@@ -28,7 +28,7 @@ _SOURCE_CONFIG: dict[str, dict[str, Any]] = {
     },
     "eastmoney": {
         "label": "东方财富",
-        "enabled": True,
+        "enabled": False,  # API 已返回 302 跳转（2026-06），匿名请求不可用
     },
     "cls": {
         "label": "财联社",

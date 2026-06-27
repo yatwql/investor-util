@@ -261,7 +261,7 @@ def _check_openai_truncation(data: dict, max_tokens: int, label: str, config_fie
     return False
 
 
-def _extract_content(data: dict, endpoint: str = "") -> str | None:
+def _extract_content(data: dict) -> str | None:
     """从 Anthropic Messages API 兼容响应中提取文本内容。
 
     兼容标准 Claude 格式及 DeepSeek Anthropic 兼容端点等多种格式变体。
@@ -387,7 +387,13 @@ def _call_claude(
             resp.raise_for_status()
             data = resp.json()
         except httpx.TimeoutException:
-            logger.warning("Claude API 超时")
+            if attempt < _RETRY_MAX:
+                delay = _RETRY_DELAYS[attempt]
+                logger.warning("Claude API 超时 (尝试 %d/%d)，%.1fs 后重试...",
+                               attempt + 1, _RETRY_MAX + 1, delay)
+                time.sleep(delay)
+                continue
+            logger.warning("Claude API 超时（已重试 %d 次）", _RETRY_MAX)
             return (None, None)
         except httpx.RequestError:
             host = _sanitize_endpoint(endpoint)
@@ -398,7 +404,7 @@ def _call_claude(
             return (None, None)
 
         # 兼容多种响应格式：标准 Claude Messages API 及 DeepSeek Anthropic 兼容端点
-        content = _extract_content(data, endpoint)
+        content = _extract_content(data)
         if content is None:
             logger.warning("Claude API 响应格式异常 (provider=%s)",
                            endpoint.split("/")[2] if endpoint else "unknown")
@@ -467,7 +473,13 @@ def _call_openai(
             resp.raise_for_status()
             data = resp.json()
         except httpx.TimeoutException:
-            logger.warning("OpenAI API 超时")
+            if attempt < _RETRY_MAX:
+                delay = _RETRY_DELAYS[attempt]
+                logger.warning("OpenAI API 超时 (尝试 %d/%d)，%.1fs 后重试...",
+                               attempt + 1, _RETRY_MAX + 1, delay)
+                time.sleep(delay)
+                continue
+            logger.warning("OpenAI API 超时（已重试 %d 次）", _RETRY_MAX)
             return (None, None)
         except httpx.RequestError:
             host = _sanitize_endpoint(endpoint)

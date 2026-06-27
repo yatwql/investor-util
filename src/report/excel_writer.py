@@ -14,9 +14,7 @@ from openpyxl.utils import get_column_letter
 from src.report.styles import (
     BOLD_FONT,
     CENTER_ALIGN,
-    FMT_DATE,
     HEADER_FILL,
-    NUMBER_ALIGN,
     NORMAL_FONT,
     SUBTOTAL_FILL,
     THIN_BORDER,

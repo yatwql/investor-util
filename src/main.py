@@ -432,7 +432,7 @@ def _cmd_generate_excel_with_news() -> None:
     _press_any_key()
 
 
-def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None, us_indices: dict[str, dict[str, Any]] | None = None, news_data: list | None = None, llm_cached: tuple[bool, bool] = (False, False), news_llm_meta: dict | None = None) -> None:
+def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None, us_indices: dict[str, dict[str, Any]] | None = None, news_data: list | None = None, llm_cached: tuple[bool, bool] = (False, False), news_llm_meta: dict | None = None) -> None:
     """生成 Excel 报告的核心逻辑。
 
     Args:

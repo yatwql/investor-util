@@ -29,8 +29,6 @@ TITLE_FILL = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="so
 # ── 对齐 ──────────────────────────────────────────────────
 
 CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
-LEFT_ALIGN = Alignment(horizontal="left", vertical="center")
-RIGHT_ALIGN = Alignment(horizontal="right", vertical="center")
 NUMBER_ALIGN = Alignment(horizontal="right", vertical="center")
 
 # ── 边线 ──────────────────────────────────────────────────
@@ -48,7 +46,6 @@ FMT_MONEY = '#,##0.00'       # 金额：千分位带两位小数
 FMT_SHARES = '#,##0.00'      # 份额
 FMT_PERCENT = '0.00%'       # 百分比
 FMT_PRICE = '#,##0.0000'    # 价格保留四位小数
-FMT_DATE = 'YYYY-MM-DD'     # 日期
 
 # ── 对特定值应用颜色 ─────────────────────────────────────
 

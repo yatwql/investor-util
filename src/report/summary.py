@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, List
+from typing import Any
 
 from openpyxl.styles import Alignment, Font
 from openpyxl.worksheet.worksheet import Worksheet
