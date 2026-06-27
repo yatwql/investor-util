@@ -126,7 +126,7 @@ def _calc_rating_comment(rating: str, perf_eval: dict | None, benchmark: str) ->
         categories = perf_eval.get("categories", [])
         scores = perf_eval.get("data", [])
         # 找到"超额收益"对应的分值
-        excess_idx = next((i for i, c in enumerate(categories) if "超额" in c or "超额收益" in c), -1)
+        excess_idx = next((i for i, c in enumerate(categories) if c and ("超额" in c or "超额收益" in c)), -1)
         if excess_idx >= 0 and excess_idx < len(scores):
             excess_score = scores[excess_idx]
             if isinstance(excess_score, (int, float)):
