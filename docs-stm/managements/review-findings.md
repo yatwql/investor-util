@@ -31,6 +31,11 @@
 | 2026-06-27 | 全量代码类型与安全审计（html_writer list→dict + fund_performance JSON null） | 代码审查 | 自审 | ✅ 已通过 |
 | 2026-06-27 | 全量代码二次类型审计（summary.py write_summary_sheet list→dict + fund_performance _adjust_rating_with_benchmark None） | 代码审查 | 自审 | ✅ 已通过 |
 | 2026-06-27 | v0.2.8 全量文档与代码一致性确认（5 文档审计 + 类型/空安全修正验证） | 一致性审查 | 自审 | ✅ 已通过 |
+| 2026-06-28 | v0.2.9 LLM 新闻关联分析 + 缓存清理补全 + HTML 模板更新 | 实现正确性审查 | 自审 | ✅ 已通过 |
+| 2026-06-28 | v0.2.10 关键词富化（持仓/穿透/行业三种类型）+ Excel 格式优化 + HTML 模板同步 | 实现正确性审查 | 自审 | ✅ 已通过 |
+| 2026-06-28 | 六文档全量第六次审计（requirements.md/README.md/changelog.md/testplan.md/review-findings.md/CLAUDE.md） | 一致性审查 + 去冗余 | 自审 | ✅ 已通过 |
+| 2026-06-28 | v0.2.11 东方财富行业分类/概念板块 Provider + 新闻关键词扩展 + 穿透板块增强 | 实现正确性审查 | 自审 | ✅ 已通过 |
+| 2026-06-28 | 全量文档第七次审计：requirements.md/README.md/changelog.md/testplan.md/review-findings.md/technical.md | 一致性审查 | 自审 | ✅ 已通过 |
 
 ---
 

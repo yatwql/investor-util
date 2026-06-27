@@ -4,6 +4,96 @@
 
 ---
 
+## [0.2.12] - 2026-06-28
+
+### Added
+- HTML 报告市值核算明细表取价方式列蓝色标识（与 Excel 端同步）
+  - 新增 `_jinja_price_type_color` Jinja2 过滤器：校内收盘价(T)/官方净值(T) → #0066CC
+  - QDII 基金官方净值(T-1) → #0066CC
+- 新增 7 项 `test_html_writer.py` 测试覆盖取价方式着色规则
+
+### Tests
+- `test_html_writer.py` 新增 TestJinjaFilters 取价方式着色场景：场内收盘价(T)、官方净值(T)、QDII T-1、非 QDII T-1、场内实时价、未知类型、无名称 T-1
+- 全量 615 passed, 30 subtests passed
+
+## [0.2.11] - 2026-06-28
+
+### Added
+- 新增 `src/providers/eastmoney_industry.py`：东方财富 push2 API 行业分类/概念板块 provider
+- 行业/概念自动获取：`fetch_industry_and_concepts()` 从 `push2.eastmoney.com` 获取三级行业名称、行业ID、概念板块列表和概念ID
+- 缓存集成：新增 `industry` 缓存类型（7 天 TTL），文件名 `industry_{code}.json`
+- 新闻关键词扩展：`build_news_data()` 自动获取持仓+穿透资产的行业名称和概念板块，追加到关键词列表提高匹配率
+- 关键词富化新增"概念"类型（橙标）：行业名称和概念板块显示为 `XXX[概念]`，排序优先级位于穿透和行业之间
+- 穿透模块板块分类增强：`compute_penetration_top10()` 调用 `batch_fetch_industry_data()` 补充 API 行业数据，优先覆盖板块列
+- HTML 模板新增 `.source-tag-concept` CSS 类：琥珀色背景 + 深橙色文字
+- 菜单 [1] 更新基础类缓存：新增 `industry_*` 前缀清除
+- 新增 `src/test_eastmoney_industry.py`（10 项测试）
+
+### Changed
+- 数据源表：行业分类/概念板块从"规划中"更新为"已实现"
+- NEWS_COLS 模块 6 运行流程：在 `aggregate_news()` 前先获取行业/概念数据并扩展关键词
+- `check_and_refresh_caches()` 新增 `industry_*` 缓存自动清理（持仓变更时）
+- `_check_and_warm_for_new_assets()` 新增新增资产行业分类自动预热（`batch_fetch_industry_data`）
+- `_build_keyword_lookup()`：新增 `industry_data` 参数处理行业和概念板块关键词
+- `_enrich_keywords_for_item()`：新增 `concept` 类型处理逻辑
+- type_order 扩展：holding(0) → penetration(1) → concept(2) → industry(3)
+
+### Docs
+- requirements.md：数据源表、缓存文件清单、TTL 表、菜单 [1] 范围、模块 4 板块分类增强、模块 6 关键词来源同步
+- README.md：版本 v0.2.11、数据源表、缓存文件清单、菜单表、模块 6 概念类型、缓存覆盖矩阵（菜单 [1]/[2] 矩阵表）
+- testplan.md：新增 v0.2.11 测试重点
+- changelog.md：本版本记录
+- review-findings.md：新增审查记录
+- technical.md：新增技术文档
+
+### Tests
+- 新增 `src/test_eastmoney_industry.py`：10 项测试覆盖正常返回（含/不含概念）、data 为空、响应为空、超时异常、基金代码
+- `src/test_news_correlation.py`：新增 3 项测试覆盖概念类型 lookup 构建、概念类型优先于行业、混合类型排序
+- 全量 607 passed, 30 subtests passed
+
+### Added
+- 关键词富化：`_build_keyword_lookup()` / `_enrich_keywords_for_item()` / `_format_enriched_keywords()` 三个新函数，自动标注每个关联关键词的来源类型（持仓/穿透/行业）
+- 关键词富化集成到 `build_news_data()`，每条新闻新增 `enriched_keywords` 字段
+- Excel 新闻页签格式优化：B 列（标题）宽 40、C 列（摘要）宽 50，启用文本换行 + 左对齐
+- HTML 模板关键词列改用 `enriched_keywords`，按类型着色（持仓→蓝、穿透→紫、行业→灰）
+- CLAUDE.md 新增缺陷自测规则：修复缺陷时优先编写测试用例，新增功能时主动研究能否自测
+
+### Changed
+- **菜单 [1] 更新基础类缓存**：清除范围新增 `news_*` 和 `llm_news_corr_*`（补全缓存清理覆盖）
+- `write_news_sheet()`：关联关键词列使用 `_format_enriched_keywords()` 替代纯 `", ".join(matched_keywords)`，优先显示富化文本
+- `_build_keyword_lookup()` 中文名称索引策略：从 4 字或更长名称中生成 2 字滑动窗口片段（如"长江电力"→"长江""电力"），提高短关键词匹配率
+
+### Docs
+- requirements.md：同步菜单 [1] 缓存范围、缓存文件清单新增 `llm_news_corr_*`、TTL 表新增 `news_corr`、模块 6 新增关键词富化/LLM 关联分析/Excel 格式优化描述、数据源表新增东方财富行业/概念板块
+- README.md：版本 v0.2.9，同步菜单/缓存/模块 6 描述
+- testplan.md：新增关键词富化函数/Excel 格式/HTML 同步测试类别
+- review-findings.md：新增最新一致性审查记录
+- CLAUDE.md：新增缺陷自测规则要求
+
+### Tests
+- 新增 3 个测试类：TestBuildKeywordLookup、TestEnrichKeywordsForItem、TestWriteNewsSheetFormatting
+- 新增 15 项测试：覆盖 lookup 构建（持仓/穿透/去重/空）、富化逻辑（三种类型、排序、空兜底）、格式断言（wrap_text、列宽、对齐）
+- 全量 592 passed, 30 subtests passed
+
+## [0.2.9] - 2026-06-28
+
+### Added
+- LLM 新闻关联分析：新增配置选项 `llm_news_analysis`（默认关闭），开启后使用 LLM 对关键词匹配后的新闻进行二次关联分析，逐条判定关联度（高/中/低/无关）并给出原因分析
+- `enhance_news_correlation()`：llm_client 新函数，含 Prompt 构建、缓存、JSON 解析、token 用量跟踪
+- Excel & HTML 新闻页签 LLM 分析列：当数据含 `llm_analysis` 时自动增加 "LLM 关联分析" 列
+- Excel & HTML 页签底部智能注脚：LLM 缓存命中 → "使用了LLM缓存"；LLM 未启用 → "未依赖于LLM服务，使用传统爬虫+NLP能力"；LLM 启用 + 非缓存 → Token 消耗明细
+- llm.json 新增 `max_tokens_news_correlation` / `cache_ttl_news_correlation` / `system_prompt_news_correlation` 配置
+- HTML 报告：`write_html_report()` 新增 `news_llm_meta` 参数，内部新闻获取改用 `build_news_data()` 以支持 LLM 增强
+- HTML 模板：新增 `has_llm_analysis` 控制 LLM 列显隐，`thousands` Jinja2 过滤器
+- 缓存清理：菜单 [1] 新增 `llm_news_corr_*` 前缀清除，补全漏网之鱼
+- 新测试：TestBuildNewsDataWithLLM、TestApplyLLMAnalysis、TestEnhanceNewsCorrelation、TestBuildHoldingsSummary、TestBuildNewsSummary、TestNewsLlmMetaTemplate、TestWriteHtmlReportNewsLlmMeta、TestJinjaFilters 等合计 34 项
+
+### Changed
+- `build_news_data()` 返回类型：`list` → `tuple[list, dict]`（新增 metadata 字典，含 llm_enabled/llm_cached/token_usage）
+- `write_news_sheet()` 参数：`llm_token_usage` → `llm_meta`（metadata 字典）
+- `_generate_excel_report()` 参数：`news_token_usage` → `news_llm_meta`
+- `_get_cache_ttl_llm()` 新增 `"news"` subtype 支持（默认 3600s）
+
 ## [0.2.8] - 2026-06-27
 
 ### Performance
@@ -66,7 +156,7 @@
 - requirements.md：菜单表同步，缓存文件/TTL 表更新，引用链同步
 - review-findings.md：新增优化/审计审查记录
 - plan.md：新增 Iter 3.6 全面性能优化与代码清理
-- testplan.md：测试覆盖更新（489 项）
+- testplan.md：测试覆盖更新（534 项）
 - changelog.md：本版本记录
 
 ## [0.2.7] - 2026-06-27

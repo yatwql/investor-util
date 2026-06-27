@@ -32,7 +32,7 @@ _SOURCE_CONFIG: dict[str, dict[str, Any]] = {
     },
     "cls": {
         "label": "财联社",
-        "enabled": True,
+        "enabled": False,  # API 已要求签名鉴权（errno=10012），匿名请求不可用
     },
 }
 
@@ -236,7 +236,7 @@ def _fetch_from_eastmoney(num: int) -> list[dict[str, Any]]:
         logger.warning("东方财富模块不可用")
         return []
 
-    items = em_fetch(page=1, num=num)
+    items = em_fetch(num=num)
     logger.info("东方财富: 获取 %d 条", len(items))
     return items
 
@@ -303,6 +303,7 @@ def aggregate_news(
     # 1) 从各源获取（并行）
     all_raw: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
+    src_results: dict[str, tuple[int, str]] = {}  # 源名 → (条数, 状态标签)
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -311,30 +312,39 @@ def aggregate_news(
         for src in sources:
             fetch_fn = _FETCH_MAP.get(src)
             if not fetch_fn:
-                logger.warning("未知新闻源: %s", src)
+                src_results[src] = (0, "未知源")
                 continue
             fut = executor.submit(fetch_fn, per_source)
             fut_to_src[fut] = src
 
         for future in as_completed(fut_to_src):
             src = fut_to_src[future]
+            label = _SOURCE_CONFIG.get(src, {}).get("label", src)
             try:
                 items = future.result()
-                label = _SOURCE_CONFIG.get(src, {}).get("label", src)
+                count = 0
                 for item in items:
                     url = item.get("url", "")
                     if url and url not in seen_urls:
                         seen_urls.add(url)
                         all_raw.append(item)
                         item["_source"] = label
+                        count += 1
+                src_results[src] = (count, "OK")
             except Exception as e:
-                logger.warning("新闻源 %s 获取失败: %s", src, e)
+                src_results[src] = (0, f"失败({e})")
+
+    # 输出各源状态汇总
+    status_parts = [f"{_SOURCE_CONFIG.get(s,{}).get('label',s)} {n}条" if st == "OK"
+                    else f"{_SOURCE_CONFIG.get(s,{}).get('label',s)} {st}"
+                    for s, (n, st) in src_results.items()]
+    logger.info("新闻源状态: %s", " | ".join(status_parts))
 
     if not all_raw:
         logger.info("所有新闻源均未获取到数据")
         return []
 
-    logger.info("新闻汇总: %d 条 (来自 %d 个源)", len(all_raw), len(sources))
+    logger.info("新闻汇总: 去重后共 %d 条 (来自 %d 个源)", len(all_raw), len(sources))
 
     # 2) 按时间排序
     def _sort_key(item: dict[str, Any]) -> str:

@@ -90,6 +90,21 @@ def _jinja_change(value: Any) -> str:
         return "--"
 
 
+def _jinja_price_type_color(price_type: str, name: str = "") -> str:
+    """取价方式颜色：蓝色代表数据时效性高/可靠。
+
+    着色规则同 Excel 端 _apply_price_type_colors：
+      - "场内收盘价(T)"、"官方净值(T)" → #0066CC
+      - QDII 基金 "官方净值(T-1)" → #0066CC
+    """
+    if price_type in ("场内收盘价(T)", "官方净值(T)"):
+        return "#0066CC"
+    if price_type == "官方净值(T-1)":
+        if name and "QDII" in name.upper():
+            return "#0066CC"
+    return ""
+
+
 def _jinja_profit_color(value: Any) -> str:
     """盈亏颜色：盈利红 #CC0000，亏损绿 #009900"""
     try:
@@ -103,6 +118,14 @@ def _jinja_profit_color(value: Any) -> str:
         return ""
 
 
+def _jinja_thousands(value: Any) -> str:
+    """格式化整数：1,234"""
+    try:
+        return f"{int(value):,}"
+    except (ValueError, TypeError):
+        return str(value)
+
+
 # 注册过滤器
 _ENV.filters["money"] = _jinja_money
 _ENV.filters["pct"] = _jinja_pct
@@ -110,12 +133,14 @@ _ENV.filters["price"] = _jinja_price
 _ENV.filters["shares"] = _jinja_shares
 _ENV.filters["change"] = _jinja_change
 _ENV.filters["profit_color"] = _jinja_profit_color
+_ENV.filters["price_type_color"] = _jinja_price_type_color
+_ENV.filters["thousands"] = _jinja_thousands
 
 
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None) -> str:
+def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     1. 通过各计算模块获取全部分析数据
@@ -126,6 +151,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         llm_content: 可选预生成内容 (macro_html, expert_html)，
             传入时跳过内部 LLM 生成直接使用此内容。
         details: 可选预计算市值核算明细，传入时跳过内部行情获取。
+        news_data: 可选预获取新闻数据，传入时跳过内部新闻获取。
+        news_llm_meta: 与 news_data 对应的 LLM 元数据字典，
+            含 llm_enabled / llm_cached / token_usage 等字段。
 
     Returns:
         最新版报告的绝对路径
@@ -227,26 +255,30 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     perf_data = _build_perf_data(holdings, details)
 
     # ── 8) 财经新闻热点（可选）─────────────────────────────
+    _news_llm_meta: dict = {"llm_enabled": False, "llm_cached": False, "token_usage": {}}
     if include_news:
         if news_data is not None:
             logger.info("复用调用方传入的新闻数据，共 %d 条", len(news_data))
+            _news_llm_meta = news_llm_meta or _news_llm_meta
         else:
             print("  [..] 正在获取财经新闻...")
             try:
                 from src.providers.news_aggregator import (
-                    aggregate_news,
                     build_holding_keywords,
                 )
                 # 提取穿透 TOP10 资产列表，用于扩展新闻关键词
                 penetrated_assets = penetration.get("top10", []) if penetration else []
-                keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
-                news_data = aggregate_news(keywords, top_n=news_top_count)
+                # 使用 build_news_data 获取新闻（含 LLM 增强）
+                from src.report.news_correlation import build_news_data
+                news_data, _news_llm_meta = build_news_data(
+                    holdings, top_n=news_top_count,
+                    penetrated_assets=penetrated_assets,
+                )
                 if not news_data:
                     news_data = []
                     logger.info("新闻关联分析：无数据")
                 else:
-                    logger.info("新闻关联分析完成，%d 条（关键词含 %d 个穿透资产）",
-                                len(news_data), len(penetrated_assets))
+                    logger.info("新闻关联分析完成，%d 条", len(news_data))
             except Exception as e:
                 logger.warning("新闻获取失败: %s", e)
                 news_data = []
@@ -287,7 +319,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
                 for d in details
             ]
 
-            global_macro_content, expert_review_content = generate_all_llm(
+            global_macro_content, expert_review_content, _, _ = generate_all_llm(
                 a_indices, us_indices, total_mv, total_cost, total_profit,
                 total_today_profit, len(holdings), cat_counts,
                 penetrated_assets=pen_top10,
@@ -306,6 +338,13 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     # ── 10) 渲染模板 ────────────────────────────────────────
     print("  [..] 正在渲染 HTML...")
     template = _ENV.get_template("report_template.html")
+
+    # 检查新闻数据中是否有 LLM 分析列
+    has_llm_analysis = any(
+        item.get("llm_analysis")
+        for item in (news_data or [])
+    )
+
     html = template.render(
         now=now_str,
         today=today_str,
@@ -326,6 +365,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         penetration=penetration,
         perf_data=perf_data,
         news_data=news_data,
+        news_llm_meta=_news_llm_meta,
+        has_llm_analysis=has_llm_analysis,
         llm_enabled=llm_enabled_flag,
         global_macro=global_macro_content,
         expert_review=expert_review_content,

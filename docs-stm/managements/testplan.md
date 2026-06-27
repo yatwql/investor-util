@@ -17,9 +17,10 @@
 - 配置管理（`config.py`）：100% 覆盖读写、缺省、异常路径（含 `output_dir` 字段）
 - 持仓读取（`reader.py`）：覆盖标准格式、缺字段、空文件、格式错误
 - 缓存管理（`cache.py`）：覆盖过期判断、读写、文件缺失、前缀清理
-- API 数据获取（`providers/*.py`）：mock HTTP 请求，覆盖正常返回、超时、异常格式
+- API 数据获取（`providers/*.py`）：mock HTTP 请求，覆盖正常返回、超时、异常格式（含 `eastmoney_industry.py`）
 - LLM 客户端（`llm_client.py`）：覆盖 API 调用路由、返回类型元组解包、缓存逻辑、截断检测
 - 报表生成（`report/*.py`）：每个模块至少覆盖正常数据和空数据两种场景
+- 关键词富化（`report/news_correlation.py`）：覆盖持仓/穿透/行业三种来源类型、去重逻辑、空列表边界、Excel 格式断言（wrap_text、列宽）
 - TUI 菜单（`main.py`）：覆盖所有菜单选项的输入输出
 
 ### 1.2 集成测试
@@ -91,6 +92,8 @@
 | Iter 3.5 | LLM 并行生成模块 7+8 同时成功、System Prompt 外部可配置生效、httpx 连接池复用、提示词紧凑化效果 |
 | Iter 3.6 | 多线程并发缓存获取无竞态、新闻 15min 缓存过期、LLM 缓存预检正确跳过线程池、Token 用量正确展示、_SYSTEM_EXPERT 压缩后三阶段格式保持、死代码无残留、配置校验警告正确触发 |
 | Iter 3.7 | html_writer.py 中 a_indices 以 dict 类型传入 generate_all_llm（不因 .values() 崩溃）、fund_performance.py 在 API 返回 JSON null 时 categories/data 自动兜底、summary.py write_summary_sheet 接收 dict 类型指数数据（不因 list 传入致 .get() 崩溃）、fund_performance._adjust_rating_with_benchmark 中 categories 含 None 时自动兜底 |
+| v0.2.10 | 关键词富化函数 `_build_keyword_lookup`/`_enrich_keywords_for_item`/`_format_enriched_keywords` 单元测试覆盖三种来源类型（持仓/穿透/行业）、去重逻辑、空列表边界；Excel 格式断言（B/C 列 wrap_text、列宽 B=40/C=50、左对齐、富化关键词写入）；HTML 模板 enriched_keywords 着色（holding→蓝/penetration→紫/industry→灰） |
+| v0.2.11 | `eastmoney_industry` provider 单元测试覆盖正常返回（含/不含概念）、data 为空、响应为空、超时异常、基金代码处理；`fetcher.fetch_industry_data` / `batch_fetch_industry_data` 缓存集成测试；`_build_keyword_lookup` 新增 concept 类型覆盖测试；`_enrich_keywords_for_item` 新增概念类型富化显示测试；全量 607 passed |
 
 ---
 

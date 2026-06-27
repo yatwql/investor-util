@@ -12,6 +12,7 @@
   - _detail_to_row_values — 行值转换
   - _num_formats        — 格式列表
   - _apply_profit_colors — 盈亏着色
+  - _apply_price_type_colors — 取价方式着色
   - write_market_value_sheet — 页签写入（mock 内部函数）
 
 运行：
@@ -26,8 +27,11 @@ from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import MagicMock, call, patch
 
+from openpyxl import Workbook
+
 from src.models import Holding
 from src.report import market_value as mv
+from src.report.styles import BLUE_FONT
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1077,6 +1081,83 @@ class TestApplyProfitColors(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
+#  _apply_price_type_colors
+# ═══════════════════════════════════════════════════════════
+
+
+class TestApplyPriceTypeColors(unittest.TestCase):
+    """测试 _apply_price_type_colors 取价方式列着色（使用真实 openpyxl Worksheet）。"""
+
+    def setUp(self):
+        self.wb = Workbook()
+        self.ws = self.wb.active
+        # 数据行（行 2 起，行 1 保留给标题）
+        # 每行数据：(名称, 取价方式)
+        self.test_cases = [
+            ("电池ETF", "场内收盘价(T)", True),       # 场内收盘价(T) → 蓝
+            ("长江电力", "场内收盘价(T-1)", False),    # 非 QDII + T-1 → 不蓝
+            ("中欧医疗", "官方净值(T)", True),          # 官方净值(T) → 蓝
+            ("某混合基金", "官方净值(T-1)", False),     # 非 QDII + T-1 → 不蓝
+            ("标普500ETF(QDII)", "官方净值(T-1)", True),  # QDII + T-1 → 蓝
+            ("恒生ETF(QDII)", "场内收盘价(T-1)", False),  # QDII + 场内 T-1 → 不蓝
+            ("宁德时代", "场内实时价", False),          # 实时价 → 不蓝
+            ("海外收益(QDII)", "官方净值(T-2)", False),  # QDII + 过期 → 不蓝
+            ("--", "--", False),                       # 占位符 → 不蓝
+        ]
+        for i, (name, price_type, expected_blue) in enumerate(self.test_cases):
+            row = i + 2
+            self.ws.cell(row=row, column=2, value=name)
+            self.ws.cell(row=row, column=7, value=price_type)
+
+    def _assert_blue(self, row: int, msg: str = ""):
+        cell = self.ws.cell(row=row, column=7)
+        self.assertIsNotNone(cell.font.color, f"Row {row} font.color is None")
+        # openpyxl 写入时 0066CC 存储为 ARGB 格式 000066CC
+        self.assertEqual(str(cell.font.color.rgb), "000066CC", msg)
+
+    def _assert_not_blue(self, row: int, msg: str = ""):
+        cell = self.ws.cell(row=row, column=7)
+        if cell.font.color and cell.font.color.rgb:
+            self.assertNotEqual(str(cell.font.color.rgb), "000066CC", msg)
+
+    def test_scenario(self):
+        """所有场景批量验证。"""
+        mv._apply_price_type_colors(self.ws, 2, 2 + len(self.test_cases) - 1)
+
+        errors = []
+        for i, (name, price_type, expected_blue) in enumerate(self.test_cases):
+            row = i + 2
+            try:
+                if expected_blue:
+                    self._assert_blue(row, f"Row {row}: {name} / {price_type} should be blue")
+                else:
+                    self._assert_not_blue(row, f"Row {row}: {name} / {price_type} should NOT be blue")
+            except AssertionError as e:
+                errors.append(str(e))
+        if errors:
+            self.fail("\n".join(errors))
+
+    def test_empty_range_no_error(self):
+        """空范围（start > end）→ 不报错。"""
+        mv._apply_price_type_colors(self.ws, 100, 50)  # 无异常即为成功
+
+    def test_single_row(self):
+        """单行范围。"""
+        self.ws.cell(row=3, column=2, value="测试")
+        self.ws.cell(row=3, column=7, value="场内收盘价(T)")
+        mv._apply_price_type_colors(self.ws, 3, 3)
+        self._assert_blue(3)
+
+    def test_none_price_type_col(self):
+        """取价方式列为 None → 不报错。"""
+        row = 2 + len(self.test_cases)  # 新行
+        self.ws.cell(row=row, column=2, value="测试")
+        self.ws.cell(row=row, column=7, value=None)  # 明确设为 None
+        mv._apply_price_type_colors(self.ws, row, row)  # 不抛异常即通过
+        self.assertIsNone(self.ws.cell(row=row, column=7).value)
+
+
+# ═══════════════════════════════════════════════════════════
 #  write_market_value_sheet
 # ═══════════════════════════════════════════════════════════
 
@@ -1113,6 +1194,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.report.market_value.write_data_row")
     @patch("src.report.market_value.write_header_row")
     @patch("src.report.market_value.write_title_row")
+    @patch("src.report.market_value._apply_price_type_colors")
     @patch("src.report.market_value._apply_profit_colors")
     @patch("src.report.market_value.freeze_header")
     @patch("src.report.market_value.auto_width")
@@ -1121,7 +1203,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.report.market_value._num_formats")
     def test_basic_write(self, mock_fmts, mock_to_row, mock_gen,
                          mock_aw, mock_freeze, mock_color,
-                         mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
+                         mock_pt_color, mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
         """正常写入：验证汇总值正确，内部函数被调用。"""
         mock_gen.return_value = self.details
         mock_fmts.return_value = [""] * 15
@@ -1160,6 +1242,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
 
         # 验证着色
         mock_color.assert_called_once()
+        mock_pt_color.assert_called_once()
 
         # 验证冻结和列宽
         mock_freeze.assert_called_once_with(ws, 2)
@@ -1173,6 +1256,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.report.market_value.write_data_row")
     @patch("src.report.market_value.write_header_row")
     @patch("src.report.market_value.write_title_row")
+    @patch("src.report.market_value._apply_price_type_colors")
     @patch("src.report.market_value._apply_profit_colors")
     @patch("src.report.market_value.freeze_header")
     @patch("src.report.market_value.auto_width")
@@ -1181,7 +1265,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.report.market_value._num_formats")
     def test_empty_holdings(self, mock_fmts, mock_to_row, mock_gen,
                             mock_aw, mock_freeze, mock_color,
-                            mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
+                            mock_pt_color, mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
         """空持仓 → 总市值为 0，无小计行。"""
         mock_gen.return_value = []
         mock_fmts.return_value = [""] * 15
@@ -1209,6 +1293,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.report.market_value.write_data_row")
     @patch("src.report.market_value.write_header_row")
     @patch("src.report.market_value.write_title_row")
+    @patch("src.report.market_value._apply_price_type_colors")
     @patch("src.report.market_value._apply_profit_colors")
     @patch("src.report.market_value.freeze_header")
     @patch("src.report.market_value.auto_width")
@@ -1217,7 +1302,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.report.market_value._num_formats")
     def test_subtotal_per_account(self, mock_fmts, mock_to_row, mock_gen,
                                    mock_aw, mock_freeze, mock_color,
-                                   mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
+                                   mock_pt_color, mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
         """多个账户 → 每个账户写入小计。"""
         detail_a = self.details[0]  # 证券账户
         detail_b = self.details[1]  # 支付宝

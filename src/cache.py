@@ -221,9 +221,11 @@ def cleanup_expired(dry_run: bool = False) -> int:
             "index": "index",
             "fund_perf": "rank",
             "fund_hold": "hold",
+            "industry": "industry",
             "news": "news",
             "llm_global_macro": "llm_macro",   # 全球政经局势：4h TTL
             "llm_expert_review": "llm_expert", # 智囊团深度复盘：2h TTL
+            "llm_news_corr": "news_corr",      # LLM 新闻关联分析：1h TTL
             "llm_": "llm",                     # 通用 LLM 缓存：24h TTL
         }
         exact_map: dict[str, str] = {
@@ -380,6 +382,11 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
         clear("fund_benchmarks")
         cleared.append("fund_benchmarks")
 
+    # 持仓变更 → 行业分类缓存可能变化（新品种代码不同，行业不同）
+    ind_count = clear_by_prefix("industry_")
+    if ind_count > 0:
+        cleared.append(f"industry_({ind_count}条)")
+
     if cleared:
         logger.info("已清除过期缓存: %s", ", ".join(cleared))
     else:
@@ -413,6 +420,8 @@ _CACHE_TTL_DEFAULTS: dict[str, float] = {
     "rank": CACHE_DAILY,
     "hold": CACHE_WEEKLY,
     "news": 900,              # 新闻聚合缓存：15 分钟
+    "news_corr": 3600,        # LLM 新闻关联分析：1 小时
+    "industry": CACHE_WEEKLY, # 行业分类/概念板块：7 天
     "benchmark": CACHE_MONTHLY,
     "llm": CACHE_DAILY,
     "llm_macro": 14400,       # 全球政经局势：4 小时

@@ -116,7 +116,11 @@ def fetch_news(num: int = 50) -> list[dict[str, Any]]:
     # 提取 data.roll_data
     outer_data = data.get("data")
     if not isinstance(outer_data, dict):
-        logger.warning("财联社新闻 API 响应缺少 data 字段")
+        errno = data.get("errno", "")
+        if errno == "10012":
+            logger.warning("财联社新闻 API 需要签名鉴权（errno=10012），当前不可用")
+        else:
+            logger.warning("财联社新闻 API 响应缺少 data 字段 (errno=%s)", errno)
         return []
 
     raw_items = outer_data.get("roll_data")

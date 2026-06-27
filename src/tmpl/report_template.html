@@ -65,6 +65,10 @@
         .placeholder-note { background: #fafbfc; border: 1px dashed #d0d5dd; border-radius: 6px; }
 
         .source-tag { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; }
+        .source-tag-holding { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #1a56db; }
+        .source-tag-penetration { display: inline-block; background: #f0e8fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #7c3aed; }
+        .source-tag-industry { display: inline-block; background: #f3f4f6; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #6b7280; }
+        .source-tag-concept { display: inline-block; background: #fef3c7; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #b45309; }
 
         @media (max-width: 768px) {
             .container { padding: 10px; }
@@ -234,7 +238,7 @@
                             <td class="text-right">{{ d.price | price }}</td>
                             <td>{{ d.nav_date }}</td>
                             <td class="text-right">{{ d.yesterday_close | price }}</td>
-                            <td>{{ d.price_type }}</td>
+                            <td{% if (d.price_type | price_type_color(d.name)) %} style="color: {{ d.price_type | price_type_color(d.name) }}; font-weight: bold;"{% endif %}>{{ d.price_type }}</td>
                             <td>{{ d.premium }}</td>
                             <td class="text-right">{{ d.shares | shares }}</td>
                             <td class="text-right">{{ d.market_value | money }}</td>
@@ -448,6 +452,7 @@
                 <thead>
                     <tr>
                         <th>序号</th><th>新闻标题</th><th>摘要</th><th>来源</th><th>发布时间</th><th>关联关键词</th>
+                        {% if has_llm_analysis %}<th>LLM 关联分析</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -461,17 +466,50 @@
                         <td>{{ item.media_name }}</td>
                         <td style="font-size: 12px;">{{ item.ctime }}</td>
                         <td class="text-left" style="font-size: 12px;">
-                            {% for kw in item.matched_keywords %}
-                            <span class="source-tag">{{ kw }}</span>
-                            {% endfor %}
+                            {% if item.enriched_keywords and item.enriched_keywords|length > 0 %}
+                                {% for ekw in item.enriched_keywords %}
+                                <span class="source-tag-{{ ekw.type }}">{{ ekw.display }}</span>
+                                {% endfor %}
+                            {% else %}
+                                {% for kw in item.matched_keywords %}
+                                <span class="source-tag">{{ kw }}</span>
+                                {% endfor %}
+                            {% endif %}
                         </td>
+                        {% if has_llm_analysis %}
+                        <td class="text-left" style="font-size: 12px; max-width: 200px;">
+                            {% if item.llm_analysis %}
+                            <span class="source-tag">{{ item.llm_analysis }}</span>
+                            {% else %}
+                            <span style="color: #999;">—</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         <div class="penetration-notes">
-            <div>* 共 {{ news_data | length }} 条关联新闻，基于持仓名称和代码进行关键词匹配</div>
+            {% set ns = namespace(llm_notes=[]) %}
+            {% set _ = ns.llm_notes.append("共 " ~ (news_data | length) ~ " 条关联新闻") %}
+            {% if news_llm_meta and news_llm_meta.get("llm_enabled") %}
+                {% if news_llm_meta.get("llm_cached") %}
+                    {% set _ = ns.llm_notes.append("本次内容使用了LLM缓存，未直接使用LLM服务能力") %}
+                {% else %}
+                    {% set _tu = news_llm_meta.get("token_usage", {}) %}
+                    {% if _tu.get("total_tokens") %}
+                        {% set _ = ns.llm_notes.append("本次Token消耗：输入 " ~ (_tu.get("input_tokens", 0) | thousands) ~ " + 输出 " ~ (_tu.get("output_tokens", 0) | thousands) ~ " = 合计 " ~ (_tu.get("total_tokens", 0) | thousands)) %}
+                    {% endif %}
+                    {% set _ = ns.llm_notes.append("基于持仓名称和代码+LLM关联分析") %}
+                {% endif %}
+            {% else %}
+                {% set _ = ns.llm_notes.append("基于持仓名称和代码进行关键词匹配") %}
+                {% set _ = ns.llm_notes.append("本次内容未依赖于LLM服务，使用传统爬虫+NLP能力") %}
+            {% endif %}
+            {% for note in ns.llm_notes %}
+            <div>* {{ note }}</div>
+            {% endfor %}
         </div>
         {% else %}
         <div class="empty-note">暂无关联新闻</div>
