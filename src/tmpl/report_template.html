@@ -238,7 +238,7 @@
                             <td class="text-right">{{ d.price | price }}</td>
                             <td>{{ d.nav_date }}</td>
                             <td class="text-right">{{ d.yesterday_close | price }}</td>
-                            <td>{{ d.price_type }}</td>
+                            <td{% if (d.price_type | price_type_color(d.name)) %} style="color: {{ d.price_type | price_type_color(d.name) }}; font-weight: bold;"{% endif %}>{{ d.price_type }}</td>
                             <td>{{ d.premium }}</td>
                             <td class="text-right">{{ d.shares | shares }}</td>
                             <td class="text-right">{{ d.market_value | money }}</td>

@@ -4,6 +4,18 @@
 
 ---
 
+## [0.2.12] - 2026-06-28
+
+### Added
+- HTML 报告市值核算明细表取价方式列蓝色标识（与 Excel 端同步）
+  - 新增 `_jinja_price_type_color` Jinja2 过滤器：校内收盘价(T)/官方净值(T) → #0066CC
+  - QDII 基金官方净值(T-1) → #0066CC
+- 新增 7 项 `test_html_writer.py` 测试覆盖取价方式着色规则
+
+### Tests
+- `test_html_writer.py` 新增 TestJinjaFilters 取价方式着色场景：场内收盘价(T)、官方净值(T)、QDII T-1、非 QDII T-1、场内实时价、未知类型、无名称 T-1
+- 全量 615 passed, 30 subtests passed
+
 ## [0.2.11] - 2026-06-28
 
 ### Added

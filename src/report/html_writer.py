@@ -90,6 +90,21 @@ def _jinja_change(value: Any) -> str:
         return "--"
 
 
+def _jinja_price_type_color(price_type: str, name: str = "") -> str:
+    """取价方式颜色：蓝色代表数据时效性高/可靠。
+
+    着色规则同 Excel 端 _apply_price_type_colors：
+      - "场内收盘价(T)"、"官方净值(T)" → #0066CC
+      - QDII 基金 "官方净值(T-1)" → #0066CC
+    """
+    if price_type in ("场内收盘价(T)", "官方净值(T)"):
+        return "#0066CC"
+    if price_type == "官方净值(T-1)":
+        if name and "QDII" in name.upper():
+            return "#0066CC"
+    return ""
+
+
 def _jinja_profit_color(value: Any) -> str:
     """盈亏颜色：盈利红 #CC0000，亏损绿 #009900"""
     try:
@@ -118,6 +133,7 @@ _ENV.filters["price"] = _jinja_price
 _ENV.filters["shares"] = _jinja_shares
 _ENV.filters["change"] = _jinja_change
 _ENV.filters["profit_color"] = _jinja_profit_color
+_ENV.filters["price_type_color"] = _jinja_price_type_color
 _ENV.filters["thousands"] = _jinja_thousands
 
 

@@ -27,8 +27,9 @@ class TestJinjaFilters(unittest.TestCase):
     """Jinja2 自定义过滤器测试。"""
 
     def setUp(self):
-        from src.report.html_writer import _jinja_thousands
+        from src.report.html_writer import _jinja_price_type_color, _jinja_thousands
         self.fn = _jinja_thousands
+        self.price_type_fn = _jinja_price_type_color
 
     def test_thousands_formats_integer(self):
         self.assertEqual(self.fn(2500), "2,500")
@@ -41,6 +42,36 @@ class TestJinjaFilters(unittest.TestCase):
 
     def test_thousands_handles_string(self):
         self.assertEqual(self.fn("abc"), "abc")
+
+    # ── price_type_color 过滤器 ─────────────────────────────────
+
+    def test_price_type_color_onchange(self):
+        """场内收盘价(T) → #0066CC"""
+        self.assertEqual(self.price_type_fn("场内收盘价(T)"), "#0066CC")
+
+    def test_price_type_color_nav_today(self):
+        """官方净值(T) → #0066CC"""
+        self.assertEqual(self.price_type_fn("官方净值(T)"), "#0066CC")
+
+    def test_price_type_color_qdii_t_minus_1(self):
+        """QDII 官方净值(T-1) → #0066CC"""
+        self.assertEqual(self.price_type_fn("官方净值(T-1)", "标普500(QDII)"), "#0066CC")
+
+    def test_price_type_color_non_qdii_t_minus_1(self):
+        """非 QDII 官方净值(T-1) → 不蓝"""
+        self.assertEqual(self.price_type_fn("官方净值(T-1)", "易方达中小盘"), "")
+
+    def test_price_type_color_t_minus_1_no_name(self):
+        """官方净值(T-1) 无名称 → 不蓝"""
+        self.assertEqual(self.price_type_fn("官方净值(T-1)"), "")
+
+    def test_price_type_color_intraday(self):
+        """场内实时价 → 不蓝"""
+        self.assertEqual(self.price_type_fn("场内实时价"), "")
+
+    def test_price_type_color_unknown(self):
+        """未知取价方式 → 不蓝"""
+        self.assertEqual(self.price_type_fn("场内收盘价(T-2)"), "")
 
 
 class TestNewsLlmMetaTemplate(unittest.TestCase):
