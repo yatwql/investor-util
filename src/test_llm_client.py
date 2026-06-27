@@ -461,5 +461,226 @@ class TestCheckTruncation(unittest.TestCase):
         self.assertFalse(result)
 
 
+# ═══════════════════════════════════════════════════════════
+#  _build_holdings_summary — 持仓摘要生成
+# ═══════════════════════════════════════════════════════════
+
+
+class TestBuildHoldingsSummary(unittest.TestCase):
+    """测试 _build_holdings_summary 的格式和内容。"""
+
+    def setUp(self) -> None:
+        from collections import namedtuple
+        Holding = namedtuple("Holding", ["name", "code"])
+        self.holdings = [
+            Holding(name="长江电力", code="600900"),
+            Holding(name="贵州茅台", code="600519"),
+        ]
+        self.penetrated = [
+            {"name": "宁德时代", "codes": ["300750"]},
+        ]
+
+    def test_basic(self) -> None:
+        from src.llm_client import _build_holdings_summary
+        result = _build_holdings_summary(self.holdings)
+        self.assertIn("长江电力", result)
+        self.assertIn("600900", result)
+        self.assertIn("600519", result)
+
+    def test_with_penetration(self) -> None:
+        from src.llm_client import _build_holdings_summary
+        result = _build_holdings_summary(self.holdings, self.penetrated)
+        self.assertIn("[穿透]", result)
+
+    def test_empty(self) -> None:
+        from src.llm_client import _build_holdings_summary
+        result = _build_holdings_summary([], None)
+        self.assertEqual(result, "")
+
+    def test_limit_20(self) -> None:
+        """超过 20 只持仓时截断。"""
+        from collections import namedtuple
+        from src.llm_client import _build_holdings_summary
+        H = namedtuple("Holding", ["name", "code"])
+        many = [H(name=f"股票{i}", code=f"{i:06d}") for i in range(30)]
+        result = _build_holdings_summary(many)
+        lines = [l for l in result.split("\n") if l.strip()]
+        # 最多 20 行持仓
+        holding_lines = [l for l in lines if "[穿透]" not in l]
+        self.assertLessEqual(len(holding_lines), 20)
+
+
+# ═══════════════════════════════════════════════════════════
+#  _build_news_summary — 新闻摘要生成
+# ═══════════════════════════════════════════════════════════
+
+
+class TestBuildNewsSummary(unittest.TestCase):
+    """测试 _build_news_summary 的格式和内容。"""
+
+    def test_basic(self) -> None:
+        from src.llm_client import _build_news_summary
+        news = [
+            {"title": "能源改革新方案", "intro": "国家能源局发布电力改革方案...",
+             "matched_keywords": ["长江电力"]},
+        ]
+        result = _build_news_summary(news)
+        self.assertIn("能源改革", result)
+        self.assertIn("长江电力", result)
+
+    def test_empty(self) -> None:
+        from src.llm_client import _build_news_summary
+        self.assertEqual(_build_news_summary([]), "")
+
+    def test_limit_30(self) -> None:
+        """超过 30 条时截断。"""
+        from src.llm_client import _build_news_summary
+        many = [{"title": f"新闻{i}", "matched_keywords": []} for i in range(50)]
+        result = _build_news_summary(many)
+        # 最多 30 条
+        count = result.count("标题:")
+        self.assertLessEqual(count, 30)
+
+
+# ═══════════════════════════════════════════════════════════
+#  _apply_llm_analysis — LLM 响应解析
+# ═══════════════════════════════════════════════════════════
+
+
+class TestApplyLLMAnalysis(unittest.TestCase):
+    """测试 LLM JSON 响应的解析和富化。"""
+
+    def setUp(self) -> None:
+        self.news = [
+            {"title": "新闻A", "matched_keywords": ["茅台"]},
+            {"title": "新闻B", "matched_keywords": ["五粮液"]},
+            {"title": "新闻C", "matched_keywords": []},
+        ]
+
+    def test_standard_response(self) -> None:
+        from src.llm_client import _apply_llm_analysis
+        llm_resp = '[{"idx": 0, "relevance": "高", "analysis": "白酒利好"}, {"idx": 1, "relevance": "中", "analysis": "间接影响"}]'
+        result = _apply_llm_analysis(self.news, llm_resp)
+        self.assertEqual(result[0].get("llm_analysis"), "[高] 白酒利好")
+        self.assertEqual(result[1].get("llm_analysis"), "[中] 间接影响")
+        self.assertNotIn("llm_analysis", result[2])
+
+    def test_irrelevant_filtered(self) -> None:
+        """关联度为"无关"时不在列中显示。"""
+        from src.llm_client import _apply_llm_analysis
+        llm_resp = '[{"idx": 0, "relevance": "高", "analysis": "利好"}, {"idx": 1, "relevance": "无关", "analysis": "无关内容"}]'
+        result = _apply_llm_analysis(self.news, llm_resp)
+        self.assertIn("llm_analysis", result[0])
+        self.assertNotIn("llm_analysis", result[1])
+
+    def test_malformed_json(self) -> None:
+        """JSON 解析失败 → 返回原始数据。"""
+        from src.llm_client import _apply_llm_analysis
+        result = _apply_llm_analysis(self.news, "不是json")
+        self.assertEqual(result, self.news)
+
+    def test_not_a_list(self) -> None:
+        """LLM 返回非数组 → 返回原始数据。"""
+        from src.llm_client import _apply_llm_analysis
+        result = _apply_llm_analysis(self.news, '{"error": "wrong"}')
+        self.assertEqual(result, self.news)
+
+    def test_with_code_block(self) -> None:
+        """响应包含 Markdown 代码块 → 正确提取 JSON。"""
+        from src.llm_client import _apply_llm_analysis
+        llm_resp = '```json\n[{"idx": 0, "relevance": "高", "analysis": "直接利好"}]\n```'
+        result = _apply_llm_analysis(self.news, llm_resp)
+        self.assertIn("llm_analysis", result[0])
+
+    def test_idx_out_of_range(self) -> None:
+        """idx 越界时忽略该条目。"""
+        from src.llm_client import _apply_llm_analysis
+        llm_resp = '[{"idx": 99, "relevance": "高", "analysis": "越界"}]'
+        result = _apply_llm_analysis(self.news, llm_resp)
+        # 不崩溃，所有项无分析
+        for item in result:
+            self.assertNotIn("llm_analysis", item)
+
+
+# ═══════════════════════════════════════════════════════════
+#  enhance_news_correlation — LLM 新闻关联增强
+# ═══════════════════════════════════════════════════════════
+
+
+@patch("src.config.get_llm_config")
+class TestEnhanceNewsCorrelation(unittest.TestCase):
+    """测试 enhance_news_correlation 的主流程。"""
+
+    def setUp(self) -> None:
+        self.news = [
+            {"title": "新闻A", "intro": "简介", "matched_keywords": ["茅台"]},
+            {"title": "新闻B", "intro": "简介", "matched_keywords": ["五粮液"]},
+        ]
+        self.holdings = [
+            MagicMock(name="长江电力", code="600900"),
+            MagicMock(name="贵州茅台", code="600519"),
+        ]
+
+    def test_llm_not_configured(self, mock_cfg: MagicMock) -> None:
+        """LLM 未配置 → 返回原始数据 + 空 token 用量。"""
+        from src.llm_client import enhance_news_correlation
+        mock_cfg.return_value = None
+        result, cached, usage = enhance_news_correlation(self.news, self.holdings)
+        self.assertEqual(result, self.news)
+        self.assertFalse(cached)
+        self.assertEqual(usage, {})
+
+    def test_empty_news(self, mock_cfg: MagicMock) -> None:
+        """空新闻列表 → 直接返回。"""
+        from src.llm_client import enhance_news_correlation
+        result, cached, usage = enhance_news_correlation([], self.holdings)
+        self.assertEqual(result, [])
+        self.assertFalse(cached)
+        self.assertEqual(usage, {})
+
+    @patch("src.llm_client._call_llm")
+    @patch("src.llm_client.cache_get")
+    def test_cache_hit(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
+        """缓存命中 → 直接返回缓存数据，不调用 LLM。"""
+        from src.llm_client import enhance_news_correlation
+        mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
+        mock_cache_get.return_value = self.news  # 缓存命中
+        result, cached, usage = enhance_news_correlation(self.news, self.holdings)
+        self.assertTrue(cached)
+        mock_call.assert_not_called()
+
+    @patch("src.llm_client._call_llm")
+    @patch("src.llm_client.cache_get")
+    def test_llm_success(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
+        """LLM 调用成功 → 返回富化数据。"""
+        from src.llm_client import enhance_news_correlation
+        mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
+        mock_cache_get.return_value = None  # 缓存未命中
+        mock_call.return_value = (
+            '[{"idx": 0, "relevance": "高", "analysis": "直接相关"}, '
+            '{"idx": 1, "relevance": "中", "analysis": "间接影响"}]',
+            {"input_tokens": 100, "output_tokens": 50},
+        )
+        result, cached, usage = enhance_news_correlation(self.news, self.holdings)
+        self.assertFalse(cached)
+        self.assertIn("llm_analysis", result[0])
+        self.assertEqual(usage.get("total_tokens"), 150)
+
+    @patch("src.llm_client._call_llm")
+    @patch("src.llm_client.cache_get")
+    def test_llm_failure(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
+        """LLM 调用失败 → 返回原始数据 + 空 token 用量。"""
+        from src.llm_client import enhance_news_correlation
+        mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
+        mock_cache_get.return_value = None  # 缓存未命中
+        mock_call.return_value = (None, None)  # 调用失败
+        result, cached, usage = enhance_news_correlation(self.news, self.holdings)
+        self.assertFalse(cached)
+        self.assertEqual(usage, {})
+        # 不应有 llm_analysis
+        for item in result:
+            self.assertNotIn("llm_analysis", item)
+
+
 if __name__ == "__main__":
     unittest.main()

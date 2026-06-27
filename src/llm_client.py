@@ -159,7 +159,7 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
       3. 代码默认值（全局政经 14400s / 智囊团 7200s）
 
     Args:
-        subtype: "macro"（模块 7）或 "expert"（模块 8）
+        subtype: "macro"（模块 7）、"expert"（模块 8）或 "news"（新闻关联）
 
     Returns:
         过期时间（秒）
@@ -181,7 +181,8 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
         from src.cache import get_ttl
         return get_ttl(f"llm_{subtype}")
     except Exception:
-        return 14400 if subtype == "macro" else 7200
+        defaults: dict[str, float] = {"macro": 14400, "expert": 7200, "news": 3600}
+        return defaults.get(subtype, 3600)
 
 
 def _compute_fingerprint(*args: Any) -> str:
@@ -515,6 +516,19 @@ Phase 3（定音锤）指挥官融合辩论给出量化调仓方案和风险提�
 
 约束：数据来自输入不虚构；每个论点引用品种代码和收益率；全 Markdown 输出；引用北京时间。"""
 
+_SYSTEM_NEWS_CORRELATION = """你是一位资深金融分析师。分析以下每条财经新闻与用户投资组合持仓的关联性。
+
+关联度标准：
+- 高：新闻内容直接涉及持仓品种、所属行业或相关重大政策
+- 中：新闻内容与持仓品种有间接关联（产业链、相关行业）
+- 低：新闻内容与持仓品种关联较弱
+- 无关：新闻内容与持仓品种无明显关联
+
+对每条新闻输出JSON数组，格式：
+[{"idx": 0, "relevance": "高|中|低|无关", "analysis": "不超过30字的原因分析"}, ...]
+
+只输出JSON，不要其他内容。"""
+
 
 # ═══════════════════════════════════════════════════════════
 #  模块 7 & 8 生成函数
@@ -768,6 +782,244 @@ def generate_expert_review(
         logger.warning("智囊团深度复盘生成失败")
 
     return (None, False)
+
+
+# ═══════════════════════════════════════════════════════════
+#  新闻关联分析（LLM 增强）
+# ═══════════════════════════════════════════════════════════
+
+
+def _build_holdings_summary(holdings: list, penetrated_assets: list | None = None) -> str:
+    """构建持仓摘要文本（紧凑格式），供新闻关联分析 Prompt 使用。
+
+    Args:
+        holdings: 持仓列表
+        penetrated_assets: 穿透 TOP10 资产（可选）
+
+    Returns:
+        紧凑格式的持仓摘要文本
+    """
+    lines: list[str] = []
+    for i, h in enumerate(holdings[:20]):
+        lines.append(f"{i + 1}. {h.name} ({h.code})")
+    if penetrated_assets:
+        for a in penetrated_assets[:10]:
+            name = a.get("name", "")
+            codes = ",".join(a.get("codes", []))
+            if name or codes:
+                lines.append(f"    [穿透] {name} ({codes})")
+    return "\n".join(lines)
+
+
+def _build_news_summary(news_data: list[dict]) -> str:
+    """构建新闻摘要文本（紧凑格式），供新闻关联分析 Prompt 使用。
+
+    Args:
+        news_data: 关键词匹配后的新闻列表，取前 30 条
+
+    Returns:
+        紧凑格式的新闻摘要文本
+    """
+    parts: list[str] = []
+    for i, item in enumerate(news_data[:30]):
+        title = (item.get("title") or "")[:120]
+        intro = (item.get("intro") or "")[:150]
+        keywords = ", ".join(item.get("matched_keywords", []))
+        parts.append(
+            f"[{i}] 标题: {title}\n"
+            f"    摘要: {intro}\n"
+            f"    关键词: {keywords or '--'}"
+        )
+    return "\n".join(parts)
+
+
+def _apply_llm_analysis(news_data: list[dict], llm_response: str) -> list[dict]:
+    """解析 LLM JSON 响应并富化新闻数据。
+
+    遍历 LLM 返回的 JSON 数组，将每条新闻的关联分析写入
+    news_data 对应项的 llm_analysis 字段。
+
+    Args:
+        news_data: 原始新闻列表
+        llm_response: LLM 返回的 JSON 字符串
+
+    Returns:
+        富化后的新闻列表（含 llm_analysis 字段），
+        解析失败时返回原始新闻列表
+    """
+    import json
+    import re
+
+    # 从可能含 Markdown 代码块的文本中提取 JSON
+    text = llm_response.strip()
+    if "```" in text:
+        # 取第一个代码块的内容
+        for block in text.split("```"):
+            block = block.strip()
+            if block.startswith("json"):
+                text = block[4:].strip()
+                break
+            elif block.startswith("[") or block.startswith("{"):
+                text = block
+                break
+    text = text.strip()
+
+    try:
+        analyses = json.loads(text)
+    except json.JSONDecodeError as e:
+        logger.warning("LLM 新闻分析 JSON 解析失败: %s", e)
+        return news_data
+
+    if not isinstance(analyses, list):
+        logger.warning("LLM 新闻分析返回格式异常: 非数组")
+        return news_data
+
+    # 建立 idx → (relevance, analysis) 映射
+    analysis_map: dict[int, str] = {}
+    for a in analyses:
+        idx = a.get("idx")
+        if not isinstance(idx, int) or idx < 0 or idx >= len(news_data):
+            continue
+        relevance = a.get("relevance", "")
+        analysis_text = a.get("analysis", "")
+        # 跳过"无关"项，不浪费列空间
+        if relevance == "无关":
+            continue
+        if analysis_text:
+            analysis_map[idx] = f"[{relevance}] {analysis_text}"
+        else:
+            analysis_map[idx] = f"[{relevance}]"
+
+    # 富化新闻数据
+    enriched: list[dict] = []
+    for i, item in enumerate(news_data):
+        item_copy = dict(item)
+        if i in analysis_map:
+            item_copy["llm_analysis"] = analysis_map[i]
+        enriched.append(item_copy)
+
+    if analysis_map:
+        logger.info("LLM 新闻关联: 富化 %d/%d 条", len(analysis_map), len(news_data))
+    else:
+        logger.info("LLM 新闻关联: 全部判定为无关")
+
+    return enriched
+
+
+def enhance_news_correlation(
+    news_data: list[dict],
+    holdings: list,
+    penetrated_assets: list | None = None,
+    force: bool = False,
+    http_client: httpx.Client | None = None,
+) -> tuple[list[dict], bool, dict]:
+    """使用 LLM 增强新闻与持仓的关联分析。
+
+    对关键词匹配后的新闻进行 LLM 二次分析：
+    - 判定每条的关联度（高/中/低/无关）
+    - 给出简要原因分析
+    - 写入 news_data 各条的 llm_analysis 字段
+
+    Args:
+        news_data: 关键词匹配后的新闻列表（由 build_news_data 返回）
+        holdings: 持仓列表
+        penetrated_assets: 穿透 TOP10 资产（可选）
+        force: 为 True 时跳过缓存强制重新生成
+        http_client: 可选的 httpx.Client 实例
+
+    Returns:
+        (富化后的新闻列表, 是否来自缓存, token 用量字典)
+        token 用量含 {"input_tokens": N, "output_tokens": N, "total_tokens": N}
+        LLM 不可用或失败时返回 (news_data, False, {})
+    """
+    from src.config import get_llm_config
+
+    llm_config = get_llm_config()
+    if llm_config is None:
+        return (news_data, False, {})
+
+    if not news_data:
+        return (news_data, False, {})
+
+    # 按关键词匹配数排序，取前 30 条送给 LLM（最相关的才需要深度分析）
+    sorted_news = sorted(
+        news_data,
+        key=lambda x: len(x.get("matched_keywords", [])),
+        reverse=True,
+    )
+    top_news = sorted_news[:30]
+
+    # 缓存键（含新闻内容 + 持仓的指纹）
+    holdings_summary = [
+        {"name": h.name, "code": h.code}
+        for h in holdings[:20]
+    ]
+    fingerprint = _compute_fingerprint(
+        top_news, holdings_summary, penetrated_assets,
+    )
+    cache_key = _CACHE_PREFIX_LLM + f"news_corr_{fingerprint}"
+
+    if not force:
+        cached = cache_get(cache_key, _get_cache_ttl_llm("news"))
+        if cached is not None:
+            logger.info("LLM 缓存命中: 新闻关联分析")
+            return (cached, True, {})
+
+    # 构建 Prompt
+    system_prompt = (
+        llm_config.get("system_prompt_news_correlation")
+        or _SYSTEM_NEWS_CORRELATION
+    )
+    holdings_text = _build_holdings_summary(holdings, penetrated_assets)
+    news_text = _build_news_summary(top_news)
+    user_prompt = (
+        f"【持仓信息】\n"
+        f"{holdings_text}\n\n"
+        f"【新闻列表】\n"
+        f"{news_text}\n\n"
+        f"请分析以上每条新闻与持仓的关联性，输出JSON数组。"
+    )
+
+    logger.info("正在调用 LLM 增强新闻关联分析...")
+    max_tokens = llm_config.get("max_tokens_news_correlation", 2000)
+    result, usage = _call_llm(
+        system_prompt, user_prompt, llm_config,
+        timeout=60.0, http_client=http_client,
+        max_tokens=max_tokens,
+        config_field="max_tokens_news_correlation",
+    )
+
+    if not result:
+        logger.warning("LLM 新闻关联分析失败")
+        return (news_data, False, {})
+
+    # 解析 JSON 并富化
+    enriched = _apply_llm_analysis(news_data, result)
+
+    # 构建 token 用量字典
+    token_usage: dict = {}
+    if usage:
+        inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+        out = usage.get("output_tokens", usage.get("completion_tokens", 0))
+        token_usage = {
+            "input_tokens": inp,
+            "output_tokens": out,
+            "total_tokens": inp + out,
+        }
+        _log_token_usage(
+            llm_config.get("provider", "unknown"),
+            usage, "新闻关联",
+        )
+
+    # 缓存
+    cache_set(cache_key, enriched)
+    logger.info(
+        "LLM 新闻关联分析完成: %d 条 → %d 条含 LLM 分析",
+        len(news_data),
+        sum(1 for n in enriched if n.get("llm_analysis")),
+    )
+
+    return (enriched, False, token_usage)
 
 
 # ═══════════════════════════════════════════════════════════

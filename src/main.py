@@ -416,7 +416,7 @@ def _cmd_generate_excel_with_news() -> None:
     _press_any_key()
 
 
-def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None, us_indices: dict[str, dict[str, Any]] | None = None, news_data: list | None = None, llm_cached: tuple[bool, bool] = (False, False)) -> None:
+def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None, us_indices: dict[str, dict[str, Any]] | None = None, news_data: list | None = None, llm_cached: tuple[bool, bool] = (False, False), news_llm_meta: dict | None = None) -> None:
     """生成 Excel 报告的核心逻辑。
 
     Args:
@@ -508,12 +508,13 @@ def _generate_excel_report(holdings: list, include_news: bool = False, output_di
 
         if news_data is not None:
             logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
+            _meta = news_llm_meta or {}
         else:
             logger.info("正在获取财经新闻（含穿透资产关键词）...")
             from src.report.news_correlation import build_news_data
-            news_data = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
+            news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
         ws6 = wb.create_sheet()
-        write_news_sheet(ws6, news_data)
+        write_news_sheet(ws6, news_data, llm_meta=_meta)
 
     # 第 7/8 页（可选）：LLM 增补内容
     if include_llm:
@@ -772,7 +773,8 @@ def _cmd_generate_full() -> None:
         print("  [..] 正在并行获取新闻 + LLM 内容...")
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        news_data = []
+        news_data: list = []
+        news_llm_meta: dict = {}
         llm_content = (None, None)
         llm_cached = (False, False)
 
@@ -800,7 +802,7 @@ def _cmd_generate_full() -> None:
                     tag = "缓存" if macro_cached and expert_cached else "LLM"
                     print(f"  [OK] {tag} 内容生成完成")
                 else:
-                    news_data = fut.result()
+                    news_data, news_llm_meta = fut.result()
                     print(f"  [OK] 新闻获取完成，共 {len(news_data)} 条")
 
         # ── HTML 报告 ──────────────────────────────────────────
@@ -812,6 +814,7 @@ def _cmd_generate_full() -> None:
                 news_top_count=news_top_count, include_news=True,
                 llm_content=llm_content, details=details,
                 news_data=news_data,
+                news_llm_meta=news_llm_meta,
             )
             print(f"  [OK] HTML 报告已生成: {path}")
         except Exception as e:
@@ -827,6 +830,7 @@ def _cmd_generate_full() -> None:
             llm_content=llm_content, show_llm_in_tui=True,
             details=details, a_indices=a_indices, us_indices=us_indices,
             news_data=news_data, llm_cached=llm_cached,
+            news_llm_meta=news_llm_meta,
         )
 
     except Exception as e:
@@ -840,13 +844,14 @@ def _cmd_generate_full() -> None:
 
 
 def _cmd_update_basic_cache() -> None:
-    """更新基础类缓存 — 清除旧缓存 → 重新获取基金业绩/持仓/基准。
+    """更新基础类缓存 — 清除旧缓存 → 重新获取基金业绩/持仓/基准/新闻关联。
 
     缓存文件：
       fund_perf_{code}.json        → 基金业绩评价+同类排名（单条，由 fetch_fund_rankings 自动写入）
       fund_hold_{code}.json        → 各基金底层持仓权重（单条，由 fetch_fund_holdings 自动写入）
       fund_benchmarks.json         → 业绩比较基准
       news_{md5}.json              → 新闻缓存（持仓更新后新闻关联可能变化，一并清除）
+      llm_news_corr_{fingerprint}  → LLM 新闻关联分析缓存（一并清除）
     """
     from src.cache import clear, clear_by_prefix
     from src.fetcher import fetch_fund_benchmark, fetch_fund_holdings, fetch_fund_rankings
@@ -882,7 +887,8 @@ def _cmd_update_basic_cache() -> None:
         clear_by_prefix("fund_hold_")
         clear("fund_benchmarks")
         clear_by_prefix("news_")
-        print("  [OK] 旧缓存已清除（含 news_ 新闻缓存）")
+        clear_by_prefix("llm_news_corr")
+        print("  [OK] 旧缓存已清除（含 news_ 新闻缓存 + llm_news_corr LLM 新闻关联分析缓存）")
 
         # 2) 获取基金业绩排名 + 持仓 + 基准
         print()

@@ -4,6 +4,22 @@
 
 ---
 
+## [0.2.9] - 2026-06-28
+
+### Added
+- LLM 新闻关联分析：新增配置选项 `llm_news_analysis`（默认关闭），开启后使用 LLM 对关键词匹配后的新闻进行二次关联分析，逐条判定关联度（高/中/低/无关）并给出原因分析
+- `enhance_news_correlation()`：llm_client 新函数，含 Prompt 构建、缓存、JSON 解析、token 用量跟踪
+- 新闻页签 LLM 分析列：自动增加第 7 列 "LLM 关联分析"
+- 页签底部智能注脚：LLM 缓存命中 → "使用了LLM缓存"；LLM 未启用 → "未依赖于LLM服务，使用传统爬虫+NLP能力"；LLM 启用 + 非缓存 → Token 消耗明细
+- llm.json 新增 `max_tokens_news_correlation` / `cache_ttl_news_correlation` / `system_prompt_news_correlation` 配置
+- 新测试：TestBuildNewsDataWithLLM、TestApplyLLMAnalysis、TestEnhanceNewsCorrelation、TestBuildHoldingsSummary、TestBuildNewsSummary 等合计 27 项
+
+### Changed
+- `build_news_data()` 返回类型：`list` → `tuple[list, dict]`（新增 metadata 字典，含 llm_enabled/llm_cached/token_usage）
+- `write_news_sheet()` 参数：`llm_token_usage` → `llm_meta`（metadata 字典）
+- `_generate_excel_report()` 参数：`news_token_usage` → `news_llm_meta`
+- `_get_cache_ttl_llm()` 新增 `"news"` subtype 支持（默认 3600s）
+
 ## [0.2.8] - 2026-06-27
 
 ### Performance

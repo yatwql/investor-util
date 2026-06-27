@@ -19,7 +19,273 @@ from src.models import Holding
 
 
 # ============================================================
-#  write_html_report — LLM 内部调用路径
+#  Template rendering — LLM 新闻关联分析
+# ============================================================
+
+
+class TestJinjaFilters(unittest.TestCase):
+    """Jinja2 自定义过滤器测试。"""
+
+    def setUp(self):
+        from src.report.html_writer import _jinja_thousands
+        self.fn = _jinja_thousands
+
+    def test_thousands_formats_integer(self):
+        self.assertEqual(self.fn(2500), "2,500")
+
+    def test_thousands_formats_large(self):
+        self.assertEqual(self.fn(1234567), "1,234,567")
+
+    def test_thousands_handles_none(self):
+        self.assertEqual(self.fn(None), "None")
+
+    def test_thousands_handles_string(self):
+        self.assertEqual(self.fn("abc"), "abc")
+
+
+class TestNewsLlmMetaTemplate(unittest.TestCase):
+    """验证 news_llm_meta 传入模板时的渲染结果。"""
+
+    def setUp(self):
+        from jinja2 import Environment
+        self.env = Environment()
+
+    def _render_news_section(self, news_data: list, news_llm_meta: dict | None = None, has_llm_analysis: bool = False) -> str:
+        """渲染新闻 section 的 Jinja2 模板片段。"""
+        template_str = """{% if news_data %}
+        <table>
+            <thead>
+                <tr>
+                    <th>序号</th><th>新闻标题</th>
+                    {% if has_llm_analysis %}<th>LLM 关联分析</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in news_data %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item.title }}</td>
+                    {% if has_llm_analysis %}
+                    <td>{% if item.llm_analysis %}{{ item.llm_analysis }}{% else %}—{% endif %}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="notes">
+            {% set ns = namespace(llm_notes=[]) %}
+            {% set _ = ns.llm_notes.append("共 " ~ (news_data | length) ~ " 条") %}
+            {% if news_llm_meta and news_llm_meta.get("llm_enabled") %}
+                {% if news_llm_meta.get("llm_cached") %}
+                    {% set _ = ns.llm_notes.append("使用了LLM缓存") %}
+                {% else %}
+                    {% set _tu = news_llm_meta.get("token_usage", {}) %}
+                    {% if _tu.get("total_tokens") %}
+                        {% set _ = ns.llm_notes.append("Token消耗：" ~ (_tu.get("total_tokens", 0))) %}
+                    {% endif %}
+                {% endif %}
+            {% else %}
+                {% set _ = ns.llm_notes.append("未依赖于LLM服务") %}
+            {% endif %}
+            {% for note in ns.llm_notes %}
+            <div>{{ note }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}"""
+        template = self.env.from_string(template_str)
+        return template.render(news_data=news_data, news_llm_meta=news_llm_meta or {}, has_llm_analysis=has_llm_analysis)
+
+    def test_llm_analysis_column_rendered(self):
+        """has_llm_analysis=True → 渲染 LLM 关联分析 列。"""
+        html = self._render_news_section(
+            [{"title": "新闻A", "llm_analysis": "[高] 利好"}],
+            has_llm_analysis=True,
+        )
+        self.assertIn("LLM 关联分析", html)
+        self.assertIn("[高] 利好", html)
+
+    def test_llm_analysis_column_hidden(self):
+        """has_llm_analysis=False → 不渲染 LLM 关联分析 列。"""
+        html = self._render_news_section(
+            [{"title": "新闻A"}],
+            has_llm_analysis=False,
+        )
+        self.assertNotIn("LLM 关联分析", html)
+
+    def test_llm_disabled_footnote(self):
+        """LLM 未启用 → 显示'未依赖于LLM服务'。"""
+        html = self._render_news_section(
+            [{"title": "新闻A"}],
+            news_llm_meta={"llm_enabled": False},
+        )
+        self.assertIn("未依赖于LLM服务", html)
+
+    def test_llm_cache_hit_footnote(self):
+        """LLM 缓存命中 → 显示'使用了LLM缓存'。"""
+        html = self._render_news_section(
+            [{"title": "新闻A", "llm_analysis": "[高] 利好"}],
+            news_llm_meta={"llm_enabled": True, "llm_cached": True, "token_usage": {}},
+            has_llm_analysis=True,
+        )
+        self.assertIn("使用了LLM缓存", html)
+        self.assertNotIn("未依赖于LLM服务", html)
+        self.assertNotIn("Token消耗", html)
+
+    def test_llm_token_usage_footnote(self):
+        """LLM 启用+非缓存 → 显示 Token 消耗。"""
+        html = self._render_news_section(
+            [{"title": "新闻A", "llm_analysis": "[高] 利好"}],
+            news_llm_meta={
+                "llm_enabled": True, "llm_cached": False,
+                "token_usage": {"input_tokens": 2000, "output_tokens": 500, "total_tokens": 2500},
+            },
+            has_llm_analysis=True,
+        )
+        self.assertIn("Token消耗：2500", html)
+        self.assertNotIn("使用了LLM缓存", html)
+        self.assertNotIn("未依赖于LLM服务", html)
+
+
+# ============================================================
+#  write_html_report — news_llm_meta 参数透传
+# ============================================================
+
+
+class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
+    """验证 write_html_report 将 news_llm_meta 传给模板。"""
+
+    def setUp(self):
+        self.holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]
+        self.detail = MagicMock()
+        self.detail.market_value = 1000.0
+        self.detail.cost = 500.0
+        self.detail.profit = 500.0
+        self.detail.today_profit = 50.0
+        self.detail.name = "长江电力"
+        self.detail.code = "600900"
+        self.detail.price = 55.0
+        self.detail.yesterday_close = 54.0
+        self.detail.profit_rate = 1.0
+        self.detail.source = "腾讯"
+        self.detail.price_type = "实时"
+        self.detail.premium = ""
+        self.detail.shares = 100
+        self.detail.cost_price = 50.0
+        self.detail.nav_date = ""
+
+    def test_news_llm_meta_passed_to_template(self):
+        """外部传入 news_data+news_llm_meta → 模板收到正确参数。"""
+        from src.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            mock_details = stack.enter_context(patch("src.report.html_writer._generate_details"))
+            mock_a_idx = stack.enter_context(patch("src.report.html_writer.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.report.html_writer.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.report.html_writer.compute_penetration_top10"))
+            mock_cat = stack.enter_context(patch("src.report.html_writer._build_category_data"))
+            mock_status = stack.enter_context(patch("src.report.html_writer.price_update_status"))
+            mock_perf = stack.enter_context(patch("src.report.html_writer._build_perf_data"))
+            mock_template = stack.enter_context(patch("src.report.html_writer._ENV.get_template"))
+
+            mock_details.return_value = [self.detail]
+            mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
+            mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
+            mock_penetration.return_value = {}
+            mock_cat.return_value = {}
+            mock_status.return_value = (0, 0, True)
+            mock_perf.return_value = {}
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html>ok</html>"
+            mock_template.return_value = tmpl
+
+            write_html_report(
+                self.holdings,
+                output_dir="reports",
+                include_news=True,
+                news_data=[{"title": "新闻A", "matched_keywords": ["茅台"]}],
+                news_llm_meta={"llm_enabled": True, "llm_cached": True, "token_usage": {}},
+            )
+
+        tmpl.render.assert_called_once()
+        _, kwargs = tmpl.render.call_args
+        self.assertIn("news_llm_meta", kwargs)
+        self.assertTrue(kwargs["news_llm_meta"]["llm_enabled"])
+        self.assertTrue(kwargs["news_llm_meta"]["llm_cached"])
+        self.assertIn("has_llm_analysis", kwargs)
+
+    def test_has_llm_analysis_false_without_analysis(self):
+        """新闻无 llm_analysis 字段 → has_llm_analysis=False。"""
+        from src.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            mock_details = stack.enter_context(patch("src.report.html_writer._generate_details"))
+            mock_a_idx = stack.enter_context(patch("src.report.html_writer.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.report.html_writer.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.report.html_writer.compute_penetration_top10"))
+            mock_cat = stack.enter_context(patch("src.report.html_writer._build_category_data"))
+            mock_status = stack.enter_context(patch("src.report.html_writer.price_update_status"))
+            mock_perf = stack.enter_context(patch("src.report.html_writer._build_perf_data"))
+            mock_template = stack.enter_context(patch("src.report.html_writer._ENV.get_template"))
+
+            mock_details.return_value = [self.detail]
+            mock_a_idx.return_value = {}
+            mock_us_idx.return_value = {}
+            mock_penetration.return_value = {}
+            mock_cat.return_value = {}
+            mock_status.return_value = (0, 0, True)
+            mock_perf.return_value = {}
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html>ok</html>"
+            mock_template.return_value = tmpl
+
+            write_html_report(
+                self.holdings,
+                output_dir="reports",
+                include_news=True,
+                news_data=[{"title": "新闻A", "matched_keywords": ["茅台"]}],
+            )
+
+        _, kwargs = tmpl.render.call_args
+        self.assertFalse(kwargs["has_llm_analysis"])
+
+    def test_has_llm_analysis_true_with_analysis(self):
+        """新闻有 llm_analysis → has_llm_analysis=True。"""
+        from src.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            mock_details = stack.enter_context(patch("src.report.html_writer._generate_details"))
+            mock_a_idx = stack.enter_context(patch("src.report.html_writer.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.report.html_writer.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.report.html_writer.compute_penetration_top10"))
+            mock_cat = stack.enter_context(patch("src.report.html_writer._build_category_data"))
+            mock_status = stack.enter_context(patch("src.report.html_writer.price_update_status"))
+            mock_perf = stack.enter_context(patch("src.report.html_writer._build_perf_data"))
+            mock_template = stack.enter_context(patch("src.report.html_writer._ENV.get_template"))
+
+            mock_details.return_value = [self.detail]
+            mock_a_idx.return_value = {}
+            mock_us_idx.return_value = {}
+            mock_penetration.return_value = {}
+            mock_cat.return_value = {}
+            mock_status.return_value = (0, 0, True)
+            mock_perf.return_value = {}
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html>ok</html>"
+            mock_template.return_value = tmpl
+
+            write_html_report(
+                self.holdings,
+                output_dir="reports",
+                include_news=True,
+                news_data=[{"title": "新闻A", "matched_keywords": ["茅台"], "llm_analysis": "[高] 利好"}],
+            )
+
+        _, kwargs = tmpl.render.call_args
+        self.assertTrue(kwargs["has_llm_analysis"])
+
+
+# ============================================================
+#  write_html_report — LLM 内部调用路径 (Modules 7/8)
 # ============================================================
 
 
