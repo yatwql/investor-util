@@ -851,10 +851,5 @@ class TestCacheConstants(unittest.TestCase):
         from src.cache import CACHE_MONTHLY
         self.assertEqual(CACHE_MONTHLY, 2592000)
 
-    def test_cache_holdings(self):
-        from src.cache import CACHE_HOLDINGS
-        self.assertEqual(CACHE_HOLDINGS, 0)
-
-
 if __name__ == "__main__":
     unittest.main()

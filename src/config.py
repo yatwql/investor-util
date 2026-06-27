@@ -35,6 +35,9 @@ _DEFAULT_CONFIG = {
         "news_corr": 3600,
         "industry": 604800,
         "benchmark": 2592000,
+        "llm": 86400,
+        "llm_macro": 14400,
+        "llm_expert": 7200,
     },
     "llm_config_file": "data/config/llm.json",
 }

@@ -860,12 +860,13 @@ def _cmd_generate_full() -> None:
 
 
 def _cmd_update_basic_cache() -> None:
-    """更新基础类缓存 — 清除旧缓存 → 重新获取基金业绩/持仓/基准/新闻关联。
+    """更新基础类缓存 — 清除旧缓存 → 重新获取基金业绩/持仓/基准/行业分类/新闻关联。
 
     缓存文件：
       fund_perf_{code}.json        → 基金业绩评价+同类排名（单条，由 fetch_fund_rankings 自动写入）
       fund_hold_{code}.json        → 各基金底层持仓权重（单条，由 fetch_fund_holdings 自动写入）
       fund_benchmarks.json         → 业绩比较基准
+      industry_{code}.json         → 行业分类/概念板块（持仓变更后一并刷新）
       news_{md5}.json              → 新闻缓存（持仓更新后新闻关联可能变化，一并清除）
       llm_news_corr_{fingerprint}  → LLM 新闻关联分析缓存（一并清除）
     """
@@ -903,7 +904,7 @@ def _cmd_update_basic_cache() -> None:
         clear_by_prefix("fund_hold_")
         clear("fund_benchmarks")
         clear_by_prefix("news_")
-        clear_by_prefix("llm_news_corr")
+        clear_by_prefix("llm_news_corr_")
         clear_by_prefix("industry_")
         print("  [OK] 旧缓存已清除（含 news_ 新闻缓存 + llm_news_corr LLM 新闻关联分析缓存 + industry_ 行业分类缓存）")
 
@@ -1001,8 +1002,8 @@ def _cmd_update_position_cache() -> None:
         print("  [..] 清除旧缓存...")
         price_count = clear_by_prefix("price_")
         index_count = clear_by_prefix("index_")
-        expert_count = clear_by_prefix("llm_expert")
-        macro_count = clear_by_prefix("llm_global_macro")
+        expert_count = clear_by_prefix("llm_expert_review_")
+        macro_count = clear_by_prefix("llm_global_macro_")
         print(f"  [OK] 价格缓存 {price_count} 条 + 指数缓存 {index_count} 条 + "
               f"智囊团复盘 {expert_count} 条 + 全球政经 {macro_count} 条 已清除")
 

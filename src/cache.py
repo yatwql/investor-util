@@ -409,9 +409,6 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
 CACHE_DAILY = 86400         # 每日（24h）
 CACHE_WEEKLY = 604800       # 每周（7d）
 CACHE_MONTHLY = 2592000     # 每月（30d）
-CACHE_HOLDINGS = 0          # 持仓更新时（不过期，由外部触发刷新）
-
-
 # ── 从 config.json 读取缓存 TTL ──────────────────────────
 
 _CACHE_TTL_DEFAULTS: dict[str, float] = {

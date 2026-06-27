@@ -141,7 +141,10 @@ python src/main.py
     "news": 900,
     "news_corr": 3600,
     "industry": 604800,
-    "benchmark": 2592000
+    "benchmark": 2592000,
+    "llm": 86400,
+    "llm_macro": 14400,
+    "llm_expert": 7200
   }
 }
 ```
@@ -167,6 +170,9 @@ python src/main.py
 | `hold` | 604800（7天） | 基金前10大持仓明细 |
 | `news` | 900（15分钟） | 多源新闻聚合结果缓存，避免重复 HTTP 获取 |
 | `news_corr` | 3600（1小时） | LLM 新闻关联分析缓存 |
+| `llm` | 86400（24h） | LLM 通用缓存兜底（其他 LLM 类型未匹配时生效） |
+| `llm_macro` | 14400（4小时） | 全球政经局势 LLM 分析 |
+| `llm_expert` | 7200（2小时） | 智囊团深度复盘 LLM 分析 |
 | `industry` | 604800（7天） | 行业分类/概念板块缓存 |
 | `benchmark` | 2592000（30天） | 业绩比较基准对照表 |
 
