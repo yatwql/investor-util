@@ -170,13 +170,13 @@ class TestBuildMacroPrompt(unittest.TestCase):
     """测试模块 7 用户提示词。"""
 
     def test_has_timestamp(self) -> None:
-        r = _build_macro_prompt([], [], 100.0, 10.0, {"股票": 3})
+        r = _build_macro_prompt({}, {}, 100.0, 10.0, {"股票": 3})
         self.assertIn("北京时间", r)
         self.assertIn("当前时间", r)
 
     def test_compact_format(self) -> None:
-        a_idx = [{"name": "上证指数", "price": 3120, "change_pct": 1.2}]
-        r = _build_macro_prompt(a_idx, [], 100000, 5000, {"股票": 3, "基金": 2})
+        a_idx = {"sh000001": {"name": "上证指数", "price": 3120, "change_pct": 1.2}}
+        r = _build_macro_prompt(a_idx, {}, 100000, 5000, {"股票": 3, "基金": 2})
         self.assertIn("上证指数", r)
         self.assertIn("3120", r)
         self.assertIn("+1.20%", r)
@@ -185,12 +185,12 @@ class TestBuildMacroPrompt(unittest.TestCase):
 
     def test_single_line_indices(self) -> None:
         """指数应为紧凑单行格式。"""
-        a_idx = [{"name": "上证", "price": 3000, "change_pct": -0.5}]
-        r = _build_macro_prompt(a_idx, [], 0, 0, {})
+        a_idx = {"sh000001": {"name": "上证", "price": 3000, "change_pct": -0.5}}
+        r = _build_macro_prompt(a_idx, {}, 0, 0, {})
         self.assertIn("上证3000(-0.50%)", r)
 
     def test_no_categories(self) -> None:
-        r = _build_macro_prompt([], [], 0, 0, {})
+        r = _build_macro_prompt({}, {}, 0, 0, {})
         self.assertIn("当前时间", r)
         # 不应该有 AssertionError
 

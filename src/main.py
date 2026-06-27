@@ -416,7 +416,7 @@ def _cmd_generate_excel_with_news() -> None:
     _press_any_key()
 
 
-def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: list | None = None, us_indices: list | None = None, news_data: list | None = None) -> None:
+def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict | None = None, us_indices: dict | None = None, news_data: list | None = None) -> None:
     """生成 Excel 报告的核心逻辑。
 
     Args:
@@ -468,11 +468,9 @@ def _generate_excel_report(holdings: list, include_news: bool = False, output_di
     # 获取指数数据（复用外部传入或内部获取）
     if a_indices is None:
         logger.info("正在获取市场指数...")
-        a_idx_dict = fetch_indices()
-        a_indices = list(a_idx_dict.values())
+        a_indices = fetch_indices()
     if us_indices is None:
-        us_idx_dict = fetch_us_indices()
-        us_indices = list(us_idx_dict.values())
+        us_indices = fetch_us_indices()
 
     # 第 2 页：汇总
     logger.info("正在生成汇总...")
@@ -746,10 +744,8 @@ def _cmd_generate_full() -> None:
         with ThreadPoolExecutor(max_workers=2) as _idx_ex:
             _a_fut = _idx_ex.submit(fetch_indices)
             _us_fut = _idx_ex.submit(fetch_us_indices)
-            a_idx_dict = _a_fut.result()
-            us_idx_dict = _us_fut.result()
-        a_indices = list(a_idx_dict.values())
-        us_indices = list(us_idx_dict.values())
+            a_indices = _a_fut.result()
+            us_indices = _us_fut.result()
         pen_result = compute_penetration_top10(holdings, details)
         penetrated_assets = (pen_result or {}).get("top10", [])
 

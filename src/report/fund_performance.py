@@ -164,7 +164,7 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
     # 找到"超额收益"在 categories 中的索引
     excess_idx = -1
     for i, cat in enumerate(categories):
-        if "超额" in cat or "超额收益" in cat:
+        if cat and ("超额" in cat or "超额收益" in cat):
             excess_idx = i
             break
 

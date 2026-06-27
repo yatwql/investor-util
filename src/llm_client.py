@@ -508,8 +508,8 @@ Phase 3（定音锤）指挥官融合辩论给出量化调仓方案和风险提�
 
 
 def _build_macro_prompt(
-    a_indices: list[dict],
-    us_indices: list[dict],
+    a_indices: dict,
+    us_indices: dict,
     total_mv: float,
     total_profit: float,
     categories: dict,
@@ -517,13 +517,13 @@ def _build_macro_prompt(
     """构建模块 7（全球政经）的用户提示词（紧凑格式）。"""
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     idx_text = "A股:"
-    for idx in a_indices:
+    for idx in a_indices.values():
         name = idx.get("name", "")
         price = idx.get("price", 0)
         chg = idx.get("change_pct", 0)
         idx_text += f" {name}{price}({chg:+.2f}%)"
     idx_text += "\n美股:"
-    for idx in us_indices:
+    for idx in us_indices.values():
         name = idx.get("name", "")
         price = idx.get("price", 0)
         chg = idx.get("change_pct", 0)
@@ -619,8 +619,8 @@ def _build_review_prompt(
 
 
 def generate_global_macro(
-    a_indices: list[dict],
-    us_indices: list[dict],
+    a_indices: dict,
+    us_indices: dict,
     total_mv: float,
     total_profit: float,
     categories: dict,
@@ -762,8 +762,8 @@ def generate_expert_review(
 
 
 def generate_all_llm(
-    a_indices: list[dict],
-    us_indices: list[dict],
+    a_indices: dict,
+    us_indices: dict,
     total_mv: float,
     total_cost: float,
     total_profit: float,
