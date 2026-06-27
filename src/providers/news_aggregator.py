@@ -236,7 +236,7 @@ def _fetch_from_eastmoney(num: int) -> list[dict[str, Any]]:
         logger.warning("东方财富模块不可用")
         return []
 
-    items = em_fetch(page=1, num=num)
+    items = em_fetch(num=num)
     logger.info("东方财富: 获取 %d 条", len(items))
     return items
 
