@@ -4,6 +4,32 @@
 
 ---
 
+## [0.2.10] - 2026-06-28
+
+### Added
+- 关键词富化：`_build_keyword_lookup()` / `_enrich_keywords_for_item()` / `_format_enriched_keywords()` 三个新函数，自动标注每个关联关键词的来源类型（持仓/穿透/行业）
+- 关键词富化集成到 `build_news_data()`，每条新闻新增 `enriched_keywords` 字段
+- Excel 新闻页签格式优化：B 列（标题）宽 40、C 列（摘要）宽 50，启用文本换行 + 左对齐
+- HTML 模板关键词列改用 `enriched_keywords`，按类型着色（持仓→蓝、穿透→紫、行业→灰）
+- CLAUDE.md 新增缺陷自测规则：修复缺陷时优先编写测试用例，新增功能时主动研究能否自测
+
+### Changed
+- **菜单 [1] 更新基础类缓存**：清除范围新增 `news_*` 和 `llm_news_corr_*`（补全缓存清理覆盖）
+- `write_news_sheet()`：关联关键词列使用 `_format_enriched_keywords()` 替代纯 `", ".join(matched_keywords)`，优先显示富化文本
+- `_build_keyword_lookup()` 中文名称索引策略：从 4 字或更长名称中生成 2 字滑动窗口片段（如"长江电力"→"长江""电力"），提高短关键词匹配率
+
+### Docs
+- requirements.md：同步菜单 [1] 缓存范围、缓存文件清单新增 `llm_news_corr_*`、TTL 表新增 `news_corr`、模块 6 新增关键词富化/LLM 关联分析/Excel 格式优化描述、数据源表新增东方财富行业/概念板块
+- README.md：版本 v0.2.9，同步菜单/缓存/模块 6 描述
+- testplan.md：新增关键词富化函数/Excel 格式/HTML 同步测试类别
+- review-findings.md：新增最新一致性审查记录
+- CLAUDE.md：新增缺陷自测规则要求
+
+### Tests
+- 新增 3 个测试类：TestBuildKeywordLookup、TestEnrichKeywordsForItem、TestWriteNewsSheetFormatting
+- 新增 15 项测试：覆盖 lookup 构建（持仓/穿透/去重/空）、富化逻辑（三种类型、排序、空兜底）、格式断言（wrap_text、列宽、对齐）
+- 全量 592 passed, 30 subtests passed
+
 ## [0.2.9] - 2026-06-28
 
 ### Added

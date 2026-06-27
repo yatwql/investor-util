@@ -9,6 +9,7 @@ Python TUI 投资分析工具：读取持仓 Excel → 生成 Excel/HTML 报告�
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：unittest 毗邻源文件（`src/test_*.py`），执行 `pytest src/`
+- **缺陷自测**：发现并修复缺陷时，优先为该缺陷编写可自测的测试用例，避免再次回退。新增功能时，主动研究能否编写自测用例覆盖。
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, testplan.md, changelog.md）
 - **中间文件**：计划/设计文档 → `docs-stm/plan/`；临时/过程文件 → `docs-stm/tmp/`。禁止放在全局 `.claude/` 目录下
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功）、`[!]`（部分失败）、`[ERR]`（错误）
