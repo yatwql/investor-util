@@ -12,7 +12,7 @@
   6. 直接持有股票     → 合并计算
 
 输出列：
-  排名 | 名称 | 代码 | 穿透市值 | 占比 | 板块 | 来源明细
+  排名 | 名称 | 代码 | 穿透市值 | 占比 | 板块 | 概念 | 来源明细
 """
 
 from __future__ import annotations
@@ -36,9 +36,9 @@ from src.report.styles import FMT_MONEY, FMT_PERCENT
 
 logger = logging.getLogger("invest")
 
-_NCOLS = 7
+_NCOLS = 8
 _HEADERS = [
-    "排名", "名称", "代码", "穿透市值", "占比", "板块", "来源明细",
+    "排名", "名称", "代码", "穿透市值", "占比", "板块", "概念", "来源明细",
 ]
 
 # ── 穿透分类常量 ───────────────────────────────────────────
@@ -472,7 +472,7 @@ def compute_penetration_top10(
         merged[norm_name]["mv"] += stock_mv
         merged[norm_name]["funds"].append("直接持有")
 
-    # ── 3.5) 用 API 行业数据补充板块分类 ───────────────────
+    # ── 3.5) 用 API 行业数据补充板块分类和概念 ──────────────
     try:
         _all_pen_codes: list[str] = []
         for _info in merged.values():
@@ -483,9 +483,13 @@ def compute_penetration_top10(
             if _ind_data:
                 for _info in merged.values():
                     for _code in _info.get("codes") or []:
-                        if _code in _ind_data and _ind_data[_code].get("industry"):
-                            _info["sector_api"] = _ind_data[_code]["industry"]
-                            _info["sector"] = _ind_data[_code]["industry"]
+                        if _code in _ind_data:
+                            _id = _ind_data[_code]
+                            if _id.get("industry"):
+                                _info["sector_api"] = _id["industry"]
+                                _info["sector"] = _id["industry"]
+                            if _id.get("concepts"):
+                                _info["concepts"] = _id["concepts"]
                             break
     except Exception as _e:
         logger.debug("穿透板块 API 补充失败（非关键）: %s", _e)
@@ -506,6 +510,8 @@ def compute_penetration_top10(
     top10_list = []
     for rank, (norm_name, info) in enumerate(sorted_items[:10], 1):
         ratio = info["mv"] / total_mv * 100 if total_mv > 0 else 0.0
+        # 概念列表最多取前 3 个
+        concepts = (info.get("concepts") or [])[:3]
         top10_list.append({
             "rank": rank,
             "name": info["name"],
@@ -513,6 +519,7 @@ def compute_penetration_top10(
             "mv": round(info["mv"], 2),
             "ratio_pct": round(ratio, 2),
             "sector": info.get("sector", "--"),
+            "concepts": concepts,
             "sources": sorted(set(info["funds"])),
         })
 
@@ -581,6 +588,8 @@ def write_penetration_sheet(
     summary = result["summary"]
 
     for entry in result["top10"]:
+        concepts = entry.get("concepts", [])
+        concepts_str = " / ".join(concepts) if concepts else "--"
         vals = [
             entry["rank"],
             entry["name"],
@@ -588,6 +597,7 @@ def write_penetration_sheet(
             entry["mv"],
             entry["ratio_pct"] / 100.0,
             entry.get("sector", "--"),
+            concepts_str,
             "; ".join(entry["sources"]),
         ]
         write_data_row(ws, row, vals, _num_formats())
@@ -640,5 +650,6 @@ def _num_formats() -> list[str]:
         FMT_MONEY,    # 4  穿透市值
         FMT_PERCENT,  # 5  占比
         "",           # 6  板块
-        "",           # 7  来源明细
+        "",           # 7  概念
+        "",           # 8  来源明细
     ]

@@ -579,5 +579,110 @@ class TestWriteNewsSheetFormatting(unittest.TestCase):
         self.assertIn("长江电力(600900)", cell_val)
 
 
+# ═══════════════════════════════════════════════════════════
+#  _format_industry_tags
+# ═══════════════════════════════════════════════════════════
+
+
+class TestFormatIndustryTags(unittest.TestCase):
+    """_format_industry_tags 行业/概念标签后缀测试。"""
+
+    def test_holding_with_industry_only(self):
+        """持仓条目仅有行业 → 返回 [行业名]。"""
+        entry = {"industry": "电力设备"}
+        result = nc._format_industry_tags(entry)
+        self.assertEqual(result, " [电力设备]")
+
+    def test_holding_with_concepts_only(self):
+        """持仓条目仅有概念 → 返回 [概念名]。"""
+        entry = {"concepts_list": ["锂电池", "储能"]}
+        result = nc._format_industry_tags(entry)
+        self.assertEqual(result, " [锂电池 · 储能]")
+
+    def test_holding_with_both(self):
+        """持仓条目有行业和概念 → 返回 [行业 · 概念]。
+        行业在前，概念在后。"""
+        entry = {"industry": "电力设备", "concepts_list": ["锂电池", "储能", "新能源"]}
+        result = nc._format_industry_tags(entry)
+        # 概念只取前 2 个
+        self.assertEqual(result, " [电力设备 · 锂电池 · 储能]")
+
+    def test_holding_no_tags(self):
+        """持仓条目无行业/概念 → 返回空字符串。"""
+        entry = {"type": "holding", "name": "长江电力", "code": "600900"}
+        result = nc._format_industry_tags(entry)
+        self.assertEqual(result, "")
+
+    def test_empty_concepts_list(self):
+        """concepts_list 为空列表 → 不报错。"""
+        entry = {"industry": "电力设备", "concepts_list": []}
+        result = nc._format_industry_tags(entry)
+        self.assertEqual(result, " [电力设备]")
+
+    def test_missing_fields(self):
+        """缺少 industry 和 concepts_list → 返回空字符串。"""
+        entry = {}
+        result = nc._format_industry_tags(entry)
+        self.assertEqual(result, "")
+
+
+# ═══════════════════════════════════════════════════════════
+#  富化显示 — 带行业/概念标签
+# ═══════════════════════════════════════════════════════════
+
+
+class TestEnrichKeywordsWithIndustryTags(unittest.TestCase):
+    """验证 enriched_keywords 在 industry_data 传入时附加行业/概念标签。"""
+
+    def _make_lookup(self, industry_data: dict | None = None) -> dict:
+        """构建带 industry_data 的 lookup。"""
+        from src.models import Holding
+        holdings = [
+            Holding("证券", "长江电力", "600900", 100, 10.0),
+        ]
+        return nc._build_keyword_lookup(holdings, industry_data=industry_data)
+
+    def test_holding_display_with_industry_tag(self):
+        """持仓匹配时 display 包含行业标签。"""
+        industry_data = {
+            "600900": {"industry": "电力", "concepts": ["水电", "大盘蓝筹"]},
+        }
+        lookup = self._make_lookup(industry_data)
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["600900"]}, lookup,
+        )
+        self.assertTrue(len(result) >= 1)
+        display = result[0]["display"]
+        self.assertIn("长江电力(600900)", display)
+        self.assertIn("电力", display, "应包含行业名称")
+        self.assertIn("水电", display, "应包含概念名称")
+
+    def test_holding_display_without_industry_data(self):
+        """无 industry_data → display 不加标签。"""
+        lookup = self._make_lookup(industry_data=None)
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["600900"]}, lookup,
+        )
+        display = result[0]["display"]
+        self.assertEqual(display, "长江电力(600900)")
+
+    def test_penetration_display_with_concept(self):
+        """穿透匹配时 display 包含概念标签。"""
+        pen_assets = [
+            {"name": "腾讯控股", "codes": ["00700"]},
+        ]
+        industry_data = {
+            "00700": {"industry": "互联网科技", "concepts": ["社交", "云计算"]},
+        }
+        lookup = nc._build_keyword_lookup([], penetrated_assets=pen_assets,
+                                           industry_data=industry_data)
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["00700"]}, lookup,
+        )
+        display = result[0]["display"]
+        self.assertIn("腾讯控股[穿透]", display)
+        self.assertIn("互联网科技", display, "应包含行业名称")
+
+
 if __name__ == "__main__":
     unittest.main()

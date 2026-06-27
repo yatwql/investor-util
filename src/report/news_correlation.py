@@ -142,7 +142,40 @@ def _build_keyword_lookup(
                         "code": code, "source": "concept",
                     }
 
+    # ── 4) 为持仓/穿透条目附加行业/概念信息 ───
+    # 只有 code 为真实证券代码（纯数字或含字母）的条目才查找 industry_data
+    if industry_data:
+        for _key, _entry in lookup.items():
+            if _entry.get("type") in ("holding", "penetration"):
+                _code = _entry.get("code", "")
+                if _code in industry_data:
+                    _idata = industry_data[_code]
+                    if _idata.get("industry"):
+                        _entry["industry"] = _idata["industry"]
+                    if _idata.get("concepts"):
+                        _entry["concepts_list"] = _idata["concepts"]
+
     return lookup
+
+
+def _format_industry_tags(entry: dict) -> str:
+    """为持仓/穿透条目生成行业/概念标签后缀。
+
+    Args:
+        entry: lookup 条目（可能含 industry / concepts_list 字段）
+
+    Returns:
+        标签字符串，如 " [电力·水电]"；无信息时返回 ""
+    """
+    tags: list[str] = []
+    if entry.get("industry"):
+        tags.append(entry["industry"])
+    concepts_list = entry.get("concepts_list", [])
+    if concepts_list:
+        tags.extend(concepts_list[:2])  # 最多取前 2 个概念
+    if tags:
+        return f" [{' · '.join(tags)}]"
+    return ""
 
 
 def _enrich_keywords_for_item(
@@ -170,7 +203,8 @@ def _enrich_keywords_for_item(
             if ("holding", dedup_key) not in seen:
                 seen.add(("holding", dedup_key))
                 enriched.append({
-                    "display": f"{entry['name']}({entry['code']})",
+                    "display": f"{entry['name']}({entry['code']})"
+                               f"{_format_industry_tags(entry)}",
                     "type": "holding",
                 })
         elif entry and entry["type"] == "penetration":
@@ -178,7 +212,8 @@ def _enrich_keywords_for_item(
             if ("penetration", dedup_key) not in seen:
                 seen.add(("penetration", dedup_key))
                 enriched.append({
-                    "display": f"{entry['name']}[穿透]",
+                    "display": f"{entry['name']}[穿透]"
+                               f"{_format_industry_tags(entry)}",
                     "type": "penetration",
                 })
         elif entry and entry["type"] == "concept":

@@ -4,6 +4,23 @@
 
 ---
 
+## [0.2.13] - 2026-06-28
+
+### Added
+- 穿透 TOP10 新增「概念」列：排名|名称|代码|穿透市值|占比|板块|**概念**|来源明细
+  - 概念数据从行业分类缓存获取（`batch_fetch_industry_data`），取前 3 个概念以 ` / ` 拼接
+  - `compute_penetration_top10()` 返回条目标新增 `concepts` 字段
+  - HTML 模板同步新增概念列
+- 新闻关联关键词补充行业/概念标签：
+  - `_build_keyword_lookup()` 为持仓/穿透条目附加 `industry` 和 `concepts_list` 字段
+  - 新增 `_format_industry_tags()` 生成 ` [行业 · 概念]` 后缀
+  - 持仓显示变为 `长江电力(600900) [电力 · 水电]`、穿透显示变为 `腾讯控股[穿透] [互联网科技 · 社交]`
+
+### Tests
+- `test_penetration.py`：新增 `TestPenetrationConcepts`（2 项测试）验证 concepts 字段输出
+- `test_news_correlation.py`：新增 `TestFormatIndustryTags`（6 项测试）、`TestEnrichKeywordsWithIndustryTags`（3 项测试）
+- 全量 626 passed, 30 subtests passed
+
 ## [0.2.12] - 2026-06-28
 
 ### Added

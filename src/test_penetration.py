@@ -565,5 +565,53 @@ class TestPenetrationEdgeCases(unittest.TestCase):
             self.assertEqual(len(top10), 2)
 
 
+class TestPenetrationConcepts(unittest.TestCase):
+    """测试穿透概念列数据获取与输出。"""
+
+    def test_concepts_in_top10_output(self):
+        """compute_penetration_top10 返回的 top10 条目应包含 concepts 字段。"""
+        holdings = [
+            Holding("证券账户", "电池ETF", "561910", 1000, 1.0),
+        ]
+        details = [MockDetailRow("561910", 10000.0)]
+
+        with patch("src.report.penetration.fetch_fund_holdings") as mock_fetch:
+            mock_fetch.return_value = {
+                "code": "561910", "name": "电池ETF", "date": "2026-03-31",
+                "holdings": [
+                    {"name": "宁德时代", "code": "300750", "ratio": 15.0},
+                    {"name": "比亚迪", "code": "002594", "ratio": 10.0},
+                ],
+            }
+            result = pene.compute_penetration_top10(holdings, details)
+            for entry in result["top10"]:
+                self.assertIn("concepts", entry,
+                              f"TOP10 条目 {entry['name']} 缺少 concepts 字段")
+                # concepts 可以为空列表或字符串列表
+                self.assertIsInstance(entry["concepts"], list)
+
+    def test_concepts_field_in_entry(self):
+        """merged 中的条目应包含 concepts 字段（API 数据补充后）。"""
+        holdings = [
+            Holding("证券账户", "电池ETF", "561910", 1000, 1.0),
+        ]
+        details = [MockDetailRow("561910", 10000.0)]
+
+        with patch("src.report.penetration.fetch_fund_holdings") as mock_fetch:
+            mock_fetch.return_value = {
+                "code": "561910", "name": "电池ETF", "date": "2026-03-31",
+                "holdings": [
+                    {"name": "宁德时代", "code": "300750", "ratio": 15.0},
+                ],
+            }
+            result = pene.compute_penetration_top10(holdings, details)
+            self.assertIn("top10", result)
+            first = result["top10"][0]
+            # concepts 字段应存在（即使为空列表）
+            self.assertIn("concepts", first)
+            # sector 字段应存在
+            self.assertIn("sector", first)
+
+
 if __name__ == "__main__":
     unittest.main()
