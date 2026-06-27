@@ -115,7 +115,7 @@ _ENV.filters["profit_color"] = _jinja_profit_color
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None] | None = None, details: list | None = None) -> str:
+def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     1. 通过各计算模块获取全部分析数据
@@ -227,25 +227,28 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
 
     # ── 8) 财经新闻热点（可选）─────────────────────────────
     if include_news:
-        print("  [..] 正在获取财经新闻...")
-        try:
-            from src.providers.news_aggregator import (
-                aggregate_news,
-                build_holding_keywords,
-            )
-            # 提取穿透 TOP10 资产列表，用于扩展新闻关键词
-            penetrated_assets = penetration.get("top10", []) if penetration else []
-            keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
-            news_data = aggregate_news(keywords, top_n=news_top_count)
-            if not news_data:
+        if news_data is not None:
+            logger.info("复用调用方传入的新闻数据，共 %d 条", len(news_data))
+        else:
+            print("  [..] 正在获取财经新闻...")
+            try:
+                from src.providers.news_aggregator import (
+                    aggregate_news,
+                    build_holding_keywords,
+                )
+                # 提取穿透 TOP10 资产列表，用于扩展新闻关键词
+                penetrated_assets = penetration.get("top10", []) if penetration else []
+                keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
+                news_data = aggregate_news(keywords, top_n=news_top_count)
+                if not news_data:
+                    news_data = []
+                    logger.info("新闻关联分析：无数据")
+                else:
+                    logger.info("新闻关联分析完成，%d 条（关键词含 %d 个穿透资产）",
+                                len(news_data), len(penetrated_assets))
+            except Exception as e:
+                logger.warning("新闻获取失败: %s", e)
                 news_data = []
-                logger.info("新闻关联分析：无数据")
-            else:
-                logger.info("新闻关联分析完成，%d 条（关键词含 %d 个穿透资产）",
-                            len(news_data), len(penetrated_assets))
-        except Exception as e:
-            logger.warning("新闻获取失败: %s", e)
-            news_data = []
     else:
         news_data = []
 

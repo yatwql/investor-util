@@ -237,23 +237,26 @@ class TestCallLlmProvider(unittest.TestCase):
 
     def test_unsupported_provider(self) -> None:
         config = {"provider": "unknown", "api_key": "test"}
-        r = _call_llm("system", "user", config)
-        self.assertIsNone(r)
+        content, usage = _call_llm("system", "user", config)
+        self.assertIsNone(content)
+        self.assertIsNone(usage)
 
     @patch("src.llm_client._call_claude")
     def test_claude_routing(self, mock_call: MagicMock) -> None:
-        mock_call.return_value = "claude result"
+        mock_call.return_value = ("claude result", {"input_tokens": 10, "output_tokens": 50})
         config = {"provider": "claude", "api_key": "sk-xxx"}
-        r = _call_llm("system", "user", config)
-        self.assertEqual(r, "claude result")
+        content, usage = _call_llm("system", "user", config)
+        self.assertEqual(content, "claude result")
+        self.assertEqual(usage, {"input_tokens": 10, "output_tokens": 50})
         mock_call.assert_called_once()
 
     @patch("src.llm_client._call_openai")
     def test_openai_routing(self, mock_call: MagicMock) -> None:
-        mock_call.return_value = "openai result"
+        mock_call.return_value = ("openai result", {"prompt_tokens": 20, "completion_tokens": 80})
         config = {"provider": "openai", "api_key": "sk-xxx"}
-        r = _call_llm("system", "user", config)
-        self.assertEqual(r, "openai result")
+        content, usage = _call_llm("system", "user", config)
+        self.assertEqual(content, "openai result")
+        self.assertEqual(usage, {"prompt_tokens": 20, "completion_tokens": 80})
         mock_call.assert_called_once()
 
 

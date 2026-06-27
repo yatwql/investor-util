@@ -287,28 +287,6 @@ class TestCacheSet(CacheTestBase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  exists 测试
-# ═══════════════════════════════════════════════════════════
-
-
-class TestCacheExists(CacheTestBase):
-    """测试 exists 检查。"""
-
-    def test_exists_file_present(self):
-        """文件存在 → True。"""
-        self._write_cache("present", "x", ts=100.0)
-        from src.cache import exists
-
-        self.assertTrue(exists("present"))
-
-    def test_exists_file_absent(self):
-        """文件不存在 → False。"""
-        from src.cache import exists
-
-        self.assertFalse(exists("absent"))
-
-
-# ═══════════════════════════════════════════════════════════
 #  clear 测试
 # ═══════════════════════════════════════════════════════════
 
@@ -678,9 +656,9 @@ class TestCleanupExpired(CacheTestBase):
         mock_time.return_value = 10000.0
         # get_ttl 不 mock — 让它走真实逻辑
         # "unknown" 前缀不匹配任何 prefix_type_map，data_type 默认为 "news"
-        # news 的默认 TTL 是 CACHE_DAILY=86400
-        # ts=1000 → age=9000 < 86400 → 未过期，不会被删除
-        self._set_time_and_write("unknown_xyz", 1, ts=1000.0)
+        # news 的默认 TTL 是 900 秒
+        # ts=9500 → age=500 < 900 → 未过期，不会被删除
+        self._set_time_and_write("unknown_xyz", 1, ts=9500.0)
 
         from src.cache import cleanup_expired
 

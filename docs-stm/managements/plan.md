@@ -392,6 +392,84 @@
 
 ---
 
+### Iter 3.6 — 全面性能优化与代码清理 ✅ 已完成
+
+**Goal**：多维度性能优化（并行化、Token 压缩、缓存增强）、死代码全面清理、LLM 优化、配置校验增强。
+
+**Files**（修改）：
+- `src/main.py` — 菜单 [1]/[2] ThreadPoolExecutor 并行化；`_busy` 防重入标志；`_check_network_available` 辅助函数
+- `src/llm_client.py` — `_SYSTEM_EXPERT` 压缩至 230 字；`_fmt_wan` 万亿单位压缩；`_call_llm` 返回 `(content, usage)` 元组；缓存预检跳过线程池；Token 用量控制台+文件展示；max_tokens 分离宏/复盘；超时提升至 120s
+- `src/report/llm_content.py` — 参数从 12 个精简至 2 个；移除死 else 分支和未使用 import
+- `src/report/html_writer.py` — `write_html_report` 增加 `news_data` 参数分复用
+- `src/report/excel_writer.py` — `_generate_excel_report` 增加 `news_data` 参数复用
+- `src/cache.py` — 移除 `exists()`；`set()` 增加 FileNotFoundError 重试；前缀映射表清理
+- `src/config.py` — `get_llm_config()` mtime 缓存；cache_ttl/llm.json 配置校验
+- `src/providers/news_aggregator.py` — 新闻 15 分钟缓存；ThreadPoolExecutor 并行获取
+- `src/providers/sina_news.py` — 移除 3 个死函数
+- `src/providers/tiantian.py` — 移除 `fetch_fund_type()` 死函数
+
+**新增文件**：无
+
+**Approach**：
+
+1. **并行化改造**：
+   - 菜单 [1] 基础缓存：ThreadPoolExecutor(max_workers=3)，每线程串行完成基金业绩+持仓+基准三项
+   - 菜单 [2] 持仓缓存：ThreadPoolExecutor(max_workers=5) 并发取价，完成后单线程更新指数和计数
+   - 新闻 3 源：ThreadPoolExecutor(max_workers=3) 并行拉取新浪/东方财富/财联社
+   - 指数：ThreadPoolExecutor(max_workers=2) A 股 + 美股并行
+   - LLM 双生成：ThreadPoolExecutor(max_workers=2)，每线程独立 httpx.Client
+
+2. **死代码清理**：
+   - cache.py：移除 `exists()`
+   - tiantian.py：移除未使用 `fetch_fund_type()`
+   - sina_news.py：移除 3 个死函数及未使用 import re
+   - llm_content.py：~60 行死 else 分支 + 12 个未用参数 + 未使用 import
+   - main.py：移除 portfolio_items 字典及未使用 import
+   - test_cache.py：移除 TestCacheExists
+   - 各模块未使用 import 统一清理
+
+3. **LLM 优化**：
+   - `_SYSTEM_EXPERT` 压缩：~435 字 → ~230 字（移除 emoji、冗余指示词）
+   - `_fmt_wan` 中文单位压缩：市值/盈亏用万/亿表示，减少 ~20-30% 输入 token
+   - 缓存 HTML 直存：免去缓存读取后的第二次 `_markdown_to_html`
+   - 缓存预检：`generate_all_llm` 先检查双缓存是否命中，是则跳过线程池
+   - Token 追踪：控制台 print + HTML 报告脚注嵌入 Token 用量
+   - max_tokens 分离：`max_tokens_macro=800` 用于全局政经，`max_tokens_expert=8192` 用于智囊团
+   - 超时提升：全局 `_LLM_TIMEOUT` 从 60s 提升至 120s
+   - `_call_llm` 返回 `(content, usage)` 元组，下游可获取用量
+
+4. **缓存增强**：
+   - 新闻聚合器 15 分钟缓存（键 `news_{md5}`）
+   - `get_llm_config()` mtime 缓存：仅文件修改时间变化时重读
+   - `exact_map` 新增 `holdings_tracking: benchmark`（30 天 TTL）
+
+5. **配置校验**：
+   - cache_ttl 非正数时输出警告
+   - llm.json provider/endpoint 合法性校验警告
+
+6. **代码健壮性**：
+   - `_busy` 防重入标志
+   - `_check_network_available` 网络检查辅助函数
+   - 7 处 `read_holdings` 后空持仓检查
+   - cache.set() FileNotFoundError 重试
+
+**Test scenarios**：
+- 多线程并发缓存获取不产生数据竞争
+- 新闻缓存 15 分钟后过期重新获取
+- LLM 缓存预检正确跳过线程池（双命中时）
+- _SYSTEM_EXPERT 压缩后输出格式仍符合三阶段格式
+- _fmt_wan 数值格式化正确（万/亿边界）
+- Token 用量正确写入报告 HTML 脚注
+- 无死代码残留（之前移除的函数不存在于 import 或调用链中）
+- 空持仓下菜单功能正常返回
+
+**Verification**：
+- `python -m pytest src/ -q` → 489 passed
+- TUI 各菜单功能正常，响应速度提升显著
+- 新闻/LLM 缓存命中时日志正确显示"缓存命中"
+
+---
+
 ## 系统影响
 
 - `data/holdings/`、`data/cache/`、`data/config/` 在首次运行时需保证存在

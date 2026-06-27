@@ -1,29 +1,23 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working with this repository.
-
 ## Project
 
-Python TUI application that reads personal investment holdings (stocks + funds) from Excel and generates analysis reports in Excel (.xlsx) and/or HTML format. Reports include market value, category summaries, asset penetration, fund performance, news correlation, and LLM-powered macro/risk commentary.
+Python TUI 投资分析工具：读取持仓 Excel → 生成 Excel/HTML 报告（含行情、穿透、基金业绩、新闻关联、LLM 宏观/复盘分析）。
 
 ## Conventions
 
-- **UI language**: All Chinese (menu, errors, report content)
-- **Logging**: Standard `logging` → `logs/app.log` + console. Levels: INFO (normal), WARNING (API switch/skip), ERROR (non-fatal failure)
-- **Tests**: Unittest alongside source (e.g. `src/test_penetration.py`)
-- **Management docs**: All in `docs-stm/managements/` — plan.md, requirements.md, testplan.md, review-findings.md, changelog.md
+- **语言**：中文（UI、报错、报告内容）
+- **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
+- **测试**：unittest 毗邻源文件（`src/test_*.py`），执行 `pytest src/`
+- **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, testplan.md, changelog.md）
+- **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功）、`[!]`（部分失败）、`[ERR]`（错误）
 
-## Holdings xlsx Format
+## 持仓文件格式
 
-- Each worksheet = one account (tab name = account name, e.g. "证券账户")
-- Fixed 4 columns: 名称 (str), 代码 (str), 持仓份额 (float > 0), 每份成本 (float > 0)
-- Column mapping is NOT configurable — columns read by fixed name
-- Prices (最新价/昨日价) fetched live from APIs, not from spreadsheet
+每 worksheet = 一个账户；固定 4 列（名称、代码、持仓份额、每份成本），列名不可配置。
 
-## Source Layout
+## 技术要点
 
-See `docs-stm/README.md` for the complete directory tree and user-facing documentation.
-
-## LLM Provider Support
-
-`llm_client.py` supports `provider: "claude"` in `llm.json` for Anthropic Messages API (including DeepSeek Anthropic-compatible endpoint at `api.deepseek.com/anthropic/v1/messages`) and `provider: "openai"` for OpenAI Chat Completions API.
+- **缓存**：`data/cache/` JSON 文件，`src/cache.py` 统一管理，按前缀匹配 TTL
+- **数据源**：腾讯/东方财富（价格）、天天基金（净值/排名/持仓）、新浪/东方财富/财联社（新闻）
+- **LLM**：`llm_client.py` 支持 `provider: "claude"`（含 DeepSeek Anthropic 兼容端点）和 `"openai"`

@@ -24,6 +24,7 @@ logger = setup_logger()
 
 # 配置缓存（每次菜单循环读一次，配置命令后刷新）
 _config_cache: dict | None = None
+_busy = False  # 防连续按键保护
 
 # ── 菜单定义 ──────────────────────────────────────────────
 
@@ -94,6 +95,21 @@ def _print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
         print(f"        详情: {msg}")
     else:
         print(f"  [ERR] {prefix}: {msg}")
+
+
+def _check_network_available(details: list) -> bool:
+    """检查行情数据是否全部不可用（网络完全中断）。"""
+    if not details:
+        return False
+    all_unavailable = all(
+        getattr(d, 'price', 0) is None or getattr(d, 'price', 0) == 0
+        for d in details
+    )
+    if all_unavailable:
+        print("  [!!] 网络连接异常：所有行情数据均获取失败")
+        print("     请检查网络连接后重试（部分报告内容可能为空）")
+        return False
+    return True
 
 
 def _press_any_key() -> None:
@@ -254,7 +270,7 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
     """检测持仓是否变化，若有新增资产则主动预热其缓存数据。
 
     当检测到持仓变更时：
-      1. 清除关联的合并缓存（fund_benchmarks.json / penetration_cache.json）
+      1. 清除关联的合并缓存（fund_benchmarks.json）
       2. 对新资产主动获取行情、业绩排名、持仓明细
          填充 price_{code}.json / fund_perf_{code}.json / fund_hold_{code}.json
 
@@ -362,6 +378,12 @@ def _cmd_generate_excel() -> None:
         return
     try:
         holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return
         _check_and_warm_for_new_assets(holdings)
         _generate_excel_report(holdings, include_news=False, output_dir=_config_cache.get("output_dir", "reports"))
     except Exception as e:
@@ -378,6 +400,12 @@ def _cmd_generate_excel_with_news() -> None:
         return
     try:
         holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return
         _check_and_warm_for_new_assets(holdings)
         output_dir = _config_cache.get("output_dir", "reports")
         news_top_count = int(_config_cache.get("news_top_count", 100))
@@ -388,7 +416,7 @@ def _cmd_generate_excel_with_news() -> None:
     _press_any_key()
 
 
-def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: list | None = None, us_indices: list | None = None) -> None:
+def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: list | None = None, us_indices: list | None = None, news_data: list | None = None) -> None:
     """生成 Excel 报告的核心逻辑。
 
     Args:
@@ -477,11 +505,14 @@ def _generate_excel_report(holdings: list, include_news: bool = False, output_di
 
     # 第 6 页（可选）：财经新闻热点
     if include_news:
-        logger.info("正在获取财经新闻（含穿透资产关键词）...")
         penetrated_assets = pen_result.get("top10", []) if pen_result else []
 
-        from src.report.news_correlation import build_news_data, write_news_sheet
-        news_data = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
+        if news_data is not None:
+            logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
+        else:
+            logger.info("正在获取财经新闻（含穿透资产关键词）...")
+            from src.report.news_correlation import build_news_data, write_news_sheet
+            news_data = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
         ws6 = wb.create_sheet()
         write_news_sheet(ws6, news_data)
 
@@ -490,7 +521,7 @@ def _generate_excel_report(holdings: list, include_news: bool = False, output_di
         logger.info("正在生成 LLM 增补内容...")
         try:
             from src.report.llm_content import write_llm_sheets
-            macro_text, expert_text = write_llm_sheets(wb, holdings, details, output_dir, total_mv, total_cost, total_profit, today_profit, categories, penetration_data=pen_result, force_llm=force_llm, llm_content=llm_content, a_indices=a_indices, us_indices=us_indices)
+            macro_text, expert_text = write_llm_sheets(wb, llm_content=llm_content)
             logger.info("LLM 增补内容已生成")
         except ImportError:
             logger.warning("LLM 增补模块 (src.report.llm_content) 未就绪，跳过")
@@ -521,6 +552,12 @@ def _cmd_generate_html(news: bool = False) -> None:
     try:
         print("  [..] 正在读取持仓数据...")
         holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return
         print(f"  [OK] 成功读取 {len(holdings)} 条持仓记录")
         _check_and_warm_for_new_assets(holdings)
 
@@ -554,6 +591,12 @@ def _cmd_generate_both() -> None:
         from datetime import datetime
 
         holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return
         _check_and_warm_for_new_assets(holdings)
         output_dir = _config_cache.get("output_dir", "reports")
         news_top_count = int(_config_cache.get("news_top_count", 100))
@@ -563,6 +606,7 @@ def _cmd_generate_both() -> None:
         from src.report.market_value import _generate_details
         print("  [..] 正在获取行情数据...")
         details = _generate_details(holdings, today_str)
+        _check_network_available(details)
         print(f"  [OK] 行情数据获取完成，共 {len(details)} 条")
 
         # HTML 报告
@@ -661,8 +705,10 @@ def _show_llm_tui(macro_text: str, expert_text: str) -> None:
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 增补内容）。
 
-    LLM 内容预先生成一次，传递给 Excel 和 HTML 两个 writer 复用，
-    避免重复调用 API 浪费 token 和时间。
+    LLM 缓存策略：
+      - 全球政经局势：TTL 4 小时 + 行情/持仓指纹 → 缓存有效时不调 API
+      - 智囊团深度复盘：TTL 2 小时 + 持仓/价格指纹 → 缓存有效时不调 API
+      以上两种缓存键均含数据指纹（MD5），持仓/行情变化时自动失效。
     """
     _refresh_config()
     filepath = _select_holdings_file()
@@ -673,6 +719,12 @@ def _cmd_generate_full() -> None:
         from datetime import datetime
 
         holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return
         _check_and_warm_for_new_assets(holdings)
         output_dir = _config_cache.get("output_dir", "reports")
         news_top_count = int(_config_cache.get("news_top_count", 100))
@@ -684,13 +736,18 @@ def _cmd_generate_full() -> None:
 
         today_str = datetime.now().strftime("%Y-%m-%d")
         details = _generate_details(holdings, today_str)
+        _check_network_available(details)
         total_mv = sum(d.market_value for d in details)
         total_cost = sum(d.cost for d in details)
         total_profit = sum(d.profit for d in details)
         total_today_profit = sum(d.today_profit for d in details)
         categories = classify_holdings(holdings)
-        a_idx_dict = fetch_indices()
-        us_idx_dict = fetch_us_indices()
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=2) as _idx_ex:
+            _a_fut = _idx_ex.submit(fetch_indices)
+            _us_fut = _idx_ex.submit(fetch_us_indices)
+            a_idx_dict = _a_fut.result()
+            us_idx_dict = _us_fut.result()
         a_indices = list(a_idx_dict.values())
         us_indices = list(us_idx_dict.values())
         pen_result = compute_penetration_top10(holdings, details)
@@ -711,33 +768,46 @@ def _cmd_generate_full() -> None:
             for d in details
         ]
 
-        # ── LLM 生成（仅一次，缓存指纹避免重复）────────────────
-        from src.cache import compute_holdings_fingerprint, get as cache_get, set as cache_set
+        # ── 并行获取新闻 + 生成 LLM 内容（一次计算，两处复用）────
+        from concurrent.futures import ThreadPoolExecutor
         from src.llm_client import generate_all_llm
+        from src.report.news_correlation import build_news_data
 
-        fp = compute_holdings_fingerprint(holdings)
-        prev_fp = cache_get("llm_holdings_fp", 86400)
-        force_llm = (prev_fp is None or prev_fp != fp)
-        if force_llm:
-            cache_set("llm_holdings_fp", fp)
+        with ThreadPoolExecutor(max_workers=2) as _llm_ex:
+            # 新闻获取（3 源并行获取，约 1s）
+            _news_fut = _llm_ex.submit(build_news_data, holdings, news_top_count, penetrated_assets)
 
-        llm_macro, llm_expert = generate_all_llm(
-            a_indices, us_indices, total_mv, total_cost, total_profit,
-            total_today_profit, len(holdings), categories,
-            penetrated_assets=penetrated_assets,
-            holdings_details=holdings_details, force=force_llm,
-        )
+            # LLM 生成（内部含缓存判断 + 1-2 次 API 调用）
+            def _run_llm():
+                from src.llm_client import generate_all_llm
+                return generate_all_llm(
+                    a_indices, us_indices, total_mv, total_cost, total_profit,
+                    total_today_profit, len(holdings), categories,
+                    penetrated_assets=penetrated_assets,
+                    holdings_details=holdings_details, force=False,
+                )
+            _llm_fut = _llm_ex.submit(_run_llm)
+
+            news_data = _news_fut.result()
+            llm_macro, llm_expert = _llm_fut.result()
+
         llm_content = (llm_macro, llm_expert)
 
         # ── HTML 报告 ──────────────────────────────────────────
         from src.report.html_writer import write_html_report
         print("  [..] 正在生成 HTML 报告（含新闻 + LLM 增补内容）...")
-        path = write_html_report(
-            holdings, output_dir=output_dir,
-            news_top_count=news_top_count, include_news=True,
-            llm_content=llm_content, details=details,
-        )
-        print(f"  [OK] HTML 报告已生成: {path}")
+        try:
+            path = write_html_report(
+                holdings, output_dir=output_dir,
+                news_top_count=news_top_count, include_news=True,
+                llm_content=llm_content, details=details,
+                news_data=news_data,
+            )
+            print(f"  [OK] HTML 报告已生成: {path}")
+        except Exception as e:
+            logger.exception("HTML 报告写入失败")
+            print(f"  [ERR] HTML 报告生成失败: {e}")
+            print("  [..] 继续生成 Excel 报告...")
 
         # ── Excel 报告 ─────────────────────────────────────────
         print()
@@ -746,6 +816,7 @@ def _cmd_generate_full() -> None:
             news_top_count=news_top_count, include_llm=True,
             llm_content=llm_content, show_llm_in_tui=True,
             details=details, a_indices=a_indices, us_indices=us_indices,
+            news_data=news_data,
         )
 
     except Exception as e:
@@ -778,6 +849,12 @@ def _cmd_update_basic_cache() -> None:
     try:
         print("  [..] 正在读取持仓数据...")
         holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return
         print(f"  [OK] 共 {len(holdings)} 条持仓记录")
 
         # 筛选基金
@@ -790,41 +867,42 @@ def _cmd_update_basic_cache() -> None:
         # 1) 清除旧缓存
         print()
         print("  [..] 清除旧缓存...")
+        clear_by_prefix("fund_perf_")
         clear_by_prefix("fund_hold_")
         clear("fund_benchmarks")
         print("  [OK] 旧缓存已清除")
 
         # 2) 获取基金业绩排名 + 持仓 + 基准
         print()
-        print(f"  [..] 获取 {len(funds)} 只基金的业绩排名、持仓数据和业绩基准...")
-        perf_ok = hold_ok = bm_ok = 0
-        for idx, fund in enumerate(funds, 1):
-            # 业绩排名（fetch_fund_rankings 自动写入 fund_perf_{code}.json）
-            print(f"  [..]   [{idx}/{len(funds)}] {fund.name} ({fund.code}) — 业绩排名...", end="")
-            result = fetch_fund_rankings(fund.code)
-            if result:
-                perf_ok += 1
-                print(" OK")
-            else:
-                print(" 失败")
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        print(f"  [..]   并行获取 {len(funds)} 只基金的数据（最多 3 路并发）...")
 
-            # 持仓（fetch_fund_holdings 自动写入 fund_hold_{code}.json）
-            print(f"  [..]   [{idx}/{len(funds)}] {fund.name} ({fund.code}) — 持仓...", end="")
-            holdings_data = fetch_fund_holdings(fund.code)
-            if holdings_data and holdings_data.get("holdings"):
-                hold_ok += 1
-                print(f" {len(holdings_data['holdings'])} 条")
-            else:
-                print(" 无数据")
-
-            # 业绩基准（fetch_fund_benchmark 自动写入 fund_benchmarks.json）
-            print(f"  [..]   [{idx}/{len(funds)}] {fund.name} ({fund.code}) — 业绩基准...", end="")
+        def _refresh_one_fund(fund):
+            """获取单只基金的业绩排名、持仓明细、业绩基准。返回 (code, name, perf_ok, hold_ok, bm_ok, benchmark_str)."""
+            perf_result = fetch_fund_rankings(fund.code)
+            perf_ok = bool(perf_result)
+            hold_data = fetch_fund_holdings(fund.code)
+            hold_ok = bool(hold_data and hold_data.get("holdings"))
+            hold_count = len(hold_data["holdings"]) if hold_data and hold_data.get("holdings") else 0
             bm = fetch_fund_benchmark(fund.code)
-            if bm and bm != "--":
-                bm_ok += 1
-                print(f" {bm}")
-            else:
-                print(" 未找到")
+            bm_ok = bool(bm and bm != "--")
+            return (fund.code, fund.name, perf_ok, hold_ok, hold_count, bm_ok, bm if bm_ok else "")
+
+        perf_ok = hold_ok = bm_ok = 0
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            fut_to_fund = {executor.submit(_refresh_one_fund, f): f for f in funds}
+            for future in as_completed(fut_to_fund):
+                code, name, p_ok, h_ok, h_cnt, b_ok, bm_str = future.result()
+                if p_ok: perf_ok += 1
+                if h_ok: hold_ok += 1
+                if b_ok: bm_ok += 1
+                parts = [f"业绩={'OK' if p_ok else '失败'}"]
+                if h_ok:
+                    parts.append(f"持仓={h_cnt}条")
+                else:
+                    parts.append("持仓=无数据")
+                parts.append(f"基准={'OK' if b_ok else '未找到'}")
+                print(f"  [OK]   {name} ({code}) — {' | '.join(parts)}")
 
         # 汇总
         print()
@@ -857,18 +935,15 @@ def _cmd_update_basic_cache() -> None:
 
 
 def _cmd_update_position_cache() -> None:
-    """更新持仓类缓存 — 清除旧缓存 → 重新获取价格/指数/穿透数据。
+    """更新持仓类缓存 — 清除旧缓存 → 重新获取价格/指数，并清除关联 LLM 缓存。
 
     缓存文件：
       price_{code}.json         → 单条持仓价格/净值（由 fetch_market_data 自动写入）
-      portfolio_latest.json    → 持仓主数据
-      penetration_cache.json   → 穿透 TOP10 计算结果
-      智囊团深度复盘缓存        → 持仓变化时 LLM 专家复盘自动失效
+      index_{code}.json         → 指数行情
+      llm_global_macro_* / llm_expert_*  → LLM 缓存（数据变更后自动失效）
     """
-    from src.cache import clear, clear_by_prefix, set as cache_set
+    from src.cache import clear_by_prefix
     from src.fetcher import fetch_indices, fetch_market_data, fetch_us_indices
-    from src.report.market_value import DetailRow, classify_holdings
-    from src.report.penetration import compute_penetration_top10
 
     _refresh_config()
     filepath = _select_holdings_file()
@@ -878,6 +953,12 @@ def _cmd_update_position_cache() -> None:
     try:
         print("  [..] 正在读取持仓数据...")
         holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return
         print(f"  [OK] 共 {len(holdings)} 条持仓记录")
 
         # 1) 清除旧缓存
@@ -885,39 +966,31 @@ def _cmd_update_position_cache() -> None:
         print("  [..] 清除旧缓存...")
         price_count = clear_by_prefix("price_")
         index_count = clear_by_prefix("index_")
-        clear("portfolio_latest")
-        clear("penetration_cache")
         expert_count = clear_by_prefix("llm_expert")
+        macro_count = clear_by_prefix("llm_global_macro")
         print(f"  [OK] 价格缓存 {price_count} 条 + 指数缓存 {index_count} 条 + "
-              f"穿透缓存 + 持仓主数据 + 智囊团复盘 {expert_count} 条 已清除")
+              f"智囊团复盘 {expert_count} 条 + 全球政经 {macro_count} 条 已清除")
 
-        # 2) 获取所有持仓的最新价格/净值
+        # 2) 获取所有持仓的最新价格/净值 → 预热 price_{code}.json
         print()
-        print(f"  [..] 获取 {len(holdings)} 条持仓的最新价格/净值...")
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        print(f"  [..]   并行获取 {len(holdings)} 条持仓的价格/净值（最多 5 路并发）...")
         price_ok = 0
-        portfolio_items = []
-        for idx, h in enumerate(holdings, 1):
-            print(f"  [..]   [{idx}/{len(holdings)}] {h.name} ({h.code})...", end="")
-            result = fetch_market_data(h.code, h.name)
-            if result and result.get("price", 0) > 0:
-                price_ok += 1
-                price = result["price"]
-                mv = round(price * h.shares, 2)
-                portfolio_items.append({
-                    "name": h.name, "code": h.code,
-                    "account": h.account, "shares": h.shares,
-                    "cost_price": h.cost_price,
-                    "price": price,
-                    "yesterday_close": result.get("yesterday_close", 0),
-                    "price_date": result.get("price_date", ""),
-                    "source": result.get("source", ""),
-                    "market_value": mv,
-                })
-                print(f" {price:.4f}")
-            else:
-                print(" 失败")
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            fut_to_h = {executor.submit(fetch_market_data, h.code, h.name): h for h in holdings}
+            for future in as_completed(fut_to_h):
+                h = fut_to_h[future]
+                try:
+                    result = future.result()
+                    if result and result.get("price", 0) > 0:
+                        price_ok += 1
+                        print(f"  [OK]   {h.name} ({h.code}) → {result['price']:.4f}")
+                    else:
+                        print(f"  [!]   {h.name} ({h.code}) → 失败")
+                except Exception as e:
+                    print(f"  [ERR]  {h.name} ({h.code}) → {e}")
 
-        # 3) 获取指数行情
+        # 3) 获取指数行情 → 预热 index_{code}.json
         print()
         print("  [..] 获取市场指数...")
         print("  [..]   获取 A 股指数...", end="")
@@ -927,49 +1000,11 @@ def _cmd_update_position_cache() -> None:
         us_idx = fetch_us_indices()
         print(f" {len(us_idx)} 个指数")
 
-        # 写入组合主数据缓存
-        categories = classify_holdings(holdings)
-        portfolio_data = {
-            "update_time": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "total_holdings": len(holdings),
-            "items": portfolio_items,
-            "categories": {k: len(v) for k, v in categories.items()},
-        }
-        cache_set("portfolio_latest", portfolio_data)
-        print("  [OK]   持仓主数据 (portfolio_latest) 已缓存")
-
-        # 5) 计算并缓存穿透 TOP10
-        print()
-        print("  [..]   计算资产穿透 TOP10...")
-
-        # 先构建假的 DetailRow（因为 compute_penetration_top10 需要细节行）
-        detail_rows = []
-        for item in portfolio_items:
-            dr = DetailRow(
-                account=item["account"],
-                name=item["name"],
-                code=item["code"],
-                price=item["price"],
-                shares=item["shares"],
-                market_value=item["market_value"],
-                cost=round(item["cost_price"] * item["shares"], 2),
-            )
-            detail_rows.append(dr)
-
-        pen_result = compute_penetration_top10(holdings, detail_rows)
-        cache_set("penetration_cache", pen_result)
-
-        top10_count = len(pen_result["top10"])
-        merged_count = pen_result["summary"]["merged_count"]
-        print(f"  [OK]   穿透 TOP10 已缓存 — 合并 {merged_count} 个标的，TOP10 {top10_count} 条")
-
         # 汇总
         print()
         print(f"  {'=' * 40}")
-
         price_fail = len(holdings) - price_ok
         total_idx = len(a_idx) + len(us_idx)
-
         print(f"  持仓缓存更新完成 — 共 {len(holdings)} 条持仓")
         print()
         if price_fail == 0:
@@ -977,16 +1012,7 @@ def _cmd_update_position_cache() -> None:
         else:
             print(f"  [!] price_{{code}}.json          ({price_ok}/{len(holdings)} 成功, {price_fail} 条失败)")
         print(f"  [OK] index_{{code}}.json           (A股 {len(a_idx)} 个 + 美股 {len(us_idx)} 个 = {total_idx} 个指数)")
-        if price_fail == 0:
-            print(f"  [OK] portfolio_latest.json         (全量数据完整)")
-        else:
-            print(f"  [!] portfolio_latest.json         (已写入，但有 {price_fail} 条持仓缺价格)")
-        if len(pen_result["top10"]) > 0:
-            print(f"  [OK] penetration_cache.json        ({merged_count} 个合并标的, TOP10 {top10_count} 条)")
-        else:
-            print(f"  [!] penetration_cache.json        (穿透计算TOP10为空)")
-        print(f"  ---")
-        print(f"  缓存文件已写入 data/cache/ 目录")
+        print(f"  [OK] LLM 关联缓存已清除（下次菜单 L 自动使用最新数据）")
 
     except Exception as e:
         logger.exception("更新持仓缓存失败")
@@ -1045,16 +1071,22 @@ def _index_by_key(key: str) -> int | None:
 
 def _execute_item(sel: int) -> None:
     """执行第 sel 项菜单的回调或退出。"""
+    global _busy
     _, _label, callback, is_exit = MENU_ITEMS[sel]
     if is_exit:
         _exit_app()
     if callback is not None:
+        if _busy:
+            return
+        _busy = True
         try:
             callback()
         except KeyboardInterrupt:
             print()
             print("  操作已取消")
             _press_any_key()
+        finally:
+            _busy = False
 
 
 # ── 主循环 ──────────────────────────────────────────────
@@ -1087,14 +1119,14 @@ def main() -> None:
             sel = (sel - 1) % len(MENU_ITEMS)
         elif key == KEY_DOWN:
             sel = (sel + 1) % len(MENU_ITEMS)
-        elif key == KEY_ENTER:
+        elif key == KEY_ENTER and not _busy:
             _execute_item(sel)
         elif key == KEY_CTRL_C:
             _exit_app()
         elif len(key) == 1 and ("A" <= key <= "Z" or "a" <= key <= "z" or "0" <= key <= "9"):
             # 统一转为大写匹配菜单快捷键
             idx = _index_by_key(key.upper())
-            if idx is not None:
+            if idx is not None and not _busy:
                 sel = idx
                 _execute_item(idx)
             # else: 非菜单字母 -> 忽略

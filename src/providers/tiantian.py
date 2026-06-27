@@ -476,37 +476,3 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     }
 
 
-# ── 基金类型判断辅助 ────────────────────────────────────
-
-
-def fetch_fund_type(code: str) -> str:
-    """获取基金类型（股票型/混合型/债券型/货币型/QDII 等）。
-
-    通过 fund.eastmoney.com 页面解析。
-
-    Args:
-        code: 6 位基金代码
-
-    Returns:
-        基金类型字符串，如 "股票型"、"混合型"；获取失败返回空字符串
-    """
-    url = f"https://fund.eastmoney.com/{code.strip()}.html"
-    try:
-        with httpx.Client(timeout=_TIMEOUT, follow_redirects=True, verify=False) as client:
-            resp = client.get(url, headers=_HEADERS)
-            resp.encoding = "utf-8"
-            html = resp.text
-    except httpx.RequestError:
-        return ""
-
-    # 从页面中查找基金类型
-    patterns = [
-        r"基金类型[：:]\s*([^<>\s]+)",
-        r'fundType[^>]*>\s*([^<>\s]+)',
-        r'class="[^"]*type[^"]*"[^>]*>\s*([^<>\s]+)',
-    ]
-    for pattern in patterns:
-        m = re.search(pattern, html)
-        if m:
-            return m.group(1).strip()
-    return ""

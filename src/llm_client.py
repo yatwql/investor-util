@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
 
@@ -128,7 +129,7 @@ _CACHE_PREFIX_LLM = "llm_"
 
 # ── 默认超时 ─────────────────────────────────────────────────
 
-_LLM_TIMEOUT = 60.0
+_LLM_TIMEOUT = 120.0
 
 # 共享 HTTP 连接池（keep-alive 复用，避免每次调用重建 TCP 握手）
 _HTTP_POOL = httpx.Client(timeout=_LLM_TIMEOUT)
@@ -140,19 +141,37 @@ _RETRY_DELAYS = [1.0, 3.0]  # 指数退避：第 1 次等 1s，第 2 次等 3s
 
 
 def _get_cache_ttl_llm(subtype: str = "macro") -> float:
-    """获取 LLM 缓存 TTL，优先 subtype 专属配置，再 fallback 通用 llm 配置。
+    """获取 LLM 缓存 TTL。
+
+    TTL 优先级：
+      1. llm.json 中的 cache_ttl_macro / cache_ttl_expert（自定义配置）
+      2. config.json 中的 cache_ttl.llm_macro / cache_ttl.llm_expert
+      3. 代码默认值（全局政经 14400s / 智囊团 7200s）
 
     Args:
         subtype: "macro"（模块 7）或 "expert"（模块 8）
 
     Returns:
-        过期时间（秒），默认 24h
+        过期时间（秒）
     """
+    # 优先从 llm.json 读取自定义 TTL
+    try:
+        from src.config import get_llm_config
+        llm_config = get_llm_config()
+        if llm_config:
+            key = f"cache_ttl_{subtype}"
+            ttl = llm_config.get(key)
+            if ttl is not None and isinstance(ttl, (int, float)) and ttl > 0:
+                return float(ttl)
+    except Exception:
+        pass
+
+    # fallback 到 config.json cache_ttl -> 代码默认值
     try:
         from src.cache import get_ttl
         return get_ttl(f"llm_{subtype}")
     except Exception:
-        return 86400
+        return 14400 if subtype == "macro" else 7200
 
 
 def _compute_fingerprint(*args: Any) -> str:
@@ -181,8 +200,10 @@ def _log_token_usage(provider: str, usage: dict | None, label: str) -> None:
     else:
         inp = usage.get("prompt_tokens", 0)
         out = usage.get("completion_tokens", 0)
+    total = inp + out
     logger.info("LLM 用量 [%s]: 输入 %d token, 输出 %d token, 合计 %d token",
-                label, inp, out, inp + out)
+                label, inp, out, total)
+    print(f"  [LLM] {label}: 输入 {inp:,} + 输出 {out:,} = {total:,} tokens")
 
 
 _TRUNCATION_WARNING = (
@@ -191,7 +212,7 @@ _TRUNCATION_WARNING = (
 )
 
 
-def _check_claude_truncation(data: dict, max_tokens: int, label: str) -> None:
+def _check_claude_truncation(data: dict, max_tokens: int, label: str) -> bool:
     """检查 Claude Messages API 响应是否被 max_tokens 截断。
 
     若 stop_reason 为 "max_tokens"，说明输出达到 token 上限被截断，
@@ -275,7 +296,9 @@ def _call_llm(
     user_prompt: str,
     llm_config: dict,
     timeout: float = 60.0,
-) -> Optional[str]:
+    http_client: httpx.Client | None = None,
+    max_tokens: int | None = None,
+) -> tuple[Optional[str], Optional[dict]]:
     """调用 LLM API 生成文本。
 
     Args:
@@ -283,23 +306,26 @@ def _call_llm(
         user_prompt: 用户提示词
         llm_config: LLM 配置字典
         timeout: API 超时秒数，默认 60s（模块 7 用）；模块 8（智囊团）建议 120s
+        http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
+            而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
+        max_tokens: 可选覆盖值，优先级高于 llm_config 中的 max_tokens（含 max_tokens_macro/expert）
 
     Returns:
-        生成的文本内容，调用失败返回 None
+        (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
     """
     provider = llm_config.get("provider", "")
     api_key = llm_config.get("api_key", "")
     model = llm_config.get("model", "")
     endpoint = llm_config.get("endpoint", "")
-    max_tokens = llm_config.get("max_tokens", 2500)
+    max_tokens = max_tokens or 2500
 
     if provider == "claude":
-        return _call_claude(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout)
+        return _call_claude(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout, http_client=http_client)
     elif provider == "openai":
-        return _call_openai(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout)
+        return _call_openai(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout, http_client=http_client)
     else:
         logger.warning("不支持的 LLM provider: %s", provider)
-        return None
+        return (None, None)
 
 
 def _call_claude(
@@ -310,8 +336,17 @@ def _call_claude(
     endpoint: str,
     max_tokens: int,
     timeout: float = 60.0,
-) -> Optional[str]:
-    """调用 Claude API (Messages API)，带重试 + 用量日志。"""
+    http_client: httpx.Client | None = None,
+) -> tuple[Optional[str], Optional[dict]]:
+    """调用 Claude API (Messages API)，带重试 + 用量日志。
+
+    Args:
+        http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
+            而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
+
+    Returns:
+        (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
+    """
     url = endpoint or "https://api.anthropic.com/v1/messages"
     headers = {
         "Content-Type": "application/json",
@@ -324,10 +359,11 @@ def _call_claude(
         "system": system,
         "messages": [{"role": "user", "content": user}],
     }
+    client = http_client or _HTTP_POOL
 
     for attempt in range(_RETRY_MAX + 1):
         try:
-            resp = _HTTP_POOL.post(url, json=payload, headers=headers, timeout=timeout)
+            resp = client.post(url, json=payload, headers=headers, timeout=timeout)
             if resp.status_code in (429, 503) and attempt < _RETRY_MAX:
                 delay = _RETRY_DELAYS[attempt]
                 logger.warning("Claude API %d (尝试 %d/%d)，%.1fs 后重试...",
@@ -338,35 +374,36 @@ def _call_claude(
             data = resp.json()
         except httpx.TimeoutException:
             logger.warning("Claude API 超时")
-            return None
+            return (None, None)
         except httpx.RequestError:
             host = _sanitize_endpoint(endpoint)
             logger.warning("Claude API 请求失败 (%s)", host)
-            return None
+            return (None, None)
         except (ValueError, KeyError) as e:
             logger.warning("Claude API 响应解析失败: %s", e)
-            return None
+            return (None, None)
 
         # 兼容多种响应格式：标准 Claude Messages API 及 DeepSeek Anthropic 兼容端点
         content = _extract_content(data, endpoint)
         if content is None:
             logger.warning("Claude API 响应格式异常 (provider=%s)",
                            endpoint.split("/")[2] if endpoint else "unknown")
-            return None
+            return (None, None)
 
         # 检查是否被 max_tokens 截断
         truncated = _check_claude_truncation(data, max_tokens, "Claude")
 
         # 记录 token 用量
-        _log_token_usage("claude", data.get("usage"), "Claude")
+        usage = data.get("usage")
+        _log_token_usage("claude", usage, "Claude")
 
         content = content.strip()
         if truncated:
             content += _TRUNCATION_WARNING
 
-        return content
+        return (content, usage)
 
-    return None
+    return (None, None)
 
 
 def _call_openai(
@@ -377,8 +414,17 @@ def _call_openai(
     endpoint: str,
     max_tokens: int,
     timeout: float = 60.0,
-) -> Optional[str]:
-    """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。"""
+    http_client: httpx.Client | None = None,
+) -> tuple[Optional[str], Optional[dict]]:
+    """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。
+
+    Args:
+        http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
+            而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
+
+    Returns:
+        (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
+    """
     url = endpoint or "https://api.openai.com/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
@@ -392,10 +438,11 @@ def _call_openai(
             {"role": "user", "content": user},
         ],
     }
+    client = http_client or _HTTP_POOL
 
     for attempt in range(_RETRY_MAX + 1):
         try:
-            resp = _HTTP_POOL.post(url, json=payload, headers=headers, timeout=timeout)
+            resp = client.post(url, json=payload, headers=headers, timeout=timeout)
             if resp.status_code in (429, 503) and attempt < _RETRY_MAX:
                 delay = _RETRY_DELAYS[attempt]
                 logger.warning("OpenAI API %d (尝试 %d/%d)，%.1fs 后重试...",
@@ -406,34 +453,35 @@ def _call_openai(
             data = resp.json()
         except httpx.TimeoutException:
             logger.warning("OpenAI API 超时")
-            return None
+            return (None, None)
         except httpx.RequestError:
             host = _sanitize_endpoint(endpoint)
             logger.warning("OpenAI API 请求失败 (%s)", host)
-            return None
+            return (None, None)
         except (ValueError, KeyError) as e:
             logger.warning("OpenAI API 响应解析失败: %s", e)
-            return None
+            return (None, None)
 
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError):
             logger.warning("OpenAI API 响应格式异常")
-            return None
+            return (None, None)
 
         # 检查是否被 max_tokens 截断
         truncated = _check_openai_truncation(data, max_tokens, "OpenAI")
 
         # 记录 token 用量
-        _log_token_usage("openai", data.get("usage"), "OpenAI")
+        usage = data.get("usage")
+        _log_token_usage("openai", usage, "OpenAI")
 
         content = content.strip()
         if truncated:
             content += _TRUNCATION_WARNING
 
-        return content
+        return (content, usage)
 
-    return None
+    return (None, None)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -443,15 +491,15 @@ def _call_openai(
 _SYSTEM_MACRO = """你是一位资深宏观经济学家。基于市场数据输出中文全球政经局势分析（500字内）。
 分3-4段，覆盖主要经济体政策走向、地缘风险、对持仓潜在影响。纯文本，不要使用HTML标签。"""
 
-_SYSTEM_EXPERT = """你是投资智囊团召集人，审计用户投资组合后召集圆桌会议，严格按三阶段输出：
+_SYSTEM_EXPERT = """你是投资智囊团召集人，审计用户投资组合后按三阶段输出：
 
-**Phase 1 召集令**：指出组合核心矛盾（如行业集中度过高、股债配比失衡、单品种超配），挑5位流派对立的专家并标明身份立场。🕵 指挥官：[组合画像]... [专家]：[头衔] - [立场]...
+Phase 1（召集令）指出组合核心矛盾，挑5位流派对立专家并标明立场。指挥官画像，专家列头衔立场。
 
-**Phase 2 圆桌会**（两轮）：第一轮 🗣 专家立足持有品种结构提优化方向。第二轮 🗣 专家间互相反驳/拆台，聚焦调仓优先级。
+Phase 2（圆桌会）两轮辩论：第一轮立足结构提方向，第二轮互相反驳聚焦调仓优先级。
 
-**Phase 3 定音锤**：⚖ 指挥官融合辩论，给出具体量化的调仓方案和风险提示。调仓目标必须是我直接持有的品种（基金/股票），禁止针对穿透后的底层资产（如个股、债券）调仓——我无法直接交易穿透层资产。
+Phase 3（定音锤）指挥官融合辩论给出量化调仓方案和风险提示。禁止调仓穿透层底层资产，只调直接持有品种。
 
-约束：① 数据必须来自输入，禁止虚构价格/代码；② 每个论点引用具体持有品种的代码、成本占比、收益率（而非穿透层代码）；③ 全 Markdown 输出；④ 引用北京时间。"""
+约束：数据来自输入不虚构；每个论点引用品种代码和收益率；全 Markdown 输出；引用北京时间。"""
 
 
 # ═══════════════════════════════════════════════════════════
@@ -500,6 +548,15 @@ def _sanitize_endpoint(endpoint: str) -> str:
         return "unknown"
 
 
+def _fmt_wan(num: float) -> str:
+    """将数值格式化为中文单位（万/亿），减少 token 消耗。"""
+    if abs(num) >= 100_000_000:
+        return f"{num/100_000_000:.2f}亿"
+    if abs(num) >= 10_000:
+        return f"{num/10_000:.1f}万"
+    return f"{num:,.0f}"
+
+
 def _build_review_prompt(
     total_mv: float,
     total_cost: float,
@@ -518,22 +575,18 @@ def _build_review_prompt(
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
-    # 持仓明细清单（防止 LLM 虚构代码）
+    # 持仓明细清单（防止 LLM 虚构代码）—— 用中文单位压缩 token
     holdings_text = ""
     if holdings_details:
         lines = []
-        for h in holdings_details[:30]:  # 上限30条防止超token
-            name = h.get("name", "")
+        for h in holdings_details[:30]:
             code = h.get("code", "")
             mv = h.get("market_value", 0)
-            cost = h.get("cost", 0)
             profit = h.get("profit", 0)
             rate = h.get("profit_rate", 0)
             chg = h.get("change_pct", 0)
             lines.append(
-                f"{name}({code}) 市值{mv:,.0f} 成本{cost:,.0f} "
-                f"盈亏{profit:+,.0f}({rate:+.2f}%) "
-                f"今日{chg:+.2f}%"
+                f"{code} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}({rate:+.2f}%) 今{chg:+.2f}%"
             )
         holdings_text = "\n".join(lines)
 
@@ -546,7 +599,7 @@ def _build_review_prompt(
             codes = ",".join(asset.get("codes", []))
             mv = asset.get("mv", 0)
             sector = asset.get("sector", "--")
-            assets.append(f"{name}({codes}){mv:,.0f}/{sector}")
+            assets.append(f"{name}({codes}){_fmt_wan(mv)}/{sector}")
         pen_text = " | 穿透:" + " ".join(assets)
 
     return (
@@ -572,6 +625,7 @@ def generate_global_macro(
     total_profit: float,
     categories: dict,
     force: bool = False,
+    http_client: httpx.Client | None = None,
 ) -> Optional[str]:
     """生成模块 7：全球政经局势分析。
 
@@ -582,6 +636,8 @@ def generate_global_macro(
         total_profit: 总盈亏
         categories: 分类计数
         force: 为 True 时跳过缓存强制重新生成
+        http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
+            而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
 
     Returns:
         HTML 格式的分析文本，LLM 不可用时返回 None
@@ -600,18 +656,24 @@ def generate_global_macro(
         cached = cache_get(cache_key, _get_cache_ttl_llm("macro"))
         if cached is not None:
             logger.info("LLM 缓存命中: 全球政经局势")
-            return _markdown_to_html(cached)
+            return cached
 
     # 优先使用外部配置的 system_prompt，未配置时回退内置常量
     system_macro = llm_config.get("system_prompt_macro") or _SYSTEM_MACRO
     prompt = _build_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories)
     logger.info("正在调用 LLM 生成全球政经局势分析...")
-    result = _call_llm(system_macro, prompt, llm_config, timeout=60.0)
+    macro_mt = llm_config.get("max_tokens_macro") or llm_config.get("max_tokens", 800)
+    result, usage = _call_llm(system_macro, prompt, llm_config, timeout=60.0, http_client=http_client, max_tokens=macro_mt)
 
     if result:
-        cache_set(cache_key, result)
+        html = _markdown_to_html(result)
+        if usage:
+            inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+            out = usage.get("output_tokens", usage.get("completion_tokens", 0))
+            html += f'<p style="color:#888;font-size:12px">⚡ Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
+        cache_set(cache_key, html)
         logger.info("全球政经局势分析生成完成")
-        return _markdown_to_html(result)
+        return html
     else:
         logger.warning("全球政经局势分析生成失败")
 
@@ -628,6 +690,7 @@ def generate_expert_review(
     penetrated_assets: Optional[list[dict]] = None,
     holdings_details: Optional[list[dict]] = None,
     force: bool = False,
+    http_client: httpx.Client | None = None,
 ) -> Optional[str]:
     """生成模块 8：智囊团深度复盘。
 
@@ -641,6 +704,8 @@ def generate_expert_review(
         penetrated_assets: 穿透 TOP10 资产列表（可选）
         holdings_details: 持仓明细列表，每项含 name/code/market_value/cost/profit/profit_rate（可选）
         force: 为 True 时跳过缓存强制重新生成
+        http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
+            而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
 
     Returns:
         HTML 格式的复盘文本，LLM 不可用时返回 None
@@ -662,7 +727,7 @@ def generate_expert_review(
         cached = cache_get(cache_key, _get_cache_ttl_llm("expert"))
         if cached is not None:
             logger.info("LLM 缓存命中: 智囊团深度复盘")
-            return _markdown_to_html(cached)
+            return cached
 
     # 优先使用外部配置的 system_prompt，未配置时回退内置常量
     system_expert = llm_config.get("system_prompt_expert") or _SYSTEM_EXPERT
@@ -672,13 +737,19 @@ def generate_expert_review(
         holdings_count, categories, penetrated_assets,
         holdings_details=holdings_details,
     )
+    expert_mt = llm_config.get("max_tokens_expert") or llm_config.get("max_tokens", 8192)
     logger.info("正在调用 LLM 生成智囊团深度复盘...")
-    result = _call_llm(system_expert, prompt, llm_config, timeout=120.0)
+    result, usage = _call_llm(system_expert, prompt, llm_config, timeout=120.0, http_client=http_client, max_tokens=expert_mt)
 
     if result:
-        cache_set(cache_key, result)
+        html = _markdown_to_html(result)
+        if usage:
+            inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+            out = usage.get("output_tokens", usage.get("completion_tokens", 0))
+            html += f'<p style="color:#888;font-size:12px">⚡ Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
+        cache_set(cache_key, html)
         logger.info("智囊团深度复盘生成完成")
-        return _markdown_to_html(result)
+        return html
     else:
         logger.warning("智囊团深度复盘生成失败")
 
@@ -686,7 +757,7 @@ def generate_expert_review(
 
 
 # ═══════════════════════════════════════════════════════════
-#  批量生成（串行，避免 httpx 连接池线程安全问题）
+#  批量生成（线程池并行，每个线程持有独立 httpx.Client）
 # ═══════════════════════════════════════════════════════════
 
 
@@ -703,33 +774,89 @@ def generate_all_llm(
     holdings_details: Optional[list[dict]] = None,
     force: bool = False,
 ) -> tuple[Optional[str], Optional[str]]:
-    """串行生成模块 7（全球政经）+ 模块 8（智囊团复盘）。
+    """并行生成模块 7（全球政经）+ 模块 8（智囊团复盘）。
 
-    串行执行而非 ThreadPoolExecutor，因为全局共享的 httpx.Client
-    (_HTTP_POOL) 不是线程安全的，并发调用可能引发连接池死锁。
+    使用 ThreadPoolExecutor(max_workers=2) 并发调用两个 LLM 生成任务。
+    每个工作线程创建独立的 httpx.Client，避免全局共享连接池的线程安全问题。
 
     Args:
+        a_indices: A 股指数列表
+        us_indices: 美股指数列表
+        total_mv: 总市值
+        total_cost: 总成本
+        total_profit: 总盈亏
+        total_today_profit: 本日盈亏
+        holdings_count: 持仓总数
+        categories: 分类计数
+        penetrated_assets: 穿透 TOP10 资产列表（可选）
+        holdings_details: 持仓明细列表（可选）
         force: 为 True 时跳过缓存强制重新生成
 
     Returns:
         (global_macro_html, expert_review_html) 二元组，各自可能为 None
     """
-    # 模块 7：全球政经局势
-    logger.info("正在生成：全球政经局势分析...")
-    macro = generate_global_macro(
-        a_indices, us_indices, total_mv, total_profit, categories,
-        force=force,
-    )
 
-    # 模块 8：智囊团深度复盘
-    logger.info("正在生成：智囊团深度复盘（耗时较长，请耐心等待）...")
-    expert = generate_expert_review(
-        total_mv, total_cost, total_profit, total_today_profit,
-        holdings_count, categories, penetrated_assets,
-        holdings_details=holdings_details,
-        force=force,
-    )
+    def _run_macro() -> Optional[str]:
+        """在线程中生成模块 7，使用独立 httpx.Client。"""
+        logger.info("正在生成：全球政经局势分析...")
+        client = httpx.Client(timeout=_LLM_TIMEOUT)
+        try:
+            return generate_global_macro(
+                a_indices, us_indices, total_mv, total_profit, categories,
+                force=force, http_client=client,
+            )
+        finally:
+            client.close()
+
+    def _run_expert() -> Optional[str]:
+        """在线程中生成模块 8，使用独立 httpx.Client。"""
+        logger.info("正在生成：智囊团深度复盘（耗时较长，请耐心等待）...")
+        client = httpx.Client(timeout=_LLM_TIMEOUT)
+        try:
+            return generate_expert_review(
+                total_mv, total_cost, total_profit, total_today_profit,
+                holdings_count, categories, penetrated_assets,
+                holdings_details=holdings_details, force=force,
+                http_client=client,
+            )
+        finally:
+            client.close()
+
+    # 缓存预检：先检查双方是否已缓存，避免不必要线程开销
+    _macro_fp = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
+    _macro_key = _CACHE_PREFIX_LLM + f"global_macro_{_macro_fp}"
+    _expert_fp = _compute_fingerprint(total_mv, total_cost, total_profit,
+                                       total_today_profit, holdings_count,
+                                       categories, penetrated_assets,
+                                       holdings_details)
+    _expert_key = _CACHE_PREFIX_LLM + f"expert_review_{_expert_fp}"
+    _macro_cached = cache_get(_macro_key, _get_cache_ttl_llm("macro"))
+    _expert_cached = cache_get(_expert_key, _get_cache_ttl_llm("expert"))
+    if _macro_cached is not None and _expert_cached is not None:
+        logger.info("LLM 双缓存命中，跳过线程池")
+        return (_macro_cached, _expert_cached)
+
+    macro_result: Optional[str] = None
+    expert_result: Optional[str] = None
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        macro_future = executor.submit(_run_macro)
+        expert_future = executor.submit(_run_expert)
+
+        for future in as_completed([macro_future, expert_future]):
+            try:
+                result = future.result()
+                if future == macro_future:
+                    macro_result = result
+                    logger.info("全球政经局势分析生成完成" if result
+                                else "全球政经局势分析生成失败（跳过）")
+                else:
+                    expert_result = result
+                    logger.info("智囊团深度复盘生成完成" if result
+                                else "智囊团深度复盘生成失败（跳过）")
+            except Exception:
+                logger.warning("LLM 生成线程异常", exc_info=True)
 
     logger.info("LLM 生成完成: 宏观=%s, 智囊团=%s",
-                "OK" if macro else "跳过", "OK" if expert else "跳过")
-    return macro, expert
+                "OK" if macro_result else "跳过", "OK" if expert_result else "跳过")
+    return macro_result, expert_result

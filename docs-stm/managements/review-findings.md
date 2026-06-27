@@ -23,6 +23,11 @@
 | 2026-06-27 | 穿透模块板块分类 + 失败基金明细 + 8 文档全量第四次审计 | 实现正确性 + 一致性审查 | 自审 | ✅ 已通过 |
 | 2026-06-27 | 文档冗余精简：CLAUDE.md 精简目录树/去重、5 文档一致性修复 | 一致性审查 + 去冗余 | 自审 | ✅ 已通过 |
 | 2026-06-27 | 全量问题修复 + 文档最终核对 | 一致性审查 | 自审 | ✅ 已通过 |
+| 2026-06-27 | 全面性能审计与并行化改造（菜单[1][2]/新闻/LLM 多线程） | 性能审查 | 自审 | ✅ 已通过 |
+| 2026-06-27 | 死代码审计与清理（exists/fetch_fund_type/3 新浪死函数/llm_content else 分支） | 代码审查 | 自审 | ✅ 已通过 |
+| 2026-06-27 | LLM 优化：Prompt 压缩 230 字/Token 追踪/并行缓存预检/万亿单位压缩 | 优化审查 | 自审 | ✅ 已通过 |
+| 2026-06-27 | 缓存策略增强：新闻 15min 缓存/mtime 配置缓存/HTML 直存 | 优化审查 | 自审 | ✅ 已通过 |
+| 2026-06-27 | 多文档全量第五次审计 + v0.2.8 文档同步 | 一致性审查 | 自审 | ✅ 已通过 |
 
 ---
 
@@ -46,6 +51,15 @@
 - **状态**：✅ 已修复（已添加 xlsx 列名映射表到 plan.md）
 - **修复日期**：2026-06-26
 
+### [R-003] 多处死代码残留（已清理）
+
+- **发现日期**：2026-06-27
+- **审查对象**：`src/` 全量代码审计
+- **类型**：死代码
+- **描述**：多模块存在已废弃但未清理的函数和 import：cache.exists()、tiantian.fetch_fund_type()、sina_news 3 个死函数、llm_content.write_llm_sheets 12 个冗余参数及 ~60 行死分支、main.py portfolio_items 字典及未使用 import
+- **状态**：✅ 已修复（详见 changelog v0.2.8 Removed 章节）
+- **修复日期**：2026-06-27
+
 ---
 
 ## 待处理问题
@@ -64,8 +78,10 @@
 - [x] Iter 3.2 已实现（财经新闻关联模块）
 - [x] Iter 3.3 已实现（模块 7-8 模板占位 + 缓存管理 [3][4] + 异常处理增强）
 - [x] Iter 3.4 已完成（HTML + Excel LLM 模块均已实现）
+- [x] Iter 3.5 已完成（LLM 全局优化：并行调用/连接复用/System Prompt 外部可配置/提示词紧凑化）
+- [x] Iter 3.6 已完成（全面性能优化与代码清理：并行化/死代码移除/LLM 优化/缓存增强）
 - [x] 配置管理含 output_dir 字段，支持菜单 R 配置
-- [x] 所有单元测试通过（491 项，覆盖 reader/cache/summary/market_value/fund_performance/penetration/llm_client）
+- [x] 所有单元测试通过（489 项，覆盖 reader/cache/summary/market_value/fund_performance/penetration/llm_client/config/fetcher/excel_writer/category/news_correlation/models）
 - [x] 异常场景测试待完善（已有 test_config/test_fetcher/test_excel_writer/test_category/test_news_correlation/test_models，覆盖度可继续补强）
 - [x] API Key 不丢失（config.json 不存明文 key，使用外部文件 data/config/llm.json）
 - [x] Excel/HTML 输出文件格式正确

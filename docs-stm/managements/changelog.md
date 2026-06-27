@@ -4,6 +4,93 @@
 
 ---
 
+## [0.2.8] - 2026-06-27
+
+### Performance
+- 菜单 [1]（基础类缓存）：串行循环 → ThreadPoolExecutor(max_workers=3) 并发刷新，每线程内串行完成 fetch_fund_rankings + fetch_fund_holdings + fetch_fund_benchmark
+- 菜单 [2]（持仓类缓存）：串行循环 → ThreadPoolExecutor(max_workers=5) 并发取价，报价完成后单线程更新指数和报告计数
+- 新闻 3 源获取：串行 for 循环 → ThreadPoolExecutor(max_workers=3) 并行拉取新浪/东方财富/财联社
+- 指数获取：ThreadPoolExecutor(max_workers=2) A 股 + 美股并行
+- LLM 生成：ThreadPoolExecutor(max_workers=2) 全局政经 + 智囊团并行
+- generate_all_llm 缓存预检：双缓存均命中时直接返回，跳过线程池
+
+### Added
+- 新闻缓存：aggregate_news() 增加 15 分钟 TTL 缓存，键名 `news_{md5}`，多源新闻结果复用
+- get_llm_config() mtime 缓存：仅当 llm.json 文件修改时间变化时重新读取，减少重复 IO
+- LLM Token 用量双重展示：控制台 print 输出 + 报告文件 HTML 尾注 (`<p style="color:#888;font-size:12px">⚡ Token 用量：...</p>`)
+- Token 压缩 `_fmt_wan()` 工具函数：万/亿中文单位格式化，减少 ~20-30% 输入 token
+- `_busy` 标志：防止菜单反复按键导致任务重入
+- `_check_network_available(details)` 辅助函数：检查网络连通性并提供详情
+- 配置校验：cache_ttl 正数校验警告、llm.json provider/endpoint 合法性警告
+- cache.set() FileNotFoundError 重试保护：竞争删除目录与创建文件之间的竞态条件
+
+### Changed
+- LLM 缓存直接存储 HTML（取消双重 `_markdown_to_html` 调用，缓存读取后直接用于 HTML 报告）
+- max_tokens 分离为 `max_tokens_macro=800` / `max_tokens_expert=8192`，移除全局 `max_tokens` 冗余配置
+- `_SYSTEM_EXPERT` 压缩：~435 字 → ~230 字，移除 emoji、冗余指示词和多级标题格式
+- `_LLM_TIMEOUT` 统一提升：60.0 → 120.0（覆盖所有 LLM 调用路径）
+- `write_llm_sheets()` 参数精简：12 个参数 → 2 个参数 `(wb, llm_content)`
+- `_generate_excel_report()` 增加 `news_data` 参数，复用调用方预获取的新闻数据
+- `write_html_report()` 增加 `news_data` 参数，复用预获取新闻，复用日志标记"复用调用方传入的新闻数据"
+- `_call_llm()` / `_call_claude()` / `_call_openai()` 返回类型：`Optional[str]` → `tuple[Optional[str], Optional[dict]]`
+- 7 个 `_cmd_*` 函数中每次 `read_holdings()` 后增加空持仓检查并直接返回
+- cache 前缀映射表：移除 `"portfolio": "hold"` 和 `"penetration": "hold"` 条目
+- `exact_map` 新增 `"holdings_tracking": "benchmark"`（30 天 TTL）
+- `get_llm_config()` 引入 mtime 缓存：每次调用不再重复读文件 IO
+- config.py 模块级 `logger` 替代多处 `__import__("logging").getLogger("invest")`
+- `_generate_details` 移除 `_is_stock` 判断和 `UnboundLocalError` 修复保持（v0.2.7 遗留清理）
+
+### Fixed
+- `_check_claude_truncation` 返回类型修正：`None` → `bool`
+- `_check_openai_truncation` 返回类型修正：`None` → `bool`
+- cache.set() 目录删除竞态条件：FileNotFoundError 时自动重试
+- `_call_llm` fallback 简化：`max_tokens = max_tokens or 2500`（移除 `llm_config.get("max_tokens", 2500)`）
+
+### Removed (Dead Code)
+- `src/cache.py`：移除 `exists()` 函数（无生产调用者）
+- `src/providers/tiantian.py`：移除 `fetch_fund_type()` 函数（定义但未调用）
+- `src/providers/sina_news.py`：移除 3 个死函数 `correlate_news_with_holdings` / `fetch_and_correlate` / `build_holding_keywords`；移除未使用的 `import re`
+- `src/report/llm_content.py`：移除 ~60 行死代码 else 分支（从未执行）；移除 12 个未使用参数；移除未使用的 import（fetch_indices, fetch_us_indices, generate_all_llm, DetailRow, compute_penetration_top10, Holding, write_data_row）
+- `src/main.py`：移除 `portfolio_items` 字典；移除未使用的 import（DetailRow, classify_holdings, compute_penetration_top10）
+- `src/test_cache.py`：移除 `TestCacheExists` 类（test_exists_file_present, test_exists_file_absent）
+- `src/test_llm_client.py`：更新 `_call_llm` 路由测试适配新的 `(content, usage)` 元组返回类型
+- `llm.json`：移除冗余 `max_tokens` 字段
+
+### Docs
+- CLAUDE.md：精简为 18 行，移除冗余目录树（引用 docs-stm/README.md）
+- README.md：版本 v0.2.8，菜单文字同步，LLM 配置表更新，缓存章节重写（3 层+指纹机制）
+- requirements.md：菜单表同步，缓存文件/TTL 表更新，引用链同步
+- review-findings.md：新增优化/审计审查记录
+- plan.md：新增 Iter 3.6 全面性能优化与代码清理
+- testplan.md：测试覆盖更新（489 项）
+- changelog.md：本版本记录
+
+## [0.2.7] - 2026-06-27
+
+### Added
+- LLM 缓存分层策略：全球政经局势 TTL 4 小时（`cache_ttl_macro`），智囊团深度复盘 TTL 2 小时（`cache_ttl_expert`），支持 llm.json 配置
+- LLM 缓存键引入指纹（MD5 of input data），持仓/指数数据变更时缓存自动失效
+- 菜单 [2] 更新持仓类缓存时主动清除 `llm_expert_*` 和 `llm_global_macro_*` 缓存文件
+- `cache_ttl_macro` / `cache_ttl_expert` 字段写入 `data/config/llm.json` 示例模板
+
+### Changed
+- LLM 缓存 TTL 配置从 `config.json` 迁移至 `llm.json`，优先级链：`llm.json` → `config.json` → 代码默认值
+- 菜单 L 从 `force=True`（每次强制调用）改为 `force=False`（缓存有效期内复用，指纹+TTL 双重校验）
+- B 菜单/L 菜单内部改为数据预计算一次，HTML 和 Excel 复用结果，消除重复 LLM 调用
+- ThreadPoolExecutor 串行化（`generate_all_llm`），消除全局 `httpx.Client` 线程安全问题
+- `_generate_details` 改为 `ThreadPoolExecutor(max_workers=8)` 并发取价，提升大持仓性能
+- 菜单文字统一：`EXCEL` → `Excel`，`基础缓存信息` → `基础类缓存`，`持仓相关缓存信息` → `持仓类缓存`
+
+### Fixed
+- L 菜单 LLM 双重调用问题（HTML writer 和 Excel writer 各调用一次 → 改为预计算后传递 `llm_content` 元组）
+- ThreadPoolExecutor + httpx.Client 死锁导致 L 菜单卡死（LLM 全局线程池安全改造）
+- 空持仓场景下 _generate_details 的 `UnboundLocalError`（DetailRow 构造移至循环体内）
+
+### Docs
+- README.md：菜单文字同步、缓存 TTL 表区分 llm_macro/llm_expert、LLM 配置新增 `cache_ttl_macro`/`cache_ttl_expert` 字段、FAQ 更新
+- requirements.md：菜单表同步、TTL 表新增 LLM 条目、手动刷新说明更新
+- changelog.md：本版本记录
+
 ## [0.2.6] - 2026-06-27
 
 ### Fixed

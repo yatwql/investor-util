@@ -82,14 +82,23 @@ def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
     latest = _latest_path(output_dir)
     archive = _archive_path(output_dir)
 
-    wb.save(latest)
-    logger.info("最新报告已保存: %s", latest)
+    try:
+        wb.save(latest)
+        logger.info("最新报告已保存: %s", latest)
+    except PermissionError:
+        print()
+        print("  [ERR] 报告文件被占用，无法保存")
+        print("     请关闭已打开的 Excel 文件后重试")
+        print(f"     文件路径: {os.path.abspath(latest)}")
+        logger.error("文件被占用: %s", latest)
+        raise
 
     try:
         wb.save(archive)
         logger.info("存档报告已保存: %s", archive)
     except (PermissionError, OSError) as e:
         logger.warning("存档报告写入失败: %s", e)
+        print("  [!] 存档报告写入失败（文件可能被占用），最新版已保存")
 
     return os.path.abspath(latest)
 

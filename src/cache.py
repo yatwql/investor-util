@@ -77,13 +77,17 @@ def set(key: str, data: Any) -> None:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
         logger.debug("缓存已写入: %s", key)
+    except FileNotFoundError:
+        # 目录可能在 makedirs 后被外部删除，重试一次
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+            logger.debug("缓存已写入(重试成功): %s", key)
+        except (IOError, OSError) as e2:
+            logger.warning("缓存写入失败(重试后) %s: %s", key, e2)
     except (IOError, OSError) as e:
         logger.warning("缓存写入失败 %s: %s", key, e)
-
-
-def exists(key: str) -> bool:
-    """检查缓存文件是否存在（不校验过期）。"""
-    return os.path.exists(_cache_path(key))
 
 
 def clear(key: str) -> None:
@@ -166,18 +170,20 @@ def cleanup_expired(dry_run: bool = False) -> int:
     from collections import defaultdict
 
     # 文件名前缀 → 数据类型键名
+    # 注意：具体前缀需在通用前缀之前（如 "llm_global_macro" 在 "llm_" 之前）
     prefix_type_map: dict[str, str] = {
         "price": "price",
         "index": "index",
         "fund_perf": "rank",
         "fund_hold": "hold",
         "news": "news",
-        "llm_": "llm",
-        "portfolio": "hold",       # portfolio_latest.json
-        "penetration": "hold",     # penetration_cache.json
+        "llm_global_macro": "llm_macro",   # 全球政经局势：4h TTL
+        "llm_expert_review": "llm_expert", # 智囊团深度复盘：2h TTL
+        "llm_": "llm",                     # 通用 LLM 缓存：24h TTL
     }
     exact_map: dict[str, str] = {
         "fund_benchmarks": "benchmark",
+        "holdings_tracking": "benchmark",  # 持仓跟踪数据：30天 TTL，防误删导致重复预热
     }
 
     if not os.path.isdir(_CACHE_DIR):
@@ -287,7 +293,6 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
 
     比较当前持仓指纹与上次存储的指纹。若不同：
       - 清除 fund_benchmarks.json（触发重新获取业绩基准）
-      - 清除 penetration_cache.json（触发重新计算穿透 TOP10）
       - 更新存储的指纹和代码集合
       - 返回新增的资产代码列表（用于主流程主动取数填充单条缓存）
 
@@ -330,11 +335,6 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
         clear("fund_benchmarks")
         cleared.append("fund_benchmarks")
 
-    pen_path = _cache_path("penetration_cache")
-    if os.path.exists(pen_path):
-        clear("penetration_cache")
-        cleared.append("penetration_cache")
-
     if cleared:
         logger.info("已清除过期缓存: %s", ", ".join(cleared))
     else:
@@ -367,7 +367,7 @@ _CACHE_TTL_DEFAULTS: dict[str, float] = {
     "index": CACHE_DAILY,
     "rank": CACHE_DAILY,
     "hold": CACHE_WEEKLY,
-    "news": CACHE_DAILY,
+    "news": 900,              # 新闻聚合缓存：15 分钟
     "benchmark": CACHE_MONTHLY,
     "llm": CACHE_DAILY,
     "llm_macro": 14400,       # 全球政经局势：4 小时

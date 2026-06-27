@@ -288,29 +288,47 @@ def aggregate_news(
     if sources is None:
         sources = get_enabled_sources()
 
-    # 1) 从各源获取
+    # 新闻缓存：同一关键词 + 同一分钟内复用，避免重复 HTTP
+    import hashlib
+    import json
+    _cache_key = "news_" + hashlib.md5(
+        json.dumps([keywords, top_n, sources, per_source], sort_keys=True, ensure_ascii=False).encode()
+    ).hexdigest()[:12]
+    from src.cache import get as _nget, set as _nset, get_ttl as _get_news_ttl
+    _cached = _nget(_cache_key, _get_news_ttl("news"))
+    if _cached is not None:
+        logger.info("新闻缓存命中，跳过 3 源获取")
+        return _cached
+
+    # 1) 从各源获取（并行）
     all_raw: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
 
-    for src in sources:
-        fetch_fn = _FETCH_MAP.get(src)
-        if not fetch_fn:
-            logger.warning("未知新闻源: %s", src)
-            continue
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        try:
-            items = fetch_fn(per_source)
-            for item in items:
-                url = item.get("url", "")
-                if url and url not in seen_urls:
-                    seen_urls.add(url)
-                    all_raw.append(item)
-                    # 标注来源
-                    label = _SOURCE_CONFIG.get(src, {}).get("label", src)
-                    item["_source"] = label
-        except Exception as e:
-            logger.warning("新闻源 %s 获取失败: %s", src, e)
-            continue
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        fut_to_src: dict[Any, str] = {}
+        for src in sources:
+            fetch_fn = _FETCH_MAP.get(src)
+            if not fetch_fn:
+                logger.warning("未知新闻源: %s", src)
+                continue
+            fut = executor.submit(fetch_fn, per_source)
+            fut_to_src[fut] = src
+
+        for future in as_completed(fut_to_src):
+            src = fut_to_src[future]
+            try:
+                items = future.result()
+                label = _SOURCE_CONFIG.get(src, {}).get("label", src)
+                for item in items:
+                    url = item.get("url", "")
+                    if url and url not in seen_urls:
+                        seen_urls.add(url)
+                        all_raw.append(item)
+                        item["_source"] = label
+            except Exception as e:
+                logger.warning("新闻源 %s 获取失败: %s", src, e)
 
     if not all_raw:
         logger.info("所有新闻源均未获取到数据")
@@ -332,4 +350,6 @@ def aggregate_news(
         if "matched_keywords" not in item:
             item["matched_keywords"] = []
 
-    return correlated
+    _result = correlated[:top_n]
+    _nset(_cache_key, _result)
+    return _result

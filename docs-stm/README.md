@@ -2,7 +2,7 @@
 
 个人投资者辅助工具：读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.6
+> 当前版本：0.2.8
 
 ---
 
@@ -15,7 +15,7 @@
 - **Excel 报告** — 8 个功能页签：汇总、市值核算、分类汇总、资产穿透 TOP10、基金业绩分析、财经新闻热点、全球政经局势（LLM）、智囊团深度复盘（LLM）
 - **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、新闻关联）
 - **多源财经新闻** — 新浪财经 + 东方财富 + 财联社 3 源并行获取，去重后与持仓关键词关联
-- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek API，双模块并行调用，结果缓存 24 小时
+- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek API，结果按策略缓存（宏观 4h / 智囊团 2h），持仓变更时主动失效
 - **基金业绩评价** — 同类排名百分位 + 超额收益修正，自动标注优秀/良好/稳定/偏差
 - **TUI 智能摘要** — LLM 分析报告生成后终端直接展示核心观点，无需打开文件
 
@@ -86,16 +86,16 @@ python src/main.py
 ## 菜单操作
 
 ```
-  > [E] 生成 EXCEL 分析报告（模块 1-5）
-    [N] 生成包含新闻的 EXCEL 分析报告（模块 1-6）
-    [H] 生成基础的 HTML 分析报告（模块 1-6）
-    [B] 生成全系列包含新闻的报告（Excel + HTML）
-    [L] 生成全系列完整版报告（含 LLM 模块 7-8）
+  > [E] 生成基础版Excel分析报告
+    [N] 生成包含新闻的Excel分析报告
+    [H] 生成基础版HTML分析报告
+    [B] 生成全系列包含新闻的报告(Excel+HTML)
+    [L] 生成全系列完整版报告(Excel+HTML)
     [C] 配置持仓信息目录
     [F] 配置持仓信息文件名
     [R] 配置报告输出目录
-    [1] 更新基础缓存信息
-    [2] 更新持仓相关缓存信息
+    [1] 更新基础类缓存
+    [2] 更新持仓类缓存
     [3] 清理过期缓存文件
     [4] 查看缓存统计信息
     [X] 退出
@@ -131,12 +131,13 @@ python src/main.py
   "output_dir": "reports",
   "news_top_count": 100,
   "preferred_provider": {},
+  "llm_config_file": "data/config/llm.json",
   "cache_ttl": {
     "price": 86400,
     "index": 86400,
     "rank": 86400,
     "hold": 604800,
-    "news": 86400,
+    "news": 900,
     "benchmark": 2592000
   }
 }
@@ -161,7 +162,7 @@ python src/main.py
 | `index` | 86400（24h） | 市场指数行情缓存 |
 | `rank` | 86400（24h） | 基金同类排名+区间收益率 |
 | `hold` | 604800（7天） | 基金前10大持仓明细 |
-| `news` | 86400（24h） | 财经新闻缓存 |
+| `news` | 900（15分钟） | 多源新闻聚合结果缓存，避免重复 HTTP 获取 |
 | `benchmark` | 2592000（30天） | 业绩比较基准对照表 |
 
 > **调整建议：** 盘中频繁刷新可将 `price` 改为 `3600`（1小时）；持仓变动少可将 `hold` 改为 `2592000`（30天）。
@@ -184,7 +185,10 @@ python src/main.py
   "api_key": "sk-ant-xxxxxxxxxxxxx",
   "model": "claude-sonnet-4-6",
   "endpoint": "https://api.anthropic.com/v1/messages",
-  "max_tokens": 2500,
+  "max_tokens_macro": 800,
+  "max_tokens_expert": 8192,
+  "cache_ttl_macro": 14400,
+  "cache_ttl_expert": 7200,
   "system_prompt_macro": "你是一位资深宏观经济学家...",
   "system_prompt_expert": "你是投资智囊团召集人..."
 }
@@ -198,7 +202,10 @@ python src/main.py
 | `api_key` | ✅ | API 密钥，妥善保管勿提交 Git |
 | `model` | — | 模型名称，留空使用 provider 默认值 |
 | `endpoint` | — | API 端点 URL，留空使用官方端点 |
-| `max_tokens` | — | 输出 token 上限（默认 2500） |
+| `max_tokens_macro` | — | 全球政经局势输出上限（默认 800） |
+| `max_tokens_expert` | — | 智囊团深度复盘输出上限（默认 8192） |
+| `cache_ttl_macro` | — | 全球政经局势缓存时间（秒，默认 14400 = 4h） |
+| `cache_ttl_expert` | — | 智囊团深度复盘缓存时间（秒，默认 7200 = 2h） |
 | `system_prompt_macro` | — | 模块 7 自定义系统提示词，留空使用内置默认值 |
 | `system_prompt_expert` | — | 模块 8 自定义系统提示词，留空使用内置默认值 |
 
@@ -213,7 +220,8 @@ python src/main.py
   "api_key": "sk-ant-your-key",
   "model": "claude-sonnet-4-6",
   "endpoint": "https://api.anthropic.com/v1/messages",
-  "max_tokens": 2500
+  "max_tokens_macro": 800,
+  "max_tokens_expert": 8192
 }
 ```
 
@@ -229,7 +237,8 @@ python src/main.py
   "api_key": "sk-your-key",
   "model": "gpt-4o",
   "endpoint": "https://api.openai.com/v1/chat/completions",
-  "max_tokens": 2500
+  "max_tokens_macro": 800,
+  "max_tokens_expert": 8192
 }
 ```
 
@@ -247,7 +256,8 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
   "api_key": "sk-your-deepseek-key",
   "model": "DeepSeek-V4-Flash",
   "endpoint": "https://api.deepseek.com/anthropic/v1/messages",
-  "max_tokens": 8192
+  "max_tokens_macro": 800,
+  "max_tokens_expert": 8192
 }
 ```
 
@@ -265,7 +275,8 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
   "api_key": "sk-your-deepseek-key",
   "model": "deepseek-chat",
   "endpoint": "https://api.deepseek.com/v1/chat/completions",
-  "max_tokens": 2500
+  "max_tokens_macro": 800,
+  "max_tokens_expert": 8192
 }
 ```
 </details>
@@ -279,7 +290,8 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
   "api_key": "your-volcengine-key",
   "model": "doubao-pro-32k",
   "endpoint": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
-  "max_tokens": 2500
+  "max_tokens_macro": 800,
+  "max_tokens_expert": 8192
 }
 ```
 
@@ -295,8 +307,9 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 | 两者合计（菜单 L） | — | — | ~$0.03-0.06/次 |
 
 - 仅菜单 **L** 触发 LLM 调用，E / N / H / B 不会
-- LLM 结果缓存 24 小时，同一天反复按 L 不会重复扣费
-- 菜单 L 已内置 `force=True`，每次强制刷新 LLM 内容
+- LLM 结果默认缓存 4 小时（全球政经）/ 2 小时（智囊团），缓存有效期内反复按 L 不会重复扣费
+- 持仓或指数数据变更时，关联的 LLM 缓存自动失效；也可通过菜单 [2] 更新持仓缓存主动清除 LLM 缓存
+- 缓存时间可在 `data/config/llm.json` 中通过 `cache_ttl_macro` / `cache_ttl_expert` 自定义
 
 ### 不配置 LLM 时的行为
 
@@ -325,40 +338,55 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 ## 缓存文件指引
 
-所有缓存文件存放于 `data/cache/` 目录，JSON 格式，自动管理过期时间。
+所有缓存文件存放于 `data/cache/` 目录，JSON 格式，自动管理过期时间。缓存分为三个层级，各有不同的生命周期和刷新策略。
 
-### 单条缓存（引擎自动管理）
+### 层级一：单条缓存（引擎自动管理）
 
-| 文件名模式 | 用途 | 有效期 |
-|-----------|------|--------|
+由 `src/fetcher.py` 在首次取数时自动创建，缓存命中时无需重复调 API。
+
+| 文件名模式 | 用途 | 默认有效期 |
+|-----------|------|-----------|
 | `price_{code}.json` | 单只股票/基金最新价、昨收、净值日期 | 24h |
 | `index_{code}.json` | A 股/美股指数行情 | 24h |
 | `fund_perf_{code}.json` | 基金同类排名+区间收益率 | 24h |
 | `fund_hold_{code}.json` | 基金前 10 持仓明细 | 7 天 |
-| `news_*.json` | 财经新闻数据（多源去重合并） | 24h |
-| `llm_*` | LLM 分析结果缓存 | 24h |
+| `llm_global_macro_{fingerprint}.json` | 全球政经局势 LLM 分析 | 4h（可配置） |
+| `llm_expert_review_{fingerprint}.json` | 智囊团深度复盘 LLM 分析 | 2h（可配置） |
+| `news_{md5}.json` | 多源新闻聚合结果（3 源并行获取后去重关联） | 15 分钟（可配置） |
 
-### 合并缓存（菜单手动触发）
+**LLM 缓存指纹机制：** 文件名中的 `{fingerprint}` 是 MD5 哈希前 12 位，两个 LLM 模块使用不同的指纹构成：
+  - **全球政经局势** (`llm_global_macro_*`)：指纹 = 股/美股指数数据 + 持仓汇总（市值/盈亏/分类）。指数或持仓数据变化时自动失效。
+  - **智囊团深度复盘** (`llm_expert_review_*`)：指纹 = 每只持仓的详细价格/盈亏/成本数据。任一持仓价格或份额变化时自动失效。
 
-| 文件名 | 用途 | 触发方式 |
-|--------|------|----------|
-| `fund_benchmarks.json` | 业绩比较基准对照表 | 菜单 [1] |
-| `portfolio_latest.json` | 持仓主数据快照 | 菜单 [2] |
-| `penetration_cache.json` | 资产穿透 TOP10 计算结果 | 菜单 [2] |
-| `holdings_tracking.json` | 持仓指纹跟踪（变更检测） | 自动 |
+### 层级二：合并缓存（菜单手动触发）
 
-### 缓存管理菜单
+由 TUI 菜单主动生成的全量快照，用于加速报告生成：
 
-| 菜单 | 功能 |
-|------|------|
-| `[1] 更新基础缓存` | 刷新基金业绩排名、持仓、基准 |
-| `[2] 更新持仓相关缓存` | 清空价格缓存、重新获取行情和穿透数据 |
-| `[3] 清理过期缓存文件` | 删除超过各自 TTL 的缓存 |
-| `[4] 查看缓存统计信息` | 显示缓存总数/大小/按前缀分类 |
+| 文件名 | 用途 | 有效期限 | 触发刷新 |
+|--------|------|---------|----------|
+| `fund_benchmarks.json` | 业绩比较基准对照表 | 30 天 | 菜单 [1] 或持仓变更自动刷新 |
+| `holdings_tracking.json` | 持仓指纹跟踪（变更检测用） | 永久，随持仓更新 | 自动 |
+
+### 层级三：TUI 缓存管理菜单
+
+| 菜单 | 功能 | 清除范围 |
+|------|------|----------|
+| `[1] 更新基础类缓存` | 主动刷新基金业绩、持仓明细、业绩基准 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json` |
+| `[2] 更新持仓类缓存` | 主动刷新价格/指数行情，**并清除关联 LLM 缓存** | `price_*`、`index_*`、`llm_expert_*`、`llm_global_macro_*` |
+| `[3] 清理过期缓存文件` | 扫描全目录，删除超过各自 TTL 的缓存文件 | 按文件名前缀匹配 TTL |
+| `[4] 查看缓存统计信息` | 显示缓存总数/大小/按前缀分类 | 只读不删 |
+
+### 主动失效链路（自动触发）
+
+以下场景会**自动**触发相关缓存失效，无需进入菜单：
+
+1. **持仓文件发生变更**（新增/清仓/修改份额）→ `check_and_refresh_caches()` 检测到指纹变化 → 自动清除 `fund_benchmarks.json` → 新增资产的 `price_*` / `fund_perf_*` / `fund_hold_*` 自动预热
+2. **LLM 缓存指纹失效**：全球政经局势（指数或持仓汇总变化时指纹失效）/ 智囊团深度复盘（任一持仓价格/份额变化时指纹失效） → 下次菜单 L 生成的指纹不同 → 原缓存自然无法命中，自动使用新数据重新生成
+3. **菜单 [2] 主动清除** — 同时清除 `llm_expert_*` 和 `llm_global_macro_*`，确保下次 L 菜单强制使用最新数据
 
 ### 降级规则
 
-缓存过期但 API 请求失败时，返回最近 7 天内的过期缓存数据而非报错。缓存文件损坏时自动删除并触发重新获取。
+缓存过期但 API 请求失败时，返回最近 **7 天内**的过期缓存数据而非直接报错。缓存文件损坏时自动删除并触发重新获取。
 
 ---
 
@@ -376,7 +404,7 @@ investor-util/
 │   ├── models.py                 # 数据模型（Holding dataclass）
 │   ├── logger.py                 # 日志模块
 │   ├── tui.py                    # 键盘输入封装
-│   ├── test_*.py                 # 单元测试（14 个模块，491 项）
+│   ├── test_*.py                 # 单元测试（14 个模块）
 │   ├── providers/                # API 供应商
 │   │   ├── tencent.py            # 腾讯财经（实时价、指数）
 │   │   ├── eastmoney.py          # 东方财富（基金净值）
@@ -493,7 +521,7 @@ A: 请使用支持 UTF-8 的终端（Windows Terminal 或 VS Code 终端），�
 A: 菜单 `C` 配置正确的持仓目录，或菜单 `F` 选择正确的文件名。
 
 **Q: 如何强制刷新 LLM 内容？**
-A: 菜单 `L` 已内置强制刷新逻辑，每次生成都会重新调用 LLM 并更新缓存。
+A: 菜单 `L` 会先检查缓存，缓存过期（默认宏观 4h/智囊团 2h）或持仓/指数数据变更时才重新调用 LLM。如需强制刷新，先执行菜单 `[2]` 更新持仓缓存即可清除关联 LLM 缓存。
 
 **Q: 报告数据感觉不完整？**
 A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最后重试生成报告。
