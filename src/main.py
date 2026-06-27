@@ -770,7 +770,12 @@ def _cmd_generate_full() -> None:
         from src.report.news_correlation import build_news_data
 
         print("  [..] 正在并行获取新闻 + LLM 内容...")
-        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        news_data = []
+        llm_content = (None, None)
+        llm_cached = (False, False)
+
         with ThreadPoolExecutor(max_workers=2) as _llm_ex:
 
             def _run_llm():
@@ -787,11 +792,16 @@ def _cmd_generate_full() -> None:
             )
             _llm_fut = _llm_ex.submit(_run_llm)
 
-            news_data = _news_fut.result()
-            llm_macro, llm_expert, macro_cached, expert_cached = _llm_fut.result()
-
-        llm_content = (llm_macro, llm_expert)
-        llm_cached = (macro_cached, expert_cached)
+            for fut in as_completed([_news_fut, _llm_fut]):
+                if fut is _llm_fut:
+                    llm_macro, llm_expert, macro_cached, expert_cached = fut.result()
+                    llm_content = (llm_macro, llm_expert)
+                    llm_cached = (macro_cached, expert_cached)
+                    tag = "缓存" if macro_cached and expert_cached else "LLM"
+                    print(f"  [OK] {tag} 内容生成完成")
+                else:
+                    news_data = fut.result()
+                    print(f"  [OK] 新闻获取完成，共 {len(news_data)} 条")
 
         # ── HTML 报告 ──────────────────────────────────────────
         from src.report.html_writer import write_html_report
