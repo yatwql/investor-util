@@ -16,7 +16,7 @@ from src.fetcher import fetch_market_data
 from src.models import Holding
 from src.report.excel_writer import auto_width, freeze_header, write_data_row, write_header_row, write_subtotal_row, \
     write_title_row, write_total_row
-from src.report.styles import FMT_MONEY, FMT_PERCENT, FMT_PRICE, FMT_SHARES, NORMAL_FONT, profit_font
+from src.report.styles import BLUE_FONT, FMT_MONEY, FMT_PERCENT, FMT_PRICE, FMT_SHARES, NORMAL_FONT, profit_font
 
 logger = logging.getLogger("invest")
 
@@ -428,6 +428,36 @@ def _apply_profit_colors(ws, start_row: int, end_row: int,
             rate_cell.font = profit_font(rate_cell.value)
 
 
+_PRICE_TYPE_COL = 7     # 取价方式列
+_NAME_COL = 2           # 名称列（用于识别 QDII）
+
+
+def _apply_price_type_colors(ws, start_row: int, end_row: int) -> None:
+    """对取价方式列（第 7 列）着色：蓝色代表价格来源可靠/时效性高。
+
+    着色规则：
+      - "场内收盘价(T)" → 蓝色（最新场内收盘数据）
+      - "官方净值(T)" → 蓝色（最新官方净值）
+      - QDII 基金的 "官方净值(T-1)" → 蓝色（QDII 因时差延迟一天属正常）
+
+    Args:
+        ws: 目标工作表
+        start_row: 起始行号（含）
+        end_row: 结束行号（含）
+    """
+    for r in range(start_row, end_row + 1):
+        cell = ws.cell(row=r, column=_PRICE_TYPE_COL)
+        val = str(cell.value) if cell.value else ""
+
+        if val in ("场内收盘价(T)", "官方净值(T)"):
+            cell.font = BLUE_FONT
+        elif val == "官方净值(T-1)":
+            name_cell = ws.cell(row=r, column=_NAME_COL)
+            name = str(name_cell.value) if name_cell.value else ""
+            if _is_qdii(name):
+                cell.font = BLUE_FONT
+
+
 def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
                              today_str: str = "",
                              details: List[DetailRow] | None = None) -> tuple[float, float, float, float, List[DetailRow]]:
@@ -497,6 +527,9 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
 
     # 对盈亏列着色（数据行 + 小计 + 总计）
     _apply_profit_colors(ws, data_start, row, profit_col=12, rate_col=13, today_col=14)
+
+    # 对取价方式列着色（蓝色标识最新可靠数据来源）
+    _apply_price_type_colors(ws, data_start, row)
 
     freeze_header(ws, 2)
     auto_width(ws)

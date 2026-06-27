@@ -10,6 +10,7 @@ Python TUI 投资分析工具：读取持仓 Excel → 生成 Excel/HTML 报告�
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：unittest 毗邻源文件（`src/test_*.py`），执行 `pytest src/`
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, testplan.md, changelog.md）
+- **中间文件**：计划/设计文档 → `docs-stm/plan/`；临时/过程文件 → `docs-stm/tmp/`。禁止放在全局 `.claude/` 目录下
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功）、`[!]`（部分失败）、`[ERR]`（错误）
 
 ## 持仓文件格式

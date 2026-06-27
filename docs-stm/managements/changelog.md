@@ -66,7 +66,7 @@
 - requirements.md：菜单表同步，缓存文件/TTL 表更新，引用链同步
 - review-findings.md：新增优化/审计审查记录
 - plan.md：新增 Iter 3.6 全面性能优化与代码清理
-- testplan.md：测试覆盖更新（489 项）
+- testplan.md：测试覆盖更新（534 项）
 - changelog.md：本版本记录
 
 ## [0.2.7] - 2026-06-27

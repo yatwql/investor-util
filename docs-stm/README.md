@@ -432,6 +432,8 @@ investor-util/
 ├── reports/                      # 生成报告（最新版+按日期存档）
 ├── logs/                         # 程序日志（app.log）
 ├── docs-stm/                     # 项目管理文档
+│   ├── plan/                     # 计划/设计文件
+│   ├── tmp/                      # 临时/过程文件
 │   └── managements/
 │       ├── plan.md               # 实现计划
 │       ├── requirements.md       # 需求文档
