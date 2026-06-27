@@ -15,6 +15,7 @@ RED_FONT = Font(color="CC0000")       # 正数 → 红色
 GREEN_FONT = Font(color="009900")     # 负数 → 绿色
 BLUE_FONT = Font(color="0066CC")      # 稳定 → 蓝色
 NORMAL_FONT = Font(size=10)
+CONTENT_FONT = Font(size=11, color="000000")  # LLM 内容区正文
 BOLD_FONT = Font(size=10, bold=True)
 TITLE_FONT = Font(size=14, bold=True, color="FFFFFF")
 

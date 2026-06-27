@@ -640,7 +640,7 @@ def generate_global_macro(
     categories: dict,
     force: bool = False,
     http_client: httpx.Client | None = None,
-) -> Optional[str]:
+) -> tuple[Optional[str], bool]:
     """生成模块 7：全球政经局势分析。
 
     Args:
@@ -654,14 +654,14 @@ def generate_global_macro(
             而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
 
     Returns:
-        HTML 格式的分析文本，LLM 不可用时返回 None
+        (HTML 格式的分析文本或 None, 是否来自缓存)
     """
     from src.config import get_llm_config
 
     llm_config = get_llm_config()
     if llm_config is None:
         logger.info("LLM 未配置，模块 7 使用占位文本")
-        return None
+        return (None, False)
 
     # 缓存键（含数据指纹：行情/持仓变化时自动失效）
     fingerprint = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
@@ -670,7 +670,7 @@ def generate_global_macro(
         cached = cache_get(cache_key, _get_cache_ttl_llm("macro"))
         if cached is not None:
             logger.info("LLM 缓存命中: 全球政经局势")
-            return cached
+            return (cached, True)
 
     # 优先使用外部配置的 system_prompt，未配置时回退内置常量
     system_macro = llm_config.get("system_prompt_macro") or _SYSTEM_MACRO
@@ -687,11 +687,11 @@ def generate_global_macro(
             html += f'<p style="color:#888;font-size:12px">⚡ Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
         cache_set(cache_key, html)
         logger.info("全球政经局势分析生成完成")
-        return html
+        return (html, False)
     else:
         logger.warning("全球政经局势分析生成失败")
 
-    return None
+    return (None, False)
 
 
 def generate_expert_review(
@@ -705,7 +705,7 @@ def generate_expert_review(
     holdings_details: Optional[list[dict]] = None,
     force: bool = False,
     http_client: httpx.Client | None = None,
-) -> Optional[str]:
+) -> tuple[Optional[str], bool]:
     """生成模块 8：智囊团深度复盘。
 
     Args:
@@ -722,14 +722,14 @@ def generate_expert_review(
             而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
 
     Returns:
-        HTML 格式的复盘文本，LLM 不可用时返回 None
+        (HTML 格式的复盘文本或 None, 是否来自缓存)
     """
     from src.config import get_llm_config
 
     llm_config = get_llm_config()
     if llm_config is None:
         logger.info("LLM 未配置，模块 8 使用占位文本")
-        return None
+        return (None, False)
 
     # 缓存键（含数据指纹：持仓变化时自动失效）
     fingerprint = _compute_fingerprint(total_mv, total_cost, total_profit,
@@ -741,7 +741,7 @@ def generate_expert_review(
         cached = cache_get(cache_key, _get_cache_ttl_llm("expert"))
         if cached is not None:
             logger.info("LLM 缓存命中: 智囊团深度复盘")
-            return cached
+            return (cached, True)
 
     # 优先使用外部配置的 system_prompt，未配置时回退内置常量
     system_expert = llm_config.get("system_prompt_expert") or _SYSTEM_EXPERT
@@ -763,11 +763,11 @@ def generate_expert_review(
             html += f'<p style="color:#888;font-size:12px">⚡ Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
         cache_set(cache_key, html)
         logger.info("智囊团深度复盘生成完成")
-        return html
+        return (html, False)
     else:
         logger.warning("智囊团深度复盘生成失败")
 
-    return None
+    return (None, False)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -787,7 +787,7 @@ def generate_all_llm(
     penetrated_assets: Optional[list[dict]] = None,
     holdings_details: Optional[list[dict]] = None,
     force: bool = False,
-) -> tuple[Optional[str], Optional[str]]:
+) -> tuple[Optional[str], Optional[str], bool, bool]:
     """并行生成模块 7（全球政经）+ 模块 8（智囊团复盘）。
 
     使用 ThreadPoolExecutor(max_workers=2) 并发调用两个 LLM 生成任务。
@@ -807,10 +807,11 @@ def generate_all_llm(
         force: 为 True 时跳过缓存强制重新生成
 
     Returns:
-        (global_macro_html, expert_review_html) 二元组，各自可能为 None
+        (macro_html, expert_html, macro_cached, expert_cached) 四元组
+        各自可能为 None/False
     """
 
-    def _run_macro() -> Optional[str]:
+    def _run_macro() -> tuple[Optional[str], bool]:
         """在线程中生成模块 7，使用独立 httpx.Client。"""
         logger.info("正在生成：全球政经局势分析...")
         client = httpx.Client(timeout=_LLM_TIMEOUT)
@@ -822,7 +823,7 @@ def generate_all_llm(
         finally:
             client.close()
 
-    def _run_expert() -> Optional[str]:
+    def _run_expert() -> tuple[Optional[str], bool]:
         """在线程中生成模块 8，使用独立 httpx.Client。"""
         logger.info("正在生成：智囊团深度复盘（耗时较长，请耐心等待）...")
         client = httpx.Client(timeout=_LLM_TIMEOUT)
@@ -848,10 +849,12 @@ def generate_all_llm(
     _expert_cached = cache_get(_expert_key, _get_cache_ttl_llm("expert"))
     if _macro_cached is not None and _expert_cached is not None:
         logger.info("LLM 双缓存命中，跳过线程池")
-        return (_macro_cached, _expert_cached)
+        return (_macro_cached, _expert_cached, True, True)
 
     macro_result: Optional[str] = None
     expert_result: Optional[str] = None
+    macro_cached_flag: bool = False
+    expert_cached_flag: bool = False
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         macro_future = executor.submit(_run_macro)
@@ -859,13 +862,15 @@ def generate_all_llm(
 
         for future in as_completed([macro_future, expert_future]):
             try:
-                result = future.result()
+                result, from_cache = future.result()
                 if future == macro_future:
                     macro_result = result
+                    macro_cached_flag = from_cache
                     logger.info("全球政经局势分析生成完成" if result
                                 else "全球政经局势分析生成失败（跳过）")
                 else:
                     expert_result = result
+                    expert_cached_flag = from_cache
                     logger.info("智囊团深度复盘生成完成" if result
                                 else "智囊团深度复盘生成失败（跳过）")
             except Exception:
@@ -873,4 +878,4 @@ def generate_all_llm(
 
     logger.info("LLM 生成完成: 宏观=%s, 智囊团=%s",
                 "OK" if macro_result else "跳过", "OK" if expert_result else "跳过")
-    return macro_result, expert_result
+    return macro_result, expert_result, macro_cached_flag, expert_cached_flag

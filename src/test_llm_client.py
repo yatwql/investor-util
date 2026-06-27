@@ -271,13 +271,15 @@ class TestGenerateAllLlm(unittest.TestCase):
     """测试并行生成函数。"""
 
     def test_force_passthrough(self, mock_expert: MagicMock, mock_macro: MagicMock) -> None:
-        mock_macro.return_value = "<p>宏</p>"
-        mock_expert.return_value = "<p>策略</p>"
+        mock_macro.return_value = ("<p>宏</p>", False)
+        mock_expert.return_value = ("<p>策略</p>", False)
 
-        macro, expert = generate_all_llm([], [], 0, 0, 0, 0, 0, {}, force=True)
+        macro, expert, mc, ec = generate_all_llm([], [], 0, 0, 0, 0, 0, {}, force=True)
 
         self.assertEqual(macro, "<p>宏</p>")
         self.assertEqual(expert, "<p>策略</p>")
+        self.assertFalse(mc)
+        self.assertFalse(ec)
         # 验证 force=True 被透传
         _, kwargs_m = mock_macro.call_args
         _, kwargs_e = mock_expert.call_args
@@ -285,11 +287,13 @@ class TestGenerateAllLlm(unittest.TestCase):
         self.assertTrue(kwargs_e.get("force"))
 
     def test_force_false_default(self, mock_expert: MagicMock, mock_macro: MagicMock) -> None:
-        mock_macro.return_value = "<p>m</p>"
-        mock_expert.return_value = "<p>e</p>"
+        mock_macro.return_value = ("<p>m</p>", False)
+        mock_expert.return_value = ("<p>e</p>", False)
 
-        generate_all_llm([], [], 0, 0, 0, 0, 0, {})
+        _, _, mc, ec = generate_all_llm([], [], 0, 0, 0, 0, 0, {})
 
+        self.assertFalse(mc)
+        self.assertFalse(ec)
         _, kwargs_m = mock_macro.call_args
         self.assertFalse(kwargs_m.get("force"))
 

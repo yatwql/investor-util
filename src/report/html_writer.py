@@ -287,7 +287,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
                 for d in details
             ]
 
-            global_macro_content, expert_review_content = generate_all_llm(
+            global_macro_content, expert_review_content, _, _ = generate_all_llm(
                 a_indices, us_indices, total_mv, total_cost, total_profit,
                 total_today_profit, len(holdings), cat_counts,
                 penetrated_assets=pen_top10,

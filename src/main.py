@@ -416,7 +416,7 @@ def _cmd_generate_excel_with_news() -> None:
     _press_any_key()
 
 
-def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None, us_indices: dict[str, dict[str, Any]] | None = None, news_data: list | None = None) -> None:
+def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None, us_indices: dict[str, dict[str, Any]] | None = None, news_data: list | None = None, llm_cached: tuple[bool, bool] = (False, False)) -> None:
     """生成 Excel 报告的核心逻辑。
 
     Args:
@@ -520,7 +520,7 @@ def _generate_excel_report(holdings: list, include_news: bool = False, output_di
         logger.info("正在生成 LLM 增补内容...")
         try:
             from src.report.llm_content import write_llm_sheets
-            macro_text, expert_text = write_llm_sheets(wb, llm_content=llm_content)
+            macro_text, expert_text = write_llm_sheets(wb, llm_content=llm_content, llm_cached=llm_cached)
             logger.info("LLM 增补内容已生成")
         except ImportError:
             logger.warning("LLM 增补模块 (src.report.llm_content) 未就绪，跳过")
@@ -788,9 +788,10 @@ def _cmd_generate_full() -> None:
             _llm_fut = _llm_ex.submit(_run_llm)
 
             news_data = _news_fut.result()
-            llm_macro, llm_expert = _llm_fut.result()
+            llm_macro, llm_expert, macro_cached, expert_cached = _llm_fut.result()
 
         llm_content = (llm_macro, llm_expert)
+        llm_cached = (macro_cached, expert_cached)
 
         # ── HTML 报告 ──────────────────────────────────────────
         from src.report.html_writer import write_html_report
@@ -815,7 +816,7 @@ def _cmd_generate_full() -> None:
             news_top_count=news_top_count, include_llm=True,
             llm_content=llm_content, show_llm_in_tui=True,
             details=details, a_indices=a_indices, us_indices=us_indices,
-            news_data=news_data,
+            news_data=news_data, llm_cached=llm_cached,
         )
 
     except Exception as e:
