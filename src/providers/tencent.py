@@ -1,0 +1,159 @@
+"""腾讯财经 API — 获取股票/ETF 实时行情。
+
+Endpoint: qt.gtimg.cn
+支持上海（sh）和深圳（sz）股票代码，自动添加前缀。
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import httpx
+
+logger = logging.getLogger("invest")
+
+_BASE_URL = "https://qt.gtimg.cn/q="
+_TIMEOUT = 15.0
+
+
+# Tencent 实际返回格式（~ 分隔）：
+# v_sh561910="1~科创材料ETF~561910~0.853~0.901~...";
+# ▲ 序号  名称     代码   最新价   昨收
+# split("~") 后：parts[0]="1"(序号), parts[1]="科创材料ETF", parts[2]="561910", ...
+# _get(idx) 读取 parts[idx-1]，所以 name=2 → parts[1] ✓
+_FIELD_MAP: dict[str, int] = {
+    "name": 2,          # 名称
+    "code": 3,          # 代码
+    "price": 4,         # 当前价格
+    "yesterday_close": 5,  # 昨收
+    "open": 6,          # 今开
+    "volume": 7,        # 成交量（手）
+    "turnover": 8,      # 成交额
+    "price_date": 31,   # 日期时间 YYYYMMDDHHMMSS
+    "high": 34,         # 最高价
+    "low": 35,          # 最低价
+}
+
+
+def _add_prefix(code: str) -> str:
+    """根据代码前缀添加交易所标识。"""
+    code = code.strip()
+    if len(code) != 6:
+        return code
+    if code.startswith(("5", "6")):
+        return f"sh{code}"
+    if code.startswith(("0", "1", "3")):
+        return f"sz{code}"
+    return code
+
+
+def _parse_response(text: str) -> dict[str, Any] | None:
+    """解析 Tencent API 返回文本为结构化 dict。
+
+    Tencent 返回格式示例:
+        v_sh561910="1~科创材料ETF~561910~0.853~0.901~...";
+        字段 ~ 分隔，_get(idx) → parts[idx-1]，第 1 个字段为序号
+
+    Returns:
+        dict 或 None（解析失败时）
+    """
+    # 提取引号内的内容
+    try:
+        start = text.index('"') + 1
+        end = text.rindex('"')
+        body = text[start:end]
+    except ValueError:
+        logger.warning("Tencent API 返回格式异常: %s", text[:80])
+        return None
+
+    if not body:
+        return None
+
+    parts = body.split("~")
+    if len(parts) < 10:
+        logger.warning("Tencent API 字段不足: %s", body[:80])
+        return None
+
+    def _get(idx: int) -> str:
+        """取第 idx 个字段的 = 号后面的值。"""
+        raw = parts[idx - 1] if idx <= len(parts) else ""
+        if "=" in raw:
+            return raw.split("=", 1)[1]
+        return raw
+
+    price_str = _get(_FIELD_MAP["price"]).strip()
+    yclose_str = _get(_FIELD_MAP["yesterday_close"]).strip()
+    raw_date = _get(_FIELD_MAP["price_date"]).strip()
+
+    # 价格可能为 "0.000"（停牌或无数据）
+    price = _parse_float(price_str)
+    yclose = _parse_float(yclose_str)
+
+    # 提取日期（YYYYMMDDHHMMSS → YYYY-MM-DD）
+    price_date = ""
+    if len(raw_date) >= 8 and raw_date.isdigit():
+        price_date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+
+    return {
+        "name": _get(_FIELD_MAP["name"]).strip(),
+        "code": _get(_FIELD_MAP["code"]).strip(),
+        "price": price,
+        "yesterday_close": yclose,
+        "price_date": price_date,
+        "open": _parse_float(_get(_FIELD_MAP["open"])),
+        "high": _parse_float(_get(_FIELD_MAP["high"])),
+        "low": _parse_float(_get(_FIELD_MAP["low"])),
+        "volume": _parse_float(_get(_FIELD_MAP["volume"])),
+        "turnover": _parse_float(_get(_FIELD_MAP["turnover"])),
+        "source": "腾讯财经",
+    }
+
+
+def _parse_float(s: str) -> float:
+    """安全解析浮点数，失败返回 0.0。"""
+    try:
+        v = float(s)
+    except (ValueError, TypeError):
+        return 0.0
+    return v if v > 0 else 0.0
+
+
+def fetch_price(code: str) -> dict[str, Any] | None:
+    """获取一只股票的实时行情。
+
+    Args:
+        code: 6 位股票/ETF 代码（如 "600900"）
+
+    Returns:
+        dict:
+            - name: 名称
+            - code: 代码
+            - price: 当前价格（float，不可用时为 0.0）
+            - yesterday_close: 昨收（float）
+            - open / high / low / volume / turnover
+            - source: "腾讯财经"
+        None: 网络异常或解析失败
+    """
+    full_code = _add_prefix(code)
+    url = f"{_BASE_URL}{full_code}"
+
+    logger.debug("Tencent API 请求: %s", full_code)
+
+    try:
+        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+            resp = client.get(url)
+            resp.encoding = "gbk"  # qt.gtimg.cn 返回 GBK 编码
+            text = resp.text
+    except httpx.TimeoutException:
+        logger.warning("Tencent API 超时: %s", full_code)
+        return None
+    except httpx.RequestError as e:
+        logger.warning("Tencent API 请求失败: %s", e)
+        return None
+
+    result = _parse_response(text)
+    if result is None:
+        logger.warning("Tencent API 解析失败: %s", full_code)
+
+    return result

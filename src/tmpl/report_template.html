@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人投资分析报告 - {{ now }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .report-header { background: #2E75B6; color: #fff; padding: 20px 30px; border-radius: 8px; margin-bottom: 24px; }
+        .report-header h1 { font-size: 22px; margin-bottom: 4px; }
+        .report-header .subtitle { font-size: 14px; opacity: 0.85; }
+
+        .section { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
+        .section-title { background: #2E75B6; color: #fff; padding: 12px 20px; font-size: 16px; font-weight: 600; }
+        .section-content { padding: 16px 20px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+        th { background: #f0f4f8; padding: 8px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #ddd; white-space: nowrap; }
+        td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #eee; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        tr:hover { background: #eef5fb; }
+
+        .subtotal-row { background: #E8F0FE !important; font-weight: 600; }
+        .subtotal-row td { border-top: 2px solid #2E75B6; }
+        .grand-total-row { background: #FFF8E1 !important; font-weight: 700; }
+        .grand-total-row td { border-top: 2px solid #333; }
+
+        .profit { color: #CC0000; }
+        .loss { color: #009900; }
+        .rating-excellent { color: #CC0000; font-weight: 600; }
+        .rating-poor { color: #009900; font-weight: 600; }
+        .rating-stable { color: #0066CC; font-weight: 600; }
+
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .summary-card { background: #f8f9fa; border-radius: 6px; padding: 14px 18px; }
+        .summary-card h3 { font-size: 13px; color: #666; margin-bottom: 6px; }
+        .summary-card .value { font-size: 22px; font-weight: 700; }
+        .summary-card .meta { font-size: 12px; color: #999; margin-top: 2px; }
+
+        .kv-table { width: auto; min-width: 0; }
+        .kv-table td { padding: 6px 16px 6px 0; border-bottom: none; text-align: left; }
+        .kv-table td:first-child { font-weight: 600; color: #555; width: 140px; }
+        .kv-table tr:nth-child(even) { background: transparent; }
+
+        .indices-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .indices-group { background: #f8f9fa; border-radius: 6px; padding: 12px 16px; }
+        .indices-group h4 { font-size: 13px; color: #555; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #ddd; }
+        .index-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+        .index-name { color: #555; }
+        .index-price { font-weight: 600; }
+        .index-change { font-size: 12px; margin-left: 8px; }
+
+        .update-ok { color: #2E75B6; font-weight: 600; }
+        .update-warn { color: #CC0000; font-weight: 600; }
+
+        .penetration-notes { font-size: 12px; color: #666; padding: 8px 20px 16px; line-height: 1.8; }
+        .empty-note { padding: 20px; text-align: center; color: #999; }
+
+        .source-tag { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; }
+
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .summary-grid { grid-template-columns: 1fr; }
+            .indices-grid { grid-template-columns: 1fr; }
+            .section-title { font-size: 14px; padding: 10px 14px; }
+            .section-content { padding: 10px 12px; }
+            table { font-size: 12px; }
+            td, th { padding: 4px 5px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  HEADER                                                -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="report-header">
+        <h1>个人投资分析报告</h1>
+        <div class="subtitle">统计时间: {{ now }} | 所属交易日: {{ trading_day }}</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 1: 汇总 (Summary)                              -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">一、投资分析汇总</div>
+        <div class="section-content">
+
+            <!-- 基本信息 -->
+            <table class="kv-table">
+                <tr><td>统计时间</td><td>{{ now }}</td></tr>
+                <tr><td>所属交易日</td><td>{{ trading_day }}</td></tr>
+            </table>
+
+            <br>
+
+            <!-- 持仓概况 -->
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【持仓概况】</h3>
+            <table class="kv-table">
+                {% if categories %}
+                <tr><td>场内股票</td><td>{{ categories.get("场内股票", 0) }}</td></tr>
+                <tr><td>场内ETF</td><td>{{ categories.get("场内ETF", 0) }}</td></tr>
+                <tr><td>国内场外</td><td>{{ categories.get("国内场外", 0) }}</td></tr>
+                <tr><td>QDII</td><td>{{ categories.get("QDII", 0) }}</td></tr>
+                <tr><td>持仓总数</td>
+                    <td>{{ categories.get("场内股票", 0) + categories.get("场内ETF", 0) + categories.get("国内场外", 0) + categories.get("QDII", 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td>持仓总数</td><td>--</td></tr>
+                {% endif %}
+                <tr>
+                    <td>价格更新状态</td>
+                    <td>
+                        {% if update_status %}
+                        <span class="{% if update_status.all_updated %}update-ok{% else %}update-warn{% endif %}">
+                            {{ update_status.updated }}/{{ update_status.total }}
+                            {% if update_status.all_updated %}(全部已更新){% else %}(尚有缺失){% endif %}
+                        </span>
+                        {% else %}--{% endif %}
+                    </td>
+                </tr>
+            </table>
+
+            <br>
+
+            <!-- 盈亏汇总 -->
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【盈亏汇总】</h3>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h3>总市值 (元)</h3>
+                    <div class="value">{{ total_mv | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>总成本 (元)</h3>
+                    <div class="value">{{ total_cost | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>总盈亏 (元)</h3>
+                    <div class="value" style="color: {{ total_profit | profit_color }}">{{ total_profit | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>总收益率</h3>
+                    <div class="value" style="color: {{ total_profit_rate | profit_color }}">{{ total_profit_rate | pct }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>本日盈亏 (元)</h3>
+                    <div class="value" style="color: {{ total_today_profit | profit_color }}">{{ total_today_profit | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>本日收益率</h3>
+                    <div class="value" style="color: {{ today_profit_rate | profit_color }}">{{ today_profit_rate | pct }}</div>
+                </div>
+            </div>
+
+            <br>
+
+            <!-- 市场指数 -->
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【市场指数】</h3>
+            <div class="indices-grid">
+                <div class="indices-group">
+                    <h4>A 股指数</h4>
+                    {% if a_indices %}
+                    {% for idx in a_indices %}
+                    <div class="index-row">
+                        <span class="index-name">{{ idx.name }}</span>
+                        <span>
+                            <span class="index-price">{{ idx.price | price }}</span>
+                            <span class="index-change" style="color: {{ idx.change_pct | profit_color }}">
+                                {% if idx.change_pct >= 0 %}+{% endif %}{{ idx.change_pct | change }}
+                            </span>
+                        </span>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="index-row"><span class="index-name">暂无数据</span></div>
+                    {% endif %}
+                </div>
+                <div class="indices-group">
+                    <h4>美股指数</h4>
+                    {% if us_indices %}
+                    {% for idx in us_indices %}
+                    <div class="index-row">
+                        <span class="index-name">{{ idx.name }}</span>
+                        <span>
+                            <span class="index-price">{{ idx.price | price }}</span>
+                            <span class="index-change" style="color: {{ idx.change_pct | profit_color }}">
+                                {% if idx.change_pct >= 0 %}+{% endif %}{{ idx.change_pct | change }}
+                            </span>
+                        </span>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="index-row"><span class="index-name">暂无数据</span></div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 2: 市值核算 (Market Value)                     -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">二、市值核算明细表</div>
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>账户</th><th>名称</th><th>代码</th><th>最新价</th><th>净值日期</th>
+                        <th>昨日价</th><th>取价方式</th><th>溢价率</th><th>份额</th><th>市值</th>
+                        <th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>取价渠道</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set grand_mv = namespace(v=0.0) %}
+                    {% set grand_cost = namespace(v=0.0) %}
+                    {% set grand_profit = namespace(v=0.0) %}
+                    {% set grand_today = namespace(v=0.0) %}
+                    {% for acc_name, acc_details in accounts.items() %}
+                        {% for d in acc_details %}
+                        <tr>
+                            <td class="text-left">{{ d.account }}</td>
+                            <td class="text-left">{{ d.name }}</td>
+                            <td>{{ d.code }}</td>
+                            <td class="text-right">{{ d.price | price }}</td>
+                            <td>{{ d.nav_date }}</td>
+                            <td class="text-right">{{ d.yesterday_close | price }}</td>
+                            <td>{{ d.price_type }}</td>
+                            <td>{{ d.premium }}</td>
+                            <td class="text-right">{{ d.shares | shares }}</td>
+                            <td class="text-right">{{ d.market_value | money }}</td>
+                            <td class="text-right">{{ d.cost | money }}</td>
+                            <td class="text-right" style="color: {{ d.profit | profit_color }}">{{ d.profit | money }}</td>
+                            <td class="text-right" style="color: {{ d.profit_rate | profit_color }}">{{ d.profit_rate | pct }}</td>
+                            <td class="text-right" style="color: {{ d.today_profit | profit_color }}">{{ d.today_profit | money }}</td>
+                            <td>{{ d.source }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% set acc_tot = account_totals.get(acc_name, {}) %}
+                        <tr class="subtotal-row">
+                            <td class="text-left" colspan="2">{{ acc_name }} 小计</td>
+                            <td></td><td></td><td></td><td></td><td></td><td></td>
+                            <td class="text-right">--</td>
+                            <td class="text-right">{{ acc_tot.get("market_value", 0) | money }}</td>
+                            <td class="text-right">{{ acc_tot.get("cost", 0) | money }}</td>
+                            <td class="text-right" style="color: {{ acc_tot.get("profit", 0) | profit_color }}">{{ acc_tot.get("profit", 0) | money }}</td>
+                            <td class="text-right" style="color: {{ acc_tot.get("profit_rate", 0) | profit_color }}">{{ acc_tot.get("profit_rate", 0) | pct }}</td>
+                            <td class="text-right" style="color: {{ acc_tot.get("today_profit", 0) | profit_color }}">{{ acc_tot.get("today_profit", 0) | money }}</td>
+                            <td></td>
+                        </tr>
+                        {% set grand_mv.v = grand_mv.v + acc_tot.get("market_value", 0) %}
+                        {% set grand_cost.v = grand_cost.v + acc_tot.get("cost", 0) %}
+                        {% set grand_profit.v = grand_profit.v + acc_tot.get("profit", 0) %}
+                        {% set grand_today.v = grand_today.v + acc_tot.get("today_profit", 0) %}
+                    {% endfor %}
+                    {% set g_rate = (grand_profit.v / grand_cost.v * 100) if grand_cost.v > 0 else 0 %}
+                    <tr class="grand-total-row">
+                        <td colspan="2" class="text-left">总计</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td>
+                        <td class="text-right">--</td>
+                        <td class="text-right">{{ grand_mv.v | money }}</td>
+                        <td class="text-right">{{ grand_cost.v | money }}</td>
+                        <td class="text-right" style="color: {{ grand_profit.v | profit_color }}">{{ grand_profit.v | money }}</td>
+                        <td class="text-right" style="color: {{ (g_rate / 100) | profit_color }}">{{ g_rate | change }}</td>
+                        <td class="text-right" style="color: {{ grand_today.v | profit_color }}">{{ grand_today.v | money }}</td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 3: 分类汇总 (Category Summary)                 -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">三、分类汇总表</div>
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>资产属性</th><th>投资分类</th><th>名称</th><th>代码</th>
+                        <th>市值</th><th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set cat_grand_mv = namespace(v=0.0) %}
+                    {% set cat_grand_cost = namespace(v=0.0) %}
+                    {% set cat_grand_profit = namespace(v=0.0) %}
+                    {% set cat_grand_today = namespace(v=0.0) %}
+                    {% for group in cat_data %}
+                        {% for item in group["items"] %}
+                        <tr>
+                            <td class="text-left">{{ group["property"] }}</td>
+                            <td class="text-left">{{ group["sub_category"] }}</td>
+                            <td class="text-left">{{ item["name"] }}</td>
+                            <td>{{ item["code"] }}</td>
+                            <td class="text-right">{{ item["market_value"] | money }}</td>
+                            <td class="text-right">{{ item["cost"] | money }}</td>
+                            <td class="text-right" style="color: {{ item["profit"] | profit_color }}">{{ item["profit"] | money }}</td>
+                            <td class="text-right" style="color: {{ item["profit_rate"] | profit_color }}">{{ item["profit_rate"] | pct }}</td>
+                            <td class="text-right" style="color: {{ item["today_profit"] | profit_color }}">{{ item["today_profit"] | money }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="subtotal-row">
+                            <td class="text-left" colspan="2">{{ group["property"] }} - {{ group["sub_category"] }} 小计</td>
+                            <td></td><td></td>
+                            <td class="text-right">{{ group["sub_mv"] | money }}</td>
+                            <td class="text-right">{{ group["sub_cost"] | money }}</td>
+                            <td class="text-right" style="color: {{ group["sub_profit"] | profit_color }}">{{ group["sub_profit"] | money }}</td>
+                            <td class="text-right" style="color: {{ group["sub_rate"] | profit_color }}">{{ group["sub_rate"] | pct }}</td>
+                            <td class="text-right" style="color: {{ group["sub_today"] | profit_color }}">{{ group["sub_today"] | money }}</td>
+                        </tr>
+                        {% set cat_grand_mv.v = cat_grand_mv.v + group["sub_mv"] %}
+                        {% set cat_grand_cost.v = cat_grand_cost.v + group["sub_cost"] %}
+                        {% set cat_grand_profit.v = cat_grand_profit.v + group["sub_profit"] %}
+                        {% set cat_grand_today.v = cat_grand_today.v + group["sub_today"] %}
+                    {% endfor %}
+                    {% set cat_g_rate = (cat_grand_profit.v / cat_grand_cost.v * 100) if cat_grand_cost.v > 0 else 0 %}
+                    <tr class="grand-total-row">
+                        <td colspan="4" class="text-left">总计</td>
+                        <td class="text-right">{{ cat_grand_mv.v | money }}</td>
+                        <td class="text-right">{{ cat_grand_cost.v | money }}</td>
+                        <td class="text-right" style="color: {{ cat_grand_profit.v | profit_color }}">{{ cat_grand_profit.v | money }}</td>
+                        <td class="text-right" style="color: {{ (cat_g_rate / 100) | profit_color }}">{{ cat_g_rate | change }}</td>
+                        <td class="text-right" style="color: {{ cat_grand_today.v | profit_color }}">{{ cat_grand_today.v | money }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 4: 资产穿透 TOP10 (Penetration)                -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">四、资产穿透 TOP 10</div>
+        {% if penetration and penetration.get("top10") %}
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>来源明细</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set pen_total_mv = penetration["summary"]["total_mv"] %}
+                    {% for entry in penetration["top10"] %}
+                    <tr>
+                        <td>{{ entry["rank"] }}</td>
+                        <td class="text-left">{{ entry["name"] }}</td>
+                        <td>{{ entry["codes"] | join(", ") if entry["codes"] else "--" }}</td>
+                        <td class="text-right">{{ entry["mv"] | money }}</td>
+                        <td class="text-right">{{ (entry["ratio_pct"] / 100) | pct }}</td>
+                        <td class="text-left" style="font-size: 12px;">
+                            {% for src in entry["sources"] %}
+                            <span class="source-tag">{{ src }}</span>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="penetration-notes">
+            {% set s = penetration["summary"] %}
+            {% if s.get("unknown_mv", 0) > 0 %}
+            <div>* {{ s["total_funds"] }} 只基金中，有 {{ s["failed_funds"] }} 只无法获取穿透数据，合计市值 {{ s["unknown_mv"] | money }} 元未计入穿透 TOP10</div>
+            {% endif %}
+            <div>
+                基金 {{ s["total_funds"] }} 只（{{ s["fund_breakdown"] }}） + 直接持股 {{ s["total_stocks"] }} 只
+                → 穿透合并 {{ s["merged_count"] }} 个标的，TOP10 覆盖 {{ s["top10_coverage_pct"] }}%
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-note">暂无穿透数据</div>
+        {% endif %}
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 5: 基金业绩分析 (Fund Performance)              -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">五、基金业绩分析</div>
+        {% if perf_data %}
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金</th><th>代码</th><th>类型</th><th>近3月</th><th>近6月</th><th>近12月</th>
+                        <th>持仓累计盈亏(¥)</th><th>持仓收益率</th><th>业绩基准</th><th>业绩评价</th><th>同类排名</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in perf_data %}
+                    <tr>
+                        <td class="text-left">{{ p["name"] }}</td>
+                        <td>{{ p["code"] }}</td>
+                        <td>{{ p["type_label"] }}</td>
+                        <td class="{% if p.get('syl_3m_raw') is defined and p['syl_3m_raw'] is number %}{% if p['syl_3m_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_3m"] }}</td>
+                        <td class="{% if p.get('syl_6m_raw') is defined and p['syl_6m_raw'] is number %}{% if p['syl_6m_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_6m"] }}</td>
+                        <td class="{% if p.get('syl_1y_raw') is defined and p['syl_1y_raw'] is number %}{% if p['syl_1y_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_1y"] }}</td>
+                        <td class="text-right" style="color: {{ p.get('profit_raw', 0) | profit_color }}">{{ p["profit"] }}</td>
+                        <td class="text-right" style="color: {{ p.get('profit_rate_raw', 0) | profit_color }}">{{ p["profit_rate"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{{ p["benchmark"] }}</td>
+                        <td class="text-left" style="font-size: 12px;{{ ' color: #CC0000; font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: #009900; font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: #0066CC; font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
+                        <td>{{ p["rank"] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-note">未检测到基金持仓</div>
+        {% endif %}
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 6: 财经新闻热点与持仓关联分析 (News)            -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">六、财经新闻热点与持仓关联分析</div>
+        {% if news_data %}
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th><th>新闻标题</th><th>摘要</th><th>来源</th><th>发布时间</th><th>关联关键词</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in news_data %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="text-left">
+                            <a href="{{ item.url }}" target="_blank" rel="noopener" style="color: #2E75B6; text-decoration: none;">{{ item.title }}</a>
+                        </td>
+                        <td class="text-left" style="font-size: 12px; max-width: 300px;">{{ item.intro }}</td>
+                        <td>{{ item.media_name }}</td>
+                        <td style="font-size: 12px;">{{ item.ctime }}</td>
+                        <td class="text-left" style="font-size: 12px;">
+                            {% for kw in item.matched_keywords %}
+                            <span class="source-tag">{{ kw }}</span>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="penetration-notes">
+            <div>* 共 {{ news_data | length }} 条关联新闻，基于持仓名称和代码进行关键词匹配</div>
+        </div>
+        {% else %}
+        <div class="empty-note">暂无关联新闻</div>
+        {% endif %}
+    </div>
+
+</div>
+</body>
+</html>
