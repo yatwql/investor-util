@@ -19,7 +19,11 @@ from src.report.excel_writer import (
     write_title_row,
 )
 from src.report.market_value import get_last_trading_day
-from src.report.styles import FMT_MONEY, profit_font
+from src.report.styles import FMT_MONEY, GREEN_FONT, RED_FONT, profit_font
+
+# 指数涨跌颜色
+_INDEX_UP_FONT = Font(size=10, bold=True, color="CC0000")    # 涨→红
+_INDEX_DOWN_FONT = Font(size=10, bold=True, color="009900")  # 跌→绿
 
 # 单元格对齐
 _CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
@@ -57,6 +61,28 @@ def _write_kv_row_colored(ws, row: int, key: str, value: Any,
     write_data_row(ws, row, [key, value])
     for col in (1, 2):
         ws.cell(row=row, column=col).font = font
+    return row + 1
+
+
+def _write_index_row(ws, row: int, name: str, price: float, change_pct: float) -> int:
+    """写入指数行，涨跌幅自动着色（涨红跌绿）。
+
+    Args:
+        ws: 工作表
+        row: 当前行号
+        name: 指数中文名
+        price: 当前点数
+        change_pct: 涨跌幅百分数（如 0.35 表示 +0.35%）
+
+    Returns:
+        下一行号
+    """
+    sign = "+" if change_pct >= 0 else ""
+    label = f"  {name}"
+    value = f"{price:.2f}  ({sign}{change_pct:.2f}%)"
+    write_data_row(ws, row, [label, value])
+    font = _INDEX_UP_FONT if change_pct >= 0 else _INDEX_DOWN_FONT
+    ws.cell(row=row, column=2).font = font
     return row + 1
 
 
@@ -180,9 +206,7 @@ def write_summary_sheet(
             if idx and idx.get("price", 0) > 0:
                 price = idx["price"]
                 change = idx.get("change_pct", 0)
-                sign = "+" if change >= 0 else ""
-                row = _write_kv_row(ws, row, f"  {cname}",
-                                     f"{price:.2f}  ({sign}{change:.2f}%)")
+                row = _write_index_row(ws, row, cname, price, change)
             else:
                 row = _write_kv_row(ws, row, f"  {cname}", "--")
 
@@ -214,9 +238,7 @@ def write_summary_sheet(
             if idx and idx.get("price", 0) > 0:
                 price = idx["price"]
                 change = idx.get("change_pct", 0)
-                sign = "+" if change >= 0 else ""
-                row = _write_kv_row(ws, row, f"  {cname}",
-                                     f"{price:.2f}  ({sign}{change:.2f}%)")
+                row = _write_index_row(ws, row, cname, price, change)
             else:
                 row = _write_kv_row(ws, row, f"  {cname}", "--")
 

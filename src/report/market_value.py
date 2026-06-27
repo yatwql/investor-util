@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, List
@@ -291,66 +292,81 @@ def _determine_price_type(source_api: str, nav_date: str, trading_day: str) -> s
 
 
 def _generate_details(holdings: List[Holding], today_str: str) -> List[DetailRow]:
-    """获取所有持仓的行情数据并生成明细行。"""
+    """获取所有持仓的行情数据并生成明细行（并行 HTTP 请求）。"""
     details: List[DetailRow] = []
     today_str = today_str or datetime.now().strftime("%Y-%m-%d")
 
-    for h in holdings:
-        mkt = fetch_market_data(h.code, h.name)
-        if mkt is None:
-            logger.warning("无法获取行情数据: %s (%s)", h.name, h.code)
-            price = 0.0
-            yclose = 0.0
-            nav_date = ""
-            source = "--"
-            source_api = ""
-            price_type = "--"
-        else:
-            price = mkt.get("price", 0.0) or 0.0
-            yclose = mkt.get("yesterday_close", 0.0) or 0.0
-            nav_date = mkt.get("price_date", "")  # 统一使用 price_date
-            source = mkt.get("source", "--")
-            source_api = mkt.get("source_api", "")
-            price_type = _determine_price_type(source_api, nav_date, get_last_trading_day())
+    # 并行发起行情请求（缓存命中时秒回，冷启动加速最高 8×）
+    future_map = {}
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for h in holdings:
+            future = executor.submit(fetch_market_data, h.code, h.name)
+            future_map[future] = h
 
-        cost = round(h.cost_price * h.shares, 2)
-        mv = round(price * h.shares, 2)
-        profit = round(mv - cost, 2)
-        profit_rate = profit / cost if cost > 0 else 0.0
+        for future in as_completed(future_map):
+            h = future_map[future]
+            try:
+                mkt = future.result()
+            except Exception:
+                logger.warning("获取行情异常: %s (%s)", h.name, h.code)
+                mkt = None
 
-        # 本日盈亏
-        is_qdii = _is_qdii(h.name)
-        if source_api == "tencent":
-            # 场内：(最新价 - 昨收盘) × 份额
-            today_profit = round((price - yclose) * h.shares, 2)
-        elif is_qdii and nav_date and nav_date != today_str:
-            # QDII：净值日期为 T-1 时才计算
-            today_profit = round((price - yclose) * h.shares, 2)
-        elif nav_date == today_str:
-            # 国内场外：净值日期==当天才计算
-            today_profit = round((price - yclose) * h.shares, 2)
-        else:
-            today_profit = 0.0
+            if mkt is None:
+                logger.warning("无法获取行情数据: %s (%s)", h.name, h.code)
+                price = 0.0
+                yclose = 0.0
+                nav_date = ""
+                source = "--"
+                source_api = ""
+                price_type = "--"
+            else:
+                price = mkt.get("price", 0.0) or 0.0
+                yclose = mkt.get("yesterday_close", 0.0) or 0.0
+                nav_date = mkt.get("price_date", "")  # 统一使用 price_date
+                source = mkt.get("source", "--")
+                source_api = mkt.get("source_api", "")
+                price_type = _determine_price_type(source_api, nav_date, get_last_trading_day())
 
-        detail = DetailRow(
-            account=h.account.strip(),
-            name=h.name,
-            code=h.code,
-            price=price,
-            nav_date=nav_date,
-            yesterday_close=yclose,
-            price_type=price_type,
-            premium=_FUND_PREMIUM_PLACEHOLDER,
-            shares=h.shares,
-            market_value=mv,
-            cost=cost,
-            profit=profit,
-            profit_rate=profit_rate,
-            today_profit=today_profit,
-            source=source,
-            source_api=source_api,
-        )
-        details.append(detail)
+            cost = round(h.cost_price * h.shares, 2)
+            mv = round(price * h.shares, 2)
+            profit = round(mv - cost, 2)
+            profit_rate = profit / cost if cost > 0 else 0.0
+
+            # 本日盈亏
+            if source_api == "tencent":
+                # 场内：(最新价 - 昨收盘) × 份额
+                today_profit = round((price - yclose) * h.shares, 2)
+            elif nav_date:
+                # 场外：nav_date 是净值的所属交易日
+                # 用最近交易日/前一交易日做对比，判断是否为最新可用数据
+                trading_day = get_last_trading_day()
+                prev_td = get_prev_trading_day(trading_day)
+                if nav_date == trading_day or (prev_td and nav_date == prev_td):
+                    today_profit = round((price - yclose) * h.shares, 2)
+                else:
+                    today_profit = 0.0
+            else:
+                today_profit = 0.0
+
+            detail = DetailRow(
+                account=h.account.strip(),
+                name=h.name,
+                code=h.code,
+                price=price,
+                nav_date=nav_date,
+                yesterday_close=yclose,
+                price_type=price_type,
+                premium=_FUND_PREMIUM_PLACEHOLDER,
+                shares=h.shares,
+                market_value=mv,
+                cost=cost,
+                profit=profit,
+                profit_rate=profit_rate,
+                today_profit=today_profit,
+                source=source,
+                source_api=source_api,
+            )
+            details.append(detail)
 
     logger.info("市值核算明细数据生成完成，共 %d 条", len(details))
     return details
@@ -413,19 +429,22 @@ def _apply_profit_colors(ws, start_row: int, end_row: int,
 
 
 def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
-                             today_str: str = "") -> tuple[float, float, float, float, List[DetailRow]]:
+                             today_str: str = "",
+                             details: List[DetailRow] | None = None) -> tuple[float, float, float, float, List[DetailRow]]:
     """写入市值核算页签，返回汇总数据供汇总页签使用。
 
     Args:
         ws: 目标工作表
         holdings: 持仓列表
         today_str: 日期字符串（YYYY-MM-DD），默认当天
+        details: 可选预计算明细行，传入时跳过内部行情获取。
 
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
     """
     ws.title = "市值核算"
-    details = _generate_details(holdings, today_str)
+    if details is None:
+        details = _generate_details(holdings, today_str)
 
     row = write_title_row(ws, 1, "市值核算明细表", _NCOLS)
     row = write_header_row(ws, row, _HEADERS)

@@ -154,11 +154,11 @@ class TestGetCacheTtlLlm(unittest.TestCase):
     def test_macro_default(self) -> None:
         ttl = _get_cache_ttl_llm("macro")
         self.assertGreater(ttl, 0)
-        self.assertEqual(ttl, 86400)
+        self.assertEqual(ttl, 14400)
 
     def test_expert_default(self) -> None:
         ttl = _get_cache_ttl_llm("expert")
-        self.assertEqual(ttl, 86400)
+        self.assertEqual(ttl, 7200)
 
 
 # ═══════════════════════════════════════════════════════════

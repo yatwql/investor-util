@@ -1,7 +1,8 @@
 """财经新闻热点与持仓关联分析模块 — 报告增补页签。
 
-从新浪财经获取最新新闻，与持仓名称/代码进行关键词匹配，
-按关联度排序输出 TOP 100，在 Excel 中以单独页签呈现。
+从新浪财经/东方财富/财联社三个源获取最新财经新闻，
+与持仓名称/代码以及穿透 TOP10 资产名称进行关键词匹配，
+按关联度排序输出 TOP N，在 Excel 中以单独页签呈现。
 
 输出列：
   序号 | 新闻标题 | 摘要 | 来源 | 发布时间 | 关联关键词
@@ -10,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, List
+from typing import Any, List, Optional
 
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -31,27 +32,37 @@ _HEADERS = [
 ]
 
 
-def build_news_data(holdings: List[Holding], top_n: int = 100) -> List[dict[str, Any]]:
+def build_news_data(
+    holdings: List[Holding],
+    top_n: int = 100,
+    penetrated_assets: Optional[List[dict]] = None,
+) -> List[dict[str, Any]]:
     """获取新闻数据并与持仓关联。
 
-    调用 sina_news 模块获取最新财经新闻，
-    与持仓名称/代码进行关键词匹配，
+    从多个财经新闻源获取最新新闻，
+    与持仓名称/代码及穿透 TOP10 资产进行关键词匹配，
     按关联度排序返回 TOP N。
 
     Args:
         holdings: 持仓列表
         top_n: 最多返回的关联新闻条数
+        penetrated_assets: 穿透 TOP10 资产列表（可选），
+            每项含 name 和 codes 字段。传入后新闻关键词
+            会额外覆盖穿透到的底层资产。
 
     Returns:
         [{title, intro, url, ctime, media_name, matched_keywords}, ...]
         获取失败返回 []
     """
-    from src.providers.sina_news import build_holding_keywords, fetch_and_correlate
+    from src.providers.news_aggregator import (
+        aggregate_news,
+        build_holding_keywords,
+    )
 
-    keywords = build_holding_keywords(holdings)
-    logger.info("新闻关联关键词: %s", keywords)
+    keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
+    logger.info("新闻关联关键词（含穿透）: %s", keywords)
 
-    news_items = fetch_and_correlate(keywords, top_n=top_n)
+    news_items = aggregate_news(keywords, top_n=top_n)
     if news_items:
         logger.info("新闻关联完成: 获取 %d 条, 匹配 %d 条",
                     len(news_items), sum(1 for n in news_items if n.get("matched_keywords")))

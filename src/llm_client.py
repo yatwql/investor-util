@@ -13,7 +13,6 @@ import json
 import logging
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
 
@@ -687,7 +686,7 @@ def generate_expert_review(
 
 
 # ═══════════════════════════════════════════════════════════
-#  并行批量生成（优化 1：并行）
+#  批量生成（串行，避免 httpx 连接池线程安全问题）
 # ═══════════════════════════════════════════════════════════
 
 
@@ -704,10 +703,10 @@ def generate_all_llm(
     holdings_details: Optional[list[dict]] = None,
     force: bool = False,
 ) -> tuple[Optional[str], Optional[str]]:
-    """并行生成模块 7（全球政经）+ 模块 8（智囊团复盘）。
+    """串行生成模块 7（全球政经）+ 模块 8（智囊团复盘）。
 
-    通过 ThreadPoolExecutor 并发调用两个 LLM 生成函数，
-    墙钟时间约等于最慢的单次调用而非二者之和。
+    串行执行而非 ThreadPoolExecutor，因为全局共享的 httpx.Client
+    (_HTTP_POOL) 不是线程安全的，并发调用可能引发连接池死锁。
 
     Args:
         force: 为 True 时跳过缓存强制重新生成
@@ -715,22 +714,22 @@ def generate_all_llm(
     Returns:
         (global_macro_html, expert_review_html) 二元组，各自可能为 None
     """
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        macro_future = pool.submit(
-            generate_global_macro,
-            a_indices, us_indices, total_mv, total_profit, categories,
-            force=force,
-        )
-        expert_future = pool.submit(
-            generate_expert_review,
-            total_mv, total_cost, total_profit, total_today_profit,
-            holdings_count, categories, penetrated_assets,
-            holdings_details=holdings_details,
-            force=force,
-        )
-        macro = macro_future.result()
-        expert = expert_future.result()
+    # 模块 7：全球政经局势
+    logger.info("正在生成：全球政经局势分析...")
+    macro = generate_global_macro(
+        a_indices, us_indices, total_mv, total_profit, categories,
+        force=force,
+    )
 
-    logger.info("LLM 并行生成完成: 宏观=%s, 智囊团=%s",
+    # 模块 8：智囊团深度复盘
+    logger.info("正在生成：智囊团深度复盘（耗时较长，请耐心等待）...")
+    expert = generate_expert_review(
+        total_mv, total_cost, total_profit, total_today_profit,
+        holdings_count, categories, penetrated_assets,
+        holdings_details=holdings_details,
+        force=force,
+    )
+
+    logger.info("LLM 生成完成: 宏观=%s, 智囊团=%s",
                 "OK" if macro else "跳过", "OK" if expert else "跳过")
     return macro, expert

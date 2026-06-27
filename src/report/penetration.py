@@ -12,7 +12,7 @@
   6. 直接持有股票     → 合并计算
 
 输出列：
-  排名 | 名称 | 代码 | 穿透市值 | 占比 | 来源明细
+  排名 | 名称 | 代码 | 穿透市值 | 占比 | 板块 | 来源明细
 """
 
 from __future__ import annotations
@@ -36,9 +36,9 @@ from src.report.styles import FMT_MONEY, FMT_PERCENT
 
 logger = logging.getLogger("invest")
 
-_NCOLS = 6
+_NCOLS = 7
 _HEADERS = [
-    "排名", "名称", "代码", "穿透市值", "占比", "来源明细",
+    "排名", "名称", "代码", "穿透市值", "占比", "板块", "来源明细",
 ]
 
 # ── 穿透分类常量 ───────────────────────────────────────────
@@ -166,8 +166,163 @@ def _fund_type_tag(ftype: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════
-#  名称归一化
+#  板块分类
 # ═══════════════════════════════════════════════════════════
+
+# A 股板块关键词映射：按名称关键词匹配 → 板块
+_SECTOR_KEYWORDS: dict[str, str] = {
+    # 消费
+    "白酒": "消费", "茅台": "消费", "五粮液": "消费", "酒": "消费",
+    "食品": "消费", "饮料": "消费", "乳业": "消费", "牛奶": "消费",
+    "家电": "消费", "美的": "消费", "格力": "消费", "海尔": "消费",
+    "汽车": "消费", "整车": "消费", "汽车零部件": "消费",
+    "零售": "消费", "超市": "消费", "电商": "消费",
+    "服装": "消费", "纺织": "消费", "家纺": "消费",
+    "医药": "医药", "医疗": "医药", "药": "医药", "生物": "医药",
+    "健康": "医药", "疫苗": "医药", "医美": "医药", "CXO": "医药",
+    "cro": "医药", "创新药": "医药",
+    # 科技
+    "芯片": "科技", "半导体": "科技", "集成电路": "科技",
+    "电子": "科技", "光电": "科技", "激光": "科技",
+    "科技": "科技", "软件": "科技", "信息": "科技",
+    "计算机": "科技", "AI": "科技", "人工智能": "科技",
+    "大数据": "科技", "云计算": "科技", "云": "科技",
+    "通信": "科技", "5G": "科技", "6G": "科技",
+    "机器人": "科技", "自动化": "科技",
+    "消费电子": "科技", "面板": "科技", "显示": "科技",
+    # 科技 - 美股权重股（QDII 穿透常见）
+    "苹果": "科技", "微软": "科技", "谷歌": "科技",
+    "亚马逊": "科技", "英伟达": "科技", "META": "科技",
+    "特斯拉": "科技", "甲骨文": "科技", "ORACLE": "科技",
+    "英特尔": "科技", "INTC": "科技", "AMD": "科技",
+    "高通": "科技", "博通": "科技", "BROADCOM": "科技",
+    "思科": "科技", "CISCO": "科技", "IBM": "科技",
+    "SALESFORCE": "科技", "CRM": "科技", "ADOBE": "科技",
+    "INTUIT": "科技", "SERVICENOW": "科技",
+    # 科技 - 光通信/算力（常见 A 股标的）
+    "新易盛": "科技", "天孚": "科技", "太辰光": "科技",
+    "旭创": "科技", "光模块": "科技", "光通信": "科技",
+    "算力": "科技", "服务器": "科技", "光迅": "科技",
+    "浪潮": "科技", "曙光": "科技",
+    # 科技 - 半导体（设计/设备/封测）
+    "中芯": "科技", "北方华创": "科技", "韦尔": "科技",
+    "兆易": "科技", "卓胜微": "科技", "圣邦": "科技",
+    "士兰微": "科技", "华大九天": "科技", "紫光": "科技",
+    "中科曙光": "科技", "景嘉微": "科技",
+    "长电": "科技", "通富": "科技", "华天": "科技",
+    "沪电": "科技", "深南电路": "科技",
+    # 科技 - 软件/互联网
+    "金山办公": "科技", "用友": "科技", "广联达": "科技",
+    "科大讯飞": "科技", "恒生电子": "科技",
+    "中科创达": "科技", "同花顺": "科技", "财富趋势": "科技",
+    # 科技 - 安防/通信运营商
+    "海康": "科技", "大华": "科技",
+    "中国联通": "科技", "中国电信": "科技", "中国移动": "科技",
+    # 科技 - 金融科技
+    "东方财富": "金融",
+    # 金融 - 美股权重股
+    "摩根大通": "金融", "JP MORGAN": "金融", "高盛": "金融",
+    "摩根士丹利": "金融", "美国银行": "金融", "花旗": "金融",
+    "富国": "金融", "VISA": "金融", "万事达": "金融",
+    # 消费 - 美股权重股
+    "可口可乐": "消费", "百事": "消费", "沃尔玛": "消费",
+    "COSTCO": "消费", "好市多": "消费", "宝洁": "消费",
+    "麦当劳": "消费", "星巴克": "消费", "耐克": "消费",
+    # 医药 - 美股权重股（重复关键词会被前面医药块覆盖，但显式列出方便检查）
+    "强生": "医药", "辉瑞": "医药", "默克": "医药",
+    "礼来": "医药", "联合健康": "医药", "艾伯维": "医药",
+    # 通信 - 美股权重股
+    "DISNEY": "消费", "迪士尼": "消费", "NETFLIX": "科技",
+    "奈飞": "科技", "COMCAST": "科技",
+    # 新能源
+    "新能源": "新能源", "光伏": "新能源", "锂电": "新能源",
+    "电池": "新能源", "风电": "新能源", "氢能": "新能源",
+    "新能源车": "新能源", "电车": "新能源", "储能": "新能源",
+    "宁德时代": "新能源", "比亚迪": "新能源", "隆基": "新能源",
+    "太阳": "新能源", "硅": "新能源", "晶澳": "新能源",
+    "晶科": "新能源", "天合": "新能源", "阳光电源": "新能源",
+    "亿纬": "新能源", "恩捷": "新能源", "天赐": "新能源",
+    "赣锋": "新能源", "天齐锂": "新能源", "华友": "新能源",
+    "福莱特": "新能源", "福斯特": "新能源",
+    # 食品饮料（消费子类细化）
+    "伊利": "消费", "海天": "消费", "金龙鱼": "消费",
+    "双汇": "消费", "安井": "消费", "涪陵": "消费",
+    "东鹏": "消费", "农夫山泉": "消费",
+    # 金融 - A 股
+    "中国人保": "金融", "新华保险": "金融",
+    "中国银河": "金融", "光大证券": "金融", "招商证券": "金融",
+    # 制造 - 材料/矿业
+    "紫金": "制造", "洛阳钼业": "制造", "江西铜业": "制造",
+    "中国铝业": "制造", "南山铝业": "制造",
+    "万华": "制造", "宝钢": "制造", "鞍钢": "制造",
+    "海螺": "制造", "华新水泥": "制造", "中国巨石": "制造",
+    # 制造 - 机械
+    "潍柴": "制造", "中联重科": "制造", "三一": "制造",
+    "徐工": "制造", "恒立": "制造", "汇川": "制造",
+    # 医药 - A 股补充
+    "长春高新": "医药", "智飞": "医药", "沃森": "医药",
+    "康泰": "医药", "通策": "医药", "凯莱英": "医药",
+    "康龙化成": "医药", "泰格": "医药", "益丰": "医药",
+    "同仁堂": "医药", "白云山": "医药", "片仔癀": "医药",
+    "东阿": "医药", "云南白药": "医药",
+    # 消费 - 细分赛道
+    "珀莱雅": "消费", "贝泰妮": "消费", "华熙": "医药",
+    "安踏": "消费", "李宁": "消费", "波司登": "消费",
+    "牧原": "农业", "温氏": "农业", "圣农": "农业",
+    "大北农": "农业", "隆平高科": "农业",
+    # 金融
+    "银行": "金融", "证券": "金融", "保险": "金融", "信托": "金融",
+    "券商": "金融", "互联网金融": "金融", "金融": "金融",
+    # 制造
+    "机械": "制造", "装备": "制造", "制造": "制造",
+    "工业": "制造", "化工": "制造", "材料": "制造",
+    "钢铁": "制造", "有色": "制造", "金属": "制造",
+    "建材": "制造", "玻璃": "制造", "水泥": "制造",
+    "造纸": "制造", "包装": "制造", "轻工": "制造",
+    "重工": "制造", "电气": "制造", "仪器": "制造",
+    # 地产基建
+    "地产": "地产基建", "房产": "地产基建", "万科": "地产基建",
+    "建设": "地产基建", "基建": "地产基建", "建筑": "地产基建",
+    "工程": "地产基建", "中铁": "地产基建", "中交": "地产基建",
+    "路桥": "地产基建", "市政": "地产基建",
+    # 军工
+    "军工": "军工", "航天": "军工", "航空": "军工", "国防": "军工",
+    "中航": "军工", "船舶": "军工", "中国重工": "军工",
+    # 能源资源
+    "能源": "能源资源", "煤炭": "能源资源", "石油": "能源资源",
+    "天然气": "能源资源", "电力": "能源资源", "核电": "能源资源",
+    "水电": "能源资源", "中国神华": "能源资源", "中国海油": "能源资源",
+    "中石油": "能源资源", "中石化": "能源资源",
+    # 交通物流
+    "运输": "交通物流", "物流": "交通物流", "快递": "交通物流",
+    "航空": "交通物流", "机场": "交通物流", "港口": "交通物流",
+    "高速": "交通物流", "航运": "交通物流", "铁路": "交通物流",
+    # 农业
+    "农业": "农业", "牧": "农业", "农": "农业", "种业": "农业",
+    "猪": "农业", "鸡": "农业", "饲料": "农业",
+    # 公用事业
+    "水务": "公用事业", "燃气": "公用事业", "环保": "公用事业",
+    "环境": "公用事业", "垃圾": "公用事业",
+}
+
+
+def classify_sector(name: str, code: str = "") -> str:
+    """根据证券名称和代码判断所属板块。
+
+    Args:
+        name: 证券名称
+        code: 证券代码（备用，当前未使用）
+
+    Returns:
+        板块名称，如 "消费" / "科技" / "医药" / "新能源"，未知返回 "--"
+    """
+    if not name:
+        return "--"
+    clean = name.replace(" ", "").upper()
+    for keyword, sector in _SECTOR_KEYWORDS.items():
+        if keyword.upper() in clean:
+            return sector
+    return "--"
 
 
 def normalize_name(name: str) -> str:
@@ -251,6 +406,7 @@ def compute_penetration_top10(
     merged: dict[str, dict[str, Any]] = {}
     unknown_mv = 0.0
     failed_count = 0
+    failed_fund_details: list[dict[str, str]] = []  # 记录无法获取穿透的基金
 
     for fund in funds:
         detail = detail_map.get(fund.code)
@@ -260,8 +416,22 @@ def compute_penetration_top10(
 
         holdings_data = fetch_fund_holdings(fund.code)
         if holdings_data is None or not holdings_data.get("holdings"):
+            # 无法获取底层持仓时，将基金本身作为穿透节点加入，
+            # 避免该基金市值完全脱离穿透 TOP10 覆盖
             unknown_mv += fund_mv
             failed_count += 1
+            failed_fund_details.append({"name": fund.name, "code": fund.code})
+            # 将基金本身作为一个穿透标的加入合并列表
+            fund_node = normalize_name(fund.name)
+            if fund_node not in merged:
+                sector = classify_sector(fund.name, fund.code)
+                merged[fund_node] = {
+                    "name": fund.name, "codes": {fund.code},
+                    "mv": 0.0, "funds": [], "sector": sector or "--",
+                }
+            merged[fund_node]["mv"] += fund_mv
+            merged[fund_node]["codes"].add(fund.code)
+            merged[fund_node]["funds"].append(f"[{tag}] {fund.name}({fund.code})")
             continue
 
         for item in holdings_data["holdings"]:
@@ -274,10 +444,11 @@ def compute_penetration_top10(
             attributed_mv = fund_mv * (ratio / 100.0) if ratio > 0 else 0.0
             norm_name = normalize_name(stock_name)
 
+            sector = classify_sector(stock_name, stock_code)
             if norm_name not in merged:
                 merged[norm_name] = {
                     "name": stock_name, "codes": set(),
-                    "mv": 0.0, "funds": [],
+                    "mv": 0.0, "funds": [], "sector": sector,
                 }
             if stock_code:
                 merged[norm_name]["codes"].add(stock_code)
@@ -289,11 +460,12 @@ def compute_penetration_top10(
         detail = detail_map.get(stock.code)
         stock_mv = detail.market_value if detail else 0.0
         norm_name = normalize_name(stock.name)
+        sector = classify_sector(stock.name, stock.code)
 
         if norm_name not in merged:
             merged[norm_name] = {
                 "name": stock.name, "codes": {stock.code},
-                "mv": 0.0, "funds": [],
+                "mv": 0.0, "funds": [], "sector": sector,
             }
         else:
             merged[norm_name]["codes"].add(stock.code)
@@ -322,6 +494,7 @@ def compute_penetration_top10(
             "codes": sorted(info["codes"]) if info["codes"] else [],
             "mv": round(info["mv"], 2),
             "ratio_pct": round(ratio, 2),
+            "sector": info.get("sector", "--"),
             "sources": sorted(set(info["funds"])),
         })
 
@@ -343,6 +516,7 @@ def compute_penetration_top10(
             "top10_coverage_pct": round(top10_coverage, 1),
             "unknown_mv": round(unknown_mv, 2),
             "failed_funds": failed_count,
+            "failed_fund_details": failed_fund_details,
         },
         "top10": top10_list,
     }
@@ -357,6 +531,7 @@ def write_penetration_sheet(
     ws: Worksheet,
     holdings: List[Holding],
     details: List[DetailRow],
+    penetration_data: dict | None = None,
 ) -> None:
     """写入资产穿透 TOP10 页签。
 
@@ -366,12 +541,17 @@ def write_penetration_sheet(
         ws: 目标工作表
         holdings: 原始持仓列表
         details: 市值核算明细行列表
+        penetration_data: 预计算穿透数据。为 None 时自动计算，提供时跳过
+                          内部重复计算，用于调用方已算过一轮的场景
     """
     ws.title = "资产穿透TOP10"
     row = write_title_row(ws, 1, "资产穿透 TOP 10", _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
-    result = compute_penetration_top10(holdings, details)
+    if penetration_data is not None:
+        result = penetration_data
+    else:
+        result = compute_penetration_top10(holdings, details)
 
     if not result["top10"]:
         write_data_row(ws, row, ["暂无穿透数据"])
@@ -389,6 +569,7 @@ def write_penetration_sheet(
             ", ".join(entry["codes"]) if entry["codes"] else "--",
             entry["mv"],
             entry["ratio_pct"] / 100.0,
+            entry.get("sector", "--"),
             "; ".join(entry["sources"]),
         ]
         write_data_row(ws, row, vals, _num_formats())
@@ -403,6 +584,14 @@ def write_penetration_sheet(
                         f"合计市值 {summary['unknown_mv']:,.2f} 元未计入穿透 TOP10"],
                        [])
         row += 1
+        # 列出无法获取穿透的基金明细
+        failed_details = summary.get("failed_fund_details", [])
+        if failed_details:
+            failed_names = "；".join(
+                f"{f['name']}({f['code']})" for f in failed_details
+            )
+            write_data_row(ws, row, [f"  无法获取穿透的基金：{failed_names}"], [])
+            row += 1
 
     info_line = (
         f"基金 {summary['total_funds']} 只（{summary['fund_breakdown']}）"
@@ -432,5 +621,6 @@ def _num_formats() -> list[str]:
         "",           # 3  代码
         FMT_MONEY,    # 4  穿透市值
         FMT_PERCENT,  # 5  占比
-        "",           # 6  来源明细
+        "",           # 6  板块
+        "",           # 7  来源明细
     ]

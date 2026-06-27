@@ -450,6 +450,18 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
         except (ValueError, ZeroDivisionError):
             pass
 
+    # 解析业绩评价数据（Data_performanceEvaluation）
+    perf_eval: dict[str, Any] | None = None
+    pe_match = re.search(
+        r'var Data_performanceEvaluation\s*=\s*(\{[^;]+\});', text, re.DOTALL
+    )
+    if pe_match:
+        try:
+            raw = pe_match.group(1)
+            perf_eval = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+
     logger.info("基金 %s（%s）: 排名 %s/%s, 评级 %s",
                 name, code, rank_entry.get("rank", "?"), rank_entry.get("total", "?"),
                 rating or "未知")
@@ -460,6 +472,7 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
         "type": "",
         "rankings": rankings,
         "rating": rating,
+        "perf_evaluation": perf_eval,
     }
 
 

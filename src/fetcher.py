@@ -80,7 +80,6 @@ _PROVIDER_REGISTRY: dict[str, tuple[str, _ProviderFunc]] = {
     "eastmoney": ("东方财富", eastmoney.fetch_nav),
     "sina": ("新浪财经", sina.fetch_us_indices),
     "tiantian": ("天天基金", tiantian.fetch_fund_rankings),
-    "tiantian_holdings": ("天天基金", tiantian.fetch_fund_holdings),
 }
 
 
@@ -158,7 +157,12 @@ def _fetch_with_fallback(
             cache_set(cache_key, result)
             return result
 
-    logger.warning("[%s] 全部 Provider 不可用", data_type)
+    # 降级：全部 Provider 失败时尝试过期缓存
+    stale = cache_get(cache_key, CACHE_WEEKLY)
+    if stale is not None:
+        logger.info("[%s] 全部 Provider 不可用，降级使用过期缓存", data_type)
+        return stale
+
     return None
 
 
@@ -298,7 +302,12 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
                 cache_set(cache_key, out)
                 return out
 
-    logger.warning("[价格] %s 全部 Provider 不可用", code)
+    # 降级：全部 Provider 失败时尝试过期缓存
+    stale = cache_get(cache_key, CACHE_WEEKLY)
+    if stale is not None:
+        logger.info("[价格] %s 全部 Provider 不可用，降级使用过期缓存", code)
+        return stale
+
     return None
 
 
@@ -316,7 +325,10 @@ _A_INDICES = {
 
 
 def fetch_indices() -> dict[str, dict[str, Any]]:
-    """获取 A 股主要指数行情（Provider Chain: 腾讯 → 新浪）。"""
+    """获取 A 股主要指数行情。Provider: 腾讯财经
+
+    Note: 新浪备用链路尚未实现 A 股指数接口
+    """
     indices: dict[str, dict[str, Any]] = {}
 
     for index_code, index_name in _A_INDICES.items():
@@ -345,6 +357,12 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
             }
             cache_set(cache_key, data)
             indices[index_code] = data
+        else:
+            # 降级：尝试过期缓存
+            stale = cache_get(cache_key, CACHE_WEEKLY)
+            if stale is not None:
+                indices[index_code] = stale
+                continue
 
     return indices
 

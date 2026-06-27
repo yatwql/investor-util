@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Tuple
 from jinja2 import Environment, FileSystemLoader
 
 from src.fetcher import fetch_fund_benchmark, fetch_fund_rankings, fetch_indices, fetch_us_indices
+from src.report.excel_writer import _ensure_reports_dir
 from src.models import Holding
 from src.report.category import _categorize_holding
 from src.report.fund_performance import (
@@ -114,7 +115,7 @@ _ENV.filters["profit_color"] = _jinja_profit_color
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100) -> str:
+def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None] | None = None, details: list | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     1. 通过各计算模块获取全部分析数据
@@ -122,9 +123,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     3. 写入 {output_dir}/ 目录（最新版 + 归档版）
 
     Args:
-        holdings: 持仓记录列表
-        output_dir: 报告输出根目录，默认 "reports"
-        news_top_count: 财经新闻 TOP N 条数，默认 100
+        llm_content: 可选预生成内容 (macro_html, expert_html)，
+            传入时跳过内部 LLM 生成直接使用此内容。
+        details: 可选预计算市值核算明细，传入时跳过内部行情获取。
 
     Returns:
         最新版报告的绝对路径
@@ -136,13 +137,15 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     today_str = datetime.now().strftime("%Y-%m-%d")
     trading_day = get_last_trading_day()
 
-    print("  [..] 正在获取行情数据...")
-    logger.info("HTML 报告生成开始，共 %d 条持仓", len(holdings))
-
-    # ── 1) 市值核算 ────────────────────────────────────────
-    print("  [..] 正在计算市值核算...")
-    details = _generate_details(holdings, today_str)
-    logger.info("市值核算明细生成完成，共 %d 条", len(details))
+    # ── 1) 市值核算（复用外部传入或内部生成）──────────────
+    if details is not None:
+        logger.info("复用外部传入的市值核算数据，共 %d 条", len(details))
+    else:
+        print("  [..] 正在获取行情数据...")
+        logger.info("HTML 报告生成开始，共 %d 条持仓", len(holdings))
+        print("  [..] 正在计算市值核算...")
+        details = _generate_details(holdings, today_str)
+        logger.info("市值核算明细生成完成，共 %d 条", len(details))
 
     total_mv = sum(d.market_value for d in details)
     total_cost = sum(d.cost for d in details)
@@ -223,21 +226,80 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     perf_data = _build_perf_data(holdings, details)
 
     # ── 8) 财经新闻热点（可选）─────────────────────────────
-    print("  [..] 正在获取财经新闻...")
-    try:
-        from src.providers.sina_news import build_holding_keywords, fetch_and_correlate
-        keywords = build_holding_keywords(holdings)
-        news_data = fetch_and_correlate(keywords, top_n=news_top_count)
-        if not news_data:
+    if include_news:
+        print("  [..] 正在获取财经新闻...")
+        try:
+            from src.providers.news_aggregator import (
+                aggregate_news,
+                build_holding_keywords,
+            )
+            # 提取穿透 TOP10 资产列表，用于扩展新闻关键词
+            penetrated_assets = penetration.get("top10", []) if penetration else []
+            keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
+            news_data = aggregate_news(keywords, top_n=news_top_count)
+            if not news_data:
+                news_data = []
+                logger.info("新闻关联分析：无数据")
+            else:
+                logger.info("新闻关联分析完成，%d 条（关键词含 %d 个穿透资产）",
+                            len(news_data), len(penetrated_assets))
+        except Exception as e:
+            logger.warning("新闻获取失败: %s", e)
             news_data = []
-            logger.info("新闻关联分析：无数据")
-        else:
-            logger.info("新闻关联分析完成，%d 条", len(news_data))
-    except Exception as e:
-        logger.warning("新闻获取失败: %s", e)
+    else:
         news_data = []
 
-    # ── 9) 渲染模板 ─────────────────────────────────────────
+    # ── 9) LLM 智能分析（模块 7/8）──────────────────────────
+    llm_enabled_flag = False
+    global_macro_content = None
+    expert_review_content = None
+
+    if llm_content is not None:
+        # 使用外部传入的预生成内容（避免重复调用 LLM）
+        global_macro_content, expert_review_content = llm_content
+        if global_macro_content or expert_review_content:
+            llm_enabled_flag = True
+    elif enable_llm:
+        print("  [..] 正在调用 LLM 生成智能分析...")
+        try:
+            from src.llm_client import generate_all_llm
+            pen_top10 = penetration.get("top10", []) if penetration else []
+
+            # 构建持仓明细（供 LLM 引用具体品种，防止虚构代码）
+            _holdings_details = [
+                {
+                    "name": d.name,
+                    "code": d.code,
+                    "market_value": d.market_value,
+                    "cost": d.cost,
+                    "profit": d.profit,
+                    "profit_rate": d.profit_rate,
+                    "change_pct": (
+                        (d.price - d.yesterday_close) / d.yesterday_close * 100
+                        if d.yesterday_close and abs(d.yesterday_close) > 1e-10
+                        else 0.0
+                    ),
+                }
+                for d in details
+            ]
+
+            global_macro_content, expert_review_content = generate_all_llm(
+                a_indices, us_indices, total_mv, total_cost, total_profit,
+                total_today_profit, len(holdings), cat_counts,
+                penetrated_assets=pen_top10,
+                holdings_details=_holdings_details,
+                force=force_llm,
+            )
+            if global_macro_content:
+                llm_enabled_flag = True
+                logger.info("模块 7（全球政经局势）LLM 生成完成")
+            if expert_review_content:
+                llm_enabled_flag = True
+                logger.info("模块 8（智囊团深度复盘）LLM 生成完成")
+        except Exception as e:
+            logger.warning("LLM 生成失败: %s", e)
+
+    # ── 10) 渲染模板 ────────────────────────────────────────
     print("  [..] 正在渲染 HTML...")
     template = _ENV.get_template("report_template.html")
     html = template.render(
@@ -260,13 +322,16 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         penetration=penetration,
         perf_data=perf_data,
         news_data=news_data,
+        llm_enabled=llm_enabled_flag,
+        global_macro=global_macro_content,
+        expert_review=expert_review_content,
     )
 
-    # ── 9) 保存文件 ─────────────────────────────────────────
+    # ── 10) 保存文件 ─────────────────────────────────────────
     print("  [..] 正在保存报告文件...")
 
-    # 确保目录存在
-    os.makedirs(output_dir, exist_ok=True)
+    # 确保目录存在并验证可写
+    _ensure_reports_dir(output_dir)
 
     # 最新版
     latest_path = os.path.join(output_dir, "个人投资分析报告.html")

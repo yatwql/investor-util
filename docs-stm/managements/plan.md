@@ -26,7 +26,7 @@
 | HTTP 客户端 | `httpx` | 同步/异步、连接复用，比 requests 现代 |
 | 数据解析 | 手动解析，不使用 pandas | 减少依赖，数据量小，自定义校验更可控 |
 | 配置持久化 | `data/config/config.json` | JSON 简单可靠，无需额外依赖 |
-| AI 模块 7、8 | 模板占位文本 | 先跑通基础功能，后续按需接入 LLM |
+| AI 模块 7、8 | LLM 生成 | 支持 Claude/OpenAI/DeepSeek API，缓存 24h，System Prompt 外部可配置 |
 | 报告模板 | 程序生成（Excel openpyxl / HTML Jinja2） | Excel 和 HTML 报告均程序化生成，在对应迭代阶段设计和讨论 |
 
 ---
@@ -292,14 +292,17 @@
 
 ### Iter 3.3 — 模板占位模块 + 打磨
 
-**Goal**：补齐模块 7/8 的模板占位，全流程打磨。
+**Goal**：补齐模块 7/8 的模板占位，缓存管理，文件选择器增强，异常处理增强，全流程打磨。
 
 **Files**：
-- `src/report/templates/__init__.py`
-- `src/report/templates/global_macro.py` — 全球政经（模板占位）
-- `src/report/templates/expert_review.py` — 智囊团复盘（模板占位）
-- `src/tmpl/report_template.html` — 更新模板，新增两个占位模块区域
-- `src/report/html_writer.py` — 集成所有 8 个模块
+- `src/tmpl/report_template.html` — 更新模板，新增两个占位模块区域（`{% if llm_enabled %}` 条件渲染），穿透增加板块列
+- `src/report/html_writer.py` — 传递 `llm_enabled=False` 标记，预留 `global_macro`/`expert_review` 参数接口，增加 `_test_writable()` 目录可写性检查
+- `src/report/penetration.py` — 增加板块分类（`classify_sector`），10+ 板块 100+ 关键词映射，返回数据增加 `sector` 和 `failed_fund_details` 字段
+- `src/cache.py` — 新增 `cleanup_expired()` / `get_cache_stats()` / `get_cache_dir()` 接口
+- `src/reader.py` — 新增 `get_xlsx_info()` 文件信息查询
+- `src/main.py` — 新增菜单 [3] 清理过期缓存 / [4] 查看缓存统计；文件选择器增强（大小/日期/账户数）；`_print_error_with_hint()` 异常友好提示；启动时自动清理缓存
+- `src/report/excel_writer.py` — `save_workbook` 增加 PermissionError 保护
+- `src/test_cache.py`, `src/test_reader.py`, `src/test_summary.py`, `src/test_market_value.py`, `src/test_fund_performance.py` — 新增 5 个测试文件，330+ 测试用例
 
 **Approach**：
 - 模块 7（全球政经局势）：输出固定占位文本，预留 LLM 接口
@@ -310,28 +313,34 @@
 **Test scenarios**：
 - 模板占位模块显示"本节内容待生成"提示
 - 全 6+2 模块 HTML 页面渲染正常（6 个现行模块 + 2 个占位）
-- 网络异常时友好提示
+- 网络异常时友好提示（_print_error_with_hint 覆盖网络/权限/文件损坏场景）
+- 缓存管理：菜单 [3] 正确删除过期文件，菜单 [4] 正确显示统计信息
+- 缓存文件损坏时自动删除并重新获取
+- 持仓文件选择器显示正确的文件大小/日期/账户数
+- 穿透板块列分类正确，底部展示失败基金明细
+- 330+ 单元测试全部通过
 
 **Verification**：TUI 选 H/B/L → HTML 报告包含 6 个现行模块 + 2 个占位模块
 
 ---
 
-### Iter 3.4 — LLM 智能分析接入
+### Iter 3.4 — LLM 智能分析接入 ✅ 已完成
 
 **Goal**：替换模板占位为 LLM 生成内容，实现智能持仓分析。
 
 **Files**：
-- `src/report/templates/__init__.py`
-- `src/report/templates/global_macro.py` — 全球政经（LLM 生成）
-- `src/report/templates/expert_review.py` — 智囊团复盘（LLM 生成）
-- `src/report/templates/llm_client.py` — LLM API 客户端
-- `.env` 或 `data/config/` — API Key 管理
+- `src/llm_client.py` —（新建）LLM API 客户端，支持 Claude API / OpenAI API，结果缓存 24h
+- `src/config.py` — 新增 `get_llm_config()` / `get_llm_config_path()`，外部配置文件引用
+- `src/report/html_writer.py` — `write_html_report` 增加 `enable_llm` 参数，调用 LLM 客户端
+- `src/tmpl/report_template.html` — 模块 7/8 区域由占位文本升级为 LLM 生成内容（`llm_enabled` 条件渲染）
+- `data/config/config.json` — 增加 `llm_config_file` 字段（默认 `data/config/llm.json`）
+- `data/config/llm.json` —（新建）外部 LLM 配置文件，存 API Key / provider / model / endpoint
 
 **Approach**：
 - 接入 LLM API（如 Claude API / OpenAI API），生成模块 7 和 8 内容
 - 模块 7（全球政经局势）：基于当前市场数据、指数表现、持仓结构，LLM 撰写宏观分析
 - 模块 8（智囊团深度复盘）：基于持仓明细和盈亏数据，LLM 生成优化建议和风险预警
-- API Key 通过环境变量或配置文件管理，不在代码中硬编码
+- API Key 通过外部 JSON 文件管理（`data/config/llm.json`），config.json 仅引用文件路径，不存明文 Key
 - 费用控制：LLM 调用结果缓存，按日更新
 - API Key 未配置时优雅降级，继续输出占位文本
 
@@ -349,7 +358,37 @@
 - LLM 输出格式异常 → 解析兜底，不中断报告生成
 - 多次调用间缓存生效，不重复扣费
 
-**Verification**：TUI 选 H/B/L → HTML 报告中全球政经和智囊团复盘由 LLM 生成真实内容（API Key 已配时）
+**Verification**：TUI 选 L → HTML 报告中模块 7/8 由 LLM 生成真实内容，Excel 报告中新增"全球政经局势"和"智囊团深度复盘"两个页签（API Key 已配时）
+
+---
+
+### Iter 3.5 — LLM 全局优化 ✅ 已完成
+
+**Goal**：LLM 调用性能优化、System Prompt 外部可配置、智囊团升级为4位专家、提示词紧凑化。
+
+**Files**：
+- `src/llm_client.py` — 新增 `generate_all_llm()` 并行批处理、全局 `_HTTP_POOL` httpx 连接池、智囊团4位专家 System Prompt、紧凑格式 `_build_macro_prompt` / `_build_review_prompt`
+- `src/config.py` — 新增 LLM 配置内存缓存 `_LLM_CONFIG_CACHE`，`get_llm_config()` 增加 `system_prompt_macro` / `system_prompt_expert` 字段读取
+- `data/config/llm.json` — 新增 `system_prompt_macro` / `system_prompt_expert` 外部配置字段
+- `src/main.py` — `_generate_excel_report` 穿透TOP10统一计算一次，三处复用
+
+**Approach**：
+- **穿透TOP10计算优化**：`_generate_excel_report` 中 `compute_penetration_top10` 只调用一次，通过 `penetration_data` 参数传递复用至穿透页签 / 新闻关键词 / LLM增补三处
+- **System Prompt 外部可配置**：`llm.json` 新增 `system_prompt_macro` / `system_prompt_expert` 字段，用户可自定义 AI 分析风格和 Expert 角色；未配置时回退内置默认 Prompt
+- **智囊团5位专家**：流派对立的5位专家联合输出深度复盘（指挥官召集令 → 两轮圆桌辩论 → 定音锤）
+- **并行调用**：`ThreadPoolExecutor` 并发生成模块 7+8，墙钟时间约等于最慢单次调用而非二者之和
+- **httpx连接复用**：全局 `_HTTP_POOL` 共享连接池，多次 LLM 调用间复用 TCP 连接，减少握手开销
+- **LLM配置内存缓存**：`_LLM_CONFIG_CACHE` 避免每次 LLM 调用重复读文件 IO
+- **提示词紧凑化**：`_build_macro_prompt` / `_build_review_prompt` 单行摘要替代多段描述，减少约 35% 输入 token
+
+**Test scenarios**：
+- 并行生成模块 7+8 同时成功，内容完整
+- `system_prompt_macro` / `system_prompt_expert` 配置后，LLM 输出风格符合自定义设定
+- 未配置 `system_prompt_*` 字段时回退内置默认 System Prompt
+- LLM 配置内存缓存在进程生命周期内生效，不重复读文件
+- httpx 连接池在多次调用间复用 TCP 连接
+
+**Verification**：TUI 选 L → 模块 7/8 由 LLM 并行生成，内容符合 4 位专家输出格式，墙钟响应时间基本等于单次 LLM 调用而非二者之和
 
 ---
 

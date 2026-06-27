@@ -100,7 +100,10 @@ def write_llm_sheets(
     categories: dict,
     penetration_data: dict | None = None,
     force_llm: bool = False,
-) -> None:
+    llm_content: tuple[str | None, str | None] | None = None,
+    a_indices: list[dict] | None = None,
+    us_indices: list[dict] | None = None,
+) -> tuple[str, str]:
     """写入 LLM 内容页签（模块 7 & 8）。
 
     创建两个页签：
@@ -108,72 +111,77 @@ def write_llm_sheets(
       - "智囊团深度复盘"：调用 LLM 生成持仓复盘与优化建议
 
     Args:
-        wb: openpyxl Workbook 对象
-        holdings: 原始持仓列表
-        details: 市值核算明细行列表
-        output_dir: 报告输出目录（暂未使用，为统一接口保留）
-        total_mv: 总市值
-        total_cost: 总成本
-        total_profit: 总盈亏
-        total_today_profit: 本日总盈亏
-        categories: 分类计数 {分类: 数量}
-        force_llm: 是否跳过缓存强制重新生成，默认 False
+        llm_content: 可选预生成内容 (macro_html, expert_html)，
+            传入时跳过内部 LLM 调用直接使用此内容。
+        a_indices: 可选预获取的 A 股指数，传入时跳过内部指数行情获取。
+        us_indices: 可选预获取的美股指数，传入时跳过内部指数行情获取。
+
+    Returns:
+        (macro_text, expert_text) 纯文本二元组，供 TUI 展示
     """
-    # ── 模块 7 & 8：LLM 并行生成 ──────────────────────────
-    try:
-        ws7 = wb.create_sheet()
-        ws7.title = "全球政经局势"
-        ws8 = wb.create_sheet()
-        ws8.title = "智囊团深度复盘"
+    ws7 = wb.create_sheet()
+    ws7.title = "全球政经局势"
+    ws8 = wb.create_sheet()
+    ws8.title = "智囊团深度复盘"
 
-        # 获取指数行情
-        a_idx_dict = fetch_indices()
-        us_idx_dict = fetch_us_indices()
-        a_indices: list[dict] = list(a_idx_dict.values())
-        us_indices: list[dict] = list(us_idx_dict.values())
+    # ── 模块 7 & 8：LLM 生成 ────────────────────────────
+    if llm_content is not None:
+        # 使用外部传入的预生成内容（避免重复调用 LLM）
+        content7, content8 = llm_content
+    else:
+        try:
+            # 获取指数行情（优先复用外部传入数据）
+            if a_indices is not None and us_indices is not None:
+                a_indices_local = a_indices
+                us_indices_local = us_indices
+            else:
+                a_idx_dict = fetch_indices()
+                us_idx_dict = fetch_us_indices()
+                a_indices_local = list(a_idx_dict.values())
+                us_indices_local = list(us_idx_dict.values())
 
-        # 获取穿透 TOP10 资产数据
-        if penetration_data is not None:
-            penetrated_assets = penetration_data.get("top10")
-        else:
-            penetrated = compute_penetration_top10(holdings, details)
-            penetrated_assets = penetrated.get("top10")
+            # 获取穿透 TOP10 资产数据
+            if penetration_data is not None:
+                penetrated_assets = penetration_data.get("top10")
+            else:
+                penetrated = compute_penetration_top10(holdings, details)
+                penetrated_assets = penetrated.get("top10")
 
-        # 构建持仓明细（供 LLM 引用具体品种，防止虚构代码）
-        holdings_details = [
-            {
-                "name": d.name,
-                "code": d.code,
-                "market_value": d.market_value,
-                "cost": d.cost,
-                "profit": d.profit,
-                "profit_rate": d.profit_rate,
-                "change_pct": (
-                    (d.price - d.yesterday_close) / d.yesterday_close * 100
-                    if d.yesterday_close and abs(d.yesterday_close) > 1e-10
-                    else 0.0
-                ),
-            }
-            for d in details
-        ]
+            # 构建持仓明细（供 LLM 引用具体品种，防止虚构代码）
+            holdings_details = [
+                {
+                    "name": d.name,
+                    "code": d.code,
+                    "market_value": d.market_value,
+                    "cost": d.cost,
+                    "profit": d.profit,
+                    "profit_rate": d.profit_rate,
+                    "change_pct": (
+                        (d.price - d.yesterday_close) / d.yesterday_close * 100
+                        if d.yesterday_close and abs(d.yesterday_close) > 1e-10
+                        else 0.0
+                    ),
+                }
+                for d in details
+            ]
 
-        # 并行调用 LLM
-        content7, content8 = generate_all_llm(
-            a_indices=a_indices,
-            us_indices=us_indices,
-            total_mv=total_mv,
-            total_cost=total_cost,
-            total_profit=total_profit,
-            total_today_profit=total_today_profit,
-            holdings_count=len(holdings),
-            categories=categories,
-            penetrated_assets=penetrated_assets,
-            holdings_details=holdings_details,
-            force=force_llm,
-        )
-    except Exception:
-        logger.warning("LLM 内容生成失败", exc_info=True)
-        content7 = content8 = None
+            # 调用 LLM
+            content7, content8 = generate_all_llm(
+                a_indices=a_indices_local,
+                us_indices=us_indices_local,
+                total_mv=total_mv,
+                total_cost=total_cost,
+                total_profit=total_profit,
+                total_today_profit=total_today_profit,
+                holdings_count=len(holdings),
+                categories=categories,
+                penetrated_assets=penetrated_assets,
+                holdings_details=holdings_details,
+                force=force_llm,
+            )
+        except Exception:
+            logger.warning("LLM 内容生成失败", exc_info=True)
+            content7 = content8 = None
 
     _write_content_sheet(ws7, "全球政经局势", content7)
     _write_content_sheet(ws8, "智囊团深度复盘", content8)

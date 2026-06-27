@@ -62,6 +62,7 @@
 
         .penetration-notes { font-size: 12px; color: #666; padding: 8px 20px 16px; line-height: 1.8; }
         .empty-note { padding: 20px; text-align: center; color: #999; }
+        .placeholder-note { background: #fafbfc; border: 1px dashed #d0d5dd; border-radius: 6px; }
 
         .source-tag { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; }
 
@@ -348,7 +349,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>来源明细</th>
+                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>来源明细</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -360,6 +361,7 @@
                         <td>{{ entry["codes"] | join(", ") if entry["codes"] else "--" }}</td>
                         <td class="text-right">{{ entry["mv"] | money }}</td>
                         <td class="text-right">{{ (entry["ratio_pct"] / 100) | pct }}</td>
+                        <td>{{ entry.get("sector", "--") }}</td>
                         <td class="text-left" style="font-size: 12px;">
                             {% for src in entry["sources"] %}
                             <span class="source-tag">{{ src }}</span>
@@ -374,6 +376,15 @@
             {% set s = penetration["summary"] %}
             {% if s.get("unknown_mv", 0) > 0 %}
             <div>* {{ s["total_funds"] }} 只基金中，有 {{ s["failed_funds"] }} 只无法获取穿透数据，合计市值 {{ s["unknown_mv"] | money }} 元未计入穿透 TOP10</div>
+            {% set failed_details = s.get("failed_fund_details", []) %}
+            {% if failed_details %}
+            <div style="margin-left: 1.5em; font-size: 12px;">
+                无法获取穿透的基金：
+                {% for f in failed_details %}
+                <span class="source-tag">{{ f["name"] }}({{ f["code"] }})</span>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% endif %}
             <div>
                 基金 {{ s["total_funds"] }} 只（{{ s["fund_breakdown"] }}） + 直接持股 {{ s["total_stocks"] }} 只
@@ -421,6 +432,9 @@
         {% else %}
         <div class="empty-note">未检测到基金持仓</div>
         {% endif %}
+        <div class="penetration-notes">
+            <div>* 业绩评价标准：同类排名前20%→优秀(红)、20%~30%→良好、30%~50%→稳定(蓝)、50%后→偏差(绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
+        </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -461,6 +475,60 @@
         </div>
         {% else %}
         <div class="empty-note">暂无关联新闻</div>
+        {% endif %}
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 7: 全球政经局势 (Global Macro, LLM augment)     -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">七、全球政经局势</div>
+        {% if llm_enabled and global_macro %}
+        <div class="section-content">
+            {{ global_macro | safe }}
+        </div>
+        {% else %}
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>本节内容待生成</strong></p>
+                <p style="margin-top: 8px; font-size: 13px; color: #888;">
+                    模块说明：基于当前市场指数、持仓行业分布及近期新闻热点，
+                    LLM 将生成宏观局势分析，包括全球主要经济体政策走向、
+                    地缘政治风险、市场流动性评估及对持仓的潜在影响。
+                </p>
+                <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
+                    功能入口：菜单 L（生成全系列完整版报告）|
+                    需配置 LLM API Key 后自动启用
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 8: 智囊团深度复盘 (Expert Review, LLM augment)  -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">八、智囊团深度复盘</div>
+        {% if llm_enabled and expert_review %}
+        <div class="section-content">
+            {{ expert_review | safe }}
+        </div>
+        {% else %}
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>本节内容待生成</strong></p>
+                <p style="margin-top: 8px; font-size: 13px; color: #888;">
+                    模块说明：基于持仓明细、盈亏数据和分类汇总，
+                    LLM 将生成个性化投资复盘，包括持仓结构优化建议、
+                    行业集中度风险预警、收益归因分析及调仓策略参考。
+                </p>
+                <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
+                    功能入口：菜单 L（生成全系列完整版报告）|
+                    需配置 LLM API Key 后自动启用
+                </p>
+            </div>
+        </div>
         {% endif %}
     </div>
 

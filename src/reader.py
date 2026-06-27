@@ -37,6 +37,35 @@ def list_xlsx_files(directory: str) -> List[str]:
     return files
 
 
+def get_xlsx_info(filepath: str) -> dict:
+    """快速读取 xlsx 文件的元信息（不解析全量持仓数据）。
+
+    Args:
+        filepath: .xlsx 文件路径
+
+    Returns:
+        {sheet_names: [str], accounts: int, total_rows: int}
+        文件无法读取时返回含 error 字段的字典
+    """
+    try:
+        wb = openpyxl.load_workbook(filepath, data_only=True, read_only=True)
+        try:
+            sheets = wb.sheetnames
+            total_rows = 0
+            for s in sheets:
+                ws = wb[s]
+                total_rows += max(0, (ws.max_row or 1) - 1)  # 减去标题行
+            return {
+                "sheet_names": sheets,
+                "accounts": len(sheets),
+                "total_rows": total_rows,
+            }
+        finally:
+            wb.close()
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def read_holdings(filepath: str) -> List[Holding]:
     """读取持仓 Excel 文件，返回持仓记录列表。
 

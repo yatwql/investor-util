@@ -28,9 +28,23 @@ from src.report.styles import (
 logger = logging.getLogger("invest")
 
 def _ensure_reports_dir(output_dir: str) -> None:
-    """创建 output_dir/YYYYMMDD/ 目录。"""
+    """创建 output_dir/YYYYMMDD/ 目录。
+
+    Raises:
+        PermissionError: 目录无写入权限
+        OSError: 目录创建失败
+    """
     date_str = datetime.now().strftime("%Y%m%d")
     os.makedirs(os.path.join(output_dir, date_str), exist_ok=True)
+    # 验证可写
+    test_file = os.path.join(output_dir, ".write_test")
+    try:
+        open(test_file, "a").close()
+        os.remove(test_file)
+    except (PermissionError, OSError) as e:
+        raise PermissionError(
+            f"输出目录 '{output_dir}' 无写入权限"
+        ) from e
 
 
 def _latest_path(output_dir: str) -> str:
@@ -59,6 +73,10 @@ def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
 
     Returns:
         最新文件绝对路径
+
+    Raises:
+        PermissionError: 输出目录无写入权限
+        OSError: 文件写入失败
     """
     _ensure_reports_dir(output_dir)
     latest = _latest_path(output_dir)
@@ -67,8 +85,11 @@ def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
     wb.save(latest)
     logger.info("最新报告已保存: %s", latest)
 
-    wb.save(archive)
-    logger.info("存档报告已保存: %s", archive)
+    try:
+        wb.save(archive)
+        logger.info("存档报告已保存: %s", archive)
+    except (PermissionError, OSError) as e:
+        logger.warning("存档报告写入失败: %s", e)
 
     return os.path.abspath(latest)
 

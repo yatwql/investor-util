@@ -231,6 +231,9 @@ def fetch_and_correlate(
         关联后的新闻列表，每项含 matched_keywords 字段
         按匹配关键词数降序排列，最多返回 top_n 条
     """
+    # 确保有足够的原始新闻供关联筛选（至少 top_n * 3 条）
+    max_news = max(max_news, top_n * 3)
+
     # 每次请求从各分类均分条数
     lids = list(_LID_MAP.keys())
     per_category = max(1, max_news // len(lids))

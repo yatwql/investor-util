@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import builtins
+import hashlib
 import json
 import logging
 import os
@@ -42,7 +44,12 @@ def get(key: str, max_age_seconds: float) -> Any | None:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, IOError) as e:
-        logger.warning("缓存文件 %s 损坏，跳过: %s", key, e)
+        logger.warning("缓存文件 %s 损坏，自动删除: %s", key, e)
+        try:
+            os.remove(path)
+            logger.info("已删除损坏的缓存文件: %s", key)
+        except OSError:
+            pass
         return None
 
     timestamp = data.get("_ts", 0)
@@ -116,6 +123,235 @@ def clear_by_prefix(key_prefix: str) -> int:
     return count
 
 
+def get_cache_dir() -> str:
+    """返回缓存目录绝对路径。"""
+    return os.path.abspath(_CACHE_DIR)
+
+
+def get_cache_stats() -> dict:
+    """统计缓存目录：文件总数、总大小、按前缀分组数量。
+
+    Returns:
+        {total_files, total_size_bytes, by_prefix: {prefix: count}}
+    """
+    stats: dict = {"total_files": 0, "total_size_bytes": 0, "by_prefix": {}}
+    if not os.path.isdir(_CACHE_DIR):
+        return stats
+    for fname in os.listdir(_CACHE_DIR):
+        if not fname.endswith(".json"):
+            continue
+        fpath = os.path.join(_CACHE_DIR, fname)
+        try:
+            stats["total_files"] += 1
+            stats["total_size_bytes"] += os.path.getsize(fpath)
+            prefix = fname.split("_", 1)[0] if "_" in fname else "other"
+            stats["by_prefix"][prefix] = stats["by_prefix"].get(prefix, 0) + 1
+        except OSError:
+            pass
+    return stats
+
+
+def cleanup_expired(dry_run: bool = False) -> int:
+    """扫描缓存目录，删除已过期的缓存文件。
+
+    每个缓存文件内含 _ts 时间戳，读取后与当前时间比对，
+    根据文件名的类型前缀查表确定 TTL，过期则删除。
+
+    Args:
+        dry_run: True 时仅打印不删除；False 时实际删除
+
+    Returns:
+        已删除（或待删除）的文件数
+    """
+    from collections import defaultdict
+
+    # 文件名前缀 → 数据类型键名
+    prefix_type_map: dict[str, str] = {
+        "price": "price",
+        "index": "index",
+        "fund_perf": "rank",
+        "fund_hold": "hold",
+        "news": "news",
+        "llm_": "llm",
+        "portfolio": "hold",       # portfolio_latest.json
+        "penetration": "hold",     # penetration_cache.json
+    }
+    exact_map: dict[str, str] = {
+        "fund_benchmarks": "benchmark",
+    }
+
+    if not os.path.isdir(_CACHE_DIR):
+        logger.info("缓存目录不存在，跳过清理")
+        return 0
+
+    now = time.time()
+    removed = 0
+    ttl_used: dict[str, int] = defaultdict(int)
+
+    for fname in sorted(os.listdir(_CACHE_DIR)):
+        if not fname.endswith(".json"):
+            continue
+        fpath = os.path.join(_CACHE_DIR, fname)
+
+        fkey = fname[:-5]  # 去掉 .json
+
+        # 确定数据类型
+        data_type = "news"  # 默认给较短的 TTL
+        if fkey in exact_map:
+            data_type = exact_map[fkey]
+        else:
+            for pfx, dtype in prefix_type_map.items():
+                if fkey.startswith(pfx):
+                    data_type = dtype
+                    break
+
+        ttl = get_ttl(data_type)
+
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            ts = payload.get("_ts", 0)
+        except Exception:
+            # 文件损坏，直接删除
+            if not dry_run:
+                try:
+                    os.remove(fpath)
+                    removed += 1
+                    logger.info("缓存清理: 删除损坏文件 %s", fname)
+                except OSError:
+                    pass
+            else:
+                logger.info("缓存清理(预览): 损坏文件 %s", fname)
+                removed += 1
+            continue
+
+        age = now - ts
+        if age > ttl:
+            if not dry_run:
+                try:
+                    os.remove(fpath)
+                    removed += 1
+                    logger.info("缓存清理: 删除过期 %s (age=%.1fh > ttl=%.1fh)",
+                                fname, age / 3600, ttl / 3600)
+                except OSError:
+                    pass
+            else:
+                logger.info("缓存清理(预览): 过期 %s (age=%.1fh > ttl=%.1fh)",
+                            fname, age / 3600, ttl / 3600)
+                removed += 1
+            ttl_used[data_type] += 1
+
+    if dry_run:
+        logger.info("缓存清理预览: 共 %d 个文件待清理", removed)
+    else:
+        logger.info("缓存清理完成: 共删除 %d 个过期文件", removed)
+    return removed
+
+
+# ── 持仓指纹检测（用于持仓变更时自动刷新关联缓存） ─────────
+
+
+def compute_holdings_fingerprint(holdings: list) -> str:
+    """计算持仓指纹，用于检测持仓是否发生变更。
+
+    基于 (代码, 账户, 份额, 每份成本) 的四元组生成 MD5 指纹。
+    持仓变更（新增/清仓/改仓位）会改变指纹，触发关联缓存刷新。
+
+    Args:
+        holdings: 持仓记录列表，每项需有 code/account/shares/cost_price 属性
+
+    Returns:
+        MD5 十六进制字符串
+    """
+    items = sorted(
+        (h.code, h.account, h.shares, h.cost_price) for h in holdings
+    )
+    raw = json.dumps(items, ensure_ascii=False, sort_keys=True)
+    return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+
+def compute_holdings_codes(holdings: list) -> set[str]:
+    """提取持仓中的证券代码集合。
+
+    Args:
+        holdings: 持仓记录列表，每项需有 code 属性
+
+    Returns:
+        全部代码的集合
+    """
+    return {h.code for h in holdings}
+
+
+def check_and_refresh_caches(holdings: list) -> list[str]:
+    """检查持仓是否发生变化，若有变更则自动刷新关联缓存并返回新增资产代码。
+
+    比较当前持仓指纹与上次存储的指纹。若不同：
+      - 清除 fund_benchmarks.json（触发重新获取业绩基准）
+      - 清除 penetration_cache.json（触发重新计算穿透 TOP10）
+      - 更新存储的指纹和代码集合
+      - 返回新增的资产代码列表（用于主流程主动取数填充单条缓存）
+
+    Args:
+        holdings: 当前持仓列表（每项需有 code/account/shares/cost_price）
+
+    Returns:
+        新持仓相比上次新增的资产代码列表；无变化时返回空列表。
+    """
+    tracking_key = "holdings_tracking"
+
+    current_fp = compute_holdings_fingerprint(holdings)
+    current_codes = compute_holdings_codes(holdings)
+
+    # 读取上次存储的跟踪数据
+    track_path = _cache_path(tracking_key)
+    prev_data: dict | None = None
+    if os.path.exists(track_path):
+        try:
+            with open(track_path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            prev_data = payload.get("_data")
+        except Exception:
+            pass
+
+    if prev_data is not None:
+        prev_fp = prev_data.get("fingerprint")
+        if prev_fp == current_fp:
+            return []  # 持仓未变，无需刷新
+
+    # 指纹不同 → 清除关联缓存
+    prev_codes = builtins.set(prev_data.get("codes", [])) if prev_data else builtins.set()
+    new_codes = current_codes - prev_codes
+
+    logger.info("持仓已变更，自动刷新关联缓存...")
+
+    cleared: list[str] = []
+    bm_path = _cache_path("fund_benchmarks")
+    if os.path.exists(bm_path):
+        clear("fund_benchmarks")
+        cleared.append("fund_benchmarks")
+
+    pen_path = _cache_path("penetration_cache")
+    if os.path.exists(pen_path):
+        clear("penetration_cache")
+        cleared.append("penetration_cache")
+
+    if cleared:
+        logger.info("已清除过期缓存: %s", ", ".join(cleared))
+    else:
+        logger.info("关联缓存尚未生成，无需清除")
+
+    # 存储新跟踪数据（指纹 + 代码集合）
+    set(tracking_key, {
+        "fingerprint": current_fp,
+        "codes": sorted(current_codes),
+    })
+
+    if new_codes:
+        logger.info("检测到新增资产代码: %s", ", ".join(sorted(new_codes)))
+        return sorted(new_codes)
+    return []
+
+
 # ── 预定义缓存频率常量（秒，用作代码内默认值） ──────────
 
 CACHE_DAILY = 86400         # 每日（24h）
@@ -133,6 +369,9 @@ _CACHE_TTL_DEFAULTS: dict[str, float] = {
     "hold": CACHE_WEEKLY,
     "news": CACHE_DAILY,
     "benchmark": CACHE_MONTHLY,
+    "llm": CACHE_DAILY,
+    "llm_macro": 14400,       # 全球政经局势：4 小时
+    "llm_expert": 7200,       # 智囊团深度复盘：2 小时
 }
 
 
