@@ -222,7 +222,7 @@ _TRUNCATION_WARNING = (
 )
 
 
-def _check_claude_truncation(data: dict, max_tokens: int, label: str) -> bool:
+def _check_claude_truncation(data: dict, max_tokens: int, label: str, config_field: str = "max_tokens") -> bool:
     """检查 Claude Messages API 响应是否被 max_tokens 截断。
 
     若 stop_reason 为 "max_tokens"，说明输出达到 token 上限被截断，
@@ -232,15 +232,15 @@ def _check_claude_truncation(data: dict, max_tokens: int, label: str) -> bool:
     if stop_reason == "max_tokens":
         out_tokens = (data.get("usage") or {}).get("output_tokens", 0)
         logger.error(
-            "LLM 输出被截断 [%s]: max_tokens=%d, 实际输出=%d tokens。"
-            "内容不完整，请在 llm.json 中增大 max_tokens",
-            label, max_tokens, out_tokens,
+            "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。"
+            "内容不完整，请在 llm.json 中增大 %s",
+            label, config_field, max_tokens, out_tokens, config_field,
         )
         return True
     return False
 
 
-def _check_openai_truncation(data: dict, max_tokens: int, label: str) -> bool:
+def _check_openai_truncation(data: dict, max_tokens: int, label: str, config_field: str = "max_tokens") -> bool:
     """检查 OpenAI Chat Completions 响应是否被 max_tokens 截断。
 
     finish_reason 为 "length" 表示达到 token 上限被截断。
@@ -252,9 +252,9 @@ def _check_openai_truncation(data: dict, max_tokens: int, label: str) -> bool:
     if finish_reason == "length":
         out_tokens = (data.get("usage") or {}).get("completion_tokens", 0)
         logger.error(
-            "LLM 输出被截断 [%s]: max_tokens=%d, 实际输出=%d tokens。"
-            "内容不完整，请在 llm.json 中增大 max_tokens",
-            label, max_tokens, out_tokens,
+            "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。"
+            "内容不完整，请在 llm.json 中增大 %s",
+            label, config_field, max_tokens, out_tokens, config_field,
         )
         return True
     return False
@@ -308,6 +308,7 @@ def _call_llm(
     timeout: float = 60.0,
     http_client: httpx.Client | None = None,
     max_tokens: int | None = None,
+    config_field: str = "max_tokens",
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 LLM API 生成文本。
 
@@ -316,9 +317,10 @@ def _call_llm(
         user_prompt: 用户提示词
         llm_config: LLM 配置字典
         timeout: API 超时秒数，默认 60s（模块 7 用）；模块 8（智囊团）建议 120s
-        http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
-            而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
-        max_tokens: 可选覆盖值，优先级高于 llm_config 中的 max_tokens（含 max_tokens_macro/expert）
+        http_client: 可选的 httpx.Client 实例
+        max_tokens: 可选覆盖值，优先级高于 llm_config 中的对应字段
+        config_field: llm.json 中的配置字段名（如 "max_tokens_macro" / "max_tokens_expert"），
+            截断时在日志中提示用户增大该字段
 
     Returns:
         (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
@@ -330,9 +332,9 @@ def _call_llm(
     max_tokens = max_tokens or 2500
 
     if provider == "claude":
-        return _call_claude(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout, http_client=http_client)
+        return _call_claude(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout, http_client=http_client, config_field=config_field)
     elif provider == "openai":
-        return _call_openai(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout, http_client=http_client)
+        return _call_openai(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout, http_client=http_client, config_field=config_field)
     else:
         logger.warning("不支持的 LLM provider: %s", provider)
         return (None, None)
@@ -347,6 +349,7 @@ def _call_claude(
     max_tokens: int,
     timeout: float = 60.0,
     http_client: httpx.Client | None = None,
+    config_field: str = "max_tokens",
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 Claude API (Messages API)，带重试 + 用量日志。
 
@@ -401,7 +404,7 @@ def _call_claude(
             return (None, None)
 
         # 检查是否被 max_tokens 截断
-        truncated = _check_claude_truncation(data, max_tokens, "Claude")
+        truncated = _check_claude_truncation(data, max_tokens, "Claude", config_field)
 
         # 记录 token 用量
         usage = data.get("usage")
@@ -425,6 +428,7 @@ def _call_openai(
     max_tokens: int,
     timeout: float = 60.0,
     http_client: httpx.Client | None = None,
+    config_field: str = "max_tokens",
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。
 
@@ -479,7 +483,7 @@ def _call_openai(
             return (None, None)
 
         # 检查是否被 max_tokens 截断
-        truncated = _check_openai_truncation(data, max_tokens, "OpenAI")
+        truncated = _check_openai_truncation(data, max_tokens, "OpenAI", config_field)
 
         # 记录 token 用量
         usage = data.get("usage")
@@ -673,7 +677,7 @@ def generate_global_macro(
     prompt = _build_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories)
     logger.info("正在调用 LLM 生成全球政经局势分析...")
     macro_mt = llm_config.get("max_tokens_macro") or llm_config.get("max_tokens", 800)
-    result, usage = _call_llm(system_macro, prompt, llm_config, timeout=60.0, http_client=http_client, max_tokens=macro_mt)
+    result, usage = _call_llm(system_macro, prompt, llm_config, timeout=60.0, http_client=http_client, max_tokens=macro_mt, config_field="max_tokens_macro")
 
     if result:
         html = _markdown_to_html(result)
@@ -749,7 +753,7 @@ def generate_expert_review(
     )
     expert_mt = llm_config.get("max_tokens_expert") or llm_config.get("max_tokens", 8192)
     logger.info("正在调用 LLM 生成智囊团深度复盘...")
-    result, usage = _call_llm(system_expert, prompt, llm_config, timeout=120.0, http_client=http_client, max_tokens=expert_mt)
+    result, usage = _call_llm(system_expert, prompt, llm_config, timeout=120.0, http_client=http_client, max_tokens=expert_mt, config_field="max_tokens_expert")
 
     if result:
         html = _markdown_to_html(result)

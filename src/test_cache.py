@@ -285,6 +285,45 @@ class TestCacheSet(CacheTestBase):
             payload = json.load(f)
         self.assertEqual(payload["_data"], data)
 
+    @patch("src.cache.time.time")
+    def test_set_atomic_write_content(self, mock_time):
+        """原子写入 → 最终文件内容正确，临时文件被清理。"""
+        mock_time.return_value = 3000.0
+        from src.cache import set
+
+        set("atomic", {"hello": "world"})
+
+        # 文件内容正确
+        path = os.path.join(self.cache_dir, "atomic.json")
+        self.assertTrue(os.path.exists(path))
+        with open(path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        self.assertEqual(payload["_ts"], 3000.0)
+        self.assertEqual(payload["_data"], {"hello": "world"})
+
+        # 临时文件已清理
+        tmp_files = [f for f in os.listdir(self.cache_dir) if f.endswith(".tmp")]
+        self.assertEqual(len(tmp_files), 0)
+
+    @patch("src.cache.time.time")
+    @patch("src.cache.os.replace")
+    def test_set_windows_replace_fallback(self, mock_replace, mock_time):
+        """Windows 上 os.replace 因 PermissionError 失败 → 降级 remove+rename 成功。"""
+        mock_time.return_value = 4000.0
+        mock_replace.side_effect = PermissionError("被锁定")
+
+        from src.cache import set
+
+        # 不应抛出异常
+        set("winlock", "data")
+
+        # 验证最终写入成功
+        path = os.path.join(self.cache_dir, "winlock.json")
+        self.assertTrue(os.path.exists(path))
+        with open(path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        self.assertEqual(payload["_data"], "data")
+
 
 # ═══════════════════════════════════════════════════════════
 #  clear 测试

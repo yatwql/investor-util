@@ -395,6 +395,67 @@ class TestExtractContent(unittest.TestCase):
         data = {"content": [{"type": "image"}, {"type": "tool_use"}]}
         self.assertIsNone(_extract_content(data))
 
+# ═══════════════════════════════════════════════════════════
+#  截断检测
+# ═══════════════════════════════════════════════════════════
+
+
+class TestCheckTruncation(unittest.TestCase):
+    """测试 _check_claude_truncation / _check_openai_truncation 的 config_field 参数。"""
+
+    def test_check_claude_truncation_default_field(self) -> None:
+        """默认 config_field='max_tokens' → 日志含 max_tokens。"""
+        from src.llm_client import _check_claude_truncation
+
+        data = {"stop_reason": "max_tokens", "usage": {"output_tokens": 500}}
+        with self.assertLogs("invest", level="ERROR") as logs:
+            result = _check_claude_truncation(data, 1000, "Claude")
+        self.assertTrue(result)
+        log_text = logs.output[0]
+        self.assertIn("max_tokens", log_text)
+
+    def test_check_claude_truncation_custom_field(self) -> None:
+        """config_field='max_tokens_expert' → 日志提示 max_tokens_expert。"""
+        from src.llm_client import _check_claude_truncation
+
+        data = {"stop_reason": "max_tokens", "usage": {"output_tokens": 500}}
+        with self.assertLogs("invest", level="ERROR") as logs:
+            result = _check_claude_truncation(data, 8192, "Claude", config_field="max_tokens_expert")
+        self.assertTrue(result)
+        log_text = logs.output[0]
+        self.assertIn("max_tokens_expert", log_text)
+        self.assertIn("8192", log_text)
+
+    def test_check_claude_truncation_not_truncated(self) -> None:
+        """stop_reason 不是 max_tokens → 不记录日志。"""
+        from src.llm_client import _check_claude_truncation
+
+        data = {"stop_reason": "end_turn", "usage": {"output_tokens": 100}}
+        result = _check_claude_truncation(data, 8192, "Claude")
+        self.assertFalse(result)
+
+    def test_check_openai_truncation_custom_field(self) -> None:
+        """OpenAI config_field='max_tokens_macro' → 日志提示 max_tokens_macro。"""
+        from src.llm_client import _check_openai_truncation
+
+        data = {"choices": [{"finish_reason": "length", "message": {"content": "..."}}],
+                "usage": {"completion_tokens": 800}}
+        with self.assertLogs("invest", level="ERROR") as logs:
+            result = _check_openai_truncation(data, 800, "OpenAI", config_field="max_tokens_macro")
+        self.assertTrue(result)
+        log_text = logs.output[0]
+        self.assertIn("max_tokens_macro", log_text)
+        self.assertIn("800", log_text)
+
+    def test_check_openai_truncation_not_truncated(self) -> None:
+        """finish_reason 不是 length → 不记录日志。"""
+        from src.llm_client import _check_openai_truncation
+
+        data = {"choices": [{"finish_reason": "stop", "message": {"content": "..."}}],
+                "usage": {"completion_tokens": 100}}
+        result = _check_openai_truncation(data, 8192, "OpenAI")
+        self.assertFalse(result)
+
 
 if __name__ == "__main__":
     unittest.main()

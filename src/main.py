@@ -765,20 +765,30 @@ def _cmd_generate_full() -> None:
             for d in details
         ]
 
-        # ── 顺序获取新闻 + 生成 LLM 内容（避免嵌套 ThreadPoolExecutor 过多线程）────
+        # ── 并行获取新闻 + 生成 LLM 内容（一次计算，两处复用）────
         from src.llm_client import generate_all_llm
         from src.report.news_correlation import build_news_data
 
-        print("  [..] 正在获取新闻...")
-        news_data = build_news_data(holdings, news_top_count, penetrated_assets)
+        print("  [..] 正在并行获取新闻 + LLM 内容...")
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=2) as _llm_ex:
 
-        print("  [..] 正在获取 LLM 内容...")
-        llm_macro, llm_expert = generate_all_llm(
-            a_indices, us_indices, total_mv, total_cost, total_profit,
-            total_today_profit, len(holdings), categories,
-            penetrated_assets=penetrated_assets,
-            holdings_details=holdings_details, force=False,
-        )
+            def _run_llm():
+                """在线程中调用 generate_all_llm（含缓存预检）。"""
+                return generate_all_llm(
+                    a_indices, us_indices, total_mv, total_cost, total_profit,
+                    total_today_profit, len(holdings), categories,
+                    penetrated_assets=penetrated_assets,
+                    holdings_details=holdings_details, force=False,
+                )
+
+            _news_fut = _llm_ex.submit(
+                build_news_data, holdings, news_top_count, penetrated_assets,
+            )
+            _llm_fut = _llm_ex.submit(_run_llm)
+
+            news_data = _news_fut.result()
+            llm_macro, llm_expert = _llm_fut.result()
 
         llm_content = (llm_macro, llm_expert)
 
@@ -825,6 +835,7 @@ def _cmd_update_basic_cache() -> None:
       fund_perf_{code}.json        → 基金业绩评价+同类排名（单条，由 fetch_fund_rankings 自动写入）
       fund_hold_{code}.json        → 各基金底层持仓权重（单条，由 fetch_fund_holdings 自动写入）
       fund_benchmarks.json         → 业绩比较基准
+      news_{md5}.json              → 新闻缓存（持仓更新后新闻关联可能变化，一并清除）
     """
     from src.cache import clear, clear_by_prefix
     from src.fetcher import fetch_fund_benchmark, fetch_fund_holdings, fetch_fund_rankings
@@ -859,7 +870,8 @@ def _cmd_update_basic_cache() -> None:
         clear_by_prefix("fund_perf_")
         clear_by_prefix("fund_hold_")
         clear("fund_benchmarks")
-        print("  [OK] 旧缓存已清除")
+        clear_by_prefix("news_")
+        print("  [OK] 旧缓存已清除（含 news_ 新闻缓存）")
 
         # 2) 获取基金业绩排名 + 持仓 + 基准
         print()

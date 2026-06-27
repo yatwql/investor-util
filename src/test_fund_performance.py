@@ -725,6 +725,69 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         # 应出现 优秀 在 偏差 之前
         self.assertLess(rating_row.index("优秀"), rating_row.index("偏差"))
 
+    # -- perf_evaluation JSON null safety --------------------------------
+
+    def test_perf_eval_null_categories(self):
+        """perf_evaluation.categories 为 JSON null → 不崩溃，正确兜底。"""
+        def _rankings_null_cat(code: str) -> dict | None:
+            return {
+                "561910": {
+                    "rankings": {"近3月": {"return": 1.5},
+                                 "近6月": {"return": 3.2},
+                                 "近1年": {"return": 8.5},
+                                 "同类排名": {"rank": 50, "total": 500}},
+                    "rating": "优秀",
+                    "perf_evaluation": {"categories": None, "data": None},
+                },
+                "012325": {
+                    "rankings": {"近3月": {"return": 0.8},
+                                 "近6月": {"return": 1.5},
+                                 "近1年": {"return": 3.0},
+                                 "同类排名": {"rank": 100, "total": 800}},
+                    "rating": "稳定",
+                    "perf_evaluation": {"categories": None, "data": None},
+                },
+            }.get(code)
+        self.mocks["fetch_fund_rankings"].side_effect = _rankings_null_cat
+
+        fp.write_fund_performance_sheet(self.ws, self.holdings, self.details)
+
+        calls = self.mocks["write_data_row"].call_args_list
+        # 2 基金 + 统计 + 评级分布 + 业绩评价标准说明 = 5
+        self.assertEqual(len(calls), 5)
+
+        # 正常写入，评级未降级（无超额收益数据）
+        vals0 = calls[0][0][2]
+        self.assertEqual(vals0[9], "优秀 持续跑赢基准，超额收益显著（基准：沪深300指数）")
+
+        vals1 = calls[1][0][2]
+        self.assertEqual(vals1[9], "稳定 收益率稳健，波动控制良好（基准：中债综合指数）")
+
+    def test_perf_eval_null_data(self):
+        """perf_evaluation.data 为 JSON null，categories 正常 → 不崩溃。"""
+        def _rankings_null_data(code: str) -> dict | None:
+            return {
+                "561910": {
+                    "rankings": {"近3月": {"return": 1.5},
+                                 "近6月": {"return": 3.2},
+                                 "近1年": {"return": 8.5},
+                                 "同类排名": {"rank": 50, "total": 500}},
+                    "rating": "优秀",
+                    "perf_evaluation": {"categories": ["超额收益", "选股能力"], "data": None},
+                },
+            }.get(code)
+        self.mocks["fetch_fund_rankings"].side_effect = _rankings_null_data
+
+        fp.write_fund_performance_sheet(self.ws, [self.holdings[0]], [self.details[0]])
+
+        calls = self.mocks["write_data_row"].call_args_list
+        # 1 基金 + 统计 + 评级分布 + 业绩评价标准说明 = 4
+        self.assertEqual(len(calls), 4)
+
+        # categories 正常但 data 为 None，len(scores) 应兜底为 0
+        vals0 = calls[0][0][2]
+        self.assertIn("基准：沪深300指数", vals0[9])
+
 
 # ============================================================
 #  Entry
