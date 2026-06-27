@@ -11,12 +11,16 @@ import hashlib
 import json
 import logging
 import os
+import tempfile
+import threading
 import time
 from typing import Any
 
 _CACHE_DIR = "data/cache"
 
 logger = logging.getLogger("invest")
+
+_cache_lock = threading.Lock()
 
 
 def _cache_path(key: str) -> str:
@@ -63,7 +67,7 @@ def get(key: str, max_age_seconds: float) -> Any | None:
 
 
 def set(key: str, data: Any) -> None:
-    """写入缓存。
+    """写入缓存。使用临时文件 + 原子替换保证线程安全。
 
     Args:
         key: 缓存键名
@@ -73,32 +77,71 @@ def set(key: str, data: Any) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     payload = {"_ts": time.time(), "_data": data}
+
+    # 先写临时文件，再 os.replace 原子替换，防止并发读取时读到不完整的 JSON
     try:
-        with open(path, "w", encoding="utf-8") as f:
+        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+    except (IOError, OSError):
+        # tempfile.mkstemp 失败（如磁盘满、权限不足），直接返回
+        logger.warning("缓存写入失败 %s: 无法创建临时文件", key)
+        return
+
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
+        try:
+            os.replace(tmp_path, path)
+        except PermissionError:
+            # Windows: replace 目标文件可能被锁，先删除再 rename
+            if os.path.exists(path):
+                os.remove(path)
+            os.rename(tmp_path, path)
         logger.debug("缓存已写入: %s", key)
     except FileNotFoundError:
         # 目录可能在 makedirs 后被外部删除，重试一次
         try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False, indent=2)
-            logger.debug("缓存已写入(重试成功): %s", key)
+            fd2, tmp_path2 = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+            try:
+                with os.fdopen(fd2, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, ensure_ascii=False, indent=2)
+                try:
+                    os.replace(tmp_path2, path)
+                except PermissionError:
+                    if os.path.exists(path):
+                        os.remove(path)
+                    os.rename(tmp_path2, path)
+                logger.debug("缓存已写入(重试成功): %s", key)
+            except (IOError, OSError) as e2:
+                logger.warning("缓存写入失败(重试后) %s: %s", key, e2)
+                try:
+                    os.remove(tmp_path2)
+                except OSError:
+                    pass
         except (IOError, OSError) as e2:
             logger.warning("缓存写入失败(重试后) %s: %s", key, e2)
     except (IOError, OSError) as e:
         logger.warning("缓存写入失败 %s: %s", key, e)
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
 
 def clear(key: str) -> None:
     """删除指定缓存文件。"""
-    path = _cache_path(key)
-    try:
-        if os.path.exists(path):
-            os.remove(path)
-            logger.debug("缓存已清除: %s", key)
-    except OSError as e:
-        logger.warning("缓存清除失败 %s: %s", key, e)
+    with _cache_lock:
+        path = _cache_path(key)
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                logger.debug("缓存已清除: %s", key)
+        except OSError as e:
+            logger.warning("缓存清除失败 %s: %s", key, e)
 
 
 def clear_by_prefix(key_prefix: str) -> int:
@@ -110,20 +153,21 @@ def clear_by_prefix(key_prefix: str) -> int:
     Returns:
         已清除的文件数量
     """
-    count = 0
-    if not os.path.isdir(_CACHE_DIR):
-        return 0
-    for fname in os.listdir(_CACHE_DIR):
-        if not fname.endswith(".json"):
-            continue
-        fkey = fname[:-5]  # 去掉 .json 后缀
-        if fkey.startswith(key_prefix):
-            try:
-                os.remove(os.path.join(_CACHE_DIR, fname))
-                count += 1
-                logger.debug("缓存已清除: %s", fkey)
-            except OSError as e:
-                logger.warning("缓存清除失败 %s: %s", fkey, e)
+    with _cache_lock:
+        count = 0
+        if not os.path.isdir(_CACHE_DIR):
+            return 0
+        for fname in os.listdir(_CACHE_DIR):
+            if not fname.endswith(".json"):
+                continue
+            fkey = fname[:-5]  # 去掉 .json 后缀
+            if fkey.startswith(key_prefix):
+                try:
+                    os.remove(os.path.join(_CACHE_DIR, fname))
+                    count += 1
+                    logger.debug("缓存已清除: %s", fkey)
+                except OSError as e:
+                    logger.warning("缓存清除失败 %s: %s", fkey, e)
     return count
 
 
@@ -167,91 +211,92 @@ def cleanup_expired(dry_run: bool = False) -> int:
     Returns:
         已删除（或待删除）的文件数
     """
-    from collections import defaultdict
+    with _cache_lock:
+        from collections import defaultdict
 
-    # 文件名前缀 → 数据类型键名
-    # 注意：具体前缀需在通用前缀之前（如 "llm_global_macro" 在 "llm_" 之前）
-    prefix_type_map: dict[str, str] = {
-        "price": "price",
-        "index": "index",
-        "fund_perf": "rank",
-        "fund_hold": "hold",
-        "news": "news",
-        "llm_global_macro": "llm_macro",   # 全球政经局势：4h TTL
-        "llm_expert_review": "llm_expert", # 智囊团深度复盘：2h TTL
-        "llm_": "llm",                     # 通用 LLM 缓存：24h TTL
-    }
-    exact_map: dict[str, str] = {
-        "fund_benchmarks": "benchmark",
-        "holdings_tracking": "benchmark",  # 持仓跟踪数据：30天 TTL，防误删导致重复预热
-    }
+        # 文件名前缀 → 数据类型键名
+        # 注意：具体前缀需在通用前缀之前（如 "llm_global_macro" 在 "llm_" 之前）
+        prefix_type_map: dict[str, str] = {
+            "price": "price",
+            "index": "index",
+            "fund_perf": "rank",
+            "fund_hold": "hold",
+            "news": "news",
+            "llm_global_macro": "llm_macro",   # 全球政经局势：4h TTL
+            "llm_expert_review": "llm_expert", # 智囊团深度复盘：2h TTL
+            "llm_": "llm",                     # 通用 LLM 缓存：24h TTL
+        }
+        exact_map: dict[str, str] = {
+            "fund_benchmarks": "benchmark",
+            "holdings_tracking": "benchmark",  # 持仓跟踪数据：30天 TTL，防误删导致重复预热
+        }
 
-    if not os.path.isdir(_CACHE_DIR):
-        logger.info("缓存目录不存在，跳过清理")
-        return 0
+        if not os.path.isdir(_CACHE_DIR):
+            logger.info("缓存目录不存在，跳过清理")
+            return 0
 
-    now = time.time()
-    removed = 0
-    ttl_used: dict[str, int] = defaultdict(int)
+        now = time.time()
+        removed = 0
+        ttl_used: dict[str, int] = defaultdict(int)
 
-    for fname in sorted(os.listdir(_CACHE_DIR)):
-        if not fname.endswith(".json"):
-            continue
-        fpath = os.path.join(_CACHE_DIR, fname)
+        for fname in sorted(os.listdir(_CACHE_DIR)):
+            if not fname.endswith(".json"):
+                continue
+            fpath = os.path.join(_CACHE_DIR, fname)
 
-        fkey = fname[:-5]  # 去掉 .json
+            fkey = fname[:-5]  # 去掉 .json
 
-        # 确定数据类型
-        data_type = "news"  # 默认给较短的 TTL
-        if fkey in exact_map:
-            data_type = exact_map[fkey]
-        else:
-            for pfx, dtype in prefix_type_map.items():
-                if fkey.startswith(pfx):
-                    data_type = dtype
-                    break
-
-        ttl = get_ttl(data_type)
-
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                payload = json.load(f)
-            ts = payload.get("_ts", 0)
-        except Exception:
-            # 文件损坏，直接删除
-            if not dry_run:
-                try:
-                    os.remove(fpath)
-                    removed += 1
-                    logger.info("缓存清理: 删除损坏文件 %s", fname)
-                except OSError:
-                    pass
+            # 确定数据类型
+            data_type = "news"  # 默认给较短的 TTL
+            if fkey in exact_map:
+                data_type = exact_map[fkey]
             else:
-                logger.info("缓存清理(预览): 损坏文件 %s", fname)
-                removed += 1
-            continue
+                for pfx, dtype in prefix_type_map.items():
+                    if fkey.startswith(pfx):
+                        data_type = dtype
+                        break
 
-        age = now - ts
-        if age > ttl:
-            if not dry_run:
-                try:
-                    os.remove(fpath)
+            ttl = get_ttl(data_type)
+
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+                ts = payload.get("_ts", 0)
+            except Exception:
+                # 文件损坏，直接删除
+                if not dry_run:
+                    try:
+                        os.remove(fpath)
+                        removed += 1
+                        logger.info("缓存清理: 删除损坏文件 %s", fname)
+                    except OSError:
+                        pass
+                else:
+                    logger.info("缓存清理(预览): 损坏文件 %s", fname)
                     removed += 1
-                    logger.info("缓存清理: 删除过期 %s (age=%.1fh > ttl=%.1fh)",
+                continue
+
+            age = now - ts
+            if age > ttl:
+                if not dry_run:
+                    try:
+                        os.remove(fpath)
+                        removed += 1
+                        logger.info("缓存清理: 删除过期 %s (age=%.1fh > ttl=%.1fh)",
+                                    fname, age / 3600, ttl / 3600)
+                    except OSError:
+                        pass
+                else:
+                    logger.info("缓存清理(预览): 过期 %s (age=%.1fh > ttl=%.1fh)",
                                 fname, age / 3600, ttl / 3600)
-                except OSError:
-                    pass
-            else:
-                logger.info("缓存清理(预览): 过期 %s (age=%.1fh > ttl=%.1fh)",
-                            fname, age / 3600, ttl / 3600)
-                removed += 1
-            ttl_used[data_type] += 1
+                    removed += 1
+                ttl_used[data_type] += 1
 
-    if dry_run:
-        logger.info("缓存清理预览: 共 %d 个文件待清理", removed)
-    else:
-        logger.info("缓存清理完成: 共删除 %d 个过期文件", removed)
-    return removed
+        if dry_run:
+            logger.info("缓存清理预览: 共 %d 个文件待清理", removed)
+        else:
+            logger.info("缓存清理完成: 共删除 %d 个过期文件", removed)
+        return removed
 
 
 # ── 持仓指纹检测（用于持仓变更时自动刷新关联缓存） ─────────

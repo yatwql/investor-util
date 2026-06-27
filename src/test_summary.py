@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import unittest
 from contextlib import ExitStack
+from typing import Any
 from unittest.mock import MagicMock, call, patch
 
 from src.report import summary as s
@@ -142,7 +143,8 @@ class TestWriteSummarySheet(unittest.TestCase):
         self, ws,
         total_mv, total_cost, total_profit, today_profit,
         categories=None, update_status=None,
-        a_indices=None, us_indices=None,
+        a_indices: dict[str, dict[str, Any]] | None = None,
+        us_indices: dict[str, dict[str, Any]] | None = None,
     ):
         """调用 write_summary_sheet 并返回 mock 字典。
 

@@ -16,6 +16,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
+import threading
 
 import httpx
 
@@ -131,8 +132,17 @@ _CACHE_PREFIX_LLM = "llm_"
 
 _LLM_TIMEOUT = 120.0
 
-# 共享 HTTP 连接池（keep-alive 复用，避免每次调用重建 TCP 握手）
-_HTTP_POOL = httpx.Client(timeout=_LLM_TIMEOUT)
+# 线程本地 HTTP 连接池（每个线程独立创建，避免多线程竞态）
+_thread_local = threading.local()
+
+
+def _get_http_pool() -> httpx.Client:
+    """获取当前线程的 HTTP 连接池，懒加载确保每个线程只创建一次。"""
+    pool: httpx.Client | None = getattr(_thread_local, "http_pool", None)
+    if pool is None:
+        pool = httpx.Client(timeout=_LLM_TIMEOUT)
+        _thread_local.http_pool = pool
+    return pool
 
 # ── 重试配置 ─────────────────────────────────────────────────
 
@@ -257,7 +267,7 @@ def _extract_content(data: dict, endpoint: str = "") -> str | None:
     会遍历 content 列表中所有 text block 并拼接返回。
     """
     # API 返回了错误信息
-    if "error" in data:
+    if data and "error" in data:
         logger.warning("LLM API 返回错误: %s", data["error"])
         return None
 
@@ -359,7 +369,7 @@ def _call_claude(
         "system": system,
         "messages": [{"role": "user", "content": user}],
     }
-    client = http_client or _HTTP_POOL
+    client = http_client or _get_http_pool()
 
     for attempt in range(_RETRY_MAX + 1):
         try:
@@ -438,7 +448,7 @@ def _call_openai(
             {"role": "user", "content": user},
         ],
     }
-    client = http_client or _HTTP_POOL
+    client = http_client or _get_http_pool()
 
     for attempt in range(_RETRY_MAX + 1):
         try:
@@ -508,8 +518,8 @@ Phase 3（定音锤）指挥官融合辩论给出量化调仓方案和风险提�
 
 
 def _build_macro_prompt(
-    a_indices: dict,
-    us_indices: dict,
+    a_indices: dict[str, dict[str, Any]],
+    us_indices: dict[str, dict[str, Any]],
     total_mv: float,
     total_profit: float,
     categories: dict,
@@ -517,13 +527,13 @@ def _build_macro_prompt(
     """构建模块 7（全球政经）的用户提示词（紧凑格式）。"""
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     idx_text = "A股:"
-    for idx in a_indices.values():
+    for idx in (a_indices or {}).values():
         name = idx.get("name", "")
         price = idx.get("price", 0)
         chg = idx.get("change_pct", 0)
         idx_text += f" {name}{price}({chg:+.2f}%)"
     idx_text += "\n美股:"
-    for idx in us_indices.values():
+    for idx in (us_indices or {}).values():
         name = idx.get("name", "")
         price = idx.get("price", 0)
         chg = idx.get("change_pct", 0)
@@ -619,8 +629,8 @@ def _build_review_prompt(
 
 
 def generate_global_macro(
-    a_indices: dict,
-    us_indices: dict,
+    a_indices: dict[str, dict[str, Any]],
+    us_indices: dict[str, dict[str, Any]],
     total_mv: float,
     total_profit: float,
     categories: dict,
@@ -762,8 +772,8 @@ def generate_expert_review(
 
 
 def generate_all_llm(
-    a_indices: dict,
-    us_indices: dict,
+    a_indices: dict[str, dict[str, Any]],
+    us_indices: dict[str, dict[str, Any]],
     total_mv: float,
     total_cost: float,
     total_profit: float,

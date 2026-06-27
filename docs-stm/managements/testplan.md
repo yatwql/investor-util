@@ -49,6 +49,9 @@
 | config.json/llm.json 配置值异常 | 输出警告，使用代码默认值 |
 | fund_performance.json 中 categories/data 为 JSON null | 自动兜底为空列表，不崩溃 |
 | html_writer.py LLM 内部调用路径（enable_llm=True, llm_content=None） | 传入 dict 类型指数数据，不因 .values() 缺失崩溃 |
+| summary.py write_summary_sheet 收到 list 而非 dict | write_summary_sheet 从 fetch_indices() 接收 dict，不因 .get() 缺失崩溃 |
+| fund_performance _adjust_rating_with_benchmark 中 categories 传入 None | 自动兜底为空列表不崩溃；循环中 cat 为 None 时 `in` 操作不崩溃 |
+| perf_eval.get("categories") / get("data") 返回 None 时 len() 和 enumerate() | 使用 or [] 兜底后，len([]) = 0 不崩溃，enumerate([]) 为空迭代 |
 
 ### 1.4 数据正确性验证
 
@@ -87,7 +90,7 @@
 | Iter 3.4 | LLM API 联通性、缓存 24h 生效、API Key 未配置降级占位文本、LLM 输出格式兜底 |
 | Iter 3.5 | LLM 并行生成模块 7+8 同时成功、System Prompt 外部可配置生效、httpx 连接池复用、提示词紧凑化效果 |
 | Iter 3.6 | 多线程并发缓存获取无竞态、新闻 15min 缓存过期、LLM 缓存预检正确跳过线程池、Token 用量正确展示、_SYSTEM_EXPERT 压缩后三阶段格式保持、死代码无残留、配置校验警告正确触发 |
-| Iter 3.7 | html_writer.py 中 a_indices 以 dict 类型传入 generate_all_llm（不因 .values() 崩溃）、fund_performance.py 在 API 返回 JSON null 时 categories/data 自动兜底 |
+| Iter 3.7 | html_writer.py 中 a_indices 以 dict 类型传入 generate_all_llm（不因 .values() 崩溃）、fund_performance.py 在 API 返回 JSON null 时 categories/data 自动兜底、summary.py write_summary_sheet 接收 dict 类型指数数据（不因 list 传入致 .get() 崩溃）、fund_performance._adjust_rating_with_benchmark 中 categories 含 None 时自动兜底 |
 
 ---
 

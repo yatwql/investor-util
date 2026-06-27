@@ -262,10 +262,10 @@ class TestCacheSet(CacheTestBase):
         self.assertEqual(payload["_data"], "new")
 
     @patch("src.cache.time.time")
-    @patch("src.cache.open")
-    def test_set_write_error_logged(self, mock_open, mock_time):
+    @patch("src.cache.tempfile.mkstemp")
+    def test_set_write_error_logged(self, mock_mkstemp, mock_time):
         """写入 IOError → 不抛出异常，正常返回。"""
-        mock_open.side_effect = IOError("disk full")
+        mock_mkstemp.side_effect = OSError("disk full")
         from src.cache import set
 
         # 不应抛出异常

@@ -474,7 +474,8 @@
 
 **Files**：
 - `src/report/html_writer.py` — a_indices/us_indices 从 list 改为 dict，LLM 调用传 dict，模板渲染传 list
-- `src/report/fund_performance.py` — categories/scores `or []` 兜底防 JSON null
+- `src/report/fund_performance.py` — `_calc_rating_comment` / `_adjust_rating_with_benchmark` 中 categories/scores `or []` 兜底防 JSON null
+- `src/report/summary.py` — `write_summary_sheet` 保留 dict 原始类型传递，调用方不再转为 list
 
 **Verification**：
 - `python -m pytest src/ -q` → 489 passed（迭代 3.6 测试数不变，修复未影响现有断言）

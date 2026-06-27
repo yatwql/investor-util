@@ -13,7 +13,7 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 os.chdir(_project_root)
 
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from src.config import get_config, get_llm_config, init_config, set_config
 from src.logger import setup_logger
@@ -416,7 +416,7 @@ def _cmd_generate_excel_with_news() -> None:
     _press_any_key()
 
 
-def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict | None = None, us_indices: dict | None = None, news_data: list | None = None) -> None:
+def _generate_excel_report(holdings: list, include_news: bool = False, output_dir: str = "reports", news_top_count: int = 100, include_llm: bool = False, force_llm: bool = False, show_llm_in_tui: bool = False, llm_content: tuple | None = None, details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None, us_indices: dict[str, dict[str, Any]] | None = None, news_data: list | None = None) -> None:
     """生成 Excel 报告的核心逻辑。
 
     Args:
@@ -764,28 +764,20 @@ def _cmd_generate_full() -> None:
             for d in details
         ]
 
-        # ── 并行获取新闻 + 生成 LLM 内容（一次计算，两处复用）────
-        from concurrent.futures import ThreadPoolExecutor
+        # ── 顺序获取新闻 + 生成 LLM 内容（避免嵌套 ThreadPoolExecutor 过多线程）────
         from src.llm_client import generate_all_llm
         from src.report.news_correlation import build_news_data
 
-        with ThreadPoolExecutor(max_workers=2) as _llm_ex:
-            # 新闻获取（3 源并行获取，约 1s）
-            _news_fut = _llm_ex.submit(build_news_data, holdings, news_top_count, penetrated_assets)
+        print("  [..] 正在获取新闻...")
+        news_data = build_news_data(holdings, news_top_count, penetrated_assets)
 
-            # LLM 生成（内部含缓存判断 + 1-2 次 API 调用）
-            def _run_llm():
-                from src.llm_client import generate_all_llm
-                return generate_all_llm(
-                    a_indices, us_indices, total_mv, total_cost, total_profit,
-                    total_today_profit, len(holdings), categories,
-                    penetrated_assets=penetrated_assets,
-                    holdings_details=holdings_details, force=False,
-                )
-            _llm_fut = _llm_ex.submit(_run_llm)
-
-            news_data = _news_fut.result()
-            llm_macro, llm_expert = _llm_fut.result()
+        print("  [..] 正在获取 LLM 内容...")
+        llm_macro, llm_expert = generate_all_llm(
+            a_indices, us_indices, total_mv, total_cost, total_profit,
+            total_today_profit, len(holdings), categories,
+            penetrated_assets=penetrated_assets,
+            holdings_details=holdings_details, force=False,
+        )
 
         llm_content = (llm_macro, llm_expert)
 

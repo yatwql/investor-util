@@ -29,6 +29,8 @@
 | 2026-06-27 | 缓存策略增强：新闻 15min 缓存/mtime 配置缓存/HTML 直存 | 优化审查 | 自审 | ✅ 已通过 |
 | 2026-06-27 | 多文档全量第五次审计 + v0.2.8 文档同步 | 一致性审查 | 自审 | ✅ 已通过 |
 | 2026-06-27 | 全量代码类型与安全审计（html_writer list→dict + fund_performance JSON null） | 代码审查 | 自审 | ✅ 已通过 |
+| 2026-06-27 | 全量代码二次类型审计（summary.py write_summary_sheet list→dict + fund_performance _adjust_rating_with_benchmark None） | 代码审查 | 自审 | ✅ 已通过 |
+| 2026-06-27 | v0.2.8 全量文档与代码一致性确认（5 文档审计 + 类型/空安全修正验证） | 一致性审查 | 自审 | ✅ 已通过 |
 
 ---
 
@@ -76,6 +78,24 @@
 - **审查对象**：`src/report/fund_performance.py`
 - **类型**：空安全缺陷
 - **描述**：`perf_eval.get("categories", [])` 在 JSON 中存在显式 `null`（如 `{"categories": null}`）时返回 `None` 而非 `[]`，随后 `enumerate(categories)` 引发 `TypeError`。同理 `scores` 在 `len(scores)` 处崩溃。涉及 _calc_rating_comment 和 _adjust_rating_with_benchmark 两处。
+- **状态**：✅ 已修复（`.get()` 后使用 `or []` 兜底确保始终为可迭代对象）
+- **修复日期**：2026-06-27
+
+### [R-006] summary.py write_summary_sheet 接收 list 而非 dict 导致崩溃
+
+- **发现日期**：2026-06-27
+- **审查对象**：`src/report/summary.py` + 调用方
+- **类型**：类型不匹配
+- **描述**：`fetch_indices()` 返回 `dict[str, dict[str, Any]]`，但调用方在传入 `write_summary_sheet()` 前错误将 dict 转为 list（如 `list(fetch_indices())`），导致函数内 `a_indices.get(code)` 引发 `AttributeError`。与 R-004 同属一类类型不匹配问题，但涉及不同模块（summary.py 而非 html_writer.py）。
+- **状态**：✅ 已修复（保留 dict 原始类型传递）
+- **修复日期**：2026-06-27
+
+### [R-007] fund_performance.py _adjust_rating_with_benchmark 对 API JSON null 缺少防护
+
+- **发现日期**：2026-06-27
+- **审查对象**：`src/report/fund_performance.py`
+- **类型**：空安全缺陷
+- **描述**：`_adjust_rating_with_benchmark` 中 `perf_eval.get("categories")` 在 JSON 中存在显式 `null`（如 `{"categories": null}`）时返回 `None` 而非 `[]`，随后 `enumerate(categories)` 引发 `TypeError`。与 R-005 属同类 API null 问题，但影响函数为 `_adjust_rating_with_benchmark`（评级修正专用），且循环中 `if cat and ("超额" in cat ...)` 在 cat 为 None 时同样会因 `in` 操作于 NoneType 上崩溃。
 - **状态**：✅ 已修复（`.get()` 后使用 `or []` 兜底确保始终为可迭代对象）
 - **修复日期**：2026-06-27
 

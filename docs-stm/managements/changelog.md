@@ -47,6 +47,8 @@
 - `_call_llm` fallback 简化：`max_tokens = max_tokens or 2500`（移除 `llm_config.get("max_tokens", 2500)`）
 - `html_writer.py`：a_indices/us_indices 从 list 改为 dict（fetch_indices() 原始类型），LLM 调用不再因 `.values()` 缺失崩溃；模板渲染使用独立 list 变量
 - `fund_performance.py`：`perf_eval.get("categories")` / `perf_eval.get("data")` 在 API 返回 JSON null 时返回 None，导致 `enumerate(categories)` 和 `len(scores)` 崩溃 — 改用 `or []` 兜底
+- `summary.py`：`write_summary_sheet` 接收的 `fetch_indices()` 指数数据被调用方错误转为 list 后传入，`dict.get()` 操作引发 `AttributeError` 崩溃 — 修正为保留 dict 原始类型传递
+- `fund_performance.py`：`_adjust_rating_with_benchmark` 中 `perf_eval.get("categories")` 在 JSON null 时返回 None 而非空列表，循环中 cat 为 None 时 `"超额" in cat` 引发 `TypeError` 崩溃 — 改用 `or []` 兜底
 
 ### Removed (Dead Code)
 - `src/cache.py`：移除 `exists()` 函数（无生产调用者）
