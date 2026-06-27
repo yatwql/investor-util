@@ -32,6 +32,7 @@ _DEFAULT_CONFIG = {
         "rank": 86400,
         "hold": 604800,
         "news": 900,
+        "news_corr": 3600,
         "industry": 604800,
         "benchmark": 2592000,
     },

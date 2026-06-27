@@ -308,19 +308,24 @@ def build_news_data(
     from src.config import get_llm_config
     _llm_config = get_llm_config()
     if _llm_config and _llm_config.get("llm_news_analysis", False):
-        meta["llm_enabled"] = True
-        try:
-            from src.llm_client import enhance_news_correlation
-            news_items, _cached, _token_usage = enhance_news_correlation(
-                news_items, holdings, penetrated_assets=penetrated_assets,
-            )
-            meta["llm_cached"] = _cached
-            meta["token_usage"] = _token_usage
-            if _cached:
-                logger.info("LLM 新闻关联分析（缓存）: 富化 %d 条",
-                            sum(1 for n in news_items if n.get("llm_analysis")))
-        except Exception as e:
-            logger.warning("LLM 新闻关联分析出错: %s", e)
+        # 检查 API Key 是否实际配置 — 未配置时降级为传统分析
+        _api_key = (_llm_config.get("api_key") or "").strip()
+        if not _api_key:
+            logger.warning("llm_news_analysis 已开启但未配置 api_key，降级为传统关键词匹配分析")
+        else:
+            meta["llm_enabled"] = True
+            try:
+                from src.llm_client import enhance_news_correlation
+                news_items, _cached, _token_usage = enhance_news_correlation(
+                    news_items, holdings, penetrated_assets=penetrated_assets,
+                )
+                meta["llm_cached"] = _cached
+                meta["token_usage"] = _token_usage
+                if _cached:
+                    logger.info("LLM 新闻关联分析（缓存）: 富化 %d 条",
+                                sum(1 for n in news_items if n.get("llm_analysis")))
+            except Exception as e:
+                logger.warning("LLM 新闻关联分析出错: %s", e)
 
     # ── 关键词富化（标注每个关键词的来源） ─────────────────
     _lookup = _build_keyword_lookup(holdings, penetrated_assets, industry_data=_industry_data)

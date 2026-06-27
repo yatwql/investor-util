@@ -225,6 +225,7 @@ def cleanup_expired(dry_run: bool = False) -> int:
             "news": "news",
             "llm_global_macro": "llm_macro",   # 全球政经局势：4h TTL
             "llm_expert_review": "llm_expert", # 智囊团深度复盘：2h TTL
+            "llm_news_corr": "news_corr",      # LLM 新闻关联分析：1h TTL
             "llm_": "llm",                     # 通用 LLM 缓存：24h TTL
         }
         exact_map: dict[str, str] = {
@@ -419,6 +420,7 @@ _CACHE_TTL_DEFAULTS: dict[str, float] = {
     "rank": CACHE_DAILY,
     "hold": CACHE_WEEKLY,
     "news": 900,              # 新闻聚合缓存：15 分钟
+    "news_corr": 3600,        # LLM 新闻关联分析：1 小时
     "industry": CACHE_WEEKLY, # 行业分类/概念板块：7 天
     "benchmark": CACHE_MONTHLY,
     "llm": CACHE_DAILY,

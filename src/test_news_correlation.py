@@ -85,7 +85,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": True}
+        mock_llm_cfg.return_value = {"llm_news_analysis": True, "api_key": "sk-test"}
         enriched = [
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪",
@@ -118,7 +118,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": True}
+        mock_llm_cfg.return_value = {"llm_news_analysis": True, "api_key": "sk-test"}
         enriched = [
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪",
@@ -138,6 +138,28 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
     @patch("src.config.get_llm_config")
     @patch("src.llm_client.enhance_news_correlation")
     @patch("src.providers.news_aggregator.aggregate_news")
+    def test_llm_disabled_when_no_api_key(
+        self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
+    ) -> None:
+        """llm_news_analysis=true 但无 api_key → 降级为传统分析，llm_enabled=False。"""
+        mock_aggregate.return_value = [
+            {"title": "新闻标题", "intro": "简介", "url": "http://example.com",
+             "ctime": "2026-06-27", "media_name": "新浪财经", "matched_keywords": ["长江电力"]},
+        ]
+        mock_llm_cfg.return_value = {"llm_news_analysis": True, "api_key": ""}
+        holdings = [
+            Holding(account="证券", name="长江电力", code="600900",
+                     shares=100, cost_price=10.0)
+        ]
+        result, meta = nc.build_news_data(holdings)
+        mock_enhance.assert_not_called()
+        self.assertFalse(meta.get("llm_enabled"))
+        self.assertEqual(len(result), 1)
+        self.assertNotIn("llm_analysis", result[0])
+
+    @patch("src.config.get_llm_config")
+    @patch("src.llm_client.enhance_news_correlation")
+    @patch("src.providers.news_aggregator.aggregate_news")
     def test_llm_enhance_failure_falls_back_gracefully(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
@@ -146,7 +168,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": True}
+        mock_llm_cfg.return_value = {"llm_news_analysis": True, "api_key": "sk-test"}
         mock_enhance.side_effect = Exception("LLM 服务异常")
 
         holdings = [
