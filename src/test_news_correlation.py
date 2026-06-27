@@ -300,5 +300,201 @@ class TestWriteNewsSheet(unittest.TestCase):
         self.assertIsNone(col7)
 
 
+# ============================================================
+#  关键词富化单元测试
+# ============================================================
+
+
+class TestBuildKeywordLookup(unittest.TestCase):
+    """_build_keyword_lookup 正向查找表构建测试。"""
+
+    def test_holding_name_and_code(self):
+        """持仓名称和代码 → lookup 中包含两条记录。"""
+        holdings = [
+            Holding("证券", "长江电力", "600900", 100, 50.0),
+        ]
+        lookup = nc._build_keyword_lookup(holdings)
+        self.assertIn("600900", lookup)
+        self.assertEqual(lookup["600900"]["type"], "holding")
+        self.assertEqual(lookup["600900"]["name"], "长江电力")
+        # 中文名称片段
+        self.assertIn("长江", lookup)
+        self.assertEqual(lookup["长江"]["type"], "holding")
+
+    def test_penetration_asset(self):
+        """穿透资产 → lookup 包含穿透资产条目。"""
+        holdings: list = []
+        penetrated = [
+            {"name": "腾讯控股", "codes": ["00700"]},
+        ]
+        lookup = nc._build_keyword_lookup(holdings, penetrated)
+        self.assertIn("00700", lookup)
+        self.assertEqual(lookup["00700"]["type"], "penetration")
+        self.assertIn("腾讯", lookup)
+        self.assertEqual(lookup["腾讯"]["type"], "penetration")
+
+    def test_holding_overrides_penetration(self):
+        """同一关键词同时匹配持仓和穿透 → 持仓优先。"""
+        holdings = [
+            Holding("证券", "腾讯控股", "00700", 100, 50.0),
+        ]
+        penetrated = [
+            {"name": "腾讯控股", "codes": ["00700"]},
+        ]
+        lookup = nc._build_keyword_lookup(holdings, penetrated)
+        self.assertEqual(lookup["00700"]["type"], "holding")
+
+    def test_empty_holdings(self):
+        """空持仓 → 返回空字典。"""
+        self.assertEqual(nc._build_keyword_lookup([]), {})
+
+
+class TestEnrichKeywordsForItem(unittest.TestCase):
+    """_enrich_keywords_for_item 富化逻辑测试。"""
+
+    def setUp(self):
+        self.lookup = nc._build_keyword_lookup([
+            Holding("证券", "长江电力", "600900", 100, 50.0),
+        ], [
+            {"name": "腾讯控股", "codes": ["00700"]},
+        ])
+
+    def test_holding_match(self):
+        """关键词匹配持仓名称 → display = "名称(代码)", type = holding。"""
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["长江"]}, self.lookup,
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["display"], "长江电力(600900)")
+        self.assertEqual(result[0]["type"], "holding")
+
+    def test_holding_code_match(self):
+        """关键词匹配持仓代码 → 与名称去重后合并。"""
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["600900", "长江"]}, self.lookup,
+        )
+        self.assertEqual(len(result), 1)  # 去重
+        self.assertEqual(result[0]["type"], "holding")
+
+    def test_penetration_match(self):
+        """关键词匹配穿透资产 → display = "名称[穿透]", type = penetration。"""
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["00700"]}, self.lookup,
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["display"], "腾讯控股[穿透]")
+        self.assertEqual(result[0]["type"], "penetration")
+
+    def test_industry_match(self):
+        """关键词未匹配持仓/穿透 → type = industry。"""
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["电力行业"]}, self.lookup,
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["display"], "电力行业")
+        self.assertEqual(result[0]["type"], "industry")
+
+    def test_mixed_types_sorted(self):
+        """混合关键词 → 排序: holding → penetration → industry。"""
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["长江", "00700", "行业词汇"]}, self.lookup,
+        )
+        self.assertGreaterEqual(len(result), 3)
+        types = [r["type"] for r in result]
+        self.assertEqual(types[0], "holding")
+        self.assertEqual(types[1], "penetration")
+        # industry 在最后
+        self.assertEqual(types[-1], "industry")
+
+    def test_empty_keywords_returns_empty_list(self):
+        """空 matched_keywords → []。"""
+        self.assertEqual(nc._enrich_keywords_for_item({}, self.lookup), [])
+        self.assertEqual(
+            nc._enrich_keywords_for_item({"matched_keywords": []}, self.lookup), [],
+        )
+
+
+class TestFormatEnrichedKeywords(unittest.TestCase):
+    """_format_enriched_keywords 格式化测试。"""
+
+    def test_single_item(self):
+        """单条 → 直接返回 display 字符串。"""
+        result = nc._format_enriched_keywords([
+            {"display": "长江电力(600900)", "type": "holding"},
+        ])
+        self.assertEqual(result, "长江电力(600900)")
+
+    def test_multiple_items(self):
+        """多条 → 逗号分隔。"""
+        result = nc._format_enriched_keywords([
+            {"display": "长江电力(600900)", "type": "holding"},
+            {"display": "电力行业", "type": "industry"},
+        ])
+        self.assertEqual(result, "长江电力(600900), 电力行业")
+
+    def test_empty_list(self):
+        """空列表 → ""。"""
+        self.assertEqual(nc._format_enriched_keywords([]), "")
+
+
+# ============================================================
+#  write_news_sheet 格式增强测试
+# ============================================================
+
+
+class TestWriteNewsSheetFormatting(unittest.TestCase):
+    """write_news_sheet 的 wrap_text / column_width 断言。"""
+
+    def setUp(self) -> None:
+        from openpyxl import Workbook
+        self.wb = Workbook()
+        self.ws = self.wb.active
+        self.data = [
+            {"title": "测试新闻标题", "intro": "这是一段较长的新闻摘要内容用于测试。",
+             "url": "http://a.com", "ctime": "2026-06-28", "media_name": "新浪",
+             "matched_keywords": ["长江电力"],
+             "enriched_keywords": [{"display": "长江电力(600900)", "type": "holding"}]},
+        ]
+
+    def test_column_b_width_after_auto_width(self):
+        """B 列宽度 = 40（覆盖 auto_width 的 max_width=30）。"""
+        nc.write_news_sheet(self.ws, self.data)
+        self.assertEqual(self.ws.column_dimensions["B"].width, 40)
+
+    def test_column_c_width_after_auto_width(self):
+        """C 列宽度 = 50。"""
+        nc.write_news_sheet(self.ws, self.data)
+        self.assertEqual(self.ws.column_dimensions["C"].width, 50)
+
+    def test_data_row_b_alignment_wrap_text(self):
+        """B 列数据行 alignment 包含 wrap_text。"""
+        nc.write_news_sheet(self.ws, self.data)
+        cell = self.ws.cell(row=3, column=2)
+        self.assertTrue(cell.alignment.wrap_text)
+        self.assertEqual(cell.alignment.horizontal, "left")
+
+    def test_data_row_c_alignment_wrap_text(self):
+        """C 列数据行 alignment 包含 wrap_text。"""
+        nc.write_news_sheet(self.ws, self.data)
+        cell = self.ws.cell(row=3, column=3)
+        self.assertTrue(cell.alignment.wrap_text)
+        self.assertEqual(cell.alignment.horizontal, "left")
+
+    def test_empty_data_does_not_set_alignment(self):
+        """空数据 → B/C alignment 不会被异常撑爆。"""
+        from openpyxl import Workbook
+        ws2 = Workbook().active
+        try:
+            nc.write_news_sheet(ws2, [])
+        except Exception as e:
+            self.fail(f"空数据写入 failed: {e}")
+
+    def test_enriched_keywords_in_excel(self):
+        """enriched_keywords 存在 → excel 关键词列显示富化文本。"""
+        nc.write_news_sheet(self.ws, self.data)
+        cell_val = self.ws.cell(row=3, column=6).value
+        self.assertIn("长江电力(600900)", cell_val)
+
+
 if __name__ == "__main__":
     unittest.main()

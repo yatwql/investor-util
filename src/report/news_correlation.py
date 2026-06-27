@@ -13,8 +13,11 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, List, Optional
 
+from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.models import Holding
@@ -29,9 +32,149 @@ from src.report.excel_writer import (
 logger = logging.getLogger("invest")
 
 _NCOLS = 6
-_BASE_HEADERS = [
-    "序号", "新闻标题", "摘要", "来源", "发布时间", "关联关键词",
-]
+_BASE_HEADERS = ["序号", "新闻标题", "摘要", "来源", "发布时间", "关联关键词"]
+
+# ── 关键词富化 ────────────────────────────────────────────────
+
+
+def _build_keyword_lookup(
+    holdings: List[Holding],
+    penetrated_assets: Optional[List[dict]] = None,
+) -> dict[str, dict]:
+    """构建关键词→来源正向查找表。
+
+    对每条持仓的名称片段和代码、穿透资产的名称和代码建立索引，
+    用于将 matched_keywords 还原为具体的持仓/穿透/行业标签。
+
+    Returns:
+        {keyword: {"type": "holding"|"penetration", "name": str, "code": str}}
+        同一关键词若同时匹配持仓和穿透，持仓优先（先到先得）。
+    """
+    lookup: dict[str, dict] = {}
+
+    _suffixes = [
+        "ETF", "联接", "A", "C", "(QDII)", "基金", "混合",
+        "指数", "开放", "式", "发起", "LOF",
+    ]
+    for h in holdings:
+        code = h.code.strip()
+        name = h.name.strip()
+
+        if code and code not in lookup:
+            lookup[code] = {"type": "holding", "name": name, "code": code}
+
+        clean = name
+        for suffix in _suffixes:
+            clean = clean.replace(suffix, "")
+        terms = re.findall(r"[一-鿿]{2,}", clean)
+        # 从多字词中额外提取双字窗口（如"长江电力"→"长江""电力"）
+        _extra: set[str] = set()
+        for t in terms:
+            if len(t) > 2:
+                for i in range(len(t) - 1):
+                    _extra.add(t[i:i + 2])
+        terms = list(set(terms) | _extra)
+        for t in terms:
+            if t not in lookup:
+                lookup[t] = {"type": "holding", "name": name, "code": code}
+
+        if "ETF" in name:
+            core = name.replace("ETF", "").strip()
+            core_terms = re.findall(r"[一-鿿]{2,}", core)
+            for t in core_terms:
+                if t not in lookup:
+                    lookup[t] = {"type": "holding", "name": name, "code": code}
+
+    if penetrated_assets:
+        for asset in penetrated_assets:
+            asset_name = (asset.get("name") or "").strip()
+            asset_codes = asset.get("codes") or []
+
+            for ac in asset_codes:
+                ac_stripped = ac.strip()
+                if ac_stripped and ac_stripped not in lookup:
+                    lookup[ac_stripped] = {
+                        "type": "penetration", "name": asset_name, "code": ac_stripped,
+                    }
+
+            if asset_name:
+                clean_name = asset_name
+                for suffix in _suffixes:
+                    clean_name = clean_name.replace(suffix, "")
+                terms = re.findall(r"[一-鿿]{2,}", clean_name)
+                _extra_pen: set[str] = set()
+                for t in terms:
+                    if len(t) > 2:
+                        for i in range(len(t) - 1):
+                            _extra_pen.add(t[i:i + 2])
+                terms = list(set(terms) | _extra_pen)
+                for t in terms:
+                    if t not in lookup:
+                        lookup[t] = {
+                            "type": "penetration", "name": asset_name, "code": t,
+                        }
+
+    return lookup
+
+
+def _enrich_keywords_for_item(
+    item: dict[str, Any],
+    keyword_lookup: dict[str, dict],
+) -> list[dict]:
+    """将单条新闻的 matched_keywords 富化为 enriched_keywords。
+
+    返回列表：
+        [{"display": "长江电力(600900)", "type": "holding"}, ...]
+
+    去重规则：同一持仓只出现一次，同一穿透资产同理。
+    """
+    matched = item.get("matched_keywords", [])
+    if not matched:
+        return []
+
+    seen: set[tuple[str, str]] = set()
+    enriched: list[dict] = []
+
+    for kw in matched:
+        entry = keyword_lookup.get(kw)
+        if entry and entry["type"] == "holding":
+            dedup_key = entry["code"]
+            if ("holding", dedup_key) not in seen:
+                seen.add(("holding", dedup_key))
+                enriched.append({
+                    "display": f"{entry['name']}({entry['code']})",
+                    "type": "holding",
+                })
+        elif entry and entry["type"] == "penetration":
+            dedup_key = entry.get("code", entry["name"])
+            if ("penetration", dedup_key) not in seen:
+                seen.add(("penetration", dedup_key))
+                enriched.append({
+                    "display": f"{entry['name']}[穿透]",
+                    "type": "penetration",
+                })
+        else:
+            if ("industry", kw) not in seen:
+                seen.add(("industry", kw))
+                enriched.append({
+                    "display": kw,
+                    "type": "industry",
+                })
+
+    type_order = {"holding": 0, "penetration": 1, "industry": 2}
+    enriched.sort(key=lambda x: type_order.get(x["type"], 99))
+
+    return enriched
+
+
+def _format_enriched_keywords(enriched: list[dict]) -> str:
+    """将 enriched_keywords 列表格式化为单行显示字符串。"""
+    if not enriched:
+        return ""
+    return ", ".join(item["display"] for item in enriched)
+
+
+# ── 核心函数 ──────────────────────────────────────────────────
 
 
 def build_news_data(
@@ -107,6 +250,15 @@ def build_news_data(
         except Exception as e:
             logger.warning("LLM 新闻关联分析出错: %s", e)
 
+    # ── 关键词富化（标注每个关键词的来源） ─────────────────
+    _lookup = _build_keyword_lookup(holdings, penetrated_assets)
+    for item in news_items:
+        enriched = _enrich_keywords_for_item(item, _lookup)
+        if enriched:
+            item["enriched_keywords"] = enriched
+        else:
+            item["enriched_keywords"] = []
+
     return news_items, meta
 
 
@@ -145,8 +297,14 @@ def write_news_sheet(
         auto_width(ws)
         return
 
+    wrap_left = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
     for idx, item in enumerate(news_data, 1):
-        keywords_str = ", ".join(item.get("matched_keywords", []))
+        enriched = item.get("enriched_keywords", [])
+        if enriched:
+            keywords_str = _format_enriched_keywords(enriched)
+        else:
+            keywords_str = ", ".join(item.get("matched_keywords", []))
 
         vals: list = [
             idx,
@@ -159,6 +317,8 @@ def write_news_sheet(
         if has_llm:
             vals.append(item.get("llm_analysis", ""))
         write_data_row(ws, row, vals)
+        ws.cell(row=row, column=2).alignment = wrap_left
+        ws.cell(row=row, column=3).alignment = wrap_left
         row += 1
 
     # 底部说明
@@ -200,5 +360,11 @@ def write_news_sheet(
 
     freeze_header(ws, 2)
     auto_width(ws)
+    # 覆盖新闻标题和摘录列宽（auto_width 的 max_width=30 偏窄）
+    ws.column_dimensions["B"].width = 40
+    ws.column_dimensions["C"].width = 50
+    if has_llm:
+        llm_col = _NCOLS + 1
+        ws.column_dimensions[get_column_letter(llm_col)].width = 30
     llm_info = f"，LLM 分析 {sum(1 for n in news_data if n.get('llm_analysis'))} 条" if has_llm else ""
     logger.info("新闻关联分析页签写入完成%s，共 %d 条", llm_info, len(news_data))

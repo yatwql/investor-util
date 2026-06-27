@@ -65,6 +65,9 @@
         .placeholder-note { background: #fafbfc; border: 1px dashed #d0d5dd; border-radius: 6px; }
 
         .source-tag { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; }
+        .source-tag-holding { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #1a56db; }
+        .source-tag-penetration { display: inline-block; background: #f0e8fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #7c3aed; }
+        .source-tag-industry { display: inline-block; background: #f3f4f6; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #6b7280; }
 
         @media (max-width: 768px) {
             .container { padding: 10px; }
@@ -462,9 +465,15 @@
                         <td>{{ item.media_name }}</td>
                         <td style="font-size: 12px;">{{ item.ctime }}</td>
                         <td class="text-left" style="font-size: 12px;">
-                            {% for kw in item.matched_keywords %}
-                            <span class="source-tag">{{ kw }}</span>
-                            {% endfor %}
+                            {% if item.enriched_keywords and item.enriched_keywords|length > 0 %}
+                                {% for ekw in item.enriched_keywords %}
+                                <span class="source-tag-{{ ekw.type }}">{{ ekw.display }}</span>
+                                {% endfor %}
+                            {% else %}
+                                {% for kw in item.matched_keywords %}
+                                <span class="source-tag">{{ kw }}</span>
+                                {% endfor %}
+                            {% endif %}
                         </td>
                         {% if has_llm_analysis %}
                         <td class="text-left" style="font-size: 12px; max-width: 200px;">
