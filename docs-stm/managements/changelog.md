@@ -4,7 +4,40 @@
 
 ---
 
-## [0.2.10] - 2026-06-28
+## [0.2.11] - 2026-06-28
+
+### Added
+- 新增 `src/providers/eastmoney_industry.py`：东方财富 push2 API 行业分类/概念板块 provider
+- 行业/概念自动获取：`fetch_industry_and_concepts()` 从 `push2.eastmoney.com` 获取三级行业名称、行业ID、概念板块列表和概念ID
+- 缓存集成：新增 `industry` 缓存类型（7 天 TTL），文件名 `industry_{code}.json`
+- 新闻关键词扩展：`build_news_data()` 自动获取持仓+穿透资产的行业名称和概念板块，追加到关键词列表提高匹配率
+- 关键词富化新增"概念"类型（橙标）：行业名称和概念板块显示为 `XXX[概念]`，排序优先级位于穿透和行业之间
+- 穿透模块板块分类增强：`compute_penetration_top10()` 调用 `batch_fetch_industry_data()` 补充 API 行业数据，优先覆盖板块列
+- HTML 模板新增 `.source-tag-concept` CSS 类：琥珀色背景 + 深橙色文字
+- 菜单 [1] 更新基础类缓存：新增 `industry_*` 前缀清除
+- 新增 `src/test_eastmoney_industry.py`（10 项测试）
+
+### Changed
+- 数据源表：行业分类/概念板块从"规划中"更新为"已实现"
+- NEWS_COLS 模块 6 运行流程：在 `aggregate_news()` 前先获取行业/概念数据并扩展关键词
+- `check_and_refresh_caches()` 新增 `industry_*` 缓存自动清理（持仓变更时）
+- `_check_and_warm_for_new_assets()` 新增新增资产行业分类自动预热（`batch_fetch_industry_data`）
+- `_build_keyword_lookup()`：新增 `industry_data` 参数处理行业和概念板块关键词
+- `_enrich_keywords_for_item()`：新增 `concept` 类型处理逻辑
+- type_order 扩展：holding(0) → penetration(1) → concept(2) → industry(3)
+
+### Docs
+- requirements.md：数据源表、缓存文件清单、TTL 表、菜单 [1] 范围、模块 4 板块分类增强、模块 6 关键词来源同步
+- README.md：版本 v0.2.11、数据源表、缓存文件清单、菜单表、模块 6 概念类型、缓存覆盖矩阵（菜单 [1]/[2] 矩阵表）
+- testplan.md：新增 v0.2.11 测试重点
+- changelog.md：本版本记录
+- review-findings.md：新增审查记录
+- technical.md：新增技术文档
+
+### Tests
+- 新增 `src/test_eastmoney_industry.py`：10 项测试覆盖正常返回（含/不含概念）、data 为空、响应为空、超时异常、基金代码
+- `src/test_news_correlation.py`：新增 3 项测试覆盖概念类型 lookup 构建、概念类型优先于行业、混合类型排序
+- 全量 607 passed, 30 subtests passed
 
 ### Added
 - 关键词富化：`_build_keyword_lookup()` / `_enrich_keywords_for_item()` / `_format_enriched_keywords()` 三个新函数，自动标注每个关联关键词的来源类型（持仓/穿透/行业）

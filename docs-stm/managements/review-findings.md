@@ -34,6 +34,8 @@
 | 2026-06-28 | v0.2.9 LLM 新闻关联分析 + 缓存清理补全 + HTML 模板更新 | 实现正确性审查 | 自审 | ✅ 已通过 |
 | 2026-06-28 | v0.2.10 关键词富化（持仓/穿透/行业三种类型）+ Excel 格式优化 + HTML 模板同步 | 实现正确性审查 | 自审 | ✅ 已通过 |
 | 2026-06-28 | 六文档全量第六次审计（requirements.md/README.md/changelog.md/testplan.md/review-findings.md/CLAUDE.md） | 一致性审查 + 去冗余 | 自审 | ✅ 已通过 |
+| 2026-06-28 | v0.2.11 东方财富行业分类/概念板块 Provider + 新闻关键词扩展 + 穿透板块增强 | 实现正确性审查 | 自审 | ✅ 已通过 |
+| 2026-06-28 | 全量文档第七次审计：requirements.md/README.md/changelog.md/testplan.md/review-findings.md/technical.md | 一致性审查 | 自审 | ✅ 已通过 |
 
 ---
 

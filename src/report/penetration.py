@@ -472,6 +472,24 @@ def compute_penetration_top10(
         merged[norm_name]["mv"] += stock_mv
         merged[norm_name]["funds"].append("直接持有")
 
+    # ── 3.5) 用 API 行业数据补充板块分类 ───────────────────
+    try:
+        _all_pen_codes: list[str] = []
+        for _info in merged.values():
+            _all_pen_codes.extend(_info.get("codes") or [])
+        if _all_pen_codes:
+            from src.fetcher import batch_fetch_industry_data as _batch_ind
+            _ind_data = _batch_ind(list(set(_all_pen_codes)))
+            if _ind_data:
+                for _info in merged.values():
+                    for _code in _info.get("codes") or []:
+                        if _code in _ind_data and _ind_data[_code].get("industry"):
+                            _info["sector_api"] = _ind_data[_code]["industry"]
+                            _info["sector"] = _ind_data[_code]["industry"]
+                            break
+    except Exception as _e:
+        logger.debug("穿透板块 API 补充失败（非关键）: %s", _e)
+
     # ── 4) 生成返回数据 ──────────────────────────────────
     total_mv = sum(v["mv"] for v in merged.values())
     sorted_items = sorted(merged.items(), key=lambda x: x[1]["mv"], reverse=True)

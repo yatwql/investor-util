@@ -348,6 +348,30 @@ class TestBuildKeywordLookup(unittest.TestCase):
         """空持仓 → 返回空字典。"""
         self.assertEqual(nc._build_keyword_lookup([]), {})
 
+    def test_industry_data_adds_concepts(self):
+        """industry_data → lookup 包含概念类型条目。"""
+        industry_data = {
+            "600900": {"industry": "电力设备", "concepts": ["CPO光模块", "人工智能"]},
+        }
+        lookup = nc._build_keyword_lookup([], industry_data=industry_data)
+        self.assertIn("电力设备", lookup)
+        self.assertEqual(lookup["电力设备"]["type"], "concept")
+        self.assertEqual(lookup["电力设备"]["source"], "industry")
+        self.assertIn("CPO光模块", lookup)
+        self.assertEqual(lookup["CPO光模块"]["type"], "concept")
+        self.assertEqual(lookup["CPO光模块"]["source"], "concept")
+
+    def test_holding_overrides_industry(self):
+        """同一关键词同时匹配持仓和行业 → 持仓优先。"""
+        holdings = [Holding("证券", "电力设备", "000xxx", 100, 10.0)]
+        industry_data = {
+            "600900": {"industry": "电力设备", "concepts": []},
+        }
+        lookup = nc._build_keyword_lookup(holdings, industry_data=industry_data)
+        # "电力设备" 来自持仓名称 "电力设备"，应该保留为 holding 类型
+        self.assertIn("电力设备", lookup)
+        self.assertEqual(lookup["电力设备"]["type"], "holding")
+
 
 class TestEnrichKeywordsForItem(unittest.TestCase):
     """_enrich_keywords_for_item 富化逻辑测试。"""
@@ -412,6 +436,43 @@ class TestEnrichKeywordsForItem(unittest.TestCase):
         self.assertEqual(
             nc._enrich_keywords_for_item({"matched_keywords": []}, self.lookup), [],
         )
+
+    def test_concept_type_enriched(self):
+        """concept 类型关键词 → 显示为 XXX[概念] 格式。"""
+        concept_lookup = {"CPO光模块": {"type": "concept", "name": "CPO光模块", "code": "600900", "source": "concept"}}
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["CPO光模块"]}, concept_lookup,
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["display"], "CPO光模块[概念]")
+        self.assertEqual(result[0]["type"], "concept")
+
+    def test_industry_name_as_concept(self):
+        """行业名称作为 concept 类型 → 显示为 行业名[概念]。"""
+        concept_lookup = {"电力设备": {"type": "concept", "name": "电力设备", "code": "600900", "source": "industry"}}
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["电力设备"]}, concept_lookup,
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["display"], "电力设备[概念]")
+        self.assertEqual(result[0]["type"], "concept")
+
+    def test_mixed_types_with_concept_sorted(self):
+        """含 concept 的混合关键词 → 排序: holding → penetration → concept → industry。"""
+        concept_lookup = {
+            "长江": {"type": "holding", "name": "长江电力", "code": "600900"},
+            "00700": {"type": "penetration", "name": "腾讯控股", "code": "00700"},
+            "CPO光模块": {"type": "concept", "name": "CPO光模块", "code": "600900", "source": "concept"},
+            "普通词汇": {},
+        }
+        result = nc._enrich_keywords_for_item(
+            {"matched_keywords": ["长江", "00700", "CPO光模块", "普通词汇"]}, concept_lookup,
+        )
+        types = [r["type"] for r in result]
+        self.assertEqual(types[0], "holding")
+        self.assertEqual(types[1], "penetration")
+        self.assertEqual(types[2], "concept")
+        self.assertEqual(types[3], "industry")
 
 
 class TestFormatEnrichedKeywords(unittest.TestCase):

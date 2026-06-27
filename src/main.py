@@ -278,7 +278,12 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
         holdings: 当前持仓列表
     """
     from src.cache import check_and_refresh_caches
-    from src.fetcher import fetch_fund_holdings, fetch_fund_rankings, fetch_market_data
+    from src.fetcher import (
+        batch_fetch_industry_data,
+        fetch_fund_holdings,
+        fetch_fund_rankings,
+        fetch_market_data,
+    )
     from src.report.fund_performance import _is_fund
 
     new_codes = check_and_refresh_caches(holdings)
@@ -317,6 +322,17 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
                 print(f" {len(holds['holdings'])} 条")
             else:
                 print(" 无数据")
+
+        # → industry_{code}.json（新增资产的行业分类）
+        print(f"  [..]   新增 {name} ({code}) — 获取行业分类...", end="")
+        _ind_map = batch_fetch_industry_data([code])
+        if _ind_map and code in _ind_map:
+            _idata = _ind_map[code]
+            ind_name = _idata.get("industry") or "未知"
+            conc_count = len(_idata.get("concepts", []))
+            print(f" {ind_name} ({conc_count} 个概念)")
+        else:
+            print(" 无数据")
 
     print(f"  [OK] 新增资产缓存预热完成")
 
@@ -888,7 +904,8 @@ def _cmd_update_basic_cache() -> None:
         clear("fund_benchmarks")
         clear_by_prefix("news_")
         clear_by_prefix("llm_news_corr")
-        print("  [OK] 旧缓存已清除（含 news_ 新闻缓存 + llm_news_corr LLM 新闻关联分析缓存）")
+        clear_by_prefix("industry_")
+        print("  [OK] 旧缓存已清除（含 news_ 新闻缓存 + llm_news_corr LLM 新闻关联分析缓存 + industry_ 行业分类缓存）")
 
         # 2) 获取基金业绩排名 + 持仓 + 基准
         print()

@@ -40,14 +40,23 @@ _BASE_HEADERS = ["序号", "新闻标题", "摘要", "来源", "发布时间", "
 def _build_keyword_lookup(
     holdings: List[Holding],
     penetrated_assets: Optional[List[dict]] = None,
+    industry_data: Optional[dict[str, dict]] = None,
 ) -> dict[str, dict]:
     """构建关键词→来源正向查找表。
 
     对每条持仓的名称片段和代码、穿透资产的名称和代码建立索引，
-    用于将 matched_keywords 还原为具体的持仓/穿透/行业标签。
+    可选加入行业分类和概念板块关键词（type="concept" 类型），
+    用于将 matched_keywords 还原为具体的持仓/穿透/概念/行业标签。
+
+    Args:
+        holdings: 持仓列表
+        penetrated_assets: 穿透 TOP10 资产列表
+        industry_data: 行业/概念数据字典 {code: {industry, concepts, ...}}
+            industry_data 由 fetcher.batch_fetch_industry_data 返回，
+            每项含 industry（行业名称）和 concepts（概念板块名称列表）。
 
     Returns:
-        {keyword: {"type": "holding"|"penetration", "name": str, "code": str}}
+        {keyword: {"type": "holding"|"penetration"|"concept", "name": str, "code": str}}
         同一关键词若同时匹配持仓和穿透，持仓优先（先到先得）。
     """
     lookup: dict[str, dict] = {}
@@ -114,6 +123,25 @@ def _build_keyword_lookup(
                             "type": "penetration", "name": asset_name, "code": t,
                         }
 
+        # ── 3) 从行业分类/概念板块数据提取 ──
+    if industry_data:
+        for code, idata in industry_data.items():
+            # 行业名称（如 "电力设备"）
+            industry_name = (idata.get("industry") or "").strip()
+            if industry_name and industry_name not in lookup:
+                lookup[industry_name] = {
+                    "type": "concept", "name": industry_name,
+                    "code": code, "source": "industry",
+                }
+            # 概念板块名称（如 "CPO光模块"）
+            for cname in idata.get("concepts", []):
+                cname = cname.strip()
+                if cname and cname not in lookup:
+                    lookup[cname] = {
+                        "type": "concept", "name": cname,
+                        "code": code, "source": "concept",
+                    }
+
     return lookup
 
 
@@ -153,6 +181,14 @@ def _enrich_keywords_for_item(
                     "display": f"{entry['name']}[穿透]",
                     "type": "penetration",
                 })
+        elif entry and entry["type"] == "concept":
+            dedup_key = entry.get("name", kw)
+            if ("concept", dedup_key) not in seen:
+                seen.add(("concept", dedup_key))
+                enriched.append({
+                    "display": f"{entry['name']}[概念]",
+                    "type": "concept",
+                })
         else:
             if ("industry", kw) not in seen:
                 seen.add(("industry", kw))
@@ -161,7 +197,7 @@ def _enrich_keywords_for_item(
                     "type": "industry",
                 })
 
-    type_order = {"holding": 0, "penetration": 1, "industry": 2}
+    type_order = {"holding": 0, "penetration": 1, "concept": 2, "industry": 3}
     enriched.sort(key=lambda x: type_order.get(x["type"], 99))
 
     return enriched
@@ -216,6 +252,42 @@ def build_news_data(
     keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
     logger.info("新闻关联关键词（含穿透）: %s", keywords)
 
+    # ── 行业/概念关键词扩展 ──────────────────────────────────────
+    _industry_data: dict[str, dict] = {}
+    try:
+        # 收集所有唯一代码（持仓 + 穿透资产）
+        _all_codes: set[str] = set()
+        for h in holdings:
+            if h.code and h.code.strip():
+                _all_codes.add(h.code.strip())
+        if penetrated_assets:
+            for _asset in penetrated_assets:
+                for _ac in (_asset.get("codes") or []):
+                    if _ac and _ac.strip():
+                        _all_codes.add(_ac.strip())
+
+        if _all_codes:
+            from src.fetcher import batch_fetch_industry_data as _batch_industry
+            _industry_data = _batch_industry(list(_all_codes))
+            if _industry_data:
+                # 将行业名称和概念名称追加为关键词，提高匹配率
+                _extra_kw: list[str] = []
+                for _idata in _industry_data.values():
+                    if _idata.get("industry"):
+                        _extra_kw.append(_idata["industry"])
+                    for _cname in _idata.get("concepts", []):
+                        if _cname.strip():
+                            _extra_kw.append(_cname.strip())
+                if _extra_kw:
+                    _all_kw = list(set(keywords + _extra_kw))
+                    _all_kw.sort(key=lambda x: (-len(x), x))
+                    keywords = _all_kw
+                    logger.info("行业/概念关键词扩展: 新增 %d 个 → 共 %d 个",
+                                len(_extra_kw), len(keywords))
+    except Exception as e:
+        logger.warning("行业/概念数据获取失败（非关键错误，继续）: %s", e)
+        _industry_data = {}
+
     news_items = aggregate_news(keywords, top_n=top_n)
 
     # 初始化元数据
@@ -251,7 +323,7 @@ def build_news_data(
             logger.warning("LLM 新闻关联分析出错: %s", e)
 
     # ── 关键词富化（标注每个关键词的来源） ─────────────────
-    _lookup = _build_keyword_lookup(holdings, penetrated_assets)
+    _lookup = _build_keyword_lookup(holdings, penetrated_assets, industry_data=_industry_data)
     for item in news_items:
         enriched = _enrich_keywords_for_item(item, _lookup)
         if enriched:

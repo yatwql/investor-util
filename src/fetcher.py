@@ -26,7 +26,7 @@ from typing import Any, Callable
 
 from src.cache import CACHE_DAILY, CACHE_WEEKLY, get as cache_get, set as cache_set
 from src.config import get_config
-from src.providers import eastmoney, sina, tencent, tiantian
+from src.providers import eastmoney, eastmoney_industry, sina, tencent, tiantian
 
 logger = logging.getLogger("invest")
 
@@ -618,3 +618,77 @@ def fetch_fund_benchmark(code: str) -> str:
 
     cache_set(cache_key, table)
     return table.get(code, "--")
+
+
+# ═══════════════════════════════════════════════════════════
+#  行业分类 / 概念板块
+# ═══════════════════════════════════════════════════════════
+
+_INDUSTRY_CACHE_PREFIX = "industry_"
+
+_INDUSTRY_PROVIDERS: dict[str, tuple[str, Callable]] = {
+    "eastmoney_industry": ("东方财富行业", eastmoney_industry.fetch_industry_and_concepts),
+}
+
+
+def _industry_transform(raw: dict, source: str) -> dict | None:
+    """东方财富行业原始数据 → 统一行业格式。"""
+    if not raw:
+        return None
+    return {
+        "code": raw.get("code", ""),
+        "industry": raw.get("industry", ""),
+        "industry_id": raw.get("industry_id", ""),
+        "concepts": raw.get("concepts", []),
+        "concept_ids": raw.get("concept_ids", []),
+    }
+
+
+def fetch_industry_data(code: str) -> dict | None:
+    """获取一只证券的行业分类和概念板块归属。
+
+    缓存键: industry_{code}.json
+    缓存 TTL: 7 天（可通过 cache_ttl.industry 配置）
+
+    Provider Chain: 东方财富 push2
+
+    Args:
+        code: 6 位证券代码
+
+    Returns:
+        {code, industry, industry_id, concepts, concept_ids}
+        失败返回 None
+    """
+    return _fetch_with_fallback(
+        "industry",
+        _INDUSTRY_PROVIDERS,
+        _INDUSTRY_CACHE_PREFIX + code.strip(),
+        CACHE_WEEKLY,
+        fn_kwargs={"code": code.strip()},
+        transform=_industry_transform,
+    )
+
+
+def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
+    """批量获取多只证券的行业分类和概念板块归属。
+
+    对一组代码逐个获取行业数据，已缓存的不重复请求。
+    使用单线程串行（行业数据变更频率低，无并发必要）。
+
+    Args:
+        codes: 6 位证券代码列表
+
+    Returns:
+        {code: {code, industry, concepts, ...}, ...}
+    """
+    result: dict[str, dict] = {}
+    for code in codes:
+        code = code.strip()
+        if not code:
+            continue
+        data = fetch_industry_data(code)
+        if data:
+            result[code] = data
+    logger.info("批量行业数据获取完成: 共 %d 个代码, 成功 %d 个",
+                len(codes), len(result))
+    return result
