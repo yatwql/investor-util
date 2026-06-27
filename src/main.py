@@ -503,13 +503,14 @@ def _generate_excel_report(holdings: list, include_news: bool = False, output_di
 
     # 第 6 页（可选）：财经新闻热点
     if include_news:
+        from src.report.news_correlation import write_news_sheet
         penetrated_assets = pen_result.get("top10", []) if pen_result else []
 
         if news_data is not None:
             logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
         else:
             logger.info("正在获取财经新闻（含穿透资产关键词）...")
-            from src.report.news_correlation import build_news_data, write_news_sheet
+            from src.report.news_correlation import build_news_data
             news_data = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
         ws6 = wb.create_sheet()
         write_news_sheet(ws6, news_data)
