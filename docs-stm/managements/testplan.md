@@ -47,6 +47,8 @@
 | 空持仓下菜单 [L] 全系列报告生成 | 跳过 LLM 调用，输出空占位 |
 | cache.set() 写入时目录被删除 | 自动重试，不抛出异常 |
 | config.json/llm.json 配置值异常 | 输出警告，使用代码默认值 |
+| fund_performance.json 中 categories/data 为 JSON null | 自动兜底为空列表，不崩溃 |
+| html_writer.py LLM 内部调用路径（enable_llm=True, llm_content=None） | 传入 dict 类型指数数据，不因 .values() 缺失崩溃 |
 
 ### 1.4 数据正确性验证
 
@@ -85,6 +87,7 @@
 | Iter 3.4 | LLM API 联通性、缓存 24h 生效、API Key 未配置降级占位文本、LLM 输出格式兜底 |
 | Iter 3.5 | LLM 并行生成模块 7+8 同时成功、System Prompt 外部可配置生效、httpx 连接池复用、提示词紧凑化效果 |
 | Iter 3.6 | 多线程并发缓存获取无竞态、新闻 15min 缓存过期、LLM 缓存预检正确跳过线程池、Token 用量正确展示、_SYSTEM_EXPERT 压缩后三阶段格式保持、死代码无残留、配置校验警告正确触发 |
+| Iter 3.7 | html_writer.py 中 a_indices 以 dict 类型传入 generate_all_llm（不因 .values() 崩溃）、fund_performance.py 在 API 返回 JSON null 时 categories/data 自动兜底 |
 
 ---
 

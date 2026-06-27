@@ -123,8 +123,8 @@ def _calc_rating_comment(rating: str, perf_eval: dict | None, benchmark: str) ->
 
     # 如果有超额收益评分，追加说明
     if perf_eval:
-        categories = perf_eval.get("categories", [])
-        scores = perf_eval.get("data", [])
+        categories = perf_eval.get("categories") or []
+        scores = perf_eval.get("data") or []
         # 找到"超额收益"对应的分值
         excess_idx = next((i for i, c in enumerate(categories) if c and ("超额" in c or "超额收益" in c)), -1)
         if excess_idx >= 0 and excess_idx < len(scores):
@@ -158,8 +158,8 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
     if not perf_eval or peer_rating not in _RATING_ORDER:
         return peer_rating
 
-    categories = perf_eval.get("categories", [])
-    scores = perf_eval.get("data", [])
+    categories = perf_eval.get("categories") or []
+    scores = perf_eval.get("data") or []
 
     # 找到"超额收益"在 categories 中的索引
     excess_idx = -1

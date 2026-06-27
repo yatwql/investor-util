@@ -45,6 +45,8 @@
 - `_check_openai_truncation` 返回类型修正：`None` → `bool`
 - cache.set() 目录删除竞态条件：FileNotFoundError 时自动重试
 - `_call_llm` fallback 简化：`max_tokens = max_tokens or 2500`（移除 `llm_config.get("max_tokens", 2500)`）
+- `html_writer.py`：a_indices/us_indices 从 list 改为 dict（fetch_indices() 原始类型），LLM 调用不再因 `.values()` 缺失崩溃；模板渲染使用独立 list 变量
+- `fund_performance.py`：`perf_eval.get("categories")` / `perf_eval.get("data")` 在 API 返回 JSON null 时返回 None，导致 `enumerate(categories)` 和 `len(scores)` 崩溃 — 改用 `or []` 兜底
 
 ### Removed (Dead Code)
 - `src/cache.py`：移除 `exists()` 函数（无生产调用者）

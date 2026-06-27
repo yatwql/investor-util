@@ -188,25 +188,26 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
 
     # ── 4) 市场指数 ─────────────────────────────────────────
     print("  [..] 正在获取市场指数...")
-    a_indices_dict = fetch_indices()
-    us_indices_dict = fetch_us_indices()
+    a_indices: dict = fetch_indices()          # dict[str, dict] — 给 LLM
+    us_indices: dict = fetch_us_indices()      # 同上
 
-    a_indices: List[Dict[str, Any]] = []
+    # 模板渲染需要可迭代序列，从 dict 提取精选字段
+    a_indices_list: List[Dict[str, Any]] = []
     for code in ("sh000001", "sz399001", "sh000300", "sh000688", "sz399006"):
-        idx = a_indices_dict.get(code)
+        idx = a_indices.get(code)
         if idx:
-            a_indices.append({
+            a_indices_list.append({
                 "name": idx.get("name", ""),
                 "price": idx.get("price", 0),
                 "change": idx.get("change", 0),
                 "change_pct": idx.get("change_pct", 0),
             })
 
-    us_indices: List[Dict[str, Any]] = []
+    us_indices_list: List[Dict[str, Any]] = []
     for code in ("gb_dji", "gb_ixic", "gb_inx"):
-        idx = us_indices_dict.get(code)
+        idx = us_indices.get(code)
         if idx:
-            us_indices.append({
+            us_indices_list.append({
                 "name": idx.get("name", ""),
                 "price": idx.get("price", 0),
                 "change": idx.get("change", 0),
@@ -317,8 +318,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         today_profit_rate=today_profit_rate,
         categories=cat_counts,
         update_status=update_status_dict,
-        a_indices=a_indices,
-        us_indices=us_indices,
+        a_indices=a_indices_list,
+        us_indices=us_indices_list,
         accounts=accounts,
         account_totals=account_totals,
         cat_data=cat_data,

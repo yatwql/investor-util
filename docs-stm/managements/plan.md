@@ -468,6 +468,17 @@
 - TUI 各菜单功能正常，响应速度提升显著
 - 新闻/LLM 缓存命中时日志正确显示"缓存命中"
 
+### Iter 3.7 — 类型与空安全审计 ✅ 已完成
+
+**Goal**：全量代码类型一致性审计 + API JSON null 防御性编程。
+
+**Files**：
+- `src/report/html_writer.py` — a_indices/us_indices 从 list 改为 dict，LLM 调用传 dict，模板渲染传 list
+- `src/report/fund_performance.py` — categories/scores `or []` 兜底防 JSON null
+
+**Verification**：
+- `python -m pytest src/ -q` → 489 passed（迭代 3.6 测试数不变，修复未影响现有断言）
+
 ---
 
 ## 系统影响

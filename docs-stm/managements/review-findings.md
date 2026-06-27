@@ -28,6 +28,7 @@
 | 2026-06-27 | LLM 优化：Prompt 压缩 230 字/Token 追踪/并行缓存预检/万亿单位压缩 | 优化审查 | 自审 | ✅ 已通过 |
 | 2026-06-27 | 缓存策略增强：新闻 15min 缓存/mtime 配置缓存/HTML 直存 | 优化审查 | 自审 | ✅ 已通过 |
 | 2026-06-27 | 多文档全量第五次审计 + v0.2.8 文档同步 | 一致性审查 | 自审 | ✅ 已通过 |
+| 2026-06-27 | 全量代码类型与安全审计（html_writer list→dict + fund_performance JSON null） | 代码审查 | 自审 | ✅ 已通过 |
 
 ---
 
@@ -58,6 +59,24 @@
 - **类型**：死代码
 - **描述**：多模块存在已废弃但未清理的函数和 import：cache.exists()、tiantian.fetch_fund_type()、sina_news 3 个死函数、llm_content.write_llm_sheets 12 个冗余参数及 ~60 行死分支、main.py portfolio_items 字典及未使用 import
 - **状态**：✅ 已修复（详见 changelog v0.2.8 Removed 章节）
+- **修复日期**：2026-06-27
+
+### [R-004] html_writer.py a_indices/us_indices 类型不匹配（潜在运行时崩溃）
+
+- **发现日期**：2026-06-27
+- **审查对象**：`src/report/html_writer.py`
+- **类型**：类型不匹配
+- **描述**：`fetch_indices()` 返回 `dict[str, dict[str, Any]]`，但 html_writer.py 在 write_html_report() 中将结果转为 `list[dict]` 传入 `generate_all_llm()`。该函数签名声明参数为 `dict` 并调用 `.values()`，列表无此方法将引发 `AttributeError`。当前路径仅在 `enable_llm=True` 且 `llm_content=None` 时触发（main.py 调用时传入 `llm_content` 走另一分支），属于潜在缺陷。
+- **状态**：✅ 已修复（保留 dict 原始类型传 LLM，模板渲染使用独立 list 变量）
+- **修复日期**：2026-06-27
+
+### [R-005] fund_performance.py 对 API JSON null 值缺少防护
+
+- **发现日期**：2026-06-27
+- **审查对象**：`src/report/fund_performance.py`
+- **类型**：空安全缺陷
+- **描述**：`perf_eval.get("categories", [])` 在 JSON 中存在显式 `null`（如 `{"categories": null}`）时返回 `None` 而非 `[]`，随后 `enumerate(categories)` 引发 `TypeError`。同理 `scores` 在 `len(scores)` 处崩溃。涉及 _calc_rating_comment 和 _adjust_rating_with_benchmark 两处。
+- **状态**：✅ 已修复（`.get()` 后使用 `or []` 兜底确保始终为可迭代对象）
 - **修复日期**：2026-06-27
 
 ---
