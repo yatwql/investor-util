@@ -5,6 +5,9 @@
   2. 东方财富   — 股市/财经综合
   3. 财联社     — 7×24 实时快讯
 
+各新闻源的启用在 config.json 中配置（news_sources 字段），
+代码不硬编码开关状态。
+
 支持从持仓和穿透 TOP10 资产提取关键词，
 多源去重合并后按关键词关联度排序。
 """
@@ -19,27 +22,35 @@ from src.models import Holding
 
 logger = logging.getLogger("invest")
 
-# ── 新闻来源注册 ──────────────────────────────────────────────
+# ── 新闻来源注册（静态元数据，不含开关状态） ─────────────────
 
-_SOURCE_CONFIG: dict[str, dict[str, Any]] = {
-    "sina": {
-        "label": "新浪财经",
-        "enabled": True,
-    },
-    "eastmoney": {
-        "label": "东方财富",
-        "enabled": False,  # API 已返回 302 跳转（2026-06），匿名请求不可用
-    },
-    "cls": {
-        "label": "财联社",
-        "enabled": False,  # API 已要求签名鉴权（errno=10012），匿名请求不可用
-    },
+_SOURCE_LABELS: dict[str, str] = {
+    "sina": "新浪财经",
+    "eastmoney": "东方财富",
+    "cls": "财联社",
+}
+
+# 代码内默认开关（config.json 中 news_sources 未配置时使用的后备值）
+_FALLBACK_ENABLED: dict[str, bool] = {
+    "sina": True,
+    "eastmoney": False,  # API 已返回 302 跳转（2026-06），匿名请求不可用
+    "cls": False,         # API 已要求签名鉴权（errno=10012），匿名请求不可用
 }
 
 
 def get_enabled_sources() -> list[str]:
-    """返回当前启用的新闻来源名称列表。"""
-    return [name for name, cfg in _SOURCE_CONFIG.items() if cfg.get("enabled", True)]
+    """返回当前启用的新闻来源名称列表。
+
+    启停状态从 config.json 的 news_sources 字段读取，
+    未配置时使用 _FALLBACK_ENABLED 后备值。
+    """
+    from src.config import get_config
+    config = get_config()
+    enabled_map: dict[str, bool] = config.get("news_sources") or {}
+    return [
+        name for name in _SOURCE_LABELS
+        if enabled_map.get(name, _FALLBACK_ENABLED.get(name, True))
+    ]
 
 
 # ── 关键词提取（含穿透资产） ──────────────────────────────────
@@ -319,7 +330,7 @@ def aggregate_news(
 
         for future in as_completed(fut_to_src):
             src = fut_to_src[future]
-            label = _SOURCE_CONFIG.get(src, {}).get("label", src)
+            label = _SOURCE_LABELS.get(src, src)
             try:
                 items = future.result()
                 count = 0
@@ -335,8 +346,8 @@ def aggregate_news(
                 src_results[src] = (0, f"失败({e})")
 
     # 输出各源状态汇总
-    status_parts = [f"{_SOURCE_CONFIG.get(s,{}).get('label',s)} {n}条" if st == "OK"
-                    else f"{_SOURCE_CONFIG.get(s,{}).get('label',s)} {st}"
+    status_parts = [f"{_SOURCE_LABELS.get(s, s)} {n}条" if st == "OK"
+                    else f"{_SOURCE_LABELS.get(s, s)} {st}"
                     for s, (n, st) in src_results.items()]
     logger.info("新闻源状态: %s", " | ".join(status_parts))
 

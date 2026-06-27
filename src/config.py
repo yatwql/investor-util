@@ -25,6 +25,11 @@ _DEFAULT_CONFIG = {
     "holdings_filename": "个人投资持仓信息.xlsx",
     "output_dir": "reports",
     "news_top_count": 100,
+    "news_sources": {
+        "sina": True,
+        "eastmoney": False,
+        "cls": False,
+    },
     "preferred_provider": {},
     "cache_ttl": {
         "price": 86400,

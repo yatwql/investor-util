@@ -131,6 +131,11 @@ python src/main.py
   "holdings_filename": "个人投资持仓信息.xlsx",
   "output_dir": "reports",
   "news_top_count": 100,
+  "news_sources": {
+    "sina": true,
+    "eastmoney": false,
+    "cls": false
+  },
   "preferred_provider": {},
   "llm_config_file": "data/config/llm.json",
   "cache_ttl": {
@@ -157,8 +162,19 @@ python src/main.py
 | `holdings_filename` | `个人投资持仓信息.xlsx` | 要读取的持仓文件名 | 菜单 `F` |
 | `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `R` |
 | `news_top_count` | `100` | 财经新闻关联分析输出条目上限 | 手动编辑 |
+| `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 优选数据源（预留字段） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
+
+### news_sources 可调字段
+
+| 子字段 | 默认 | 说明 |
+|--------|------|------|
+| `sina` | `true` | 新浪财经（财经要闻/国内/国际，正常工作） |
+| `eastmoney` | `false` | 东方财富（2026 年 6 月起 API 返回 302 跳转，匿名请求不可用） |
+| `cls` | `false` | 财联社（API 要求签名鉴权，匿名请求不可用） |
+
+> **用法：** 当某个新闻源恢复可用时，将其值改为 `true` 即可启用。
 
 ### cache_ttl 可调参数
 
