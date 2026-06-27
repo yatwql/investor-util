@@ -64,7 +64,6 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     try:
         with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
             resp = client.get(_PUSH2_BASE, params=params, headers=_HEADERS)
-            resp.encoding = "utf-8"
             text = resp.text
     except (httpx.TimeoutException, httpx.RequestError) as e:
         logger.warning("东方财富 push2 请求失败 [%s]: %s", code, e)
@@ -82,21 +81,36 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
         logger.warning("东方财富 push2 返回空数据 [%s]", code)
         return None
 
-    # f128 = 行业名称
-    industry: str = (inner.get("f128") or "").strip()
-    industry_id: str = (inner.get("f127") or "").strip()
-
-    # f141 = 概念板块名称列表（逗号分隔）
-    # f140 = 概念板块 ID 列表（逗号分隔）
-    concepts_raw: str = (inner.get("f141") or "").strip()
-    concept_ids_raw: str = (inner.get("f140") or "").strip()
+    # f141 = 概念板块名称列表（逗号分隔字符串）
+    # f140 = 概念板块 ID 列表（逗号分隔字符串）
+    # 注意：API 可能返回数字（如 0/- 表示无数据），需转为字符串处理
+    concepts_raw = inner.get("f141")
+    concept_ids_raw = inner.get("f140")
 
     concepts: list[str] = []
     concept_ids: list[str] = []
-    if concepts_raw:
-        concepts = [c.strip() for c in concepts_raw.split(",") if c.strip()]
-    if concept_ids_raw:
-        concept_ids = [c.strip() for c in concept_ids_raw.split(",") if c.strip()]
+    if concepts_raw is not None and not isinstance(concepts_raw, (int, float)):
+        concepts_str = str(concepts_raw).strip()
+        if concepts_str and concepts_str != "-":
+            concepts = [c.strip() for c in concepts_str.split(",") if c.strip()]
+    if concept_ids_raw is not None and not isinstance(concept_ids_raw, (int, float)):
+        ids_str = str(concept_ids_raw).strip()
+        if ids_str and ids_str != "-":
+            concept_ids = [c.strip() for c in ids_str.split(",") if c.strip()]
+
+    # f128 = 行业名称（可能为 - 表示无行业数据）
+    industry_raw = inner.get("f128")
+    industry: str = (
+        str(industry_raw).strip()
+        if isinstance(industry_raw, str) and industry_raw.strip() not in ("", "-")
+        else ""
+    )
+    industry_id_raw = inner.get("f127")
+    industry_id: str = (
+        str(industry_id_raw).strip()
+        if isinstance(industry_id_raw, str) and industry_id_raw.strip() not in ("", "-")
+        else ""
+    )
 
     result: dict[str, Any] = {
         "code": code.strip(),
