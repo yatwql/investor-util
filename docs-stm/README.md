@@ -185,7 +185,7 @@ python src/main.py
 | `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `R` |
 | `news_top_count` | `100` | 财经新闻关联分析输出条目上限 | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
-| `preferred_provider` | `{}` | 优选数据源（预留字段） | 手动编辑 |
+| `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个敏感字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
@@ -195,16 +195,40 @@ python src/main.py
 | 子字段 | 默认 | 说明 |
 |--------|------|------|
 | `sina` | `true` | 新浪财经（财经要闻/国内/国际，正常工作） |
-| `eastmoney` | `false` | 东方财富（2026 年 6 月起 API 返回 302 跳转，匿名请求不可用） |
+| `eastmoney` | `true` | 东方财富（np-weblist 快讯接口，req_trace 参数，稳定可用） |
 | `cls` | `false` | 财联社（API 要求签名鉴权，匿名请求不可用） |
 | `wallstreetcn` | `true` | 华尔街见闻（全球财经直播流，JSON API，无需鉴权，推荐开启） |
 | `akshare` | `true` | akshare（财新网要闻 + CCTV 财经新闻，开源封装，推荐开启） |
 
-> **用法：** 当某个新闻源恢复可用时，将其值改为 `true` 即可启用。
+> **用法：** 将值改为 `true` 或 `false` 即可启用/禁用对应新闻源。
+
+### preferred_provider 可调字段
+
+`preferred_provider` 用于手动指定某类数据的首选提供商，将其提到 Provider Chain 第一位。不配置时全部走默认优先级，一个源失败后自动递补备用。
+
+适用场景：某网络环境下特定数据源更稳定、或因 IP 限制某数据源不可用。
+
+| 子字段 | 默认 | 可选值 | 说明 |
+|--------|:----:|--------|------|
+| `price` | — | `tencent`, `eastmoney` | 股票/ETF 实时收盘价首选源 |
+| `index` | — | `tencent`, `sina` | A 股指数首选源 |
+| `us_index` | — | `sina` | 美股指数首选源 |
+| `fund_rank` | — | `tiantian` | 基金业绩排名首选源 |
+| `fund_hold` | — | `tiantian` | 基金持仓穿透首选源 |
+
+示例 — 将行情首选从腾讯改为东方财富：
+
+```json
+{
+  "preferred_provider": {
+    "price": "eastmoney"
+  }
+}
+```
+
+> `preferred_provider` 为空对象 `{}` 时全部使用默认优先级。
 
 ### cache_ttl 可调参数
-
-| 子字段 | 默认 | 指纹 | 说明 |
 |--------|------|:----:|------|
 | `price` | 86400（24h） | — | 股票/基金最新价缓存 |
 | `index` | 86400（24h） | — | 市场指数行情缓存 |
@@ -636,7 +660,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 | 基金业绩排名 | 天天基金 `pingzhongdata/{code}.js`（JS 变量解析） | — |
 | 基金持仓数据 | 天天基金 `fundf10.eastmoney.com` | — |
 | 财经新闻（源1） | 新浪财经 `feed.mix.sina.com.cn` | — |
-| 财经新闻（源2） | 东方财富 `push-api-html.eastmoney.com` | — |
+| 财经新闻（源2） | 东方财富 `np-weblist.eastmoney.com/comm/web/getFastNewsList` | — |
 | 财经新闻（源3） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | — |
 | 财经新闻（源4） | 华尔街见闻 `api-one.wallstcn.com/apiv1/content/lives` | — |
 | 财经新闻（源5） | akshare 封装：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — |
