@@ -494,7 +494,7 @@ class TestParseWorkbook(unittest.TestCase):
         self.assertTrue(any("成本" in msg for msg in log.output))
 
     def test_skip_zero_negative_values(self):
-        """份额或成本 <= 0 -> 跳过并记录警告。"""
+        """份额 <= 0 或成本 < 0 -> 跳过并记录警告；成本为 0 时视为有效（零成本获赠/继承）。"""
         header = ["名称", "代码", "持仓份额", "每份成本"]
         data = [
             ["长江电力", "600900", 0, 50.0],
@@ -505,7 +505,10 @@ class TestParseWorkbook(unittest.TestCase):
         wb = self._make_workbook({"证券账户": (header, data)})
         with self.assertLogs("invest", level="WARNING") as log:
             holdings = reader._parse_workbook(wb)
-        self.assertEqual(len(holdings), 0)
+        # cost_price=0 的行（某基金）应被保留，其余 3 行跳过
+        self.assertEqual(len(holdings), 1)
+        self.assertEqual(holdings[0].name, "某基金")
+        self.assertEqual(holdings[0].cost_price, 0.0)
         self.assertTrue(any("无效数值" in msg for msg in log.output))
 
     def test_mixed_valid_and_invalid(self):

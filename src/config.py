@@ -88,7 +88,11 @@ def get_config() -> dict:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
             merged = dict(_DEFAULT_CONFIG)
-            merged.update(config)
+            # 过滤 null 值：不允许 config.json 中的 null 覆盖默认值
+            for key, val in config.items():
+                if val is None and key in _DEFAULT_CONFIG:
+                    continue
+                merged[key] = val
             _config_cache = merged
             try:
                 _config_mtime = os.path.getmtime(config_path)

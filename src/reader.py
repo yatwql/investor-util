@@ -137,7 +137,7 @@ def _parse_workbook(wb) -> List[Holding]:
             if shares is None or cost_price is None:
                 continue
 
-            if shares <= 0 or cost_price <= 0:
+            if shares <= 0 or cost_price < 0:
                 logger.warning("工作表 '%s' 第 %d 行含无效数值 (份额=%s, 成本=%s), 跳过此行",
                                sheet_name, excel_row, shares, cost_price)
                 continue

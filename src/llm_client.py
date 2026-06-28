@@ -147,7 +147,7 @@ def _get_http_pool() -> httpx.Client:
 # ── 重试配置 ─────────────────────────────────────────────────
 
 _RETRY_MAX = 2  # 最多重试 2 次
-_RETRY_DELAYS = [1.0, 3.0]  # 指数退避：第 1 次等 1s，第 2 次等 3s
+_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]  # 指数退避：第 1~5 次依次等待
 
 
 def _get_cache_ttl_llm(subtype: str = "macro") -> float:
@@ -399,22 +399,22 @@ def _call_claude(
     for attempt in range(max_retries + 1):
         try:
             resp = client.post(url, json=payload, headers=headers, timeout=timeout)
-            if resp.status_code in (429, 503) and attempt < _RETRY_MAX:
+            if resp.status_code in (429, 503) and attempt < max_retries:
                 delay = _RETRY_DELAYS[attempt]
                 logger.warning("Claude API %d (尝试 %d/%d)，%.1fs 后重试...",
-                               resp.status_code, attempt + 1, _RETRY_MAX + 1, delay)
+                               resp.status_code, attempt + 1, max_retries + 1, delay)
                 time.sleep(delay)
                 continue
             resp.raise_for_status()
             data = resp.json()
         except httpx.TimeoutException:
-            if attempt < _RETRY_MAX:
+            if attempt < max_retries:
                 delay = _RETRY_DELAYS[attempt]
                 logger.warning("Claude API 超时 (尝试 %d/%d)，%.1fs 后重试...",
-                               attempt + 1, _RETRY_MAX + 1, delay)
+                               attempt + 1, max_retries + 1, delay)
                 time.sleep(delay)
                 continue
-            logger.warning("Claude API 超时（已重试 %d 次）", _RETRY_MAX)
+            logger.warning("Claude API 超时（已重试 %d 次）", max_retries)
             return (None, None)
         except httpx.RequestError:
             host = _sanitize_endpoint(endpoint)
@@ -489,22 +489,22 @@ def _call_openai(
     for attempt in range(max_retries + 1):
         try:
             resp = client.post(url, json=payload, headers=headers, timeout=timeout)
-            if resp.status_code in (429, 503) and attempt < _RETRY_MAX:
+            if resp.status_code in (429, 503) and attempt < max_retries:
                 delay = _RETRY_DELAYS[attempt]
                 logger.warning("OpenAI API %d (尝试 %d/%d)，%.1fs 后重试...",
-                               resp.status_code, attempt + 1, _RETRY_MAX + 1, delay)
+                               resp.status_code, attempt + 1, max_retries + 1, delay)
                 time.sleep(delay)
                 continue
             resp.raise_for_status()
             data = resp.json()
         except httpx.TimeoutException:
-            if attempt < _RETRY_MAX:
+            if attempt < max_retries:
                 delay = _RETRY_DELAYS[attempt]
                 logger.warning("OpenAI API 超时 (尝试 %d/%d)，%.1fs 后重试...",
-                               attempt + 1, _RETRY_MAX + 1, delay)
+                               attempt + 1, max_retries + 1, delay)
                 time.sleep(delay)
                 continue
-            logger.warning("OpenAI API 超时（已重试 %d 次）", _RETRY_MAX)
+            logger.warning("OpenAI API 超时（已重试 %d 次）", max_retries)
             return (None, None)
         except httpx.RequestError:
             host = _sanitize_endpoint(endpoint)
@@ -743,6 +743,10 @@ def generate_global_macro(
 
     if result:
         html = _markdown_to_html(result)
+        if result and not html.strip():
+            # LLM 返回了空白/控制字符，不缓存空结果
+            logger.warning("全球政经局势分析内容为空，跳过缓存")
+            return (None, False)
         if usage:
             inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
             out = usage.get("output_tokens", usage.get("completion_tokens", 0))

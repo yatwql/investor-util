@@ -33,8 +33,9 @@ def _ensure_reports_dir(output_dir: str) -> None:
         OSError: 目录创建失败
     """
     date_str = datetime.now().strftime("%Y%m%d")
-    os.makedirs(os.path.join(output_dir, date_str), exist_ok=True)
-    # 验证可写
+    date_dir = os.path.join(output_dir, date_str)
+    os.makedirs(date_dir, exist_ok=True)
+    # 验证 output_dir 可写
     test_file = os.path.join(output_dir, ".write_test")
     try:
         open(test_file, "a").close()
@@ -42,6 +43,15 @@ def _ensure_reports_dir(output_dir: str) -> None:
     except (PermissionError, OSError) as e:
         raise PermissionError(
             f"输出目录 '{output_dir}' 无写入权限"
+        ) from e
+    # 验证存档子目录可写
+    archive_test_file = os.path.join(date_dir, ".write_test")
+    try:
+        open(archive_test_file, "a").close()
+        os.remove(archive_test_file)
+    except (PermissionError, OSError) as e:
+        raise PermissionError(
+            f"存档子目录 '{date_dir}' 无写入权限"
         ) from e
 
 

@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
 from src.cache import CACHE_DAILY, CACHE_WEEKLY, get as cache_get, set as cache_set
@@ -331,13 +333,21 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
     """
     indices: dict[str, dict[str, Any]] = {}
 
-    for index_code, index_name in _A_INDICES.items():
+    # 先行收集已缓存的指数
+    uncached_codes: list[str] = []
+    for index_code in _A_INDICES:
         cache_key = _index_cache_key(index_code)
         cached = cache_get(cache_key, CACHE_DAILY)
         if cached is not None:
             indices[index_code] = cached
-            continue
+        else:
+            uncached_codes.append(index_code)
 
+    if not uncached_codes:
+        return indices
+
+    def _fetch_one(index_code: str) -> tuple[str, dict] | None:
+        index_name = _A_INDICES[index_code]
         # Chain: 腾讯主导（新浪备用链路尚未实现 A 股指数接口）
         result = tencent.fetch_price(index_code)
         if result and result.get("price", 0) > 0:
@@ -355,14 +365,22 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
                 "change": change,
                 "change_pct": change_pct,
             }
-            cache_set(cache_key, data)
-            indices[index_code] = data
+            cache_set(_index_cache_key(index_code), data)
+            return index_code, data
         else:
             # 降级：尝试过期缓存
-            stale = cache_get(cache_key, CACHE_WEEKLY)
+            stale = cache_get(_index_cache_key(index_code), CACHE_WEEKLY)
             if stale is not None:
-                indices[index_code] = stale
-                continue
+                return index_code, stale
+        return None
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_fetch_one, code): code for code in uncached_codes}
+        for future in as_completed(futures):
+            result = future.result()
+            if result is not None:
+                code, data = result
+                indices[code] = data
 
     return indices
 
@@ -582,6 +600,17 @@ def _get_full_benchmark_table() -> dict[str, str]:
 
 # ── 公开接口 ────────────────────────────────────────────
 
+# per-code 锁，防止 fetch_fund_benchmark 并发写入缓存互相覆盖
+_benchmark_locks: dict[str, threading.Lock] = {}
+_benchmark_locks_lock = threading.Lock()
+
+
+def _get_benchmark_lock(code: str) -> threading.Lock:
+    with _benchmark_locks_lock:
+        if code not in _benchmark_locks:
+            _benchmark_locks[code] = threading.Lock()
+        return _benchmark_locks[code]
+
 
 def fetch_fund_benchmark(code: str) -> str:
     """获取基金业绩比较基准。
@@ -605,19 +634,26 @@ def fetch_fund_benchmark(code: str) -> str:
     if cached is not None and isinstance(cached, dict):
         return cached.get(code, "--")
 
-    table = _get_full_benchmark_table()
+    lock = _get_benchmark_lock(code)
+    with lock:
+        # 双重检查：获得锁后确认缓存未被其他线程更新
+        cached = cache_get(cache_key, CACHE_MONTHLY)
+        if cached is not None and isinstance(cached, dict):
+            return cached.get(code, "--")
 
-    api_result = _fetch_benchmark_from_api(code)
-    if api_result:
-        table[code] = api_result
-        logger.info("[基准] %s API 解析成功: %s", code, api_result)
-    elif code in table:
-        logger.info("[基准] %s 使用内置知识库", code)
-    else:
-        logger.warning("[基准] %s 无基准数据", code)
+        table = _get_full_benchmark_table()
 
-    cache_set(cache_key, table)
-    return table.get(code, "--")
+        api_result = _fetch_benchmark_from_api(code)
+        if api_result:
+            table[code] = api_result
+            logger.info("[基准] %s API 解析成功: %s", code, api_result)
+        elif code in table:
+            logger.info("[基准] %s 使用内置知识库", code)
+        else:
+            logger.warning("[基准] %s 无基准数据", code)
+
+        cache_set(cache_key, table)
+        return table.get(code, "--")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -669,26 +705,40 @@ def fetch_industry_data(code: str) -> dict | None:
     )
 
 
-def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
+def batch_fetch_industry_data(codes: list[str], max_workers: int = 10) -> dict[str, dict]:
     """批量获取多只证券的行业分类和概念板块归属。
 
-    对一组代码逐个获取行业数据，已缓存的不重复请求。
-    使用单线程串行（行业数据变更频率低，无并发必要）。
+    使用线程池并发获取，已缓存的不重复请求。
 
     Args:
         codes: 6 位证券代码列表
+        max_workers: 最大并发线程数，默认 10
 
     Returns:
         {code: {code, industry, concepts, ...}, ...}
     """
+    valid_codes = [c.strip() for c in codes if c and c.strip()]
+    if not valid_codes:
+        return {}
+
     result: dict[str, dict] = {}
-    for code in codes:
-        code = code.strip()
-        if not code:
-            continue
+    lock = threading.Lock()
+
+    def _fetch_one(code: str) -> tuple[str, dict] | None:
         data = fetch_industry_data(code)
         if data:
-            result[code] = data
+            return code, data
+        return None
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_fetch_one, code): code for code in valid_codes}
+        for future in as_completed(futures):
+            res = future.result()
+            if res is not None:
+                code, data = res
+                with lock:
+                    result[code] = data
+
     logger.info("批量行业数据获取完成: 共 %d 个代码, 成功 %d 个",
-                len(codes), len(result))
+                len(valid_codes), len(result))
     return result

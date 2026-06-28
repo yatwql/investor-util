@@ -4,6 +4,36 @@
 
 ---
 
+## [0.2.16] - 2026-06-28
+
+### Fixed
+- **P0 config null 覆写**：`config.json` 中字段设为 `null` 时不再覆盖默认值，防止 `int(None)` 崩溃（`src/config.py`）
+- **P1 benchmark 竞态条件**：多线程并发调用 `fetch_fund_benchmark()` 时，以每个基金代码独立加锁防止数据覆写（`src/fetcher.py`）
+- **P1 缓存参数无效**：`tiantian.py` 缓存绕开参数 `"rt": "0.123456"` 硬编码固定值，改为 `random.random()` 真正生效
+- **P1 死关键词**：`penetration.py` 板块分类中 `"JP MORGAN"` / `"MORGAN STANLEY"` 因去空格后无法匹配，移除
+- **P2 重试次数不匹配**：`_call_claude()` / `_call_openai()` 中重试条件仍用硬编码 `_RETRY_MAX=2` 而非用户配置的 `max_retries`，修正；延迟数组扩展至 `[1, 3, 5, 10, 15]` 支持更多重试
+- **P2 空 LLM 结果缓存**：LLM 返回空白内容时不再写入缓存，避免 TTL 期内输出空白报告
+- **P2 零成本持仓放行**：零成本持仓（赠与/转股）不再被 `cost_price <= 0` 跳过，改为仅跳过负成本
+
+### Performance
+- **指数并行**：`fetch_indices()` 从顺序获取改为 `ThreadPoolExecutor(max_workers=5)` 并行拉取 5 个 A 股指数
+- **行业数据并行**：`batch_fetch_industry_data()` 从顺序循环改为 `max_workers=10` 并行 HTTP 请求
+- **benchmark 缓存锁优化**：带双重检查的 per-code 锁，减少不必要的重新获取
+
+### Removed (死代码)
+- `src/report/styles.py`：`NUMBER_ALIGN` 常量（无引用）
+- `src/report/excel_writer.py`：`add_styles_to_cells()` 函数（无调用且不生效）
+- `src/test_excel_writer.py`：`TestAddStyles` 测试类（对应死函数）
+
+### Changed
+- `src/report/summary.py`：收益率盈亏着色从脆弱的字符串解析改为纯 `isinstance(val, (int, float))` 处理
+- `src/report/penetration.py`：`__import__("datetime")` 惰性导入改为顶层 `from datetime import datetime`
+- `src/report/excel_writer.py`：`_ensure_reports_dir()` 增加存档子目录写入权限检测
+- `src/reader.py`：零成本持仓允许穿透计算和盈亏显示
+
+### Tests
+- 633 passed (30 subtests)，移除 1 个死代码测试类，更新 2 个测试适配新逻辑
+
 ## [0.2.15] - 2026-06-28
 
 ### Changed
