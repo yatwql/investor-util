@@ -26,7 +26,7 @@ _SOURCE_LABELS: dict[str, str] = {
 # 代码内默认开关（config.json 中 news_sources 未配置时使用的后备值）
 _FALLBACK_ENABLED: dict[str, bool] = {
     "sina": True,
-    "eastmoney": False,   # API 已返回 302 跳转（2026-06），匿名请求不可用
+    "eastmoney": True,    # 快讯接口（np-weblist）稳定可用
     "cls": False,          # API 已要求签名鉴权（errno=10012），匿名请求不可用
     "wallstreetcn": True,  # 华尔街见闻 API 稳定可用，无需鉴权
     "akshare": True,       # akshare 封装财新网/CCTV，开源稳定

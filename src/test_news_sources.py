@@ -37,9 +37,9 @@ class TestSourceMetadata(unittest.TestCase):
         """新浪默认开启。"""
         self.assertTrue(_FALLBACK_ENABLED["sina"])
 
-    def test_eastmoney_default_disabled(self) -> None:
-        """东方财富默认关闭。"""
-        self.assertFalse(_FALLBACK_ENABLED["eastmoney"])
+    def test_eastmoney_default_enabled(self) -> None:
+        """东方财富默认开启（API 已修复）。"""
+        self.assertTrue(_FALLBACK_ENABLED["eastmoney"])
 
     def test_cls_default_disabled(self) -> None:
         """财联社默认关闭。"""
