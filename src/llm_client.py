@@ -204,7 +204,7 @@ def _generate_llm_content(
     # ── 缓存检查 ──
     if cache_enabled and not force:
         cached = cache_get(cache_key, cache_ttl)
-        if cached is not None:
+        if cached:
             logger.info("LLM 缓存命中: %s", cache_key)
             cached_clean = _strip_token_line(cached) + _CACHE_LINE_HTML
             return (cached_clean, True)
@@ -220,7 +220,7 @@ def _generate_llm_content(
         if result and not html.strip():
             logger.warning("LLM 返回内容为空，跳过缓存")
             return (None, False)
-        _model_name = model or llm_config.get("model", "")
+        _model_name = model or llm_config.get("model", "") or "未指定"
         if usage:
             inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
             out = usage.get("output_tokens", usage.get("completion_tokens", 0))
@@ -1196,7 +1196,7 @@ def enhance_news_correlation(
     _timeout = llm_config.get("timeout_news_correlation", 60.0)
     _temp = llm_config.get("temperature_news_correlation")
     _model = llm_config.get("model_news_correlation")
-    _model_name = _model or llm_config.get("model", "")
+    _model_name = _model or llm_config.get("model", "") or "未指定"
 
     # analysis_by_orig_idx[news_data_index] = (relevance, sentiment, analysis)
     analysis_by_orig_idx: dict[int, tuple[str, str, str]] = {}
