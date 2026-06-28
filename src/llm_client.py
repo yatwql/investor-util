@@ -851,6 +851,7 @@ def generate_global_macro(
     _timeout = llm_config.get("timeout_macro", 60.0)
     _temp = llm_config.get("temperature_macro")
     _model = llm_config.get("model_macro")
+    _model_name = _model or llm_config.get("model", "")
     result, usage = _call_llm(system_macro, prompt, llm_config, timeout=_timeout,
                               http_client=http_client, max_tokens=macro_mt,
                               config_field="max_tokens_macro", temperature=_temp,
@@ -865,7 +866,7 @@ def generate_global_macro(
         if usage:
             inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
             out = usage.get("output_tokens", usage.get("completion_tokens", 0))
-            html += f'<p style="color:#888;font-size:12px">Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
+            html += f'<p style="color:#888;font-size:12px">模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
         cache_set(cache_key, html)
         logger.info("全球政经局势分析生成完成")
         return (html, False)
@@ -946,6 +947,7 @@ def generate_expert_review(
     _timeout = llm_config.get("timeout_expert", 120.0)
     _temp = llm_config.get("temperature_expert")
     _model = llm_config.get("model_expert")
+    _model_name = _model or llm_config.get("model", "")
     logger.info("正在调用 LLM 生成智囊团深度复盘...")
     result, usage = _call_llm(system_expert, prompt, llm_config, timeout=_timeout,
                               http_client=http_client, max_tokens=expert_mt,
@@ -957,7 +959,7 @@ def generate_expert_review(
         if usage:
             inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
             out = usage.get("output_tokens", usage.get("completion_tokens", 0))
-            html += f'<p style="color:#888;font-size:12px">Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
+            html += f'<p style="color:#888;font-size:12px">模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
         cache_set(cache_key, html)
         logger.info("智囊团深度复盘生成完成")
         return (html, False)
@@ -1196,6 +1198,7 @@ def enhance_news_correlation(
     _timeout = llm_config.get("timeout_news_correlation", 60.0)
     _temp = llm_config.get("temperature_news_correlation")
     _model = llm_config.get("model_news_correlation")
+    _model_name = _model or llm_config.get("model", "")
 
     # analysis_by_orig_idx[news_data_index] = (relevance, sentiment, analysis)
     analysis_by_orig_idx: dict[int, tuple[str, str, str]] = {}
@@ -1271,6 +1274,7 @@ def enhance_news_correlation(
     token_usage: dict = {}
     if total_tokens_input > 0 or total_tokens_output > 0:
         token_usage = {
+            "model": _model_name,
             "input_tokens": total_tokens_input,
             "output_tokens": total_tokens_output,
             "total_tokens": total_tokens_input + total_tokens_output,

@@ -499,8 +499,12 @@
                     {% set _ = ns.llm_notes.append("本次使用LLM缓存，未直接使用LLM服务能力") %}
                 {% else %}
                     {% set _tu = news_llm_meta.get("token_usage", {}) %}
+                    {% set _model_name = _tu.get("model", "") %}
                     {% if _tu.get("total_tokens") %}
-                        {% set _ = ns.llm_notes.append("Token 用量：输入 " ~ (_tu.get("input_tokens", 0) | thousands) ~ " / 输出 " ~ (_tu.get("output_tokens", 0) | thousands) ~ " = " ~ (_tu.get("total_tokens", 0) | thousands)) %}
+                        {% set _token_parts = [] %}
+                        {% if _model_name %}{% set _ = _token_parts.append("模型：" ~ _model_name) %}{% endif %}
+                        {% set _ = _token_parts.append("Token 用量：输入 " ~ (_tu.get("input_tokens", 0) | thousands) ~ " / 输出 " ~ (_tu.get("output_tokens", 0) | thousands) ~ " = " ~ (_tu.get("total_tokens", 0) | thousands)) %}
+                        {% set _ = ns.llm_notes.append(_token_parts | join(" | ")) %}
                     {% endif %}
                     {% set _ = ns.llm_notes.append("基于持仓名称和代码+LLM关联分析") %}
                 {% endif %}

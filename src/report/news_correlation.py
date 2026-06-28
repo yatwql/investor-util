@@ -473,6 +473,7 @@ def write_news_sheet(
         if token_usage.get("total_tokens", 0) > 0:
             row += 1
             token_note = (
+                f"模型：{token_usage.get('model', '')} | "
                 f"Token 用量："
                 f"输入 {token_usage.get('input_tokens', 0):,} / "
                 f"输出 {token_usage.get('output_tokens', 0):,} = "
