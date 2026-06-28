@@ -166,6 +166,73 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
         return defaults.get(subtype, 3600)
 
 
+def _generate_llm_content(
+    llm_config: dict,
+    cache_key: str,
+    cache_ttl: float,
+    system_prompt: str,
+    user_prompt: str,
+    cache_enabled: bool,
+    force: bool,
+    max_tokens: int,
+    timeout: float,
+    temperature: float | None,
+    model: str | None,
+    config_field: str,
+    http_client: httpx.Client | None = None,
+) -> tuple[Optional[str], bool]:
+    """通用 LLM 内容生成骨架，带缓存检查与写入。
+
+    Args:
+        llm_config: LLM 配置字典
+        cache_key: 缓存键
+        cache_ttl: 缓存过期时间（秒）
+        system_prompt: 系统提示词
+        user_prompt: 用户提示词
+        cache_enabled: 是否启用缓存
+        force: 为 True 时跳过缓存
+        max_tokens: 最大输出 token 数
+        timeout: API 超时秒数
+        temperature: 温度参数（None=使用 API 默认）
+        model: 模型名称
+        config_field: llm_settings.json 中的配置字段名（截断时提示）
+        http_client: 可选的 httpx.Client 实例
+
+    Returns:
+        (HTML 文本或 None, 是否来自缓存)
+    """
+    # ── 缓存检查 ──
+    if cache_enabled and not force:
+        cached = cache_get(cache_key, cache_ttl)
+        if cached is not None:
+            logger.info("LLM 缓存命中: %s", cache_key)
+            cached_clean = _strip_token_line(cached) + _CACHE_LINE_HTML
+            return (cached_clean, True)
+
+    # ── LLM 调用 ──
+    result, usage = _call_llm(system_prompt, user_prompt, llm_config,
+                              timeout=timeout, http_client=http_client,
+                              max_tokens=max_tokens, config_field=config_field,
+                              temperature=temperature, model=model)
+
+    if result:
+        html = _markdown_to_html(result)
+        if result and not html.strip():
+            logger.warning("LLM 返回内容为空，跳过缓存")
+            return (None, False)
+        _model_name = model or llm_config.get("model", "")
+        if usage:
+            inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+            out = usage.get("output_tokens", usage.get("completion_tokens", 0))
+            html += f'<p style="color:#888;font-size:12px">模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
+        cache_set(cache_key, html)
+        logger.info("LLM 内容生成完成: %s", cache_key)
+        return (html, False)
+
+    logger.warning("LLM 内容生成失败: %s", cache_key)
+    return (None, False)
+
+
 def _expert_fingerprint(
     total_mv: float = 0,
     total_cost: float = 0,
@@ -806,55 +873,26 @@ def generate_global_macro(
         logger.info("LLM 未配置，模块 7 使用占位文本")
         return (None, False)
 
-    # 缓存开关（默认启用）
     cache_enabled = llm_config.get("cache_enabled_macro", True)
-
-    # 缓存键（含数据指纹：行情/持仓变化时自动失效；sector_flow 因 TTL 仅 15 分钟不纳入指纹，
-    # 避免 sector_flow 频繁变化导致 24h TTL 的 macro 缓存反复失效）
     fingerprint = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
     cache_key = _CACHE_PREFIX_LLM + f"global_macro_{fingerprint}"
-    if cache_enabled and not force:
-        cached = cache_get(cache_key, _get_cache_ttl_llm("macro"))
-        if cached is not None:
-            logger.info("LLM 缓存命中: 全球政经局势")
-            cached_clean = _strip_token_line(cached) + _CACHE_LINE_HTML
-            return (cached_clean, True)
 
-    # 优先使用外部配置的 system_prompt，未配置时回退内置常量
-    system_macro = llm_config.get("system_prompt_macro") or _SYSTEM_MACRO
-    # 精简模式：附加输出长度约束
+    system_prompt = llm_config.get("system_prompt_macro") or _SYSTEM_MACRO
     if llm_config.get("output_brief_macro", False):
-        system_macro += "\n（精简模式，输出 200 字以内。）"
+        system_prompt += "\n（精简模式，输出 200 字以内。）"
 
-    prompt = _build_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories, sector_flow)
-    logger.info("正在调用 LLM 生成全球政经局势分析...")
-    macro_mt = llm_config.get("max_tokens_macro") or llm_config.get("max_tokens", 800)
-    _timeout = llm_config.get("timeout_macro", 60.0)
-    _temp = llm_config.get("temperature_macro")
-    _model = llm_config.get("model_macro")
-    _model_name = _model or llm_config.get("model", "")
-    result, usage = _call_llm(system_macro, prompt, llm_config, timeout=_timeout,
-                              http_client=http_client, max_tokens=macro_mt,
-                              config_field="max_tokens_macro", temperature=_temp,
-                              model=_model)
+    user_prompt = _build_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories, sector_flow)
 
-    if result:
-        html = _markdown_to_html(result)
-        if result and not html.strip():
-            # LLM 返回了空白/控制字符，不缓存空结果
-            logger.warning("全球政经局势分析内容为空，跳过缓存")
-            return (None, False)
-        if usage:
-            inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
-            out = usage.get("output_tokens", usage.get("completion_tokens", 0))
-            html += f'<p style="color:#888;font-size:12px">模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
-        cache_set(cache_key, html)
-        logger.info("全球政经局势分析生成完成")
-        return (html, False)
-    else:
-        logger.warning("全球政经局势分析生成失败")
-
-    return (None, False)
+    return _generate_llm_content(
+        llm_config, cache_key, _get_cache_ttl_llm("macro"),
+        system_prompt, user_prompt, cache_enabled, force,
+        max_tokens=llm_config.get("max_tokens_macro") or llm_config.get("max_tokens", 800),
+        timeout=llm_config.get("timeout_macro", 60.0),
+        temperature=llm_config.get("temperature_macro"),
+        model=llm_config.get("model_macro"),
+        config_field="max_tokens_macro",
+        http_client=http_client,
+    )
 
 
 def generate_expert_review(
@@ -894,10 +932,7 @@ def generate_expert_review(
         logger.info("LLM 未配置，模块 8 使用占位文本")
         return (None, False)
 
-    # 缓存开关（默认启用）
     cache_enabled = llm_config.get("cache_enabled_expert", True)
-
-    # 缓存键（指纹含持仓汇总 + 结构稳定字段）
     fingerprint = _expert_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
@@ -906,48 +941,27 @@ def generate_expert_review(
         categories=categories,
     )
     cache_key = _CACHE_PREFIX_LLM + f"expert_review_{fingerprint}"
-    if cache_enabled and not force:
-        cached = cache_get(cache_key, _get_cache_ttl_llm("expert"))
-        if cached is not None:
-            logger.info("LLM 缓存命中: 智囊团深度复盘")
-            cached_clean = _strip_token_line(cached) + _CACHE_LINE_HTML
-            return (cached_clean, True)
 
-    # 优先使用外部配置的 system_prompt，未配置时回退内置常量
-    system_expert = llm_config.get("system_prompt_expert") or _SYSTEM_EXPERT
-    # 精简模式：附加输出长度约束
+    system_prompt = llm_config.get("system_prompt_expert") or _SYSTEM_EXPERT
     if llm_config.get("output_brief_expert", False):
-        system_expert += "\n（精简模式，输出 300 字以内。）"
+        system_prompt += "\n（精简模式，输出 300 字以内。）"
 
-    prompt = _build_review_prompt(
+    user_prompt = _build_review_prompt(
         total_mv, total_cost, total_profit, total_today_profit,
         holdings_count, categories, penetrated_assets,
         holdings_details=holdings_details,
     )
-    expert_mt = llm_config.get("max_tokens_expert") or llm_config.get("max_tokens", 8192)
-    _timeout = llm_config.get("timeout_expert", 120.0)
-    _temp = llm_config.get("temperature_expert")
-    _model = llm_config.get("model_expert")
-    _model_name = _model or llm_config.get("model", "")
-    logger.info("正在调用 LLM 生成智囊团深度复盘...")
-    result, usage = _call_llm(system_expert, prompt, llm_config, timeout=_timeout,
-                              http_client=http_client, max_tokens=expert_mt,
-                              config_field="max_tokens_expert", temperature=_temp,
-                              model=_model)
 
-    if result:
-        html = _markdown_to_html(result)
-        if usage:
-            inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
-            out = usage.get("output_tokens", usage.get("completion_tokens", 0))
-            html += f'<p style="color:#888;font-size:12px">模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
-        cache_set(cache_key, html)
-        logger.info("智囊团深度复盘生成完成")
-        return (html, False)
-    else:
-        logger.warning("智囊团深度复盘生成失败")
-
-    return (None, False)
+    return _generate_llm_content(
+        llm_config, cache_key, _get_cache_ttl_llm("expert"),
+        system_prompt, user_prompt, cache_enabled, force,
+        max_tokens=llm_config.get("max_tokens_expert") or llm_config.get("max_tokens", 8192),
+        timeout=llm_config.get("timeout_expert", 120.0),
+        temperature=llm_config.get("temperature_expert"),
+        model=llm_config.get("model_expert"),
+        config_field="max_tokens_expert",
+        http_client=http_client,
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1347,32 +1361,6 @@ def generate_all_llm(
             )
         finally:
             client.close()
-
-    # 缓存预检（尊重各模块 cache_enabled 开关）：先检查双方是否已缓存，避免不必要线程开销
-    _cfg = get_llm_config() or {}
-    _macro_cache_on = _cfg.get("cache_enabled_macro", True) and not force
-    _expert_cache_on = _cfg.get("cache_enabled_expert", True) and not force
-    _macro_cached = None
-    _expert_cached = None
-    if _macro_cache_on:
-        _macro_fp = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
-        _macro_key = _CACHE_PREFIX_LLM + f"global_macro_{_macro_fp}"
-        _macro_cached = cache_get(_macro_key, _get_cache_ttl_llm("macro"))
-    if _expert_cache_on:
-        _expert_fp = _expert_fingerprint(
-            total_mv=total_mv, total_cost=total_cost,
-            total_profit=total_profit, total_today_profit=total_today_profit,
-            holdings_details=holdings_details,
-            penetrated_assets=penetrated_assets,
-            categories=categories,
-        )
-        _expert_key = _CACHE_PREFIX_LLM + f"expert_review_{_expert_fp}"
-        _expert_cached = cache_get(_expert_key, _get_cache_ttl_llm("expert"))
-    if _macro_cached is not None and _expert_cached is not None:
-        logger.info("LLM 双缓存命中，跳过线程池")
-        _macro = _strip_token_line(_macro_cached) + _CACHE_LINE_HTML
-        _expert = _strip_token_line(_expert_cached) + _CACHE_LINE_HTML
-        return (_macro, _expert, True, True)
 
     macro_result: Optional[str] = None
     expert_result: Optional[str] = None
