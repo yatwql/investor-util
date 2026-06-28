@@ -4,6 +4,28 @@
 
 ---
 
+## [0.2.21] - 2026-06-29
+
+### Changed
+- **`generate_global_macro()` / `generate_expert_review()` 重构** — 提取 `_generate_llm_content()` 共享骨架函数，消除两函数间约 60 行重复代码
+- **新闻 LLM 缓存指纹优化** — 改用 (序号, 标题前 80 字) 摘要计算指纹，避免正文微小差异导致 TTL 内缓存频繁失效
+
+### Fixed
+- **LLM 缓存空串假命中** — `_generate_llm_content()` 缓存检查 `is not None` → 真值检查，防止空字符串误判为缓存命中
+- **模型名 footer 空白** — 当 model 参数和配置均为空时增加 `"未指定"` 兜底
+
+### Removed
+- **`_get_http_pool()` 死代码** — `_thread_local` 懒加载 httpx.Client 回退路径已无用，安全删除
+- **`config.json` 无用 `llm` 泛用 TTL 键** — 未使用的 `cache_ttl.llm` 及 `cache.py` 对应前缀映射已删除
+- **`generate_all_llm()` 冗余缓存预检** — 预检仅在双方都命中时省线程创建开销，却被各 generate 函数内部自检覆盖，移除
+
+### Added
+- **强制刷新 LLM 缓存** — 菜单 [L] 增加交互询问 `是否强制重新生成 LLM 内容？(y/N)`，确认后跳缓存强制生成
+- **配置模型路由显示** — `_show_llm_config_status()` 新增逐模块模型名显示行
+
+### Docs
+- plan.md：补充下一步迭代计划（A~E 五个增强方向），标注难度和价值
+
 ## [0.2.20] - 2026-06-29
 
 ### Changed
