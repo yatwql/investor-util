@@ -199,6 +199,12 @@ def _ensure_llm_settings_file() -> None:
             "system_prompt_expert": None,
             "system_prompt_news_correlation": None,
             "llm_news_analysis": False,
+            "thinking_enabled_macro": False,
+            "thinking_enabled_expert": False,
+            "thinking_enabled_news_correlation": False,
+            "thinking_budget_macro": 4000,
+            "thinking_budget_expert": 16000,
+            "thinking_budget_news_correlation": 4000,
         }
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump(_DEFAULT_LLM_SETTINGS, f, ensure_ascii=False, indent=2)

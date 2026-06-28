@@ -4,6 +4,18 @@
 
 ---
 
+## [0.2.22] - 2026-06-29
+
+### Added
+- **Extended Thinking 支持** — `_call_claude()` 根据 `llm_settings.json` 的 `thinking_enabled_{模块}` 配置注入 `thinking` payload，让 ≥ Claude Sonnet 4 的模型在回答前进行深度推理，提升复杂分析质量
+- **`llm_settings.json` 新增 6 个 Extended Thinking 配置项** — `thinking_enabled_macro` / `thinking_enabled_expert` / `thinking_enabled_news_correlation` 及其对应的 `thinking_budget_*` 预算
+
+### Changed
+- **`_call_claude()` 签名扩展** — 新增 `llm_config` 参数，用于读取 thinking 配置；开启 thinking 时自动跳过 `temperature`（API 不兼容）
+
+### Docs
+- README.md：新增 Extended Thinking 章节，详细说明各场景收益对比和配置方式；llm_settings.json 示例值同步新增 thinking 字段；推荐参数表新增 6 个 thinking 配置项；删除已移除的 `cache_ttl.llm` 泛用键文档
+
 ## [0.2.21] - 2026-06-29
 
 ### Changed

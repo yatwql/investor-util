@@ -539,7 +539,7 @@ def _call_llm(
         return _call_claude(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                             max_tokens, timeout, max_retries=max_retries,
                             http_client=http_client, config_field=config_field,
-                            temperature=temperature)
+                            temperature=temperature, llm_config=llm_config)
     elif provider == "openai":
         return _call_openai(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                             max_tokens, timeout, max_retries=max_retries,
@@ -562,6 +562,7 @@ def _call_claude(
     http_client: httpx.Client | None = None,
     config_field: str = "max_tokens",
     temperature: float | None = None,
+    llm_config: dict | None = None,
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 Claude API (Messages API)，带重试 + 用量日志。
 
@@ -569,9 +570,14 @@ def _call_claude(
     system prompt 使用数组格式 + cache_control 以支持 Anthropic Prompt Caching
     （同一 system prompt 在 5 分钟内多次调用时节省输入 token）。
 
+    支持 Extended Thinking（thinking 参数），通过 llm_settings.json 中
+    thinking_enabled_{模块} / thinking_budget_{模块} 配置开启。
+    推荐仅在智囊团深度复盘（expert）场景开启，全局政经和新闻分析收益有限。
+
     Args:
         max_retries: 最大重试次数，从 llm_config 读取
         temperature: 若不为 None，覆盖 payload 中的 temperature 字段
+        llm_config: LLM 合并配置，用于读取 thinking 配置项
 
     Returns:
         (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
@@ -589,7 +595,24 @@ def _call_claude(
         "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user}],
     }
-    if temperature is not None:
+    # ── Extended Thinking（仅 Claude，根据模块配置） ──
+    if llm_config:
+        # config_field = "max_tokens_macro" / "max_tokens_expert" / "max_tokens_news_correlation"
+        _module_suffix = config_field.replace("max_tokens_", "")
+        _thinking_key = f"thinking_enabled_{_module_suffix}"
+        _budget_key = f"thinking_budget_{_module_suffix}"
+        if llm_config.get(_thinking_key, False):
+            _budget = llm_config.get(_budget_key)
+            if not _budget or _budget < max_tokens + 1024:
+                _budget = max_tokens + 4096  # 自动兜底
+            payload["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": _budget,
+            }
+            # Extended Thinking 与 temperature 互斥，移除 temperature
+            payload.pop("temperature", None)
+            logger.info("Extended Thinking 已开启 [%s]: budget=%d", _module_suffix, _budget)
+    if temperature is not None and "thinking" not in payload:
         payload["temperature"] = temperature
     client = http_client
 

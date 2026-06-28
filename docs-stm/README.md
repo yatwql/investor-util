@@ -2,7 +2,7 @@
 
 个人投资者辅助工具：读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.21
+> 当前版本：0.2.22
 
 ---
 
@@ -212,7 +212,6 @@ python src/main.py
 | `hold` | 604800（7天） | — | 基金前10大持仓明细 |
 | `news` | 900（15分钟） | 输入参数指纹 | 多源新闻聚合结果缓存，避免重复 HTTP 获取 |
 | `llm_news_corr` | 3600（1小时） | 输入数据指纹 | LLM 新闻关联分析缓存 |
-| `llm` | 86400（24h） | —（兜底） | LLM 通用缓存兜底（其他 LLM 类型未匹配时生效） |
 | `llm_global_macro` | 86400（24小时） | 指数+持仓指纹 | 全球政经局势 LLM 分析 |
 | `llm_expert_review` | 7200（2小时） | 持仓结构指纹 | 智囊团深度复盘 LLM 分析 |
 | `industry` | 604800（7天） | — | 行业分类/概念板块缓存 |
@@ -279,7 +278,13 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
   "system_prompt_macro": null,
   "system_prompt_expert": null,
   "system_prompt_news_correlation": null,
-  "llm_news_analysis": false
+  "llm_news_analysis": false,
+  "thinking_enabled_macro": false,
+  "thinking_enabled_expert": false,
+  "thinking_enabled_news_correlation": false,
+  "thinking_budget_macro": 4000,
+  "thinking_budget_expert": 16000,
+  "thinking_budget_news_correlation": 4000
 }
 ```
 
@@ -313,6 +318,12 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `system_prompt_expert` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖专家角色设定 |
 | `system_prompt_news_correlation` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖新闻关联判定规则 |
 | `llm_news_analysis` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
+| `thinking_enabled_macro` | **false** | 全球政经启用 Extended Thinking（不建议——输出短，不值得） |
+| `thinking_enabled_expert` | **false** | 智囊团启用 Extended Thinking（**推荐设为 true**——深度推理提升分析质量） |
+| `thinking_enabled_news_correlation` | **false** | 新闻关联启用 Extended Thinking（不建议——JSON 格式任务不需要深度推理） |
+| `thinking_budget_macro` | **4000** | 政经 thinking token 预算。自动兜底 `max_tokens + 4096` |
+| `thinking_budget_expert` | **16000** | 智囊团 thinking token 预算。`max_tokens_expert=8192`，16000 留充足余量 |
+| `thinking_budget_news_correlation` | **4000** | 新闻关联 thinking token 预算。实际被关闭时该值不生效 |
 
 #### 逐章节模型路由（Per-Section Model Routing）
 
@@ -336,6 +347,52 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 - **场景**：新闻关联分析批量处理时最有价值——5 分钟内多次调用共享缓存，**输入 token 扣费减少约 50%**
 - **效果**：费用按 `cache_creation_tokens`（写入缓存）× 1.25 + `cache_read_tokens`（命中缓存）× 0.1 计价，远低于全价输入 token
 - **无感使用**：不需要任何配置项，调用 Claude API 时自动启用
+
+---
+
+#### Extended Thinking（Anthropic 专属 — 可选）
+
+> 仅 `provider: "claude"` 且模型 ≥ `claude-sonnet-4` 时生效。
+
+**[Extended Thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking)** 让模型在回答前进行深度推理（类似 DeepSeek-R1 的思维链），大幅提升复杂分析的深度和逻辑严谨性。代价是输出 token 大幅增加（约 2~4 倍），费用相应上升。
+
+##### 什么时候该开？
+
+| 场景 | 推荐 | 原因 |
+|------|:----:|------|
+| **智囊团深度复盘**（`thinking_enabled_expert`） | ✅ **推荐开启** | 三阶段论证（召集令→圆桌→定音锤）需要深度逻辑推演，开启后分析质量明显提升。`thinking_budget_expert` 建议 16000 |
+| **全球政经局势**（`thinking_enabled_macro`） | ❌ 不建议 | 输出仅 500 字、2~3 段，不值得花费翻倍 token |
+| **新闻关联分析**（`thinking_enabled_news_correlation`） | ❌ 不建议 | 输出严格 JSON 格式，深度推理反而降低格式稳定性 |
+
+##### 配置方式
+
+在 `llm_settings.json` 中设置：
+
+```json
+{
+  "thinking_enabled_expert": true,
+  "thinking_budget_expert": 16000
+}
+```
+
+| 字段 | 默认 | 说明 |
+|------|:----:|------|
+| `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking |
+| `thinking_enabled_expert` | `false` | 智囊团深度复盘启用 Extended Thinking（**推荐开启**） |
+| `thinking_enabled_news_correlation` | `false` | 新闻关联分析启用 Extended Thinking |
+| `thinking_budget_macro` | 4000 | 全球政经 thinking token 预算（自动 ≤ max_tokens + 1024） |
+| `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算（自动 ≤ max_tokens + 1024） |
+| `thinking_budget_news_correlation` | 4000 | 新闻关联 thinking token 预算 |
+
+> **注意**：开启 Extended Thinking 后，`temperature` 参数被自动忽略（API 不支持两者并存）。
+> `budget_tokens` 若配置值小于 `max_tokens + 1024`，代码自动补足到 `max_tokens + 4096`。
+
+##### 效果参考
+
+| 模块 | 关闭 thinking（token 用量） | 开启 thinking（token 用量） | 费用倍率 |
+|------|:---------------------------:|:---------------------------:|:--------:|
+| 智囊团深度复盘 | 输入 ~3000 / 输出 ~2000 | 输入 ~3000 / 输出 ~8000 | ~2.5× |
+| 全球政经 | 输入 ~1500 / 输出 ~600 | 输入 ~1500 / 输出 ~2500 | ~3× |
 
 ---
 
