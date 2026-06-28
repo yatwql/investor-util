@@ -4,6 +4,57 @@
 
 ---
 
+## [0.2.15] - 2026-06-28
+
+### Changed
+- LLM 配置文件拆分：敏感密钥 `data/config/llm.json` → `data/config/llm_key.json`，config.json 键名 `llm_config_file` → `llm_key_file`
+- LLM 非敏感配置从 config.json llm_settings 段独立为 `data/config/llm_settings.json`，config.json 新增 `llm_settings_file` 引用
+- `src/config.py`：`get_llm_config_path()` → `get_llm_key_path()`，新增 `get_llm_settings_path()`
+- `get_llm_config()` 读取逻辑：基础层从 config.json.llm_settings 改为 llm_settings.json（向后兼容保留 config.json.llm_settings 回退）
+- `src/config.py` 缺省 temperature 默认值：`temperature_macro=0.3`、`temperature_expert=0.8`、`temperature_news_correlation=0.1`（原为 `None`）
+- 全量用户提示信息从 `llm.json` → `llm_key.json` / `llm_settings.json`
+
+### Added
+- `src/config.py`：新增 `_ensure_llm_settings_file()` 自动初始化函数（`init_config()` 触发）
+- llm_settings.json 写入代码内置 system_prompt 缺省值，用户可直接编辑覆盖
+
+### Docs
+- README.md：LLM 配置指引重写为双文件架构，新增推荐值说明
+- requirements.md/plan.md/testplan.md：llm.json 引用更新为 llm_key.json，TLT 优先级链更新
+- changelog.md：本版本记录
+
+## [0.2.14] - 2026-06-28
+
+### Added
+- 新增财经新闻源：华尔街见闻（wallstreetcn.com）
+  - API：`api-one.wallstcn.com/apiv1/content/lives?channel=global-channel`（全球财经直播流）
+  - 无鉴权要求，JSON 格式，标题/正文/时间戳字段完整
+  - 新增 `src/providers/wallstreetcn_news.py`（参考 sina_news.py 结构）
+  - `news_aggregator.py` 注册：`_SOURCE_LABELS`、`_FALLBACK_ENABLED`、`_FETCH_MAP` 新增 wallstreetcn 条目
+- 新增财经新闻源：akshare（财新网 / CCTV）
+  - 通过 akshare 开源库间接获取财新网要闻 + 央视财经新闻
+  - 新增 `src/providers/akshare_news.py`
+  - `news_aggregator.py`、`config.py` 注册 akshare 源，默认启用
+  - `requirements.txt` 新增 `akshare>=1.18.0`
+- 新闻页脚标注成功访问的数据源：HTML 报告「财经新闻热点与持仓关联分析」底部新增"本次抓取财经资讯所使用的数据源"行，仅列出成功获取数据的源，无论是否匹配到关键词
+
+### Changed
+- `news_aggregator.py`：ThreadPoolExecutor max_workers 从 3 提升至 5（适配 5 源并行）
+- `build_news_data()` 返回值 meta 新增 `active_sources` 字段
+
+### LLM 配置优化
+- `llm_client.py`：`temperature_macro / temperature_expert / temperature_news_correlation` — 每个模块独立控制生成温度，从 llm.json 读取，不设置时使用 API 默认值
+- `llm_client.py`：`timeout_macro / timeout_expert / timeout_news_correlation` — 每个模块独立控制 API 超时，替代原来的硬编码 60s/120s/60s
+- `llm_client.py`：`max_retries` — API 调用重试次数从 llm.json 读取（默认 2），替代硬编码 `_RETRY_MAX`
+- `llm_client.py`：`cache_enabled_macro / cache_enabled_expert / cache_enabled_news` — 缓存独立开关，关闭时每次重新生成，适用于需要实时更新的场景
+- `llm_client.py`：`output_brief_macro / output_brief_expert` — 精简模式，附加大幅缩减的输出长度约束到 system prompt，适用于快速预览场景
+- `generate_all_llm()` 缓存预检也尊重 cache_enabled 开关，禁用时跳过双缓存检查
+
+### Docs
+- README.md：版本号、news_sources 配置表、数据源表、目录结构、特性列表同步更新
+- requirements.md：数据源表同步
+- changelog.md：本版本记录
+
 ## [0.2.13] - 2026-06-28
 
 ### Added

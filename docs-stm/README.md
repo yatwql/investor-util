@@ -2,7 +2,7 @@
 
 个人投资者辅助工具：读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.12
+> 当前版本：0.2.14
 
 ---
 
@@ -14,7 +14,7 @@
 - **智能缓存** — API 响应按指定频率缓存，减少网络请求，支持手动刷新和缓存管理
 - **Excel 报告** — 8 个功能页签：汇总、市值核算、分类汇总、资产穿透 TOP10、基金业绩分析、财经新闻热点、全球政经局势（LLM）、智囊团深度复盘（LLM）
 - **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、新闻关联）
-- **多源财经新闻** — 新浪财经 + 东方财富 + 财联社 3 源并行获取，去重后与持仓关键词关联
+- **多源财经新闻** — 新浪财经 + 东方财富 + 财联社 + 华尔街见闻 + akshare（财新网/CCTV）5 源并行获取，去重后与持仓关键词关联
 - **行业/概念关键词** — 自动获取东方财富三级行业分类和概念板块，扩展新闻匹配关键词
 - **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek API，结果按策略缓存（宏观 4h / 智囊团 2h），持仓变更时主动失效
 - **基金业绩评价** — 同类排名百分位 + 超额收益修正，自动标注优秀/良好/稳定/偏差
@@ -134,10 +134,13 @@ python src/main.py
   "news_sources": {
     "sina": true,
     "eastmoney": false,
-    "cls": false
+    "cls": false,
+    "wallstreetcn": true,
+    "akshare": true
   },
   "preferred_provider": {},
-  "llm_config_file": "data/config/llm.json",
+  "llm_key_file": "data/config/llm_key.json",
+  "llm_settings_file": "data/config/llm_settings.json",
   "cache_ttl": {
     "price": 86400,
     "index": 86400,
@@ -165,6 +168,8 @@ python src/main.py
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 优选数据源（预留字段） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
+| `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个敏感字段） | 手动编辑 |
+| `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
 
 ### news_sources 可调字段
 
@@ -173,6 +178,8 @@ python src/main.py
 | `sina` | `true` | 新浪财经（财经要闻/国内/国际，正常工作） |
 | `eastmoney` | `false` | 东方财富（2026 年 6 月起 API 返回 302 跳转，匿名请求不可用） |
 | `cls` | `false` | 财联社（API 要求签名鉴权，匿名请求不可用） |
+| `wallstreetcn` | `true` | 华尔街见闻（全球财经直播流，JSON API，无需鉴权，推荐开启） |
+| `akshare` | `true` | akshare（财新网要闻 + CCTV 财经新闻，开源封装，推荐开启） |
 
 > **用法：** 当某个新闻源恢复可用时，将其值改为 `true` 即可启用。
 
@@ -198,45 +205,146 @@ python src/main.py
 
 ## LLM 配置指引
 
-模块 7（全球政经局势）和模块 8（智囊团深度复盘）需调用外部 LLM API。API Key 独立存储于 `data/config/llm.json`，避免误提交到版本控制。
+模块 7（全球政经局势）、模块 8（智囊团深度复盘）、以及可选的 LLM 新闻关联分析均需调用外部 LLM API。
+
+LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
+
+| 文件 | 内容 | 用途 |
+|------|------|------|
+| `data/config/llm_key.json` | 4 个敏感字段 | API 调用渠道（provider / api_key / model / endpoint） |
+| `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt 等） |
+
+> **为什么拆分？** `llm_key.json` 包含 API Key，可加入 `.gitignore` 避免误提交；
+> `llm_settings.json` 不含密钥，可安全纳入版本控制，方便团队共享调优参数。
 
 ### 快速配置
 
-1. 编辑 `data/config/llm.json`
-2. 填入 provider 和 api_key
-3. 启动程序，菜单选 **L** 生成完整版报告
+**Step 1**：编辑 `data/config/llm_key.json`，填入 provider 和 api_key：
 
 ```json
 {
   "provider": "claude",
   "api_key": "sk-ant-xxxxxxxxxxxxx",
   "model": "claude-sonnet-4-6",
-  "endpoint": "https://api.anthropic.com/v1/messages",
-  "max_tokens_macro": 800,
-  "max_tokens_expert": 8192,
-  "cache_ttl_macro": 14400,
-  "cache_ttl_expert": 7200,
-  "system_prompt_macro": "你是一位资深宏观经济学家...",
-  "system_prompt_expert": "你是投资智囊团召集人..."
+  "endpoint": "https://api.anthropic.com/v1/messages"
 }
 ```
 
-### 字段全表
+> `llm_key.json` 仅保留以上 4 个字段，其余所有参数移至 `llm_settings.json`。
+
+**Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数：
+
+```json
+{
+  "max_retries": 2,
+  "temperature_macro": 0.3,
+  "temperature_expert": 0.8,
+  "temperature_news_correlation": 0.1,
+  "timeout_macro": 60,
+  "timeout_expert": 120,
+  "timeout_news_correlation": 60,
+  "cache_enabled_macro": true,
+  "cache_enabled_expert": true,
+  "cache_enabled_news": true,
+  "output_brief_macro": false,
+  "output_brief_expert": false,
+  "max_tokens_macro": 800,
+  "max_tokens_expert": 8192,
+  "max_tokens_news_correlation": 2000,
+  "cache_ttl_macro": 14400,
+  "cache_ttl_expert": 7200,
+  "cache_ttl_news_correlation": 3600,
+  "system_prompt_macro": null,
+  "system_prompt_expert": null,
+  "system_prompt_news_correlation": null,
+  "llm_news_analysis": false
+}
+```
+
+**Step 3**：启动程序，菜单选 **L** 生成包含 LLM 分析的完整版报告。
+
+---
+
+### 推荐参数值及说明
+
+| 字段 | 推荐值 | 说明 |
+|------|:------:|------|
+| `temperature_macro` | **0.3** | 全球政经局势需稳定、事实性输出。低温（<0.5）减少幻觉，确保分析可信；高温（>0.7）易发散编造数据 |
+| `temperature_expert` | **0.8** | 智囊团复盘需要多元视角和创造性碰撞。高温（>0.7）鼓励专家输出差异化观点，避免千篇一律 |
+| `temperature_news_correlation` | **0.1** | 新闻关联分析要求严格的结构化 JSON 输出。极低温（<0.2）保证格式稳定，杜绝 JSON 解析失败 |
+| `timeout_macro` | **60s** | 宏观分析输入简短，60 秒内大部分 API 能完成 |
+| `timeout_expert` | **120s** | 智囊团输入量大（含全部持仓明细），需更长的生成时间 |
+| `timeout_news_correlation` | **60s** | 新闻分析逐条处理，单次调用数据量不大 |
+| `max_retries` | **2** | 遇到 429（限流）或 503（服务不可用）时最多重试 2 次 |
+| `max_tokens_macro` | **800** | 宏观分析输出 ≈ 300-600 tokens，800 留有富余 |
+| `max_tokens_expert` | **8192** | 智囊团三阶段输出可达 2000+ tokens，8192 保障完整输出 |
+| `max_tokens_news_correlation` | **2000** | 新闻 JSON 数组输出，2000 足以覆盖 30+ 条新闻 |
+| `cache_enabled_macro` | **true** | 宏观分析 4 小时内市场格局不会剧变，开启缓存节省费用 |
+| `cache_enabled_expert` | **true** | 智囊团 2 小时内观点有效，开启缓存避免重复扣费 |
+| `cache_enabled_news` | **true** | 同批次新闻的 LLM 分析结果可复用，1 小时缓存 |
+| `cache_ttl_macro` | **14400（4h）** | 4 小时内指数/持仓不变时复用上次分析结果 |
+| `cache_ttl_expert` | **7200（2h）** | 2 小时内持仓价格变化不大时复用 |
+| `cache_ttl_news_correlation` | **3600（1h）** | 1 小时内同批新闻分析结果有效 |
+| `output_brief_macro` | **false** | 关闭时输出完整分析（~500字）；开启后精简至 ≤200 字，适合快速预览 |
+| `output_brief_expert` | **false** | 关闭时输出完整三阶段复盘；开启后精简至 ≤300 字 |
+| `system_prompt_macro` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖分析风格 |
+| `system_prompt_expert` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖专家角色设定 |
+| `system_prompt_news_correlation` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖新闻关联判定规则 |
+| `llm_news_analysis` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
+
+#### temperature 推荐理由详解
+
+| 模块 | 推荐值 | 为什么低/高 | 风险提示 |
+|------|:------:|-------------|----------|
+| global_macro | 0.3 | 宏观分析是事实性任务：引用真实指数数据、判断经济走向。低温度让输出更聚焦、减少编造虚假经济数据的风险 | >0.5 → 可能编造不存在的经济指标或政策事件 |
+| expert_review | 0.8 | 专家复盘是创造性任务：需要五位专家从不同立场碰撞观点。高温度让输出更多样化、避免所有专家意见趋同 | <0.4 → 专家观点雷同，失去"圆桌辩论"意义 |
+| news_correlation | 0.1 | 新闻关联是结构化任务：输出严格 JSON 格式。极低温保证格式稳定性，避免 JSON 字段缺失或格式错误 | >0.3 → JSON 解析失败率显著上升，影响报告渲染 |
+
+---
+
+### 字段总表
+
+#### llm_key.json（敏感字段 — 4 个）
 
 | 字段 | 必填 | 说明 |
 |------|:----:|------|
-| `provider` | ✅ | `"claude"`（Anthropic Messages API）或 `"openai"`（OpenAI Chat Completions） |
+| `provider` | ✅ | `"claude"`（Anthropic Messages API 兼容）或 `"openai"`（OpenAI Chat Completions 兼容） |
 | `api_key` | ✅ | API 密钥，妥善保管勿提交 Git |
 | `model` | — | 模型名称，留空使用 provider 默认值 |
 | `endpoint` | — | API 端点 URL，留空使用官方端点 |
-| `max_tokens_macro` | — | 全球政经局势输出上限（默认 800） |
-| `max_tokens_expert` | — | 智囊团深度复盘输出上限（默认 8192） |
-| `cache_ttl_macro` | — | 全球政经局势缓存时间（秒，默认 14400 = 4h） |
-| `cache_ttl_expert` | — | 智囊团深度复盘缓存时间（秒，默认 7200 = 2h） |
-| `system_prompt_macro` | — | 模块 7 自定义系统提示词，留空使用内置默认值 |
-| `system_prompt_expert` | — | 模块 8 自定义系统提示词，留空使用内置默认值 |
+
+#### llm_settings.json（非敏感字段 — 全部可选）
+
+| 字段 | 默认值 | 说明 |
+|------|:------:|------|
+| `max_retries` | `2` | API 调用失败最大重试次数 |
+| `temperature_macro` | `0.3` | 全球政经局势生成温度（0-1），低值 → 稳定可靠，高值 → 创意发散 |
+| `temperature_expert` | `0.8` | 智囊团深度复盘生成温度（0-1），建议高值鼓励观点多样性 |
+| `temperature_news_correlation` | `0.1` | LLM 新闻关联分析温度（0-1），建议低值保证 JSON 格式稳定性 |
+| `timeout_macro` | `60` | 全球政经局势 API 超时秒数 |
+| `timeout_expert` | `120` | 智囊团深度复盘 API 超时秒数（输入量大，需更长时间） |
+| `timeout_news_correlation` | `60` | LLM 新闻关联分析 API 超时秒数 |
+| `cache_enabled_macro` | `true` | 全球政经局势是否启用缓存 |
+| `cache_enabled_expert` | `true` | 智囊团深度复盘是否启用缓存 |
+| `cache_enabled_news` | `true` | LLM 新闻关联分析是否启用缓存 |
+| `output_brief_macro` | `false` | `true` 时输出 ≤200 字精简版宏观分析 |
+| `output_brief_expert` | `false` | `true` 时输出 ≤300 字精简版专家复盘 |
+| `max_tokens_macro` | `800` | 全球政经局势输出 token 上限 |
+| `max_tokens_expert` | `8192` | 智囊团深度复盘输出 token 上限 |
+| `max_tokens_news_correlation` | `2000` | LLM 新闻关联分析输出 token 上限 |
+| `cache_ttl_macro` | `14400` | 全球政经局势缓存时间（秒，4 小时） |
+| `cache_ttl_expert` | `7200` | 智囊团深度复盘缓存时间（秒，2 小时） |
+| `cache_ttl_news_correlation` | `3600` | LLM 新闻关联分析缓存时间（秒，1 小时） |
+| `system_prompt_macro` | `null` | 自定义宏观分析系统提示词，`null` 回退内置默认值 |
+| `system_prompt_expert` | `null` | 自定义智囊团系统提示词，`null` 回退内置默认值 |
+| `system_prompt_news_correlation` | `null` | 自定义新闻关联系统提示词，`null` 回退内置默认值 |
+| `llm_news_analysis` | `false` | 是否启用 LLM 新闻二次关联分析 |
+
+---
 
 ### 支持的 provider 及配置示例
+
+所有示例配置写入 `data/config/llm_key.json`，非敏感参数（max_tokens / cache_ttl 等）仍在 `llm_settings.json` 中管理。
 
 <details>
 <summary><b>Claude（Anthropic 官方）</b></summary>
@@ -246,9 +354,7 @@ python src/main.py
   "provider": "claude",
   "api_key": "sk-ant-your-key",
   "model": "claude-sonnet-4-6",
-  "endpoint": "https://api.anthropic.com/v1/messages",
-  "max_tokens_macro": 800,
-  "max_tokens_expert": 8192
+  "endpoint": "https://api.anthropic.com/v1/messages"
 }
 ```
 
@@ -263,9 +369,7 @@ python src/main.py
   "provider": "openai",
   "api_key": "sk-your-key",
   "model": "gpt-4o",
-  "endpoint": "https://api.openai.com/v1/chat/completions",
-  "max_tokens_macro": 800,
-  "max_tokens_expert": 8192
+  "endpoint": "https://api.openai.com/v1/chat/completions"
 }
 ```
 
@@ -282,9 +386,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
   "provider": "claude",
   "api_key": "sk-your-deepseek-key",
   "model": "DeepSeek-V4-Flash",
-  "endpoint": "https://api.deepseek.com/anthropic/v1/messages",
-  "max_tokens_macro": 800,
-  "max_tokens_expert": 8192
+  "endpoint": "https://api.deepseek.com/anthropic/v1/messages"
 }
 ```
 
@@ -301,9 +403,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
   "provider": "openai",
   "api_key": "sk-your-deepseek-key",
   "model": "deepseek-chat",
-  "endpoint": "https://api.deepseek.com/v1/chat/completions",
-  "max_tokens_macro": 800,
-  "max_tokens_expert": 8192
+  "endpoint": "https://api.deepseek.com/v1/chat/completions"
 }
 ```
 </details>
@@ -316,14 +416,14 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
   "provider": "openai",
   "api_key": "your-volcengine-key",
   "model": "doubao-pro-32k",
-  "endpoint": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
-  "max_tokens_macro": 800,
-  "max_tokens_expert": 8192
+  "endpoint": "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
 }
 ```
 
 获取方式：火山引擎方舟控制台 → 推理接入点 → 创建接入点。
 </details>
+
+---
 
 ### token 消耗参考
 
@@ -336,13 +436,13 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 - 仅菜单 **L** 触发 LLM 调用，E / N / H / B 不会
 - LLM 结果默认缓存 4 小时（全球政经）/ 2 小时（智囊团），缓存有效期内反复按 L 不会重复扣费
 - 持仓或指数数据变更时，关联的 LLM 缓存自动失效；也可通过菜单 [2] 更新持仓缓存主动清除 LLM 缓存
-- 缓存时间可在 `data/config/llm.json` 中通过 `cache_ttl_macro` / `cache_ttl_expert` 自定义
+- 缓存时间可在 `data/config/llm_settings.json` 中通过 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news_correlation` 自定义
 
 ### 不配置 LLM 时的行为
 
-`llm.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示：
+`llm_key.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示：
 ```
-本节内容待生成 — 请配置 LLM API Key（data/config/llm.json）
+本节内容待生成 — 请配置 LLM API Key（data/config/llm_key.json）
 ```
 
 ---
@@ -358,6 +458,8 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 | 财经新闻（源1） | 新浪财经 `feed.mix.sina.com.cn` | — |
 | 财经新闻（源2） | 东方财富 `push-api-html.eastmoney.com` | — |
 | 财经新闻（源3） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | — |
+| 财经新闻（源4） | 华尔街见闻 `api-one.wallstcn.com/apiv1/content/lives` | — |
+| 财经新闻（源5） | akshare 封装：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — |
 | A 股指数 | 腾讯财经 `qt.gtimg.cn` | — |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析） | — |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业分类 + 概念板块归属） | — |
@@ -381,7 +483,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 | `industry_{code}.json` | 证券行业分类和概念板块归属 | 7 天 |
 | `llm_global_macro_{fingerprint}.json` | 全球政经局势 LLM 分析 | 4h（可配置） |
 | `llm_expert_review_{fingerprint}.json` | 智囊团深度复盘 LLM 分析 | 2h（可配置） |
-| `news_{md5}.json` | 多源新闻聚合结果（3 源并行获取后去重关联） | 15 分钟（可配置） |
+| `news_{md5}.json` | 多源新闻聚合结果（5 源并行获取后去重关联） | 15 分钟（可配置） |
 | `llm_news_corr_{fingerprint}.json` | LLM 新闻关联分析结果 | 1 小时（可配置） |
 
 **LLM 缓存指纹机制：** 文件名中的 `{fingerprint}` 是 MD5 哈希前 12 位，三个 LLM 模块使用不同的指纹构成：
@@ -463,6 +565,8 @@ investor-util/
 │   │   ├── sina_news.py          # 新浪财经（新闻）
 │   │   ├── eastmoney_news.py     # 东方财富（新闻）
 │   │   ├── cls_news.py           # 财联社（新闻）
+│   │   ├── wallstreetcn_news.py  # 华尔街见闻（新闻）
+│   │   ├── akshare_news.py       # akshare 聚合（财新网/CCTV）
 │   │   └── news_aggregator.py    # 多源新闻聚合器
 │   └── report/                   # 报告生成
 │       ├── excel_writer.py       # Excel 工作簿管理
@@ -478,7 +582,7 @@ investor-util/
 ├── data/
 │   ├── holdings/                 # 持仓 xlsx 文件
 │   ├── cache/                    # API 响应缓存
-│   └── config/                   # 配置文件（config.json, llm.json）
+│   └── config/                   # 配置文件（config.json, llm_key.json, llm_settings.json）
 ├── reports/                      # 生成报告（最新版+按日期存档）
 ├── logs/                         # 程序日志（app.log）
 ├── docs-stm/                     # 项目管理文档
@@ -511,7 +615,7 @@ investor-util/
 | 3 | **分类汇总** | 按资产属性（股票/ETF/基金）和投资分类（沪市/深市/指数/债券等）分组统计市值和盈亏 |
 | 4 | **资产穿透 TOP10** | 7 列明细：排名、名称、代码、穿透市值、占比、板块、来源明细。基金拆解为底层标的合并排序，底部标注无法获取穿透数据的基金 |
 | 5 | **基金业绩分析** | 11 列：基金、代码、类型、近3月/6月/12月收益率、累计盈亏(¥)、持仓收益率、业绩基准、业绩评价、同类排名。业绩标色：优秀→红、稳定→蓝、偏差→绿 |
-| 6 | **财经新闻热点**（菜单 N/B/L） | 3 源新闻与持仓关键词匹配结果，含标题、来源、时间、关联度。关联关键词按来源富化显示（持仓→蓝色、穿透→紫色、概念→橙色、行业→灰色），可选 LLM 二次关联分析 |
+| 6 | **财经新闻热点**（菜单 N/B/L） | 5 源新闻与持仓关键词匹配结果，含标题、来源、时间、关联度。关联关键词按来源富化显示（持仓→蓝色、穿透→紫色、概念→橙色、行业→灰色），可选 LLM 二次关联分析 |
 | 7 | **全球政经局势**（菜单 L） | LLM 基于指数行情和持仓结构生成的宏观分析 |
 | 8 | **智囊团深度复盘**（菜单 L） | LLM 三阶段圆桌会议：召集令→辩论→定音锤，含调仓建议和风险预警 |
 

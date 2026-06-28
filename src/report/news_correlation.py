@@ -259,7 +259,7 @@ def build_news_data(
     与持仓名称/代码及穿透 TOP10 资产进行关键词匹配，
     按关联度排序返回 TOP N。
 
-    若 llm.json 中 llm_news_analysis 为 true，自动启用 LLM 二次分析，
+    若 llm_settings.json 中 llm_news_analysis 为 true，自动启用 LLM 二次分析，
     对新闻逐条判定关联度并给出原因分析，结果写入 llm_analysis 字段。
 
     Args:
@@ -325,11 +325,22 @@ def build_news_data(
 
     news_items = aggregate_news(keywords, top_n=top_n)
 
+    # 提取成功访问的数据源列表（用于报告底部脚注）
+    _active_sources: list[str] = []
+    if news_items:
+        seen_labels: list[str] = []
+        for item in news_items:
+            label = item.get("_source", "")
+            if label and label not in seen_labels:
+                seen_labels.append(label)
+                _active_sources.append(label)
+
     # 初始化元数据
     meta: dict = {
         "token_usage": {},
         "llm_cached": False,
         "llm_enabled": False,
+        "active_sources": _active_sources,
     }
 
     if news_items:

@@ -67,6 +67,8 @@
 | 财经新闻（源1：新浪财经） | 新浪财经 `feed.mix.sina.com.cn`（要闻/国内/国际3分类） | — |
 | 财经新闻（源2：东方财富） | 东方财富 `push-api-html.eastmoney.com`（股市财经综合） | — |
 | 财经新闻（源3：财联社） | 财联社 `www.cls.cn/v1/roll/get_roll_list`（7x24实时快讯） | — |
+| 财经新闻（源4：华尔街见闻） | 华尔街见闻 `api-one.wallstcn.com/apiv1/content/lives`（全球财经直播流） | — |
+| 财经新闻（源5：akshare） | akshare 封装：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — |
 | 市场指数（A股） | 腾讯财经 `qt.gtimg.cn` | — |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS变量解析） | — |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业分类 + 概念板块归属） | — |
@@ -99,7 +101,7 @@
 | `industry_{code}.json` | **单只证券的行业分类和概念板块归属**（三级行业名称 + 概念板块列表），用于新闻关键词富化和穿透板块补充。文件如 `industry_600900.json` | 7 天 |
 | `llm_global_macro_{fingerprint}.json` | **全球政经局势 LLM 分析结果**。文件名含指数行情 + 持仓汇总的 MD5 指纹；指数或持仓变化时原缓存自动失效 | 4 小时（可配置） |
 | `llm_expert_review_{fingerprint}.json` | **智囊团深度复盘 LLM 分析结果**。文件名含每只持仓的详细价格/盈亏数据的 MD5 指纹；任一持仓价格或份额变化时原缓存自动失效 | 2 小时（可配置） |
-| `news_{md5}.json` | **多源新闻聚合结果**。3 源（新浪/东方财富/财联社）并行获取后去重、关键词关联、排序。文件名含输入参数 MD5 指纹，参数变化时自动失效 | 15 分钟（可配置） |
+| `news_{md5}.json` | **多源新闻聚合结果**。5 源（新浪/东方财富/财联社/华尔街见闻/akshare）并行获取后去重、关键词关联、排序。文件名含输入参数 MD5 指纹，参数变化时自动失效 | 15 分钟（可配置） |
 | `llm_news_corr_{fingerprint}.json` | **LLM 新闻关联分析结果**。对关键词匹配后的新闻逐条做 LLM 关联度判定（高/中/低/无关），文件名含输入参数 MD5 指纹，参数变化时自动失效 | 1 小时（可配置） |
 
 ### 6.2 LLM 缓存指纹自动失效机制
@@ -146,7 +148,7 @@ LLM 缓存（`llm_global_macro_*`、`llm_expert_review_*`）的文件名内嵌 M
 | 基准数据 | `benchmark` | 2592000 秒（30 天） | `fund_benchmarks.json` |
 
 **TTL 优先级链（按优先级从高到低）：**
-1. `llm.json` 中的 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news_correlation`（仅限 LLM 缓存）
+1. `llm_settings.json` 中的 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news_correlation`（仅限 LLM 缓存）
 2. `config.json` 中的 `cache_ttl.<data_type>`
 3. 代码内置默认值（如上表）
 
@@ -286,10 +288,12 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 - 穿透 TOP10 底层资产的名称和代码（需先计算穿透数据）
 - 东方财富三级行业名称和概念板块名称（自动从 API 获取，用于扩展关键词匹配范围）
 
-新闻来源（3 个财经源并行获取、去重后排序）：
+新闻来源（5 个财经源并行获取、去重后排序）：
 1. **新浪财经** — `feed.mix.sina.com.cn`（财经要闻/国内财经/国际财经 3 分类）
 2. **东方财富** — `push-api-html.eastmoney.com`（股市财经综合新闻）
 3. **财联社** — `www.cls.cn/v1/roll/get_roll_list`（7x24 实时财经快讯）
+4. **华尔街见闻** — `api-one.wallstcn.com/apiv1/content/lives`（全球财经直播流，无需鉴权）
+5. **akshare** — 封装财新网 `stock_news_main_cx()` 和 CCTV `news_cctv()`，开源库自动适配底层 API
 
 关联规则：对每条新闻的 title + intro 与关键词全集做子串匹配，按匹配到的关键词数量降序排列，去重后输出 TOP N。
 
@@ -301,7 +305,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 富化后关键词按 持仓→穿透→概念→行业 顺序排列，在 Excel 中以格式化字符串显示，在 HTML 中以不同颜色标签区分（持仓→蓝色、穿透→紫色、概念→橙色、行业→灰色）。
 
-**LLM 关联分析（可选，v0.2.9+）：** `data/config/llm.json` 中 `llm_news_analysis` 为 `true` 时自动开启，对关键词匹配后的新闻逐条进行二次关联判定：每条新闻获得 LLM 生成的关联度（高/中/低/无关）并附加原因分析。分析结果写入 "LLM 关联分析" 列（仅在有分析数据时显示列头）。
+**LLM 关联分析（可选，v0.2.9+）：** `data/config/llm_settings.json` 中 `llm_news_analysis` 为 `true` 时自动开启，对关键词匹配后的新闻逐条进行二次关联判定：每条新闻获得 LLM 生成的关联度（高/中/低/无关）并附加原因分析。分析结果写入 "LLM 关联分析" 列（仅在有分析数据时显示列头）。
 
 **Excel 格式优化（v0.2.10+）：** 新闻标题列宽 40、摘要列宽 50，启用文本换行 + 左对齐，长文本自动换行适应内容。
 

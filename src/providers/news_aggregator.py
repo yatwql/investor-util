@@ -1,9 +1,10 @@
 """统一财经新闻聚合器 — 多源获取 + 去重 + 关键词关联。
 
-聚合三大财经新闻源：
-  1. 新浪财经   — 财经要闻/国内/国际
-  2. 东方财富   — 股市/财经综合
-  3. 财联社     — 7×24 实时快讯
+聚合四大财经新闻源：
+  1. 新浪财经     — 财经要闻/国内/国际
+  2. 东方财富     — 股市/财经综合
+  3. 财联社       — 7×24 实时快讯
+  4. 华尔街见闻   — 全球财经直播流
 
 各新闻源的启用在 config.json 中配置（news_sources 字段），
 代码不硬编码开关状态。
@@ -28,13 +29,17 @@ _SOURCE_LABELS: dict[str, str] = {
     "sina": "新浪财经",
     "eastmoney": "东方财富",
     "cls": "财联社",
+    "wallstreetcn": "华尔街见闻",
+    "akshare": "财新网 / CCTV",
 }
 
 # 代码内默认开关（config.json 中 news_sources 未配置时使用的后备值）
 _FALLBACK_ENABLED: dict[str, bool] = {
     "sina": True,
-    "eastmoney": False,  # API 已返回 302 跳转（2026-06），匿名请求不可用
-    "cls": False,         # API 已要求签名鉴权（errno=10012），匿名请求不可用
+    "eastmoney": False,   # API 已返回 302 跳转（2026-06），匿名请求不可用
+    "cls": False,          # API 已要求签名鉴权（errno=10012），匿名请求不可用
+    "wallstreetcn": True,  # 华尔街见闻 API 稳定可用，无需鉴权
+    "akshare": True,       # akshare 封装财新网/CCTV，开源稳定
 }
 
 
@@ -265,10 +270,38 @@ def _fetch_from_cls(num: int) -> list[dict[str, Any]]:
     return items
 
 
+def _fetch_from_wallstreetcn(num: int) -> list[dict[str, Any]]:
+    """从华尔街见闻获取新闻。"""
+    try:
+        from src.providers.wallstreetcn_news import fetch_news as wsc_fetch
+    except ImportError:
+        logger.warning("华尔街见闻模块不可用")
+        return []
+
+    items = wsc_fetch(num=num)
+    logger.info("华尔街见闻: 获取 %d 条", len(items))
+    return items
+
+
+def _fetch_from_akshare(num: int) -> list[dict[str, Any]]:
+    """通过 akshare 获取财新网 + CCTV 财经新闻。"""
+    try:
+        from src.providers.akshare_news import fetch_news as ak_fetch
+    except ImportError:
+        logger.warning("akshare 模块不可用")
+        return []
+
+    items = ak_fetch(num=num)
+    logger.info("akshare 新闻: 获取 %d 条", len(items))
+    return items
+
+
 _FETCH_MAP: dict[str, Callable] = {
     "sina": _fetch_from_sina,
     "eastmoney": _fetch_from_eastmoney,
     "cls": _fetch_from_cls,
+    "wallstreetcn": _fetch_from_wallstreetcn,
+    "akshare": _fetch_from_akshare,
 }
 
 
@@ -308,7 +341,7 @@ def aggregate_news(
     from src.cache import get as _nget, set as _nset, get_ttl as _get_news_ttl
     _cached = _nget(_cache_key, _get_news_ttl("news"))
     if _cached is not None:
-        logger.info("新闻缓存命中，跳过 3 源获取")
+        logger.info("新闻缓存命中，跳过 %d 个源获取", len(sources))
         return _cached
 
     # 1) 从各源获取（并行）
@@ -318,7 +351,7 @@ def aggregate_news(
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         fut_to_src: dict[Any, str] = {}
         for src in sources:
             fetch_fn = _FETCH_MAP.get(src)

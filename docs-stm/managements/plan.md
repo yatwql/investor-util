@@ -510,3 +510,13 @@
 2. 选择对应功能生成报告文件
 3. 打开输出目录（默认 `reports/`，可通过菜单 R 配置）下的 `个人投资分析报告.xlsx` 或 `个人投资分析报告.html` 确认内容完整
 4. 模拟异常场景（断网、空目录、格式错误）确认程序不崩溃
+
+---
+
+## 当前配置架构（v0.2.15+）
+
+LLM 配置已拆分为两个独立文件：
+- `data/config/llm_key.json` — 仅 4 个敏感字段：`provider`、`api_key`、`model`、`endpoint`
+- `data/config/llm_settings.json` — 所有非敏感配置：`max_retries`、`timeout_*`、`temperature_*`、`cache_enabled_*`、`output_brief_*`、`max_tokens_*`、`cache_ttl_*`、`system_prompt_*`、`llm_news_analysis`
+
+历史文档中引用的 `data/config/llm.json` 和 `config.json.llm_settings` 在 v0.2.15 中已废弃。

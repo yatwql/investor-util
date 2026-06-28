@@ -193,7 +193,7 @@ def _show_llm_config_status() -> None:
         ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" else endpoint
         print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
     else:
-        print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm.json 后重启生效）")
+        print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
 
 
 # ── 配置命令 ──────────────────────────────────────────────

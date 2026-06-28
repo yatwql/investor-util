@@ -100,7 +100,7 @@ def _write_content_sheet(
             row += 1
     else:
         placeholder = (
-            "本节内容待生成 — 请配置 LLM API Key（data/config/llm.json）"
+            "本节内容待生成 — 请配置 LLM API Key（data/config/llm_key.json）"
         )
         cell = ws.cell(row=row, column=1, value=placeholder)
         cell.font = CONTENT_FONT

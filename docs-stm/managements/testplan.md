@@ -47,7 +47,7 @@
 | LLM 缓存中 HTML 格式与旧版本 Markdown 格式共存 | 新缓存直接存储 HTML，老缓存自然过期（指纹变更） |
 | 空持仓下菜单 [L] 全系列报告生成 | 跳过 LLM 调用，输出空占位 |
 | cache.set() 写入时目录被删除 | 自动重试，不抛出异常 |
-| config.json/llm.json 配置值异常 | 输出警告，使用代码默认值 |
+| config.json / llm_settings.json / llm_key.json 配置值异常 | 输出警告，使用代码默认值 |
 | fund_performance.json 中 categories/data 为 JSON null | 自动兜底为空列表，不崩溃 |
 | html_writer.py LLM 内部调用路径（enable_llm=True, llm_content=None） | 传入 dict 类型指数数据，不因 .values() 缺失崩溃 |
 | summary.py write_summary_sheet 收到 list 而非 dict | write_summary_sheet 从 fetch_indices() 接收 dict，不因 .get() 缺失崩溃 |

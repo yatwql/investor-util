@@ -511,6 +511,10 @@
             {% for note in ns.llm_notes %}
             <div>* {{ note }}</div>
             {% endfor %}
+            {% set _active_src = (news_llm_meta or {}).get("active_sources", []) %}
+            {% if _active_src %}
+            <div>* 本次抓取财经资讯所使用的数据源：{{ _active_src | join("、") }}</div>
+            {% endif %}
         </div>
         {% else %}
         <div class="empty-note">暂无关联新闻</div>

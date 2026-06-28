@@ -2,7 +2,7 @@
 
 为报告模块 7（全球政经局势）和模块 8（智囊团深度复盘）生成内容。
 
-API Key 通过外部配置文件管理（data/config/llm.json），
+API Key 通过 data/config/llm_key.json 管理，非敏感配置通过 data/config/llm_settings.json 管理，
 不直接存储在 config.json 中。支持结果缓存，避免重复扣费。
 """
 
@@ -154,7 +154,7 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
     """获取 LLM 缓存 TTL。
 
     TTL 优先级：
-      1. llm.json 中的 cache_ttl_macro / cache_ttl_expert（自定义配置）
+      1. llm_settings.json 中的 cache_ttl_macro / cache_ttl_expert（自定义配置）
       2. config.json 中的 cache_ttl.llm_macro / cache_ttl.llm_expert
       3. 代码默认值（全局政经 14400s / 智囊团 7200s）
 
@@ -164,7 +164,7 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
     Returns:
         过期时间（秒）
     """
-    # 优先从 llm.json 读取自定义 TTL
+    # 优先从 llm_settings.json 读取自定义 TTL
     try:
         from src.config import get_llm_config
         llm_config = get_llm_config()
@@ -219,7 +219,7 @@ def _log_token_usage(provider: str, usage: dict | None, label: str) -> None:
 
 _TRUNCATION_WARNING = (
     "\n\n【⚠ 输出已被截断！max_tokens 上限不足，内容不完整。"
-    "请在 data/config/llm.json 中增大 max_tokens 后重新生成。】"
+    "请在 data/config/llm_settings.json 中增大 max_tokens 后重新生成。】"
 )
 
 
@@ -234,7 +234,7 @@ def _check_claude_truncation(data: dict, max_tokens: int, label: str, config_fie
         out_tokens = (data.get("usage") or {}).get("output_tokens", 0)
         logger.error(
             "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。"
-            "内容不完整，请在 llm.json 中增大 %s",
+            "内容不完整，请在 llm_settings.json 中增大 %s",
             label, config_field, max_tokens, out_tokens, config_field,
         )
         return True
@@ -254,7 +254,7 @@ def _check_openai_truncation(data: dict, max_tokens: int, label: str, config_fie
         out_tokens = (data.get("usage") or {}).get("completion_tokens", 0)
         logger.error(
             "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。"
-            "内容不完整，请在 llm.json 中增大 %s",
+            "内容不完整，请在 llm_settings.json 中增大 %s",
             label, config_field, max_tokens, out_tokens, config_field,
         )
         return True
@@ -302,6 +302,15 @@ def _extract_content(data: dict) -> str | None:
 # ═══════════════════════════════════════════════════════════
 
 
+def _get_retry_max(llm_config: dict) -> int:
+    """从 llm_config 中读取最大重试次数，兜底返回 2。"""
+    try:
+        val = int(llm_config.get("max_retries", 2))
+        return max(0, val)
+    except (TypeError, ValueError):
+        return 2
+
+
 def _call_llm(
     system_prompt: str,
     user_prompt: str,
@@ -310,6 +319,7 @@ def _call_llm(
     http_client: httpx.Client | None = None,
     max_tokens: int | None = None,
     config_field: str = "max_tokens",
+    temperature: float | None = None,
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 LLM API 生成文本。
 
@@ -317,11 +327,11 @@ def _call_llm(
         system_prompt: 系统提示词
         user_prompt: 用户提示词
         llm_config: LLM 配置字典
-        timeout: API 超时秒数，默认 60s（模块 7 用）；模块 8（智囊团）建议 120s
+        timeout: API 超时秒数，默认 60s
         http_client: 可选的 httpx.Client 实例
         max_tokens: 可选覆盖值，优先级高于 llm_config 中的对应字段
-        config_field: llm.json 中的配置字段名（如 "max_tokens_macro" / "max_tokens_expert"），
-            截断时在日志中提示用户增大该字段
+        config_field: llm_settings.json 中的配置字段名，截断时在日志中提示用户增大该字段
+        temperature: 可选覆盖值，优先级高于 llm_config 中的对应字段，None 表示使用 API 默认值
 
     Returns:
         (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
@@ -331,11 +341,18 @@ def _call_llm(
     model = llm_config.get("model", "")
     endpoint = llm_config.get("endpoint", "")
     max_tokens = max_tokens or 2500
+    max_retries = _get_retry_max(llm_config)
 
     if provider == "claude":
-        return _call_claude(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout, http_client=http_client, config_field=config_field)
+        return _call_claude(system_prompt, user_prompt, api_key, model, endpoint,
+                            max_tokens, timeout, max_retries=max_retries,
+                            http_client=http_client, config_field=config_field,
+                            temperature=temperature)
     elif provider == "openai":
-        return _call_openai(system_prompt, user_prompt, api_key, model, endpoint, max_tokens, timeout, http_client=http_client, config_field=config_field)
+        return _call_openai(system_prompt, user_prompt, api_key, model, endpoint,
+                            max_tokens, timeout, max_retries=max_retries,
+                            http_client=http_client, config_field=config_field,
+                            temperature=temperature)
     else:
         logger.warning("不支持的 LLM provider: %s", provider)
         return (None, None)
@@ -349,14 +366,16 @@ def _call_claude(
     endpoint: str,
     max_tokens: int,
     timeout: float = 60.0,
+    max_retries: int = 2,
     http_client: httpx.Client | None = None,
     config_field: str = "max_tokens",
+    temperature: float | None = None,
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 Claude API (Messages API)，带重试 + 用量日志。
 
     Args:
-        http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
-            而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
+        max_retries: 最大重试次数，从 llm_config 读取
+        temperature: 若不为 None，覆盖 payload 中的 temperature 字段
 
     Returns:
         (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
@@ -373,9 +392,11 @@ def _call_claude(
         "system": system,
         "messages": [{"role": "user", "content": user}],
     }
+    if temperature is not None:
+        payload["temperature"] = temperature
     client = http_client or _get_http_pool()
 
-    for attempt in range(_RETRY_MAX + 1):
+    for attempt in range(max_retries + 1):
         try:
             resp = client.post(url, json=payload, headers=headers, timeout=timeout)
             if resp.status_code in (429, 503) and attempt < _RETRY_MAX:
@@ -434,14 +455,16 @@ def _call_openai(
     endpoint: str,
     max_tokens: int,
     timeout: float = 60.0,
+    max_retries: int = 2,
     http_client: httpx.Client | None = None,
     config_field: str = "max_tokens",
+    temperature: float | None = None,
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。
 
     Args:
-        http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
-            而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
+        max_retries: 最大重试次数，从 llm_config 读取
+        temperature: 若不为 None，覆盖 payload 中的 temperature 字段
 
     Returns:
         (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
@@ -459,9 +482,11 @@ def _call_openai(
             {"role": "user", "content": user},
         ],
     }
+    if temperature is not None:
+        payload["temperature"] = temperature
     client = http_client or _get_http_pool()
 
-    for attempt in range(_RETRY_MAX + 1):
+    for attempt in range(max_retries + 1):
         try:
             resp = client.post(url, json=payload, headers=headers, timeout=timeout)
             if resp.status_code in (429, 503) and attempt < _RETRY_MAX:
@@ -689,10 +714,13 @@ def generate_global_macro(
         logger.info("LLM 未配置，模块 7 使用占位文本")
         return (None, False)
 
+    # 缓存开关（默认启用）
+    cache_enabled = llm_config.get("cache_enabled_macro", True)
+
     # 缓存键（含数据指纹：行情/持仓变化时自动失效）
     fingerprint = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
     cache_key = _CACHE_PREFIX_LLM + f"global_macro_{fingerprint}"
-    if not force:
+    if cache_enabled and not force:
         cached = cache_get(cache_key, _get_cache_ttl_llm("macro"))
         if cached is not None:
             logger.info("LLM 缓存命中: 全球政经局势")
@@ -700,10 +728,18 @@ def generate_global_macro(
 
     # 优先使用外部配置的 system_prompt，未配置时回退内置常量
     system_macro = llm_config.get("system_prompt_macro") or _SYSTEM_MACRO
+    # 精简模式：附加输出长度约束
+    if llm_config.get("output_brief_macro", False):
+        system_macro += "\n（精简模式，输出 200 字以内。）"
+
     prompt = _build_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories)
     logger.info("正在调用 LLM 生成全球政经局势分析...")
     macro_mt = llm_config.get("max_tokens_macro") or llm_config.get("max_tokens", 800)
-    result, usage = _call_llm(system_macro, prompt, llm_config, timeout=60.0, http_client=http_client, max_tokens=macro_mt, config_field="max_tokens_macro")
+    _timeout = llm_config.get("timeout_macro", 60.0)
+    _temp = llm_config.get("temperature_macro")
+    result, usage = _call_llm(system_macro, prompt, llm_config, timeout=_timeout,
+                              http_client=http_client, max_tokens=macro_mt,
+                              config_field="max_tokens_macro", temperature=_temp)
 
     if result:
         html = _markdown_to_html(result)
@@ -757,13 +793,16 @@ def generate_expert_review(
         logger.info("LLM 未配置，模块 8 使用占位文本")
         return (None, False)
 
+    # 缓存开关（默认启用）
+    cache_enabled = llm_config.get("cache_enabled_expert", True)
+
     # 缓存键（含数据指纹：持仓变化时自动失效）
     fingerprint = _compute_fingerprint(total_mv, total_cost, total_profit,
                                        total_today_profit, holdings_count,
                                        categories, penetrated_assets,
                                        holdings_details)
     cache_key = _CACHE_PREFIX_LLM + f"expert_review_{fingerprint}"
-    if not force:
+    if cache_enabled and not force:
         cached = cache_get(cache_key, _get_cache_ttl_llm("expert"))
         if cached is not None:
             logger.info("LLM 缓存命中: 智囊团深度复盘")
@@ -771,6 +810,9 @@ def generate_expert_review(
 
     # 优先使用外部配置的 system_prompt，未配置时回退内置常量
     system_expert = llm_config.get("system_prompt_expert") or _SYSTEM_EXPERT
+    # 精简模式：附加输出长度约束
+    if llm_config.get("output_brief_expert", False):
+        system_expert += "\n（精简模式，输出 300 字以内。）"
 
     prompt = _build_review_prompt(
         total_mv, total_cost, total_profit, total_today_profit,
@@ -778,8 +820,12 @@ def generate_expert_review(
         holdings_details=holdings_details,
     )
     expert_mt = llm_config.get("max_tokens_expert") or llm_config.get("max_tokens", 8192)
+    _timeout = llm_config.get("timeout_expert", 120.0)
+    _temp = llm_config.get("temperature_expert")
     logger.info("正在调用 LLM 生成智囊团深度复盘...")
-    result, usage = _call_llm(system_expert, prompt, llm_config, timeout=120.0, http_client=http_client, max_tokens=expert_mt, config_field="max_tokens_expert")
+    result, usage = _call_llm(system_expert, prompt, llm_config, timeout=_timeout,
+                              http_client=http_client, max_tokens=expert_mt,
+                              config_field="max_tokens_expert", temperature=_temp)
 
     if result:
         html = _markdown_to_html(result)
@@ -961,6 +1007,9 @@ def enhance_news_correlation(
     )
     top_news = sorted_news[:30]
 
+    # 缓存开关（默认启用）
+    cache_enabled = llm_config.get("cache_enabled_news", True)
+
     # 缓存键（含新闻内容 + 持仓的指纹）
     holdings_summary = [
         {"name": h.name, "code": h.code}
@@ -971,7 +1020,7 @@ def enhance_news_correlation(
     )
     cache_key = _CACHE_PREFIX_LLM + f"news_corr_{fingerprint}"
 
-    if not force:
+    if cache_enabled and not force:
         cached = cache_get(cache_key, _get_cache_ttl_llm("news"))
         if cached is not None:
             logger.info("LLM 缓存命中: 新闻关联分析")
@@ -994,11 +1043,14 @@ def enhance_news_correlation(
 
     logger.info("正在调用 LLM 增强新闻关联分析...")
     max_tokens = llm_config.get("max_tokens_news_correlation", 2000)
+    _timeout = llm_config.get("timeout_news_correlation", 60.0)
+    _temp = llm_config.get("temperature_news_correlation")
     result, usage = _call_llm(
         system_prompt, user_prompt, llm_config,
-        timeout=60.0, http_client=http_client,
+        timeout=_timeout, http_client=http_client,
         max_tokens=max_tokens,
         config_field="max_tokens_news_correlation",
+        temperature=_temp,
     )
 
     if not result:
@@ -1075,6 +1127,8 @@ def generate_all_llm(
         各自可能为 None/False
     """
 
+    from src.config import get_llm_config
+
     def _run_macro() -> tuple[Optional[str], bool]:
         """在线程中生成模块 7，使用独立 httpx.Client。"""
         logger.info("正在生成：全球政经局势分析...")
@@ -1101,16 +1155,23 @@ def generate_all_llm(
         finally:
             client.close()
 
-    # 缓存预检：先检查双方是否已缓存，避免不必要线程开销
-    _macro_fp = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
-    _macro_key = _CACHE_PREFIX_LLM + f"global_macro_{_macro_fp}"
-    _expert_fp = _compute_fingerprint(total_mv, total_cost, total_profit,
-                                       total_today_profit, holdings_count,
-                                       categories, penetrated_assets,
-                                       holdings_details)
-    _expert_key = _CACHE_PREFIX_LLM + f"expert_review_{_expert_fp}"
-    _macro_cached = cache_get(_macro_key, _get_cache_ttl_llm("macro"))
-    _expert_cached = cache_get(_expert_key, _get_cache_ttl_llm("expert"))
+    # 缓存预检（尊重各模块 cache_enabled 开关）：先检查双方是否已缓存，避免不必要线程开销
+    _cfg = get_llm_config() or {}
+    _macro_cache_on = _cfg.get("cache_enabled_macro", True) and not force
+    _expert_cache_on = _cfg.get("cache_enabled_expert", True) and not force
+    _macro_cached = None
+    _expert_cached = None
+    if _macro_cache_on:
+        _macro_fp = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
+        _macro_key = _CACHE_PREFIX_LLM + f"global_macro_{_macro_fp}"
+        _macro_cached = cache_get(_macro_key, _get_cache_ttl_llm("macro"))
+    if _expert_cache_on:
+        _expert_fp = _compute_fingerprint(total_mv, total_cost, total_profit,
+                                           total_today_profit, holdings_count,
+                                           categories, penetrated_assets,
+                                           holdings_details)
+        _expert_key = _CACHE_PREFIX_LLM + f"expert_review_{_expert_fp}"
+        _expert_cached = cache_get(_expert_key, _get_cache_ttl_llm("expert"))
     if _macro_cached is not None and _expert_cached is not None:
         logger.info("LLM 双缓存命中，跳过线程池")
         return (_macro_cached, _expert_cached, True, True)
