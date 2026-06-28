@@ -1166,13 +1166,16 @@ def enhance_news_correlation(
     # 缓存开关（默认启用）
     cache_enabled = llm_config.get("cache_enabled_news", True)
 
-    # 缓存键（含新闻内容 + 持仓的指纹）
+    # 缓存键（含新闻标题摘要 + 持仓的指纹）
+    # 使用 (序号, 标题前80字) 作指纹摘要，而非完整新闻内容，
+    # 避免新闻正文小差异导致 TTL 内缓存频繁失效。
     holdings_summary = [
         {"name": h.name, "code": h.code}
         for h in holdings[:20]
     ]
+    _news_fp_data = [(i, item.get("title", "")[:80]) for i, item in enumerate(top_news)]
     fingerprint = _compute_fingerprint(
-        top_news, holdings_summary, penetrated_assets,
+        _news_fp_data, holdings_summary, penetrated_assets,
     )
     cache_key = _CACHE_PREFIX_LLM + f"news_corr_{fingerprint}"
 
