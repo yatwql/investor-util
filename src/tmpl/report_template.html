@@ -496,17 +496,17 @@
             {% set _ = ns.llm_notes.append("共 " ~ (news_data | length) ~ " 条关联新闻") %}
             {% if news_llm_meta and news_llm_meta.get("llm_enabled") %}
                 {% if news_llm_meta.get("llm_cached") %}
-                    {% set _ = ns.llm_notes.append("本次内容使用了LLM缓存，未直接使用LLM服务能力") %}
+                    {% set _ = ns.llm_notes.append("本次使用LLM缓存，未直接使用LLM服务能力") %}
                 {% else %}
                     {% set _tu = news_llm_meta.get("token_usage", {}) %}
                     {% if _tu.get("total_tokens") %}
-                        {% set _ = ns.llm_notes.append("本次Token消耗：输入 " ~ (_tu.get("input_tokens", 0) | thousands) ~ " + 输出 " ~ (_tu.get("output_tokens", 0) | thousands) ~ " = 合计 " ~ (_tu.get("total_tokens", 0) | thousands)) %}
+                        {% set _ = ns.llm_notes.append("Token 用量：输入 " ~ (_tu.get("input_tokens", 0) | thousands) ~ " / 输出 " ~ (_tu.get("output_tokens", 0) | thousands) ~ " = " ~ (_tu.get("total_tokens", 0) | thousands)) %}
                     {% endif %}
                     {% set _ = ns.llm_notes.append("基于持仓名称和代码+LLM关联分析") %}
                 {% endif %}
             {% else %}
                 {% set _ = ns.llm_notes.append("基于持仓名称和代码进行关键词匹配") %}
-                {% set _ = ns.llm_notes.append("本次内容未依赖于LLM服务，使用传统爬虫+NLP能力") %}
+                {% set _ = ns.llm_notes.append("本次未使用LLM服务能力增强支持，使用传统关键字匹配技术") %}
             {% endif %}
             {% for note in ns.llm_notes %}
             <div>* {{ note }}</div>

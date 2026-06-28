@@ -279,10 +279,8 @@ def build_news_data(
         }
         获取失败时 news_data 为 []。
     """
-    from src.providers.news_aggregator import (
-        aggregate_news,
-        build_holding_keywords,
-    )
+    from src.providers.news_aggregator import aggregate_news
+    from src.providers.news_keywords import build_holding_keywords
 
     keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
     logger.info("新闻关联关键词（含穿透）: %s", keywords)
@@ -364,6 +362,7 @@ def build_news_data(
                 from src.llm_client import enhance_news_correlation
                 news_items, _cached, _token_usage = enhance_news_correlation(
                     news_items, holdings, penetrated_assets=penetrated_assets,
+                    industry_data=_industry_data,
                 )
                 meta["llm_cached"] = _cached
                 meta["token_usage"] = _token_usage
@@ -452,7 +451,7 @@ def write_news_sheet(
         if llm_meta.get("llm_cached"):
             note_parts = [
                 f"共获取 {len(news_data)} 条关联新闻。"
-                "本次内容使用了LLM缓存，未直接使用LLM服务能力"
+                "本次使用LLM缓存，未直接使用LLM服务能力"
             ]
         else:
             note_parts = [f"共获取 {len(news_data)} 条关联新闻"]
@@ -463,7 +462,7 @@ def write_news_sheet(
         # LLM 未启用（或配置关闭）
         note_parts = [
             f"共获取 {len(news_data)} 条关联新闻。"
-            "本次内容未依赖于LLM服务，使用传统爬虫+NLP能力"
+            "本次未使用LLM服务能力增强支持，使用传统关键字匹配技术"
         ]
 
     write_data_row(ws, row, ["".join(note_parts)])
@@ -474,10 +473,10 @@ def write_news_sheet(
         if token_usage.get("total_tokens", 0) > 0:
             row += 1
             token_note = (
-                f"[LLM] Token 消耗: "
-                f"输入 {token_usage.get('input_tokens', 0):,} + "
+                f"Token 用量："
+                f"输入 {token_usage.get('input_tokens', 0):,} / "
                 f"输出 {token_usage.get('output_tokens', 0):,} = "
-                f"总计 {token_usage.get('total_tokens', 0):,} tokens"
+                f"{token_usage.get('total_tokens', 0):,}"
             )
             write_data_row(ws, row, [token_note])
 

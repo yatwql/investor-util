@@ -466,7 +466,7 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         fp.write_fund_performance_sheet(self.ws, stocks, [])
 
         self.mocks["write_title_row"].assert_called_once_with(
-            self.ws, 1, "基金业绩分析", 11)
+            self.ws, 1, "基金业绩分析", 12)
         self.mocks["write_header_row"].assert_called_once()
 
         # write_data_row 仅调用一次（占位行）

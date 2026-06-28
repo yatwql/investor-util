@@ -297,7 +297,7 @@ class TestWriteNewsSheet(unittest.TestCase):
         self.assertTrue(found, "缓存命中时应显示'使用了LLM缓存'")
 
     def test_llm_disabled_footnote(self) -> None:
-        """LLM 未启用 → 底部写"未依赖于LLM服务"。"""
+        """LLM 未启用 → 底部写"未使用LLM服务能力增强支持"。"""
         data = [{"title": "新闻A", "intro": "简介", "url": "http://a.com",
                  "ctime": "2026-06-27", "media_name": "新浪", "matched_keywords": ["茅台"]}]
         llm_meta = {"llm_enabled": False, "llm_cached": False, "token_usage": {}}
@@ -306,9 +306,9 @@ class TestWriteNewsSheet(unittest.TestCase):
         found = False
         for row in self.ws.iter_rows():
             for cell in row:
-                if cell.value and "未依赖于LLM" in str(cell.value):
+                if cell.value and "未使用LLM服务能力" in str(cell.value):
                     found = True
-        self.assertTrue(found, "LLM 未启用时应显示'未依赖于LLM服务'")
+        self.assertTrue(found, "LLM 未启用时应显示'未使用LLM服务能力增强支持'")
 
     def test_llm_analysis_is_empty_when_all_irrelevant(self) -> None:
         """所有新闻 LLM 判定为无关 → 不显示 LLM 分析列。"""

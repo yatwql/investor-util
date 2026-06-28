@@ -181,8 +181,44 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
         from src.cache import get_ttl
         return get_ttl(f"llm_{subtype}")
     except Exception:
-        defaults: dict[str, float] = {"macro": 14400, "expert": 7200, "news": 3600}
+        defaults: dict[str, float] = {"macro": 86400, "expert": 7200, "news": 3600}
         return defaults.get(subtype, 3600)
+
+
+def _expert_fingerprint(
+    total_mv: float = 0,
+    total_cost: float = 0,
+    total_profit: float = 0,
+    total_today_profit: float = 0,
+    holdings_details: list[dict] | None = None,
+    penetrated_assets: list[dict] | None = None,
+    categories: dict | None = None,
+) -> str:
+    """计算智囊团深度回测的缓存指纹。
+
+    包含持仓汇总 + 结构稳定字段，剔除单品级行情波动（market_value / profit / change_pct）。
+
+    包含：
+      - total_mv / total_cost / total_profit / total_today_profit — 持仓汇总（求和无精度抖动）
+      - categories — 分类计数
+      - penetrated_assets — 穿透 TOP10 资产列表
+      - holdings_details — 仅取 (name, code, cost) 三元组
+
+    不包含（避免浮点精度导致误失效）：
+      - holdings_details 中的 market_value / profit / profit_rate / change_pct
+    """
+    _stable_details = []
+    if holdings_details:
+        for d in holdings_details:
+            _stable_details.append({
+                "name": d.get("name", ""),
+                "code": d.get("code", ""),
+                "cost": d.get("cost", 0),
+            })
+    return _compute_fingerprint(
+        total_mv, total_cost, total_profit, total_today_profit,
+        categories, penetrated_assets, _stable_details,
+    )
 
 
 def _compute_fingerprint(*args: Any) -> str:
@@ -217,10 +253,30 @@ def _log_token_usage(provider: str, usage: dict | None, label: str) -> None:
     print(f"  [LLM] {label}: 输入 {inp:,} + 输出 {out:,} = {total:,} tokens")
 
 
-_TRUNCATION_WARNING = (
-    "\n\n【⚠ 输出已被截断！max_tokens 上限不足，内容不完整。"
-    "请在 data/config/llm_settings.json 中增大 max_tokens 后重新生成。】"
+_TOKEN_LINE_RE = re.compile(
+    r'<p style="color:#888;font-size:12px">[^<]*Token 用量[^<]*</p>'
 )
+"""匹配旧版和新版 Token 用量行。"""
+
+_CACHE_LINE_HTML = (
+    '<p style="color:#888;font-size:12px">'
+    "本次使用LLM缓存，未直接使用LLM服务能力"
+    "</p>"
+)
+"""缓存命中的 HTML 提示行。"""
+
+
+def _strip_token_line(html: str) -> str:
+    """从缓存的 HTML 中剥离旧的 Token 用量行。"""
+    return _TOKEN_LINE_RE.sub("", html).strip()
+
+
+def _truncation_warning(config_field: str) -> str:
+    """生成截断警告，指明 llm_settings.json 中需要增大的具体配置项。"""
+    return (
+        f"\n\n【⚠ 输出已被截断！{config_field} 上限不足，内容不完整。"
+        f"请在 data/config/llm_settings.json 中增大 {config_field} 后重新生成。】"
+    )
 
 
 def _check_claude_truncation(data: dict, max_tokens: int, label: str, config_field: str = "max_tokens") -> bool:
@@ -440,7 +496,7 @@ def _call_claude(
 
         content = content.strip()
         if truncated:
-            content += _TRUNCATION_WARNING
+            content += _truncation_warning(config_field)
 
         return (content, usage)
 
@@ -529,7 +585,7 @@ def _call_openai(
 
         content = content.strip()
         if truncated:
-            content += _TRUNCATION_WARNING
+            content += _truncation_warning(config_field)
 
         return (content, usage)
 
@@ -553,7 +609,7 @@ Phase 3（定音锤）指挥官融合辩论给出量化调仓方案和风险提�
 
 约束：数据来自输入不虚构；每个论点引用品种代码和收益率；全 Markdown 输出；引用北京时间。"""
 
-_SYSTEM_NEWS_CORRELATION = """你是一位资深金融分析师。分析以下每条财经新闻与用户投资组合持仓的关联性。
+_SYSTEM_NEWS_CORRELATION = """你是一位资深金融分析师。以下会给你多批财经新闻（每批最多5条），请逐批分析每条新闻与用户投资组合持仓的关联性。
 
 关联度标准：
 - 高：新闻内容直接涉及持仓品种、所属行业或相关重大政策
@@ -561,9 +617,11 @@ _SYSTEM_NEWS_CORRELATION = """你是一位资深金融分析师。分析以下�
 - 低：新闻内容与持仓品种关联较弱
 - 无关：新闻内容与持仓品种无明显关联
 
-对每条新闻输出JSON数组，格式：
-[{"idx": 0, "relevance": "高|中|低|无关", "analysis": "不超过30字的原因分析"}, ...]
+每批输出一个JSON数组，为本批【每条新闻】分别输出关联分析结果，格式：
+[{"idx": 0, "relevance": "高|中|低|无关", "sentiment": "利好|利空|中性", "analysis": "不超过30字的原因分析"}, ...]
 
+每条新闻必须分析，不允许跳过任何一条。idx 对应当前批新闻列表中的序号（0 开始）。
+sentiment 字段判断该新闻对持仓的利好/利空影响（结合行业和概念判断）。
 只输出JSON，不要其他内容。"""
 
 
@@ -578,8 +636,18 @@ def _build_macro_prompt(
     total_mv: float,
     total_profit: float,
     categories: dict,
+    sector_flow: list[dict[str, Any]] | None = None,
 ) -> str:
-    """构建模块 7（全球政经）的用户提示词（紧凑格式）。"""
+    """构建模块 7（全球政经）的用户提示词（紧凑格式）。
+
+    Args:
+        a_indices: A 股指数行情
+        us_indices: 美股指数行情
+        total_mv: 持仓总市值
+        total_profit: 持仓总盈亏
+        categories: 品种分类计数
+        sector_flow: 行业资金流向数据（可选），含主力净流入排名
+    """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     idx_text = "A股:"
     for idx in (a_indices or {}).values():
@@ -596,11 +664,32 @@ def _build_macro_prompt(
 
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
+    # ── 行业资金流向 ──
+    flow_text = ""
+    if sector_flow:
+        top_sectors = sector_flow[:5]  # 前 5 个行业
+        flow_lines = []
+        for s in top_sectors:
+            name = s.get("name", "")
+            chg = s.get("change_pct")
+            inflow = s.get("main_net_inflow")
+            inflow_pct = s.get("main_net_inflow_pct")
+            parts = [f"{name}"]
+            if chg is not None:
+                parts.append(f"涨跌{chg:+.2f}%")
+            if inflow is not None:
+                parts.append(f"主力净流入{inflow:,.0f}")
+            if inflow_pct is not None:
+                parts.append(f"净占比{inflow_pct:.2f}%")
+            flow_lines.append("  ".join(parts))
+        flow_text = "\n【行业资金流向】\n" + "\n".join(flow_lines)
+
     return (
         f"【当前时间】{now_bj}（北京时间）\n"
         f"【指数】{idx_text}\n"
         f"【持仓】总市值{total_mv:,.0f} 总盈亏{total_profit:+,.0f}\n"
         f"【分布】{' '.join(cat_parts)}\n"
+        f"{flow_text}"
         f"请基于以上数据，分析当前全球政经局势对持仓的潜在影响。"
     )
 
@@ -689,6 +778,7 @@ def generate_global_macro(
     total_mv: float,
     total_profit: float,
     categories: dict,
+    sector_flow: list[dict[str, Any]] | None = None,
     force: bool = False,
     http_client: httpx.Client | None = None,
 ) -> tuple[Optional[str], bool]:
@@ -700,6 +790,7 @@ def generate_global_macro(
         total_mv: 总市值
         total_profit: 总盈亏
         categories: 分类计数
+        sector_flow: 行业资金流向数据（可选），含主力净流入排名
         force: 为 True 时跳过缓存强制重新生成
         http_client: 可选的 httpx.Client 实例。传入时使用该客户端发起 HTTP 请求，
             而非全局共享的 _HTTP_POOL。用于多线程场景下避免连接池线程安全问题。
@@ -717,14 +808,16 @@ def generate_global_macro(
     # 缓存开关（默认启用）
     cache_enabled = llm_config.get("cache_enabled_macro", True)
 
-    # 缓存键（含数据指纹：行情/持仓变化时自动失效）
+    # 缓存键（含数据指纹：行情/持仓变化时自动失效；sector_flow 因 TTL 仅 15 分钟不纳入指纹，
+    # 避免 sector_flow 频繁变化导致 24h TTL 的 macro 缓存反复失效）
     fingerprint = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
     cache_key = _CACHE_PREFIX_LLM + f"global_macro_{fingerprint}"
     if cache_enabled and not force:
         cached = cache_get(cache_key, _get_cache_ttl_llm("macro"))
         if cached is not None:
             logger.info("LLM 缓存命中: 全球政经局势")
-            return (cached, True)
+            cached_clean = _strip_token_line(cached) + _CACHE_LINE_HTML
+            return (cached_clean, True)
 
     # 优先使用外部配置的 system_prompt，未配置时回退内置常量
     system_macro = llm_config.get("system_prompt_macro") or _SYSTEM_MACRO
@@ -732,7 +825,7 @@ def generate_global_macro(
     if llm_config.get("output_brief_macro", False):
         system_macro += "\n（精简模式，输出 200 字以内。）"
 
-    prompt = _build_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories)
+    prompt = _build_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories, sector_flow)
     logger.info("正在调用 LLM 生成全球政经局势分析...")
     macro_mt = llm_config.get("max_tokens_macro") or llm_config.get("max_tokens", 800)
     _timeout = llm_config.get("timeout_macro", 60.0)
@@ -750,7 +843,7 @@ def generate_global_macro(
         if usage:
             inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
             out = usage.get("output_tokens", usage.get("completion_tokens", 0))
-            html += f'<p style="color:#888;font-size:12px">⚡ Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
+            html += f'<p style="color:#888;font-size:12px">Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
         cache_set(cache_key, html)
         logger.info("全球政经局势分析生成完成")
         return (html, False)
@@ -800,17 +893,21 @@ def generate_expert_review(
     # 缓存开关（默认启用）
     cache_enabled = llm_config.get("cache_enabled_expert", True)
 
-    # 缓存键（含数据指纹：持仓变化时自动失效）
-    fingerprint = _compute_fingerprint(total_mv, total_cost, total_profit,
-                                       total_today_profit, holdings_count,
-                                       categories, penetrated_assets,
-                                       holdings_details)
+    # 缓存键（指纹含持仓汇总 + 结构稳定字段）
+    fingerprint = _expert_fingerprint(
+        total_mv=total_mv, total_cost=total_cost,
+        total_profit=total_profit, total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
+        categories=categories,
+    )
     cache_key = _CACHE_PREFIX_LLM + f"expert_review_{fingerprint}"
     if cache_enabled and not force:
         cached = cache_get(cache_key, _get_cache_ttl_llm("expert"))
         if cached is not None:
             logger.info("LLM 缓存命中: 智囊团深度复盘")
-            return (cached, True)
+            cached_clean = _strip_token_line(cached) + _CACHE_LINE_HTML
+            return (cached_clean, True)
 
     # 优先使用外部配置的 system_prompt，未配置时回退内置常量
     system_expert = llm_config.get("system_prompt_expert") or _SYSTEM_EXPERT
@@ -836,7 +933,7 @@ def generate_expert_review(
         if usage:
             inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
             out = usage.get("output_tokens", usage.get("completion_tokens", 0))
-            html += f'<p style="color:#888;font-size:12px">⚡ Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
+            html += f'<p style="color:#888;font-size:12px">Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
         cache_set(cache_key, html)
         logger.info("智囊团深度复盘生成完成")
         return (html, False)
@@ -851,25 +948,56 @@ def generate_expert_review(
 # ═══════════════════════════════════════════════════════════
 
 
-def _build_holdings_summary(holdings: list, penetrated_assets: list | None = None) -> str:
+def _build_holdings_summary(
+    holdings: list,
+    penetrated_assets: list | None = None,
+    industry_data: dict[str, dict] | None = None,
+) -> str:
     """构建持仓摘要文本（紧凑格式），供新闻关联分析 Prompt 使用。
+
+    可选注入行业分类和概念板块信息（industry_data），
+    使 LLM 能更准确判断新闻对持仓的利好/利空影响。
 
     Args:
         holdings: 持仓列表
         penetrated_assets: 穿透 TOP10 资产（可选）
+        industry_data: 行业/概念数据 {code: {industry, concepts, ...}}（可选）
 
     Returns:
         紧凑格式的持仓摘要文本
     """
     lines: list[str] = []
     for i, h in enumerate(holdings[:20]):
-        lines.append(f"{i + 1}. {h.name} ({h.code})")
+        code = (h.code or "").strip()
+        line = f"{i + 1}. {h.name} ({code})"
+        if industry_data and code in industry_data:
+            idata = industry_data[code]
+            tags = []
+            if idata.get("industry"):
+                tags.append(idata["industry"])
+            if idata.get("concepts"):
+                tags.extend(idata["concepts"][:3])
+            if tags:
+                line += f" [{'·'.join(tags)}]"
+        lines.append(line)
     if penetrated_assets:
         for a in penetrated_assets[:10]:
             name = a.get("name", "")
             codes = ",".join(a.get("codes", []))
-            if name or codes:
-                lines.append(f"    [穿透] {name} ({codes})")
+            line = f"    [穿透] {name} ({codes})"
+            if industry_data:
+                tags = []
+                for ac in (a.get("codes") or []):
+                    ac = ac.strip()
+                    if ac in industry_data:
+                        idata = industry_data[ac]
+                        if idata.get("industry"):
+                            tags.append(idata["industry"])
+                        if idata.get("concepts"):
+                            tags.extend(idata["concepts"][:2])
+                if tags:
+                    line += f" [{'·'.join(tags)}]"
+            lines.append(line)
     return "\n".join(lines)
 
 
@@ -895,27 +1023,31 @@ def _build_news_summary(news_data: list[dict]) -> str:
     return "\n".join(parts)
 
 
-def _apply_llm_analysis(news_data: list[dict], llm_response: str) -> list[dict]:
-    """解析 LLM JSON 响应并富化新闻数据。
-
-    遍历 LLM 返回的 JSON 数组，将每条新闻的关联分析写入
-    news_data 对应项的 llm_analysis 字段。
+def _apply_llm_analysis(
+    news_batch: list[dict],
+    llm_response: str,
+) -> list[tuple[str, str, str]]:
+    """解析 LLM JSON 响应，返回批次内每条新闻的 (relevance, sentiment, analysis) 元组。
 
     Args:
-        news_data: 原始新闻列表
+        news_batch: 本批新闻列表（用于确定预期的条目数）
         llm_response: LLM 返回的 JSON 字符串
 
     Returns:
-        富化后的新闻列表（含 llm_analysis 字段），
-        解析失败时返回原始新闻列表
+        (relevance, sentiment, analysis) 元组列表，长度与 news_batch 一致。
+        LLM 返回结果少于请求数时，缺失项用默认值 ("低", "中性", "") 填充。
+        JSON 解析失败时，所有项返回默认值。
     """
     import json
     import re
 
+    batch_size = len(news_batch)
+    if batch_size == 0:
+        return []
+
     # 从可能含 Markdown 代码块的文本中提取 JSON
     text = llm_response.strip()
     if "```" in text:
-        # 取第一个代码块的内容
         for block in text.split("```"):
             block = block.strip()
             if block.startswith("json"):
@@ -930,48 +1062,39 @@ def _apply_llm_analysis(news_data: list[dict], llm_response: str) -> list[dict]:
         analyses = json.loads(text)
     except json.JSONDecodeError as e:
         logger.warning("LLM 新闻分析 JSON 解析失败: %s", e)
-        return news_data
+        return [("低", "中性", "")] * batch_size
 
     if not isinstance(analyses, list):
         logger.warning("LLM 新闻分析返回格式异常: 非数组")
-        return news_data
+        return [("低", "中性", "")] * batch_size
 
-    # 建立 idx → (relevance, analysis) 映射
-    analysis_map: dict[int, str] = {}
+    # 建立 idx → (relevance, sentiment, analysis) 映射
+    result_map: dict[int, tuple[str, str, str]] = {}
     for a in analyses:
         idx = a.get("idx")
-        if not isinstance(idx, int) or idx < 0 or idx >= len(news_data):
+        if not isinstance(idx, int) or idx < 0 or idx >= batch_size:
             continue
-        relevance = a.get("relevance", "")
-        analysis_text = a.get("analysis", "")
-        # 跳过"无关"项，不浪费列空间
-        if relevance == "无关":
-            continue
-        if analysis_text:
-            analysis_map[idx] = f"[{relevance}] {analysis_text}"
+        relevance = a.get("relevance", "低")
+        sentiment = a.get("sentiment", "中性")
+        analysis = a.get("analysis", "")
+        result_map[idx] = (relevance, sentiment, analysis)
+
+    # 按顺序组装结果，缺失项填充默认值
+    results: list[tuple[str, str, str]] = []
+    for i in range(batch_size):
+        if i in result_map:
+            results.append(result_map[i])
         else:
-            analysis_map[idx] = f"[{relevance}]"
+            results.append(("低", "中性", ""))
 
-    # 富化新闻数据
-    enriched: list[dict] = []
-    for i, item in enumerate(news_data):
-        item_copy = dict(item)
-        if i in analysis_map:
-            item_copy["llm_analysis"] = analysis_map[i]
-        enriched.append(item_copy)
-
-    if analysis_map:
-        logger.info("LLM 新闻关联: 富化 %d/%d 条", len(analysis_map), len(news_data))
-    else:
-        logger.info("LLM 新闻关联: 全部判定为无关")
-
-    return enriched
+    return results
 
 
 def enhance_news_correlation(
     news_data: list[dict],
     holdings: list,
     penetrated_assets: list | None = None,
+    industry_data: dict[str, dict] | None = None,
     force: bool = False,
     http_client: httpx.Client | None = None,
 ) -> tuple[list[dict], bool, dict]:
@@ -979,13 +1102,18 @@ def enhance_news_correlation(
 
     对关键词匹配后的新闻进行 LLM 二次分析：
     - 判定每条的关联度（高/中/低/无关）
+    - 判断利好/利空影响
     - 给出简要原因分析
     - 写入 news_data 各条的 llm_analysis 字段
+
+    支持分批处理：将新闻按每批至多 5 条分组，逐批调用 LLM 分析。
+    每批独立处理，单批失败仅影响本批 5 条（降级为默认值）。
 
     Args:
         news_data: 关键词匹配后的新闻列表（由 build_news_data 返回）
         holdings: 持仓列表
         penetrated_assets: 穿透 TOP10 资产（可选）
+        industry_data: 行业/概念数据 {code: {industry, concepts, ...}}（可选）
         force: 为 True 时跳过缓存强制重新生成
         http_client: 可选的 httpx.Client 实例
 
@@ -1030,61 +1158,105 @@ def enhance_news_correlation(
             logger.info("LLM 缓存命中: 新闻关联分析")
             return (cached, True, {})
 
-    # 构建 Prompt
+    # 构建 top_news → news_data 原始位置的正查映射（sorted 改变了顺序）
+    news_data_index_of = {id(item): i for i, item in enumerate(news_data)}
+    top_to_original: dict[int, int] = {}
+    for ti, item in enumerate(top_news):
+        orig_i = news_data_index_of.get(id(item))
+        if orig_i is not None:
+            top_to_original[ti] = orig_i
+
+    # ── 分批处理 ─────────────────────────────────────────
+    BATCH_SIZE = 5
     system_prompt = (
         llm_config.get("system_prompt_news_correlation")
         or _SYSTEM_NEWS_CORRELATION
     )
-    holdings_text = _build_holdings_summary(holdings, penetrated_assets)
-    news_text = _build_news_summary(top_news)
-    user_prompt = (
-        f"【持仓信息】\n"
-        f"{holdings_text}\n\n"
-        f"【新闻列表】\n"
-        f"{news_text}\n\n"
-        f"请分析以上每条新闻与持仓的关联性，输出JSON数组。"
-    )
-
-    logger.info("正在调用 LLM 增强新闻关联分析...")
+    holdings_text = _build_holdings_summary(holdings, penetrated_assets, industry_data)
     max_tokens = llm_config.get("max_tokens_news_correlation", 2000)
     _timeout = llm_config.get("timeout_news_correlation", 60.0)
     _temp = llm_config.get("temperature_news_correlation")
-    result, usage = _call_llm(
-        system_prompt, user_prompt, llm_config,
-        timeout=_timeout, http_client=http_client,
-        max_tokens=max_tokens,
-        config_field="max_tokens_news_correlation",
-        temperature=_temp,
-    )
 
-    if not result:
-        logger.warning("LLM 新闻关联分析失败")
-        return (news_data, False, {})
+    # analysis_by_orig_idx[news_data_index] = (relevance, sentiment, analysis)
+    analysis_by_orig_idx: dict[int, tuple[str, str, str]] = {}
+    total_tokens_input = 0
+    total_tokens_output = 0
 
-    # 解析 JSON 并富化
-    enriched = _apply_llm_analysis(news_data, result)
+    batches = [top_news[i:i + BATCH_SIZE] for i in range(0, len(top_news), BATCH_SIZE)]
+    logger.info("正在调用 LLM 增强新闻关联分析（%d 批，每批最多 %d 条）...",
+                len(batches), BATCH_SIZE)
+
+    for batch_idx, batch in enumerate(batches):
+        news_text = _build_news_summary(batch)
+        user_prompt = (
+            f"【持仓信息】\n"
+            f"{holdings_text}\n\n"
+            f"【新闻列表】\n"
+            f"{news_text}\n\n"
+            f"请分析以上每条新闻与持仓的关联性，输出JSON数组。"
+        )
+
+        result, usage = _call_llm(
+            system_prompt, user_prompt, llm_config,
+            timeout=_timeout, http_client=http_client,
+            max_tokens=max_tokens,
+            config_field="max_tokens_news_correlation",
+            temperature=_temp,
+        )
+
+        if result:
+            batch_tuples = _apply_llm_analysis(batch, result)
+            # 将本批结果按 top_news 全局位置映射回 news_data 原始位置
+            for local_idx, (rel, sent, analysis_text) in enumerate(batch_tuples):
+                global_pos = batch_idx * BATCH_SIZE + local_idx
+                if global_pos in top_to_original:
+                    orig_i = top_to_original[global_pos]
+                    analysis_by_orig_idx[orig_i] = (rel, sent, analysis_text)
+            if usage:
+                inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+                out = usage.get("output_tokens", usage.get("completion_tokens", 0))
+                total_tokens_input += inp
+                total_tokens_output += out
+        else:
+            logger.warning("LLM 新闻关联分析（批 %d/%d）: 分析失败，使用默认值",
+                           batch_idx + 1, len(batches))
+
+    # ── 合并结果 ─────────────────────────────────────────
+    enriched: list[dict] = []
+    analysis_count = 0
+    for i, item in enumerate(news_data):
+        item_copy = dict(item)
+        if i in analysis_by_orig_idx:
+            relevance, sentiment, analysis_text = analysis_by_orig_idx[i]
+            if relevance != "无关":
+                prefix = f"[{relevance}]"
+                if sentiment in ("利好", "利空"):
+                    prefix += f"[{sentiment}]"
+                item_copy["llm_analysis"] = (
+                    f"{prefix} {analysis_text}" if analysis_text else prefix
+                )
+                analysis_count += 1
+        enriched.append(item_copy)
 
     # 构建 token 用量字典
     token_usage: dict = {}
-    if usage:
-        inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
-        out = usage.get("output_tokens", usage.get("completion_tokens", 0))
+    if total_tokens_input > 0 or total_tokens_output > 0:
         token_usage = {
-            "input_tokens": inp,
-            "output_tokens": out,
-            "total_tokens": inp + out,
+            "input_tokens": total_tokens_input,
+            "output_tokens": total_tokens_output,
+            "total_tokens": total_tokens_input + total_tokens_output,
         }
         _log_token_usage(
             llm_config.get("provider", "unknown"),
-            usage, "新闻关联",
+            {"input_tokens": total_tokens_input, "output_tokens": total_tokens_output},
+            "新闻关联（批处理）",
         )
 
     # 缓存
     cache_set(cache_key, enriched)
     logger.info(
-        "LLM 新闻关联分析完成: %d 条 → %d 条含 LLM 分析",
-        len(news_data),
-        sum(1 for n in enriched if n.get("llm_analysis")),
+        "LLM 新闻关联分析完成: %d 条 → %d 条含 LLM 分析（%d 批）",
+        len(news_data), analysis_count, len(batches),
     )
 
     return (enriched, False, token_usage)
@@ -1106,6 +1278,7 @@ def generate_all_llm(
     categories: dict,
     penetrated_assets: Optional[list[dict]] = None,
     holdings_details: Optional[list[dict]] = None,
+    sector_flow: Optional[list[dict]] = None,
     force: bool = False,
 ) -> tuple[Optional[str], Optional[str], bool, bool]:
     """并行生成模块 7（全球政经）+ 模块 8（智囊团复盘）。
@@ -1124,6 +1297,7 @@ def generate_all_llm(
         categories: 分类计数
         penetrated_assets: 穿透 TOP10 资产列表（可选）
         holdings_details: 持仓明细列表（可选）
+        sector_flow: 行业资金流向数据（可选），注入全球政经 prompt
         force: 为 True 时跳过缓存强制重新生成
 
     Returns:
@@ -1140,6 +1314,7 @@ def generate_all_llm(
         try:
             return generate_global_macro(
                 a_indices, us_indices, total_mv, total_profit, categories,
+                sector_flow=sector_flow,
                 force=force, http_client=client,
             )
         finally:
@@ -1170,15 +1345,20 @@ def generate_all_llm(
         _macro_key = _CACHE_PREFIX_LLM + f"global_macro_{_macro_fp}"
         _macro_cached = cache_get(_macro_key, _get_cache_ttl_llm("macro"))
     if _expert_cache_on:
-        _expert_fp = _compute_fingerprint(total_mv, total_cost, total_profit,
-                                           total_today_profit, holdings_count,
-                                           categories, penetrated_assets,
-                                           holdings_details)
+        _expert_fp = _expert_fingerprint(
+            total_mv=total_mv, total_cost=total_cost,
+            total_profit=total_profit, total_today_profit=total_today_profit,
+            holdings_details=holdings_details,
+            penetrated_assets=penetrated_assets,
+            categories=categories,
+        )
         _expert_key = _CACHE_PREFIX_LLM + f"expert_review_{_expert_fp}"
         _expert_cached = cache_get(_expert_key, _get_cache_ttl_llm("expert"))
     if _macro_cached is not None and _expert_cached is not None:
         logger.info("LLM 双缓存命中，跳过线程池")
-        return (_macro_cached, _expert_cached, True, True)
+        _macro = _strip_token_line(_macro_cached) + _CACHE_LINE_HTML
+        _expert = _strip_token_line(_expert_cached) + _CACHE_LINE_HTML
+        return (_macro, _expert, True, True)
 
     macro_result: Optional[str] = None
     expert_result: Optional[str] = None

@@ -159,7 +159,7 @@ class TestWriteContentSheet(unittest.TestCase):
         ws = self._write_and_get_sheet(content="一段落话", from_cache=True)
         # 第 2 行 = 段落, 第 3 行 = 空行, 第 4 行 = 缓存提示
         hint_cell = ws.cell(row=4, column=1)
-        self.assertIn("LLM 缓存", str(hint_cell.value))
+        self.assertIn("LLM缓存", str(hint_cell.value))
         self.assertTrue(hint_cell.font.italic)
 
     def test_from_cache_false_no_hint(self):
@@ -233,7 +233,7 @@ class TestWriteLlmSheets(unittest.TestCase):
         ws7, ws8 = self._get_llm_sheets()
 
         # sheet7：第 4 行应有缓存提示
-        self.assertIn("LLM 缓存", str(ws7.cell(row=4, column=1).value or ""))
+        self.assertIn("LLM缓存", str(ws7.cell(row=4, column=1).value or ""))
         # sheet8：第 4 行应无提示
         self.assertIsNone(ws8.cell(row=4, column=1).value)
 
@@ -245,8 +245,8 @@ class TestWriteLlmSheets(unittest.TestCase):
             llm_cached=(True, True),
         )
         ws7, ws8 = self._get_llm_sheets()
-        self.assertIn("LLM 缓存", str(ws7.cell(row=4, column=1).value or ""))
-        self.assertIn("LLM 缓存", str(ws8.cell(row=4, column=1).value or ""))
+        self.assertIn("LLM缓存", str(ws7.cell(row=4, column=1).value or ""))
+        self.assertIn("LLM缓存", str(ws8.cell(row=4, column=1).value or ""))
 
     def test_cache_off_default(self):
         """默认 llm_cached=(False, False) → 无缓存提示。"""

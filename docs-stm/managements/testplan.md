@@ -94,6 +94,7 @@
 | Iter 3.7 | html_writer.py 中 a_indices 以 dict 类型传入 generate_all_llm（不因 .values() 崩溃）、fund_performance.py 在 API 返回 JSON null 时 categories/data 自动兜底、summary.py write_summary_sheet 接收 dict 类型指数数据（不因 list 传入致 .get() 崩溃）、fund_performance._adjust_rating_with_benchmark 中 categories 含 None 时自动兜底 |
 | v0.2.10 | 关键词富化函数 `_build_keyword_lookup`/`_enrich_keywords_for_item`/`_format_enriched_keywords` 单元测试覆盖三种来源类型（持仓/穿透/行业）、去重逻辑、空列表边界；Excel 格式断言（B/C 列 wrap_text、列宽 B=40/C=50、左对齐、富化关键词写入）；HTML 模板 enriched_keywords 着色（holding→蓝/penetration→紫/industry→灰） |
 | v0.2.11 | `eastmoney_industry` provider 单元测试覆盖正常返回（含/不含概念）、data 为空、响应为空、超时异常、基金代码处理；`fetcher.fetch_industry_data` / `batch_fetch_industry_data` 缓存集成测试；`_build_keyword_lookup` 新增 concept 类型覆盖测试；`_enrich_keywords_for_item` 新增概念类型富化显示测试；全量 607 passed |
+| v0.2.18 | 新增 `test_akshare_extras.py`（16 项）：指数指纹计算、缓存键生成、分红汇总计算、分红数据获取全路径、内存缓存（TestMemoCache 5 项）；`test_llm_client.py` 新增 sector_flow prompt 注入测试（2 项）、batch 新闻 LLM 分析测试（6 项）；全量 749 passed |
 
 ---
 

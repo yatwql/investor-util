@@ -154,7 +154,7 @@ class TestGetCacheTtlLlm(unittest.TestCase):
     def test_macro_default(self) -> None:
         ttl = _get_cache_ttl_llm("macro")
         self.assertGreater(ttl, 0)
-        self.assertEqual(ttl, 14400)
+        self.assertEqual(ttl, 86400)
 
     def test_expert_default(self) -> None:
         ttl = _get_cache_ttl_llm("expert")
@@ -193,6 +193,25 @@ class TestBuildMacroPrompt(unittest.TestCase):
         r = _build_macro_prompt({}, {}, 0, 0, {})
         self.assertIn("当前时间", r)
         # 不应该有 AssertionError
+
+    def test_with_sector_flow(self) -> None:
+        """传入行业资金流向时，prompt 应包含资金流向数据。"""
+        sector_flow = [
+            {"name": "半导体", "change_pct": 2.5, "main_net_inflow": 1500000000, "main_net_inflow_pct": 3.2},
+            {"name": "银行", "change_pct": -0.8, "main_net_inflow": -500000000, "main_net_inflow_pct": -1.1},
+        ]
+        r = _build_macro_prompt({}, {}, 100000, 5000, {"股票": 3}, sector_flow=sector_flow)
+        self.assertIn("行业资金流向", r)
+        self.assertIn("半导体", r)
+        self.assertIn("+2.50%", r)
+        self.assertIn("银行", r)
+        self.assertIn("-0.80%", r)
+        self.assertIn("主力净流入", r)
+
+    def test_sector_flow_none(self) -> None:
+        """sector_flow=None 时不应包含资金流向内容。"""
+        r = _build_macro_prompt({}, {}, 0, 0, {})
+        self.assertNotIn("行业资金流向", r)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -492,6 +511,18 @@ class TestBuildHoldingsSummary(unittest.TestCase):
         result = _build_holdings_summary(self.holdings, self.penetrated)
         self.assertIn("[穿透]", result)
 
+    def test_with_industry_data(self) -> None:
+        """industry_data 中包含行业和概念 → 显示到摘要中。"""
+        from src.llm_client import _build_holdings_summary
+        industry_data = {
+            "600900": {"industry": "电力", "concepts": ["核电", "水电"]},
+            "600519": {"industry": "白酒Ⅱ", "concepts": ["白酒", "超级品牌"]},
+        }
+        result = _build_holdings_summary(self.holdings, industry_data=industry_data)
+        self.assertIn("电力", result)
+        self.assertIn("白酒Ⅱ", result)
+        self.assertIn("核电", result)
+
     def test_empty(self) -> None:
         from src.llm_client import _build_holdings_summary
         result = _build_holdings_summary([], None)
@@ -548,7 +579,7 @@ class TestBuildNewsSummary(unittest.TestCase):
 
 
 class TestApplyLLMAnalysis(unittest.TestCase):
-    """测试 LLM JSON 响应的解析和富化。"""
+    """测试 LLM JSON 响应的解析 — 返回 (relevance, sentiment, analysis) 元组列表。"""
 
     def setUp(self) -> None:
         self.news = [
@@ -559,47 +590,148 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_standard_response(self) -> None:
         from src.llm_client import _apply_llm_analysis
-        llm_resp = '[{"idx": 0, "relevance": "高", "analysis": "白酒利好"}, {"idx": 1, "relevance": "中", "analysis": "间接影响"}]'
+        llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "白酒利好"}, {"idx": 1, "relevance": "中", "sentiment": "中性", "analysis": "间接影响"}]'
         result = _apply_llm_analysis(self.news, llm_resp)
-        self.assertEqual(result[0].get("llm_analysis"), "[高] 白酒利好")
-        self.assertEqual(result[1].get("llm_analysis"), "[中] 间接影响")
-        self.assertNotIn("llm_analysis", result[2])
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0], ("高", "利好", "白酒利好"))
+        self.assertEqual(result[1], ("中", "中性", "间接影响"))
+        self.assertEqual(result[2], ("低", "中性", ""))  # 缺失项默认值
 
-    def test_irrelevant_filtered(self) -> None:
-        """关联度为"无关"时不在列中显示。"""
+    def test_with_sentiment(self) -> None:
+        """解析 sentiment 字段。"""
         from src.llm_client import _apply_llm_analysis
-        llm_resp = '[{"idx": 0, "relevance": "高", "analysis": "利好"}, {"idx": 1, "relevance": "无关", "analysis": "无关内容"}]'
+        llm_resp = (
+            '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "白酒利好"},'
+            ' {"idx": 1, "relevance": "高", "sentiment": "利空", "analysis": "利空影响"},'
+            ' {"idx": 2, "relevance": "低", "sentiment": "中性", "analysis": "中性影响"}]'
+        )
+        batch = self.news + [{"title": "新闻D", "matched_keywords": []}]
+        result = _apply_llm_analysis(batch, llm_resp)
+        self.assertEqual(len(result), 4)
+        self.assertEqual(result[0], ("高", "利好", "白酒利好"))
+        self.assertEqual(result[1], ("高", "利空", "利空影响"))
+        self.assertEqual(result[2], ("低", "中性", "中性影响"))
+        self.assertEqual(result[3], ("低", "中性", ""))  # 缺失项默认值
+
+    def test_irrelevant_not_filtered(self) -> None:
+        """"无关"不再被过滤——元组中直接返回原始数据，由调用方决定是否跳过。"""
+        from src.llm_client import _apply_llm_analysis
+        llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "中性", "analysis": "利好"}, {"idx": 1, "relevance": "无关", "sentiment": "中性", "analysis": "无关内容"}]'
         result = _apply_llm_analysis(self.news, llm_resp)
-        self.assertIn("llm_analysis", result[0])
-        self.assertNotIn("llm_analysis", result[1])
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[0], ("高", "中性", "利好"))
+        self.assertEqual(result[1], ("无关", "中性", "无关内容"))
+        self.assertEqual(result[2], ("低", "中性", ""))
 
     def test_malformed_json(self) -> None:
-        """JSON 解析失败 → 返回原始数据。"""
+        """JSON 解析失败 → 全部返回默认值。"""
         from src.llm_client import _apply_llm_analysis
         result = _apply_llm_analysis(self.news, "不是json")
-        self.assertEqual(result, self.news)
+        self.assertEqual(len(result), 3)
+        for t in result:
+            self.assertEqual(t, ("低", "中性", ""))
 
     def test_not_a_list(self) -> None:
-        """LLM 返回非数组 → 返回原始数据。"""
+        """LLM 返回非数组 → 全部返回默认值。"""
         from src.llm_client import _apply_llm_analysis
         result = _apply_llm_analysis(self.news, '{"error": "wrong"}')
-        self.assertEqual(result, self.news)
+        self.assertEqual(len(result), 3)
+        for t in result:
+            self.assertEqual(t, ("低", "中性", ""))
 
     def test_with_code_block(self) -> None:
         """响应包含 Markdown 代码块 → 正确提取 JSON。"""
         from src.llm_client import _apply_llm_analysis
-        llm_resp = '```json\n[{"idx": 0, "relevance": "高", "analysis": "直接利好"}]\n```'
-        result = _apply_llm_analysis(self.news, llm_resp)
-        self.assertIn("llm_analysis", result[0])
+        llm_resp = '```json\n[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "直接利好"}]\n```'
+        result = _apply_llm_analysis(self.news[:1], llm_resp)
+        self.assertEqual(result[0], ("高", "利好", "直接利好"))
 
     def test_idx_out_of_range(self) -> None:
-        """idx 越界时忽略该条目。"""
+        """idx 越界时忽略该条目，使用默认值填充。"""
         from src.llm_client import _apply_llm_analysis
-        llm_resp = '[{"idx": 99, "relevance": "高", "analysis": "越界"}]'
+        llm_resp = '[{"idx": 99, "relevance": "高", "sentiment": "利好", "analysis": "越界"}]'
         result = _apply_llm_analysis(self.news, llm_resp)
-        # 不崩溃，所有项无分析
-        for item in result:
-            self.assertNotIn("llm_analysis", item)
+        self.assertEqual(len(result), 3)
+        for t in result:
+            self.assertEqual(t, ("低", "中性", ""))
+
+    def test_empty_batch(self) -> None:
+        """空列表 → 返回空列表。"""
+        from src.llm_client import _apply_llm_analysis
+        result = _apply_llm_analysis([], "[]")
+        self.assertEqual(result, [])
+
+
+# ═══════════════════════════════════════════════════════════
+#  批次 LLM 新闻分析（TestBatchNewsAnalysis）
+# ═══════════════════════════════════════════════════════════
+
+
+class TestBatchNewsAnalysis(unittest.TestCase):
+    """测试批次 LLM 新闻分析功能。"""
+
+    def setUp(self) -> None:
+        self.news_5 = [
+            {"title": f"新闻{i}", "matched_keywords": ["茅台"]}
+            for i in range(5)
+        ]
+
+    def test_handle_5_items_in_one_batch(self) -> None:
+        """处理 5 条新闻的批次，全部成功返回。"""
+        from src.llm_client import _apply_llm_analysis
+        import json
+        llm_resp = json.dumps([
+            {"idx": i, "relevance": "高", "sentiment": "利好", "analysis": f"原因{i}"}
+            for i in range(5)
+        ])
+        result = _apply_llm_analysis(self.news_5, llm_resp)
+        self.assertEqual(len(result), 5)
+        for i in range(5):
+            self.assertEqual(result[i], ("高", "利好", f"原因{i}"))
+
+    def test_partial_json_response(self) -> None:
+        """LLM 返回 3 条结果给 5 条新闻 → 缺失 2 条填充默认值。"""
+        from src.llm_client import _apply_llm_analysis
+        import json
+        llm_resp = json.dumps([
+            {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
+            {"idx": 2, "relevance": "中", "sentiment": "中性", "analysis": "原因2"},
+            {"idx": 4, "relevance": "高", "sentiment": "利空", "analysis": "原因4"},
+        ])
+        result = _apply_llm_analysis(self.news_5, llm_resp)
+        self.assertEqual(len(result), 5)
+        self.assertEqual(result[0], ("高", "利好", "原因0"))
+        self.assertEqual(result[1], ("低", "中性", ""))  # 缺失
+        self.assertEqual(result[2], ("中", "中性", "原因2"))
+        self.assertEqual(result[3], ("低", "中性", ""))  # 缺失
+        self.assertEqual(result[4], ("高", "利空", "原因4"))
+
+    def test_empty_batch(self) -> None:
+        """空批次 → 返回空列表。"""
+        from src.llm_client import _apply_llm_analysis
+        result = _apply_llm_analysis([], "[]")
+        self.assertEqual(result, [])
+
+    def test_fewer_results_than_requested(self) -> None:
+        """LLM 返回 1 条结果给 5 条新闻 → 缺失 4 条填充默认值。"""
+        from src.llm_client import _apply_llm_analysis
+        import json
+        llm_resp = json.dumps([
+            {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
+        ])
+        result = _apply_llm_analysis(self.news_5, llm_resp)
+        self.assertEqual(len(result), 5)
+        self.assertEqual(result[0], ("高", "利好", "原因0"))
+        for i in range(1, 5):
+            self.assertEqual(result[i], ("低", "中性", ""))
+
+    def test_malformed_json_in_batch(self) -> None:
+        """JSON 格式错误 → 全部返回默认值。"""
+        from src.llm_client import _apply_llm_analysis
+        result = _apply_llm_analysis(self.news_5, "这不是JSON")
+        self.assertEqual(len(result), 5)
+        for t in result:
+            self.assertEqual(t, ("低", "中性", ""))
 
 
 # ═══════════════════════════════════════════════════════════

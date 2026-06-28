@@ -26,10 +26,10 @@ from src.report.styles import FMT_MONEY, FMT_PERCENT, profit_font
 
 logger = logging.getLogger("invest")
 
-_NCOLS = 9
+_NCOLS = 10
 _HEADERS = [
     "资产属性", "投资分类", "名称", "代码",
-    "市值", "成本", "盈亏", "收益率", "本日盈亏",
+    "市值", "成本", "盈亏", "收益率", "本日盈亏", "年均股息率",
 ]
 
 # ── 分类映射规则 ──────────────────────────────────────────
@@ -112,7 +112,7 @@ def write_category_sheet(
 
     分类层级：
       资产属性 → 投资分类 → 持仓明细 → 小计 → 总计
-    每行含市值、成本、盈亏、收益率、本日盈亏。
+    每行含市值、成本、盈亏、收益率、本日盈亏、年均股息率。
 
     Args:
         ws: 目标工作表
@@ -149,6 +149,28 @@ def write_category_sheet(
     # 遍历分组，写入明细+小计
     grand_mv = grand_cost = grand_profit = grand_today = 0.0
 
+    # ── 加载分红数据（用于年均股息率） ──
+    try:
+        from src.providers.akshare_extras import get_dividend_data
+        stock_codes = [h.code for h in holdings if h.code.strip().startswith(("6", "0", "3"))]
+        dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
+    except Exception:
+        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --")
+        dividend_data = {}
+
+    def _yield_text(code: str, d) -> str:
+        """计算单条持仓的年均股息率文本。"""
+        info = dividend_data.get(code)
+        if not info:
+            return "--"
+        avg_div = info.get("avg_dividend")
+        if avg_div is None:
+            return "--"
+        price = d.price if d and d.price > 0 else 0.0
+        if price <= 0:
+            return "--"
+        return f"{avg_div / price * 100:.2f}%"
+
     for (prop, sub), group in sorted_groups:
         # 分组明细行
         for h in group:
@@ -157,10 +179,10 @@ def write_category_sheet(
                 vals = [
                     prop, sub, h.name, h.code,
                     d.market_value, d.cost, d.profit, d.profit_rate,
-                    d.today_profit,
+                    d.today_profit, _yield_text(h.code, d),
                 ]
             else:
-                vals = [prop, sub, h.name, h.code, 0.0, 0.0, 0.0, 0.0, 0.0]
+                vals = [prop, sub, h.name, h.code, 0.0, 0.0, 0.0, 0.0, 0.0, "--"]
             write_data_row(ws, row, vals, _num_formats())
             row += 1
 
@@ -178,7 +200,7 @@ def write_category_sheet(
         subtotal_vals = [
             f"{prop} - {sub} 小计",
             "", "",
-            len(group), sub_mv, sub_cost, sub_profit, sub_rate, sub_today,
+            len(group), sub_mv, sub_cost, sub_profit, sub_rate, sub_today, "--",
         ]
         write_subtotal_row(ws, row, f"{prop} - {sub} 小计",
                            subtotal_vals[1:], _NCOLS, _num_formats())
@@ -193,7 +215,7 @@ def write_category_sheet(
     grand_rate = grand_profit / grand_cost if grand_cost > 0 else 0.0
     total_vals = [
         "总计", "", "",
-        "-", grand_mv, grand_cost, grand_profit, grand_rate, grand_today,
+        "-", grand_mv, grand_cost, grand_profit, grand_rate, grand_today, "--",
     ]
     write_total_row(ws, row, "总计", total_vals[1:], _NCOLS, _num_formats())
 
@@ -219,6 +241,7 @@ def _num_formats() -> List[str]:
         FMT_MONEY,    # 7  盈亏
         FMT_PERCENT,  # 8  收益率
         FMT_MONEY,    # 9  本日盈亏
+        "",           # 10 年均股息率（字符串格式）
     ]
 
 

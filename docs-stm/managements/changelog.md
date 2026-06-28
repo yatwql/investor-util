@@ -4,6 +4,58 @@
 
 ---
 
+## [0.2.18] - 2026-06-28
+
+### Added
+- **机构盈利预测集成** — 调用 akshare `stock_profit_forecast_em()` 获取全量股票机构的研报覆盖、预测 EPS、评级分布
+  - 穿透 TOP10（模块 4）新增「预测EPS(2025E)」列
+  - 基金业绩分析（模块 5）新增「机构覆盖」列，显示研报家数和预测 EPS
+  - 缓存策略：指数指纹 + 1 天 TTL 双因子失效
+- **行业资金流向集成** — 调用 akshare `stock_sector_fund_flow_rank()` 获取今日行业资金流向排名
+  - LLM 宏观分析 Prompt 注入前 5 个行业资金流向数据（名称、涨跌幅、主力净流入）
+  - 缓存策略：指数指纹 + 15 分钟 TTL 双因子失效
+  - 新增 `get_sector_fund_flow()` 函数，TUI 菜单 [1] 刷新时更新
+- **分红历史集成** — 调用 akshare `stock_history_dividend()` 获取个股历年分红数据
+  - 分类汇总（模块 3）新增「年均股息率」列：`avg_dividend / price × 100%`
+  - 穿透 TOP10（模块 4）新增「年均股息率」列：原始 `avg_dividend` 值
+  - 缓存策略：持仓/穿透代码列表指纹 + 1 月 TTL 双因子失效
+  - 多线程并行获取（max_workers=5），TUI 菜单 [1] 刷新时更新
+- **进程级内存缓存层** — 在文件缓存之上新增 `_MEMO_CACHE`，减少同一会话内的重复文件读取
+  - profit_forecast: 5 分钟 memo TTL，sector_flow: 1 分钟，dividend: 10 分钟
+- **指数数据内存缓存** — `_INDEX_MEMO` 缓存 `fetch_indices()`/`fetch_us_indices()` 结果 60 秒，消除每次指纹计算时的重复 HTTP 请求
+
+### Changed
+- **LLM 宏观缓存 TTL**：`cache_ttl_macro` 从 4 小时（14400s）调整为 24 小时（86400s），配合指数指纹驱动缓存失效策略，减少不必要的 API 调用
+- **行业资金流向缓存 TTL**：`sector_flow` 从 1 天（86400s）调整为 15 分钟（900s），提升盘中数据的时效性
+- `_compute_index_fingerprint()` 改为使用 `_INDEX_MEMO` 缓存指数数据，避免每次指纹计算重复 HTTP 请求
+- 所有 akshare_extras 调用（profit_forecast/sector_flow/dividend）增加进程级 memo 缓存，减少文件缓存读取
+
+### Fixed
+- 移除 `exc_info=True` 参数从 `logger.debug("分红数据解析失败")` 调用中（仅在 Exception 级别有意义）
+- 修复 `_DIVIDEND_CACHE_PREFIX` 重复定义问题
+
+### Docs
+- config.json cache_ttl 补充 8 个缺失条目（news_corr, industry, llm, llm_macro, llm_expert, profit_forecast, sector_flow, dividend）
+- llm_settings.json cache_ttl_macro 同步为 86400
+- requirements.md：菜单 [1] 范围新增 `dividend_*` 清除；TTL 表新增 profit_forecast/sector_flow/dividend；Cache 文件清单新增对应条目；模块列宽同步
+- README.md：版本更新至 0.2.18，功能特性新增，配置示例同步，cache_ttl 表补全
+
+### Tests
+- 新增 `src/test_akshare_extras.py`：16 项测试覆盖指数指纹、缓存键、分红汇总计算、分红数据获取全路径、内存缓存（TestMemoCache 5 项）
+- `src/test_llm_client.py`：新增 2 项 sector_flow 测试
+- 全量 737 passed, 30 subtests passed
+
+## [0.2.17] - 2026-06-28
+
+### Changed
+- **文档精简**：`plan.md` 历史迭代（Iter 1.1~3.7）归档至 `docs-stm/plan/archived_plan.md`，原文件从 525 行精简至 70 行；`review-findings.md` 审计记录精简保留典型问题，从 135 行压缩至 50 行
+- **main.py 职责拆分**：拆分为 `tui_menu.py`（菜单定义/渲染）、`tui_handlers.py`（命令处理器），`main.py` 从 1177 行降至 100 行（纯入口+主循环）
+- **news_aggregator.py 模块拆分**：拆分为 `news_keywords.py`（关键词提取）、`news_correlator.py`（关联匹配）、`news_sources.py`（源获取注册），`news_aggregator.py` 保留聚合逻辑
+- **technical.md**：`llm.json` 引用更新为 `llm_key.json` / `llm_settings.json`
+
+### Added
+- **新测试模块**：`test_tui_menu.py`（17 项）、`test_tui_handlers.py`（14 项）、`test_news_keywords.py`（17 项）、`test_news_correlator.py`（16 项）、`test_news_sources.py`（11 项）、`test_integration.py`（7 项），共 +76 测试
+
 ## [0.2.16] - 2026-06-28
 
 ### Fixed

@@ -1,13 +1,15 @@
 """东方财富 push2 API — 获取行业分类与概念板块归属。
 
 主链路: push2.eastmoney.com/api/qt/stock/get
-  - f127: 行业 ID
-  - f128: 行业名称（三级行业）
-  - f140: 概念板块 ID 列表（逗号分隔）
-  - f141: 概念板块名称列表（逗号分隔）
+  - f127: 行业名称（三级行业，如"电力""白酒Ⅱ"）
+  - f128: 地域板块（如"北京板块""广东板块"）
+  - f129: 概念板块名称列表（逗号分隔，如"创投,参股银行,..."）
+  - f198: 行业 BK 代码（如"BK0428"）
+  - f140: 已变更为数值字段，不再包含概念 ID
 
 secid 前缀规则：
-  - 1.{code} — 上海（60xxxx）和深圳（00xxxx, 30xxxx）股票通用
+  - 1.{code} — 上海（60xxxx, 68xxxx, 51xxxx, 56xxxx, 58xxxx）
+  - 0.{code} — 深圳（00xxxx, 30xxxx, 15xxxx, 2xxxxx）
 """
 
 from __future__ import annotations
@@ -31,11 +33,15 @@ _HEADERS = {
 def _secid(code: str) -> str:
     """根据代码生成 secid 参数。
 
-    上海股票 (60xxxx、68xxxx) 和 深圳股票 (00xxxx、30xxxx)
-    统一使用 1. 前缀。基金代码 (如 000961、011506) 也使用 1. 前缀。
+    上海股票 (60xxxx、68xxxx) 及沪市 ETF (51xxxx、56xxxx、58xxxx)
+    使用 1.{code} 前缀。
+    深圳股票 (00xxxx、30xxxx) 及深市 ETF (15xxxx、2xxxxx)
+    使用 0.{code} 前缀。
     """
     code = code.strip()
-    return f"1.{code}"
+    if code.startswith(("0", "1", "2", "3")):  # 深市
+        return f"0.{code}"
+    return f"1.{code}"  # 沪市（含 5/6/8/4 开头）
 
 
 def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
@@ -47,16 +53,16 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     Returns:
         {
             "code": "600900",
-            "industry": "电力设备",       # 三级行业名称
-            "industry_id": "BKxxxx",      # 行业 ID
-            "concepts": ["CPO光模块", "人工智能", ...],  # 概念板块列表
-            "concept_ids": ["BKxxxx", "BKxxxx", ...],    # 概念板块 ID
+            "industry": "电力",           # 三级行业名称（f127）
+            "industry_id": "BK0428",      # 行业 BK 代码（f198，可能为空）
+            "concepts": ["创投", "参股银行", ...],  # 概念板块名称列表（f129）
+            "concept_ids": [],            # 占位字段（API 不再提供）
         }
         None: API 异常或解析失败
     """
     params = {
         "secid": _secid(code),
-        "fields": "f57,f58,f128,f140,f141",
+        "fields": "f57,f58,f127,f128,f129,f198",
     }
 
     logger.debug("东方财富 push2 行业/概念请求: %s", code)
@@ -81,31 +87,29 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
         logger.warning("东方财富 push2 返回空数据 [%s]", code)
         return None
 
-    # f141 = 概念板块名称列表（逗号分隔字符串）
-    # f140 = 概念板块 ID 列表（逗号分隔字符串）
-    # 注意：API 可能返回数字（如 0/- 表示无数据），需转为字符串处理
-    concepts_raw = inner.get("f141")
-    concept_ids_raw = inner.get("f140")
+    # f129 = 概念板块名称列表（逗号分隔字符串）
+    # f140 = 已变更为数值字段，不再包含概念 ID
+    # f127 = 行业名称
+    # f198 = 行业 BK 代码
+    concepts_raw = inner.get("f129")
 
     concepts: list[str] = []
-    concept_ids: list[str] = []
-    if concepts_raw is not None and not isinstance(concepts_raw, (int, float)):
-        concepts_str = str(concepts_raw).strip()
+    if concepts_raw is not None and isinstance(concepts_raw, str):
+        concepts_str = concepts_raw.strip()
         if concepts_str and concepts_str != "-":
             concepts = [c.strip() for c in concepts_str.split(",") if c.strip()]
-    if concept_ids_raw is not None and not isinstance(concept_ids_raw, (int, float)):
-        ids_str = str(concept_ids_raw).strip()
-        if ids_str and ids_str != "-":
-            concept_ids = [c.strip() for c in ids_str.split(",") if c.strip()]
 
-    # f128 = 行业名称（可能为 - 表示无行业数据）
-    industry_raw = inner.get("f128")
+    concept_ids: list[str] = []  # API 不再提供概念 ID
+
+    # f127 = 行业名称（三级行业，如"电力""白酒Ⅱ"）
+    industry_raw = inner.get("f127")
     industry: str = (
         str(industry_raw).strip()
         if isinstance(industry_raw, str) and industry_raw.strip() not in ("", "-")
         else ""
     )
-    industry_id_raw = inner.get("f127")
+    # f198 = 行业 BK 代码（如"BK0428"）
+    industry_id_raw = inner.get("f198")
     industry_id: str = (
         str(industry_id_raw).strip()
         if isinstance(industry_id_raw, str) and industry_id_raw.strip() not in ("", "-")

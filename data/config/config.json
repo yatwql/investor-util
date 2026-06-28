@@ -17,7 +17,15 @@
     "rank": 86400,
     "hold": 604800,
     "news": 900,
-    "benchmark": 2592000
+    "news_corr": 3600,
+    "industry": 604800,
+    "llm": 86400,
+    "llm_macro": 86400,
+    "llm_expert": 7200,
+    "benchmark": 2592000,
+    "profit_forecast": 86400,
+    "sector_flow": 900,
+    "dividend": 2592000
   },
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json"

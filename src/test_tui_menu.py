@@ -1,0 +1,130 @@
+"""TUI 菜单模块单元测试。
+
+测试目标：
+  - MENU_ITEMS 结构完整性
+  - _index_by_key 快捷键查找
+  - _print_sep / _print_header 不崩溃
+  - _exit_app 退出行为
+  - _show_llm_config_status 格式
+
+运行：
+  cd D:/codebase/zoo/investor-util
+  python -m unittest src.test_tui_menu -v
+"""
+
+from __future__ import annotations
+
+import unittest
+from io import StringIO
+from unittest.mock import patch
+
+from src.tui_menu import (
+    MENU_ITEMS,
+    _index_by_key,
+    _print_header,
+    _print_sep,
+    _show_llm_config_status,
+    get_config_cache,
+)
+
+
+class TestMenuItems(unittest.TestCase):
+    """MENU_ITEMS 结构完整性测试。"""
+
+    def test_item_count(self) -> None:
+        """菜单项应为 13 个。"""
+        self.assertEqual(len(MENU_ITEMS), 13)
+
+    def test_first_item_excel(self) -> None:
+        """第一项快捷键 E。"""
+        key, label, cb, is_exit = MENU_ITEMS[0]
+        self.assertEqual(key, "E")
+        self.assertIn("Excel", label)
+        self.assertIsNone(cb)
+        self.assertFalse(is_exit)
+
+    def test_last_item_exit(self) -> None:
+        """最后一项快捷键 X，is_exit=True。"""
+        key, label, cb, is_exit = MENU_ITEMS[12]
+        self.assertEqual(key, "X")
+        self.assertIn("退出", label)
+        self.assertIsNone(cb)
+        self.assertTrue(is_exit)
+
+    def test_all_keys_unique(self) -> None:
+        """所有快捷键不重复。"""
+        keys = [item[0] for item in MENU_ITEMS]
+        self.assertEqual(len(keys), len(set(keys)))
+
+    def test_all_labels_nonempty(self) -> None:
+        """所有标签非空。"""
+        for item in MENU_ITEMS:
+            self.assertTrue(len(item[1]) > 0, f"Label for key '{item[0]}' is empty")
+
+    def test_callbacks_are_none_initially(self) -> None:
+        """回调初始化为 None。"""
+        for item in MENU_ITEMS:
+            self.assertIsNone(item[2], f"Key '{item[0]}' callback should be None initially")
+
+    def test_only_exit_is_exit(self) -> None:
+        """仅退出项 is_exit=True。"""
+        exit_count = sum(1 for item in MENU_ITEMS if item[3])
+        self.assertEqual(exit_count, 1)
+
+
+class TestIndexByKey(unittest.TestCase):
+    """_index_by_key 快捷键查找测试。"""
+
+    def test_find_E(self) -> None:
+        self.assertEqual(_index_by_key("E"), 0)
+
+    def test_find_X(self) -> None:
+        self.assertEqual(_index_by_key("X"), 12)
+
+    def test_find_nonexistent(self) -> None:
+        self.assertIsNone(_index_by_key("Z"))
+
+    def test_find_lowercase(self) -> None:
+        """小写字母未实现——必须大写。"""
+        self.assertIsNone(_index_by_key("e"))
+
+    def test_find_number(self) -> None:
+        self.assertEqual(_index_by_key("1"), 8)
+
+    def test_find_empty(self) -> None:
+        self.assertIsNone(_index_by_key(""))
+
+
+class TestPrintFunctions(unittest.TestCase):
+    """打印函数不崩溃测试。"""
+
+    def test_print_sep_default(self) -> None:
+        """默认分隔线。"""
+        with patch("sys.stdout", new_callable=StringIO) as mock_out:
+            _print_sep()
+            output = mock_out.getvalue()
+            self.assertIn("=", output)
+
+    def test_print_sep_custom(self) -> None:
+        """自定义字符和宽度。"""
+        with patch("sys.stdout", new_callable=StringIO) as mock_out:
+            _print_sep(char="-", width=10)
+            self.assertIn("----------", mock_out.getvalue())
+
+    def test_print_header(self) -> None:
+        """标题头包含系统名称。"""
+        with patch("sys.stdout", new_callable=StringIO) as mock_out:
+            _print_header()
+            self.assertIn("投资分析报告生成系统", mock_out.getvalue())
+
+
+class TestConfigCache(unittest.TestCase):
+    """配置缓存访问测试。"""
+
+    def test_get_config_cache_default(self) -> None:
+        """未初始化时返回 None。"""
+        self.assertIsNone(get_config_cache())
+
+
+if __name__ == "__main__":
+    unittest.main()

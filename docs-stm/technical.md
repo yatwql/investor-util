@@ -23,7 +23,7 @@
 | 模块 | 职责 | 文件 |
 |------|------|------|
 | TUI 入口 | 菜单循环、用户交互、流程编排 | `src/main.py` |
-| 配置管理 | config.json + llm.json 读写、mtime 缓存 | `src/config.py` |
+| 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/config.py` |
 | 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/cache.py` |
 | 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/fetcher.py` |
 | 持仓读取 | xlsx 解析、多工作表、列校验 | `src/reader.py` |
@@ -142,7 +142,7 @@ investor-util/
 ├── data/
 │   ├── holdings/                 # 持仓 xlsx 文件
 │   ├── cache/                    # API 响应缓存
-│   └── config/                   # 配置文件（config.json, llm.json）
+│   └── config/                   # 配置文件（config.json, llm_key.json, llm_settings.json）
 ├── reports/                      # 生成报告（最新版+按日期存档）
 ├── logs/                         # 程序日志（app.log）
 ├── docs-stm/                     # 项目管理文档

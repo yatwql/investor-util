@@ -34,10 +34,10 @@ from src.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT
 
 logger = logging.getLogger("invest")
 
-_NCOLS = 11
+_NCOLS = 12
 _HEADERS = [
     "基金", "代码", "类型", "近3月", "近6月", "近12月",
-    "持仓累计盈亏(¥)", "持仓收益率", "业绩基准", "业绩评价", "同类排名",
+    "持仓累计盈亏(¥)", "持仓收益率", "业绩基准", "业绩评价", "同类排名", "机构覆盖",
 ]
 
 # 基础业绩评价 -> 标签 + 描述
@@ -233,6 +233,28 @@ def write_fund_performance_sheet(
 
     fund_holdings_sorted = sorted(fund_holdings, key=_fund_sort_key, reverse=True)
 
+    # ── 加载盈利预测数据（机构覆盖） ──
+    try:
+        from src.providers.akshare_extras import get_profit_forecast
+        profit_forecast = get_profit_forecast()
+    except Exception:
+        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --")
+        profit_forecast = {}
+
+    def _coverage_text(code: str) -> str:
+        """根据基金代码查找机构覆盖信息。"""
+        info = profit_forecast.get(code)
+        if info:
+            reports = info.get("reports", 0)
+            eps = info.get("eps_2025e")
+            if reports and eps is not None:
+                return f"{reports}家研报 EPS¥{eps:.2f}"
+            elif reports:
+                return f"{reports}家研报"
+            elif eps is not None:
+                return f"EPS¥{eps:.2f}"
+        return "--"
+
     # 遍历每只基金获取业绩数据
     fund_count = len(fund_holdings_sorted)
     success_count = 0
@@ -281,6 +303,7 @@ def write_fund_performance_sheet(
             benchmark,                                               # 业绩比较基准
             comment,                                                 # 业绩评价（含基准说明）
             _format_rank(rankings.get("同类排名", {})),              # 同类排名
+            _coverage_text(fund.code),                               # 机构覆盖
         ]
         write_data_row(ws, row, vals, _num_formats())
 
@@ -348,6 +371,7 @@ def _write_empty_row(ws, row: int, fund: Holding) -> None:
         "--",
         "--",
         "--",
+        "--",
     ]
     write_data_row(ws, row, vals, _num_formats())
 
@@ -366,4 +390,5 @@ def _num_formats() -> List[str]:
         "",           # 9  业绩基准
         "",           # 10 业绩评价
         "",           # 11 同类排名
+        "",           # 12 机构覆盖
     ]

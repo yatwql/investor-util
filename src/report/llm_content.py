@@ -25,7 +25,7 @@ _COL_WIDTH = 80          # 固定列宽（字符宽度）
 _CHARS_PER_LINE = 40     # 每行约 40 中文字符
 _ROW_HEIGHT_MIN = 30     # 最小行高 (pt)
 _ROW_HEIGHT_PER_LINE = 15  # 每行增加高度 (pt)
-_CACHE_HINT_TEXT = "⚠ 本章节内容使用了 LLM 缓存，未直接调用 LLM 服务"
+_CACHE_HINT_TEXT = "本次使用LLM缓存，未直接使用LLM服务能力"
 
 
 def _strip_html(text: str) -> str:
@@ -108,8 +108,8 @@ def _write_content_sheet(
         ws.row_dimensions[row].height = _ROW_HEIGHT_MIN
         row += 1
 
-    # 缓存来源提示
-    if from_cache and content:
+    # 缓存来源提示（仅在 content 中尚未包含时追加，避免重复）
+    if from_cache and content and _CACHE_HINT_TEXT not in content:
         cell = ws.cell(row=row, column=1, value=_CACHE_HINT_TEXT)
         cell.font = _CACHE_HINT_FONT
         cell.alignment = Alignment(horizontal="left", vertical="center")

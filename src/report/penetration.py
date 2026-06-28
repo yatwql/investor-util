@@ -12,7 +12,7 @@
   6. 直接持有股票     → 合并计算
 
 输出列：
-  排名 | 名称 | 代码 | 穿透市值 | 占比 | 板块 | 概念 | 来源明细
+  排名 | 名称 | 代码 | 穿透市值 | 占比 | 板块 | 概念 | 预测EPS(2025E) | 年均股息率 | 来源明细
 """
 
 from __future__ import annotations
@@ -35,11 +35,36 @@ from src.report.excel_writer import (
 from src.report.market_value import DetailRow
 from src.report.styles import FMT_MONEY, FMT_PERCENT
 
+
+def _get_eps_text(forecast: dict, codes: list[str]) -> str:
+    """根据盈利预测数据和代码列表，查找匹配的预测 EPS 文本。"""
+    if not forecast:
+        return "--"
+    for code in codes:
+        info = forecast.get(code)
+        if info:
+            eps = info.get("eps_2025e")
+            if eps is not None:
+                return f"¥{eps:.2f}"
+    return "--"
+
+
+def _get_dividend_text(dividend_data: dict, codes: list[str]) -> str:
+    """根据分红数据和代码列表，查找匹配的年均股息率文本。"""
+    if not dividend_data:
+        return "--"
+    for code in codes:
+        info = dividend_data.get(code)
+        if info and info.get("avg_dividend"):
+            return f"{info['avg_dividend']:.4f}元/年"
+    return "--"
+
 logger = logging.getLogger("invest")
 
-_NCOLS = 8
+_NCOLS = 10
 _HEADERS = [
-    "排名", "名称", "代码", "穿透市值", "占比", "板块", "概念", "来源明细",
+    "排名", "名称", "代码", "穿透市值", "占比", "板块", "概念",
+    "预测EPS(2025E)", "年均股息率", "来源明细",
 ]
 
 # ── 穿透分类常量 ───────────────────────────────────────────
@@ -588,17 +613,40 @@ def write_penetration_sheet(
 
     summary = result["summary"]
 
+    # ── 加载盈利预测数据（降级：API 不可用时全列 "--"） ──
+    try:
+        from src.providers.akshare_extras import get_profit_forecast
+        profit_forecast = get_profit_forecast()
+    except Exception:
+        logger.debug("盈利预测加载失败（非关键），EPS 列显示 --")
+        profit_forecast = {}
+
+    # ── 加载分红数据（降级：API 不可用时全列 "--"） ──
+    try:
+        from src.providers.akshare_extras import get_dividend_data
+        _all_top10_codes = list(set().union(*(entry.get("codes", []) for entry in result["top10"])))
+        _a_stock_codes = [c for c in _all_top10_codes if c.startswith(("6", "0", "3"))]
+        dividend_data = get_dividend_data(_a_stock_codes) if _a_stock_codes else {}
+    except Exception:
+        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --")
+        dividend_data = {}
+
     for entry in result["top10"]:
         concepts = entry.get("concepts", [])
         concepts_str = " / ".join(concepts) if concepts else "--"
+        codes = entry.get("codes", [])
+        eps_text = _get_eps_text(profit_forecast, codes)
+        div_text = _get_dividend_text(dividend_data, codes)
         vals = [
             entry["rank"],
             entry["name"],
-            ", ".join(entry["codes"]) if entry["codes"] else "--",
+            ", ".join(codes) if codes else "--",
             entry["mv"],
             entry["ratio_pct"] / 100.0,
             entry.get("sector", "--"),
             concepts_str,
+            eps_text,
+            div_text,
             "; ".join(entry["sources"]),
         ]
         write_data_row(ws, row, vals, _num_formats())
@@ -652,5 +700,7 @@ def _num_formats() -> list[str]:
         FMT_PERCENT,  # 5  占比
         "",           # 6  板块
         "",           # 7  概念
-        "",           # 8  来源明细
+        "",           # 8  预测EPS(2025E)
+        "",           # 9  年均股息率
+        "",           # 10 来源明细
     ]

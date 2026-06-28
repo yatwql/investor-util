@@ -140,7 +140,7 @@ _ENV.filters["thousands"] = _jinja_thousands
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None) -> str:
+def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     1. 通过各计算模块获取全部分析数据
@@ -154,6 +154,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         news_data: 可选预获取新闻数据，传入时跳过内部新闻获取。
         news_llm_meta: 与 news_data 对应的 LLM 元数据字典，
             含 llm_enabled / llm_cached / token_usage 等字段。
+        sector_flow: 行业资金流向数据（可选），注入全球政经 LLM prompt
 
     Returns:
         最新版报告的绝对路径
@@ -263,7 +264,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         else:
             print("  [..] 正在获取财经新闻...")
             try:
-                from src.providers.news_aggregator import (
+                from src.providers.news_keywords import (
                     build_holding_keywords,
                 )
                 # 提取穿透 TOP10 资产列表，用于扩展新闻关键词
@@ -319,11 +320,15 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
                 for d in details
             ]
 
+            from src.providers.akshare_extras import get_sector_fund_flow
+            _sector_flow = sector_flow if sector_flow is not None else get_sector_fund_flow()
+
             global_macro_content, expert_review_content, _, _ = generate_all_llm(
                 a_indices, us_indices, total_mv, total_cost, total_profit,
                 total_today_profit, len(holdings), cat_counts,
                 penetrated_assets=pen_top10,
                 holdings_details=_holdings_details,
+                sector_flow=_sector_flow,
                 force=force_llm,
             )
             if global_macro_content:
