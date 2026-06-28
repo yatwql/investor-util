@@ -15,7 +15,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 import threading
 
 import httpx
@@ -367,6 +367,92 @@ def _get_retry_max(llm_config: dict) -> int:
         return 2
 
 
+def _call_llm_with_retry(
+    label: str,
+    client: httpx.Client,
+    url: str,
+    headers: dict,
+    payload: dict,
+    timeout: float,
+    max_retries: int,
+    max_tokens: int,
+    config_field: str,
+    extract_fn: Callable[[dict], str | None],
+    check_truncation_fn: Callable[[dict, int], bool],
+    provider: str,
+) -> tuple[Optional[str], Optional[dict]]:
+    """LLM API 调用通用重试骨架。
+
+    合并 _call_claude 和 _call_openai 中完全相同的重试/超时/错误处理逻辑。
+    API 特有的部分（payload 构造、响应提取、截断检测）通过回调参数注入。
+
+    Args:
+        label: 显示名称（"Claude" / "OpenAI"），用于日志
+        client: httpx 客户端实例
+        url: API 端点 URL
+        headers: HTTP 请求头
+        payload: JSON 请求体
+        timeout: 请求超时秒数
+        max_retries: 最大重试次数
+        max_tokens: 最大输出 token 数（用于截断日志）
+        config_field: llm_settings.json 中的配置字段名（截断时提示用户）
+        extract_fn: 从响应 dict 中提取文本内容的回调
+        check_truncation_fn: 检查是否被截断的回调
+        provider: 日志中的 provider 标识（"claude" / "openai"）
+
+    Returns:
+        (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            resp = client.post(url, json=payload, headers=headers, timeout=timeout)
+            if resp.status_code in (429, 503) and attempt < max_retries:
+                delay = _RETRY_DELAYS[attempt]
+                logger.warning(
+                    "%s API %d (尝试 %d/%d)，%.1fs 后重试...",
+                    label, resp.status_code, attempt + 1, max_retries + 1, delay,
+                )
+                time.sleep(delay)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+        except httpx.TimeoutException:
+            if attempt < max_retries:
+                delay = _RETRY_DELAYS[attempt]
+                logger.warning(
+                    "%s API 超时 (尝试 %d/%d)，%.1fs 后重试...",
+                    label, attempt + 1, max_retries + 1, delay,
+                )
+                time.sleep(delay)
+                continue
+            logger.warning("%s API 超时（已重试 %d 次）", label, max_retries)
+            return (None, None)
+        except httpx.RequestError:
+            host = _sanitize_endpoint(url)
+            logger.warning("%s API 请求失败 (%s)", label, host)
+            return (None, None)
+        except (ValueError, KeyError) as e:
+            logger.warning("%s API 响应解析失败: %s", label, e)
+            return (None, None)
+
+        content = extract_fn(data)
+        if content is None:
+            logger.warning("%s API 响应格式异常", label)
+            return (None, None)
+
+        truncated = check_truncation_fn(data, max_tokens)
+        usage = data.get("usage")
+        _log_token_usage(provider, usage, label)
+
+        content = content.strip()
+        if truncated:
+            content += _truncation_warning(config_field)
+
+        return (content, usage)
+
+    return (None, None)
+
+
 def _call_llm(
     system_prompt: str,
     user_prompt: str,
@@ -376,6 +462,7 @@ def _call_llm(
     max_tokens: int | None = None,
     config_field: str = "max_tokens",
     temperature: float | None = None,
+    model: str | None = None,
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 LLM API 生成文本。
 
@@ -388,24 +475,25 @@ def _call_llm(
         max_tokens: 可选覆盖值，优先级高于 llm_config 中的对应字段
         config_field: llm_settings.json 中的配置字段名，截断时在日志中提示用户增大该字段
         temperature: 可选覆盖值，优先级高于 llm_config 中的对应字段，None 表示使用 API 默认值
+        model: 可选模型覆盖，优先级高于 llm_config 中的 model 字段（用于 per-module 路由）
 
     Returns:
         (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
     """
     provider = llm_config.get("provider", "")
     api_key = llm_config.get("api_key", "")
-    model = llm_config.get("model", "")
+    resolved_model = model or llm_config.get("model", "")
     endpoint = llm_config.get("endpoint", "")
     max_tokens = max_tokens or 2500
     max_retries = _get_retry_max(llm_config)
 
     if provider == "claude":
-        return _call_claude(system_prompt, user_prompt, api_key, model, endpoint,
+        return _call_claude(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                             max_tokens, timeout, max_retries=max_retries,
                             http_client=http_client, config_field=config_field,
                             temperature=temperature)
     elif provider == "openai":
-        return _call_openai(system_prompt, user_prompt, api_key, model, endpoint,
+        return _call_openai(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                             max_tokens, timeout, max_retries=max_retries,
                             http_client=http_client, config_field=config_field,
                             temperature=temperature)
@@ -429,6 +517,10 @@ def _call_claude(
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 Claude API (Messages API)，带重试 + 用量日志。
 
+    实际 HTTP 重试逻辑委托给 _call_llm_with_retry。
+    system prompt 使用数组格式 + cache_control 以支持 Anthropic Prompt Caching
+    （同一 system prompt 在 5 分钟内多次调用时节省输入 token）。
+
     Args:
         max_retries: 最大重试次数，从 llm_config 读取
         temperature: 若不为 None，覆盖 payload 中的 temperature 字段
@@ -442,65 +534,25 @@ def _call_claude(
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
     }
+    # 数组格式 + cache_control 支持 Prompt Caching
     payload = {
         "model": model or "claude-sonnet-4-20250514",
         "max_tokens": max_tokens,
-        "system": system,
+        "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user}],
     }
     if temperature is not None:
         payload["temperature"] = temperature
     client = http_client or _get_http_pool()
 
-    for attempt in range(max_retries + 1):
-        try:
-            resp = client.post(url, json=payload, headers=headers, timeout=timeout)
-            if resp.status_code in (429, 503) and attempt < max_retries:
-                delay = _RETRY_DELAYS[attempt]
-                logger.warning("Claude API %d (尝试 %d/%d)，%.1fs 后重试...",
-                               resp.status_code, attempt + 1, max_retries + 1, delay)
-                time.sleep(delay)
-                continue
-            resp.raise_for_status()
-            data = resp.json()
-        except httpx.TimeoutException:
-            if attempt < max_retries:
-                delay = _RETRY_DELAYS[attempt]
-                logger.warning("Claude API 超时 (尝试 %d/%d)，%.1fs 后重试...",
-                               attempt + 1, max_retries + 1, delay)
-                time.sleep(delay)
-                continue
-            logger.warning("Claude API 超时（已重试 %d 次）", max_retries)
-            return (None, None)
-        except httpx.RequestError:
-            host = _sanitize_endpoint(endpoint)
-            logger.warning("Claude API 请求失败 (%s)", host)
-            return (None, None)
-        except (ValueError, KeyError) as e:
-            logger.warning("Claude API 响应解析失败: %s", e)
-            return (None, None)
-
-        # 兼容多种响应格式：标准 Claude Messages API 及 DeepSeek Anthropic 兼容端点
-        content = _extract_content(data)
-        if content is None:
-            logger.warning("Claude API 响应格式异常 (provider=%s)",
-                           endpoint.split("/")[2] if endpoint else "unknown")
-            return (None, None)
-
-        # 检查是否被 max_tokens 截断
-        truncated = _check_claude_truncation(data, max_tokens, "Claude", config_field)
-
-        # 记录 token 用量
-        usage = data.get("usage")
-        _log_token_usage("claude", usage, "Claude")
-
-        content = content.strip()
-        if truncated:
-            content += _truncation_warning(config_field)
-
-        return (content, usage)
-
-    return (None, None)
+    return _call_llm_with_retry(
+        label="Claude", client=client, url=url, headers=headers,
+        payload=payload, timeout=timeout, max_retries=max_retries,
+        max_tokens=max_tokens, config_field=config_field,
+        extract_fn=_extract_content,
+        check_truncation_fn=lambda d, mt: _check_claude_truncation(d, mt, "Claude", config_field),
+        provider="claude",
+    )
 
 
 def _call_openai(
@@ -517,6 +569,8 @@ def _call_openai(
     temperature: float | None = None,
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。
+
+    实际 HTTP 重试逻辑委托给 _call_llm_with_retry。
 
     Args:
         max_retries: 最大重试次数，从 llm_config 读取
@@ -542,54 +596,20 @@ def _call_openai(
         payload["temperature"] = temperature
     client = http_client or _get_http_pool()
 
-    for attempt in range(max_retries + 1):
+    def _extract_openai(data: dict) -> str | None:
         try:
-            resp = client.post(url, json=payload, headers=headers, timeout=timeout)
-            if resp.status_code in (429, 503) and attempt < max_retries:
-                delay = _RETRY_DELAYS[attempt]
-                logger.warning("OpenAI API %d (尝试 %d/%d)，%.1fs 后重试...",
-                               resp.status_code, attempt + 1, max_retries + 1, delay)
-                time.sleep(delay)
-                continue
-            resp.raise_for_status()
-            data = resp.json()
-        except httpx.TimeoutException:
-            if attempt < max_retries:
-                delay = _RETRY_DELAYS[attempt]
-                logger.warning("OpenAI API 超时 (尝试 %d/%d)，%.1fs 后重试...",
-                               attempt + 1, max_retries + 1, delay)
-                time.sleep(delay)
-                continue
-            logger.warning("OpenAI API 超时（已重试 %d 次）", max_retries)
-            return (None, None)
-        except httpx.RequestError:
-            host = _sanitize_endpoint(endpoint)
-            logger.warning("OpenAI API 请求失败 (%s)", host)
-            return (None, None)
-        except (ValueError, KeyError) as e:
-            logger.warning("OpenAI API 响应解析失败: %s", e)
-            return (None, None)
-
-        try:
-            content = data["choices"][0]["message"]["content"]
+            return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError):
-            logger.warning("OpenAI API 响应格式异常")
-            return (None, None)
+            return None
 
-        # 检查是否被 max_tokens 截断
-        truncated = _check_openai_truncation(data, max_tokens, "OpenAI", config_field)
-
-        # 记录 token 用量
-        usage = data.get("usage")
-        _log_token_usage("openai", usage, "OpenAI")
-
-        content = content.strip()
-        if truncated:
-            content += _truncation_warning(config_field)
-
-        return (content, usage)
-
-    return (None, None)
+    return _call_llm_with_retry(
+        label="OpenAI", client=client, url=url, headers=headers,
+        payload=payload, timeout=timeout, max_retries=max_retries,
+        max_tokens=max_tokens, config_field=config_field,
+        extract_fn=_extract_openai,
+        check_truncation_fn=lambda d, mt: _check_openai_truncation(d, mt, "OpenAI", config_field),
+        provider="openai",
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -830,9 +850,11 @@ def generate_global_macro(
     macro_mt = llm_config.get("max_tokens_macro") or llm_config.get("max_tokens", 800)
     _timeout = llm_config.get("timeout_macro", 60.0)
     _temp = llm_config.get("temperature_macro")
+    _model = llm_config.get("model_macro")
     result, usage = _call_llm(system_macro, prompt, llm_config, timeout=_timeout,
                               http_client=http_client, max_tokens=macro_mt,
-                              config_field="max_tokens_macro", temperature=_temp)
+                              config_field="max_tokens_macro", temperature=_temp,
+                              model=_model)
 
     if result:
         html = _markdown_to_html(result)
@@ -923,10 +945,12 @@ def generate_expert_review(
     expert_mt = llm_config.get("max_tokens_expert") or llm_config.get("max_tokens", 8192)
     _timeout = llm_config.get("timeout_expert", 120.0)
     _temp = llm_config.get("temperature_expert")
+    _model = llm_config.get("model_expert")
     logger.info("正在调用 LLM 生成智囊团深度复盘...")
     result, usage = _call_llm(system_expert, prompt, llm_config, timeout=_timeout,
                               http_client=http_client, max_tokens=expert_mt,
-                              config_field="max_tokens_expert", temperature=_temp)
+                              config_field="max_tokens_expert", temperature=_temp,
+                              model=_model)
 
     if result:
         html = _markdown_to_html(result)
@@ -1106,8 +1130,9 @@ def enhance_news_correlation(
     - 给出简要原因分析
     - 写入 news_data 各条的 llm_analysis 字段
 
-    支持分批处理：将新闻按每批至多 5 条分组，逐批调用 LLM 分析。
-    每批独立处理，单批失败仅影响本批 5 条（降级为默认值）。
+    支持分批并行处理：将新闻按每批至多 5 条分组，用 ThreadPoolExecutor
+    并行调用 LLM 分析（最多 3 批并发）。每批独立处理，单批失败仅影响本批
+    5 条（降级为默认值）。
 
     Args:
         news_data: 关键词匹配后的新闻列表（由 build_news_data 返回）
@@ -1132,12 +1157,14 @@ def enhance_news_correlation(
         return (news_data, False, {})
 
     # 按关键词匹配数排序，取前 30 条送给 LLM（最相关的才需要深度分析）
-    sorted_news = sorted(
-        news_data,
-        key=lambda x: len(x.get("matched_keywords", [])),
+    # 使用 enumerate 保留原始索引，避免依赖 id() 做映射
+    _sorted_with_idx = sorted(
+        enumerate(news_data),
+        key=lambda x: len(x[1].get("matched_keywords", [])),
         reverse=True,
     )
-    top_news = sorted_news[:30]
+    top_news = [item for _, item in _sorted_with_idx[:30]]
+    top_to_original = {ti: orig_i for ti, (orig_i, _) in enumerate(_sorted_with_idx[:30])}
 
     # 缓存开关（默认启用）
     cache_enabled = llm_config.get("cache_enabled_news", True)
@@ -1158,15 +1185,7 @@ def enhance_news_correlation(
             logger.info("LLM 缓存命中: 新闻关联分析")
             return (cached, True, {})
 
-    # 构建 top_news → news_data 原始位置的正查映射（sorted 改变了顺序）
-    news_data_index_of = {id(item): i for i, item in enumerate(news_data)}
-    top_to_original: dict[int, int] = {}
-    for ti, item in enumerate(top_news):
-        orig_i = news_data_index_of.get(id(item))
-        if orig_i is not None:
-            top_to_original[ti] = orig_i
-
-    # ── 分批处理 ─────────────────────────────────────────
+    # ── 分批并行处理 ─────────────────────────────────────
     BATCH_SIZE = 5
     system_prompt = (
         llm_config.get("system_prompt_news_correlation")
@@ -1176,6 +1195,7 @@ def enhance_news_correlation(
     max_tokens = llm_config.get("max_tokens_news_correlation", 2000)
     _timeout = llm_config.get("timeout_news_correlation", 60.0)
     _temp = llm_config.get("temperature_news_correlation")
+    _model = llm_config.get("model_news_correlation")
 
     # analysis_by_orig_idx[news_data_index] = (relevance, sentiment, analysis)
     analysis_by_orig_idx: dict[int, tuple[str, str, str]] = {}
@@ -1183,43 +1203,52 @@ def enhance_news_correlation(
     total_tokens_output = 0
 
     batches = [top_news[i:i + BATCH_SIZE] for i in range(0, len(top_news), BATCH_SIZE)]
-    logger.info("正在调用 LLM 增强新闻关联分析（%d 批，每批最多 %d 条）...",
-                len(batches), BATCH_SIZE)
+    logger.info("正在调用 LLM 增强新闻关联分析（%d 批，每批最多 %d 条，并行 %d 批）...",
+                len(batches), BATCH_SIZE, min(3, len(batches)))
 
-    for batch_idx, batch in enumerate(batches):
-        news_text = _build_news_summary(batch)
-        user_prompt = (
-            f"【持仓信息】\n"
-            f"{holdings_text}\n\n"
-            f"【新闻列表】\n"
-            f"{news_text}\n\n"
-            f"请分析以上每条新闻与持仓的关联性，输出JSON数组。"
-        )
+    def _process_batch(batch_idx: int, batch: list) -> tuple:
+        """线程内处理一批新闻的 LLM 分析，使用独立 httpx 客户端。"""
+        batch_client = httpx.Client(timeout=_LLM_TIMEOUT)
+        try:
+            news_text = _build_news_summary(batch)
+            user_prompt = (
+                f"【持仓信息】\n"
+                f"{holdings_text}\n\n"
+                f"【新闻列表】\n"
+                f"{news_text}\n\n"
+                f"请分析以上每条新闻与持仓的关联性，输出JSON数组。"
+            )
+            result, usage = _call_llm(
+                system_prompt, user_prompt, llm_config,
+                timeout=_timeout, http_client=batch_client,
+                max_tokens=max_tokens,
+                config_field="max_tokens_news_correlation",
+                temperature=_temp, model=_model,
+            )
+            return batch_idx, result, usage
+        finally:
+            batch_client.close()
 
-        result, usage = _call_llm(
-            system_prompt, user_prompt, llm_config,
-            timeout=_timeout, http_client=http_client,
-            max_tokens=max_tokens,
-            config_field="max_tokens_news_correlation",
-            temperature=_temp,
-        )
-
-        if result:
-            batch_tuples = _apply_llm_analysis(batch, result)
-            # 将本批结果按 top_news 全局位置映射回 news_data 原始位置
-            for local_idx, (rel, sent, analysis_text) in enumerate(batch_tuples):
-                global_pos = batch_idx * BATCH_SIZE + local_idx
-                if global_pos in top_to_original:
-                    orig_i = top_to_original[global_pos]
-                    analysis_by_orig_idx[orig_i] = (rel, sent, analysis_text)
-            if usage:
-                inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
-                out = usage.get("output_tokens", usage.get("completion_tokens", 0))
-                total_tokens_input += inp
-                total_tokens_output += out
-        else:
-            logger.warning("LLM 新闻关联分析（批 %d/%d）: 分析失败，使用默认值",
-                           batch_idx + 1, len(batches))
+    with ThreadPoolExecutor(max_workers=min(3, len(batches), 6)) as ex:
+        fut_map = {ex.submit(_process_batch, i, b): i for i, b in enumerate(batches)}
+        for future in as_completed(fut_map):
+            batch_idx, result, usage = future.result()
+            batch = batches[batch_idx]
+            if result:
+                batch_tuples = _apply_llm_analysis(batch, result)
+                for local_idx, (rel, sent, analysis_text) in enumerate(batch_tuples):
+                    global_pos = batch_idx * BATCH_SIZE + local_idx
+                    if global_pos in top_to_original:
+                        orig_i = top_to_original[global_pos]
+                        analysis_by_orig_idx[orig_i] = (rel, sent, analysis_text)
+                if usage:
+                    inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+                    out = usage.get("output_tokens", usage.get("completion_tokens", 0))
+                    total_tokens_input += inp
+                    total_tokens_output += out
+            else:
+                logger.warning("LLM 新闻关联分析（批 %d/%d）: 分析失败，使用默认值",
+                               batch_idx + 1, len(batches))
 
     # ── 合并结果 ─────────────────────────────────────────
     enriched: list[dict] = []

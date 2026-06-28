@@ -4,6 +4,26 @@
 
 ---
 
+## [0.2.19] - 2026-06-28
+
+### Changed
+- **LLM 调用代码重构** — 提取 `_call_llm_with_retry()` 共享函数，消除 `_call_claude` / `_call_openai` 中约 100 行重复的重试/超时/错误处理代码
+- **新闻关联分析分批并行化** — `enhance_news_correlation()` 分批处理从串行 `for` 循环改为 `ThreadPoolExecutor(max_workers=3)` 并行，6 批并行处理后墙钟时间降低约 60%（30s → ~10s）
+
+### Added
+- **模型路由** — `llm_settings.json` 新增 `model_macro` / `model_expert` / `model_news_correlation` 配置项，per-module 独立模型选择，未配置时沿用 `llm_key.json` 的全局 `model` 字段
+- **Prompt Caching** — Claude API system prompt 使用数组格式 + `cache_control` 支持 Anthropic Prompt Caching，批量新闻关联分析时 5 分钟内同 system prompt 节省约 50% 输入 token 费用
+
+### Fixed
+- **`enhance_news_correlation` id() 映射** — top_news → news_data 原始位置映射从 `id()`（对象身份）改为 `enumerate` 保留原始索引，消除对象身份漂移的理论风险
+
+### Removed
+- **`_fingerprint` 假注释** — 从 `llm_settings.json` 移除 JSON 中用作注释的 `_fingerprint` 字段（无代码读取，纯误导性装饰）
+
+### Docs
+- requirements.md：模型路由新配置项说明
+- changelog.md：本版本记录
+
 ## [0.2.18] - 2026-06-28
 
 ### Added

@@ -14,7 +14,6 @@
   "max_tokens_macro": 800,
   "max_tokens_expert": 8192,
   "max_tokens_news_correlation": 2000,
-  "_fingerprint": "cache_ttl_macro/expert/news_corr → 输入数据指纹驱动失效，详见 README.md",
   "cache_ttl_macro": 86400,
   "cache_ttl_expert": 7200,
   "cache_ttl_news_correlation": 3600,
