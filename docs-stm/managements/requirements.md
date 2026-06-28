@@ -99,15 +99,31 @@
 | `sector_flow_{fingerprint}.json` | **行业资金流向排名**。今日行业资金流向（主力净流入/涨跌幅等）。文件名含指数 MD5 指纹，指数变化时自动失效 | 15 分钟（可配置） |
 | `dividend_{fingerprint}.json` | **股票历史分红数据**。持仓及穿透 TOP10 A 股代码的历年分红汇总。文件名含代码列表 MD5 指纹，持仓/穿透变化时自动失效 | 30 天（可配置） |
 
-### 5.1 LLM 缓存指纹自动失效机制
+### 5.1 指纹驱动失效机制
 
-LLM 缓存（`llm_global_macro_*`、`llm_expert_review_*`）的文件名内嵌 MD5 指纹：
+以下缓存文件在文件名中**内嵌 MD5 指纹**。当指纹的输入源数据发生变化时，下次读取时的缓存键与已有文件不匹配，等效于"缓存未命中"，自动使用新数据。**无需手动清除缓存即可刷新。**
 
-- **指纹的构成**：
-  - 全球政经局势：A 股/美股指数行情 + 持仓汇总（总市值/总成本/总盈亏/分类）
-  - 智囊团深度复盘：持仓汇总（总市值/总成本/总盈亏/本日盈亏）+ 分类计数 + 穿透 TOP10 + 持仓明细（名称/代码/成本），剔除单品行情波动字段（market_value/profit/change_pct）
-- **自动失效原理**：持仓或指数数据发生任何变化 → 指纹改变 → 下次菜单 L 生成时的缓存键与已有文件不匹配 → 等效于"缓存未命中" → 自动使用新数据重新生成 LLM 内容
-- **无手动操作需求**：无需进入菜单清除，自然过期
+#### 指纹类型总览
+
+| 指纹类型 | 指纹来源 | 用途 | 所在缓存文件 |
+|---------|---------|------|------------|
+| **指数指纹** | A股指数 + 美股指数（`_compute_index_fingerprint`） | 市场指数变化时失效 | `profit_forecast_{fingerprint}`、`sector_flow_{fingerprint}` |
+| **代码列表指纹** | 持仓+穿透 A 股代码排序后的 MD5（`_compute_dividend_fingerprint`） | 持仓/穿透品种变化时失效 | `dividend_{fingerprint}` |
+| **输入参数指纹** | 新闻源参数 + 关键词的 MD5（`_compute_fingerprint`） | 新闻参数或持仓变化时失效 | `news_{md5}` |
+| **输入数据指纹** | 指数+持仓汇总/持仓结构等（`_compute_fingerprint` / `_expert_fingerprint`） | 指数波动/持仓变化时失效 | `llm_global_macro_{fingerprint}`、`llm_expert_review_{fingerprint}`、`llm_news_corr_{fingerprint}` |
+
+#### 各指纹的详细构成
+
+- **指数指纹**：`json.dumps([a_indices, us_indices])` → MD5 前 12 位。A 股 5 大指数 + 美股 3 大指数任一变化 → 指纹改变 → profit_forecast/sector_flow 缓存自动失效
+- **代码列表指纹**：`json.dumps(sorted(set(codes)))` → MD5 前 12 位。持仓文件新增/移除了 A 股代码、或穿透 TOP10 发生变化 → 指纹改变 → dividend 缓存自动失效
+- **全球政经局势指纹**：A 股/美股指数行情 + 持仓汇总（总市值/总成本/总盈亏/分类）→ `_compute_fingerprint()` 生成
+- **智囊团深度复盘指纹**：持仓汇总（总市值/总成本/总盈亏/本日盈亏）+ 分类计数 + 穿透 TOP10 + 持仓明细（名称/代码/成本），剔除单品行情波动字段（market_value/profit/change_pct），仅品种/份额/成本变化才会失效
+- **LLM 新闻关联分析指纹**：关键词 + 持仓汇总 → `_compute_fingerprint()` 生成
+- **新闻聚合指纹**：新闻源参数 + 关键词集合 → `hashlib.md5` 生成，`{md5}` 为完整 32 位指纹
+
+**TTL 兜底：** 即使指纹未变（源数据无变化），缓存文件仍有 TTL 到期自动刷新，防止数据"永久有效"。
+
+**无指纹（固定键名）的缓存：** `price_{code}`、`index_{code}`、`fund_perf_{code}`、`fund_hold_{code}`、`industry_{code}`、`fund_benchmarks`、`holdings_tracking` — 纯 TTL 管理。`holdings_tracking` 内部存了指纹用于变更检测，但键名本身固定。`llm_*`（通用 LLM 缓存兜底）也无指纹，仅在其他 LLM 类型未匹配时生效。
 
 ### 5.2 主动失效链路（自动触发）
 
@@ -128,22 +144,22 @@ LLM 缓存（`llm_global_macro_*`、`llm_expert_review_*`）的文件名内嵌 M
 
 ### 5.3 TTL 常量对照表
 
-| 类别 | 数据类型键 | 默认 TTL | 对应缓存文件 |
-|---|---|---|---|
-| 价格行情 | `price` | 86400 秒（24 小时） | `price_{code}.json` |
-| 市场指数 | `index` | 86400 秒（24 小时） | `index_{code}.json` |
-| 基金业绩 | `rank` | 86400 秒（24 小时） | `fund_perf_{code}.json` |
-| 持仓数据 | `hold` | 604800 秒（7 天） | `fund_hold_{code}.json` |
-| 行业分类 | `industry` | 604800 秒（7 天） | `industry_{code}.json` |
-| 新闻聚合 | `news` | 900 秒（15 分钟） | `news_{md5}.json` |
-| 新闻 LLM 关联分析 | `news_corr` | 3600 秒（1 小时） | `llm_news_corr_{fingerprint}.json` |
-| LLM 全局（通用） | `llm` | 86400 秒（24 小时） | `llm_*` |
-| 全球政经局势（LLM） | `llm_macro` | 86400 秒（24 小时） | `llm_global_macro_{fingerprint}.json` |
-| 智囊团深度复盘（LLM） | `llm_expert` | 7200 秒（2 小时） | `llm_expert_review_{fingerprint}.json` |
-| 基准数据 | `benchmark` | 2592000 秒（30 天） | `fund_benchmarks.json` |
-| 机构盈利预测 | `profit_forecast` | 86400 秒（24 小时） | `profit_forecast_{fingerprint}.json` |
-| 行业资金流向 | `sector_flow` | 900 秒（15 分钟） | `sector_flow_{fingerprint}.json` |
-| 股票历史分红 | `dividend` | 2592000 秒（30 天） | `dividend_{fingerprint}.json` |
+| 类别 | 数据类型键 | 默认 TTL | 对应缓存文件 | 指纹 |
+|---|---|---|---|---|
+| 价格行情 | `price` | 86400 秒（24 小时） | `price_{code}.json` | — |
+| 市场指数 | `index` | 86400 秒（24 小时） | `index_{code}.json` | — |
+| 基金业绩 | `rank` | 86400 秒（24 小时） | `fund_perf_{code}.json` | — |
+| 持仓数据 | `hold` | 604800 秒（7 天） | `fund_hold_{code}.json` | — |
+| 行业分类 | `industry` | 604800 秒（7 天） | `industry_{code}.json` | — |
+| 新闻聚合 | `news` | 900 秒（15 分钟） | `news_{md5}.json` | 输入参数指纹 |
+| 新闻 LLM 关联分析 | `news_corr` | 3600 秒（1 小时） | `llm_news_corr_{fingerprint}.json` | 输入数据指纹 |
+| LLM 全局（通用） | `llm` | 86400 秒（24 小时） | `llm_*` | —（兜底） |
+| 全球政经局势（LLM） | `llm_macro` | 86400 秒（24 小时） | `llm_global_macro_{fingerprint}.json` | 指数+持仓指纹 |
+| 智囊团深度复盘（LLM） | `llm_expert` | 7200 秒（2 小时） | `llm_expert_review_{fingerprint}.json` | 持仓结构指纹 |
+| 基准数据 | `benchmark` | 2592000 秒（30 天） | `fund_benchmarks.json` | — |
+| 机构盈利预测 | `profit_forecast` | 86400 秒（24 小时） | `profit_forecast_{fingerprint}.json` | 指数指纹 |
+| 行业资金流向 | `sector_flow` | 900 秒（15 分钟） | `sector_flow_{fingerprint}.json` | 指数指纹 |
+| 股票历史分红 | `dividend` | 2592000 秒（30 天） | `dividend_{fingerprint}.json` | 代码列表指纹 |
 
 **TTL 优先级链（按优先级从高到低）：**
 1. `llm_settings.json` 中的 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news_correlation`（仅限 LLM 缓存）

@@ -12,6 +12,7 @@
   "news_top_count": 300,
   "preferred_provider": {},
   "cache_ttl": {
+    "_fingerprint": "profit_forecast/sector_flow=指数指纹｜dividend=代码指纹｜llm_macro/expert/news_corr=输入数据指纹",
     "price": 86400,
     "index": 86400,
     "rank": 86400,
