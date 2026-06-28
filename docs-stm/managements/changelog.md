@@ -4,6 +4,37 @@
 
 ---
 
+## [0.2.24] - 2026-06-29
+
+### Added
+- **Extended Thinking 模型兼容性降级** — `_supports_extended_thinking()` 检查模型是否
+  在已知支持名单（`claude-sonnet-4*` / `claude-opus-4*`）中，不匹配时自动跳过 `thinking`
+  payload 注入并记录 `WARNING` 日志，兼容 `deepseek-v4-flash` 等第三方模型
+- **`_supports_extended_thinking()` 单元测试** — 13 条用例覆盖支持/不支持/空模型等场景
+- **`_call_claude()` thinking 降级自动化测试** — 5 条用例覆盖注入、跳过、自动兜底、配置缺省等场景
+
+### Changed
+- **`thinking_enabled_expert` 默认改为 `true`** — 智囊团深度复盘默认启用 Extended Thinking，
+  用户开箱即用无需额外配置
+- **`llm_settings.json` 同步** — 新增 6 个 thinking 配置项，`thinking_enabled_expert: true`
+  确保与代码默认一致
+
+## [0.2.23] - 2026-06-29
+
+### Added
+- **Extended Thinking 状态标识** — HTML 报告中，Token 用量行末尾追加 `| Extended Thinking`；
+  Excel 报告中，模型名称行下方追加 `Extended Thinking 已开启` 行（灰斜体 9pt），
+  便于快速确认当前报告各 LLM 章节是否启用深度推理
+
+### Changed
+- **`_generate_llm_content()` 新增 `thinking_enabled` 参数** — 由各模块调用方（`generate_global_macro`、
+  `generate_expert_review`）从 `llm_settings.json` 读取状态后传入
+- **`write_llm_sheets()` 新增 `thinking` 元组参数** — 透传两个 LLM 页签的开启状态至 `_write_content_sheet()`
+- **`tui_handlers.py`** — 从配置读取 `thinking_enabled_macro` / `thinking_enabled_expert` 并传入写表逻辑
+
+### Fixed
+- **模型名称标识行后缺少 `row += 1`** — 修复 Extended Thinking 行可能覆盖模型名称的边界问题
+
 ## [0.2.22] - 2026-06-29
 
 ### Added

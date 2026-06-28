@@ -555,6 +555,17 @@ def _call_llm(
         return (None, None)
 
 
+# ── Extended Thinking 模型兼容性名单 ──
+# 已知支持 Extended Thinking 的模型前缀。若使用的模型不在此列，
+# 即使配置了 thinking_enabled 也会自动降级跳过，避免 API 报错。
+_THINKING_SUPPORTED_PREFIXES = ("claude-sonnet-4", "claude-opus-4")
+
+
+def _supports_extended_thinking(model: str) -> bool:
+    """检查模型是否支持 Extended Thinking。"""
+    return any(model.startswith(p) for p in _THINKING_SUPPORTED_PREFIXES)
+
+
 def _call_claude(
     system: str,
     user: str,
@@ -578,6 +589,7 @@ def _call_claude(
     支持 Extended Thinking（thinking 参数），通过 llm_settings.json 中
     thinking_enabled_{模块} / thinking_budget_{模块} 配置开启。
     推荐仅在智囊团深度复盘（expert）场景开启，全局政经和新闻分析收益有限。
+    若模型不支持 Extended Thinking（如 claude-sonnet-3-5），自动降级跳过。
 
     Args:
         max_retries: 最大重试次数，从 llm_config 读取
@@ -602,21 +614,27 @@ def _call_claude(
     }
     # ── Extended Thinking（仅 Claude，根据模块配置） ──
     if llm_config:
-        # config_field = "max_tokens_macro" / "max_tokens_expert" / "max_tokens_news_correlation"
         _module_suffix = config_field.replace("max_tokens_", "")
         _thinking_key = f"thinking_enabled_{_module_suffix}"
         _budget_key = f"thinking_budget_{_module_suffix}"
         if llm_config.get(_thinking_key, False):
-            _budget = llm_config.get(_budget_key)
-            if not _budget or _budget < max_tokens + 1024:
-                _budget = max_tokens + 4096  # 自动兜底
-            payload["thinking"] = {
-                "type": "enabled",
-                "budget_tokens": _budget,
-            }
-            # Extended Thinking 与 temperature 互斥，移除 temperature
-            payload.pop("temperature", None)
-            logger.info("Extended Thinking 已开启 [%s]: budget=%d", _module_suffix, _budget)
+            _resolved_model = model or "claude-sonnet-4-20250514"
+            if not _supports_extended_thinking(_resolved_model):
+                logger.warning(
+                    "模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]",
+                    _resolved_model, _module_suffix,
+                )
+            else:
+                _budget = llm_config.get(_budget_key)
+                if not _budget or _budget < max_tokens + 1024:
+                    _budget = max_tokens + 4096  # 自动兜底
+                payload["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": _budget,
+                }
+                # Extended Thinking 与 temperature 互斥，移除 temperature
+                payload.pop("temperature", None)
+                logger.info("Extended Thinking 已开启 [%s]: budget=%d", _module_suffix, _budget)
     if temperature is not None and "thinking" not in payload:
         payload["temperature"] = temperature
     client = http_client

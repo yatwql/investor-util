@@ -318,12 +318,12 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `system_prompt_expert` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖专家角色设定 |
 | `system_prompt_news_correlation` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖新闻关联判定规则 |
 | `llm_news_analysis` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
-| `thinking_enabled_macro` | **false** | 全球政经启用 Extended Thinking（不建议——输出短，不值得） |
-| `thinking_enabled_expert` | **false** | 智囊团启用 Extended Thinking（**推荐设为 true**——深度推理提升分析质量） |
-| `thinking_enabled_news_correlation` | **false** | 新闻关联启用 Extended Thinking（不建议——JSON 格式任务不需要深度推理） |
-| `thinking_budget_macro` | **4000** | 政经 thinking token 预算。自动兜底 `max_tokens + 4096` |
-| `thinking_budget_expert` | **16000** | 智囊团 thinking token 预算。`max_tokens_expert=8192`，16000 留充足余量 |
-| `thinking_budget_news_correlation` | **4000** | 新闻关联 thinking token 预算。实际被关闭时该值不生效 |
+| `thinking_enabled_expert` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking |
+| `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking（不建议——输出短，不值得） |
+| `thinking_enabled_news_correlation` | `false` | 新闻关联启用 Extended Thinking（不建议——JSON 格式任务不需要深度推理） |
+| `thinking_budget_macro` | 4000 | 政经 thinking token 预算。自动兜底 `max_tokens + 4096` |
+| `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算。`max_tokens_expert=8192`，16000 留充足余量 |
+| `thinking_budget_news_correlation` | 4000 | 新闻关联 thinking token 预算。实际被关闭时该值不生效 |
 
 #### 逐章节模型路由（Per-Section Model Routing）
 
@@ -350,7 +350,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 ---
 
-#### Extended Thinking（Anthropic 专属 — 可选）
+#### Extended Thinking（Anthropic 专属）
 
 > 仅 `provider: "claude"` 且模型 ≥ `claude-sonnet-4` 时生效。
 
@@ -378,7 +378,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | 字段 | 默认 | 说明 |
 |------|:----:|------|
 | `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking |
-| `thinking_enabled_expert` | `false` | 智囊团深度复盘启用 Extended Thinking（**推荐开启**） |
+| `thinking_enabled_expert` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking |
 | `thinking_enabled_news_correlation` | `false` | 新闻关联分析启用 Extended Thinking |
 | `thinking_budget_macro` | 4000 | 全球政经 thinking token 预算。若小于 `max_tokens_macro + 1024` 则自动补足 |
 | `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算。若小于 `max_tokens_expert + 1024` 则自动补足 |
@@ -413,9 +413,14 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 **API 硬性约束：** `thinking_budget_{模块}` 的值 **必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。实际场景：
 - `max_tokens_macro=800` → `thinking_budget_macro` 至少 1824（默认 4000 ✅）
 - `max_tokens_expert=8192` → `thinking_budget_expert` 至少 9216（默认 16000 ✅）
+
+> **提示**：开启 Extended Thinking 后，HTML 报告在该章节的 Token 用量行末尾追加 `| Extended Thinking` 标识；
+> Excel 报告在该章节的模型名称行下方追加 `Extended Thinking 已开启` 行，便于快速确认深度推理是否生效。
 - `max_tokens_news_correlation=2000` → `thinking_budget_news_correlation` 至少 3024（默认 4000 ✅）
 
 **代码自动保护：** 若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`，不会因配置错误导致 API 请求失败。
+
+**模型兼容性降级：** 若配置开启 `thinking_enabled_expert` 但实际使用的模型不支持 Extended Thinking（如 `claude-sonnet-3-5`、`deepseek-v4-flash` 等），`_call_claude()` 会自动跳过 `thinking` 参数并记录 `WARNING` 日志，不会抛出 API 错误。
 
 **一句话总结：** `max_tokens_{模块}` 管"最终说多少"，`thinking_budget_{模块}` 管"允许想多久"。budget 必须大于对应 max_tokens + 1024。当前推荐值 `budget=16000 / max=8192` 是合理的组合。
 

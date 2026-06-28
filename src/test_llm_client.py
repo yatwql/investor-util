@@ -32,6 +32,7 @@ from src.llm_client import (
     _get_cache_ttl_llm,
     _log_token_usage,
     _markdown_to_html,
+    _supports_extended_thinking,
     generate_all_llm,
     generate_expert_review,
     generate_global_macro,
@@ -247,6 +248,42 @@ class TestBuildReviewPrompt(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
+#  _supports_extended_thinking
+# ═══════════════════════════════════════════════════════════
+
+
+class TestSupportsExtendedThinking(unittest.TestCase):
+    """测试 Extended Thinking 模型兼容性检查。"""
+
+    def test_sonnet4_supported(self) -> None:
+        self.assertTrue(_supports_extended_thinking("claude-sonnet-4-20250514"))
+
+    def test_opus4_supported(self) -> None:
+        self.assertTrue(_supports_extended_thinking("claude-opus-4-20250514"))
+
+    def test_sonnet4_variant_supported(self) -> None:
+        """claude-sonnet-4 系列任意变体都应支持。"""
+        self.assertTrue(_supports_extended_thinking("claude-sonnet-4-20251022"))
+
+    def test_opus4_variant_supported(self) -> None:
+        self.assertTrue(_supports_extended_thinking("claude-opus-4-20251022"))
+
+    def test_sonnet35_not_supported(self) -> None:
+        self.assertFalse(_supports_extended_thinking("claude-sonnet-3-5-20241022"))
+
+    def test_haiku35_not_supported(self) -> None:
+        self.assertFalse(_supports_extended_thinking("claude-haiku-3-5-20241022"))
+
+    def test_claude3_not_supported(self) -> None:
+        self.assertFalse(_supports_extended_thinking("claude-3-opus-20240229"))
+        self.assertFalse(_supports_extended_thinking("claude-3-sonnet-20240229"))
+        self.assertFalse(_supports_extended_thinking("claude-3-haiku-20240307"))
+
+    def test_empty_string_not_supported(self) -> None:
+        self.assertFalse(_supports_extended_thinking(""))
+
+
+# ═══════════════════════════════════════════════════════════
 #  _call_llm provider routing
 # ═══════════════════════════════════════════════════════════
 
@@ -277,6 +314,84 @@ class TestCallLlmProvider(unittest.TestCase):
         self.assertEqual(content, "openai result")
         self.assertEqual(usage, {"prompt_tokens": 20, "completion_tokens": 80})
         mock_call.assert_called_once()
+
+
+# ═══════════════════════════════════════════════════════════
+#  _call_claude Extended Thinking 降级
+# ═══════════════════════════════════════════════════════════
+
+
+class TestCallClaudeThinkingDegradation(unittest.TestCase):
+    """测试 _call_claude 中 Extended Thinking 的降级行为。
+
+    通过 mock _call_llm_with_retry 捕获 payload，验证 thinking 注入逻辑。
+    """
+
+    def setUp(self) -> None:
+        self.base_kw = dict(
+            system="system", user="user", api_key="sk-test",
+            endpoint="", max_tokens=800,
+        )
+        self.llm_config = {
+            "thinking_enabled_macro": True,
+            "thinking_budget_macro": 4000,
+        }
+
+    @patch("src.llm_client._call_llm_with_retry")
+    def test_thinking_injected_for_supported_model(self, mock_retry: MagicMock) -> None:
+        """Sonnet-4 支持 Extended Thinking，应注入 thinking 参数。"""
+        _call_claude(
+            **self.base_kw, model="claude-sonnet-4-20250514",
+            config_field="max_tokens_macro", llm_config=self.llm_config,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertIn("thinking", _payload)
+        self.assertEqual(_payload["thinking"]["type"], "enabled")
+        # temperature 应在 thinking 开启时被移除
+        self.assertNotIn("temperature", _payload)
+
+    @patch("src.llm_client._call_llm_with_retry")
+    def test_thinking_skipped_for_unsupported_model(self, mock_retry: MagicMock) -> None:
+        """Sonnet-3.5 不支持 Extended Thinking，应降级跳过。"""
+        _call_claude(
+            **self.base_kw, model="claude-sonnet-3-5-20241022",
+            config_field="max_tokens_macro", llm_config=self.llm_config,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertNotIn("thinking", _payload)
+
+    @patch("src.llm_client._call_llm_with_retry")
+    def test_thinking_skipped_when_disabled(self, mock_retry: MagicMock) -> None:
+        """thinking_enabled=False 时不应注入 thinking 参数。"""
+        cfg = {"thinking_enabled_macro": False}
+        _call_claude(
+            **self.base_kw, model="claude-sonnet-4-20250514",
+            config_field="max_tokens_macro", llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertNotIn("thinking", _payload)
+
+    @patch("src.llm_client._call_llm_with_retry")
+    def test_thinking_skipped_when_no_llm_config(self, mock_retry: MagicMock) -> None:
+        """llm_config=None 时不报错、不注入。"""
+        _call_claude(
+            **self.base_kw, model="claude-sonnet-4-20250514",
+            config_field="max_tokens_macro", llm_config=None,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertNotIn("thinking", _payload)
+
+    @patch("src.llm_client._call_llm_with_retry")
+    def test_budget_auto_padding(self, mock_retry: MagicMock) -> None:
+        """budget 小于 max_tokens + 1024 时自动补足到 max_tokens + 4096。"""
+        cfg = {"thinking_enabled_macro": True, "thinking_budget_macro": 100}
+        _call_claude(
+            **self.base_kw, model="claude-sonnet-4-20250514",
+            config_field="max_tokens_macro", llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        # max_tokens=800 → auto_pad=800+4096=4896
+        self.assertEqual(_payload["thinking"]["budget_tokens"], 4896)
 
 
 # ═══════════════════════════════════════════════════════════
