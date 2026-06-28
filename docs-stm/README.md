@@ -380,12 +380,44 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking |
 | `thinking_enabled_expert` | `false` | 智囊团深度复盘启用 Extended Thinking（**推荐开启**） |
 | `thinking_enabled_news_correlation` | `false` | 新闻关联分析启用 Extended Thinking |
-| `thinking_budget_macro` | 4000 | 全球政经 thinking token 预算（自动 ≤ max_tokens + 1024） |
-| `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算（自动 ≤ max_tokens + 1024） |
-| `thinking_budget_news_correlation` | 4000 | 新闻关联 thinking token 预算 |
+| `thinking_budget_macro` | 4000 | 全球政经 thinking token 预算。若小于 `max_tokens_macro + 1024` 则自动补足 |
+| `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算。若小于 `max_tokens_expert + 1024` 则自动补足 |
+| `thinking_budget_news_correlation` | 4000 | 新闻关联 thinking token 预算。若小于 `max_tokens_news_correlation + 1024` 则自动补足 |
 
 > **注意**：开启 Extended Thinking 后，`temperature` 参数被自动忽略（API 不支持两者并存）。
-> `budget_tokens` 若配置值小于 `max_tokens + 1024`，代码自动补足到 `max_tokens + 4096`。
+
+##### `thinking_budget` 与 `max_tokens_*` 的关系（必读）
+
+**这是最容易被误解的两个参数，务必理解。**
+
+在 `llm_settings.json` 中实际配置的是 `thinking_budget_{模块}` 和 `max_tokens_{模块}`（如 `thinking_budget_expert` / `max_tokens_expert`）。以下用 API 层面的通用概念 `max_tokens` 解释原理：
+
+| 配置项（llm_settings.json） | 管什么 | expert 默认值 |
+|------|--------|:------------:|
+| `max_tokens_expert` | **最终输出文本**的最大 token 数 | 8192 |
+| `thinking_budget_expert` | **内部思考过程**分配的 token 预算 | 16000 |
+
+模型先消耗 `thinking_budget` 做内部推理（该部分不可见），再从剩余额度里吐出最终回答（不超过 `max_tokens`）：
+
+```
+┌─── thinking_budget_expert: 16000 ──────────────────┐
+│  ┌── 模型内部思考 ──┐  ┌── 最终输出 ──────────┐   │
+│  │  ~8000 tokens    │  │  ~3000 tokens (可见)  │   │
+│  │  (不可见，不计入  │  │  ≤ max_tokens=8192   │   │
+│  │   输出 token)     │  │                      │   │
+│  └──────────────────┘  └──────────────────────┘   │
+│                   总计 ~11000 tokens（API 按此计价）  │
+└───────────────────────────────────────────────────┘
+```
+
+**API 硬性约束：** `thinking_budget_{模块}` 的值 **必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。实际场景：
+- `max_tokens_macro=800` → `thinking_budget_macro` 至少 1824（默认 4000 ✅）
+- `max_tokens_expert=8192` → `thinking_budget_expert` 至少 9216（默认 16000 ✅）
+- `max_tokens_news_correlation=2000` → `thinking_budget_news_correlation` 至少 3024（默认 4000 ✅）
+
+**代码自动保护：** 若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`，不会因配置错误导致 API 请求失败。
+
+**一句话总结：** `max_tokens_{模块}` 管"最终说多少"，`thinking_budget_{模块}` 管"允许想多久"。budget 必须大于对应 max_tokens + 1024。当前推荐值 `budget=16000 / max=8192` 是合理的组合。
 
 ##### 效果参考
 

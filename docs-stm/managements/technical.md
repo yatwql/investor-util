@@ -170,3 +170,34 @@ investor-util/
 ├── README.md                     # 用户文档
 └── requirements.txt
 ```
+
+---
+
+## LLM 客户端技术要点
+
+- **统一入口** `_call_llm()` 按 `provider` 路由到 `_call_claude()` 或 `_call_openai()`
+- **`_call_llm_with_retry()`** 共享重试/超时/错误处理骨架
+- **`_generate_llm_content()`** 共享骨架函数，封装缓存检查 + 调用 + markdown→HTML + 写入的 85% 公共逻辑
+- **`generate_global_macro()` / `generate_expert_review()`** 仅保留 prompt 构建 + 配置解析，其余委托 `_generate_llm_content()`
+
+### Extended Thinking（v0.2.22+）
+
+`_call_claude()` 通过 `llm_config` 参数读取 `thinking_enabled_{模块}` 配置，为 Claude API 注入 `thinking` payload 以实现深度推理。
+
+**关键逻辑：**
+- `thinking_budget` 与 `max_tokens` 是独立参数：前者控制内部推理 token（不可见），后者控制最终输出 token
+- API 约束：`thinking_budget` ≥ `max_tokens + 1024`，代码中 `_call_claude()` 自动兜底不足时补到 `max_tokens + 4096`
+- Extended Thinking 与 `temperature` 互斥，开启后自动 `payload.pop("temperature", None)`
+- 模块后缀通过 `config_field` 解析：`config_field.replace("max_tokens_", "")` → `"macro"` / `"expert"` / `"news_correlation"`
+- 推荐仅在智囊团深度复盘（expert）开启
+
+**payload 示例（开启后）：**
+```python
+{
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 8192,
+    "thinking": {"type": "enabled", "budget_tokens": 16000},
+    "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+    "messages": [{"role": "user", "content": user}],
+}
+```

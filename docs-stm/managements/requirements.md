@@ -351,6 +351,13 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 **逐章节模型路由（v0.2.17+）：** 支持对全球政经局势、智囊团深度复盘、新闻关联分析三个 LLM 章节分别指定不同的模型。通过 `data/config/llm_settings.json` 中的 `model_macro`、`model_expert`、`model_news_correlation` 字段设置，为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。详见 README.md「逐章节模型路由」小节。
 
+**Extended Thinking（v0.2.22+，Anthropic 专属）：** `_call_claude()` 支持注入 Anthropic Messages API 的 `thinking` 参数，让 ≥ Claude Sonnet 4 的模型在回答前进行深度推理。通过 `llm_settings.json` 中 `thinking_enabled_{模块}` 和 `thinking_budget_{模块}` 配置开关和预算。`thinking_budget_{模块}` 与对应的 `max_tokens_{模块}` 的关系：
+- `thinking_budget_{模块}` 控制内部思考过程的 token 预算（不可见）
+- `max_tokens_{模块}` 控制最终输出文本的最大 token 数（如 `max_tokens_expert=8192`）
+- API 强制约束：`thinking_budget_{模块}` ≥ `max_tokens_{模块} + 1024`，未满足时代码自动补足
+- 开启后 `temperature` 自动忽略（API 不支持并存）
+- 推荐仅在智囊团深度复盘开启，详见 README.md「Extended Thinking」章节
+
 ---
 
 ## 8. 页面/页签布局
