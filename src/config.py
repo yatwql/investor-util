@@ -198,7 +198,7 @@ def _ensure_llm_settings_file() -> None:
             "model_news_correlation": None,
             "cache_ttl_macro": 86400,
             "cache_ttl_expert": 7200,
-            "cache_ttl_news_correlation": 3600,
+            "cache_ttl_news": 3600,
             "system_prompt_macro": None,
             "system_prompt_expert": None,
             "system_prompt_news_correlation": None,
