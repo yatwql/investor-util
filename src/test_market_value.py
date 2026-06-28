@@ -529,22 +529,52 @@ class TestGetLastTradingDay(unittest.TestCase):
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
     @patch("src.report.market_value.datetime")
-    def test_monday(self, mock_dt):
-        """周一 → 当天。"""
-        mock_dt.now.return_value = datetime(2026, 6, 22, 10, 0, 0)
-        self.assertEqual(mv.get_last_trading_day(), "2026-06-22")
+    def test_monday_after_open(self, mock_dt):
+        """周一 10:00（已开盘）→ 当天。"""
+        mock_dt.now.return_value = datetime(2026, 6, 29, 10, 0, 0)
+        self.assertEqual(mv.get_last_trading_day(), "2026-06-29")
+
+    @patch("src.report.market_value.datetime")
+    def test_monday_before_open(self, mock_dt):
+        """周一 02:35（盘前）→ 上周五。"""
+        mock_dt.now.return_value = datetime(2026, 6, 29, 2, 35, 0)
+        self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
+
+    @patch("src.report.market_value.datetime")
+    def test_monday_early_morning(self, mock_dt):
+        """周一 9:00（盘前）→ 上周五。"""
+        mock_dt.now.return_value = datetime(2026, 6, 29, 9, 0, 0)
+        self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
+
+    @patch("src.report.market_value.datetime")
+    def test_monday_at_open(self, mock_dt):
+        """周一 9:30（开盘）→ 当天。"""
+        mock_dt.now.return_value = datetime(2026, 6, 29, 9, 30, 0)
+        self.assertEqual(mv.get_last_trading_day(), "2026-06-29")
 
     @patch("src.report.market_value.datetime")
     def test_wednesday(self, mock_dt):
-        """周三 → 当天。"""
+        """周三 10:00 → 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 24, 10, 0, 0)
         self.assertEqual(mv.get_last_trading_day(), "2026-06-24")
 
     @patch("src.report.market_value.datetime")
+    def test_wednesday_before_open(self, mock_dt):
+        """周三 7:00（盘前）→ 周二。"""
+        mock_dt.now.return_value = datetime(2026, 6, 24, 7, 0, 0)
+        self.assertEqual(mv.get_last_trading_day(), "2026-06-23")
+
+    @patch("src.report.market_value.datetime")
     def test_friday(self, mock_dt):
-        """周五 → 当天。"""
+        """周五 10:00 → 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 26, 10, 0, 0)
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
+
+    @patch("src.report.market_value.datetime")
+    def test_friday_before_open(self, mock_dt):
+        """周五 7:00（盘前）→ 周四。"""
+        mock_dt.now.return_value = datetime(2026, 6, 26, 7, 0, 0)
+        self.assertEqual(mv.get_last_trading_day(), "2026-06-25")
 
 
 # ═══════════════════════════════════════════════════════════

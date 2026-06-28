@@ -182,10 +182,11 @@ def is_market_open() -> bool:
 def get_last_trading_day() -> str:
     """获取最近一个交易日（YYYY-MM-DD）。
 
-    简化实现：
+    简化实现（不含节假日判断）：
     - 周六 → 上周五
     - 周日 → 上周五
-    - 周一至五 → 当天（交易日当天或收市当日）
+    - 周一至五 → 若当前时间 ≥ 9:30（已开盘），当天即为交易日；
+                    若当前时间 < 9:30（盘前），退回上一个交易日
 
     更精确的节假日判断留待后续迭代。
 
@@ -198,6 +199,11 @@ def get_last_trading_day() -> str:
         return (now - timedelta(days=1)).strftime("%Y-%m-%d")
     elif weekday == 6:  # Sunday
         return (now - timedelta(days=2)).strftime("%Y-%m-%d")
+    # 周一至五：盘前（< 9:30）退回上一交易日
+    if now.hour < 9 or (now.hour == 9 and now.minute < 30):
+        if weekday == 0:  # Monday before market open → Friday
+            return (now - timedelta(days=3)).strftime("%Y-%m-%d")
+        return (now - timedelta(days=1)).strftime("%Y-%m-%d")
     return now.strftime("%Y-%m-%d")
 
 
