@@ -12,6 +12,7 @@ from typing import Any, List
 
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src import cache
 from src.fetcher import fetch_market_data
 from src.models import Holding
 from src.report.excel_writer import auto_width, freeze_header, write_data_row, write_header_row, write_subtotal_row, \
@@ -179,40 +180,92 @@ def is_market_open() -> bool:
     return (9.5 <= time_decimal <= 11.5) or (13.0 <= time_decimal <= 15.0)
 
 
+# ── 交易日历（节假日感知） ───────────────────────────────
+_TRADING_CALENDAR_CACHE_KEY = "trading_calendar"
+_TRADING_CALENDAR_TTL = 86400 * 7  # 7 天刷新一次
+
+
+def _get_trading_calendar() -> set[str]:
+    """获取 A 股交易日历（YYYY-MM-DD 字符串集合）。
+
+    通过 akshare 获取全年交易日数据并缓存。若获取失败，返回空集合，
+    由调用方（get_last_trading_day）回退到简易周度判断。
+
+    Returns:
+        交易日日期字符串集合
+    """
+    cached = cache.get(_TRADING_CALENDAR_CACHE_KEY, _TRADING_CALENDAR_TTL)
+    if cached is not None and isinstance(cached, list):
+        logger.debug("交易日历缓存命中")
+        return set(cached)
+
+    try:
+        import akshare as ak
+
+        df = ak.tool_trade_date_hist_sina()
+        dates: set[str] = set(df["trade_date"].dropna().astype(str).tolist())
+        if dates:
+            cache.set(_TRADING_CALENDAR_CACHE_KEY, sorted(dates))
+            logger.info("交易日历已更新（%d 个交易日）", len(dates))
+            return dates
+    except Exception as exc:
+        logger.warning("获取交易日历失败: %s，使用简易节假日判断回退", exc)
+
+    return set()
+
+
+def _is_trading_day(date: datetime) -> bool:
+    """判断给定日期是否为 A 股交易日。
+
+    优先使用 akshare 日历，失败时回退到简易判断（非周六日即为交易日）。
+
+    Args:
+        date: 待判断的日期
+
+    Returns:
+        True 表示为交易日
+    """
+    calendar = _get_trading_calendar()
+    date_str = date.strftime("%Y-%m-%d")
+    if calendar:
+        return date_str in calendar
+    # 回退：仅排除周六日
+    return date.weekday() < 5
+
+
 def get_last_trading_day() -> str:
-    """获取最近一个交易日（YYYY-MM-DD）。
+    """获取最近一个交易日（YYYY-MM-DD），含节假日感知。
 
-    简化实现（不含节假日判断）：
-    - 周六 → 上周五
-    - 周日 → 上周五
-    - 周一至五 → 若当前时间 ≥ 9:30（已开盘），当天即为交易日；
-                    若当前时间 < 9:30（盘前），退回上一个交易日
-
-    更精确的节假日判断留待后续迭代。
+    判断逻辑：
+    1. 使用 akshare 交易日历判定节假日（端午、中秋、国庆等）
+    2. A 股盘前（< 9:30）退回上一交易日
+    3. 盘中/盘后（≥ 9:30）且当天为交易日 → 返回当天
+    4. 非交易日则向前查找最近一个交易日
 
     Returns:
         YYYY-MM-DD 格式的交易日字符串
     """
     now = datetime.now()
-    weekday = now.weekday()
-    if weekday == 5:  # Saturday
-        return (now - timedelta(days=1)).strftime("%Y-%m-%d")
-    elif weekday == 6:  # Sunday
-        return (now - timedelta(days=2)).strftime("%Y-%m-%d")
-    # 周一至五：盘前（< 9:30）退回上一交易日
+    # 若盘前（< 9:30），基准日设为昨天
     if now.hour < 9 or (now.hour == 9 and now.minute < 30):
-        if weekday == 0:  # Monday before market open → Friday
-            return (now - timedelta(days=3)).strftime("%Y-%m-%d")
-        return (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        check = now - timedelta(days=1)
+    else:
+        check = now
+
+    # 从基准日起向前查找最近一个交易日
+    for _ in range(14):  # 最多回溯 14 天（覆盖长假）
+        if _is_trading_day(check):
+            return check.strftime("%Y-%m-%d")
+        check -= timedelta(days=1)
+
+    # 极端回退（不应到达）
     return now.strftime("%Y-%m-%d")
 
 
 def get_prev_trading_day(trading_day: str = "") -> str:
-    """获取指定交易日的前一个交易日。
+    """获取指定交易日的前一个交易日，含节假日感知。
 
-    简化实现（不含节假日判断）：
-    - trading_day 是周一 → 返回上周五（减 3 天）
-    - 其余 → 减 1 天
+    使用 akshare 交易日历向前查找，找不到时回退到简易周度判断。
 
     Args:
         trading_day: YYYY-MM-DD 格式的交易日，默认取最近交易日
@@ -224,12 +277,13 @@ def get_prev_trading_day(trading_day: str = "") -> str:
         trading_day = get_last_trading_day()
     try:
         dt = datetime.strptime(trading_day, "%Y-%m-%d")
-        # 周一减 3 天回到上周五
-        if dt.weekday() == 0:
-            dt -= timedelta(days=3)
-        else:
-            dt -= timedelta(days=1)
-        return dt.strftime("%Y-%m-%d")
+        # 从 trading_day - 1 起向前查找最近一个交易日
+        check = dt - timedelta(days=1)
+        for _ in range(14):
+            if _is_trading_day(check):
+                return check.strftime("%Y-%m-%d")
+            check -= timedelta(days=1)
+        return (dt - timedelta(days=1)).strftime("%Y-%m-%d")
     except (ValueError, TypeError):
         return ""
 
