@@ -64,6 +64,12 @@ _MODEL_NAME_FONT = Font(
     italic=True,
 )
 
+_THINKING_FONT = Font(
+    color="888888",
+    size=9,
+    italic=True,
+)
+
 
 def _write_content_sheet(
     ws: Worksheet,
@@ -71,6 +77,7 @@ def _write_content_sheet(
     content: str | None,
     from_cache: bool = False,
     model_name: str = "",
+    thinking_enabled: bool = False,
 ) -> None:
     """写入一个 LLM 内容页签。
 
@@ -79,6 +86,7 @@ def _write_content_sheet(
       - 第 2 行起：每段落占一行 + 一行空行间距
       - 若 from_cache 为 True，末尾追加灰色缓存提示行
       - 若非缓存且 model_name 非空，末尾追加模型名标识行
+      - 若 thinking_enabled 为 True，追加 Extended Thinking 标识行
 
     Args:
         ws: 目标工作表
@@ -86,6 +94,7 @@ def _write_content_sheet(
         content: LLM 返回的 HTML 文本（已剥离标签），为 None 时写入占位符
         from_cache: 是否来自缓存（为 True 时追加缓存提示）
         model_name: 使用的 LLM 模型名称（非缓存时追加标识行）
+        thinking_enabled: 是否开启 Extended Thinking（非缓存时追加标识行）
     """
     ws.title = title
 
@@ -130,6 +139,14 @@ def _write_content_sheet(
         cell.font = _MODEL_NAME_FONT
         cell.alignment = Alignment(horizontal="left", vertical="center")
         ws.row_dimensions[row].height = 20
+        row += 1
+
+    # 非缓存 + Extended Thinking 开启：追加标识行
+    if not from_cache and thinking_enabled and content:
+        cell = ws.cell(row=row, column=1, value="Extended Thinking 已开启")
+        cell.font = _THINKING_FONT
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[row].height = 20
 
     # 冻结标题行
     freeze_header(ws, 1)
@@ -140,6 +157,7 @@ def write_llm_sheets(
     llm_content: tuple[str | None, str | None],
     llm_cached: tuple[bool, bool] = (False, False),
     model_names: tuple[str, str] = ("", ""),
+    thinking: tuple[bool, bool] = (False, False),
 ) -> tuple[str, str]:
     """写入 LLM 内容页签（模块 7 & 8）。
 
@@ -151,6 +169,7 @@ def write_llm_sheets(
         llm_cached: (macro_cached, expert_cached) 缓存标记，
             分别对应两个页签的缓存状态
         model_names: (macro_model, expert_model) 模型名称，非缓存时追加标识行
+        thinking: (macro_thinking, expert_thinking) Extended Thinking 开启标记
 
     Returns:
         (macro_text, expert_text) 纯文本二元组，供 TUI 展示
@@ -163,9 +182,10 @@ def write_llm_sheets(
     content7, content8 = llm_content
     macro_cached, expert_cached = llm_cached
     name7, name8 = model_names
+    think7, think8 = thinking
 
-    _write_content_sheet(ws7, "全球政经局势", content7, from_cache=macro_cached, model_name=name7)
-    _write_content_sheet(ws8, "智囊团深度复盘", content8, from_cache=expert_cached, model_name=name8)
+    _write_content_sheet(ws7, "全球政经局势", content7, from_cache=macro_cached, model_name=name7, thinking_enabled=think7)
+    _write_content_sheet(ws8, "智囊团深度复盘", content8, from_cache=expert_cached, model_name=name8, thinking_enabled=think8)
 
     logger.info("LLM 内容页签写入完成")
 

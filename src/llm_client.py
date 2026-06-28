@@ -180,6 +180,7 @@ def _generate_llm_content(
     model: str | None,
     config_field: str,
     http_client: httpx.Client | None = None,
+    thinking_enabled: bool = False,
 ) -> tuple[Optional[str], bool]:
     """通用 LLM 内容生成骨架，带缓存检查与写入。
 
@@ -197,6 +198,7 @@ def _generate_llm_content(
         model: 模型名称
         config_field: llm_settings.json 中的配置字段名（截断时提示）
         http_client: 可选的 httpx.Client 实例
+        thinking_enabled: 是否已开启 Extended Thinking（为 True 时底部追加标识）
 
     Returns:
         (HTML 文本或 None, 是否来自缓存)
@@ -224,7 +226,10 @@ def _generate_llm_content(
         if usage:
             inp = usage.get("input_tokens", usage.get("prompt_tokens", 0))
             out = usage.get("output_tokens", usage.get("completion_tokens", 0))
-            html += f'<p style="color:#888;font-size:12px">模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}</p>'
+            _footer = f"模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}"
+            if thinking_enabled:
+                _footer += " | Extended Thinking"
+            html += f'<p style="color:#888;font-size:12px">{_footer}</p>'
         cache_set(cache_key, html)
         logger.info("LLM 内容生成完成: %s", cache_key)
         return (html, False)
@@ -915,6 +920,7 @@ def generate_global_macro(
         model=llm_config.get("model_macro"),
         config_field="max_tokens_macro",
         http_client=http_client,
+        thinking_enabled=llm_config.get("thinking_enabled_macro", False),
     )
 
 
@@ -984,6 +990,7 @@ def generate_expert_review(
         model=llm_config.get("model_expert"),
         config_field="max_tokens_expert",
         http_client=http_client,
+        thinking_enabled=llm_config.get("thinking_enabled_expert", False),
     )
 
 

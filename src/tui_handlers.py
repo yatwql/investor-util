@@ -312,9 +312,13 @@ def _generate_excel_report(
                 _llm_cfg.get("model_macro") or _llm_cfg.get("model", ""),
                 _llm_cfg.get("model_expert") or _llm_cfg.get("model", ""),
             )
+            _thinking = (
+                _llm_cfg.get("thinking_enabled_macro", False),
+                _llm_cfg.get("thinking_enabled_expert", False),
+            )
             macro_text, expert_text = write_llm_sheets(
                 wb, llm_content=llm_content, llm_cached=llm_cached,
-                model_names=_model_names,
+                model_names=_model_names, thinking=_thinking,
             )
             logger.info("LLM 增补内容已生成")
         except ImportError:
