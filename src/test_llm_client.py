@@ -30,6 +30,7 @@ from src.llm_client import (
     _compute_fingerprint,
     _extract_content,
     _get_cache_ttl_llm,
+    _is_effort_model,
     _log_token_usage,
     _markdown_to_html,
     _supports_extended_thinking,
@@ -282,6 +283,45 @@ class TestSupportsExtendedThinking(unittest.TestCase):
     def test_empty_string_not_supported(self) -> None:
         self.assertFalse(_supports_extended_thinking(""))
 
+    def test_deepseek_v4_flash_supported(self) -> None:
+        self.assertTrue(_supports_extended_thinking("DeepSeek-V4-Flash"))
+
+    def test_deepseek_v4_pro_supported(self) -> None:
+        self.assertTrue(_supports_extended_thinking("deepseek-v4-pro"))
+
+    def test_deepseek_chat_supported(self) -> None:
+        self.assertTrue(_supports_extended_thinking("deepseek-chat"))
+
+    def test_deepseek_v3_not_supported(self) -> None:
+        self.assertFalse(_supports_extended_thinking("deepseek-v3"))
+
+
+# ═══════════════════════════════════════════════════════════
+#  _is_effort_model
+# ═══════════════════════════════════════════════════════════
+
+
+class TestIsEffortModel(unittest.TestCase):
+    """测试模型类型识别：budget（Claude）vs effort（DeepSeek）。"""
+
+    def test_claude_sonnet4_is_not_effort(self) -> None:
+        self.assertFalse(_is_effort_model("claude-sonnet-4-20250514"))
+
+    def test_claude_opus4_is_not_effort(self) -> None:
+        self.assertFalse(_is_effort_model("claude-opus-4-20250514"))
+
+    def test_deepseek_v4_flash_is_effort(self) -> None:
+        self.assertTrue(_is_effort_model("DeepSeek-V4-Flash"))
+
+    def test_deepseek_v4_pro_is_effort(self) -> None:
+        self.assertTrue(_is_effort_model("deepseek-v4-pro"))
+
+    def test_deepseek_chat_is_effort(self) -> None:
+        self.assertTrue(_is_effort_model("deepseek-chat"))
+
+    def test_empty_is_not_effort(self) -> None:
+        self.assertFalse(_is_effort_model(""))
+
 
 # ═══════════════════════════════════════════════════════════
 #  _call_llm provider routing
@@ -392,6 +432,51 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         _payload = mock_retry.call_args[1]["payload"]
         # max_tokens=800 → auto_pad=800+4096=4896
         self.assertEqual(_payload["thinking"]["budget_tokens"], 4896)
+
+    @patch("src.llm_client._call_llm_with_retry")
+    def test_deepseek_uses_effort_not_budget(self, mock_retry: MagicMock) -> None:
+        """DeepSeek 使用 effort 而非 budget_tokens 控制思考深度。"""
+        cfg = {
+            "thinking_enabled_macro": True,
+            "reasoning_effort_macro": "high",
+        }
+        _call_claude(
+            **self.base_kw, model="DeepSeek-V4-Flash",
+            config_field="max_tokens_macro", llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(_payload["thinking"]["type"], "enabled")
+        self.assertIn("output_config", _payload)
+        self.assertEqual(_payload["output_config"]["effort"], "high")
+        # DeepSeek 不发送 budget_tokens
+        self.assertNotIn("budget_tokens", _payload["thinking"])
+        # temperature 应被移除
+        self.assertNotIn("temperature", _payload)
+
+    @patch("src.llm_client._call_llm_with_retry")
+    def test_deepseek_effort_default_high(self, mock_retry: MagicMock) -> None:
+        """DeepSeek 未配置 reasoning_effort 时默认 high。"""
+        cfg = {"thinking_enabled_macro": True}
+        _call_claude(
+            **self.base_kw, model="DeepSeek-V4-Flash",
+            config_field="max_tokens_macro", llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(_payload["output_config"]["effort"], "high")
+
+    @patch("src.llm_client._call_llm_with_retry")
+    def test_deepseek_effort_max(self, mock_retry: MagicMock) -> None:
+        """DeepSeek reasoning_effort 可以设为 max。"""
+        cfg = {
+            "thinking_enabled_macro": True,
+            "reasoning_effort_macro": "max",
+        }
+        _call_claude(
+            **self.base_kw, model="DeepSeek-V4-Flash",
+            config_field="max_tokens_macro", llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(_payload["output_config"]["effort"], "max")
 
 
 # ═══════════════════════════════════════════════════════════

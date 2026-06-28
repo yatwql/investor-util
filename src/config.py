@@ -189,7 +189,7 @@ def _ensure_llm_settings_file() -> None:
             "cache_enabled_news_correlation": True,
             "output_brief_macro": False,
             "output_brief_expert": False,
-            "max_tokens_macro": 800,
+            "max_tokens_macro": 1024,
             "max_tokens_expert": 8192,
             "max_tokens_news_correlation": 2000,
             "model_macro": None,
@@ -205,6 +205,9 @@ def _ensure_llm_settings_file() -> None:
             "thinking_budget_macro": 4000,
             "thinking_budget_expert": 16000,
             "thinking_budget_news_correlation": 4000,
+            "reasoning_effort_macro": "high",
+            "reasoning_effort_expert": "high",
+            "reasoning_effort_news_correlation": "high",
         }
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump(_DEFAULT_LLM_SETTINGS, f, ensure_ascii=False, indent=2)

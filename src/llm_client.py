@@ -564,14 +564,24 @@ def _call_llm(
 
 
 # ── Extended Thinking 模型兼容性名单 ──
-# 已知支持 Extended Thinking 的模型前缀。若使用的模型不在此列，
-# 即使配置了 thinking_enabled 也会自动降级跳过，避免 API 报错。
-_THINKING_SUPPORTED_PREFIXES = ("claude-sonnet-4", "claude-opus-4")
+# 已知支持 Extended Thinking 的模型前缀。
+# 若使用的模型不在此列，即使配置了 thinking_enabled 也会自动降级跳过。
+_THINKING_SUPPORTED_PREFIXES = ("claude-sonnet-4", "claude-opus-4", "deepseek-v4-", "deepseek-chat")
+
+# 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
+# Anthropic Claude → budget_tokens（token 数量预算）；
+# DeepSeek → effort（"high"/"max" 定性控制）。
+_THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-v4-", "deepseek-chat")
 
 
 def _supports_extended_thinking(model: str) -> bool:
     """检查模型是否支持 Extended Thinking。"""
-    return any(model.startswith(p) for p in _THINKING_SUPPORTED_PREFIXES)
+    return any(model.lower().startswith(p) for p in _THINKING_SUPPORTED_PREFIXES)
+
+
+def _is_effort_model(model: str) -> bool:
+    """检查模型是否使用 effort（而非 budget_tokens）控制思考深度。"""
+    return any(model.lower().startswith(p) for p in _THINKING_EFFORT_MODEL_PREFIXES)
 
 
 def _call_claude(
@@ -620,11 +630,10 @@ def _call_claude(
         "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user}],
     }
-    # ── Extended Thinking（仅 Claude，根据模块配置） ──
+    # ── Extended Thinking（根据模型类型 + 模块配置） ──
     if llm_config:
         _module_suffix = config_field.replace("max_tokens_", "")
         _thinking_key = f"thinking_enabled_{_module_suffix}"
-        _budget_key = f"thinking_budget_{_module_suffix}"
         if llm_config.get(_thinking_key, False):
             _resolved_model = model or "claude-sonnet-4-20250514"
             if not _supports_extended_thinking(_resolved_model):
@@ -633,16 +642,22 @@ def _call_claude(
                     _resolved_model, _module_suffix,
                 )
             else:
-                _budget = llm_config.get(_budget_key)
-                if not _budget or _budget < max_tokens + 1024:
-                    _budget = max_tokens + 4096  # 自动兜底
-                payload["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": _budget,
-                }
-                # Extended Thinking 与 temperature 互斥，移除 temperature
-                payload.pop("temperature", None)
-                logger.info("Extended Thinking 已开启 [%s]: budget=%d", _module_suffix, _budget)
+                payload["thinking"] = {"type": "enabled"}
+                payload.pop("temperature", None)  # Extended Thinking 与 temperature 互斥
+                if _is_effort_model(_resolved_model):
+                    # DeepSeek 等：用 effort（high/max）控制思考深度
+                    _effort_key = f"reasoning_effort_{_module_suffix}"
+                    _effort = llm_config.get(_effort_key, "high")
+                    payload["output_config"] = {"effort": _effort}
+                    logger.info("Extended Thinking 已开启 [%s]: effort=%s", _module_suffix, _effort)
+                else:
+                    # Anthropic Claude：用 budget_tokens 控制
+                    _budget_key = f"thinking_budget_{_module_suffix}"
+                    _budget = llm_config.get(_budget_key)
+                    if not _budget or _budget < max_tokens + 1024:
+                        _budget = max_tokens + 4096  # 自动兜底
+                    payload["thinking"]["budget_tokens"] = _budget
+                    logger.info("Extended Thinking 已开启 [%s]: budget=%d", _module_suffix, _budget)
     if temperature is not None and "thinking" not in payload:
         payload["temperature"] = temperature
     client = http_client

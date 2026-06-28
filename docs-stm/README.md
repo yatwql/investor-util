@@ -269,7 +269,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
   "cache_enabled_news_correlation": true,
   "output_brief_macro": false,
   "output_brief_expert": false,
-  "max_tokens_macro": 800,
+  "max_tokens_macro": 1024,
   "max_tokens_expert": 8192,
   "max_tokens_news_correlation": 2000,
   "model_macro": null,
@@ -280,11 +280,14 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
   "system_prompt_news_correlation": null,
   "llm_news_analysis": false,
   "thinking_enabled_macro": false,
-  "thinking_enabled_expert": false,
+  "thinking_enabled_expert": true,
   "thinking_enabled_news_correlation": false,
   "thinking_budget_macro": 4000,
   "thinking_budget_expert": 16000,
-  "thinking_budget_news_correlation": 4000
+  "thinking_budget_news_correlation": 4000,
+  "reasoning_effort_macro": "high",
+  "reasoning_effort_expert": "high",
+  "reasoning_effort_news_correlation": "high"
 }
 ```
 
@@ -303,7 +306,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `timeout_expert` | **120s** | 智囊团输入量大（含全部持仓明细），需更长的生成时间 |
 | `timeout_news_correlation` | **60s** | 新闻分析逐条处理，单次调用数据量不大 |
 | `max_retries` | **2** | 遇到 429（限流）或 503（服务不可用）时最多重试 2 次 |
-| `max_tokens_macro` | **800** | 宏观分析输出 ≈ 300-600 tokens，800 留有富余 |
+| `max_tokens_macro` | **1024** | 宏观分析输出 ≈ 300-600 tokens，1024 留有充足富余 |
 | `max_tokens_expert` | **8192** | 智囊团三阶段输出可达 2000+ tokens，8192 保障完整输出 |
 | `max_tokens_news_correlation` | **2000** | 新闻 JSON 数组输出，2000 足以覆盖 30+ 条新闻 |
 | `model_macro` | **null** | `null` 时使用 `llm_key.json` 的默认 model；填入模型名（如 `"claude-sonnet-4-6"`）单独指定全球政经局势用模型 |
@@ -317,6 +320,15 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `system_prompt_macro` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖分析风格 |
 | `system_prompt_expert` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖专家角色设定 |
 | `system_prompt_news_correlation` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖新闻关联判定规则 |
+| `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking（不建议——输出短，不值得） |
+| `thinking_enabled_expert` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking |
+| `thinking_enabled_news_correlation` | `false` | 新闻关联启用 Extended Thinking（不建议——JSON 格式任务不需要深度推理） |
+| `thinking_budget_macro` | 4000 | 政经 thinking token 预算。自动兜底 `max_tokens + 4096`（仅 Claude 有效） |
+| `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算。`max_tokens_expert=8192`，16000 留充足余量（仅 Claude 有效） |
+| `thinking_budget_news_correlation` | 4000 | 新闻关联 thinking token 预算。实际被关闭时该值不生效 |
+| `reasoning_effort_macro` | `"high"` | DeepSeek 模型思考深度：`"high"` 或 `"max"`（仅 DeepSeek 有效） |
+| `reasoning_effort_expert` | `"high"` | 智囊团思考深度，推荐 `"max"` 以充分发挥 DeepSeek V4 推理能力 |
+| `reasoning_effort_news_correlation` | `"high"` | 新闻关联思考深度，建议保持 `"high"` |
 | `llm_news_analysis` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
 | `thinking_enabled_expert` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking |
 | `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking（不建议——输出短，不值得） |
@@ -350,11 +362,13 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 ---
 
-#### Extended Thinking（Anthropic 专属）
+#### Extended Thinking
 
-> 仅 `provider: "claude"` 且模型 ≥ `claude-sonnet-4` 时生效。
+> **Claude**（provider: `"claude"`）：模型 ≥ `claude-sonnet-4` 时生效，用 `thinking.budget_tokens` 控制思考 token 预算。
+>
+> **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"high"` / `"max"`）。
 
-**[Extended Thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking)** 让模型在回答前进行深度推理（类似 DeepSeek-R1 的思维链），大幅提升复杂分析的深度和逻辑严谨性。代价是输出 token 大幅增加（约 2~4 倍），费用相应上升。
+**[Extended Thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking)** 让模型在回答前进行深度推理，大幅提升复杂分析的深度和逻辑严谨性。代价是输出 token 大幅增加（约 2~4 倍），费用相应上升。
 
 ##### 什么时候该开？
 
@@ -366,7 +380,16 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 ##### 配置方式
 
-在 `llm_settings.json` 中设置：
+在 `llm_settings.json` 中设置（示例为 DeepSeek 全面开启智囊团深度推理）：
+
+```json
+{
+  "thinking_enabled_expert": true,
+  "reasoning_effort_expert": "max"
+}
+```
+
+或使用 Claude 模型：
 
 ```json
 {
@@ -380,17 +403,30 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking |
 | `thinking_enabled_expert` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking |
 | `thinking_enabled_news_correlation` | `false` | 新闻关联分析启用 Extended Thinking |
-| `thinking_budget_macro` | 4000 | 全球政经 thinking token 预算。若小于 `max_tokens_macro + 1024` 则自动补足 |
-| `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算。若小于 `max_tokens_expert + 1024` 则自动补足 |
-| `thinking_budget_news_correlation` | 4000 | 新闻关联 thinking token 预算。若小于 `max_tokens_news_correlation + 1024` 则自动补足 |
+| `thinking_budget_macro` | 4000 | **仅 Claude** 全球政经 thinking token 预算。若小于 `max_tokens_macro + 1024` 则自动补足 |
+| `thinking_budget_expert` | 16000 | **仅 Claude** 智囊团 thinking token 预算。若小于 `max_tokens_expert + 1024` 则自动补足 |
+| `thinking_budget_news_correlation` | 4000 | **仅 Claude** 新闻关联 thinking token 预算 |
+| `reasoning_effort_macro` | `"high"` | **仅 DeepSeek** 全球政经思考深度。`"high"`（标准）或 `"max"`（极致） |
+| `reasoning_effort_expert` | `"high"` | **仅 DeepSeek** 智囊团思考深度，推荐 `"max"` |
+| `reasoning_effort_news_correlation` | `"high"` | **仅 DeepSeek** 新闻关联思考深度，建议 `"high"` |
 
 > **注意**：开启 Extended Thinking 后，`temperature` 参数被自动忽略（API 不支持两者并存）。
 
-##### `thinking_budget` 与 `max_tokens_*` 的关系（必读）
+##### 模型差异详解
 
-**这是最容易被误解的两个参数，务必理解。**
+| 维度 | Anthropic Claude | DeepSeek V4+ |
+|------|------------------|-------------|
+| 控制参数 | `thinking.budget_tokens`（token 数量预算） | `output_config.effort`（"high"/"max" 定性控制） |
+| 互斥参数 | temperature | temperature |
+| 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） |
+| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` |
+| 降级策略 | 模型不支持时自动跳过，记录 WARNING | 模型不支持时自动跳过，记录 WARNING |
 
-在 `llm_settings.json` 中实际配置的是 `thinking_budget_{模块}` 和 `max_tokens_{模块}`（如 `thinking_budget_expert` / `max_tokens_expert`）。以下用 API 层面的通用概念 `max_tokens` 解释原理：
+##### `thinking_budget` 与 `max_tokens_*` 的关系（仅 Claude，必读）
+
+**仅在使用 Claude 模型时 `thinking_budget_{模块}` 有意义。** DeepSeek 使用 `reasoning_effort`（`"high"` / `"max"`）定性控制思考深度，不涉及 token 预算概念。
+
+以下解释针对 Claude 的 `thinking_budget_{模块}` 和 `max_tokens_{模块}`（如 `thinking_budget_expert` / `max_tokens_expert`）。
 
 | 配置项（llm_settings.json） | 管什么 | expert 默认值 |
 |------|--------|:------------:|
@@ -410,19 +446,21 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 └───────────────────────────────────────────────────┘
 ```
 
-**API 硬性约束：** `thinking_budget_{模块}` 的值 **必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。实际场景：
-- `max_tokens_macro=800` → `thinking_budget_macro` 至少 1824（默认 4000 ✅）
+**API 硬性约束（仅 Claude）：** `thinking_budget_{模块}` 的值 **必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。实际场景：
+- `max_tokens_macro=1024` → `thinking_budget_macro` 至少 2048（默认 4000 ✅）
 - `max_tokens_expert=8192` → `thinking_budget_expert` 至少 9216（默认 16000 ✅）
 
 > **提示**：开启 Extended Thinking 后，HTML 报告在该章节的 Token 用量行末尾追加 `| Extended Thinking` 标识；
 > Excel 报告在该章节的模型名称行下方追加 `Extended Thinking 已开启` 行，便于快速确认深度推理是否生效。
 - `max_tokens_news_correlation=2000` → `thinking_budget_news_correlation` 至少 3024（默认 4000 ✅）
 
-**代码自动保护：** 若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`，不会因配置错误导致 API 请求失败。
+**代码自动保护：**
+- 若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。
+- 若配置开启但模型不支持（如 `claude-sonnet-3-5`），自动跳过并记录 WARNING。
+- DeepSeek V4+ 与 Claude Sonnet 4+ / Opus 4+ 均可自动识别，无需手动适配。
 
-**模型兼容性降级：** 若配置开启 `thinking_enabled_expert` 但实际使用的模型不支持 Extended Thinking（如 `claude-sonnet-3-5`、`deepseek-v4-flash` 等），`_call_claude()` 会自动跳过 `thinking` 参数并记录 `WARNING` 日志，不会抛出 API 错误。
-
-**一句话总结：** `max_tokens_{模块}` 管"最终说多少"，`thinking_budget_{模块}` 管"允许想多久"。budget 必须大于对应 max_tokens + 1024。当前推荐值 `budget=16000 / max=8192` 是合理的组合。
+**一句话总结（Claude）：** `max_tokens_{模块}` 管"最终说多少"，`thinking_budget_{模块}` 管"允许想多久"。
+**一句话总结（DeepSeek）：** `reasoning_effort_{模块}` 管"想多深"，`"max"` 对应深度分析的极致模式。
 
 ##### 效果参考
 
@@ -470,7 +508,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `cache_enabled_news_correlation` | `true` | LLM 新闻关联分析是否启用缓存 |
 | `output_brief_macro` | `false` | `true` 时输出 ≤200 字精简版宏观分析 |
 | `output_brief_expert` | `false` | `true` 时输出 ≤300 字精简版专家复盘 |
-| `max_tokens_macro` | `800` | 全球政经局势输出 token 上限 |
+| `max_tokens_macro` | `1024` | 全球政经局势输出 token 上限 |
 | `max_tokens_expert` | `8192` | 智囊团深度复盘输出 token 上限 |
 | `max_tokens_news_correlation` | `2000` | LLM 新闻关联分析输出 token 上限 |
 | `model_macro` | `null` | 单独指定全球政经局势用模型，`null` 使用 `llm_key.json` 的全局 `model` |

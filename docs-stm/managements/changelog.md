@@ -4,6 +4,30 @@
 
 ---
 
+## [0.2.28] - 2026-06-29
+
+### Added
+- **DeepSeek Extended Thinking 支持** — 检测到 `deepseek-v4-*` / `deepseek-chat` 模型时，
+  使用 `output_config.effort`（"high"/"max"）替代 Claude 的 `thinking.budget_tokens`，
+  实现与 Anthropic 协议兼容的思考深度控制
+- **`reasoning_effort_*` 配置项** — `llm_settings.json` 新增 `reasoning_effort_macro` /
+  `reasoning_effort_expert` / `reasoning_effort_news_correlation`，默认 `"high"`；
+  Claude 忽略此字段，DeepSeek 模型自动读取
+- **`_is_effort_model()` 检测函数** — 区分 Claude（`thinking.budget_tokens` 定量预算）
+  与 DeepSeek（`output_config.effort` 定性深度）的 thinking payload 注入逻辑
+- **`model_macro` / `model_expert` / `model_news_correlation` 配置项** — 支持为各 LLM 模块
+  指定独立的模型名称，覆盖全局配置，默认 `null`（使用全局模型）
+
+### Changed
+- **`max_tokens_macro` 默认值 800→1024** — 增加宏观分析输出空间
+- **`llm_settings.json` 同步** — 新增 `reasoning_effort_*`（3 项）和 `model_*`（3 项），
+  `thinking_enabled_expert: true`，与代码默认保持完全一致
+
+### Tests
+- **新增 `TestIsEffortModel` 测试类** — 6 条用例覆盖 DeepSeek/Claude/空模型/大小写/前缀匹配
+- **`TestSupportsExtendedThinking` 扩展** — 4 条 DeepSeek 测试用例（v4-flash / chat / 大小写）
+- **`_is_effort_model` 导入验证** — 验证新导出函数可正确导入
+
 ## [0.2.27] - 2026-06-29
 
 ### Added

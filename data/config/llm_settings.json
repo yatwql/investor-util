@@ -26,5 +26,8 @@
   "thinking_enabled_news_correlation": false,
   "thinking_budget_macro": 4000,
   "thinking_budget_expert": 16000,
-  "thinking_budget_news_correlation": 4000
+  "thinking_budget_news_correlation": 4000,
+  "reasoning_effort_macro": "high",
+  "reasoning_effort_expert": "high",
+  "reasoning_effort_news_correlation": "high"
 }
