@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.tui_menu import MENU_ITEMS, _press_any_key, _refresh_config, get_config_cache
 from src.logger import setup_logger
 from src.reader import get_xlsx_info, list_xlsx_files, read_holdings
-from src.config import get_config, set_config
+from src.config import get_config, set_config, get_llm_config
 
 logger = setup_logger()
 
@@ -307,7 +307,15 @@ def _generate_excel_report(
         logger.info("正在生成 LLM 增补内容...")
         try:
             from src.report.llm_content import write_llm_sheets
-            macro_text, expert_text = write_llm_sheets(wb, llm_content=llm_content, llm_cached=llm_cached)
+            _llm_cfg = get_llm_config() or {}
+            _model_names = (
+                _llm_cfg.get("model_macro") or _llm_cfg.get("model", ""),
+                _llm_cfg.get("model_expert") or _llm_cfg.get("model", ""),
+            )
+            macro_text, expert_text = write_llm_sheets(
+                wb, llm_content=llm_content, llm_cached=llm_cached,
+                model_names=_model_names,
+            )
             logger.info("LLM 增补内容已生成")
         except ImportError:
             logger.warning("LLM 增补模块 (src.report.llm_content) 未就绪，跳过")

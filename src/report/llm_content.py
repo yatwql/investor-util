@@ -58,12 +58,19 @@ _CACHE_HINT_FONT = Font(
     italic=True,
 )
 
+_MODEL_NAME_FONT = Font(
+    color="888888",
+    size=9,
+    italic=True,
+)
+
 
 def _write_content_sheet(
     ws: Worksheet,
     title: str,
     content: str | None,
     from_cache: bool = False,
+    model_name: str = "",
 ) -> None:
     """写入一个 LLM 内容页签。
 
@@ -71,12 +78,14 @@ def _write_content_sheet(
       - 第 1 行：标题（合并 A1:B1，居中标题样式）
       - 第 2 行起：每段落占一行 + 一行空行间距
       - 若 from_cache 为 True，末尾追加灰色缓存提示行
+      - 若非缓存且 model_name 非空，末尾追加模型名标识行
 
     Args:
         ws: 目标工作表
         title: 页签标题行文本
         content: LLM 返回的 HTML 文本（已剥离标签），为 None 时写入占位符
         from_cache: 是否来自缓存（为 True 时追加缓存提示）
+        model_name: 使用的 LLM 模型名称（非缓存时追加标识行）
     """
     ws.title = title
 
@@ -115,6 +124,13 @@ def _write_content_sheet(
         cell.alignment = Alignment(horizontal="left", vertical="center")
         ws.row_dimensions[row].height = 20
 
+    # 非缓存：追加模型名标识行
+    if not from_cache and model_name and content:
+        cell = ws.cell(row=row, column=1, value=f"模型：{model_name}")
+        cell.font = _MODEL_NAME_FONT
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[row].height = 20
+
     # 冻结标题行
     freeze_header(ws, 1)
 
@@ -123,6 +139,7 @@ def write_llm_sheets(
     wb: Any,
     llm_content: tuple[str | None, str | None],
     llm_cached: tuple[bool, bool] = (False, False),
+    model_names: tuple[str, str] = ("", ""),
 ) -> tuple[str, str]:
     """写入 LLM 内容页签（模块 7 & 8）。
 
@@ -133,6 +150,7 @@ def write_llm_sheets(
         llm_content: (macro_html, expert_html) 预生成内容，各可能为 None
         llm_cached: (macro_cached, expert_cached) 缓存标记，
             分别对应两个页签的缓存状态
+        model_names: (macro_model, expert_model) 模型名称，非缓存时追加标识行
 
     Returns:
         (macro_text, expert_text) 纯文本二元组，供 TUI 展示
@@ -144,9 +162,10 @@ def write_llm_sheets(
 
     content7, content8 = llm_content
     macro_cached, expert_cached = llm_cached
+    name7, name8 = model_names
 
-    _write_content_sheet(ws7, "全球政经局势", content7, from_cache=macro_cached)
-    _write_content_sheet(ws8, "智囊团深度复盘", content8, from_cache=expert_cached)
+    _write_content_sheet(ws7, "全球政经局势", content7, from_cache=macro_cached, model_name=name7)
+    _write_content_sheet(ws8, "智囊团深度复盘", content8, from_cache=expert_cached, model_name=name8)
 
     logger.info("LLM 内容页签写入完成")
 
