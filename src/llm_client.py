@@ -482,7 +482,15 @@ def _call_llm_with_retry(
             return (None, None)
         except httpx.RequestError:
             host = _sanitize_endpoint(url)
-            logger.warning("%s API 请求失败 (%s)", label, host)
+            if attempt < max_retries:
+                delay = _RETRY_DELAYS[attempt]
+                logger.warning(
+                    "%s API 请求失败 (%s) (尝试 %d/%d)，%.1fs 后重试...",
+                    label, host, attempt + 1, max_retries + 1, delay,
+                )
+                time.sleep(delay)
+                continue
+            logger.warning("%s API 请求失败 (%s)（已重试 %d 次）", label, host, max_retries)
             return (None, None)
         except (ValueError, KeyError) as e:
             logger.warning("%s API 响应解析失败: %s", label, e)

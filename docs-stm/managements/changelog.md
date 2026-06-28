@@ -4,6 +4,14 @@
 
 ---
 
+## [0.2.25] - 2026-06-29
+
+### Fixed
+- **`httpx.RequestError`（网络层错误）未重试** — `_call_llm_with_retry()` 中 `RequestError`
+  之前直接返回，不触发任何重试。瞬态网络波动（DNS 抖动、SSL 握手失败、连接重置）
+  可导致所有 LLM 调用同时失败。现已增加与 `TimeoutException` 一致的重试逻辑，
+  最大重试次数内以指数退避（1s/3s）自动恢复。
+
 ## [0.2.24] - 2026-06-29
 
 ### Added
