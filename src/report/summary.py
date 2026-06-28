@@ -165,25 +165,19 @@ def write_summary_sheet(
         ("总市值 (元)", total_mv),
         ("总成本 (元)", total_cost),
         ("总盈亏 (元)", total_profit),
-        ("总收益率", f"{profit_rate:+.2f}%"),
+        ("总收益率", profit_rate),
         ("本日盈亏 (元)", today_profit),
-        ("本日收益率", f"{today_rate:+.2f}%"),
+        ("本日收益率", today_rate),
     ]
     for label, val in summary_data:
-        write_data_row(ws, row, [label, val])
-        # 对盈亏行着色
+        # 收益率行在显示时格式化为百分数，着色用原始数值
+        display_val = f"{val:+.2f}%" if "收益率" in label else val
+        write_data_row(ws, row, [label, display_val])
+        # 对盈亏/收益率行着色
         if "盈亏" in label and isinstance(val, (int, float)):
             ws.cell(row=row, column=2).font = profit_font(val)
-        elif "收益率" in label and isinstance(val, str) and val not in ("--", ""):
-            try:
-                num_str = val.strip("+%").strip()
-                if num_str and num_str != "-":
-                    num_val = float(num_str) * (1 if val.startswith("-") else 1)
-                    if "-" in val:
-                        num_val = -abs(num_val)
-                    ws.cell(row=row, column=2).font = profit_font(num_val)
-            except ValueError:
-                pass
+        elif "收益率" in label and isinstance(val, (int, float)):
+            ws.cell(row=row, column=2).font = profit_font(val)
         row += 1
 
     row = _write_blanks(ws, row)

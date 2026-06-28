@@ -425,27 +425,26 @@ class TestWriteSummarySheet(unittest.TestCase):
         mocks["mock_profit_font"].assert_any_call(-3000.0)
 
     def test_profit_font_rate_positive(self):
-        """收益率正数时 profit_font 传入格式化后解析的浮点数（经 2 位小数舍入）。"""
+        """收益率正数时 profit_font 传入原始浮点数值（不再经字符串格式化舍入）。"""
         mocks = self._call_summary_sheet(
             self.ws, self.mv, self.cost, self.profit, self.today,
             categories=self.categories,
         )
-        # 总收益率 25.00% -> profit_font(25.0)
+        # 总收益率 25.0%
         mocks["mock_profit_font"].assert_any_call(25.0)
-        # 本日收益率原始值 ~3.4483%，经 :+.2f 格式化为 +3.45%，
-        # 再解析回 3.45
-        mocks["mock_profit_font"].assert_any_call(3.45)
+        # 本日收益率原始值 5000/(120000+30000-5000)*100 ≈ 3.448275862...
+        mocks["mock_profit_font"].assert_any_call(5000.0 / 145000.0 * 100)
 
     def test_profit_font_rate_negative(self):
-        """收益率负值时 profit_font 传入经 2 位小数舍入后的值。"""
+        """收益率负值时 profit_font 传入原始浮点数值（不再经字符串格式化舍入）。"""
         mocks = self._call_summary_sheet(
             self.ws, 90000.0, 100000.0, -10000.0, -2000.0,
             categories=self.categories,
         )
-        # profit_rate = -10.00% -> profit_font(-10.0)
+        # profit_rate = -10.0%
         mocks["mock_profit_font"].assert_any_call(-10.0)
-        # today_rate 原始值 ~-2.1739%，格式化为 -2.17%，再解析为 -2.17
-        mocks["mock_profit_font"].assert_any_call(-2.17)
+        # today_rate 原始值 -2000/(100000-10000+2000)*100 ≈ -2.173913...
+        mocks["mock_profit_font"].assert_any_call(-2000.0 / 92000.0 * 100)
 
     def test_zero_cost_edge_case(self):
         """总成本为 0 时 profit_rate = 0.0，不除零。"""

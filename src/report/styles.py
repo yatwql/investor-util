@@ -29,7 +29,6 @@ TITLE_FILL = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="so
 # ── 对齐 ──────────────────────────────────────────────────
 
 CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
-NUMBER_ALIGN = Alignment(horizontal="right", vertical="center")
 
 # ── 边线 ──────────────────────────────────────────────────
 

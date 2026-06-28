@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import re
 from datetime import datetime
 from typing import Any
@@ -216,7 +217,7 @@ def fetch_quarterly_holdings(code: str) -> dict[str, Any] | None:
             "topline": 10,
             "year": "",
             "month": "",
-            "rt": "0.123456",
+            "rt": str(random.random()),
         }
         try:
             with httpx.Client(timeout=_TIMEOUT, verify=False) as client:

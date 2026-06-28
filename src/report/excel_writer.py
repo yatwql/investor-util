@@ -254,17 +254,3 @@ def freeze_header(ws, row: int = 1) -> None:
     ws.freeze_panes = f"A{row + 1}"
 
 
-def add_styles_to_cells(ws, row: int, ncols: int, styles: dict[str, Any]) -> None:
-    """对一行中的特定列应用样式。
-
-    Args:
-        ws: 工作表
-        row: 行号
-        ncols: 总列数
-        styles: {col_index (1-based): openpyxl style object}
-    """
-    for col_idx, style in styles.items():
-        if 1 <= col_idx <= ncols:
-            cell = ws.cell(row=row, column=col_idx)
-            if hasattr(style, "font"):
-                cell.font = style

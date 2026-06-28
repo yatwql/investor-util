@@ -202,20 +202,5 @@ class TestFreezeHeader(unittest.TestCase):
             self.fail(f"freeze_header raised: {e}")
 
 
-class TestAddStyles(unittest.TestCase):
-    """add_styles_to_cells 测试。"""
-
-    def setUp(self):
-        self.wb = ew.create_workbook()
-        self.ws = self.wb.active
-
-    def test_add_styles(self):
-        """应用样式到单元格。"""
-        self.ws.cell(row=1, column=1, value="test")
-        ew.add_styles_to_cells(self.ws, 1, 1, {})
-        # 不校验特定样式值，仅确保不崩溃
-        self.assertEqual(self.ws.cell(row=1, column=1).value, "test")
-
-
 if __name__ == "__main__":
     unittest.main()

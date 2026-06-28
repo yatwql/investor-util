@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, List
 
 from openpyxl.worksheet.worksheet import Worksheet
@@ -221,7 +222,7 @@ _SECTOR_KEYWORDS: dict[str, str] = {
     # 科技 - 金融科技
     "东方财富": "金融",
     # 金融 - 美股权重股
-    "摩根大通": "金融", "JP MORGAN": "金融", "高盛": "金融",
+    "摩根大通": "金融", "高盛": "金融",
     "摩根士丹利": "金融", "美国银行": "金融", "花旗": "金融",
     "富国": "金融", "VISA": "金融", "万事达": "金融",
     # 消费 - 美股权重股
@@ -528,7 +529,7 @@ def compute_penetration_top10(
         if total_mv > 0 else 0.0
     )
 
-    now = __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     return {
         "update_time": now,
