@@ -152,19 +152,18 @@
 | 持仓数据 | `hold` | 604800 秒（7 天） | `fund_hold_{code}.json` | — |
 | 行业分类 | `industry` | 604800 秒（7 天） | `industry_{code}.json` | — |
 | 新闻聚合 | `news` | 900 秒（15 分钟） | `news_{md5}.json` | 输入参数指纹 |
-| 新闻 LLM 关联分析 | `news_corr` | 3600 秒（1 小时） | `llm_news_corr_{fingerprint}.json` | 输入数据指纹 |
+| 新闻 LLM 关联分析 | `llm_news_corr` | 3600 秒（1 小时） | `llm_news_corr_{fingerprint}.json` | 输入数据指纹 |
 | LLM 全局（通用） | `llm` | 86400 秒（24 小时） | `llm_*` | —（兜底） |
-| 全球政经局势（LLM） | `llm_macro` | 86400 秒（24 小时） | `llm_global_macro_{fingerprint}.json` | 指数+持仓指纹 |
-| 智囊团深度复盘（LLM） | `llm_expert` | 7200 秒（2 小时） | `llm_expert_review_{fingerprint}.json` | 持仓结构指纹 |
+| 全球政经局势（LLM） | `llm_global_macro` | 86400 秒（24 小时） | `llm_global_macro_{fingerprint}.json` | 指数+持仓指纹 |
+| 智囊团深度复盘（LLM） | `llm_expert_review` | 7200 秒（2 小时） | `llm_expert_review_{fingerprint}.json` | 持仓结构指纹 |
 | 基准数据 | `benchmark` | 2592000 秒（30 天） | `fund_benchmarks.json` | — |
 | 机构盈利预测 | `profit_forecast` | 86400 秒（24 小时） | `profit_forecast_{fingerprint}.json` | 指数指纹 |
 | 行业资金流向 | `sector_flow` | 900 秒（15 分钟） | `sector_flow_{fingerprint}.json` | 指数指纹 |
 | 股票历史分红 | `dividend` | 2592000 秒（30 天） | `dividend_{fingerprint}.json` | 代码列表指纹 |
 
 **TTL 优先级链（按优先级从高到低）：**
-1. `llm_settings.json` 中的 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news_correlation`（仅限 LLM 缓存）
-2. `config.json` 中的 `cache_ttl.<data_type>`
-3. 代码内置默认值（如上表）
+1. `config.json` 中的 `cache_ttl.<data_type>`
+2. 代码内置默认值（如上表）
 
 ### 5.4 手动刷新
 
@@ -349,6 +348,8 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 详见 [plan.md](plan.md)「LLM 智能分析策略」章节。
 
 用户配置指南详见根目录 [README.md](../README.md)「LLM 配置指引」章节。
+
+**逐章节模型路由（v0.2.17+）：** 支持对全球政经局势、智囊团深度复盘、新闻关联分析三个 LLM 章节分别指定不同的模型。通过 `data/config/llm_settings.json` 中的 `model_macro`、`model_expert`、`model_news_correlation` 字段设置，为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。详见 README.md「逐章节模型路由」小节。
 
 ---
 

@@ -695,7 +695,10 @@ def _cmd_update_basic_cache() -> None:
         clear_by_prefix("llm_news_corr_")
         clear_by_prefix("industry_")
         clear_by_prefix("dividend_")
-        print("  [OK] 旧缓存已清除（含 news_ + llm_news_corr_ + industry_ + dividend_ 缓存）")
+        clear_by_prefix("profit_forecast_")
+        clear_by_prefix("sector_flow_")
+        print("  [OK] 旧缓存已清除（含 news_ + llm_news_corr_ + industry_ +"
+              " dividend_ + profit_forecast_ + sector_flow_ 缓存）")
 
         print()
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -746,6 +749,32 @@ def _cmd_update_basic_cache() -> None:
             print(f"  [OK] fund_benchmarks.json       ({bm_ok}/{len(funds)} 全部成功)")
         else:
             print(f"  [!] fund_benchmarks.json       ({bm_ok}/{len(funds)} 成功, {bm_fail} 只未找到)")
+
+        # ── 盈利预测 + 行业资金流向 ──
+        print()
+        print("  [..]   刷新全量盈利预测和行业资金流向...")
+        from src.providers.akshare_extras import (
+            _memo_clear, get_profit_forecast, get_sector_fund_flow,
+        )
+        _memo_clear()
+        pf_ok = sf_ok = 0
+        with ThreadPoolExecutor(max_workers=2) as _pool:
+            _pf_fut = _pool.submit(get_profit_forecast)
+            _sf_fut = _pool.submit(get_sector_fund_flow)
+            pf_data = _pf_fut.result()
+            sf_data = _sf_fut.result()
+            if pf_data:
+                pf_ok = len(pf_data)
+            if sf_data:
+                sf_ok = len(sf_data)
+        if pf_ok:
+            print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)")
+        else:
+            print("  [!]   profit_forecast              获取失败")
+        if sf_ok:
+            print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)")
+        else:
+            print("  [!]   sector_flow                  获取失败")
     except Exception as e:
         logger.exception("更新基础缓存失败")
         print(f"  [ERR] 更新失败: {e}")

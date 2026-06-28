@@ -45,7 +45,12 @@
 | 财经新闻（新浪） | 新浪财经 `feed.mix.sina.com.cn` | — | `sina_news.py` |
 | 财经新闻（东方财富） | 东方财富 `push-api-html.eastmoney.com` | — | `eastmoney_news.py` |
 | 财经新闻（财联社） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | — | `cls_news.py` |
+| 财经新闻（华尔街见闻） | 华尔街见闻 `api-one.wallstcn.com/apiv1/content/lives`（JSON API，无需鉴权） | — | `wallstreetcn_news.py` |
+| 财经新闻（akshare） | akshare 封装：财新网 + CCTV | — | `akshare_news.py` |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com` 三级行业 + 概念板块 | — | `eastmoney_industry.py` |
+| 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `akshare_extras.py` |
+| 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `akshare_extras.py` |
+| 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `akshare_extras.py` |
 
 ---
 
@@ -117,7 +122,7 @@ investor-util/
 │   ├── models.py                 # 数据模型（Holding dataclass）
 │   ├── logger.py                 # 日志模块
 │   ├── tui.py                    # 键盘输入封装
-│   ├── test_*.py                 # 单元测试（15 个模块）
+│   ├── test_*.py                 # 单元测试（18 个模块）
 │   ├── providers/                # API 供应商
 │   │   ├── tencent.py            # 腾讯财经（实时价、指数）
 │   │   ├── eastmoney.py          # 东方财富（基金净值）
@@ -126,7 +131,11 @@ investor-util/
 │   │   ├── sina.py               # 新浪财经（美股指数）
 │   │   ├── sina_news.py          # 新浪财经（新闻）
 │   │   ├── eastmoney_news.py     # 东方财富（新闻）
+│   │   ├── eastmoney_news.py     # 东方财富（新闻）
 │   │   ├── cls_news.py           # 财联社（新闻）
+│   │   ├── wallstreetcn_news.py  # 华尔街见闻（新闻）
+│   │   ├── akshare_extras.py     # akshare 扩展（盈利预测/资金流向/分红）
+│   │   ├── akshare_news.py       # akshare 聚合（财新网/CCTV）
 │   │   └── news_aggregator.py    # 多源新闻聚合器
 │   └── report/                   # 报告生成
 │       ├── excel_writer.py       # Excel 工作簿管理

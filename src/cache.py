@@ -223,9 +223,9 @@ def cleanup_expired(dry_run: bool = False) -> int:
             "fund_hold": "hold",
             "industry": "industry",
             "news": "news",
-            "llm_global_macro": "llm_macro",   # 全球政经局势：24h TTL
-            "llm_expert_review": "llm_expert", # 智囊团深度复盘：2h TTL
-            "llm_news_corr": "news_corr",      # LLM 新闻关联分析：1h TTL
+            "llm_global_macro": "llm_global_macro",   # 全球政经局势：24h TTL
+            "llm_expert_review": "llm_expert_review", # 智囊团深度复盘：2h TTL
+            "llm_news_corr": "llm_news_corr",     # LLM 新闻关联分析：1h TTL
             "llm_": "llm",                     # 通用 LLM 缓存：24h TTL
             "profit_forecast": "profit_forecast",
             "sector_flow": "sector_flow",
@@ -420,12 +420,12 @@ _CACHE_TTL_DEFAULTS: dict[str, float] = {
     "rank": CACHE_DAILY,
     "hold": CACHE_WEEKLY,
     "news": 900,              # 新闻聚合缓存：15 分钟
-    "news_corr": 3600,        # LLM 新闻关联分析：1 小时
     "industry": CACHE_WEEKLY, # 行业分类/概念板块：7 天
     "benchmark": CACHE_MONTHLY,
     "llm": CACHE_DAILY,
-    "llm_macro": 86400,       # 全球政经局势：24 小时
-    "llm_expert": 7200,       # 智囊团深度复盘：2 小时
+    "llm_global_macro": 86400,       # 全球政经局势：24 小时
+    "llm_expert_review": 7200,       # 智囊团深度复盘：2 小时
+    "llm_news_corr": 3600,           # LLM 新闻关联分析：1 小时
     "profit_forecast": CACHE_DAILY,   # 机构盈利预测：24h
     "sector_flow": 900,               # 行业资金流向：15分钟
     "dividend": CACHE_MONTHLY,        # 分红历史：30天

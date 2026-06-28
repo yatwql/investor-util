@@ -26,7 +26,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
-from src.cache import CACHE_DAILY, CACHE_WEEKLY, get as cache_get, set as cache_set
+from src.cache import CACHE_DAILY, CACHE_WEEKLY, get as cache_get, get_ttl, set as cache_set
 from src.config import get_config
 from src.providers import eastmoney, eastmoney_industry, sina, tencent, tiantian
 
@@ -261,8 +261,8 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
     code = code.strip()
     cache_key = _price_cache_key(code)
 
-    # 1) 读缓存
-    cached = cache_get(cache_key, CACHE_DAILY)
+    # 1) 读缓存（TTL 从 config.json cache_ttl.price 读取，可配置）
+    cached = cache_get(cache_key, get_ttl("price"))
     if cached is not None:
         logger.debug("行情缓存命中: %s", code)
         return cached

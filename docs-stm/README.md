@@ -2,7 +2,7 @@
 
 个人投资者辅助工具：读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.18
+> 当前版本：0.2.20
 
 ---
 
@@ -21,7 +21,7 @@
 - **分红历史分析** — 个股历年分红自动汇总，计算年均股息率（分类汇总 + 穿透 TOP10 双列展示）
 - **行业资金流向** — LLM 宏观分析注入实时行业资金流向数据（主力净流入/涨跌幅），辅助判断板块轮动
 - **基金业绩评价** — 同类排名百分位 + 超额收益修正，自动标注优秀/良好/稳定/偏差
-- **TUI 智能摘要** — LLM 分析报告生成后终端直接展示核心观点，无需打开文件
+- **TUI 智能摘要** — LLM 分析报告生成后终端直接展示核心观点（全球政经摘要 + 智囊团定音锤阶段），无需打开文件即可快速了解 LLM 输出重点
 
 ---
 
@@ -163,12 +163,12 @@ python src/main.py
     "rank": 86400,
     "hold": 604800,
     "news": 900,
-    "news_corr": 3600,
+    "llm_news_corr": 3600,
     "industry": 604800,
     "benchmark": 2592000,
     "llm": 86400,
-    "llm_macro": 86400,
-    "llm_expert": 7200,
+    "llm_global_macro": 86400,
+    "llm_expert_review": 7200,
     "profit_forecast": 86400,
     "sector_flow": 900,
     "dividend": 2592000
@@ -211,10 +211,10 @@ python src/main.py
 | `rank` | 86400（24h） | — | 基金同类排名+区间收益率 |
 | `hold` | 604800（7天） | — | 基金前10大持仓明细 |
 | `news` | 900（15分钟） | 输入参数指纹 | 多源新闻聚合结果缓存，避免重复 HTTP 获取 |
-| `news_corr` | 3600（1小时） | 输入数据指纹 | LLM 新闻关联分析缓存 |
+| `llm_news_corr` | 3600（1小时） | 输入数据指纹 | LLM 新闻关联分析缓存 |
 | `llm` | 86400（24h） | —（兜底） | LLM 通用缓存兜底（其他 LLM 类型未匹配时生效） |
-| `llm_macro` | 86400（24小时） | 指数+持仓指纹 | 全球政经局势 LLM 分析 |
-| `llm_expert` | 7200（2小时） | 持仓结构指纹 | 智囊团深度复盘 LLM 分析 |
+| `llm_global_macro` | 86400（24小时） | 指数+持仓指纹 | 全球政经局势 LLM 分析 |
+| `llm_expert_review` | 7200（2小时） | 持仓结构指纹 | 智囊团深度复盘 LLM 分析 |
 | `industry` | 604800（7天） | — | 行业分类/概念板块缓存 |
 | `benchmark` | 2592000（30天） | — | 业绩比较基准对照表 |
 | `profit_forecast` | 86400（24小时） | 指数指纹 | 机构盈利预测 |
@@ -273,9 +273,9 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
   "max_tokens_macro": 800,
   "max_tokens_expert": 8192,
   "max_tokens_news_correlation": 2000,
-  "cache_ttl_macro": 86400,
-  "cache_ttl_expert": 7200,
-  "cache_ttl_news_correlation": 3600,
+  "model_macro": null,
+  "model_expert": null,
+  "model_news_correlation": null,
   "system_prompt_macro": null,
   "system_prompt_expert": null,
   "system_prompt_news_correlation": null,
@@ -301,18 +301,43 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `max_tokens_macro` | **800** | 宏观分析输出 ≈ 300-600 tokens，800 留有富余 |
 | `max_tokens_expert` | **8192** | 智囊团三阶段输出可达 2000+ tokens，8192 保障完整输出 |
 | `max_tokens_news_correlation` | **2000** | 新闻 JSON 数组输出，2000 足以覆盖 30+ 条新闻 |
+| `model_macro` | **null** | `null` 时使用 `llm_key.json` 的默认 model；填入模型名（如 `"claude-sonnet-4-6"`）单独指定全球政经局势用模型 |
+| `model_expert` | **null** | `null` 时使用默认 model；填入模型名单独指定智囊团深度复盘用模型（如需更大输出量可换 `"claude-opus-4-8"`） |
+| `model_news_correlation` | **null** | `null` 时使用默认 model；填入模型名单独指定新闻关联分析用模型（批量任务可选轻量模型如 `"claude-haiku-4-5"` 降低成本） |
 | `cache_enabled_macro` | **true** | 宏观分析 24 小时内市场格局不会剧变，开启缓存节省费用（指数指纹驱动失效） |
 | `cache_enabled_expert` | **true** | 智囊团 2 小时内观点有效，开启缓存避免重复扣费 |
 | `cache_enabled_news` | **true** | 同批次新闻的 LLM 分析结果可复用，1 小时缓存 |
-| `cache_ttl_macro` | **86400（24h）** | 24 小时内指数/持仓不变时复用上次分析结果（指数指纹驱动失效） |
-| `cache_ttl_expert` | **7200（2h）** | 2 小时内持仓价格变化不大时复用 |
-| `cache_ttl_news_correlation` | **3600（1h）** | 1 小时内同批新闻分析结果有效 |
 | `output_brief_macro` | **false** | 关闭时输出完整分析（~500字）；开启后精简至 ≤200 字，适合快速预览 |
 | `output_brief_expert` | **false** | 关闭时输出完整三阶段复盘；开启后精简至 ≤300 字 |
 | `system_prompt_macro` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖分析风格 |
 | `system_prompt_expert` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖专家角色设定 |
 | `system_prompt_news_correlation` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖新闻关联判定规则 |
 | `llm_news_analysis` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
+
+#### 逐章节模型路由（Per-Section Model Routing）
+
+`llm_settings.json` 中的 `model_macro` / `model_expert` / `model_news_correlation` 可对**不同报告章节指定不同 LLM 模型**。使用场景：
+
+- **全球政经局势**用中端模型（如 `claude-sonnet-4-6`）即可满足事实性分析要求
+- **智囊团深度复盘**需要大输出量，可换高端模型（如 `claude-opus-4-8`）
+- **新闻关联分析**是批量任务（一次调用分析 30 条新闻），使用轻量模型（如 `claude-haiku-4-5`）可显著降低成本
+
+所有 `model_*` 为 `null` 时各章节统一使用 `llm_key.json` 中配置的默认 `model`，不影响现有配置。
+
+---
+
+#### Prompt Caching（Anthropic 专属）
+
+> 仅 `provider: "claude"` 时生效，OpenAI 提供商不适用。
+
+代码在 `_call_claude()` 中自动启用 Anthropic Messages API 的 [Prompt Caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) 功能。system prompt 以数组格式发送并标注 `cache_control: ephemeral`：
+
+- **生效条件**：同一 system prompt 在 **5 分钟内**重复使用
+- **场景**：新闻关联分析批量处理时最有价值——5 分钟内多次调用共享缓存，**输入 token 扣费减少约 50%**
+- **效果**：费用按 `cache_creation_tokens`（写入缓存）× 1.25 + `cache_read_tokens`（命中缓存）× 0.1 计价，远低于全价输入 token
+- **无感使用**：不需要任何配置项，调用 Claude API 时自动启用
+
+---
 
 #### temperature 推荐理由详解
 
@@ -332,7 +357,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 |------|:----:|------|
 | `provider` | ✅ | `"claude"`（Anthropic Messages API 兼容）或 `"openai"`（OpenAI Chat Completions 兼容） |
 | `api_key` | ✅ | API 密钥，妥善保管勿提交 Git |
-| `model` | — | 模型名称，留空使用 provider 默认值 |
+| `model` | — | 模型名称；留空时 provider 默认值：`"claude"` → `claude-sonnet-4-20250514`、`"openai"` → `gpt-4o` |
 | `endpoint` | — | API 端点 URL，留空使用官方端点 |
 
 #### llm_settings.json（非敏感字段 — 全部可选）
@@ -354,9 +379,9 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `max_tokens_macro` | `800` | 全球政经局势输出 token 上限 |
 | `max_tokens_expert` | `8192` | 智囊团深度复盘输出 token 上限 |
 | `max_tokens_news_correlation` | `2000` | LLM 新闻关联分析输出 token 上限 |
-| `cache_ttl_macro` | `86400` | 全球政经局势缓存时间（秒，24 小时，指数指纹驱动失效） |
-| `cache_ttl_expert` | `7200` | 智囊团深度复盘缓存时间（秒，2 小时） |
-| `cache_ttl_news_correlation` | `3600` | LLM 新闻关联分析缓存时间（秒，1 小时） |
+| `model_macro` | `null` | 单独指定全球政经局势用模型，`null` 使用 `llm_key.json` 的全局 `model` |
+| `model_expert` | `null` | 单独指定智囊团深度复盘用模型，`null` 使用全局 `model` |
+| `model_news_correlation` | `null` | 单独指定新闻关联分析用模型（批量任务可选轻量模型降成本），`null` 使用全局 `model` |
 | `system_prompt_macro` | `null` | 自定义宏观分析系统提示词，`null` 回退内置默认值 |
 | `system_prompt_expert` | `null` | 自定义智囊团系统提示词，`null` 回退内置默认值 |
 | `system_prompt_news_correlation` | `null` | 自定义新闻关联系统提示词，`null` 回退内置默认值 |
@@ -366,7 +391,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 ### 支持的 provider 及配置示例
 
-所有示例配置写入 `data/config/llm_key.json`，非敏感参数（max_tokens / cache_ttl 等）仍在 `llm_settings.json` 中管理。
+所有示例配置写入 `data/config/llm_key.json`，非敏感参数（max_tokens 等）仍在 `llm_settings.json` 中管理。缓存 TTL 统一在 `data/config/config.json` → `cache_ttl` 中配置。
 
 <details>
 <summary><b>Claude（Anthropic 官方）</b></summary>
@@ -413,7 +438,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 ```
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
-- 模型：`DeepSeek-V4-Flash`（推荐）、`deepseek-v4-pro`、`deepseek-chat`（V3，即将废弃）
+- 模型：`DeepSeek-V4-Flash`（推荐，当前主版本）、`deepseek-chat`（V3 旧版，功能受限）
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
 
@@ -424,7 +449,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 {
   "provider": "openai",
   "api_key": "sk-your-deepseek-key",
-  "model": "deepseek-chat",
+  "model": "DeepSeek-V4-Flash",
   "endpoint": "https://api.deepseek.com/v1/chat/completions"
 }
 ```
@@ -453,12 +478,13 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 |------|-----------|-----------|-------------|
 | 模块 7（全球政经） | ~300-800 | ~300-600 | ~$0.005-0.015 |
 | 模块 8（智囊团） | ~800-2500 | ~1500-2500 | ~$0.02-0.05 |
-| 两者合计（菜单 L） | — | — | ~$0.03-0.06/次 |
+| 新闻关联 LLM（可选） | ~2000-4000 | ~600-1200 | ~$0.01-0.03 |
+| 三者合计（菜单 L + 新闻 LLM） | — | — | ~$0.04-0.10/次 |
 
 - 仅菜单 **L** 触发 LLM 调用，E / N / H / B 不会
 - LLM 结果默认缓存 24 小时（全球政经）/ 2 小时（智囊团），缓存有效期内反复按 L 不会重复扣费
 - 持仓或指数数据变更时，关联的 LLM 缓存自动失效；也可通过菜单 [2] 更新持仓缓存主动清除 LLM 缓存
-- 缓存时间可在 `data/config/llm_settings.json` 中通过 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news_correlation` 自定义
+- 缓存时间可在 `data/config/config.json` → `cache_ttl` 中通过 `llm_global_macro` / `llm_expert_review` / `llm_news_corr` 自定义
 
 ### 不配置 LLM 时的行为
 
@@ -692,6 +718,9 @@ A: 拉取最新代码后，重新运行启动脚本即可自动更新依赖。
 
 **Q: 能否不配置 LLM 使用程序？**
 A: 可以。菜单 E / N / H / B 全部不依赖 LLM，仅菜单 L 需要 LLM 配置。
+
+**Q: 如何开启新闻 LLM 关联分析？**
+A: 编辑 `data/config/llm_settings.json`，将 `llm_news_analysis` 设为 `true`，并确保 `llm_key.json` 已配置有效的 API Key。开启后菜单 N / B / L 生成的报告增加"LLM 关联分析"列，每条新闻获得 LLM 判定的关联度（高/中/低/无关）和原因分析。默认关闭以节省费用。
 
 ---
 

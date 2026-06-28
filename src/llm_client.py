@@ -154,9 +154,10 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
     """获取 LLM 缓存 TTL。
 
     TTL 优先级：
-      1. llm_settings.json 中的 cache_ttl_macro / cache_ttl_expert（自定义配置）
-      2. config.json 中的 cache_ttl.llm_macro / cache_ttl.llm_expert
-      3. 代码默认值（全局政经 14400s / 智囊团 7200s）
+      1. 已废弃（原 llm_settings.json 的 cache_ttl_macro/expert/news 已移除）
+      2. config.json 中的 cache_ttl.llm_global_macro / llm_expert_review / llm_news_corr
+      3. 代码默认值（全局政经 86400s / 智囊团 7200s / 新闻关联 3600s）
+      3. 代码默认值（全局政经 86400s / 智囊团 7200s / 新闻关联 3600s）
 
     Args:
         subtype: "macro"（模块 7）、"expert"（模块 8）或 "news"（新闻关联）
@@ -164,22 +165,16 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
     Returns:
         过期时间（秒）
     """
-    # 优先从 llm_settings.json 读取自定义 TTL
-    try:
-        from src.config import get_llm_config
-        llm_config = get_llm_config()
-        if llm_config:
-            key = f"cache_ttl_{subtype}"
-            ttl = llm_config.get(key)
-            if ttl is not None and isinstance(ttl, (int, float)) and ttl > 0:
-                return float(ttl)
-    except Exception:
-        pass
-
-    # fallback 到 config.json cache_ttl -> 代码默认值
+    # 从 config.json cache_ttl 读取
+    _key_map: dict[str, str] = {
+        "macro": "llm_global_macro",
+        "expert": "llm_expert_review",
+        "news": "llm_news_corr",
+    }
+    data_type = _key_map.get(subtype, "llm_global_macro")
     try:
         from src.cache import get_ttl
-        return get_ttl(f"llm_{subtype}")
+        return get_ttl(data_type)
     except Exception:
         defaults: dict[str, float] = {"macro": 86400, "expert": 7200, "news": 3600}
         return defaults.get(subtype, 3600)

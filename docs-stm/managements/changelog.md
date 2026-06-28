@@ -4,6 +4,23 @@
 
 ---
 
+## [0.2.20] - 2026-06-29
+
+### Changed
+- **缓存 TTL 配置去冗余** — 从 `llm_settings.json` 移除 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news`，统一归入 `config.json` → `cache_ttl`，消除两份文件参数冲突风险
+- **config.json cache_ttl 键名规范化** — `llm_macro` → `llm_global_macro`、`llm_expert` → `llm_expert_review`、`llm_news` → `llm_news_corr`，与缓存文件命名前缀保持一致
+
+### Fixed
+- **菜单 [1] 缓存清除不完整** — 补上遗漏的 `profit_forecast_*` 和 `sector_flow_*` 清除与主动刷新（含进程级 memo 缓存失效），菜单 [1] 现在会主动重新获取这两类数据
+
+### Removed
+- **`llm_settings.json` 中的 cache_ttl 字段** — 原 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news` 已迁移至 `config.json` → `cache_ttl`，llm_settings.json 仅保留 LLM 运行参数
+
+### Docs
+- README.md：补充逐章节模型路由（Per-Section Model Routing）文档、参数表中新增 `model_macro` / `model_expert` / `model_news_correlation`
+- requirements.md：LLM 章节补充模型路由说明
+- README.md / requirements.md：所有 cache_ttl 键名同步至新命名
+
 ## [0.2.19] - 2026-06-28
 
 ### Changed
