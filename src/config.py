@@ -41,7 +41,6 @@ _DEFAULT_CONFIG = {
         "news": 900,
         "industry": 604800,
         "benchmark": 2592000,
-        "llm": 86400,
         "llm_global_macro": 86400,
         "llm_expert_review": 7200,
         "llm_news_corr": 3600,

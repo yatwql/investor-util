@@ -537,6 +537,16 @@ def _cmd_generate_full() -> None:
         llm_content = (None, None)
         llm_cached = (False, False)
 
+        # 是否强制刷新 LLM 缓存
+        _force_llm = False
+        try:
+            _resp = input("  [..] 是否强制重新生成 LLM 内容（跳过缓存）？(y/N): ").strip().lower()
+            _force_llm = _resp == "y"
+        except (EOFError, KeyboardInterrupt):
+            _force_llm = False
+        if _force_llm:
+            print("  [OK] 将跳过 LLM 缓存强制重新生成")
+
         with ThreadPoolExecutor(max_workers=2) as _llm_ex:
 
             def _run_llm():
@@ -545,7 +555,7 @@ def _cmd_generate_full() -> None:
                     total_today_profit, len(holdings), categories,
                     penetrated_assets=penetrated_assets,
                     holdings_details=holdings_details,
-                    sector_flow=_sector_flow, force=False,
+                    sector_flow=_sector_flow, force=_force_llm,
                 )
 
             _news_fut = _llm_ex.submit(

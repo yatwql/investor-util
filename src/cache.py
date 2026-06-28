@@ -226,7 +226,6 @@ def cleanup_expired(dry_run: bool = False) -> int:
             "llm_global_macro": "llm_global_macro",   # 全球政经局势：24h TTL
             "llm_expert_review": "llm_expert_review", # 智囊团深度复盘：2h TTL
             "llm_news_corr": "llm_news_corr",     # LLM 新闻关联分析：1h TTL
-            "llm_": "llm",                     # 通用 LLM 缓存：24h TTL
             "profit_forecast": "profit_forecast",
             "sector_flow": "sector_flow",
             "dividend": "dividend",

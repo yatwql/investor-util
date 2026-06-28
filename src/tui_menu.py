@@ -105,6 +105,10 @@ def _show_llm_config_status() -> None:
         endpoint = llm_config.get("endpoint") or "默认"
         ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" else endpoint
         print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
+        model_macro = llm_config.get("model_macro") or model
+        model_expert = llm_config.get("model_expert") or model
+        model_news = llm_config.get("model_news_correlation") or model
+        print(f"         模型路由: 全局政经={model_macro} / 智囊团={model_expert} / 新闻关联={model_news}")
     else:
         print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
 

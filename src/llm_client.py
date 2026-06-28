@@ -16,8 +16,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from typing import Any, Callable, Optional
-import threading
-
 import httpx
 
 from src.cache import get as cache_get, set as cache_set
@@ -131,18 +129,6 @@ _CACHE_PREFIX_LLM = "llm_"
 # ── 默认超时 ─────────────────────────────────────────────────
 
 _LLM_TIMEOUT = 120.0
-
-# 线程本地 HTTP 连接池（每个线程独立创建，避免多线程竞态）
-_thread_local = threading.local()
-
-
-def _get_http_pool() -> httpx.Client:
-    """获取当前线程的 HTTP 连接池，懒加载确保每个线程只创建一次。"""
-    pool: httpx.Client | None = getattr(_thread_local, "http_pool", None)
-    if pool is None:
-        pool = httpx.Client(timeout=_LLM_TIMEOUT)
-        _thread_local.http_pool = pool
-    return pool
 
 # ── 重试配置 ─────────────────────────────────────────────────
 
@@ -538,7 +524,7 @@ def _call_claude(
     }
     if temperature is not None:
         payload["temperature"] = temperature
-    client = http_client or _get_http_pool()
+    client = http_client
 
     return _call_llm_with_retry(
         label="Claude", client=client, url=url, headers=headers,
@@ -589,7 +575,7 @@ def _call_openai(
     }
     if temperature is not None:
         payload["temperature"] = temperature
-    client = http_client or _get_http_pool()
+    client = http_client
 
     def _extract_openai(data: dict) -> str | None:
         try:
