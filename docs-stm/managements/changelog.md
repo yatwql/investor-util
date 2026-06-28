@@ -16,8 +16,14 @@
 ### Changed
 - **`thinking_enabled_expert` 默认改为 `true`** — 智囊团深度复盘默认启用 Extended Thinking，
   用户开箱即用无需额外配置
-- **`llm_settings.json` 同步** — 新增 6 个 thinking 配置项，`thinking_enabled_expert: true`
-  确保与代码默认一致
+- **`llm_settings.json` 同步** — 新增 6 个 thinking 配置项 + 3 个 `model_*` 缺失项，
+  `thinking_enabled_expert: true` 确保与代码默认一致
+- **`cache_enabled_news` 重命名为 `cache_enabled_news_correlation`** — 统一命名规范，
+  与 `max_tokens_news_correlation` 等现有后缀保持一致
+
+### Removed
+- **`cache_ttl.llm` 死配置** — `config.json` 中废弃的泛用 LLM 缓存 TTL 键，
+  无代码读取，已删除
 
 ## [0.2.23] - 2026-06-29
 

@@ -18,7 +18,6 @@
     "hold": 604800,
     "news": 900,
     "industry": 604800,
-    "llm": 86400,
     "llm_global_macro": 86400,
     "llm_expert_review": 7200,
     "llm_news_corr": 3600,

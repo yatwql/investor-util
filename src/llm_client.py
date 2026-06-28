@@ -1212,7 +1212,7 @@ def enhance_news_correlation(
     top_to_original = {ti: orig_i for ti, (orig_i, _) in enumerate(_sorted_with_idx[:30])}
 
     # 缓存开关（默认启用）
-    cache_enabled = llm_config.get("cache_enabled_news", True)
+    cache_enabled = llm_config.get("cache_enabled_news_correlation", True)
 
     # 缓存键（含新闻标题摘要 + 持仓的指纹）
     # 使用 (序号, 标题前80字) 作指纹摘要，而非完整新闻内容，

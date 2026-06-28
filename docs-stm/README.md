@@ -266,7 +266,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
   "timeout_news_correlation": 60,
   "cache_enabled_macro": true,
   "cache_enabled_expert": true,
-  "cache_enabled_news": true,
+  "cache_enabled_news_correlation": true,
   "output_brief_macro": false,
   "output_brief_expert": false,
   "max_tokens_macro": 800,
@@ -311,7 +311,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `model_news_correlation` | **null** | `null` 时使用默认 model；填入模型名单独指定新闻关联分析用模型（批量任务可选轻量模型如 `"claude-haiku-4-5"` 降低成本） |
 | `cache_enabled_macro` | **true** | 宏观分析 24 小时内市场格局不会剧变，开启缓存节省费用（指数指纹驱动失效） |
 | `cache_enabled_expert` | **true** | 智囊团 2 小时内观点有效，开启缓存避免重复扣费 |
-| `cache_enabled_news` | **true** | 同批次新闻的 LLM 分析结果可复用，1 小时缓存 |
+| `cache_enabled_news_correlation` | **true** | 同批次新闻的 LLM 分析结果可复用，1 小时缓存 |
 | `output_brief_macro` | **false** | 关闭时输出完整分析（~500字）；开启后精简至 ≤200 字，适合快速预览 |
 | `output_brief_expert` | **false** | 关闭时输出完整三阶段复盘；开启后精简至 ≤300 字 |
 | `system_prompt_macro` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖分析风格 |
@@ -467,7 +467,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `timeout_news_correlation` | `60` | LLM 新闻关联分析 API 超时秒数 |
 | `cache_enabled_macro` | `true` | 全球政经局势是否启用缓存 |
 | `cache_enabled_expert` | `true` | 智囊团深度复盘是否启用缓存 |
-| `cache_enabled_news` | `true` | LLM 新闻关联分析是否启用缓存 |
+| `cache_enabled_news_correlation` | `true` | LLM 新闻关联分析是否启用缓存 |
 | `output_brief_macro` | `false` | `true` 时输出 ≤200 字精简版宏观分析 |
 | `output_brief_expert` | `false` | `true` 时输出 ≤300 字精简版专家复盘 |
 | `max_tokens_macro` | `800` | 全球政经局势输出 token 上限 |

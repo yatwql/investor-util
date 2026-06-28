@@ -186,7 +186,7 @@ def _ensure_llm_settings_file() -> None:
             "timeout_news_correlation": 60,
             "cache_enabled_macro": True,
             "cache_enabled_expert": True,
-            "cache_enabled_news": True,
+            "cache_enabled_news_correlation": True,
             "output_brief_macro": False,
             "output_brief_expert": False,
             "max_tokens_macro": 800,
