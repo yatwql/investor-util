@@ -6,8 +6,10 @@ __pycache__/
 .venv/
 venv/
 
-# ── 个人数据（持仓、配置、API Key）────────────────────
+# ── 个人数据（持仓、缓存、API Key）────────────────────
 data/
+!data/config/config.json
+!data/config/llm_settings.json
 
 # ── 运行时生成 ───────────────────────────────────────
 logs/

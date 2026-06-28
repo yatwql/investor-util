@@ -1,0 +1,24 @@
+{
+  "holdings_dir": "data/holdings",
+  "holdings_filename": "个人投资持仓信息.xlsx",
+  "output_dir": "reports",
+  "news_sources": {
+    "sina": true,
+    "eastmoney": true,
+    "cls": true,
+    "wallstreetcn": true,
+    "akshare": true
+  },
+  "news_top_count": 300,
+  "preferred_provider": {},
+  "cache_ttl": {
+    "price": 86400,
+    "index": 86400,
+    "rank": 86400,
+    "hold": 604800,
+    "news": 900,
+    "benchmark": 2592000
+  },
+  "llm_key_file": "data/config/llm_key.json",
+  "llm_settings_file": "data/config/llm_settings.json"
+}
