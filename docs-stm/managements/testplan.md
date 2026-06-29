@@ -87,16 +87,16 @@
 | Iter 2 | 分类汇总聚合计算、穿透合并逻辑（含精细化分类）、基金排名数据正确性 |
 | Iter 3.1 | HTML 渲染效果、Jinja2 模板正确性、5 模块内容一致性 |
 | Iter 3.2 | 3 源新闻聚合正确性、关键词关联准确度、`news_top_count` 可配置验证 |
-| Iter 3.3 | 模板占位显示（模块 7/8）、缓存管理（菜单 [3] 清理 / [4] 统计）、缓存文件损坏自动修复、异常友好提示（网络/权限/文件损坏） |
+| Iter 3.3 | 模板占位显示（全球政经局势 / 智囊团深度复盘）、缓存管理（菜单 [3] 清理 / [4] 统计）、缓存文件损坏自动修复、异常友好提示（网络/权限/文件损坏） |
 | Iter 3.4 | LLM API 联通性、缓存 24h 生效、API Key 未配置降级占位文本、LLM 输出格式兜底 |
-| Iter 3.5 | LLM 并行生成模块 7+8 同时成功、System Prompt 外部可配置生效、httpx 连接池复用、提示词紧凑化效果 |
+| Iter 3.5 | LLM 并行生成全球政经局势 + 智囊团深度复盘同时成功、System Prompt 外部可配置生效、httpx 连接池复用、提示词紧凑化效果 |
 | Iter 3.6 | 多线程并发缓存获取无竞态、新闻 15min 缓存过期、LLM 缓存预检正确跳过线程池、Token 用量正确展示、_SYSTEM_EXPERT 压缩后三阶段格式保持、死代码无残留、配置校验警告正确触发 |
 | Iter 3.7 | html_writer.py 中 a_indices 以 dict 类型传入 generate_all_llm（不因 .values() 崩溃）、fund_performance.py 在 API 返回 JSON null 时 categories/data 自动兜底、summary.py write_summary_sheet 接收 dict 类型指数数据（不因 list 传入致 .get() 崩溃）、fund_performance._adjust_rating_with_benchmark 中 categories 含 None 时自动兜底 |
 | v0.2.10 | 关键词富化函数 `_build_keyword_lookup`/`_enrich_keywords_for_item`/`_format_enriched_keywords` 单元测试覆盖三种来源类型（持仓/穿透/行业）、去重逻辑、空列表边界；Excel 格式断言（B/C 列 wrap_text、列宽 B=40/C=50、左对齐、富化关键词写入）；HTML 模板 enriched_keywords 着色（holding→蓝/penetration→紫/industry→灰） |
 | v0.2.11 | `eastmoney_industry` provider 单元测试覆盖正常返回（含/不含概念）、data 为空、响应为空、超时异常、基金代码处理；`fetcher.fetch_industry_data` / `batch_fetch_industry_data` 缓存集成测试；`_build_keyword_lookup` 新增 concept 类型覆盖测试；`_enrich_keywords_for_item` 新增概念类型富化显示测试；全量 607 passed |
 | v0.2.18 | 新增 `test_akshare_extras.py`（16 项）：指数指纹计算、缓存键生成、分红汇总计算、分红数据获取全路径、内存缓存（TestMemoCache 5 项）；`test_llm_client.py` 新增 sector_flow prompt 注入测试（2 项）、batch 新闻 LLM 分析测试（6 项）；全量 749 passed |
-| v0.2.29 | 模块 9（持仓体检报告）新增：`generate_health_check`/`_health_check_fingerprint` 单元测试、`write_llm_sheets` 扩展为 3 元组测试、`generate_all_llm` 返回 6 元组测试、`write_html_report` 签名 3 元组测试；`tui_handlers.py` `health_text` 参数覆盖、配置项 `model_health_check`/`temperature_health_check` 等 10 项默认值验证；全量 783 passed |
-| v0.2.30 | 模块 10（穿透深度分析）新增：`generate_penetration_deep_analysis`/`_penetration_deep_fingerprint` 单元测试、`write_llm_sheets` 扩展为 4 元组测试、`generate_all_llm` 返回 8 元组测试、`write_html_report` 签名 4 元组测试；Excel 页签序号前缀（1.~10.）排序验证；TUI 模型路由 5 条显示覆盖；配置项 `model_penetration_deep`/`temperature_penetration_deep` 等 10 项默认值验证；全量 783 passed |
+| v0.2.29 | 持仓体检报告新增：`generate_health_check`/`_health_check_fingerprint` 单元测试、`write_llm_sheets` 扩展为 3 元组测试、`generate_all_llm` 返回 6 元组测试、`write_html_report` 签名 3 元组测试；`tui_handlers.py` `health_text` 参数覆盖、配置项 `model_health_check`/`temperature_health_check` 等 10 项默认值验证；全量 783 passed |
+| v0.2.30 | 穿透深度分析新增：`generate_penetration_deep_analysis`/`_penetration_deep_fingerprint` 单元测试、`write_llm_sheets` 扩展为 4 元组测试、`generate_all_llm` 返回 8 元组测试、`write_html_report` 签名 4 元组测试；Excel 页签序号前缀（1.~10.）排序验证；TUI 模型路由 5 条显示覆盖；配置项 `model_penetration_deep`/`temperature_penetration_deep` 等 10 项默认值验证；全量 783 passed |
 | v0.2.33 | `_generate_excel_report` Import/Sheet 写入隔离（7 个模块逐个 try/except，6 个 Sheet 写入 _call_sheet 包装）回归测试；日志模块名/Excel 页签/HTML 章节名称统一回归；`_SYSTEM_MACRO`→`_SYSTEM_GLOBAL_MACRO` 等 4 项常量重命名回归；test_config.py `validate_config` 10 项校验用例；test_helpers.py `SynchronousExecutor` 测试辅助类；全量 814 passed |
 
 ---

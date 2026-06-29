@@ -148,13 +148,13 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     3. 写入 {output_dir}/ 目录（最新版 + 归档版）
 
     Args:
-        llm_content: 可选预生成内容 (macro_html, expert_html, health_html, penetration_html)，
+        llm_content: 可选预生成内容 (global_macro_html, expert_review_html, health_check_html, penetration_deep_html)，
             传入时跳过内部 LLM 生成直接使用此内容。
         details: 可选预计算市值核算明细，传入时跳过内部行情获取。
         news_data: 可选预获取新闻数据，传入时跳过内部新闻获取。
         news_llm_meta: 与 news_data 对应的 LLM 元数据字典，
             含 llm_enabled / llm_cached / token_usage 等字段。
-        sector_flow: 行业资金流向数据（可选），注入全球政经 LLM prompt
+        sector_flow: 行业资金流向数据（可选），注入全球政经局势 LLM prompt
 
     Returns:
         最新版报告的绝对路径
@@ -286,7 +286,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     else:
         news_data = []
 
-    # ── 9) LLM 智能分析（模块 7/8/9）──────────────────────────
+    # ── 9) LLM 智能分析（全球政经局势 / 智囊团深度复盘 / 持仓体检报告 / 穿透深度分析）──────────
     llm_enabled_flag = False
     global_macro_content = None
     expert_review_content = None
@@ -335,18 +335,27 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
             )
             if global_macro_content:
                 llm_enabled_flag = True
-                logger.info("模块 7（全球政经局势）LLM 生成完成")
+                logger.info("全球政经局势 LLM 生成完成")
             if expert_review_content:
                 llm_enabled_flag = True
-                logger.info("模块 8（智囊团深度复盘）LLM 生成完成")
+                logger.info("智囊团深度复盘 LLM 生成完成")
             if health_check_content:
                 llm_enabled_flag = True
-                logger.info("模块 9（持仓体检报告）LLM 生成完成")
+                logger.info("持仓体检报告 LLM 生成完成")
             if penetration_deep_content:
                 llm_enabled_flag = True
-                logger.info("模块 10（穿透深度分析）LLM 生成完成")
+                logger.info("穿透深度分析 LLM 生成完成")
         except Exception as e:
             logger.warning("LLM 生成失败: %s", e)
+
+    # ── 捕获 LLM 会话用量 ────────────────────────────
+    _llm_session_usage = None
+    if llm_enabled_flag:
+        try:
+            from src.python.llm_client import get_session_usage, format_session_usage
+            _llm_session_usage = format_session_usage(get_session_usage())
+        except Exception:
+            pass
 
     # ── 10) 渲染模板 ────────────────────────────────────────
     print("  [..] 正在渲染 HTML...")
@@ -385,6 +394,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         expert_review=expert_review_content,
         health_check=health_check_content,
         penetration_deep=penetration_deep_content,
+        llm_session_usage=_llm_session_usage,
     )
 
     # ── 10) 保存文件 ─────────────────────────────────────────

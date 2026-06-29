@@ -3,7 +3,7 @@
 测试目标：
   - _markdown_to_html — 各类 Markdown → HTML 的正确渲染
   - _compute_fingerprint — 确定性哈希、不同输入不同指纹
-  - _get_cache_ttl_llm — 模块 7/8 分 TTL
+  - _get_cache_ttl_llm — 全球政经局势 / 智囊团深度复盘 分 TTL
   - _build_global_macro_prompt — 北京时间注入 + 紧凑格式
   - _build_expert_review_prompt — 北京时间注入 + 穿透数据拼接
   - _call_llm — provider 路由
@@ -156,14 +156,19 @@ class TestComputeFingerprint(unittest.TestCase):
 class TestGetCacheTtlLlm(unittest.TestCase):
     """测试 LLM TTL 取值。"""
 
-    def test_macro_default(self) -> None:
-        ttl = _get_cache_ttl_llm("macro")
+    def test_global_macro_default(self) -> None:
+        ttl = _get_cache_ttl_llm("global_macro")
         self.assertGreater(ttl, 0)
         self.assertEqual(ttl, 86400)
 
-    def test_expert_default(self) -> None:
-        ttl = _get_cache_ttl_llm("expert")
+    def test_expert_review_default(self) -> None:
+        ttl = _get_cache_ttl_llm("expert_review")
         self.assertEqual(ttl, 7200)
+
+    def test_news_correlation_default(self) -> None:
+        ttl = _get_cache_ttl_llm("news_correlation")
+        self.assertGreater(ttl, 0)
+        self.assertEqual(ttl, 3600)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -171,8 +176,8 @@ class TestGetCacheTtlLlm(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 
 
-class TestBuildMacroPrompt(unittest.TestCase):
-    """测试模块 7 用户提示词。"""
+class TestBuildGlobalMacroPrompt(unittest.TestCase):
+    """测试全球政经局势用户提示词。"""
 
     def test_has_timestamp(self) -> None:
         r = _build_global_macro_prompt({}, {}, 100.0, 10.0, {"股票": 3})
@@ -225,7 +230,7 @@ class TestBuildMacroPrompt(unittest.TestCase):
 
 
 class TestBuildReviewPrompt(unittest.TestCase):
-    """测试模块 8 用户提示词。"""
+    """测试智囊团深度复盘用户提示词。"""
 
     def test_has_timestamp(self) -> None:
         r = _build_expert_review_prompt(100, 80, 20, 5, 5, {"股票": 3})
@@ -737,7 +742,7 @@ class TestCheckTruncation(unittest.TestCase):
         self.assertFalse(result)
 
     def test_check_openai_truncation_custom_field(self) -> None:
-        """OpenAI config_field='max_tokens_global_macro' → 日志提示 max_tokens_macro。"""
+        """OpenAI config_field='max_tokens_global_macro' → 日志提示 max_tokens_global_macro。"""
         from src.python.llm_client import _check_openai_truncation
 
         data = {"choices": [{"finish_reason": "length", "message": {"content": "..."}}],
@@ -821,32 +826,32 @@ class TestBuildHoldingsSummary(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _build_news_summary — 新闻摘要生成
+#  _build_news_correlation_summary — 新闻摘要生成（LLM 关联分析用）
 # ═══════════════════════════════════════════════════════════
 
 
 class TestBuildNewsSummary(unittest.TestCase):
-    """测试 _build_news_summary 的格式和内容。"""
+    """测试 _build_news_correlation_summary 的格式和内容。"""
 
     def test_basic(self) -> None:
-        from src.python.llm_client import _build_news_summary
+        from src.python.llm_client import _build_news_correlation_summary
         news = [
             {"title": "能源改革新方案", "intro": "国家能源局发布电力改革方案...",
              "matched_keywords": ["长江电力"]},
         ]
-        result = _build_news_summary(news)
+        result = _build_news_correlation_summary(news)
         self.assertIn("能源改革", result)
         self.assertIn("长江电力", result)
 
     def test_empty(self) -> None:
-        from src.python.llm_client import _build_news_summary
-        self.assertEqual(_build_news_summary([]), "")
+        from src.python.llm_client import _build_news_correlation_summary
+        self.assertEqual(_build_news_correlation_summary([]), "")
 
     def test_limit_30(self) -> None:
         """超过 30 条时截断。"""
-        from src.python.llm_client import _build_news_summary
+        from src.python.llm_client import _build_news_correlation_summary
         many = [{"title": f"新闻{i}", "matched_keywords": []} for i in range(50)]
-        result = _build_news_summary(many)
+        result = _build_news_correlation_summary(many)
         # 最多 30 条
         count = result.count("标题:")
         self.assertLessEqual(count, 30)

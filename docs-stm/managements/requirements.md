@@ -25,7 +25,7 @@
 | N | 生成包含新闻的Excel分析报告 | 生成 Excel 报告 + 财经新闻关联增补页签（模块 6） |
 | H | 生成基础版HTML分析报告 | 读取持仓信息生成 HTML 报告，不含 LLM 增补内容（模块 1-6） |
 | B | 生成全系列包含新闻的报告(Excel+HTML) | 同时生成 HTML + 含新闻的 Excel 报告，不含 LLM 增补内容（模块 1-6） |
-| L | 生成全系列完整版报告(Excel+HTML) | 同时生成 HTML + Excel，含新闻、模块 7-10 LLM 增补内容（模块 1-10） |
+| L | 生成全系列完整版报告(Excel+HTML) | 同时生成 HTML + Excel，含新闻、LLM 增补内容（全球政经局势+智囊团深度复盘+持仓体检报告+穿透深度分析） |
 | C | 配置持仓信息目录 | 配置持仓文件的存放目录 |
 | F | 配置持仓信息文件名 | 配置持仓文件的文件名 |
 | R | 配置报告输出目录 | 配置报告文件的输出目录（默认 reports） |
@@ -333,7 +333,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 - **Excel**：通过菜单 N/B/L 生成增补页签（财经新闻热点表）
 - **HTML**：自动渲染在报告第 6 节（来源标注为"新浪财经"/"东方财富"/"财联社"/"华尔街见闻"/"akshare"）
 
-##### 模块 7：全球政经局势（Excel + HTML，分阶段实现 — LLM 增补项目）
+##### 全球政经局势（Excel + HTML，分阶段实现 — LLM 增补项目）
 
 在有 LLM 支持下的增补内容。
 - **Phase 1（Iter 3.3）**：模板占位文本输出，预留接口
@@ -341,7 +341,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 - **Excel**：通过菜单 L 生成增补页签 ✅
 - **HTML**：通过菜单 L 渲染在报告第 7 节 ✅
 
-#### 模块 8：智囊团深度复盘（Excel + HTML，分阶段实现 — LLM 增补项目）
+#### 智囊团深度复盘（Excel + HTML，分阶段实现 — LLM 增补项目）
 
 在有 LLM 支持下的增补内容。
 - **Phase 1（Iter 3.3）**：模板占位文本输出，预留接口
@@ -349,7 +349,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 - **Excel**：通过菜单 L 生成增补页签 ✅
 - **HTML**：通过菜单 L 渲染在报告第 8 节 ✅
 
-#### 模块 9：持仓体检报告（Excel + HTML — LLM 增补项目，v0.2.29+）
+#### 持仓体检报告（Excel + HTML — LLM 增补项目，v0.2.29+）
 
 在有 LLM 支持下的增补内容。从风险分散度、流动性、收益合理性、成本结构四个维度
 对投资组合进行量化打分（每项满分 100）并给出改进建议。
@@ -365,7 +365,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 `max_tokens_health_check`（默认 4096）/ `thinking_enabled_health_check`（默认 true）/
 `thinking_budget_health_check`（默认 12000）
 
-#### 模块 10：穿透深度分析（Excel + HTML — LLM 增补项目，v0.2.30+）
+#### 穿透深度分析（Excel + HTML — LLM 增补项目，v0.2.30+）
 
 在有 LLM 支持下的增补内容。从行业集中度、国别/币种暴露角度对投资组合进行深度分析。
 
@@ -392,7 +392,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 用户配置指南详见根目录 [README.md](../README.md)「LLM 配置指引」章节。
 
-**逐章节模型路由（v0.2.17+）：** 支持对全球政经局势、智囊团深度复盘、新闻关联分析、持仓体检报告、穿透深度分析五个 LLM 章节分别指定不同的模型。通过 `data/config/llm_settings.json` 中的 `model_global_macro`、`model_expert_review`、`model_news_correlation`、`model_health_check`、`model_penetration_deep` 字段设置，为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。详见 README.md「逐章节模型路由」小节。
+**逐章节模型路由（v0.2.17+）：** 支持对全球政经局势、智囊团深度复盘、财经新闻热点与持仓关联分析、持仓体检报告、穿透深度分析五个 LLM 章节分别指定不同的模型。通过 `data/config/llm_settings.json` 中的 `model_global_macro`、`model_expert_review`、`model_news_correlation`、`model_health_check`、`model_penetration_deep` 字段设置，为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。详见 README.md「逐章节模型路由」小节。
 
 **Extended Thinking（v0.2.22+，Anthropic 专属）：** `_call_claude()` 支持注入 Anthropic Messages API 的 `thinking` 参数，让 ≥ Claude Sonnet 4 的模型在回答前进行深度推理。通过 `llm_settings.json` 中 `thinking_enabled_{模块}` 和 `thinking_budget_{模块}` 配置开关和预算。`thinking_budget_{模块}` 与对应的 `max_tokens_{模块}` 的关系：
 - `thinking_budget_{模块}` 控制内部思考过程的 token 预算（不可见）

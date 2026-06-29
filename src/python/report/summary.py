@@ -19,7 +19,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.market_value import get_last_trading_day
-from src.python.report.styles import FMT_MONEY, GREEN_FONT, RED_FONT, profit_font
+from src.python.report.styles import profit_font
 
 # 指数涨跌颜色
 _INDEX_UP_FONT = Font(size=10, bold=True, color="CC0000")    # 涨→红
@@ -101,7 +101,6 @@ def write_summary_sheet(
     update_status: tuple[int, int, bool] | None = None,
     a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
-    llm_session_usage: dict | None = None,
 ) -> None:
     """写入汇总页签。
 
@@ -115,8 +114,6 @@ def write_summary_sheet(
         update_status: (已更新数, 总数, 是否全部更新)，来自 price_update_status()
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
-        llm_session_usage: 可选，会话累计 LLM 用量（来自 get_session_usage()），
-            含 input_tokens / output_tokens / cache_hit_tokens / total_cost / currency / model / call_count
     """
     ws.title = "1.投资分析汇总"
 
@@ -252,28 +249,33 @@ def write_summary_sheet(
     else:
         row = _write_kv_row(ws, row, "── 美股指数 ──", "暂无数据")
 
-    # ── LLM 用量（可选） ──────────────────────────────────────
-    if llm_session_usage and llm_session_usage.get("call_count", 0) > 0:
-        row = _write_blanks(ws, row)
-        row = _write_section(ws, row, "【LLM 用量】")
-        inp = llm_session_usage.get("input_tokens", 0)
-        out = llm_session_usage.get("output_tokens", 0)
-        cache_hit = llm_session_usage.get("cache_hit_tokens", 0)
-        total_tok = inp + out
-        calls = llm_session_usage.get("call_count", 0)
-        cost = llm_session_usage.get("total_cost", 0.0)
-        currency = llm_session_usage.get("currency", "CNY")
-        symbol = {"CNY": "¥", "USD": "$", "EUR": "€", "GBP": "£"}.get(currency, "¥")
-        model = llm_session_usage.get("model", "未指定")
-        row = _write_kv_row(ws, row, "  API 调用次数", f"{calls} 次")
-        row = _write_kv_row(ws, row, "  模型", model)
-        row = _write_kv_row(ws, row, "  输入 token", f"{inp:,}")
-        row = _write_kv_row(ws, row, "  输出 token", f"{out:,}")
-        row = _write_kv_row(ws, row, "  总 token", f"{total_tok:,}")
-        if cache_hit:
-            row = _write_kv_row(ws, row, "  缓存命中", f"{cache_hit:,}")
-        row = _write_kv_row(ws, row, "  累计费用", f"{symbol}{cost:.4f}")
+    # ── LLM 用量（由 write_llm_usage_block 在 LLM 生成后追加） ─
 
     freeze_header(ws, 2)
     auto_width(ws)
     logger.info("汇总页签写入完成，共 %d 行", row)
+
+
+def write_llm_usage_block(ws: Worksheet,
+                           llm_session_usage: dict[str, Any] | None) -> None:
+    """在汇总页追加写入 LLM 用量区块（应在 LLM 生成完成后调用）。
+
+    Args:
+        ws: 汇总页工作表
+        llm_session_usage: get_session_usage() 返回值
+    """
+    from src.python.llm_client import format_session_usage
+    u = format_session_usage(llm_session_usage)
+    if not u.get("has_usage"):
+        return
+    row = ws.max_row + 1
+    row = _write_blanks(ws, row)
+    row = _write_section(ws, row, "【LLM 用量】")
+    row = _write_kv_row(ws, row, "  API 调用次数", f"{u['call_count']} 次")
+    row = _write_kv_row(ws, row, "  模型", u["model"])
+    row = _write_kv_row(ws, row, "  输入 token", f"{u['input_tokens']:,}")
+    row = _write_kv_row(ws, row, "  输出 token", f"{u['output_tokens']:,}")
+    row = _write_kv_row(ws, row, "  总 token", f"{u['total_tokens']:,}")
+    if u["cache_hit_tokens"]:
+        row = _write_kv_row(ws, row, "  缓存命中", f"{u['cache_hit_tokens']:,}")
+    row = _write_kv_row(ws, row, "  累计费用", u["cost_display"])

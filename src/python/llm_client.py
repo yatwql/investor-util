@@ -1,6 +1,6 @@
 """LLM 智能分析客户端 — 接入 Claude API / OpenAI API。
 
-为报告模块 7（全球政经局势）和模块 8（智囊团深度复盘）生成内容。
+为全球政经局势分析和智囊团深度复盘生成内容。
 
 API Key 通过 data/config/llm_key.json 管理，非敏感配置通过 data/config/llm_settings.json 管理，
 不直接存储在 config.json 中。支持结果缓存，避免重复扣费。
@@ -133,7 +133,6 @@ _LLM_TIMEOUT = 120.0
 
 # ── 重试配置 ─────────────────────────────────────────────────
 
-_RETRY_MAX = 2  # 最多重试 2 次
 _RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]  # 指数退避：第 1~5 次依次等待
 
 # ── 输出截断自适应重试 ────────────────────────────────
@@ -143,9 +142,6 @@ _TRUNCATION_MARKER = "【⚠ 输出已被截断"
 
 _AUTO_INCREASE_FACTOR = 1.5
 """截断时自动增大的倍数。"""
-
-_AUTO_INCREASE_MAX_RETRIES = 1
-"""自适应重试最多尝试次数（防止无限循环）。"""
 
 # ── 内容过滤安抚重试 ────────────────────────────────
 
@@ -347,11 +343,10 @@ FAIL_REASON_API_ERROR = "api_error"
 FAIL_REASON_NETWORK_ERROR = "network_error"
 FAIL_REASON_TIMEOUT = "timeout"
 FAIL_REASON_CIRCUIT_OPEN = "circuit_open"
-FAIL_REASON_FALLBACK_FAILED = "fallback_failed"
 
 _LLM_MODULE_FAILURE: dict[str, str] = {}
 """{module_key: reason} 各 LLM 模块最近一次生成的失败原因。
-key 为 "macro"/"expert"/"health"/"penetration"，
+key 为 "global_macro"/"expert_review"/"health_check"/"penetration_deep"，
 value 为 FAIL_REASON_* 常量。每次新生成开始时清除对应 key。"""
 
 # ── 会话级 Token 用量累计跟踪 ──
@@ -384,6 +379,43 @@ def reset_session_usage() -> None:
 def get_session_usage() -> dict[str, Any]:
     """返回会话累计用量字典的副本（供 TUI/报告展示）。"""
     return dict(_session_usage)
+
+
+def format_session_usage(raw: dict[str, Any] | None) -> dict[str, Any]:
+    """将 get_session_usage() 的原始 dict 格式化为报告展示用的 dict。
+
+    输出字段：
+      has_usage    — bool，是否有实际调用
+      call_count   — 调用次数
+      model        — 模型名
+      input_tokens — 输入 token 数
+      output_tokens
+      total_tokens — 输入+输出合计数
+      cache_hit_tokens
+      cost         — 费用数值（float）
+      currency     — 货币类型（CNY/USD）
+      cost_display — 格式化费用字符串（如 "¥0.0456"）
+    """
+    if not raw or not raw.get("call_count", 0):
+        return {"has_usage": False}
+    inp = raw.get("input_tokens", 0)
+    out = raw.get("output_tokens", 0)
+    cache_hit = raw.get("cache_hit_tokens", 0)
+    cost = raw.get("total_cost", 0.0)
+    currency = raw.get("currency", "CNY")
+    symbol = {"CNY": "¥", "USD": "$", "EUR": "€", "GBP": "£"}.get(currency, "¥")
+    return {
+        "has_usage": True,
+        "call_count": raw.get("call_count", 0),
+        "model": raw.get("model", "未指定"),
+        "input_tokens": inp,
+        "output_tokens": out,
+        "total_tokens": inp + out,
+        "cache_hit_tokens": cache_hit,
+        "cost": cost,
+        "currency": currency,
+        "cost_display": f"{symbol}{cost:.4f}",
+    }
 
 
 def _track_session_usage(provider: str, usage: dict | None,
@@ -435,35 +467,33 @@ def _record_per_module(module_key: str, model_name: str,
         pm[module_key]["model"] = model_name
 
 
-def _get_cache_ttl_llm(subtype: str = "macro") -> float:
+def _get_cache_ttl_llm(subtype: str = "global_macro") -> float:
     """获取 LLM 缓存 TTL。
 
-    TTL 优先级：
-      1. 已废弃（原 llm_settings.json 的 cache_ttl_macro/expert/news 已移除）
-      2. config.json 中的 cache_ttl.llm_global_macro / llm_expert_review / llm_news_correlation
-      3. 代码默认值（全局政经 86400s / 智囊团 7200s / 新闻关联 3600s）
-      3. 代码默认值（全局政经 86400s / 智囊团 7200s / 新闻关联 3600s）
+    TTL 优先级：      
+      1. config.json 中的 cache_ttl.llm_global_macro / llm_expert_review / llm_news_correlation
+      2. 代码默认值（全球政经局势 86400s / 智囊团深度复盘 7200s / 财经新闻热点与持仓关联分析 3600s）      
 
     Args:
-        subtype: "macro"（模块 7）、"expert"（模块 8）或 "news"（新闻关联）
+        subtype: "global_macro"（全球政经局势）、"expert_review"（智囊团深度复盘）或 "news_correlation"（财经新闻热点与持仓关联分析）
 
     Returns:
         过期时间（秒）
     """
     # 从 config.json cache_ttl 读取
     _key_map: dict[str, str] = {
-        "macro": "llm_global_macro",
-        "expert": "llm_expert_review",
-        "news": "llm_news_correlation",
-        "health": "llm_health_check",
-        "penetration": "llm_penetration_deep",
+        "global_macro": "llm_global_macro",
+        "expert_review": "llm_expert_review",
+        "news_correlation": "llm_news_correlation",
+        "health_check": "llm_health_check",
+        "penetration_deep": "llm_penetration_deep",
     }
     data_type = _key_map.get(subtype, "llm_global_macro")
     try:
         from src.python.cache import get_ttl
         return get_ttl(data_type)
     except Exception:
-        defaults: dict[str, float] = {"macro": 86400, "expert": 7200, "news": 3600, "health": 7200, "penetration": 86400}
+        defaults: dict[str, float] = {"global_macro": 86400, "expert_review": 7200, "news_correlation": 3600, "health_check": 7200, "penetration_deep": 86400}
         return defaults.get(subtype, 3600)
 
 
@@ -501,7 +531,7 @@ def _generate_llm_content(
         config_field: llm_settings.json 中的配置字段名（截断时提示）
         http_client: 可选的 httpx.Client 实例
         thinking_enabled: 是否已开启 Extended Thinking（为 True 时底部追加标识）
-        module_key: 模块键名（"macro"/"expert"/"health"/"penetration"），
+        module_key: 模块键名（"global_macro"/"expert_review"/"health_check"/"penetration_deep"），
             用于记录失败原因供写入层读取
 
     Returns:
@@ -636,7 +666,7 @@ def _compute_fingerprint(*args: Any) -> str:
     return hashlib.md5(raw.encode()).hexdigest()[:12]
 
 
-def _expert_fingerprint(
+def _expert_review_fingerprint(
     total_mv: float = 0,
     total_cost: float = 0,
     total_profit: float = 0,
@@ -670,7 +700,7 @@ def _health_check_fingerprint(
 ) -> str:
     """计算持仓体检报告的缓存指纹。
 
-    与 _expert_fingerprint 完全同构，统一使用 _extract_stable_* 辅助函数。
+    与 _expert_review_fingerprint 完全同构，统一使用 _extract_stable_* 辅助函数。
     """
     _details = _extract_stable_holdings(holdings_details)
     _pen = _extract_stable_penetration(penetrated_assets, full=False)
@@ -691,7 +721,7 @@ def _penetration_deep_fingerprint(
 ) -> str:
     """计算穿透深度分析的缓存指纹。
 
-    与 _expert_fingerprint 区别：穿透资产额外包含 mv/sector/ratio，
+    与 _expert_review_fingerprint 区别：穿透资产额外包含 mv/sector/ratio，
     使得仅穿透数据更新时也能触发缓存失效。
     """
     _details = _extract_stable_holdings(holdings_details)
@@ -708,7 +738,7 @@ def _log_token_usage(provider: str, usage: dict | None, label: str, model_name: 
     Args:
         provider: "claude" 或 "openai"
         usage: API 响应中的 usage 字典
-        label: 调用标签（如 "全球政经"）
+        label: 调用标签（如 "全球政经局势"）
         model_name: 模型名称（用于费用估算，可空）
     """
     if not usage:
@@ -1136,7 +1166,7 @@ def _call_claude(
 
     支持 Extended Thinking（thinking 参数），通过 llm_settings.json 中
     thinking_enabled_{模块} / thinking_budget_{模块} 配置开启。
-    推荐仅在智囊团深度复盘（expert）场景开启，全局政经和新闻分析收益有限。
+    推荐仅在智囊团深度复盘（expert_review）场景开启，全球政经局势和新闻关联分析收益有限。
     若模型不支持 Extended Thinking（如 claude-sonnet-3-5），自动降级跳过。
 
     Args:
@@ -1367,7 +1397,7 @@ def _fmt_holding_line(h: dict, show_cost: bool = False) -> str:
     Args:
         h: 持仓明细字典（code, market_value, profit, profit_rate,
            nav_date, source_api, name, change_pct, 可选 cost）
-        show_cost: 是否显示成本（体检报告用）
+        show_cost: 是否显示成本（持仓体检报告用）
 
     Returns:
         格式化的文本行
@@ -1406,7 +1436,7 @@ def _build_global_macro_prompt(
     categories: dict,
     sector_flow: list[dict[str, Any]] | None = None,
 ) -> str:
-    """构建模块 7（全球政经）的用户提示词（紧凑格式）。
+    """构建全球政经局势的用户提示词（紧凑格式）。
 
     Args:
         a_indices: A 股指数行情
@@ -1489,7 +1519,7 @@ def _build_expert_review_prompt(
     penetrated_assets: Optional[list[dict]] = None,
     holdings_details: Optional[list[dict]] = None,
 ) -> str:
-    """构建模块 8（智囊团复盘）的用户提示词（紧凑格式）。
+    """构建智囊团深度复盘的用户提示词（紧凑格式）。
 
     必须包含实际持仓明细（名称、代码、市值、成本、盈亏），
     防止 LLM 虚构持仓代码。同时包含穿透 TOP10 供参考。
@@ -1543,7 +1573,7 @@ def _build_health_check_prompt(
     penetrated_assets: Optional[list[dict]] = None,
     holdings_details: Optional[list[dict]] = None,
 ) -> str:
-    """构建模块 9（持仓体检报告）的用户提示词。
+    """构建持仓体检报告的用户提示词。
 
     要求 LLM 从风险分散度/流动性/收益合理性/成本结构四维度打分。
     """
@@ -1597,7 +1627,7 @@ def _build_penetration_deep_prompt(
     penetrated_assets: Optional[list[dict]] = None,
     holdings_details: Optional[list[dict]] = None,
 ) -> str:
-    """构建模块 10（穿透深度分析）的用户提示词。
+    """构建穿透深度分析的用户提示词。
 
     要求 LLM 基于穿透 TOP10 和持仓行业分类，
     分析行业集中度、品种集中度、国别/币种暴露。
@@ -1680,7 +1710,7 @@ def generate_global_macro(
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
 ) -> tuple[Optional[str], bool]:
-    """生成模块 7：全球政经局势分析。
+    """生成全球政经局势分析。
 
     Args:
         a_indices: A 股指数列表
@@ -1702,8 +1732,8 @@ def generate_global_macro(
         from src.python.config import get_llm_config
         llm_config = get_llm_config()
     if llm_config is None:
-        logger.info("LLM 未配置，模块 7 使用占位文本")
-        _LLM_MODULE_FAILURE["macro"] = FAIL_REASON_NOT_CONFIGURED
+        logger.info("LLM 未配置，全球政经局势使用占位文本")
+        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_NOT_CONFIGURED
         return (None, False)
 
     cache_enabled = llm_config.get("cache_enabled_global_macro", True)
@@ -1717,7 +1747,7 @@ def generate_global_macro(
     user_prompt = _build_global_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories, sector_flow)
 
     return _generate_llm_content(
-        llm_config, cache_key, _get_cache_ttl_llm("macro"),
+        llm_config, cache_key, _get_cache_ttl_llm("global_macro"),
         system_prompt, user_prompt, cache_enabled, force,
         max_tokens=llm_config.get("max_tokens_global_macro") or llm_config.get("max_tokens", 800),
         timeout=llm_config.get("timeout_global_macro", 60.0),
@@ -1726,7 +1756,7 @@ def generate_global_macro(
         config_field="max_tokens_global_macro",
         http_client=http_client,
         thinking_enabled=llm_config.get("thinking_enabled_global_macro", False),
-        module_key="macro",
+        module_key="global_macro",
     )
 
 
@@ -1743,7 +1773,7 @@ def generate_expert_review(
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
 ) -> tuple[Optional[str], bool]:
-    """生成模块 8：智囊团深度复盘。
+    """生成智囊团深度复盘。
 
     Args:
         total_mv: 总市值
@@ -1766,12 +1796,12 @@ def generate_expert_review(
         from src.python.config import get_llm_config
         llm_config = get_llm_config()
     if llm_config is None:
-        logger.info("LLM 未配置，模块 8 使用占位文本")
-        _LLM_MODULE_FAILURE["expert"] = FAIL_REASON_NOT_CONFIGURED
+        logger.info("LLM 未配置，智囊团深度复盘使用占位文本")
+        _LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_NOT_CONFIGURED
         return (None, False)
 
     cache_enabled = llm_config.get("cache_enabled_expert_review", True)
-    fingerprint = _expert_fingerprint(
+    fingerprint = _expert_review_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
         holdings_details=holdings_details,
@@ -1791,7 +1821,7 @@ def generate_expert_review(
     )
 
     return _generate_llm_content(
-        llm_config, cache_key, _get_cache_ttl_llm("expert"),
+        llm_config, cache_key, _get_cache_ttl_llm("expert_review"),
         system_prompt, user_prompt, cache_enabled, force,
         max_tokens=llm_config.get("max_tokens_expert_review") or llm_config.get("max_tokens", 8192),
         timeout=llm_config.get("timeout_expert_review", 120.0),
@@ -1800,7 +1830,7 @@ def generate_expert_review(
         config_field="max_tokens_expert_review",
         http_client=http_client,
         thinking_enabled=llm_config.get("thinking_enabled_expert_review", False),
-        module_key="expert",
+        module_key="expert_review",
     )
 
 
@@ -1817,7 +1847,7 @@ def generate_health_check(
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
 ) -> tuple[Optional[str], bool]:
-    """生成模块 9：持仓体检报告。
+    """生成持仓体检报告。
 
     从风险分散度/流动性/收益合理性/成本结构四维度打分并给出改进建议。
 
@@ -1825,14 +1855,14 @@ def generate_health_check(
         llm_config: 可选的 LLM 配置字典。传入时跳过内部 get_llm_config() 调用。
 
     Returns:
-        (HTML 格式的体检报告或 None, 是否来自缓存)
+        (HTML 格式的持仓体检报告或 None, 是否来自缓存)
     """
     if llm_config is None:
         from src.python.config import get_llm_config
         llm_config = get_llm_config()
     if llm_config is None:
-        logger.info("LLM 未配置，模块 9 跳过")
-        _LLM_MODULE_FAILURE["health"] = FAIL_REASON_NOT_CONFIGURED
+        logger.info("LLM 未配置，持仓体检报告跳过")
+        _LLM_MODULE_FAILURE["health_check"] = FAIL_REASON_NOT_CONFIGURED
         return (None, False)
 
     cache_enabled = llm_config.get("cache_enabled_health_check", True)
@@ -1856,7 +1886,7 @@ def generate_health_check(
     )
 
     return _generate_llm_content(
-        llm_config, cache_key, _get_cache_ttl_llm("health"),
+        llm_config, cache_key, _get_cache_ttl_llm("health_check"),
         system_prompt, user_prompt, cache_enabled, force,
         max_tokens=llm_config.get("max_tokens_health_check") or llm_config.get("max_tokens", 4096),
         timeout=llm_config.get("timeout_health_check", 120.0),
@@ -1865,7 +1895,7 @@ def generate_health_check(
         config_field="max_tokens_health_check",
         http_client=http_client,
         thinking_enabled=llm_config.get("thinking_enabled_health_check", False),
-        module_key="health",
+        module_key="health_check",
     )
 
 
@@ -1882,7 +1912,7 @@ def generate_penetration_deep_analysis(
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
 ) -> tuple[Optional[str], bool]:
-    """生成模块 10：穿透深度分析。
+    """生成穿透深度分析。
 
     分析行业集中度、品种集中度、国别/币种暴露。
     缓存 TTL 设为 1 天，使用持仓数据做指纹。
@@ -1897,8 +1927,8 @@ def generate_penetration_deep_analysis(
         from src.python.config import get_llm_config
         llm_config = get_llm_config()
     if llm_config is None:
-        logger.info("LLM 未配置，模块 10 跳过")
-        _LLM_MODULE_FAILURE["penetration"] = FAIL_REASON_NOT_CONFIGURED
+        logger.info("LLM 未配置，穿透深度分析跳过")
+        _LLM_MODULE_FAILURE["penetration_deep"] = FAIL_REASON_NOT_CONFIGURED
         return (None, False)
 
     cache_enabled = llm_config.get("cache_enabled_penetration_deep", True)
@@ -1922,7 +1952,7 @@ def generate_penetration_deep_analysis(
     )
 
     return _generate_llm_content(
-        llm_config, cache_key, _get_cache_ttl_llm("penetration"),
+        llm_config, cache_key, _get_cache_ttl_llm("penetration_deep"),
         system_prompt, user_prompt, cache_enabled, force,
         max_tokens=llm_config.get("max_tokens_penetration_deep") or llm_config.get("max_tokens", 4096),
         timeout=llm_config.get("timeout_penetration_deep", 90.0),
@@ -1931,7 +1961,7 @@ def generate_penetration_deep_analysis(
         config_field="max_tokens_penetration_deep",
         http_client=http_client,
         thinking_enabled=llm_config.get("thinking_enabled_penetration_deep", False),
-        module_key="penetration",
+        module_key="penetration_deep",
     )
 
 
@@ -1993,7 +2023,7 @@ def _build_holdings_summary(
     return "\n".join(lines)
 
 
-def _build_news_summary(news_data: list[dict]) -> str:
+def _build_news_correlation_summary(news_data: list[dict]) -> str:
     """构建新闻摘要文本（紧凑格式），供新闻关联分析 Prompt 使用。
 
     Args:
@@ -2053,11 +2083,11 @@ def _apply_llm_news_correlation(
     try:
         analyses = json.loads(text)
     except json.JSONDecodeError as e:
-        logger.warning("LLM 新闻分析 JSON 解析失败: %s", e)
+        logger.warning("LLM 新闻关联分析 JSON 解析失败: %s", e)
         return [("低", "中性", "")] * batch_size
 
     if not isinstance(analyses, list):
-        logger.warning("LLM 新闻分析返回格式异常: 非数组")
+        logger.warning("LLM 新闻关联分析返回格式异常: 非数组")
         return [("低", "中性", "")] * batch_size
 
     # 建立 idx → (relevance, sentiment, analysis) 映射
@@ -2155,7 +2185,7 @@ def enhance_news_correlation(
     article_cache_keys: dict[int, str] = {}  # global_pos in top_news → cache_key
     _uncached_positions: list[int] = []
     _model = llm_config.get("model_news_correlation")
-    _model_name_news = _model or llm_config.get("model", "") or "未指定"
+    _model_name_news_correlation = _model or llm_config.get("model", "") or "未指定"
 
     for global_pos in range(len(top_news)):
         item = top_news[global_pos]
@@ -2165,7 +2195,7 @@ def enhance_news_correlation(
         article_cache_keys[global_pos] = article_key
 
         if cache_enabled and not force:
-            cached = cache_get(article_key, _get_cache_ttl_llm("news"))
+            cached = cache_get(article_key, _get_cache_ttl_llm("news_correlation"))
             if cached is not None:
                 orig_i = top_to_original[global_pos]
                 analysis_by_orig_idx[orig_i] = (
@@ -2173,7 +2203,7 @@ def enhance_news_correlation(
                     cached.get("sentiment", "中性"),
                     cached.get("analysis", ""),
                 )
-                logger.debug("新闻关联缓存命中: pos=%d orig=%d", global_pos, orig_i)
+                logger.debug("LLM 新闻关联分析缓存命中: pos=%d orig=%d", global_pos, orig_i)
                 continue
         _uncached_positions.append(global_pos)
 
@@ -2194,17 +2224,17 @@ def enhance_news_correlation(
             _uncached_positions[i:i + BATCH_SIZE]
             for i in range(0, len(_uncached_positions), BATCH_SIZE)
         ]
-        logger.info("正在调用 LLM 增强新闻关联分析（%d 批未缓存，每批最多 %d 条）...",
+        logger.info("正在调用 LLM 新闻关联分析（%d 批未缓存，每批最多 %d 条）...",
                     len(uncached_batches), BATCH_SIZE)
 
         def _process_uncached_batch(batch_id: int, batch_positions: list[int]) -> tuple:
             """线程内处理一批未缓存新闻的 LLM 分析。"""
             total_batches = len(uncached_batches)
-            print(f"  [..] LLM 新闻分析 [{batch_id + 1}/{total_batches}] 批处理中 ({len(batch_positions)} 条)...")
+            print(f"  [..] LLM 新闻关联分析 [{batch_id + 1}/{total_batches}] 批处理中 ({len(batch_positions)} 条)...")
             batch_client = httpx.Client(timeout=_LLM_TIMEOUT)
             try:
                 batch_items = [top_news[gp] for gp in batch_positions]
-                news_text = _build_news_summary(batch_items)  # idx 从 0 开始本批
+                news_text = _build_news_correlation_summary(batch_items)  # idx 从 0 开始本批
                 user_prompt = (
                     f"【持仓信息】\n"
                     f"{holdings_text}\n\n"
@@ -2223,7 +2253,7 @@ def enhance_news_correlation(
                 if result and _TRUNCATION_MARKER in result:
                     new_max = int(max_tokens * _AUTO_INCREASE_FACTOR)
                     logger.warning(
-                        "新闻分析输出被截断（max_tokens=%d），自动以 %d 重新生成 [批 %d/%d]",
+                        "LLM 新闻关联分析输出被截断（max_tokens=%d），自动以 %d 重新生成 [批 %d/%d]",
                         max_tokens, new_max, batch_id + 1, len(uncached_batches),
                     )
                     result2, usage2 = _call_llm(
@@ -2264,13 +2294,13 @@ def enhance_news_correlation(
                         out = usage.get("output_tokens", usage.get("completion_tokens", 0))
                         total_tokens_input += inp
                         total_tokens_output += out
-                    print(f"  [OK] LLM 新闻分析 [{_bid + 1}/{total_batches_proc}] 批完成")
+                    print(f"  [OK] LLM 新闻关联分析 [{_bid + 1}/{total_batches_proc}] 批完成")
                 else:
                     logger.warning("LLM 新闻关联分析（批 %d/%d）: 分析失败",
                                    _bid + 1, total_batches_proc)
-                    print(f"  [!] LLM 新闻分析 [{_bid + 1}/{total_batches_proc}] 批失败")
+                    print(f"  [!] LLM 新闻关联分析 [{_bid + 1}/{total_batches_proc}] 批失败")
     else:
-        _record_per_module("news", _model_name_news, cached=True)
+        _record_per_module("news_correlation", _model_name_news_correlation, cached=True)
 
     # ── 合并结果 ─────────────────────────────────────────
     enriched: list[dict] = []
@@ -2293,7 +2323,7 @@ def enhance_news_correlation(
     token_usage: dict = {}
     if total_tokens_input > 0 or total_tokens_output > 0:
         token_usage = {
-            "model": _model_name_news,
+            "model": _model_name_news_correlation,
             "input_tokens": total_tokens_input,
             "output_tokens": total_tokens_output,
             "total_tokens": total_tokens_input + total_tokens_output,
@@ -2301,10 +2331,10 @@ def enhance_news_correlation(
         _log_token_usage(
             llm_config.get("provider", "unknown"),
             {"input_tokens": total_tokens_input, "output_tokens": total_tokens_output},
-            "新闻关联（批处理）",
-            model_name=_model_name_news,
+            "财经新闻热点与持仓关联分析（批处理）",
+            model_name=_model_name_news_correlation,
         )
-        _record_per_module("news", _model_name_news, inp=total_tokens_input, out=total_tokens_output)
+        _record_per_module("news_correlation", _model_name_news_correlation, inp=total_tokens_input, out=total_tokens_output)
 
     _cached_count = len(top_news) - len(_uncached_positions)
     _fresh_count = len(_uncached_positions)
@@ -2335,7 +2365,7 @@ def generate_all_llm(
     sector_flow: Optional[list[dict]] = None,
     force: bool = False,
 ) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], bool, bool, bool, bool]:
-    """并行生成模块 7（全球政经）+ 模块 8（智囊团复盘）+ 模块 9（持仓体检）+ 模块 10（穿透深度）。
+    """并行生成全球政经局势 + 智囊团深度复盘 + 持仓体检报告 + 穿透深度分析。
 
     优化：
       - 调用 get_llm_config() 仅一次，避免各生成函数内部重复文件 I/O
@@ -2359,7 +2389,7 @@ def generate_all_llm(
     fp_global_macro = _compute_fingerprint(
         a_indices, us_indices, total_mv, total_profit, categories,
     )
-    fp_expert_review = _expert_fingerprint(
+    fp_expert_review = _expert_review_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
         holdings_details=holdings_details, penetrated_assets=penetrated_assets,
@@ -2383,10 +2413,10 @@ def generate_all_llm(
     key_health_check = _CACHE_PREFIX_LLM + f"health_check_{fp_health_check}"
     key_penetration_deep = _CACHE_PREFIX_LLM + f"penetration_deep_{fp_penetration_deep}"
 
-    ttl_global_macro = _get_cache_ttl_llm("macro")
-    ttl_expert_review = _get_cache_ttl_llm("expert")
-    ttl_health_check = _get_cache_ttl_llm("health")
-    ttl_penetration_deep = _get_cache_ttl_llm("penetration")
+    ttl_global_macro = _get_cache_ttl_llm("global_macro")
+    ttl_expert_review = _get_cache_ttl_llm("expert_review")
+    ttl_health_check = _get_cache_ttl_llm("health_check")
+    ttl_penetration_deep = _get_cache_ttl_llm("penetration_deep")
 
     force_flag = force
     can_cache_global_macro = not force_flag and llm_config.get("cache_enabled_global_macro", True)
@@ -2443,7 +2473,7 @@ def generate_all_llm(
                         )
                     finally:
                         c.close()
-                _futures[executor.submit(_run_global_macro)] = "macro"
+                _futures[executor.submit(_run_global_macro)] = "global_macro"
 
             if needs_expert_review:
                 def _run_expert_review() -> tuple[Optional[str], bool]:
@@ -2458,7 +2488,7 @@ def generate_all_llm(
                         )
                     finally:
                         c.close()
-                _futures[executor.submit(_run_expert_review)] = "expert"
+                _futures[executor.submit(_run_expert_review)] = "expert_review"
 
             if needs_health_check:
                 def _run_health_check() -> tuple[Optional[str], bool]:
@@ -2473,7 +2503,7 @@ def generate_all_llm(
                         )
                     finally:
                         c.close()
-                _futures[executor.submit(_run_health_check)] = "health"
+                _futures[executor.submit(_run_health_check)] = "health_check"
 
             if needs_penetration_deep:
                 def _run_penetration_deep() -> tuple[Optional[str], bool]:
@@ -2488,30 +2518,30 @@ def generate_all_llm(
                         )
                     finally:
                         c.close()
-                _futures[executor.submit(_run_penetration_deep)] = "penetration"
+                _futures[executor.submit(_run_penetration_deep)] = "penetration_deep"
 
             _label_map: dict[str, str] = {
-                "macro": "全球政经局势", "expert": "智囊团深度复盘",
-                "health": "持仓体检报告", "penetration": "穿透深度分析",
+                "global_macro": "全球政经局势", "expert_review": "智囊团深度复盘",
+                "health_check": "持仓体检报告", "penetration_deep": "穿透深度分析",
             }
 
             for future in as_completed(_futures):
                 try:
                     result, from_cache = future.result()
                     key = _futures[future]
-                    if key == "macro":
+                    if key == "global_macro":
                         global_macro_result, global_macro_cached_flag = result, from_cache
-                    elif key == "expert":
+                    elif key == "expert_review":
                         expert_review_result, expert_review_cached_flag = result, from_cache
-                    elif key == "health":
+                    elif key == "health_check":
                         health_check_result, health_check_cached_flag = result, from_cache
-                    elif key == "penetration":
+                    elif key == "penetration_deep":
                         penetration_deep_result, penetration_deep_cached_flag = result, from_cache
                     logger.info("%s生成完成" if result else "%s生成失败（跳过）", _label_map.get(key, key))
                 except Exception:
                     logger.warning("LLM 生成线程异常", exc_info=True)
 
-    logger.info("LLM 生成完成: 全球政经=%s, 智囊团=%s, 体检=%s, 穿透=%s",
+    logger.info("LLM 生成完成: 全球政经局势=%s, 智囊团深度复盘=%s, 持仓体检报告=%s, 穿透深度分析=%s",
                 "OK" if global_macro_result else "跳过",
                 "OK" if expert_review_result else "跳过",
                 "OK" if health_check_result else "跳过",

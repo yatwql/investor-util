@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.python.tui_menu import MENU_ITEMS, _press_any_key, _refresh_config, get_config_cache
 from src.python.logger import setup_logger
 from src.python.reader import get_xlsx_info, list_xlsx_files, read_holdings
-from src.python.config import get_config, set_config, get_llm_config
+from src.python.config import set_config, get_llm_config
 
 logger = setup_logger()
 
@@ -458,18 +458,12 @@ def _generate_excel_report(
             print("  [OK] 市场指数获取完成")
 
     # ── 各页安全写入 ──
+    _llm_session = None
     with _Timer("投资分析汇总"):
-        _llm_session = None
-        try:
-            from src.python.llm_client import get_session_usage
-            _llm_session = get_session_usage()
-        except Exception:
-            pass
         _call_sheet("投资分析汇总", write_summary_sheet,
                      ws1, total_mv, total_cost, total_profit, today_profit,
                      categories=categories, update_status=up_status,
-                     a_indices=a_indices, us_indices=us_indices,
-                     llm_session_usage=_llm_session)
+                     a_indices=a_indices, us_indices=us_indices)
 
     with _Timer("分类汇总表"):
         _call_sheet("分类汇总表", write_category_sheet, ws3, holdings, details)
@@ -477,8 +471,6 @@ def _generate_excel_report(
     with _Timer("资产穿透TOP10"):
         pen_result = compute_penetration_top10(holdings, details) if compute_penetration_top10 else {}
         print("  [OK] 资产穿透 TOP10 计算完成")
-
-    with _Timer("资产穿透TOP10"):
         _call_sheet("资产穿透TOP10", write_penetration_sheet,
                      ws4, holdings, details, penetration_data=pen_result)
 
@@ -513,7 +505,6 @@ def _generate_excel_report(
                 else:
                     _add_error("新闻数据模块缺失")
                     news_data, _meta = [], {}
-        with _Timer("财经新闻热点与持仓关联分析"):
             _call_sheet("财经新闻热点与持仓关联分析", write_news_sheet, ws6, news_data, llm_meta=_meta)
 
     if include_llm:
@@ -541,13 +532,29 @@ def _generate_excel_report(
                 logger.info("LLM 分析章节已生成")
                 print("  [OK] LLM 分析章节生成完成")
             except ImportError:
-                logger.warning("LLM 分析章节模块 (src.report.llm_content) 未就绪，跳过")
+                logger.warning("LLM 分析章节模块 (src.python.report.llm_content) 未就绪，跳过")
                 _add_error("LLM 分析章节模块未就绪，跳过")
                 global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
             except Exception as e:
                 logger.exception("生成 LLM 分析章节失败")
                 _add_error(f"LLM 分析章节生成失败: {e}")
                 global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
+
+        # LLM 生成完成后捕获会话用量，追加到汇总页
+        try:
+            from src.python.llm_client import get_session_usage
+            _llm_session = get_session_usage()
+        except Exception:
+            _llm_session = None
+        if _llm_session and _llm_session.get("call_count", 0) > 0:
+            try:
+                from src.python.report.summary import write_llm_usage_block
+                write_llm_usage_block(ws1, _llm_session)
+                from src.python.report.excel_writer import freeze_header, auto_width
+                freeze_header(ws1, 2)
+                auto_width(ws1)
+            except Exception:
+                pass
 
         if show_llm_in_tui and (global_macro_text or expert_review_text or health_check_text or penetration_deep_text):
             _show_llm_tui(global_macro_text, expert_review_text, health_check_text, penetration_deep_text)
@@ -723,7 +730,7 @@ def _show_llm_tui(global_macro_text: str, expert_review_text: str, health_check_
                 score_line = line.strip()[:120]
                 break
         body = score_line if score_line else _trim(health_check_text.strip(), 200)
-        _print_box("持仓体检摘要", body)
+        _print_box("持仓体检报告摘要", body)
     print()
 
     if penetration_deep_text:
@@ -1144,13 +1151,13 @@ def _cmd_update_position_cache() -> None:
         print("  [..] 清除旧缓存...")
         price_count = clear_by_prefix("price_")
         index_count = clear_by_prefix("index_")
-        expert_count = clear_by_prefix("llm_expert_review_")
-        macro_count = clear_by_prefix("llm_global_macro_")
-        health_count = clear_by_prefix("llm_health_check_")
-        penetration_count = clear_by_prefix("llm_penetration_deep_")
+        expert_review_count = clear_by_prefix("llm_expert_review_")
+        global_macro_count = clear_by_prefix("llm_global_macro_")
+        health_check_count = clear_by_prefix("llm_health_check_")
+        penetration_deep_count = clear_by_prefix("llm_penetration_deep_")
         print(f"  [OK] 价格缓存 {price_count} 条 + 指数缓存 {index_count} 条 + "
-              f"智囊团复盘 {expert_count} 条 + 全球政经 {macro_count} 条 + "
-              f"体检报告 {health_count} 条 + 穿透深度 {penetration_count} 条 已清除")
+              f"智囊团深度复盘 {expert_review_count} 条 + 全球政经局势 {global_macro_count} 条 + "
+              f"持仓体检报告 {health_check_count} 条 + 穿透深度分析 {penetration_deep_count} 条 已清除")
 
         print()
         print(f"  [..]   并行获取持仓价格/净值 + 市场指数...")

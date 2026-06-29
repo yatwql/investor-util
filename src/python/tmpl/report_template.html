@@ -642,6 +642,33 @@
         {% endif %}
     </div>
 
+    <!--  MODULE 11: LLM API Usage -->
+    <div class="section">
+        <div class="section-title">十一、LLM API 用量</div>
+        <div class="section-content">
+            {% if llm_session_usage and llm_session_usage.get("has_usage") %}
+            <table class="kv-table">
+                <tr><td>API 调用次数</td><td>{{ llm_session_usage["call_count"] }} 次</td></tr>
+                <tr><td>模型</td><td>{{ llm_session_usage["model"] }}</td></tr>
+                <tr><td>输入 token</td><td>{{ "{:,}".format(llm_session_usage["input_tokens"]) }}</td></tr>
+                <tr><td>输出 token</td><td>{{ "{:,}".format(llm_session_usage["output_tokens"]) }}</td></tr>
+                <tr><td>总 token</td><td>{{ "{:,}".format(llm_session_usage["total_tokens"]) }}</td></tr>
+                {% if llm_session_usage["cache_hit_tokens"] %}
+                <tr><td>缓存命中</td><td>{{ "{:,}".format(llm_session_usage["cache_hit_tokens"]) }}</td></tr>
+                {% endif %}
+                <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
+            </table>
+            {% else %}
+            <div class="empty-note placeholder-note">
+                <p><strong>本次生成未调用 LLM</strong></p>
+                <p style="margin-top: 8px; font-size: 13px; color: #888;">
+                    仅菜单 L 触发 LLM 调用；缓存有效期内的重复生成不会产生额外费用。
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
 </div>
 </body>
 </html>

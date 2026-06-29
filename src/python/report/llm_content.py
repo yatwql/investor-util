@@ -1,4 +1,4 @@
-"""LLM 内容输出模块 — 报告第 7、8、9、10 页（模块 7/8/9/A）。
+"""LLM 内容输出模块 — 全球政经局势 / 智囊团深度复盘 / 持仓体检报告 / 穿透深度分析。
 
 由调用方预生成 LLM 内容后传入本模块写入 Excel 页签。
 """
@@ -103,10 +103,10 @@ _THINKING_FONT = Font(
 
 
 _MODULE_KEY_MAP: dict[str, str] = {
-    "7.全球政经局势": "macro",
-    "8.智囊团深度复盘": "expert",
-    "9.持仓体检报告": "health",
-    "10.穿透深度分析": "penetration",
+    "7.全球政经局势": "global_macro",
+    "8.智囊团深度复盘": "expert_review",
+    "9.持仓体检报告": "health_check",
+    "10.穿透深度分析": "penetration_deep",
 }
 
 _PLACEHOLDER_BY_REASON: dict[str, str] = {
@@ -226,7 +226,7 @@ def write_llm_sheets(
     model_names: tuple[str, str, str, str] = ("", "", "", ""),
     thinking: tuple[bool, bool, bool, bool] = (False, False, False, False),
 ) -> tuple[str, str, str, str]:
-    """写入 LLM 内容页签（模块 7 & 8 & 9 & A）。
+    """写入 LLM 内容页签（全球政经局势 & 智囊团深度复盘 & 持仓体检报告 & 穿透深度分析）。
 
     调用方必须预先生成 llm_content，本函数仅负责写入 Excel。
 

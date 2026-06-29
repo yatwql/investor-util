@@ -113,7 +113,7 @@ def _show_llm_config_status() -> None:
         model_news_correlation = llm_config.get("model_news_correlation") or model
         model_health_check = llm_config.get("model_health_check") or model
         model_penetration_deep = llm_config.get("model_penetration_deep") or model
-        print(f"         模型路由: 全球政经局势={model_global_macro} / 智囊团深度复盘={model_expert_review} / 新闻关联={model_news_correlation} / 持仓体检报告={model_health_check} / 穿透深度分析={model_penetration_deep}")
+        print(f"         模型路由: 全球政经局势={model_global_macro} / 智囊团深度复盘={model_expert_review} / 财经新闻热点与持仓关联分析={model_news_correlation} / 持仓体检报告={model_health_check} / 穿透深度分析={model_penetration_deep}")
     else:
         print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
 

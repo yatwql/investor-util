@@ -117,7 +117,7 @@ class TestGenerateExcelReport(unittest.TestCase):
     @patch("src.python.report.fund_performance.write_fund_performance_sheet")
     @patch("src.python.report.llm_content.write_llm_sheets")
     def test_generate_with_llm(self, mock_llm, mock_perf, mock_us_idx, mock_a_idx):
-        """含 LLM 报告 → 新增模块 7+8 页签。"""
+        """含 LLM 报告 → 新增全球政经局势 + 智囊团深度复盘 页签。"""
         mock_a_idx.return_value = {}
         mock_us_idx.return_value = {}
         mock_llm.return_value = ("宏观内容", "复盘内容", "", "")

@@ -52,11 +52,11 @@ def _print_session_usage_on_exit() -> None:
             per_module = usage.get("per_module", {})
             if per_module:
                 _MODULE_DISPLAY = {
-                    "macro": "全球政经局势",
-                    "expert": "智囊团深度复盘",
-                    "health": "持仓体检报告",
-                    "penetration": "穿透深度分析",
-                    "news": "新闻关联",
+                    "global_macro": "全球政经局势",
+                    "expert_review": "智囊团深度复盘",
+                    "health_check": "持仓体检报告",
+                    "penetration_deep": "穿透深度分析",
+                    "news_correlation": "财经新闻热点与持仓关联分析",
                 }
                 for key, display_name in _MODULE_DISPLAY.items():
                     if key in per_module:

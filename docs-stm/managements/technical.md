@@ -70,14 +70,14 @@
 
 ## 模块技术要点
 
-### 模块 4：资产穿透 TOP10
+### 资产穿透 TOP10
 
 - `compute_penetration_top10()` 纯计算函数，不依赖 openpyxl
 - 分类逻辑（QDII/ETF/联接/债券/主动/直接持股）基于代码前缀 + 名称规则
 - 板块分类 `classify_sector()` 使用静态关键词映射，同时支持 API 行业数据补充
 - 调用 `batch_fetch_industry_data()` 为穿透结果注入行业信息（覆盖静态关键词的局限）
 
-### 模块 6：财经新闻关联分析
+### 财经新闻热点与持仓关联分析
 
 - 5 源并行获取（ThreadPoolExecutor max_workers=5）
 - 新闻缓存 `news_{md5}.json`，15 分钟 TTL，MD5 指纹含关键词/参数
@@ -203,8 +203,8 @@ investor-util/
 - `thinking_budget` 与 `max_tokens` 是独立参数：前者控制内部推理 token（不可见），后者控制最终输出 token
 - API 约束：`thinking_budget` ≥ `max_tokens + 1024`，代码中 `_call_claude()` 自动兜底不足时补到 `max_tokens + 4096`
 - Extended Thinking 与 `temperature` 互斥，开启后自动 `payload.pop("temperature", None)`
-- 模块后缀通过 `config_field` 解析：`config_field.replace("max_tokens_", "")` → `"macro"` / `"expert"` / `"news_correlation"`
-- 推荐仅在智囊团深度复盘（expert）开启
+- 模块后缀通过 `config_field` 解析：`config_field.replace("max_tokens_", "")` → `"global_macro"` / `"expert_review"` / `"news_correlation"`
+- 推荐仅在智囊团深度复盘（expert_review）开启
 
 **payload 示例（开启后）：**
 ```python
