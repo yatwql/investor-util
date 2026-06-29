@@ -311,7 +311,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 新闻来源（5 个财经源并行获取、去重后排序）：
 1. **新浪财经** — `feed.mix.sina.com.cn`（财经要闻/国内财经/国际财经 3 分类）
-2. **东方财富** — `push-api-html.eastmoney.com`（股市财经综合新闻）
+2. **东方财富** — `np-weblist.eastmoney.com/comm/web/getFastNewsList`（快讯接口 JSON）
 3. **财联社** — `www.cls.cn/v1/roll/get_roll_list`（7x24 实时财经快讯）
 4. **华尔街见闻** — `api-one.wallstcn.com/apiv1/content/lives`（全球财经直播流，无需鉴权）
 5. **akshare** — 封装财新网 `stock_news_main_cx()` 和 CCTV `news_cctv()`，开源库自动适配底层 API
@@ -354,7 +354,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 在有 LLM 支持下的增补内容。从风险分散度、流动性、收益合理性、成本结构四个维度
 对投资组合进行量化打分（每项满分 100）并给出改进建议。
 
-- **Excel**：通过菜单 L 生成「9. 持仓体检报告」页签 ✅
+- **Excel**：通过菜单 L 生成「9.持仓体检报告」页签 ✅
 - **HTML**：通过菜单 L 渲染在报告第 9 节 ✅
 
 **生成逻辑：** `generate_health_check()` 复用现有持仓数据（市值核算明细 + 穿透 TOP10 +
@@ -373,7 +373,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
   当某行业占比 > 30% 时标注集中度风险
 - **国别/币种暴露**：QDII/港股通/美股/A 股按币种分类，计算外汇风险敞口百分比，
   输出分散化建议
-- **Excel**：通过菜单 L 生成「10. 穿透深度分析」页签 ✅
+- **Excel**：通过菜单 L 生成「10.穿透深度分析」页签 ✅
 - **HTML**：通过菜单 L 渲染在报告第 10 节 ✅
 
 **生成逻辑：** `generate_penetration_deep_analysis()` 复用穿透 TOP10 + 行业分类数据，

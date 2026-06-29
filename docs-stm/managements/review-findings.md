@@ -74,3 +74,4 @@
 - [x] 全量 800 测试通过
 - [x] 综合审计：配置/缓存前缀/管理文档核对完成
 - [x] v0.2.32 Token 定价可配置、多币种、缓存命中计费、全量管理文档审计（requirements/plan/testplan/technical/review）
+- [x] v0.2.33 Import/Sheet 写入隔离 + 名称统一（日志/Excel/HTML）+ 常量重命名（_SYSTEM_GLOBAL_MACRO 等）+ 智囊团 NAV/QDII 标注 + 全量自测 814 passed
