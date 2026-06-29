@@ -17,7 +17,8 @@ import threading
 import time
 from typing import Any
 
-from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY, CACHE_TTL_DEFAULTS
+from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
+from src.python.registry import get_cache_ttl_defaults, get_prefix_type_map, get_exact_type_map
 
 _CACHE_DIR = "data/cache"
 _GZIP_THRESHOLD = 100 * 1024  # 100KB 以上的缓存自动 gzip
@@ -97,6 +98,49 @@ def get(key: str, max_age_seconds: float) -> Any | None:
     return data.get("_data")
 
 
+def _write_atomic(
+    fd: int, tmp_path: str, final_path: str,
+    path: str, json_str: str, raw_bytes: bytes, use_gzip: bool,
+) -> None:
+    """原子写入：写临时文件 → os.replace 替换 → 清理旧格式。
+
+    Args:
+        fd: tempfile.mkstemp 返回的文件描述符
+        tmp_path: 临时文件路径
+        final_path: 最终目标文件路径（含 .json 或 .json.gz）
+        path: 原始缓存路径（用于清理另一格式文件）
+        json_str: JSON 序列化字符串
+        raw_bytes: UTF-8 编码字节
+        use_gzip: 是否 gzip 压缩
+
+    Raises:
+        OSError: IO 写入或替换失败
+        FileNotFoundError: 临时文件所在目录被删除
+    """
+    if use_gzip:
+        compressed = gzip.compress(raw_bytes)
+        with os.fdopen(fd, "wb") as f:
+            f.write(compressed)
+    else:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json_str)
+    try:
+        os.replace(tmp_path, final_path)
+    except PermissionError:
+        # Windows: replace 目标文件可能被锁，先删除再 rename
+        if os.path.exists(final_path):
+            os.remove(final_path)
+        os.rename(tmp_path, final_path)
+
+    # 清理旧格式文件（防止 .json 和 .json.gz 同时存在）
+    other_path = path if use_gzip else (path + _GZIP_SUFFIX)
+    if os.path.exists(other_path):
+        try:
+            os.remove(other_path)
+        except OSError:
+            pass
+
+
 def set(key: str, data: Any) -> None:
     """写入缓存。使用临时文件 + 原子替换保证线程安全。
 
@@ -126,29 +170,7 @@ def set(key: str, data: Any) -> None:
         return
 
     try:
-        if use_gzip:
-            compressed = gzip.compress(raw_bytes)
-            with os.fdopen(fd, "wb") as f:
-                f.write(compressed)
-        else:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(json_str)
-        try:
-            os.replace(tmp_path, final_path)
-        except PermissionError:
-            # Windows: replace 目标文件可能被锁，先删除再 rename
-            if os.path.exists(final_path):
-                os.remove(final_path)
-            os.rename(tmp_path, final_path)
-
-        # 清理旧格式文件（防止 .json 和 .json.gz 同时存在）
-        other_path = path if use_gzip else (path + _GZIP_SUFFIX)
-        if os.path.exists(other_path):
-            try:
-                os.remove(other_path)
-            except OSError:
-                pass
-
+        _write_atomic(fd, tmp_path, final_path, path, json_str, raw_bytes, use_gzip)
         logger.debug("缓存已写入: %s", key)
     except FileNotFoundError:
         # 目录可能在 makedirs 后被外部删除，重试一次
@@ -160,28 +182,7 @@ def set(key: str, data: Any) -> None:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             fd2, tmp_path2 = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
             try:
-                if use_gzip:
-                    compressed = gzip.compress(raw_bytes)
-                    with os.fdopen(fd2, "wb") as f:
-                        f.write(compressed)
-                else:
-                    with os.fdopen(fd2, "w", encoding="utf-8") as f:
-                        f.write(json_str)
-                try:
-                    os.replace(tmp_path2, final_path)
-                except PermissionError:
-                    if os.path.exists(final_path):
-                        os.remove(final_path)
-                    os.rename(tmp_path2, final_path)
-
-                # 清理旧格式文件
-                other_path = path if use_gzip else (path + _GZIP_SUFFIX)
-                if os.path.exists(other_path):
-                    try:
-                        os.remove(other_path)
-                    except OSError:
-                        pass
-
+                _write_atomic(fd2, tmp_path2, final_path, path, json_str, raw_bytes, use_gzip)
                 logger.debug("缓存已写入(重试成功): %s", key)
             except (IOError, OSError) as e2:
                 logger.warning("缓存写入失败(重试后) %s: %s", key, e2)
@@ -302,27 +303,8 @@ def cleanup_expired(dry_run: bool = False) -> int:
 
         # 文件名前缀 → 数据类型键名
         # 注意：具体前缀需在通用前缀之前（如 "llm_global_macro" 在 "llm_" 之前）
-        prefix_type_map: dict[str, str] = {
-            "price": "price",
-            "index": "index",
-            "fund_perf": "rank",
-            "fund_hold": "hold",
-            "industry": "industry",
-            "news": "news",
-            "llm_global_macro": "llm_global_macro",   # 全球政经局势：24h TTL
-            "llm_expert_review": "llm_expert_review", # 智囊团深度复盘：2h TTL
-            "llm_news_correlation": "llm_news_correlation",     # LLM 新闻关联分析：1h TTL
-            "llm_news_item": "llm_news_correlation",            # LLM 新闻逐条缓存：1h TTL（同 news_correlation）
-            "llm_health_check": "llm_health_check",             # 持仓体检报告：2h TTL
-            "llm_penetration_deep": "llm_penetration_deep",     # 穿透深度分析：24h TTL
-            "profit_forecast": "profit_forecast",
-            "sector_flow": "sector_flow",
-            "dividend": "dividend",
-        }
-        exact_map: dict[str, str] = {
-            "fund_benchmarks": "benchmark",
-            "holdings_tracking": "benchmark",  # 持仓跟踪数据：30天 TTL，防误删导致重复预热
-        }
+        prefix_type_map: dict[str, str] = get_prefix_type_map()
+        exact_map: dict[str, str] = get_exact_type_map()
 
         if not os.path.isdir(_CACHE_DIR):
             logger.info("缓存目录不存在，跳过清理")
@@ -528,4 +510,4 @@ def get_ttl(data_type: str) -> float:
                 return val
     except (ImportError, TypeError, ValueError, KeyError, AttributeError, RuntimeError):
         logger.debug("get_ttl: 配置读取失败，使用默认值")
-    return CACHE_TTL_DEFAULTS.get(data_type, CACHE_DAILY)
+    return get_cache_ttl_defaults().get(data_type, CACHE_DAILY)

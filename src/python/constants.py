@@ -1,8 +1,7 @@
 """项目共享常量模块。
 
 此模块不含对本项目其他任何模块的 import，保持零依赖。
-供 cache.py、config.py、llm_client.py 等模块引用，
-避免同一常量在多处重复维护。
+供 cache.py、registry.py、llm_client.py 等模块引用。
 """
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
@@ -10,26 +9,6 @@
 CACHE_DAILY = 86400         # 每日（24h）
 CACHE_WEEKLY = 604800       # 每周（7d）
 CACHE_MONTHLY = 2592000     # 每月（30d）
-
-# ── 缓存 TTL 默认值（按数据类型） ─────────────────────────
-
-CACHE_TTL_DEFAULTS: dict[str, float] = {
-    "price": CACHE_DAILY,
-    "index": CACHE_DAILY,
-    "rank": CACHE_DAILY,
-    "hold": CACHE_WEEKLY,
-    "news": 900,              # 新闻聚合缓存：15 分钟
-    "industry": CACHE_WEEKLY, # 行业分类/概念板块：7 天
-    "benchmark": CACHE_MONTHLY,
-    "llm_global_macro": 86400,       # 全球政经局势：24 小时
-    "llm_expert_review": 7200,       # 智囊团深度复盘：2 小时
-    "llm_news_correlation": 3600,           # LLM 新闻关联分析：1 小时
-    "llm_health_check": 7200,               # 持仓体检报告：2 小时
-    "llm_penetration_deep": 86400,           # 穿透深度分析：24 小时
-    "profit_forecast": CACHE_DAILY,   # 机构盈利预测：24h
-    "sector_flow": 900,               # 行业资金流向：15分钟
-    "dividend": CACHE_MONTHLY,        # 分红历史：30天
-}
 
 # ── LLM 模型定价表（每百万 token，CNY） ───────────────────
 

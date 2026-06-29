@@ -140,7 +140,7 @@ _ENV.filters["thousands"] = _jinja_thousands
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None) -> str:
+def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     1. 通过各计算模块获取全部分析数据
@@ -395,6 +395,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         health_check=health_check_content,
         penetration_deep=penetration_deep_content,
         llm_session_usage=_llm_session_usage,
+        early_warnings=early_warnings,
     )
 
     # ── 10) 保存文件 ─────────────────────────────────────────

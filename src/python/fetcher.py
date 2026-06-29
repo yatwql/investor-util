@@ -96,7 +96,10 @@ def _fetch_with_fallback(
     cache_key: str,
     cache_ttl: float,
     fn_kwargs: dict[str, Any] | None = None,
-    transform: Callable[[dict[str, Any], str], dict[str, Any] | None] | None = None,
+    transform: Callable[[dict[str, Any], str], dict[str, Any] | None]
+              | dict[str, Callable[[dict[str, Any], str], dict[str, Any] | None]]
+              | None = None,
+    validate: Callable[[dict[str, Any], str], bool] | None = None,
 ) -> dict[str, Any] | None:
     """通用 Fallback 获取器。
 
@@ -109,8 +112,12 @@ def _fetch_with_fallback(
         cache_key: 缓存键
         cache_ttl: 缓存 TTL（秒）
         fn_kwargs: 传给 fetch_fn 的额外参数
-        transform: 将 provider 原始结果转为统一输出格式
-                   (raw_result, source_label) → unified_dict | None
+        transform: 将 provider 原始结果转为统一输出格式。
+            可以是:
+            - 单个 Callable[[raw, source_label], dict|None]
+            - dict[str, Callable] 按 provider_name 选择
+        validate: 可选的数据验证函数 (raw, provider_name) → bool，
+            在 transform 前调用。返回 False 跳过该 provider。
 
     Returns:
         unified dict 或 None
@@ -144,8 +151,28 @@ def _fetch_with_fallback(
             logger.info("[%s] %s 返回空，尝试下一链路", data_type, provider_name)
             continue
 
+        # 数据验证
+        if validate:
+            try:
+                if not validate(raw, provider_name):
+                    logger.info("[%s] %s 数据验证未通过，尝试下一链路", data_type, provider_name)
+                    continue
+            except Exception as e:
+                logger.warning("[%s] %s 数据验证异常: %s", data_type, provider_name, e)
+                continue
+
         # 应用数据转换
-        if transform:
+        if isinstance(transform, dict):
+            fn = transform.get(provider_name)
+            if fn:
+                try:
+                    result = fn(raw, source_label)
+                except Exception as e:
+                    logger.warning("[%s] %s 数据转换失败: %s", data_type, provider_name, e)
+                    continue
+            else:
+                result = raw
+        elif transform:
             try:
                 result = transform(raw, source_label)
             except Exception as e:
@@ -261,56 +288,27 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
     code = code.strip()
     cache_key = _price_cache_key(code)
 
-    # 1) 读缓存（TTL 从 config.json cache_ttl.price 读取，可配置）
-    cached = cache_get(cache_key, get_ttl("price"))
-    if cached is not None:
-        logger.debug("行情缓存命中: %s", code)
-        return cached
-
-    # 2) 遍历 Provider Chain
-    chain = _get_chain("price")
-
-    for provider_name in chain:
-        entry = _PRICE_PROVIDERS.get(provider_name)
-        if not entry:
-            continue
-
-        source_label, fetch_fn = entry
-        transform = _PRICE_TRANSFORMS.get(provider_name)
-        logger.info("[价格] %s 尝试 %s (%s)", code, source_label, provider_name)
-
-        try:
-            raw = fetch_fn(code)
-        except Exception as e:
-            logger.warning("[价格] %s (%s): %s", provider_name, code, e)
-            continue
-
-        if raw is None or not raw.get("name" if provider_name == "tencent" else "nav"):
-            logger.info("[价格] %s (%s) 返回空", provider_name, code)
-            continue
-
-        # 名称比对（仅 Tencent 需要，因为可能代码重叠）
+    def _validate(raw: dict, provider_name: str) -> bool:
         if provider_name == "tencent":
+            if not raw.get("name"):
+                return False
             tencent_name = raw.get("name", "").strip()
             if expected_name and tencent_name and not _name_matches(tencent_name, expected_name):
-                logger.info("[价格] %s 名称不匹配 '%s' vs '%s'，尝试下一链路",
-                           code, tencent_name, expected_name)
-                continue
+                return False
+            return True
+        if provider_name == "eastmoney":
+            return bool(raw.get("nav") and raw.get("nav", 0.0) > 0)
+        return True
 
-        # 转换并返回
-        if transform:
-            out = transform(raw, source_label)
-            if out:
-                cache_set(cache_key, out)
-                return out
-
-    # 降级：全部 Provider 失败时尝试过期缓存
-    stale = cache_get(cache_key, CACHE_WEEKLY)
-    if stale is not None:
-        logger.info("[价格] %s 全部 Provider 不可用，降级使用过期缓存", code)
-        return stale
-
-    return None
+    return _fetch_with_fallback(
+        data_type="price",
+        provider_fn_map=_PRICE_PROVIDERS,
+        cache_key=cache_key,
+        cache_ttl=get_ttl("price"),
+        fn_kwargs={"code": code},
+        transform=_PRICE_TRANSFORMS,
+        validate=_validate,
+    )
 
 
 # ═══════════════════════════════════════════════════════════

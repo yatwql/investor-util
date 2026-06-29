@@ -100,6 +100,8 @@
 | v0.2.30 | 穿透深度分析新增：`generate_penetration_deep_analysis`/`_penetration_deep_fingerprint` 单元测试、`write_llm_sheets` 扩展为 4 元组测试、`generate_all_llm` 返回 8 元组测试、`write_html_report` 签名 4 元组测试；Excel 页签序号前缀（1.~10.）排序验证；TUI 模型路由 5 条显示覆盖；配置项 `model_penetration_deep`/`temperature_penetration_deep` 等 10 项默认值验证；全量 783 passed |
 | v0.2.33 | `_generate_excel_report` Import/Sheet 写入隔离（7 个模块逐个 try/except，6 个 Sheet 写入 _call_sheet 包装）回归测试；日志模块名/Excel 页签/HTML 章节名称统一回归；`_SYSTEM_MACRO`→`_SYSTEM_GLOBAL_MACRO` 等 4 项常量重命名回归；test_config.py `validate_config` 10 项校验用例；helpers.py `SynchronousExecutor` 测试辅助类；全量 814 passed |
 | v0.2.34 | content.py 拆分为 prompts.py + generators.py 回归测试；`test_helpers.py` → `helpers.py` 重命名后导入路径更新验证；system_prompt 覆盖路径（配置值/空值/缺失键）3 项测试；llm_settings.json 键名一致性校验测试；`llm/__init__.py` 显式导入验证；全量 945 passed |
+| v0.2.35 | 配置注册表 `registry.py` 新增 21 项测试（注册表完备性、派生映射正确性、DataModuleDef 单元测试）；config.py/cache.py/constants.py 去硬编码回归；全量 966 passed |
+| v0.2.36 | 智能预警 `early_warning.py` 新增 25 项测试（行业资金流向联动/新闻情绪聚合/等级判定/边界场景/Excel 写入）；P1 优化回归（cache/fetcher/prompts）；全量 991 passed |
 
 ---
 

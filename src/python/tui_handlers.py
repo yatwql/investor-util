@@ -363,6 +363,7 @@ def _generate_excel_report(
     news_data: list | None = None,
     llm_cached: tuple[bool, bool, bool, bool] = (False, False, False, False),
     news_llm_meta: dict | None = None,
+    early_warnings: dict | None = None,
 ) -> None:
     """生成 Excel 报告的核心逻辑。"""
     # ── 导入各报告模块（单独捕获，避免一处缺失拖垮整个报告） ──
@@ -422,13 +423,14 @@ def _generate_excel_report(
     wb = create_workbook()
     wb.remove(wb.active)
 
-    # 预创建全部页签，确保 1→10 数字顺序从左到右
+    # 预创建全部页签，确保 1→12 数字顺序从左到右
     ws1 = wb.create_sheet()  # 1. 汇总
     ws2 = wb.create_sheet()  # 2. 市值核算
     ws3 = wb.create_sheet()  # 3. 持仓分类
     ws4 = wb.create_sheet()  # 4. 资产穿透TOP10
     ws5 = wb.create_sheet()  # 5. 基金业绩分析
     ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点
+    ws7 = wb.create_sheet() if include_news else None  # 7. 智能预警（仅在有新闻时生成）
 
     # ── 行情市值页（返回下游所需的核心数据） ──
     if write_market_value_sheet is None:
@@ -513,6 +515,19 @@ def _generate_excel_report(
                     _add_error("新闻数据模块缺失")
                     news_data, _meta = [], {}
             _call_sheet("财经新闻热点与持仓关联分析", write_news_sheet, ws6, news_data, llm_meta=_meta)
+
+        # 智能预警页签（依赖新闻 + 穿透数据）
+        if include_news and ws7 is not None:
+            if early_warnings is None:
+                _early_warnings = {"sector_alerts": [], "sentiment_alerts": [],
+                                   "has_warnings": False, "has_sector_data": False, "has_llm_news": False}
+            else:
+                _early_warnings = early_warnings
+            try:
+                from src.python.report.early_warning import write_early_warning_sheet
+                _call_sheet("智能预警", write_early_warning_sheet, ws7, _early_warnings)
+            except ImportError as _ew_err:
+                _add_error(f"智能预警模块缺失: {_ew_err}")
 
     if include_llm:
         with _Timer("LLM 分析章节"):
@@ -877,6 +892,24 @@ def _cmd_generate_full() -> None:
 
         _print_llm_session_usage()
 
+        # ── 智能预警 ──
+        try:
+            from src.python.report.early_warning import compute_early_warnings
+            _early_warnings = compute_early_warnings(
+                holdings,
+                penetration_top10=penetrated_assets,
+                sector_flow=_sector_flow,
+                news_data=news_data,
+                news_llm_meta=news_llm_meta,
+            )
+            if _early_warnings.get("has_warnings"):
+                _n_sector = len(_early_warnings.get("sector_alerts", []))
+                _n_sentiment = len(_early_warnings.get("sentiment_alerts", []))
+                print(f"  [OK] 智能预警完成: {_n_sector} 条行业预警, {_n_sentiment} 条新闻情绪")
+        except Exception as e:
+            logger.warning("智能预警计算失败: %s", e)
+            _early_warnings = None
+
         from src.python.report.html_writer import write_html_report
         print("  [..] 正在生成 HTML 报告（含新闻 + LLM 分析章节）...")
         try:
@@ -885,6 +918,7 @@ def _cmd_generate_full() -> None:
                 news_top_count=news_top_count, include_news=True,
                 llm_content=llm_content, details=details,
                 news_data=news_data, news_llm_meta=news_llm_meta,
+                early_warnings=_early_warnings,
             )
             print(f"  [OK] HTML 报告已生成: {path}")
         except Exception as e:
@@ -901,6 +935,7 @@ def _cmd_generate_full() -> None:
             details=details, a_indices=a_indices, us_indices=us_indices,
             news_data=news_data, llm_cached=llm_cached,
             news_llm_meta=news_llm_meta,
+            early_warnings=_early_warnings,
         )
     except Exception as e:
         _add_error(f"全系列报告生成失败: {e}")

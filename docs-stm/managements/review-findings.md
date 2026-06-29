@@ -44,6 +44,8 @@
 | 2026-06-29 | 持仓体检报告（持仓体检报告）— generate_health_check、4 维度评分逻辑、2h 缓存策略、排除行情指纹 | 实现审查 |
 | 2026-06-29 | 穿透深度分析（穿透深度分析）— generate_penetration_deep_analysis、行业集中度/国别暴露、24h 缓存策略、排除行情指纹 | 实现审查 |
 | 2026-06-29 | 全配置审计 — config.json / llm_settings.json / llm_key.json 冗余、冲突、缺失检查；README / requirements / plan / changelog 四文档同步 | 综合审计 |
+| 2026-06-30 | 智能预警（行业资金流向联动 + 新闻情绪聚合）— early_warning.py、P1 代码优化（cache/fetcher/prompts） | 实现审查 |
+| 2026-06-30 | 全量文档审计 — 冗余内容清理、冲突修复（plan.md D 标记/README 12 页签/requirements 新章节/technical 目录同步） | 综合审计 |
 
 ---
 
@@ -58,7 +60,7 @@
 - [x] Iter 3.5 已完成（LLM 全局优化）
 - [x] Iter 3.6 已完成（全面性能优化与代码清理）
 - [x] 配置管理含 output_dir 字段，支持菜单 R 配置
-- [x] 所有单元测试通过（800 项）
+- [x] 所有单元测试通过（991 项）
 - [x] API Key 不丢失（config.json 不存明文 key，使用外部文件 llm_key.json）
 - [x] Excel/HTML 输出文件格式正确
 - [x] TUI 菜单功能正常（含 B/L/R 新菜单）
@@ -68,10 +70,8 @@
 - [x] 进程级内存缓存层 + 指数数据内存缓存
 - [x] Batch 新闻 LLM 分析优化
 - [x] 配置同步（config.json cache_ttl 补全 + llm_settings.json cache_ttl_macro 修正）
-- [x] 全量 800 测试通过
-- [x] v0.2.29 持仓体检报告（持仓体检报告）集成完成
-- [x] v0.2.30 穿透深度分析（穿透深度分析）集成完成
-- [x] 全量 800 测试通过
+- [x] v0.2.29 持仓体检报告集成完成
+- [x] v0.2.30 穿透深度分析集成完成
 - [x] 综合审计：配置/缓存前缀/管理文档核对完成
-- [x] v0.2.32 Token 定价可配置、多币种、缓存命中计费、全量管理文档审计（requirements/plan/testplan/technical/review）
-- [x] v0.2.33 Import/Sheet 写入隔离 + 名称统一（日志/Excel/HTML）+ 常量重命名（_SYSTEM_GLOBAL_MACRO 等）+ 智囊团 NAV/QDII 标注 + 全量自测 814 passed
+- [x] v0.2.32 Token 定价可配置、多币种、缓存命中计费、全量管理文档审计
+- [x] v0.2.33 Import/Sheet 写入隔离 + 名称统一 + 常量重命名 + 智囊团 NAV/QDII 标注 + 全量自测 814 passed

@@ -537,10 +537,88 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 7: 全球政经局势 (Global Macro, LLM augment)     -->
+        </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  MODULE 7: 智能预警 (Early Warning)                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">七、智能预警</div>
+        {% if early_warnings and early_warnings.has_warnings %}
+        <div class="section-content">
+            {% if early_warnings.sector_alerts %}
+            <h3 style="margin: 12px 0 8px;">行业资金流向联动预警</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>行业</th>
+                        <th>主力净流入</th>
+                        <th>净占比</th>
+                        <th>涨跌幅</th>
+                        <th>关联持仓</th>
+                        <th>预警等级</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in early_warnings.sector_alerts %}
+                    <tr>
+                        <td>{{ alert.sector_name }}</td>
+                        <td>{{ alert.main_net_inflow | money }}</td>
+                        <td>{{ "%.2f"|format(alert.main_net_inflow_pct) }}%</td>
+                        <td>{{ "%.2f"|format(alert.change_pct) }}%</td>
+                        <td>{{ alert.matched_assets | map(attribute="name") | join(", ") }}</td>
+                        <td>
+                            {% if alert.alert_level == "danger" %}⚠ 危险
+                            {% elif alert.alert_level == "warning" %}▲ 关注
+                            {% else %}● 注意{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if early_warnings.sentiment_alerts %}
+            <h3 style="margin: 20px 0 8px;">新闻情绪聚合</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>持仓品种</th>
+                        <th>代码</th>
+                        <th>提及次数</th>
+                        <th>利好</th>
+                        <th>利空</th>
+                        <th>中性</th>
+                        <th>情绪</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in early_warnings.sentiment_alerts %}
+                    <tr>
+                        <td>{{ entry.name }}</td>
+                        <td>{{ entry.code }}</td>
+                        <td>{{ entry.total_mentions }}</td>
+                        <td>{{ entry.positive }}</td>
+                        <td>{{ entry.negative }}</td>
+                        <td>{{ entry.neutral }}</td>
+                        <td>{{ entry.sentiment_label }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="section-content">当前无预警信息。</div>
+        {% endif %}
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  MODULE 8: 全球政经局势 (Global Macro, LLM augment)     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
-        <div class="section-title">七、全球政经局势</div>
+        <div class="section-title">八、全球政经局势</div>
         {% if llm_enabled and global_macro %}
         <div class="section-content">
             {{ global_macro | safe }}
@@ -564,10 +642,10 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 8: 智囊团深度复盘 (Expert Review, LLM augment)  -->
+    <!--  MODULE 9: 智囊团深度复盘 (Expert Review, LLM augment)  -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
-        <div class="section-title">八、智囊团深度复盘</div>
+        <div class="section-title">九、智囊团深度复盘</div>
         {% if llm_enabled and expert_review %}
         <div class="section-content">
             {{ expert_review | safe }}
@@ -591,10 +669,10 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 9: 持仓体检报告 (Health Check, LLM augment)    -->
+    <!--  MODULE 10: 持仓体检报告 (Health Check, LLM augment)    -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
-        <div class="section-title">九、持仓体检报告</div>
+        <div class="section-title">十、持仓体检报告</div>
         {% if llm_enabled and health_check %}
         <div class="section-content">
             {{ health_check | safe }}
@@ -617,10 +695,10 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 10: 穿透深度分析 (Penetration Deep, LLM augment)-->
+    <!--  MODULE 11: 穿透深度分析 (Penetration Deep, LLM augment)-->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
-        <div class="section-title">十、穿透深度分析</div>
+        <div class="section-title">十一、穿透深度分析</div>
         {% if llm_enabled and penetration_deep %}
         <div class="section-content">
             {{ penetration_deep | safe }}
@@ -642,9 +720,9 @@
         {% endif %}
     </div>
 
-    <!--  MODULE 11: LLM API Usage -->
+    <!--  MODULE 12: LLM API Usage -->
     <div class="section">
-        <div class="section-title">十一、LLM API 用量</div>
+        <div class="section-title">十二、LLM API 用量</div>
         <div class="section-content">
             {% if llm_session_usage and llm_session_usage.get("has_usage") %}
             <table class="kv-table">

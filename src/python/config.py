@@ -14,7 +14,8 @@ import os
 import threading
 from typing import Any
 
-from src.python.constants import CACHE_TTL_DEFAULTS, MODEL_PRICING
+from src.python.constants import MODEL_PRICING
+from src.python.registry import get_cache_ttl_defaults, get_known_llm_settings_keys
 
 logger = logging.getLogger("invest")
 
@@ -35,7 +36,7 @@ _DEFAULT_CONFIG = {
         "akshare": True,
     },
     "preferred_provider": {},
-    "cache_ttl": CACHE_TTL_DEFAULTS,
+    "cache_ttl": get_cache_ttl_defaults(),
     "user_fund_benchmarks": {},
     "llm_key_file": "data/config/llm_key.json",
     "llm_settings_file": "data/config/llm_settings.json",
@@ -357,53 +358,8 @@ def get_llm_settings_path() -> str:
 # ── LLM 配置缓存（按文件修改时间自动失效） ──────────────────
 
 # 已知的 llm_settings.json 合法键名集合，用于启动时未知键名告警
-_KNOWN_LLM_SETTINGS_KEYS: set[str] = {
-    # 重试
-    "max_retries",
-    # 温度
-    "temperature_global_macro", "temperature_expert_review",
-    "temperature_news_correlation", "temperature_health_check",
-    "temperature_penetration_deep",
-    # 超时
-    "timeout_global_macro", "timeout_expert_review",
-    "timeout_news_correlation", "timeout_health_check",
-    "timeout_penetration_deep",
-    # 缓存
-    "cache_enabled_global_macro", "cache_enabled_expert_review",
-    "cache_enabled_news_correlation", "cache_enabled_health_check",
-    "cache_enabled_penetration_deep",
-    # 精简输出
-    "output_brief_global_macro", "output_brief_expert_review",
-    "output_brief_health_check", "output_brief_penetration_deep",
-    # max_tokens
-    "max_tokens_global_macro", "max_tokens_expert_review",
-    "max_tokens_news_correlation", "max_tokens_health_check",
-    "max_tokens_penetration_deep",
-    # per-module 模型覆盖
-    "model_global_macro", "model_expert_review",
-    "model_news_correlation", "model_health_check",
-    "model_penetration_deep",
-    # system prompt 覆盖
-    "system_prompt_global_macro", "system_prompt_expert_review",
-    "system_prompt_news_correlation", "system_prompt_health_check",
-    "system_prompt_penetration_deep",
-    # 新闻关联
-    "enabled_llm_news_correlation",
-    # Extended Thinking
-    "thinking_enabled_global_macro", "thinking_enabled_expert_review",
-    "thinking_enabled_news_correlation", "thinking_enabled_health_check",
-    "thinking_enabled_penetration_deep",
-    # thinking budget (Anthropic)
-    "thinking_budget_global_macro", "thinking_budget_expert_review",
-    "thinking_budget_news_correlation", "thinking_budget_health_check",
-    "thinking_budget_penetration_deep",
-    # reasoning effort (DeepSeek)
-    "reasoning_effort_global_macro", "reasoning_effort_expert_review",
-    "reasoning_effort_news_correlation", "reasoning_effort_health_check",
-    "reasoning_effort_penetration_deep",
-    # 定价
-    "pricing",
-}
+# 由中央注册表 registry.py 自动派生，不再硬编码
+_KNOWN_LLM_SETTINGS_KEYS: set[str] = get_known_llm_settings_keys()
 
 # llm_key.json 中也允许出现的键名（与 llm_settings.json 重叠视为合法）
 _LLM_KEY_OVERLAP_KEYS: set[str] = {"provider", "api_key", "model", "endpoint",

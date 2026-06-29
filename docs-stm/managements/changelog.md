@@ -4,6 +4,56 @@
 
 ---
 
+## [0.2.36] - 2026-06-30
+
+### Added
+- **智能预警模块 `src/python/report/early_warning.py`** — 两个独立预警维度：
+  - 行业资金流向联动：穿透资产的行业概念与今日行业资金流向匹配，净流出超过阈值自动标记预警等级（注意/关注/危险）
+  - 新闻情绪聚合：LLM 新闻关联分析结果按持仓品种汇总，计算情绪得分与偏好评级
+- **`src/test/test_early_warning.py` 智能预警测试** — 25 项测试覆盖：
+  - 集成测试（正常数据/无数据/无LLM/正向净流入/空输入等 6 场景）
+  - 行业预警单元测试（危险/关注/注意等级判定、概念匹配、排序、空输入）
+  - 情绪聚合单元测试（代码聚合、低关联过滤、LLM未启用、情绪标签、要闻限制）
+  - Excel 写入测试（正常数据/空数据 mock openpyxl）
+
+### Changed
+- **Excel 报告新增「11.智能预警」页签** — 位于财经新闻之后、LLM 章节之前，含行业联动 + 情绪聚合双表格
+- **HTML 报告新增「七、智能预警」章节** — 含 Jinja2 模板渲染双表格，无预警显示占位文本
+- 后续 LLM 章节编号顺延（七→八→九→十→十一→十二）
+- 报告生成流程（菜单 N/B/L）自动附带智能预警
+
+### P1 Optimized
+- **`_sanitize_endpoint()` 去重** — 删除 `prompts.py` 中死代码副本（`api.py` 版本保持不动）
+- **`cache.py` `_write_atomic()` 提取** — 消除 `set()` 中 21 行写入逻辑重复，提取私有辅助函数
+- **`fetch_market_data()` 委托重构** — `_fetch_with_fallback()` 新增 `validate` + dict `transform` 支持，行情获取复用通用 fallback 链
+
+### Tests
+- 新建 `test_early_warning.py`（25 项）
+- 全量 991 passed, 11 skipped, 30 subtests passed
+
+## [0.2.35] - 2026-06-30
+
+### Added
+- **`src/python/registry.py` 配置注册表模块** — 引入中央注册表模式，使用 `DataModuleDef` 数据类统一管理所有数据模块的：
+  - 缓存文件名前缀 → 数据类型映射（`get_prefix_type_map()`）
+  - 数据类型 → 默认 TTL 映射（`get_cache_ttl_defaults()`）
+  - LLM settings 键名自动派生（`get_known_llm_settings_keys()`）
+  - 精确缓存键名映射（`get_exact_type_map()`）
+  - 新增模块只需在 `_MODULE_REGISTRY` 添加一行，三处派生映射自动同步
+- **`src/test/test_registry.py` 注册表测试** — 21 项测试覆盖：
+  - 注册表完备性（无重复 data_type/前缀/键名、LLM/非LLM模块正确标记）
+  - 派生映射正确性（全量 data_type TTL 覆盖、已知条目值精确断言）
+  - DataModuleDef 单元测试（key 生成、不可变性、news_correlation 例外）
+
+### Changed
+- **`config.py` 去硬编码** — `_KNOWN_LLM_SETTINGS_KEYS` 改为 `get_known_llm_settings_keys()` 动态派生；`cache_ttl` 默认值改为 `get_cache_ttl_defaults()` 调用
+- **`cache.py` 去硬编码** — `prefix_type_map` / `exact_map` / TTL 查找均改为调用 registry 函数
+- **`constants.py` 清理** — 移除 `CACHE_TTL_DEFAULTS` 字典（已迁移至 registry），保留 `CACHE_DAILY/WEEKLY/MONTHLY` 零依赖常量
+
+### Tests
+- 新建 `test_registry.py`（21 项）
+- 全量 966 passed, 11 skipped, 30 subtests passed
+
 ## [0.2.34] - 2026-06-30
 
 ### Changed

@@ -15,7 +15,7 @@ __all__ = [
     "_LLM_MODULE_FAILURE",
     "_SYSTEM_GLOBAL_MACRO", "_SYSTEM_EXPERT_REVIEW", "_SYSTEM_HEALTH_CHECK",
     "_SYSTEM_PENETRATION_DEEP", "_SYSTEM_NEWS_CORRELATION",
-    "_is_qdii", "_fmt_wan", "_fmt_holding_line", "_sanitize_endpoint",
+    "_is_qdii", "_fmt_wan", "_fmt_holding_line",
     "_build_global_macro_prompt", "_build_expert_review_prompt", "_build_health_check_prompt",
     "_build_penetration_deep_prompt", "_build_holdings_summary", "_build_news_correlation_summary",
 ]
@@ -182,14 +182,6 @@ def _fmt_holding_line(h: dict, show_cost: bool = False) -> str:
         return f"{base} 净值:{nav_date}{qdii_suffix}"
     chg = h.get("change_pct", 0)
     return f"{base} 今{chg:+.2f}%{qdii_suffix}"
-
-
-def _sanitize_endpoint(endpoint: str) -> str:
-    """从 endpoint URL 中提取纯域名，避免路径/参数泄露到日志。"""
-    try:
-        return endpoint.split("/")[2] if endpoint else "unknown"
-    except (IndexError, TypeError, AttributeError):
-        return "unknown"
 
 
 # ═══════════════════════════════════════════════════════════

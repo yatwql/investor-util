@@ -105,19 +105,25 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 - **报告对比**：将本次报告的关键指标（市值/盈亏/仓位）与上次对比，输出变化摘要
 - **回撤监控**：从历史缓存中提取持仓的连续回撤曲线
 
-### D. 智能预警（低-中难度 / 高价值）
+### ✅ D. 智能预警 — 已实现（v0.2.36）
 
-- **行业资金流向联动**：当穿透资产所属行业出现持续大额净流出时关联持仓预警
-- **新闻情绪聚合**：对 LLM 分析的利空/利好消息按品种聚合，列出"最受关注的品种"
+行业资金流向联动预警 + 新闻情绪聚合，基于已有计算数据二次加工，不依赖 LLM。
 
 ### F. LLM 分析增强
 
 - **环比分析**：对比历史报告摘要，说明组合变化趋势
 
-### G. 配置注册表模式（远期蓝图）
+### G. 配置注册表模式（已实现 v0.2.35）
 
 引入中央注册表机制，统一管理模块的配置键名、缓存前缀、默认 TTL：
 
 - **现状**：`_KNOWN_LLM_SETTINGS_KEYS`（`config.py`）、`prefix_type_map`（`cache.py`）、`CACHE_TTL_DEFAULTS`（`constants.py`）三处各自维护，新增模块时容易遗漏某处
 - **方案**：每模块在中央注册自己的配置键名、缓存前缀、默认 TTL，`config.py`/`cache.py` 从注册表动态派发生效键名和缓存策略
 - **收益**：新增模块只需注册一次，所有校验、缓存、配置文档自动同步，消除三处维护的遗漏风险
+
+### H. 代码架构优化（中难度 / 高可维护性）
+
+- **LLM Generator 函数去重**：`generate_global_macro`、`generate_expert_review`、`generate_health_check`、`generate_penetration_deep_analysis` 四个函数骨架相同（llm_config → fingerprint → build prompt → `_generate_llm_content`），可抽取参数化 dispatch 函数统一管理
+- **Prompt Builder 去重**：`_build_expert_review_prompt`、`_build_health_check_prompt`、`_build_penetration_deep_prompt` 共享约 70% 结构（摘要+持仓循环+穿透循环），可抽取共享模板
+- **`_DEFAULT_LLM_SETTINGS` 注册表化**：`_ensure_llm_settings_file()` 中硬编码的 50 个默认值改为从 registry 自动派生
+- **`tui_handlers.py` 拆分**：1331 行的单文件按领域拆分为 `handler_cache.py`、`handler_report.py`、`handler_llm.py` 等子模块

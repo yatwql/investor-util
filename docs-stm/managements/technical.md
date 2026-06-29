@@ -121,11 +121,12 @@ investor-util/
 │   │   ├── __init__.py
 │   │   ├── main.py               # TUI 入口 + 菜单循环
 │   │   ├── config.py             # 配置读写
+│   │   ├── registry.py           # 中央注册表（模块配置键名/缓存前缀/TTL 统一管理）
 │   │   ├── cache.py              # 缓存引擎
 │   │   ├── fetcher.py            # 数据获取调度
 │   │   ├── reader.py             # 持仓 Excel 解析
 │   │   ├── llm/                  # LLM 集成（9 子模块：api/pricing/content/session/circuit_breaker/fingerprint/markdown/generators/prompts）
-│   │   ├── constants.py          # 共享常量（TTL、模型定价）
+│   │   ├── constants.py          # 共享常量（CACHE_DAILY/WEEKLY/MONTHLY、模型定价）
 │   │   ├── models.py             # 数据模型（Holding dataclass）
 │   │   ├── logger.py             # 日志模块
 │   │   ├── tui.py                # 键盘输入封装
@@ -151,6 +152,7 @@ investor-util/
 │   │   ├── report/               # 报告生成
 │   │   │   ├── __init__.py
 │   │   │   ├── category.py
+│   │   │   ├── early_warning.py        # 智能预警（行业资金流向联动 + 新闻情绪聚合）
 │   │   │   ├── excel_writer.py
 │   │   │   ├── fund_performance.py
 │   │   │   ├── html_writer.py
