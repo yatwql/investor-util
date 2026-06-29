@@ -111,7 +111,9 @@ def _show_llm_config_status() -> None:
         model_macro = llm_config.get("model_global_macro") or model
         model_expert = llm_config.get("model_expert_review") or model
         model_news = llm_config.get("model_news_correlation") or model
-        print(f"         模型路由: 全局政经={model_macro} / 智囊团={model_expert} / 新闻关联={model_news}")
+        model_health = llm_config.get("model_health_check") or model
+        model_penetration = llm_config.get("model_penetration_deep") or model
+        print(f"         模型路由: 全局政经={model_macro} / 智囊团={model_expert} / 新闻关联={model_news} / 体检={model_health} / 穿透={model_penetration}")
     else:
         print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
 

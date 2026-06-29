@@ -140,7 +140,7 @@ _ENV.filters["thousands"] = _jinja_thousands
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None) -> str:
+def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     1. 通过各计算模块获取全部分析数据
@@ -148,7 +148,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     3. 写入 {output_dir}/ 目录（最新版 + 归档版）
 
     Args:
-        llm_content: 可选预生成内容 (macro_html, expert_html)，
+        llm_content: 可选预生成内容 (macro_html, expert_html, health_html, penetration_html)，
             传入时跳过内部 LLM 生成直接使用此内容。
         details: 可选预计算市值核算明细，传入时跳过内部行情获取。
         news_data: 可选预获取新闻数据，传入时跳过内部新闻获取。
@@ -286,15 +286,17 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     else:
         news_data = []
 
-    # ── 9) LLM 智能分析（模块 7/8）──────────────────────────
+    # ── 9) LLM 智能分析（模块 7/8/9）──────────────────────────
     llm_enabled_flag = False
     global_macro_content = None
     expert_review_content = None
+    health_check_content = None
+    penetration_deep_content = None
 
     if llm_content is not None:
         # 使用外部传入的预生成内容（避免重复调用 LLM）
-        global_macro_content, expert_review_content = llm_content
-        if global_macro_content or expert_review_content:
+        global_macro_content, expert_review_content, health_check_content, penetration_deep_content = llm_content
+        if global_macro_content or expert_review_content or health_check_content or penetration_deep_content:
             llm_enabled_flag = True
     elif enable_llm:
         print("  [..] 正在调用 LLM 生成智能分析...")
@@ -323,7 +325,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
             from src.python.providers.akshare_extras import get_sector_fund_flow
             _sector_flow = sector_flow if sector_flow is not None else get_sector_fund_flow()
 
-            global_macro_content, expert_review_content, _, _ = generate_all_llm(
+            global_macro_content, expert_review_content, health_check_content, penetration_deep_content, _, _, _, _ = generate_all_llm(
                 a_indices, us_indices, total_mv, total_cost, total_profit,
                 total_today_profit, len(holdings), cat_counts,
                 penetrated_assets=pen_top10,
@@ -337,6 +339,12 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
             if expert_review_content:
                 llm_enabled_flag = True
                 logger.info("模块 8（智囊团深度复盘）LLM 生成完成")
+            if health_check_content:
+                llm_enabled_flag = True
+                logger.info("模块 9（持仓体检报告）LLM 生成完成")
+            if penetration_deep_content:
+                llm_enabled_flag = True
+                logger.info("模块 A（穿透深度分析）LLM 生成完成")
         except Exception as e:
             logger.warning("LLM 生成失败: %s", e)
 
@@ -375,6 +383,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         llm_enabled=llm_enabled_flag,
         global_macro=global_macro_content,
         expert_review=expert_review_content,
+        health_check=health_check_content,
+        penetration_deep=penetration_deep_content,
     )
 
     # ── 10) 保存文件 ─────────────────────────────────────────

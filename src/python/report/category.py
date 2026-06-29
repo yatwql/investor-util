@@ -119,7 +119,7 @@ def write_category_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    ws.title = "分类汇总"
+    ws.title = "3. 分类汇总"
 
     # 建立 code → detail 映射
     detail_map: dict[str, DetailRow] = {}

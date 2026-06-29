@@ -21,6 +21,8 @@
     "llm_global_macro": 86400,
     "llm_expert_review": 7200,
     "llm_news_correlation": 3600,
+    "llm_health_check": 7200,
+    "llm_penetration_deep": 86400,
     "benchmark": 2592000,
     "profit_forecast": 86400,
     "sector_flow": 900,

@@ -1,4 +1,4 @@
-"""LLM 内容输出模块 — 报告第 7、8 页。
+"""LLM 内容输出模块 — 报告第 7、8、9、10 页（模块 7/8/9/A）。
 
 由调用方预生成 LLM 内容后传入本模块写入 Excel 页签。
 """
@@ -154,40 +154,50 @@ def _write_content_sheet(
 
 def write_llm_sheets(
     wb: Any,
-    llm_content: tuple[str | None, str | None],
-    llm_cached: tuple[bool, bool] = (False, False),
-    model_names: tuple[str, str] = ("", ""),
-    thinking: tuple[bool, bool] = (False, False),
-) -> tuple[str, str]:
-    """写入 LLM 内容页签（模块 7 & 8）。
+    llm_content: tuple[str | None, str | None, str | None, str | None],
+    llm_cached: tuple[bool, bool, bool, bool] = (False, False, False, False),
+    model_names: tuple[str, str, str, str] = ("", "", "", ""),
+    thinking: tuple[bool, bool, bool, bool] = (False, False, False, False),
+) -> tuple[str, str, str, str]:
+    """写入 LLM 内容页签（模块 7 & 8 & 9 & A）。
 
     调用方必须预先生成 llm_content，本函数仅负责写入 Excel。
 
     Args:
         wb: 工作簿
-        llm_content: (macro_html, expert_html) 预生成内容，各可能为 None
-        llm_cached: (macro_cached, expert_cached) 缓存标记，
-            分别对应两个页签的缓存状态
-        model_names: (macro_model, expert_model) 模型名称，非缓存时追加标识行
-        thinking: (macro_thinking, expert_thinking) Extended Thinking 开启标记
+        llm_content: (macro_html, expert_html, health_html, penetration_html) 预生成内容
+        llm_cached: (macro_cached, expert_cached, health_cached, penetration_cached) 缓存标记
+        model_names: (macro_model, expert_model, health_model, penetration_model) 模型名称
+        thinking: (macro_thinking, expert_thinking, health_thinking, penetration_thinking) Extended Thinking
 
     Returns:
-        (macro_text, expert_text) 纯文本二元组，供 TUI 展示
+        (macro_text, expert_text, health_text, penetration_text) 纯文本四元组，供 TUI 展示
     """
     ws7 = wb.create_sheet()
-    ws7.title = "全球政经局势"
+    ws7.title = "7. 全球政经局势"
     ws8 = wb.create_sheet()
-    ws8.title = "智囊团深度复盘"
+    ws8.title = "8. 智囊团深度复盘"
+    ws9 = wb.create_sheet()
+    ws9.title = "9. 持仓体检报告"
+    wsA = wb.create_sheet()
+    wsA.title = "10. 穿透深度分析"
 
-    content7, content8 = llm_content
-    macro_cached, expert_cached = llm_cached
-    name7, name8 = model_names
-    think7, think8 = thinking
+    content7, content8, content9, contentA = llm_content
+    macro_cached, expert_cached, health_cached, penetration_cached = llm_cached
+    name7, name8, name9, nameA = model_names
+    think7, think8, think9, thinkA = thinking
 
-    _write_content_sheet(ws7, "全球政经局势", content7, from_cache=macro_cached, model_name=name7, thinking_enabled=think7)
-    _write_content_sheet(ws8, "智囊团深度复盘", content8, from_cache=expert_cached, model_name=name8, thinking_enabled=think8)
+    _write_content_sheet(ws7, "7. 全球政经局势", content7, from_cache=macro_cached, model_name=name7, thinking_enabled=think7)
+    _write_content_sheet(ws8, "8. 智囊团深度复盘", content8, from_cache=expert_cached, model_name=name8, thinking_enabled=think8)
+    _write_content_sheet(ws9, "9. 持仓体检报告", content9, from_cache=health_cached, model_name=name9, thinking_enabled=think9)
+    _write_content_sheet(wsA, "10. 穿透深度分析", contentA, from_cache=penetration_cached, model_name=nameA, thinking_enabled=thinkA)
 
-    logger.info("LLM 内容页签写入完成")
+    logger.info("LLM 内容页签写入完成（含穿透深度分析）")
 
     # 返回纯文本内容，供 TUI 展示
-    return _strip_html(content7) if content7 else "", _strip_html(content8) if content8 else ""
+    return (
+        _strip_html(content7) if content7 else "",
+        _strip_html(content8) if content8 else "",
+        _strip_html(content9) if content9 else "",
+        _strip_html(contentA) if contentA else "",
+    )

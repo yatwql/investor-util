@@ -579,6 +579,58 @@
         {% endif %}
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 9: 持仓体检报告 (Health Check, LLM augment)    -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">九、持仓体检报告</div>
+        {% if llm_enabled and health_check %}
+        <div class="section-content">
+            {{ health_check | safe }}
+        </div>
+        {% else %}
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>本节内容待生成</strong></p>
+                <p style="margin-top: 8px; font-size: 13px; color: #888;">
+                    模块说明：从风险分散度、流动性、收益合理性、成本结构
+                    四个维度对投资组合进行全面体检并打分，提供具体改进建议。
+                </p>
+                <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
+                    功能入口：菜单 L（生成全系列完整版报告）|
+                    需配置 LLM API Key 后自动启用
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE A: 穿透深度分析 (Penetration Deep, LLM augment)-->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-title">十、穿透深度分析</div>
+        {% if llm_enabled and penetration_deep %}
+        <div class="section-content">
+            {{ penetration_deep | safe }}
+        </div>
+        {% else %}
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>本节内容待生成</strong></p>
+                <p style="margin-top: 8px; font-size: 13px; color: #888;">
+                    模块说明：基于资产穿透 TOP10 及全部持仓明细，对投资组合进行
+                    行业集中度分析、国家/地区敞口评估、货币敞口分析及底层资产风险揭示。
+                </p>
+                <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
+                    功能入口：菜单 L（生成全系列完整版报告）|
+                    需配置 LLM API Key 后自动启用
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
 </div>
 </body>
 </html>

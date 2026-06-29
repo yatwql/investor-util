@@ -120,7 +120,7 @@ class TestGenerateExcelReport(unittest.TestCase):
         """含 LLM 报告 → 新增模块 7+8 页签。"""
         mock_a_idx.return_value = {}
         mock_us_idx.return_value = {}
-        mock_llm.return_value = ("宏观内容", "复盘内容")
+        mock_llm.return_value = ("宏观内容", "复盘内容", "", "")
 
         _generate_excel_report(
             self.holdings,
@@ -130,8 +130,8 @@ class TestGenerateExcelReport(unittest.TestCase):
             details=self.details,
             a_indices={},
             us_indices={},
-            llm_content=("<p>宏观</p>", "<p>复盘</p>"),
-            llm_cached=(True, True),
+            llm_content=("<p>宏观</p>", "<p>复盘</p>", None, None),
+            llm_cached=(True, True, False, False),
         )
 
         out_files = os.listdir(self.tmp.name)

@@ -224,7 +224,7 @@ def _generate_excel_report(
     details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
     news_data: list | None = None,
-    llm_cached: tuple[bool, bool] = (False, False),
+    llm_cached: tuple[bool, bool, bool, bool] = (False, False, False, False),
     news_llm_meta: dict | None = None,
 ) -> None:
     """生成 Excel 报告的核心逻辑。"""
@@ -244,19 +244,25 @@ def _generate_excel_report(
     wb = create_workbook()
     wb.remove(wb.active)
 
+    # 预创建全部页签，确保 1→10 数字顺序从左到右
+    ws1 = wb.create_sheet()  # 1. 汇总
+    ws2 = wb.create_sheet()  # 2. 市值核算
+    ws3 = wb.create_sheet()  # 3. 分类汇总
+    ws4 = wb.create_sheet()  # 4. 资产穿透TOP10
+    ws5 = wb.create_sheet()  # 5. 基金业绩分析
+    ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点
+
     if details is not None:
         logger.info("复用外部传入的市值核算数据，共 %d 条", len(details))
         total_mv = sum(d.market_value for d in details)
         total_cost = sum(d.cost for d in details)
         total_profit = sum(d.profit for d in details)
         today_profit = sum(d.today_profit for d in details)
-        ws1 = wb.create_sheet()
-        write_market_value_sheet(ws1, holdings, details=details)
+        write_market_value_sheet(ws2, holdings, details=details)
     else:
         logger.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
-        ws1 = wb.create_sheet()
         total_mv, total_cost, total_profit, today_profit, details = \
-            write_market_value_sheet(ws1, holdings)
+            write_market_value_sheet(ws2, holdings)
 
     categories = classify_holdings(holdings)
     up_status = price_update_status(details, get_last_trading_day())
@@ -268,25 +274,21 @@ def _generate_excel_report(
         us_indices = fetch_us_indices()
 
     logger.info("正在生成汇总...")
-    ws2 = wb.create_sheet()
     write_summary_sheet(
-        ws2, total_mv, total_cost, total_profit, today_profit,
+        ws1, total_mv, total_cost, total_profit, today_profit,
         categories=categories, update_status=up_status,
         a_indices=a_indices, us_indices=us_indices,
     )
 
     logger.info("正在生成分类汇总...")
-    ws3 = wb.create_sheet()
     write_category_sheet(ws3, holdings, details)
 
     pen_result = compute_penetration_top10(holdings, details)
 
     logger.info("正在生成资产穿透 TOP10...")
-    ws4 = wb.create_sheet()
     write_penetration_sheet(ws4, holdings, details, penetration_data=pen_result)
 
     logger.info("正在获取基金业绩排名...")
-    ws5 = wb.create_sheet()
     write_fund_performance_sheet(ws5, holdings, details)
 
     if include_news:
@@ -300,7 +302,6 @@ def _generate_excel_report(
             logger.info("正在获取财经新闻（含穿透资产关键词）...")
             from src.python.report.news_correlation import build_news_data
             news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
-        ws6 = wb.create_sheet()
         write_news_sheet(ws6, news_data, llm_meta=_meta)
 
     if include_llm:
@@ -311,25 +312,29 @@ def _generate_excel_report(
             _model_names = (
                 _llm_cfg.get("model_global_macro") or _llm_cfg.get("model", ""),
                 _llm_cfg.get("model_expert_review") or _llm_cfg.get("model", ""),
+                _llm_cfg.get("model_health_check") or _llm_cfg.get("model", ""),
+                _llm_cfg.get("model_penetration_deep") or _llm_cfg.get("model", ""),
             )
             _thinking = (
                 _llm_cfg.get("thinking_enabled_global_macro", False),
                 _llm_cfg.get("thinking_enabled_expert_review", False),
+                _llm_cfg.get("thinking_enabled_health_check", False),
+                _llm_cfg.get("thinking_enabled_penetration_deep", False),
             )
-            macro_text, expert_text = write_llm_sheets(
+            macro_text, expert_text, health_text, penetration_text = write_llm_sheets(
                 wb, llm_content=llm_content, llm_cached=llm_cached,
                 model_names=_model_names, thinking=_thinking,
             )
             logger.info("LLM 增补内容已生成")
         except ImportError:
             logger.warning("LLM 增补模块 (src.report.llm_content) 未就绪，跳过")
-            macro_text = expert_text = ""
+            macro_text = expert_text = health_text = penetration_text = ""
         except Exception as e:
             logger.exception("生成 LLM 增补内容失败")
-            macro_text = expert_text = ""
+            macro_text = expert_text = health_text = penetration_text = ""
 
-        if show_llm_in_tui and (macro_text or expert_text):
-            _show_llm_tui(macro_text, expert_text)
+        if show_llm_in_tui and (macro_text or expert_text or health_text or penetration_text):
+            _show_llm_tui(macro_text, expert_text, health_text, penetration_text)
 
     path = save_workbook(wb, output_dir=output_dir)
     logger.info("Excel 报告已生成: %s", path)
@@ -419,7 +424,7 @@ def _cmd_generate_both() -> None:
     _press_any_key()
 
 
-def _show_llm_tui(macro_text: str, expert_text: str) -> None:
+def _show_llm_tui(macro_text: str, expert_text: str, health_text: str = "", penetration_text: str = "") -> None:
     """在 TUI 终端中展示 LLM 增补内容摘要。"""
     W = 72
 
@@ -470,6 +475,30 @@ def _show_llm_tui(macro_text: str, expert_text: str) -> None:
         parts = [p for p in [phase1, phase3] if p]
         body = _trim("\n".join(parts) if parts else expert_text.strip(), 500)
         _print_box("智囊团核心观点", body)
+    print()
+
+    if health_text:
+        # 提取综合评分和评级供 TUI 展示
+        lines = health_text.split("\n")
+        score_line = ""
+        for line in lines:
+            if "总分" in line or "综合评分" in line:
+                score_line = line.strip()[:120]
+                break
+        body = score_line if score_line else _trim(health_text.strip(), 200)
+        _print_box("持仓体检摘要", body)
+    print()
+
+    if penetration_text:
+        # 提取穿透深度分析概要
+        lines = penetration_text.split("\n")
+        summary_line = ""
+        for line in lines:
+            if "集中度" in line or "行业" in line or "国家" in line or "货币" in line:
+                summary_line = line.strip()[:120]
+                break
+        body = summary_line if summary_line else _trim(penetration_text.strip(), 200)
+        _print_box("穿透深度分析概要", body)
     print()
 
 
@@ -538,8 +567,8 @@ def _cmd_generate_full() -> None:
 
         news_data: list = []
         news_llm_meta: dict = {}
-        llm_content = (None, None)
-        llm_cached = (False, False)
+        llm_content = (None, None, None, None)
+        llm_cached = (False, False, False, False)
 
         # 是否强制刷新 LLM 缓存
         _force_llm = False
@@ -569,9 +598,9 @@ def _cmd_generate_full() -> None:
 
             for fut in as_completed([_news_fut, _llm_fut]):
                 if fut is _llm_fut:
-                    llm_macro, llm_expert, macro_cached, expert_cached = fut.result()
-                    llm_content = (llm_macro, llm_expert)
-                    llm_cached = (macro_cached, expert_cached)
+                    llm_macro, llm_expert, llm_health, llm_penetration, macro_cached, expert_cached, health_cached, penetration_cached = fut.result()
+                    llm_content = (llm_macro, llm_expert, llm_health, llm_penetration)
+                    llm_cached = (macro_cached, expert_cached, health_cached, penetration_cached)
                     tag = "缓存" if macro_cached and expert_cached else "LLM"
                     print(f"  [OK] {tag} 内容生成完成")
                 else:
@@ -831,8 +860,11 @@ def _cmd_update_position_cache() -> None:
         index_count = clear_by_prefix("index_")
         expert_count = clear_by_prefix("llm_expert_review_")
         macro_count = clear_by_prefix("llm_global_macro_")
+        health_count = clear_by_prefix("llm_health_check_")
+        penetration_count = clear_by_prefix("llm_penetration_deep_")
         print(f"  [OK] 价格缓存 {price_count} 条 + 指数缓存 {index_count} 条 + "
-              f"智囊团复盘 {expert_count} 条 + 全球政经 {macro_count} 条 已清除")
+              f"智囊团复盘 {expert_count} 条 + 全球政经 {macro_count} 条 + "
+              f"体检报告 {health_count} 条 + 穿透深度 {penetration_count} 条 已清除")
 
         print()
         print(f"  [..]   并行获取 {len(holdings)} 条持仓的价格/净值（最多 5 路并发）...")

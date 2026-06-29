@@ -362,7 +362,7 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
             mock_cat.return_value = {}
             mock_status.return_value = (0, 0, True)
             mock_perf.return_value = {}
-            mock_llm.return_value = ("<p>宏观</p>", "<p>复盘</p>", False, False)
+            mock_llm.return_value = ("<p>宏观</p>", "<p>复盘</p>", None, None, False, False, False, False)
             tmpl = MagicMock()
             tmpl.render.return_value = "<html>ok</html>"
             mock_template.return_value = tmpl

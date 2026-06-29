@@ -595,7 +595,7 @@ def write_penetration_sheet(
         penetration_data: 预计算穿透数据。为 None 时自动计算，提供时跳过
                           内部重复计算，用于调用方已算过一轮的场景
     """
-    ws.title = "资产穿透TOP10"
+    ws.title = "4. 资产穿透TOP10"
     row = write_title_row(ws, 1, "资产穿透 TOP 10", _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 

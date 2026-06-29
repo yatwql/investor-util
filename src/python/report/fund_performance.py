@@ -209,7 +209,7 @@ def write_fund_performance_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    ws.title = "基金业绩分析"
+    ws.title = "5. 基金业绩分析"
 
     row = write_title_row(ws, 1, "基金业绩分析", _NCOLS)
     row = write_header_row(ws, row, _HEADERS)

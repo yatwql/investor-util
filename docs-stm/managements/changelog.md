@@ -4,6 +4,81 @@
 
 ---
 
+## [0.2.30] - 2026-06-29
+
+### Added
+- **模块 A — 穿透深度分析** — 新增 LLM 生成模块，从行业集中度、国别/币种暴露维度
+  对投资组合进行深度分析，含行业集中度仪表盘、外汇风险敞口分析、改进建议
+  - `generate_penetration_deep_analysis()` / `_build_penetration_deep_prompt()` /
+    `_SYSTEM_PENETRATION_DEEP` — 核心生成函数、Prompt 构建、System Prompt
+  - `_penetration_deep_fingerprint()` — 稳定指纹计算（排除行情波动字段）
+  - Excel 页签「10. 穿透深度分析」— 调用 `write_llm_sheets()` 写入第 10 个页签
+  - HTML 报告「十、穿透深度分析」— 模板新增第 10 节，条件渲染穿透分析或占位提示
+  - TUI 展示 — `_show_llm_tui()` 新增穿透分析摘要框
+- **配置项** — `llm_settings.json` 新增 `_penetration_deep` 系列 10 项配置（temperature /
+  timeout / cache_enabled / max_tokens / model / system_prompt / thinking_enabled /
+  thinking_budget / reasoning_effort / output_brief）
+- **缓存支持** — `cache.py` 注册 `llm_penetration_deep` 前缀（24h TTL），菜单 [2] 新增清除
+  `llm_penetration_deep_*` 缓存
+
+### Changed
+- **`generate_all_llm()` 返回 8 元组** — 原 `(macro, expert, health, macro_cached, expert_cached,
+  health_cached)` 扩展为 `(macro, expert, health, penetration, macro_cached, expert_cached,
+  health_cached, penetration_cached)`
+- **`write_llm_sheets()` 签名扩展** — `llm_content` / `llm_cached` / `model_names` /
+  `thinking` 均从 3 元组扩展为 4 元组
+- **`write_html_report()` 签名扩展** — `llm_content` 从 3 元组扩展为 4 元组
+- **`_generate_excel_report()` 同步** — `llm_cached` 默认值从 `(False, False, False)` 扩展为
+  `(False, False, False, False)`
+- **`_cmd_generate_full()` 同步** — 8 元组解包 `llm_macro, llm_expert, llm_health, llm_penetration, ...`
+- **`_show_llm_tui()` 新增 `penetration_text` 参数** — 可选，展示穿透深度摘要
+- **Excel 报告页签名称加序号前缀** — 所有页签名统一添加 `N. ` 前缀（如 `1. 汇总`、
+  `2. 市值核算` ... `10. 穿透深度分析`），与 HTML 报告章节顺序对齐
+
+### Config
+- `data/config/config.json` — `cache_ttl` 新增 `llm_penetration_deep: 86400`
+- `data/config/llm_settings.json` — 新增 `temperature_penetration_deep: 0.5`,
+  `max_tokens_penetration_deep: 4096`, `thinking_enabled_penetration_deep: false` 等 10 项
+- `src/python/config.py` — `_DEFAULT_LLM_SETTINGS` 新增 `_penetration_deep` 系列默认值
+- `src/python/cache.py` — `_CACHE_TTL_DEFAULTS` + `prefix_type_map` 注册 `llm_penetration_deep`
+- `src/python/tui_menu.py` — `_show_llm_config_status()` 模型路由显示新增 `model_health_check`
+  和 `model_penetration_deep`，共 5 条路由
+
+## [0.2.29] - 2026-06-29
+
+### Added
+- **模块 9 — 持仓体检报告** — 新增 LLM 生成模块，从风险分散度/流动性/收益合理性/成本结构
+  四个维度对投资组合进行量化打分并给出改进建议
+  - `generate_health_check()` / `_build_health_check_prompt()` / `_SYSTEM_HEALTH_CHECK` —
+    核心生成函数、Prompt 构建、System Prompt
+  - `_health_check_fingerprint()` — 稳定指纹计算（同智囊团，排除行情波动字段）
+  - Excel 页签「持仓体检报告」— 调用 `write_llm_sheets()` 写入第 9 个页签
+  - HTML 报告「九、持仓体检报告」— 模板新增第 9 节，条件渲染体检内容或占位提示
+  - TUI 展示 — `_show_llm_tui()` 新增体检摘要框（提取综合评分行）
+- **配置项** — `llm_settings.json` 新增 `_health_check` 系列 10 项配置（temperature / timeout /
+  cache_enabled / max_tokens / model / system_prompt / thinking_enabled / thinking_budget /
+  reasoning_effort / output_brief）
+- **缓存支持** — `cache.py` 注册 `llm_health_check` 前缀（2h TTL），菜单 [2] 新增清除
+  `llm_health_check_*` 缓存
+
+### Changed
+- **`generate_all_llm()` 返回 6 元组** — 原 `(macro, expert, macro_cached, expert_cached)`
+  扩展为 `(macro, expert, health, macro_cached, expert_cached, health_cached)`
+- **`write_llm_sheets()` 签名扩展** — `llm_content` / `llm_cached` / `model_names` /
+  `thinking` 均从 2 元组扩展为 3 元组
+- **`write_html_report()` 签名扩展** — `llm_content` 从 2 元组扩展为 3 元组
+- **`_generate_excel_report()` 同步** — `llm_cached` 默认值从 `(False, False)` 扩展为
+  `(False, False, False)`
+- **`_cmd_generate_full()` 同步** — 6 元组解包 `llm_macro, llm_expert, llm_health, ...`
+- **`_show_llm_tui()` 新增 `health_text` 参数** — 可选，展示体检摘要评分
+
+### Config
+- `data/config/config.json` — `cache_ttl` 新增 `llm_health_check: 7200`
+- `data/config/llm_settings.json` — 新增 `temperature_health_check: 0.5`,
+  `max_tokens_health_check: 4096`, `thinking_enabled_health_check: true` 等 10 项
+- `src/python/config.py` — `_DEFAULT_LLM_SETTINGS` 新增 `_health_check` 系列默认值
+- `src/python/cache.py` — `_CACHE_TTL_DEFAULTS` + `prefix_type_map` 注册 `llm_health_check`
+
 ## [0.2.28] - 2026-06-29
 
 ### Added

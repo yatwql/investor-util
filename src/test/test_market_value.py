@@ -1354,7 +1354,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_aw.assert_called_once_with(ws)
 
         # 验证工作表标题
-        self.assertEqual(ws.title, "市值核算")
+        self.assertEqual(ws.title, "2. 市值核算")
 
     @patch("src.python.report.market_value.write_total_row")
     @patch("src.python.report.market_value.write_subtotal_row")

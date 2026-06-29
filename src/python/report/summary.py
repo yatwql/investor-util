@@ -115,7 +115,7 @@ def write_summary_sheet(
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
     """
-    ws.title = "汇总"
+    ws.title = "1. 汇总"
 
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")

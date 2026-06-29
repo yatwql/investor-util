@@ -226,6 +226,8 @@ def cleanup_expired(dry_run: bool = False) -> int:
             "llm_global_macro": "llm_global_macro",   # 全球政经局势：24h TTL
             "llm_expert_review": "llm_expert_review", # 智囊团深度复盘：2h TTL
             "llm_news_correlation": "llm_news_correlation",     # LLM 新闻关联分析：1h TTL
+            "llm_health_check": "llm_health_check",             # 持仓体检报告：2h TTL
+            "llm_penetration_deep": "llm_penetration_deep",     # 穿透深度分析：24h TTL
             "profit_forecast": "profit_forecast",
             "sector_flow": "sector_flow",
             "dividend": "dividend",
@@ -424,6 +426,8 @@ _CACHE_TTL_DEFAULTS: dict[str, float] = {
     "llm_global_macro": 86400,       # 全球政经局势：24 小时
     "llm_expert_review": 7200,       # 智囊团深度复盘：2 小时
     "llm_news_correlation": 3600,           # LLM 新闻关联分析：1 小时
+    "llm_health_check": 7200,               # 持仓体检报告：2 小时
+    "llm_penetration_deep": 86400,           # 穿透深度分析：24 小时
     "profit_forecast": CACHE_DAILY,   # 机构盈利预测：24h
     "sector_flow": 900,               # 行业资金流向：15分钟
     "dividend": CACHE_MONTHLY,        # 分红历史：30天

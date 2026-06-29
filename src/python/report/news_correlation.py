@@ -399,7 +399,7 @@ def write_news_sheet(
         news_data: build_news_data() 返回的数据
         llm_meta: LLM 元数据，含 token_usage / llm_cached / llm_enabled
     """
-    ws.title = "财经新闻热点"
+    ws.title = "6. 财经新闻热点"
 
     # 检测是否有 LLM 分析数据（按 item 中的 llm_analysis 字段）
     has_llm = any(

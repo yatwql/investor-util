@@ -156,13 +156,15 @@ def _get_cache_ttl_llm(subtype: str = "macro") -> float:
         "macro": "llm_global_macro",
         "expert": "llm_expert_review",
         "news": "llm_news_correlation",
+        "health": "llm_health_check",
+        "penetration": "llm_penetration_deep",
     }
     data_type = _key_map.get(subtype, "llm_global_macro")
     try:
         from src.python.cache import get_ttl
         return get_ttl(data_type)
     except Exception:
-        defaults: dict[str, float] = {"macro": 86400, "expert": 7200, "news": 3600}
+        defaults: dict[str, float] = {"macro": 86400, "expert": 7200, "news": 3600, "health": 7200, "penetration": 86400}
         return defaults.get(subtype, 3600)
 
 
@@ -271,6 +273,73 @@ def _expert_fingerprint(
     return _compute_fingerprint(
         total_mv, total_cost, total_profit, total_today_profit,
         categories, penetrated_assets, _stable_details,
+    )
+
+
+def _health_check_fingerprint(
+    total_mv: float = 0,
+    total_cost: float = 0,
+    total_profit: float = 0,
+    total_today_profit: float = 0,
+    holdings_details: list[dict] | None = None,
+    penetrated_assets: list[dict] | None = None,
+    categories: dict | None = None,
+) -> str:
+    """计算持仓体检报告的缓存指纹。
+
+    与 _expert_fingerprint 同样排除行情波动字段，
+    确保小微浮点变化不会让缓存失效。
+    """
+    _stable_details = []
+    if holdings_details:
+        for d in holdings_details:
+            _stable_details.append({
+                "name": d.get("name", ""),
+                "code": d.get("code", ""),
+                "cost": d.get("cost", 0),
+            })
+    return _compute_fingerprint(
+        total_mv, total_cost, total_profit, total_today_profit,
+        categories, penetrated_assets, _stable_details,
+    )
+
+
+def _penetration_deep_fingerprint(
+    total_mv: float = 0,
+    total_cost: float = 0,
+    total_profit: float = 0,
+    total_today_profit: float = 0,
+    holdings_details: list[dict] | None = None,
+    penetrated_assets: list[dict] | None = None,
+    categories: dict | None = None,
+) -> str:
+    """计算穿透深度分析的缓存指纹。
+
+    包含穿透 TOP10 资产列表 + 持仓汇总，排除行情波动字段。
+    确保持仓结构变化时自动失效，价格波动不触发重新生成。
+    """
+    _stable_details = []
+    if holdings_details:
+        for d in holdings_details:
+            _stable_details.append({
+                "name": d.get("name", ""),
+                "code": d.get("code", ""),
+                "cost": d.get("cost", 0),
+            })
+    # 穿透数据本身不含行情字段，直接使用
+    _stable_penetration = []
+    if penetrated_assets:
+        for a in penetrated_assets:
+            _stable_penetration.append({
+                "name": a.get("name", ""),
+                "codes": a.get("codes", []),
+                "mv": a.get("mv", 0),
+                "sector": a.get("sector", ""),
+                "ratio": a.get("ratio", 0),
+            })
+    return _compute_fingerprint(
+        total_mv, total_cost, total_profit, total_today_profit,
+        categories, _stable_details, _stable_penetration,
     )
 
 
@@ -746,6 +815,64 @@ Phase 3（定音锤）指挥官融合辩论给出量化调仓方案和风险提�
 
 约束：数据来自输入不虚构；每个论点引用品种代码和收益率；全 Markdown 输出；引用北京时间。"""
 
+_SYSTEM_HEALTH_CHECK = """你是专业投资组合体检分析师。基于用户持仓数据，从四个维度打分：
+
+## 评分标准（每项满分100）
+
+1. **风险分散度**：评估行业集中度、单品种集中度、穿透资产集中度
+2. **流动性**：评估场内/场外比例、停牌风险、基金封闭期
+3. **收益合理性**：评估盈亏是否合理、与大盘/同类对比
+4. **成本结构**：评估成本分布、浮盈浮亏比
+
+## 输出格式（Markdown）
+
+## 综合评分
+**总分：XX/100** | 评级：优/良/中/差
+
+## 一、风险分散度（XX/100）
+评分依据：…
+扣分项：…
+
+## 二、流动性（XX/100）
+评分依据：…
+风险提示：…
+
+## 三、收益合理性（XX/100）
+评分依据：…
+异常说明：…
+
+## 四、成本结构（XX/100）
+评分依据：…
+优化建议：…
+
+## 改进建议
+按优先级列出3-5条具体可操作建议。
+
+约束：只引用数据中实际存在的品种，不虚构任何数据。每个判断必须有数据支撑。"""
+
+_SYSTEM_PENETRATION_DEEP = """你是穿透深度分析专家。基于用户穿透 TOP10 数据和持仓行业分类，分析以下维度：
+
+## 输出格式（Markdown）
+
+## 行业集中度分析
+- 前 N 大行业及占比
+- 集中度风险判断（>30%标注风险）
+- 行业分散度评分
+
+## 品种集中度分析
+- 前 N 大底层资产及占比
+- 单品种风险判断（>15%标注风险）
+
+## 国别/币种暴露
+- A股/港股/美股 各占比
+- 外汇风险敞口判断
+
+## 综合建议
+- 2-3条调整建议
+
+约束：只引用数据中实际存在的品种，不虚构任何数据。
+每个结论须有具体数据支撑（占比百分比）。"""
+
 _SYSTEM_NEWS_CORRELATION = """你是一位资深金融分析师。以下会给你多批财经新闻（每批最多5条），请逐批分析每条新闻与用户投资组合持仓的关联性。
 
 关联度标准：
@@ -909,6 +1036,150 @@ def _build_review_prompt(
     )
 
 
+def _build_health_check_prompt(
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    total_today_profit: float,
+    holdings_count: int,
+    categories: dict,
+    penetrated_assets: Optional[list[dict]] = None,
+    holdings_details: Optional[list[dict]] = None,
+) -> str:
+    """构建模块 9（持仓体检报告）的用户提示词。
+
+    要求 LLM 从风险分散度/流动性/收益合理性/成本结构四维度打分。
+    """
+    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
+
+    # 持仓明细
+    holdings_text = ""
+    if holdings_details:
+        lines = []
+        for h in holdings_details[:30]:
+            code = h.get("code", "")
+            mv = h.get("market_value", 0)
+            profit = h.get("profit", 0)
+            rate = h.get("profit_rate", 0)
+            cost = h.get("cost", 0)
+            lines.append(
+                f"{code} 成本{_fmt_wan(cost)} 市值{_fmt_wan(mv)} "
+                f"盈亏{_fmt_wan(profit)}({rate:+.2f}%)"
+            )
+        holdings_text = "\n".join(lines)
+
+    # 穿透 TOP10
+    pen_text = ""
+    if penetrated_assets:
+        assets = []
+        for asset in penetrated_assets[:10]:
+            name = asset.get("name", "")
+            codes = ",".join(asset.get("codes", []))
+            mv = asset.get("mv", 0)
+            sector = asset.get("sector", "--")
+            assets.append(f"{name}({codes}){_fmt_wan(mv)}/{sector}")
+        pen_text = " | 穿透:" + " ".join(assets)
+
+    return (
+        f"【当前时间】{now_bj}（北京时间）\n"
+        f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} "
+        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f} 今日{total_today_profit:+,.0f}\n"
+        f"【分布】{' '.join(cat_parts)}{pen_text}\n"
+        f"\n"
+        f"【持仓明细】\n"
+        f"{holdings_text}\n"
+        f"\n"
+        f"请从以下四个维度对以上投资组合进行全面体检并打分：\n"
+        f"1. 风险分散度 — 行业/品种集中度\n"
+        f"2. 流动性 — 场内场外/停牌/封闭期\n"
+        f"3. 收益合理性 — 盈亏是否与市场匹配\n"
+        f"4. 成本结构 — 成本分布与浮盈浮亏比\n"
+        f"按要求的输出格式给出评分和改进建议。"
+    )
+
+
+def _build_penetration_deep_prompt(
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    holdings_count: int,
+    categories: dict,
+    penetrated_assets: Optional[list[dict]] = None,
+    holdings_details: Optional[list[dict]] = None,
+) -> str:
+    """构建模块 A（穿透深度分析）的用户提示词。
+
+    要求 LLM 基于穿透 TOP10 和持仓行业分类，
+    分析行业集中度、品种集中度、国别/币种暴露。
+    """
+    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
+
+    # 持仓明细
+    holdings_text = ""
+    if holdings_details:
+        lines = []
+        for h in holdings_details[:30]:
+            code = h.get("code", "")
+            mv = h.get("market_value", 0)
+            profit = h.get("profit", 0)
+            cost = h.get("cost", 0)
+            lines.append(
+                f"{code} 成本{_fmt_wan(cost)} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}"
+            )
+        holdings_text = "\n".join(lines)
+
+    # 穿透 TOP10 明细（包含行业/板块）
+    pen_list = ""
+    if penetrated_assets:
+        items = []
+        for a in penetrated_assets[:10]:
+            name = a.get("name", "")
+            codes = ",".join(a.get("codes", []))
+            mv = a.get("mv", 0)
+            ratio = a.get("ratio", 0)
+            sector = a.get("sector", "--")
+            items.append(f"{name}({codes}) 市值{_fmt_wan(mv)} 占比{ratio:.1f}% 行业:{sector}")
+        pen_list = "\n".join(items)
+
+    # 根据代码前缀推断国别/币种
+    _country_map: dict[str, str] = {"hk": "港股", "us": "美股", "sh": "A股", "sz": "A股", "bj": "A股"}
+    country_exposure: dict[str, float] = {}
+    if holdings_details:
+        for h in holdings_details:
+            code = h.get("code", "")
+            mv = h.get("market_value", 0)
+            prefix = code.split(".")[0].split("_")[0].split("-")[0].lower() if "." in code else code[:2].lower()
+            country = _country_map.get(prefix, "其他")
+            if prefix.startswith("sh") or prefix.startswith("sz") or prefix.startswith("bj"):
+                country = "A股"
+            country_exposure[country] = country_exposure.get(country, 0) + mv
+
+    country_lines = [f"{k}: {_fmt_wan(v)}" for k, v in sorted(country_exposure.items(), key=lambda x: -x[1])]
+
+    return (
+        f"【当前时间】{now_bj}（北京时间）\n"
+        f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} 成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}\n"
+        f"【分布】{' '.join(cat_parts)}\n"
+        f"\n"
+        f"【持仓明细】\n"
+        f"{holdings_text}\n"
+        f"\n"
+        f"【穿透TOP10底层资产】\n"
+        f"{pen_list}\n"
+        f"\n"
+        f"【国别/币种分布】\n"
+        f"{chr(10).join(country_lines)}\n"
+        f"\n"
+        f"请基于以上数据，从以下维度进行穿透深度分析：\n"
+        f"1. 行业集中度评估 — 前 N 大行业及占比，>30%时标注风险\n"
+        f"2. 品种集中度评估 — 前 N 大底层资产及占比\n"
+        f"3. 国别/币种暴露 — 外汇风险敞口判断\n"
+        f"按要求的输出格式给出分析结论和建议。"
+    )
+
+
 def generate_global_macro(
     a_indices: dict[str, dict[str, Any]],
     us_indices: dict[str, dict[str, Any]],
@@ -1032,6 +1303,125 @@ def generate_expert_review(
         config_field="max_tokens_expert_review",
         http_client=http_client,
         thinking_enabled=llm_config.get("thinking_enabled_expert_review", False),
+    )
+
+
+def generate_health_check(
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    total_today_profit: float,
+    holdings_count: int,
+    categories: dict,
+    penetrated_assets: Optional[list[dict]] = None,
+    holdings_details: Optional[list[dict]] = None,
+    force: bool = False,
+    http_client: httpx.Client | None = None,
+) -> tuple[Optional[str], bool]:
+    """生成模块 9：持仓体检报告。
+
+    从风险分散度/流动性/收益合理性/成本结构四维度打分并给出改进建议。
+
+    Returns:
+        (HTML 格式的体检报告或 None, 是否来自缓存)
+    """
+    from src.python.config import get_llm_config
+
+    llm_config = get_llm_config()
+    if llm_config is None:
+        logger.info("LLM 未配置，模块 9 跳过")
+        return (None, False)
+
+    cache_enabled = llm_config.get("cache_enabled_health_check", True)
+    fingerprint = _health_check_fingerprint(
+        total_mv=total_mv, total_cost=total_cost,
+        total_profit=total_profit, total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
+        categories=categories,
+    )
+    cache_key = _CACHE_PREFIX_LLM + f"health_check_{fingerprint}"
+
+    system_prompt = llm_config.get("system_prompt_health_check") or _SYSTEM_HEALTH_CHECK
+    if llm_config.get("output_brief_health_check", False):
+        system_prompt += "\n（精简模式，输出 300 字以内。）"
+
+    user_prompt = _build_health_check_prompt(
+        total_mv, total_cost, total_profit, total_today_profit,
+        holdings_count, categories, penetrated_assets,
+        holdings_details=holdings_details,
+    )
+
+    return _generate_llm_content(
+        llm_config, cache_key, _get_cache_ttl_llm("health"),
+        system_prompt, user_prompt, cache_enabled, force,
+        max_tokens=llm_config.get("max_tokens_health_check") or llm_config.get("max_tokens", 4096),
+        timeout=llm_config.get("timeout_health_check", 120.0),
+        temperature=llm_config.get("temperature_health_check"),
+        model=llm_config.get("model_health_check"),
+        config_field="max_tokens_health_check",
+        http_client=http_client,
+        thinking_enabled=llm_config.get("thinking_enabled_health_check", False),
+    )
+
+
+def generate_penetration_deep_analysis(
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    total_today_profit: float,
+    holdings_count: int,
+    categories: dict,
+    penetrated_assets: Optional[list[dict]] = None,
+    holdings_details: Optional[list[dict]] = None,
+    force: bool = False,
+    http_client: httpx.Client | None = None,
+) -> tuple[Optional[str], bool]:
+    """生成模块 A：穿透深度分析。
+
+    分析行业集中度、品种集中度、国别/币种暴露。
+    缓存 TTL 设为 1 天，使用持仓数据做指纹。
+
+    Returns:
+        (HTML 格式的分析报告或 None, 是否来自缓存)
+    """
+    from src.python.config import get_llm_config
+
+    llm_config = get_llm_config()
+    if llm_config is None:
+        logger.info("LLM 未配置，模块 A 跳过")
+        return (None, False)
+
+    cache_enabled = llm_config.get("cache_enabled_penetration_deep", True)
+    fingerprint = _penetration_deep_fingerprint(
+        total_mv=total_mv, total_cost=total_cost,
+        total_profit=total_profit, total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
+        categories=categories,
+    )
+    cache_key = _CACHE_PREFIX_LLM + f"penetration_deep_{fingerprint}"
+
+    system_prompt = llm_config.get("system_prompt_penetration_deep") or _SYSTEM_PENETRATION_DEEP
+    if llm_config.get("output_brief_penetration_deep", False):
+        system_prompt += "\n（精简模式，输出 300 字以内。）"
+
+    user_prompt = _build_penetration_deep_prompt(
+        total_mv, total_cost, total_profit,
+        holdings_count, categories, penetrated_assets,
+        holdings_details=holdings_details,
+    )
+
+    return _generate_llm_content(
+        llm_config, cache_key, _get_cache_ttl_llm("penetration"),
+        system_prompt, user_prompt, cache_enabled, force,
+        max_tokens=llm_config.get("max_tokens_penetration_deep") or llm_config.get("max_tokens", 2048),
+        timeout=llm_config.get("timeout_penetration_deep", 90.0),
+        temperature=llm_config.get("temperature_penetration_deep"),
+        model=llm_config.get("model_penetration_deep"),
+        config_field="max_tokens_penetration_deep",
+        http_client=http_client,
+        thinking_enabled=llm_config.get("thinking_enabled_penetration_deep", False),
     )
 
 
@@ -1382,35 +1772,20 @@ def generate_all_llm(
     holdings_details: Optional[list[dict]] = None,
     sector_flow: Optional[list[dict]] = None,
     force: bool = False,
-) -> tuple[Optional[str], Optional[str], bool, bool]:
-    """并行生成模块 7（全球政经）+ 模块 8（智囊团复盘）。
+) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], bool, bool, bool, bool]:
+    """并行生成模块 7（全球政经）+ 模块 8（智囊团复盘）+ 模块 9（持仓体检）+ 模块 A（穿透深度）。
 
-    使用 ThreadPoolExecutor(max_workers=2) 并发调用两个 LLM 生成任务。
+    使用 ThreadPoolExecutor(max_workers=4) 并发调用四个 LLM 生成任务。
     每个工作线程创建独立的 httpx.Client，避免全局共享连接池的线程安全问题。
 
-    Args:
-        a_indices: A 股指数列表
-        us_indices: 美股指数列表
-        total_mv: 总市值
-        total_cost: 总成本
-        total_profit: 总盈亏
-        total_today_profit: 本日盈亏
-        holdings_count: 持仓总数
-        categories: 分类计数
-        penetrated_assets: 穿透 TOP10 资产列表（可选）
-        holdings_details: 持仓明细列表（可选）
-        sector_flow: 行业资金流向数据（可选），注入全球政经 prompt
-        force: 为 True 时跳过缓存强制重新生成
-
     Returns:
-        (macro_html, expert_html, macro_cached, expert_cached) 四元组
-        各自可能为 None/False
+        (macro_html, expert_html, health_html, penetration_html,
+         macro_cached, expert_cached, health_cached, penetration_cached) 八元组
     """
 
     from src.python.config import get_llm_config
 
     def _run_macro() -> tuple[Optional[str], bool]:
-        """在线程中生成模块 7，使用独立 httpx.Client。"""
         logger.info("正在生成：全球政经局势分析...")
         client = httpx.Client(timeout=_LLM_TIMEOUT)
         try:
@@ -1423,7 +1798,6 @@ def generate_all_llm(
             client.close()
 
     def _run_expert() -> tuple[Optional[str], bool]:
-        """在线程中生成模块 8，使用独立 httpx.Client。"""
         logger.info("正在生成：智囊团深度复盘（耗时较长，请耐心等待）...")
         client = httpx.Client(timeout=_LLM_TIMEOUT)
         try:
@@ -1436,31 +1810,78 @@ def generate_all_llm(
         finally:
             client.close()
 
+    def _run_health() -> tuple[Optional[str], bool]:
+        logger.info("正在生成：持仓体检报告（耗时较长，请耐心等待）...")
+        client = httpx.Client(timeout=_LLM_TIMEOUT)
+        try:
+            return generate_health_check(
+                total_mv, total_cost, total_profit, total_today_profit,
+                holdings_count, categories, penetrated_assets,
+                holdings_details=holdings_details, force=force,
+                http_client=client,
+            )
+        finally:
+            client.close()
+
+    def _run_penetration() -> tuple[Optional[str], bool]:
+        logger.info("正在生成：穿透深度分析...")
+        client = httpx.Client(timeout=_LLM_TIMEOUT)
+        try:
+            return generate_penetration_deep_analysis(
+                total_mv, total_cost, total_profit, total_today_profit,
+                holdings_count, categories, penetrated_assets,
+                holdings_details=holdings_details, force=force,
+                http_client=client,
+            )
+        finally:
+            client.close()
+
     macro_result: Optional[str] = None
     expert_result: Optional[str] = None
+    health_result: Optional[str] = None
+    penetration_result: Optional[str] = None
     macro_cached_flag: bool = False
     expert_cached_flag: bool = False
+    health_cached_flag: bool = False
+    penetration_cached_flag: bool = False
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         macro_future = executor.submit(_run_macro)
         expert_future = executor.submit(_run_expert)
+        health_future = executor.submit(_run_health)
+        penetration_future = executor.submit(_run_penetration)
 
-        for future in as_completed([macro_future, expert_future]):
+        fut_map = {
+            macro_future: ("macro", "宏观"),
+            expert_future: ("expert", "智囊团"),
+            health_future: ("health", "体检报告"),
+            penetration_future: ("penetration", "穿透深度分析"),
+        }
+
+        for future in as_completed([macro_future, expert_future, health_future, penetration_future]):
             try:
                 result, from_cache = future.result()
-                if future == macro_future:
+                key, label = fut_map[future]
+                if key == "macro":
                     macro_result = result
                     macro_cached_flag = from_cache
-                    logger.info("全球政经局势分析生成完成" if result
-                                else "全球政经局势分析生成失败（跳过）")
-                else:
+                elif key == "expert":
                     expert_result = result
                     expert_cached_flag = from_cache
-                    logger.info("智囊团深度复盘生成完成" if result
-                                else "智囊团深度复盘生成失败（跳过）")
+                elif key == "health":
+                    health_result = result
+                    health_cached_flag = from_cache
+                else:
+                    penetration_result = result
+                    penetration_cached_flag = from_cache
+                logger.info("%s生成完成" if result else "%s生成失败（跳过）", label)
             except Exception:
                 logger.warning("LLM 生成线程异常", exc_info=True)
 
-    logger.info("LLM 生成完成: 宏观=%s, 智囊团=%s",
-                "OK" if macro_result else "跳过", "OK" if expert_result else "跳过")
-    return macro_result, expert_result, macro_cached_flag, expert_cached_flag
+    logger.info("LLM 生成完成: 宏观=%s, 智囊团=%s, 体检=%s, 穿透=%s",
+                "OK" if macro_result else "跳过",
+                "OK" if expert_result else "跳过",
+                "OK" if health_result else "跳过",
+                "OK" if penetration_result else "跳过")
+    return (macro_result, expert_result, health_result, penetration_result,
+            macro_cached_flag, expert_cached_flag, health_cached_flag, penetration_cached_flag)

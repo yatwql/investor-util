@@ -484,35 +484,51 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 
 
+@patch("src.python.llm_client.generate_penetration_deep_analysis")
+@patch("src.python.llm_client.generate_health_check")
 @patch("src.python.llm_client.generate_global_macro")
 @patch("src.python.llm_client.generate_expert_review")
 class TestGenerateAllLlm(unittest.TestCase):
     """测试并行生成函数。"""
 
-    def test_force_passthrough(self, mock_expert: MagicMock, mock_macro: MagicMock) -> None:
+    def test_force_passthrough(self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock) -> None:
         mock_macro.return_value = ("<p>宏</p>", False)
         mock_expert.return_value = ("<p>策略</p>", False)
+        mock_health.return_value = ("<p>体检</p>", False)
+        mock_penetration.return_value = ("<p>穿透</p>", False)
 
-        macro, expert, mc, ec = generate_all_llm([], [], 0, 0, 0, 0, 0, {}, force=True)
+        macro, expert, health, penetration, mc, ec, hc, pc = generate_all_llm([], [], 0, 0, 0, 0, 0, {}, force=True)
 
         self.assertEqual(macro, "<p>宏</p>")
         self.assertEqual(expert, "<p>策略</p>")
+        self.assertEqual(health, "<p>体检</p>")
+        self.assertEqual(penetration, "<p>穿透</p>")
         self.assertFalse(mc)
         self.assertFalse(ec)
+        self.assertFalse(hc)
+        self.assertFalse(pc)
         # 验证 force=True 被透传
         _, kwargs_m = mock_macro.call_args
         _, kwargs_e = mock_expert.call_args
         self.assertTrue(kwargs_m.get("force"))
         self.assertTrue(kwargs_e.get("force"))
 
-    def test_force_false_default(self, mock_expert: MagicMock, mock_macro: MagicMock) -> None:
+    def test_force_false_default(self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock) -> None:
         mock_macro.return_value = ("<p>m</p>", False)
         mock_expert.return_value = ("<p>e</p>", False)
+        mock_health.return_value = ("<p>h</p>", False)
+        mock_penetration.return_value = ("<p>p</p>", False)
 
-        _, _, mc, ec = generate_all_llm([], [], 0, 0, 0, 0, 0, {})
+        macro, expert, health, penetration, mc, ec, hc, pc = generate_all_llm([], [], 0, 0, 0, 0, 0, {})
 
+        self.assertIsNotNone(macro)
+        self.assertIsNotNone(expert)
+        self.assertIsNotNone(health)
+        self.assertIsNotNone(penetration)
         self.assertFalse(mc)
         self.assertFalse(ec)
+        self.assertFalse(hc)
+        self.assertFalse(pc)
         _, kwargs_m = mock_macro.call_args
         self.assertFalse(kwargs_m.get("force"))
 

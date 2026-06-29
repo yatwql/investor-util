@@ -206,31 +206,35 @@ class TestWriteLlmSheets(unittest.TestCase):
         self.wb = Workbook()
 
     def _get_llm_sheets(self):
-        """返回 write_llm_sheets 创建的两个 sheet（跳过 Workbook 默认 sheet）。"""
-        return self.wb.worksheets[-2:]
+        """返回 write_llm_sheets 创建的四个 sheet（跳过 Workbook 默认 sheet）。"""
+        return self.wb.worksheets[-4:]
 
     def test_sheet_titles(self):
-        """两个 sheet 标题正确。"""
-        write_llm_sheets(self.wb, ("<p>宏观</p>", "<p>复盘</p>"))
+        """四个 sheet 标题正确。"""
+        write_llm_sheets(self.wb, ("<p>宏观</p>", "<p>复盘</p>", None, None))
         sheet_names = [ws.title for ws in self.wb.worksheets]
-        self.assertIn("全球政经局势", sheet_names)
-        self.assertIn("智囊团深度复盘", sheet_names)
+        self.assertIn("7. 全球政经局势", sheet_names)
+        self.assertIn("8. 智囊团深度复盘", sheet_names)
+        self.assertIn("9. 持仓体检报告", sheet_names)
+        self.assertIn("10. 穿透深度分析", sheet_names)
 
-    def test_return_text_pair(self):
-        """返回 (text7, text8) 纯文本二元组。"""
-        text7, text8 = write_llm_sheets(
-            self.wb, ("<p>宏观分析</p>", "<p>复盘内容</p>"))
+    def test_return_text_quad(self):
+        """返回 (text7, text8, text9, textA) 纯文本四元组。"""
+        text7, text8, text9, textA = write_llm_sheets(
+            self.wb, ("<p>宏观分析</p>", "<p>复盘内容</p>", "<p>体检结果</p>", "<p>穿透分析</p>"))
         self.assertEqual(text7, "宏观分析")
         self.assertEqual(text8, "复盘内容")
+        self.assertEqual(text9, "体检结果")
+        self.assertEqual(textA, "穿透分析")
 
     def test_cache_macro_only(self):
         """macro 缓存 + expert 未缓存 → sheet7 有提示行，sheet8 无。"""
         write_llm_sheets(
             self.wb,
-            ("<p>宏观内容</p>", "<p>复盘内容</p>"),
-            llm_cached=(True, False),
+            ("<p>宏观内容</p>", "<p>复盘内容</p>", None, None),
+            llm_cached=(True, False, False, False),
         )
-        ws7, ws8 = self._get_llm_sheets()
+        ws7, ws8, ws9, wsA = self._get_llm_sheets()
 
         # sheet7：第 4 行应有缓存提示
         self.assertIn("LLM缓存", str(ws7.cell(row=4, column=1).value or ""))
@@ -241,26 +245,28 @@ class TestWriteLlmSheets(unittest.TestCase):
         """macro + expert 都来自缓存 → 两个 sheet 都有提示。"""
         write_llm_sheets(
             self.wb,
-            ("<p>宏观</p>", "<p>复盘</p>"),
-            llm_cached=(True, True),
+            ("<p>宏观</p>", "<p>复盘</p>", None, None),
+            llm_cached=(True, True, False, False),
         )
-        ws7, ws8 = self._get_llm_sheets()
+        ws7, ws8, ws9, wsA = self._get_llm_sheets()
         self.assertIn("LLM缓存", str(ws7.cell(row=4, column=1).value or ""))
         self.assertIn("LLM缓存", str(ws8.cell(row=4, column=1).value or ""))
 
     def test_cache_off_default(self):
-        """默认 llm_cached=(False, False) → 无缓存提示。"""
-        write_llm_sheets(self.wb, ("<p>宏观</p>", "<p>复盘</p>"))
-        ws7, ws8 = self._get_llm_sheets()
+        """默认 llm_cached=(False, False, False, False) → 无缓存提示。"""
+        write_llm_sheets(self.wb, ("<p>宏观</p>", "<p>复盘</p>", None, None))
+        ws7, ws8, ws9, wsA = self._get_llm_sheets()
         self.assertIsNone(ws7.cell(row=4, column=1).value)
         self.assertIsNone(ws8.cell(row=4, column=1).value)
 
     def test_content_none(self):
-        """content=(None, None) → 占位符，不崩溃。"""
-        text7, text8 = write_llm_sheets(self.wb, (None, None))
+        """content=(None, None, None, None) → 占位符，不崩溃。"""
+        text7, text8, text9, textA = write_llm_sheets(self.wb, (None, None, None, None))
         self.assertEqual(text7, "")
         self.assertEqual(text8, "")
-        ws7, ws8 = self._get_llm_sheets()
+        self.assertEqual(text9, "")
+        self.assertEqual(textA, "")
+        ws7, ws8, ws9, wsA = self._get_llm_sheets()
         self.assertIn("LLM API Key", str(ws7.cell(row=2, column=1).value or ""))
         self.assertIn("LLM API Key", str(ws8.cell(row=2, column=1).value or ""))
 
