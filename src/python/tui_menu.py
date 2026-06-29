@@ -64,7 +64,7 @@ def _print_sep(char: str = "=", width: int = 56) -> None:
 def _print_header() -> None:
     """打印程序标题头（仅启动时一次）。"""
     _print_sep()
-    print("           投资分析报告生成系统")
+    print("        个人投资分析报告生成小助手")
     _print_sep()
 
 

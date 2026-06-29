@@ -115,7 +115,7 @@ class TestPrintFunctions(unittest.TestCase):
         """标题头包含系统名称。"""
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             _print_header()
-            self.assertIn("投资分析报告生成系统", mock_out.getvalue())
+            self.assertIn("个人投资分析报告生成小助手", mock_out.getvalue())
 
 
 class TestConfigCache(unittest.TestCase):
