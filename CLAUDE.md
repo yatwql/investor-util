@@ -6,6 +6,7 @@ Python TUI 投资分析工具：读取持仓 Excel → 生成 Excel/HTML 报告�
 
 ## Conventions
 
+- **默认分支**：`master`
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：`src/test/test_*.py`，执行 `pytest src/test/`
