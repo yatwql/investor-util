@@ -519,4 +519,4 @@ def write_news_sheet(
         llm_col = _NCOLS + 1
         ws.column_dimensions[get_column_letter(llm_col)].width = 30
     llm_info = f"，LLM 分析 {sum(1 for n in news_data if n.get('llm_analysis'))} 条" if has_llm else ""
-    logger.info("新闻关联分析页签写入完成%s，共 %d 条", llm_info, len(news_data))
+    logger.info("财经新闻热点与持仓关联分析写入完成%s，共 %d 条", llm_info, len(news_data))

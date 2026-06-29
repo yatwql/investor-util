@@ -1,4 +1,4 @@
-"""分类汇总模块 — 报告第 3 页。
+"""持仓分类模块 — 报告第 3 页。
 
 按资产属性（股票/基金/债券/现金）和投资分类（主动/被动/固收等）分组，
 统计各类的数量、市值、成本、盈亏、收益率和本日盈亏。
@@ -108,7 +108,7 @@ def write_category_sheet(
     holdings: List[Holding],
     details: List[DetailRow],
 ) -> None:
-    """写入分类汇总页签。
+    """写入持仓分类表。
 
     分类层级：
       资产属性 → 投资分类 → 持仓明细 → 小计 → 总计
@@ -119,7 +119,7 @@ def write_category_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    ws.title = "3.分类汇总表"
+    ws.title = "3.持仓分类表"
 
     # 建立 code → detail 映射
     detail_map: dict[str, DetailRow] = {}
@@ -142,7 +142,7 @@ def write_category_sheet(
     )
 
     # 写入标题和表头
-    row = write_title_row(ws, 1, "分类汇总表", _NCOLS)
+    row = write_title_row(ws, 1, "持仓分类表", _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
@@ -225,7 +225,7 @@ def write_category_sheet(
     freeze_header(ws, 2)
     auto_width(ws)
 
-    logger.info("分类汇总页签写入完成，共 %d 个分组，%d 条持仓",
+    logger.info("持仓分类表写入完成，共 %d 个分组，%d 条持仓",
                 len(sorted_groups), len(holdings))
 
 

@@ -570,7 +570,7 @@ def _apply_price_type_colors(ws, start_row: int, end_row: int) -> None:
 def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
                              today_str: str = "",
                              details: List[DetailRow] | None = None) -> tuple[float, float, float, float, List[DetailRow]]:
-    """写入市值核算页签，返回汇总数据供汇总页签使用。
+    """写入市值核算明细表，返回汇总数据供汇总页签使用。
 
     Args:
         ws: 目标工作表
@@ -643,7 +643,7 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
     freeze_header(ws, 2)
     auto_width(ws)
 
-    logger.info("市值核算页签写入完成，共 %d 个账户，%d 条持仓",
+    logger.info("市值核算明细表写入完成，共 %d 个账户，%d 条持仓",
                 len(accounts), len(details))
 
     return grand_mv, grand_cost, grand_profit, grand_today, details

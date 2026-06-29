@@ -136,7 +136,7 @@ def _write_content_sheet(
     model_name: str = "",
     thinking_enabled: bool = False,
 ) -> None:
-    """写入一个 LLM 内容页签。
+    """写入一个 LLM 分析章节。
 
     结构：
       - 第 1 行：标题（合并 A1:B1，居中标题样式）
@@ -226,7 +226,7 @@ def write_llm_sheets(
     model_names: tuple[str, str, str, str] = ("", "", "", ""),
     thinking: tuple[bool, bool, bool, bool] = (False, False, False, False),
 ) -> tuple[str, str, str, str]:
-    """写入 LLM 内容页签（全球政经局势 & 智囊团深度复盘 & 持仓体检报告 & 穿透深度分析）。
+    """写入 LLM 分析章节（全球政经局势 & 智囊团深度复盘 & 持仓体检报告 & 穿透深度分析）。
 
     调用方必须预先生成 llm_content，本函数仅负责写入 Excel。
 
@@ -259,7 +259,7 @@ def write_llm_sheets(
     _write_content_sheet(ws9, "9.持仓体检报告", content9, from_cache=health_check_cached, model_name=name9, thinking_enabled=think9)
     _write_content_sheet(wsA, "10.穿透深度分析", contentA, from_cache=penetration_deep_cached, model_name=nameA, thinking_enabled=thinkA)
 
-    logger.info("LLM 内容页签写入完成（含穿透深度分析）")
+    logger.info("LLM 分析章节写入完成（含穿透深度分析）")
 
     # 返回纯文本内容，供 TUI 展示
     return (

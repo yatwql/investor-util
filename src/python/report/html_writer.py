@@ -243,8 +243,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
                 "change_pct": idx.get("change_pct", 0),
             })
 
-    # ── 5) 分类汇总数据 ─────────────────────────────────────
-    print("  [..] 正在生成分类汇总...")
+    # ── 5) 持仓分类数据 ─────────────────────────────────────
+    print("  [..] 正在生成持仓分类表...")
     cat_data = _build_category_data(holdings, details)
 
     # ── 6) 资产穿透 TOP10 ──────────────────────────────────
@@ -438,7 +438,7 @@ def _build_category_data(
     holdings: List[Holding],
     details: List[DetailRow],
 ) -> List[Dict[str, Any]]:
-    """构建分类汇总数据结构。
+    """构建持仓分类表数据结构。
 
     按 (资产属性, 投资分类) 分组，汇总每组内的明细数据，
     按 股票→基金→债券→现金 顺序排列。
@@ -448,7 +448,7 @@ def _build_category_data(
         details: 市值核算明细行列表
 
     Returns:
-        分类汇总数据列表，每个元素含 property / sub_category / items / 小计字段
+        持仓分类数据列表，每个元素含 property / sub_category / items / 小计字段
     """
     detail_map: Dict[str, DetailRow] = {d.code: d for d in details}
 

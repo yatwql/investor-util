@@ -199,7 +199,7 @@ def write_fund_performance_sheet(
     holdings: List[Holding],
     details: List[DetailRow],
 ) -> None:
-    """写入基金业绩分析页签。
+    """写入基金业绩分析。
 
     对每只基金调 API 获取区间收益和同类排名，汇总为 11 列表格。
     评级同时考虑同类排名百分位和业绩比较基准（超额收益评分）。
@@ -356,7 +356,7 @@ def write_fund_performance_sheet(
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
 
-    logger.info("基金业绩分析页签写入完成，%d/%d 只基金获取成功",
+    logger.info("基金业绩分析写入完成，%d/%d 只基金获取成功",
                 success_count, fund_count)
 
 

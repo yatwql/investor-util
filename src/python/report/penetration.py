@@ -584,7 +584,7 @@ def write_penetration_sheet(
     details: List[DetailRow],
     penetration_data: dict | None = None,
 ) -> None:
-    """写入资产穿透 TOP10 页签。
+    """写入资产穿透TOP10。
 
     用 :func:`compute_penetration_top10` 计算数据后写入 Excel 行。
 
@@ -681,7 +681,7 @@ def write_penetration_sheet(
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=40)
 
-    logger.info("资产穿透 TOP10 页签写入完成，合并 %d 个标的",
+    logger.info("资产穿透TOP10写入完成，合并 %d 个标的",
                 summary["merged_count"])
 
 

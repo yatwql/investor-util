@@ -96,7 +96,7 @@ class TestStripHtml(unittest.TestCase):
 
 
 class TestWriteContentSheet(unittest.TestCase):
-    """测试单个 LLM 内容页签的写入行为。"""
+    """测试单个 LLM 分析章节的写入行为。"""
 
     def setUp(self):
         self.wb = Workbook()

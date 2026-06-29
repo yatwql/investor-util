@@ -102,7 +102,7 @@ def write_summary_sheet(
     a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
 ) -> None:
-    """写入汇总页签。
+    """写入投资分析汇总。
 
     Args:
         ws: 目标工作表
@@ -253,7 +253,7 @@ def write_summary_sheet(
 
     freeze_header(ws, 2)
     auto_width(ws)
-    logger.info("汇总页签写入完成，共 %d 行", row)
+    logger.info("投资分析汇总写入完成，共 %d 行", row)
 
 
 def write_llm_usage_block(ws: Worksheet,

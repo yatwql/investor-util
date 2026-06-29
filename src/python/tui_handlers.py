@@ -390,7 +390,7 @@ def _generate_excel_report(
         from src.python.report.category import write_category_sheet
     except ImportError:
         write_category_sheet = None
-        _add_error("分类汇总模块缺失 (category)")
+        _add_error("持仓分类模块缺失 (category)")
 
     try:
         from src.python.report.market_value import (
@@ -424,7 +424,7 @@ def _generate_excel_report(
     # 预创建全部页签，确保 1→10 数字顺序从左到右
     ws1 = wb.create_sheet()  # 1. 汇总
     ws2 = wb.create_sheet()  # 2. 市值核算
-    ws3 = wb.create_sheet()  # 3. 分类汇总
+    ws3 = wb.create_sheet()  # 3. 持仓分类
     ws4 = wb.create_sheet()  # 4. 资产穿透TOP10
     ws5 = wb.create_sheet()  # 5. 基金业绩分析
     ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点
@@ -471,8 +471,8 @@ def _generate_excel_report(
                      categories=categories, update_status=up_status,
                      a_indices=a_indices, us_indices=us_indices)
 
-    with _Timer("分类汇总表"):
-        _call_sheet("分类汇总表", write_category_sheet, ws3, holdings, details)
+    with _Timer("持仓分类表"):
+        _call_sheet("持仓分类表", write_category_sheet, ws3, holdings, details)
 
     with _Timer("资产穿透TOP10"):
         pen_result = compute_penetration_top10(holdings, details) if compute_penetration_top10 else {}
