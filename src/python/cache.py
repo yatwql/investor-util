@@ -177,25 +177,31 @@ def get_cache_dir() -> str:
 
 
 def get_cache_stats() -> dict:
-    """统计缓存目录：文件总数、总大小、按前缀分组数量。
+    """统计缓存目录：文件总数、总大小、按前缀分组数量、最大文件 TOP 10。
 
     Returns:
-        {total_files, total_size_bytes, by_prefix: {prefix: count}}
+        {total_files, total_size_bytes, by_prefix: {prefix: count},
+         top_by_size: [(key, size_bytes), ...]}
     """
-    stats: dict = {"total_files": 0, "total_size_bytes": 0, "by_prefix": {}}
+    stats: dict = {"total_files": 0, "total_size_bytes": 0, "by_prefix": {}, "top_by_size": []}
     if not os.path.isdir(_CACHE_DIR):
         return stats
+    _sized_items: list[tuple[str, int]] = []
     for fname in os.listdir(_CACHE_DIR):
         if not fname.endswith(".json"):
             continue
         fpath = os.path.join(_CACHE_DIR, fname)
         try:
+            size = os.path.getsize(fpath)
             stats["total_files"] += 1
-            stats["total_size_bytes"] += os.path.getsize(fpath)
+            stats["total_size_bytes"] += size
             prefix = fname.split("_", 1)[0] if "_" in fname else "other"
             stats["by_prefix"][prefix] = stats["by_prefix"].get(prefix, 0) + 1
+            _sized_items.append((fname[:-5], size))  # trim .json
         except OSError:
             pass
+    _sized_items.sort(key=lambda x: -x[1])
+    stats["top_by_size"] = _sized_items[:10]
     return stats
 
 
@@ -226,6 +232,7 @@ def cleanup_expired(dry_run: bool = False) -> int:
             "llm_global_macro": "llm_global_macro",   # 全球政经局势：24h TTL
             "llm_expert_review": "llm_expert_review", # 智囊团深度复盘：2h TTL
             "llm_news_correlation": "llm_news_correlation",     # LLM 新闻关联分析：1h TTL
+            "llm_news_item": "llm_news_correlation",            # LLM 新闻逐条缓存：1h TTL（同 news_correlation）
             "llm_health_check": "llm_health_check",             # 持仓体检报告：2h TTL
             "llm_penetration_deep": "llm_penetration_deep",     # 穿透深度分析：24h TTL
             "profit_forecast": "profit_forecast",

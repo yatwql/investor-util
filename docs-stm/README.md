@@ -2,7 +2,7 @@
 
 个人投资者辅助工具：读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.30
+> 当前版本：0.2.32
 
 ---
 
@@ -146,6 +146,14 @@ python src/python/main.py
 | **H** | ✅ | ✅ | — | — | — | — |
 | **B** | ✅ | ✅ | — | — | — | — |
 | **L** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+缓存管理：
+| 菜单 | 功能 |
+|------|------|
+| `[1]` | 清除并重新获取基金业绩、持仓明细、基准、行业分类、新闻、LLM新闻关联（含逐条缓存）、盈利预测、行业资金流向、分红 |
+| `[2]` | 清除并重新获取价格/指数行情，**附带清除 LLM 缓存**（智囊团、全球政经、持仓体检、穿透深度分析） |
+| `[3]` | 按 TTL 扫描删除已过期的缓存文件 |
+| `[4]` | 查看缓存统计信息（仅浏览，不删除） |
 
 ---
 
@@ -317,67 +325,96 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 > `llm_key.json` 仅保留以上 4 个字段，其余所有参数移至 `llm_settings.json`。
 
-**Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数：
+**Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数。配置项按业务模块分组排列：
 
 ```json
 {
   "max_retries": 2,
-  "temperature_global_macro": 0.3,
-  "temperature_expert_review": 0.8,
-  "temperature_news_correlation": 0.1,
-  "temperature_health_check": 0.5,
-  "temperature_penetration_deep": 0.5,
-  "timeout_global_macro": 60,
-  "timeout_expert_review": 120,
-  "timeout_news_correlation": 60,
-  "timeout_health_check": 60,
-  "timeout_penetration_deep": 60,
-  "cache_enabled_global_macro": true,
-  "cache_enabled_expert_review": true,
-  "cache_enabled_news_correlation": true,
-  "cache_enabled_health_check": true,
-  "cache_enabled_penetration_deep": true,
-  "output_brief_global_macro": false,
-  "output_brief_expert_review": false,
-  "output_brief_health_check": false,
-  "output_brief_penetration_deep": false,
-  "max_tokens_global_macro": 1024,
-  "max_tokens_expert_review": 8192,
-  "max_tokens_news_correlation": 2000,
-  "max_tokens_health_check": 4096,
-  "max_tokens_penetration_deep": 4096,
-  "model_global_macro": null,
-  "model_expert_review": null,
-  "model_news_correlation": null,
-  "model_health_check": null,
-  "model_penetration_deep": null,
+  "enabled_llm_news_correlation": false,
+
   "system_prompt_global_macro": null,
-  "system_prompt_expert_review": null,
-  "system_prompt_news_correlation": null,
-  "system_prompt_health_check": null,
-  "system_prompt_penetration_deep": null,
-  "llm_news_analysis": false,
+  "model_global_macro": null,
+  "temperature_global_macro": 0.3,
+  "max_tokens_global_macro": 1024,
+  "timeout_global_macro": 60,
+  "cache_enabled_global_macro": true,
+  "output_brief_global_macro": false,
   "thinking_enabled_global_macro": false,
-  "thinking_enabled_expert_review": true,
-  "thinking_enabled_news_correlation": false,
-  "thinking_enabled_health_check": true,
-  "thinking_enabled_penetration_deep": false,
   "thinking_budget_global_macro": 4000,
-  "thinking_budget_expert_review": 16000,
-  "thinking_budget_news_correlation": 4000,
-  "thinking_budget_health_check": 12000,
-  "thinking_budget_penetration_deep": 12000,
   "reasoning_effort_global_macro": "high",
+
+  "system_prompt_expert_review": null,
+  "model_expert_review": null,
+  "temperature_expert_review": 0.8,
+  "max_tokens_expert_review": 8192,
+  "timeout_expert_review": 120,
+  "cache_enabled_expert_review": true,
+  "output_brief_expert_review": false,
+  "thinking_enabled_expert_review": true,
+  "thinking_budget_expert_review": 16000,
   "reasoning_effort_expert_review": "high",
-  "reasoning_effort_news_correlation": "high",
+
+  "system_prompt_health_check": null,
+  "model_health_check": null,
+  "temperature_health_check": 0.5,
+  "max_tokens_health_check": 4096,
+  "timeout_health_check": 120,
+  "cache_enabled_health_check": true,
+  "output_brief_health_check": false,
+  "thinking_enabled_health_check": true,
+  "thinking_budget_health_check": 12000,
   "reasoning_effort_health_check": "high",
-  "reasoning_effort_penetration_deep": "high"
+
+  "system_prompt_penetration_deep": null,
+  "model_penetration_deep": null,
+  "temperature_penetration_deep": 0.4,
+  "max_tokens_penetration_deep": 4096,
+  "timeout_penetration_deep": 90,
+  "cache_enabled_penetration_deep": true,
+  "output_brief_penetration_deep": false,
+  "thinking_enabled_penetration_deep": false,
+  "thinking_budget_penetration_deep": 8000,
+  "reasoning_effort_penetration_deep": "high",
+
+  "system_prompt_news_correlation": null,
+  "model_news_correlation": null,
+  "temperature_news_correlation": 0.1,
+  "max_tokens_news_correlation": 2000,
+  "timeout_news_correlation": 60,
+  "cache_enabled_news_correlation": true,
+  "thinking_enabled_news_correlation": false,
+  "thinking_budget_news_correlation": 4000,
+  "reasoning_effort_news_correlation": "high"
 }
 ```
 
-**Step 3**：启动程序，菜单选 **L** 生成包含 LLM 分析的完整版报告。
+> **注意**：
+> - `system_prompt_*` 字段已默认同步代码内置提示词，可直接编辑覆盖。
+> - `pricing` 段可省略（代码内置默认定价：货币 CNY，DeepSeek-V4-Flash 输入 1 元/M、输出 2 元/M、缓存命中 0.02 元/M）。仅需自定义覆盖时才在 `llm_settings.json` 中添加 `pricing` 段，例如：
+>
+> ```json
+> "pricing": {
+>   "currency": "CNY",
+>   "deepseek-v4-flash": {"input": 1, "output": 2, "input_cache_hit": 0.02},
+>   "deepseek-v4-pro": {"input": 3, "output": 6, "input_cache_hit": 0.025}
+> }
+> ```
+>
+> 文件中的 `pricing` 优先级高于代码内置默认值。只写需要覆盖的模型即可，其余模型自动使用代码默认值。
+> 各模块角色定位及对应配置参数：
 
----
+| 模块 | 配置参数 | 角色 | 核心指令摘要 |
+|------|----------|------|-------------|
+| 全球政经 | `system_prompt_global_macro` | 资深宏观经济学家 | 500 字分析主要经济体政策走向、地缘风险、持仓影响 |
+| 智囊团复盘 | `system_prompt_expert_review` | 投资智囊团召集人 | 三阶段：Phase 1 召集令 → Phase 2 圆桌辩论 → Phase 3 定音锤。净值滞后品种（标注"净值:YYYY-MM-DD"）不得讨论本日盈亏；QDII 基金（标注"(QDII滞后1日)"）底层定价天然滞后一交易日 |
+| 持仓体检 | `system_prompt_health_check` | 组合体检分析师 | 四维度评分（风险/流动性/收益/成本），综合评级+改进建议 |
+| 穿透深析 | `system_prompt_penetration_deep` | 穿透分析专家 | 行业集中度、品种集中度、国别/币种暴露分析 |
+| 新闻关联 | `system_prompt_news_correlation` | 资深金融分析师 | 逐条分析新闻关联性，输出 JSON（高/中/低/无关+原因） |
+
+> 代码内置完整提示词定义在 `src/python/llm_client.py` 中，变量名分别为 `_SYSTEM_GLOBAL_MACRO`、`_SYSTEM_EXPERT_REVIEW`、`_SYSTEM_HEALTH_CHECK`、`_SYSTEM_PENETRATION_DEEP`、`_SYSTEM_NEWS_CORRELATION`。
+> 将配置项设为 `null` 即回退使用这些内置 prompt，方便升级时自动获取更新。
+
+**Step 3**：启动程序，菜单选 **L** 生成包含 LLM 分析的完整版报告。
 
 ### 推荐参数值及说明
 
@@ -387,18 +424,18 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `temperature_expert_review` | **0.8** | 智囊团复盘需要多元视角和创造性碰撞。高温（>0.7）鼓励专家输出差异化观点，避免千篇一律。风险：<0.4 专家观点雷同，失去圆桌辩论意义 |
 | `temperature_news_correlation` | **0.1** | 新闻关联分析要求严格的结构化 JSON 输出。极低温（<0.2）保证格式稳定，杜绝 JSON 解析失败。风险：>0.3 JSON 解析失败率显著上升，影响报告渲染 |
 | `temperature_health_check` | **0.5** | 持仓体检需要平衡稳定性和判断力。中等温度（0.5）在保持事实准确的同时保留适度判断空间 |
-| `temperature_penetration_deep` | **0.5** | 穿透深度分析需稳定的事实性输出（行业占比和币种分布），中等温度平衡准确性和洞察力 |
+| `temperature_penetration_deep` | **0.4** | 穿透深度分析需稳定的事实性输出（行业占比和币种分布），中等低温平衡准确性和保守性 |
 | `timeout_global_macro` | **60s** | 宏观分析输入简短，60 秒内大部分 API 能完成 |
 | `timeout_expert_review` | **120s** | 智囊团输入量大（含全部持仓明细），需更长的生成时间 |
 | `timeout_news_correlation` | **60s** | 新闻分析逐条处理，单次调用数据量不大 |
-| `timeout_health_check` | **60s** | 持仓体检输入中等，60 秒足够 |
-| `timeout_penetration_deep` | **60s** | 穿透分析输入中等，60 秒足够 |
+| `timeout_health_check` | **120s** | 持仓体检输入中等，120 秒确保完整评分输出 |
+| `timeout_penetration_deep` | **90s** | 穿透分析输入中等，90 秒确保完整输出 |
 | `max_retries` | **2** | 遇到 429（限流）或 503（服务不可用）时最多重试 2 次 |
 | `max_tokens_global_macro` | **1024** | 宏观分析输出 ≈ 300-600 tokens，1024 留有充足富余 |
 | `max_tokens_expert_review` | **8192** | 智囊团三阶段输出可达 2000+ tokens，8192 保障完整输出 |
 | `max_tokens_news_correlation` | **2000** | 新闻 JSON 数组输出，2000 足以覆盖 30+ 条新闻 |
 | `max_tokens_health_check` | **4096** | 体检报告四个维度评分+建议，4096 保障完整输出 |
-| `max_tokens_penetration_deep` | **4096** | 穿透深度分析行业集中度+币种暴露，4096 足以覆盖 |
+| `max_tokens_penetration_deep` | **4096** | 穿透深度分析行业集中度+币种暴露，4096 保障完整输出（此前 2048 易截断） |
 | `model_global_macro` | **null** | `null` 时使用 `llm_key.json` 的默认 model；填入模型名（如 `"claude-sonnet-4-6"`）单独指定全球政经局势用模型 |
 | `model_expert_review` | **null** | `null` 时使用默认 model；填入模型名单独指定智囊团深度复盘用模型（如需更大输出量可换 `"claude-opus-4-8"`） |
 | `model_news_correlation` | **null** | `null` 时使用默认 model；填入模型名单独指定新闻关联分析用模型（批量任务可选轻量模型如 `"claude-haiku-4-5"` 降低成本） |
@@ -413,11 +450,9 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `output_brief_expert_review` | **false** | 关闭时输出完整三阶段复盘；开启后精简至 ≤300 字 |
 | `output_brief_health_check` | **false** | 关闭时输出完整分析（四维度评分+建议）；开启后精简至 ≤300 字 |
 | `output_brief_penetration_deep` | **false** | 关闭时输出完整分析（行业集中度+币种暴露）；开启后精简至 ≤300 字 |
-| `system_prompt_global_macro` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖分析风格 |
-| `system_prompt_expert_review` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖专家角色设定 |
-| `system_prompt_news_correlation` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖新闻关联判定规则 |
-| `system_prompt_health_check` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖评分标准 |
-| `system_prompt_penetration_deep` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖分析维度 |
+
+> **注意**：`news_correlation` 模块无 `output_brief` 配置项。该模块输出严格 JSON 格式供程序解析，精简会破坏 JSON 结构，故不支持精简模式。
+| `system_prompt_*` | （已同步） | 已默认同步代码内置 prompt，可直接编辑修改。设为 `null` 回退使用代码默认值。各模块角色定位见下方说明 |
 | `thinking_enabled_global_macro` | `false` | 全球政经启用 Extended Thinking（不建议——输出短，不值得）。**Claude / DeepSeek 均兼容** |
 | `thinking_enabled_expert_review` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking。**Claude / DeepSeek 均兼容** |
 | `thinking_enabled_news_correlation` | `false` | 新闻关联启用 Extended Thinking（不建议——JSON 格式任务不需要深度推理）。**Claude / DeepSeek 均兼容** |
@@ -427,15 +462,14 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `thinking_budget_expert_review` | 16000 | **仅 Claude** 智囊团 thinking token 预算。`max_tokens_expert_review=8192`，16000 留充足余量 |
 | `thinking_budget_news_correlation` | 4000 | **仅 Claude** 新闻关联 thinking token 预算。实际被关闭时该值不生效 |
 | `thinking_budget_health_check` | 12000 | **仅 Claude** 体检 thinking token 预算。`max_tokens_health_check=4096`，12000 留充足余量 |
-| `thinking_budget_penetration_deep` | 12000 | **仅 Claude** 穿透 thinking token 预算。`max_tokens_penetration_deep=4096`，12000 留充足余量 |
+| `thinking_budget_penetration_deep` | 8000 | **仅 Claude** 穿透 thinking token 预算。`max_tokens_penetration_deep=4096`，8000 留充足余量 |
 | `reasoning_effort_global_macro` | `"high"` | **仅 DeepSeek** 思考深度：`"high"`（标准）或 `"max"`（极致） |
 | `reasoning_effort_expert_review` | `"high"` | **仅 DeepSeek** 思考深度，推荐 `"max"` 以充分发挥 V4 推理能力 |
 | `reasoning_effort_news_correlation` | `"high"` | **仅 DeepSeek** 思考深度，建议保持 `"high"` |
 | `reasoning_effort_health_check` | `"high"` | **仅 DeepSeek** 思考深度，推荐 `"max"` 以增强评分判断 |
 | `reasoning_effort_penetration_deep` | `"high"` | **仅 DeepSeek** 思考深度，建议保持 `"high"` |
-| `llm_news_analysis` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
-
----
+| `enabled_llm_news_correlation` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
+| `pricing` | （内置） | 模型 Token 定价表，格式 `{"model_name": {"input": X, "output": Y, "input_cache_hit": Z}}`（每百万 Token，货币由 `pricing.currency` 决定）。`input` = 标准输入（缓存未命中），`input_cache_hit` = 缓存命中输入（可选，缺失时等于 `input` 即无折扣），`currency` = 货币标识（`"CNY"` / `"USD"`，默认 `"CNY"`）。代码内置默认定价以人民币计价，`llm_settings.json` 中的 `pricing` 段优先级更高，可覆盖或新增模型。例如 DeepSeek-V4-Flash：输入 1 元/M、输出 2 元/M、缓存命中 0.02 元/M。用于 `_estimate_cost()` 生成格式化费用估算字符串供报告展示 |
 
 #### Prompt Caching（Anthropic 专属）
 
@@ -519,8 +553,9 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 - `max_tokens_global_macro=1024` → `thinking_budget_global_macro` 至少 2048（默认 4000 ✅）
 - `max_tokens_expert_review=8192` → `thinking_budget_expert_review` 至少 9216（默认 16000 ✅）
 
-> **提示**：开启 Extended Thinking 后，HTML 报告在该章节的 Token 用量行末尾追加 `| Extended Thinking` 标识；
-> Excel 报告在该章节的模型名称行下方追加 `Extended Thinking 已开启` 行，便于快速确认深度推理是否生效。
+> **提示**：开启 Extended Thinking 后，所有 LLM 章节底部统一追加 `| Extended Thinking` 标识，
+> 格式为：`模型：{model} | Token 用量：输入 X / 输出 Y = Z | 估算费用：${cost} | Extended Thinking`，
+> Excel 与 HTML 报告保持一致。未启用时仅显示模型名、用量和费用。
 - `max_tokens_news_correlation=2000` → `thinking_budget_news_correlation` 至少 3024（默认 4000 ✅）
 
 **代码自动保护：**
@@ -539,20 +574,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | 全球政经 | 输入 ~1500 / 输出 ~600 | 输入 ~1500 / 输出 ~2500 | ~3× |
 
 ---
----
 
-### 字段总表
-
-#### llm_key.json（敏感字段 — 4 个）
-
-| 字段 | 必填 | 说明 |
-|------|:----:|------|
-| `provider` | ✅ | `"claude"`（Anthropic Messages API 兼容）或 `"openai"`（OpenAI Chat Completions 兼容） |
-| `api_key` | ✅ | API 密钥，妥善保管勿提交 Git |
-| `model` | — | 模型名称；留空时 provider 默认值：`"claude"` → `claude-sonnet-4-20250514`、`"openai"` → `gpt-4o` |
-| `endpoint` | — | API 端点 URL，留空使用官方端点 |
-
----
 
 ### 支持的 provider 及配置示例
 
@@ -637,16 +659,16 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 ---
 
-### token 消耗参考
+### token 消耗参考（按 DeepSeek-V4-Flash 定价，CNY）
 
 | 模块 | 输入 token | 输出 token | 单次费用参考 |
 |------|-----------|-----------|-------------|
-| 模块 7（全球政经） | ~300-800 | ~300-600 | ~$0.005-0.015 |
-| 模块 8（智囊团） | ~800-2500 | ~1500-2500 | ~$0.02-0.05 |
-| 模块 9（持仓体检） | ~500-1500 | ~800-1500 | ~$0.01-0.03 |
-| 模块 10（穿透深析） | ~500-1500 | ~800-1500 | ~$0.01-0.03 |
-| 新闻关联 LLM（可选） | ~2000-4000 | ~600-1200 | ~$0.01-0.03 |
-| 五者合计（菜单 L + 新闻 LLM） | — | — | ~$0.06-0.16/次 |
+| 模块 7（全球政经） | ~300-800 | ~300-600 | ~¥0.001-0.003 |
+| 模块 8（智囊团） | ~800-2500 | ~1500-2500 | ~¥0.005-0.02 |
+| 模块 9（持仓体检） | ~500-1500 | ~800-1500 | ~¥0.002-0.008 |
+| 模块 10（穿透深析） | ~500-1500 | ~800-1500 | ~¥0.002-0.008 |
+| 新闻关联 LLM（可选） | ~2000-4000 | ~600-1200 | ~¥0.003-0.01 |
+| 五者合计（菜单 L + 新闻 LLM） | — | — | ~¥0.01-0.05/次 |
 
 - 仅菜单 **L** 触发 LLM 调用，E / N / H / B 不会
 - LLM 结果默认缓存 24 小时（全球政经/穿透深度）/ 2 小时（智囊团/持仓体检），缓存有效期内反复按 L 不会重复扣费
@@ -682,16 +704,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — |
 
----
 
-### TUI 缓存管理
-
-| 菜单 | 功能 |
-|------|------|
-| `[1]` | 刷新基金业绩、持仓明细、基准、行业分类、新闻、盈利预测、行业资金流向、分红缓存 |
-| `[2]` | 刷新价格/指数行情，**并清除 LLM 缓存**（智囊团、全球政经、持仓体检、穿透深度分析） |
-| `[3]` | 删除已过期的缓存文件 |
-| `[4]` | 查看缓存统计（只读） |
 
 ---
 
@@ -861,7 +874,25 @@ A: 拉取最新代码后，重新运行启动脚本即可自动更新依赖。
 A: 可以。菜单 E / N / H / B 全部不依赖 LLM，仅菜单 L 需要 LLM 配置。
 
 **Q: 如何开启新闻 LLM 关联分析？**
-A: 编辑 `data/config/llm_settings.json`，将 `llm_news_analysis` 设为 `true`，并确保 `llm_key.json` 已配置有效的 API Key。开启后菜单 N / B / L 生成的报告增加"LLM 关联分析"列，每条新闻获得 LLM 判定的关联度（高/中/低/无关）和原因分析。默认关闭以节省费用。
+A: 编辑 `data/config/llm_settings.json`，将 `enabled_llm_news_correlation` 设为 `true`，并确保 `llm_key.json` 已配置有效的 API Key。开启后菜单 N / B / L 生成的报告增加"LLM 关联分析"列，每条新闻获得 LLM 判定的关联度（高/中/低/无关）和原因分析。默认关闭以节省费用。
+
+---
+
+## 附录：新增 LLM 分析章节规范
+
+增加新的 LLM 服务章节时，必须同步完成以下步骤：
+
+1. **`llm_settings.json`** — 增加一整套配置键（10 个），命名格式为 `{key}_{module_name}`：
+   - 必含：`system_prompt_{module}`、`model_{module}`、`temperature_{module}`、`max_tokens_{module}`、
+     `timeout_{module}`、`cache_enabled_{module}`、`output_brief_{module}`、
+     `thinking_enabled_{module}`、`thinking_budget_{module}`、`reasoning_effort_{module}`
+2. **`llm_client.py`** — 添加 LLM 调用函数，使用 `llm_config.get("{key}_{module}")` 读取对应配置
+3. **`llm_content.py`** — 在 `_MODULE_KEY_MAP` 中添加章节名→模块键映射；在 `write_llm_sheets()` 中添加新页签
+4. **报告模板** — 在 Excel `tui_handlers.py` 和 HTML `html_writer.py` 中传递新章节的 model/thinking 参数
+5. **页脚规范** — 章节内容底部 LLM 提示使用标准格式：
+   `模型：{model} | Token 用量：输入 X / 输出 Y = Z | 估算费用：${cost} | Extended Thinking`
+6. **缓存 TTL** — 在 `config.json` → `cache_ttl` 中添加 `llm_{module}` 条目，并在 `cache.py` → `prefix_type_map` / `_CACHE_TTL_DEFAULTS` 同步
+7. **README** — 文档化新章节的配置项、推荐值、缓存策略
 
 ---
 

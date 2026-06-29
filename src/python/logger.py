@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from logging.handlers import RotatingFileHandler
 
 # 日志文件路径
 _LOG_FILE = "logs/app.log"
@@ -9,13 +10,18 @@ _LOG_FILE = "logs/app.log"
 # 日志格式
 _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 
+# 日志轮转配置
+_LOG_MAX_BYTES = 10 * 1024 * 1024  # 单文件最大 10 MB
+_LOG_BACKUP_COUNT = 5               # 保留 5 个备份
+
 
 def setup_logger(name: str = "invest") -> logging.Logger:
     """
     初始化并返回 logger。
 
-    配置控制台输出和文件输出两种 handler，避免重复添加。
+    配置控制台输出和自动轮转文件输出两种 handler，避免重复添加。
     自动创建 logs/ 目录（如果不存在）。
+    使用 RotatingFileHandler，单文件超过 10 MB 自动切割，保留 5 份备份。
 
     Args:
         name: logger 名称，默认 "invest"
@@ -40,11 +46,16 @@ def setup_logger(name: str = "invest") -> logging.Logger:
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # ---- 文件 Handler ----
+    # ---- 文件 Handler（自动轮转） ----
     log_dir = os.path.dirname(_LOG_FILE)
     os.makedirs(log_dir, exist_ok=True)
 
-    file_handler = logging.FileHandler(_LOG_FILE, encoding="utf-8")
+    file_handler = RotatingFileHandler(
+        _LOG_FILE,
+        maxBytes=_LOG_MAX_BYTES,
+        backupCount=_LOG_BACKUP_COUNT,
+        encoding="utf-8",
+    )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)

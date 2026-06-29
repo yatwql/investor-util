@@ -4,10 +4,159 @@
 
 ---
 
+## [0.2.33] - 2026-06-29
+
+### Changed
+- **模块耗时日志名称同步** — `_Timer` 标签与 Excel 页签名/HTML 章节名统一：
+  `汇总页`→`投资分析汇总`、`行情页`→`市值核算明细表`、`穿透TOP10`→`资产穿透TOP10`、
+  `基金业绩`→`基金业绩分析`、`新闻数据`/`新闻页`→`财经新闻热点与持仓关联分析`、
+  `LLM增补`→`LLM 分析章节`
+
+### Changed
+- **`_generate_excel_report` Import 隔离** — 7 个报告模块改为逐个 try/except 懒导入，
+  缺失模块不会拖垮整个报告，仅跳过该页签并记录错误。
+- **`_generate_excel_report` Sheet 写入隔离** — 6 个 Sheet 写入步骤使用 `_call_sheet()`
+  统一包装，单个页签写入失败不影响其他页签。
+- **Excel/HTML/日志名称统一** — 修复 `penetration.py`、`fund_performance.py`、
+  `llm_content.py`、`report_template.html` 中页签名和章节名前缀空格不一致（`4. 资产` → `4.资产`），
+  HTML 中 `资产穿透 TOP 10` → `资产穿透TOP10`，与日志模块名完全对齐。
+
+### Tests
+- 全量 814 项测试通过
+
+## [0.2.32] - 2026-06-29
+
+### Added
+- **`generate_*` 函数新增 `llm_config` 参数** — 4 个 LLM 生成函数（`generate_global_macro` /
+  `generate_expert_review` / `generate_health_check` / `generate_penetration_deep_analysis`）
+  新增可选 `llm_config: dict | None = None` 参数。传入时跳过内部 `get_llm_config()` 调用，
+  避免多线程场景下冗余文件 I/O
+- **`enhance_news_correlation` 新增 `llm_config` 参数** — 与 4 个 `generate_*` 函数一致，
+  传入时跳过内部 `get_llm_config()` 调用。`news_correlation.py` 调用处已持有 `_llm_config`
+  变量，同步透传
+
+### Changed
+- **`generate_all_llm()` 缓存预检** — `get_llm_config()` 改为仅在顶层调用一次，预计算
+  全部 4 个模块的指纹 + 缓存键，仅对缓存未命中的模块提交线程池任务。缓存命中的模块
+  直接读取缓存内容，减少线程开销和文件 I/O
+- **新闻关联分析改为逐条缓存** — 每篇文章独立计算缓存键（标题前 80 字 + 持仓指纹）。
+  新文章加入时仅新文章的缓存缺失，已缓存的老文章在 TTL 内直接复用，不再触发整批重分析。
+  单篇缓存存储 `(relevance, sentiment, analysis)` 元组
+
+### Fixed
+- **场外基金本日盈亏修复** — 仅净值日期等于当前交易日（T）时计算本日盈亏。
+  此前 T-1 净值也参与计算，导致净值未发布时误将昨日变动标为"本日盈亏"。
+  涵盖 QDII 与非 QDII 所有场外基金。
+- **DeepSeek V4 Flash 定价修正** — `_MODEL_PRICING` 中
+  `deepseek-v4-flash` 从 `$0.50/$2.00` 更正为 `$0.14/$0.28`（每百万 token
+  input/output），与官方 2026 年定价一致。
+
+### Tests
+- **`TestGenerateFunctionsAcceptLlmConfig`** — 4 条用例验证 `llm_config` 参数透传
+- **`TestEnhanceNewsCorrelationUsesLlmConfig`** — 1 条用例验证 `enhance_news_correlation`
+  的 `llm_config` 参数透传
+- **`TestGenerateAllLlmCachePrecheck`** — 4 条用例验证缓存预检：全部命中/全部未命中/
+  force 跳过/部分命中
+- **`TestEnhanceNewsCorrelationGranularCache`** — 3 条用例验证逐条缓存：
+  全部缓存/全部未缓存/部分混合
+- **回归测试 — 场外基金本日盈亏** — 3 条用例：T-1 净值→today_profit=0、
+  T-2 净值→price_type="官方净值(T-2)"、T 净值→today_profit 正常计算
+- 全量 800 项测试通过（移除 11 个 `_date_within_days` 测试）
+
+### Changed
+- **`_estimate_cost` 改为从 `_PRICING_MERGED` 读取** — 新增模块级 `_PRICING_MERGED` 字典，
+  初始化时从 `llm_settings.json` 的 `pricing` 段与 `_MODEL_PRICING` 合并（文件配置优先级更高）。
+  `_reload_pricing()` 支持运行时重新加载定价配置。
+- **`_DEFAULT_LLM_SETTINGS` 新增 `pricing` 默认段** — 包含所有已知模型的硬编码定价，
+  自动创建 `llm_settings.json` 时写入。用户可直接编辑该文件覆盖或新增模型定价。
+- **`_estimate_cost` 新增缓存命中计费** — 新增可选 `cache_hit_input_tokens` 参数，
+  配合 `pricing` 中新增的 `input_cache_hit` 字段（缓存命中输入价格），
+  在 API 返回 `cache_read_input_tokens` 时精确估算费用。
+  Claude 模型缓存命中价为 input 的 10%（0.30 vs 3.0），
+  无缓存折扣的模型（DeepSeek/GPT）设为与 input 相同。
+- **`_MODEL_PRICING` 新增 `input_cache_hit` 字段** — 每个模型硬编码默认值增加缓存命中价格。
+- **报告/日志显示缓存命中量** — HTML 报告和终端日志在 API 返回缓存命中数据时，
+  显示"缓存命中：N tokens"标记。
+- **新增 `deepseek-v4-pro` 模型定价** — 按官方 CNY 定价设置：input=3、output=6、input_cache_hit=0.025
+- **`pricing` 段新增 `currency` 字段** — 支持多币种标识（`"CNY"` / `"USD"`），
+  `_reload_pricing()` 读取后存入 `_PRICING_CURRENCY`，`_estimate_cost()` 用 `_CURRENCY_SYMBOLS` 映射符号输出
+- **`llm_news_item` 加入 `prefix_type_map`** — `cache.py` 的过期清理函数现在能正确识别逐条新闻缓存并分配 1h TTL
+- **菜单 [1] 补充 `llm_news_item_` 清理** — 更新基础类缓存时一并清理逐条新闻 LLM 缓存
+- **管理文档审计修复** — requirements.md 章节编号 5.3→5.1→5.2→5.3→5.4 纠正、`llm_news_item_` 缺失补充、最后更新日期补全、plan.md 交叉引用修复；testplan.md 源文件路径修正（src/→src/python/）；technical.md `tmpl/` 目录位置修正（report/子目录→同级）；review-findings.md 测试计数更新（783→811）及审计记录追加
+- **README 版本/参数同步** — 版本号 0.2.30→0.2.32；`max_tokens_penetration_deep` 示例值 2048→4096（与代码默认一致）；Token 消耗参考表改为 CNY 计价示例（DeepSeek-V4-Flash）
+- **`generate_penetration_deep_analysis` fallback `max_tokens` 修正** — 兜底值 2048→4096，匹配 `max_tokens_penetration_deep` 默认值
+- **穿透深度分析 Prompt 措辞修正** — system prompt + user prompt "前 N 大"→"TOP 10"（输入固定为 10 条），"占总资产"→"占总市值百分比"
+- **内容过滤安抚重试** — `_call_llm_with_retry` 对空内容返回 `("", usage)` 而非 `(None, None)`，`_call_llm` 检测空内容后追加 `_CONTENT_FILTER_RECOVERY` 指令重试一次。DeepSeek 安全过滤误杀时自动恢复，不再直接失败
+- **新闻关联分析批量合并** — `BATCH_SIZE` 从 5 增至 10，冷启动时 LLM 调用次数从 6 次降至 3 次，减少约 50%
+- **会话级 Token 用量累计跟踪** — 新增 `_session_usage` 模块全局累积器（input/output/cache_hit/cost/call_count），`_track_session_usage()` 在每次 `_call_llm_with_retry` 成功后同步累计。导出 `get_session_usage()` / `reset_session_usage()` 供外部读取
+- **汇总页签「LLM 用量」** — `write_summary_sheet` 新增 `llm_session_usage` 参数，报告汇总页底部显示本会话 LLM 调用次数、模型、输入/输出 token、缓存命中、累计费用
+- **TUI 会话统计** — 报告生成完成后终端输出 `本会话 LLM 累计：N 次调用，X tokens，费用 ¥X.XX`
+
+## [0.2.31] - 2026-06-29
+
+### Added
+- **熔断器（Circuit Breaker）** — LLM API 连续失败 3 次后自动开启 60s 冷却，
+  冷却期内跳过对故障 endpoint 的请求，返回特定失败原因 `circuit_open`
+  - `_cb_endpoint()` / `_cb_record_failure()` / `_cb_record_success()` / `_cb_is_open()` —
+    熔断器核心函数，按域名粒度统计失败次数
+  - `_call_llm_with_retry()` 入口检查熔断状态，冷却期内返回含熔断状态
+- **跨 provider 自动回退** — 主 provider（如 claude）失败时自动尝试
+  `fallback_provider`（如 openai），支持独立的 `fallback_api_key` / `fallback_endpoint` /
+  `fallback_model` 配置
+  - `_call_llm()` 新增双 provider 链式调用：主 → 回退。回退仍失败时返回 `fallback_failed`
+  - TUI 输出回退状态：`[..] LLM 主 provider (claude) 失败，正在回退到 openai...`
+- **失败原因传播至 Excel 占位符** — LLM 生成失败时，区分 5 种原因
+  （`not_configured` / `api_error` / `network_error` / `timeout` / `circuit_open`），
+  Excel 页签不同占位提示
+  - `_LLM_MODULE_FAILURE` 字典、`FAIL_REASON_*` 常量、`_MODULE_KEY_MAP` 映射
+  - `_get_placeholder()` 按失败原因输出针对性中文提示
+- **缓存模型名保留** — 缓存命中时从缓存 HTML 提取原始模型名称并显示
+  - `_extract_model_from_cached()` / `_MODEL_LINE_RE` — 从 Token 行提取模型名
+  - `_CACHE_LINE_MODEL_TPL` — 新模板：`本次使用LLM缓存（原始模型：{model}）`
+- **新闻关联分析 TUI 进度反馈** — 重试/回退时 TUI 输出可视化进度（`[..]` 标记）
+- **自适应 max_tokens 截断重试** — `_generate_llm_content()` / `_process_batch()` 中
+  检测到 `_TRUNCATION_MARKER` 后自动以 1.5 倍 max_tokens 重试一次
+  - `_AUTO_INCREASE_FACTOR` / `_AUTO_INCREASE_MAX_RETRIES` — 常量控制重试倍数和次数
+  - TUI 输出：`[..] 输出被截断，自动增大 max_tokens (4096 → 6144) 重新生成...`
+  - 二次截断时记录 WARNING 日志提示手动增大配置
+- **费用估算** — `_estimate_cost()` 基于 `_MODEL_PRICING` 定价表估算单次 API 费用
+  - HTML 报告 footer 追加 `| 估算费用：$0.012`
+  - TUI 输出追加 `| 估算费用: $0.008`（需已知定价模型）
+  - 支持 10 种常见模型定价（Claude / GPT / DeepSeek），未知模型显示 "-"
+
+### Changed
+- **`_call_llm()` 拆分为二层** — 提取 `_call_single_provider()` 处理单 provider 调用，
+  `_call_llm()` 负责主+回退链式调度
+- **`_call_llm_with_retry()` 增强** — 成功时调用 `_cb_record_success()` 重置熔断状态；
+  各类异常（超时/网络错误/HTTP 429/503）调用 `_cb_record_failure()`
+- **所有 LLM 模块统一 token/model 显示** — `_generate_llm_content()` 在非缓存时
+  追加灰色 footer：`模型：xxx | Token 用量：输入 X / 输出 Y = Z`；缓存时显示
+  原始模型名或通用缓存提示
+- **Extended Thinking 统一底部提示** — 无论缓存/非缓存，只要配置了 `thinking_enabled=true`，
+  HTML 底部缓存提示行或 Token 行追加 `| Extended Thinking`；Excel 页签始终追加
+  `Extended Thinking 已开启` 标识行（灰斜体 9pt）
+- **`_log_token_usage()` 增强** — 新增 `model_name` 参数，已知模型时 TUI 输出追加估算费用
+- **`_call_llm_with_retry()` 签名扩展** — 新增 `model_name` 参数，
+  `_call_claude()` / `_call_openai()` 透传模型名实现费用估算
+- **Excel 页签名称更新** — `1. 汇总` → `1.投资分析汇总`、`2. 市值核算` → `2.市值核算明细表`、
+  `3. 分类汇总` → `3.分类汇总表`、`6. 财经新闻热点` → `6.财经新闻热点与持仓关联分析`
+  （summary.py / market_value.py / category.py / news_correlation.py + 测试文件同步）
+- **`llm_content.py` 增强** — `_write_content_sheet()` 使用 `_get_placeholder()` 替代
+  硬编码占位符；`_get_placeholder()` 消费 `_LLM_MODULE_FAILURE` 中的失败原因
+- **模块 A 命名修正** — 日志/模板/注释中 `模块 A` → `模块 10`（html_writer.py、
+  report_template.html、changelog.md）
+
+### Config
+- `data/config/llm_settings.json` — 新增 `fallback_provider` / `fallback_api_key` /
+  `fallback_endpoint` / `fallback_model` 等回退配置项（可选）
+
+### Tests
+- 全量 783 项测试通过
+
 ## [0.2.30] - 2026-06-29
 
 ### Added
-- **模块 A — 穿透深度分析** — 新增 LLM 生成模块，从行业集中度、国别/币种暴露维度
+- **模块 10 — 穿透深度分析** — 新增 LLM 生成模块，从行业集中度、国别/币种暴露维度
   对投资组合进行深度分析，含行业集中度仪表盘、外汇风险敞口分析、改进建议
   - `generate_penetration_deep_analysis()` / `_build_penetration_deep_prompt()` /
     `_SYSTEM_PENETRATION_DEEP` — 核心生成函数、Prompt 构建、System Prompt

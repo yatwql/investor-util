@@ -138,6 +138,116 @@ def set_config(key: str, value: Any) -> None:
     _config_mtime = 0
 
 
+# ── 已知的配置项枚举（用于配置校验） ──────────────────
+
+_KNOWN_NEWS_SOURCES: set[str] = {"sina", "eastmoney", "cls", "wallstreetcn", "akshare"}
+
+_KNOWN_PROVIDER_TYPES: set[str] = {"price", "index", "us_index", "fund_rank", "fund_hold"}
+
+_KNOWN_PROVIDER_NAMES: set[str] = {"tencent", "eastmoney", "sina", "tiantian"}
+
+_STRING_CONFIG_KEYS: set[str] = {"holdings_dir", "holdings_filename", "output_dir",
+                                  "llm_key_file", "llm_settings_file"}
+
+
+def validate_config(config: dict | None = None) -> int:
+    """校验 config.json 中的常见配置错误，输出 WARNING 日志。
+
+    Args:
+        config: 已合并的配置字典。为 None 时自动调用 get_config()。
+
+    Returns:
+        发现的问题数量（方便测试断言）。
+    """
+    if config is None:
+        config = get_config()
+    issues = 0
+
+    # ── 字符串类型检查 ──
+    for key in _STRING_CONFIG_KEYS:
+        val = config.get(key)
+        if val is not None and not isinstance(val, str):
+            logger.warning("config.json %s = %r 不是字符串类型，可能导致运行时 TypeError", key, val)
+            issues += 1
+    # holdings_filename 为空字符串时会导致 os.path.join 返回目录路径
+    fn = config.get("holdings_filename")
+    if fn is not None and not isinstance(fn, str):
+        pass  # 已在上面的循环中报过
+    elif isinstance(fn, str) and fn.strip() == "":
+        logger.warning("config.json holdings_filename 为空字符串，将使用默认文件名")
+        issues += 1
+
+    # ── news_top_count ──
+    ntc = config.get("news_top_count")
+    if ntc is not None:
+        try:
+            n_int = int(ntc)
+            if n_int <= 0:
+                logger.warning("config.json news_top_count = %r 不是正数，将使用默认值 100", ntc)
+                issues += 1
+        except (ValueError, TypeError):
+            logger.warning("config.json news_top_count = %r 不是有效整数，将使用默认值 100", ntc)
+            issues += 1
+
+    # ── cache_ttl ──
+    cache_ttl = config.get("cache_ttl")
+    if cache_ttl is not None and not isinstance(cache_ttl, dict):
+        logger.warning("config.json cache_ttl = %r 不是对象(dict)，所有缓存 TTL 将使用默认值", cache_ttl)
+        issues += 1
+    elif isinstance(cache_ttl, dict):
+        for k, v in cache_ttl.items():
+            try:
+                val = float(v)
+                if val <= 0:
+                    logger.warning("config.json cache_ttl.%s = %s 不是正数，将使用默认值", k, v)
+                    issues += 1
+            except (ValueError, TypeError):
+                logger.warning("config.json cache_ttl.%s = %s 不是有效数字，将使用默认值", k, v)
+                issues += 1
+
+    # ── news_sources ──
+    news_src = config.get("news_sources")
+    if news_src is not None and not isinstance(news_src, dict):
+        logger.warning("config.json news_sources = %r 不是对象(dict)，所有源将使用默认开关状态", news_src)
+        issues += 1
+    elif isinstance(news_src, dict):
+        for key, val in news_src.items():
+            if key not in _KNOWN_NEWS_SOURCES:
+                logger.warning("config.json news_sources 中存在未知的源 %r，将被忽略", key)
+                issues += 1
+            if not isinstance(val, bool):
+                logger.warning("config.json news_sources.%s = %r 不是布尔值，"
+                               "非空字符串/数字会被当作 True 处理", key, val)
+                issues += 1
+
+    # ── preferred_provider ──
+    pref = config.get("preferred_provider")
+    if pref is not None and not isinstance(pref, dict):
+        logger.warning("config.json preferred_provider = %r 不是对象(dict)，配置无效", pref)
+        issues += 1
+    elif isinstance(pref, dict):
+        for data_type, provider in pref.items():
+            if data_type not in _KNOWN_PROVIDER_TYPES:
+                logger.warning("config.json preferred_provider 中存在未知的数据类型 %r，"
+                               "有效值: %s", data_type, ", ".join(sorted(_KNOWN_PROVIDER_TYPES)))
+                issues += 1
+            if provider not in _KNOWN_PROVIDER_NAMES:
+                logger.warning("config.json preferred_provider.%s = %r 不是已知的 provider，"
+                               "有效值: %s", data_type, provider,
+                               ", ".join(sorted(_KNOWN_PROVIDER_NAMES)))
+                issues += 1
+
+    # ── user_fund_benchmarks ──
+    ufb = config.get("user_fund_benchmarks")
+    if ufb is not None and not isinstance(ufb, dict):
+        logger.warning("config.json user_fund_benchmarks = %r 不是对象(dict)，自定义基准将忽略", ufb)
+        issues += 1
+
+    if issues:
+        logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)
+    return issues
+
+
 def init_config() -> None:
     """初始化配置文件。
 
@@ -149,15 +259,7 @@ def init_config() -> None:
     config_path = get_config_path()
     if os.path.exists(config_path):
         config = get_config()
-        # 校验 cache_ttl 配置
-        cache_ttl = config.get("cache_ttl") or {}
-        for k, v in cache_ttl.items():
-            try:
-                val = float(v)
-                if val <= 0:
-                    logger.warning("config.json cache_ttl.%s = %s 无效（应为正数），将使用默认值", k, v)
-            except (ValueError, TypeError):
-                logger.warning("config.json cache_ttl.%s = %s 不是有效数字，将使用默认值", k, v)
+        validate_config(config)  # 全面校验配置
         return
     config_dir = os.path.dirname(config_path)
     os.makedirs(config_dir, exist_ok=True)
@@ -204,7 +306,7 @@ def _ensure_llm_settings_file() -> None:
             "max_tokens_expert_review": 8192,
             "max_tokens_news_correlation": 2000,
             "max_tokens_health_check": 4096,
-            "max_tokens_penetration_deep": 2048,
+            "max_tokens_penetration_deep": 4096,
             "model_global_macro": None,
             "model_expert_review": None,
             "model_news_correlation": None,
@@ -215,7 +317,7 @@ def _ensure_llm_settings_file() -> None:
             "system_prompt_news_correlation": None,
             "system_prompt_health_check": None,
             "system_prompt_penetration_deep": None,
-            "llm_news_analysis": False,
+            "enabled_llm_news_correlation": False,
             "thinking_enabled_global_macro": False,
             "thinking_enabled_expert_review": True,
             "thinking_enabled_news_correlation": False,
@@ -231,6 +333,20 @@ def _ensure_llm_settings_file() -> None:
             "reasoning_effort_news_correlation": "high",
             "reasoning_effort_health_check": "high",
             "reasoning_effort_penetration_deep": "high",
+            "pricing": {
+                "currency": "CNY",
+                "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
+                "claude-sonnet-4-8": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
+                "claude-opus-4-6": {"input": 15.0, "output": 75.0, "input_cache_hit": 1.50},
+                "claude-opus-4-8": {"input": 15.0, "output": 75.0, "input_cache_hit": 1.50},
+                "claude-haiku-4-5": {"input": 0.25, "output": 1.25, "input_cache_hit": 0.025},
+                "claude-fable-5": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
+                "gpt-4o": {"input": 2.5, "output": 10.0, "input_cache_hit": 2.5},
+                "gpt-4o-mini": {"input": 0.15, "output": 0.6, "input_cache_hit": 0.15},
+                "deepseek-v4-flash": {"input": 1, "output": 2, "input_cache_hit": 0.02},
+                "deepseek-v4-pro": {"input": 3, "output": 6, "input_cache_hit": 0.025},
+                "deepseek-chat": {"input": 1, "output": 2, "input_cache_hit": 0.02},
+            },
         }
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump(_DEFAULT_LLM_SETTINGS, f, ensure_ascii=False, indent=2)
@@ -264,6 +380,81 @@ def get_llm_settings_path() -> str:
 
 # ── LLM 配置缓存（按文件修改时间自动失效） ──────────────────
 
+# 已知的 llm_settings.json 合法键名集合，用于启动时未知键名告警
+_KNOWN_LLM_SETTINGS_KEYS: set[str] = {
+    # 重试
+    "max_retries",
+    # 温度
+    "temperature_global_macro", "temperature_expert_review",
+    "temperature_news_correlation", "temperature_health_check",
+    "temperature_penetration_deep",
+    # 超时
+    "timeout_global_macro", "timeout_expert_review",
+    "timeout_news_correlation", "timeout_health_check",
+    "timeout_penetration_deep",
+    # 缓存
+    "cache_enabled_global_macro", "cache_enabled_expert_review",
+    "cache_enabled_news_correlation", "cache_enabled_health_check",
+    "cache_enabled_penetration_deep",
+    # 精简输出
+    "output_brief_global_macro", "output_brief_expert_review",
+    "output_brief_health_check", "output_brief_penetration_deep",
+    # max_tokens
+    "max_tokens_global_macro", "max_tokens_expert_review",
+    "max_tokens_news_correlation", "max_tokens_health_check",
+    "max_tokens_penetration_deep",
+    # per-module 模型覆盖
+    "model_global_macro", "model_expert_review",
+    "model_news_correlation", "model_health_check",
+    "model_penetration_deep",
+    # system prompt 覆盖
+    "system_prompt_global_macro", "system_prompt_expert_review",
+    "system_prompt_news_correlation", "system_prompt_health_check",
+    "system_prompt_penetration_deep",
+    # 新闻关联
+    "enabled_llm_news_correlation",
+    # Extended Thinking
+    "thinking_enabled_global_macro", "thinking_enabled_expert_review",
+    "thinking_enabled_news_correlation", "thinking_enabled_health_check",
+    "thinking_enabled_penetration_deep",
+    # thinking budget (Anthropic)
+    "thinking_budget_global_macro", "thinking_budget_expert_review",
+    "thinking_budget_news_correlation", "thinking_budget_health_check",
+    "thinking_budget_penetration_deep",
+    # reasoning effort (DeepSeek)
+    "reasoning_effort_global_macro", "reasoning_effort_expert_review",
+    "reasoning_effort_news_correlation", "reasoning_effort_health_check",
+    "reasoning_effort_penetration_deep",
+    # 定价
+    "pricing",
+}
+
+# llm_key.json 中也允许出现的键名（与 llm_settings.json 重叠视为合法）
+_LLM_KEY_OVERLAP_KEYS: set[str] = {"provider", "api_key", "model", "endpoint",
+                                    "fallback_provider", "fallback_api_key",
+                                    "fallback_endpoint", "fallback_model"}
+
+# 已知键名合集（settings + key overlap）
+_KNOWN_TOTAL_KEYS: set[str] = _KNOWN_LLM_SETTINGS_KEYS | _LLM_KEY_OVERLAP_KEYS
+
+
+def _check_unknown_llm_keys(settings: dict) -> None:
+    """检查 llm_settings.json 中是否存在未知键名，若有则输出 WARNING。
+
+    Args:
+        settings: 从 llm_settings.json 读取的配置字典
+    """
+    unknown: list[str] = []
+    for key in settings:
+        if key not in _KNOWN_TOTAL_KEYS:
+            unknown.append(key)
+    if unknown:
+        logger.warning(
+            "llm_settings.json 中检测到 %d 个未知配置项，可能是拼写错误或已废弃的配置: %s。"
+            "请核对后删除，避免混淆。",
+            len(unknown), ", ".join(repr(k) for k in sorted(unknown)),
+        )
+
 _llm_config_cache: dict | None = None
 _llm_config_mtime: float = 0
 _llm_config_lock = threading.Lock()
@@ -291,6 +482,9 @@ def get_llm_config() -> dict | None:
                 with open(settings_path, "r", encoding="utf-8") as f:
                     base_settings = json.load(f)
                 settings_mtime = os.path.getmtime(settings_path)
+                # 首次加载时检测未知键名（仅在 cache 未初始化时告警一次）
+                if _llm_config_cache is None and base_settings:
+                    _check_unknown_llm_keys(base_settings)
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning("LLM 设置文件读取失败: %s", e)
         else:

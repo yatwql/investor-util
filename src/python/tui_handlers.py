@@ -24,6 +24,126 @@ logger = setup_logger()
 
 _busy: bool = False  # 防连续按键保护
 
+# 报告生成过程中的错误累计（每次生成开始时清空）
+_generation_errors: list[str] = []
+
+
+# ── 计时器 ──────────────────────────────────────────────────
+
+import time as _time_module
+
+_timing_records: list[tuple[str, float]] = []
+
+
+class _Timer:
+    """简单计时器上下文管理器，记录各模块耗时。"""
+
+    def __init__(self, label: str) -> None:
+        self.label = label
+        self.start: float = 0.0
+
+    def __enter__(self) -> '_Timer':
+        self.start = _time_module.time()
+        return self
+
+    def __exit__(self, *args) -> None:
+        elapsed = _time_module.time() - self.start
+        _timing_records.append((self.label, elapsed))
+
+
+def _print_llm_session_usage(usage: dict | None = None) -> None:
+    """输出会话累计 LLM 用量（TUI 终端一行）。
+
+    若 usage 为 None，自动调用 get_session_usage()。
+    无调用记录时静默不输出。
+
+    Args:
+        usage: 可选的 get_session_usage() 返回值，避免重复导入
+    """
+    if usage is None:
+        try:
+            from src.python.llm_client import get_session_usage
+            usage = get_session_usage()
+        except Exception:
+            return
+    if not usage or usage.get("call_count", 0) == 0:
+        return
+    calls = usage["call_count"]
+    total_tok = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+    cost = usage.get("total_cost", 0.0)
+    symbol = {"CNY": "¥", "USD": "$", "EUR": "€", "GBP": "£"}.get(usage.get("currency", "CNY"), "¥")
+    print(f"  [OK] 本会话 LLM 累计：{calls} 次调用，{total_tok:,} tokens，费用 {symbol}{cost:.4f}")
+
+
+def _print_timing_summary() -> None:
+    """输出本次运行时各模块耗时排行。"""
+    if not _timing_records:
+        return
+    total = sum(t for _, t in _timing_records)
+    print()
+    print(f"  ┌{'─' * 48}┐")
+    print(f"  │  ⏱ 模块耗时排行（总计 {total:.1f}s）{' ' * 17}│")
+    print(f"  ├{'─' * 48}┤")
+    sorted_records = sorted(_timing_records, key=lambda x: -x[1])
+    for label, t in sorted_records:
+        pct = t / total * 100 if total > 0 else 0
+        bar_len = int(pct / 100 * 24)
+        bar = "█" * bar_len + "░" * (24 - bar_len)
+        print(f"  │ {label:<18s} {t:>6.1f}s {pct:>5.1f}% {bar} │")
+    print(f"  └{'─' * 48}┘")
+    _timing_records.clear()
+
+
+def _add_error(msg: str) -> None:
+    """向当前会话的错误汇总列表添加一条错误。"""
+    _generation_errors.append(msg)
+    logger.warning("生成异常: %s", msg)
+
+
+def _call_sheet(label: str, fn, *args, **kwargs) -> bool:
+    """安全调用单页写入函数，失败时记录错误并继续。
+
+    Args:
+        label: 页面名称（中文，用于日志/输出）
+        fn: 要调用的写入函数（为 None 时视为模块缺失）
+        args, kwargs: 传递给 fn 的参数
+
+    Returns:
+        True 表示成功，False 表示失败/未调用
+    """
+    if fn is None:
+        _add_error(f"{label}模块缺失，跳过")
+        return False
+    try:
+        print(f"  [..] 正在生成{label}...")
+        fn(*args, **kwargs)
+        print(f"  [OK] {label}生成完成")
+        return True
+    except Exception as e:
+        _add_error(f"{label}生成失败: {e}")
+        logger.exception(f"{label}写入异常")
+        return False
+
+
+def _clear_errors() -> None:
+    """清空错误汇总。"""
+    _generation_errors.clear()
+
+
+def _print_error_summary() -> None:
+    """如果存在错误，在 TUI 尾部输出汇总。"""
+    if not _generation_errors:
+        return
+    print()
+    print(f"  ╔{'═' * 48}╗")
+    print(f"  ║  ⚠ 本次运行异常汇总：{len(_generation_errors)} 项             ║")
+    print(f"  ╠{'═' * 48}╣")
+    for i, err in enumerate(_generation_errors, 1):
+        truncated = err if len(err) <= 70 else err[:67] + "..."
+        print(f"  ║ {i}. {truncated:<45} ║")
+    print(f"  ╚{'═' * 48}╝")
+    print(f"  详细日志请查看 logs/app.log")
+
 
 # ── 辅助函数 ──────────────────────────────────────────────
 
@@ -172,6 +292,7 @@ def _select_holdings_file() -> str | None:
 def _cmd_generate_excel() -> None:
     """生成 Excel 分析报告（必选内容）。"""
     _refresh_config()
+    _clear_errors()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -179,6 +300,7 @@ def _cmd_generate_excel() -> None:
     try:
         holdings = read_holdings(filepath)
         if not holdings:
+            _add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
@@ -187,14 +309,18 @@ def _cmd_generate_excel() -> None:
         _check_and_warm_for_new_assets(holdings)
         _generate_excel_report(holdings, include_news=False, output_dir=config.get("output_dir", "reports"))
     except Exception as e:
+        _add_error(str(e))
         logger.exception("生成 Excel 报告失败")
         _print_error_with_hint(e, "生成失败")
+    _print_error_summary()
+    _print_timing_summary()
     _press_any_key()
 
 
 def _cmd_generate_excel_with_news() -> None:
     """生成包含新闻的 Excel 分析报告。"""
     _refresh_config()
+    _clear_errors()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -202,6 +328,7 @@ def _cmd_generate_excel_with_news() -> None:
     try:
         holdings = read_holdings(filepath)
         if not holdings:
+            _add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
@@ -212,8 +339,11 @@ def _cmd_generate_excel_with_news() -> None:
         news_top_count = int(config.get("news_top_count", 100))
         _generate_excel_report(holdings, include_news=True, output_dir=output_dir, news_top_count=news_top_count)
     except Exception as e:
+        _add_error(str(e))
         logger.exception("生成 Excel（新闻）报告失败")
         _print_error_with_hint(e, "生成失败")
+    _print_error_summary()
+    _print_timing_summary()
     _press_any_key()
 
 
@@ -228,19 +358,60 @@ def _generate_excel_report(
     news_llm_meta: dict | None = None,
 ) -> None:
     """生成 Excel 报告的核心逻辑。"""
-    from src.python.fetcher import fetch_indices, fetch_us_indices
-    from src.python.report.category import write_category_sheet
-    from src.python.report.excel_writer import create_workbook, save_workbook
-    from src.python.report.fund_performance import write_fund_performance_sheet
-    from src.python.report.market_value import (
-        classify_holdings,
-        get_last_trading_day,
-        price_update_status,
-        write_market_value_sheet,
-    )
-    from src.python.report.penetration import write_penetration_sheet, compute_penetration_top10
-    from src.python.report.summary import write_summary_sheet
+    # ── 导入各报告模块（单独捕获，避免一处缺失拖垮整个报告） ──
+    try:
+        from src.python.fetcher import fetch_indices, fetch_us_indices
+    except ImportError:
+        fetch_indices = lambda: {}
+        fetch_us_indices = lambda: {}
+        _add_error("市场指数模块缺失 (fetcher)")
 
+    try:
+        from src.python.report.excel_writer import create_workbook, save_workbook
+    except ImportError:
+        _add_error("Excel 报告核心模块缺失 (excel_writer)，无法生成报告")
+        return
+
+    sheets_ok: dict[str, bool] = {}
+
+    try:
+        from src.python.report.summary import write_summary_sheet
+    except ImportError:
+        write_summary_sheet = None
+        _add_error("汇总页模块缺失 (summary)")
+
+    try:
+        from src.python.report.category import write_category_sheet
+    except ImportError:
+        write_category_sheet = None
+        _add_error("分类汇总模块缺失 (category)")
+
+    try:
+        from src.python.report.market_value import (
+            classify_holdings, get_last_trading_day,
+            price_update_status, write_market_value_sheet,
+        )
+    except ImportError:
+        classify_holdings = lambda _: {}
+        get_last_trading_day = lambda: ""
+        price_update_status = lambda _a, _b: (0, 0, True)
+        write_market_value_sheet = None
+        _add_error("行情市值模块缺失 (market_value)")
+
+    try:
+        from src.python.report.penetration import write_penetration_sheet, compute_penetration_top10
+    except ImportError:
+        write_penetration_sheet = None
+        compute_penetration_top10 = lambda _a, _b: {}
+        _add_error("穿透分析模块缺失 (penetration)")
+
+    try:
+        from src.python.report.fund_performance import write_fund_performance_sheet
+    except ImportError:
+        write_fund_performance_sheet = None
+        _add_error("基金业绩模块缺失 (fund_performance)")
+
+    # ── 创建工作簿（必须成功） ──
     wb = create_workbook()
     wb.remove(wb.active)
 
@@ -252,99 +423,150 @@ def _generate_excel_report(
     ws5 = wb.create_sheet()  # 5. 基金业绩分析
     ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点
 
-    if details is not None:
+    # ── 行情市值页（返回下游所需的核心数据） ──
+    if write_market_value_sheet is None:
+        total_mv = total_cost = total_profit = today_profit = 0.0
+        details = details or []
+        categories: dict[str, int] = {}
+        up_status = (0, 0, True)
+        _add_error("行情市值模块缺失，跳过 Sheet 2")
+    elif details is not None:
         logger.info("复用外部传入的市值核算数据，共 %d 条", len(details))
         total_mv = sum(d.market_value for d in details)
         total_cost = sum(d.cost for d in details)
         total_profit = sum(d.profit for d in details)
         today_profit = sum(d.today_profit for d in details)
-        write_market_value_sheet(ws2, holdings, details=details)
+        with _Timer("市值核算明细表"):
+            write_market_value_sheet(ws2, holdings, details=details)
     else:
-        logger.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
-        total_mv, total_cost, total_profit, today_profit, details = \
-            write_market_value_sheet(ws2, holdings)
+        with _Timer("行情数据获取"):
+            print("  [..] 正在获取行情数据（首次耗时较长，后续使用缓存）...")
+            total_mv, total_cost, total_profit, today_profit, details = \
+                write_market_value_sheet(ws2, holdings)
+        print("  [OK] 行情数据获取完成")
 
-    categories = classify_holdings(holdings)
-    up_status = price_update_status(details, get_last_trading_day())
+    categories = classify_holdings(holdings) if classify_holdings else {}
+    up_status = price_update_status(details, get_last_trading_day()) if price_update_status else (0, 0, True)
 
+    # ── 市场指数 ──
     if a_indices is None:
-        logger.info("正在获取市场指数...")
-        a_indices = fetch_indices()
-    if us_indices is None:
-        us_indices = fetch_us_indices()
+        with _Timer("市场指数"):
+            print("  [..] 正在获取市场指数...")
+            a_indices = fetch_indices() if fetch_indices else {}
+            if us_indices is None:
+                us_indices = fetch_us_indices() if fetch_us_indices else {}
+            print("  [OK] 市场指数获取完成")
 
-    logger.info("正在生成汇总...")
-    write_summary_sheet(
-        ws1, total_mv, total_cost, total_profit, today_profit,
-        categories=categories, update_status=up_status,
-        a_indices=a_indices, us_indices=us_indices,
-    )
+    # ── 各页安全写入 ──
+    with _Timer("投资分析汇总"):
+        _llm_session = None
+        try:
+            from src.python.llm_client import get_session_usage
+            _llm_session = get_session_usage()
+        except Exception:
+            pass
+        _call_sheet("投资分析汇总", write_summary_sheet,
+                     ws1, total_mv, total_cost, total_profit, today_profit,
+                     categories=categories, update_status=up_status,
+                     a_indices=a_indices, us_indices=us_indices,
+                     llm_session_usage=_llm_session)
 
-    logger.info("正在生成分类汇总...")
-    write_category_sheet(ws3, holdings, details)
+    with _Timer("分类汇总表"):
+        _call_sheet("分类汇总表", write_category_sheet, ws3, holdings, details)
 
-    pen_result = compute_penetration_top10(holdings, details)
+    with _Timer("资产穿透TOP10"):
+        pen_result = compute_penetration_top10(holdings, details) if compute_penetration_top10 else {}
+        print("  [OK] 资产穿透 TOP10 计算完成")
 
-    logger.info("正在生成资产穿透 TOP10...")
-    write_penetration_sheet(ws4, holdings, details, penetration_data=pen_result)
+    with _Timer("资产穿透TOP10"):
+        _call_sheet("资产穿透TOP10", write_penetration_sheet,
+                     ws4, holdings, details, penetration_data=pen_result)
 
-    logger.info("正在获取基金业绩排名...")
-    write_fund_performance_sheet(ws5, holdings, details)
+    with _Timer("基金业绩分析"):
+        _call_sheet("基金业绩分析", write_fund_performance_sheet, ws5, holdings, details)
 
     if include_news:
-        from src.python.report.news_correlation import write_news_sheet
         penetrated_assets = pen_result.get("top10", []) if pen_result else []
+        try:
+            from src.python.report.news_correlation import write_news_sheet
+        except ImportError:
+            write_news_sheet = None
+            _add_error("新闻页模块缺失 (news_correlation)")
 
-        if news_data is not None:
-            logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
-            _meta = news_llm_meta or {}
-        else:
-            logger.info("正在获取财经新闻（含穿透资产关键词）...")
-            from src.python.report.news_correlation import build_news_data
-            news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
-        write_news_sheet(ws6, news_data, llm_meta=_meta)
+        with _Timer("财经新闻热点与持仓关联分析"):
+            if news_data is not None:
+                logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
+                _meta = news_llm_meta or {}
+                print(f"  [OK] 复用预取新闻数据（{len(news_data)} 条）")
+            else:
+                print("  [..] 正在获取财经新闻（含穿透资产关键词）...")
+                try:
+                    from src.python.report.news_correlation import build_news_data
+                except ImportError:
+                    build_news_data = None
+                if build_news_data:
+                    try:
+                        news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
+                    except Exception as e:
+                        _add_error(f"新闻数据获取失败: {e}")
+                        news_data, _meta = [], {}
+                else:
+                    _add_error("新闻数据模块缺失")
+                    news_data, _meta = [], {}
+        with _Timer("财经新闻热点与持仓关联分析"):
+            _call_sheet("财经新闻热点与持仓关联分析", write_news_sheet, ws6, news_data, llm_meta=_meta)
 
     if include_llm:
-        logger.info("正在生成 LLM 增补内容...")
-        try:
-            from src.python.report.llm_content import write_llm_sheets
-            _llm_cfg = get_llm_config() or {}
-            _model_names = (
-                _llm_cfg.get("model_global_macro") or _llm_cfg.get("model", ""),
-                _llm_cfg.get("model_expert_review") or _llm_cfg.get("model", ""),
-                _llm_cfg.get("model_health_check") or _llm_cfg.get("model", ""),
-                _llm_cfg.get("model_penetration_deep") or _llm_cfg.get("model", ""),
-            )
-            _thinking = (
-                _llm_cfg.get("thinking_enabled_global_macro", False),
-                _llm_cfg.get("thinking_enabled_expert_review", False),
-                _llm_cfg.get("thinking_enabled_health_check", False),
-                _llm_cfg.get("thinking_enabled_penetration_deep", False),
-            )
-            macro_text, expert_text, health_text, penetration_text = write_llm_sheets(
-                wb, llm_content=llm_content, llm_cached=llm_cached,
-                model_names=_model_names, thinking=_thinking,
-            )
-            logger.info("LLM 增补内容已生成")
-        except ImportError:
-            logger.warning("LLM 增补模块 (src.report.llm_content) 未就绪，跳过")
-            macro_text = expert_text = health_text = penetration_text = ""
-        except Exception as e:
-            logger.exception("生成 LLM 增补内容失败")
-            macro_text = expert_text = health_text = penetration_text = ""
+        with _Timer("LLM 分析章节"):
+            print("  [..] 正在生成 LLM 增补内容...")
+            try:
+                from src.python.report.llm_content import write_llm_sheets
+                _llm_cfg = get_llm_config() or {}
+                _model_names = (
+                    _llm_cfg.get("model_global_macro") or _llm_cfg.get("model", ""),
+                    _llm_cfg.get("model_expert_review") or _llm_cfg.get("model", ""),
+                    _llm_cfg.get("model_health_check") or _llm_cfg.get("model", ""),
+                    _llm_cfg.get("model_penetration_deep") or _llm_cfg.get("model", ""),
+                )
+                _thinking = (
+                    _llm_cfg.get("thinking_enabled_global_macro", False),
+                    _llm_cfg.get("thinking_enabled_expert_review", False),
+                    _llm_cfg.get("thinking_enabled_health_check", False),
+                    _llm_cfg.get("thinking_enabled_penetration_deep", False),
+                )
+                macro_text, expert_text, health_text, penetration_text = write_llm_sheets(
+                    wb, llm_content=llm_content, llm_cached=llm_cached,
+                    model_names=_model_names, thinking=_thinking,
+                )
+                logger.info("LLM 增补内容已生成")
+                print("  [OK] LLM 增补内容生成完成")
+            except ImportError:
+                logger.warning("LLM 增补模块 (src.report.llm_content) 未就绪，跳过")
+                _add_error("LLM 增补模块未就绪，跳过")
+                macro_text = expert_text = health_text = penetration_text = ""
+            except Exception as e:
+                logger.exception("生成 LLM 增补内容失败")
+                _add_error(f"LLM 增补内容生成失败: {e}")
+                macro_text = expert_text = health_text = penetration_text = ""
 
         if show_llm_in_tui and (macro_text or expert_text or health_text or penetration_text):
             _show_llm_tui(macro_text, expert_text, health_text, penetration_text)
 
-    path = save_workbook(wb, output_dir=output_dir)
-    logger.info("Excel 报告已生成: %s", path)
-    logger.info("总市值: %.2f元, 总成本: %.2f元, 总盈亏: %.2f元, 本日盈亏: %.2f元",
-                total_mv, total_cost, total_profit, today_profit)
+        _print_llm_session_usage(_llm_session)
+
+    with _Timer("保存文件"):
+        print("  [..] 正在保存 Excel 报告...")
+        path = save_workbook(wb, output_dir=output_dir)
+        logger.info("Excel 报告已生成: %s", path)
+        logger.info("总市值: %.2f元, 总成本: %.2f元, 总盈亏: %.2f元, 本日盈亏: %.2f元",
+                    total_mv, total_cost, total_profit, today_profit)
+        print(f"  [OK] Excel 报告已保存: {path}")
 
 
 def _cmd_generate_html(news: bool = False) -> None:
     """生成基础的 HTML 分析报告。"""
     _refresh_config()
+    _clear_errors()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -354,6 +576,7 @@ def _cmd_generate_html(news: bool = False) -> None:
         print("  [..] 正在读取持仓数据...")
         holdings = read_holdings(filepath)
         if not holdings:
+            _add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
@@ -372,14 +595,18 @@ def _cmd_generate_html(news: bool = False) -> None:
         print()
         print(f"  [OK] HTML 报告已生成: {path}")
     except Exception as e:
+        _add_error(f"HTML 报告生成失败: {e}")
         logger.exception("生成 HTML 报告失败")
         _print_error_with_hint(e, "生成失败")
+    _print_error_summary()
+    _print_timing_summary()
     _press_any_key()
 
 
 def _cmd_generate_both() -> None:
     """生成全系列包含新闻的报告（Excel+HTML，不含 LLM 增补内容）。"""
     _refresh_config()
+    _clear_errors()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -388,6 +615,7 @@ def _cmd_generate_both() -> None:
     try:
         holdings = read_holdings(filepath)
         if not holdings:
+            _add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
@@ -406,12 +634,18 @@ def _cmd_generate_both() -> None:
 
         from src.python.report.html_writer import write_html_report
         print("  [..] 正在生成 HTML 报告（含新闻）...")
-        path = write_html_report(
-            holdings, output_dir=output_dir,
-            news_top_count=news_top_count, include_news=True,
-            details=details,
-        )
-        print(f"  [OK] HTML 报告已生成: {path}")
+        try:
+            path = write_html_report(
+                holdings, output_dir=output_dir,
+                news_top_count=news_top_count, include_news=True,
+                details=details,
+            )
+            print(f"  [OK] HTML 报告已生成: {path}")
+        except Exception as e:
+            _add_error(f"HTML 报告生成失败: {e}")
+            logger.exception("HTML 报告写入失败")
+            print(f"  [ERR] HTML 报告生成失败: {e}")
+            print("  [..] 继续生成 Excel 报告...")
 
         print()
         _generate_excel_report(
@@ -419,8 +653,11 @@ def _cmd_generate_both() -> None:
             news_top_count=news_top_count, details=details,
         )
     except Exception as e:
+        _add_error(f"全系列报告生成失败: {e}")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
+    _print_error_summary()
+    _print_timing_summary()
     _press_any_key()
 
 
@@ -505,6 +742,7 @@ def _show_llm_tui(macro_text: str, expert_text: str, health_text: str = "", pene
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 增补内容）。"""
     _refresh_config()
+    _clear_errors()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -513,6 +751,7 @@ def _cmd_generate_full() -> None:
     try:
         holdings = read_holdings(filepath)
         if not holdings:
+            _add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
@@ -553,6 +792,8 @@ def _cmd_generate_full() -> None:
                     if d.yesterday_close and abs(d.yesterday_close) > 1e-10
                     else 0.0
                 ),
+                "nav_date": d.nav_date,
+                "source_api": d.source_api,
             }
             for d in details
         ]
@@ -598,14 +839,28 @@ def _cmd_generate_full() -> None:
 
             for fut in as_completed([_news_fut, _llm_fut]):
                 if fut is _llm_fut:
-                    llm_macro, llm_expert, llm_health, llm_penetration, macro_cached, expert_cached, health_cached, penetration_cached = fut.result()
-                    llm_content = (llm_macro, llm_expert, llm_health, llm_penetration)
-                    llm_cached = (macro_cached, expert_cached, health_cached, penetration_cached)
-                    tag = "缓存" if macro_cached and expert_cached else "LLM"
-                    print(f"  [OK] {tag} 内容生成完成")
+                    try:
+                        llm_macro, llm_expert, llm_health, llm_penetration, macro_cached, expert_cached, health_cached, penetration_cached = fut.result()
+                        llm_content = (llm_macro, llm_expert, llm_health, llm_penetration)
+                        llm_cached = (macro_cached, expert_cached, health_cached, penetration_cached)
+                        if not any(c is None for c in (llm_macro, llm_expert, llm_health, llm_penetration)):
+                            tag = "缓存" if macro_cached and expert_cached else "LLM"
+                            print(f"  [OK] {tag} 内容生成完成")
+                        else:
+                            _add_error("部分 LLM 内容生成失败（已降级使用占位文本）")
+                            print("  [!] 部分 LLM 内容生成失败（已降级使用占位文本）")
+                    except Exception as e:
+                        _add_error(f"LLM 内容生成异常: {e}")
+                        print(f"  [ERR] LLM 内容生成异常: {e}")
                 else:
-                    news_data, news_llm_meta = fut.result()
-                    print(f"  [OK] 新闻获取完成，共 {len(news_data)} 条")
+                    try:
+                        news_data, news_llm_meta = fut.result()
+                        print(f"  [OK] 新闻获取完成，共 {len(news_data)} 条")
+                    except Exception as e:
+                        _add_error(f"新闻获取失败: {e}")
+                        print(f"  [!] 新闻获取失败: {e}")
+
+        _print_llm_session_usage()
 
         from src.python.report.html_writer import write_html_report
         print("  [..] 正在生成 HTML 报告（含新闻 + LLM 增补内容）...")
@@ -618,6 +873,7 @@ def _cmd_generate_full() -> None:
             )
             print(f"  [OK] HTML 报告已生成: {path}")
         except Exception as e:
+            _add_error(f"HTML 报告生成失败: {e}")
             logger.exception("HTML 报告写入失败")
             print(f"  [ERR] HTML 报告生成失败: {e}")
             print("  [..] 继续生成 Excel 报告...")
@@ -632,8 +888,11 @@ def _cmd_generate_full() -> None:
             news_llm_meta=news_llm_meta,
         )
     except Exception as e:
+        _add_error(f"全系列报告生成失败: {e}")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
+    _print_error_summary()
+    _print_timing_summary()
     _press_any_key()
 
 
@@ -744,17 +1003,19 @@ def _cmd_update_basic_cache() -> None:
         clear("fund_benchmarks")
         clear_by_prefix("news_")
         clear_by_prefix("llm_news_correlation_")
+        clear_by_prefix("llm_news_item_")
         clear_by_prefix("industry_")
         clear_by_prefix("dividend_")
         clear_by_prefix("profit_forecast_")
         clear_by_prefix("sector_flow_")
-        print("  [OK] 旧缓存已清除（含 news_ + llm_news_correlation_ + industry_ +"
+        print("  [OK] 旧缓存已清除（含 fund_perf_ + fund_hold_ + fund_benchmarks + news_ +"
+              " llm_news_correlation_ + llm_news_item_ + industry_ +"
               " dividend_ + profit_forecast_ + sector_flow_ 缓存）")
 
         print()
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        print(f"  [..]   并行获取 {len(funds)} 只基金的数据（最多 3 路并发）...")
+        print(f"  [..]   并行获取全部 8 类缓存数据...")
 
+        # 基金级刷新
         def _refresh_one_fund(fund):
             perf_result = fetch_fund_rankings(fund.code)
             perf_ok = bool(perf_result)
@@ -763,23 +1024,66 @@ def _cmd_update_basic_cache() -> None:
             hold_count = len(hold_data["holdings"]) if hold_data and hold_data.get("holdings") else 0
             bm = fetch_fund_benchmark(fund.code)
             bm_ok = bool(bm and bm != "--")
-            return (fund.code, fund.name, perf_ok, hold_ok, hold_count, bm_ok, bm if bm_ok else "")
+            return ("fund", fund.code, fund.name, perf_ok, hold_ok, hold_count, bm_ok)
+
+        def _refresh_profit_forecast():
+            from src.python.providers.akshare_extras import _memo_clear, get_profit_forecast
+            _memo_clear()
+            data = get_profit_forecast()
+            ok = len(data) if data else 0
+            return ("profit_forecast", ok)
+
+        def _refresh_sector_flow():
+            from src.python.providers.akshare_extras import get_sector_fund_flow
+            data = get_sector_fund_flow()
+            ok = len(data) if data else 0
+            return ("sector_flow", ok)
 
         perf_ok = hold_ok = bm_ok = 0
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            fut_to_fund = {executor.submit(_refresh_one_fund, f): f for f in funds}
-            for future in as_completed(fut_to_fund):
-                code, name, p_ok, h_ok, h_cnt, b_ok, bm_str = future.result()
-                if p_ok: perf_ok += 1
-                if h_ok: hold_ok += 1
-                if b_ok: bm_ok += 1
-                parts = [f"业绩={'OK' if p_ok else '失败'}"]
-                if h_ok:
-                    parts.append(f"持仓={h_cnt}条")
-                else:
-                    parts.append("持仓=无数据")
-                parts.append(f"基准={'OK' if b_ok else '未找到'}")
-                print(f"  [OK]   {name} ({code}) — {' | '.join(parts)}")
+        pf_ok = sf_ok = 0
+
+        # 将所有任务提交到同一线程池：基金数据 + 盈利预测 + 行业资金流向
+        max_workers_val = max(3, min(len(funds) + 2, 7))
+        with ThreadPoolExecutor(max_workers=max_workers_val) as executor:
+            all_futures = {}
+            for f in funds:
+                all_futures[executor.submit(_refresh_one_fund, f)] = "fund"
+            all_futures[executor.submit(_refresh_profit_forecast)] = "other"
+            all_futures[executor.submit(_refresh_sector_flow)] = "other"
+
+            for future in as_completed(all_futures):
+                tag = all_futures[future]
+                try:
+                    result = future.result()
+                    if result[0] == "fund":
+                        _, code, name, p_ok, h_ok, h_cnt, b_ok = result
+                        if p_ok: perf_ok += 1
+                        if h_ok: hold_ok += 1
+                        if b_ok: bm_ok += 1
+                        parts = [f"业绩={'OK' if p_ok else '失败'}"]
+                        if h_ok:
+                            parts.append(f"持仓={h_cnt}条")
+                        else:
+                            parts.append("持仓=无数据")
+                        parts.append(f"基准={'OK' if b_ok else '未找到'}")
+                        print(f"  [OK]   {name} ({code}) — {' | '.join(parts)}")
+                    elif result[0] == "profit_forecast":
+                        pf_ok = result[1]
+                        if pf_ok:
+                            print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)")
+                        else:
+                            print("  [!]   profit_forecast              获取失败")
+                    elif result[0] == "sector_flow":
+                        sf_ok = result[1]
+                        if sf_ok:
+                            print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)")
+                        else:
+                            print("  [!]   sector_flow                  获取失败")
+                except Exception:
+                    if tag == "fund":
+                        print(f"  [!]   基金刷新异常")
+                    else:
+                        print(f"  [!]   其他缓存刷新异常")
 
         print()
         print(f"  {'=' * 40}")
@@ -800,32 +1104,14 @@ def _cmd_update_basic_cache() -> None:
             print(f"  [OK] fund_benchmarks.json       ({bm_ok}/{len(funds)} 全部成功)")
         else:
             print(f"  [!] fund_benchmarks.json       ({bm_ok}/{len(funds)} 成功, {bm_fail} 只未找到)")
-
-        # ── 盈利预测 + 行业资金流向 ──
-        print()
-        print("  [..]   刷新全量盈利预测和行业资金流向...")
-        from src.python.providers.akshare_extras import (
-            _memo_clear, get_profit_forecast, get_sector_fund_flow,
-        )
-        _memo_clear()
-        pf_ok = sf_ok = 0
-        with ThreadPoolExecutor(max_workers=2) as _pool:
-            _pf_fut = _pool.submit(get_profit_forecast)
-            _sf_fut = _pool.submit(get_sector_fund_flow)
-            pf_data = _pf_fut.result()
-            sf_data = _sf_fut.result()
-            if pf_data:
-                pf_ok = len(pf_data)
-            if sf_data:
-                sf_ok = len(sf_data)
         if pf_ok:
-            print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)")
+            print(f"  [OK] profit_forecast.json           ({pf_ok} 只股票)")
         else:
-            print("  [!]   profit_forecast              获取失败")
+            print(f"  [!] profit_forecast.json           获取失败")
         if sf_ok:
-            print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)")
+            print(f"  [OK] sector_flow.json               ({sf_ok} 个行业)")
         else:
-            print("  [!]   sector_flow                  获取失败")
+            print(f"  [!] sector_flow.json               获取失败")
     except Exception as e:
         logger.exception("更新基础缓存失败")
         print(f"  [ERR] 更新失败: {e}")
@@ -867,28 +1153,42 @@ def _cmd_update_position_cache() -> None:
               f"体检报告 {health_count} 条 + 穿透深度 {penetration_count} 条 已清除")
 
         print()
-        print(f"  [..]   并行获取 {len(holdings)} 条持仓的价格/净值（最多 5 路并发）...")
+        print(f"  [..]   并行获取持仓价格/净值 + 市场指数...")
         price_ok = 0
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            fut_to_h = {executor.submit(fetch_market_data, h.code, h.name): h for h in holdings}
-            for future in as_completed(fut_to_h):
-                h = fut_to_h[future]
-                try:
-                    result = future.result()
-                    if result and result.get("price", 0) > 0:
-                        price_ok += 1
-                        print(f"  [OK]   {h.name} ({h.code}) → {result['price']:.4f}")
-                    else:
-                        print(f"  [!]   {h.name} ({h.code}) → 失败")
-                except Exception as e:
-                    print(f"  [ERR]  {h.name} ({h.code}) → {e}")
+        a_idx: dict = {}
+        us_idx: dict = {}
+        with ThreadPoolExecutor(max_workers=max(3, min(len(holdings) + 2, 7))) as executor:
+            fut_map: dict[Any, str | None] = {}
+            for h in holdings:
+                fut_map[executor.submit(fetch_market_data, h.code, h.name)] = h
+            idx_a_fut = executor.submit(fetch_indices)
+            idx_us_fut = executor.submit(fetch_us_indices)
+            fut_map[idx_a_fut] = None
+            fut_map[idx_us_fut] = None
 
-        print()
-        print("  [..] 获取市场指数...")
-        a_idx = fetch_indices()
-        print(f"  [OK] A 股指数: {len(a_idx)} 个")
-        us_idx = fetch_us_indices()
-        print(f"  [OK] 美股指数: {len(us_idx)} 个")
+            for future in as_completed(fut_map):
+                h_or_none = fut_map[future]
+                try:
+                    if h_or_none is None:
+                        # 指数请求
+                        result = future.result()
+                        if future is idx_a_fut:
+                            a_idx = result or {}
+                            print(f"  [OK]   A 股指数: {len(a_idx)} 个")
+                        else:
+                            us_idx = result or {}
+                            print(f"  [OK]   美股指数: {len(us_idx)} 个")
+                    else:
+                        h = h_or_none
+                        result = future.result()
+                        if result and result.get("price", 0) > 0:
+                            price_ok += 1
+                            print(f"  [OK]   {h.name} ({h.code}) → {result['price']:.4f}")
+                        else:
+                            print(f"  [!]   {h.name} ({h.code}) → 失败")
+                except Exception as e:
+                    if h_or_none is not None:
+                        print(f"  [ERR]  {h_or_none.name} ({h_or_none.code}) → {e}")
 
         print()
         print(f"  {'=' * 40}")
@@ -933,6 +1233,16 @@ def _cmd_show_cache_stats() -> None:
     for prefix, count in sorted(stats.get("by_prefix", {}).items()):
         print(f"    {prefix}_*: {count} 个文件")
     print()
+    top_size = stats.get("top_by_size", [])
+    if top_size:
+        print(f"  最大文件 TOP {len(top_size)}:")
+        for key, size in top_size:
+            size_kb = size / 1024
+            if size_kb >= 1024:
+                print(f"    {key}.json  ({size_kb / 1024:.1f} MB)")
+            else:
+                print(f"    {key}.json  ({size_kb:.0f} KB)")
+        print()
     print("  [..] 正在检查过期文件...")
     expired = cleanup_expired(dry_run=True)
     print(f"  过期文件: {expired} 个（可通过菜单 [3] 清理）")

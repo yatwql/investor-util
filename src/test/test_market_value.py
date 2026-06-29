@@ -97,59 +97,6 @@ class TestIsEtf(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _date_within_days
-# ═══════════════════════════════════════════════════════════
-
-
-class TestDateWithinDays(unittest.TestCase):
-    """测试 _date_within_days 日期范围判断。"""
-
-    def test_same_day(self):
-        """同一天 → True（0 天差）。"""
-        self.assertTrue(mv._date_within_days("2026-06-26", "2026-06-26", 3))
-
-    def test_within_days(self):
-        """在范围内（1 天差）→ True。"""
-        self.assertTrue(mv._date_within_days("2026-06-25", "2026-06-26", 3))
-
-    def test_exactly_max_days(self):
-        """恰好 max_days 天差 → True。"""
-        self.assertTrue(mv._date_within_days("2026-06-23", "2026-06-26", 3))
-
-    def test_beyond_max_days(self):
-        """超过 max_days 天差 → False。"""
-        self.assertFalse(mv._date_within_days("2026-06-22", "2026-06-26", 3))
-
-    def test_future_date(self):
-        """未来日期（负数天差）→ False。"""
-        self.assertFalse(mv._date_within_days("2026-06-28", "2026-06-26", 3))
-
-    def test_invalid_date_str(self):
-        """无效日期字符串 → False。"""
-        self.assertFalse(mv._date_within_days("not-a-date", "2026-06-26", 3))
-
-    def test_empty_date_str(self):
-        """空日期字符串 → False。"""
-        self.assertFalse(mv._date_within_days("", "2026-06-26", 3))
-
-    def test_none_date_str(self):
-        """None 日期 → False（TypeError 分支）。"""
-        self.assertFalse(mv._date_within_days(None, "2026-06-26", 3))
-
-    def test_invalid_today_str(self):
-        """无效 today_str → False。"""
-        self.assertFalse(mv._date_within_days("2026-06-26", "", 3))
-
-    def test_max_days_zero(self):
-        """max_days=0，仅当天匹配 → True。"""
-        self.assertTrue(mv._date_within_days("2026-06-26", "2026-06-26", 0))
-
-    def test_max_days_zero_beyond(self):
-        """max_days=0，差 1 天 → False。"""
-        self.assertFalse(mv._date_within_days("2026-06-25", "2026-06-26", 0))
-
-
-# ═══════════════════════════════════════════════════════════
 #  classify_holdings
 # ═══════════════════════════════════════════════════════════
 
@@ -341,26 +288,26 @@ class TestPriceUpdateStatus(unittest.TestCase):
 
     # ── EastMoney + QDII ────────────────────────────────
 
-    def test_eastmoney_qdii_within_3_days(self):
-        """eastmoney + QDII + nav_date 在 3 天内 → 已更新。"""
+    def test_eastmoney_qdii_equal_trading_day(self):
+        """eastmoney + QDII + nav_date == trading_day(T) → 已更新。"""
+        d = self._row("eastmoney", "2026-06-26", name="标普500(QDII)")
+        updated, _, _ = mv.price_update_status([d], "2026-06-26")
+        self.assertEqual(updated, 1)
+
+    def test_eastmoney_qdii_equal_prev_trading_day(self):
+        """eastmoney + QDII + nav_date == prev_trading_day(T-1) → 已更新。"""
+        d = self._row("eastmoney", "2026-06-25", name="标普500(QDII)")
+        updated, _, _ = mv.price_update_status([d], "2026-06-26")
+        self.assertEqual(updated, 1)
+
+    def test_eastmoney_qdii_old_date(self):
+        """eastmoney + QDII + nav_date 早于 T-1 → 未更新。"""
         d = self._row("eastmoney", "2026-06-24", name="标普500(QDII)")
-        updated, _, _ = mv.price_update_status([d], "2026-06-26")
-        self.assertEqual(updated, 1)
-
-    def test_eastmoney_qdii_exactly_3_days(self):
-        """eastmoney + QDII + nav_date 恰好 3 天 → 已更新。"""
-        d = self._row("eastmoney", "2026-06-23", name="标普500(QDII)")
-        updated, _, _ = mv.price_update_status([d], "2026-06-26")
-        self.assertEqual(updated, 1)
-
-    def test_eastmoney_qdii_beyond_3_days(self):
-        """eastmoney + QDII + nav_date 超出 3 天 → 未更新。"""
-        d = self._row("eastmoney", "2026-06-22", name="标普500(QDII)")
         updated, _, _ = mv.price_update_status([d], "2026-06-26")
         self.assertEqual(updated, 0)
 
     def test_eastmoney_qdii_empty_nav_date(self):
-        """eastmoney + QDII + 空 nav_date → 未更新（nav_date 为 falsy）。"""
+        """eastmoney + QDII + 空 nav_date → 未更新。"""
         d = self._row("eastmoney", "", name="标普500(QDII)")
         updated, _, _ = mv.price_update_status([d], "2026-06-26")
         self.assertEqual(updated, 0)
@@ -374,11 +321,11 @@ class TestPriceUpdateStatus(unittest.TestCase):
         self.assertEqual(updated, 1)
 
     def test_eastmoney_domestic_equal_prev_trading_day(self):
-        """eastmoney + 非 QDII + nav_date == prev_trading_day → 已更新。"""
+        """eastmoney + 非 QDII + nav_date == prev_trading_day(T-1) → 不计入（仅 T 算已更新）。"""
         # 周三交易日，周二为前一日
         d = self._row("eastmoney", "2026-06-23", name="中欧医疗健康混合")
         updated, _, _ = mv.price_update_status([d], "2026-06-24")
-        self.assertEqual(updated, 1)
+        self.assertEqual(updated, 0)
 
     def test_eastmoney_domestic_neither(self):
         """eastmoney + 非 QDII + nav_date 不是 T 也不是 T-1 → 未更新。"""
@@ -732,7 +679,8 @@ class TestDeterminePriceType(unittest.TestCase):
         self.assertEqual(result, "场内实时价")
 
     @patch("src.python.report.market_value.is_market_open", return_value=False)
-    def test_tencent_closed_no_nav_date(self, _):
+    @patch("src.python.report.market_value.is_midday_break", return_value=False)
+    def test_tencent_closed_no_nav_date(self, _, __):
         """tencent + 已收市 + 无净值日期 → 场内收盘价(--)。"""
         with patch("src.python.report.market_value.get_prev_trading_day",
                    return_value=self.prev):
@@ -740,13 +688,15 @@ class TestDeterminePriceType(unittest.TestCase):
             self.assertEqual(result, "场内收盘价(--)")
 
     @patch("src.python.report.market_value.is_market_open", return_value=False)
-    def test_tencent_closed_nav_today(self, _):
+    @patch("src.python.report.market_value.is_midday_break", return_value=False)
+    def test_tencent_closed_nav_today(self, _, __):
         """tencent + 已收市 + nav_date == T → 场内收盘价(T)。"""
         result = mv._determine_price_type("tencent", self.td, self.td)
         self.assertEqual(result, "场内收盘价(T)")
 
     @patch("src.python.report.market_value.is_market_open", return_value=False)
-    def test_tencent_closed_nav_prev(self, _):
+    @patch("src.python.report.market_value.is_midday_break", return_value=False)
+    def test_tencent_closed_nav_prev(self, _, __):
         """tencent + 已收市 + nav_date == T-1 → 场内收盘价(T-1)。"""
         with patch("src.python.report.market_value.get_prev_trading_day",
                    return_value=self.prev):
@@ -754,10 +704,29 @@ class TestDeterminePriceType(unittest.TestCase):
             self.assertEqual(result, "场内收盘价(T-1)")
 
     @patch("src.python.report.market_value.is_market_open", return_value=False)
-    def test_tencent_closed_nav_other(self, _):
+    @patch("src.python.report.market_value.is_midday_break", return_value=False)
+    def test_tencent_closed_nav_other(self, _, __):
         """tencent + 已收市 + nav_date 为其他日期 → 场内收盘价(date)。"""
         result = mv._determine_price_type("tencent", "2026-06-20", self.td)
         self.assertEqual(result, "场内收盘价(2026-06-20)")
+
+    # ── 午间休市 ──────────────────────────────────────────
+
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.is_midday_break", return_value=True)
+    def test_tencent_midday_nav_today(self, _, __):
+        """tencent + 午间休市 + nav_date == T → 场内午市收盘(T)。"""
+        result = mv._determine_price_type("tencent", self.td, self.td)
+        self.assertEqual(result, "场内午市收盘(T)")
+
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.is_midday_break", return_value=True)
+    def test_tencent_midday_nav_prev(self, _, __):
+        """tencent + 午间休市 + nav_date == T-1 → 仍为场内收盘价(T-1)。"""
+        with patch("src.python.report.market_value.get_prev_trading_day",
+                   return_value=self.prev):
+            result = mv._determine_price_type("tencent", self.prev, self.td)
+            self.assertEqual(result, "场内收盘价(T-1)")
 
     # ── EastMoney（场外）──────────────────────────────────
 
@@ -784,14 +753,14 @@ class TestDeterminePriceType(unittest.TestCase):
         self.assertEqual(result, "官方净值(T-2)")
 
     def test_eastmoney_nav_5_days_ago(self):
-        """eastmoney + nav_date 5 天前 → 官方净值(T-5)。"""
-        result = mv._determine_price_type("eastmoney", "2026-06-21", self.td)
+        """eastmoney + nav_date 5 个交易日前 → 官方净值(T-5)。"""
+        result = mv._determine_price_type("eastmoney", "2026-06-18", self.td)
         self.assertEqual(result, "官方净值(T-5)")
 
     def test_eastmoney_nav_6_days_ago(self):
-        """eastmoney + nav_date 6 天前 → 官方净值(date)。"""
-        result = mv._determine_price_type("eastmoney", "2026-06-20", self.td)
-        self.assertEqual(result, "官方净值(2026-06-20)")
+        """eastmoney + nav_date 6 个交易日前 → 官方净值(date)。"""
+        result = mv._determine_price_type("eastmoney", "2026-06-17", self.td)
+        self.assertEqual(result, "官方净值(2026-06-17)")
 
     def test_eastmoney_nav_invalid_format(self):
         """eastmoney + 无效日期格式 → 官方净值(原字符串)（ValueError 分支）。"""
@@ -829,8 +798,10 @@ class TestGenerateDetails(unittest.TestCase):
     @patch("src.python.report.market_value.fetch_market_data")
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open")
-    def test_tencent_asset(self, mock_open, mock_ltd, mock_fetch):
+    @patch("src.python.report.market_value.is_midday_break")
+    def test_tencent_asset(self, mock_midday, mock_open, mock_ltd, mock_fetch):
         """Tencent 场内资产：各字段正确赋值，today_profit 按公式计算。"""
+        mock_midday.return_value = False
         mock_open.return_value = False
         mock_ltd.return_value = "2026-06-26"
         mock_fetch.return_value = self.tencent_mock_data
@@ -978,6 +949,57 @@ class TestGenerateDetails(unittest.TestCase):
         h = Holding("  证券账户  ", "电池ETF", "561910", 100.0, 1.0)
         details = mv._generate_details([h], "2026-06-26")
         self.assertEqual(details[0].account, "证券账户")
+
+    # ── 回归测试：场外基金本日盈亏（issue #1）────────────
+    @patch("src.python.report.market_value.fetch_market_data")
+    @patch("src.python.report.market_value.get_last_trading_day")
+    def test_eastmoney_nav_t_minus_1_today_profit_zero(self, mock_ltd, mock_fetch):
+        """场外基金净值日期为 T-1（今日净值未出）→ 本日盈亏为 0。"""
+        mock_ltd.return_value = "2026-06-26"
+        mock_fetch.return_value = {
+            "name": "中欧医疗健康混合", "code": "003095",
+            "price": 1.5, "yesterday_close": 1.48,
+            "price_date": "2026-06-25",          # T-1（周四）
+            "source_api": "eastmoney", "source": "东方财富",
+        }
+        h = Holding("支付宝", "中欧医疗健康混合", "003095", 500.0, 2.0)
+        details = mv._generate_details([h], "2026-06-26")
+        self.assertEqual(details[0].today_profit, 0.0)
+        # price_type 仍应为 T-1
+        self.assertEqual(details[0].price_type, "官方净值(T-1)")
+
+    @patch("src.python.report.market_value.fetch_market_data")
+    @patch("src.python.report.market_value.get_last_trading_day")
+    def test_eastmoney_nav_t_minus_2_price_type(self, mock_ltd, mock_fetch):
+        """场外基金净值日期为 T-2（如 6/25 → T=6/29 周一）→ 显示官方净值(T-2)。"""
+        mock_ltd.return_value = "2026-06-29"
+        mock_fetch.return_value = {
+            "name": "016055", "code": "016055",
+            "price": 1.2, "yesterday_close": 1.18,
+            "price_date": "2026-06-25",          # T-2（周四）
+            "source_api": "eastmoney", "source": "东方财富",
+        }
+        h = Holding("基金账户", "016055", "016055", 1000.0, 1.0)
+        details = mv._generate_details([h], "2026-06-29")
+        self.assertEqual(details[0].price_type, "官方净值(T-2)")
+        # 今日净值未出 → 本日盈亏为 0
+        self.assertEqual(details[0].today_profit, 0.0)
+
+    @patch("src.python.report.market_value.fetch_market_data")
+    @patch("src.python.report.market_value.get_last_trading_day")
+    def test_eastmoney_nav_today_today_profit_computed(self, mock_ltd, mock_fetch):
+        """场外基金净值日期等于交易日（T）→ 本日盈亏正常计算。"""
+        mock_ltd.return_value = "2026-06-26"
+        mock_fetch.return_value = {
+            "name": "中欧医疗健康混合", "code": "003095",
+            "price": 1.5, "yesterday_close": 1.48,
+            "price_date": "2026-06-26",          # T（周五）
+            "source_api": "eastmoney", "source": "东方财富",
+        }
+        h = Holding("支付宝", "中欧医疗健康混合", "003095", 500.0, 2.0)
+        details = mv._generate_details([h], "2026-06-26")
+        self.assertEqual(details[0].today_profit, 10.0)
+        self.assertEqual(details[0].price_type, "官方净值(T)")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1354,7 +1376,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_aw.assert_called_once_with(ws)
 
         # 验证工作表标题
-        self.assertEqual(ws.title, "2. 市值核算")
+        self.assertEqual(ws.title, "2.市值核算明细表")
 
     @patch("src.python.report.market_value.write_total_row")
     @patch("src.python.report.market_value.write_subtotal_row")

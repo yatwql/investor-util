@@ -94,10 +94,10 @@ def _jinja_price_type_color(price_type: str, name: str = "") -> str:
     """取价方式颜色：蓝色代表数据时效性高/可靠。
 
     着色规则同 Excel 端 _apply_price_type_colors：
-      - "场内收盘价(T)"、"官方净值(T)" → #0066CC
+      - "场内收盘价(T)"、"场内午市收盘(T)"、"官方净值(T)" → #0066CC
       - QDII 基金 "官方净值(T-1)" → #0066CC
     """
-    if price_type in ("场内收盘价(T)", "官方净值(T)"):
+    if price_type in ("场内收盘价(T)", "场内午市收盘(T)", "官方净值(T)"):
         return "#0066CC"
     if price_type == "官方净值(T-1)":
         if name and "QDII" in name.upper():
@@ -256,7 +256,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     perf_data = _build_perf_data(holdings, details)
 
     # ── 8) 财经新闻热点（可选）─────────────────────────────
-    _news_llm_meta: dict = {"llm_enabled": False, "llm_cached": False, "token_usage": {}}
+    _news_llm_meta: dict = {"llm_enabled": False, "llm_cached": False, "token_usage": {}, "cost_estimation": "-", "thinking_enabled": False}
     if include_news:
         if news_data is not None:
             logger.info("复用调用方传入的新闻数据，共 %d 条", len(news_data))
@@ -344,7 +344,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
                 logger.info("模块 9（持仓体检报告）LLM 生成完成")
             if penetration_deep_content:
                 llm_enabled_flag = True
-                logger.info("模块 A（穿透深度分析）LLM 生成完成")
+                logger.info("模块 10（穿透深度分析）LLM 生成完成")
         except Exception as e:
             logger.warning("LLM 生成失败: %s", e)
 

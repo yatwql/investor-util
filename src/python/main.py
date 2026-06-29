@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import sys
 
@@ -29,6 +30,35 @@ from src.python.tui_menu import (
 from src.python.tui_handlers import _execute_item
 
 logger = setup_logger()
+
+
+def _print_session_usage_on_exit() -> None:
+    """程序退出时打印 LLM 会话累计用量。"""
+    try:
+        from src.python.llm_client import get_session_usage
+        usage = get_session_usage()
+        if usage.get("call_count", 0) > 0:
+            inp = usage.get("input_tokens", 0)
+            out = usage.get("output_tokens", 0)
+            cache_hit = usage.get("cache_hit_tokens", 0)
+            total_tok = inp + out
+            calls = usage.get("call_count", 0)
+            cost = usage.get("total_cost", 0.0)
+            currency = usage.get("currency", "CNY")
+            symbol = {"CNY": "¥", "USD": "$", "EUR": "€", "GBP": "£"}.get(currency, "¥")
+            model = usage.get("model", "")
+            print(f"\n── LLM 会话统计 ──")
+            print(f"  模型: {model}")
+            print(f"  调用次数: {calls}")
+            print(f"  输入 tokens: {inp:,}")
+            print(f"  输出 tokens: {out:,}")
+            if cache_hit:
+                print(f"  缓存命中: {cache_hit:,}")
+            print(f"  总 tokens: {total_tok:,}")
+            print(f"  累计费用: {symbol}{cost:.4f}")
+            print(f"──────────────────")
+    except Exception:
+        pass
 
 
 def _bind_callbacks() -> None:
@@ -69,6 +99,7 @@ def main() -> None:
     """TUI 主循环。支持方向键导航 + Enter 确认 + 字母快捷键 + Ctrl+C。"""
     init_config()
     _bind_callbacks()
+    atexit.register(_print_session_usage_on_exit)
 
     # 启动时自动清理过期缓存（静默后台执行，仅日志记录）
     try:

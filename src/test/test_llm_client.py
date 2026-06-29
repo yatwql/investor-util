@@ -4,8 +4,8 @@
   - _markdown_to_html — 各类 Markdown → HTML 的正确渲染
   - _compute_fingerprint — 确定性哈希、不同输入不同指纹
   - _get_cache_ttl_llm — 模块 7/8 分 TTL
-  - _build_macro_prompt — 北京时间注入 + 紧凑格式
-  - _build_review_prompt — 北京时间注入 + 穿透数据拼接
+  - _build_global_macro_prompt — 北京时间注入 + 紧凑格式
+  - _build_expert_review_prompt — 北京时间注入 + 穿透数据拼接
   - _call_llm — provider 路由
   - generate_all_llm — force 参数透传
 
@@ -18,12 +18,13 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import MagicMock, patch
+import pytest
 
 from src.python.llm_client import (
-    _SYSTEM_MACRO,
-    _SYSTEM_EXPERT,
-    _build_macro_prompt,
-    _build_review_prompt,
+    _SYSTEM_GLOBAL_MACRO,
+    _SYSTEM_EXPERT_REVIEW,
+    _build_global_macro_prompt,
+    _build_expert_review_prompt,
     _call_claude,
     _call_llm,
     _call_openai,
@@ -38,6 +39,8 @@ from src.python.llm_client import (
     generate_expert_review,
     generate_global_macro,
 )
+
+from src.test.test_helpers import SynchronousExecutor
 
 
 # ═══════════════════════════════════════════════════════════
@@ -164,7 +167,7 @@ class TestGetCacheTtlLlm(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _build_macro_prompt
+#  _build_global_macro_prompt
 # ═══════════════════════════════════════════════════════════
 
 
@@ -172,13 +175,13 @@ class TestBuildMacroPrompt(unittest.TestCase):
     """测试模块 7 用户提示词。"""
 
     def test_has_timestamp(self) -> None:
-        r = _build_macro_prompt({}, {}, 100.0, 10.0, {"股票": 3})
+        r = _build_global_macro_prompt({}, {}, 100.0, 10.0, {"股票": 3})
         self.assertIn("北京时间", r)
         self.assertIn("当前时间", r)
 
     def test_compact_format(self) -> None:
         a_idx = {"sh000001": {"name": "上证指数", "price": 3120, "change_pct": 1.2}}
-        r = _build_macro_prompt(a_idx, {}, 100000, 5000, {"股票": 3, "基金": 2})
+        r = _build_global_macro_prompt(a_idx, {}, 100000, 5000, {"股票": 3, "基金": 2})
         self.assertIn("上证指数", r)
         self.assertIn("3120", r)
         self.assertIn("+1.20%", r)
@@ -188,11 +191,11 @@ class TestBuildMacroPrompt(unittest.TestCase):
     def test_single_line_indices(self) -> None:
         """指数应为紧凑单行格式。"""
         a_idx = {"sh000001": {"name": "上证", "price": 3000, "change_pct": -0.5}}
-        r = _build_macro_prompt(a_idx, {}, 0, 0, {})
+        r = _build_global_macro_prompt(a_idx, {}, 0, 0, {})
         self.assertIn("上证3000(-0.50%)", r)
 
     def test_no_categories(self) -> None:
-        r = _build_macro_prompt({}, {}, 0, 0, {})
+        r = _build_global_macro_prompt({}, {}, 0, 0, {})
         self.assertIn("当前时间", r)
         # 不应该有 AssertionError
 
@@ -202,7 +205,7 @@ class TestBuildMacroPrompt(unittest.TestCase):
             {"name": "半导体", "change_pct": 2.5, "main_net_inflow": 1500000000, "main_net_inflow_pct": 3.2},
             {"name": "银行", "change_pct": -0.8, "main_net_inflow": -500000000, "main_net_inflow_pct": -1.1},
         ]
-        r = _build_macro_prompt({}, {}, 100000, 5000, {"股票": 3}, sector_flow=sector_flow)
+        r = _build_global_macro_prompt({}, {}, 100000, 5000, {"股票": 3}, sector_flow=sector_flow)
         self.assertIn("行业资金流向", r)
         self.assertIn("半导体", r)
         self.assertIn("+2.50%", r)
@@ -212,12 +215,12 @@ class TestBuildMacroPrompt(unittest.TestCase):
 
     def test_sector_flow_none(self) -> None:
         """sector_flow=None 时不应包含资金流向内容。"""
-        r = _build_macro_prompt({}, {}, 0, 0, {})
+        r = _build_global_macro_prompt({}, {}, 0, 0, {})
         self.assertNotIn("行业资金流向", r)
 
 
 # ═══════════════════════════════════════════════════════════
-#  _build_review_prompt
+#  _build_expert_review_prompt
 # ═══════════════════════════════════════════════════════════
 
 
@@ -225,7 +228,7 @@ class TestBuildReviewPrompt(unittest.TestCase):
     """测试模块 8 用户提示词。"""
 
     def test_has_timestamp(self) -> None:
-        r = _build_review_prompt(100, 80, 20, 5, 5, {"股票": 3})
+        r = _build_expert_review_prompt(100, 80, 20, 5, 5, {"股票": 3})
         self.assertIn("北京时间", r)
         self.assertIn("当前时间", r)
 
@@ -234,18 +237,64 @@ class TestBuildReviewPrompt(unittest.TestCase):
             {"name": "茅台", "codes": ["600519"], "mv": 50000, "sector": "消费"},
             {"name": "宁德", "codes": ["300750"], "mv": 30000, "sector": "新能源"},
         ]
-        r = _build_review_prompt(100000, 80000, 20000, 1000, 3, {"基金": 2}, pen)
+        r = _build_expert_review_prompt(100000, 80000, 20000, 1000, 3, {"基金": 2}, pen)
         self.assertIn("茅台", r)
         self.assertIn("穿透", r)
 
     def test_without_penetration(self) -> None:
-        r = _build_review_prompt(100, 80, 20, 5, 5, {"股票": 3})
+        r = _build_expert_review_prompt(100, 80, 20, 5, 5, {"股票": 3})
         self.assertNotIn("穿透", r)
 
     def test_compact_format(self) -> None:
-        r = _build_review_prompt(100000, 80000, 20000, 1000, 3, {"股票": 2, "基金": 1})
+        r = _build_expert_review_prompt(100000, 80000, 20000, 1000, 3, {"股票": 2, "基金": 1})
         self.assertIn("股票2只", r)
         self.assertIn("基金1只", r)
+
+    def test_nav_date_label(self) -> None:
+        """tencent→今涨跌幅，场外→净值日期。"""
+        details = [
+            {"code": "600900", "market_value": 100000, "cost": 80000,
+             "profit": 20000, "profit_rate": 25.0, "change_pct": 1.2,
+             "nav_date": "", "source_api": "tencent"},
+            {"code": "110011", "market_value": 50000, "cost": 40000,
+             "profit": 10000, "profit_rate": 25.0, "change_pct": -0.5,
+             "nav_date": "2026-06-26", "source_api": "eastmoney"},
+        ]
+        r = _build_expert_review_prompt(150000, 120000, 30000, 1500, 2, {},
+                                 holdings_details=details)
+        self.assertIn("今+1.20%", r)
+        self.assertIn("净值:2026-06-26", r)
+
+    def test_nav_date_empty_fallback(self) -> None:
+        """nav_date/source_api 缺失时仍显示今涨跌幅（向后兼容）。"""
+        details = [
+            {"code": "600900", "market_value": 100000, "cost": 80000,
+             "profit": 20000, "profit_rate": 25.0, "change_pct": 1.2},
+        ]
+        r = _build_expert_review_prompt(100000, 80000, 20000, 1200, 1, {},
+                                 holdings_details=details)
+        self.assertIn("今+1.20%", r)
+
+    def test_qdii_label(self) -> None:
+        """QDII 品种标注 (QDII滞后1日)，无论场内/场外。"""
+        details = [
+            {"code": "000041", "name": "华夏全球QDII混合", "market_value": 30000, "cost": 25000,
+             "profit": 5000, "profit_rate": 20.0, "change_pct": 0.3,
+             "nav_date": "2026-06-26", "source_api": "eastmoney"},
+            {"code": "513100", "name": "纳指ETF(QDII)", "market_value": 20000, "cost": 18000,
+             "profit": 2000, "profit_rate": 11.1, "change_pct": 1.5,
+             "nav_date": "", "source_api": "tencent"},
+        ]
+        r = _build_expert_review_prompt(50000, 43000, 7000, 200, 2, {},
+                                 holdings_details=details)
+        self.assertIn("净值:2026-06-26(QDII滞后1日)", r)
+        self.assertIn("今+1.50%(QDII滞后1日)", r)
+
+    def test_system_expert_constraint_updated(self) -> None:
+        """_SYSTEM_EXPERT_REVIEW 包含净值约束和 QDII 说明。"""
+        self.assertIn("净值", _SYSTEM_EXPERT_REVIEW)
+        self.assertIn("QDII", _SYSTEM_EXPERT_REVIEW)
+        self.assertIn("滞后", _SYSTEM_EXPERT_REVIEW)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -491,6 +540,20 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
 class TestGenerateAllLlm(unittest.TestCase):
     """测试并行生成函数。"""
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+                                   new=SynchronousExecutor)
+        cls._exec_patcher.start()
+        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+                                    new=MagicMock())
+        cls._httpx_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._httpx_patcher.stop()
+        cls._exec_patcher.stop()
+
     def test_force_passthrough(self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock) -> None:
         mock_macro.return_value = ("<p>宏</p>", False)
         mock_expert.return_value = ("<p>策略</p>", False)
@@ -542,16 +605,16 @@ class TestPromptConstants(unittest.TestCase):
     """测试 _SYSTEM_* 常量完整性。"""
 
     def test_macro_not_empty(self) -> None:
-        self.assertTrue(len(_SYSTEM_MACRO) > 50)
-        self.assertIn("宏观", _SYSTEM_MACRO)
+        self.assertTrue(len(_SYSTEM_GLOBAL_MACRO) > 50)
+        self.assertIn("宏观", _SYSTEM_GLOBAL_MACRO)
 
     def test_expert_compact(self) -> None:
         """智囊团 Prompt 已精简。"""
-        self.assertLess(len(_SYSTEM_EXPERT), 500,
-                        f"EXPERT prompt too long: {len(_SYSTEM_EXPERT)} chars")
-        self.assertIn("Phase", _SYSTEM_EXPERT)
-        self.assertIn("约束", _SYSTEM_EXPERT)
-        self.assertIn("Markdown", _SYSTEM_EXPERT)
+        self.assertLess(len(_SYSTEM_EXPERT_REVIEW), 500,
+                        f"EXPERT prompt too long: {len(_SYSTEM_EXPERT_REVIEW)} chars")
+        self.assertIn("Phase", _SYSTEM_EXPERT_REVIEW)
+        self.assertIn("约束", _SYSTEM_EXPERT_REVIEW)
+        self.assertIn("Markdown", _SYSTEM_EXPERT_REVIEW)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -600,9 +663,9 @@ class TestExtractContent(unittest.TestCase):
         self.assertEqual(_extract_content(data), "直接字符串回复")
 
     def test_content_as_empty_list(self) -> None:
-        """content 为空列表。"""
+        """content 为空列表 → 返回空字符串（视为空内容而非格式异常）。"""
         data = {"content": []}
-        self.assertIsNone(_extract_content(data))
+        self.assertEqual(_extract_content(data), "")
 
     def test_content_missing(self) -> None:
         """响应中无 content 字段。"""
@@ -630,9 +693,9 @@ class TestExtractContent(unittest.TestCase):
         self.assertIsNone(_extract_content(data))
 
     def test_content_list_no_text(self) -> None:
-        """content 列表但元素无 text 字段。"""
+        """content 列表但元素无 text 字段 → 返回空字符串（视为空内容而非格式异常）。"""
         data = {"content": [{"type": "image"}, {"type": "tool_use"}]}
-        self.assertIsNone(_extract_content(data))
+        self.assertEqual(_extract_content(data), "")
 
 # ═══════════════════════════════════════════════════════════
 #  截断检测
@@ -790,7 +853,7 @@ class TestBuildNewsSummary(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _apply_llm_analysis — LLM 响应解析
+#  _apply_llm_news_correlation — LLM 响应解析
 # ═══════════════════════════════════════════════════════════
 
 
@@ -805,9 +868,9 @@ class TestApplyLLMAnalysis(unittest.TestCase):
         ]
 
     def test_standard_response(self) -> None:
-        from src.python.llm_client import _apply_llm_analysis
+        from src.python.llm_client import _apply_llm_news_correlation
         llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "白酒利好"}, {"idx": 1, "relevance": "中", "sentiment": "中性", "analysis": "间接影响"}]'
-        result = _apply_llm_analysis(self.news, llm_resp)
+        result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
         self.assertEqual(result[0], ("高", "利好", "白酒利好"))
         self.assertEqual(result[1], ("中", "中性", "间接影响"))
@@ -815,14 +878,14 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_with_sentiment(self) -> None:
         """解析 sentiment 字段。"""
-        from src.python.llm_client import _apply_llm_analysis
+        from src.python.llm_client import _apply_llm_news_correlation
         llm_resp = (
             '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "白酒利好"},'
             ' {"idx": 1, "relevance": "高", "sentiment": "利空", "analysis": "利空影响"},'
             ' {"idx": 2, "relevance": "低", "sentiment": "中性", "analysis": "中性影响"}]'
         )
         batch = self.news + [{"title": "新闻D", "matched_keywords": []}]
-        result = _apply_llm_analysis(batch, llm_resp)
+        result = _apply_llm_news_correlation(batch, llm_resp)
         self.assertEqual(len(result), 4)
         self.assertEqual(result[0], ("高", "利好", "白酒利好"))
         self.assertEqual(result[1], ("高", "利空", "利空影响"))
@@ -831,9 +894,9 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_irrelevant_not_filtered(self) -> None:
         """"无关"不再被过滤——元组中直接返回原始数据，由调用方决定是否跳过。"""
-        from src.python.llm_client import _apply_llm_analysis
+        from src.python.llm_client import _apply_llm_news_correlation
         llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "中性", "analysis": "利好"}, {"idx": 1, "relevance": "无关", "sentiment": "中性", "analysis": "无关内容"}]'
-        result = _apply_llm_analysis(self.news, llm_resp)
+        result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
         self.assertEqual(result[0], ("高", "中性", "利好"))
         self.assertEqual(result[1], ("无关", "中性", "无关内容"))
@@ -841,40 +904,40 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_malformed_json(self) -> None:
         """JSON 解析失败 → 全部返回默认值。"""
-        from src.python.llm_client import _apply_llm_analysis
-        result = _apply_llm_analysis(self.news, "不是json")
+        from src.python.llm_client import _apply_llm_news_correlation
+        result = _apply_llm_news_correlation(self.news, "不是json")
         self.assertEqual(len(result), 3)
         for t in result:
             self.assertEqual(t, ("低", "中性", ""))
 
     def test_not_a_list(self) -> None:
         """LLM 返回非数组 → 全部返回默认值。"""
-        from src.python.llm_client import _apply_llm_analysis
-        result = _apply_llm_analysis(self.news, '{"error": "wrong"}')
+        from src.python.llm_client import _apply_llm_news_correlation
+        result = _apply_llm_news_correlation(self.news, '{"error": "wrong"}')
         self.assertEqual(len(result), 3)
         for t in result:
             self.assertEqual(t, ("低", "中性", ""))
 
     def test_with_code_block(self) -> None:
         """响应包含 Markdown 代码块 → 正确提取 JSON。"""
-        from src.python.llm_client import _apply_llm_analysis
+        from src.python.llm_client import _apply_llm_news_correlation
         llm_resp = '```json\n[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "直接利好"}]\n```'
-        result = _apply_llm_analysis(self.news[:1], llm_resp)
+        result = _apply_llm_news_correlation(self.news[:1], llm_resp)
         self.assertEqual(result[0], ("高", "利好", "直接利好"))
 
     def test_idx_out_of_range(self) -> None:
         """idx 越界时忽略该条目，使用默认值填充。"""
-        from src.python.llm_client import _apply_llm_analysis
+        from src.python.llm_client import _apply_llm_news_correlation
         llm_resp = '[{"idx": 99, "relevance": "高", "sentiment": "利好", "analysis": "越界"}]'
-        result = _apply_llm_analysis(self.news, llm_resp)
+        result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
         for t in result:
             self.assertEqual(t, ("低", "中性", ""))
 
     def test_empty_batch(self) -> None:
         """空列表 → 返回空列表。"""
-        from src.python.llm_client import _apply_llm_analysis
-        result = _apply_llm_analysis([], "[]")
+        from src.python.llm_client import _apply_llm_news_correlation
+        result = _apply_llm_news_correlation([], "[]")
         self.assertEqual(result, [])
 
 
@@ -894,27 +957,27 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_handle_5_items_in_one_batch(self) -> None:
         """处理 5 条新闻的批次，全部成功返回。"""
-        from src.python.llm_client import _apply_llm_analysis
+        from src.python.llm_client import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": i, "relevance": "高", "sentiment": "利好", "analysis": f"原因{i}"}
             for i in range(5)
         ])
-        result = _apply_llm_analysis(self.news_5, llm_resp)
+        result = _apply_llm_news_correlation(self.news_5, llm_resp)
         self.assertEqual(len(result), 5)
         for i in range(5):
             self.assertEqual(result[i], ("高", "利好", f"原因{i}"))
 
     def test_partial_json_response(self) -> None:
         """LLM 返回 3 条结果给 5 条新闻 → 缺失 2 条填充默认值。"""
-        from src.python.llm_client import _apply_llm_analysis
+        from src.python.llm_client import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
             {"idx": 2, "relevance": "中", "sentiment": "中性", "analysis": "原因2"},
             {"idx": 4, "relevance": "高", "sentiment": "利空", "analysis": "原因4"},
         ])
-        result = _apply_llm_analysis(self.news_5, llm_resp)
+        result = _apply_llm_news_correlation(self.news_5, llm_resp)
         self.assertEqual(len(result), 5)
         self.assertEqual(result[0], ("高", "利好", "原因0"))
         self.assertEqual(result[1], ("低", "中性", ""))  # 缺失
@@ -924,18 +987,18 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_empty_batch(self) -> None:
         """空批次 → 返回空列表。"""
-        from src.python.llm_client import _apply_llm_analysis
-        result = _apply_llm_analysis([], "[]")
+        from src.python.llm_client import _apply_llm_news_correlation
+        result = _apply_llm_news_correlation([], "[]")
         self.assertEqual(result, [])
 
     def test_fewer_results_than_requested(self) -> None:
         """LLM 返回 1 条结果给 5 条新闻 → 缺失 4 条填充默认值。"""
-        from src.python.llm_client import _apply_llm_analysis
+        from src.python.llm_client import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
         ])
-        result = _apply_llm_analysis(self.news_5, llm_resp)
+        result = _apply_llm_news_correlation(self.news_5, llm_resp)
         self.assertEqual(len(result), 5)
         self.assertEqual(result[0], ("高", "利好", "原因0"))
         for i in range(1, 5):
@@ -943,8 +1006,8 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_malformed_json_in_batch(self) -> None:
         """JSON 格式错误 → 全部返回默认值。"""
-        from src.python.llm_client import _apply_llm_analysis
-        result = _apply_llm_analysis(self.news_5, "这不是JSON")
+        from src.python.llm_client import _apply_llm_news_correlation
+        result = _apply_llm_news_correlation(self.news_5, "这不是JSON")
         self.assertEqual(len(result), 5)
         for t in result:
             self.assertEqual(t, ("低", "中性", ""))
@@ -958,6 +1021,20 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 @patch("src.python.config.get_llm_config")
 class TestEnhanceNewsCorrelation(unittest.TestCase):
     """测试 enhance_news_correlation 的主流程。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+                                   new=SynchronousExecutor)
+        cls._exec_patcher.start()
+        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+                                    new=MagicMock())
+        cls._httpx_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._httpx_patcher.stop()
+        cls._exec_patcher.stop()
 
     def setUp(self) -> None:
         self.news = [
@@ -989,10 +1066,11 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
     @patch("src.python.llm_client._call_llm")
     @patch("src.python.llm_client.cache_get")
     def test_cache_hit(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
-        """缓存命中 → 直接返回缓存数据，不调用 LLM。"""
+        """每篇文章独立缓存命中 → 直接返回，不调用 LLM。"""
         from src.python.llm_client import enhance_news_correlation
         mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
-        mock_cache_get.return_value = self.news  # 缓存命中
+        # 每篇文章的独立缓存存储 dict {relevance, sentiment, analysis}
+        mock_cache_get.return_value = {"relevance": "高", "sentiment": "利好", "analysis": "已缓存"}
         result, cached, usage = enhance_news_correlation(self.news, self.holdings)
         self.assertTrue(cached)
         mock_call.assert_not_called()
@@ -1028,6 +1106,371 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
         # 不应有 llm_analysis
         for item in result:
             self.assertNotIn("llm_analysis", item)
+
+
+# ═══════════════════════════════════════════════════════════
+#  generate_* 传递 llm_config 参数
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
+    """测试 generate_* 函数传递 llm_config 参数。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+                                   new=SynchronousExecutor)
+        cls._exec_patcher.start()
+        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+                                    new=MagicMock())
+        cls._httpx_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._httpx_patcher.stop()
+        cls._exec_patcher.stop()
+    """测试 generate_* 函数接受外部 llm_config 参数。"""
+
+    @patch("src.python.llm_client._generate_llm_content")
+    def test_global_macro_uses_passed_config(
+        self, mock_gen: MagicMock,
+    ) -> None:
+        """传入 llm_config → 被 _generate_llm_content 接收。"""
+        from src.python.llm_client import generate_global_macro
+        mock_gen.return_value = ("<p>结果</p>", False)
+        llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_global_macro": False}
+        result, cached = generate_global_macro(
+            a_indices={}, us_indices={}, total_mv=0, total_profit=0,
+            categories={}, llm_config=llm_config,
+        )
+        self.assertEqual(result, "<p>结果</p>")
+        # 验证传递给 _generate_llm_content 的第一个参数是传入的 llm_config
+        self.assertIs(mock_gen.call_args[0][0], llm_config)
+
+    @patch("src.python.llm_client._generate_llm_content")
+    def test_expert_review_uses_passed_config(
+        self, mock_gen: MagicMock,
+    ) -> None:
+        """gen_expert_review 传递 llm_config 到 _generate_llm_content。"""
+        from src.python.llm_client import generate_expert_review
+        mock_gen.return_value = ("<p>复盘</p>", False)
+        llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_expert_review": False}
+        result, cached = generate_expert_review(
+            total_mv=0, total_cost=0, total_profit=0, total_today_profit=0,
+            holdings_count=1, categories={}, llm_config=llm_config,
+        )
+        self.assertEqual(result, "<p>复盘</p>")
+        self.assertIs(mock_gen.call_args[0][0], llm_config)
+
+    @patch("src.python.llm_client._generate_llm_content")
+    def test_health_check_uses_passed_config(
+        self, mock_gen: MagicMock,
+    ) -> None:
+        """gen_health_check 传递 llm_config 到 _generate_llm_content。"""
+        from src.python.llm_client import generate_health_check
+        mock_gen.return_value = ("<p>体检</p>", False)
+        llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_health_check": False}
+        result, cached = generate_health_check(
+            total_mv=0, total_cost=0, total_profit=0, total_today_profit=0,
+            holdings_count=1, categories={}, llm_config=llm_config,
+        )
+        self.assertEqual(result, "<p>体检</p>")
+        self.assertIs(mock_gen.call_args[0][0], llm_config)
+
+    @patch("src.python.llm_client._generate_llm_content")
+    def test_penetration_uses_passed_config(
+        self, mock_gen: MagicMock,
+    ) -> None:
+        """gen_penetration_deep_analysis 传递 llm_config。"""
+        from src.python.llm_client import generate_penetration_deep_analysis
+        mock_gen.return_value = ("<p>穿透</p>", False)
+        llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_penetration_deep": False}
+        result, cached = generate_penetration_deep_analysis(
+            total_mv=0, total_cost=0, total_profit=0, total_today_profit=0,
+            holdings_count=1, categories={}, llm_config=llm_config,
+        )
+        self.assertEqual(result, "<p>穿透</p>")
+        self.assertIs(mock_gen.call_args[0][0], llm_config)
+
+
+class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
+    """测试 enhance_news_correlation 接受 llm_config 参数。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+                                   new=SynchronousExecutor)
+        cls._exec_patcher.start()
+        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+                                    new=MagicMock())
+        cls._httpx_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._httpx_patcher.stop()
+        cls._exec_patcher.stop()
+
+    @patch("src.python.llm_client.cache_get", return_value=None)
+    @patch("src.python.llm_client._call_llm")
+    def test_passed_config_used(
+        self, mock_call: MagicMock, mock_cache_get: MagicMock,
+    ) -> None:
+        """传入 llm_config → 不需要内部 get_llm_config()。"""
+        from src.python.llm_client import enhance_news_correlation
+        news = [{"title": "A", "matched_keywords": ["茅台"]}]
+        holdings = [MagicMock(name="茅台", code="600519")]
+        mock_call.return_value = (
+            '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "好"}]',
+            {"input_tokens": 10, "output_tokens": 5},
+        )
+        llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_news_correlation": False}
+        result, cached, usage = enhance_news_correlation(
+            news, holdings, llm_config=llm_config,
+        )
+        self.assertIn("llm_analysis", result[0])
+        # 验证 _call_llm 接受到 config（首个参数应为 llm_config）
+        self.assertIs(mock_call.call_args[0][2], llm_config)
+
+
+# ═══════════════════════════════════════════════════════════
+#  generate_all_llm 缓存预检
+# ═══════════════════════════════════════════════════════════
+
+
+@patch("src.python.llm_client.generate_penetration_deep_analysis")
+@patch("src.python.llm_client.generate_health_check")
+@patch("src.python.llm_client.generate_global_macro")
+@patch("src.python.llm_client.generate_expert_review")
+class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
+    """测试 generate_all_llm 缓存预检行为。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+                                   new=SynchronousExecutor)
+        cls._exec_patcher.start()
+        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+                                    new=MagicMock())
+        cls._httpx_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._httpx_patcher.stop()
+        cls._exec_patcher.stop()
+
+    CACHED_CONTENT = '<p>缓存内容</p><p style="color:#888;font-size:12px">本次使用LLM缓存</p>'
+
+    @patch("src.python.llm_client.cache_get")
+    def test_all_cached_no_threads(
+        self, mock_cache_get: MagicMock,
+        mock_expert: MagicMock, mock_macro: MagicMock,
+        mock_health: MagicMock, mock_penetration: MagicMock,
+    ) -> None:
+        """全部缓存命中 → 不调用 generate_* 函数。"""
+        mock_cache_get.return_value = self.CACHED_CONTENT
+        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+            {}, {}, 0, 0, 0, 0, 0, {},
+            holdings_details=[], penetrated_assets=[],
+        )
+        self.assertIsNotNone(macro)
+        self.assertIsNotNone(expert)
+        self.assertIsNotNone(health)
+        self.assertIsNotNone(pen)
+        self.assertTrue(mc)
+        self.assertTrue(ec)
+        self.assertTrue(hc)
+        self.assertTrue(pc)
+        mock_macro.assert_not_called()
+        mock_expert.assert_not_called()
+        mock_health.assert_not_called()
+        mock_penetration.assert_not_called()
+
+    @patch("src.python.llm_client.cache_get")
+    def test_none_cached_all_threads(
+        self, mock_cache_get: MagicMock,
+        mock_expert: MagicMock, mock_macro: MagicMock,
+        mock_health: MagicMock, mock_penetration: MagicMock,
+    ) -> None:
+        """全部未缓存 → 调用全部 generate_* 函数。"""
+        mock_cache_get.return_value = None
+        mock_macro.return_value = ("<p>宏</p>", False)
+        mock_expert.return_value = ("<p>策略</p>", False)
+        mock_health.return_value = ("<p>体检</p>", False)
+        mock_penetration.return_value = ("<p>穿透</p>", False)
+
+        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+            {}, {}, 0, 0, 0, 0, 0, {},
+            holdings_details=[], penetrated_assets=[],
+        )
+        self.assertIsNotNone(macro)
+        self.assertIsNotNone(expert)
+        self.assertIsNotNone(health)
+        self.assertIsNotNone(pen)
+        mock_macro.assert_called_once()
+        mock_expert.assert_called_once()
+        mock_health.assert_called_once()
+        mock_penetration.assert_called_once()
+
+    @patch("src.python.llm_client.cache_get")
+    def test_force_skips_cache(
+        self, mock_cache_get: MagicMock,
+        mock_expert: MagicMock, mock_macro: MagicMock,
+        mock_health: MagicMock, mock_penetration: MagicMock,
+    ) -> None:
+        """force=True → 跳过缓存预检，全部线程生成。"""
+        mock_cache_get.return_value = self.CACHED_CONTENT
+        mock_macro.return_value = ("<p>宏</p>", False)
+        mock_expert.return_value = ("<p>策略</p>", False)
+        mock_health.return_value = ("<p>体检</p>", False)
+        mock_penetration.return_value = ("<p>穿透</p>", False)
+
+        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+            {}, {}, 0, 0, 0, 0, 0, {},
+            holdings_details=[], penetrated_assets=[],
+            force=True,
+        )
+        self.assertIsNotNone(macro)
+        self.assertIsNotNone(expert)
+        self.assertIsNotNone(health)
+        self.assertIsNotNone(pen)
+        # force=True 时 force_flag=True → can_cache_* 全为 False → 不走缓存
+        mock_macro.assert_called_once()
+        mock_expert.assert_called_once()
+        mock_health.assert_called_once()
+        mock_penetration.assert_called_once()
+
+    @patch("src.python.llm_client.cache_get")
+    def test_partial_cache_some_threads(
+        self, mock_cache_get: MagicMock,
+        mock_expert: MagicMock, mock_macro: MagicMock,
+        mock_health: MagicMock, mock_penetration: MagicMock,
+    ) -> None:
+        """部分缓存命中 → 仅未命中的模块提交线程。"""
+        # 模拟 macro 和 expert 命中缓存，health 和 penetration 未命中
+        def _side_effect(key, ttl=None):
+            if "global_macro" in key or "expert_review" in key:
+                return self.CACHED_CONTENT
+            return None
+        mock_cache_get.side_effect = _side_effect
+        mock_health.return_value = ("<p>体检</p>", False)
+        mock_penetration.return_value = ("<p>穿透</p>", False)
+
+        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+            {}, {}, 0, 0, 0, 0, 0, {},
+            holdings_details=[], penetrated_assets=[],
+        )
+        self.assertIsNotNone(macro)
+        self.assertIsNotNone(expert)
+        self.assertIsNotNone(health)
+        self.assertIsNotNone(pen)
+        self.assertTrue(mc)
+        self.assertTrue(ec)
+        self.assertFalse(hc)
+        self.assertFalse(pc)
+        mock_macro.assert_not_called()
+        mock_expert.assert_not_called()
+        mock_health.assert_called_once()
+        mock_penetration.assert_called_once()
+
+
+# ═══════════════════════════════════════════════════════════
+#  enhance_news_correlation 逐条缓存
+# ═══════════════════════════════════════════════════════════
+
+
+@patch("src.python.config.get_llm_config")
+class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
+    """测试新闻关联分析的逐条缓存行为。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+                                   new=SynchronousExecutor)
+        cls._exec_patcher.start()
+        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+                                    new=MagicMock())
+        cls._httpx_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._httpx_patcher.stop()
+        cls._exec_patcher.stop()
+
+    def setUp(self):
+        self.news = [
+            {"title": "新闻A", "intro": "简介", "matched_keywords": ["茅台"]},
+            {"title": "新闻B", "intro": "简介", "matched_keywords": ["五粮液"]},
+            {"title": "新闻C", "intro": "简介", "matched_keywords": ["茅台", "五粮液"]},
+        ]
+        self.holdings = [
+            MagicMock(name="长江电力", code="600900"),
+            MagicMock(name="贵州茅台", code="600519"),
+        ]
+
+    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm_client._call_llm")
+    def test_all_articles_cached(
+        self, mock_call: MagicMock, mock_cache_get: MagicMock,
+        mock_cfg: MagicMock,
+    ) -> None:
+        """全部文章独立缓存命中 → cached=True + 不调用 LLM。"""
+        from src.python.llm_client import enhance_news_correlation
+        mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
+        mock_cache_get.return_value = {"relevance": "高", "sentiment": "利好", "analysis": "缓存"}
+        result, cached, usage = enhance_news_correlation(self.news, self.holdings)
+        self.assertTrue(cached)
+        mock_call.assert_not_called()
+        # 文章应有 llm_analysis 字段
+        for item in result:
+            self.assertIn("llm_analysis", item)
+
+    @patch("src.python.llm_client.cache_get", return_value=None)
+    @patch("src.python.llm_client._call_llm")
+    def test_no_cache_all_fresh(
+        self, mock_call: MagicMock, mock_cache_get: MagicMock,
+        mock_cfg: MagicMock,
+    ) -> None:
+        """全部未缓存 → cached=False + 调用 LLM。"""
+        from src.python.llm_client import enhance_news_correlation
+        mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
+        mock_call.return_value = (
+            '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "A"},'
+            '{"idx": 1, "relevance": "中", "sentiment": "中性", "analysis": "B"},'
+            '{"idx": 2, "relevance": "低", "sentiment": "利空", "analysis": "C"}]',
+            {"input_tokens": 200, "output_tokens": 100},
+        )
+        result, cached, usage = enhance_news_correlation(self.news, self.holdings)
+        self.assertFalse(cached)
+        self.assertGreater(usage.get("total_tokens", 0), 0)
+        mock_call.assert_called_once()
+
+    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm_client._call_llm")
+    def test_mixed_cache(
+        self, mock_call: MagicMock, mock_cache_get: MagicMock,
+        mock_cfg: MagicMock,
+    ) -> None:
+        """部分文章缓存 → 仅未缓存文章走 LLM。"""
+        from src.python.llm_client import enhance_news_correlation
+        mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
+        # 文章 0 和 2 缓存命中，文章 1 未命中
+        self._call_count = 0
+
+        def _side_effect(*args, **kwargs):
+            self._call_count += 1
+            # 前 2 次调用对应文章 0 和 2（已排序后 top_news 顺序）
+            if self._call_count in (1, 3):
+                return {"relevance": "高", "sentiment": "利好", "analysis": "缓存"}
+            return None
+
+        mock_cache_get.side_effect = _side_effect
+        mock_call.return_value = (
+            '[{"idx": 0, "relevance": "中", "sentiment": "中性", "analysis": "新鲜"}]',
+            {"input_tokens": 50, "output_tokens": 25},
+        )
+        result, cached, usage = enhance_news_correlation(self.news, self.holdings)
+        self.assertFalse(cached)  # 部分未缓存 → 整体 cached=False
+        mock_call.assert_called_once()
 
 
 if __name__ == "__main__":

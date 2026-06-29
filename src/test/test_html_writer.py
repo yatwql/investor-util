@@ -11,6 +11,9 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+import tempfile
 import unittest
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
@@ -187,6 +190,7 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 
     def setUp(self):
         self.holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]
+        self._tmp = tempfile.mkdtemp(prefix="test_html_")
         self.detail = MagicMock()
         self.detail.market_value = 1000.0
         self.detail.cost = 500.0
@@ -203,6 +207,9 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
         self.detail.shares = 100
         self.detail.cost_price = 50.0
         self.detail.nav_date = ""
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
 
     def test_news_llm_meta_passed_to_template(self):
         """外部传入 news_data+news_llm_meta → 模板收到正确参数。"""
@@ -231,7 +238,7 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 
             write_html_report(
                 self.holdings,
-                output_dir="reports",
+                output_dir=self._tmp,
                 include_news=True,
                 news_data=[{"title": "新闻A", "matched_keywords": ["茅台"]}],
                 news_llm_meta={"llm_enabled": True, "llm_cached": True, "token_usage": {}},
@@ -271,7 +278,7 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 
             write_html_report(
                 self.holdings,
-                output_dir="reports",
+                output_dir=self._tmp,
                 include_news=True,
                 news_data=[{"title": "新闻A", "matched_keywords": ["茅台"]}],
             )
@@ -306,7 +313,7 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 
             write_html_report(
                 self.holdings,
-                output_dir="reports",
+                output_dir=self._tmp,
                 include_news=True,
                 news_data=[{"title": "新闻A", "matched_keywords": ["茅台"], "llm_analysis": "[高] 利好"}],
             )
@@ -337,6 +344,10 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         self.mock_detail.price = 55.0
         self.mock_detail.yesterday_close = 54.0
         self.mock_detail.profit_rate = 1.0
+        self._tmp = tempfile.mkdtemp(prefix="test_html_")
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
 
     def _run_with_mocks(self, enable_llm=True):
         """用 ExitStack 统一管理 9 个补丁，调用 write_html_report 并返回 mock_llm。"""
@@ -371,7 +382,7 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
 
             write_html_report(
                 self.holdings,
-                output_dir="reports",
+                output_dir=self._tmp,
                 enable_llm=enable_llm,
                 llm_content=None,
                 include_news=False,

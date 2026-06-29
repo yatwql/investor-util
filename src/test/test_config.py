@@ -180,3 +180,74 @@ class TestSetConfig(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestValidateConfig(unittest.TestCase):
+    """validate_config 对各类配置错误的检测。"""
+
+    def test_clean_config_returns_zero(self) -> None:
+        """有效配置 → 0 问题。"""
+        config = {
+            "holdings_dir": "data/holdings",
+            "holdings_filename": "持仓.xlsx",
+            "output_dir": "reports",
+            "llm_key_file": "data/config/llm_key.json",
+            "llm_settings_file": "data/config/llm_settings.json",
+            "news_top_count": 100,
+            "cache_ttl": {"price": 86400, "news": 900},
+            "news_sources": {"sina": True, "cls": False},
+            "preferred_provider": {"price": "tencent"},
+            "user_fund_benchmarks": {"000001": "沪深300"},
+        }
+        n = cfg.validate_config(config)
+        self.assertEqual(n, 0)
+
+    def test_string_type_errors(self) -> None:
+        """字符串配置项不是字符串类型 → 告警。"""
+        config = {"holdings_dir": 123, "output_dir": None, "holdings_filename": True}
+        n = cfg.validate_config(config)
+        self.assertGreaterEqual(n, 2)
+
+    def test_empty_holdings_filename(self) -> None:
+        """holdings_filename 为空 → 告警。"""
+        n = cfg.validate_config({"holdings_filename": ""})
+        self.assertEqual(n, 1)
+
+    def test_news_top_count_invalid(self) -> None:
+        """news_top_count 无效 → 告警。"""
+        n1 = cfg.validate_config({"news_top_count": -5})
+        self.assertEqual(n1, 1)
+        n2 = cfg.validate_config({"news_top_count": "abc"})
+        self.assertEqual(n2, 1)
+        n3 = cfg.validate_config({"news_top_count": 0})
+        self.assertEqual(n3, 1)
+
+    def test_cache_ttl_non_dict(self) -> None:
+        """cache_ttl 不是 dict → 告警。"""
+        n = cfg.validate_config({"cache_ttl": "all_good"})
+        self.assertEqual(n, 1)
+
+    def test_cache_ttl_bad_values(self) -> None:
+        """cache_ttl 内负值/非数字 → 告警。"""
+        n = cfg.validate_config({"cache_ttl": {"price": "abc", "news": -1, "rank": 0}})
+        self.assertEqual(n, 3)
+
+    def test_news_sources_unknown_key(self) -> None:
+        """news_sources 内未知的源 → 告警。"""
+        n = cfg.validate_config({"news_sources": {"my_source": True}})
+        self.assertEqual(n, 1)
+
+    def test_news_sources_non_bool(self) -> None:
+        """news_sources 内非布尔值 → 告警。"""
+        n = cfg.validate_config({"news_sources": {"sina": "yes"}})
+        self.assertEqual(n, 1)
+
+    def test_preferred_provider_unknown(self) -> None:
+        """preferred_provider 未知类型/名称 → 告警。"""
+        n = cfg.validate_config({"preferred_provider": {"stocks": "tencent", "price": "nonexistent"}})
+        self.assertEqual(n, 2)
+
+    def test_user_fund_benchmarks_not_dict(self) -> None:
+        """user_fund_benchmarks 不是 dict → 告警。"""
+        n = cfg.validate_config({"user_fund_benchmarks": ["600519", "沪深300"]})
+        self.assertEqual(n, 1)

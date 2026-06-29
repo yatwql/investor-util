@@ -85,7 +85,7 @@
 - 关键词富化 4 种类型：持仓(0) → 穿透(1) → 概念(2) → 行业(3)
 - 概念类型：来源为东方财富 push2 API 的行业分类和概念板块
 - HTML 富化显示：蓝(持仓) / 紫(穿透) / 橙(概念) / 灰(行业)
-- LLM 二次关联分析（可选）：`llm_news_analysis` 配置开启
+- LLM 二次关联分析（可选）：`enabled_llm_news_correlation` 配置开启
 
 ### 行业/概念数据流
 
@@ -146,20 +146,20 @@ investor-util/
 │   │   │   ├── tencent.py
 │   │   │   ├── tiantian.py
 │   │   │   └── wallstreetcn_news.py
-│   │   └── report/               # 报告生成
-│   │       ├── __init__.py
-│   │       ├── category.py
-│   │       ├── excel_writer.py
-│   │       ├── fund_performance.py
-│   │       ├── html_writer.py
-│   │       ├── llm_content.py
-│   │       ├── market_value.py
-│   │       ├── news_correlation.py
-│   │       ├── penetration.py
-│   │       ├── styles.py
-│   │       ├── summary.py
-│   │       └── tmpl/
-│   │           └── report_template.html
+│   │   ├── report/               # 报告生成
+│   │   │   ├── __init__.py
+│   │   │   ├── category.py
+│   │   │   ├── excel_writer.py
+│   │   │   ├── fund_performance.py
+│   │   │   ├── html_writer.py
+│   │   │   ├── llm_content.py
+│   │   │   ├── market_value.py
+│   │   │   ├── news_correlation.py
+│   │   │   ├── penetration.py
+│   │   │   ├── styles.py
+│   │   │   └── summary.py
+│   │   ├── tmpl/                 # HTML 报告模板（report/ 的同级目录）
+│   │   │   └── report_template.html
 │   └── test/                     # 测试
 │       ├── __init__.py
 │       └── test_*.py（23 个）

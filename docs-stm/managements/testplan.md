@@ -8,20 +8,20 @@
 
 ### 1.1 单元测试
 
-每个 Python 模块对应的测试文件位于 `src/` 同级目录下。
+每个 Python 模块对应的测试文件位于 `src/test/` 目录下。
 
-**测试框架**：使用 Python 内置 `unittest` 或 `pytest`（按最终选型定）。
+**测试框架**：`pytest`
 
 **覆盖要求**：
-- 数据模型（`models.py`）：100% 覆盖字段验证逻辑
-- 配置管理（`config.py`）：100% 覆盖读写、缺省、异常路径（含 `output_dir` 字段）
-- 持仓读取（`reader.py`）：覆盖标准格式、缺字段、空文件、格式错误
-- 缓存管理（`cache.py`）：覆盖过期判断、读写、文件缺失、前缀清理
-- API 数据获取（`providers/*.py`）：mock HTTP 请求，覆盖正常返回、超时、异常格式（含 `eastmoney_industry.py`）
-- LLM 客户端（`llm_client.py`）：覆盖 API 调用路由、返回类型元组解包、缓存逻辑、截断检测
-- 报表生成（`report/*.py`）：每个模块至少覆盖正常数据和空数据两种场景
-- 关键词富化（`report/news_correlation.py`）：覆盖持仓/穿透/行业三种来源类型、去重逻辑、空列表边界、Excel 格式断言（wrap_text、列宽）
-- TUI 菜单（`main.py`）：覆盖所有菜单选项的输入输出
+- 数据模型（`src/python/models.py`）：100% 覆盖字段验证逻辑
+- 配置管理（`src/python/config.py`）：100% 覆盖读写、缺省、异常路径（含 `output_dir` 字段）
+- 持仓读取（`src/python/reader.py`）：覆盖标准格式、缺字段、空文件、格式错误
+- 缓存管理（`src/python/cache.py`）：覆盖过期判断、读写、文件缺失、前缀清理
+- API 数据获取（`src/python/providers/*.py`）：mock HTTP 请求，覆盖正常返回、超时、异常格式
+- LLM 客户端（`src/python/llm_client.py`）：覆盖 API 调用路由、返回类型元组解包、缓存逻辑、截断检测
+- 报表生成（`src/python/report/*.py`）：每个模块至少覆盖正常数据和空数据两种场景
+- 关键词富化（`src/python/report/news_correlation.py`）：覆盖持仓/穿透/行业三种来源类型、去重逻辑、空列表边界、Excel 格式断言（wrap_text、列宽）
+- TUI 菜单（`src/python/main.py`）：覆盖所有菜单选项的输入输出
 
 ### 1.2 集成测试
 

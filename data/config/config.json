@@ -2,14 +2,14 @@
   "holdings_dir": "data/holdings",
   "holdings_filename": "个人投资持仓信息.xlsx",
   "output_dir": "reports",
+  "news_top_count": 100,
   "news_sources": {
     "sina": true,
     "eastmoney": true,
-    "cls": true,
+    "cls": false,
     "wallstreetcn": true,
     "akshare": true
   },
-  "news_top_count": 300,
   "preferred_provider": {},
   "cache_ttl": {
     "price": 86400,
@@ -18,16 +18,17 @@
     "hold": 604800,
     "news": 900,
     "industry": 604800,
+    "benchmark": 2592000,
     "llm_global_macro": 86400,
     "llm_expert_review": 7200,
     "llm_news_correlation": 3600,
     "llm_health_check": 7200,
     "llm_penetration_deep": 86400,
-    "benchmark": 2592000,
     "profit_forecast": 86400,
     "sector_flow": 900,
     "dividend": 2592000
   },
+  "user_fund_benchmarks": {},
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json"
 }

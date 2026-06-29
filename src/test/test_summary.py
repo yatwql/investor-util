@@ -683,7 +683,7 @@ class TestWriteSummarySheet(unittest.TestCase):
         self._call_summary_sheet(
             self.ws, self.mv, self.cost, self.profit, self.today,
         )
-        self.assertEqual(self.ws.title, "1. 汇总")
+        self.assertEqual(self.ws.title, "1.投资分析汇总")
 
     def test_section_headers_written(self):
         """三个章节标题（持仓概况/盈亏汇总/市场指数）通过 section 写入。"""

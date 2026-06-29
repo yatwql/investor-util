@@ -259,7 +259,7 @@ def build_news_data(
     与持仓名称/代码及穿透 TOP10 资产进行关键词匹配，
     按关联度排序返回 TOP N。
 
-    若 llm_settings.json 中 llm_news_analysis 为 true，自动启用 LLM 二次分析，
+    若 llm_settings.json 中 enabled_llm_news_correlation 为 true，自动启用 LLM 二次分析，
     对新闻逐条判定关联度并给出原因分析，结果写入 llm_analysis 字段。
 
     Args:
@@ -321,7 +321,14 @@ def build_news_data(
         logger.warning("行业/概念数据获取失败（非关键错误，继续）: %s", e)
         _industry_data = {}
 
-    news_items = aggregate_news(keywords, top_n=top_n)
+    def _news_source_cb(label: str, count: int, status: str) -> None:
+        """回调：各新闻源获取完成后在 TUI 输出状态。"""
+        if status == "OK":
+            print(f"  [OK] 新闻源 {label}: {count} 条")
+        else:
+            print(f"  [!] 新闻源 {label}: {status}")
+
+    news_items = aggregate_news(keywords, top_n=top_n, progress_callback=_news_source_cb)
 
     # 提取成功访问的数据源列表（用于报告底部脚注）
     _active_sources: list[str] = []
@@ -349,23 +356,39 @@ def build_news_data(
         return news_items, meta
 
     # ── LLM 增强（可选） ──────────────────────────────────────
+    # 注意：此模块不提供 output_brief 配置项。
+    # 其他 4 个 LLM 模块（宏观/智囊团/体检/穿透）输出散文，
+    # 可通过 output_brief_{module} 精简字数。新闻模块输出严格 JSON
+    # 供程序解析，精简会破坏 JSON 结构，故不支持精简模式。
     from src.python.config import get_llm_config
     _llm_config = get_llm_config()
-    if _llm_config and _llm_config.get("llm_news_analysis", False):
+    if _llm_config and _llm_config.get("enabled_llm_news_correlation", False):
         # 检查 API Key 是否实际配置 — 未配置时降级为传统分析
         _api_key = (_llm_config.get("api_key") or "").strip()
         if not _api_key:
-            logger.warning("llm_news_analysis 已开启但未配置 api_key，降级为传统关键词匹配分析")
+            logger.warning("enabled_llm_news_correlation 已开启但未配置 api_key，降级为传统关键词匹配分析")
         else:
             meta["llm_enabled"] = True
             try:
-                from src.python.llm_client import enhance_news_correlation
+                from src.python.llm_client import (
+                    enhance_news_correlation,
+                    _estimate_cost,
+                )
                 news_items, _cached, _token_usage = enhance_news_correlation(
                     news_items, holdings, penetrated_assets=penetrated_assets,
-                    industry_data=_industry_data,
+                    industry_data=_industry_data, llm_config=_llm_config,
                 )
                 meta["llm_cached"] = _cached
                 meta["token_usage"] = _token_usage
+                meta["thinking_enabled"] = _llm_config.get("thinking_enabled_news_correlation", False)
+                if _token_usage and _token_usage.get("model"):
+                    meta["cost_estimation"] = _estimate_cost(
+                        _token_usage.get("model", ""),
+                        _token_usage.get("input_tokens", 0),
+                        _token_usage.get("output_tokens", 0),
+                    )
+                else:
+                    meta["cost_estimation"] = "-"
                 if _cached:
                     logger.info("LLM 新闻关联分析（缓存）: 富化 %d 条",
                                 sum(1 for n in news_items if n.get("llm_analysis")))
@@ -399,7 +422,7 @@ def write_news_sheet(
         news_data: build_news_data() 返回的数据
         llm_meta: LLM 元数据，含 token_usage / llm_cached / llm_enabled
     """
-    ws.title = "6. 财经新闻热点"
+    ws.title = "6.财经新闻热点与持仓关联分析"
 
     # 检测是否有 LLM 分析数据（按 item 中的 llm_analysis 字段）
     has_llm = any(
@@ -449,10 +472,13 @@ def write_news_sheet(
     if llm_meta and llm_meta.get("llm_enabled"):
         # LLM 已启用
         if llm_meta.get("llm_cached"):
-            note_parts = [
+            _cache_hint = (
                 f"共获取 {len(news_data)} 条关联新闻。"
                 "本次使用LLM缓存，未直接使用LLM服务能力"
-            ]
+            )
+            if llm_meta.get("thinking_enabled", False):
+                _cache_hint += " | Extended Thinking"
+            note_parts = [_cache_hint]
         else:
             note_parts = [f"共获取 {len(news_data)} 条关联新闻"]
             if has_llm:
@@ -462,24 +488,27 @@ def write_news_sheet(
         # LLM 未启用（或配置关闭）
         note_parts = [
             f"共获取 {len(news_data)} 条关联新闻。"
-            "本次未使用LLM服务能力增强支持，使用传统关键字匹配技术"
+            "基于持仓名称和代码进行关键词匹配。"
+            "本次未使用LLM服务能力增强支持，使用传统关键字匹配技术",
         ]
 
     write_data_row(ws, row, ["".join(note_parts)])
 
-    # Token 用量行（LLM 启用且非缓存命中时）
+    # Token 用量行（LLM 启用且非缓存命中时）— 与 HTML 报告格式保持一致
     if llm_meta and llm_meta.get("llm_enabled") and not llm_meta.get("llm_cached"):
         token_usage = llm_meta.get("token_usage") or {}
         if token_usage.get("total_tokens", 0) > 0:
             row += 1
-            token_note = (
-                f"模型：{token_usage.get('model', '')} | "
-                f"Token 用量："
-                f"输入 {token_usage.get('input_tokens', 0):,} / "
-                f"输出 {token_usage.get('output_tokens', 0):,} = "
-                f"{token_usage.get('total_tokens', 0):,}"
-            )
-            write_data_row(ws, row, [token_note])
+            token_parts = [
+                f"模型：{token_usage.get('model', '')}",
+                f"Token 用量：输入 {token_usage.get('input_tokens', 0):,} / 输出 {token_usage.get('output_tokens', 0):,} = {token_usage.get('total_tokens', 0):,}",
+            ]
+            cost_est = llm_meta.get("cost_estimation", "-")
+            if cost_est and cost_est != "-":
+                token_parts.append(f"估算费用：{cost_est}")
+            if llm_meta.get("thinking_enabled", False):
+                token_parts.append("Extended Thinking")
+            write_data_row(ws, row, [" | ".join(token_parts)])
 
     freeze_header(ws, 2)
     auto_width(ws)

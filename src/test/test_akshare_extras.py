@@ -22,6 +22,8 @@ from unittest.mock import MagicMock, patch
 
 from src.python.providers import akshare_extras as ae
 
+import sys
+
 
 class TestComputeDividendFingerprint(unittest.TestCase):
     """测试分红指纹计算。"""
@@ -126,6 +128,15 @@ class TestCalcDividendSummary(unittest.TestCase):
 
 class TestGetDividendData(unittest.TestCase):
     """测试 get_dividend_data 缓存/降级/数据流。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._akshare_patcher = patch.dict("sys.modules", {"akshare": MagicMock()})
+        cls._akshare_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._akshare_patcher.stop()
 
     def setUp(self):
         ae._memo_clear()

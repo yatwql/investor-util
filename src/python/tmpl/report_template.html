@@ -347,7 +347,7 @@
     <!--  MODULE 4: 资产穿透 TOP10 (Penetration)                -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
-        <div class="section-title">四、资产穿透 TOP 10</div>
+        <div class="section-title">四、资产穿透TOP10</div>
         {% if penetration and penetration.get("top10") %}
         <div class="section-content" style="padding: 0;">
             <table>
@@ -496,7 +496,11 @@
             {% set _ = ns.llm_notes.append("共 " ~ (news_data | length) ~ " 条关联新闻") %}
             {% if news_llm_meta and news_llm_meta.get("llm_enabled") %}
                 {% if news_llm_meta.get("llm_cached") %}
-                    {% set _ = ns.llm_notes.append("本次使用LLM缓存，未直接使用LLM服务能力") %}
+                    {% set _cache_hint = "本次使用LLM缓存，未直接使用LLM服务能力" %}
+                    {% if news_llm_meta.get("thinking_enabled", false) %}
+                        {% set _cache_hint = _cache_hint ~ " | Extended Thinking" %}
+                    {% endif %}
+                    {% set _ = ns.llm_notes.append(_cache_hint) %}
                 {% else %}
                     {% set _tu = news_llm_meta.get("token_usage", {}) %}
                     {% set _model_name = _tu.get("model", "") %}
@@ -504,6 +508,13 @@
                         {% set _token_parts = [] %}
                         {% if _model_name %}{% set _ = _token_parts.append("模型：" ~ _model_name) %}{% endif %}
                         {% set _ = _token_parts.append("Token 用量：输入 " ~ (_tu.get("input_tokens", 0) | thousands) ~ " / 输出 " ~ (_tu.get("output_tokens", 0) | thousands) ~ " = " ~ (_tu.get("total_tokens", 0) | thousands)) %}
+                        {% set _cost_est = news_llm_meta.get("cost_estimation", "-") %}
+                        {% if _cost_est and _cost_est != "-" %}
+                            {% set _ = _token_parts.append("估算费用：" ~ _cost_est) %}
+                        {% endif %}
+                        {% if news_llm_meta.get("thinking_enabled", false) %}
+                            {% set _ = _token_parts.append("Extended Thinking") %}
+                        {% endif %}
                         {% set _ = ns.llm_notes.append(_token_parts | join(" | ")) %}
                     {% endif %}
                     {% set _ = ns.llm_notes.append("基于持仓名称和代码+LLM关联分析") %}
@@ -606,7 +617,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE A: 穿透深度分析 (Penetration Deep, LLM augment)-->
+    <!--  MODULE 10: 穿透深度分析 (Penetration Deep, LLM augment)-->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
         <div class="section-title">十、穿透深度分析</div>

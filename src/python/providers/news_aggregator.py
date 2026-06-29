@@ -42,6 +42,7 @@ def aggregate_news(
     top_n: int = 100,
     sources: Optional[list[str]] = None,
     per_source: int = 100,
+    progress_callback: Optional[Callable[[str, int, str], None]] = None,
 ) -> list[dict[str, Any]]:
     """从多个新闻源获取新闻，去重后按关键词关联度排序。
 
@@ -57,6 +58,8 @@ def aggregate_news(
         top_n: 最多返回的关联新闻条数
         sources: 要使用的新闻源名称列表，默认使用全部启用的源
         per_source: 每个源获取的原始新闻条数
+        progress_callback: 可选进度回调，签名为 (source_label, count, status)
+            每次源获取完成后调用。status 为 "OK" 或 "失败原因"
 
     Returns:
         关联后的新闻列表，每项含 matched_keywords 字段
@@ -103,8 +106,13 @@ def aggregate_news(
                         item["_source"] = label
                         count += 1
                 src_results[src] = (count, "OK")
+                if progress_callback:
+                    progress_callback(label, count, "OK")
             except Exception as e:
-                src_results[src] = (0, f"失败({e})")
+                err_msg = f"失败({e})"
+                src_results[src] = (0, err_msg)
+                if progress_callback:
+                    progress_callback(label, 0, err_msg)
 
     # 输出各源状态汇总
     status_parts = [f"{_SOURCE_LABELS.get(s, s)} {n}条" if st == "OK"

@@ -58,16 +58,6 @@ def _is_qdii(name: str) -> bool:
     return "QDII" in name.upper()
 
 
-def _date_within_days(date_str: str, today_str: str, max_days: int) -> bool:
-    """检查日期是否在指定天数内。"""
-    try:
-        d = datetime.strptime(date_str, "%Y-%m-%d")
-        t = datetime.strptime(today_str, "%Y-%m-%d")
-        return 0 <= (t - d).days <= max_days
-    except (ValueError, TypeError):
-        return False
-
-
 def _is_etf(name: str) -> bool:
     return "ETF" in name.upper()
 
@@ -129,10 +119,11 @@ def price_update_status(details: List[DetailRow], trading_day: str) -> tuple[int
     """检查今日价格更新状态。
 
     判断逻辑：
-    - 场内资产（tencent）：nav_date == trading_day 视为已更新
-    - QDII（eastmoney + QDII）：nav_date 在 trading_day 3 天内视为已更新
-    - 国内场外（eastmoney + 非 QDII）：nav_date == trading_day 或
-      nav_date == prev_trading_day 视为已更新
+    - 场内资产（tencent）：nav_date == trading_day 视为已更新（本日已更新收市价格）
+    - QDII（eastmoney + QDII）：nav_date == trading_day 或 nav_date == prev_trading_day
+      视为已更新（本日已更新官方净值 T-1）
+    - 国内场外（eastmoney + 非 QDII）：nav_date == trading_day 视为已更新
+      （本日已更新官方净值 T）
 
     Args:
         details: 明细行列表
@@ -146,16 +137,16 @@ def price_update_status(details: List[DetailRow], trading_day: str) -> tuple[int
     prev_td = get_prev_trading_day(trading_day)
     for d in details:
         if d.source_api == "tencent":
-            # 场内资产：净值日期等于交易日即视为已更新
+            # 场内资产：净值日期等于交易日即视为已更新（收市价）
             if d.nav_date == trading_day:
                 updated += 1
         elif d.source_api == "eastmoney" and _is_qdii(d.name):
-            # QDII：净值日期在 3 天内即视为已更新
-            if d.nav_date and _date_within_days(d.nav_date, trading_day, 3):
+            # QDII：净值日期等于交易日(T)或前一个交易日(T-1)即视为已更新
+            if d.nav_date == trading_day or (prev_td and d.nav_date == prev_td):
                 updated += 1
         elif d.source_api == "eastmoney":
-            # 国内场外：净值日期等于交易日或前一个交易日即视为已更新
-            if d.nav_date == trading_day or (prev_td and d.nav_date == prev_td):
+            # 国内场外：仅净值日期等于交易日(T)视为已更新
+            if d.nav_date == trading_day:
                 updated += 1
     return updated, total, updated >= total
 
@@ -178,6 +169,24 @@ def is_market_open() -> bool:
     time_decimal = hour + minute / 60.0
     # 9:30-11:30 或 13:00-15:00
     return (9.5 <= time_decimal <= 11.5) or (13.0 <= time_decimal <= 15.0)
+
+
+def is_midday_break() -> bool:
+    """检查当前是否为 A 股午间休市时段（11:30-13:00）。
+
+    午间休市时最新价格来自上午收盘，既非实时价也非全日收盘价。
+    用于取价方式标识，区分"午市收盘"和"收盘价"。
+
+    Returns:
+        True 表示正处于午间休市时段（11:30-13:00 之间）
+    """
+    now = datetime.now()
+    if now.weekday() >= 5:
+        return False
+    hour = now.hour
+    minute = now.minute
+    time_decimal = hour + minute / 60.0
+    return 11.5 < time_decimal < 13.0
 
 
 # ── 交易日历（节假日感知） ───────────────────────────────
@@ -288,6 +297,39 @@ def get_prev_trading_day(trading_day: str = "") -> str:
         return ""
 
 
+def _count_trading_days_back(trading_day: str, nav_date: str) -> int | None:
+    """计算 nav_date 比 trading_day 早多少个交易日。
+
+    用于场外基金净值日期的 T-N 判定，替代简单的自然日差值。
+    例如：T=周一，nav_date=上周四 → 返回 2（上周五为 T-1）。
+
+    Args:
+        trading_day: 基准交易日（YYYY-MM-DD）
+        nav_date: 目标日期（YYYY-MM-DD）
+
+    Returns:
+        交易日数差（T-1 返回 1，T-2 返回 2...），
+        nav_date >= trading_day 时返回 None，
+        超出 60 个自然日查找范围时返回 None
+    """
+    try:
+        td_dt = datetime.strptime(trading_day, "%Y-%m-%d")
+        nav_dt = datetime.strptime(nav_date, "%Y-%m-%d")
+        if nav_dt >= td_dt:
+            return None
+        check = td_dt - timedelta(days=1)
+        count = 0
+        for _ in range(60):
+            if _is_trading_day(check):
+                count += 1
+                if check.strftime("%Y-%m-%d") == nav_date:
+                    return count
+            check -= timedelta(days=1)
+        return None
+    except (ValueError, TypeError):
+        return None
+
+
 def _determine_price_type(source_api: str, nav_date: str, trading_day: str) -> str:
     """判断取价方式。
 
@@ -295,14 +337,15 @@ def _determine_price_type(source_api: str, nav_date: str, trading_day: str) -> s
 
     Tencent（场内股票/ETF）：
       - 交易时段 → "场内实时价"
+      - 午间休市（11:30-13:00），nav_date == T → "场内午市收盘(T)"
       - 已收市，nav_date == T → "场内收盘价(T)"
       - 已收市，nav_date == T-1 → "场内收盘价(T-1)"
 
     East Money（场外基金）：
       - nav_date == T → "官方净值(T)"
       - nav_date == T-1 → "官方净值(T-1)"
-      - nav_date 为 2~5 天前 → "官方净值(T-N)"
-      - nav_date 为 6 天以上 → "官方净值(YYYY-MM-DD)"
+      - nav_date 为 2~5 个交易日前 → "官方净值(T-N)"
+      - nav_date 为 6 个交易日以上 → "官方净值(YYYY-MM-DD)"
 
     Args:
         source_api: "tencent"（场内）或 "eastmoney"（场外）
@@ -316,6 +359,9 @@ def _determine_price_type(source_api: str, nav_date: str, trading_day: str) -> s
     if source_api == "tencent":
         if is_market_open():
             return "场内实时价"
+        # 午间休市（11:30-13:00）：最新价为上午收盘，非全日收盘
+        if nav_date == trading_day and is_midday_break():
+            return "场内午市收盘(T)"
         # 已收市，用交易日作为 T
         if not nav_date:
             return "场内收盘价(--)"
@@ -336,19 +382,22 @@ def _determine_price_type(source_api: str, nav_date: str, trading_day: str) -> s
     elif prev_td and nav_date == prev_td:
         return "官方净值(T-1)"
 
-    # 计算天数差（用自然日大致估算，基金净值可能跳过周末）
+    # 未来净值日期（数据异常）→ 视为当日
     try:
         nav_dt = datetime.strptime(nav_date, "%Y-%m-%d")
         td_dt = datetime.strptime(trading_day, "%Y-%m-%d")
-        days_diff = (td_dt - nav_dt).days
-        if 2 <= days_diff <= 5:
-            return f"官方净值(T-{days_diff})"
-        elif days_diff > 5:
-            return f"官方净值({nav_date})"
-        # days_diff < 0? 不太可能
-        return "官方净值(T)"
-    except ValueError:
+        if nav_dt > td_dt:
+            return "官方净值(T)"
+    except (ValueError, TypeError):
+        pass
+
+    # 以交易日（而非自然日）计算 N，正确处理周末/节假日跳越
+    td_offset = _count_trading_days_back(trading_day, nav_date)
+    if td_offset is not None and 2 <= td_offset <= 5:
+        return f"官方净值(T-{td_offset})"
+    elif td_offset is not None and td_offset > 5:
         return f"官方净值({nav_date})"
+    return f"官方净值({nav_date})"
 
 
 def _generate_details(holdings: List[Holding], today_str: str) -> List[DetailRow]:
@@ -397,11 +446,11 @@ def _generate_details(holdings: List[Holding], today_str: str) -> List[DetailRow
                 # 场内：(最新价 - 昨收盘) × 份额
                 today_profit = round((price - yclose) * h.shares, 2)
             elif nav_date:
-                # 场外：nav_date 是净值的所属交易日
-                # 用最近交易日/前一交易日做对比，判断是否为最新可用数据
+                # 场外：仅当净值日期等于当前交易日时才计算本日盈亏
+                # 净值尚未发布（nav_date < T）时本日盈亏为 0，
+                # 避免将 T-1 的最新变动误标为"本日盈亏"
                 trading_day = get_last_trading_day()
-                prev_td = get_prev_trading_day(trading_day)
-                if nav_date == trading_day or (prev_td and nav_date == prev_td):
+                if nav_date == trading_day:
                     today_profit = round((price - yclose) * h.shares, 2)
                 else:
                     today_profit = 0.0
@@ -509,7 +558,7 @@ def _apply_price_type_colors(ws, start_row: int, end_row: int) -> None:
         cell = ws.cell(row=r, column=_PRICE_TYPE_COL)
         val = str(cell.value) if cell.value else ""
 
-        if val in ("场内收盘价(T)", "官方净值(T)"):
+        if val in ("场内收盘价(T)", "场内午市收盘(T)", "官方净值(T)"):
             cell.font = BLUE_FONT
         elif val == "官方净值(T-1)":
             name_cell = ws.cell(row=r, column=_NAME_COL)
@@ -532,7 +581,7 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
     """
-    ws.title = "2. 市值核算"
+    ws.title = "2.市值核算明细表"
     if details is None:
         details = _generate_details(holdings, today_str)
 

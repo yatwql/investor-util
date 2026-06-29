@@ -23,6 +23,7 @@ from src.python.report.llm_content import (
     _CHARS_PER_LINE,
     _calc_row_height,
     _strip_html,
+    _extract_footer_text,
     _write_content_sheet,
     write_llm_sheets,
 )
@@ -213,10 +214,10 @@ class TestWriteLlmSheets(unittest.TestCase):
         """四个 sheet 标题正确。"""
         write_llm_sheets(self.wb, ("<p>宏观</p>", "<p>复盘</p>", None, None))
         sheet_names = [ws.title for ws in self.wb.worksheets]
-        self.assertIn("7. 全球政经局势", sheet_names)
-        self.assertIn("8. 智囊团深度复盘", sheet_names)
-        self.assertIn("9. 持仓体检报告", sheet_names)
-        self.assertIn("10. 穿透深度分析", sheet_names)
+        self.assertIn("7.全球政经局势", sheet_names)
+        self.assertIn("8.智囊团深度复盘", sheet_names)
+        self.assertIn("9.持仓体检报告", sheet_names)
+        self.assertIn("10.穿透深度分析", sheet_names)
 
     def test_return_text_quad(self):
         """返回 (text7, text8, text9, textA) 纯文本四元组。"""
@@ -269,6 +270,148 @@ class TestWriteLlmSheets(unittest.TestCase):
         ws7, ws8, ws9, wsA = self._get_llm_sheets()
         self.assertIn("LLM API Key", str(ws7.cell(row=2, column=1).value or ""))
         self.assertIn("LLM API Key", str(ws8.cell(row=2, column=1).value or ""))
+
+
+# ═══════════════════════════════════════════════════════════
+#  _extract_footer_text
+# ═══════════════════════════════════════════════════════════
+
+
+class TestExtractFooterText(unittest.TestCase):
+    """测试从 HTML 中提取底部 LLM 标识行。"""
+
+    def test_none_input(self) -> None:
+        self.assertEqual(_extract_footer_text(None), "")
+
+    def test_empty_input(self) -> None:
+        self.assertEqual(_extract_footer_text(""), "")
+
+    def test_no_footer(self) -> None:
+        """无 footer 标签 → 空字符串。"""
+        html = "<p>纯内容</p>\n\n<p>更多内容</p>"
+        self.assertEqual(_extract_footer_text(html), "")
+
+    def test_extract_token_footer(self) -> None:
+        """提取包含模型和 Token 用量的 footer。"""
+        html = (
+            '<p>宏观分析内容</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '模型：gpt-4o | Token 用量：输入 1,234 / 输出 567 = 1,801'
+            '</p>'
+        )
+        self.assertEqual(
+            _extract_footer_text(html),
+            "模型：gpt-4o | Token 用量：输入 1,234 / 输出 567 = 1,801",
+        )
+
+    def test_extract_footer_with_cost(self) -> None:
+        """提取含估算费用和 Extended Thinking 的 footer。"""
+        html = (
+            '<p>内容</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '模型：claude-sonnet-4 | Token 用量：输入 5,000 / 输出 1,000 = 6,000 | '
+            '估算费用：$0.015 | Extended Thinking'
+            '</p>'
+        )
+        result = _extract_footer_text(html)
+        self.assertIn("模型：claude-sonnet-4", result)
+        self.assertIn("Token 用量：输入 5,000 / 输出 1,000 = 6,000", result)
+        self.assertIn("估算费用：$0.015", result)
+        self.assertIn("Extended Thinking", result)
+
+    def test_extract_cache_footer(self) -> None:
+        """提取缓存 footer。"""
+        html = (
+            '<p>内容</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '本次使用LLM缓存，未直接使用LLM服务能力'
+            '</p>'
+        )
+        self.assertEqual(
+            _extract_footer_text(html),
+            "本次使用LLM缓存，未直接使用LLM服务能力",
+        )
+
+    def test_extract_cache_footer_with_thinking(self) -> None:
+        """提取含 Extended Thinking 的缓存 footer。"""
+        html = (
+            '<p>内容</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '本次使用LLM缓存（原始模型：claude-sonnet-4） | Extended Thinking'
+            '</p>'
+        )
+        result = _extract_footer_text(html)
+        self.assertIn("本次使用LLM缓存", result)
+        self.assertIn("Extended Thinking", result)
+
+
+# ═══════════════════════════════════════════════════════════
+#  _write_content_sheet — unified footer
+# ═══════════════════════════════════════════════════════════
+
+
+class TestWriteContentSheetUnifiedFooter(unittest.TestCase):
+    """测试 _write_content_sheet 中统一 footer 的行为。"""
+
+    def setUp(self):
+        self.wb = Workbook()
+
+    def test_footer_extracted_from_html(self) -> None:
+        """HTML 含 footer → 最后一行为 footer 纯文本。"""
+        html = (
+            '<p>宏观分析内容段落</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '模型：gpt-4o | Token 用量：输入 1,234 / 输出 567 = 1,801 | '
+            '估算费用：$0.005 | Extended Thinking'
+            '</p>'
+        )
+        ws = self.wb.create_sheet()
+        _write_content_sheet(ws, "测试", html, from_cache=False)
+        footer_cell = ws.cell(row=4, column=1)
+        self.assertIn("模型：gpt-4o", str(footer_cell.value or ""))
+        self.assertIn("Token 用量", str(footer_cell.value or ""))
+        self.assertIn("估算费用：$0.005", str(footer_cell.value or ""))
+        self.assertIn("Extended Thinking", str(footer_cell.value or ""))
+
+    def test_footer_not_repeated_in_content(self) -> None:
+        """footer 被排除在正文之外，避免重复。"""
+        html = (
+            '<p>内容段落</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '模型：gpt-4o | Token 用量：输入 100 / 输出 50 = 150'
+            '</p>'
+        )
+        ws = self.wb.create_sheet()
+        _write_content_sheet(ws, "测试", html, from_cache=False)
+        content_cell = ws.cell(row=2, column=1)
+        self.assertEqual(content_cell.value, "内容段落")
+        self.assertNotIn("模型", str(content_cell.value or ""))
+
+    def test_cached_with_embedded_footer_uses_it(self) -> None:
+        """缓存 + 有嵌入式 footer → 使用 footer 而非单独 cache hint。"""
+        html = (
+            '<p>缓存内容</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '本次使用LLM缓存，未直接使用LLM服务能力'
+            '</p>'
+        )
+        ws = self.wb.create_sheet()
+        _write_content_sheet(ws, "测试", html, from_cache=True)
+        footer_cell = ws.cell(row=4, column=1)
+        self.assertIn("LLM缓存", str(footer_cell.value or ""))
+        # 不应再有额外行
+        self.assertIsNone(ws.cell(row=5, column=1).value)
+
+    def test_non_cached_no_footer_fallback(self) -> None:
+        """非缓存 + 无嵌入式 footer → 后备 model_name 行 + thinking 行。"""
+        html = "<p>旧版内容</p>"
+        ws = self.wb.create_sheet()
+        _write_content_sheet(ws, "测试", html, from_cache=False,
+                             model_name="gpt-4o", thinking_enabled=True)
+        model_cell = ws.cell(row=4, column=1)
+        self.assertEqual(model_cell.value, "模型：gpt-4o")
+        thinking_cell = ws.cell(row=5, column=1)
+        self.assertEqual(thinking_cell.value, "Extended Thinking 已开启")
 
 
 if __name__ == "__main__":

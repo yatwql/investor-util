@@ -101,6 +101,7 @@ def write_summary_sheet(
     update_status: tuple[int, int, bool] | None = None,
     a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
+    llm_session_usage: dict | None = None,
 ) -> None:
     """写入汇总页签。
 
@@ -114,8 +115,10 @@ def write_summary_sheet(
         update_status: (已更新数, 总数, 是否全部更新)，来自 price_update_status()
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
+        llm_session_usage: 可选，会话累计 LLM 用量（来自 get_session_usage()），
+            含 input_tokens / output_tokens / cache_hit_tokens / total_cost / currency / model / call_count
     """
-    ws.title = "1. 汇总"
+    ws.title = "1.投资分析汇总"
 
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
@@ -248,6 +251,28 @@ def write_summary_sheet(
                 row = _write_kv_row(ws, row, f"  {cname}", "--")
     else:
         row = _write_kv_row(ws, row, "── 美股指数 ──", "暂无数据")
+
+    # ── LLM 用量（可选） ──────────────────────────────────────
+    if llm_session_usage and llm_session_usage.get("call_count", 0) > 0:
+        row = _write_blanks(ws, row)
+        row = _write_section(ws, row, "【LLM 用量】")
+        inp = llm_session_usage.get("input_tokens", 0)
+        out = llm_session_usage.get("output_tokens", 0)
+        cache_hit = llm_session_usage.get("cache_hit_tokens", 0)
+        total_tok = inp + out
+        calls = llm_session_usage.get("call_count", 0)
+        cost = llm_session_usage.get("total_cost", 0.0)
+        currency = llm_session_usage.get("currency", "CNY")
+        symbol = {"CNY": "¥", "USD": "$", "EUR": "€", "GBP": "£"}.get(currency, "¥")
+        model = llm_session_usage.get("model", "未指定")
+        row = _write_kv_row(ws, row, "  API 调用次数", f"{calls} 次")
+        row = _write_kv_row(ws, row, "  模型", model)
+        row = _write_kv_row(ws, row, "  输入 token", f"{inp:,}")
+        row = _write_kv_row(ws, row, "  输出 token", f"{out:,}")
+        row = _write_kv_row(ws, row, "  总 token", f"{total_tok:,}")
+        if cache_hit:
+            row = _write_kv_row(ws, row, "  缓存命中", f"{cache_hit:,}")
+        row = _write_kv_row(ws, row, "  累计费用", f"{symbol}{cost:.4f}")
 
     freeze_header(ws, 2)
     auto_width(ws)

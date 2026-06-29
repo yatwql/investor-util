@@ -60,7 +60,7 @@ class TestBuildNewsData(unittest.TestCase):
             {"title": "新闻标题", "intro": "简介", "url": "http://example.com",
              "ctime": "2026-06-27", "media_name": "新浪财经", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": False}
+        mock_llm_cfg.return_value = {"enabled_llm_news_correlation": False}
         holdings = [
             Holding(account="证券", name="长江电力", code="600900",
                      shares=100, cost_price=10.0)
@@ -80,12 +80,12 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
     def test_llm_enabled_calls_enhance(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
-        """llm_news_analysis=true → 调用 enhance_news_correlation。"""
+        """enabled_llm_news_correlation=true → 调用 enhance_news_correlation。"""
         mock_aggregate.return_value = [
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": True, "api_key": "sk-test"}
+        mock_llm_cfg.return_value = {"enabled_llm_news_correlation": True, "api_key": "sk-test"}
         enriched = [
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪",
@@ -118,7 +118,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": True, "api_key": "sk-test"}
+        mock_llm_cfg.return_value = {"enabled_llm_news_correlation": True, "api_key": "sk-test"}
         enriched = [
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪",
@@ -141,12 +141,12 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
     def test_llm_disabled_when_no_api_key(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
-        """llm_news_analysis=true 但无 api_key → 降级为传统分析，llm_enabled=False。"""
+        """enabled_llm_news_correlation=true 但无 api_key → 降级为传统分析，llm_enabled=False。"""
         mock_aggregate.return_value = [
             {"title": "新闻标题", "intro": "简介", "url": "http://example.com",
              "ctime": "2026-06-27", "media_name": "新浪财经", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": True, "api_key": ""}
+        mock_llm_cfg.return_value = {"enabled_llm_news_correlation": True, "api_key": ""}
         holdings = [
             Holding(account="证券", name="长江电力", code="600900",
                      shares=100, cost_price=10.0)
@@ -168,7 +168,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": True, "api_key": "sk-test"}
+        mock_llm_cfg.return_value = {"enabled_llm_news_correlation": True, "api_key": "sk-test"}
         mock_enhance.side_effect = Exception("LLM 服务异常")
 
         holdings = [
@@ -188,12 +188,12 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
     def test_llm_disabled_returns_no_llm_meta(
         self, mock_aggregate: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
-        """llm_news_analysis=false → llm_enabled=False。"""
+        """enabled_llm_news_correlation=false → llm_enabled=False。"""
         mock_aggregate.return_value = [
             {"title": "新闻", "intro": "简介", "url": "http://ex.com",
              "ctime": "2026-06-28", "media_name": "新浪", "matched_keywords": ["长江电力"]},
         ]
-        mock_llm_cfg.return_value = {"llm_news_analysis": False}
+        mock_llm_cfg.return_value = {"enabled_llm_news_correlation": False}
 
         holdings = [
             Holding(account="证券", name="长江电力", code="600900",
