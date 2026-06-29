@@ -232,13 +232,13 @@ def write_llm_sheets(
 
     Args:
         wb: 工作簿
-        llm_content: (macro_html, expert_html, health_html, penetration_html) 预生成内容
-        llm_cached: (macro_cached, expert_cached, health_cached, penetration_cached) 缓存标记
-        model_names: (macro_model, expert_model, health_model, penetration_model) 模型名称
-        thinking: (macro_thinking, expert_thinking, health_thinking, penetration_thinking) Extended Thinking
+        llm_content: (global_macro_html, expert_review_html, health_check_html, penetration_deep_html) 预生成内容
+        llm_cached: (global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached) 缓存标记
+        model_names: (global_macro_model, expert_review_model, health_check_model, penetration_deep_model) 模型名称
+        thinking: (global_macro_thinking, expert_review_thinking, health_check_thinking, penetration_deep_thinking) Extended Thinking
 
     Returns:
-        (macro_text, expert_text, health_text, penetration_text) 纯文本四元组，供 TUI 展示
+        (global_macro_text, expert_review_text, health_check_text, penetration_deep_text) 纯文本四元组，供 TUI 展示
     """
     ws7 = wb.create_sheet()
     ws7.title = "7.全球政经局势"
@@ -250,14 +250,14 @@ def write_llm_sheets(
     wsA.title = "10.穿透深度分析"
 
     content7, content8, content9, contentA = llm_content
-    macro_cached, expert_cached, health_cached, penetration_cached = llm_cached
+    global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached = llm_cached
     name7, name8, name9, nameA = model_names
     think7, think8, think9, thinkA = thinking
 
-    _write_content_sheet(ws7, "7.全球政经局势", content7, from_cache=macro_cached, model_name=name7, thinking_enabled=think7)
-    _write_content_sheet(ws8, "8.智囊团深度复盘", content8, from_cache=expert_cached, model_name=name8, thinking_enabled=think8)
-    _write_content_sheet(ws9, "9.持仓体检报告", content9, from_cache=health_cached, model_name=name9, thinking_enabled=think9)
-    _write_content_sheet(wsA, "10.穿透深度分析", contentA, from_cache=penetration_cached, model_name=nameA, thinking_enabled=thinkA)
+    _write_content_sheet(ws7, "7.全球政经局势", content7, from_cache=global_macro_cached, model_name=name7, thinking_enabled=think7)
+    _write_content_sheet(ws8, "8.智囊团深度复盘", content8, from_cache=expert_review_cached, model_name=name8, thinking_enabled=think8)
+    _write_content_sheet(ws9, "9.持仓体检报告", content9, from_cache=health_check_cached, model_name=name9, thinking_enabled=think9)
+    _write_content_sheet(wsA, "10.穿透深度分析", contentA, from_cache=penetration_deep_cached, model_name=nameA, thinking_enabled=thinkA)
 
     logger.info("LLM 内容页签写入完成（含穿透深度分析）")
 

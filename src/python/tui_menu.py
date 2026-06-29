@@ -108,12 +108,12 @@ def _show_llm_config_status() -> None:
         endpoint = llm_config.get("endpoint") or "默认"
         ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" else endpoint
         print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
-        model_macro = llm_config.get("model_global_macro") or model
-        model_expert = llm_config.get("model_expert_review") or model
-        model_news = llm_config.get("model_news_correlation") or model
-        model_health = llm_config.get("model_health_check") or model
-        model_penetration = llm_config.get("model_penetration_deep") or model
-        print(f"         模型路由: 全局政经={model_macro} / 智囊团={model_expert} / 新闻关联={model_news} / 体检={model_health} / 穿透={model_penetration}")
+        model_global_macro = llm_config.get("model_global_macro") or model
+        model_expert_review = llm_config.get("model_expert_review") or model
+        model_news_correlation = llm_config.get("model_news_correlation") or model
+        model_health_check = llm_config.get("model_health_check") or model
+        model_penetration_deep = llm_config.get("model_penetration_deep") or model
+        print(f"         模型路由: 全球政经局势={model_global_macro} / 智囊团深度复盘={model_expert_review} / 新闻关联={model_news_correlation} / 持仓体检报告={model_health_check} / 穿透深度分析={model_penetration_deep}")
     else:
         print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
 

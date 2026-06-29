@@ -49,6 +49,21 @@ def _print_session_usage_on_exit() -> None:
             model = usage.get("model", "")
             print(f"\n── LLM 会话统计 ──")
             print(f"  模型: {model}")
+            per_module = usage.get("per_module", {})
+            if per_module:
+                _MODULE_DISPLAY = {
+                    "macro": "全球政经局势",
+                    "expert": "智囊团深度复盘",
+                    "health": "持仓体检报告",
+                    "penetration": "穿透深度分析",
+                    "news": "新闻关联",
+                }
+                for key, display_name in _MODULE_DISPLAY.items():
+                    if key in per_module:
+                        pm = per_module[key]
+                        _m = pm.get("model", "-")
+                        _tag = " (缓存)" if pm.get("cached") else ""
+                        print(f"    {display_name}: {_m}{_tag}")
             print(f"  调用次数: {calls}")
             print(f"  输入 tokens: {inp:,}")
             print(f"  输出 tokens: {out:,}")

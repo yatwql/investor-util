@@ -518,7 +518,7 @@ def _generate_excel_report(
 
     if include_llm:
         with _Timer("LLM 分析章节"):
-            print("  [..] 正在生成 LLM 增补内容...")
+            print("  [..] 正在生成 LLM 分析章节...")
             try:
                 from src.python.report.llm_content import write_llm_sheets
                 _llm_cfg = get_llm_config() or {}
@@ -534,23 +534,23 @@ def _generate_excel_report(
                     _llm_cfg.get("thinking_enabled_health_check", False),
                     _llm_cfg.get("thinking_enabled_penetration_deep", False),
                 )
-                macro_text, expert_text, health_text, penetration_text = write_llm_sheets(
+                global_macro_text, expert_review_text, health_check_text, penetration_deep_text = write_llm_sheets(
                     wb, llm_content=llm_content, llm_cached=llm_cached,
                     model_names=_model_names, thinking=_thinking,
                 )
-                logger.info("LLM 增补内容已生成")
-                print("  [OK] LLM 增补内容生成完成")
+                logger.info("LLM 分析章节已生成")
+                print("  [OK] LLM 分析章节生成完成")
             except ImportError:
-                logger.warning("LLM 增补模块 (src.report.llm_content) 未就绪，跳过")
-                _add_error("LLM 增补模块未就绪，跳过")
-                macro_text = expert_text = health_text = penetration_text = ""
+                logger.warning("LLM 分析章节模块 (src.report.llm_content) 未就绪，跳过")
+                _add_error("LLM 分析章节模块未就绪，跳过")
+                global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
             except Exception as e:
-                logger.exception("生成 LLM 增补内容失败")
-                _add_error(f"LLM 增补内容生成失败: {e}")
-                macro_text = expert_text = health_text = penetration_text = ""
+                logger.exception("生成 LLM 分析章节失败")
+                _add_error(f"LLM 分析章节生成失败: {e}")
+                global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
 
-        if show_llm_in_tui and (macro_text or expert_text or health_text or penetration_text):
-            _show_llm_tui(macro_text, expert_text, health_text, penetration_text)
+        if show_llm_in_tui and (global_macro_text or expert_review_text or health_check_text or penetration_deep_text):
+            _show_llm_tui(global_macro_text, expert_review_text, health_check_text, penetration_deep_text)
 
         _print_llm_session_usage(_llm_session)
 
@@ -604,7 +604,7 @@ def _cmd_generate_html(news: bool = False) -> None:
 
 
 def _cmd_generate_both() -> None:
-    """生成全系列包含新闻的报告（Excel+HTML，不含 LLM 增补内容）。"""
+    """生成全系列包含新闻的报告（Excel+HTML，不含 LLM 分析章节）。"""
     _refresh_config()
     _clear_errors()
     config = get_config_cache() or {}
@@ -661,8 +661,8 @@ def _cmd_generate_both() -> None:
     _press_any_key()
 
 
-def _show_llm_tui(macro_text: str, expert_text: str, health_text: str = "", penetration_text: str = "") -> None:
-    """在 TUI 终端中展示 LLM 增补内容摘要。"""
+def _show_llm_tui(global_macro_text: str, expert_review_text: str, health_check_text: str = "", penetration_deep_text: str = "") -> None:
+    """在 TUI 终端中展示 LLM 分析章节摘要。"""
     W = 72
 
     def _trim(text: str, max_len: int = 280) -> str:
@@ -684,63 +684,63 @@ def _show_llm_tui(macro_text: str, expert_text: str, health_text: str = "", pene
                 print(f"  │ {chunk:<{W - 3}}│")
         print(f"  └{border}┘")
 
-    if macro_text:
-        _print_box("全球政经局势", _trim(macro_text.strip(), 200))
+    if global_macro_text:
+        _print_box("全球政经局势", _trim(global_macro_text.strip(), 200))
         print()
 
-    if expert_text:
+    if expert_review_text:
         phase3 = ""
         for kw in ("定音锤", "Phase 3", "⚖"):
-            idx = expert_text.find(kw)
+            idx = expert_review_text.find(kw)
             if idx >= 0:
-                phase3 = expert_text[idx:]
+                phase3 = expert_review_text[idx:]
                 break
         phase1 = ""
         for kw in ("召集令", "Phase 1", "🕵"):
-            idx = expert_text.find(kw)
+            idx = expert_review_text.find(kw)
             if idx >= 0:
-                end = expert_text.find("Phase 2", idx)
+                end = expert_review_text.find("Phase 2", idx)
                 if end < 0:
-                    end = expert_text.find("**Phase 2", idx)
+                    end = expert_review_text.find("**Phase 2", idx)
                 if end < 0:
-                    end = expert_text.find("圆桌", idx)
+                    end = expert_review_text.find("圆桌", idx)
                 if end < 0:
                     end = idx + 400
-                phase1 = expert_text[idx:end]
+                phase1 = expert_review_text[idx:end]
                 break
 
         parts = [p for p in [phase1, phase3] if p]
-        body = _trim("\n".join(parts) if parts else expert_text.strip(), 500)
-        _print_box("智囊团核心观点", body)
+        body = _trim("\n".join(parts) if parts else expert_review_text.strip(), 500)
+        _print_box("智囊团深度复盘", body)
     print()
 
-    if health_text:
+    if health_check_text:
         # 提取综合评分和评级供 TUI 展示
-        lines = health_text.split("\n")
+        lines = health_check_text.split("\n")
         score_line = ""
         for line in lines:
             if "总分" in line or "综合评分" in line:
                 score_line = line.strip()[:120]
                 break
-        body = score_line if score_line else _trim(health_text.strip(), 200)
+        body = score_line if score_line else _trim(health_check_text.strip(), 200)
         _print_box("持仓体检摘要", body)
     print()
 
-    if penetration_text:
+    if penetration_deep_text:
         # 提取穿透深度分析概要
-        lines = penetration_text.split("\n")
+        lines = penetration_deep_text.split("\n")
         summary_line = ""
         for line in lines:
             if "集中度" in line or "行业" in line or "国家" in line or "货币" in line:
                 summary_line = line.strip()[:120]
                 break
-        body = summary_line if summary_line else _trim(penetration_text.strip(), 200)
+        body = summary_line if summary_line else _trim(penetration_deep_text.strip(), 200)
         _print_box("穿透深度分析概要", body)
     print()
 
 
 def _cmd_generate_full() -> None:
-    """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 增补内容）。"""
+    """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 分析章节）。"""
     _refresh_config()
     _clear_errors()
     config = get_config_cache() or {}
@@ -840,11 +840,11 @@ def _cmd_generate_full() -> None:
             for fut in as_completed([_news_fut, _llm_fut]):
                 if fut is _llm_fut:
                     try:
-                        llm_macro, llm_expert, llm_health, llm_penetration, macro_cached, expert_cached, health_cached, penetration_cached = fut.result()
-                        llm_content = (llm_macro, llm_expert, llm_health, llm_penetration)
-                        llm_cached = (macro_cached, expert_cached, health_cached, penetration_cached)
-                        if not any(c is None for c in (llm_macro, llm_expert, llm_health, llm_penetration)):
-                            tag = "缓存" if macro_cached and expert_cached else "LLM"
+                        llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep, global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached = fut.result()
+                        llm_content = (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)
+                        llm_cached = (global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached)
+                        if not any(c is None for c in (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)):
+                            tag = "缓存" if global_macro_cached and expert_review_cached else "LLM"
                             print(f"  [OK] {tag} 内容生成完成")
                         else:
                             _add_error("部分 LLM 内容生成失败（已降级使用占位文本）")
@@ -863,7 +863,7 @@ def _cmd_generate_full() -> None:
         _print_llm_session_usage()
 
         from src.python.report.html_writer import write_html_report
-        print("  [..] 正在生成 HTML 报告（含新闻 + LLM 增补内容）...")
+        print("  [..] 正在生成 HTML 报告（含新闻 + LLM 分析章节）...")
         try:
             path = write_html_report(
                 holdings, output_dir=output_dir,

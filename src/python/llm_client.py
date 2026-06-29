@@ -364,8 +364,10 @@ _session_usage: dict[str, Any] = {
     "currency": "CNY",
     "model": "未指定",
     "call_count": 0,
+    "per_module": {},
 }
 """会话期间所有 LLM 调用的累计 Token 用量和费用。
+per_module: {module_key: {"model": str, "input_tokens": int, "output_tokens": int}}
 生成报告后可在 TUI/汇总页展示。"""
 
 
@@ -376,6 +378,7 @@ def reset_session_usage() -> None:
     _session_usage["cache_hit_tokens"] = 0
     _session_usage["total_cost"] = 0.0
     _session_usage["call_count"] = 0
+    _session_usage["per_module"] = {}
 
 
 def get_session_usage() -> dict[str, Any]:
@@ -417,6 +420,19 @@ def _track_session_usage(provider: str, usage: dict | None,
     _session_usage["currency"] = _PRICING_CURRENCY
 
 
+def _record_per_module(module_key: str, model_name: str,
+                       inp: int = 0, out: int = 0,
+                       cached: bool = False) -> None:
+    """按模块记录本次 LLM 调用的模型和 Token 用量，用于 TUI 退出统计展示。"""
+    pm = _session_usage.setdefault("per_module", {})
+    if module_key not in pm:
+        pm[module_key] = {"model": model_name, "input_tokens": 0, "output_tokens": 0}
+    elif cached and not pm[module_key].get("model"):
+        pm[module_key]["model"] = model_name
+    pm[module_key]["input_tokens"] += inp
+    pm[module_key]["output_tokens"] += out
+    if model_name:
+        pm[module_key]["model"] = model_name
 
 
 def _get_cache_ttl_llm(subtype: str = "macro") -> float:
@@ -510,6 +526,8 @@ def _generate_llm_content(
                 # 在缓存提示行尾部追加 Extended Thinking 标识
                 _hint = _hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
             cached_clean += _hint
+            if module_key:
+                _record_per_module(module_key, _orig_model or model or llm_config.get("model", "") or "缓存命中", cached=True)
             return (cached_clean, True)
 
     # ── LLM 调用 ──
@@ -558,6 +576,10 @@ def _generate_llm_content(
             if thinking_enabled:
                 _footer += " | Extended Thinking"
             html += f'<p style="color:#888;font-size:12px">{_footer}</p>'
+            if module_key:
+                _inp = usage.get("input_tokens", usage.get("prompt_tokens", 0)) if usage else 0
+                _out = usage.get("output_tokens", usage.get("completion_tokens", 0)) if usage else 0
+                _record_per_module(module_key, _model_name, inp=_inp, out=_out)
         cache_set(cache_key, html)
         logger.info("LLM 内容生成完成: %s", cache_key)
         return (html, False)
@@ -2132,6 +2154,8 @@ def enhance_news_correlation(
     # 只要持仓结构不变，已分析的新闻在 TTL 内直接复用。
     article_cache_keys: dict[int, str] = {}  # global_pos in top_news → cache_key
     _uncached_positions: list[int] = []
+    _model = llm_config.get("model_news_correlation")
+    _model_name_news = _model or llm_config.get("model", "") or "未指定"
 
     for global_pos in range(len(top_news)):
         item = top_news[global_pos]
@@ -2165,9 +2189,6 @@ def enhance_news_correlation(
         max_tokens = llm_config.get("max_tokens_news_correlation", 2000)
         _timeout = llm_config.get("timeout_news_correlation", 60.0)
         _temp = llm_config.get("temperature_news_correlation")
-        _model = llm_config.get("model_news_correlation")
-        _model_name = _model or llm_config.get("model", "") or "未指定"
-
         # 按 BATCH_SIZE 分批
         uncached_batches = [
             _uncached_positions[i:i + BATCH_SIZE]
@@ -2249,8 +2270,7 @@ def enhance_news_correlation(
                                    _bid + 1, total_batches_proc)
                     print(f"  [!] LLM 新闻分析 [{_bid + 1}/{total_batches_proc}] 批失败")
     else:
-        _model_name = (llm_config.get("model_news_correlation")
-                       or llm_config.get("model", "") or "未指定")
+        _record_per_module("news", _model_name_news, cached=True)
 
     # ── 合并结果 ─────────────────────────────────────────
     enriched: list[dict] = []
@@ -2273,7 +2293,7 @@ def enhance_news_correlation(
     token_usage: dict = {}
     if total_tokens_input > 0 or total_tokens_output > 0:
         token_usage = {
-            "model": _model_name,
+            "model": _model_name_news,
             "input_tokens": total_tokens_input,
             "output_tokens": total_tokens_output,
             "total_tokens": total_tokens_input + total_tokens_output,
@@ -2282,8 +2302,9 @@ def enhance_news_correlation(
             llm_config.get("provider", "unknown"),
             {"input_tokens": total_tokens_input, "output_tokens": total_tokens_output},
             "新闻关联（批处理）",
-            model_name=_model_name,
+            model_name=_model_name_news,
         )
+        _record_per_module("news", _model_name_news, inp=total_tokens_input, out=total_tokens_output)
 
     _cached_count = len(top_news) - len(_uncached_positions)
     _fresh_count = len(_uncached_positions)
@@ -2325,8 +2346,8 @@ def generate_all_llm(
     每个工作线程创建独立的 httpx.Client，避免全局共享连接池的线程安全问题。
 
     Returns:
-        (macro_html, expert_html, health_html, penetration_html,
-         macro_cached, expert_cached, health_cached, penetration_cached) 八元组
+        (global_macro_html, expert_review_html, health_check_html, penetration_deep_html,
+         global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached) 八元组
     """
     from src.python.config import get_llm_config
 
@@ -2335,43 +2356,43 @@ def generate_all_llm(
         return (None, None, None, None, False, False, False, False)
 
     # ── 预计算指纹 + 缓存键 ──
-    fp_macro = _compute_fingerprint(
+    fp_global_macro = _compute_fingerprint(
         a_indices, us_indices, total_mv, total_profit, categories,
     )
-    fp_expert = _expert_fingerprint(
+    fp_expert_review = _expert_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
         holdings_details=holdings_details, penetrated_assets=penetrated_assets,
         categories=categories,
     )
-    fp_health = _health_check_fingerprint(
+    fp_health_check = _health_check_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
         holdings_details=holdings_details, penetrated_assets=penetrated_assets,
         categories=categories,
     )
-    fp_penetration = _penetration_deep_fingerprint(
+    fp_penetration_deep = _penetration_deep_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
         holdings_details=holdings_details, penetrated_assets=penetrated_assets,
         categories=categories,
     )
 
-    key_macro = _CACHE_PREFIX_LLM + f"global_macro_{fp_macro}"
-    key_expert = _CACHE_PREFIX_LLM + f"expert_review_{fp_expert}"
-    key_health = _CACHE_PREFIX_LLM + f"health_check_{fp_health}"
-    key_penetration = _CACHE_PREFIX_LLM + f"penetration_deep_{fp_penetration}"
+    key_global_macro = _CACHE_PREFIX_LLM + f"global_macro_{fp_global_macro}"
+    key_expert_review = _CACHE_PREFIX_LLM + f"expert_review_{fp_expert_review}"
+    key_health_check = _CACHE_PREFIX_LLM + f"health_check_{fp_health_check}"
+    key_penetration_deep = _CACHE_PREFIX_LLM + f"penetration_deep_{fp_penetration_deep}"
 
-    ttl_macro = _get_cache_ttl_llm("macro")
-    ttl_expert = _get_cache_ttl_llm("expert")
-    ttl_health = _get_cache_ttl_llm("health")
-    ttl_penetration = _get_cache_ttl_llm("penetration")
+    ttl_global_macro = _get_cache_ttl_llm("macro")
+    ttl_expert_review = _get_cache_ttl_llm("expert")
+    ttl_health_check = _get_cache_ttl_llm("health")
+    ttl_penetration_deep = _get_cache_ttl_llm("penetration")
 
     force_flag = force
-    can_cache_macro = not force_flag and llm_config.get("cache_enabled_global_macro", True)
-    can_cache_expert = not force_flag and llm_config.get("cache_enabled_expert_review", True)
-    can_cache_health = not force_flag and llm_config.get("cache_enabled_health_check", True)
-    can_cache_penetration = not force_flag and llm_config.get("cache_enabled_penetration_deep", True)
+    can_cache_global_macro = not force_flag and llm_config.get("cache_enabled_global_macro", True)
+    can_cache_expert_review = not force_flag and llm_config.get("cache_enabled_expert_review", True)
+    can_cache_health_check = not force_flag and llm_config.get("cache_enabled_health_check", True)
+    can_cache_penetration_deep = not force_flag and llm_config.get("cache_enabled_penetration_deep", True)
 
     # ── 预检缓存（仅当缓存开启且非强制模式）──
     def _precheck(cache_key, cache_ttl, can_cache, thinking_key):
@@ -2387,31 +2408,31 @@ def generate_all_llm(
             hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
         return (clean + hint, True)
 
-    macro_result, macro_cached_flag = _precheck(
-        key_macro, ttl_macro, can_cache_macro, "thinking_enabled_global_macro",
+    global_macro_result, global_macro_cached_flag = _precheck(
+        key_global_macro, ttl_global_macro, can_cache_global_macro, "thinking_enabled_global_macro",
     )
-    expert_result, expert_cached_flag = _precheck(
-        key_expert, ttl_expert, can_cache_expert, "thinking_enabled_expert_review",
+    expert_review_result, expert_review_cached_flag = _precheck(
+        key_expert_review, ttl_expert_review, can_cache_expert_review, "thinking_enabled_expert_review",
     )
-    health_result, health_cached_flag = _precheck(
-        key_health, ttl_health, can_cache_health, "thinking_enabled_health_check",
+    health_check_result, health_check_cached_flag = _precheck(
+        key_health_check, ttl_health_check, can_cache_health_check, "thinking_enabled_health_check",
     )
-    penetration_result, penetration_cached_flag = _precheck(
-        key_penetration, ttl_penetration, can_cache_penetration, "thinking_enabled_penetration_deep",
+    penetration_deep_result, penetration_deep_cached_flag = _precheck(
+        key_penetration_deep, ttl_penetration_deep, can_cache_penetration_deep, "thinking_enabled_penetration_deep",
     )
 
     # ── 仅对缓存未命中的模块提交线程池任务 ──
-    needs_macro = macro_result is None
-    needs_expert = expert_result is None
-    needs_health = health_result is None
-    needs_penetration = penetration_result is None
+    needs_global_macro = global_macro_result is None
+    needs_expert_review = expert_review_result is None
+    needs_health_check = health_check_result is None
+    needs_penetration_deep = penetration_deep_result is None
 
-    if needs_macro or needs_expert or needs_health or needs_penetration:
+    if needs_global_macro or needs_expert_review or needs_health_check or needs_penetration_deep:
         with ThreadPoolExecutor(max_workers=4) as executor:
             _futures: dict[Any, str] = {}
 
-            if needs_macro:
-                def _run_macro() -> tuple[Optional[str], bool]:
+            if needs_global_macro:
+                def _run_global_macro() -> tuple[Optional[str], bool]:
                     logger.info("正在生成：全球政经局势分析...")
                     c = httpx.Client(timeout=_LLM_TIMEOUT)
                     try:
@@ -2422,10 +2443,10 @@ def generate_all_llm(
                         )
                     finally:
                         c.close()
-                _futures[executor.submit(_run_macro)] = "macro"
+                _futures[executor.submit(_run_global_macro)] = "macro"
 
-            if needs_expert:
-                def _run_expert() -> tuple[Optional[str], bool]:
+            if needs_expert_review:
+                def _run_expert_review() -> tuple[Optional[str], bool]:
                     logger.info("正在生成：智囊团深度复盘（耗时较长，请耐心等待）...")
                     c = httpx.Client(timeout=_LLM_TIMEOUT)
                     try:
@@ -2437,10 +2458,10 @@ def generate_all_llm(
                         )
                     finally:
                         c.close()
-                _futures[executor.submit(_run_expert)] = "expert"
+                _futures[executor.submit(_run_expert_review)] = "expert"
 
-            if needs_health:
-                def _run_health() -> tuple[Optional[str], bool]:
+            if needs_health_check:
+                def _run_health_check() -> tuple[Optional[str], bool]:
                     logger.info("正在生成：持仓体检报告（耗时较长，请耐心等待）...")
                     c = httpx.Client(timeout=_LLM_TIMEOUT)
                     try:
@@ -2452,10 +2473,10 @@ def generate_all_llm(
                         )
                     finally:
                         c.close()
-                _futures[executor.submit(_run_health)] = "health"
+                _futures[executor.submit(_run_health_check)] = "health"
 
-            if needs_penetration:
-                def _run_penetration() -> tuple[Optional[str], bool]:
+            if needs_penetration_deep:
+                def _run_penetration_deep() -> tuple[Optional[str], bool]:
                     logger.info("正在生成：穿透深度分析...")
                     c = httpx.Client(timeout=_LLM_TIMEOUT)
                     try:
@@ -2467,11 +2488,11 @@ def generate_all_llm(
                         )
                     finally:
                         c.close()
-                _futures[executor.submit(_run_penetration)] = "penetration"
+                _futures[executor.submit(_run_penetration_deep)] = "penetration"
 
             _label_map: dict[str, str] = {
-                "macro": "宏观", "expert": "智囊团",
-                "health": "体检报告", "penetration": "穿透深度分析",
+                "macro": "全球政经局势", "expert": "智囊团深度复盘",
+                "health": "持仓体检报告", "penetration": "穿透深度分析",
             }
 
             for future in as_completed(_futures):
@@ -2479,21 +2500,21 @@ def generate_all_llm(
                     result, from_cache = future.result()
                     key = _futures[future]
                     if key == "macro":
-                        macro_result, macro_cached_flag = result, from_cache
+                        global_macro_result, global_macro_cached_flag = result, from_cache
                     elif key == "expert":
-                        expert_result, expert_cached_flag = result, from_cache
+                        expert_review_result, expert_review_cached_flag = result, from_cache
                     elif key == "health":
-                        health_result, health_cached_flag = result, from_cache
+                        health_check_result, health_check_cached_flag = result, from_cache
                     elif key == "penetration":
-                        penetration_result, penetration_cached_flag = result, from_cache
+                        penetration_deep_result, penetration_deep_cached_flag = result, from_cache
                     logger.info("%s生成完成" if result else "%s生成失败（跳过）", _label_map.get(key, key))
                 except Exception:
                     logger.warning("LLM 生成线程异常", exc_info=True)
 
-    logger.info("LLM 生成完成: 宏观=%s, 智囊团=%s, 体检=%s, 穿透=%s",
-                "OK" if macro_result else "跳过",
-                "OK" if expert_result else "跳过",
-                "OK" if health_result else "跳过",
-                "OK" if penetration_result else "跳过")
-    return (macro_result, expert_result, health_result, penetration_result,
-            macro_cached_flag, expert_cached_flag, health_cached_flag, penetration_cached_flag)
+    logger.info("LLM 生成完成: 全球政经=%s, 智囊团=%s, 体检=%s, 穿透=%s",
+                "OK" if global_macro_result else "跳过",
+                "OK" if expert_review_result else "跳过",
+                "OK" if health_check_result else "跳过",
+                "OK" if penetration_deep_result else "跳过")
+    return (global_macro_result, expert_review_result, health_check_result, penetration_deep_result,
+            global_macro_cached_flag, expert_review_cached_flag, health_check_cached_flag, penetration_deep_cached_flag)
