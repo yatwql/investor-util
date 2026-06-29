@@ -58,7 +58,7 @@
 
 ## 缓存策略
 
-详见 `docs-stm/README.md` 的「缓存文件指引」章节。
+详见 `README.md` 的「缓存文件指引」章节。
 
 ### 新增：行业/概念缓存
 
@@ -182,7 +182,7 @@ investor-util/
 │   ├── launch.ps1                # Windows 启动脚本
 │   └── launch.sh                 # Linux 启动脚本
 ├── CLAUDE.md                     # Claude Code 指引
-├── README.md                     # 用户文档
+├── README.md                     # 用户文档（项目根目录）
 └── requirements.txt
 ```
 

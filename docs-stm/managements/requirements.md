@@ -64,7 +64,7 @@
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS变量解析） | — |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com` | — |
 
-> 各新闻源的完整端点格式见 [README.md](../README.md#数据源一览)。
+> 各新闻源的完整端点格式见 [README.md](../../README.md#数据源一览)。
 
 ---
 
@@ -390,7 +390,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 详见 [plan.md](plan.md)「关键技术决策」和「当前配置架构」章节。
 
-用户配置指南详见根目录 [README.md](../README.md)「LLM 配置指引」章节。
+用户配置指南详见根目录 [README.md](../../README.md)「LLM 配置指引」章节。
 
 **逐章节模型路由（v0.2.17+）：** 支持对全球政经局势、智囊团深度复盘、财经新闻热点与持仓关联分析、持仓体检报告、穿透深度分析五个 LLM 章节分别指定不同的模型。通过 `data/config/llm_settings.json` 中的 `model_global_macro`、`model_expert_review`、`model_news_correlation`、`model_health_check`、`model_penetration_deep` 字段设置，为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。详见 README.md「逐章节模型路由」小节。
 
