@@ -13,15 +13,15 @@
 - **实时行情获取** — 腾讯财经（场内实时价）、东方财富（场外基金净值）等多源备线
 - **智能缓存** — API 响应按指定频率缓存，减少网络请求，支持手动刷新和缓存管理
 - **Excel 报告** — 10 个功能页签：投资分析汇总、市值核算明细表、分类汇总表、资产穿透TOP10、基金业绩分析、财经新闻热点与持仓关联分析、全球政经局势（LLM）、智囊团深度复盘（LLM）、持仓体检报告（LLM）、穿透深度分析（LLM）
-- **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、新闻关联、LLM 10 模块顺序展示）
+- **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、新闻关联、模块 1-10 顺序展示）
 - **多源财经新闻** — 新浪财经 + 东方财富 + 财联社 + 华尔街见闻 + akshare（财新网/CCTV）5 源并行获取，去重后与持仓关键词关联
 - **行业/概念关键词** — 自动获取东方财富三级行业分类和概念板块，扩展新闻匹配关键词
-- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek API，结果按策略缓存（宏观 24h / 智囊团 2h / 体检 2h / 穿透 24h），持仓变更时主动失效
+- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek API，结果按策略缓存（宏观/穿透 24h / 智囊团/体检 2h / 新闻关联 1h），持仓变更时主动失效
 - **机构盈利预测** — 调用 akshare 获取全量股票的研报覆盖、预测 EPS、机构评级，穿透 TOP10 与基金业绩页签同步显示
 - **分红历史分析** — 个股历年分红自动汇总，计算年均股息率（分类汇总 + 穿透 TOP10 双列展示）
 - **行业资金流向** — LLM 宏观分析注入实时行业资金流向数据（主力净流入/涨跌幅），辅助判断板块轮动
 - **基金业绩评价** — 同类排名百分位 + 超额收益修正，自动标注优秀/良好/稳定/偏差
-- **TUI 智能摘要** — LLM 分析报告生成后终端直接展示核心观点（全球政经摘要 + 智囊团定音锤阶段），无需打开文件即可快速了解 LLM 输出重点
+- **TUI 智能摘要** — LLM 分析报告生成后终端直接展示核心观点（全球政经、智囊团定音锤、体检评分、穿透概要），无需打开文件即可快速了解 LLM 输出重点
 
 ---
 
@@ -209,7 +209,7 @@ python src/python/main.py
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
-| `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个敏感字段） | 手动编辑 |
+| `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
 
 ### news_sources 可调字段
@@ -298,13 +298,13 @@ python src/python/main.py
 
 ## LLM 配置指引
 
-模块 7（全球政经局势）、模块 8（智囊团深度复盘）、以及可选的 LLM 新闻关联分析均需调用外部 LLM API。
+模块 7（全球政经局势）、模块 8（智囊团深度复盘）、模块 9（持仓体检报告）、模块 10（穿透深度分析）、以及可选的 LLM 新闻关联分析均需调用外部 LLM API。
 
 LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 | 文件 | 内容 | 用途 |
 |------|------|------|
-| `data/config/llm_key.json` | 4 个敏感字段 | API 调用渠道（provider / api_key / model / endpoint） |
+| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段 | API 调用渠道（必填：provider / api_key / model / endpoint；可选：fallback_provider / fallback_api_key / fallback_endpoint / fallback_model） |
 | `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt 等） |
 
 > **为什么拆分？** `llm_key.json` 包含 API Key，可加入 `.gitignore` 避免误提交；
@@ -323,7 +323,21 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 }
 ```
 
-> `llm_key.json` 仅保留以上 4 个字段，其余所有参数移至 `llm_settings.json`。
+> `llm_key.json` 仅保留必填字段（provider / api_key / model / endpoint）和可选回退字段（fallback_provider / fallback_api_key / fallback_endpoint / fallback_model，见下方说明），其余所有参数移至 `llm_settings.json`。
+
+> **可选 — 跨 Provider 自动回退**：可在 `llm_key.json` 中额外配置 `fallback_provider`、`fallback_api_key`、`fallback_endpoint`、`fallback_model`。当主 provider 连续请求失败（网络超时、429 限流、服务端错误）后，自动切换到回退 provider 重试。适用于高可用场景，如主用 DeepSeek（低成本）、回退到 Anthropic Claude（高稳定性）：
+> ```json
+> {
+>   "provider": "claude",
+>   "api_key": "sk-ant-xxxxxxxxxxxxx",
+>   "model": "claude-sonnet-4-6",
+>   "endpoint": "https://api.anthropic.com/v1/messages",
+>   "fallback_provider": "openai",
+>   "fallback_api_key": "sk-your-fallback-key",
+>   "fallback_endpoint": "https://api.openai.com/v1/chat/completions",
+>   "fallback_model": "gpt-4o-mini"
+> }
+> ```
 
 **Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数。配置项按业务模块分组排列：
 
@@ -452,6 +466,9 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `output_brief_penetration_deep` | **false** | 关闭时输出完整分析（行业集中度+币种暴露）；开启后精简至 ≤300 字 |
 
 > **注意**：`news_correlation` 模块无 `output_brief` 配置项。该模块输出严格 JSON 格式供程序解析，精简会破坏 JSON 结构，故不支持精简模式。
+
+| 字段 | 推荐值 | 说明 |
+|------|:------:|------|
 | `system_prompt_*` | （已同步） | 已默认同步代码内置 prompt，可直接编辑修改。设为 `null` 回退使用代码默认值。各模块角色定位见下方说明 |
 | `thinking_enabled_global_macro` | `false` | 全球政经启用 Extended Thinking（不建议——输出短，不值得）。**Claude / DeepSeek 均兼容** |
 | `thinking_enabled_expert_review` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking。**Claude / DeepSeek 均兼容** |
@@ -512,8 +529,6 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 }
 ```
 
-| 字段 | 默认 | 说明 |
-|------|:----:|------|
 
 ##### 模型差异详解
 
@@ -556,7 +571,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 > **提示**：开启 Extended Thinking 后，所有 LLM 章节底部统一追加 `| Extended Thinking` 标识，
 > 格式为：`模型：{model} | Token 用量：输入 X / 输出 Y = Z | 估算费用：${cost} | Extended Thinking`，
 > Excel 与 HTML 报告保持一致。未启用时仅显示模型名、用量和费用。
-- `max_tokens_news_correlation=2000` → `thinking_budget_news_correlation` 至少 3024（默认 4000 ✅）
+> - `max_tokens_news_correlation=2000` → `thinking_budget_news_correlation` 至少 3024（默认 4000 ✅）
 
 **代码自动保护：**
 - 若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。
@@ -671,9 +686,33 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 | 五者合计（菜单 L + 新闻 LLM） | — | — | ~¥0.01-0.05/次 |
 
 - 仅菜单 **L** 触发 LLM 调用，E / N / H / B 不会
-- LLM 结果默认缓存 24 小时（全球政经/穿透深度）/ 2 小时（智囊团/持仓体检），缓存有效期内反复按 L 不会重复扣费
+- LLM 结果默认缓存 24 小时（全球政经/穿透深度）/ 2 小时（智囊团/持仓体检）/ 1 小时（新闻关联），缓存有效期内反复按 L 不会重复扣费
 - 持仓或指数数据变更时，关联的 LLM 缓存自动失效；也可通过菜单 [2] 更新持仓缓存主动清除所有 LLM 缓存
 - 缓存时间可在 `data/config/config.json` → `cache_ttl` 中通过 `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` 自定义
+
+### 完整模型定价表
+
+代码内置所有支持模型的 Token 定价（货币单位 CNY，每百万 Token），`pricing` 段可自定义覆盖：
+
+| 模型 | 输入 ¥/M | 输出 ¥/M | 缓存命中 ¥/M | 说明 |
+|------|:--------:|:--------:|:------------:|------|
+| `claude-sonnet-4-6` | 3.00 | 15.00 | 0.30 | Claude 主力模型，推荐日常使用 |
+| `claude-sonnet-4-8` | 3.00 | 15.00 | 0.30 | Sonnet 升级版，同价 |
+| `claude-haiku-4-5-20251001` | 0.25 | 1.25 | 0.025 | 轻量高性价比，适合新闻关联批量任务 |
+| `claude-opus-4-6` | 15.00 | 75.00 | 1.50 | 强推理，适合智囊团等复杂分析 |
+| `claude-opus-4-8` | 15.00 | 75.00 | 1.50 | Opus 升级版，同价 |
+| `claude-fable-5` | 3.00 | 15.00 | 0.30 | 最新 Claude 模型 |
+| `gpt-4o` | 2.50 | 10.00 | 2.50 | OpenAI 主力（缓存无折扣） |
+| `gpt-4o-mini` | 0.15 | 0.60 | 0.15 | OpenAI 轻量（缓存无折扣） |
+| `deepseek-v4-flash` | 1.00 | 2.00 | 0.02 | ⭐ 高性价比推荐，默认模型 |
+| `deepseek-v4-pro` | 3.00 | 6.00 | 0.025 | DeepSeek 增强推理 |
+| `deepseek-chat` | 1.00 | 2.00 | 0.02 | DeepSeek V3 旧版 |
+
+> **起算关系**：上述价格为**每百万 Token**单价。单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如：
+> - DeepSeek-V4-Flash：输入 3000 tokens × ¥1 + 输出 2000 tokens × ¥2 = ¥0.007/次（含输入约 ¥0.003/次）
+> - 缓存命中时输入部分按 `input_cache_hit` 计费，大幅降低成本
+>
+> **自定义定价**：在 `llm_settings.json` 中添加 `pricing` 段即可覆盖任意模型的定价，未覆盖的模型自动使用上方内置价格。例如添加 `"claude-opus-4-8": {"input": 15, "output": 75}` 或新模型。
 
 ### 不配置 LLM 时的行为
 
@@ -862,7 +901,7 @@ A: 请使用支持 UTF-8 的终端（Windows Terminal 或 VS Code 终端），�
 A: 菜单 `C` 配置正确的持仓目录，或菜单 `F` 选择正确的文件名。
 
 **Q: 如何强制刷新 LLM 内容？**
-A: 菜单 `L` 会先检查缓存，缓存过期（默认宏观 24h / 智囊团 2h / 体检 2h / 穿透 24h）或持仓/指数数据变更时才重新调用 LLM。如需强制刷新，先执行菜单 `[2]` 更新持仓缓存即可清除关联 LLM 缓存（智囊团、全球政经、持仓体检、穿透深度分析均被清除）。
+A: 菜单 `L` 会先检查缓存，缓存过期（默认宏观/穿透 24h / 智囊团/体检 2h / 新闻关联 1h）或持仓/指数数据变更时才重新调用 LLM。如需强制刷新，先执行菜单 `[2]` 更新持仓缓存即可清除关联 LLM 缓存（智囊团、全球政经、持仓体检、穿透深度分析均被清除）。
 
 **Q: 报告数据感觉不完整？**
 A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最后重试生成报告。
