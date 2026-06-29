@@ -1048,14 +1048,13 @@ def _cmd_update_basic_cache() -> None:
         clear_by_prefix("fund_hold_")
         clear("fund_benchmarks")
         clear_by_prefix("news_")
-        clear_by_prefix("llm_news_correlation_")
         clear_by_prefix("llm_news_item_")
         clear_by_prefix("industry_")
         clear_by_prefix("dividend_")
         clear_by_prefix("profit_forecast_")
         clear_by_prefix("sector_flow_")
         print("  [OK] 旧缓存已清除（含 fund_perf_ + fund_hold_ + fund_benchmarks + news_ +"
-              " llm_news_correlation_ + llm_news_item_ + industry_ +"
+              " llm_news_item_ + industry_ +"
               " dividend_ + profit_forecast_ + sector_flow_ 缓存）")
 
         if not funds:

@@ -283,7 +283,7 @@ python src/python/main.py
 | `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | 持仓汇总 + 分类计数 + 穿透 TOP10 + 持仓明细 | 智囊团深度复盘 LLM 分析 |
 | `llm_health_check` | `llm_health_check_{fingerprint}.json` | 2h | 持仓明细（排除行情波动） | 持仓体检报告 LLM 分析 |
 | `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 LLM 分析 |
-| `llm_news_correlation` | `llm_news_correlation_{fingerprint}.json` | 1h | 关键词 + 持仓汇总 | LLM 新闻关联分析 |
+| `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 1h | 标题前 80 字 + 持仓指纹 | LLM 新闻关联分析 |
 | `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
 | `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | A股+美股指数 | 行业资金流向排名 |
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |

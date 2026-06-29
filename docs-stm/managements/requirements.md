@@ -29,7 +29,7 @@
 | C | 配置持仓信息目录 | 配置持仓文件的存放目录 |
 | F | 配置持仓信息文件名 | 配置持仓文件的文件名 |
 | R | 配置报告输出目录 | 配置报告文件的输出目录（默认 reports） |
-| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/行业资金流向/分红缓存（含 news_、llm_news_correlation_、llm_news_item_、industry_、profit_forecast_、sector_flow_、dividend_） |
+| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/行业资金流向/分红缓存（含 news_、llm_news_item_、industry_、profit_forecast_、sector_flow_、dividend_） |
 | 2 | 更新持仓类缓存 | 主动更新价格/指数行情，清除关联 LLM 缓存（智囊团深度复盘、全球政经局势、持仓体检报告、穿透深度分析） |
 | 3 | 清理过期缓存文件 | 扫描 data/cache/ 目录，删除已过期的缓存文件 |
 | 4 | 查看缓存统计信息 | 显示缓存文件总数/大小/按前缀分类/过期预览 |
@@ -97,8 +97,7 @@
 | `llm_health_check_{fingerprint}.json` | **持仓体检报告 LLM 分析结果**。同智囊团指纹策略，排除行情波动字段。四维度打分+改进建议 | 2 小时（可配置） |
 | `llm_penetration_deep_{fingerprint}.json` | **穿透深度分析 LLM 分析结果**。行业集中度+品种集中度+国别/币种暴露，排除行情波动字段 | 24 小时（可配置） |
 | `news_{md5}.json` | **多源新闻聚合结果**。5 源（新浪/东方财富/财联社/华尔街见闻/akshare）并行获取后去重、关键词关联、排序。文件名含输入参数 MD5 指纹，参数变化时自动失效 | 15 分钟（可配置） |
-| `llm_news_correlation_{fingerprint}.json` | **LLM 新闻关联分析结果**。对关键词匹配后的新闻逐条做 LLM 关联度判定（高/中/低/无关），文件名含输入参数 MD5 指纹，参数变化时自动失效 | 1 小时（可配置） |
-| `llm_news_item_{fingerprint}.json` | **LLM 新闻逐条缓存**。每篇新闻文章的独立 LLM 关联分析结果（关联度+情绪+分析），指纹基于标题前 80 字+持仓指纹，新文章仅新增文件的缓存缺失 | 1 小时（可配置，与 llm_news_correlation 同 TTL） |
+| `llm_news_item_{hash}.json` | **LLM 新闻逐条缓存**。每篇新闻文章的独立 LLM 关联分析结果（关联度+情绪+分析），指纹基于标题前 80 字+持仓指纹；新文章仅新增文件的缓存缺失，已缓存的文章不受影响 | 1 小时（可配置，数据类为 `llm_news_correlation`） |
 | `profit_forecast_{fingerprint}.json` | **机构盈利预测全量数据**。调用 akshare 获取所有股票的研报覆盖、预测 EPS、机构评级。文件名含指数 MD5 指纹，指数变化时自动失效 | 24 小时（可配置） |
 | `sector_flow_{fingerprint}.json` | **行业资金流向排名**。今日行业资金流向（主力净流入/涨跌幅等）。文件名含指数 MD5 指纹，指数变化时自动失效 | 15 分钟（可配置） |
 | `dividend_{fingerprint}.json` | **股票历史分红数据**。持仓及穿透 TOP10 A 股代码的历年分红汇总。文件名含代码列表 MD5 指纹，持仓/穿透变化时自动失效 | 30 天（可配置） |
@@ -114,7 +113,7 @@
 | **指数指纹** | A股指数 + 美股指数（`_compute_index_fingerprint`） | 市场指数变化时失效 | `profit_forecast_{fingerprint}`、`sector_flow_{fingerprint}` |
 | **代码列表指纹** | 持仓+穿透 A 股代码排序后的 MD5（`_compute_dividend_fingerprint`） | 持仓/穿透品种变化时失效 | `dividend_{fingerprint}` |
 | **输入参数指纹** | 新闻源参数 + 关键词的 MD5（`_compute_fingerprint`） | 新闻参数或持仓变化时失效 | `news_{md5}` |
-| **输入数据指纹** | 指数+持仓汇总/持仓结构等（`_compute_fingerprint` / `_expert_fingerprint` / `_health_check_fingerprint` / `_penetration_deep_fingerprint`） | 指数波动/持仓变化时失效 | `llm_global_macro_{fingerprint}`、`llm_expert_review_{fingerprint}`、`llm_news_correlation_{fingerprint}`、`llm_health_check_{fingerprint}`、`llm_penetration_deep_{fingerprint}` |
+| **输入数据指纹** | 指数+持仓汇总/持仓结构等（`_compute_fingerprint` / `_expert_fingerprint` / `_health_check_fingerprint` / `_penetration_deep_fingerprint`） | 指数波动/持仓变化时失效 | `llm_global_macro_{fingerprint}`、`llm_expert_review_{fingerprint}`、`llm_news_item_{hash}`、`llm_health_check_{fingerprint}`、`llm_penetration_deep_{fingerprint}` |
 
 #### 各指纹的详细构成
 
@@ -158,7 +157,7 @@
 | 持仓数据 | `hold` | 604800 秒（7 天） | `fund_hold_{code}.json` | — |
 | 行业分类 | `industry` | 604800 秒（7 天） | `industry_{code}.json` | — |
 | 新闻聚合 | `news` | 900 秒（15 分钟） | `news_{md5}.json` | 输入参数指纹 |
-| 新闻 LLM 关联分析 | `llm_news_correlation` | 3600 秒（1 小时） | `llm_news_correlation_{fingerprint}.json` | 输入数据指纹 |
+| 新闻 LLM 关联分析 | `llm_news_correlation` | 3600 秒（1 小时） | `llm_news_item_{hash}.json`（逐条） | 标题前 80 字+持仓指纹 |
 | LLM 全局（通用） | `llm` | 86400 秒（24 小时） | `llm_*` | —（兜底） |
 | 全球政经局势（LLM） | `llm_global_macro` | 86400 秒（24 小时） | `llm_global_macro_{fingerprint}.json` | 指数+持仓指纹 |
 | 智囊团深度复盘（LLM） | `llm_expert_review` | 7200 秒（2 小时） | `llm_expert_review_{fingerprint}.json` | 持仓结构指纹 |
@@ -177,7 +176,7 @@
 
 | 菜单 | 功能 | 清除范围 |
 |---|---|---|
-| `[1] 更新基础类缓存` | 主动刷新基金业绩排名、持仓明细、业绩基准、行业分类、新闻、新闻 LLM 关联分析、盈利预测、行业资金流向、分红数据 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_correlation_*`、`llm_news_item_*`、`profit_forecast_*`、`sector_flow_*`、`dividend_*` |
+| `[1] 更新基础类缓存` | 主动刷新基金业绩排名、持仓明细、业绩基准、行业分类、新闻、新闻 LLM 关联分析、盈利预测、行业资金流向、分红数据 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_item_*`、`profit_forecast_*`、`sector_flow_*`、`dividend_*` |
 | `[2] 更新持仓类缓存` | 主动刷新价格/指数行情，并清除关联 LLM 缓存 | `price_*`、`index_*`、`llm_expert_review_*`、`llm_global_macro_*`、`llm_health_check_*`、`llm_penetration_deep_*` |
 | `[3] 清理过期缓存文件` | 扫描全目录，按文件名前缀匹配各自 TTL，删除过期文件 | 全部过期缓存 |
 | `[4] 查看缓存统计信息` | 显示缓存总数/总大小/按前缀分类统计 | 只读不删 |
