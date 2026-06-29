@@ -26,8 +26,29 @@ try {
 Write-Host "检测到 Python: $($pythonCmd)"
 
 # 2. 检查/创建虚拟环境
-if (-not (Test-Path ".venv")) {
-    Write-Host "正在创建虚拟环境 ..."
+if (Test-Path ".venv") {
+    if ((Get-Item ".venv").LinkType -eq "Junction") {
+        Write-Host "检测到外部虚拟环境链接: $((Get-Item ".venv").Target)" -ForegroundColor Cyan
+    } else {
+        Write-Host "检测到本地虚拟环境。" -ForegroundColor Cyan
+    }
+} elseif ($env:VENV_PATH) {
+    # VENV_PATH 环境变量指向外部管理的 .venv 目录
+    $externalVenv = $env:VENV_PATH
+    Write-Host "正在链接外部虚拟环境: $externalVenv" -ForegroundColor Cyan
+    if (-not (Test-Path $externalVenv)) {
+        Write-Host "外部虚拟环境目录不存在，正在创建: $externalVenv" -ForegroundColor Yellow
+        & $pythonCmd -m venv $externalVenv
+        if (-not (Test-Path $externalVenv)) {
+            Write-Host "错误: 创建外部虚拟环境失败。" -ForegroundColor Red
+            exit 1
+        }
+    }
+    New-Item -ItemType Junction -Path ".venv" -Target $externalVenv | Out-Null
+    Write-Host "已创建链接: .venv → $externalVenv" -ForegroundColor Cyan
+} else {
+    Write-Host "正在创建本地虚拟环境 ..."
+    Write-Host "提示: 设置 VENV_PATH 环境变量可将 .venv 管理在项目外部。" -ForegroundColor DarkGray
     & $pythonCmd -m venv .venv
     if (-not (Test-Path ".venv")) {
         Write-Host "错误: 创建虚拟环境失败。" -ForegroundColor Red

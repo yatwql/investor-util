@@ -18,8 +18,28 @@ fi
 echo "检测到 Python: $PYTHON_CMD"
 
 # 2. 检查/创建虚拟环境
-if [ ! -d ".venv" ]; then
-    echo "正在创建虚拟环境 ..."
+if [ -d ".venv" ] || [ -L ".venv" ]; then
+    if [ -L ".venv" ]; then
+        echo "检测到外部虚拟环境链接: $(readlink .venv)"
+    else
+        echo "检测到本地虚拟环境。"
+    fi
+elif [ -n "$VENV_PATH" ]; then
+    # VENV_PATH 环境变量指向外部管理的 .venv 目录
+    echo "正在链接外部虚拟环境: $VENV_PATH"
+    if [ ! -d "$VENV_PATH" ]; then
+        echo "外部虚拟环境目录不存在，正在创建: $VENV_PATH"
+        $PYTHON_CMD -m venv "$VENV_PATH"
+        if [ ! -d "$VENV_PATH" ]; then
+            echo "错误: 创建外部虚拟环境失败。" >&2
+            exit 1
+        fi
+    fi
+    ln -s "$VENV_PATH" .venv
+    echo "已创建链接: .venv → $VENV_PATH"
+else
+    echo "正在创建本地虚拟环境 ..."
+    echo "(提示: 设置 VENV_PATH 环境变量可将 .venv 管理在项目外部。)"
     $PYTHON_CMD -m venv .venv
     if [ ! -d ".venv" ]; then
         echo "错误: 创建虚拟环境失败。" >&2
