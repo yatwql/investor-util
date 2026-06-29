@@ -139,7 +139,7 @@
    - 智囊团深度复盘：持仓品种/份额/成本变化后指纹自动失效；单品行情波动（价格/涨跌幅）不影响
    - 下次生成 L 菜单时自然使用新数据
 3. **菜单 [2] 主动清除**：
-   - 同时清除 `llm_expert_*`（智囊团）和 `llm_global_macro_*`（全球政经）缓存
+   - 同时清除 `llm_expert_review_*`（智囊团）和 `llm_global_macro_*`（全球政经）缓存
    - 确保下次 L 菜单强制使用最新数据
 
 ### 5.3 TTL 常量对照表
@@ -170,7 +170,7 @@
 | 菜单 | 功能 | 清除范围 |
 |---|---|---|
 | `[1] 更新基础类缓存` | 主动刷新基金业绩排名、持仓明细、业绩基准、行业分类、新闻、新闻 LLM 关联分析、盈利预测、行业资金流向、分红数据 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_correlation_*`、`profit_forecast_*`、`sector_flow_*`、`dividend_*` |
-| `[2] 更新持仓类缓存` | 主动刷新价格/指数行情，并清除关联 LLM 缓存 | `price_*`、`index_*`、`llm_expert_*`、`llm_global_macro_*` |
+| `[2] 更新持仓类缓存` | 主动刷新价格/指数行情，并清除关联 LLM 缓存 | `price_*`、`index_*`、`llm_expert_review_*`、`llm_global_macro_*` |
 | `[3] 清理过期缓存文件` | 扫描全目录，按文件名前缀匹配各自 TTL，删除过期文件 | 全部过期缓存 |
 | `[4] 查看缓存统计信息` | 显示缓存总数/总大小/按前缀分类统计 | 只读不删 |
 
