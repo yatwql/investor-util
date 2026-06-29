@@ -28,7 +28,7 @@
 | C | 配置持仓信息目录 | 配置持仓文件的存放目录 |
 | F | 配置持仓信息文件名 | 配置持仓文件的文件名 |
 | R | 配置报告输出目录 | 配置报告文件的输出目录（默认 reports） |
-| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/新闻/盈利预测/行业资金流向/分红缓存（含 news_、llm_news_corr_、profit_forecast_、sector_flow_、dividend_） |
+| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/新闻/盈利预测/行业资金流向/分红缓存（含 news_、llm_news_correlation_、profit_forecast_、sector_flow_、dividend_） |
 | 2 | 更新持仓类缓存 | 主动更新价格/指数行情，清除关联 LLM 缓存 |
 | 3 | 清理过期缓存文件 | 扫描 data/cache/ 目录，删除已过期的缓存文件 |
 | 4 | 查看缓存统计信息 | 显示缓存文件总数/大小/按前缀分类/过期预览 |
@@ -94,7 +94,7 @@
 | `llm_global_macro_{fingerprint}.json` | **全球政经局势 LLM 分析结果**。文件名含指数行情 + 持仓汇总的 MD5 指纹；指数或持仓变化时原缓存自动失效 | 24 小时（可配置） |
 | `llm_expert_review_{fingerprint}.json` | **智囊团深度复盘 LLM 分析结果**。文件名含持仓汇总+分类+穿透+持仓明细（名称/代码/成本）的 MD5 指纹，剔除单品行情波动字段（change_pct/实时价）；持仓品种或成本变化时原缓存自动失效，单纯行情波动不影响 | 2 小时（可配置） |
 | `news_{md5}.json` | **多源新闻聚合结果**。5 源（新浪/东方财富/财联社/华尔街见闻/akshare）并行获取后去重、关键词关联、排序。文件名含输入参数 MD5 指纹，参数变化时自动失效 | 15 分钟（可配置） |
-| `llm_news_corr_{fingerprint}.json` | **LLM 新闻关联分析结果**。对关键词匹配后的新闻逐条做 LLM 关联度判定（高/中/低/无关），文件名含输入参数 MD5 指纹，参数变化时自动失效 | 1 小时（可配置） |
+| `llm_news_correlation_{fingerprint}.json` | **LLM 新闻关联分析结果**。对关键词匹配后的新闻逐条做 LLM 关联度判定（高/中/低/无关），文件名含输入参数 MD5 指纹，参数变化时自动失效 | 1 小时（可配置） |
 | `profit_forecast_{fingerprint}.json` | **机构盈利预测全量数据**。调用 akshare 获取所有股票的研报覆盖、预测 EPS、机构评级。文件名含指数 MD5 指纹，指数变化时自动失效 | 24 小时（可配置） |
 | `sector_flow_{fingerprint}.json` | **行业资金流向排名**。今日行业资金流向（主力净流入/涨跌幅等）。文件名含指数 MD5 指纹，指数变化时自动失效 | 15 分钟（可配置） |
 | `dividend_{fingerprint}.json` | **股票历史分红数据**。持仓及穿透 TOP10 A 股代码的历年分红汇总。文件名含代码列表 MD5 指纹，持仓/穿透变化时自动失效 | 30 天（可配置） |
@@ -110,7 +110,7 @@
 | **指数指纹** | A股指数 + 美股指数（`_compute_index_fingerprint`） | 市场指数变化时失效 | `profit_forecast_{fingerprint}`、`sector_flow_{fingerprint}` |
 | **代码列表指纹** | 持仓+穿透 A 股代码排序后的 MD5（`_compute_dividend_fingerprint`） | 持仓/穿透品种变化时失效 | `dividend_{fingerprint}` |
 | **输入参数指纹** | 新闻源参数 + 关键词的 MD5（`_compute_fingerprint`） | 新闻参数或持仓变化时失效 | `news_{md5}` |
-| **输入数据指纹** | 指数+持仓汇总/持仓结构等（`_compute_fingerprint` / `_expert_fingerprint`） | 指数波动/持仓变化时失效 | `llm_global_macro_{fingerprint}`、`llm_expert_review_{fingerprint}`、`llm_news_corr_{fingerprint}` |
+| **输入数据指纹** | 指数+持仓汇总/持仓结构等（`_compute_fingerprint` / `_expert_fingerprint`） | 指数波动/持仓变化时失效 | `llm_global_macro_{fingerprint}`、`llm_expert_review_{fingerprint}`、`llm_news_correlation_{fingerprint}` |
 
 #### 各指纹的详细构成
 
@@ -152,7 +152,7 @@
 | 持仓数据 | `hold` | 604800 秒（7 天） | `fund_hold_{code}.json` | — |
 | 行业分类 | `industry` | 604800 秒（7 天） | `industry_{code}.json` | — |
 | 新闻聚合 | `news` | 900 秒（15 分钟） | `news_{md5}.json` | 输入参数指纹 |
-| 新闻 LLM 关联分析 | `llm_news_corr` | 3600 秒（1 小时） | `llm_news_corr_{fingerprint}.json` | 输入数据指纹 |
+| 新闻 LLM 关联分析 | `llm_news_correlation` | 3600 秒（1 小时） | `llm_news_correlation_{fingerprint}.json` | 输入数据指纹 |
 | LLM 全局（通用） | `llm` | 86400 秒（24 小时） | `llm_*` | —（兜底） |
 | 全球政经局势（LLM） | `llm_global_macro` | 86400 秒（24 小时） | `llm_global_macro_{fingerprint}.json` | 指数+持仓指纹 |
 | 智囊团深度复盘（LLM） | `llm_expert_review` | 7200 秒（2 小时） | `llm_expert_review_{fingerprint}.json` | 持仓结构指纹 |
@@ -169,7 +169,7 @@
 
 | 菜单 | 功能 | 清除范围 |
 |---|---|---|
-| `[1] 更新基础类缓存` | 主动刷新基金业绩排名、持仓明细、业绩基准、行业分类、新闻、新闻 LLM 关联分析、盈利预测、行业资金流向、分红数据 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_corr_*`、`profit_forecast_*`、`sector_flow_*`、`dividend_*` |
+| `[1] 更新基础类缓存` | 主动刷新基金业绩排名、持仓明细、业绩基准、行业分类、新闻、新闻 LLM 关联分析、盈利预测、行业资金流向、分红数据 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_correlation_*`、`profit_forecast_*`、`sector_flow_*`、`dividend_*` |
 | `[2] 更新持仓类缓存` | 主动刷新价格/指数行情，并清除关联 LLM 缓存 | `price_*`、`index_*`、`llm_expert_*`、`llm_global_macro_*` |
 | `[3] 清理过期缓存文件` | 扫描全目录，按文件名前缀匹配各自 TTL，删除过期文件 | 全部过期缓存 |
 | `[4] 查看缓存统计信息` | 显示缓存总数/总大小/按前缀分类统计 | 只读不删 |
@@ -349,11 +349,11 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 用户配置指南详见根目录 [README.md](../README.md)「LLM 配置指引」章节。
 
-**逐章节模型路由（v0.2.17+）：** 支持对全球政经局势、智囊团深度复盘、新闻关联分析三个 LLM 章节分别指定不同的模型。通过 `data/config/llm_settings.json` 中的 `model_macro`、`model_expert`、`model_news_correlation` 字段设置，为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。详见 README.md「逐章节模型路由」小节。
+**逐章节模型路由（v0.2.17+）：** 支持对全球政经局势、智囊团深度复盘、新闻关联分析三个 LLM 章节分别指定不同的模型。通过 `data/config/llm_settings.json` 中的 `model_global_macro`、`model_expert_review`、`model_news_correlation` 字段设置，为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。详见 README.md「逐章节模型路由」小节。
 
 **Extended Thinking（v0.2.22+，Anthropic 专属）：** `_call_claude()` 支持注入 Anthropic Messages API 的 `thinking` 参数，让 ≥ Claude Sonnet 4 的模型在回答前进行深度推理。通过 `llm_settings.json` 中 `thinking_enabled_{模块}` 和 `thinking_budget_{模块}` 配置开关和预算。`thinking_budget_{模块}` 与对应的 `max_tokens_{模块}` 的关系：
 - `thinking_budget_{模块}` 控制内部思考过程的 token 预算（不可见）
-- `max_tokens_{模块}` 控制最终输出文本的最大 token 数（如 `max_tokens_expert=8192`）
+- `max_tokens_{模块}` 控制最终输出文本的最大 token 数（如 `max_tokens_expert_review=8192`）
 - API 强制约束：`thinking_budget_{模块}` ≥ `max_tokens_{模块} + 1024`，未满足时代码自动补足
 - 开启后 `temperature` 自动忽略（API 不支持并存）
 - 推荐仅在智囊团深度复盘开启，详见 README.md「Extended Thinking」章节

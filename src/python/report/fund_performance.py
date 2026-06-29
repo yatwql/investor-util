@@ -1,0 +1,394 @@
+"""基金业绩分析模块 — 报告第 5 页。
+
+调天天基金 API 获取每只基金在同类中的排名和区间收益率，
+按排名百分位打标签（优秀/良好/稳定/偏差），生成结构化 Sheet。
+
+评级逻辑：
+  1. 同类排名百分位 → 基础评级（当前逻辑）
+  2. 超额收益评分（Data_performanceEvaluation）→ 调整评级
+  3. 最终评级 = 基础评级 + 基准比较修正
+
+输出列：
+  基金 | 代码 | 类型 | 近3月 | 近6月 | 近12月 | 持仓累计盈亏(¥) | 持仓收益率 | 业绩基准 | 业绩评价 | 同类排名
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List
+
+from openpyxl.worksheet.worksheet import Worksheet
+
+from src.python.fetcher import fetch_fund_benchmark, fetch_fund_rankings
+from src.python.models import Holding
+from src.python.report.excel_writer import (
+    auto_width,
+    freeze_header,
+    write_data_row,
+    write_header_row,
+    write_title_row,
+)
+from src.python.report.market_value import DetailRow
+from src.python.report.penetration import classify_penetration, QDII, ETF, INDEX_LINK, BOND_FUND, ACTIVE_EQUITY
+from src.python.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT
+
+logger = logging.getLogger("invest")
+
+_NCOLS = 12
+_HEADERS = [
+    "基金", "代码", "类型", "近3月", "近6月", "近12月",
+    "持仓累计盈亏(¥)", "持仓收益率", "业绩基准", "业绩评价", "同类排名", "机构覆盖",
+]
+
+# 基础业绩评价 -> 标签 + 描述
+_RATING_COMMENT: Dict[str, str] = {
+    "优秀": "优秀 持续跑赢基准，超额收益显著",
+    "良好": "良好 稳定跑赢基准，组合管理得当",
+    "稳定": "稳定 收益率稳健，波动控制良好",
+    "偏差": "偏差 近期表现欠佳，需关注持仓变化",
+}
+
+
+# 穿透分类 → 基金类型显示标签
+_FUND_TYPE_LABEL = {
+    QDII: "场外QDII基金",
+    ETF: "场内ETF",
+    INDEX_LINK: "场外指数基金",
+    BOND_FUND: "场外债券基金",
+    ACTIVE_EQUITY: "场外主动型基金",
+}
+
+# 评级权重
+_RATING_ORDER = ["偏差", "稳定", "良好", "优秀"]
+
+# 超额收益评分阈值（用于评级修正）
+_EXCESS_THRESHOLD_UP = 80    # 超额收益 ≥ 80 → 评级上调一级
+_EXCESS_THRESHOLD_DOWN = 40  # 超额收益 < 40 → 评级下调一级
+
+
+def _fund_display_type(h: Holding) -> str:
+    """用穿透分类逻辑判定基金类型，返回中文显示标签。"""
+    ftype = classify_penetration(h)
+    return _FUND_TYPE_LABEL.get(ftype, "--")
+
+
+def _is_fund(h: Holding) -> bool:
+    """判断持仓是否为基金（需要业绩分析）。"""
+    name = h.name.strip().upper()
+    code = h.code.strip()
+
+    # 纯股票直接排除
+    if code.startswith(("6", "0", "3")) and "ETF" not in name:
+        # 双重确认：A股渠道
+        account = h.account.strip()
+        fund_keywords = ("基金", "支付宝", "微信", "银行")
+        if not any(kw in account for kw in fund_keywords):
+            return False
+
+    return True
+
+
+def _format_return(val: Any) -> str:
+    """格式化收益率为带正负号的百分比字符串。"""
+    if val is None or val == "--":
+        return "--"
+    try:
+        v = float(val)
+        return f"{v:+.2f}%"
+    except (ValueError, TypeError):
+        return "--"
+
+
+def _format_rank(entry: dict) -> str:
+    """格式化排名为 '排名/总数' 格式。"""
+    rank = entry.get("rank", "--")
+    total = entry.get("total", "--")
+    if rank == "--" or total == "--":
+        return "--"
+    return f"{rank}/{total}"
+
+
+def _calc_rating_comment(rating: str, perf_eval: dict | None, benchmark: str) -> str:
+    """根据评级 + 超额收益数据 + 业绩基准，生成带具体描述的业绩评价文本。
+
+    Args:
+        rating: 最终评级（优秀/良好/稳定/偏差）
+        perf_eval: Data_performanceEvaluation 的 JSON 对象，含 categories/data
+        benchmark: 业绩比较基准名称
+
+    Returns:
+        完整业绩评价字符串
+    """
+    base = _RATING_COMMENT.get(rating, "--")
+
+    # 如果有超额收益评分，追加说明
+    if perf_eval:
+        categories = perf_eval.get("categories") or []
+        scores = perf_eval.get("data") or []
+        # 找到"超额收益"对应的分值
+        excess_idx = next((i for i, c in enumerate(categories) if c and ("超额" in c or "超额收益" in c)), -1)
+        if excess_idx >= 0 and excess_idx < len(scores):
+            excess_score = scores[excess_idx]
+            if isinstance(excess_score, (int, float)):
+                base += f"（超额收益评分{excess_score:.0f}）"
+                return base
+
+    # 没有超额收益评分但有基准名，附加基准信息
+    if benchmark and benchmark != "--":
+        base += f"（基准：{benchmark}）"
+
+    return base
+
+
+def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = None) -> str:
+    """用基准比较数据修正纯同类排名评级。
+
+    修正规则：
+      - 超额收益评分 ≥ 80  → 评级上调一级（如 良好→优秀）
+      - 超额收益评分 < 40  → 评级下调一级（如 稳定→偏差）
+      - 无超额收益数据或评分居中 → 保持原评级
+
+    Args:
+        peer_rating: 纯同类排名评级（优秀/良好/稳定/偏差）
+        perf_eval: Data_performanceEvaluation 对象，含"超额收益"评分
+
+    Returns:
+        修正后的最终评级
+    """
+    if not perf_eval or peer_rating not in _RATING_ORDER:
+        return peer_rating
+
+    categories = perf_eval.get("categories") or []
+    scores = perf_eval.get("data") or []
+
+    # 找到"超额收益"在 categories 中的索引
+    excess_idx = -1
+    for i, cat in enumerate(categories):
+        if cat and ("超额" in cat or "超额收益" in cat):
+            excess_idx = i
+            break
+
+    if excess_idx < 0 or excess_idx >= len(scores):
+        return peer_rating
+
+    excess_score = scores[excess_idx]
+    if not isinstance(excess_score, (int, float)):
+        return peer_rating
+
+    current_idx = _RATING_ORDER.index(peer_rating)
+
+    if excess_score >= _EXCESS_THRESHOLD_UP:
+        # 超额收益显著 → 上调
+        new_idx = min(current_idx + 1, len(_RATING_ORDER) - 1)
+    elif excess_score < _EXCESS_THRESHOLD_DOWN:
+        # 超额收益较差 → 下调
+        new_idx = max(current_idx - 1, 0)
+    else:
+        # 中间区间 → 不调整
+        return peer_rating
+
+    adjusted = _RATING_ORDER[new_idx]
+    if adjusted != peer_rating:
+        logger.debug("评级调整: %s → %s（超额收益评分 %.0f）",
+                     peer_rating, adjusted, excess_score)
+    return adjusted
+
+
+def write_fund_performance_sheet(
+    ws: Worksheet,
+    holdings: List[Holding],
+    details: List[DetailRow],
+) -> None:
+    """写入基金业绩分析页签。
+
+    对每只基金调 API 获取区间收益和同类排名，汇总为 11 列表格。
+    评级同时考虑同类排名百分位和业绩比较基准（超额收益评分）。
+
+    Args:
+        ws: 目标工作表
+        holdings: 原始持仓列表
+        details: 市值核算明细行列表
+    """
+    ws.title = "基金业绩分析"
+
+    row = write_title_row(ws, 1, "基金业绩分析", _NCOLS)
+    row = write_header_row(ws, row, _HEADERS)
+    data_start = row
+
+    # 识别基金
+    fund_holdings = [h for h in holdings if _is_fund(h)]
+    detail_map = {d.code: d for d in details}
+
+    if not fund_holdings:
+        write_data_row(ws, row, ["未检测到基金持仓"])
+        logger.info("基金业绩分析：无基金持仓")
+        freeze_header(ws, 2)
+        auto_width(ws)
+        return
+
+    # 按市值降序排列（市值大的基金排在前面）
+    def _fund_sort_key(h: Holding) -> float:
+        d = detail_map.get(h.code)
+        return d.market_value if d else 0.0
+
+    fund_holdings_sorted = sorted(fund_holdings, key=_fund_sort_key, reverse=True)
+
+    # ── 加载盈利预测数据（机构覆盖） ──
+    try:
+        from src.python.providers.akshare_extras import get_profit_forecast
+        profit_forecast = get_profit_forecast()
+    except Exception:
+        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --")
+        profit_forecast = {}
+
+    def _coverage_text(code: str) -> str:
+        """根据基金代码查找机构覆盖信息。"""
+        info = profit_forecast.get(code)
+        if info:
+            reports = info.get("reports", 0)
+            eps = info.get("eps_2025e")
+            if reports and eps is not None:
+                return f"{reports}家研报 EPS¥{eps:.2f}"
+            elif reports:
+                return f"{reports}家研报"
+            elif eps is not None:
+                return f"EPS¥{eps:.2f}"
+        return "--"
+
+    # 遍历每只基金获取业绩数据
+    fund_count = len(fund_holdings_sorted)
+    success_count = 0
+    perf_results: dict[str, dict] = {}
+    adjusted_ratings: dict[str, str] = {}
+
+    for idx, fund in enumerate(fund_holdings_sorted, 1):
+        logger.info("获取基金业绩 [%d/%d]: %s (%s)", idx, fund_count, fund.name, fund.code)
+
+        perf_data = fetch_fund_rankings(fund.code)
+
+        if perf_data is None or not perf_data.get("rankings"):
+            # 获取失败，写入兜底数据
+            _write_empty_row(ws, row, fund)
+            row += 1
+            logger.warning("基金 %s (%s) 业绩数据获取失败", fund.name, fund.code)
+            continue
+
+        rankings = perf_data.get("rankings", {})
+        peer_rating = perf_data.get("rating", "")
+        perf_eval = perf_data.get("perf_evaluation")
+        fund_type = _fund_display_type(fund)
+        benchmark = fetch_fund_benchmark(fund.code)
+
+        # 调整评级：同类排名 + 超额收益评分
+        final_rating = _adjust_rating_with_benchmark(peer_rating, perf_eval)
+
+        # 生成带基准说明的业绩评价文本
+        comment = _calc_rating_comment(final_rating, perf_eval, benchmark)
+
+        # 从估值明细中获取持仓盈亏数据
+        d = detail_map.get(fund.code)
+        profit_val = d.profit if d else 0.0
+        profit_rate_val = d.profit_rate if d else 0.0
+
+        # 写入该基金的行
+        vals = [
+            fund.name,
+            fund.code,
+            fund_type,
+            _format_return(rankings.get("近3月", {}).get("return")),
+            _format_return(rankings.get("近6月", {}).get("return")),
+            _format_return(rankings.get("近1年", {}).get("return")),  # 近1年 → 近12月
+            f"{profit_val:+,.2f}",                                   # 累计盈亏(¥)
+            f"{profit_rate_val * 100:+.2f}%",                        # 收益率
+            benchmark,                                               # 业绩比较基准
+            comment,                                                 # 业绩评价（含基准说明）
+            _format_rank(rankings.get("同类排名", {})),              # 同类排名
+            _coverage_text(fund.code),                               # 机构覆盖
+        ]
+        write_data_row(ws, row, vals, _num_formats())
+
+        # 业绩评价标色：优秀→红，偏差→绿，稳定→蓝
+        _rating_font = ""
+        if final_rating == "优秀":
+            _rating_font = RED_FONT
+        elif final_rating == "偏差":
+            _rating_font = GREEN_FONT
+        elif final_rating == "稳定":
+            _rating_font = BLUE_FONT
+        if _rating_font:
+            ws.cell(row=row, column=10).font = _rating_font
+
+        row += 1
+        success_count += 1
+        perf_results[fund.code] = perf_data
+        adjusted_ratings[fund.code] = final_rating
+
+    # 底部统计
+    row += 1
+    write_data_row(ws, row, [
+        f"共 {fund_count} 只基金，{success_count} 只获取到业绩数据",
+    ])
+    row += 1
+
+    # 评级分布（用最终调整后的评级）
+    rating_counts: Dict[str, int] = {}
+    for fund_code, adj_rating in adjusted_ratings.items():
+        if adj_rating:
+            rating_counts[adj_rating] = rating_counts.get(adj_rating, 0) + 1
+
+    if rating_counts:
+        rating_summary = " | ".join(
+            f"{k}: {v}只" for k, v in sorted(rating_counts.items(),
+                                              key=lambda x: _RATING_ORDER.index(x[0])
+                                              if x[0] in _RATING_ORDER else 99,
+                                              reverse=True)
+        )
+        write_data_row(ws, row, [f"评级分布: {rating_summary}"])
+        row += 1
+
+    # 底部标注业绩评价标准说明
+    row += 1
+    write_data_row(ws, row, [
+        "业绩评价标准：同类排名前20%→优秀(红)、20%~30%→良好、30%~50%→稳定(蓝)、50%后→偏差(绿) | "
+        "超额收益评分≥80上调一级、<40下调一级"
+    ])
+
+    freeze_header(ws, 2)
+    auto_width(ws, min_width=10, max_width=30)
+
+    logger.info("基金业绩分析页签写入完成，%d/%d 只基金获取成功",
+                success_count, fund_count)
+
+
+def _write_empty_row(ws, row: int, fund: Holding) -> None:
+    """写入获取失败的基金占位行。"""
+    vals = [
+        fund.name,
+        fund.code,
+        _fund_display_type(fund),
+        "--", "--", "--",
+        "--", "--",
+        "--",
+        "--",
+        "--",
+        "--",
+    ]
+    write_data_row(ws, row, vals, _num_formats())
+
+
+def _num_formats() -> List[str]:
+    """每列的 Excel 数字格式。"""
+    return [
+        "",           # 1  基金
+        "",           # 2  代码
+        "",           # 3  类型
+        "",           # 4  近3月（字符串 %）
+        "",           # 5  近6月
+        "",           # 6  近12月
+        "",           # 7  持仓累计盈亏(¥)（字符串 ¥）
+        "",           # 8  持仓收益率（字符串 %）
+        "",           # 9  业绩基准
+        "",           # 10 业绩评价
+        "",           # 11 同类排名
+        "",           # 12 机构覆盖
+    ]

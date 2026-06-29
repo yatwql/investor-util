@@ -2,7 +2,7 @@
 
 个人投资者辅助工具：读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.22
+> 当前版本：0.2.28
 
 ---
 
@@ -105,7 +105,7 @@ python src/main.py
 ```
   > [E] 生成基础版Excel分析报告
     [N] 生成包含新闻的Excel分析报告
-    [H] 生成基础版HTML分析报告
+    [H] 生成包含新闻的HTML分析报告
     [B] 生成全系列包含新闻的报告(Excel+HTML)
     [L] 生成全系列完整版报告(Excel+HTML)
     [C] 配置持仓信息目录
@@ -149,7 +149,7 @@ python src/main.py
   "news_top_count": 100,
   "news_sources": {
     "sina": true,
-    "eastmoney": false,
+    "eastmoney": true,
     "cls": false,
     "wallstreetcn": true,
     "akshare": true
@@ -163,10 +163,9 @@ python src/main.py
     "rank": 86400,
     "hold": 604800,
     "news": 900,
-    "llm_news_corr": 3600,
+    "llm_news_correlation": 3600,
     "industry": 604800,
     "benchmark": 2592000,
-    "llm": 86400,
     "llm_global_macro": 86400,
     "llm_expert_review": 7200,
     "profit_forecast": 86400,
@@ -186,6 +185,7 @@ python src/main.py
 | `news_top_count` | `100` | 财经新闻关联分析输出条目上限 | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
+| `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个敏感字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
@@ -228,22 +228,46 @@ python src/main.py
 
 > `preferred_provider` 为空对象 `{}` 时全部使用默认优先级。
 
-### cache_ttl 可调参数
-|--------|------|:----:|------|
-| `price` | 86400（24h） | — | 股票/基金最新价缓存 |
-| `index` | 86400（24h） | — | 市场指数行情缓存 |
-| `rank` | 86400（24h） | — | 基金同类排名+区间收益率 |
-| `hold` | 604800（7天） | — | 基金前10大持仓明细 |
-| `news` | 900（15分钟） | 输入参数指纹 | 多源新闻聚合结果缓存，避免重复 HTTP 获取 |
-| `llm_news_corr` | 3600（1小时） | 输入数据指纹 | LLM 新闻关联分析缓存 |
-| `llm_global_macro` | 86400（24小时） | 指数+持仓指纹 | 全球政经局势 LLM 分析 |
-| `llm_expert_review` | 7200（2小时） | 持仓结构指纹 | 智囊团深度复盘 LLM 分析 |
-| `industry` | 604800（7天） | — | 行业分类/概念板块缓存 |
-| `benchmark` | 2592000（30天） | — | 业绩比较基准对照表 |
-| `profit_forecast` | 86400（24小时） | 指数指纹 | 机构盈利预测 |
-| `sector_flow` | 900（15分钟） | 指数指纹 | 行业资金流向排名 |
-| `dividend` | 2592000（30天） | 代码列表指纹 | 股票历史分红 |
+### user_fund_benchmarks 自定义基准
 
+`user_fund_benchmarks` 用于覆盖部分基金的业绩比较基准。代码内置了主流宽基/行业指数（沪深 300、中证 500、纳斯达克 100 等），遇到不在内置库中的基金时，可通过此字段手动指定。
+
+格式：`{"基金代码": "基准代码"}`，键值均为六位基金代码（字符串或数字均可）。
+
+```json
+{
+  "user_fund_benchmarks": {
+    "000001": "000300",
+    "005827": "399001",
+    "110011": "000300"
+  }
+}
+```
+
+> 内置基准库实时自动补充，`user_fund_benchmarks` 仅在置信度不足时作为兜底。空对象 `{}` 表示不添加自定义覆盖。
+
+### cache_ttl 可调参数
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
+|------|-----------|:--------:|----------|------|
+| `price` | `price_{code}.json` | 24h | — | 股票/基金最新价、昨收 |
+| `index` | `index_{code}.json` | 24h | — | 市场指数行情 |
+| `rank` | `fund_perf_{code}.json` | 24h | — | 基金同类排名+区间收益率 |
+| `hold` | `fund_hold_{code}.json` | 7 天 | — | 基金前 10 持仓明细 |
+| `industry` | `industry_{code}.json` | 7 天 | — | 行业分类/概念板块 |
+| `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
+| `news` | `news_{md5}.json` | 15 分钟 | 新闻源参数 + 关键词 | 多源新闻聚合结果 |
+| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | A股/美股指数 + 持仓汇总 | 全球政经局势 LLM 分析 |
+| `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | 持仓汇总 + 分类计数 + 穿透 TOP10 + 持仓明细 | 智囊团深度复盘 LLM 分析 |
+| `llm_news_correlation` | `llm_news_correlation_{fingerprint}.json` | 1h | 关键词 + 持仓汇总 | LLM 新闻关联分析 |
+| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
+| `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | A股+美股指数 | 行业资金流向排名 |
+| `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
+
+> **指纹驱动失效：** 文件名中的 `{fingerprint}` 是输入数据的 MD5 哈希。持仓/指数数据变化时指纹自动改变，原缓存失效，无需手动清除。
+> 
+> **TTL 兜底：** 即使指纹未变，缓存文件仍有 TTL 兜底到期自动刷新，防止数据"永久有效"。
+> 
 > **调整建议：** 盘中频繁刷新可将 `price` 改为 `3600`（1小时）；持仓变动少可将 `hold` 改为 `2592000`（30天）。
 
 ---
@@ -282,35 +306,35 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 ```json
 {
   "max_retries": 2,
-  "temperature_macro": 0.3,
-  "temperature_expert": 0.8,
+  "temperature_global_macro": 0.3,
+  "temperature_expert_review": 0.8,
   "temperature_news_correlation": 0.1,
-  "timeout_macro": 60,
-  "timeout_expert": 120,
+  "timeout_global_macro": 60,
+  "timeout_expert_review": 120,
   "timeout_news_correlation": 60,
-  "cache_enabled_macro": true,
-  "cache_enabled_expert": true,
+  "cache_enabled_global_macro": true,
+  "cache_enabled_expert_review": true,
   "cache_enabled_news_correlation": true,
-  "output_brief_macro": false,
-  "output_brief_expert": false,
-  "max_tokens_macro": 1024,
-  "max_tokens_expert": 8192,
+  "output_brief_global_macro": false,
+  "output_brief_expert_review": false,
+  "max_tokens_global_macro": 1024,
+  "max_tokens_expert_review": 8192,
   "max_tokens_news_correlation": 2000,
-  "model_macro": null,
-  "model_expert": null,
+  "model_global_macro": null,
+  "model_expert_review": null,
   "model_news_correlation": null,
-  "system_prompt_macro": null,
-  "system_prompt_expert": null,
+  "system_prompt_global_macro": null,
+  "system_prompt_expert_review": null,
   "system_prompt_news_correlation": null,
   "llm_news_analysis": false,
-  "thinking_enabled_macro": false,
-  "thinking_enabled_expert": true,
+  "thinking_enabled_global_macro": false,
+  "thinking_enabled_expert_review": true,
   "thinking_enabled_news_correlation": false,
-  "thinking_budget_macro": 4000,
-  "thinking_budget_expert": 16000,
+  "thinking_budget_global_macro": 4000,
+  "thinking_budget_expert_review": 16000,
   "thinking_budget_news_correlation": 4000,
-  "reasoning_effort_macro": "high",
-  "reasoning_effort_expert": "high",
+  "reasoning_effort_global_macro": "high",
+  "reasoning_effort_expert_review": "high",
   "reasoning_effort_news_correlation": "high"
 }
 ```
@@ -323,53 +347,37 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 | 字段 | 推荐值 | 说明 |
 |------|:------:|------|
-| `temperature_macro` | **0.3** | 全球政经局势需稳定、事实性输出。低温（<0.5）减少幻觉，确保分析可信；高温（>0.7）易发散编造数据 |
-| `temperature_expert` | **0.8** | 智囊团复盘需要多元视角和创造性碰撞。高温（>0.7）鼓励专家输出差异化观点，避免千篇一律 |
-| `temperature_news_correlation` | **0.1** | 新闻关联分析要求严格的结构化 JSON 输出。极低温（<0.2）保证格式稳定，杜绝 JSON 解析失败 |
-| `timeout_macro` | **60s** | 宏观分析输入简短，60 秒内大部分 API 能完成 |
-| `timeout_expert` | **120s** | 智囊团输入量大（含全部持仓明细），需更长的生成时间 |
+| `temperature_global_macro` | **0.3** | 全球政经局势需稳定、事实性输出。低温（<0.5）减少幻觉，确保分析可信；高温（>0.7）易发散编造数据。风险：>0.5 可能编造不存在的经济指标或政策事件 |
+| `temperature_expert_review` | **0.8** | 智囊团复盘需要多元视角和创造性碰撞。高温（>0.7）鼓励专家输出差异化观点，避免千篇一律。风险：<0.4 专家观点雷同，失去圆桌辩论意义 |
+| `temperature_news_correlation` | **0.1** | 新闻关联分析要求严格的结构化 JSON 输出。极低温（<0.2）保证格式稳定，杜绝 JSON 解析失败。风险：>0.3 JSON 解析失败率显著上升，影响报告渲染 |
+| `timeout_global_macro` | **60s** | 宏观分析输入简短，60 秒内大部分 API 能完成 |
+| `timeout_expert_review` | **120s** | 智囊团输入量大（含全部持仓明细），需更长的生成时间 |
 | `timeout_news_correlation` | **60s** | 新闻分析逐条处理，单次调用数据量不大 |
 | `max_retries` | **2** | 遇到 429（限流）或 503（服务不可用）时最多重试 2 次 |
-| `max_tokens_macro` | **1024** | 宏观分析输出 ≈ 300-600 tokens，1024 留有充足富余 |
-| `max_tokens_expert` | **8192** | 智囊团三阶段输出可达 2000+ tokens，8192 保障完整输出 |
+| `max_tokens_global_macro` | **1024** | 宏观分析输出 ≈ 300-600 tokens，1024 留有充足富余 |
+| `max_tokens_expert_review` | **8192** | 智囊团三阶段输出可达 2000+ tokens，8192 保障完整输出 |
 | `max_tokens_news_correlation` | **2000** | 新闻 JSON 数组输出，2000 足以覆盖 30+ 条新闻 |
-| `model_macro` | **null** | `null` 时使用 `llm_key.json` 的默认 model；填入模型名（如 `"claude-sonnet-4-6"`）单独指定全球政经局势用模型 |
-| `model_expert` | **null** | `null` 时使用默认 model；填入模型名单独指定智囊团深度复盘用模型（如需更大输出量可换 `"claude-opus-4-8"`） |
+| `model_global_macro` | **null** | `null` 时使用 `llm_key.json` 的默认 model；填入模型名（如 `"claude-sonnet-4-6"`）单独指定全球政经局势用模型 |
+| `model_expert_review` | **null** | `null` 时使用默认 model；填入模型名单独指定智囊团深度复盘用模型（如需更大输出量可换 `"claude-opus-4-8"`） |
 | `model_news_correlation` | **null** | `null` 时使用默认 model；填入模型名单独指定新闻关联分析用模型（批量任务可选轻量模型如 `"claude-haiku-4-5"` 降低成本） |
-| `cache_enabled_macro` | **true** | 宏观分析 24 小时内市场格局不会剧变，开启缓存节省费用（指数指纹驱动失效） |
-| `cache_enabled_expert` | **true** | 智囊团 2 小时内观点有效，开启缓存避免重复扣费 |
+| `cache_enabled_global_macro` | **true** | 宏观分析 24 小时内市场格局不会剧变，开启缓存节省费用（指数指纹驱动失效） |
+| `cache_enabled_expert_review` | **true** | 智囊团 2 小时内观点有效，开启缓存避免重复扣费 |
 | `cache_enabled_news_correlation` | **true** | 同批次新闻的 LLM 分析结果可复用，1 小时缓存 |
-| `output_brief_macro` | **false** | 关闭时输出完整分析（~500字）；开启后精简至 ≤200 字，适合快速预览 |
-| `output_brief_expert` | **false** | 关闭时输出完整三阶段复盘；开启后精简至 ≤300 字 |
-| `system_prompt_macro` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖分析风格 |
-| `system_prompt_expert` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖专家角色设定 |
+| `output_brief_global_macro` | **false** | 关闭时输出完整分析（~500字）；开启后精简至 ≤200 字，适合快速预览 |
+| `output_brief_expert_review` | **false** | 关闭时输出完整三阶段复盘；开启后精简至 ≤300 字 |
+| `system_prompt_global_macro` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖分析风格 |
+| `system_prompt_expert_review` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖专家角色设定 |
 | `system_prompt_news_correlation` | **null** | `null` 时使用代码内置默认 prompt；填入自定义文本可覆盖新闻关联判定规则 |
-| `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking（不建议——输出短，不值得） |
-| `thinking_enabled_expert` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking |
-| `thinking_enabled_news_correlation` | `false` | 新闻关联启用 Extended Thinking（不建议——JSON 格式任务不需要深度推理） |
-| `thinking_budget_macro` | 4000 | 政经 thinking token 预算。自动兜底 `max_tokens + 4096`（仅 Claude 有效） |
-| `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算。`max_tokens_expert=8192`，16000 留充足余量（仅 Claude 有效） |
-| `thinking_budget_news_correlation` | 4000 | 新闻关联 thinking token 预算。实际被关闭时该值不生效 |
-| `reasoning_effort_macro` | `"high"` | DeepSeek 模型思考深度：`"high"` 或 `"max"`（仅 DeepSeek 有效） |
-| `reasoning_effort_expert` | `"high"` | 智囊团思考深度，推荐 `"max"` 以充分发挥 DeepSeek V4 推理能力 |
-| `reasoning_effort_news_correlation` | `"high"` | 新闻关联思考深度，建议保持 `"high"` |
+| `thinking_enabled_global_macro` | `false` | 全球政经启用 Extended Thinking（不建议——输出短，不值得）。**Claude / DeepSeek 均兼容** |
+| `thinking_enabled_expert_review` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking。**Claude / DeepSeek 均兼容** |
+| `thinking_enabled_news_correlation` | `false` | 新闻关联启用 Extended Thinking（不建议——JSON 格式任务不需要深度推理）。**Claude / DeepSeek 均兼容** |
+| `thinking_budget_global_macro` | 4000 | **仅 Claude** 政经 thinking token 预算。自动兜底 `max_tokens + 4096` |
+| `thinking_budget_expert_review` | 16000 | **仅 Claude** 智囊团 thinking token 预算。`max_tokens_expert_review=8192`，16000 留充足余量 |
+| `thinking_budget_news_correlation` | 4000 | **仅 Claude** 新闻关联 thinking token 预算。实际被关闭时该值不生效 |
+| `reasoning_effort_global_macro` | `"high"` | **仅 DeepSeek** 思考深度：`"high"`（标准）或 `"max"`（极致） |
+| `reasoning_effort_expert_review` | `"high"` | **仅 DeepSeek** 思考深度，推荐 `"max"` 以充分发挥 V4 推理能力 |
+| `reasoning_effort_news_correlation` | `"high"` | **仅 DeepSeek** 思考深度，建议保持 `"high"` |
 | `llm_news_analysis` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
-| `thinking_enabled_expert` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking |
-| `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking（不建议——输出短，不值得） |
-| `thinking_enabled_news_correlation` | `false` | 新闻关联启用 Extended Thinking（不建议——JSON 格式任务不需要深度推理） |
-| `thinking_budget_macro` | 4000 | 政经 thinking token 预算。自动兜底 `max_tokens + 4096` |
-| `thinking_budget_expert` | 16000 | 智囊团 thinking token 预算。`max_tokens_expert=8192`，16000 留充足余量 |
-| `thinking_budget_news_correlation` | 4000 | 新闻关联 thinking token 预算。实际被关闭时该值不生效 |
-
-#### 逐章节模型路由（Per-Section Model Routing）
-
-`llm_settings.json` 中的 `model_macro` / `model_expert` / `model_news_correlation` 可对**不同报告章节指定不同 LLM 模型**。使用场景：
-
-- **全球政经局势**用中端模型（如 `claude-sonnet-4-6`）即可满足事实性分析要求
-- **智囊团深度复盘**需要大输出量，可换高端模型（如 `claude-opus-4-8`）
-- **新闻关联分析**是批量任务（一次调用分析 30 条新闻），使用轻量模型（如 `claude-haiku-4-5`）可显著降低成本
-
-所有 `model_*` 为 `null` 时各章节统一使用 `llm_key.json` 中配置的默认 `model`，不影响现有配置。
 
 ---
 
@@ -394,22 +402,14 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 **[Extended Thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking)** 让模型在回答前进行深度推理，大幅提升复杂分析的深度和逻辑严谨性。代价是输出 token 大幅增加（约 2~4 倍），费用相应上升。
 
-##### 什么时候该开？
-
-| 场景 | 推荐 | 原因 |
-|------|:----:|------|
-| **智囊团深度复盘**（`thinking_enabled_expert`） | ✅ **推荐开启** | 三阶段论证（召集令→圆桌→定音锤）需要深度逻辑推演，开启后分析质量明显提升。`thinking_budget_expert` 建议 16000 |
-| **全球政经局势**（`thinking_enabled_macro`） | ❌ 不建议 | 输出仅 500 字、2~3 段，不值得花费翻倍 token |
-| **新闻关联分析**（`thinking_enabled_news_correlation`） | ❌ 不建议 | 输出严格 JSON 格式，深度推理反而降低格式稳定性 |
-
 ##### 配置方式
 
 在 `llm_settings.json` 中设置（示例为 DeepSeek 全面开启智囊团深度推理）：
 
 ```json
 {
-  "thinking_enabled_expert": true,
-  "reasoning_effort_expert": "max"
+  "thinking_enabled_expert_review": true,
+  "reasoning_effort_expert_review": "max"
 }
 ```
 
@@ -417,24 +417,13 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 ```json
 {
-  "thinking_enabled_expert": true,
-  "thinking_budget_expert": 16000
+  "thinking_enabled_expert_review": true,
+  "thinking_budget_expert_review": 16000
 }
 ```
 
 | 字段 | 默认 | 说明 |
 |------|:----:|------|
-| `thinking_enabled_macro` | `false` | 全球政经启用 Extended Thinking |
-| `thinking_enabled_expert` | `true` ⭐ | **默认已开启**。智囊团深度复盘启用 Extended Thinking |
-| `thinking_enabled_news_correlation` | `false` | 新闻关联分析启用 Extended Thinking |
-| `thinking_budget_macro` | 4000 | **仅 Claude** 全球政经 thinking token 预算。若小于 `max_tokens_macro + 1024` 则自动补足 |
-| `thinking_budget_expert` | 16000 | **仅 Claude** 智囊团 thinking token 预算。若小于 `max_tokens_expert + 1024` 则自动补足 |
-| `thinking_budget_news_correlation` | 4000 | **仅 Claude** 新闻关联 thinking token 预算 |
-| `reasoning_effort_macro` | `"high"` | **仅 DeepSeek** 全球政经思考深度。`"high"`（标准）或 `"max"`（极致） |
-| `reasoning_effort_expert` | `"high"` | **仅 DeepSeek** 智囊团思考深度，推荐 `"max"` |
-| `reasoning_effort_news_correlation` | `"high"` | **仅 DeepSeek** 新闻关联思考深度，建议 `"high"` |
-
-> **注意**：开启 Extended Thinking 后，`temperature` 参数被自动忽略（API 不支持两者并存）。
 
 ##### 模型差异详解
 
@@ -450,17 +439,17 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 **仅在使用 Claude 模型时 `thinking_budget_{模块}` 有意义。** DeepSeek 使用 `reasoning_effort`（`"high"` / `"max"`）定性控制思考深度，不涉及 token 预算概念。
 
-以下解释针对 Claude 的 `thinking_budget_{模块}` 和 `max_tokens_{模块}`（如 `thinking_budget_expert` / `max_tokens_expert`）。
+以下解释针对 Claude 的 `thinking_budget_{模块}` 和 `max_tokens_{模块}`（如 `thinking_budget_expert_review` / `max_tokens_expert_review`）。
 
 | 配置项（llm_settings.json） | 管什么 | expert 默认值 |
 |------|--------|:------------:|
-| `max_tokens_expert` | **最终输出文本**的最大 token 数 | 8192 |
-| `thinking_budget_expert` | **内部思考过程**分配的 token 预算 | 16000 |
+| `max_tokens_expert_review` | **最终输出文本**的最大 token 数 | 8192 |
+| `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 16000 |
 
 模型先消耗 `thinking_budget` 做内部推理（该部分不可见），再从剩余额度里吐出最终回答（不超过 `max_tokens`）：
 
 ```
-┌─── thinking_budget_expert: 16000 ──────────────────┐
+┌─── thinking_budget_expert_review: 16000 ────────────────┐
 │  ┌── 模型内部思考 ──┐  ┌── 最终输出 ──────────┐   │
 │  │  ~8000 tokens    │  │  ~3000 tokens (可见)  │   │
 │  │  (不可见，不计入  │  │  ≤ max_tokens=8192   │   │
@@ -471,8 +460,8 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 ```
 
 **API 硬性约束（仅 Claude）：** `thinking_budget_{模块}` 的值 **必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。实际场景：
-- `max_tokens_macro=1024` → `thinking_budget_macro` 至少 2048（默认 4000 ✅）
-- `max_tokens_expert=8192` → `thinking_budget_expert` 至少 9216（默认 16000 ✅）
+- `max_tokens_global_macro=1024` → `thinking_budget_global_macro` 至少 2048（默认 4000 ✅）
+- `max_tokens_expert_review=8192` → `thinking_budget_expert_review` 至少 9216（默认 16000 ✅）
 
 > **提示**：开启 Extended Thinking 后，HTML 报告在该章节的 Token 用量行末尾追加 `| Extended Thinking` 标识；
 > Excel 报告在该章节的模型名称行下方追加 `Extended Thinking 已开启` 行，便于快速确认深度推理是否生效。
@@ -494,15 +483,6 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | 全球政经 | 输入 ~1500 / 输出 ~600 | 输入 ~1500 / 输出 ~2500 | ~3× |
 
 ---
-
-#### temperature 推荐理由详解
-
-| 模块 | 推荐值 | 为什么低/高 | 风险提示 |
-|------|:------:|-------------|----------|
-| global_macro | 0.3 | 宏观分析是事实性任务：引用真实指数数据、判断经济走向。低温度让输出更聚焦、减少编造虚假经济数据的风险 | >0.5 → 可能编造不存在的经济指标或政策事件 |
-| expert_review | 0.8 | 专家复盘是创造性任务：需要五位专家从不同立场碰撞观点。高温度让输出更多样化、避免所有专家意见趋同 | <0.4 → 专家观点雷同，失去"圆桌辩论"意义 |
-| news_correlation | 0.1 | 新闻关联是结构化任务：输出严格 JSON 格式。极低温保证格式稳定性，避免 JSON 字段缺失或格式错误 | >0.3 → JSON 解析失败率显著上升，影响报告渲染 |
-
 ---
 
 ### 字段总表
@@ -515,33 +495,6 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `api_key` | ✅ | API 密钥，妥善保管勿提交 Git |
 | `model` | — | 模型名称；留空时 provider 默认值：`"claude"` → `claude-sonnet-4-20250514`、`"openai"` → `gpt-4o` |
 | `endpoint` | — | API 端点 URL，留空使用官方端点 |
-
-#### llm_settings.json（非敏感字段 — 全部可选）
-
-| 字段 | 默认值 | 说明 |
-|------|:------:|------|
-| `max_retries` | `2` | API 调用失败最大重试次数 |
-| `temperature_macro` | `0.3` | 全球政经局势生成温度（0-1），低值 → 稳定可靠，高值 → 创意发散 |
-| `temperature_expert` | `0.8` | 智囊团深度复盘生成温度（0-1），建议高值鼓励观点多样性 |
-| `temperature_news_correlation` | `0.1` | LLM 新闻关联分析温度（0-1），建议低值保证 JSON 格式稳定性 |
-| `timeout_macro` | `60` | 全球政经局势 API 超时秒数 |
-| `timeout_expert` | `120` | 智囊团深度复盘 API 超时秒数（输入量大，需更长时间） |
-| `timeout_news_correlation` | `60` | LLM 新闻关联分析 API 超时秒数 |
-| `cache_enabled_macro` | `true` | 全球政经局势是否启用缓存 |
-| `cache_enabled_expert` | `true` | 智囊团深度复盘是否启用缓存 |
-| `cache_enabled_news_correlation` | `true` | LLM 新闻关联分析是否启用缓存 |
-| `output_brief_macro` | `false` | `true` 时输出 ≤200 字精简版宏观分析 |
-| `output_brief_expert` | `false` | `true` 时输出 ≤300 字精简版专家复盘 |
-| `max_tokens_macro` | `1024` | 全球政经局势输出 token 上限 |
-| `max_tokens_expert` | `8192` | 智囊团深度复盘输出 token 上限 |
-| `max_tokens_news_correlation` | `2000` | LLM 新闻关联分析输出 token 上限 |
-| `model_macro` | `null` | 单独指定全球政经局势用模型，`null` 使用 `llm_key.json` 的全局 `model` |
-| `model_expert` | `null` | 单独指定智囊团深度复盘用模型，`null` 使用全局 `model` |
-| `model_news_correlation` | `null` | 单独指定新闻关联分析用模型（批量任务可选轻量模型降成本），`null` 使用全局 `model` |
-| `system_prompt_macro` | `null` | 自定义宏观分析系统提示词，`null` 回退内置默认值 |
-| `system_prompt_expert` | `null` | 自定义智囊团系统提示词，`null` 回退内置默认值 |
-| `system_prompt_news_correlation` | `null` | 自定义新闻关联系统提示词，`null` 回退内置默认值 |
-| `llm_news_analysis` | `false` | 是否启用 LLM 新闻二次关联分析 |
 
 ---
 
@@ -640,7 +593,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 - 仅菜单 **L** 触发 LLM 调用，E / N / H / B 不会
 - LLM 结果默认缓存 24 小时（全球政经）/ 2 小时（智囊团），缓存有效期内反复按 L 不会重复扣费
 - 持仓或指数数据变更时，关联的 LLM 缓存自动失效；也可通过菜单 [2] 更新持仓缓存主动清除 LLM 缓存
-- 缓存时间可在 `data/config/config.json` → `cache_ttl` 中通过 `llm_global_macro` / `llm_expert_review` / `llm_news_corr` 自定义
+- 缓存时间可在 `data/config/config.json` → `cache_ttl` 中通过 `llm_global_macro` / `llm_expert_review` / `llm_news_correlation` 自定义
 
 ### 不配置 LLM 时的行为
 
@@ -672,48 +625,6 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — |
 
 ---
-
-## 缓存文件指引
-
-所有缓存文件存放于 `data/cache/` 目录，JSON 格式，自动管理过期时间。详细缓存机制（TTL 表、指纹构成、覆盖矩阵、降级规则）见 [需求文档 — 缓存策略](docs-stm/managements/requirements.md#6-缓存策略)。
-
-### 缓存文件清单
-
-| 文件名模式 | 用途 | 默认 TTL |
-|-----------|------|:--------:|
-| `price_{code}.json` | 股票/基金最新价、昨收 | 24h |
-| `index_{code}.json` | 市场指数行情 | 24h |
-| `fund_perf_{code}.json` | 基金同类排名+区间收益率 | 24h |
-| `fund_hold_{code}.json` | 基金前 10 持仓明细 | 7 天 |
-| `industry_{code}.json` | 行业分类/概念板块 | 7 天 |
-| `fund_benchmarks.json` | 业绩比较基准对照表 | 30 天 |
-| `news_{md5}.json` | 多源新闻聚合结果 | 15 分钟 |
-| `llm_global_macro_{fingerprint}.json` | 全球政经局势 LLM 分析 | 24h |
-| `llm_expert_review_{fingerprint}.json` | 智囊团深度复盘 LLM 分析 | 2h |
-| `llm_news_corr_{fingerprint}.json` | LLM 新闻关联分析 | 1h |
-| `profit_forecast_{fingerprint}.json` | 机构盈利预测全量数据 | 24h |
-| `sector_flow_{fingerprint}.json` | 行业资金流向排名 | 15 分钟 |
-| `dividend_{fingerprint}.json` | 股票历史分红汇总 | 30 天 |
-
-**LLM 缓存指纹：** 文件名中的 `{fingerprint}` 是输入数据的 MD5 哈希前 12 位。持仓/指数数据变化时指纹自动改变，原缓存失效。
-
-### 指纹驱动失效机制
-
-以下缓存文件的文件名中**内嵌 MD5 指纹**，输入源数据变化时指纹自动改变 → 缓存键不匹配 → 等效于"缓存未命中" → 自动使用新数据。**无需手动清除。**
-
-| 缓存文件 | 指纹来源 | 指纹数据变更时自动失效 |
-|---------|---------|:---:|
-| `news_{md5}.json` | 新闻源参数 + 关键词 | 持仓/穿透变化 |
-| `llm_global_macro_{fingerprint}.json` | A股/美股指数 + 持仓汇总（总市值/总成本/总盈亏/分类） | 指数波动 / 持仓变化 |
-| `llm_expert_review_{fingerprint}.json` | 持仓汇总 + 分类计数 + 穿透 TOP10 + 持仓明细（剔除行情波动字段） | 品种/份额/成本变化 |
-| `llm_news_corr_{fingerprint}.json` | 关键词 + 持仓汇总 | 持仓变化 |
-| `profit_forecast_{fingerprint}.json` | **A股+美股指数**（`_compute_index_fingerprint`） | 指数行情变化 |
-| `sector_flow_{fingerprint}.json` | **A股+美股指数**（`_compute_index_fingerprint`） | 指数行情变化 |
-| `dividend_{fingerprint}.json` | **持仓+穿透 A 股代码列表**（`_compute_dividend_fingerprint`） | 持仓/穿透品种变化 |
-
-**TTL 兜底：** 即使指纹未变（源数据无变化），缓存文件仍有 TTL 兜底到期自动刷新，防止数据"永久有效"。
-
-**无指纹（固定键名）的缓存：** `price_{code}`、`index_{code}`、`fund_perf_{code}`、`fund_hold_{code}`、`industry_{code}`、`fund_benchmarks`、`holdings_tracking` — 这些缓存的键名固定，纯 TTL 管理。`holdings_tracking` 内部存了指纹用于变更检测，但键名本身固定。
 
 ### TUI 缓存管理
 

@@ -20,7 +20,7 @@
     "industry": 604800,
     "llm_global_macro": 86400,
     "llm_expert_review": 7200,
-    "llm_news_corr": 3600,
+    "llm_news_correlation": 3600,
     "benchmark": 2592000,
     "profit_forecast": 86400,
     "sector_flow": 900,

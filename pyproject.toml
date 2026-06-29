@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "investor-util"
+version = "0.2.28"
+description = "个人投资者辅助工具：读取持仓 Excel，生成 Excel/HTML 投资分析报告"
+requires-python = ">=3.10"
+dependencies = [
+    "openpyxl>=3.1.0",
+    "httpx>=0.27.0",
+    "jinja2>=3.1.0",
+    "akshare>=1.18.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["src/test"]
