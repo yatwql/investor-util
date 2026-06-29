@@ -39,6 +39,18 @@
 
 启动脚本自动完成：Python 检测 → 虚拟环境创建 → 依赖安装 → 目录创建 → 运行主程序。
 
+> **💡 外部虚拟环境管理：** 设置环境变量 `VENV_PATH` 可将 `.venv` 放在项目目录外部，
+> 方便多个项目共享或集中管理虚拟环境：
+> ```bash
+> # Windows PowerShell
+> $env:VENV_PATH = "D:\shared\venvs\investor-util"
+> .\scripts\launch.ps1
+>
+> # Linux
+> VENV_PATH=/opt/venvs/investor-util ./scripts/launch.sh
+> ```
+> 首次运行自动创建并链接，再次运行直接复用。
+
 ### 方式二：手动运行
 
 ```bash
@@ -55,7 +67,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 4. 启动
-python src/main.py
+python src/python/main.py
 ```
 
 ---
