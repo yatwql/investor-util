@@ -64,7 +64,8 @@ def _print_llm_session_usage(usage: dict | None = None) -> None:
         try:
             from src.python.llm_client import get_session_usage
             usage = get_session_usage()
-        except Exception:
+        except (ImportError, TypeError, AttributeError):
+            logger.debug("获取 LLM 会话用量失败（非关键）")
             return
     if not usage or usage.get("call_count", 0) == 0:
         return
@@ -445,7 +446,7 @@ def _generate_excel_report(
         with _Timer("市值核算明细表"):
             write_market_value_sheet(ws2, holdings, details=details)
     else:
-        with _Timer("行情数据获取"):
+        with _Timer("行情数据获取 (市值核算明细表)"):
             print("  [..] 正在获取行情数据（首次耗时较长，后续使用缓存）...")
             total_mv, total_cost, total_profit, today_profit, details = \
                 write_market_value_sheet(ws2, holdings)
@@ -456,7 +457,7 @@ def _generate_excel_report(
 
     # ── 市场指数 ──
     if a_indices is None:
-        with _Timer("市场指数"):
+        with _Timer("市场指数 (投资分析汇总)"):
             print("  [..] 正在获取市场指数...")
             a_indices = fetch_indices() if fetch_indices else {}
             if us_indices is None:
@@ -476,7 +477,7 @@ def _generate_excel_report(
 
     with _Timer("资产穿透TOP10"):
         pen_result = compute_penetration_top10(holdings, details) if compute_penetration_top10 else {}
-        print("  [OK] 资产穿透 TOP10 计算完成")
+        print("  [OK] 资产穿透TOP10 计算完成")
         _call_sheet("资产穿透TOP10", write_penetration_sheet,
                      ws4, holdings, details, penetration_data=pen_result)
 
@@ -550,7 +551,8 @@ def _generate_excel_report(
         try:
             from src.python.llm_client import get_session_usage
             _llm_session = get_session_usage()
-        except Exception:
+        except (ImportError, TypeError, AttributeError):
+            logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
             _llm_session = None
         if _llm_session and _llm_session.get("call_count", 0) > 0:
             try:
@@ -559,15 +561,15 @@ def _generate_excel_report(
                 from src.python.report.excel_writer import freeze_header, auto_width
                 freeze_header(ws1, 2)
                 auto_width(ws1)
-            except Exception:
-                pass
+            except (OSError, TypeError, AttributeError):
+                logger.debug("写入 LLM 用量或格式化 worksheet 失败（非关键）")
 
         if show_llm_in_tui and (global_macro_text or expert_review_text or health_check_text or penetration_deep_text):
             _show_llm_tui(global_macro_text, expert_review_text, health_check_text, penetration_deep_text)
 
         _print_llm_session_usage(_llm_session)
 
-    with _Timer("保存文件"):
+    with _Timer("保存 Excel/HTML 文件"):
         print("  [..] 正在保存 Excel 报告...")
         path = save_workbook(wb, output_dir=output_dir)
         logger.info("Excel 报告已生成: %s", path)
@@ -1003,13 +1005,15 @@ def _refresh_common_caches() -> None:
             pf_ok = _f1.result()
             print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
                   else "  [!]   profit_forecast              获取失败")
-        except Exception:
+        except Exception as e:
+            logger.debug("profit_forecast Future 异常: %s", e)
             print("  [!]   profit_forecast              获取失败")
         try:
             sf_ok = _f2.result()
             print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
                   else "  [!]   sector_flow                  获取失败")
-        except Exception:
+        except Exception as e:
+            logger.debug("sector_flow Future 异常: %s", e)
             print("  [!]   sector_flow                  获取失败")
 
 
@@ -1132,7 +1136,8 @@ def _cmd_update_basic_cache() -> None:
                             print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)")
                         else:
                             print("  [!]   sector_flow                  获取失败")
-                except Exception:
+                except Exception as e:
+                    logger.debug("缓存刷新 Future 异常 (%s): %s", tag, e)
                     if tag == "fund":
                         print(f"  [!]   基金刷新异常")
                     else:

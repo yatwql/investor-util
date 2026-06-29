@@ -1,6 +1,7 @@
 # 投资分析报告小工具 — 质量控制与测试标准
 
 创建日期：2026-06-26
+最后更新：2026-06-30
 
 ---
 
@@ -18,7 +19,7 @@
 - 持仓读取（`src/python/reader.py`）：覆盖标准格式、缺字段、空文件、格式错误
 - 缓存管理（`src/python/cache.py`）：覆盖过期判断、读写、文件缺失、前缀清理
 - API 数据获取（`src/python/providers/*.py`）：mock HTTP 请求，覆盖正常返回、超时、异常格式
-- LLM 客户端（`src/python/llm_client.py`）：覆盖 API 调用路由、返回类型元组解包、缓存逻辑、截断检测
+- LLM 客户端（`src/python/llm/` 包）：覆盖 API 调用路由、返回类型元组解包、缓存逻辑、截断检测
 - 报表生成（`src/python/report/*.py`）：每个模块至少覆盖正常数据和空数据两种场景
 - 关键词富化（`src/python/report/news_correlation.py`）：覆盖持仓/穿透/行业三种来源类型、去重逻辑、空列表边界、Excel 格式断言（wrap_text、列宽）
 - TUI 菜单（`src/python/main.py`）：覆盖所有菜单选项的输入输出
@@ -97,7 +98,8 @@
 | v0.2.18 | 新增 `test_akshare_extras.py`（16 项）：指数指纹计算、缓存键生成、分红汇总计算、分红数据获取全路径、内存缓存（TestMemoCache 5 项）；`test_llm_client.py` 新增 sector_flow prompt 注入测试（2 项）、batch 新闻 LLM 分析测试（6 项）；全量 749 passed |
 | v0.2.29 | 持仓体检报告新增：`generate_health_check`/`_health_check_fingerprint` 单元测试、`write_llm_sheets` 扩展为 3 元组测试、`generate_all_llm` 返回 6 元组测试、`write_html_report` 签名 3 元组测试；`tui_handlers.py` `health_text` 参数覆盖、配置项 `model_health_check`/`temperature_health_check` 等 10 项默认值验证；全量 783 passed |
 | v0.2.30 | 穿透深度分析新增：`generate_penetration_deep_analysis`/`_penetration_deep_fingerprint` 单元测试、`write_llm_sheets` 扩展为 4 元组测试、`generate_all_llm` 返回 8 元组测试、`write_html_report` 签名 4 元组测试；Excel 页签序号前缀（1.~10.）排序验证；TUI 模型路由 5 条显示覆盖；配置项 `model_penetration_deep`/`temperature_penetration_deep` 等 10 项默认值验证；全量 783 passed |
-| v0.2.33 | `_generate_excel_report` Import/Sheet 写入隔离（7 个模块逐个 try/except，6 个 Sheet 写入 _call_sheet 包装）回归测试；日志模块名/Excel 页签/HTML 章节名称统一回归；`_SYSTEM_MACRO`→`_SYSTEM_GLOBAL_MACRO` 等 4 项常量重命名回归；test_config.py `validate_config` 10 项校验用例；test_helpers.py `SynchronousExecutor` 测试辅助类；全量 814 passed |
+| v0.2.33 | `_generate_excel_report` Import/Sheet 写入隔离（7 个模块逐个 try/except，6 个 Sheet 写入 _call_sheet 包装）回归测试；日志模块名/Excel 页签/HTML 章节名称统一回归；`_SYSTEM_MACRO`→`_SYSTEM_GLOBAL_MACRO` 等 4 项常量重命名回归；test_config.py `validate_config` 10 项校验用例；helpers.py `SynchronousExecutor` 测试辅助类；全量 814 passed |
+| v0.2.34 | content.py 拆分为 prompts.py + generators.py 回归测试；`test_helpers.py` → `helpers.py` 重命名后导入路径更新验证；system_prompt 覆盖路径（配置值/空值/缺失键）3 项测试；llm_settings.json 键名一致性校验测试；`llm/__init__.py` 显式导入验证；全量 945 passed |
 
 ---
 

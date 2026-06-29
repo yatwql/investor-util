@@ -51,6 +51,15 @@ class CacheTestBase(unittest.TestCase):
             json.dump({"_ts": ts, "_data": data}, f, ensure_ascii=False)
         return path
 
+    def _write_gz_cache(self, key: str, data: object, ts: float) -> str:
+        """向缓存目录写入 gzip 压缩的 JSON 文件，返回完整路径。"""
+        import gzip
+        safe = key.replace("/", "_").replace("\\", "_").replace("..", "_")
+        path = os.path.join(self.cache_dir, f"{safe}.json.gz")
+        with gzip.open(path, "wt", encoding="utf-8") as f:
+            json.dump({"_ts": ts, "_data": data}, f, ensure_ascii=False)
+        return path
+
 
 # ═══════════════════════════════════════════════════════════
 #  _cache_path 测试
@@ -850,6 +859,123 @@ class TestCacheConstants(unittest.TestCase):
     def test_cache_monthly(self):
         from src.python.cache import CACHE_MONTHLY
         self.assertEqual(CACHE_MONTHLY, 2592000)
+
+
+# ═══════════════════════════════════════════════════════════
+#  gzip 缓存测试
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGzipCache(CacheTestBase):
+    """测试大文件的自动 gzip 压缩/解压。"""
+
+    @patch("src.python.cache.time.time")
+    def test_small_file_not_gzipped(self, mock_time):
+        """小文件 (<100KB) 仍写入 .json。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set
+
+        set("small_key", "small_data")
+
+        json_path = os.path.join(self.cache_dir, "small_key.json")
+        gz_path = json_path + ".gz"
+        self.assertTrue(os.path.exists(json_path))
+        self.assertFalse(os.path.exists(gz_path))
+
+    @patch("src.python.cache.time.time")
+    def test_large_file_auto_gzipped(self, mock_time):
+        """大文件 (>100KB) 自动写入 .json.gz。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set
+
+        large_data = "x" * 110000
+        set("large_key", large_data)
+
+        json_path = os.path.join(self.cache_dir, "large_key.json")
+        gz_path = json_path + ".gz"
+        self.assertTrue(os.path.exists(gz_path))
+        self.assertFalse(os.path.exists(json_path))
+
+    @patch("src.python.cache.time.time")
+    def test_read_gzipped_file(self, mock_time):
+        """读取 .json.gz 返回正确数据。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set
+
+        large_data = "x" * 110000
+        set("read_gz", large_data)
+
+        mock_time.return_value = 1050.0
+        from src.python.cache import get
+
+        result = get("read_gz", 100)
+        self.assertEqual(result, large_data)
+
+    @patch("src.python.cache.time.time")
+    def test_read_fallback_json(self, mock_time):
+        """.gz 不存在时回退到 .json。"""
+        mock_time.return_value = 1000.0
+        self._write_cache("fallback", "json_data", ts=950.0)
+        from src.python.cache import get
+
+        result = get("fallback", 100)
+        self.assertEqual(result, "json_data")
+
+    @patch("src.python.cache.time.time")
+    def test_clear_by_prefix_removes_gz(self, mock_time):
+        """前缀删除同时删除 .gz 文件。"""
+        mock_time.return_value = 1000.0
+        self._write_cache("price_000001", 1, ts=100.0)
+        self._write_gz_cache("price_000002", 2, ts=100.0)
+        from src.python.cache import clear_by_prefix
+
+        count = clear_by_prefix("price_")
+        self.assertEqual(count, 2)
+
+        json_path = os.path.join(self.cache_dir, "price_000001.json")
+        gz_path = os.path.join(self.cache_dir, "price_000002.json.gz")
+        self.assertFalse(os.path.exists(json_path))
+        self.assertFalse(os.path.exists(gz_path))
+
+    @patch("src.python.cache.time.time")
+    @patch("src.python.cache.get_ttl")
+    def test_cleanup_expired_gz(self, mock_ttl, mock_time):
+        """缓存清理处理 .gz 文件。"""
+        mock_time.return_value = 10000.0
+        mock_ttl.return_value = 100.0
+
+        self._write_gz_cache("price_gz_old", 1, ts=9500.0)
+        self._write_gz_cache("price_gz_fresh", 2, ts=9950.0)
+        from src.python.cache import cleanup_expired
+
+        count = cleanup_expired()
+        self.assertEqual(count, 1)
+
+        old_path = os.path.join(self.cache_dir, "price_gz_old.json.gz")
+        fresh_path = os.path.join(self.cache_dir, "price_gz_fresh.json.gz")
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(fresh_path))
+
+    @patch("src.python.cache.time.time")
+    def test_gzip_fingerprint_matches(self, mock_time):
+        """内容指纹在压缩前后一致。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set
+
+        complex_data = {
+            "list": list(range(500)),
+            "nested": {"a": 1, "b": [1, 2, 3], "c": {"d": "e"}},
+            "numbers": [1.0, 2.0, 3.0],
+            "text": "x" * 110000,
+        }
+        set("fp_complex", complex_data)
+
+        mock_time.return_value = 1500.0
+        from src.python.cache import get
+
+        result = get("fp_complex", 600)
+        self.assertEqual(result, complex_data)
+
 
 if __name__ == "__main__":
     unittest.main()

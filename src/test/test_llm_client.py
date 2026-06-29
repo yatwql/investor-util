@@ -40,7 +40,7 @@ from src.python.llm_client import (
     generate_global_macro,
 )
 
-from src.test.test_helpers import SynchronousExecutor
+from src.test.helpers import SynchronousExecutor
 
 
 # ═══════════════════════════════════════════════════════════

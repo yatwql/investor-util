@@ -64,7 +64,7 @@ def _get_chain(data_type: str) -> list[str]:
             chain.remove(preferred)
             chain.insert(0, preferred)
             logger.info("%s Provider Chain: 根据配置首选 '%s'", data_type, preferred)
-    except Exception:
+    except (KeyError, TypeError):
         pass
     return chain
 
@@ -529,18 +529,18 @@ def _fetch_benchmark_from_api(code: str) -> str | None:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Referer": "https://fund.eastmoney.com/",
     }
+    import httpx as _httpx_loc
     urls = [
         f"https://fund.eastmoney.com/{code}.html",
         f"https://fundf10.eastmoney.com/jbgk_{code}.html",
     ]
     for url in urls:
         try:
-            import httpx as _httpx_loc
             with _httpx_loc.Client(timeout=10, follow_redirects=True, verify=False) as client:
                 resp = client.get(url, headers=headers)
                 resp.encoding = "utf-8"
                 html = resp.text
-        except Exception:
+        except (_httpx_loc.RequestError, OSError):
             continue
 
         patterns = [
@@ -593,7 +593,7 @@ def _get_full_benchmark_table() -> dict[str, str]:
         config = get_config()
         user_benchmarks = config.get("user_fund_benchmarks") or {}
         table.update(user_benchmarks)
-    except Exception:
+    except (KeyError, TypeError):
         pass
     return table
 

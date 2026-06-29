@@ -127,6 +127,69 @@ class TestCorrelateNewsWithHoldings(unittest.TestCase):
         result = correlate_news_with_holdings(news, self.keywords)
         self.assertEqual(len(result), 1)
 
+    def test_multiple_keywords_in_one_news(self) -> None:
+        """一条新闻匹配多个关键词。"""
+        news = [
+            {"title": "长江电力与腾讯控股达成合作", "intro": "电力互联网", "url": "http://a.com/multi"},
+        ]
+        result = correlate_news_with_holdings(news, self.keywords)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(len(result[0]["matched_keywords"]), 2)
+        self.assertIn("长江电力", result[0]["matched_keywords"])
+        self.assertIn("腾讯", result[0]["matched_keywords"])
+
+    def test_dedup_by_same_url_different_title(self) -> None:
+        """相同 URL 只保留一条（即使 title 不同）。"""
+        news = [
+            {"title": "长江电力大涨", "intro": "", "url": "http://a.com/dup"},
+            {"title": "长江电力下跌", "intro": "", "url": "http://a.com/dup"},
+        ]
+        result = correlate_news_with_holdings(news, self.keywords)
+        self.assertEqual(len(result), 1)
+
+    def test_url_dedup_with_missing_url_field(self) -> None:
+        """缺 url 字段的新闻只保留第一条。"""
+        news = [
+            {"title": "长江电力新闻", "intro": ""},
+            {"title": "腾讯控股消息", "intro": ""},
+        ]
+        result = correlate_news_with_holdings(news, self.keywords)
+        self.assertEqual(len(result), 1)
+        self.assertIn("长江电力", result[0]["matched_keywords"])
+
+    def test_none_url_handled(self) -> None:
+        """url 为 None 不崩溃。"""
+        news = [
+            {"title": "长江电力", "intro": "", "url": None},
+        ]
+        result = correlate_news_with_holdings(news, self.keywords)
+        self.assertEqual(len(result), 1)
+
+    def test_keywords_case_preserved_in_result(self) -> None:
+        """matched_keywords 保持原始大小写。"""
+        news = [
+            {"title": "AAPL rises", "intro": "", "url": "http://a.com/aapl"},
+        ]
+        result = correlate_news_with_holdings(news, ["AAPL"])
+        self.assertEqual(result[0]["matched_keywords"], ["AAPL"])
+
+    def test_empty_keyword_in_list_ignored(self) -> None:
+        """关键词列表中的空字符串不参与匹配。"""
+        news = [
+            {"title": "长江电力", "intro": "", "url": "http://a.com/e"},
+        ]
+        result = correlate_news_with_holdings(news, ["", "长江电力"])
+        self.assertEqual(len(result), 1)
+        self.assertIn("长江电力", result[0]["matched_keywords"])
+
+    def test_keyword_match_count_correct(self) -> None:
+        """matched_keywords 数量与匹配的关键词数一致。"""
+        news = [
+            {"title": "长江电力 腾讯", "intro": "宁德时代", "url": "http://a.com/count"},
+        ]
+        result = correlate_news_with_holdings(news, self.keywords)
+        self.assertEqual(len(result[0]["matched_keywords"]), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

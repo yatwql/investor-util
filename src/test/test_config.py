@@ -251,3 +251,119 @@ class TestValidateConfig(unittest.TestCase):
         """user_fund_benchmarks 不是 dict → 告警。"""
         n = cfg.validate_config({"user_fund_benchmarks": ["600519", "沪深300"]})
         self.assertEqual(n, 1)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  System Prompt 覆盖路径测试（pytest）
+# ═══════════════════════════════════════════════════════════════
+#
+# 测试 generate_global_macro / generate_expert_review / etc.
+# 中对 system_prompt 的处理：
+#   llm_settings.json system_prompt_* 非 null → 用配置值
+#   llm_settings.json system_prompt_* 为 null → 回退代码内置默认值
+#   缺少 system_prompt_* 键 → 回退代码内置默认值
+
+
+class TestSystemPromptOverride:
+    """验证 system_prompt_* 覆盖字段的控制逻辑。"""
+
+    def test_override_from_config(self, mocker):
+        """配置中 system_prompt_global_macro 为非 null 时，应以配置值为准。"""
+        import src.python.llm.generators as _gens
+        mock_system = "自定义宏观分析提示词，请分析全球经济趋势。"
+
+        # mock get_llm_config 返回包含 system_prompt_global_macro 的配置
+        mock_config = {
+            "system_prompt_global_macro": mock_system,
+            "cache_enabled_global_macro": False,
+            "max_tokens_global_macro": 800,
+            "timeout_global_macro": 60,
+            # model 设为 None 以跳过实际 LLM 调用
+            "model": None,
+        }
+        mocker.patch("src.python.config.get_llm_config", return_value=mock_config)
+        # generate_global_macro 内部导入 llm_client as _lm 后调用 _lm._generate_llm_content
+        mock_gen = mocker.patch("src.python.llm_client._generate_llm_content",
+                                return_value=(None, False))
+
+        _gens.generate_global_macro(
+            a_indices={}, us_indices={}, total_mv=100000,
+            total_profit=5000, categories={},
+        )
+
+        # 验证 _generate_llm_content 被调用，且第 4 个 positional 参数（system_prompt）等于自定义值
+        # _generate_llm_content(llm_config, cache_key, cache_ttl, system_prompt, user_prompt, ...)
+        call_args = mock_gen.call_args[0]  # positional args
+        assert call_args[3] == mock_system, (
+            f"预期 system_prompt={mock_system!r}, 实际={call_args[3]!r}"
+        )
+
+    def test_fallback_to_default(self, mocker):
+        """配置中 system_prompt_global_macro 为 null 时，应使用代码内置默认值。"""
+        from src.python.llm.prompts import _SYSTEM_GLOBAL_MACRO
+        import src.python.llm.generators as _gens
+
+        mock_config = {
+            "system_prompt_global_macro": None,
+            "cache_enabled_global_macro": False,
+            "max_tokens_global_macro": 800,
+            "timeout_global_macro": 60,
+            "model": None,
+        }
+        mocker.patch("src.python.config.get_llm_config", return_value=mock_config)
+        mock_gen = mocker.patch("src.python.llm_client._generate_llm_content",
+                                return_value=(None, False))
+
+        _gens.generate_global_macro(
+            a_indices={}, us_indices={}, total_mv=100000,
+            total_profit=5000, categories={},
+        )
+
+        call_args = mock_gen.call_args[0]
+        # 应该使用代码内置默认值 _SYSTEM_GLOBAL_MACRO
+        assert call_args[3] == _SYSTEM_GLOBAL_MACRO, (
+            f"预期内置默认值, 实际={call_args[3][:50]!r}"
+        )
+
+    def test_missing_key_fallback(self, mocker):
+        """配置中完全没有 system_prompt_global_macro 键时，应使用内置默认值。"""
+        from src.python.llm.prompts import _SYSTEM_GLOBAL_MACRO
+        import src.python.llm.generators as _gens
+
+        mock_config = {
+            "cache_enabled_global_macro": False,
+            "max_tokens_global_macro": 800,
+            "timeout_global_macro": 60,
+            "model": None,
+        }
+        mocker.patch("src.python.config.get_llm_config", return_value=mock_config)
+        mock_gen = mocker.patch("src.python.llm_client._generate_llm_content",
+                                return_value=(None, False))
+
+        _gens.generate_global_macro(
+            a_indices={}, us_indices={}, total_mv=100000,
+            total_profit=5000, categories={},
+        )
+
+        call_args = mock_gen.call_args[0]
+        assert call_args[3] == _SYSTEM_GLOBAL_MACRO, (
+            f"预期内置默认值, 实际={call_args[3][:50]!r}"
+        )
+
+
+class TestLlmSettingsKeyConsistency:
+    """验证 llm_settings.json 的键名与 _KNOWN_LLM_SETTINGS_KEYS 一致。"""
+
+    def test_all_keys_tracked(self):
+        """llm_settings.json 中不应有未在 _KNOWN_LLM_SETTINGS_KEYS 中登记的键。"""
+        import json
+        from src.python.config import _KNOWN_LLM_SETTINGS_KEYS
+
+        with open("data/config/llm_settings.json", encoding="utf-8") as f:
+            llm = json.load(f)
+
+        file_keys = set(llm.keys())
+        untracked = file_keys - _KNOWN_LLM_SETTINGS_KEYS
+        assert not untracked, (
+            f"llm_settings.json 中发现 {len(untracked)} 个未登记键名: {sorted(untracked)}"
+        )

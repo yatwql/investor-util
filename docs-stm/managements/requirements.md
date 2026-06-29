@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
 创建日期：2026-06-26
-最后更新：2026-06-29
+最后更新：2026-06-30
 来源：`投资分析应用-需求.txt`
 
 ---
@@ -56,7 +56,7 @@
 | 用途 | 主链路 | 备用链路 |
 |---|---|---|
 | 场内实时/收盘价 | 腾讯财经 `qt.gtimg.cn` | 东方财富 `push2.eastmoney.com` |
-| 场外官方净值 | 东方财富 `fundf.eastmoney.com` | 天天基金 `fundgz.1234567.com.cn` |
+| 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 天天基金 `fundf10.eastmoney.com` |
 | 基金持仓数据 | 天天基金 `fundf10.eastmoney.com` | — |
 | 基金业绩排名 | 天天基金 JS 变量解析 | — |
 | 财经新闻 | 5 源并行：新浪/东方财富/财联社/华尔街见闻/akshare | — |
@@ -144,7 +144,8 @@
    - 智囊团深度复盘：持仓品种/份额/成本变化后指纹自动失效；单品行情波动（价格/涨跌幅）不影响
    - 下次生成 L 菜单时自然使用新数据
 3. **菜单 [2] 主动清除**：
-   - 同时清除 `llm_expert_review_*`（智囊团深度复盘）和 `llm_global_macro_*`（全球政经局势）缓存
+   - 同时清除 `llm_expert_review_*`（智囊团深度复盘）、`llm_global_macro_*`（全球政经局势）、
+     `llm_health_check_*`（持仓体检报告）和 `llm_penetration_deep_*`（穿透深度分析）缓存
    - 确保下次 L 菜单强制使用最新数据
 
 ### 5.4 TTL 常量对照表
@@ -200,11 +201,11 @@
 
 ### 6.2 输出内容
 
-#### 模块 1：汇总（Excel + HTML）
+#### 投资分析汇总（Excel + HTML）
 
 显示当前日期和时间、所属交易日、当日 A 股指数、美股指数、总市值、总成本、总盈亏、本日盈亏。
 
-#### 模块 2：核算市值（Excel + HTML）
+#### 市值核算明细表（Excel + HTML）
 
 15 列明细表：
 
@@ -240,11 +241,11 @@
 - 国内场外：净值日期 == 当天 → (当日净值 - 前日净值) × 份额；否则 0
 - QDII：净值日期 == T-1 → (当日净值 - 前日净值) × 份额；否则 0
 
-#### 模块 3：持仓分类表（Excel + HTML）
+#### 持仓分类表（Excel + HTML）
 
 按资产属性 + 按投资分类进行分组汇总。10 列明细：资产属性 | 投资分类 | 名称 | 代码 | 市值 | 成本 | 盈亏 | 收益率 | 本日盈亏 | 年均股息率（持仓 A 股的年均股息/最新价 × 100%）。
 
-#### 模块 4：资产穿透 TOP10（Excel + HTML）
+#### 资产穿透TOP10（Excel + HTML）
 
 所有基金拆分为前 10 大持仓成分股：
 - 债券基金 → 具体债券品种
@@ -259,7 +260,7 @@
 
 **板块分类增强（v0.2.11+）：** 在关键词映射分类基础上，额外调用东方财富 push2 API 获取三级行业分类，作为板块列的补充数据源。当 API 返回的行业数据可用时，优先使用 API 数据覆盖板块列。覆盖静态关键词映射的局限，提高新/偏门股票的板块识别率。
 
-#### 模块 5：基金业绩分析（Excel + HTML）
+#### 基金业绩分析（Excel + HTML）
 
 12 列表格：基金 | 代码 | 类型 | 近3月 | 近6月 | 近12月 | 持仓累计盈亏(¥) | 持仓收益率 | 业绩基准 | 业绩评价 | 同类排名 | 机构覆盖（研报家数 + 预测 EPS）
 
@@ -299,7 +300,7 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 **同类排名**：格式为"排名/总数"，如"23/156"。排名和总数来源于 API 返回的 `Data_rateInSimilarType` 最近一期数据。
 
-#### 模块 6：财经新闻热点与持仓关联分析（Excel + HTML）
+#### 财经新闻热点与持仓关联分析（Excel + HTML）
 
 分析财经新闻热点，与持仓名称/代码及穿透TOP10底层资产进行关键词匹配，输出 TOP N 新闻（N 通过 `data/config/config.json` 中的 `news_top_count` 配置，默认 100）。
 
@@ -332,21 +333,27 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 - **Excel**：通过菜单 N/B/L 生成增补页签（财经新闻热点表）
 - **HTML**：自动渲染在报告第 6 节（来源标注为"新浪财经"/"东方财富"/"财联社"/"华尔街见闻"/"akshare"）
 
-#### 全球政经局势（Excel + HTML，分阶段实现 — LLM 增补项目）
+#### 全球政经局势（Excel + HTML — LLM 增补项目）
 
-在有 LLM 支持下的增补内容。
-- **Phase 1（Iter 3.3）**：模板占位文本输出，预留接口
-- **Phase 2（Iter 3.4）**：LLM 基于市场数据和持仓结构生成宏观分析（HTML ✅ 已实现，Excel ✅ 已实现）
-- **Excel**：通过菜单 L 生成增补页签 ✅
-- **HTML**：通过菜单 L 渲染在报告第 7 节 ✅
+在有 LLM 支持下的增补内容。基于市场数据和持仓结构生成宏观分析（HTML ✅，Excel ✅）。
+通过菜单 L 生成「7.全球政经局势」页签/章节。
 
-#### 智囊团深度复盘（Excel + HTML，分阶段实现 — LLM 增补项目）
+**生成逻辑：** `generate_global_macro()` 读取指数行情 + 持仓汇总，调用 LLM 生成 500 字宏观分析。
+缓存策略：24 小时 TTL，指数/持仓变化时指纹自动失效。
+​
+**配置项：** `llm_settings.json` 中 `model_global_macro` / `temperature_global_macro`（默认 0.3）/
+`max_tokens_global_macro`（默认 1024）/ `cache_enabled_global_macro`（默认 true）
 
-在有 LLM 支持下的增补内容。
-- **Phase 1（Iter 3.3）**：模板占位文本输出，预留接口
-- **Phase 2（Iter 3.4）**：LLM 基于持仓明细和盈亏数据生成优化建议和风险预警（HTML ✅ 已实现，Excel ✅ 已实现）
-- **Excel**：通过菜单 L 生成增补页签 ✅
-- **HTML**：通过菜单 L 渲染在报告第 8 节 ✅
+#### 智囊团深度复盘（Excel + HTML — LLM 增补项目）
+
+在有 LLM 支持下的增补内容。基于持仓明细和盈亏数据生成优化建议和风险预警（HTML ✅，Excel ✅）。
+通过菜单 L 生成「8.智囊团深度复盘」页签/章节。
+
+**生成逻辑：** `generate_expert_review()` 模拟三阶段圆桌会议：召集令→辩论→定音锤，
+输出调仓建议和风险预警。缓存策略 2 小时 TTL，指纹排除行情波动字段。
+
+**配置项：** `llm_settings.json` 中 `model_expert_review` / `temperature_expert_review`（默认 0.8）/
+`max_tokens_expert_review`（默认 8192）/ `thinking_enabled_expert_review`（默认 true）
 
 #### 持仓体检报告（Excel + HTML — LLM 增补项目，v0.2.29+）
 
@@ -379,9 +386,9 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 计算行业集中度和国别/币种暴露度。缓存策略 24 小时 TTL，指纹排除行情波动字段。
 每个维度输出分析和建议。
 
-**配置项：** `llm_settings.json` 中 `model_penetration_deep` / `temperature_penetration_deep`（默认 0.5）/
+**配置项：** `llm_settings.json` 中 `model_penetration_deep` / `temperature_penetration_deep`（默认 0.4）/
 `max_tokens_penetration_deep`（默认 4096）/ `thinking_enabled_penetration_deep`（默认 false）/
-`thinking_budget_penetration_deep`（默认 12000）
+`thinking_budget_penetration_deep`（默认 8000）
 
 ---
 
@@ -389,16 +396,25 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 详见 [plan.md](plan.md)「关键技术决策」和「当前配置架构」章节。
 
-用户配置指南详见根目录 [README.md](../../README.md)「LLM 配置指引」章节。
+用户配置指南（Provider 配置、llm_key.json / llm_settings.json 字段说明、推荐参数、
+Extended Thinking 详解、定价表等）详见根目录 [README.md](../../README.md)「LLM 配置指引」章节。
 
-**逐章节模型路由（v0.2.17+）：** 支持对全球政经局势、智囊团深度复盘、财经新闻热点与持仓关联分析、持仓体检报告、穿透深度分析五个 LLM 章节分别指定不同的模型。通过 `data/config/llm_settings.json` 中的 `model_global_macro`、`model_expert_review`、`model_news_correlation`、`model_health_check`、`model_penetration_deep` 字段设置，为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。详见 README.md「逐章节模型路由」小节。
+**核心配置层次（v0.2.15+）：**
 
-**Extended Thinking（v0.2.22+，Anthropic 专属）：** `_call_claude()` 支持注入 Anthropic Messages API 的 `thinking` 参数，让 ≥ Claude Sonnet 4 的模型在回答前进行深度推理。通过 `llm_settings.json` 中 `thinking_enabled_{模块}` 和 `thinking_budget_{模块}` 配置开关和预算。`thinking_budget_{模块}` 与对应的 `max_tokens_{模块}` 的关系：
-- `thinking_budget_{模块}` 控制内部思考过程的 token 预算（不可见）
-- `max_tokens_{模块}` 控制最终输出文本的最大 token 数（如 `max_tokens_expert_review=8192`）
-- API 强制约束：`thinking_budget_{模块}` ≥ `max_tokens_{模块} + 1024`，未满足时代码自动补足
-- 开启后 `temperature` 自动忽略（API 不支持并存）
-- 推荐仅在智囊团深度复盘开启，详见 README.md「Extended Thinking」章节
+| 文件 | 内容 | 用途 |
+|------|------|------|
+| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段 | API 调用渠道（provider/api_key/model/endpoint + fallback_*） |
+| `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature/timeout/cache/system_prompt/thinking 等） |
+
+**逐章节模型路由（v0.2.17+）：** 支持对五个 LLM 章节分别指定不同模型，
+通过 `llm_settings.json` 中的 `model_global_macro` / `model_expert_review` /
+`model_news_correlation` / `model_health_check` / `model_penetration_deep` 字段设置，
+为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。
+
+**Extended Thinking（v0.2.22+）：** 支持 Claude（`thinking.budget_tokens`）和
+DeepSeek（`reasoning_effort`）两种模式。配置项：`thinking_enabled_{模块}`、
+`thinking_budget_{模块}`（仅 Claude）、`reasoning_effort_{模块}`（仅 DeepSeek）。
+详见 README「Extended Thinking」章节。
 
 ---
 

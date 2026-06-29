@@ -1,0 +1,158 @@
+"""LLM 缓存指纹模块 — 指纹计算与缓存 TTL 管理。"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+from typing import Any
+
+logger = logging.getLogger("invest")
+
+__all__ = [
+    "_compute_fingerprint", "_extract_stable_holdings", "_extract_stable_penetration",
+    "_expert_review_fingerprint", "_health_check_fingerprint", "_penetration_deep_fingerprint",
+    "_get_cache_ttl_llm",
+]
+
+def _compute_fingerprint(*args: Any) -> str:
+    """计算输入数据的确定性哈希值（前 12 位），用作缓存键后缀。
+
+    当市场行情、持仓数据变化时指纹随之改变，
+    自动跳过旧缓存，无需等待 TTL 过期。
+    """
+    raw = json.dumps(args, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+
+def _extract_stable_holdings(holdings_details: list[dict] | None) -> list[dict]:
+    """从持仓明细中提取稳定的（无行情波动）字段。"""
+    result: list[dict] = []
+    if holdings_details:
+        for d in holdings_details:
+            result.append({
+                "name": d.get("name", ""),
+                "code": d.get("code", ""),
+                "cost": d.get("cost", 0),
+            })
+    return result
+
+
+def _extract_stable_penetration(penetrated_assets: list[dict] | None,
+                                 full: bool = False) -> list[dict]:
+    """从穿透资产中提取稳定的（无行情波动）字段。
+
+    Args:
+        penetrated_assets: 穿透 TOP10 资产列表
+        full: 若为 True 则包含 mv/ratio/sector（用于穿透深度分析的额外区分）
+
+    Returns:
+        稳定字段的字典列表
+    """
+    result: list[dict] = []
+    if penetrated_assets:
+        for a in penetrated_assets:
+            entry = {"name": a.get("name", ""), "codes": a.get("codes", [])}
+            if full:
+                entry["mv"] = a.get("mv", 0)
+                entry["sector"] = a.get("sector", "")
+                entry["ratio"] = a.get("ratio", 0)
+            result.append(entry)
+    return result
+
+
+def _expert_review_fingerprint(
+    total_mv: float = 0,
+    total_cost: float = 0,
+    total_profit: float = 0,
+    total_today_profit: float = 0,
+    holdings_details: list[dict] | None = None,
+    penetrated_assets: list[dict] | None = None,
+    categories: dict | None = None,
+) -> str:
+    """计算智囊团深度回测的缓存指纹。
+
+    使用 _extract_stable_holdings 剔除行情波动，
+    穿透资产仅取 (name, codes) 不包含 mv/ratio 等行情字段。
+    委托 _compute_fingerprint 计算哈希。
+    """
+    _details = _extract_stable_holdings(holdings_details)
+    _pen = _extract_stable_penetration(penetrated_assets, full=False)
+    return _compute_fingerprint(
+        total_mv, total_cost, total_profit, total_today_profit,
+        categories, _details, _pen,
+    )
+
+
+def _health_check_fingerprint(
+    total_mv: float = 0,
+    total_cost: float = 0,
+    total_profit: float = 0,
+    total_today_profit: float = 0,
+    holdings_details: list[dict] | None = None,
+    penetrated_assets: list[dict] | None = None,
+    categories: dict | None = None,
+) -> str:
+    """计算持仓体检报告的缓存指纹。
+
+    与 _expert_review_fingerprint 完全同构，统一使用 _extract_stable_* 辅助函数。
+    """
+    _details = _extract_stable_holdings(holdings_details)
+    _pen = _extract_stable_penetration(penetrated_assets, full=False)
+    return _compute_fingerprint(
+        total_mv, total_cost, total_profit, total_today_profit,
+        categories, _details, _pen,
+    )
+
+
+def _penetration_deep_fingerprint(
+    total_mv: float = 0,
+    total_cost: float = 0,
+    total_profit: float = 0,
+    total_today_profit: float = 0,
+    holdings_details: list[dict] | None = None,
+    penetrated_assets: list[dict] | None = None,
+    categories: dict | None = None,
+) -> str:
+    """计算穿透深度分析的缓存指纹。
+
+    与 _expert_review_fingerprint 区别：穿透资产额外包含 mv/sector/ratio，
+    使得仅穿透数据更新时也能触发缓存失效。
+    """
+    _details = _extract_stable_holdings(holdings_details)
+    _pen = _extract_stable_penetration(penetrated_assets, full=True)
+    return _compute_fingerprint(
+        total_mv, total_cost, total_profit, total_today_profit,
+        categories, _details, _pen,
+    )
+
+
+def _get_cache_ttl_llm(subtype: str = "global_macro") -> float:
+    """获取 LLM 缓存 TTL。
+
+    TTL 优先级：
+      1. config.json 中的 cache_ttl.llm_global_macro / llm_expert_review / llm_news_correlation
+      2. 代码默认值（全球政经局势 86400s / 智囊团深度复盘 7200s / 财经新闻热点与持仓关联分析 3600s）
+
+    Args:
+        subtype: "global_macro"（全球政经局势）、"expert_review"（智囊团深度复盘）或 "news_correlation"（财经新闻热点与持仓关联分析）
+
+    Returns:
+        过期时间（秒）
+    """
+    # 从 config.json cache_ttl 读取
+    _key_map: dict[str, str] = {
+        "global_macro": "llm_global_macro",
+        "expert_review": "llm_expert_review",
+        "news_correlation": "llm_news_correlation",
+        "health_check": "llm_health_check",
+        "penetration_deep": "llm_penetration_deep",
+    }
+    data_type = _key_map.get(subtype, "llm_global_macro")
+    try:
+        from src.python.cache import get_ttl
+        return get_ttl(data_type)
+    except (ImportError, TypeError, AttributeError):
+        logger.debug("_get_llm_ttl: 获取 TTL 失败，使用 LLM 默认值")
+        defaults: dict[str, float] = {"global_macro": 86400, "expert_review": 7200, "news_correlation": 3600, "health_check": 7200, "penetration_deep": 86400}
+        return defaults.get(subtype, 3600)

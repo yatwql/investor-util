@@ -70,3 +70,95 @@ class TestHolding(unittest.TestCase):
         h2 = Holding(account="A", name="X", code="000001",
                       shares=100, cost_price=10.0)
         self.assertEqual(h1, h2)
+
+
+class TestHoldingEdgeCases(unittest.TestCase):
+    """Holding 边缘情况测试。"""
+
+    def test_negative_shares(self) -> None:
+        """负份额（dataclass 不校验）。"""
+        h = Holding(account="证券", name="股票", code="000001",
+                     shares=-100.0, cost_price=10.0)
+        self.assertEqual(h.shares, -100.0)
+
+    def test_empty_code(self) -> None:
+        """代码为空字符串。"""
+        h = Holding(account="证券", name="现金", code="",
+                     shares=100, cost_price=1.0)
+        self.assertEqual(h.code, "")
+
+    def test_empty_account(self) -> None:
+        """账户名为空字符串。"""
+        h = Holding(account="", name="股票", code="000001",
+                     shares=100, cost_price=10.0)
+        self.assertEqual(h.account, "")
+
+    def test_empty_name(self) -> None:
+        """名称为空字符串。"""
+        h = Holding(account="证券", name="", code="000001",
+                     shares=100, cost_price=10.0)
+        self.assertEqual(h.name, "")
+
+    def test_code_with_special_chars(self) -> None:
+        """代码含特殊字符（如港股代码）。"""
+        h = Holding(account="港股", name="腾讯控股", code="00700.HK",
+                     shares=1000, cost_price=300.0)
+        self.assertEqual(h.code, "00700.HK")
+
+    def test_shares_as_float(self) -> None:
+        """份额为浮点数。"""
+        h = Holding(account="证券", name="股票", code="000001",
+                     shares=100.5, cost_price=10.0)
+        self.assertIsInstance(h.shares, float)
+
+    def test_repr_contains_all_fields(self) -> None:
+        """repr 包含所有字段。"""
+        h = Holding(account="证券", name="长江电力", code="600900",
+                     shares=800, cost_price=17.65)
+        r = repr(h)
+        self.assertIn("Holding", r)
+        self.assertIn("account=", r)
+        self.assertIn("name=", r)
+        self.assertIn("code=", r)
+        self.assertIn("shares=", r)
+        self.assertIn("cost_price=", r)
+
+
+class TestHoldingComparison(unittest.TestCase):
+    """Holding 比较行为测试。"""
+
+    def test_eq_ignores_type_mismatch(self) -> None:
+        """不同类型的对象不相等。"""
+        h = Holding(account="A", name="X", code="000001",
+                     shares=100, cost_price=10.0)
+        self.assertNotEqual(h, "not a holding")
+
+    def test_eq_shares_type_coercion(self) -> None:
+        """100 == 100.0（Dataclass 默认行为）。"""
+        h1 = Holding(account="A", name="X", code="000001",
+                      shares=100, cost_price=10.0)
+        h2 = Holding(account="A", name="X", code="000001",
+                      shares=100.0, cost_price=10.0)
+        self.assertEqual(h1, h2)
+
+    def test_hash_raises_type_error(self) -> None:
+        """非 frozen dataclass 不可 hash。"""
+        h = Holding(account="A", name="X", code="000001",
+                     shares=100, cost_price=10.0)
+        with self.assertRaises(TypeError):
+            hash(h)
+
+
+class TestHoldingLargeDataset(unittest.TestCase):
+    """大量 Holding 对象构造测试。"""
+
+    def test_create_many_holdings(self) -> None:
+        """快速构造 10000 个 Holding 不报错。"""
+        holdings = [
+            Holding(account=f"账户{i%5}", name=f"股票{i}", code=f"{i:06d}",
+                    shares=float(i), cost_price=float(i % 100))
+            for i in range(10000)
+        ]
+        self.assertEqual(len(holdings), 10000)
+        self.assertEqual(holdings[0].account, "账户0")
+        self.assertEqual(holdings[-1].code, "009999")

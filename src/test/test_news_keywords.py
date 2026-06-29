@@ -151,6 +151,112 @@ class TestBuildHoldingKeywords(unittest.TestCase):
         idx_short = keywords.index("长江电力")
         self.assertLess(idx_long, idx_short)
 
+    def test_empty_name_with_code(self) -> None:
+        """名称为空但代码存在 → 只提取代码。"""
+        holdings = [
+            Holding(account="证券", name="", code="600900",
+                    shares=100, cost_price=10.0),
+        ]
+        keywords = build_holding_keywords(holdings)
+        self.assertEqual(keywords, ["600900"])
+
+    def test_empty_name_and_empty_code(self) -> None:
+        """名称和代码均为空 → 返回空列表。"""
+        holdings = [
+            Holding(account="证券", name="", code="",
+                    shares=100, cost_price=10.0),
+        ]
+        keywords = build_holding_keywords(holdings)
+        self.assertEqual(keywords, [])
+
+    def test_name_special_chars(self) -> None:
+        """名称含括号 → 正确提取中文关键词，括号不干扰。"""
+        holdings = [
+            Holding(account="证券", name="药明康德(港股)", code="02359",
+                    shares=100, cost_price=10.0),
+        ]
+        keywords = build_holding_keywords(holdings)
+        self.assertIn("药明康德", keywords)
+        self.assertIn("02359", keywords)
+
+    def test_name_with_dash(self) -> None:
+        """名称含破折号 → 正确提取中文关键词。"""
+        holdings = [
+            Holding(account="证券", name="ST-华英", code="002321",
+                    shares=100, cost_price=10.0),
+        ]
+        keywords = build_holding_keywords(holdings)
+        self.assertIn("华英", keywords)
+        self.assertIn("002321", keywords)
+
+    def test_name_only_ascii(self) -> None:
+        """名称只有 ASCII 字符 → 只提取代码。"""
+        holdings = [
+            Holding(account="美股", name="Apple Inc.", code="AAPL",
+                    shares=100, cost_price=150.0),
+        ]
+        keywords = build_holding_keywords(holdings)
+        self.assertEqual(keywords, ["AAPL"])
+
+    def test_penetrated_assets_empty_list(self) -> None:
+        """penetrated_assets=[] 与默认行为一致。"""
+        holdings = [
+            Holding(account="证券", name="长江电力", code="600900",
+                    shares=100, cost_price=10.0),
+        ]
+        keywords_with = build_holding_keywords(holdings, penetrated_assets=[])
+        keywords_without = build_holding_keywords(holdings)
+        self.assertEqual(keywords_with, keywords_without)
+
+    def test_penetrated_assets_none(self) -> None:
+        """penetrated_assets=None 不崩溃。"""
+        holdings = [
+            Holding(account="证券", name="长江电力", code="600900",
+                    shares=100, cost_price=10.0),
+        ]
+        keywords = build_holding_keywords(holdings, penetrated_assets=None)
+        self.assertIsInstance(keywords, list)
+        self.assertIn("600900", keywords)
+
+    def test_penetrated_assets_empty_name_and_empty_codes(self) -> None:
+        """穿透资产名称和代码均为空 → 不影响已有关键词。"""
+        holdings = [
+            Holding(account="证券", name="长江电力", code="600900",
+                    shares=100, cost_price=10.0),
+        ]
+        penetrated = [{"name": "", "codes": [""]}]
+        keywords = build_holding_keywords(holdings, penetrated_assets=penetrated)
+        self.assertIn("600900", keywords)
+        self.assertIn("长江电力", keywords)
+
+    def test_penetrated_assets_name_without_codes(self) -> None:
+        """穿透资产有名称无代码。"""
+        holdings = [
+            Holding(account="证券", name="长江电力", code="600900",
+                    shares=100, cost_price=10.0),
+        ]
+        penetrated = [{"name": "宁德时代", "codes": []}]
+        keywords = build_holding_keywords(holdings, penetrated_assets=penetrated)
+        self.assertIn("宁德时代", keywords)
+
+    def test_lianjie_with_single_part(self) -> None:
+        """联接基金但提取不到两个中文片段 → 不额外添加。"""
+        holdings = [
+            Holding(account="基金", name="联接A", code="000000",
+                    shares=100, cost_price=1.0),
+        ]
+        keywords = build_holding_keywords(holdings)
+        self.assertEqual(keywords, ["000000"])
+
+    def test_max_keywords_zero(self) -> None:
+        """max_keywords=0 返回空列表。"""
+        holdings = [
+            Holding(account="证券", name="长江电力", code="600900",
+                    shares=100, cost_price=10.0),
+        ]
+        keywords = build_holding_keywords(holdings, max_keywords=0)
+        self.assertEqual(keywords, [])
+
 
 if __name__ == "__main__":
     unittest.main()

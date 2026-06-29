@@ -1,6 +1,7 @@
 # 投资分析报告小工具 — 技术文档
 
 创建日期：2026-06-28
+最后更新：2026-06-30
 
 ---
 
@@ -29,7 +30,7 @@
 | 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache.py` |
 | 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher.py` |
 | 持仓读取 | xlsx 解析、多工作表、列校验 | `src/python/reader.py` |
-| LLM 客户端 | Claude / OpenAI / DeepSeek API 调用 | `src/python/llm_client.py` |
+| LLM 客户端 | Claude / OpenAI / DeepSeek API 调用 | `src/python/llm/` |
 | 报告生成 | Excel (openpyxl) + HTML (Jinja2) | `src/python/report/*.py` |
 
 ---
@@ -45,7 +46,7 @@
 | A 股指数 | 腾讯财经 `qt.gtimg.cn` | — | `tencent.py` |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析） | — | `sina.py` |
 | 财经新闻（新浪） | 新浪财经 `feed.mix.sina.com.cn` | — | `sina_news.py` |
-| 财经新闻（东方财富） | 东方财富 `push-api-html.eastmoney.com` | — | `eastmoney_news.py` |
+| 财经新闻（东方财富） | 东方财富 `np-weblist.eastmoney.com/comm/web/getFastNewsList` | — | `eastmoney_news.py` |
 | 财经新闻（财联社） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | — | `cls_news.py` |
 | 财经新闻（华尔街见闻） | 华尔街见闻 `api-one.wallstcn.com/apiv1/content/lives`（JSON API，无需鉴权） | — | `wallstreetcn_news.py` |
 | 财经新闻（akshare） | akshare 封装：财新网 + CCTV | — | `akshare_news.py` |
@@ -70,7 +71,7 @@
 
 ## 模块技术要点
 
-### 资产穿透 TOP10
+### 资产穿透TOP10
 
 - `compute_penetration_top10()` 纯计算函数，不依赖 openpyxl
 - 分类逻辑（QDII/ETF/联接/债券/主动/直接持股）基于代码前缀 + 名称规则
@@ -123,7 +124,8 @@ investor-util/
 │   │   ├── cache.py              # 缓存引擎
 │   │   ├── fetcher.py            # 数据获取调度
 │   │   ├── reader.py             # 持仓 Excel 解析
-│   │   ├── llm_client.py         # LLM 集成（Claude/OpenAI/DeepSeek）
+│   │   ├── llm/                  # LLM 集成（9 子模块：api/pricing/content/session/circuit_breaker/fingerprint/markdown/generators/prompts）
+│   │   ├── constants.py          # 共享常量（TTL、模型定价）
 │   │   ├── models.py             # 数据模型（Holding dataclass）
 │   │   ├── logger.py             # 日志模块
 │   │   ├── tui.py                # 键盘输入封装
@@ -162,7 +164,7 @@ investor-util/
 │   │   │   └── report_template.html
 │   └── test/                     # 测试
 │       ├── __init__.py
-│       └── test_*.py（23 个）
+│       └── test_*.py（25 个）
 ├── data/
 │   ├── holdings/                 # 持仓 xlsx 文件
 │   ├── cache/                    # API 响应缓存
@@ -189,6 +191,22 @@ investor-util/
 ---
 
 ## LLM 客户端技术要点
+
+`src/python/llm/` 包拆分架构（原 2550 行 `llm_client.py` 解耦为 9 子模块）：
+
+| 模块 | 职责 |
+|------|------|
+| `api.py` | API 调用路由 (Claude/OpenAI)、重试、截断检测、熔断器集成 |
+| `prompts.py` | System Prompt 常量与构建函数 |
+| `generators.py` | LLM 生成编排（5 模块 + 全量生成） |
+| `pricing.py` | 模型定价加载、费用估算 |
+| `session.py` | 会话用量累计、追踪 |
+| `circuit_breaker.py` | 端点熔断器 |
+| `fingerprint.py` | 各种缓存指纹计算 |
+| `markdown.py` | Markdown→HTML 渲染 |
+| `content.py` | 兼容存根，re-exports prompts.py + generators.py |
+
+`__init__.py` 导出所有公共 API 保持向后兼容。
 
 - **统一入口** `_call_llm()` 按 `provider` 路由到 `_call_claude()` 或 `_call_openai()`
 - **`_call_llm_with_retry()`** 共享重试/超时/错误处理骨架

@@ -1,4 +1,4 @@
-"""资产穿透 TOP10 模块 — 报告第 4 页。
+"""资产穿透TOP10 模块 — 报告第 4 页。
 
 将每只基金拆解为前 10 大持仓，合并相同底层标的，
 再合并直接持有的股票，按市值降序取全仓前 10。
@@ -376,7 +376,7 @@ def compute_penetration_top10(
     holdings: List[Holding],
     details: List[DetailRow],
 ) -> dict[str, Any]:
-    """计算资产穿透 TOP10，返回结构化数据（不写 Excel）。
+    """计算资产穿透TOP10，返回结构化数据（不写 Excel）。
 
     与 :func:`write_penetration_sheet` 共用同一套合并/排序逻辑，
     但返回可序列化的 Python 字典，适合缓存为 JSON。

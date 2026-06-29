@@ -72,7 +72,7 @@ def _print_session_usage_on_exit() -> None:
             print(f"  总 tokens: {total_tok:,}")
             print(f"  累计费用: {symbol}{cost:.4f}")
             print(f"──────────────────")
-    except Exception:
+    except (KeyError, TypeError, AttributeError):
         pass
 
 
@@ -122,7 +122,7 @@ def main() -> None:
         removed = cleanup_expired(dry_run=False)
         if removed > 0:
             logger.info("启动时自动清理了 %d 个过期缓存文件", removed)
-    except Exception:
+    except OSError:
         pass
 
     _print_header()

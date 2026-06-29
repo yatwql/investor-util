@@ -2,7 +2,7 @@
 
 读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.33
+> 当前版本：0.2.34
 
 ---
 
@@ -293,6 +293,7 @@ python src/python/main.py
 > **TTL 兜底：** 即使指纹未变，缓存文件仍有 TTL 兜底到期自动刷新，防止数据"永久有效"。
 > 
 > **调整建议：** 盘中频繁刷新可将 `price` 改为 `3600`（1小时）；持仓变动少可将 `hold` 改为 `2592000`（30天）。
+> **自动 gzip 压缩：** 超过 100KB 的缓存文件自动以 `.json.gz` 格式压缩存储（如 `profit_forecast_*.json.gz`），节省约 80-90% 磁盘空间。读取时透明解压，无需任何配置或迁移。小文件保持原 `.json` 格式，热路径无额外开销。
 
 ---
 
@@ -425,7 +426,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | 穿透深度分析 | `system_prompt_penetration_deep` | 穿透分析专家 | 行业集中度、品种集中度、国别/币种暴露分析 |
 | 财经新闻热点与持仓关联分析 | `system_prompt_news_correlation` | 资深金融分析师 | 逐条分析新闻关联性，输出 JSON（高/中/低/无关+原因） |
 
-> 代码内置完整提示词定义在 `src/python/llm_client.py` 中，变量名分别为 `_SYSTEM_GLOBAL_MACRO`、`_SYSTEM_EXPERT_REVIEW`、`_SYSTEM_HEALTH_CHECK`、`_SYSTEM_PENETRATION_DEEP`、`_SYSTEM_NEWS_CORRELATION`。
+> 代码内置完整提示词定义在 `src/python/llm/prompts.py` 中，变量名分别为 `_SYSTEM_GLOBAL_MACRO`、`_SYSTEM_EXPERT_REVIEW`、`_SYSTEM_HEALTH_CHECK`、`_SYSTEM_PENETRATION_DEEP`、`_SYSTEM_NEWS_CORRELATION`。
 > 将配置项设为 `null` 即回退使用这些内置 prompt，方便升级时自动获取更新。
 
 **Step 3**：启动程序，菜单选 **L** 生成包含 LLM 分析的完整版报告。
@@ -485,7 +486,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `reasoning_effort_news_correlation` | `"high"` | **仅 DeepSeek** 思考深度，建议保持 `"high"` |
 | `reasoning_effort_health_check` | `"high"` | **仅 DeepSeek** 思考深度，推荐 `"max"` 以增强评分判断 |
 | `reasoning_effort_penetration_deep` | `"high"` | **仅 DeepSeek** 思考深度，建议保持 `"high"` |
-| `enabled_llm_news_correlation` | **false** | 默认关闭 LLM 新闻关联分析；开启后每条新闻报道 LLM 判定关联度，增加费用但提高准确率 |
+| `enabled_llm_news_correlation` | **false** | 默认关闭，`llm_settings.json` 中设置为 `true` 开启。开启后每条新闻经 LLM 判定关联度（高/中/低/无关）并分析原因，增加费用但提高准确率。`pricing` 段可省略使用代码内置定价 |
 | `pricing` | （内置） | 模型 Token 定价表，格式 `{"model_name": {"input": X, "output": Y, "input_cache_hit": Z}}`（每百万 Token，货币由 `pricing.currency` 决定）。`input` = 标准输入（缓存未命中），`input_cache_hit` = 缓存命中输入（可选，缺失时等于 `input` 即无折扣），`currency` = 货币标识（`"CNY"` / `"USD"`，默认 `"CNY"`）。代码内置默认定价以人民币计价，`llm_settings.json` 中的 `pricing` 段优先级更高，可覆盖或新增模型。例如 DeepSeek-V4-Flash：输入 1 元/M、输出 2 元/M、缓存命中 0.02 元/M。用于 `_estimate_cost()` 生成格式化费用估算字符串供报告展示 |
 
 #### Prompt Caching（Anthropic 专属）
@@ -759,7 +760,8 @@ investor-util/
 │   │   ├── cache.py              # 缓存管理
 │   │   ├── config.py             # 配置文件管理
 │   │   ├── fetcher.py            # 数据获取路由
-│   │   ├── llm_client.py         # LLM 客户端
+│   │   ├── llm/                  # LLM 客户端（9 子模块：api/pricing/content/session/circuit_breaker/fingerprint/markdown/generators/prompts）
+│   │   ├── constants.py          # 共享常量
 │   │   ├── logger.py             # 日志模块
 │   │   ├── models.py             # 数据模型
 │   │   ├── reader.py             # 持仓读取
@@ -799,7 +801,7 @@ investor-util/
 │   │       └── report_template.html
 │   └── test/                     # 测试
 │       ├── __init__.py
-│       └── test_*.py (23 个)
+│       └── test_*.py (25 个)
 ├── data/
 │   ├── holdings/                 # 持仓 xlsx 文件
 │   ├── cache/                    # API 响应缓存
@@ -844,11 +846,12 @@ investor-util/
 
 ### HTML 报告
 
-单页渲染以上全部 10 个模块，响应式 CSS 自适应桌面/移动端。额外特性：
+单页渲染以上全部 10 个核心页签（共 11 个章节，含 LLM API 用量统计），响应式 CSS 自适应桌面/移动端。额外特性：
 - 盈亏正数红色、负数绿色着色
 - 取价方式蓝色标识（与 Excel 端规则一致）
 - 新闻来源可点击跳转
 - 基金业绩评价带颜色标签
+- LLM API 用量章节展示各模块 Token 消耗、费用估算及 per-module 模型/用量明细
 - 页脚标注生成时间和版本号
 - LLM 内容为条件渲染（仅菜单 L 时显示）
 
@@ -925,12 +928,12 @@ A: 编辑 `data/config/llm_settings.json`，将 `enabled_llm_news_correlation` �
    - 必含：`system_prompt_{module}`、`model_{module}`、`temperature_{module}`、`max_tokens_{module}`、
      `timeout_{module}`、`cache_enabled_{module}`、`output_brief_{module}`、
      `thinking_enabled_{module}`、`thinking_budget_{module}`、`reasoning_effort_{module}`
-2. **`llm_client.py`** — 添加 LLM 调用函数，使用 `llm_config.get("{key}_{module}")` 读取对应配置
+2. **`src/python/llm/content.py`** — 添加 LLM 调用函数，使用 `llm_config.get("{key}_{module}")` 读取对应配置
 3. **`llm_content.py`** — 在 `_MODULE_KEY_MAP` 中添加章节名→模块键映射；在 `write_llm_sheets()` 中添加新页签
 4. **报告模板** — 在 Excel `tui_handlers.py` 和 HTML `html_writer.py` 中传递新章节的 model/thinking 参数
 5. **页脚规范** — 章节内容底部 LLM 提示使用标准格式：
    `模型：{model} | Token 用量：输入 X / 输出 Y = Z | 估算费用：${cost} | Extended Thinking`
-6. **缓存 TTL** — 在 `config.json` → `cache_ttl` 中添加 `llm_{module}` 条目，并在 `cache.py` → `prefix_type_map` / `_CACHE_TTL_DEFAULTS` 同步
+6. **缓存 TTL** — 在 `config.json` → `cache_ttl` 中添加 `llm_{module}` 条目，并在 `cache.py` → `prefix_type_map` / `constants.py` → `CACHE_TTL_DEFAULTS` 同步
 7. **README** — 文档化新章节的配置项、推荐值、缓存策略
 
 ---

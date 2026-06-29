@@ -4,6 +4,21 @@
 
 ---
 
+## [0.2.34] - 2026-06-30
+
+### Changed
+- **`content.py` 拆分为 `prompts.py` + `generators.py`** — 1471 行的 `content.py` 按职责拆分为提示词常量/构建函数（`prompts.py`）和编排逻辑（`generators.py`），`content.py` 保留为兼容重导出入口。`llm/` 包总子模块数增至 9 个。
+
+### Fixed
+- **`src/test/test_helpers.py` → `helpers.py`** — 该文件定义 `SynchronousExecutor` 测试辅助类，非测试用例，重命名以避免 pytest 误扫描（零个 `test_` 函数）并消除命名误导
+- **`content.py` 移除冗余 `cache_get` 导入** — `cache_get` 在 `content.py` 中未直接使用（所有缓存读取通过 `_lm.cache_get()` 懒导入），仅保留 `cache_set`
+
+### Tests
+- **补充 System Prompt 覆盖路径测试** — 验证 `llm_settings.json` 中 `system_prompt_*` 设为非 null 时覆盖生效，设为 null 时回退到代码内置默认值
+
+### Docs
+- **`plan.md` 新增注册表模式迭代计划** — 将"配置注册表模式（远期蓝图）"写入下一次迭代规划
+
 ## [0.2.33] - 2026-06-29
 
 ### Changed
@@ -143,7 +158,7 @@
   （summary.py / market_value.py / category.py / news_correlation.py + 测试文件同步）
 - **`llm_content.py` 增强** — `_write_content_sheet()` 使用 `_get_placeholder()` 替代
   硬编码占位符；`_get_placeholder()` 消费 `_LLM_MODULE_FAILURE` 中的失败原因
-- **模块 A 命名修正** — 日志/模板/注释中 `模块 A` → `模块 10`（html_writer.py、
+- **穿透深度分析 命名修正** — 日志/模板/注释中 `穿透深度分析` → `穿透深度分析`（html_writer.py、
   report_template.html、changelog.md）
 
 ### Config
@@ -156,7 +171,7 @@
 ## [0.2.30] - 2026-06-29
 
 ### Added
-- **模块 10 — 穿透深度分析** — 新增 LLM 生成模块，从行业集中度、国别/币种暴露维度
+- **穿透深度分析** — 新增 LLM 生成模块，从行业集中度、国别/币种暴露维度
   对投资组合进行深度分析，含行业集中度仪表盘、外汇风险敞口分析、改进建议
   - `generate_penetration_deep_analysis()` / `_build_penetration_deep_prompt()` /
     `_SYSTEM_PENETRATION_DEEP` — 核心生成函数、Prompt 构建、System Prompt
@@ -196,7 +211,7 @@
 ## [0.2.29] - 2026-06-29
 
 ### Added
-- **模块 9 — 持仓体检报告** — 新增 LLM 生成模块，从风险分散度/流动性/收益合理性/成本结构
+- **持仓体检报告** — 新增 LLM 生成模块，从风险分散度/流动性/收益合理性/成本结构
   四个维度对投资组合进行量化打分并给出改进建议
   - `generate_health_check()` / `_build_health_check_prompt()` / `_SYSTEM_HEALTH_CHECK` —
     核心生成函数、Prompt 构建、System Prompt
@@ -395,16 +410,16 @@
 
 ### Added
 - **机构盈利预测集成** — 调用 akshare `stock_profit_forecast_em()` 获取全量股票机构的研报覆盖、预测 EPS、评级分布
-  - 穿透 TOP10（模块 4）新增「预测EPS(2025E)」列
-  - 基金业绩分析（模块 5）新增「机构覆盖」列，显示研报家数和预测 EPS
+  - 穿透 TOP10（资产穿透 TOP10）新增「预测EPS(2025E)」列
+  - 基金业绩分析（基金业绩分析）新增「机构覆盖」列，显示研报家数和预测 EPS
   - 缓存策略：指数指纹 + 1 天 TTL 双因子失效
 - **行业资金流向集成** — 调用 akshare `stock_sector_fund_flow_rank()` 获取今日行业资金流向排名
   - LLM 宏观分析 Prompt 注入前 5 个行业资金流向数据（名称、涨跌幅、主力净流入）
   - 缓存策略：指数指纹 + 15 分钟 TTL 双因子失效
   - 新增 `get_sector_fund_flow()` 函数，TUI 菜单 [1] 刷新时更新
 - **分红历史集成** — 调用 akshare `stock_history_dividend()` 获取个股历年分红数据
-  - 分类汇总（模块 3）新增「年均股息率」列：`avg_dividend / price × 100%`
-  - 穿透 TOP10（模块 4）新增「年均股息率」列：原始 `avg_dividend` 值
+  - 分类汇总（持仓分类表）新增「年均股息率」列：`avg_dividend / price × 100%`
+  - 穿透 TOP10（资产穿透 TOP10）新增「年均股息率」列：原始 `avg_dividend` 值
   - 缓存策略：持仓/穿透代码列表指纹 + 1 月 TTL 双因子失效
   - 多线程并行获取（max_workers=5），TUI 菜单 [1] 刷新时更新
 - **进程级内存缓存层** — 在文件缓存之上新增 `_MEMO_CACHE`，减少同一会话内的重复文件读取
@@ -568,7 +583,7 @@
 
 ### Changed
 - 数据源表：行业分类/概念板块从"规划中"更新为"已实现"
-- NEWS_COLS 模块 6 运行流程：在 `aggregate_news()` 前先获取行业/概念数据并扩展关键词
+- NEWS_COLS 财经新闻热点与持仓关联分析 运行流程：在 `aggregate_news()` 前先获取行业/概念数据并扩展关键词
 - `check_and_refresh_caches()` 新增 `industry_*` 缓存自动清理（持仓变更时）
 - `_check_and_warm_for_new_assets()` 新增新增资产行业分类自动预热（`batch_fetch_industry_data`）
 - `_build_keyword_lookup()`：新增 `industry_data` 参数处理行业和概念板块关键词
@@ -576,8 +591,8 @@
 - type_order 扩展：holding(0) → penetration(1) → concept(2) → industry(3)
 
 ### Docs
-- requirements.md：数据源表、缓存文件清单、TTL 表、菜单 [1] 范围、模块 4 板块分类增强、模块 6 关键词来源同步
-- README.md：版本 v0.2.11、数据源表、缓存文件清单、菜单表、模块 6 概念类型、缓存覆盖矩阵（菜单 [1]/[2] 矩阵表）
+- requirements.md：数据源表、缓存文件清单、TTL 表、菜单 [1] 范围、资产穿透 TOP10 板块分类增强、财经新闻热点与持仓关联分析 关键词来源同步
+- README.md：版本 v0.2.11、数据源表、缓存文件清单、菜单表、财经新闻热点与持仓关联分析 概念类型、缓存覆盖矩阵（菜单 [1]/[2] 矩阵表）
 - testplan.md：新增 v0.2.11 测试重点
 - changelog.md：本版本记录
 - review-findings.md：新增审查记录
@@ -601,8 +616,8 @@
 - `_build_keyword_lookup()` 中文名称索引策略：从 4 字或更长名称中生成 2 字滑动窗口片段（如"长江电力"→"长江""电力"），提高短关键词匹配率
 
 ### Docs
-- requirements.md：同步菜单 [1] 缓存范围、缓存文件清单新增 `llm_news_corr_*`、TTL 表新增 `news_corr`、模块 6 新增关键词富化/LLM 关联分析/Excel 格式优化描述、数据源表新增东方财富行业/概念板块
-- README.md：版本 v0.2.9，同步菜单/缓存/模块 6 描述
+- requirements.md：同步菜单 [1] 缓存范围、缓存文件清单新增 `llm_news_corr_*`、TTL 表新增 `news_corr`、财经新闻热点与持仓关联分析 新增关键词富化/LLM 关联分析/Excel 格式优化描述、数据源表新增东方财富行业/概念板块
+- README.md：版本 v0.2.9，同步菜单/缓存/财经新闻热点与持仓关联分析 描述
 - testplan.md：新增关键词富化函数/Excel 格式/HTML 同步测试类别
 - review-findings.md：新增最新一致性审查记录
 - CLAUDE.md：新增缺陷自测规则要求
@@ -730,10 +745,10 @@
 ### Added
 - LLM System Prompt 外部可配置：data/config/llm.json 新增 system_prompt_macro / system_prompt_expert 字段
 - 智囊团升级为5位专家模式：三阶段圆桌会议（召集令 → 两轮辩论 → 定音锤），System Prompt 精简至 297 字
-- LLM 全局四大优化：并行调用（ThreadPoolExecutor 并发生成模块7+8）、httpx连接复用（全局 _HTTP_POOL 共享连接池）、LLM配置内存缓存（_LLM_CONFIG_CACHE 避免重复文件IO）、提示词紧凑化
+- LLM 全局四大优化：并行调用（ThreadPoolExecutor 并发生成全球政经局势/智囊团深度复盘）、httpx连接复用（全局 _HTTP_POOL 共享连接池）、LLM配置内存缓存（_LLM_CONFIG_CACHE 避免重复文件IO）、提示词紧凑化
 
 ### Changed
-- 模块 7/8 用户提示词改为紧凑格式，减少约 35% 输入 token
+- 全球政经局势/智囊团深度复盘 用户提示词改为紧凑格式，减少约 35% 输入 token
 - _build_macro_prompt / _build_review_prompt 输出格式精简，单行摘要替代多段描述
 
 ## [0.2.5] - 2026-06-27
@@ -745,7 +760,7 @@
 - 代码清理：移除 fetcher.py 中未使用的 tiantian_holdings 注册项、cache.py 前缀匹配边缘情况、未使用的导入变量
 
 ### Added
-- Excel LLM 增补页签：模块 7（全球政经局势）和模块 8（智囊团深度复盘）通过菜单 L 触发
+- Excel LLM 增补页签：全球政经局势（全球政经局势）和智囊团深度复盘（智囊团深度复盘）通过菜单 L 触发
 - 新增 src/report/llm_content.py：LLM 内容写入 Excel 页签（含 HTML 标签剥离、合并单元格排版）
 - cache.py check_and_refresh_caches()：持仓 MD5 指纹检测，持仓变更时自动清除关联缓存并返回新增代码列表
 - main.py _check_and_warm_for_new_assets()：对新增资产自动预热价格/业绩/持仓缓存
@@ -800,7 +815,7 @@
 - excel_writer.py: `save_workbook` 增加 `output_dir` 参数
 - html_writer.py: `write_html_report` 增加 `output_dir` 参数，移除硬编码 `_REPORT_DIR`
 - html_writer.py: `write_html_report` 增加 `news_top_count` 参数，控制新闻输出条数
-- requirements.md: 模块 7/8 改为"Excel + HTML，LLM 增补项目"
+- requirements.md: 全球政经局势/智囊团深度复盘 改为"Excel + HTML，LLM 增补项目"
 - fund_performance.py: 业绩评价标色（优秀→红色、偏差→绿色、稳定→蓝色，Excel + HTML）
 - styles.py: 新增 `BLUE_FONT` 常量
 - main.py: 新增菜单 [3] 清理过期缓存文件（`_cmd_cleanup_cache`）
@@ -812,8 +827,8 @@
 - cache.py: 新增 `get_cache_stats()` 缓存统计信息（总数/大小/按前缀分类）
 - cache.py: 新增 `get_cache_dir()` 获取缓存目录绝对路径
 - reader.py: 新增 `get_xlsx_info()` 获取 xlsx 文件信息（页签数/行数）
-- html_writer.py: 模块 7/8 模板占位文本（`llm_enabled=False` 时输出"本节内容待生成"提示）
-- report_template.html: 新增模块 7（全球政经局势）和模块 8（智囊团深度复盘）占位区域，`{% if llm_enabled %}` 条件渲染
+- html_writer.py: 全球政经局势/智囊团深度复盘 模板占位文本（`llm_enabled=False` 时输出"本节内容待生成"提示）
+- report_template.html: 新增全球政经局势（全球政经局势）和智囊团深度复盘（智囊团深度复盘）占位区域，`{% if llm_enabled %}` 条件渲染
 
 ### Changed
 - main.py: TUI 菜单扩展为 13 选项，新增 [3] 清理过期缓存 / [4] 查看缓存统计
@@ -824,8 +839,8 @@
 - main.py: `_cmd_generate_both` 改为 B 快捷键，生成 HTML + Excel（含新闻）
 - tiantian.py: `fetch_quarterly_holdings` 重写为解析 `apidata.content` HTML（支持 GBK 编码）
 - tiantian.py: `fetch_fund_holdings` 移除早期 return 阻塞季报回退路径的问题
-- requirements.md: TUI 菜单表重构（11 选项，新增 B/L/R，更新 H 标签）；模块 7/8 改为 Excel + HTML
-- README.md: 菜单表、配置说明同步更新；模块 7/8 改为 LLM 增补项目
+- requirements.md: TUI 菜单表重构（11 选项，新增 B/L/R，更新 H 标签）；全球政经局势/智囊团深度复盘 改为 Excel + HTML
+- README.md: 菜单表、配置说明同步更新；全球政经局势/智囊团深度复盘 改为 LLM 增补项目
 - testplan.md: Iter 3 测试重点增加 N/A 新菜单和新闻关联验证
 - sina_news.py: `correlate_news_with_holdings` / `fetch_and_correlate` 增加 `top_n` 参数，硬编码 50/100 改为可配置
 - sina_news.py: `fetch_and_correlate` 增加 `max_news = max(max_news, top_n * 3)` 自动缩放逻辑，确保 `top_n` 较大时能获取足够原始新闻条数
@@ -855,7 +870,7 @@
 - `src/providers/sina_news.py`: 新浪财经新闻获取 + 持仓关键词关联模块
 - `src/report/news_correlation.py`: 新闻关联分析的 Excel 页签生成 + HTML 数据构建
 - TUI 菜单新增 N 选项：生成包含新闻的 Excel 报告
-- HTML 报告新增模块 6（财经新闻热点与持仓关联分析）
+- HTML 报告新增财经新闻热点与持仓关联分析（财经新闻热点与持仓关联分析）
 
 
 ## [0.2.2] - 2026-06-27
@@ -875,7 +890,7 @@
 - main.py: 菜单 [1] 不再写入 `fund_performance_cache.json`、`fund_holdings_cache.json` 合并文件，改为依赖 `fund_perf_{code}.json`、`fund_hold_{code}.json` 单条缓存
 - main.py: 菜单 [1] 步骤合并为 2 步（原 3 步），移除 `perf_collected`/`bm_collected` 等死代码
 - main.py: HTML 占位菜单版本号更新至 0.2.2
-- requirements.md/README.md: 模块 5 列名修正为"持仓累计盈亏(¥)"/"持仓收益率"，缓存文件表移除 `fund_benchmarks.json` 重复项
+- requirements.md/README.md: 基金业绩分析 列名修正为"持仓累计盈亏(¥)"/"持仓收益率"，缓存文件表移除 `fund_benchmarks.json` 重复项
 
 ### Removed
 - `daily_data.json` 缓存文件废弃，不再生成（价格数据存于 `price_{code}.json` 即可）

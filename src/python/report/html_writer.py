@@ -247,8 +247,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     print("  [..] 正在生成持仓分类表...")
     cat_data = _build_category_data(holdings, details)
 
-    # ── 6) 资产穿透 TOP10 ──────────────────────────────────
-    print("  [..] 正在计算资产穿透 TOP10...")
+    # ── 6) 资产穿透TOP10 ───────────────────────────────────
+    print("  [..] 正在计算资产穿透TOP10...")
     penetration = compute_penetration_top10(holdings, details)
 
     # ── 7) 基金业绩分析 ─────────────────────────────────────
@@ -354,8 +354,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         try:
             from src.python.llm_client import get_session_usage, format_session_usage
             _llm_session_usage = format_session_usage(get_session_usage())
-        except Exception:
-            pass
+        except (ImportError, TypeError, AttributeError):
+            logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
 
     # ── 10) 渲染模板 ────────────────────────────────────────
     print("  [..] 正在渲染 HTML...")

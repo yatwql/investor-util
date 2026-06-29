@@ -344,7 +344,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 4: 资产穿透 TOP10 (Penetration)                -->
+    <!--  MODULE 4: 资产穿透TOP10 (Penetration)                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
         <div class="section-title">四、资产穿透TOP10</div>
@@ -630,7 +630,7 @@
             <div class="empty-note placeholder-note">
                 <p><strong>本节内容待生成</strong></p>
                 <p style="margin-top: 8px; font-size: 13px; color: #888;">
-                    模块说明：基于资产穿透 TOP10 及全部持仓明细，对投资组合进行
+                    模块说明：基于资产穿透TOP10 及全部持仓明细，对投资组合进行
                     行业集中度分析、国家/地区敞口评估、货币敞口分析及底层资产风险揭示。
                 </p>
                 <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
@@ -649,7 +649,7 @@
             {% if llm_session_usage and llm_session_usage.get("has_usage") %}
             <table class="kv-table">
                 <tr><td>API 调用次数</td><td>{{ llm_session_usage["call_count"] }} 次</td></tr>
-                <tr><td>模型</td><td>{{ llm_session_usage["model"] }}</td></tr>
+                <tr><td>模型</td><td>{{ llm_session_usage["model_display"] }}</td></tr>
                 <tr><td>输入 token</td><td>{{ "{:,}".format(llm_session_usage["input_tokens"]) }}</td></tr>
                 <tr><td>输出 token</td><td>{{ "{:,}".format(llm_session_usage["output_tokens"]) }}</td></tr>
                 <tr><td>总 token</td><td>{{ "{:,}".format(llm_session_usage["total_tokens"]) }}</td></tr>
@@ -658,6 +658,28 @@
                 {% endif %}
                 <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
             </table>
+            {% if llm_session_usage["per_module"] %}
+            <div style="margin-top: 12px; font-size: 13px; color: #555;">
+                <strong>各模块模型/用量明细：</strong>
+                <table class="kv-table" style="margin-top: 6px;">
+                    <tr style="background: #f5f5f5;">
+                        <th style="padding: 4px 8px; text-align: left;">模块</th>
+                        <th style="padding: 4px 8px; text-align: left;">模型</th>
+                        <th style="padding: 4px 8px; text-align: right;">输入 token</th>
+                        <th style="padding: 4px 8px; text-align: right;">输出 token</th>
+                    </tr>
+                    {% set _module_labels = {"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘", "health_check": "持仓体检报告", "penetration_deep": "穿透深度分析", "news_correlation": "财经新闻关联分析"} %}
+                    {% for _mk, _md in llm_session_usage["per_module"].items() %}
+                    <tr>
+                        <td style="padding: 4px 8px;">{{ _module_labels.get(_mk, _mk) }}</td>
+                        <td style="padding: 4px 8px;">{{ _md.get("model", "未指定") }}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{{ "{:,}".format(_md.get("input_tokens", 0)) }}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{{ "{:,}".format(_md.get("output_tokens", 0)) }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endif %}
             {% else %}
             <div class="empty-note placeholder-note">
                 <p><strong>本次生成未调用 LLM</strong></p>

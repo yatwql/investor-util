@@ -14,6 +14,8 @@ import os
 import threading
 from typing import Any
 
+from src.python.constants import CACHE_TTL_DEFAULTS, MODEL_PRICING
+
 logger = logging.getLogger("invest")
 
 # 配置文件路径
@@ -33,23 +35,7 @@ _DEFAULT_CONFIG = {
         "akshare": True,
     },
     "preferred_provider": {},
-    "cache_ttl": {
-        "price": 86400,
-        "index": 86400,
-        "rank": 86400,
-        "hold": 604800,
-        "news": 900,
-        "industry": 604800,
-        "benchmark": 2592000,
-        "llm_global_macro": 86400,
-        "llm_expert_review": 7200,
-        "llm_news_correlation": 3600,
-        "llm_health_check": 7200,
-        "llm_penetration_deep": 86400,
-        "profit_forecast": 86400,
-        "sector_flow": 900,
-        "dividend": 2592000,
-    },
+    "cache_ttl": CACHE_TTL_DEFAULTS,
     "user_fund_benchmarks": {},
     "llm_key_file": "data/config/llm_key.json",
     "llm_settings_file": "data/config/llm_settings.json",
@@ -335,17 +321,7 @@ def _ensure_llm_settings_file() -> None:
             "reasoning_effort_penetration_deep": "high",
             "pricing": {
                 "currency": "CNY",
-                "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
-                "claude-sonnet-4-8": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
-                "claude-opus-4-6": {"input": 15.0, "output": 75.0, "input_cache_hit": 1.50},
-                "claude-opus-4-8": {"input": 15.0, "output": 75.0, "input_cache_hit": 1.50},
-                "claude-haiku-4-5": {"input": 0.25, "output": 1.25, "input_cache_hit": 0.025},
-                "claude-fable-5": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
-                "gpt-4o": {"input": 2.5, "output": 10.0, "input_cache_hit": 2.5},
-                "gpt-4o-mini": {"input": 0.15, "output": 0.6, "input_cache_hit": 0.15},
-                "deepseek-v4-flash": {"input": 1, "output": 2, "input_cache_hit": 0.02},
-                "deepseek-v4-pro": {"input": 3, "output": 6, "input_cache_hit": 0.025},
-                "deepseek-chat": {"input": 1, "output": 2, "input_cache_hit": 0.02},
+                **MODEL_PRICING,
             },
         }
         with open(settings_path, "w", encoding="utf-8") as f:

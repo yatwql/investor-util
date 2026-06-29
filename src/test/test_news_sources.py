@@ -13,6 +13,8 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import MagicMock, patch
+
 from src.python.providers.news_sources import (
     _FETCH_MAP,
     _FALLBACK_ENABLED,
@@ -70,6 +72,88 @@ class TestSourceMetadata(unittest.TestCase):
         """_FETCH_MAP 中所有值都是 callable。"""
         for name, fn in _FETCH_MAP.items():
             self.assertTrue(callable(fn), f"{name} 的 fetch 函数不可调用")
+
+    def test_get_source_label_empty_string(self) -> None:
+        """空字符串 → 返回空字符串。"""
+        self.assertEqual(get_source_label(""), "")
+
+    def test_get_source_label_whitespace(self) -> None:
+        """空白字符 → 返回原值。"""
+        self.assertEqual(get_source_label("  "), "  ")
+
+    def test_get_source_label_numeric(self) -> None:
+        """纯数字字符串 → 返回原值。"""
+        self.assertEqual(get_source_label("123"), "123")
+
+    def test_source_label_values_non_empty(self) -> None:
+        """所有中文标签非空。"""
+        for key, label in _SOURCE_LABELS.items():
+            self.assertTrue(label, f"{key} 的标签为空")
+
+    def test_fallback_enabled_values_are_bool(self) -> None:
+        """_FALLBACK_ENABLED 值均为布尔类型。"""
+        for key, val in _FALLBACK_ENABLED.items():
+            self.assertIsInstance(val, bool, f"{key} 的值不是布尔类型")
+
+
+class TestFetchFunctionBehavior(unittest.TestCase):
+    """各源获取函数的行为测试。"""
+
+    @patch("src.python.providers.sina_news.fetch_news")
+    def test_fetch_from_sina_returns_list(self, mock_fetch: MagicMock) -> None:
+        """新浪财经获取函数返回列表。"""
+        mock_fetch.return_value = [{"title": "t1", "url": "http://u1"}]
+        fn = _FETCH_MAP["sina"]
+        result = fn(num=3)
+        self.assertIsInstance(result, list)
+        self.assertGreater(len(result), 0)
+
+    @patch("src.python.providers.sina_news.fetch_news")
+    def test_fetch_from_sina_dedup_by_url(self, mock_fetch: MagicMock) -> None:
+        """新浪财经获取函数按 URL 去重。"""
+        mock_fetch.return_value = [
+            {"title": "a", "url": "http://u"},
+            {"title": "b", "url": "http://u"},
+        ]
+        fn = _FETCH_MAP["sina"]
+        result = fn(num=5)
+        self.assertEqual(len(result), 1)
+
+    @patch("src.python.providers.eastmoney_news.fetch_news")
+    def test_fetch_from_eastmoney_returns_list(self, mock_fetch: MagicMock) -> None:
+        """东方财富获取函数返回列表。"""
+        mock_fetch.return_value = []
+        fn = _FETCH_MAP["eastmoney"]
+        result = fn(num=5)
+        self.assertIsInstance(result, list)
+        mock_fetch.assert_called_once_with(num=5)
+
+    @patch("src.python.providers.cls_news.fetch_news")
+    def test_fetch_from_cls_returns_list(self, mock_fetch: MagicMock) -> None:
+        """财联社获取函数返回列表。"""
+        mock_fetch.return_value = []
+        fn = _FETCH_MAP["cls"]
+        result = fn(num=5)
+        self.assertIsInstance(result, list)
+        mock_fetch.assert_called_once_with(num=5)
+
+    @patch("src.python.providers.wallstreetcn_news.fetch_news")
+    def test_fetch_from_wallstreetcn_returns_list(self, mock_fetch: MagicMock) -> None:
+        """华尔街见闻获取函数返回列表。"""
+        mock_fetch.return_value = []
+        fn = _FETCH_MAP["wallstreetcn"]
+        result = fn(num=5)
+        self.assertIsInstance(result, list)
+        mock_fetch.assert_called_once_with(num=5)
+
+    @patch("src.python.providers.akshare_news.fetch_news")
+    def test_fetch_from_akshare_returns_list(self, mock_fetch: MagicMock) -> None:
+        """akshare 获取函数返回列表。"""
+        mock_fetch.return_value = []
+        fn = _FETCH_MAP["akshare"]
+        result = fn(num=5)
+        self.assertIsInstance(result, list)
+        mock_fetch.assert_called_once_with(num=5)
 
 
 if __name__ == "__main__":
