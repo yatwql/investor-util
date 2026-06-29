@@ -121,7 +121,7 @@ def aggregate_news(
     logger.info("新闻源状态: %s", " | ".join(status_parts))
 
     if not all_raw:
-        logger.info("所有新闻源均未获取到数据")
+        logger.warning("所有新闻源均获取失败，请检查网络连接")
         return []
 
     logger.info("新闻汇总: 去重后共 %d 条 (来自 %d 个源)", len(all_raw), len(sources))

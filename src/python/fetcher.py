@@ -705,7 +705,7 @@ def fetch_industry_data(code: str) -> dict | None:
     )
 
 
-def batch_fetch_industry_data(codes: list[str], max_workers: int = 10) -> dict[str, dict]:
+def batch_fetch_industry_data(codes: list[str], max_workers: int = 5) -> dict[str, dict]:
     """批量获取多只证券的行业分类和概念板块归属。
 
     使用线程池并发获取，已缓存的不重复请求。

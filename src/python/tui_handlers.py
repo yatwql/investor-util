@@ -187,57 +187,63 @@ def _check_network_available(details: list) -> bool:
 
 
 def _check_and_warm_for_new_assets(holdings: list) -> None:
-    """检测持仓是否变化，若有新增资产则主动预热其缓存数据。"""
-    from src.python.cache import check_and_refresh_caches
-    from src.python.fetcher import (
-        batch_fetch_industry_data,
-        fetch_fund_holdings,
-        fetch_fund_rankings,
-        fetch_market_data,
-    )
-    from src.python.report.fund_performance import _is_fund
+    """检测持仓是否变化，若有新增资产则主动预热其缓存数据。
 
-    new_codes = check_and_refresh_caches(holdings)
-    if not new_codes:
-        return
+    异常不会向外传播 — 预热是优化而非必需步骤，失败不影响后续报告生成。
+    """
+    try:
+        from src.python.cache import check_and_refresh_caches
+        from src.python.fetcher import (
+            batch_fetch_industry_data,
+            fetch_fund_holdings,
+            fetch_fund_rankings,
+            fetch_market_data,
+        )
+        from src.python.report.fund_performance import _is_fund
 
-    code_map = {h.code: h for h in holdings}
-    print(f"  [..] 检测到 {len(new_codes)} 个新增资产，正在预热缓存...")
+        new_codes = check_and_refresh_caches(holdings)
+        if not new_codes:
+            return
 
-    for code in new_codes:
-        h = code_map.get(code)
-        name = h.name if h else code
+        code_map = {h.code: h for h in holdings}
+        print(f"  [..] 检测到 {len(new_codes)} 个新增资产，正在预热缓存...")
 
-        print(f"  [..]   新增 {name} ({code}) — 获取行情...", end="")
-        result = fetch_market_data(code, name)
-        if result and result.get("price", 0) > 0:
-            print(f" {result['price']:.4f}")
-        else:
-            print(" 失败")
+        for code in new_codes:
+            h = code_map.get(code)
+            name = h.name if h else code
 
-        if h and _is_fund(h):
-            print(f"  [..]   新增基金 {name} ({code}) — 获取业绩排名...", end="")
-            perf = fetch_fund_rankings(code)
-            print(" OK" if perf else " 失败")
+            print(f"  [..]   新增 {name} ({code}) — 获取行情...", end="")
+            result = fetch_market_data(code, name)
+            if result and result.get("price", 0) > 0:
+                print(f" {result['price']:.4f}")
+            else:
+                print(" 失败")
 
-            print(f"  [..]   新增基金 {name} ({code}) — 获取持仓明细...", end="")
-            holds = fetch_fund_holdings(code)
-            if holds and holds.get("holdings"):
-                print(f" {len(holds['holdings'])} 条")
+            if h and _is_fund(h):
+                print(f"  [..]   新增基金 {name} ({code}) — 获取业绩排名...", end="")
+                perf = fetch_fund_rankings(code)
+                print(" OK" if perf else " 失败")
+
+                print(f"  [..]   新增基金 {name} ({code}) — 获取持仓明细...", end="")
+                holds = fetch_fund_holdings(code)
+                if holds and holds.get("holdings"):
+                    print(f" {len(holds['holdings'])} 条")
+                else:
+                    print(" 无数据")
+
+            print(f"  [..]   新增 {name} ({code}) — 获取行业分类...", end="")
+            _ind_map = batch_fetch_industry_data([code])
+            if _ind_map and code in _ind_map:
+                _idata = _ind_map[code]
+                ind_name = _idata.get("industry") or "未知"
+                conc_count = len(_idata.get("concepts", []))
+                print(f" {ind_name} ({conc_count} 个概念)")
             else:
                 print(" 无数据")
 
-        print(f"  [..]   新增 {name} ({code}) — 获取行业分类...", end="")
-        _ind_map = batch_fetch_industry_data([code])
-        if _ind_map and code in _ind_map:
-            _idata = _ind_map[code]
-            ind_name = _idata.get("industry") or "未知"
-            conc_count = len(_idata.get("concepts", []))
-            print(f" {ind_name} ({conc_count} 个概念)")
-        else:
-            print(" 无数据")
-
-    print(f"  [OK] 新增资产缓存预热完成")
+        print(f"  [OK] 新增资产缓存预热完成")
+    except Exception:
+        logger.warning("新资产预热过程异常，跳过（不影响后续生成）")
 
 
 # ── 文件选择 ──────────────────────────────────────────────
@@ -975,6 +981,38 @@ def _cmd_config_output_dir() -> None:
 # ── 缓存刷新命令 ─────────────────────────────────────────
 
 
+def _refresh_common_caches() -> None:
+    """刷新不依赖基金持仓的公共缓存：盈利预测 + 行业资金流向。
+
+    缓存清除已在主流程中完成，此函数仅触发刷新操作。
+    """
+    pf_ok = sf_ok = 0
+    with ThreadPoolExecutor(max_workers=2) as _ex:
+        def _job1():
+            from src.python.providers.akshare_extras import _memo_clear, get_profit_forecast
+            _memo_clear()
+            data = get_profit_forecast()
+            return len(data) if data else 0
+        def _job2():
+            from src.python.providers.akshare_extras import get_sector_fund_flow
+            data = get_sector_fund_flow()
+            return len(data) if data else 0
+        _f1 = _ex.submit(_job1)
+        _f2 = _ex.submit(_job2)
+        try:
+            pf_ok = _f1.result()
+            print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
+                  else "  [!]   profit_forecast              获取失败")
+        except Exception:
+            print("  [!]   profit_forecast              获取失败")
+        try:
+            sf_ok = _f2.result()
+            print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
+                  else "  [!]   sector_flow                  获取失败")
+        except Exception:
+            print("  [!]   sector_flow                  获取失败")
+
+
 def _cmd_update_basic_cache() -> None:
     """更新基础类缓存。"""
     from src.python.cache import clear, clear_by_prefix
@@ -998,10 +1036,11 @@ def _cmd_update_basic_cache() -> None:
         print(f"  [OK] 共 {len(holdings)} 条持仓记录")
 
         funds = [h for h in holdings if _is_fund(h)]
+        has_non_fundable_data = True  # news/industry/dividend/profit_forecast/sector_flow 不依赖基金
+
         if not funds:
-            print("  [!!] 未检测到基金持仓，无需更新基础缓存")
-            _press_any_key()
-            return
+            print("  [!!] 未检测到基金持仓，跳过基金业绩/持仓/基准缓存")
+            print("  [..] 继续刷新新闻/行业分类/分红/盈利预测/行业资金流向...")
 
         print()
         print("  [..] 清除旧缓存...")
@@ -1019,8 +1058,16 @@ def _cmd_update_basic_cache() -> None:
               " llm_news_correlation_ + llm_news_item_ + industry_ +"
               " dividend_ + profit_forecast_ + sector_flow_ 缓存）")
 
+        if not funds:
+            # 无基金：只刷新非基金类缓存
+            print()
+            print(f"  [..]   并行获取新闻/行业/分红/盈利预测/行业资金流向...")
+            _refresh_common_caches()
+            _press_any_key()
+            return
+
         print()
-        print(f"  [..]   并行获取全部 8 类缓存数据...")
+        print(f"  [..]   并行获取全部缓存数据...")
 
         # 基金级刷新
         def _refresh_one_fund(fund):
