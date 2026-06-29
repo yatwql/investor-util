@@ -112,13 +112,17 @@ def _cache_key(prefix: str, fingerprint: str) -> str:
 
 
 def _run_with_timeout(fn, timeout: float = _TIMEOUT):
-    """在线程中执行函数，超时返回 None。"""
+    """在线程中执行函数，超时或异常时返回 None。"""
     with ThreadPoolExecutor(max_workers=1) as pool:
         fut = pool.submit(fn)
         try:
             return fut.result(timeout=timeout)
         except TimeoutError:
             logger.warning("akshare 调用超时 (%.1fs)", timeout)
+            fut.cancel()
+            return None
+        except Exception as e:
+            logger.warning("akshare 调用异常: %s", e)
             fut.cancel()
             return None
 
@@ -162,7 +166,7 @@ def get_profit_forecast() -> dict[str, dict]:
 
     df = _run_with_timeout(_fetch)
     if df is None:
-        logger.warning("盈利预测获取失败: 超时")
+        logger.warning("盈利预测获取失败（超时或网络错误）")
         return {}
     if df.empty:
         logger.debug("盈利预测: 结果为空")
@@ -235,7 +239,7 @@ def get_sector_fund_flow() -> list[dict[str, Any]]:
 
     df = _run_with_timeout(_fetch)
     if df is None:
-        logger.warning("行业资金流向获取失败: 超时")
+        logger.warning("行业资金流向获取失败")
         return []
     if df.empty:
         logger.debug("行业资金流向: 结果为空")
