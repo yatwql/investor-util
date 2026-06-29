@@ -653,41 +653,55 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 ```
 investor-util/
-├── src/                          # 源代码
-│   ├── main.py                   # TUI 入口 + 菜单循环
-│   ├── config.py                 # 配置读写
-│   ├── cache.py                  # 缓存引擎
-│   ├── fetcher.py                # 数据获取调度
-│   ├── reader.py                 # 持仓 Excel 解析
-│   ├── llm_client.py             # LLM 集成（Claude/OpenAI/DeepSeek）
-│   ├── models.py                 # 数据模型（Holding dataclass）
-│   ├── logger.py                 # 日志模块
-│   ├── tui.py                    # 键盘输入封装
-│   ├── test_*.py                 # 单元测试（18 个模块）
-│   ├── providers/                # API 供应商
-│   │   ├── tencent.py            # 腾讯财经（实时价、指数）
-│   │   ├── eastmoney.py          # 东方财富（基金净值）
-│   │   ├── eastmoney_industry.py # 东方财富（行业分类/概念板块）
-│   │   ├── tiantian.py           # 天天基金（业绩排名、持仓）
-│   │   ├── sina.py               # 新浪财经（美股指数）
-│   │   ├── sina_news.py          # 新浪财经（新闻）
-│   │   ├── eastmoney_news.py     # 东方财富（新闻）
-│   │   ├── cls_news.py           # 财联社（新闻）
-│   │   ├── wallstreetcn_news.py  # 华尔街见闻（新闻）
-│   │   ├── akshare_extras.py     # akshare 扩展（盈利预测/资金流向/分红）
-│   │   ├── akshare_news.py       # akshare 聚合（财新网/CCTV）
-│   │   └── news_aggregator.py    # 多源新闻聚合器
-│   └── report/                   # 报告生成
-│       ├── excel_writer.py       # Excel 工作簿管理
-│       ├── styles.py             # 样式常量
-│       ├── summary.py            # 模块 1：汇总
-│       ├── market_value.py       # 模块 2：市值核算
-│       ├── category.py           # 模块 3：分类汇总
-│       ├── penetration.py        # 模块 4：资产穿透 TOP10
-│       ├── fund_performance.py   # 模块 5：基金业绩分析
-│       ├── news_correlation.py   # 模块 6：财经新闻关联
-│       ├── llm_content.py        # 模块 7+8：LLM 内容
-│       └── html_writer.py        # HTML 报告引擎
+├── src/
+│   ├── __init__.py
+│   ├── python/                   # 源代码
+│   │   ├── __init__.py
+│   │   ├── main.py               # 入口
+│   │   ├── cache.py              # 缓存管理
+│   │   ├── config.py             # 配置文件管理
+│   │   ├── fetcher.py            # 数据获取路由
+│   │   ├── llm_client.py         # LLM 客户端
+│   │   ├── logger.py             # 日志模块
+│   │   ├── models.py             # 数据模型
+│   │   ├── reader.py             # 持仓读取
+│   │   ├── tui.py                # TUI 主循环
+│   │   ├── tui_menu.py           # 菜单交互
+│   │   ├── tui_handlers.py       # 菜单功能执行
+│   │   ├── providers/            # 数据源提供商
+│   │   │   ├── __init__.py
+│   │   │   ├── akshare_extras.py
+│   │   │   ├── akshare_news.py
+│   │   │   ├── cls_news.py
+│   │   │   ├── eastmoney.py
+│   │   │   ├── eastmoney_industry.py
+│   │   │   ├── eastmoney_news.py
+│   │   │   ├── news_aggregator.py
+│   │   │   ├── news_correlator.py
+│   │   │   ├── news_keywords.py
+│   │   │   ├── news_sources.py
+│   │   │   ├── sina.py
+│   │   │   ├── sina_news.py
+│   │   │   ├── tencent.py
+│   │   │   ├── tiantian.py
+│   │   │   └── wallstreetcn_news.py
+│   │   ├── report/               # 报告生成
+│   │   │   ├── __init__.py
+│   │   │   ├── category.py
+│   │   │   ├── excel_writer.py
+│   │   │   ├── fund_performance.py
+│   │   │   ├── html_writer.py
+│   │   │   ├── llm_content.py
+│   │   │   ├── market_value.py
+│   │   │   ├── news_correlation.py
+│   │   │   ├── penetration.py
+│   │   │   ├── styles.py
+│   │   │   └── summary.py
+│   │   └── tmpl/
+│   │       └── report_template.html
+│   └── test/                     # 测试
+│       ├── __init__.py
+│       └── test_*.py (23 个)
 ├── data/
 │   ├── holdings/                 # 持仓 xlsx 文件
 │   ├── cache/                    # API 响应缓存
@@ -707,7 +721,7 @@ investor-util/
 │   ├── launch.ps1                # Windows 启动脚本
 │   └── launch.sh                 # Linux 启动脚本
 ├── CLAUDE.md                     # Claude Code 指引
-├── README.md                     # 本文件
+├── README.md                     # 用户文档
 └── requirements.txt
 ```
 

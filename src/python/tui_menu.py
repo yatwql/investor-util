@@ -11,9 +11,12 @@
 
 from __future__ import annotations
 
+import colorama
 import os
 import sys
 from typing import Any, Callable, Optional
+
+colorama.just_fix_windows_console()
 
 from src.python.config import get_config, get_llm_config
 

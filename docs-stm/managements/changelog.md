@@ -134,7 +134,7 @@
 
 ### Changed
 - **缓存 TTL 配置去冗余** — 从 `llm_settings.json` 移除 `cache_ttl_macro` / `cache_ttl_expert` / `cache_ttl_news`，统一归入 `config.json` → `cache_ttl`，消除两份文件参数冲突风险
-- **config.json cache_ttl 键名规范化** — `llm_macro` → `llm_global_macro`、`llm_expert` → `llm_expert_review`、`llm_news` → `llm_news_corr`，与缓存文件命名前缀保持一致
+- **config.json cache_ttl 键名规范化** — `llm_macro` → `llm_global_macro`、`llm_expert` → `llm_expert_review`、`llm_news` → `llm_news_correlation`，与缓存文件命名前缀保持一致
 
 ### Fixed
 - **菜单 [1] 缓存清除不完整** — 补上遗漏的 `profit_forecast_*` 和 `sector_flow_*` 清除与主动刷新（含进程级 memo 缓存失效），菜单 [1] 现在会主动重新获取这两类数据

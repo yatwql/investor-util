@@ -401,7 +401,7 @@ class TestCacheClearByPrefix(CacheTestBase):
         """非 .json 文件不被纳入匹配。"""
         # 写入一个非 .json 文件
         non_json = os.path.join(self.cache_dir, "price_other.txt")
-        with open(non_json, "w") as f:
+        with open(non_json, "w", encoding="utf-8") as f:
             f.write("not cache")
 
         from src.python.cache import clear_by_prefix
@@ -506,7 +506,7 @@ class TestCacheGetStats(CacheTestBase):
         """非 .json 文件不被计入统计。"""
         self._write_cache("mykey", 1, 100.0)
         path = os.path.join(self.cache_dir, "readme.txt")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write("not cache")
 
         from src.python.cache import get_cache_stats
@@ -639,7 +639,7 @@ class TestCleanupExpired(CacheTestBase):
         mock_ttl.return_value = 100.0
 
         path = os.path.join(self.cache_dir, "notes.txt")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write("not cache")
 
         from src.python.cache import cleanup_expired

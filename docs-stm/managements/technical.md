@@ -22,13 +22,15 @@
 
 | 模块 | 职责 | 文件 |
 |------|------|------|
-| TUI 入口 | 菜单循环、用户交互、流程编排 | `src/main.py` |
-| 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/config.py` |
-| 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/cache.py` |
-| 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/fetcher.py` |
-| 持仓读取 | xlsx 解析、多工作表、列校验 | `src/reader.py` |
-| LLM 客户端 | Claude / OpenAI / DeepSeek API 调用 | `src/llm_client.py` |
-| 报告生成 | Excel (openpyxl) + HTML (Jinja2) | `src/report/*.py` |
+| TUI 入口 | 主循环、流程编排 | `src/python/main.py` |
+| 菜单交互 | 菜单定义、渲染、导航 | `src/python/tui_menu.py` |
+| 菜单功能执行 | 命令处理器、各功能入口 | `src/python/tui_handlers.py` |
+| 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config.py` |
+| 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache.py` |
+| 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher.py` |
+| 持仓读取 | xlsx 解析、多工作表、列校验 | `src/python/reader.py` |
+| LLM 客户端 | Claude / OpenAI / DeepSeek API 调用 | `src/python/llm_client.py` |
+| 报告生成 | Excel (openpyxl) + HTML (Jinja2) | `src/python/report/*.py` |
 
 ---
 
@@ -77,7 +79,7 @@
 
 ### 模块 6：财经新闻关联分析
 
-- 3 源并行获取（ThreadPoolExecutor max_workers=3）
+- 5 源并行获取（ThreadPoolExecutor max_workers=5）
 - 新闻缓存 `news_{md5}.json`，15 分钟 TTL，MD5 指纹含关键词/参数
 - 关键词提取：持仓名称片段 + 代码 + 穿透资产 + **行业名称 + 概念板块**
 - 关键词富化 4 种类型：持仓(0) → 穿透(1) → 概念(2) → 行业(3)
@@ -112,42 +114,55 @@ penetration_sector = fetch_industry_data(code).industry  // API优先
 
 ```
 investor-util/
-├── src/                          # 源代码
-│   ├── main.py                   # TUI 入口 + 菜单循环
-│   ├── config.py                 # 配置读写
-│   ├── cache.py                  # 缓存引擎
-│   ├── fetcher.py                # 数据获取调度
-│   ├── reader.py                 # 持仓 Excel 解析
-│   ├── llm_client.py             # LLM 集成（Claude/OpenAI/DeepSeek）
-│   ├── models.py                 # 数据模型（Holding dataclass）
-│   ├── logger.py                 # 日志模块
-│   ├── tui.py                    # 键盘输入封装
-│   ├── test_*.py                 # 单元测试（18 个模块）
-│   ├── providers/                # API 供应商
-│   │   ├── tencent.py            # 腾讯财经（实时价、指数）
-│   │   ├── eastmoney.py          # 东方财富（基金净值）
-│   │   ├── eastmoney_industry.py # 东方财富（行业分类/概念板块）
-│   │   ├── tiantian.py           # 天天基金（业绩排名、持仓）
-│   │   ├── sina.py               # 新浪财经（美股指数）
-│   │   ├── sina_news.py          # 新浪财经（新闻）
-│   │   ├── eastmoney_news.py     # 东方财富（新闻）
-│   │   ├── eastmoney_news.py     # 东方财富（新闻）
-│   │   ├── cls_news.py           # 财联社（新闻）
-│   │   ├── wallstreetcn_news.py  # 华尔街见闻（新闻）
-│   │   ├── akshare_extras.py     # akshare 扩展（盈利预测/资金流向/分红）
-│   │   ├── akshare_news.py       # akshare 聚合（财新网/CCTV）
-│   │   └── news_aggregator.py    # 多源新闻聚合器
-│   └── report/                   # 报告生成
-│       ├── excel_writer.py       # Excel 工作簿管理
-│       ├── styles.py             # 样式常量
-│       ├── summary.py            # 模块 1：汇总
-│       ├── market_value.py       # 模块 2：市值核算
-│       ├── category.py           # 模块 3：分类汇总
-│       ├── penetration.py        # 模块 4：资产穿透 TOP10
-│       ├── fund_performance.py   # 模块 5：基金业绩分析
-│       ├── news_correlation.py   # 模块 6：财经新闻关联
-│       ├── llm_content.py        # 模块 7+8：LLM 内容
-│       └── html_writer.py        # HTML 报告引擎
+├── src/
+│   ├── __init__.py
+│   ├── python/                   # 源代码
+│   │   ├── __init__.py
+│   │   ├── main.py               # TUI 入口 + 菜单循环
+│   │   ├── config.py             # 配置读写
+│   │   ├── cache.py              # 缓存引擎
+│   │   ├── fetcher.py            # 数据获取调度
+│   │   ├── reader.py             # 持仓 Excel 解析
+│   │   ├── llm_client.py         # LLM 集成（Claude/OpenAI/DeepSeek）
+│   │   ├── models.py             # 数据模型（Holding dataclass）
+│   │   ├── logger.py             # 日志模块
+│   │   ├── tui.py                # 键盘输入封装
+│   │   ├── tui_menu.py           # 菜单交互
+│   │   ├── tui_handlers.py       # 菜单功能执行
+│   │   ├── providers/            # 数据源提供商
+│   │   │   ├── __init__.py
+│   │   │   ├── akshare_extras.py
+│   │   │   ├── akshare_news.py
+│   │   │   ├── cls_news.py
+│   │   │   ├── eastmoney.py
+│   │   │   ├── eastmoney_industry.py
+│   │   │   ├── eastmoney_news.py
+│   │   │   ├── news_aggregator.py
+│   │   │   ├── news_correlator.py
+│   │   │   ├── news_keywords.py
+│   │   │   ├── news_sources.py
+│   │   │   ├── sina.py
+│   │   │   ├── sina_news.py
+│   │   │   ├── tencent.py
+│   │   │   ├── tiantian.py
+│   │   │   └── wallstreetcn_news.py
+│   │   └── report/               # 报告生成
+│   │       ├── __init__.py
+│   │       ├── category.py
+│   │       ├── excel_writer.py
+│   │       ├── fund_performance.py
+│   │       ├── html_writer.py
+│   │       ├── llm_content.py
+│   │       ├── market_value.py
+│   │       ├── news_correlation.py
+│   │       ├── penetration.py
+│   │       ├── styles.py
+│   │       ├── summary.py
+│   │       └── tmpl/
+│   │           └── report_template.html
+│   └── test/                     # 测试
+│       ├── __init__.py
+│       └── test_*.py（23 个）
 ├── data/
 │   ├── holdings/                 # 持仓 xlsx 文件
 │   ├── cache/                    # API 响应缓存
