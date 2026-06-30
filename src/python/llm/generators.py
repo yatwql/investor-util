@@ -25,6 +25,8 @@ from src.python.llm.fingerprint import (
 )
 from src.python.llm.prompts import (
     _CACHE_PREFIX_LLM,
+    _LLM_MODULE_FAILURE,
+    FAIL_REASON_DISABLED,
     _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_EXPERT_REVIEW,
     _SYSTEM_HEALTH_CHECK,
@@ -517,6 +519,7 @@ def generate_all_llm(
         )
     else:
         logger.info("%s LLM 分析已禁用（enabled_llm.global_macro = false）", _MN("global_macro"))
+        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
         global_macro_result, global_macro_cached_flag = None, False
 
     if enabled_expert_review:
@@ -525,6 +528,7 @@ def generate_all_llm(
         )
     else:
         logger.info("%s LLM 分析已禁用（enabled_llm.expert_review = false）", _MN("expert_review"))
+        _LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_DISABLED
         expert_review_result, expert_review_cached_flag = None, False
 
     if enabled_health_check:
@@ -533,6 +537,7 @@ def generate_all_llm(
         )
     else:
         logger.info("%s LLM 分析已禁用（enabled_llm.health_check = false）", _MN("health_check"))
+        _LLM_MODULE_FAILURE["health_check"] = FAIL_REASON_DISABLED
         health_check_result, health_check_cached_flag = None, False
 
     if enabled_penetration_deep:
@@ -541,6 +546,7 @@ def generate_all_llm(
         )
     else:
         logger.info("%s LLM 分析已禁用（enabled_llm.penetration_deep = false）", _MN("penetration_deep"))
+        _LLM_MODULE_FAILURE["penetration_deep"] = FAIL_REASON_DISABLED
         penetration_deep_result, penetration_deep_cached_flag = None, False
 
     # ── 仅对缓存未命中的模块提交线程池任务 ──
