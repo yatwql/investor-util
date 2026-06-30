@@ -136,7 +136,7 @@ investor-util/
 │   │   ├── tui_handlers.py       # 菜单功能执行
 │   │   ├── providers/            # 数据源提供商
 │   │   └── report/               # 报告生成
-│   └── test/                     # 测试（29 个 test_*.py）
+│   └── test/                     # 测试（30 个 test_*.py）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志

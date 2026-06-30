@@ -659,24 +659,96 @@ def _read_holdings_and_clear_cache(group_name: str) -> list | None:
         return None
 
 
-def _refresh_common_caches() -> None:
+def _refresh_one_fund_cache(fund) -> tuple:
+    """刷新单只基金的排名、持仓和基准缓存。
+
+    Args:
+        fund: 基金持仓记录
+
+    Returns:
+        ("fund", code, name, perf_ok, hold_ok, hold_count, bm_ok)
+    """
+    from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_holdings, fetch_fund_rankings
+    perf_result = fetch_fund_rankings(fund.code)
+    perf_ok = bool(perf_result)
+    hold_data = fetch_fund_holdings(fund.code)
+    hold_ok = bool(hold_data and hold_data.get("holdings"))
+    hold_count = len(hold_data["holdings"]) if hold_data and hold_data.get("holdings") else 0
+    bm = fetch_fund_benchmark(fund.code)
+    bm_ok = bool(bm and bm != "--")
+    return ("fund", fund.code, fund.name, perf_ok, hold_ok, hold_count, bm_ok)
+
+
+def _refresh_profit_forecast_cache() -> int:
+    """刷新盈利预测缓存。
+
+    Returns:
+        覆盖股票数（0 表示失败）
+    """
+    from src.python.providers.akshare_extras import _memo_clear, get_profit_forecast
+    _memo_clear()
+    data = get_profit_forecast()
+    return len(data) if data else 0
+
+
+def _refresh_sector_flow_cache() -> int:
+    """刷新行业资金流向缓存。
+
+    Returns:
+        行业数（0 表示失败）
+    """
+    from src.python.providers.akshare_extras import get_sector_fund_flow
+    data = get_sector_fund_flow()
+    return len(data) if data else 0
+
+
+def _print_cache_refresh_report(
+    funds: list, perf_ok: int, hold_ok: int, bm_ok: int,
+    pf_ok: int = 0, sf_ok: int = 0,
+) -> None:
+    """输出基础缓存刷新结果汇总。"""
+    print()
+    print(f"  {'=' * 40}")
+    if funds:
+        perf_fail = len(funds) - perf_ok
+        hold_fail = len(funds) - hold_ok
+        bm_fail = len(funds) - bm_ok
+        print(f"  基础缓存更新完成 — 共 {len(funds)} 只基金")
+        print()
+        if perf_fail == 0:
+            print(f"  [OK] fund_perf_{{code}}.json  ({perf_ok}/{len(funds)} 全部成功)")
+        else:
+            print(f"  [!] fund_perf_{{code}}.json  ({perf_ok}/{len(funds)} 成功, {perf_fail} 只失败)")
+        if hold_fail == 0:
+            print(f"  [OK] fund_hold_{{code}}.json  ({hold_ok}/{len(funds)} 全部成功)")
+        else:
+            print(f"  [!] fund_hold_{{code}}.json  ({hold_ok}/{len(funds)} 成功, {hold_fail} 只失败)")
+        if bm_fail == 0:
+            print(f"  [OK] fund_benchmarks.json       ({bm_ok}/{len(funds)} 全部成功)")
+        else:
+            print(f"  [!] fund_benchmarks.json       ({bm_ok}/{len(funds)} 成功, {bm_fail} 只未找到)")
+    if pf_ok:
+        print(f"  [OK] profit_forecast.json           ({pf_ok} 只股票)")
+    elif funds:
+        print(f"  [!] profit_forecast.json           获取失败")
+    if sf_ok:
+        print(f"  [OK] sector_flow.json               ({sf_ok} 个行业)")
+    elif funds:
+        print(f"  [!] sector_flow.json               获取失败")
+
+
+def _refresh_common_caches() -> tuple[int, int]:
     """刷新不依赖基金持仓的公共缓存：盈利预测 + 行业资金流向。
 
     缓存清除已在主流程中完成，此函数仅触发刷新操作。
+
+    Returns:
+        (pf_ok, sf_ok) — 盈利预测覆盖股票数，行业资金流向行业数
     """
     pf_ok = sf_ok = 0
     with ThreadPoolExecutor(max_workers=2) as _ex:
-        def _job1():
-            from src.python.providers.akshare_extras import _memo_clear, get_profit_forecast
-            _memo_clear()
-            data = get_profit_forecast()
-            return len(data) if data else 0
-        def _job2():
-            from src.python.providers.akshare_extras import get_sector_fund_flow
-            data = get_sector_fund_flow()
-            return len(data) if data else 0
-        _f1 = _ex.submit(_job1)
-        _f2 = _ex.submit(_job2)
+        _f1 = _ex.submit(_refresh_profit_forecast_cache)
+        _f2 = _ex.submit(_refresh_sector_flow_cache)
         try:
             pf_ok = _f1.result()
             print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
@@ -691,59 +763,30 @@ def _refresh_common_caches() -> None:
         except Exception as e:
             logger.debug("sector_flow Future 异常: %s", e)
             print("  [!]   sector_flow                  获取失败")
+    return pf_ok, sf_ok
 
 
 def _cmd_update_basic_cache() -> None:
     """更新基础类缓存。"""
-    from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_holdings, fetch_fund_rankings
-    from src.python.report.fund_performance import _is_fund
-
     holdings = _read_holdings_and_clear_cache("refresh")
     if holdings is None:
         return
 
+    from src.python.report.fund_performance import _is_fund
     funds = [h for h in holdings if _is_fund(h)]
-    has_non_fundable_data = True  # news/industry/dividend/profit_forecast/sector_flow 不依赖基金
 
     if not funds:
         print("  [!!] 未检测到基金持仓，跳过基金业绩/持仓/基准缓存")
         print("  [..] 继续刷新新闻/行业分类/分红/盈利预测/行业资金流向...")
+        print()
+        print("  [..]   并行获取新闻/行业/分红/盈利预测/行业资金流向...")
+        _refresh_common_caches()
+        _press_any_key()
+        return
 
     try:
-        if not funds:
-            # 无基金：只刷新非基金类缓存
-            print()
-            print(f"  [..]   并行获取新闻/行业/分红/盈利预测/行业资金流向...")
-            _refresh_common_caches()
-            _press_any_key()
-            return
-
         print()
-        print(f"  [..]   并行获取全部缓存数据...")
-
-        # 基金级刷新
-        def _refresh_one_fund(fund):
-            perf_result = fetch_fund_rankings(fund.code)
-            perf_ok = bool(perf_result)
-            hold_data = fetch_fund_holdings(fund.code)
-            hold_ok = bool(hold_data and hold_data.get("holdings"))
-            hold_count = len(hold_data["holdings"]) if hold_data and hold_data.get("holdings") else 0
-            bm = fetch_fund_benchmark(fund.code)
-            bm_ok = bool(bm and bm != "--")
-            return ("fund", fund.code, fund.name, perf_ok, hold_ok, hold_count, bm_ok)
-
-        def _refresh_profit_forecast():
-            from src.python.providers.akshare_extras import _memo_clear, get_profit_forecast
-            _memo_clear()
-            data = get_profit_forecast()
-            ok = len(data) if data else 0
-            return ("profit_forecast", ok)
-
-        def _refresh_sector_flow():
-            from src.python.providers.akshare_extras import get_sector_fund_flow
-            data = get_sector_fund_flow()
-            ok = len(data) if data else 0
-            return ("sector_flow", ok)
+        print("  [..]   并行获取全部缓存数据...")
 
         perf_ok = hold_ok = bm_ok = 0
         pf_ok = sf_ok = 0
@@ -751,11 +794,11 @@ def _cmd_update_basic_cache() -> None:
         # 将所有任务提交到同一线程池：基金数据 + 盈利预测 + 行业资金流向
         max_workers_val = max(3, min(len(funds) + 2, 7))
         with ThreadPoolExecutor(max_workers=max_workers_val) as executor:
-            all_futures = {}
+            all_futures: dict = {}
             for f in funds:
-                all_futures[executor.submit(_refresh_one_fund, f)] = "fund"
-            all_futures[executor.submit(_refresh_profit_forecast)] = "other"
-            all_futures[executor.submit(_refresh_sector_flow)] = "other"
+                all_futures[executor.submit(_refresh_one_fund_cache, f)] = "fund"
+            all_futures[executor.submit(_refresh_profit_forecast_cache)] = "other"
+            all_futures[executor.submit(_refresh_sector_flow_cache)] = "other"
 
             for future in as_completed(all_futures):
                 tag = all_futures[future]
@@ -775,50 +818,17 @@ def _cmd_update_basic_cache() -> None:
                         print(f"  [OK]   {name} ({code}) — {' | '.join(parts)}")
                     elif result[0] == "profit_forecast":
                         pf_ok = result[1]
-                        if pf_ok:
-                            print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)")
-                        else:
-                            print("  [!]   profit_forecast              获取失败")
+                        print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
+                              else "  [!]   profit_forecast              获取失败")
                     elif result[0] == "sector_flow":
                         sf_ok = result[1]
-                        if sf_ok:
-                            print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)")
-                        else:
-                            print("  [!]   sector_flow                  获取失败")
+                        print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
+                              else "  [!]   sector_flow                  获取失败")
                 except Exception as e:
                     logger.debug("缓存刷新 Future 异常 (%s): %s", tag, e)
-                    if tag == "fund":
-                        print(f"  [!]   基金刷新异常")
-                    else:
-                        print(f"  [!]   其他缓存刷新异常")
+                    print(f"  [!]   {'基金刷新异常' if tag == 'fund' else '其他缓存刷新异常'}")
 
-        print()
-        print(f"  {'=' * 40}")
-        perf_fail = len(funds) - perf_ok
-        hold_fail = len(funds) - hold_ok
-        bm_fail = len(funds) - bm_ok
-        print(f"  基础缓存更新完成 — 共 {len(funds)} 只基金")
-        print()
-        if perf_fail == 0:
-            print(f"  [OK] fund_perf_{{code}}.json  ({perf_ok}/{len(funds)} 全部成功)")
-        else:
-            print(f"  [!] fund_perf_{{code}}.json  ({perf_ok}/{len(funds)} 成功, {perf_fail} 只失败)")
-        if hold_fail == 0:
-            print(f"  [OK] fund_hold_{{code}}.json  ({hold_ok}/{len(funds)} 全部成功)")
-        else:
-            print(f"  [!] fund_hold_{{code}}.json  ({hold_ok}/{len(funds)} 成功, {hold_fail} 只失败)")
-        if bm_fail == 0:
-            print(f"  [OK] fund_benchmarks.json       ({bm_ok}/{len(funds)} 全部成功)")
-        else:
-            print(f"  [!] fund_benchmarks.json       ({bm_ok}/{len(funds)} 成功, {bm_fail} 只未找到)")
-        if pf_ok:
-            print(f"  [OK] profit_forecast.json           ({pf_ok} 只股票)")
-        else:
-            print(f"  [!] profit_forecast.json           获取失败")
-        if sf_ok:
-            print(f"  [OK] sector_flow.json               ({sf_ok} 个行业)")
-        else:
-            print(f"  [!] sector_flow.json               获取失败")
+        _print_cache_refresh_report(funds, perf_ok, hold_ok, bm_ok, pf_ok, sf_ok)
     except Exception as e:
         logger.exception("更新基础缓存失败")
         print(f"  [ERR] 更新失败: {e}")

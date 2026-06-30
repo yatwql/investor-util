@@ -4,6 +4,22 @@
 
 ---
 
+## [0.2.44] - 2026-07-01
+
+### Changed
+- **`_cmd_update_basic_cache` 提取 4 个模块级函数**：`_refresh_one_fund_cache()`、`_refresh_profit_forecast_cache()`、`_refresh_sector_flow_cache()`、`_print_cache_refresh_report()`。去除 3 个内嵌闭包，`_refresh_common_caches()` 复用提取函数并返回 `(pf_ok, sf_ok)`。`_cmd_update_basic_cache` 从 130 行降至 67 行（-48%）。
+
+### Added
+- **`src/test/test_fund.py` — fetcher/fund.py 单元测试**：19 项测试覆盖基准三层策略（API 解析/内置库/config 覆盖）、HTML 正则解析（含 script 标签/冒号变体/无匹配/HTTP 异常/多 URL 回退）、per-code 锁管理、双重检查锁并发、config 合并异常兜底。
+
+### Docs
+- **review-findings.md 更新**：R-014 ✅ 标记完成，R-015 ◐ 更新为部分完成（test_fund.py 已覆盖），新增 2026-07-01 全量审查记录。
+- **plan.md 新增「代码质量持续优化」方向 (A)**：在下一步迭代计划中补充 cache.py 大函数拆分、测试增补、文档同步三个子方向。
+- **technical.md 测试文件数：29→30**
+- **版本号同步**：constants.py 0.2.43→0.2.44，README.md 0.2.43→0.2.44
+
+---
+
 ## [0.2.43] - 2026-07-01
 
 ### Fixed
