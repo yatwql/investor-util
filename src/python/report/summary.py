@@ -11,7 +11,7 @@ from typing import Any
 from openpyxl.styles import Alignment, Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.registry import get_report_sheet_name
+from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -291,7 +291,11 @@ def write_llm_module_status_block(ws: Worksheet) -> None:
     Args:
         ws: 汇总页工作表
     """
-    from src.python.llm import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+    from src.python.llm import (
+        _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
+        FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
+        FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
+    )
 
     _DISPLAY_REASON: dict[str, str] = {
         FAIL_REASON_NOT_CONFIGURED: "LLM 未配置",
