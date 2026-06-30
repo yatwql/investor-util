@@ -280,3 +280,51 @@ def write_llm_usage_block(ws: Worksheet,
     if u["cache_hit_tokens"]:
         row = _write_kv_row(ws, row, "  缓存命中", f"{u['cache_hit_tokens']:,}")
     row = _write_kv_row(ws, row, "  累计费用", u["cost_display"])
+
+
+def write_llm_module_status_block(ws: Worksheet) -> None:
+    """在汇总页追加写入 LLM 模块状态（跳过的模块和失败的模块）。
+
+    从 _LLM_MODULE_FAILURE 读取各模块的失败原因，将 disabled 的模块归类为
+    "跳过"，其他失败原因归类为"生成失败"，分别写入摘要行。
+
+    Args:
+        ws: 汇总页工作表
+    """
+    from src.python.llm import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+
+    _DISPLAY_REASON: dict[str, str] = {
+        FAIL_REASON_NOT_CONFIGURED: "LLM 未配置",
+        FAIL_REASON_API_ERROR: "LLM API 调用失败",
+        FAIL_REASON_NETWORK_ERROR: "LLM API 网络连接失败",
+        FAIL_REASON_TIMEOUT: "LLM API 请求超时",
+        FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
+    }
+
+    # 仅关注 4 个有独立页签的 LLM 模块
+    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+
+    skipped: list[str] = []
+    failed: list[tuple[str, str]] = []
+    for mk in _MODULE_KEYS:
+        reason = _LLM_MODULE_FAILURE.get(mk)
+        if not reason:
+            continue
+        name = get_llm_module_name(mk) or mk
+        if reason == FAIL_REASON_DISABLED:
+            skipped.append(name)
+        else:
+            reason_text = _DISPLAY_REASON.get(reason, reason)
+            failed.append((name, reason_text))
+
+    if not skipped and not failed:
+        return
+
+    row = ws.max_row + 1
+    row = _write_blanks(ws, row)
+    row = _write_section(ws, row, "【LLM 模块状态】")
+
+    if skipped:
+        row = _write_kv_row(ws, row, "  跳过的模块（已禁用）", "、".join(skipped))
+    for name, reason_text in failed:
+        row = _write_kv_row(ws, row, "  生成失败的模块", f"{name}（{reason_text}）")

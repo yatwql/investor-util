@@ -23,6 +23,7 @@ from src.python.llm import (
     FAIL_REASON_NETWORK_ERROR,
     FAIL_REASON_TIMEOUT,
     FAIL_REASON_CIRCUIT_OPEN,
+    FAIL_REASON_DISABLED,
     _LLM_MODULE_FAILURE,
 )
 from src.python.registry import get_llm_module_name
@@ -255,31 +256,45 @@ def write_llm_sheets(
         (global_macro_text, expert_review_text, health_check_text, penetration_deep_text) 纯文本四元组，供 TUI 展示
     """
     _reverse = {v: k for k, v in _get_module_key_map().items()}
-    ws7 = wb.create_sheet()
-    ws7.title = _reverse.get("global_macro", get_llm_module_name("global_macro"))
-    ws8 = wb.create_sheet()
-    ws8.title = _reverse.get("expert_review", get_llm_module_name("expert_review"))
-    ws9 = wb.create_sheet()
-    ws9.title = _reverse.get("health_check", get_llm_module_name("health_check"))
-    wsA = wb.create_sheet()
-    wsA.title = _reverse.get("penetration_deep", get_llm_module_name("penetration_deep"))
+
+    _module_keys = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    _disabled = tuple(
+        _LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED
+        for mk in _module_keys
+    )
 
     content7, content8, content9, contentA = llm_content
     global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached = llm_cached
     name7, name8, name9, nameA = model_names
     think7, think8, think9, thinkA = thinking
 
-    _write_content_sheet(ws7, _reverse.get("global_macro", get_llm_module_name("global_macro")), content7, from_cache=global_macro_cached, model_name=name7, thinking_enabled=think7)
-    _write_content_sheet(ws8, _reverse.get("expert_review", get_llm_module_name("expert_review")), content8, from_cache=expert_review_cached, model_name=name8, thinking_enabled=think8)
-    _write_content_sheet(ws9, _reverse.get("health_check", get_llm_module_name("health_check")), content9, from_cache=health_check_cached, model_name=name9, thinking_enabled=think9)
-    _write_content_sheet(wsA, _reverse.get("penetration_deep", get_llm_module_name("penetration_deep")), contentA, from_cache=penetration_deep_cached, model_name=nameA, thinking_enabled=thinkA)
+    _sheet_pairs = [
+        ("global_macro", content7, global_macro_cached, name7, think7),
+        ("expert_review", content8, expert_review_cached, name8, think8),
+        ("health_check", content9, health_check_cached, name9, think9),
+        ("penetration_deep", contentA, penetration_deep_cached, nameA, thinkA),
+    ]
+    for i, (mk, content, cached, mname, think_flag) in enumerate(_sheet_pairs):
+        if _disabled[i]:
+            logger.info("LLM 页签跳过（已禁用）: %s", get_llm_module_name(mk))
+            continue
+        ws = wb.create_sheet()
+        ws.title = _reverse.get(mk, get_llm_module_name(mk))
+        _write_content_sheet(ws, _reverse.get(mk, get_llm_module_name(mk)),
+                             content, from_cache=cached, model_name=mname, thinking_enabled=think_flag)
 
     logger.info("LLM 分析章节写入完成（含%s）", get_llm_module_name("penetration_deep"))
 
-    # 返回纯文本内容，供 TUI 展示
+    # 返回纯文本内容，供 TUI 展示（禁用模块返回空字符串）
+    def _text_or_empty(c: str | None, disabled: bool) -> str:
+        """禁用或空内容返回 ""，否则返回剥离 HTML 的纯文本。"""
+        if disabled or not c:
+            return ""
+        return _strip_html(c)
+
     return (
-        _strip_html(content7) if content7 else "",
-        _strip_html(content8) if content8 else "",
-        _strip_html(content9) if content9 else "",
-        _strip_html(contentA) if contentA else "",
+        _text_or_empty(content7, _disabled[0]),
+        _text_or_empty(content8, _disabled[1]),
+        _text_or_empty(content9, _disabled[2]),
+        _text_or_empty(contentA, _disabled[3]),
     )

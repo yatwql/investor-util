@@ -358,6 +358,45 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
 
+    # ── 收集 LLM 模块状态（跳过/失败） ────────────────
+    _llm_failure = {}
+    try:
+        from src.python.llm import (
+            _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
+            FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
+            FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
+        )
+        _llm_failure = dict(_LLM_MODULE_FAILURE)
+    except ImportError:
+        _llm_failure = {}
+
+    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    module_disabled = {
+        mk: _llm_failure.get(mk) == FAIL_REASON_DISABLED
+        for mk in _MODULE_KEYS
+    }
+    _NAMES = get_llm_module_names()
+    _DISPLAY_REASON = {
+        FAIL_REASON_NOT_CONFIGURED: "LLM 未配置",
+        FAIL_REASON_API_ERROR: "LLM API 调用失败",
+        FAIL_REASON_NETWORK_ERROR: "LLM API 网络连接失败",
+        FAIL_REASON_TIMEOUT: "LLM API 请求超时",
+        FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
+    }
+    llm_module_status: dict[str, list] = {"skipped": [], "failed": []}
+    for mk in _MODULE_KEYS:
+        reason = _llm_failure.get(mk)
+        if not reason:
+            continue
+        display_name = _NAMES.get(mk, mk)
+        if reason == FAIL_REASON_DISABLED:
+            llm_module_status["skipped"].append(display_name)
+        else:
+            llm_module_status["failed"].append({
+                "name": display_name,
+                "reason": _DISPLAY_REASON.get(reason, reason),
+            })
+
     # ── 10) 渲染模板 ────────────────────────────────────────
     print("  [..] 正在渲染 HTML...")
     template = _ENV.get_template("report_template.html")
@@ -398,6 +437,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         llm_session_usage=_llm_session_usage,
         early_warnings=early_warnings,
         module_labels=get_llm_module_names(),
+        module_disabled=module_disabled,
+        llm_module_status=llm_module_status,
     )
 
     # ── 10) 保存文件 ─────────────────────────────────────────

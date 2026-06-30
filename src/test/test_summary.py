@@ -743,3 +743,100 @@ class TestWriteSummarySheet(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ═══════════════════════════════════════════════════════════
+#  write_llm_module_status_block
+# ═══════════════════════════════════════════════════════════
+
+
+class TestWriteLlmModuleStatusBlock(unittest.TestCase):
+    """测试 write_llm_module_status_block 渲染。"""
+
+    def setUp(self):
+        self.ws = MagicMock()
+        self.cell = MagicMock()
+        self.ws.cell.return_value = self.cell
+        self.ws.max_row = 30
+
+    @patch("src.python.registry.get_llm_module_name")
+    def test_skipped_modules_only(self, mock_name):
+        """仅跳过（禁用）模块 → 写入跳过行。"""
+        mock_name.side_effect = lambda mk: {
+            "global_macro": "全球政经局势",
+            "expert_review": "智囊团深度复盘",
+        }.get(mk, mk)
+
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+        _LLM_MODULE_FAILURE.clear()
+        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
+        _LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_DISABLED
+        try:
+            s.write_llm_module_status_block(self.ws)
+            # 验证写入数据：应包含跳过的模块行
+            write_calls = [c[0] for c in self.ws.cell.call_args_list if len(c[0]) >= 3]
+            skipped_values = [c[2] for c in write_calls if c[1] == "value" and "跳过的模块" in str(c[2])]
+            self.assertTrue(skipped_values, "应有跳过的模块行")
+            # 不写入失败模块行
+            failed_values = [c[2] for c in write_calls if c[1] == "value" and "生成失败" in str(c[2])]
+            self.assertFalse(failed_values, "不应有生成失败行")
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+
+    @patch("src.python.registry.get_llm_module_name")
+    def test_failed_modules_only(self, mock_name):
+        """仅有生成失败模块 → 写入失败行。"""
+        mock_name.side_effect = lambda mk: {
+            "health_check": "持仓体检报告",
+        }.get(mk, mk)
+
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_API_ERROR
+        _LLM_MODULE_FAILURE.clear()
+        _LLM_MODULE_FAILURE["health_check"] = FAIL_REASON_API_ERROR
+        try:
+            s.write_llm_module_status_block(self.ws)
+            write_calls = [c[0] for c in self.ws.cell.call_args_list if len(c[0]) >= 3]
+            failed_values = [c[2] for c in write_calls if c[1] == "value" and "生成失败" in str(c[2])]
+            self.assertTrue(failed_values, "应有生成失败行")
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+
+    def test_no_failures_no_output(self):
+        """_LLM_MODULE_FAILURE 为空 → 不写入任何内容。"""
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE
+        _LLM_MODULE_FAILURE.clear()
+        try:
+            s.write_llm_module_status_block(self.ws)
+            # max_row 不应被读取（函数内部 return）
+            # cell 不应被调用（除了 ws.max_row，但那是 property）
+            self.assertFalse(
+                any("【LLM 模块状态】" in str(c) for c in self.ws.cell.call_args_list),
+                "无失败记录时不应写入任何内容"
+            )
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+
+    @patch("src.python.registry.get_llm_module_name")
+    def test_mixed_skipped_and_failed(self, mock_name):
+        """同时存在跳过和失败 → 两类都写入。"""
+        mock_name.side_effect = lambda mk: {
+            "global_macro": "全球政经局势",
+            "health_check": "持仓体检报告",
+        }.get(mk, mk)
+
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED, FAIL_REASON_TIMEOUT
+        _LLM_MODULE_FAILURE.clear()
+        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
+        _LLM_MODULE_FAILURE["health_check"] = FAIL_REASON_TIMEOUT
+        try:
+            s.write_llm_module_status_block(self.ws)
+            write_calls = [c[0] for c in self.ws.cell.call_args_list if len(c[0]) >= 3]
+            values = [str(c[2]) for c in write_calls if c[1] == "value"]
+            skipped_lines = [v for v in values if "跳过" in v]
+            failed_lines = [v for v in values if "生成失败" in v]
+            self.assertTrue(skipped_lines, "应有跳过行")
+            self.assertTrue(failed_lines, "应有失败行")
+            self.assertIn("全球政经局势", str(skipped_lines[0]))
+            self.assertIn("持仓体检报告", str(failed_lines[0]))
+        finally:
+            _LLM_MODULE_FAILURE.clear()

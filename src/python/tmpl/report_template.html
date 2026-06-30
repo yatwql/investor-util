@@ -623,6 +623,8 @@
         <div class="section-content">
             {{ global_macro | safe }}
         </div>
+        {% elif module_disabled.get("global_macro") %}
+        {# 模块已禁用，完全跳过 #}
         {% else %}
         <div class="section-content">
             <div class="empty-note placeholder-note">
@@ -650,6 +652,8 @@
         <div class="section-content">
             {{ expert_review | safe }}
         </div>
+        {% elif module_disabled.get("expert_review") %}
+        {# 模块已禁用，完全跳过 #}
         {% else %}
         <div class="section-content">
             <div class="empty-note placeholder-note">
@@ -677,6 +681,8 @@
         <div class="section-content">
             {{ health_check | safe }}
         </div>
+        {% elif module_disabled.get("health_check") %}
+        {# 模块已禁用，完全跳过 #}
         {% else %}
         <div class="section-content">
             <div class="empty-note placeholder-note">
@@ -703,6 +709,8 @@
         <div class="section-content">
             {{ penetration_deep | safe }}
         </div>
+        {% elif module_disabled.get("penetration_deep") %}
+        {# 模块已禁用，完全跳过 #}
         {% else %}
         <div class="section-content">
             <div class="empty-note placeholder-note">
@@ -767,6 +775,32 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 13: LLM 模块状态（仅在存在跳过/失败时显示）    -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    {% if llm_module_status and (llm_module_status.skipped or llm_module_status.failed) %}
+    <div class="section">
+        <div class="section-title">十三、LLM 模块状态</div>
+        <div class="section-content">
+            {% if llm_module_status.skipped %}
+            <p><strong>跳过的模块（已禁用）：</strong>
+            {% for name in llm_module_status.skipped %}
+                <span class="source-tag" style="background: #f3f4f6; color: #6b7280;">{{ name }}</span>
+            {% endfor %}
+            </p>
+            {% endif %}
+            {% if llm_module_status.failed %}
+            <p style="margin-top: 8px;"><strong>生成失败的模块：</strong></p>
+            <ul style="margin: 6px 0 0 20px; font-size: 13px; color: #555; line-height: 1.8;">
+                {% for item in llm_module_status.failed %}
+                <li><strong>{{ item.name }}</strong> — {{ item.reason }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
 </div>
 </body>

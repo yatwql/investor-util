@@ -288,6 +288,13 @@ def generate_excel_report(
             except (OSError, TypeError, AttributeError):
                 logger.debug("写入 LLM 用量或格式化 worksheet 失败（非关键）")
 
+        # 写入 LLM 模块状态（跳过的模块 / 生成失败的模块），不受 _llm_session 有无影响
+        try:
+            from src.python.report.summary import write_llm_module_status_block
+            write_llm_module_status_block(ws1)
+        except Exception:
+            logger.debug("写入 LLM 模块状态失败（非关键）")
+
         if show_llm_in_tui and (global_macro_text or expert_review_text or health_check_text or penetration_deep_text):
             _show_llm_tui(global_macro_text, expert_review_text, health_check_text, penetration_deep_text)
 

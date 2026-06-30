@@ -272,6 +272,65 @@ class TestWriteLlmSheets(unittest.TestCase):
         self.assertIn("LLM API Key", str(ws8.cell(row=2, column=1).value or ""))
 
 
+class TestWriteLlmSheetsDisabled(unittest.TestCase):
+    """测试 write_llm_sheets 在模块禁用时的行为。"""
+
+    def setUp(self):
+        self.wb = Workbook()
+
+    def _get_llm_sheets(self):
+        return self.wb.worksheets
+
+    def test_disabled_global_macro_skips_sheet(self):
+        """global_macro 禁用 → 不创建该页签，其他页签正常。"""
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+        # 清除可能残留的状态
+        _LLM_MODULE_FAILURE.clear()
+        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
+        try:
+            text7, text8, text9, textA = write_llm_sheets(
+                self.wb, ("<p>宏观</p>", "<p>复盘</p>", "<p>体检</p>", "<p>穿透</p>"))
+            # 禁用模块返回空文本
+            self.assertEqual(text7, "")
+            self.assertNotEqual(text8, "")
+            # 只创建了 3 个新 sheet（默认 sheet + 3 个非禁用）
+            sheets = self._get_llm_sheets()
+            sheet_titles = [s.title for s in sheets]
+            self.assertNotIn("8.全球政经局势", sheet_titles)
+            self.assertIn("9.智囊团深度复盘", sheet_titles)
+            self.assertIn("10.持仓体检报告", sheet_titles)
+            self.assertIn("11.穿透深度分析", sheet_titles)
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+
+    def test_all_disabled_no_sheets_created(self):
+        """所有 4 个模块都禁用 → 不创建任何 LLM sheet。"""
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+        _LLM_MODULE_FAILURE.clear()
+        _LLM_MODULE_FAILURE.update(
+            global_macro=FAIL_REASON_DISABLED,
+            expert_review=FAIL_REASON_DISABLED,
+            health_check=FAIL_REASON_DISABLED,
+            penetration_deep=FAIL_REASON_DISABLED,
+        )
+        try:
+            text7, text8, text9, textA = write_llm_sheets(
+                self.wb, (None, None, None, None))
+            # 全部返回空文本
+            self.assertEqual(text7, "")
+            self.assertEqual(text8, "")
+            self.assertEqual(text9, "")
+            self.assertEqual(textA, "")
+            # 只有默认 sheet，没有新创建的 LLM sheet
+            sheets = self._get_llm_sheets()
+            sheet_titles = [s.title for s in sheets]
+            for title in ["8.全球政经局势", "9.智囊团深度复盘",
+                          "10.持仓体检报告", "11.穿透深度分析"]:
+                self.assertNotIn(title, sheet_titles)
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+
+
 # ═══════════════════════════════════════════════════════════
 #  _extract_footer_text
 # ═══════════════════════════════════════════════════════════
