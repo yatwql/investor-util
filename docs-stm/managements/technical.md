@@ -125,7 +125,7 @@ investor-util/
 │   │   ├── cache.py              # 缓存引擎
 │   │   ├── fetcher.py            # 数据获取调度
 │   │   ├── reader.py             # 持仓 Excel 解析
-│   │   ├── llm/                  # LLM 集成（8 子模块：api/pricing/session/circuit_breaker/fingerprint/markdown/generators/prompts）
+│   │   ├── llm/                  # LLM 集成（9 子模块：api/pricing/session/circuit_breaker/fingerprint/markdown/generators/skeleton/prompts）
 │   │   ├── constants.py          # 共享常量（CACHE_DAILY/WEEKLY/MONTHLY、模型定价）
 │   │   ├── models.py             # 数据模型（Holding dataclass）
 │   │   ├── logger.py             # 日志模块
@@ -158,6 +158,7 @@ investor-util/
 │   │   │   ├── html_writer.py
 │   │   │   ├── llm_content.py
 │   │   │   ├── market_value.py
+│   │   │   ├── excel_generator.py
 │   │   │   ├── news_correlation.py
 │   │   │   ├── penetration.py
 │   │   │   ├── styles.py
@@ -194,7 +195,7 @@ investor-util/
 
 ## LLM 客户端技术要点
 
-`src/python/llm/` 包拆分架构（原 2550 行 `llm_client.py` 解耦为 8 子模块）：
+`src/python/llm/` 包拆分架构（原 `llm_client.py` 解耦为 9 子模块（+skeleton.py 共享骨架））：
 
 | 模块 | 职责 |
 |------|------|
@@ -206,14 +207,14 @@ investor-util/
 | `circuit_breaker.py` | 端点熔断器 |
 | `fingerprint.py` | 各种缓存指纹计算 |
 | `markdown.py` | Markdown→HTML 渲染 |
-| `content.py` | 已删除（原兼容存根） |
+| `skeleton.py` | 共享生成骨架（_generate_llm_content / _is_llm_module_enabled / _generate_llm_module / _run_batch_mode） |
 
 `__init__.py` 导出所有公共 API 保持向后兼容。
 
 - **统一入口** `_call_llm()` 按 `provider` 路由到 `_call_claude()` 或 `_call_openai()`
 - **`_call_llm_with_retry()`** 共享重试/超时/错误处理骨架
-- **`_generate_llm_content()`** 共享骨架函数，封装缓存检查 + 调用 + markdown→HTML + 写入的 85% 公共逻辑
-- **`generate_global_macro()` / `generate_expert_review()`** 仅保留 prompt 构建 + 配置解析，其余委托 `_generate_llm_content()`
+- **`_generate_llm_content()` / `_generate_llm_module()`** 共享骨架函数（`skeleton.py`），封装缓存检查 + 调用 + markdown→HTML + 写入的 85% 公共逻辑
+- **`generate_global_macro()` / `generate_expert_review()`** 仅保留 prompt 构建 + 配置解析，其余委托 `_generate_llm_module()`（`skeleton.py`）
 
 ### Extended Thinking（v0.2.22+）
 

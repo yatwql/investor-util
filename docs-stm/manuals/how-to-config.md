@@ -16,6 +16,13 @@
     "akshare": true
   },
   "preferred_provider": {},
+  "market_hour_aware": ["price", "index"],
+  "market_hour_ttl": 30,
+  "market_hours": {
+    "start": "09:30",
+    "end": "15:00",
+    "official_source": true
+  },
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
   "cache_ttl": {
@@ -50,6 +57,9 @@
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
+| `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
+| `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
+| `market_hours` | `{...}` | 市场时段配置：`start`/`end` 手动覆盖开盘收盘（HH:MM）；`official_source` 是否尝试从东方财富 API 获取实时交易状态 | 手动编辑 |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
 
@@ -113,8 +123,8 @@
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
-| `price` | `price_{code}.json` | 24h | — | 股票/基金最新价、昨收 |
-| `index` | `index_{code}.json` | 24h | — | 市场指数行情 |
+| `price` | `price_{code}.json` | 24h（交易时段 30s） | — | 股票/基金最新价、昨收 |
+| `index` | `index_{code}.json` | 24h（交易时段 30s） | — | 市场指数行情 |
 | `rank` | `fund_perf_{code}.json` | 24h | — | 基金同类排名+区间收益率 |
 | `hold` | `fund_hold_{code}.json` | 7 天 | — | 基金前 10 持仓明细 |
 | `industry` | `industry_{code}.json` | 7 天 | — | 行业分类/概念板块 |
@@ -134,4 +144,5 @@
 > **TTL 兜底：** 即使指纹未变，缓存文件仍有 TTL 兜底到期自动刷新，防止数据"永久有效"。
 > 
 > **调整建议：** 盘中频繁刷新可将 `price` 改为 `3600`（1小时）；持仓变动少可将 `hold` 改为 `2592000`（30天）。
+> **交易时段短 TTL：** `price` 和 `index` 默认注册在 `market_hour_aware` 中，A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s）替代常规 TTL，确保盘中实时行情。收盘后自动回落长 TTL 保持收盘价。可通过 `market_hours.start`/`end` 手动覆盖时段，或设 `market_hours.official_source: false` 关闭东方财富 API 实时状态查询。
 > **自动 gzip 压缩：** 超过 100KB 的缓存文件自动以 `.json.gz` 格式压缩存储（如 `profit_forecast_*.json.gz`），节省约 80-90% 磁盘空间。读取时透明解压，无需任何配置或迁移。小文件保持原 `.json` 格式，热路径无额外开销。

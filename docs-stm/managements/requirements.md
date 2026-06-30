@@ -151,8 +151,8 @@
 
 | 类别 | 数据类型键 | 默认 TTL | 对应缓存文件 | 指纹 |
 |---|---|---|---|---|
-| 价格行情 | `price` | 86400 秒（24 小时） | `price_{code}.json` | — |
-| 市场指数 | `index` | 86400 秒（24 小时） | `index_{code}.json` | — |
+| 价格行情 | `price` | 86400 秒（24 小时，交易时段内 30s） | `price_{code}.json` | — |
+| 市场指数 | `index` | 86400 秒（24 小时，交易时段内 30s） | `index_{code}.json` | — |
 | 基金业绩 | `rank` | 86400 秒（24 小时） | `fund_perf_{code}.json` | — |
 | 持仓数据 | `hold` | 604800 秒（7 天） | `fund_hold_{code}.json` | — |
 | 行业分类 | `industry` | 604800 秒（7 天） | `industry_{code}.json` | — |
@@ -169,8 +169,9 @@
 | 股票历史分红 | `dividend` | 2592000 秒（30 天） | `dividend_{fingerprint}.json` | 代码列表指纹 |
 
 **TTL 优先级链（按优先级从高到低）：**
-1. `config.json` 中的 `cache_ttl.<data_type>`
-2. 代码内置默认值（如上表）
+1. `config.json` 中的 `cache_ttl.<data_type>`（显式配置）
+2. **交易时段覆盖**：`config.json` 中 `market_hour_aware` 数组内声明的类型（如 `price`、`index`），在 A 股交易时段（09:30–11:30 + 13:00–15:00，多渠道判断：config 覆盖 → 东方财富 push2 API → 内置默认）内使用 `market_hour_ttl`（默认 30s）替代常规 TTL。收盘后用回常规 TTL
+3. 代码内置默认值（如上表）
 
 ### 5.5 手动刷新
 

@@ -1,7 +1,7 @@
 # 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-06-30
+最后更新：2026-06-30（v0.2.38）
 
 ---
 
@@ -48,6 +48,7 @@
 | 2026-06-30 | 全量文档审计 — 冗余内容清理、冲突修复（plan.md D 标记/README 12 页签/requirements 新章节/technical 目录同步） | 综合审计 |
 | 2026-06-30 | 代码审查 — A~F 硬编码名 registry 替换、P 生成器共享骨架、未使用 import 清理 | 代码审查 |
 | 2026-06-30 | 代码审查 — 非 LLM 页签名注册化、指纹函数合并、news_correlation 批量模式纳入共享骨架、TUI 摘要标题统一、`_CONTENT_FILTER_RECOVERY` 导出清理 | 代码审查 |
+| 2026-06-30 | generators.py 拆分 skeleton.py、价格缓存 market-hours 感知 TTL、JSON 注释支持、llm_settings 分组、market_hour 官方 API 获取、TUI LLM 跳过/失败区分 | 实现审查 |
 
 ---
 
@@ -62,7 +63,7 @@
 - [x] Iter 3.5 已完成（LLM 全局优化）
 - [x] Iter 3.6 已完成（全面性能优化与代码清理）
 - [x] 配置管理含 output_dir 字段，支持菜单 R 配置
-- [x] 所有单元测试通过（1019 项）
+- [x] 所有单元测试通过（1041 项）
 - [x] API Key 不丢失（config.json 不存明文 key，使用外部文件 llm_key.json）
 - [x] Excel/HTML 输出文件格式正确
 - [x] TUI 菜单功能正常（含 B/L/R 新菜单）
@@ -77,3 +78,6 @@
 - [x] 综合审计：配置/缓存前缀/管理文档核对完成
 - [x] v0.2.32 Token 定价可配置、多币种、缓存命中计费、全量管理文档审计
 - [x] v0.2.33 Import/Sheet 写入隔离 + 名称统一 + 常量重命名 + 智囊团 NAV/QDII 标注 + 全量自测 814 passed
+- [x] v0.2.37 硬编码名 registry 替换 + P 生成器共享骨架 + 指纹合并 + 未使用 import 清理
+- [x] v0.2.38 generators.py 拆分 skeleton.py + market-hours 缓存 TTL + JSON 注释支持 + llm_settings 分组 + TUI 跳过/失败区分 + 管理文档/用户文档审计修复
+- [x] 全量单元测试 1041 项通过
