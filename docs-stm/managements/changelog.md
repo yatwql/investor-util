@@ -4,6 +4,21 @@
 
 ---
 
+## [0.2.43] - 2026-07-01
+
+### Fixed
+- **`_read_llm_settings()` JSON 注释崩溃**：R-012 提取时用 `json.load()` 代替了 `json.loads(_strip_json_comments())`，导致含 `//` 注释的 `llm_settings.json` 解析失败（菜单 [S] `[ERR] 无法读取 llm_settings.json`），现改回使用 `_strip_json_comments()` 先剥离注释再解析。
+
+### Changed
+- **`_cmd_generate_full` 提取 `_process_llm_news_futures()`**：184 行大函数中闭包 `_run_llm` 内联为 `generate_all_llm` 直接传参，`as_completed` 结果处理逻辑提取为独立函数，主函数降至 136 行（-26%），新函数职责明确。
+
+### Docs
+- **how-to-start.md 菜单 S 同步**：ASCII 图从 4→5 模块（含「财经新闻热点与持仓关联分析」），菜单 L 描述「LLM 四模块」→「LLM 多模块分析（5 个）」，菜单 1 描述补齐新闻关联分析缓存清除说明。
+- **review-findings.md 清理**：R-011/R-012/R-013 已完成项移除待办状态，更新 R-009 进度描述。
+- **版本号同步**：constants.py 0.2.41→0.2.43，README.md 0.2.42→0.2.43。
+
+---
+
 ## [0.2.42] - 2026-07-01
 
 ### Changed

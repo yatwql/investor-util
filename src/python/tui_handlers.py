@@ -340,6 +340,76 @@ def _cmd_generate_both() -> None:
     _finish_report(reporter)
 
 
+def _process_llm_news_futures(
+    llm_fut, news_fut, reporter,
+) -> tuple[tuple, list, dict]:
+    """处理 LLM 生成 + 新闻获取的并行 Future 结果。
+
+    Args:
+        llm_fut: generate_all_llm 的 Future
+        news_fut: build_news_data 的 Future
+        reporter: 进度报告器
+
+    Returns:
+        (llm_content, news_data, news_llm_meta)
+    """
+    llm_content = (None, None, None, None)
+    news_data: list = []
+    news_llm_meta: dict = {}
+
+    for fut in as_completed([news_fut, llm_fut]):
+        if fut is llm_fut:
+            try:
+                (llm_global_macro, llm_expert_review,
+                 llm_health_check, llm_penetration_deep,
+                 global_macro_cached, expert_review_cached,
+                 health_check_cached, penetration_deep_cached) = fut.result()
+                llm_content = (llm_global_macro, llm_expert_review,
+                               llm_health_check, llm_penetration_deep)
+                _MODULE_KEYS = ("global_macro", "expert_review",
+                                "health_check", "penetration_deep")
+                _MODULE_RESULTS = (llm_global_macro, llm_expert_review,
+                                   llm_health_check, llm_penetration_deep)
+                _CACHED_FLAGS = (global_macro_cached, expert_review_cached,
+                                 health_check_cached, penetration_deep_cached)
+                disabled: list[str] = []
+                failed: list[str] = []
+                ok_count = 0
+                for mk, r in zip(_MODULE_KEYS, _MODULE_RESULTS):
+                    if r is not None:
+                        ok_count += 1
+                    elif _LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
+                        disabled.append(get_llm_module_name(mk))
+                    else:
+                        failed.append(get_llm_module_name(mk))
+
+                for name in disabled:
+                    reporter.info(f"{name}：已跳过（菜单 S 可切换）")
+                for name in failed:
+                    reporter.add_error(f"{name}：内容生成失败（已降级使用占位文本）")
+                    reporter.warn(f"{name}：内容生成失败（已降级使用占位文本）")
+
+                if ok_count > 0 and not failed:
+                    tag = "缓存" if all(_CACHED_FLAGS) else "LLM"
+                    reporter.ok(f"{tag} 内容生成完成")
+                elif ok_count == 0 and not failed and not disabled:
+                    reporter.warn("LLM 均未生成（请检查 LLM 配置）")
+                elif ok_count == 0 and not failed:
+                    reporter.info("所有 LLM 内容已跳过，未调用 LLM")
+            except Exception as e:
+                reporter.add_error(f"LLM 内容生成异常: {e}")
+                reporter.error(f"LLM 内容生成异常: {e}")
+        else:
+            try:
+                news_data, news_llm_meta = fut.result()
+                reporter.ok(f"新闻获取完成，共 {len(news_data)} 条")
+            except Exception as e:
+                reporter.add_error(f"新闻获取失败: {e}")
+                reporter.warn(f"新闻获取失败: {e}")
+
+    return llm_content, news_data, news_llm_meta
+
+
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 分析章节）。"""
     reporter = TuiProgressReporter()
@@ -398,10 +468,6 @@ def _cmd_generate_full() -> None:
 
         _sector_flow = get_sector_fund_flow()
 
-        news_data: list = []
-        news_llm_meta: dict = {}
-        llm_content = (None, None, None, None)
-
         # 是否强制刷新 LLM 缓存
         _force_llm = False
         try:
@@ -413,64 +479,20 @@ def _cmd_generate_full() -> None:
             reporter.ok("将跳过 LLM 缓存强制重新生成")
 
         with ThreadPoolExecutor(max_workers=2) as _llm_ex:
-
-            def _run_llm():
-                return generate_all_llm(
-                    a_indices, us_indices, total_mv, total_cost, total_profit,
-                    total_today_profit, len(holdings), categories,
-                    penetrated_assets=penetrated_assets,
-                    holdings_details=holdings_details,
-                    sector_flow=_sector_flow, force=_force_llm,
-                )
-
             _news_fut = _llm_ex.submit(
                 build_news_data, holdings, news_top_count, penetrated_assets,
             )
-            _llm_fut = _llm_ex.submit(_run_llm)
-
-            for fut in as_completed([_news_fut, _llm_fut]):
-                if fut is _llm_fut:
-                    try:
-                        llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep, global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached = fut.result()
-                        llm_content = (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)
-                        # ── 区分因禁用跳过的模块与真正失败的模块 ──
-                        _MODULE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep")
-                        _MODULE_RESULTS = (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)
-                        _CACHED_FLAGS = (global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached)
-                        disabled: list[str] = []
-                        failed: list[str] = []
-                        ok_count = 0
-                        for mk, result in zip(_MODULE_KEYS, _MODULE_RESULTS):
-                            if result is not None:
-                                ok_count += 1
-                            elif _LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
-                                disabled.append(get_llm_module_name(mk))
-                            else:
-                                failed.append(get_llm_module_name(mk))
-
-                        for name in disabled:
-                            reporter.info(f"{name}：已跳过（菜单 S 可切换）")
-                        for name in failed:
-                            reporter.add_error(f"{name}：内容生成失败（已降级使用占位文本）")
-                            reporter.warn(f"{name}：内容生成失败（已降级使用占位文本）")
-
-                        if ok_count > 0 and not failed:
-                            tag = "缓存" if all(_CACHED_FLAGS) else "LLM"
-                            reporter.ok(f"{tag} 内容生成完成")
-                        elif ok_count == 0 and not failed and not disabled:
-                            reporter.warn("LLM 均未生成（请检查 LLM 配置）")
-                        elif ok_count == 0 and not failed:
-                            reporter.info("所有 LLM 内容已跳过，未调用 LLM")
-                    except Exception as e:
-                        reporter.add_error(f"LLM 内容生成异常: {e}")
-                        reporter.error(f"LLM 内容生成异常: {e}")
-                else:
-                    try:
-                        news_data, news_llm_meta = fut.result()
-                        reporter.ok(f"新闻获取完成，共 {len(news_data)} 条")
-                    except Exception as e:
-                        reporter.add_error(f"新闻获取失败: {e}")
-                        reporter.warn(f"新闻获取失败: {e}")
+            _llm_fut = _llm_ex.submit(
+                generate_all_llm,
+                a_indices, us_indices, total_mv, total_cost, total_profit,
+                total_today_profit, len(holdings), categories,
+                penetrated_assets=penetrated_assets,
+                holdings_details=holdings_details,
+                sector_flow=_sector_flow, force=_force_llm,
+            )
+            llm_content, news_data, news_llm_meta = _process_llm_news_futures(
+                _llm_fut, _news_fut, reporter,
+            )
 
         _print_llm_session_usage()
 
@@ -932,16 +954,18 @@ def _cmd_show_cache_stats() -> None:
 
 
 def _read_llm_settings() -> tuple[dict, str] | None:
-    """读取 llm_settings.json 配置。
+    """读取 llm_settings.json 配置（支持 JSON 注释）。
 
     Returns:
         (settings_dict, path) 成功时；失败时返回 None（已输出错误提示）
     """
     import json
+    from src.python.config import _strip_json_comments
     path = "data/config/llm_settings.json"
     try:
         with open(path, "r", encoding="utf-8") as f:
-            settings = json.load(f)
+            raw = f.read()
+        settings = json.loads(_strip_json_comments(raw))
         return settings, path
     except (FileNotFoundError, json.JSONDecodeError):
         print("  [ERR] 无法读取 llm_settings.json")

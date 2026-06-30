@@ -1,7 +1,7 @@
 # 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.41 fix: God对象/大函数拆分/补充测试/文档审计）
+最后更新：2026-07-01（v0.2.43 fix: JSON 注释修复/大函数继续拆分/doc 同步）
 
 ---
 
@@ -24,6 +24,7 @@
 | 2026-06-30 | 代码审查 — A~F 硬编码名 registry 替换、P 生成器共享骨架、未使用 import 清理 | 代码审查 |
 | 2026-06-30 | 代码审查 — 非 LLM 分析章节名注册化、指纹函数合并、news_correlation 批量模式纳入共享骨架、TUI 摘要标题统一、`_CONTENT_FILTER_RECOVERY` 导出清理 | 代码审查 |
 | 2026-06-30 | generators.py 拆分 skeleton.py、价格缓存 market-hours 感知 TTL、JSON 注释支持、llm_settings 分组、market_hour 官方 API 获取、TUI LLM 跳过/失败区分 | 实现审查 |
+| 2026-07-01 | _read_llm_settings JSON 注释回归修复、_cmd_generate_full 提取 _process_llm_news_futures、菜单 S 文档同步 | 缺陷修复 |
 
 ---
 
@@ -32,38 +33,17 @@
 ### [R-009] tui_handlers.py God 对象 ◐（部分完成）
 
 - **类型**：架构/可维护性
-- **文件**：`src/python/tui_handlers.py`（~1050 行）
-- **描述**：同时负责用户交互、数据获取编排、报告生成调度，职责过重。已提取 `_prepare_holdings()`、`_finish_report()`、`_fetch_prices_and_indices()`、`_read_llm_settings()`、`_write_llm_settings()` 共享函数，减少重复。仍有 `_cmd_generate_full`（~175 行）、`_cmd_update_basic_cache`（~130 行）等大函数待增量拆分。
-- **状态**：P2 — 部分完成（R-012/013 子项已修复，主项待继续）
+- **文件**：`src/python/tui_handlers.py`（~1060 行）
+- **描述**：同时负责用户交互、数据获取编排、报告生成调度，职责过重。已提取 `_prepare_holdings()`、`_finish_report()`、`_fetch_prices_and_indices()`、`_read_llm_settings()`、`_write_llm_settings()`、`_process_llm_news_futures()` 共享函数，`_cmd_generate_full` 从 184 行降至 136 行。仍有 `_cmd_generate_full`（136 行）、`_cmd_update_basic_cache`（130 行）待继续拆分。
+- **状态**：P3 — 部分完成（_cmd_generate_full 已提取 _process_llm_news_futures，其余待增量处理）
 
 ### [R-010] cache.py 大函数拆分 ◐（部分完成）
 
 - **类型**：可维护性
 - **文件**：`src/python/cache.py`
-- **描述**：已提取 `_read_cache_data()` 统一处理 gzip/非 gzip 读取，`get()` 从 67 行缩减至 33 行，`cleanup_expired` 复用同一辅助函数。`_is_market_open`（75 行）、`check_and_refresh_caches`（91 行）、`set`（57 行）仍可进一步提取。
+- **描述**：已提取 `_read_cache_data()` 统一处理 gzip/非 gzip 读取，`get()` 从 67 行缩减至 33 行，`cleanup_expired` 复用同一辅助函数。`_is_market_open`（75 行）、`check_and_refresh_caches`（68 行）、`set`（57 行）仍可进一步提取。
 - **状态**：P3 — 部分完成（get/cleanup_expired 已简化，其余待增量处理）
 
-### [R-011] 测试覆盖缺口 ✅（已完成）
-
-- **类型**：测试
-- **文件**：多个
-- **描述**：新增 `test_progress.py`（33 tests）和 `test_session.py`（32 tests）。`fetcher/fund.py`、`fetcher/price.py`、`fetcher/industry.py`、`llm/api.py`、`llm/skeleton.py`、`llm/generators.py` 仍靠集成测试覆盖，边界场景可后续补充。
-- **状态**：P3 — ✅ 已修复（2026-07-01）
-
-### [R-012] _cmd_config_llm_modules 职责拆分 ✅（已完成）
-
-- **类型**：可维护性
-- **文件**：`src/python/tui_handlers.py`
-- **描述**：提取 `_read_llm_settings()` 和 `_write_llm_settings()`，将配置读取/写入与交互菜单分离。
-- **状态**：P3 — ✅ 已修复（2026-07-01）
-
-### [R-013] 缓存刷新逻辑重复 ✅（已完成）
-
-- **类型**：架构
-- **文件**：`src/python/tui_handlers.py`
-- **描述**：提取 `_fetch_prices_and_indices()` 并行获取持仓价格+指数，`_cmd_update_position_cache` 调用之。
-- **状态**：P3 — ✅ 已修复（2026-07-01）
-
-<!-- 已完成：v0.2.41（2026-07-01）= write_html_report 拆分 + fund.py 日志 + chain.py 测试 + R-011~R-013 修复 + R-009/R-010 部分完成 -->
+<!-- 已完成：v0.2.43 = R-012(_read_llm_settings JSON 注释) 回归修复 + _cmd_generate_full 提取 _process_llm_news_futures + 管理文档同步 -- 此前 R-011~R-013 R-012/R-013 已在 v0.2.42 完成 -->
 
 
