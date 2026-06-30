@@ -130,7 +130,6 @@ class TestGenerateExcelReport(unittest.TestCase):
             a_indices={},
             us_indices={},
             llm_content=("<p>宏观</p>", "<p>复盘</p>", None, None),
-            llm_cached=(True, True, False, False),
         )
 
         out_files = os.listdir(self.tmp.name)

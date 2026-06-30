@@ -22,7 +22,6 @@ def generate_excel_report(
     details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
     news_data: list | None = None,
-    llm_cached: tuple[bool, bool, bool, bool] = (False, False, False, False),
     news_llm_meta: dict | None = None,
     early_warnings: dict | None = None,
     progress: ProgressReporter | None = None,
@@ -40,7 +39,6 @@ def generate_excel_report(
         a_indices: A 股指数数据
         us_indices: 美股指数数据
         news_data: 预获取的新闻数据
-        llm_cached: 各 LLM 章节是否来自缓存
         news_llm_meta: 新闻 LLM 元数据
         early_warnings: 智能预警数据
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
@@ -149,23 +147,19 @@ def generate_excel_report(
 
     # ── 各页安全写入 ──
     _llm_session = None
-    with _Timer(get_report_sheet_name('summary')):
-        prog.call_sheet(get_report_sheet_name('summary'), write_summary_sheet,
-                     ws1, total_mv, total_cost, total_profit, today_profit,
-                     categories=categories, update_status=up_status,
-                     a_indices=a_indices, us_indices=us_indices)
+    prog.call_sheet(get_report_sheet_name('summary'), write_summary_sheet,
+                 ws1, total_mv, total_cost, total_profit, today_profit,
+                 categories=categories, update_status=up_status,
+                 a_indices=a_indices, us_indices=us_indices)
 
-    with _Timer(get_report_sheet_name('category')):
-        prog.call_sheet(get_report_sheet_name('category'), write_category_sheet, ws3, holdings, details)
+    prog.call_sheet(get_report_sheet_name('category'), write_category_sheet, ws3, holdings, details)
 
-    with _Timer(get_report_sheet_name('penetration')):
-        pen_result = compute_penetration_top10(holdings, details) if compute_penetration_top10 else {}
-        prog.ok("资产穿透TOP10 计算完成")
-        prog.call_sheet(get_report_sheet_name('penetration'), write_penetration_sheet,
-                     ws4, holdings, details, penetration_data=pen_result)
+    pen_result = compute_penetration_top10(holdings, details) if compute_penetration_top10 else {}
+    prog.ok("资产穿透TOP10 计算完成")
+    prog.call_sheet(get_report_sheet_name('penetration'), write_penetration_sheet,
+                 ws4, holdings, details, penetration_data=pen_result)
 
-    with _Timer(get_report_sheet_name('fund_performance')):
-        prog.call_sheet(get_report_sheet_name('fund_performance'), write_fund_performance_sheet, ws5, holdings, details)
+    prog.call_sheet(get_report_sheet_name('fund_performance'), write_fund_performance_sheet, ws5, holdings, details)
 
     if include_news:
         penetrated_assets = pen_result.get("top10", []) if pen_result else []
@@ -175,27 +169,26 @@ def generate_excel_report(
             write_news_sheet = None
             prog.add_error(f"{get_llm_module_name('news_correlation')}模块缺失 (news_correlation)")
 
-        with _Timer(get_llm_module_name('news_correlation')):
-            if news_data is not None:
-                logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
-                _meta = news_llm_meta or {}
-                prog.ok(f"复用预取新闻数据（{len(news_data)} 条）")
-            else:
-                prog.info("正在获取财经新闻（含穿透资产关键词）...")
+        if news_data is not None:
+            logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
+            _meta = news_llm_meta or {}
+            prog.ok(f"复用预取新闻数据（{len(news_data)} 条）")
+        else:
+            prog.info("正在获取财经新闻（含穿透资产关键词）...")
+            try:
+                from src.python.report.news_correlation import build_news_data
+            except ImportError:
+                build_news_data = None
+            if build_news_data:
                 try:
-                    from src.python.report.news_correlation import build_news_data
-                except ImportError:
-                    build_news_data = None
-                if build_news_data:
-                    try:
-                        news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
-                    except Exception as e:
-                        prog.add_error(f"新闻数据获取失败: {e}")
-                        news_data, _meta = [], {}
-                else:
-                    prog.add_error(f"{get_llm_module_name('news_correlation')}数据模块缺失")
+                    news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
+                except Exception as e:
+                    prog.add_error(f"新闻数据获取失败: {e}")
                     news_data, _meta = [], {}
-            prog.call_sheet(get_llm_module_name('news_correlation'), write_news_sheet, ws6, news_data, llm_meta=_meta)
+            else:
+                prog.add_error(f"{get_llm_module_name('news_correlation')}数据模块缺失")
+                news_data, _meta = [], {}
+        prog.call_sheet(get_llm_module_name('news_correlation'), write_news_sheet, ws6, news_data, llm_meta=_meta)
 
         # 智能预警页签（依赖新闻 + 穿透数据）
         if include_news and ws7 is not None:

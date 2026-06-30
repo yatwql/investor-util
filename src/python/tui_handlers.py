@@ -411,7 +411,6 @@ def _cmd_generate_full() -> None:
         news_data: list = []
         news_llm_meta: dict = {}
         llm_content = (None, None, None, None)
-        llm_cached = (False, False, False, False)
 
         # 是否强制刷新 LLM 缓存
         _force_llm = False
@@ -444,7 +443,6 @@ def _cmd_generate_full() -> None:
                     try:
                         llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep, global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached = fut.result()
                         llm_content = (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)
-                        llm_cached = (global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached)
                         # ── 区分因禁用跳过的模块与真正失败的模块 ──
                         _MODULE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep")
                         _MODULE_RESULTS = (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)
