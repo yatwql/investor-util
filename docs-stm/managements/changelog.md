@@ -4,7 +4,22 @@
 
 ---
 
-## [0.2.40] - 2026-06-30
+## [0.2.41] - 2026-07-01
+
+### Changed
+- **`write_html_report` 拆分为 12 个子函数**：390 行单体函数拆分为 `_render_market_value_section`、`_render_account_grouping`、`_render_category_info`、`_render_index_section`、`_render_category_table`、`_render_penetration_section`、`_render_fund_performance_section`、`_render_news_section`、`_render_llm_content_section`、`_render_llm_module_info`、`_save_html_report`、`_time_strings`，主函数降为 ~60 行，各子函数职责明确。
+
+### Added
+- **`src/test/test_chain.py` — Provider Chain 单元测试**：23 项测试覆盖 `_get_chain`（默认顺序、preferred_provider 前置、异常安全）和 `_fetch_with_fallback`（缓存命中、Provider 遍历回退、验证通过/拒绝、转换函数、per-provider 转换字典、过期缓存降级、未知 Provider 跳过、参数传递）。
+
+### Fixed
+- **`fetcher/fund.py` 静默异常加日志**：`_fetch_benchmark_from_api` 的 `except: continue` 和 `_get_full_benchmark_table` 的 `except: pass` 补充 `logger.debug`，避免运行时错误线索丢失。
+
+### Docs
+- **how-to-config.md 新增「缓存分组」章节**：说明 `preload` / `refresh` 两个分组的模块归属、与菜单 `[1]`/`[2]` 的对应关系、工作原理。
+- **how-to-config.md 修复 `cache_ttl` 调整建议冲突**：「盘中频繁刷新可将 price 改为 3600」与 market_hour_aware 盘中自动 30s 短 TTL 矛盾，移除该建议。
+- **review-findings.md 更新**：新增 R-010~R-013 待办（cache.py 大函数拆分、测试覆盖缺口、llm 配置菜单职责混合、缓存刷新逻辑重复），标记今日完成的 3 项修复。
+- **CLAUDE.md 新增自审记录规则**：自查发现的所有问题必须记录到 review-findings.md，修复后将变更移至 changelog.md。
 
 ### Fixed
 - **3 处剩余静默异常**：`main.py:71` `_print_session_usage_on_exit`、`cache.py:528` `check_and_refresh_caches`、`llm/skeleton.py:188` 费用字符串解析 — 在 `except: pass` 前增加 `logger.warning(...)` 记录上下文，避免运行时错误线索丢失。

@@ -105,6 +105,7 @@ def _fetch_benchmark_from_api(code: str) -> str | None:
                 resp.encoding = "utf-8"
                 html = resp.text
         except (_httpx_loc.RequestError, OSError):
+            logger.debug("[基准] %s API 请求失败（url=%s）", code, url)
             continue
 
         patterns = [
@@ -158,6 +159,7 @@ def _get_full_benchmark_table() -> dict[str, str]:
         user_benchmarks = config.get("user_fund_benchmarks") or {}
         table.update(user_benchmarks)
     except (KeyError, TypeError):
+        logger.debug("[基准] 获取用户配置覆盖失败，使用内置库")
         pass
     return table
 
