@@ -736,21 +736,15 @@
             <table class="kv-table">
                 <tr><td>API 调用次数</td><td>{{ llm_session_usage["call_count"] }} 次</td></tr>
                 <tr><td>模型</td><td>{{ llm_session_usage["model_display"] }}</td></tr>
+                <tr><td>Endpoint</td><td style="word-break: break-all; font-size: 13px;">{{ llm_endpoint or "—" }}</td></tr>
                 <tr><td>输入 token</td><td>{{ "{:,}".format(llm_session_usage["input_tokens"]) }}</td></tr>
                 <tr><td>输出 token</td><td>{{ "{:,}".format(llm_session_usage["output_tokens"]) }}</td></tr>
                 <tr><td>总 token</td><td>{{ "{:,}".format(llm_session_usage["total_tokens"]) }}</td></tr>
                 {% if llm_session_usage["cache_hit_tokens"] %}
-                <tr><td>缓存命中</td><td>{{ "{:,}".format(llm_session_usage["cache_hit_tokens"]) }}</td></tr>
+                <tr><td>缓存命中 token</td><td>{{ "{:,}".format(llm_session_usage["cache_hit_tokens"]) }}</td></tr>
                 {% endif %}
                 <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
             </table>
-            {% else %}
-            <div class="empty-note placeholder-note">
-                <p><strong>本次生成未调用 LLM</strong></p>
-                <p style="margin-top: 8px; font-size: 13px; color: #888;">
-                    仅菜单 L 触发 LLM 调用；缓存有效期内的重复生成不会产生额外费用。
-                </p>
-            </div>
             {% endif %}
 
             {% if llm_module_info %}
@@ -761,10 +755,12 @@
                         <th style="padding: 4px 8px; text-align: left;">模块</th>
                         <th style="padding: 4px 8px; text-align: left;">状态</th>
                         <th style="padding: 4px 8px; text-align: left;">模型</th>
-                        <th style="padding: 4px 8px; text-align: right;">输入 token</th>
-                        <th style="padding: 4px 8px; text-align: right;">输出 token</th>
+                        <th style="padding: 4px 8px; text-align: right;">总 Token 用量</th>
+                        <th style="padding: 4px 8px; text-align: right;">输入 Token</th>
+                        <th style="padding: 4px 8px; text-align: right;">输出 Token</th>
+                        <th style="padding: 4px 8px; text-align: right;">缓存命中 Token</th>
                         <th style="padding: 4px 8px; text-align: right;">费用</th>
-                        <th style="padding: 4px 8px; text-align: center;">缓存</th>
+                        <th style="padding: 4px 8px; text-align: center;">LLM 缓存</th>
                         <th style="padding: 4px 8px; text-align: center;">Thinking</th>
                     </tr>
                     {% for _mi in llm_module_info %}
@@ -774,18 +770,20 @@
                             {% if _mi.status == "disabled" %}
                             <span style="color: #9ca3af;">{{ _mi.status_label }}</span>
                             {% elif _mi.status == "failed" %}
-                            <span style="color: #c0392b;" title="{{ _mi.status_label }}">失败</span>
+                            <span style="color: #c0392b;" title="{{ _mi.status_label }}">{{ _mi.status_label }}</span>
                             {% elif _mi.status == "cached" %}
                             <span style="color: #2e86c1;">{{ _mi.status_label }}</span>
                             {% elif _mi.status == "success" %}
                             <span style="color: #27ae60;">{{ _mi.status_label }}</span>
-                            {% else %}
+                            {% elif _mi.status_label %}
                             <span style="color: #aaa;">{{ _mi.status_label }}</span>
                             {% endif %}
                         </td>
                         <td style="padding: 4px 8px;">{{ _mi.model or "—" }}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{{ "{:,}".format(_mi.input_tokens) if _mi.input_tokens else "—" }}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{{ "{:,}".format(_mi.output_tokens) if _mi.output_tokens else "—" }}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.total_tokens %}{{ "{:,}".format(_mi.total_tokens) }}{% else %}—{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.input_tokens %}{{ "{:,}".format(_mi.input_tokens) }}{% else %}—{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.output_tokens %}{{ "{:,}".format(_mi.output_tokens) }}{% else %}—{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.cache_hit_tokens %}{{ "{:,}".format(_mi.cache_hit_tokens) }}{% else %}—{% endif %}</td>
                         <td style="padding: 4px 8px; text-align: right;">
                             {% if _mi.cost > 0 %}
                             ¥{{ "%.4f"|format(_mi.cost) }}
@@ -798,7 +796,7 @@
                         <td style="padding: 4px 8px; text-align: center;">
                             {% if _mi.cached %}
                             <span style="color: #2e86c1;">✓</span>
-                            {% elif _mi.status == "success" or _mi.status == "cached" %}
+                            {% elif _mi.status == "success" %}
                             <span style="color: #ccc;">—</span>
                             {% else %}
                             —

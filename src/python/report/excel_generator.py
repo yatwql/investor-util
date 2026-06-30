@@ -278,7 +278,7 @@ def generate_excel_report(
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
             _llm_session = None
-        if _llm_session and _llm_session.get("call_count", 0) > 0:
+        if _llm_session and (_llm_session.get("call_count", 0) > 0 or _llm_session.get("per_module")):
             try:
                 from src.python.report.summary import write_llm_usage_block
                 write_llm_usage_block(ws1, _llm_session)
@@ -288,12 +288,79 @@ def generate_excel_report(
             except (OSError, TypeError, AttributeError):
                 logger.debug("写入 LLM 用量或格式化 worksheet 失败（非关键）")
 
-        # 写入 LLM 模块状态（跳过的模块 / 生成失败的模块），不受 _llm_session 有无影响
+        # 创建 'LLM API 用量' 页签（仅 LLM 被启用时）
         try:
-            from src.python.report.summary import write_llm_module_status_block
-            write_llm_module_status_block(ws1)
-        except Exception:
-            logger.debug("写入 LLM 模块状态失败（非关键）")
+            from src.python.llm import (
+                _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
+                get_session_usage as _gsu, format_session_usage as _fsu,
+            )
+            from src.python.registry import get_llm_module_names
+            from src.python.report.summary import write_llm_usage_sheet
+
+            _raw_session = _gsu()
+            _formatted = _fsu(_raw_session)
+            _per_module = _formatted.get("per_module", {}) if _formatted else {}
+            _all_failure = dict(_LLM_MODULE_FAILURE)
+            _names_map = get_llm_module_names()
+
+            _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+            _DISPLAY_REASON = {
+                "not_configured": "LLM 未配置",
+                "api_error": "LLM API 调用失败",
+                "network_error": "LLM API 网络连接失败",
+                "timeout": "LLM API 请求超时",
+                "circuit_open": "LLM API 暂时不可用（熔断冷却中）",
+            }
+
+            _excel_module_info: list[dict] = []
+            for mk in _MODULE_KEYS:
+                _entry: dict = {"key": mk, "name": _names_map.get(mk, mk)}
+                _reason = _all_failure.get(mk)
+                _pm = _per_module.get(mk)
+                if _reason == FAIL_REASON_DISABLED:
+                    _entry.update({"status": "disabled", "status_label": "已禁用",
+                                   "model": "", "input_tokens": 0, "output_tokens": 0,
+                                   "total_tokens": 0, "cache_hit_tokens": 0,
+                                   "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
+                elif _reason:
+                    _reason_text = _DISPLAY_REASON.get(str(_reason).lower(), str(_reason))
+                    _entry.update({"status": "failed", "status_label": _reason_text,
+                                   "model": "", "input_tokens": 0, "output_tokens": 0,
+                                   "total_tokens": 0, "cache_hit_tokens": 0,
+                                   "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
+                elif _pm:
+                    _inp = _pm.get("input_tokens", 0)
+                    _out = _pm.get("output_tokens", 0)
+                    _entry.update({
+                        "status": "cached" if _pm.get("cached") else "success",
+                        "status_label": "缓存" if _pm.get("cached") else "成功",
+                        "model": _pm.get("model", ""),
+                        "input_tokens": _inp, "output_tokens": _out,
+                        "total_tokens": _inp + _out,
+                        "cache_hit_tokens": _pm.get("cache_hit_tokens", 0),
+                        "cost": _pm.get("cost", 0.0),
+                        "cached": _pm.get("cached", False),
+                        "thinking": _pm.get("thinking", False),
+                        "endpoint": _pm.get("endpoint", ""),
+                    })
+                else:
+                    _entry.update({"status": "unknown", "status_label": "",
+                                   "model": "", "input_tokens": 0, "output_tokens": 0,
+                                   "total_tokens": 0, "cache_hit_tokens": 0,
+                                   "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
+                if _entry.get("status_label"):
+                    _excel_module_info.append(_entry)
+
+            if _excel_module_info:
+                # 取第一个非空 endpoint 作为全局端点
+                _glb_endpoint = ""
+                for _mi in _excel_module_info:
+                    if _mi.get("endpoint"):
+                        _glb_endpoint = _mi["endpoint"]
+                        break
+                write_llm_usage_sheet(wb, _formatted, _excel_module_info, llm_endpoint=_glb_endpoint)
+        except Exception as e:
+            logger.debug("创建 LLM API 用量页签失败（非关键）: %s", e)
 
         if show_llm_in_tui and (global_macro_text or expert_review_text or health_check_text or penetration_deep_text):
             _show_llm_tui(global_macro_text, expert_review_text, health_check_text, penetration_deep_text)

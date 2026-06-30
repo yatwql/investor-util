@@ -399,38 +399,59 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
             entry["model"] = ""
             entry["input_tokens"] = 0
             entry["output_tokens"] = 0
+            entry["total_tokens"] = 0
+            entry["cache_hit_tokens"] = 0
             entry["cost"] = 0.0
             entry["cached"] = False
             entry["thinking"] = False
+            entry["endpoint"] = ""
         elif reason:
             entry["status"] = "failed"
             entry["status_label"] = _DISPLAY_REASON.get(reason, reason)
             entry["model"] = ""
             entry["input_tokens"] = 0
             entry["output_tokens"] = 0
+            entry["total_tokens"] = 0
+            entry["cache_hit_tokens"] = 0
             entry["cost"] = 0.0
             entry["cached"] = False
             entry["thinking"] = False
+            entry["endpoint"] = ""
         elif pm:
             entry["status"] = "cached" if pm.get("cached") else "success"
             entry["status_label"] = "缓存" if pm.get("cached") else "成功"
             entry["model"] = pm.get("model", "")
-            entry["input_tokens"] = pm.get("input_tokens", 0)
-            entry["output_tokens"] = pm.get("output_tokens", 0)
+            _inp = pm.get("input_tokens", 0)
+            _out = pm.get("output_tokens", 0)
+            entry["input_tokens"] = _inp
+            entry["output_tokens"] = _out
+            entry["total_tokens"] = _inp + _out
+            entry["cache_hit_tokens"] = pm.get("cache_hit_tokens", 0)
             entry["cost"] = pm.get("cost", 0.0)
             entry["cached"] = pm.get("cached", False)
             entry["thinking"] = pm.get("thinking", False)
+            entry["endpoint"] = pm.get("endpoint", "")
         else:
             # 既无 failure 记录也无 per_module 数据 → 未触发/未知
             entry["status"] = "unknown"
-            entry["status_label"] = "未生成"
+            entry["status_label"] = ""
             entry["model"] = ""
             entry["input_tokens"] = 0
             entry["output_tokens"] = 0
+            entry["total_tokens"] = 0
+            entry["cache_hit_tokens"] = 0
             entry["cost"] = 0.0
             entry["cached"] = False
             entry["thinking"] = False
+            entry["endpoint"] = ""
         llm_module_info.append(entry)
+
+    # 全局 endpoint（取第一个非空模块的 endpoint）
+    _llm_endpoint = ""
+    for _mi in llm_module_info:
+        if _mi.get("endpoint"):
+            _llm_endpoint = _mi["endpoint"]
+            break
 
     # ── 10) 渲染模板 ────────────────────────────────────────
     print("  [..] 正在渲染 HTML...")
@@ -474,6 +495,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         module_labels=get_llm_module_names(),
         module_disabled=module_disabled,
         llm_module_info=llm_module_info,
+        llm_endpoint=_llm_endpoint,
     )
 
     # ── 10) 保存文件 ─────────────────────────────────────────

@@ -126,7 +126,9 @@ def _generate_llm_content(
             cached_clean += _hint
             if module_key:
                 _model_for_record = _orig_model or model or llm_config.get("model", "") or "缓存命中"
-                _record_per_module(module_key, _model_for_record, cached=True, thinking=thinking_enabled)
+                _endpoint_for_record = llm_config.get("endpoint", "") or ""
+                _record_per_module(module_key, _model_for_record, cached=True, thinking=thinking_enabled,
+                                   endpoint=_endpoint_for_record)
             return (cached_clean, True)
 
     # ── LLM 调用 ──
@@ -185,8 +187,11 @@ def _generate_llm_content(
                         _cost_val = float(_cost.lstrip("$¥€£"))
                     except ValueError:
                         pass
+                _endpoint_for_record = llm_config.get("endpoint", "") or ""
+                _cache_hit = usage.get("cache_read_input_tokens", 0)
                 _record_per_module(module_key, _model_name, inp=_inp, out=_out,
-                                   thinking=thinking_enabled, cost=_cost_val)
+                                   thinking=thinking_enabled, cost=_cost_val,
+                                   endpoint=_endpoint_for_record, cache_hit_tokens=_cache_hit)
         cache_set(cache_key, html)
         logger.info("LLM 内容生成完成: %s", cache_key)
         return (html, False)

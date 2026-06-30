@@ -65,7 +65,10 @@ def format_session_usage(raw: dict[str, Any] | None) -> dict[str, Any]:
       currency     — 货币类型（CNY/USD）
       cost_display — 格式化费用字符串（如 "¥0.0456"）
     """
-    if not raw or not raw.get("call_count", 0):
+    if not raw:
+        return {"has_usage": False}
+    # 即使 call_count 为 0（全缓存场景），只要 per_module 有数据就视为有用量
+    if not raw.get("call_count", 0) and not raw.get("per_module"):
         return {"has_usage": False}
     inp = raw.get("input_tokens", 0)
     out = raw.get("output_tokens", 0)
@@ -133,20 +136,26 @@ def _record_per_module(module_key: str, model_name: str,
                        inp: int = 0, out: int = 0,
                        cached: bool = False,
                        thinking: bool = False,
-                       cost: float = 0.0) -> None:
-    """按模块记录本次 LLM 调用的模型、Token 用量、缓存/Thinking/费用。"""
+                       cost: float = 0.0,
+                       endpoint: str = "",
+                       cache_hit_tokens: int = 0) -> None:
+    """按模块记录本次 LLM 调用的模型、Token 用量、缓存/Thinking/费用/Endpoint。"""
     pm = _session_usage.setdefault("per_module", {})
     if module_key not in pm:
         pm[module_key] = {
             "model": model_name, "input_tokens": 0, "output_tokens": 0,
             "cached": cached, "thinking": thinking, "cost": 0.0,
+            "endpoint": endpoint, "cache_hit_tokens": 0,
         }
     entry = pm[module_key]
     entry["input_tokens"] += inp
     entry["output_tokens"] += out
     entry["cost"] += cost
+    entry["cache_hit_tokens"] += cache_hit_tokens
     if model_name:
         entry["model"] = model_name
+    if endpoint:
+        entry["endpoint"] = endpoint
     if cached:
         entry["cached"] = True
     if thinking:
