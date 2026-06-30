@@ -1,7 +1,7 @@
 # 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.45 — R-015 延期，其余问题全部修复完毕）
+最后更新：2026-07-01（v0.2.45 — 全部可修复问题已处理，R-015 延期移出待办）
 
 ---
 
@@ -28,6 +28,7 @@
 | 2026-07-01 | 全量审查：测试缺口审计、_cmd_update_basic_cache 大函数识别、plan.md 迭代计划缺失、docs 一致性 | 综合审查 |
 | 2026-07-01 | R-014 _cmd_update_basic_cache 提取 + R-015 test_fund.py 新增 + plan.md 代码质量方向 + docs 同步 | 缺陷修复/测试新增 |
 | 2026-07-01 | cache.py _is_market_open 拆解 + R-009 tui_handlers 完成 + R-010 cache 完成 | 代码质量修复 |
+| 2026-07-01 | R-015 P3 延期，test_fund.py 已覆盖，其余后续迭代补充 | 延期决策 |
 
 ---
 
@@ -39,13 +40,6 @@
 - **文件**：`src/python/tui_handlers.py`（~1080 行）
 - **描述**：提取 `_refresh_one_fund_cache()`、`_refresh_profit_forecast_cache()`、`_refresh_sector_flow_cache()`、`_print_cache_refresh_report()` 四个模块级函数。`_refresh_common_caches()` 复用提取函数并返回 `(pf_ok, sf_ok)`。`_cmd_update_basic_cache` 从 130 行降至 67 行（-48%）。
 - **状态**：P2 — ✅ 已修复（2026-07-01）
-
-### [R-015] 测试覆盖缺口 ◐（P3 延期）
-
-- **类型**：测试
-- **文件**：`fetcher/fund.py`（已覆盖）、`llm/api.py`、`report/excel_generator.py` 等
-- **描述**：新增 `src/test/test_fund.py`（19 项测试，覆盖基准三层策略、HTML 解析、per-code 锁、config 合并）。`llm/api.py`（熔断/重试/回退/截断）、`report/excel_generator.py`（18 个页签写入）因涉及大量 mock 和复杂依赖，属于 P3 低优先级，延期至后续迭代。
-- **状态**：P3 — 🔵 已延期（test_fund.py 已新增，其余后续迭代补充）
 
 ### [R-016] plan.md 迭代计划未包含当前代码质量方向 ✅
 
