@@ -182,7 +182,7 @@ def get_known_llm_settings_keys() -> set[str]:
     """返回 llm_settings.json 的所有合法键名。
 
     由每个 LLM 模块的 settings_suffix 自动派生。
-    外加全局键名（max_retries, enabled_llm_news_correlation, pricing）。
+    外加全局键名（max_retries, enabled_llm, pricing）。
     对应原 config.py 中 _KNOWN_LLM_SETTINGS_KEYS 的功能。
     """
     keys: set[str] = set()
@@ -190,7 +190,8 @@ def get_known_llm_settings_keys() -> set[str]:
         if m.is_llm:
             keys |= m.llm_settings_keys()
     # 全局键名
-    keys |= {"max_retries", "enabled_llm_news_correlation", "pricing"}
+    # enabled_llm_news_correlation 是 v0.2.35 之前的旧键名，作为已知的已弃用键保留
+    keys |= {"max_retries", "enabled_llm", "enabled_llm_news_correlation", "pricing"}
     return keys
 
 

@@ -304,7 +304,13 @@ def _ensure_llm_settings_file() -> None:
             "system_prompt_news_correlation": None,
             "system_prompt_health_check": None,
             "system_prompt_penetration_deep": None,
-            "enabled_llm_news_correlation": False,
+            "enabled_llm": {
+                "global_macro": True,
+                "expert_review": True,
+                "health_check": True,
+                "penetration_deep": True,
+                "news_correlation": False,
+            },
             "thinking_enabled_global_macro": False,
             "thinking_enabled_expert_review": True,
             "thinking_enabled_news_correlation": False,
@@ -330,6 +336,32 @@ def _ensure_llm_settings_file() -> None:
         logger.info("LLM 设置文件已自动生成: %s", settings_path)
     except OSError as e:
         logger.warning("无法自动创建 LLM 设置文件: %s", e)
+
+
+def _migrate_llm_settings(settings: dict) -> None:
+    """原地迁移旧版 LLM 配置到新版分层结构。
+
+    旧版扁平键 enabled_llm_news_correlation 迁移到 enabled_llm.news_correlation。
+    如果已有新版 enabled_llm 结构则保留不动（新格式优先）。
+    """
+    if "enabled_llm" not in settings:
+        enabled_llm: dict[str, bool] = {}
+        old_val = settings.get("enabled_llm_news_correlation")
+        if old_val is not None:
+            enabled_llm["news_correlation"] = bool(old_val)
+        # 所有非新闻模块默认启用（旧格式无法控制它们的开关）
+        for mod in ("global_macro", "expert_review", "health_check", "penetration_deep"):
+            enabled_llm.setdefault(mod, True)
+        settings["enabled_llm"] = enabled_llm
+    else:
+        # 新格式已存在，但可能缺少某些模块（例如新增的模块）
+        existing = settings["enabled_llm"]
+        if isinstance(existing, dict):
+            existing.setdefault("news_correlation", bool(settings.get("enabled_llm_news_correlation", False)))
+            existing.setdefault("global_macro", True)
+            existing.setdefault("expert_review", True)
+            existing.setdefault("health_check", True)
+            existing.setdefault("penetration_deep", True)
 
 
 # ── LLM 配置读取（外部文件） ─────────────────────────────────
@@ -414,6 +446,8 @@ def get_llm_config() -> dict | None:
                 with open(settings_path, "r", encoding="utf-8") as f:
                     base_settings = json.load(f)
                 settings_mtime = os.path.getmtime(settings_path)
+                # 迁移旧版配置到新版分层结构
+                _migrate_llm_settings(base_settings)
                 # 首次加载时检测未知键名（仅在 cache 未初始化时告警一次）
                 if _llm_config_cache is None and base_settings:
                     _check_unknown_llm_keys(base_settings)

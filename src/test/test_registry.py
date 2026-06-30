@@ -68,10 +68,12 @@ class TestRegistryCompleteness:
                 )
 
     def test_llm_settings_keys_count(self):
-        """LLM settings 键名数量应与预期一致（5模块 × 10 - 1个例外 = 49 + 3全局 = 52）。"""
+        """LLM settings 键名数量应与预期一致（5模块 × 10 - 1个例外 = 49 + 4全局 = 53）。"""
         keys = get_known_llm_settings_keys()
         # 确认已知的全局键存在
         assert "max_retries" in keys
+        assert "enabled_llm" in keys
+        # enabled_llm_news_correlation 是 v0.2.35 之前的旧键名，作为已弃用的已知键保留
         assert "enabled_llm_news_correlation" in keys
         assert "pricing" in keys
         # 确认 per-module 键生成正确
@@ -80,7 +82,7 @@ class TestRegistryCompleteness:
         # news_correlation 不应有 output_brief
         assert "output_brief_news_correlation" not in keys
         # 确认总键数
-        assert len(keys) == 52, f"预期 52 个 LLM settings 键，实际 {len(keys)}"
+        assert len(keys) == 53, f"预期 53 个 LLM settings 键，实际 {len(keys)}"
 
     def test_each_llm_module_has_model_key(self):
         """每个 LLM 模块必须有 model_{suffix} 键。"""

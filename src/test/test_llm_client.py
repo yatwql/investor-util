@@ -28,16 +28,32 @@ from src.python.llm_client import (
     _call_claude,
     _call_llm,
     _call_openai,
+    _cb_endpoint,
+    _cb_is_open,
+    _cb_record_failure,
+    _cb_record_success,
+    _CIRCUIT_BREAKER_THRESHOLD,
+    _CIRCUIT_BREAKER_RECOVERY,
     _compute_fingerprint,
+    _CURRENCY_SYMBOLS,
+    _estimate_cost,
     _extract_content,
     _get_cache_ttl_llm,
     _is_effort_model,
     _log_token_usage,
     _markdown_to_html,
+    _PRICING_MERGED,
+    _reload_pricing,
+    _record_per_module,
+    _session_usage,
     _supports_extended_thinking,
+    _track_session_usage,
+    format_session_usage,
     generate_all_llm,
     generate_expert_review,
     generate_global_macro,
+    get_session_usage,
+    reset_session_usage,
 )
 
 from src.test.helpers import SynchronousExecutor
@@ -1476,6 +1492,219 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
         result, cached, usage = enhance_news_correlation(self.news, self.holdings)
         self.assertFalse(cached)  # 部分未缓存 → 整体 cached=False
         mock_call.assert_called_once()
+
+
+# ═══════════════════════════════════════════════════════════
+#  Pricing — _estimate_cost / _reload_pricing / _PRICING_MERGED
+# ═══════════════════════════════════════════════════════════
+
+
+class TestPricing(unittest.TestCase):
+    """测试 LLM 费用估算和定价管理。"""
+
+    def test_estimate_cost_known_model(self) -> None:
+        """已知模型应返回正确的费用估算。"""
+        cost = _estimate_cost("deepseek-v4-flash", 3000, 2000)
+        # (3000/1M)*1 + (2000/1M)*2 = 0.003 + 0.004 = 0.007
+        self.assertIn("0.007", cost)
+
+    def test_estimate_cost_cache_hit(self) -> None:
+        """缓存命中应降低费用。"""
+        cost = _estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=2000)
+        cost_no = _estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=0)
+        self.assertNotEqual(cost, cost_no)
+
+    def test_estimate_cost_unknown_model(self) -> None:
+        """未知模型应返回 -。"""
+        self.assertEqual(_estimate_cost("nonexistent-model", 100, 100), "-")
+
+    def test_estimate_cost_zero_tokens(self) -> None:
+        """零 token 应返回 -。"""
+        self.assertEqual(_estimate_cost("deepseek-v4-flash", 0, 0), "-")
+
+    def test_estimate_cost_model_prefix_match(self) -> None:
+        """模型名前缀匹配应选择正确的定价。"""
+        cost = _estimate_cost("claude-sonnet-4-6-20250514", 1000, 500)
+        self.assertNotEqual(cost, "-")
+
+    def test_pricing_merged_has_defaults(self) -> None:
+        """_PRICING_MERGED 应包含所有内置模型。"""
+        for model in ("deepseek-v4-flash", "claude-sonnet-4-6", "gpt-4o"):
+            self.assertIn(model, _PRICING_MERGED)
+
+    def test_currency_symbols(self) -> None:
+        """货币符号映射应包含主要货币。"""
+        self.assertIn("CNY", _CURRENCY_SYMBOLS)
+        self.assertIn("USD", _CURRENCY_SYMBOLS)
+        self.assertEqual(_CURRENCY_SYMBOLS["CNY"], "¥")
+        self.assertEqual(_CURRENCY_SYMBOLS["USD"], "$")
+
+    def test_reload_pricing_merge(self) -> None:
+        """_reload_pricing 应合并不覆盖已有值。"""
+        orig = dict(_PRICING_MERGED)
+        _reload_pricing()
+        self.assertEqual(_PRICING_MERGED.get("deepseek-v4-flash"),
+                         orig.get("deepseek-v4-flash"))
+
+
+# ═══════════════════════════════════════════════════════════
+#  Session — _track_session_usage / format_session_usage / _record_per_module
+# ═══════════════════════════════════════════════════════════
+
+
+class TestSession(unittest.TestCase):
+    """测试 LLM 会话统计模块。"""
+
+    def setUp(self) -> None:
+        reset_session_usage()
+
+    def test_reset_clears_all(self) -> None:
+        """reset_session_usage 应清零所有累计。"""
+        _track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50}, "claude-sonnet-4-6")
+        reset_session_usage()
+        usage = get_session_usage()
+        self.assertEqual(usage["input_tokens"], 0)
+        self.assertEqual(usage["output_tokens"], 0)
+        self.assertEqual(usage["call_count"], 0)
+
+    def test_track_claude_usage(self) -> None:
+        """Claude 格式的用量应正确累计。"""
+        _track_session_usage("claude", {"input_tokens": 200, "output_tokens": 100,
+                                        "cache_read_input_tokens": 50}, "claude-sonnet-4-6")
+        usage = get_session_usage()
+        self.assertEqual(usage["input_tokens"], 200)
+        self.assertEqual(usage["output_tokens"], 100)
+        self.assertEqual(usage["cache_hit_tokens"], 50)
+        self.assertEqual(usage["call_count"], 1)
+        self.assertEqual(usage["model"], "claude-sonnet-4-6")
+
+    def test_track_openai_usage(self) -> None:
+        """OpenAI 格式的用量应正确累计。"""
+        _track_session_usage("openai", {"prompt_tokens": 150, "completion_tokens": 75}, "gpt-4o")
+        usage = get_session_usage()
+        self.assertEqual(usage["input_tokens"], 150)
+        self.assertEqual(usage["output_tokens"], 75)
+
+    def test_track_none_usage_no_op(self) -> None:
+        """None 用量不应改变累计值。"""
+        _track_session_usage("claude", None)
+        usage = get_session_usage()
+        self.assertEqual(usage["call_count"], 0)
+
+    def test_get_session_usage_returns_copy(self) -> None:
+        """get_session_usage 应返回副本而非引用。"""
+        usage = get_session_usage()
+        usage["input_tokens"] = 999
+        self.assertEqual(_session_usage["input_tokens"], 0)
+
+    def test_track_multiple_calls_accumulate(self) -> None:
+        """多次调用应正确累加。"""
+        for _ in range(5):
+            _track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50})
+        usage = get_session_usage()
+        self.assertEqual(usage["input_tokens"], 500)
+        self.assertEqual(usage["output_tokens"], 250)
+        self.assertEqual(usage["call_count"], 5)
+
+    def test_record_per_module(self) -> None:
+        """_record_per_module 应记录模块级用量。"""
+        _record_per_module("global_macro", "deepseek-v4-flash", inp=100, out=50)
+        _record_per_module("expert_review", "deepseek-v4-flash", inp=200, out=100)
+        usage = get_session_usage()
+        self.assertIn("global_macro", usage["per_module"])
+        self.assertIn("expert_review", usage["per_module"])
+        self.assertEqual(usage["per_module"]["global_macro"]["input_tokens"], 100)
+        self.assertEqual(usage["per_module"]["expert_review"]["output_tokens"], 100)
+
+    def test_record_per_module_accumulate(self) -> None:
+        """同一模块多次记录应累加 token。"""
+        _record_per_module("global_macro", "deepseek-v4-flash", inp=100, out=50)
+        _record_per_module("global_macro", "deepseek-v4-flash", inp=50, out=25)
+        self.assertEqual(_session_usage["per_module"]["global_macro"]["input_tokens"], 150)
+
+    def test_format_session_usage_no_data(self) -> None:
+        """无数据时应返回 has_usage=False。"""
+        result = format_session_usage(None)
+        self.assertFalse(result["has_usage"])
+        result = format_session_usage({})
+        self.assertFalse(result["has_usage"])
+
+    def test_format_session_usage_with_data(self) -> None:
+        """有数据时应正确格式化。"""
+        _track_session_usage("claude", {"input_tokens": 1000, "output_tokens": 500}, "deepseek-v4-flash")
+        raw = get_session_usage()
+        result = format_session_usage(raw)
+        self.assertTrue(result["has_usage"])
+        self.assertEqual(result["call_count"], 1)
+        self.assertEqual(result["total_tokens"], 1500)
+        self.assertIn("cost_display", result)
+
+    def test_track_session_usage_models_dedup(self) -> None:
+        """多次使用同一模型应去重。"""
+        _track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50}, "deepseek-v4-flash")
+        _track_session_usage("claude", {"input_tokens": 200, "output_tokens": 100}, "deepseek-v4-flash")
+        self.assertEqual(len(_session_usage["models"]), 1)
+
+
+# ═══════════════════════════════════════════════════════════
+#  Circuit Breaker — _cb_endpoint / _cb_record_failure / _cb_record_success / _cb_is_open
+# ═══════════════════════════════════════════════════════════
+
+
+class TestCircuitBreaker(unittest.TestCase):
+    """测试 LLM 熔断器逻辑。"""
+
+    def setUp(self) -> None:
+        import src.python.llm.circuit_breaker as _cb
+        _cb._circuit_failures.clear()
+        _cb._circuit_open_until.clear()
+
+    def test_cb_endpoint_normal(self) -> None:
+        """应正确提取域名。"""
+        self.assertEqual(_cb_endpoint("https://api.anthropic.com/v1/messages"), "api.anthropic.com")
+
+    def test_cb_endpoint_empty(self) -> None:
+        """空 URL 应返回 unknown。"""
+        self.assertEqual(_cb_endpoint(""), "unknown")
+
+    def test_cb_endpoint_invalid(self) -> None:
+        """无效 URL 应返回 unknown。"""
+        self.assertEqual(_cb_endpoint("not-a-url"), "unknown")
+
+    def test_cb_record_failure_increment(self) -> None:
+        """记录失败应递增计数。"""
+        _cb_record_failure("https://api.anthropic.com/v1/messages")
+        _cb_record_failure("https://api.anthropic.com/v1/messages")
+        from src.python.llm.circuit_breaker import _circuit_failures
+        self.assertEqual(_circuit_failures.get("api.anthropic.com"), 2)
+
+    def test_cb_record_failure_opens_at_threshold(self) -> None:
+        """达到阈值应开启熔断。"""
+        url = "https://api.test.com/v1"
+        for _ in range(_CIRCUIT_BREAKER_THRESHOLD):
+            _cb_record_failure(url)
+        self.assertTrue(_cb_is_open(url))
+
+    def test_cb_record_success_resets(self) -> None:
+        """成功应重置失败计数。"""
+        url = "https://api.test.com/v1"
+        _cb_record_failure(url)
+        _cb_record_success(url)
+        from src.python.llm.circuit_breaker import _circuit_failures
+        self.assertNotIn("api.test.com", _circuit_failures)
+
+    def test_cb_is_open_unknown_endpoint(self) -> None:
+        """未知 endpoint 返回 False。"""
+        self.assertFalse(_cb_is_open("https://api.unknown.com/v1"))
+
+    def test_cb_record_success_after_opened(self) -> None:
+        """熔断后成功应关闭熔断。"""
+        url = "https://api.test.com/v1"
+        for _ in range(_CIRCUIT_BREAKER_THRESHOLD):
+            _cb_record_failure(url)
+        self.assertTrue(_cb_is_open(url))
+        _cb_record_success(url)
+        self.assertFalse(_cb_is_open(url))
 
 
 if __name__ == "__main__":

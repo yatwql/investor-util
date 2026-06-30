@@ -36,6 +36,7 @@ from src.python.llm.prompts import (
     _LLM_MODULE_FAILURE,
     FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_API_ERROR,
+    FAIL_REASON_DISABLED,
     _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_EXPERT_REVIEW,
     _SYSTEM_HEALTH_CHECK,
@@ -52,6 +53,7 @@ from src.python.llm.prompts import (
 logger = logging.getLogger("invest")
 
 __all__ = [
+    "_is_llm_module_enabled",
     "_generate_llm_content",
     "_apply_llm_news_correlation",
     "generate_global_macro",
@@ -61,6 +63,28 @@ __all__ = [
     "enhance_news_correlation",
     "generate_all_llm",
 ]
+
+
+def _is_llm_module_enabled(llm_config: dict | None, module_suffix: str) -> bool:
+    """检查 LLM 模块是否已启用。
+
+    读取 enabled_llm 嵌套字典（由 config.py _migrate_llm_settings 保证存在），
+    默认 True（即旧配置无该开关时模块仍保持启用状态）。
+
+    Args:
+        llm_config: LLM 配置字典
+        module_suffix: 模块后缀名（global_macro / expert_review / health_check /
+                       penetration_deep / news_correlation）
+
+    Returns:
+        模块是否启用了 LLM 生成
+    """
+    if llm_config is None:
+        return False
+    enabled_map = llm_config.get("enabled_llm")
+    if not isinstance(enabled_map, dict):
+        return True  # 无 enabled_llm 配置时默认启用
+    return bool(enabled_map.get(module_suffix, True))
 
 
 def _generate_llm_content(
@@ -227,6 +251,11 @@ def generate_global_macro(
         _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_NOT_CONFIGURED
         return (None, False)
 
+    if not _is_llm_module_enabled(llm_config, "global_macro"):
+        logger.info("全球政经局势 LLM 分析已禁用（enabled_llm.global_macro = false）")
+        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
+        return (None, False)
+
     cache_enabled = llm_config.get("cache_enabled_global_macro", True)
     fingerprint = _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
     cache_key = _CACHE_PREFIX_LLM + f"global_macro_{fingerprint}"
@@ -290,6 +319,11 @@ def generate_expert_review(
     if llm_config is None:
         logger.info("LLM 未配置，智囊团深度复盘使用占位文本")
         _LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_NOT_CONFIGURED
+        return (None, False)
+
+    if not _is_llm_module_enabled(llm_config, "expert_review"):
+        logger.info("智囊团深度复盘 LLM 分析已禁用（enabled_llm.expert_review = false）")
+        _LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_DISABLED
         return (None, False)
 
     cache_enabled = llm_config.get("cache_enabled_expert_review", True)
@@ -358,6 +392,11 @@ def generate_health_check(
         _LLM_MODULE_FAILURE["health_check"] = FAIL_REASON_NOT_CONFIGURED
         return (None, False)
 
+    if not _is_llm_module_enabled(llm_config, "health_check"):
+        logger.info("持仓体检报告 LLM 分析已禁用（enabled_llm.health_check = false）")
+        _LLM_MODULE_FAILURE["health_check"] = FAIL_REASON_DISABLED
+        return (None, False)
+
     cache_enabled = llm_config.get("cache_enabled_health_check", True)
     fingerprint = _health_check_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
@@ -423,6 +462,11 @@ def generate_penetration_deep_analysis(
     if llm_config is None:
         logger.info("LLM 未配置，穿透深度分析跳过")
         _LLM_MODULE_FAILURE["penetration_deep"] = FAIL_REASON_NOT_CONFIGURED
+        return (None, False)
+
+    if not _is_llm_module_enabled(llm_config, "penetration_deep"):
+        logger.info("穿透深度分析 LLM 分析已禁用（enabled_llm.penetration_deep = false）")
+        _LLM_MODULE_FAILURE["penetration_deep"] = FAIL_REASON_DISABLED
         return (None, False)
 
     cache_enabled = llm_config.get("cache_enabled_penetration_deep", True)
@@ -809,7 +853,13 @@ def generate_all_llm(
     if llm_config is None:
         return (None, None, None, None, False, False, False, False)
 
-    # ── 预计算指纹 + 缓存键 ──
+    # ── 每模块启用状态检查 ──
+    enabled_global_macro = _is_llm_module_enabled(llm_config, "global_macro")
+    enabled_expert_review = _is_llm_module_enabled(llm_config, "expert_review")
+    enabled_health_check = _is_llm_module_enabled(llm_config, "health_check")
+    enabled_penetration_deep = _is_llm_module_enabled(llm_config, "penetration_deep")
+
+    # ── 预计算指纹 + 缓存键（仅对已启用的模块） ──
     fp_global_macro = _compute_fingerprint(
         a_indices, us_indices, total_mv, total_profit, categories,
     )
@@ -863,24 +913,44 @@ def generate_all_llm(
             hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
         return (clean + hint, True)
 
-    global_macro_result, global_macro_cached_flag = _precheck(
-        key_global_macro, ttl_global_macro, can_cache_global_macro, "thinking_enabled_global_macro",
-    )
-    expert_review_result, expert_review_cached_flag = _precheck(
-        key_expert_review, ttl_expert_review, can_cache_expert_review, "thinking_enabled_expert_review",
-    )
-    health_check_result, health_check_cached_flag = _precheck(
-        key_health_check, ttl_health_check, can_cache_health_check, "thinking_enabled_health_check",
-    )
-    penetration_deep_result, penetration_deep_cached_flag = _precheck(
-        key_penetration_deep, ttl_penetration_deep, can_cache_penetration_deep, "thinking_enabled_penetration_deep",
-    )
+    # ── 预检缓存（仅对已启用且缓存可用的模块）──
+    if enabled_global_macro:
+        global_macro_result, global_macro_cached_flag = _precheck(
+            key_global_macro, ttl_global_macro, can_cache_global_macro, "thinking_enabled_global_macro",
+        )
+    else:
+        logger.info("全球政经局势 LLM 分析已禁用（enabled_llm.global_macro = false）")
+        global_macro_result, global_macro_cached_flag = None, False
+
+    if enabled_expert_review:
+        expert_review_result, expert_review_cached_flag = _precheck(
+            key_expert_review, ttl_expert_review, can_cache_expert_review, "thinking_enabled_expert_review",
+        )
+    else:
+        logger.info("智囊团深度复盘 LLM 分析已禁用（enabled_llm.expert_review = false）")
+        expert_review_result, expert_review_cached_flag = None, False
+
+    if enabled_health_check:
+        health_check_result, health_check_cached_flag = _precheck(
+            key_health_check, ttl_health_check, can_cache_health_check, "thinking_enabled_health_check",
+        )
+    else:
+        logger.info("持仓体检报告 LLM 分析已禁用（enabled_llm.health_check = false）")
+        health_check_result, health_check_cached_flag = None, False
+
+    if enabled_penetration_deep:
+        penetration_deep_result, penetration_deep_cached_flag = _precheck(
+            key_penetration_deep, ttl_penetration_deep, can_cache_penetration_deep, "thinking_enabled_penetration_deep",
+        )
+    else:
+        logger.info("穿透深度分析 LLM 分析已禁用（enabled_llm.penetration_deep = false）")
+        penetration_deep_result, penetration_deep_cached_flag = None, False
 
     # ── 仅对缓存未命中的模块提交线程池任务 ──
-    needs_global_macro = global_macro_result is None
-    needs_expert_review = expert_review_result is None
-    needs_health_check = health_check_result is None
-    needs_penetration_deep = penetration_deep_result is None
+    needs_global_macro = global_macro_result is None and enabled_global_macro
+    needs_expert_review = expert_review_result is None and enabled_expert_review
+    needs_health_check = health_check_result is None and enabled_health_check
+    needs_penetration_deep = penetration_deep_result is None and enabled_penetration_deep
 
     if needs_global_macro or needs_expert_review or needs_health_check or needs_penetration_deep:
         import src.python.llm_client as _lm_pool  # noqa: F811
