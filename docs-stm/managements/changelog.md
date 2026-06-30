@@ -15,13 +15,20 @@
 
 ### Changed
 - **generators.py 拆分**：980 行 → skeleton.py (383 行) + generators.py (~280 行)。4 个骨架函数移至 skeleton.py，generators.py 保留 5 个生成器函数 + 1 个批量编排函数。
-- **价格/指数缓存 TTL：静态 24h → 动态 market-hours 感知 TTL**：`cache.py` 新增 `_is_market_open()` (UTC+8 工作日 09:30-15:00)。市场开放期间使用短 TTL（默认 60s），收盘后恢复正常缓存。通过 `config.json` 的 `market_hour_aware` 数组（`["price", "index"]`）和 `market_hour_ttl`（默认 60）驱动，无需硬编码。
+- **价格/指数缓存 TTL：静态 24h → 动态 market-hours 感知 TTL**：`cache.py` 新增 `_is_market_open()`，支持多渠道判断：
+  - 优先读取 config.json `market_hours.start/end` 手动覆盖
+  - 其次从东方财富 push2 API（上证指数 f100 交易状态）实时获取（缓存 TTL：盘中 30s，盘后 7 天）
+  - 最后回退内置默认值（09:30–11:30 + 13:00–15:00，自动排除午餐休市）
+  - 通过 `config.json` 的 `market_hour_aware`（`["price", "index"]`）和 `market_hour_ttl: 30` 驱动
 - **TUI LLM 状态输出：区分跳过 vs 失败**：`tui_handlers.py` 报告生成循环按模块检查 `_LLM_MODULE_FAILURE` 原因，跳过的模块显示 `[..] 已跳过`，真正失败的模块显示 `[!] 内容生成失败` 并调用 `_add_error()`。
+- **JSON 注释支持**：`config.py` 新增 `_strip_json_comments()`，在解析 `llm_settings.json` / `llm_key.json` 前自动剥离 `//` 和 `/* */` 注释，方便用户在配置文件中加注说明。
+- **llm_settings.json 按业务模块分组重排**：用 `//` 注释标六大模块标题（全球政经局势 / 智囊团深度复盘 / 持仓体检报告 / 穿透深度分析 / 新闻关联分析 / 计价），配置项归入对应分组，便于阅读和维护。
 - **README.md 版本号 0.2.37 → 0.2.38**，恢复缺失的用户文档链接。
 - **test_llm.py / test_config.py mock 路径更新**：适应 generators→skeleton 的模块拆分，共 20 个 mock 路径修正。
 
 ### Fixed
 - **HTML 报告指数涨跌幅双 `+` 号**：`report_template.html` 中 `{% if ... %}+{% endif %}{{ change | change }}` 的 `| change` 过滤器已自带 `+`，移除模板中的显式 `+` 前缀。
+- **`_is_market_open()` 午餐排除**：从 09:30–15:00 连续区间改为 09:30–11:30 + 13:00–15:00，交易时段判断更精确。
 
 ### Docs
 - **重写 how-to-config-llm.md** (581 行)：新增"LLM 业务模块架构与公共特征"章节（8 项公共特征），统一配置表格，补充缺失示例说明，去冗余。

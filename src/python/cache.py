@@ -521,23 +521,143 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
 # ── 从 config.json 读取缓存 TTL ──────────────────────────
 
 
+# ── A 股交易时段（内置默认值，用于 fallback） ───────────
+# 早盘 09:30 (570min) – 11:30 (690min)
+# 午盘 13:00 (780min) – 15:00 (900min)
+_MORNING_START = 570   # 09:30
+_MORNING_END = 690     # 11:30
+_AFTERNOON_START = 780  # 13:00
+_AFTERNOON_END = 900    # 15:00
+_DEFAULT_START = "09:30"
+_DEFAULT_END = "15:00"
+
+# ── 官方交易状态缓存 ───────────────────────────────────
+_CACHE_KEY_MARKET_HOURS = "market_hours"
+_PUSH2_BASE = "https://push2.eastmoney.com/api/qt/stock/get"
+_EM_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer": "https://www.eastmoney.com/",
+}
+
+
+def _parse_time_to_minutes(time_str: str) -> int | None:
+    """将 ``HH:MM`` 字符串转换为当日分钟数。
+
+    Args:
+        time_str: 如 ``"09:30"``、``"15:00"``
+
+    Returns:
+        当日分钟数（如 570），解析失败返回 None
+    """
+    try:
+        parts = time_str.strip().split(":")
+        return int(parts[0]) * 60 + int(parts[1])
+    except (ValueError, IndexError):
+        return None
+
+
+def _fetch_trading_status_from_official() -> int | None:
+    """从东方财富 push2 API 获取上证指数实时交易状态。
+
+    f100 字段含义：
+        - 0 = 未开盘（盘前）
+        - 1 = 交易中
+        - 2 = 已收盘（盘后）
+        - 3 = 午间休市
+
+    Returns:
+        交易状态码（0-3），API 失败返回 None
+    """
+    import httpx
+
+    params = {"secid": "1.000001", "fields": "f100,f169"}
+    try:
+        with httpx.Client(timeout=5.0, verify=False) as client:
+            resp = client.get(_PUSH2_BASE, params=params, headers=_EM_HEADERS)
+            data = resp.json()
+            inner = data.get("data")
+            if inner and isinstance(inner, dict):
+                status = inner.get("f100")
+                if status is not None:
+                    return int(status)
+    except Exception as e:
+        logger.debug("获取东方财富交易状态失败: %s", e)
+    return None
+
 
 def _is_market_open() -> bool:
-    """检查 A 股市场当前是否在交易时段。
+    """多渠道判断 A 股市场当前是否在交易时段。
 
-    判断逻辑：北京时区，工作日 09:30–15:00。
-    非此时间段（周末、非交易时段）返回 False，让价格缓存保持收盘价。
+    优先级：
+    1. **config.json** ``market_hours.start`` / ``market_hours.end`` 手动覆盖
+    2. **东方财富 push2 API** 实时交易状态（缓存 TTL：盘中 60s，盘后 7 天）
+    3. **内置默认值**（北京时区工作日 09:30–11:30 + 13:00–15:00，自动排除午餐）
+
+    非交易时段返回 ``False``，让 price / index 缓存使用长 TTL 保持收盘价。
 
     Returns:
         是否在交易时段内
     """
     try:
+        from src.python.config import get_config
+
+        config = get_config()
+        mh_config = config.get("market_hours") or {}
+
         now = datetime.now(timezone(timedelta(hours=8)))
-        if now.weekday() >= 5:  # 周六、周日
+        current_min = now.hour * 60 + now.minute
+
+        # ── 1. config.json 手动覆盖 ──────────────────────
+        start_str = mh_config.get("start")
+        end_str = mh_config.get("end")
+        if start_str and end_str:
+            start_min = _parse_time_to_minutes(start_str)
+            end_min = _parse_time_to_minutes(end_str)
+            if start_min is not None and end_min is not None:
+                if now.weekday() >= 5:
+                    return False
+                # 在 start~end 范围内，同时排除午餐
+                in_range = start_min <= current_min <= end_min
+                lunch = _MORNING_END < current_min < _AFTERNOON_START
+                result = in_range and not lunch
+                logger.debug("市场时段(配置 %s-%s): %s", start_str, end_str, result)
+                return result
+
+        # ── 2. 官方 API 实时状态 ─────────────────────────
+        use_official = mh_config.get("official_source", True)
+        if use_official and now.weekday() < 5:
+            # 盘中用短 TTL(60s)，盘后用长 TTL(7d)
+            from src.python.cache import get as _cg, set as _cs
+
+            official_ttl = 60 if _MORNING_START <= current_min <= _AFTERNOON_END else 86400 * 7
+            cached = _cg(_CACHE_KEY_MARKET_HOURS, official_ttl)
+            if cached is not None and isinstance(cached, dict):
+                status = cached.get("status")
+                logger.debug("市场时段(API缓存): status=%s", status)
+                if status == 1:
+                    return True
+                if status == 2:
+                    return False  # 确收收盘
+                # status=0/3 → 继续降级到默认值
+
+            # 缓存未命中或不确定 → 实时请求
+            status = _fetch_trading_status_from_official()
+            if status is not None:
+                _cs(_CACHE_KEY_MARKET_HOURS, {"status": status})
+                logger.debug("市场时段(API实时): status=%s", status)
+                if status == 1:
+                    return True
+                if status == 2:
+                    return False
+
+        # ── 3. 内置默认值 ────────────────────────────────
+        if now.weekday() >= 5:
             return False
-        open_time = now.replace(hour=9, minute=30, second=0, microsecond=0)
-        close_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
-        return open_time <= now <= close_time
+        # 早盘 09:30-11:30 或 午盘 13:00-15:00
+        in_morning = _MORNING_START <= current_min <= _MORNING_END
+        in_afternoon = _AFTERNOON_START <= current_min <= _AFTERNOON_END
+        return in_morning or in_afternoon
+
     except Exception:
         return False  # 异常时保守处理：视为非交易时段
 
@@ -565,11 +685,13 @@ def get_ttl(data_type: str) -> float:
         # ── 交易时段内：配置声明的数据类型用短 TTL 确保实时性 ──
         market_hour_aware: list = config.get("market_hour_aware") or []
         if _is_market_open() and data_type in market_hour_aware:
-            market_ttl = config.get("market_hour_ttl", 60)
+            market_ttl = config.get("market_hour_ttl", 30)
             try:
-                return max(60, float(market_ttl))
+                market_ttl_val = float(market_ttl)
+                # 最短 30 秒，最长不过 86400（一整天的缓存也没意义）
+                return max(30, min(86400, market_ttl_val))
             except (ValueError, TypeError):
-                return 60
+                return 30
     except (ImportError, TypeError, ValueError, KeyError, AttributeError, RuntimeError):
         logger.debug("get_ttl: 配置读取失败，使用默认值")
     return get_cache_ttl_defaults().get(data_type, CACHE_DAILY)

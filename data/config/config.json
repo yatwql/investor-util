@@ -11,6 +11,13 @@
     "akshare": true
   },
   "preferred_provider": {},
+  "market_hour_aware": ["price", "index"],
+  "market_hour_ttl": 30,
+  "market_hours": {
+    "start": "09:30",
+    "end": "15:00",
+    "official_source": true
+  },
   "cache_ttl": {
     "price": 86400,
     "index": 86400,
