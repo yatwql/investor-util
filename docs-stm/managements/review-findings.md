@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.47 — 全部待办问题已修复）
+最后更新：2026-07-01（v0.2.48 — 待办区已清空，R-020~R-024 全部完成）
 
 ---
 
@@ -35,4 +35,14 @@
 | 2026-07-01 | **汇总页移除【LLM 用量】区块**、**LLM API 用量页签排版优化**（增加区域标题、图例、间距） | 体验改进 |
 | 2026-07-01 | **R-018 ✅ tui_handlers.py 拆分**（1147→234 行，拆出 handlers_report/handlers_cache/handlers_config） | 代码质量修复 |
 | 2026-07-01 | **R-019 ✅ cache.py 交易时间逻辑提取为 market_hours.py 独立模块** | 代码质量修复 |
+| 2026-07-01 | 代码审计：generate_excel_report(296行)/generate_all_llm(224行)/write_llm_usage_sheet(215行)/compute_penetration_top10(199行) 大函数识别；handlers 测试缺口审计 | 优化审查 |
 
+---
+
+## 待处理问题
+
+| 编号 | 问题 | 严重度 | 状态 | 发现日期 |
+|:----|------|:------:|:----:|:--------:|
+| R-022 | **`report/summary.py:write_llm_usage_sheet()`（215 行）**：LLM 用量页签写入，内部含汇总区/明细表/图例三段，可拆分 | P3 | ✅ 已完成 | 2026-07-01 |
+| R-023 | **`report/penetration.py:compute_penetration_top10()`（199 行）**：穿透计算涉及多数据源并行获取 + 排名逻辑，可拆分 | P3 | ✅ 已完成 | 2026-07-01 |
+| R-024 | **handlers 模块无独立测试文件**：`handlers_cache.py` / `handlers_config.py` / `handlers_report.py` 的 `_cmd_*` 函数无专用测试文件 | P3 | ✅ 已完成 | 2026-07-01 |

@@ -373,67 +373,35 @@ def normalize_name(name: str) -> str:
 # ═══════════════════════════════════════════════════════════
 
 
-def compute_penetration_top10(
-    holdings: List[Holding],
-    details: List[DetailRow],
-) -> dict[str, Any]:
-    """计算资产穿透TOP10，返回结构化数据（不写 Excel）。
-
-    与 :func:`write_penetration_sheet` 共用同一套合并/排序逻辑，
-    但返回可序列化的 Python 字典，适合缓存为 JSON。
-
-    Args:
-        holdings: 原始持仓列表
-        details: 市值核算明细行列表
-
-    Returns:
-        {
-            "update_time": "2026-06-27 14:30:00",
-            "summary": {
-                "total_funds": 5,
-                "total_stocks": 3,
-                "fund_breakdown": "QDII1 + ETF2 + 联接1 + 债券1 + 主动0",
-                "merged_count": 12,
-                "total_mv": 123456.78,
-                "top10_coverage_pct": 85.3,
-                "unknown_mv": 5000.0,
-                "failed_funds": 1,
-            },
-            "top10": [
-                {
-                    "rank": 1, "name": "贵州茅台",
-                    "codes": ["600519"], "mv": 50000.0,
-                    "ratio_pct": 15.2, "sources": ["[ETF] 电池ETF(561910)"]
-                },
-                ...
-            ],
-        }
-    """
-    # ── 1) 精细化分类 ──────────────────────────────────────
+def _classify_and_group(
+    holdings: list[Holding], details: list[DetailRow],
+) -> tuple[dict[str, list[Holding]], list[Holding], list[Holding], dict[str, DetailRow]]:
+    """按穿透类型分类持仓，分离基金/直接持股，构建市值映射。"""
     classified: dict[str, list[Holding]] = {
         QDII: [], ETF: [], INDEX_LINK: [],
         BOND_FUND: [], ACTIVE_EQUITY: [], STOCK: [], IGNORE: [],
     }
     for h in holdings:
         cat = classify_penetration(h)
-        if cat in classified:
-            classified[cat].append(h)
-        else:
-            classified[IGNORE].append(h)
+        (classified[cat] if cat in classified else classified[IGNORE]).append(h)
 
     fund_types = [QDII, ETF, INDEX_LINK, BOND_FUND, ACTIVE_EQUITY]
     funds: list[Holding] = []
     for ft in fund_types:
         funds.extend(classified[ft])
     direct_stocks = classified[STOCK]
+    detail_map = {d.code: d for d in details}
+    return classified, funds, direct_stocks, detail_map
 
-    detail_map: dict[str, DetailRow] = {d.code: d for d in details}
 
-    # ── 2) 合并底层标的 ──────────────────────────────────────
-    merged: dict[str, dict[str, Any]] = {}
+def _merge_fund_layer(
+    funds: list[Holding], detail_map: dict[str, DetailRow],
+) -> tuple[dict[str, Any], float, int, list[dict[str, str]]]:
+    """合并基金层穿透，返回 merged 字典 + 统计值。"""
+    merged: dict[str, Any] = {}
     unknown_mv = 0.0
     failed_count = 0
-    failed_fund_details: list[dict[str, str]] = []  # 记录无法获取穿透的基金
+    failed_fund_details: list[dict[str, str]] = []
 
     for fund in funds:
         detail = detail_map.get(fund.code)
@@ -443,12 +411,9 @@ def compute_penetration_top10(
 
         holdings_data = fetch_fund_holdings(fund.code)
         if holdings_data is None or not holdings_data.get("holdings"):
-            # 无法获取底层持仓时，将基金本身作为穿透节点加入，
-            # 避免该基金市值完全脱离穿透 TOP10 覆盖
             unknown_mv += fund_mv
             failed_count += 1
             failed_fund_details.append({"name": fund.name, "code": fund.code})
-            # 将基金本身作为一个穿透标的加入合并列表
             fund_node = normalize_name(fund.name)
             if fund_node not in merged:
                 sector = classify_sector(fund.name, fund.code)
@@ -467,10 +432,8 @@ def compute_penetration_top10(
             ratio = item.get("ratio", 0.0)
             if not stock_name:
                 continue
-
             attributed_mv = fund_mv * (ratio / 100.0) if ratio > 0 else 0.0
             norm_name = normalize_name(stock_name)
-
             sector = classify_sector(stock_name, stock_code)
             if norm_name not in merged:
                 merged[norm_name] = {
@@ -482,13 +445,20 @@ def compute_penetration_top10(
             merged[norm_name]["mv"] += attributed_mv
             merged[norm_name]["funds"].append(f"[{tag}] {fund.name}({fund.code})")
 
-    # ── 3) 合并直接持股 ──────────────────────────────────────
+    return merged, unknown_mv, failed_count, failed_fund_details
+
+
+def _merge_stock_layer(
+    direct_stocks: list[Holding],
+    detail_map: dict[str, DetailRow],
+    merged: dict[str, Any],
+) -> None:
+    """将直接持股合并入 merged 字典（原地修改）。"""
     for stock in direct_stocks:
         detail = detail_map.get(stock.code)
         stock_mv = detail.market_value if detail else 0.0
         norm_name = normalize_name(stock.name)
         sector = classify_sector(stock.name, stock.code)
-
         if norm_name not in merged:
             merged[norm_name] = {
                 "name": stock.name, "codes": {stock.code},
@@ -499,35 +469,47 @@ def compute_penetration_top10(
         merged[norm_name]["mv"] += stock_mv
         merged[norm_name]["funds"].append("直接持有")
 
-    # ── 3.5) 用 API 行业数据补充板块分类和概念 ──────────────
-    try:
-        _all_pen_codes: list[str] = []
-        for _info in merged.values():
-            _all_pen_codes.extend(_info.get("codes") or [])
-        if _all_pen_codes:
-            from src.python.fetcher.industry import batch_fetch_industry_data as _batch_ind
-            _ind_data = _batch_ind(list(set(_all_pen_codes)))
-            if _ind_data:
-                for _info in merged.values():
-                    for _code in _info.get("codes") or []:
-                        if _code in _ind_data:
-                            _id = _ind_data[_code]
-                            if _id.get("industry"):
-                                _info["sector_api"] = _id["industry"]
-                                _info["sector"] = _id["industry"]
-                            if _id.get("concepts"):
-                                _info["concepts"] = _id["concepts"]
-                            break
-    except Exception as _e:
-        logger.debug("穿透板块 API 补充失败（非关键）: %s", _e)
 
-    # ── 4) 生成返回数据 ──────────────────────────────────
+def _enrich_with_industry_api(merged: dict[str, Any]) -> None:
+    """用 API 行业数据补充板块分类和概念（原地修改）。"""
+    try:
+        all_codes: list[str] = []
+        for info in merged.values():
+            all_codes.extend(info.get("codes") or [])
+        if all_codes:
+            from src.python.fetcher.industry import batch_fetch_industry_data as batch_ind
+            ind_data = batch_ind(list(set(all_codes)))
+            if ind_data:
+                for info in merged.values():
+                    for code in info.get("codes") or []:
+                        if code in ind_data:
+                            id_rec = ind_data[code]
+                            if id_rec.get("industry"):
+                                info["sector_api"] = id_rec["industry"]
+                                info["sector"] = id_rec["industry"]
+                            if id_rec.get("concepts"):
+                                info["concepts"] = id_rec["concepts"]
+                            break
+    except Exception:
+        logger.debug("穿透板块 API 补充失败（非关键）")
+
+
+def _build_penetration_result(
+    merged: dict[str, Any],
+    classified: dict[str, list[Holding]],
+    funds: list[Holding],
+    direct_stocks: list[Holding],
+    unknown_mv: float,
+    failed_count: int,
+    failed_fund_details: list[dict[str, str]],
+) -> dict[str, Any]:
+    """从合并数据生成穿透 TOP10 返回字典。"""
     total_mv = sum(v["mv"] for v in merged.values())
     sorted_items = sorted(merged.items(), key=lambda x: x[1]["mv"], reverse=True)
 
     fund_breakdown = " + ".join(
-        f"{cat_label}{len(classified[c])}"
-        for c, cat_label in [
+        f"{cl}{len(classified[c])}"
+        for c, cl in [
             (QDII, "QDII"), (ETF, "ETF"), (INDEX_LINK, "联接"),
             (BOND_FUND, "债券"), (ACTIVE_EQUITY, "主动"),
         ]
@@ -535,10 +517,8 @@ def compute_penetration_top10(
     )
 
     top10_list = []
-    for rank, (norm_name, info) in enumerate(sorted_items[:10], 1):
+    for rank, (_, info) in enumerate(sorted_items[:10], 1):
         ratio = info["mv"] / total_mv * 100 if total_mv > 0 else 0.0
-        # 概念列表最多取前 3 个
-        concepts = (info.get("concepts") or [])[:3]
         top10_list.append({
             "rank": rank,
             "name": info["name"],
@@ -546,7 +526,7 @@ def compute_penetration_top10(
             "mv": round(info["mv"], 2),
             "ratio_pct": round(ratio, 2),
             "sector": info.get("sector", "--"),
-            "concepts": concepts,
+            "concepts": (info.get("concepts") or [])[:3],
             "sources": sorted(set(info["funds"])),
         })
 
@@ -555,10 +535,8 @@ def compute_penetration_top10(
         if total_mv > 0 else 0.0
     )
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     return {
-        "update_time": now,
+        "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "summary": {
             "total_funds": len(funds),
             "total_stocks": len(direct_stocks),
@@ -572,6 +550,36 @@ def compute_penetration_top10(
         },
         "top10": top10_list,
     }
+
+
+def compute_penetration_top10(
+    holdings: List[Holding],
+    details: List[DetailRow],
+) -> dict[str, Any]:
+    """计算资产穿透TOP10，返回结构化数据（不写 Excel）。
+
+    与 :func:`write_penetration_sheet` 共用同一套合并/排序逻辑，
+    但返回可序列化的 Python 字典，适合缓存为 JSON。
+
+    Args:
+        holdings: 原始持仓列表
+        details: 市值核算明细行列表
+
+    Returns:
+        {
+            "update_time": "...",
+            "summary": {...},
+            "top10": [...],
+        }
+    """
+    classified, funds, direct_stocks, detail_map = _classify_and_group(holdings, details)
+    merged, unknown_mv, failed_count, failed_fund_details = _merge_fund_layer(funds, detail_map)
+    _merge_stock_layer(direct_stocks, detail_map, merged)
+    _enrich_with_industry_api(merged)
+    return _build_penetration_result(
+        merged, classified, funds, direct_stocks,
+        unknown_mv, failed_count, failed_fund_details,
+    )
 
 
 # ═══════════════════════════════════════════════════════════

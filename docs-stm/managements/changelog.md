@@ -4,6 +4,22 @@
 
 ---
 
+## [0.2.48] - 2026-07-01
+
+### Changed
+- **`report/excel_generator.py:generate_excel_report()` 拆分（R-020 ✅）**：296 行→8 个函数（均 ≤75 行），提取 `_import_report_modules`/`_resolve_market_data`/`_resolve_indices`/`_write_content_sheets`/`_write_news_and_early_warning`/`_write_llm_section_and_usage`/`_build_llm_usage_sheet`。主函数降至 70 行。解决 ws2 循环依赖（直接传参而非通过 dict）。
+- **`llm/generators.py:generate_all_llm()` 拆分（R-021 ✅）**：224 行→5 个函数（均 ≤75 行），提取 `_compute_module_cache_info`/`_precheck_one_cache`/`_precheck_all_modules`/`_dispatch_llm_workers`。`_make_runner` 闭包工厂统一 4 个近相同模块，主函数降至 72 行。
+- **`report/summary.py:write_llm_usage_sheet()` 拆分（R-022 ✅）**：215 行→6 个辅助函数（均 ≤40 行），提取 `_init_llm_usage_sheet`/`_write_llm_summary_section`/`_write_module_table_header`/`_write_module_data_rows`/`_write_legend`/`_set_column_widths`。主函数降至 50 行。
+- **`report/penetration.py:compute_penetration_top10()` 拆分（R-023 ✅）**：199 行→6 个函数（均 ≤55 行），提取 `_classify_and_group`/`_merge_fund_layer`/`_merge_stock_layer`/`_enrich_with_industry_api`/`_build_penetration_result`。主函数降至 20 行编排。
+
+### Added
+- **`src/test/test_handlers.py`（R-024 ✅）**：23 项测试覆盖 handlers_cache/handlers_config/handlers_report 三大模块的可测试辅助函数。包括 JSON 注释读取/写入、缓存刷新报告输出、单基金缓存刷新、盈利预测/行业资金流向、LLM+新闻 Future 处理、智能预警计算、用户输入选择。
+
+### Docs
+- **review-findings.md**：R-020~R-024 全部标记 ✅ 已完成，待办区再次清空。
+- **technical.md**：测试文件数 34→33（核验修正）。
+- **版本号同步**：constants.py 0.2.47→0.2.48，README.md 0.2.47→0.2.48
+
 ## [0.2.47] - 2026-07-01
 
 ### Changed

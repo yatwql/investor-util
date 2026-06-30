@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from src.python.logger import setup_logger
@@ -13,6 +12,323 @@ from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, _Timer
 
 logger = setup_logger()
+
+
+def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
+    """导入各报告模块（单独捕获），返回模块引用字典。"""
+    try:
+        from src.python.fetcher.index import fetch_indices, fetch_us_indices
+    except ImportError:
+        fetch_indices = lambda: {}
+        fetch_us_indices = lambda: {}
+        prog.add_error("市场指数模块缺失 (fetcher)")
+
+    try:
+        from src.python.report.excel_writer import create_workbook, save_workbook
+    except ImportError:
+        prog.add_error("Excel 报告核心模块缺失 (excel_writer)，无法生成报告")
+        return {}
+
+    modules: dict[str, Any] = {
+        "fetch_indices": fetch_indices,
+        "fetch_us_indices": fetch_us_indices,
+        "create_workbook": create_workbook,
+        "save_workbook": save_workbook,
+    }
+
+    try:
+        from src.python.report.summary import write_summary_sheet
+        modules["write_summary_sheet"] = write_summary_sheet
+    except ImportError:
+        modules["write_summary_sheet"] = None
+        prog.add_error("汇总页模块缺失 (summary)")
+
+    try:
+        from src.python.report.category import write_category_sheet
+        modules["write_category_sheet"] = write_category_sheet
+    except ImportError:
+        modules["write_category_sheet"] = None
+        prog.add_error("持仓分类模块缺失 (category)")
+
+    try:
+        from src.python.report.market_value import (
+            classify_holdings, get_last_trading_day,
+            price_update_status, write_market_value_sheet,
+        )
+        modules.update(
+            classify_holdings=classify_holdings,
+            get_last_trading_day=get_last_trading_day,
+            price_update_status=price_update_status,
+            write_market_value_sheet=write_market_value_sheet,
+        )
+    except ImportError:
+        modules.update(
+            classify_holdings=lambda _: {},
+            get_last_trading_day=lambda: "",
+            price_update_status=lambda _a, _b: (0, 0, True),
+            write_market_value_sheet=None,
+        )
+        prog.add_error("行情市值模块缺失 (market_value)")
+
+    try:
+        from src.python.report.penetration import write_penetration_sheet, compute_penetration_top10
+        modules["write_penetration_sheet"] = write_penetration_sheet
+        modules["compute_penetration_top10"] = compute_penetration_top10
+    except ImportError:
+        modules["write_penetration_sheet"] = None
+        modules["compute_penetration_top10"] = lambda _a, _b: {}
+        prog.add_error(f"{get_llm_module_name('penetration_deep')}模块缺失 (penetration)")
+
+    try:
+        from src.python.report.fund_performance import write_fund_performance_sheet
+        modules["write_fund_performance_sheet"] = write_fund_performance_sheet
+    except ImportError:
+        modules["write_fund_performance_sheet"] = None
+        prog.add_error("基金业绩模块缺失 (fund_performance)")
+
+    return modules
+
+
+def _resolve_market_data(
+    holdings: list, details: list | None,
+    modules: dict[str, Any], ws2: Any, prog: ProgressReporter,
+) -> dict[str, Any]:
+    """行情市值页写入，返回核心数据字典。"""
+    mvs = modules.get("write_market_value_sheet")
+    classify = modules.get("classify_holdings")
+    last_trading = modules.get("get_last_trading_day")
+    price_status = modules.get("price_update_status")
+
+    if mvs is None:
+        data = {"total_mv": 0.0, "total_cost": 0.0, "total_profit": 0.0,
+                "today_profit": 0.0, "details": details or [],
+                "categories": {}, "update_status": (0, 0, True)}
+        prog.add_error("行情市值模块缺失，跳过 Sheet 2")
+    elif details is not None:
+        logger.info("复用外部传入的市值核算数据，共 %d 条", len(details))
+        data = {
+            "total_mv": sum(d.market_value for d in details),
+            "total_cost": sum(d.cost for d in details),
+            "total_profit": sum(d.profit for d in details),
+            "today_profit": sum(d.today_profit for d in details),
+            "details": details,
+        }
+        with _Timer(get_report_sheet_name("market_value")):
+            mvs(ws2, holdings, details=details)
+    else:
+        with _Timer("行情数据获取 (" + get_report_sheet_name("market_value") + ")"):
+            prog.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
+            total_mv, total_cost, total_profit, today_profit, details = mvs(ws2, holdings)
+            data = {
+                "total_mv": total_mv, "total_cost": total_cost,
+                "total_profit": total_profit, "today_profit": today_profit,
+                "details": details,
+            }
+        prog.ok("行情数据获取完成")
+
+    data["categories"] = classify(holdings) if classify else {}
+    data["update_status"] = price_status(data["details"], last_trading()) if price_status else (0, 0, True)
+    return data
+
+
+def _resolve_indices(
+    a_indices: dict | None, us_indices: dict | None,
+    modules: dict[str, Any], prog: ProgressReporter,
+) -> tuple[dict, dict]:
+    """获取市场指数（外部传入时复用）。"""
+    if a_indices is not None:
+        return a_indices, us_indices if us_indices is not None else {}
+    with _Timer("市场指数 (" + get_report_sheet_name("summary") + ")"):
+        prog.info("正在获取市场指数...")
+        a_idx = modules.get("fetch_indices", lambda: {})()
+        us_idx = modules.get("fetch_us_indices", lambda: {})() if us_indices is None else (us_indices or {})
+        prog.ok("市场指数获取完成")
+    return a_idx, us_idx
+
+
+def _write_content_sheets(
+    sheets: dict[str, Any], holdings: list, data: dict[str, Any],
+    a_indices: dict, us_indices: dict, modules: dict[str, Any],
+    prog: ProgressReporter,
+) -> dict:
+    """写入汇总 / 分类 / 穿透 / 基金业绩页签，返回穿透结果。"""
+    prog.call_sheet(get_report_sheet_name("summary"), modules.get("write_summary_sheet"),
+                    sheets["ws1"], data["total_mv"], data["total_cost"],
+                    data["total_profit"], data["today_profit"],
+                    categories=data["categories"], update_status=data["update_status"],
+                    a_indices=a_indices, us_indices=us_indices)
+
+    prog.call_sheet(get_report_sheet_name("category"), modules.get("write_category_sheet"),
+                    sheets["ws3"], holdings, data["details"])
+
+    compute_pen = modules.get("compute_penetration_top10", lambda _a, _b: {})
+    pen_result = compute_pen(holdings, data["details"])
+    prog.ok("资产穿透TOP10 计算完成")
+    prog.call_sheet(get_report_sheet_name("penetration"), modules.get("write_penetration_sheet"),
+                    sheets["ws4"], holdings, data["details"], penetration_data=pen_result)
+
+    prog.call_sheet(get_report_sheet_name("fund_performance"), modules.get("write_fund_performance_sheet"),
+                    sheets["ws5"], holdings, data["details"])
+
+    return pen_result
+
+
+def _write_news_and_early_warning(
+    sheets: dict[str, Any], holdings: list,
+    pen_result: dict, include_news: bool,
+    news_data: list | None, news_llm_meta: dict | None,
+    news_top_count: int, early_warnings: dict | None,
+    prog: ProgressReporter,
+) -> None:
+    """写入新闻页签和智能预警页签。"""
+    if not include_news:
+        return
+    penetrated_assets = pen_result.get("top10", []) if pen_result else []
+
+    try:
+        from src.python.report.news_correlation import write_news_sheet
+    except ImportError:
+        write_news_sheet = None
+        prog.add_error(f"{get_llm_module_name('news_correlation')}模块缺失 (news_correlation)")
+
+    if news_data is not None:
+        logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
+        _meta = news_llm_meta or {}
+        prog.ok(f"复用预取新闻数据（{len(news_data)} 条）")
+    else:
+        prog.info("正在获取财经新闻（含穿透资产关键词）...")
+        try:
+            from src.python.report.news_correlation import build_news_data
+        except ImportError:
+            build_news_data = None
+        if build_news_data:
+            try:
+                news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
+            except Exception as e:
+                prog.add_error(f"新闻数据获取失败: {e}")
+                news_data, _meta = [], {}
+        else:
+            prog.add_error(f"{get_llm_module_name('news_correlation')}数据模块缺失")
+            news_data, _meta = [], {}
+
+    prog.call_sheet(get_llm_module_name("news_correlation"), write_news_sheet,
+                    sheets["ws6"], news_data, llm_meta=_meta)
+
+    # 智能预警页签
+    if sheets.get("ws7") is not None:
+        if early_warnings is None:
+            _warnings = {"sector_alerts": [], "sentiment_alerts": [],
+                         "has_warnings": False, "has_sector_data": False, "has_llm_news": False}
+        else:
+            _warnings = early_warnings
+        try:
+            from src.python.report.early_warning import write_early_warning_sheet
+            prog.call_sheet(get_report_sheet_name("early_warning"), write_early_warning_sheet,
+                            sheets["ws7"], _warnings)
+        except ImportError as _ew_err:
+            prog.add_error(f"智能预警模块缺失: {_ew_err}")
+
+
+def _write_llm_section_and_usage(
+    wb: Any, include_llm: bool, llm_content: tuple | None,
+    prog: ProgressReporter,
+) -> None:
+    """写入 LLM 分析章节页签和 LLM API 用量页签。"""
+    if not include_llm:
+        return
+
+    with _Timer("LLM 分析章节"):
+        prog.info("正在生成 LLM 分析章节...")
+        try:
+            from src.python.report.llm_content import write_llm_sheets
+            write_llm_sheets(wb, llm_content=llm_content)
+            logger.info("LLM 分析章节已生成")
+            prog.ok("LLM 分析章节生成完成")
+        except ImportError:
+            logger.warning("LLM 分析章节模块 (src.python.report.llm_content) 未就绪，跳过")
+            prog.add_error("LLM 分析章节模块未就绪，跳过")
+        except Exception as e:
+            logger.exception("生成 LLM 分析章节失败")
+            prog.add_error(f"LLM 分析章节生成失败: {e}")
+
+    _build_llm_usage_sheet(wb, prog)
+
+
+def _build_llm_usage_sheet(wb: Any, prog: ProgressReporter) -> None:
+    """构建并写入 LLM API 用量页签。"""
+    try:
+        from src.python.llm import (
+            _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
+            get_session_usage, format_session_usage,
+        )
+        from src.python.registry import get_llm_module_names
+        from src.python.report.summary import write_llm_usage_sheet
+    except (ImportError, AttributeError) as e:
+        logger.debug("LLM 用量页签模块未就绪（非关键）: %s", e)
+        return
+
+    raw_session = get_session_usage()
+    formatted = format_session_usage(raw_session)
+    if not formatted:
+        return
+
+    per_module = formatted.get("per_module", {})
+    all_failure = dict(_LLM_MODULE_FAILURE)
+    names_map = get_llm_module_names()
+
+    MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    DISPLAY_REASON = {
+        "not_configured": "LLM 未配置",
+        "api_error": "LLM API 调用失败",
+        "network_error": "LLM API 网络连接失败",
+        "timeout": "LLM API 请求超时",
+        "circuit_open": "LLM API 暂时不可用（熔断冷却中）",
+    }
+
+    excel_module_info: list[dict] = []
+    for mk in MODULE_KEYS:
+        entry: dict = {"key": mk, "name": names_map.get(mk, mk)}
+        reason = all_failure.get(mk)
+        pm = per_module.get(mk)
+        if reason == FAIL_REASON_DISABLED:
+            entry.update({"status": "disabled", "status_label": "已禁用",
+                          "model": "", "input_tokens": 0, "output_tokens": 0,
+                          "total_tokens": 0, "cache_hit_tokens": 0,
+                          "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
+        elif reason:
+            reason_text = DISPLAY_REASON.get(str(reason).lower(), str(reason))
+            entry.update({"status": "failed", "status_label": reason_text,
+                          "model": "", "input_tokens": 0, "output_tokens": 0,
+                          "total_tokens": 0, "cache_hit_tokens": 0,
+                          "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
+        elif pm:
+            inp = pm.get("input_tokens", 0)
+            out = pm.get("output_tokens", 0)
+            entry.update({
+                "status": "cached" if pm.get("cached") else "success",
+                "status_label": "缓存" if pm.get("cached") else "成功",
+                "model": pm.get("model", ""),
+                "input_tokens": inp, "output_tokens": out,
+                "total_tokens": inp + out,
+                "cache_hit_tokens": pm.get("cache_hit_tokens", 0),
+                "cost": pm.get("cost", 0.0),
+                "cached": pm.get("cached", False),
+                "thinking": pm.get("thinking", False),
+                "endpoint": pm.get("endpoint", ""),
+            })
+        else:
+            continue  # 无状态的模块不加入明细
+        if entry.get("status_label"):
+            excel_module_info.append(entry)
+
+    if not excel_module_info:
+        return
+
+    glb_endpoint = next((mi["endpoint"] for mi in excel_module_info if mi.get("endpoint")), "")
+    try:
+        write_llm_usage_sheet(wb, formatted, excel_module_info, llm_endpoint=glb_endpoint)
+    except Exception as e:
+        logger.debug("创建 LLM API 用量页签失败（非关键）: %s", e)
 
 
 def generate_excel_report(
@@ -45,269 +361,43 @@ def generate_excel_report(
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
-    # ── 导入各报告模块（单独捕获，避免一处缺失拖垮整个报告） ──
-    try:
-        from src.python.fetcher.index import fetch_indices, fetch_us_indices
-    except ImportError:
-        fetch_indices = lambda: {}
-        fetch_us_indices = lambda: {}
-        prog.add_error("市场指数模块缺失 (fetcher)")
+    modules = _import_report_modules(prog)
+    if not modules:
+        return  # excel_writer 缺失，无法继续
 
-    try:
-        from src.python.report.excel_writer import create_workbook, save_workbook
-    except ImportError:
-        prog.add_error("Excel 报告核心模块缺失 (excel_writer)，无法生成报告")
-        return
+    create_workbook = modules["create_workbook"]
+    save_workbook = modules["save_workbook"]
 
-    sheets_ok: dict[str, bool] = {}
-
-    try:
-        from src.python.report.summary import write_summary_sheet
-    except ImportError:
-        write_summary_sheet = None
-        prog.add_error("汇总页模块缺失 (summary)")
-
-    try:
-        from src.python.report.category import write_category_sheet
-    except ImportError:
-        write_category_sheet = None
-        prog.add_error("持仓分类模块缺失 (category)")
-
-    try:
-        from src.python.report.market_value import (
-            classify_holdings, get_last_trading_day,
-            price_update_status, write_market_value_sheet,
-        )
-    except ImportError:
-        classify_holdings = lambda _: {}
-        get_last_trading_day = lambda: ""
-        price_update_status = lambda _a, _b: (0, 0, True)
-        write_market_value_sheet = None
-        prog.add_error("行情市值模块缺失 (market_value)")
-
-    try:
-        from src.python.report.penetration import write_penetration_sheet, compute_penetration_top10
-    except ImportError:
-        write_penetration_sheet = None
-        compute_penetration_top10 = lambda _a, _b: {}
-        prog.add_error(f"{get_llm_module_name('penetration_deep')}模块缺失 (penetration)")
-
-    try:
-        from src.python.report.fund_performance import write_fund_performance_sheet
-    except ImportError:
-        write_fund_performance_sheet = None
-        prog.add_error("基金业绩模块缺失 (fund_performance)")
-
-    # ── 创建工作簿（必须成功） ──
+    # ── 创建工作簿，预创建全部页签 ──
     wb = create_workbook()
     wb.remove(wb.active)
-
-    # 预创建全部页签，确保 1→12 数字顺序从左到右
-    ws1 = wb.create_sheet()  # 1. 汇总
-    ws2 = wb.create_sheet()  # 2. 市值核算
-    ws3 = wb.create_sheet()  # 3. 持仓分类
-    ws4 = wb.create_sheet()  # 4. 资产穿透TOP10
-    ws5 = wb.create_sheet()  # 5. 基金业绩分析
+    ws1 = wb.create_sheet()   # 1. 汇总
+    ws2 = wb.create_sheet()   # 2. 市值核算
+    ws3 = wb.create_sheet()   # 3. 持仓分类
+    ws4 = wb.create_sheet()   # 4. 资产穿透TOP10
+    ws5 = wb.create_sheet()   # 5. 基金业绩分析
     ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点与持仓关联分析
-    ws7 = wb.create_sheet() if include_news else None  # 7. 智能预警（仅在有新闻时生成）
+    ws7 = wb.create_sheet() if include_news else None  # 7. 智能预警
 
-    # ── 行情市值页（返回下游所需的核心数据） ──
-    if write_market_value_sheet is None:
-        total_mv = total_cost = total_profit = today_profit = 0.0
-        details = details or []
-        categories: dict[str, int] = {}
-        up_status = (0, 0, True)
-        prog.add_error("行情市值模块缺失，跳过 Sheet 2")
-    elif details is not None:
-        logger.info("复用外部传入的市值核算数据，共 %d 条", len(details))
-        total_mv = sum(d.market_value for d in details)
-        total_cost = sum(d.cost for d in details)
-        total_profit = sum(d.profit for d in details)
-        today_profit = sum(d.today_profit for d in details)
-        with _Timer(get_report_sheet_name('market_value')):
-            write_market_value_sheet(ws2, holdings, details=details)
-    else:
-        with _Timer("行情数据获取 (" + get_report_sheet_name('market_value') + ")"):
-            prog.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
-            total_mv, total_cost, total_profit, today_profit, details = \
-                write_market_value_sheet(ws2, holdings)
-        prog.ok("行情数据获取完成")
+    sheets = {"ws1": ws1, "ws2": ws2, "ws3": ws3, "ws4": ws4, "ws5": ws5, "ws6": ws6, "ws7": ws7}
 
-    categories = classify_holdings(holdings) if classify_holdings else {}
-    up_status = price_update_status(details, get_last_trading_day()) if price_update_status else (0, 0, True)
+    # ── 行情市值 + 指数 ──
+    data = _resolve_market_data(holdings, details, modules, ws2, prog)
+    a_idx, us_idx = _resolve_indices(a_indices, us_indices, modules, prog)
 
-    # ── 市场指数 ──
-    if a_indices is None:
-        with _Timer("市场指数 (" + get_report_sheet_name('summary') + ")"):
-            prog.info("正在获取市场指数...")
-            a_indices = fetch_indices() if fetch_indices else {}
-            if us_indices is None:
-                us_indices = fetch_us_indices() if fetch_us_indices else {}
-            prog.ok("市场指数获取完成")
+    # ── 各页签写入 ──
+    pen_result = _write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
+    _write_news_and_early_warning(sheets, holdings, pen_result, include_news,
+                                  news_data, news_llm_meta, news_top_count,
+                                  early_warnings, prog)
+    _write_llm_section_and_usage(wb, include_llm, llm_content, prog)
 
-    # ── 各页安全写入 ──
-    _llm_session = None
-    prog.call_sheet(get_report_sheet_name('summary'), write_summary_sheet,
-                 ws1, total_mv, total_cost, total_profit, today_profit,
-                 categories=categories, update_status=up_status,
-                 a_indices=a_indices, us_indices=us_indices)
-
-    prog.call_sheet(get_report_sheet_name('category'), write_category_sheet, ws3, holdings, details)
-
-    pen_result = compute_penetration_top10(holdings, details) if compute_penetration_top10 else {}
-    prog.ok("资产穿透TOP10 计算完成")
-    prog.call_sheet(get_report_sheet_name('penetration'), write_penetration_sheet,
-                 ws4, holdings, details, penetration_data=pen_result)
-
-    prog.call_sheet(get_report_sheet_name('fund_performance'), write_fund_performance_sheet, ws5, holdings, details)
-
-    if include_news:
-        penetrated_assets = pen_result.get("top10", []) if pen_result else []
-        try:
-            from src.python.report.news_correlation import write_news_sheet
-        except ImportError:
-            write_news_sheet = None
-            prog.add_error(f"{get_llm_module_name('news_correlation')}模块缺失 (news_correlation)")
-
-        if news_data is not None:
-            logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
-            _meta = news_llm_meta or {}
-            prog.ok(f"复用预取新闻数据（{len(news_data)} 条）")
-        else:
-            prog.info("正在获取财经新闻（含穿透资产关键词）...")
-            try:
-                from src.python.report.news_correlation import build_news_data
-            except ImportError:
-                build_news_data = None
-            if build_news_data:
-                try:
-                    news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
-                except Exception as e:
-                    prog.add_error(f"新闻数据获取失败: {e}")
-                    news_data, _meta = [], {}
-            else:
-                prog.add_error(f"{get_llm_module_name('news_correlation')}数据模块缺失")
-                news_data, _meta = [], {}
-        prog.call_sheet(get_llm_module_name('news_correlation'), write_news_sheet, ws6, news_data, llm_meta=_meta)
-
-        # 智能预警页签（依赖新闻 + 穿透数据）
-        if include_news and ws7 is not None:
-            if early_warnings is None:
-                _early_warnings = {"sector_alerts": [], "sentiment_alerts": [],
-                                   "has_warnings": False, "has_sector_data": False, "has_llm_news": False}
-            else:
-                _early_warnings = early_warnings
-            try:
-                from src.python.report.early_warning import write_early_warning_sheet
-                prog.call_sheet(get_report_sheet_name('early_warning'), write_early_warning_sheet, ws7, _early_warnings)
-            except ImportError as _ew_err:
-                prog.add_error(f"智能预警模块缺失: {_ew_err}")
-
-    if include_llm:
-        with _Timer("LLM 分析章节"):
-            prog.info("正在生成 LLM 分析章节...")
-            try:
-                from src.python.report.llm_content import write_llm_sheets
-                global_macro_text, expert_review_text, health_check_text, penetration_deep_text = write_llm_sheets(
-                    wb, llm_content=llm_content,
-                )
-                logger.info("LLM 分析章节已生成")
-                prog.ok("LLM 分析章节生成完成")
-            except ImportError:
-                logger.warning("LLM 分析章节模块 (src.python.report.llm_content) 未就绪，跳过")
-                prog.add_error("LLM 分析章节模块未就绪，跳过")
-                global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
-            except Exception as e:
-                logger.exception("生成 LLM 分析章节失败")
-                prog.add_error(f"LLM 分析章节生成失败: {e}")
-                global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
-
-        # LLM 生成完成后捕获会话用量，供 LLM API 用量页签使用
-        try:
-            from src.python.llm import get_session_usage
-            _llm_session = get_session_usage()
-        except (ImportError, TypeError, AttributeError):
-            logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
-            _llm_session = None
-
-        # 创建 'LLM API 用量' 页签（仅 LLM 被启用时）
-        try:
-            from src.python.llm import (
-                _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
-                get_session_usage as _gsu, format_session_usage as _fsu,
-            )
-            from src.python.registry import get_llm_module_names
-            from src.python.report.summary import write_llm_usage_sheet
-
-            _raw_session = _gsu()
-            _formatted = _fsu(_raw_session)
-            _per_module = _formatted.get("per_module", {}) if _formatted else {}
-            _all_failure = dict(_LLM_MODULE_FAILURE)
-            _names_map = get_llm_module_names()
-
-            _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
-            _DISPLAY_REASON = {
-                "not_configured": "LLM 未配置",
-                "api_error": "LLM API 调用失败",
-                "network_error": "LLM API 网络连接失败",
-                "timeout": "LLM API 请求超时",
-                "circuit_open": "LLM API 暂时不可用（熔断冷却中）",
-            }
-
-            _excel_module_info: list[dict] = []
-            for mk in _MODULE_KEYS:
-                _entry: dict = {"key": mk, "name": _names_map.get(mk, mk)}
-                _reason = _all_failure.get(mk)
-                _pm = _per_module.get(mk)
-                if _reason == FAIL_REASON_DISABLED:
-                    _entry.update({"status": "disabled", "status_label": "已禁用",
-                                   "model": "", "input_tokens": 0, "output_tokens": 0,
-                                   "total_tokens": 0, "cache_hit_tokens": 0,
-                                   "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
-                elif _reason:
-                    _reason_text = _DISPLAY_REASON.get(str(_reason).lower(), str(_reason))
-                    _entry.update({"status": "failed", "status_label": _reason_text,
-                                   "model": "", "input_tokens": 0, "output_tokens": 0,
-                                   "total_tokens": 0, "cache_hit_tokens": 0,
-                                   "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
-                elif _pm:
-                    _inp = _pm.get("input_tokens", 0)
-                    _out = _pm.get("output_tokens", 0)
-                    _entry.update({
-                        "status": "cached" if _pm.get("cached") else "success",
-                        "status_label": "缓存" if _pm.get("cached") else "成功",
-                        "model": _pm.get("model", ""),
-                        "input_tokens": _inp, "output_tokens": _out,
-                        "total_tokens": _inp + _out,
-                        "cache_hit_tokens": _pm.get("cache_hit_tokens", 0),
-                        "cost": _pm.get("cost", 0.0),
-                        "cached": _pm.get("cached", False),
-                        "thinking": _pm.get("thinking", False),
-                        "endpoint": _pm.get("endpoint", ""),
-                    })
-                else:
-                    _entry.update({"status": "unknown", "status_label": "",
-                                   "model": "", "input_tokens": 0, "output_tokens": 0,
-                                   "total_tokens": 0, "cache_hit_tokens": 0,
-                                   "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
-                if _entry.get("status_label"):
-                    _excel_module_info.append(_entry)
-
-            if _excel_module_info:
-                # 取第一个非空 endpoint 作为全局端点
-                _glb_endpoint = ""
-                for _mi in _excel_module_info:
-                    if _mi.get("endpoint"):
-                        _glb_endpoint = _mi["endpoint"]
-                        break
-                write_llm_usage_sheet(wb, _formatted, _excel_module_info, llm_endpoint=_glb_endpoint)
-        except Exception as e:
-            logger.debug("创建 LLM API 用量页签失败（非关键）: %s", e)
-
+    # ── 保存 ──
     with _Timer("保存 Excel/HTML 文件"):
         prog.info("正在保存 Excel 报告...")
         path = save_workbook(wb, output_dir=output_dir)
         logger.info("Excel 报告已生成: %s", path)
         logger.info("总市值: %.2f元, 总成本: %.2f元, 总盈亏: %.2f元, 本日盈亏: %.2f元",
-                    total_mv, total_cost, total_profit, today_profit)
+                    data["total_mv"], data["total_cost"],
+                    data["total_profit"], data["today_profit"])
         prog.ok(f"Excel 报告已保存: {path}")

@@ -419,6 +419,167 @@ def enhance_news_correlation(
 # ═══════════════════════════════════════════════════════════
 
 
+def _compute_module_cache_info(
+    llm_config: dict, a_indices, us_indices,
+    total_mv: float, total_cost: float, total_profit: float,
+    total_today_profit: float, holdings_count: int, categories: dict,
+    penetrated_assets: list[dict] | None, holdings_details: list[dict] | None,
+    force: bool,
+) -> dict[str, dict]:
+    """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。"""
+    fp_global_macro = _compute_fingerprint(
+        a_indices, us_indices, total_mv, total_profit, categories,
+    )
+    fp_expert_review = _build_llm_fingerprint(
+        total_mv=total_mv, total_cost=total_cost,
+        total_profit=total_profit, total_today_profit=total_today_profit,
+        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
+        categories=categories,
+    )
+    fp_health_check = _build_llm_fingerprint(
+        total_mv=total_mv, total_cost=total_cost,
+        total_profit=total_profit, total_today_profit=total_today_profit,
+        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
+        categories=categories,
+    )
+    fp_penetration_deep = _build_llm_fingerprint(
+        total_mv=total_mv, total_cost=total_cost,
+        total_profit=total_profit, total_today_profit=total_today_profit,
+        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
+        categories=categories, full_penetration=True,
+    )
+
+    force_flag = force
+    info: dict[str, dict] = {
+        "global_macro": {
+            "key": _CACHE_PREFIX_LLM + f"global_macro_{fp_global_macro}",
+            "ttl": _get_cache_ttl_llm("global_macro"),
+            "can_cache": not force_flag and llm_config.get("cache_enabled_global_macro", True),
+            "thinking_key": "thinking_enabled_global_macro",
+        },
+        "expert_review": {
+            "key": _CACHE_PREFIX_LLM + f"expert_review_{fp_expert_review}",
+            "ttl": _get_cache_ttl_llm("expert_review"),
+            "can_cache": not force_flag and llm_config.get("cache_enabled_expert_review", True),
+            "thinking_key": "thinking_enabled_expert_review",
+        },
+        "health_check": {
+            "key": _CACHE_PREFIX_LLM + f"health_check_{fp_health_check}",
+            "ttl": _get_cache_ttl_llm("health_check"),
+            "can_cache": not force_flag and llm_config.get("cache_enabled_health_check", True),
+            "thinking_key": "thinking_enabled_health_check",
+        },
+        "penetration_deep": {
+            "key": _CACHE_PREFIX_LLM + f"penetration_deep_{fp_penetration_deep}",
+            "ttl": _get_cache_ttl_llm("penetration_deep"),
+            "can_cache": not force_flag and llm_config.get("cache_enabled_penetration_deep", True),
+            "thinking_key": "thinking_enabled_penetration_deep",
+        },
+    }
+    return info
+
+
+def _precheck_one_cache(cache_info: dict, llm_config: dict) -> tuple[str | None, bool]:
+    """预检单个模块的缓存，返回 (result, from_cached)。"""
+    if not cache_info["can_cache"]:
+        return (None, False)
+    cached = cache_get(cache_info["key"], cache_info["ttl"])
+    if not cached:
+        return (None, False)
+    clean = _strip_token_line(cached)
+    model = _extract_model_from_cached(cached)
+    hint = _CACHE_LINE_MODEL_TPL.format(model=model) if model else _CACHE_LINE_HTML
+    if llm_config.get(cache_info["thinking_key"], False):
+        hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
+    return (clean + hint, True)
+
+
+def _precheck_all_modules(
+    llm_config: dict, cache_info: dict[str, dict], force: bool,
+) -> dict[str, dict]:
+    """检查所有模块的状态（已禁用/缓存命中/缓存未命中）。"""
+    results: dict[str, dict] = {}
+    for module_key, info in cache_info.items():
+        enabled = _is_llm_module_enabled(llm_config, module_key)
+        if not enabled:
+            logger.info("%s LLM 分析已禁用（enabled_llm.%s = false）", _MN(module_key), module_key)
+            _LLM_MODULE_FAILURE[module_key] = FAIL_REASON_DISABLED
+            results[module_key] = {"result": None, "cached": False}
+            continue
+        result, from_cache = _precheck_one_cache(info, llm_config)
+        results[module_key] = {"result": result, "cached": from_cache}
+    return results
+
+
+def _dispatch_llm_workers(
+    needs: dict[str, bool], llm_config: dict | None, force: bool,
+    a_indices, us_indices,
+    total_mv: float, total_cost: float, total_profit: float,
+    total_today_profit: float, holdings_count: int, categories: dict,
+    penetrated_assets: list[dict] | None, holdings_details: list[dict] | None,
+    sector_flow: list[dict] | None,
+) -> dict[str, dict]:
+    """对缓存未命中的模块提交线程池任务，返回结果字典。"""
+    if not any(needs.values()):
+        return {}
+
+    results_dict: dict[str, dict] = {}
+    _label_map: dict[str, str] = get_llm_module_names()
+
+    def _make_runner(label: str, fn: callable) -> callable:
+        """创建闭包：持独立 httpx.Client 运行 fn(c, llm_config)。"""
+        def _run() -> tuple[str | None, bool]:
+            logger.info("正在生成：%s...", _label_map.get(label, label))
+            c = httpx.Client(timeout=_LLM_TIMEOUT)
+            try:
+                return fn(c, llm_config)
+            finally:
+                c.close()
+        return _run
+
+    _MODULE_FNS: dict[str, callable] = {
+        "global_macro": lambda c, lc: generate_global_macro(
+            a_indices, us_indices, total_mv, total_profit, categories,
+            sector_flow=sector_flow, force=force, http_client=c, llm_config=lc,
+        ),
+        "expert_review": lambda c, lc: generate_expert_review(
+            total_mv, total_cost, total_profit, total_today_profit,
+            holdings_count, categories, penetrated_assets,
+            holdings_details=holdings_details, force=force,
+            http_client=c, llm_config=lc,
+        ),
+        "health_check": lambda c, lc: generate_health_check(
+            total_mv, total_cost, total_profit, total_today_profit,
+            holdings_count, categories, penetrated_assets,
+            holdings_details=holdings_details, force=force,
+            http_client=c, llm_config=lc,
+        ),
+        "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
+            total_mv, total_cost, total_profit, total_today_profit,
+            holdings_count, categories, penetrated_assets,
+            holdings_details=holdings_details, force=force,
+            http_client=c, llm_config=lc,
+        ),
+    }
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        _futures: dict[Future, str] = {
+            executor.submit(_make_runner(k, fn)): k
+            for k, fn in _MODULE_FNS.items() if needs.get(k)
+        }
+
+        for future in as_completed(_futures):
+            try:
+                result, from_cache = future.result()
+                key = _futures[future]
+                results_dict[key] = {"result": result, "cached": from_cache}
+                logger.info("%s生成完成" if result else "%s生成失败（跳过）", _label_map.get(key, key))
+            except Exception:
+                logger.warning("LLM 生成线程异常", exc_info=True)
+
+    return results_dict
+
+
 def generate_all_llm(
     a_indices: dict[str, dict[str, Any]],
     us_indices: dict[str, dict[str, Any]],
@@ -447,199 +608,47 @@ def generate_all_llm(
         (global_macro_html, expert_review_html, health_check_html, penetration_deep_html,
          global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached) 八元组
     """
-
     llm_config = get_llm_config()
     if llm_config is None:
         return (None, None, None, None, False, False, False, False)
 
-    # ── 每模块启用状态检查 ──
-    enabled_global_macro = _is_llm_module_enabled(llm_config, "global_macro")
-    enabled_expert_review = _is_llm_module_enabled(llm_config, "expert_review")
-    enabled_health_check = _is_llm_module_enabled(llm_config, "health_check")
-    enabled_penetration_deep = _is_llm_module_enabled(llm_config, "penetration_deep")
-
-    # ── 预计算指纹 + 缓存键（仅对已启用的模块） ──
-    fp_global_macro = _compute_fingerprint(
-        a_indices, us_indices, total_mv, total_profit, categories,
-    )
-    fp_expert_review = _build_llm_fingerprint(
-        total_mv=total_mv, total_cost=total_cost,
-        total_profit=total_profit, total_today_profit=total_today_profit,
-        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
-        categories=categories,
-    )
-    fp_health_check = _build_llm_fingerprint(
-        total_mv=total_mv, total_cost=total_cost,
-        total_profit=total_profit, total_today_profit=total_today_profit,
-        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
-        categories=categories,
-    )
-    fp_penetration_deep = _build_llm_fingerprint(
-        total_mv=total_mv, total_cost=total_cost,
-        total_profit=total_profit, total_today_profit=total_today_profit,
-        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
-        categories=categories,
-        full_penetration=True,
+    cache_info = _compute_module_cache_info(
+        llm_config, a_indices, us_indices,
+        total_mv, total_cost, total_profit, total_today_profit,
+        holdings_count, categories, penetrated_assets, holdings_details,
+        force,
     )
 
-    key_global_macro = _CACHE_PREFIX_LLM + f"global_macro_{fp_global_macro}"
-    key_expert_review = _CACHE_PREFIX_LLM + f"expert_review_{fp_expert_review}"
-    key_health_check = _CACHE_PREFIX_LLM + f"health_check_{fp_health_check}"
-    key_penetration_deep = _CACHE_PREFIX_LLM + f"penetration_deep_{fp_penetration_deep}"
+    precheck_results = _precheck_all_modules(llm_config, cache_info, force)
 
-    ttl_global_macro = _get_cache_ttl_llm("global_macro")
-    ttl_expert_review = _get_cache_ttl_llm("expert_review")
-    ttl_health_check = _get_cache_ttl_llm("health_check")
-    ttl_penetration_deep = _get_cache_ttl_llm("penetration_deep")
+    needs = {k: (v["result"] is None and _is_llm_module_enabled(llm_config, k))
+             for k, v in precheck_results.items()}
 
-    force_flag = force
-    can_cache_global_macro = not force_flag and llm_config.get("cache_enabled_global_macro", True)
-    can_cache_expert_review = not force_flag and llm_config.get("cache_enabled_expert_review", True)
-    can_cache_health_check = not force_flag and llm_config.get("cache_enabled_health_check", True)
-    can_cache_penetration_deep = not force_flag and llm_config.get("cache_enabled_penetration_deep", True)
+    worker_results = _dispatch_llm_workers(
+        needs, llm_config, force,
+        a_indices, us_indices, total_mv, total_cost, total_profit,
+        total_today_profit, holdings_count, categories,
+        penetrated_assets, holdings_details, sector_flow,
+    )
 
-    # ── 预检缓存（仅当缓存开启且非强制模式）──
-    def _precheck(cache_key, cache_ttl, can_cache, thinking_key):
-        if not can_cache:
-            return (None, False)
-        cached = cache_get(cache_key, cache_ttl)
-        if not cached:
-            return (None, False)
-        clean = _strip_token_line(cached)
-        model = _extract_model_from_cached(cached)
-        hint = _CACHE_LINE_MODEL_TPL.format(model=model) if model else _CACHE_LINE_HTML
-        if llm_config.get(thinking_key, False):
-            hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
-        return (clean + hint, True)
+    # 合并预检结果 + 工作线程结果
+    for k, v in worker_results.items():
+        if k in precheck_results:
+            precheck_results[k] = v
 
-    # ── 预检缓存（仅对已启用且缓存可用的模块）──
-    if enabled_global_macro:
-        global_macro_result, global_macro_cached_flag = _precheck(
-            key_global_macro, ttl_global_macro, can_cache_global_macro, "thinking_enabled_global_macro",
-        )
-    else:
-        logger.info("%s LLM 分析已禁用（enabled_llm.global_macro = false）", _MN("global_macro"))
-        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
-        global_macro_result, global_macro_cached_flag = None, False
+    # 提取最终结果
+    def _get(mk: str) -> tuple[str | None, bool]:
+        r = precheck_results.get(mk, {})
+        return (r.get("result"), r.get("cached", False))
 
-    if enabled_expert_review:
-        expert_review_result, expert_review_cached_flag = _precheck(
-            key_expert_review, ttl_expert_review, can_cache_expert_review, "thinking_enabled_expert_review",
-        )
-    else:
-        logger.info("%s LLM 分析已禁用（enabled_llm.expert_review = false）", _MN("expert_review"))
-        _LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_DISABLED
-        expert_review_result, expert_review_cached_flag = None, False
-
-    if enabled_health_check:
-        health_check_result, health_check_cached_flag = _precheck(
-            key_health_check, ttl_health_check, can_cache_health_check, "thinking_enabled_health_check",
-        )
-    else:
-        logger.info("%s LLM 分析已禁用（enabled_llm.health_check = false）", _MN("health_check"))
-        _LLM_MODULE_FAILURE["health_check"] = FAIL_REASON_DISABLED
-        health_check_result, health_check_cached_flag = None, False
-
-    if enabled_penetration_deep:
-        penetration_deep_result, penetration_deep_cached_flag = _precheck(
-            key_penetration_deep, ttl_penetration_deep, can_cache_penetration_deep, "thinking_enabled_penetration_deep",
-        )
-    else:
-        logger.info("%s LLM 分析已禁用（enabled_llm.penetration_deep = false）", _MN("penetration_deep"))
-        _LLM_MODULE_FAILURE["penetration_deep"] = FAIL_REASON_DISABLED
-        penetration_deep_result, penetration_deep_cached_flag = None, False
-
-    # ── 仅对缓存未命中的模块提交线程池任务 ──
-    needs_global_macro = global_macro_result is None and enabled_global_macro
-    needs_expert_review = expert_review_result is None and enabled_expert_review
-    needs_health_check = health_check_result is None and enabled_health_check
-    needs_penetration_deep = penetration_deep_result is None and enabled_penetration_deep
-
-    if needs_global_macro or needs_expert_review or needs_health_check or needs_penetration_deep:
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            _futures: dict[Future, str] = {}
-
-            if needs_global_macro:
-                def _run_global_macro() -> tuple[str | None, bool]:
-                    logger.info("正在生成：%s...", _MN("global_macro"))
-                    c = httpx.Client(timeout=_LLM_TIMEOUT)
-                    try:
-                        return generate_global_macro(
-                            a_indices, us_indices, total_mv, total_profit, categories,
-                            sector_flow=sector_flow, force=force_flag,
-                            http_client=c, llm_config=llm_config,
-                        )
-                    finally:
-                        c.close()
-                _futures[executor.submit(_run_global_macro)] = "global_macro"
-
-            if needs_expert_review:
-                def _run_expert_review() -> tuple[str | None, bool]:
-                    logger.info("正在生成：%s（耗时较长，请耐心等待）...", _MN("expert_review"))
-                    c = httpx.Client(timeout=_LLM_TIMEOUT)
-                    try:
-                        return generate_expert_review(
-                            total_mv, total_cost, total_profit, total_today_profit,
-                            holdings_count, categories, penetrated_assets,
-                            holdings_details=holdings_details, force=force_flag,
-                            http_client=c, llm_config=llm_config,
-                        )
-                    finally:
-                        c.close()
-                _futures[executor.submit(_run_expert_review)] = "expert_review"
-
-            if needs_health_check:
-                def _run_health_check() -> tuple[str | None, bool]:
-                    logger.info("正在生成：%s（耗时较长，请耐心等待）...", _MN("health_check"))
-                    c = httpx.Client(timeout=_LLM_TIMEOUT)
-                    try:
-                        return generate_health_check(
-                            total_mv, total_cost, total_profit, total_today_profit,
-                            holdings_count, categories, penetrated_assets,
-                            holdings_details=holdings_details, force=force_flag,
-                            http_client=c, llm_config=llm_config,
-                        )
-                    finally:
-                        c.close()
-                _futures[executor.submit(_run_health_check)] = "health_check"
-
-            if needs_penetration_deep:
-                def _run_penetration_deep() -> tuple[str | None, bool]:
-                    logger.info("正在生成：%s...", _MN("penetration_deep"))
-                    c = httpx.Client(timeout=_LLM_TIMEOUT)
-                    try:
-                        return generate_penetration_deep_analysis(
-                            total_mv, total_cost, total_profit, total_today_profit,
-                            holdings_count, categories, penetrated_assets,
-                            holdings_details=holdings_details, force=force_flag,
-                            http_client=c, llm_config=llm_config,
-                        )
-                    finally:
-                        c.close()
-                _futures[executor.submit(_run_penetration_deep)] = "penetration_deep"
-
-            _label_map: dict[str, str] = get_llm_module_names()
-
-            for future in as_completed(_futures):
-                try:
-                    result, from_cache = future.result()
-                    key = _futures[future]
-                    if key == "global_macro":
-                        global_macro_result, global_macro_cached_flag = result, from_cache
-                    elif key == "expert_review":
-                        expert_review_result, expert_review_cached_flag = result, from_cache
-                    elif key == "health_check":
-                        health_check_result, health_check_cached_flag = result, from_cache
-                    elif key == "penetration_deep":
-                        penetration_deep_result, penetration_deep_cached_flag = result, from_cache
-                    logger.info("%s生成完成" if result else "%s生成失败（跳过）", _label_map.get(key, key))
-                except Exception:
-                    logger.warning("LLM 生成线程异常", exc_info=True)
+    gm_r, gm_c = _get("global_macro")
+    er_r, er_c = _get("expert_review")
+    hc_r, hc_c = _get("health_check")
+    pd_r, pd_c = _get("penetration_deep")
 
     logger.info("LLM 生成完成: %s=%s, %s=%s, %s=%s, %s=%s",
-                _MN("global_macro"), "OK" if global_macro_result else "跳过",
-                _MN("expert_review"), "OK" if expert_review_result else "跳过",
-                _MN("health_check"), "OK" if health_check_result else "跳过",
-                _MN("penetration_deep"), "OK" if penetration_deep_result else "跳过")
-    return (global_macro_result, expert_review_result, health_check_result, penetration_deep_result,
-            global_macro_cached_flag, expert_review_cached_flag, health_check_cached_flag, penetration_deep_cached_flag)
+                _MN("global_macro"), "OK" if gm_r else "跳过",
+                _MN("expert_review"), "OK" if er_r else "跳过",
+                _MN("health_check"), "OK" if hc_r else "跳过",
+                _MN("penetration_deep"), "OK" if pd_r else "跳过")
+    return (gm_r, er_r, hc_r, pd_r, gm_c, er_c, hc_c, pd_c)
