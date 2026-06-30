@@ -525,7 +525,7 @@ def _cmd_generate_full() -> None:
             news_top_count=news_top_count, include_llm=True,
             llm_content=llm_content,
             details=details, a_indices=a_indices, us_indices=us_indices,
-            news_data=news_data, llm_cached=llm_cached,
+            news_data=news_data,
             news_llm_meta=news_llm_meta,
             early_warnings=_early_warnings, progress=reporter,
         )
