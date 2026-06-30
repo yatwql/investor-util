@@ -17,8 +17,10 @@ import threading
 import time
 from typing import Any
 
+from datetime import datetime, timezone, timedelta
+
 from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
-from src.python.registry import get_cache_ttl_defaults, get_prefix_type_map, get_exact_type_map
+from src.python.registry import get_cache_ttl_defaults, get_prefix_type_map, get_exact_type_map, get_registry
 
 _CACHE_DIR = "data/cache"
 _GZIP_THRESHOLD = 100 * 1024  # 100KB 以上的缓存自动 gzip
@@ -245,6 +247,37 @@ def clear_by_prefix(key_prefix: str) -> int:
     return count
 
 
+def clear_by_group(group_name: str) -> dict[str, int]:
+    """清除指定缓存组的所有缓存文件。
+
+    从 registry 自动推导该组包含的所有模块的缓存前缀和精确键名，
+    逐一调用 clear_by_prefix / clear。
+
+    Args:
+        group_name: 缓存组名，对应 DataModuleDef.cache_groups 中的值
+
+    Returns:
+        {模块名: 清除的文件数} 字典，方便日志/UI 展示
+    """
+    result: dict[str, int] = {}
+    for m in get_registry():
+        if group_name not in m.cache_groups:
+            continue
+        total = 0
+        for prefix in m.cache_prefixes:
+            total += clear_by_prefix(prefix)
+        for exact_key in m.exact_cache_keys:
+            path = _cache_path(exact_key)
+            gz_path = path + _GZIP_SUFFIX
+            file_exists = os.path.exists(path) or os.path.exists(gz_path)
+            clear(exact_key)
+            if file_exists:
+                total += 1
+        if total > 0:
+            result[m.name] = total
+    return result
+
+
 def get_cache_dir() -> str:
     """返回缓存目录绝对路径。"""
     return os.path.abspath(_CACHE_DIR)
@@ -326,7 +359,7 @@ def cleanup_expired(dry_run: bool = False) -> int:
             fpath = os.path.join(_CACHE_DIR, fname)
 
             # 确定数据类型
-            data_type = "news"  # 默认给较短的 TTL
+            data_type = "default"  # fallback 到 get_ttl() 的 CACHE_DAILY（86400s）
             if fkey in exact_map:
                 data_type = exact_map[fkey]
             else:
@@ -488,6 +521,27 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
 # ── 从 config.json 读取缓存 TTL ──────────────────────────
 
 
+
+def _is_market_open() -> bool:
+    """检查 A 股市场当前是否在交易时段。
+
+    判断逻辑：北京时区，工作日 09:30–15:00。
+    非此时间段（周末、非交易时段）返回 False，让价格缓存保持收盘价。
+
+    Returns:
+        是否在交易时段内
+    """
+    try:
+        now = datetime.now(timezone(timedelta(hours=8)))
+        if now.weekday() >= 5:  # 周六、周日
+            return False
+        open_time = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        close_time = now.replace(hour=15, minute=0, second=0, microsecond=0)
+        return open_time <= now <= close_time
+    except Exception:
+        return False  # 异常时保守处理：视为非交易时段
+
+
 def get_ttl(data_type: str) -> float:
     """获取指定数据类型的缓存过期时间（秒）。
 
@@ -508,6 +562,14 @@ def get_ttl(data_type: str) -> float:
             val = float(ttl_config[data_type])
             if val > 0:
                 return val
+        # ── 交易时段内：配置声明的数据类型用短 TTL 确保实时性 ──
+        market_hour_aware: list = config.get("market_hour_aware") or []
+        if _is_market_open() and data_type in market_hour_aware:
+            market_ttl = config.get("market_hour_ttl", 60)
+            try:
+                return max(60, float(market_ttl))
+            except (ValueError, TypeError):
+                return 60
     except (ImportError, TypeError, ValueError, KeyError, AttributeError, RuntimeError):
         logger.debug("get_ttl: 配置读取失败，使用默认值")
     return get_cache_ttl_defaults().get(data_type, CACHE_DAILY)

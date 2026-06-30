@@ -1,7 +1,12 @@
 {
   "max_retries": 2,
-  "enabled_llm_news_correlation": true,
-
+  "enabled_llm": {
+    "global_macro": true,
+    "expert_review": true,
+    "health_check": true,
+    "penetration_deep": false,
+    "news_correlation": false
+  },
   "system_prompt_global_macro": null,
   "model_global_macro": null,
   "temperature_global_macro": 0.3,
@@ -12,9 +17,8 @@
   "thinking_enabled_global_macro": false,
   "thinking_budget_global_macro": 4000,
   "reasoning_effort_global_macro": "high",
-
   "system_prompt_expert_review": null,
-  "model_expert_review": "deepseek-v4-pro",
+  "model_expert_review": null,
   "temperature_expert_review": 0.8,
   "max_tokens_expert_review": 8192,
   "timeout_expert_review": 120,
@@ -23,7 +27,6 @@
   "thinking_enabled_expert_review": true,
   "thinking_budget_expert_review": 16000,
   "reasoning_effort_expert_review": "high",
-
   "system_prompt_health_check": null,
   "model_health_check": null,
   "temperature_health_check": 0.5,
@@ -34,7 +37,6 @@
   "thinking_enabled_health_check": true,
   "thinking_budget_health_check": 12000,
   "reasoning_effort_health_check": "high",
-
   "system_prompt_penetration_deep": null,
   "model_penetration_deep": null,
   "temperature_penetration_deep": 0.4,
@@ -45,7 +47,6 @@
   "thinking_enabled_penetration_deep": false,
   "thinking_budget_penetration_deep": 8000,
   "reasoning_effort_penetration_deep": "high",
-
   "system_prompt_news_correlation": null,
   "model_news_correlation": null,
   "temperature_news_correlation": 0.1,
@@ -54,5 +55,8 @@
   "cache_enabled_news_correlation": true,
   "thinking_enabled_news_correlation": false,
   "thinking_budget_news_correlation": 4000,
-  "reasoning_effort_news_correlation": "high"
+  "reasoning_effort_news_correlation": "high",
+  "pricing": {
+    "currency": "CNY"
+  }
 }

@@ -1,4 +1,4 @@
-# 投资分析报告小工具 — 技术文档
+# 投资分析报告小工具 — 技术设计
 
 创建日期：2026-06-28
 最后更新：2026-06-30
@@ -59,7 +59,7 @@
 
 ## 缓存策略
 
-详见 `README.md` 的「缓存文件指引」章节。
+详见 [配置指南缓存章节](../manuals/how-to-config.md#cache_ttl-可调参数)。
 
 ### 新增：行业/概念缓存
 
@@ -86,7 +86,7 @@
 - 关键词富化 4 种类型：持仓(0) → 穿透(1) → 概念(2) → 行业(3)
 - 概念类型：来源为东方财富 push2 API 的行业分类和概念板块
 - HTML 富化显示：蓝(持仓) / 紫(穿透) / 橙(概念) / 灰(行业)
-- LLM 二次关联分析（可选）：`enabled_llm_news_correlation` 配置开启
+- LLM 二次关联分析（可选）：`enabled_llm.news_correlation` 配置开启
 
 ### 行业/概念数据流
 
@@ -125,7 +125,7 @@ investor-util/
 │   │   ├── cache.py              # 缓存引擎
 │   │   ├── fetcher.py            # 数据获取调度
 │   │   ├── reader.py             # 持仓 Excel 解析
-│   │   ├── llm/                  # LLM 集成（9 子模块：api/pricing/content/session/circuit_breaker/fingerprint/markdown/generators/prompts）
+│   │   ├── llm/                  # LLM 集成（8 子模块：api/pricing/session/circuit_breaker/fingerprint/markdown/generators/prompts）
 │   │   ├── constants.py          # 共享常量（CACHE_DAILY/WEEKLY/MONTHLY、模型定价）
 │   │   ├── models.py             # 数据模型（Holding dataclass）
 │   │   ├── logger.py             # 日志模块
@@ -166,7 +166,7 @@ investor-util/
 │   │   │   └── report_template.html
 │   └── test/                     # 测试
 │       ├── __init__.py
-│       └── test_*.py（25 个）
+│       └── test_*.py（26 个）
 ├── data/
 │   ├── holdings/                 # 持仓 xlsx 文件
 │   ├── cache/                    # API 响应缓存
@@ -194,7 +194,7 @@ investor-util/
 
 ## LLM 客户端技术要点
 
-`src/python/llm/` 包拆分架构（原 2550 行 `llm_client.py` 解耦为 9 子模块）：
+`src/python/llm/` 包拆分架构（原 2550 行 `llm_client.py` 解耦为 8 子模块）：
 
 | 模块 | 职责 |
 |------|------|
@@ -206,7 +206,7 @@ investor-util/
 | `circuit_breaker.py` | 端点熔断器 |
 | `fingerprint.py` | 各种缓存指纹计算 |
 | `markdown.py` | Markdown→HTML 渲染 |
-| `content.py` | 兼容存根，re-exports prompts.py + generators.py |
+| `content.py` | 已删除（原兼容存根） |
 
 `__init__.py` 导出所有公共 API 保持向后兼容。
 

@@ -11,7 +11,7 @@ logger = logging.getLogger("invest")
 
 __all__ = [
     "_compute_fingerprint", "_extract_stable_holdings", "_extract_stable_penetration",
-    "_expert_review_fingerprint", "_health_check_fingerprint", "_penetration_deep_fingerprint",
+    "_build_llm_fingerprint",
     "_get_cache_ttl_llm",
 ]
 
@@ -61,7 +61,7 @@ def _extract_stable_penetration(penetrated_assets: list[dict] | None,
     return result
 
 
-def _expert_review_fingerprint(
+def _build_llm_fingerprint(
     total_mv: float = 0,
     total_cost: float = 0,
     total_profit: float = 0,
@@ -69,58 +69,31 @@ def _expert_review_fingerprint(
     holdings_details: list[dict] | None = None,
     penetrated_assets: list[dict] | None = None,
     categories: dict | None = None,
+    full_penetration: bool = False,
 ) -> str:
-    """计算智囊团深度回测的缓存指纹。
+    """构建 LLM 模块的缓存指纹，统一剔除行情波动字段。
 
-    使用 _extract_stable_holdings 剔除行情波动，
-    穿透资产仅取 (name, codes) 不包含 mv/ratio 等行情字段。
-    委托 _compute_fingerprint 计算哈希。
+    替代 _expert_review_fingerprint / _health_check_fingerprint / _penetration_deep_fingerprint。
+
+    使用 _extract_stable_holdings 剔除行情波动；
+    穿透资产默认仅取 (name, codes)，full_penetration=True 时额外包含
+    mv/sector/ratio（穿透深度分析需要穿透数据更新触发缓存失效）。
+
+    Args:
+        total_mv: 总市值
+        total_cost: 总成本
+        total_profit: 总盈亏
+        total_today_profit: 本日盈亏
+        holdings_details: 持仓明细（仅提取 name/code/cost）
+        penetrated_assets: 穿透资产列表
+        categories: 分类汇总
+        full_penetration: 为 True 时穿透资产包含 mv/sector/ratio（用于穿透深度分析）
+
+    Returns:
+        指纹哈希值（前 12 位）
     """
     _details = _extract_stable_holdings(holdings_details)
-    _pen = _extract_stable_penetration(penetrated_assets, full=False)
-    return _compute_fingerprint(
-        total_mv, total_cost, total_profit, total_today_profit,
-        categories, _details, _pen,
-    )
-
-
-def _health_check_fingerprint(
-    total_mv: float = 0,
-    total_cost: float = 0,
-    total_profit: float = 0,
-    total_today_profit: float = 0,
-    holdings_details: list[dict] | None = None,
-    penetrated_assets: list[dict] | None = None,
-    categories: dict | None = None,
-) -> str:
-    """计算持仓体检报告的缓存指纹。
-
-    与 _expert_review_fingerprint 完全同构，统一使用 _extract_stable_* 辅助函数。
-    """
-    _details = _extract_stable_holdings(holdings_details)
-    _pen = _extract_stable_penetration(penetrated_assets, full=False)
-    return _compute_fingerprint(
-        total_mv, total_cost, total_profit, total_today_profit,
-        categories, _details, _pen,
-    )
-
-
-def _penetration_deep_fingerprint(
-    total_mv: float = 0,
-    total_cost: float = 0,
-    total_profit: float = 0,
-    total_today_profit: float = 0,
-    holdings_details: list[dict] | None = None,
-    penetrated_assets: list[dict] | None = None,
-    categories: dict | None = None,
-) -> str:
-    """计算穿透深度分析的缓存指纹。
-
-    与 _expert_review_fingerprint 区别：穿透资产额外包含 mv/sector/ratio，
-    使得仅穿透数据更新时也能触发缓存失效。
-    """
-    _details = _extract_stable_holdings(holdings_details)
-    _pen = _extract_stable_penetration(penetrated_assets, full=True)
+    _pen = _extract_stable_penetration(penetrated_assets, full=full_penetration)
     return _compute_fingerprint(
         total_mv, total_cost, total_profit, total_today_profit,
         categories, _details, _pen,

@@ -25,17 +25,18 @@ MenuItem = tuple[str, str, Optional[Callable[[], None]], bool]
 
 MENU_ITEMS: list[MenuItem] = [
     ("E", "生成基础版Excel分析报告", None, False),
-    ("N", "生成包含新闻的Excel分析报告", None, False),
     ("H", "生成基础版HTML分析报告", None, False),
     ("B", "生成全系列包含新闻的报告(Excel+HTML)", None, False),
     ("L", "生成全系列完整版报告(Excel+HTML)", None, False),
     ("C", "配置持仓信息目录", None, False),
     ("F", "配置持仓信息文件名", None, False),
-    ("R", "配置报告输出目录", None, False),
+    ("O", "配置报告输出目录", None, False),
     ("1", "更新基础类缓存", None, False),
     ("2", "更新持仓类缓存", None, False),
     ("3", "清理过期缓存文件", None, False),
     ("4", "查看缓存统计信息", None, False),
+    ("S", "配置支持LLM的报告模块", None, False),
+    ("R", "刷新配置", None, False),
     ("X", "退出", None, True),
 ]
 
@@ -63,8 +64,9 @@ def _print_sep(char: str = "=", width: int = 56) -> None:
 
 def _print_header() -> None:
     """打印程序标题头（仅启动时一次）。"""
+    from src.python.constants import APP_VERSION
     _print_sep()
-    print("        个人投资分析报告生成小助手")
+    print(f"        个人投资分析报告生成小助手  v{APP_VERSION}")
     _print_sep()
 
 
@@ -108,12 +110,12 @@ def _show_llm_config_status() -> None:
         endpoint = llm_config.get("endpoint") or "默认"
         ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" else endpoint
         print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
-        model_global_macro = llm_config.get("model_global_macro") or model
-        model_expert_review = llm_config.get("model_expert_review") or model
-        model_news_correlation = llm_config.get("model_news_correlation") or model
-        model_health_check = llm_config.get("model_health_check") or model
-        model_penetration_deep = llm_config.get("model_penetration_deep") or model
-        print(f"         模型路由: 全球政经局势={model_global_macro} / 智囊团深度复盘={model_expert_review} / 财经新闻热点与持仓关联分析={model_news_correlation} / 持仓体检报告={model_health_check} / 穿透深度分析={model_penetration_deep}")
+        from src.python.registry import get_llm_module_names
+        _route_parts = []
+        for _sfx, _name in get_llm_module_names().items():
+            _mv = llm_config.get(f"model_{_sfx}") or model
+            _route_parts.append(f"{_name}={_mv}")
+        print(f"         模型路由: {' / '.join(_route_parts)}")
     else:
         print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
 

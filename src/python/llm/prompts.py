@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("invest")
 
@@ -46,7 +46,7 @@ value 为 FAIL_REASON_* 常量。每次新生成开始时清除对应 key。"""
 #  Prompt 模板
 # ═══════════════════════════════════════════════════════════
 
-_SYSTEM_GLOBAL_MACRO = """你是一位资深宏观经济学家。基于市场数据输出中文全球政经局势分析（500字内）。
+_SYSTEM_GLOBAL_MACRO = """你是一位资深宏观经济学家。基于市场数据输出中文全球政经局势（500字内）。
 分3-4段，覆盖主要经济体政策走向、地缘风险、对持仓潜在影响。纯文本，不要使用HTML标签。"""
 
 _SYSTEM_EXPERT_REVIEW = """你是投资智囊团召集人，审计用户投资组合后按三阶段输出：
@@ -136,7 +136,7 @@ sentiment 字段判断该新闻对持仓的利好/利空影响（结合行业和
 
 
 # ═══════════════════════════════════════════════════════════
-#  共享持仓明细格式化（智囊团 / 体检 / 穿透共用）
+#  共享持仓明细格式化（智囊团深度复盘 / 持仓体检报告 / 穿透深度分析共用）
 # ═══════════════════════════════════════════════════════════
 
 
@@ -261,8 +261,8 @@ def _build_expert_review_prompt(
     total_today_profit: float,
     holdings_count: int,
     categories: dict,
-    penetrated_assets: Optional[list[dict]] = None,
-    holdings_details: Optional[list[dict]] = None,
+    penetrated_assets: list[dict] | None = None,
+    holdings_details: list[dict] | None = None,
 ) -> str:
     """构建智囊团深度复盘的用户提示词（紧凑格式）。
 
@@ -315,8 +315,8 @@ def _build_health_check_prompt(
     total_today_profit: float,
     holdings_count: int,
     categories: dict,
-    penetrated_assets: Optional[list[dict]] = None,
-    holdings_details: Optional[list[dict]] = None,
+    penetrated_assets: list[dict] | None = None,
+    holdings_details: list[dict] | None = None,
 ) -> str:
     """构建持仓体检报告的用户提示词。
 
@@ -369,8 +369,8 @@ def _build_penetration_deep_prompt(
     total_profit: float,
     holdings_count: int,
     categories: dict,
-    penetrated_assets: Optional[list[dict]] = None,
-    holdings_details: Optional[list[dict]] = None,
+    penetrated_assets: list[dict] | None = None,
+    holdings_details: list[dict] | None = None,
 ) -> str:
     """构建穿透深度分析的用户提示词。
 
@@ -454,7 +454,7 @@ def _build_holdings_summary(
     penetrated_assets: list | None = None,
     industry_data: dict[str, dict] | None = None,
 ) -> str:
-    """构建持仓摘要文本（紧凑格式），供新闻关联分析 Prompt 使用。
+    """构建持仓摘要文本（紧凑格式），供财经新闻热点与持仓关联分析 Prompt 使用。
 
     可选注入行业分类和概念板块信息（industry_data），
     使 LLM 能更准确判断新闻对持仓的利好/利空影响。
@@ -503,7 +503,7 @@ def _build_holdings_summary(
 
 
 def _build_news_correlation_summary(news_data: list[dict]) -> str:
-    """构建新闻摘要文本（紧凑格式），供新闻关联分析 Prompt 使用。
+    """构建新闻摘要文本（紧凑格式），供财经新闻热点与持仓关联分析 Prompt 使用。
 
     Args:
         news_data: 关键词匹配后的新闻列表，取前 30 条

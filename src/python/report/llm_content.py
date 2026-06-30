@@ -17,7 +17,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.styles import CONTENT_FONT
-from src.python.llm_client import (
+from src.python.llm import (
     FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_API_ERROR,
     FAIL_REASON_NETWORK_ERROR,
@@ -25,6 +25,7 @@ from src.python.llm_client import (
     FAIL_REASON_CIRCUIT_OPEN,
     _LLM_MODULE_FAILURE,
 )
+from src.python.registry import get_llm_module_name
 
 logger = logging.getLogger("invest")
 
@@ -102,12 +103,25 @@ _THINKING_FONT = Font(
 )
 
 
-_MODULE_KEY_MAP: dict[str, str] = {
-    "7.全球政经局势": "global_macro",
-    "8.智囊团深度复盘": "expert_review",
-    "9.持仓体检报告": "health_check",
-    "10.穿透深度分析": "penetration_deep",
-}
+_MODULE_KEY_MAP: dict[str, str] = {}
+
+def _get_module_key_map() -> dict[str, str]:
+    """从 registry 构建 Excel 页签标题 → settings_suffix 映射。
+
+    格式：{"8.全球政经局势": "global_macro", ...}
+    页签号由 LLM 模块遍历顺序派生（从 8 开始）。
+    注意：news_correlation 无独立 LLM 页签（合并到新闻页签），排除在外。
+    """
+    if _MODULE_KEY_MAP:
+        return _MODULE_KEY_MAP
+    from src.python.registry import get_registry
+    idx = 8
+    for m in get_registry():
+        if m.is_llm and m.settings_suffix and m.settings_suffix != "news_correlation":
+            title = f"{idx}.{m.name}"
+            _MODULE_KEY_MAP[title] = m.settings_suffix
+            idx += 1
+    return _MODULE_KEY_MAP
 
 _PLACEHOLDER_BY_REASON: dict[str, str] = {
     FAIL_REASON_NOT_CONFIGURED: "本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）",
@@ -120,7 +134,7 @@ _PLACEHOLDER_BY_REASON: dict[str, str] = {
 
 def _get_placeholder(title: str) -> str:
     """根据页签标题查找对应的失败原因占位文本。"""
-    mk = _MODULE_KEY_MAP.get(title)
+    mk = _get_module_key_map().get(title)
     if mk:
         reason = _LLM_MODULE_FAILURE.get(mk)
         if reason in _PLACEHOLDER_BY_REASON:
@@ -240,26 +254,27 @@ def write_llm_sheets(
     Returns:
         (global_macro_text, expert_review_text, health_check_text, penetration_deep_text) 纯文本四元组，供 TUI 展示
     """
+    _reverse = {v: k for k, v in _get_module_key_map().items()}
     ws7 = wb.create_sheet()
-    ws7.title = "7.全球政经局势"
+    ws7.title = _reverse.get("global_macro", get_llm_module_name("global_macro"))
     ws8 = wb.create_sheet()
-    ws8.title = "8.智囊团深度复盘"
+    ws8.title = _reverse.get("expert_review", get_llm_module_name("expert_review"))
     ws9 = wb.create_sheet()
-    ws9.title = "9.持仓体检报告"
+    ws9.title = _reverse.get("health_check", get_llm_module_name("health_check"))
     wsA = wb.create_sheet()
-    wsA.title = "10.穿透深度分析"
+    wsA.title = _reverse.get("penetration_deep", get_llm_module_name("penetration_deep"))
 
     content7, content8, content9, contentA = llm_content
     global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached = llm_cached
     name7, name8, name9, nameA = model_names
     think7, think8, think9, thinkA = thinking
 
-    _write_content_sheet(ws7, "7.全球政经局势", content7, from_cache=global_macro_cached, model_name=name7, thinking_enabled=think7)
-    _write_content_sheet(ws8, "8.智囊团深度复盘", content8, from_cache=expert_review_cached, model_name=name8, thinking_enabled=think8)
-    _write_content_sheet(ws9, "9.持仓体检报告", content9, from_cache=health_check_cached, model_name=name9, thinking_enabled=think9)
-    _write_content_sheet(wsA, "10.穿透深度分析", contentA, from_cache=penetration_deep_cached, model_name=nameA, thinking_enabled=thinkA)
+    _write_content_sheet(ws7, _reverse.get("global_macro", get_llm_module_name("global_macro")), content7, from_cache=global_macro_cached, model_name=name7, thinking_enabled=think7)
+    _write_content_sheet(ws8, _reverse.get("expert_review", get_llm_module_name("expert_review")), content8, from_cache=expert_review_cached, model_name=name8, thinking_enabled=think8)
+    _write_content_sheet(ws9, _reverse.get("health_check", get_llm_module_name("health_check")), content9, from_cache=health_check_cached, model_name=name9, thinking_enabled=think9)
+    _write_content_sheet(wsA, _reverse.get("penetration_deep", get_llm_module_name("penetration_deep")), contentA, from_cache=penetration_deep_cached, model_name=nameA, thinking_enabled=thinkA)
 
-    logger.info("LLM 分析章节写入完成（含穿透深度分析）")
+    logger.info("LLM 分析章节写入完成（含%s）", get_llm_module_name("penetration_deep"))
 
     # 返回纯文本内容，供 TUI 展示
     return (

@@ -14,6 +14,7 @@ import logging
 import re
 from typing import Any
 
+from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -53,7 +54,7 @@ def compute_early_warnings(
 
     两个独立维度：
       1. 行业资金流向联动 — 穿透资产的行业概念与今日资金流向匹配
-      2. 新闻情绪聚合 — LLM 新闻分析按持仓品种汇总
+      2. 新闻情绪聚合 — 财经新闻热点与持仓关联分析按持仓品种汇总
 
     Args:
         holdings: 持仓列表（Holding objects），用于获取名称/代码
@@ -173,7 +174,7 @@ def _compute_sentiment_alerts(
     """新闻情绪聚合预警。
 
     从每条新闻的 llm_analysis.sentiment 字段聚合，按持仓品种汇总。
-    仅当 LLM 新闻关联分析启用时生效。
+    仅当财经新闻热点与持仓关联分析启用时生效。
 
     Returns:
         [{code, name, total_mentions, positive, negative, neutral,
@@ -279,8 +280,8 @@ def write_early_warning_sheet(ws, early_warnings: dict) -> None:
         ws: 目标工作表
         early_warnings: compute_early_warnings() 返回的字典
     """
-    ws.title = "11.智能预警"
-    row = write_title_row(ws, 1, "智能预警", max(_SECTOR_COLS, _SENTIMENT_COLS))
+    ws.title = f"7.{get_report_sheet_name('early_warning')}"
+    row = write_title_row(ws, 1, get_report_sheet_name('early_warning'), max(_SECTOR_COLS, _SENTIMENT_COLS))
 
     # ── 第一段：行业资金流向联动预警 ────────────────────────
     row += 1
@@ -323,7 +324,7 @@ def write_early_warning_sheet(ws, early_warnings: dict) -> None:
     has_llm_news = early_warnings.get("has_llm_news", False)
 
     if not has_llm_news:
-        row = _write_empty_row(ws, row, "开启 LLM 新闻关联分析（enabled_llm_news_correlation = true）后可显示新闻情绪聚合。")
+        row = _write_empty_row(ws, row, f"开启{get_llm_module_name('news_correlation')}后可显示新闻情绪聚合。")
     elif not sentiment_alerts:
         row = _write_empty_row(ws, row, "暂无新闻情绪聚合数据。")
     else:

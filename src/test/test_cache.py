@@ -714,6 +714,22 @@ class TestCleanupExpired(CacheTestBase):
         self.assertEqual(count, 0)
 
     @patch("src.python.cache.time.time")
+    def test_trading_calendar_not_cleaned_early(self, mock_time):
+        """交易日历注册了 exact key → 使用 calendar TTL，不会被 news 的短 TTL 误删。"""
+        # trading_calendar 未注册时，data_type 回退到 "news" (TTL=900)
+        # 写入 age=2000s（>900s 但 < calendar 的 1209600s）
+        mock_time.return_value = 10000.0
+        self._set_time_and_write("trading_calendar", ["2026-01-01"], ts=8000.0)
+
+        from src.python.cache import cleanup_expired
+
+        count = cleanup_expired()
+        self.assertEqual(count, 0, "trading_calendar 已注册 exact key，不应被误删")
+
+        path = os.path.join(self.cache_dir, "trading_calendar.json")
+        self.assertTrue(os.path.exists(path))
+
+    @patch("src.python.cache.time.time")
     @patch("src.python.cache.get_ttl")
     def test_sorted_file_processing(self, mock_ttl, mock_time):
         """文件按名称排序处理，不报错。"""
@@ -738,7 +754,8 @@ class TestCleanupExpired(CacheTestBase):
 class TestGetTTL(unittest.TestCase):
     """测试 get_ttl 的配置读取、默认值与兜底逻辑。"""
 
-    def test_known_type_returns_default(self):
+    @patch("src.python.cache._is_market_open", return_value=False)
+    def test_known_type_returns_default(self, mock_market):
         """已知类型未配置 → 返回默认值。"""
         from src.python.cache import CACHE_DAILY, get_ttl
 
@@ -772,49 +789,59 @@ class TestGetTTL(unittest.TestCase):
 
         self.assertEqual(get_ttl("price"), 12345.0)
 
+    @patch("src.python.cache._is_market_open", return_value=False)
     @patch("src.python.config.get_config")
-    def test_config_zero_value_ignored(self, mock_get_config):
+    def test_config_zero_value_ignored(self, mock_get_config, mock_market):
         """配置中 TTL 为 0 → 忽略该值，使用默认。"""
-        from src.python.cache import CACHE_DAILY, get_ttl
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
 
         mock_get_config.return_value = {
             "cache_ttl": {"price": 0},
         }
-        self.assertEqual(get_ttl("price"), CACHE_DAILY)
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
 
+    @patch("src.python.cache._is_market_open", return_value=False)
     @patch("src.python.config.get_config")
-    def test_config_negative_value_ignored(self, mock_get_config):
+    def test_config_negative_value_ignored(self, mock_get_config, mock_market):
         """配置中 TTL 为负数 → 忽略该值，使用默认。"""
-        from src.python.cache import CACHE_DAILY, get_ttl
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
 
         mock_get_config.return_value = {
             "cache_ttl": {"price": -100},
         }
-        self.assertEqual(get_ttl("price"), CACHE_DAILY)
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
 
+    @patch("src.python.cache._is_market_open", return_value=False)
     @patch("src.python.config.get_config")
-    def test_config_exception_falls_back(self, mock_get_config):
+    def test_config_exception_falls_back(self, mock_get_config, mock_market):
         """get_config 抛出异常 → 返回默认值。"""
         mock_get_config.side_effect = RuntimeError("config error")
-        from src.python.cache import CACHE_DAILY, get_ttl
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
 
-        self.assertEqual(get_ttl("price"), CACHE_DAILY)
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
 
+    @patch("src.python.cache._is_market_open", return_value=False)
     @patch("src.python.config.get_config")
-    def test_config_missing_cache_ttl_key(self, mock_get_config):
+    def test_config_missing_cache_ttl_key(self, mock_get_config, mock_market):
         """配置中无 cache_ttl 键 → 返回默认值。"""
         mock_get_config.return_value = {}
-        from src.python.cache import CACHE_DAILY, get_ttl
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
 
-        self.assertEqual(get_ttl("price"), CACHE_DAILY)
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
 
+    @patch("src.python.cache._is_market_open", return_value=False)
     @patch("src.python.config.get_config")
-    def test_config_cache_ttl_is_none(self, mock_get_config):
+    def test_config_cache_ttl_is_none(self, mock_get_config, mock_market):
         """配置中 cache_ttl 为 None → 返回默认值。"""
         mock_get_config.return_value = {"cache_ttl": None}
-        from src.python.cache import CACHE_DAILY, get_ttl
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
 
-        self.assertEqual(get_ttl("price"), CACHE_DAILY)
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
 
 
 # ═══════════════════════════════════════════════════════════
@@ -975,6 +1002,69 @@ class TestGzipCache(CacheTestBase):
 
         result = get("fp_complex", 600)
         self.assertEqual(result, complex_data)
+
+
+# ═══════════════════════════════════════════════════════════
+#  clear_by_group 测试
+# ═══════════════════════════════════════════════════════════
+
+
+class TestClearByGroup(CacheTestBase):
+    """测试 clear_by_group 函数。"""
+
+    def test_clear_refresh_group_deletes_matching(self):
+        """refresh 组清除基金/新闻/行业/分红/盈利预测缓存，保留 preload 组。"""
+        self._write_cache("fund_perf_000001", {"d": 1}, ts=1000.0)
+        self._write_cache("news_abc", {"d": 2}, ts=1000.0)
+        self._write_cache("industry_600000", {"d": 3}, ts=1000.0)
+        self._write_cache("dividend_600000", {"d": 4}, ts=1000.0)
+        self._write_cache("price_600000", {"d": 5}, ts=1000.0)  # preload 组，不应删除
+
+        from src.python.cache import clear_by_group
+
+        result = clear_by_group("refresh")
+
+        for key in ("fund_perf_000001", "news_abc", "industry_600000", "dividend_600000"):
+            self.assertFalse(os.path.exists(os.path.join(self.cache_dir, f"{key}.json")))
+        self.assertTrue(os.path.exists(os.path.join(self.cache_dir, "price_600000.json")))
+        self.assertIn("基金业绩排名", result)
+
+    def test_clear_preload_group(self):
+        """preload 组清除价格/指数/LLM 缓存，保留 refresh 组。"""
+        self._write_cache("price_000001", {"d": 1}, ts=1000.0)
+        self._write_cache("index_sh000001", {"d": 2}, ts=1000.0)
+        self._write_cache("llm_global_macro_abc", {"d": 3}, ts=1000.0)
+        self._write_cache("news_abc", {"d": 4}, ts=1000.0)  # refresh 组
+
+        from src.python.cache import clear_by_group
+
+        result = clear_by_group("preload")
+
+        for key in ("price_000001", "index_sh000001", "llm_global_macro_abc"):
+            self.assertFalse(os.path.exists(os.path.join(self.cache_dir, f"{key}.json")))
+        self.assertTrue(os.path.exists(os.path.join(self.cache_dir, "news_abc.json")))
+        self.assertIn("股票价格", result)
+
+    def test_clear_refresh_clears_exact_keys(self):
+        """refresh 组也清除 fund_benchmarks 精确键名。"""
+        self._write_cache("fund_benchmarks", {"d": 1}, ts=1000.0)
+        from src.python.cache import clear_by_group
+
+        result = clear_by_group("refresh")
+        self.assertFalse(os.path.exists(os.path.join(self.cache_dir, "fund_benchmarks.json")))
+        self.assertIn("基金业绩基准", result)
+
+    def test_clear_unknown_group(self):
+        """未知组名返回空字典。"""
+        from src.python.cache import clear_by_group
+
+        self.assertEqual(clear_by_group("nonexistent"), {})
+
+    def test_clear_group_empty_dir(self):
+        """空目录不报错。"""
+        from src.python.cache import clear_by_group
+
+        self.assertEqual(clear_by_group("refresh"), {})
 
 
 if __name__ == "__main__":

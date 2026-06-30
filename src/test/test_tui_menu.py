@@ -32,8 +32,8 @@ class TestMenuItems(unittest.TestCase):
     """MENU_ITEMS 结构完整性测试。"""
 
     def test_item_count(self) -> None:
-        """菜单项应为 13 个。"""
-        self.assertEqual(len(MENU_ITEMS), 13)
+        """菜单项应为 14 个。"""
+        self.assertEqual(len(MENU_ITEMS), 14)
 
     def test_first_item_excel(self) -> None:
         """第一项快捷键 E。"""
@@ -45,7 +45,7 @@ class TestMenuItems(unittest.TestCase):
 
     def test_last_item_exit(self) -> None:
         """最后一项快捷键 X，is_exit=True。"""
-        key, label, cb, is_exit = MENU_ITEMS[12]
+        key, label, cb, is_exit = MENU_ITEMS[13]
         self.assertEqual(key, "X")
         self.assertIn("退出", label)
         self.assertIsNone(cb)
@@ -79,7 +79,7 @@ class TestIndexByKey(unittest.TestCase):
         self.assertEqual(_index_by_key("E"), 0)
 
     def test_find_X(self) -> None:
-        self.assertEqual(_index_by_key("X"), 12)
+        self.assertEqual(_index_by_key("X"), 13)
 
     def test_find_nonexistent(self) -> None:
         self.assertIsNone(_index_by_key("Z"))
@@ -89,7 +89,7 @@ class TestIndexByKey(unittest.TestCase):
         self.assertIsNone(_index_by_key("e"))
 
     def test_find_number(self) -> None:
-        self.assertEqual(_index_by_key("1"), 8)
+        self.assertEqual(_index_by_key("1"), 7)
 
     def test_find_empty(self) -> None:
         self.assertIsNone(_index_by_key(""))

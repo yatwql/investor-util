@@ -21,6 +21,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.models import Holding
+from src.python.registry import get_llm_module_name
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -259,7 +260,7 @@ def build_news_data(
     与持仓名称/代码及穿透 TOP10 资产进行关键词匹配，
     按关联度排序返回 TOP N。
 
-    若 llm_settings.json 中 enabled_llm_news_correlation 为 true，自动启用 LLM 二次分析，
+    若 llm_settings.json 中 enabled_llm.news_correlation 为 true，自动启用 LLM 二次分析，
     对新闻逐条判定关联度并给出原因分析，结果写入 llm_analysis 字段。
 
     Args:
@@ -283,7 +284,7 @@ def build_news_data(
     from src.python.providers.news_keywords import build_holding_keywords
 
     keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
-    logger.info("新闻关联关键词（含穿透）: %s", keywords)
+    logger.info("%s关键词（含穿透）: %s", get_llm_module_name("news_correlation"), keywords)
 
     # ── 行业/概念关键词扩展 ──────────────────────────────────────
     _industry_data: dict[str, dict] = {}
@@ -349,7 +350,8 @@ def build_news_data(
     }
 
     if news_items:
-        logger.info("新闻关联完成: 获取 %d 条, 匹配 %d 条",
+        logger.info("%s完成: 获取 %d 条, 匹配 %d 条",
+                    get_llm_module_name("news_correlation"),
                     len(news_items), sum(1 for n in news_items if n.get("matched_keywords")))
     else:
         logger.warning("新闻获取失败")
@@ -357,23 +359,23 @@ def build_news_data(
 
     # ── LLM 增强（可选） ──────────────────────────────────────
     # 注意：此模块不提供 output_brief 配置项。
-    # 其他 4 个 LLM 模块（宏观/智囊团/体检/穿透）输出散文，
+    # 其他 4 个 LLM 模块（全球政经局势/智囊团深度复盘/持仓体检报告/穿透深度分析）输出散文，
     # 可通过 output_brief_{module} 精简字数。新闻模块输出严格 JSON
     # 供程序解析，精简会破坏 JSON 结构，故不支持精简模式。
     from src.python.config import get_llm_config
     _llm_config = get_llm_config()
-    if _llm_config and _llm_config.get("enabled_llm_news_correlation", False):
+    _enabled_llm = _llm_config.get("enabled_llm") if _llm_config else None
+    _llm_enabled = _enabled_llm.get("news_correlation", False) if isinstance(_enabled_llm, dict) else False
+    if _llm_config and _llm_enabled:
         # 检查 API Key 是否实际配置 — 未配置时降级为传统分析
         _api_key = (_llm_config.get("api_key") or "").strip()
         if not _api_key:
-            logger.warning("enabled_llm_news_correlation 已开启但未配置 api_key，降级为传统关键词匹配分析")
+            logger.warning("enabled_llm.news_correlation 已开启但未配置 api_key，降级为传统关键词匹配分析")
         else:
             meta["llm_enabled"] = True
             try:
-                from src.python.llm_client import (
-                    enhance_news_correlation,
-                    _estimate_cost,
-                )
+                from src.python.llm import enhance_news_correlation
+                from src.python.llm.pricing import _estimate_cost
                 news_items, _cached, _token_usage = enhance_news_correlation(
                     news_items, holdings, penetrated_assets=penetrated_assets,
                     industry_data=_industry_data, llm_config=_llm_config,
@@ -390,10 +392,11 @@ def build_news_data(
                 else:
                     meta["cost_estimation"] = "-"
                 if _cached:
-                    logger.info("LLM 新闻关联分析（缓存）: 富化 %d 条",
+                    logger.info("%s（缓存）: 富化 %d 条",
+                                get_llm_module_name("news_correlation"),
                                 sum(1 for n in news_items if n.get("llm_analysis")))
             except Exception as e:
-                logger.warning("LLM 新闻关联分析出错: %s", e)
+                logger.warning("%s出错: %s", get_llm_module_name("news_correlation"), e)
 
     # ── 关键词富化（标注每个关键词的来源） ─────────────────
     _lookup = _build_keyword_lookup(holdings, penetrated_assets, industry_data=_industry_data)
@@ -422,7 +425,7 @@ def write_news_sheet(
         news_data: build_news_data() 返回的数据
         llm_meta: LLM 元数据，含 token_usage / llm_cached / llm_enabled
     """
-    ws.title = "6.财经新闻热点与持仓关联分析"
+    ws.title = f"6.{get_llm_module_name('news_correlation')}"
 
     # 检测是否有 LLM 分析数据（按 item 中的 llm_analysis 字段）
     has_llm = any(
@@ -432,12 +435,12 @@ def write_news_sheet(
     ncols = _NCOLS + (1 if has_llm else 0)
     headers = _BASE_HEADERS + (["LLM 关联分析"] if has_llm else [])
 
-    row = write_title_row(ws, 1, "财经新闻热点与持仓关联分析", ncols)
+    row = write_title_row(ws, 1, get_llm_module_name('news_correlation'), ncols)
     row = write_header_row(ws, row, headers)
 
     if not news_data:
         write_data_row(ws, row, ["暂无关联新闻"])
-        logger.info("新闻关联分析：无数据")
+        logger.info("%s：无数据", get_llm_module_name("news_correlation"))
         freeze_header(ws, 2)
         auto_width(ws)
         return
@@ -519,4 +522,4 @@ def write_news_sheet(
         llm_col = _NCOLS + 1
         ws.column_dimensions[get_column_letter(llm_col)].width = 30
     llm_info = f"，LLM 分析 {sum(1 for n in news_data if n.get('llm_analysis'))} 条" if has_llm else ""
-    logger.info("财经新闻热点与持仓关联分析写入完成%s，共 %d 条", llm_info, len(news_data))
+    logger.info("%s写入完成%s，共 %d 条", get_llm_module_name("news_correlation"), llm_info, len(news_data))

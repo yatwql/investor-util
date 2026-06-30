@@ -179,7 +179,7 @@
                         <span>
                             <span class="index-price">{{ idx.price | price }}</span>
                             <span class="index-change" style="color: {{ idx.change_pct | profit_color }}">
-                                {% if idx.change_pct >= 0 %}+{% endif %}{{ idx.change_pct | change }}
+                                {{ idx.change_pct | change }}
                             </span>
                         </span>
                     </div>
@@ -197,7 +197,7 @@
                         <span>
                             <span class="index-price">{{ idx.price | price }}</span>
                             <span class="index-change" style="color: {{ idx.change_pct | profit_color }}">
-                                {% if idx.change_pct >= 0 %}+{% endif %}{{ idx.change_pct | change }}
+                                {{ idx.change_pct | change }}
                             </span>
                         </span>
                     </div>
@@ -629,7 +629,7 @@
                 <p><strong>本节内容待生成</strong></p>
                 <p style="margin-top: 8px; font-size: 13px; color: #888;">
                     模块说明：基于当前市场指数、持仓行业分布及近期新闻热点，
-                    LLM 将生成宏观局势分析，包括全球主要经济体政策走向、
+                    LLM 将生成全球政经局势分析，包括全球主要经济体政策走向、
                     地缘政治风险、市场流动性评估及对持仓的潜在影响。
                 </p>
                 <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
@@ -746,10 +746,9 @@
                         <th style="padding: 4px 8px; text-align: right;">输入 token</th>
                         <th style="padding: 4px 8px; text-align: right;">输出 token</th>
                     </tr>
-                    {% set _module_labels = {"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘", "health_check": "持仓体检报告", "penetration_deep": "穿透深度分析", "news_correlation": "财经新闻关联分析"} %}
                     {% for _mk, _md in llm_session_usage["per_module"].items() %}
                     <tr>
-                        <td style="padding: 4px 8px;">{{ _module_labels.get(_mk, _mk) }}</td>
+                        <td style="padding: 4px 8px;">{{ module_labels.get(_mk, _mk) }}</td>
                         <td style="padding: 4px 8px;">{{ _md.get("model", "未指定") }}</td>
                         <td style="padding: 4px 8px; text-align: right;">{{ "{:,}".format(_md.get("input_tokens", 0)) }}</td>
                         <td style="padding: 4px 8px; text-align: right;">{{ "{:,}".format(_md.get("output_tokens", 0)) }}</td>

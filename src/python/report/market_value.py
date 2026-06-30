@@ -13,6 +13,7 @@ from typing import Any, List
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python import cache
+from src.python.registry import get_report_sheet_name
 from src.python.fetcher import fetch_market_data
 from src.python.models import Holding
 from src.python.report.excel_writer import auto_width, freeze_header, write_data_row, write_header_row, write_subtotal_row, \
@@ -581,11 +582,11 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
     """
-    ws.title = "2.市值核算明细表"
+    ws.title = f"2.{get_report_sheet_name('market_value')}"
     if details is None:
         details = _generate_details(holdings, today_str)
 
-    row = write_title_row(ws, 1, "市值核算明细表", _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name('market_value'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
@@ -643,7 +644,7 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
     freeze_header(ws, 2)
     auto_width(ws)
 
-    logger.info("市值核算明细表写入完成，共 %d 个账户，%d 条持仓",
-                len(accounts), len(details))
+    logger.info("%s写入完成，共 %d 个账户，%d 条持仓",
+                get_report_sheet_name('market_value'), len(accounts), len(details))
 
     return grand_mv, grand_cost, grand_profit, grand_today, details

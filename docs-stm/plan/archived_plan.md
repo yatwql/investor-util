@@ -141,13 +141,13 @@
 
 ---
 
-## Iter 3.2 — 财经新闻关联模块 ✅ 已完成
+## Iter 3.2 — 财经新闻热点与持仓关联分析模块 ✅ 已完成
 
-**Goal**：实现财经新闻关联模块，在 HTML 报告中新增第 6 个模块。
+**Goal**：实现财经新闻热点与持仓关联分析模块，在 HTML 报告中新增第 6 个模块。
 
 **Files**：
 - `src/providers/sina_news.py` — 新浪新闻 API + 关键词关联
-- `src/report/news_correlation.py` — 财经新闻关联（Excel + HTML）
+- `src/report/news_correlation.py` — 财经新闻热点与持仓关联分析（Excel + HTML）
 - `src/tmpl/report_template.html` — 更新模板，新增新闻模块区域
 
 ---

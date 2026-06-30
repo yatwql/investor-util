@@ -24,6 +24,8 @@ from unittest.mock import MagicMock, patch
 
 import src.python.tui_handlers as _th_module
 
+from src.python.report.excel_generator import _timing_records, _Timer
+
 from src.python.tui_handlers import (
     _add_error,
     _call_sheet,
@@ -36,8 +38,6 @@ from src.python.tui_handlers import (
     _print_llm_session_usage,
     _print_timing_summary,
     _select_holdings_file,
-    _timing_records,
-    _Timer,
 )
 
 
@@ -338,13 +338,13 @@ class TestPrintLlmSessionUsage(unittest.TestCase):
     def test_none_usage_calls_get_session_usage(self):
         """usage=None 时导入 get_session_usage 并使用其返回值。"""
         mock_usage = {"call_count": 2, "input_tokens": 50, "output_tokens": 50, "total_cost": 0.01, "currency": "CNY"}
-        with patch("src.python.llm_client.get_session_usage", return_value=mock_usage):
+        with patch("src.python.llm.get_session_usage", return_value=mock_usage):
             out = self._capture(None)
             self.assertIn("2", out)
 
     def test_none_usage_empty_result_silent(self):
         """usage=None 且 get_session_usage 返回空用量时静默。"""
-        with patch("src.python.llm_client.get_session_usage", return_value={"call_count": 0}):
+        with patch("src.python.llm.get_session_usage", return_value={"call_count": 0}):
             out = self._capture(None)
             self.assertEqual(out, "")
 

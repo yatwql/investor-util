@@ -270,7 +270,7 @@ class TestSystemPromptOverride:
     def test_override_from_config(self, mocker):
         """配置中 system_prompt_global_macro 为非 null 时，应以配置值为准。"""
         import src.python.llm.generators as _gens
-        mock_system = "自定义宏观分析提示词，请分析全球经济趋势。"
+        mock_system = "自定义全球政经局势提示词，请分析全球经济趋势。"
 
         # mock get_llm_config 返回包含 system_prompt_global_macro 的配置
         mock_config = {
@@ -281,9 +281,10 @@ class TestSystemPromptOverride:
             # model 设为 None 以跳过实际 LLM 调用
             "model": None,
         }
-        mocker.patch("src.python.config.get_llm_config", return_value=mock_config)
-        # generate_global_macro 内部导入 llm_client as _lm 后调用 _lm._generate_llm_content
-        mock_gen = mocker.patch("src.python.llm_client._generate_llm_content",
+        mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
+        # _generate_llm_module 位于 skeleton.py，内部调用 skeleton.get_llm_config 和
+        # skeleton._generate_llm_content，因此 mock 需指向 skeleton 而非 generators
+        mock_gen = mocker.patch("src.python.llm.skeleton._generate_llm_content",
                                 return_value=(None, False))
 
         _gens.generate_global_macro(
@@ -310,8 +311,8 @@ class TestSystemPromptOverride:
             "timeout_global_macro": 60,
             "model": None,
         }
-        mocker.patch("src.python.config.get_llm_config", return_value=mock_config)
-        mock_gen = mocker.patch("src.python.llm_client._generate_llm_content",
+        mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
+        mock_gen = mocker.patch("src.python.llm.skeleton._generate_llm_content",
                                 return_value=(None, False))
 
         _gens.generate_global_macro(
@@ -336,8 +337,8 @@ class TestSystemPromptOverride:
             "timeout_global_macro": 60,
             "model": None,
         }
-        mocker.patch("src.python.config.get_llm_config", return_value=mock_config)
-        mock_gen = mocker.patch("src.python.llm_client._generate_llm_content",
+        mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
+        mock_gen = mocker.patch("src.python.llm.skeleton._generate_llm_content",
                                 return_value=(None, False))
 
         _gens.generate_global_macro(

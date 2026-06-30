@@ -4,12 +4,69 @@
 
 ---
 
+## [0.2.38] - 2026-06-30
+
+### Added
+- **`src/python/llm/skeleton.py` — 独立骨架模块**：从 generators.py 拆分 4 个共享函数（`_is_llm_module_enabled`、`_generate_llm_content`、`_generate_llm_module`、`_run_batch_mode`），用于标准模式和批量模式 LLM 生成。
+- **TUI 版本号显示**：菜单头部显示 `v0.2.38`。
+- **TUI 菜单 [S] / [R]**：[S] 交互切换各 LLM 模块启停，[R] 立即刷新配置（config.json / llm_settings.json / llm_key.json）。
+- **TUI 菜单 [S] 新增 `_cmd_config_llm_modules()`**：读取 `llm_settings.json`，交互式启用/禁用 LLM 模块。
+- **TUI 菜单 [R] 新增 `_cmd_refresh_config()`**：清除 config 层缓存，强制重载三个配置文件。
+
+### Changed
+- **generators.py 拆分**：980 行 → skeleton.py (383 行) + generators.py (~280 行)。4 个骨架函数移至 skeleton.py，generators.py 保留 5 个生成器函数 + 1 个批量编排函数。
+- **价格/指数缓存 TTL：静态 24h → 动态 market-hours 感知 TTL**：`cache.py` 新增 `_is_market_open()` (UTC+8 工作日 09:30-15:00)。市场开放期间使用短 TTL（默认 60s），收盘后恢复正常缓存。通过 `config.json` 的 `market_hour_aware` 数组（`["price", "index"]`）和 `market_hour_ttl`（默认 60）驱动，无需硬编码。
+- **TUI LLM 状态输出：区分跳过 vs 失败**：`tui_handlers.py` 报告生成循环按模块检查 `_LLM_MODULE_FAILURE` 原因，跳过的模块显示 `[..] 已跳过`，真正失败的模块显示 `[!] 内容生成失败` 并调用 `_add_error()`。
+- **README.md 版本号 0.2.37 → 0.2.38**，恢复缺失的用户文档链接。
+- **test_llm.py / test_config.py mock 路径更新**：适应 generators→skeleton 的模块拆分，共 20 个 mock 路径修正。
+
+### Fixed
+- **HTML 报告指数涨跌幅双 `+` 号**：`report_template.html` 中 `{% if ... %}+{% endif %}{{ change | change }}` 的 `| change` 过滤器已自带 `+`，移除模板中的显式 `+` 前缀。
+
+### Docs
+- **重写 how-to-config-llm.md** (581 行)：新增"LLM 业务模块架构与公共特征"章节（8 项公共特征），统一配置表格，补充缺失示例说明，去冗余。
+
+## [0.2.37] - 2026-06-30
+
+### Changed
+- **`generators.py` P 重构 — 4 个 LLM 生成器提取共享骨架 `_generate_llm_module()`**：
+  每个生成器从 ~70 行简化为 ~18 行的薄包装，通过 closure 传入 `fingerprint_fn`/`prompt_builder` 定制行为。
+  文件 1050→961 行（-8.5%）
+- **所有硬编码 LLM 模块名 → registry 查找**：
+  - `news_correlation.py`：页签标题、write_title_row、6 处 logger 改用 `get_llm_module_name()`
+  - `excel_generator.py`：`_add_error()` 消息、`_Timer` 标签改用 `get_llm_module_name()`
+  - `tui_handlers.py`：4 个 `_print_box()` 标题改用 `get_llm_module_name()`
+  - `generators.py`：所有 closure/disabled/completion logger 消息改用 `_MN()` 注册中心查找
+- **所有非 LLM 报表页签中文名 → `get_report_sheet_name()` 统一注册**：
+  - `registry.py` 新增 `_REPORT_SHEET_NAMES` 字典和 `get_report_sheet_name()` 函数（6 个页签）
+  - `summary.py` / `market_value.py` / `category.py` / `penetration.py` / `fund_performance.py` / `early_warning.py` — 6 文件的 `ws.title` + `write_title_row` 共 12 处替换
+  - `excel_generator.py` — `_Timer` 标签 7 处 + `_call_sheet` 标签 5 处共 12 处替换
+  - 至此所有运行时的模块中文名均通过 registry 查找，实现"一处注册、全局生效"
+- **清理 P 重构后的残留未使用 import**：移除 `datetime`/`timezone`/`timedelta`、`_CONTENT_FILTER_RECOVERY`、函数体内 `import re`
+- **指纹函数 `_expert_review_fingerprint` / `_health_check_fingerprint` / `_penetration_deep_fingerprint` 合并为 `_build_llm_fingerprint()`**：3 个同构函数通过 `full_penetration` 参数统一，从 `fingerprint.py` 和 `generators.py` 中消除 ~30 行重复代码
+- **`_generate_llm_module()` 新增批量模式**：通过 `batch_preparer` / `per_item_cache_fn` / `batch_prompt_fn` / `response_parser` 四个 hook，将 `enhance_news_correlation` 纳入共享骨架。旧函数从 ~230 行简化为 ~120 行，提取 `_run_batch_mode()` 辅助函数供未来批量模块复用
+- **`api.py` `__all__` 清理**：`_CONTENT_FILTER_RECOVERY` 已无外部消费者，移出导出列表
+- **`llm/__init__.py` 同步**：更新指纹导出名和 api 导出名
+- **TUI 摘要标题统一**：`health_check` 和 `penetration_deep` 的 `_print_box` 标题后缀"摘要"/"概要"改为纯模块名，与 macro/expert 一致
+
+### Docs
+- **注册中心使用说明 `docs-stm/manuals/how-to-use-registry.md`** — 完整覆盖 DataModuleDef 结构、公共 API、消费方清单、新增模块流程
+- **README.md** — 新增注册中心文档链接
+- **管理文档修复**：
+  - `technical.md`：content.py 已删除，子模块 9→8
+  - `datasource-and-folders.md`：同上
+  - `how-to-config-llm.md`：步骤 3/6 改为引用 registry
+- **`changelog.md`**：本版本记录
+
+### Tests
+- 全量 1026 passed, 11 skipped, 30 subtests passed
+
 ## [0.2.36] - 2026-06-30
 
 ### Added
 - **智能预警模块 `src/python/report/early_warning.py`** — 两个独立预警维度：
   - 行业资金流向联动：穿透资产的行业概念与今日行业资金流向匹配，净流出超过阈值自动标记预警等级（注意/关注/危险）
-  - 新闻情绪聚合：LLM 新闻关联分析结果按持仓品种汇总，计算情绪得分与偏好评级
+  - 新闻情绪聚合：财经新闻热点与持仓关联分析结果按持仓品种汇总，计算情绪得分与偏好评级
 - **`src/test/test_early_warning.py` 智能预警测试** — 25 项测试覆盖：
   - 集成测试（正常数据/无数据/无LLM/正向净流入/空输入等 6 场景）
   - 行业预警单元测试（危险/关注/注意等级判定、概念匹配、排序、空输入）
@@ -104,7 +161,7 @@
 - **`generate_all_llm()` 缓存预检** — `get_llm_config()` 改为仅在顶层调用一次，预计算
   全部 4 个模块的指纹 + 缓存键，仅对缓存未命中的模块提交线程池任务。缓存命中的模块
   直接读取缓存内容，减少线程开销和文件 I/O
-- **新闻关联分析改为逐条缓存** — 每篇文章独立计算缓存键（标题前 80 字 + 持仓指纹）。
+- **财经新闻热点与持仓关联分析改为逐条缓存** — 每篇文章独立计算缓存键（标题前 80 字 + 持仓指纹）。
   新文章加入时仅新文章的缓存缺失，已缓存的老文章在 TTL 内直接复用，不再触发整批重分析。
   单篇缓存存储 `(relevance, sentiment, analysis)` 元组
 
@@ -152,7 +209,7 @@
 - **`generate_penetration_deep_analysis` fallback `max_tokens` 修正** — 兜底值 2048→4096，匹配 `max_tokens_penetration_deep` 默认值
 - **穿透深度分析 Prompt 措辞修正** — system prompt + user prompt "前 N 大"→"TOP 10"（输入固定为 10 条），"占总资产"→"占总市值百分比"
 - **内容过滤安抚重试** — `_call_llm_with_retry` 对空内容返回 `("", usage)` 而非 `(None, None)`，`_call_llm` 检测空内容后追加 `_CONTENT_FILTER_RECOVERY` 指令重试一次。DeepSeek 安全过滤误杀时自动恢复，不再直接失败
-- **新闻关联分析批量合并** — `BATCH_SIZE` 从 5 增至 10，冷启动时 LLM 调用次数从 6 次降至 3 次，减少约 50%
+- **财经新闻热点与持仓关联分析批量合并** — `BATCH_SIZE` 从 5 增至 10，冷启动时 LLM 调用次数从 6 次降至 3 次，减少约 50%
 - **会话级 Token 用量累计跟踪** — 新增 `_session_usage` 模块全局累积器（input/output/cache_hit/cost/call_count），`_track_session_usage()` 在每次 `_call_llm_with_retry` 成功后同步累计。导出 `get_session_usage()` / `reset_session_usage()` 供外部读取
 - **汇总页签「LLM 用量」** — `write_summary_sheet` 新增 `llm_session_usage` 参数，报告汇总页底部显示本会话 LLM 调用次数、模型、输入/输出 token、缓存命中、累计费用
 - **TUI 会话统计** — 报告生成完成后终端输出 `本会话 LLM 累计：N 次调用，X tokens，费用 ¥X.XX`
@@ -178,7 +235,7 @@
 - **缓存模型名保留** — 缓存命中时从缓存 HTML 提取原始模型名称并显示
   - `_extract_model_from_cached()` / `_MODEL_LINE_RE` — 从 Token 行提取模型名
   - `_CACHE_LINE_MODEL_TPL` — 新模板：`本次使用LLM缓存（原始模型：{model}）`
-- **新闻关联分析 TUI 进度反馈** — 重试/回退时 TUI 输出可视化进度（`[..]` 标记）
+- **财经新闻热点与持仓关联分析 TUI 进度反馈** — 重试/回退时 TUI 输出可视化进度（`[..]` 标记）
 - **自适应 max_tokens 截断重试** — `_generate_llm_content()` / `_process_batch()` 中
   检测到 `_TRUNCATION_MARKER` 后自动以 1.5 倍 max_tokens 重试一次
   - `_AUTO_INCREASE_FACTOR` / `_AUTO_INCREASE_MAX_RETRIES` — 常量控制重试倍数和次数
@@ -440,11 +497,11 @@
 
 ### Changed
 - **LLM 调用代码重构** — 提取 `_call_llm_with_retry()` 共享函数，消除 `_call_claude` / `_call_openai` 中约 100 行重复的重试/超时/错误处理代码
-- **新闻关联分析分批并行化** — `enhance_news_correlation()` 分批处理从串行 `for` 循环改为 `ThreadPoolExecutor(max_workers=3)` 并行，6 批并行处理后墙钟时间降低约 60%（30s → ~10s）
+- **财经新闻热点与持仓关联分析分批并行化** — `enhance_news_correlation()` 分批处理从串行 `for` 循环改为 `ThreadPoolExecutor(max_workers=3)` 并行，6 批并行处理后墙钟时间降低约 60%（30s → ~10s）
 
 ### Added
 - **模型路由** — `llm_settings.json` 新增 `model_macro` / `model_expert` / `model_news_correlation` 配置项，per-module 独立模型选择，未配置时沿用 `llm_key.json` 的全局 `model` 字段
-- **Prompt Caching** — Claude API system prompt 使用数组格式 + `cache_control` 支持 Anthropic Prompt Caching，批量新闻关联分析时 5 分钟内同 system prompt 节省约 50% 输入 token 费用
+- **Prompt Caching** — Claude API system prompt 使用数组格式 + `cache_control` 支持 Anthropic Prompt Caching，批量财经新闻热点与持仓关联分析时 5 分钟内同 system prompt 节省约 50% 输入 token 费用
 
 ### Fixed
 - **`enhance_news_correlation` id() 映射** — top_news → news_data 原始位置映射从 `id()`（对象身份）改为 `enumerate` 保留原始索引，消除对象身份漂移的理论风险
@@ -680,7 +737,7 @@
 ## [0.2.9] - 2026-06-28
 
 ### Added
-- LLM 新闻关联分析：新增配置选项 `llm_news_analysis`（默认关闭），开启后使用 LLM 对关键词匹配后的新闻进行二次关联分析，逐条判定关联度（高/中/低/无关）并给出原因分析
+- 财经新闻热点与持仓关联分析：新增配置选项 `llm_news_analysis`（默认关闭），开启后使用 LLM 对关键词匹配后的新闻进行二次关联分析，逐条判定关联度（高/中/低/无关）并给出原因分析
 - `enhance_news_correlation()`：llm_client 新函数，含 Prompt 构建、缓存、JSON 解析、token 用量跟踪
 - Excel & HTML 新闻页签 LLM 分析列：当数据含 `llm_analysis` 时自动增加 "LLM 关联分析" 列
 - Excel & HTML 页签底部智能注脚：LLM 缓存命中 → "使用了LLM缓存"；LLM 未启用 → "未依赖于LLM服务，使用传统爬虫+NLP能力"；LLM 启用 + 非缓存 → Token 消耗明细
@@ -918,7 +975,7 @@
 
 ### Added (Iter 3.2)
 - `src/providers/sina_news.py`: 新浪财经新闻获取 + 持仓关键词关联模块
-- `src/report/news_correlation.py`: 新闻关联分析的 Excel 页签生成 + HTML 数据构建
+- `src/report/news_correlation.py`: 财经新闻热点与持仓关联分析的 Excel 页签生成 + HTML 数据构建
 - TUI 菜单新增 N 选项：生成包含新闻的 Excel 报告
 - HTML 报告新增财经新闻热点与持仓关联分析（财经新闻热点与持仓关联分析）
 

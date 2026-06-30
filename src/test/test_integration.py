@@ -19,7 +19,7 @@ from openpyxl import Workbook
 
 from src.python.models import Holding
 from src.python.report.excel_writer import create_workbook, save_workbook
-from src.python.tui_handlers import _generate_excel_report
+from src.python.report.excel_generator import generate_excel_report as _generate_excel_report
 
 
 class MockDetail:
@@ -120,7 +120,7 @@ class TestGenerateExcelReport(unittest.TestCase):
         """含 LLM 报告 → 新增全球政经局势 + 智囊团深度复盘 页签。"""
         mock_a_idx.return_value = {}
         mock_us_idx.return_value = {}
-        mock_llm.return_value = ("宏观内容", "复盘内容", "", "")
+        mock_llm.return_value = ("全球政经局势", "复盘内容", "", "")
 
         _generate_excel_report(
             self.holdings,

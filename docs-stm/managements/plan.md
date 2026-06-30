@@ -26,21 +26,19 @@
 | HTTP 客户端 | `httpx` | 同步/异步、连接复用，比 requests 现代 |
 | 数据解析 | 手动解析，不使用 pandas | 减少依赖，数据量小，自定义校验更可控 |
 | 配置持久化 | `data/config/config.json` | JSON 简单可靠，无需额外依赖 |
-| AI 全球政经局势 + 智囊团深度复盘 | LLM 生成 | 支持 Claude/OpenAI/DeepSeek API，缓存策略分层，System Prompt 外部可配置 |
+| AI 全球政经局势 + 智囊团深度复盘 + 持仓体检报告 + 穿透深度分析 + 财经新闻热点与持仓关联分析 | LLM 生成 | 支持 Claude/OpenAI/DeepSeek API，缓存策略分层，System Prompt 外部可配置 |
 | 报告模板 | 程序生成（Excel openpyxl / HTML Jinja2） | Excel 和 HTML 报告均程序化生成 |
 
 ---
 
-## 当前配置架构（v0.2.15+）
+## 当前配置架构
 
-LLM 配置已拆分为两个独立文件：
+LLM 配置拆分为两个独立文件：
 
 | 文件 | 内容 | 用途 |
 |------|------|------|
-| `data/config/llm_key.json` | 4 个敏感字段 | API 调用渠道（provider / api_key / model / endpoint） |
-| `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt 等） |
-
-> 历史文档中引用的 `data/config/llm.json` 和 `config.json.llm_settings` 在 v0.2.15 中已废弃。
+| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段 | API 调用渠道（provider / api_key / model / endpoint / fallback_*） |
+| `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt、thinking 等） |
 
 ---
 
@@ -85,14 +83,6 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 
 以下增强方向经评估对个人持仓分析有较高价值，按实现简易度排序：
 
-### ✅ A. 持仓穿透深度分析 — 已实现（v0.2.30）
-
-行业集中度仪表盘 + 国别/币种暴露度分析已实现。
-
-### ✅ E. 持仓体检报告 — 已实现（v0.2.29）
-
-从风险分散度/流动性/收益合理性/成本结构四维度评分已实现。
-
 ### 待实现方向
 
 ### B. 基金持仓专属分析（中难度 / 高价值）
@@ -105,25 +95,6 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 - **报告对比**：将本次报告的关键指标（市值/盈亏/仓位）与上次对比，输出变化摘要
 - **回撤监控**：从历史缓存中提取持仓的连续回撤曲线
 
-### ✅ D. 智能预警 — 已实现（v0.2.36）
-
-行业资金流向联动预警 + 新闻情绪聚合，基于已有计算数据二次加工，不依赖 LLM。
-
 ### F. LLM 分析增强
 
 - **环比分析**：对比历史报告摘要，说明组合变化趋势
-
-### G. 配置注册表模式（已实现 v0.2.35）
-
-引入中央注册表机制，统一管理模块的配置键名、缓存前缀、默认 TTL：
-
-- **现状**：`_KNOWN_LLM_SETTINGS_KEYS`（`config.py`）、`prefix_type_map`（`cache.py`）、`CACHE_TTL_DEFAULTS`（`constants.py`）三处各自维护，新增模块时容易遗漏某处
-- **方案**：每模块在中央注册自己的配置键名、缓存前缀、默认 TTL，`config.py`/`cache.py` 从注册表动态派发生效键名和缓存策略
-- **收益**：新增模块只需注册一次，所有校验、缓存、配置文档自动同步，消除三处维护的遗漏风险
-
-### H. 代码架构优化（中难度 / 高可维护性）
-
-- **LLM Generator 函数去重**：`generate_global_macro`、`generate_expert_review`、`generate_health_check`、`generate_penetration_deep_analysis` 四个函数骨架相同（llm_config → fingerprint → build prompt → `_generate_llm_content`），可抽取参数化 dispatch 函数统一管理
-- **Prompt Builder 去重**：`_build_expert_review_prompt`、`_build_health_check_prompt`、`_build_penetration_deep_prompt` 共享约 70% 结构（摘要+持仓循环+穿透循环），可抽取共享模板
-- **`_DEFAULT_LLM_SETTINGS` 注册表化**：`_ensure_llm_settings_file()` 中硬编码的 50 个默认值改为从 registry 自动派生
-- **`tui_handlers.py` 拆分**：1331 行的单文件按领域拆分为 `handler_cache.py`、`handler_report.py`、`handler_llm.py` 等子模块

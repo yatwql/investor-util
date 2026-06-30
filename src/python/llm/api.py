@@ -21,7 +21,7 @@ logger = logging.getLogger("invest")
 
 __all__ = [
     "_LLM_TIMEOUT", "_RETRY_DELAYS", "_TRUNCATION_MARKER", "_AUTO_INCREASE_FACTOR",
-    "_CONTENT_FILTER_RECOVERY", "_TOKEN_LINE_RE", "_CACHE_LINE_HTML", "_CACHE_LINE_MODEL_TPL",
+    "_TOKEN_LINE_RE", "_CACHE_LINE_HTML", "_CACHE_LINE_MODEL_TPL",
     "_MODEL_LINE_RE", "_THINKING_SUPPORTED_PREFIXES", "_THINKING_EFFORT_MODEL_PREFIXES",
     "_supports_extended_thinking", "_is_effort_model", "_truncation_warning",
     "_check_claude_truncation", "_check_openai_truncation", "_extract_content",
@@ -381,16 +381,13 @@ def _call_single_provider(
     llm_config: dict | None,
 ) -> tuple[Optional[str], Optional[dict]]:
     """调用单个 LLM provider。"""
-    # 使用 lazy import 通过 llm_client 获取函数引用，
-    # 确保 unittest.mock.patch("src.python.llm_client.XXX") 对测试生效
-    import src.python.llm_client as _lm  # noqa: F811
     if provider == "claude":
-        return _lm._call_claude(system_prompt, user_prompt, api_key, resolved_model, endpoint,
+        return _call_claude(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                                 max_tokens, timeout, max_retries=max_retries,
                                 http_client=http_client, config_field=config_field,
                                 temperature=temperature, llm_config=llm_config)
     elif provider == "openai":
-        return _lm._call_openai(system_prompt, user_prompt, api_key, resolved_model, endpoint,
+        return _call_openai(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                                 max_tokens, timeout, max_retries=max_retries,
                                 http_client=http_client, config_field=config_field,
                                 temperature=temperature)
@@ -433,12 +430,8 @@ def _call_llm(
     max_tokens = max_tokens or 2500
     max_retries = _get_retry_max(llm_config)
 
-    # 使用 lazy import 通过 llm_client 获取 _call_single_provider，
-    # 确保 unittest.mock.patch("src.python.llm_client._call_single_provider") 对测试生效
-    import src.python.llm_client as _lm  # noqa: F811
-
     # ── 主 provider ──
-    result, usage = _lm._call_single_provider(
+    result, usage = _call_single_provider(
         provider, system_prompt, user_prompt, api_key, resolved_model, endpoint,
         max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
     )
@@ -449,7 +442,7 @@ def _call_llm(
         logger.warning("%s API 返回空内容，追加安抚指令重试一次", provider)
         print(f"  [..] {provider} API 返回空内容，追加安抚指令重试...")
         calmed_system = system_prompt + _CONTENT_FILTER_RECOVERY
-        result2, usage2 = _lm._call_single_provider(
+        result2, usage2 = _call_single_provider(
             provider, calmed_system, user_prompt, api_key, resolved_model, endpoint,
             max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
         )
@@ -466,7 +459,7 @@ def _call_llm(
         fb_model = llm_config.get("fallback_model", resolved_model)
         logger.warning("主 provider (%s) 已失败，回退到 %s", provider, fallback_provider)
         print(f"  [..] LLM 主 provider ({provider}) 失败，正在回退到 {fallback_provider}...")
-        result, usage = _lm._call_single_provider(
+        result, usage = _call_single_provider(
             fallback_provider, system_prompt, user_prompt, fb_api_key, fb_model, fb_endpoint,
             max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
         )
@@ -499,7 +492,7 @@ def _call_claude(
 
     支持 Extended Thinking（thinking 参数），通过 llm_settings.json 中
     thinking_enabled_{模块} / thinking_budget_{模块} 配置开启。
-    推荐仅在智囊团深度复盘（expert_review）场景开启，全球政经局势和新闻关联分析收益有限。
+    推荐仅在智囊团深度复盘（expert_review）场景开启，全球政经局势和财经新闻热点与持仓关联分析收益有限。
     若模型不支持 Extended Thinking（如 claude-sonnet-3-5），自动降级跳过。
 
     Args:
@@ -555,8 +548,7 @@ def _call_claude(
         payload["temperature"] = temperature
     client = http_client
 
-    import src.python.llm_client as _lm  # noqa: F811
-    return _lm._call_llm_with_retry(
+    return _call_llm_with_retry(
         label="Claude", client=client, url=url, headers=headers,
         payload=payload, timeout=timeout, max_retries=max_retries,
         max_tokens=max_tokens, config_field=config_field,
@@ -613,8 +605,7 @@ def _call_openai(
         except (KeyError, IndexError, TypeError):
             return None
 
-    import src.python.llm_client as _lm  # noqa: F811
-    return _lm._call_llm_with_retry(
+    return _call_llm_with_retry(
         label="OpenAI", client=client, url=url, headers=headers,
         payload=payload, timeout=timeout, max_retries=max_retries,
         max_tokens=max_tokens, config_field=config_field,

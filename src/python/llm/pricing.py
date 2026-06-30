@@ -32,7 +32,7 @@ _CURRENCY_SYMBOLS: dict[str, str] = {
 def _reload_pricing() -> None:
     """从 llm_settings.json 重新加载定价配置。
 
-    - "currency" 字段（可选，默认 "USD"）设定货币类型，影响费用显示的符号。
+    - "currency" 字段（可选，默认 "CNY"）设定货币类型，影响费用显示的符号。
     - 其余字段按模型名合并到 _PRICING_MERGED（文件配置优先级高于内置默认）。
       文件中的 input_cache_hit 为可选字段，缺失时继承内置默认值（如内置也无则等于 input）。
     """

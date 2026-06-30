@@ -11,7 +11,7 @@
 
 运行：
   cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_llm_client -v
+  python -m unittest src.test_llm -v
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import pytest
 
-from src.python.llm_client import (
+from src.python.llm import (
     _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_EXPERT_REVIEW,
     _build_global_macro_prompt,
@@ -407,7 +407,7 @@ class TestCallLlmProvider(unittest.TestCase):
         self.assertIsNone(content)
         self.assertIsNone(usage)
 
-    @patch("src.python.llm_client._call_claude")
+    @patch("src.python.llm.api._call_claude")
     def test_claude_routing(self, mock_call: MagicMock) -> None:
         mock_call.return_value = ("claude result", {"input_tokens": 10, "output_tokens": 50})
         config = {"provider": "claude", "api_key": "sk-xxx"}
@@ -416,7 +416,7 @@ class TestCallLlmProvider(unittest.TestCase):
         self.assertEqual(usage, {"input_tokens": 10, "output_tokens": 50})
         mock_call.assert_called_once()
 
-    @patch("src.python.llm_client._call_openai")
+    @patch("src.python.llm.api._call_openai")
     def test_openai_routing(self, mock_call: MagicMock) -> None:
         mock_call.return_value = ("openai result", {"prompt_tokens": 20, "completion_tokens": 80})
         config = {"provider": "openai", "api_key": "sk-xxx"}
@@ -447,7 +447,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
             "thinking_budget_global_macro": 4000,
         }
 
-    @patch("src.python.llm_client._call_llm_with_retry")
+    @patch("src.python.llm.api._call_llm_with_retry")
     def test_thinking_injected_for_supported_model(self, mock_retry: MagicMock) -> None:
         """Sonnet-4 支持 Extended Thinking，应注入 thinking 参数。"""
         _call_claude(
@@ -460,7 +460,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         # temperature 应在 thinking 开启时被移除
         self.assertNotIn("temperature", _payload)
 
-    @patch("src.python.llm_client._call_llm_with_retry")
+    @patch("src.python.llm.api._call_llm_with_retry")
     def test_thinking_skipped_for_unsupported_model(self, mock_retry: MagicMock) -> None:
         """Sonnet-3.5 不支持 Extended Thinking，应降级跳过。"""
         _call_claude(
@@ -470,7 +470,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
 
-    @patch("src.python.llm_client._call_llm_with_retry")
+    @patch("src.python.llm.api._call_llm_with_retry")
     def test_thinking_skipped_when_disabled(self, mock_retry: MagicMock) -> None:
         """thinking_enabled=False 时不应注入 thinking 参数。"""
         cfg = {"thinking_enabled_global_macro": False}
@@ -481,7 +481,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
 
-    @patch("src.python.llm_client._call_llm_with_retry")
+    @patch("src.python.llm.api._call_llm_with_retry")
     def test_thinking_skipped_when_no_llm_config(self, mock_retry: MagicMock) -> None:
         """llm_config=None 时不报错、不注入。"""
         _call_claude(
@@ -491,7 +491,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
 
-    @patch("src.python.llm_client._call_llm_with_retry")
+    @patch("src.python.llm.api._call_llm_with_retry")
     def test_budget_auto_padding(self, mock_retry: MagicMock) -> None:
         """budget 小于 max_tokens + 1024 时自动补足到 max_tokens + 4096。"""
         cfg = {"thinking_enabled_global_macro": True, "thinking_budget_global_macro": 100}
@@ -503,7 +503,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         # max_tokens=800 → auto_pad=800+4096=4896
         self.assertEqual(_payload["thinking"]["budget_tokens"], 4896)
 
-    @patch("src.python.llm_client._call_llm_with_retry")
+    @patch("src.python.llm.api._call_llm_with_retry")
     def test_deepseek_uses_effort_not_budget(self, mock_retry: MagicMock) -> None:
         """DeepSeek 使用 effort 而非 budget_tokens 控制思考深度。"""
         cfg = {
@@ -523,7 +523,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         # temperature 应被移除
         self.assertNotIn("temperature", _payload)
 
-    @patch("src.python.llm_client._call_llm_with_retry")
+    @patch("src.python.llm.api._call_llm_with_retry")
     def test_deepseek_effort_default_high(self, mock_retry: MagicMock) -> None:
         """DeepSeek 未配置 reasoning_effort 时默认 high。"""
         cfg = {"thinking_enabled_global_macro": True}
@@ -534,7 +534,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         _payload = mock_retry.call_args[1]["payload"]
         self.assertEqual(_payload["output_config"]["effort"], "high")
 
-    @patch("src.python.llm_client._call_llm_with_retry")
+    @patch("src.python.llm.api._call_llm_with_retry")
     def test_deepseek_effort_max(self, mock_retry: MagicMock) -> None:
         """DeepSeek reasoning_effort 可以设为 max。"""
         cfg = {
@@ -554,19 +554,27 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 
 
-@patch("src.python.llm_client.generate_penetration_deep_analysis")
-@patch("src.python.llm_client.generate_health_check")
-@patch("src.python.llm_client.generate_global_macro")
-@patch("src.python.llm_client.generate_expert_review")
+@patch("src.python.llm.generators.generate_penetration_deep_analysis")
+@patch("src.python.llm.generators.generate_health_check")
+@patch("src.python.llm.generators.generate_global_macro")
+@patch("src.python.llm.generators.generate_expert_review")
 class TestGenerateAllLlm(unittest.TestCase):
     """测试并行生成函数。"""
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+        cls._cfg_patcher = patch("src.python.llm.generators.get_llm_config",
+                                  return_value={"enabled_llm": {
+                                      "global_macro": True,
+                                      "expert_review": True,
+                                      "health_check": True,
+                                      "penetration_deep": True,
+                                  }})
+        cls._cfg_patcher.start()
+        cls._exec_patcher = patch("src.python.llm.generators.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+        cls._httpx_patcher = patch("src.python.llm.generators.httpx.Client",
                                     new=MagicMock())
         cls._httpx_patcher.start()
 
@@ -574,6 +582,7 @@ class TestGenerateAllLlm(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls._httpx_patcher.stop()
         cls._exec_patcher.stop()
+        cls._cfg_patcher.stop()
 
     def test_force_passthrough(self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock) -> None:
         mock_macro.return_value = ("<p>宏</p>", False)
@@ -728,7 +737,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_claude_truncation_default_field(self) -> None:
         """默认 config_field='max_tokens' → 日志含 max_tokens。"""
-        from src.python.llm_client import _check_claude_truncation
+        from src.python.llm import _check_claude_truncation
 
         data = {"stop_reason": "max_tokens", "usage": {"output_tokens": 500}}
         with self.assertLogs("invest", level="ERROR") as logs:
@@ -739,7 +748,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_claude_truncation_custom_field(self) -> None:
         """config_field='max_tokens_expert_review' → 日志提示 max_tokens_expert_review。"""
-        from src.python.llm_client import _check_claude_truncation
+        from src.python.llm import _check_claude_truncation
 
         data = {"stop_reason": "max_tokens", "usage": {"output_tokens": 500}}
         with self.assertLogs("invest", level="ERROR") as logs:
@@ -751,7 +760,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_claude_truncation_not_truncated(self) -> None:
         """stop_reason 不是 max_tokens → 不记录日志。"""
-        from src.python.llm_client import _check_claude_truncation
+        from src.python.llm import _check_claude_truncation
 
         data = {"stop_reason": "end_turn", "usage": {"output_tokens": 100}}
         result = _check_claude_truncation(data, 8192, "Claude")
@@ -759,7 +768,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_openai_truncation_custom_field(self) -> None:
         """OpenAI config_field='max_tokens_global_macro' → 日志提示 max_tokens_global_macro。"""
-        from src.python.llm_client import _check_openai_truncation
+        from src.python.llm import _check_openai_truncation
 
         data = {"choices": [{"finish_reason": "length", "message": {"content": "..."}}],
                 "usage": {"completion_tokens": 800}}
@@ -772,7 +781,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_openai_truncation_not_truncated(self) -> None:
         """finish_reason 不是 length → 不记录日志。"""
-        from src.python.llm_client import _check_openai_truncation
+        from src.python.llm import _check_openai_truncation
 
         data = {"choices": [{"finish_reason": "stop", "message": {"content": "..."}}],
                 "usage": {"completion_tokens": 100}}
@@ -800,20 +809,20 @@ class TestBuildHoldingsSummary(unittest.TestCase):
         ]
 
     def test_basic(self) -> None:
-        from src.python.llm_client import _build_holdings_summary
+        from src.python.llm import _build_holdings_summary
         result = _build_holdings_summary(self.holdings)
         self.assertIn("长江电力", result)
         self.assertIn("600900", result)
         self.assertIn("600519", result)
 
     def test_with_penetration(self) -> None:
-        from src.python.llm_client import _build_holdings_summary
+        from src.python.llm import _build_holdings_summary
         result = _build_holdings_summary(self.holdings, self.penetrated)
         self.assertIn("[穿透]", result)
 
     def test_with_industry_data(self) -> None:
         """industry_data 中包含行业和概念 → 显示到摘要中。"""
-        from src.python.llm_client import _build_holdings_summary
+        from src.python.llm import _build_holdings_summary
         industry_data = {
             "600900": {"industry": "电力", "concepts": ["核电", "水电"]},
             "600519": {"industry": "白酒Ⅱ", "concepts": ["白酒", "超级品牌"]},
@@ -824,14 +833,14 @@ class TestBuildHoldingsSummary(unittest.TestCase):
         self.assertIn("核电", result)
 
     def test_empty(self) -> None:
-        from src.python.llm_client import _build_holdings_summary
+        from src.python.llm import _build_holdings_summary
         result = _build_holdings_summary([], None)
         self.assertEqual(result, "")
 
     def test_limit_20(self) -> None:
         """超过 20 只持仓时截断。"""
         from collections import namedtuple
-        from src.python.llm_client import _build_holdings_summary
+        from src.python.llm import _build_holdings_summary
         H = namedtuple("Holding", ["name", "code"])
         many = [H(name=f"股票{i}", code=f"{i:06d}") for i in range(30)]
         result = _build_holdings_summary(many)
@@ -850,7 +859,7 @@ class TestBuildNewsSummary(unittest.TestCase):
     """测试 _build_news_correlation_summary 的格式和内容。"""
 
     def test_basic(self) -> None:
-        from src.python.llm_client import _build_news_correlation_summary
+        from src.python.llm import _build_news_correlation_summary
         news = [
             {"title": "能源改革新方案", "intro": "国家能源局发布电力改革方案...",
              "matched_keywords": ["长江电力"]},
@@ -860,12 +869,12 @@ class TestBuildNewsSummary(unittest.TestCase):
         self.assertIn("长江电力", result)
 
     def test_empty(self) -> None:
-        from src.python.llm_client import _build_news_correlation_summary
+        from src.python.llm import _build_news_correlation_summary
         self.assertEqual(_build_news_correlation_summary([]), "")
 
     def test_limit_30(self) -> None:
         """超过 30 条时截断。"""
-        from src.python.llm_client import _build_news_correlation_summary
+        from src.python.llm import _build_news_correlation_summary
         many = [{"title": f"新闻{i}", "matched_keywords": []} for i in range(50)]
         result = _build_news_correlation_summary(many)
         # 最多 30 条
@@ -889,7 +898,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
         ]
 
     def test_standard_response(self) -> None:
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "白酒利好"}, {"idx": 1, "relevance": "中", "sentiment": "中性", "analysis": "间接影响"}]'
         result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
@@ -899,7 +908,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_with_sentiment(self) -> None:
         """解析 sentiment 字段。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         llm_resp = (
             '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "白酒利好"},'
             ' {"idx": 1, "relevance": "高", "sentiment": "利空", "analysis": "利空影响"},'
@@ -915,7 +924,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_irrelevant_not_filtered(self) -> None:
         """"无关"不再被过滤——元组中直接返回原始数据，由调用方决定是否跳过。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "中性", "analysis": "利好"}, {"idx": 1, "relevance": "无关", "sentiment": "中性", "analysis": "无关内容"}]'
         result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
@@ -925,7 +934,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_malformed_json(self) -> None:
         """JSON 解析失败 → 全部返回默认值。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         result = _apply_llm_news_correlation(self.news, "不是json")
         self.assertEqual(len(result), 3)
         for t in result:
@@ -933,7 +942,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_not_a_list(self) -> None:
         """LLM 返回非数组 → 全部返回默认值。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         result = _apply_llm_news_correlation(self.news, '{"error": "wrong"}')
         self.assertEqual(len(result), 3)
         for t in result:
@@ -941,14 +950,14 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_with_code_block(self) -> None:
         """响应包含 Markdown 代码块 → 正确提取 JSON。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         llm_resp = '```json\n[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "直接利好"}]\n```'
         result = _apply_llm_news_correlation(self.news[:1], llm_resp)
         self.assertEqual(result[0], ("高", "利好", "直接利好"))
 
     def test_idx_out_of_range(self) -> None:
         """idx 越界时忽略该条目，使用默认值填充。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         llm_resp = '[{"idx": 99, "relevance": "高", "sentiment": "利好", "analysis": "越界"}]'
         result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
@@ -957,18 +966,18 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_empty_batch(self) -> None:
         """空列表 → 返回空列表。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         result = _apply_llm_news_correlation([], "[]")
         self.assertEqual(result, [])
 
 
 # ═══════════════════════════════════════════════════════════
-#  批次 LLM 新闻分析（TestBatchNewsAnalysis）
+#  批次 财经新闻热点与持仓关联分析（TestBatchNewsAnalysis）
 # ═══════════════════════════════════════════════════════════
 
 
 class TestBatchNewsAnalysis(unittest.TestCase):
-    """测试批次 LLM 新闻分析功能。"""
+    """测试批次 财经新闻热点与持仓关联分析功能。"""
 
     def setUp(self) -> None:
         self.news_5 = [
@@ -978,7 +987,7 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_handle_5_items_in_one_batch(self) -> None:
         """处理 5 条新闻的批次，全部成功返回。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": i, "relevance": "高", "sentiment": "利好", "analysis": f"原因{i}"}
@@ -991,7 +1000,7 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_partial_json_response(self) -> None:
         """LLM 返回 3 条结果给 5 条新闻 → 缺失 2 条填充默认值。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
@@ -1008,13 +1017,13 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_empty_batch(self) -> None:
         """空批次 → 返回空列表。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         result = _apply_llm_news_correlation([], "[]")
         self.assertEqual(result, [])
 
     def test_fewer_results_than_requested(self) -> None:
         """LLM 返回 1 条结果给 5 条新闻 → 缺失 4 条填充默认值。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
@@ -1027,7 +1036,7 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_malformed_json_in_batch(self) -> None:
         """JSON 格式错误 → 全部返回默认值。"""
-        from src.python.llm_client import _apply_llm_news_correlation
+        from src.python.llm import _apply_llm_news_correlation
         result = _apply_llm_news_correlation(self.news_5, "这不是JSON")
         self.assertEqual(len(result), 5)
         for t in result:
@@ -1035,20 +1044,20 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  enhance_news_correlation — LLM 新闻关联增强
+#  enhance_news_correlation — 财经新闻热点与持仓关联分析 LLM 增强
 # ═══════════════════════════════════════════════════════════
 
 
-@patch("src.python.config.get_llm_config")
+@patch("src.python.llm.skeleton.get_llm_config")
 class TestEnhanceNewsCorrelation(unittest.TestCase):
     """测试 enhance_news_correlation 的主流程。"""
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+        cls._exec_patcher = patch("src.python.llm.skeleton.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+        cls._httpx_patcher = patch("src.python.llm.skeleton.httpx.Client",
                                     new=MagicMock())
         cls._httpx_patcher.start()
 
@@ -1069,7 +1078,7 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
 
     def test_llm_not_configured(self, mock_cfg: MagicMock) -> None:
         """LLM 未配置 → 返回原始数据 + 空 token 用量。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         mock_cfg.return_value = None
         result, cached, usage = enhance_news_correlation(self.news, self.holdings)
         self.assertEqual(result, self.news)
@@ -1078,17 +1087,17 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
 
     def test_empty_news(self, mock_cfg: MagicMock) -> None:
         """空新闻列表 → 直接返回。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         result, cached, usage = enhance_news_correlation([], self.holdings)
         self.assertEqual(result, [])
         self.assertFalse(cached)
         self.assertEqual(usage, {})
 
-    @patch("src.python.llm_client._call_llm")
-    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.cache_get")
     def test_cache_hit(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
         """每篇文章独立缓存命中 → 直接返回，不调用 LLM。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
         # 每篇文章的独立缓存存储 dict {relevance, sentiment, analysis}
         mock_cache_get.return_value = {"relevance": "高", "sentiment": "利好", "analysis": "已缓存"}
@@ -1096,11 +1105,11 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
         self.assertTrue(cached)
         mock_call.assert_not_called()
 
-    @patch("src.python.llm_client._call_llm")
-    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.cache_get")
     def test_llm_success(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
         """LLM 调用成功 → 返回富化数据。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
         mock_cache_get.return_value = None  # 缓存未命中
         mock_call.return_value = (
@@ -1113,11 +1122,11 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
         self.assertIn("llm_analysis", result[0])
         self.assertEqual(usage.get("total_tokens"), 150)
 
-    @patch("src.python.llm_client._call_llm")
-    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.cache_get")
     def test_llm_failure(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
         """LLM 调用失败 → 返回原始数据 + 空 token 用量。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
         mock_cache_get.return_value = None  # 缓存未命中
         mock_call.return_value = (None, None)  # 调用失败
@@ -1139,10 +1148,10 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+        cls._exec_patcher = patch("src.python.llm.generators.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+        cls._httpx_patcher = patch("src.python.llm.generators.httpx.Client",
                                     new=MagicMock())
         cls._httpx_patcher.start()
 
@@ -1152,12 +1161,12 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         cls._exec_patcher.stop()
     """测试 generate_* 函数接受外部 llm_config 参数。"""
 
-    @patch("src.python.llm_client._generate_llm_content")
+    @patch("src.python.llm.skeleton._generate_llm_content")
     def test_global_macro_uses_passed_config(
         self, mock_gen: MagicMock,
     ) -> None:
         """传入 llm_config → 被 _generate_llm_content 接收。"""
-        from src.python.llm_client import generate_global_macro
+        from src.python.llm import generate_global_macro
         mock_gen.return_value = ("<p>结果</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_global_macro": False}
         result, cached = generate_global_macro(
@@ -1168,12 +1177,12 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         # 验证传递给 _generate_llm_content 的第一个参数是传入的 llm_config
         self.assertIs(mock_gen.call_args[0][0], llm_config)
 
-    @patch("src.python.llm_client._generate_llm_content")
+    @patch("src.python.llm.skeleton._generate_llm_content")
     def test_expert_review_uses_passed_config(
         self, mock_gen: MagicMock,
     ) -> None:
         """gen_expert_review 传递 llm_config 到 _generate_llm_content。"""
-        from src.python.llm_client import generate_expert_review
+        from src.python.llm import generate_expert_review
         mock_gen.return_value = ("<p>复盘</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_expert_review": False}
         result, cached = generate_expert_review(
@@ -1183,12 +1192,12 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         self.assertEqual(result, "<p>复盘</p>")
         self.assertIs(mock_gen.call_args[0][0], llm_config)
 
-    @patch("src.python.llm_client._generate_llm_content")
+    @patch("src.python.llm.skeleton._generate_llm_content")
     def test_health_check_uses_passed_config(
         self, mock_gen: MagicMock,
     ) -> None:
         """gen_health_check 传递 llm_config 到 _generate_llm_content。"""
-        from src.python.llm_client import generate_health_check
+        from src.python.llm import generate_health_check
         mock_gen.return_value = ("<p>体检</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_health_check": False}
         result, cached = generate_health_check(
@@ -1198,12 +1207,12 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         self.assertEqual(result, "<p>体检</p>")
         self.assertIs(mock_gen.call_args[0][0], llm_config)
 
-    @patch("src.python.llm_client._generate_llm_content")
+    @patch("src.python.llm.skeleton._generate_llm_content")
     def test_penetration_uses_passed_config(
         self, mock_gen: MagicMock,
     ) -> None:
         """gen_penetration_deep_analysis 传递 llm_config。"""
-        from src.python.llm_client import generate_penetration_deep_analysis
+        from src.python.llm import generate_penetration_deep_analysis
         mock_gen.return_value = ("<p>穿透</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_penetration_deep": False}
         result, cached = generate_penetration_deep_analysis(
@@ -1219,10 +1228,10 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+        cls._exec_patcher = patch("src.python.llm.generators.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+        cls._httpx_patcher = patch("src.python.llm.generators.httpx.Client",
                                     new=MagicMock())
         cls._httpx_patcher.start()
 
@@ -1231,13 +1240,13 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
         cls._httpx_patcher.stop()
         cls._exec_patcher.stop()
 
-    @patch("src.python.llm_client.cache_get", return_value=None)
-    @patch("src.python.llm_client._call_llm")
+    @patch("src.python.llm.skeleton.cache_get", return_value=None)
+    @patch("src.python.llm.skeleton._call_llm")
     def test_passed_config_used(
         self, mock_call: MagicMock, mock_cache_get: MagicMock,
     ) -> None:
         """传入 llm_config → 不需要内部 get_llm_config()。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         news = [{"title": "A", "matched_keywords": ["茅台"]}]
         holdings = [MagicMock(name="茅台", code="600519")]
         mock_call.return_value = (
@@ -1258,19 +1267,27 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 
 
-@patch("src.python.llm_client.generate_penetration_deep_analysis")
-@patch("src.python.llm_client.generate_health_check")
-@patch("src.python.llm_client.generate_global_macro")
-@patch("src.python.llm_client.generate_expert_review")
+@patch("src.python.llm.generators.generate_penetration_deep_analysis")
+@patch("src.python.llm.generators.generate_health_check")
+@patch("src.python.llm.generators.generate_global_macro")
+@patch("src.python.llm.generators.generate_expert_review")
 class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
     """测试 generate_all_llm 缓存预检行为。"""
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+        cls._cfg_patcher = patch("src.python.llm.generators.get_llm_config",
+                                  return_value={"enabled_llm": {
+                                      "global_macro": True,
+                                      "expert_review": True,
+                                      "health_check": True,
+                                      "penetration_deep": True,
+                                  }})
+        cls._cfg_patcher.start()
+        cls._exec_patcher = patch("src.python.llm.generators.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+        cls._httpx_patcher = patch("src.python.llm.generators.httpx.Client",
                                     new=MagicMock())
         cls._httpx_patcher.start()
 
@@ -1278,10 +1295,11 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls._httpx_patcher.stop()
         cls._exec_patcher.stop()
+        cls._cfg_patcher.stop()
 
     CACHED_CONTENT = '<p>缓存内容</p><p style="color:#888;font-size:12px">本次使用LLM缓存</p>'
 
-    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm.generators.cache_get")
     def test_all_cached_no_threads(
         self, mock_cache_get: MagicMock,
         mock_expert: MagicMock, mock_macro: MagicMock,
@@ -1306,7 +1324,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_health.assert_not_called()
         mock_penetration.assert_not_called()
 
-    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm.generators.cache_get")
     def test_none_cached_all_threads(
         self, mock_cache_get: MagicMock,
         mock_expert: MagicMock, mock_macro: MagicMock,
@@ -1332,7 +1350,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_health.assert_called_once()
         mock_penetration.assert_called_once()
 
-    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm.generators.cache_get")
     def test_force_skips_cache(
         self, mock_cache_get: MagicMock,
         mock_expert: MagicMock, mock_macro: MagicMock,
@@ -1360,7 +1378,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_health.assert_called_once()
         mock_penetration.assert_called_once()
 
-    @patch("src.python.llm_client.cache_get")
+    @patch("src.python.llm.generators.cache_get")
     def test_partial_cache_some_threads(
         self, mock_cache_get: MagicMock,
         mock_expert: MagicMock, mock_macro: MagicMock,
@@ -1399,16 +1417,16 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 
 
-@patch("src.python.config.get_llm_config")
+@patch("src.python.llm.skeleton.get_llm_config")
 class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
-    """测试新闻关联分析的逐条缓存行为。"""
+    """测试财经新闻热点与持仓关联分析的逐条缓存行为。"""
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm_client.ThreadPoolExecutor",
+        cls._exec_patcher = patch("src.python.llm.skeleton.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm_client.httpx.Client",
+        cls._httpx_patcher = patch("src.python.llm.skeleton.httpx.Client",
                                     new=MagicMock())
         cls._httpx_patcher.start()
 
@@ -1428,14 +1446,14 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
             MagicMock(name="贵州茅台", code="600519"),
         ]
 
-    @patch("src.python.llm_client.cache_get")
-    @patch("src.python.llm_client._call_llm")
+    @patch("src.python.llm.skeleton.cache_get")
+    @patch("src.python.llm.skeleton._call_llm")
     def test_all_articles_cached(
         self, mock_call: MagicMock, mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
     ) -> None:
         """全部文章独立缓存命中 → cached=True + 不调用 LLM。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
         mock_cache_get.return_value = {"relevance": "高", "sentiment": "利好", "analysis": "缓存"}
         result, cached, usage = enhance_news_correlation(self.news, self.holdings)
@@ -1445,14 +1463,14 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
         for item in result:
             self.assertIn("llm_analysis", item)
 
-    @patch("src.python.llm_client.cache_get", return_value=None)
-    @patch("src.python.llm_client._call_llm")
+    @patch("src.python.llm.skeleton.cache_get", return_value=None)
+    @patch("src.python.llm.skeleton._call_llm")
     def test_no_cache_all_fresh(
         self, mock_call: MagicMock, mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
     ) -> None:
         """全部未缓存 → cached=False + 调用 LLM。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
         mock_call.return_value = (
             '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "A"},'
@@ -1465,14 +1483,14 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
         self.assertGreater(usage.get("total_tokens", 0), 0)
         mock_call.assert_called_once()
 
-    @patch("src.python.llm_client.cache_get")
-    @patch("src.python.llm_client._call_llm")
+    @patch("src.python.llm.skeleton.cache_get")
+    @patch("src.python.llm.skeleton._call_llm")
     def test_mixed_cache(
         self, mock_call: MagicMock, mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
     ) -> None:
         """部分文章缓存 → 仅未缓存文章走 LLM。"""
-        from src.python.llm_client import enhance_news_correlation
+        from src.python.llm import enhance_news_correlation
         mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
         # 文章 0 和 2 缓存命中，文章 1 未命中
         self._call_count = 0

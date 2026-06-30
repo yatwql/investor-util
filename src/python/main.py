@@ -35,7 +35,7 @@ logger = setup_logger()
 def _print_session_usage_on_exit() -> None:
     """程序退出时打印 LLM 会话累计用量。"""
     try:
-        from src.python.llm_client import get_session_usage
+        from src.python.llm import get_session_usage
         usage = get_session_usage()
         if usage.get("call_count", 0) > 0:
             inp = usage.get("input_tokens", 0)
@@ -51,13 +51,8 @@ def _print_session_usage_on_exit() -> None:
             print(f"  模型: {model}")
             per_module = usage.get("per_module", {})
             if per_module:
-                _MODULE_DISPLAY = {
-                    "global_macro": "全球政经局势",
-                    "expert_review": "智囊团深度复盘",
-                    "health_check": "持仓体检报告",
-                    "penetration_deep": "穿透深度分析",
-                    "news_correlation": "财经新闻热点与持仓关联分析",
-                }
+                from src.python.registry import get_llm_module_names
+                _MODULE_DISPLAY = get_llm_module_names()
                 for key, display_name in _MODULE_DISPLAY.items():
                     if key in per_module:
                         pm = per_module[key]
@@ -80,7 +75,6 @@ def _bind_callbacks() -> None:
     """运行时将函数引用填入 MENU_ITEMS。"""
     from src.python.tui_handlers import (
         _cmd_generate_excel,
-        _cmd_generate_excel_with_news,
         _cmd_generate_html,
         _cmd_generate_both,
         _cmd_generate_full,
@@ -91,20 +85,23 @@ def _bind_callbacks() -> None:
         _cmd_update_position_cache,
         _cmd_cleanup_cache,
         _cmd_show_cache_stats,
+        _cmd_config_llm_modules,
+        _cmd_refresh_config,
     )
     callbacks: dict[str, callable] = {
         "E": _cmd_generate_excel,
-        "N": _cmd_generate_excel_with_news,
         "H": _cmd_generate_html,
         "B": _cmd_generate_both,
         "L": _cmd_generate_full,
         "C": _cmd_config_dir,
         "F": _cmd_config_filename,
-        "R": _cmd_config_output_dir,
+        "O": _cmd_config_output_dir,
         "1": _cmd_update_basic_cache,
         "2": _cmd_update_position_cache,
         "3": _cmd_cleanup_cache,
         "4": _cmd_show_cache_stats,
+        "S": _cmd_config_llm_modules,
+        "R": _cmd_refresh_config,
     }
     for i, (key, _label, _cb, is_exit) in enumerate(MENU_ITEMS):
         MENU_ITEMS[i] = (key, _label, callbacks.get(key), is_exit)

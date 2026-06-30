@@ -19,36 +19,14 @@ from src.python.tui_menu import MENU_ITEMS, _press_any_key, _refresh_config, get
 from src.python.logger import setup_logger
 from src.python.reader import get_xlsx_info, list_xlsx_files, read_holdings
 from src.python.config import set_config, get_llm_config
-
+from src.python.registry import get_llm_module_name
+from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
 logger = setup_logger()
 
 _busy: bool = False  # 防连续按键保护
 
 # 报告生成过程中的错误累计（每次生成开始时清空）
 _generation_errors: list[str] = []
-
-
-# ── 计时器 ──────────────────────────────────────────────────
-
-import time as _time_module
-
-_timing_records: list[tuple[str, float]] = []
-
-
-class _Timer:
-    """简单计时器上下文管理器，记录各模块耗时。"""
-
-    def __init__(self, label: str) -> None:
-        self.label = label
-        self.start: float = 0.0
-
-    def __enter__(self) -> '_Timer':
-        self.start = _time_module.time()
-        return self
-
-    def __exit__(self, *args) -> None:
-        elapsed = _time_module.time() - self.start
-        _timing_records.append((self.label, elapsed))
 
 
 def _print_llm_session_usage(usage: dict | None = None) -> None:
@@ -62,7 +40,7 @@ def _print_llm_session_usage(usage: dict | None = None) -> None:
     """
     if usage is None:
         try:
-            from src.python.llm_client import get_session_usage
+            from src.python.llm import get_session_usage
             usage = get_session_usage()
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键）")
@@ -78,6 +56,7 @@ def _print_llm_session_usage(usage: dict | None = None) -> None:
 
 def _print_timing_summary() -> None:
     """输出本次运行时各模块耗时排行。"""
+    from src.python.report.excel_generator import _timing_records
     if not _timing_records:
         return
     total = sum(t for _, t in _timing_records)
@@ -324,273 +303,16 @@ def _cmd_generate_excel() -> None:
     _press_any_key()
 
 
-def _cmd_generate_excel_with_news() -> None:
-    """生成包含新闻的 Excel 分析报告。"""
-    _refresh_config()
-    _clear_errors()
-    config = get_config_cache() or {}
-    filepath = _select_holdings_file()
-    if not filepath:
-        return
-    try:
-        holdings = read_holdings(filepath)
-        if not holdings:
-            _add_error("未读取到有效的持仓数据")
-            print("  [ERR] 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
-            return
-        _check_and_warm_for_new_assets(holdings)
-        output_dir = config.get("output_dir", "reports")
-        news_top_count = int(config.get("news_top_count", 100))
-        _generate_excel_report(holdings, include_news=True, output_dir=output_dir, news_top_count=news_top_count)
-    except Exception as e:
-        _add_error(str(e))
-        logger.exception("生成 Excel（新闻）报告失败")
-        _print_error_with_hint(e, "生成失败")
-    _print_error_summary()
-    _print_timing_summary()
-    _press_any_key()
-
-
-def _generate_excel_report(
-    holdings: list, include_news: bool = False, output_dir: str = "reports",
-    news_top_count: int = 100, include_llm: bool = False,
-    show_llm_in_tui: bool = False, llm_content: tuple | None = None,
-    details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None,
-    us_indices: dict[str, dict[str, Any]] | None = None,
-    news_data: list | None = None,
-    llm_cached: tuple[bool, bool, bool, bool] = (False, False, False, False),
-    news_llm_meta: dict | None = None,
-    early_warnings: dict | None = None,
-) -> None:
-    """生成 Excel 报告的核心逻辑。"""
-    # ── 导入各报告模块（单独捕获，避免一处缺失拖垮整个报告） ──
-    try:
-        from src.python.fetcher import fetch_indices, fetch_us_indices
-    except ImportError:
-        fetch_indices = lambda: {}
-        fetch_us_indices = lambda: {}
-        _add_error("市场指数模块缺失 (fetcher)")
-
-    try:
-        from src.python.report.excel_writer import create_workbook, save_workbook
-    except ImportError:
-        _add_error("Excel 报告核心模块缺失 (excel_writer)，无法生成报告")
-        return
-
-    sheets_ok: dict[str, bool] = {}
-
-    try:
-        from src.python.report.summary import write_summary_sheet
-    except ImportError:
-        write_summary_sheet = None
-        _add_error("汇总页模块缺失 (summary)")
-
-    try:
-        from src.python.report.category import write_category_sheet
-    except ImportError:
-        write_category_sheet = None
-        _add_error("持仓分类模块缺失 (category)")
-
-    try:
-        from src.python.report.market_value import (
-            classify_holdings, get_last_trading_day,
-            price_update_status, write_market_value_sheet,
-        )
-    except ImportError:
-        classify_holdings = lambda _: {}
-        get_last_trading_day = lambda: ""
-        price_update_status = lambda _a, _b: (0, 0, True)
-        write_market_value_sheet = None
-        _add_error("行情市值模块缺失 (market_value)")
-
-    try:
-        from src.python.report.penetration import write_penetration_sheet, compute_penetration_top10
-    except ImportError:
-        write_penetration_sheet = None
-        compute_penetration_top10 = lambda _a, _b: {}
-        _add_error("穿透分析模块缺失 (penetration)")
-
-    try:
-        from src.python.report.fund_performance import write_fund_performance_sheet
-    except ImportError:
-        write_fund_performance_sheet = None
-        _add_error("基金业绩模块缺失 (fund_performance)")
-
-    # ── 创建工作簿（必须成功） ──
-    wb = create_workbook()
-    wb.remove(wb.active)
-
-    # 预创建全部页签，确保 1→12 数字顺序从左到右
-    ws1 = wb.create_sheet()  # 1. 汇总
-    ws2 = wb.create_sheet()  # 2. 市值核算
-    ws3 = wb.create_sheet()  # 3. 持仓分类
-    ws4 = wb.create_sheet()  # 4. 资产穿透TOP10
-    ws5 = wb.create_sheet()  # 5. 基金业绩分析
-    ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点
-    ws7 = wb.create_sheet() if include_news else None  # 7. 智能预警（仅在有新闻时生成）
-
-    # ── 行情市值页（返回下游所需的核心数据） ──
-    if write_market_value_sheet is None:
-        total_mv = total_cost = total_profit = today_profit = 0.0
-        details = details or []
-        categories: dict[str, int] = {}
-        up_status = (0, 0, True)
-        _add_error("行情市值模块缺失，跳过 Sheet 2")
-    elif details is not None:
-        logger.info("复用外部传入的市值核算数据，共 %d 条", len(details))
-        total_mv = sum(d.market_value for d in details)
-        total_cost = sum(d.cost for d in details)
-        total_profit = sum(d.profit for d in details)
-        today_profit = sum(d.today_profit for d in details)
-        with _Timer("市值核算明细表"):
-            write_market_value_sheet(ws2, holdings, details=details)
-    else:
-        with _Timer("行情数据获取 (市值核算明细表)"):
-            print("  [..] 正在获取行情数据（首次耗时较长，后续使用缓存）...")
-            total_mv, total_cost, total_profit, today_profit, details = \
-                write_market_value_sheet(ws2, holdings)
-        print("  [OK] 行情数据获取完成")
-
-    categories = classify_holdings(holdings) if classify_holdings else {}
-    up_status = price_update_status(details, get_last_trading_day()) if price_update_status else (0, 0, True)
-
-    # ── 市场指数 ──
-    if a_indices is None:
-        with _Timer("市场指数 (投资分析汇总)"):
-            print("  [..] 正在获取市场指数...")
-            a_indices = fetch_indices() if fetch_indices else {}
-            if us_indices is None:
-                us_indices = fetch_us_indices() if fetch_us_indices else {}
-            print("  [OK] 市场指数获取完成")
-
-    # ── 各页安全写入 ──
-    _llm_session = None
-    with _Timer("投资分析汇总"):
-        _call_sheet("投资分析汇总", write_summary_sheet,
-                     ws1, total_mv, total_cost, total_profit, today_profit,
-                     categories=categories, update_status=up_status,
-                     a_indices=a_indices, us_indices=us_indices)
-
-    with _Timer("持仓分类表"):
-        _call_sheet("持仓分类表", write_category_sheet, ws3, holdings, details)
-
-    with _Timer("资产穿透TOP10"):
-        pen_result = compute_penetration_top10(holdings, details) if compute_penetration_top10 else {}
-        print("  [OK] 资产穿透TOP10 计算完成")
-        _call_sheet("资产穿透TOP10", write_penetration_sheet,
-                     ws4, holdings, details, penetration_data=pen_result)
-
-    with _Timer("基金业绩分析"):
-        _call_sheet("基金业绩分析", write_fund_performance_sheet, ws5, holdings, details)
-
-    if include_news:
-        penetrated_assets = pen_result.get("top10", []) if pen_result else []
-        try:
-            from src.python.report.news_correlation import write_news_sheet
-        except ImportError:
-            write_news_sheet = None
-            _add_error("新闻页模块缺失 (news_correlation)")
-
-        with _Timer("财经新闻热点与持仓关联分析"):
-            if news_data is not None:
-                logger.info("复用预取的新闻数据，共 %d 条", len(news_data))
-                _meta = news_llm_meta or {}
-                print(f"  [OK] 复用预取新闻数据（{len(news_data)} 条）")
-            else:
-                print("  [..] 正在获取财经新闻（含穿透资产关键词）...")
-                try:
-                    from src.python.report.news_correlation import build_news_data
-                except ImportError:
-                    build_news_data = None
-                if build_news_data:
-                    try:
-                        news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
-                    except Exception as e:
-                        _add_error(f"新闻数据获取失败: {e}")
-                        news_data, _meta = [], {}
-                else:
-                    _add_error("新闻数据模块缺失")
-                    news_data, _meta = [], {}
-            _call_sheet("财经新闻热点与持仓关联分析", write_news_sheet, ws6, news_data, llm_meta=_meta)
-
-        # 智能预警页签（依赖新闻 + 穿透数据）
-        if include_news and ws7 is not None:
-            if early_warnings is None:
-                _early_warnings = {"sector_alerts": [], "sentiment_alerts": [],
-                                   "has_warnings": False, "has_sector_data": False, "has_llm_news": False}
-            else:
-                _early_warnings = early_warnings
-            try:
-                from src.python.report.early_warning import write_early_warning_sheet
-                _call_sheet("智能预警", write_early_warning_sheet, ws7, _early_warnings)
-            except ImportError as _ew_err:
-                _add_error(f"智能预警模块缺失: {_ew_err}")
-
-    if include_llm:
-        with _Timer("LLM 分析章节"):
-            print("  [..] 正在生成 LLM 分析章节...")
-            try:
-                from src.python.report.llm_content import write_llm_sheets
-                _llm_cfg = get_llm_config() or {}
-                _model_names = (
-                    _llm_cfg.get("model_global_macro") or _llm_cfg.get("model", ""),
-                    _llm_cfg.get("model_expert_review") or _llm_cfg.get("model", ""),
-                    _llm_cfg.get("model_health_check") or _llm_cfg.get("model", ""),
-                    _llm_cfg.get("model_penetration_deep") or _llm_cfg.get("model", ""),
-                )
-                _thinking = (
-                    _llm_cfg.get("thinking_enabled_global_macro", False),
-                    _llm_cfg.get("thinking_enabled_expert_review", False),
-                    _llm_cfg.get("thinking_enabled_health_check", False),
-                    _llm_cfg.get("thinking_enabled_penetration_deep", False),
-                )
-                global_macro_text, expert_review_text, health_check_text, penetration_deep_text = write_llm_sheets(
-                    wb, llm_content=llm_content, llm_cached=llm_cached,
-                    model_names=_model_names, thinking=_thinking,
-                )
-                logger.info("LLM 分析章节已生成")
-                print("  [OK] LLM 分析章节生成完成")
-            except ImportError:
-                logger.warning("LLM 分析章节模块 (src.python.report.llm_content) 未就绪，跳过")
-                _add_error("LLM 分析章节模块未就绪，跳过")
-                global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
-            except Exception as e:
-                logger.exception("生成 LLM 分析章节失败")
-                _add_error(f"LLM 分析章节生成失败: {e}")
-                global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
-
-        # LLM 生成完成后捕获会话用量，追加到汇总页
-        try:
-            from src.python.llm_client import get_session_usage
-            _llm_session = get_session_usage()
-        except (ImportError, TypeError, AttributeError):
-            logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
-            _llm_session = None
-        if _llm_session and _llm_session.get("call_count", 0) > 0:
-            try:
-                from src.python.report.summary import write_llm_usage_block
-                write_llm_usage_block(ws1, _llm_session)
-                from src.python.report.excel_writer import freeze_header, auto_width
-                freeze_header(ws1, 2)
-                auto_width(ws1)
-            except (OSError, TypeError, AttributeError):
-                logger.debug("写入 LLM 用量或格式化 worksheet 失败（非关键）")
-
-        if show_llm_in_tui and (global_macro_text or expert_review_text or health_check_text or penetration_deep_text):
-            _show_llm_tui(global_macro_text, expert_review_text, health_check_text, penetration_deep_text)
-
-        _print_llm_session_usage(_llm_session)
-
-    with _Timer("保存 Excel/HTML 文件"):
-        print("  [..] 正在保存 Excel 报告...")
-        path = save_workbook(wb, output_dir=output_dir)
-        logger.info("Excel 报告已生成: %s", path)
-        logger.info("总市值: %.2f元, 总成本: %.2f元, 总盈亏: %.2f元, 本日盈亏: %.2f元",
-                    total_mv, total_cost, total_profit, today_profit)
-        print(f"  [OK] Excel 报告已保存: {path}")
+def _generate_excel_report(*args, **kwargs):
+    """生成 Excel 报告（委托给 excel_generator 模块）。"""
+    callbacks = {
+        "add_error": _add_error,
+        "call_sheet": _call_sheet,
+        "show_llm_tui": _show_llm_tui,
+        "print_llm_session_usage": _print_llm_session_usage,
+    }
+    from src.python.report.excel_generator import generate_excel_report
+    return generate_excel_report(*args, **kwargs, callbacks=callbacks)
 
 
 def _cmd_generate_html(news: bool = False) -> None:
@@ -715,7 +437,7 @@ def _show_llm_tui(global_macro_text: str, expert_review_text: str, health_check_
         print(f"  └{border}┘")
 
     if global_macro_text:
-        _print_box("全球政经局势", _trim(global_macro_text.strip(), 200))
+        _print_box(get_llm_module_name('global_macro'), _trim(global_macro_text.strip(), 200))
         print()
 
     if expert_review_text:
@@ -741,7 +463,7 @@ def _show_llm_tui(global_macro_text: str, expert_review_text: str, health_check_
 
         parts = [p for p in [phase1, phase3] if p]
         body = _trim("\n".join(parts) if parts else expert_review_text.strip(), 500)
-        _print_box("智囊团深度复盘", body)
+        _print_box(get_llm_module_name('expert_review'), body)
     print()
 
     if health_check_text:
@@ -753,7 +475,7 @@ def _show_llm_tui(global_macro_text: str, expert_review_text: str, health_check_
                 score_line = line.strip()[:120]
                 break
         body = score_line if score_line else _trim(health_check_text.strip(), 200)
-        _print_box("持仓体检报告摘要", body)
+        _print_box(get_llm_module_name('health_check'), body)
     print()
 
     if penetration_deep_text:
@@ -765,7 +487,7 @@ def _show_llm_tui(global_macro_text: str, expert_review_text: str, health_check_
                 summary_line = line.strip()[:120]
                 break
         body = summary_line if summary_line else _trim(penetration_deep_text.strip(), 200)
-        _print_box("穿透深度分析概要", body)
+        _print_box(get_llm_module_name('penetration_deep'), body)
     print()
 
 
@@ -828,7 +550,7 @@ def _cmd_generate_full() -> None:
             for d in details
         ]
 
-        from src.python.llm_client import generate_all_llm
+        from src.python.llm import generate_all_llm
         from src.python.providers.akshare_extras import get_sector_fund_flow
         from src.python.report.news_correlation import build_news_data
 
@@ -873,12 +595,34 @@ def _cmd_generate_full() -> None:
                         llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep, global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached = fut.result()
                         llm_content = (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)
                         llm_cached = (global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached)
-                        if not any(c is None for c in (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)):
-                            tag = "缓存" if global_macro_cached and expert_review_cached else "LLM"
+                        # ── 区分因禁用跳过的模块与真正失败的模块 ──
+                        _MODULE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep")
+                        _MODULE_RESULTS = (llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep)
+                        _CACHED_FLAGS = (global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached)
+                        disabled: list[str] = []
+                        failed: list[str] = []
+                        ok_count = 0
+                        for mk, result in zip(_MODULE_KEYS, _MODULE_RESULTS):
+                            if result is not None:
+                                ok_count += 1
+                            elif _LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
+                                disabled.append(get_llm_module_name(mk))
+                            else:
+                                failed.append(get_llm_module_name(mk))
+
+                        for name in disabled:
+                            print(f"  [..] {name}：已跳过（菜单 S 可切换）")
+                        for name in failed:
+                            _add_error(f"{name}：内容生成失败（已降级使用占位文本）")
+                            print(f"  [!] {name}：内容生成失败（已降级使用占位文本）")
+
+                        if ok_count > 0 and not failed:
+                            tag = "缓存" if all(_CACHED_FLAGS) else "LLM"
                             print(f"  [OK] {tag} 内容生成完成")
-                        else:
-                            _add_error("部分 LLM 内容生成失败（已降级使用占位文本）")
-                            print("  [!] 部分 LLM 内容生成失败（已降级使用占位文本）")
+                        elif ok_count == 0 and not failed and not disabled:
+                            print("  [!] LLM 均未生成（请检查 LLM 配置）")
+                        elif ok_count == 0 and not failed:
+                            print("  [..] 所有 LLM 内容已跳过，未调用 LLM")
                     except Exception as e:
                         _add_error(f"LLM 内容生成异常: {e}")
                         print(f"  [ERR] LLM 内容生成异常: {e}")
@@ -1018,6 +762,45 @@ def _cmd_config_output_dir() -> None:
 # ── 缓存刷新命令 ─────────────────────────────────────────
 
 
+def _read_holdings_and_clear_cache(group_name: str) -> list | None:
+    """选择持仓文件 → 读取 → 清缓存。失败返回 None。
+
+    Args:
+        group_name: 缓存分组名称，传给 clear_by_group
+
+    Returns:
+        持仓列表（成功）或 None（失败）
+    """
+    from src.python.cache import clear_by_group
+
+    _refresh_config()
+    filepath = _select_holdings_file()
+    if not filepath:
+        return None
+
+    try:
+        holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return None
+        print(f"  [OK] 共 {len(holdings)} 条持仓记录")
+        print("  [..] 清除旧缓存...")
+        cleared = clear_by_group(group_name)
+        if cleared:
+            parts = [f"{name} {count}条" for name, count in cleared.items()]
+            print(f"  [OK] {' + '.join(parts)} 已清除")
+        else:
+            print("  [OK] 无缓存需清除")
+        return holdings
+    except Exception as e:
+        print(f"  [ERR] 读取持仓失败: {e}")
+        _press_any_key()
+        return None
+
+
 def _refresh_common_caches() -> None:
     """刷新不依赖基金持仓的公共缓存：盈利预测 + 行业资金流向。
 
@@ -1054,48 +837,21 @@ def _refresh_common_caches() -> None:
 
 def _cmd_update_basic_cache() -> None:
     """更新基础类缓存。"""
-    from src.python.cache import clear, clear_by_prefix
     from src.python.fetcher import fetch_fund_benchmark, fetch_fund_holdings, fetch_fund_rankings
     from src.python.report.fund_performance import _is_fund
 
-    _refresh_config()
-    filepath = _select_holdings_file()
-    if not filepath:
+    holdings = _read_holdings_and_clear_cache("refresh")
+    if holdings is None:
         return
 
+    funds = [h for h in holdings if _is_fund(h)]
+    has_non_fundable_data = True  # news/industry/dividend/profit_forecast/sector_flow 不依赖基金
+
+    if not funds:
+        print("  [!!] 未检测到基金持仓，跳过基金业绩/持仓/基准缓存")
+        print("  [..] 继续刷新新闻/行业分类/分红/盈利预测/行业资金流向...")
+
     try:
-        print("  [..] 正在读取持仓数据...")
-        holdings = read_holdings(filepath)
-        if not holdings:
-            print("  [ERR] 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
-            return
-        print(f"  [OK] 共 {len(holdings)} 条持仓记录")
-
-        funds = [h for h in holdings if _is_fund(h)]
-        has_non_fundable_data = True  # news/industry/dividend/profit_forecast/sector_flow 不依赖基金
-
-        if not funds:
-            print("  [!!] 未检测到基金持仓，跳过基金业绩/持仓/基准缓存")
-            print("  [..] 继续刷新新闻/行业分类/分红/盈利预测/行业资金流向...")
-
-        print()
-        print("  [..] 清除旧缓存...")
-        clear_by_prefix("fund_perf_")
-        clear_by_prefix("fund_hold_")
-        clear("fund_benchmarks")
-        clear_by_prefix("news_")
-        clear_by_prefix("llm_news_item_")
-        clear_by_prefix("industry_")
-        clear_by_prefix("dividend_")
-        clear_by_prefix("profit_forecast_")
-        clear_by_prefix("sector_flow_")
-        print("  [OK] 旧缓存已清除（含 fund_perf_ + fund_hold_ + fund_benchmarks + news_ +"
-              " llm_news_item_ + industry_ +"
-              " dividend_ + profit_forecast_ + sector_flow_ 缓存）")
-
         if not funds:
             # 无基金：只刷新非基金类缓存
             print()
@@ -1213,37 +969,14 @@ def _cmd_update_basic_cache() -> None:
 
 def _cmd_update_position_cache() -> None:
     """更新持仓类缓存。"""
-    from src.python.cache import clear_by_prefix
     from src.python.fetcher import fetch_indices, fetch_market_data, fetch_us_indices
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    _refresh_config()
-    filepath = _select_holdings_file()
-    if not filepath:
+    holdings = _read_holdings_and_clear_cache("preload")
+    if holdings is None:
         return
 
     try:
-        print("  [..] 正在读取持仓数据...")
-        holdings = read_holdings(filepath)
-        if not holdings:
-            print("  [ERR] 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
-            return
-        print(f"  [OK] 共 {len(holdings)} 条持仓记录")
-
-        print()
-        print("  [..] 清除旧缓存...")
-        price_count = clear_by_prefix("price_")
-        index_count = clear_by_prefix("index_")
-        expert_review_count = clear_by_prefix("llm_expert_review_")
-        global_macro_count = clear_by_prefix("llm_global_macro_")
-        health_check_count = clear_by_prefix("llm_health_check_")
-        penetration_deep_count = clear_by_prefix("llm_penetration_deep_")
-        print(f"  [OK] 价格缓存 {price_count} 条 + 指数缓存 {index_count} 条 + "
-              f"智囊团深度复盘 {expert_review_count} 条 + 全球政经局势 {global_macro_count} 条 + "
-              f"持仓体检报告 {health_check_count} 条 + 穿透深度分析 {penetration_deep_count} 条 已清除")
 
         print()
         print(f"  [..]   并行获取持仓价格/净值 + 市场指数...")
@@ -1339,6 +1072,98 @@ def _cmd_show_cache_stats() -> None:
     print("  [..] 正在检查过期文件...")
     expired = cleanup_expired(dry_run=True)
     print(f"  过期文件: {expired} 个（可通过菜单 [3] 清理）")
+    _press_any_key()
+
+
+# ── 配置支持LLM的报告模块 ──────────────────────────────────
+
+
+def _cmd_config_llm_modules() -> None:
+    """配置各 LLM 报告的启用/停用（编辑 llm_settings.json 的 enabled_llm）。"""
+    import json
+    from src.python.registry import get_llm_module_names
+
+    settings_path = "data/config/llm_settings.json"
+
+    # 读取当前配置
+    try:
+        with open(settings_path, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("  [ERR] 无法读取 llm_settings.json")
+        _press_any_key()
+        return
+
+    enabled_map = settings.get("enabled_llm", {})
+    module_names = get_llm_module_names()
+
+    while True:
+        print()
+        print("  ┌── 配置支持LLM的报告模块 ──────────────────┐")
+        items = []
+        for i, (sfx, name) in enumerate(module_names.items(), 1):
+            status = enabled_map.get(sfx, True)
+            status_str = f"\033[92m开启\033[0m" if status else f"\033[91m关闭\033[0m"
+            items.append((i, sfx, name, status))
+            print(f"  │ {i}. {name:<14s} [{status_str}]\033[0m{' ' * 4}│")
+        print(f"  │ 0. 返回主菜单{' ' * 27}│")
+        print(f"  └{'─' * 42}┘")
+        print()
+        choice = input("  输入编号切换 (0-5): ").strip()
+
+        if choice == "0":
+            break
+
+        try:
+            idx = int(choice)
+            matched = [it for it in items if it[0] == idx]
+            if matched:
+                _, sfx, name, curr = matched[0]
+                enabled_map[sfx] = not curr
+                # 写入文件
+                settings["enabled_llm"] = enabled_map
+                with open(settings_path, "w", encoding="utf-8") as f:
+                    json.dump(settings, f, ensure_ascii=False, indent=2)
+                print(f"  [OK] {name} 已{'开启' if not curr else '关闭'}")
+                # 刷新 LLM 配置缓存
+                from src.python.config import get_llm_config
+                get_llm_config()
+            else:
+                print("  [!] 无效编号")
+        except (ValueError, TypeError):
+            print("  [!] 请输入有效编号")
+
+    _press_any_key()
+
+
+# ── 刷新配置 ─────────────────────────────────────────────
+
+
+def _cmd_refresh_config() -> None:
+    """重新加载所有配置（config.json + llm_settings.json + llm_key.json）。"""
+    from src.python.config import get_config, get_llm_config
+    from src.python.llm.pricing import _reload_pricing
+
+    # 破坏内部缓存强制重新读取
+    import src.python.config as _cfg_mod
+    _cfg_mod._config_cache = None
+    _cfg_mod._config_mtime = 0
+    _cfg_mod._llm_config_cache = None
+    _cfg_mod._llm_config_mtime = 0
+
+    config = get_config()
+    llm_config = get_llm_config()
+    _reload_pricing()
+
+    # 刷新 tui_menu 配置缓存
+    _refresh_config()
+
+    if config:
+        print("  [OK] config.json 已重新加载")
+    if llm_config:
+        print("  [OK] llm_settings.json + llm_key.json 已重新加载")
+    else:
+        print("  [!] LLM 未配置（llm_key.json 缺失或无效）")
     _press_any_key()
 
 

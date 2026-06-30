@@ -214,25 +214,25 @@ class TestWriteLlmSheets(unittest.TestCase):
         """四个 sheet 标题正确。"""
         write_llm_sheets(self.wb, ("<p>宏观</p>", "<p>复盘</p>", None, None))
         sheet_names = [ws.title for ws in self.wb.worksheets]
-        self.assertIn("7.全球政经局势", sheet_names)
-        self.assertIn("8.智囊团深度复盘", sheet_names)
-        self.assertIn("9.持仓体检报告", sheet_names)
-        self.assertIn("10.穿透深度分析", sheet_names)
+        self.assertIn("8.全球政经局势", sheet_names)
+        self.assertIn("9.智囊团深度复盘", sheet_names)
+        self.assertIn("10.持仓体检报告", sheet_names)
+        self.assertIn("11.穿透深度分析", sheet_names)
 
     def test_return_text_quad(self):
         """返回 (text7, text8, text9, textA) 纯文本四元组。"""
         text7, text8, text9, textA = write_llm_sheets(
-            self.wb, ("<p>宏观分析</p>", "<p>复盘内容</p>", "<p>体检结果</p>", "<p>穿透分析</p>"))
-        self.assertEqual(text7, "宏观分析")
+            self.wb, ("<p>全球政经局势</p>", "<p>复盘内容</p>", "<p>持仓体检报告</p>", "<p>穿透深度分析</p>"))
+        self.assertEqual(text7, "全球政经局势")
         self.assertEqual(text8, "复盘内容")
-        self.assertEqual(text9, "体检结果")
-        self.assertEqual(textA, "穿透分析")
+        self.assertEqual(text9, "持仓体检报告")
+        self.assertEqual(textA, "穿透深度分析")
 
     def test_cache_macro_only(self):
         """macro 缓存 + expert 未缓存 → sheet7 有提示行，sheet8 无。"""
         write_llm_sheets(
             self.wb,
-            ("<p>宏观内容</p>", "<p>复盘内容</p>", None, None),
+            ("<p>全球政经局势</p>", "<p>复盘内容</p>", None, None),
             llm_cached=(True, False, False, False),
         )
         ws7, ws8, ws9, wsA = self._get_llm_sheets()
@@ -246,7 +246,7 @@ class TestWriteLlmSheets(unittest.TestCase):
         """macro + expert 都来自缓存 → 两个 sheet 都有提示。"""
         write_llm_sheets(
             self.wb,
-            ("<p>宏观</p>", "<p>复盘</p>", None, None),
+            ("<p>全球政经局势</p>", "<p>复盘</p>", None, None),
             llm_cached=(True, True, False, False),
         )
         ws7, ws8, ws9, wsA = self._get_llm_sheets()
@@ -294,7 +294,7 @@ class TestExtractFooterText(unittest.TestCase):
     def test_extract_token_footer(self) -> None:
         """提取包含模型和 Token 用量的 footer。"""
         html = (
-            '<p>宏观分析内容</p>\n\n'
+            '<p>全球政经局势</p>\n\n'
             '<p style="color:#888;font-size:12px">'
             '模型：gpt-4o | Token 用量：输入 1,234 / 输出 567 = 1,801'
             '</p>'
@@ -359,7 +359,7 @@ class TestWriteContentSheetUnifiedFooter(unittest.TestCase):
     def test_footer_extracted_from_html(self) -> None:
         """HTML 含 footer → 最后一行为 footer 纯文本。"""
         html = (
-            '<p>宏观分析内容段落</p>\n\n'
+            '<p>全球政经局势</p>\n\n'
             '<p style="color:#888;font-size:12px">'
             '模型：gpt-4o | Token 用量：输入 1,234 / 输出 567 = 1,801 | '
             '估算费用：$0.005 | Extended Thinking'

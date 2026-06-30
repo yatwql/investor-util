@@ -29,6 +29,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.market_value import DetailRow
+from src.python.registry import get_report_sheet_name
 from src.python.report.penetration import classify_penetration, QDII, ETF, INDEX_LINK, BOND_FUND, ACTIVE_EQUITY
 from src.python.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT
 
@@ -209,9 +210,9 @@ def write_fund_performance_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    ws.title = "5.基金业绩分析"
+    ws.title = f"5.{get_report_sheet_name('fund_performance')}"
 
-    row = write_title_row(ws, 1, "基金业绩分析", _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name('fund_performance'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
@@ -356,8 +357,8 @@ def write_fund_performance_sheet(
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
 
-    logger.info("基金业绩分析写入完成，%d/%d 只基金获取成功",
-                success_count, fund_count)
+    logger.info("%s写入完成，%d/%d 只基金获取成功",
+                get_report_sheet_name('fund_performance'), success_count, fund_count)
 
 
 def _write_empty_row(ws, row: int, fund: Holding) -> None:

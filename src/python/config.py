@@ -338,32 +338,6 @@ def _ensure_llm_settings_file() -> None:
         logger.warning("无法自动创建 LLM 设置文件: %s", e)
 
 
-def _migrate_llm_settings(settings: dict) -> None:
-    """原地迁移旧版 LLM 配置到新版分层结构。
-
-    旧版扁平键 enabled_llm_news_correlation 迁移到 enabled_llm.news_correlation。
-    如果已有新版 enabled_llm 结构则保留不动（新格式优先）。
-    """
-    if "enabled_llm" not in settings:
-        enabled_llm: dict[str, bool] = {}
-        old_val = settings.get("enabled_llm_news_correlation")
-        if old_val is not None:
-            enabled_llm["news_correlation"] = bool(old_val)
-        # 所有非新闻模块默认启用（旧格式无法控制它们的开关）
-        for mod in ("global_macro", "expert_review", "health_check", "penetration_deep"):
-            enabled_llm.setdefault(mod, True)
-        settings["enabled_llm"] = enabled_llm
-    else:
-        # 新格式已存在，但可能缺少某些模块（例如新增的模块）
-        existing = settings["enabled_llm"]
-        if isinstance(existing, dict):
-            existing.setdefault("news_correlation", bool(settings.get("enabled_llm_news_correlation", False)))
-            existing.setdefault("global_macro", True)
-            existing.setdefault("expert_review", True)
-            existing.setdefault("health_check", True)
-            existing.setdefault("penetration_deep", True)
-
-
 # ── LLM 配置读取（外部文件） ─────────────────────────────────
 
 
@@ -430,14 +404,14 @@ def get_llm_config() -> dict | None:
     配置优先级（高 → 低）：
       1. llm_key.json 中的字段（provider, api_key, model, endpoint）
       2. llm_settings.json 中的字段（其余所有非敏感配置）
-      3. 代码内置默认值（init_llm_settings() 自动创建时写入）
+      3. 代码内置默认值（_ensure_llm_settings_file() 自动创建时写入）
 
     缓存按 llm_settings.json 和 llm_key.json 的修改时间联合失效。
     """
     global _llm_config_cache, _llm_config_mtime
 
     with _llm_config_lock:
-        # ── 基础层：llm_settings.json（或向后兼容：config.json 的 llm_settings）──
+        # ── 基础层：llm_settings.json ──
         base_settings: dict = {}
         settings_mtime: float = 0
         settings_path = get_llm_settings_path()
@@ -446,17 +420,11 @@ def get_llm_config() -> dict | None:
                 with open(settings_path, "r", encoding="utf-8") as f:
                     base_settings = json.load(f)
                 settings_mtime = os.path.getmtime(settings_path)
-                # 迁移旧版配置到新版分层结构
-                _migrate_llm_settings(base_settings)
                 # 首次加载时检测未知键名（仅在 cache 未初始化时告警一次）
                 if _llm_config_cache is None and base_settings:
                     _check_unknown_llm_keys(base_settings)
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning("LLM 设置文件读取失败: %s", e)
-        else:
-            # 向后兼容：从 config.json 读取
-            main_config = get_config()
-            base_settings = dict(main_config.get("llm_settings") or {})
 
         # ── 覆盖层：llm_key.json ──
         key_path = get_llm_key_path()

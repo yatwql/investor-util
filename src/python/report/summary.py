@@ -11,6 +11,7 @@ from typing import Any
 from openpyxl.styles import Alignment, Font
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.registry import get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -115,7 +116,7 @@ def write_summary_sheet(
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
     """
-    ws.title = "1.投资分析汇总"
+    ws.title = f"1.{get_report_sheet_name('summary')}"
 
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
@@ -125,7 +126,7 @@ def write_summary_sheet(
     denominator = total_cost + total_profit - today_profit
     today_rate = (today_profit / denominator * 100) if denominator > 0 else 0.0
 
-    row = write_title_row(ws, 1, "投资分析汇总", _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name('summary'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
     # ── 基本信息 ────────────────────────────────────────────
@@ -264,7 +265,7 @@ def write_llm_usage_block(ws: Worksheet,
         ws: 汇总页工作表
         llm_session_usage: get_session_usage() 返回值
     """
-    from src.python.llm_client import format_session_usage
+    from src.python.llm import format_session_usage
     u = format_session_usage(llm_session_usage)
     if not u.get("has_usage"):
         return

@@ -25,6 +25,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.fetcher import fetch_fund_holdings
 from src.python.models import Holding
+from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -97,7 +98,7 @@ _FUND_ACCOUNT_KW = ("基金", "支付宝", "微信", "银行")
 
 
 def classify_penetration(h: Holding) -> str:
-    """判断持仓在穿透分析中的角色。
+    """判断持仓在穿透深度分析中的角色。
 
     优先级（高 → 低）：
       1. QDII            — 名称含 ``QDII``
@@ -595,8 +596,8 @@ def write_penetration_sheet(
         penetration_data: 预计算穿透数据。为 None 时自动计算，提供时跳过
                           内部重复计算，用于调用方已算过一轮的场景
     """
-    ws.title = "4.资产穿透TOP10"
-    row = write_title_row(ws, 1, "资产穿透TOP10", _NCOLS)
+    ws.title = f"4.{get_report_sheet_name('penetration')}"
+    row = write_title_row(ws, 1, get_report_sheet_name('penetration'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
     if penetration_data is not None:
@@ -608,7 +609,7 @@ def write_penetration_sheet(
         write_data_row(ws, row, ["暂无穿透数据"])
         freeze_header(ws, 2)
         auto_width(ws)
-        logger.warning("穿透分析无数据")
+        logger.warning("%s无数据", get_llm_module_name("penetration_deep"))
         return
 
     summary = result["summary"]
@@ -681,8 +682,8 @@ def write_penetration_sheet(
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=40)
 
-    logger.info("资产穿透TOP10写入完成，合并 %d 个标的",
-                summary["merged_count"])
+    logger.info("%s写入完成，合并 %d 个标的",
+                get_report_sheet_name('penetration'), summary["merged_count"])
 
 
 # ═══════════════════════════════════════════════════════════

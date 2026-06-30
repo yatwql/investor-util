@@ -22,7 +22,7 @@ from src.python.models import Holding
 
 
 # ============================================================
-#  Template rendering — LLM 新闻关联分析
+#  Template rendering — 财经新闻热点与持仓关联分析
 # ============================================================
 
 
@@ -359,7 +359,7 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
             mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
             mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
             mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
-            mock_llm = stack.enter_context(patch("src.python.llm_client.generate_all_llm"))
+            mock_llm = stack.enter_context(patch("src.python.llm.generate_all_llm"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
             mock_details.return_value = [self.mock_detail]

@@ -68,13 +68,11 @@ class TestRegistryCompleteness:
                 )
 
     def test_llm_settings_keys_count(self):
-        """LLM settings 键名数量应与预期一致（5模块 × 10 - 1个例外 = 49 + 4全局 = 53）。"""
+        """LLM settings 键名数量应与预期一致（5模块 × 10 - 1个例外 = 49 + 3全局 = 52）。"""
         keys = get_known_llm_settings_keys()
         # 确认已知的全局键存在
         assert "max_retries" in keys
         assert "enabled_llm" in keys
-        # enabled_llm_news_correlation 是 v0.2.35 之前的旧键名，作为已弃用的已知键保留
-        assert "enabled_llm_news_correlation" in keys
         assert "pricing" in keys
         # 确认 per-module 键生成正确
         assert "temperature_global_macro" in keys
@@ -82,7 +80,7 @@ class TestRegistryCompleteness:
         # news_correlation 不应有 output_brief
         assert "output_brief_news_correlation" not in keys
         # 确认总键数
-        assert len(keys) == 53, f"预期 53 个 LLM settings 键，实际 {len(keys)}"
+        assert len(keys) == 52, f"预期 52 个 LLM settings 键，实际 {len(keys)}"
 
     def test_each_llm_module_has_model_key(self):
         """每个 LLM 模块必须有 model_{suffix} 键。"""
@@ -138,7 +136,6 @@ class TestDerivedMaps:
         assert ptm["news_"] == "news"
         assert ptm["llm_global_macro_"] == "llm_global_macro"
         assert ptm["llm_expert_review_"] == "llm_expert_review"
-        assert ptm["llm_news_correlation_"] == "llm_news_correlation"
         assert ptm["llm_news_item_"] == "llm_news_correlation"
         assert ptm["llm_health_check_"] == "llm_health_check"
         assert ptm["llm_penetration_deep_"] == "llm_penetration_deep"
@@ -150,12 +147,13 @@ class TestDerivedMaps:
         """验证精确键名映射。"""
         etm = get_exact_type_map()
         assert etm["fund_benchmarks"] == "benchmark"
-        assert etm["holdings_tracking"] == "benchmark"
+        assert etm["holdings_tracking"] == "tracking"
+        assert etm["trading_calendar"] == "calendar"
 
     def test_exact_type_map_no_extra_keys(self):
         """exact_map 不包含多余键名。"""
         etm = get_exact_type_map()
-        assert len(etm) == 2, f"预期 2 个精确键名，实际 {len(etm)}"
+        assert len(etm) == 3, f"预期 3 个精确键名，实际 {len(etm)}"
 
     def test_registered_data_types(self):
         """get_registered_data_types 返回所有 data_type。"""
@@ -179,6 +177,23 @@ class TestDerivedMaps:
                         f"data_type {dtype!r} 被前缀 {pfx!r} 匹配到 {mapped_type!r}，"
                         f"可能导致 cleanup_expired 误判"
                     )
+
+    def test_cache_groups_known_values(self):
+        """验证已知模块的组归属。"""
+        reg = {m.data_type: m for m in get_registry()}
+        assert "refresh" in reg["rank"].cache_groups
+        assert "refresh" in reg["hold"].cache_groups
+        assert "refresh" in reg["industry"].cache_groups
+        assert "refresh" in reg["news"].cache_groups
+        assert "preload" in reg["price"].cache_groups
+        assert "preload" in reg["index"].cache_groups
+        assert not reg["calendar"].cache_groups
+
+    def test_cache_prefix_modules_have_groups(self):
+        """所有有缓存前缀的模块都应有 cache_groups。"""
+        for m in get_registry():
+            if m.cache_prefixes:
+                assert m.cache_groups, f"{m.name} 有 cache_prefixes 但无 cache_groups"
 
 
 class TestDataModuleDef:

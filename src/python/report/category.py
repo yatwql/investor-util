@@ -11,6 +11,7 @@ from typing import List, Tuple
 
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.registry import get_report_sheet_name
 from src.python.models import Holding
 from src.python.report.excel_writer import (
     auto_width,
@@ -119,7 +120,7 @@ def write_category_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    ws.title = "3.持仓分类表"
+    ws.title = f"3.{get_report_sheet_name('category')}"
 
     # 建立 code → detail 映射
     detail_map: dict[str, DetailRow] = {}
@@ -142,7 +143,7 @@ def write_category_sheet(
     )
 
     # 写入标题和表头
-    row = write_title_row(ws, 1, "持仓分类表", _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name('category'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
@@ -225,8 +226,8 @@ def write_category_sheet(
     freeze_header(ws, 2)
     auto_width(ws)
 
-    logger.info("持仓分类表写入完成，共 %d 个分组，%d 条持仓",
-                len(sorted_groups), len(holdings))
+    logger.info("%s写入完成，共 %d 个分组，%d 条持仓",
+                get_report_sheet_name('category'), len(sorted_groups), len(holdings))
 
 
 def _num_formats() -> List[str]:

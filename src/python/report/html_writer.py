@@ -32,6 +32,7 @@ from src.python.report.market_value import (
     price_update_status,
 )
 from src.python.report.penetration import compute_penetration_top10
+from src.python.registry import get_llm_module_name, get_llm_module_names
 
 logger = logging.getLogger("invest")
 
@@ -255,7 +256,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     print("  [..] 正在获取基金业绩排名...")
     perf_data = _build_perf_data(holdings, details)
 
-    # ── 8) 财经新闻热点（可选）─────────────────────────────
+    # ── 8) 财经新闻热点与持仓关联分析（可选）─────────────────
     _news_llm_meta: dict = {"llm_enabled": False, "llm_cached": False, "token_usage": {}, "cost_estimation": "-", "thinking_enabled": False}
     if include_news:
         if news_data is not None:
@@ -277,9 +278,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
                 )
                 if not news_data:
                     news_data = []
-                    logger.info("新闻关联分析：无数据")
+                    logger.info("财经新闻热点与持仓关联分析：无数据")
                 else:
-                    logger.info("新闻关联分析完成，%d 条", len(news_data))
+                    logger.info("财经新闻热点与持仓关联分析完成，%d 条", len(news_data))
             except Exception as e:
                 logger.warning("新闻获取失败: %s", e)
                 news_data = []
@@ -301,7 +302,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     elif enable_llm:
         print("  [..] 正在调用 LLM 生成智能分析...")
         try:
-            from src.python.llm_client import generate_all_llm
+            from src.python.llm import generate_all_llm
             pen_top10 = penetration.get("top10", []) if penetration else []
 
             # 构建持仓明细（供 LLM 引用具体品种，防止虚构代码）
@@ -335,16 +336,16 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
             )
             if global_macro_content:
                 llm_enabled_flag = True
-                logger.info("全球政经局势 LLM 生成完成")
+                logger.info("%s LLM 生成完成", get_llm_module_name("global_macro"))
             if expert_review_content:
                 llm_enabled_flag = True
-                logger.info("智囊团深度复盘 LLM 生成完成")
+                logger.info("%s LLM 生成完成", get_llm_module_name("expert_review"))
             if health_check_content:
                 llm_enabled_flag = True
-                logger.info("持仓体检报告 LLM 生成完成")
+                logger.info("%s LLM 生成完成", get_llm_module_name("health_check"))
             if penetration_deep_content:
                 llm_enabled_flag = True
-                logger.info("穿透深度分析 LLM 生成完成")
+                logger.info("%s LLM 生成完成", get_llm_module_name("penetration_deep"))
         except Exception as e:
             logger.warning("LLM 生成失败: %s", e)
 
@@ -352,7 +353,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     _llm_session_usage = None
     if llm_enabled_flag:
         try:
-            from src.python.llm_client import get_session_usage, format_session_usage
+            from src.python.llm import get_session_usage, format_session_usage
             _llm_session_usage = format_session_usage(get_session_usage())
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
@@ -396,6 +397,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         penetration_deep=penetration_deep_content,
         llm_session_usage=_llm_session_usage,
         early_warnings=early_warnings,
+        module_labels=get_llm_module_names(),
     )
 
     # ── 10) 保存文件 ─────────────────────────────────────────
