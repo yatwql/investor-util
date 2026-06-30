@@ -23,6 +23,8 @@
 - **technical.md**：目录结构修正（移除重复 registry.py、添加 http_client.py），更新最后更新日期。
 - **plan.md**：版本号更新至 v0.2.49。
 - **版本号同步**：constants.py 0.2.48→0.2.49，README.md 0.2.48→0.2.49
+- **全量文档一致性审计**：修复 5 处不一致：`how-to-start.md` 菜单 S 穿透深度分析默认状态 [关闭]→[开启]（代码默认 true）；`requirements.md` 最后更新 2026-06-30→2026-07-01；`testplan.md` 最后更新 2026-06-30→2026-07-01；`datasource-and-folders.md` 和 `technical.md` 测试数 "共 1264 项"→"1264 passed / 11 skipped"
+- **datasource-and-folders.md 目录结构完善**：补全 `.gitignore` 根文件描述；为 5 个 `__init__.py`（src/、src/python/、fetcher/、providers/、report/）补充描述（包标记/公共 API 导出）；修正 `data/config/` 树形符号（├──/└── 层级）；调整 manuals 各分册描述更精确
 
 ## [0.2.48] - 2026-07-01
 

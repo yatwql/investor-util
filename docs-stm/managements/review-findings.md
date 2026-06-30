@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.49 — R-025~R-032 ✅ 全部完成）
+最后更新：2026-07-01（v0.2.49 — R-025~R-032 ✅ 全部完成 + 文档审计 ✅）
 
 ---
 
@@ -42,5 +42,7 @@
 | 2026-07-01 | **R-028 ✅ `build_news_data` 拆分（159→60行）**、**R-029 ✅ tiantian.py 三大函数全部分解**（fetch_fund_holdings/fetch_quarterly_holdings/fetch_fund_rankings，提取12个辅助函数） | 代码质量修复 |
 | 2026-07-01 | **R-030 ✅ skeleton.py 两大函数拆分**：`_generate_llm_content`（136→43行）提取 3 个辅助函数；`_run_batch_mode`（112→57行）提取 2 个辅助函数 | 代码质量修复 |
 | 2026-07-01 | **R-031 ✅ test_tiantian.py 新增 39 项**（8 个纯函数测试）、**R-032 ✅ test_skeleton.py 新增 9 项**（`_is_llm_module_enabled` + 导入验证）。全量 1264 测试通过。 | 测试覆盖 |
+| 2026-07-01 | **全量文档一致性审计**：修复 5 处不一致（how-to-start.md 菜单 S 穿透深度分析状态、requirements.md/testplan.md 日期、datasource-and-folders.md/technical.md 测试数表述） | 文档审计 |
+| 2026-07-01 | **datasource-and-folders.md 目录结构完善**：补全 `.gitignore` 描述、5 个 `__init__.py` 描述、修正 `data/config/` 树形符号 | 文档完善 |
 
 ---
