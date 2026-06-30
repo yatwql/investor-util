@@ -22,7 +22,7 @@
 - LLM 客户端（`src/python/llm/` 包）：覆盖 API 调用路由、返回类型元组解包、缓存逻辑、截断检测
 - 报表生成（`src/python/report/*.py`）：每个模块至少覆盖正常数据和空数据两种场景
 - 关键词富化（`src/python/report/news_correlation.py`）：覆盖持仓/穿透/行业三种来源类型、去重逻辑、空列表边界、Excel 格式断言（wrap_text、列宽）
-- TUI 菜单（`src/python/main.py`）：覆盖所有菜单选项的输入输出
+- TUI 菜单（`src/python/tui_menu.py`）：覆盖所有菜单选项的输入输出
 
 ### 1.2 集成测试
 

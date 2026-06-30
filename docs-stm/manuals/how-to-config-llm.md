@@ -594,7 +594,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 4. **`prompts.py`** — 添加系统提示词常量和提示词构建函数
 5. **`report/llm_content.py`** — 在 `write_llm_sheets()` 中添加新页签（章节名→模块键映射由 `_get_module_key_map()` 自动派生，无需手动维护）
 6. **`llm/__init__.py`** — 若需要 export 新生成函数
-7. **报告模板** — Excel：在 `tui_handlers.py` 传递新章节 model/thinking 参数；HTML：在 `html_writer.py` 适配
+7. **报告模板** — Excel：`generators.py` 自动从 `llm_settings.json` 读取 model/thinking 参数传入骨干函数；HTML：在 `html_writer.py` 适配
 8. **缓存 TTL** — 在 `config.json` → `cache_ttl` 中添加 `llm_{module}` 条目
 9. **用户文档** — 在 `llm_settings.json` 中添加推荐默认值，在本文档中添加模块说明
 

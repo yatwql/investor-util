@@ -28,39 +28,32 @@ investor-util/
 │   ├── __init__.py
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
-│   │   ├── main.py               # 入口
 │   │   ├── cache.py              # 缓存管理
 │   │   ├── config.py             # 配置文件管理
-│   │   ├── fetcher/               # 数据获取路由（子包：chain/price/index/fund/industry）
-│   │   ├── llm/                  # LLM 客户端（9 子模块：api/pricing/session/circuit_breaker/fingerprint/markdown/generators/prompts/skeleton）
 │   │   ├── constants.py          # 共享常量
-│   │   ├── logger.py             # 日志模块
-│   │   ├── models.py             # 数据模型
-│   │   ├── reader.py             # 持仓读取
-│   │   ├── tui.py                # TUI 主循环
-│   │   ├── tui_menu.py           # 菜单交互
-│   │   ├── tui_handlers.py       # 菜单功能执行
-│   │   ├── providers/            # 数据源提供商
+│   │   ├── fetcher/              # 数据获取路由（子包：chain/price/index/fund/industry）
+│   │   ├── handlers_cache.py     # TUI 缓存管理命令（从 tui_handlers.py 拆分）
+│   │   ├── handlers_config.py    # TUI 配置管理命令
+│   │   ├── handlers_report.py    # TUI 报告生成命令
+│   │   ├── http_client.py        # HTTP 客户端工厂
+│   │   ├── llm/                 # LLM 客户端（api/pricing/session/circuit_breaker/fingerprint/markdown/generators/prompts/skeleton）
+│   │   ├── logger.py            # 日志模块
+│   │   ├── main.py              # 入口
+│   │   ├── market_hours.py      # 交易时段判断（从 cache.py 拆分）
+│   │   ├── models.py            # 数据模型
+│   │   ├── reader.py            # 持仓读取
+│   │   ├── registry.py          # 中央注册表
+│   │   ├── tui.py               # TUI 主循环
+│   │   ├── tui_handlers.py      # 菜单通用辅助函数
+│   │   ├── tui_menu.py          # 菜单交互
+│   │   ├── providers/           # 数据源提供商
 │   │   │   ├── __init__.py
-│   │   │   ├── akshare_extras.py
-│   │   │   ├── akshare_news.py
-│   │   │   ├── cls_news.py
-│   │   │   ├── eastmoney.py
-│   │   │   ├── eastmoney_industry.py
-│   │   │   ├── eastmoney_news.py
-│   │   │   ├── news_aggregator.py
-│   │   │   ├── news_correlator.py
-│   │   │   ├── news_keywords.py
-│   │   │   ├── news_sources.py
-│   │   │   ├── sina.py
-│   │   │   ├── sina_news.py
-│   │   │   ├── tencent.py
-│   │   │   ├── tiantian.py
-│   │   │   └── wallstreetcn_news.py
-│   │   ├── report/               # 报告生成
+│   │   │   └── ... (16 files)
+│   │   ├── report/              # 报告生成
 │   │   │   ├── __init__.py
 │   │   │   ├── category.py
-│   │   │   ├── early_warning.py        # 智能预警（行业资金流向联动 + 新闻情绪聚合）
+│   │   │   ├── early_warning.py       # 智能预警
+│   │   │   ├── excel_generator.py     # 报告生成编排
 │   │   │   ├── excel_writer.py
 │   │   │   ├── fund_performance.py
 │   │   │   ├── html_writer.py
@@ -68,13 +61,12 @@ investor-util/
 │   │   │   ├── market_value.py
 │   │   │   ├── news_correlation.py
 │   │   │   ├── penetration.py
+│   │   │   ├── progress.py            # 进度报告接口
 │   │   │   ├── styles.py
 │   │   │   └── summary.py
 │   │   └── tmpl/
 │   │       └── report_template.html
-│   └── test/                     # 测试
-│       ├── __init__.py
-│       └── test_*.py (26 个)
+│   └── test/                     # 测试（33 个 test_*.py）
 ├── data/
 │   ├── holdings/                 # 持仓 xlsx 文件
 │   ├── cache/                    # API 响应缓存

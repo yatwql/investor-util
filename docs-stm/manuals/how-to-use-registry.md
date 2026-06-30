@@ -115,6 +115,7 @@ registry 的派生产出被以下模块消费：
 | `src/python/main.py` | `get_llm_module_names()` | 菜单显示 |
 | `src/python/tui_menu.py` | `get_llm_module_names()` | LLM 配置状态展示 |
 | `src/python/tui_handlers.py` | `get_llm_module_name()` | TUI 输出框标题 |
+| `src/python/handlers_report.py` | `get_llm_module_name()` | LLM 模块失败标签、报告生成 |
 | `src/python/report/llm_content.py` | `get_registry()`, `get_llm_module_name()` | Excel LLM 分析章节生成 |
 | `src/python/report/news_correlation.py` | `get_llm_module_name()` | 新闻页签标题 |
 | `src/python/report/excel_generator.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 错误提示、`_Timer`/`_call_sheet` 标签 |
@@ -189,7 +190,7 @@ DataModuleDef("我的固定键", "fixed",
 | `cache.py` → `exact_map` | `get_exact_type_map()` |
 | `config.py` → `_KNOWN_LLM_SETTINGS_KEYS` | `get_known_llm_settings_keys()` |
 | `generators.py` → `_label_map` | `get_llm_module_names()` |
-| `main.py` → `_MODULE_DISPLAY` | `get_llm_module_names()` |
+| `tui_menu.py` → `_MODULE_DISPLAY` | `get_llm_module_names()` |
 | `llm_content.py` → `_MODULE_KEY_MAP` 硬编码 | `_get_module_key_map()` via `get_registry()` |
 | `tui_menu.py` → 内联 print 模块名 | `get_llm_module_names()` 循环 |
 | `summary.py/market_value.py/...` → 6 处硬编码 `ws.title` + `write_title_row` | `get_report_sheet_name()` |

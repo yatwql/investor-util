@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-01
+最后更新：2026-07-01（v0.2.48 — R-020~R-024 代码质量优化完成）
 
 ---
 
@@ -85,11 +85,19 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 
 ### 待实现方向
 
-### A. 测试覆盖补全（低难度 / 中价值）✅ 已完成（v0.2.46）
+### A. 测试覆盖补全（低难度 / 中价值）✅ 已完成（v0.2.46 / v0.2.48）
 
 - **`llm/api.py` 单元测试**：44 项，覆盖熔断/重试/回退/截断/安抚重试骨架
 - **`report/excel_generator.py` 单元测试**：15 项，覆盖 18 个页签写入隔离、模块缺失降级
+- **R-024 ✅ v0.2.48**：`src/test/test_handlers.py` 23 项，覆盖 handlers 三大模块辅助函数
 - **文档同步**：每次变更后核对 review-findings.md → changelog.md 的流转。
+
+### A2. 大函数拆分（低难度 / 中价值）✅ 已完成（v0.2.48）
+
+- **R-020 ✅** `excel_generator.py:generate_excel_report()` 296 行→8 函数
+- **R-021 ✅** `generators.py:generate_all_llm()` 224 行→5 函数
+- **R-022 ✅** `summary.py:write_llm_usage_sheet()` 215 行→6 辅助函数
+- **R-023 ✅** `penetration.py:compute_penetration_top10()` 199 行→6 函数
 
 ### B. 基金持仓专属分析（中难度 / 高价值）
 
