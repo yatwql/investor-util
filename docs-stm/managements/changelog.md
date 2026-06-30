@@ -1,4 +1,4 @@
-# 变更日志
+# 个人投资分析报告生成小助手 - 变更日志
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/)。
 
