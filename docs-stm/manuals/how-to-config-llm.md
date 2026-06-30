@@ -289,6 +289,27 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `enabled_llm` | dict | 见上 | 各模块独立启停开关；`news_correlation` 默认 `false` 表示可选，其余默认 `true` |
 | `pricing` | dict | `{currency: "CNY"}` | 模型 Token 定价表 + 货币标识。格式见"完整模型定价表"章节 |
 
+全局配置段在 `llm_settings.json` 中的实际写法示例：
+
+```json
+{
+  "max_retries": 2,
+  "enabled_llm": {
+    "global_macro": true,
+    "expert_review": true,
+    "health_check": true,
+    "penetration_deep": true,
+    "news_correlation": false
+  },
+  "pricing": {
+    "currency": "CNY"
+  }
+}
+```
+
+> `enabled_llm` 中关闭的模块在报告中自动跳过，不消耗 Token。
+> `pricing` 段可省略（代码内置定价），仅需覆盖时才添加，详见「完整模型定价表」章节。
+
 ### 模块级配置
 
 | 配置键 | 类型 | 默认值（各模块不同） | 说明 |
