@@ -283,10 +283,10 @@ def write_llm_usage_block(ws: Worksheet,
 
 
 def write_llm_module_status_block(ws: Worksheet) -> None:
-    """在汇总页追加写入 LLM 模块状态（跳过的模块和失败的模块）。
+    """在汇总页追加写入 LLM 模块状态（各模块状态、费用、缓存、Extended Thinking）。
 
-    从 _LLM_MODULE_FAILURE 读取各模块的失败原因，将 disabled 的模块归类为
-    "跳过"，其他失败原因归类为"生成失败"，分别写入摘要行。
+    从 _LLM_MODULE_FAILURE 读取禁用/失败状态，从 get_session_usage()
+    读取成功/缓存模块的 Token 用量、费用等信息，合并写入摘要行。
 
     Args:
         ws: 汇总页工作表
@@ -295,6 +295,7 @@ def write_llm_module_status_block(ws: Worksheet) -> None:
         _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
         FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
         FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
+        get_session_usage,
     )
 
     _DISPLAY_REASON: dict[str, str] = {
@@ -308,27 +309,44 @@ def write_llm_module_status_block(ws: Worksheet) -> None:
     # 仅关注 4 个有独立页签的 LLM 模块
     _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
 
-    skipped: list[str] = []
-    failed: list[tuple[str, str]] = []
-    for mk in _MODULE_KEYS:
-        reason = _LLM_MODULE_FAILURE.get(mk)
-        if not reason:
-            continue
-        name = get_llm_module_name(mk) or mk
-        if reason == FAIL_REASON_DISABLED:
-            skipped.append(name)
-        else:
-            reason_text = _DISPLAY_REASON.get(reason, reason)
-            failed.append((name, reason_text))
+    # 读取 per_module 数据
+    _session = get_session_usage()
+    _per_module = _session.get("per_module", {}) if _session else {}
 
-    if not skipped and not failed:
+    rows_data: list[tuple[str, str]] = []
+    for mk in _MODULE_KEYS:
+        name = get_llm_module_name(mk) or mk
+        reason = _LLM_MODULE_FAILURE.get(mk)
+        pm = _per_module.get(mk)
+
+        if reason == FAIL_REASON_DISABLED:
+            rows_data.append((f"  {name}", "⏭️ 已禁用"))
+        elif reason:
+            reason_text = _DISPLAY_REASON.get(reason, reason)
+            rows_data.append((f"  {name}", f"❌ {reason_text}"))
+        elif pm:
+            parts = [pm.get("model", "未知模型")]
+            inp = pm.get("input_tokens", 0)
+            out = pm.get("output_tokens", 0)
+            if inp or out:
+                parts.append(f"输入{inp:,}/输出{out:,}")
+            cost = pm.get("cost", 0.0)
+            if cost > 0:
+                from src.python.llm.pricing import _PRICING_CURRENCY
+                symbol = {"CNY": "¥", "USD": "$"}.get(_PRICING_CURRENCY, "¥")
+                parts.append(f"费用{symbol}{cost:.4f}")
+            if pm.get("cached"):
+                parts.append("缓存")
+            if pm.get("thinking"):
+                parts.append("Extended Thinking")
+            rows_data.append((f"  {name}", " | ".join(parts)))
+        # else: 未触发 → 不显示
+
+    if not rows_data:
         return
 
     row = ws.max_row + 1
     row = _write_blanks(ws, row)
     row = _write_section(ws, row, "【LLM 模块状态】")
-
-    if skipped:
-        row = _write_kv_row(ws, row, "  跳过的模块（已禁用）", "、".join(skipped))
-    for name, reason_text in failed:
-        row = _write_kv_row(ws, row, "  生成失败的模块", f"{name}（{reason_text}）")
+    for key, value in rows_data:
+        row = _write_kv_row(ws, row, key, value)

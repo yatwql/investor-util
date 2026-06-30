@@ -29,7 +29,8 @@ _session_usage: dict[str, Any] = {
     "per_module": {},
 }
 """会话期间所有 LLM 调用的累计 Token 用量和费用。
-per_module: {module_key: {"model": str, "input_tokens": int, "output_tokens": int}}
+per_module: {module_key: {"model": str, "input_tokens": int, "output_tokens": int,
+                           "cached": bool, "thinking": bool, "cost": float}}
 生成报告后可在 TUI/汇总页展示。"""
 
 
@@ -130,17 +131,26 @@ def _track_session_usage(provider: str, usage: dict | None,
 
 def _record_per_module(module_key: str, model_name: str,
                        inp: int = 0, out: int = 0,
-                       cached: bool = False) -> None:
-    """按模块记录本次 LLM 调用的模型和 Token 用量，用于 TUI 退出统计展示。"""
+                       cached: bool = False,
+                       thinking: bool = False,
+                       cost: float = 0.0) -> None:
+    """按模块记录本次 LLM 调用的模型、Token 用量、缓存/Thinking/费用。"""
     pm = _session_usage.setdefault("per_module", {})
     if module_key not in pm:
-        pm[module_key] = {"model": model_name, "input_tokens": 0, "output_tokens": 0}
-    elif cached and not pm[module_key].get("model"):
-        pm[module_key]["model"] = model_name
-    pm[module_key]["input_tokens"] += inp
-    pm[module_key]["output_tokens"] += out
+        pm[module_key] = {
+            "model": model_name, "input_tokens": 0, "output_tokens": 0,
+            "cached": cached, "thinking": thinking, "cost": 0.0,
+        }
+    entry = pm[module_key]
+    entry["input_tokens"] += inp
+    entry["output_tokens"] += out
+    entry["cost"] += cost
     if model_name:
-        pm[module_key]["model"] = model_name
-        # 缓存命中时也记录模型名称，确保全缓存场景下 models 列表有值
-        if model_name not in _session_usage["models"]:
-            _session_usage["models"].append(model_name)
+        entry["model"] = model_name
+    if cached:
+        entry["cached"] = True
+    if thinking:
+        entry["thinking"] = True
+    # 缓存命中时也记录模型名称，确保全缓存场景下 models 列表有值
+    if model_name and model_name not in _session_usage["models"]:
+        _session_usage["models"].append(model_name)

@@ -358,8 +358,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
 
-    # ── 收集 LLM 模块状态（跳过/失败） ────────────────
+    # ── 收集 LLM 模块状态及合并模块明细（成功/缓存/禁用/失败） ──
     _llm_failure = {}
+    _per_module = {}
     try:
         from src.python.llm import (
             _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
@@ -369,6 +370,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         _llm_failure = dict(_LLM_MODULE_FAILURE)
     except ImportError:
         _llm_failure = {}
+    if _llm_session_usage:
+        _per_module = _llm_session_usage.get("per_module", {}) or {}
 
     _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
     module_disabled = {
@@ -383,19 +386,51 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         FAIL_REASON_TIMEOUT: "LLM API 请求超时",
         FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
     }
-    llm_module_status: dict[str, list] = {"skipped": [], "failed": []}
+
+    # 合并 per_module 数据（成功/缓存的模块）与 _LLM_MODULE_FAILURE（禁用/失败）
+    llm_module_info: list[dict[str, Any]] = []
     for mk in _MODULE_KEYS:
+        entry: dict[str, Any] = {"key": mk, "name": _NAMES.get(mk, mk)}
         reason = _llm_failure.get(mk)
-        if not reason:
-            continue
-        display_name = _NAMES.get(mk, mk)
+        pm = _per_module.get(mk)
         if reason == FAIL_REASON_DISABLED:
-            llm_module_status["skipped"].append(display_name)
+            entry["status"] = "disabled"
+            entry["status_label"] = "已禁用"
+            entry["model"] = ""
+            entry["input_tokens"] = 0
+            entry["output_tokens"] = 0
+            entry["cost"] = 0.0
+            entry["cached"] = False
+            entry["thinking"] = False
+        elif reason:
+            entry["status"] = "failed"
+            entry["status_label"] = _DISPLAY_REASON.get(reason, reason)
+            entry["model"] = ""
+            entry["input_tokens"] = 0
+            entry["output_tokens"] = 0
+            entry["cost"] = 0.0
+            entry["cached"] = False
+            entry["thinking"] = False
+        elif pm:
+            entry["status"] = "cached" if pm.get("cached") else "success"
+            entry["status_label"] = "缓存" if pm.get("cached") else "成功"
+            entry["model"] = pm.get("model", "")
+            entry["input_tokens"] = pm.get("input_tokens", 0)
+            entry["output_tokens"] = pm.get("output_tokens", 0)
+            entry["cost"] = pm.get("cost", 0.0)
+            entry["cached"] = pm.get("cached", False)
+            entry["thinking"] = pm.get("thinking", False)
         else:
-            llm_module_status["failed"].append({
-                "name": display_name,
-                "reason": _DISPLAY_REASON.get(reason, reason),
-            })
+            # 既无 failure 记录也无 per_module 数据 → 未触发/未知
+            entry["status"] = "unknown"
+            entry["status_label"] = "未生成"
+            entry["model"] = ""
+            entry["input_tokens"] = 0
+            entry["output_tokens"] = 0
+            entry["cost"] = 0.0
+            entry["cached"] = False
+            entry["thinking"] = False
+        llm_module_info.append(entry)
 
     # ── 10) 渲染模板 ────────────────────────────────────────
     print("  [..] 正在渲染 HTML...")
@@ -438,7 +473,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         early_warnings=early_warnings,
         module_labels=get_llm_module_names(),
         module_disabled=module_disabled,
-        llm_module_status=llm_module_status,
+        llm_module_info=llm_module_info,
     )
 
     # ── 10) 保存文件 ─────────────────────────────────────────

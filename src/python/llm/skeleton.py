@@ -125,7 +125,8 @@ def _generate_llm_content(
                 _hint = _hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
             cached_clean += _hint
             if module_key:
-                _record_per_module(module_key, _orig_model or model or llm_config.get("model", "") or "缓存命中", cached=True)
+                _model_for_record = _orig_model or model or llm_config.get("model", "") or "缓存命中"
+                _record_per_module(module_key, _model_for_record, cached=True, thinking=thinking_enabled)
             return (cached_clean, True)
 
     # ── LLM 调用 ──
@@ -177,7 +178,15 @@ def _generate_llm_content(
             if module_key:
                 _inp = usage.get("input_tokens", usage.get("prompt_tokens", 0)) if usage else 0
                 _out = usage.get("output_tokens", usage.get("completion_tokens", 0)) if usage else 0
-                _record_per_module(module_key, _model_name, inp=_inp, out=_out)
+                # 从 _cost 字符串提取数值（如 "¥0.0123" → 0.0123）
+                _cost_val = 0.0
+                if _cost != "-":
+                    try:
+                        _cost_val = float(_cost.lstrip("$¥€£"))
+                    except ValueError:
+                        pass
+                _record_per_module(module_key, _model_name, inp=_inp, out=_out,
+                                   thinking=thinking_enabled, cost=_cost_val)
         cache_set(cache_key, html)
         logger.info("LLM 内容生成完成: %s", cache_key)
         return (html, False)

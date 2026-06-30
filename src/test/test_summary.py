@@ -756,6 +756,8 @@ class TestWriteLlmModuleStatusBlock(unittest.TestCase):
     def setUp(self):
         self.ws = MagicMock()
         self.ws.max_row = 30
+        from src.python.llm import reset_session_usage
+        reset_session_usage()
 
     def _get_cell_values(self):
         """从 mock 的 ws.cell 调用中提取所有 value 参数。"""
@@ -767,7 +769,7 @@ class TestWriteLlmModuleStatusBlock(unittest.TestCase):
 
     @patch("src.python.report.summary.get_llm_module_name")
     def test_skipped_modules_only(self, mock_name):
-        """仅跳过（禁用）模块 → 写入跳过行。"""
+        """仅跳过（禁用）模块 → 每个模块独立行显示已禁用。"""
         mock_name.side_effect = lambda mk: {
             "global_macro": "全球政经局势",
             "expert_review": "智囊团深度复盘",
@@ -781,19 +783,18 @@ class TestWriteLlmModuleStatusBlock(unittest.TestCase):
             s.write_llm_module_status_block(self.ws)
             values = self._get_cell_values()
             self.assertIn("【LLM 模块状态】", values)
-            self.assertIn("  跳过的模块（已禁用）", values)
-            self.assertIn("全球政经局势、智囊团深度复盘", values)
-            # 不应有"生成失败的模块"
-            self.assertFalse(
-                any("生成失败" in str(v) for v in values),
-                "不应有生成失败行"
-            )
+            all_text = "|".join(str(v) for v in values)
+            self.assertIn("全球政经局势", all_text)
+            self.assertIn("智囊团深度复盘", all_text)
+            self.assertIn("⏭️ 已禁用", all_text)
+            # 不应有失败相关文本
+            self.assertNotIn("❌", all_text)
         finally:
             _LLM_MODULE_FAILURE.clear()
 
     @patch("src.python.report.summary.get_llm_module_name")
     def test_failed_modules_only(self, mock_name):
-        """仅有生成失败模块 → 写入失败行。"""
+        """仅有生成失败模块 → 每个模块独立行显示失败原因。"""
         mock_name.side_effect = lambda mk: {
             "health_check": "持仓体检报告",
         }.get(mk, mk)
@@ -805,16 +806,15 @@ class TestWriteLlmModuleStatusBlock(unittest.TestCase):
             s.write_llm_module_status_block(self.ws)
             values = self._get_cell_values()
             self.assertIn("【LLM 模块状态】", values)
-            self.assertIn("  生成失败的模块", values)
-            # 验证失败详情（column 2）包含模块名称和原因
             all_text = "|".join(str(v) for v in values)
             self.assertIn("持仓体检报告", all_text)
+            self.assertIn("❌", all_text)
             self.assertIn("API 调用失败", all_text)
         finally:
             _LLM_MODULE_FAILURE.clear()
 
     def test_no_failures_no_output(self):
-        """_LLM_MODULE_FAILURE 为空 → 不写入任何内容。"""
+        """_LLM_MODULE_FAILURE 为空且 per_module 无数据 → 不写入任何内容。"""
         from src.python.llm.prompts import _LLM_MODULE_FAILURE
         _LLM_MODULE_FAILURE.clear()
         try:
@@ -829,7 +829,7 @@ class TestWriteLlmModuleStatusBlock(unittest.TestCase):
 
     @patch("src.python.report.summary.get_llm_module_name")
     def test_mixed_skipped_and_failed(self, mock_name):
-        """同时存在跳过和失败 → 两类都写入。"""
+        """同时存在跳过和失败 → 两类都写入，各自独立行。"""
         mock_name.side_effect = lambda mk: {
             "global_macro": "全球政经局势",
             "health_check": "持仓体检报告",
@@ -846,7 +846,8 @@ class TestWriteLlmModuleStatusBlock(unittest.TestCase):
             self.assertIn("【LLM 模块状态】", all_text)
             self.assertIn("全球政经局势", all_text)
             self.assertIn("持仓体检报告", all_text)
-            self.assertIn("跳过的模块", all_text)
-            self.assertIn("生成失败的模块", all_text)
+            self.assertIn("⏭️ 已禁用", all_text)
+            self.assertIn("❌", all_text)
+            self.assertIn("请求超时", all_text)
         finally:
             _LLM_MODULE_FAILURE.clear()
