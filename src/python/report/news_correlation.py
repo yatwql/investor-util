@@ -249,6 +249,140 @@ def _format_enriched_keywords(enriched: list[dict]) -> str:
 # ── 核心函数 ──────────────────────────────────────────────────
 
 
+def _expand_industry_keywords(
+    holdings: List[Holding],
+    penetrated_assets: Optional[List[dict]],
+    keywords: list[str],
+) -> tuple[list[str], dict[str, dict]]:
+    """扩展关键词：获取行业/概念数据，将行业名和概念名追加为关键词。
+
+    Returns:
+        (expanded_keywords, industry_data)
+        行业数据获取失败时返回 (keywords, {})。
+    """
+    industry_data: dict[str, dict] = {}
+    try:
+        all_codes: set[str] = set()
+        for h in holdings:
+            if h.code and h.code.strip():
+                all_codes.add(h.code.strip())
+        if penetrated_assets:
+            for asset in penetrated_assets:
+                for ac in (asset.get("codes") or []):
+                    if ac and ac.strip():
+                        all_codes.add(ac.strip())
+
+        if all_codes:
+            from src.python.fetcher.industry import batch_fetch_industry_data as _batch_industry
+            industry_data = _batch_industry(list(all_codes))
+            if industry_data:
+                extra_kw: list[str] = []
+                for idata in industry_data.values():
+                    if idata.get("industry"):
+                        extra_kw.append(idata["industry"])
+                    for cname in idata.get("concepts", []):
+                        if cname.strip():
+                            extra_kw.append(cname.strip())
+                if extra_kw:
+                    all_kw = list(set(keywords + extra_kw))
+                    all_kw.sort(key=lambda x: (-len(x), x))
+                    logger.info("行业/概念关键词扩展: 新增 %d 个 → 共 %d 个",
+                                len(extra_kw), len(all_kw))
+                    return all_kw, industry_data
+    except Exception as e:
+        logger.warning("行业/概念数据获取失败（非关键错误，继续）: %s", e)
+    return keywords, industry_data
+
+
+def _extract_active_sources(news_items: list[dict]) -> list[str]:
+    """提取成功访问的数据源标签列表。"""
+    active: list[str] = []
+    seen: list[str] = []
+    for item in news_items:
+        label = item.get("_source", "")
+        if label and label not in seen:
+            seen.append(label)
+            active.append(label)
+    return active
+
+
+def _news_source_cb(label: str, count: int, status: str) -> None:
+    """回调：各新闻源获取完成后在 TUI 输出状态。"""
+    if status == "OK":
+        print(f"  [OK] 新闻源 {label}: {count} 条")
+    else:
+        print(f"  [!] 新闻源 {label}: {status}")
+
+
+def _apply_llm_enhancement(
+    news_items: list[dict[str, Any]],
+    holdings: List[Holding],
+    penetrated_assets: Optional[List[dict]],
+    industry_data: dict[str, dict],
+    meta: dict,
+) -> dict:
+    """可选 LLM 增强：对新闻逐条判定关联度。
+
+    注意：此模块不提供 output_brief 配置项。其他 LLM 模块支持精简模式，
+    但新闻模块输出严格 JSON 供程序解析，精简会破坏 JSON 结构，故不支持。
+
+    Returns:
+        更新后的 meta 字典
+    """
+    from src.python.config import get_llm_config
+    llm_config = get_llm_config()
+    enabled_llm = llm_config.get("enabled_llm") if llm_config else None
+    llm_enabled = enabled_llm.get("news_correlation", False) if isinstance(enabled_llm, dict) else False
+
+    if not llm_config or not llm_enabled:
+        return meta
+
+    api_key = (llm_config.get("api_key") or "").strip()
+    if not api_key:
+        logger.warning("enabled_llm.news_correlation 已开启但未配置 api_key，降级为传统关键词匹配分析")
+        return meta
+
+    meta["llm_enabled"] = True
+    try:
+        from src.python.llm import enhance_news_correlation
+        from src.python.llm.pricing import _estimate_cost
+        news_items[:], cached, token_usage = enhance_news_correlation(
+            news_items, holdings, penetrated_assets=penetrated_assets,
+            industry_data=industry_data, llm_config=llm_config,
+        )
+        meta["llm_cached"] = cached
+        meta["token_usage"] = token_usage
+        meta["thinking_enabled"] = llm_config.get("thinking_enabled_news_correlation", False)
+        if token_usage and token_usage.get("model"):
+            meta["cost_estimation"] = _estimate_cost(
+                token_usage.get("model", ""),
+                token_usage.get("input_tokens", 0),
+                token_usage.get("output_tokens", 0),
+            )
+        else:
+            meta["cost_estimation"] = "-"
+        if cached:
+            logger.info("%s（缓存）: 富化 %d 条",
+                        get_llm_module_name("news_correlation"),
+                        sum(1 for n in news_items if n.get("llm_analysis")))
+    except Exception as e:
+        logger.warning("%s出错: %s", get_llm_module_name("news_correlation"), e)
+    return meta
+
+
+def _enrich_news_keywords(
+    news_items: list[dict[str, Any]],
+    holdings: List[Holding],
+    penetrated_assets: Optional[List[dict]],
+    industry_data: dict[str, dict],
+) -> None:
+    """为每条新闻做关键词富化（标注来源为持仓/穿透/概念）。"""
+    lookup = _build_keyword_lookup(holdings, penetrated_assets, industry_data=industry_data)
+    for item in news_items:
+        enriched = _enrich_keywords_for_item(item, lookup)
+        item["enriched_keywords"] = enriched if enriched else []
+
+
 def build_news_data(
     holdings: List[Holding],
     top_n: int = 100,
@@ -286,126 +420,27 @@ def build_news_data(
     keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
     logger.info("%s关键词（含穿透）: %s", get_llm_module_name("news_correlation"), keywords)
 
-    # ── 行业/概念关键词扩展 ──────────────────────────────────────
-    _industry_data: dict[str, dict] = {}
-    try:
-        # 收集所有唯一代码（持仓 + 穿透资产）
-        _all_codes: set[str] = set()
-        for h in holdings:
-            if h.code and h.code.strip():
-                _all_codes.add(h.code.strip())
-        if penetrated_assets:
-            for _asset in penetrated_assets:
-                for _ac in (_asset.get("codes") or []):
-                    if _ac and _ac.strip():
-                        _all_codes.add(_ac.strip())
-
-        if _all_codes:
-            from src.python.fetcher.industry import batch_fetch_industry_data as _batch_industry
-            _industry_data = _batch_industry(list(_all_codes))
-            if _industry_data:
-                # 将行业名称和概念名称追加为关键词，提高匹配率
-                _extra_kw: list[str] = []
-                for _idata in _industry_data.values():
-                    if _idata.get("industry"):
-                        _extra_kw.append(_idata["industry"])
-                    for _cname in _idata.get("concepts", []):
-                        if _cname.strip():
-                            _extra_kw.append(_cname.strip())
-                if _extra_kw:
-                    _all_kw = list(set(keywords + _extra_kw))
-                    _all_kw.sort(key=lambda x: (-len(x), x))
-                    keywords = _all_kw
-                    logger.info("行业/概念关键词扩展: 新增 %d 个 → 共 %d 个",
-                                len(_extra_kw), len(keywords))
-    except Exception as e:
-        logger.warning("行业/概念数据获取失败（非关键错误，继续）: %s", e)
-        _industry_data = {}
-
-    def _news_source_cb(label: str, count: int, status: str) -> None:
-        """回调：各新闻源获取完成后在 TUI 输出状态。"""
-        if status == "OK":
-            print(f"  [OK] 新闻源 {label}: {count} 条")
-        else:
-            print(f"  [!] 新闻源 {label}: {status}")
-
+    keywords, industry_data = _expand_industry_keywords(holdings, penetrated_assets, keywords)
     news_items = aggregate_news(keywords, top_n=top_n, progress_callback=_news_source_cb)
 
-    # 提取成功访问的数据源列表（用于报告底部脚注）
-    _active_sources: list[str] = []
-    if news_items:
-        seen_labels: list[str] = []
-        for item in news_items:
-            label = item.get("_source", "")
-            if label and label not in seen_labels:
-                seen_labels.append(label)
-                _active_sources.append(label)
-
-    # 初始化元数据
+    active_sources = _extract_active_sources(news_items)
     meta: dict = {
         "token_usage": {},
         "llm_cached": False,
         "llm_enabled": False,
-        "active_sources": _active_sources,
+        "active_sources": active_sources,
     }
 
-    if news_items:
-        logger.info("%s完成: 获取 %d 条, 匹配 %d 条",
-                    get_llm_module_name("news_correlation"),
-                    len(news_items), sum(1 for n in news_items if n.get("matched_keywords")))
-    else:
+    if not news_items:
         logger.warning("新闻获取失败")
         return news_items, meta
 
-    # ── LLM 增强（可选） ──────────────────────────────────────
-    # 注意：此模块不提供 output_brief 配置项。
-    # 其他 4 个 LLM 模块（全球政经局势/智囊团深度复盘/持仓体检报告/穿透深度分析）输出散文，
-    # 可通过 output_brief_{module} 精简字数。新闻模块输出严格 JSON
-    # 供程序解析，精简会破坏 JSON 结构，故不支持精简模式。
-    from src.python.config import get_llm_config
-    _llm_config = get_llm_config()
-    _enabled_llm = _llm_config.get("enabled_llm") if _llm_config else None
-    _llm_enabled = _enabled_llm.get("news_correlation", False) if isinstance(_enabled_llm, dict) else False
-    if _llm_config and _llm_enabled:
-        # 检查 API Key 是否实际配置 — 未配置时降级为传统分析
-        _api_key = (_llm_config.get("api_key") or "").strip()
-        if not _api_key:
-            logger.warning("enabled_llm.news_correlation 已开启但未配置 api_key，降级为传统关键词匹配分析")
-        else:
-            meta["llm_enabled"] = True
-            try:
-                from src.python.llm import enhance_news_correlation
-                from src.python.llm.pricing import _estimate_cost
-                news_items, _cached, _token_usage = enhance_news_correlation(
-                    news_items, holdings, penetrated_assets=penetrated_assets,
-                    industry_data=_industry_data, llm_config=_llm_config,
-                )
-                meta["llm_cached"] = _cached
-                meta["token_usage"] = _token_usage
-                meta["thinking_enabled"] = _llm_config.get("thinking_enabled_news_correlation", False)
-                if _token_usage and _token_usage.get("model"):
-                    meta["cost_estimation"] = _estimate_cost(
-                        _token_usage.get("model", ""),
-                        _token_usage.get("input_tokens", 0),
-                        _token_usage.get("output_tokens", 0),
-                    )
-                else:
-                    meta["cost_estimation"] = "-"
-                if _cached:
-                    logger.info("%s（缓存）: 富化 %d 条",
-                                get_llm_module_name("news_correlation"),
-                                sum(1 for n in news_items if n.get("llm_analysis")))
-            except Exception as e:
-                logger.warning("%s出错: %s", get_llm_module_name("news_correlation"), e)
+    logger.info("%s完成: 获取 %d 条, 匹配 %d 条",
+                get_llm_module_name("news_correlation"),
+                len(news_items), sum(1 for n in news_items if n.get("matched_keywords")))
 
-    # ── 关键词富化（标注每个关键词的来源） ─────────────────
-    _lookup = _build_keyword_lookup(holdings, penetrated_assets, industry_data=_industry_data)
-    for item in news_items:
-        enriched = _enrich_keywords_for_item(item, _lookup)
-        if enriched:
-            item["enriched_keywords"] = enriched
-        else:
-            item["enriched_keywords"] = []
+    meta = _apply_llm_enhancement(news_items, holdings, penetrated_assets, industry_data, meta)
+    _enrich_news_keywords(news_items, holdings, penetrated_assets, industry_data)
 
     return news_items, meta
 

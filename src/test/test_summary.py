@@ -172,7 +172,6 @@ class TestWriteSummarySheet(unittest.TestCase):
             # 固定 datetime.now() 输出
             mock_now = MagicMock()
             mock_now.strftime.side_effect = [
-                "2026-06-27",           # today_str
                 "2026-06-27 15:30:00",  # 统计时间
             ]
             mock_dt.now.return_value = mock_now

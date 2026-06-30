@@ -92,6 +92,140 @@ def _write_blanks(ws, row: int, n: int = 1) -> int:
     return row + n
 
 
+def _write_basic_info(ws: Worksheet, row: int, now: datetime | None = None) -> int:
+    """写入基本信息和所属交易日。
+
+    Args:
+        ws: 工作表
+        row: 当前行号
+        now: 当前时间（允许外部注入便于测试）
+    """
+    now = now or datetime.now()
+    row = _write_kv_row(ws, row, "统计时间", now.strftime("%Y-%m-%d %H:%M:%S"))
+    row = _write_kv_row(ws, row, "所属交易日", get_last_trading_day())
+    row = _write_blanks(ws, row)
+    return row
+
+
+def _write_holdings_overview(
+    ws: Worksheet, row: int,
+    categories: dict[str, list] | None,
+    update_status: tuple[int, int, bool] | None,
+) -> int:
+    """写入持仓概况分类计数和价格更新状态。"""
+    row = _write_section(ws, row, "【持仓概况】")
+    total_count = 0
+    if categories:
+        for cat_label in ("场内股票", "场内ETF", "国内场外", "QDII"):
+            count = len(categories.get(cat_label, []))
+            total_count += count
+            row = _write_kv_row(ws, row, f"  {cat_label}", count)
+        row = _write_kv_row(ws, row, "持仓总数", total_count)
+    else:
+        row = _write_kv_row(ws, row, "持仓总数", "--")
+
+    if update_status:
+        updated, total, all_done = update_status
+        if total > 0:
+            status_text = f"{updated}/{total}  (全部已更新)" if all_done else f"{updated}/{total}  (尚有缺失)"
+            status_font = _BLUE_FONT if all_done else _RED_FONT
+        else:
+            status_text = "--"
+            status_font = _NORMAL_FONT
+        row = _write_kv_row_colored(ws, row, "价格更新状态", status_text, status_font)
+    else:
+        row = _write_kv_row(ws, row, "价格更新状态", "--")
+    row = _write_blanks(ws, row)
+    return row
+
+
+def _write_profit_summary(
+    ws: Worksheet, row: int,
+    total_mv: float, total_cost: float, total_profit: float, today_profit: float,
+) -> int:
+    """写入盈亏汇总。"""
+    profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0.0
+    denominator = total_cost + total_profit - today_profit
+    today_rate = (today_profit / denominator * 100) if denominator > 0 else 0.0
+
+    row = _write_section(ws, row, "【盈亏汇总】")
+    summary_data = [
+        ("总市值 (元)", total_mv),
+        ("总成本 (元)", total_cost),
+        ("总盈亏 (元)", total_profit),
+        ("总收益率", profit_rate),
+        ("本日盈亏 (元)", today_profit),
+        ("本日收益率", today_rate),
+    ]
+    for label, val in summary_data:
+        display_val = f"{val:+.2f}%" if "收益率" in label else val
+        write_data_row(ws, row, [label, display_val])
+        if "盈亏" in label and isinstance(val, (int, float)):
+            ws.cell(row=row, column=2).font = profit_font(val)
+        elif "收益率" in label and isinstance(val, (int, float)):
+            ws.cell(row=row, column=2).font = profit_font(val)
+        row += 1
+
+    row = _write_blanks(ws, row)
+    return row
+
+
+def _write_a_share_indices(ws: Worksheet, row: int, a_indices: dict[str, dict[str, Any]] | None) -> int:
+    """写入 A 股指数（本日 + 上日）。"""
+    if not a_indices:
+        return _write_kv_row(ws, row, "── A股指数 ──", "暂无数据")
+
+    row = _write_kv_row(ws, row, "── A股指数（本日）──", "")
+    a_list = [
+        ("sh000001", "上证指数"), ("sz399001", "深证成指"),
+        ("sh000300", "沪深300"), ("sh000688", "科创板50"),
+        ("sz399006", "创业板指"),
+    ]
+    for code, cname in a_list:
+        idx = a_indices.get(code)
+        if idx and idx.get("price", 0) > 0:
+            row = _write_index_row(ws, row, cname, idx["price"], idx.get("change_pct", 0))
+        else:
+            row = _write_kv_row(ws, row, f"  {cname}", "--")
+
+    row = _write_kv_row(ws, row, "── A股指数（上日）──", "")
+    for code, cname in a_list:
+        idx = a_indices.get(code)
+        yclose = idx.get("yesterday_close", 0) if idx else 0
+        if yclose > 0:
+            row = _write_kv_row(ws, row, f"  {cname}", f"{yclose:.2f}")
+        else:
+            row = _write_kv_row(ws, row, f"  {cname}", "--")
+    return row
+
+
+def _write_us_indices(ws: Worksheet, row: int, us_indices: dict[str, dict[str, Any]] | None) -> int:
+    """写入美股指数（最新 + 上日）。"""
+    if not us_indices:
+        return _write_kv_row(ws, row, "── 美股指数 ──", "暂无数据")
+
+    row = _write_kv_row(ws, row, "── 美股指数（最新）──", "")
+    us_list = [
+        ("gb_dji", "道琼斯"), ("gb_ixic", "纳斯达克"), ("gb_inx", "标普500"),
+    ]
+    for code, cname in us_list:
+        idx = us_indices.get(code)
+        if idx and idx.get("price", 0) > 0:
+            row = _write_index_row(ws, row, cname, idx["price"], idx.get("change_pct", 0))
+        else:
+            row = _write_kv_row(ws, row, f"  {cname}", "--")
+
+    row = _write_kv_row(ws, row, "── 美股指数（上日）──", "")
+    for code, cname in us_list:
+        idx = us_indices.get(code)
+        yclose = idx.get("yesterday_close", 0) if idx else 0
+        if yclose > 0:
+            row = _write_kv_row(ws, row, f"  {cname}", f"{yclose:.2f}")
+        else:
+            row = _write_kv_row(ws, row, f"  {cname}", "--")
+    return row
+
+
 def write_summary_sheet(
     ws: Worksheet,
     total_mv: float,
@@ -118,139 +252,19 @@ def write_summary_sheet(
     """
     ws.title = f"1.{get_report_sheet_name('summary')}"
 
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
-
-    # 计算盈亏数据
-    profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0.0
-    denominator = total_cost + total_profit - today_profit
-    today_rate = (today_profit / denominator * 100) if denominator > 0 else 0.0
-
     row = write_title_row(ws, 1, get_report_sheet_name('summary'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
-    # ── 基本信息 ────────────────────────────────────────────
-    row = _write_kv_row(ws, row, "统计时间", now.strftime("%Y-%m-%d %H:%M:%S"))
-    row = _write_kv_row(ws, row, "所属交易日", get_last_trading_day())
+    row = _write_basic_info(ws, row)
+    row = _write_holdings_overview(ws, row, categories, update_status)
+    row = _write_profit_summary(ws, row, total_mv, total_cost, total_profit, today_profit)
     row = _write_blanks(ws, row)
 
-    # ── 持仓概况 ────────────────────────────────────────────
-    row = _write_section(ws, row, "【持仓概况】")
-    total_count = 0
-    if categories:
-        for cat_label in ("场内股票", "场内ETF", "国内场外", "QDII"):
-            count = len(categories.get(cat_label, []))
-            total_count += count
-            row = _write_kv_row(ws, row, f"  {cat_label}", count)
-        row = _write_kv_row(ws, row, "持仓总数", total_count)
-    else:
-        row = _write_kv_row(ws, row, "持仓总数", "--")
-
-    # 价格更新状态
-    if update_status:
-        updated, total, all_done = update_status
-        if total > 0:
-            status_text = f"{updated}/{total}  (全部已更新)" if all_done else f"{updated}/{total}  (尚有缺失)"
-            status_font = _BLUE_FONT if all_done else _RED_FONT
-        else:
-            status_text = "--"
-            status_font = _NORMAL_FONT
-        row = _write_kv_row_colored(ws, row, "价格更新状态", status_text, status_font)
-    else:
-        row = _write_kv_row(ws, row, "价格更新状态", "--")
-    row = _write_blanks(ws, row)
-
-    # ── 盈亏汇总 ────────────────────────────────────────────
-    row = _write_section(ws, row, "【盈亏汇总】")
-    summary_data = [
-        ("总市值 (元)", total_mv),
-        ("总成本 (元)", total_cost),
-        ("总盈亏 (元)", total_profit),
-        ("总收益率", profit_rate),
-        ("本日盈亏 (元)", today_profit),
-        ("本日收益率", today_rate),
-    ]
-    for label, val in summary_data:
-        # 收益率行在显示时格式化为百分数，着色用原始数值
-        display_val = f"{val:+.2f}%" if "收益率" in label else val
-        write_data_row(ws, row, [label, display_val])
-        # 对盈亏/收益率行着色
-        if "盈亏" in label and isinstance(val, (int, float)):
-            ws.cell(row=row, column=2).font = profit_font(val)
-        elif "收益率" in label and isinstance(val, (int, float)):
-            ws.cell(row=row, column=2).font = profit_font(val)
-        row += 1
-
-    row = _write_blanks(ws, row)
-
-    # ── 市场指数 ────────────────────────────────────────────
+    # ── 市场指数 ──
     row = _write_section(ws, row, "【市场指数】")
-
-    # A 股指数 - 本交易日
-    if a_indices:
-        row = _write_kv_row(ws, row, "── A股指数（本日）──", "")
-        a_list = [
-            ("sh000001", "上证指数"),
-            ("sz399001", "深证成指"),
-            ("sh000300", "沪深300"),
-            ("sh000688", "科创板50"),
-            ("sz399006", "创业板指"),
-        ]
-        for code, cname in a_list:
-            idx = a_indices.get(code)
-            if idx and idx.get("price", 0) > 0:
-                price = idx["price"]
-                change = idx.get("change_pct", 0)
-                row = _write_index_row(ws, row, cname, price, change)
-            else:
-                row = _write_kv_row(ws, row, f"  {cname}", "--")
-
-        # A 股指数 - 上一交易日
-        row = _write_blanks(ws, row, 0)
-        row = _write_kv_row(ws, row, "── A股指数（上日）──", "")
-        for code, cname in a_list:
-            idx = a_indices.get(code)
-            if idx and idx.get("yesterday_close", 0) > 0:
-                yclose = idx["yesterday_close"]
-                row = _write_kv_row(ws, row, f"  {cname}", f"{yclose:.2f}")
-            else:
-                row = _write_kv_row(ws, row, f"  {cname}", "--")
-    else:
-        row = _write_kv_row(ws, row, "── A股指数 ──", "暂无数据")
-
+    row = _write_a_share_indices(ws, row, a_indices)
     row = _write_blanks(ws, row)
-
-    # 美股指数
-    if us_indices:
-        row = _write_kv_row(ws, row, "── 美股指数（最新）──", "")
-        us_list = [
-            ("gb_dji", "道琼斯"),
-            ("gb_ixic", "纳斯达克"),
-            ("gb_inx", "标普500"),
-        ]
-        for code, cname in us_list:
-            idx = us_indices.get(code)
-            if idx and idx.get("price", 0) > 0:
-                price = idx["price"]
-                change = idx.get("change_pct", 0)
-                row = _write_index_row(ws, row, cname, price, change)
-            else:
-                row = _write_kv_row(ws, row, f"  {cname}", "--")
-
-        # 美股指数 - 上一交易日
-        row = _write_blanks(ws, row, 0)
-        row = _write_kv_row(ws, row, "── 美股指数（上日）──", "")
-        for code, cname in us_list:
-            idx = us_indices.get(code)
-            if idx and idx.get("yesterday_close", 0) > 0:
-                yclose = idx["yesterday_close"]
-                row = _write_kv_row(ws, row, f"  {cname}", f"{yclose:.2f}")
-            else:
-                row = _write_kv_row(ws, row, f"  {cname}", "--")
-    else:
-        row = _write_kv_row(ws, row, "── 美股指数 ──", "暂无数据")
-
-    # ── LLM 用量（由 write_llm_usage_block 在 LLM 生成后追加） ─
+    row = _write_us_indices(ws, row, us_indices)
 
     freeze_header(ws, 2)
     auto_width(ws)

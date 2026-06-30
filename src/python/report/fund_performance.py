@@ -195,6 +195,148 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
     return adjusted
 
 
+def _load_profit_forecast() -> dict[str, Any]:
+    """加载盈利预测数据（非关键，失败时返回空字典）。
+
+    Returns:
+        盈利预测字典 {code: {reports, eps_2025e}} 或空字典
+    """
+    try:
+        from src.python.providers.akshare_extras import get_profit_forecast
+        return get_profit_forecast()
+    except Exception:
+        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --")
+        return {}
+
+
+def _coverage_text(code: str, profit_forecast: dict[str, Any]) -> str:
+    """根据基金代码查找机构覆盖信息。
+
+    Args:
+        code: 基金代码
+        profit_forecast: 盈利预测字典
+
+    Returns:
+        机构覆盖文本（如"5家研报 EPS¥1.23"）或 "--"
+    """
+    info = profit_forecast.get(code)
+    if info:
+        reports = info.get("reports", 0)
+        eps = info.get("eps_2025e")
+        if reports and eps is not None:
+            return f"{reports}家研报 EPS¥{eps:.2f}"
+        elif reports:
+            return f"{reports}家研报"
+        elif eps is not None:
+            return f"EPS¥{eps:.2f}"
+    return "--"
+
+
+def _write_one_fund_row(
+    ws: Worksheet, row: int, fund: Holding,
+    detail_map: dict[str, DetailRow],
+    profit_forecast: dict[str, Any],
+) -> str | None:
+    """获取并写入单只基金的业绩数据行。
+
+    Args:
+        ws: 工作表
+        row: 当前行号
+        fund: 基金持仓
+        detail_map: 估值明细映射 {code: DetailRow}
+        profit_forecast: 盈利预测字典
+
+    Returns:
+        最终评级（优秀/良好/稳定/偏差），获取失败返回 None
+    """
+    perf_data = fetch_fund_rankings(fund.code)
+
+    if perf_data is None or not perf_data.get("rankings"):
+        _write_empty_row(ws, row, fund)
+        logger.warning("基金 %s (%s) 业绩数据获取失败", fund.name, fund.code)
+        return None
+
+    rankings = perf_data.get("rankings", {})
+    peer_rating = perf_data.get("rating", "")
+    perf_eval = perf_data.get("perf_evaluation")
+    fund_type = _fund_display_type(fund)
+    benchmark = fetch_fund_benchmark(fund.code)
+
+    final_rating = _adjust_rating_with_benchmark(peer_rating, perf_eval)
+    comment = _calc_rating_comment(final_rating, perf_eval, benchmark)
+
+    d = detail_map.get(fund.code)
+    profit_val = d.profit if d else 0.0
+    profit_rate_val = d.profit_rate if d else 0.0
+
+    vals = [
+        fund.name, fund.code, fund_type,
+        _format_return(rankings.get("近3月", {}).get("return")),
+        _format_return(rankings.get("近6月", {}).get("return")),
+        _format_return(rankings.get("近1年", {}).get("return")),
+        f"{profit_val:+,.2f}",
+        f"{profit_rate_val * 100:+.2f}%",
+        benchmark, comment,
+        _format_rank(rankings.get("同类排名", {})),
+        _coverage_text(fund.code, profit_forecast),
+    ]
+    write_data_row(ws, row, vals, _num_formats())
+
+    # 业绩评价标色：优秀→红，偏差→绿，稳定→蓝
+    _rating_font = ""
+    if final_rating == "优秀":
+        _rating_font = RED_FONT
+    elif final_rating == "偏差":
+        _rating_font = GREEN_FONT
+    elif final_rating == "稳定":
+        _rating_font = BLUE_FONT
+    if _rating_font:
+        ws.cell(row=row, column=10).font = _rating_font
+
+    return final_rating
+
+
+def _write_rating_distribution(ws: Worksheet, row: int, fund_count: int, adjusted_ratings: dict[str, str]) -> int:
+    """写入评级分布统计和业绩评价标准说明。
+
+    Args:
+        ws: 工作表
+        row: 当前行号
+        fund_count: 基金总数
+        adjusted_ratings: {基金代码: 最终评级} 字典（仅成功获取业绩的基金）
+
+    Returns:
+        写入后的下一个行号
+    """
+    success_count = len(adjusted_ratings)
+    row += 1
+    write_data_row(ws, row, [f"共 {fund_count} 只基金，{success_count} 只获取到业绩数据"])
+    row += 1
+
+    rating_counts: Dict[str, int] = {}
+    for adj_rating in adjusted_ratings.values():
+        if adj_rating:
+            rating_counts[adj_rating] = rating_counts.get(adj_rating, 0) + 1
+
+    if rating_counts:
+        summary = " | ".join(
+            f"{k}: {v}只" for k, v in sorted(
+                rating_counts.items(),
+                key=lambda x: _RATING_ORDER.index(x[0]) if x[0] in _RATING_ORDER else 99,
+                reverse=True,
+            )
+        )
+        write_data_row(ws, row, [f"评级分布: {summary}"])
+        row += 1
+
+    row += 1
+    write_data_row(ws, row, [
+        "业绩评价标准：同类排名前20%→优秀(红)、20%~30%→良好、30%~50%→稳定(蓝)、50%后→偏差(绿) | "
+        "超额收益评分≥80上调一级、<40下调一级"
+    ])
+    return row + 1
+
+
 def write_fund_performance_sheet(
     ws: Worksheet,
     holdings: List[Holding],
@@ -214,7 +356,6 @@ def write_fund_performance_sheet(
 
     row = write_title_row(ws, 1, get_report_sheet_name('fund_performance'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
-    data_start = row
 
     # 识别基金
     fund_holdings = [h for h in holdings if _is_fund(h)]
@@ -227,138 +368,30 @@ def write_fund_performance_sheet(
         auto_width(ws)
         return
 
-    # 按市值降序排列（市值大的基金排在前面）
-    def _fund_sort_key(h: Holding) -> float:
-        d = detail_map.get(h.code)
-        return d.market_value if d else 0.0
+    # 按市值降序排列
+    fund_holdings_sorted = sorted(
+        fund_holdings,
+        key=lambda h: detail_map.get(h.code).market_value if detail_map.get(h.code) else 0.0,
+        reverse=True,
+    )
 
-    fund_holdings_sorted = sorted(fund_holdings, key=_fund_sort_key, reverse=True)
-
-    # ── 加载盈利预测数据（机构覆盖） ──
-    try:
-        from src.python.providers.akshare_extras import get_profit_forecast
-        profit_forecast = get_profit_forecast()
-    except Exception:
-        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --")
-        profit_forecast = {}
-
-    def _coverage_text(code: str) -> str:
-        """根据基金代码查找机构覆盖信息。"""
-        info = profit_forecast.get(code)
-        if info:
-            reports = info.get("reports", 0)
-            eps = info.get("eps_2025e")
-            if reports and eps is not None:
-                return f"{reports}家研报 EPS¥{eps:.2f}"
-            elif reports:
-                return f"{reports}家研报"
-            elif eps is not None:
-                return f"EPS¥{eps:.2f}"
-        return "--"
-
-    # 遍历每只基金获取业绩数据
-    fund_count = len(fund_holdings_sorted)
-    success_count = 0
-    perf_results: dict[str, dict] = {}
+    profit_forecast = _load_profit_forecast()
     adjusted_ratings: dict[str, str] = {}
 
     for idx, fund in enumerate(fund_holdings_sorted, 1):
-        logger.info("获取基金业绩 [%d/%d]: %s (%s)", idx, fund_count, fund.name, fund.code)
-
-        perf_data = fetch_fund_rankings(fund.code)
-
-        if perf_data is None or not perf_data.get("rankings"):
-            # 获取失败，写入兜底数据
-            _write_empty_row(ws, row, fund)
-            row += 1
-            logger.warning("基金 %s (%s) 业绩数据获取失败", fund.name, fund.code)
-            continue
-
-        rankings = perf_data.get("rankings", {})
-        peer_rating = perf_data.get("rating", "")
-        perf_eval = perf_data.get("perf_evaluation")
-        fund_type = _fund_display_type(fund)
-        benchmark = fetch_fund_benchmark(fund.code)
-
-        # 调整评级：同类排名 + 超额收益评分
-        final_rating = _adjust_rating_with_benchmark(peer_rating, perf_eval)
-
-        # 生成带基准说明的业绩评价文本
-        comment = _calc_rating_comment(final_rating, perf_eval, benchmark)
-
-        # 从估值明细中获取持仓盈亏数据
-        d = detail_map.get(fund.code)
-        profit_val = d.profit if d else 0.0
-        profit_rate_val = d.profit_rate if d else 0.0
-
-        # 写入该基金的行
-        vals = [
-            fund.name,
-            fund.code,
-            fund_type,
-            _format_return(rankings.get("近3月", {}).get("return")),
-            _format_return(rankings.get("近6月", {}).get("return")),
-            _format_return(rankings.get("近1年", {}).get("return")),  # 近1年 → 近12月
-            f"{profit_val:+,.2f}",                                   # 累计盈亏(¥)
-            f"{profit_rate_val * 100:+.2f}%",                        # 收益率
-            benchmark,                                               # 业绩比较基准
-            comment,                                                 # 业绩评价（含基准说明）
-            _format_rank(rankings.get("同类排名", {})),              # 同类排名
-            _coverage_text(fund.code),                               # 机构覆盖
-        ]
-        write_data_row(ws, row, vals, _num_formats())
-
-        # 业绩评价标色：优秀→红，偏差→绿，稳定→蓝
-        _rating_font = ""
-        if final_rating == "优秀":
-            _rating_font = RED_FONT
-        elif final_rating == "偏差":
-            _rating_font = GREEN_FONT
-        elif final_rating == "稳定":
-            _rating_font = BLUE_FONT
-        if _rating_font:
-            ws.cell(row=row, column=10).font = _rating_font
-
-        row += 1
-        success_count += 1
-        perf_results[fund.code] = perf_data
-        adjusted_ratings[fund.code] = final_rating
-
-    # 底部统计
-    row += 1
-    write_data_row(ws, row, [
-        f"共 {fund_count} 只基金，{success_count} 只获取到业绩数据",
-    ])
-    row += 1
-
-    # 评级分布（用最终调整后的评级）
-    rating_counts: Dict[str, int] = {}
-    for fund_code, adj_rating in adjusted_ratings.items():
-        if adj_rating:
-            rating_counts[adj_rating] = rating_counts.get(adj_rating, 0) + 1
-
-    if rating_counts:
-        rating_summary = " | ".join(
-            f"{k}: {v}只" for k, v in sorted(rating_counts.items(),
-                                              key=lambda x: _RATING_ORDER.index(x[0])
-                                              if x[0] in _RATING_ORDER else 99,
-                                              reverse=True)
-        )
-        write_data_row(ws, row, [f"评级分布: {rating_summary}"])
+        logger.info("获取基金业绩 [%d/%d]: %s (%s)", idx, len(fund_holdings_sorted), fund.name, fund.code)
+        rating = _write_one_fund_row(ws, row, fund, detail_map, profit_forecast)
+        if rating:
+            adjusted_ratings[fund.code] = rating
         row += 1
 
-    # 底部标注业绩评价标准说明
-    row += 1
-    write_data_row(ws, row, [
-        "业绩评价标准：同类排名前20%→优秀(红)、20%~30%→良好、30%~50%→稳定(蓝)、50%后→偏差(绿) | "
-        "超额收益评分≥80上调一级、<40下调一级"
-    ])
-
+    row = _write_rating_distribution(ws, row, len(fund_holdings_sorted), adjusted_ratings)
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
 
     logger.info("%s写入完成，%d/%d 只基金获取成功",
-                get_report_sheet_name('fund_performance'), success_count, fund_count)
+                get_report_sheet_name('fund_performance'),
+                len(adjusted_ratings), len(fund_holdings_sorted))
 
 
 def _write_empty_row(ws, row: int, fund: Holding) -> None:

@@ -8,6 +8,15 @@
 
 ### Changed
 - **未使用 import 清理（R-025 ✅）**：移除 12 个文件中的 19 处未使用 import，保留 `cache.py` 的 `CACHE_WEEKLY`/`CACHE_MONTHLY`（外部模块通过 cache.py 便捷导入）及 `generators.py` 的 `_generate_llm_content`（`__init__.py` 经由此处再导出）。
+- **`report/fund_performance.py:write_fund_performance_sheet()` 拆分（R-026 ✅）**：164→55 行，提取 4 个辅助函数（`_load_profit_forecast`/`_coverage_text`/`_write_one_fund_row`/`_write_rating_distribution`）。主函数降至 55 行编排，47 项测试全部通过。
+- **`report/summary.py:write_summary_sheet()` 拆分（R-027 ✅）**：163→43 行，提取 5 个辅助函数（`_write_basic_info`/`_write_holdings_overview`/`_write_profit_summary`/`_write_a_share_indices`/`_write_us_indices`）。主函数降至 43 行编排，45 项测试全部通过。
+- **`report/news_correlation.py:build_news_data()` 拆分（R-028 ✅）**：159→60 行，提取 4 个辅助函数（`_expand_industry_keywords`/`_extract_active_sources`/`_apply_llm_enhancement`/`_enrich_news_keywords`）。news_correlation 测试 49 项全部通过。
+- **`providers/tiantian.py` 三大函数拆分（R-029 ✅）**：`fetch_fund_holdings`(143→20行) 提取 `_request_fund_html`/`_find_holdings_table`/`_parse_holdings_rows`/`_extract_fund_meta`；`fetch_quarterly_holdings`(150→48行) 提取 `_request_quarterly_api`/`_parse_quarterly_holdings`/`_extract_quarterly_meta`；`fetch_fund_rankings`(135→40行) 提取 `_request_pingzhong_data`/`_parse_syl_returns`/`_parse_rank_entry`/`_calc_rating_from_entry`/`_parse_perf_evaluation`。全量 1216 测试通过。
+- **`llm/skeleton.py` 两大函数拆分（R-030 ✅）**：`_generate_llm_content`(136→43行) 提取 `_handle_cache_hit`/`_finalize_and_cache`/`_handle_truncation`；`_run_batch_mode`(112→57行) 提取 `_check_batch_caches`/`_execute_and_merge_batch`。148 项 LLM 测试全部通过。
+
+### Added
+- **`src/test/test_tiantian.py`（R-031 ✅）**：39 项测试覆盖 `_find_holdings_table`/`_parse_holdings_rows`/`_extract_fund_meta`/`_parse_quarterly_holdings`/`_extract_quarterly_meta`/`_parse_syl_returns`/`_parse_rank_entry`/`_calc_rating_from_entry`/`_parse_perf_evaluation` 共 9 个纯函数。
+- **`src/test/test_skeleton.py`（R-032 ✅）**：9 项测试覆盖 `_is_llm_module_enabled` 全分支 + 模块导入验证。
 
 ### Docs
 - **review-findings.md**：R-025 标记 ✅ 已完成，待办区保留 R-026~R-032（P3）。
