@@ -16,6 +16,11 @@
     "akshare": true
   },
   "preferred_provider": {},
+  "early_warning": {
+    "sector_alert_threshold_warning": -50000000,
+    "sector_alert_threshold_danger": -200000000,
+    "sentiment_top_n": 10
+  },
   "market_hour_aware": ["price", "index"],
   "market_hour_ttl": 30,
   "market_hours": {
@@ -51,12 +56,13 @@
 |------|--------|------|----------|
 | `holdings_dir` | `data/holdings` | 持仓 xlsx 文件所在目录 | 菜单 `C` |
 | `holdings_filename` | `个人投资持仓信息.xlsx` | 要读取的持仓文件名 | 菜单 `F` |
-| `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `R` |
+| `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `O` |
 | `news_top_count` | `100` | 财经新闻热点与持仓关联分析输出条目上限 | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
+| `early_warning` | `{...}` | 智能预警参数：`sector_alert_threshold_warning`（行业预警阈值，默认 -50,000,000）、`sector_alert_threshold_danger`（行业危险阈值，默认 -200,000,000）、`sentiment_top_n`（新闻情绪 TOP N，默认 10） | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
 | `market_hours` | `{...}` | 市场时段配置：`start`/`end` 手动覆盖开盘收盘（HH:MM）；`official_source` 是否尝试从东方财富 API 获取实时交易状态 | 手动编辑 |

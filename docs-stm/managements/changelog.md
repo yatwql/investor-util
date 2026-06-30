@@ -4,43 +4,38 @@
 
 ---
 
-## [0.2.41] - 2026-07-01
+## [0.2.42] - 2026-07-01
 
 ### Changed
 - **`write_html_report` 拆分为 12 个子函数**：390 行单体函数拆分为 `_render_market_value_section`、`_render_account_grouping`、`_render_category_info`、`_render_index_section`、`_render_category_table`、`_render_penetration_section`、`_render_fund_performance_section`、`_render_news_section`、`_render_llm_content_section`、`_render_llm_module_info`、`_save_html_report`、`_time_strings`，主函数降为 ~60 行，各子函数职责明确。
+- **`tui_handlers.py` 提取 5 个共享函数**：`_prepare_holdings()`（持仓选择/读取/预热一体化）、`_finish_report()`（收尾收拢）、`_fetch_prices_and_indices()`（并行价格+指数）、`_read_llm_settings()` / `_write_llm_settings()`（配置读写分离），4 个 `_cmd_generate_*` 函数前置/后置逻辑复用，`_cmd_config_llm_modules` 读写职责分离。
+- **`cache.py` 提取 `_read_cache_data()`**：统一处理 gzip/非 gzip 缓存文件读取、损坏自动删除，`get()` 从 67 行精简至 33 行，`cleanup_expired()` 复用同一辅助函数。
 
 ### Added
 - **`src/test/test_chain.py` — Provider Chain 单元测试**：23 项测试覆盖 `_get_chain`（默认顺序、preferred_provider 前置、异常安全）和 `_fetch_with_fallback`（缓存命中、Provider 遍历回退、验证通过/拒绝、转换函数、per-provider 转换字典、过期缓存降级、未知 Provider 跳过、参数传递）。
+- **`src/test/test_progress.py` — ProgressReporter 单元测试**：33 项测试覆盖基类、静默报告器、TUI 格式化输出、错误跟踪、耗时排行、_Timer 计时器。
+- **`src/test/test_session.py` — 会话用量单元测试**：32 项测试覆盖 `reset/get/format/_track/_record_per_module` 全接口，含 claude/openai provider 差异、多模型去重、模块级累计。
+- **`src/python/http_client.py`** — HTTP 客户端工厂模块，`make_http_client(**kwargs)` 自动读取 `SSL_VERIFY` 环境变量，避免各 provider 分散使用 `verify=False`。
 
 ### Fixed
 - **`fetcher/fund.py` 静默异常加日志**：`_fetch_benchmark_from_api` 的 `except: continue` 和 `_get_full_benchmark_table` 的 `except: pass` 补充 `logger.debug`，避免运行时错误线索丢失。
-
-### Docs
-- **how-to-config.md 新增「缓存分组」章节**：说明 `preload` / `refresh` 两个分组的模块归属、与菜单 `[1]`/`[2]` 的对应关系、工作原理。
-- **how-to-config.md 修复 `cache_ttl` 调整建议冲突**：「盘中频繁刷新可将 price 改为 3600」与 market_hour_aware 盘中自动 30s 短 TTL 矛盾，移除该建议。
-- **review-findings.md 更新**：新增 R-010~R-013 待办（cache.py 大函数拆分、测试覆盖缺口、llm 配置菜单职责混合、缓存刷新逻辑重复），标记今日完成的 3 项修复。
-- **CLAUDE.md 新增自审记录规则**：自查发现的所有问题必须记录到 review-findings.md，修复后将变更移至 changelog.md。
-
-### Fixed
-- **3 处剩余静默异常**：`main.py:71` `_print_session_usage_on_exit`、`cache.py:528` `check_and_refresh_caches`、`llm/skeleton.py:188` 费用字符串解析 — 在 `except: pass` 前增加 `logger.warning(...)` 记录上下文，避免运行时错误线索丢失。
-
-### Changed
-- **akshare_extras.py 延迟导入统一**：3 处函数内 `import akshare as ak` 提至模块级统一导入，失败时 `ak = None` 兜底，各函数改为 `if ak is None` 提前返回。
-- **`verify=False` 统一治理**：新建 `src/python/http_client.py` 工厂函数 `make_http_client()`，由环境变量 `SSL_VERIFY`（默认 `true`）统一控制 SSL 证书验证策略。替换 11 个模块共 14 处 `verify=False` 调用。
-
-### Added
-- **`src/python/http_client.py`** — HTTP 客户端工厂模块，`make_http_client(**kwargs)` 自动读取 `SSL_VERIFY` 环境变量，避免各 provider 分散使用 `verify=False`。
+- **3 处剩余静默异常**：`main.py:71` `_print_session_usage_on_exit`、`cache.py:528` `check_and_refresh_caches`、`llm/skeleton.py:188` 费用字符串解析 — 在 `except: pass` 前增加 `logger.warning(...)` 记录上下文。
+- **`cache.py` `cleanup_expired(dry_run=True)` 不删除损坏文件**：`_read_cache_data()` 新增 `dry_run` 参数，预览模式仅计数不删。
 
 ### Removed
-- **`fetcher/__init__.py` 向后兼容转发层**：曾为 `fetcher.py` → `fetcher/` 子包迁移保留约 40 项私有符号（`_get_chain`、`_fetch_with_fallback` 等）+ 7 个公有函数的 re-export。所有消费者改为直接从 `fetcher.price` / `fetcher.index` / `fetcher.fund` / `fetcher.industry` / `fetcher.chain` 导入。
-- **`report/llm_content.py` 旧版页脚兼容代码**：移除 `from_cache`、`model_name`、`thinking_enabled` 参数、`_CACHE_HINT_TEXT` 常量及对应的 `else` 分支回退逻辑。LLM 的模型名/Token 用量/缓存/Extended Thinking 标识统一由 HTML 内嵌 footer 携带，`_extract_footer_text()` 统一提取。
+- **`fetcher/__init__.py` 向后兼容转发层**：曾为 `fetcher.py` → `fetcher/` 子包迁移保留约 40 项私有符号 + 7 个公有函数的 re-export。所有消费者改为直接从子模块导入。
+- **`report/llm_content.py` 旧版页脚兼容代码**：移除 `from_cache`、`model_name`、`thinking_enabled` 参数及对应回退逻辑。
+
+### Changed
+- **akshare_extras.py 延迟导入统一**：3 处函数内 `import akshare as ak` 提至模块级统一导入，失败时 `ak = None` 兜底。
+- **`verify=False` 统一治理**：`make_http_client()` 工厂函数替换 11 个模块共 14 处 `verify=False` 调用。
 
 ### Docs
-- **管理文档一致性审计**：全面核对 6 份管理文档 + 6 份用户文档 + README，修复以下冲突/冗余：
-  - **iteration-plan.md**：已空（唯一内容 R-009 移入 review-findings.md）
-  - **review-findings.md**：移除已全部完成的「迭代结束审查清单」（约 30 条 [x] 项），仅保留审计历史表 + R-009 待办
-  - **technical.md**：3 处遗留 `fetcher.py` 引用更新为 `fetcher/` 子包
-  - **README.md / constants.py**：版本号从 `0.2.38` 同步为 `0.2.40`
+- **how-to-config.md 新增「缓存分组」章节**：说明 `preload` / `refresh` 两个分组与菜单 `[1]`/`[2]` 的对应关系。
+- **how-to-config.md 修复 `cache_ttl` 调整建议冲突**：移除与 market_hour_aware 盘中 30s 短 TTL 矛盾的调整建议。
+- **CLAUDE.md 新增自审记录规则**：自查所有问题必须记录到 review-findings.md，修复后移至 changelog.md。
+- **全量文档审计修复**：how-to-start.md（菜单 H/添加 S/R/表格修正）、how-to-config.md（菜单 O/early_warning）、how-to-config-llm.md（模型名修正）、README.md（版本号 0.2.40→0.2.42/移除菜单 N）、requirements.md（菜单数 12→14）、technical.md（测试数 26→29）、review-findings.md（R-011~R-013✅ 完成、R-009/R-010◐ 部分完成）
+- **管理文档一致性审计**：iteration-plan.md 清空、technical.md fetcher 路径修正、review-findings.md 清理已完成审查清单。
 
 ---
 

@@ -81,6 +81,42 @@ def _cache_path(key: str) -> str:
     return os.path.join(_CACHE_DIR, f"{safe_name}.json")
 
 
+def _read_cache_data(fpath: str, key: str, dry_run: bool = False) -> dict | None:
+    """读取并解析单个缓存文件，返回载荷字典（含 _ts 和 _data 键）。
+
+    自动识别 .json.gz（gzip 压缩）和 .json（纯文本）格式。
+    文件损坏时自动删除并返回 None。
+
+    Args:
+        fpath: 缓存文件路径
+        key: 缓存键名（仅用于日志）
+        dry_run: True 时仅记录不删除损坏文件（用于 cleanup_expired 预览）
+
+    Returns:
+        解析后的字典载荷，文件不存在/损坏返回 None
+    """
+    if not os.path.exists(fpath):
+        return None
+    is_gz = fpath.endswith(_GZIP_SUFFIX)
+    try:
+        if is_gz:
+            with open(fpath, "rb") as f:
+                return json.loads(gzip.decompress(f.read()).decode("utf-8"))
+        with open(fpath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        if dry_run:
+            logger.info("缓存清理(预览): 损坏文件 %s", os.path.basename(fpath))
+        else:
+            logger.warning("缓存文件 %s 损坏，自动删除: %s", key, e)
+            try:
+                os.remove(fpath)
+                logger.info("已删除损坏的缓存文件: %s", key)
+            except OSError:
+                pass
+        return None
+
+
 def get(key: str, max_age_seconds: float) -> Any | None:
     """读取缓存，过期或不存在时返回 None。
 
@@ -95,20 +131,10 @@ def get(key: str, max_age_seconds: float) -> Any | None:
     gz_path = path + _GZIP_SUFFIX
 
     # 优先读取 .json.gz，不存在则回退到 .json
-    if os.path.exists(gz_path):
-        try:
-            with open(gz_path, "rb") as f:
-                compressed = f.read()
-            data = json.loads(gzip.decompress(compressed).decode("utf-8"))
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning("缓存文件 %s 损坏，自动删除: %s", key, e)
-            try:
-                os.remove(gz_path)
-                logger.info("已删除损坏的缓存文件: %s", key)
-            except OSError:
-                pass
-            _record_cache_miss()
-            return None
+    for fpath in (gz_path, path):
+        data = _read_cache_data(fpath, key)
+        if data is None:
+            continue
 
         timestamp = data.get("_ts", 0)
         age = time.time() - timestamp
@@ -121,33 +147,8 @@ def get(key: str, max_age_seconds: float) -> Any | None:
         _record_cache_hit()
         return data.get("_data")
 
-    if not os.path.exists(path):
-        _record_cache_miss()
-        return None
-
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, IOError) as e:
-        logger.warning("缓存文件 %s 损坏，自动删除: %s", key, e)
-        try:
-            os.remove(path)
-            logger.info("已删除损坏的缓存文件: %s", key)
-        except OSError:
-            pass
-        _record_cache_miss()
-        return None
-
-    timestamp = data.get("_ts", 0)
-    age = time.time() - timestamp
-    if age > max_age_seconds:
-        logger.debug("缓存 %s 已过期 (%.1fs > %.1fs)", key, age, max_age_seconds)
-        _record_cache_miss()
-        return None
-
-    logger.debug("缓存命中: %s (age=%.1fs, max=%.1fs)", key, age, max_age_seconds)
-    _record_cache_hit()
-    return data.get("_data")
+    _record_cache_miss()
+    return None
 
 
 def _write_atomic(
@@ -400,10 +401,8 @@ def cleanup_expired(dry_run: bool = False) -> int:
         for fname in sorted(os.listdir(_CACHE_DIR)):
             if fname.endswith(".json.gz"):
                 fkey = fname[:-8]  # 去掉 .json.gz
-                is_gz = True
             elif fname.endswith(".json"):
                 fkey = fname[:-5]  # 去掉 .json
-                is_gz = False
             else:
                 continue
             fpath = os.path.join(_CACHE_DIR, fname)
@@ -420,27 +419,12 @@ def cleanup_expired(dry_run: bool = False) -> int:
 
             ttl = get_ttl(data_type)
 
-            try:
-                if is_gz:
-                    with open(fpath, "rb") as f:
-                        payload = json.loads(gzip.decompress(f.read()).decode("utf-8"))
-                else:
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        payload = json.load(f)
-                ts = payload.get("_ts", 0)
-            except (json.JSONDecodeError, OSError):
-                # 文件损坏，直接删除
-                if not dry_run:
-                    try:
-                        os.remove(fpath)
-                        removed += 1
-                        logger.info("缓存清理: 删除损坏文件 %s", fname)
-                    except OSError:
-                        pass
-                else:
-                    logger.info("缓存清理(预览): 损坏文件 %s", fname)
-                    removed += 1
+            payload = _read_cache_data(fpath, fkey, dry_run=dry_run)
+            if payload is None:
+                # 文件不存在/损坏（dry_run 模式已计数，实际模式 _read_cache_data 已删除）
+                removed += 1
                 continue
+            ts = payload.get("_ts", 0)
 
             age = now - ts
             if age > ttl:

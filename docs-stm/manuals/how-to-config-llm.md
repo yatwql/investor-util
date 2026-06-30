@@ -458,7 +458,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 }
 ```
 
-可用模型：`claude-sonnet-4-6`（推荐）、`claude-haiku-4-5-20251001`（高性价比）、`claude-opus-4-8`（强推理）、`claude-fable-5`（最新）
+可用模型：`claude-sonnet-4-6`（推荐）、`claude-haiku-4-5`（高性价比）、`claude-opus-4-8`（强推理）、`claude-fable-5`（最新）
 </details>
 
 <details>
@@ -550,7 +550,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 |------|:--------:|:--------:|:------------:|------|
 | `claude-sonnet-4-6` | 3.00 | 15.00 | 0.30 | Claude 主力模型，推荐日常使用 |
 | `claude-sonnet-4-8` | 3.00 | 15.00 | 0.30 | Sonnet 升级版，同价 |
-| `claude-haiku-4-5-20251001` | 0.25 | 1.25 | 0.025 | 轻量高性价比，适合批量任务 |
+| `claude-haiku-4-5` | 0.25 | 1.25 | 0.025 | 轻量高性价比，适合批量任务 |
 | `claude-opus-4-6` | 15.00 | 75.00 | 1.50 | 强推理，适合智囊团等复杂分析 |
 | `claude-opus-4-8` | 15.00 | 75.00 | 1.50 | Opus 升级版，同价 |
 | `claude-fable-5` | 3.00 | 15.00 | 0.30 | 最新 Claude 模型 |

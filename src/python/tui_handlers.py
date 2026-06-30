@@ -96,6 +96,43 @@ def _check_network_available(details: list) -> bool:
     return True
 
 
+def _prepare_holdings() -> list | None:
+    """选择持仓文件并读取持仓记录。
+
+    刷新配置 → 选文件 → 读持仓 → 非空检查 → 预热缓存。
+
+    Returns:
+        持仓列表；失败/取消时返回 None（已输出错误提示）
+    """
+    _refresh_config()
+    filepath = _select_holdings_file()
+    if not filepath:
+        return None
+    try:
+        print("  [..] 正在读取持仓数据...")
+        holdings = read_holdings(filepath)
+        if not holdings:
+            print("  [ERR] 未读取到有效的持仓数据")
+            print("     请检查持仓文件中是否有数据，列名是否正确")
+            print("     需要的列名：名称、代码、持仓份额、每份成本")
+            _press_any_key()
+            return None
+        print(f"  [OK] 成功读取 {len(holdings)} 条持仓记录")
+        _check_and_warm_for_new_assets(holdings)
+        return holdings
+    except Exception as e:
+        print(f"  [ERR] 读取持仓失败: {e}")
+        _press_any_key()
+        return None
+
+
+def _finish_report(reporter: TuiProgressReporter) -> None:
+    """报告生成收尾：错误摘要 → 耗时排行 → 按任意键。"""
+    reporter.print_error_summary()
+    reporter.print_timing_summary()
+    _press_any_key()
+
+
 # ── 持仓变更检测与缓存预热 ─────────────────────────────────
 
 
@@ -207,30 +244,20 @@ def _select_holdings_file() -> str | None:
 
 def _cmd_generate_excel() -> None:
     """生成 Excel 分析报告（必选内容）。"""
-    _refresh_config()
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
-    filepath = _select_holdings_file()
-    if not filepath:
+    holdings = _prepare_holdings()
+    if not holdings:
         return
     try:
-        holdings = read_holdings(filepath)
-        if not holdings:
-            reporter.add_error("未读取到有效的持仓数据")
-            print("  [ERR] 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
-            return
-        _check_and_warm_for_new_assets(holdings)
-        _generate_excel_report(holdings, include_news=False, output_dir=config.get("output_dir", "reports"), progress=reporter)
+        _generate_excel_report(holdings, include_news=False,
+                               output_dir=config.get("output_dir", "reports"),
+                               progress=reporter)
     except Exception as e:
         reporter.add_error(str(e))
         logger.exception("生成 Excel 报告失败")
         _print_error_with_hint(e, "生成失败")
-    reporter.print_error_summary()
-    reporter.print_timing_summary()
-    _press_any_key()
+    _finish_report(reporter)
 
 
 def _generate_excel_report(*args, progress=None, **kwargs):
@@ -242,26 +269,13 @@ def _generate_excel_report(*args, progress=None, **kwargs):
 
 def _cmd_generate_html(news: bool = False) -> None:
     """生成基础的 HTML 分析报告。"""
-    _refresh_config()
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
-    filepath = _select_holdings_file()
-    if not filepath:
+    holdings = _prepare_holdings()
+    if not holdings:
         return
 
     try:
-        print("  [..] 正在读取持仓数据...")
-        holdings = read_holdings(filepath)
-        if not holdings:
-            reporter.add_error("未读取到有效的持仓数据")
-            print("  [ERR] 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
-            return
-        print(f"  [OK] 成功读取 {len(holdings)} 条持仓记录")
-        _check_and_warm_for_new_assets(holdings)
-
         print("  [..] 正在获取行情数据并生成 HTML 报告...")
         from src.python.report.html_writer import write_html_report
         news_top_count = int(config.get("news_top_count", 100))
@@ -276,30 +290,18 @@ def _cmd_generate_html(news: bool = False) -> None:
         reporter.add_error(f"HTML 报告生成失败: {e}")
         logger.exception("生成 HTML 报告失败")
         _print_error_with_hint(e, "生成失败")
-    reporter.print_error_summary()
-    reporter.print_timing_summary()
-    _press_any_key()
+    _finish_report(reporter)
 
 
 def _cmd_generate_both() -> None:
     """生成全系列包含新闻的报告（Excel+HTML，不含 LLM 分析章节）。"""
-    _refresh_config()
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
-    filepath = _select_holdings_file()
-    if not filepath:
+    holdings = _prepare_holdings()
+    if not holdings:
         return
 
     try:
-        holdings = read_holdings(filepath)
-        if not holdings:
-            reporter.add_error("未读取到有效的持仓数据")
-            print("  [ERR] 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
-            return
-        _check_and_warm_for_new_assets(holdings)
         output_dir = config.get("output_dir", "reports")
         news_top_count = int(config.get("news_top_count", 100))
         today_str = datetime.now().strftime("%Y-%m-%d")
@@ -335,30 +337,18 @@ def _cmd_generate_both() -> None:
         reporter.add_error(f"全系列报告生成失败: {e}")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
-    reporter.print_error_summary()
-    reporter.print_timing_summary()
-    _press_any_key()
+    _finish_report(reporter)
 
 
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 分析章节）。"""
-    _refresh_config()
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
-    filepath = _select_holdings_file()
-    if not filepath:
+    holdings = _prepare_holdings()
+    if not holdings:
         return
 
     try:
-        holdings = read_holdings(filepath)
-        if not holdings:
-            reporter.add_error("未读取到有效的持仓数据")
-            print("  [ERR] 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
-            return
-        _check_and_warm_for_new_assets(holdings)
         output_dir = config.get("output_dir", "reports")
         news_top_count = int(config.get("news_top_count", 100))
 
@@ -533,9 +523,7 @@ def _cmd_generate_full() -> None:
         reporter.add_error(f"全系列报告生成失败: {e}")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
-    reporter.print_error_summary()
-    reporter.print_timing_summary()
-    _press_any_key()
+    _finish_report(reporter)
 
 
 # ── 配置命令 ──────────────────────────────────────────────
@@ -815,55 +803,67 @@ def _cmd_update_basic_cache() -> None:
     _press_any_key()
 
 
-def _cmd_update_position_cache() -> None:
-    """更新持仓类缓存。"""
+def _fetch_prices_and_indices(holdings: list) -> tuple[int, dict, dict]:
+    """并行获取持仓价格 + 市场指数并逐条输出。
+
+    Args:
+        holdings: 持仓记录列表
+
+    Returns:
+        (price_ok_count, a_indices_dict, us_indices_dict)
+    """
     from src.python.fetcher.index import fetch_indices, fetch_us_indices
     from src.python.fetcher.price import fetch_market_data
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
+    price_ok = 0
+    a_idx: dict = {}
+    us_idx: dict = {}
+    with ThreadPoolExecutor(max_workers=max(3, min(len(holdings) + 2, 7))) as executor:
+        fut_map: dict[Any, Any] = {}
+        for h in holdings:
+            fut_map[executor.submit(fetch_market_data, h.code, h.name)] = h
+        idx_a_fut = executor.submit(fetch_indices)
+        idx_us_fut = executor.submit(fetch_us_indices)
+        fut_map[idx_a_fut] = None
+        fut_map[idx_us_fut] = None
+
+        for future in as_completed(fut_map):
+            h_or_none = fut_map[future]
+            try:
+                if h_or_none is None:
+                    result = future.result()
+                    if future is idx_a_fut:
+                        a_idx = result or {}
+                        print(f"  [OK]   A 股指数: {len(a_idx)} 个")
+                    else:
+                        us_idx = result or {}
+                        print(f"  [OK]   美股指数: {len(us_idx)} 个")
+                else:
+                    h = h_or_none
+                    result = future.result()
+                    if result and result.get("price", 0) > 0:
+                        price_ok += 1
+                        print(f"  [OK]   {h.name} ({h.code}) → {result['price']:.4f}")
+                    else:
+                        print(f"  [!]   {h.name} ({h.code}) → 失败")
+            except Exception as e:
+                if h_or_none is not None:
+                    print(f"  [ERR]  {h_or_none.name} ({h_or_none.code}) → {e}")
+
+    return price_ok, a_idx, us_idx
+
+
+def _cmd_update_position_cache() -> None:
+    """更新持仓类缓存。"""
     holdings = _read_holdings_and_clear_cache("preload")
     if holdings is None:
         return
 
     try:
-
         print()
         print(f"  [..]   并行获取持仓价格/净值 + 市场指数...")
-        price_ok = 0
-        a_idx: dict = {}
-        us_idx: dict = {}
-        with ThreadPoolExecutor(max_workers=max(3, min(len(holdings) + 2, 7))) as executor:
-            fut_map: dict[Any, str | None] = {}
-            for h in holdings:
-                fut_map[executor.submit(fetch_market_data, h.code, h.name)] = h
-            idx_a_fut = executor.submit(fetch_indices)
-            idx_us_fut = executor.submit(fetch_us_indices)
-            fut_map[idx_a_fut] = None
-            fut_map[idx_us_fut] = None
-
-            for future in as_completed(fut_map):
-                h_or_none = fut_map[future]
-                try:
-                    if h_or_none is None:
-                        # 指数请求
-                        result = future.result()
-                        if future is idx_a_fut:
-                            a_idx = result or {}
-                            print(f"  [OK]   A 股指数: {len(a_idx)} 个")
-                        else:
-                            us_idx = result or {}
-                            print(f"  [OK]   美股指数: {len(us_idx)} 个")
-                    else:
-                        h = h_or_none
-                        result = future.result()
-                        if result and result.get("price", 0) > 0:
-                            price_ok += 1
-                            print(f"  [OK]   {h.name} ({h.code}) → {result['price']:.4f}")
-                        else:
-                            print(f"  [!]   {h.name} ({h.code}) → 失败")
-                except Exception as e:
-                    if h_or_none is not None:
-                        print(f"  [ERR]  {h_or_none.name} ({h_or_none.code}) → {e}")
+        price_ok, a_idx, us_idx = _fetch_prices_and_indices(holdings)
 
         print()
         print(f"  {'=' * 40}")
@@ -931,21 +931,41 @@ def _cmd_show_cache_stats() -> None:
 # ── 配置支持LLM的报告模块 ──────────────────────────────────
 
 
-def _cmd_config_llm_modules() -> None:
-    """配置各 LLM 报告的启用/停用（编辑 llm_settings.json 的 enabled_llm）。"""
+def _read_llm_settings() -> tuple[dict, str] | None:
+    """读取 llm_settings.json 配置。
+
+    Returns:
+        (settings_dict, path) 成功时；失败时返回 None（已输出错误提示）
+    """
     import json
-    from src.python.registry import get_llm_module_names
-
-    settings_path = "data/config/llm_settings.json"
-
-    # 读取当前配置
+    path = "data/config/llm_settings.json"
     try:
-        with open(settings_path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             settings = json.load(f)
+        return settings, path
     except (FileNotFoundError, json.JSONDecodeError):
         print("  [ERR] 无法读取 llm_settings.json")
         _press_any_key()
+        return None
+
+
+def _write_llm_settings(settings: dict, path: str) -> None:
+    """写入 llm_settings.json 并刷新 LLM 配置缓存。"""
+    import json
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
+    from src.python.config import get_llm_config
+    get_llm_config()
+
+
+def _cmd_config_llm_modules() -> None:
+    """配置各 LLM 报告的启用/停用（编辑 llm_settings.json 的 enabled_llm）。"""
+    from src.python.registry import get_llm_module_names
+
+    result = _read_llm_settings()
+    if result is None:
         return
+    settings, settings_path = result
 
     enabled_map = settings.get("enabled_llm", {})
     module_names = get_llm_module_names()
@@ -973,14 +993,9 @@ def _cmd_config_llm_modules() -> None:
             if matched:
                 _, sfx, name, curr = matched[0]
                 enabled_map[sfx] = not curr
-                # 写入文件
                 settings["enabled_llm"] = enabled_map
-                with open(settings_path, "w", encoding="utf-8") as f:
-                    json.dump(settings, f, ensure_ascii=False, indent=2)
+                _write_llm_settings(settings, settings_path)
                 print(f"  [OK] {name} 已{'开启' if not curr else '关闭'}")
-                # 刷新 LLM 配置缓存
-                from src.python.config import get_llm_config
-                get_llm_config()
             else:
                 print("  [!] 无效编号")
         except (ValueError, TypeError):
