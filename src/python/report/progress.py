@@ -41,6 +41,9 @@ class ProgressReporter:
     子类可覆盖各方法自定义输出格式（终端、日志、静默等）。
     """
 
+    def __init__(self) -> None:
+        self._errors: list[str] = []
+
     def info(self, msg: str) -> None:
         """进行中消息（对应 [..] 前缀）。"""
 
@@ -55,11 +58,12 @@ class ProgressReporter:
 
     def add_error(self, msg: str) -> None:
         """记录非致命错误，不影响继续执行。"""
+        self._errors.append(msg)
         logger.warning("生成异常: %s", msg)
 
     def get_errors(self) -> list[str]:
         """返回已记录的错误列表。"""
-        return []
+        return list(self._errors)
 
     def call_sheet(self, label: str, fn: Callable | None, *args: Any, **kwargs: Any) -> bool:
         """安全调用单页写入函数，记录耗时，失败时记录错误并继续。

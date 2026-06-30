@@ -321,7 +321,7 @@ def _call_llm_with_retry(
             logger.warning("%s API 超时（已重试 %d 次）", label, max_retries)
             _cb_record_failure(url)
             return (None, None)
-        except httpx.RequestError:
+        except httpx.HTTPError:
             host = _sanitize_endpoint(url)
             if attempt < max_retries:
                 delay = _RETRY_DELAYS[attempt]

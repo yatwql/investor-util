@@ -4,6 +4,22 @@
 
 ---
 
+## [0.2.46] - 2026-07-01
+
+### Fixed
+- **`llm/api.py` HTTPStatusError 未捕获修复（R-015 完）**：`_call_llm_with_retry` 中 `raise_for_status()` 抛出的 `httpx.HTTPStatusError`（429/503 全部重试耗尽后）不被 `except httpx.RequestError` 捕获，改为 `except httpx.HTTPError` 后正常捕获。test_api.py 44 项全部通过。
+- **`report/progress.py` ProgressReporter 基类错误存储修复**：基类 `add_error()` 仅 `logger.warning` 未存储错误，`get_errors()` 恒返回 `[]`。将 `_errors` 列表初始化、`add_error()`、`get_errors()` 从 `TuiProgressReporter` 提升至基类 `ProgressReporter`。
+
+### Added
+- **`src/test/test_api.py` — llm/api.py 单元测试**：44 项测试覆盖熔断/重试/回退/截断/Content Filter 安抚重试/JSON 解码/空内容/Provider 路由/fallback 链。
+- **`src/test/test_excel_generator.py` — excel_generator.py 单元测试（重写）**：15 项测试覆盖基本路径、新闻/LLM 包含路径、模块缺失降级、页签异常隔离、`progress=None` 默认值、计时记录。修正 mock 策略以适配懒导入（模块级 → 源模块补丁）。
+- **`docs-stm/manuals/reports-instruction.md` LLM API 用量章节**：新增独立说明章节，涵盖出现条件（仅菜单 L）、页签结构（汇总区 + 模块明细表）、状态颜色标识、完整示例表格。
+
+### Docs
+- **review-findings.md**：R-015 ✅ 标记完成，新增 2026-07-01 R-015 完成记录。
+- **plan.md**：A. 测试覆盖补全 标记为 ✅ 已完成（v0.2.46）。
+- **版本号同步**：constants.py 0.2.45→0.2.46，README.md 0.2.45→0.2.46
+
 ## [0.2.45] - 2026-07-01
 
 ### Changed
