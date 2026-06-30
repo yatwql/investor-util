@@ -21,7 +21,6 @@ from datetime import datetime, timezone, timedelta
 
 from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
 from src.python.registry import get_cache_ttl_defaults, get_prefix_type_map, get_exact_type_map, get_registry
-from src.python.http_client import make_http_client
 from src.python.market_hours import is_market_open as _is_market_open
 
 _CACHE_DIR = "data/cache"

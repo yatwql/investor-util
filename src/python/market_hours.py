@@ -69,7 +69,6 @@ def _fetch_trading_status_from_official() -> int | None:
     """
     from src.python.http_client import make_http_client
 
-    import httpx
 
     params = {"secid": "1.000001", "fields": "f100,f169"}
     try:

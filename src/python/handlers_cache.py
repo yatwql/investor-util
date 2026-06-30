@@ -4,14 +4,11 @@
 """
 from __future__ import annotations
 
-import os
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.python.logger import setup_logger
-from src.python.tui_menu import _press_any_key, _refresh_config, get_config_cache
-from src.python.reader import list_xlsx_files, read_holdings
-from src.python.config import set_config, get_llm_config
+from src.python.tui_menu import _press_any_key, _refresh_config
 from src.python.tui_handlers import _select_holdings_file
 logger = setup_logger()
 

@@ -18,7 +18,7 @@ from src.python.fetcher.price import fetch_market_data
 from src.python.models import Holding
 from src.python.report.excel_writer import auto_width, freeze_header, write_data_row, write_header_row, write_subtotal_row, \
     write_title_row, write_total_row
-from src.python.report.styles import BLUE_FONT, FMT_MONEY, FMT_PERCENT, FMT_PRICE, FMT_SHARES, NORMAL_FONT, profit_font
+from src.python.report.styles import BLUE_FONT, FMT_MONEY, FMT_PERCENT, FMT_PRICE, FMT_SHARES, profit_font
 
 logger = logging.getLogger("invest")
 

@@ -15,7 +15,6 @@ from src.python.providers.news_sources import (
     _FETCH_MAP,
     _FALLBACK_ENABLED,
     _SOURCE_LABELS,
-    get_source_label,
 )
 from src.python.providers.news_correlator import correlate_news_with_holdings
 

@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.48 — 待办区已清空，R-020~R-024 全部完成，无待修复问题）
+最后更新：2026-07-01（v0.2.48 — R-025 ✅ 已完成，R-026~R-032 P3 待处理）
 
 ---
 
@@ -37,9 +37,19 @@
 | 2026-07-01 | **R-019 ✅ cache.py 交易时间逻辑提取为 market_hours.py 独立模块** | 代码质量修复 |
 | 2026-07-01 | 代码审计：generate_excel_report(296行)/generate_all_llm(224行)/write_llm_usage_sheet(215行)/compute_penetration_top10(199行) 大函数识别；handlers 测试缺口审计 | 优化审查 |
 | 2026-07-01 | **R-020 ✅ ～ R-024 ✅ 全部完成** — 4 个大函数拆分（均≤75行）+ handlers 测试 23 项新增，全量 1216 passed | 代码质量修复 |
+| 2026-07-01 | 全量审计：AST 扫描大函数（16个>100行）、未使用 import 扫描（28处）、测试缺口分析（tiantian/skeleton 无专用测试）、硬编码名称扫描（~45处） | 综合审计 |
 
 ---
 
 ## 待处理问题
 
-当前无待修复问题。最后全部完成记录：v0.2.48（R-020~R-024）。
+| 编号 | 问题 | 严重度 | 状态 | 发现日期 |
+|:----|------|:------:|:----:|:--------:|
+| R-025 | **未使用 import 清理（28 处，12 个文件）**：`cache.py` 3 处、`config.py` 1 处、`handlers_cache.py` 5 处、`handlers_report.py` 10 处、`main.py` 2 处、`market_hours.py` 1 处、`fetcher/chain.py` 1 处、`llm/generators.py` 1 处、`report/market_value.py` 1 处、`providers/` 3 处（其中 `CACHE_WEEKLY`/`CACHE_MONTHLY` 与 `_generate_llm_content` 为便利再导出而非未使用，已保留） | P2 | ✅ v0.2.48 | 2026-07-01 |
+| R-026 | **`report/fund_performance.py:write_fund_performance_sheet()`（164 行）**：Excel 页签写入大函数，含表头/数据行/标色/备注四段，可拆分 | P3 | 待处理 | 2026-07-01 |
+| R-027 | **`report/summary.py:write_summary_sheet()`（163 行）**：投资分析汇总页签写入，含指数行情/汇总数据/账户小计/备注四段，可拆分 | P3 | 待处理 | 2026-07-01 |
+| R-028 | **`report/news_correlation.py:build_news_data()`（159 行）**：新闻获取/关键词匹配/LLM 分析/排序输出四段逻辑可拆分 | P3 | 待处理 | 2026-07-01 |
+| R-029 | **`providers/tiantian.py` 三大函数（平均 143 行）**：`fetch_quarterly_holdings`（150）、`fetch_fund_holdings`（143）、`fetch_fund_rankings`（135），含复杂的 JS 变量解析/HTML 多格式处理，可拆分 | P3 | 待处理 | 2026-07-01 |
+| R-030 | **`llm/skeleton.py` 两大函数**：`_generate_llm_content()`（136 行）+ `_run_batch_mode()`（112 行），骨干函数含缓存/API/截断重试/格式处理多段逻辑 | P3 | 待处理 | 2026-07-01 |
+| R-031 | **`providers/tiantian.py` 缺专用测试**：481 行文件含三大复杂函数，现有 `test_fund.py` 间接覆盖不足 | P3 | 待处理 | 2026-07-01 |
+| R-032 | **`llm/skeleton.py` 缺专用测试**：397 行含 2 个大函数，缓存/API/截断重试路径无独立覆盖 | P3 | 待处理 | 2026-07-01 |

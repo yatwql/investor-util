@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from src.python.cache import CACHE_WEEKLY, get as cache_get, get_ttl, set as cache_set
+from src.python.cache import CACHE_WEEKLY, get as cache_get, set as cache_set
 from src.python.config import get_config
 
 logger = logging.getLogger("invest")

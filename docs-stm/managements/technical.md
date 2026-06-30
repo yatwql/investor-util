@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-06-30
+最后更新：2026-07-01（v0.2.48 — 未使用 import 清理、目录结构修正）
 
 ---
 
@@ -121,14 +121,14 @@ investor-util/
 │   ├── __init__.py
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
-│   │   ├── config.py             # 配置读写
-│   │   ├── registry.py           # 中央注册表
 │   │   ├── cache.py              # 缓存引擎
+│   │   ├── config.py             # 配置读写
 │   │   ├── constants.py          # 共享常量
 │   │   ├── fetcher/               # 数据获取调度
 │   │   ├── handlers_cache.py     # TUI 缓存管理命令
 │   │   ├── handlers_config.py    # TUI 配置管理命令
 │   │   ├── handlers_report.py    # TUI 报告生成命令
+│   │   ├── http_client.py        # HTTP 客户端工厂
 │   │   ├── llm/                  # LLM 集成（9 子模块）
 │   │   ├── logger.py             # 日志模块
 │   │   ├── main.py               # TUI 入口 + 菜单循环
@@ -156,7 +156,7 @@ investor-util/
 
 ## LLM 客户端技术要点
 
-`src/python/llm/` 包拆分架构（原 `llm_client.py` 解耦为 9 子模块（+skeleton.py 共享骨架））：
+`src/python/llm/` 包拆分架构（原 `llm_client.py` 解耦为 9 子模块，含 skeleton.py 共享骨架）：
 
 | 模块 | 职责 |
 |------|------|

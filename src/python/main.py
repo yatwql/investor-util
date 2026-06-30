@@ -15,7 +15,6 @@ os.chdir(_project_root)
 
 from src.python.logger import setup_logger
 from src.python.config import init_config
-from src.python.reader import read_holdings
 from src.python.tui import KEY_CTRL_C, KEY_DOWN, KEY_ENTER, KEY_UP, get_key
 
 from src.python.tui_menu import (
@@ -25,7 +24,6 @@ from src.python.tui_menu import (
     _print_header,
     _render_menu,
     _show_config,
-    _refresh_config,
 )
 from src.python.tui_handlers import _execute_item
 from src.python.llm.pricing import _CURRENCY_SYMBOLS
