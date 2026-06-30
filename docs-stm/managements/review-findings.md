@@ -1,7 +1,7 @@
 # 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.45 — 全部可修复问题已处理，R-015 延期移出待办）
+最后更新：2026-07-01（v0.2.45 — 全部已修复问题移出待办，待办区已清空）
 
 ---
 
@@ -29,39 +29,6 @@
 | 2026-07-01 | R-014 _cmd_update_basic_cache 提取 + R-015 test_fund.py 新增 + plan.md 代码质量方向 + docs 同步 | 缺陷修复/测试新增 |
 | 2026-07-01 | cache.py _is_market_open 拆解 + R-009 tui_handlers 完成 + R-010 cache 完成 | 代码质量修复 |
 | 2026-07-01 | R-015 P3 延期，test_fund.py 已覆盖，其余后续迭代补充 | 延期决策 |
-
----
-
-## 待办事项
-
-### [R-014] _cmd_update_basic_cache 大函数拆分 ✅
-
-- **类型**：可维护性
-- **文件**：`src/python/tui_handlers.py`（~1080 行）
-- **描述**：提取 `_refresh_one_fund_cache()`、`_refresh_profit_forecast_cache()`、`_refresh_sector_flow_cache()`、`_print_cache_refresh_report()` 四个模块级函数。`_refresh_common_caches()` 复用提取函数并返回 `(pf_ok, sf_ok)`。`_cmd_update_basic_cache` 从 130 行降至 67 行（-48%）。
-- **状态**：P2 — ✅ 已修复（2026-07-01）
-
-### [R-016] plan.md 迭代计划未包含当前代码质量方向 ✅
-
-- **类型**：文档
-- **文件**：`docs-stm/managements/plan.md`
-- **描述**：plan.md 的"下一步迭代计划"只有 B/C/F 三个远期业务方向，未包含当前的代码质量优化（大函数拆分、测试补全、文档审计等）迭代规划。已新增「A. 代码质量持续优化」方向。
-- **状态**：P3 — ✅ 已修复（2026-07-01）
-
-### [R-009] tui_handlers.py God 对象 ✅
-
-- **类型**：架构/可维护性
-- **文件**：`src/python/tui_handlers.py`（~1080 行）
-- **描述**：已提取 `_prepare_holdings()`、`_finish_report()`、`_fetch_prices_and_indices()`、`_read_llm_settings()`、`_write_llm_settings()`、`_process_llm_news_futures()`、`_refresh_one_fund_cache()`、`_refresh_profit_forecast_cache()`、`_refresh_sector_flow_cache()`、`_print_cache_refresh_report()`、`_prepare_report_data()`、`_prompt_force_llm()`、`_compute_early_warnings()` 共享函数。`_cmd_generate_full` 降至 75 行（-55%）、`_cmd_update_basic_cache` 67 行。
-- **状态**：P3 — ✅ 已修复（2026-07-01）
-
-### [R-010] cache.py 大函数拆分 ✅
-
-- **类型**：可维护性
-- **文件**：`src/python/cache.py`
-- **描述**：`get()` 从 67 行精简至 33 行；`cleanup_expired` 复用 `_read_cache_data()`；`check_and_refresh_caches` 提取 `_read_holdings_tracking()`、`_clear_holdings_related_caches()`；`_is_market_open` 提取 3 层策略辅助函数（`_is_market_open_config/official/fallback`），主体降为 16 行 3 层链式调用；`set()` 已提取 `_write_atomic()`（v0.2.36）。
-- **状态**：P3 — ✅ 已修复（2026-07-01）
-
-<!-- 已完成：v0.2.43 = R-012(_read_llm_settings JSON 注释) 回归修复 + _cmd_generate_full 提取 _process_llm_news_futures + 管理文档同步 -- 此前 R-011~R-013 已在 v0.2.42 完成 -->
+| 2026-07-01 | 全部已修复问题移出待办区，review-findings.md 待办区清空 | 文档清理 |
 
 
