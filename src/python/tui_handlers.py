@@ -410,84 +410,150 @@ def _process_llm_news_futures(
     return llm_content, news_data, news_llm_meta
 
 
+def _prepare_report_data(holdings: list, reporter: TuiProgressReporter) -> dict:
+    """获取行情、指数、穿透数据，整理持仓明细字典列表。
+
+    Args:
+        holdings: 持仓记录列表
+        reporter: 进度报告器
+
+    Returns:
+        dict 含 details / total_mv / total_cost / total_profit /
+             total_today_profit / categories / a_indices / us_indices /
+             penetrated_assets / holdings_details / today_str / output_dir / news_top_count
+    """
+    from src.python.fetcher.index import fetch_indices, fetch_us_indices
+    from src.python.report.market_value import _generate_details, classify_holdings
+    from src.python.report.penetration import compute_penetration_top10
+
+    config = get_config_cache() or {}
+    output_dir = config.get("output_dir", "reports")
+    news_top_count = int(config.get("news_top_count", 100))
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    reporter.info("正在获取行情数据...")
+    details = _generate_details(holdings, today_str)
+    _check_network_available(details)
+    total_mv = sum(d.market_value for d in details)
+    total_cost = sum(d.cost for d in details)
+    total_profit = sum(d.profit for d in details)
+    total_today_profit = sum(d.today_profit for d in details)
+    categories = classify_holdings(holdings)
+
+    with ThreadPoolExecutor(max_workers=2) as _idx_ex:
+        _a_fut = _idx_ex.submit(fetch_indices)
+        _us_fut = _idx_ex.submit(fetch_us_indices)
+        a_indices = _a_fut.result()
+        us_indices = _us_fut.result()
+    pen_result = compute_penetration_top10(holdings, details)
+    penetrated_assets = (pen_result or {}).get("top10", [])
+
+    holdings_details = [
+        {
+            "name": d.name, "code": d.code,
+            "market_value": d.market_value, "cost": d.cost,
+            "profit": d.profit, "profit_rate": d.profit_rate,
+            "change_pct": (
+                (d.price - d.yesterday_close) / d.yesterday_close * 100
+                if d.yesterday_close and abs(d.yesterday_close) > 1e-10
+                else 0.0
+            ),
+            "nav_date": d.nav_date,
+            "source_api": d.source_api,
+        }
+        for d in details
+    ]
+
+    return {
+        "details": details,
+        "total_mv": total_mv,
+        "total_cost": total_cost,
+        "total_profit": total_profit,
+        "total_today_profit": total_today_profit,
+        "categories": categories,
+        "a_indices": a_indices,
+        "us_indices": us_indices,
+        "penetrated_assets": penetrated_assets,
+        "holdings_details": holdings_details,
+        "today_str": today_str,
+        "output_dir": output_dir,
+        "news_top_count": news_top_count,
+    }
+
+
+def _prompt_force_llm(reporter: TuiProgressReporter) -> bool:
+    """询问用户是否强制刷新 LLM 缓存。
+
+    Returns:
+        True 强制刷新，False 使用缓存
+    """
+    try:
+        _resp = input("  [..] 是否强制重新生成 LLM 内容（跳过缓存）？(y/N): ").strip().lower()
+        _force = _resp == "y"
+    except (EOFError, KeyboardInterrupt):
+        _force = False
+    if _force:
+        reporter.ok("将跳过 LLM 缓存强制重新生成")
+    return _force
+
+
+def _compute_early_warnings(
+    holdings: list, penetrated_assets: list, sector_flow: dict,
+    news_data: list, news_llm_meta: dict, reporter: TuiProgressReporter,
+) -> dict | None:
+    """计算智能预警（行业资金流向联动 + 新闻情绪聚合）。
+
+    Returns:
+        预警结果字典，失败时返回 None
+    """
+    try:
+        from src.python.report.early_warning import compute_early_warnings
+        _warnings = compute_early_warnings(
+            holdings,
+            penetration_top10=penetrated_assets,
+            sector_flow=sector_flow,
+            news_data=news_data,
+            news_llm_meta=news_llm_meta,
+        )
+        if _warnings.get("has_warnings"):
+            _n_sector = len(_warnings.get("sector_alerts", []))
+            _n_sentiment = len(_warnings.get("sentiment_alerts", []))
+            reporter.ok(f"智能预警完成: {_n_sector} 条行业预警, {_n_sentiment} 条新闻情绪")
+        return _warnings
+    except Exception as e:
+        logger.warning("智能预警计算失败: %s", e)
+        return None
+
+
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 分析章节）。"""
     reporter = TuiProgressReporter()
-    config = get_config_cache() or {}
     holdings = _prepare_holdings()
     if not holdings:
         return
 
     try:
-        output_dir = config.get("output_dir", "reports")
-        news_top_count = int(config.get("news_top_count", 100))
-
-        from src.python.fetcher.index import fetch_indices, fetch_us_indices
-        from src.python.report.market_value import _generate_details, classify_holdings
-        from src.python.report.penetration import compute_penetration_top10
-
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        reporter.info("正在获取行情数据...")
-        details = _generate_details(holdings, today_str)
-        _check_network_available(details)
-        total_mv = sum(d.market_value for d in details)
-        total_cost = sum(d.cost for d in details)
-        total_profit = sum(d.profit for d in details)
-        total_today_profit = sum(d.today_profit for d in details)
-        categories = classify_holdings(holdings)
-
-        with ThreadPoolExecutor(max_workers=2) as _idx_ex:
-            _a_fut = _idx_ex.submit(fetch_indices)
-            _us_fut = _idx_ex.submit(fetch_us_indices)
-            a_indices = _a_fut.result()
-            us_indices = _us_fut.result()
-        pen_result = compute_penetration_top10(holdings, details)
-        penetrated_assets = (pen_result or {}).get("top10", [])
-
-        holdings_details = [
-            {
-                "name": d.name, "code": d.code,
-                "market_value": d.market_value, "cost": d.cost,
-                "profit": d.profit, "profit_rate": d.profit_rate,
-                "change_pct": (
-                    (d.price - d.yesterday_close) / d.yesterday_close * 100
-                    if d.yesterday_close and abs(d.yesterday_close) > 1e-10
-                    else 0.0
-                ),
-                "nav_date": d.nav_date,
-                "source_api": d.source_api,
-            }
-            for d in details
-        ]
+        prep = _prepare_report_data(holdings, reporter)
 
         from src.python.llm import generate_all_llm
         from src.python.providers.akshare_extras import get_sector_fund_flow
         from src.python.report.news_correlation import build_news_data
 
         reporter.info("正在并行获取新闻 + LLM 内容...")
-
         _sector_flow = get_sector_fund_flow()
-
-        # 是否强制刷新 LLM 缓存
-        _force_llm = False
-        try:
-            _resp = input("  [..] 是否强制重新生成 LLM 内容（跳过缓存）？(y/N): ").strip().lower()
-            _force_llm = _resp == "y"
-        except (EOFError, KeyboardInterrupt):
-            _force_llm = False
-        if _force_llm:
-            reporter.ok("将跳过 LLM 缓存强制重新生成")
+        _force_llm = _prompt_force_llm(reporter)
 
         with ThreadPoolExecutor(max_workers=2) as _llm_ex:
             _news_fut = _llm_ex.submit(
-                build_news_data, holdings, news_top_count, penetrated_assets,
+                build_news_data, holdings, prep["news_top_count"], prep["penetrated_assets"],
             )
             _llm_fut = _llm_ex.submit(
                 generate_all_llm,
-                a_indices, us_indices, total_mv, total_cost, total_profit,
-                total_today_profit, len(holdings), categories,
-                penetrated_assets=penetrated_assets,
-                holdings_details=holdings_details,
+                prep["a_indices"], prep["us_indices"],
+                prep["total_mv"], prep["total_cost"], prep["total_profit"],
+                prep["total_today_profit"], len(holdings), prep["categories"],
+                penetrated_assets=prep["penetrated_assets"],
+                holdings_details=prep["holdings_details"],
                 sector_flow=_sector_flow, force=_force_llm,
             )
             llm_content, news_data, news_llm_meta = _process_llm_news_futures(
@@ -496,31 +562,18 @@ def _cmd_generate_full() -> None:
 
         _print_llm_session_usage()
 
-        # ── 智能预警 ──
-        try:
-            from src.python.report.early_warning import compute_early_warnings
-            _early_warnings = compute_early_warnings(
-                holdings,
-                penetration_top10=penetrated_assets,
-                sector_flow=_sector_flow,
-                news_data=news_data,
-                news_llm_meta=news_llm_meta,
-            )
-            if _early_warnings.get("has_warnings"):
-                _n_sector = len(_early_warnings.get("sector_alerts", []))
-                _n_sentiment = len(_early_warnings.get("sentiment_alerts", []))
-                reporter.ok(f"智能预警完成: {_n_sector} 条行业预警, {_n_sentiment} 条新闻情绪")
-        except Exception as e:
-            logger.warning("智能预警计算失败: %s", e)
-            _early_warnings = None
+        _early_warnings = _compute_early_warnings(
+            holdings, prep["penetrated_assets"], _sector_flow,
+            news_data, news_llm_meta, reporter,
+        )
 
         from src.python.report.html_writer import write_html_report
         reporter.info("正在生成 HTML 报告（含新闻 + LLM 分析章节）...")
         try:
             path = write_html_report(
-                holdings, output_dir=output_dir,
-                news_top_count=news_top_count, include_news=True,
-                llm_content=llm_content, details=details,
+                holdings, output_dir=prep["output_dir"],
+                news_top_count=prep["news_top_count"], include_news=True,
+                llm_content=llm_content, details=prep["details"],
                 news_data=news_data, news_llm_meta=news_llm_meta,
                 early_warnings=_early_warnings, progress=reporter,
             )
@@ -533,10 +586,11 @@ def _cmd_generate_full() -> None:
 
         print()
         _generate_excel_report(
-            holdings, include_news=True, output_dir=output_dir,
-            news_top_count=news_top_count, include_llm=True,
+            holdings, include_news=True, output_dir=prep["output_dir"],
+            news_top_count=prep["news_top_count"], include_llm=True,
             llm_content=llm_content,
-            details=details, a_indices=a_indices, us_indices=us_indices,
+            details=prep["details"], a_indices=prep["a_indices"],
+            us_indices=prep["us_indices"],
             news_data=news_data,
             news_llm_meta=news_llm_meta,
             early_warnings=_early_warnings, progress=reporter,

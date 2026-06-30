@@ -4,6 +4,17 @@
 
 ---
 
+## [0.2.45] - 2026-07-01
+
+### Changed
+- **`_cmd_generate_full` 继续拆分（R-009 完）**：提取 `_prepare_report_data()`（69 行）、`_prompt_force_llm()`（26 行）、`_compute_early_warnings()`（26 行）。`_cmd_generate_full` 从 136 行降至 75 行（-45%）。`tui_handlers.py` 所有函数均 ≤75 行。
+- **`cache.py _is_market_open` 拆解（R-010 完）**：提取 3 个策略辅助函数 `_is_market_open_config()` / `_is_market_open_official()` / `_is_market_open_fallback()`，主函数降至 16 行 3 层链式调用。`check_and_refresh_caches` 已提取 `_read_holdings_tracking()` / `_clear_holdings_related_caches()`。
+
+### Docs
+- **review-findings.md**：R-009 ✅、R-010 ✅ 标记完成，R-015 ◐ 更新为 P3 延期（后续迭代补充）。
+- **review-findings.md 清理**：确认所有可修复问题已修复完毕，剩余 R-015 P3 延期。
+- **版本号同步**：constants.py 0.2.44→0.2.45，README.md 0.2.44→0.2.45
+
 ## [0.2.44] - 2026-07-01
 
 ### Changed

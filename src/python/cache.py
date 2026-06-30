@@ -483,6 +483,45 @@ def compute_holdings_codes(holdings: list) -> set[str]:
     return {h.code for h in holdings}
 
 
+def _read_holdings_tracking(tracking_key: str) -> dict | None:
+    """读取上次存储的持仓跟踪数据。
+
+    Returns:
+        跟踪数据字典（含 fingerprint / codes），文件不存在或损坏时返回 None
+    """
+    track_path = _cache_path(tracking_key)
+    if not os.path.exists(track_path):
+        return None
+    try:
+        with open(track_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        return payload.get("_data")
+    except (json.JSONDecodeError, OSError, KeyError):
+        logger.warning("读取持仓跟踪缓存数据失败，将重新生成")
+        return None
+
+
+def _clear_holdings_related_caches() -> list[str]:
+    """清除与持仓关联的缓存（fund_benchmarks + industry_*）。
+
+    Returns:
+        已清除的缓存项描述列表
+    """
+    cleared: list[str] = []
+    bm_path = _cache_path("fund_benchmarks")
+    if os.path.exists(bm_path):
+        clear("fund_benchmarks")
+        cleared.append("fund_benchmarks")
+    ind_count = clear_by_prefix("industry_")
+    if ind_count > 0:
+        cleared.append(f"industry_({ind_count}条)")
+    if cleared:
+        logger.info("已清除过期缓存: %s", ", ".join(cleared))
+    else:
+        logger.info("关联缓存尚未生成，无需清除")
+    return cleared
+
+
 def check_and_refresh_caches(holdings: list) -> list[str]:
     """检查持仓是否发生变化，若有变更则自动刷新关联缓存并返回新增资产代码。
 
@@ -502,17 +541,7 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
     current_fp = compute_holdings_fingerprint(holdings)
     current_codes = compute_holdings_codes(holdings)
 
-    # 读取上次存储的跟踪数据
-    track_path = _cache_path(tracking_key)
-    prev_data: dict | None = None
-    if os.path.exists(track_path):
-        try:
-            with open(track_path, "r", encoding="utf-8") as f:
-                payload = json.load(f)
-            prev_data = payload.get("_data")
-        except (json.JSONDecodeError, OSError, KeyError):
-            logger.warning("读取持仓跟踪缓存数据失败，将重新生成")
-            pass
+    prev_data = _read_holdings_tracking(tracking_key)
 
     if prev_data is not None:
         prev_fp = prev_data.get("fingerprint")
@@ -524,22 +553,7 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
     new_codes = current_codes - prev_codes
 
     logger.info("持仓已变更，自动刷新关联缓存...")
-
-    cleared: list[str] = []
-    bm_path = _cache_path("fund_benchmarks")
-    if os.path.exists(bm_path):
-        clear("fund_benchmarks")
-        cleared.append("fund_benchmarks")
-
-    # 持仓变更 → 行业分类缓存可能变化（新品种代码不同，行业不同）
-    ind_count = clear_by_prefix("industry_")
-    if ind_count > 0:
-        cleared.append(f"industry_({ind_count}条)")
-
-    if cleared:
-        logger.info("已清除过期缓存: %s", ", ".join(cleared))
-    else:
-        logger.info("关联缓存尚未生成，无需清除")
+    _clear_holdings_related_caches()
 
     # 存储新跟踪数据（指纹 + 代码集合）
     set(tracking_key, {
@@ -620,6 +634,82 @@ def _fetch_trading_status_from_official() -> int | None:
     return None
 
 
+def _is_market_open_config(current_min: int) -> bool | None:
+    """第 1 层：从 config.json 手动覆盖判断市场是否开盘。
+
+    Returns:
+        True 开市 / False 闭市 / None 未配置，继续下一层
+    """
+    from src.python.config import get_config
+    config = get_config()
+    mh_config = config.get("market_hours") or {}
+    start_str = mh_config.get("start")
+    end_str = mh_config.get("end")
+    if not start_str or not end_str:
+        return None
+    start_min = _parse_time_to_minutes(start_str)
+    end_min = _parse_time_to_minutes(end_str)
+    if start_min is None or end_min is None:
+        return None
+    now = datetime.now(timezone(timedelta(hours=8)))
+    if now.weekday() >= 5:
+        return False
+    in_range = start_min <= current_min <= end_min
+    lunch = _MORNING_END < current_min < _AFTERNOON_START
+    result = in_range and not lunch
+    logger.debug("市场时段(配置 %s-%s): %s", start_str, end_str, result)
+    return result
+
+
+def _is_market_open_official(current_min: int) -> bool | None:
+    """第 2 层：从东方财富 push2 API 实时交易状态判断。
+
+    Returns:
+        True 开市 / False 收盘 / None API 不可用
+    """
+    from src.python.config import get_config
+    config = get_config()
+    mh_config = config.get("market_hours") or {}
+    use_official = mh_config.get("official_source", True)
+    if not use_official:
+        return None
+    now = datetime.now(timezone(timedelta(hours=8)))
+    if now.weekday() >= 5:
+        return None  # 周末 return None 让 fallback 处理
+    official_ttl = 60 if _MORNING_START <= current_min <= _AFTERNOON_END else 86400 * 7
+    cached = get(_CACHE_KEY_MARKET_HOURS, official_ttl)
+    if cached is not None and isinstance(cached, dict):
+        status = cached.get("status")
+        logger.debug("市场时段(API缓存): status=%s", status)
+        if status == 1:
+            return True
+        if status == 2:
+            return False
+    status = _fetch_trading_status_from_official()
+    if status is not None:
+        set(_CACHE_KEY_MARKET_HOURS, {"status": status})
+        logger.debug("市场时段(API实时): status=%s", status)
+        if status == 1:
+            return True
+        if status == 2:
+            return False
+    return None
+
+
+def _is_market_open_fallback(current_min: int) -> bool:
+    """第 3 层：根据内置默认值判断市场是否开盘。
+
+    北京时区工作日 09:30–11:30 + 13:00–15:00，自动排除午餐和周末。
+    """
+    import datetime as _dt
+    now = datetime.now(timezone(timedelta(hours=8)))
+    if now.weekday() >= 5:
+        return False
+    in_morning = _MORNING_START <= current_min <= _MORNING_END
+    in_afternoon = _AFTERNOON_START <= current_min <= _AFTERNOON_END
+    return in_morning or in_afternoon
+
+
 def _is_market_open() -> bool:
     """多渠道判断 A 股市场当前是否在交易时段。
 
@@ -634,64 +724,21 @@ def _is_market_open() -> bool:
         是否在交易时段内
     """
     try:
-        from src.python.config import get_config
-
-        config = get_config()
-        mh_config = config.get("market_hours") or {}
-
         now = datetime.now(timezone(timedelta(hours=8)))
         current_min = now.hour * 60 + now.minute
 
-        # ── 1. config.json 手动覆盖 ──────────────────────
-        start_str = mh_config.get("start")
-        end_str = mh_config.get("end")
-        if start_str and end_str:
-            start_min = _parse_time_to_minutes(start_str)
-            end_min = _parse_time_to_minutes(end_str)
-            if start_min is not None and end_min is not None:
-                if now.weekday() >= 5:
-                    return False
-                # 在 start~end 范围内，同时排除午餐
-                in_range = start_min <= current_min <= end_min
-                lunch = _MORNING_END < current_min < _AFTERNOON_START
-                result = in_range and not lunch
-                logger.debug("市场时段(配置 %s-%s): %s", start_str, end_str, result)
-                return result
+        # 第 1 层：config.json 手动覆盖
+        result = _is_market_open_config(current_min)
+        if result is not None:
+            return result
 
-        # ── 2. 官方 API 实时状态 ─────────────────────────
-        use_official = mh_config.get("official_source", True)
-        if use_official and now.weekday() < 5:
-            # 盘中用短 TTL(60s)，盘后用长 TTL(7d)
-            from src.python.cache import get as _cg, set as _cs
+        # 第 2 层：官方 API 实时状态
+        result = _is_market_open_official(current_min)
+        if result is not None:
+            return result
 
-            official_ttl = 60 if _MORNING_START <= current_min <= _AFTERNOON_END else 86400 * 7
-            cached = _cg(_CACHE_KEY_MARKET_HOURS, official_ttl)
-            if cached is not None and isinstance(cached, dict):
-                status = cached.get("status")
-                logger.debug("市场时段(API缓存): status=%s", status)
-                if status == 1:
-                    return True
-                if status == 2:
-                    return False  # 确收收盘
-                # status=0/3 → 继续降级到默认值
-
-            # 缓存未命中或不确定 → 实时请求
-            status = _fetch_trading_status_from_official()
-            if status is not None:
-                _cs(_CACHE_KEY_MARKET_HOURS, {"status": status})
-                logger.debug("市场时段(API实时): status=%s", status)
-                if status == 1:
-                    return True
-                if status == 2:
-                    return False
-
-        # ── 3. 内置默认值 ────────────────────────────────
-        if now.weekday() >= 5:
-            return False
-        # 早盘 09:30-11:30 或 午盘 13:00-15:00
-        in_morning = _MORNING_START <= current_min <= _MORNING_END
-        in_afternoon = _AFTERNOON_START <= current_min <= _AFTERNOON_END
-        return in_morning or in_afternoon
+        # 第 3 层：内置默认值
+        return _is_market_open_fallback(current_min)
 
     except Exception:
         return False  # 异常时保守处理：视为非交易时段
