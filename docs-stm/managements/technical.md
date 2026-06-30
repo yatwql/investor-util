@@ -55,6 +55,8 @@
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `akshare_extras.py` |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `akshare_extras.py` |
 
+> 各新闻源的完整端点格式及通用数据源说明参见 [数据源一览](../manuals/datasource-and-folders.md)。
+
 ---
 
 ## 缓存策略
@@ -121,75 +123,29 @@ investor-util/
 │   │   ├── __init__.py
 │   │   ├── main.py               # TUI 入口 + 菜单循环
 │   │   ├── config.py             # 配置读写
-│   │   ├── registry.py           # 中央注册表（模块配置键名/缓存前缀/TTL 统一管理）
+│   │   ├── registry.py           # 中央注册表
 │   │   ├── cache.py              # 缓存引擎
 │   │   ├── fetcher.py            # 数据获取调度
 │   │   ├── reader.py             # 持仓 Excel 解析
-│   │   ├── llm/                  # LLM 集成（9 子模块：api/pricing/session/circuit_breaker/fingerprint/markdown/generators/skeleton/prompts）
-│   │   ├── constants.py          # 共享常量（CACHE_DAILY/WEEKLY/MONTHLY、模型定价）
-│   │   ├── models.py             # 数据模型（Holding dataclass）
+│   │   ├── llm/                  # LLM 集成（9 子模块）
+│   │   ├── constants.py          # 共享常量
+│   │   ├── models.py             # 数据模型
 │   │   ├── logger.py             # 日志模块
 │   │   ├── tui.py                # 键盘输入封装
 │   │   ├── tui_menu.py           # 菜单交互
 │   │   ├── tui_handlers.py       # 菜单功能执行
 │   │   ├── providers/            # 数据源提供商
-│   │   │   ├── __init__.py
-│   │   │   ├── akshare_extras.py
-│   │   │   ├── akshare_news.py
-│   │   │   ├── cls_news.py
-│   │   │   ├── eastmoney.py
-│   │   │   ├── eastmoney_industry.py
-│   │   │   ├── eastmoney_news.py
-│   │   │   ├── news_aggregator.py
-│   │   │   ├── news_correlator.py
-│   │   │   ├── news_keywords.py
-│   │   │   ├── news_sources.py
-│   │   │   ├── sina.py
-│   │   │   ├── sina_news.py
-│   │   │   ├── tencent.py
-│   │   │   ├── tiantian.py
-│   │   │   └── wallstreetcn_news.py
-│   │   ├── report/               # 报告生成
-│   │   │   ├── __init__.py
-│   │   │   ├── category.py
-│   │   │   ├── early_warning.py        # 智能预警（行业资金流向联动 + 新闻情绪聚合）
-│   │   │   ├── excel_writer.py
-│   │   │   ├── fund_performance.py
-│   │   │   ├── html_writer.py
-│   │   │   ├── llm_content.py
-│   │   │   ├── market_value.py
-│   │   │   ├── excel_generator.py
-│   │   │   ├── news_correlation.py
-│   │   │   ├── penetration.py
-│   │   │   ├── styles.py
-│   │   │   └── summary.py
-│   │   ├── tmpl/                 # HTML 报告模板（report/ 的同级目录）
-│   │   │   └── report_template.html
-│   └── test/                     # 测试
-│       ├── __init__.py
-│       └── test_*.py（26 个）
-├── data/
-│   ├── holdings/                 # 持仓 xlsx 文件
-│   ├── cache/                    # API 响应缓存
-│   └── config/                   # 配置文件（config.json, llm_key.json, llm_settings.json）
-├── reports/                      # 生成报告（最新版+按日期存档）
-├── logs/                         # 程序日志（app.log）
+│   │   └── report/               # 报告生成
+│   └── test/                     # 测试（26 个 test_*.py）
+├── data/                         # 运行时数据
+├── reports/                      # 生成报告
+├── logs/                         # 程序日志
 ├── docs-stm/                     # 项目管理文档
-│   ├── plan/                     # 计划/设计文件
-│   ├── tmp/                      # 临时/过程文件
-│   └── managements/
-│       ├── plan.md               # 实现计划
-│       ├── requirements.md       # 需求文档
-│       ├── testplan.md           # 测试计划
-│       ├── changelog.md          # 变更日志
-│       └── review-findings.md    # 自审记录
-├── scripts/
-│   ├── launch.ps1                # Windows 启动脚本
-│   └── launch.sh                 # Linux 启动脚本
-├── CLAUDE.md                     # Claude Code 指引
-├── README.md                     # 用户文档（项目根目录）
-└── requirements.txt
+├── scripts/                      # 启动脚本
+├── CLAUDE.md / README.md / requirements.txt
 ```
+
+> 完整目录树（含所有 providers/ 和 report/ 子文件）见 [数据源一览 & 目录结构](../manuals/datasource-and-folders.md#目录结构)。
 
 ---
 

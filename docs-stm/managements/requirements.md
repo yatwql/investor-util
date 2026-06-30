@@ -69,122 +69,45 @@
 
 ## 5. 缓存策略
 
-缓存统一存放在 `data/cache/` 目录，采用 JSON 格式，由 `src/python/cache.py` 提供泛用键值对存储接口。缓存分为三个层级，各有不同的生命周期和刷新策略。
+缓存统一存放在 `data/cache/` 目录，采用 JSON/JSON.GZ 格式，由 `src/python/cache.py` 提供泛用键值对存储接口。
 
-### 5.1 缓存文件清单及命名规则
+### 5.1 三层缓存架构
 
-#### 合并缓存文件（菜单手动生成 + 自动管理）
-
-| 文件名 | 使用目的 | 有效期限 | 刷新方式 |
-|---|---|---|---|
-| `fund_benchmarks.json` | 业绩比较基准对照表——每只基金的比较基准名称 | 30 天 | 自动 + [1] 刷新；持仓变更时自动清除 |
-| `holdings_tracking.json` | 持仓指纹跟踪——MD5 指纹 + 代码集合，用于变更检测 | 永久，随持仓更新 | 每次检测持仓变化后自动更新 |
-
-#### 单条缓存文件（引擎自动管理）
-
-命名规则：`{类型前缀}_{证券代码}.json` 或 `{类型前缀}_{特征值}.json`
-
-| 文件名模式 | 使用目的 | 默认 TTL |
-|---|---|---|
-| `price_{code}.json` | **单只股票/基金的最新价、昨收盘、净值日期**。fetcher 自动读写，需区分场内/场外取价链路。文件如 `price_600900.json` | 24 小时 |
-| `index_{code}.json` | **A股/美股市场指数行情**（指数名称、最新价、涨跌幅）。文件如 `index_sh000001.json` | 24 小时 |
-| `fund_perf_{code}.json` | **单只基金同类排名和区间收益率**（近3月/近6月/近1年），含同类排名百分位、超额收益评分。文件如 `fund_perf_000961.json` | 24 小时 |
-| `fund_hold_{code}.json` | **单只基金的前10大持仓明细**（名称、代码、持仓比例），用于穿透深度分析和板块分类。文件如 `fund_hold_012325.json` | 7 天 |
-| `industry_{code}.json` | **单只证券的行业分类和概念板块归属**（三级行业名称 + 概念板块列表），用于新闻关键词富化和穿透板块补充。文件如 `industry_600900.json` | 7 天 |
-| `llm_global_macro_{fingerprint}.json` | **全球政经局势 LLM 分析结果**。文件名含指数行情 + 持仓汇总的 MD5 指纹；指数或持仓变化时原缓存自动失效 | 24 小时（可配置） |
-| `llm_expert_review_{fingerprint}.json` | **智囊团深度复盘 LLM 分析结果**。文件名含持仓汇总+分类+穿透+持仓明细（名称/代码/成本）的 MD5 指纹，剔除单品行情波动字段（change_pct/实时价）；持仓品种或成本变化时原缓存自动失效，单纯行情波动不影响 | 2 小时（可配置） |
-| `llm_health_check_{fingerprint}.json` | **持仓体检报告 LLM 分析结果**。同智囊团指纹策略，排除行情波动字段。四维度打分+改进建议 | 2 小时（可配置） |
-| `llm_penetration_deep_{fingerprint}.json` | **穿透深度分析 LLM 分析结果**。行业集中度+品种集中度+国别/币种暴露，排除行情波动字段 | 24 小时（可配置） |
-| `news_{md5}.json` | **多源新闻聚合结果**。5 源（新浪/东方财富/财联社/华尔街见闻/akshare）并行获取后去重、关键词关联、排序。文件名含输入参数 MD5 指纹，参数变化时自动失效 | 15 分钟（可配置） |
-| `llm_news_item_{hash}.json` | **LLM 新闻逐条缓存**。每篇新闻文章的独立 LLM 关联分析结果（关联度+情绪+分析），指纹基于标题前 80 字+持仓指纹；新文章仅新增文件的缓存缺失，已缓存的文章不受影响 | 1 小时（可配置，数据类为 `llm_news_correlation`） |
-| `profit_forecast_{fingerprint}.json` | **机构盈利预测全量数据**。调用 akshare 获取所有股票的研报覆盖、预测 EPS、机构评级。文件名含指数 MD5 指纹，指数变化时自动失效 | 24 小时（可配置） |
-| `sector_flow_{fingerprint}.json` | **行业资金流向排名**。今日行业资金流向（主力净流入/涨跌幅等）。文件名含指数 MD5 指纹，指数变化时自动失效 | 15 分钟（可配置） |
-| `dividend_{fingerprint}.json` | **股票历史分红数据**。持仓及穿透 TOP10 A 股代码的历年分红汇总。文件名含代码列表 MD5 指纹，持仓/穿透变化时自动失效 | 30 天（可配置） |
+| 层级 | 管理方式 | 示例 |
+|------|---------|------|
+| **单条缓存**（引擎自动管理） | `{类型前缀}_{键名}.json`，按 TTL 自动过期 | `price_600900.json`、`llm_global_macro_{fingerprint}.json` |
+| **合并缓存**（菜单手动生成 + 自动管理） | 固定文件名，跨会话复用 | `fund_benchmarks.json`（30天）、`holdings_tracking.json`（永久） |
+| **进程级内存缓存**（memo） | 同一会话内减少文件 IO，短 TTL | 指数数据 60s、盈利预测 5min、分红 10min |
 
 ### 5.2 指纹驱动失效机制
 
-以下缓存文件在文件名中**内嵌 MD5 指纹**。当指纹的输入源数据发生变化时，下次读取时的缓存键与已有文件不匹配，等效于"缓存未命中"，自动使用新数据。**无需手动清除缓存即可刷新。**
+核心策略：文件名中内嵌 **MD5 指纹**，输入源数据变化时缓存键自动不匹配，等效于"缓存未命中"，无需手动清除。
 
-#### 指纹类型总览
+| 指纹类型 | 指纹来源 | 作用范围 |
+|---------|---------|---------|
+| **指数指纹** | A股 + 美股指数行情 | `profit_forecast_*`、`sector_flow_*` |
+| **代码列表指纹** | 持仓+穿透 A 股代码排序 MD5 | `dividend_*` |
+| **输入参数指纹** | 新闻源参数 + 关键词 | `news_*` |
+| **输入数据指纹** | 指数+持仓汇总/持仓结构 | `llm_global_macro_*`、`llm_expert_review_*`、`llm_health_check_*`、`llm_penetration_deep_*`、`llm_news_item_*` |
 
-| 指纹类型 | 指纹来源 | 用途 | 所在缓存文件 |
-|---------|---------|------|------------|
-| **指数指纹** | A股指数 + 美股指数（`_compute_index_fingerprint`） | 市场指数变化时失效 | `profit_forecast_{fingerprint}`、`sector_flow_{fingerprint}` |
-| **代码列表指纹** | 持仓+穿透 A 股代码排序后的 MD5（`_compute_dividend_fingerprint`） | 持仓/穿透品种变化时失效 | `dividend_{fingerprint}` |
-| **输入参数指纹** | 新闻源参数 + 关键词的 MD5（`_compute_fingerprint`） | 新闻参数或持仓变化时失效 | `news_{md5}` |
-| **输入数据指纹** | 指数+持仓汇总/持仓结构等（`_compute_fingerprint` / `_expert_fingerprint` / `_health_check_fingerprint` / `_penetration_deep_fingerprint`） | 指数波动/持仓变化时失效 | `llm_global_macro_{fingerprint}`、`llm_expert_review_{fingerprint}`、`llm_news_item_{hash}`、`llm_health_check_{fingerprint}`、`llm_penetration_deep_{fingerprint}` |
+> **TTL 兜底**：即使指纹未变，缓存文件仍有 TTL 到期自动刷新。
+> **LLM 指纹策略**：智囊团深度复盘、持仓体检报告、穿透深度分析排除行情波动字段（price/change_pct），仅品种/份额/成本变化时失效。
+> **交易时段短 TTL**：`price` 和 `index` 在 A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s），盘后回落常规 TTL。
 
-#### 各指纹的详细构成
-
-- **指数指纹**：`json.dumps([a_indices, us_indices])` → MD5 前 12 位。A 股 5 大指数 + 美股 3 大指数任一变化 → 指纹改变 → profit_forecast/sector_flow 缓存自动失效
-- **代码列表指纹**：`json.dumps(sorted(set(codes)))` → MD5 前 12 位。持仓文件新增/移除了 A 股代码、或穿透 TOP10 发生变化 → 指纹改变 → dividend 缓存自动失效
-- **全球政经局势指纹**：A 股/美股指数行情 + 持仓汇总（总市值/总成本/总盈亏/分类）→ `_compute_fingerprint()` 生成
-- **智囊团深度复盘指纹**：持仓汇总（总市值/总成本/总盈亏/本日盈亏）+ 分类计数 + 穿透 TOP10 + 持仓明细（名称/代码/成本），剔除单品行情波动字段（market_value/profit/change_pct），仅品种/份额/成本变化才会失效
-- **持仓体检报告指纹**：同智囊团策略，排除行情波动字段 → `_health_check_fingerprint()` 生成
-- **穿透深度分析指纹**：同智囊团策略，排除行情波动字段 → `_penetration_deep_fingerprint()` 生成
-- **财经新闻热点与持仓关联分析指纹**：关键词 + 持仓汇总 → `_compute_fingerprint()` 生成
-- **新闻聚合指纹**：新闻源参数 + 关键词集合 → `hashlib.md5` 生成，`{md5}` 为完整 32 位指纹
-
-**TTL 兜底：** 即使指纹未变（源数据无变化），缓存文件仍有 TTL 到期自动刷新，防止数据"永久有效"。
-
-**无指纹（固定键名）的缓存：** `price_{code}`、`index_{code}`、`fund_perf_{code}`、`fund_hold_{code}`、`industry_{code}`、`fund_benchmarks`、`holdings_tracking` — 纯 TTL 管理。`holdings_tracking` 内部存了指纹用于变更检测，但键名本身固定。`llm_*`（通用 LLM 缓存兜底）也无指纹，仅在其他 LLM 类型未匹配时生效。
-
-### 5.3 主动失效链路（自动触发）
-
-以下场景会**自动**触发相关缓存失效，无需用户进入菜单：
-
-1. **持仓文件发生变更**（新增品种/清仓/修改份额）：
-   - `check_and_refresh_caches()` 检测到 MD5 指纹变化
-   - 自动清除关联的 `fund_benchmarks.json` 和 `industry_*` 缓存
-   - 新增资产的 `price_*`、`fund_perf_*`、`fund_hold_*`、`industry_*` 自动预热（避免首次取价延迟）
-   - 更新 `holdings_tracking.json` 中的指纹和代码集合
-2. **LLM 缓存指纹失效**：
-   - 全球政经局势：指数行情或持仓汇总数据变化后，指纹与旧缓存不匹配
-   - 智囊团深度复盘：持仓品种/份额/成本变化后指纹自动失效；单品行情波动（价格/涨跌幅）不影响
-   - 下次生成 L 菜单时自然使用新数据
-3. **菜单 [2] 主动清除**：
-   - 同时清除 `llm_expert_review_*`（智囊团深度复盘）、`llm_global_macro_*`（全球政经局势）、
-     `llm_health_check_*`（持仓体检报告）和 `llm_penetration_deep_*`（穿透深度分析）缓存
-   - 确保下次 L 菜单强制使用最新数据
-
-### 5.4 TTL 常量对照表
-
-| 类别 | 数据类型键 | 默认 TTL | 对应缓存文件 | 指纹 |
-|---|---|---|---|---|
-| 价格行情 | `price` | 86400 秒（24 小时，交易时段内 30s） | `price_{code}.json` | — |
-| 市场指数 | `index` | 86400 秒（24 小时，交易时段内 30s） | `index_{code}.json` | — |
-| 基金业绩 | `rank` | 86400 秒（24 小时） | `fund_perf_{code}.json` | — |
-| 持仓数据 | `hold` | 604800 秒（7 天） | `fund_hold_{code}.json` | — |
-| 行业分类 | `industry` | 604800 秒（7 天） | `industry_{code}.json` | — |
-| 新闻聚合 | `news` | 900 秒（15 分钟） | `news_{md5}.json` | 输入参数指纹 |
-| 新闻 LLM 关联分析 | `llm_news_correlation` | 3600 秒（1 小时） | `llm_news_item_{hash}.json`（逐条） | 标题前 80 字+持仓指纹 |
-| LLM 全局（通用） | `llm` | 86400 秒（24 小时） | `llm_*` | —（兜底） |
-| 全球政经局势（LLM） | `llm_global_macro` | 86400 秒（24 小时） | `llm_global_macro_{fingerprint}.json` | 指数+持仓指纹 |
-| 智囊团深度复盘（LLM） | `llm_expert_review` | 7200 秒（2 小时） | `llm_expert_review_{fingerprint}.json` | 持仓结构指纹 |
-| 持仓体检报告（LLM） | `llm_health_check` | 7200 秒（2 小时） | `llm_health_check_{fingerprint}.json` | 持仓结构指纹 |
-| 穿透深度分析（LLM） | `llm_penetration_deep` | 86400 秒（24 小时） | `llm_penetration_deep_{fingerprint}.json` | 持仓结构指纹 |
-| 基准数据 | `benchmark` | 2592000 秒（30 天） | `fund_benchmarks.json` | — |
-| 机构盈利预测 | `profit_forecast` | 86400 秒（24 小时） | `profit_forecast_{fingerprint}.json` | 指数指纹 |
-| 行业资金流向 | `sector_flow` | 900 秒（15 分钟） | `sector_flow_{fingerprint}.json` | 指数指纹 |
-| 股票历史分红 | `dividend` | 2592000 秒（30 天） | `dividend_{fingerprint}.json` | 代码列表指纹 |
-
-**TTL 优先级链（按优先级从高到低）：**
-1. `config.json` 中的 `cache_ttl.<data_type>`（显式配置）
-2. **交易时段覆盖**：`config.json` 中 `market_hour_aware` 数组内声明的类型（如 `price`、`index`），在 A 股交易时段（09:30–11:30 + 13:00–15:00，多渠道判断：config 覆盖 → 东方财富 push2 API → 内置默认）内使用 `market_hour_ttl`（默认 30s）替代常规 TTL。收盘后用回常规 TTL
-3. 代码内置默认值（如上表）
-
-### 5.5 手动刷新
+### 5.3 手动刷新
 
 | 菜单 | 功能 | 清除范围 |
 |---|---|---|
-| `[1] 更新基础类缓存` | 主动刷新基金业绩排名、持仓明细、业绩基准、行业分类、新闻、新闻 LLM 关联分析、盈利预测、行业资金流向、分红数据 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_item_*`、`profit_forecast_*`、`sector_flow_*`、`dividend_*` |
-| `[2] 更新持仓类缓存` | 主动刷新价格/指数行情，并清除关联 LLM 缓存 | `price_*`、`index_*`、`llm_expert_review_*`、`llm_global_macro_*`、`llm_health_check_*`、`llm_penetration_deep_*` |
-| `[3] 清理过期缓存文件` | 扫描全目录，按文件名前缀匹配各自 TTL，删除过期文件 | 全部过期缓存 |
-| `[4] 查看缓存统计信息` | 显示缓存总数/总大小/按前缀分类统计 | 只读不删 |
+| `[1] 更新基础类缓存` | 基金业绩/持仓/基准/行业/新闻/新闻 LLM/盈利预测/资金流向/分红 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_item_*`、`profit_forecast_*`、`sector_flow_*`、`dividend_*` |
+| `[2] 更新持仓类缓存` | 价格/指数行情，并清除关联 LLM 缓存 | `price_*`、`index_*`、`llm_*`（四大分析模块） |
+| `[3] 清理过期缓存` | 按 TTL 扫描删除过期文件 | 全部过期缓存 |
+| `[4] 查看缓存统计` | 只读统计 | — |
 
-### 5.6 降级规则
+### 5.4 降级规则
 
 缓存过期但 API 请求失败时使用最近 **7 天内**的过期缓存数据；缓存文件损坏时自动删除并触发重新获取。
+
+> 完整缓存文件清单（含 TTL 表、文件名模式、指纹机制）见 [配置指南 cache_ttl 章节](../manuals/how-to-config.md#cache_ttl-可调参数)。
 
 ---
 
@@ -270,33 +193,11 @@
 
 **业绩评价标签标准（三层计算逻辑）：**
 
-**第 1 层：基础评级** — 基于同类排名百分位，数据来源于天天基金 API（`Data_rateInSimilarPersent`）：
+1. **基础评级** — 基于同类排名百分位：≤20%=优秀、20%~30%=良好、30%~50%=稳定、>50%=偏差
+2. **超额收益修正** — 超额收益评分≥80 上调一级、40~80 维持、<40 下调一级
+3. **显示与标色** — 优秀=红色、良好=默认、稳定=蓝色、偏差=绿色
 
-| 排名百分位 | 基础标签 |
-|---|---|
-| ≤ 20%（前 1/5） | 优秀 |
-| 20% ~ 30% | 良好 |
-| 30% ~ 50% | 稳定 |
-| > 50%（后 1/2） | 偏差 |
-
-API 无百分位数据时降级使用排名/总数折算百分位。
-
-**第 2 层：超额收益修正** — 基于 `Data_performanceEvaluation` 中的超额收益评分：
-
-| 超额收益评分 | 修正规则 |
-|---|---|
-| ≥ 80 | 基础评级上调一级（如 良好 → 优秀） |
-| 40 ~ 80 | 不调整，维持基础评级 |
-| < 40 | 基础评级下调一级（如 稳定 → 偏差） |
-
-**第 3 层：显示文本** — 标签转换为带说明的字符串：
-
-| 最终标签 | 显示文本 | Excel/HTML标色 |
-|---|---|---|
-| 优秀 | "优秀 持续跑赢基准，超额收益显著" | 红色 (#CC0000) |
-| 良好 | "良好 稳定跑赢基准，组合管理得当" | 默认 |
-| 稳定 | "稳定 收益率稳健，波动控制良好" | 蓝色 (#0066CC) |
-| 偏差 | "偏差 近期表现欠佳，需关注持仓变化" | 绿色 (#009900) |
+> 三层评价的完整评分表和颜色编码详见 [报告文件结构章节](../manuals/reports-instruction.md#基金业绩评价标准)。
 
 **同类排名**：格式为"排名/总数"，如"23/156"。排名和总数来源于 API 返回的 `Data_rateInSimilarType` 最近一期数据。
 
@@ -309,12 +210,9 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 - 穿透 TOP10 底层资产的名称和代码（需先计算穿透数据）
 - 东方财富三级行业名称和概念板块名称（自动从 API 获取，用于扩展关键词匹配范围）
 
-新闻来源（5 个财经源并行获取、去重后排序）：
-1. **新浪财经** — `feed.mix.sina.com.cn`（财经要闻/国内财经/国际财经 3 分类）
-2. **东方财富** — `np-weblist.eastmoney.com/comm/web/getFastNewsList`（快讯接口 JSON）
-3. **财联社** — `www.cls.cn/v1/roll/get_roll_list`（7x24 实时财经快讯）
-4. **华尔街见闻** — `api-one.wallstcn.com/apiv1/content/lives`（全球财经直播流，无需鉴权）
-5. **akshare** — 封装财新网 `stock_news_main_cx()` 和 CCTV `news_cctv()`，开源库自动适配底层 API
+新闻来源（5 个财经源并行获取、去重后排序）：新浪财经、东方财富、财联社、华尔街见闻、akshare（财新网/CCTV）。
+
+> 各新闻源的完整 API 端点格式见 [数据源一览](../manuals/datasource-and-folders.md)。
 
 关联规则：对每条新闻的 title + intro 与关键词全集做子串匹配，按匹配到的关键词数量降序排列，去重后输出 TOP N。
 
@@ -347,46 +245,36 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 - 算法：按持仓代码聚合 → 统计利好/利空/中性数量 → 计算情绪得分（-1~1）→ 生成情绪标签（偏利好/偏利空/中性）
 - 输出：情绪聚合表格（持仓品种、提及次数、利好/利空/中性计数、情绪得分、最新要闻 TOP3）
 
-- **Excel**：通过菜单 B/L 生成「11.智能预警」页签 ✅（自动附带，无须额外操作）
+- **Excel**：通过菜单 B/L 生成「7.智能预警」页签 ✅（自动附带，无须额外操作）
 - **HTML**：自动渲染在报告第 7 节（财经新闻热点与持仓关联分析之后，全球政经局势之前）✅
 
 #### 全球政经局势（Excel + HTML — LLM 增补项目）
 
-在有 LLM 支持下的增补内容。基于市场数据和持仓结构生成全球政经局势分析（HTML ✅，Excel ✅）。
-通过菜单 L 生成「7.全球政经局势」页签/章节。
+在有 LLM 支持下的增补内容。基于市场数据和持仓结构生成全球政经局势分析。
+通过菜单 L 生成「8.全球政经局势」页签/章节。
 
-**生成逻辑：** `generate_global_macro()` 读取指数行情 + 持仓汇总，调用 LLM 生成 500 字全球政经局势分析。
+**生成逻辑：** `generate_global_macro()` 读取指数行情 + 持仓汇总，调用 LLM 生成分析。
 缓存策略：24 小时 TTL，指数/持仓变化时指纹自动失效。
-​
-**配置项：** `llm_settings.json` 中 `model_global_macro` / `temperature_global_macro`（默认 0.3）/
-`max_tokens_global_macro`（默认 1024）/ `cache_enabled_global_macro`（默认 true）
 
 #### 智囊团深度复盘（Excel + HTML — LLM 增补项目）
 
-在有 LLM 支持下的增补内容。基于持仓明细和盈亏数据生成优化建议和风险预警（HTML ✅，Excel ✅）。
-通过菜单 L 生成「8.智囊团深度复盘」页签/章节。
+在有 LLM 支持下的增补内容。基于持仓明细和盈亏数据生成优化建议和风险预警。
+通过菜单 L 生成「9.智囊团深度复盘」页签/章节。
 
 **生成逻辑：** `generate_expert_review()` 模拟三阶段圆桌会议：召集令→辩论→定音锤，
 输出调仓建议和风险预警。缓存策略 2 小时 TTL，指纹排除行情波动字段。
-
-**配置项：** `llm_settings.json` 中 `model_expert_review` / `temperature_expert_review`（默认 0.8）/
-`max_tokens_expert_review`（默认 8192）/ `thinking_enabled_expert_review`（默认 true）
 
 #### 持仓体检报告（Excel + HTML — LLM 增补项目，v0.2.29+）
 
 在有 LLM 支持下的增补内容。从风险分散度、流动性、收益合理性、成本结构四个维度
 对投资组合进行量化打分（每项满分 100）并给出改进建议。
 
-- **Excel**：通过菜单 L 生成「9.持仓体检报告」页签 ✅
+- **Excel**：通过菜单 L 生成「10.持仓体检报告」页签 ✅
 - **HTML**：通过菜单 L 渲染在报告第 9 节 ✅
 
 **生成逻辑：** `generate_health_check()` 复用现有持仓数据（市值核算明细 + 穿透 TOP10 +
 分类计数），缓存策略同智囊团（2 小时 TTL，指纹排除行情波动字段）。每个维度独立评分，
 最终输出综合评分和评级（优/良/中/差）及 3-5 条具体可操作建议。
-
-**配置项：** `llm_settings.json` 中 `model_health_check` / `temperature_health_check`（默认 0.5）/
-`max_tokens_health_check`（默认 4096）/ `thinking_enabled_health_check`（默认 true）/
-`thinking_budget_health_check`（默认 12000）
 
 #### 穿透深度分析（Excel + HTML — LLM 增补项目，v0.2.30+）
 
@@ -396,16 +284,12 @@ API 无百分位数据时降级使用排名/总数折算百分位。
   当某行业占比 > 30% 时标注集中度风险
 - **国别/币种暴露**：QDII/港股通/美股/A 股按币种分类，计算外汇风险敞口百分比，
   输出分散化建议
-- **Excel**：通过菜单 L 生成「10.穿透深度分析」页签 ✅
+- **Excel**：通过菜单 L 生成「11.穿透深度分析」页签 ✅
 - **HTML**：通过菜单 L 渲染在报告第 10 节 ✅
 
 **生成逻辑：** `generate_penetration_deep_analysis()` 复用穿透 TOP10 + 行业分类数据，
 计算行业集中度和国别/币种暴露度。缓存策略 24 小时 TTL，指纹排除行情波动字段。
 每个维度输出分析和建议。
-
-**配置项：** `llm_settings.json` 中 `model_penetration_deep` / `temperature_penetration_deep`（默认 0.4）/
-`max_tokens_penetration_deep`（默认 4096）/ `thinking_enabled_penetration_deep`（默认 false）/
-`thinking_budget_penetration_deep`（默认 8000）
 
 ---
 
@@ -413,25 +297,9 @@ API 无百分位数据时降级使用排名/总数折算百分位。
 
 详见 [plan.md](plan.md)「关键技术决策」和「当前配置架构」章节。
 
-用户配置指南（Provider 配置、llm_key.json / llm_settings.json 字段说明、推荐参数、
-Extended Thinking 详解、定价表等）详见 [LLM 配置指引](../manuals/how-to-config-llm.md)。
-
-**核心配置层次（v0.2.15+）：**
-
-| 文件 | 内容 | 用途 |
-|------|------|------|
-| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段 | API 调用渠道（provider/api_key/model/endpoint + fallback_*） |
-| `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature/timeout/cache/system_prompt/thinking 等） |
-
-**逐章节模型路由（v0.2.17+）：** 支持对五个 LLM 章节分别指定不同模型，
-通过 `llm_settings.json` 中的 `model_global_macro` / `model_expert_review` /
-`model_news_correlation` / `model_health_check` / `model_penetration_deep` 字段设置，
-为 `null` 时统一使用 `llm_key.json` 中的默认 `model`。
-
-**Extended Thinking（v0.2.22+）：** 支持 Claude（`thinking.budget_tokens`）和
-DeepSeek（`reasoning_effort`）两种模式。配置项：`thinking_enabled_{模块}`、
-`thinking_budget_{模块}`（仅 Claude）、`reasoning_effort_{模块}`（仅 DeepSeek）。
-详见 [LLM 配置指引 Extended Thinking 章节](../manuals/how-to-config-llm.md#extended-thinking)。
+> 用户配置指南（Provider 配置、llm_key.json / llm_settings.json 字段说明、推荐参数、
+Extended Thinking 详解、定价表等）及本章各模块的完整配置项（model_* / temperature_* / max_tokens_* 等）
+详见 [LLM 配置指引](../manuals/how-to-config-llm.md)。
 
 ---
 
