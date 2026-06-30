@@ -75,18 +75,23 @@ def _print_session_usage_on_exit() -> None:
 
 def _bind_callbacks() -> None:
     """运行时将函数引用填入 MENU_ITEMS。"""
-    from src.python.tui_handlers import (
+    from src.python.tui_handlers import _execute_item
+    from src.python.handlers_report import (
         _cmd_generate_excel,
         _cmd_generate_html,
         _cmd_generate_both,
         _cmd_generate_full,
-        _cmd_config_dir,
-        _cmd_config_filename,
-        _cmd_config_output_dir,
+    )
+    from src.python.handlers_cache import (
         _cmd_update_basic_cache,
         _cmd_update_position_cache,
         _cmd_cleanup_cache,
         _cmd_show_cache_stats,
+    )
+    from src.python.handlers_config import (
+        _cmd_config_dir,
+        _cmd_config_filename,
+        _cmd_config_output_dir,
         _cmd_config_llm_modules,
         _cmd_refresh_config,
     )

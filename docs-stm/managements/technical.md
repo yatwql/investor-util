@@ -121,22 +121,27 @@ investor-util/
 │   ├── __init__.py
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
-│   │   ├── main.py               # TUI 入口 + 菜单循环
 │   │   ├── config.py             # 配置读写
 │   │   ├── registry.py           # 中央注册表
 │   │   ├── cache.py              # 缓存引擎
-│   │   ├── fetcher/               # 数据获取调度
-│   │   ├── reader.py             # 持仓 Excel 解析
-│   │   ├── llm/                  # LLM 集成（9 子模块）
 │   │   ├── constants.py          # 共享常量
-│   │   ├── models.py             # 数据模型
+│   │   ├── fetcher/               # 数据获取调度
+│   │   ├── handlers_cache.py     # TUI 缓存管理命令
+│   │   ├── handlers_config.py    # TUI 配置管理命令
+│   │   ├── handlers_report.py    # TUI 报告生成命令
+│   │   ├── llm/                  # LLM 集成（9 子模块）
 │   │   ├── logger.py             # 日志模块
-│   │   ├── tui.py                # 键盘输入封装
-│   │   ├── tui_menu.py           # 菜单交互
-│   │   ├── tui_handlers.py       # 菜单功能执行
+│   │   ├── main.py               # TUI 入口 + 菜单循环
+│   │   ├── market_hours.py       # A 股交易时段判断
+│   │   ├── models.py             # 数据模型
 │   │   ├── providers/            # 数据源提供商
-│   │   └── report/               # 报告生成
-│   └── test/                     # 测试（30 个 test_*.py）
+│   │   ├── reader.py             # 持仓 Excel 解析
+│   │   ├── registry.py           # 中央注册表
+│   │   ├── report/               # 报告生成
+│   │   ├── tui.py                # 键盘输入封装
+│   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
+│   │   └── tui_menu.py           # 菜单交互
+│   └── test/                     # 测试（34 个 test_*.py）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志

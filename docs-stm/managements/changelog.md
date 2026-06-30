@@ -4,6 +4,17 @@
 
 ---
 
+## [0.2.47] - 2026-07-01
+
+### Changed
+- **`cache.py` 交易时段判断提取为独立模块 `market_hours.py`（R-019 ✅）**：`_is_market_open()` 及其 5 个辅助函数（`_parse_time_to_minutes`、`_fetch_trading_status_from_official`、`_is_market_open_config`、`_is_market_open_official`、`_is_market_open_fallback`）及相关常量从 cache.py 迁入新文件 `src/python/market_hours.py`。cache.py 通过 `from src.python.market_hours import is_market_open as _is_market_open` 引用。测试文件同步更新 mock 路径。
+- **`tui_handlers.py` 拆分（R-018 ✅）**：按职责拆为 `handlers_report.py`（报告生成，357 行）、`handlers_cache.py`（缓存管理，335 行）、`handlers_config.py`（配置管理，182 行）。`tui_handlers.py` 从 1147 行降至 234 行（-80%），保留菜单调度 + 通用辅助函数。`main.py` 导入目标改为各 handlers 模块。
+
+### Docs
+- **review-findings.md**：R-018 ✅、R-019 ✅ 标记已完成，全部待办问题清空。
+- **technical.md**：项目结构树新增 `market_hours.py`、`handlers_report.py`、`handlers_cache.py`、`handlers_config.py`。
+- **版本号同步**：constants.py 0.2.46→0.2.47，README.md 0.2.46→0.2.47
+
 ## [0.2.46] - 2026-07-01
 
 ### Fixed
@@ -18,6 +29,7 @@
 ### Docs
 - **review-findings.md**：R-015 ✅ 标记完成，新增 2026-07-01 R-015 完成记录。
 - **plan.md**：A. 测试覆盖补全 标记为 ✅ 已完成（v0.2.46）。
+- **technical.md**：测试文件数 30→34 同步（R-017 ✅）。
 - **版本号同步**：constants.py 0.2.45→0.2.46，README.md 0.2.45→0.2.46
 
 ## [0.2.45] - 2026-07-01

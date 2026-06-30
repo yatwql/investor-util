@@ -222,22 +222,13 @@ def generate_excel_report(
                 prog.add_error(f"LLM 分析章节生成失败: {e}")
                 global_macro_text = expert_review_text = health_check_text = penetration_deep_text = ""
 
-        # LLM 生成完成后捕获会话用量，追加到汇总页
+        # LLM 生成完成后捕获会话用量，供 LLM API 用量页签使用
         try:
             from src.python.llm import get_session_usage
             _llm_session = get_session_usage()
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键，不展示用量信息）")
             _llm_session = None
-        if _llm_session and (_llm_session.get("call_count", 0) > 0 or _llm_session.get("per_module")):
-            try:
-                from src.python.report.summary import write_llm_usage_block
-                write_llm_usage_block(ws1, _llm_session)
-                from src.python.report.excel_writer import freeze_header, auto_width
-                freeze_header(ws1, 2)
-                auto_width(ws1)
-            except (OSError, TypeError, AttributeError):
-                logger.debug("写入 LLM 用量或格式化 worksheet 失败（非关键）")
 
         # 创建 'LLM API 用量' 页签（仅 LLM 被启用时）
         try:

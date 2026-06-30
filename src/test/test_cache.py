@@ -1081,16 +1081,16 @@ class TestIsMarketOpen(unittest.TestCase):
     """测试 _is_market_open() 的多数据源与午餐排除逻辑。"""
 
     def _call_is_market_open(self, mock_now: datetime) -> bool:
-        """辅助：patch datetime.now → 调用 _is_market_open。"""
-        with patch("src.python.cache.datetime") as mock_dt:
+        """辅助：patch datetime.now → 调用 is_market_open。"""
+        with patch("src.python.market_hours.datetime") as mock_dt:
             mock_dt.now.return_value = mock_now
             mock_dt.timezone = timezone
             mock_dt.timedelta = timedelta
-            from src.python.cache import _is_market_open
+            from src.python.market_hours import is_market_open as _is_market_open
             return _is_market_open()
 
     # ── 默认 fallback（无 config、无 API） ────────────────
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_default_morning_session(self, mock_cfg, mock_fetch):
         """工作日 10:00 → 交易时段。"""
@@ -1098,7 +1098,7 @@ class TestIsMarketOpen(unittest.TestCase):
         now = datetime(2026, 6, 30, 10, 0, 0, tzinfo=timezone(timedelta(hours=8)))  # 周二
         self.assertTrue(self._call_is_market_open(now))
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_default_lunch_break(self, mock_cfg, mock_fetch):
         """工作日 12:00（午餐休市）→ 非交易时段。"""
@@ -1106,7 +1106,7 @@ class TestIsMarketOpen(unittest.TestCase):
         now = datetime(2026, 6, 30, 12, 0, 0, tzinfo=timezone(timedelta(hours=8)))
         self.assertFalse(self._call_is_market_open(now))
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_default_afternoon_session(self, mock_cfg, mock_fetch):
         """工作日 14:00 → 交易时段。"""
@@ -1114,7 +1114,7 @@ class TestIsMarketOpen(unittest.TestCase):
         now = datetime(2026, 6, 30, 14, 0, 0, tzinfo=timezone(timedelta(hours=8)))
         self.assertTrue(self._call_is_market_open(now))
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_default_after_close(self, mock_cfg, mock_fetch):
         """工作日 15:30 → 非交易时段。"""
@@ -1122,7 +1122,7 @@ class TestIsMarketOpen(unittest.TestCase):
         now = datetime(2026, 6, 30, 15, 30, 0, tzinfo=timezone(timedelta(hours=8)))
         self.assertFalse(self._call_is_market_open(now))
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_default_weekend(self, mock_cfg, mock_fetch):
         """周六 → 非交易时段。"""
@@ -1130,7 +1130,7 @@ class TestIsMarketOpen(unittest.TestCase):
         now = datetime(2026, 7, 4, 10, 0, 0, tzinfo=timezone(timedelta(hours=8)))  # 周六
         self.assertFalse(self._call_is_market_open(now))
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_default_before_open(self, mock_cfg, mock_fetch):
         """工作日 09:00 → 非交易时段。"""
@@ -1139,7 +1139,7 @@ class TestIsMarketOpen(unittest.TestCase):
         self.assertFalse(self._call_is_market_open(now))
 
     # ── config.json 覆盖 ─────────────────────────────────
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_config_override_start_end(self, mock_cfg, mock_fetch):
         """配置 market_hours.start=08:00, end=16:00 → 覆盖默认值。"""
@@ -1150,7 +1150,7 @@ class TestIsMarketOpen(unittest.TestCase):
         now = datetime(2026, 6, 30, 8, 30, 0, tzinfo=timezone(timedelta(hours=8)))
         self.assertTrue(self._call_is_market_open(now))
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_config_override_outside(self, mock_cfg, mock_fetch):
         """配置 market_hours.start=10:00 → 09:30 不算交易时段。"""
@@ -1160,7 +1160,7 @@ class TestIsMarketOpen(unittest.TestCase):
         now = datetime(2026, 6, 30, 9, 30, 0, tzinfo=timezone(timedelta(hours=8)))
         self.assertFalse(self._call_is_market_open(now))
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.config.get_config")
     def test_config_override_empty_ignored(self, mock_cfg, mock_fetch):
         """配置 market_hours 无 start/end → 降级到默认值。"""
@@ -1171,7 +1171,7 @@ class TestIsMarketOpen(unittest.TestCase):
         self.assertTrue(self._call_is_market_open(now))
 
     # ── 官方 API 状态 ─────────────────────────────────────
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.cache.get")
     @patch("src.python.cache.set")
     @patch("src.python.config.get_config")
@@ -1184,7 +1184,7 @@ class TestIsMarketOpen(unittest.TestCase):
         self.assertTrue(self._call_is_market_open(now))
         mock_set.assert_called_once()
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.cache.get")
     @patch("src.python.cache.set")
     @patch("src.python.config.get_config")
@@ -1196,7 +1196,7 @@ class TestIsMarketOpen(unittest.TestCase):
         now = datetime(2026, 6, 30, 15, 30, 0, tzinfo=timezone(timedelta(hours=8)))
         self.assertFalse(self._call_is_market_open(now))
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.cache.get")
     @patch("src.python.config.get_config")
     def test_api_cached_trading(self, mock_cfg, mock_get, mock_fetch):
@@ -1207,7 +1207,7 @@ class TestIsMarketOpen(unittest.TestCase):
         self.assertTrue(self._call_is_market_open(now))
         mock_fetch.assert_not_called()
 
-    @patch("src.python.cache._fetch_trading_status_from_official", return_value=None)
+    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.cache.get")
     @patch("src.python.config.get_config")
     def test_api_cached_closed(self, mock_cfg, mock_get, mock_fetch):
@@ -1222,13 +1222,13 @@ class TestParseTimeToMinutes(unittest.TestCase):
     """测试 _parse_time_to_minutes 工具函数。"""
 
     def test_normal(self):
-        from src.python.cache import _parse_time_to_minutes
+        from src.python.market_hours import _parse_time_to_minutes
         self.assertEqual(_parse_time_to_minutes("09:30"), 570)
         self.assertEqual(_parse_time_to_minutes("15:00"), 900)
         self.assertEqual(_parse_time_to_minutes("00:00"), 0)
 
     def test_invalid_format(self):
-        from src.python.cache import _parse_time_to_minutes
+        from src.python.market_hours import _parse_time_to_minutes
         self.assertIsNone(_parse_time_to_minutes(""))
         self.assertIsNone(_parse_time_to_minutes("abc"))
         self.assertIsNone(_parse_time_to_minutes("09:"))

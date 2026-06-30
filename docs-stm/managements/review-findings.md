@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.46 — R-015 ✅ 已完成，待办区已清空）
+最后更新：2026-07-01（v0.2.47 — 全部待办问题已修复）
 
 ---
 
@@ -31,5 +31,8 @@
 | 2026-07-01 | R-015 P3 延期，test_fund.py 已覆盖，其余后续迭代补充 | 延期决策 |
 | 2026-07-01 | 全部已修复问题移出待办区，review-findings.md 待办区清空 | 文档清理 |
 | 2026-07-01 | **R-015 ✅ 已完成** — test_api.py（44 项，含 HTTPStatusError 修复）+ test_excel_generator.py（15 项，重写 mock 策略）+ progress.py 基类错误存储修复 + reports-instruction.md LLM API 用量章节更新 | 测试覆盖完成 |
-
+| 2026-07-01 | 全量检查：technical.md 测试文件数 30→34 未更新、tui_handlers.py 1147 行文件偏大、cache.py 交易时间逻辑可提取 | 优化审查 |
+| 2026-07-01 | **汇总页移除【LLM 用量】区块**、**LLM API 用量页签排版优化**（增加区域标题、图例、间距） | 体验改进 |
+| 2026-07-01 | **R-018 ✅ tui_handlers.py 拆分**（1147→234 行，拆出 handlers_report/handlers_cache/handlers_config） | 代码质量修复 |
+| 2026-07-01 | **R-019 ✅ cache.py 交易时间逻辑提取为 market_hours.py 独立模块** | 代码质量修复 |
 

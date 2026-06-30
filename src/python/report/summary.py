@@ -392,16 +392,32 @@ def write_llm_usage_sheet(
     row = write_title_row(ws, 1, _TITLE, _NCOLS)
     row += 1  # 空行
 
-    # ── 汇总样式 ──
+    # ── 副标题说明 ──
+    _SUB_FONT = Font(size=9, color="666666")
+    ws.cell(row=row, column=1, value="以下展示本次 LLM 全量生成的 API 调用统计和模块明细，帮助了解 Token 消耗和费用构成。")
+    ws.cell(row=row, column=1).font = _SUB_FONT
+    row += 2  # 空行 + 内容行 + 空行
+
+    # ── 样式定义 ──
     _KV_KEY_FONT = Font(size=10, bold=True, color="2E75B6")
     _KV_VAL_FONT = Font(size=10)
     _THIN_BORDER = Border(
         bottom=Side(style="thin", color="d0d0d0"),
     )
     _HEADER_FILL = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+    _SECTION_FILL = PatternFill(start_color="E8F0FE", end_color="E8F0FE", fill_type="solid")
+    _SECTION_FONT = Font(size=10, bold=True, color="1A1A1A")
 
-    # ── 汇总数据（仅在有 API 调用时显示） ──
+    # ── 汇总数据区（仅在有 API 调用时显示） ──
     if llm_session_usage and llm_session_usage.get("has_usage"):
+        # 区域标题
+        for ci in range(1, 3):
+            cell = ws.cell(row=row, column=ci)
+            cell.fill = _SECTION_FILL
+        ws.cell(row=row, column=1, value="▎汇总数据").font = _SECTION_FONT
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+        row += 1
+
         _summary_pairs = [
             ("API 调用次数", f"{llm_session_usage.get('call_count', 0)} 次"),
             ("模型", llm_session_usage.get("model_display", "未指定")),
@@ -414,15 +430,25 @@ def write_llm_usage_sheet(
         if _cache_hit:
             _summary_pairs.append(("缓存命中 Token", f"{_cache_hit:,}"))
         _summary_pairs.append(("累计费用", llm_session_usage.get("cost_display", "—")))
+
         for key, val in _summary_pairs:
             c1 = ws.cell(row=row, column=1, value=key)
             c1.font = _KV_KEY_FONT
             c2 = ws.cell(row=row, column=2, value=val)
             c2.font = _KV_VAL_FONT
             row += 1
-        row += 1  # 空行
+        row += 1  # 汇总区与明细区之间的空行
 
-    # ── 模块明细表头 ──
+    # ── 各模块明细区 ──
+    # 区域标题
+    for ci in range(1, _NCOLS + 1):
+        cell = ws.cell(row=row, column=ci)
+        cell.fill = _SECTION_FILL
+    ws.cell(row=row, column=1, value="▎各模块明细").font = _SECTION_FONT
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=_NCOLS)
+    row += 1
+
+    # 明细表头
     header_font = Font(size=10, bold=True, color="333333")
     center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
     left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
@@ -445,7 +471,6 @@ def write_llm_usage_sheet(
     }
     for _mi in llm_module_info:
         if not _mi.get("status_label"):
-            # unknown 模块不显示
             continue
 
         # 模块名
@@ -463,7 +488,7 @@ def write_llm_usage_sheet(
         ws.cell(row=row, column=3, value=_mi.get("model") or "—").font = _KV_VAL_FONT
         ws.cell(row=row, column=3).alignment = left_align
 
-        # 总 Token / 输入 / 输出 / 缓存命中 Token (columns 4-7)
+        # 总 Token / 输入 / 输出 / 缓存命中 Token
         _token_fields = ["total_tokens", "input_tokens", "output_tokens", "cache_hit_tokens"]
         for ci, tf in enumerate(_token_fields, 4):
             _v = _mi.get(tf, 0)
@@ -514,9 +539,27 @@ def write_llm_usage_sheet(
 
         row += 1
 
+    # ── 图例（底部） ──
+    row += 1
+    _LEGEND_FONT = Font(size=8, color="999999")
+    ws.cell(row=row, column=1, value="状态标色说明：").font = Font(size=9, bold=True, color="999999")
+    row += 1
+    _legends = [
+        ("成功  ", "27ae60", "API 调用成功，生成正常"),
+        ("缓存  ", "2e86c1", "结果来自 LLM 缓存，未发起 API 请求"),
+        ("已禁用  ", "9ca3af", "该模块在配置中未启用"),
+        ("已失败  ", "c0392b", "API 调用失败/超时/熔断/未配置"),
+    ]
+    for _lbl, _clr, _desc in _legends:
+        c1 = ws.cell(row=row, column=1, value=_lbl)
+        c1.font = Font(size=9, color=_clr)
+        c2 = ws.cell(row=row, column=2, value=_desc)
+        c2.font = _LEGEND_FONT
+        row += 1
+
     # ── 列宽 ──
     from openpyxl.utils import get_column_letter
-    _WIDTHS = [18, 14, 24, 14, 14, 14, 16, 14, 12, 12]
+    _WIDTHS = [20, 16, 26, 16, 14, 14, 18, 16, 12, 12]
     for ci, w in enumerate(_WIDTHS, 1):
         ws.column_dimensions[get_column_letter(ci)].width = w
 

@@ -226,8 +226,7 @@ class TestGenerateExcelReport(unittest.TestCase):
                         "total_tokens": 1500, "cost_display": "¥0.002",
                         "per_module": session_usage["per_module"],
                     }
-                    with patch("src.python.report.summary.write_llm_usage_block"):
-                        with patch("src.python.report.summary.write_llm_usage_sheet"):
+                    with patch("src.python.report.summary.write_llm_usage_sheet"):
                             generate_excel_report(
                                 self.holdings, include_llm=True,
                                 llm_content=llm_content,
