@@ -598,5 +598,5 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 8. **缓存 TTL** — 在 `config.json` → `cache_ttl` 中添加 `llm_{module}` 条目
 9. **用户文档** — 在 `llm_settings.json` 中添加推荐默认值，在本文档中添加模块说明
 
-> 上述步骤中，LLM 页签标题、缓存前缀、data_type 等通过 registry 自动派生，无需额外手动注册。
+> 上述步骤中，LLM 分析章节标题、缓存前缀、data_type 等通过 registry 自动派生，无需额外手动注册。
 > 新增模块自动享受页脚格式、会话级统计、截断重试、失败降级等公共特征。

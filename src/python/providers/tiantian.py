@@ -18,6 +18,8 @@ from typing import Any
 
 import httpx
 
+from src.python.http_client import make_http_client
+
 logger = logging.getLogger("invest")
 
 _HEADERS = {
@@ -63,7 +65,7 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
     logger.debug("请求基金持仓页面: %s", url)
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, follow_redirects=True, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
             resp = client.get(url, headers=_HEADERS)
             resp.encoding = "utf-8"
             html = resp.text
@@ -220,7 +222,7 @@ def fetch_quarterly_holdings(code: str) -> dict[str, Any] | None:
             "rt": str(random.random()),
         }
         try:
-            with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+            with make_http_client(timeout=_TIMEOUT) as client:
                 resp = client.get(url, params=params, headers=headers)
                 resp.encoding = "utf-8"
                 text = resp.text
@@ -365,7 +367,7 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     logger.debug("请求基金业绩数据: %s", url)
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(url, headers=_HEADERS)
             resp.encoding = "utf-8"
             text = resp.text
@@ -404,8 +406,8 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
                 last = rank_data[-1]
                 rank_entry["rank"] = str(last.get("y", "--"))
                 rank_entry["total"] = str(last.get("sc", "--"))
-        except (json.JSONDecodeError, IndexError, TypeError):
-            pass
+        except (json.JSONDecodeError, IndexError, TypeError) as _e:
+            logger.warning("解析同类排名数据失败 (%s): %s", code, _e)
 
     # 解析排名百分位（Data_rateInSimilarPersent）
     pct_match = re.search(r"var Data_rateInSimilarPersent\s*=\s*(\[.*?\]);", text, re.DOTALL)
@@ -416,8 +418,8 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
                 last_pct = pct_data[-1]
                 if isinstance(last_pct, list) and len(last_pct) >= 2:
                     rank_entry["percentile"] = str(round(last_pct[1], 2))
-        except (json.JSONDecodeError, IndexError, TypeError):
-            pass
+        except (json.JSONDecodeError, IndexError, TypeError) as _e:
+            logger.warning("解析百分位排名数据失败 (%s): %s", code, _e)
 
     if rank_entry.get("rank") != "--" or rank_entry.get("percentile") != "--":
         rankings["同类排名"] = rank_entry
@@ -435,8 +437,8 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
                 rating = "稳定"
             else:
                 rating = "偏差"
-        except (ValueError, TypeError):
-            pass
+        except (ValueError, TypeError) as _e:
+            logger.warning("计算百分位评级失败 (%s): %s", code, _e)
     elif rank_entry.get("rank", "--") != "--" and rank_entry.get("total", "--") != "--":
         try:
             pct_val = int(rank_entry["rank"]) / int(rank_entry["total"])
@@ -448,8 +450,8 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
                 rating = "稳定"
             else:
                 rating = "偏差"
-        except (ValueError, ZeroDivisionError):
-            pass
+        except (ValueError, ZeroDivisionError) as _e:
+            logger.warning("按排名计算评级失败 (%s): %s", code, _e)
 
     # 解析业绩评价数据（Data_performanceEvaluation）
     perf_eval: dict[str, Any] | None = None
@@ -460,8 +462,8 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
         try:
             raw = pe_match.group(1)
             perf_eval = json.loads(raw)
-        except (json.JSONDecodeError, TypeError, ValueError):
-            pass
+        except (json.JSONDecodeError, TypeError, ValueError) as _e:
+            logger.warning("解析业绩评价数据失败 (%s): %s", code, _e)
 
     logger.info("基金 %s（%s）: 排名 %s/%s, 评级 %s",
                 name, code, rank_entry.get("rank", "?"), rank_entry.get("total", "?"),

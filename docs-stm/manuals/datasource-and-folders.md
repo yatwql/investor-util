@@ -31,8 +31,8 @@ investor-util/
 │   │   ├── main.py               # 入口
 │   │   ├── cache.py              # 缓存管理
 │   │   ├── config.py             # 配置文件管理
-│   │   ├── fetcher.py            # 数据获取路由
-│   │   ├── llm/                  # LLM 客户端（8 子模块：api/pricing/session/circuit_breaker/fingerprint/markdown/generators/prompts）
+│   │   ├── fetcher/               # 数据获取路由（子包：chain/price/index/fund/industry）
+│   │   ├── llm/                  # LLM 客户端（9 子模块：api/pricing/session/circuit_breaker/fingerprint/markdown/generators/prompts/skeleton）
 │   │   ├── constants.py          # 共享常量
 │   │   ├── logger.py             # 日志模块
 │   │   ├── models.py             # 数据模型

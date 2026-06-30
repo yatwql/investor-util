@@ -332,8 +332,8 @@ def write_llm_module_status_block(ws: Worksheet) -> None:
                 parts.append(f"输入{inp:,}/输出{out:,}")
             cost = pm.get("cost", 0.0)
             if cost > 0:
-                from src.python.llm.pricing import _PRICING_CURRENCY
-                symbol = {"CNY": "¥", "USD": "$"}.get(_PRICING_CURRENCY, "¥")
+                from src.python.llm.pricing import _PRICING_CURRENCY, _CURRENCY_SYMBOLS
+                symbol = _CURRENCY_SYMBOLS.get(_PRICING_CURRENCY, "¥")
                 parts.append(f"费用{symbol}{cost:.4f}")
             if pm.get("cached"):
                 parts.append("缓存")

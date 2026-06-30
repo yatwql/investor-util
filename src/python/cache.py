@@ -21,6 +21,7 @@ from datetime import datetime, timezone, timedelta
 
 from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
 from src.python.registry import get_cache_ttl_defaults, get_prefix_type_map, get_exact_type_map, get_registry
+from src.python.http_client import make_http_client
 
 _CACHE_DIR = "data/cache"
 _GZIP_THRESHOLD = 100 * 1024  # 100KB 以上的缓存自动 gzip
@@ -29,6 +30,48 @@ _GZIP_SUFFIX = ".gz"
 logger = logging.getLogger("invest")
 
 _cache_lock = threading.Lock()
+
+# ── 缓存命中率统计（线程安全） ───────────────────────────────
+_cache_stats_lock = threading.Lock()
+_cache_hits: int = 0
+_cache_misses: int = 0
+
+
+def _record_cache_hit() -> None:
+    """记录一次缓存命中（线程安全）。"""
+    global _cache_hits
+    with _cache_stats_lock:
+        _cache_hits += 1
+
+
+def _record_cache_miss() -> None:
+    """记录一次缓存未命中（线程安全）。"""
+    global _cache_misses
+    with _cache_stats_lock:
+        _cache_misses += 1
+
+
+def get_cache_hit_rate() -> dict[str, int | float]:
+    """返回缓存命中率统计。
+
+    Returns:
+        {hits, misses, total, rate}
+        rate 为 0.0~1.0 的浮点数，无可观测数据时返回 0.0
+    """
+    with _cache_stats_lock:
+        hits = _cache_hits
+        misses = _cache_misses
+    total = hits + misses
+    rate = round(hits / total, 4) if total > 0 else 0.0
+    return {"hits": hits, "misses": misses, "total": total, "rate": rate}
+
+
+def reset_cache_stats() -> None:
+    """重置缓存命中率计数器。"""
+    global _cache_hits, _cache_misses
+    with _cache_stats_lock:
+        _cache_hits = 0
+        _cache_misses = 0
 
 
 def _cache_path(key: str) -> str:
@@ -64,18 +107,22 @@ def get(key: str, max_age_seconds: float) -> Any | None:
                 logger.info("已删除损坏的缓存文件: %s", key)
             except OSError:
                 pass
+            _record_cache_miss()
             return None
 
         timestamp = data.get("_ts", 0)
         age = time.time() - timestamp
         if age > max_age_seconds:
             logger.debug("缓存 %s 已过期 (%.1fs > %.1fs)", key, age, max_age_seconds)
+            _record_cache_miss()
             return None
 
         logger.debug("缓存命中: %s (age=%.1fs, max=%.1fs)", key, age, max_age_seconds)
+        _record_cache_hit()
         return data.get("_data")
 
     if not os.path.exists(path):
+        _record_cache_miss()
         return None
 
     try:
@@ -88,15 +135,18 @@ def get(key: str, max_age_seconds: float) -> Any | None:
             logger.info("已删除损坏的缓存文件: %s", key)
         except OSError:
             pass
+        _record_cache_miss()
         return None
 
     timestamp = data.get("_ts", 0)
     age = time.time() - timestamp
     if age > max_age_seconds:
         logger.debug("缓存 %s 已过期 (%.1fs > %.1fs)", key, age, max_age_seconds)
+        _record_cache_miss()
         return None
 
     logger.debug("缓存命中: %s (age=%.1fs, max=%.1fs)", key, age, max_age_seconds)
+    _record_cache_hit()
     return data.get("_data")
 
 
@@ -477,6 +527,7 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
                 payload = json.load(f)
             prev_data = payload.get("_data")
         except (json.JSONDecodeError, OSError, KeyError):
+            logger.warning("读取持仓跟踪缓存数据失败，将重新生成")
             pass
 
     if prev_data is not None:
@@ -572,7 +623,7 @@ def _fetch_trading_status_from_official() -> int | None:
 
     params = {"secid": "1.000001", "fields": "f100,f169"}
     try:
-        with httpx.Client(timeout=5.0, verify=False) as client:
+        with make_http_client(timeout=5.0) as client:
             resp = client.get(_PUSH2_BASE, params=params, headers=_EM_HEADERS)
             data = resp.json()
             inner = data.get("data")

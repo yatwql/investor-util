@@ -2,8 +2,8 @@
 
 测试目标：
   - _strip_html — HTML 标签剥离
-  - _write_content_sheet — 段落分行、wrap_text、行高、列宽、缓存提示
-  - write_llm_sheets — 双页签写入 + 缓存标记独立
+  - _write_content_sheet — 段落分行、wrap_text、行高、列宽、footer 提取
+  - write_llm_sheets — 多页签写入 + 禁用模块处理
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -101,10 +101,10 @@ class TestWriteContentSheet(unittest.TestCase):
     def setUp(self):
         self.wb = Workbook()
 
-    def _write_and_get_sheet(self, content=None, from_cache=False):
+    def _write_and_get_sheet(self, content=None):
         """写入内容并返回 worksheet 对象。"""
         ws = self.wb.create_sheet()
-        _write_content_sheet(ws, "测试页签", content, from_cache=from_cache)
+        _write_content_sheet(ws, "测试页签", content)
         return ws
 
     def test_title_row(self):
@@ -135,7 +135,7 @@ class TestWriteContentSheet(unittest.TestCase):
         self.assertIsNone(ws.cell(row=5, column=1).value)
 
     def test_content_none_placeholder(self):
-        """content=None → A2 写入占位符，无缓存提示行。"""
+        """content=None → A2 写入占位符。"""
         ws = self._write_and_get_sheet(content=None)
         cell = ws.cell(row=2, column=1)
         self.assertIn("LLM API Key", str(cell.value))
@@ -154,26 +154,6 @@ class TestWriteContentSheet(unittest.TestCase):
         cell = ws.cell(row=2, column=1)
         self.assertEqual(cell.font.size, CONTENT_FONT.size)
         self.assertEqual(cell.font.color.rgb, CONTENT_FONT.color.rgb)
-
-    def test_from_cache_hint_row(self):
-        """from_cache=True → 段落后追加灰色缓存提示行。"""
-        ws = self._write_and_get_sheet(content="一段落话", from_cache=True)
-        # 第 2 行 = 段落, 第 3 行 = 空行, 第 4 行 = 缓存提示
-        hint_cell = ws.cell(row=4, column=1)
-        self.assertIn("LLM缓存", str(hint_cell.value))
-        self.assertTrue(hint_cell.font.italic)
-
-    def test_from_cache_false_no_hint(self):
-        """from_cache=False → 无缓存提示行。"""
-        ws = self._write_and_get_sheet(content="一段落话", from_cache=False)
-        # 第 2 行 = 段落, 第 3 行 = 空行, 第 4 行应为空
-        self.assertIsNone(ws.cell(row=4, column=1).value)
-
-    def test_content_none_no_cache_hint(self):
-        """content=None 即使 from_cache=True 也不追加提示行。"""
-        ws = self._write_and_get_sheet(content=None, from_cache=True)
-        cell = ws.cell(row=3, column=1)
-        self.assertIsNone(cell.value)
 
     def test_row_height_short(self):
         """短段落行高 = 最小行高。"""
@@ -227,38 +207,6 @@ class TestWriteLlmSheets(unittest.TestCase):
         self.assertEqual(text8, "复盘内容")
         self.assertEqual(text9, "持仓体检报告")
         self.assertEqual(textA, "穿透深度分析")
-
-    def test_cache_macro_only(self):
-        """macro 缓存 + expert 未缓存 → sheet7 有提示行，sheet8 无。"""
-        write_llm_sheets(
-            self.wb,
-            ("<p>全球政经局势</p>", "<p>复盘内容</p>", None, None),
-            llm_cached=(True, False, False, False),
-        )
-        ws7, ws8, ws9, wsA = self._get_llm_sheets()
-
-        # sheet7：第 4 行应有缓存提示
-        self.assertIn("LLM缓存", str(ws7.cell(row=4, column=1).value or ""))
-        # sheet8：第 4 行应无提示
-        self.assertIsNone(ws8.cell(row=4, column=1).value)
-
-    def test_cache_both(self):
-        """macro + expert 都来自缓存 → 两个 sheet 都有提示。"""
-        write_llm_sheets(
-            self.wb,
-            ("<p>全球政经局势</p>", "<p>复盘</p>", None, None),
-            llm_cached=(True, True, False, False),
-        )
-        ws7, ws8, ws9, wsA = self._get_llm_sheets()
-        self.assertIn("LLM缓存", str(ws7.cell(row=4, column=1).value or ""))
-        self.assertIn("LLM缓存", str(ws8.cell(row=4, column=1).value or ""))
-
-    def test_cache_off_default(self):
-        """默认 llm_cached=(False, False, False, False) → 无缓存提示。"""
-        write_llm_sheets(self.wb, ("<p>宏观</p>", "<p>复盘</p>", None, None))
-        ws7, ws8, ws9, wsA = self._get_llm_sheets()
-        self.assertIsNone(ws7.cell(row=4, column=1).value)
-        self.assertIsNone(ws8.cell(row=4, column=1).value)
 
     def test_content_none(self):
         """content=(None, None, None, None) → 占位符，不崩溃。"""
@@ -425,7 +373,7 @@ class TestWriteContentSheetUnifiedFooter(unittest.TestCase):
             '</p>'
         )
         ws = self.wb.create_sheet()
-        _write_content_sheet(ws, "测试", html, from_cache=False)
+        _write_content_sheet(ws, "测试", html)
         footer_cell = ws.cell(row=4, column=1)
         self.assertIn("模型：gpt-4o", str(footer_cell.value or ""))
         self.assertIn("Token 用量", str(footer_cell.value or ""))
@@ -441,13 +389,13 @@ class TestWriteContentSheetUnifiedFooter(unittest.TestCase):
             '</p>'
         )
         ws = self.wb.create_sheet()
-        _write_content_sheet(ws, "测试", html, from_cache=False)
+        _write_content_sheet(ws, "测试", html)
         content_cell = ws.cell(row=2, column=1)
         self.assertEqual(content_cell.value, "内容段落")
         self.assertNotIn("模型", str(content_cell.value or ""))
 
     def test_cached_with_embedded_footer_uses_it(self) -> None:
-        """缓存 + 有嵌入式 footer → 使用 footer 而非单独 cache hint。"""
+        """缓存内容含嵌入式 footer → footer 正确展示。"""
         html = (
             '<p>缓存内容</p>\n\n'
             '<p style="color:#888;font-size:12px">'
@@ -455,22 +403,11 @@ class TestWriteContentSheetUnifiedFooter(unittest.TestCase):
             '</p>'
         )
         ws = self.wb.create_sheet()
-        _write_content_sheet(ws, "测试", html, from_cache=True)
+        _write_content_sheet(ws, "测试", html)
         footer_cell = ws.cell(row=4, column=1)
         self.assertIn("LLM缓存", str(footer_cell.value or ""))
         # 不应再有额外行
         self.assertIsNone(ws.cell(row=5, column=1).value)
-
-    def test_non_cached_no_footer_fallback(self) -> None:
-        """非缓存 + 无嵌入式 footer → 后备 model_name 行 + thinking 行。"""
-        html = "<p>旧版内容</p>"
-        ws = self.wb.create_sheet()
-        _write_content_sheet(ws, "测试", html, from_cache=False,
-                             model_name="gpt-4o", thinking_enabled=True)
-        model_cell = ws.cell(row=4, column=1)
-        self.assertEqual(model_cell.value, "模型：gpt-4o")
-        thinking_cell = ws.cell(row=5, column=1)
-        self.assertEqual(thinking_cell.value, "Extended Thinking 已开启")
 
 
 if __name__ == "__main__":

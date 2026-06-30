@@ -10,7 +10,7 @@
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
 │  持仓 xlsx   │ ──→ │  数据获取层   │ ──→ │  报告生成层   │
-│ (reader.py)  │     │ (fetcher.py) │     │ (report/)    │
+│ (reader.py)  │     │ (fetcher/) │     │ (report/)    │
 └─────────────┘     └──────┬───────┘     └──────────────┘
                           │
                     ┌──────▼───────┐
@@ -28,7 +28,7 @@
 | 菜单功能执行 | 命令处理器、各功能入口 | `src/python/tui_handlers.py` |
 | 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config.py` |
 | 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache.py` |
-| 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher.py` |
+| 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher/` |
 | 持仓读取 | xlsx 解析、多工作表、列校验 | `src/python/reader.py` |
 | LLM 客户端 | Claude / OpenAI / DeepSeek API 调用 | `src/python/llm/` |
 | 报告生成 | Excel (openpyxl) + HTML (Jinja2) | `src/python/report/*.py` |
@@ -125,7 +125,7 @@ investor-util/
 │   │   ├── config.py             # 配置读写
 │   │   ├── registry.py           # 中央注册表
 │   │   ├── cache.py              # 缓存引擎
-│   │   ├── fetcher.py            # 数据获取调度
+│   │   ├── fetcher/               # 数据获取调度
 │   │   ├── reader.py             # 持仓 Excel 解析
 │   │   ├── llm/                  # LLM 集成（9 子模块）
 │   │   ├── constants.py          # 共享常量

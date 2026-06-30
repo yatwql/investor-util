@@ -28,6 +28,7 @@ from src.python.tui_menu import (
     _refresh_config,
 )
 from src.python.tui_handlers import _execute_item
+from src.python.llm.pricing import _CURRENCY_SYMBOLS
 
 logger = setup_logger()
 
@@ -45,7 +46,7 @@ def _print_session_usage_on_exit() -> None:
             calls = usage.get("call_count", 0)
             cost = usage.get("total_cost", 0.0)
             currency = usage.get("currency", "CNY")
-            symbol = {"CNY": "¥", "USD": "$", "EUR": "€", "GBP": "£"}.get(currency, "¥")
+            symbol = _CURRENCY_SYMBOLS.get(currency, "¥")
             model = usage.get("model", "")
             print(f"\n── LLM 会话统计 ──")
             print(f"  模型: {model}")
@@ -68,6 +69,7 @@ def _print_session_usage_on_exit() -> None:
             print(f"  累计费用: {symbol}{cost:.4f}")
             print(f"──────────────────")
     except (KeyError, TypeError, AttributeError):
+        logger.warning("打印 LLM 会话统计时出错", exc_info=True)
         pass
 
 
@@ -119,8 +121,8 @@ def main() -> None:
         removed = cleanup_expired(dry_run=False)
         if removed > 0:
             logger.info("启动时自动清理了 %d 个过期缓存文件", removed)
-    except OSError:
-        pass
+    except OSError as e:
+        logger.warning("启动时缓存清理失败: %s", e)
 
     _print_header()
     sel: int = 0

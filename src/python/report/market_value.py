@@ -14,7 +14,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python import cache
 from src.python.registry import get_report_sheet_name
-from src.python.fetcher import fetch_market_data
+from src.python.fetcher.price import fetch_market_data
 from src.python.models import Holding
 from src.python.report.excel_writer import auto_width, freeze_header, write_data_row, write_header_row, write_subtotal_row, \
     write_title_row, write_total_row

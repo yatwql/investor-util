@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx
 
+from src.python.http_client import make_http_client
+
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://qt.gtimg.cn/q="
@@ -141,7 +143,7 @@ def fetch_price(code: str) -> dict[str, Any] | None:
     logger.debug("Tencent API 请求: %s", full_code)
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(url)
             resp.encoding = "gbk"  # qt.gtimg.cn 返回 GBK 编码
             text = resp.text

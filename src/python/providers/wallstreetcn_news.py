@@ -14,6 +14,8 @@ from typing import Any
 
 import httpx
 
+from src.python.http_client import make_http_client
+
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://api-one.wallstcn.com/apiv1/content/lives"
@@ -119,7 +121,7 @@ def fetch_news(num: int = 50) -> list[dict[str, Any]]:
     logger.debug("WallStreetCN 新闻请求: limit=%d", params["limit"])
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(_BASE_URL, params=params, headers=_HEADERS)
             resp.raise_for_status()
             data = resp.json()

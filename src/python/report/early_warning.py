@@ -14,6 +14,7 @@ import logging
 import re
 from typing import Any
 
+from src.python.config import get_config
 from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
@@ -25,13 +26,22 @@ from src.python.report.excel_writer import (
 
 logger = logging.getLogger("invest")
 
-# ── 预警阈值 ────────────────────────────────────────────────
-# 主力净流出（负值）超过此金额标记为"关注"
-_SECTOR_ALERT_THRESHOLD_WARNING: float = -50_000_000  # -5000万
-# 超过此金额标记为"危险"
-_SECTOR_ALERT_THRESHOLD_DANGER: float = -200_000_000  # -2亿
-# 新闻情绪聚合 TOP N
-_SENTIMENT_TOP_N: int = 10
+
+def _get_sector_alert_thresholds() -> tuple[float, float]:
+    """从 config.json 读取行业预警阈值，不存在时返回默认值。"""
+    cfg = get_config()
+    ew = cfg.get("early_warning", {}) if isinstance(cfg, dict) else {}
+    return (
+        float(ew.get("sector_alert_threshold_warning", -50_000_000)),
+        float(ew.get("sector_alert_threshold_danger", -200_000_000)),
+    )
+
+
+def _get_sentiment_top_n() -> int:
+    """从 config.json 读取新闻情绪聚合 TOP N，不存在时返回默认值。"""
+    cfg = get_config()
+    ew = cfg.get("early_warning", {}) if isinstance(cfg, dict) else {}
+    return int(ew.get("sentiment_top_n", 10))
 
 # ── Excel 列数 ──────────────────────────────────────────────
 _SECTOR_COLS = 6
@@ -143,10 +153,11 @@ def _compute_sector_alerts(
         if not matched:
             continue
 
-        # 判定预警等级
-        if main_inflow <= _SECTOR_ALERT_THRESHOLD_DANGER:
+        # 判定预警等级（从 config 读取阈值）
+        _threshold_warn, _threshold_danger = _get_sector_alert_thresholds()
+        if main_inflow <= _threshold_danger:
             level = "danger"
-        elif main_inflow <= _SECTOR_ALERT_THRESHOLD_WARNING:
+        elif main_inflow <= _threshold_warn:
             level = "warning"
         else:
             level = "info"
@@ -265,7 +276,7 @@ def _compute_sentiment_alerts(
 
     # 按提及次数降序
     result.sort(key=lambda a: a["total_mentions"], reverse=True)
-    return result[:_SENTIMENT_TOP_N]
+    return result[:_get_sentiment_top_n()]
 
 
 # ═══════════════════════════════════════════════════════════

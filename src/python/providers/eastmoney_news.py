@@ -14,6 +14,8 @@ from typing import Any
 
 import httpx
 
+from src.python.http_client import make_http_client
+
 logger = logging.getLogger("invest")
 
 _TIMEOUT = 15.0
@@ -74,7 +76,7 @@ def fetch_news(num: int = 50) -> list[dict[str, Any]]:
     }
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(_API_URL, headers=_HEADERS, params=params)
             resp.raise_for_status()
             data = resp.json()

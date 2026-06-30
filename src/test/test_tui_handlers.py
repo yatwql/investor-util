@@ -24,16 +24,11 @@ from unittest.mock import MagicMock, patch
 
 import src.python.tui_handlers as _th_module
 
-from src.python.report.excel_generator import _timing_records, _Timer
+from src.python.report.progress import _timing_records, _Timer
 
 from src.python.tui_handlers import (
-    _add_error,
-    _call_sheet,
     _check_network_available,
-    _clear_errors,
     _execute_item,
-    _generation_errors,
-    _print_error_summary,
     _print_error_with_hint,
     _print_llm_session_usage,
     _print_timing_summary,
@@ -449,130 +444,6 @@ class TestPrintErrorWithHintExtended(unittest.TestCase):
         out = self._capture(ValueError(""), "操作失败")
         self.assertNotIn("网络连接异常", out)
         self.assertIn("操作失败", out)
-
-
-# ═══════════════════════════════════════════════════════════════
-# 新增测试 — 错误累积功能
-# ═══════════════════════════════════════════════════════════════
-
-class TestErrorFunctions(unittest.TestCase):
-    """_add_error / _clear_errors / _print_error_summary 测试。"""
-
-    def setUp(self):
-        _generation_errors.clear()
-
-    def tearDown(self):
-        _generation_errors.clear()
-
-    def _capture_summary(self) -> str:
-        out = io.StringIO()
-        with patch("sys.stdout", out):
-            _print_error_summary()
-        return out.getvalue()
-
-    def test_add_error_appends(self):
-        """_add_error 向列表追加错误。"""
-        _add_error("test error")
-        self.assertIn("test error", _generation_errors)
-        self.assertEqual(len(_generation_errors), 1)
-
-    def test_add_error_multiple(self):
-        """多次调用 _add_error 累积多个错误。"""
-        _add_error("err1")
-        _add_error("err2")
-        self.assertEqual(len(_generation_errors), 2)
-
-    def test_clear_errors_empties(self):
-        """_clear_errors 清空错误列表。"""
-        _add_error("some error")
-        _clear_errors()
-        self.assertEqual(len(_generation_errors), 0)
-
-    def test_summary_empty_silent(self):
-        """无错误时 _print_error_summary 不输出。"""
-        out = self._capture_summary()
-        self.assertEqual(out, "")
-
-    def test_summary_with_errors(self):
-        """有错误时输出正确格式。"""
-        _add_error("测试错误1")
-        _add_error("测试错误2")
-        out = self._capture_summary()
-        self.assertIn("测试错误1", out)
-        self.assertIn("测试错误2", out)
-        self.assertIn("异常汇总", out)
-
-    def test_summary_truncates_long_error(self):
-        """长错误消息被截断。"""
-        long_err = "x" * 100
-        _add_error(long_err)
-        out = self._capture_summary()
-        self.assertIn("...", out)
-        self.assertNotIn(long_err, out)
-
-    def test_add_error_logs_warning(self):
-        """_add_error 调用 logger.warning。"""
-        with patch("src.python.tui_handlers.logger") as mock_logger:
-            _add_error("log test")
-            mock_logger.warning.assert_called_once_with("生成异常: %s", "log test")
-
-    def test_summary_shows_error_count(self):
-        """异常汇总显示正确的错误数量。"""
-        _add_error("e1")
-        _add_error("e2")
-        _add_error("e3")
-        out = self._capture_summary()
-        self.assertIn("3 项", out)
-
-
-# ═══════════════════════════════════════════════════════════════
-# 新增测试 — _call_sheet
-# ═══════════════════════════════════════════════════════════════
-
-class TestCallSheet(unittest.TestCase):
-    """_call_sheet 安全调用包装测试。"""
-
-    def setUp(self):
-        _generation_errors.clear()
-
-    def tearDown(self):
-        _generation_errors.clear()
-
-    def test_fn_none_returns_false_and_adds_error(self):
-        """fn 为 None 时返回 False 并添加模块缺失错误。"""
-        self.assertFalse(_call_sheet("测试页", None))
-        self.assertTrue(any("测试页模块缺失" in e for e in _generation_errors))
-
-    def test_fn_success_returns_true(self):
-        """fn 成功时返回 True。"""
-        fn = MagicMock()
-        result = _call_sheet("测试页", fn, "arg1", kwarg="val")
-        self.assertTrue(result)
-        fn.assert_called_once_with("arg1", kwarg="val")
-
-    def test_fn_exception_returns_false_and_adds_error(self):
-        """fn 抛出异常时返回 False 并记录生成失败错误。"""
-        fn = MagicMock(side_effect=ValueError("bad data"))
-        result = _call_sheet("测试页", fn)
-        self.assertFalse(result)
-        self.assertTrue(any("测试页生成失败" in e for e in _generation_errors))
-
-    def test_output_on_success(self):
-        """成功时打印进度。"""
-        fn = MagicMock()
-        out = io.StringIO()
-        with patch("sys.stdout", out):
-            _call_sheet("测试页", fn)
-        output = out.getvalue()
-        self.assertIn("正在生成测试页", output)
-        self.assertIn("测试页生成完成", output)
-
-    def test_call_sheet_logs_exception(self):
-        """fn 异常时调用 logger.exception。"""
-        fn = MagicMock(side_effect=RuntimeError("fail"))
-        with patch("src.python.tui_handlers.logger") as mock_logger:
-            _call_sheet("测试页", fn)
-            mock_logger.exception.assert_called_once()
 
 
 # ═══════════════════════════════════════════════════════════════

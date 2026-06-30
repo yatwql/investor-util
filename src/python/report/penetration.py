@@ -23,7 +23,7 @@ from typing import Any, List
 
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.fetcher import fetch_fund_holdings
+from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.excel_writer import (
@@ -505,7 +505,7 @@ def compute_penetration_top10(
         for _info in merged.values():
             _all_pen_codes.extend(_info.get("codes") or [])
         if _all_pen_codes:
-            from src.python.fetcher import batch_fetch_industry_data as _batch_ind
+            from src.python.fetcher.industry import batch_fetch_industry_data as _batch_ind
             _ind_data = _batch_ind(list(set(_all_pen_codes)))
             if _ind_data:
                 for _info in merged.values():

@@ -13,6 +13,8 @@ from typing import Any
 
 import httpx
 
+from src.python.http_client import make_http_client
+
 logger = logging.getLogger("invest")
 
 _FUND_API_URL = "https://api.fund.eastmoney.com/f10/lsjz"
@@ -62,7 +64,7 @@ def fetch_nav(code: str) -> dict[str, Any] | None:
     logger.debug("东方财富 API 请求基金: %s", code)
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)
             text = resp.text
     except httpx.TimeoutException:
@@ -116,7 +118,7 @@ def _fallback_fundf10(code: str) -> dict[str, Any] | None:
     logger.info("切换备用链路: %s", url)
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, follow_redirects=True, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
             resp = client.get(url, headers=_HEADERS)
             resp.encoding = "utf-8"
             html = resp.text

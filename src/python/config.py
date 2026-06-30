@@ -43,6 +43,11 @@ _DEFAULT_CONFIG = {
     "user_fund_benchmarks": {},
     "llm_key_file": "data/config/llm_key.json",
     "llm_settings_file": "data/config/llm_settings.json",
+    "early_warning": {
+        "sector_alert_threshold_warning": -50_000_000,
+        "sector_alert_threshold_danger": -200_000_000,
+        "sentiment_top_n": 10,
+    },
 }
 
 

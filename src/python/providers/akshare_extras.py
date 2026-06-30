@@ -23,6 +23,13 @@ from src.python.cache import get as cache_get, set as cache_set
 
 logger = logging.getLogger("invest")
 
+# akshare 是可选依赖，统一在模块级加载一次
+try:
+    import akshare as ak
+except ImportError:
+    ak = None  # type: ignore[assignment]
+    logger.info("akshare 模块未安装，akshare_extras 功能将跳过")
+
 # ── 进程级内存 TTL 缓存（位于文件缓存之上） ──
 _MEMO_CACHE: dict[str, tuple[Any, float]] = {}
 _MEMO_LOCK = _threading.Lock()
@@ -86,7 +93,7 @@ def _compute_index_fingerprint() -> str:
         12 字符十六进制指纹；获取失败时返回空字符串（降级到纯 TTL 缓存）
     """
     try:
-        from src.python.fetcher import fetch_indices, fetch_us_indices
+        from src.python.fetcher.index import fetch_indices, fetch_us_indices
 
         with _INDEX_MEMO_LOCK:
             cached = _INDEX_MEMO.get("indices")
@@ -155,9 +162,7 @@ def get_profit_forecast() -> dict[str, dict]:
         return cached
 
     # ── 取数 ──
-    try:
-        import akshare as ak
-    except ImportError:
+    if ak is None:
         logger.warning("akshare 模块未安装，跳过盈利预测")
         return {}
 
@@ -226,9 +231,7 @@ def get_sector_fund_flow() -> list[dict[str, Any]]:
         return cached
 
     # ── 取数 ──
-    try:
-        import akshare as ak
-    except ImportError:
+    if ak is None:
         logger.warning("akshare 模块未安装，跳过行业资金流向")
         return []
 
@@ -374,9 +377,7 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
         return cached
 
     # ── lazily import akshare ──
-    try:
-        import akshare as ak
-    except ImportError:
+    if ak is None:
         logger.warning("akshare 模块未安装，跳过分红数据")
         return {}
 

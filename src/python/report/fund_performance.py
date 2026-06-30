@@ -19,7 +19,7 @@ from typing import Any, Dict, List
 
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.fetcher import fetch_fund_benchmark, fetch_fund_rankings
+from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
 from src.python.models import Holding
 from src.python.report.excel_writer import (
     auto_width,

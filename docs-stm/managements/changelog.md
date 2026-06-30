@@ -4,6 +4,31 @@
 
 ---
 
+## [0.2.40] - 2026-06-30
+
+### Fixed
+- **3 处剩余静默异常**：`main.py:71` `_print_session_usage_on_exit`、`cache.py:528` `check_and_refresh_caches`、`llm/skeleton.py:188` 费用字符串解析 — 在 `except: pass` 前增加 `logger.warning(...)` 记录上下文，避免运行时错误线索丢失。
+
+### Changed
+- **akshare_extras.py 延迟导入统一**：3 处函数内 `import akshare as ak` 提至模块级统一导入，失败时 `ak = None` 兜底，各函数改为 `if ak is None` 提前返回。
+- **`verify=False` 统一治理**：新建 `src/python/http_client.py` 工厂函数 `make_http_client()`，由环境变量 `SSL_VERIFY`（默认 `true`）统一控制 SSL 证书验证策略。替换 11 个模块共 14 处 `verify=False` 调用。
+
+### Added
+- **`src/python/http_client.py`** — HTTP 客户端工厂模块，`make_http_client(**kwargs)` 自动读取 `SSL_VERIFY` 环境变量，避免各 provider 分散使用 `verify=False`。
+
+### Removed
+- **`fetcher/__init__.py` 向后兼容转发层**：曾为 `fetcher.py` → `fetcher/` 子包迁移保留约 40 项私有符号（`_get_chain`、`_fetch_with_fallback` 等）+ 7 个公有函数的 re-export。所有消费者改为直接从 `fetcher.price` / `fetcher.index` / `fetcher.fund` / `fetcher.industry` / `fetcher.chain` 导入。
+- **`report/llm_content.py` 旧版页脚兼容代码**：移除 `from_cache`、`model_name`、`thinking_enabled` 参数、`_CACHE_HINT_TEXT` 常量及对应的 `else` 分支回退逻辑。LLM 的模型名/Token 用量/缓存/Extended Thinking 标识统一由 HTML 内嵌 footer 携带，`_extract_footer_text()` 统一提取。
+
+### Docs
+- **管理文档一致性审计**：全面核对 6 份管理文档 + 6 份用户文档 + README，修复以下冲突/冗余：
+  - **iteration-plan.md**：已空（唯一内容 R-009 移入 review-findings.md）
+  - **review-findings.md**：移除已全部完成的「迭代结束审查清单」（约 30 条 [x] 项），仅保留审计历史表 + R-009 待办
+  - **technical.md**：3 处遗留 `fetcher.py` 引用更新为 `fetcher/` 子包
+  - **README.md / constants.py**：版本号从 `0.2.38` 同步为 `0.2.40`
+
+---
+
 ## [0.2.38] - 2026-06-30
 
 ### Added
@@ -443,7 +468,7 @@
 ### Changed
 - **`_generate_llm_content()` 新增 `thinking_enabled` 参数** — 由各模块调用方（`generate_global_macro`、
   `generate_expert_review`）从 `llm_settings.json` 读取状态后传入
-- **`write_llm_sheets()` 新增 `thinking` 元组参数** — 透传两个 LLM 页签的开启状态至 `_write_content_sheet()`
+- **`write_llm_sheets()` 新增 `thinking` 元组参数** — 透传两个 LLM 分析章节的开启状态至 `_write_content_sheet()`
 - **`tui_handlers.py`** — 从配置读取 `thinking_enabled_macro` / `thinking_enabled_expert` 并传入写表逻辑
 
 ### Fixed

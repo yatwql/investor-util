@@ -13,7 +13,8 @@ from typing import Any, Dict, List, Tuple
 
 from jinja2 import Environment, FileSystemLoader
 
-from src.python.fetcher import fetch_fund_benchmark, fetch_fund_rankings, fetch_indices, fetch_us_indices
+from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
+from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.report.excel_writer import _ensure_reports_dir
 from src.python.models import Holding
 from src.python.report.category import _categorize_holding
@@ -33,6 +34,7 @@ from src.python.report.market_value import (
 )
 from src.python.report.penetration import compute_penetration_top10
 from src.python.registry import get_llm_module_name, get_llm_module_names
+from src.python.report.progress import ProgressReporter, SilentProgressReporter
 
 logger = logging.getLogger("invest")
 
@@ -141,7 +143,7 @@ _ENV.filters["thousands"] = _jinja_thousands
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None) -> str:
+def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     1. 通过各计算模块获取全部分析数据
@@ -163,6 +165,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     Raises:
         Exception: 任何计算或 IO 错误，由调用方处理
     """
+    prog = progress if progress is not None else SilentProgressReporter()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     today_str = datetime.now().strftime("%Y-%m-%d")
     trading_day = get_last_trading_day()
@@ -171,9 +174,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     if details is not None:
         logger.info("复用外部传入的市值核算数据，共 %d 条", len(details))
     else:
-        print("  [..] 正在获取行情数据...")
+        prog.info("正在获取行情数据...")
         logger.info("HTML 报告生成开始，共 %d 条持仓", len(holdings))
-        print("  [..] 正在计算市值核算...")
+        prog.info("正在计算市值核算...")
         details = _generate_details(holdings, today_str)
         logger.info("市值核算明细生成完成，共 %d 条", len(details))
 
@@ -186,7 +189,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     today_profit_rate = total_today_profit / today_denom if today_denom > 0 else 0.0
 
     # ── 2) 按账户分组 + 小计 ────────────────────────────────
-    print("  [..] 正在分组统计...")
+    prog.info("正在分组统计...")
     accounts: Dict[str, List[DetailRow]] = {}
     for d in details:
         accounts.setdefault(d.account, []).append(d)
@@ -217,7 +220,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     }
 
     # ── 4) 市场指数 ─────────────────────────────────────────
-    print("  [..] 正在获取市场指数...")
+    prog.info("正在获取市场指数...")
     a_indices: dict = fetch_indices()          # dict[str, dict] — 给 LLM
     us_indices: dict = fetch_us_indices()      # 同上
 
@@ -245,16 +248,16 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
             })
 
     # ── 5) 持仓分类数据 ─────────────────────────────────────
-    print("  [..] 正在生成持仓分类表...")
+    prog.info("正在生成持仓分类表...")
     cat_data = _build_category_data(holdings, details)
 
     # ── 6) 资产穿透TOP10 ───────────────────────────────────
-    print("  [..] 正在计算资产穿透TOP10...")
+    prog.info("正在计算资产穿透TOP10...")
     penetration = compute_penetration_top10(holdings, details)
 
     # ── 7) 基金业绩分析 ─────────────────────────────────────
-    print("  [..] 正在获取基金业绩排名...")
-    perf_data = _build_perf_data(holdings, details)
+    prog.info("正在获取基金业绩排名...")
+    perf_data = _build_perf_data(holdings, details, progress=prog)
 
     # ── 8) 财经新闻热点与持仓关联分析（可选）─────────────────
     _news_llm_meta: dict = {"llm_enabled": False, "llm_cached": False, "token_usage": {}, "cost_estimation": "-", "thinking_enabled": False}
@@ -263,7 +266,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
             logger.info("复用调用方传入的新闻数据，共 %d 条", len(news_data))
             _news_llm_meta = news_llm_meta or _news_llm_meta
         else:
-            print("  [..] 正在获取财经新闻...")
+            prog.info("正在获取财经新闻...")
             try:
                 from src.python.providers.news_keywords import (
                     build_holding_keywords,
@@ -300,7 +303,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         if global_macro_content or expert_review_content or health_check_content or penetration_deep_content:
             llm_enabled_flag = True
     elif enable_llm:
-        print("  [..] 正在调用 LLM 生成智能分析...")
+        prog.info("正在调用 LLM 生成智能分析...")
         try:
             from src.python.llm import generate_all_llm
             pen_top10 = penetration.get("top10", []) if penetration else []
@@ -454,7 +457,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
             break
 
     # ── 10) 渲染模板 ────────────────────────────────────────
-    print("  [..] 正在渲染 HTML...")
+    prog.info("正在渲染 HTML...")
     template = _ENV.get_template("report_template.html")
 
     # 检查新闻数据中是否有 LLM 分析列
@@ -499,7 +502,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     )
 
     # ── 10) 保存文件 ─────────────────────────────────────────
-    print("  [..] 正在保存报告文件...")
+    prog.info("正在保存报告文件...")
 
     # 确保目录存在并验证可写
     _ensure_reports_dir(output_dir)
@@ -509,7 +512,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     with open(latest_path, "w", encoding="utf-8") as f:
         f.write(html)
     logger.info("最新 HTML 报告已保存: %s", latest_path)
-    print(f"  [OK] 最新版报告: {latest_path}")
+    prog.ok(f"最新版报告: {latest_path}")
 
     # 归档版
     archive_dir = os.path.join(
@@ -524,9 +527,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     with open(archive_path, "w", encoding="utf-8") as f:
         f.write(html)
     logger.info("归档 HTML 报告已保存: %s", archive_path)
-    print(f"  [OK] 归档版报告: {archive_path}")
+    prog.ok(f"归档版报告: {archive_path}")
 
-    print(f"  [OK] HTML 报告生成完成！总市值: {total_mv:,.2f}元, "
+    prog.ok(f"HTML 报告生成完成！总市值: {total_mv:,.2f}元, "
           f"总盈亏: {total_profit:,.2f}元")
 
     return os.path.abspath(latest_path)
@@ -609,6 +612,7 @@ def _build_category_data(
 def _build_perf_data(
     holdings: List[Holding],
     details: List[DetailRow],
+    progress: ProgressReporter | None = None,
 ) -> List[Dict[str, Any]]:
     """构建基金业绩分析数据。
 
@@ -622,6 +626,7 @@ def _build_perf_data(
     Returns:
         业绩分析数据列表，每项含名称/代码/类型/收益率/排名等字符串值
     """
+    prog = progress if progress is not None else SilentProgressReporter()
     fund_holdings = [h for h in holdings if _is_fund(h)]
     detail_map: Dict[str, DetailRow] = {d.code: d for d in details}
 
@@ -640,7 +645,7 @@ def _build_perf_data(
             "获取基金业绩 [%d/%d]: %s (%s)",
             idx, fund_count, fund.name, fund.code,
         )
-        print(f"  [..] 基金业绩 [{idx}/{fund_count}]: {fund.name}")
+        prog.info(f"基金业绩 [{idx}/{fund_count}]: {fund.name}")
 
         d = detail_map.get(fund.code)
 

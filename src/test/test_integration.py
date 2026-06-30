@@ -70,8 +70,8 @@ class TestGenerateExcelReport(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    @patch("src.python.fetcher.fetch_indices")
-    @patch("src.python.fetcher.fetch_us_indices")
+    @patch("src.python.fetcher.index.fetch_indices")
+    @patch("src.python.fetcher.index.fetch_us_indices")
     @patch("src.python.report.fund_performance.write_fund_performance_sheet")
     def test_generate_basic_report(self, mock_perf, mock_us_idx, mock_a_idx):
         """基础报告（无新闻/无LLM）→ 5 个核心页签。"""
@@ -91,8 +91,8 @@ class TestGenerateExcelReport(unittest.TestCase):
         self.assertTrue(any(f.endswith(".xlsx") for f in out_files),
                         f"应在 {self.tmp.name} 中找到 xlsx 文件，实际有 {out_files}")
 
-    @patch("src.python.fetcher.fetch_indices")
-    @patch("src.python.fetcher.fetch_us_indices")
+    @patch("src.python.fetcher.index.fetch_indices")
+    @patch("src.python.fetcher.index.fetch_us_indices")
     @patch("src.python.report.fund_performance.write_fund_performance_sheet")
     def test_generate_with_news(self, mock_perf, mock_us_idx, mock_a_idx):
         """含新闻报告 → 使用预传入 news_data。"""
@@ -112,8 +112,8 @@ class TestGenerateExcelReport(unittest.TestCase):
         out_files = os.listdir(self.tmp.name)
         self.assertTrue(any(f.endswith(".xlsx") for f in out_files))
 
-    @patch("src.python.fetcher.fetch_indices")
-    @patch("src.python.fetcher.fetch_us_indices")
+    @patch("src.python.fetcher.index.fetch_indices")
+    @patch("src.python.fetcher.index.fetch_us_indices")
     @patch("src.python.report.fund_performance.write_fund_performance_sheet")
     @patch("src.python.report.llm_content.write_llm_sheets")
     def test_generate_with_llm(self, mock_llm, mock_perf, mock_us_idx, mock_a_idx):
@@ -125,7 +125,6 @@ class TestGenerateExcelReport(unittest.TestCase):
         _generate_excel_report(
             self.holdings,
             include_llm=True,
-            show_llm_in_tui=False,
             output_dir=self.tmp.name,
             details=self.details,
             a_indices={},
@@ -137,8 +136,8 @@ class TestGenerateExcelReport(unittest.TestCase):
         out_files = os.listdir(self.tmp.name)
         self.assertTrue(any(f.endswith(".xlsx") for f in out_files))
 
-    @patch("src.python.fetcher.fetch_indices")
-    @patch("src.python.fetcher.fetch_us_indices")
+    @patch("src.python.fetcher.index.fetch_indices")
+    @patch("src.python.fetcher.index.fetch_us_indices")
     @patch("src.python.report.fund_performance.write_fund_performance_sheet")
     def test_generate_empty_holdings(self, mock_perf, mock_us_idx, mock_a_idx):
         """空持仓 → 不崩溃。"""
@@ -156,8 +155,8 @@ class TestGenerateExcelReport(unittest.TestCase):
         out_files = os.listdir(self.tmp.name)
         self.assertTrue(any(f.endswith(".xlsx") for f in out_files))
 
-    @patch("src.python.fetcher.fetch_indices")
-    @patch("src.python.fetcher.fetch_us_indices")
+    @patch("src.python.fetcher.index.fetch_indices")
+    @patch("src.python.fetcher.index.fetch_us_indices")
     @patch("src.python.report.fund_performance.write_fund_performance_sheet")
     def test_generate_single_holding(self, mock_perf, mock_us_idx, mock_a_idx):
         """单条持仓 → 正确生成。"""

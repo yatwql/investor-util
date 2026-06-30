@@ -13,6 +13,8 @@ from typing import Any
 
 import httpx
 
+from src.python.http_client import make_http_client
+
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://hq.sinajs.cn/list="
@@ -102,7 +104,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
     logger.debug("Sina US 指数请求: %s", codes)
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(url, headers={"Referer": "https://finance.sina.com.cn"})
             resp.encoding = "gb18030"  # Sina 返回 GB18030 编码
             text = resp.text

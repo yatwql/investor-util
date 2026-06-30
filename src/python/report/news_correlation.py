@@ -301,7 +301,7 @@ def build_news_data(
                         _all_codes.add(_ac.strip())
 
         if _all_codes:
-            from src.python.fetcher import batch_fetch_industry_data as _batch_industry
+            from src.python.fetcher.industry import batch_fetch_industry_data as _batch_industry
             _industry_data = _batch_industry(list(_all_codes))
             if _industry_data:
                 # 将行业名称和概念名称追加为关键词，提高匹配率

@@ -115,7 +115,7 @@ registry 的派生产出被以下模块消费：
 | `src/python/main.py` | `get_llm_module_names()` | 菜单显示 |
 | `src/python/tui_menu.py` | `get_llm_module_names()` | LLM 配置状态展示 |
 | `src/python/tui_handlers.py` | `get_llm_module_name()` | TUI 输出框标题 |
-| `src/python/report/llm_content.py` | `get_registry()`, `get_llm_module_name()` | Excel LLM 页签生成 |
+| `src/python/report/llm_content.py` | `get_registry()`, `get_llm_module_name()` | Excel LLM 分析章节生成 |
 | `src/python/report/news_correlation.py` | `get_llm_module_name()` | 新闻页签标题 |
 | `src/python/report/excel_generator.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 错误提示、`_Timer`/`_call_sheet` 标签 |
 | `src/python/report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入、日志 |

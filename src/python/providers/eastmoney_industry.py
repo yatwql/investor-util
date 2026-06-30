@@ -20,6 +20,8 @@ from typing import Any
 
 import httpx
 
+from src.python.http_client import make_http_client
+
 logger = logging.getLogger("invest")
 
 _PUSH2_BASE = "https://push2.eastmoney.com/api/qt/stock/get"
@@ -68,7 +70,7 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     logger.debug("东方财富 push2 行业/概念请求: %s", code)
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(_PUSH2_BASE, params=params, headers=_HEADERS)
             text = resp.text
     except (httpx.TimeoutException, httpx.RequestError) as e:

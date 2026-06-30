@@ -186,6 +186,7 @@ def _generate_llm_content(
                     try:
                         _cost_val = float(_cost.lstrip("$¥€£"))
                     except ValueError:
+                        logger.warning("LLM 费用字符串解析失败: %s", _cost)
                         pass
                 _endpoint_for_record = llm_config.get("endpoint", "") or ""
                 _cache_hit = usage.get("cache_read_input_tokens", 0)

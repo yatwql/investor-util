@@ -14,6 +14,8 @@ from typing import Any
 
 import httpx
 
+from src.python.http_client import make_http_client
+
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://feed.mix.sina.com.cn/api/roll/get"
@@ -108,7 +110,7 @@ def fetch_news(lid: str = "2516", num: int = 30, page: int = 1) -> list[dict[str
     logger.debug("Sina 新闻请求: %s (分类=%s, num=%d, page=%d)", lid, category, num, page)
 
     try:
-        with httpx.Client(timeout=_TIMEOUT, verify=False) as client:
+        with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(_BASE_URL, params=params, headers=_HEADERS)
             resp.raise_for_status()
             data = resp.json()

@@ -20,13 +20,12 @@ from src.python.logger import setup_logger
 from src.python.reader import get_xlsx_info, list_xlsx_files, read_holdings
 from src.python.config import set_config, get_llm_config
 from src.python.registry import get_llm_module_name
+from src.python.llm.pricing import _CURRENCY_SYMBOLS
 from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+from src.python.report.progress import TuiProgressReporter
 logger = setup_logger()
 
 _busy: bool = False  # 防连续按键保护
-
-# 报告生成过程中的错误累计（每次生成开始时清空）
-_generation_errors: list[str] = []
 
 
 def _print_llm_session_usage(usage: dict | None = None) -> None:
@@ -50,79 +49,13 @@ def _print_llm_session_usage(usage: dict | None = None) -> None:
     calls = usage["call_count"]
     total_tok = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
     cost = usage.get("total_cost", 0.0)
-    symbol = {"CNY": "¥", "USD": "$", "EUR": "€", "GBP": "£"}.get(usage.get("currency", "CNY"), "¥")
+    symbol = _CURRENCY_SYMBOLS.get(usage.get("currency", "CNY"), "¥")
     print(f"  [OK] 本会话 LLM 累计：{calls} 次调用，{total_tok:,} tokens，费用 {symbol}{cost:.4f}")
 
 
 def _print_timing_summary() -> None:
-    """输出本次运行时各模块耗时排行。"""
-    from src.python.report.excel_generator import _timing_records
-    if not _timing_records:
-        return
-    total = sum(t for _, t in _timing_records)
-    print()
-    print(f"  ┌{'─' * 48}┐")
-    print(f"  │  ⏱ 模块耗时排行（总计 {total:.1f}s）{' ' * 17}│")
-    print(f"  ├{'─' * 48}┤")
-    sorted_records = sorted(_timing_records, key=lambda x: -x[1])
-    for label, t in sorted_records:
-        pct = t / total * 100 if total > 0 else 0
-        bar_len = int(pct / 100 * 24)
-        bar = "█" * bar_len + "░" * (24 - bar_len)
-        print(f"  │ {label:<18s} {t:>6.1f}s {pct:>5.1f}% {bar} │")
-    print(f"  └{'─' * 48}┘")
-    _timing_records.clear()
-
-
-def _add_error(msg: str) -> None:
-    """向当前会话的错误汇总列表添加一条错误。"""
-    _generation_errors.append(msg)
-    logger.warning("生成异常: %s", msg)
-
-
-def _call_sheet(label: str, fn, *args, **kwargs) -> bool:
-    """安全调用单页写入函数，失败时记录错误并继续。
-
-    Args:
-        label: 页面名称（中文，用于日志/输出）
-        fn: 要调用的写入函数（为 None 时视为模块缺失）
-        args, kwargs: 传递给 fn 的参数
-
-    Returns:
-        True 表示成功，False 表示失败/未调用
-    """
-    if fn is None:
-        _add_error(f"{label}模块缺失，跳过")
-        return False
-    try:
-        print(f"  [..] 正在生成{label}...")
-        fn(*args, **kwargs)
-        print(f"  [OK] {label}生成完成")
-        return True
-    except Exception as e:
-        _add_error(f"{label}生成失败: {e}")
-        logger.exception(f"{label}写入异常")
-        return False
-
-
-def _clear_errors() -> None:
-    """清空错误汇总。"""
-    _generation_errors.clear()
-
-
-def _print_error_summary() -> None:
-    """如果存在错误，在 TUI 尾部输出汇总。"""
-    if not _generation_errors:
-        return
-    print()
-    print(f"  ╔{'═' * 48}╗")
-    print(f"  ║  ⚠ 本次运行异常汇总：{len(_generation_errors)} 项             ║")
-    print(f"  ╠{'═' * 48}╣")
-    for i, err in enumerate(_generation_errors, 1):
-        truncated = err if len(err) <= 70 else err[:67] + "..."
-        print(f"  ║ {i}. {truncated:<45} ║")
-    print(f"  ╚{'═' * 48}╝")
-    print(f"  详细日志请查看 logs/app.log")
+    """输出本次运行时各模块耗时排行（委托至 TuiProgressReporter）。"""
+    TuiProgressReporter().print_timing_summary()
 
 
 # ── 辅助函数 ──────────────────────────────────────────────
@@ -173,12 +106,9 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
     """
     try:
         from src.python.cache import check_and_refresh_caches
-        from src.python.fetcher import (
-            batch_fetch_industry_data,
-            fetch_fund_holdings,
-            fetch_fund_rankings,
-            fetch_market_data,
-        )
+        from src.python.fetcher.industry import batch_fetch_industry_data
+        from src.python.fetcher.fund import fetch_fund_holdings, fetch_fund_rankings
+        from src.python.fetcher.price import fetch_market_data
         from src.python.report.fund_performance import _is_fund
 
         new_codes = check_and_refresh_caches(holdings)
@@ -278,7 +208,7 @@ def _select_holdings_file() -> str | None:
 def _cmd_generate_excel() -> None:
     """生成 Excel 分析报告（必选内容）。"""
     _refresh_config()
-    _clear_errors()
+    reporter = TuiProgressReporter()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -286,39 +216,34 @@ def _cmd_generate_excel() -> None:
     try:
         holdings = read_holdings(filepath)
         if not holdings:
-            _add_error("未读取到有效的持仓数据")
+            reporter.add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
             _press_any_key()
             return
         _check_and_warm_for_new_assets(holdings)
-        _generate_excel_report(holdings, include_news=False, output_dir=config.get("output_dir", "reports"))
+        _generate_excel_report(holdings, include_news=False, output_dir=config.get("output_dir", "reports"), progress=reporter)
     except Exception as e:
-        _add_error(str(e))
+        reporter.add_error(str(e))
         logger.exception("生成 Excel 报告失败")
         _print_error_with_hint(e, "生成失败")
-    _print_error_summary()
-    _print_timing_summary()
+    reporter.print_error_summary()
+    reporter.print_timing_summary()
     _press_any_key()
 
 
-def _generate_excel_report(*args, **kwargs):
+def _generate_excel_report(*args, progress=None, **kwargs):
     """生成 Excel 报告（委托给 excel_generator 模块）。"""
-    callbacks = {
-        "add_error": _add_error,
-        "call_sheet": _call_sheet,
-        "show_llm_tui": _show_llm_tui,
-        "print_llm_session_usage": _print_llm_session_usage,
-    }
     from src.python.report.excel_generator import generate_excel_report
-    return generate_excel_report(*args, **kwargs, callbacks=callbacks)
+    prog = progress if progress is not None else TuiProgressReporter()
+    return generate_excel_report(*args, **kwargs, progress=prog)
 
 
 def _cmd_generate_html(news: bool = False) -> None:
     """生成基础的 HTML 分析报告。"""
     _refresh_config()
-    _clear_errors()
+    reporter = TuiProgressReporter()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -328,7 +253,7 @@ def _cmd_generate_html(news: bool = False) -> None:
         print("  [..] 正在读取持仓数据...")
         holdings = read_holdings(filepath)
         if not holdings:
-            _add_error("未读取到有效的持仓数据")
+            reporter.add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
@@ -343,22 +268,23 @@ def _cmd_generate_html(news: bool = False) -> None:
         path = write_html_report(
             holdings, output_dir=config.get("output_dir", "reports"),
             news_top_count=news_top_count, include_news=news,
+            progress=reporter,
         )
         print()
         print(f"  [OK] HTML 报告已生成: {path}")
     except Exception as e:
-        _add_error(f"HTML 报告生成失败: {e}")
+        reporter.add_error(f"HTML 报告生成失败: {e}")
         logger.exception("生成 HTML 报告失败")
         _print_error_with_hint(e, "生成失败")
-    _print_error_summary()
-    _print_timing_summary()
+    reporter.print_error_summary()
+    reporter.print_timing_summary()
     _press_any_key()
 
 
 def _cmd_generate_both() -> None:
     """生成全系列包含新闻的报告（Excel+HTML，不含 LLM 分析章节）。"""
     _refresh_config()
-    _clear_errors()
+    reporter = TuiProgressReporter()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -367,7 +293,7 @@ def _cmd_generate_both() -> None:
     try:
         holdings = read_holdings(filepath)
         if not holdings:
-            _add_error("未读取到有效的持仓数据")
+            reporter.add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
@@ -379,122 +305,45 @@ def _cmd_generate_both() -> None:
         today_str = datetime.now().strftime("%Y-%m-%d")
 
         from src.python.report.market_value import _generate_details
-        print("  [..] 正在获取行情数据...")
+        reporter.info("正在获取行情数据...")
         details = _generate_details(holdings, today_str)
         _check_network_available(details)
-        print(f"  [OK] 行情数据获取完成，共 {len(details)} 条")
+        reporter.ok(f"行情数据获取完成，共 {len(details)} 条")
 
         from src.python.report.html_writer import write_html_report
-        print("  [..] 正在生成 HTML 报告（含新闻）...")
+        reporter.info("正在生成 HTML 报告（含新闻）...")
         try:
             path = write_html_report(
                 holdings, output_dir=output_dir,
                 news_top_count=news_top_count, include_news=True,
-                details=details,
+                details=details, progress=reporter,
             )
-            print(f"  [OK] HTML 报告已生成: {path}")
+            reporter.ok(f"HTML 报告已生成: {path}")
         except Exception as e:
-            _add_error(f"HTML 报告生成失败: {e}")
+            reporter.add_error(f"HTML 报告生成失败: {e}")
             logger.exception("HTML 报告写入失败")
-            print(f"  [ERR] HTML 报告生成失败: {e}")
-            print("  [..] 继续生成 Excel 报告...")
+            reporter.error(f"HTML 报告生成失败: {e}")
+            reporter.info("继续生成 Excel 报告...")
 
         print()
         _generate_excel_report(
             holdings, include_news=True, output_dir=output_dir,
             news_top_count=news_top_count, details=details,
+            progress=reporter,
         )
     except Exception as e:
-        _add_error(f"全系列报告生成失败: {e}")
+        reporter.add_error(f"全系列报告生成失败: {e}")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
-    _print_error_summary()
-    _print_timing_summary()
+    reporter.print_error_summary()
+    reporter.print_timing_summary()
     _press_any_key()
-
-
-def _show_llm_tui(global_macro_text: str, expert_review_text: str, health_check_text: str = "", penetration_deep_text: str = "") -> None:
-    """在 TUI 终端中展示 LLM 分析章节摘要。"""
-    W = 72
-
-    def _trim(text: str, max_len: int = 280) -> str:
-        if len(text) <= max_len:
-            return text
-        cut = text[:max_len]
-        last_period = cut.rfind("。")
-        if last_period > max_len // 2:
-            return cut[:last_period + 1]
-        return cut + "…"
-
-    def _print_box(title: str, body: str) -> None:
-        border = "─" * (W - 2)
-        print(f"  ┌{border}┐")
-        print(f"  │ {title:<{W - 3}}│")
-        print(f"  ├{border}┤")
-        for line in body.split("\n"):
-            for chunk in [line[i:i + W - 4] for i in range(0, max(len(line), 1), W - 4)]:
-                print(f"  │ {chunk:<{W - 3}}│")
-        print(f"  └{border}┘")
-
-    if global_macro_text:
-        _print_box(get_llm_module_name('global_macro'), _trim(global_macro_text.strip(), 200))
-        print()
-
-    if expert_review_text:
-        phase3 = ""
-        for kw in ("定音锤", "Phase 3", "⚖"):
-            idx = expert_review_text.find(kw)
-            if idx >= 0:
-                phase3 = expert_review_text[idx:]
-                break
-        phase1 = ""
-        for kw in ("召集令", "Phase 1", "🕵"):
-            idx = expert_review_text.find(kw)
-            if idx >= 0:
-                end = expert_review_text.find("Phase 2", idx)
-                if end < 0:
-                    end = expert_review_text.find("**Phase 2", idx)
-                if end < 0:
-                    end = expert_review_text.find("圆桌", idx)
-                if end < 0:
-                    end = idx + 400
-                phase1 = expert_review_text[idx:end]
-                break
-
-        parts = [p for p in [phase1, phase3] if p]
-        body = _trim("\n".join(parts) if parts else expert_review_text.strip(), 500)
-        _print_box(get_llm_module_name('expert_review'), body)
-    print()
-
-    if health_check_text:
-        # 提取综合评分和评级供 TUI 展示
-        lines = health_check_text.split("\n")
-        score_line = ""
-        for line in lines:
-            if "总分" in line or "综合评分" in line:
-                score_line = line.strip()[:120]
-                break
-        body = score_line if score_line else _trim(health_check_text.strip(), 200)
-        _print_box(get_llm_module_name('health_check'), body)
-    print()
-
-    if penetration_deep_text:
-        # 提取穿透深度分析概要
-        lines = penetration_deep_text.split("\n")
-        summary_line = ""
-        for line in lines:
-            if "集中度" in line or "行业" in line or "国家" in line or "货币" in line:
-                summary_line = line.strip()[:120]
-                break
-        body = summary_line if summary_line else _trim(penetration_deep_text.strip(), 200)
-        _print_box(get_llm_module_name('penetration_deep'), body)
-    print()
 
 
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 分析章节）。"""
     _refresh_config()
-    _clear_errors()
+    reporter = TuiProgressReporter()
     config = get_config_cache() or {}
     filepath = _select_holdings_file()
     if not filepath:
@@ -503,7 +352,7 @@ def _cmd_generate_full() -> None:
     try:
         holdings = read_holdings(filepath)
         if not holdings:
-            _add_error("未读取到有效的持仓数据")
+            reporter.add_error("未读取到有效的持仓数据")
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
@@ -513,11 +362,12 @@ def _cmd_generate_full() -> None:
         output_dir = config.get("output_dir", "reports")
         news_top_count = int(config.get("news_top_count", 100))
 
-        from src.python.fetcher import fetch_indices, fetch_us_indices
+        from src.python.fetcher.index import fetch_indices, fetch_us_indices
         from src.python.report.market_value import _generate_details, classify_holdings
         from src.python.report.penetration import compute_penetration_top10
 
         today_str = datetime.now().strftime("%Y-%m-%d")
+        reporter.info("正在获取行情数据...")
         details = _generate_details(holdings, today_str)
         _check_network_available(details)
         total_mv = sum(d.market_value for d in details)
@@ -554,7 +404,7 @@ def _cmd_generate_full() -> None:
         from src.python.providers.akshare_extras import get_sector_fund_flow
         from src.python.report.news_correlation import build_news_data
 
-        print("  [..] 正在并行获取新闻 + LLM 内容...")
+        reporter.info("正在并行获取新闻 + LLM 内容...")
 
         _sector_flow = get_sector_fund_flow()
 
@@ -571,7 +421,7 @@ def _cmd_generate_full() -> None:
         except (EOFError, KeyboardInterrupt):
             _force_llm = False
         if _force_llm:
-            print("  [OK] 将跳过 LLM 缓存强制重新生成")
+            reporter.ok("将跳过 LLM 缓存强制重新生成")
 
         with ThreadPoolExecutor(max_workers=2) as _llm_ex:
 
@@ -611,28 +461,28 @@ def _cmd_generate_full() -> None:
                                 failed.append(get_llm_module_name(mk))
 
                         for name in disabled:
-                            print(f"  [..] {name}：已跳过（菜单 S 可切换）")
+                            reporter.info(f"{name}：已跳过（菜单 S 可切换）")
                         for name in failed:
-                            _add_error(f"{name}：内容生成失败（已降级使用占位文本）")
-                            print(f"  [!] {name}：内容生成失败（已降级使用占位文本）")
+                            reporter.add_error(f"{name}：内容生成失败（已降级使用占位文本）")
+                            reporter.warn(f"{name}：内容生成失败（已降级使用占位文本）")
 
                         if ok_count > 0 and not failed:
                             tag = "缓存" if all(_CACHED_FLAGS) else "LLM"
-                            print(f"  [OK] {tag} 内容生成完成")
+                            reporter.ok(f"{tag} 内容生成完成")
                         elif ok_count == 0 and not failed and not disabled:
-                            print("  [!] LLM 均未生成（请检查 LLM 配置）")
+                            reporter.warn("LLM 均未生成（请检查 LLM 配置）")
                         elif ok_count == 0 and not failed:
-                            print("  [..] 所有 LLM 内容已跳过，未调用 LLM")
+                            reporter.info("所有 LLM 内容已跳过，未调用 LLM")
                     except Exception as e:
-                        _add_error(f"LLM 内容生成异常: {e}")
-                        print(f"  [ERR] LLM 内容生成异常: {e}")
+                        reporter.add_error(f"LLM 内容生成异常: {e}")
+                        reporter.error(f"LLM 内容生成异常: {e}")
                 else:
                     try:
                         news_data, news_llm_meta = fut.result()
-                        print(f"  [OK] 新闻获取完成，共 {len(news_data)} 条")
+                        reporter.ok(f"新闻获取完成，共 {len(news_data)} 条")
                     except Exception as e:
-                        _add_error(f"新闻获取失败: {e}")
-                        print(f"  [!] 新闻获取失败: {e}")
+                        reporter.add_error(f"新闻获取失败: {e}")
+                        reporter.warn(f"新闻获取失败: {e}")
 
         _print_llm_session_usage()
 
@@ -649,44 +499,44 @@ def _cmd_generate_full() -> None:
             if _early_warnings.get("has_warnings"):
                 _n_sector = len(_early_warnings.get("sector_alerts", []))
                 _n_sentiment = len(_early_warnings.get("sentiment_alerts", []))
-                print(f"  [OK] 智能预警完成: {_n_sector} 条行业预警, {_n_sentiment} 条新闻情绪")
+                reporter.ok(f"智能预警完成: {_n_sector} 条行业预警, {_n_sentiment} 条新闻情绪")
         except Exception as e:
             logger.warning("智能预警计算失败: %s", e)
             _early_warnings = None
 
         from src.python.report.html_writer import write_html_report
-        print("  [..] 正在生成 HTML 报告（含新闻 + LLM 分析章节）...")
+        reporter.info("正在生成 HTML 报告（含新闻 + LLM 分析章节）...")
         try:
             path = write_html_report(
                 holdings, output_dir=output_dir,
                 news_top_count=news_top_count, include_news=True,
                 llm_content=llm_content, details=details,
                 news_data=news_data, news_llm_meta=news_llm_meta,
-                early_warnings=_early_warnings,
+                early_warnings=_early_warnings, progress=reporter,
             )
-            print(f"  [OK] HTML 报告已生成: {path}")
+            reporter.ok(f"HTML 报告已生成: {path}")
         except Exception as e:
-            _add_error(f"HTML 报告生成失败: {e}")
+            reporter.add_error(f"HTML 报告生成失败: {e}")
             logger.exception("HTML 报告写入失败")
-            print(f"  [ERR] HTML 报告生成失败: {e}")
-            print("  [..] 继续生成 Excel 报告...")
+            reporter.error(f"HTML 报告生成失败: {e}")
+            reporter.info("继续生成 Excel 报告...")
 
         print()
         _generate_excel_report(
             holdings, include_news=True, output_dir=output_dir,
             news_top_count=news_top_count, include_llm=True,
-            llm_content=llm_content, show_llm_in_tui=True,
+            llm_content=llm_content,
             details=details, a_indices=a_indices, us_indices=us_indices,
             news_data=news_data, llm_cached=llm_cached,
             news_llm_meta=news_llm_meta,
-            early_warnings=_early_warnings,
+            early_warnings=_early_warnings, progress=reporter,
         )
     except Exception as e:
-        _add_error(f"全系列报告生成失败: {e}")
+        reporter.add_error(f"全系列报告生成失败: {e}")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
-    _print_error_summary()
-    _print_timing_summary()
+    reporter.print_error_summary()
+    reporter.print_timing_summary()
     _press_any_key()
 
 
@@ -837,7 +687,7 @@ def _refresh_common_caches() -> None:
 
 def _cmd_update_basic_cache() -> None:
     """更新基础类缓存。"""
-    from src.python.fetcher import fetch_fund_benchmark, fetch_fund_holdings, fetch_fund_rankings
+    from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_holdings, fetch_fund_rankings
     from src.python.report.fund_performance import _is_fund
 
     holdings = _read_holdings_and_clear_cache("refresh")
@@ -969,7 +819,8 @@ def _cmd_update_basic_cache() -> None:
 
 def _cmd_update_position_cache() -> None:
     """更新持仓类缓存。"""
-    from src.python.fetcher import fetch_indices, fetch_market_data, fetch_us_indices
+    from src.python.fetcher.index import fetch_indices, fetch_us_indices
+    from src.python.fetcher.price import fetch_market_data
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     holdings = _read_holdings_and_clear_cache("preload")
@@ -1049,12 +900,16 @@ def _cmd_cleanup_cache() -> None:
 
 def _cmd_show_cache_stats() -> None:
     """查看缓存统计信息。"""
-    from src.python.cache import cleanup_expired, get_cache_dir, get_cache_stats
+    from src.python.cache import cleanup_expired, get_cache_dir, get_cache_hit_rate, get_cache_stats
     cache_dir = get_cache_dir()
     stats = get_cache_stats()
+    hit_rate = get_cache_hit_rate()
     print(f"  缓存目录: {cache_dir}")
     print(f"  文件总数: {stats['total_files']}")
     print(f"  总大小:   {stats['total_size_bytes'] / 1024:.0f} KB")
+    if hit_rate["total"] > 0:
+        pct = hit_rate["rate"] * 100
+        print(f"  命中率:   {pct:.1f}% ({hit_rate['hits']} 命中 / {hit_rate['total']} 次请求)")
     print(f"  按前缀分类:")
     for prefix, count in sorted(stats.get("by_prefix", {}).items()):
         print(f"    {prefix}_*: {count} 个文件")

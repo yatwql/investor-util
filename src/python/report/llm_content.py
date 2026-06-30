@@ -35,7 +35,6 @@ _COL_WIDTH = 80          # 固定列宽（字符宽度）
 _CHARS_PER_LINE = 40     # 每行约 40 中文字符
 _ROW_HEIGHT_MIN = 30     # 最小行高 (pt)
 _ROW_HEIGHT_PER_LINE = 15  # 每行增加高度 (pt)
-_CACHE_HINT_TEXT = "本次使用LLM缓存，未直接使用LLM服务能力"
 
 # 匹配 LLM 生成的底部标识行：<p style="color:#888;font-size:12px">...</p>
 _FOOTER_RE = re.compile(
@@ -85,12 +84,6 @@ _CONTENT_ALIGN = Alignment(
     horizontal="left",
 )
 
-_CACHE_HINT_FONT = Font(
-    color="999999",
-    size=9,
-    italic=True,
-)
-
 _MODEL_NAME_FONT = Font(
     color="888888",
     size=9,
@@ -111,7 +104,7 @@ def _get_module_key_map() -> dict[str, str]:
 
     格式：{"8.全球政经局势": "global_macro", ...}
     页签号由 LLM 模块遍历顺序派生（从 8 开始）。
-    注意：news_correlation 无独立 LLM 页签（合并到新闻页签），排除在外。
+    注意：news_correlation 无独立 LLM 分析章节（合并到新闻章节），排除在外。
     """
     if _MODULE_KEY_MAP:
         return _MODULE_KEY_MAP
@@ -147,26 +140,18 @@ def _write_content_sheet(
     ws: Worksheet,
     title: str,
     content: str | None,
-    from_cache: bool = False,
-    model_name: str = "",
-    thinking_enabled: bool = False,
 ) -> None:
     """写入一个 LLM 分析章节。
 
     结构：
       - 第 1 行：标题（合并 A1:B1，居中标题样式）
       - 第 2 行起：每段落占一行 + 一行空行间距
-      - 若 from_cache 为 True，末尾追加灰色缓存提示行
-      - 若非缓存且 model_name 非空，末尾追加模型名标识行
-      - 若 thinking_enabled 为 True，追加 Extended Thinking 标识行
+      - 底部标识行从 HTML 内容末尾的 ``<p style="color:#888;font-size:12px">`` 标签提取
 
     Args:
         ws: 目标工作表
         title: 页签标题行文本
         content: LLM 返回的 HTML 文本（已剥离标签），为 None 时写入占位符
-        from_cache: 是否来自缓存（为 True 时追加缓存提示）
-        model_name: 使用的 LLM 模型名称（非缓存时追加标识行）
-        thinking_enabled: 是否开启 Extended Thinking（非缓存时追加标识行）
     """
     ws.title = title
 
@@ -204,24 +189,6 @@ def _write_content_sheet(
             cell.alignment = Alignment(horizontal="left", vertical="center")
             ws.row_dimensions[row].height = 20
             row += 1
-        else:
-            # 无嵌入式 footer 时的后备行为（兼容旧版缓存/旧版 LLM 内容）
-            if from_cache and content and _CACHE_HINT_TEXT not in content:
-                cell = ws.cell(row=row, column=1, value=_CACHE_HINT_TEXT)
-                cell.font = _CACHE_HINT_FONT
-                cell.alignment = Alignment(horizontal="left", vertical="center")
-                ws.row_dimensions[row].height = 20
-            if not from_cache and model_name and content:
-                cell = ws.cell(row=row, column=1, value=f"模型：{model_name}")
-                cell.font = _MODEL_NAME_FONT
-                cell.alignment = Alignment(horizontal="left", vertical="center")
-                ws.row_dimensions[row].height = 20
-                row += 1
-            if thinking_enabled and content:
-                cell = ws.cell(row=row, column=1, value="Extended Thinking 已开启")
-                cell.font = _THINKING_FONT
-                cell.alignment = Alignment(horizontal="left", vertical="center")
-                ws.row_dimensions[row].height = 20
     else:
         placeholder = _get_placeholder(title)
         cell = ws.cell(row=row, column=1, value=placeholder)
@@ -237,20 +204,16 @@ def _write_content_sheet(
 def write_llm_sheets(
     wb: Any,
     llm_content: tuple[str | None, str | None, str | None, str | None],
-    llm_cached: tuple[bool, bool, bool, bool] = (False, False, False, False),
-    model_names: tuple[str, str, str, str] = ("", "", "", ""),
-    thinking: tuple[bool, bool, bool, bool] = (False, False, False, False),
 ) -> tuple[str, str, str, str]:
     """写入 LLM 分析章节（全球政经局势 & 智囊团深度复盘 & 持仓体检报告 & 穿透深度分析）。
 
     调用方必须预先生成 llm_content，本函数仅负责写入 Excel。
+    底部标识行（模型名/Token用量/缓存/Extended Thinking）已嵌入 HTML 内容中，
+    由 ``_extract_footer_text()`` 提取后追加到页签尾部。
 
     Args:
         wb: 工作簿
         llm_content: (global_macro_html, expert_review_html, health_check_html, penetration_deep_html) 预生成内容
-        llm_cached: (global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached) 缓存标记
-        model_names: (global_macro_model, expert_review_model, health_check_model, penetration_deep_model) 模型名称
-        thinking: (global_macro_thinking, expert_review_thinking, health_check_thinking, penetration_deep_thinking) Extended Thinking
 
     Returns:
         (global_macro_text, expert_review_text, health_check_text, penetration_deep_text) 纯文本四元组，供 TUI 展示
@@ -264,24 +227,20 @@ def write_llm_sheets(
     )
 
     content7, content8, content9, contentA = llm_content
-    global_macro_cached, expert_review_cached, health_check_cached, penetration_deep_cached = llm_cached
-    name7, name8, name9, nameA = model_names
-    think7, think8, think9, thinkA = thinking
 
-    _sheet_pairs = [
-        ("global_macro", content7, global_macro_cached, name7, think7),
-        ("expert_review", content8, expert_review_cached, name8, think8),
-        ("health_check", content9, health_check_cached, name9, think9),
-        ("penetration_deep", contentA, penetration_deep_cached, nameA, thinkA),
+    _module_contents = [
+        ("global_macro", content7),
+        ("expert_review", content8),
+        ("health_check", content9),
+        ("penetration_deep", contentA),
     ]
-    for i, (mk, content, cached, mname, think_flag) in enumerate(_sheet_pairs):
+    for i, (mk, content) in enumerate(_module_contents):
         if _disabled[i]:
-            logger.info("LLM 页签跳过（已禁用）: %s", get_llm_module_name(mk))
+            logger.info("LLM 分析章节跳过（已禁用）: %s", get_llm_module_name(mk))
             continue
         ws = wb.create_sheet()
         ws.title = _reverse.get(mk, get_llm_module_name(mk))
-        _write_content_sheet(ws, _reverse.get(mk, get_llm_module_name(mk)),
-                             content, from_cache=cached, model_name=mname, thinking_enabled=think_flag)
+        _write_content_sheet(ws, _reverse.get(mk, get_llm_module_name(mk)), content)
 
     logger.info("LLM 分析章节写入完成（含%s）", get_llm_module_name("penetration_deep"))
 
