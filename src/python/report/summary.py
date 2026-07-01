@@ -306,11 +306,12 @@ def write_llm_module_status_block(ws: Worksheet) -> None:
         ws: 汇总页工作表
     """
     from src.python.llm import (
-        _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
+        FAIL_REASON_DISABLED,
         FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
         FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
         get_session_usage,
     )
+    from src.python.llm.prompts import _LLM_MODULE_FAILURE
 
     _DISPLAY_REASON: dict[str, str] = {
         FAIL_REASON_NOT_CONFIGURED: "LLM 未配置",

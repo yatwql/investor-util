@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.49 — 待办区清空，规划 D~H 新方向）
+最后更新：2026-07-01（v0.2.51 — P2 测试覆盖全部完成 + 配置审查、兼容代码清理）
 
 ---
 
@@ -92,7 +92,7 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 - **R-031 ✅** `test_tiantian.py` 39 项
 - **R-032 ✅** `test_skeleton.py` 9 项
 
-### A2. 大函数拆分（低难度 / 中价值）✅ 已完成（v0.2.48 / v0.2.49）
+### A2. 大函数拆分（低难度 / 中价值）✅ 已完成（v0.2.48 / v0.2.49 / v0.2.50）
 
 - **R-020~R-023 ✅** `generate_excel_report`/`generate_all_llm`/`write_llm_usage_sheet`/`compute_penetration_top10`
 - **R-026 ✅** `write_fund_performance_sheet` 164→55 行
@@ -100,6 +100,20 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 - **R-028 ✅** `build_news_data` 159→60 行
 - **R-029 ✅** `tiantian.py` 三大函数全部分解
 - **R-030 ✅** `skeleton.py` 两大函数拆分
+- **R-033~R-042 ✅** 全部 8 个大函数（>100行）拆分完成
+
+### A3. 测试覆盖补全（二期）（低难度 / 中价值）✅ 已完成（v0.2.50 / v0.2.51）
+
+- **R-033/R-034 ✅** `http_client.py`（17 项）/ `market_hours.py`（41 项）测试
+- **R-043~R-046 ✅** circuit_breaker/pricing/markdown 已有充分覆盖无需加测
+- **R-044 ✅** `fingerprint.py` 新增 16 项测试
+- **R-047~R-049 ✅** 三大新闻 provider 新增 50 项测试
+
+### A4. 代码治理完成项（低难度 / 低价值）✅ 已完成（v0.2.51）
+
+- **R-050 ✅** `llm/__init__.py` 过度导出治理：移除 ~60 个私有符号 re-export，仅保留公有接口
+- **`llm/skeleton.py` 全局 max_tokens 回退清理**：移除旧版配置全局 `max_tokens` 兜底路径
+- **`config.py` 键名兼容去重**：移除 `_LLM_KEY_OVERLAP_KEYS` 跨文件键名互通机制
 
 ---
 
@@ -115,44 +129,25 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 - **报告对比**：将本次报告的关键指标（市值/盈亏/仓位）与上次对比，输出变化摘要
 - **回撤监控**：从历史缓存中提取持仓的连续回撤曲线
 
-### D. 测试覆盖补全（二期）（低难度 / 中价值）
-
-补齐当前测试缺口中的高优先级模块：
-
-- **P0 `http_client.py` 单元测试**：HTTP 客户端工厂，所有 provider 共用，覆盖 `make_http_client` 配置合并/超时/SSL_VERIFY 环境变量
-- **P0 `market_hours.py` 单元测试**：交易时段判断核心，覆盖 3 层策略链（配置/API/回退）、午餐排除、盘前/盘中/盘后判定
-- **P1 `llm/circuit_breaker.py` 单元测试**：熔断器模块，覆盖 `_cb_endpoint`/`_cb_record_failure`/`_cb_is_open`/冷却期自动恢复
-- **P1 `llm/fingerprint.py` 单元测试**：缓存指纹计算，覆盖 `_build_llm_fingerprint`/`_compute_fingerprint`/`_get_cache_ttl_llm`
-- **P1 `llm/pricing.py` 单元测试**：定价估算，覆盖 `_estimate_cost`/`_reload_pricing`/`_PRICING_MERGED` 合并逻辑
-- **P1 `llm/markdown.py` 单元测试**：Markdown→HTML 转换覆盖
-- **P2 `providers/eastmoney_news.py`/`sina_news.py`/`wallstreetcn_news.py` 单元测试**：各新闻 provider 独立覆盖
-
-### E. 大函数拆分（二期）（低难度 / 中价值）
-
-当前仍存 8 个 >100 行函数待拆分：
-
-- **R-033** `llm/generators.py:enhance_news_correlation`（128 行）— 新闻 LLM 分析核心
-- **R-034** `report/category.py:write_category_sheet`（124 行）— 分类汇总表写入
-- **R-035** `report/news_correlation.py:_build_keyword_lookup`（119 行）— 关键词查找构建
-- **R-036** `llm/api.py:_call_llm_with_retry`（114 行）— LLM 调用重试核心
-- **R-037** `report/news_correlation.py:write_news_sheet`（113 行）— 新闻工作表写入
-- **R-038** `report/html_writer.py:_build_perf_data`（107 行）— HTML 性能数据构建
-- **R-039** `providers/news_aggregator.py:aggregate_news`（106 行）— 多源新闻聚合
-- **R-040** `report/penetration.py:write_penetration_sheet`（105 行）— 穿透分析表写入
-
 ### F. LLM 分析增强
 
 - **环比分析**：对比历史报告摘要，说明组合变化趋势
 
-### G. `llm/__init__.py` 过度导出治理（低难度 / 低价值）
+### H. 代码治理（低难度 / 中价值）
 
-`llm/__init__.py` 从 6 个子模块 re-export 了约 60 个私有符号（`_` 前缀），既是公共 API 又暴露内部实现。建议：
+#### R-051 `report/html_writer.py` 文件偏大
 
-- 仅保留公有函数/类的导出
-- 移除不必要的 `_` 前缀私有符号导出
-- 各模块直接引用子模块路径
+792 行，虽已拆分函数，但文件整体仍可考虑按章节拆分（HTML 头部/LLM 章节/历史净值/穿透数据分拆为独立模块）。
 
-### H. 配置/依赖治理（低难度 / 低价值）
+#### R-052 `report/penetration.py` 文件偏大
 
-- **`requirements.txt` → `pyproject.toml` 迁移**：增加版本锁定和元数据描述
-- **`config.json` cache_ttl 条目自动化**：从 registry 自动派生，减少手动同步遗漏
+715 行，穿透逻辑与 Excel 写入混合，建议将纯计算逻辑（行业分级/基金穿透/前十权重）与工作表写入解耦。
+
+#### R-053 `requirements.txt` 缺少锁定版本
+
+仅有 5 个顶层依赖（httpx, openpyxl, jinja2, akshare, lxml），建议使用 `pip freeze` 导出锁定文件或迁移至 `pyproject.toml`。
+
+### I. 配置治理（低难度 / 低价值）
+
+- **`early_warning` 配置段添加 `validate_config()` 校验**：`sector_alert_threshold_warning`/`danger`/`sentiment_top_n` 当前无类型/范围校验
+- **`_FALLBACK_ENABLED` 死路径清理**：`news_aggregator.py` 的后备路径因 `get_config()` 总提供完整默认值而不可达

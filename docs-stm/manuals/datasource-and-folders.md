@@ -93,18 +93,20 @@ investor-util/
 │   │   │   ├── summary.py            # 投资分析汇总页签 — 指数行情、账户汇总、LLM 用量
 │   │   │   ├── market_value.py       # 市值核算明细表页签 — 15 列持仓行情、盈亏计算
 │   │   │   ├── category.py           # 持仓分类表页签 — 按资产属性+投资分类聚合
-│   │   │   ├── penetration.py        # 资产穿透 TOP10 页签 — 基金穿透合并、行业分类
+│   │   │   ├── penetration.py        # 资产穿透 TOP10 — 基金穿透合并、行业分类、板块映射
+│   │   │   ├── penetration_sheet.py  # 穿透 TOP10 Excel 写入 — 从 penetration.py 拆分的页签写入函数
 │   │   │   ├── fund_performance.py   # 基金业绩分析页签 — 排名/收益率/基准对比/评级
 │   │   │   ├── news_correlation.py   # 新闻关联分析页签 — 财经新闻关键词匹配
 │   │   │   ├── early_warning.py      # 智能预警页签 — 行业资金流向联动 + 新闻情绪聚合
 │   │   │   ├── llm_content.py        # LLM 增补页签写入 — 各 LLM 模块的 Excel 页签生成
 │   │   │   ├── html_writer.py        # HTML 报告生成 — Jinja2 模板渲染、HTML 章节编排
+│   │   │   ├── html_builders.py      # HTML 数据构建器 — 持仓分类表/基金业绩数据构建（从 html_writer.py 拆分）
 │   │   │   └── progress.py           # 进度报告接口 — ProgressReporter 基类 + TuiProgressReporter
 │   │   │
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                         # 单元测试（35 个 test_*.py，1264 passed / 11 skipped）
+│   └── test/                         # 单元测试（35 个 test_*.py，1395 passed / 11 skipped）
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     # 持仓 xlsx 文件（用户放置）

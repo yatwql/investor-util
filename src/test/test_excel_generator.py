@@ -77,7 +77,7 @@ class _SheetMocks:
             patch("src.python.report.market_value.price_update_status", self.price_update_status),
             patch("src.python.report.category.write_category_sheet", self.write_category),
             patch("src.python.report.penetration.compute_penetration_top10", self.compute_penetration),
-            patch("src.python.report.penetration.write_penetration_sheet", self.write_penetration),
+            patch("src.python.report.penetration_sheet.write_penetration_sheet", self.write_penetration),
             patch("src.python.report.fund_performance.write_fund_performance_sheet", self.write_fund_performance),
             patch("src.python.report.excel_generator.get_report_sheet_name", side_effect=lambda k: k),
             patch("src.python.report.excel_generator.get_llm_module_name", MagicMock()),

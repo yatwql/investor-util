@@ -21,39 +21,51 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.python.llm import (
-    _SYSTEM_GLOBAL_MACRO,
-    _SYSTEM_EXPERT_REVIEW,
-    _build_global_macro_prompt,
-    _build_expert_review_prompt,
-    _call_claude,
-    _call_llm,
-    _call_openai,
-    _cb_endpoint,
-    _cb_is_open,
-    _cb_record_failure,
-    _cb_record_success,
-    _CIRCUIT_BREAKER_THRESHOLD,
-    _CIRCUIT_BREAKER_RECOVERY,
-    _compute_fingerprint,
-    _CURRENCY_SYMBOLS,
-    _estimate_cost,
-    _extract_content,
-    _get_cache_ttl_llm,
-    _is_effort_model,
-    _log_token_usage,
-    _markdown_to_html,
-    _PRICING_MERGED,
-    _reload_pricing,
-    _record_per_module,
-    _session_usage,
-    _supports_extended_thinking,
-    _track_session_usage,
     format_session_usage,
     generate_all_llm,
     generate_expert_review,
     generate_global_macro,
     get_session_usage,
     reset_session_usage,
+)
+from src.python.llm.api import (
+    _call_claude,
+    _call_llm,
+    _call_openai,
+    _extract_content,
+    _is_effort_model,
+    _log_token_usage,
+    _supports_extended_thinking,
+)
+from src.python.llm.circuit_breaker import (
+    _CIRCUIT_BREAKER_THRESHOLD,
+    _CIRCUIT_BREAKER_RECOVERY,
+    _cb_endpoint,
+    _cb_is_open,
+    _cb_record_failure,
+    _cb_record_success,
+)
+from src.python.llm.fingerprint import (
+    _compute_fingerprint,
+    _get_cache_ttl_llm,
+)
+from src.python.llm.markdown import _markdown_to_html
+from src.python.llm.pricing import (
+    _CURRENCY_SYMBOLS,
+    _PRICING_MERGED,
+    _estimate_cost,
+    _reload_pricing,
+)
+from src.python.llm.prompts import (
+    _SYSTEM_EXPERT_REVIEW,
+    _SYSTEM_GLOBAL_MACRO,
+    _build_expert_review_prompt,
+    _build_global_macro_prompt,
+)
+from src.python.llm.session import (
+    _record_per_module,
+    _session_usage,
+    _track_session_usage,
 )
 
 from src.test.helpers import SynchronousExecutor
@@ -737,7 +749,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_claude_truncation_default_field(self) -> None:
         """默认 config_field='max_tokens' → 日志含 max_tokens。"""
-        from src.python.llm import _check_claude_truncation
+        from src.python.llm.api import _check_claude_truncation
 
         data = {"stop_reason": "max_tokens", "usage": {"output_tokens": 500}}
         with self.assertLogs("invest", level="ERROR") as logs:
@@ -748,7 +760,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_claude_truncation_custom_field(self) -> None:
         """config_field='max_tokens_expert_review' → 日志提示 max_tokens_expert_review。"""
-        from src.python.llm import _check_claude_truncation
+        from src.python.llm.api import _check_claude_truncation
 
         data = {"stop_reason": "max_tokens", "usage": {"output_tokens": 500}}
         with self.assertLogs("invest", level="ERROR") as logs:
@@ -760,7 +772,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_claude_truncation_not_truncated(self) -> None:
         """stop_reason 不是 max_tokens → 不记录日志。"""
-        from src.python.llm import _check_claude_truncation
+        from src.python.llm.api import _check_claude_truncation
 
         data = {"stop_reason": "end_turn", "usage": {"output_tokens": 100}}
         result = _check_claude_truncation(data, 8192, "Claude")
@@ -768,7 +780,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_openai_truncation_custom_field(self) -> None:
         """OpenAI config_field='max_tokens_global_macro' → 日志提示 max_tokens_global_macro。"""
-        from src.python.llm import _check_openai_truncation
+        from src.python.llm.api import _check_openai_truncation
 
         data = {"choices": [{"finish_reason": "length", "message": {"content": "..."}}],
                 "usage": {"completion_tokens": 800}}
@@ -781,7 +793,7 @@ class TestCheckTruncation(unittest.TestCase):
 
     def test_check_openai_truncation_not_truncated(self) -> None:
         """finish_reason 不是 length → 不记录日志。"""
-        from src.python.llm import _check_openai_truncation
+        from src.python.llm.api import _check_openai_truncation
 
         data = {"choices": [{"finish_reason": "stop", "message": {"content": "..."}}],
                 "usage": {"completion_tokens": 100}}
@@ -809,20 +821,20 @@ class TestBuildHoldingsSummary(unittest.TestCase):
         ]
 
     def test_basic(self) -> None:
-        from src.python.llm import _build_holdings_summary
+        from src.python.llm.prompts import _build_holdings_summary
         result = _build_holdings_summary(self.holdings)
         self.assertIn("长江电力", result)
         self.assertIn("600900", result)
         self.assertIn("600519", result)
 
     def test_with_penetration(self) -> None:
-        from src.python.llm import _build_holdings_summary
+        from src.python.llm.prompts import _build_holdings_summary
         result = _build_holdings_summary(self.holdings, self.penetrated)
         self.assertIn("[穿透]", result)
 
     def test_with_industry_data(self) -> None:
         """industry_data 中包含行业和概念 → 显示到摘要中。"""
-        from src.python.llm import _build_holdings_summary
+        from src.python.llm.prompts import _build_holdings_summary
         industry_data = {
             "600900": {"industry": "电力", "concepts": ["核电", "水电"]},
             "600519": {"industry": "白酒Ⅱ", "concepts": ["白酒", "超级品牌"]},
@@ -833,14 +845,14 @@ class TestBuildHoldingsSummary(unittest.TestCase):
         self.assertIn("核电", result)
 
     def test_empty(self) -> None:
-        from src.python.llm import _build_holdings_summary
+        from src.python.llm.prompts import _build_holdings_summary
         result = _build_holdings_summary([], None)
         self.assertEqual(result, "")
 
     def test_limit_20(self) -> None:
         """超过 20 只持仓时截断。"""
         from collections import namedtuple
-        from src.python.llm import _build_holdings_summary
+        from src.python.llm.prompts import _build_holdings_summary
         H = namedtuple("Holding", ["name", "code"])
         many = [H(name=f"股票{i}", code=f"{i:06d}") for i in range(30)]
         result = _build_holdings_summary(many)
@@ -859,7 +871,7 @@ class TestBuildNewsSummary(unittest.TestCase):
     """测试 _build_news_correlation_summary 的格式和内容。"""
 
     def test_basic(self) -> None:
-        from src.python.llm import _build_news_correlation_summary
+        from src.python.llm.prompts import _build_news_correlation_summary
         news = [
             {"title": "能源改革新方案", "intro": "国家能源局发布电力改革方案...",
              "matched_keywords": ["长江电力"]},
@@ -869,12 +881,12 @@ class TestBuildNewsSummary(unittest.TestCase):
         self.assertIn("长江电力", result)
 
     def test_empty(self) -> None:
-        from src.python.llm import _build_news_correlation_summary
+        from src.python.llm.prompts import _build_news_correlation_summary
         self.assertEqual(_build_news_correlation_summary([]), "")
 
     def test_limit_30(self) -> None:
         """超过 30 条时截断。"""
-        from src.python.llm import _build_news_correlation_summary
+        from src.python.llm.prompts import _build_news_correlation_summary
         many = [{"title": f"新闻{i}", "matched_keywords": []} for i in range(50)]
         result = _build_news_correlation_summary(many)
         # 最多 30 条
@@ -898,7 +910,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
         ]
 
     def test_standard_response(self) -> None:
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "白酒利好"}, {"idx": 1, "relevance": "中", "sentiment": "中性", "analysis": "间接影响"}]'
         result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
@@ -908,7 +920,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_with_sentiment(self) -> None:
         """解析 sentiment 字段。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         llm_resp = (
             '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "白酒利好"},'
             ' {"idx": 1, "relevance": "高", "sentiment": "利空", "analysis": "利空影响"},'
@@ -924,7 +936,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_irrelevant_not_filtered(self) -> None:
         """"无关"不再被过滤——元组中直接返回原始数据，由调用方决定是否跳过。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "中性", "analysis": "利好"}, {"idx": 1, "relevance": "无关", "sentiment": "中性", "analysis": "无关内容"}]'
         result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
@@ -934,7 +946,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_malformed_json(self) -> None:
         """JSON 解析失败 → 全部返回默认值。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         result = _apply_llm_news_correlation(self.news, "不是json")
         self.assertEqual(len(result), 3)
         for t in result:
@@ -942,7 +954,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_not_a_list(self) -> None:
         """LLM 返回非数组 → 全部返回默认值。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         result = _apply_llm_news_correlation(self.news, '{"error": "wrong"}')
         self.assertEqual(len(result), 3)
         for t in result:
@@ -950,14 +962,14 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_with_code_block(self) -> None:
         """响应包含 Markdown 代码块 → 正确提取 JSON。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         llm_resp = '```json\n[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "直接利好"}]\n```'
         result = _apply_llm_news_correlation(self.news[:1], llm_resp)
         self.assertEqual(result[0], ("高", "利好", "直接利好"))
 
     def test_idx_out_of_range(self) -> None:
         """idx 越界时忽略该条目，使用默认值填充。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         llm_resp = '[{"idx": 99, "relevance": "高", "sentiment": "利好", "analysis": "越界"}]'
         result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
@@ -966,7 +978,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
 
     def test_empty_batch(self) -> None:
         """空列表 → 返回空列表。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         result = _apply_llm_news_correlation([], "[]")
         self.assertEqual(result, [])
 
@@ -987,7 +999,7 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_handle_5_items_in_one_batch(self) -> None:
         """处理 5 条新闻的批次，全部成功返回。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": i, "relevance": "高", "sentiment": "利好", "analysis": f"原因{i}"}
@@ -1000,7 +1012,7 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_partial_json_response(self) -> None:
         """LLM 返回 3 条结果给 5 条新闻 → 缺失 2 条填充默认值。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
@@ -1017,13 +1029,13 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_empty_batch(self) -> None:
         """空批次 → 返回空列表。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         result = _apply_llm_news_correlation([], "[]")
         self.assertEqual(result, [])
 
     def test_fewer_results_than_requested(self) -> None:
         """LLM 返回 1 条结果给 5 条新闻 → 缺失 4 条填充默认值。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         import json
         llm_resp = json.dumps([
             {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
@@ -1036,7 +1048,7 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_malformed_json_in_batch(self) -> None:
         """JSON 格式错误 → 全部返回默认值。"""
-        from src.python.llm import _apply_llm_news_correlation
+        from src.python.llm.generators import _apply_llm_news_correlation
         result = _apply_llm_news_correlation(self.news_5, "这不是JSON")
         self.assertEqual(len(result), 5)
         for t in result:

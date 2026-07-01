@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.50 — P1 大函数拆分全部完成 + 缓存 TTL 盘中感知缺陷修复 + HTML 报告 LLM 章节按需隐藏）
+最后更新：2026-07-01（v0.2.51 — 待办区全部完成，R-051/R-052 拆分完毕）
 
 ---
 
@@ -46,48 +46,7 @@
 | 2026-07-01 | **datasource-and-folders.md 目录结构完善**：补全 `.gitignore` 描述、5 个 `__init__.py` 描述、修正 `data/config/` 树形符号 | 文档完善 |
 | 2026-07-01 | **全量AST扫描审查**：8个剩余大函数、测试缺口分析、`llm/__init__.py` 过度导出（~60个私有符号）、静默异常清零确认 | 综合审查 |
 | 2026-07-01 | **新一轮全量审查** — 8个大函数定位、测试缺口（http_client/market_hours/llm子模块）识别、P3代码治理（__init__.py导出/html_writer文件拆分） | 综合审查 |
+| 2026-07-01 | **P2 全部完成（R-043~R-049）** — fingerprint 新增 16 项测试、3 个新闻 provider 新增 50 项测试、circuit_breaker/pricing/markdown 确认已有测试充分无需新增。全量 1402 测试通过。 | 测试覆盖完成 |
+| 2026-07-01 | **全量配置 + 代码兼容性审查** — 发现 early_warning 配置段无 validate_config() 校验、_FALLBACK_ENABLED 死路径（不可达后备）、max_tokens 全局回退幽灵字段、_LLM_KEY_OVERLAP_KEYS 跨文件兼容机制 | 配置审计 |
 
 ---
-
-## 待办区
-
-### P0 — 基础设施测试覆盖（当前迭代）
-
-| 编号 | 模块 | 问题 | 状态 |
-|------|------|------|------|
-| R-033 | `http_client.py` | 缺少专用单元测试 — HTTP 客户端工厂，所有 provider 共用 | ✅ 17项覆盖 |
-| R-034 | `market_hours.py` | 缺少专用单元测试 — 交易时段判断核心，影响缓存 TTL 和报告日期 | ✅ 41项覆盖 |
-
-### P1 — 大函数拆分
-
-| 编号 | 文件:函数 | 行数 | 问题 | 状态 |
-|------|----------|------|------|------|
-| R-035 | `report/news_correlation.py:_build_keyword_lookup` | 119 | 关键词查找构建 | ✅ 提取6个辅助函数，核心降至28行 (2026-07-01) |
-| R-036 | `report/category.py:write_category_sheet` | 124 | 分类汇总表写入 | ✅ 提取3个辅助函数，核心降至58行 (2026-07-01) |
-| R-037 | `llm/generators.py:enhance_news_correlation` | 128 | 新闻 LLM 分析核心，含批处理逻辑，可拆分 | ✅ 提取5个辅助函数，核心降至35行 (2026-07-01) |
-| R-038 | `llm/api.py:_call_llm_with_retry` | 114 | LLM 调用重试核心 | ✅ 提取2个辅助函数，核心降至75行 (2026-07-01) |
-| R-039 | `report/news_correlation.py:write_news_sheet` | 113 | 新闻工作表写入 | ✅ 提取3个辅助函数，核心降至48行 (2026-07-01) |
-| R-040 | `report/html_writer.py:_build_perf_data` | 107 | HTML 性能数据构建 | ✅ 提取_build_single_perf_item，核心降至27行 (2026-07-01) |
-| R-041 | `providers/news_aggregator.py:aggregate_news` | 106 | 多源新闻聚合 | ✅ 提取4个辅助函数，核心降至27行 (2026-07-01) |
-| R-042 | `report/penetration.py:write_penetration_sheet` | 105 | 穿透分析表写入 | ✅ 提取3个辅助函数，核心降至40行 (2026-07-01) |
-
-### P2 — 补充模块测试
-
-| 编号 | 模块 | 风险 | 说明 | 状态 |
-|------|------|------|------|------|
-| R-043 | `llm/circuit_breaker.py` | 🟡 中 | 熔断器，仅在 test_api.py 间接覆盖 | 待处理 |
-| R-044 | `llm/fingerprint.py` | 🟡 中 | 缓存指纹计算 | 待处理 |
-| R-045 | `llm/pricing.py` | 🟢 低 | 定价计算 | 待处理 |
-| R-046 | `llm/markdown.py` | 🟢 低 | Markdown→HTML 转换 | 待处理 |
-| R-047 | `providers/eastmoney_news.py` | 🟢 低 | 东方财富新闻 provider | 待处理 |
-| R-048 | `providers/sina_news.py` | 🟢 低 | 新浪新闻 provider | 待处理 |
-| R-049 | `providers/wallstreetcn_news.py` | 🟢 低 | 华尔街见闻 provider | 待处理 |
-
-### P3 — 代码治理
-
-| 编号 | 问题 | 说明 | 状态 |
-|------|------|------|------|
-| R-050 | `llm/__init__.py` 过度导出 | 从 6 个子模块 re-export ~60 个私有符号（`_` 前缀），既是公共 API 又暴露内部实现 | 待处理 |
-| R-051 | `report/html_writer.py` 文件偏大 | 792 行，虽已拆分函数，但文件整体仍可考虑按章节拆分 | 待处理 |
-| R-052 | `report/penetration.py` 文件偏大 | 715 行，穿透逻辑与 Excel 写入混合 | 待处理 |
-| R-053 | `requirements.txt` 缺少锁定版本 | 仅有 5 个顶层依赖，无可复现锁定文件 | 待处理 |

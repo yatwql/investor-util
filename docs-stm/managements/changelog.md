@@ -4,7 +4,32 @@
 
 ---
 
-## [0.2.50] - 2026-07-01
+## [0.2.51] - 2026-07-01
+
+### Added
+- **`src/test/test_fingerprint.py`（R-044 ✅）**：16 项测试覆盖 `_extract_stable_holdings`（5 项）/ `_extract_stable_penetration`（5 项）/ `_build_llm_fingerprint`（6 项，含确定性/不同输入/full_penetration/价格无关/hex 格式/全默认值）。
+- **`src/test/test_eastmoney_news.py`（R-047 ✅）**：18 项测试覆盖 `_parse_news_item`（9 项纯函数）+ `fetch_news`（9 项 HTTP/异常/空数据/无效条目过滤）。
+- **`src/test/test_sina_news.py`（R-048 ✅）**：17 项测试覆盖 `_ts_to_str`（2 项）+ `_parse_news_item`（9 项纯函数）+ `fetch_news`（8 项 HTTP/异常/参数验证）。
+- **`src/test/test_wallstreetcn_news.py`（R-049 ✅）**：15 项测试覆盖 `_ts_to_str`（2 项）+ `_parse_news_item`（12 项纯函数，含标题回退/HTML 剥离/URI 处理/截断）+ `fetch_news`（9 项 HTTP/异常/limit 上限）。
+
+### Changed
+- **`llm/__init__.py` 过度导出清理（R-050 ✅）**：从 6 个子模块 re-export 的 ~60 个私有符号仅保留公有接口（FAIL_REASON_* 常量 + 6 个公开函数）。`_LLM_MODULE_FAILURE`/`_CACHE_PREFIX_LLM` 等私有符号改为从子模块直接导入。同步修复 `test_llm.py` 中 26 处 import 路径。
+- **`llm/skeleton.py` 全局 max_tokens 回退路径清理**：`llm_config.get(f"max_tokens_{module_key}") or llm_config.get("max_tokens", max_tokens_default)` → `llm_config.get(f"max_tokens_{module_key}", max_tokens_default)`。移除旧版全局 `max_tokens` 幽灵字段兜底。
+- **`config.py` 跨文件键名兼容机制清理**：移除 `_LLM_KEY_OVERLAP_KEYS` 集合及 `_KNOWN_TOTAL_KEYS` 合集。llm_key.json 与 llm_settings.json 的键名严格分离。
+- **`llm/circuit_breaker.py`（R-043 ✅ 无需加测）**：熔断器逻辑已由 test_api.py 7 项测试间接充分覆盖，无需单独测试文件。
+- **`llm/pricing.py`（R-045 ✅ 无需加测）**：定价计算已由 test_pricing.py 8 项测试覆盖。
+- **`llm/markdown.py`（R-046 ✅ 无需加测）**：Markdown→HTML 转换已由 test_markdown.py 11 项测试覆盖。
+
+### Changed（续）
+- **`requirements.txt` 版本锁定（R-053 ✅）**：从未锁定范围（`>=`）改为精确版本锁定（`==`），新增 `lxml==6.1.1` 和 `pytest==9.1.1`/`pytest-mock==3.15.1` 测试依赖。
+- **`config.py:validate_config()` 新增 early_warning 配置段校验（R-054 ✅）**：覆盖 `sector_alert_threshold_warning`/`danger`/`sentiment_top_n` 的类型、范围（阈值应为负值）和格式校验。
+- **`news_aggregator.py` 清理 `_FALLBACK_ENABLED` 死路径（R-055 ✅）**：移除对 `_FALLBACK_ENABLED` 的导入和后备引用，简化 `get_enabled_sources()` 逻辑。同步更新 `test_news_sources.py`（移除 7 项相关测试）。
+- **`html_writer.py` 拆分 — 提取 `html_builders.py`（R-051 ✅）**：将 `_build_category_data`、`_build_single_perf_item`、`_build_perf_data`、`_parse_return_raw` 4 个数据构建函数（~175 行）迁入独立模块。主文件从 792 行降至 617 行（-22%）。render 函数通过导入保持对外接口不变，测试 mock 路径无需变更。
+- **`penetration.py` 拆分 — 提取 `penetration_sheet.py`（R-052 ✅）**：将 `write_penetration_sheet` 及 6 个辅助函数（共 ~185 行）迁入独立模块。`penetration.py` 保留 `compute_penetration_top10` 及所有分类/合并逻辑，从 715 行降至 530 行（-26%）。同步更新 `excel_generator.py` 的 lazy import 和 `test_excel_generator.py` 的 mock 路径。
+
+### Docs
+- **review-findings.md**：P2 全部 7 项问题（R-043~R-049）完成，移除待办表。R-050/R-053/R-054/R-055/R-051/R-052 全部完成，待办区清空。
+- **版本号同步**：constants.py 0.2.50→0.2.51
 
 ### Fixed
 - **缓存 TTL 市场时段感知逻辑缺陷（🐛 561910 价格偏差根因）**：`cache.py:get_ttl()` 中 `market_hour_aware` 检查位于显式 `cache_ttl` 配置之后导致死代码，盘中 30s 短 TTL 永不生效。交换判断顺序：交易时段内对 `market_hour_aware` 声明类型优先使用短 TTL，确保实时价格更新。

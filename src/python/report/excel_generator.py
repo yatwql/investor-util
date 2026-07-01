@@ -71,7 +71,8 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("行情市值模块缺失 (market_value)")
 
     try:
-        from src.python.report.penetration import write_penetration_sheet, compute_penetration_top10
+        from src.python.report.penetration import compute_penetration_top10
+        from src.python.report.penetration_sheet import write_penetration_sheet
         modules["write_penetration_sheet"] = write_penetration_sheet
         modules["compute_penetration_top10"] = compute_penetration_top10
     except ImportError:
@@ -258,9 +259,10 @@ def _build_llm_usage_sheet(wb: Any, prog: ProgressReporter) -> None:
     """构建并写入 LLM API 用量页签。"""
     try:
         from src.python.llm import (
-            _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED,
+            FAIL_REASON_DISABLED,
             get_session_usage, format_session_usage,
         )
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE
         from src.python.registry import get_llm_module_names
         from src.python.report.summary import write_llm_usage_sheet
     except (ImportError, AttributeError) as e:

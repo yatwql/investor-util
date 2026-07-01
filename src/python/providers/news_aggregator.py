@@ -13,7 +13,6 @@ from typing import Any, Callable, Optional
 
 from src.python.providers.news_sources import (
     _FETCH_MAP,
-    _FALLBACK_ENABLED,
     _SOURCE_LABELS,
 )
 from src.python.providers.news_correlator import correlate_news_with_holdings
@@ -24,15 +23,14 @@ logger = logging.getLogger("invest")
 def get_enabled_sources() -> list[str]:
     """返回当前启用的新闻来源名称列表。
 
-    启停状态从 config.json 的 news_sources 字段读取，
-    未配置时使用 _FALLBACK_ENABLED 后备值。
+    启停状态从 config.json 的 news_sources 字段读取。
     """
     from src.python.config import get_config
     config = get_config()
     enabled_map: dict[str, bool] = config.get("news_sources") or {}
     return [
         name for name in _SOURCE_LABELS
-        if enabled_map.get(name, _FALLBACK_ENABLED.get(name, True))
+        if enabled_map.get(name, False)
     ]
 
 

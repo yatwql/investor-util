@@ -24,8 +24,8 @@ from src.python.llm import (
     FAIL_REASON_TIMEOUT,
     FAIL_REASON_CIRCUIT_OPEN,
     FAIL_REASON_DISABLED,
-    _LLM_MODULE_FAILURE,
 )
+from src.python.llm.prompts import _LLM_MODULE_FAILURE
 from src.python.registry import get_llm_module_name
 
 logger = logging.getLogger("invest")

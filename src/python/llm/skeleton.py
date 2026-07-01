@@ -301,7 +301,7 @@ def _generate_llm_module(
     return _generate_llm_content(
         llm_config, cache_key, _get_cache_ttl_llm(module_key),
         system_prompt, user_prompt, cache_enabled, force,
-        max_tokens=llm_config.get(f"max_tokens_{module_key}") or llm_config.get("max_tokens", max_tokens_default),
+        max_tokens=llm_config.get(f"max_tokens_{module_key}", max_tokens_default),
         timeout=llm_config.get(f"timeout_{module_key}", timeout_default),
         temperature=llm_config.get(f"temperature_{module_key}"),
         model=llm_config.get(f"model_{module_key}"),

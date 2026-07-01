@@ -237,6 +237,34 @@ def validate_config(config: dict | None = None) -> int:
         logger.warning("config.json user_fund_benchmarks = %r 不是对象(dict)，自定义基准将忽略", ufb)
         issues += 1
 
+    # ── early_warning ──
+    ew = config.get("early_warning")
+    if ew is not None and not isinstance(ew, dict):
+        logger.warning("config.json early_warning = %r 不是对象(dict)，智能预警阈值将使用默认值", ew)
+        issues += 1
+    elif isinstance(ew, dict):
+        for ew_key in ("sector_alert_threshold_warning", "sector_alert_threshold_danger"):
+            ew_val = ew.get(ew_key)
+            if ew_val is not None:
+                try:
+                    fv = float(ew_val)
+                    if fv >= 0:
+                        logger.warning("config.json early_warning.%s = %s 应为负值（净流出阈值），当前值为正", ew_key, ew_val)
+                        issues += 1
+                except (ValueError, TypeError):
+                    logger.warning("config.json early_warning.%s = %s 不是有效数字", ew_key, ew_val)
+                    issues += 1
+        sentiment_n = ew.get("sentiment_top_n")
+        if sentiment_n is not None:
+            try:
+                sn = int(sentiment_n)
+                if sn <= 0:
+                    logger.warning("config.json early_warning.sentiment_top_n = %s 不是正数", sentiment_n)
+                    issues += 1
+            except (ValueError, TypeError):
+                logger.warning("config.json early_warning.sentiment_top_n = %s 不是有效整数", sentiment_n)
+                issues += 1
+
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)
     return issues
@@ -374,14 +402,6 @@ def get_llm_settings_path() -> str:
 # 由中央注册表 registry.py 自动派生，不再硬编码
 _KNOWN_LLM_SETTINGS_KEYS: set[str] = get_known_llm_settings_keys()
 
-# llm_key.json 中也允许出现的键名（与 llm_settings.json 重叠视为合法）
-_LLM_KEY_OVERLAP_KEYS: set[str] = {"provider", "api_key", "model", "endpoint",
-                                    "fallback_provider", "fallback_api_key",
-                                    "fallback_endpoint", "fallback_model"}
-
-# 已知键名合集（settings + key overlap）
-_KNOWN_TOTAL_KEYS: set[str] = _KNOWN_LLM_SETTINGS_KEYS | _LLM_KEY_OVERLAP_KEYS
-
 
 def _check_unknown_llm_keys(settings: dict) -> None:
     """检查 llm_settings.json 中是否存在未知键名，若有则输出 WARNING。
@@ -391,7 +411,7 @@ def _check_unknown_llm_keys(settings: dict) -> None:
     """
     unknown: list[str] = []
     for key in settings:
-        if key not in _KNOWN_TOTAL_KEYS:
+        if key not in _KNOWN_LLM_SETTINGS_KEYS:
             unknown.append(key)
     if unknown:
         logger.warning(
