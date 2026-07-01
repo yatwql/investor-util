@@ -18,7 +18,6 @@ from src.python.llm.api import (
     _LLM_TIMEOUT,
     _TRUNCATION_MARKER,
     _extract_model_from_cached,
-    _strip_token_line,
 )
 from src.python.llm.fingerprint import _get_cache_ttl_llm
 from src.python.llm.markdown import _markdown_to_html
@@ -79,7 +78,7 @@ def _handle_cache_hit(
         带缓存标记的 HTML 字符串
     """
     logger.info("LLM 缓存命中: %s", cache_key)
-    cached_clean = _strip_token_line(cached)
+    cached_clean = cached
     _orig_model = _extract_model_from_cached(cached)
     if _orig_model:
         _hint = _cache_line_model_tpl(_orig_model)

@@ -4,7 +4,44 @@
 
 ---
 
-## [0.2.56] - 2026-07-01
+## [0.2.58] - 2026-07-02
+
+### Added
+- **指数双链路 fallback**：A 股指数新增新浪财经备用链路（sina.fetch_a_indices，s_* 前缀），腾讯失败时自动切换；美股指数新增腾讯财经备用链路（tencent.fetch_index_price，gb_* 前缀），新浪 2 次重试失败后自动切换。双链路均失败时降级过期缓存。
+- **`src/python/providers/sina.py`** 新增 `_parse_a_index()`、`fetch_a_indices()` — A 股指数解析与获取（s_* 前缀，字段索引：name/price/change/change_pct/volume/amount/datetime）。
+- **`src/python/providers/tencent.py`** 新增 `fetch_index_price(code)` — 通用指数获取，不添加交易所前缀，直接请求原始代码。
+
+### Changed
+- **`fetcher/index.py`** 重构为模块级函数：`_fetch_indices_from_tencent()` / `_fetch_indices_from_sina()` / `_fetch_us_from_tencent()`，主链路→备用链路→过期缓存三层降级。
+- **`technical.md` / `datasource-and-folders.md`**：数据源表 A 股/美股指数备用链路从"—"更新为实际备用 API。
+
+### Tests
+- `test_fetcher_index.py`：从 8 项扩展至 13 项，新增腾讯→新浪 fallback、新浪→腾讯 fallback、双链路均失败降级等场景覆盖。
+- `test_fetcher.py`：`TestFetchUsIndices` mock 补充腾讯备用链路模拟。
+
+---
+
+## [0.2.57] - 2026-07-01
+
+### Fixed
+- **🐛 `industry` Provider Chain 缺失（R-138）**：`fetcher/chain.py` 的 `_DEFAULT_CHAINS` 无 `"industry"` 条目，导致 `_fetch_with_fallback("industry", ...)` 的 Provider Chain 永不会执行。由于 `industry.py` 回调了独立的 `eastmoney_industry.fetch_industry_and_concepts()`（不经 Chain），该缺陷未暴露为数据异常。修复：补充 `"industry": ["eastmoney_industry"]` 到 `_DEFAULT_CHAINS`。
+- **🐛 `claude-fable-5` 缺失 Extended Thinking 名单（R-141）**：`llm/api.py` 的 `_THINKING_SUPPORTED_PREFIXES` 未包含 `claude-fable-5`，新模型使用时自动降级跳过 Extended Thinking。修复：补入名单。
+
+### Removed（死代码 / 向后兼容代码）
+- **R-138: `_PROVIDER_REGISTRY` 死字典**：`fetcher/chain.py` 废弃的旧版 Provider 注册字典，无任何引用。
+- **R-140: `_strip_token_line()` 向后兼容函数**：`llm/api.py` 的 `_TOKEN_LINE_RE` 正则及 `_strip_token_line()` 函数（R-131 移除旧版 Token 行格式后遗留），以及 `generators.py`/`skeleton.py` 中的调用处、`test_api.py` 中的导入和测试类。
+- **R-139: `config.py` 过期 Provider 条目**：`_KNOWN_PROVIDER_TYPES` 移除已废弃的 `index`、`us_index`；`_KNOWN_PROVIDER_NAMES` 增补 `eastmoney_industry`。
+- **R-142: 未使用 import**：`fetcher/index.py` `CACHE_DAILY`、`fetcher/fund.py` `CACHE_DAILY`/`CACHE_MONTHLY`/`CACHE_WEEKLY`。
+
+### Changed
+- **R-143: config.json + 管理文档同步**：`cache_ttl` 补充 `tracking`（2592000）和 `calendar`（1209600）。`technical.md` 缓存分组计数修正（preload 5→6、refresh 10→9）。`requirements.md` cache_ttl 项数 15→17。`how-to-config.md` 同步更新示例 JSON、TTL 表及 ungrouped 说明。
+- **`fetcher/index.py` docstring**：更新新浪备用链路描述（"仅有主链路，无可用备用"）。
+- **文件标题更新**：review-findings.md 最后更新 v0.2.57。
+
+### Tests
+- `test_api.py`：移除 `_strip_token_line` 导入和 3 项测试 → 41 passed（-3 项），全量测试 1708 passed。[^1]
+
+[^1]: 原 1711 passed - 3 项移除 = 1708 passed，12 skipped，31 subtests passed。  
 
 ### Fixed
 - **P0: 指数 `market_hour_aware` 不生效**（R-136）：`fetcher/index.py` 硬编码 `CACHE_DAILY` 代替 `get_ttl("index")`，盘中 30s 短 TTL 对指数无效。修复后指数在交易时段内自动使用短 TTL 刷新实时行情。

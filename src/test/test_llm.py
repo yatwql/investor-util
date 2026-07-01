@@ -1426,6 +1426,57 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_health.assert_called_once()
         mock_penetration.assert_called_once()
 
+    @patch("src.python.llm.generators.cache_get")
+    @patch("src.python.llm.generators._record_per_module")
+    def test_cache_hit_records_per_module(
+        self, mock_record: MagicMock, mock_cache_get: MagicMock,
+        mock_expert: MagicMock, mock_macro: MagicMock,
+        mock_health: MagicMock, mock_penetration: MagicMock,
+    ) -> None:
+        """全部缓存命中 → 为每个模块记录 per_module 用量（cached=True）。"""
+        mock_cache_get.return_value = self.CACHED_CONTENT
+
+        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+            {}, {}, 0, 0, 0, 0, 0, {},
+            holdings_details=[], penetrated_assets=[],
+        )
+
+        self.assertEqual(mock_record.call_count, 4)
+        expected_keys = {"global_macro", "expert_review", "health_check", "penetration_deep"}
+        actual_keys = {call[0][0] for call in mock_record.call_args_list}
+        self.assertEqual(actual_keys, expected_keys)
+        # 每个调用必须带 cached=True
+        for call in mock_record.call_args_list:
+            kwargs = call[1] if len(call) > 1 else {}
+            cached = kwargs.get("cached") if "cached" in kwargs else (call[0][2] if len(call[0]) > 2 else False)
+            self.assertTrue(cached, f"模块 {call[0][0]} 的 cached 不是 True")
+
+    @patch("src.python.llm.generators._record_per_module")
+    def test_partial_cache_records_per_module(
+        self, mock_record: MagicMock,
+        mock_expert: MagicMock, mock_macro: MagicMock,
+        mock_health: MagicMock, mock_penetration: MagicMock,
+    ) -> None:
+        """部分缓存命中 → 仅缓存命中模块记录 per_module。"""
+        # 模拟 precheck 缓存：需要 mock cache_get 但该函数在 @patch 顺序中未直接传入
+        # 直接调用 _precheck_one_cache 验证，而非 generate_all_llm
+        from src.python.llm.generators import _precheck_one_cache
+
+        cache_info = {"key": "llm_global_macro_fp", "ttl": 3600,
+                       "can_cache": True, "thinking_key": "thinking_enabled_global_macro"}
+        llm_config = {"model": "test-model", "endpoint": "https://test.endpoint"}
+
+        with patch("src.python.llm.generators.cache_get", return_value=self.CACHED_CONTENT):
+            result, from_cache = _precheck_one_cache(cache_info, llm_config, "global_macro")
+
+        self.assertIsNotNone(result)
+        self.assertTrue(from_cache)
+        # 当缓存内容不含模型名时，使用 llm_config["model"] 作为模型名
+        mock_record.assert_called_once_with(
+            "global_macro", "test-model", cached=True,
+            thinking=False, endpoint="https://test.endpoint",
+        )
+
 
 # ═══════════════════════════════════════════════════════════
 #  enhance_news_correlation 逐条缓存

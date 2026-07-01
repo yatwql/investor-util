@@ -4,8 +4,7 @@
   - _call_llm_with_retry — 熔断/429/503/超时/网络错误/截断/内容过滤
   - _call_llm — 主/回退链式调度 + 空内容安抚重试
   - _call_single_provider — claude/openai/unknown 路由
-  - 辅助函数：_get_retry_max/_sanitize_endpoint/_strip_token_line
-             /_extract_model_from_cached/_truncation_warning
+  - 辅助函数：_get_retry_max/_sanitize_endpoint/_extract_model_from_cached/_truncation_warning
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -24,7 +23,6 @@ from src.python.llm.api import (
     _call_llm,
     _get_retry_max,
     _sanitize_endpoint,
-    _strip_token_line,
     _extract_model_from_cached,
     _truncation_warning,
     _TRUNCATION_MARKER,
@@ -130,7 +128,7 @@ class TestSanitizeEndpoint(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _truncation_warning / _strip_token_line / _extract_model_from_cached
+#  _truncation_warning / _extract_model_from_cached
 # ═══════════════════════════════════════════════════════════
 
 
@@ -145,22 +143,6 @@ class TestTruncationWarning(unittest.TestCase):
     def test_custom_field(self) -> None:
         result = _truncation_warning("max_tokens_expert_review")
         self.assertIn("max_tokens_expert_review", result)
-
-
-class TestStripTokenLine(unittest.TestCase):
-    """_strip_token_line 正则剥离。"""
-
-    def test_strips_token_line(self) -> None:
-        html = '<p>内容</p><p style="color:#888;font-size:12px">Token 用量</p>'
-        result = _strip_token_line(html)
-        self.assertNotIn("Token 用量", result)
-
-    def test_no_token_line(self) -> None:
-        html = "<p>纯内容</p>"
-        self.assertEqual(_strip_token_line(html), html)
-
-    def test_empty(self) -> None:
-        self.assertEqual(_strip_token_line(""), "")
 
 
 class TestExtractModelFromCached(unittest.TestCase):

@@ -161,3 +161,38 @@ def fetch_price(code: str) -> dict[str, Any] | None:
         logger.warning("Tencent API 解析失败: %s", full_code)
 
     return result
+
+
+def fetch_index_price(code: str) -> dict[str, Any] | None:
+    """获取指数实时行情（A 股/美股通用），作为备用链路。
+
+    与 fetch_price 的区别：不添加交易所前缀，直接使用原始代码（如 gb_dji）。
+    Tencent API 对指数返回的 ~ 分隔格式与股票一致，使用同一解析器。
+
+    Args:
+        code: 指数代码（如 "sh000001"、"gb_dji"）
+
+    Returns:
+        dict（同 fetch_price）或 None
+    """
+    url = f"{_BASE_URL}{code.strip()}"
+
+    logger.debug("Tencent 指数 API 请求: %s", code)
+
+    try:
+        with make_http_client(timeout=_TIMEOUT) as client:
+            resp = client.get(url)
+            resp.encoding = "gbk"
+            text = resp.text
+    except httpx.TimeoutException:
+        logger.warning("Tencent 指数 API 超时: %s", code)
+        return None
+    except httpx.RequestError as e:
+        logger.warning("Tencent 指数 API 请求失败: %s", e)
+        return None
+
+    result = _parse_response(text)
+    if result is None:
+        logger.warning("Tencent 指数 API 解析失败: %s", code)
+
+    return result

@@ -19,10 +19,9 @@ logger = logging.getLogger("invest")
 
 _DEFAULT_CHAINS: dict[str, list[str]] = {
     "price": ["tencent", "eastmoney"],
-    "index": ["tencent", "sina"],
-    "us_index": ["sina"],
     "fund_rank": ["tiantian"],
     "fund_hold": ["tiantian"],
+    "industry": ["eastmoney_industry"],
 }
 
 
@@ -44,16 +43,9 @@ def _get_chain(data_type: str) -> list[str]:
     return chain
 
 
-# ── Provider 注册表（核心类型） ──────────────────────────────
+# ── Provider 函数类型 ────────────────────────────────────────
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]
-
-_PROVIDER_REGISTRY: dict[str, tuple[str, _ProviderFunc]] = {
-    "tencent": ("腾讯财经", None),
-    "eastmoney": ("东方财富", None),
-    "sina": ("新浪财经", None),
-    "tiantian": ("天天基金", None),
-}
 
 
 # ── 通用带缓存的 Fallback 调用 ──────────────────────────────

@@ -204,16 +204,16 @@ class TestRefreshProfitForecast:
         from src.python.handlers_cache import _refresh_profit_forecast_cache
 
         count = _refresh_profit_forecast_cache()
-        assert count == 2
+        assert count == ("profit_forecast", 2)
 
     @patch("src.python.providers.akshare_extras._memo_clear")
     @patch("src.python.providers.akshare_extras.get_profit_forecast", return_value=None)
     def test_failure(self, mock_get, mock_clear):
-        """失败返回 0。"""
+        """失败返回 ('profit_forecast', 0)。"""
         from src.python.handlers_cache import _refresh_profit_forecast_cache
 
         count = _refresh_profit_forecast_cache()
-        assert count == 0
+        assert count == ("profit_forecast", 0)
 
 
 class TestRefreshSectorFlow:
@@ -226,15 +226,15 @@ class TestRefreshSectorFlow:
         from src.python.handlers_cache import _refresh_sector_flow_cache
 
         count = _refresh_sector_flow_cache()
-        assert count == 2
+        assert count == ("sector_flow", 2)
 
     @patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None)
     def test_failure(self, mock_get):
-        """失败返回 0。"""
+        """失败返回 ('sector_flow', 0)。"""
         from src.python.handlers_cache import _refresh_sector_flow_cache
 
         count = _refresh_sector_flow_cache()
-        assert count == 0
+        assert count == ("sector_flow", 0)
 
 
 # ═══════════════════════════════════════════════════════════════

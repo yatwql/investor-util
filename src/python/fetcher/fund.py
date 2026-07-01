@@ -13,7 +13,6 @@ import re
 import threading
 from typing import Any, Callable
 
-from src.python.cache import CACHE_DAILY, CACHE_MONTHLY, CACHE_WEEKLY
 from src.python.cache import get as cache_get, get_ttl, set as cache_set
 from src.python.config import get_config
 from src.python.fetcher.chain import _fetch_with_fallback

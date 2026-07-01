@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-01（v0.2.56 — 全局 Cache TTL 审计 + 注册表统一 + pip 静默安装）
+最后更新：2026-07-02（v0.2.58 — 指数双链路 fallback + 资料源表更新）
 
 ---
 
@@ -43,8 +43,10 @@
 | 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 天天基金 `fundf10.eastmoney.com` | `eastmoney.py` |
 | 基金业绩排名 | 天天基金 `pingzhongdata/{code}.js`（JS 变量解析） | — | `tiantian.py` |
 | 基金持仓数据 | 天天基金 `fundf10.eastmoney.com` | — | `tiantian.py` |
-| A 股指数 | 腾讯财经 `qt.gtimg.cn` | — | `tencent.py` |
-| 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析） | — | `sina.py` |
+| A 股指数 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `tencent.py` |
+| 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析） | 腾讯财经 `qt.gtimg.cn` | `sina.py` |
+
+> 指数数据由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存。
 | 财经新闻（新浪） | 新浪财经 `feed.mix.sina.com.cn` | — | `sina_news.py` |
 | 财经新闻（东方财富） | 东方财富 `np-weblist.eastmoney.com/comm/web/getFastNewsList` | — | `eastmoney_news.py` |
 | 财经新闻（财联社） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | — | `cls_news.py` |
@@ -141,7 +143,7 @@ investor-util/
 │   │   ├── tui.py                # 键盘输入封装
 │   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
 │   │   └── tui_menu.py           # 菜单交互
-│   └── test/                     # 测试（57 个 test_*.py + helpers.py，1711 passed / 12 skipped）
+│   └── test/                     # 测试（57 个 test_*.py + helpers.py，1713 passed / 12 skipped）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志

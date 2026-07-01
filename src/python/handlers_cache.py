@@ -11,6 +11,7 @@ from src.python.logger import setup_logger
 from src.python.reader import read_holdings
 from src.python.tui_menu import _press_any_key, _refresh_config
 from src.python.tui_handlers import _select_holdings_file
+from src.python.market_hours import is_market_open
 logger = setup_logger()
 
 
@@ -66,27 +67,27 @@ def _refresh_one_fund_cache(fund) -> tuple:
     return ("fund", fund.code, fund.name, perf_ok, hold_ok, hold_count, bm_ok)
 
 
-def _refresh_profit_forecast_cache() -> int:
+def _refresh_profit_forecast_cache() -> tuple[str, int]:
     """刷新盈利预测缓存。
 
     Returns:
-        覆盖股票数（0 表示失败）
+        ("profit_forecast", 覆盖股票数) — 0 表示失败
     """
     from src.python.providers.akshare_extras import _memo_clear, get_profit_forecast
     _memo_clear()
     data = get_profit_forecast()
-    return len(data) if data else 0
+    return ("profit_forecast", len(data) if data else 0)
 
 
-def _refresh_sector_flow_cache() -> int:
+def _refresh_sector_flow_cache() -> tuple[str, int]:
     """刷新行业资金流向缓存。
 
     Returns:
-        行业数（0 表示失败）
+        ("sector_flow", 行业数) — 0 表示失败
     """
     from src.python.providers.akshare_extras import get_sector_fund_flow
     data = get_sector_fund_flow()
-    return len(data) if data else 0
+    return ("sector_flow", len(data) if data else 0)
 
 
 def _print_cache_refresh_report(
@@ -121,7 +122,8 @@ def _print_cache_refresh_report(
     if sf_ok:
         print(f"  [OK] sector_flow.json               ({sf_ok} 个行业)")
     elif funds:
-        print(f"  [!] sector_flow.json               获取失败")
+        _hint = "非交易时段无数据" if not is_market_open() else "获取失败"
+        print(f"  [!] sector_flow.json               {_hint}")
 
 
 def _refresh_common_caches() -> tuple[int, int]:
@@ -131,16 +133,17 @@ def _refresh_common_caches() -> tuple[int, int]:
         _f1 = _ex.submit(_refresh_profit_forecast_cache)
         _f2 = _ex.submit(_refresh_sector_flow_cache)
         try:
-            pf_ok = _f1.result()
+            _, pf_ok = _f1.result()
             print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
                   else "  [!]   profit_forecast              获取失败")
         except Exception as e:
             logger.debug("profit_forecast Future 异常: %s", e)
             print("  [!]   profit_forecast              获取失败")
         try:
-            sf_ok = _f2.result()
+            _, sf_ok = _f2.result()
+            _hint = "非交易时段无数据" if not is_market_open() and not sf_ok else ""
             print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
-                  else "  [!]   sector_flow                  获取失败")
+                  else f"  [!]   sector_flow                  {_hint}")
         except Exception as e:
             logger.debug("sector_flow Future 异常: %s", e)
             print("  [!]   sector_flow                  获取失败")
@@ -202,8 +205,9 @@ def _cmd_update_basic_cache() -> None:
                               else "  [!]   profit_forecast              获取失败")
                     elif result[0] == "sector_flow":
                         sf_ok = result[1]
+                        _hint = "非交易时段无数据" if not is_market_open() and not sf_ok else ""
                         print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
-                              else "  [!]   sector_flow                  获取失败")
+                              else f"  [!]   sector_flow                  {_hint}")
                 except Exception as e:
                     logger.debug("缓存刷新 Future 异常 (%s): %s", tag, e)
                     print(f"  [!]   {'基金刷新异常' if tag == 'fund' else '其他缓存刷新异常'}")

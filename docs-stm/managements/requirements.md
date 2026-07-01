@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.54 — 依据代码/配置反推补全：配置段详解、LLM架构、缓存分组、降级策略）
+最后更新：2026-07-02（v0.2.57 — 同步 Provider 条目/cache_ttl 项数）
 
 ---
 
@@ -352,7 +352,7 @@ Extended Thinking 详解、定价表等）及本章各模块的完整配置项�
 | `output_dir` | str | `reports` | O | 报告输出根目录 |
 | `news_top_count` | int | `100` | 手动 | 新闻关联输出 TOP N |
 | `news_sources` | dict | {sina:true, eastmoney:true, cls:false, wallstreetcn:true, akshare:true} | 手动 | 各新闻源启停 |
-| `preferred_provider` | dict | `{}` | 手动 | Provider Chain 首选覆写（price/index/us_index/fund_rank/fund_hold） |
+| `preferred_provider` | dict | `{}` | 手动 | Provider Chain 首选覆写（price/fund_rank/fund_hold/industry） |
 | `user_fund_benchmarks` | dict | `{}` | 手动 | 自定义基金基准 {代码: 基准代码} |
 | `early_warning` | dict | `{warning:-5000万, danger:-2亿, sentiment_top_n:10}` | 手动 | 智能预警阈值（单位：元） |
 | `market_hour_aware` | list | `["price", "index"]` | 手动 | 交易时段短 TTL 的数据类型 |

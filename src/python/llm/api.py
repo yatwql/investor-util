@@ -21,11 +21,11 @@ logger = logging.getLogger("invest")
 
 __all__ = [
     "_LLM_TIMEOUT", "_RETRY_DELAYS", "_TRUNCATION_MARKER", "_AUTO_INCREASE_FACTOR",
-    "_TOKEN_LINE_RE", "_CACHE_LINE_HTML", "_cache_line_model_tpl",
+    "_CACHE_LINE_HTML", "_cache_line_model_tpl",
     "_MODEL_LINE_RE", "_THINKING_SUPPORTED_PREFIXES", "_THINKING_EFFORT_MODEL_PREFIXES",
     "_supports_extended_thinking", "_is_effort_model", "_truncation_warning",
     "_check_claude_truncation", "_check_openai_truncation", "_extract_content",
-    "_strip_token_line", "_extract_model_from_cached", "_log_token_usage",
+    "_extract_model_from_cached", "_log_token_usage",
     "_get_retry_max", "_sanitize_endpoint",
     "_call_llm_with_retry", "_call_single_provider", "_call_llm", "_call_claude", "_call_openai",
 ]
@@ -59,11 +59,6 @@ _CONTENT_FILTER_RECOVERY = (
 
 # ── 缓存行定义 ────────────────────────────────────
 
-_TOKEN_LINE_RE = re.compile(
-    r'<p style="color:#888;font-size:12px">[^<]*Token 用量[^<]*</p>'
-)
-"""匹配旧版和新版 Token 用量行。"""
-
 _CACHE_LINE_HTML = (
     '<p style="color:#888;font-size:12px">'
     "本次使用LLM缓存，未直接使用LLM服务能力"
@@ -86,7 +81,7 @@ _MODEL_LINE_RE = re.compile(r'模型[：:]\s*([^|<\s][^|]*)')
 
 # ── Extended Thinking 模型兼容性名单 ──
 
-_THINKING_SUPPORTED_PREFIXES = ("claude-sonnet-4", "claude-opus-4", "deepseek-v4-", "deepseek-chat")
+_THINKING_SUPPORTED_PREFIXES = ("claude-sonnet-4", "claude-opus-4", "claude-fable-5", "deepseek-v4-", "deepseek-chat")
 
 # 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
 _THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-v4-", "deepseek-chat")
@@ -191,11 +186,6 @@ def _extract_content(data: dict) -> str | None:
         return ""  # 空列表也视为空内容而非格式异常
 
     return None
-
-
-def _strip_token_line(html: str) -> str:
-    """从缓存的 HTML 中剥离旧的 Token 用量行。"""
-    return _TOKEN_LINE_RE.sub("", html).strip()
 
 
 def _extract_model_from_cached(html: str) -> str:

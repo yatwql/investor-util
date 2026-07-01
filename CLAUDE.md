@@ -11,7 +11,7 @@
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：`src/test/test_*.py`，执行 `pytest src/test/`
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。
-- **自审记录**：自查发现的所有问题（无论是否立即修复）**必须**记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。修复后将变更记录移至 `docs-stm/managements/changelog.md`，review-findings.md 中保留完成标记和日期即可。
+- **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/manuals/datasource-and-folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`src/test/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, testplan.md, review-findings.md, changelog.md）
 - **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource-and-folders.md, reports-instruction.md）

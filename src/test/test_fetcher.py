@@ -33,10 +33,9 @@ class TestProviderChain(unittest.TestCase):
         self.assertIn("eastmoney", chain)
 
     def test_default_chain_index(self):
-        """index 类型的默认链路。"""
+        """index 类型无默认链路（index.py 直调 Provider，不经 Chain）。"""
         chain = _get_chain("index")
-        self.assertIsInstance(chain, list)
-        self.assertTrue(len(chain) > 0)
+        self.assertEqual(chain, [])
 
     def test_default_chain_fund_rank(self):
         """fund_rank 类型的默认链路。"""
@@ -121,22 +120,28 @@ class TestFetchUsIndices(unittest.TestCase):
     """fetch_us_indices 的 mock API 失败降级测试。"""
 
     @patch("src.python.fetcher.index.cache_get")
+    @patch("src.python.fetcher.index.tencent.fetch_index_price", return_value=None)
     @patch("src.python.fetcher.index.sina.fetch_us_indices")
-    def test_api_failure_returns_empty(self, mock_sina, mock_cache_get):
-        """API 失败 → 返回空字典。"""
+    def test_api_failure_returns_empty(self, mock_sina, mock_tencent,
+                                        mock_cache_get):
+        """所有链路失败 → 返回空字典。"""
         mock_cache_get.return_value = None
         mock_sina.side_effect = Exception("API error")
         result = fetch_us_indices()
         self.assertEqual(result, {})
 
     @patch("src.python.fetcher.index.cache_get")
+    @patch("src.python.fetcher.index.tencent.fetch_index_price", return_value=None)
     @patch("src.python.fetcher.index.sina.fetch_us_indices")
-    def test_retry_on_failure(self, mock_sina, mock_cache_get):
-        """API 首次失败 → 重试。"""
+    def test_retry_on_failure(self, mock_sina, mock_tencent, mock_cache_get):
+        """新浪失败 2 次 → 腾讯备用也失败 → 返回空。"""
         mock_cache_get.return_value = None
         mock_sina.side_effect = [Exception("fail"), Exception("fail")]
         result = fetch_us_indices()
         self.assertEqual(result, {})
+        self.assertEqual(mock_sina.call_count, 2)
+        # 腾讯备用链路被调用
+        mock_tencent.assert_called()
 
 
 class TestFetchFundBenchmark(unittest.TestCase):

@@ -850,3 +850,307 @@ class TestWriteLlmModuleStatusBlock(unittest.TestCase):
             self.assertIn("请求超时", all_text)
         finally:
             _LLM_MODULE_FAILURE.clear()
+
+    @patch("src.python.report.summary.get_llm_module_name")
+    def test_cache_hit_module(self, mock_name):
+        """缓存命中模块 → 显示模型名 + '缓存' 标签。"""
+        mock_name.side_effect = lambda mk: {
+            "global_macro": "全球政经局势",
+            "expert_review": "智囊团深度复盘",
+        }.get(mk, mk)
+
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE
+        from src.python.llm import reset_session_usage
+        from src.python.llm.session import _session_usage, _session_lock
+        _LLM_MODULE_FAILURE.clear()
+        reset_session_usage()
+        # 直接写入 _session_usage["per_module"]
+        _session_lock.acquire()
+        try:
+            _session_usage["per_module"]["global_macro"] = {
+                "model": "deepseek-v4-flash", "cached": True,
+                "input_tokens": 0, "output_tokens": 0,
+                "cache_hit_tokens": 800, "cost": 0.0,
+                "thinking": False, "endpoint": "",
+            }
+            _session_usage["per_module"]["expert_review"] = {
+                "model": "claude-sonnet-4", "cached": True,
+                "input_tokens": 0, "output_tokens": 0,
+                "cache_hit_tokens": 1200, "cost": 0.0,
+                "thinking": True, "endpoint": "",
+            }
+        finally:
+            _session_lock.release()
+
+        try:
+            s.write_llm_module_status_block(self.ws)
+            values = self._get_cell_values()
+            all_text = "|".join(str(v) for v in values)
+            self.assertIn("全球政经局势", all_text)
+            self.assertIn("智囊团深度复盘", all_text)
+            self.assertIn("deepseek-v4-flash", all_text)
+            self.assertIn("claude-sonnet-4", all_text)
+            self.assertIn("缓存", all_text)
+            self.assertIn("Extended Thinking", all_text)
+            self.assertNotIn("Token", all_text)  # 缓存命中不显示 Token 用量
+            self.assertNotIn("费用", all_text)
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+            reset_session_usage()
+
+    @patch("src.python.report.summary.get_llm_module_name")
+    def test_mixed_cached_and_success(self, mock_name):
+        """混合缓存+真实调用 → 缓存模块显示"缓存"，成功模块显示 Token。"""
+        mock_name.side_effect = lambda mk: {
+            "global_macro": "全球政经局势",
+            "expert_review": "智囊团深度复盘",
+            "health_check": "持仓体检报告",
+            "penetration_deep": "穿透深度分析",
+        }.get(mk, mk)
+
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE
+        from src.python.llm import reset_session_usage
+        from src.python.llm.session import _session_usage, _session_lock
+        _LLM_MODULE_FAILURE.clear()
+        reset_session_usage()
+        _session_lock.acquire()
+        try:
+            # global_macro = 缓存命中
+            _session_usage["per_module"]["global_macro"] = {
+                "model": "deepseek-v4-flash", "cached": True,
+                "input_tokens": 0, "output_tokens": 0,
+                "cache_hit_tokens": 500, "cost": 0.0,
+                "thinking": False, "endpoint": "",
+            }
+            # expert_review = 真实调用 + Thinking
+            _session_usage["per_module"]["expert_review"] = {
+                "model": "claude-sonnet-4", "cached": False,
+                "input_tokens": 2000, "output_tokens": 1000,
+                "cache_hit_tokens": 0, "cost": 0.008,
+                "thinking": True, "endpoint": "",
+            }
+            # health_check = 真实调用 + 无 Thinking
+            _session_usage["per_module"]["health_check"] = {
+                "model": "gpt-4o", "cached": False,
+                "input_tokens": 800, "output_tokens": 400,
+                "cache_hit_tokens": 0, "cost": 0.003,
+                "thinking": False, "endpoint": "",
+            }
+            # penetration_deep = 无 per_module（未知状态）
+        finally:
+            _session_lock.release()
+
+        try:
+            s.write_llm_module_status_block(self.ws)
+            values = self._get_cell_values()
+            all_text = "|".join(str(v) for v in values)
+            # 缓存模块
+            self.assertIn("全球政经局势", all_text)
+            self.assertIn("deepseek-v4-flash", all_text)
+            self.assertIn("缓存", all_text)
+            # 真实调用 + Thinking
+            self.assertIn("智囊团深度复盘", all_text)
+            self.assertIn("claude-sonnet-4", all_text)
+            self.assertIn("输入2,000/输出1,000", all_text)
+            self.assertIn("Extended Thinking", all_text)
+            # 真实调用 + 无 Thinking
+            self.assertIn("持仓体检报告", all_text)
+            self.assertIn("gpt-4o", all_text)
+            self.assertIn("输入800/输出400", all_text)
+            self.assertNotIn("Extended Thinking", all_text)
+            # 无 per_module → 不显示
+            self.assertNotIn("穿透深度分析", all_text)
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+            reset_session_usage()
+
+    @patch("src.python.report.summary.get_llm_module_name")
+    def test_success_with_tokens(self, mock_name):
+        """真实 API 调用 → 显示模型名 + Token 用量 + 费用 + Thinking。"""
+        mock_name.side_effect = lambda mk: {
+            "global_macro": "全球政经局势",
+            "penetration_deep": "穿透深度分析",
+        }.get(mk, mk)
+
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE
+        from src.python.llm import reset_session_usage
+        from src.python.llm.session import _session_usage, _session_lock
+        _LLM_MODULE_FAILURE.clear()
+        reset_session_usage()
+        _session_lock.acquire()
+        try:
+            _session_usage["per_module"]["global_macro"] = {
+                "model": "deepseek-v4-flash", "cached": False,
+                "input_tokens": 1500, "output_tokens": 800,
+                "cache_hit_tokens": 200, "cost": 0.005,
+                "thinking": True, "endpoint": "",
+            }
+            _session_usage["per_module"]["penetration_deep"] = {
+                "model": "claude-sonnet-4", "cached": False,
+                "input_tokens": 3000, "output_tokens": 1200,
+                "cache_hit_tokens": 500, "cost": 0.012,
+                "thinking": False, "endpoint": "",
+            }
+        finally:
+            _session_lock.release()
+
+        try:
+            s.write_llm_module_status_block(self.ws)
+            values = self._get_cell_values()
+            all_text = "|".join(str(v) for v in values)
+            self.assertIn("全球政经局势", all_text)
+            self.assertIn("穿透深度分析", all_text)
+            self.assertIn("deepseek-v4-flash", all_text)
+            self.assertIn("claude-sonnet-4", all_text)
+            self.assertIn("输入1,500/输出800", all_text)
+            self.assertIn("输入3,000/输出1,200", all_text)
+            self.assertIn("Extended Thinking", all_text)
+            # 不应有"缓存"标签（这是真实调用）
+            self.assertNotIn("缓存", all_text)
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+            reset_session_usage()
+
+
+# ═══════════════════════════════════════════════════════════
+#  _write_module_data_rows — Excel 明细行单元格渲染
+# ═══════════════════════════════════════════════════════════
+
+
+class TestWriteModuleDataRows(unittest.TestCase):
+    """测试 _write_module_data_rows 的 Excel 单元格写入逻辑。"""
+
+    def setUp(self):
+        import openpyxl
+        self.wb = openpyxl.Workbook()
+        self.ws = self.wb.active
+        self.start_row = 5
+
+    def _run(self, module_info):
+        """执行 _write_module_data_rows 并返回写入的单元格值字典。"""
+        from src.python.report.summary import _write_module_data_rows
+        end_row = _write_module_data_rows(self.ws, self.start_row, module_info)
+        result = {}
+        for r in range(self.start_row, end_row):
+            row_data = {}
+            for c in range(1, 11):
+                cell = self.ws.cell(row=r, column=c)
+                row_data[c] = cell.value
+            result[r] = row_data
+        return result, end_row
+
+    def test_cache_hit_row(self):
+        """缓存命中 → 蓝字'缓存'、费用'已计入原调用'、缓存✓、Thinking—。"""
+        rows, end = self._run([
+            {"key": "global_macro", "name": "全球政经局势",
+             "status": "cached", "status_label": "缓存",
+             "model": "deepseek-v4-flash",
+             "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+             "cache_hit_tokens": 500, "cost": 0.0, "cached": True,
+             "thinking": False, "endpoint": ""},
+        ])
+        self.assertIn(self.start_row, rows)
+        r = rows[self.start_row]
+        self.assertEqual(r[1], "全球政经局势")
+        self.assertEqual(r[2], "缓存")
+        self.assertEqual(r[3], "deepseek-v4-flash")
+        self.assertEqual(r[8], "已计入原调用")
+        self.assertEqual(r[9], "✓")
+        self.assertEqual(r[10], "—")
+
+    def test_success_with_thinking_row(self):
+        """真实调用+Thinking → 绿字'成功'、费用¥、缓存—、Thinking✓。"""
+        rows, end = self._run([
+            {"key": "expert_review", "name": "智囊团深度复盘",
+             "status": "success", "status_label": "成功",
+             "model": "claude-sonnet-4",
+             "input_tokens": 1500, "output_tokens": 800, "total_tokens": 2300,
+             "cache_hit_tokens": 0, "cost": 0.005, "cached": False,
+             "thinking": True, "endpoint": ""},
+        ])
+        r = rows[self.start_row]
+        self.assertEqual(r[1], "智囊团深度复盘")
+        self.assertEqual(r[2], "成功")
+        self.assertEqual(r[3], "claude-sonnet-4")
+        self.assertEqual(r[4], "2,300")   # total_tokens 格式化
+        self.assertEqual(r[5], "1,500")
+        self.assertEqual(r[6], "800")
+        self.assertEqual(r[7], "—")       # cache_hit_tokens=0 → —
+        self.assertIsInstance(r[8], str)
+        self.assertIn("¥", str(r[8]))
+        self.assertEqual(r[9], "—")
+        self.assertEqual(r[10], "✓")
+
+    def test_disabled_row(self):
+        """禁用 → 灰字、模型—、费用—、缓存—、Thinking—。"""
+        rows, end = self._run([
+            {"key": "health_check", "name": "持仓体检报告",
+             "status": "disabled", "status_label": "已禁用",
+             "model": "", "input_tokens": 0, "output_tokens": 0,
+             "total_tokens": 0, "cache_hit_tokens": 0, "cost": 0.0,
+             "cached": False, "thinking": False, "endpoint": ""},
+        ])
+        r = rows[self.start_row]
+        self.assertEqual(r[1], "持仓体检报告")
+        self.assertEqual(r[2], "已禁用")
+        self.assertEqual(r[3], "—")
+        self.assertEqual(r[8], "—")
+        self.assertEqual(r[9], "—")
+        self.assertEqual(r[10], "—")
+
+    def test_failed_row(self):
+        """失败 → 红字错误原因。"""
+        rows, end = self._run([
+            {"key": "penetration_deep", "name": "穿透深度分析",
+             "status": "failed", "status_label": "LLM API 调用失败",
+             "model": "", "input_tokens": 0, "output_tokens": 0,
+             "total_tokens": 0, "cache_hit_tokens": 0, "cost": 0.0,
+             "cached": False, "thinking": False, "endpoint": ""},
+        ])
+        r = rows[self.start_row]
+        self.assertEqual(r[2], "LLM API 调用失败")
+        self.assertEqual(r[3], "—")
+
+    def test_no_status_label_skipped(self):
+        """status_label 为空 → 跳过该行，不写入。"""
+        rows, end = self._run([
+            {"key": "unknown", "name": "未知模块", "status": "unknown",
+             "status_label": "", "model": "", "input_tokens": 0,
+             "output_tokens": 0, "total_tokens": 0, "cache_hit_tokens": 0,
+             "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""},
+        ])
+        self.assertEqual(end, self.start_row)
+        self.assertNotIn(self.start_row, rows)
+
+    def test_mixed_rows(self):
+        """4 种状态混合 → 各行正确渲染，行号递增。"""
+        rows, end = self._run([
+            {"key": "gm", "name": "全球政经局势", "status": "cached",
+             "status_label": "缓存", "model": "ds", "cached": True,
+             "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+             "cache_hit_tokens": 500, "cost": 0.0, "thinking": False, "endpoint": ""},
+            {"key": "er", "name": "智囊团深度复盘", "status": "success",
+             "status_label": "成功", "model": "claude", "cached": False,
+             "input_tokens": 1000, "output_tokens": 500, "total_tokens": 1500,
+             "cache_hit_tokens": 0, "cost": 0.003, "thinking": True, "endpoint": ""},
+            {"key": "hc", "name": "持仓体检报告", "status": "disabled",
+             "status_label": "已禁用", "model": "", "cached": False,
+             "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+             "cache_hit_tokens": 0, "cost": 0.0, "thinking": False, "endpoint": ""},
+            {"key": "pd", "name": "穿透深度分析", "status": "failed",
+             "status_label": "LLM API 调用失败", "model": "", "cached": False,
+             "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+             "cache_hit_tokens": 0, "cost": 0.0, "thinking": False, "endpoint": ""},
+        ])
+        self.assertEqual(end, self.start_row + 4)
+        self.assertEqual(rows[self.start_row][1], "全球政经局势")
+        self.assertEqual(rows[self.start_row + 1][1], "智囊团深度复盘")
+        self.assertEqual(rows[self.start_row + 2][1], "持仓体检报告")
+        self.assertEqual(rows[self.start_row + 3][1], "穿透深度分析")
+        # 缓存行费用
+        self.assertEqual(rows[self.start_row][8], "已计入原调用")
+        # 成功行费用（带 ¥）
+        self.assertIn("¥", str(rows[self.start_row + 1][8]))
+        # 成功行 Thinking
+        self.assertEqual(rows[self.start_row + 1][10], "✓")
+

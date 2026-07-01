@@ -423,6 +423,7 @@ def _write_llm_summary_section(ws: Any, row: int, session_usage: dict) -> int:
 
 def _write_module_table_header(ws: Any, row: int, headers: list[str]) -> int:
     """写入「各模块明细」区域标题 + 列头，返回下一行号。"""
+    from openpyxl.styles import Border, PatternFill, Side
     ncols = len(headers)
     _SECTION_FILL = PatternFill(start_color="E8F0FE", end_color="E8F0FE", fill_type="solid")
     _SECTION_FONT = Font(size=10, bold=True, color="1A1A1A")
@@ -448,6 +449,7 @@ def _write_module_table_header(ws: Any, row: int, headers: list[str]) -> int:
 
 def _write_module_data_rows(ws: Any, row: int, module_info: list[dict]) -> int:
     """写入各模块明细行，返回下一行号。"""
+    from openpyxl.styles import Border, Side
     _KV_VAL_FONT = Font(size=10)
     _STATUS_COLORS = {
         "disabled": "9ca3af", "failed": "c0392b",

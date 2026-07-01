@@ -1,9 +1,10 @@
 """行业分类 API 模块单元测试。
 
 测试目标：
+  - _is_a_share_code — A 股代码识别
   - _industry_transform — 原始数据转换
   - fetch_industry_data — 单只证券行业查询（mock chain）
-  - batch_fetch_industry_data — 批量查询
+  - batch_fetch_industry_data — 批量查询（含非 A 股过滤）
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -14,6 +15,59 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import MagicMock, patch
+
+
+class TestIsAShareCode(unittest.TestCase):
+    """_is_a_share_code 纯函数测试。"""
+
+    def _call(self, code: str) -> bool:
+        from src.python.fetcher.industry import _is_a_share_code
+        return _is_a_share_code(code)
+
+    def test_normal_sh(self):
+        """sh 前缀 A 股代码 → True。"""
+        self.assertTrue(self._call("sh600000"))
+
+    def test_normal_sz(self):
+        """sz 前缀 A 股代码 → True。"""
+        self.assertTrue(self._call("sz000001"))
+
+    def test_normal_bj(self):
+        """bj 前缀 A 股代码 → True。"""
+        self.assertTrue(self._call("bj830001"))
+
+    def test_raw_six_digit(self):
+        """纯 6 位数字 → True。"""
+        self.assertTrue(self._call("600900"))
+
+    def test_us_stock(self):
+        """美股字母代码 → False。"""
+        self.assertFalse(self._call("AAPL"))
+
+    def test_us_stock_numeric(self):
+        """美股数字代码（无前缀非 6 位）→ False。"""
+        self.assertFalse(self._call("BRK.B"))
+
+    def test_hk_stock(self):
+        """港股 5 位 → False。"""
+        self.assertFalse(self._call("00700"))
+
+    def test_empty(self):
+        """空字符串 → False。"""
+        self.assertFalse(self._call(""))
+
+    def test_whitespace(self):
+        """空格 → False。"""
+        self.assertFalse(self._call("  "))
+
+    def test_prefix_is_a_share(self):
+        """带 sh/sz/bj 前缀的 6 位码 → True。"""
+        for prefix in ("sh", "sz", "bj"):
+            self.assertTrue(self._call(f"{prefix}600000"))
+
+    def test_prefix_not_a_share(self):
+        """带 sh/sz/bj 前缀但非 6 位 → False。"""
+        self.assertFalse(self._call("sh60000"))  # 5 位
 
 
 class TestIndustryTransform(unittest.TestCase):
@@ -100,7 +154,7 @@ class TestBatchFetchIndustryData(unittest.TestCase):
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
     def test_batch_success(self, mock_fetch):
-        """批量成功 → 返回映射。"""
+        """批量 A 股成功 → 返回映射。"""
         def side_effect(code, **kwargs):
             return {"code": code, "industry": "测试"}
         mock_fetch.side_effect = side_effect
@@ -116,3 +170,35 @@ class TestBatchFetchIndustryData(unittest.TestCase):
         from src.python.fetcher.industry import batch_fetch_industry_data
         result = batch_fetch_industry_data(["000001", "600900"])
         self.assertEqual(result, {})
+
+    @patch("src.python.fetcher.industry.fetch_industry_data", return_value=None)
+    def test_us_stock_filtered_out(self, mock_fetch):
+        """美股代码自动过滤，不调 API。"""
+        from src.python.fetcher.industry import batch_fetch_industry_data
+        result = batch_fetch_industry_data(["600900", "AAPL", "00700", "PEP"])
+        # AAPL/00700/PEP 被过滤，只调用了 600900
+        self.assertEqual(mock_fetch.call_count, 1)
+        # 600900 返回 None，全空
+        self.assertEqual(result, {})
+
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    def test_all_us_stocks_return_empty(self, mock_fetch):
+        """全是美股 → 不调 API，直接返回空字典。"""
+        from src.python.fetcher.industry import batch_fetch_industry_data
+        result = batch_fetch_industry_data(["AAPL", "GOOG", "TSLA"])
+        mock_fetch.assert_not_called()
+        self.assertEqual(result, {})
+
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    def test_mixed_with_prefixed_codes(self, mock_fetch):
+        """带 sh/sz 前缀和美股混合 → 前缀码通过，美股过滤。"""
+        def side_effect(code, **kwargs):
+            return {"code": code, "industry": "测试"}
+        mock_fetch.side_effect = side_effect
+
+        from src.python.fetcher.industry import batch_fetch_industry_data
+        result = batch_fetch_industry_data(["sh600000", "sz000001", "AAPL"])
+        self.assertEqual(len(result), 2)
+        self.assertIn("sh600000", result)
+        self.assertIn("sz000001", result)
+        self.assertNotIn("AAPL", result)

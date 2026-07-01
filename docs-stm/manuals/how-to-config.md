@@ -93,10 +93,9 @@
 | 子字段 | 默认 | 可选值 | 说明 |
 |--------|:----:|--------|------|
 | `price` | — | `tencent`, `eastmoney` | 股票/ETF 实时收盘价首选源 |
-| `index` | — | `tencent`, `sina` | A 股指数首选源 |
-| `us_index` | — | `sina` | 美股指数首选源 |
 | `fund_rank` | — | `tiantian` | 基金业绩排名首选源 |
 | `fund_hold` | — | `tiantian` | 基金持仓穿透首选源 |
+| `industry` | — | `eastmoney_industry` | 行业分类/概念板块首选源 |
 
 示例 — 将行情首选从腾讯改为东方财富：
 
@@ -109,6 +108,10 @@
 ```
 
 > `preferred_provider` 为空对象 `{}` 时全部使用默认优先级。
+>
+> **💡 指数数据说明：** A 股/美股指数由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**，不受 `preferred_provider` 控制。双链路自动 fallback：
+>   - A 股：**腾讯财经→新浪财经→过期缓存**
+>   - 美股：**新浪财经（2次重试）→腾讯财经→过期缓存**
 
 ## user_fund_benchmarks 自定义基准
 

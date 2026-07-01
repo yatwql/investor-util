@@ -351,6 +351,22 @@ class TestExtractFooterText(unittest.TestCase):
         self.assertIn("本次使用LLM缓存", result)
         self.assertIn("Extended Thinking", result)
 
+    def test_extract_last_of_multiple_footers(self) -> None:
+        """多个 <p style='color:#888;font-size:12px'> 标签 → 提取最后一条（缓存提示）。"""
+        html = (
+            '<p>正文内容</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '模型：DeepSeek-V4-Flash | Token 用量：输入 3,200 / 输出 1,321 = 4,521 | '
+            '估算费用：¥0.0063'
+            '</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '本次使用LLM缓存（原始模型：DeepSeek-V4-Flash）'
+            '</p>'
+        )
+        result = _extract_footer_text(html)
+        self.assertIn("本次使用LLM缓存", result)
+        self.assertNotIn("Token 用量", result)
+
 
 # ═══════════════════════════════════════════════════════════
 #  _write_content_sheet — unified footer
@@ -408,6 +424,27 @@ class TestWriteContentSheetUnifiedFooter(unittest.TestCase):
         self.assertIn("LLM缓存", str(footer_cell.value or ""))
         # 不应再有额外行
         self.assertIsNone(ws.cell(row=5, column=1).value)
+
+    def test_dual_footer_cache_line_shown(self) -> None:
+        """模型/Token footer + 缓存 footer 并存 → 缓存 footer 为末尾标识行。"""
+        html = (
+            '<p>正文段落</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '模型：DeepSeek-V4-Flash | Token 用量：输入 100 / 输出 50 = 150'
+            '</p>\n\n'
+            '<p style="color:#888;font-size:12px">'
+            '本次使用LLM缓存（原始模型：DeepSeek-V4-Flash）'
+            '</p>'
+        )
+        ws = self.wb.create_sheet()
+        _write_content_sheet(ws, "测试", html)
+        # 模型/Token 行在正文中（不会被排除，因为不是最后一段）
+        content_cell_after_token = ws.cell(row=4, column=1)
+        self.assertIn("模型：DeepSeek-V4-Flash", str(content_cell_after_token.value or ""))
+        # 缓存提示为末尾 footer
+        footer_cell = ws.cell(row=6, column=1)
+        self.assertIn("本次使用LLM缓存", str(footer_cell.value or ""))
+        self.assertNotIn("Token 用量", str(footer_cell.value or ""))
 
 
 if __name__ == "__main__":

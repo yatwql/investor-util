@@ -147,9 +147,9 @@ def set_config(key: str, value: Any) -> None:
 
 _KNOWN_NEWS_SOURCES: set[str] = {"sina", "eastmoney", "cls", "wallstreetcn", "akshare"}
 
-_KNOWN_PROVIDER_TYPES: set[str] = {"price", "index", "us_index", "fund_rank", "fund_hold"}
+_KNOWN_PROVIDER_TYPES: set[str] = {"price", "fund_rank", "fund_hold", "industry"}
 
-_KNOWN_PROVIDER_NAMES: set[str] = {"tencent", "eastmoney", "sina", "tiantian"}
+_KNOWN_PROVIDER_NAMES: set[str] = {"tencent", "eastmoney", "sina", "tiantian", "eastmoney_industry"}
 
 _STRING_CONFIG_KEYS: set[str] = {"holdings_dir", "holdings_filename", "output_dir",
                                   "llm_key_file", "llm_settings_file"}

@@ -60,10 +60,29 @@ def fetch_industry_data(code: str) -> dict | None:
     )
 
 
+def _is_a_share_code(code: str) -> bool:
+    """判断是否为 A 股代码（含 sh/sz/bj 前缀的 6 位数字）。
+
+    美股（AAPL）、港股（00700）等非 A 股代码直接跳过，
+    避免无效 API 调用和误导性日志。
+    """
+    raw = code.strip()
+    if not raw:
+        return False
+    # 去除已知前缀
+    for prefix in ("sh", "sz", "bj"):
+        if raw.startswith(prefix):
+            raw = raw[len(prefix):]
+            break
+    # A 股代码必须为纯数字 6 位
+    return len(raw) == 6 and raw.isdigit()
+
+
 def batch_fetch_industry_data(codes: list[str], max_workers: int = 5) -> dict[str, dict]:
     """批量获取多只证券的行业分类和概念板块归属。
 
     使用线程池并发获取，已缓存的不重复请求。
+    非 A 股代码（美股/港股等）自动跳过，不调用 API。
 
     Args:
         codes: 6 位证券代码列表
@@ -76,6 +95,15 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 5) -> dict[st
     if not valid_codes:
         return {}
 
+    # 过滤非 A 股代码，避免无效 API 调用
+    a_codes = [c for c in valid_codes if _is_a_share_code(c)]
+    skipped = len(valid_codes) - len(a_codes)
+    if skipped:
+        logger.debug("跳过 %d 个非 A 股代码（行业数据仅支持 A 股）", skipped)
+
+    if not a_codes:
+        return {}
+
     result: dict[str, dict] = {}
     lock = threading.Lock()
 
@@ -86,7 +114,7 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 5) -> dict[st
         return None
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_fetch_one, code): code for code in valid_codes}
+        futures = {executor.submit(_fetch_one, code): code for code in a_codes}
         for future in as_completed(futures):
             try:
                 res = future.result()
@@ -99,5 +127,5 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 5) -> dict[st
                     result[code] = data
 
     logger.info("批量行业数据获取完成: 共 %d 个代码, 成功 %d 个",
-                len(valid_codes), len(result))
+                len(a_codes), len(result))
     return result

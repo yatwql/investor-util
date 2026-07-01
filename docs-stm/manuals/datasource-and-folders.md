@@ -11,8 +11,10 @@
 | 财经新闻（源3） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | — |
 | 财经新闻（源4） | 华尔街见闻 `api-one.wallstcn.com/apiv1/content/lives` | — |
 | 财经新闻（源5） | akshare 封装：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — |
-| A 股指数 | 腾讯财经 `qt.gtimg.cn` | — |
-| 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析） | — |
+| A 股指数 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn`（s_* 前缀） |
+| 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析，gb_* 前缀） | 腾讯财经 `qt.gtimg.cn` |
+
+> **架构说明：** 指数数据由 `fetcher/index.py` 直接调用对应 API（不经过 Provider Chain）。A 股指数：腾讯→新浪备用→过期缓存；美股指数：新浪（2 次重试）→腾讯备用→过期缓存。
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业分类 + 概念板块归属） | — |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
@@ -106,7 +108,7 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                         # 单元测试（57 个 test_*.py + helpers.py，1711 passed / 12 skipped）
+│   └── test/                         # 单元测试（57 个 test_*.py + helpers.py，1713 passed / 12 skipped）
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     # 持仓 xlsx 文件（用户放置）

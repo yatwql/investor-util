@@ -422,6 +422,305 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         mock_llm = self._run_with_mocks(enable_llm=False)
         mock_llm.assert_not_called()
 
+    def _run_with_mocks_and_template(self, enable_llm=True):
+        """类似 _run_with_mocks，额外返回 template mock 用于断言模板数据。"""
+        with ExitStack() as stack:
+            mock_details = stack.enter_context(patch("src.python.report.html_writer._generate_details"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
+            mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
+            mock_llm = stack.enter_context(patch("src.python.llm.generate_all_llm"))
+            mock_template_call = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
+
+            mock_details.return_value = [self.mock_detail]
+            mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
+            mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
+            mock_penetration.return_value = {}
+            mock_cat.return_value = {}
+            mock_status.return_value = (0, 0, True)
+            mock_perf.return_value = {}
+            mock_llm.return_value = ("<p>宏观</p>", "<p>复盘</p>", None, None, False, False, False, False)
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html>ok</html>"
+            mock_template_call.return_value = tmpl
+
+            from src.python.report.html_writer import write_html_report
+
+            write_html_report(
+                self.holdings,
+                output_dir=self._tmp,
+                enable_llm=enable_llm,
+                llm_content=None,
+                include_news=False,
+                sector_flow=[],
+            )
+
+            # 捕获模板渲染参数
+            _, render_kwargs = tmpl.render.call_args
+
+        return render_kwargs
+
+    def test_llm_disabled_template_data(self):
+        """enable_llm=False → 模板收到 llm_enabled=False，module 内容为 None。"""
+        kwargs = self._run_with_mocks_and_template(enable_llm=False)
+        self.assertFalse(kwargs["llm_enabled"])
+        # 各模块内容为 None（未生成）
+        self.assertIsNone(kwargs["global_macro"])
+        self.assertIsNone(kwargs["expert_review"])
+        self.assertIsNone(kwargs["health_check"])
+        self.assertIsNone(kwargs["penetration_deep"])
+        # llm_session_usage 为 None（未获取用量）
+        self.assertIsNone(kwargs["llm_session_usage"])
+        # llm_module_info 仍有默认的4条记录（状态为 unknown）
+        self.assertEqual(len(kwargs["llm_module_info"]), 4)
+        for mi in kwargs["llm_module_info"]:
+            self.assertEqual(mi["status"], "unknown")
+            self.assertEqual(mi["status_label"], "")
+
+
+# ============================================================
+#  _build_module_info_list — LLM 模块状态列表
+# ============================================================
+
+
+class TestBuildModuleInfoList(unittest.TestCase):
+    """测试 _build_module_info_list 的状态判定逻辑。"""
+
+    def test_cache_hit(self):
+        """per_module 缓存命中 → status='cached', status_label='缓存'。"""
+        from src.python.report.html_writer import _build_module_info_list
+        per_module = {
+            "global_macro": {
+                "model": "deepseek-v4-flash", "cached": True,
+                "input_tokens": 0, "output_tokens": 0, "cache_hit_tokens": 500,
+                "cost": 0.0, "thinking": False, "endpoint": "",
+            },
+        }
+        result = _build_module_info_list({}, per_module)
+        gm = next(m for m in result if m["key"] == "global_macro")
+        self.assertEqual(gm["status"], "cached")
+        self.assertEqual(gm["status_label"], "缓存")
+        self.assertEqual(gm["cache_hit_tokens"], 500)
+        self.assertTrue(gm["cached"])
+        self.assertEqual(gm["total_tokens"], 0)
+
+    def test_success_call(self):
+        """per_module 非缓存 → status='success', status_label='成功'。"""
+        from src.python.report.html_writer import _build_module_info_list
+        per_module = {
+            "expert_review": {
+                "model": "deepseek-v4-flash", "cached": False,
+                "input_tokens": 500, "output_tokens": 300,
+                "cache_hit_tokens": 0, "cost": 0.001, "thinking": True, "endpoint": "",
+            },
+        }
+        result = _build_module_info_list({}, per_module)
+        er = next(m for m in result if m["key"] == "expert_review")
+        self.assertEqual(er["status"], "success")
+        self.assertEqual(er["status_label"], "成功")
+        self.assertEqual(er["input_tokens"], 500)
+        self.assertEqual(er["output_tokens"], 300)
+        self.assertEqual(er["total_tokens"], 800)
+        self.assertTrue(er["thinking"])
+
+    def test_disabled(self):
+        """FAIL_REASON_DISABLED → status='disabled', status_label='已禁用'。"""
+        from src.python.llm import FAIL_REASON_DISABLED
+        from src.python.report.html_writer import _build_module_info_list
+        failure = {"global_macro": FAIL_REASON_DISABLED}
+        result = _build_module_info_list(failure, {})
+        gm = next(m for m in result if m["key"] == "global_macro")
+        self.assertEqual(gm["status"], "disabled")
+        self.assertEqual(gm["status_label"], "已禁用")
+        self.assertEqual(gm["model"], "")
+        self.assertEqual(gm["cost"], 0.0)
+
+    def test_failed(self):
+        """FAIL_REASON_API_ERROR → status='failed', status_label 含错误描述。"""
+        from src.python.llm import FAIL_REASON_API_ERROR
+        from src.python.report.html_writer import _build_module_info_list
+        failure = {"health_check": FAIL_REASON_API_ERROR}
+        result = _build_module_info_list(failure, {})
+        hc = next(m for m in result if m["key"] == "health_check")
+        self.assertEqual(hc["status"], "failed")
+        self.assertEqual(hc["status_label"], "LLM API 调用失败")
+
+    def test_failed_all_reasons(self):
+        """各失败原因 → 对应的中文描述。"""
+        from src.python.llm import (
+            FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
+            FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
+        )
+        from src.python.report.html_writer import _build_module_info_list
+        cases = [
+            (FAIL_REASON_NOT_CONFIGURED, "LLM 未配置"),
+            (FAIL_REASON_API_ERROR, "LLM API 调用失败"),
+            (FAIL_REASON_NETWORK_ERROR, "LLM API 网络连接失败"),
+            (FAIL_REASON_TIMEOUT, "LLM API 请求超时"),
+            (FAIL_REASON_CIRCUIT_OPEN, "LLM API 暂时不可用（熔断冷却中）"),
+        ]
+        _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+        for idx, (reason, expected) in enumerate(cases):
+            with self.subTest(reason=reason):
+                mk = _MODULE_KEYS[idx % len(_MODULE_KEYS)]
+                result = _build_module_info_list({mk: reason}, {})
+                entry = next(m for m in result if m["key"] == mk)
+                self.assertEqual(entry["status"], "failed")
+                self.assertEqual(entry["status_label"], expected)
+
+    def test_unknown(self):
+        """无 per_module 且无 failure → status='unknown', status_label=''。"""
+        from src.python.report.html_writer import _build_module_info_list
+        result = _build_module_info_list({}, {})
+        for mk in ["global_macro", "expert_review", "health_check", "penetration_deep"]:
+            m = next(entry for entry in result if entry["key"] == mk)
+            self.assertEqual(m["status"], "unknown", f"{mk} should be unknown")
+            self.assertEqual(m["status_label"], "", f"{mk} status_label should be empty")
+
+    def test_mixed_states(self):
+        """混合状态：禁用、失败、缓存、成功同时存在。"""
+        from src.python.llm import FAIL_REASON_DISABLED, FAIL_REASON_TIMEOUT
+        from src.python.report.html_writer import _build_module_info_list
+        failure = {
+            "global_macro": FAIL_REASON_DISABLED,
+            "health_check": FAIL_REASON_TIMEOUT,
+        }
+        per_module = {
+            "expert_review": {
+                "model": "claude-sonnet-4", "cached": True,
+                "input_tokens": 0, "output_tokens": 0, "cache_hit_tokens": 1000,
+                "cost": 0.0, "thinking": False, "endpoint": "",
+            },
+            "penetration_deep": {
+                "model": "deepseek-v4-flash", "cached": False,
+                "input_tokens": 300, "output_tokens": 200,
+                "cache_hit_tokens": 0, "cost": 0.002, "thinking": True,
+                "endpoint": "https://api.test.com",
+            },
+        }
+        result = _build_module_info_list(failure, per_module)
+        by_key = {m["key"]: m for m in result}
+
+        self.assertEqual(by_key["global_macro"]["status"], "disabled")
+        self.assertEqual(by_key["health_check"]["status"], "failed")
+        self.assertEqual(by_key["expert_review"]["status"], "cached")
+        self.assertEqual(by_key["penetration_deep"]["status"], "success")
+        self.assertEqual(by_key["penetration_deep"]["endpoint"], "https://api.test.com")
+
+
+# ============================================================
+#  _render_llm_module_info — HTML 报告模块状态收集
+# ============================================================
+
+
+class TestRenderLlmModuleInfo(unittest.TestCase):
+    """测试 _render_llm_module_info 的使能分支和数据聚合。"""
+
+    def _call(self, llm_enabled_flag=False, session_usage=None, module_failure=None):
+        """调用 _render_llm_module_info，返回结果四元组。"""
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE",
+                                      module_failure or {}))
+            if session_usage is not None:
+                stack.enter_context(
+                    patch("src.python.llm.get_session_usage", return_value=session_usage))
+                stack.enter_context(
+                    patch("src.python.llm.format_session_usage", return_value=session_usage))
+            from src.python.report.html_writer import _render_llm_module_info
+            return _render_llm_module_info(llm_enabled_flag)
+
+    def test_not_enabled_returns_unknown(self):
+        """llm_enabled_flag=False → 所有模块状态为 unknown，无用量数据。"""
+        llm_module_info, llm_endpoint, module_disabled, llm_session_usage = self._call(
+            llm_enabled_flag=False)
+        self.assertEqual(len(llm_module_info), 4)
+        for mi in llm_module_info:
+            self.assertEqual(mi["status"], "unknown")
+        self.assertEqual(llm_endpoint, "")
+        self.assertIsNone(llm_session_usage)
+        self.assertFalse(any(module_disabled.values()))
+
+    def test_enabled_with_cache_hit(self):
+        """llm_enabled_flag=True + 全缓存 → 所有模块状态为 cached。"""
+        session_usage = {
+            "has_usage": True, "call_count": 0, "per_module": {
+                "global_macro": {"model": "ds", "cached": True, "input_tokens": 0,
+                                 "output_tokens": 0, "cache_hit_tokens": 500,
+                                 "cost": 0.0, "thinking": False, "endpoint": ""},
+                "expert_review": {"model": "ds", "cached": True, "input_tokens": 0,
+                                  "output_tokens": 0, "cache_hit_tokens": 300,
+                                  "cost": 0.0, "thinking": True, "endpoint": ""},
+                "health_check": {"model": "ds", "cached": True, "input_tokens": 0,
+                                 "output_tokens": 0, "cache_hit_tokens": 200,
+                                 "cost": 0.0, "thinking": False, "endpoint": ""},
+                "penetration_deep": {"model": "claude", "cached": True, "input_tokens": 0,
+                                     "output_tokens": 0, "cache_hit_tokens": 400,
+                                     "cost": 0.0, "thinking": False,
+                                     "endpoint": "https://api.test.com"},
+            },
+        }
+        llm_module_info, llm_endpoint, module_disabled, llm_session_usage = self._call(
+            llm_enabled_flag=True, session_usage=session_usage)
+        by_key = {m["key"]: m for m in llm_module_info}
+        for mk in ["global_macro", "expert_review", "health_check", "penetration_deep"]:
+            self.assertEqual(by_key[mk]["status"], "cached")
+        self.assertEqual(llm_endpoint, "https://api.test.com")
+        self.assertIsNotNone(llm_session_usage)
+        self.assertTrue(by_key["expert_review"]["thinking"])
+
+    def test_enabled_with_mixed_states(self):
+        """llm_enabled_flag=True + 混合 + failure → 正确状态分发。"""
+        from src.python.llm import FAIL_REASON_DISABLED, FAIL_REASON_API_ERROR
+        session_usage = {
+            "has_usage": True, "call_count": 2, "per_module": {
+                "global_macro": {"model": "ds", "cached": False, "input_tokens": 500,
+                                 "output_tokens": 300, "cache_hit_tokens": 0,
+                                 "cost": 0.002, "thinking": False, "endpoint": ""},
+                "expert_review": {"model": "claude", "cached": True, "input_tokens": 0,
+                                  "output_tokens": 0, "cache_hit_tokens": 1000,
+                                  "cost": 0.0, "thinking": False, "endpoint": ""},
+            },
+        }
+        module_failure = {
+            "health_check": FAIL_REASON_DISABLED,
+            "penetration_deep": FAIL_REASON_API_ERROR,
+        }
+        llm_module_info, llm_endpoint, module_disabled, _ = self._call(
+            llm_enabled_flag=True, session_usage=session_usage,
+            module_failure=module_failure)
+        by_key = {m["key"]: m for m in llm_module_info}
+        self.assertEqual(by_key["global_macro"]["status"], "success")
+        self.assertEqual(by_key["expert_review"]["status"], "cached")
+        self.assertEqual(by_key["health_check"]["status"], "disabled")
+        self.assertEqual(by_key["penetration_deep"]["status"], "failed")
+        # module_disabled 字典
+        self.assertTrue(module_disabled["health_check"])
+        self.assertFalse(module_disabled["global_macro"])
+        self.assertFalse(module_disabled["expert_review"])
+        self.assertFalse(module_disabled["penetration_deep"])
+
+    def test_enabled_import_failure_returns_unknown(self):
+        """llm_enabled_flag=True 但 format_session_usage 异常 → 返回 unknown + 无 session_usage。"""
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE", {}))
+            # 模拟 format_session_usage / get_session_usage 抛出 TypeError
+            # （与 _render_llm_module_info 中 except (ImportError, TypeError, AttributeError) 匹配）
+            stack.enter_context(patch("src.python.llm.get_session_usage",
+                                      side_effect=TypeError("模拟错误")))
+            stack.enter_context(patch("src.python.llm.format_session_usage",
+                                      side_effect=TypeError("模拟错误")))
+            from src.python.report.html_writer import _render_llm_module_info
+            llm_module_info, llm_endpoint, _, llm_session_usage = \
+                _render_llm_module_info(True)
+        for mi in llm_module_info:
+            self.assertEqual(mi["status"], "unknown")
+        self.assertIsNone(llm_session_usage)
+
 
 if __name__ == "__main__":
     unittest.main()

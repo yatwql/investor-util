@@ -26,7 +26,6 @@ from src.python.llm.api import (
     _LLM_TIMEOUT,
     _extract_model_from_cached,
     _log_token_usage,
-    _strip_token_line,
 )
 from src.python.llm.fingerprint import (
     _build_llm_fingerprint,
@@ -538,18 +537,31 @@ def _compute_module_cache_info(
     return info
 
 
-def _precheck_one_cache(cache_info: dict, llm_config: dict) -> tuple[str | None, bool]:
-    """预检单个模块的缓存，返回 (result, from_cached)。"""
+def _precheck_one_cache(
+    cache_info: dict, llm_config: dict, module_key: str = "",
+) -> tuple[str | None, bool]:
+    """预检单个模块的缓存，返回 (result, from_cached)。
+
+    缓存命中时同时记录模块用量（_record_per_module），
+    确保 LLM API 用量页签能正确显示"缓存"状态。
+    """
     if not cache_info["can_cache"]:
         return (None, False)
     cached = cache_get(cache_info["key"], cache_info["ttl"])
     if not cached:
         return (None, False)
-    clean = _strip_token_line(cached)
+    clean = cached
     model = _extract_model_from_cached(cached)
     hint = _cache_line_model_tpl(model) if model else _CACHE_LINE_HTML
-    if llm_config.get(cache_info["thinking_key"], False):
+    thinking_enabled = llm_config.get(cache_info["thinking_key"], False)
+    if thinking_enabled:
         hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
+    # 记录模块用量，确保 API 用量页签显示"缓存"状态而非"—"
+    if module_key:
+        _name_for_record = model or llm_config.get("model", "") or "缓存命中"
+        _endpoint_for_record = llm_config.get("endpoint", "") or ""
+        _record_per_module(module_key, _name_for_record, cached=True,
+                           thinking=thinking_enabled, endpoint=_endpoint_for_record)
     return (clean + hint, True)
 
 
@@ -565,7 +577,7 @@ def _precheck_all_modules(
             _LLM_MODULE_FAILURE[module_key] = FAIL_REASON_DISABLED
             results[module_key] = {"result": None, "cached": False}
             continue
-        result, from_cache = _precheck_one_cache(info, llm_config)
+        result, from_cache = _precheck_one_cache(info, llm_config, module_key)
         results[module_key] = {"result": result, "cached": from_cache}
     return results
 
@@ -589,7 +601,13 @@ def _dispatch_llm_workers(
         """创建闭包：持 httpx.Client（HTTP/2 + 连接池）运行 fn(c, llm_config)。"""
         def _run() -> tuple[str | None, bool]:
             logger.info("正在生成：%s...", _label_map.get(label, label))
-            c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)
+            try:
+                c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)
+            except ImportError:
+                # h2 包未安装时降级到 HTTP/1.1
+                _settings = dict(_LLM_CLIENT_SETTINGS)
+                _settings.pop("http2", None)
+                c = httpx.Client(timeout=_LLM_TIMEOUT, **_settings)
             try:
                 return fn(c, llm_config)
             finally:
