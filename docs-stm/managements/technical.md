@@ -141,7 +141,7 @@ investor-util/
 │   │   ├── tui.py                # 键盘输入封装
 │   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
 │   │   └── tui_menu.py           # 菜单交互
-│   └── test/                     # 测试（57 个 test_*.py + helpers.py，1685 passed / 11 skipped）
+│   └── test/                     # 测试（57 个 test_*.py + helpers.py，1691 passed / 11 skipped）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志
