@@ -174,7 +174,7 @@
 | v0.2.51 | fingerprint 16 项 + 新闻 provider 50 项 + 代码治理回归 |
 | v0.2.52 | 大函数治理二期 + 测试补全三期（9 模块 140 项） |
 | v0.2.53 | P1 LLM Prompt 精简 + P2 HTTP/2 复用 + dead code 清理 |
-| v0.2.54 | 时区安全修复 + config 原子写入 + docs 反推补全 |
+| v0.2.54 | P 节 12 项 Edge Case/场景测试补全 + 评级 bug 修复 + 8 项预存测试缺陷修复 + HTML 响应式 + docs 反推补全 |
 
 ---
 

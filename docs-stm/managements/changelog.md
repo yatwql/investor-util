@@ -4,6 +4,78 @@
 
 ---
 
+## [0.2.54] - 2026-07-01
+
+### Fixed
+- **P0 CRASH × 6**：
+  - **R-116** `tui_menu.py` `config["holdings_dir"]` 裸键访问 → `.get()` 安全读取（配置异常时菜单入口崩溃）
+  - **R-117** `tui_menu.py` `endpoint.split("/")[2]` → 安全解析（短端点格式时配置显示崩溃）
+  - **R-114** `tui.py` Linux 非 TTY 下 `termios.tcgetattr` 崩溃 → 加 `isatty()` 保护
+  - **R-130** `tui.py` Windows `msvcrt.getch()` 方向键二次读取时 `KeyboardInterrupt` 保护
+  - **R-119** `fetcher/industry.py` `future.result()` 无异常防护 → 加 `try/except` 批量继续
+  - **R-113** `providers/tiantian.py` 全宽括号正则 `group(1)` 为 `None` → 合并为 `[\(（]` 字符集
+- **P0 HANG × 1**：
+  - **R-115** `tui.py` Linux ESC 序列 `read(2)` 永久阻塞 → 逐字节 `select.select` 超时读取
+- **P1 WRONG DATA × 5**：
+  - **R-120** `providers/tencent.py` `_add_prefix()` 缺失 2/4/8/9 前缀 → 补 sz/bj 映射
+  - **R-122** `providers/akshare_extras.py` `_run_with_timeout` 未实际超时 → `shutdown(wait=False)`
+  - **R-124** `providers/akshare_extras.py` NaN 穿透写入非法 JSON → `math.isnan` 返回 `None`
+  - **R-123** `providers/akshare_extras.py` 分红 API `future.result()` 无超时 → 加 30s timeout
+  - **R-121** `providers/sina.py` 硬编码 `var hq_str_` 无格式校验 → 加 `startswith` 告警
+- **P1 场景问题 × 3**：
+  - **R-101** `providers/eastmoney.py` 备用链路 `yesterday_nav=0` → today_profit 虚高修复
+  - **R-103** `report/market_value.py` 零成本 `profit_rate=0%` → 改为 `None`
+  - **R-125** `providers/akshare_extras.py` `_MEMO_CACHE` 无界 → LRU 淘汰（上限 100）
+- **基金业绩评级 bug（R-131）**：百分位(Data_rateInSimilarPersent)与排名/总数(Data_rateInSimilarType)来自不同同类分组导致评级矛盾（如 159222 自由现金流ETF：百分位 3.33→优秀，排名 4823/4985→偏差，最终错误显示"优秀"）。修复后：同时计算百分位评级和排名评级，不一致时以排名/总数为准并记日志。同步新增 6 项回归测试。
+- **`_parse_rank_entry` 异常防御增强（R-132）**：捕获补充 `AttributeError`。
+
+### Added
+- **`src/test/test_config_atomic.py`（R-085 ✅）**：11 项测试覆盖原子写入创建/覆盖/持久化/异常时临时文件清理/递归目录创建/缓存失效。
+- **`src/test/test_circuit_breaker_recovery.py`（R-087 ✅）**：15 项测试覆盖熔断器全生命周期（关闭→1次失败→2次→3次→开启→冷却→半开→恢复/重开）。
+- **`src/test/test_market_value_edge.py`（R-090+R-091 ✅）**：15 项测试覆盖溢价率占位符"--"、非 T 日 today_profit=0、腾讯始终计算、负值利润、空 nav_date。
+- **`src/test/test_penetration_edge.py`（R-092 ✅）**：12 项测试覆盖占比归一化(≈100%)、零总市值→全零、单资产→100%、TOP10 上限、金额为空处理。
+- **`src/test/test_integration_scenarios.py`（R-095 S6~S10 ✅）**：17 项测试覆盖纯债基金分类、Provider 回退至过期缓存、单只持仓利润计算、零成本利润率为 None、极端份额与高精度 NAV。
+
+### Changed
+- **日志轮转确认已有实现**：`src/python/logger.py` 使用 `RotatingFileHandler`（10MB/5备份），`logs/app.log` 已有大小轮转，无需修改。plan.md M 节条目移除。
+- **review-findings.md**：R-085~R-132 全部完成，待办区清空。
+
+### Tests
+- 全量 1691 passed（+156）, 11 skipped, 30 subtests passed。
+- P 节 12 项测试补全 + 补充修复 8 项预存测试缺陷 + R-131 评级 bug 6 项回归。
+
+### Docs
+- **plan.md**：P 区 12 项清理归档，移除已完成"日志轮转"条目，标记 HTML 响应式 ✅ 已完成。
+- **datasource-and-folders.md**：测试文件数 50→57，passed 1535→1691。
+- **technical.md**：测试数 1691 passed 同步。
+
+---
+
+## [0.2.53] - 2026-07-01
+
+### Added
+- **`_format_holdings_block()` / `_format_penetration_block()` 共享格式化函数**（`prompts.py`）：抽取为 3 模块（expert_review / health_check / penetration_deep）共用的持仓明细格式化函数，消除重复循环。
+- **`_LLM_CLIENT_SETTINGS` HTTP 连接池配置**（`generators.py`）：`http2=True` 多路复用 + 连接池上限 20 / 空闲保持 10，减少 API 连接建立开销。
+
+### Changed
+- **P1: LLM Prompt 精简** — `_build_expert_review_prompt` 启用 `compact` 模式，省略今日涨跌幅字段（场外基金保留净值日期）。输入 token 减少 10~15%，缓存受行情波动影响降低。
+- **P2: HTTP 会话复用** — `_make_runner` 创建 `httpx.Client` 时使用共享 `_LLM_CLIENT_SETTINGS`，统一超时/连接池参数。
+- **`_FALLBACK_ENABLED` 死代码移除**（`news_sources.py`）：R-055 时清理了引用但未删除定义，现彻底移除。
+
+### Fixed
+- **config.json 缺少 `early_warning` 配置段**：补齐 `sector_alert_threshold_*` 和 `sentiment_top_n` 三个可调参数。
+- **P0: `handlers_cache.py` 缺失 `read_holdings` 导入（R-084）**：从 `tui_handlers.py` 拆分出 `handlers_cache.py` 时，`_read_holdings_and_clear_cache()` 依赖的 `read_holdings` 导入未随迁，菜单 [1]/[2] 刷新缓存时 `NameError`。已补上 `from src.python.reader import read_holdings`。
+
+### Docs
+- **review-findings.md**：精简审查记录，待办区全部清空（R-001~R-083 ✅）；R-084（P0 导入缺失）已完成并移入 changelog；新增场景审计 12 项（R-101~R-112）。
+- **plan.md / technical.md / README.md**：版本号同步至 v0.2.52，K/L/M/N/O 方向标注。
+- **datasource-and-folders.md**：测试文件数 35→50，新增 `reason.bat`。
+
+### Tests
+- 全量 1535 passed, 11 skipped, 30 subtests passed。
+
+---
+
 ## [0.2.52] - 2026-07-01
 
 ### Changed
@@ -48,77 +120,6 @@
 ### Docs
 - **review-findings.md**：R-056~R-070（大函数治理二期）、R-071~R-079（测试覆盖补全三期）全部完成，移出待办区。待办区仅保留 P3 R-080~R-083。
 - **版本号同步**：constants.py 0.2.51→0.2.52
-
-## [0.2.53] - 2026-07-01
-
-### Added
-- **`_format_holdings_block()` / `_format_penetration_block()` 共享格式化函数**（`prompts.py`）：抽取为 3 模块（expert_review / health_check / penetration_deep）共用的持仓明细格式化函数，消除重复循环。
-- **`_LLM_CLIENT_SETTINGS` HTTP 连接池配置**（`generators.py`）：`http2=True` 多路复用 + 连接池上限 20 / 空闲保持 10，减少 API 连接建立开销。
-
-### Changed
-- **日志轮转确认已有实现**：`src/python/logger.py` 使用 `RotatingFileHandler`（10MB/5备份），`logs/app.log` 已有大小轮转，无需修改。计划 M 节条目移除。
-- **P1: LLM Prompt 精简** — `_build_expert_review_prompt` 启用 `compact` 模式，省略今日涨跌幅字段（场外基金保留净值日期）。输入 token 减少 10~15%，缓存受行情波动影响降低。
-- **P2: HTTP 会话复用** — `_make_runner` 创建 `httpx.Client` 时使用共享 `_LLM_CLIENT_SETTINGS`，统一超时/连接池参数。
-- **`_FALLBACK_ENABLED` 死代码移除**（`news_sources.py`）：R-055 时清理了引用但未删除定义，现彻底移除。
-
-### Fixed
-- **config.json 缺少 `early_warning` 配置段**：补齐 `sector_alert_threshold_*` 和 `sentiment_top_n` 三个可调参数。
-- **P0: `handlers_cache.py` 缺失 `read_holdings` 导入（R-084）**：从 `tui_handlers.py` 拆分出 `handlers_cache.py` 时，`_read_holdings_and_clear_cache()` 依赖的 `read_holdings` 导入未随迁，菜单 [1]/[2] 刷新缓存时 `NameError`。已补上 `from src.python.reader import read_holdings`。
-
-### Docs
-- **review-findings.md**：精简审查记录，待办区全部清空（R-001~R-083 ✅）；R-084（P0 导入缺失）已完成并移入 changelog；新增场景审计 12 项（R-101~R-112）。
-- **plan.md / technical.md / README.md**：版本号同步至 v0.2.52，K/L/M/N/O 方向标注。
-- **datasource-and-folders.md**：测试文件数 35→50，新增 `reason.bat`。
-
-### Tests
-- 全量 1685 passed（+150）, 11 skipped, 30 subtests passed。
-- 补充修复 8 项预存测试缺陷（market_hours UTC 时区 mock/llm_placeholder import/log_sanitize 熔断阈值）。
-
-### Added
-- **`src/test/test_config_atomic.py`（R-085 ✅）**：11 项测试覆盖原子写入创建/覆盖/持久化/异常时临时文件清理/递归目录创建/缓存失效。
-- **`src/test/test_circuit_breaker_recovery.py`（R-087 ✅）**：15 项测试覆盖熔断器全生命周期（关闭→1次失败→2次→3次→开启→冷却→半开→恢复/重开）。
-- **`src/test/test_market_value_edge.py`（R-090+R-091 ✅）**：15 项测试覆盖溢价率占位符"--"、非 T 日 today_profit=0、腾讯始终计算、负值利润、空 nav_date。
-- **`src/test/test_penetration_edge.py`（R-092 ✅）**：12 项测试覆盖占比归一化(≈100%)、零总市值→全零、单资产→100%、TOP10 上限、金额为空处理。
-- **`src/test/test_integration_scenarios.py`（R-095 S6~S10 ✅）**：17 项测试覆盖纯债基金分类、Provider 回退至过期缓存、单只持仓利润计算、零成本利润率为 None、极端份额与高精度 NAV。
-
-### Docs
-- **plan.md**：P 区 12 项（R-084~R-095）全部标记 ✅，测试缺口补全方向完成。
-- **datasource-and-folders.md**：测试文件数 50→57，passed 1535→1685。
-
----
-
-## [0.2.54] - 2026-07-01
-
-### Fixed
-- **P0 CRASH × 6**：
-  - **R-116** `tui_menu.py` `config["holdings_dir"]` 裸键访问 → `.get()` 安全读取（配置异常时菜单入口崩溃）
-  - **R-117** `tui_menu.py` `endpoint.split("/")[2]` → 安全解析（短端点格式时配置显示崩溃）
-  - **R-114** `tui.py` Linux 非 TTY 下 `termios.tcgetattr` 崩溃 → 加 `isatty()` 保护
-  - **R-130** `tui.py` Windows `msvcrt.getch()` 方向键二次读取时 `KeyboardInterrupt` 保护
-  - **R-119** `fetcher/industry.py` `future.result()` 无异常防护 → 加 `try/except` 批量继续
-  - **R-113** `providers/tiantian.py` 全宽括号正则 `group(1)` 为 `None` → 合并为 `[\(（]` 字符集
-- **P0 HANG × 1**：
-  - **R-115** `tui.py` Linux ESC 序列 `read(2)` 永久阻塞 → 逐字节 `select.select` 超时读取
-- **P1 WRONG DATA × 5**：
-  - **R-120** `providers/tencent.py` `_add_prefix()` 缺失 2/4/8/9 前缀 → 补 sz/bj 映射
-  - **R-122** `providers/akshare_extras.py` `_run_with_timeout` 未实际超时 → `shutdown(wait=False)`
-  - **R-124** `providers/akshare_extras.py` NaN 穿透写入非法 JSON → `math.isnan` 返回 `None`
-  - **R-123** `providers/akshare_extras.py` 分红 API `future.result()` 无超时 → 加 30s timeout
-  - **R-121** `providers/sina.py` 硬编码 `var hq_str_` 无格式校验 → 加 `startswith` 告警
-- **P1 场景问题 × 3**：
-  - **R-101** `providers/eastmoney.py` 备用链路 `yesterday_nav=0` → today_profit 虚高修复
-  - **R-103** `report/market_value.py` 零成本 `profit_rate=0%` → 改为 `None`
-  - **R-125** `providers/akshare_extras.py` `_MEMO_CACHE` 无界 → LRU 淘汰（上限 100）
-
-### Changed
-- **review-findings.md**：R-085~R-130 全部完成，待办区清空，原文归档已记录。
-- **testplan.md / plan.md**：测试缺口覆盖对应修复，同步标注完成。
-
-### Tests
-- 全量 1535 passed, 11 skipped, 30 subtests passed。
-
-### Fixed
-- **基金业绩评级 bug：百分位(Data_rateInSimilarPersent)与排名/总数(Data_rateInSimilarType)来自不同同类分组导致评级矛盾**（如 159222 自由现金流ETF：百分位 3.33→优秀，排名 4823/4985→偏差，最终错误显示"优秀"）。修复后：同时计算百分位评级和排名评级，不一致时以排名/总数为准并记日志。同步新增 6 项回归测试。
 
 ## [0.2.51] - 2026-07-01
 
