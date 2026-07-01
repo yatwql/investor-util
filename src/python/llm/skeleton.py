@@ -14,7 +14,7 @@ from src.python.llm.api import (
     _AUTO_INCREASE_FACTOR,
     _call_llm,
     _CACHE_LINE_HTML,
-    _CACHE_LINE_MODEL_TPL,
+    _cache_line_model_tpl,
     _LLM_TIMEOUT,
     _TRUNCATION_MARKER,
     _extract_model_from_cached,
@@ -82,7 +82,7 @@ def _handle_cache_hit(
     cached_clean = _strip_token_line(cached)
     _orig_model = _extract_model_from_cached(cached)
     if _orig_model:
-        _hint = _CACHE_LINE_MODEL_TPL.format(model=_orig_model)
+        _hint = _cache_line_model_tpl(_orig_model)
     else:
         _hint = _CACHE_LINE_HTML
     if thinking_enabled:
@@ -232,6 +232,43 @@ def _generate_llm_content(
     return (None, False)
 
 
+def _run_standard_mode(
+    llm_config: dict,
+    module_key: str,
+    force: bool,
+    http_client: httpx.Client | None,
+    fingerprint_fn: Any,
+    system_prompt_default: str,
+    prompt_builder: Any,
+    max_tokens_default: int,
+    timeout_default: float,
+    output_brief_limit: int,
+) -> tuple[str | None, bool]:
+    """标准 LLM 单篇生成模式：缓存 → 调用 → 处理结果。"""
+    cache_enabled = llm_config.get(f"cache_enabled_{module_key}", True)
+    fingerprint = fingerprint_fn() if fingerprint_fn else ""
+    cache_key = _CACHE_PREFIX_LLM + f"{module_key}_{fingerprint}"
+
+    system_prompt = llm_config.get(f"system_prompt_{module_key}") or system_prompt_default
+    if llm_config.get(f"output_brief_{module_key}", False):
+        system_prompt += f"\n（精简模式，输出 {output_brief_limit} 字以内。）"
+
+    user_prompt = prompt_builder() if prompt_builder else ""
+
+    return _generate_llm_content(
+        llm_config, cache_key, _get_cache_ttl_llm(module_key),
+        system_prompt, user_prompt, cache_enabled, force,
+        max_tokens=llm_config.get(f"max_tokens_{module_key}", max_tokens_default),
+        timeout=llm_config.get(f"timeout_{module_key}", timeout_default),
+        temperature=llm_config.get(f"temperature_{module_key}"),
+        model=llm_config.get(f"model_{module_key}"),
+        config_field=f"max_tokens_{module_key}",
+        http_client=http_client,
+        thinking_enabled=llm_config.get(f"thinking_enabled_{module_key}", False),
+        module_key=module_key,
+    )
+
+
 def _generate_llm_module(
     llm_config: dict | None,
     module_key: str,
@@ -288,27 +325,10 @@ def _generate_llm_module(
         )
 
     # ── 标准模式（原有的 4 个分析模块） ──────────────────
-    cache_enabled = llm_config.get(f"cache_enabled_{module_key}", True)
-    fingerprint = fingerprint_fn() if fingerprint_fn else ""
-    cache_key = _CACHE_PREFIX_LLM + f"{module_key}_{fingerprint}"
-
-    system_prompt = llm_config.get(f"system_prompt_{module_key}") or system_prompt_default
-    if llm_config.get(f"output_brief_{module_key}", False):
-        system_prompt += f"\n（精简模式，输出 {output_brief_limit} 字以内。）"
-
-    user_prompt = prompt_builder() if prompt_builder else ""
-
-    return _generate_llm_content(
-        llm_config, cache_key, _get_cache_ttl_llm(module_key),
-        system_prompt, user_prompt, cache_enabled, force,
-        max_tokens=llm_config.get(f"max_tokens_{module_key}", max_tokens_default),
-        timeout=llm_config.get(f"timeout_{module_key}", timeout_default),
-        temperature=llm_config.get(f"temperature_{module_key}"),
-        model=llm_config.get(f"model_{module_key}"),
-        config_field=f"max_tokens_{module_key}",
-        http_client=http_client,
-        thinking_enabled=llm_config.get(f"thinking_enabled_{module_key}", False),
-        module_key=module_key,
+    return _run_standard_mode(
+        llm_config, module_key, force, http_client,
+        fingerprint_fn, system_prompt_default, prompt_builder,
+        max_tokens_default, timeout_default, output_brief_limit,
     )
 
 

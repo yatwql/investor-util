@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -259,7 +259,7 @@ def _render_market_value_section(
 def _render_account_grouping(
     details: list,
     prog: ProgressReporter,
-) -> tuple[Dict[str, List[DetailRow]], Dict[str, Dict[str, float]]]:
+) -> tuple[dict[str, list[DetailRow]], dict[str, dict[str, float]]]:
     """按账户分组并计算小计。
 
     Returns:
@@ -267,11 +267,11 @@ def _render_account_grouping(
          account_totals: {账户名: {market_value, cost, profit, profit_rate, today_profit}})
     """
     prog.info("正在分组统计...")
-    accounts: Dict[str, List[DetailRow]] = {}
+    accounts: dict[str, list[DetailRow]] = {}
     for d in details:
         accounts.setdefault(d.account, []).append(d)
 
-    account_totals: Dict[str, Dict[str, float]] = {}
+    account_totals: dict[str, dict[str, float]] = {}
     for acc_name, acc_details in accounts.items():
         acc_mv = sum(d.market_value for d in acc_details)
         acc_cost = sum(d.cost for d in acc_details)
@@ -290,16 +290,16 @@ def _render_category_info(
     holdings: List[Holding],
     details: list,
     trading_day: str,
-) -> tuple[Dict[str, int], Dict[str, Any]]:
+) -> tuple[dict[str, int], dict[str, Any]]:
     """分类信息 + 价格更新状态。
 
     Returns:
         (cat_counts, update_status_dict)
     """
     categories = classify_holdings(holdings)
-    cat_counts: Dict[str, int] = {k: len(v) for k, v in categories.items()}
+    cat_counts: dict[str, int] = {k: len(v) for k, v in categories.items()}
     up_status = price_update_status(details, trading_day)
-    update_status_dict: Dict[str, Any] = {
+    update_status_dict: dict[str, Any] = {
         "updated": up_status[0],
         "total": up_status[1],
         "all_updated": up_status[2],
@@ -319,7 +319,7 @@ def _render_index_section(
     a_indices: dict = fetch_indices()
     us_indices: dict = fetch_us_indices()
 
-    a_indices_list: List[Dict[str, Any]] = []
+    a_indices_list: list[dict[str, Any]] = []
     for code in ("sh000001", "sz399001", "sh000300", "sh000688", "sz399006"):
         idx = a_indices.get(code)
         if idx:
@@ -328,7 +328,7 @@ def _render_index_section(
                 "change": idx.get("change", 0), "change_pct": idx.get("change_pct", 0),
             })
 
-    us_indices_list: List[Dict[str, Any]] = []
+    us_indices_list: list[dict[str, Any]] = []
     for code in ("gb_dji", "gb_ixic", "gb_inx"):
         idx = us_indices.get(code)
         if idx:
@@ -470,6 +470,63 @@ def _render_llm_content_section(
         return False, None, None, None, None
 
 
+def _build_module_info_list(
+    llm_failure: dict,
+    per_module: dict,
+) -> list[dict[str, Any]]:
+    """构建 LLM 模块信息列表（状态、Token 用量、费用等）。"""
+    try:
+        from src.python.llm import (
+            FAIL_REASON_DISABLED, FAIL_REASON_NOT_CONFIGURED,
+            FAIL_REASON_API_ERROR, FAIL_REASON_NETWORK_ERROR,
+            FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
+        )
+    except ImportError:
+        FAIL_REASON_DISABLED = FAIL_REASON_NOT_CONFIGURED = "disabled"
+        FAIL_REASON_API_ERROR = FAIL_REASON_NETWORK_ERROR = FAIL_REASON_TIMEOUT = FAIL_REASON_CIRCUIT_OPEN = "error"
+
+    _NAMES = get_llm_module_names()
+    _DISPLAY_REASON = {
+        FAIL_REASON_NOT_CONFIGURED: "LLM 未配置",
+        FAIL_REASON_API_ERROR: "LLM API 调用失败",
+        FAIL_REASON_NETWORK_ERROR: "LLM API 网络连接失败",
+        FAIL_REASON_TIMEOUT: "LLM API 请求超时",
+        FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
+    }
+
+    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    llm_module_info: list[dict[str, Any]] = []
+    for mk in _MODULE_KEYS:
+        entry: dict[str, Any] = {"key": mk, "name": _NAMES.get(mk, mk)}
+        reason = llm_failure.get(mk)
+        pm = per_module.get(mk)
+        if reason == FAIL_REASON_DISABLED:
+            entry.update(status="disabled", status_label="已禁用",
+                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
+                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
+        elif reason:
+            entry.update(status="failed", status_label=_DISPLAY_REASON.get(reason, reason),
+                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
+                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
+        elif pm:
+            _inp = pm.get("input_tokens", 0)
+            _out = pm.get("output_tokens", 0)
+            entry.update(
+                status="cached" if pm.get("cached") else "success",
+                status_label="缓存" if pm.get("cached") else "成功",
+                model=pm.get("model", ""), input_tokens=_inp, output_tokens=_out,
+                total_tokens=_inp + _out, cache_hit_tokens=pm.get("cache_hit_tokens", 0),
+                cost=pm.get("cost", 0.0), cached=pm.get("cached", False),
+                thinking=pm.get("thinking", False), endpoint=pm.get("endpoint", ""),
+            )
+        else:
+            entry.update(status="unknown", status_label="",
+                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
+                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
+        llm_module_info.append(entry)
+    return llm_module_info
+
+
 def _render_llm_module_info(
     llm_enabled_flag: bool,
 ) -> tuple[list[dict[str, Any]], str, dict[str, bool], dict | None]:
@@ -503,47 +560,11 @@ def _render_llm_module_info(
     if _llm_session_usage:
         _per_module = _llm_session_usage.get("per_module", {}) or {}
 
-    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
     module_disabled = {
-        mk: _llm_failure.get(mk) == FAIL_REASON_DISABLED for mk in _MODULE_KEYS}
-    _NAMES = get_llm_module_names()
-    _DISPLAY_REASON = {
-        FAIL_REASON_NOT_CONFIGURED: "LLM 未配置",
-        FAIL_REASON_API_ERROR: "LLM API 调用失败",
-        FAIL_REASON_NETWORK_ERROR: "LLM API 网络连接失败",
-        FAIL_REASON_TIMEOUT: "LLM API 请求超时",
-        FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
-    }
+        mk: _llm_failure.get(mk) == FAIL_REASON_DISABLED
+        for mk in ["global_macro", "expert_review", "health_check", "penetration_deep"]}
 
-    llm_module_info: list[dict[str, Any]] = []
-    for mk in _MODULE_KEYS:
-        entry: dict[str, Any] = {"key": mk, "name": _NAMES.get(mk, mk)}
-        reason = _llm_failure.get(mk)
-        pm = _per_module.get(mk)
-        if reason == FAIL_REASON_DISABLED:
-            entry.update(status="disabled", status_label="已禁用",
-                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
-        elif reason:
-            entry.update(status="failed", status_label=_DISPLAY_REASON.get(reason, reason),
-                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
-        elif pm:
-            _inp = pm.get("input_tokens", 0)
-            _out = pm.get("output_tokens", 0)
-            entry.update(
-                status="cached" if pm.get("cached") else "success",
-                status_label="缓存" if pm.get("cached") else "成功",
-                model=pm.get("model", ""), input_tokens=_inp, output_tokens=_out,
-                total_tokens=_inp + _out, cache_hit_tokens=pm.get("cache_hit_tokens", 0),
-                cost=pm.get("cost", 0.0), cached=pm.get("cached", False),
-                thinking=pm.get("thinking", False), endpoint=pm.get("endpoint", ""),
-            )
-        else:
-            entry.update(status="unknown", status_label="",
-                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
-        llm_module_info.append(entry)
+    llm_module_info = _build_module_info_list(_llm_failure, _per_module)
 
     _llm_endpoint = next((mi["endpoint"] for mi in llm_module_info if mi.get("endpoint")), "")
     return llm_module_info, _llm_endpoint, module_disabled, _llm_session_usage
@@ -574,7 +595,7 @@ def _save_html_report(
     os.makedirs(archive_dir, exist_ok=True)
     archive_path = os.path.join(
         archive_dir,
-        "个人投资分析报告-{}.html".format(datetime.now().strftime("%Y%m%d-%H%M%S")),
+        f"个人投资分析报告-{datetime.now().strftime('%Y%m%d-%H%M%S')}.html",
     )
     with open(archive_path, "w", encoding="utf-8") as f:
         f.write(html)

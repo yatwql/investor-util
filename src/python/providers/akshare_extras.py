@@ -341,6 +341,37 @@ def _calc_dividend_summary(df_data) -> dict | None:
         return None
 
 
+def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
+    """并发请求多只股票的分红数据，返回 {code: summary}。"""
+    result: dict[str, dict] = {}
+    failed = 0
+
+    def _fetch_one(code: str) -> tuple[str, dict | None]:
+        try:
+            df = ak.stock_history_dividend(symbol=code, indicator="分红")
+            summary = _calc_dividend_summary(df)
+            if summary:
+                name_col = next((c for c in (df or {}).columns if "简称" in c or "名称" in c), None)
+                name = str(df.iloc[0].get(name_col, "")) if name_col and df is not None and not df.empty else ""
+                summary["name"] = name
+            return (code, summary)
+        except Exception as e:
+            logger.debug("股票 %s 分红获取失败: %s", code, e)
+            return (code, None)
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        fut_map = {pool.submit(_fetch_one, code): code for code in a_codes}
+        for future in as_completed(fut_map):
+            code, summary = future.result()
+            if summary:
+                result[code] = summary
+            else:
+                failed += 1
+
+    logger.info("分红数据加载完成: %d 只成功, %d 只无数据", len(result), failed)
+    return result
+
+
 def get_dividend_data(codes: list[str]) -> dict[str, dict]:
     """获取股票历史分红数据，计算年均每股分红。
 
@@ -388,36 +419,9 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
         return {}
 
     logger.info("正在获取 %d 只股票的分红历史...", len(a_codes))
-    result: dict[str, dict] = {}
-    failed = 0
-
-    def _fetch_one(code: str) -> tuple[str, dict | None]:
-        """获取单只股票分红并计算汇总。"""
-        try:
-            df = ak.stock_history_dividend(symbol=code, indicator="分红")
-            summary = _calc_dividend_summary(df)
-            if summary:
-                # 提取股票简称（从 df 第一行）
-                name_col = next((c for c in (df or {}).columns if "简称" in c or "名称" in c), None)
-                name = str(df.iloc[0].get(name_col, "")) if name_col and df is not None and not df.empty else ""
-                summary["name"] = name
-            return (code, summary)
-        except Exception as e:
-            logger.debug("股票 %s 分红获取失败: %s", code, e)
-            return (code, None)
-
-    # 用线程池并行获取（最多 5 路）
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        fut_map = {pool.submit(_fetch_one, code): code for code in a_codes}
-        for future in as_completed(fut_map):
-            code, summary = future.result()
-            if summary:
-                result[code] = summary
-            else:
-                failed += 1
-
-    logger.info("分红数据加载完成: %d 只成功, %d 只无数据", len(result), failed)
-    cache_set(_key, result)
+    result = _fetch_all_dividends(a_codes)
+    if result:
+        cache_set(_key, result)
     _memo_set(_memo_key_str, result)
     return result
 

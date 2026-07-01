@@ -9,7 +9,7 @@ import hashlib
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from src.python.providers.news_sources import (
     _FETCH_MAP,
@@ -137,7 +137,7 @@ def _finalize_news_results(
 def aggregate_news(
     keywords: list[str],
     top_n: int = 100,
-    sources: Optional[list[str]] = None,
+    sources: list[str] | None = None,
     per_source: int = 100,
     progress_callback: Optional[Callable[[str, int, str], None]] = None,
 ) -> list[dict[str, Any]]:

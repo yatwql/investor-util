@@ -59,6 +59,56 @@ _PROVIDER_REGISTRY: dict[str, tuple[str, _ProviderFunc]] = {
 # ── 通用带缓存的 Fallback 调用 ──────────────────────────────
 
 
+def _try_provider_fetch(
+    data_type: str,
+    provider_name: str,
+    source_label: str,
+    fetch_fn: _ProviderFunc,
+    kwargs: dict,
+    validate: Callable[[dict[str, Any], str], bool] | None,
+    transform: Callable[[dict[str, Any], str], dict[str, Any] | None]
+              | dict[str, Callable[[dict[str, Any], str], dict[str, Any] | None]]
+              | None,
+) -> dict[str, Any] | None:
+    """尝试调用单个 provider 的 fetch 函数，返回转换后的结果或 None。"""
+    try:
+        raw = fetch_fn(**kwargs)
+    except Exception as e:
+        logger.warning("[%s] %s 调用异常: %s", data_type, provider_name, e)
+        return None
+
+    if raw is None:
+        logger.info("[%s] %s 返回空，尝试下一链路", data_type, provider_name)
+        return None
+
+    # 数据验证
+    if validate:
+        try:
+            if not validate(raw, provider_name):
+                logger.info("[%s] %s 数据验证未通过，尝试下一链路", data_type, provider_name)
+                return None
+        except Exception as e:
+            logger.warning("[%s] %s 数据验证异常: %s", data_type, provider_name, e)
+            return None
+
+    # 应用数据转换
+    try:
+        if isinstance(transform, dict):
+            fn = transform.get(provider_name)
+            result = fn(raw, source_label) if fn else raw
+        elif transform:
+            result = transform(raw, source_label)
+        else:
+            result = raw
+    except Exception as e:
+        logger.warning("[%s] %s 数据转换失败: %s", data_type, provider_name, e)
+        return None
+
+    if result is not None:
+        logger.info("[%s] %s 成功", data_type, provider_name)
+    return result
+
+
 def _fetch_with_fallback(
     data_type: str,
     provider_fn_map: dict[str, tuple[str, _ProviderFunc]],
@@ -98,52 +148,12 @@ def _fetch_with_fallback(
             logger.warning("[%s] %s 没有注册的 fetch 函数", data_type, provider_name)
             continue
 
-        try:
-            raw = fetch_fn(**kwargs)
-        except Exception as e:
-            logger.warning("[%s] %s 调用异常: %s", data_type, provider_name, e)
-            continue
-
-        if raw is None:
-            logger.info("[%s] %s 返回空，尝试下一链路", data_type, provider_name)
-            continue
-
-        # 数据验证
-        if validate:
-            try:
-                if not validate(raw, provider_name):
-                    logger.info("[%s] %s 数据验证未通过，尝试下一链路", data_type, provider_name)
-                    continue
-            except Exception as e:
-                logger.warning("[%s] %s 数据验证异常: %s", data_type, provider_name, e)
-                continue
-
-        # 应用数据转换
-        if isinstance(transform, dict):
-            fn = transform.get(provider_name)
-            if fn:
-                try:
-                    result = fn(raw, source_label)
-                except Exception as e:
-                    logger.warning("[%s] %s 数据转换失败: %s", data_type, provider_name, e)
-                    continue
-            else:
-                result = raw
-        elif transform:
-            try:
-                result = transform(raw, source_label)
-            except Exception as e:
-                logger.warning("[%s] %s 数据转换失败: %s", data_type, provider_name, e)
-                continue
-        else:
-            result = raw
-
+        result = _try_provider_fetch(data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform)
         if result is not None:
-            logger.info("[%s] %s 成功", data_type, provider_name)
             cache_set(cache_key, result)
             return result
 
-    # 降级：全部 Provider 失败时尝试过期缓存
+    # 3) 降级：全部 Provider 失败时尝试过期缓存
     stale = cache_get(cache_key, CACHE_WEEKLY)
     if stale is not None:
         logger.info("[%s] 全部 Provider 不可用，降级使用过期缓存", data_type)

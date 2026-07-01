@@ -144,6 +144,144 @@ _STRING_CONFIG_KEYS: set[str] = {"holdings_dir", "holdings_filename", "output_di
                                   "llm_key_file", "llm_settings_file"}
 
 
+# ── 配置校验辅助函数 ────────────────────────────────────────
+
+
+def _validate_string_configs(config: dict, issues: int) -> int:
+    """校验字符串类型配置项。"""
+    for key in _STRING_CONFIG_KEYS:
+        val = config.get(key)
+        if val is not None and not isinstance(val, str):
+            logger.warning("config.json %s = %r 不是字符串类型，可能导致运行时 TypeError", key, val)
+            issues += 1
+    # holdings_filename 为空字符串时会导致 os.path.join 返回目录路径
+    fn = config.get("holdings_filename")
+    if isinstance(fn, str) and fn.strip() == "":
+        logger.warning("config.json holdings_filename 为空字符串，将使用默认文件名")
+        issues += 1
+    return issues
+
+
+def _validate_news_top_count(config: dict, issues: int) -> int:
+    """校验 news_top_count 配置项。"""
+    ntc = config.get("news_top_count")
+    if ntc is None:
+        return issues
+    try:
+        n_int = int(ntc)
+        if n_int <= 0:
+            logger.warning("config.json news_top_count = %r 不是正数，将使用默认值 100", ntc)
+            issues += 1
+    except (ValueError, TypeError):
+        logger.warning("config.json news_top_count = %r 不是有效整数，将使用默认值 100", ntc)
+        issues += 1
+    return issues
+
+
+def _validate_cache_ttl(config: dict, issues: int) -> int:
+    """校验 cache_ttl 配置段。"""
+    cache_ttl = config.get("cache_ttl")
+    if cache_ttl is None:
+        return issues
+    if not isinstance(cache_ttl, dict):
+        logger.warning("config.json cache_ttl = %r 不是对象(dict)，所有缓存 TTL 将使用默认值", cache_ttl)
+        return issues + 1
+    for k, v in cache_ttl.items():
+        try:
+            val = float(v)
+            if val <= 0:
+                logger.warning("config.json cache_ttl.%s = %s 不是正数，将使用默认值", k, v)
+                issues += 1
+        except (ValueError, TypeError):
+            logger.warning("config.json cache_ttl.%s = %s 不是有效数字，将使用默认值", k, v)
+            issues += 1
+    return issues
+
+
+def _validate_news_sources(config: dict, issues: int) -> int:
+    """校验 news_sources 配置段。"""
+    news_src = config.get("news_sources")
+    if news_src is None:
+        return issues
+    if not isinstance(news_src, dict):
+        logger.warning("config.json news_sources = %r 不是对象(dict)，所有源将使用默认开关状态", news_src)
+        return issues + 1
+    for key, val in news_src.items():
+        if key not in _KNOWN_NEWS_SOURCES:
+            logger.warning("config.json news_sources 中存在未知的源 %r，将被忽略", key)
+            issues += 1
+        if not isinstance(val, bool):
+            logger.warning("config.json news_sources.%s = %r 不是布尔值，"
+                           "非空字符串/数字会被当作 True 处理", key, val)
+            issues += 1
+    return issues
+
+
+def _validate_preferred_provider(config: dict, issues: int) -> int:
+    """校验 preferred_provider 配置段。"""
+    pref = config.get("preferred_provider")
+    if pref is None:
+        return issues
+    if not isinstance(pref, dict):
+        logger.warning("config.json preferred_provider = %r 不是对象(dict)，配置无效", pref)
+        return issues + 1
+    for data_type, provider in pref.items():
+        if data_type not in _KNOWN_PROVIDER_TYPES:
+            logger.warning("config.json preferred_provider 中存在未知的数据类型 %r，"
+                           "有效值: %s", data_type, ", ".join(sorted(_KNOWN_PROVIDER_TYPES)))
+            issues += 1
+        if provider not in _KNOWN_PROVIDER_NAMES:
+            logger.warning("config.json preferred_provider.%s = %r 不是已知的 provider，"
+                           "有效值: %s", data_type, provider,
+                           ", ".join(sorted(_KNOWN_PROVIDER_NAMES)))
+            issues += 1
+    return issues
+
+
+def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
+    """校验 user_fund_benchmarks 配置段。"""
+    ufb = config.get("user_fund_benchmarks")
+    if ufb is None:
+        return issues
+    if not isinstance(ufb, dict):
+        logger.warning("config.json user_fund_benchmarks = %r 不是对象(dict)，自定义基准将忽略", ufb)
+        issues += 1
+    return issues
+
+
+def _validate_early_warning(config: dict, issues: int) -> int:
+    """校验 early_warning 配置段。"""
+    ew = config.get("early_warning")
+    if ew is None:
+        return issues
+    if not isinstance(ew, dict):
+        logger.warning("config.json early_warning = %r 不是对象(dict)，智能预警阈值将使用默认值", ew)
+        return issues + 1
+    for ew_key in ("sector_alert_threshold_warning", "sector_alert_threshold_danger"):
+        ew_val = ew.get(ew_key)
+        if ew_val is not None:
+            try:
+                fv = float(ew_val)
+                if fv >= 0:
+                    logger.warning("config.json early_warning.%s = %s 应为负值（净流出阈值），当前值为正", ew_key, ew_val)
+                    issues += 1
+            except (ValueError, TypeError):
+                logger.warning("config.json early_warning.%s = %s 不是有效数字", ew_key, ew_val)
+                issues += 1
+    sentiment_n = ew.get("sentiment_top_n")
+    if sentiment_n is None:
+        return issues
+    try:
+        sn = int(sentiment_n)
+        if sn <= 0:
+            logger.warning("config.json early_warning.sentiment_top_n = %s 不是正数", sentiment_n)
+            issues += 1
+    except (ValueError, TypeError):
+        logger.warning("config.json early_warning.sentiment_top_n = %s 不是有效整数", sentiment_n)
+        issues += 1
+    return issues
+
+
 def validate_config(config: dict | None = None) -> int:
     """校验 config.json 中的常见配置错误，输出 WARNING 日志。
 
@@ -157,113 +295,13 @@ def validate_config(config: dict | None = None) -> int:
         config = get_config()
     issues = 0
 
-    # ── 字符串类型检查 ──
-    for key in _STRING_CONFIG_KEYS:
-        val = config.get(key)
-        if val is not None and not isinstance(val, str):
-            logger.warning("config.json %s = %r 不是字符串类型，可能导致运行时 TypeError", key, val)
-            issues += 1
-    # holdings_filename 为空字符串时会导致 os.path.join 返回目录路径
-    fn = config.get("holdings_filename")
-    if fn is not None and not isinstance(fn, str):
-        pass  # 已在上面的循环中报过
-    elif isinstance(fn, str) and fn.strip() == "":
-        logger.warning("config.json holdings_filename 为空字符串，将使用默认文件名")
-        issues += 1
-
-    # ── news_top_count ──
-    ntc = config.get("news_top_count")
-    if ntc is not None:
-        try:
-            n_int = int(ntc)
-            if n_int <= 0:
-                logger.warning("config.json news_top_count = %r 不是正数，将使用默认值 100", ntc)
-                issues += 1
-        except (ValueError, TypeError):
-            logger.warning("config.json news_top_count = %r 不是有效整数，将使用默认值 100", ntc)
-            issues += 1
-
-    # ── cache_ttl ──
-    cache_ttl = config.get("cache_ttl")
-    if cache_ttl is not None and not isinstance(cache_ttl, dict):
-        logger.warning("config.json cache_ttl = %r 不是对象(dict)，所有缓存 TTL 将使用默认值", cache_ttl)
-        issues += 1
-    elif isinstance(cache_ttl, dict):
-        for k, v in cache_ttl.items():
-            try:
-                val = float(v)
-                if val <= 0:
-                    logger.warning("config.json cache_ttl.%s = %s 不是正数，将使用默认值", k, v)
-                    issues += 1
-            except (ValueError, TypeError):
-                logger.warning("config.json cache_ttl.%s = %s 不是有效数字，将使用默认值", k, v)
-                issues += 1
-
-    # ── news_sources ──
-    news_src = config.get("news_sources")
-    if news_src is not None and not isinstance(news_src, dict):
-        logger.warning("config.json news_sources = %r 不是对象(dict)，所有源将使用默认开关状态", news_src)
-        issues += 1
-    elif isinstance(news_src, dict):
-        for key, val in news_src.items():
-            if key not in _KNOWN_NEWS_SOURCES:
-                logger.warning("config.json news_sources 中存在未知的源 %r，将被忽略", key)
-                issues += 1
-            if not isinstance(val, bool):
-                logger.warning("config.json news_sources.%s = %r 不是布尔值，"
-                               "非空字符串/数字会被当作 True 处理", key, val)
-                issues += 1
-
-    # ── preferred_provider ──
-    pref = config.get("preferred_provider")
-    if pref is not None and not isinstance(pref, dict):
-        logger.warning("config.json preferred_provider = %r 不是对象(dict)，配置无效", pref)
-        issues += 1
-    elif isinstance(pref, dict):
-        for data_type, provider in pref.items():
-            if data_type not in _KNOWN_PROVIDER_TYPES:
-                logger.warning("config.json preferred_provider 中存在未知的数据类型 %r，"
-                               "有效值: %s", data_type, ", ".join(sorted(_KNOWN_PROVIDER_TYPES)))
-                issues += 1
-            if provider not in _KNOWN_PROVIDER_NAMES:
-                logger.warning("config.json preferred_provider.%s = %r 不是已知的 provider，"
-                               "有效值: %s", data_type, provider,
-                               ", ".join(sorted(_KNOWN_PROVIDER_NAMES)))
-                issues += 1
-
-    # ── user_fund_benchmarks ──
-    ufb = config.get("user_fund_benchmarks")
-    if ufb is not None and not isinstance(ufb, dict):
-        logger.warning("config.json user_fund_benchmarks = %r 不是对象(dict)，自定义基准将忽略", ufb)
-        issues += 1
-
-    # ── early_warning ──
-    ew = config.get("early_warning")
-    if ew is not None and not isinstance(ew, dict):
-        logger.warning("config.json early_warning = %r 不是对象(dict)，智能预警阈值将使用默认值", ew)
-        issues += 1
-    elif isinstance(ew, dict):
-        for ew_key in ("sector_alert_threshold_warning", "sector_alert_threshold_danger"):
-            ew_val = ew.get(ew_key)
-            if ew_val is not None:
-                try:
-                    fv = float(ew_val)
-                    if fv >= 0:
-                        logger.warning("config.json early_warning.%s = %s 应为负值（净流出阈值），当前值为正", ew_key, ew_val)
-                        issues += 1
-                except (ValueError, TypeError):
-                    logger.warning("config.json early_warning.%s = %s 不是有效数字", ew_key, ew_val)
-                    issues += 1
-        sentiment_n = ew.get("sentiment_top_n")
-        if sentiment_n is not None:
-            try:
-                sn = int(sentiment_n)
-                if sn <= 0:
-                    logger.warning("config.json early_warning.sentiment_top_n = %s 不是正数", sentiment_n)
-                    issues += 1
-            except (ValueError, TypeError):
-                logger.warning("config.json early_warning.sentiment_top_n = %s 不是有效整数", sentiment_n)
-                issues += 1
+    issues = _validate_string_configs(config, issues)
+    issues = _validate_news_top_count(config, issues)
+    issues = _validate_cache_ttl(config, issues)
+    issues = _validate_news_sources(config, issues)
+    issues = _validate_preferred_provider(config, issues)
+    issues = _validate_user_fund_benchmarks(config, issues)
+    issues = _validate_early_warning(config, issues)
 
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)

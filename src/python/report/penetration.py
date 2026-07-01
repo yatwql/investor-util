@@ -517,8 +517,8 @@ def _build_penetration_result(
 
 
 def compute_penetration_top10(
-    holdings: List[Holding],
-    details: List[DetailRow],
+    holdings: list[Holding],
+    details: list[DetailRow],
 ) -> dict[str, Any]:
     """计算资产穿透TOP10，返回结构化数据。
 

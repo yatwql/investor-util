@@ -369,6 +369,50 @@ def get_cache_stats() -> dict:
     return stats
 
 
+def _process_cache_file(
+    fname: str,
+    dry_run: bool,
+    prefix_type_map: dict[str, str],
+    exact_map: dict[str, str],
+) -> int:
+    """处理单个缓存文件：判断类型、检查过期、删除。returns 是否删除（0/1）。"""
+    if fname.endswith(".json.gz"):
+        fkey = fname[:-8]
+    elif fname.endswith(".json"):
+        fkey = fname[:-5]
+    else:
+        return 0
+    fpath = os.path.join(_CACHE_DIR, fname)
+
+    data_type = "default"
+    if fkey in exact_map:
+        data_type = exact_map[fkey]
+    else:
+        for pfx, dtype in prefix_type_map.items():
+            if fkey.startswith(pfx):
+                data_type = dtype
+                break
+
+    ttl = get_ttl(data_type)
+    payload = _read_cache_data(fpath, fkey, dry_run=dry_run)
+    if payload is None:
+        return 1  # 损坏也算清理
+
+    now = time.time()
+    age = now - payload.get("_ts", 0)
+    if age <= ttl:
+        return 0
+
+    if not dry_run:
+        try:
+            os.remove(fpath)
+        except OSError:
+            return 0
+    logger.info("缓存清理: %s %s (age=%.1fh > ttl=%.1fh)",
+                "预览" if dry_run else "删除", fname, age / 3600, ttl / 3600)
+    return 1
+
+
 def cleanup_expired(dry_run: bool = False) -> int:
     """扫描缓存目录，删除已过期的缓存文件。
 
@@ -383,10 +427,6 @@ def cleanup_expired(dry_run: bool = False) -> int:
         已删除（或待删除）的文件数
     """
     with _cache_lock:
-        from collections import defaultdict
-
-        # 文件名前缀 → 数据类型键名
-        # 注意：具体前缀需在通用前缀之前（如 "llm_global_macro" 在 "llm_" 之前）
         prefix_type_map: dict[str, str] = get_prefix_type_map()
         exact_map: dict[str, str] = get_exact_type_map()
 
@@ -394,58 +434,12 @@ def cleanup_expired(dry_run: bool = False) -> int:
             logger.info("缓存目录不存在，跳过清理")
             return 0
 
-        now = time.time()
         removed = 0
-        ttl_used: dict[str, int] = defaultdict(int)
-
         for fname in sorted(os.listdir(_CACHE_DIR)):
-            if fname.endswith(".json.gz"):
-                fkey = fname[:-8]  # 去掉 .json.gz
-            elif fname.endswith(".json"):
-                fkey = fname[:-5]  # 去掉 .json
-            else:
-                continue
-            fpath = os.path.join(_CACHE_DIR, fname)
+            removed += _process_cache_file(fname, dry_run, prefix_type_map, exact_map)
 
-            # 确定数据类型
-            data_type = "default"  # fallback 到 get_ttl() 的 CACHE_DAILY（86400s）
-            if fkey in exact_map:
-                data_type = exact_map[fkey]
-            else:
-                for pfx, dtype in prefix_type_map.items():
-                    if fkey.startswith(pfx):
-                        data_type = dtype
-                        break
-
-            ttl = get_ttl(data_type)
-
-            payload = _read_cache_data(fpath, fkey, dry_run=dry_run)
-            if payload is None:
-                # 文件不存在/损坏（dry_run 模式已计数，实际模式 _read_cache_data 已删除）
-                removed += 1
-                continue
-            ts = payload.get("_ts", 0)
-
-            age = now - ts
-            if age > ttl:
-                if not dry_run:
-                    try:
-                        os.remove(fpath)
-                        removed += 1
-                        logger.info("缓存清理: 删除过期 %s (age=%.1fh > ttl=%.1fh)",
-                                    fname, age / 3600, ttl / 3600)
-                    except OSError:
-                        pass
-                else:
-                    logger.info("缓存清理(预览): 过期 %s (age=%.1fh > ttl=%.1fh)",
-                                fname, age / 3600, ttl / 3600)
-                    removed += 1
-                ttl_used[data_type] += 1
-
-        if dry_run:
-            logger.info("缓存清理预览: 共 %d 个文件待清理", removed)
-        else:
-            logger.info("缓存清理完成: 共删除 %d 个过期文件", removed)
+        logger.info("缓存清理%s: 共 %d 个文件",
+                    "预览" if dry_run else "完成", removed)
         return removed
 
 

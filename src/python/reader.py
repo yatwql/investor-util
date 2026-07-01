@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 import zipfile
-from typing import List
 
 import openpyxl
 from openpyxl.utils.exceptions import InvalidFileException
@@ -16,7 +15,7 @@ logger = logging.getLogger("invest")
 _EXPECTED_HEADER = ["名称", "代码", "持仓份额", "每份成本"]
 
 
-def list_xlsx_files(directory: str) -> List[str]:
+def list_xlsx_files(directory: str) -> list[str]:
     """列出指定目录下所有 .xlsx 文件，按修改时间降序排列。
 
     Args:
@@ -66,7 +65,7 @@ def get_xlsx_info(filepath: str) -> dict:
         return {"error": str(e)}
 
 
-def read_holdings(filepath: str) -> List[Holding]:
+def read_holdings(filepath: str) -> list[Holding]:
     """读取持仓 Excel 文件，返回持仓记录列表。
 
     每个工作表为一个独立账户，表头固定 4 列：
@@ -103,9 +102,9 @@ def read_holdings(filepath: str) -> List[Holding]:
     return holdings
 
 
-def _parse_workbook(wb) -> List[Holding]:
+def _parse_workbook(wb) -> list[Holding]:
     """解析 workbook 中的所有工作表。"""
-    holdings: List[Holding] = []
+    holdings: list[Holding] = []
 
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
@@ -180,7 +179,7 @@ def _safe_float(value, field: str, sheet: str, row: int) -> float | None:
         return None
 
 
-def _match_header(actual: List[str], expected: List[str]) -> bool:
+def _match_header(actual: list[str], expected: list[str]) -> bool:
     """判断表头是否与期望匹配（允许比预期更多的列）。"""
     if len(actual) < len(expected):
         return False

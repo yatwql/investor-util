@@ -8,7 +8,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, List
+from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -63,7 +63,7 @@ def _is_etf(name: str) -> bool:
     return "ETF" in name.upper()
 
 
-def classify_holdings(holdings: List[Holding]) -> dict[str, list]:
+def classify_holdings(holdings: list[Holding]) -> dict[str, list]:
     """按类型分类持仓。
 
     判断逻辑（按优先级）:
@@ -116,7 +116,7 @@ def classify_holdings(holdings: List[Holding]) -> dict[str, list]:
     return categories
 
 
-def price_update_status(details: List[DetailRow], trading_day: str) -> tuple[int, int, bool]:
+def price_update_status(details: list[DetailRow], trading_day: str) -> tuple[int, int, bool]:
     """检查今日价格更新状态。
 
     判断逻辑：
@@ -401,9 +401,53 @@ def _determine_price_type(source_api: str, nav_date: str, trading_day: str) -> s
     return f"官方净值({nav_date})"
 
 
-def _generate_details(holdings: List[Holding], today_str: str) -> List[DetailRow]:
+def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
+    """根据持仓对象和行情数据计算一条 DetailRow。"""
+    if mkt is None:
+        logger.warning("无法获取行情数据: %s (%s)", h.name, h.code)
+        return DetailRow(
+            account=h.account.strip(), name=h.name, code=h.code,
+            price=0.0, nav_date="", yesterday_close=0.0,
+            price_type="--", shares=h.shares,
+            market_value=0.0, cost=round(h.cost_price * h.shares, 2),
+            profit=0.0, profit_rate=0.0, today_profit=0.0,
+            source="--", source_api="",
+        )
+
+    price = mkt.get("price", 0.0) or 0.0
+    yclose = mkt.get("yesterday_close", 0.0) or 0.0
+    nav_date = mkt.get("price_date", "")
+    source = mkt.get("source", "--")
+    source_api = mkt.get("source_api", "")
+    price_type = _determine_price_type(source_api, nav_date, get_last_trading_day())
+
+    cost = round(h.cost_price * h.shares, 2)
+    mv = round(price * h.shares, 2)
+    profit = round(mv - cost, 2)
+    profit_rate = profit / cost if cost > 0 else 0.0
+
+    # 本日盈亏
+    if source_api == "tencent":
+        today_profit = round((price - yclose) * h.shares, 2)
+    elif nav_date:
+        trading_day = get_last_trading_day()
+        today_profit = round((price - yclose) * h.shares, 2) if nav_date == trading_day else 0.0
+    else:
+        today_profit = 0.0
+
+    return DetailRow(
+        account=h.account.strip(), name=h.name, code=h.code,
+        price=price, nav_date=nav_date, yesterday_close=yclose,
+        price_type=price_type, premium=_FUND_PREMIUM_PLACEHOLDER,
+        shares=h.shares, market_value=mv, cost=cost,
+        profit=profit, profit_rate=profit_rate, today_profit=today_profit,
+        source=source, source_api=source_api,
+    )
+
+
+def _generate_details(holdings: list[Holding], today_str: str) -> list[DetailRow]:
     """获取所有持仓的行情数据并生成明细行（并行 HTTP 请求）。"""
-    details: List[DetailRow] = []
+    details: list[DetailRow] = []
     today_str = today_str or datetime.now().strftime("%Y-%m-%d")
 
     # 并行发起行情请求（缓存命中时秒回，冷启动加速最高 8×）
@@ -420,69 +464,13 @@ def _generate_details(holdings: List[Holding], today_str: str) -> List[DetailRow
             except Exception:
                 logger.warning("获取行情异常: %s (%s)", h.name, h.code)
                 mkt = None
-
-            if mkt is None:
-                logger.warning("无法获取行情数据: %s (%s)", h.name, h.code)
-                price = 0.0
-                yclose = 0.0
-                nav_date = ""
-                source = "--"
-                source_api = ""
-                price_type = "--"
-            else:
-                price = mkt.get("price", 0.0) or 0.0
-                yclose = mkt.get("yesterday_close", 0.0) or 0.0
-                nav_date = mkt.get("price_date", "")  # 统一使用 price_date
-                source = mkt.get("source", "--")
-                source_api = mkt.get("source_api", "")
-                price_type = _determine_price_type(source_api, nav_date, get_last_trading_day())
-
-            cost = round(h.cost_price * h.shares, 2)
-            mv = round(price * h.shares, 2)
-            profit = round(mv - cost, 2)
-            profit_rate = profit / cost if cost > 0 else 0.0
-
-            # 本日盈亏
-            if source_api == "tencent":
-                # 场内：(最新价 - 昨收盘) × 份额
-                today_profit = round((price - yclose) * h.shares, 2)
-            elif nav_date:
-                # 场外：仅当净值日期等于当前交易日时才计算本日盈亏
-                # 净值尚未发布（nav_date < T）时本日盈亏为 0，
-                # 避免将 T-1 的最新变动误标为"本日盈亏"
-                trading_day = get_last_trading_day()
-                if nav_date == trading_day:
-                    today_profit = round((price - yclose) * h.shares, 2)
-                else:
-                    today_profit = 0.0
-            else:
-                today_profit = 0.0
-
-            detail = DetailRow(
-                account=h.account.strip(),
-                name=h.name,
-                code=h.code,
-                price=price,
-                nav_date=nav_date,
-                yesterday_close=yclose,
-                price_type=price_type,
-                premium=_FUND_PREMIUM_PLACEHOLDER,
-                shares=h.shares,
-                market_value=mv,
-                cost=cost,
-                profit=profit,
-                profit_rate=profit_rate,
-                today_profit=today_profit,
-                source=source,
-                source_api=source_api,
-            )
-            details.append(detail)
+            details.append(_compute_detail_row(h, mkt))
 
     logger.info("市值核算明细数据生成完成，共 %d 条", len(details))
     return details
 
 
-def _detail_to_row_values(d: DetailRow) -> List[Any]:
+def _detail_to_row_values(d: DetailRow) -> list[Any]:
     """将 DetailRow 转为 Excel 行值列表。"""
     return [
         d.account,
@@ -503,7 +491,7 @@ def _detail_to_row_values(d: DetailRow) -> List[Any]:
     ]
 
 
-def _num_formats() -> List[str]:
+def _num_formats() -> list[str]:
     """每列的 Excel 数字格式。"""
     return [
         "",           # 1  账户
@@ -568,6 +556,50 @@ def _apply_price_type_colors(ws, start_row: int, end_row: int) -> None:
                 cell.font = BLUE_FONT
 
 
+def _write_account_groupings(
+    ws, details: list[DetailRow], data_start: int,
+) -> tuple[float, float, float, float, int]:
+    """按账户分组写入明细行和小计，返回汇总数据及最终行号。
+
+    Returns:
+        (grand_mv, grand_cost, grand_profit, grand_today, final_row)
+    """
+    accounts: dict[str, list[DetailRow]] = {}
+    for d in details:
+        accounts.setdefault(d.account, []).append(d)
+
+    row = data_start
+    grand_mv = grand_cost = grand_profit = grand_today = 0.0
+
+    for acc_name, acc_details in accounts.items():
+        for d in acc_details:
+            vals = _detail_to_row_values(d)
+            write_data_row(ws, row, vals, _num_formats())
+            row += 1
+
+        acc_mv = sum(d.market_value for d in acc_details)
+        acc_cost = sum(d.cost for d in acc_details)
+        acc_profit = sum(d.profit for d in acc_details)
+        acc_today = sum(d.today_profit for d in acc_details)
+        acc_rate = acc_profit / acc_cost if acc_cost > 0 else 0.0
+
+        subtotal_vals = [
+            f"{acc_name} 小计", "", "", "", "", "", "", "",
+            sum(d.shares for d in acc_details),
+            acc_mv, acc_cost, acc_profit, acc_rate, acc_today, "",
+        ]
+        write_subtotal_row(ws, row, f"{acc_name} 小计",
+                           subtotal_vals[1:], _NCOLS, _num_formats())
+        row += 1
+
+        grand_mv += acc_mv
+        grand_cost += acc_cost
+        grand_profit += acc_profit
+        grand_today += acc_today
+
+    return grand_mv, grand_cost, grand_profit, grand_today, row
+
+
 def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
                              today_str: str = "",
                              details: List[DetailRow] | None = None) -> tuple[float, float, float, float, List[DetailRow]]:
@@ -590,41 +622,8 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
-    # 按账户分组，组内输出
-    accounts: dict[str, List[DetailRow]] = {}
-    for d in details:
-        accounts.setdefault(d.account, []).append(d)
-
-    grand_mv = grand_cost = grand_profit = grand_today = 0.0
-
-    for acc_name, acc_details in accounts.items():
-        # 该账户的明细行
-        for d in acc_details:
-            vals = _detail_to_row_values(d)
-            write_data_row(ws, row, vals, _num_formats())
-            row += 1
-
-        # 小计
-        acc_mv = sum(d.market_value for d in acc_details)
-        acc_cost = sum(d.cost for d in acc_details)
-        acc_profit = sum(d.profit for d in acc_details)
-        acc_today = sum(d.today_profit for d in acc_details)
-        acc_rate = acc_profit / acc_cost if acc_cost > 0 else 0.0
-
-        subtotal_vals = [
-            f"{acc_name} 小计",
-            "", "", "", "", "", "", "",
-            sum(d.shares for d in acc_details),
-            acc_mv, acc_cost, acc_profit, acc_rate, acc_today, "",
-        ]
-        write_subtotal_row(ws, row, f"{acc_name} 小计",
-                           subtotal_vals[1:], _NCOLS, _num_formats())
-        row += 1
-
-        grand_mv += acc_mv
-        grand_cost += acc_cost
-        grand_profit += acc_profit
-        grand_today += acc_today
+    # 按账户分组写入明细 + 小计
+    grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(ws, details, data_start)
 
     # 总计
     grand_rate = grand_profit / grand_cost if grand_cost > 0 else 0.0
@@ -645,6 +644,6 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
     auto_width(ws)
 
     logger.info("%s写入完成，共 %d 个账户，%d 条持仓",
-                get_report_sheet_name('market_value'), len(accounts), len(details))
+                get_report_sheet_name('market_value'), len(set(d.account for d in details)), len(details))
 
     return grand_mv, grand_cost, grand_profit, grand_today, details

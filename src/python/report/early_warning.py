@@ -177,29 +177,15 @@ def _compute_sector_alerts(
     return alerts
 
 
-def _compute_sentiment_alerts(
-    holdings: list,
-    news_data: list[dict] | None,
-    news_llm_meta: dict | None,
+def _collect_relevant_news(
+    news_data: list[dict],
+    news_llm_meta: dict,
 ) -> list[dict]:
-    """新闻情绪聚合预警。
-
-    从每条新闻的 llm_analysis.sentiment 字段聚合，按持仓品种汇总。
-    仅当财经新闻热点与持仓关联分析启用时生效。
-
-    Returns:
-        [{code, name, total_mentions, positive, negative, neutral,
-          sentiment_score, sentiment_label, top_stories}, ...]
-    """
-    if not news_data or not news_llm_meta:
+    """从新闻列表中筛选出有 LLM 分析且关联度 >= 中 的条目。"""
+    if not news_llm_meta.get("llm_enabled", False):
         return []
 
-    llm_enabled = news_llm_meta.get("llm_enabled", False)
-    if not llm_enabled:
-        return []
-
-    # 收集有 LLM 分析的新闻（关联度 >= "中"）
-    relevant_news: list[dict] = []
+    result: list[dict] = []
     for item in news_data:
         analysis = item.get("llm_analysis")
         if not isinstance(analysis, dict):
@@ -207,20 +193,26 @@ def _compute_sentiment_alerts(
         relevance = analysis.get("relevance", "")
         if relevance not in ("高", "中"):
             continue
-        relevant_news.append(item)
+        result.append(item)
+    return result
 
-    if not relevant_news:
-        return []
 
-    # 构建持仓代码 → 名称查找表
+def _build_code_to_name_map(holdings: list) -> dict[str, str]:
+    """构建持仓代码 → 名称查找表。"""
     code_to_name: dict[str, str] = {}
     for h in holdings:
         code = h.code.strip() if hasattr(h, "code") else ""
         name = h.name.strip() if hasattr(h, "name") else ""
         if code:
             code_to_name[code] = name or code
+    return code_to_name
 
-    # 按持仓代码聚合
+
+def _aggregate_and_score_sentiments(
+    relevant_news: list[dict],
+    code_to_name: dict[str, str],
+) -> list[dict]:
+    """按持仓代码聚合新闻情绪，计算得分并排序。"""
     holding_sentiments: dict[str, dict] = {}
     for item in relevant_news:
         analysis = item.get("llm_analysis", {})
@@ -261,7 +253,6 @@ def _compute_sentiment_alerts(
     if not holding_sentiments:
         return []
 
-    # 计算情绪得分
     result: list[dict] = list(holding_sentiments.values())
     for entry in result:
         total = entry["total_mentions"]
@@ -274,9 +265,33 @@ def _compute_sentiment_alerts(
         else:
             entry["sentiment_label"] = "中性"
 
-    # 按提及次数降序
     result.sort(key=lambda a: a["total_mentions"], reverse=True)
     return result[:_get_sentiment_top_n()]
+
+
+def _compute_sentiment_alerts(
+    holdings: list,
+    news_data: list[dict] | None,
+    news_llm_meta: dict | None,
+) -> list[dict]:
+    """新闻情绪聚合预警。
+
+    从每条新闻的 llm_analysis.sentiment 字段聚合，按持仓品种汇总。
+    仅当财经新闻热点与持仓关联分析启用时生效。
+
+    Returns:
+        [{code, name, total_mentions, positive, negative, neutral,
+          sentiment_score, sentiment_label, top_stories}, ...]
+    """
+    if not news_data or not news_llm_meta:
+        return []
+
+    relevant_news = _collect_relevant_news(news_data, news_llm_meta)
+    if not relevant_news:
+        return []
+
+    code_to_name = _build_code_to_name_map(holdings)
+    return _aggregate_and_score_sentiments(relevant_news, code_to_name)
 
 
 # ═══════════════════════════════════════════════════════════

@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -42,7 +42,7 @@ _HEADERS = [
 ]
 
 # 基础业绩评价 -> 标签 + 描述
-_RATING_COMMENT: Dict[str, str] = {
+_RATING_COMMENT: dict[str, str] = {
     "优秀": "优秀 持续跑赢基准，超额收益显著",
     "良好": "良好 稳定跑赢基准，组合管理得当",
     "稳定": "稳定 收益率稳健，波动控制良好",
@@ -313,7 +313,7 @@ def _write_rating_distribution(ws: Worksheet, row: int, fund_count: int, adjuste
     write_data_row(ws, row, [f"共 {fund_count} 只基金，{success_count} 只获取到业绩数据"])
     row += 1
 
-    rating_counts: Dict[str, int] = {}
+    rating_counts: dict[str, int] = {}
     for adj_rating in adjusted_ratings.values():
         if adj_rating:
             rating_counts[adj_rating] = rating_counts.get(adj_rating, 0) + 1
@@ -339,7 +339,7 @@ def _write_rating_distribution(ws: Worksheet, row: int, fund_count: int, adjuste
 
 def write_fund_performance_sheet(
     ws: Worksheet,
-    holdings: List[Holding],
+    holdings: list[Holding],
     details: List[DetailRow],
 ) -> None:
     """写入基金业绩分析。
@@ -410,7 +410,7 @@ def _write_empty_row(ws, row: int, fund: Holding) -> None:
     write_data_row(ws, row, vals, _num_formats())
 
 
-def _num_formats() -> List[str]:
+def _num_formats() -> list[str]:
     """每列的 Excel 数字格式。"""
     return [
         "",           # 1  基金

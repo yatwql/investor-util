@@ -12,7 +12,7 @@ from src.python.cache import get as cache_get
 from src.python.config import get_llm_config
 from src.python.llm.api import (
     _CACHE_LINE_HTML,
-    _CACHE_LINE_MODEL_TPL,
+    _cache_line_model_tpl,
     _LLM_TIMEOUT,
     _extract_model_from_cached,
     _log_token_usage,
@@ -537,7 +537,7 @@ def _precheck_one_cache(cache_info: dict, llm_config: dict) -> tuple[str | None,
         return (None, False)
     clean = _strip_token_line(cached)
     model = _extract_model_from_cached(cached)
-    hint = _CACHE_LINE_MODEL_TPL.format(model=model) if model else _CACHE_LINE_HTML
+    hint = _cache_line_model_tpl(model) if model else _CACHE_LINE_HTML
     if llm_config.get(cache_info["thinking_key"], False):
         hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
     return (clean + hint, True)

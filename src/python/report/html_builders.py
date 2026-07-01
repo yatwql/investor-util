@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
 from src.python.models import Holding
@@ -26,9 +26,9 @@ logger = logging.getLogger("invest")
 
 
 def _build_category_data(
-    holdings: List[Holding],
-    details: List[DetailRow],
-) -> List[Dict[str, Any]]:
+    holdings: list[Holding],
+    details: list[DetailRow],
+) -> list[dict[str, Any]]:
     """构建持仓分类表数据结构。
 
     按 (资产属性, 投资分类) 分组，汇总每组内的明细数据，
@@ -43,7 +43,7 @@ def _build_category_data(
     """
     detail_map: Dict[str, DetailRow] = {d.code: d for d in details}
 
-    cat_groups: Dict[Tuple[str, str], List[Holding]] = {}
+    cat_groups: dict[tuple[str, str], list[Holding]] = {}
     for h in holdings:
         prop, sub = _categorize_holding(h)
         cat_groups.setdefault((prop, sub), []).append(h)
@@ -63,7 +63,7 @@ def _build_category_data(
 
     result: List[Dict[str, Any]] = []
     for (prop, sub), group in sorted_groups:
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
         for h in group:
             d = detail_map.get(h.code)
             items.append({
@@ -99,7 +99,7 @@ def _build_category_data(
 def _build_single_perf_item(
     idx: int, fund: Holding, detail_map: dict,
     prog: ProgressReporter, fund_count: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """构建单只基金的业绩分析条目。"""
     logger.info(
         "获取基金业绩 [%d/%d]: %s (%s)",
@@ -110,7 +110,7 @@ def _build_single_perf_item(
     d = detail_map.get(fund.code)
 
     perf_data = fetch_fund_rankings(fund.code)
-    rankings: Dict[str, Any] = {}
+    rankings: dict[str, Any] = {}
     rating: str = ""
 
     if perf_data and perf_data.get("rankings"):
@@ -166,10 +166,10 @@ def _build_single_perf_item(
 
 
 def _build_perf_data(
-    holdings: List[Holding],
-    details: List[DetailRow],
+    holdings: list[Holding],
+    details: list[DetailRow],
     progress: ProgressReporter | None = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """构建基金业绩分析数据。
 
     筛选出基金持仓，对每只基金调用 API 获取区间收益和同类排名，

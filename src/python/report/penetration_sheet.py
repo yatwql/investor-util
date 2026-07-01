@@ -7,7 +7,7 @@ compute_penetration_top10 进行计算。
 from __future__ import annotations
 
 import logging
-from typing import Any, List
+from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -109,8 +109,8 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
 
 def write_penetration_sheet(
     ws: Worksheet,
-    holdings: List[Holding],
-    details: List[DetailRow],
+    holdings: list[Holding],
+    details: list[DetailRow],
     penetration_data: dict | None = None,
 ) -> None:
     """写入资产穿透TOP10。

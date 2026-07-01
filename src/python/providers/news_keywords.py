@@ -8,16 +8,83 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import List, Optional
+
 
 from src.python.models import Holding
 
 logger = logging.getLogger("invest")
 
 
+# 常见需要过滤的基金/ETF 后缀
+_KEYWORD_FILTER_SUFFIXES = [
+    "ETF", "联接", "A", "C", "(QDII)", "基金", "混合",
+    "指数", "开放", "式", "发起", "LOF",
+]
+
+
+def _clean_name(name: str) -> str:
+    """去除名称中的基金/ETF 后缀。"""
+    for suffix in _KEYWORD_FILTER_SUFFIXES:
+        name = name.replace(suffix, "")
+    return name
+
+
+def _extract_chinese_terms(text: str, min_len: int = 2) -> set[str]:
+    """从文本中提取指定最小长度的中文词组。"""
+    return {t for t in re.findall(r"[一-鿿]{2,}", text) if len(t) >= min_len}
+
+
+def _extract_keywords_from_holding(h: Holding) -> set[str]:
+    """从单只持仓提取关键词（代码 + 中文名称片段）。"""
+    keywords: set[str] = set()
+    name = h.name.strip()
+    code = h.code.strip()
+
+    if code:
+        keywords.add(code)
+
+    clean = _clean_name(name)
+    keywords.update(_extract_chinese_terms(clean))
+
+    if "ETF" in name:
+        core = name.replace("ETF", "").strip()
+        keywords.update(_extract_chinese_terms(core))
+
+    if "联接" in name:
+        parts = re.findall(r"[一-鿿]{2,}", name)
+        if len(parts) >= 2:
+            if len(parts[0]) >= 2:
+                keywords.add(parts[0])
+            for i in range(1, min(3, len(parts))):
+                if len(parts[i]) >= 2:
+                    keywords.add(parts[i])
+
+    return keywords
+
+
+def _extract_keywords_from_penetrated(asset: dict) -> set[str]:
+    """从单只穿透资产提取关键词（代码 + 英文名称或中文片段）。"""
+    keywords: set[str] = set()
+    asset_name = (asset.get("name") or "").strip()
+    asset_codes = asset.get("codes") or []
+
+    for ac in asset_codes:
+        if ac.strip():
+            keywords.add(ac.strip())
+
+    if asset_name:
+        if re.match(r"^[A-Za-z0-9\s.&]+$", asset_name):
+            keywords.add(asset_name)
+        else:
+            clean_name = _clean_name(asset_name)
+            keywords.update(_extract_chinese_terms(clean_name))
+
+    return keywords
+
+
 def build_holding_keywords(
-    holdings: List[Holding],
-    penetrated_assets: Optional[List[dict]] = None,
+    holdings: list[Holding],
+    penetrated_assets: list[dict] | None = None,
     max_keywords: int = 50,
 ) -> list[str]:
     """从持仓和穿透 TOP10 资产提取关键词。
@@ -35,62 +102,12 @@ def build_holding_keywords(
     """
     keywords: set[str] = set()
 
-    # 常见需要过滤的基金/ETF 后缀
-    _suffixes = [
-        "ETF", "联接", "A", "C", "(QDII)", "基金", "混合",
-        "指数", "开放", "式", "发起", "LOF",
-    ]
-
-    # ── 1) 从持仓提取 ──
     for h in holdings:
-        name = h.name.strip()
-        code = h.code.strip()
+        keywords.update(_extract_keywords_from_holding(h))
 
-        if code:
-            keywords.add(code)
-
-        clean = name
-        for suffix in _suffixes:
-            clean = clean.replace(suffix, "")
-
-        terms = re.findall(r"[一-鿿]{2,}", clean)
-        for t in terms:
-            keywords.add(t)
-
-        if "ETF" in name:
-            core = name.replace("ETF", "").strip()
-            core_terms = re.findall(r"[一-鿿]{2,}", core)
-            for t in core_terms:
-                keywords.add(t)
-
-        if "联接" in name:
-            parts = re.findall(r"[一-鿿]{2,}", name)
-            if len(parts) >= 2:
-                keywords.add(parts[0] if len(parts[0]) >= 2 else "")
-                for i in range(1, min(3, len(parts))):
-                    if len(parts[i]) >= 2:
-                        keywords.add(parts[i])
-
-    # ── 2) 从穿透 TOP10 资产提取 ──
     if penetrated_assets:
         for asset in penetrated_assets:
-            asset_name = (asset.get("name") or "").strip()
-            asset_codes = asset.get("codes") or []
-
-            for ac in asset_codes:
-                if ac.strip():
-                    keywords.add(ac.strip())
-
-            if asset_name:
-                if re.match(r"^[A-Za-z0-9\s.&]+$", asset_name):
-                    keywords.add(asset_name)
-                else:
-                    clean_name = asset_name
-                    for suffix in _suffixes:
-                        clean_name = clean_name.replace(suffix, "")
-                    terms = re.findall(r"[一-鿿]{2,}", clean_name)
-                    for t in terms:
-                        keywords.add(t)
+            keywords.update(_extract_keywords_from_penetrated(asset))
 
     keywords.discard("")
     sorted_kw = sorted(keywords, key=lambda x: (-len(x), x))

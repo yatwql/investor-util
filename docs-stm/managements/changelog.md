@@ -4,6 +4,51 @@
 
 ---
 
+## [0.2.52] - 2026-07-01
+
+### Changed
+- **15 个大函数全部拆分完成（R-056~R-070 ✅）**：P2 大函数治理二期收官，函数均 ≤75 行：
+  - `config.py:validate_config()` 123→71 行，提取 `_validate_sector_alerts`/`_validate_numeric_range`/`_validate_sentiment_top_n`
+  - `report/early_warning.py:_compute_sentiment_alerts()` 99→48 行，提取 `_collect_news_sentiments`/`_build_sentiment_alert_items`
+  - `llm/markdown.py:_markdown_to_html()` 96→34 行，提取 `_convert_code_block`/`_convert_table`/`_convert_inline`
+  - `llm/api.py:_call_llm_with_retry()` 94→50 行，提取 `_execute_with_retry`/`_should_retry`
+  - `fetcher/chain.py:_fetch_with_fallback()` 90→42 行，提取 `_try_chain_provider`/`_degrade_expired_cache`
+  - `providers/news_keywords.py:build_holding_keywords()` 86→35 行，提取 `_build_keyword_sources`/`_enrich_industry_keywords`
+  - `llm/api.py:_call_claude()` 85→45 行，提取 `_inject_thinking`/`_format_claude_messages`
+  - `providers/eastmoney_industry.py:fetch_industry_and_concepts()` 82→38 行，提取 `_call_industry_api`/`_parse_industry_result`
+  - `report/market_value.py:write_market_value_sheet()` 79→40 行，提取 `_init_market_value_sheet`/`_build_market_value_data`
+  - `report/market_value.py:_generate_details()` 78→32 行，提取 `_fetch_price_batch`/`_compute_detail_row`
+  - `providers/akshare_extras.py:get_dividend_data()` 78→35 行，提取 `_fetch_dividend_api`/`_compute_avg_dividend`
+  - `llm/prompts.py:_build_penetration_deep_prompt()` 78→30 行，提取 `_build_industry_concentration`/`_build_currency_exposure`
+  - `llm/skeleton.py:_generate_llm_module()` 77→40 行，提取 `_build_llm_module_input`/`_process_llm_module_result`
+  - `cache.py:cleanup_expired()` 77→35 行，提取 `_scan_cache_files`/`_filter_expired`
+  - `report/html_writer.py:_render_llm_module_info()` 76→32 行，提取 `_build_llm_section_html`/`_build_footer_line`
+
+### Added
+- **`src/test/test_akshare_news.py`（R-071 ✅）**：16 项测试覆盖 `_fetch_from_caixin`（9 项纯函数 + mock 含未安装/异常/空数据/正常解析/去重/截断/过滤）+ `_fetch_cctv_news`（4 项）+ `fetch_news`（3 项聚合）。
+- **`src/test/test_cls_news.py`（R-072 ✅）**：21 项测试覆盖 `_ts_to_str`（3 项）+ `_parse_news_item`（10 项纯函数）+ `fetch_news`（8 项 HTTP/异常/缺字段）。
+- **`src/test/test_eastmoney.py`（R-073 ✅）**：15 项测试覆盖 `_strip_jsonp`（2 项）+ `_safe_float`（3 项）+ `_fallback_fundf10`（4 项）+ `fetch_nav`（6 项 HTTP/异常/缓存/回退/错误解析）。
+- **`src/test/test_sina.py`（R-074 ✅）**：10 项测试覆盖 `_parse_us_index`（4 项纯函数）+ `fetch_us_indices`（6 项 HTTP/异常/部分失败/空数据）。
+- **`src/test/test_tencent.py`（R-075 ✅）**：16 项测试覆盖 `_add_prefix`（6 项）+ `_parse_float`（5 项）+ `_parse_response`（6 项纯函数，含 35 字段补齐）+ `fetch_price`（4 项 HTTP/超时/网络异常/解析失败）。
+- **`src/test/test_news_aggregator.py`（R-076 ✅）**：16 项测试覆盖 `get_enabled_sources`（3 项）+ `_compute_cache_key`（3 项）+ `_finalize_news_results`（5 项）+ `aggregate_news`（5 项编排，含缓存命中/未命中/全失败/默认源）。
+- **`src/test/test_fetcher_index.py`（R-077 ✅）**：8 项测试覆盖 `_index_cache_key`（2 项）+ `fetch_indices`（3 项）+ `fetch_us_indices`（3 项 HTTP/异常 + provider 回退）。
+- **`src/test/test_fetcher_industry.py`（R-078 ✅）**：10 项测试覆盖 `_industry_transform`（4 项纯函数）+ `fetch_industry_data`（3 项）+ `batch_fetch_industry_data`（3 项并发）。
+- **`src/test/test_fetcher_price.py`（R-079 ✅）**：21 项测试覆盖 `_name_matches`（4 项）+ `_price_cache_key`（2 项）+ `_price_transform_tencent`（5 项）+ `_price_transform_eastmoney`（3 项）+ `fetch_market_data`（7 项编排/异常/降级/部分失败）。
+- **R-080 ✅ 旧式 typing 泛型 → 内置泛型**：13 个文件的 `List[X]`/`Dict[X,Y]`/`Optional[X]`/`Tuple[X,Y]` 全部替换为 `list[X]`/`dict[X,Y]`/`X | None`/`tuple[X,Y]`。涉及：reader.py、category.py、excel_writer.py、fund_performance.py、html_builders.py、html_writer.py、market_value.py、news_correlation.py、penetration.py、penetration_sheet.py、llm/api.py、news_aggregator.py、news_keywords.py。
+- **R-082 ✅ `.format()` → f-string（3 处）**：`generators.py`/`skeleton.py` 中模板 `.format()` 改为函数调用 `_cache_line_model_tpl()`；`html_writer.py` 中存档文件名改为 f-string。
+- **R-083 ✅ pyproject.toml 同步**：版本号 0.2.36→0.2.52，依赖 `>=`→`==` 精确版本（与 requirements.txt 一致），补充 `lxml==6.1.1` 和 pytest 插件。
+
+### Changed
+- **`config.py:validate_config()` 新增 early_warning 段校验（R-054 续）**：补充 `sentiment_top_n` 正整型验证。
+
+### Tests
+- 9 个新测试文件 + 140 项新增测试（全量 1535 passed, 11 skipped）。
+- 新增测试覆盖 providers/tencent/sina/eastmoney/akshare_news/cls_news/news_aggregator、fetcher/index/industry/price 共 9 个模块。
+
+### Docs
+- **review-findings.md**：R-056~R-070（大函数治理二期）、R-071~R-079（测试覆盖补全三期）全部完成，移出待办区。待办区仅保留 P3 R-080~R-083。
+- **版本号同步**：constants.py 0.2.51→0.2.52
+
 ## [0.2.51] - 2026-07-01
 
 ### Added
@@ -29,6 +74,10 @@
 
 ### Docs
 - **review-findings.md**：P2 全部 7 项问题（R-043~R-049）完成，移除待办表。R-050/R-053/R-054/R-055/R-051/R-052 全部完成，待办区清空。
+- **plan.md**：移除已完成 H（代码治理 R-051~R-053）和 I（配置治理 R-054~R-055）待实现方向，统一纳入 A5 完成项。
+- **README.md**：版本号 0.2.49→0.2.51 同步。
+- **datasource-and-folders.md**：新增 `html_builders.py`/`penetration_sheet.py` 目录描述，测试数 1264→1395。
+- **technical.md**：测试数 1264→1395，最后更新描述同步。
 - **版本号同步**：constants.py 0.2.50→0.2.51
 
 ### Fixed

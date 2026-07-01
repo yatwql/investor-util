@@ -35,7 +35,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("2", "更新持仓类缓存", None, False),
     ("3", "清理过期缓存文件", None, False),
     ("4", "查看缓存统计信息", None, False),
-    ("S", "配置支持LLM的报告模块", None, False),
+    ("S", "配置支持LLM的报告分析章节", None, False),
     ("R", "刷新配置", None, False),
     ("X", "退出", None, True),
 ]

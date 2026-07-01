@@ -6,7 +6,7 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -137,7 +137,7 @@ def write_title_row(ws, row: int, text: str, ncols: int) -> int:
     return row + 1
 
 
-def write_header_row(ws, row: int, headers: List[str]) -> int:
+def write_header_row(ws, row: int, headers: list[str]) -> int:
     """写入表头行。
 
     Args:
@@ -157,7 +157,7 @@ def write_header_row(ws, row: int, headers: List[str]) -> int:
     return row + 1
 
 
-def write_data_row(ws, row: int, values: List[Any], formats: Optional[List[Optional[str]]] = None) -> int:
+def write_data_row(ws, row: int, values: list[Any], formats: list[str | None] | None = None) -> int:
     """写一行数据。
 
     Args:
@@ -180,7 +180,7 @@ def write_data_row(ws, row: int, values: List[Any], formats: Optional[List[Optio
 
 
 def write_subtotal_row(ws, row: int, label: str, values: List[Any], ncols: int,
-                       formats: Optional[List[Optional[str]]] = None) -> int:
+                       formats: list[str | None] | None = None) -> int:
     """写小计行（首列标签，后续各列居中对齐，黄底）。
 
     Args:

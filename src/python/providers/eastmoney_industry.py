@@ -46,27 +46,12 @@ def _secid(code: str) -> str:
     return f"1.{code}"  # 沪市（含 5/6/8/4 开头）
 
 
-def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
-    """获取一只证券的行业分类和概念板块归属。
-
-    Args:
-        code: 6 位证券代码
-
-    Returns:
-        {
-            "code": "600900",
-            "industry": "电力",           # 三级行业名称（f127）
-            "industry_id": "BK0428",      # 行业 BK 代码（f198，可能为空）
-            "concepts": ["创投", "参股银行", ...],  # 概念板块名称列表（f129）
-            "concept_ids": [],            # 占位字段（API 不再提供）
-        }
-        None: API 异常或解析失败
-    """
+def _make_push2_request(code: str) -> dict | None:
+    """执行 push2 行业/概念 API 请求，返回 data 内层字典或 None。"""
     params = {
         "secid": _secid(code),
         "fields": "f57,f58,f127,f128,f129,f198",
     }
-
     logger.debug("东方财富 push2 行业/概念请求: %s", code)
 
     try:
@@ -83,51 +68,54 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
         logger.warning("东方财富 push2 JSON 解析失败 [%s]: %s", code, e)
         return None
 
-    # push2 返回格式: {"data": {...}}
     inner = data.get("data")
     if not inner or not isinstance(inner, dict):
         logger.warning("东方财富 push2 返回空数据 [%s]", code)
         return None
+    return inner
 
-    # f129 = 概念板块名称列表（逗号分隔字符串）
-    # f140 = 已变更为数值字段，不再包含概念 ID
-    # f127 = 行业名称
-    # f198 = 行业 BK 代码
+
+def _extract_concept_list(inner: dict) -> list[str]:
+    """从 push2 响应中提取概念板块名称列表。"""
     concepts_raw = inner.get("f129")
-
-    concepts: list[str] = []
     if concepts_raw is not None and isinstance(concepts_raw, str):
         concepts_str = concepts_raw.strip()
         if concepts_str and concepts_str != "-":
-            concepts = [c.strip() for c in concepts_str.split(",") if c.strip()]
+            return [c.strip() for c in concepts_str.split(",") if c.strip()]
+    return []
 
-    concept_ids: list[str] = []  # API 不再提供概念 ID
 
-    # f127 = 行业名称（三级行业，如"电力""白酒Ⅱ"）
-    industry_raw = inner.get("f127")
-    industry: str = (
-        str(industry_raw).strip()
-        if isinstance(industry_raw, str) and industry_raw.strip() not in ("", "-")
-        else ""
-    )
-    # f198 = 行业 BK 代码（如"BK0428"）
-    industry_id_raw = inner.get("f198")
-    industry_id: str = (
-        str(industry_id_raw).strip()
-        if isinstance(industry_id_raw, str) and industry_id_raw.strip() not in ("", "-")
-        else ""
-    )
+def _extract_industry(inner: dict, key: str) -> str:
+    """从 push2 响应中提取指定字段的行业/板块字符串。"""
+    raw = inner.get(key)
+    if isinstance(raw, str) and raw.strip() not in ("", "-"):
+        return raw.strip()
+    return ""
+
+
+def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
+    """获取一只证券的行业分类和概念板块归属。
+
+    Args:
+        code: 6 位证券代码
+
+    Returns:
+        {...} 详见函数内结果字典定义；None: API 异常或解析失败
+    """
+    inner = _make_push2_request(code)
+    if inner is None:
+        return None
 
     result: dict[str, Any] = {
         "code": code.strip(),
-        "industry": industry,
-        "industry_id": industry_id,
-        "concepts": concepts,
-        "concept_ids": concept_ids,
+        "industry": _extract_industry(inner, "f127"),
+        "industry_id": _extract_industry(inner, "f198"),
+        "concepts": _extract_concept_list(inner),
+        "concept_ids": [],
     }
 
     logger.debug("东方财富行业/概念 [%s]: 行业=%s, 概念=%d个",
-                 code, industry or "无", len(concepts))
+                 code, result["industry"] or "无", len(result["concepts"]))
     return result
 
 

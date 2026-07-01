@@ -122,7 +122,7 @@ def _cmd_config_llm_modules() -> None:
 
     while True:
         print()
-        print("  ┌── 配置支持LLM的报告模块 ──────────────────┐")
+        print("  ┌── 配置支持LLM的报告分析章节 ──────────────┐")
         items = []
         for i, (sfx, name) in enumerate(module_names.items(), 1):
             status = enabled_map.get(sfx, True)

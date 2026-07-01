@@ -106,7 +106,7 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                         # 单元测试（35 个 test_*.py，1395 passed / 11 skipped）
+│   └── test/                         # 单元测试（50 个 test_*.py + helpers.py，1395 passed / 11 skipped）
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     # 持仓 xlsx 文件（用户放置）
@@ -150,7 +150,8 @@ investor-util/
 ├── README.md                         # 用户文档总入口（指向各分册）
 ├── pyproject.toml                    # Python 项目元数据（setuptools 配置）
 ├── pytest.ini                        # pytest 配置 — testpaths / 标记注册 / 命令行选项
-└── requirements.txt                  # Python 依赖清单（pip install -r 安装）
+├── reason.bat                        # Windows 一键启动批处理脚本
+├── requirements.txt                  # Python 依赖清单（pip install -r 安装）
 ```
 
 > 注意：项目每次版本变更后，`technical.md` 中的目录树和测试文件数可能滞后。请以本文档为准。

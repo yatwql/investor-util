@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 import httpx
 
 from src.python.llm.circuit_breaker import (
@@ -21,7 +21,7 @@ logger = logging.getLogger("invest")
 
 __all__ = [
     "_LLM_TIMEOUT", "_RETRY_DELAYS", "_TRUNCATION_MARKER", "_AUTO_INCREASE_FACTOR",
-    "_TOKEN_LINE_RE", "_CACHE_LINE_HTML", "_CACHE_LINE_MODEL_TPL",
+    "_TOKEN_LINE_RE", "_CACHE_LINE_HTML", "_cache_line_model_tpl",
     "_MODEL_LINE_RE", "_THINKING_SUPPORTED_PREFIXES", "_THINKING_EFFORT_MODEL_PREFIXES",
     "_supports_extended_thinking", "_is_effort_model", "_truncation_warning",
     "_check_claude_truncation", "_check_openai_truncation", "_extract_content",
@@ -71,11 +71,13 @@ _CACHE_LINE_HTML = (
 )
 """缓存命中的 HTML 提示行。"""
 
-_CACHE_LINE_MODEL_TPL = (
-    '<p style="color:#888;font-size:12px">'
-    "本次使用LLM缓存（原始模型：{model}）"
-    "</p>"
-)
+def _cache_line_model_tpl(model: str) -> str:
+    """生成缓存命中提示行（含模型名）。"""
+    return (
+        '<p style="color:#888;font-size:12px">'
+        f"本次使用LLM缓存（原始模型：{model}）"
+        "</p>"
+    )
 """含原始模型名称的缓存提示行模板。"""
 
 _MODEL_LINE_RE = re.compile(r'模型[：:]\s*([^|<\s][^|]*)')
@@ -288,6 +290,50 @@ def _process_success_response(
     return (content, usage)
 
 
+def _attempt_api_call(
+    client: httpx.Client,
+    url: str,
+    headers: dict,
+    payload: dict,
+    timeout: float,
+) -> tuple[str, Any]:
+    """执行一次 LLM API 调用，返回 (kind, info)。
+
+    Returns:
+        ("success", data) — 调用成功，data 为解析后的 JSON
+        ("retryable", detail) — 可重试（detail 可为 int 状态码或 str 描述）
+        ("fatal", error_msg) — 不可恢复（响应解析失败）
+    """
+    try:
+        resp = client.post(url, json=payload, headers=headers, timeout=timeout)
+        if resp.status_code in (429, 503):
+            return ("retryable", resp.status_code)
+        resp.raise_for_status()
+        return ("success", resp.json())
+    except httpx.TimeoutException:
+        return ("retryable", None)
+    except httpx.HTTPError:
+        host = _sanitize_endpoint(url)
+        return ("retryable", host)
+    except (ValueError, KeyError) as e:
+        return ("fatal", str(e))
+
+
+def _is_retry_available(label: str, attempt: int, max_retries: int, detail: str, url: str) -> bool:
+    """判断是否可重试；若可则等待后返回 True，否则 False。"""
+    if attempt < max_retries:
+        delay = _RETRY_DELAYS[attempt]
+        logger.warning(
+            "%s API %s (尝试 %d/%d)，%.1fs 后重试...",
+            label, detail, attempt + 1, max_retries + 1, delay,
+        )
+        print(f"  [..] {label} API {detail} (第{attempt + 1}次重试, {delay:.0f}s后)...")
+        time.sleep(delay)
+        return True
+    logger.warning("%s API %s（已重试 %d 次）", label, detail, max_retries)
+    return False
+
+
 def _call_llm_with_retry(
     label: str,
     client: httpx.Client,
@@ -330,56 +376,26 @@ def _call_llm_with_retry(
         return (None, None)
 
     for attempt in range(max_retries + 1):
-        try:
-            resp = client.post(url, json=payload, headers=headers, timeout=timeout)
-            if resp.status_code in (429, 503) and attempt < max_retries:
-                delay = _RETRY_DELAYS[attempt]
-                logger.warning(
-                    "%s API %d (尝试 %d/%d)，%.1fs 后重试...",
-                    label, resp.status_code, attempt + 1, max_retries + 1, delay,
-                )
-                print(f"  [..] {label} API {resp.status_code} (第{attempt + 1}次重试, {delay:.0f}s后)...")
-                time.sleep(delay)
-                continue
-            resp.raise_for_status()
-            data = resp.json()
+        kind, info = _attempt_api_call(client, url, headers, payload, timeout)
+
+        if kind == "success":
             _cb_record_success(url)
-        except httpx.TimeoutException:
-            if attempt < max_retries:
-                delay = _RETRY_DELAYS[attempt]
-                logger.warning(
-                    "%s API 超时 (尝试 %d/%d)，%.1fs 后重试...",
-                    label, attempt + 1, max_retries + 1, delay,
-                )
-                print(f"  [..] {label} API 超时 (第{attempt + 1}次重试, {delay:.0f}s后)...")
-                time.sleep(delay)
+            return _process_success_response(
+                info, extract_fn, check_truncation_fn, max_tokens, config_field,
+                provider, model_name, label, url,
+            )
+
+        if kind == "retryable":
+            detail = "超时" if info is None else (f"{info}" if isinstance(info, int) else f"网络错误 ({info})")
+            if _is_retry_available(label, attempt, max_retries, detail, url):
                 continue
-            logger.warning("%s API 超时（已重试 %d 次）", label, max_retries)
-            _cb_record_failure(url)
-            return (None, None)
-        except httpx.HTTPError:
-            host = _sanitize_endpoint(url)
-            if attempt < max_retries:
-                delay = _RETRY_DELAYS[attempt]
-                logger.warning(
-                    "%s API 请求失败 (%s) (尝试 %d/%d)，%.1fs 后重试...",
-                    label, host, attempt + 1, max_retries + 1, delay,
-                )
-                print(f"  [..] {label} API 网络错误 ({host}) (第{attempt + 1}次重试, {delay:.0f}s后)...")
-                time.sleep(delay)
-                continue
-            logger.warning("%s API 请求失败 (%s)（已重试 %d 次）", label, host, max_retries)
-            _cb_record_failure(url)
-            return (None, None)
-        except (ValueError, KeyError) as e:
-            logger.warning("%s API 响应解析失败: %s", label, e)
             _cb_record_failure(url)
             return (None, None)
 
-        return _process_success_response(
-            data, extract_fn, check_truncation_fn, max_tokens, config_field,
-            provider, model_name, label, url,
-        )
+        # kind == "fatal"
+        logger.warning("%s API 响应解析失败: %s", label, info)
+        _cb_record_failure(url)
+        return (None, None)
 
     _cb_record_failure(url)
     return (None, None)
@@ -490,6 +506,51 @@ def _call_llm(
     return (None, None)
 
 
+def _configure_extended_thinking(
+    payload: dict,
+    llm_config: dict | None,
+    config_field: str,
+    model: str,
+    max_tokens: int,
+) -> None:
+    """如果开启，在 payload 中注入 Extended Thinking 参数（原地修改）。
+
+    根据模型类型选择 effort（DeepSeek）或 budget_tokens（Anthropic）控制思考深度。
+    若模型不支持则自动降级跳过。
+    """
+    if not llm_config:
+        return
+
+    module_suffix = config_field.replace("max_tokens_", "")
+    thinking_key = f"thinking_enabled_{module_suffix}"
+    if not llm_config.get(thinking_key, False):
+        return
+
+    resolved_model = model or "claude-sonnet-4-20250514"
+    if not _supports_extended_thinking(resolved_model):
+        logger.warning(
+            "模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]",
+            resolved_model, module_suffix,
+        )
+        return
+
+    payload["thinking"] = {"type": "enabled"}
+    payload.pop("temperature", None)  # Extended Thinking 与 temperature 互斥
+
+    if _is_effort_model(resolved_model):
+        effort_key = f"reasoning_effort_{module_suffix}"
+        effort = llm_config.get(effort_key, "high")
+        payload["output_config"] = {"effort": effort}
+        logger.info("Extended Thinking 已开启 [%s]: effort=%s", module_suffix, effort)
+    else:
+        budget_key = f"thinking_budget_{module_suffix}"
+        budget = llm_config.get(budget_key)
+        if not budget or budget < max_tokens + 1024:
+            budget = max_tokens + 4096  # 自动兜底
+        payload["thinking"]["budget_tokens"] = budget
+        logger.info("Extended Thinking 已开启 [%s]: budget=%d", module_suffix, budget)
+
+
 def _call_claude(
     system: str,
     user: str,
@@ -537,33 +598,7 @@ def _call_claude(
         "messages": [{"role": "user", "content": user}],
     }
     # ── Extended Thinking（根据模型类型 + 模块配置） ──
-    if llm_config:
-        _module_suffix = config_field.replace("max_tokens_", "")
-        _thinking_key = f"thinking_enabled_{_module_suffix}"
-        if llm_config.get(_thinking_key, False):
-            _resolved_model = model or "claude-sonnet-4-20250514"
-            if not _supports_extended_thinking(_resolved_model):
-                logger.warning(
-                    "模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]",
-                    _resolved_model, _module_suffix,
-                )
-            else:
-                payload["thinking"] = {"type": "enabled"}
-                payload.pop("temperature", None)  # Extended Thinking 与 temperature 互斥
-                if _is_effort_model(_resolved_model):
-                    # DeepSeek 等：用 effort（high/max）控制思考深度
-                    _effort_key = f"reasoning_effort_{_module_suffix}"
-                    _effort = llm_config.get(_effort_key, "high")
-                    payload["output_config"] = {"effort": _effort}
-                    logger.info("Extended Thinking 已开启 [%s]: effort=%s", _module_suffix, _effort)
-                else:
-                    # Anthropic Claude：用 budget_tokens 控制
-                    _budget_key = f"thinking_budget_{_module_suffix}"
-                    _budget = llm_config.get(_budget_key)
-                    if not _budget or _budget < max_tokens + 1024:
-                        _budget = max_tokens + 4096  # 自动兜底
-                    payload["thinking"]["budget_tokens"] = _budget
-                    logger.info("Extended Thinking 已开启 [%s]: budget=%d", _module_suffix, _budget)
+    _configure_extended_thinking(payload, llm_config, config_field, model, max_tokens)
     if temperature is not None and "thinking" not in payload:
         payload["temperature"] = temperature
     client = http_client

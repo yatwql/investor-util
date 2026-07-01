@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Tuple
+
 
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -49,7 +49,7 @@ _INDEX_KEYWORDS = ("指数", "ETF联接", "ETF 联接", "中证", "沪深300",
                    "中证500", "中证1000", "科创50", "创业板", "上证")
 
 
-def _categorize_holding(h: Holding) -> Tuple[str, str]:
+def _categorize_holding(h: Holding) -> tuple[str, str]:
     """将单条持仓映射到 (资产属性, 投资分类)。
 
     分类逻辑（按优先级）：
@@ -158,7 +158,7 @@ def _write_category_group(
 
 def write_category_sheet(
     ws: Worksheet,
-    holdings: List[Holding],
+    holdings: list[Holding],
     details: List[DetailRow],
 ) -> None:
     """写入持仓分类表。
@@ -216,7 +216,7 @@ def write_category_sheet(
                 get_report_sheet_name('category'), len(sorted_groups), len(holdings))
 
 
-def _num_formats() -> List[str]:
+def _num_formats() -> list[str]:
     """每列的 Excel 数字格式。"""
     return [
         "",           # 1  资产属性

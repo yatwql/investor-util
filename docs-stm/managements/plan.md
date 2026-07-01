@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.51 — P2 测试覆盖全部完成 + 配置审查、兼容代码清理）
+最后更新：2026-07-01（v0.2.52 — 待办区全部清空，所有治理项（含 P3 代码现代化）完成）
 
 ---
 
@@ -115,6 +115,14 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 - **`llm/skeleton.py` 全局 max_tokens 回退清理**：移除旧版配置全局 `max_tokens` 兜底路径
 - **`config.py` 键名兼容去重**：移除 `_LLM_KEY_OVERLAP_KEYS` 跨文件键名互通机制
 
+### A5. 文件拆分 + 配置治理（低难度 / 低价值）✅ 已完成（v0.2.51）
+
+- **R-051 ✅** `report/html_writer.py`（792→617 行）：提取 `_build_category_data` 等 4 个构建函数至 `html_builders.py`
+- **R-052 ✅** `report/penetration.py`（715→530 行）：提取 `write_penetration_sheet` 等 6 个辅助函数至 `penetration_sheet.py`
+- **R-053 ✅** `requirements.txt` 版本锁定：从 `>=` 改为 `==`，新增 `lxml`/`pytest`/`pytest-mock` 精确版本
+- **R-054 ✅** `config.py:validate_config()` 新增 `early_warning` 配置段类型/范围校验
+- **R-055 ✅** `news_aggregator.py` 清理 `_FALLBACK_ENABLED` 死路径
+
 ---
 
 ### 待实现方向
@@ -133,21 +141,52 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 
 - **环比分析**：对比历史报告摘要，说明组合变化趋势
 
-### H. 代码治理（低难度 / 中价值）
+### J. 大函数治理（二期）（低难度 / 中价值）
 
-#### R-051 `report/html_writer.py` 文件偏大
+将 15 个 >75 行的函数进一步拆分（单元可测试化）：
 
-792 行，虽已拆分函数，但文件整体仍可考虑按章节拆分（HTML 头部/LLM 章节/历史净值/穿透数据分拆为独立模块）。
+| 行数 | 函数 | 位置 |
+|:----:|------|------|
+| 123 | `validate_config` | `config.py` | ✅ 已完成 |
+| 99 | `_compute_sentiment_alerts` | `report/early_warning.py` | ✅ 已完成 |
+| 96 | `_markdown_to_html` | `llm/markdown.py` | ✅ 已完成 |
+| 94 | `_call_llm_with_retry` | `llm/api.py` | ✅ 已完成 |
+| 90 | `_fetch_with_fallback` | `fetcher/chain.py` | ✅ 已完成 |
+| 86 | `build_holding_keywords` | `providers/news_keywords.py` | ✅ 已完成 |
+| 85 | `_call_claude` | `llm/api.py` | ✅ 已完成 |
+| 82 | `fetch_industry_and_concepts` | `providers/eastmoney_industry.py` | ✅ 已完成 |
+| 79 | `write_market_value_sheet` | `report/market_value.py` | ✅ 已完成 |
+| 78 | `_generate_details` | `report/market_value.py` | ✅ 已完成 |
+| 78 | `get_dividend_data` | `providers/akshare_extras.py` | ✅ 已完成 |
+| 78 | `_build_penetration_deep_prompt` | `llm/prompts.py` | ✅ 已完成 |
+| 77 | `_generate_llm_module` | `llm/skeleton.py` | ✅ 已完成 |
+| 77 | `cleanup_expired` | `cache.py` | ✅ 已完成 |
+| 76 | `_render_llm_module_info` | `report/html_writer.py` | ✅ 已完成 |
 
-#### R-052 `report/penetration.py` 文件偏大
+### K. 测试覆盖补全（三期）（低难度 / 中价值）✅ 已完成（v0.2.52）
 
-715 行，穿透逻辑与 Excel 写入混合，建议将纯计算逻辑（行业分级/基金穿透/前十权重）与工作表写入解耦。
+- 9 个模块全部新增专用测试文件（R-071~R-079），共 140 项测试，全量 1395 passed / 11 skipped
 
-#### R-053 `requirements.txt` 缺少锁定版本
+### L. 代码现代化（低难度 / 低价值）✅ 已完成（v0.2.52）
 
-仅有 5 个顶层依赖（httpx, openpyxl, jinja2, akshare, lxml），建议使用 `pip freeze` 导出锁定文件或迁移至 `pyproject.toml`。
+- **旧式 typing 泛型 → 内置泛型**：13 个文件的 `List`/`Dict`/`Optional`/`Tuple` → `list`/`dict`/`X \| None`/`tuple`
+- **`.format()` → f-string**：3 处全部转换
+- **pyproject.toml 同步**：版本/依赖精确锁定与 requirements.txt 一致
 
-### I. 配置治理（低难度 / 低价值）
+---
 
-- **`early_warning` 配置段添加 `validate_config()` 校验**：`sector_alert_threshold_warning`/`danger`/`sentiment_top_n` 当前无类型/范围校验
-- **`_FALLBACK_ENABLED` 死路径清理**：`news_aggregator.py` 的后备路径因 `get_config()` 总提供完整默认值而不可达
+### M. UI/体验优化（低难度 / 中价值）
+
+- **错误提示优化**：部分异常堆栈直接暴露给用户，可包装为友好中文提示，避免恐慌
+- **日志轮转**：`logs/app.log` 无大小轮转，长期运行会膨胀，建议 RotatingFileHandler
+
+### N. 工程化增强（低难度 / 低价值）
+
+- **CI/CD 集成**：添加 GitHub Actions 自动化流水线，每次 Push 自动运行 `pytest`
+- **HTML 报告响应式**：当前模板固定宽度，移动端查看体验一般，可适配 mobile 端
+- **Excel 页签并行写入**：报告生成时每个页签独立写入，可考虑并行加速
+
+### O. TUI 现代化（中难度 / 中价值）
+
+- **TUI 框架升级**：当前用原生 `input()` 循环 + `getch()`，可替换为 `textual` 或 `rich` 提升交互体验（菜单导航、进度动画、色彩丰富度）
+

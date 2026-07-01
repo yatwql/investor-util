@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, List, Optional
+from typing import Any
 
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
@@ -123,9 +123,9 @@ def _enrich_with_industry_data(lookup: dict, industry_data: dict[str, dict]) -> 
 
 
 def _build_keyword_lookup(
-    holdings: List[Holding],
-    penetrated_assets: Optional[List[dict]] = None,
-    industry_data: Optional[dict[str, dict]] = None,
+    holdings: list[Holding],
+    penetrated_assets: list[dict] | None = None,
+    industry_data: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """构建关键词→来源正向查找表。
 
@@ -243,8 +243,8 @@ def _format_enriched_keywords(enriched: list[dict]) -> str:
 
 
 def _expand_industry_keywords(
-    holdings: List[Holding],
-    penetrated_assets: Optional[List[dict]],
+    holdings: list[Holding],
+    penetrated_assets: list[dict] | None,
     keywords: list[str],
 ) -> tuple[list[str], dict[str, dict]]:
     """扩展关键词：获取行业/概念数据，将行业名和概念名追加为关键词。
@@ -493,8 +493,8 @@ def _set_news_column_widths(ws: Worksheet, has_llm: bool) -> None:
 
 def write_news_sheet(
     ws: Worksheet,
-    news_data: List[dict[str, Any]],
-    llm_meta: Optional[dict] = None,
+    news_data: list[dict[str, Any]],
+    llm_meta: dict | None = None,
 ) -> None:
     """写入财经新闻热点与持仓关联分析页签。
 
