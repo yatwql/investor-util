@@ -106,7 +106,7 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                         # 单元测试（50 个 test_*.py + helpers.py，1395 passed / 11 skipped）
+│   └── test/                         # 单元测试（50 个 test_*.py + helpers.py，1535 passed / 11 skipped）
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     # 持仓 xlsx 文件（用户放置）
@@ -122,6 +122,8 @@ investor-util/
 ├── logs/                             # 程序日志（app.log，自动生成）
 │
 ├── scripts/                          # 启动脚本
+│   ├── data/                         # 启动脚本占位目录 — cache/ + holdings/（初始环境准备用）
+│   ├── docs-stm/                     # 启动脚本占位目录 — tmp/（初始环境准备用）
 │   ├── launch.ps1                    # Windows PowerShell 启动脚本
 │   └── launch.sh                     # Linux Bash 启动脚本
 │
