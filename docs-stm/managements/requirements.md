@@ -1,8 +1,7 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
 创建日期：2026-06-26
-最后更新：2026-07-01
-来源：`投资分析应用-需求.txt`
+最后更新：2026-07-01（v0.2.54 — 依据代码/配置反推补全：配置段详解、LLM架构、缓存分组、降级策略）
 
 ---
 
@@ -307,5 +306,133 @@ Extended Thinking 详解、定价表等）及本章各模块的完整配置项�
 
 ## 8. 页面/页签布局
 
-- Excel 格式：每个模块独立一个页签
-- HTML 格式：所有模块在同一页面中按顺序排列
+- Excel 格式：每个模块独立一个页签，页签编号 1~12，统一用数字前缀保证排序（`1.投资分析汇总` → `12.LLM API 用量`）
+- HTML 格式：所有模块在同一页面中按顺序排列，附目录锚点导航；智能预警、LLM 增补章节为条件渲染（仅对应菜单项时显示）
+
+### 8.1 完整页签对照表
+
+| 序号 | 页签名称 | 触发菜单 | 是否 LLM | 说明 |
+|:----:|:---------|:--------:|:--------:|:-----|
+| 1 | 投资分析汇总 | E/H/B/L | — | 指数行情、账户汇总、持仓概况 |
+| 2 | 市值核算明细表 | E/H/B/L | — | 15 列明细，含分账户小计+总计 |
+| 3 | 持仓分类表 | E/H/B/L | — | 按资产属性+投资分类分组聚合 |
+| 4 | 资产穿透TOP10 | E/H/B/L | — | 基金底层标的拆解合并排序 |
+| 5 | 基金业绩分析 | E/H/B/L | — | 同类排名、收益率、基准对比 |
+| 6 | 财经新闻热点与持仓关联分析 | B/L | — | 5 源新闻关键词匹配，可选 LLM 二次关联分析 |
+| 7 | 智能预警 | B/L | — | 行业资金联动 + 新闻情绪聚合 |
+| 8 | 全球政经局势 | L | ✅ | LLM 基于指数+持仓结构生成 |
+| 9 | 智囊团深度复盘 | L | ✅ | LLM 三阶段圆桌会议 |
+| 10 | 持仓体检报告 | L | ✅ | LLM 四维度评分 |
+| 11 | 穿透深度分析 | L | ✅ | LLM 行业集中度+国别暴露 |
+| 12 | LLM API 用量 | L | — | Token 用量、费用估算、模块明细 |
+
+### 8.2 取价方式规范
+
+| 取价方式 | 触发条件 | 蓝色标识 |
+|:---------|:---------|:--------:|
+| 场内实时价 | 腾讯 source_api 且市场开盘 | — |
+| 场内午市收盘(T) | 腾讯 source_api，午间休市，nav_date == T | — |
+| 场内收盘价(T) | 腾讯 source_api，盘后，nav_date == T | ✅ `#0066CC` |
+| 场内收盘价(T-1) | 腾讯 source_api，盘后，nav_date == 前一交易日 | — |
+| 官方净值(T) | East Money source 且 nav_date == T | ✅ `#0066CC` |
+| 官方净值(T-1) | QDII 基金且 nav_date == 前一交易日 | ✅ `#0066CC` |
+| 官方净值(T-N) | nav_date 为 2~5 个交易日前 | — |
+| 官方净值(YYYY-MM-DD) | nav_date 为 6 个交易日以上 | — |
+
+---
+
+## 9. 配置文件规格
+
+### 9.1 config.json
+
+| 字段 | 类型 | 默认值 | TUI 修改 | 说明 |
+|:-----|:----:|:------:|:--------:|:-----|
+| `holdings_dir` | str | `data/holdings` | C | 持仓 xlsx 目录 |
+| `holdings_filename` | str | `个人投资持仓信息.xlsx` | F | 持仓文件名 |
+| `output_dir` | str | `reports` | O | 报告输出根目录 |
+| `news_top_count` | int | `100` | 手动 | 新闻关联输出 TOP N |
+| `news_sources` | dict | {sina:true, eastmoney:true, cls:false, wallstreetcn:true, akshare:true} | 手动 | 各新闻源启停 |
+| `preferred_provider` | dict | `{}` | 手动 | Provider Chain 首选覆写（price/index/us_index/fund_rank/fund_hold） |
+| `user_fund_benchmarks` | dict | `{}` | 手动 | 自定义基金基准 {代码: 基准代码} |
+| `early_warning` | dict | `{warning:-5000万, danger:-2亿, sentiment_top_n:10}` | 手动 | 智能预警阈值（单位：元） |
+| `market_hour_aware` | list | `["price", "index"]` | 手动 | 交易时段短 TTL 的数据类型 |
+| `market_hour_ttl` | int | `30` | 手动 | 交易时段缓存有效期（秒） |
+| `market_hours` | dict | `{start:"09:30", end:"15:00", official_source:true}` | 手动 | 交易时段配置 + 官方 API 开关 |
+| `cache_ttl` | dict | 15 项 | 手动 | 各缓存类型 TTL（秒） |
+| `llm_key_file` | str | `data/config/llm_key.json` | 手动 | LLM 密钥文件路径 |
+| `llm_settings_file` | str | `data/config/llm_settings.json` | 手动 | LLM 参数文件路径 |
+
+### 9.2 llm_key.json（敏感字段，建议 gitignore）
+
+| 字段 | 必填 | 说明 |
+|:-----|:----:|:-----|
+| `provider` | ✅ | `"claude"` 或 `"openai"` |
+| `api_key` | ✅ | API Key |
+| `model` | ✅ | 默认模型名 |
+| `endpoint` | ✅ | API 端点 URL |
+| `fallback_provider` | — | 主 provider 失败时回退的 provider |
+| `fallback_api_key` | — | 回退 provider 的 API Key |
+| `fallback_endpoint` | — | 回退 provider 的端点 URL |
+| `fallback_model` | — | 回退 provider 的默认模型 |
+
+### 9.3 llm_settings.json（非敏感参数，可纳入版本控制）
+
+**全局配置**
+
+| 键 | 类型 | 默认值 | 说明 |
+|:---|:----:|:------:|:-----|
+| `max_retries` | int | `2` | 429/503 最大重试次数 |
+| `enabled_llm` | dict | 全局开启 + news_correlation 默认关闭 | 各模块独立启停开关 |
+| `pricing` | dict | `{currency:"CNY"}` | 模型定价表覆盖 |
+
+**模块级配置**（`{key}` 替换为 global_macro / expert_review / health_check / penetration_deep / news_correlation）
+
+| 键 | 类型 | 说明 |
+|:---|:----:|:-----|
+| `system_prompt_{key}` | str/null | `null`=使用代码内置提示词 |
+| `model_{key}` | str/null | `null`=使用 llm_key.json 的默认 model |
+| `temperature_{key}` | float | 0.1~0.8（模块差异） |
+| `max_tokens_{key}` | int | 1024~8192（模块差异） |
+| `timeout_{key}` | int | 60~120s（模块差异） |
+| `cache_enabled_{key}` | bool | 是否缓存 LLM 结果 |
+| `output_brief_{key}` | bool | 精简模式 ≤200~300 字（news_correlation 不支持） |
+| `thinking_enabled_{key}` | bool | Extended Thinking 开关 |
+| `thinking_budget_{key}` | int | Claude Thinking token 预算（≥max_tokens+1024，自动兜底） |
+| `reasoning_effort_{key}` | str | DeepSeek 推理深度：`"high"` / `"max"` |
+
+---
+
+## 10. 错误处理与降级策略
+
+| 场景 | 用户感知 | 内部处理 |
+|:-----|:---------|:---------|
+| 网络断开 | TUI 提示网络异常 | 7 天内过期缓存降级使用 |
+| API 超时 | 单条数据跳过，其余继续 | Provider Chain 自动切换备用链路 |
+| API 返回异常/空数据 | 显示 `--` 占位 | 日志记录 WARNING |
+| 缓存文件损坏 | 透明修复 | 自动删除并重新获取 |
+| 配置值异常 | 启动时输出 WARNING | 使用代码默认值兜底 |
+| LLM API Key 未配置 | 跳过 LLM 模块，不阻塞 | 占位文本"请配置 API Key" |
+| LLM 超时/失败 | 占位"（本节内容生成失败）" | 熔断器自动冷却，支持 fallback_provider 回退 |
+| LLM 输出截断 | 自动增大 max_tokens 1.5× 重试 | 日志 ERROR 提示 |
+| LLM 内容过滤（空返回） | 追加安抚指令重试 | 日志 WARNING |
+| config.json 损坏 | 回退到全默认配置 | 日志 WARNING |
+| 报告输出目录无写入权限 | 提示错误 | PermissionError，不继续 |
+| 持仓文件格式异常 | 跳过异常行，继续解析 | 提示具体行号错误 |
+| 空持仓 | 正常生成空报告 | 跳过 LLM 调用 |
+| 熔断器触发 | 跳过该端点请求 | 冷却期后自动恢复 |
+
+---
+
+## 11. 性能与资源约束
+
+| 约束项 | 设计决策 |
+|:-------|:---------|
+| **并发策略** | ThreadPoolExecutor：新闻 5 源并发获取、LLM 4 模块并发生成、取价批量异步 |
+| **HTTP 连接池** | HTTP/2 多路复用 + 连接池上限 20 / 空闲保持 10 (`_LLM_CLIENT_SETTINGS`) |
+| **缓存原子写入** | `tempfile.mkstemp` + `os.replace` 模式，防断电半写导致文件截断 |
+| **配置原子写入** | 同上，防 config.json 截断导致下次启动丢失全部自定义配置 |
+| **大文件优化** | 缓存超过 100KB 自动 gzip 压缩（`.json.gz`），节省 80-90% 磁盘 |
+| **时区安全** | 所有交易时段判断统一使用 `timezone(timedelta(hours=8))` 北京时间 |
+| **LLM Prompt 精简** | 专家复盘 compact 模式省略今日涨跌幅，输入 token 减少 10-15% |
+| **LLM Prompt 缓存** | Claude API 使用 `cache_control: ephemeral` 5 分钟内复用 system prompt |
+| **加载顺序** | `get_config()` 带 mtime 缓存，避免每次读取磁盘 |

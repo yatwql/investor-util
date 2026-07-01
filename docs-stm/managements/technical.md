@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-01（v0.2.54 — 第二波深度代码审计：18 项新发现写入 review-findings.md，全 1535 测试通过）
+最后更新：2026-07-01（v0.2.54 — 代码反推补全：registry架构、market_hours模块、缓存安全、HTTP/2、原子写入）
 
 ---
 
@@ -197,4 +197,143 @@ investor-util/
     "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
     "messages": [{"role": "user", "content": user}],
 }
+```
+
+### DeepSeek / Effort 模式
+
+DeepSeek V4+（`deepseek-v4-*` / `deepseek-chat`）通过 Anthropic 兼容端点支持 Extended Thinking，但不使用 `budget_tokens`，而使用 `output_config.effort` 定性控制思考深度：
+
+```python
+payload["thinking"] = {"type": "enabled"}
+payload["output_config"] = {"effort": "high"}   # "low" / "medium" / "high" / "max"
+```
+
+模型名大小写敏感：代码按全小写前缀匹配（`deepseek-v4-`），文档示例统一使用 `deepseek-v4-flash`。
+
+### Prompt Caching（Anthropic 专属）
+
+`_call_claude()` 中 system prompt 使用数组格式 + `cache_control: {"type": "ephemeral"}`。同一 system prompt 在 **5 分钟内**重复使用时，输入 token 扣费大幅降低（缓存写入 ×1.25 价格，命中 ×0.1 价格）。无需任何配置，程序自动启用。
+
+### 熔断器（Circuit Breaker）
+
+`llm/circuit_breaker.py` 实现端点级熔断：连续 5 次失败后熔断 60 秒，半开状态允许 1 次探测。通过 `_cb_is_open()` / `_cb_record_failure()` / `_cb_record_success()` 暴露接口，`_call_llm_with_retry()` 在每次请求前检查熔断状态。
+
+### 会话级 Token 追踪
+
+`llm/session.py` 维护全局 `_session_usage` 字典，每次 LLM 调用完成后累计：
+- 全局：input_tokens + output_tokens + cache_hit_tokens + total_cost
+- 按模块：per_module[module_key] → {model, input_tokens, output_tokens, ...}
+- 报告末尾通过 `format_session_usage()` 格式化输出
+
+---
+
+## 配置管理技术要点
+
+### 配置分层
+
+```
+config.json (基础配置)  ──→ get_config() 内存缓存，按 mtime 自动失效
+llm_settings.json (非敏感) ──→ get_llm_config() 合并读取，联合 mtime 失效
+llm_key.json (敏感密钥)    ──→ 覆盖 llm_settings.json 的同名字段
+```
+
+### JSON 注释支持
+
+`config.py:_strip_json_comments()` 逐字符扫描，支持 `//` 单行注释和 `/* */` 多行注释。正确处理字符串内的转义引号，不会将字符串内的 `//` / `/*` 误伤。
+
+### 原子写入
+
+配置文件（`set_config`）和缓存写入（`_write_atomic`）均使用 `tempfile.mkstemp` + `os.replace` 模式：
+- 先写入临时文件，成功后 `os.replace` 原子替换原文件
+- 防止断电/崩溃导致文件截断（半写文件）
+- 缓存文件 PermissionError 时自动降级到直接写入（Windows 兼容）
+
+---
+
+## 市场时段判断（market_hours.py）
+
+三层 fallback 架构：
+
+```
+第 1 层：config.json market_hours.start / end 手动覆盖
+第 2 层：东方财富 push2 API 实时交易状态（盘中缓存 60s，盘后 7 天）
+第 3 层：内置默认值（北京时间 09:30-11:30 + 13:00-15:00，排除周末）
+```
+
+**时区安全**：所有 `datetime.now()` 调用均使用 `timezone(timedelta(hours=8))` 北京时区，防止 UTC 服务器上时段判断全错。
+
+**消费方**：
+- `cache.py:get_ttl()` → 交易时段内 `market_hour_aware` 类型自动使用 `market_hour_ttl`（默认 30s）
+- `report/market_value.py:is_market_open()` → 取价方式标签判断（委派 market_hours 实现）
+- `report/market_value.py:is_midday_break()` → 午间休市识别
+
+---
+
+## 缓存安全机制
+
+### 原子写入
+- 先通过 `tempfile.mkstemp` 写临时文件
+- 成功后再 `os.replace` 原子替换原文件
+- 磁盘满时自动回退到 gzip 压缩以节省空间
+
+### 文件损坏恢复
+- `_read_cache()` 解析失败时自动 `os.remove` 损坏文件
+- 记录 WARNING 日志，下次调用时重新拉取
+
+### 并发安全
+- `os.replace` 保证读取方不会看到半写文件
+- 多线程同时 `get()` 同一 key 可能产生 TOCTOU 空窗（两线程均认为缓存过期，均拉取 API），但通过 `_write_atomic` 保证同时写入时只有一个生效
+
+### 路径安全
+- `_cache_path(key)` 对 key 做 `replace("..", "_")` 防目录穿越
+- 缓存目录不存在时 `os.makedirs(dir, exist_ok=True)` 自动创建
+
+### 大文件 gzip 压缩
+- `set()` 中数据 ≥ 100KB 时自动使用 `.json.gz` 压缩
+- 节省约 80-90% 磁盘空间（`profit_forecast` 等全量数据受益最大）
+- 读取时透明解压（`_read_cache()` 根据后缀自动判断）
+
+### 缓存分组机制
+
+通过 `registry.py` 的 `cache_groups` 字段定义分组：
+- **preload（5 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
+- **refresh（10 模块）**：fund_rank, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, benchmark → 菜单 `[1]` 触发清除
+- **独立模块**：tracking, calendar → 无分组保护，不被菜单缓存命令误删
+
+---
+
+## 模块间依赖关系
+
+```
+reader.py (持仓解析)
+  → models.py (Holding/DetailRow 数据模型)
+  → fetcher/price.py (价格获取)
+  → fetcher/index.py (指数获取)
+  → fetcher/fund.py (基金数据获取)
+  → fetcher/industry.py (行业分类)
+  → providers/* (各数据源 API 实现)
+  → cache.py (缓存读写)
+    → market_hours.py (交易时段感知 TTL)
+    → registry.py (TTL 默认值、缓存分组)
+
+report/excel_generator.py (Excel 编排)
+  → report/summary.py, market_value.py, category.py, penetration.py,
+    fund_performance.py, news_correlation.py, early_warning.py,
+    llm_content.py (各页签写入)
+  → report/excel_writer.py, styles.py (通用写入/样式)
+  → report/html_writer.py (HTML 编排)
+    → report/html_builders.py (数据构建器)
+    → tmpl/report_template.html (Jinja2 模板)
+
+llm/generators.py (LLM 编排)
+  → llm/skeleton.py (共享生成骨架)
+    → llm/api.py (API 调用+重试+截断+熔断)
+    → llm/prompts.py (System Prompt + User Prompt 构建)
+    → llm/fingerprint.py (缓存指纹)
+    → llm/markdown.py (Markdown→HTML)
+    → llm/pricing.py, session.py (定价+用量)
+  → cache.py (LLM 结果缓存)
+
+config.py → registry.py (注册表驱动的 TTL/分组/键名)
+handlers_*.py → 各模块入口函数编排
 ```
