@@ -168,12 +168,9 @@ class TestSetConfig(unittest.TestCase):
         cfg.init_config()
         # 模拟写入失败，读取正常（让 get_config 能读出已有配置）
         _real_open = open
-        def _mock_open(*args, **kwargs):
-            mode = args[1] if len(args) > 1 else kwargs.get("mode", "r")
-            if "w" in mode or "a" in mode:
-                raise PermissionError("denied")
-            return _real_open(*args, **kwargs)
-        with patch("builtins.open", side_effect=_mock_open):
+        def _mock_mkstemp(*args, **kwargs):
+            raise PermissionError("denied")
+        with patch("tempfile.mkstemp", side_effect=_mock_mkstemp):
             with self.assertRaises(PermissionError):
                 cfg.set_config("key", "value")
 

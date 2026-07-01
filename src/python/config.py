@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 import threading
 from typing import Any
 
@@ -124,8 +125,18 @@ def set_config(key: str, value: Any) -> None:
     # 确保父目录存在
     os.makedirs(config_dir, exist_ok=True)
 
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+    # 原子写入：先写临时文件再 os.replace，防止断电半写导致 config.json 截断
+    fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, config_path)
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
     # 清除缓存，使下次 get_config() 重新读取
     _config_cache = None

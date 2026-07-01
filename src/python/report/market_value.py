@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
@@ -231,7 +231,7 @@ def get_last_trading_day() -> str:
     Returns:
         YYYY-MM-DD 格式的交易日字符串
     """
-    now = datetime.now()
+    now = datetime.now(timezone(timedelta(hours=8)))
     # 若盘前（< 9:30），基准日设为昨天
     if now.hour < 9 or (now.hour == 9 and now.minute < 30):
         check = now - timedelta(days=1)
