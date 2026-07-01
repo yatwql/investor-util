@@ -49,6 +49,28 @@
 - **review-findings.md**：R-056~R-070（大函数治理二期）、R-071~R-079（测试覆盖补全三期）全部完成，移出待办区。待办区仅保留 P3 R-080~R-083。
 - **版本号同步**：constants.py 0.2.51→0.2.52
 
+## [0.2.53] - 2026-07-01
+
+### Added
+- **`_format_holdings_block()` / `_format_penetration_block()` 共享格式化函数**（`prompts.py`）：抽取为 3 模块（expert_review / health_check / penetration_deep）共用的持仓明细格式化函数，消除重复循环。
+- **`_LLM_CLIENT_SETTINGS` HTTP 连接池配置**（`generators.py`）：`http2=True` 多路复用 + 连接池上限 20 / 空闲保持 10，减少 API 连接建立开销。
+
+### Changed
+- **P1: LLM Prompt 精简** — `_build_expert_review_prompt` 启用 `compact` 模式，省略今日涨跌幅字段（场外基金保留净值日期）。输入 token 减少 10~15%，缓存受行情波动影响降低。
+- **P2: HTTP 会话复用** — `_make_runner` 创建 `httpx.Client` 时使用共享 `_LLM_CLIENT_SETTINGS`，统一超时/连接池参数。
+- **`_FALLBACK_ENABLED` 死代码移除**（`news_sources.py`）：R-055 时清理了引用但未删除定义，现彻底移除。
+
+### Fixed
+- **config.json 缺少 `early_warning` 配置段**：补齐 `sector_alert_threshold_*` 和 `sentiment_top_n` 三个可调参数。
+
+### Docs
+- **review-findings.md**：精简审查记录，待办区全部清空（R-001~R-083 ✅）。
+- **plan.md / technical.md / README.md**：版本号同步至 v0.2.52，K/L/M/N/O 方向标注。
+- **datasource-and-folders.md**：测试文件数 35→50，新增 `reason.bat`。
+
+### Tests
+- 全量 1535 passed, 11 skipped, 30 subtests passed。
+
 ## [0.2.51] - 2026-07-01
 
 ### Added
