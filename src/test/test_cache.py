@@ -1218,6 +1218,130 @@ class TestIsMarketOpen(unittest.TestCase):
         self.assertFalse(self._call_is_market_open(now))
 
 
+# ═══════════════════════════════════════════════════════════════
+#  R-088: gzip 透明压缩解压测试
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestGzipTransparentCompression(CacheTestBase):
+    """测试缓存 >100KB 时自动 gzip 压缩 + 透明解压。"""
+
+    def _big_data(self, size_kb: int = 150) -> dict:
+        """生成指定大小的测试数据（确保超过 _GZIP_THRESHOLD=100KB）。"""
+        return {"data": "x" * (size_kb * 1024)}
+
+    @patch("src.python.cache.time.time")
+    def test_small_data_not_gzip(self, mock_time):
+        """小数据（<100KB）→ 存储为 .json 而非 .json.gz。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set
+        data = {"small": "hello"}
+        set("small_key", data)
+
+        json_path = os.path.join(self.cache_dir, "small_key.json")
+        gz_path = json_path + ".gz"
+        self.assertTrue(os.path.exists(json_path))
+        self.assertFalse(os.path.exists(gz_path))
+
+    @patch("src.python.cache.time.time")
+    def test_large_data_stored_as_gz(self, mock_time):
+        """大数据（>100KB）→ 自动存储为 .json.gz。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set
+        big = self._big_data(150)
+        set("big_key", big)
+
+        json_path = os.path.join(self.cache_dir, "big_key.json")
+        gz_path = json_path + ".gz"
+
+        # .json 文件不应存在（被 .json.gz 替代）
+        self.assertFalse(os.path.exists(json_path),
+                         ".json 文件应被清理")
+        self.assertTrue(os.path.exists(gz_path),
+                        "应创建 .json.gz 文件")
+
+        # 验证确实是 gzip 格式
+        import gzip
+        with gzip.open(gz_path, "rt", encoding="utf-8") as f:
+            payload = json.load(f)
+        self.assertEqual(payload["_data"]["data"], big["data"])
+
+    @patch("src.python.cache.time.time")
+    def test_read_gz_transparently(self, mock_time):
+        """读取 .json.gz 透明解压 → 返回正确数据。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set, get
+
+        big = self._big_data(120)
+        set("transparent_key", big)
+
+        # 读取（应透明解压 .json.gz）
+        mock_time.return_value = 1000.0  # 同一时刻，未过期
+        result = get("transparent_key", 9999)
+        self.assertEqual(result, big)
+
+    @patch("src.python.cache.time.time")
+    def test_gz_cleanup_expired(self, mock_time):
+        """清理过期缓存时 .json.gz 也被正确处理。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set
+
+        big = self._big_data(110)
+        set("expire_gz", big)
+
+        gz_path = os.path.join(self.cache_dir, "expire_gz.json.gz")
+        self.assertTrue(os.path.exists(gz_path))
+
+        # 快进到过期后清理
+        mock_time.return_value = 999999.0
+        from src.python.cache import cleanup_expired
+        count = cleanup_expired()
+        self.assertEqual(count, 1)
+        self.assertFalse(os.path.exists(gz_path))
+
+    @patch("src.python.cache.time.time")
+    def test_gz_clear_by_prefix(self, mock_time):
+        """clear_by_prefix 应同时清理 .json.gz 文件。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set, clear_by_prefix
+
+        big1 = self._big_data(110)
+        big2 = self._big_data(110)
+        set("price_gz_a", big1)
+        set("price_gz_b", big2)
+
+        gz_a = os.path.join(self.cache_dir, "price_gz_a.json.gz")
+        gz_b = os.path.join(self.cache_dir, "price_gz_b.json.gz")
+        self.assertTrue(os.path.exists(gz_a))
+        self.assertTrue(os.path.exists(gz_b))
+
+        count = clear_by_prefix("price_gz_")
+        self.assertEqual(count, 2)
+        self.assertFalse(os.path.exists(gz_a))
+        self.assertFalse(os.path.exists(gz_b))
+
+    @patch("src.python.cache.time.time")
+    def test_get_prefers_gz_over_json(self, mock_time):
+        """同时存在 .json 和 .json.gz → 优先读取 .json.gz。"""
+        mock_time.return_value = 1000.0
+
+        # 写两个同名不同格式的文件
+        json_path = os.path.join(self.cache_dir, "duel.json")
+        gz_path = json_path + ".gz"
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump({"_ts": 900.0, "_data": "plain"}, f)
+
+        import gzip
+        with gzip.open(gz_path, "wt", encoding="utf-8") as f:
+            json.dump({"_ts": 900.0, "_data": "compressed"}, f)
+
+        from src.python.cache import get
+        result = get("duel", 9999)
+        # 应返回 gzip 的内容
+        self.assertEqual(result, "compressed")
+
+
 class TestParseTimeToMinutes(unittest.TestCase):
     """测试 _parse_time_to_minutes 工具函数。"""
 

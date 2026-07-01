@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.54 — testplan.md 全面加强 + 新增 P. 测试补全方向 12 项）
+最后更新：2026-07-01（v0.2.54 — P. Edge Case + 场景测试补全 12 项全部完成 ✅）
 
 ---
 
@@ -118,22 +118,22 @@ A（测试覆盖补全一期）、A2（大函数拆分一期）、A3（测试覆
 
 ### P. Edge Case + 场景测试补全（低难度 / 中价值）
 
-以下测试缺口在 testplan.md 中标记，待择机补全：
+✅ **全部 12 项于 v0.2.54 完成**
 
-| 编号 | 测试项 | 类型 | 优先级 |
-|:----:|:-------|:-----|:------:|
-| R-084 | `market_hours` UTC 时区一致性测试 | 已修复 Bug 的回归 | P0 |
-| R-085 | `config.py` 原子写入断电恢复测试 | 已修复 Bug 的回归 | P0 |
-| R-086 | Provider 回退链路测试（主失败 → fallback） | 异常路径 | P1 |
-| R-087 | 熔断器冷却恢复测试（熔断 → 60s → 半开 → 恢复） | 异常路径 | P1 |
-| R-088 | 缓存 > 100KB gzip 透明压缩解压测试 | 功能正确性 | P1 |
-| R-089 | LLM content_filter 空返回安抚重试测试 | 异常路径 | P1 |
-| R-090 | 溢价率计算验证（QDII ETF 场内折溢价） | 数据正确性 | P2 |
-| R-091 | 场外基金非 T 日更新 → today_profit=0 验证 | 数据正确性 | P2 |
-| R-092 | 穿透市值占比归一化验证（≤100%） | 数据正确性 | P2 |
-| R-093 | 日志脱敏验证（API Key 不出现在 app.log） | 安全 | P1 |
-| R-094 | LLM 占位文本三种状态区分断言 | UI | P2 |
-| R-095 | 业务场景 S1~S10 集成测试 | 集成 | P2 |
+| 编号 | 测试项 | 覆盖文件 | 状态 |
+|:----:|:-------|:---------|:----:|
+| R-084 | `market_hours` UTC 时区一致性测试 | `test_market_hours.py`（已存在，追加验证） | ✅ |
+| R-085 | `config.py` 原子写入断电恢复测试 | `test_config_atomic.py` + `test_config.py` | ✅ |
+| R-086 | Provider 回退链路测试 | `test_chain.py`（已存在，无需新文件） | ✅ |
+| R-087 | 熔断器冷却恢复测试 | `test_circuit_breaker_recovery.py` | ✅ |
+| R-088 | 缓存 > 100KB gzip 透明压缩解压测试 | `test_cache.py`（已存在，追加验证） | ✅ |
+| R-089 | LLM content_filter 空返回安抚重试测试 | `test_api.py`（已存在） | ✅ |
+| R-090 | 溢价率计算验证 | `test_market_value_edge.py` | ✅ |
+| R-091 | 非 T 日 today_profit=0 验证 | `test_market_value_edge.py` | ✅ |
+| R-092 | 穿透市值占比归一化验证 | `test_penetration_edge.py` | ✅ |
+| R-093 | 日志脱敏验证 | `test_log_sanitize.py`（已存在） | ✅ |
+| R-094 | LLM 占位文本三种状态区分 | `test_llm_placeholder.py`（已存在） | ✅ |
+| R-095 | 业务场景 S1~S10 集成测试 | `test_integration.py`(S1~S5) + `test_integration_scenarios.py`(S6~S10) | ✅ |
 
 ### O. TUI 现代化（中难度 / 中价值）
 

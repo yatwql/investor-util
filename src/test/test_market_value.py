@@ -1464,5 +1464,168 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         self.assertAlmostEqual(grand_mv, 3800.0)
 
 
+# ═══════════════════════════════════════════════════════════════
+#  R-090: 溢价率计算验证
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestPremiumRate(unittest.TestCase):
+    """验证溢价率字段的处理。
+
+    当前实现：溢价率使用占位符 "--"（简化处理，不考虑实时溢价）。
+    测试确保：
+      - 占位符正确填充
+      - 不出现报错
+      - 溢价率列始终为字符串类型
+    """
+
+    def test_premium_placeholder_in_detail_row(self):
+        """不在交易时段或不是 tencent 源 → premium=--。"""
+        from src.python.report.market_value import (
+            _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
+        )
+        from src.python.models import Holding
+
+        h = Holding(account="证券", name="华夏纳斯达克100ETF(QDII)",
+                     code="513300", shares=100, cost_price=1.5)
+        mkt = {
+            "price": 1.6, "yesterday_close": 1.55,
+            "price_date": "2026-06-26",
+            "source": "腾讯财经", "source_api": "tencent",
+        }
+        detail = _compute_detail_row(h, mkt)
+        self.assertEqual(detail.premium, _FUND_PREMIUM_PLACEHOLDER)
+
+    def test_premium_type_is_string(self):
+        """溢价率字段始终为字符串类型。"""
+        from src.python.report.market_value import (
+            _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
+        )
+        from src.python.models import Holding
+
+        h = Holding(account="证券", name="沪深300ETF",
+                     code="510300", shares=100, cost_price=4.0)
+        mkt = {
+            "price": 4.2, "yesterday_close": 4.1,
+            "price_date": "", "source": "东方财富", "source_api": "eastmoney",
+        }
+        detail = _compute_detail_row(h, mkt)
+        self.assertIsInstance(detail.premium, str)
+
+    def test_premium_in_row_values(self):
+        """detail_to_row_values 中溢价率列索引正确。"""
+        from src.python.report.market_value import (
+            _detail_to_row_values, DetailRow,
+        )
+
+        d = DetailRow(
+            account="证券", name="测试", code="600000",
+            premium="--",
+        )
+        values = _detail_to_row_values(d)
+        # 溢价率是第 8 列（0-indexed）
+        self.assertEqual(values[7], "--")
+
+    def test_premium_not_none(self):
+        """溢价率不应为 None（避免 Excel 单元格显示空白）。"""
+        from src.python.report.market_value import (
+            _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
+        )
+        from src.python.models import Holding
+
+        h = Holding(account="证券", name="普通股票",
+                     code="600000", shares=100, cost_price=10.0)
+        mkt = {
+            "price": 11.0, "yesterday_close": 10.5,
+            "price_date": "2026-06-26",
+            "source": "腾讯财经", "source_api": "tencent",
+        }
+        detail = _compute_detail_row(h, mkt)
+        self.assertIsNotNone(detail.premium)
+        self.assertNotEqual(detail.premium, "")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R-091: 场外基金非 T 日 today_profit=0 验证
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestTodayProfitOffMarket(unittest.TestCase):
+    """验证场外基金在非 T 日（nav_date ≠ trading_day）时 today_profit=0。"""
+
+    def setUp(self):
+        # 固定交易日为 "2026-06-26"
+        self._ld_patcher = unittest.mock.patch(
+            "src.python.report.market_value.get_last_trading_day",
+            return_value="2026-06-26",
+        )
+        self._ld_patcher.start()
+
+    def tearDown(self):
+        self._ld_patcher.stop()
+
+    def test_off_market_nav_not_t_day(self):
+        """场外基金 nav_date != trading_day → today_profit=0。"""
+        from src.python.report.market_value import _compute_detail_row
+        from src.python.models import Holding
+
+        h = Holding(account="支付宝", name="易方达蓝筹精选",
+                     code="005827", shares=1000, cost_price=2.0)
+        mkt = {
+            "price": 2.1, "yesterday_close": 2.05,
+            "price_date": "2026-06-24",  # ≠ 2026-06-26（非 T 日）
+            "source": "天天基金", "source_api": "tiantian",
+        }
+        detail = _compute_detail_row(h, mkt)
+        self.assertEqual(detail.today_profit, 0.0)
+
+    def test_on_market_nav_is_t_day(self):
+        """场外基金 nav_date == trading_day → today_profit 正常计算。"""
+        from src.python.report.market_value import _compute_detail_row
+        from src.python.models import Holding
+
+        h = Holding(account="支付宝", name="易方达蓝筹精选",
+                     code="005827", shares=1000, cost_price=2.0)
+        mkt = {
+            "price": 2.1, "yesterday_close": 2.05,
+            "price_date": "2026-06-26",  # == trading_day
+            "source": "天天基金", "source_api": "tiantian",
+        }
+        detail = _compute_detail_row(h, mkt)
+        # today_profit = (2.1 - 2.05) * 1000 = 50.0
+        self.assertAlmostEqual(detail.today_profit, 50.0)
+
+    def test_tencent_source_ignores_nav_date(self):
+        """腾讯源（场内实时）即使无 nav_date 也计算 today_profit。"""
+        from src.python.report.market_value import _compute_detail_row
+        from src.python.models import Holding
+
+        h = Holding(account="证券", name="长江电力",
+                     code="600900", shares=100, cost_price=20.0)
+        mkt = {
+            "price": 21.0, "yesterday_close": 20.5,
+            "price_date": "",  # 腾讯源无净值日期
+            "source": "腾讯财经", "source_api": "tencent",
+        }
+        detail = _compute_detail_row(h, mkt)
+        # tencent 源始终用 price - yclose 计算 today_profit
+        self.assertAlmostEqual(detail.today_profit, 50.0)
+
+    def test_no_nav_date_non_tencent(self):
+        """非腾讯源且无 nav_date → today_profit=0。"""
+        from src.python.report.market_value import _compute_detail_row
+        from src.python.models import Holding
+
+        h = Holding(account="支付宝", name="某基金",
+                     code="000001", shares=100, cost_price=1.0)
+        mkt = {
+            "price": 1.1, "yesterday_close": 1.05,
+            "price_date": "",
+            "source": "天天基金", "source_api": "tiantian",
+        }
+        detail = _compute_detail_row(h, mkt)
+        self.assertEqual(detail.today_profit, 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

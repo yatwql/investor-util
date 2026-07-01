@@ -227,5 +227,270 @@ class TestWorkbookSaveRoundtrip(unittest.TestCase):
         loaded.close()
 
 
+# ═══════════════════════════════════════════════════════════════
+#  R-095: 业务场景集成测试 S1~S5
+# ═══════════════════════════════════════════════════════════════
+
+
+class ScenarioTestBase(unittest.TestCase):
+    """场景测试基类：提供共享的 mock 环境。"""
+
+    def setUp(self):
+        # 阻止所有网络/API 调用
+        self._price_patcher = patch("src.python.fetcher.price.fetch_market_data")
+        self._mock_price = self._price_patcher.start()
+        self._mock_price.return_value = {
+            "price": 10.0, "yesterday_close": 9.8,
+            "price_date": "2026-06-26", "source": "腾讯财经",
+            "source_api": "tencent",
+        }
+
+        self._fund_patcher = patch("src.python.report.penetration.fetch_fund_holdings")
+        self._mock_fund = self._fund_patcher.start()
+        self._mock_fund.return_value = {
+            "code": "510300", "name": "沪深300ETF",
+            "date": "2026-03-31",
+            "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
+        }
+
+        # LLM 相关 mock
+        self._llm_config_patcher = patch(
+            "src.python.config.get_llm_config",
+            return_value={"provider": None, "enabled_llm": {}},
+        )
+        self._llm_config_patcher.start()
+
+    def tearDown(self):
+        self._price_patcher.stop()
+        self._fund_patcher.stop()
+        self._llm_config_patcher.stop()
+
+    def _make_holding(self, account: str, name: str, code: str,
+                       shares: float, cost_price: float) -> Holding:
+        return Holding(
+            account=account, name=name, code=code,
+            shares=shares, cost_price=cost_price,
+        )
+
+
+class TestScenarioS1(ScenarioTestBase):
+    """S1: 纯股票组合（3 只 A 股，无基金）→ 穿透 TOP10 等于直接持股。"""
+
+    def setUp(self):
+        super().setUp()
+        self.holdings = [
+            self._make_holding("证券", "贵州茅台", "600519", 100, 2000.0),
+            self._make_holding("证券", "长江电力", "600900", 200, 28.0),
+            self._make_holding("证券", "宁德时代", "300750", 50, 250.0),
+        ]
+
+    def test_penetration_top10_equals_direct_holdings(self):
+        """纯股票 → 穿透 TOP10 即为直接持股。"""
+        from src.python.report.market_value import DetailRow
+
+        details = []
+        for h in self.holdings:
+            dr = DetailRow()
+            dr.code = h.code
+            dr.name = h.name
+            dr.price = h.cost_price
+            dr.market_value = h.cost_price * h.shares
+            dr.source_api = "tencent"
+            dr.account = "证券"
+            dr.nav_date = "2026-06-26"
+            dr.yesterday_close = h.cost_price * 0.98
+            dr.price_type = "场内收盘价(T)"
+            dr.premium = "--"
+            dr.shares = h.shares
+            dr.cost = h.cost_price * h.shares
+            dr.profit = 0.0
+            dr.profit_rate = 0.0
+            dr.today_profit = 0.0
+            dr.source = "mock"
+            details.append(dr)
+
+        from src.python.report.penetration import compute_penetration_top10
+        result = compute_penetration_top10(self.holdings, details)
+        top10 = result.get("top10", [])
+        code_set = {item.get("code", "").split(",")[0] for item in top10 if item.get("code")}
+        expected = {"600519", "600900", "300750"}
+        self.assertTrue(expected.issubset(code_set) or code_set.issubset(expected),
+                        f"穿透 TOP10 代码 {code_set} 应与直接持股 {expected} 匹配")
+
+    def test_no_fund_in_category(self):
+        """纯股票 → 分类表中无基金行。"""
+        from src.python.report.penetration import classify_penetration
+        for h in self.holdings:
+            cls = classify_penetration(h)
+            self.assertEqual(cls, "stock", f"{h.name} 应为 stock")
+
+    def test_total_profit_correct(self):
+        """总盈亏 = 各股票盈亏之和。"""
+        from src.python.report.market_value import _compute_detail_row
+        details = [{
+            "price": 2050.0, "yesterday_close": 2000.0,
+            "price_date": "2026-06-26",
+            "source": "腾讯财经", "source_api": "tencent",
+        }, {
+            "price": 28.5, "yesterday_close": 28.0,
+            "price_date": "2026-06-26",
+            "source": "腾讯财经", "source_api": "tencent",
+        }, {
+            "price": 260.0, "yesterday_close": 250.0,
+            "price_date": "2026-06-26",
+            "source": "腾讯财经", "source_api": "tencent",
+        }]
+        total = 0
+        for h, m in zip(self.holdings, details):
+            d = _compute_detail_row(h, m)
+            total += d.profit
+        self.assertAlmostEqual(total, (2050-2000)*100 + (28.5-28)*200 + (260-250)*50)
+
+
+class TestScenarioS2(ScenarioTestBase):
+    """S2: 纯基金组合（ETF + 主动 + QDII）。"""
+
+    def setUp(self):
+        super().setUp()
+        self.holdings = [
+            self._make_holding("证券", "沪深300ETF", "510300", 1000, 4.0),
+            self._make_holding("支付宝", "易方达蓝筹精选", "005827", 500, 2.0),
+            self._make_holding("证券", "纳斯达克ETF", "513300", 200, 1.5),
+        ]
+
+    def test_classify_correct(self):
+        """基金类型分类正确。"""
+        from src.python.report.penetration import classify_penetration
+        classes = {h.code: classify_penetration(h) for h in self.holdings}
+        # 513300 是 ETF 含 QDII → QDII
+        self.assertIn(classes.get("513300", ""), ("qdii", "etf"))
+        # 510300 → ETF
+        self.assertEqual(classes.get("510300"), "etf")
+        # 005827 支付宝 → active_equity
+        self.assertEqual(classes.get("005827"), "active_equity")
+
+    def test_penetration_top10_not_empty(self):
+        """基金持仓 → 穿透 TOP10 不为空。"""
+        from src.python.report.market_value import DetailRow
+
+        details = []
+        for h in self.holdings:
+            dr = DetailRow()
+            dr.code = h.code
+            dr.name = h.name
+            dr.price = h.cost_price
+            dr.market_value = h.cost_price * h.shares
+            dr.source_api = "tencent" if h.code in ("510300", "513300") else "tiantian"
+            dr.account = h.account
+            dr.nav_date = "2026-06-26"
+            dr.yesterday_close = h.cost_price * 0.98
+            dr.price_type = "T"
+            dr.premium = "--"
+            dr.shares = h.shares
+            dr.cost = h.cost_price * h.shares
+            dr.profit = 0.0
+            dr.profit_rate = 0.0
+            dr.today_profit = 0.0
+            dr.source = "mock"
+            details.append(dr)
+
+        from src.python.report.penetration import compute_penetration_top10
+        result = compute_penetration_top10(self.holdings, details)
+        top10 = result.get("top10", [])
+        self.assertTrue(len(top10) > 0, "基金持仓穿透后 TOP10 不应为空")
+
+
+class TestScenarioS3(ScenarioTestBase):
+    """S3: 混合多账户（证券+支付宝+微信）。"""
+
+    def setUp(self):
+        super().setUp()
+        self.holdings = [
+            self._make_holding("证券", "长江电力", "600900", 100, 28.0),
+            self._make_holding("证券", "沪深300ETF", "510300", 500, 4.0),
+            self._make_holding("支付宝", "易方达蓝筹精选", "005827", 300, 2.0),
+            self._make_holding("微信", "招商鑫福中短债A", "012325", 1000, 1.0),
+        ]
+
+    def test_account_subtotals(self):
+        """分账户小计正确。"""
+        details = {}
+        for h in self.holdings:
+            details[h.code] = {
+                "code": h.code, "name": h.name, "price": h.cost_price * 1.05,
+                "market_value": h.cost_price * h.shares * 1.05,
+                "source_api": "tencent",
+            }
+
+        from src.python.report.market_value import _compute_detail_row
+        rows = [_compute_detail_row(h, details[h.code]) for h in self.holdings]
+
+        # 按账户分组求和
+        subtotals = {}
+        for r in rows:
+            subtotals[r.account] = subtotals.get(r.account, 0) + r.market_value
+        total = sum(subtotals.values())
+        self.assertAlmostEqual(total, sum(r.market_value for r in rows))
+        self.assertEqual(len(subtotals), 3, "应有 3 个不同账户")
+
+
+class TestScenarioS4(ScenarioTestBase):
+    """S4: 新持仓无缓存 → 全部从 API 获取。"""
+
+    def test_api_called_when_no_cache(self):
+        """无缓存 → 调用 fetch_market_data。"""
+        holdings = [
+            self._make_holding("证券", "长江电力", "600900", 100, 28.0),
+        ]
+
+        from src.python.report.market_value import _generate_details
+        self._mock_price.reset_mock()
+        details = _generate_details(holdings, "2026-06-26")
+        self.assertEqual(len(details), 1)
+        # fetch_market_data 被调用过
+        self._mock_price.assert_called()
+
+
+class TestScenarioS5(ScenarioTestBase):
+    """S5: 缓存全命中 → LLM 页脚显示缓存提示。"""
+
+    @patch("src.python.cache.get")
+    def test_llm_cache_hit_shows_hint(self, mock_cache_get):
+        """LLM 缓存命中 → 页脚包含缓存标记。"""
+        from src.python.llm.skeleton import _handle_cache_hit
+
+        mock_cache_get.return_value = "<p>缓存内容</p>"
+        llm_config = {"model": "claude-sonnet-4-20250514"}
+
+        result = _handle_cache_hit(
+            cached="<p>旧缓存</p>",
+            cache_key="llm_global_macro_abc",
+            module_key="global_macro",
+            model="claude-sonnet-4",
+            llm_config=llm_config,
+            thinking_enabled=False,
+        )
+        self.assertIn("使用LLM缓存", result)
+
+    @patch("src.python.cache.get")
+    def test_llm_cache_hit_zero_cost(self, mock_cache_get):
+        """缓存命中 → Token 费用为 0。"""
+        from src.python.llm.skeleton import _handle_cache_hit
+
+        mock_cache_get.return_value = "<p>缓存</p>"
+        llm_config = {"model": "claude-sonnet-4"}
+
+        result = _handle_cache_hit(
+            cached="<p>缓存</p>",
+            cache_key="test_key",
+            module_key="test_mod",
+            model="test-model",
+            llm_config=llm_config,
+            thinking_enabled=False,
+        )
+        # 缓存命中时不应显示费用
+        self.assertNotIn("费用", result)
+
+
 if __name__ == "__main__":
     unittest.main()

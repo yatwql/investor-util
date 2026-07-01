@@ -366,3 +366,115 @@ class TestLlmSettingsKeyConsistency:
         assert not untracked, (
             f"llm_settings.json 中发现 {len(untracked)} 个未登记键名: {sorted(untracked)}"
         )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R-085: config 原子写入断电恢复回归测试
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestAtomicWriteCrashRecovery(unittest.TestCase):
+    """验证 config.set_config 在写入过程中崩溃不会导致配置文件损坏。
+
+    模拟场景：
+      1. 写入时 os.replace 抛出异常 → 配置保持原内容
+      2. 写入时 tempfile.mkstemp 成功但后续崩溃 → 临时文件被清理
+      3. 半写文件被遗留（模拟断电后重启）→ get_config 仍能返回默认值
+    """
+
+    def setUp(self):
+        self._orig_config = cfg._CONFIG_FILE
+        self.tmp = tempfile.TemporaryDirectory()
+        cfg._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        cfg.init_config()
+
+    def tearDown(self):
+        cfg._CONFIG_FILE = self._orig_config
+        self.tmp.cleanup()
+
+    def test_replace_crash_preserves_original(self):
+        """os.replace 抛出异常 → 原配置文件内容不变。"""
+        # 先写入一个已知值
+        cfg.set_config("holdings_dir", "/original/path")
+        original_content = open(cfg._CONFIG_FILE, encoding="utf-8").read()
+
+        # 模拟 os.replace 崩溃
+        with patch("src.python.config.os.replace", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                cfg.set_config("holdings_dir", "/new/path")
+
+        # 文件内容应保持原样
+        with open(cfg._CONFIG_FILE, encoding="utf-8") as f:
+            self.assertEqual(f.read(), original_content)
+
+    def test_replace_crash_tmp_file_cleaned(self):
+        """os.replace 崩溃后临时文件被清理。"""
+        cfg.set_config("holdings_dir", "/original")
+        config_dir = os.path.dirname(cfg._CONFIG_FILE)
+        tmp_files_before = [f for f in os.listdir(config_dir) if f.endswith(".tmp")]
+
+        with patch("src.python.config.os.replace", side_effect=OSError("crash")):
+            try:
+                cfg.set_config("holdings_dir", "/new")
+            except OSError:
+                pass
+
+        tmp_files_after = [f for f in os.listdir(config_dir) if f.endswith(".tmp")]
+        self.assertEqual(len(tmp_files_after), len(tmp_files_before))
+
+    def test_crash_before_replace_config_intact(self):
+        """模拟写入过程中途崩溃（异常抛出前）/ 配置文件可读。"""
+        cfg.set_config("output_dir", "/reports/original")
+
+        def _crash_before_replace(tmp_path, final_path):
+            # 模拟写入 tmp 成功后、replace 前崩溃
+            raise RuntimeError("power failure")
+
+        with patch("src.python.config.os.replace", side_effect=_crash_before_replace):
+            with self.assertRaises(RuntimeError):
+                cfg.set_config("output_dir", "/reports/crashed")
+
+        # 直接读取文件内容验证（内存缓存可能已被 crash 污染）
+        with open(cfg._CONFIG_FILE, encoding="utf-8") as f:
+            payload = json.load(f)
+        self.assertEqual(payload.get("output_dir"), "/reports/original")
+
+    def test_simulate_power_failure_then_recovery(self):
+        """模拟断电后重启：遗留临时文件不影响正常读取。"""
+        cfg.set_config("holdings_dir", "/before/crash")
+
+        # 模拟断电：手动创建临时文件但不执行 replace
+        config_dir = os.path.dirname(cfg._CONFIG_FILE)
+        fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump({"holdings_dir": "/crash/data"}, f)
+
+        # 模拟重启后 get_config → 应返回旧配置（临时文件被忽略）
+        result = cfg.get_config()
+        self.assertEqual(result.get("holdings_dir"), "/before/crash")
+
+    def test_partial_write_after_crash_old_file_readable(self):
+        """模拟 os.replace 前崩溃导致 tempfile 残留，旧配置仍可用。"""
+        cfg.set_config("holdings_dir", "/safe/value")
+
+        # 模拟磁盘写中途崩溃
+        original_replace = os.replace
+        call_count = [0]
+
+        def _crash_mid_write(tmp_path, final_path):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                # 第一次调用：写入临时文件后崩溃
+                raise OSError("disk full")
+            # 后续调用正常
+            return original_replace(tmp_path, final_path)
+
+        # 多次 set_config 即使部分失败也不影响整体
+        with patch("src.python.config.os.replace", side_effect=_crash_mid_write):
+            with self.assertRaises(OSError):
+                cfg.set_config("holdings_dir", "/unsafe")
+
+        # 旧值依然可用（直接读文件避免内存缓存污染）
+        with open(cfg._CONFIG_FILE, encoding="utf-8") as f:
+            payload = json.load(f)
+        self.assertEqual(payload.get("holdings_dir"), "/safe/value")

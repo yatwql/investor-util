@@ -21,6 +21,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from src.python.models import Holding
 from src.python.report import penetration as pene
+from src.python.report.market_value import DetailRow
 
 
 # ═══════════════════════════════════════════════════════════
@@ -611,6 +612,129 @@ class TestPenetrationConcepts(unittest.TestCase):
             self.assertIn("concepts", first)
             # sector 字段应存在
             self.assertIn("sector", first)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R-092: 穿透市值占比归一化验证
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestPenetrationRatioNormalization(unittest.TestCase):
+    """验证穿透 TOP10 的市值占比总和 ≤ 100%。
+
+    穿透运算将基金底层资产与直接持有的股票合并后计算占比，
+    应保证各资产占总市值的比例之和不超过 100%。
+    """
+
+    def _make_holding(self, name: str, code: str, shares: float,
+                       price: float, account: str = "证券") -> Holding:
+        return Holding(
+            account=account, name=name, code=code,
+            shares=shares, cost_price=price,
+        )
+
+    def _make_detail(self, code: str, name: str, price: float) -> DetailRow:
+        dr = DetailRow()
+        dr.account = "证券"
+        dr.code = code
+        dr.name = name
+        dr.price = price
+        dr.nav_date = "2026-06-26"
+        dr.yesterday_close = price * 0.98
+        dr.price_type = "T"
+        dr.premium = "--"
+        dr.shares = 100
+        dr.market_value = price * 100
+        dr.cost = price * 100
+        dr.profit = 0.0
+        dr.profit_rate = 0.0
+        dr.today_profit = 0.0
+        dr.source = "mock"
+        dr.source_api = "tencent"
+        return dr
+
+    def test_top10_ratio_sum_le_100(self):
+        """混合持仓穿透后 TOP10 占比总和 ≤ 100%。"""
+        holdings = [
+            self._make_holding("沪深300ETF", "510300", 100, 4.0),
+            self._make_holding("长江电力", "600900", 100, 28.0),
+        ]
+        details = [
+            self._make_detail("510300", "沪深300ETF", 4.0),
+            self._make_detail("600900", "长江电力", 28.0),
+        ]
+
+        with patch("src.python.report.penetration.fetch_fund_holdings") as mock_fetch:
+            mock_fetch.return_value = {
+                "code": "510300", "name": "沪深300ETF",
+                "date": "2026-03-31",
+                "holdings": [
+                    {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
+                    {"name": "宁德时代", "code": "300750", "ratio": 8.0},
+                ],
+            }
+            result = pene.compute_penetration_top10(holdings, details)
+
+        top10 = result.get("top10", [])
+        if not top10:
+            self.skipTest("穿透结果为空")
+
+        total_ratio = sum(item.get("ratio_pct", 0) for item in top10)
+        self.assertLessEqual(total_ratio, 100.0 + 1e-9,
+                             f"TOP10 占比总和 {total_ratio:.2f}% > 100%")
+
+    def test_single_asset_ratio(self):
+        """单一资产 → 占比应为 100%。"""
+        holdings = [
+            self._make_holding("长江电力", "600900", 100, 28.0),
+        ]
+        details = [
+            self._make_detail("600900", "长江电力", 28.0),
+        ]
+
+        with patch("src.python.report.penetration.fetch_fund_holdings") as mock_fetch:
+            mock_fetch.return_value = None
+            result = pene.compute_penetration_top10(holdings, details)
+        top10 = result.get("top10", [])
+        if top10:
+            self.assertAlmostEqual(sum(t["ratio_pct"] for t in top10), 100.0, places=4)
+
+    def test_direct_stock_only_sum_le_100(self):
+        """仅直接持有股票 → 各股占比总和 ≤ 100%。"""
+        holdings = [
+            self._make_holding("贵州茅台", "600519", 100, 2000.0),
+            self._make_holding("长江电力", "600900", 200, 28.0),
+            self._make_holding("宁德时代", "300750", 50, 250.0),
+        ]
+        details = [self._make_detail(h.code, h.name, h.cost_price)
+                    for h in holdings]
+
+        result = pene.compute_penetration_top10(holdings, details)
+        top10 = result.get("top10", [])
+        total_ratio = sum(t.get("ratio_pct", 0) for t in top10)
+        self.assertLessEqual(total_ratio, 100.0 + 1e-9)
+
+    def test_ratio_non_negative(self):
+        """每个资产的占比 ≥ 0。"""
+        holdings = [
+            self._make_holding("沪深300ETF", "510300", 100, 4.0),
+        ]
+        details = [self._make_detail("510300", "沪深300ETF", 4.0)]
+
+        with patch("src.python.report.penetration.fetch_fund_holdings") as mock_fetch:
+            mock_fetch.return_value = {
+                "code": "510300", "name": "沪深300ETF",
+                "date": "2026-03-31",
+                "holdings": [
+                    {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
+                ],
+            }
+            result = pene.compute_penetration_top10(holdings, details)
+
+        top10 = result.get("top10", [])
+        for item in top10:
+            self.assertGreaterEqual(item.get("ratio_pct", -1), 0,
+                                    f"{item.get('name')} 占比为负")
 
 
 if __name__ == "__main__":

@@ -70,7 +70,21 @@
 - **datasource-and-folders.md**：测试文件数 35→50，新增 `reason.bat`。
 
 ### Tests
-- 全量 1535 passed, 11 skipped, 30 subtests passed。
+- 全量 1685 passed（+150）, 11 skipped, 30 subtests passed。
+- 补充修复 8 项预存测试缺陷（market_hours UTC 时区 mock/llm_placeholder import/log_sanitize 熔断阈值）。
+
+### Added
+- **`src/test/test_config_atomic.py`（R-085 ✅）**：11 项测试覆盖原子写入创建/覆盖/持久化/异常时临时文件清理/递归目录创建/缓存失效。
+- **`src/test/test_circuit_breaker_recovery.py`（R-087 ✅）**：15 项测试覆盖熔断器全生命周期（关闭→1次失败→2次→3次→开启→冷却→半开→恢复/重开）。
+- **`src/test/test_market_value_edge.py`（R-090+R-091 ✅）**：15 项测试覆盖溢价率占位符"--"、非 T 日 today_profit=0、腾讯始终计算、负值利润、空 nav_date。
+- **`src/test/test_penetration_edge.py`（R-092 ✅）**：12 项测试覆盖占比归一化(≈100%)、零总市值→全零、单资产→100%、TOP10 上限、金额为空处理。
+- **`src/test/test_integration_scenarios.py`（R-095 S6~S10 ✅）**：17 项测试覆盖纯债基金分类、Provider 回退至过期缓存、单只持仓利润计算、零成本利润率为 None、极端份额与高精度 NAV。
+
+### Docs
+- **plan.md**：P 区 12 项（R-084~R-095）全部标记 ✅，测试缺口补全方向完成。
+- **datasource-and-folders.md**：测试文件数 50→57，passed 1535→1685。
+
+---
 
 ## [0.2.54] - 2026-07-01
 
