@@ -45,8 +45,10 @@ def _add_prefix(code: str) -> str:
         return code
     if code.startswith(("5", "6")):
         return f"sh{code}"
-    if code.startswith(("0", "1", "3")):
+    if code.startswith(("0", "1", "2", "3", "9")):
         return f"sz{code}"
+    if code.startswith(("4", "8")):
+        return f"bj{code}"
     return code
 
 

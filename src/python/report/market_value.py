@@ -400,7 +400,7 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     cost = round(h.cost_price * h.shares, 2)
     mv = round(price * h.shares, 2)
     profit = round(mv - cost, 2)
-    profit_rate = profit / cost if cost > 0 else 0.0
+    profit_rate = profit / cost if cost > 0 else None
 
     # 本日盈亏
     if source_api == "tencent":

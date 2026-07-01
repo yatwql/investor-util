@@ -127,7 +127,7 @@ def _parse_holdings_rows(table_html: str) -> list[dict[str, Any]]:
 def _extract_fund_meta(html: str) -> tuple[str, str]:
     """从基金主页 HTML 提取基金名称和报告日期。"""
     fund_name = ""
-    title_match = re.search(r"<title>(.*?)\(|（", html)
+    title_match = re.search(r"<title>(.*?)[\(（]", html)
     if title_match:
         fund_name = title_match.group(1).strip()
     report_date = ""

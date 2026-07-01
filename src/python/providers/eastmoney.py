@@ -150,7 +150,7 @@ def _fallback_fundf10(code: str) -> dict[str, Any] | None:
         "nav": nav,
         "acc_nav": 0.0,
         "nav_date": nav_date,
-        "yesterday_nav": 0.0,  # 备用链路不提供前日净值, 置零避免 today_profit=0 误判
+        "yesterday_nav": nav,  # 备用链路无前日净值，使用 nav 确保 today_profit=0
         "source": "天天基金(备用链路)",
     }
 

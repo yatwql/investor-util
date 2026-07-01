@@ -84,9 +84,9 @@ def _render_menu(sel: int) -> None:
 def _show_config() -> None:
     """显示当前配置及 LLM 配置状态。"""
     config = _config_cache if _config_cache is not None else _refresh_config()
-    holdings_path = os.path.join(config["holdings_dir"], config["holdings_filename"])
-    print(f"  持仓目录: {config['holdings_dir']}")
-    print(f"  持仓文件: {config['holdings_filename']}")
+    holdings_path = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))
+    print(f"  持仓目录: {config.get('holdings_dir', '未设置')}")
+    print(f"  持仓文件: {config.get('holdings_filename', '未设置')}")
     print(f"  输出目录: {config.get('output_dir', 'reports')}")
     print(f"  新闻 TOP: {config.get('news_top_count', '100')} 条")
     if os.path.exists(holdings_path):
@@ -108,7 +108,7 @@ def _show_llm_config_status() -> None:
         provider = llm_config["provider"]
         model = llm_config.get("model") or "默认"
         endpoint = llm_config.get("endpoint") or "默认"
-        ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" else endpoint
+        ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
         print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
         from src.python.registry import get_llm_module_names
         _route_parts = []

@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from typing import Any
 
@@ -33,6 +34,7 @@ except ImportError:
 # ── 进程级内存 TTL 缓存（位于文件缓存之上） ──
 _MEMO_CACHE: dict[str, tuple[Any, float]] = {}
 _MEMO_LOCK = _threading.Lock()
+_MEMO_MAX = 100
 _MEMO_TTL: dict[str, float] = {
     "profit_forecast": 300,   # 5 min — 指纹驱动，短期 memo 足够
     "sector_flow": 60,        # 1 min — 行业资金流向变化快
@@ -53,11 +55,17 @@ def _memo_get(key: str) -> Any:
             ttl = _MEMO_TTL.get(prefix, 60)
             if age < ttl:
                 return entry[0]
+            # 过期条目延迟删除
+            del _MEMO_CACHE[key]
     return None
 
 
 def _memo_set(key: str, value: Any) -> None:
     with _MEMO_LOCK:
+        # LRU 淘汰：超过 _MEMO_MAX 条时删除最旧条目
+        if len(_MEMO_CACHE) >= _MEMO_MAX and key not in _MEMO_CACHE:
+            oldest_key = min(_MEMO_CACHE, key=lambda k: _MEMO_CACHE[k][1])
+            del _MEMO_CACHE[oldest_key]
         _MEMO_CACHE[key] = (value, _time.time())
 
 
@@ -120,7 +128,8 @@ def _cache_key(prefix: str, fingerprint: str) -> str:
 
 def _run_with_timeout(fn, timeout: float = _TIMEOUT):
     """在线程中执行函数，超时或异常时返回 None。"""
-    with ThreadPoolExecutor(max_workers=1) as pool:
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
         fut = pool.submit(fn)
         try:
             return fut.result(timeout=timeout)
@@ -132,6 +141,8 @@ def _run_with_timeout(fn, timeout: float = _TIMEOUT):
             logger.warning("akshare 调用异常: %s", e)
             fut.cancel()
             return None
+    finally:
+        pool.shutdown(wait=False)
 
 
 def get_profit_forecast() -> dict[str, dict]:
@@ -362,7 +373,13 @@ def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
     with ThreadPoolExecutor(max_workers=5) as pool:
         fut_map = {pool.submit(_fetch_one, code): code for code in a_codes}
         for future in as_completed(fut_map):
-            code, summary = future.result()
+            try:
+                code, summary = future.result(timeout=30)
+            except TimeoutError:
+                code = fut_map[future]
+                logger.warning("分红API超时: %s", code)
+                failed += 1
+                continue
             if summary:
                 result[code] = summary
             else:
@@ -432,6 +449,8 @@ def _safe_float(val: Any) -> float | None:
         return None
     try:
         v = float(val)
+        if isinstance(v, float) and math.isnan(v):
+            return None
         return v
     except (ValueError, TypeError):
         return None

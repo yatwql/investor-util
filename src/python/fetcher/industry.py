@@ -88,7 +88,11 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 5) -> dict[st
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(_fetch_one, code): code for code in valid_codes}
         for future in as_completed(futures):
-            res = future.result()
+            try:
+                res = future.result()
+            except Exception as exc:
+                logger.warning("批量行业数据获取异常: %s", exc)
+                continue
             if res is not None:
                 code, data = res
                 with lock:

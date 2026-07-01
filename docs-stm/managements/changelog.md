@@ -72,6 +72,36 @@
 ### Tests
 - 全量 1535 passed, 11 skipped, 30 subtests passed。
 
+## [0.2.54] - 2026-07-01
+
+### Fixed
+- **P0 CRASH × 6**：
+  - **R-116** `tui_menu.py` `config["holdings_dir"]` 裸键访问 → `.get()` 安全读取（配置异常时菜单入口崩溃）
+  - **R-117** `tui_menu.py` `endpoint.split("/")[2]` → 安全解析（短端点格式时配置显示崩溃）
+  - **R-114** `tui.py` Linux 非 TTY 下 `termios.tcgetattr` 崩溃 → 加 `isatty()` 保护
+  - **R-130** `tui.py` Windows `msvcrt.getch()` 方向键二次读取时 `KeyboardInterrupt` 保护
+  - **R-119** `fetcher/industry.py` `future.result()` 无异常防护 → 加 `try/except` 批量继续
+  - **R-113** `providers/tiantian.py` 全宽括号正则 `group(1)` 为 `None` → 合并为 `[\(（]` 字符集
+- **P0 HANG × 1**：
+  - **R-115** `tui.py` Linux ESC 序列 `read(2)` 永久阻塞 → 逐字节 `select.select` 超时读取
+- **P1 WRONG DATA × 5**：
+  - **R-120** `providers/tencent.py` `_add_prefix()` 缺失 2/4/8/9 前缀 → 补 sz/bj 映射
+  - **R-122** `providers/akshare_extras.py` `_run_with_timeout` 未实际超时 → `shutdown(wait=False)`
+  - **R-124** `providers/akshare_extras.py` NaN 穿透写入非法 JSON → `math.isnan` 返回 `None`
+  - **R-123** `providers/akshare_extras.py` 分红 API `future.result()` 无超时 → 加 30s timeout
+  - **R-121** `providers/sina.py` 硬编码 `var hq_str_` 无格式校验 → 加 `startswith` 告警
+- **P1 场景问题 × 3**：
+  - **R-101** `providers/eastmoney.py` 备用链路 `yesterday_nav=0` → today_profit 虚高修复
+  - **R-103** `report/market_value.py` 零成本 `profit_rate=0%` → 改为 `None`
+  - **R-125** `providers/akshare_extras.py` `_MEMO_CACHE` 无界 → LRU 淘汰（上限 100）
+
+### Changed
+- **review-findings.md**：R-085~R-130 全部完成，待办区清空，原文归档已记录。
+- **testplan.md / plan.md**：测试缺口覆盖对应修复，同步标注完成。
+
+### Tests
+- 全量 1535 passed, 11 skipped, 30 subtests passed。
+
 ## [0.2.51] - 2026-07-01
 
 ### Added

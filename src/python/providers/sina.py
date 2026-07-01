@@ -116,6 +116,9 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
     results: dict[str, dict[str, Any]] = {}
     lines = text.strip().split("\n")
     for line in lines:
+        if not line.startswith("var hq_str_"):
+            logger.warning("Sina 格式异常: %s", line[:60])
+            continue
         if "=" not in line:
             continue
         var_part = line.split("=", 1)[0]
