@@ -295,21 +295,22 @@ class TestBuildReviewPrompt(unittest.TestCase):
         ]
         r = _build_expert_review_prompt(150000, 120000, 30000, 1500, 2, {},
                                  holdings_details=details)
-        self.assertIn("今+1.20%", r)
+        # compact 模式省略今日涨跌幅，保留净值日期
+        self.assertNotIn("今+1.20%", r)
         self.assertIn("净值:2026-06-26", r)
 
     def test_nav_date_empty_fallback(self) -> None:
-        """nav_date/source_api 缺失时仍显示今涨跌幅（向后兼容）。"""
+        """compact 模式下场内品种无今日涨跌幅（减少 token）。"""
         details = [
             {"code": "600900", "market_value": 100000, "cost": 80000,
              "profit": 20000, "profit_rate": 25.0, "change_pct": 1.2},
         ]
         r = _build_expert_review_prompt(100000, 80000, 20000, 1200, 1, {},
                                  holdings_details=details)
-        self.assertIn("今+1.20%", r)
+        self.assertNotIn("今+1.20%", r)
 
     def test_qdii_label(self) -> None:
-        """QDII 品种标注 (QDII滞后1日)，无论场内/场外。"""
+        """compact 模式下 QDII 品种标注 (QDII滞后1日)，省略今日涨跌幅。"""
         details = [
             {"code": "000041", "name": "华夏全球QDII混合", "market_value": 30000, "cost": 25000,
              "profit": 5000, "profit_rate": 20.0, "change_pct": 0.3,
@@ -321,7 +322,9 @@ class TestBuildReviewPrompt(unittest.TestCase):
         r = _build_expert_review_prompt(50000, 43000, 7000, 200, 2, {},
                                  holdings_details=details)
         self.assertIn("净值:2026-06-26(QDII滞后1日)", r)
-        self.assertIn("今+1.50%(QDII滞后1日)", r)
+        # compact 模式省略今日涨跌幅
+        self.assertNotIn("今+1.50%", r)
+        self.assertIn("(QDII滞后1日)", r)
 
     def test_system_expert_constraint_updated(self) -> None:
         """_SYSTEM_EXPERT_REVIEW 包含净值约束和 QDII 说明。"""

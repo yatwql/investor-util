@@ -153,7 +153,7 @@ def _fmt_wan(num: float) -> str:
     return f"{num:,.0f}"
 
 
-def _fmt_holding_line(h: dict, show_cost: bool = False) -> str:
+def _fmt_holding_line(h: dict, show_cost: bool = False, compact: bool = False) -> str:
     """格式化单条持仓明细行，含净值日期 / QDII 标注。
 
     Args:
@@ -182,6 +182,8 @@ def _fmt_holding_line(h: dict, show_cost: bool = False) -> str:
     if source_api != "tencent" and nav_date:
         return f"{base} 净值:{nav_date}{qdii_suffix}"
     chg = h.get("change_pct", 0)
+    if compact:
+        return f"{base}{qdii_suffix}"
     return f"{base} 今{chg:+.2f}%{qdii_suffix}"
 
 
@@ -254,6 +256,48 @@ def _build_global_macro_prompt(
     )
 
 
+def _format_holdings_block(holdings_details: list[dict] | None, show_cost: bool = False, compact: bool = False, limit: int = 30) -> str:
+    """将持仓明细格式化为紧凑文本块（共享函数，消除 3 模块重复循环）。
+
+    Args:
+        holdings_details: 持仓明细列表
+        show_cost: 是否显示成本
+        compact: 是否省略今日涨跌幅（减少 token + 缓存更稳定）
+        limit: 最大行数
+
+    Returns:
+        格式化的持仓明细文本块
+    """
+    if not holdings_details:
+        return ""
+    lines = []
+    for h in holdings_details[:limit]:
+        lines.append(_fmt_holding_line(h, show_cost=show_cost, compact=compact))
+    return "\n".join(lines)
+
+
+def _format_penetration_block(penetrated_assets: list[dict] | None, limit: int = 10) -> str:
+    """将穿透 TOP10 格式化为紧凑文本块（共享函数）。
+
+    Args:
+        penetrated_assets: 穿透资产列表
+        limit: 最大条目数
+
+    Returns:
+        格式化的穿透文本块
+    """
+    if not penetrated_assets:
+        return ""
+    assets = []
+    for asset in penetrated_assets[:limit]:
+        name = asset.get("name", "")
+        codes = ",".join(asset.get("codes", []))
+        mv = asset.get("mv", 0)
+        sector = asset.get("sector", "--")
+        assets.append(f"{name}({codes}){_fmt_wan(mv)}/{sector}")
+    return " | 穿透:" + " ".join(assets)
+
+
 def _build_expert_review_prompt(
     total_mv: float,
     total_cost: float,
@@ -272,25 +316,8 @@ def _build_expert_review_prompt(
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
-    # 持仓明细清单（防止 LLM 虚构代码）—— 用中文单位压缩 token
-    holdings_text = ""
-    if holdings_details:
-        lines = []
-        for h in holdings_details[:30]:
-            lines.append(_fmt_holding_line(h))
-        holdings_text = "\n".join(lines)
-
-    # 穿透 TOP10（辅助参考）
-    pen_text = ""
-    if penetrated_assets:
-        assets = []
-        for asset in penetrated_assets[:10]:
-            name = asset.get("name", "")
-            codes = ",".join(asset.get("codes", []))
-            mv = asset.get("mv", 0)
-            sector = asset.get("sector", "--")
-            assets.append(f"{name}({codes}){_fmt_wan(mv)}/{sector}")
-        pen_text = " | 穿透:" + " ".join(assets)
+    holdings_text = _format_holdings_block(holdings_details, compact=True)
+    pen_text = _format_penetration_block(penetrated_assets)
 
     return (
         f"【当前时间】{now_bj}（北京时间）\n"
@@ -325,25 +352,8 @@ def _build_health_check_prompt(
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
-    # 持仓明细
-    holdings_text = ""
-    if holdings_details:
-        lines = []
-        for h in holdings_details[:30]:
-            lines.append(_fmt_holding_line(h, show_cost=True))
-        holdings_text = "\n".join(lines)
-
-    # 穿透 TOP10
-    pen_text = ""
-    if penetrated_assets:
-        assets = []
-        for asset in penetrated_assets[:10]:
-            name = asset.get("name", "")
-            codes = ",".join(asset.get("codes", []))
-            mv = asset.get("mv", 0)
-            sector = asset.get("sector", "--")
-            assets.append(f"{name}({codes}){_fmt_wan(mv)}/{sector}")
-        pen_text = " | 穿透:" + " ".join(assets)
+    holdings_text = _format_holdings_block(holdings_details, show_cost=True)
+    pen_text = _format_penetration_block(penetrated_assets)
 
     return (
         f"【当前时间】{now_bj}（北京时间）\n"
@@ -396,19 +406,7 @@ def _build_penetration_deep_prompt(
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
-    # 持仓明细
-    holdings_text = ""
-    if holdings_details:
-        lines = []
-        for h in holdings_details[:30]:
-            code = h.get("code", "")
-            mv = h.get("market_value", 0)
-            profit = h.get("profit", 0)
-            cost = h.get("cost", 0)
-            lines.append(
-                f"{code} 成本{_fmt_wan(cost)} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}"
-            )
-        holdings_text = "\n".join(lines)
+    holdings_text = _format_holdings_block(holdings_details)
 
     # 穿透 TOP10 明细（包含行业/板块）
     pen_list = ""
