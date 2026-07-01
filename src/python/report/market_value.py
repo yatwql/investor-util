@@ -13,6 +13,7 @@ from typing import Any
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python import cache
+from src.python.market_hours import is_market_open as _mh_is_market_open, is_midday_break as _mh_is_midday_break
 from src.python.registry import get_report_sheet_name
 from src.python.fetcher.price import fetch_market_data
 from src.python.models import Holding
@@ -152,42 +153,17 @@ def price_update_status(details: list[DetailRow], trading_day: str) -> tuple[int
     return updated, total, updated >= total
 
 
+# ── A 股交易时段判断（委派 market_hours 实现） ──────────
+
+
 def is_market_open() -> bool:
-    """检查当前是否为 A 股交易时间。
-
-    A 股交易时间：周一至周五 9:30-11:30, 13:00-15:00
-    周末及非交易时段返回 False（即取价方式应为"收盘价"）。
-
-    Returns:
-        True 表示正处交易时段，False 表示已收市或休市
-    """
-    now = datetime.now()
-    # 周末不开市
-    if now.weekday() >= 5:  # 5=Saturday, 6=Sunday
-        return False
-    hour = now.hour
-    minute = now.minute
-    time_decimal = hour + minute / 60.0
-    # 9:30-11:30 或 13:00-15:00
-    return (9.5 <= time_decimal <= 11.5) or (13.0 <= time_decimal <= 15.0)
+    """委派 market_hours.is_market_open（含 config/API/fallback 三层判断）。"""
+    return _mh_is_market_open()
 
 
 def is_midday_break() -> bool:
-    """检查当前是否为 A 股午间休市时段（11:30-13:00）。
-
-    午间休市时最新价格来自上午收盘，既非实时价也非全日收盘价。
-    用于取价方式标识，区分"午市收盘"和"收盘价"。
-
-    Returns:
-        True 表示正处于午间休市时段（11:30-13:00 之间）
-    """
-    now = datetime.now()
-    if now.weekday() >= 5:
-        return False
-    hour = now.hour
-    minute = now.minute
-    time_decimal = hour + minute / 60.0
-    return 11.5 < time_decimal < 13.0
+    """委派 market_hours.is_midday_break。"""
+    return _mh_is_midday_break()
 
 
 # ── 交易日历（节假日感知） ───────────────────────────────

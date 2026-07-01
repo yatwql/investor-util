@@ -388,67 +388,67 @@ class TestPriceUpdateStatus(unittest.TestCase):
 class TestIsMarketOpen(unittest.TestCase):
     """测试 is_market_open A 股交易时段判断（mock datetime.now）。"""
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_weekend_saturday(self, mock_dt):
         """周六 → False。"""
         mock_dt.now.return_value = datetime(2026, 6, 27, 10, 0, 0)  # Saturday
         self.assertFalse(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_weekend_sunday(self, mock_dt):
         """周日 → False。"""
         mock_dt.now.return_value = datetime(2026, 6, 28, 10, 0, 0)  # Sunday
         self.assertFalse(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_before_open(self, mock_dt):
         """周一 9:00（开盘前）→ False。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 9, 0, 0)  # Mon
         self.assertFalse(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_morning_session(self, mock_dt):
         """周一 10:00（上午交易时段）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 10, 0, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_morning_open_boundary(self, mock_dt):
         """周一 9:30（开盘边界）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 9, 30, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_morning_close_boundary(self, mock_dt):
         """周一 11:30（午休边界）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 11, 30, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_lunch_break(self, mock_dt):
         """周一 12:00（午休）→ False。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 12, 0, 0)
         self.assertFalse(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_afternoon_session(self, mock_dt):
         """周一 14:00（下午交易时段）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 14, 0, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_afternoon_open_boundary(self, mock_dt):
         """周一 13:00（下午开盘边界）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 13, 0, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_afternoon_close_boundary(self, mock_dt):
         """周一 15:00（收盘边界）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 15, 0, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.market_hours.datetime")
     def test_after_close(self, mock_dt):
         """周一 15:30（收盘后）→ False。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 15, 30, 0)

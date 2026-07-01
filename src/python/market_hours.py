@@ -163,6 +163,22 @@ def _is_market_open_fallback(current_min: int) -> bool:
     return in_morning or in_afternoon
 
 
+def is_midday_break() -> bool:
+    """检查当前是否为 A 股午间休市时段（11:30-13:00，北京时间）。
+
+    午间休市时最新价格来自上午收盘，既非实时价也非全日收盘价。
+    用于取价方式标识，区分"午市收盘"和"收盘价"。
+
+    Returns:
+        True 表示正处于午间休市时段（11:30-13:00 之间）
+    """
+    now = datetime.now(timezone(timedelta(hours=8)))
+    if now.weekday() >= 5:
+        return False
+    current_min = now.hour * 60 + now.minute
+    return _MORNING_END < current_min < _AFTERNOON_START
+
+
 def is_market_open() -> bool:
     """多渠道判断 A 股市场当前是否在交易时段。
 
