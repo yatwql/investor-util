@@ -8,6 +8,16 @@ from typing import Any
 
 import httpx
 
+# ── HTTP 客户端配置 ──────────────────────────────────────────
+# 各工作线程共享同一组连接参数，通过 HTTP/2 + keepalive 减少连接建立开销
+_LLM_CLIENT_SETTINGS = {
+    "http2": True,                               # HTTP/2 多路复用
+    "limits": httpx.Limits(
+        max_connections=20,                      # 总连接池上限
+        max_keepalive_connections=10,            # 空闲保持连接数
+    ),
+}
+
 from src.python.cache import get as cache_get
 from src.python.config import get_llm_config
 from src.python.llm.api import (
@@ -576,10 +586,10 @@ def _dispatch_llm_workers(
     _label_map: dict[str, str] = get_llm_module_names()
 
     def _make_runner(label: str, fn: callable) -> callable:
-        """创建闭包：持独立 httpx.Client 运行 fn(c, llm_config)。"""
+        """创建闭包：持 httpx.Client（HTTP/2 + 连接池）运行 fn(c, llm_config)。"""
         def _run() -> tuple[str | None, bool]:
             logger.info("正在生成：%s...", _label_map.get(label, label))
-            c = httpx.Client(timeout=_LLM_TIMEOUT)
+            c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)
             try:
                 return fn(c, llm_config)
             finally:
