@@ -217,3 +217,75 @@
 - `src/report/html_writer.py` — a_indices/us_indices dict 修复
 - `src/report/fund_performance.py` — API null 兜底
 - `src/report/summary.py` — dict 类型保留
+
+---
+
+## Iter 4.1 — 测试覆盖补全一期（A）✅ 已完成（v0.2.46 / v0.2.48 / v0.2.49）
+
+- **R-015 ✅** `llm/api.py` 44 项、`excel_generator.py` 15 项
+- **R-024 ✅** `test_handlers.py` 23 项
+- **R-031 ✅** `test_tiantian.py` 39 项
+- **R-032 ✅** `test_skeleton.py` 9 项
+
+## Iter 4.2 — 大函数拆分一期（A2）✅ 已完成（v0.2.48 / v0.2.49 / v0.2.50）
+
+- **R-020~R-023 ✅** `generate_excel_report`/`generate_all_llm`/`write_llm_usage_sheet`/`compute_penetration_top10`
+- **R-026 ✅** `write_fund_performance_sheet` 164→55 行
+- **R-027 ✅** `write_summary_sheet` 163→43 行
+- **R-028 ✅** `build_news_data` 159→60 行
+- **R-029 ✅** `tiantian.py` 三大函数全部分解
+- **R-030 ✅** `skeleton.py` 两大函数拆分
+- **R-033~R-042 ✅** 全部 8 个大函数（>100行）拆分完成
+
+## Iter 4.3 — 测试覆盖补全二期（A3）✅ 已完成（v0.2.50 / v0.2.51）
+
+- **R-033/R-034 ✅** `http_client.py`（17 项）/ `market_hours.py`（41 项）测试
+- **R-043~R-046 ✅** circuit_breaker/pricing/markdown 已有充分覆盖无需加测
+- **R-044 ✅** `fingerprint.py` 新增 16 项测试
+- **R-047~R-049 ✅** 三大新闻 provider 新增 50 项测试
+
+## Iter 4.4 — 代码治理（A4）✅ 已完成（v0.2.51）
+
+- **R-050 ✅** `llm/__init__.py` 过度导出治理：移除 ~60 个私有符号 re-export
+- **`llm/skeleton.py` 全局 max_tokens 回退清理**：移除旧版配置全局 `max_tokens` 兜底路径
+- **`config.py` 键名兼容去重**：移除 `_LLM_KEY_OVERLAP_KEYS` 跨文件键名互通机制
+
+## Iter 4.5 — 文件拆分 + 配置治理（A5）✅ 已完成（v0.2.51）
+
+- **R-051 ✅** `report/html_writer.py`（792→617 行）：提取 4 个构建函数至 `html_builders.py`
+- **R-052 ✅** `report/penetration.py`（715→530 行）：提取 `write_penetration_sheet` 等 6 个辅助函数至 `penetration_sheet.py`
+- **R-053 ✅** `requirements.txt` 版本锁定：从 `>=` 改为 `==`
+- **R-054 ✅** `config.py:validate_config()` 新增 `early_warning` 配置段校验
+- **R-055 ✅** `news_aggregator.py` 清理 `_FALLBACK_ENABLED` 死路径
+
+## Iter 5.1 — 大函数治理二期（J）✅ 已完成（v0.2.52）
+
+将 15 个 >75 行的函数进一步拆分（单元可测试化）：
+
+| 行数 | 函数 | 位置 |
+|:----:|------|------|
+| 123 | `validate_config` | `config.py` | ✅ 已完成 |
+| 99 | `_compute_sentiment_alerts` | `report/early_warning.py` | ✅ 已完成 |
+| 96 | `_markdown_to_html` | `llm/markdown.py` | ✅ 已完成 |
+| 94 | `_call_llm_with_retry` | `llm/api.py` | ✅ 已完成 |
+| 90 | `_fetch_with_fallback` | `fetcher/chain.py` | ✅ 已完成 |
+| 86 | `build_holding_keywords` | `providers/news_keywords.py` | ✅ 已完成 |
+| 85 | `_call_claude` | `llm/api.py` | ✅ 已完成 |
+| 82 | `fetch_industry_and_concepts` | `providers/eastmoney_industry.py` | ✅ 已完成 |
+| 79 | `write_market_value_sheet` | `report/market_value.py` | ✅ 已完成 |
+| 78 | `_generate_details` | `report/market_value.py` | ✅ 已完成 |
+| 78 | `get_dividend_data` | `providers/akshare_extras.py` | ✅ 已完成 |
+| 78 | `_build_penetration_deep_prompt` | `llm/prompts.py` | ✅ 已完成 |
+| 77 | `_generate_llm_module` | `llm/skeleton.py` | ✅ 已完成 |
+| 77 | `cleanup_expired` | `cache.py` | ✅ 已完成 |
+| 76 | `_render_llm_module_info` | `report/html_writer.py` | ✅ 已完成 |
+
+## Iter 5.2 — 测试覆盖补全三期（K）✅ 已完成（v0.2.52）
+
+- 9 个模块全部新增专用测试文件（R-071~R-079），共 140 项测试，全量 1535 passed / 11 skipped
+
+## Iter 5.3 — 代码现代化（L）✅ 已完成（v0.2.52）
+
+- **旧式 typing 泛型 → 内置泛型**：13 个文件的 `List`/`Dict`/`Optional`/`Tuple` → `list`/`dict`/`X | None`/`tuple`
+- **`.format()` → f-string**：3 处全部转换
+- **pyproject.toml 同步**：版本/依赖精确锁定与 requirements.txt 一致
