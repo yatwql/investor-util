@@ -115,7 +115,7 @@ def _calc_rating_comment(rating: str, perf_eval: dict | None, benchmark: str) ->
     """根据评级 + 超额收益数据 + 业绩基准，生成带具体描述的业绩评价文本。
 
     Args:
-        rating: 最终评级（优秀/良好/稳定/偏差）
+        rating: 最终评级（优秀/良好/稳定/偏差/较差）
         perf_eval: Data_performanceEvaluation 的 JSON 对象，含 categories/data
         benchmark: 业绩比较基准名称
 
@@ -152,7 +152,7 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
       - 无超额收益数据或评分居中 → 保持原评级
 
     Args:
-        peer_rating: 纯同类排名评级（优秀/良好/稳定/偏差）
+        peer_rating: 纯同类排名评级（优秀/良好/稳定/偏差/较差）
         perf_eval: Data_performanceEvaluation 对象，含"超额收益"评分
 
     Returns:
@@ -249,7 +249,7 @@ def _write_one_fund_row(
         profit_forecast: 盈利预测字典
 
     Returns:
-        最终评级（优秀/良好/稳定/偏差），获取失败返回 None
+        最终评级（优秀/良好/稳定/偏差/较差），获取失败返回 None
     """
     perf_data = fetch_fund_rankings(fund.code)
 
