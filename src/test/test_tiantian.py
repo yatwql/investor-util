@@ -12,7 +12,12 @@ from src.python.providers.tiantian import (
     _parse_perf_evaluation,
     _parse_quarterly_holdings,
     _parse_rank_entry,
+    _parse_risk_analysis,
     _parse_syl_returns,
+    _pct_to_rating,
+    _get_rating_thresholds,
+    _RATING_THRESHOLDS,
+    _KNOWN_RATING_TYPES,
 )
 
 
@@ -165,9 +170,9 @@ class TestExtractQuarterlyMeta(unittest.TestCase):
 
 
 class TestParseSylReturns(unittest.TestCase):
-    """_parse_syl_returns — 解析 JS 中的区间收益率变量。"""
+    """_parse_syl_returns — 解析 JS 中的区间收益率变量（P0：长周期 + -- 防御）。"""
 
-    def test_parses_all_periods(self):
+    def test_parses_all_short_periods(self):
         js = """
         var syl_1y = "1.23";
         var syl_3y = "3.45";
@@ -180,6 +185,39 @@ class TestParseSylReturns(unittest.TestCase):
         self.assertAlmostEqual(result["近3月"]["return"], 3.45)
         self.assertAlmostEqual(result["近6月"]["return"], -0.56)
         self.assertAlmostEqual(result["近1年"]["return"], 12.34)
+
+    def test_parses_long_periods(self):
+        """P0 新增：解析 2 年/3 年/5 年长周期收益率。"""
+        js = """
+        var syl_2n = "8.50";
+        var syl_3n = "18.20";
+        var syl_5n = "25.00";
+        """
+        result = _parse_syl_returns(js)
+        self.assertIn("近2年", result)
+        self.assertAlmostEqual(result["近2年"]["return"], 8.50)
+        self.assertIn("近3年", result)
+        self.assertAlmostEqual(result["近3年"]["return"], 18.20)
+        self.assertIn("近5年", result)
+        self.assertAlmostEqual(result["近5年"]["return"], 25.00)
+
+    def test_skips_dash_placeholder(self):
+        """P0 修复：'--' 应跳过而非解析为 0。"""
+        js = 'var syl_1y = "--";'
+        result = _parse_syl_returns(js)
+        self.assertNotIn("近1月", result)
+
+    def test_mixed_dash_and_value(self):
+        """短周期有值、长周期为 -- 时正确混合。"""
+        js = """
+        var syl_1y = "1.23";
+        var syl_2n = "--";
+        var syl_3n = "18.20";
+        """
+        result = _parse_syl_returns(js)
+        self.assertIn("近1月", result)
+        self.assertNotIn("近2年", result)  # -- 跳过
+        self.assertIn("近3年", result)
 
     def test_missing_variables(self):
         js = "var silly = 1.0;"
@@ -223,22 +261,31 @@ class TestParseRankEntry(unittest.TestCase):
 
 
 class TestCalcRatingFromEntry(unittest.TestCase):
-    """_calc_rating_from_entry — 根据排名百分位计算评级。"""
+    """_calc_rating_from_entry — 5 级评级 + 类型差异化阈值（P2）。"""
 
-    def test_excellent(self):
-        self.assertEqual(_calc_rating_from_entry({"percentile": "10.0"}), "优秀")
+    def test_excellent_top_10pct(self):
+        self.assertEqual(_calc_rating_from_entry({"percentile": "5.0"}), "优秀")
 
-    def test_good(self):
-        self.assertEqual(_calc_rating_from_entry({"percentile": "25.0"}), "良好")
+    def test_good_10_to_30pct(self):
+        self.assertEqual(_calc_rating_from_entry({"percentile": "20.0"}), "良好")
 
-    def test_stable(self):
+    def test_stable_30_to_50pct(self):
         self.assertEqual(_calc_rating_from_entry({"percentile": "40.0"}), "稳定")
 
-    def test_poor(self):
+    def test_poor_50_to_75pct(self):
         self.assertEqual(_calc_rating_from_entry({"percentile": "60.0"}), "偏差")
 
-    def test_boundary_20(self):
-        self.assertEqual(_calc_rating_from_entry({"percentile": "20.0"}), "优秀")
+    def test_worst_bottom_25pct(self):
+        """新增 5 级：较差（后 25%）。"""
+        self.assertEqual(_calc_rating_from_entry({"percentile": "80.0"}), "较差")
+
+    def test_boundary_10(self):
+        """10% 为优秀/良好分界线（优秀）。"""
+        self.assertEqual(_calc_rating_from_entry({"percentile": "10.0"}), "优秀")
+
+    def test_boundary_10_exact_11(self):
+        """10% 以上为良好。"""
+        self.assertEqual(_calc_rating_from_entry({"percentile": "10.01"}), "良好")
 
     def test_boundary_30(self):
         self.assertEqual(_calc_rating_from_entry({"percentile": "30.0"}), "良好")
@@ -246,11 +293,15 @@ class TestCalcRatingFromEntry(unittest.TestCase):
     def test_boundary_50(self):
         self.assertEqual(_calc_rating_from_entry({"percentile": "50.0"}), "稳定")
 
+    def test_boundary_75(self):
+        """75% 为稳定/偏差分界线。"""
+        self.assertEqual(_calc_rating_from_entry({"percentile": "75.0"}), "偏差")
+
     def test_fallback_rank_ratio(self):
         self.assertEqual(_calc_rating_from_entry({"rank": "10", "total": "100"}), "优秀")
         self.assertEqual(_calc_rating_from_entry({"rank": "40", "total": "100"}), "稳定")
         self.assertEqual(_calc_rating_from_entry({"rank": "60", "total": "100"}), "偏差")
-        self.assertEqual(_calc_rating_from_entry({"rank": "80", "total": "100"}), "偏差")
+        self.assertEqual(_calc_rating_from_entry({"rank": "80", "total": "100"}), "较差")
 
     def test_empty_entry(self):
         self.assertEqual(_calc_rating_from_entry({}), "")
@@ -263,12 +314,12 @@ class TestCalcRatingFromEntry(unittest.TestCase):
 
     def test_rank_outranks_percentile_when_conflict(self):
         """百分位与排名矛盾时，以排名/总数为准（回归：159222 bug）。"""
-        # 百分位=3.33(top 3.3%)→优秀，但排名=4823/4985(bottom 3.3%)→偏差
+        # 百分位=3.33(top 3.3%)→优秀，但排名=4823/4985(bottom 3.3%)→较差
         self.assertEqual(
             _calc_rating_from_entry({
                 "percentile": "3.33", "rank": "4823", "total": "4985",
             }),
-            "偏差",
+            "较差",
         )
 
     def test_rank_outranks_percentile_good_rank(self):
@@ -284,32 +335,79 @@ class TestCalcRatingFromEntry(unittest.TestCase):
         """百分位和排名一致时，返回一致的评级。"""
         self.assertEqual(
             _calc_rating_from_entry({
-                "percentile": "10.0", "rank": "10", "total": "100",
+                "percentile": "5.0", "rank": "10", "total": "100",
             }),
             "优秀",
         )
 
     def test_no_conflict_both_poor(self):
-        """百分位和排名都差时，返回偏差。"""
+        """百分位和排名都差时，返回较差。"""
         self.assertEqual(
             _calc_rating_from_entry({
                 "percentile": "60.0", "rank": "80", "total": "100",
             }),
-            "偏差",
+            "较差",
         )
 
     def test_percentile_only_fallback(self):
-        """仅有百分位时，以百分位为准。"""
         self.assertEqual(
-            _calc_rating_from_entry({"percentile": "10.0"}),
+            _calc_rating_from_entry({"percentile": "5.0"}),
             "优秀",
         )
 
     def test_rank_only_fallback(self):
-        """仅有排名时，以排名为准。"""
         self.assertEqual(
             _calc_rating_from_entry({"rank": "60", "total": "100"}),
             "偏差",
+        )
+
+    # ── 类型差异化阈值 ──
+
+    def test_bond_looser_threshold(self):
+        """债券型：15%/35%/55%/80%，10% 仍为优秀。"""
+        e = {"percentile": "10.0", "rank": "10", "total": "100"}
+        self.assertEqual(_calc_rating_from_entry(e, "bond"), "优秀")
+
+    def test_bond_14pct_is_excellent(self):
+        """债券型 14% < 15% 优秀阈值。"""
+        self.assertEqual(
+            _calc_rating_from_entry({"rank": "14", "total": "100"}, "bond"),
+            "优秀",
+        )
+
+    def test_bond_16pct_is_good(self):
+        """债券型 16% > 15% 为良好。"""
+        self.assertEqual(
+            _calc_rating_from_entry({"rank": "16", "total": "100"}, "bond"),
+            "良好",
+        )
+
+    def test_qdii_same_as_bond(self):
+        """QDII 与债券型共用宽松阈值。"""
+        self.assertEqual(
+            _calc_rating_from_entry({"rank": "14", "total": "100"}, "qdii"),
+            "优秀",
+        )
+
+    def test_index_stricter_threshold(self):
+        """指数型：10%/25%/45%/70%，25% 为良好。"""
+        self.assertEqual(
+            _calc_rating_from_entry({"rank": "25", "total": "100"}, "index"),
+            "良好",
+        )
+
+    def test_index_26pct_is_stable(self):
+        """指数型 26% > 25% -> 稳定。"""
+        self.assertEqual(
+            _calc_rating_from_entry({"rank": "26", "total": "100"}, "index"),
+            "稳定",
+        )
+
+    def test_default_threshold_unknown_type(self):
+        """未知类型回退到 default。"""
+        self.assertEqual(
+            _calc_rating_from_entry({"rank": "10", "total": "100"}, "unknown_type"),
+            "优秀",
         )
 
 
@@ -330,6 +428,54 @@ class TestParsePerfEvaluation(unittest.TestCase):
     def test_invalid_json_returns_none(self):
         js = 'var Data_performanceEvaluation = {broken};'
         self.assertIsNone(_parse_perf_evaluation(js))
+
+
+class TestParseRiskAnalysis(unittest.TestCase):
+    """_parse_risk_analysis — 解析风险分析数据（P1 新增）。"""
+
+    def test_dict_with_categories_and_data(self):
+        """JSON 对象格式：categories + data 双数组。"""
+        js = 'var Data_riskAnalysis = {"categories": ["年化波动率","最大回撤","夏普比率"],"data": [15.2,-18.5,0.85]};'
+        result = _parse_risk_analysis(js)
+        self.assertIsNotNone(result)
+        self.assertAlmostEqual(result["年化波动率"], 15.2)
+        self.assertAlmostEqual(result["最大回撤"], -18.5)
+        self.assertAlmostEqual(result["夏普比率"], 0.85)
+
+    def test_array_format(self):
+        """数组格式：[["名称", 值], ...]。"""
+        js = 'var Data_riskAnalysis = [["最大回撤", -25.3], ["夏普比率", 1.2], ["年化波动率", 18.5]];'
+        result = _parse_risk_analysis(js)
+        self.assertIsNotNone(result)
+        self.assertAlmostEqual(result["最大回撤"], -25.3)
+        self.assertAlmostEqual(result["夏普比率"], 1.2)
+        self.assertAlmostEqual(result["年化波动率"], 18.5)
+
+    def test_missing_variable(self):
+        """JS 中无 Data_riskAnalysis → None。"""
+        self.assertIsNone(_parse_risk_analysis("var foo = 1;"))
+
+    def test_invalid_json(self):
+        """无效 JSON → None。"""
+        js = 'var Data_riskAnalysis = {broken};'
+        self.assertIsNone(_parse_risk_analysis(js))
+
+    def test_empty_result(self):
+        """空数组 → None（无有效条目）。"""
+        js = "var Data_riskAnalysis = [];"
+        self.assertIsNone(_parse_risk_analysis(js))
+
+    def test_partial_nulls(self):
+        """categories 或 data 为 null → 按格式回退处理。"""
+        js = 'var Data_riskAnalysis = {"categories": null, "data": null};'
+        result = _parse_risk_analysis(js)
+        self.assertIsNone(result)
+
+    def test_mismatched_lengths(self):
+        """categories 与 data 长度不一致 → None（格式1无效，尝试格式2失败）。"""
+        js = 'var Data_riskAnalysis = {"categories": ["a","b"], "data": [1.0]};'
+        result = _parse_risk_analysis(js)
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":

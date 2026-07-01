@@ -51,6 +51,27 @@
 
 ---
 
+## [0.2.55] - 2026-07-01
+
+### Added
+- **P0: `_parse_syl_returns()` 长周期 + `--` 防御**：新增 `syl_2n`/`syl_3n`/`syl_5n` 长周期变量名映射；`--` 占位符跳过而非解析为数值，避免净值数据不足时误显示零收益。新增 4 项测试。
+- **P1: `_parse_risk_analysis()` 风险分析解析**：从 `Data_riskAnalysis` JS 变量解析年化波动率、最大回撤、夏普比率等风险指标。支持 JSON 对象格式（categories+data）和数组格式（`[名称,值]`）。`fetch_fund_rankings()` 返回字典新增 `risk_analysis` 字段。新增 7 项测试。
+- **P2: 5 级评级系统 + 类型差异化阈值**：
+  - **5 级评级**：4 级→5 级（优秀≤10%/良好≤30%/稳定≤50%/偏差≤75%/较差>75%），与 Morningstar/银河证券行业标准对齐。
+  - **`_pct_to_rating()` 独立函数**：百分位→评级纯函数，支持自定义阈值。
+  - **`_RATING_THRESHOLDS` 类型差异化**：`bond`/`qdii` 宽松（15%/35%/55%/80%），`index` 严格（10%/25%/45%/70%），`default` 标准（10%/30%/50%/75%）。
+  - **`fund_type_hint` 参数**：`_calc_rating_from_entry()` 自动选择类型阈值。
+- **`fund_performance.py` 同步 5 级**：`_RATING_ORDER` 扩展为 `["较差","偏差","稳定","良好","优秀"]`；`_RATING_COMMENT` 新增 `"较差"`；`_adjust_rating_with_benchmark` 自动适配。
+
+### Changed
+- **`test_tiantian.py` `TestCalcRatingFromEntry` 重写**：23 项覆盖 5 级边界 + 类型差异化阈值（bond/index/qdii/unknown 回退）；rank_outranks 矛盾回归用例从"偏差"→"较差"（5 级后底部 3.3% 映射正确）。
+
+### Tests
+- 全量 **1711 passed**（+20）, 12 skipped, 31 subtests passed。
+- `test_tiantian.py` 从 39 项扩充至 **65 项**（+26）
+
+---
+
 ## [0.2.53] - 2026-07-01
 
 ### Added
