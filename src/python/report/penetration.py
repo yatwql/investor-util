@@ -587,6 +587,56 @@ def compute_penetration_top10(
 # ═══════════════════════════════════════════════════════════
 
 
+def _load_profit_forecast_safe() -> dict:
+    """加载盈利预测数据，失败时返回空字典。"""
+    try:
+        from src.python.providers.akshare_extras import get_profit_forecast
+        return get_profit_forecast()
+    except Exception:
+        logger.debug("盈利预测加载失败（非关键），EPS 列显示 --")
+        return {}
+
+
+def _load_dividend_data_safe(result: dict) -> dict:
+    """加载分红数据，失败时返回空字典。"""
+    try:
+        from src.python.providers.akshare_extras import get_dividend_data
+        all_top10_codes = list(set().union(*(entry.get("codes", []) for entry in result["top10"])))
+        a_stock_codes = [c for c in all_top10_codes if c.startswith(("6", "0", "3"))]
+        return get_dividend_data(a_stock_codes) if a_stock_codes else {}
+    except Exception:
+        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --")
+        return {}
+
+
+def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
+    """写入穿透页签底部备注和统计信息。返回写入后的行号。"""
+    row += 1
+    if summary["unknown_mv"] > 0:
+        write_data_row(ws, row,
+                       [f"* {summary['total_funds']} 只基金中，有 "
+                        f"{summary['failed_funds']} 只无法获取穿透数据，"
+                        f"合计市值 {summary['unknown_mv']:,.2f} 元未计入穿透 TOP10"],
+                       [])
+        row += 1
+        failed_details = summary.get("failed_fund_details", [])
+        if failed_details:
+            failed_names = "；".join(
+                f"{f['name']}({f['code']})" for f in failed_details
+            )
+            write_data_row(ws, row, [f"  无法获取穿透的基金：{failed_names}"], [])
+            row += 1
+
+    info_line = (
+        f"基金 {summary['total_funds']} 只（{summary['fund_breakdown']}）"
+        f" + 直接持股 {summary['total_stocks']} 只 → "
+        f"穿透合并 {summary['merged_count']} 个标的，"
+        f"TOP10 覆盖 {summary['top10_coverage_pct']:.1f}%"
+    )
+    write_data_row(ws, row, [info_line], [])
+    return row
+
+
 def write_penetration_sheet(
     ws: Worksheet,
     holdings: List[Holding],
@@ -621,24 +671,8 @@ def write_penetration_sheet(
         return
 
     summary = result["summary"]
-
-    # ── 加载盈利预测数据（降级：API 不可用时全列 "--"） ──
-    try:
-        from src.python.providers.akshare_extras import get_profit_forecast
-        profit_forecast = get_profit_forecast()
-    except Exception:
-        logger.debug("盈利预测加载失败（非关键），EPS 列显示 --")
-        profit_forecast = {}
-
-    # ── 加载分红数据（降级：API 不可用时全列 "--"） ──
-    try:
-        from src.python.providers.akshare_extras import get_dividend_data
-        _all_top10_codes = list(set().union(*(entry.get("codes", []) for entry in result["top10"])))
-        _a_stock_codes = [c for c in _all_top10_codes if c.startswith(("6", "0", "3"))]
-        dividend_data = get_dividend_data(_a_stock_codes) if _a_stock_codes else {}
-    except Exception:
-        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --")
-        dividend_data = {}
+    profit_forecast = _load_profit_forecast_safe()
+    dividend_data = _load_dividend_data_safe(result)
 
     for entry in result["top10"]:
         concepts = entry.get("concepts", [])
@@ -661,32 +695,7 @@ def write_penetration_sheet(
         write_data_row(ws, row, vals, _num_formats())
         row += 1
 
-    # 备注 & 统计信息
-    row += 1
-    if summary["unknown_mv"] > 0:
-        write_data_row(ws, row,
-                       [f"* {summary['total_funds']} 只基金中，有 "
-                        f"{summary['failed_funds']} 只无法获取穿透数据，"
-                        f"合计市值 {summary['unknown_mv']:,.2f} 元未计入穿透 TOP10"],
-                       [])
-        row += 1
-        # 列出无法获取穿透的基金明细
-        failed_details = summary.get("failed_fund_details", [])
-        if failed_details:
-            failed_names = "；".join(
-                f"{f['name']}({f['code']})" for f in failed_details
-            )
-            write_data_row(ws, row, [f"  无法获取穿透的基金：{failed_names}"], [])
-            row += 1
-
-    info_line = (
-        f"基金 {summary['total_funds']} 只（{summary['fund_breakdown']}）"
-        f" + 直接持股 {summary['total_stocks']} 只 → "
-        f"穿透合并 {summary['merged_count']} 个标的，"
-        f"TOP10 覆盖 {summary['top10_coverage_pct']:.1f}%"
-    )
-    write_data_row(ws, row, [info_line], [])
-
+    _write_penetration_footer(ws, row, summary)
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=40)
 

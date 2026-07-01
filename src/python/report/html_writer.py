@@ -666,6 +666,75 @@ def _build_category_data(
     return result
 
 
+def _build_single_perf_item(
+    idx: int, fund: Holding, detail_map: dict,
+    prog: ProgressReporter, fund_count: int,
+) -> Dict[str, Any]:
+    """构建单只基金的业绩分析条目。"""
+    logger.info(
+        "获取基金业绩 [%d/%d]: %s (%s)",
+        idx, fund_count, fund.name, fund.code,
+    )
+    prog.info(f"基金业绩 [{idx}/{fund_count}]: {fund.name}")
+
+    d = detail_map.get(fund.code)
+
+    perf_data = fetch_fund_rankings(fund.code)
+    rankings: Dict[str, Any] = {}
+    rating: str = ""
+
+    if perf_data and perf_data.get("rankings"):
+        rankings = perf_data.get("rankings", {})
+        rating = perf_data.get("rating", "")
+    else:
+        logger.warning("基金 %s (%s) 业绩数据获取失败", fund.name, fund.code)
+
+    type_label = _fund_display_type(fund)
+    benchmark = fetch_fund_benchmark(fund.code)
+
+    if d:
+        profit_val = d.profit
+        profit_rate_val = d.profit_rate
+        profit_str = f"{profit_val:+,.2f}"
+        profit_rate_str = f"{profit_rate_val * 100:+.2f}%"
+    else:
+        profit_val = 0.0
+        profit_rate_val = 0.0
+        profit_str = "--"
+        profit_rate_str = "--"
+
+    syl_3m = _format_return(rankings.get("近3月", {}).get("return"))
+    syl_6m = _format_return(rankings.get("近6月", {}).get("return"))
+    syl_1y = _format_return(rankings.get("近1年", {}).get("return"))
+
+    syl_3m_raw = _parse_return_raw(rankings.get("近3月", {}).get("return"))
+    syl_6m_raw = _parse_return_raw(rankings.get("近6月", {}).get("return"))
+    syl_1y_raw = _parse_return_raw(rankings.get("近1年", {}).get("return"))
+
+    rating_comment = _RATING_COMMENT.get(rating, "--")
+    rank_str = _format_rank(rankings.get("同类排名", {}))
+
+    return {
+        "name": fund.name,
+        "code": fund.code,
+        "type_label": type_label,
+        "syl_3m": syl_3m,
+        "syl_6m": syl_6m,
+        "syl_1y": syl_1y,
+        "syl_3m_raw": syl_3m_raw,
+        "syl_6m_raw": syl_6m_raw,
+        "syl_1y_raw": syl_1y_raw,
+        "profit": profit_str,
+        "profit_rate": profit_rate_str,
+        "profit_raw": profit_val,
+        "profit_rate_raw": profit_rate_val,
+        "benchmark": benchmark,
+        "rating": rating_comment,
+        "rating_tag": rating,
+        "rank": rank_str,
+    }
+
+
 def _build_perf_data(
     holdings: List[Holding],
     details: List[DetailRow],
@@ -687,7 +756,6 @@ def _build_perf_data(
     fund_holdings = [h for h in holdings if _is_fund(h)]
     detail_map: Dict[str, DetailRow] = {d.code: d for d in details}
 
-    # 按市值降序
     fund_holdings_sorted = sorted(
         fund_holdings,
         key=lambda h: detail_map.get(h.code, DetailRow()).market_value,
@@ -695,77 +763,8 @@ def _build_perf_data(
     )
 
     result: List[Dict[str, Any]] = []
-    fund_count = len(fund_holdings_sorted)
-
     for idx, fund in enumerate(fund_holdings_sorted, 1):
-        logger.info(
-            "获取基金业绩 [%d/%d]: %s (%s)",
-            idx, fund_count, fund.name, fund.code,
-        )
-        prog.info(f"基金业绩 [{idx}/{fund_count}]: {fund.name}")
-
-        d = detail_map.get(fund.code)
-
-        perf_data = fetch_fund_rankings(fund.code)
-        rankings: Dict[str, Any] = {}
-        rating: str = ""
-
-        if perf_data and perf_data.get("rankings"):
-            rankings = perf_data.get("rankings", {})
-            rating = perf_data.get("rating", "")
-        else:
-            logger.warning("基金 %s (%s) 业绩数据获取失败", fund.name, fund.code)
-
-        type_label = _fund_display_type(fund)
-        benchmark = fetch_fund_benchmark(fund.code)
-
-        # 持仓盈亏
-        if d:
-            profit_val = d.profit
-            profit_rate_val = d.profit_rate
-            profit_str = f"{profit_val:+,.2f}"
-            profit_rate_str = f"{profit_rate_val * 100:+.2f}%"
-        else:
-            profit_val = 0.0
-            profit_rate_val = 0.0
-            profit_str = "--"
-            profit_rate_str = "--"
-
-        # 区间收益（格式化字符串）
-        syl_3m = _format_return(rankings.get("近3月", {}).get("return"))
-        syl_6m = _format_return(rankings.get("近6月", {}).get("return"))
-        syl_1y = _format_return(rankings.get("近1年", {}).get("return"))
-
-        # 解析 raw 数值用于着色（兼容 None / "--"）
-        syl_3m_raw = _parse_return_raw(rankings.get("近3月", {}).get("return"))
-        syl_6m_raw = _parse_return_raw(rankings.get("近6月", {}).get("return"))
-        syl_1y_raw = _parse_return_raw(rankings.get("近1年", {}).get("return"))
-
-        # 业绩评价
-        rating_comment = _RATING_COMMENT.get(rating, "--")
-
-        # 同类排名
-        rank_str = _format_rank(rankings.get("同类排名", {}))
-
-        result.append({
-            "name": fund.name,
-            "code": fund.code,
-            "type_label": type_label,
-            "syl_3m": syl_3m,
-            "syl_6m": syl_6m,
-            "syl_1y": syl_1y,
-            "syl_3m_raw": syl_3m_raw,
-            "syl_6m_raw": syl_6m_raw,
-            "syl_1y_raw": syl_1y_raw,
-            "profit": profit_str,
-            "profit_rate": profit_rate_str,
-            "profit_raw": profit_val,
-            "profit_rate_raw": profit_rate_val,
-            "benchmark": benchmark,
-            "rating": rating_comment,
-            "rating_tag": rating,
-            "rank": rank_str,
-        })
+        result.append(_build_single_perf_item(idx, fund, detail_map, prog, len(fund_holdings_sorted)))
 
     if result:
         logger.info("基金业绩分析完成，%d 只基金获取成功", len(result))

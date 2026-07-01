@@ -104,6 +104,58 @@ def _categorize_holding(h: Holding) -> Tuple[str, str]:
     return ("基金", "混合")
 
 
+def _load_dividend_data(holdings: List[Holding]) -> dict:
+    """加载分红数据（非关键，失败时返回空字典）。"""
+    try:
+        from src.python.providers.akshare_extras import get_dividend_data
+        stock_codes = [h.code for h in holdings if h.code.strip().startswith(("6", "0", "3"))]
+        return get_dividend_data(stock_codes) if stock_codes else {}
+    except Exception:
+        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --")
+        return {}
+
+
+def _yield_text(code: str, d, dividend_data: dict) -> str:
+    """计算单条持仓的年均股息率文本。"""
+    info = dividend_data.get(code)
+    if not info:
+        return "--"
+    avg_div = info.get("avg_dividend")
+    if avg_div is None:
+        return "--"
+    price = d.price if d and d.price > 0 else 0.0
+    if price <= 0:
+        return "--"
+    return f"{avg_div / price * 100:.2f}%"
+
+
+def _write_category_group(
+    ws: Worksheet, row: int, group: List[Holding], prop: str, sub: str,
+    detail_map: dict, dividend_data: dict,
+) -> tuple[int, float, float, float, float]:
+    """写入一个分类分组的明细行和小计，返回 (next_row, mv, cost, profit, today)。"""
+    for h in group:
+        d = detail_map.get(h.code)
+        if d:
+            vals = [prop, sub, h.name, h.code,
+                    d.market_value, d.cost, d.profit, d.profit_rate,
+                    d.today_profit, _yield_text(h.code, d, dividend_data)]
+        else:
+            vals = [prop, sub, h.name, h.code, 0.0, 0.0, 0.0, 0.0, 0.0, "--"]
+        write_data_row(ws, row, vals, _num_formats())
+        row += 1
+
+    sub_mv = sum(detail_map.get(h.code, DetailRow()).market_value for h in group if h.code in detail_map)
+    sub_cost = sum(detail_map.get(h.code, DetailRow()).cost for h in group if h.code in detail_map)
+    sub_profit = sum(detail_map.get(h.code, DetailRow()).profit for h in group if h.code in detail_map)
+    sub_today = sum(detail_map.get(h.code, DetailRow()).today_profit for h in group if h.code in detail_map)
+    sub_rate = sub_profit / sub_cost if sub_cost > 0 else 0.0
+
+    subtotal_vals = ["", "", len(group), sub_mv, sub_cost, sub_profit, sub_rate, sub_today, "--"]
+    write_subtotal_row(ws, row, f"{prop} - {sub} 小计", subtotal_vals, _NCOLS, _num_formats())
+    return row + 1, sub_mv, sub_cost, sub_profit, sub_today
+
+
 def write_category_sheet(
     ws: Worksheet,
     holdings: List[Holding],
@@ -122,18 +174,13 @@ def write_category_sheet(
     """
     ws.title = f"3.{get_report_sheet_name('category')}"
 
-    # 建立 code → detail 映射
-    detail_map: dict[str, DetailRow] = {}
-    for d in details:
-        detail_map[d.code] = d
+    detail_map: dict[str, DetailRow] = {d.code: d for d in details}
 
-    # 分类并聚合
     cat_groups: dict[Tuple[str, str], List[Holding]] = {}
     for h in holdings:
         prop, sub = _categorize_holding(h)
         cat_groups.setdefault((prop, sub), []).append(h)
 
-    # 排序：先按资产属性（股票→基金→债券→现金），再按投资分类
     _PROP_ORDER = {"股票": 0, "基金": 1, "债券": 2, "现金": 3, "其他": 4}
     _SUB_ORDER = {"A股": 0, "QDII": 1, "主动": 2, "被动": 3, "指数": 4,
                   "混合": 5, "纯债": 6, "货币": 7, "其他": 8}
@@ -142,90 +189,29 @@ def write_category_sheet(
         key=lambda x: (_PROP_ORDER.get(x[0][0], 99), _SUB_ORDER.get(x[0][1], 99)),
     )
 
-    # 写入标题和表头
     row = write_title_row(ws, 1, get_report_sheet_name('category'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
-    # 遍历分组，写入明细+小计
+    dividend_data = _load_dividend_data(holdings)
     grand_mv = grand_cost = grand_profit = grand_today = 0.0
 
-    # ── 加载分红数据（用于年均股息率） ──
-    try:
-        from src.python.providers.akshare_extras import get_dividend_data
-        stock_codes = [h.code for h in holdings if h.code.strip().startswith(("6", "0", "3"))]
-        dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
-    except Exception:
-        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --")
-        dividend_data = {}
-
-    def _yield_text(code: str, d) -> str:
-        """计算单条持仓的年均股息率文本。"""
-        info = dividend_data.get(code)
-        if not info:
-            return "--"
-        avg_div = info.get("avg_dividend")
-        if avg_div is None:
-            return "--"
-        price = d.price if d and d.price > 0 else 0.0
-        if price <= 0:
-            return "--"
-        return f"{avg_div / price * 100:.2f}%"
-
     for (prop, sub), group in sorted_groups:
-        # 分组明细行
-        for h in group:
-            d = detail_map.get(h.code)
-            if d:
-                vals = [
-                    prop, sub, h.name, h.code,
-                    d.market_value, d.cost, d.profit, d.profit_rate,
-                    d.today_profit, _yield_text(h.code, d),
-                ]
-            else:
-                vals = [prop, sub, h.name, h.code, 0.0, 0.0, 0.0, 0.0, 0.0, "--"]
-            write_data_row(ws, row, vals, _num_formats())
-            row += 1
+        row, smv, scost, sprofit, stoday = _write_category_group(
+            ws, row, group, prop, sub, detail_map, dividend_data,
+        )
+        grand_mv += smv
+        grand_cost += scost
+        grand_profit += sprofit
+        grand_today += stoday
 
-        # 小计
-        sub_mv = sum(detail_map.get(h.code, DetailRow()).market_value
-                     for h in group if h.code in detail_map)
-        sub_cost = sum(detail_map.get(h.code, DetailRow()).cost
-                       for h in group if h.code in detail_map)
-        sub_profit = sum(detail_map.get(h.code, DetailRow()).profit
-                         for h in group if h.code in detail_map)
-        sub_today = sum(detail_map.get(h.code, DetailRow()).today_profit
-                        for h in group if h.code in detail_map)
-        sub_rate = sub_profit / sub_cost if sub_cost > 0 else 0.0
-
-        subtotal_vals = [
-            f"{prop} - {sub} 小计",
-            "", "",
-            len(group), sub_mv, sub_cost, sub_profit, sub_rate, sub_today, "--",
-        ]
-        write_subtotal_row(ws, row, f"{prop} - {sub} 小计",
-                           subtotal_vals[1:], _NCOLS, _num_formats())
-        row += 1
-
-        grand_mv += sub_mv
-        grand_cost += sub_cost
-        grand_profit += sub_profit
-        grand_today += sub_today
-
-    # 总计行
     grand_rate = grand_profit / grand_cost if grand_cost > 0 else 0.0
-    total_vals = [
-        "总计", "", "",
-        "-", grand_mv, grand_cost, grand_profit, grand_rate, grand_today, "--",
-    ]
-    write_total_row(ws, row, "总计", total_vals[1:], _NCOLS, _num_formats())
+    total_vals = ["", "", "-", grand_mv, grand_cost, grand_profit, grand_rate, grand_today, "--"]
+    write_total_row(ws, row, "总计", total_vals, _NCOLS, _num_formats())
 
-    # 对盈亏列着色
     _apply_profit_colors(ws, data_start, row)
-
     freeze_header(ws, 2)
     auto_width(ws)
-
     logger.info("%s写入完成，共 %d 个分组，%d 条持仓",
                 get_report_sheet_name('category'), len(sorted_groups), len(holdings))
 

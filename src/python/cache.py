@@ -574,8 +574,8 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
 def get_ttl(data_type: str) -> float:
     """获取指定数据类型的缓存过期时间（秒）。
 
-    优先读取 data/config/config.json 中的 cache_ttl.<data_type>，
-    未配置时返回预定义默认值。
+    交易时段内，对 market_hour_aware 声明过的数据类型使用短 TTL（默认 30s）
+    确保实时性，优先于静态 cache_ttl 配置。
 
     Args:
         data_type: 数据类型键名，如 "price"、"rank"、"hold"
@@ -586,21 +586,21 @@ def get_ttl(data_type: str) -> float:
     try:
         from src.python.config import get_config
         config = get_config()
-        ttl_config = config.get("cache_ttl") or {}
-        if data_type in ttl_config:
-            val = float(ttl_config[data_type])
-            if val > 0:
-                return val
         # ── 交易时段内：配置声明的数据类型用短 TTL 确保实时性 ──
         market_hour_aware: list = config.get("market_hour_aware") or []
         if _is_market_open() and data_type in market_hour_aware:
             market_ttl = config.get("market_hour_ttl", 30)
             try:
                 market_ttl_val = float(market_ttl)
-                # 最短 30 秒，最长不过 86400（一整天的缓存也没意义）
                 return max(30, min(86400, market_ttl_val))
             except (ValueError, TypeError):
                 return 30
+        # ── 非交易时段或非感知类型：用静态配置或默认值 ──
+        ttl_config = config.get("cache_ttl") or {}
+        if data_type in ttl_config:
+            val = float(ttl_config[data_type])
+            if val > 0:
+                return val
     except (ImportError, TypeError, ValueError, KeyError, AttributeError, RuntimeError):
         logger.debug("get_ttl: 配置读取失败，使用默认值")
     return get_cache_ttl_defaults().get(data_type, CACHE_DAILY)

@@ -249,6 +249,45 @@ def _sanitize_endpoint(endpoint: str) -> str:
         return "unknown"
 
 
+def _check_circuit_breaker(url: str, label: str) -> bool:
+    """检查熔断器状态，若已熔断则记录日志并返回 True。"""
+    if _cb_is_open(url):
+        logger.warning("%s API 熔断中 (%s)，跳过本次请求", label, _cb_endpoint(url))
+        print(f"  [!] {label} API 暂时不可用（熔断冷却中），跳过请求")
+        return True
+    return False
+
+
+def _process_success_response(
+    data: dict,
+    extract_fn: Callable[[dict], str | None],
+    check_truncation_fn: Callable[[dict, int], bool],
+    max_tokens: int, config_field: str,
+    provider: str, model_name: str, label: str,
+    url: str,
+) -> tuple[str | None, dict | None]:
+    """处理成功响应：内容提取、截断检测、Token 日志。"""
+    content = extract_fn(data)
+    if content is None:
+        logger.warning("%s API 响应格式异常", label)
+        _cb_record_failure(url)
+        return (None, None)
+    if not content.strip():
+        logger.warning("%s API 返回空内容（可能被内容过滤机制拦截）", label)
+        return ("", data.get("usage"))
+
+    truncated = check_truncation_fn(data, max_tokens)
+    usage = data.get("usage")
+    _log_token_usage(provider, usage, label, model_name=model_name)
+    _track_session_usage(provider, usage, model_name=model_name)
+
+    content = content.strip()
+    if truncated:
+        content += _truncation_warning(config_field)
+
+    return (content, usage)
+
+
 def _call_llm_with_retry(
     label: str,
     client: httpx.Client,
@@ -287,10 +326,7 @@ def _call_llm_with_retry(
     Returns:
         (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
     """
-    # ── 熔断器检查 ──
-    if _cb_is_open(url):
-        logger.warning("%s API 熔断中 (%s)，跳过本次请求", label, _cb_endpoint(url))
-        print(f"  [!] {label} API 暂时不可用（熔断冷却中），跳过请求")
+    if _check_circuit_breaker(url, label):
         return (None, None)
 
     for attempt in range(max_retries + 1):
@@ -340,26 +376,10 @@ def _call_llm_with_retry(
             _cb_record_failure(url)
             return (None, None)
 
-        content = extract_fn(data)
-        if content is None:
-            logger.warning("%s API 响应格式异常", label)
-            _cb_record_failure(url)
-            return (None, None)
-        if not content.strip():
-            logger.warning("%s API 返回空内容（可能被内容过滤机制拦截）", label)
-            # 不记为熔断失败 — 保留 usage 信息供上层做安抚重试
-            return ("", data.get("usage"))
-
-        truncated = check_truncation_fn(data, max_tokens)
-        usage = data.get("usage")
-        _log_token_usage(provider, usage, label, model_name=model_name)
-        _track_session_usage(provider, usage, model_name=model_name)
-
-        content = content.strip()
-        if truncated:
-            content += _truncation_warning(config_field)
-
-        return (content, usage)
+        return _process_success_response(
+            data, extract_fn, check_truncation_fn, max_tokens, config_field,
+            provider, model_name, label, url,
+        )
 
     _cb_record_failure(url)
     return (None, None)

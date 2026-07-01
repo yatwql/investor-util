@@ -284,6 +284,128 @@ def _apply_llm_news_correlation(
     return results
 
 
+def _select_top_news(
+    news_data: list[dict], top_n: int = 30,
+) -> tuple[list[dict], dict[int, int]]:
+    """按关键词匹配数排序，选取 TOP N 条送 LLM 分析。
+
+    Returns:
+        (top_news, top_to_original)
+        top_to_original: top_news 索引 → news_data 索引的映射
+    """
+    sorted_with_idx = sorted(
+        enumerate(news_data),
+        key=lambda x: len(x[1].get("matched_keywords", [])),
+        reverse=True,
+    )
+    top_news = [item for _, item in sorted_with_idx[:top_n]]
+    top_to_original = {ti: orig_i for ti, (orig_i, _) in enumerate(sorted_with_idx[:top_n])}
+    return top_news, top_to_original
+
+
+def _build_news_hooks(
+    top_news: list[dict], holdings: list, penetrated_assets: list | None,
+    industry_data: dict[str, dict] | None, llm_config: dict | None,
+) -> tuple[callable, callable, callable, str]:
+    """构建批量处理 hooks。
+
+    Args:
+        top_news: 选取的 TOP N 条新闻（供 _batch_preparer 返回）
+
+    Returns:
+        (batch_preparer, per_item_cache_fn, batch_prompt_fn, model_name)
+    """
+    _model = (llm_config.get("model_news_correlation") or
+              (llm_config or {}).get("model", "") or "未指定") if llm_config else "未指定"
+
+    def _batch_preparer():
+        holdings_summary = [{"name": h.name, "code": h.code} for h in holdings[:20]]
+        holdings_fp = _compute_fingerprint(holdings_summary, penetrated_assets)
+        return top_news, holdings_fp
+
+    def _per_item_cache(idx: int, item: dict, context_fp: str) -> str:
+        title_prefix = (item.get("title", "") or "")[:80]
+        article_fp = _compute_fingerprint({"title": title_prefix, "holdings_fp": context_fp})
+        return _CACHE_PREFIX_LLM + f"news_item_{article_fp}"
+
+    def _batch_prompt(batch_items: list[dict], context_fp: str) -> str:
+        holdings_text = _build_holdings_summary(holdings, penetrated_assets, industry_data)
+        news_text = _build_news_correlation_summary(batch_items)
+        return (
+            f"【持仓信息】\n{holdings_text}\n\n"
+            f"【新闻列表】\n{news_text}\n\n"
+            f"请分析以上每条新闻与持仓的关联性，输出JSON数组。"
+        )
+
+    return _batch_preparer, _per_item_cache, _batch_prompt, _model
+
+
+def _map_llm_results(
+    results_map: dict[int, tuple], top_to_original: dict[int, int],
+) -> dict[int, tuple]:
+    """将 LLM results_map（top_news idx→parsed）映射到原始 news_data idx。"""
+    analysis_by_orig_idx: dict[int, tuple] = {}
+    for top_idx, parsed in results_map.items():
+        orig_i = top_to_original.get(top_idx)
+        if orig_i is not None:
+            analysis_by_orig_idx[orig_i] = parsed
+    return analysis_by_orig_idx
+
+
+def _merge_llm_analysis(
+    news_data: list[dict], analysis_by_orig_idx: dict[int, tuple],
+) -> tuple[list[dict], int]:
+    """将 LLM 分析结果合并回 news_data，返回 (enriched, analysis_count)。"""
+    enriched: list[dict] = []
+    analysis_count = 0
+    for i, item in enumerate(news_data):
+        item_copy = dict(item)
+        if i in analysis_by_orig_idx:
+            relevance, sentiment, analysis_text = analysis_by_orig_idx[i]
+            if relevance != "无关":
+                prefix = f"[{relevance}]"
+                if sentiment in ("利好", "利空"):
+                    prefix += f"[{sentiment}]"
+                item_copy["llm_analysis"] = (
+                    f"{prefix} {analysis_text}" if analysis_text else prefix
+                )
+                analysis_count += 1
+        enriched.append(item_copy)
+    return enriched, analysis_count
+
+
+def _finalize_news_token_usage(
+    batch_usage: dict, llm_config: dict | None, _model: str,
+    top_news: list, cached_count: int, news_data: list, analysis_count: int,
+) -> dict:
+    """计算 Token 用量并记录日志。返回 token_usage dict。"""
+    total_in = batch_usage.get("input", 0)
+    total_out = batch_usage.get("output", 0)
+    token_usage: dict = {}
+    if total_in > 0 or total_out > 0:
+        token_usage = {
+            "model": _model,
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+            "total_tokens": total_in + total_out,
+        }
+        if llm_config:
+            _log_token_usage(
+                llm_config.get("provider", "unknown"),
+                {"input_tokens": total_in, "output_tokens": total_out},
+                f"{_MN('news_correlation')}（批处理）",
+                model_name=_model,
+            )
+            _record_per_module("news_correlation", _model, inp=total_in, out=total_out)
+
+    fresh_count = len(top_news) - cached_count
+    logger.info(
+        "%s完成: %d 条 → %d 条含 LLM 分析（缓存 %d 条 + 新处理 %d 条）",
+        _MN("news_correlation"), len(news_data), analysis_count, cached_count, fresh_count,
+    )
+    return token_usage
+
+
 def enhance_news_correlation(
     news_data: list[dict],
     holdings: list,
@@ -315,100 +437,27 @@ def enhance_news_correlation(
     if not news_data:
         return (news_data, False, {})
 
-    # 按关键词匹配数排序，取前 30 条送给 LLM
-    _sorted_with_idx = sorted(
-        enumerate(news_data),
-        key=lambda x: len(x[1].get("matched_keywords", [])),
-        reverse=True,
+    top_news, top_to_original = _select_top_news(news_data, top_n=30)
+    batch_preparer, per_item_cache_fn, batch_prompt_fn, _model = _build_news_hooks(
+        top_news, holdings, penetrated_assets, industry_data, llm_config,
     )
-    top_news = [item for _, item in _sorted_with_idx[:30]]
-    top_to_original = {ti: orig_i for ti, (orig_i, _) in enumerate(_sorted_with_idx[:30])}
 
-    # ── 闭包捕获变量（供 hook 使用） ─────────────────────
-    _model = (llm_config.get("model_news_correlation") or
-              (llm_config or {}).get("model", "") or "未指定") if llm_config else "未指定"
-
-    def _batch_preparer():
-        """返回 (top_news 列表, 持仓指纹上下文)。"""
-        holdings_summary = [{"name": h.name, "code": h.code} for h in holdings[:20]]
-        holdings_fp = _compute_fingerprint(holdings_summary, penetrated_assets)
-        return top_news, holdings_fp
-
-    def _per_item_cache(idx: int, item: dict, context_fp: str) -> str:
-        title_prefix = (item.get("title", "") or "")[:80]
-        article_fp = _compute_fingerprint({"title": title_prefix, "holdings_fp": context_fp})
-        return _CACHE_PREFIX_LLM + f"news_item_{article_fp}"
-
-    def _batch_prompt(batch_items: list[dict], context_fp: str) -> str:
-        holdings_text = _build_holdings_summary(holdings, penetrated_assets, industry_data)
-        news_text = _build_news_correlation_summary(batch_items)
-        return (
-            f"【持仓信息】\n{holdings_text}\n\n"
-            f"【新闻列表】\n{news_text}\n\n"
-            f"请分析以上每条新闻与持仓的关联性，输出JSON数组。"
-        )
-
-    # ── 委托 _generate_llm_module 骨架 ─────────────────
     results_map, all_cached, batch_usage, cached_count = _generate_llm_module(
         llm_config, "news_correlation",
         force=force,
         system_prompt_default=_SYSTEM_NEWS_CORRELATION,
         max_tokens_default=2000,
         timeout_default=60.0,
-        batch_preparer=_batch_preparer,
-        per_item_cache_fn=_per_item_cache,
-        batch_prompt_fn=_batch_prompt,
+        batch_preparer=batch_preparer,
+        per_item_cache_fn=per_item_cache_fn,
+        batch_prompt_fn=batch_prompt_fn,
         response_parser=_apply_llm_news_correlation,
     )
 
-    # ── 映射 results_map（top_news idx → 原始 news_data idx） ───
-    analysis_by_orig_idx: dict[int, tuple] = {}
-    for top_idx, parsed in results_map.items():
-        orig_i = top_to_original.get(top_idx)
-        if orig_i is not None:
-            analysis_by_orig_idx[orig_i] = parsed
-
-    # ── 合并回 news_data ──────────────────────────────
-    enriched: list[dict] = []
-    analysis_count = 0
-    for i, item in enumerate(news_data):
-        item_copy = dict(item)
-        if i in analysis_by_orig_idx:
-            relevance, sentiment, analysis_text = analysis_by_orig_idx[i]
-            if relevance != "无关":
-                prefix = f"[{relevance}]"
-                if sentiment in ("利好", "利空"):
-                    prefix += f"[{sentiment}]"
-                item_copy["llm_analysis"] = (
-                    f"{prefix} {analysis_text}" if analysis_text else prefix
-                )
-                analysis_count += 1
-        enriched.append(item_copy)
-
-    # ── Token 用量 ─────────────────────────────────────
-    total_in = batch_usage.get("input", 0)
-    total_out = batch_usage.get("output", 0)
-    token_usage: dict = {}
-    if total_in > 0 or total_out > 0:
-        token_usage = {
-            "model": _model,
-            "input_tokens": total_in,
-            "output_tokens": total_out,
-            "total_tokens": total_in + total_out,
-        }
-        if llm_config:
-            _log_token_usage(
-                llm_config.get("provider", "unknown"),
-                {"input_tokens": total_in, "output_tokens": total_out},
-                f"{_MN('news_correlation')}（批处理）",
-                model_name=_model,
-            )
-            _record_per_module("news_correlation", _model, inp=total_in, out=total_out)
-
-    _fresh_count = len(top_news) - cached_count
-    logger.info(
-        "%s完成: %d 条 → %d 条含 LLM 分析（缓存 %d 条 + 新处理 %d 条）",
-        _MN("news_correlation"), len(news_data), analysis_count, cached_count, _fresh_count,
+    analysis_by_orig_idx = _map_llm_results(results_map, top_to_original)
+    enriched, analysis_count = _merge_llm_analysis(news_data, analysis_by_orig_idx)
+    token_usage = _finalize_news_token_usage(
+        batch_usage, llm_config, _model, top_news, cached_count, news_data, analysis_count,
     )
 
     return (enriched, all_cached, token_usage)

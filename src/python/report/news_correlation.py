@@ -38,6 +38,90 @@ _BASE_HEADERS = ["序号", "新闻标题", "摘要", "来源", "发布时间", "
 # ── 关键词富化 ────────────────────────────────────────────────
 
 
+# ── 关键词构建辅助函数 ──────────────────────────────────────────
+
+_SUFFIXES = [
+    "ETF", "联接", "A", "C", "(QDII)", "基金", "混合",
+    "指数", "开放", "式", "发起", "LOF",
+]
+
+
+def _extract_terms(name: str) -> list[str]:
+    """从名称中提取中文词及双字窗口。"""
+    clean = name
+    for suffix in _SUFFIXES:
+        clean = clean.replace(suffix, "")
+    terms = re.findall(r"[一-鿿]{2,}", clean)
+    extra: set[str] = set()
+    for t in terms:
+        if len(t) > 2:
+            for i in range(len(t) - 1):
+                extra.add(t[i:i + 2])
+    return list(set(terms) | extra)
+
+
+def _index_holdings(lookup: dict, holdings: list[Holding]) -> None:
+    """将持仓名称/代码加入关键词查找表。"""
+    for h in holdings:
+        code = h.code.strip()
+        name = h.name.strip()
+        if code and code not in lookup:
+            lookup[code] = {"type": "holding", "name": name, "code": code}
+        for t in _extract_terms(name):
+            if t not in lookup:
+                lookup[t] = {"type": "holding", "name": name, "code": code}
+        if "ETF" in name:
+            core = name.replace("ETF", "").strip()
+            for t in re.findall(r"[一-鿿]{2,}", core):
+                if t not in lookup:
+                    lookup[t] = {"type": "holding", "name": name, "code": code}
+
+
+def _index_penetrated_assets(lookup: dict, penetrated_assets: list[dict]) -> None:
+    """将穿透资产名称/代码加入关键词查找表。"""
+    for asset in penetrated_assets:
+        asset_name = (asset.get("name") or "").strip()
+        for ac in (asset.get("codes") or []):
+            ac_stripped = ac.strip()
+            if ac_stripped and ac_stripped not in lookup:
+                lookup[ac_stripped] = {"type": "penetration", "name": asset_name, "code": ac_stripped}
+        if asset_name:
+            for t in _extract_terms(asset_name):
+                if t not in lookup:
+                    lookup[t] = {"type": "penetration", "name": asset_name, "code": t}
+
+
+def _index_industry_concepts(lookup: dict, industry_data: dict[str, dict]) -> None:
+    """将行业分类/概念板块加入关键词查找表。"""
+    for code, idata in industry_data.items():
+        industry_name = (idata.get("industry") or "").strip()
+        if industry_name and industry_name not in lookup:
+            lookup[industry_name] = {
+                "type": "concept", "name": industry_name,
+                "code": code, "source": "industry",
+            }
+        for cname in (idata.get("concepts", [])):
+            cname = cname.strip()
+            if cname and cname not in lookup:
+                lookup[cname] = {
+                    "type": "concept", "name": cname,
+                    "code": code, "source": "concept",
+                }
+
+
+def _enrich_with_industry_data(lookup: dict, industry_data: dict[str, dict]) -> None:
+    """为持仓/穿透条目附加行业/概念信息。"""
+    for entry in lookup.values():
+        if entry.get("type") in ("holding", "penetration"):
+            code = entry.get("code", "")
+            idata = industry_data.get(code)
+            if idata:
+                if idata.get("industry"):
+                    entry["industry"] = idata["industry"]
+                if idata.get("concepts"):
+                    entry["concepts_list"] = idata["concepts"]
+
+
 def _build_keyword_lookup(
     holdings: List[Holding],
     penetrated_assets: Optional[List[dict]] = None,
@@ -53,109 +137,18 @@ def _build_keyword_lookup(
         holdings: 持仓列表
         penetrated_assets: 穿透 TOP10 资产列表
         industry_data: 行业/概念数据字典 {code: {industry, concepts, ...}}
-            industry_data 由 fetcher.batch_fetch_industry_data 返回，
-            每项含 industry（行业名称）和 concepts（概念板块名称列表）。
 
     Returns:
         {keyword: {"type": "holding"|"penetration"|"concept", "name": str, "code": str}}
         同一关键词若同时匹配持仓和穿透，持仓优先（先到先得）。
     """
     lookup: dict[str, dict] = {}
-
-    _suffixes = [
-        "ETF", "联接", "A", "C", "(QDII)", "基金", "混合",
-        "指数", "开放", "式", "发起", "LOF",
-    ]
-    for h in holdings:
-        code = h.code.strip()
-        name = h.name.strip()
-
-        if code and code not in lookup:
-            lookup[code] = {"type": "holding", "name": name, "code": code}
-
-        clean = name
-        for suffix in _suffixes:
-            clean = clean.replace(suffix, "")
-        terms = re.findall(r"[一-鿿]{2,}", clean)
-        # 从多字词中额外提取双字窗口（如"长江电力"→"长江""电力"）
-        _extra: set[str] = set()
-        for t in terms:
-            if len(t) > 2:
-                for i in range(len(t) - 1):
-                    _extra.add(t[i:i + 2])
-        terms = list(set(terms) | _extra)
-        for t in terms:
-            if t not in lookup:
-                lookup[t] = {"type": "holding", "name": name, "code": code}
-
-        if "ETF" in name:
-            core = name.replace("ETF", "").strip()
-            core_terms = re.findall(r"[一-鿿]{2,}", core)
-            for t in core_terms:
-                if t not in lookup:
-                    lookup[t] = {"type": "holding", "name": name, "code": code}
-
+    _index_holdings(lookup, holdings)
     if penetrated_assets:
-        for asset in penetrated_assets:
-            asset_name = (asset.get("name") or "").strip()
-            asset_codes = asset.get("codes") or []
-
-            for ac in asset_codes:
-                ac_stripped = ac.strip()
-                if ac_stripped and ac_stripped not in lookup:
-                    lookup[ac_stripped] = {
-                        "type": "penetration", "name": asset_name, "code": ac_stripped,
-                    }
-
-            if asset_name:
-                clean_name = asset_name
-                for suffix in _suffixes:
-                    clean_name = clean_name.replace(suffix, "")
-                terms = re.findall(r"[一-鿿]{2,}", clean_name)
-                _extra_pen: set[str] = set()
-                for t in terms:
-                    if len(t) > 2:
-                        for i in range(len(t) - 1):
-                            _extra_pen.add(t[i:i + 2])
-                terms = list(set(terms) | _extra_pen)
-                for t in terms:
-                    if t not in lookup:
-                        lookup[t] = {
-                            "type": "penetration", "name": asset_name, "code": t,
-                        }
-
-        # ── 3) 从行业分类/概念板块数据提取 ──
+        _index_penetrated_assets(lookup, penetrated_assets)
     if industry_data:
-        for code, idata in industry_data.items():
-            # 行业名称（如 "电力设备"）
-            industry_name = (idata.get("industry") or "").strip()
-            if industry_name and industry_name not in lookup:
-                lookup[industry_name] = {
-                    "type": "concept", "name": industry_name,
-                    "code": code, "source": "industry",
-                }
-            # 概念板块名称（如 "CPO光模块"）
-            for cname in idata.get("concepts", []):
-                cname = cname.strip()
-                if cname and cname not in lookup:
-                    lookup[cname] = {
-                        "type": "concept", "name": cname,
-                        "code": code, "source": "concept",
-                    }
-
-    # ── 4) 为持仓/穿透条目附加行业/概念信息 ───
-    # 只有 code 为真实证券代码（纯数字或含字母）的条目才查找 industry_data
-    if industry_data:
-        for _key, _entry in lookup.items():
-            if _entry.get("type") in ("holding", "penetration"):
-                _code = _entry.get("code", "")
-                if _code in industry_data:
-                    _idata = industry_data[_code]
-                    if _idata.get("industry"):
-                        _entry["industry"] = _idata["industry"]
-                    if _idata.get("concepts"):
-                        _entry["concepts_list"] = _idata["concepts"]
-
+        _index_industry_concepts(lookup, industry_data)
+        _enrich_with_industry_data(lookup, industry_data)
     return lookup
 
 
@@ -445,6 +438,59 @@ def build_news_data(
     return news_items, meta
 
 
+def _build_news_footer(news_data: list[dict], llm_meta: dict | None, has_llm: bool) -> str:
+    """构建新闻页签底部说明文本。"""
+    if llm_meta and llm_meta.get("llm_enabled"):
+        if llm_meta.get("llm_cached"):
+            hint = (
+                f"共获取 {len(news_data)} 条关联新闻。"
+                "本次使用LLM缓存，未直接使用LLM服务能力"
+            )
+            if llm_meta.get("thinking_enabled", False):
+                hint += " | Extended Thinking"
+            return hint
+        parts = [f"共获取 {len(news_data)} 条关联新闻"]
+        if has_llm:
+            parts.append("（含 LLM 智能关联分析）")
+        parts.append("，关键词匹配基于持仓名称和代码")
+        return "".join(parts)
+    return (
+        f"共获取 {len(news_data)} 条关联新闻。"
+        "基于持仓名称和代码进行关键词匹配。"
+        "本次未使用LLM服务能力增强支持，使用传统关键字匹配技术"
+    )
+
+
+def _write_news_token_footer(ws: Worksheet, row: int, llm_meta: dict | None) -> int:
+    """写入 Token 用量行（LLM 启用且非缓存时）。返回写入后的行号。"""
+    if not (llm_meta and llm_meta.get("llm_enabled") and not llm_meta.get("llm_cached")):
+        return row
+    token_usage = llm_meta.get("token_usage") or {}
+    if token_usage.get("total_tokens", 0) <= 0:
+        return row
+    row += 1
+    parts = [
+        f"模型：{token_usage.get('model', '')}",
+        f"Token 用量：输入 {token_usage.get('input_tokens', 0):,} / 输出 {token_usage.get('output_tokens', 0):,} = {token_usage.get('total_tokens', 0):,}",
+    ]
+    cost_est = llm_meta.get("cost_estimation", "-")
+    if cost_est and cost_est != "-":
+        parts.append(f"估算费用：{cost_est}")
+    if llm_meta.get("thinking_enabled", False):
+        parts.append("Extended Thinking")
+    write_data_row(ws, row, [" | ".join(parts)])
+    return row
+
+
+def _set_news_column_widths(ws: Worksheet, has_llm: bool) -> None:
+    """设置新闻页签列宽。"""
+    ws.column_dimensions["B"].width = 40
+    ws.column_dimensions["C"].width = 50
+    if has_llm:
+        llm_col = _NCOLS + 1
+        ws.column_dimensions[get_column_letter(llm_col)].width = 30
+
+
 def write_news_sheet(
     ws: Worksheet,
     news_data: List[dict[str, Any]],
@@ -462,11 +508,7 @@ def write_news_sheet(
     """
     ws.title = f"6.{get_llm_module_name('news_correlation')}"
 
-    # 检测是否有 LLM 分析数据（按 item 中的 llm_analysis 字段）
-    has_llm = any(
-        isinstance(item, dict) and item.get("llm_analysis")
-        for item in news_data
-    )
+    has_llm = any(isinstance(item, dict) and item.get("llm_analysis") for item in news_data)
     ncols = _NCOLS + (1 if has_llm else 0)
     headers = _BASE_HEADERS + (["LLM 关联分析"] if has_llm else [])
 
@@ -481,22 +523,10 @@ def write_news_sheet(
         return
 
     wrap_left = Alignment(horizontal="left", vertical="top", wrap_text=True)
-
     for idx, item in enumerate(news_data, 1):
         enriched = item.get("enriched_keywords", [])
-        if enriched:
-            keywords_str = _format_enriched_keywords(enriched)
-        else:
-            keywords_str = ", ".join(item.get("matched_keywords", []))
-
-        vals: list = [
-            idx,
-            item.get("title", ""),
-            item.get("intro", ""),
-            item.get("media_name", ""),
-            item.get("ctime", ""),
-            keywords_str,
-        ]
+        keywords_str = _format_enriched_keywords(enriched) if enriched else ", ".join(item.get("matched_keywords", []))
+        vals = [idx, item.get("title", ""), item.get("intro", ""), item.get("media_name", ""), item.get("ctime", ""), keywords_str]
         if has_llm:
             vals.append(item.get("llm_analysis", ""))
         write_data_row(ws, row, vals)
@@ -504,57 +534,12 @@ def write_news_sheet(
         ws.cell(row=row, column=3).alignment = wrap_left
         row += 1
 
-    # 底部说明
     row += 1
-
-    if llm_meta and llm_meta.get("llm_enabled"):
-        # LLM 已启用
-        if llm_meta.get("llm_cached"):
-            _cache_hint = (
-                f"共获取 {len(news_data)} 条关联新闻。"
-                "本次使用LLM缓存，未直接使用LLM服务能力"
-            )
-            if llm_meta.get("thinking_enabled", False):
-                _cache_hint += " | Extended Thinking"
-            note_parts = [_cache_hint]
-        else:
-            note_parts = [f"共获取 {len(news_data)} 条关联新闻"]
-            if has_llm:
-                note_parts.append("（含 LLM 智能关联分析）")
-            note_parts.append("，关键词匹配基于持仓名称和代码")
-    else:
-        # LLM 未启用（或配置关闭）
-        note_parts = [
-            f"共获取 {len(news_data)} 条关联新闻。"
-            "基于持仓名称和代码进行关键词匹配。"
-            "本次未使用LLM服务能力增强支持，使用传统关键字匹配技术",
-        ]
-
-    write_data_row(ws, row, ["".join(note_parts)])
-
-    # Token 用量行（LLM 启用且非缓存命中时）— 与 HTML 报告格式保持一致
-    if llm_meta and llm_meta.get("llm_enabled") and not llm_meta.get("llm_cached"):
-        token_usage = llm_meta.get("token_usage") or {}
-        if token_usage.get("total_tokens", 0) > 0:
-            row += 1
-            token_parts = [
-                f"模型：{token_usage.get('model', '')}",
-                f"Token 用量：输入 {token_usage.get('input_tokens', 0):,} / 输出 {token_usage.get('output_tokens', 0):,} = {token_usage.get('total_tokens', 0):,}",
-            ]
-            cost_est = llm_meta.get("cost_estimation", "-")
-            if cost_est and cost_est != "-":
-                token_parts.append(f"估算费用：{cost_est}")
-            if llm_meta.get("thinking_enabled", False):
-                token_parts.append("Extended Thinking")
-            write_data_row(ws, row, [" | ".join(token_parts)])
+    write_data_row(ws, row, [_build_news_footer(news_data, llm_meta, has_llm)])
+    row = _write_news_token_footer(ws, row, llm_meta)
 
     freeze_header(ws, 2)
     auto_width(ws)
-    # 覆盖新闻标题和摘录列宽（auto_width 的 max_width=30 偏窄）
-    ws.column_dimensions["B"].width = 40
-    ws.column_dimensions["C"].width = 50
-    if has_llm:
-        llm_col = _NCOLS + 1
-        ws.column_dimensions[get_column_letter(llm_col)].width = 30
+    _set_news_column_widths(ws, has_llm)
     llm_info = f"，LLM 分析 {sum(1 for n in news_data if n.get('llm_analysis'))} 条" if has_llm else ""
     logger.info("%s写入完成%s，共 %d 条", get_llm_module_name("news_correlation"), llm_info, len(news_data))

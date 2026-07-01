@@ -4,6 +4,26 @@
 
 ---
 
+## [0.2.50] - 2026-07-01
+
+### Fixed
+- **缓存 TTL 市场时段感知逻辑缺陷（🐛 561910 价格偏差根因）**：`cache.py:get_ttl()` 中 `market_hour_aware` 检查位于显式 `cache_ttl` 配置之后导致死代码，盘中 30s 短 TTL 永不生效。交换判断顺序：交易时段内对 `market_hour_aware` 声明类型优先使用短 TTL，确保实时价格更新。
+- **HTML 报告：B 模式下不应展示 LLM 分析章节占位符**：`report_template.html` 中八～十二节（全球政经局势/智囊团深度复盘/持仓体检报告/穿透深度分析/LLM API 用量）在 `llm_enabled=False` 时仍渲染"本节内容待生成"占位内容。包裹 `{% if llm_enabled %}` 条件，B 模式下完全隐藏。
+
+### Changed
+- **`report/news_correlation.py:_build_keyword_lookup()` 拆分（R-035 ✅）**：119→28 行，提取 5 个辅助函数（`_extract_terms`/`_index_holdings`/`_index_penetrated_assets`/`_index_industry_concepts`/`_enrich_with_industry_data`）。
+- **`report/category.py:write_category_sheet()` 拆分（R-036 ✅）**：124→58 行，提取 3 个辅助函数（`_load_dividend_data`/`_yield_text`/`_write_category_group`）。修复 subtotal/total 值数组元素数与 API 签名一致（10→9）。
+- **`llm/generators.py:enhance_news_correlation()` 拆分（R-037 ✅）**：128→35 行，提取 5 个辅助函数（`_select_top_news`/`_build_news_hooks`/`_map_llm_results`/`_merge_llm_analysis`/`_finalize_news_token_usage`）。
+- **`llm/api.py:_call_llm_with_retry()` 拆分（R-038 ✅）**：114→75 行，提取 `_check_circuit_breaker`/`_process_success_response`。
+- **`report/news_correlation.py:write_news_sheet()` 拆分（R-039 ✅）**：113→48 行，提取 3 个辅助函数（`_build_news_footer`/`_write_news_token_footer`/`_set_news_column_widths`）。
+- **`report/html_writer.py:_build_perf_data()` 拆分（R-040 ✅）**：107→27 行，提取 `_build_single_perf_item`。
+- **`providers/news_aggregator.py:aggregate_news()` 拆分（R-041 ✅）**：106→27 行，提取 4 个辅助函数（`_compute_cache_key`/`_check_news_cache`/`_save_news_cache`/`_fetch_from_all_sources`/`_log_source_status`/`_finalize_news_results`）。
+- **`report/penetration.py:write_penetration_sheet()` 拆分（R-042 ✅）**：105→40 行，提取 3 个辅助函数（`_load_profit_forecast_safe`/`_load_dividend_data_safe`/`_write_penetration_footer`）。
+
+### Added
+- **`src/test/test_http_client.py`（R-033 ✅）**：17 项测试覆盖 `_should_verify`（8 种 env 值）+ `make_http_client`（6 种 kwargs 组合 + context manager）。
+- **`src/test/test_market_hours.py`（R-034 ✅）**：41 项测试覆盖 `_parse_time_to_minutes`（10 项）/ `_fetch_trading_status_from_official`（7 项）/ `_is_market_open_fallback`（14 项）/ `_is_market_open_config`（6 项）/ `is_market_open`（5 项三层编排）。
+
 ## [0.2.49] - 2026-07-01
 
 ### Changed

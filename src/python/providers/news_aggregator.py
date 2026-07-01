@@ -36,47 +36,34 @@ def get_enabled_sources() -> list[str]:
     ]
 
 
-def aggregate_news(
-    keywords: list[str],
-    top_n: int = 100,
-    sources: Optional[list[str]] = None,
-    per_source: int = 100,
-    progress_callback: Optional[Callable[[str, int, str], None]] = None,
-) -> list[dict[str, Any]]:
-    """从多个新闻源获取新闻，去重后按关键词关联度排序。
+def _compute_cache_key(
+    keywords: list[str], top_n: int, sources: list[str], per_source: int,
+) -> str:
+    """计算新闻缓存键。"""
+    raw = json.dumps([keywords, top_n, sources, per_source], sort_keys=True, ensure_ascii=False)
+    return "news_" + hashlib.md5(raw.encode()).hexdigest()[:12]
 
-    流程：
-      1. 从各源获取原始新闻（并行）
-      2. 按 URL 去重合并
-      3. 按发布时间排序
-      4. 与关键词关联匹配
-      5. 按匹配度降序返回 TOP N
 
-    Args:
-        keywords: 关键词列表
-        top_n: 最多返回的关联新闻条数
-        sources: 要使用的新闻源名称列表，默认使用全部启用的源
-        per_source: 每个源获取的原始新闻条数
-        progress_callback: 可选进度回调，签名为 (source_label, count, status)
-            每次源获取完成后调用。status 为 "OK" 或 "失败原因"
-
-    Returns:
-        关联后的新闻列表，每项含 matched_keywords 字段
-    """
-    if sources is None:
-        sources = get_enabled_sources()
-
-    # 新闻缓存：同一关键词 + 同一分钟内复用，避免重复 HTTP
-    _cache_key = "news_" + hashlib.md5(
-        json.dumps([keywords, top_n, sources, per_source], sort_keys=True, ensure_ascii=False).encode()
-    ).hexdigest()[:12]
-    from src.python.cache import get as _nget, set as _nset, get_ttl as _get_news_ttl
-    _cached = _nget(_cache_key, _get_news_ttl("news"))
-    if _cached is not None:
+def _check_news_cache(cache_key: str, sources: list[str]) -> list[dict] | None:
+    """检查新闻缓存，命中则直接返回缓存结果。"""
+    from src.python.cache import get as _nget, get_ttl as _get_news_ttl
+    cached = _nget(cache_key, _get_news_ttl("news"))
+    if cached is not None:
         logger.info("新闻缓存命中，跳过 %d 个源获取", len(sources))
-        return _cached
+    return cached
 
-    # 1) 从各源获取（并行）
+
+def _save_news_cache(cache_key: str, result: list[dict]) -> None:
+    """保存新闻结果到缓存。"""
+    from src.python.cache import set as _nset
+    _nset(cache_key, result)
+
+
+def _fetch_from_all_sources(
+    sources: list[str], per_source: int,
+    progress_callback: Optional[Callable[[str, int, str], None]] = None,
+) -> tuple[list[dict[str, Any]], dict[str, tuple[int, str]]]:
+    """从多个新闻源并行获取，去重合并。返回 (all_raw, src_results)。"""
     all_raw: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
     src_results: dict[str, tuple[int, str]] = {}
@@ -113,11 +100,79 @@ def aggregate_news(
                 if progress_callback:
                     progress_callback(label, 0, err_msg)
 
-    # 输出各源状态汇总
-    status_parts = [f"{_SOURCE_LABELS.get(s, s)} {n}条" if st == "OK"
-                    else f"{_SOURCE_LABELS.get(s, s)} {st}"
-                    for s, (n, st) in src_results.items()]
+    return all_raw, src_results
+
+
+def _log_source_status(src_results: dict[str, tuple[int, str]]) -> None:
+    """输出各新闻源状态汇总日志。"""
+    status_parts = []
+    for s, (n, st) in src_results.items():
+        label = _SOURCE_LABELS.get(s, s)
+        if st == "OK":
+            status_parts.append(f"{label} {n}条")
+        else:
+            status_parts.append(f"{label} {st}")
     logger.info("新闻源状态: %s", " | ".join(status_parts))
+
+
+def _finalize_news_results(
+    all_raw: list[dict[str, Any]], keywords: list[str], top_n: int,
+) -> list[dict[str, Any]]:
+    """排序、关联关键词、确保 matched_keywords 字段、截取 TOP N。"""
+    if not all_raw:
+        return []
+
+    # 按时间排序
+    all_raw.sort(key=lambda item: item.get("ctime", ""), reverse=True)
+
+    # 与关键词关联
+    correlated = correlate_news_with_holdings(all_raw, keywords, top_n=top_n)
+
+    # 确保 matched_keywords 字段
+    for item in correlated:
+        if "matched_keywords" not in item:
+            item["matched_keywords"] = []
+
+    return correlated[:top_n]
+
+
+def aggregate_news(
+    keywords: list[str],
+    top_n: int = 100,
+    sources: Optional[list[str]] = None,
+    per_source: int = 100,
+    progress_callback: Optional[Callable[[str, int, str], None]] = None,
+) -> list[dict[str, Any]]:
+    """从多个新闻源获取新闻，去重后按关键词关联度排序。
+
+    流程：
+      1. 从各源获取原始新闻（并行）
+      2. 按 URL 去重合并
+      3. 按发布时间排序
+      4. 与关键词关联匹配
+      5. 按匹配度降序返回 TOP N
+
+    Args:
+        keywords: 关键词列表
+        top_n: 最多返回的关联新闻条数
+        sources: 要使用的新闻源名称列表，默认使用全部启用的源
+        per_source: 每个源获取的原始新闻条数
+        progress_callback: 可选进度回调，签名为 (source_label, count, status)
+            每次源获取完成后调用。status 为 "OK" 或 "失败原因"
+
+    Returns:
+        关联后的新闻列表，每项含 matched_keywords 字段
+    """
+    if sources is None:
+        sources = get_enabled_sources()
+
+    cache_key = _compute_cache_key(keywords, top_n, sources, per_source)
+    cached = _check_news_cache(cache_key, sources)
+    if cached is not None:
+        return cached
+
+    all_raw, src_results = _fetch_from_all_sources(sources, per_source, progress_callback)
+    _log_source_status(src_results)
 
     if not all_raw:
         logger.warning("所有新闻源均获取失败，请检查网络连接")
@@ -125,20 +180,6 @@ def aggregate_news(
 
     logger.info("新闻汇总: 去重后共 %d 条 (来自 %d 个源)", len(all_raw), len(sources))
 
-    # 2) 按时间排序
-    def _sort_key(item: dict[str, Any]) -> str:
-        return item.get("ctime", "")
-
-    all_raw.sort(key=_sort_key, reverse=True)
-
-    # 3) 与关键词关联
-    correlated = correlate_news_with_holdings(all_raw, keywords, top_n=top_n)
-
-    # 4) 在结果中标注来源（若无 matched_keywords 则补空列表）
-    for item in correlated:
-        if "matched_keywords" not in item:
-            item["matched_keywords"] = []
-
-    _result = correlated[:top_n]
-    _nset(_cache_key, _result)
-    return _result
+    result = _finalize_news_results(all_raw, keywords, top_n)
+    _save_news_cache(cache_key, result)
+    return result
