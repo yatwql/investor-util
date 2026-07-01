@@ -70,14 +70,100 @@
         .source-tag-industry { display: inline-block; background: #f3f4f6; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #6b7280; }
         .source-tag-concept { display: inline-block; background: #fef3c7; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #b45309; }
 
+        /* ── 章节快捷导航 ────────────────────── */
+        .section-nav {
+            display: flex; flex-wrap: nowrap; overflow-x: auto;
+            background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 16px; padding: 0; -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .section-nav::-webkit-scrollbar { display: none; }
+        .section-nav a {
+            flex-shrink: 0; display: block; padding: 10px 14px;
+            color: #2E75B6; text-decoration: none; font-size: 12px;
+            font-weight: 500; border-right: 1px solid #eee; white-space: nowrap;
+            transition: background 0.2s;
+        }
+        .section-nav a:hover { background: #e8f0fe; }
+        .section-nav a:last-child { border-right: none; }
+
         @media (max-width: 768px) {
-            .container { padding: 10px; }
-            .summary-grid { grid-template-columns: 1fr; }
-            .indices-grid { grid-template-columns: 1fr; }
-            .section-title { font-size: 14px; padding: 10px 14px; }
-            .section-content { padding: 10px 12px; }
-            table { font-size: 12px; }
-            td, th { padding: 4px 5px; }
+            .section-nav a { font-size: 11px; padding: 8px 10px; }
+        }
+
+        /* ── 移动端响应式 ────────────────────────── */
+        @media (max-width: 768px) {
+            .container { padding: 8px; }
+            .report-header { padding: 14px 16px; }
+            .report-header h1 { font-size: 18px; }
+            .report-header .subtitle { font-size: 12px; }
+
+            .section { margin-bottom: 14px; border-radius: 6px; }
+            .section-title { font-size: 14px; padding: 10px 12px; }
+            .section-content { padding: 8px 10px; }
+
+            /* 表格横向滚动 + 阴影提示 */
+            .section { position: relative; }
+            .section::after {
+                content: ''; position: absolute; right: 0; top: 40px; bottom: 0;
+                width: 20px; background: linear-gradient(to left, rgba(0,0,0,0.06), transparent);
+                pointer-events: none;
+            }
+            table { font-size: 11px; min-width: unset; }
+            td, th { padding: 4px 5px; white-space: nowrap; }
+            th { font-size: 10px; }
+
+            /* kv表格不限宽 */
+            .kv-table { min-width: unset; }
+            .kv-table td:first-child { width: 100px; font-size: 11px; }
+            .kv-table td { font-size: 11px; white-space: normal; }
+
+            /* 卡片布局堆叠 */
+            .summary-grid { grid-template-columns: 1fr; gap: 8px; }
+            .summary-card { padding: 10px 14px; }
+            .summary-card h3 { font-size: 11px; }
+            .summary-card .value { font-size: 18px; }
+
+            .indices-grid { grid-template-columns: 1fr; gap: 8px; }
+            .indices-group { padding: 8px 12px; }
+            .index-row { font-size: 11px; }
+
+            /* 字体缩小 */
+            body { font-size: 12px; }
+            .penetration-notes { font-size: 11px; padding: 6px 10px 12px; }
+
+            /* 回到顶部按钮 */
+            .back-to-top {
+                display: block; position: fixed; bottom: 16px; right: 16px;
+                width: 40px; height: 40px; border-radius: 50%;
+                background: #2E75B6; color: #fff; border: none;
+                font-size: 18px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                z-index: 999; opacity: 0.85;
+            }
+
+            /* 标签在移动端缩小 */
+            .source-tag, .source-tag-holding, .source-tag-penetration,
+            .source-tag-industry, .source-tag-concept {
+                font-size: 10px; padding: 0px 4px; margin: 0;
+            }
+        }
+
+        /* ── 超小屏（320px-480px）──────────────── */
+        @media (max-width: 480px) {
+            .report-header h1 { font-size: 16px; }
+            .section-title { font-size: 13px; }
+            table { font-size: 10px; }
+            td, th { padding: 3px 4px; }
+            .kv-table td:first-child { width: 80px; }
+            .summary-card .value { font-size: 16px; }
+        }
+
+        /* ── 打印优化 ──────────────────────────── */
+        @media print {
+            body { background: #fff; font-size: 12px; }
+            .container { max-width: 100%; padding: 0; }
+            .section { box-shadow: none; border: 1px solid #ddd; }
+            .back-to-top { display: none; }
         }
     </style>
 </head>
@@ -92,7 +178,23 @@
         <div class="subtitle">统计时间: {{ now }} | 所属交易日: {{ trading_day }}</div>
     </div>
 
+
     <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  SECTION NAVIGATION (mobile-friendly)                  -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <nav class="section-nav">
+        <a href="#sec-summary">一、投资分析汇总</a>
+        <a href="#sec-market-value">二、市值核算明细</a>
+        <a href="#sec-category">三、持仓分类</a>
+        <a href="#sec-penetration">四、资产穿透TOP10</a>
+        <a href="#sec-fund-perf">五、基金业绩</a>
+        {% if news_enabled %}<a href="#sec-news">六、新闻关联</a>{% endif %}
+        {% if early_warnings %}<a href="#sec-early-warning">七、智能预警</a>{% endif %}
+        {% if llm_enabled %}<a href="#sec-llm">LLM分析</a>{% endif %}
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="sec-summary"></div>
     <!--  MODULE 1: 汇总 (Summary)                              -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
@@ -211,6 +313,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="sec-market-value"></div>
     <!--  MODULE 2: 市值核算 (Market Value)                     -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
@@ -284,6 +387,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="sec-category"></div>
     <!--  MODULE 3: 持仓分类表 (Category Summary)                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
@@ -344,6 +448,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="sec-penetration"></div>
     <!--  MODULE 4: 资产穿透TOP10 (Penetration)                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
@@ -402,6 +507,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="sec-fund-perf"></div>
     <!--  MODULE 5: 基金业绩分析 (Fund Performance)              -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
@@ -443,6 +549,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="sec-news"></div>
     <!--  MODULE 6: 财经新闻热点与持仓关联分析 (News)            -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section">
@@ -540,6 +647,7 @@
         </div>
 
     <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="sec-early-warning"></div>
     <!--  MODULE 7: 智能预警 (Early Warning)                     -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <div class="section">
@@ -615,6 +723,7 @@
 
     {% if llm_enabled %}
     <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="sec-llm"></div>
     <!--  MODULE 8: 全球政经局势 (Global Macro, LLM augment)     -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -822,5 +931,8 @@
     {% endif %}
 
 </div>
+
+<button class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到顶部">&#8593;</button>
+
 </body>
 </html>
