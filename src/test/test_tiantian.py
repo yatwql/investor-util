@@ -261,6 +261,57 @@ class TestCalcRatingFromEntry(unittest.TestCase):
     def test_zero_division(self):
         self.assertEqual(_calc_rating_from_entry({"rank": "5", "total": "0"}), "")
 
+    def test_rank_outranks_percentile_when_conflict(self):
+        """百分位与排名矛盾时，以排名/总数为准（回归：159222 bug）。"""
+        # 百分位=3.33(top 3.3%)→优秀，但排名=4823/4985(bottom 3.3%)→偏差
+        self.assertEqual(
+            _calc_rating_from_entry({
+                "percentile": "3.33", "rank": "4823", "total": "4985",
+            }),
+            "偏差",
+        )
+
+    def test_rank_outranks_percentile_good_rank(self):
+        """排名好于百分位时，以排名为准。"""
+        self.assertEqual(
+            _calc_rating_from_entry({
+                "percentile": "60.0", "rank": "10", "total": "100",
+            }),
+            "优秀",
+        )
+
+    def test_no_conflict_both_good(self):
+        """百分位和排名一致时，返回一致的评级。"""
+        self.assertEqual(
+            _calc_rating_from_entry({
+                "percentile": "10.0", "rank": "10", "total": "100",
+            }),
+            "优秀",
+        )
+
+    def test_no_conflict_both_poor(self):
+        """百分位和排名都差时，返回偏差。"""
+        self.assertEqual(
+            _calc_rating_from_entry({
+                "percentile": "60.0", "rank": "80", "total": "100",
+            }),
+            "偏差",
+        )
+
+    def test_percentile_only_fallback(self):
+        """仅有百分位时，以百分位为准。"""
+        self.assertEqual(
+            _calc_rating_from_entry({"percentile": "10.0"}),
+            "优秀",
+        )
+
+    def test_rank_only_fallback(self):
+        """仅有排名时，以排名为准。"""
+        self.assertEqual(
+            _calc_rating_from_entry({"rank": "60", "total": "100"}),
+            "偏差",
+        )
+
 
 class TestParsePerfEvaluation(unittest.TestCase):
     """_parse_perf_evaluation — 解析业绩评价 JSON 变量。"""

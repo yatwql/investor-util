@@ -117,6 +117,9 @@
 ### Tests
 - 全量 1535 passed, 11 skipped, 30 subtests passed。
 
+### Fixed
+- **基金业绩评级 bug：百分位(Data_rateInSimilarPersent)与排名/总数(Data_rateInSimilarType)来自不同同类分组导致评级矛盾**（如 159222 自由现金流ETF：百分位 3.33→优秀，排名 4823/4985→偏差，最终错误显示"优秀"）。修复后：同时计算百分位评级和排名评级，不一致时以排名/总数为准并记日志。同步新增 6 项回归测试。
+
 ## [0.2.51] - 2026-07-01
 
 ### Added

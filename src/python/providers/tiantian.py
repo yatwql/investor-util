@@ -371,7 +371,7 @@ def _parse_rank_entry(text: str) -> dict[str, Any]:
                 last = rank_data[-1]
                 rank_entry["rank"] = str(last.get("y", "--"))
                 rank_entry["total"] = str(last.get("sc", "--"))
-        except (json.JSONDecodeError, IndexError, TypeError) as _e:
+        except (json.JSONDecodeError, IndexError, TypeError, AttributeError) as _e:
             logger.warning("解析同类排名数据失败: %s", _e)
 
     pct_match = re.search(r"var Data_rateInSimilarPersent\s*=\s*(\[.*?\]);", text, re.DOTALL)
@@ -382,45 +382,59 @@ def _parse_rank_entry(text: str) -> dict[str, Any]:
                 last_pct = pct_data[-1]
                 if isinstance(last_pct, list) and len(last_pct) >= 2:
                     rank_entry["percentile"] = str(round(last_pct[1], 2))
-        except (json.JSONDecodeError, IndexError, TypeError) as _e:
+        except (json.JSONDecodeError, IndexError, TypeError, AttributeError) as _e:
             logger.warning("解析百分位排名数据失败: %s", _e)
 
     return rank_entry
 
 
 def _calc_rating_from_entry(rank_entry: dict[str, Any]) -> str:
-    """根据排名百分位或排名/总数计算评级。"""
+    """根据排名/总数（优先）或百分位计算评级。
+
+    同时存在百分位和排名/总数时，分别计算：
+      - 若两者评级不一致 → 以排名/总数为准（排名和总数来自同一同类的明确分组）
+      - 百分位（Data_rateInSimilarPersent）可能来自更窄/不同的同类分组，仅供参考
+
+    Bug背景：159222 自由现金流ETF的百分位=3.33(top 3.3%)但排名=4823/4985(bottom 3.3%)，
+    两者矛盾，百分位来自细分同类而排名来自全量同类。
+    """
+    def _pct_to_rating(pct: float) -> str:
+        """将 0~1 百分位值转为评级。"""
+        if pct < 0 or pct > 1:
+            return ""
+        if pct <= 0.20:
+            return "优秀"
+        if pct <= 0.30:
+            return "良好"
+        if pct <= 0.50:
+            return "稳定"
+        return "偏差"
+
+    # 路径1：百分位
+    pct_rating = ""
     if rank_entry.get("percentile", "--") != "--":
         try:
             pct_val = float(rank_entry["percentile"]) / 100.0
+            pct_rating = _pct_to_rating(pct_val)
         except (ValueError, TypeError):
-            return ""
+            pass
 
-        if pct_val <= 0.20:
-            return "优秀"
-        elif pct_val <= 0.30:
-            return "良好"
-        elif pct_val <= 0.50:
-            return "稳定"
-        else:
-            return "偏差"
-
+    # 路径2：排名/总数（更可靠）
+    rank_rating = ""
     if rank_entry.get("rank", "--") != "--" and rank_entry.get("total", "--") != "--":
         try:
-            pct_val = int(rank_entry["rank"]) / int(rank_entry["total"])
+            rank_pct = int(rank_entry["rank"]) / int(rank_entry["total"])
+            rank_rating = _pct_to_rating(rank_pct)
         except (ValueError, ZeroDivisionError):
-            return ""
+            pass
 
-        if pct_val <= 0.20:
-            return "优秀"
-        elif pct_val <= 0.30:
-            return "良好"
-        elif pct_val <= 0.50:
-            return "稳定"
-        else:
-            return "偏差"
+    # 两者矛盾 → 以排名/总数为准
+    if pct_rating and rank_rating and pct_rating != rank_rating:
+        logger.info("百分位评级(%s)与排名评级(%s)不一致，以排名/总数(%s/%s)为准",
+                    pct_rating, rank_rating,
+                    rank_entry.get("rank", "?"), rank_entry.get("total", "?"))
 
-    return ""
+    return rank_rating or pct_rating or ""
 
 
 def _parse_perf_evaluation(text: str) -> dict[str, Any] | None:
