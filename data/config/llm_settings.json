@@ -5,8 +5,8 @@
     "global_macro": true,
     "expert_review": true,
     "health_check": true,
-    "penetration_deep": false,
-    "news_correlation": false
+    "penetration_deep": true,
+    "news_correlation": true
   },
 
   // ═══════════════════════════════════════════════════════════
