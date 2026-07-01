@@ -4,6 +4,46 @@
 
 ---
 
+## [0.2.56] - 2026-07-01
+
+### Fixed
+- **P0: 指数 `market_hour_aware` 不生效**（R-136）：`fetcher/index.py` 硬编码 `CACHE_DAILY` 代替 `get_ttl("index")`，盘中 30s 短 TTL 对指数无效。修复后指数在交易时段内自动使用短 TTL 刷新实时行情。
+- **P1: 多处硬编码 TTL 绕过 `get_ttl()`（R-137）**：`fund.py` 基金排名/基金持仓/基准、`industry.py` 行业分类、`market_value.py` 交易日历共 5 处硬编码常量改为 `get_ttl("type")`，确保 `config.json` 中的 `cache_ttl.*` 配置变更对所有读缓存路径生效。
+- **P1: `test_fund.py` 双重检查锁用例锁外竞态**：`_call_no` 非线程安全的 RMW 竞态在 `get_ttl()` 微耗时变化后暴露。改为 `threading.Event` 精确控制缓存状态，消除时序依赖。
+
+### Changed
+- **P2: `llm_health_check` TTL 7200→86400**（注册表 + config.json + 用户文档同步）：持仓体检报告基于组合结构（行业集中度/流动性/成本结构），持仓不变时无需每小时重新生成，24h + 持仓指纹变化自动失效更合理。
+- **P3: 交易日历 TTL 不一致消除**：`registry.py` 注册 14 天 + `market_value.py` 读缓存统一使用 `get_ttl("calendar")`，与 `cleanup_expired()` 清理周期一致。
+- **scripts/launch.ps1 / launch.sh**：`pip install -q` → `-qq`，抑制 `.venv` 内 pip 版本更新通知（venv 继承 Python 3.13.0 捆绑的 pip 24.2，而系统 pip 已升级至 26.1.2）。
+- **config.json + how-to-config.md 同步**：config.json 的 `cache_ttl` 补充缺失的 `tracking`（2592000）和 `calendar`（1209600）条目；how-to-config.md 同步更新示例 JSON、TTL 参数表及无分组说明；requirements.md cache_ttl 项数从 15→17。
+- **technical.md 缓存分组计数修正**：preload 组 5→6 模块（llm_health_check 加入后未更新）、refresh 组 10→9 模块（列表实际只有 9 项）。
+
+### Tests
+- 全量 1711 passed, 12 skipped, 31 subtests passed。
+
+---
+
+## [0.2.55] - 2026-07-01
+
+### Added
+- **P0: `_parse_syl_returns()` 长周期 + `--` 防御**：新增 `syl_2n`/`syl_3n`/`syl_5n` 长周期变量名映射；`--` 占位符跳过而非解析为数值，避免净值数据不足时误显示零收益。新增 4 项测试。
+- **P1: `_parse_risk_analysis()` 风险分析解析**：从 `Data_riskAnalysis` JS 变量解析年化波动率、最大回撤、夏普比率等风险指标。支持 JSON 对象格式（categories+data）和数组格式（`[名称,值]`）。`fetch_fund_rankings()` 返回字典新增 `risk_analysis` 字段。新增 7 项测试。
+- **P2: 5 级评级系统 + 类型差异化阈值**：
+  - **5 级评级**：4 级→5 级（优秀≤10%/良好≤30%/稳定≤50%/偏差≤75%/较差>75%），与 Morningstar/银河证券行业标准对齐。
+  - **`_pct_to_rating()` 独立函数**：百分位→评级纯函数，支持自定义阈值。
+  - **`_RATING_THRESHOLDS` 类型差异化**：`bond`/`qdii` 宽松（15%/35%/55%/80%），`index` 严格（10%/25%/45%/70%），`default` 标准（10%/30%/50%/75%）。
+  - **`fund_type_hint` 参数**：`_calc_rating_from_entry()` 自动选择类型阈值。
+- **`fund_performance.py` 同步 5 级**：`_RATING_ORDER` 扩展为 `["较差","偏差","稳定","良好","优秀"]`；`_RATING_COMMENT` 新增 `"较差"`；`_adjust_rating_with_benchmark` 自动适配。
+
+### Changed
+- **`test_tiantian.py` `TestCalcRatingFromEntry` 重写**：23 项覆盖 5 级边界 + 类型差异化阈值（bond/index/qdii/unknown 回退）；rank_outranks 矛盾回归用例从"偏差"→"较差"（5 级后底部 3.3% 映射正确）。
+
+### Tests
+- 全量 **1711 passed**（+20）, 12 skipped, 31 subtests passed。
+- `test_tiantian.py` 从 39 项扩充至 **65 项**（+26）
+
+---
+
 ## [0.2.54] - 2026-07-01
 
 ### Fixed
@@ -48,29 +88,6 @@
 - **plan.md**：P 区 12 项清理归档，移除已完成"日志轮转"条目；N 节 HTML 响应式 ✅ 从待实现方向移至已完成迭代。
 - **datasource-and-folders.md**：测试文件数 50→57，passed 1535→1691。
 - **technical.md**：测试数 1691 passed 同步。
-
----
-
-## [0.2.55] - 2026-07-01
-
-### Added
-- **P0: `_parse_syl_returns()` 长周期 + `--` 防御**：新增 `syl_2n`/`syl_3n`/`syl_5n` 长周期变量名映射；`--` 占位符跳过而非解析为数值，避免净值数据不足时误显示零收益。新增 4 项测试。
-- **P1: `_parse_risk_analysis()` 风险分析解析**：从 `Data_riskAnalysis` JS 变量解析年化波动率、最大回撤、夏普比率等风险指标。支持 JSON 对象格式（categories+data）和数组格式（`[名称,值]`）。`fetch_fund_rankings()` 返回字典新增 `risk_analysis` 字段。新增 7 项测试。
-- **P2: 5 级评级系统 + 类型差异化阈值**：
-  - **5 级评级**：4 级→5 级（优秀≤10%/良好≤30%/稳定≤50%/偏差≤75%/较差>75%），与 Morningstar/银河证券行业标准对齐。
-  - **`_pct_to_rating()` 独立函数**：百分位→评级纯函数，支持自定义阈值。
-  - **`_RATING_THRESHOLDS` 类型差异化**：`bond`/`qdii` 宽松（15%/35%/55%/80%），`index` 严格（10%/25%/45%/70%），`default` 标准（10%/30%/50%/75%）。
-  - **`fund_type_hint` 参数**：`_calc_rating_from_entry()` 自动选择类型阈值。
-- **`fund_performance.py` 同步 5 级**：`_RATING_ORDER` 扩展为 `["较差","偏差","稳定","良好","优秀"]`；`_RATING_COMMENT` 新增 `"较差"`；`_adjust_rating_with_benchmark` 自动适配。
-
-### Changed
-- **`test_tiantian.py` `TestCalcRatingFromEntry` 重写**：23 项覆盖 5 级边界 + 类型差异化阈值（bond/index/qdii/unknown 回退）；rank_outranks 矛盾回归用例从"偏差"→"较差"（5 级后底部 3.3% 映射正确）。
-
-### Tests
-- 全量 **1711 passed**（+20）, 12 skipped, 31 subtests passed。
-- `test_tiantian.py` 从 39 项扩充至 **65 项**（+26）
-
----
 
 ## [0.2.53] - 2026-07-01
 

@@ -57,7 +57,8 @@ fi
 
 # 4. 安装依赖
 echo "正在安装依赖 ..."
-pip install -q -r requirements.txt
+# -qq 级静默：抑制 pip 版本通知和下载进度条
+pip install -qq -r requirements.txt
 if [ $? -ne 0 ]; then
     echo "错误: 安装依赖失败。" >&2
     exit 1

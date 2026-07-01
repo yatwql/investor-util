@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-01（v0.2.55 — P0 长周期/P1 风险分析/P2 5 级评级 + 类型差异化阈值）
+最后更新：2026-07-01（v0.2.56 — 全局 Cache TTL 审计 + 注册表统一 + pip 静默安装）
 
 ---
 
@@ -296,8 +296,8 @@ llm_key.json (敏感密钥)    ──→ 覆盖 llm_settings.json 的同名字�
 ### 缓存分组机制
 
 通过 `registry.py` 的 `cache_groups` 字段定义分组：
-- **preload（5 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
-- **refresh（10 模块）**：fund_rank, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, benchmark → 菜单 `[1]` 触发清除
+- **preload（6 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
+- **refresh（9 模块）**：fund_rank, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, benchmark → 菜单 `[1]` 触发清除
 - **独立模块**：tracking, calendar → 无分组保护，不被菜单缓存命令误删
 
 ---

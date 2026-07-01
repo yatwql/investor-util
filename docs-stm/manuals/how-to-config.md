@@ -42,11 +42,13 @@
     "benchmark": 2592000,
     "llm_global_macro": 86400,
     "llm_expert_review": 7200,
-    "llm_health_check": 7200,
+    "llm_health_check": 86400,
     "llm_penetration_deep": 86400,
     "profit_forecast": 86400,
     "sector_flow": 900,
-    "dividend": 2592000
+    "dividend": 2592000,
+    "tracking": 2592000,
+    "calendar": 1209600
   }
 }
 ```
@@ -139,12 +141,14 @@
 | `news` | `news_{md5}.json` | 15 分钟 | 新闻源参数 + 关键词 | 多源新闻聚合结果 |
 | `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | A股/美股指数 + 持仓汇总 | 全球政经局势 LLM 分析 |
 | `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | 持仓汇总 + 分类计数 + 穿透 TOP10 + 持仓明细 | 智囊团深度复盘 LLM 分析 |
-| `llm_health_check` | `llm_health_check_{fingerprint}.json` | 2h | 持仓明细（排除行情波动） | 持仓体检报告 LLM 分析 |
+| `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 LLM 分析 |
 | `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 LLM 分析 |
 | `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 1h | 标题前 80 字 + 持仓指纹 | 财经新闻热点与持仓关联分析 |
 | `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
 | `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | A股+美股指数 | 行业资金流向排名 |
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
+| `tracking` | `holdings_tracking.json` | 30 天 | — | 持仓跟踪数据（精确键名，无指纹） |
+| `calendar` | `trading_calendar.json` | 14 天 | — | A 股交易日历（精确键名，无指纹） |
 
 > **指纹驱动失效：** 文件名中的 `{fingerprint}` 是输入数据的 MD5 哈希。持仓/指数数据变化时指纹自动改变，原缓存失效，无需手动清除。
 > 
@@ -163,7 +167,7 @@
 | `preload` | 股票价格、市场指数、LLM 全球政经局势、LLM 智囊团深度复盘、LLM 持仓体检报告、LLM 穿透深度分析 | **切换持仓文件后必须重取的数据。** 价格/指数随持仓变动，LLM 基础分析依赖持仓内容，切换到新持仓文件时必须清除旧缓存 |
 | `refresh` | 基金业绩排名、基金持仓、行业分类、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准 | **可随时独立刷新的补充数据。** 不依赖持仓文件切换，任何时候都可以主动刷新 — 如盘中更新行业资金流向、拉取最新基金排名 |
 
-**无分组的模块**（持仓跟踪 `tracking`、交易日历 `calendar`）：未被任何分组覆盖，不会被菜单缓存命令误删。
+**无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.tracking` / `cache_ttl.calendar` 自行调整。
 
 ### 与菜单命令的对应关系
 

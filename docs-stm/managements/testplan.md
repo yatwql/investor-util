@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.55 — P0 长周期/P1 风险分析/P2 5 级评级 + 类型差异化阈值）
+最后更新：2026-07-01（v0.2.56 — 全局 Cache TTL 审计 + 测试 race condition 修复）
 
 ---
 
@@ -176,6 +176,7 @@
 | v0.2.53 | P1 LLM Prompt 精简 + P2 HTTP/2 复用 + dead code 清理 |
 | v0.2.54 | P 节 12 项 Edge Case/场景测试补全 + 评级 bug 修复 + 8 项预存测试缺陷修复 + HTML 响应式 + docs 反推补全 |
 | v0.2.55 | P0 长周期收益率 + P1 风险分析解析 + P2 5 级评级系统 + 类型差异化阈值 + test_tiantian.py 39→65 项 |
+| v0.2.56 | P0 index market_hour_aware 修复 + P1 硬编码 TTL 全部替换为 get_ttl() + pip -qq 静默 + test_double_check 竞态修复 |
 
 ---
 

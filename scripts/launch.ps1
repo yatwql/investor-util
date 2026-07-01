@@ -68,7 +68,8 @@ try {
 # 4. 安装依赖
 Write-Host "正在安装依赖 ..."
 try {
-    pip install -q -r requirements.txt
+    # -qq 级静默：抑制 pip 版本通知和下载进度条
+    pip install -qq -r requirements.txt
 } catch {
     Write-Host "错误: 安装依赖失败。" -ForegroundColor Red
     exit 1

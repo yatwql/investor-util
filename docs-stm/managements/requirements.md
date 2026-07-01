@@ -358,7 +358,7 @@ Extended Thinking 详解、定价表等）及本章各模块的完整配置项�
 | `market_hour_aware` | list | `["price", "index"]` | 手动 | 交易时段短 TTL 的数据类型 |
 | `market_hour_ttl` | int | `30` | 手动 | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30", end:"15:00", official_source:true}` | 手动 | 交易时段配置 + 官方 API 开关 |
-| `cache_ttl` | dict | 15 项 | 手动 | 各缓存类型 TTL（秒） |
+| `cache_ttl` | dict | 17 项 | 手动 | 各缓存类型 TTL（秒） |
 | `llm_key_file` | str | `data/config/llm_key.json` | 手动 | LLM 密钥文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | 手动 | LLM 参数文件路径 |
 

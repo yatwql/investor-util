@@ -14,7 +14,7 @@ import threading
 from typing import Any, Callable
 
 from src.python.cache import CACHE_DAILY, CACHE_MONTHLY, CACHE_WEEKLY
-from src.python.cache import get as cache_get, set as cache_set
+from src.python.cache import get as cache_get, get_ttl, set as cache_set
 from src.python.config import get_config
 from src.python.fetcher.chain import _fetch_with_fallback
 from src.python.providers import tiantian
@@ -46,7 +46,7 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
         "fund_rank",
         _FUND_RANK_PROVIDERS,
         _FUND_PERF_CACHE_PREFIX + code,
-        CACHE_DAILY,
+        get_ttl("rank"),
         fn_kwargs={"code": code},
     )
 
@@ -72,7 +72,7 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
         "fund_hold",
         _FUND_HOLD_PROVIDERS,
         _FUND_HOLD_CACHE_PREFIX + code,
-        CACHE_WEEKLY,
+        get_ttl("hold"),
         fn_kwargs={"code": code},
     )
 
@@ -194,13 +194,13 @@ def fetch_fund_benchmark(code: str) -> str:
     """
     code = code.strip()
     cache_key = _BENCHMARK_TABLE_KEY
-    cached = cache_get(cache_key, CACHE_MONTHLY)
+    cached = cache_get(cache_key, get_ttl("benchmark"))
     if cached is not None and isinstance(cached, dict):
         return cached.get(code, "--")
 
     lock = _get_benchmark_lock(code)
     with lock:
-        cached = cache_get(cache_key, CACHE_MONTHLY)
+        cached = cache_get(cache_key, get_ttl("benchmark"))
         if cached is not None and isinstance(cached, dict):
             return cached.get(code, "--")
 

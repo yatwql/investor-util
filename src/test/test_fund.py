@@ -261,17 +261,20 @@ class TestFetchFundBenchmark(unittest.TestCase):
     @patch("src.python.fetcher.fund._fetch_benchmark_from_api")
     def test_double_check_locking(self, mock_api, mock_set, mock_get):
         """双重检查锁：只有第一个进入的线程调 API，第二个线程复用结果。"""
-        # 用可变状态模拟：第一次 cache_get → None 触发锁，
-        # 锁内第二次也 None → 调 API → cache_set 写入
-        # 第二个线程进入锁后第三次 cache_get 返回刚写入的值
-        _call_no = [0]
+        # 用 Event 控制：API 调用前 cache_get 返回 None，调用后返回有效数据
+        api_called = threading.Event()
+
         def _side(*args, **kwargs):
-            _call_no[0] += 1
-            if _call_no[0] >= 3:
-                return {"000000": "沪深300"}
-            return None
+            # 第 1 次调用（任意线程首次检查）：返回 None → 进入锁
+            if not api_called.is_set():
+                return None
+            # API 已调用后：返回有效数据（模拟缓存生效）
+            return {"000000": "沪深300"}
+
         mock_get.side_effect = _side
-        mock_api.return_value = "沪深300"
+        mock_api.side_effect = lambda code: (
+            api_called.set() or "沪深300"
+        )
 
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:

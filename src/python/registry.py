@@ -128,7 +128,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
                   cache_groups=("refresh",)),
     DataModuleDef("持仓体检报告", "llm_health_check",
                   cache_prefixes=("llm_health_check_",),
-                  cache_ttl=7200, settings_suffix="health_check",
+                  cache_ttl=86400, settings_suffix="health_check",
                   cache_groups=("preload",)),
     DataModuleDef("穿透深度分析", "llm_penetration_deep",
                   cache_prefixes=("llm_penetration_deep_",),
@@ -158,7 +158,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     # ── 交易日历（akshare 全年数据，极少变动，无 cache_group 避免误删）──
     DataModuleDef("交易日历", "calendar",
                   exact_cache_keys=("trading_calendar",),
-                  cache_ttl=CACHE_WEEKLY * 2),  # 两周，由 market_value.py 的 7 天 TTL 实际控制获取频次
+                  cache_ttl=CACHE_WEEKLY * 2),  # 两周（cleanup 周期 + 读缓存均从此取值）
 )
 
 

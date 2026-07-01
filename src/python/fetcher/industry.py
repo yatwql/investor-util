@@ -10,7 +10,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from src.python.cache import CACHE_WEEKLY
+from src.python.cache import get_ttl
 from src.python.fetcher.chain import _fetch_with_fallback
 from src.python.providers import eastmoney_industry
 
@@ -54,7 +54,7 @@ def fetch_industry_data(code: str) -> dict | None:
         "industry",
         _INDUSTRY_PROVIDERS,
         _INDUSTRY_CACHE_PREFIX + code.strip(),
-        CACHE_WEEKLY,
+        get_ttl("industry"),
         fn_kwargs={"code": code.strip()},
         transform=_industry_transform,
     )

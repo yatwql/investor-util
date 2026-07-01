@@ -168,7 +168,6 @@ def is_midday_break() -> bool:
 
 # ── 交易日历（节假日感知） ───────────────────────────────
 _TRADING_CALENDAR_CACHE_KEY = "trading_calendar"
-_TRADING_CALENDAR_TTL = 86400 * 7  # 7 天刷新一次
 
 
 def _get_trading_calendar() -> set[str]:
@@ -180,7 +179,7 @@ def _get_trading_calendar() -> set[str]:
     Returns:
         交易日日期字符串集合
     """
-    cached = cache.get(_TRADING_CALENDAR_CACHE_KEY, _TRADING_CALENDAR_TTL)
+    cached = cache.get(_TRADING_CALENDAR_CACHE_KEY, cache.get_ttl("calendar"))
     if cached is not None and isinstance(cached, list):
         logger.debug("交易日历缓存命中")
         return set(cached)

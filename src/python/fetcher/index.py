@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from src.python.cache import CACHE_DAILY, CACHE_WEEKLY, get as cache_get, set as cache_set
+from src.python.cache import CACHE_DAILY, CACHE_WEEKLY, get as cache_get, get_ttl, set as cache_set
 from src.python.providers import sina, tencent
 
 logger = logging.getLogger("invest")
@@ -37,7 +37,7 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
     uncached_codes: list[str] = []
     for index_code in _A_INDICES:
         cache_key = _index_cache_key(index_code)
-        cached = cache_get(cache_key, CACHE_DAILY)
+        cached = cache_get(cache_key, get_ttl("index"))
         if cached is not None:
             indices[index_code] = cached
         else:
@@ -98,7 +98,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
 
     for code in _US_INDEX_CODES:
         cache_key = _index_cache_key(code)
-        cached = cache_get(cache_key, CACHE_DAILY)
+        cached = cache_get(cache_key, get_ttl("index"))
         if cached is not None:
             indices[code] = cached
         else:
