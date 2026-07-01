@@ -62,9 +62,10 @@
 
 ### Fixed
 - **config.json 缺少 `early_warning` 配置段**：补齐 `sector_alert_threshold_*` 和 `sentiment_top_n` 三个可调参数。
+- **P0: `handlers_cache.py` 缺失 `read_holdings` 导入（R-084）**：从 `tui_handlers.py` 拆分出 `handlers_cache.py` 时，`_read_holdings_and_clear_cache()` 依赖的 `read_holdings` 导入未随迁，菜单 [1]/[2] 刷新缓存时 `NameError`。已补上 `from src.python.reader import read_holdings`。
 
 ### Docs
-- **review-findings.md**：精简审查记录，待办区全部清空（R-001~R-083 ✅）。
+- **review-findings.md**：精简审查记录，待办区全部清空（R-001~R-083 ✅）；R-084（P0 导入缺失）已完成并移入 changelog；新增场景审计 12 项（R-101~R-112）。
 - **plan.md / technical.md / README.md**：版本号同步至 v0.2.52，K/L/M/N/O 方向标注。
 - **datasource-and-folders.md**：测试文件数 35→50，新增 `reason.bat`。
 
