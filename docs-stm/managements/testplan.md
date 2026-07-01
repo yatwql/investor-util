@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-01
+最后更新：2026-07-01（v0.2.54 — Edge Case + 业务场景 + 回归测试体系全面加强）
 
 ---
 
@@ -9,77 +9,142 @@
 
 ### 1.1 单元测试
 
-每个 Python 模块对应的测试文件位于 `src/test/` 目录下。
+**测试框架**：`pytest`（含 `unittest.mock.patch` + `pytest-mock`）
 
-**测试框架**：`pytest`
+**覆盖要求：**
 
-**覆盖要求**：
-- 数据模型（`src/python/models.py`）：100% 覆盖字段验证逻辑
-- 配置管理（`src/python/config.py`）：100% 覆盖读写、缺省、异常路径（含 `output_dir` 字段）
-- 持仓读取（`src/python/reader.py`）：覆盖标准格式、缺字段、空文件、格式错误
-- 缓存管理（`src/python/cache.py`）：覆盖过期判断、读写、文件缺失、前缀清理
-- API 数据获取（`src/python/providers/*.py`）：mock HTTP 请求，覆盖正常返回、超时、异常格式
-- LLM 客户端（`src/python/llm/` 包）：覆盖 API 调用路由、返回类型元组解包、缓存逻辑、截断检测
-- 报表生成（`src/python/report/*.py`）：每个模块至少覆盖正常数据和空数据两种场景
-- 关键词富化（`src/python/report/news_correlation.py`）：覆盖持仓/穿透/行业三种来源类型、去重逻辑、空列表边界、Excel 格式断言（wrap_text、列宽）
-- TUI 菜单（`src/python/tui_menu.py`）：覆盖所有菜单选项的输入输出
+| 模块 | 覆盖目标 | 强制验证项 |
+|:-----|:--------|:-----------|
+| `models.py` | 100% 字段验证 | 有效值、边界值（0/负数/超长字符串）、类型错误 |
+| `config.py` | 100% 读写/异常 | 文件缺失、JSON 损坏、null 值覆盖、类型错误、权限拒绝、并发写入 |
+| `reader.py` | 标准格式 + 7 种异常 | 空文件、缺列、多工作表、全空行、数值类型转换失败、zip 损坏、临时文件（~$前缀自动跳过） |
+| `cache.py` | 过期判断、读写、清理 | 原子写入、损坏恢复、TTL 边界（0s/1s/过期1s）、前缀匹配、并发 access、gzip 透明解压 |
+| `providers/*.py` | mock HTTP + 异常 | 200 正常 / 空数据 / 超时 / 429 / 503 / JSON 格式错误 / HTML 而非 JSON / 空响应 / 字段缺失 / 编码异常 |
+| `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、指纹确定性 |
+| `report/*.py` | 正常 + 空数据 + 边界 | 单条持仓、最大 100 条持仓、零成本/零市值、全亏损、全盈利、混合账户 |
+| `market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |
+| `handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
+| `tui_menu.py` | 所有 14 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
 
-### 1.2 集成测试
+### 1.2 Edge Case 强制清单
+
+每个模块的测试必须覆盖以下 edge case 类型（至少每个函数 1 项）：
+
+| Edge Case 类型 | 示例 | 验证点 |
+|:---------------|:-----|:-------|
+| **零值边界** | 成本=0、市值=0、份额=0、收益率=NaN | 不抛出 ZeroDivisionError，输出 `0.0` 或 `--` |
+| **极大/极小值** | 市值超 1e12、成本=0.0001、份额=1e8 | 数值不溢出，`_fmt_wan()` 正确定标 |
+| **空数据集** | 空持仓文件、空 API 响应、空缓存文件、空新闻列表 | 不崩溃，输出合理占位 |
+| **单条/极限大** | 1 条持仓 vs 1000 条持仓 | 前者不空转，后者有时间保护（不超时） |
+| **Unicode/全角** | 名称含全角括号、emoji、日文 | 不崩、JSON 序列化正常、Excel 不乱码 |
+| **并发/竞态** | 两个线程同时 `cache.set()` 同 key | 不产生损坏文件 |
+| **时区安全** | 系统时区非 UTC+8 时运行 | `datetime.now(timezone(hours=8))` 一致 |
+| **版本兼容** | 旧版缓存带 `--` 占位符、新版带 `|--|` | 旧缓存正确降级读取 |
+| **特殊代码格式** | `600000`（无前缀）、`sh600000`、`600000.SH` | 统一处理 |
+| **文件系统边界** | 缓存目录不存在、磁盘满、路径含空格/中文 | 自动创建目录、gzip 压缩回退 |
+
+### 1.3 业务场景测试（Scenario Tests）
+
+按真实用户行为组合设计的集成测试场景：
+
+| 场景 | 前置条件 | 操作 | 验证点 |
+|:-----|:---------|:-----|:-------|
+| **S1: 纯股票组合** | 持仓仅含 3 只 A 股，无基金 | 菜单 E → 菜单 H | 穿透 TOP10 等于直接持股；基金业绩显示"无基金"；总计正确 |
+| **S2: 纯基金组合** | 持仓仅含 5 只基金（ETF+主动+QDII） | 菜单 L | 穿透计算正确、分类表无"股票"行、LLM 正常生成 |
+| **S3: 混合多账户** | 3 个账户：证券（股票+ETF）、支付宝（场外基金）、微信（债基） | 菜单 L | 分账户小计正确、总计 = 小计和、分类表按账户分组 |
+| **S4: 新持仓无缓存** | 删除全部缓存后首次生成 | 菜单 L | 所有 API 正常获取、无缓存命中提示、生成时间 > 缓存命中场景 |
+| **S5: 缓存全命中** | 连续两次执行菜单 L，间隔 < TTL | 菜单 L × 2 | 第二次所有 LLM 显示"缓存命中"页脚、总费用为 0 |
+| **S6: 切换持仓文件** | 两个不同 xlsx，先选 A 生成报告，再选 B | 菜单 L → 菜单 2 → 菜单 L | 价格/指数缓存因持仓变更而更新、LLM 缓存因指纹不同而重新生成 |
+| **S7: 非交易日生成** | 模拟周末执行 | 菜单 L | 取价方式显示"场内收盘价(T-1)"、"官方净值(最近交易日)"，不显示"实时价" |
+| **S8: 单一品种极限** | 全部资金买入同一只股票 | 菜单 E | 分类表仅一行、穿透 TOP10 仅一项、总计 = 单项 |
+| **S9: QDII 特殊处理** | 持仓含 QDII 基金（净值滞后 1 日） | 菜单 L | 取价方式显示"QDII滞后1日"、净值日期标注、LLM 不会讨论该品种的"本日"盈亏 |
+| **S10: LLM 全部失败** | llm_key.json 缺失 API Key | 菜单 L | 所有 LLM 模块占位"请配置"、核心报告正常生成、不崩溃 |
+
+### 1.4 集成测试
 
 - **数据流完整链路**：持仓 xlsx → 数据获取 → 缓存 → Excel/HTML 输出，全流程可走通
 - **API 联通性**：手动验证腾讯财经、东方财富、天天基金 API 实际可调通（每次迭代至少验证一次）
 - **缓存与 API 协同**：缓存存在 + 未过期 → 不调 API；缓存不存在 → 调 API 并写入
+- **原子写入验证**：模拟磁盘满 / 断电台式机重启后缓存和配置文件完整性
 
-### 1.3 异常场景测试
+### 1.5 异常场景全覆盖
 
-| 场景 | 预期行为 |
-|---|---|
-| 持仓目录不存在 | TUI 提示配置目录，不崩溃 |
-| 持仓目录为空 | TUI 提示配置目录，不崩溃 |
-| 持仓 xlsx 格式异常 | 提示具体错误行，跳过异常行 |
-| 网络断开 | 提示网络异常，使用缓存数据或显示"--" |
-| API 超时 | 自动切换备用链路；全部失败则跳过该数据 |
-| API 返回异常数据 | 跳过该条，日志记录 |
-| 缓存文件损坏 | 删除损坏缓存，重新获取 |
-| 报告输出目录无写入权限 | 提示文件写入失败 |
-| 股票代码前缀缺失（600000 vs sh600000） | 自动补全或正确处理 |
-| ThreadPoolExecutor 并发取价竞争 | 每种资产正确获取独立价格 |
-| LLM API 超时（120s 上限） | 降级返回 None，报告输出占位文本 |
-| LLM 缓存中 HTML 格式与旧版本 Markdown 格式共存 | 新缓存直接存储 HTML，老缓存自然过期（指纹变更） |
-| 空持仓下菜单 [L] 全系列报告生成 | 跳过 LLM 调用，输出空占位 |
-| cache.set() 写入时目录被删除 | 自动重试，不抛出异常 |
-| config.json / llm_settings.json / llm_key.json 配置值异常 | 输出警告，使用代码默认值 |
-| fund_performance.json 中 categories/data 为 JSON null | 自动兜底为空列表，不崩溃 |
-| html_writer.py LLM 内部调用路径（enable_llm=True, llm_content=None） | 传入 dict 类型指数数据，不因 .values() 缺失崩溃 |
-| summary.py write_summary_sheet 收到 list 而非 dict | write_summary_sheet 从 fetch_indices() 接收 dict，不因 .get() 缺失崩溃 |
-| fund_performance _adjust_rating_with_benchmark 中 categories 传入 None | 自动兜底为空列表不崩溃；循环中 cat 为 None 时 `in` 操作不崩溃 |
-| perf_eval.get("categories") / get("data") 返回 None 时 len() 和 enumerate() | 使用 or [] 兜底后，len([]) = 0 不崩溃，enumerate([]) 为空迭代 |
-
-### 1.4 数据正确性验证
-
-| 验证项 | 方法 |
-|---|---|
-| 市值 = 最新价 × 份额 | 抽样 3-5 条持仓手动计算比对 |
-| 盈亏 = 市值 - 成本 | 同上 |
-| 分账户小计 = 该账户持仓合计数 | 逐账户比对 |
-| 总计 = 各账户小计之和 | 比对总计行 |
-| 穿透 TOP10 合并逻辑 | 构造两个基金持相同股票 + 直接持有，验证合并正确 |
-| 本日盈亏计算 | 给定时价、昨收、份额，验证公式输出 |
-
-### 1.5 UI/UX 验证
-
-| 验证项 | 标准 |
-|---|---|
-| TUI 菜单显示 | 选项完整、中文字符正常、按键响应正确 |
-| Excel 文件 | 各页签命名正确、冻结首行、颜色格式正确 |
-| HTML 文件 | 浏览器渲染正常、中文字符无乱码、布局清晰 |
+| 场景 | 预期行为 | 现有测试 |
+|:-----|:---------|:--------:|
+| 持仓目录不存在 | TUI 提示配置目录，不崩溃 | ✅ |
+| 持仓目录为空 | TUI 提示配置目录，不崩溃 | ✅ |
+| 持仓 xlsx 格式异常 | 提示具体错误行，跳过异常行 | ✅ |
+| 网络断开 | 提示网络异常，使用缓存数据或显示"--" | ✅ |
+| API 超时 | 自动切换备用链路；全部失败则跳过该数据 | ✅ |
+| API 返回异常数据 | 跳过该条，日志记录 | ✅ |
+| 缓存文件损坏 | 删除损坏缓存，重新获取 | ✅ |
+| 报告输出目录无写入权限 | 提示文件写入失败 | ✅ |
+| 股票代码前缀缺失 | 自动补全 | ✅ |
+| 并发取价竞争 | 每种资产正确获取独立价格 | ✅ |
+| LLM API 超时（120s 上限） | 降级返回 None，报告输出占位文本 | ✅ |
+| LLM 缓存 HTML vs Markdown 共存 | 新缓存 HTML，老缓存自然过期 | ✅ |
+| 空持仓下菜单 L | 跳过 LLM 调用，输出空占位 | ✅ |
+| config.json 配置值异常 | 输出警告，使用代码默认值 | ✅ |
+| JSON null 自动兜底 | 不崩溃，降级为空列表 | ✅ |
+| market_hours UTC 时区 | `datetime.now(timezone(hours=8))` 一致 | 🔴 已修复，需补测试 |
+| config 原子写入断电 | `tempfile.mkstemp` + `os.replace` | 🔴 已实现，需补测试 |
+| Provider 回退链路 | 主 provider 失败 → fallback provider | 🟡 待补 |
+| 熔断器冷却恢复 | 熔断后 60s 半开探测 | 🟡 待补 |
+| 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | 🟡 待补 |
+| LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | 🟡 待补 |
 
 ---
 
-## 2. 各迭代测试重点
+## 2. 数据正确性验证
+
+| 验证项 | 方法 | 现有测试 |
+|:-------|:-----|:--------:|
+| 市值 = 最新价 × 份额 | 抽样 3-5 条持仓手动计算比对 | ✅ |
+| 盈亏 = 市值 - 成本 | 同上 | ✅ |
+| 分账户小计 = 该账户持仓合计数 | 逐账户比对 | ✅ |
+| 总计 = 各账户小计之和 | 比对总计行 | ✅ |
+| 穿透 TOP10 合并逻辑 | 构造两个基金持相同股票 + 直接持有 | ✅ |
+| 本日盈亏计算 | 给定时价、昨收、份额 | ✅ |
+| 收益率 = 盈亏 / 成本（成本 > 0） | 验证边界值 cost=0 | ✅ |
+| 溢价率 = (市价 - 净值) / 净值 | QDII ETF 验证 | 🟡 |
+| 本日盈亏 — 场外非 T 日更新 | 场外基金 nav_date ≠ T → today_profit = 0 | 🟡 |
+| 穿透市值占比归一化 | TOP10 占比总和 ≤ 100% | 🟡 |
+
+---
+
+## 3. UI/UX 验证
+
+| 验证项 | 标准 | 现有测试 |
+|:-------|:-----|:--------:|
+| TUI 菜单显示 | 14 选项完整、中文字符正常、按键响应正确 | ✅ |
+| Excel 文件 | 页签编号排序（1.~12.）、冻结首行、盈亏着色（红/绿）、取价方式蓝色标识 | ✅ |
+| HTML 文件 | 浏览器渲染正常、中文无乱码、章节锚点导航、LLM 条件渲染 | ✅ |
+| 日志输出 | `logs/app.log` 含 INFO/WARNING/ERROR 三级，无敏感信息（API Key 脱敏） | 🟡 |
+| LLM 占位文本 | "未配置"/"已禁用"/"生成失败"三种文本区分明确 | 🟡 |
+| LLM 缓存提示 | 缓存命中显示灰字"本次使用LLM缓存" | ✅ |
+
+---
+
+## 4. 回归测试清单
+
+每次代码变更后必须执行的全量回归：
+
+| 优先级 | 回归范围 | 触发条件 |
+|:------:|:---------|:---------|
+| **P0** | `pytest src/test/` 全量 50 文件 | 任何代码变更 |
+| **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） |
+| **P1** | 手动运行菜单 E/H/B/L 各一次 | config / report 相关变更 |
+| **P1** | 手动运行菜单 [1] [2] [3] [4] | cache / handlers 相关变更 |
+| **P2** | 清理缓存后全新运行 | provider / fetcher 相关变更 |
+| **P2** | 断网环境下运行 | 网络相关变更 |
+| **P3** | 在非 UTC+8 时区机器上运行 | 日期/时间相关变更 |
+
+---
+
+## 5. 各迭代测试重点
 
 | 迭代 | 测试重点 |
-|---|---|
+|:------|:---------|
 | Iter 1.1 | 配置文件读写正确性、启动脚本可用性 |
 | Iter 1.2 | xlsx 解析正确性、菜单导航完整性 |
 | Iter 1.3 | API 联通性、缓存过期逻辑、备用链路切换 |
@@ -87,36 +152,89 @@
 | Iter 1.5 | 全链路异常场景覆盖 |
 | Iter 2 | 分类汇总聚合计算、穿透合并逻辑（含精细化分类）、基金排名数据正确性 |
 | Iter 3.1 | HTML 渲染效果、Jinja2 模板正确性、5 模块内容一致性 |
-| Iter 3.2 | 5 源新闻聚合正确性、关键词关联准确度、`news_top_count` 可配置验证 |
-| Iter 3.3 | 模板占位显示（全球政经局势 / 智囊团深度复盘）、缓存管理（菜单 [3] 清理 / [4] 统计）、缓存文件损坏自动修复、异常友好提示（网络/权限/文件损坏） |
-| Iter 3.4 | LLM API 联通性、缓存 24h 生效、API Key 未配置降级占位文本、LLM 输出格式兜底 |
-| Iter 3.5 | LLM 并行生成全球政经局势 + 智囊团深度复盘同时成功、System Prompt 外部可配置生效、httpx 连接池复用、提示词紧凑化效果 |
-| Iter 3.6 | 多线程并发缓存获取无竞态、新闻 15min 缓存过期、LLM 缓存预检正确跳过线程池、Token 用量正确展示、_SYSTEM_EXPERT 压缩后三阶段格式保持、死代码无残留、配置校验警告正确触发 |
-| Iter 3.7 | html_writer.py 中 a_indices 以 dict 类型传入 generate_all_llm（不因 .values() 崩溃）、fund_performance.py 在 API 返回 JSON null 时 categories/data 自动兜底、summary.py write_summary_sheet 接收 dict 类型指数数据（不因 list 传入致 .get() 崩溃）、fund_performance._adjust_rating_with_benchmark 中 categories 含 None 时自动兜底 |
-| v0.2.10 | 关键词富化函数 `_build_keyword_lookup`/`_enrich_keywords_for_item`/`_format_enriched_keywords` 单元测试覆盖三种来源类型（持仓/穿透/行业）、去重逻辑、空列表边界；Excel 格式断言（B/C 列 wrap_text、列宽 B=40/C=50、左对齐、富化关键词写入）；HTML 模板 enriched_keywords 着色（holding→蓝/penetration→紫/industry→灰） |
-| v0.2.11 | `eastmoney_industry` provider 单元测试覆盖正常返回（含/不含概念）、data 为空、响应为空、超时异常、基金代码处理；`fetcher.fetch_industry_data` / `batch_fetch_industry_data` 缓存集成测试；`_build_keyword_lookup` 新增 concept 类型覆盖测试；`_enrich_keywords_for_item` 新增概念类型富化显示测试；全量 607 passed |
-| v0.2.18 | 新增 `test_akshare_extras.py`（16 项）：指数指纹计算、缓存键生成、分红汇总计算、分红数据获取全路径、内存缓存（TestMemoCache 5 项）；`test_llm.py` 新增 sector_flow prompt 注入测试（2 项）、batch 新闻 LLM 分析测试（6 项）；全量 749 passed |
-| v0.2.29 | 持仓体检报告新增：`generate_health_check`/`_health_check_fingerprint` 单元测试、`write_llm_sheets` 扩展为 3 元组测试、`generate_all_llm` 返回 6 元组测试、`write_html_report` 签名 3 元组测试；`tui_handlers.py` `health_text` 参数覆盖、配置项 `model_health_check`/`temperature_health_check` 等 10 项默认值验证；全量 783 passed |
-| v0.2.30 | 穿透深度分析新增：`generate_penetration_deep_analysis`/`_penetration_deep_fingerprint` 单元测试、`write_llm_sheets` 扩展为 4 元组测试、`generate_all_llm` 返回 8 元组测试、`write_html_report` 签名 4 元组测试；Excel 页签序号前缀（1.~10.）排序验证；TUI 模型路由 5 条显示覆盖；配置项 `model_penetration_deep`/`temperature_penetration_deep` 等 10 项默认值验证；全量 783 passed |
-| v0.2.33 | `_generate_excel_report` Import/Sheet 写入隔离（7 个模块逐个 try/except，6 个 Sheet 写入 _call_sheet 包装）回归测试；日志模块名/Excel 页签/HTML 章节名称统一回归；`_SYSTEM_MACRO`→`_SYSTEM_GLOBAL_MACRO` 等 4 项常量重命名回归；test_config.py `validate_config` 10 项校验用例；helpers.py `SynchronousExecutor` 测试辅助类；全量 814 passed |
-| v0.2.34 | content.py 拆分为 prompts.py + generators.py 回归测试；`test_helpers.py` → `helpers.py` 重命名后导入路径更新验证；system_prompt 覆盖路径（配置值/空值/缺失键）3 项测试；llm_settings.json 键名一致性校验测试；`llm/__init__.py` 显式导入验证；全量 945 passed |
-| v0.2.35 | 配置注册表 `registry.py` 新增 21 项测试（注册表完备性、派生映射正确性、DataModuleDef 单元测试）；config.py/cache.py/constants.py 去硬编码回归；全量 966 passed |
-| v0.2.36 | 智能预警 `early_warning.py` 新增 25 项测试（行业资金流向联动/新闻情绪聚合/等级判定/边界场景/Excel 写入）；P1 优化回归（cache/fetcher/prompts）；全量 991 passed |
+| Iter 3.2 | 5 源新闻聚合正确性、关键词关联准确度 |
+| Iter 3.3 | 模板占位显示、缓存管理、缓存文件损坏修复、异常提示 |
+| Iter 3.4 | LLM API 联通性、缓存 TTL、API Key 未配置降级 |
+| Iter 3.5 | LLM 并行生成、System Prompt 外部配置、httpx 连接池 |
+| Iter 3.6 | 多线程缓存竞态、新闻缓存过期、Token 用量展示 |
+| Iter 3.7 | html_writer/fund_performance/summary 类型安全性审计 |
+| v0.2.10 | 关键词富化 4 种类型 + HTML 着色 |
+| v0.2.11 | eastmoney_industry provider + 行业概念缓存 |
+| v0.2.18 | akshare 盈利预测/资金流向/分红 + 内存缓存 |
+| v0.2.29 | 持仓体检报告：4 维度评分 + 配置项默认值 |
+| v0.2.30 | 穿透深度分析：行业集中度/国别暴露 |
+| v0.2.33 | config.py validate_config 全字段校验 + 页签命名统一 |
+| v0.2.34 | prompts.py/generators.py 拆分回归 + system_prompt 覆盖链 |
+| v0.2.35 | registry.py 中央注册表完备性 + 去硬编码 |
+| v0.2.36 | early_warning 智能预警 + 行业资金联动 + 新闻情绪聚合 |
+| v0.2.46 | test_api.py 44 项 + test_excel_generator.py 15 项 |
+| v0.2.48 | tiantian.py 大函数拆分 + test_tiantian.py 39 项 |
+| v0.2.49 | 大函数治理 + 未使用 import 清理回归 |
+| v0.2.50 | test_http_client.py 17 项 + test_market_hours.py 41 项 |
+| v0.2.51 | fingerprint 16 项 + 新闻 provider 50 项 + 代码治理回归 |
+| v0.2.52 | 大函数治理二期 + 测试补全三期（9 模块 140 项） |
+| v0.2.53 | P1 LLM Prompt 精简 + P2 HTTP/2 复用 + dead code 清理 |
+| v0.2.54 | 时区安全修复 + config 原子写入 + docs 反推补全 |
 
 ---
 
-## 3. 验收标准
+## 6. 测试数据与 Mock 策略
+
+### 6.1 Mock HTTP 请求
+
+所有 `providers/*.py` 测试均使用 `unittest.mock.patch` 模拟 `httpx.Client.get/post`：
+
+```python
+@patch("src.python.providers.tencent.httpx.Client.get")
+def test_fetch_price_normal(self, mock_get):
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.text = 'v_sh600900="1~长江电力~600900~28.50~..."'
+    result = fetch_price("600900")
+    self.assertIsNotNone(result)
+```
+
+### 6.2 Mock LLM API
+
+LLM 测试使用 mock 替代真实 API 调用，验证缓存/截断/重试/路由逻辑：
+
+```python
+@patch("src.python.llm.api._call_single_provider")
+def test_generate_global_macro_cached(self, mock_call):
+    # 预热缓存
+    mock_call.return_value = ("分析内容...", {"input_tokens": 100})
+    ...
+```
+
+### 6.3 测试数据文件
+
+- **持仓测试数据**：测试中使用内存构造的 `Holding` 对象，不依赖磁盘 xlsx 文件
+- **Mock 交易日历**：通过 `@patch` 注入固定日期集合，避免 akshare API 依赖
+- **Mock 市场时段**：通过 `@patch("market_hours.datetime")` 控制时间，覆盖开盘/午休/收盘/周末
+
+### 6.4 测试隔离要求
+
+- 测试不操作真实 `data/cache/`，所有缓存操作使用 `tempfile.mkdtemp` 临时目录
+- 测试不写磁盘配置，`config.json` 通过 `os.environ` 或 `tempfile` 隔离
+- 网络测试全部 mock，不发起真实 HTTP 请求
+- 测试间互不依赖，每个 `setUp` 清理状态
+
+---
+
+## 7. 验收标准
 
 每个迭代完成后必须满足以下条件方可进入下一迭代：
 
 1. 当前迭代的所有计划功能已实现
-2. 所有单元测试通过
-3. 人工验证测试覆盖的异常场景程序不崩溃
-4. Excel/HTML 输出文件内容在 visual 检查下无明显的格式或数据错误
-5. TUI 菜单所有可用选项功能正常
+2. **全量 `pytest src/test/` 通过**（0 failed, 0 error）
+3. 新增功能有对应测试用例（**MUST** — 来自 CLAUDE.md 约定）
+4. Bug 修复有对应回归用例（**MUST** — 验证 Bug 场景的具体断言）
+5. 人工验证测试覆盖的异常场景程序不崩溃
+6. Excel/HTML 输出文件在 visual 检查下无明显格式或数据错误
+7. TUI 菜单 14 个选项功能正常
 
 ---
 
-## 4. 测试记录
+## 8. 测试记录
 
 测试记录和发现的问题记录在 `docs-stm/managements/changelog.md` 中。
+审查发现的问题（无论是否已修复）记录在 `docs-stm/managements/review-findings.md`。
