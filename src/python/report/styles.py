@@ -11,9 +11,10 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 # ── 颜色 ──────────────────────────────────────────────────
 
-RED_FONT = Font(color="CC0000")       # 正数 → 红色
-GREEN_FONT = Font(color="009900")     # 负数 → 绿色
-BLUE_FONT = Font(color="0066CC")      # 稳定 → 蓝色
+RED_FONT = Font(color="CC0000")        # 正数 / 优秀 → 红色
+GREEN_FONT = Font(color="009900")      # 负数 / 偏差 → 绿色
+DARK_GREEN_FONT = Font(color="006400") # 较差 → 深绿色
+BLUE_FONT = Font(color="0066CC")       # 稳定 → 蓝色
 NORMAL_FONT = Font(size=10)
 CONTENT_FONT = Font(size=11, color="000000")  # LLM 内容区正文
 BOLD_FONT = Font(size=10, bold=True)

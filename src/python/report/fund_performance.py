@@ -32,7 +32,7 @@ from src.python.report.excel_writer import (
 from src.python.report.market_value import DetailRow
 from src.python.registry import get_report_sheet_name
 from src.python.report.penetration import classify_penetration, QDII, ETF, INDEX_LINK, BOND_FUND, ACTIVE_EQUITY
-from src.python.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT
+from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, RED_FONT
 
 logger = logging.getLogger("invest")
 
@@ -289,7 +289,7 @@ def _write_one_fund_row(
     if final_rating == "优秀":
         _rating_font = RED_FONT
     elif final_rating == "较差":
-        _rating_font = GREEN_FONT
+        _rating_font = DARK_GREEN_FONT
     elif final_rating == "偏差":
         _rating_font = GREEN_FONT
     elif final_rating == "稳定":

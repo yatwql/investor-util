@@ -29,7 +29,7 @@
 ## 快速开始
 
 快速启动指南、持仓文件格式说明、菜单操作说明，请参见：
-- [快速开始 & 持仓文件格式 & 菜单操作](docs-stm/manuals/how-to-start.md)
+- [快速启动指南 & 持仓文件格式 & 菜单操作](docs-stm/manuals/how-to-start.md)
 
 ---
 
@@ -42,7 +42,7 @@
 
 ## LLM 配置指引
 
-LLM 密钥配置、参数调优、provider 选择、Extended Thinking、Prompt Caching、token 消耗参考等，请参见：
+`llm_key.json` LLM 密钥配置、`llm_settings.json` 完整配置说明及参数调优、provider 选择、Extended Thinking、Prompt Caching、token 消耗参考等，请参见：
 - [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md)
 
 ---
@@ -56,7 +56,7 @@ LLM 密钥配置、参数调优、provider 选择、Extended Thinking、Prompt C
 
 ## 报告文件结构 & 基金业绩评价标准
 
-Excel 报告各页签说明、HTML 报告特性、基金业绩三层评价标准，请参见：
+Excel 报告各页签说明、HTML 报告特性、基金业绩评价标准，请参见：
 - [报告文件结构 & 基金业绩评价标准](docs-stm/manuals/reports-instruction.md)
 
 
@@ -103,9 +103,9 @@ A: 菜单 `R` 刷新配置可重新加载 `config.json`、`llm_settings.json` �
 |------|------|
 | [快速开始 & 菜单操作](docs-stm/manuals/how-to-start.md) | 启动指南、持仓格式、菜单功能 |
 | [配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL |
-| [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | LLM 密钥、参数调优、provider 选择 |
+| [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | llm_key.json 字段说明、llm_settings.json 字段说明、LLM 密钥、参数调优、provider 选择 |
 | [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块流程 |
-| [报告文件结构 & 基金业绩评价标准](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、业绩三层评价 |
+| [报告文件结构 & 基金业绩评价标准](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价模型 |
 | [数据源一览 & 目录结构](docs-stm/manuals/datasource-and-folders.md) | 数据源说明、项目目录结构 |
 
 ## 管理文档

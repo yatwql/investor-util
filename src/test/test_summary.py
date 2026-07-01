@@ -957,7 +957,8 @@ class TestWriteLlmModuleStatusBlock(unittest.TestCase):
             self.assertIn("持仓体检报告", all_text)
             self.assertIn("gpt-4o", all_text)
             self.assertIn("输入800/输出400", all_text)
-            self.assertNotIn("Extended Thinking", all_text)
+            # Extended Thinking 应恰好出现 1 次（智囊团模块）
+            self.assertEqual(all_text.count("Extended Thinking"), 1)
             # 无 per_module → 不显示
             self.assertNotIn("穿透深度分析", all_text)
         finally:

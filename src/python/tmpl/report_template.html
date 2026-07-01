@@ -31,7 +31,7 @@
         .profit { color: #CC0000; }
         .loss { color: #009900; }
         .rating-excellent { color: #CC0000; font-weight: 600; }
-        .rating-poor { color: #009900; font-weight: 600; }
+        .rating-poor { color: #006400; font-weight: 600; }
         .rating-stable { color: #0066CC; font-weight: 600; }
 
         .text-left { text-align: left; }
@@ -533,7 +533,7 @@
                         <td class="text-right" style="color: {{ p.get('profit_raw', 0) | profit_color }}">{{ p["profit"] }}</td>
                         <td class="text-right" style="color: {{ p.get('profit_rate_raw', 0) | profit_color }}">{{ p["profit_rate"] }}</td>
                         <td class="text-left" style="font-size: 12px;">{{ p["benchmark"] }}</td>
-                        <td class="text-left" style="font-size: 12px;{{ ' color: #CC0000; font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: #009900; font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: #0066CC; font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
+                        <td class="text-left" style="font-size: 12px;{{ ' color: #CC0000; font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: #006400; font-weight: 600;' if p['rating_tag'] == '较差' }}{{ ' color: #009900; font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: #0066CC; font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
                         <td>{{ p["rank"] }}</td>
                     </tr>
                     {% endfor %}
