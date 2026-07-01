@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-01（v0.2.52 — P3 代码现代化完成：旧式 typing/.format/pyproject.toml 同步，全量 1395 测试通过）
+最后更新：2026-07-01（v0.2.53 — LLM Prompt精简/HTTP会话复用/死代码清理，全量 1535 测试通过）
 
 ---
 
@@ -141,7 +141,7 @@ investor-util/
 │   │   ├── tui.py                # 键盘输入封装
 │   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
 │   │   └── tui_menu.py           # 菜单交互
-│   └── test/                     # 测试（50 个 test_*.py + helpers.py，1395 passed / 11 skipped）
+│   └── test/                     # 测试（50 个 test_*.py + helpers.py，1535 passed / 11 skipped）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志

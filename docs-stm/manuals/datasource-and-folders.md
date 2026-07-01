@@ -122,8 +122,6 @@ investor-util/
 ├── logs/                             # 程序日志（app.log，自动生成）
 │
 ├── scripts/                          # 启动脚本
-│   ├── data/                         # 启动脚本占位目录 — cache/ + holdings/（初始环境准备用）
-│   ├── docs-stm/                     # 启动脚本占位目录 — tmp/（初始环境准备用）
 │   ├── launch.ps1                    # Windows PowerShell 启动脚本
 │   └── launch.sh                     # Linux Bash 启动脚本
 │
