@@ -28,6 +28,7 @@
     "end": "15:00",
     "official_source": true
   },
+  "user_fund_benchmarks": {},
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
   "cache_ttl": {
@@ -62,7 +63,7 @@
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
-| `early_warning` | `{...}` | 智能预警参数：`sector_alert_threshold_warning`（行业预警阈值，默认 -50,000,000）、`sector_alert_threshold_danger`（行业危险阈值，默认 -200,000,000）、`sentiment_top_n`（新闻情绪 TOP N，默认 10） | 手动编辑 |
+| `early_warning` | `{...}` | 智能预警参数：`sector_alert_threshold_warning`（行业预警阈值，默认 -50,000,000 ≈ -5000万 **元**，负值表示净流出）、`sector_alert_threshold_danger`（行业危险阈值，默认 -200,000,000 ≈ -2亿 **元**）、`sentiment_top_n`（新闻情绪 TOP N，默认 10） | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
 | `market_hours` | `{...}` | 市场时段配置：`start`/`end` 手动覆盖开盘收盘（HH:MM）；`official_source` 是否尝试从东方财富 API 获取实时交易状态 | 手动编辑 |

@@ -22,7 +22,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 {
   "provider": "claude",
   "api_key": "sk-ant-xxxxxxxxxxxxx",
-  "model": "claude-sonnet-4-6",
+  "model": "claude-sonnet-4-20250514",
   "endpoint": "https://api.anthropic.com/v1/messages"
 }
 ```
@@ -453,12 +453,12 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 {
   "provider": "claude",
   "api_key": "sk-ant-your-key",
-  "model": "claude-sonnet-4-6",
+  "model": "claude-sonnet-4-20250514",
   "endpoint": "https://api.anthropic.com/v1/messages"
 }
 ```
 
-可用模型：`claude-sonnet-4-6`（推荐）、`claude-haiku-4-5`（高性价比）、`claude-opus-4-8`（强推理）、`claude-fable-5`（最新）
+可用模型：`claude-sonnet-4-20250514`（推荐）、`claude-haiku-4-20250514`（高性价比）、`claude-opus-4-20250514`（强推理）
 </details>
 
 <details>
@@ -485,13 +485,14 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 {
   "provider": "claude",
   "api_key": "sk-your-deepseek-key",
-  "model": "DeepSeek-V4-Flash",
+  "model": "deepseek-v4-flash",
   "endpoint": "https://api.deepseek.com/anthropic/v1/messages"
 }
 ```
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
-- 模型：`DeepSeek-V4-Flash`（推荐，当前主版本）、`deepseek-chat`（V3 旧版，功能受限）
+- 模型：`deepseek-v4-flash`（推荐，**注意全小写**，当前主版本）、`deepseek-chat`（V3 旧版，功能受限）
+- ⚠️ **模型名大小写敏感**：代码中以全小写前缀匹配（如 `deepseek-v4-`），`DeepSeek-V4-Flash` 等大小写混合写法会导致 Extended Thinking 等功能无法识别，请统一使用小写
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
 

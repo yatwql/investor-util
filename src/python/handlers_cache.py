@@ -8,6 +8,7 @@ from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.python.logger import setup_logger
+from src.python.reader import read_holdings
 from src.python.tui_menu import _press_any_key, _refresh_config
 from src.python.tui_handlers import _select_holdings_file
 logger = setup_logger()

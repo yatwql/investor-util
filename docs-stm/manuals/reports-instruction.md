@@ -109,7 +109,7 @@ Endpoint       https://api.anthropic.com/v1/messages
 
 ## HTML 报告
 
-单页渲染以上全部 12 个功能页签（含 LLM API 用量），响应式 CSS 自适应桌面/移动端。额外特性：
+单页渲染以上全部 12 个功能页签（含 LLM API 用量），CSS 样式桌面端优先。额外特性：
 - 盈亏正数红色、负数绿色着色
 - 取价方式蓝色标识（与 Excel 端规则一致）
 - 新闻来源可点击跳转
