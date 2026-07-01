@@ -56,6 +56,7 @@
 - **`_LLM_CLIENT_SETTINGS` HTTP 连接池配置**（`generators.py`）：`http2=True` 多路复用 + 连接池上限 20 / 空闲保持 10，减少 API 连接建立开销。
 
 ### Changed
+- **日志轮转确认已有实现**：`src/python/logger.py` 使用 `RotatingFileHandler`（10MB/5备份），`logs/app.log` 已有大小轮转，无需修改。计划 M 节条目移除。
 - **P1: LLM Prompt 精简** — `_build_expert_review_prompt` 启用 `compact` 模式，省略今日涨跌幅字段（场外基金保留净值日期）。输入 token 减少 10~15%，缓存受行情波动影响降低。
 - **P2: HTTP 会话复用** — `_make_runner` 创建 `httpx.Client` 时使用共享 `_LLM_CLIENT_SETTINGS`，统一超时/连接池参数。
 - **`_FALLBACK_ENABLED` 死代码移除**（`news_sources.py`）：R-055 时清理了引用但未删除定义，现彻底移除。

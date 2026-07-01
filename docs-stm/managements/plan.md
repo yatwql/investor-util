@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-01（v0.2.54 — P. Edge Case + 场景测试补全 12 项全部完成 ✅）
+最后更新：2026-07-01（v0.2.54 — P/M 已完成项清理归档）
 
 ---
 
@@ -85,7 +85,7 @@ Iter 1.1~1.5（项目骨架至打磨验证）、Iter 2（分类汇总/穿透/基
 
 ### ✅ 已完成迭代
 
-A（测试覆盖补全一期）、A2（大函数拆分一期）、A3（测试覆盖补全二期）、A4（代码治理）、A5（文件拆分+配置治理）、J（大函数治理二期）、K（测试覆盖补全三期）、L（代码现代化）的详细记录已归档至 [`docs-stm/plan/archived_plan.md`](../plan/archived_plan.md)。以上所有迭代均已完成。
+A（测试覆盖补全一期）、A2（大函数拆分一期）、A3（测试覆盖补全二期）、A4（代码治理）、A5（文件拆分+配置治理）、J（大函数治理二期）、K（测试覆盖补全三期）、L（代码现代化）、P（Edge Case + 场景测试补全 12 项）的详细记录已归档至 [`docs-stm/plan/archived_plan.md`](../plan/archived_plan.md)。以上所有迭代均已完成。
 
 ---
 
@@ -108,32 +108,12 @@ A（测试覆盖补全一期）、A2（大函数拆分一期）、A3（测试覆
 ### M. UI/体验优化（低难度 / 中价值）
 
 - **错误提示优化**：部分异常堆栈直接暴露给用户，可包装为友好中文提示，避免恐慌
-- **日志轮转**：`logs/app.log` 无大小轮转，长期运行会膨胀，建议 RotatingFileHandler
 
 ### N. 工程化增强（低难度 / 低价值）
 
 - **CI/CD 集成**：添加 GitHub Actions 自动化流水线，每次 Push 自动运行 `pytest`
 - **HTML 报告响应式**：当前模板固定宽度，移动端查看体验一般，可适配 mobile 端
 - **Excel 页签并行写入**：报告生成时每个页签独立写入，可考虑并行加速
-
-### P. Edge Case + 场景测试补全（低难度 / 中价值）
-
-✅ **全部 12 项于 v0.2.54 完成**
-
-| 编号 | 测试项 | 覆盖文件 | 状态 |
-|:----:|:-------|:---------|:----:|
-| R-084 | `market_hours` UTC 时区一致性测试 | `test_market_hours.py`（已存在，追加验证） | ✅ |
-| R-085 | `config.py` 原子写入断电恢复测试 | `test_config_atomic.py` + `test_config.py` | ✅ |
-| R-086 | Provider 回退链路测试 | `test_chain.py`（已存在，无需新文件） | ✅ |
-| R-087 | 熔断器冷却恢复测试 | `test_circuit_breaker_recovery.py` | ✅ |
-| R-088 | 缓存 > 100KB gzip 透明压缩解压测试 | `test_cache.py`（已存在，追加验证） | ✅ |
-| R-089 | LLM content_filter 空返回安抚重试测试 | `test_api.py`（已存在） | ✅ |
-| R-090 | 溢价率计算验证 | `test_market_value_edge.py` | ✅ |
-| R-091 | 非 T 日 today_profit=0 验证 | `test_market_value_edge.py` | ✅ |
-| R-092 | 穿透市值占比归一化验证 | `test_penetration_edge.py` | ✅ |
-| R-093 | 日志脱敏验证 | `test_log_sanitize.py`（已存在） | ✅ |
-| R-094 | LLM 占位文本三种状态区分 | `test_llm_placeholder.py`（已存在） | ✅ |
-| R-095 | 业务场景 S1~S10 集成测试 | `test_integration.py`(S1~S5) + `test_integration_scenarios.py`(S6~S10) | ✅ |
 
 ### O. TUI 现代化（中难度 / 中价值）
 
