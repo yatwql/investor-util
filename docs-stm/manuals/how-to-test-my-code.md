@@ -51,9 +51,9 @@ python scripts/test_runner.py --coverage
 | `edge` | `edge` | §1.5 异常/边界场景（39 项） | ~10s |
 | `data` | `data` | 数据正确性验证（28 项） | ~10s |
 | `regression` | `not (edge or data)` | 提交前验证（同 unit） | ~25min |
-| `all` | 无限制 | 全量 1900+ 测试 | ~26min |
+| `all` | 无限制 | 全量 1938 测试 | ~26min |
 
-> **注意**：`scenario`/`integration`/`llm`/`smoke` 标记已在 `conftest.py` 注册但尚未有测试使用，后续新增测试时逐步补上标记即可自动生效。`edge` 和 `data` 标记已在对应测试类/方法上使用。`datetime` 标记已废弃，由 `scenario_datetime` 替代。
+> **注意**：`smoke` 标记已在 `conftest.py` 注册但尚未分配测试，后续新增测试时逐步补上标记即可自动生效。`edge` 和 `data` 标记已在对应测试类/方法上使用。`datetime` 标记已废弃，由 `scenario_datetime` 替代。
 
 ## 查看报告
 
@@ -96,18 +96,30 @@ pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency
 
 ## 标记分组（pytest markers）
 
-| 标记 | 说明 |
-|:-----|:-----|
-| `scenario` | 全量业务场景（S1-S20 + T1-T16，107 项） |
-| ├─ `scenario_basic` | 基础业务链路（S1-S5） |
-| ├─ `scenario_extended` | 扩展业务场景（S6-S10） |
-| ├─ `scenario_llm` | LLM 场景组合（S11-S20） |
-| └─ `scenario_datetime` | 日期/时间场景（T1-T16） |
-| `integration` | 集成/端到端流程测试（模块间接口契约） |
-| `llm` | LLM 相关测试（需 API key 配置） |
-| `edge` | 边缘/异常场景测试 |
-| `smoke` | 冒烟测试（快速验证核心功能） |
-| `data` | 数据正确性验证测试 |
+| 标记 | 归属 | 说明 |
+|:-----|:-----|:-----|
+| **场景测试（父标记）** | | |
+| `scenario` | — | 全量业务场景（S1-S20 + T1-T16，107 项） |
+| ├─ `scenario_basic` | 子标记 | 基础业务链路（S1-S5，9 项） |
+| ├─ `scenario_extended` | 子标记 | 扩展业务场景（S6-S10，18 项） |
+| ├─ `scenario_llm` | 子标记 | LLM 场景组合（S11-S20，19 项） |
+| └─ `scenario_datetime` | 子标记 | 日期/时间场景（T1-T16，61 项） |
+| **单元测试（父标记）** | | |
+| `unit` | — | 全量单元测试（8 子组，1810 项） |
+| ├─ `unit_providers` | 子标记 | 数据源 Provider（166 项） |
+| ├─ `unit_fetcher` | 子标记 | 抓取器（118 项） |
+| ├─ `unit_llm` | 子标记 | LLM 模块（331 项） |
+| ├─ `unit_news` | 子标记 | 新闻源（176 项） |
+| ├─ `unit_report` | 子标记 | 报表生成（558 项） |
+| ├─ `unit_config` | 子标记 | 配置管理（42 项） |
+| ├─ `unit_core` | 子标记 | 核心模块（277 项） |
+| └─ `unit_ui` | 子标记 | TUI 交互（142 项） |
+| **横切标记** | | |
+| `llm` | 横切 | 全部 LLM 相关（unit_llm 331 + scenario_llm 19 = 350 项，需 API key） |
+| **其他** | | |
+| `edge` | 独立 | 边缘/异常场景测试 |
+| `data` | 独立 | 数据正确性验证测试 |
+| `smoke` | 独立 | 冒烟测试（快速验证核心功能，待分配） |
 
 ### 组合查询示例
 

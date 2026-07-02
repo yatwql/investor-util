@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-02（v0.2.59 — 扩展会话级 Token 追踪与用量展示设计，对齐 requirements.md）
+最后更新：2026-07-02（v0.2.62 — pytest 标记层级体系 + 测试文件目录分组搬迁）
 
 ---
 
@@ -143,7 +143,11 @@ investor-util/
 │   │   ├── tui.py                # 键盘输入封装
 │   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
 │   │   └── tui_menu.py           # 菜单交互
-│   └── test/                     # 测试（57 个 test_*.py + helpers.py，1713 passed / 12 skipped）
+│   └── test/                     # 测试（按标记分组目录，1938+ passed）
+│       ├── conftest.py           # pytest 配置 + 15 个分层标记注册
+│       ├── helpers.py            # 测试辅助工具
+│       ├── unit/                 # 单元测试（8 子组，1810 项）
+│       ├── scenario/             # 场景测试（4 子组，107 项）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志

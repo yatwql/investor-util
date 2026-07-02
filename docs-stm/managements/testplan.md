@@ -83,6 +83,24 @@
 > T 类场景统一放在 `test_datetime_scenarios.py` 并标注 `scenario_datetime`。
 > 新增场景需要同时标注场景父标记（如 `scenario_llm`）和通用 `scenario` 标记，确保 `-m "scenario"` 能自动涵盖。
 
+### 1.3a 单元测试标记分组（Unit Test Markers）
+
+单元测试按被测模块分组，通过 **父子双层 marker** 实现灵活筛选：
+
+| pytest marker | 覆盖范围 | 测试数 | 对应子目录 |
+|:--------------|:---------|:------:|:-----------|
+| `unit` | 全量单元测试（8 子组） | **1810** | `src/test/unit/` |
+| ├─ `unit_providers` | 数据源 Provider 测试 | **166** | `unit/providers/` |
+| ├─ `unit_fetcher` | 抓取器测试 | **118** | `unit/fetcher/` |
+| ├─ `unit_llm` | LLM 模块测试 | **331** | `unit/llm/` |
+| ├─ `unit_news` | 新闻源测试 | **176** | `unit/news/` |
+| ├─ `unit_report` | 报表生成测试 | **558** | `unit/report/` |
+| ├─ `unit_config` | 配置管理测试 | **42** | `unit/config/` |
+| ├─ `unit_core` | 核心模块测试 | **277** | `unit/core/` |
+| └─ `unit_ui` | TUI 交互测试 | **142** | `unit/ui/` |
+
+横切标记 `llm` 同时覆盖 `unit_llm`（331 项）和 `scenario_llm`（19 项），`-m "llm"` 共 350 项。
+
 | 场景 | 前置场景 | 前置条件 | 操作 | 验证点 |
 |:-----|:---------|:---------|:-----|:-------|
 | **S1: 纯股票组合** | — | 持仓仅含 3 只 A 股，无基金 | 菜单 E → 菜单 H | 穿透 TOP10 等于直接持股；基金业绩显示"无基金"；总计正确 |
