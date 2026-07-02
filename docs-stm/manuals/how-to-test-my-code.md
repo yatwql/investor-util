@@ -46,19 +46,83 @@ python scripts/test_runner.py --coverage
 
 ## 测试组合说明
 
-| `--mode` 值 | pytest 标记 | 覆盖范围 | 典型耗时 |
-|:------------|:------------|:---------|:---------|
-| `unit` | `unit` | 全量单元（含 edge/data 标记，1810 项） | ~25min |
-| `standard` | `unit and not (edge or data)` | 常规单元（排除 edge/data） | ~25min |
-| `scenario` | `scenario` | §1.3 + §1.6 全量业务场景（S1-S20 + T1-T16，107 项） | ~25s |
-| **`regression`** | `scenario` | **提交前极速验证（同 scenario 107 项）** | **~25s** |
-| **`verify`** | `scenario or unit_core or unit_providers or unit_fetcher` | **合入验证（场景+核心/数据源/管道 668 项）** | **~10min** |
-| `edge` | `edge` | §1.5 异常/边界场景（39 项） | ~10s |
-| `data` | `data` | 数据正确性验证（28 项） | ~10s |
-| `integration` | `scenario or integration` | 集成/端到端流程测试（含场景标记） | ~10s（待补充） |
-| `all` | 无限制 | 全量 1938 项 | ~26min |
+### 三级验证流水线
 
-> **注意**：`smoke` 标记已在 `conftest.py` 注册但尚未分配测试，后续新增测试时逐步补上标记即可自动生效。`edge` 和 `data` 标记已在对应测试类/方法上使用。`datetime` 标记已废弃，由 `scenario_datetime` 替代。
+| 阶段 | `--mode` | 覆盖范围 | 项数 | 耗时 | 阻断点 |
+|:-----|:---------|:---------|:----:|:----:|:-------|
+| **① 提交前** | `regression` | 业务场景全量 | 107 | ~25s | 不得 commit |
+| **② PR 前** | `verify` | 场景 + 核心/数据源/管道 | 668 | ~10min | 不得 merge |
+| **③ 发布前** | `all` | 全量测试 | 1938 | ~26min | 不得 release |
+
+> `regression` 与 `scenario` 的 marker 相同（`-m "scenario"`），均为 107 项业务场景测试。`regression` 作为模式别名，语义上定位为"提交前极速验证"，与 `verify`、`all` 构成三级流水线。
+
+### 全部模式一览
+
+| `--mode` 值 | pytest 标记 | 覆盖范围 | 项数 | 典型耗时 |
+|:------------|:------------|:---------|:----:|:---------|
+| `unit` | `unit` | 全量单元（含 edge/data） | 1810 | ~25min |
+| `standard` | `unit and not (edge or data)` | 常规单元（排除 edge/data） | 1743 | ~25min |
+| `scenario` | `scenario` | §1.3 + §1.6 全量业务场景（S1-S20 + T1-T16） | 107 | ~25s |
+| **`regression`** | `scenario` | **同上（模式别名，语义定位为提交前验证）** | **107** | **~25s** |
+| **`verify`** | `scenario or unit_core or unit_providers or unit_fetcher` | **场景+核心/数据源/管道模块** | **668** | **~10min** |
+| `edge` | `edge` | §1.5 异常/边界场景 | 39 | ~10s |
+| `data` | `data` | 数据正确性验证 | 28 | ~10s |
+| `integration` | `scenario or integration` | 集成/端到端流程测试（含场景标记） | 107（同 scenario） | ~25s（待补充独立标记） |
+| `all` | 无限制 | 全量测试 | 1938 | ~26min |
+
+> **注意**：`smoke` 标记已在 `conftest.py` 注册但尚未分配测试。`datetime` 标记已废弃，由 `scenario_datetime` 替代。
+
+## 最新标记测试分组统计（2026-07-02）
+
+### 场景测试（scenario）
+
+| marker | 说明 | 项数 |
+|:-------|:-----|:----:|
+| `scenario`（父） | 全量业务场景 S1-S20 + T1-T16 | **107** |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 | 9 |
+| ├─ `scenario_extended` | 扩展业务场景 S6-S10 | 18 |
+| ├─ `scenario_llm` | LLM 场景组合 S11-S20 | 19 |
+| └─ `scenario_datetime` | 日期/时间场景 T1-T16 | 61 |
+
+### 单元测试（unit）
+
+| marker | 说明 | 项数 |
+|:-------|:-----|:----:|
+| `unit`（父） | 全量单元测试（8 子组） | **1810** |
+| ├─ `unit_providers` | 数据源 Provider | 166 |
+| ├─ `unit_fetcher` | 抓取器 | 118 |
+| ├─ `unit_llm` | LLM 模块 | 331 |
+| ├─ `unit_news` | 新闻源 | 176 |
+| ├─ `unit_report` | 报表生成 | 558 |
+| ├─ `unit_config` | 配置管理 | 42 |
+| ├─ `unit_core` | 核心模块 | 277 |
+| └─ `unit_ui` | TUI 交互 | 142 |
+
+### 横切标记
+
+| marker | 说明 | 项数 |
+|:-------|:-----|:----:|
+| `llm` | 全部 LLM 相关（unit_llm 331 + scenario_llm 19） | **350** |
+| `edge` | 边缘/异常场景（叠加于 unit） | **39** |
+| `data` | 数据正确性验证（叠加于 unit） | **28** |
+
+### 关于 LLM 标记与 API Key
+
+`llm` 标记的 350 项测试 **绝大多数不需要真实 API key**：
+
+| 测试文件 | mock 数 | 是否需 API key | 说明 |
+|:---------|:-------:|:--------------|:-----|
+| `unit/llm/test_fingerprint.py` | 0 处 | ❌ 不需要 | 纯逻辑：持仓指纹确定性计算 |
+| `unit/llm/test_session.py` | 0 处 | ❌ 不需要 | 纯逻辑：会话用量跟踪 |
+| `unit/llm/test_skeleton.py` | 0 处 | ❌ 不需要 | 纯逻辑：骨架结构测试，`"sk-xxx"` 仅作 dummy 值 |
+| `unit/llm/test_llm_content.py` | 0 处 | ❌ 不需要 | 纯逻辑：内容截断/处理 |
+| `unit/llm/test_llm_placeholder.py` | 1 处 | ❌ 不需要 | 占位符生成 |
+| `unit/llm/test_circuit_breaker_recovery.py` | 15 处 | ❌ 不需要 | 熔断器逻辑，全部 mock |
+| `unit/llm/test_api.py` | 103 处 | ❌ 不需要 | API 路由/重试，全部 mock |
+| `unit/llm/test_llm.py` | 243 处 | ❌ 不需要 | LLM Manager 编排逻辑，全部 mock |
+| `scenario/llm/test_llm_scenarios.py` | 35 处 | ❌ 不需要 | 场景流程，全部 mock |
+
+> 全部 331 项 `unit_llm` + 19 项 `scenario_llm` **均为 mock 测试，无需真实的 LLM API key**。`-m "not llm"` 跳过它们是因为属于 LLM **模块**而非需要真实 API 调用——纯属模块筛选，非依赖检查。
 
 ## 查看报告
 
