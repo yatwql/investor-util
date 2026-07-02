@@ -11,39 +11,34 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 > **为什么拆分？** `llm_key.json` 包含 API Key，可加入 `.gitignore` 避免误提交；
 > `llm_settings.json` 不含密钥，可安全纳入版本控制，方便团队共享调优参数。
+>
+> **不配置会怎样？** `llm_key.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示：
+> ```
+> 本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）
+> ```
 
 ---
 
 ## 快速配置
 
-**Step 1**：编辑 `data/config/llm_key.json`，填入 provider 和 api_key：
+**Step 1**：编辑 `data/config/llm_key.json`，填入必填字段和（可选）回退字段：
 
 ```json
 {
   "provider": "claude",
   "api_key": "sk-ant-xxxxxxxxxxxxx",
   "model": "claude-sonnet-4-20250514",
-  "endpoint": "https://api.anthropic.com/v1/messages"
+  "endpoint": "https://api.anthropic.com/v1/messages",
+  "fallback_provider": "openai",
+  "fallback_api_key": "sk-your-fallback-key",
+  "fallback_endpoint": "https://api.openai.com/v1/chat/completions",
+  "fallback_model": "gpt-4o-mini"
 }
 ```
 
-> `llm_key.json` 仅保留必填字段（provider / api_key / model / endpoint）和可选回退字段（fallback_provider / fallback_api_key / fallback_endpoint / fallback_model，见下方说明），其余所有参数移至 `llm_settings.json`。
+> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。`fallback_*` 回退字段可选，配置后主 provider 连续失败时自动切换，适用于高可用场景（如主用 DeepSeek 低成本、回退 Anthropic Claude 高稳定性）。非敏感参数统一移至 `llm_settings.json` 管理。
 
-> **可选 — 跨 Provider 自动回退**：可在 `llm_key.json` 中额外配置 `fallback_provider`、`fallback_api_key`、`fallback_endpoint`、`fallback_model`。当主 provider 连续请求失败（网络超时、429 限流、服务端错误）后，自动切换到回退 provider 重试。适用于高可用场景，如主用 DeepSeek（低成本）、回退到 Anthropic Claude（高稳定性）：
-> ```json
-> {
->   "provider": "claude",
->   "api_key": "sk-ant-xxxxxxxxxxxxx",
->   "model": "claude-sonnet-4-6",
->   "endpoint": "https://api.anthropic.com/v1/messages",
->   "fallback_provider": "openai",
->   "fallback_api_key": "sk-your-fallback-key",
->   "fallback_endpoint": "https://api.openai.com/v1/chat/completions",
->   "fallback_model": "gpt-4o-mini"
-> }
-> ```
-
-**Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数。完整默认值如下：
+**Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数。示意结构如下（完整配置项见「配置项总览」章节）：
 
 ```json
 {
@@ -55,61 +50,10 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
     "penetration_deep": true,
     "news_correlation": false
   },
-
-  "system_prompt_global_macro": null,
-  "model_global_macro": null,
   "temperature_global_macro": 0.3,
   "max_tokens_global_macro": 1024,
-  "timeout_global_macro": 60,
-  "cache_enabled_global_macro": true,
-  "output_brief_global_macro": false,
-  "thinking_enabled_global_macro": false,
-  "thinking_budget_global_macro": 4000,
-  "reasoning_effort_global_macro": "high",
-
-  "system_prompt_expert_review": null,
-  "model_expert_review": null,
   "temperature_expert_review": 0.8,
   "max_tokens_expert_review": 8192,
-  "timeout_expert_review": 120,
-  "cache_enabled_expert_review": true,
-  "output_brief_expert_review": false,
-  "thinking_enabled_expert_review": true,
-  "thinking_budget_expert_review": 16000,
-  "reasoning_effort_expert_review": "high",
-
-  "system_prompt_health_check": null,
-  "model_health_check": null,
-  "temperature_health_check": 0.5,
-  "max_tokens_health_check": 4096,
-  "timeout_health_check": 120,
-  "cache_enabled_health_check": true,
-  "output_brief_health_check": false,
-  "thinking_enabled_health_check": true,
-  "thinking_budget_health_check": 12000,
-  "reasoning_effort_health_check": "high",
-
-  "system_prompt_penetration_deep": null,
-  "model_penetration_deep": null,
-  "temperature_penetration_deep": 0.4,
-  "max_tokens_penetration_deep": 4096,
-  "timeout_penetration_deep": 90,
-  "cache_enabled_penetration_deep": true,
-  "output_brief_penetration_deep": false,
-  "thinking_enabled_penetration_deep": false,
-  "thinking_budget_penetration_deep": 8000,
-  "reasoning_effort_penetration_deep": "high",
-
-  "system_prompt_news_correlation": null,
-  "model_news_correlation": null,
-  "temperature_news_correlation": 0.1,
-  "max_tokens_news_correlation": 2000,
-  "timeout_news_correlation": 60,
-  "cache_enabled_news_correlation": true,
-  "thinking_enabled_news_correlation": false,
-  "thinking_budget_news_correlation": 4000,
-  "reasoning_effort_news_correlation": "high",
-
   "pricing": {
     "currency": "CNY"
   }
@@ -119,17 +63,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 > **注意**：
 > - `system_prompt_*` 默认值为 `null`，表示使用代码内置提示词。填入字符串可覆盖。
 > - 代码内置提示词定义在 `src/python/llm/prompts.py` 中（`_SYSTEM_GLOBAL_MACRO`、`_SYSTEM_EXPERT_REVIEW` 等变量），更新代码时可自动升级。
-> - `pricing` 段可省略（代码内置默认定价：货币 CNY，DeepSeek-V4-Flash 输入 1 元/M、输出 2 元/M、缓存命中 0.02 元/M）。仅需自定义覆盖时才添加：
->
-> ```json
-> "pricing": {
->   "currency": "CNY",
->   "deepseek-v4-flash": {"input": 1, "output": 2, "input_cache_hit": 0.02},
->   "deepseek-v4-pro": {"input": 3, "output": 6, "input_cache_hit": 0.025}
-> }
-> ```
->
-> 文件中的 `pricing` 优先级高于代码内置默认值。只写需要覆盖的模型即可，其余模型自动使用代码默认值。
+> - `pricing` 段可省略（使用代码内置定价），仅需自定义覆盖时添加，详见下方「完整模型定价表」章节。
 
 **Step 3**：启动程序，菜单选 **L** 生成包含 LLM 分析的完整版报告。
 
@@ -164,20 +98,20 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 #### 1. 统一的配置项命名规则
 
-每个模块在 `llm_settings.json` 中有 **10 个（标准模式）或 9 个（批量模式，无 output_brief）** 配置键，命名格式统一为 `{key}_{module_suffix}`：
+每个模块在 `llm_settings.json` 中有 **10 个（标准模式）或 9 个（批量模式，无 output_brief）** 配置键，命名格式统一为 `{key}_{module_suffix}`（类型/默认值详见下方「模块级配置」章节）：
 
-| 配置键 | 含义 | 标准模式 | 批量模式 |
-|--------|------|:--------:|:--------:|
-| `system_prompt_{module}` | 系统提示词覆盖 | ✅ | ✅ |
-| `model_{module}` | 独立指定模型 | ✅ | ✅ |
-| `temperature_{module}` | 温度参数 | ✅ | ✅ |
-| `max_tokens_{module}` | 最大输出 token 数 | ✅ | ✅ |
-| `timeout_{module}` | API 超时秒数 | ✅ | ✅ |
-| `cache_enabled_{module}` | 是否启用缓存 | ✅ | ✅ |
-| `output_brief_{module}` | 精简模式（≤200~300 字） | ✅ | ❌（JSON 输出不可精简） |
-| `thinking_enabled_{module}` | 是否开启 Extended Thinking | ✅ | ✅ |
-| `thinking_budget_{module}` | Thinking token 预算（仅 Claude） | ✅ | ✅ |
-| `reasoning_effort_{module}` | 推理深度（仅 DeepSeek） | ✅ | ✅ |
+| 配置键 | 含义 |
+|--------|------|
+| `system_prompt_{module}` | 系统提示词覆盖 |
+| `model_{module}` | 独立指定模型 |
+| `temperature_{module}` | 温度参数 |
+| `max_tokens_{module}` | 最大输出 token 数 |
+| `timeout_{module}` | API 超时秒数 |
+| `cache_enabled_{module}` | 是否启用缓存 |
+| `output_brief_{module}` | 精简模式（≤200~300 字，**批量模式不支持**） |
+| `thinking_enabled_{module}` | 是否开启 Extended Thinking |
+| `thinking_budget_{module}` | Thinking token 预算（仅 Claude） |
+| `reasoning_effort_{module}` | 推理深度（仅 DeepSeek） |
 
 模块后缀名表：
 
@@ -282,23 +216,22 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 > 详情参见 [报告文件结构](../manuals/reports-instruction.md#llm-api-用量页签章节说明页签-12--html-第-12-节) 中"LLM API 用量页签/章节说明"章节。
 
-#### 6. 截断自动重试
+#### 6. 失败降级、占位与截断重试
 
-标准模式下，当 LLM 返回内容包含截断标记（`... [TRUNCATED] ...`）时，自动将 `max_tokens` 增大 1.5× 重新调用，最多重试一次。若增大后仍截断，记录 WARNING 日志，提示用户手动增大配置。
+各模块在以下降级场景下自动显示占位文本：
 
-#### 7. 失败降级与占位
+各模块在以下场景下自动降级或重试：
 
-各模块在以下三种降级场景下自动显示占位文本：
-
-| 场景 | 占位文本 | 日志 |
-|------|---------|------|
-| `llm_key.json` 缺失或 key 为空 | "本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）" | INFO |
+| 场景 | 行为 | 日志 |
+|------|------|------|
+| `llm_key.json` 缺失或 key 为空 | 显示占位："本节内容待生成 — LLM 未配置" | INFO |
 | `enabled_llm.{module}` = false | 直接跳过，不显示占位 | INFO |
-| API 调用失败（网络错误/超时/返回空） | "（本节内容生成失败）" | WARNING |
+| API 调用失败（网络错误/超时/返回空） | 显示占位："（本节内容生成失败）" | WARNING |
+| 输出被截断（含 `... [TRUNCATED] ...`） | 自动增大 `max_tokens` 1.5× 重试一次，仍截断则记录日志提示用户手动调大 | WARNING |
 
 > 失败原因写入模块级 `_LLM_MODULE_FAILURE` 字典，供写入层（`llm_content.py`、`html_writer.py`）读取后决定占位文本。
 
-#### 8. `system_prompt` 配置覆盖链
+#### 7. `system_prompt` 配置覆盖链
 
 系统提示词按以下优先级（高 → 低）解析：
 
@@ -314,13 +247,11 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 > 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation）。
 
-### 全局配置
+配置分为**全局配置**和**模块级配置**两类。全局配置仅有 3 项：
 
-| 配置键 | 类型 | 默认值 | 说明 |
-|--------|:----:|:------:|------|
-| `max_retries` | int | `2` | 遇到 429（限流）或 503（服务不可用）时最多重试次数 |
-| `enabled_llm` | dict | 见上 | 各模块独立启停开关；`news_correlation` 默认 `false` 表示可选，其余默认 `true` |
-| `pricing` | dict | `{currency: "CNY"}` | 模型 Token 定价表 + 货币标识。格式见"完整模型定价表"章节 |
+- `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
+- `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关，关闭的模块在报告中自动跳过
+- `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 
 全局配置段在 `llm_settings.json` 中的实际写法示例：
 
@@ -340,9 +271,6 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 }
 ```
 
-> `enabled_llm` 中关闭的模块在报告中自动跳过，不消耗 Token。
-> `pricing` 段可省略（代码内置定价），仅需覆盖时才添加，详见「完整模型定价表」章节。
-
 ### 模块级配置
 
 | 配置键 | 类型 | 默认值（各模块不同） | 说明 |
@@ -360,17 +288,117 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 > **各模块默认值差异表**：详细推荐值见下方「各模块推荐参数值」章节。
 
+<details>
+<summary><b>📄 llm_settings.json 完整参考</b>（点击展开）</summary>
+
+以下为 `llm_settings.json` 的完整配置范例，与实际生成的文件结构一致，含中文注释分组：
+
+```json
+{
+  // ── 全局配置 ────────────────────────────────────────────
+  "max_retries": 2,
+  "enabled_llm": {
+    "global_macro": true,
+    "expert_review": true,
+    "health_check": true,
+    "penetration_deep": true,
+    "news_correlation": false
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // 一、全球政经局势 (global_macro)
+  // ═══════════════════════════════════════════════════════════
+  "system_prompt_global_macro": null,
+  "model_global_macro": null,
+  "temperature_global_macro": 0.3,
+  "max_tokens_global_macro": 1024,
+  "timeout_global_macro": 60,
+  "cache_enabled_global_macro": true,
+  "output_brief_global_macro": false,
+  "thinking_enabled_global_macro": false,
+  "thinking_budget_global_macro": 4000,
+  "reasoning_effort_global_macro": "high",
+
+  // ═══════════════════════════════════════════════════════════
+  // 二、智囊团深度复盘 (expert_review)
+  // ═══════════════════════════════════════════════════════════
+  "system_prompt_expert_review": null,
+  "model_expert_review": null,
+  "temperature_expert_review": 0.8,
+  "max_tokens_expert_review": 8192,
+  "timeout_expert_review": 120,
+  "cache_enabled_expert_review": true,
+  "output_brief_expert_review": false,
+  "thinking_enabled_expert_review": true,
+  "thinking_budget_expert_review": 16000,
+  "reasoning_effort_expert_review": "high",
+
+  // ═══════════════════════════════════════════════════════════
+  // 三、持仓体检报告 (health_check)
+  // ═══════════════════════════════════════════════════════════
+  "system_prompt_health_check": null,
+  "model_health_check": null,
+  "temperature_health_check": 0.5,
+  "max_tokens_health_check": 4096,
+  "timeout_health_check": 120,
+  "cache_enabled_health_check": true,
+  "output_brief_health_check": false,
+  "thinking_enabled_health_check": true,
+  "thinking_budget_health_check": 12000,
+  "reasoning_effort_health_check": "high",
+
+  // ═══════════════════════════════════════════════════════════
+  // 四、穿透深度分析 (penetration_deep)
+  // ═══════════════════════════════════════════════════════════
+  "system_prompt_penetration_deep": null,
+  "model_penetration_deep": null,
+  "temperature_penetration_deep": 0.4,
+  "max_tokens_penetration_deep": 4096,
+  "timeout_penetration_deep": 90,
+  "cache_enabled_penetration_deep": true,
+  "output_brief_penetration_deep": false,
+  "thinking_enabled_penetration_deep": false,
+  "thinking_budget_penetration_deep": 8000,
+  "reasoning_effort_penetration_deep": "high",
+
+  // ═══════════════════════════════════════════════════════════
+  // 五、财经新闻与持仓关联分析 (news_correlation)
+  // ═══════════════════════════════════════════════════════════
+  "system_prompt_news_correlation": null,
+  "model_news_correlation": null,
+  "temperature_news_correlation": 0.1,
+  "max_tokens_news_correlation": 2000,
+  "timeout_news_correlation": 60,
+  "cache_enabled_news_correlation": true,
+  "thinking_enabled_news_correlation": false,
+  "thinking_budget_news_correlation": 4000,
+  "reasoning_effort_news_correlation": "high",
+
+  // ═══════════════════════════════════════════════════════════
+  // 六、计价 (pricing)
+  // ═══════════════════════════════════════════════════════════
+  "pricing": {
+    "currency": "CNY"
+  }
+}
+```
+
+> 此文件支持 `//` 和 `/* */` 注释，可直接复制后按需修改。`enabled_llm.news_correlation` 默认 `false`，如需新闻 LLM 分析可改为 `true`。
+</details>
+
 ---
 
 ## 各模块推荐参数值
 
-| 模块 | temperature | max_tokens | timeout | thinking_enabled | model |
-|------|:-----------:|:----------:|:-------:|:----------------:|:-----:|
-| **全球政经局势** | **0.3**（低温保事实） | **1024** | **60s** | false | null（使用默认） |
-| **智囊团深度复盘** | **0.8**（高温促多元） | **8192** | **120s** | **true** ⭐ | null |
-| **持仓体检报告** | **0.5**（居中平衡） | **4096** | **120s** | **true** | null |
-| **穿透深度分析** | **0.4**（中低温稳定） | **4096** | **90s** | false | null |
-| **财经新闻关联分析** | **0.1**（极低温保 JSON） | **2000** | **60s** | false | null（可换轻量模型降成本） |
+> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`model=null`（使用默认）、`reasoning_effort="high"`。完整参数说明见上方「模块级配置」表。
+
+| 模块 | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | model |
+|------|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:-----:|
+| **全球政经局势** | **0.3**（低温保事实） | **1024** | **60s** | false | 4000 | null（使用默认） |
+| **智囊团深度复盘** | **0.8**（高温促多元） | **8192** | **120s** | **true** ⭐ | 16000 | null |
+| **持仓体检报告** | **0.5**（居中平衡） | **4096** | **120s** | **true** | 12000 | null |
+| **穿透深度分析** | **0.4**（中低温稳定） | **4096** | **90s** | false | 8000 | null |
+| **财经新闻关联分析** | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | null（可换轻量模型降成本） |
 
 > **temperature 项说明**：
 > - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**>0.5 时全球政经局势可能编造经济指标**。
@@ -559,7 +587,9 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 ---
 
-## Token 消耗参考（按 DeepSeek-V4-Flash 定价，CNY）
+## Token 消耗参考
+
+以下费用按 **DeepSeek-V4-Flash** 定价（¥1/M 输入、¥2/M 输出）估算，各模型单价详见下方「完整模型定价表」。
 
 | 模块 | 输入 token | 输出 token | 单次费用参考 |
 |------|-----------|-----------|-------------|
@@ -603,16 +633,6 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 >   "my-new-model": {"input": 5, "output": 10, "input_cache_hit": 0.5}
 > }
 > ```
-
----
-
-## 不配置 LLM 时的行为
-
-`llm_key.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示：
-
-```
-本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）
-```
 
 ---
 

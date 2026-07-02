@@ -55,6 +55,8 @@
 
 ## 字段说明
 
+以下字段可通过 TUI 主菜单的对应命令修改（运行 `python src/python/main.py` 进入主菜单）。标有"手动编辑"的字段需直接修改 JSON 文件。
+
 | 字段 | 默认值 | 说明 | TUI 修改 |
 |------|--------|------|----------|
 | `holdings_dir` | `data/holdings` | 持仓 xlsx 文件所在目录 | 菜单 `C` |
@@ -66,7 +68,7 @@
 | `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
-| `market_hours` | `{...}` | 市场时段配置：`start`/`end` 手动覆盖开盘收盘（HH:MM）；`official_source` 是否尝试从东方财富 API 获取实时交易状态 | 手动编辑 |
+| `market_hours` | `{...}` | 市场时段配置：`start`/`end` 手动覆盖开盘收盘（HH:MM），实际交易分为 09:30-11:30 上午和 13:00-15:00 下午两段，午餐休市期间自动回落长 TTL；`official_source` 是否尝试从东方财富 API 获取实时交易状态 | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
@@ -145,23 +147,37 @@
 
 ## cache_ttl 可调参数
 
+> `—` 表示该缓存类型文件名为精确键名（无指纹后缀），不受持仓变化影响，仅在 TTL 到期后刷新。
+
+#### 行情/数据类
+
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
 | `price` | `price_{code}.json` | 24h（交易时段 30s） | — | 股票/基金最新价、昨收 |
 | `index` | `index_{code}.json` | 24h（交易时段 30s） | — | 市场指数行情 |
+| `news` | `news_{md5}.json` | 15 分钟 | 新闻源参数 + 关键词 | 多源新闻聚合结果 |
+| `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | A股+美股指数 | 行业资金流向排名 |
 | `rank` | `fund_perf_{code}.json` | 24h | — | 基金同类排名+区间收益率 |
+| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
 | `hold` | `fund_hold_{code}.json` | 7 天 | — | 基金前 10 持仓明细 |
 | `industry` | `industry_{code}.json` | 7 天 | — | 行业分类/概念板块 |
-| `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
-| `news` | `news_{md5}.json` | 15 分钟 | 新闻源参数 + 关键词 | 多源新闻聚合结果 |
-| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | A股/美股指数 + 持仓汇总 | 全球政经局势 LLM 分析 |
-| `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | 持仓汇总 + 分类计数 + 穿透 TOP10 + 持仓明细 | 智囊团深度复盘 LLM 分析 |
-| `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 LLM 分析 |
-| `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 LLM 分析 |
-| `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 1h | 标题前 80 字 + 持仓指纹 | 财经新闻热点与持仓关联分析 |
-| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
-| `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | A股+美股指数 | 行业资金流向排名 |
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
+| `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
+
+#### LLM 分析类
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
+|------|-----------|:--------:|----------|------|
+| `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | 持仓汇总 + 分类计数 + 穿透 TOP10 + 持仓明细 | 智囊团深度复盘 |
+| `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 1h | 标题前 80 字 + 持仓指纹 | 财经新闻热点与持仓关联分析 |
+| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | A股/美股指数 + 持仓汇总 | 全球政经局势 |
+| `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 |
+| `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 |
+
+#### 系统类
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
+|------|-----------|:--------:|----------|------|
 | `tracking` | `holdings_tracking.json` | 30 天 | — | 持仓跟踪数据（精确键名，无指纹） |
 | `calendar` | `trading_calendar.json` | 14 天 | — | A 股交易日历（精确键名，无指纹） |
 
@@ -171,8 +187,6 @@
 
 > **调整建议：** 持仓变动少可将 `hold` 改为 `2592000`（30天），减少基金持仓的重复拉取。
 > **交易时段短 TTL：** `price` 和 `index` 默认注册在 `market_hour_aware` 中，A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s）替代常规 TTL，确保盘中实时行情。收盘后自动回落长 TTL 保持收盘价。可通过 `market_hours.start`/`end` 手动覆盖时段，或设 `market_hours.official_source: false` 关闭东方财富 API 实时状态查询。
-> 
-> **自动 gzip 压缩：** 超过 100KB 的缓存文件自动以 `.json.gz` 格式压缩存储（如 `profit_forecast_*.json.gz`），节省约 80-90% 磁盘空间。读取时透明解压，无需任何配置或迁移。小文件保持原 `.json` 格式，热路径无额外开销。
 
 ### 缓存分组
 
@@ -195,3 +209,7 @@
 #### 工作原理
 
 缓存分组由 `src/python/registry.py` 中的模块注册表驱动。每个模块注册时指定所属分组（`cache_groups` 字段），`cache.py:clear_by_group()` 遍历注册表，只清除匹配分组的模块缓存文件。新增缓存模块时只需在注册表中声明分组，无需修改菜单代码。
+
+## 技术细节：自动 gzip 压缩
+
+超过 100KB 的缓存文件自动以 `.json.gz` 格式压缩存储（如 `profit_forecast_*.json.gz`），节省约 80-90% 磁盘空间。读取时透明解压，无需任何配置或迁移。小文件保持原 `.json` 格式，热路径无额外开销。
