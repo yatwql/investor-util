@@ -37,14 +37,14 @@ class DataModuleDef:
 
 见 `registry.py` 中 `_MODULE_REGISTRY: tuple[DataModuleDef, ...]` — 当前包含以下几类：
 
-| 分组 | 包含模块 | TTL | 说明 |
-|------|---------|-----|------|
-| **行情（preload）** | 股票价格、市场指数、LLM 四大分析模块 | 2h~24h | 换持仓后需重新获取 |
-| **基金数据（refresh）** | 基金业绩排名、基金持仓 | 1d~1w | 主动刷新按钮触发 |
-| **新闻（refresh）** | 新闻聚合 | 15min | 短 TTL 高频更新 |
-| **行业/补充（refresh）** | 行业分类、盈利预测、资金流向、分红 | 15min~1M | 主动刷新触发 |
-| **精确键名** | 基金业绩基准、持仓跟踪、交易日历 | 2w~1M | 固定键名，非前缀匹配 |
-| **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、新闻关联 | 2h~24h | 带 `settings_suffix` |
+| 分组 | 包含模块 | data_type | TTL | 说明 |
+|------|---------|-----------|:---:|------|
+| **行情（preload）** | 股票价格、市场指数 | `price`, `index` | 24h（交易时段 30s） | 换持仓后需重新获取 |
+| **基金数据（refresh）** | 基金业绩排名、基金持仓 | `rank`, `hold` | 1d~1w | 主动刷新按钮触发 |
+| **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
+| **行业/补充（refresh）** | 行业分类、盈利预测、资金流向、分红 | `industry`, `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
+| **精确键名** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | 固定键名，非前缀匹配 |
+| **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、新闻关联 | `llm_global_macro`, `llm_expert_review`, `llm_health_check`, `llm_penetration_deep`, `llm_news_correlation` | 2h~24h | 带 `settings_suffix` |
 
 ---
 
@@ -99,7 +99,7 @@ from src.python.registry import (
 | `fund_performance` | 基金业绩分析 | 5. |
 | `early_warning` | 智能预警 | 7. |
 
-> LLM 模块页签（global_macro/expert_review/health_check/penetration_deep）和 news_correlation 的标题已通过 `get_llm_module_name()` 注册，无需再次录入。
+> 第 6 号为 LLM 分析模块页签（global_macro / expert_review / health_check / penetration_deep / news_correlation），其标题通过 `get_llm_module_name()` 注册，无需在 `get_report_sheet_name()` 中录入。
 
 ---
 
@@ -160,12 +160,22 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
               cache_groups=("preload",)),
 ```
 
-添加后需补充：
+添加后还需在以下位置补充配套代码：
 
-1. **`llm_settings.json`** — 添加 `model_my_analysis`、`temperature_my_analysis` 等 10 个配置键
-2. **`llm/generators.py`** — 添加 LLM 调用函数
-3. **`report/llm_content.py`** — 在 `write_llm_sheets()` 中添加新页签
-4. **`llm/__init__.py`** — 若需要 export 新生成函数
+1. **`llm_settings.json`** — 新增同名配置键组，键名为 `{model|temperature|...}_{my_analysis}`，共 10 个键
+2. **`llm/generators.py`** — 添加 LLM 调用函数，调用 `_call_llm("my_analysis", context)` 并处理返回
+3. **`report/llm_content.py`** — 在 `write_llm_sheets()` 中注册新页签，调用 generators 中的新函数写入对应单元格
+4. **`llm/__init__.py`** — 将新生成函数加入 `__all__` 供外部导入
+
+#### 新增 LLM 模块检查清单
+
+| # | 步骤 | 操作位置 | 产出 |
+|---|------|---------|------|
+| ① | **注册模块定义** | `registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
+| ② | **配置 JSON 键组** | `llm_settings.json` | 新增 10 个 `{key}_{suffix}` 配置键 |
+| ③ | **实现生成函数** | `llm/generators.py` | 新增异步生成函数，通过 `_call_llm()` 调用 LLM |
+| ④ | **添加报告页签** | `report/llm_content.py` | 在 `write_llm_sheets()` 中注册新 sheet 并写入结果 |
+| ⑤ | **暴露导出接口** | `llm/__init__.py` | 将新生成函数加入 `__all__` |
 
 ### 精确键名缓存（无前缀匹配）
 
@@ -181,22 +191,14 @@ DataModuleDef("我的固定键", "fixed",
 
 ## 无需手动维护的派生产出
 
-以下映射**不再**需要手动维护，均由 registry 自动派生：
+以下映射原分散在多个文件中硬编码维护，现已统一由 registry 自动派生，**新增模块时只需在 `_MODULE_REGISTRY` 中添加一行 `DataModuleDef`，无需再手动维护以下任一位置**：
 
-| 历史位置 | 已迁移到 registry |
-|---------|------------------|
-| `constants.py` → `CACHE_TTL_DEFAULTS` | `get_cache_ttl_defaults()` |
-| `cache.py` → `prefix_type_map` | `get_prefix_type_map()` |
-| `cache.py` → `exact_map` | `get_exact_type_map()` |
-| `config.py` → `_KNOWN_LLM_SETTINGS_KEYS` | `get_known_llm_settings_keys()` |
-| `generators.py` → `_label_map` | `get_llm_module_names()` |
-| `tui_menu.py` → `_MODULE_DISPLAY` | `get_llm_module_names()` |
-| `llm_content.py` → `_MODULE_KEY_MAP` 硬编码 | `_get_module_key_map()` via `get_registry()` |
-| `tui_menu.py` → 内联 print 模块名 | `get_llm_module_names()` 循环 |
-| `summary.py/market_value.py/...` → 6 处硬编码 `ws.title` + `write_title_row` | `get_report_sheet_name()` |
-| `excel_generator.py` → 12 处硬编码 `_Timer`/`_call_sheet` 标签 | `get_report_sheet_name()` |
-
-> 新增模块时 **只需修改 registry.py**，上述所有派生产出自动同步。
+- 缓存 TTL 默认值（原 `constants.CACHE_TTL_DEFAULTS`）→ `get_cache_ttl_defaults()`
+- 缓存前缀/精确键名映射（原 `cache.prefix_type_map` / `exact_map`）→ `get_prefix_type_map()` / `get_exact_type_map()`
+- LLM settings 键名（原 `config._KNOWN_LLM_SETTINGS_KEYS`）→ `get_known_llm_settings_keys()`
+- LLM 模块名称（原 `generators._label_map`、`tui_menu._MODULE_DISPLAY`）→ `get_llm_module_names()`
+- 报表页签标题（原 6 处 `ws.title` + `write_title_row`）→ `get_report_sheet_name()`
+- Excel 生成器标签（原 12 处 `_Timer`/`_call_sheet` 硬编码）→ `get_report_sheet_name()`
 
 ---
 
