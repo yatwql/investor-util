@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-02（v0.2.60 — §1.4/§2/§3/§4/§6/§7 全量审阅修订 + R 迭代测试覆盖增补）
+最后更新：2026-07-02（v0.2.62 — §1.3/§1.6 场景标记分层 + 日期/时间场景纳入 scenario）
 
 ---
 
@@ -60,15 +60,28 @@
 
 ### 1.3 业务场景测试（Scenario Tests）
 
-按真实用户行为组合设计的集成测试场景。根据场景复杂度分属不同文件：
+按真实用户行为组合设计的集成测试场景。根据场景复杂度分属不同文件，通过 **分层 pytest marker** 实现灵活选择：
+
+| pytest marker | 覆盖范围 | 测试数 | 对应文件 |
+|:--------------|:---------|:------:|:---------|
+| `scenario` | 全量场景（S1-S20 + T1-T16） | **107** | 全部场景文件 |
+| ├─ `scenario_basic` | 基础业务链路（S1-S5） | **9** | `test_integration.py` |
+| ├─ `scenario_extended` | 扩展业务场景（S6-S10） | **18** | `test_integration_scenarios.py` |
+| ├─ `scenario_llm` | LLM 场景组合（S11-S20） | **19** | `test_llm_scenarios.py` |
+| └─ `scenario_datetime` | 日期/时间场景（T1-T16，§1.6） | **61** | `test_datetime_scenarios.py` |
+
+各场景的文件归属：
 
 | 测试文件 | 覆盖场景 | 职责范围 |
 |:---------|:---------|:---------|
 | `test_integration.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
 | `test_integration_scenarios.py` | S6-S10 | 扩展场景：纯债/断网/单账户/零成本/极端值 |
 | `test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
+| `test_datetime_scenarios.py` | T1-T16 | 日期/时间场景：市场状态×产品类型×边界 |
 
 > 添加新场景时，按复杂度选择文件。LLM 相关的场景统一放在 `test_llm_scenarios.py`。
+> T 类场景统一放在 `test_datetime_scenarios.py` 并标注 `scenario_datetime`。
+> 新增场景需要同时标注场景父标记（如 `scenario_llm`）和通用 `scenario` 标记，确保 `-m "scenario"` 能自动涵盖。
 
 | 场景 | 前置场景 | 前置条件 | 操作 | 验证点 |
 |:-----|:---------|:---------|:-----|:-------|
@@ -143,7 +156,9 @@
 | 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | 🟡 待补 |
 | LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | 🟡 待补 |
 
-### 1.6 日期/时间数据获取场景测试
+### 1.6 日期/时间数据获取场景测试（T1-T16）
+
+> **pytest marker**：`scenario_datetime`（含 `scenario` 父标记），`-m "scenario_datetime"` 可独立选择运行，共 **61 项**测试。旧 `datetime` 标记已废弃。
 
 按市场状态、产品类型、时间边界组合，验证各数据源在不同时段的正确性和降级表现。
 
@@ -183,6 +198,9 @@
 > **维护方式：** 详细映射（每场景 → 测试文件/类）由脚本 `scripts/validate_coverage_map.py` 半自动管理。
 > 新增 S/T 场景或修改测试文件后，运行 `python scripts/validate_coverage_map.py` 验证映射准确性。
 > 详细映射全文见 `docs-stm/plan/test-coverage-map.md`。
+>
+> **pytest marker 对照：** §1.3 场景 → `scenario_basic`/`scenario_extended`/`scenario_llm`；
+> §1.6 场景 → `scenario_datetime`。全量场景用 `-m "scenario"` (107 项)。
 
 **覆盖状态汇总：**
 
@@ -489,7 +507,7 @@ def test_qdii_nav_date_delayed_t2(self):
 ```bash
 pytest src/test/                                   # 全量通过
 pytest --co                                         # 无 patch 残留污染
-pytest src/test/test_新文件.py --co -v              # 新文件隔离
+pytest src/test/unit/core/test_registry.py --co -v      # 新文件隔离（示例）
 python scripts/validate_coverage_map.py             # §1.7 映射验证
 ```
 

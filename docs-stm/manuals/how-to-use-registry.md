@@ -202,7 +202,7 @@ DataModuleDef("我的固定键", "fixed",
 
 ## 测试
 
-registry 的测试在 `src/test/test_registry.py`，验证：
+registry 的测试在 `src/test/unit/core/test_registry.py`，验证：
 
 - TTL 默认值完整性
 - 前缀类型映射一致性
@@ -211,4 +211,4 @@ registry 的测试在 `src/test/test_registry.py`，验证：
 - 所有 LLM 模块都有 settings_suffix
 - 缓存分组标记完整性
 
-运行：`pytest src/test/test_registry.py -v`
+运行：`pytest src/test/unit/core/test_registry.py -v`

@@ -45,12 +45,15 @@ python scripts/test_runner.py --coverage
 
 | `--mode` 值 | pytest 标记 | 覆盖范围 | 典型耗时 |
 |:------------|:------------|:---------|:---------|
-| `unit` | 无标记（默认含 `not scenario`） | 纯单元测试，不含场景集成 | ~5s |
-| `scenario` | `scenario` | §1.3 业务场景 S1-S20 | ~60s |
-| `integration` | `scenario` 或 `integration` | 集成/端到端流程 | ~60s |
-| `regression` | 无限制（含全部 P0-P2 级别） | 提交前必须通过的验证集 | ~30s |
-| `edge` | `edge` | §1.5 异常/边界场景 | ~15s |
-| `all` | 无限制 | 全量 1900+ 测试 | ~5min |
+| `unit` | `not (edge or data)` | 单元测试（排除 edge/data 标记） | ~25min |
+| `scenario` | `scenario` | §1.3 + §1.6 全量业务场景（S1-S20 + T1-T16，107 项） | ~25s |
+| `integration` | `scenario or integration` | 集成/端到端流程测试（含场景标记） | ~10s（目前未标注） |
+| `edge` | `edge` | §1.5 异常/边界场景（39 项） | ~10s |
+| `data` | `data` | 数据正确性验证（28 项） | ~10s |
+| `regression` | `not (edge or data)` | 提交前验证（同 unit） | ~25min |
+| `all` | 无限制 | 全量 1900+ 测试 | ~26min |
+
+> **注意**：`scenario`/`integration`/`llm`/`smoke` 标记已在 `conftest.py` 注册但尚未有测试使用，后续新增测试时逐步补上标记即可自动生效。`edge` 和 `data` 标记已在对应测试类/方法上使用。`datetime` 标记已废弃，由 `scenario_datetime` 替代。
 
 ## 查看报告
 
@@ -84,20 +87,24 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 # 排除 LLM 相关测试（不需要 API key）
 pytest src/test/ -m "not llm" -v
 
-# 运行单个测试文件
-pytest src/test/test_category.py -v
+# 运行单个测试文件（按目录分组存放）
+pytest src/test/unit/report/test_category.py -v
 
 # 运行单个测试类
-pytest src/test/test_category.py::TestCategoryAggregationConsistency -v
+pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
 ```
 
 ## 标记分组（pytest markers）
 
 | 标记 | 说明 |
 |:-----|:-----|
-| `scenario` | 业务场景集成测试（S1-S20） |
+| `scenario` | 全量业务场景（S1-S20 + T1-T16，107 项） |
+| ├─ `scenario_basic` | 基础业务链路（S1-S5） |
+| ├─ `scenario_extended` | 扩展业务场景（S6-S10） |
+| ├─ `scenario_llm` | LLM 场景组合（S11-S20） |
+| └─ `scenario_datetime` | 日期/时间场景（T1-T16） |
+| `integration` | 集成/端到端流程测试（模块间接口契约） |
 | `llm` | LLM 相关测试（需 API key 配置） |
-| `datetime` | 日期/时间/交易时段测试（T1-T16） |
 | `edge` | 边缘/异常场景测试 |
 | `smoke` | 冒烟测试（快速验证核心功能） |
 | `data` | 数据正确性验证测试 |
@@ -111,9 +118,14 @@ pytest src/test/ -m "smoke or edge" -v
 # 除 LLM 外的全部测试
 pytest src/test/ -m "not llm" -v
 
-# 日期相关 + 边缘场景
-pytest src/test/ -m "datetime or edge" -v
-```
+# 全量业务场景（S1-S20 + T1-T16）
+pytest src/test/ -m "scenario" -v
+
+# 仅 LLM 场景（S11-S20）
+pytest src/test/ -m "scenario_llm" -v
+
+# 基础业务链路 + 日期/时间场景
+pytest src/test/ -m "scenario_basic or scenario_datetime" -v
 
 ## 回归测试级别
 

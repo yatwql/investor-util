@@ -108,7 +108,99 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                         # 单元测试（59 test_*.py + conftest.py + helpers.py，1900+ passed）
+│   └── test/                             # 测试（按标记分组目录，1938+ passed）
+│       ├── __init__.py                   # 包标记（空文件）
+│       ├── conftest.py                   # pytest 配置 — 所有标记注册（15 个分层标记）、fixture
+│       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
+│       ├── unit/                         # 单元测试（1810 项，8 个子分组）
+│       │   ├── __init__.py               # 子包标记（空文件）
+│       │   ├── providers/                # 数据源 provider 测试（166 项）
+│       │   │   ├── __init__.py           # 子包标记（空文件）
+│       │   │   ├── test_eastmoney.py     # 东方财富净值 API — _strip_jsonp / _safe_float / fetch_nav（15 项）
+│       │   │   ├── test_eastmoney_industry.py  # 东方财富行业分类 API — _secid 前缀规则、fetch_industry_and_concepts（26 项）
+│       │   │   ├── test_tencent.py       # 腾讯财经行情 — _add_prefix / _parse_float / _parse_response / fetch_price（16 项）
+│       │   │   ├── test_sina.py          # 新浪财经指数 — _parse_us_index / fetch_us_indices（10 项）
+│       │   │   ├── test_tiantian.py      # 天天基金 — _find_holdings_table / _parse_syl_returns / _calc_rating_from_entry（65 项）
+│       │   │   └── test_akshare_extras.py # akshare 封装 — 盈利预测/行业资金流向/分红（16 项）
+│       │   ├── fetcher/                  # 抓取器测试（118 项）
+│       │   │   ├── __init__.py           # 子包标记（空文件）
+│       │   │   ├── test_chain.py         # Provider Chain — _get_chain / _fetch_with_fallback 全链路（23 项）
+│       │   │   ├── test_fetcher.py       # 抓取器调度 — 指数/行业/价格聚合入口（5 项）
+│       │   │   ├── test_fetcher_price.py # 行情抓取 — _name_matches / _price_cache_key / _price_transform（21 项）
+│       │   │   ├── test_fetcher_index.py # 指数抓取 — 腾讯→新浪 fallback 双链路（13 项）
+│       │   │   ├── test_fetcher_industry.py # 行业抓取 — _industry_transform / fetch_industry_data（10 项）
+│       │   │   └── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
+│       │   ├── llm/                      # LLM 相关测试（331 项）
+│       │   │   ├── __init__.py           # 子包标记（空文件）
+│       │   │   ├── test_api.py           # LLM API 调用 — 重试/熔断/回退/截断/Provider 路由（44 项）
+│       │   │   ├── test_circuit_breaker_recovery.py  # 熔断器恢复 — 冷却/半开/重开全生命周期（15 项）
+│       │   │   ├── test_fingerprint.py   # 缓存指纹 — _extract_stable_holdings / _build_llm_fingerprint（16 项）
+│       │   │   ├── test_llm.py           # LLM 客户端 — _markdown_to_html / generate_all_llm / prompt 构建（50 项）
+│       │   │   ├── test_llm_content.py   # LLM 内容 Excel 写入 — _strip_html / _write_content_sheet（9 项）
+│       │   │   ├── test_llm_placeholder.py # LLM 占位文本 — 未配置/已禁用/API 失败三种状态（3 项）
+│       │   │   ├── test_session.py       # 会话统计 — reset / get / format / _track_session_usage（32 项）
+│       │   │   └── test_skeleton.py      # 共享骨架 — _is_llm_module_enabled / _handle_truncation（9 项）
+│       │   ├── news/                     # 新闻抓取测试（176 项）
+│       │   │   ├── __init__.py           # 子包标记（空文件）
+│       │   │   ├── test_news_aggregator.py  # 新闻聚合器 — 多源并行/去重/缓存三态（16 项）
+│       │   │   ├── test_news_correlator.py # 新闻关联引擎 — 关键词匹配/关联度排序（27 项）
+│       │   │   ├── test_news_keywords.py # 关键词提取 — 从持仓/穿透/行业生成关键词（12 项）
+│       │   │   ├── test_news_sources.py  # 新闻源注册表 — 启停映射/默认配置（11 项）
+│       │   │   ├── test_eastmoney_news.py # 东方财富新闻 — _parse_news_item / fetch_news 全流程（18 项）
+│       │   │   ├── test_sina_news.py     # 新浪财经新闻 — _ts_to_str / fetch_news 参数透传（17 项）
+│       │   │   ├── test_wallstreetcn_news.py # 华尔街见闻新闻 — _parse_news_item HTML 剥离（15 项）
+│       │   │   ├── test_cls_news.py      # 财联社新闻 — _parse_news_item 缺字段测试（21 项）
+│       │   │   └── test_akshare_news.py  # akshare 新闻 — 财新网 + CCTV 双链路（16 项）
+│       │   ├── report/                   # 报表生成测试（558 项）
+│       │   │   ├── __init__.py           # 子包标记（空文件）
+│       │   │   ├── test_excel_writer.py  # Excel 写入引擎 — Workbook 创建/页签管理（30 项）
+│       │   │   ├── test_html_writer.py   # HTML 报告生成 — Jinja2 渲染/LLM 章节分支（89 项）
+│       │   │   ├── test_excel_generator.py # Excel 报告编排 — 懒导入/异常隔离/计时（15 项）
+│       │   │   ├── test_summary.py       # 投资分析汇总页签 — 指数行情/账户汇总/LLM 用量（85 项）
+│       │   │   ├── test_market_value.py  # 市值核算明细表 — 15 列持仓盈亏计算（59 项）
+│       │   │   ├── test_penetration.py   # 资产穿透 TOP10 — 基金合并/行业分类（12 项）
+│       │   │   ├── test_penetration_edge.py # 穿透异常场景 — 占比归一化/零总市值/单资产（12 项）
+│       │   │   ├── test_fund_performance.py # 基金业绩分析 — 排名/评级/评级分布直方图（48 项）
+│       │   │   ├── test_category.py      # 持仓分类表 — 按资产属性+投资分类聚合（30 项）
+│       │   │   ├── test_market_value_edge.py # 行情异常场景 — NAV 空窗期/交易时段切换/溢价率（37 项）
+│       │   │   ├── test_qdii_timezone.py # QDII 多时区 — _is_qdii / 多时区日期转换（26 项）
+│       │   │   ├── test_news_correlation.py # 新闻关联分析页签 — 新闻匹配/关键词写入（49 项）
+│       │   │   ├── test_early_warning.py # 智能预警页签 — 行业资金流出/新闻情绪聚合（25 项）
+│       │   │   └── test_progress.py      # 进度报告 — ProgressReporter / 错误跟踪/耗时排行（33 项）
+│       │   ├── config/                   # 配置测试（42 项）
+│       │   │   ├── __init__.py           # 子包标记（空文件）
+│       │   │   ├── test_config.py        # 配置管理 — config.json / llm_settings 读写/校验（31 项）
+│       │   │   └── test_config_atomic.py # 原子写入 — 创建/覆盖/异常清理/缓存失效（11 项）
+│       │   ├── core/                     # 核心模块测试（277 项）
+│       │   │   ├── __init__.py           # 子包标记（空文件）
+│       │   │   ├── test_cache.py         # 缓存引擎 — TTL 管理/过期清理/市场时段感知（181 项）
+│       │   │   ├── test_http_client.py   # HTTP 客户端工厂 — _should_verify / make_http_client（17 项）
+│       │   │   ├── test_market_hours.py  # 交易时段判断 — _is_market_open 三层编排（41 项）
+│       │   │   ├── test_models.py        # 数据模型 — NamedTuple / dataclass 定义校验（17 项）
+│       │   │   ├── test_reader.py        # 持仓读取 — xlsx 解析/多 worksheet/列校验（11 项）
+│       │   │   └── test_registry.py      # 中央注册表 — 模块注册/TTL 映射/设置键派生（21 项）
+│       │   └── ui/                       # TUI 测试（142 项）
+│       │       ├── __init__.py           # 子包标记（空文件）
+│       │       ├── test_tui.py           # 键盘输入 — getch() 跨平台/方向键解析（32 项）
+│       │       ├── test_tui_menu.py      # 菜单交互 — 菜单渲染/导航/快捷键（27 项）
+│       │       ├── test_tui_handlers.py  # 通用辅助 — 文件选择器/输出框/进度显示（20 项）
+│       │       ├── test_handlers.py      # 菜单命令 — 缓存刷新/配置/LLM 模块管理（23 项）
+│       │       └── test_log_sanitize.py  # 日志脱敏 — 敏感信息过滤/安全日志（40 项）
+│       │
+│       └── scenario/                     # 场景测试（107 项，4 个子分组）
+│           ├── __init__.py               # 子包标记（空文件）
+│           ├── basic/                    # 基础业务场景 S1-S5（9 项）
+│           │   ├── __init__.py           # 子包标记（空文件）
+│           │   └── test_integration.py   # S1-S5：持仓读取/行情获取/市值核算/分类汇总/报告生成
+│           ├── extended/                 # 扩展业务场景 S6-S10（18 项）
+│           │   ├── __init__.py           # 子包标记（空文件）
+│           │   └── test_integration_scenarios.py  # S6-S10：纯债分类/缓存回退/零成本利润/极端份额/高精度
+│           ├── llm/                      # LLM 场景 S11-S20（19 项）
+│           │   ├── __init__.py           # 子包标记（空文件）
+│           │   └── test_llm_scenarios.py # S11-S20：混合缓存/全部失败/Thinking/禁用/断网/部分超期/HTML 分支
+│           └── datetime/                 # 日期时间场景 T1-T16（61 项）
+│               ├── __init__.py           # 子包标记（空文件）
+│               └── test_datetime_scenarios.py  # T1-T16：市场状态/产品分类/边界 Edge Case
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     # 持仓 xlsx 文件（用户放置）
@@ -125,12 +217,15 @@ investor-util/
 │
 ├── scripts/                          # 启动脚本
 │   ├── launch.ps1                    # Windows PowerShell 启动脚本
-│   └── launch.sh                     # Linux Bash 启动脚本
+│   ├── launch.sh                     # Linux Bash 启动脚本
+│   ├── test_runner.py                # 测试驱动脚本 — pytest 统一运行 + 结构化 HTML 报告输出
+│   └── validate_coverage_map.py      # 覆盖率映射验证 — 校验 test-coverage-map.md 与实际测试文件一致性
 │
 ├── docs-stm/                         # 项目文档
 │   ├── plan/                         # 计划与设计文件
 │   │   ├── archived_plan.md          # 历史迭代归档（Iter 1.1~3.7）
-│   │   └── iteration-plan.md         # 迭代计划细节
+│   │   ├── iteration-plan.md         # 迭代计划细节
+│   │   └── test-coverage-map.md      # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
@@ -138,7 +233,21 @@ investor-util/
 │   │   ├── how-to-use-registry.md    # 中央注册表使用说明
 │   │   ├── datasource-and-folders.md # 数据源一览 + 目录结构（本文档）
 │   │   ├── faq.md                    # 常见问题解答 — 使用中的高频问题，按类别组织
+│   │   ├── how-to-test-my-code.md    # 如何测试我的代码 — 本地运行测试、测试报告系统、新增测试指南
 │   │   └── reports-instruction.md    # 报告文件结构说明
+│   ├── test-reports/                 # 测试报告输出（自动生成）
+│   │   ├── latest/                   # 最新测试报告（按 --mode 生成子目录）
+│   │   │   ├── index.html            # 汇总页 — 各模式通过/失败总览 + 最近运行时间
+│   │   │   ├── unit/report.html      # 单元测试报告（标记 -m "unit"，1810 项）
+│   │   │   ├── scenario/report.html  # 场景测试报告（标记 -m "scenario"，107 项）
+│   │   │   ├── integration/report.html  # 集成测试报告（标记 -m "scenario or integration"）
+│   │   │   ├── edge/report.html      # 边缘场景报告（标记 -m "edge"）
+│   │   │   ├── data/report.html      # 数据正确性报告（标记 -m "data"）
+│   │   │   ├── regression/report.html # 回归测试报告（标记 -m "regression"）
+│   │   │   ├── all/report.html       # 全量测试报告（无标记筛选，1938 项）
+│   │   │   └── coverage/             # HTML 行覆盖率报告（--coverage 时生成）
+│   │   └── archives/                 # 历史报告存档
+│   │       └── <YYYYMMDD>/           # 按日期归档的子目录（含完整 latest/ 快照）
 │   ├── tmp/                          # 临时文件 / 过程文件（git 忽略）
 │   └── managements/                  # 管理文档
 │       ├── plan.md                   # 实现计划（关键技术决策 + 下一步迭代计划）

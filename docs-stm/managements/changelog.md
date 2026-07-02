@@ -15,12 +15,33 @@
 - **`constants.py`**：`APP_VERSION` 0.2.61 → 0.2.62
 - **`README.md`**：用户文档表增加"如何测试我的代码"链接
 
+### Changed
+- **pytest 标记层级体系**：原有 6 个扁平 marker 扩展为 15 个分层 marker
+  - 场景测试：`scenario` 父标记 → `scenario_basic`（S1-S5, 9 项）/ `scenario_extended`（S6-S10, 18 项）/ `scenario_llm`（S11-S20, 19 项）/ `scenario_datetime`（T1-T16, 61 项）— 子标记总和 = 107，父标记匹配全部
+  - 单元测试：`unit` 父标记 → `unit_providers`（166 项）/ `unit_fetcher`（118 项）/ `unit_llm`（331 项）/ `unit_news`（176 项）/ `unit_report`（558 项）/ `unit_config`（42 项）/ `unit_core`（277 项）/ `unit_ui`（142 项）— 子标记总和 = 1810，父标记匹配全部
+  - 横切标记：`llm` 同时覆盖 `unit_llm`（331 项）+ `scenario_llm`（19 项），`-m "llm"` = 350 项
+  - 废弃 `datetime` 旧标记（已被 `scenario_datetime` 替代）
+  - `conftest.py` 注册全部新 markers，docstring 更新分层树
+  - `scripts/test_runner.py` MODES 字典新增 `integration` 模式
+- **测试文件目录分组搬迁**：60 个测试文件从扁平 `src/test/` 按标记分组迁入子目录
+  - `src/test/unit/{providers,fetcher,llm,news,report,config,core,ui}/`（8 组，56 文件）
+  - `src/test/scenario/{basic,extended,llm,datetime}/`（4 组，4 文件）
+  - `conftest.py` / `helpers.py` 保留在根级共享
+  - 所有 `from src.python.*` 导入不受影响，0 处路径断裂
+- **`datasource-and-folders.md`**：目录树全面更新为新分层结构
+- **`how-to-test-my-code.md`**：单文件运行路径示例改为新子目录路径
+- **`how-to-use-registry.md`**：test_registry.py 路径同步更新
+- **`testplan.md`**：示例命令路径同步更新
+- **`plan.md`**：新增 T. 测试标记与目录分组已完成迭代条目
+
 ### Fixed
+- **🐛 首批标记插入脚本损坏 6 个测试文件**：脚本 `last_import_idx` 错误匹配方法体内的 `import httpx`，将 `import pytest` / `pytestmark` 插入到测试方法体中（test_eastmoney_industry.py:244、test_sina_news.py:193、test_tencent.py:228 等）。修复：写 `fix_markers.py` 用 AST 验证替换，删除所有误插标记并正确插入模块级位置。全量 1938 测试收集恢复。
 - **`test_tui_handlers.py::TestPrintErrorWithHint`**：修正两个测试断言，验证友好提示而非原始异常文本
 - **`test_excel_generator.py::test_sheet_exception_isolation`**：修正断言验证友好提示格式，增加"不暴露原始异常类型"断言
 
 ---
 
+## [0.2.61] - 2026-07-02
 
 ### Changed
 - **`plan.md`**：R 测试覆盖增补三期（数据正确性 + 异常场景 + 测试文件治理）从"待实现方向"移入"✅ 已完成迭代"；原 R 节详细规格删除（已归档至 changelog.md）；S 测试报告系统标记为 🟡 暂停中并注明进展
