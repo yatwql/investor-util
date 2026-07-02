@@ -2,7 +2,7 @@
 
 读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.58
+> 当前版本：0.2.62
 
 ---
 
@@ -97,6 +97,7 @@ Excel 报告各页签说明、HTML 报告特性、基金业绩评价标准，请
 | [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块流程 |
 | [报告文件结构 & 基金业绩评价标准](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价模型 |
 | [数据源一览 & 目录结构](docs-stm/manuals/datasource-and-folders.md) | 数据源说明、项目目录结构 |
+| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试报告系统、新增测试指南 |
 
 ## 管理文档
 

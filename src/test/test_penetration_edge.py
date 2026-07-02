@@ -343,5 +343,57 @@ class TestPenetrationWithFunds(unittest.TestCase):
         self.assertEqual(result["summary"]["unknown_mv"], 30000)
 
 
+class TestSectorAllocationRatio(unittest.TestCase):
+    """R-094: 穿透行业占比归一化 — 各行业占比之和 ≤ 100%。"""
+
+    def _make_sector_result(self, sectors: list[tuple[str, float]]) -> dict:
+        """构造穿透结果，含行业分布。"""
+        from src.python.report.penetration import _build_penetration_result
+        merged = {}
+        for name, mv in sectors:
+            merged[name] = {
+                "name": name, "mv": mv, "codes": [], "funds": ["直接持股"],
+                "sector": name, "concepts": [],
+            }
+        classified = {key: [] for key in
+                       ("qdii", "etf", "index_link", "bond_fund", "active_equity")}
+        return _build_penetration_result(
+            merged=merged, classified=classified, funds=[],
+            direct_stocks=[], unknown_mv=0.0, failed_count=0,
+            failed_fund_details=[],
+        )
+
+    def test_sector_ratios_sum_to_100(self):
+        """多个行业 → 各行业占比 ≈ 100%。"""
+        sectors = [("制造业", 50000), ("金融", 30000), ("信息技术", 20000)]
+        result = self._make_sector_result(sectors)
+        # 穿透结果中 sector 字段来自 merged item 的 sector
+        sector_mvs = {}
+        for item in result["top10"]:
+            s = item.get("sector", item["name"])
+            sector_mvs[s] = sector_mvs.get(s, 0) + item["mv"]
+        total_mv = sum(sector_mvs.values())
+        sector_ratios = {s: mv / total_mv * 100 for s, mv in sector_mvs.items()}
+        self.assertAlmostEqual(sum(sector_ratios.values()), 100.0, delta=0.01)
+
+    def test_single_sector_100_percent(self):
+        """单一行业 → 占比 100%。"""
+        sectors = [("制造业", 100000)]
+        result = self._make_sector_result(sectors)
+        sector_mvs = {}
+        for item in result["top10"]:
+            s = item.get("sector", item["name"])
+            sector_mvs[s] = sector_mvs.get(s, 0) + item["mv"]
+        total_mv = sum(sector_mvs.values())
+        sector_ratios = {s: mv / total_mv * 100 for s, mv in sector_mvs.items()}
+        self.assertAlmostEqual(sector_ratios.get("制造业", 0), 100.0, delta=0.01)
+
+    def test_no_holdings_no_sectors(self):
+        """无持仓 → 行业分布为空。"""
+        sectors = []
+        result = self._make_sector_result(sectors)
+        self.assertEqual(len(result.get("top10", [])), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

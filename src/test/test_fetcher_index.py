@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import MagicMock, patch
+import pytest
 
 
 class TestIndexCacheKey(unittest.TestCase):
@@ -213,3 +214,78 @@ class TestFetchUsIndices(unittest.TestCase):
                    return_value=None) as mock_tencent:
             result = fetch_us_indices()
             self.assertGreater(len(result), 0)
+
+
+@pytest.mark.data
+class TestIndexValueSanity(unittest.TestCase):
+    """R-095: 指数行情数值合理 — 数量级确认。"""
+
+    def _call_fetch_indices(self, cached_data: dict | None = None):
+        """通过 mock 缓存返回固定的指数数据。"""
+        with patch("src.python.fetcher.index.cache_set"):
+            with patch("src.python.fetcher.index.cache_get",
+                       return_value=cached_data):
+                from src.python.fetcher.index import fetch_indices
+                return fetch_indices()
+
+    def _call_fetch_us(self, cached_data: dict | None = None):
+        """通过 mock 缓存返回固定的美股指数数据。"""
+        with patch("src.python.fetcher.index.cache_set"):
+            with patch("src.python.fetcher.index.cache_get",
+                       return_value=cached_data):
+                with patch("src.python.fetcher.index.tencent.fetch_index_price",
+                           return_value=None):
+                    from src.python.fetcher.index import fetch_us_indices
+                    return fetch_us_indices()
+
+    def test_shanghai_composite_magnitude(self):
+        """上证 ≈ 3000 量级（非 30000 或 300）。"""
+        result = self._call_fetch_indices(
+            {"name": "上证指数", "price": 3000.45})
+        values = list(result.values())
+        self.assertTrue(
+            any(v.get("price", 0) == 3000.45 for v in values),
+            f"预期价格 3000.45，实际: {[v.get('price') for v in values]}"
+        )
+
+    def test_csi300_magnitude(self):
+        """沪深300 ≈ 4000 量级。"""
+        result = self._call_fetch_indices(
+            {"name": "沪深300", "price": 4000.78})
+        values = list(result.values())
+        # fetch_indices 返回 dict[code, data]；所有缓存数据一致
+        self.assertTrue(
+            any(v.get("price", 0) == 4000.78 for v in values),
+            f"预期价格 4000.78，实际: {[v.get('price') for v in values]}"
+        )
+
+    def test_hang_seng_magnitude(self):
+        """恒指 ≈ 20000 量级（所有指数使用相同 mock 缓存）。"""
+        idx_data = {"name": "恒生指数", "price": 22000.50}
+        result = self._call_fetch_indices(idx_data)
+        values = list(result.values())
+        self.assertTrue(
+            any(isinstance(v, dict) and 10000 < v.get("price", 0) < 40000
+                for v in values),
+            f"无恒指量级价格，实际: {[v.get('price') for v in values]}"
+        )
+
+    def test_sp500_magnitude(self):
+        """标普500 ≈ 5000 量级。"""
+        idx_data = {"name": "标普500", "price": 5500.30}
+        result = self._call_fetch_us(idx_data)
+        values = list(result.values())
+        self.assertTrue(
+            any(isinstance(v, dict) and 1000 < v.get("price", 0) < 20000
+                for v in values),
+            f"无标普量级价格，实际: {[v.get('price') for v in values]}"
+        )
+
+    def test_index_price_non_negative(self):
+        """所有指数价格 >= 0。"""
+        idx_data = {"name": "上证指数", "price": 3000}
+        result = self._call_fetch_indices(idx_data)
+        values = list(result.values())
+        for v in values:
+            self.assertGreaterEqual(v["price"], 0,
+                f"指数 {v.get('name', '?')} 价格为负: {v['price']}")

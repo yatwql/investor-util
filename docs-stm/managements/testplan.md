@@ -1,9 +1,23 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-02（v0.2.59 — 补充 LLM API 用量场景 S18~S20, 修正 QDII 标签/缓存颜色对齐）
+最后更新：2026-07-02（v0.2.60 — §1.4/§2/§3/§4/§6/§7 全量审阅修订 + R 迭代测试覆盖增补）
 
 ---
+
+## 0. 测试环境要求
+
+| 环境项 | 要求 | 说明 |
+|:-------|:-----|:-----|
+| **Python** | >= 3.10 | f-strings / match-case / `timezone` 等语法特性要求 |
+| **依赖安装** | `pip install -r requirements.txt` | 含 httpx / openpyxl / akshare（间接依赖 pandas）|
+| **网络** | 全量 UT 不需要（全 mock） | 手动回归需要（§4 P1 Provider 联通性）|
+| **系统时区** | 不限 | `datetime.now(timezone(hours=8))` 保证 UTC+8 一致性 |
+| **磁盘** | `data/cache/` `data/config/` `reports/` 读写权限 | 首次运行自动创建缺失目录 |
+| **aktools/pandas** | akshare 需 pandas | 部分 test_*.py 间接依赖，CI 中需预装 |
+| **pytest 插件** | `pytest-mock` 可选 | 项目中统一用 `unittest.mock.patch`，非强制 |
+
+> 注：CI/CD 环境（GitHub Actions 等）中需额外注意 akshare 的 pandas 依赖和网络 mock 覆盖。
 
 ## 1. 测试分类
 
@@ -26,9 +40,10 @@
 | `handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
 | `tui_menu.py` | 所有 14 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
 
-### 1.2 Edge Case 强制清单
+### 1.2 数据边界 Edge Case 强制清单（横切维度）
 
-每个模块的测试必须覆盖以下 edge case 类型（至少每个函数 1 项）：
+写任何函数/模块的测试时，必须从以下 edge case **类型**中选取适用的来覆盖（至少每函数 1 项）。
+这是横切所有模块的**测试编写规范**，关注**输入值域的极端情况**。
 
 | Edge Case 类型 | 示例 | 验证点 |
 |:---------------|:-----|:-------|
@@ -45,39 +60,64 @@
 
 ### 1.3 业务场景测试（Scenario Tests）
 
-按真实用户行为组合设计的集成测试场景：
+按真实用户行为组合设计的集成测试场景。根据场景复杂度分属不同文件：
 
-| 场景 | 前置条件 | 操作 | 验证点 |
-|:-----|:---------|:-----|:-------|
-| **S1: 纯股票组合** | 持仓仅含 3 只 A 股，无基金 | 菜单 E → 菜单 H | 穿透 TOP10 等于直接持股；基金业绩显示"无基金"；总计正确 |
-| **S2: 纯基金组合** | 持仓仅含 5 只基金（ETF+主动+QDII） | 菜单 L | 穿透计算正确、分类表无"股票"行、LLM 正常生成 |
-| **S3: 混合多账户** | 3 个账户：证券（股票+ETF）、支付宝（场外基金）、微信（债基） | 菜单 L | 分账户小计正确、总计 = 小计和、分类表按账户分组 |
-| **S4: 新持仓无缓存** | 删除全部缓存后首次生成 | 菜单 L | 所有 API 正常获取、无缓存命中提示、生成时间 > 缓存命中场景 |
-| **S5: 缓存全命中** | 连续两次执行菜单 L，间隔 < TTL | 菜单 L × 2 | 第二次所有 LLM 显示"缓存命中"页脚、总费用为 0 |
-| **S6: 切换持仓文件** | 两个不同 xlsx，先选 A 生成报告，再选 B | 菜单 L → 菜单 2 → 菜单 L | 价格/指数缓存因持仓变更而更新、LLM 缓存因指纹不同而重新生成 |
-| **S7: 非交易日生成** | 模拟周末执行 | 菜单 L | 取价方式显示"场内收盘价(T-1)"、"官方净值(T-1)"，不显示"实时价" |
-| **S8: 单一品种极限** | 全部资金买入同一只股票 | 菜单 E | 分类表仅一行、穿透 TOP10 仅一项、总计 = 单项 |
-| **S9: QDII 特殊处理** | 持仓含 QDII 基金（净值滞后 1 日） | 菜单 L | 取价方式显示"官方净值(T-1)"、净值日期标注、LLM 不会讨论该品种的"本日"盈亏 |
-| **S10: LLM 全部失败** | llm_key.json 缺失 API Key | 菜单 L | 所有 LLM 模块占位"本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）"、核心报告正常生成、不崩溃 |
-| **S11: LLM 混合缓存+真实调用** | 4 模块：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"LLM API 调用失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 页模块列表正确 |
-| **S12: LLM 全部失败（5 种原因）** | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
-| **S13: Extended Thinking 混合** | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用的模块行，Excel/HTML/Summary 三种输出一致 |
-| **S14: LLM 不启用** | TUI 不按 L，直接生成报告 | 菜单 E / H / B 等（无 L） | 核心报告完整生成（市值/穿透/基金业绩/指数）；无十二.LLM API 用量页签（HTML 无该章节，Excel 无该页签）；无 LLM 分析章节 |
-| **S15: 禁用+缓存混合** | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），即使该模块有缓存或 per_module 数据，禁用优先 |
-| **S16: 断网下 LLM 降级** | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为占位文本"本节内容待生成 — LLM API 网络连接失败（请检查网络后重新生成）"，不阻塞报告生成，日志记录 NETWORK_ERROR |
-| **S17: LLM 部分缓存超期** | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示"缓存"状态，费用为 0 |
-| **S18: LLM 全缓存 + 无实际 API 调用** | 连续两次菜单 L（间隔 < TTL，所有模块命中缓存） | 菜单 L → 菜单 L | 第二次 LLM API 用量页签汇总区显示"无新增 API 调用，数据全部来自缓存"，模块明细表 5 行全部显示缓存状态、费用列"已计入原调用"、call_count=0 |
-| **S19: news_correlation 启用 + 5 模块混合** | `enabled_llm.news_correlation=true`，2 缓存 + 2 成功 + 1 新闻关联成功 | 菜单 L | LLM API 用量页签明细表含 5 行（含新闻关联分析(LLM)）、状态正确（蓝/蓝/绿/绿/绿）、费用计算含所有 5 模块、总 Token 为 5 模块之和 |
-| **S20: 无 LLM 用量不渲染** | 菜单 E / H / B（不含 L） | 菜单 E → 菜单 H → 菜单 B | 报告无 LLM API 用量页签/章节（Excel 无页签 12、HTML 无第 12 节）；LLM 分析章节整体不出现 |
+| 测试文件 | 覆盖场景 | 职责范围 |
+|:---------|:---------|:---------|
+| `test_integration.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
+| `test_integration_scenarios.py` | S6-S10 | 扩展场景：纯债/断网/单账户/零成本/极端值 |
+| `test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
+
+> 添加新场景时，按复杂度选择文件。LLM 相关的场景统一放在 `test_llm_scenarios.py`。
+
+| 场景 | 前置场景 | 前置条件 | 操作 | 验证点 |
+|:-----|:---------|:---------|:-----|:-------|
+| **S1: 纯股票组合** | — | 持仓仅含 3 只 A 股，无基金 | 菜单 E → 菜单 H | 穿透 TOP10 等于直接持股；基金业绩显示"无基金"；总计正确 |
+| **S2: 纯基金组合** | — | 持仓仅含 5 只基金（ETF+主动+QDII） | 菜单 L | 穿透计算正确、分类表无"股票"行、LLM 正常生成 |
+| **S3: 混合多账户** | — | 3 个账户：证券（股票+ETF）、支付宝（场外基金）、微信（债基） | 菜单 L | 分账户小计正确、总计 = 小计和、分类表按账户分组 |
+| **S4: 新持仓无缓存** | — | 删除全部缓存后首次生成 | 菜单 L | 所有 API 正常获取、无缓存命中提示、生成时间 > 缓存命中场景 |
+| **S5: 缓存全命中** | **S4** | 连续两次执行菜单 L，间隔 < TTL | 菜单 L × 2 | 第二次所有 LLM 显示"缓存命中"页脚、总费用为 0 |
+| **S6: 切换持仓文件** | — | 两个不同 xlsx，先选 A 生成报告，再选 B | 菜单 L → 菜单 2 → 菜单 L | 价格/指数缓存因持仓变更而更新、LLM 缓存因指纹不同而重新生成 |
+| **S7: 非交易日生成** | — | 模拟周末执行 | 菜单 L | 取价方式显示"场内收盘价(T-1)"、"官方净值(T-1)"，不显示"实时价" |
+| **S8: 单一品种极限** | — | 全部资金买入同一只股票 | 菜单 E | 分类表仅一行、穿透 TOP10 仅一项、总计 = 单项 |
+| **S9: QDII 特殊处理** | — | 持仓含 QDII 基金（净值滞后 1 日） | 菜单 L | 取价方式显示"官方净值(T-1)"、净值日期标注、LLM 不会讨论该品种的"本日"盈亏 |
+| **S10: LLM 全部失败** | — | llm_key.json 缺失 API Key | 菜单 L | 所有 LLM 模块占位"本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）"、核心报告正常生成、不崩溃 |
+| **S11: LLM 混合缓存+真实调用** | — | 4 模块：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"LLM API 调用失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 页模块列表正确 |
+| **S12: LLM 全部失败（5 种原因）** | — | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
+| **S13: Extended Thinking 混合** | — | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用的模块行，Excel/HTML/Summary 三种输出一致 |
+| **S14: LLM 不启用** | — | TUI 不按 L，直接生成报告 | 菜单 E / H / B 等（无 L） | 核心报告完整生成（市值/穿透/基金业绩/指数）；无十二.LLM API 用量页签（HTML 无该章节，Excel 无该页签）；无 LLM 分析章节 |
+| **S15: 禁用+缓存混合** | — | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），即使该模块有缓存或 per_module 数据，禁用优先 |
+| **S16: 断网下 LLM 降级** | — | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为占位文本"本节内容待生成 — LLM API 网络连接失败（请检查网络后重新生成）"，不阻塞报告生成，日志记录 NETWORK_ERROR |
+| **S17: LLM 部分缓存超期** | — | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示"缓存"状态，费用为 0 |
+| **S18: LLM 全缓存 + 无实际 API 调用** | — | 连续两次菜单 L（间隔 < TTL，所有模块命中缓存） | 菜单 L → 菜单 L | 第二次 LLM API 用量页签汇总区显示"无新增 API 调用，数据全部来自缓存"，模块明细表 5 行全部显示缓存状态、费用列"已计入原调用"、call_count=0 |
+| **S19: news_correlation 启用 + 5 模块混合** | — | `enabled_llm.news_correlation=true`，2 缓存 + 2 成功 + 1 新闻关联成功 | 菜单 L | LLM API 用量页签明细表含 5 行（含新闻关联分析(LLM)）、状态正确（蓝/蓝/绿/绿/绿）、费用计算含所有 5 模块、总 Token 为 5 模块之和 |
+| **S20: 无 LLM 用量不渲染** | **S14** | 菜单 E / H / B（不含 L） | 菜单 E → 菜单 H → 菜单 B | 报告无 LLM API 用量页签/章节（Excel 无页签 12、HTML 无第 12 节）；LLM 分析章节整体不出现 |
 
 ### 1.4 集成测试
 
-- **数据流完整链路**：持仓 xlsx → 数据获取 → 缓存 → Excel/HTML 输出，全流程可走通
-- **API 联通性**：手动验证腾讯财经、东方财富、天天基金 API 实际可调通（每次迭代至少验证一次）
-- **缓存与 API 协同**：缓存存在 + 未过期 → 不调 API；缓存不存在 → 调 API 并写入
-- **原子写入验证**：模拟磁盘满 / 断电台式机重启后缓存和配置文件完整性
+与 §1.3（端到端用户场景）的分工：**§1.4 聚焦模块间的接口契约和管道行为** — 组件 A 的输出是组件 B 的合法输入、错误在模块边界正确隔离、数据流跨模块一致。
+
+> **与 §1.5 异常场景的关系：** §1.4 = 集成测试目标（"应该测什么"），§1.5 = 当前覆盖状态跟踪（"现在实测了什么"）。
+> 重叠条目（如断网降级、Provider 回退）在 §1.4 标注目标状态，在 §1.5 标注实测状态，两者不矛盾。
+
+| 集成维度 | 已验证 | 测试位置 |
+|:---------|:------:|:---------|
+| **数据流完整链路**：持仓 xlsx → 数据获取 → 缓存 → Excel/HTML 输出 | ✅ | `test_integration.py` S1-S5 |
+| **Provider 回退链路端到端**：腾讯不可用 → 东方财富 → 过期缓存 | ✅ | `test_chain.py` |
+| **缓存与 API 协同**：缓存命中不调 API，缓存缺失调 API 并写入 | ✅ | `test_cache.py` |
+| **原子写入恢复**：磁盘满/断电后缓存和配置文件完整性 | ✅ | `test_config_atomic.py` |
+| **模块间接口契约**：reader 输出 → market_value 输入 → penetration 输入 → ... 类型链正确 | ❌ | 待补 — 缺少 data contract 验证 |
+| **错误隔离**：penetration/LLM/news_correlation 任一模块失败，不阻塞其他模块写入 | ◐ | `test_excel_generator.py` 有异常隔离，缺业务语义验证 |
+| **LLM 输出→报告渲染**：Markdown → HTML/Jinja2 → 条件段落的渲染链路 | ✅ | `test_llm_scenarios.py` S14/S20（无 LLM 不渲染） |
+| **新闻流水线集成**：fetch_all → aggregate → deduplicate → correlate_with_holdings → write_to_report | ◐ | 子步骤有单元测试，全链路缺 |
+| **多模块缓存一致性**：price 刷新后，market_value / fund_performance 使用同一缓存源 | ❌ | 待补 — 缺少跨模块缓存穿透验证 |
+| **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ❌ | 待补 — mock UI 事件触发 handler 链 |
+| **API 联通性验证**：手动运行确认腾讯/东方财富/天天基金 API 实际可调通 | ✅ | 每次迭代人工执行 |
 
 ### 1.5 异常场景全覆盖
+
+> **与 §1.4 集成测试的关系：** §1.5 跟踪已有测试的覆盖状态（✅/🟡/🔴/❌），§1.4 列出集成测试目标。
+> 同一异常场景（如断网降级）可能同时出现在两处：§1.4 标识为集成目标，§1.5 标识实测状态。
 
 | 场景 | 预期行为 | 现有测试 |
 |:-----|:---------|:--------:|
@@ -103,6 +143,56 @@
 | 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | 🟡 待补 |
 | LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | 🟡 待补 |
 
+### 1.6 日期/时间数据获取场景测试
+
+按市场状态、产品类型、时间边界组合，验证各数据源在不同时段的正确性和降级表现。
+
+**市场状态组合：**
+
+| 场景 | 前置条件 | 操作 | 预期结果 |
+|------|----------|------|----------|
+| **T1: 交易日盘中**（09:30-11:30 / 13:00-15:00） | 网络正常、无缓存 | 菜单 E/H/B | 实时价格使用短 TTL（30s）；场外基金净值昨收；涨幅基于昨收计算；IOPV/溢价率实时更新 |
+| **T2: 交易日盘前**（09:30 前） | 网络正常 | 菜单 E | 昨日收盘价可用，实时价不可用；最后交易日为上一交易日；场外基金净值日期为 T-1 |
+| **T3: 交易日午间休市**（11:30-13:00） | 网络正常 | 菜单 E | 行情续用上午盘中高频缓存；基金净值不可用（发布在盘后）|
+| **T4: 交易日盘后**（15:00 后） | 网络正常 | 菜单 E/H/B | 收盘价固化；场外基金净值渐次发布（15:00-20:00）；净值日期为 T；盘中缓存已清理 |
+| **T5: 非交易日**（周末/节假日） | 网络正常 | 菜单 E | 使用最近交易日收盘价；净值日期停留在最近交易日；指数显示最近交易日数据 |
+| **T6: 长假前后**（春节/国庆假期） | 假期前最后交易日生成报告 + 假期中再生成 | 菜单 E × 2 | 假期中所有价格降级为过期缓存；缓存 TTL 判断正常（非"过期"错误）；假期后首个交易日恢复正常 |
+
+**产品类型差异化：**
+
+| 场景 | 前置条件 | 操作 | 预期结果 |
+|------|----------|------|----------|
+| **T7: 国内场外基金** | 含多只国内场外基金 | 菜单 L | 净值日期标记 T 日（15:00 后）或 T-1（15:00 前）；本日盈亏仅当净值日期=T 时计算 |
+| **T8: QDII 场外基金** | 含 QDII 基金（美股/港股方向） | 菜单 L | 净值日期通常 T-2（跨境延迟）；估值净值与官方净值差异字段标记正确；美元份额币种转换 |
+| **T9: 场内 ETF/LOF** | 含 ETF/LOF 持仓 | 菜单 E | 盘中实时价更新；盘后收盘价固化；IOPV/溢价率计算；振幅/换手率字段正确 |
+| **T10: 股票持仓** | 含 A 股股票 | 菜单 E | 实时价（盘中）/ 昨收（盘前盘后）；PE/PB/总市值等基本面字段盘后才更新 |
+| **T11: 混合持仓** | 同时含场外+场内+股票 | 菜单 H | 各类型行情获取互不干扰；市值核算中价格来源标识正确；报告完整无遗漏 |
+
+**边界与异常 Edge Case：**
+
+| 场景 | 前置条件 | 操作 | 预期结果 |
+|------|----------|------|----------|
+| **T12: 盘中转盘后** | 盘中生成报告 B | 盘中生成后再盘后生成 | 盘中实时价 → 盘后收盘价；盘中缓存已过期 → 盘后新缓存写入 TTL 正确 |
+| **T13: 交易时段切换缝隙** | 11:29:59 / 14:59:59 附近 | 时间条件模拟 | 午休/收盘切换前夕的缓存/数据行为正确，不出现竞态或错误缓存残留 |
+| **T14: 第一次启动+非交易日** | 完全无缓存 + 非交易日 | 首次运行菜单 E | 全降级路径正确：指数→过期缓存→"--"；价格→昨收/净值→"--"；报告完整无崩溃 |
+| **T15: 盘中断网** | 盘中网络断开 | 菜单 L | 价格从缓存读取（过期缓存降级）；LLM 全部失败降级；报告完整 |
+| **T16: 盘后断网** | 盘后网络断开 + 有当日缓存 | 菜单 E | 收盘价从缓存读取（当日缓存未过期）；全流程正常 |
+
+### 1.7 场景-测试文件覆盖率映射
+
+> **维护方式：** 详细映射（每场景 → 测试文件/类）由脚本 `scripts/validate_coverage_map.py` 半自动管理。
+> 新增 S/T 场景或修改测试文件后，运行 `python scripts/validate_coverage_map.py` 验证映射准确性。
+> 详细映射全文见 `docs-stm/plan/test-coverage-map.md`。
+
+**覆盖状态汇总：**
+
+| 覆盖状态 | 数量 | 说明 |
+|:---------|:----:|:-----|
+| ✅ 已覆盖 | 43 项 | S1-S20（20项）+ T1-T12/T14-T16（15项）+ 异常场景已覆盖（8项） |
+| ◐ 部分覆盖 | 3 项 | T13（时段切换缝隙）、非交易日+LLM、多账户混合+LLM 多轮 |
+| ❌ 未覆盖 | 2 项 | 净值数据空窗期、多时区 QDII 净值一致性 |
+| **合计** | **48 项** | 含 §1.3（S1-S20）+ §1.6（T1-T16）+ §1.5 异常场景 |
+
 ---
 
 ## 2. 数据正确性验证
@@ -119,6 +209,12 @@
 | 溢价率 = (市价 - 净值) / 净值 | QDII ETF 验证 | 🟡 |
 | 本日盈亏 — 场外非 T 日更新 | 场外基金 nav_date ≠ T → today_profit = 0 | 🟡 |
 | 穿透市值占比归一化 | TOP10 占比总和 ≤ 100% | 🟡 |
+| **三维度分类聚合一致**：资产属性/投资分类/账户的小计各自 = 总计 | 三类分类各自独立聚合，交叉验证无遗漏/无重复 | ❌ 待补 |
+| **穿透行业占比归一化**：各行业占比之和 ≤ 100% | 穿透行业分布验证 | ❌ 待补 |
+| **指数行情数值合理**：上证≈3000、沪深300≈4000、恒指≈20000、标普≈5000 | 数量级确认，非精确值 | ❌ 待补 |
+| **多币种转换正确**：美元份额 × 汇率中间价 = 人民币市值 | 构造美元/港币持仓，验证币种转换 | ❌ 待补 |
+| **QDII 估值净值 vs 官方净值关系**：估值净值 ≥ 0，官方净值延迟 T-2 | 双列数值关系合理性断言 | ❌ 待补 |
+| **基金业绩排名数据合理性**：排名/收益率在 0-100% 范围内 | 天天基金排名数值验证 | ❌ 待补 |
 
 ---
 
@@ -126,110 +222,190 @@
 
 | 验证项 | 标准 | 现有测试 |
 |:-------|:-----|:--------:|
-| TUI 菜单显示 | 14 选项完整、中文字符正常、按键响应正确 | ✅ |
-| Excel 文件 | 页签编号排序（1.~12.）、冻结首行、盈亏着色（红/绿）、取价方式蓝色标识 | ✅ |
-| HTML 文件 | 浏览器渲染正常、中文无乱码、章节锚点导航、LLM 条件渲染 | ✅ |
-| 日志输出 | `logs/app.log` 含 INFO/WARNING/ERROR 三级，无敏感信息（API Key 脱敏） | 🟡 |
-| LLM 占位文本 | "未配置"/"已禁用"/"生成失败"三种文本区分明确 | 🟡 |
-| LLM 缓存提示 | 缓存命中显示灰字"本次使用LLM缓存" | ✅ |
+| **TUI 菜单** | 14 选项完整、中文字符正常、按键响应正确 | ✅ |
+| **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
+| **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | 🟡 |
+| **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | 🟡 |
+| **Excel 页签结构** | 页签编号排序（1.~12.）、冻结首行、列宽自适应 | ✅ |
+| **Excel 盈亏着色** | 正数绿/红色（RGB 正绿/红），覆盖所有盈亏列（本日盈亏/持仓盈亏/收益率） | ✅ |
+| **Excel LLM 状态颜色** | 蓝底=缓存、绿底=成功、红底=失败、灰底=禁用+各色图标 | ✅ |
+| **Excel 取价方式标识** | 蓝色字体标注（实时价/收盘价/官方净值） | ✅ |
+| **Excel 评级颜色** | 5 级评级对应深绿/绿/黄/橙/红，与 HTML 一致 | ✅ |
+| **Excel 数字格式** | 收益率列 % 格式，金额列千分位，小数位数统一 | 🟡 |
+| **HTML 渲染** | 浏览器渲染正常、中文无乱码、章节锚点导航 | ✅ |
+| **HTML 响应式布局** | 移动端和桌面端均排版正常 | ✅ |
+| **HTML LLM 条件渲染** | 无 LLM 时整节消失，有 LLM 时显示状态颜色标签 | ✅ |
+| **HTML 评级色** | 深绿/绿/黄/橙/红与 Excel 一致 | ✅ |
+| **HTML 打印样式** | 打印时隐藏导航、展开全部内容、黑白友好 | ❌ 待补 |
+| **日志输出** | `logs/app.log` 含 INFO/WARNING/ERROR 三级，无敏感信息（API Key 脱敏） | 🟡 |
+| **LLM 占位文本区分** | "未配置"/"已禁用"/"生成失败"三种文本用户可辨别 | 🟡 |
+| **LLM 缓存提示** | 缓存命中显示灰字"本次使用LLM缓存" | ✅ |
+| **报告文件管理** | 按日期归档、文件名含时间戳、不覆盖旧报告 | ❌ 待补 |
+| **首次运行引导** | 配置缺失时提示操作步骤而非直接报错 | ❌ 待补 |
 
 ---
 
 ## 4. 回归测试清单
 
-每次代码变更后必须执行的全量回归：
+每次代码变更后按优先级执行。**§1.4 集成测试**的自动化用例是回归套件的一部分，写入 `src/test/`，由 `pytest` 统一执行；
+**§4 回归清单**则额外覆盖自动化无法验证的手动和环境检查项。
 
-| 优先级 | 回归范围 | 触发条件 |
-|:------:|:---------|:---------|
-| **P0** | `pytest src/test/` 全量 57 文件 | 任何代码变更 |
-| **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） |
-| **P1** | 手动运行菜单 E/H/B/L 各一次 | config / report 相关变更 |
-| **P1** | 手动运行菜单 [1] [2] [3] [4] | cache / handlers 相关变更 |
-| **P2** | 清理缓存后全新运行 | provider / fetcher 相关变更 |
-| **P2** | 断网环境下运行 | 网络相关变更 |
-| **P3** | 在非 UTC+8 时区机器上运行 | 日期/时间相关变更 |
+优先级定义：
+| 等级 | 含义 | 不通过则 |
+|:----:|:-----|:---------|
+| **P0** | 阻塞级 | 不可提交代码 |
+| **P1** | 严重级 | 不可合并到 master |
+| **P2** | 正常级 | 不可发布版本 |
+| **P3** | 建议级 | 建议修复，可带缺陷发布 |
+
+| 优先级 | 回归范围 | 触发条件 | 备注 |
+|:------:|:---------|:---------|:-----|
+| **P0** | `pytest src/test/` 全量通过（数量以 `pytest --collect-only` 统计为准） | **任何代码变更** | 全量自动化回归 |
+| **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） | 验证缺陷场景的断言 |
+| **P0** | 测试隔离验证：`pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
+| **P1** | 手动菜单 E/H/B/L 各一次，检查报告完整性 | config / report / html / llm 变更 | Excel 页签完整、不崩溃 |
+| **P1** | 手动检查 Excel 报告视觉质量 | 颜色/格式/样式相关变更 | 盈亏着色、评级色、LLM 状态色、冻结首行 |
+| **P1** | 手动检查 HTML 报告浏览器渲染 | html_writer / template 变更 | 中文不乱码、章节锚点、LLM 条件消失/出现 |
+| **P1** | 手动运行菜单 [1][2][3][4] | cache / handlers / registry 变更 | 缓存刷新/清理/统计不崩溃 |
+| **P1** | Provider 链路手动联通性 | providers / fetcher 变更 | 腾讯/东方财富/天天基金 API 实际可调通 |
+| **P2** | 断网环境下运行（自动降级） | 网络/超时/重试相关变更 | 所有缓存的场景降级正确 |
+| **P2** | 清理缓存后全新运行 | provider / fetcher / cache 变更 | 无缓存路径完整可走通 |
+| **P2** | 旧缓存格式兼容性验证 | cache.py / models.py 变更 | 用 v0.2.48 格式缓存测试新版读取 |
+| **P2** | 跨缓存池污染验证 | 缓存 Key/TTL 策略变更 | price TTL 变化不污染 rank/hold TTL |
+| **P3** | 非 UTC+8 时区运行 | 日期/时间/时区相关变更 | `datetime.now(timezone(hours=8))` 一致 |
+| **P3** | 长假期前后跨日运行 | TTL / market_hours 变更 | 长假后首个交易日恢复正常 |
 
 ---
 
-## 5. 各迭代测试重点
+## 5. 各迭代测试重点（快速索引）
 
-| 迭代 | 测试重点 |
-|:------|:---------|
-| Iter 1.1 | 配置文件读写正确性、启动脚本可用性 |
-| Iter 1.2 | xlsx 解析正确性、菜单导航完整性 |
-| Iter 1.3 | API 联通性、缓存过期逻辑、备用链路切换 |
-| Iter 1.4 | Excel 生成正确性、15 列对齐、颜色格式、盈亏计算 |
-| Iter 1.5 | 全链路异常场景覆盖 |
-| Iter 2 | 分类汇总聚合计算、穿透合并逻辑（含精细化分类）、基金排名数据正确性 |
-| Iter 3.1 | HTML 渲染效果、Jinja2 模板正确性、5 模块内容一致性 |
-| Iter 3.2 | 5 源新闻聚合正确性、关键词关联准确度 |
-| Iter 3.3 | 模板占位显示、缓存管理、缓存文件损坏修复、异常提示 |
-| Iter 3.4 | LLM API 联通性、缓存 TTL、API Key 未配置降级 |
-| Iter 3.5 | LLM 并行生成、System Prompt 外部配置、httpx 连接池 |
-| Iter 3.6 | 多线程缓存竞态、新闻缓存过期、Token 用量展示 |
-| Iter 3.7 | html_writer/fund_performance/summary 类型安全性审计 |
-| v0.2.10 | 关键词富化 4 种类型 + HTML 着色 |
-| v0.2.11 | eastmoney_industry provider + 行业概念缓存 |
-| v0.2.18 | akshare 盈利预测/资金流向/分红 + 内存缓存 |
-| v0.2.29 | 持仓体检报告：4 维度评分 + 配置项默认值 |
-| v0.2.30 | 穿透深度分析：行业集中度/国别暴露 |
-| v0.2.33 | config.py validate_config 全字段校验 + 页签命名统一 |
-| v0.2.34 | prompts.py/generators.py 拆分回归 + system_prompt 覆盖链 |
-| v0.2.35 | registry.py 中央注册表完备性 + 去硬编码 |
-| v0.2.36 | early_warning 智能预警 + 行业资金联动 + 新闻情绪聚合 |
-| v0.2.46 | test_api.py 44 项 + test_excel_generator.py 15 项 |
-| v0.2.48 | tiantian.py 大函数拆分 + test_tiantian.py 39 项 |
-| v0.2.49 | 大函数治理 + 未使用 import 清理回归 |
-| v0.2.50 | test_http_client.py 17 项 + test_market_hours.py 41 项 |
-| v0.2.51 | fingerprint 16 项 + 新闻 provider 50 项 + 代码治理回归 |
-| v0.2.52 | 大函数治理二期 + 测试补全三期（9 模块 140 项） |
-| v0.2.53 | P1 LLM Prompt 精简 + P2 HTTP/2 复用 + dead code 清理 |
-| v0.2.54 | P 节 12 项 Edge Case/场景测试补全 + 评级 bug 修复 + 8 项预存测试缺陷修复 + HTML 响应式 + docs 反推补全 |
-| v0.2.55 | P0 长周期收益率 + P1 风险分析解析 + P2 5 级评级系统 + 类型差异化阈值 + test_tiantian.py 39→65 项 |
-| v0.2.56 | P0 index market_hour_aware 修复 + P1 硬编码 TTL 全部替换为 get_ttl() + pip -qq 静默 + test_double_check 竞态修复 |
-| v0.2.58 | P0 指数双链路 fallback（A股：腾讯→新浪；美股：新浪→腾讯）+ test_fetcher_index 扩展 8→13 项 |
-| v0.2.59 | P0 `_handle_truncation` usage 透传修复 + news_correlation 模块明细遗漏修复 + 缓存 Token 隐藏为 `—` 修复 + _handle_truncation 回归 3 项 + 日志隔离 + 测试隔离修复 + plan.md 业务场景测试增强需求
+> 完整变更日志详 `docs-stm/managements/changelog.md`，旧版本（Iter 1.1~v0.2.36）的详细记录已归档至 `docs-stm/plan/archived_plan.md`。
+> 此处仅列近 10 个版本的测试重点作为快速参考。
+
+| 版本 | 测试重点 |
+|:-----|:---------|
+| v0.2.59 | LLM 全场景组合测试 S11-S20（33 项）、日期/时间场景 T1-T16（61 项）、plan.md/testplan.md 需求同步 |
+| v0.2.58 | 指数双链路 fallback（A股腾讯→新浪、美股新浪→腾讯）、test_fetcher_index 8→13 项 |
+| v0.2.56 | index market_hour_aware TTL 修复、硬编码 TTL→get_ttl() 全量替换、竞态修复 |
+| v0.2.55 | P0 长周期收益率、P1 风险分析解析、P2 5 级评级系统+类型差异化阈值 |
+| v0.2.54 | P 节 12 项 Edge Case/场景测试补全、8 项预存缺陷修复、HTML 响应式 |
+| v0.2.53 | P1 LLM Prompt 精简、P2 HTTP/2 复用、dead code 清理 |
+| v0.2.52 | 大函数治理二期、测试补全三期（9 模块 140 项） |
+| v0.2.51 | fingerprint 16 项、新闻 provider 50 项、代码治理回归 |
+| v0.2.50 | test_http_client.py 17 项、test_market_hours.py 41 项 |
+| v0.2.49 | 大函数治理、未使用 import 清理回归 |
 ---
+
+
 
 ## 6. 测试数据与 Mock 策略
 
-### 6.1 Mock HTTP 请求
-
-所有 `providers/*.py` 测试均使用 `unittest.mock.patch` 模拟 `httpx.Client.get/post`：
+### 6.1 通用 Mock 约定
 
 ```python
-@patch("src.python.providers.tencent.httpx.Client.get")
-def test_fetch_price_normal(self, mock_get):
-    mock_get.return_value.status_code = 200
-    mock_get.return_value.text = 'v_sh600900="1~长江电力~600900~28.50~..."'
+# 所有 mock 使用 unittest.mock.patch，统一路径规则：
+#   模块级导入 → patch("src.python.<module>.<symbol>")
+#   函数体内导入 → patch("<package>.<symbol>")   # 第三方库用顶层包名
+#   内部 import → patch("src.python.<module>.<symbol>")
+```
+
+### 6.2 Mock HTTP 请求
+
+所有 `providers/*.py` 测试通过 mock `httpx.Client` 规避真实网络：
+
+```python
+# 通过 http_client.py 工厂创建的 client
+@patch("src.python.providers.tencent.httpx.Client")
+def test_fetch_price_normal(self, mock_client_cls):
+    mock_instance = mock_client_cls.return_value.__enter__.return_value
+    mock_instance.get.return_value.status_code = 200
+    mock_instance.get.return_value.text = 'v_sh600900="1~长江电力~600900~28.50~..."'
     result = fetch_price("600900")
     self.assertIsNotNone(result)
 ```
 
-### 6.2 Mock LLM API
+> 注意：provider 通过 `http_client.py` 创建 client（`with get_httpx_client() as client:`），
+> 应 mock `httpx.Client` 类的构造，而非直接 mock 模块函数。
 
-LLM 测试使用 mock 替代真实 API 调用，验证缓存/截断/重试/路由逻辑：
+### 6.3 Mock LLM API
 
 ```python
+# LLM API 调用统一 mock 入口
 @patch("src.python.llm.api._call_single_provider")
 def test_generate_global_macro_cached(self, mock_call):
-    # 预热缓存
     mock_call.return_value = ("分析内容...", {"input_tokens": 100})
-    ...
+    # 预热缓存
+    result = generate_global_macro(...)    # 第一次调用 API
+    result = generate_global_macro(...)    # 第二次命中缓存→不调 API
+    assert mock_call.call_count == 1
 ```
 
-### 6.3 测试数据文件
+### 6.4 Mock 交易日历 & 市场时段
 
-- **持仓测试数据**：测试中使用内存构造的 `Holding` 对象，不依赖磁盘 xlsx 文件
-- **Mock 交易日历**：通过 `@patch` 注入固定日期集合，避免 akshare API 依赖
-- **Mock 市场时段**：通过 `@patch("market_hours.datetime")` 控制时间，覆盖开盘/午休/收盘/周末
+```python
+# 交易日历 — akshare 在 _get_trading_calendar 内部以 "import akshare as ak" 导入
+# 不能在模块级 patch "src.python...ak"，需直接 patch 函数：
+@patch("akshare.tool_trade_date_hist_sina")
+def test_trading_calendar(self, mock_ak):
+    mock_ak.return_value = pd.DataFrame(...)
 
-### 6.4 测试隔离要求
+# 市场时段 — market_hours 中 datetime.now 通过模块级引用
+# 标准写法（替代对全部代码搜索 datetime.now 的 patch 路径）：
+@patch("src.python.market_hours.datetime")
+def test_is_market_open_morning(self, mock_dt):
+    mock_dt.now.return_value = datetime(2026, 7, 2, 10, 30)  # 盘中
+
+# 更简单的做法（日期不敏感的测试）：
+@patch("src.python.cache._is_market_open")
+def test_get_ttl_closed(self, mock_open):
+    mock_open.return_value = False  # 盘后/非交易日 → long TTL
+```
+
+### 6.5 Mock 配置文件
+
+```python
+# config.json — get_config() 在不同函数体内导入
+# 标准路径（取决于函数内 import 位置）：
+@patch("src.python.cache.get_config")   # get_ttl() 内部 import
+@patch("src.python.config.get_config")  # 模块级 import
+
+# llm_key.json — 同理：
+@patch("src.python.llm.api.load_llm_key")
+```
+
+### 6.6 测试数据构造
+
+| 数据类型 | 构造方式 | 说明 |
+|:---------|:---------|:-----|
+| **持仓数据** | 内存 `Holding(...)` 对象 | 不依赖磁盘 xlsx |
+| **API 响应** | `httpx.Response(status_code, text=...)` 或 dict→JSON | 返回结构模拟真实 API |
+| **缓存数据** | `cache.set(key, value)` 到临时目录 | 不操作真实 `data/cache/` |
+| **交易日历** | 固定 `datetime.date` 列表 | 避免 akshare API 依赖 |
+| **市场时段** | `@patch("src.python.market_hours.datetime")` | 覆盖开盘/午休/收盘/周末/节假日 |
+| **基金净值** | `{"NAV": 1.5, "NAVdate": "2026-07-01"}` 字典 | 模拟东方财富返回值 |
+| **天天基金 JS** | 模拟 `var data = { ... }` 格式的 JavaScript 变量 | 模拟 pingzhongdata 响应 |
+| **新闻** | `{"title": "...", "content": "..."}` 列表 | 模拟各新闻源返回 |
+
+### 6.7 不应 Mock 的场景
+
+以下场景需要手动运行真实代码（不可 mock）验证：
+
+| 场景 | 执行频率 | 说明 |
+|:-----|:---------|:-----|
+| 腾讯/东方财富/天天基金 API 联通性 | 每次迭代至少一次 | mock 无法验证 API 实际可调通 |
+| Excel 报告视觉检查 | config/report 变更时 | 颜色/格式/冻结首行等自动化难验证 |
+| HTML 报告浏览器渲染 | html_writer/template 变更时 | 中文乱码、章节锚点、响应式布局 |
+| 断网降级 | 网络相关变更时 | 真实断网 vs mock 超时的行为差异 |
+| 旧缓存格式兼容 | cache.py 变更时 | 真实旧缓存文件 vs mock 行为差异 |
+
+### 6.8 测试隔离要求
 
 - 测试不操作真实 `data/cache/`，所有缓存操作使用 `tempfile.mkdtemp` 临时目录
 - 测试不写磁盘配置，`config.json` 通过 `os.environ` 或 `tempfile` 隔离
 - 网络测试全部 mock，不发起真实 HTTP 请求
 - 测试间互不依赖，每个 `setUp` 清理状态
+- 每新增 test_*.py 后运行 `pytest --co` 验证无 patch 残留污染
+- 不修改全局变量/环境变量（必须修改时用 `with patch.dict(os.environ, ...)`）
 
 ---
 
@@ -237,13 +413,31 @@ def test_generate_global_macro_cached(self, mock_call):
 
 每个迭代完成后必须满足以下条件方可进入下一迭代：
 
-1. 当前迭代的所有计划功能已实现
-2. **全量 `pytest src/test/` 通过**（0 failed, 0 error）
-3. 新增功能有对应测试用例（**MUST** — 来自 CLAUDE.md 约定）
-4. Bug 修复有对应回归用例（**MUST** — 验证 Bug 场景的具体断言）
-5. 人工验证测试覆盖的异常场景程序不崩溃
-6. Excel/HTML 输出文件在 visual 检查下无明显格式或数据错误
-7. TUI 菜单 14 个选项功能正常
+### 7.1 功能完整性
+
+1. **功能完成**：当前迭代的所有计划功能已实现（对应 `plan.md` 条目全部标注完成）
+2. **文档同步**：新增/重命名/删除的文件或目录已同步更新 `datasource-and-folders.md` 目录树
+3. **自审记录**：自查问题已写入 `review-findings.md`，修复后已同步到 `changelog.md`
+
+### 7.2 自动化测试门禁
+
+4. **全量 pytest 通过**：`pytest src/test/` 全部通过（0 failed, 0 error）
+5. **无测试污染**：`pytest --co` 验证无跨文件 patch 残留冲突
+6. **测试数量不降级**：新增功能后 `pytest --collect-only | tail -1` 报告的总测试数 ≥ 变更前（有删除须在 changelog.md 中说明理由）
+7. **测试用例 MUST**：新增功能必有对应测试用例，Bug 修复必有对应回归用例（验证缺陷场景的具体断言，非仅正常路径）
+8. **§1.7 覆盖率映射更新**：新场景（S/Txx）必须映射到对应测试文件，并更新覆盖状态
+
+### 7.3 回归检查门禁
+
+9. **§4 P0 全通**：`pytest src/test/` + Bug 回归用例 + 测试隔离验证 — 不可提交代码
+10. **§4 P1 全通**：手动菜单 + Excel/HTML 视觉检查 + Provider 联通性 — 不可合并到 master
+11. **§4 P2 已执行**（可带未通过的 P2 合并，但不可发布版本）：断网降级/旧缓存兼容/跨池污染
+
+### 7.4 人工验证
+
+12. **异常场景不崩溃**：对 §1.5 异常场景清单中的 🔴/🟡 状态项，人工确认至少不导致程序崩溃
+13. **报告文件视觉检查**：Excel 和 HTML 输出文件无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）
+14. **TUI 菜单功能正常**：所有菜单选项（[E]/[H]/[B]/[L]/[C]/[F]/[O]/[S]/[R]/[1][2][3][4]）响应正确，无崩溃
 
 ---
 
@@ -251,3 +445,59 @@ def test_generate_global_macro_cached(self, mock_call):
 
 测试记录和发现的问题记录在 `docs-stm/managements/changelog.md` 中。
 审查发现的问题（无论是否已修复）记录在 `docs-stm/managements/review-findings.md`。
+
+---
+
+## 9. 新增测试指南
+
+新增测试用例时，按以下流程操作：
+
+### 9.1 确定测试类型和文件位置
+
+| 测试类型 | 放哪里 | 示例 |
+|:---------|:-------|:-----|
+| **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache.py` 追加 `TestCacheEdgeCases` |
+| **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
+| **业务场景测试** | `test_integration.py`（基础链路）或 `test_integration_scenarios.py`（扩展场景） | S1-S5 → `test_integration.py` |
+| **LLM 场景测试** | `test_llm_scenarios.py` | S11-S20 |
+| **日期/时间场景** | `test_datetime_scenarios.py` | T1-T16 |
+| **缺陷回归测试** | 对应模块的 `test_*.py` 或 `test_regression.py` | Bug fix 的断言 |
+
+### 9.2 命名规范
+
+```python
+# 测试类名 — 模块/场景名 + 测试维度
+class TestCacheEdgeCases:          # 模块 + 测试类型
+class TestGetTtlMarketAware:       # 函数名 + 场景
+class TestScenarioS21:             # 新业务场景递增
+
+# 测试方法名 — test_ + 场景 + 预期结果
+def test_empty_holdings_returns_zero(self):
+def test_ttl_during_trading_hours_returns_30s(self):
+def test_qdii_nav_date_delayed_t2(self):
+```
+
+### 9.3 新增后必须更新的文件
+
+1. **`testplan.md §1.7`** — 运行 `python scripts/validate_coverage_map.py` 并确保通过
+2. **`datasource-and-folders.md`** — 新增 test_*.py 文件后更新目录树（test 目录下的测试文件数）
+3. **`changelog.md`** — 记录新增的测试数量和覆盖场景
+4. **`plan.md`** — 如果在迭代中新增的功能，更新对应条目的完成状态
+
+### 9.4 新增后必须执行的验证
+
+```bash
+pytest src/test/                                   # 全量通过
+pytest --co                                         # 无 patch 残留污染
+pytest src/test/test_新文件.py --co -v              # 新文件隔离
+python scripts/validate_coverage_map.py             # §1.7 映射验证
+```
+
+### 9.5 文件膨胀阈值
+
+| 指标 | 警告线 | 红线 | 措施 |
+|:-----|:------:|:----:|:-----|
+| 单文件测试数 | > 80 项 | > 120 项 | 拆分到子文件 `test_xxx_part1.py` / `test_xxx_part2.py` |
+| 单文件行数 | > 800 行 | > 1200 行 | 考虑按被测函数 / 场景类型拆分 |
+| 单类方法数 | > 15 项 | > 25 项 | 拆为多个 Test 类或拆分文件 |
+| 单方法 mock 数 | > 5 个 patch | > 8 个 patch | 重构被测函数以降低耦合 |

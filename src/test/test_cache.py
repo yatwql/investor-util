@@ -24,6 +24,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, patch
+import pytest
 
 
 # ═══════════════════════════════════════════════════════════
@@ -848,6 +849,100 @@ class TestGetTTL(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 #  get_cache_dir 测试
 # ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.edge
+class TestGetTTLMarketHourAware(unittest.TestCase):
+    """R-101: 交易时段内 market_hour_aware 数据类型使用短 TTL。"""
+
+    def setUp(self):
+        self.config_patch = patch("src.python.config.get_config")
+        self.mock_config = self.config_patch.start()
+        self.mock_config.return_value = {
+            "market_hour_aware": ["price", "index"],
+            "market_hour_ttl": 45,
+            "cache_ttl": {"price": 86400},
+        }
+
+    def tearDown(self):
+        self.config_patch.stop()
+
+    @patch("src.python.cache._is_market_open", return_value=True)
+    def test_market_open_uses_short_ttl(self, _):
+        """交易时段内 + 感知类型 → 用短 TTL（配置值 45s）。"""
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("price"), 45)
+
+    @patch("src.python.cache._is_market_open", return_value=True)
+    def test_market_open_clamps_min_30(self, _):
+        """短 TTL 配置 <30s → 兜底到 30s。"""
+        self.mock_config.return_value = {
+            "market_hour_aware": ["price"],
+            "market_hour_ttl": 5,
+        }
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("price"), 30)
+
+    @patch("src.python.cache._is_market_open", return_value=True)
+    def test_market_open_clamps_max_86400(self, _):
+        """短 TTL 配置 >86400s → 兜底到 86400s。"""
+        self.mock_config.return_value = {
+            "market_hour_aware": ["price"],
+            "market_hour_ttl": 999999,
+        }
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("price"), 86400)
+
+    @patch("src.python.cache._is_market_open", return_value=True)
+    def test_non_aware_type_uses_static(self, _):
+        """交易时段中但非感知类型 → 使用静态 cache_ttl。"""
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("rank"), 86400)
+
+    @patch("src.python.cache._is_market_open", return_value=False)
+    def test_market_closed_uses_static_ttl(self, _):
+        """非交易时段 → 使用静态 cache_ttl（忽略 short TTL）。"""
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("price"), 86400)
+
+    @patch("src.python.cache._is_market_open", return_value=False)
+    def test_market_closed_no_config_uses_default(self, _):
+        """非交易时段 + 无 cache_ttl 配置 → 返回对应类型默认值。"""
+        self.mock_config.return_value = {"market_hour_aware": ["price"]}
+        from src.python.cache import get_ttl, CACHE_DAILY
+        self.assertEqual(get_ttl("price"), CACHE_DAILY)
+
+    @patch("src.python.cache._is_market_open", return_value=True)
+    def test_market_hour_ttl_missing_fallback_to_30(self, _):
+        """market_hour_ttl 缺失 → 兜底 30s。"""
+        self.mock_config.return_value = {
+            "market_hour_aware": ["price"],
+        }
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("price"), 30)
+
+    @patch("src.python.cache._is_market_open", return_value=True)
+    def test_invalid_market_hour_ttl_fallback_to_30(self, _):
+        """market_hour_ttl 为无效值 → 兜底 30s。"""
+        self.mock_config.return_value = {
+            "market_hour_aware": ["price"],
+            "market_hour_ttl": "abc",
+        }
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("price"), 30)
+
+    @patch("src.python.cache._is_market_open", return_value=False)
+    def test_midday_break_uses_long_ttl(self, _):
+        """11:30-13:00 午间休市 → 非 market_open → 长 TTL。"""
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("price"), 86400)
+
+    @patch("src.python.cache._is_market_open", return_value=False)
+    def test_afternoon_closed_uses_long_ttl(self, _):
+        """15:00 收盘后 → 非 market_open → 长 TTL。"""
+        from src.python.cache import get_ttl
+        self.assertEqual(get_ttl("price"), 86400)
+
 
 
 class TestGetCacheDir(unittest.TestCase):

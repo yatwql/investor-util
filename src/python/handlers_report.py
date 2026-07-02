@@ -39,7 +39,7 @@ def _cmd_generate_excel() -> None:
                                output_dir=config.get("output_dir", "reports"),
                                progress=reporter)
     except Exception as e:
-        reporter.add_error(str(e))
+        reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成 Excel 报告失败")
         _print_error_with_hint(e, "生成失败")
     _finish_report(reporter)
@@ -65,7 +65,7 @@ def _cmd_generate_html(news: bool = False) -> None:
         print()
         print(f"  [OK] HTML 报告已生成: {path}")
     except Exception as e:
-        reporter.add_error(f"HTML 报告生成失败: {e}")
+        reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成 HTML 报告失败")
         _print_error_with_hint(e, "生成失败")
     _finish_report(reporter)
@@ -100,9 +100,9 @@ def _cmd_generate_both() -> None:
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception as e:
-            reporter.add_error(f"HTML 报告生成失败: {e}")
+            reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
             logger.exception("HTML 报告写入失败")
-            reporter.error(f"HTML 报告生成失败: {e}")
+            reporter.error("HTML 报告生成失败（详情请查看日志）")
             reporter.info("继续生成 Excel 报告...")
 
         print()
@@ -112,7 +112,7 @@ def _cmd_generate_both() -> None:
             progress=reporter,
         )
     except Exception as e:
-        reporter.add_error(f"全系列报告生成失败: {e}")
+        reporter.add_error("全系列报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
     _finish_report(reporter)
@@ -166,15 +166,15 @@ def _process_llm_news_futures(
                 elif ok_count == 0 and not failed:
                     reporter.info("所有 LLM 内容已跳过，未调用 LLM")
             except Exception as e:
-                reporter.add_error(f"LLM 内容生成异常: {e}")
-                reporter.error(f"LLM 内容生成异常: {e}")
+                reporter.add_error("LLM 内容生成异常（详情请查看日志文件 logs/app.log）")
+                reporter.error("LLM 内容生成异常（详情请查看日志）")
         else:
             try:
                 news_data, news_llm_meta = fut.result()
                 reporter.ok(f"新闻获取完成，共 {len(news_data)} 条")
             except Exception as e:
-                reporter.add_error(f"新闻获取失败: {e}")
-                reporter.warn(f"新闻获取失败: {e}")
+                reporter.add_error("新闻获取异常（详情请查看日志文件 logs/app.log）")
+                reporter.warn("新闻获取异常（详情请查看日志）")
 
     return llm_content, news_data, news_llm_meta
 
@@ -330,9 +330,9 @@ def _cmd_generate_full() -> None:
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception as e:
-            reporter.add_error(f"HTML 报告生成失败: {e}")
+            reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
             logger.exception("HTML 报告写入失败")
-            reporter.error(f"HTML 报告生成失败: {e}")
+            reporter.error("HTML 报告生成失败（详情请查看日志）")
             reporter.info("继续生成 Excel 报告...")
 
         print()
@@ -347,7 +347,7 @@ def _cmd_generate_full() -> None:
             early_warnings=_early_warnings, progress=reporter,
         )
     except Exception as e:
-        reporter.add_error(f"全系列报告生成失败: {e}")
+        reporter.add_error("全系列报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
     _finish_report(reporter)

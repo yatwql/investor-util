@@ -108,7 +108,7 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                         # 单元测试（57 个 test_*.py + helpers.py，1713 passed / 12 skipped）
+│   └── test/                         # 单元测试（59 test_*.py + conftest.py + helpers.py，1900+ passed）
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     # 持仓 xlsx 文件（用户放置）

@@ -206,7 +206,7 @@ def _write_news_and_early_warning(
             try:
                 news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
             except Exception as e:
-                prog.add_error(f"新闻数据获取失败: {e}")
+                prog.add_error("新闻数据获取失败（详情请查看日志）")
                 news_data, _meta = [], {}
         else:
             prog.add_error(f"{get_llm_module_name('news_correlation')}数据模块缺失")
@@ -227,7 +227,8 @@ def _write_news_and_early_warning(
             prog.call_sheet(get_report_sheet_name("early_warning"), write_early_warning_sheet,
                             sheets["ws7"], _warnings)
         except ImportError as _ew_err:
-            prog.add_error(f"智能预警模块缺失: {_ew_err}")
+            logger.warning("智能预警模块缺失: %s", _ew_err)
+            prog.add_error("智能预警模块缺失，跳过")
 
 
 def _write_llm_section_and_usage(
@@ -250,7 +251,7 @@ def _write_llm_section_and_usage(
             prog.add_error("LLM 分析章节模块未就绪，跳过")
         except Exception as e:
             logger.exception("生成 LLM 分析章节失败")
-            prog.add_error(f"LLM 分析章节生成失败: {e}")
+            prog.add_error("LLM 分析章节生成失败（详情请查看日志）")
 
     _build_llm_usage_sheet(wb, prog)
 

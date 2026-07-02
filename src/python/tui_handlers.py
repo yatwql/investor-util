@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime
 from typing import Any
@@ -61,13 +62,24 @@ def _print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
         print(f"  [ERR] {prefix}: 网络连接异常，请检查网络后重试")
         print(f"        详情: {msg}")
     elif isinstance(e, PermissionError):
-        print(f"  [ERR] {prefix}: 文件写入权限不足")
-        print(f"        请检查输出目录的写入权限")
+        print(f"  [ERR] {prefix}: 文件读取/写入权限不足")
+        print(f"        请检查文件或目录的权限设置")
     elif isinstance(e, FileNotFoundError):
-        print(f"  [ERR] {prefix}: 文件未找到")
+        print(f"  [ERR] {prefix}: 文件未找到，请检查路径是否正确")
         print(f"        详情: {msg}")
+    elif isinstance(e, json.JSONDecodeError):
+        print(f"  [ERR] {prefix}: 配置文件格式错误（JSON 语法错误）")
+        print(f"        请检查配置文件是否为有效 JSON 格式")
+    elif isinstance(e, (KeyError, ValueError, AttributeError, TypeError)):
+        logger.warning("%s: %s", prefix, msg, exc_info=True)
+        print(f"  [ERR] {prefix}: 数据处理异常，详情请查看日志文件 logs/app.log")
+    elif isinstance(e, ImportError):
+        logger.warning("%s: %s", prefix, msg, exc_info=True)
+        print(f"  [ERR] {prefix}: 模块加载失败，请检查依赖是否完整安装")
+        print(f"        pip install -r requirements.txt")
     else:
-        print(f"  [ERR] {prefix}: {msg}")
+        logger.warning("%s: %s", prefix, msg, exc_info=True)
+        print(f"  [ERR] {prefix}: 操作异常，详情请查看日志文件 logs/app.log")
 
 
 def _check_network_available(details: list) -> bool:
@@ -107,7 +119,7 @@ def _prepare_holdings() -> list | None:
         _check_and_warm_for_new_assets(holdings)
         return holdings
     except Exception as e:
-        print(f"  [ERR] 读取持仓失败: {e}")
+        _print_error_with_hint(e, "读取持仓失败")
         _press_any_key()
         return None
 
@@ -229,6 +241,10 @@ def _execute_item(sel: int) -> None:
         except KeyboardInterrupt:
             print()
             print("  操作已取消")
+            _press_any_key()
+        except Exception as e:
+            logger.exception("菜单项执行异常")
+            _print_error_with_hint(e, "操作执行异常")
             _press_any_key()
         finally:
             _busy = False

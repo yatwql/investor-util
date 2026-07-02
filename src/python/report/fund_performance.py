@@ -106,7 +106,7 @@ def _format_rank(entry: dict) -> str:
     """格式化排名为 '排名/总数' 格式。"""
     rank = entry.get("rank", "--")
     total = entry.get("total", "--")
-    if rank == "--" or total == "--":
+    if rank is None or rank == "--" or total is None or total == "--":
         return "--"
     return f"{rank}/{total}"
 

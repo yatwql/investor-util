@@ -119,10 +119,11 @@ class TestPrintErrorWithHint(unittest.TestCase):
         self.assertIn("文件未找到", out)
 
     def test_generic_error(self) -> None:
-        """其他错误 → 直接显示错误消息。"""
+        """其他错误 → 数据处理异常提示，不暴露原始堆栈。"""
         out = self._capture(ValueError("invalid value"), "操作失败")
         self.assertIn("操作失败", out)
-        self.assertIn("invalid value", out)
+        self.assertIn("数据处理异常", out)
+        self.assertNotIn("invalid value", out)
 
     def test_network_keywords(self) -> None:
         """不同网络错误关键词均触发网络提示。"""
@@ -434,10 +435,11 @@ class TestPrintErrorWithHintExtended(unittest.TestCase):
         self.assertIn("网络连接异常", out)
 
     def test_prefix_appears_in_output(self):
-        """前缀字符串出现在输出中。"""
+        """前缀字符串出现在输出中，不暴露原始异常。"""
         out = self._capture(ValueError("test msg"), "自定义前缀")
         self.assertIn("自定义前缀", out)
-        self.assertIn("test msg", out)
+        self.assertNotIn("test msg", out)
+        self.assertIn("数据处理异常", out)
 
     def test_empty_message_handling(self):
         """空消息的异常不崩溃。"""

@@ -84,7 +84,7 @@ class ProgressReporter:
                 fn(*args, **kwargs)
                 return True
             except Exception as e:
-                self.add_error(f"{label}生成失败: {e}")
+                self.add_error(f"{label}生成失败（详情请查看日志）")
                 logger.exception("%s写入异常", label)
                 return False
 
@@ -133,7 +133,7 @@ class TuiProgressReporter(ProgressReporter):
             with _Timer(label):
                 fn(*args, **kwargs)
         except Exception as e:
-            self.add_error(f"{label}生成失败: {e}")
+            self.add_error(f"{label}生成失败（详情请查看日志）")
             logger.exception("%s写入异常", label)
             return False
         self.ok(f"{label}生成完成")

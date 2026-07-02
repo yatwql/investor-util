@@ -303,8 +303,12 @@ class TestGenerateExcelReport(unittest.TestCase):
             )
 
         errors = self.progress.get_errors()
-        self.assertTrue(any("写入失败" in e for e in errors),
-                        f"预期 sheet 写入错误，得到: {errors}")
+        self.assertTrue(any("生成失败" in e for e in errors),
+                        f"预期 sheet 写入错误记录，得到: {errors}")
+        # 确认不暴露原始异常堆栈
+        for e in errors:
+            self.assertNotIn("ValueError", e,
+                             f"错误信息不应包含原始异常类型: {e}")
 
     # ── ProgressReporter 默认值 ──
 
@@ -360,13 +364,17 @@ class TestProgressReporterCallSheet(unittest.TestCase):
         self.assertTrue(any("缺失" in e for e in errors))
 
     def test_call_sheet_exception(self) -> None:
-        """fn 抛出异常 → 返回 False + add_error。"""
+        """fn 抛出异常 → 返回 False + add_error（友好提示，不暴露堆栈）。"""
         def _broken(*a, **kw):
             raise RuntimeError("写入失败")
         result = self.prog.call_sheet("损坏模块", _broken)
         self.assertFalse(result)
         errors = self.prog.get_errors()
-        self.assertTrue(any("写入失败" in e for e in errors))
+        self.assertTrue(any("生成失败" in e for e in errors),
+                        f"预期友好错误提示，得到: {errors}")
+        for e in errors:
+            self.assertNotIn("RuntimeError", e,
+                             f"错误信息不应包含原始异常类型: {e}")
 
 
 # ═══════════════════════════════════════════════════════════

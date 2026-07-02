@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.python.logger import setup_logger
 from src.python.reader import read_holdings
 from src.python.tui_menu import _press_any_key, _refresh_config
-from src.python.tui_handlers import _select_holdings_file
+from src.python.tui_handlers import _print_error_with_hint, _select_holdings_file
 from src.python.market_hours import is_market_open
 logger = setup_logger()
 
@@ -49,7 +49,7 @@ def _read_holdings_and_clear_cache(group_name: str) -> list | None:
             print("  [OK] 无缓存需清除")
         return holdings
     except Exception as e:
-        print(f"  [ERR] 读取持仓失败: {e}")
+        _print_error_with_hint(e, "读取持仓失败")
         _press_any_key()
         return None
 
@@ -215,7 +215,7 @@ def _cmd_update_basic_cache() -> None:
         _print_cache_refresh_report(funds, perf_ok, hold_ok, bm_ok, pf_ok, sf_ok)
     except Exception as e:
         logger.exception("更新基础缓存失败")
-        print(f"  [ERR] 更新失败: {e}")
+        _print_error_with_hint(e, "更新基础缓存")
     _press_any_key()
 
 
@@ -258,7 +258,14 @@ def _fetch_prices_and_indices(holdings: list) -> tuple[int, dict, dict]:
                         print(f"  [!]   {h.name} ({h.code}) → 失败")
             except Exception as e:
                 if h_or_none is not None:
-                    print(f"  [ERR]  {h_or_none.name} ({h_or_none.code}) → {e}")
+                    _msg = str(e)
+                    if any(kw in _msg.lower() for kw in ("connect", "timeout", "network", "reset")):
+                        _hint = "网络异常"
+                    elif "parse" in _msg.lower() or "decode" in _msg.lower():
+                        _hint = "数据解析失败"
+                    else:
+                        _hint = "获取失败"
+                    print(f"  [ERR]  {h_or_none.name} ({h_or_none.code}) → {_hint}")
 
     return price_ok, a_idx, us_idx
 
@@ -288,7 +295,7 @@ def _cmd_update_position_cache() -> None:
         print(f"  [OK] LLM 关联缓存已清除（下次菜单 L 自动使用最新数据）")
     except Exception as e:
         logger.exception("更新持仓缓存失败")
-        print(f"  [ERR] 更新失败: {e}")
+        _print_error_with_hint(e, "更新持仓缓存")
     _press_any_key()
 
 

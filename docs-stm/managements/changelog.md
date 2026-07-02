@@ -4,7 +4,81 @@
 
 ---
 
-## [0.2.59] - 2026-07-02
+## [0.2.62] - 2026-07-02
+
+### Changed
+- **错误提示优化**：所有直接暴露原始异常堆栈给用户的 `print(str(e))` 替换为友好中文提示，引导用户查看日志文件，避免恐慌
+  - `_prepare_holdings` 异常改用 `_print_error_with_hint` 分类提示（`tui_handlers.py`）
+  - `handlers_report.py` 中所有 `add_error`/`.error()` 调用用"详情请查看日志"替代原始 `{e}`
+  - `progress.py` 中 `ProgressReporter.call_sheet` 和 `TuiProgressReporter.call_sheet` 的 `add_error` 同样用友好提示替代原始 `{e}`
+  - `excel_generator.py` 中新闻/LLM/智能预警模块异常同样改为友好提示
+- **`constants.py`**：`APP_VERSION` 0.2.61 → 0.2.62
+- **`README.md`**：用户文档表增加"如何测试我的代码"链接
+
+### Fixed
+- **`test_tui_handlers.py::TestPrintErrorWithHint`**：修正两个测试断言，验证友好提示而非原始异常文本
+- **`test_excel_generator.py::test_sheet_exception_isolation`**：修正断言验证友好提示格式，增加"不暴露原始异常类型"断言
+
+---
+
+
+### Changed
+- **`plan.md`**：R 测试覆盖增补三期（数据正确性 + 异常场景 + 测试文件治理）从"待实现方向"移入"✅ 已完成迭代"；原 R 节详细规格删除（已归档至 changelog.md）；S 测试报告系统标记为 🟡 暂停中并注明进展
+- **`constants.py`**：`APP_VERSION` 0.2.59 → 0.2.61（同步 v0.2.60 遗漏的版本号更新）
+
+### Added
+- **`src/test/conftest.py`**（新建）：注册 6 个 pytest marker（scenario/llm/datetime/edge/smoke/data），支持组合筛选运行
+- **`docs-stm/manuals/how-to-test-my-code.md`**（新建）：用户文档，覆盖 CLI 用法、marker 选择、报告查看、常见问题
+- **`src/test/test_market_value_edge.py`** 新增 22 项异常场景测试：
+  - `TestCountTradingDaysBack`（8 项）：交易日计数回退边界（同日/隔日/跨周末/超 60 天/未来/无效日期）
+  - `TestDeterminePriceTypeNavGap`（10 项）：净值空窗期价格类型（T 到 T-5 及更久/3 个月/未来）
+  - `TestDeterminePriceTypeSessionSwitch`（4 项）：交易时段切换取价（11:29:59→11:30:00→14:59:59→15:00:00）
+- **`src/test/test_cache.py::TestGetTTLMarketHourAware`**（10 项）：市场时段感知 TTL（开盘短 TTL 30s/闭市长 TTL/类型非感知/配置缺失/无效值）
+- **pytest marker 标注**：6 个测试文件添加 `@pytest.mark.data` 或 `@pytest.mark.edge`
+
+### Fixed
+- **test_category.py 6 项断言错误**：期望值未对齐中文简标签（"被动指数"→"指数"、"主动管理"→"主动"、"股票"→"A 股"）；`test_single_holding` 使用 dict 而非 `DetailRow` 对象
+- **test_fetcher_index.py 迭代 bug**：`for item in result` 遍历 dict keys（字符串）而非 `result.values()`
+- **test_market_value_edge.py `trading_day` 缺失**：`price_update_status([detail])` 缺少第二参数
+- **test_qdii_timezone.py 5 项**：4 处 `price_update_status` 缺少 `trading_day` 参数；HK 基金名称应含 `(QDII)` 后缀以被 `_is_qdii()` 识别
+- **test_fund_performance.py `_calc_fund_scores` 不存在**：重写为 `write_fund_performance_sheet` 集成测试；`_format_rank` 补充 `rank is None`/`total is None` 检查
+- **test_cache.py patch 目标错误**：`cache.get_config` → `config.get_config`（`get_config` 在函数体内导入）
+
+### Tests
+- 修复 20 项数据正确性测试缺陷
+- 新增 42 项测试（异常场景 22 + cache TTL 10 + conftest.py 基建）
+- 全量 1900+ 测试通过
+- `test-coverage-map.md` 总量 36→40 条目（NAV 空窗期 ✅、QDII 多时区 ✅、交易时段切换 ✅、cache TTL ✅）
+
+---
+
+## [0.2.60] - 2026-07-02
+
+### Changed
+- **`plan.md`**：Q（日期/时间数据获取场景测试）从"待实现方向"移至"✅ 已完成迭代"；Q 实施发现的 4 个新功能需求归并入 R 迭代范围；新增 R 子方向"测试文件治理"（文件拆分/pytest 标记/验证脚本）
+- **`testplan.md`** 全量审阅修订（§1.4/§2/§3/§4/§6/§7 重写或扩充）：
+  - §1.4 集成测试：6 条模糊描述 → 11 条维度化清单 + 覆盖状态
+  - §2 数据正确性验证：10 项 → 16 项（新增三维度聚合/行业占比/指数合理性等）
+  - §3 UI/UX 验证：6 项 → 20 项（新增打印样式/报告归档/首次引导等）
+  - §4 回归测试清单：7 行 → 15 行 + P0/P1/P2/P3 语义定义
+  - §5 迭代测试重点：34 行碎片 → 10 行快速索引
+  - §6 Mock 策略：过期示例更新 + akshare/datetime/cache 模板
+  - §7 验收标准：7 条 → 14 条四维门禁
+  - 新增 §0 测试环境要求 / §9 新增测试指南
+  - §1.2 标题+描述完善，明确"横切测试编写规范"定位
+  - §1.3 新增文件范围说明表 + 场景间前置依赖列
+  - §1.4 vs §1.5 去重，添加交叉引用
+  - §1.7 从 40+ 行手动表格精简为汇总表，详细映射移至 `docs-stm/plan/test-coverage-map.md`
+  - §4"57 文件"硬编码 → `pytest --collect-only` 动态统计
+- **`scripts/validate_coverage_map.py`**（新建）：场景-测试文件覆盖率映射验证脚本，支持 `--summary` / `--update`
+
+### Added
+- **`docs-stm/plan/test-coverage-map.md`**（新建）：详细场景-测试文件覆盖率映射（从 testplan.md §1.7 拆分）
+- **`scripts/validate_coverage_map.py`**：覆盖率映射验证脚本，扫描 `src/test/` 所有 Test 类并对比映射文件准确性
+
+### Tests
+- 全量测试文件数：59，测试类数：327
+- `test_datetime_scenarios.py` 61 项（已计入 v0.2.59，此处仅确认）
 
 ### Fixed
 - **🐛 `_handle_truncation` 丢弃 usage（R-145）**：`skeleton.py:171` 非截断路径下 `return result, None` 应改为 `return result, usage`。导致 `_finalize_and_cache` 中 `if usage:` 整个块被跳过，`_record_per_module()` 和 HTML 页脚 Token 信息均未执行。影响：LLM API 用量模块明细全部显示 `—`，各章节底部无"模型：X | Token 用量：..." 信息。修复：增加 `usage` 参数透传。
@@ -17,17 +91,23 @@
 ### Added
 - **`test_skeleton.py::TestHandleTruncation`**（3 项新测试）：非截断保留 usage、None 保留 usage、空字符串保留 usage。直接验证 `_handle_truncation` 的核心契约。
 - **`test_summary.py::TestWriteModuleDataRows`**（6 项新测试）：缓存命中行渲染、成功+Thinking 行渲染、禁用行渲染、失败行渲染、空 status_label 跳过、4 状态混合行序列验证。覆盖 Excel 单元格级渲染逻辑（Token 格式化、费用展示、✓/— 标记）。
+- **`test_llm_scenarios.py`**（33 项新测试）：LLM 全场景组合 + 异常/Edge Case + 输出格式一致性 + HTML 模板分支巡检。
 - **`styles.py::DARK_GREEN_FONT`**：深绿色字体常量 `Font(color="006400")`，用于基金业绩"较差"评级标色。
 
 ### Changed
 - **`logger.py`：测试日志写入 `logs/test.log`** — 通过 `sys.argv` 检测 pytest 环境，测试期间日志写入独立文件，避免与运行时 `logs/app.log` 混淆。
 - **`test_html_writer.py` 测试隔离增强** — `TestWriteHtmlReportLlmType.setUp/tearDown` 保存并清理 `_LLM_MODULE_FAILURE` 全局状态，消除前序测试跨类残留。模块明细计数断言从 `4` 更新为 `5`。
 - **`_finalize_news_token_usage` 记录增强** — 新增 `all_cached` 参数，全缓存场景也调用 `_record_per_module`；新增 `_estimate_cost` 计算费用；传递 `endpoint` 字段。
-- **`plan.md`**：新增 P. 业务场景测试增强迭代方向（S11-S17 LLM 全场景组合 + 异常/Edge Case + 输出格式一致性验证）。
-- **`testplan.md`**：业务场景表扩展 S11-S17（LLM 混合缓存/失败/Thinking/禁用/断网/部分超期）；迭代列表新增 v0.2.59。
+- **`plan.md`**：新增 P. 业务场景测试增强迭代方向（S11-S17 LLM 全场景组合 + 异常/Edge Case + 输出格式一致性验证）；新增 Q. 日期/时间数据获取场景测试方向；P 节已完成并移至待实现方向 → 已完成迭代。
+- **`testplan.md`**：业务场景表扩展 S11-S17（LLM 混合缓存/失败/Thinking/禁用/断网/部分超期）；新增 1.6 日期/时间数据获取场景测试 T1-T16；新增 1.7 场景-测试文件覆盖率映射；迭代列表新增 v0.2.59。
 
 ### Tests
-- 全量 **287 passed**（+12），9 subtests passed。
+- 全量 **1854 passed**（12 skipped，65 subtests passed）。
+- **新增 `test_llm_scenarios.py`**（33 项），覆盖 S11-S17 LLM 混合缓存+全部失败+Thinking+禁用+断网+部分超期+全缓存、空持仓+LLM、HTML/Excel/Summary 输出一致性、模板分支审计。
+- **新增 `test_datetime_scenarios.py`**（61 项），覆盖 T1-T16 日期/时间数据获取场景：
+  - T1~T6 市场状态组合（get_ttl market-hour-aware 12 项 + is_midday_break 7 项 + 长假边界 6 项）
+  - T7~T11 产品类型分类（classify_holdings 17 项 + count_trading_days_back 9 项）
+  - T12~T16 边界 Edge Case（TTL 过渡/首次启动/fetch 链路 5 项）
 - `test_skeleton.py` 从 2 项扩充至 **5 项**（+3）
 - `test_html_writer.py` 模块计数 4→5，隔离修复
 

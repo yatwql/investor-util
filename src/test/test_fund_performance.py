@@ -24,6 +24,7 @@ from src.python.models import Holding
 from src.python.report import fund_performance as fp
 from src.python.report import penetration as pene
 from src.python.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT
+import pytest
 
 
 # ============================================================
@@ -787,6 +788,179 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         # categories 正常但 data 为 None，len(scores) 应兜底为 0
         vals0 = calls[0][0][2]
         self.assertIn("基准：沪深300指数", vals0[9])
+
+
+
+# ============================================================
+#  R-098: 基金排名数据合理性
+# ============================================================
+
+@pytest.mark.data
+class TestFormatReturnBoundary(unittest.TestCase):
+    """_format_return 边界值和合理性验证。"""
+
+    def _call(self, val):
+        return fp._format_return(val)
+
+    def test_normal_positive(self):
+        """正收益率 → +X.XX% 格式。"""
+        self.assertEqual(self._call(5.5), "+5.50%")
+
+    def test_normal_negative(self):
+        """负收益率 → -X.XX% 格式。"""
+        self.assertEqual(self._call(-3.2), "-3.20%")
+
+    def test_zero(self):
+        """零收益率 → +0.00%。"""
+        self.assertEqual(self._call(0), "+0.00%")
+
+    def test_extreme_large(self):
+        """极大值(+9999%) → 不崩溃。"""
+        result = self._call(9999.99)
+        self.assertTrue(result.endswith("%"))
+
+    def test_extreme_small(self):
+        """极小值(-99.99%) → 不崩溃。"""
+        result = self._call(-99.99)
+        self.assertTrue(result.endswith("%"))
+        self.assertTrue(result.startswith("-"))
+
+    def test_none(self):
+        """None → '--'。"""
+        self.assertEqual(self._call(None), "--")
+
+    def test_invalid_string(self):
+        """无效字符串 → '--'。"""
+        self.assertEqual(self._call("N/A"), "--")
+
+
+@pytest.mark.data
+class TestFormatRankSanity(unittest.TestCase):
+    """_format_rank 合理性验证。"""
+
+    def _call(self, entry):
+        return fp._format_rank(entry)
+
+    def test_normal_rank(self):
+        """正常排名 → '排名/总数'。"""
+        self.assertEqual(self._call({"rank": 50, "total": 2000}), "50/2000")
+
+    def test_top_rank(self):
+        """第1名。"""
+        self.assertEqual(self._call({"rank": 1, "total": 500}), "1/500")
+
+    def test_last_rank(self):
+        """最后一名。"""
+        self.assertEqual(self._call({"rank": 500, "total": 500}), "500/500")
+
+    def test_rank_not_exceed_total(self):
+        """排名不超过总数。"""
+        entry = {"rank": 500, "total": 500}
+        rank, total = entry["rank"], entry["total"]
+        self.assertLessEqual(rank, total)
+
+    def test_rank_positive(self):
+        """排名为正数。"""
+        entry = {"rank": 1, "total": 500}
+        self.assertGreaterEqual(entry["rank"], 1)
+
+    def test_missing_rank(self):
+        """缺失排名 → '--'。"""
+        self.assertEqual(self._call({}), "--")
+
+    def test_missing_total(self):
+        """缺失总数 → '--'。"""
+        self.assertEqual(self._call({"rank": 1}), "--")
+
+    def test_none_rank(self):
+        """rank=None → '--'。"""
+        self.assertEqual(self._call({"rank": None, "total": 500}), "--")
+
+
+@pytest.mark.data
+class TestRankDataReasonableRange(unittest.TestCase):
+    """R-098: 排名和收益率在合理范围内（通过 write_fund_performance_sheet 集成测试）。"""
+
+    def setUp(self):
+        self.ws = MagicMock()
+        _cell_cache: dict = {}
+        def _cell_side_effect(*, row: int, column: int) -> MagicMock:
+            key = (row, column)
+            if key not in _cell_cache:
+                _cell_cache[key] = MagicMock()
+            return _cell_cache[key]
+        self.ws.cell.side_effect = _cell_side_effect
+
+    @patch("src.python.report.fund_performance.fetch_fund_rankings")
+    @patch("src.python.report.fund_performance.fetch_fund_benchmark",
+           return_value="沪深300指数")
+    @patch("src.python.report.fund_performance.classify_penetration",
+           return_value=pene.ACTIVE_EQUITY)
+    def test_yield_rate_in_reasonable_range(self, mock_pene, mock_bm, mock_rank):
+        """收益率极端值应通过 _format_return 格式化为正确字符串。"""
+        mock_rank.return_value = {
+            "rankings": {
+                "近3月": {"return": 9999.99},      # 极端大
+                "近6月": {"return": -99.99},        # 极端小负
+                "近1年": {"return": 50.0},           # 正常
+                "同类排名": {"rank": 100, "total": 500},
+            },
+            "rating": "优秀",
+        }
+        holdings = [Holding("支付宝", "易方达蓝筹混合", "005827", 100, 2.0)]
+        details = [_MockDetailRow("005827", profit=1000.0, profit_rate=0.05,
+                                  market_value=10000.0)]
+        with patch("src.python.report.fund_performance.write_data_row") as mock_wdr:
+            with patch("src.python.report.fund_performance.write_title_row",
+                       return_value=2):
+                with patch("src.python.report.fund_performance.write_header_row",
+                           return_value=3):
+                    with patch("src.python.report.fund_performance.freeze_header"):
+                        with patch("src.python.report.fund_performance.auto_width"):
+                            fp.write_fund_performance_sheet(
+                                self.ws, holdings, details)
+
+            calls = mock_wdr.call_args_list
+            fund_row = calls[0][0][2]
+            # 格式化结果应为 +符号 + 保留两位小数 + % 后缀
+            self.assertEqual(fund_row[3], "+9999.99%")
+            self.assertEqual(fund_row[4], "-99.99%")
+            self.assertEqual(fund_row[5], "+50.00%")
+
+    @patch("src.python.report.fund_performance.fetch_fund_rankings")
+    @patch("src.python.report.fund_performance.fetch_fund_benchmark",
+           return_value="沪深300指数")
+    @patch("src.python.report.fund_performance.classify_penetration",
+           return_value=pene.ACTIVE_EQUITY)
+    def test_rank_not_exceed_total_all(self, mock_pene, mock_bm, mock_rank):
+        """排名数据中 rank ≤ total → _format_rank 输出正确格式。"""
+        mock_rank.return_value = {
+            "rankings": {
+                "近3月": {"return": 5.0},
+                "近6月": {"return": 3.0},
+                "近1年": {"return": 1.0},
+                "同类排名": {"rank": 500, "total": 500},  # 边界值
+            },
+            "rating": "优秀",
+        }
+        holdings = [Holding("支付宝", "易方达蓝筹混合", "005827", 100, 2.0)]
+        details = [_MockDetailRow("005827", profit=1000.0, profit_rate=0.05,
+                                  market_value=10000.0)]
+        with patch("src.python.report.fund_performance.write_data_row") as mock_wdr:
+            with patch("src.python.report.fund_performance.write_title_row",
+                       return_value=2):
+                with patch("src.python.report.fund_performance.write_header_row",
+                           return_value=3):
+                    with patch("src.python.report.fund_performance.freeze_header"):
+                        with patch("src.python.report.fund_performance.auto_width"):
+                            fp.write_fund_performance_sheet(
+                                self.ws, holdings, details)
+
+            calls = mock_wdr.call_args_list
+            fund_row = calls[0][0][2]
+            # 同类排名在第11列（索引10）
+            rank_str = fund_row[10]
+            self.assertEqual(rank_str, "500/500")
 
 
 # ============================================================
