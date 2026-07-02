@@ -19,8 +19,16 @@ pip install pytest-cov coverage
 # 查看所有可用选项
 python scripts/test_runner.py --help
 
-# 运行全量测试（默认）
-python scripts/test_runner.py
+# ===== ① 日常常用（快速反馈，提交前验证） =====
+
+# 快速回归 — 提交前验证（~25s）
+python scripts/test_runner.py --mode regression
+
+# 冒烟测试（~2s 快速验证核心通路）
+python scripts/test_runner.py --mode smoke
+
+# 仅运行业务场景测试
+python scripts/test_runner.py --mode scenario
 
 # 全量单元测试（含 edge/data）
 python scripts/test_runner.py --mode unit
@@ -28,29 +36,24 @@ python scripts/test_runner.py --mode unit
 # 常规单元测试（排除 edge/data）
 python scripts/test_runner.py --mode standard
 
-# 快速回归 — 提交前验证（~25s）
-python scripts/test_runner.py --mode regression
-
-# 合入验证 — PR 前检查（~10min）
-python scripts/test_runner.py --mode verify
-
-# 仅运行业务场景测试
-python scripts/test_runner.py --mode scenario
+# ===== ② 专项验证（定向覆盖） =====
 
 # 仅运行边缘/异常场景测试
 python scripts/test_runner.py --mode edge
 
+# 数据正确性验证（~10s）
+python scripts/test_runner.py --mode data
+
 # 运行全量 + 行覆盖率报告
 python scripts/test_runner.py --coverage
 
-# 冒烟测试（~2s 快速验证核心通路）
-python scripts/test_runner.py --mode smoke
+# ===== ③ 全量/CI 门禁（耗时较长） =====
 
-# 集成测试（同 scenario 128 项）
-python scripts/test_runner.py --mode integration
+# 合入验证 — PR 前检查（~10min）
+python scripts/test_runner.py --mode verify
 
-# 数据正确性验证（~10s）
-python scripts/test_runner.py --mode data
+# 运行全量测试（默认）
+python scripts/test_runner.py
 
 # 全量测试（1978 项，~26min）
 python scripts/test_runner.py --mode all
@@ -97,6 +100,8 @@ python scripts/test_runner.py --mode all
 | **P3** | 建议修复 | 不阻断 | — |
 
 P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
+
+> 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式（128 项场景测试）中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
 
 ### 模式与覆盖范围说明
 
@@ -221,32 +226,16 @@ python scripts/test_runner.py --mode scenario,edge
 
 ### Smoke 测试明细
 
-| 节点 | 文件 | 测试方法 | 验证点 |
-|:-----|:-----|:---------|:-------|
-| **核心数据模型** | `unit/core/test_models.py` | `test_create_minimal` | 最简构造，所有字段必填 |
-| | | `test_repr` | repr 含关键字段 |
-| | | `test_eq_different` | 不同持仓不等 |
-| | | `test_eq_same_values` | 相同字段值相等 |
-| **入口读取** | `unit/core/test_reader.py` | `test_none_returns_empty` | `_safe_str(None)` → `""` |
-| | | `test_string_stripped` | `_safe_str` 去除空格 |
-| | | `test_number_to_string` | `_safe_str(513300)` → `"513300"` |
-| | | `test_empty_string` | `_safe_str("")` → `""` |
-| **分类计算** | `unit/report/test_category.py` | `test_qdii` | QDII → (基金, QDII) |
-| | | `test_bond` | 含债 → (债券, 纯债) |
-| | | `test_stock` | 6/0/3 开头 → (股票, A股) |
-| | | `test_index_fund` | 5 开头 ETF → (基金, 指数) |
-| **报告输出** | `unit/report/test_excel_generator.py` | `test_basic_generation` | 所有模块正常生成 |
-| | | `test_summary_module_missing` | 模块缺失降级 |
-| | | `test_sheet_exception_isolation` | 页签异常不阻塞其他 |
-| | | `test_default_progress_reporter` | progress=None 不抛异常 |
-| **启动依赖** | `unit/config/test_config.py` | `test_missing_file_returns_defaults` | 缺文件返回默认值 |
-| | | `test_valid_config_read` | 完整配置正常读取 |
-| | | `test_init_creates_default_config` | 初始化创建默认配置 |
-| | | `test_set_and_get` | 写入后读取一致 |
-| **数据获取** | `unit/providers/test_eastmoney.py` | `test_jsonp_format` | JSONP 提取 JSON |
-| | | `test_pure_json` | 纯 JSON 原样返回 |
-| | | `test_normal` | `_safe_float("1.2345")` |
-| | | `test_empty_string` | `_safe_float("")` → 0.0 |
+| 节点 | 测试文件 | 覆盖项数 |
+|:-----|:---------|:--------:|
+| **核心数据模型** | `unit/core/test_models.py` | 4 |
+| **入口读取** | `unit/core/test_reader.py` | 4 |
+| **分类计算** | `unit/report/test_category.py` | 4 |
+| **报告输出** | `unit/report/test_excel_generator.py` | 4 |
+| **启动依赖** | `unit/config/test_config.py` | 4 |
+| **数据获取** | `unit/providers/test_eastmoney.py` | 4 |
+
+详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。
 
 ## 查看报告
 
@@ -385,10 +374,23 @@ pytest src/test/ -m "scenario_llm or unit_llm"
 - **方法**：`test_<场景>`
 - **单文件上限**：≤ 800 行 / ≤ 80 测试项 / ≤ 15 方法每类
 - **标记**：
-  - **单元测试**：使用模块级 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]` 列表，所有 62 个单元文件统一此模式
+  - **单元测试**：使用模块级 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]` 列表，所有单元测试文件统一此模式
   - **场景测试**：使用类级 `@pytest.mark.scenario` + `@pytest.mark.<子组>` 装饰器
   - **edge 测试**：在 `pytestmark` 列表中追加 `pytest.mark.edge`
   - 新增文件后运行 `python scripts/check-test-markers.py` 验证标记合规性
+
+## 新增测试文件流程
+
+为新增模块添加测试时，按以下步骤操作：
+
+1. **创建测试文件**：按功能域放入对应 `src/test/` 子目录，命名 `test_<模块>.py`
+2. **编写测试**：继承 `unittest.TestCase`，方法命名 `test_<场景>`
+3. **添加标记**：
+   - 单元测试：在文件顶部添加 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]`，子组名见下方标记说明
+   - 场景测试：在测试类前使用 `@pytest.mark.scenario` + `@pytest.mark.<子组>` 装饰器
+   - edge 测试：在 `pytestmark` 列表中追加 `pytest.mark.edge`
+4. **验证标记合规**：`python scripts/check-test-markers.py`，无报错继续
+5. **本地确认**：`pytest src/test/<子目录>/test_<模块>.py -v` 全部通过
 
 ## 常见问题
 
