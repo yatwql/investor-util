@@ -557,6 +557,30 @@ class TestCallLlm(unittest.TestCase):
         self.assertEqual(result, "回退结果")
         self.assertEqual(mock_single.call_count, 3)
 
+    @patch("src.python.llm.api._call_single_provider")
+    def test_recovery_retry_usage_propagated(self, mock_single: MagicMock) -> None:
+        """安抚重试成功后，返回的是重试调用的 usage（非原始空调用的）。"""
+        mock_single.side_effect = [
+            ("", {"input_tokens": 10, "output_tokens": 0}),
+            ("安抚成功", {"input_tokens": 15, "output_tokens": 200}),
+        ]
+        result, usage = _call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
+        self.assertEqual(result, "安抚成功")
+        self.assertEqual(usage["input_tokens"], 15, "usage 应来自安抚重试，非原始调用")
+        self.assertEqual(usage["output_tokens"], 200)
+
+    @patch("src.python.llm.api._call_single_provider")
+    def test_recovery_retry_still_empty_no_fallback(self, mock_single: MagicMock) -> None:
+        """安抚重试仍空 + 无回退 → (None, None)。"""
+        mock_single.side_effect = [
+            ("", {"input_tokens": 10}),
+            ("   ", {"input_tokens": 20}),  # 仅空白字符，strip() 后为空
+        ]
+        result, usage = _call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        self.assertEqual(mock_single.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1101,10 +1101,37 @@ class TestGzipCache(CacheTestBase):
         result = get("fp_complex", 600)
         self.assertEqual(result, complex_data)
 
+    @patch("src.python.cache.time.time")
+    def test_exact_100kb_boundary_not_gzip(self, mock_time):
+        """恰 100KB（未超阈值）→ 不 gzip。"""
+        mock_time.return_value = 1000.0
+        from src.python.cache import set
 
-# ═══════════════════════════════════════════════════════════
-#  clear_by_group 测试
-# ═══════════════════════════════════════════════════════════
+        # 恰好 100*1024 字节（阈值是 > 不是 >=）
+        boundary_data = "x" * (100 * 1024 - 50)  # 留余量给 JSON 序列化开销
+        set("boundary_key", boundary_data)
+
+        json_path = os.path.join(self.cache_dir, "boundary_key.json")
+        gz_path = json_path + ".gz"
+        self.assertTrue(os.path.exists(json_path),
+                        "≤100KB 数据应仍为 .json")
+        self.assertFalse(os.path.exists(gz_path))
+
+    @patch("src.python.cache.time.time")
+    def test_gz_corrupted_file_deleted_on_read(self, mock_time):
+        """损坏的 .json.gz → 删除并返回 None。"""
+        mock_time.return_value = 1000.0
+        # 创建一个损坏的 .json.gz 文件
+        gz_path = os.path.join(self.cache_dir, "corrupted_gz.json.gz")
+        with open(gz_path, "wb") as f:
+            f.write(b"this is not valid gzip data")
+
+        from src.python.cache import get
+        result = get("corrupted_gz", 3600)
+
+        self.assertIsNone(result)
+        # 损坏文件应被删除
+        self.assertFalse(os.path.exists(gz_path))
 
 
 class TestClearByGroup(CacheTestBase):
