@@ -48,6 +48,7 @@ _DEFAULT_CONFIG = {
         "sector_alert_threshold_danger": -200_000_000,
         "sentiment_top_n": 10,
     },
+    "default_menu_key": "L",
 }
 
 

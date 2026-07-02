@@ -28,6 +28,7 @@
     "end": "15:00",
     "official_source": true
   },
+  "default_menu_key": "L",
   "user_fund_benchmarks": {},
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
@@ -66,6 +67,7 @@
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
+| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R），启动后光标自动定位 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
 | `market_hours` | `{...}` | 市场时段配置：`start`/`end` 手动覆盖开盘收盘（HH:MM），实际交易分为 09:30-11:30 上午和 13:00-15:00 下午两段，午餐休市期间自动回落长 TTL；`official_source` 是否尝试从东方财富 API 获取实时交易状态 | 手动编辑 |

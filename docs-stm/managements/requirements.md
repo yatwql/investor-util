@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
 创建日期：2026-06-26
-最后更新：2026-07-02（v0.2.62 — pytest 标记层级体系 + 测试文件目录分组搬迁）
+最后更新：2026-07-03（v0.2.65 — TUI 缺省菜单选项可配置 + README 优化 + 全手册内部核对）
 
 ---
 
@@ -63,6 +63,9 @@
 | 市场指数（A股） | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS变量解析） | 腾讯财经 `qt.gtimg.cn` |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com` | — |
+| 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量研报覆盖 | — |
+| 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
+| 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — |
 
 > **指数双链路说明**：指数数据由 `fetcher/index.py` 直调 Provider，不走 Provider Chain。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存。
 >
@@ -442,6 +445,7 @@ Extended Thinking 详解、定价表等）及本章各模块的完整配置项�
 | `preferred_provider` | dict | `{}` | 手动 | Provider Chain 首选覆写（price/fund_rank/fund_hold/industry） |
 | `user_fund_benchmarks` | dict | `{}` | 手动 | 自定义基金基准 {代码: 基准代码} |
 | `early_warning` | dict | `{warning:-5000万, danger:-2亿, sentiment_top_n:10}` | 手动 | 智能预警阈值（单位：元） |
+| `default_menu_key` | str | `"L"` | 手动 | TUI 菜单缺省选项快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R） |
 | `market_hour_aware` | list | `["price", "index"]` | 手动 | 交易时段短 TTL 的数据类型 |
 | `market_hour_ttl` | int | `30` | 手动 | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30", end:"15:00", official_source:true}` | 手动 | 交易时段配置 + 官方 API 开关 |
