@@ -63,14 +63,14 @@
 | `news_top_count` | `100` | 财经新闻热点与持仓关联分析输出条目上限 | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
-| `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
-| `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
-| `early_warning` | `{...}` | 智能预警参数：`sector_alert_threshold_warning`（行业预警阈值，默认 -50,000,000 ≈ -5000万 **元**，负值表示净流出）、`sector_alert_threshold_danger`（行业危险阈值，默认 -200,000,000 ≈ -2亿 **元**）、`sentiment_top_n`（新闻情绪 TOP N，默认 10） | 手动编辑 |
+| `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
 | `market_hours` | `{...}` | 市场时段配置：`start`/`end` 手动覆盖开盘收盘（HH:MM）；`official_source` 是否尝试从东方财富 API 获取实时交易状态 | 手动编辑 |
+| `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
+| `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 
 ## news_sources 可调字段
 
@@ -112,6 +112,18 @@
 > **💡 指数数据说明：** A 股/美股指数由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**，不受 `preferred_provider` 控制。双链路自动 fallback：
 >   - A 股：**腾讯财经→新浪财经→过期缓存**
 >   - 美股：**新浪财经（2次重试）→腾讯财经→过期缓存**
+
+## early_warning 可调参数
+
+`early_warning` 控制智能预警模块的行为，用于发现持仓组合的异常信号。
+
+| 子字段 | 默认值 | 说明 |
+|--------|:------:|------|
+| `sector_alert_threshold_warning` | `-50,000,000` (≈-5000万) | 行业资金净流出预警阈值（负值表示净流出），低于此值标记"⚠注意" |
+| `sector_alert_threshold_danger` | `-200,000,000` (≈-2亿) | 行业资金净流出危险阈值，低于此值标记"🔴危险" |
+| `sentiment_top_n` | `10` | 新闻情绪聚合时取 TOP N 持仓品种（按关联新闻数量排序） |
+
+> 阈值均为负值（元），绝对值越大越不容易触发预警。默认值适合 A 股中等市值组合；持仓规模较大时可适当调高（如 warning 调至 -1 亿、danger 调至 -5 亿）。
 
 ## user_fund_benchmarks 自定义基准
 
@@ -156,12 +168,13 @@
 > **指纹驱动失效：** 文件名中的 `{fingerprint}` 是输入数据的 MD5 哈希。持仓/指数数据变化时指纹自动改变，原缓存失效，无需手动清除。
 > 
 > **TTL 兜底：** 即使指纹未变，缓存文件仍有 TTL 兜底到期自动刷新，防止数据"永久有效"。
-> 
+
 > **调整建议：** 持仓变动少可将 `hold` 改为 `2592000`（30天），减少基金持仓的重复拉取。
 > **交易时段短 TTL：** `price` 和 `index` 默认注册在 `market_hour_aware` 中，A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s）替代常规 TTL，确保盘中实时行情。收盘后自动回落长 TTL 保持收盘价。可通过 `market_hours.start`/`end` 手动覆盖时段，或设 `market_hours.official_source: false` 关闭东方财富 API 实时状态查询。
+> 
 > **自动 gzip 压缩：** 超过 100KB 的缓存文件自动以 `.json.gz` 格式压缩存储（如 `profit_forecast_*.json.gz`），节省约 80-90% 磁盘空间。读取时透明解压，无需任何配置或迁移。小文件保持原 `.json` 格式，热路径无额外开销。
 
-## 缓存分组
+### 缓存分组
 
 所有缓存模块归入两个分组，控制菜单命令的缓存清除范围：
 
@@ -172,13 +185,13 @@
 
 **无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.tracking` / `cache_ttl.calendar` 自行调整。
 
-### 与菜单命令的对应关系
+#### 与菜单命令的对应关系
 
 - **菜单 `[1]` 更新基础类缓存** → 清除 `refresh` 组全部缓存，然后重新拉取。适合：启动后先刷新补充数据，再生成报告。
 - **菜单 `[2]` 更新持仓类缓存** → 清除 `preload` 组全部缓存，然后并行拉取新持仓的价格和指数。适合：切换到另一份持仓文件时一键清理依赖旧持仓的缓存。
 
 两组互不重叠：`[1]` 不会误删价格/指数缓存，`[2]` 不会误删基金排名/行业分类缓存。
 
-### 工作原理
+#### 工作原理
 
 缓存分组由 `src/python/registry.py` 中的模块注册表驱动。每个模块注册时指定所属分组（`cache_groups` 字段），`cache.py:clear_by_group()` 遍历注册表，只清除匹配分组的模块缓存文件。新增缓存模块时只需在注册表中声明分组，无需修改菜单代码。
