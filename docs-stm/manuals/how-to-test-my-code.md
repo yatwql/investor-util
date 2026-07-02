@@ -46,13 +46,13 @@ python scripts/test_runner.py --coverage
 # 冒烟测试（~2s 快速验证核心通路）
 python scripts/test_runner.py --mode smoke
 
-# 集成测试（同 scenario 107 项）
+# 集成测试（同 scenario 128 项）
 python scripts/test_runner.py --mode integration
 
 # 数据正确性验证（~10s）
 python scripts/test_runner.py --mode data
 
-# 全量测试（1938 项，~26min）
+# 全量测试（1978 项，~26min）
 python scripts/test_runner.py --mode all
 ```
 
@@ -64,7 +64,7 @@ python scripts/test_runner.py --mode all
 
 项目推荐的三道质量门禁，按开发阶段逐级收紧：
 
-- **提交前验证（`--mode regression`）** — 每次代码变更后、commit 前必须执行。覆盖全部 107 项业务场景测试，确保 S1-S20 端到端用户路径和 T1-T16 日期/时间场景不被破坏。约 25s 即可完成。是编辑-验证循环中的第一道屏障，核心原则是"够快才能频繁跑，频繁跑才能尽早发现问题"。
+- **提交前验证（`--mode regression`）** — 每次代码变更后、commit 前必须执行。覆盖全部 128 项业务场景测试，确保 S1-S20 端到端用户路径和 T1-T16 日期/时间场景不被破坏。约 25s 即可完成。是编辑-验证循环中的第一道屏障，核心原则是"够快才能频繁跑，频繁跑才能尽早发现问题"。
 - **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。共 703 项，确保数据从抓取→缓存→计算的整条管道通畅且正确。约 10min，适合作为 PR CI 门禁或合入前的手动检查。
 - **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量 1978 项测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 26min，适合发布前的夜间或定时全量回归。
 
@@ -111,7 +111,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 - **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime），共 128 项。这些测试模拟真实用户操作（如菜单 E/H/B/L 生成报告），组合多个模块进行端到端验证。
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
-- **`--mode integration`** 与 `--mode scenario` 相同（107 项），`integration` 是一个语义别名而非独立标记。`integration` 标记已移除，后续不再区分。
+- **`--mode integration`** 与 `--mode scenario` 相同（128 项），`integration` 是一个语义别名而非独立标记。`integration` 标记已移除，后续不再区分。
 - **`--mode verify`** 覆盖范围最广的组合模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。这是"快速回查"的上限——确保数据管道整条链路正常，但跳过纯 UI、纯 LLM 等不直接影响数据流的模块。
 
 #### 🔷 专项验证系列（`edge` / `data` / `smoke`）
@@ -122,7 +122,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 全量（`all`）
 
-- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全部 1938 项测试。包含所有单元测试、场景测试、跨类标记测试。约 26min，作为发布前的最终全量回归。
+- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全部 1978 项测试。包含所有单元测试、场景测试、跨类标记测试。约 26min，作为发布前的最终全量回归。
 
 #### 多模式组合
 
@@ -139,7 +139,7 @@ python scripts/test_runner.py --mode scenario,edge
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-02）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-03）测试覆盖规模：
 
 ### 模式对应测试量
 
@@ -166,7 +166,7 @@ python scripts/test_runner.py --mode scenario,edge
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund.py` + `test_chain.py` | 122 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
 | **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone) | `unit/report/test_{excel_generator,excel_writer,html_writer,category,summary,market_value,penetration,fund_performance,early_warning,news_correlation,qdii_timezone}.py` 等 15 文件 | 576 |
-| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton) | `unit/llm/`(8 文件) + `scenario/llm/test_llm_scenarios.py` | 369 |
+| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton) | `unit/llm/`(10 文件) + `scenario/llm/test_llm_scenarios.py` | 369 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` | 287 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 45 |
 | **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 142 |
@@ -384,7 +384,11 @@ pytest src/test/ -m "scenario_llm or unit_llm"
 - **类名**：`Test<Feature>`，继承 `unittest.TestCase`
 - **方法**：`test_<场景>`
 - **单文件上限**：≤ 800 行 / ≤ 80 测试项 / ≤ 15 方法每类
-- **标记**：新增测试类应添加对应 `@pytest.mark.<group>`
+- **标记**：
+  - **单元测试**：使用模块级 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]` 列表，所有 62 个单元文件统一此模式
+  - **场景测试**：使用类级 `@pytest.mark.scenario` + `@pytest.mark.<子组>` 装饰器
+  - **edge 测试**：在 `pytestmark` 列表中追加 `pytest.mark.edge`
+  - 新增文件后运行 `python scripts/check-test-markers.py` 验证标记合规性
 
 ## 常见问题
 
@@ -394,8 +398,14 @@ A: 确认使用了正确的 marker 名：`pytest src/test/ -m "edge" --collect-o
 **Q: 需要跳过 LLM 测试？**
 A: 使用 `--mode unit` 或 `python scripts/test_runner.py --mode unit` 即可跳过 LLM 场景。
 
+**Q: 新增测试文件后运行报错 `missing unit_* marker`？**
+A: `unit/conftest.py` 的验证模式要求每个单元测试文件必须包含 `unit_*` 子标记。在文件顶部添加 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]`，子组名见 `conftest.py` 注册表（如 `unit_providers`、`unit_report` 等）。
+
 **Q: 如何添加新的测试标记？**
-A: 在 `src/test/conftest.py` 的 `pytest_configure` 中注册新标记，然后在测试类前加 `@pytest.mark.<新标记>`。
+A: 在 `src/test/conftest.py` 的 `pytest_configure` 中注册新标记，然后在测试类前加 `@pytest.mark.<新标记>`。单元测试使用模块级 `pytestmark` 列表，而非类级装饰器。
+
+**Q: 如何验证新增文件的标记是否正确？**
+A: 运行 `python scripts/check-test-markers.py`，脚本会静态扫描所有 `test_*.py` 文件，检查标记完整性、是否有拼写错误、`_edge.py` 是否漏标 `edge` 等。
 
 **Q: 报告中文乱码？**
 A: 确保操作系统编码为 UTF-8。Windows PowerShell：`chcp 65001`；Linux/Mac 默认即可。
