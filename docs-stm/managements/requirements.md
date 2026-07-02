@@ -29,7 +29,7 @@
 | O | 配置报告输出目录 | 配置报告文件的输出目录（默认 reports） |
 | S | 配置支持LLM的报告分析章节 | 交互切换各 LLM 报告的启用/停用 |
 | R | 刷新配置 | 重新加载 config.json / llm_settings.json / llm_key.json |
-| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/行业资金流向/分红缓存（含 news_、llm_news_item_、industry_、profit_forecast_、sector_flow_、dividend_） |
+| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/行业资金流向/分红缓存（含 fund_perf_*、fund_hold_*、fund_benchmarks.json、industry_*、news_*、llm_news_item_*、profit_forecast_*、sector_flow_*、dividend_*） |
 | 2 | 更新持仓类缓存 | 主动更新价格/指数行情，清除关联 LLM 缓存（智囊团深度复盘、全球政经局势、持仓体检报告、穿透深度分析；另：`llm_news_correlation` 由菜单 1 清理） |
 | 3 | 清理过期缓存文件 | 扫描 data/cache/ 目录，删除已过期的缓存文件 |
 | 4 | 查看缓存统计信息 | 显示缓存文件总数/大小/按前缀分类/过期预览 |
@@ -276,7 +276,7 @@
 - **HTML**：通过菜单 L 渲染在报告第 10 节 ✅
 
 **生成逻辑：** `generate_health_check()` 复用现有持仓数据（市值核算明细 + 穿透 TOP10 +
-分类计数），缓存策略同智囊团（2 小时 TTL，指纹排除行情波动字段）。每个维度独立评分，
+分类计数），缓存策略（24 小时 TTL，指纹排除行情波动字段）。每个维度独立评分，
 最终输出综合评分和评级（优/良/中/差）及 3-5 条具体可操作建议。
 
 #### 穿透深度分析（Excel + HTML — LLM 增补项目，v0.2.30+）

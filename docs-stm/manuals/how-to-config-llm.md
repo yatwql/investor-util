@@ -137,7 +137,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 ## LLM 业务模块架构与公共特征
 
-本项目目前有 5 个 LLM 业务模块，共享同一套生成骨架。所有模块在代码层面经过统一封装，以下特征对每个模块都适用。
+本项目目前有 5 个 LLM 业务模块（1 个可选），共享同一套生成骨架。所有模块在代码层面经过统一封装，以下特征对每个模块都适用。
 
 ### 总体架构
 
@@ -262,7 +262,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 ```
 
 **覆盖范围说明：**
-- 会话级统计包含全部 5 个 LLM 子模块，其中 `news_correlation` 仅在 `enabled_llm.news_correlation = true` 时计入
+- 会话级统计包含全部 5 个 LLM 子模块（1 个可选），其中 `news_correlation` 仅在 `enabled_llm.news_correlation = true` 时计入
 - 缓存命中：仅记录到 `per_module`（标记 `cached=True`），不计入 `call_count`
 - API 失败：不记录到统计中（失败不计费，也不计入调用次数）
 - 模块已禁用：不产生任何统计记录
@@ -274,13 +274,13 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | 输出端 | 展示形式 | 说明 |
 |:-------|:---------|:-----|
 | **Excel 报告** | 独立页签 `12.LLM API 用量` + 汇总页补充区块 | 仅菜单 L |
-| **HTML 报告** | 报告第 11 节（底部） | 仅菜单 L |
+| **HTML 报告** | 报告第 12 节（底部） | 仅菜单 L |
 | **TUI 终端** | 一行摘要 | 每次菜单 L 完成时输出 |
 | **调试日志** | `logs/app.log` | 每次 API 调用后记录明细 |
 
 具体格式处理函数为 `format_session_usage()`，将原始数据转为可直接展示的字典（含 `call_count`、`model_display`、`cost_display`、`total_tokens` 等格式化字段）。
 
-> 详情参见 [报告文件结构](../manuals/reports-instruction.md#llm-api-用量页签章节说明页签-12--html-第-11-节) 中"LLM API 用量页签/章节说明"章节。
+> 详情参见 [报告文件结构](../manuals/reports-instruction.md#llm-api-用量页签章节说明页签-12--html-第-12-节) 中"LLM API 用量页签/章节说明"章节。
 
 #### 6. 截断自动重试
 
@@ -292,7 +292,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 | 场景 | 占位文本 | 日志 |
 |------|---------|------|
-| `llm_key.json` 缺失或 key 为空 | "本节内容待生成 — 请配置 LLM API Key（data/config/llm_key.json）" | INFO |
+| `llm_key.json` 缺失或 key 为空 | "本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）" | INFO |
 | `enabled_llm.{module}` = false | 直接跳过，不显示占位 | INFO |
 | API 调用失败（网络错误/超时/返回空） | "（本节内容生成失败）" | WARNING |
 
@@ -611,7 +611,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 `llm_key.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示：
 
 ```
-本节内容待生成 — 请配置 LLM API Key（data/config/llm_key.json）
+本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）
 ```
 
 ---

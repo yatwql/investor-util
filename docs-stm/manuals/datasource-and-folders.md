@@ -3,7 +3,7 @@
 | 用途 | 主链路 | 备用链路 |
 |------|--------|----------|
 | 场内实时/收盘价 | 腾讯财经 `qt.gtimg.cn` | 东方财富 `push2.eastmoney.com` |
-| 场外基金净值 | 东方财富 `fundf.eastmoney.com` | 天天基金 `fundgz.1234567.com.cn` |
+| 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 天天基金 `fundf10.eastmoney.com` |
 | 基金业绩排名 | 天天基金 `pingzhongdata/{code}.js`（JS 变量解析） | — |
 | 基金持仓数据 | 天天基金 `fundf10.eastmoney.com` | — |
 | 财经新闻（源1） | 新浪财经 `feed.mix.sina.com.cn` | — |
@@ -13,12 +13,12 @@
 | 财经新闻（源5） | akshare 封装：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — |
 | A 股指数 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn`（s_* 前缀） |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析，gb_* 前缀） | 腾讯财经 `qt.gtimg.cn` |
-
-> **架构说明：** 指数数据由 `fetcher/index.py` 直接调用对应 API（不经过 Provider Chain）。A 股指数：腾讯→新浪备用→过期缓存；美股指数：新浪（2 次重试）→腾讯备用→过期缓存。
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业分类 + 概念板块归属） | — |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — |
+
+> **架构说明：** 指数数据由 `fetcher/index.py` 直接调用对应 API（不经过 Provider Chain）。A 股指数：腾讯→新浪备用→过期缓存；美股指数：新浪（2 次重试）→腾讯备用→过期缓存。
 
 ---
 
@@ -80,7 +80,7 @@ investor-util/
 │   │   │   ├── api.py                # API 调用 — Claude/OpenAI/DeepSeek 统一路由、重试、截断检测
 │   │   │   ├── circuit_breaker.py    # 熔断器 — 端点级熔断，防止级联超时
 │   │   │   ├── fingerprint.py        # 缓存指纹 — LLM 输入指纹计算、TTL 管理
-│   │   │   ├── generators.py         # 生成编排 — 5 个 LLM 模块的入口函数、批量调度
+│   │   │   ├── generators.py         # 生成编排 — 5 个 LLM 模块（1 个可选）的入口函数、批量调度
 │   │   │   ├── markdown.py           # Markdown→HTML 渲染
 │   │   │   ├── pricing.py            # 模型定价 — 各模型 Token 单价加载、费用估算
 │   │   │   ├── prompts.py            # 系统提示词 — 内置 System Prompt 常量 + 构建函数
