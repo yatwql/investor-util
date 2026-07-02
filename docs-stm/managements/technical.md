@@ -144,7 +144,7 @@ investor-util/
 │   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
 │   │   └── tui_menu.py           # 菜单交互
 │   └── test/                     # 测试（按标记分组目录，1938+ passed）
-│       ├── conftest.py           # pytest 配置 + 15 个分层标记注册
+│       ├── conftest.py           # pytest 配置 + 19 个分层标记注册
 │       ├── helpers.py            # 测试辅助工具
 │       ├── unit/                 # 单元测试（8 子组，1810 项）
 │       ├── scenario/             # 场景测试（4 子组，107 项）

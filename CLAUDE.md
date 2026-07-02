@@ -10,6 +10,9 @@
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：`src/test/test_*.py`，执行 `pytest src/test/`
+  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode regression`（107 项业务场景，~25s），否则不得 commit
+  - **合入门禁（P1）**：合并到 master 前必须通过 `python scripts/test_runner.py --mode verify`（场景+核心模块 668 项，~10min），否则不得 merge
+  - **发布门禁（P2）**：发布版本前必须通过 `python scripts/test_runner.py --mode all`（全量 1938 项，~26min），否则不得 release
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/manuals/datasource-and-folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`docs-stm/test-reports/latest/` 的子目录（`unit/`、`scenario/`、`integration/`、`regression/`、`edge/`、`all/`）需逐行说明，汇总文件 `index.html` 需标注其作用；`archives/` 下一级仅需一行描述，`<YYYYMMDD>/` 子目录不展开。

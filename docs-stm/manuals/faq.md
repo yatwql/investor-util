@@ -102,7 +102,7 @@ A: `data/config/config.json` 中可配置 `"proxy": "http://your-proxy:port"`，
 
 **Q: 如何关闭某个不需要的新闻源？**
 
-A: 编辑 `data/config/config.json`，将对应新闻源的 `enabled` 设为 `false` 即可（如 `"cls_news": {"enabled": false}` 关闭财联社）。重启或菜单 `R` 刷新配置后生效。
+A: 编辑 `data/config/config.json`，将对应新闻源的值设为 `false` 即可（如 `"cls": false` 关闭财联社）。重启或菜单 `R` 刷新配置后生效。
 
 **Q: 如何切换 LLM provider（如从 Claude 切到 DeepSeek）？**
 
@@ -114,7 +114,7 @@ A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled
 
 **Q: 如何使用自定义业绩基准？**
 
-A: 编辑 `data/config/config.json` 的 `benchmark` 字段，可指定指数代码作为基金业绩基准。默认基准是沪深300（000300）。自定义基准会替换报告中基金业绩分析的基准对比列。
+A: 编辑 `data/config/config.json` 的 `user_fund_benchmarks` 字段，可指定指数代码作为基金业绩基准。默认基准是沪深300（000300）。自定义基准会替换报告中基金业绩分析的基准对比列。
 
 **Q: 如何开启财经新闻热点与持仓关联分析 LLM 关联分析？**
 

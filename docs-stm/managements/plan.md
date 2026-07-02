@@ -89,7 +89,7 @@ A（测试覆盖补全一期）、A2（大函数拆分一期）、A3（测试覆
 
 - **R（测试覆盖增补三期 — 数据正确性 + 异常场景 + 测试文件治理）**：数据正确性增补 20 项测试缺陷修复及分类聚合/指数/排名合理性测试；异常场景覆盖（NAV 空窗期 10 项、交易时段切换取价 4 项、cache TTL 市场时段感知 10 项）；测试文件治理（conftest.py 6 个 pytest markers、coverage map 36→40 项、全量 1900+ 测试通过）。详见 changelog.md v0.2.61。
 - **M（UI/体验优化 — 错误提示优化）**：将所有直接暴露原始异常堆栈给用户的 `print(str(e))` 替换为友好中文提示，引导用户查看日志文件。涉及 tui_handlers.py（_print_error_with_hint 分类提示）、handlers_report.py（add_error/error 友好化）、progress.py（call_sheet 友好化）、excel_generator.py（新闻/LLM/智能预警异常友好化）。全量 1926 测试通过。详见 changelog.md v0.2.62。
-- **T（pytest 标记层级体系 + 测试文件目录分组搬迁）**：从 6 个扁平 marker 扩展为 15 个分层 marker（scenario 父子体系 4 子 + unit 父子体系 8 子 + 横切 llm 标记）；56 个单元测试文件迁入 `unit/{8 分组}/`、4 个场景文件迁入 `scenario/{4 分组}/`；conftest.py/test_runner.py 同步更新；全量 1938 测试收集正常。详见 changelog.md v0.2.62。
+- **T（pytest 标记层级体系 + 测试文件目录分组搬迁）**：从 6 个扁平 marker 扩展为 19 个分层标记（scenario 父子体系 5 标记 + unit 父子体系 9 标记 + 横切 llm + integration/edge/smoke/data）；56 个单元测试文件迁入 `unit/{8 分组}/`、4 个场景文件迁入 `scenario/{4 分组}/`；conftest.py/test_runner.py 同步更新；全量 1938 测试收集正常。详见 changelog.md v0.2.62。
 
 ---
 
@@ -106,7 +106,7 @@ A（测试覆盖补全一期）、A2（大函数拆分一期）、A3（测试覆
 
 ### [P1] S. 🟢 测试报告系统 — 脚本驱动 + 结构化输出 + 存档（进行中）
 
-> **当前进展**：`scripts/test_runner.py` 已完成，支持 `--mode`（unit/scenario/edge/data/regression/all）、`--coverage`、自动归档、汇总页生成。使用方法详见 `docs-stm/manuals/how-to-test-my-code.md`。
+> **当前进展**：`scripts/test_runner.py` 已完成，支持 `--mode`（unit/standard/scenario/regression/verify/integration/edge/data/all/smoke 共 10 种模式）、`--coverage`、自动归档、汇总页生成。同时分配 24 项冒烟测试（6 文件 × 4 项，~2s 快速验证核心通路）。使用方法详见 `docs-stm/manuals/how-to-test-my-code.md`。
 
 ---
 

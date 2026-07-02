@@ -19,7 +19,7 @@
 - **pytest 标记层级体系**：原有 6 个扁平 marker 扩展为 15 个分层 marker
   - 场景测试：`scenario` 父标记 → `scenario_basic`（S1-S5, 9 项）/ `scenario_extended`（S6-S10, 18 项）/ `scenario_llm`（S11-S20, 19 项）/ `scenario_datetime`（T1-T16, 61 项）— 子标记总和 = 107，父标记匹配全部
   - 单元测试：`unit` 父标记 → `unit_providers`（166 项）/ `unit_fetcher`（118 项）/ `unit_llm`（331 项）/ `unit_news`（176 项）/ `unit_report`（558 项）/ `unit_config`（42 项）/ `unit_core`（277 项）/ `unit_ui`（142 项）— 子标记总和 = 1810，父标记匹配全部
-  - 横切标记：`llm` 同时覆盖 `unit_llm`（331 项）+ `scenario_llm`（19 项），`-m "llm"` = 350 项
+  - 跨类标签：`llm` 同时覆盖 `unit_llm`（331 项）+ `scenario_llm`（19 项），`-m "llm"` = 350 项
   - `conftest.py` 注册全部新 markers，docstring 更新分层树
   - `scripts/test_runner.py` MODES 字典新增 `integration` 模式
 - **测试文件目录分组搬迁**：60 个测试文件从扁平 `src/test/` 按标记分组迁入子目录
@@ -32,6 +32,14 @@
 - **`how-to-use-registry.md`**：test_registry.py 路径同步更新
 - **`testplan.md`**：示例命令路径同步更新
 - **`plan.md`**：新增 T. 测试标记与目录分组已完成迭代条目
+
+### Added
+- **冒烟测试 `smoke` 标记（24 项）**：从核心数据模型、入口读取、分类计算、报告输出、启动依赖、数据获取 6 个关键节点各选 4 项最快基础测试，分配 `@pytest.mark.smoke`。`-m "smoke"` 可在 ~2s 内验证核心通路。涉及文件：`test_models.py`、`test_reader.py`、`test_category.py`、`test_excel_generator.py`、`test_config.py`、`test_eastmoney.py`。
+- **LLM 测试 API Key 审计**：确认全部 350 项 `llm` 标记测试（unit_llm 331 + scenario_llm 19）均为 mock 测试，无需真实 API key。`how-to-test-my-code.md` 新增逐文件 mock 分析表。
+
+### Changed
+- **`test_runner.py` MODES 字典 order 修复**：scenario/regression 重复 order=3 修复为各模式唯一值（regression=4→verify=5→integration=6→edge=7→data=8→all=9）；新增 `smoke` 模式（order=10，marker="smoke"）
+- **全量文档一致性审阅**：`datasource-and-folders.md` 标记数 15→19、`cls_news`→`cls` 配置修正；`faq.md` 过时引用修正；`how-to-test-my-code.md` 完整更新（三级流水线、10 模式表、smoke 明细、LLM mock 分析）；`plan.md`/`technical.md`/`review-findings.md` 标记计数 15→19；`plan.md` S 节模式列表同步
 
 ### Fixed
 - **🐛 首批标记插入脚本损坏 6 个测试文件**：脚本 `last_import_idx` 错误匹配方法体内的 `import httpx`，将 `import pytest` / `pytestmark` 插入到测试方法体中（test_eastmoney_industry.py:244、test_sina_news.py:193、test_tencent.py:228 等）。修复：写 `fix_markers.py` 用 AST 验证替换，删除所有误插标记并正确插入模块级位置。全量 1938 测试收集恢复。

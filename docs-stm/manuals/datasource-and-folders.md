@@ -110,7 +110,7 @@ investor-util/
 │   │
 │   └── test/                             # 测试（按标记分组目录，1938+ passed）
 │       ├── __init__.py                   # 包标记（空文件）
-│       ├── conftest.py                   # pytest 配置 — 所有标记注册（15 个分层标记）、fixture
+│       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
 │       ├── unit/                         # 单元测试（1810 项，8 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
@@ -239,11 +239,14 @@ investor-util/
 │   │   ├── latest/                   # 最新测试报告（按 --mode 生成子目录）
 │   │   │   ├── index.html            # 汇总页 — 各模式通过/失败总览 + 最近运行时间
 │   │   │   ├── unit/report.html      # 单元测试报告（标记 -m "unit"，1810 项）
+│   │   │   ├── standard/report.html  # 常规单元报告（标记 -m "unit and not (edge or data)"，1743 项）
 │   │   │   ├── scenario/report.html  # 场景测试报告（标记 -m "scenario"，107 项）
+│   │   │   ├── regression/report.html # 回归测试报告（标记 -m "scenario"，模式别名，107 项）
+│   │   │   ├── verify/report.html    # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，668 项）
 │   │   │   ├── integration/report.html  # 集成测试报告（标记 -m "scenario or integration"）
+│   │   │   ├── smoke/report.html     # 冒烟测试报告（标记 -m "smoke"，24 项）
 │   │   │   ├── edge/report.html      # 边缘场景报告（标记 -m "edge"）
 │   │   │   ├── data/report.html      # 数据正确性报告（标记 -m "data"）
-│   │   │   ├── regression/report.html # 回归测试报告（标记 -m "regression"）
 │   │   │   ├── all/report.html       # 全量测试报告（无标记筛选，1938 项）
 │   │   │   └── coverage/             # HTML 行覆盖率报告（--coverage 时生成）
 │   │   └── archives/                 # 历史报告存档
