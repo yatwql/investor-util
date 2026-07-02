@@ -853,97 +853,6 @@ class TestGetTTL(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 
 
-@pytest.mark.edge
-class TestGetTTLMarketHourAware(unittest.TestCase):
-    """R-101: 交易时段内 market_hour_aware 数据类型使用短 TTL。"""
-
-    def setUp(self):
-        self.config_patch = patch("src.python.config.get_config")
-        self.mock_config = self.config_patch.start()
-        self.mock_config.return_value = {
-            "market_hour_aware": ["price", "index"],
-            "market_hour_ttl": 45,
-            "cache_ttl": {"price": 86400},
-        }
-
-    def tearDown(self):
-        self.config_patch.stop()
-
-    @patch("src.python.cache._is_market_open", return_value=True)
-    def test_market_open_uses_short_ttl(self, _):
-        """交易时段内 + 感知类型 → 用短 TTL（配置值 45s）。"""
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("price"), 45)
-
-    @patch("src.python.cache._is_market_open", return_value=True)
-    def test_market_open_clamps_min_30(self, _):
-        """短 TTL 配置 <30s → 兜底到 30s。"""
-        self.mock_config.return_value = {
-            "market_hour_aware": ["price"],
-            "market_hour_ttl": 5,
-        }
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("price"), 30)
-
-    @patch("src.python.cache._is_market_open", return_value=True)
-    def test_market_open_clamps_max_86400(self, _):
-        """短 TTL 配置 >86400s → 兜底到 86400s。"""
-        self.mock_config.return_value = {
-            "market_hour_aware": ["price"],
-            "market_hour_ttl": 999999,
-        }
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("price"), 86400)
-
-    @patch("src.python.cache._is_market_open", return_value=True)
-    def test_non_aware_type_uses_static(self, _):
-        """交易时段中但非感知类型 → 使用静态 cache_ttl。"""
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("rank"), 86400)
-
-    @patch("src.python.cache._is_market_open", return_value=False)
-    def test_market_closed_uses_static_ttl(self, _):
-        """非交易时段 → 使用静态 cache_ttl（忽略 short TTL）。"""
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("price"), 86400)
-
-    @patch("src.python.cache._is_market_open", return_value=False)
-    def test_market_closed_no_config_uses_default(self, _):
-        """非交易时段 + 无 cache_ttl 配置 → 返回对应类型默认值。"""
-        self.mock_config.return_value = {"market_hour_aware": ["price"]}
-        from src.python.cache import get_ttl, CACHE_DAILY
-        self.assertEqual(get_ttl("price"), CACHE_DAILY)
-
-    @patch("src.python.cache._is_market_open", return_value=True)
-    def test_market_hour_ttl_missing_fallback_to_30(self, _):
-        """market_hour_ttl 缺失 → 兜底 30s。"""
-        self.mock_config.return_value = {
-            "market_hour_aware": ["price"],
-        }
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("price"), 30)
-
-    @patch("src.python.cache._is_market_open", return_value=True)
-    def test_invalid_market_hour_ttl_fallback_to_30(self, _):
-        """market_hour_ttl 为无效值 → 兜底 30s。"""
-        self.mock_config.return_value = {
-            "market_hour_aware": ["price"],
-            "market_hour_ttl": "abc",
-        }
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("price"), 30)
-
-    @patch("src.python.cache._is_market_open", return_value=False)
-    def test_midday_break_uses_long_ttl(self, _):
-        """11:30-13:00 午间休市 → 非 market_open → 长 TTL。"""
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("price"), 86400)
-
-    @patch("src.python.cache._is_market_open", return_value=False)
-    def test_afternoon_closed_uses_long_ttl(self, _):
-        """15:00 收盘后 → 非 market_open → 长 TTL。"""
-        from src.python.cache import get_ttl
-        self.assertEqual(get_ttl("price"), 86400)
 
 
 
@@ -1100,38 +1009,6 @@ class TestGzipCache(CacheTestBase):
 
         result = get("fp_complex", 600)
         self.assertEqual(result, complex_data)
-
-    @patch("src.python.cache.time.time")
-    def test_exact_100kb_boundary_not_gzip(self, mock_time):
-        """恰 100KB（未超阈值）→ 不 gzip。"""
-        mock_time.return_value = 1000.0
-        from src.python.cache import set
-
-        # 恰好 100*1024 字节（阈值是 > 不是 >=）
-        boundary_data = "x" * (100 * 1024 - 50)  # 留余量给 JSON 序列化开销
-        set("boundary_key", boundary_data)
-
-        json_path = os.path.join(self.cache_dir, "boundary_key.json")
-        gz_path = json_path + ".gz"
-        self.assertTrue(os.path.exists(json_path),
-                        "≤100KB 数据应仍为 .json")
-        self.assertFalse(os.path.exists(gz_path))
-
-    @patch("src.python.cache.time.time")
-    def test_gz_corrupted_file_deleted_on_read(self, mock_time):
-        """损坏的 .json.gz → 删除并返回 None。"""
-        mock_time.return_value = 1000.0
-        # 创建一个损坏的 .json.gz 文件
-        gz_path = os.path.join(self.cache_dir, "corrupted_gz.json.gz")
-        with open(gz_path, "wb") as f:
-            f.write(b"this is not valid gzip data")
-
-        from src.python.cache import get
-        result = get("corrupted_gz", 3600)
-
-        self.assertIsNone(result)
-        # 损坏文件应被删除
-        self.assertFalse(os.path.exists(gz_path))
 
 
 class TestClearByGroup(CacheTestBase):

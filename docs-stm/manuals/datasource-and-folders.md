@@ -192,9 +192,9 @@ investor-util/
 │           ├── basic/                    # 基础业务场景 S1-S5（9 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   └── test_integration.py   # S1-S5：持仓读取/行情获取/市值核算/分类汇总/报告生成
-│           ├── extended/                 # 扩展业务场景 S6-S10（18 项）
+│           ├── resilience/               # 异常容错场景 S6-S10（18 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
-│           │   └── test_integration_scenarios.py  # S6-S10：纯债分类/缓存回退/零成本利润/极端份额/高精度
+│           │   └── test_integration_scenarios.py  # S6-S10：纯债分类/网络降级/单行报告/零成本利润/极端份额
 │           ├── llm/                      # LLM 场景 S11-S20（19 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   └── test_llm_scenarios.py # S11-S20：混合缓存/全部失败/Thinking/禁用/断网/部分超期/HTML 分支

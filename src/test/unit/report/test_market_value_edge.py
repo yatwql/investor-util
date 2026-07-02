@@ -22,14 +22,12 @@ from unittest.mock import ANY, MagicMock, patch
 
 from src.python.models import Holding
 from src.python.report.market_value import (
-    _FUND_PREMIUM_PLACEHOLDER,
-    
-    _compute_detail_row,
-    _detail_to_row_values,
-    price_update_status,
+    _count_trading_days_back,
+    _determine_price_type,
+    _is_trading_day,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 
@@ -311,7 +309,6 @@ class TestCurrencyConversion(unittest.TestCase):
         self.assertTrue(all_updated)
 
 
-@pytest.mark.edge
 class TestCountTradingDaysBack(unittest.TestCase):
     """R-100: _count_trading_days_back 净值日期空窗期判定。
 
@@ -384,7 +381,6 @@ class TestCountTradingDaysBack(unittest.TestCase):
         self.assertIsNone(self._call("not-a-date"))
 
 
-@pytest.mark.edge
 class TestDeterminePriceTypeNavGap(unittest.TestCase):
     """R-100: _determine_price_type 场外基金净值日期空窗期取价标签。"""
 
@@ -437,7 +433,6 @@ class TestDeterminePriceTypeNavGap(unittest.TestCase):
         self.assertEqual(self._call("2026-07-02"), "官方净值(T)")
 
 
-@pytest.mark.edge
 class TestDeterminePriceTypeSessionSwitch(unittest.TestCase):
     """R-101: 交易时段切换瞬间 _determine_price_type 标签正确。"""
 

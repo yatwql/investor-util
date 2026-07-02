@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-02（v0.2.62 — 去重 §1.3/§1.4/§4 与 how-to-test-my-code.md 的冗余统计和流水线描述，改引用）
+最后更新：2026-07-03（v0.2.64 — §1.6/§1.8 同步 edge 覆盖状态、§5 版本表更新、§7.3 去重引用 §4、§9 补充检查脚本指引）
 
 ---
 
@@ -68,7 +68,7 @@
 | 测试文件 | 覆盖场景 | 职责范围 |
 |:---------|:---------|:---------|
 | `test_integration.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
-| `test_integration_scenarios.py` | S6-S10 | 扩展场景：纯债/断网/单账户/零成本/极端值 |
+| `test_integration_scenarios.py` | S6-S10 | 异常容错场景：纯债/断网/单账户/零成本/极端值 |
 | `test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
 | `test_datetime_scenarios.py` | T1-T16 | 日期/时间场景：市场状态×产品类型×边界 |
 
@@ -156,12 +156,12 @@
 | 空持仓下菜单 L | 跳过 LLM 调用，输出空占位 | ✅ |
 | config.json 配置值异常 | 输出警告，使用代码默认值 | ✅ |
 | JSON null 自动兜底 | 不崩溃，降级为空列表 | ✅ |
-| market_hours UTC 时区 | `datetime.now(timezone(hours=8))` 一致 | 🔴 已修复，需补测试 |
-| config 原子写入断电 | `tempfile.mkstemp` + `os.replace` | 🔴 已实现，需补测试 |
-| Provider 回退链路 | 主 provider 失败 → fallback provider | 🟡 待补 |
-| 熔断器冷却恢复 | 熔断后 60s 半开探测 | 🟡 待补 |
-| 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | 🟡 待补 |
-| LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | 🟡 待补 |
+| market_hours UTC 时区 | `datetime.now(timezone(hours=8))` 一致 | ✅ `test_market_hours_edge.py`（8 项，UTC/JST/PST 时区） |
+| config 原子写入断电 | `tempfile.mkstemp` + `os.replace` | ✅ `test_config_atomic_edge.py`（3 项，模拟断电/部分写入） |
+| Provider 回退链路 | 主 provider 失败 → fallback provider | ✅ `test_chain_edge.py`（4 项，超时/429/503/全失败） |
+| 熔断器冷却恢复 | 熔断后 60s 半开探测 | ✅ `test_circuit_breaker_edge.py`（3 项，60s 边界/59s 仍开/多端点） |
+| 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | ✅ `test_cache_edge.py`（gzip 边界 100KB/损坏删除） |
+| LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | ✅ `test_api_edge.py`（2 项，恢复重试/仍空不回退） |
 
 ### 1.7 日期/时间数据获取场景测试（T1-T16）
 
@@ -206,19 +206,20 @@
 > 新增 S/T 场景或修改测试文件后，运行 `python scripts/validate_coverage_map.py` 验证映射准确性。
 > 详细映射全文见 `docs-stm/plan/test-coverage-map.md`。
 >
-> **pytest marker 对照：** §1.3 场景 → `scenario_basic`/`scenario_extended`/`scenario_llm`；
-> §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"` (107 项)。
+> **pytest marker 对照：** §1.3 场景 → `scenario_basic`/`scenario_resilience`/`scenario_llm`；
+> §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"` (128 项)。
 
 **覆盖状态汇总：**
 
 | 覆盖状态 | 数量 | 说明 |
 |:---------|:----:|:-----|
-| ✅ 已覆盖 | 50 项 | S1-S20（20项）+ T1-T12/T14-T16（15项）+ 异常场景已覆盖（15项） |
+| ✅ 已覆盖 | 56 项 | S1-S20（20项）+ T1-T12/T14-T16（15项）+ 异常场景已覆盖（21项） |
 | ◐ 部分覆盖 | 3 项 | T13（时段切换缝隙）、非交易日+LLM、多账户混合+LLM 多轮 |
 | ❌ 未覆盖 | 2 项 | 净值数据空窗期、多时区 QDII 净值一致性 |
-| **合计** | **55 项** | 含 §1.3（S1-S20）+ §1.7（T1-T16）+ §1.6 异常场景 |
+| **合计** | **61 项** | 含 §1.3（S1-S20）+ §1.7（T1-T16）+ §1.6 异常场景 |
 
 ---
+> edge 异常场景测试另有专项覆盖（`_edge.py` 文件，当前 ~86 项），见 `how-to-test-my-code.md` → 跨类标记。
 
 ## 2. 数据正确性验证
 
@@ -279,7 +280,7 @@
 
 | 优先级 | 回归范围 | 触发条件 | 备注 |
 |:------:|:---------|:---------|:-----|
-| **P0** | `python scripts/test_runner.py --mode regression` 通过（107 项业务场景） | **任何代码变更** | 提交前极速验证 |
+| **P0** | `python scripts/test_runner.py --mode regression` 通过（128 项业务场景） | **任何代码变更** | 提交前极速验证 |
 | **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） | 验证缺陷场景的断言 |
 | **P0** | 测试隔离验证：`pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
 | **P1** | 手动菜单 E/H/B/L 各一次，检查报告完整性 | config / report / html / llm 变更 | Excel 页签完整、不崩溃 |
@@ -303,19 +304,15 @@
 
 | 版本 | 测试重点 |
 |:-----|:---------|
-| v0.2.62 | pytest 标记分层体系（6→19 标记）+ 目录分组搬迁（60 文件）+ 冒烟测试 24 项 + 三级流水线模式系统 + 全量管理文档一致性审阅 |
+| v0.2.64 | pytest 标记语义化改造（S1-S10 编号→语义名、`scenario_resilience`、`check-test-markers.py`）、`integration` 标记移除、全量测试 1978 项 |
+| v0.2.63 | 异常场景测试增补（6 个 `_edge.py` 文件共 19 项新测试）、edge 总数 ~39→~86 |
+| v0.2.62 | pytest 标记分层体系（6→28 标记）+ 目录分组搬迁（60 文件）+ 冒烟测试 24 项 + 三级流水线模式系统 + 全量管理文档一致性审阅 |
 | v0.2.61 | datasource-and-folders 表格截断修复 + requirements 缓存前缀修正（文档同步，无测试变更） |
 | v0.2.60 | 文档分拆与全量核对、三文档一致性对齐（文档同步，无测试变更） |
 | v0.2.59 | LLM 全场景组合测试 S11-S20（33 项）、日期/时间场景 T1-T16（61 项）、plan.md/testplan.md 需求同步 |
 | v0.2.58 | 指数双链路 fallback（A股腾讯→新浪、美股新浪→腾讯）、test_fetcher_index 8→13 项 |
 | v0.2.56 | index market_hour_aware TTL 修复、硬编码 TTL→get_ttl() 全量替换、竞态修复 |
 | v0.2.55 | P0 长周期收益率、P1 风险分析解析、P2 5 级评级系统+类型差异化阈值 |
-| v0.2.54 | P 节 12 项 Edge Case/场景测试补全、8 项预存缺陷修复、HTML 响应式 |
-| v0.2.53 | P1 LLM Prompt 精简、P2 HTTP/2 复用、dead code 清理 |
-| v0.2.52 | 大函数治理二期、测试补全三期（9 模块 140 项） |
-| v0.2.51 | fingerprint 16 项、新闻 provider 50 项、代码治理回归 |
-| v0.2.50 | test_http_client.py 17 项、test_market_hours.py 41 项 |
-| v0.2.49 | 大函数治理、未使用 import 清理回归 |
 ---
 
 ## 6. 测试数据与 Mock 策略
@@ -449,11 +446,11 @@ def test_get_ttl_closed(self, mock_open):
 
 ### 7.3 回归检查门禁
 
-> 详细回归项定义（含触发条件和备注）见 §4 回归测试清单。
+> 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **§4 P0 全通**：`python scripts/test_runner.py --mode regression`（107 项） + Bug 回归用例 + 测试隔离验证 — 不可提交代码
-10. **§4 P1 全通**：手动菜单 + Excel/HTML 视觉检查 + Provider 联通性 — 不可合并到 master
-11. **§4 P2 已执行**（可带未通过的 P2 合并，但不可发布版本）：断网降级/旧缓存兼容/跨池污染
+- **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（128 项）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+- **P1 全通** — 不可合并 master：手动菜单 E/H/B/L + Excel/HTML 视觉检查 + Provider 联通性
+- **P2 已执行** — 可合入但不可发布：断网降级/旧缓存兼容/跨池污染
 
 ### 7.4 人工验证
 
@@ -480,10 +477,11 @@ def test_get_ttl_closed(self, mock_open):
 |:---------|:-------|:-----|
 | **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache.py` 追加 `TestCacheEdgeCases` |
 | **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
-| **业务场景测试** | `test_integration.py`（基础链路）或 `test_integration_scenarios.py`（扩展场景） | S1-S5 → `test_integration.py` |
+| **业务场景测试** | `test_integration.py`（基础链路）或 `test_integration_scenarios.py`（异常容错场景） | S1-S5 → `test_integration.py` |
 | **LLM 场景测试** | `test_llm_scenarios.py` | S11-S20 |
 | **日期/时间场景** | `test_datetime_scenarios.py` | T1-T16 |
 | **缺陷回归测试** | 对应模块的 `test_*.py` 或 `test_regression.py` | Bug fix 的断言 |
+| **边缘/异常场景测试** | 对应模块的 `test_<module>_edge.py` | 使用 `@pytest.mark.edge` 标记，放置于模块目录下 |
 
 ### 9.2 命名规范
 
@@ -505,6 +503,7 @@ def test_qdii_nav_date_delayed_t2(self):
 2. **`datasource-and-folders.md`** — 新增 test_*.py 文件后更新目录树（test 目录下的测试文件数）
 3. **`changelog.md`** — 记录新增的测试数量和覆盖场景
 4. **`plan.md`** — 如果在迭代中新增的功能，更新对应条目的完成状态
+5. **`unit/conftest.py`** — 新增 `unit/` 下测试文件时确认 `pytestmark` 列表包含正确的 `unit_*` 子标记
 
 ### 9.4 新增后必须执行的验证
 
@@ -513,6 +512,7 @@ pytest src/test/                                   # 全量通过
 pytest --co                                         # 无 patch 残留污染
 pytest src/test/unit/core/test_registry.py --co -v      # 新文件隔离（示例）
 python scripts/validate_coverage_map.py             # §1.8 映射验证
+python scripts/check-test-markers.py                # 标记合规性检查（AST 静态扫描）
 ```
 
 ### 9.5 文件膨胀阈值

@@ -277,7 +277,8 @@ class ScenarioTestBase(unittest.TestCase):
         )
 
 
-class TestScenarioS1(ScenarioTestBase):
+@pytest.mark.scenario_stock
+class TestScenarioStock(ScenarioTestBase):
     """S1: 纯股票组合（3 只 A 股，无基金）→ 穿透 TOP10 等于直接持股。"""
 
     def setUp(self):
@@ -351,7 +352,8 @@ class TestScenarioS1(ScenarioTestBase):
         self.assertAlmostEqual(total, (2050-2000)*100 + (28.5-28)*200 + (260-250)*50)
 
 
-class TestScenarioS2(ScenarioTestBase):
+@pytest.mark.scenario_fund
+class TestScenarioFund(ScenarioTestBase):
     """S2: 纯基金组合（ETF + 主动 + QDII）。"""
 
     def setUp(self):
@@ -404,7 +406,8 @@ class TestScenarioS2(ScenarioTestBase):
         self.assertTrue(len(top10) > 0, "基金持仓穿透后 TOP10 不应为空")
 
 
-class TestScenarioS3(ScenarioTestBase):
+@pytest.mark.scenario_mixed_accounts
+class TestScenarioMixedAccounts(ScenarioTestBase):
     """S3: 混合多账户（证券+支付宝+微信）。"""
 
     def setUp(self):
@@ -438,7 +441,8 @@ class TestScenarioS3(ScenarioTestBase):
         self.assertEqual(len(subtotals), 3, "应有 3 个不同账户")
 
 
-class TestScenarioS4(ScenarioTestBase):
+@pytest.mark.scenario_new_holdings
+class TestScenarioNewHoldings(ScenarioTestBase):
     def setUp(self):
         super().setUp()
         """清除可能影响测试的缓存。"""
@@ -478,7 +482,8 @@ class TestScenarioS4(ScenarioTestBase):
         self._mock_price.assert_called()
 
 
-class TestScenarioS5(ScenarioTestBase):
+@pytest.mark.scenario_cache_hit
+class TestScenarioCacheHit(ScenarioTestBase):
     """S5: 缓存全命中 → LLM 页脚显示缓存提示。"""
 
     @patch("src.python.cache.get")

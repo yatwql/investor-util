@@ -4,7 +4,30 @@
 
 ---
 
-## [0.2.62] - 2026-07-02
+## [Unreleased]
+
+### Added
+- **新增边缘场景测试文件（6 项共 19 个新测试）**：`test_config_atomic_edge.py`（3 项）、`test_cache_edge.py`（12 项）、`test_market_hours_edge.py`（8 项）、`test_chain_edge.py`（4 项）、`test_api_edge.py`（2 项）、`test_circuit_breaker_edge.py`（3 项）、`test_market_value_edge.py`（从 15→40 项）、`test_penetration_edge.py`（从 12→14 项）。边缘场景测试总数从 ~39 增至 ~86 项。
+- **`scripts/check-test-markers.py`**：基于 AST 的静态标记合规检查脚本，CI 模式下检测缺失/废弃/未知标记，全覆盖 66 个测试文件。
+
+### Changed
+- **pytest 标记重命名 — 语义化改造**：
+  - S1-S10 原子标记从编号式 `scenario_s1`→`scenario_s10` 改为语义名：`scenario_stock`、`scenario_fund`、`scenario_mixed_accounts`、`scenario_new_holdings`、`scenario_cache_hit`、`scenario_bond`、`scenario_network_down`、`scenario_single_holding`、`scenario_zero_cost`、`scenario_extreme`
+  - S1-S10 测试类同步重命名：`TestScenarioS1`~`TestScenarioS10` → `TestScenarioStock`~`TestScenarioExtreme`
+  - 主分组标记 `scenario_extended` → `scenario_resilience`，`extended/` 目录同步重命名为 `resilience/`
+- **`unit/conftest.py`**：从自动注入模式改为验证模式，新文件漏标 `unit_*` 标记时抛出 `pytest.UsageError`
+- **`test_market_value_edge.py`**：从方法级 `@pytest.mark.edge` 统一为模块级 `pytestmark` 列表，与其他 8 个 `_edge.py` 文件风格一致
+- **全量测试计数更新**：单元测试 1810→1850，场景测试 107→128，全量 1938→1978
+
+### Removed
+- **`integration` 标记**：已注册但从未在测试类/方法上使用，移除 conftest.py 注册及 KNOWN_MARKERS 集合。
+
+---
+
+## [0.2.63] - 2026-07-02
+
+### Added
+- **边缘场景测试增补（迭代 V）**：在执行已有 conftest.py 和测试框架基础上新增 6 个 `_edge.py` 文件和增强 2 个已有 `_edge.py`，共 19 个新测试用例，覆盖 cache 损坏恢复、API 异常数据、市场时段边界等边缘场景。
 
 ### Changed
 - **错误提示优化**：所有直接暴露原始异常堆栈给用户的 `print(str(e))` 替换为友好中文提示，引导用户查看日志文件，避免恐慌

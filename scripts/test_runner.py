@@ -64,8 +64,8 @@ MODES: dict[str, dict] = {
         "order": 5,
     },
     "integration": {
-        "marker": "scenario or integration",
-        "desc": "集成/端到端流程测试（场景+集成标记）",
+        "marker": "scenario",
+        "desc": "集成测试（scenario 别名，同 107 项）",
         "timeout_sec": 300,
         "order": 6,
     },

@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 from src.python.models import Holding
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 

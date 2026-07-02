@@ -25,7 +25,7 @@ from src.python.models import Holding
 from src.python.report.penetration import classify_penetration
 
 
-@pytest.mark.scenario_extended
+@pytest.mark.scenario_resilience
 @pytest.mark.scenario
 class ScenarioTestBase(unittest.TestCase):
     """场景测试基类：提供共享的 mock 环境。"""
@@ -73,7 +73,8 @@ class ScenarioTestBase(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 
 
-class TestScenarioS6(ScenarioTestBase):
+@pytest.mark.scenario_bond
+class TestScenarioBond(ScenarioTestBase):
     """S6: 纯债券基金组合 → 穿透 TOP10 无股权覆盖或极小。"""
 
     def setUp(self):
@@ -159,7 +160,8 @@ class TestScenarioS6(ScenarioTestBase):
 # ═══════════════════════════════════════════════════════════════
 
 
-class TestScenarioS7(ScenarioTestBase):
+@pytest.mark.scenario_network_down
+class TestScenarioNetworkDown(ScenarioTestBase):
     """S7: 报告生成过程中网络中断 → 降级使用过期缓存。"""
 
     def setUp(self):
@@ -229,7 +231,8 @@ class TestScenarioS7(ScenarioTestBase):
 # ═══════════════════════════════════════════════════════════════
 
 
-class TestScenarioS8(ScenarioTestBase):
+@pytest.mark.scenario_single_holding
+class TestScenarioSingleHolding(ScenarioTestBase):
     """S8: 单账户单持仓 → 正确生成单行报告。"""
 
     def setUp(self):
@@ -296,7 +299,8 @@ class TestScenarioS8(ScenarioTestBase):
 # ═══════════════════════════════════════════════════════════════
 
 
-class TestScenarioS9(ScenarioTestBase):
+@pytest.mark.scenario_zero_cost
+class TestScenarioZeroCost(ScenarioTestBase):
     """S9: 零成本持仓 → 盈亏/收益率正确处理。"""
 
     def test_zero_cost_stock(self):
@@ -380,7 +384,8 @@ class TestScenarioS9(ScenarioTestBase):
 # ═══════════════════════════════════════════════════════════════
 
 
-class TestScenarioS10(ScenarioTestBase):
+@pytest.mark.scenario_extreme
+class TestScenarioExtreme(ScenarioTestBase):
     """S10: 极端值 — 极大/极小持仓份额。"""
 
     def test_extremely_large_shares(self):
