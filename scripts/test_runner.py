@@ -87,6 +87,12 @@ MODES: dict[str, dict] = {
         "timeout_sec": 2400,
         "order": 9,
     },
+    "smoke": {
+        "marker": "smoke",
+        "desc": "冒烟测试（24 项，~2s 快速验证核心通路）",
+        "timeout_sec": 30,
+        "order": 10,
+    },
 }
 
 # ── 帮助文本 ─────────────────────────────────────────────────

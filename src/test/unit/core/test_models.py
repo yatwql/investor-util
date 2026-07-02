@@ -23,6 +23,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 class TestHolding(unittest.TestCase):
     """Holding dataclass 的基础字段测试。"""
 
+    @pytest.mark.smoke
     def test_create_minimal(self):
         """最简构造，所有字段必填。"""
         h = Holding(account="证券账户", name="长江电力",
@@ -51,6 +52,7 @@ class TestHolding(unittest.TestCase):
                      shares="800", cost_price=10.0)
         self.assertEqual(h.shares, "800")
 
+    @pytest.mark.smoke
     def test_repr(self):
         """repr 输出含关键字段。"""
         h = Holding(account="证券账户", name="长江电力",
@@ -59,6 +61,7 @@ class TestHolding(unittest.TestCase):
         self.assertIn("长江电力", r)
         self.assertIn("600900", r)
 
+    @pytest.mark.smoke
     def test_eq_different(self):
         """不同持仓对象不等。"""
         h1 = Holding(account="A", name="股票1", code="000001",
@@ -67,6 +70,7 @@ class TestHolding(unittest.TestCase):
                       shares=200, cost_price=20.0)
         self.assertNotEqual(h1, h2)
 
+    @pytest.mark.smoke
     def test_eq_same_values(self):
         """相同字段值的对象相等（dataclass 默认行为）。"""
         h1 = Holding(account="A", name="X", code="000001",

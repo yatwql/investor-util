@@ -39,14 +39,17 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 class TestSafeStr(unittest.TestCase):
     """测试 _safe_str 转换逻辑。"""
 
+    @pytest.mark.smoke
     def test_none_returns_empty(self):
         """None -> 空字符串。"""
         self.assertEqual(reader._safe_str(None), "")
 
+    @pytest.mark.smoke
     def test_string_stripped(self):
         """字符串 -> 去除前后空格。"""
         self.assertEqual(reader._safe_str("  贵州茅台  "), "贵州茅台")
 
+    @pytest.mark.smoke
     def test_number_to_string(self):
         """数字 -> 字符串。"""
         self.assertEqual(reader._safe_str(513300), "513300")
@@ -55,6 +58,7 @@ class TestSafeStr(unittest.TestCase):
         """浮点数 -> 字符串。"""
         self.assertEqual(reader._safe_str(100.5), "100.5")
 
+    @pytest.mark.smoke
     def test_empty_string(self):
         """空字符串 -> 空字符串。"""
         self.assertEqual(reader._safe_str(""), "")

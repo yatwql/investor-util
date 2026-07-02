@@ -30,11 +30,13 @@ class TestCategorizeHolding(unittest.TestCase):
         return Holding(account=account, name=name, code=code,
                         shares=100, cost_price=10.0)
 
+    @pytest.mark.smoke
     def test_qdii(self):
         """QDII → (基金, QDII)。"""
         h = self._h("华夏纳斯达克100ETF(QDII)", "513300")
         self.assertEqual(cat._categorize_holding(h), ("基金", "QDII"))
 
+    @pytest.mark.smoke
     def test_bond(self):
         """含债关键词 → (债券, 纯债)。"""
         h = self._h("招商鑫福中短债A", "012325", "支付宝")
@@ -45,11 +47,13 @@ class TestCategorizeHolding(unittest.TestCase):
         h = self._h("银华货币A", "180008", "支付宝")
         self.assertEqual(cat._categorize_holding(h), ("现金", "货币"))
 
+    @pytest.mark.smoke
     def test_stock(self):
         """股票代码 6/0/3 开头 → (股票, A股)。"""
         h = self._h("贵州茅台", "600519")
         self.assertEqual(cat._categorize_holding(h), ("股票", "A股"))
 
+    @pytest.mark.smoke
     def test_index_fund(self):
         """场内 ETF 代码 5 开头 → (基金, 指数)。"""
         h = self._h("南方中证500ETF", "510500", "证券账户")

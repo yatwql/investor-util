@@ -20,7 +20,6 @@
   - 场景测试：`scenario` 父标记 → `scenario_basic`（S1-S5, 9 项）/ `scenario_extended`（S6-S10, 18 项）/ `scenario_llm`（S11-S20, 19 项）/ `scenario_datetime`（T1-T16, 61 项）— 子标记总和 = 107，父标记匹配全部
   - 单元测试：`unit` 父标记 → `unit_providers`（166 项）/ `unit_fetcher`（118 项）/ `unit_llm`（331 项）/ `unit_news`（176 项）/ `unit_report`（558 项）/ `unit_config`（42 项）/ `unit_core`（277 项）/ `unit_ui`（142 项）— 子标记总和 = 1810，父标记匹配全部
   - 横切标记：`llm` 同时覆盖 `unit_llm`（331 项）+ `scenario_llm`（19 项），`-m "llm"` = 350 项
-  - 废弃 `datetime` 旧标记（已被 `scenario_datetime` 替代）
   - `conftest.py` 注册全部新 markers，docstring 更新分层树
   - `scripts/test_runner.py` MODES 字典新增 `integration` 模式
 - **测试文件目录分组搬迁**：60 个测试文件从扁平 `src/test/` 按标记分组迁入子目录

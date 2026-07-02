@@ -42,6 +42,9 @@ python scripts/test_runner.py --mode edge
 
 # 运行全量 + 行覆盖率报告
 python scripts/test_runner.py --coverage
+
+# 冒烟测试（24 项，~2s 快速验证核心通路）
+python scripts/test_runner.py --mode smoke
 ```
 
 ## 测试组合说明
@@ -68,9 +71,10 @@ python scripts/test_runner.py --coverage
 | `edge` | `edge` | §1.5 异常/边界场景 | 39 | ~10s |
 | `data` | `data` | 数据正确性验证 | 28 | ~10s |
 | `integration` | `scenario or integration` | 集成/端到端流程测试（含场景标记） | 107（同 scenario） | ~25s（待补充独立标记） |
+| `smoke` | `smoke` | 冒烟测试（核心通路，6 文件 × 4 项） | **24** | **~2s** |
 | `all` | 无限制 | 全量测试 | 1938 | ~26min |
 
-> **注意**：`smoke` 标记已在 `conftest.py` 注册但尚未分配测试。`datetime` 标记已废弃，由 `scenario_datetime` 替代。
+> **注意**：`smoke` 标记已分配 24 项最快基础测试（详见下方统计表）。
 
 ## 最新标记测试分组统计（2026-07-02）
 
@@ -103,6 +107,7 @@ python scripts/test_runner.py --coverage
 | marker | 说明 | 项数 |
 |:-------|:-----|:----:|
 | `llm` | 全部 LLM 相关（unit_llm 331 + scenario_llm 19） | **350** |
+| `smoke` | 冒烟测试 — 6 文件各 4 项最快基础测试 | **24** |
 | `edge` | 边缘/异常场景（叠加于 unit） | **39** |
 | `data` | 数据正确性验证（叠加于 unit） | **28** |
 
@@ -123,6 +128,35 @@ python scripts/test_runner.py --coverage
 | `scenario/llm/test_llm_scenarios.py` | 35 处 | ❌ 不需要 | 场景流程，全部 mock |
 
 > 全部 331 项 `unit_llm` + 19 项 `scenario_llm` **均为 mock 测试，无需真实的 LLM API key**。`-m "not llm"` 跳过它们是因为属于 LLM **模块**而非需要真实 API 调用——纯属模块筛选，非依赖检查。
+
+### Smoke 测试明细
+
+| 节点 | 文件 | 测试方法 | 验证点 |
+|:-----|:-----|:---------|:-------|
+| **核心数据模型** | `unit/core/test_models.py` | `test_create_minimal` | 最简构造，所有字段必填 |
+| | | `test_repr` | repr 含关键字段 |
+| | | `test_eq_different` | 不同持仓不等 |
+| | | `test_eq_same_values` | 相同字段值相等 |
+| **入口读取** | `unit/core/test_reader.py` | `test_none_returns_empty` | `_safe_str(None)` → `""` |
+| | | `test_string_stripped` | `_safe_str` 去除空格 |
+| | | `test_number_to_string` | `_safe_str(513300)` → `"513300"` |
+| | | `test_empty_string` | `_safe_str("")` → `""` |
+| **分类计算** | `unit/report/test_category.py` | `test_qdii` | QDII → (基金, QDII) |
+| | | `test_bond` | 含债 → (债券, 纯债) |
+| | | `test_stock` | 6/0/3 开头 → (股票, A股) |
+| | | `test_index_fund` | 5 开头 ETF → (基金, 指数) |
+| **报告输出** | `unit/report/test_excel_generator.py` | `test_basic_generation` | 所有模块正常生成 |
+| | | `test_summary_module_missing` | 模块缺失降级 |
+| | | `test_sheet_exception_isolation` | 页签异常不阻塞其他 |
+| | | `test_default_progress_reporter` | progress=None 不抛异常 |
+| **启动依赖** | `unit/config/test_config.py` | `test_missing_file_returns_defaults` | 缺文件返回默认值 |
+| | | `test_valid_config_read` | 完整配置正常读取 |
+| | | `test_init_creates_default_config` | 初始化创建默认配置 |
+| | | `test_set_and_get` | 写入后读取一致 |
+| **数据获取** | `unit/providers/test_eastmoney.py` | `test_jsonp_format` | JSONP 提取 JSON |
+| | | `test_pure_json` | 纯 JSON 原样返回 |
+| | | `test_normal` | `_safe_float("1.2345")` |
+| | | `test_empty_string` | `_safe_float("")` → 0.0 |
 
 ## 查看报告
 
@@ -184,15 +218,18 @@ pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency
 | ├─ `unit_core` | 子标记 | 核心模块（277 项） |
 | └─ `unit_ui` | 子标记 | TUI 交互（142 项） |
 | **横切标记** | | |
-| `llm` | 横切 | 全部 LLM 相关（unit_llm 331 + scenario_llm 19 = 350 项，需 API key） |
+| `llm` | 横切 | 全部 LLM 相关（unit_llm 331 + scenario_llm 19 = 350 项，均为 mock） |
 | **其他** | | |
-| `edge` | 独立 | 边缘/异常场景测试 |
-| `data` | 独立 | 数据正确性验证测试 |
-| `smoke` | 独立 | 冒烟测试（快速验证核心功能，待分配） |
+| `edge` | 独立 | 边缘/异常场景测试（39 项） |
+| `data` | 独立 | 数据正确性验证测试（28 项） |
+| `smoke` | 独立 | 冒烟测试（6 文件 × 4 项 = 24 项，~2s） |
 
 ### 组合查询示例
 
 ```bash
+# 冒烟测试（24 项，~2s 验证核心通路）
+pytest src/test/ -m "smoke" -v
+
 # 冒烟 + 边缘测试
 pytest src/test/ -m "smoke or edge" -v
 

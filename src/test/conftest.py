@@ -7,10 +7,10 @@
     - scenario_llm: LLM 场景组合（S11-S20）
     - scenario_datetime: 日期/时间场景（T1-T16）
   - integration: 集成/端到端流程测试（模块间接口契约）
-  - llm: LLM 相关测试（需 API key 配置）
-  - edge: 边缘/异常场景测试
-  - smoke: 冒烟测试（快速验证核心功能）
-  - data: 数据正确性验证测试
+  - llm: LLM 相关测试（unit_llm 331 + scenario_llm 19，均为 mock）
+  - edge: 边缘/异常场景测试（39 项）
+  - smoke: 冒烟测试（6 文件 × 4 项 = 24 项，~2s）
+  - data: 数据正确性验证测试（28 项）
 
 用法：
   cd D:/codebase/zoo/investor-util

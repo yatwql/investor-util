@@ -123,6 +123,7 @@ class TestGenerateExcelReport(unittest.TestCase):
 
     # ── 基本路径 ──
 
+    @pytest.mark.smoke
     def test_basic_generation(self) -> None:
         """基本路径：所有模块正常，外部传入明细+指数。"""
         from src.python.report.excel_generator import generate_excel_report
@@ -266,6 +267,7 @@ class TestGenerateExcelReport(unittest.TestCase):
 
     # ── 模块缺失降级 ──
 
+    @pytest.mark.smoke
     def test_summary_module_missing(self) -> None:
         """汇总模块缺失 → add_error + 其他模块继续。"""
         from src.python.report.excel_generator import generate_excel_report
@@ -294,6 +296,7 @@ class TestGenerateExcelReport(unittest.TestCase):
 
     # ── 页签写入异常隔离 ──
 
+    @pytest.mark.smoke
     def test_sheet_exception_isolation(self) -> None:
         """某个页签抛出异常 → add_error + 不影响其他页签写入。"""
         from src.python.report.excel_generator import generate_excel_report
@@ -315,6 +318,7 @@ class TestGenerateExcelReport(unittest.TestCase):
 
     # ── ProgressReporter 默认值 ──
 
+    @pytest.mark.smoke
     def test_default_progress_reporter(self) -> None:
         """progress=None → 使用 SilentProgressReporter（不抛异常）。"""
         from src.python.report.excel_generator import generate_excel_report

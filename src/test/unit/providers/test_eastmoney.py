@@ -27,11 +27,13 @@ class TestStripJsonp(unittest.TestCase):
         from src.python.providers.eastmoney import _strip_jsonp
         return _strip_jsonp(text)
 
+    @pytest.mark.smoke
     def test_jsonp_format(self):
         """jQuery 回调包裹 → 提取 JSON。"""
         text = 'jQuery({"Data": {"LSJZList": []}})'
         self.assertEqual(self._call(text), '{"Data": {"LSJZList": []}}')
 
+    @pytest.mark.smoke
     def test_pure_json(self):
         """纯 JSON → 原样返回。"""
         text = '{"key": "value"}'
@@ -50,9 +52,11 @@ class TestSafeFloat(unittest.TestCase):
         from src.python.providers.eastmoney import _safe_float
         return _safe_float(s)
 
+    @pytest.mark.smoke
     def test_normal(self):
         self.assertEqual(self._call("1.2345"), 1.2345)
 
+    @pytest.mark.smoke
     def test_empty_string(self):
         self.assertEqual(self._call(""), 0.0)
 

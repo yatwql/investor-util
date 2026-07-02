@@ -37,6 +37,7 @@ class TestGetConfig(unittest.TestCase):
         cfg._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
+    @pytest.mark.smoke
     def test_missing_file_returns_defaults(self):
         """配置文件不存在 → 返回默认值。"""
         result = cfg.get_config()
@@ -74,6 +75,7 @@ class TestGetConfig(unittest.TestCase):
         self.assertEqual(result["holdings_filename"], "个人投资持仓信息.xlsx")
         self.assertEqual(result.get("output_dir"), "reports")
 
+    @pytest.mark.smoke
     def test_valid_config_read(self):
         """完整配置正常读取。"""
         os.makedirs(self.tmp.name, exist_ok=True)
@@ -104,6 +106,7 @@ class TestInitConfig(unittest.TestCase):
         cfg._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
+    @pytest.mark.smoke
     def test_init_creates_default_config(self):
         """初始化 → 创建包含默认值的配置文件。"""
         self.assertFalse(os.path.exists(cfg._CONFIG_FILE))
@@ -144,6 +147,7 @@ class TestSetConfig(unittest.TestCase):
         cfg._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
+    @pytest.mark.smoke
     def test_set_and_get(self):
         """写入 → 再次读取值与写入一致。"""
         cfg.init_config()
