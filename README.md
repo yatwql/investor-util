@@ -86,18 +86,26 @@ Excel 报告各页签说明、HTML 报告特性、基金业绩评价标准，请
 
 ---
 
+## 如何测试我的代码
+
+想知道如何在本地运行测试，查看测试报告，请参见：
+- [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md)
+
+---
+
+
 ## 用户文档
 
 | 文档 | 说明 |
 |------|------|
 | [快速开始 & 菜单操作](docs-stm/manuals/how-to-start.md) | 启动指南、持仓格式、菜单功能 |
 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
-| [配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL |
+| [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL |
 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | llm_key.json 字段说明、llm_settings.json 字段说明、LLM 密钥、参数调优、provider 选择 |
 | [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块流程 |
 | [报告文件结构 & 基金业绩评价标准](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价模型 |
 | [数据源一览 & 目录结构](docs-stm/manuals/datasource-and-folders.md) | 数据源说明、项目目录结构 |
-| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试报告系统、新增测试指南 |
+| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试报告、新增测试指南 |
 
 ## 管理文档
 
