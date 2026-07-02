@@ -45,6 +45,15 @@ python scripts/test_runner.py --coverage
 
 # 冒烟测试（~2s 快速验证核心通路）
 python scripts/test_runner.py --mode smoke
+
+# 集成测试（同场景 107 项）
+python scripts/test_runner.py --mode integration
+
+# 数据正确性验证（~10s）
+python scripts/test_runner.py --mode data
+
+# 全量测试（1938 项，~26min）
+python scripts/test_runner.py --mode all
 ```
 
 ## 测试模式详解
@@ -139,11 +148,11 @@ python scripts/test_runner.py --mode scenario,edge
 | `scenario` | 107 | ~25s |
 | `regression` | 107 | ~25s |
 | `verify` | 668 | ~10min |
+| `integration` | 107（同 scenario） | ~25s |
 | `edge` | 39 | ~10s |
 | `data` | 28 | ~10s |
-| `integration` | 107（同 scenario） | ~25s |
-| `smoke` | 24 | ~2s |
 | `all` | 1938 | ~26min |
+| `smoke` | 24 | ~2s |
 
 ### 功能域对应测试源
 
@@ -154,13 +163,12 @@ python scripts/test_runner.py --mode scenario,edge
 | **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 166 |
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund.py` + `test_chain.py` | 118 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
-| **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation) | `unit/report/test_{excel_generator,excel_writer,html_writer,category,summary,market_value,penetration,fund_performance,early_warning,news_correlation}.py` 等 14 文件 | 558 |
+| **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone) | `unit/report/test_{excel_generator,excel_writer,html_writer,category,summary,market_value,penetration,fund_performance,early_warning,news_correlation,qdii_timezone}.py` 等 15 文件 | 558 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton) | `unit/llm/`(8 文件) + `scenario/llm/test_llm_scenarios.py` | 350 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` | 277 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 42 |
 | **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 142 |
 | **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic, extended, llm, datetime 共 4 文件) | 107 |
-| **特殊场景：QDII 时区** | `report/`(qdii_timezone 相关逻辑) | `unit/report/test_qdii_timezone.py`（已计入报告生成 558） | — |
 
 ### 场景测试分组（scenario）
 
@@ -192,7 +200,7 @@ python scripts/test_runner.py --mode scenario,edge
 |:-------|:---------|:--------:|:---------|
 | `llm` | 全部 LLM 相关（unit_llm 331 + scenario_llm 19） | **350** | ~4min |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** | ~2s |
-| `integration` | 集成/端到端流程测试 | 待补充独立标记 | — |
+| `integration` | 集成/端到端流程测试（当前与 scenario 合并统计） | **107**（同 scenario） | ~25s |
 | `edge` | 异常/边界场景 | **39** | ~10s |
 | `data` | 数据正确性验证 | **28** | ~10s |
 
@@ -212,7 +220,7 @@ python scripts/test_runner.py --mode scenario,edge
 | `unit/llm/test_llm.py` | 243 处 | ❌ 不需要 | LLM Manager 编排逻辑，全部 mock |
 | `scenario/llm/test_llm_scenarios.py` | 35 处 | ❌ 不需要 | 场景流程，全部 mock |
 
-> 全部 331 项 `unit_llm` + 19 项 `scenario_llm` 均为 mock 测试，无需真实的 LLM API key。`-m "not llm"` 跳过它们是因为属于 LLM **模块**而非需要真实 API 调用——纯属模块筛选，非依赖检查。
+> 全部 350 项 LLM 测试均为 mock，无需真实 API key。`-m "not llm"` 跳过的是 LLM 模块而非真实 API 依赖。
 
 ### Smoke 测试明细
 
@@ -261,40 +269,31 @@ docs-stm/test-reports/latest/
 ├── verify/
 │   └── report.html       # 合入验证（668 项）
 ├── integration/
-│   └── report.html       # 集成测试
-├── smoke/
-│   └── report.html       # 冒烟测试（24 项）
+│   └── report.html       # 集成测试（同 scenario 107 项）
 ├── edge/
 │   └── report.html       # 边缘场景测试（39 项）
 ├── data/
 │   └── report.html       # 数据正确性验证（28 项）
-└── all/
-    └── report.html       # 全量测试（1938 项）
+├── all/
+│   └── report.html       # 全量测试（1938 项）
+└── smoke/
+    └── report.html       # 冒烟测试（24 项）
 ```
 
 **打开方式**：直接用浏览器打开 `docs-stm/test-reports/latest/index.html`
 
-## 直接使用 pytest（跳过脚本）
+## 直接使用 pytest 组合查询
 
 ```bash
-# 运行指定标记组合
-pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.html
+# 查看指定标记下有哪些测试（不执行）
+pytest src/test/ -m "edge" --collect-only
 
-# 排除 LLM 相关测试（不需要 API key）
-pytest src/test/ -m "not llm" -v
-
-# 运行单个测试文件（按目录分组存放）
+# 运行单个测试文件
 pytest src/test/unit/report/test_category.py -v
 
 # 运行单个测试类
 pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
-```
 
-## 组合查询示例
-
-直接使用 pytest 的 `-m` 参数进行灵活组合：
-
-```bash
 # 冒烟测试（24 项，~2s 验证核心通路）
 pytest src/test/ -m "smoke" -v
 
@@ -304,14 +303,14 @@ pytest src/test/ -m "smoke or edge" -v
 # 除 LLM 外的全部测试
 pytest src/test/ -m "not llm" -v
 
-# 全量业务场景（S1-S20 + T1-T16）
-pytest src/test/ -m "scenario" -v
-
 # 仅 LLM 场景（S11-S20）
 pytest src/test/ -m "scenario_llm" -v
 
 # 基础业务链路 + 日期/时间场景
 pytest src/test/ -m "scenario_basic or scenario_datetime" -v
+
+# 输出 HTML 报告
+pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.html
 ```
 
 ## 测试文件规范
