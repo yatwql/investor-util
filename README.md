@@ -69,31 +69,20 @@ Excel 报告各页签说明、HTML 报告特性、基金业绩评价标准，请
 
 ---
 
-## 常见问题
+## 使用中的常见问题
 
-**Q: 启动后菜单显示乱码？**
-A: 请使用支持 UTF-8 的终端（Windows Terminal 或 VS Code 终端），或运行 `chcp 65001` 切换代码页。
+使用过程中遇到问题？请查阅 [常见问题解答](docs-stm/manuals/faq.md)，按以下分类组织：
 
-**Q: 提示"文件未找到"？**
-A: 菜单 `C` 配置正确的持仓目录，或菜单 `F` 选择正确的文件名。
-
-**Q: 如何强制刷新 LLM 内容？**
-A: 菜单 `L` 会先检查缓存，缓存过期（默认全球政经局势/穿透深度分析 24h / 智囊团深度复盘/持仓体检报告 2h / 财经新闻热点与持仓关联分析 1h）或持仓/指数数据变更时才重新调用 LLM。如需强制刷新，先执行菜单 `[2]` 更新持仓缓存即可清除关联 LLM 缓存（智囊团深度复盘、全球政经局势、持仓体检报告、穿透深度分析均被清除）。
-
-**Q: 报告数据感觉不完整？**
-A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最后重试生成报告。
-
-**Q: 后续如何升级？**
-A: 拉取最新代码后，重新运行启动脚本即可自动更新依赖。
-
-**Q: 能否不配置 LLM 使用程序？**
-A: 可以。菜单 E / H / B 全部不依赖 LLM，仅菜单 L 需要 LLM 配置。
-
-**Q: 如何开启财经新闻热点与持仓关联分析 LLM 关联分析？**
-A: 菜单 `S` 可交互切换各 LLM 模块的启停状态（立即生效），或将 `data/config/llm_settings.json` 中的 `enabled_llm.news_correlation` 设为 `true`。开启后菜单 B / L 生成的报告增加"LLM 关联分析"列，每条新闻获得 LLM 判定的关联度（高/中/低/无关）和原因分析。默认关闭以节省费用。
-
-**Q: 修改配置文件后如何生效？**
-A: 菜单 `R` 刷新配置可重新加载 `config.json`、`llm_settings.json` 及 `llm_key.json`，立即生效无需重启程序。
+- [启动与安装](docs-stm/manuals/faq.md#启动与安装) — 乱码、PowerShell 策略、Python 版本、首次启动慢等
+- [配置相关](docs-stm/manuals/faq.md#配置相关) — 文件未找到、代理、新闻源开关、LLM provider 切换等
+- [持仓格式](docs-stm/manuals/faq.md#持仓格式) — 多账户、混合持仓、代码前缀、成本为 0 等
+- [数据获取](docs-stm/manuals/faq.md#数据获取) — 数据实时性、非交易日、API 失效、网络验证等
+- [LLM 相关](docs-stm/manuals/faq.md#llm-相关) — 费用、报错、缺少章节、强制刷新、截断处理等
+- [报告理解](docs-stm/manuals/faq.md#报告理解) — 穿透、评级算法、浮动盈亏、`--` 含义、QDII 标色等
+- [缓存相关](docs-stm/manuals/faq.md#缓存相关) — 清空缓存、指纹机制、升级兼容等
+- [平台与兼容性](docs-stm/manuals/faq.md#平台与兼容性) — Linux/macOS、迁移、日志查看与轮转等
+- [隐私与安全](docs-stm/manuals/faq.md#隐私与安全) — 数据去向、无统计收集等
+- [实操技巧](docs-stm/manuals/faq.md#实操技巧) — 多格式生成、定时自动化、HTML 样式自定义等
 
 ---
 
@@ -102,6 +91,7 @@ A: 菜单 `R` 刷新配置可重新加载 `config.json`、`llm_settings.json` �
 | 文档 | 说明 |
 |------|------|
 | [快速开始 & 菜单操作](docs-stm/manuals/how-to-start.md) | 启动指南、持仓格式、菜单功能 |
+| [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
 | [配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL |
 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | llm_key.json 字段说明、llm_settings.json 字段说明、LLM 密钥、参数调优、provider 选择 |
 | [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块流程 |

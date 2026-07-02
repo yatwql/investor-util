@@ -137,6 +137,7 @@ investor-util/
 │   │   ├── how-to-config-llm.md      # LLM 配置指引 — llm_key.json / llm_settings.json
 │   │   ├── how-to-use-registry.md    # 中央注册表使用说明
 │   │   ├── datasource-and-folders.md # 数据源一览 + 目录结构（本文档）
+│   │   ├── faq.md                    # 常见问题解答 — 使用中的高频问题，按类别组织
 │   │   └── reports-instruction.md    # 报告文件结构说明
 │   ├── tmp/                          # 临时文件 / 过程文件（git 忽略）
 │   └── managements/                  # 管理文档

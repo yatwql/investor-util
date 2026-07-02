@@ -14,7 +14,7 @@
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/manuals/datasource-and-folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`src/test/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, testplan.md, review-findings.md, changelog.md）
-- **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource-and-folders.md, reports-instruction.md）
+- **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource-and-folders.md, reports-instruction.md, faq.md）
 - **中间文件**：中间过程及设计文件 → `docs-stm/plan/`；除日志以外的临时文件 → `docs-stm/tmp/`。禁止放在全局 `.claude/` 目录下
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功）、`[!]`（部分失败）、`[ERR]`（错误）
 

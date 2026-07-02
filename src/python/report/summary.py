@@ -569,7 +569,7 @@ def write_llm_usage_sheet(
         "缓存命中 Token", "费用", "LLM 缓存", "Thinking",
     ]
 
-    ws, row = _init_llm_usage_sheet(wb, "LLM API 用量")
+    ws, row = _init_llm_usage_sheet(wb, "12.LLM API 用量")
     row = _write_llm_summary_section(ws, row, llm_session_usage)
 
     # 补充 endpoint 到汇总区（如果 llm_session_usage 没有 has_usage，添加在明细上方）

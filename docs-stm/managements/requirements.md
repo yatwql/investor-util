@@ -27,12 +27,12 @@
 | C | 配置持仓信息目录 | 配置持仓文件的存放目录 |
 | F | 配置持仓信息文件名 | 配置持仓文件的文件名 |
 | O | 配置报告输出目录 | 配置报告文件的输出目录（默认 reports） |
-| S | 配置支持LLM的报告分析章节 | 交互切换各 LLM 报告的启用/停用 |
-| R | 刷新配置 | 重新加载 config.json / llm_settings.json / llm_key.json |
 | 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/行业资金流向/分红缓存（含 fund_perf_*、fund_hold_*、fund_benchmarks.json、industry_*、news_*、llm_news_item_*、profit_forecast_*、sector_flow_*、dividend_*） |
 | 2 | 更新持仓类缓存 | 主动更新价格/指数行情，清除关联 LLM 缓存（智囊团深度复盘、全球政经局势、持仓体检报告、穿透深度分析；另：`llm_news_correlation` 由菜单 1 清理） |
 | 3 | 清理过期缓存文件 | 扫描 data/cache/ 目录，删除已过期的缓存文件 |
 | 4 | 查看缓存统计信息 | 显示缓存文件总数/大小/按前缀分类/过期预览 |
+| S | 配置支持LLM的报告分析章节 | 交互切换各 LLM 报告的启用/停用 |
+| R | 刷新配置 | 重新加载 config.json / llm_settings.json / llm_key.json |
 | X | 退出 | 退出程序 |
 
 - R-TUI3. E/H/B/L 操作流程：
@@ -498,7 +498,8 @@ Extended Thinking 详解、定价表等）及本章各模块的完整配置项�
 | API 返回异常/空数据 | 显示 `--` 占位 | 日志记录 WARNING |
 | 缓存文件损坏 | 透明修复 | 自动删除并重新获取 |
 | 配置值异常 | 启动时输出 WARNING | 使用代码默认值兜底 |
-| LLM API Key 未配置 | 跳过 LLM 模块，不阻塞 | 占位文本"本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）" |
+| LLM API Key 未配置 | 显示占位文本"本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）" | 跳过 LLM 模块，不阻塞 |
+| LLM 模块已禁用 | 章节/页签完全跳过，不显示任何内容（含已禁用模块） | `continue` 跳过 / `{# 模块已禁用，完全跳过 #}` |
 | LLM 超时/失败 | 占位"（本节内容生成失败）" | 熔断器自动冷却，支持 fallback_provider 回退 |
 | LLM 输出截断 | 自动增大 max_tokens 1.5× 重试 | 日志 ERROR 提示 |
 | LLM 内容过滤（空返回） | 追加安抚指令重试 | 日志 WARNING |
