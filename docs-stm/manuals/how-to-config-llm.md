@@ -238,16 +238,49 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 - Excel 报告：在页签底部单元格显示
 - TUI 输出框：在框内最后一行显示
 
-#### 5. 会话级用量统计
+#### 5. 会话级用量统计与报告展示
 
-每次 LLM 调用完成后，Token 用量自动累计到会话级统计字典 `_session_usage`（代码：`src/python/llm/session.py`）：
+每次 LLM 调用完成后，Token 用量自动累计到会话级统计字典 `_session_usage`（代码：`src/python/llm/session.py`）。该字典受线程锁保护，支持多模块并发生成时的并发写入。
+
+**数据结构：**
 
 ```
-全局累计：input_tokens + output_tokens + cache_hit_tokens + total_cost
-按模块汇总：per_module[module_key] → {model, input_tokens, output_tokens}
+全局累计
+├── input_tokens        — 累计输入 token
+├── output_tokens       — 累计输出 token
+├── cache_hit_tokens    — 累计缓存命中 token
+├── total_cost          — 累计估算费用
+├── call_count          — API 调用次数（缓存命中不计入）
+├── models              — 去重模型列表
+│
+按模块汇总（per_module）
+├── global_macro        — 全球政经局势
+├── expert_review       — 智囊团深度复盘
+├── health_check        — 持仓体检报告（v0.2.29+）
+├── penetration_deep    — 穿透深度分析（v0.2.30+）
+└── news_correlation    — 新闻 LLM 关联分析（可选）
 ```
 
-> 此统计在程序退出时通过 TUI 展示，也可在报告末尾展示汇总。格式处理函数 `format_session_usage()` 将原始数据转为可直接展示的字典（含 `call_count`、`model_display`、`cost_display` 等字段）。
+**覆盖范围说明：**
+- 会话级统计包含全部 5 个 LLM 子模块，其中 `news_correlation` 仅在 `enabled_llm.news_correlation = true` 时计入
+- 缓存命中：仅记录到 `per_module`（标记 `cached=True`），不计入 `call_count`
+- API 失败：不记录到统计中（失败不计费，也不计入调用次数）
+- 模块已禁用：不产生任何统计记录
+
+**输出链路：**
+
+此统计数据在多个位置展示：
+
+| 输出端 | 展示形式 | 说明 |
+|:-------|:---------|:-----|
+| **Excel 报告** | 独立页签 `12.LLM API 用量` + 汇总页补充区块 | 仅菜单 L |
+| **HTML 报告** | 报告第 11 节（底部） | 仅菜单 L |
+| **TUI 终端** | 一行摘要 | 每次菜单 L 完成时输出 |
+| **调试日志** | `logs/app.log` | 每次 API 调用后记录明细 |
+
+具体格式处理函数为 `format_session_usage()`，将原始数据转为可直接展示的字典（含 `call_count`、`model_display`、`cost_display`、`total_tokens` 等格式化字段）。
+
+> 详情参见 [报告文件结构](../manuals/reports-instruction.md#llm-api-用量页签章节说明页签-12--html-第-11-节) 中"LLM API 用量页签/章节说明"章节。
 
 #### 6. 截断自动重试
 

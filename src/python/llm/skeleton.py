@@ -152,6 +152,7 @@ def _finalize_and_cache(
 
 def _handle_truncation(
     result: str | None,
+    usage: dict | None,
     max_tokens: int,
     system_prompt: str,
     user_prompt: str,
@@ -165,10 +166,10 @@ def _handle_truncation(
     """检测截断并自动增大 max_tokens 重试。
 
     Returns:
-        (result, usage) — 重试后的结果，或原结果（未截断时）
+        (result, usage) — 重试后的结果与用量，或原结果与用量（未截断时）
     """
     if not result or _TRUNCATION_MARKER not in result:
-        return result, None
+        return result, usage
 
     new_max = int(max_tokens * _AUTO_INCREASE_FACTOR)
     logger.warning("输出被截断（max_tokens=%d），自动以 %d 重新生成...", max_tokens, new_max)
@@ -218,7 +219,7 @@ def _generate_llm_content(
                               timeout=timeout, http_client=http_client,
                               max_tokens=max_tokens, config_field=config_field,
                               temperature=temperature, model=model)
-    result, usage = _handle_truncation(result, max_tokens, system_prompt, user_prompt,
+    result, usage = _handle_truncation(result, usage, max_tokens, system_prompt, user_prompt,
                                        llm_config, timeout, http_client, config_field,
                                        temperature, model)
 

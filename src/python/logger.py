@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from logging.handlers import RotatingFileHandler
 
-# 日志文件路径
-_LOG_FILE = "logs/app.log"
+# 日志文件路径：测试期间写入独立文件，避免与运行时日志混淆
+# 检测方式：检查 sys.argv 中是否包含 pytest 调用（在导入阶段即可可靠判断）
+_is_pytest = any("pytest" in arg.lower() for arg in sys.argv[:3])
+_LOG_FILE = "logs/test.log" if _is_pytest else "logs/app.log"
 
 # 日志格式
 _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"

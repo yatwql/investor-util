@@ -49,6 +49,7 @@ from src.python.llm.prompts import (
     _build_news_correlation_summary,
 )
 from src.python.llm.session import _record_per_module
+from src.python.llm.pricing import _estimate_cost
 from src.python.llm.skeleton import (
     _is_llm_module_enabled,
     _generate_llm_content,
@@ -386,6 +387,7 @@ def _merge_llm_analysis(
 def _finalize_news_token_usage(
     batch_usage: dict, llm_config: dict | None, _model: str,
     top_news: list, cached_count: int, news_data: list, analysis_count: int,
+    all_cached: bool = False,
 ) -> dict:
     """计算 Token 用量并记录日志。返回 token_usage dict。"""
     total_in = batch_usage.get("input", 0)
@@ -398,14 +400,27 @@ def _finalize_news_token_usage(
             "output_tokens": total_out,
             "total_tokens": total_in + total_out,
         }
-        if llm_config:
+    # 无论是否有新用量，都记录 per_module（all_cached 时也需标记缓存状态）
+    if llm_config:
+        if total_in > 0 or total_out > 0:
             _log_token_usage(
                 llm_config.get("provider", "unknown"),
                 {"input_tokens": total_in, "output_tokens": total_out},
                 f"{_MN('news_correlation')}（批处理）",
                 model_name=_model,
             )
-            _record_per_module("news_correlation", _model, inp=total_in, out=total_out)
+        _cost_val = 0.0
+        _cost = _estimate_cost(_model, total_in, total_out, cache_hit_input_tokens=0)
+        if _cost != "-":
+            try:
+                _cost_val = float(_cost.lstrip("$¥€£"))
+            except ValueError:
+                pass
+        _endpoint = llm_config.get("endpoint", "") or ""
+        _record_per_module(
+            "news_correlation", _model, inp=total_in, out=total_out,
+            cached=all_cached, cost=_cost_val, endpoint=_endpoint,
+        )
 
     fresh_count = len(top_news) - cached_count
     logger.info(
@@ -467,6 +482,7 @@ def enhance_news_correlation(
     enriched, analysis_count = _merge_llm_analysis(news_data, analysis_by_orig_idx)
     token_usage = _finalize_news_token_usage(
         batch_usage, llm_config, _model, top_news, cached_count, news_data, analysis_count,
+        all_cached=all_cached,
     )
 
     return (enriched, all_cached, token_usage)

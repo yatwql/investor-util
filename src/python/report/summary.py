@@ -321,8 +321,8 @@ def write_llm_module_status_block(ws: Worksheet) -> None:
         FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
     }
 
-    # 仅关注 4 个有独立页签的 LLM 模块
-    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    # 关注所有 LLM 模块（含集成在新闻页签中的 news_correlation）
+    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]
 
     # 读取 per_module 数据
     _session = get_session_usage()

@@ -4,6 +4,35 @@
 
 ---
 
+## [0.2.59] - 2026-07-02
+
+### Fixed
+- **🐛 `_handle_truncation` 丢弃 usage（R-145）**：`skeleton.py:171` 非截断路径下 `return result, None` 应改为 `return result, usage`。导致 `_finalize_and_cache` 中 `if usage:` 整个块被跳过，`_record_per_module()` 和 HTML 页脚 Token 信息均未执行。影响：LLM API 用量模块明细全部显示 `—`，各章节底部无"模型：X | Token 用量：..." 信息。修复：增加 `usage` 参数透传。
+- **🐛 `news_correlation` 遗漏在 LLM 模块明细表（R-146）**：`excel_generator.py:281` / `html_writer.py:497` / `summary.py:325` 三处硬编码 `MODULE_KEYS = [4个模块]`，漏了 `"news_correlation"`。修复：三处均添加 `"news_correlation"`。同步修复 `html_writer.py:564` `module_disabled` 字典循环。
+- **🐛 缓存模块 Token 显示为 `—`（R-147）**：HTML 模板 `report_template.html:893-896` 使用 `{% if _mi.total_tokens %}`，Jinja2 中 `0` 为 falsy，缓存模块 Token=0 时显示 `—`。修复：改为 `{% if _mi.status == "unknown" %}—{% else %}{{ ... }}{% endif %}`。
+- **🐛 基金业绩"较差"评级颜色错误（深绿→浅绿）**：`fund_performance.py` 中"较差"评级误用 `GREEN_FONT`（#009900），与 footnote 承诺的"深绿"不符。HTML 模板 `report_template.html` 第 536 行**遗漏"较差"条件分支**，导致该评级单元格无任何颜色样式，保持默认黑色。修复：`styles.py` 新增 `DARK_GREEN_FONT`（#006400）；`fund_performance.py` 改为 `DARK_GREEN_FONT`；HTML 模板补齐 `{{ ' color: #006400; font-weight: 600;' if p['rating_tag'] == '较差' }}`。
+- **🐛 `_write_module_data_rows` 缺少 `Border`/`Side` 导入**：函数内使用 `Border()` / `Side()` 但未导入，正常执行因 `write_llm_module_status_block` 先执行导入了这些符号而掩盖。独立调用时抛出 `NameError`。修复：函数内添加 `from openpyxl.styles import Border, Side`。
+- **🐛 `test_mixed_cached_and_success` 断言错误**：测试 `assertNotIn("Extended Thinking", all_text)` 但 "智囊团深度复盘" 模块启用了 Thinking，`Extended Thinking` 正确出现在输出中。修复：改为 `assertEqual(all_text.count("Extended Thinking"), 1)` 精确计数。
+
+### Added
+- **`test_skeleton.py::TestHandleTruncation`**（3 项新测试）：非截断保留 usage、None 保留 usage、空字符串保留 usage。直接验证 `_handle_truncation` 的核心契约。
+- **`test_summary.py::TestWriteModuleDataRows`**（6 项新测试）：缓存命中行渲染、成功+Thinking 行渲染、禁用行渲染、失败行渲染、空 status_label 跳过、4 状态混合行序列验证。覆盖 Excel 单元格级渲染逻辑（Token 格式化、费用展示、✓/— 标记）。
+- **`styles.py::DARK_GREEN_FONT`**：深绿色字体常量 `Font(color="006400")`，用于基金业绩"较差"评级标色。
+
+### Changed
+- **`logger.py`：测试日志写入 `logs/test.log`** — 通过 `sys.argv` 检测 pytest 环境，测试期间日志写入独立文件，避免与运行时 `logs/app.log` 混淆。
+- **`test_html_writer.py` 测试隔离增强** — `TestWriteHtmlReportLlmType.setUp/tearDown` 保存并清理 `_LLM_MODULE_FAILURE` 全局状态，消除前序测试跨类残留。模块明细计数断言从 `4` 更新为 `5`。
+- **`_finalize_news_token_usage` 记录增强** — 新增 `all_cached` 参数，全缓存场景也调用 `_record_per_module`；新增 `_estimate_cost` 计算费用；传递 `endpoint` 字段。
+- **`plan.md`**：新增 P. 业务场景测试增强迭代方向（S11-S17 LLM 全场景组合 + 异常/Edge Case + 输出格式一致性验证）。
+- **`testplan.md`**：业务场景表扩展 S11-S17（LLM 混合缓存/失败/Thinking/禁用/断网/部分超期）；迭代列表新增 v0.2.59。
+
+### Tests
+- 全量 **287 passed**（+12），9 subtests passed。
+- `test_skeleton.py` 从 2 项扩充至 **5 项**（+3）
+- `test_html_writer.py` 模块计数 4→5，隔离修复
+
+---
+
 ## [0.2.58] - 2026-07-02
 
 ### Added

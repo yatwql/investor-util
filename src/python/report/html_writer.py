@@ -494,7 +494,7 @@ def _build_module_info_list(
         FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
     }
 
-    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]
     llm_module_info: list[dict[str, Any]] = []
     for mk in _MODULE_KEYS:
         entry: dict[str, Any] = {"key": mk, "name": _NAMES.get(mk, mk)}
@@ -562,7 +562,7 @@ def _render_llm_module_info(
 
     module_disabled = {
         mk: _llm_failure.get(mk) == FAIL_REASON_DISABLED
-        for mk in ["global_macro", "expert_review", "health_check", "penetration_deep"]}
+        for mk in ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]}
 
     llm_module_info = _build_module_info_list(_llm_failure, _per_module)
 

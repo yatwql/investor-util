@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-02（v0.2.58 — 指数双链路 fallback + 资料源表更新）
+最后更新：2026-07-02（v0.2.59 — 扩展会话级 Token 追踪与用量展示设计，对齐 requirements.md）
 
 ---
 
@@ -45,8 +45,6 @@
 | 基金持仓数据 | 天天基金 `fundf10.eastmoney.com` | — | `tiantian.py` |
 | A 股指数 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `tencent.py` |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析） | 腾讯财经 `qt.gtimg.cn` | `sina.py` |
-
-> 指数数据由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存。
 | 财经新闻（新浪） | 新浪财经 `feed.mix.sina.com.cn` | — | `sina_news.py` |
 | 财经新闻（东方财富） | 东方财富 `np-weblist.eastmoney.com/comm/web/getFastNewsList` | — | `eastmoney_news.py` |
 | 财经新闻（财联社） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | — | `cls_news.py` |
@@ -56,6 +54,8 @@
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `akshare_extras.py` |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `akshare_extras.py` |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `akshare_extras.py` |
+
+> 指数数据由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存。
 
 > 各新闻源的完整端点格式及通用数据源说明参见 [数据源一览](../manuals/datasource-and-folders.md)。
 
@@ -164,7 +164,7 @@ investor-util/
 |------|------|
 | `api.py` | API 调用路由 (Claude/OpenAI)、重试、截断检测、熔断器集成 |
 | `prompts.py` | System Prompt 常量与构建函数 |
-| `generators.py` | LLM 生成编排（5 模块 + 全量生成） |
+| `generators.py` | LLM 生成编排（4+1 模块：4 个 LLM 分析模块 + 可选的新闻关联分析） |
 | `pricing.py` | 模型定价加载、费用估算 |
 | `session.py` | 会话用量累计、追踪 |
 | `circuit_breaker.py` | 端点熔断器 |
@@ -220,12 +220,215 @@ payload["output_config"] = {"effort": "high"}   # "low" / "medium" / "high" / "m
 
 `llm/circuit_breaker.py` 实现端点级熔断：连续 5 次失败后熔断 60 秒，半开状态允许 1 次探测。通过 `_cb_is_open()` / `_cb_record_failure()` / `_cb_record_success()` 暴露接口，`_call_llm_with_retry()` 在每次请求前检查熔断状态。
 
-### 会话级 Token 追踪
+### 会话级 Token 追踪与用量展示
 
-`llm/session.py` 维护全局 `_session_usage` 字典，每次 LLM 调用完成后累计：
-- 全局：input_tokens + output_tokens + cache_hit_tokens + total_cost
-- 按模块：per_module[module_key] → {model, input_tokens, output_tokens, ...}
-- 报告末尾通过 `format_session_usage()` 格式化输出
+#### 数据收集架构
+
+`llm/session.py` 维护全局线程安全（`threading.Lock`）的 `_session_usage` 字典，作为单个报告生成会话中所有 LLM 调用的累计存储器。
+
+**数据结构：**
+```python
+_session_usage: dict[str, Any] = {
+    "input_tokens": 0,          # 累计输入 token
+    "output_tokens": 0,         # 累计输出 token
+    "cache_hit_tokens": 0,      # 累计缓存命中 token
+    "total_cost": 0.0,          # 累计费用
+    "currency": "CNY",          # 货币标识
+    "model": "未指定",           # 最近使用的模型名
+    "models": [],               # 所有出现过的模型名（去重）
+    "call_count": 0,            # API 调用次数（缓存命中不计入）
+    "per_module": {},           # 按模块细分
+}
+```
+
+**模块级记录（`per_module`）** — 每个 LLM 子模块一个条目，共 5 个键：
+
+| 模块键 | 覆盖范围 | 说明 |
+|:------|:---------|:-----|
+| `global_macro` | 全球政经局势 | 始终启用 |
+| `expert_review` | 智囊团深度复盘 | 始终启用 |
+| `health_check` | 持仓体检报告 | v0.2.29+ |
+| `penetration_deep` | 穿透深度分析 | v0.2.30+ |
+| `news_correlation` | 新闻 LLM 关联分析 | 仅 `enabled_llm.news_correlation = true` 时启用 |
+
+每个模块条目包含：
+```python
+{
+    "model": str,              # 实际使用的模型名
+    "input_tokens": int,       # 该模块输入 token
+    "output_tokens": int,      # 该模块输出 token
+    "cache_hit_tokens": int,   # 缓存命中 token
+    "cached": bool,            # 是否来自缓存（无实际 API 调用）
+    "thinking": bool,          # 是否启用 Extended Thinking
+    "cost": float,             # 该模块费用估算
+    "endpoint": str,           # API 端点 URL
+}
+```
+
+#### 数据收集流程
+
+```
+API 调用响应 (usage dict)
+    │
+    ├─► _process_success_response()          [api.py]
+    │       │
+    │       ├─► _track_session_usage()        [session.py]
+    │       │     ├─ input_tokens += usage.input_tokens
+    │       │     ├─ output_tokens += usage.output_tokens
+    │       │     ├─ cache_hit_tokens += cache_read
+    │       │     ├─ call_count += 1
+    │       │     ├─ models.append(model)     (去重)
+    │       │     └─ total_cost += _estimate_cost(...)
+    │       │
+    │       └─► _record_per_module()          [session.py]
+    │             └─ per_module[key] ← {model, tokens, cached=False, ...}
+    │
+    ├─► _handle_cache_hit()                   [skeleton.py]
+    │       └─► _record_per_module()           [session.py]
+    │             └─ per_module[key] ← {model, tokens, cached=True, ...}
+    │                                           (调用次数不计入 call_count)
+    │
+    ├─► _precheck_one_cache()                 [generators.py]
+    │       └─► _record_per_module()           [session.py]
+    │
+    └─► _finalize_news_token_usage()          [generators.py]
+            └─► _record_per_module(key="news_correlation")
+```
+
+**覆盖范围说明：**
+- 每次 **成功的 API 调用**（包括重试后的成功响应）均触发 `_track_session_usage()` 和 `_record_per_module()`
+- **缓存命中**（从缓存文件读取 LLM 结果而非调用 API）仅触发 `_record_per_module()`，标记 `cached=True`，不计入 `call_count`
+- **模块失败/禁用**（API Key 未配置、熔断器打开、`enabled_llm.{key}=false`）不产生任何用量数据
+- **新闻 LLM 关联分析**（`news_correlation`）由 `generators.py` 中 `_finalize_news_token_usage()` 单独汇总，以兼容其在新闻处理流程中的独立缓存和批处理逻辑
+
+#### 用量数据到报告输出
+
+```
+_session_usage (dict)
+    │
+    ├─► format_session_usage()               [session.py]
+    │     返回展示用格式化字典：
+    │     {
+    │       "has_usage": bool,         # 是否有任何调用记录
+    │       "call_count": int,         # API 调用次数
+    │       "model_display": str,      # "deepseek-v4-flash" 或 "modelA / modelB"
+    │       "input_tokens": str,       # 格式化为 "25,432"
+    │       "output_tokens": str,
+    │       "total_tokens": str,       # 输入+输出
+    │       "cache_hit_tokens": str,   # 有条件显示（>0 时）
+    │       "cost": float,
+    │       "cost_display": str,       # "¥0.0456"
+    │       "currency": str,
+    │       "per_module": dict,        # 各模块原始数据（由消费方自行格式化为明细表）
+    │     }
+    │
+    ├─► Excel 报告                          [excel_generator.py + summary.py]
+    │      _build_llm_usage_sheet()
+    │        → get_session_usage()
+    │        → format_session_usage()
+    │        → write_llm_usage_sheet()    写入页签 12
+    │        → write_llm_usage_block()    追加到汇总页
+    │        → write_llm_module_status_block()  追加模块状态
+    │
+    ├─► HTML 报告                           [html_writer.py + template]
+    │      _render_llm_module_info()
+    │        → _build_module_info_list()   构建模块明细（含状态标签）
+    │        → get_session_usage()
+    │        → format_session_usage()
+    │        → Jinja2 模板变量：llm_session_usage / llm_module_info / llm_endpoint
+    │
+    └─► TUI 终端                            [tui_handlers.py]
+           _print_llm_session_usage()
+             → f"本会话 LLM 累计：{calls} 次调用，{total_tok:,} tokens，费用 {symbol}{cost:.4f}"
+```
+
+#### 用量展示与 LLM 分析章节的关系
+
+LLM API 用量页签/章节（页签 12 / HTML 底部）**不是独立的 LLM 生成模块**，而是对同一会话中所有 LLM 分析章节调用量的被动统计汇总。
+
+| 方面 | 设计决策 |
+|:-----|:---------|
+| **触发条件** | 仅菜单 L（全系列完整版报告），与 LLM 分析章节共进退 |
+| **无用量不显示** | 无任何 LLM 调用时（API Key 未配置或所有模块已禁用），该页签/章节整个跳过不渲染 |
+| **全缓存场景** | 所有模块均为缓存命中（无实际 API 调用），汇总区标注"无新增 API 调用，数据全部来自缓存"，模块明细表正常显示 |
+| **与 LLM 章节的物理位置** | Excel 中作为页签 12（最后一位），HTML 中在所有 LLM 分析章节之后渲染 |
+| **新闻 LLM 关联分析** | 当 `enabled_llm.news_correlation = true` 时，其 token 使用量计入 `per_module["news_correlation"]`，与另外 4 个 LLM 主模块在同一明细表中展示 |
+
+#### 展示格式
+
+**汇总区字段（顶部）：**
+
+| 字段 | 数据来源 | 格式 |
+|:-----|:---------|:-----|
+| API 调用次数 | `call_count` | 整数 |
+| 模型 | `models` 去重列表 | `model1 / model2` 格式 |
+| 输入 Token | `input_tokens` | 千分位格式化 |
+| 输出 Token | `output_tokens` | 千分位格式化 |
+| 总 Token | `input_tokens + output_tokens` | 千分位格式化 |
+| 缓存命中 Token | `cache_hit_tokens`（>0 显示） | 千分位格式化 |
+| 累计费用 | `total_cost` + 货币符号 | `¥0.0456` |
+
+**模块明细表字段（每模块一行）：**
+
+| 列 | 数据来源 | Excel 格式 | HTML 格式 |
+|:---|:---------|:-----------|:----------|
+| 模块 | 模块键映射中文名 | 文本 | 文本 |
+| 状态 | `per_module[key].cached` + 模块失败标记 | 带填充色 | 颜色标签（成功/缓存/失败/禁用） |
+| 模型 | `per_module[key].model` | 文本 | 文本 |
+| 输入 Token | `per_module[key].input_tokens` | 千分位 | 千分位 |
+| 输出 Token | `per_module[key].output_tokens` | 千分位 | 千分位 |
+| 缓存命中 Token | `per_module[key].cache_hit_tokens` | 千分位或 `—` | 同左 |
+| 费用 | `per_module[key].cost` | 格式化货币或"已计入原调用" | 同左 |
+| LLM 缓存 | `per_module[key].cached` | ✓ 或 — | ✓ 或 — |
+| Thinking | `per_module[key].thinking` | ✓ 或 — | ✓ 或 — |
+
+**状态标签颜色规范：**
+
+| 状态 | 含义 | Excel 填充色 | HTML 标签色 |
+|:-----|:-----|:------------|:------------|
+| ✅ 成功 | 有实际 API 调用且成功返回 | #E8F5E9（浅绿） | #27ae60（绿） |
+| 📦 缓存 | 结果来自缓存文件，无实际 API 调用 | —（默认） | #2e86c1（蓝） |
+| ⛔ 失败 | API 调用失败，返回占位文本 | #FFEBEE（浅红） | #e74c3c（红） |
+| 🚫 已禁用 | `enabled_llm.{key} = false`，模块被跳过 | #F5F5F5（浅灰） | #95a5a6（灰） |
+
+#### 定价匹配规则
+
+`llm/pricing.py` 中 `_estimate_cost()` 按以下优先级匹配模型定价：
+
+1. 精确匹配（模型全名小写 → 定价表中同名）
+2. 前缀匹配（`deepseek-v4-flash-xxx` → `deepseek-v4-flash`）
+3. 均不匹配 → 回退到 `MODEL_PRICING` 中的 `"default"` 费率
+
+费用计算（元/百万 token）：
+```
+费用 = (input_tokens - cache_hit_tokens) / 1_000_000 * input_rate
+     + output_tokens / 1_000_000 * output_rate
+     + cache_hit_tokens / 1_000_000 * input_cache_hit_rate
+```
+
+默认定价表见 `src/python/constants.py:MODEL_PRICING`，用户可通过 `llm_settings.json` 的 `pricing` 字段覆盖。货币符号通过 `pricing.currency` 配置（默认 `CNY → ¥`）。
+
+#### 会话生命周期
+
+```
+main.py 入口（菜单 L 选中文件后）
+  │
+  ├─ reset_session_usage(config)     // 清空 _session_usage，重新加载定价
+  │
+  ├─ generate_all_llm_content(...)   // 并发生成 4+1 个 LLM 模块
+  │     ├─ 每个模块调用 → _track + _record（API 调用或缓存命中）
+  │     └─ ...
+  │
+  ├─ generate_excel_report(...)      // 写入页签 12 + 汇总页补充区块
+  │     └─ _build_llm_usage_sheet()
+  │
+  ├─ write_html_report(...)          // 渲染 HTML 底部
+  │     └─ _render_llm_module_info()
+  │
+  └─ _print_llm_session_usage()      // TUI 一行摘要
+```
+
+每次菜单 L 生成报告均为独立会话。会话开始时 `reset_session_usage()` 清空数据并从 `llm_settings.json` 重新加载定价表和货币配置。
 
 ---
 

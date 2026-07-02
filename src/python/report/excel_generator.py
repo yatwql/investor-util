@@ -278,7 +278,7 @@ def _build_llm_usage_sheet(wb: Any, prog: ProgressReporter) -> None:
     all_failure = dict(_LLM_MODULE_FAILURE)
     names_map = get_llm_module_names()
 
-    MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]
     DISPLAY_REASON = {
         "not_configured": "LLM 未配置",
         "api_error": "LLM API 调用失败",

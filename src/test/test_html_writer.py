@@ -345,9 +345,17 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         self.mock_detail.yesterday_close = 54.0
         self.mock_detail.profit_rate = 1.0
         self._tmp = tempfile.mkdtemp(prefix="test_html_")
+        # 清理前序测试在 _LLM_MODULE_FAILURE 中残留的状态
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE
+        self._saved_llm_failure = dict(_LLM_MODULE_FAILURE)
+        _LLM_MODULE_FAILURE.clear()
 
     def tearDown(self):
         shutil.rmtree(self._tmp, ignore_errors=True)
+        # 恢复 _LLM_MODULE_FAILURE 原始状态
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE
+        _LLM_MODULE_FAILURE.clear()
+        _LLM_MODULE_FAILURE.update(self._saved_llm_failure)
 
     def _run_with_mocks(self, enable_llm=True):
         """用 ExitStack 统一管理 9 个补丁，调用 write_html_report 并返回 mock_llm。"""
@@ -474,8 +482,8 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         self.assertIsNone(kwargs["penetration_deep"])
         # llm_session_usage 为 None（未获取用量）
         self.assertIsNone(kwargs["llm_session_usage"])
-        # llm_module_info 仍有默认的4条记录（状态为 unknown）
-        self.assertEqual(len(kwargs["llm_module_info"]), 4)
+        # llm_module_info 仍有默认的5条记录（状态为 unknown，含 news_correlation）
+        self.assertEqual(len(kwargs["llm_module_info"]), 5)
         for mi in kwargs["llm_module_info"]:
             self.assertEqual(mi["status"], "unknown")
             self.assertEqual(mi["status_label"], "")
@@ -637,7 +645,7 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
         """llm_enabled_flag=False → 所有模块状态为 unknown，无用量数据。"""
         llm_module_info, llm_endpoint, module_disabled, llm_session_usage = self._call(
             llm_enabled_flag=False)
-        self.assertEqual(len(llm_module_info), 4)
+        self.assertEqual(len(llm_module_info), 5)
         for mi in llm_module_info:
             self.assertEqual(mi["status"], "unknown")
         self.assertEqual(llm_endpoint, "")
