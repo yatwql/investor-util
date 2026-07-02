@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-02（v0.2.62 — pytest 标记层级体系 + 测试文件目录分组搬迁）
+最后更新：2026-07-03（v0.2.66 — TUI 缺省菜单选项可配置 + 全手册内部核对）
 
 ---
 
@@ -27,6 +27,7 @@
 | 菜单交互 | 菜单定义、渲染、导航 | `src/python/tui_menu.py` |
 | 菜单功能执行 | 命令处理器、各功能入口 | `src/python/tui_handlers.py` |
 | 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config.py` |
+| 中央注册表 | 数据模块的 name/缓存前缀/TTL/分组/LLM Settings 键名统一注册与查询 | `src/python/registry.py` |
 | 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache.py` |
 | 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher/` |
 | 持仓读取 | xlsx 解析、多工作表、列校验 | `src/python/reader.py` |
@@ -143,11 +144,11 @@ investor-util/
 │   │   ├── tui.py                # 键盘输入封装
 │   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
 │   │   └── tui_menu.py           # 菜单交互
-│   └── test/                     # 测试（按标记分组目录，1938+ passed）
+│   └── test/                     # 测试（按标记分组目录，≈1938+ passed）
 │       ├── conftest.py           # pytest 配置 + 19 个分层标记注册
 │       ├── helpers.py            # 测试辅助工具
-│       ├── unit/                 # 单元测试（8 子组，1810 项）
-│       ├── scenario/             # 场景测试（4 子组，107 项）
+│       ├── unit/                 # 单元测试（8 子组，≈1810 项）
+│       ├── scenario/             # 场景测试（4 子组，≈107 项）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志
