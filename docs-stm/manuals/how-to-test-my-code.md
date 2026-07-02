@@ -22,17 +22,20 @@ python scripts/test_runner.py --help
 # 运行全量测试（默认）
 python scripts/test_runner.py
 
-# 仅运行单元测试
+# 全量单元测试（含 edge/data）
 python scripts/test_runner.py --mode unit
+
+# 常规单元测试（排除 edge/data）
+python scripts/test_runner.py --mode standard
+
+# 快速回归 — 提交前验证（scenario 107 项，~25s）
+python scripts/test_runner.py --mode regression
+
+# 合入验证 — PR 前检查（场景+核心模块 668 项，~10min）
+python scripts/test_runner.py --mode verify
 
 # 仅运行业务场景测试
 python scripts/test_runner.py --mode scenario
-
-# 仅运行集成测试
-python scripts/test_runner.py --mode integration
-
-# 仅运行回归测试（P0-P2）
-python scripts/test_runner.py --mode regression
 
 # 仅运行边缘/异常场景测试
 python scripts/test_runner.py --mode edge
@@ -45,13 +48,15 @@ python scripts/test_runner.py --coverage
 
 | `--mode` 值 | pytest 标记 | 覆盖范围 | 典型耗时 |
 |:------------|:------------|:---------|:---------|
-| `unit` | `not (edge or data)` | 单元测试（排除 edge/data 标记） | ~25min |
+| `unit` | `unit` | 全量单元（含 edge/data 标记，1810 项） | ~25min |
+| `standard` | `unit and not (edge or data)` | 常规单元（排除 edge/data） | ~25min |
 | `scenario` | `scenario` | §1.3 + §1.6 全量业务场景（S1-S20 + T1-T16，107 项） | ~25s |
-| `integration` | `scenario or integration` | 集成/端到端流程测试（含场景标记） | ~10s（目前未标注） |
+| **`regression`** | `scenario` | **提交前极速验证（同 scenario 107 项）** | **~25s** |
+| **`verify`** | `scenario or unit_core or unit_providers or unit_fetcher` | **合入验证（场景+核心/数据源/管道 668 项）** | **~10min** |
 | `edge` | `edge` | §1.5 异常/边界场景（39 项） | ~10s |
 | `data` | `data` | 数据正确性验证（28 项） | ~10s |
-| `regression` | `not (edge or data)` | 提交前验证（同 unit） | ~25min |
-| `all` | 无限制 | 全量 1938 测试 | ~26min |
+| `integration` | `scenario or integration` | 集成/端到端流程测试（含场景标记） | ~10s（待补充） |
+| `all` | 无限制 | 全量 1938 项 | ~26min |
 
 > **注意**：`smoke` 标记已在 `conftest.py` 注册但尚未分配测试，后续新增测试时逐步补上标记即可自动生效。`edge` 和 `data` 标记已在对应测试类/方法上使用。`datetime` 标记已废弃，由 `scenario_datetime` 替代。
 

@@ -34,46 +34,58 @@ _SRC_DIR = os.path.join(_PROJECT_ROOT, "src", "test")
 
 MODES: dict[str, dict] = {
     "unit": {
-        "marker": "not (edge or data)",
-        "desc": "单元测试（排除 edge/data 标记测试）",
+        "marker": "unit",
+        "desc": "全量单元测试（含 edge/data，1810 项）",
         "timeout_sec": 1800,
         "order": 1,
+    },
+    "standard": {
+        "marker": "unit and not (edge or data)",
+        "desc": "常规单元测试（排除 edge/data 标记）",
+        "timeout_sec": 1800,
+        "order": 2,
     },
     "scenario": {
         "marker": "scenario",
         "desc": "业务场景集成测试（S1-S20）",
         "timeout_sec": 300,
-        "order": 2,
+        "order": 3,
+    },
+    "regression": {
+        "marker": "scenario",
+        "desc": "回归测试（场景 107 项，~25s 提交前极速验证）",
+        "timeout_sec": 120,
+        "order": 4,
+    },
+    "verify": {
+        "marker": "scenario or unit_core or unit_providers or unit_fetcher",
+        "desc": "合入验证（场景+核心模块 668 项，~10min）",
+        "timeout_sec": 1200,
+        "order": 5,
     },
     "integration": {
         "marker": "scenario or integration",
         "desc": "集成/端到端流程测试（场景+集成标记）",
         "timeout_sec": 300,
-        "order": 3,
+        "order": 6,
     },
     "edge": {
         "marker": "edge",
         "desc": "边缘/异常场景测试",
         "timeout_sec": 300,
-        "order": 4,
+        "order": 7,
     },
     "data": {
         "marker": "data",
         "desc": "数据正确性验证测试",
         "timeout_sec": 60,
-        "order": 5,
-    },
-    "regression": {
-        "marker": "not (edge or data)",
-        "desc": "回归测试（P0-P2，排除 edge/data）",
-        "timeout_sec": 1800,
-        "order": 6,
+        "order": 8,
     },
     "all": {
         "marker": "",
-        "desc": "全量测试",
+        "desc": "全量测试（1938 项）",
         "timeout_sec": 2400,
-        "order": 7,
+        "order": 9,
     },
 }
 
