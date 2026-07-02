@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-03（v0.2.66 — TUI 缺省菜单选项可配置 + 全手册内部核对 + 技术文档优化）
+最后更新：2026-07-03（v0.2.66 — 代码反查修正：fetcher/news.py 已移除/熔断3次/链路径/结构优化）
 
 ---
 
@@ -213,7 +213,7 @@ Provider Chain 注册表（registry.py）
 尝试最近 7 天内过期缓存（降级）
 ```
 
-- **默认优先级**硬编码在 `registry._PROVIDER_CHAIN` 中，`preferred_provider` 可在 `config.json` 中手动将某类型首选调整到链首
+- **默认优先级**硬编码在 `fetcher/chain.py:_DEFAULT_CHAINS` 中，`preferred_provider` 可在 `config.json` 中手动将某类型首选调整到链首
 - 失败检测：空返回、HTTP 错误、JSON 解析异常均视为失败触发递补
 - 全链路失败 → 尝试过期缓存降级 → 仍失败则抛异常由调用方处理
 
@@ -226,7 +226,6 @@ Provider Chain 注册表（registry.py）
 | `price.py` | 股票/基金最新价 | tencent, eastmoney | `price_*` |
 | `index.py` | A 股/美股指数 | tencent, sina | `index_*` |
 | `fund.py` | 基金排名/持仓/基准 | tiantian, eastmoney | `fund_perf_*`, `fund_hold_*`, `fund_benchmarks` |
-| `news.py` | 5 源新闻并发抓取 | sina_news, eastmoney_news, cls_news, wallstreetcn_news, akshare_news | `news_*` |
 | `industry.py` | 行业分类+概念板块 | eastmoney_industry | `industry_*` |
 
 - **并行预热**：`preload_cache()` 对 preload 组（6 模块）使用 `ThreadPoolExecutor` 并行获取，减少串行等待
@@ -329,7 +328,7 @@ payload["output_config"] = {"effort": "high"}   # "low" / "medium" / "high" / "m
 
 ### 熔断器（Circuit Breaker）
 
-`llm/circuit_breaker.py` 实现端点级熔断：连续 5 次失败后熔断 60 秒，半开状态允许 1 次探测。通过 `_cb_is_open()` / `_cb_record_failure()` / `_cb_record_success()` 暴露接口，`_call_llm_with_retry()` 在每次请求前检查熔断状态。
+`llm/circuit_breaker.py` 实现端点级熔断：连续 3 次失败后熔断 60 秒，半开状态允许 1 次探测。通过 `_cb_is_open()` / `_cb_record_failure()` / `_cb_record_success()` 暴露接口，`_call_llm_with_retry()` 在每次请求前检查熔断状态。
 
 ### 会话级 Token 追踪与用量展示
 
