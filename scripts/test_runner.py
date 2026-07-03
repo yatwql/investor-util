@@ -35,7 +35,7 @@ _SRC_DIR = os.path.join(_PROJECT_ROOT, "src", "test")
 MODES: dict[str, dict] = {
     "unit": {
         "marker": "unit",
-        "desc": "全量单元测试（含 edge/data，1888 项）",
+        "desc": "全量单元测试（含 edge/data，1993 项）",
         "timeout_sec": 1800,
         "order": 1,
     },
@@ -47,31 +47,31 @@ MODES: dict[str, dict] = {
     },
     "scenario": {
         "marker": "scenario",
-        "desc": "业务场景集成测试（S1-S20 + T1-T16，143 项）",
+        "desc": "业务场景集成测试（S1-S28 + T1-T21，207 项）",
         "timeout_sec": 300,
         "order": 3,
     },
     "regression": {
         "marker": "scenario",
-        "desc": "回归测试（场景 143 项，~25s 提交前极速验证）",
+        "desc": "回归测试（场景 207 项，~30s 提交前极速验证）",
         "timeout_sec": 120,
         "order": 4,
     },
     "verify": {
         "marker": "scenario or unit_core or unit_providers or unit_fetcher",
-        "desc": "合入验证（场景+核心模块 718 项，~10min）",
+        "desc": "合入验证（场景+核心模块 824 项，~12min）",
         "timeout_sec": 1200,
         "order": 5,
     },
     "integration": {
         "marker": "scenario or integration",
-        "desc": "集成测试（场景+模块契约/缓存/TUI 路由 168 项）",
+        "desc": "集成测试（场景+模块契约/缓存/TUI 路由 232 项）",
         "timeout_sec": 600,
         "order": 6,
     },
     "edge": {
         "marker": "edge",
-        "desc": "边缘/异常场景测试（93 项）",
+        "desc": "边缘/异常场景测试（198 项）",
         "timeout_sec": 300,
         "order": 7,
     },
@@ -83,7 +83,7 @@ MODES: dict[str, dict] = {
     },
     "all": {
         "marker": "",
-        "desc": "全量测试（2056 项）",
+        "desc": "全量测试（2225 项）",
         "timeout_sec": 2400,
         "order": 9,
     },

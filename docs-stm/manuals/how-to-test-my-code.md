@@ -150,6 +150,7 @@ python scripts/test_runner.py --mode scenario,edge
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
 按不同的 `--mode` / pytest 标记统计当前（2026-07-04）测试覆盖规模：
+> 场景测试因 Z1（特殊品种）+ Z4（时间补充）新增，从 143 增至 207；单元/集成同步扩展，全量从 2056 增至 2225。
 
 ### 模式对应测试量
 
@@ -157,13 +158,13 @@ python scripts/test_runner.py --mode scenario,edge
 |:------------|:--------:|:---------|
 | `unit` | 1993 | ~25min |
 | `standard` | 1730 | ~25min |
-| `scenario` | 143 | ~25s |
-| `regression` | 143 | ~25s |
-| `verify` | 718 | ~10min |
-| `integration` | 168（场景 143 + 模块契约/缓存/TUI 25） | ~35s |
+| `scenario` | 207 | ~30s |
+| `regression` | 207 | ~30s |
+| `verify` | 824 | ~12min |
+| `integration` | 232（场景 207 + 模块契约/缓存/TUI 25） | ~40s |
 | `edge` | 198 | ~15s |
 | `data` | 65 | ~10s |
-| `all` | 2198 | ~26min |
+| `all` | 2225 | ~26min |
 | `smoke` | 24 | ~2s |
 
 ### 功能域对应测试源
@@ -180,19 +181,21 @@ python scripts/test_runner.py --mode scenario,edge
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` | 287 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 45 |
 | **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 142 |
-| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic, resilience, llm, datetime 共 4 文件) | 159 |
+| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic, resilience, llm, datetime 共 4 文件) | 207 |
 
 ### 场景测试分组（scenario）
 
 | 标记 | 覆盖场景 | 覆盖项数 | 典型耗时 |
 |:-------|:---------|:--------:|:---------|
-| `scenario`（父标记） | S0a-S0d + S1-S20 + T1-T16 全量业务场景 | **159** | ~25s |
-| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d | 30 | ~3s |
+| `scenario`（父标记） | S0a-S0d + S1-S28 + T1-T21 全量业务场景 | **207** | ~30s |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S28 特殊品种 | 57 | ~5s |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | — |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | — |
 | │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 | — |
 | │  ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 | — |
-| │  └ `scenario_cache_hit` | S5: 缓存全命中 | 2 | — |
+| │  ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 | — |
+| │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 | — |
+| │  └ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量（清仓/同名多份额/超多持仓/特殊字符） | 16 | — |
 | ├─ `scenario_resilience` | 异常容错场景 S6-S10 | 18 | ~5s |
 | │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | — |
 | │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | — |
@@ -200,7 +203,7 @@ python scripts/test_runner.py --mode scenario,edge
 | │  ├ `scenario_zero_cost` | S9: 零成本持仓 | 4 | — |
 | │  └ `scenario_extreme` | S10: 极端值 | 5 | — |
 | ├─ `scenario_llm` | LLM 场景组合 S11-S20（10 个类共 32 项，其中 24 项同时标记为 llm） | 32 | ~5s |
-| └─ `scenario_datetime` | 日期/时间场景 T1-T16 | 61 | ~15s |
+| └─ `scenario_datetime` | 日期/时间场景 T1-T21（含跨月/跨年/调休/港股通假期） | 100 | ~20s |
 
 ### 单元测试分组（unit）
 

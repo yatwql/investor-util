@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **Z1 迭代完成（特殊品种场景 S21-S28，27 项 scenario_basic 测试）**：`test_scenario_special_securities.py` 新增 27 项测试，覆盖 S21 港股通持仓（3 项：分类/代码前缀/无行情不崩溃）、S22 可转债持仓（3 项：名称含"债"分类/市值计算/关键字匹配）、S23 公募 REITs（3 项：代码1开头分类/名称含REIT分类/市值计算）、S24 货币基金（3 项：货币关键字分类/净值恒为1/增利关键字分类）、S25 科创板+北交所混合（4 项：688分类/8xx分类/上海前缀/北京前缀）、S26 商品/黄金 ETF（3 项：黄金ETF分类/商品ETF分类/溢价率占位符）、S27 跨境 ETF（3 项：纳指ETF分类/恒生科技ETF分类/T-1净值 today_profit=0）、S28 纯债/国债持仓（5 项：国债ETF名称含"债"分类/关键字检测/国债分类/企业债分类/市值计算）。全量测试 2198→2225，场景测试 180→207，scenario_basic 30→57。
 - **Y1 迭代完成（API/网络异常纵深，23 项 edge 测试）**：`test_api_edge.py`（`unit/fetcher/`）新增 23 项测试，覆盖 Provider 层 HTTP 异常（4 项：超时/DNS 解析失败/连接拒绝/SSL 证书错误，均返回 None 不抛出）、Provider Chain 多级降级（4 项：主链路失败→备链路成功、全部失败→过期缓存降级、全部失败无缓存→返回 None、Provider 抛出异常→跳过该链路）、响应解析异常（5 项：空响应体/截断字段/非 JSON/空 JSON/编码异常）、LLM API 错误分类（8 项：429/503 可重试、401/500 retryable、超时可重试、连接错误 retryable、正常 200 success）、HTTP 客户端 SSL 验证（2 项：SSL_VERIFY=false 关闭验证、默认 true）。单元测试 1970→1993，edge 测试 175→198，全量 2175→2198。，覆盖 CSV 公式注入（2 项：=`+/` 开头名称不执行公式）、XSS 缓存注入（3 项：`<script>`/`<img onerror>` 原样保留、Jinja2 autoescape=False 确认、payload 传递校验）、符号链接（2 项：目录遍历不跟随符号链接）、路径遍历（2 项：`../` 和 `..\\` 被 `_` 替换不逃逸缓存目录）、API Key 日志泄漏（1 项：交叉验证 _sanitize_endpoint）、JSON 原型污染（2 项：Python json.loads 无 __proto__ 风险、config.json 含 __proto__ 不被特殊处理）、临时文件竞争（3 项：mkstemp 原子写入检查 + 并发写入不崩溃）。确认 Jinja2 autoescape=False 为已知技术债务。
 - **Y4 迭代完成（数值计算纵深，16 项 edge 测试）**：`test_market_value_edge.py` 新增 `TestNumericalEdgeY4` 类（16 项），覆盖浮点累加误差（2 项）、极微份额 0.01/0.0001（2 项）、超高单价 20 万 + 万元级精度（2 项）、收益率超 ±1000%（2 项）、NaN 传播链 price/yclose（2 项）、int32/int64 溢出（2 项）、负成本（1 项）、零成本 profit_rate=None（1 项）、多数量级累加保留（2 项）。边缘场景测试总数从 ~86 增至 ~102 项。
 - **Y3 迭代完成（文件系统纵深，18 项 edge 测试）**：`test_filesystem_edge.py` 新增 18 项测试，覆盖加密 Excel/xlsm 宏（2 项：加密文件 ValueError、xlsm 不被 list_xlsx_files 识别）、隐藏工作表（1 项：veryHidden 跳过）、损坏 xlsx（2 项：非 zip 格式/截断 zip → ValueError）、UNC 网络路径（2 项：UNC 传递到 load_workbook/不存在 UNC 返回空列表）、文件占用（2 项：PermissionError/OSError 不崩溃）、权限变更（2 项：只读文件可读取、无权限目录返回空）、超长路径（2 项：不崩溃返回空/允许 OSError）、缓存篡改（4 项：损坏 JSON/空字节/0 字节/非 UTF-8 均自动删除）、空字节 xlsx（1 项：空字节不崩溃）。修复 cache.py UnicodeDecodeError 未捕获 bug（导致非 UTF-8 缓存文件无法自动恢复）。
@@ -49,7 +50,7 @@
   - 主分组标记 `scenario_extended` → `scenario_resilience`，`extended/` 目录同步重命名为 `resilience/`
 - **`unit/conftest.py`**：从自动注入模式改为验证模式，新文件漏标 `unit_*` 标记时抛出 `pytest.UsageError`
 - **`test_market_value_edge.py`**：从方法级 `@pytest.mark.edge` 统一为模块级 `pytestmark` 列表，与其他 8 个 `_edge.py` 文件风格一致
-- **全量测试计数更新**：单元测试 1810→1993，场景测试 107→180，集成测试 0→25，全量 1938→2198
+- **全量测试计数更新**：单元测试 1810→1993，场景测试 107→207，集成测试 0→25，全量 1938→2225
 
 ### Removed
 - **`integration` 标记**：已注册但从未在测试类/方法上使用，移除 conftest.py 注册及 KNOWN_MARKERS 集合。
