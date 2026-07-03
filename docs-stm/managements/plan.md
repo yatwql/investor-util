@@ -75,7 +75,7 @@ LLM 配置拆分为两个独立文件：
 
 ## ✅ 已完成迭代
 
-所有已完成迭代（A/A2/A3/A4/A5/J/K/L/P/N/Q/R/M/T/S/V）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md).
+所有已完成迭代（A/A2/A3/A4/A5/J/K/L/P/N/Q/R/M/T/S/V/U）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md).
 
 ---
 
@@ -92,19 +92,6 @@ LLM 配置拆分为两个独立文件：
 - **基金风格漂移检测**：对比基金当前持仓与招募说明书约定风格（大盘/中小盘、成长/价值）是否一致，识别风格飘移风险
 - **持仓集中度监控**：跟踪前十大持仓占比变化趋势，集中度突变时提示风险
 
----
-
-### [P0] U. 集成测试覆盖增补（中难度 / 高价值）
-
-来自 §1.5 集成测试的未实现项，补全模块间契约验证和全链路覆盖：
-
-- **模块间接口契约验证**：构造 reader 输出 → market_value 输入 → penetration 输入 → ... 类型链，断言各环节输入/输出类型正确（data contract 验证）
-- **错误隔离业务语义验证**：penetration/LLM/news_correlation 任一模块失败时，验证其他模块写入不受影响，而非仅断言不崩溃
-- **新闻流水线全链路集成测试**：fetch_all → aggregate → deduplicate → correlate_with_holdings → write_to_report 的端到端链路，当前子步骤仅有 UT
-- **跨模块缓存一致性验证**：price 刷新后，market_value / fund_performance 使用同一缓存源的价格数据
-- **TUI → Handler 路由集成测试**：mock UI 事件触发 handler 链，验证菜单按键正确路由到目标模块
-
----
 
 ### [P1] W. 剩余场景与数据正确性验证增补（中难度 / 中价值）
 

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import unittest
+from contextlib import ExitStack
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -828,6 +829,244 @@ class TestFetchMarketDataMarketAware(unittest.TestCase):
         fetch_market_data("003095")
 
         mock_get_ttl.assert_called_once_with("price")
+
+
+# ═══════════════════════════════════════════════════════════
+# T13: 交易时段切换缝隙 — 边界时间精度
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.scenario_datetime
+@pytest.mark.scenario
+class TestT13TradingSessionSwitch(unittest.TestCase):
+    """T13: 午休/收盘切换前夕的缓存/数据行为。
+
+    验证 11:29:59 / 11:30:00 / 12:59:59 / 13:00:00 /
+    14:59:59 / 15:00:00 / 15:00:01 这 7 个边界点的市场状态判断正确。
+
+    注意：_is_market_open_fallback 使用 <= 闭合边界，
+    因此 11:30 和 15:00 仍视为"交易中"（含最后 1 秒），
+    而 is_midday_break() 使用 [690, 780) 半开区间。
+    """
+
+    def _is_open(self, year, month, day, hour, minute, second=0):
+        """Patch market_hours.datetime 并返回 _is_market_open_fallback()。"""
+        with patch("src.python.market_hours.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(
+                year, month, day, hour, minute, second,
+                tzinfo=timezone(timedelta(hours=8)),
+            )
+            mock_dt.timezone = timezone
+            mock_dt.timedelta = timedelta
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            mock_dt.saturday = 5
+            mock_dt.sunday = 6
+            from src.python.market_hours import _is_market_open_fallback
+            return _is_market_open_fallback(hour * 60 + minute)
+
+    def _midday_break(self, year, month, day, hour, minute, second=0):
+        """Patch market_hours.datetime 并返回 is_midday_break()。"""
+        with patch("src.python.market_hours.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(
+                year, month, day, hour, minute, second,
+                tzinfo=timezone(timedelta(hours=8)),
+            )
+            mock_dt.timezone = timezone
+            mock_dt.timedelta = timedelta
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            mock_dt.saturday = 5
+            mock_dt.sunday = 6
+            from src.python.market_hours import is_midday_break
+            return is_midday_break()
+
+    # ── 午休入口 ──
+
+    def test_midday_break_112959(self):
+        """11:29:59 — 仍在交易，非午休。"""
+        self.assertTrue(self._is_open(2026, 7, 3, 11, 29, 59))
+        self.assertFalse(self._midday_break(2026, 7, 3, 11, 29, 59))
+
+    def test_midday_break_113000(self):
+        """11:30:00 — is_midday_break=False（闭区间不含 690），
+        _is_market_open_fallback 含 11:30。"""
+        self.assertTrue(self._is_open(2026, 7, 3, 11, 30, 0))
+        self.assertFalse(self._midday_break(2026, 7, 3, 11, 30, 0))
+
+    def test_midday_break_125959(self):
+        """12:59:59 — 仍午休。"""
+        self.assertFalse(self._is_open(2026, 7, 3, 12, 59, 59))
+        self.assertTrue(self._midday_break(2026, 7, 3, 12, 59, 59))
+
+    def test_midday_break_130000(self):
+        """13:00:00 — 午休结束，恢复交易。"""
+        self.assertTrue(self._is_open(2026, 7, 3, 13, 0, 0))
+        self.assertFalse(self._midday_break(2026, 7, 3, 13, 0, 0))
+
+    # ── 收盘边界 ──
+
+    def test_close_switch_145959(self):
+        """14:59:59 — 仍交易。"""
+        self.assertTrue(self._is_open(2026, 7, 3, 14, 59, 59))
+
+    def test_close_switch_150000(self):
+        """15:00:00 — _is_market_open_fallback 使用 <= 闭区间，仍返回 True。"""
+        self.assertTrue(self._is_open(2026, 7, 3, 15, 0, 0))
+
+    def test_close_switch_1500(self):
+        """15:00（刚好 900 分钟闭区间终点）→ 含最后 1 分钟仍交易。"""
+        self.assertTrue(self._is_open(2026, 7, 3, 15, 0, 0))
+
+    def test_close_switch_1501(self):
+        """15:01（901 分钟）→ 收盘。"""
+        self.assertFalse(self._is_open(2026, 7, 3, 15, 1, 0))
+
+
+# ═══════════════════════════════════════════════════════════
+# 净值数据空窗期
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.scenario_datetime
+@pytest.mark.scenario
+class TestNavDataGap(unittest.TestCase):
+    """净值数据空窗期：基金净值未发布（15:00 前）时的降级行为。
+
+    验证 nav_date ≠ T → today_profit = 0；
+    价格日期描述为旧日期。
+    """
+
+    def _compute_row(self, nav_date: str, trading_day: str = "2026-07-03"):
+        """调用 _compute_detail_row 并返回 DetailRow。"""
+        from src.python.report.market_value import _compute_detail_row
+        from src.python.models import Holding
+
+        h = Holding(account="证券", name="测试基金", code="003095",
+                    shares=1000.0, cost_price=1.5)
+        mkt = {
+            "price": 1.6, "yesterday_close": 1.55,
+            "price_date": nav_date, "source_api": "eastmoney",
+            "name": "测试基金", "code": "003095",
+        }
+        with patch("src.python.report.market_value.get_last_trading_day",
+                   return_value=trading_day):
+            return _compute_detail_row(h, mkt)
+
+    def test_nav_date_t_equal_today_profit_calculated(self):
+        """nav_date == T → 计算本日盈亏。"""
+        row = self._compute_row("2026-07-03")
+        self.assertGreater(row.today_profit, 0)
+
+    def test_nav_date_t_minus_1_today_profit_zero(self):
+        """nav_date == T-1（15:00 前空窗期）→ today_profit = 0。"""
+        row = self._compute_row("2026-07-02")
+        self.assertEqual(row.today_profit, 0.0)
+
+    def test_nav_date_none_today_profit_zero(self):
+        """nav_date 为空 → today_profit = 0。"""
+        row = self._compute_row("")
+        self.assertEqual(row.today_profit, 0.0)
+
+    def test_nav_date_t_minus_1_price_type_official_prev(self):
+        """nav_date == T-1 → 价格类型显示 "官方净值(T-1)"。"""
+        from src.python.report.market_value import _determine_price_type
+
+        with (
+            patch("src.python.report.market_value.get_last_trading_day",
+                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_prev_trading_day",
+                  return_value="2026-07-02"),
+        ):
+            ptype = _determine_price_type(
+                "eastmoney", "2026-07-02", "2026-07-03",
+            )
+            self.assertEqual(ptype, "官方净值(T-1)")
+
+
+# ═══════════════════════════════════════════════════════════
+# 多时区 QDII 净值一致性
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.scenario_datetime
+@pytest.mark.scenario
+class TestQdiiDateConsistency(unittest.TestCase):
+    """多时区 QDII 净值一致性：不同交易时区 QDII 净值的日期标注。
+
+    QDII 基金因时差净值延迟一天发布（T-1），
+    在 price_update_status 中应视为"已更新"。
+    """
+
+    @staticmethod
+    def _make_detail(name: str, nav_date: str, source_api: str = "eastmoney"):
+        """构造 DetailRow。"""
+        from src.python.report.market_value import DetailRow
+        return DetailRow(
+            account="证券", name=name, code="003095",
+            shares=100.0, cost=100.0,
+            price=1.2, yesterday_close=1.15,
+            nav_date=nav_date, source_api=source_api,
+            today_profit=0.0, profit=20.0,
+            profit_rate=0.0, premium="--",
+            market_value=120.0,
+        )
+
+    def _update_status(self, details: list) -> tuple:
+        """调用 price_update_status 返回更新状态。"""
+        from src.python.report.market_value import price_update_status
+
+        with (
+            patch("src.python.report.market_value.get_last_trading_day",
+                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_prev_trading_day",
+                  return_value="2026-07-02"),
+        ):
+            return price_update_status(details, "2026-07-03")
+
+    def test_qdii_nav_date_t_updated(self):
+        """QDII + nav_date == T → 更新完成。"""
+        d = self._make_detail("标普500QDII", "2026-07-03")
+        updated, total, all_updated = self._update_status([d])
+        self.assertEqual(updated, 1)
+        self.assertEqual(total, 1)
+        self.assertTrue(all_updated)
+
+    def test_qdii_nav_date_t_minus_1_updated(self):
+        """QDII + nav_date == T-1 → 视为更新完成（时差延迟一天）。"""
+        d = self._make_detail("标普500QDII", "2026-07-02")
+        updated, total, all_updated = self._update_status([d])
+        self.assertEqual(updated, 1)
+        self.assertEqual(total, 1)
+        self.assertTrue(all_updated)
+
+    def test_non_qdii_nav_date_t_minus_1_not_updated(self):
+        """非 QDII + nav_date == T-1 → 未更新。"""
+        d = self._make_detail("易方达蓝筹", "2026-07-02")
+        updated, total, all_updated = self._update_status([d])
+        self.assertEqual(updated, 0)
+        self.assertEqual(total, 1)
+        self.assertFalse(all_updated)
+
+    def test_qdii_nav_date_t_minus_2_not_updated(self):
+        """QDII + nav_date == T-2（延迟超过 1 天）→ 未更新。"""
+        d = self._make_detail("标普500QDII", "2026-07-01")
+        updated, total, all_updated = self._update_status([d])
+        self.assertEqual(updated, 0)
+        self.assertEqual(total, 1)
+        self.assertFalse(all_updated)
+
+    def test_tencent_nav_date_t_updated(self):
+        """场内（tencent）+ nav_date == T → 更新完成。"""
+        d = self._make_detail("贵州茅台", "2026-07-03", source_api="tencent")
+        updated, total, all_updated = self._update_status([d])
+        self.assertEqual(updated, 1)
+        self.assertTrue(all_updated)
+
+    def test_tencent_nav_date_t_minus_1_not_updated(self):
+        """场内（tencent）+ nav_date == T-1 → 未更新。"""
+        d = self._make_detail("贵州茅台", "2026-07-02", source_api="tencent")
+        updated, total, all_updated = self._update_status([d])
+        self.assertEqual(updated, 0)
+        self.assertFalse(all_updated)
 
 
 if __name__ == "__main__":

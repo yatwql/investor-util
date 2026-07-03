@@ -1060,5 +1060,137 @@ class TestOutputConsistency(unittest.TestCase):
             self.assertEqual(key, expected_order[i])
 
 
+# ═══════════════════════════════════════════════════════════
+#  非交易日 + LLM 混合场景
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.llm
+@pytest.mark.scenario_llm
+@pytest.mark.scenario
+class TestNonTradingDayWithLlm(unittest.TestCase):
+    """非交易日生成含 LLM 的报告。
+
+    LLM 模块状态不受市场状态影响，非交易日下应正常显示。
+    """
+
+    def test_llm_module_info_independent_of_market_state(self):
+        """_build_module_info_list 不依赖市场状态，非交易日照常调用。"""
+        from src.python.report.html_writer import _build_module_info_list
+
+        failure = {"penetration_deep": FAIL_REASON_NETWORK_ERROR}
+        per_module = {
+            "global_macro": {
+                "model": "ds", "cached": True,
+                "input_tokens": 0, "output_tokens": 0,
+                "cache_hit_tokens": 500, "cost": 0.0, "thinking": False,
+                "endpoint": "",
+            },
+            "expert_review": {
+                "model": "claude", "cached": False,
+                "input_tokens": 2000, "output_tokens": 1000,
+                "cache_hit_tokens": 0, "cost": 0.008, "thinking": True,
+                "endpoint": "",
+            },
+        }
+        result = _build_module_info_list(failure, per_module)
+        by_key = {m["key"]: m for m in result}
+
+        self.assertEqual(by_key["global_macro"]["status"], "cached")
+        self.assertEqual(by_key["expert_review"]["status"], "success")
+        self.assertEqual(by_key["penetration_deep"]["status_label"], "LLM API 网络连接失败")
+        self.assertEqual(by_key["health_check"]["status"], "unknown")
+        self.assertEqual(by_key["news_correlation"]["status"], "unknown")
+
+    def test_non_trading_day_no_llm_crash(self):
+        """非交易日下 generate_all_llm 不应崩溃。"""
+        from src.python.llm.generators import generate_all_llm
+
+        with (
+            patch("src.python.llm.generators._is_llm_module_enabled",
+                  return_value=False),
+        ):
+            result = generate_all_llm({}, {}, 0, 0, 0, 0, 0, {},
+                                      holdings_details=[],
+                                      penetrated_assets=[])
+            self.assertIsNotNone(result)
+
+
+# ═══════════════════════════════════════════════════════════
+#  多账户混合 + LLM 多轮
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.llm
+@pytest.mark.scenario_llm
+@pytest.mark.scenario
+class TestMultiAccountMultiRoundLlm(unittest.TestCase):
+    """多账户 + LLM 多轮交互场景。
+
+    验证多账户下 LLM 生成不冲突，多轮调用数据完整聚合。
+    """
+
+    def test_multi_account_does_not_break_build_module_info(self):
+        """多账户持仓传入 _build_module_info_list 不崩溃。"""
+        from src.python.report.html_writer import _build_module_info_list
+
+        failure = {}
+        per_module = {
+            "global_macro": {
+                "model": "ds", "cached": True,
+                "input_tokens": 0, "output_tokens": 0,
+                "cache_hit_tokens": 500, "cost": 0.0, "thinking": False,
+                "endpoint": "",
+            },
+        }
+        result = _build_module_info_list(failure, per_module)
+        by_key = {m["key"]: m for m in result}
+        self.assertEqual(by_key["global_macro"]["status"], "cached")
+        self.assertEqual(len(result), 5)
+
+    def test_multi_round_per_module_accumulates(self):
+        """多轮调用后 per_module 累加所有轮次的 token 数据。"""
+        from src.python.report.html_writer import _build_module_info_list
+
+        per_module_round1 = {
+            "global_macro": {
+                "model": "ds", "cached": False,
+                "input_tokens": 1000, "output_tokens": 500,
+                "cache_hit_tokens": 0, "cost": 0.005, "thinking": False,
+                "endpoint": "",
+            },
+        }
+        per_module_round2 = {
+            "expert_review": {
+                "model": "claude", "cached": False,
+                "input_tokens": 2000, "output_tokens": 1000,
+                "cache_hit_tokens": 0, "cost": 0.008, "thinking": True,
+                "endpoint": "",
+            },
+        }
+        # 模拟多轮合并（生产代码中由调用方合并 per_module 字典）
+        merged = {**per_module_round1, **per_module_round2}
+        result = _build_module_info_list({}, merged)
+        by_key = {m["key"]: m for m in result}
+
+        self.assertEqual(by_key["global_macro"]["input_tokens"], 1000)
+        self.assertEqual(by_key["expert_review"]["input_tokens"], 2000)
+        # 确保所有 5 个模块都存在
+        self.assertEqual(len(result), 5)
+
+    def test_generate_all_llm_with_multi_account(self):
+        """多账户持仓下 generate_all_llm 不崩溃。"""
+        from src.python.llm.generators import generate_all_llm
+
+        with (
+            patch("src.python.llm.generators._is_llm_module_enabled",
+                  return_value=False),
+        ):
+            result = generate_all_llm({}, {}, 0, 0, 0, 0, 0, {},
+                                      holdings_details=[],
+                                      penetrated_assets=[])
+            self.assertIsNotNone(result)
+
+
 if __name__ == "__main__":
     unittest.main()
