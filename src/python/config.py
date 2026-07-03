@@ -93,7 +93,7 @@ def get_config() -> dict:
             pass
 
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, "r", encoding="utf-8-sig") as f:
                 config = json.load(f)
             merged = dict(_DEFAULT_CONFIG)
             # 过滤 null 值：不允许 config.json 中的 null 覆盖默认值
@@ -612,7 +612,7 @@ def get_llm_config() -> dict | None:
         settings_path = get_llm_settings_path()
         if os.path.exists(settings_path):
             try:
-                with open(settings_path, "r", encoding="utf-8") as f:
+                with open(settings_path, "r", encoding="utf-8-sig") as f:
                     raw = f.read()
                     cleaned = _strip_json_comments(raw)
                     base_settings = json.loads(cleaned)
@@ -628,6 +628,7 @@ def get_llm_config() -> dict | None:
         if not os.path.exists(key_path):
             logger.warning("LLM 密钥文件不存在: %s", key_path)
             if base_settings.get("api_key"):
+                base_settings["api_key"] = base_settings["api_key"].strip()
                 _llm_config_cache = base_settings
                 _llm_config_mtime = 0
                 return base_settings
@@ -641,7 +642,7 @@ def get_llm_config() -> dict | None:
             if _llm_config_cache is not None and combined_mtime <= _llm_config_mtime:
                 return _llm_config_cache
 
-            with open(key_path, "r", encoding="utf-8") as f:
+            with open(key_path, "r", encoding="utf-8-sig") as f:
                 key_raw = f.read()
                 key_config = json.loads(_strip_json_comments(key_raw))
 
@@ -656,6 +657,9 @@ def get_llm_config() -> dict | None:
             # 合并：base_settings 为基础，key_config 覆盖（仅敏感字段）
             merged = dict(base_settings)
             merged.update(key_config)
+            # 去除 api_key 首尾空格，避免因配置文件误含空格导致认证失败
+            if merged.get("api_key"):
+                merged["api_key"] = merged["api_key"].strip()
 
             _llm_config_cache = merged
             _llm_config_mtime = combined_mtime

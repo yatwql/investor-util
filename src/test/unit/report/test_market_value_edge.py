@@ -17,13 +17,17 @@
 from __future__ import annotations
 
 import unittest
+import math
 from datetime import datetime, timedelta
 from unittest.mock import ANY, MagicMock, patch
 
 from src.python.models import Holding
 from src.python.report.market_value import (
+    _compute_detail_row,
     _count_trading_days_back,
+    _detail_to_row_values,
     _determine_price_type,
+    _FUND_PREMIUM_PLACEHOLDER,
     _is_trading_day,
 )
 import pytest
@@ -475,6 +479,277 @@ class TestDeterminePriceTypeSessionSwitch(unittest.TestCase):
 
         result = _determine_price_type("tencent", self.td, self.td)
         self.assertEqual(result, "场内收盘价(T)")
+
+
+# ═══════════════════════════════════════════════════════════
+# Y4: 数值计算纵深 — 浮点/极值/NaN/int32/负成本
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+@pytest.mark.unit_report
+@pytest.mark.edge
+class TestNumericalEdgeY4(unittest.TestCase):
+    """Y4: 数值计算纵深边缘场景。
+
+    覆盖浮点累加误差/极微份额/超高单价/收益率超 ±1000%/NaN 传播链/
+    int32 溢出/负成本/多数量级相加共 12 项测试。
+    """
+
+    # ── Y4-1: 浮点累加误差 ────────────────────────────────
+
+    def test_float_accumulation_many_tiny_values(self):
+        """1000 条微额持仓 market_value 累加 → 浮点误差在 1e-6 以内。"""
+        from src.python.report.market_value import DetailRow
+        details = [
+            DetailRow(account="账户", name=f"资产{i}", code=f"000{i:04d}",
+                      shares=0.01, cost=0.01, price=0.001 * (i % 10 + 1),
+                      yesterday_close=0.001, nav_date="", source_api="tencent",
+                      today_profit=0.0, profit=0.0, profit_rate=0.0,
+                      premium="--", market_value=0.001 * (i % 10 + 1) * 0.01,
+                      ) for i in range(1000)
+        ]
+        total = sum(d.market_value for d in details)
+        expected = 0.055
+        self.assertAlmostEqual(total, expected, places=6)
+
+    def test_float_accumulation_many_profit_values(self):
+        """1000 条持仓 profit 累加 → 浮点误差在合理范围。"""
+        from src.python.report.market_value import DetailRow
+        details = [
+            DetailRow(account="账户", name=f"资产{i}", code=f"000{i:04d}",
+                      shares=1.0, cost=100.0, price=100.0,
+                      yesterday_close=100.0, nav_date="", source_api="tencent",
+                      today_profit=0.0, profit=0.01,
+                      profit_rate=0.0001, premium="--", market_value=100.0,
+                      ) for i in range(1000)
+        ]
+        total = sum(d.profit for d in details)
+        self.assertAlmostEqual(total, 10.0, places=6)
+
+    # ── Y4-2: 极微份额 ────────────────────────────────────
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_tiny_shares_001(self, mock_open, mock_td):
+        """极微份额（0.01 份）→ 市值计算正确无精度丢失。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "极微持仓", "600519", 0.01, 200000.0)
+        mkt = {"price": 210000.0, "yesterday_close": 208000.0,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertAlmostEqual(detail.cost, 2000.0)
+        self.assertAlmostEqual(detail.market_value, 2100.0)
+        self.assertAlmostEqual(detail.profit, 100.0)
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_tiny_shares_0001(self, mock_open, mock_td):
+        """极微份额（0.0001 份）→ 市值计算正确。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "纳米持仓", "600519", 0.0001, 200000.0)
+        mkt = {"price": 210000.0, "yesterday_close": 208000.0,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertAlmostEqual(detail.cost, 20.0)
+        self.assertAlmostEqual(detail.market_value, 21.0)
+        self.assertAlmostEqual(detail.profit, 1.0)
+
+    # ── Y4-3: 超高单价 ────────────────────────────────────
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_ultra_high_price(self, mock_open, mock_td):
+        """超高单价（20 万/份）→ 市值计算正确无溢出。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "贵州茅台", "600519", 10, 200000.0)
+        mkt = {"price": 210000.0, "yesterday_close": 208000.0,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertAlmostEqual(detail.market_value, 2100000.0)
+        self.assertAlmostEqual(detail.cost, 2000000.0)
+        self.assertAlmostEqual(detail.profit, 100000.0)
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_ultra_high_price_precision(self, mock_open, mock_td):
+        """超高单价（万元级带两位小数）× 份额 → 精度正确。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "高价资产", "000001", 123.45, 15234.56)
+        mkt = {"price": 15876.82, "yesterday_close": 15700.00,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        expected_mv = round(15876.82 * 123.45, 2)
+        expected_cost = round(15234.56 * 123.45, 2)
+        self.assertAlmostEqual(detail.market_value, expected_mv, places=2)
+        self.assertAlmostEqual(detail.cost, expected_cost, places=2)
+
+    # ── Y4-4: 收益率超 ±1000% ─────────────────────────────
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_extreme_positive_profit_rate_over_1000pct(self, mock_open, mock_td):
+        """收益率 > 1000%（微成本暴涨）→ profit_rate > 10.0 不崩溃。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "百倍股", "000001", 100, 0.01)
+        mkt = {"price": 50.0, "yesterday_close": 49.0,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertGreater(detail.profit_rate, 10.0)
+        self.assertAlmostEqual(detail.profit_rate, 4999.0)
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_extreme_negative_profit_rate(self, mock_open, mock_td):
+        """严重亏损（成本远高于市值）→ profit_rate ≈ -100%。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "清零资产", "000001", 100, 1000.0)
+        mkt = {"price": 0.5, "yesterday_close": 0.6,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertAlmostEqual(detail.profit_rate, -0.9995, places=4)
+        self.assertGreater(detail.profit_rate, -1.0)
+
+    # ── Y4-5: NaN 传播链 ─────────────────────────────────
+
+    def test_nan_price_does_not_crash(self):
+        """price = NaN → 不崩溃。"""
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "异常资产", "000001", 100, 10.0)
+        mkt = {"price": float('nan'), "yesterday_close": 10.0,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        try:
+            detail = _compute_detail_row(h, mkt)
+            self.assertTrue(math.isnan(detail.market_value) or detail.market_value == 0.0)
+        except Exception:
+            self.fail("NaN price should not cause exception")
+
+    def test_nan_yclose_does_not_crash(self):
+        """yesterday_close = NaN → today_profit 不崩溃。"""
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "异常资产", "000001", 100, 10.0)
+        mkt = {"price": 10.0, "yesterday_close": float('nan'),
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        try:
+            detail = _compute_detail_row(h, mkt)
+            self.assertIsNotNone(detail)
+            self.assertTrue(math.isnan(detail.today_profit) or detail.today_profit == 0.0)
+        except Exception:
+            self.fail("NaN yesterday_close should not cause exception")
+
+    # ── Y4-6: int32 溢出 ──────────────────────────────────
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_market_value_exceeds_int32(self, mock_open, mock_td):
+        """市值超过 int32 范围（> 21 亿）→ Python 无溢出。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "巨量持仓", "000001", 100_000_000, 100.0)
+        mkt = {"price": 500.0, "yesterday_close": 490.0,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertGreater(detail.market_value, 2**31 - 1)
+        self.assertAlmostEqual(detail.market_value, 50_000_000_000.0)
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_market_value_exceeds_int64(self, mock_open, mock_td):
+        """市值超过 int64 范围（> 9e18）→ Python 浮点不溢出。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "天文持仓", "000001", 1_000_000_000_000, 1.0)
+        mkt = {"price": 10_000_000.0, "yesterday_close": 9_900_000.0,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertGreater(detail.market_value, 9e18)
+        self.assertAlmostEqual(detail.market_value / 1e19, 1.0, places=5)
+
+    # ── Y4-7: 负成本 ──────────────────────────────────────
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_negative_cost_price(self, mock_open, mock_td):
+        """负成本（赠予/合并形成）→ profit_rate = None（cost≤0 保护），其他值正常。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "负成本资产", "000001", 100, -5.0)
+        mkt = {"price": 10.0, "yesterday_close": 9.5,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertAlmostEqual(detail.cost, -500.0)
+        self.assertAlmostEqual(detail.market_value, 1000.0)
+        self.assertAlmostEqual(detail.profit, 1500.0)
+        self.assertIsNone(detail.profit_rate)  # cost=-500 ≤ 0，源码中 profit_rate = None
+
+    @patch("src.python.report.market_value.get_last_trading_day")
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_zero_cost_price(self, mock_open, mock_td):
+        """零成本 → profit_rate = None（避免除零），其他值正常。"""
+        mock_td.return_value = "2026-07-01"
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding("证券", "零成本资产", "000001", 100, 0.0)
+        mkt = {"price": 10.0, "yesterday_close": 9.5,
+               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
+        detail = _compute_detail_row(h, mkt)
+        self.assertAlmostEqual(detail.cost, 0.0)
+        self.assertAlmostEqual(detail.market_value, 1000.0)
+        self.assertIsNone(detail.profit_rate)
+
+    # ── Y4-8: 多数量级相加 ────────────────────────────────
+
+    def test_mixed_magnitudes_in_sum(self):
+        """多数量级（1e-6 到 1e9）累加 → 小值不被大值完全淹没（float64 精度约 1e-7）。"""
+        from src.python.report.market_value import DetailRow
+        tiny = DetailRow(account="A", name="tiny", code="000001",
+                         shares=0.001, cost=0.001, price=0.001,
+                         yesterday_close=0.001, nav_date="", source_api="tencent",
+                         price_type="", premium="--",
+                         today_profit=0.0, profit=0.0, profit_rate=0.0,
+                         market_value=1e-6)
+        huge = DetailRow(account="B", name="huge", code="000002",
+                         shares=1e7, cost=1e9, price=100.0,
+                         yesterday_close=99.0, nav_date="", source_api="tencent",
+                         price_type="", premium="--",
+                         today_profit=0.0, profit=0.0, profit_rate=0.0,
+                         market_value=1e9)
+        total = sum([tiny.market_value, huge.market_value])
+        self.assertNotEqual(total, huge.market_value)
+        # float64 精度：1e9 + 1e-6 误差约 1e-7，验证小值贡献存在即可
+        diff = total - huge.market_value
+        self.assertGreater(diff, 0)
+        self.assertLess(diff, 1e-5)
+
+    def test_mixed_magnitudes_three_levels(self):
+        """三数量级（1e-3, 1e0, 1e6）累加 → 各数量级均保留。"""
+        from src.python.report.market_value import DetailRow
+        rows = [
+            DetailRow(account="A", name="low", code="001",
+                      shares=1, cost=1, price=1, yesterday_close=1,
+                      nav_date="", source_api="tencent", price_type="",
+                      today_profit=0.0, profit=0.0, profit_rate=0.0,
+                      premium="--", market_value=0.001),
+            DetailRow(account="A", name="mid", code="002",
+                      shares=1, cost=1, price=1, yesterday_close=1,
+                      nav_date="", source_api="tencent", price_type="",
+                      today_profit=0.0, profit=0.0, profit_rate=0.0,
+                      premium="--", market_value=1.0),
+            DetailRow(account="A", name="high", code="003",
+                      shares=1, cost=1, price=1, yesterday_close=1,
+                      nav_date="", source_api="tencent", price_type="",
+                      today_profit=0.0, profit=0.0, profit_rate=0.0,
+                      premium="--", market_value=1_000_000.0),
+        ]
+        total = sum(r.market_value for r in rows)
+        expected = 0.001 + 1.0 + 1_000_000.0
+        self.assertAlmostEqual(total, expected, places=3)
+        self.assertNotAlmostEqual(total, 1_000_000.0, places=3)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
-from src.python.report.excel_writer import _ensure_reports_dir
+from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.models import Holding
 from src.python.report.html_builders import _build_category_data, _build_perf_data
 from src.python.report.market_value import (
@@ -601,6 +601,9 @@ def _save_html_report(
         f.write(html)
     logger.info("归档 HTML 报告已保存: %s", archive_path)
     prog.ok(f"归档版报告: {archive_path}")
+
+    # 清理过期归档（非关键），避免目录无限增长
+    _cleanup_old_archives(output_dir)
 
     prog.ok(f"HTML 报告生成完成！总市值: {total_mv:,.2f}元, 总盈亏: {total_profit:,.2f}元")
     return os.path.abspath(latest_path)

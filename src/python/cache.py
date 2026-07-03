@@ -102,9 +102,9 @@ def _read_cache_data(fpath: str, key: str, dry_run: bool = False) -> dict | None
         if is_gz:
             with open(fpath, "rb") as f:
                 return json.loads(gzip.decompress(f.read()).decode("utf-8"))
-        with open(fpath, "r", encoding="utf-8") as f:
+        with open(fpath, "r", encoding="utf-8-sig") as f:
             return json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
         if dry_run:
             logger.info("缓存清理(预览): 损坏文件 %s", os.path.basename(fpath))
         else:

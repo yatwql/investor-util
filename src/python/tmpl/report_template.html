@@ -160,10 +160,29 @@
 
         /* ── 打印优化 ──────────────────────────── */
         @media print {
-            body { background: #fff; font-size: 12px; }
+            @page { size: A4; margin: 12mm 15mm; }
+
+            body { background: #fff; font-size: 11px; color: #000; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
             .container { max-width: 100%; padding: 0; }
-            .section { box-shadow: none; border: 1px solid #ddd; }
-            .back-to-top { display: none; }
+            .section { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+            .section-content { padding: 8px 12px; }
+
+            /* 隐藏屏幕交互元素 */
+            .back-to-top,
+            .section-nav { display: none !important; }
+
+            /* 表头跨页重复 */
+            thead { display: table-header-group; }
+
+            /* 避免行和图片跨页断裂 */
+            tr, img { page-break-inside: avoid; }
+
+            /* 缩紧表格间距节省纸张 */
+            td, th { padding: 3px 6px; font-size: 10px; }
+            .summary-card { padding: 8px 12px; }
+            .summary-card .value { font-size: 18px; }
         }
     </style>
 </head>

@@ -1069,5 +1069,393 @@ class TestQdiiDateConsistency(unittest.TestCase):
         self.assertFalse(all_updated)
 
 
+# ═══════════════════════════════════════════════════════════
+# T17: 跨月/跨年报告 — get_last_trading_day 跨年行为
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.scenario_datetime
+@pytest.mark.scenario
+class TestCrossYearReport(unittest.TestCase):
+    """T17: 跨月/跨年报告 — get_last_trading_day / get_prev_trading_day 跨年行为。
+
+    验证 12 月 31 日和 1 月 2 日生成的跨年行情数据连续性。
+    """
+
+    _CROSS_YEAR_CALENDAR = {
+        "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31",
+        "2027-01-04", "2027-01-05", "2027-01-06", "2027-01-07",
+    }
+
+    @staticmethod
+    def _is_trading_side_effect(d):
+        return d.strftime("%Y-%m-%d") in TestCrossYearReport._CROSS_YEAR_CALENDAR
+
+    def _run_get_last_trading_day(self, dt):
+        with (
+            patch("src.python.report.market_value.datetime") as mock_dt,
+            patch("src.python.report.market_value._is_trading_day") as mock_td,
+        ):
+            mock_dt.now.return_value = dt
+            mock_dt.timezone = timezone
+            mock_dt.timedelta = timedelta
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            mock_td.side_effect = self._is_trading_side_effect
+            from src.python.report.market_value import get_last_trading_day
+            return get_last_trading_day()
+
+    def test_dec31_intraday_returns_dec31(self):
+        """12月31日盘中 → 返回 2026-12-31。"""
+        dt = datetime(2026, 12, 31, 10, 0, tzinfo=timezone(timedelta(hours=8)))
+        self.assertEqual(self._run_get_last_trading_day(dt), "2026-12-31")
+
+    def test_jan1_holiday_returns_dec31(self):
+        """1月1日（元旦假期）→ 返回 2026-12-31（跨年回退）。"""
+        dt = datetime(2027, 1, 1, 10, 0, tzinfo=timezone(timedelta(hours=8)))
+        self.assertEqual(self._run_get_last_trading_day(dt), "2026-12-31")
+
+    def test_jan4_intraday_returns_jan4(self):
+        """1月4日盘中（节后首个交易日）→ 返回 2027-01-04。"""
+        dt = datetime(2027, 1, 4, 10, 0, tzinfo=timezone(timedelta(hours=8)))
+        self.assertEqual(self._run_get_last_trading_day(dt), "2027-01-04")
+
+    def test_jan4_pre_market_returns_dec31(self):
+        """1月4日盘前（9:00）→ 先退回1月3日（非交易日）→ 最终回退到2026-12-31。"""
+        dt = datetime(2027, 1, 4, 9, 0, tzinfo=timezone(timedelta(hours=8)))
+        self.assertEqual(self._run_get_last_trading_day(dt), "2026-12-31")
+
+    def test_prev_trading_day_cross_year(self):
+        """get_prev_trading_day('2027-01-04') → '2026-12-31'（跨年查找）。"""
+        with patch("src.python.report.market_value._is_trading_day") as mock_td:
+            mock_td.side_effect = self._is_trading_side_effect
+            from src.python.report.market_value import get_prev_trading_day
+            self.assertEqual(get_prev_trading_day("2027-01-04"), "2026-12-31")
+
+
+# ═══════════════════════════════════════════════════════════
+# T18: 季末/年末效应 — 基金调仓前后净值跳变
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.scenario_datetime
+@pytest.mark.scenario
+class TestQuarterEndEffect(unittest.TestCase):
+    """T18: 季末/年末效应 — 基金季末调仓日前后净值跳变。
+
+    验证大额净值变动时 today_profit 计算正确、profit_rate 无除零异常。
+    """
+
+    def _compute(self, nav_date: str, price: float, yclose: float,
+                 trading_day: str = "2026-09-30") -> "DetailRow":
+        from src.python.report.market_value import DetailRow, _compute_detail_row
+        h = Holding(account="证券", name="测试基金", code="003095",
+                    shares=1000.0, cost_price=1.5)
+        mkt = {
+            "price": price, "yesterday_close": yclose,
+            "price_date": nav_date, "source_api": "eastmoney",
+            "name": "测试基金", "code": "003095",
+        }
+        with patch("src.python.report.market_value.get_last_trading_day",
+                   return_value=trading_day):
+            return _compute_detail_row(h, mkt)
+
+    def test_quarter_end_large_positive_jump(self):
+        """季末调仓日净值大幅上涨（+10%）→ today_profit 正确。"""
+        row = self._compute("2026-09-30", 1.65, 1.50)
+        self.assertEqual(row.today_profit, 150.0)  # (1.65-1.50)*1000
+
+    def test_quarter_end_large_negative_jump(self):
+        """季末调仓日净值大幅下跌（-5%）→ 本日亏损。"""
+        row = self._compute("2026-09-30", 1.425, 1.50)
+        self.assertEqual(row.today_profit, -75.0)  # (1.425-1.50)*1000
+
+    def test_quarter_end_t_minus_1_nav_not_updated(self):
+        """调仓次日（T-1 净值）→ today_profit = 0（净值未更新）。"""
+        row = self._compute("2026-09-29", 1.65, 1.50, trading_day="2026-09-30")
+        self.assertEqual(row.today_profit, 0.0)
+
+    def test_quarter_end_extreme_20pct_jump_no_overflow(self):
+        """季末极端调仓 +20% → 计算正确无溢出。"""
+        row = self._compute("2026-09-30", 1.80, 1.50)
+        self.assertEqual(row.today_profit, 300.0)
+        self.assertAlmostEqual(row.profit_rate, 0.20)
+
+    def test_quarter_end_price_update_status_during_rebalance(self):
+        """季末调仓日 → price_update_status 正确识别已更新资产。"""
+        from src.python.report.market_value import DetailRow, price_update_status
+
+        # 季末前最后交易日：调仓完成，净值已更新
+        rebalanced = DetailRow(account="证券", name="调仓基金", code="003095",
+            shares=1000, cost=1500, price=1.65, yesterday_close=1.50,
+            nav_date="2026-09-30", source_api="eastmoney",
+            today_profit=0.0, profit=150.0, profit_rate=0.0, premium="--",
+            market_value=1650.0)
+        # 场外基金净值 T-1（尚未更新）
+        pending = DetailRow(account="证券", name="场外基金", code="000961",
+            shares=1000, cost=1200, price=1.25, yesterday_close=1.24,
+            nav_date="2026-09-29", source_api="eastmoney",
+            today_profit=0.0, profit=50.0, profit_rate=0.0, premium="--",
+            market_value=1250.0)
+
+        with (
+            patch("src.python.report.market_value.get_last_trading_day",
+                  return_value="2026-09-30"),
+            patch("src.python.report.market_value.get_prev_trading_day",
+                  return_value="2026-09-29"),
+        ):
+            updated, total, all_updated = price_update_status(
+                [rebalanced, pending], "2026-09-30")
+            self.assertEqual(updated, 1)
+            self.assertEqual(total, 2)
+            self.assertFalse(all_updated)
+
+
+# ═══════════════════════════════════════════════════════════
+# T19: 汇率中间价故障 — QDII 取价降级
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.scenario_datetime
+@pytest.mark.scenario
+class TestExchangeRateFailure(unittest.TestCase):
+    """T19: 汇率中间价故障 — 美元/港币汇率数据暂不可用时的 QDII 降级。
+
+    当汇率数据故障导致 QDII 净值获取失败或延迟时，验证系统降级行为。
+    """
+
+    def test_qdii_market_data_none_graceful(self):
+        """QDII + 行情数据为空 → 返回零值 DetailRow，不崩溃。"""
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding(account="证券", name="标普500QDII", code="159941",
+                    shares=100.0, cost_price=2.0)
+        row = _compute_detail_row(h, None)
+        self.assertEqual(row.market_value, 0.0)
+        self.assertEqual(row.price, 0.0)
+        self.assertEqual(row.today_profit, 0.0)
+        self.assertEqual(row.code, "159941")
+        # cost 应正确计算
+        self.assertEqual(row.cost, 200.0)
+
+    def test_qdii_stale_nav_t_minus_3(self):
+        """汇率故障导致 QDII 净值延迟到 T-3 → 价格类型标注为"官方净值(T-3)"，today_profit=0。"""
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding(account="证券", name="标普500QDII", code="159941",
+                    shares=100.0, cost_price=2.0)
+        mkt = {
+            "price": 1.8, "yesterday_close": 1.85,
+            "price_date": "2026-06-30",  # T-3
+            "source_api": "eastmoney",
+            "name": "标普500QDII", "code": "159941",
+        }
+        with (
+            patch("src.python.report.market_value.get_last_trading_day",
+                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_prev_trading_day",
+                  return_value="2026-07-02"),
+            patch("src.python.report.market_value._count_trading_days_back",
+                  return_value=3),
+        ):
+            row = _compute_detail_row(h, mkt)
+            self.assertEqual(row.today_profit, 0.0)
+            self.assertIn("T-3", row.price_type)
+
+    def test_qdii_stale_not_updated_in_status(self):
+        """汇率故障导致 QDII 净值延迟超过 1 天 → price_update_status 标记为未更新。"""
+        from src.python.report.market_value import DetailRow, price_update_status
+
+        qdii_t = DetailRow(account="证券", name="标普500QDII-A", code="159941",
+            shares=100, cost=200, price=1.82, yesterday_close=1.85,
+            nav_date="2026-07-03", source_api="eastmoney",
+            today_profit=0.0, profit=-18.0, profit_rate=0.0, premium="--",
+            market_value=182.0)
+        qdii_stale = DetailRow(account="证券", name="标普500QDII-B", code="016055",
+            shares=100, cost=200, price=1.80, yesterday_close=1.85,
+            nav_date="2026-06-30", source_api="eastmoney",  # T-3, too stale
+            today_profit=0.0, profit=-20.0, profit_rate=0.0, premium="--",
+            market_value=180.0)
+
+        with (
+            patch("src.python.report.market_value.get_last_trading_day",
+                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_prev_trading_day",
+                  return_value="2026-07-02"),
+        ):
+            updated, total, all_updated = price_update_status(
+                [qdii_t, qdii_stale], "2026-07-03")
+            self.assertEqual(updated, 1)  # T 的 QDII 已更新
+            self.assertEqual(total, 2)
+            self.assertFalse(all_updated)
+
+
+# ═══════════════════════════════════════════════════════════
+# T20: 节假日调休 — 调休工作日/放假日的交易日判断
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.scenario_datetime
+@pytest.mark.scenario
+class TestHolidayMakeupWorkday(unittest.TestCase):
+    """T20: 节假日调休 — 调休工作日（周日上班）vs 调休放假（周六休息）的交易日判断。
+
+    交易日历包含调休规则时，_is_trading_day 应正确识别。
+    """
+
+    _MAKEUP_CALENDAR = {
+        "2026-07-01", "2026-07-02", "2026-07-03",  # Wed-Fri 正常
+        "2026-07-04",  # Saturday 调休上班（在日历中）
+        "2026-07-06", "2026-07-07", "2026-07-08", "2026-07-09", "2026-07-10",  # Mon-Fri
+        # 7月11日（周六）正常休息 —— 不在日历中
+        # 7月12日（周日）正常休息 —— 不在日历中
+    }
+
+    def test_saturday_makeup_workday_is_trading(self):
+        """周六调休上班（在交易日历中）→ _is_trading_day 返回 True。"""
+        from src.python.report.market_value import _is_trading_day
+        with patch("src.python.report.market_value._get_trading_calendar",
+                   return_value=self._MAKEUP_CALENDAR):
+            self.assertTrue(_is_trading_day(datetime(2026, 7, 4)))  # Saturday
+
+    def test_saturday_holiday_not_in_calendar(self):
+        """周六调休放假（不在交易日历中）→ _is_trading_day 返回 False。"""
+        from src.python.report.market_value import _is_trading_day
+        with patch("src.python.report.market_value._get_trading_calendar",
+                   return_value=self._MAKEUP_CALENDAR):
+            self.assertFalse(_is_trading_day(datetime(2026, 7, 11)))  # Saturday
+
+    def test_fallback_weekend_not_trading(self):
+        """无交易日历回退 → 周六日均返回 False。"""
+        from src.python.report.market_value import _is_trading_day
+        with patch("src.python.report.market_value._get_trading_calendar",
+                   return_value=set()):
+            self.assertFalse(_is_trading_day(datetime(2026, 7, 4)))   # Saturday
+            self.assertFalse(_is_trading_day(datetime(2026, 7, 5)))   # Sunday
+
+    def test_makeup_workday_market_open_still_false(self):
+        """调休工作日（周六）→ is_market_open 因 weekday>=5 返回 False（已知局限）。
+
+        is_market_open 各层都查 weekday() >= 5 快速短路，
+        这是已知的局限性——调休上班日虽然 _is_trading_day 返回 True，
+        但 is_market_open 返回 False。不影响缓存 TTL 等核心功能。
+        """
+        config_patcher = patch("src.python.config.get_config",
+                               return_value={})
+        config_patcher.start()
+        try:
+            with patch("src.python.market_hours.datetime") as mock_dt:
+                mock_dt.now.return_value = datetime(
+                    2026, 7, 4, 10, 0,  # Saturday makeup workday
+                    tzinfo=timezone(timedelta(hours=8)),
+                )
+                mock_dt.timezone = timezone
+                mock_dt.timedelta = timedelta
+                mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+                mock_dt.saturday = 5
+                mock_dt.sunday = 6
+                from src.python.market_hours import is_market_open
+                self.assertFalse(is_market_open())
+        finally:
+            config_patcher.stop()
+
+    def test_get_last_trading_day_via_holiday_calendar(self):
+        """调休放假期间 get_last_trading_day 正确回退到最近交易日。"""
+        holiday_calendar = {
+            "2026-09-28", "2026-09-29", "2026-09-30",
+            "2026-10-10",  # Saturday makeup workday
+            "2026-10-12", "2026-10-13",
+        }
+        dt = datetime(2026, 10, 5, 10, 0, tzinfo=timezone(timedelta(hours=8)))
+        with (
+            patch("src.python.report.market_value.datetime") as mock_dt,
+            patch("src.python.report.market_value._is_trading_day") as mock_td,
+        ):
+            mock_dt.now.return_value = dt
+            mock_dt.timezone = timezone
+            mock_dt.timedelta = timedelta
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in holiday_calendar
+            from src.python.report.market_value import get_last_trading_day
+            # 10月5日盘中 → 非交易日（国庆假期）→ 前找 → 9月30日
+            self.assertEqual(get_last_trading_day(), "2026-09-30")
+
+
+# ═══════════════════════════════════════════════════════════
+# T21: 港股通假期差异 — A 股开市但港股通关闭
+# ═══════════════════════════════════════════════════════════
+
+
+@pytest.mark.scenario_datetime
+@pytest.mark.scenario
+class TestHKConnectHoliday(unittest.TestCase):
+    """T21: 港股通假期差异 — A 股开市但港股通关闭时的取价降级。
+
+    A 股交易日但港股通因香港假期（如佛诞日）关闭时，QDII 净值
+    延迟到 T-1，系统应正确标记 price_type 并计算 today_profit。
+    """
+
+    def test_qdii_hk_nav_t_minus_1_during_a_share_trading(self):
+        """A 股盘中 + QDII 净值 T-1（港股通假期滞后）→ today_profit=0，price_type 正确。"""
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding(account="证券", name="港股通QDII", code="016055",
+                    shares=100.0, cost_price=1.0)
+        mkt = {
+            "price": 1.05, "yesterday_close": 1.04,
+            "price_date": "2026-09-29",  # T-1（港股通假期，净值未更新）
+            "source_api": "eastmoney",
+            "name": "港股通QDII", "code": "016055",
+        }
+        with (
+            patch("src.python.report.market_value.get_last_trading_day",
+                  return_value="2026-09-30"),
+            patch("src.python.report.market_value.get_prev_trading_day",
+                  return_value="2026-09-29"),
+        ):
+            row = _compute_detail_row(h, mkt)
+            self.assertEqual(row.today_profit, 0.0)
+            self.assertEqual(row.price_type, "官方净值(T-1)")
+
+    def test_qdii_hk_nav_t_during_a_share_trading(self):
+        """A 股盘中 + QDII 净值 T（港股通正常）→ 计算本日盈亏。"""
+        from src.python.report.market_value import _compute_detail_row
+        h = Holding(account="证券", name="港股通QDII", code="016055",
+                    shares=100.0, cost_price=1.0)
+        mkt = {
+            "price": 1.06, "yesterday_close": 1.04,
+            "price_date": "2026-09-30",  # T（正常更新）
+            "source_api": "eastmoney",
+            "name": "港股通QDII", "code": "016055",
+        }
+        with patch("src.python.report.market_value.get_last_trading_day",
+                   return_value="2026-09-30"):
+            row = _compute_detail_row(h, mkt)
+            self.assertGreater(row.today_profit, 0.0)
+
+    def test_price_update_status_hk_connect_closed(self):
+        """港股通假期 → QDII 净值 T-1 视为已更新（时差容忍），T-2 视为未更新。"""
+        from src.python.report.market_value import DetailRow, price_update_status
+
+        qdii_t_minus_1 = DetailRow(account="证券", name="港股通QDII-A", code="016055",
+            shares=100, cost=100, price=1.05, yesterday_close=1.04,
+            nav_date="2026-09-29", source_api="eastmoney",
+            today_profit=0.0, profit=5.0, profit_rate=0.0, premium="--",
+            market_value=105.0)
+        qdii_t_minus_2 = DetailRow(account="证券", name="港股通QDII-B", code="017730",
+            shares=100, cost=100, price=1.03, yesterday_close=1.05,
+            nav_date="2026-09-28", source_api="eastmoney",
+            today_profit=0.0, profit=3.0, profit_rate=0.0, premium="--",
+            market_value=103.0)
+
+        with (
+            patch("src.python.report.market_value.get_last_trading_day",
+                  return_value="2026-09-30"),
+            patch("src.python.report.market_value.get_prev_trading_day",
+                  return_value="2026-09-29"),
+        ):
+            updated, total, all_updated = price_update_status(
+                [qdii_t_minus_1, qdii_t_minus_2], "2026-09-30")
+            self.assertEqual(updated, 1)  # T-1 视为已更新
+            self.assertEqual(total, 2)
+            self.assertFalse(all_updated)
+
+
 if __name__ == "__main__":
     unittest.main()

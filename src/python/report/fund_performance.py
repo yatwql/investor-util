@@ -91,13 +91,16 @@ def _is_fund(h: Holding) -> bool:
     return True
 
 
-def _format_return(val: Any) -> str:
-    """格式化收益率为带正负号的百分比字符串。"""
+def _format_return(val: Any) -> float | str:
+    """格式化收益率为小数（供 Excel 百分比格式使用）。
+
+    Returns:
+        小数（如 0.0523 表示 5.23%），或 "--" 表示无数据
+    """
     if val is None or val == "--":
         return "--"
     try:
-        v = float(val)
-        return f"{v:+.2f}%"
+        return float(val) / 100  # 转为小数供 Excel 0.00% 格式使用
     except (ValueError, TypeError):
         return "--"
 
@@ -276,8 +279,8 @@ def _write_one_fund_row(
         _format_return(rankings.get("近3月", {}).get("return")),
         _format_return(rankings.get("近6月", {}).get("return")),
         _format_return(rankings.get("近1年", {}).get("return")),
-        f"{profit_val:+,.2f}",
-        f"{profit_rate_val * 100:+.2f}%",
+        profit_val,
+        profit_rate_val,  # 已为小数（如 0.0523），Excel 0.00% 格式自动处理
         benchmark, comment,
         _format_rank(rankings.get("同类排名", {})),
         _coverage_text(fund.code, profit_forecast),
@@ -414,19 +417,20 @@ def _write_empty_row(ws, row: int, fund: Holding) -> None:
     write_data_row(ws, row, vals, _num_formats())
 
 
-def _num_formats() -> list[str]:
+def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
+    from src.python.report.styles import FMT_PERCENT, FMT_MONEY
     return [
-        "",           # 1  基金
-        "",           # 2  代码
-        "",           # 3  类型
-        "",           # 4  近3月（字符串 %）
-        "",           # 5  近6月
-        "",           # 6  近12月
-        "",           # 7  持仓累计盈亏(¥)（字符串 ¥）
-        "",           # 8  持仓收益率（字符串 %）
-        "",           # 9  业绩基准
-        "",           # 10 业绩评价
-        "",           # 11 同类排名
-        "",           # 12 机构覆盖
+        None,          # 1  基金（文本）
+        None,          # 2  代码（文本）
+        None,          # 3  类型（文本）
+        FMT_PERCENT,   # 4  近3月
+        FMT_PERCENT,   # 5  近6月
+        FMT_PERCENT,   # 6  近12月
+        FMT_MONEY,     # 7  持仓累计盈亏(¥)
+        FMT_PERCENT,   # 8  持仓收益率
+        None,          # 9  业绩基准（文本）
+        None,          # 10 业绩评价（文本）
+        None,          # 11 同类排名（文本）
+        None,          # 12 机构覆盖（文本）
     ]

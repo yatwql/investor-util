@@ -62,11 +62,12 @@ investor-util/
 │   │   ├── tui.py                # 键盘输入封装
 │   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
 │   │   └── tui_menu.py           # 菜单交互
-│   └── test/                     # 测试（按标记分组目录，≈1938+ passed）
+│   └── test/                     # 测试（按标记分组目录，≈2056+ passed）
 │       ├── conftest.py           # pytest 配置 + 19 个分层标记注册
 │       ├── helpers.py            # 测试辅助工具
-│       ├── unit/                 # 单元测试（8 子组，≈1810 项）
-│       ├── scenario/             # 场景测试（4 子组，≈107 项）
+│       ├── unit/                 # 单元测试（8 子组，≈1888 项）
+│       ├── integration/          # 集成测试（5 子组，≈25 项）
+│       ├── scenario/             # 场景测试（4 子组，≈159 项）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志

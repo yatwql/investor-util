@@ -119,20 +119,20 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
 
-- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime），共 143 项。这些测试模拟真实用户操作（如菜单 E/H/B/L 生成报告），组合多个模块进行端到端验证。
+- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime），共 159 项。这些测试模拟真实用户操作（如菜单 E/H/B/L 生成报告），组合多个模块进行端到端验证。
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
-- **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`），共 168 项。在全部 143 项业务场景基础上，增加 25 项模块间验证：接口契约（7 项）、错误隔离（3 项）、新闻流水线（4 项）、缓存一致性（4 项）、TUI 路由（7 项）。用于修改了跨模块调用关系后的定向回归。
+- **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`），共 184 项。在全部 159 项业务场景基础上，增加 25 项模块间验证：接口契约（7 项）、错误隔离（3 项）、新闻流水线（4 项）、缓存一致性（4 项）、TUI 路由（7 项）。用于修改了跨模块调用关系后的定向回归。
 - **`--mode verify`** 覆盖范围最广的组合模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。这是"快速回查"的上限——确保数据管道整条链路正常，但跳过纯 UI、纯 LLM 等不直接影响数据流的模块。
 
 #### 🔷 专项验证系列（`edge` / `data` / `smoke`）
 
-- **`--mode edge`** 仅运行标记为 `edge` 的测试（93 项），覆盖各种异常和边界情况：零值、空数据集、并发竞态、Unicode、时区安全、文件系统边界等。适用于修改了函数内部错误处理逻辑后的针对性验证。
+- **`--mode edge`** 仅运行标记为 `edge` 的测试（198 项），覆盖各种异常和边界情况：零值、空数据集、并发竞态、Unicode、时区安全、文件系统边界、API 网络异常等。适用于修改了函数内部错误处理逻辑后的针对性验证。
 - **`--mode data`** 仅运行标记为 `data` 的测试（65 项），覆盖数据精确性：市值=价格×份额、盈亏=市值-成本、收益率=盈亏÷成本（成本>0）、穿透 TOP10 占比归一化等。适用于修改了数值计算逻辑后的回归。
 - **`--mode smoke`** 仅运行标记为 `smoke` 的测试（24 项），从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s，合计 ~2s。适用于部署后冒烟或极速"通不通"检查。
 
 #### 🔷 全量（`all`）
 
-- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全部 2056 项测试。包含所有单元测试、场景测试、集成测试、跨类标记测试。约 26min，作为发布前的最终全量回归。
+- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全部 2198 项测试。包含所有单元测试、场景测试、集成测试、跨类标记测试。约 26min，作为发布前的最终全量回归。
 
 #### 多模式组合
 
@@ -149,21 +149,21 @@ python scripts/test_runner.py --mode scenario,edge
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-03）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-04）测试覆盖规模：
 
 ### 模式对应测试量
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:---------|
-| `unit` | 1888 | ~25min |
+| `unit` | 1993 | ~25min |
 | `standard` | 1730 | ~25min |
 | `scenario` | 143 | ~25s |
 | `regression` | 143 | ~25s |
 | `verify` | 718 | ~10min |
 | `integration` | 168（场景 143 + 模块契约/缓存/TUI 25） | ~35s |
-| `edge` | 93 | ~10s |
+| `edge` | 198 | ~15s |
 | `data` | 65 | ~10s |
-| `all` | 2056 | ~26min |
+| `all` | 2198 | ~26min |
 | `smoke` | 24 | ~2s |
 
 ### 功能域对应测试源
@@ -173,21 +173,21 @@ python scripts/test_runner.py --mode scenario,edge
 | 功能域 | 源模块（`src/python/`） | 对应测试文件（`src/test/`） | 覆盖项数 |
 |:-------|:-----------------------|:---------------------------|:--------:|
 | **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 166 |
-| **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund.py` + `test_chain.py` | 122 |
+| **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund.py` + `test_chain.py` + `test_api_edge.py` | 145 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
 | **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone) | `unit/report/test_{excel_generator,excel_writer,html_writer,category,summary,market_value,penetration,fund_performance,early_warning,news_correlation,qdii_timezone,excel_roundtrip,html_template}.py` 等 17 文件 | 614 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton) | `unit/llm/`(10 文件) + `scenario/llm/test_llm_scenarios.py` | 368 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` | 287 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 45 |
 | **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 142 |
-| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic, resilience, llm, datetime 共 4 文件) | 143 |
+| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic, resilience, llm, datetime 共 4 文件) | 159 |
 
 ### 场景测试分组（scenario）
 
 | 标记 | 覆盖场景 | 覆盖项数 | 典型耗时 |
 |:-------|:---------|:--------:|:---------|
-| `scenario`（父标记） | S1-S20 + T1-T16 全量业务场景 | **143** | ~25s |
-| ├─ `scenario_basic` | 基础业务链路 S1-S5 | 14 | ~2s |
+| `scenario`（父标记） | S0a-S0d + S1-S20 + T1-T16 全量业务场景 | **159** | ~25s |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d | 30 | ~3s |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | — |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | — |
 | │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 | — |
@@ -206,14 +206,14 @@ python scripts/test_runner.py --mode scenario,edge
 
 | 标记 | 覆盖模块 | 覆盖项数 | 典型耗时 |
 |:-------|:---------|:--------:|:---------|
-| `unit`（父标记） | 8 个子组合计 | **1888** | ~25min |
+| `unit`（父标记） | 8 个子组合计 | **1993** | ~25min |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 166 | ~2min |
-| ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业） | 122 | ~1.5min |
+| ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常） | 145 | ~2min |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架） | 336 | ~4min |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 | ~2min |
-| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入；含 60 项 data 标记测试） | 614 | ~7min |
-| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key） | 45 | ~30s |
-| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表） | 287 | ~3.5min |
+| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入；含 60 项 data 标记测试） | 667 | ~8min |
+| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key） | 55 | ~30s |
+| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表） | 306 | ~4min |
 | └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 142 | ~2min |
 
 ### 跨类标记
@@ -222,7 +222,7 @@ python scripts/test_runner.py --mode scenario,edge
 |:-------|:---------|:--------:|:---------|
 | `llm` | 全部 LLM 相关（unit_llm 336 + scenario_llm 24） | **360** | ~4min |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** | ~2s |
-| `edge` | 异常/边界场景 | **93** | ~10s |
+| `edge` | 异常/边界场景 | **198** | ~15s |
 | `data` | 数据正确性验证 | **65** | ~10s |
 
 ### LLM 标记说明
@@ -312,8 +312,8 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 
 | 表达式 | 覆盖范围 | 测试项数 |
 |:-------|:---------|:--------:|
-| `scenario` | 全部业务场景 S1-S20 + T1-T16 | 143 |
-| `scenario_basic` | 基础链路 S1-S5 | 14 |
+| `scenario` | 全部业务场景 S0a-S0d + S1-S20 + T1-T16 | 159 |
+| `scenario_basic` | 基础链路 S1-S5 + S0a-S0d | 30 |
 | ├ `scenario_stock` | S1: 纯股票组合 | 3 |
 | ├ `scenario_fund` | S2: 纯基金组合 | 2 |
 | ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 |
@@ -334,14 +334,14 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 
 | 表达式 | 覆盖范围 | 测试项数 |
 |:-------|:---------|:--------:|
-| `unit` | 所有单元测试 | 1888 |
+| `unit` | 所有单元测试 | 1993 |
 | `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 166 |
-| `unit_fetcher` | 数据获取调度 | 122 |
+| `unit_fetcher` | 数据获取调度 | 145 |
 | `unit_llm` | LLM 模块 | 336 |
 | `unit_news` | 新闻处理 | 176 |
-| `unit_report` | 报表生成 | 614 |
-| `unit_config` | 配置管理 | 45 |
-| `unit_core` | 核心基础设施（缓存/模型/注册表等） | 287 |
+| `unit_report` | 报表生成 | 667 |
+| `unit_config` | 配置管理 | 55 |
+| `unit_core` | 核心基础设施（缓存/模型/注册表等） | 306 |
 | `unit_ui` | TUI 交互 | 142 |
 | `unit_providers or unit_fetcher` | 数据管道（Provider + 调度） | 288 |
 
@@ -350,7 +350,7 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 | 表达式 | 覆盖范围 | 测试项数 |
 |:-------|:---------|:--------:|
 | `smoke` | 冒烟（6 文件 × 4 项） | 24 |
-| `edge` | 边缘/异常场景 | 93 |
+| `edge` | 边缘/异常场景 | 198 |
 | `data` | 数据正确性验证 | 65 |
 | `llm` | 全部 LLM（单元 336 + 场景 24） | 360 |
 | `not llm` | 排除 LLM 后的全量 | 1696 |

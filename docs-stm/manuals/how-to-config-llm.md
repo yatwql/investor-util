@@ -12,10 +12,16 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 > **为什么拆分？** `llm_key.json` 包含 API Key，可加入 `.gitignore` 避免误提交；
 > `llm_settings.json` 不含密钥，可安全纳入版本控制，方便团队共享调优参数。
 >
-> **不配置会怎样？** `llm_key.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示：
-> ```
-> 本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）
-> ```
+> **不配置会怎样？** `llm_key.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示。不同失败场景的占位文本：
+> 
+> | 原因 | 占位文本 |
+> |------|---------|
+> | LLM 未配置 | 本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json） |
+> | API 调用失败 | 本节内容待生成 — LLM API 调用失败（请检查 API Key 和网络连接后重新生成） |
+> | 请求超时 | 本节内容待生成 — LLM API 请求超时（可尝试在 llm_settings.json 中增大 timeout 配置） |
+> | 网络连接失败 | 本节内容待生成 — LLM API 网络连接失败（请检查网络后重新生成） |
+> | 熔断冷却中 | 本节内容待生成 — LLM API 暂时不可用（熔断冷却中，请稍后重试） |
+> | 模块已禁用 | （直接跳过，无占位文本，报告中不出现该页签） |
 
 ---
 
@@ -63,7 +69,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 > **注意**：
 > - `system_prompt_*` 默认值为 `null`，表示使用代码内置提示词。填入字符串可覆盖。
 > - 代码内置提示词定义在 `src/python/llm/prompts.py` 中（`_SYSTEM_GLOBAL_MACRO`、`_SYSTEM_EXPERT_REVIEW` 等变量），更新代码时可自动升级。
-> - `pricing` 段可省略（使用代码内置定价），仅需自定义覆盖时添加，详见下方「完整模型定价表」章节。
+> - `pricing` 段可省略（使用代码内置定价），仅需自定义覆盖时添加，详见下方「完整模型定价表」章节。如需新增或覆盖任意模型的 Token 单价，在 `pricing` 中添加模型条目即可，未覆盖的模型自动使用内置价格。
 
 **Step 3**：启动程序，菜单选 **L** 生成包含 LLM 分析的完整版报告。
 
@@ -141,7 +147,14 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 #### 3. 指纹驱动的缓存自动失效
 
-每个标准模块的缓存键基于**持仓数据指纹**生成（含持仓市值、成本、盈亏、分类、穿透资产等核心维度）。指纹哈希值随数据变化而改变，缓存自动失效：
+每个标准模块的缓存键基于**持仓数据指纹**生成，指纹成分因模块而异：
+
+| 模块 | 指纹包含 |
+|:-----|:---------|
+| **全球政经局势** | 市场指数 + 总市值 + 总盈亏 + 分类 |
+| **智囊团复盘/体检报告/穿透分析** | 总市值/成本/盈亏 + 每笔持仓明细 + 穿透资产 + 分类 |
+
+指纹哈希值随数据变化而改变，缓存自动失效：
 
 - **触发缓存的变更**：持仓数据更新、指数数据变更、穿透资产变更
 - **不变更缓存的操作**：菜单 **L** 反复生成（相同指纹下直接命中缓存）
@@ -195,6 +208,19 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 └── news_correlation    — 新闻 LLM 关联分析（可选）
 ```
 
+每个 `per_module` 条目包含以下字段（来自 `session.py` 的 `_record_per_module()`）：
+
+| 字段 | 类型 | 含义 |
+|------|------|------|
+| `model` | str | 实际调用的模型名 |
+| `input_tokens` | int | 输入 token 数 |
+| `output_tokens` | int | 输出 token 数 |
+| `cache_hit_tokens` | int | 其中缓存命中的 token 数 |
+| `cost` | float | 估算费用 |
+| `cached` | bool | 是否命中缓存 |
+| `thinking` | bool | 是否开启 Extended Thinking |
+| `endpoint` | str | API 端点 |
+
 **覆盖范围说明：**
 - 会话级统计包含全部 5 个 LLM 子模块（1 个可选），其中 `news_correlation` 仅在 `enabled_llm.news_correlation = true` 时计入
 - 缓存命中：仅记录到 `per_module`（标记 `cached=True`），不计入 `call_count`
@@ -207,7 +233,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 | 输出端 | 展示形式 | 说明 |
 |:-------|:---------|:-----|
-| **Excel 报告** | 独立页签 `12.LLM API 用量` + 汇总页补充区块 | 仅菜单 L |
+| **Excel 报告** | 独立页签 `12.LLM API 用量`（放至最右侧）；汇总页（Sheet 1）底部追加一行摘要，显示调用次数和总费用 | 仅菜单 L |
 | **HTML 报告** | 报告第 12 节（底部） | 仅菜单 L |
 | **TUI 终端** | 一行摘要 | 每次菜单 L 完成时输出 |
 | **调试日志** | `logs/app.log` | 每次 API 调用后记录明细 |
@@ -281,7 +307,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `max_tokens_{module}` | int | 1024~8192（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试） |
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
-| `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200~300 字。**批量模式不支持** |
+| `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式不支持** |
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude 或 DeepSeek） |
 | `thinking_budget_{module}` | int | 4000~16000（模块差异） | **仅 Claude** Thinking token 预算。自动兜底 ≥ `max_tokens` + 4096 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
@@ -390,15 +416,15 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 ## 各模块推荐参数值
 
-> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`model=null`（使用默认）、`reasoning_effort="high"`。完整参数说明见上方「模块级配置」表。
+> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`reasoning_effort="high"`。完整参数说明见上方「模块级配置」表。
 
-| 模块 | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | model |
-|------|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:-----:|
-| **全球政经局势** | **0.3**（低温保事实） | **1024** | **60s** | false | 4000 | null（使用默认） |
-| **智囊团深度复盘** | **0.8**（高温促多元） | **8192** | **120s** | **true** ⭐ | 16000 | null |
-| **持仓体检报告** | **0.5**（居中平衡） | **4096** | **120s** | **true** | 12000 | null |
-| **穿透深度分析** | **0.4**（中低温稳定） | **4096** | **90s** | false | 8000 | null |
-| **财经新闻关联分析** | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | null（可换轻量模型降成本） |
+| 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | output_brief_limit |
+|------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:------------------:|
+| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **1024** | **60s** | false | 4000 | **200 字** |
+| **智囊团深度复盘** | null | **0.8**（高温促多元） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
+| **持仓体检报告** | null | **0.5**（居中平衡） | **4096** | **120s** | **true** | 12000 | 300 字 |
+| **穿透深度分析** | null | **0.4**（中低温稳定） | **4096** | **90s** | false | 8000 | 300 字 |
+| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | 不适用（批量模式） |
 
 > **temperature 项说明**：
 > - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**>0.5 时全球政经局势可能编造经济指标**。
@@ -638,19 +664,11 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 ## 新增 LLM 服务章节规范
 
-增加新的 LLM 服务章节时，必须同步完成以下步骤：
+增加新的 LLM 服务章节时，共同的注册/配置/生成/写入步骤见 **[how-to-use-registry.md → 新增 LLM 模块检查清单](how-to-use-registry.md#新增-llm-模块检查清单)**（共 7 步，含注册表测试和标记合规验证）。在 registry 清单基础上，补充以下本领域特有的步骤：
 
-1. **`registry.py`** — 在 `_MODULE_REGISTRY` 中添加 `DataModuleDef`，含 `settings_suffix`（命名规则：`{module_suffix}`）
-2. **`llm_settings.json`** — 增加一整套配置键（10 个），命名格式为 `{key}_{module_suffix}`
-3. **`src/python/llm/generators.py`** — 添加 LLM 入口函数，闭包委托 `_generate_llm_module()`：
-   - 标准模式：实现 `_fingerprint()` 和 `_prompt()` 闭包
-   - 批量模式：实现 `_batch_preparer()`、`_per_item_cache_fn()`、`_batch_prompt_fn()` + 独立 `response_parser`
-4. **`prompts.py`** — 添加系统提示词常量和提示词构建函数
-5. **`report/llm_content.py`** — 在 `write_llm_sheets()` 中添加新页签（章节名→模块键映射由 `_get_module_key_map()` 自动派生，无需手动维护）
-6. **`llm/__init__.py`** — 若需要 export 新生成函数
-7. **报告模板** — Excel：`generators.py` 自动从 `llm_settings.json` 读取 model/thinking 参数传入骨干函数；HTML：在 `html_writer.py` 适配
-8. **缓存 TTL** — 在 `config.json` → `cache_ttl` 中添加 `llm_{module}` 条目
-9. **用户文档** — 在 `llm_settings.json` 中添加推荐默认值，在本文档中添加模块说明
-
-> 上述步骤中，LLM 分析章节标题、缓存前缀、data_type 等通过 registry 自动派生，无需额外手动注册。
-> 新增模块自动享受页脚格式、会话级统计、截断重试、失败降级等公共特征。
+| # | 步骤 | 操作位置 | 产出 |
+|---|------|---------|------|
+| ① | **添加系统提示词** | `llm/prompts.py` | 新增 `_SYSTEM_{MODULE}` 常量和提示词构建函数 |
+| ② | **适配报告模板** | `report/html_writer.py`（HTML）+ `report/llm_content.py`（Excel） | 新章节在两种报告中正确渲染 |
+| ③ | **配置缓存 TTL** | `data/config/config.json` → `cache_ttl` | 添加 `llm_{module}` 条目 |
+| ④ | **更新用户文档** | `data/config/llm_settings.json`（推荐默认值）+ 本文档（模块说明） | 用户可查阅和配置 |

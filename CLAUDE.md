@@ -10,9 +10,9 @@
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：`src/test/test_*.py`，执行 `pytest src/test/`
-  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode regression`（120 项业务场景，~25s），否则不得 commit
-  - **合入门禁（P1）**：合并到 master 前必须通过 `python scripts/test_runner.py --mode verify`（场景+核心模块 695 项，~10min），否则不得 merge
-  - **发布门禁（P2）**：发布版本前必须通过 `python scripts/test_runner.py --mode all`（全量 1971 项，~26min），否则不得 release
+  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode regression`（143 项业务场景，~25s），否则不得 commit
+  - **合入门禁（P1）**：合并到 master 前必须通过 `python scripts/test_runner.py --mode verify`（场景+核心模块 718 项，~10min），否则不得 merge
+  - **发布门禁（P2）**：发布版本前必须通过 `python scripts/test_runner.py --mode all`（全量 2056 项，~26min），否则不得 release
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。
 - **测试标记强制**：所有新增/修改的测试用例（测试类或测试方法）**必须**标注对应的 pytest marker（如 `@pytest.mark.unit_providers`、`@pytest.mark.scenario_basic` 等），marker 定义见 `src/test/conftest.py` 的 `pytest_configure`。新增 marker 需同步注册到 `conftest.py` 和维护文档。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。

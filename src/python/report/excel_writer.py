@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import datetime
+import shutil
+from datetime import datetime, timedelta
 from typing import Any
 
 from openpyxl import Workbook
@@ -69,6 +70,41 @@ def _archive_path(output_dir: str) -> str:
     return os.path.join(output_dir, date_str, fname)
 
 
+_REPORT_RETENTION_DAYS = 180  # 归档报告保留天数，超过此天数的自动清理
+
+
+def _cleanup_old_archives(output_dir: str, max_days: int = _REPORT_RETENTION_DAYS) -> None:
+    """清理超过 max_days 天的归档报告目录。
+
+    扫描 output_dir 下所有 YYYYMMDD 格式的归档子目录，
+    删除早于保留天数的目录及其内容。
+
+    Args:
+        output_dir: 报告输出根目录
+        max_days: 保留天数，默认为 _REPORT_RETENTION_DAYS
+    """
+    try:
+        now = datetime.now()
+        cutoff = now - timedelta(days=max_days)
+        for entry in os.listdir(output_dir):
+            dir_path = os.path.join(output_dir, entry)
+            if not os.path.isdir(dir_path):
+                continue
+            # 只处理 YYYYMMDD 格式的目录（归档报告目录）
+            if not re.match(r"^\d{8}$", entry):
+                continue
+            try:
+                dir_mtime = datetime.strptime(entry, "%Y%m%d")
+                if dir_mtime < cutoff:
+                    shutil.rmtree(dir_path)
+                    age = (now - dir_mtime).days
+                    logger.info("已清理过期归档目录: %s（%d 天前）", dir_path, age)
+            except ValueError:
+                continue
+    except Exception:
+        logger.warning("归档清理过程异常（非关键），跳过", exc_info=True)
+
+
 def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
     """保存 workbook 到最新路径和存档路径，返回最新文件路径。
 
@@ -107,6 +143,9 @@ def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
     except (PermissionError, OSError) as e:
         logger.warning("存档报告写入失败: %s", e)
         print("  [!] 存档报告写入失败（文件可能被占用），最新版已保存")
+
+    # 清理过期归档（非关键），避免目录无限增长
+    _cleanup_old_archives(output_dir)
 
     return os.path.abspath(latest)
 

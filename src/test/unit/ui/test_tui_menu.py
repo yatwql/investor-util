@@ -125,6 +125,11 @@ class TestPrintFunctions(unittest.TestCase):
 class TestConfigCache(unittest.TestCase):
     """配置缓存访问测试。"""
 
+    def setUp(self) -> None:
+        """重置模块级 _config_cache 为初始 None，防止前序测试的副作用。"""
+        import src.python.tui_menu as _tm
+        _tm._config_cache = None
+
     def test_get_config_cache_default(self) -> None:
         """未初始化时返回 None。"""
         self.assertIsNone(get_config_cache())

@@ -15,6 +15,8 @@ from src.python.llm.api import (
     _call_llm,
     _CACHE_LINE_HTML,
     _cache_line_model_tpl,
+    _clear_last_llm_failure,
+    _get_last_llm_failure,
     _LLM_TIMEOUT,
     _TRUNCATION_MARKER,
     _extract_model_from_cached,
@@ -28,7 +30,10 @@ from src.python.llm.prompts import (
     _LLM_MODULE_FAILURE,
     FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_API_ERROR,
+    FAIL_REASON_CIRCUIT_OPEN,
     FAIL_REASON_DISABLED,
+    FAIL_REASON_NETWORK_ERROR,
+    FAIL_REASON_TIMEOUT,
 )
 
 from src.python.registry import get_llm_module_name
@@ -215,6 +220,7 @@ def _generate_llm_content(
             return (_handle_cache_hit(cached, cache_key, module_key, model, llm_config, thinking_enabled), True)
 
     # ── LLM 调用 → 截断重试 → 处理结果 ──
+    _clear_last_llm_failure()
     result, usage = _call_llm(system_prompt, user_prompt, llm_config,
                               timeout=timeout, http_client=http_client,
                               max_tokens=max_tokens, config_field=config_field,
@@ -228,7 +234,9 @@ def _generate_llm_content(
 
     logger.warning("LLM 内容生成失败: %s", cache_key)
     if module_key:
-        _LLM_MODULE_FAILURE[module_key] = FAIL_REASON_API_ERROR
+        # 使用 api.py 记录的详细失败原因（区分熔断/超时/网络/API 错误）
+        failure_reason = _get_last_llm_failure() or FAIL_REASON_API_ERROR
+        _LLM_MODULE_FAILURE[module_key] = failure_reason
     return (None, False)
 
 

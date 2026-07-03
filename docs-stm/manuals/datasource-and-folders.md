@@ -195,15 +195,17 @@ investor-util/
 │       │       ├── test_handlers.py      # 菜单命令 — 缓存刷新/配置/LLM 模块管理（23 项）
 │       │       └── test_log_sanitize.py  # 日志脱敏 — 敏感信息过滤/安全日志（40 项）
 │       │
-│       └── scenario/                     # 场景测试（120 项，4 个子分组）
+│       ├── integration/                # 集成测试（25 项，5 个子分组）
+│       └── scenario/                     # 场景测试（159 项，4 个子分组）
 │           ├── __init__.py               # 子包标记（空文件）
-│           ├── basic/                    # 基础业务场景 S1-S5（14 项）
+│           ├── basic/                    # 基础业务场景 S1-S5 + S0a-S0d（30 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
-│           │   └── test_integration.py   # S1-S5：持仓读取/行情获取/市值核算/分类汇总/报告生成
+│           │   ├── test_integration.py              # S1-S5：持仓读取/行情获取/市值核算/分类汇总/报告生成
+│           │   └── test_scenario_holdings_quality.py # S0a-S0d（Z3）：清仓跳过/A-C份额/200+持仓/特殊字符
 │           ├── resilience/               # 异常容错场景 S6-S10（≈18 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   └── test_integration_scenarios.py  # S6-S10：纯债分类/网络降级/单行报告/零成本利润/极端份额
-│           ├── llm/                      # LLM 场景 S11-S20（27 项）
+│           ├── llm/                      # LLM 场景 S11-S20（32 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   └── test_llm_scenarios.py # S11-S20：混合缓存/全部失败/Thinking/禁用/断网/部分超期/HTML 分支
 │           └── datetime/                 # 日期时间场景 T1-T16（≈61 项）

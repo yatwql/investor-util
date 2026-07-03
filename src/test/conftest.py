@@ -2,7 +2,7 @@
 
 标记分组（支持 -m 选择运行）：
   - scenario: 全部业务场景（S1-S20 + T1-T16）
-    - scenario_basic: 基础业务链路（S1-S5）
+    - scenario_basic: 基础业务链路（S1-S5 + S0a-S0d）
     - scenario_resilience: 异常容错场景（S6-S10）
     - scenario_llm: LLM 场景组合（S11-S20）
     - scenario_datetime: 日期/时间场景（T1-T16）
@@ -18,7 +18,7 @@
   pytest src/test/ -m "smoke"                                    # 仅冒烟
   pytest src/test/ -m "not llm"                                  # 排除 LLM
   pytest src/test/ -m "scenario"                                 # 全部场景 S1-S20 + T1-T16
-  pytest src/test/ -m "scenario_basic"                           # 仅基础链路 S1-S5
+  pytest src/test/ -m "scenario_basic"                           # 仅基础链路 S1-S5 + S0a-S0d
   pytest src/test/ -m "scenario_llm or scenario_datetime"        # LLM + 日期时间场景
   pytest src/test/                                             # 全量运行
 """
@@ -29,7 +29,7 @@ from __future__ import annotations
 def pytest_configure(config):
     """注册自定义标记，避免 pytest 警告。"""
     config.addinivalue_line("markers", "scenario: 业务场景集成测试（S1-S20 + T1-T16）")
-    config.addinivalue_line("markers", "scenario_basic: 基础业务链路（S1-S5）")
+    config.addinivalue_line("markers", "scenario_basic: 基础业务链路（S1-S5 + S0a-S0d）")
     config.addinivalue_line("markers", "scenario_resilience: 异常容错场景（S6-S10）")
     config.addinivalue_line("markers", "scenario_llm: LLM 场景组合（S11-S20）")
     config.addinivalue_line("markers", "scenario_datetime: 日期/时间场景（T1-T16）")

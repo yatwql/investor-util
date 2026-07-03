@@ -7,18 +7,49 @@
 ## [Unreleased]
 
 ### Added
+- **Y1 迭代完成（API/网络异常纵深，23 项 edge 测试）**：`test_api_edge.py`（`unit/fetcher/`）新增 23 项测试，覆盖 Provider 层 HTTP 异常（4 项：超时/DNS 解析失败/连接拒绝/SSL 证书错误，均返回 None 不抛出）、Provider Chain 多级降级（4 项：主链路失败→备链路成功、全部失败→过期缓存降级、全部失败无缓存→返回 None、Provider 抛出异常→跳过该链路）、响应解析异常（5 项：空响应体/截断字段/非 JSON/空 JSON/编码异常）、LLM API 错误分类（8 项：429/503 可重试、401/500 retryable、超时可重试、连接错误 retryable、正常 200 success）、HTTP 客户端 SSL 验证（2 项：SSL_VERIFY=false 关闭验证、默认 true）。单元测试 1970→1993，edge 测试 175→198，全量 2175→2198。，覆盖 CSV 公式注入（2 项：=`+/` 开头名称不执行公式）、XSS 缓存注入（3 项：`<script>`/`<img onerror>` 原样保留、Jinja2 autoescape=False 确认、payload 传递校验）、符号链接（2 项：目录遍历不跟随符号链接）、路径遍历（2 项：`../` 和 `..\\` 被 `_` 替换不逃逸缓存目录）、API Key 日志泄漏（1 项：交叉验证 _sanitize_endpoint）、JSON 原型污染（2 项：Python json.loads 无 __proto__ 风险、config.json 含 __proto__ 不被特殊处理）、临时文件竞争（3 项：mkstemp 原子写入检查 + 并发写入不崩溃）。确认 Jinja2 autoescape=False 为已知技术债务。
+- **Y4 迭代完成（数值计算纵深，16 项 edge 测试）**：`test_market_value_edge.py` 新增 `TestNumericalEdgeY4` 类（16 项），覆盖浮点累加误差（2 项）、极微份额 0.01/0.0001（2 项）、超高单价 20 万 + 万元级精度（2 项）、收益率超 ±1000%（2 项）、NaN 传播链 price/yclose（2 项）、int32/int64 溢出（2 项）、负成本（1 项）、零成本 profit_rate=None（1 项）、多数量级累加保留（2 项）。边缘场景测试总数从 ~86 增至 ~102 项。
+- **Y3 迭代完成（文件系统纵深，18 项 edge 测试）**：`test_filesystem_edge.py` 新增 18 项测试，覆盖加密 Excel/xlsm 宏（2 项：加密文件 ValueError、xlsm 不被 list_xlsx_files 识别）、隐藏工作表（1 项：veryHidden 跳过）、损坏 xlsx（2 项：非 zip 格式/截断 zip → ValueError）、UNC 网络路径（2 项：UNC 传递到 load_workbook/不存在 UNC 返回空列表）、文件占用（2 项：PermissionError/OSError 不崩溃）、权限变更（2 项：只读文件可读取、无权限目录返回空）、超长路径（2 项：不崩溃返回空/允许 OSError）、缓存篡改（4 项：损坏 JSON/空字节/0 字节/非 UTF-8 均自动删除）、空字节 xlsx（1 项：空字节不崩溃）。修复 cache.py UnicodeDecodeError 未捕获 bug（导致非 UTF-8 缓存文件无法自动恢复）。
+- **Y2 迭代完成（数据质量纵深，22 项 edge 测试）**：`test_data_quality_edge.py` 新增 22 项测试，覆盖停牌无交易（3 项：价格不变/昨日价类型/零价格不崩溃）、新基金空持仓（2 项：混合正常/归入 unknown）、穿透数据重复（2 项：同代码基金+直接持仓去重、多基金同代码合并）、多层嵌套 FOF（1 项：FOF 持有 FOF 不崩溃）、ETF 超多持仓（2 项：200 持仓不崩溃、TOP10 占比计算正确）、负价格净值（3 项：负净值穿透/负价格市值/负昨日价）、极低流动性（2 项：sub-cent 价格/零量价格不变）、债券违约（2 项：含违约债不崩溃/零净值）、同基金多层份额（3 项：A/C 穿透合并/分类检测/统一 ETF 标记）、跨市场停牌时差（2 项：A 停牌 H 正常、H 停牌 A 正常）。
 - **新增边缘场景测试文件（6 项共 19 个新测试）**：`test_config_atomic_edge.py`（3 项）、`test_cache_edge.py`（12 项）、`test_market_hours_edge.py`（8 项）、`test_chain_edge.py`（4 项）、`test_api_edge.py`（2 项）、`test_circuit_breaker_edge.py`（3 项）、`test_market_value_edge.py`（从 15→40 项）、`test_penetration_edge.py`（从 12→14 项）。边缘场景测试总数从 ~39 增至 ~86 项。
 - **集成测试覆盖增补（迭代 U）**：新增 `src/test/integration/test_integration_coverage.py`（24 项集成测试，5 类标记），覆盖模块间接口契约验证（`integration_contract`，7 项）、错误隔离语义验证（`integration_isolation`，3 项）、新闻流水线全链路集成（`integration_news_pipeline`，4 项）、跨模块缓存一致性（`integration_cache`，4 项）、TUI → Handler 路由集成（`integration_tui`，6 项）。修复 7 个已实现但引用错误/挂起的问题测试。
 - **`scripts/check-test-markers.py`**：基于 AST 的静态标记合规检查脚本，CI 模式下检测缺失/废弃/未知标记，全覆盖 66 个测试文件。
+- **W 迭代完成（剩余场景与数据正确性验证增补）**：
+  - 场景补全 5 项：T13 交易时段切换缝隙（7 个边界点）、非交易日+LLM 混合（2 项）、多账户+LLM 多轮（3 项）、净值数据空窗期（4 项）、多时区 QDII 净值一致性（6 项）—— 确认均已在 `test_datetime_scenarios.py` 和 `test_llm_scenarios.py` 中实现
+  - 数据正确性验证 9 项：三维度分类聚合一致、穿透行业占比归一化、指数行情数值合理、多币种转换正确、QDII 估值净值 vs 官方净值、基金业绩排名合理性、溢价率计算、本日盈亏场外非 T 日更新、穿透市值占比归一化——确认均在 `test_data_integrity.py` 中实现
+  - 相关文档同步更新（plan.md、conftest.py）
+- **Z3 迭代完成（持仓质量场景，scenario_basic）**：
+  - S0a: 含已清仓记录（4 项测试 — shares=0 市值/成本/盈亏均为 0，不触发除零，不影响合计）
+  - S0b: 同名基金多份额（4 项测试 — A/C 类分类正确、穿透计算不崩溃、市值合计正确）
+  - S0c: 超多持仓 200+ 条（3 项测试 — 批量明细生成、市值合计正确、多账户分组小计一致）
+  - S0d: 持仓名称含特殊字符（6 项测试 — ®/™/♥/全角括号/繁体/空格——分类、穿透、行情计算、Excel 写入、HTML 过滤器均不崩溃）
+  - 新增 `src/test/scenario/basic/test_scenario_holdings_quality.py`（16 项测试）
 
 ### Changed
+- **Y5 迭代完成（配置/环境纵深 edge 测试）**：
+  - 生产代码修复 8 处：JSON 读取 `utf-8`→`utf-8-sig`（config.py/cache.py/handlers_config.py 共 5 处，兼容 Windows BOM）；`get_llm_config()` 中 `api_key` 自动 `.strip()`（防配置文件空格导致认证失败）；TUI 颜色输出检测 `NO_COLOR`/非 TTY 时禁用 ANSI 转义码（tui_menu.py/handlers_config.py）
+  - 新增 11 项 edge 测试：BOM JSON（config + llm_settings + cache 3 项）、CRLF 行尾 + 注释（1 项）、api_key 空格 llm_key + settings（2 项）、缺失嵌套键 pricing + system_prompt（2 项）、并发 init_config（1 项）、NO_COLOR ANSI 抑制（2 项）
+  - 涉及文件：`config.py`、`cache.py`、`handlers_config.py`、`tui_menu.py`、`test_config_atomic_edge.py`、`test_cache_edge.py`
+- **X 迭代完成（UI/UX 验证增补）**：
+  - TUI Ctrl+C 中断友好化：`handlers_config.py` 中 `_cmd_config_llm_modules` 的 `input()` 增加 `try/except (EOFError, KeyboardInterrupt)`；`tui_handlers.py` 中 `_select_holdings_file` 的 `except` 增加 `KeyboardInterrupt` 捕获
+  - Excel 数字格式统一：`fund_performance.py` 和 `summary.py` 中硬编码 `'0.00%'` 和 `'#,##0.00'` 替换为 `FMT_PERCENT` 和 `FMT_MONEY`（来自 `styles.py`）
+  - 报告文件管理：`excel_writer.py` 新增 `_cleanup_old_archives()` 归档清理函数（保留 180 天），Excel 和 HTML 报告保存后自动清理过期归档目录
+  - 首次运行引导：`tui_menu.py` `_print_header()` 增加检测逻辑，缺失持仓文件或 LLM 配置时打印操作提示
+  - 涉及文件：`handlers_config.py`、`tui_handlers.py`、`tui_menu.py`、`excel_writer.py`、`html_writer.py`、`fund_performance.py`、`summary.py`
+- **Z4 迭代完成（场景补充场景，T17-T21 时间补充分组）**：
+  - T17: 跨月/跨年报告 — `get_last_trading_day`/`get_prev_trading_day` 跨年边界（12月31日→1月4日），5 项测试
+  - T18: 季末/年末效应 — 基金调仓日前后净值跳变（+10%/-5%/+20%），today_profit 计算正确，5 项测试
+  - T19: 汇率中间价故障 — QDII 行情数据不可用时的零值降级、净值延迟到 T-3 的价格类型标注、price_update_status 未更新标记，3 项测试
+  - T20: 节假日调休 — 周六调休上班/周六调休放假的 `_is_trading_day` 判断、调休工作日 `is_market_open` 已知局限、get_last_trading_day 回退行为，5 项测试
+  - T21: 港股通假期差异 — A 股开市但港股通关闭时 QDII 净值 T-1 的价格类型和 today_profit、price_update_status 时差容忍，3 项测试
+  - 新增 21 项场景测试到 `test_datetime_scenarios.py`
 - **pytest 标记重命名 — 语义化改造**：
   - S1-S10 原子标记从编号式 `scenario_s1`→`scenario_s10` 改为语义名：`scenario_stock`、`scenario_fund`、`scenario_mixed_accounts`、`scenario_new_holdings`、`scenario_cache_hit`、`scenario_bond`、`scenario_network_down`、`scenario_single_holding`、`scenario_zero_cost`、`scenario_extreme`
   - S1-S10 测试类同步重命名：`TestScenarioS1`~`TestScenarioS10` → `TestScenarioStock`~`TestScenarioExtreme`
   - 主分组标记 `scenario_extended` → `scenario_resilience`，`extended/` 目录同步重命名为 `resilience/`
 - **`unit/conftest.py`**：从自动注入模式改为验证模式，新文件漏标 `unit_*` 标记时抛出 `pytest.UsageError`
 - **`test_market_value_edge.py`**：从方法级 `@pytest.mark.edge` 统一为模块级 `pytestmark` 列表，与其他 8 个 `_edge.py` 文件风格一致
-- **全量测试计数更新**：单元测试 1810→1850，场景测试 107→128，全量 1938→1978
+- **全量测试计数更新**：单元测试 1810→1993，场景测试 107→180，集成测试 0→25，全量 1938→2198
 
 ### Removed
 - **`integration` 标记**：已注册但从未在测试类/方法上使用，移除 conftest.py 注册及 KNOWN_MARKERS 集合。

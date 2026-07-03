@@ -217,7 +217,8 @@ def _select_holdings_file() -> str | None:
         if 0 <= idx < len(files):
             return files[idx]
         print("  [ERR] 无效编号")
-    except (ValueError, EOFError):
+    except (ValueError, EOFError, KeyboardInterrupt):
+        print()
         print("  [ERR] 无效输入")
     return None
 

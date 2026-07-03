@@ -343,19 +343,19 @@ class TestFundPerformanceReasonableness(unittest.TestCase):
     """基金业绩排名数据合理性：排名/收益率在合理范围。"""
 
     def test_format_return_positive(self):
-        """正收益率 → "+X.XX%" 格式。"""
+        """正收益率 → 小数（5.23 → 0.0523，浮点近似）。"""
         from src.python.report.fund_performance import _format_return
-        self.assertEqual(_format_return(5.23), "+5.23%")
+        self.assertAlmostEqual(_format_return(5.23), 0.0523)
 
     def test_format_return_negative(self):
-        """负收益率 → "-X.XX%" 格式。"""
+        """负收益率 → 负小数（-3.14 → -0.0314，浮点近似）。"""
         from src.python.report.fund_performance import _format_return
-        self.assertEqual(_format_return(-3.14), "-3.14%")
+        self.assertAlmostEqual(_format_return(-3.14), -0.0314)
 
     def test_format_return_zero(self):
-        """零收益率 → "+0.00%"。"""
+        """零收益率 → 0.0。"""
         from src.python.report.fund_performance import _format_return
-        self.assertEqual(_format_return(0.0), "+0.00%")
+        self.assertEqual(_format_return(0.0), 0.0)
 
     def test_format_return_none(self):
         """None → "--"。"""

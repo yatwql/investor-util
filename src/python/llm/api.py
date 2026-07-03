@@ -15,6 +15,12 @@ from src.python.llm.circuit_breaker import (
     _cb_record_success,
 )
 from src.python.llm.pricing import _estimate_cost
+from src.python.llm.prompts import (
+    FAIL_REASON_API_ERROR,
+    FAIL_REASON_CIRCUIT_OPEN,
+    FAIL_REASON_NETWORK_ERROR,
+    FAIL_REASON_TIMEOUT,
+)
 from src.python.llm.session import _track_session_usage
 
 logger = logging.getLogger("invest")
@@ -29,6 +35,23 @@ __all__ = [
     "_get_retry_max", "_sanitize_endpoint",
     "_call_llm_with_retry", "_call_single_provider", "_call_llm", "_call_claude", "_call_openai",
 ]
+
+# ── 上次失败的详细原因（供调用方区分失败类型，不改变函数签名） ──
+
+_last_llm_failure_reason: str | None = None
+"""最近一次 LLM API 调用失败的详细原因（FAIL_REASON_* 常量），成功调用后为 None。"""
+
+
+def _clear_last_llm_failure() -> None:
+    """清除上次失败原因记录。"""
+    global _last_llm_failure_reason
+    _last_llm_failure_reason = None
+
+
+def _get_last_llm_failure() -> str | None:
+    """返回最近一次 LLM API 调用的失败原因，无失败时返回 None。"""
+    return _last_llm_failure_reason
+
 
 # ── 默认超时 ─────────────────────────────────────────────────
 
@@ -362,13 +385,16 @@ def _call_llm_with_retry(
     Returns:
         (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
     """
+    global _last_llm_failure_reason
     if _check_circuit_breaker(url, label):
+        _last_llm_failure_reason = FAIL_REASON_CIRCUIT_OPEN
         return (None, None)
 
     for attempt in range(max_retries + 1):
         kind, info = _attempt_api_call(client, url, headers, payload, timeout)
 
         if kind == "success":
+            _clear_last_llm_failure()
             _cb_record_success(url)
             return _process_success_response(
                 info, extract_fn, check_truncation_fn, max_tokens, config_field,
@@ -380,14 +406,17 @@ def _call_llm_with_retry(
             if _is_retry_available(label, attempt, max_retries, detail, url):
                 continue
             _cb_record_failure(url)
+            _last_llm_failure_reason = FAIL_REASON_TIMEOUT if info is None else FAIL_REASON_NETWORK_ERROR
             return (None, None)
 
         # kind == "fatal"
         logger.warning("%s API 响应解析失败: %s", label, info)
         _cb_record_failure(url)
+        _last_llm_failure_reason = FAIL_REASON_API_ERROR
         return (None, None)
 
     _cb_record_failure(url)
+    _last_llm_failure_reason = FAIL_REASON_API_ERROR
     return (None, None)
 
 

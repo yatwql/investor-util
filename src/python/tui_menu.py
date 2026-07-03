@@ -18,6 +18,14 @@ from typing import Any, Callable, Optional
 
 colorama.just_fix_windows_console()
 
+# ANSI 颜色：非 TTY 或设置了 NO_COLOR 环境变量时禁用颜色输出
+if "NO_COLOR" in os.environ or not sys.stdout.isatty():
+    _GREEN = _RED = _RESET = ""
+else:
+    _GREEN = "\033[92m"
+    _RED = "\033[91m"
+    _RESET = "\033[0m"
+
 from src.python.config import get_config, get_llm_config
 
 # 每个菜单项：(快捷键, 显示标签, 回调函数, 是否退出项)
@@ -69,6 +77,21 @@ def _print_header() -> None:
     print(f"        个人投资分析报告生成小助手  v{APP_VERSION}")
     _print_sep()
 
+    # 首次运行引导：检测是否缺少关键资源
+    config = _config_cache if _config_cache is not None else _refresh_config()
+    holdings = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))
+    _first_run_hints = []
+    if not os.path.exists(holdings):
+        _first_run_hints.append("• 请先通过菜单 [C]/[F] 配置持仓文件路径，或放置文件到默认目录")
+    llm_conf = get_llm_config()
+    if llm_conf is None or not llm_conf.get("api_key"):
+        _first_run_hints.append("• 如需 LLM 分析，请配置 data/config/llm_key.json（菜单 [S] 查看状态）")
+    if _first_run_hints:
+        print("  📋 首次使用指引：")
+        for hint in _first_run_hints:
+            print(f"    {hint}")
+        print()
+
 
 def _render_menu(sel: int) -> None:
     """打印带选择指示器的菜单。"""
@@ -99,17 +122,13 @@ def _show_config() -> None:
 
 def _show_llm_config_status() -> None:
     """显示 LLM 配置状态（绿色已配置 / 红色未配置）。"""
-    GREEN = "\033[92m"
-    RED = "\033[91m"
-    RESET = "\033[0m"
-
     llm_config = get_llm_config()
     if llm_config and llm_config.get("api_key") and llm_config.get("provider"):
         provider = llm_config["provider"]
         model = llm_config.get("model") or "默认"
         endpoint = llm_config.get("endpoint") or "默认"
         ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
-        print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
+        print(f"  LLM: {_GREEN}已配置{_RESET}  provider={provider}  model={model}  endpoint={ep_display}")
         from src.python.registry import get_llm_module_names
         _route_parts = []
         for _sfx, _name in get_llm_module_names().items():
@@ -117,7 +136,7 @@ def _show_llm_config_status() -> None:
             _route_parts.append(f"{_name}={_mv}")
         print(f"         模型路由: {' / '.join(_route_parts)}")
     else:
-        print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
+        print(f"  LLM: {_RED}未配置{_RESET}（配置 data/config/llm_key.json 后重启生效）")
 
 
 # ── 快捷键查找 ──────────────────────────────────────────────

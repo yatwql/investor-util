@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import json
 
 from src.python.logger import setup_logger
@@ -24,7 +25,7 @@ def _read_llm_settings() -> tuple[dict, str] | None:
     from src.python.config import _strip_json_comments
     path = "data/config/llm_settings.json"
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             raw = f.read()
         settings = json.loads(_strip_json_comments(raw))
         return settings, path
@@ -126,13 +127,21 @@ def _cmd_config_llm_modules() -> None:
         items = []
         for i, (sfx, name) in enumerate(module_names.items(), 1):
             status = enabled_map.get(sfx, True)
-            status_str = f"\033[92m开启\033[0m" if status else f"\033[91m关闭\033[0m"
+            if os.environ.get("NO_COLOR") or not sys.stdout.isatty():
+                _GREEN = _RED = _RESET = ""
+            else:
+                _GREEN, _RED, _RESET = "\033[92m", "\033[91m", "\033[0m"
+            status_str = f"{_GREEN}开启{_RESET}" if status else f"{_RED}关闭{_RESET}"
             items.append((i, sfx, name, status))
-            print(f"  │ {i}. {name:<14s} [{status_str}]\033[0m{' ' * 4}│")
+            print(f"  │ {i}. {name:<14s} [{status_str}]{' ' * 4}│")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
         print()
-        choice = input("  输入编号切换 (0-5): ").strip()
+        try:
+            choice = input("  输入编号切换 (0-5): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
 
         if choice == "0":
             break

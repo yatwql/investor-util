@@ -404,9 +404,9 @@ class TestWriteSummarySheet(unittest.TestCase):
         self._assert_pairs_contain(pairs, "总市值 (元)", 150000.0)
         self._assert_pairs_contain(pairs, "总成本 (元)", 120000.0)
         self._assert_pairs_contain(pairs, "总盈亏 (元)", 30000.0)
-        self._assert_pairs_contain(pairs, "总收益率", "+25.00%")
+        self._assert_pairs_contain(pairs, "总收益率", 0.25)
         self._assert_pairs_contain(pairs, "本日盈亏 (元)", 5000.0)
-        self._assert_pairs_contain(pairs, "本日收益率", "+3.45%")
+        self._assert_pairs_contain(pairs, "本日收益率", 5000.0 / 145000.0)
 
     def test_profit_font_called_for_profit_value(self):
         """总盈亏 >0 时 profit_font 被调用。"""
@@ -432,10 +432,10 @@ class TestWriteSummarySheet(unittest.TestCase):
             self.ws, self.mv, self.cost, self.profit, self.today,
             categories=self.categories,
         )
-        # 总收益率 25.0%
-        mocks["mock_profit_font"].assert_any_call(25.0)
-        # 本日收益率原始值 5000/(120000+30000-5000)*100 ≈ 3.448275862...
-        mocks["mock_profit_font"].assert_any_call(5000.0 / 145000.0 * 100)
+        # 总收益率 25.0% → 小数 0.25
+        mocks["mock_profit_font"].assert_any_call(0.25)
+        # 本日收益率原始值 5000/145000 ≈ 0.03448
+        mocks["mock_profit_font"].assert_any_call(5000.0 / 145000.0)
 
     def test_profit_font_rate_negative(self):
         """收益率负值时 profit_font 传入原始浮点数值（不再经字符串格式化舍入）。"""
@@ -443,10 +443,10 @@ class TestWriteSummarySheet(unittest.TestCase):
             self.ws, 90000.0, 100000.0, -10000.0, -2000.0,
             categories=self.categories,
         )
-        # profit_rate = -10.0%
-        mocks["mock_profit_font"].assert_any_call(-10.0)
-        # today_rate 原始值 -2000/(100000-10000+2000)*100 ≈ -2.173913...
-        mocks["mock_profit_font"].assert_any_call(-2000.0 / 92000.0 * 100)
+        # profit_rate = -10.0% → 小数 -0.10
+        mocks["mock_profit_font"].assert_any_call(-0.10)
+        # today_rate 原始值 -2000/92000 ≈ -0.02174
+        mocks["mock_profit_font"].assert_any_call(-2000.0 / 92000.0)
 
     def test_zero_cost_edge_case(self):
         """总成本为 0 时 profit_rate = 0.0，不除零。"""
@@ -456,10 +456,10 @@ class TestWriteSummarySheet(unittest.TestCase):
         )
         pairs = self._data_pairs(mocks["mock_data"])
         # total_cost=0 -> profit_rate=0.0
-        self._assert_pairs_contain(pairs, "总收益率", "+0.00%")
+        self._assert_pairs_contain(pairs, "总收益率", 0.0)
         # denominator = 0 + 10000 - 500 = 9500
-        # today_rate = 500/9500*100 ≈ 5.26%
-        self._assert_pairs_contain(pairs, "本日收益率", "+5.26%")
+        # today_rate = 500/9500 ≈ 0.05263
+        self._assert_pairs_contain(pairs, "本日收益率", 500.0 / 9500.0)
 
     # ════════════════════════════════════════════════════════
     #  市场指数 — A 股

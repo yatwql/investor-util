@@ -183,7 +183,7 @@ class TestFundDisplayType(unittest.TestCase):
 # ============================================================
 
 class TestFormatReturn(unittest.TestCase):
-    """测试 _format_return 收益率格式化。"""
+    """测试 _format_return 收益率格式化（返回小数供 Excel 百分比格式使用）。"""
 
     def test_none(self):
         """None -> '--'"""
@@ -194,32 +194,32 @@ class TestFormatReturn(unittest.TestCase):
         self.assertEqual(fp._format_return("--"), "--")
 
     def test_positive_float(self):
-        """正浮点数 -> '+X.XX%'"""
-        self.assertEqual(fp._format_return(1.5), "+1.50%")
+        """正浮点数 -> 小数（如 1.5 -> 0.015）"""
+        self.assertAlmostEqual(fp._format_return(1.5), 0.015)
 
     def test_negative_float(self):
-        """负浮点数 -> '-X.XX%'"""
-        self.assertEqual(fp._format_return(-3.25), "-3.25%")
+        """负浮点数 -> 负小数（如 -3.25 -> -0.0325）"""
+        self.assertAlmostEqual(fp._format_return(-3.25), -0.0325)
 
     def test_zero(self):
-        """零 -> '+0.00%'"""
-        self.assertEqual(fp._format_return(0), "+0.00%")
+        """零 -> 0.0"""
+        self.assertEqual(fp._format_return(0), 0.0)
 
     def test_positive_string_number(self):
-        """正数字符串 -> '+X.XX%'"""
-        self.assertEqual(fp._format_return("2.5"), "+2.50%")
+        """正数字符串 -> 小数（如 '2.5' -> 0.025）"""
+        self.assertAlmostEqual(fp._format_return("2.5"), 0.025)
 
     def test_negative_string_number(self):
-        """负数字符串 -> '-X.XX%'"""
-        self.assertEqual(fp._format_return("-1.8"), "-1.80%")
+        """负数字符串 -> 负小数（如 '-1.8' -> -0.018）"""
+        self.assertAlmostEqual(fp._format_return("-1.8"), -0.018)
 
     def test_rounding(self):
-        """四舍五入：99.999 -> '+100.00%'"""
-        self.assertEqual(fp._format_return(99.999), "+100.00%")
+        """四舍五入：99.999 -> 0.99999（浮点近似）"""
+        self.assertAlmostEqual(fp._format_return(99.999), 0.99999, places=5)
 
     def test_small_positive(self):
-        """很小的正数 -> '+0.01%'"""
-        self.assertEqual(fp._format_return(0.006), "+0.01%")
+        """很小的正数 -> 小数（0.006 -> 6e-5）"""
+        self.assertAlmostEqual(fp._format_return(0.006), 6e-5)
 
     def test_empty_string(self):
         """空字符串 -> '--'"""
@@ -415,11 +415,11 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         self.assertEqual(vals0[0], "电池ETF")
         self.assertEqual(vals0[1], "561910")
         self.assertEqual(vals0[2], "场内ETF")
-        self.assertEqual(vals0[3], "+1.50%")
-        self.assertEqual(vals0[4], "+3.20%")
-        self.assertEqual(vals0[5], "+8.50%")
-        self.assertEqual(vals0[6], "+1,000.00")
-        self.assertEqual(vals0[7], "+5.00%")
+        self.assertEqual(vals0[3], 0.015)     # 1.5% → 小数
+        self.assertEqual(vals0[4], 0.032)     # 3.2% → 小数
+        self.assertEqual(vals0[5], 0.085)     # 8.5% → 小数
+        self.assertEqual(vals0[6], 1000.0)    # 持仓盈亏(¥) 原始值
+        self.assertEqual(vals0[7], 0.05)      # 持仓收益率 小数
         self.assertEqual(vals0[8], "沪深300指数")
         self.assertEqual(vals0[9], "优秀 持续跑赢基准，超额收益显著（基准：沪深300指数）")
         self.assertEqual(vals0[10], "50/500")
@@ -429,11 +429,11 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         self.assertEqual(vals1[0], "招商鑫福中短债A")
         self.assertEqual(vals1[1], "012325")
         self.assertEqual(vals1[2], "场外债券基金")
-        self.assertEqual(vals1[3], "+0.80%")
-        self.assertEqual(vals1[4], "+1.50%")
-        self.assertEqual(vals1[5], "+3.00%")
-        self.assertEqual(vals1[6], "+200.00")
-        self.assertEqual(vals1[7], "+3.00%")
+        self.assertEqual(vals1[3], 0.008)    # 0.8% → 小数
+        self.assertEqual(vals1[4], 0.015)    # 1.5% → 小数
+        self.assertEqual(vals1[5], 0.03)     # 3.0% → 小数
+        self.assertEqual(vals1[6], 200.0)    # 持仓盈亏(¥) 原始值
+        self.assertEqual(vals1[7], 0.03)     # 持仓收益率 小数
         self.assertEqual(vals1[8], "中债综合指数")
         self.assertEqual(vals1[9], "稳定 收益率稳健，波动控制良好（基准：中债综合指数）")
         self.assertEqual(vals1[10], "100/800")
@@ -578,14 +578,14 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         calls = self.mocks["write_data_row"].call_args_list
         self.assertEqual(len(calls), 5)  # 2 基金 + 统计 + 评级分布 + 业绩评价标准说明
 
-        # 利润字段为 0
+        # 利润字段为 0（原始数值，Excel 数字格式处理显示）
         vals0 = calls[0][0][2]
-        self.assertEqual(vals0[6], "+0.00")
-        self.assertEqual(vals0[7], "+0.00%")
+        self.assertEqual(vals0[6], 0.0)
+        self.assertEqual(vals0[7], 0.0)
 
         vals1 = calls[1][0][2]
-        self.assertEqual(vals1[6], "+0.00")
-        self.assertEqual(vals1[7], "+0.00%")
+        self.assertEqual(vals1[6], 0.0)
+        self.assertEqual(vals1[7], 0.0)
 
     # -- all ratings (color test) ------------------------------------
 
@@ -806,27 +806,28 @@ class TestFormatReturnBoundary(unittest.TestCase):
         return fp._format_return(val)
 
     def test_normal_positive(self):
-        """正收益率 → +X.XX% 格式。"""
-        self.assertEqual(self._call(5.5), "+5.50%")
+        """正收益率 → 小数（5.5 → 0.055）。"""
+        self.assertAlmostEqual(self._call(5.5), 0.055)
 
     def test_normal_negative(self):
-        """负收益率 → -X.XX% 格式。"""
-        self.assertEqual(self._call(-3.2), "-3.20%")
+        """负收益率 → 负小数（-3.2 → -0.032）。"""
+        self.assertAlmostEqual(self._call(-3.2), -0.032)
 
     def test_zero(self):
-        """零收益率 → +0.00%。"""
-        self.assertEqual(self._call(0), "+0.00%")
+        """零收益率 → 0.0。"""
+        self.assertEqual(self._call(0), 0.0)
 
     def test_extreme_large(self):
-        """极大值(+9999%) → 不崩溃。"""
+        """极大值(+9999%) → 返回正浮点数。"""
         result = self._call(9999.99)
-        self.assertTrue(result.endswith("%"))
+        self.assertIsInstance(result, float)
+        self.assertGreater(result, 0)
 
     def test_extreme_small(self):
-        """极小值(-99.99%) → 不崩溃。"""
+        """极小值(-99.99%) → 返回负浮点数。"""
         result = self._call(-99.99)
-        self.assertTrue(result.endswith("%"))
-        self.assertTrue(result.startswith("-"))
+        self.assertIsInstance(result, float)
+        self.assertLess(result, 0)
 
     def test_none(self):
         """None → '--'。"""
@@ -925,10 +926,10 @@ class TestRankDataReasonableRange(unittest.TestCase):
 
             calls = mock_wdr.call_args_list
             fund_row = calls[0][0][2]
-            # 格式化结果应为 +符号 + 保留两位小数 + % 后缀
-            self.assertEqual(fund_row[3], "+9999.99%")
-            self.assertEqual(fund_row[4], "-99.99%")
-            self.assertEqual(fund_row[5], "+50.00%")
+            # 格式化结果应为小数（供 Excel 百分比格式使用）
+            self.assertAlmostEqual(fund_row[3], 99.9999)
+            self.assertAlmostEqual(fund_row[4], -0.9999)
+            self.assertEqual(fund_row[5], 0.5)
 
     @patch("src.python.report.fund_performance.fetch_fund_rankings")
     @patch("src.python.report.fund_performance.fetch_fund_benchmark",

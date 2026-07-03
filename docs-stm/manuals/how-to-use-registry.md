@@ -27,9 +27,22 @@ class DataModuleDef:
     cache_ttl: float = CACHE_DAILY
     settings_suffix: str | None = None   # None 表示非 LLM 模块
     cache_groups: tuple[str, ...] = ()
+
+    @property
+    def is_llm(self) -> bool:
+        """是否为 LLM 模块（即有 settings 键名）。"""
+        return self.settings_suffix is not None
+
+    def llm_settings_keys(self) -> set[str]:
+        """返回该模块的所有 llm_settings.json 合法键名（共 9~10 个键）。"""
+        ...
 ```
 
 > `DataModuleDef` 是不可变的（`frozen=True`），注册后不可修改。
+>
+> 两个派生成员在新增 LLM 模块时尤为有用：
+> - `is_llm` — 自动判断是否为 LLM 模块（`settings_suffix is not None`）
+> - `llm_settings_keys()` — 生成该模块在 `llm_settings.json` 中的所有合法键名，新增后可用于配置校验
 
 ---
 
@@ -41,10 +54,11 @@ class DataModuleDef:
 |------|---------|-----------|:---:|------|
 | **行情（preload）** | 股票价格、市场指数 | `price`, `index` | 24h（交易时段 30s） | 换持仓后需重新获取 |
 | **基金数据（refresh）** | 基金业绩排名、基金持仓 | `rank`, `hold` | 1d~1w | 主动刷新按钮触发 |
+| **行业分类（refresh）** | 行业分类 | `industry` | 1w | 主动刷新触发 |
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
-| **行业/补充（refresh）** | 行业分类、盈利预测、资金流向、分红 | `industry`, `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
+| **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
+| **补充数据（refresh）** | 盈利预测、资金流向、分红 | `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
 | **精确键名** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | 固定键名，非前缀匹配 |
-| **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、新闻关联 | `llm_global_macro`, `llm_expert_review`, `llm_health_check`, `llm_penetration_deep`, `llm_news_correlation` | 2h~24h | 带 `settings_suffix` |
 
 ---
 
@@ -97,9 +111,21 @@ from src.python.registry import (
 | `category` | 持仓分类表 | 3. |
 | `penetration` | 资产穿透TOP10 | 4. |
 | `fund_performance` | 基金业绩分析 | 5. |
+| — | 财经新闻热点与持仓关联分析（通过 `get_llm_module_name("news_correlation")` 获取标题） | 6. |
 | `early_warning` | 智能预警 | 7. |
+| — | LLM 分析模块（4 个页签，见下表） | 8. |
+| — | LLM API 用量 | 9. |
 
-> 第 6 号为 LLM 分析模块页签（global_macro / expert_review / health_check / penetration_deep / news_correlation），其标题通过 `get_llm_module_name()` 注册，无需在 `get_report_sheet_name()` 中录入。
+第 8 号位置为 LLM 分析模块页签区，共 4 个页签，按 `write_llm_sheets()` 写入顺序排列：
+
+| 页签内容 | 对应 `settings_suffix` | Excel 子序号 |
+|---------|----------------------|:-----------:|
+| 全球政经局势 | `global_macro` | 8.1 |
+| 智囊团深度复盘 | `expert_review` | 8.2 |
+| 持仓体检报告 | `health_check` | 8.3 |
+| 穿透深度分析 | `penetration_deep` | 8.4 |
+
+> LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 6 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 8 号），在新闻数据就绪时写入。第 9 号的 LLM API 用量页签为程序生成，不依赖 registry。
 
 ---
 
@@ -144,9 +170,9 @@ DataModuleDef("我的中文名称", "my_data_type",
 
 - `name` — 中文显示名
 - `data_type` — 内部标识键，需唯一
-- `cache_prefixes` — 缓存文件名前缀（可多个），清理时按前缀匹配
+- `cache_prefixes` — 缓存文件名前缀（可多个），清理时按前缀匹配。**注意：长前缀需排在短前缀之前**，否则短前缀可能先匹配（如 `"llm_"` 会误匹配 `"llm_global_macro_"`）。实际声明时所有 LLM 模块均已使用完整长前缀，无歧义
 - `cache_ttl` — 使用 `CACHE_DAILY` / `CACHE_WEEKLY` / `CACHE_MONTHLY` 或自定义秒数
-- `cache_groups` — `"preload"`（换持仓需重取）或 `"refresh"`（主动刷新按钮触发）；新模块如不希望被任何组清除则不填
+- `cache_groups` — `"preload"`（换持仓需重取）或 `"refresh"`（主动刷新按钮触发）；**留空 `()` 表示不被任何组清除操作命中**（如 `tracking`、`calendar` 等安全设计）
 
 ### 新增 LLM 分析模块
 
@@ -172,10 +198,12 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 | # | 步骤 | 操作位置 | 产出 |
 |---|------|---------|------|
 | ① | **注册模块定义** | `registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
-| ② | **配置 JSON 键组** | `llm_settings.json` | 新增 10 个 `{key}_{suffix}` 配置键 |
+| ② | **配置 JSON 键组** | `llm_settings.json` | 新增 9~10 个 `{key}_{suffix}` 配置键 |
 | ③ | **实现生成函数** | `llm/generators.py` | 新增异步生成函数，通过 `_call_llm()` 调用 LLM |
 | ④ | **添加报告页签** | `report/llm_content.py` | 在 `write_llm_sheets()` 中注册新 sheet 并写入结果 |
 | ⑤ | **暴露导出接口** | `llm/__init__.py` | 将新生成函数加入 `__all__` |
+| ⑥ | **运行注册表测试** | 终端 | `pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
+| ⑦ | **验证标记合规** | 终端 | `python scripts/check-test-markers.py` — 确认测试文件标记无遗漏 |
 
 ### 精确键名缓存（无前缀匹配）
 

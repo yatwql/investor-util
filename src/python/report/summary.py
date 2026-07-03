@@ -143,23 +143,24 @@ def _write_profit_summary(
     ws: Worksheet, row: int,
     total_mv: float, total_cost: float, total_profit: float, today_profit: float,
 ) -> int:
-    """写入盈亏汇总。"""
-    profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0.0
+    """写入盈亏汇总（数值以原始小数/金额写入，由 Excel 数字格式控制显示）。"""
+    profit_rate = (total_profit / total_cost) if total_cost > 0 else 0.0  # 小数，0.00% 格式
     denominator = total_cost + total_profit - today_profit
-    today_rate = (today_profit / denominator * 100) if denominator > 0 else 0.0
+    today_rate = (today_profit / denominator) if denominator > 0 else 0.0  # 小数，0.00% 格式
 
+    from src.python.report.styles import FMT_MONEY, FMT_PERCENT
     row = _write_section(ws, row, "【盈亏汇总】")
-    summary_data = [
-        ("总市值 (元)", total_mv),
-        ("总成本 (元)", total_cost),
-        ("总盈亏 (元)", total_profit),
-        ("总收益率", profit_rate),
-        ("本日盈亏 (元)", today_profit),
-        ("本日收益率", today_rate),
+    summary_data: list[tuple[str, float, str]] = [
+        ("总市值 (元)", total_mv, FMT_MONEY),
+        ("总成本 (元)", total_cost, FMT_MONEY),
+        ("总盈亏 (元)", total_profit, FMT_MONEY),
+        ("总收益率", profit_rate, FMT_PERCENT),
+        ("本日盈亏 (元)", today_profit, FMT_MONEY),
+        ("本日收益率", today_rate, FMT_PERCENT),
     ]
-    for label, val in summary_data:
-        display_val = f"{val:+.2f}%" if "收益率" in label else val
-        write_data_row(ws, row, [label, display_val])
+    for label, val, fmt in summary_data:
+        write_data_row(ws, row, [label, val])
+        ws.cell(row=row, column=2).number_format = fmt
         if "盈亏" in label and isinstance(val, (int, float)):
             ws.cell(row=row, column=2).font = profit_font(val)
         elif "收益率" in label and isinstance(val, (int, float)):
