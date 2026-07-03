@@ -268,6 +268,7 @@ investor-util/
 │       ├── technical.md              # 技术设计文档
 │       ├── testplan.md               # 质量控制与测试标准
 │       ├── changelog.md              # 变更日志 — 所有版本的详细更新记录
+│       ├── test-coverage.md          # 测试覆盖统计（mode/功能域/场景分组/单元分组/跨类标记）
 │       └── review-findings.md        # 自审问题记录
 │
 ├── .gitignore                        # Git 忽略规则 — 排除缓存/日志/虚拟环境/敏感密钥
