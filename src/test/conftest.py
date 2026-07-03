@@ -52,7 +52,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_config: 配置管理单元测试")
     config.addinivalue_line("markers", "unit_core: 核心基础设施单元测试")
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")
-    config.addinivalue_line("markers", "llm: LLM 相关测试（unit_llm 331 + scenario_llm 19，均为 mock，无需 API key）")
+    config.addinivalue_line("markers", "llm: LLM 相关测试（unit_llm 336 + scenario_llm 27，均为 mock，无需 API key）")
     config.addinivalue_line("markers", "edge: 边缘/异常场景测试")
     config.addinivalue_line("markers", "smoke: 冒烟测试（快速验证核心功能）")
     config.addinivalue_line("markers", "data: 数据正确性验证测试")

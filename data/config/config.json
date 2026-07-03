@@ -44,5 +44,6 @@
     "sector_alert_threshold_warning": -50000000,
     "sector_alert_threshold_danger": -200000000,
     "sentiment_top_n": 10
-  }
+  },
+  "default_menu_key": "L"
 }

@@ -48,6 +48,13 @@ _DEFAULT_CONFIG = {
         "sector_alert_threshold_danger": -200_000_000,
         "sentiment_top_n": 10,
     },
+    "market_hour_aware": ["price", "index"],
+    "market_hour_ttl": 30,
+    "market_hours": {
+        "start": "09:30",
+        "end": "15:00",
+        "official_source": True,
+    },
     "default_menu_key": "L",
 }
 
@@ -294,6 +301,40 @@ def _validate_early_warning(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_market_hours(config: dict, issues: int) -> int:
+    """校验 market_hour_aware / market_hour_ttl / market_hours 配置段。"""
+    # market_hour_aware：必须为列表，元素为字符串
+    mha = config.get("market_hour_aware")
+    if mha is not None:
+        if not isinstance(mha, list) or not all(isinstance(x, str) for x in mha):
+            logger.warning("config.json market_hour_aware = %r 不是字符串列表，将使用默认值 [\"price\", \"index\"]", mha)
+            issues += 1
+    # market_hour_ttl：必须为正整数
+    mht = config.get("market_hour_ttl")
+    if mht is not None:
+        try:
+            mht_int = int(mht)
+            if mht_int < 30:
+                logger.warning("config.json market_hour_ttl = %s 小于 30 秒，将被钳制到 30 秒", mht)
+                issues += 1
+        except (ValueError, TypeError):
+            logger.warning("config.json market_hour_ttl = %r 不是有效整数，将使用默认值 30", mht)
+            issues += 1
+    # market_hours：必须为 dict，含有效 start/end 时间
+    mh = config.get("market_hours")
+    if mh is not None:
+        if not isinstance(mh, dict):
+            logger.warning("config.json market_hours = %r 不是对象(dict)，将使用内置默认时段", mh)
+            issues += 1
+        else:
+            for time_key in ("start", "end"):
+                tv = mh.get(time_key)
+                if tv is not None and not isinstance(tv, str):
+                    logger.warning("config.json market_hours.%s = %r 不是字符串，将使用默认值", time_key, tv)
+                    issues += 1
+    return issues
+
+
 def validate_config(config: dict | None = None) -> int:
     """校验 config.json 中的常见配置错误，输出 WARNING 日志。
 
@@ -314,6 +355,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_preferred_provider(config, issues)
     issues = _validate_user_fund_benchmarks(config, issues)
     issues = _validate_early_warning(config, issues)
+    issues = _validate_market_hours(config, issues)
 
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)
