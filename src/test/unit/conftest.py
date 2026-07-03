@@ -14,7 +14,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+
+# 本 conftest 所在目录（src/test/unit/），用于过滤仅属于 unit/ 的测试项
+_UNIT_ROOT = Path(__file__).resolve().parent
 
 # 子目录名 → unit_* 标记名
 _DIR_TO_MARKER: dict[str, str] = {
@@ -30,8 +35,13 @@ _DIR_TO_MARKER: dict[str, str] = {
 
 
 def pytest_collection_modifyitems(config, items):
-    """收集后验证每个测试项都有 unit_* 子标记，缺失则报错。"""
-    for item in items:
+    """收集后验证每个测试项都有 unit_* 子标记，缺失则报错。
+
+    注意：pytest 9.x 中此 hook 可能收到父级范围的全部 items，
+    因此先按文件路径过滤，只处理属于 unit/ 目录的测试项，
+    避免干扰顶层（src/test/）的 marker 过滤。"""
+    unit_items = [it for it in items if _is_under_unit(it)]
+    for item in unit_items:
         if not _has_subunit_marker(item):
             parent_dir = item.fspath.dirpath().basename
             expected = _DIR_TO_MARKER.get(parent_dir, "unit_<未知模块>")
@@ -43,6 +53,14 @@ def pytest_collection_modifyitems(config, items):
                 f"        pytestmark = [pytest.mark.unit, pytest.mark.{expected}]\n"
                 f"    如该文件还需 edge/llm 等横切标记，一并加入列表。\n"
             )
+
+
+def _is_under_unit(item) -> bool:
+    """判断测试项文件路径是否在 unit/ 目录下。"""
+    try:
+        return _UNIT_ROOT in Path(item.fspath).resolve().parents
+    except (OSError, TypeError):
+        return False
 
 
 def _has_subunit_marker(item) -> bool:

@@ -207,7 +207,7 @@
 > 详细映射全文见 `docs-stm/plan/test-coverage-map.md`。
 >
 > **pytest marker 对照：** §1.3 场景 → `scenario_basic`/`scenario_resilience`/`scenario_llm`；
-> §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"` (128 项)。
+> §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"` (120 项)。
 
 **覆盖状态汇总：**
 
@@ -280,7 +280,7 @@
 
 | 优先级 | 回归范围 | 触发条件 | 备注 |
 |:------:|:---------|:---------|:-----|
-| **P0** | `python scripts/test_runner.py --mode regression` 通过（128 项业务场景） | **任何代码变更** | 提交前极速验证 |
+| **P0** | `python scripts/test_runner.py --mode regression` 通过（120 项业务场景） | **任何代码变更** | 提交前极速验证 |
 | **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） | 验证缺陷场景的断言 |
 | **P0** | 测试隔离验证：`pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
 | **P1** | 手动菜单 E/H/B/L 各一次，检查报告完整性 | config / report / html / llm 变更 | Excel 页签完整、不崩溃 |
@@ -305,6 +305,7 @@
 | 版本 | 测试重点 |
 |:-----|:---------|
 | v0.2.64 | pytest 标记语义化改造（S1-S10 编号→语义名、`scenario_resilience`、`check-test-markers.py`）、`integration` 标记移除、全量测试 1978 项 |
+| v0.2.66 | 全量测试计数 1971（scenario 120）、标记污染修复、8 项非场景测试迁至 unit/report/ |
 | v0.2.63 | 异常场景测试增补（6 个 `_edge.py` 文件共 19 项新测试）、edge 总数 ~39→~86 |
 | v0.2.62 | pytest 标记分层体系（6→28 标记）+ 目录分组搬迁（60 文件）+ 冒烟测试 24 项 + 三级流水线模式系统 + 全量管理文档一致性审阅 |
 | v0.2.61 | datasource-and-folders 表格截断修复 + requirements 缓存前缀修正（文档同步，无测试变更） |
@@ -448,7 +449,7 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-- **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（128 项）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+- **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（120 项）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 - **P1 全通** — 不可合并 master：手动菜单 E/H/B/L + Excel/HTML 视觉检查 + Provider 联通性
 - **P2 已执行** — 可合入但不可发布：断网降级/旧缓存兼容/跨池污染
 

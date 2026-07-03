@@ -6,10 +6,10 @@
     - scenario_resilience: 异常容错场景（S6-S10）
     - scenario_llm: LLM 场景组合（S11-S20）
     - scenario_datetime: 日期/时间场景（T1-T16）
-  - llm: LLM 相关测试（unit_llm 331 + scenario_llm 19，均为 mock，无需 API key）
-  - edge: 边缘/异常场景测试（~75 项，含 9 个 _edge.py 文件）
+  - llm: LLM 相关测试（unit_llm 336 + scenario_llm 27，均为 mock，无需 API key）
+  - edge: 边缘/异常场景测试（~93 项，含 9 个 _edge.py 文件）
   - smoke: 冒烟测试（6 文件 × 4 项 = 24 项，~2s）
-  - data: 数据正确性验证测试（29 项）
+  - data: 数据正确性验证测试（28 项）
 
 ⚠ 以下注释中的测试项数可能随版本更新而变化，参见 test_runner.py 获取精确统计。
 

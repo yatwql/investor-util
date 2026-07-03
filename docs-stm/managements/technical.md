@@ -150,7 +150,7 @@ investor-util/
 
 通过 `registry.py` 的 `cache_groups` 字段定义分组：
 - **preload（6 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
-- **refresh（9 模块）**：fund_rank, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, benchmark → 菜单 `[1]` 触发清除
+- **refresh（9 模块）**：fund_perf（基金业绩排名）, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, fund_benchmarks（基金业绩基准）→ 菜单 `[1]` 触发清除
 - **独立模块**：tracking, calendar → 无分组保护，不被菜单缓存命令误删
 
 ---
