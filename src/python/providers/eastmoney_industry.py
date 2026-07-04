@@ -46,33 +46,51 @@ def _secid(code: str) -> str:
     return f"1.{code}"  # 沪市（含 5/6/8/4 开头）
 
 
-def _make_push2_request(code: str) -> dict | None:
-    """执行 push2 行业/概念 API 请求，返回 data 内层字典或 None。"""
+def _make_push2_request(code: str, retries: int = 1) -> dict | None:
+    """执行 push2 行业/概念 API 请求，返回 data 内层字典或 None。
+
+    支持自动重试：对连接断开等瞬态错误，间隔 0.5s 重试。
+
+    Args:
+        code: 6 位证券代码
+        retries: 失败重试次数（默认 1 次，总请求数 = retries + 1）
+
+    Returns:
+        data 内层字典；全部失败返回 None
+    """
     params = {
         "secid": _secid(code),
         "fields": "f57,f58,f127,f128,f129,f198",
     }
     logger.debug("东方财富 push2 行业/概念请求: %s", code)
 
-    try:
-        with make_http_client(timeout=_TIMEOUT) as client:
-            resp = client.get(_PUSH2_BASE, params=params, headers=_HEADERS)
-            text = resp.text
-    except (httpx.TimeoutException, httpx.RequestError) as e:
-        logger.warning("东方财富 push2 请求失败 [%s]: %s", code, e)
-        return None
+    import time
 
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as e:
-        logger.warning("东方财富 push2 JSON 解析失败 [%s]: %s", code, e)
-        return None
+    for attempt in range(retries + 1):
+        try:
+            with make_http_client(timeout=_TIMEOUT) as client:
+                resp = client.get(_PUSH2_BASE, params=params, headers=_HEADERS)
+                text = resp.text
+        except (httpx.TimeoutException, httpx.RequestError) as e:
+            if attempt < retries:
+                logger.debug("东方财富 push2 请求失败 [%s]（第 %d 次重试）: %s", code, attempt + 1, e)
+                time.sleep(0.5)
+                continue
+            logger.warning("东方财富 push2 请求失败 [%s]: %s", code, e)
+            return None
 
-    inner = data.get("data")
-    if not inner or not isinstance(inner, dict):
-        logger.warning("东方财富 push2 返回空数据 [%s]", code)
-        return None
-    return inner
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.warning("东方财富 push2 JSON 解析失败 [%s]: %s", code, e)
+            return None
+
+        inner = data.get("data")
+        if not inner or not isinstance(inner, dict):
+            logger.warning("东方财富 push2 返回空数据 [%s]", code)
+            return None
+        return inner
+    return None
 
 
 def _extract_concept_list(inner: dict) -> list[str]:

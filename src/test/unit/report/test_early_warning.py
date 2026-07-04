@@ -285,7 +285,7 @@ class TestWriteEarlyWarningSheet:
             "has_llm_news": True,
         }
         write_early_warning_sheet(ws, early_warnings)
-        assert ws.title == "7.智能预警"
+        assert ws.title == "11.智能预警"
 
     def test_write_empty(self):
         """无数据写入不抛出异常。"""
@@ -299,4 +299,4 @@ class TestWriteEarlyWarningSheet:
             "sector_alerts": [], "sentiment_alerts": [],
             "has_warnings": False, "has_sector_data": False, "has_llm_news": False,
         })
-        assert ws.title == "7.智能预警"
+        assert ws.title == "11.智能预警"
