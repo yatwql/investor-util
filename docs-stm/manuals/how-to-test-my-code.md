@@ -169,25 +169,25 @@ python scripts/test_runner.py --mode scenario,edge
 docs-stm/test-reports/latest/
 ├── index.html            # 汇总页（打开此文件查看总览）
 ├── unit/
-│   └── report.html       # 单元测试（1993 项）
+│   └── report.html       # 单元测试
 ├── standard/
-│   └── report.html       # 常规单元测试（1730 项）
+│   └── report.html       # 常规单元测试
 ├── scenario/
-│   └── report.html       # 业务场景测试（207 项）
+│   └── report.html       # 业务场景测试
 ├── integration/
-│   └── report.html       # 集成测试（场景+模块间契约 232 项）
+│   └── report.html       # 集成测试（场景 + 模块间契约）
 ├── regression/
-│   └── report.html       # 回归测试/场景别名（207 项）
+│   └── report.html       # 回归测试 / 场景别名
 ├── verify/
-│   └── report.html       # 合入验证（824 项）
+│   └── report.html       # 合入验证
 ├── edge/
-│   └── report.html       # 边缘场景测试（198 项）
+│   └── report.html       # 边缘场景测试
 ├── data/
-│   └── report.html       # 数据正确性验证（65 项）
+│   └── report.html       # 数据正确性验证
 ├── all/
-│   └── report.html       # 全量测试（2225 项）
+│   └── report.html       # 全量测试
 └── smoke/
-    └── report.html       # 冒烟测试（24 项）
+    └── report.html       # 冒烟测试
 ```
 
 **打开方式**：直接用浏览器打开 `docs-stm/test-reports/latest/index.html`
