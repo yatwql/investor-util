@@ -742,7 +742,7 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
 
 
 class TestFundsWithUnavailableHoldings(unittest.TestCase):
-    """验证基金持仓不可获取时，不污染穿透 TOP10。"""
+    """验证基金持仓不可获取或数据无效时，不污染穿透 TOP10。"""
 
     def _make_detail(self, code: str, market_value: float) -> MockDetailRow:
         return MockDetailRow(code, market_value)
@@ -829,6 +829,76 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         # unknown_mv 正确
         self.assertAlmostEqual(result["summary"]["unknown_mv"], 100000.0, delta=0.02)
         self.assertEqual(result["summary"]["failed_funds"], 1)
+
+    @patch("src.python.report.penetration.fetch_fund_holdings")
+    def test_invalid_ratio_filtered(self, mock_fetch):
+        """持仓比例 >100% 的标的应被过滤（如 518880 黄金 ETF API 返回的垃圾数据）。"""
+        mock_fetch.side_effect = lambda code: {
+            "518880": {
+                "code": "518880", "name": "华安黄金ETF", "date": "",
+                "holdings": [
+                    # 与用户实际遇到的缓存数据一致：ratio > 100%
+                    {"name": "财通成长优选混合A（001480）", "code": "001480", "ratio": 401.03},
+                    {"name": "财通成长优选混合C（021528）", "code": "021528", "ratio": 399.15},
+                    {"name": "财通价值动量混合A（720001）", "code": "720001", "ratio": 359.33},
+                ],
+            },
+        }.get(code, None)
+
+        holdings = [
+            Holding("证券账户", "华安黄金ETF", "518880", 100, 83.097),
+        ]
+        details = [
+            self._make_detail("518880", 8309.70),
+        ]
+
+        result = pene.compute_penetration_top10(holdings, details)
+
+        # 过滤后无有效标的 → top10 应为空
+        self.assertEqual(len(result["top10"]), 0,
+                         "ratio 全部 >100% 的基金不应产生穿透标的")
+
+        # unknown_mv 应包含 518880 的全值
+        self.assertAlmostEqual(result["summary"]["unknown_mv"], 8309.70, delta=0.02)
+        self.assertEqual(result["summary"]["failed_funds"], 1)
+
+    @patch("src.python.report.penetration.fetch_fund_holdings")
+    def test_mixed_valid_and_invalid_ratios(self, mock_fetch):
+        """同一基金混有无效和有效比例 → 只保留有效比例。"""
+        mock_fetch.side_effect = lambda code: {
+            "518880": {
+                "code": "518880", "name": "华安黄金ETF", "date": "",
+                "holdings": [
+                    {"name": "财通成长优选混合A（001480）", "code": "001480", "ratio": 401.03},
+                    {"name": "山东黄金", "code": "600547", "ratio": 15.0},
+                    {"name": "中金黄金", "code": "600489", "ratio": 10.0},
+                ],
+            },
+        }.get(code, None)
+
+        holdings = [
+            Holding("证券账户", "华安黄金ETF", "518880", 100, 83.097),
+        ]
+        details = [
+            self._make_detail("518880", 8309.70),
+        ]
+
+        result = pene.compute_penetration_top10(holdings, details)
+
+        # 财通基金应被过滤，只保留山东黄金和中金黄金
+        top10_names = [e["name"] for e in result["top10"]]
+        self.assertNotIn("财通成长优选混合A", top10_names,
+                         "ratio>100% 的标的应被过滤")
+        self.assertIn("山东黄金", top10_names)
+        self.assertIn("中金黄金", top10_names)
+
+        # 山东黄金 = 8309.70 * 15% = 1246.46
+        sd = next(e for e in result["top10"] if e["name"] == "山东黄金")
+        self.assertAlmostEqual(sd["mv"], 1246.46, places=1)
+
+        # 有效持仓占比之和 ≈ 100%
+        total_ratio = sum(e["ratio_pct"] for e in result["top10"])
+        self.assertAlmostEqual(total_ratio, 100.0, delta=0.02)
 
 
 if __name__ == "__main__":

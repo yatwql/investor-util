@@ -404,13 +404,28 @@ def _merge_fund_layer(
             # 基金全值计入 unknown_mv 并在页脚提示，不污染 TOP10
             continue
 
-        for item in holdings_data["holdings"]:
+        # 过滤无效持仓比例（<= 0 或 > 100），一些基金（如黄金 ETF）的
+        # 天天基金 API 可能返回垃圾数据（ratio 如 401%/399% 等）
+        valid_items = [
+            item for item in holdings_data["holdings"]
+            if 0 < item.get("ratio", 0) <= 100
+        ]
+        if not valid_items:
+            unknown_mv += fund_mv
+            failed_count += 1
+            failed_fund_details.append({"name": fund.name, "code": fund.code})
+            logger.info("基金 %s(%s) 所有持仓比例无效（包含 %s），已排除",
+                        fund.name, fund.code,
+                        [h.get("ratio", 0) for h in holdings_data["holdings"]])
+            continue
+
+        for item in valid_items:
             stock_name = item.get("name", "").strip()
             stock_code = item.get("code", "").strip()
             ratio = item.get("ratio", 0.0)
             if not stock_name:
                 continue
-            attributed_mv = fund_mv * (ratio / 100.0) if ratio > 0 else 0.0
+            attributed_mv = fund_mv * (ratio / 100.0)
             norm_name = normalize_name(stock_name)
             sector = classify_sector(stock_name, stock_code)
             if norm_name not in merged:

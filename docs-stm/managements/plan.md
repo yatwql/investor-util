@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-04（v0.2.83 — 版本号同步 + faq 文档修正 + autoescape 技术债务修复）
+最后更新：2026-07-04（v0.2.84 — 穿透TOP10 ratio>100% 过滤 + A5 并行配置 high/medium/low 三档）
 
 ---
 
@@ -98,6 +98,15 @@ A5 Step E（全量回归通过）后执行：
 **问题**：`unit` 已达 1998 项/~25min，`verify` 839 项/~12min，增长趋势不乐观。
 
 **方案**：四管齐下 — 并行执行（pytest-xdist）+ 超大文件拆分 + 增量测试（git-aware）+ 新增快速子模式。
+
+**pytest-xdist 并行策略**：`-n auto` 自动检测 CPU 核数，同时提供三档预设值：
+| 档位 | 并行数 | 说明 |
+|:----|:------|:-----|
+| `high` | `auto`（100% CPU 核数） | 最大吞吐，适合 CI 专用机 |
+| `medium` | `auto × 50%`（默认值） | 平衡本机开发，不影响前台操作 |
+| `low` | `auto × 25%`（最小 2） | 低负载模式，后台运行不抢资源 |
+
+`high`/`medium`/`low` 映射为 `scripts/test_runner.py` 的 `--parallel` 参数（如 `--parallel medium`），缺省值为 `medium`。具体数值在 `test_runner.py` 解析为 `max(1, int(n_cores * factor))`。
 
 ---
 
