@@ -13,6 +13,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from src.python.cache import get_cache_hit_rate
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.models import Holding
@@ -218,6 +219,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         a_indices=a_indices_list, us_indices=us_indices_list,
         accounts=accounts, account_totals=account_totals,
         cat_data=cat_data, penetration=penetration, perf_data=perf_data,
+        # SAC: news_data[*].enriched_keywords[*].display 来自外部 API
+        # 模板中已禁用 |safe 过滤器，依赖 autoescape 防 XSS —— 勿加 |safe
         news_data=news_data, news_llm_meta=_news_llm_meta,
         has_llm_analysis=has_llm_analysis,
         manager_analysis=manager_analysis,
@@ -230,6 +233,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         llm_session_usage=_llm_session_usage, early_warnings=early_warnings,
         module_labels=get_llm_module_names(), module_disabled=module_disabled,
         llm_module_info=llm_module_info, llm_endpoint=llm_endpoint,
+        cache_stats=get_cache_hit_rate(),
     )
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)

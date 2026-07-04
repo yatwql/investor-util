@@ -291,6 +291,10 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "penetration": "资产穿透TOP10",
     "fund_performance": "基金业绩分析",
     "early_warning": "智能预警",
+    "fund_manager": "基金经理变更监控",
+    "fund_overlap": "持仓重合度矩阵",
+    "fund_concentration": "持仓集中度监控",
+    "fund_style": "基金风格分析",
 }
 
 

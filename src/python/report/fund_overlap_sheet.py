@@ -21,6 +21,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.report.excel_writer import auto_width, write_data_row, write_header_row, write_title_row
+from src.python.registry import get_report_sheet_name
 
 logger = logging.getLogger("invest")
 
@@ -72,7 +73,9 @@ def write_overlap_matrix_sheet(
     n = len(funds)
 
     # ── 标题 ──
-    write_title_row(ws, 1, "14. 持仓重合度矩阵", ncols=n + 2)
+    _name = get_report_sheet_name('fund_overlap')
+    ws.title = f"14.{_name}"
+    write_title_row(ws, 1, f"14. {_name}", ncols=n + 2)
 
     if n < 2:
         write_data_row(ws, 2, ["无可比较的基金（至少需要 2 只基金）"])

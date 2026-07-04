@@ -35,7 +35,7 @@ _SRC_DIR = os.path.join(_PROJECT_ROOT, "src", "test")
 MODES: dict[str, dict] = {
     "unit": {
         "marker": "unit",
-        "desc": "全量单元测试（含 edge/data，1993 项）",
+        "desc": "全量单元测试（含 edge/data，1993+ 项）",
         "timeout_sec": 720,
         "order": 1,
         "parallel": True,
@@ -49,14 +49,14 @@ MODES: dict[str, dict] = {
     },
     "scenario": {
         "marker": "scenario",
-        "desc": "业务场景集成测试（S1-S28 + T1-T21，207 项）",
+        "desc": "业务场景集成测试（S1-S28 + T1-T21，222 项）",
         "timeout_sec": 300,
         "order": 3,
         "parallel": False,
     },
     "regression": {
         "marker": "scenario",
-        "desc": "回归测试（场景 207 项，~30s 提交前极速验证）",
+        "desc": "回归测试（场景 222 项，~30s 提交前极速验证）",
         "timeout_sec": 120,
         "order": 4,
         "parallel": False,
@@ -91,7 +91,7 @@ MODES: dict[str, dict] = {
     },
     "all": {
         "marker": "",
-        "desc": "全量测试（2225 项）",
+        "desc": "全量测试（2353 项）",
         "timeout_sec": 720,
         "order": 9,
         "parallel": True,

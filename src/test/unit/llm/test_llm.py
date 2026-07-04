@@ -23,11 +23,10 @@ from unittest.mock import MagicMock, patch
 from src.python.llm import (
     format_session_usage,
     generate_all_llm,
-    generate_expert_review,
-    generate_global_macro,
     get_session_usage,
-    reset_session_usage,
 )
+from src.python.llm.session import reset_session_usage
+from src.python.llm.generators import generate_expert_review, generate_global_macro
 from src.python.llm.api import (
     _call_claude,
     _call_llm,
@@ -1183,7 +1182,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         self, mock_gen: MagicMock,
     ) -> None:
         """传入 llm_config → 被 _generate_llm_content 接收。"""
-        from src.python.llm import generate_global_macro
+        from src.python.llm.generators import generate_global_macro
         mock_gen.return_value = ("<p>结果</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_global_macro": False}
         result, cached = generate_global_macro(
@@ -1199,7 +1198,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         self, mock_gen: MagicMock,
     ) -> None:
         """gen_expert_review 传递 llm_config 到 _generate_llm_content。"""
-        from src.python.llm import generate_expert_review
+        from src.python.llm.generators import generate_expert_review
         mock_gen.return_value = ("<p>复盘</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_expert_review": False}
         result, cached = generate_expert_review(
@@ -1214,7 +1213,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         self, mock_gen: MagicMock,
     ) -> None:
         """gen_health_check 传递 llm_config 到 _generate_llm_content。"""
-        from src.python.llm import generate_health_check
+        from src.python.llm.generators import generate_health_check
         mock_gen.return_value = ("<p>体检</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_health_check": False}
         result, cached = generate_health_check(
@@ -1229,7 +1228,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         self, mock_gen: MagicMock,
     ) -> None:
         """gen_penetration_deep_analysis 传递 llm_config。"""
-        from src.python.llm import generate_penetration_deep_analysis
+        from src.python.llm.generators import generate_penetration_deep_analysis
         mock_gen.return_value = ("<p>穿透</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_penetration_deep": False}
         result, cached = generate_penetration_deep_analysis(

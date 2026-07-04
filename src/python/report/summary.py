@@ -442,6 +442,43 @@ def _write_legend(ws: Any, row: int) -> None:
         row += 1
 
 
+def _write_cache_stats_section(ws: Any) -> None:
+    """写入数据缓存命中率统计区（仅在有过缓存请求时显示）。"""
+    from src.python.cache import get_cache_hit_rate
+
+    stats = get_cache_hit_rate()
+    total = stats.get("total", 0)
+    if not total:
+        return
+
+    _SECTION_FILL = PatternFill(start_color="E8F0FE", end_color="E8F0FE", fill_type="solid")
+    _SECTION_FONT = Font(size=10, bold=True, color="1A1A1A")
+    _KV_KEY_FONT = Font(size=10, bold=True, color="2E75B6")
+    _KV_VAL_FONT = Font(size=10)
+
+    # 找到页签最后一行
+    row = ws.max_row + 2
+
+    for ci in range(1, 3):
+        ws.cell(row=row, column=ci).fill = _SECTION_FILL
+    ws.cell(row=row, column=1, value="▎数据缓存系统").font = _SECTION_FONT
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+    row += 1
+
+    rate = stats.get("rate", 0.0)
+    rate_display = f"{rate * 100:.1f}%" if rate > 0 else "—"
+    pairs = [
+        ("缓存命中", f"{stats.get('hits', 0):,} 次"),
+        ("缓存未命中", f"{stats.get('misses', 0):,} 次"),
+        ("总请求", f"{total:,} 次"),
+        ("命中率", rate_display),
+    ]
+    for key, val in pairs:
+        ws.cell(row=row, column=1, value=key).font = _KV_KEY_FONT
+        ws.cell(row=row, column=2, value=val).font = _KV_VAL_FONT
+        row += 1
+
+
 def _set_column_widths(ws: Any, widths: list[int]) -> None:
     """设置列宽并冻结标题行。"""
     from openpyxl.utils import get_column_letter
@@ -488,6 +525,7 @@ def write_llm_usage_sheet(
     row = _write_module_table_header(ws, row, _HEADERS)
     row = _write_module_data_rows(ws, row, llm_module_info)
     _write_legend(ws, row)
+    _write_cache_stats_section(ws)
     _set_column_widths(ws, [20, 16, 26, 16, 14, 14, 18, 16, 12, 12])
 
     logger.info("LLM API 用量页签写入完成")

@@ -661,7 +661,8 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
 
     def test_session_usage_correctly_reports_mixed_cache(self):
         """阶段性验证：format_session_usage 在混合场景下正确反映 call_count。"""
-        from src.python.llm import reset_session_usage, get_session_usage, format_session_usage
+        from src.python.llm import get_session_usage, format_session_usage
+        from src.python.llm.session import reset_session_usage
         from src.python.llm.session import _track_session_usage, _record_per_module
 
         reset_session_usage()

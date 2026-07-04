@@ -589,6 +589,12 @@ def generate_excel_report(
     _write_fund_deep_sheets(sheets, holdings, fund_deep, data, modules, prog)
     _write_llm_section_and_usage(wb, include_llm, llm_content, prog)
 
+    # ── 页签排序：B 模块页签（13-16）移至 LLM 页签（8-12）之后 ──
+    if fund_deep:
+        for ws in (ws13, ws14, ws15, ws16):
+            if ws is not None:
+                wb.move_sheet(ws, offset=len(wb.sheetnames))
+
     # ── 保存 ──
     with _Timer("保存 Excel/HTML 文件"):
         prog.info("正在保存 Excel 报告...")

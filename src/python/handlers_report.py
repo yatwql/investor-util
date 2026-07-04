@@ -11,7 +11,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.python.logger import setup_logger
 from src.python.tui_menu import get_config_cache
 from src.python.registry import get_llm_module_name
-from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+from src.python.llm import FAIL_REASON_DISABLED
+from src.python.llm.prompts import _LLM_MODULE_FAILURE
 from src.python.report.progress import TuiProgressReporter
 from src.python.tui_handlers import (
     _check_network_available, _finish_report, _prepare_holdings, _print_error_with_hint,

@@ -184,6 +184,13 @@
 - **datasource-and-folders.md**：目录树补全 B2-B4 模块 6 个源文件（fund_concentration/fund_concentration_sheet/fund_manager_analysis/fund_manager_sheet/fund_overlap/fund_overlap_sheet）和 5 个测试文件（test_fund_concentration/test_data_integrity/test_fund_manager_analysis/test_fund_manager_sheet/test_fund_overlap）；全量测试计数 2244→2341；修复 basic/ 目录树层级标识（3 文件→4 文件）
 - **review-findings.md**：清理已完成问题 R-152（测试时长关注，A5 已实施 unit 20s/verify 49s）和 R-153（PE 阈值边界条件，B5 已修复 ✅）；摘要表统计更新：R-149~R-152→R-149~R-151，B 自审行标注 PE 边界条件 ✅ 已修复
 
+### Fixed
+- **R-155：Excel 页签排序错位**（#O17）：在 `excel_generator.py` LLM 页签写入完成后使用 `wb.move_sheet()` 将 B 模块页签（13-16）移至末尾，页签序恢复为 1~16 连续编号。
+- **R-154：`excel_writer.py` API 签名验证 + B 模块硬编码标题**：为 `write_header_row` 添加参数类型校验（旧式 `(ws, headers, ncols)` 引发 TypeError）；B 模块 4 sheet 标题去硬编码 — 注册 `fund_manager/fund_overlap/fund_concentration/fund_style` 到 `registry.py._REPORT_SHEET_NAMES`，各 sheet 模块改用 `get_report_sheet_name()` + 设置 `ws.title`；`penetration_sheet.py` 传 `formats=[]` → `formats=None` 一致性修复。
+- **R-151：缓存命中率数据展示**：Excel LLM 用量页签追加"▎数据缓存系统"区域（命中/未命中/总请求/命中率）；HTML LLM 用量模块追加"系统数据缓存"表格；涉及 `summary.py._write_cache_stats_section`、`html_writer.py` 模板上下文、`report_template.html`。
+- **R-149：新闻富化关键词 XSS 安全注释**：`report_template.html` `{{ ekw.display }}` 前添加 Jinja2 注释警告勿加 `|safe`；`html_writer.py` render 调用处添加 SAC 注释标记。
+- **R-150：`llm/__init__.py` re-export 符号清理**：移除 4 个无生产消费者的生成器函数（`generate_global_macro`/`generate_expert_review`/`generate_health_check`/`generate_penetration_deep_analysis`）和 `reset_session_usage` 的 re-export；`handlers_report.py` 改用 `from src.python.llm import FAIL_REASON_DISABLED` 一致性修复；测试文件相应更新导入路径。全部 15 个 re-export 符号经审计确认，保留 10 个有效导出。
+
 ---
 
 ## [0.2.63] - 2026-07-02

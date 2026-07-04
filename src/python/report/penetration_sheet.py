@@ -94,7 +94,7 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
             failed_names = "；".join(
                 f"{f['name']}({f['code']})" for f in failed_details
             )
-            write_data_row(ws, row, [f"  无法获取穿透的基金：{failed_names}"], [])
+            write_data_row(ws, row, [f"  无法获取穿透的基金：{failed_names}"])
             row += 1
 
     info_line = (
@@ -103,7 +103,7 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
         f"穿透合并 {summary['merged_count']} 个标的，"
         f"TOP10 覆盖 {summary['top10_coverage_pct']:.1f}%"
     )
-    write_data_row(ws, row, [info_line], [])
+    write_data_row(ws, row, [info_line])
     return row
 
 

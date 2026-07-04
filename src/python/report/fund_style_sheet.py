@@ -21,6 +21,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.styles import NORMAL_FONT
+from src.python.registry import get_report_sheet_name
 
 logger = logging.getLogger("invest")
 
@@ -61,7 +62,9 @@ def write_style_sheet(
         ws: openpyxl Worksheet 对象
         style_data: analyze_style_for_all_funds 的结果中的 results 列表
     """
-    write_title_row(ws, 1, "16. 基金风格分析", ncols=_NCOLS)
+    _name = get_report_sheet_name('fund_style')
+    ws.title = f"16.{_name}"
+    write_title_row(ws, 1, f"16. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 
     for i, item in enumerate(style_data, start=3):

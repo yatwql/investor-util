@@ -878,6 +878,7 @@
                         <td class="text-left" style="font-size: 12px;">
                             {% if item.enriched_keywords and item.enriched_keywords|length > 0 %}
                                 {% for ekw in item.enriched_keywords %}
+                                {# ⚠️ ekw.display 来自外部 API，依赖 autoescape 防 XSS —— 勿加 |safe 过滤器 #}
                                 <span class="source-tag-{{ ekw.type }}">{{ ekw.display }}</span>
                                 {% endfor %}
                             {% else %}
@@ -1225,6 +1226,24 @@
                         </td>
                     </tr>
                     {% endfor %}
+                </table>
+            </div>
+            {% endif %}
+
+            {% if cache_stats and cache_stats.get("total", 0) > 0 %}
+            <div style="margin-top: 16px; font-size: 13px; color: #555;">
+                <strong>系统数据缓存：</strong>
+                <table class="kv-table" style="margin-top: 6px;">
+                    <tr><td>缓存命中</td><td>{{ cache_stats["hits"] }} 次</td></tr>
+                    <tr><td>缓存未命中</td><td>{{ cache_stats["misses"] }} 次</td></tr>
+                    <tr><td>总请求</td><td>{{ cache_stats["total"] }} 次</td></tr>
+                    <tr><td>命中率</td><td>
+                        {%- if cache_stats["rate"] > 0 -%}
+                        {{ "%.1f"|format(cache_stats["rate"] * 100) }}%
+                        {%- else -%}
+                        —
+                        {%- endif -%}
+                    </td></tr>
                 </table>
             </div>
             {% endif %}

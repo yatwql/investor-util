@@ -20,6 +20,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.styles import NORMAL_FONT
+from src.python.registry import get_report_sheet_name
 
 logger = logging.getLogger("invest")
 
@@ -60,7 +61,9 @@ def write_fund_manager_sheet(
         ws: openpyxl Worksheet 对象
         manager_data: detect_manager_changes() 的返回结果
     """
-    write_title_row(ws, 1, "13. 基金经理变更监控", ncols=_NCOLS)
+    _name = get_report_sheet_name('fund_manager')
+    ws.title = f"13.{_name}"
+    write_title_row(ws, 1, f"13. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 
     for i, item in enumerate(manager_data, start=3):

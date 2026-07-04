@@ -116,7 +116,7 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2341 passed）
+│   └── test/                             # 测试（按标记分组目录，2353 passed）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
@@ -281,7 +281,7 @@ investor-util/
 │       │   │   ├── smoke/report.html     # 冒烟测试报告（标记 -m "smoke"，24 项）
 │       │   │   ├── edge/report.html      # 边缘场景报告（标记 -m "edge"，202 项）
 │       │   │   ├── data/report.html      # 数据正确性报告（标记 -m "data"，65 项）
-│       │   │   ├── all/report.html       # 全量测试报告（无标记筛选，2341 项）
+│       │   │   ├── all/report.html       # 全量测试报告（无标记筛选，2353 项）
 │       │   │   └── coverage/             # HTML 行覆盖率报告（--coverage 时生成）
 │   │   └── archives/                 # 历史报告存档
 │   │       └── <YYYYMMDD>/           # 按日期归档的子目录（含完整 latest/ 快照）

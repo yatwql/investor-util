@@ -186,7 +186,16 @@ def write_header_row(ws, row: int, headers: list[str]) -> int:
 
     Returns:
         下一行起始行号
+
+    Note:
+        API 历史：旧签名为 (ws, headers, ncols)，当前为 (ws, row, headers)。
+        若传入旧式调用将引发 TypeError，切勿混用。
     """
+    if not isinstance(row, int):
+        raise TypeError(
+            f"write_header_row: 'row' 应为 int，收到 {type(row).__name__}。"
+            " 旧式 API (ws, headers, ncols) 已被弃用，请使用 (ws, row, headers)。"
+        )
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=row, column=col, value=h)
         cell.font = BOLD_FONT

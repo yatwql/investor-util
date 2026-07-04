@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-04（v0.2.85 — 清理 R-152/R-153：测试时长关注（A5 已实施）/ PE 边界条件（B5 已修复））
+最后更新：2026-07-04（v0.2.85 — 全部 R-149~R-155 修复完成：页签排序/API签名验证/缓存展示/安全注释/re-export审计）
 
 ---
 
@@ -26,46 +26,6 @@
 ---
 
 | 2026-07-04 | 全技术债务审计：版本漂移/except Exception 追踪/模板格式统一 | ✅ 已完成 |
-| 2026-07-04 | 待观察/优化项（R-149~R-151）：安全隐式依赖/re-export审计/缓存展示 | 📋 待决策 |
-| 2026-07-04 | B 迭代自审：PE 阈值边界条件（✅ 已修复）/ excel_writer API 签名系统性风险 | 📋 待观察 |
-| 2026-07-04 | R-155：Excel 页签排序错位（1-7→13-16→8-11→12）— B 模块插入后未 reorder | 📋 待决策 |
+| 2026-07-04 | R-149~R-155 全部 5 项修复（安全注释/re-export审计/缓存展示/API签名验证/页签排序） | ✅ 已完成 |
 
----
-
-## 待处理问题
-
-### [R-149] 新闻富化关键词 `display` 字段隐式安全依赖（低风险）
-
-**发现**：模板第 598 行 `{{ ekw.display }}` 未标记 `|safe`，autoescape 生效防止 XSS。但 display 值来自外部 API（东方财富/新浪），当前安全依赖 autoescape 默认行为，后续若有 `|safe` 添加将暴露 XSS 风险。
-**状态**：📋 待观察 — 建议在 html_writer.py 的 render 调用处或模板变量注入前加 sanitize 注释标记。
-
-### [R-150] `llm/__init__.py` re-export 符号审计（低优先级）
-
-**发现**：`llm/__init__.py` 通过 `# noqa: F401` 批量 re-export 了多个模块的符号（`cache_get`、`cache_set` 等），部分可能已无外部调用者。
-**状态**：📋 待审计 — 建议每半年或大版本发布前核查一次导出符号的实际使用情况。
-
-### [R-151] 缓存命中率数据未在报告中展示（中低优先级）
-
-**发现**：`cache.py` 已有完善的 `get_cache_hit_rate()` 统计接口，跟踪命中/未命中和命中率，但 HTML 和 Excel 报告均未消费此数据。
-**状态**：📋 待决策 — 展示缓存命中率有助于用户判断数据新鲜度，建议在报告页脚或 LLM 用量页签追加。
-
-### [R-154] `excel_writer.py` API 签名系统性风险（低优先级）
-
-**发现**：B2 实施时 `fund_manager_sheet.py` 调用了错误的 `excel_writer.py` API 签名——`write_header_row(ws, _HEADERS, ncols=N)` 应改为 `write_header_row(ws, 2, _HEADERS)`；`freeze_header(ws, nrows, ncols)` 应改为 `freeze_header(ws, row=2)`；`auto_width(ws, ncols)` 应改为 `auto_width(ws)`。问题在 B2 集成测试阶段被捕获，但说明 `excel_writer.py` 的 API 签名变更（从旧式 `ncols` 参数改为无参/最小参数）已导致多个调用方出错，存在系统性风险。
-
-**关联问题**：B 系列 4 个 sheet 模块（`fund_manager_sheet.py`、`fund_overlap_sheet.py`、`fund_concentration_sheet.py`、`fund_style_sheet.py`）的页签标题均为硬编码字符串（如 `"14. 持仓重合度矩阵"`），未通过 `get_report_sheet_name()`（非 LLM）或 `get_llm_module_name()`（B 模块标题暂无 registry 入口）获取。若未来需统一标题来源，需在 registry 中为 B 模块注册 sheet 键名，并修改硬编码调用方。
-
-**状态**：📋 待观察 — 建议对所有调用 `excel_writer.py` 的 sheet 模块做一次 API 签名一致性审计，或在 `excel_writer.py` 增加参数类型校验和弃用警告。
-
-### [R-155] Excel 页签排序错位 — B 模块插入导致 1-7→13-16→8-11→12（低优先级）
-
-**发现**：B 迭代实施中，Excel 页签创建顺序为 `ws1-ws7 → ws13-ws16 → ws8-ws12`（LLM 页签由 `write_llm_sheets()` 通过 `wb.create_sheet()` 默认 append 到末尾），最终 Excel 页签排序为 **1-7, 13-16, 8-11, 12**，不满足 §8 要求的"页签编号排序（1.~16.）"。根因：`excel_generator.py` 中 B 模块预创建在 LLM 模块写入之前，而 LLM 模块作为独立写入阶段 `_write_llm_section_and_usage()` 将其页签追加到末尾。
-
-**修复思路**：在 `_write_llm_section_and_usage()` 写入完成后，通过 `wb.move_sheet()` 将 ws8-ws12 移动到 ws7 之后、ws13 之前；或统一由 `excel_generator.py` 创建全部页签并固定顺序，传入 LLM 写入器。
-
-**状态**：📋 待决策 — 建议 P3 或 O 迭代处理，非功能阻塞（页签编号仍有数字前缀，用户可通过菜单导航，无数据损失）。
-
----
-
-**已修复问题详细变更记录见** `docs-stm/managements/changelog.md`。
-**待处理问题状态将随后续审查更新。**
+_已修复问题详细变更记录见 `docs-stm/managements/changelog.md`。_
