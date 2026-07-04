@@ -255,39 +255,43 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 
 ### 单元子模块标记
 
-| 表达式 | 覆盖范围 | 测试项数 |
-|:-------|:---------|:--------:|
-| `unit` | 所有单元测试 | 1993 |
-| `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 166 |
-| `unit_fetcher` | 数据获取调度 | 145 |
-| `unit_llm` | LLM 模块 | 336 |
-| `unit_news` | 新闻处理 | 176 |
-| `unit_report` | 报表生成 | 667 |
-| `unit_config` | 配置管理 | 55 |
-| `unit_core` | 核心基础设施（缓存/模型/注册表等） | 306 |
-| `unit_ui` | TUI 交互 | 142 |
-| `unit_providers or unit_fetcher` | 数据管道（Provider + 调度） | 311 |
+以 `pytest -m "<表达式>"` 快速选取单元子模块。项数见 [`test-coverage.md`](../managements/test-coverage.md) → 单元测试分组。
+
+| 表达式 | 覆盖范围 |
+|:-------|:---------|
+| `unit` | 所有单元测试 |
+| `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） |
+| `unit_fetcher` | 数据获取调度 |
+| `unit_llm` | LLM 模块 |
+| `unit_news` | 新闻处理 |
+| `unit_report` | 报表生成 |
+| `unit_config` | 配置管理 |
+| `unit_core` | 核心基础设施（缓存/模型/注册表等） |
+| `unit_ui` | TUI 交互 |
+| `unit_providers or unit_fetcher` | 数据管道（Provider + 调度） |
 
 ### 横切标记
 
-| 表达式 | 覆盖范围 | 测试项数 |
-|:-------|:---------|:--------:|
-| `smoke` | 冒烟（6 文件 × 4 项） | 24 |
-| `edge` | 边缘/异常场景 | 198 |
-| `data` | 数据正确性验证 | 65 |
-| `llm` | 全部 LLM（单元 336 + 场景 24） | 360 |
-| `not llm` | 排除 LLM 后的全量 | 1865 |
+以 `pytest -m "<表达式>"` 快速选取横切标记。项数见 [`test-coverage.md`](../managements/test-coverage.md) → 跨类标记。
+
+| 表达式 | 覆盖范围 |
+|:-------|:---------|
+| `smoke` | 冒烟（6 文件 × 4 项） |
+| `edge` | 边缘/异常场景 |
+| `data` | 数据正确性验证 |
+| `llm` | 全部 LLM（单元 + 场景） |
+| `not llm` | 排除 LLM 后的全量 |
 
 ### 集成测试标记
 
-| 表达式 | 覆盖范围 | 测试项数 |
-|:-------|:---------|:--------:|
-| `integration`（父标记） | 全部集成测试 | 25 |
-| ├─ `integration_contract` | 模块间接口契约验证 | 7 |
-| ├─ `integration_isolation` | 错误隔离业务语义验证 | 3 |
-| ├─ `integration_news_pipeline` | 新闻流水线全链路 | 4 |
-| ├─ `integration_cache` | 跨模块缓存一致性验证 | 4 |
-| └─ `integration_tui` | TUI → Handler 路由集成测试 | 7 |
+| 表达式 | 覆盖范围 |
+|:-------|:---------|
+| `integration`（父标记） | 全部集成测试 |
+| ├─ `integration_contract` | 模块间接口契约验证 |
+| ├─ `integration_isolation` | 错误隔离业务语义验证 |
+| ├─ `integration_news_pipeline` | 新闻流水线全链路 |
+| ├─ `integration_cache` | 跨模块缓存一致性验证 |
+| └─ `integration_tui` | TUI → Handler 路由集成测试 |
 
 ### 组合示例
 
