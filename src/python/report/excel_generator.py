@@ -118,6 +118,16 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["write_concentration_sheet"] = None
         prog.add_error("持仓集中度监控模块缺失 (fund_concentration)")
 
+    try:
+        from src.python.report.fund_style_analysis import analyze_style_for_all_funds
+        from src.python.report.fund_style_sheet import write_style_sheet
+        modules["analyze_style_for_all_funds"] = analyze_style_for_all_funds
+        modules["write_style_sheet"] = write_style_sheet
+    except ImportError:
+        modules["analyze_style_for_all_funds"] = lambda fh: {"results": []}
+        modules["write_style_sheet"] = None
+        prog.add_error("基金风格分析模块缺失 (fund_style)")
+
     return modules
 
 
@@ -367,6 +377,41 @@ def _write_fund_deep_sheets(
             logger.warning("持仓集中度监控失败: %s", e)
             prog.add_error("持仓集中度监控失败")
 
+    # 16. 基金风格分析
+    analyze_style = modules.get("analyze_style_for_all_funds")
+    write_style = modules.get("write_style_sheet")
+    ws16 = sheets.get("ws16")
+    if ws16 is not None and analyze_style is not None and write_style is not None:
+        prog.info("正在分析基金风格漂移...")
+        try:
+            from src.python.fetcher.fund import fetch_fund_holdings
+            from src.python.report.fund_manager_analysis import _is_fund_code
+
+            fund_codes = list(dict.fromkeys(
+                h.code for h in holdings if _is_fund_code(h.code)
+            ))
+            fund_holdings: dict[str, dict] = {}
+            for code in fund_codes:
+                fh = fetch_fund_holdings(code)
+                if fh and fh.get("holdings"):
+                    fund_holdings[code] = {
+                        "name": fh.get("name", code),
+                        "holdings": fh["holdings"],
+                    }
+
+            if fund_holdings:
+                style_result = analyze_style(fund_holdings)
+                if style_result.get("results"):
+                    write_style(ws16, style_result["results"])
+                    prog.ok("基金风格分析页签写入完成")
+                else:
+                    logger.info("基金风格分析：无结果")
+            else:
+                logger.info("基金风格分析：无基金持仓数据")
+        except Exception as e:
+            logger.warning("基金风格分析失败: %s", e)
+            prog.add_error("基金风格分析失败")
+
 
 def _write_llm_section_and_usage(
     wb: Any, include_llm: bool, llm_content: tuple | None,
@@ -527,9 +572,10 @@ def generate_excel_report(
     ws13 = wb.create_sheet() if fund_deep else None    # 13. 基金经理变更监控
     ws14 = wb.create_sheet() if fund_deep else None    # 14. 持仓重合度矩阵
     ws15 = wb.create_sheet() if fund_deep else None    # 15. 持仓集中度监控
+    ws16 = wb.create_sheet() if fund_deep else None    # 16. 基金风格分析
 
     sheets = {"ws1": ws1, "ws2": ws2, "ws3": ws3, "ws4": ws4, "ws5": ws5,
-              "ws6": ws6, "ws7": ws7, "ws13": ws13, "ws14": ws14, "ws15": ws15}
+              "ws6": ws6, "ws7": ws7, "ws13": ws13, "ws14": ws14, "ws15": ws15, "ws16": ws16}
 
     # ── 行情市值 + 指数 ──
     data = _resolve_market_data(holdings, details, modules, ws2, prog)

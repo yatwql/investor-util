@@ -225,6 +225,7 @@
         {% if manager_analysis and manager_analysis.get("results") %}<a href="#sec-manager">十三、经理变更</a>{% endif %}
         {% if overlap_matrix and overlap_matrix.get("funds") and overlap_matrix["funds"]|length >= 2 %}<a href="#sec-overlap">十四、重合度矩阵</a>{% endif %}
         {% if concentration_analysis and concentration_analysis.get("results") %}<a href="#sec-concentration">十五、集中度</a>{% endif %}
+        {% if style_analysis and style_analysis.get("results") %}<a href="#sec-style">十六、风格分析</a>{% endif %}
         {% if news_enabled %}<a href="#sec-news">六、新闻关联</a>{% endif %}
         {% if early_warnings %}<a href="#sec-early-warning">七、智能预警</a>{% endif %}
         {% if llm_enabled %}<a href="#sec-llm">LLM分析</a>{% endif %}
@@ -795,6 +796,55 @@
             </table>
             <div class="penetration-notes">
                 <div>* 环比变化 >+20% → 🔴 紧急，>+10% → ⚠️ 关注，前10占比 >80% → ⚠️ 关注</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 16: 基金风格分析 (B 系列)                         -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    {% if style_analysis and style_analysis.get("results") %}
+    {% set style_results = style_analysis["results"] %}
+    <div id="sec-style"></div>
+    <div class="section">
+        <div class="section-title">十六、基金风格分析</div>
+        <div class="section-content">
+            {% set drifted = style_results | selectattr("drift_level", "in", ["轻度", "中度", "严重"]) | list %}
+            {% if drifted %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                ⚠️ <strong>{{ drifted | length }}</strong> 只基金存在风格漂移
+            </div>
+            {% endif %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金名称</th><th>代码</th><th>当前风格</th><th>上期风格</th>
+                        <th>漂移等级</th><th>漂移评分</th><th>备注</th><th>标识</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in style_results %}
+                    {% set _drift = r.get("drift_level", "") %}
+                    <tr class="{% if _drift == '严重' %}row-danger{% elif _drift == '中度' %}row-warning{% elif _drift == '基准确立中' %}row-first-check{% endif %}">
+                        <td class="text-left">{{ r["name"] }}</td>
+                        <td>{{ r["code"] }}</td>
+                        <td>{{ r.get("current_style", "--") }}</td>
+                        <td>{{ r.get("prev_style", "--") }}</td>
+                        <td class="{% if _drift == '严重' %}red-text{% elif _drift == '中度' %}orange-text{% elif _drift == '基准确立中' %}gray-text{% endif %}">
+                            {% if _drift == "严重" %}🔴 {{ _drift }}{% elif _drift == "中度" %}⚠️ {{ _drift }}{% elif _drift == "轻度" %}▲ {{ _drift }}{% elif _drift == "基准确立中" %}📋 {{ _drift }}{% else %}✅ {{ _drift }}{% endif %}
+                        </td>
+                        <td>{{ r.get("drift_score", "--") if r.get("drift_score") is not none else "--" }}</td>
+                        <td style="font-size: 12px;">{{ r.get("remark", "") if r.get("remark") else "" }}</td>
+                        <td>{% if r.get("is_first_check") %}📋 基线{% else %}✅{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 风格判定：按持仓个股的市值×PE 加权（东方财富 push2 数据），无数据时按代码段降级</div>
+                <div>* 漂移评分 = 网格曼哈顿距离（size差 + style差，0~4）</div>
+                <div>* 轻度(1分) / 中度(2分) / 严重(≥3分) — 首次运行记录基线，基准确立中</div>
             </div>
         </div>
     </div>
