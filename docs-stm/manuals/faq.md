@@ -31,7 +31,7 @@ A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope C
 
 **Q: 需要什么 Python 版本？**
 
-A: Python 3.10+。启动脚本（`launch.ps1` / `launch.sh`）自动检测并创建虚拟环境，也可手动执行 `pip install -r requirements.txt`。
+A: Python 3.10+。启动脚本（`launch.ps1` / `launch.sh`）自动检测 Python 版本是否满足要求并创建虚拟环境，也可手动执行 `pip install -r requirements.txt`。
 
 **Q: 支持 Windows 7 吗？**
 
@@ -39,7 +39,7 @@ A: 不正式支持。Python 3.10+ 在 Windows 7 上安装受限，且部分依�
 
 **Q: 程序首次启动为什么比较慢？**
 
-A: 首次启动或清空缓存后首次生成报告，所有数据源均需从零获取（价格、净值、新闻、基金排名、行业分类等），根据网络情况耗时约 10-30 秒。后续操作因大量命中缓存，通常在 3-5 秒内完成。如果完全无缓存且不配置 LLM，生成基础版报告（菜单 E/H）约 5-10 秒。
+A: 首次启动需创建虚拟环境并安装依赖（`pip install`），此外所有数据源均需从零获取（价格、净值、新闻、基金排名、行业分类等），根据网络情况耗时约 10-30 秒。后续启动会跳过 `pip install`（`requirements.txt` 未变更时），操作因大量命中缓存，通常在 3-5 秒内完成。如果完全无缓存且不配置 LLM，生成基础版报告（菜单 E/H）约 5-10 秒。
 
 **Q: 终端方向键在 SSH / tmux 下无效？**
 

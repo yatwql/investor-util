@@ -65,14 +65,41 @@ try {
     exit 1
 }
 
-# 4. 安装依赖
-Write-Host "正在安装依赖 ..."
-try {
-    # -qq 级静默：抑制 pip 版本通知和下载进度条
-    pip install -qq -r requirements.txt
-} catch {
-    Write-Host "错误: 安装依赖失败。" -ForegroundColor Red
+# 3.5. 检查 Python 版本（要求 >= 3.10）
+$pyVer = & $pythonCmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+$verParts = $pyVer.Split('.')
+$major = [int]$verParts[0]
+$minor = [int]$verParts[1]
+if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 10)) {
+    Write-Host "错误: 需要 Python >= 3.10，当前版本: $pyVer" -ForegroundColor Red
     exit 1
+}
+Write-Host "Python 版本: $pyVer（满足要求）" -ForegroundColor Cyan
+
+# 4. 安装依赖（检查 requirements.txt 是否变更，未变更则跳过）
+$depsMarker = ".venv\.deps_installed"
+$reqHash = (Get-FileHash "requirements.txt" -Algorithm SHA256).Hash
+$skipInstall = $false
+if (Test-Path $depsMarker) {
+    $oldHash = (Get-Content $depsMarker -Raw).Trim()
+    if ($oldHash -eq $reqHash) {
+        $skipInstall = $true
+    }
+}
+if (-not $skipInstall) {
+    Write-Host "正在安装依赖 ..."
+    try {
+        # -qq 级静默：抑制 pip 版本通知和下载进度条
+        pip install -qq -r requirements.txt
+        if ($LASTEXITCODE -eq 0) {
+            Set-Content -Path $depsMarker -Value $reqHash
+        }
+    } catch {
+        Write-Host "错误: 安装依赖失败。" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "依赖已安装，跳过 pip install（requirements.txt 未变更）" -ForegroundColor DarkGray
 }
 
 # 5. 创建所需目录
@@ -89,10 +116,4 @@ try {
     & $pythonCmd src\python\main.py
 } catch {
     Write-Host "错误: 程序运行失败: $_" -ForegroundColor Red
-} finally {
-    # TUI 退出后自动退出虚拟环境
-    if (Get-Command deactivate -ErrorAction SilentlyContinue) {
-        deactivate
-        Write-Host "虚拟环境已退出。"
-    }
 }

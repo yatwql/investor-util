@@ -55,13 +55,39 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 4. 安装依赖
-echo "正在安装依赖 ..."
-# -qq 级静默：抑制 pip 版本通知和下载进度条
-pip install -qq -r requirements.txt
-if [ $? -ne 0 ]; then
-    echo "错误: 安装依赖失败。" >&2
+# 3.5. 检查 Python 版本（要求 >= 3.10）
+echo "正在检查 Python 版本 ..."
+PY_VER=$($PYTHON_CMD -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PY_MAJOR=$(echo "$PY_VER" | cut -d. -f1)
+PY_MINOR=$(echo "$PY_VER" | cut -d. -f2)
+if [ "$PY_MAJOR" -lt 3 ] || [ "$PY_MAJOR" -eq 3 -a "$PY_MINOR" -lt 10 ]; then
+    echo "错误: 需要 Python >= 3.10，当前版本: $PY_VER" >&2
     exit 1
+fi
+echo "Python 版本: $PY_VER（满足要求）"
+
+# 4. 安装依赖（检查 requirements.txt 是否变更，未变更则跳过）
+DEPS_MARKER=".venv/.deps_installed"
+REQ_HASH=$(sha256sum requirements.txt | awk '{print $1}')
+SKIP_INSTALL=false
+if [ -f "$DEPS_MARKER" ]; then
+    OLD_HASH=$(cat "$DEPS_MARKER")
+    if [ "$OLD_HASH" = "$REQ_HASH" ]; then
+        SKIP_INSTALL=true
+    fi
+fi
+if [ "$SKIP_INSTALL" = false ]; then
+    echo "正在安装依赖 ..."
+    # -qq 级静默：抑制 pip 版本通知和下载进度条
+    pip install -qq -r requirements.txt
+    if [ $? -eq 0 ]; then
+        echo "$REQ_HASH" > "$DEPS_MARKER"
+    else
+        echo "错误: 安装依赖失败。" >&2
+        exit 1
+    fi
+else
+    echo "依赖已安装，跳过 pip install（requirements.txt 未变更）"
 fi
 
 # 5. 创建所需目录
