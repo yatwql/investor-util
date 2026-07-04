@@ -866,11 +866,11 @@
                 <tr><td>API 调用次数</td><td>{{ llm_session_usage["call_count"] }} 次</td></tr>
                 <tr><td>模型</td><td>{{ llm_session_usage["model_display"] }}</td></tr>
                 <tr><td>Endpoint</td><td style="word-break: break-all; font-size: 13px;">{{ llm_endpoint or "—" }}</td></tr>
-                <tr><td>输入 token</td><td>{{ "{:,}".format(llm_session_usage["input_tokens"]) }}</td></tr>
-                <tr><td>输出 token</td><td>{{ "{:,}".format(llm_session_usage["output_tokens"]) }}</td></tr>
-                <tr><td>总 token</td><td>{{ "{:,}".format(llm_session_usage["total_tokens"]) }}</td></tr>
+                <tr><td>输入 token</td><td>{{ llm_session_usage["input_tokens"] | thousands }}</td></tr>
+                <tr><td>输出 token</td><td>{{ llm_session_usage["output_tokens"] | thousands }}</td></tr>
+                <tr><td>总 token</td><td>{{ llm_session_usage["total_tokens"] | thousands }}</td></tr>
                 {% if llm_session_usage["cache_hit_tokens"] %}
-                <tr><td>缓存命中 token</td><td>{{ "{:,}".format(llm_session_usage["cache_hit_tokens"]) }}</td></tr>
+                <tr><td>缓存命中 token</td><td>{{ llm_session_usage["cache_hit_tokens"] | thousands }}</td></tr>
                 {% endif %}
                 <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
             </table>
@@ -909,10 +909,10 @@
                             {% endif %}
                         </td>
                         <td style="padding: 4px 8px;">{{ _mi.model or "—" }}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ "{:,}".format(_mi.total_tokens) }}{% endif %}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ "{:,}".format(_mi.input_tokens) }}{% endif %}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ "{:,}".format(_mi.output_tokens) }}{% endif %}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ "{:,}".format(_mi.cache_hit_tokens) }}{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.total_tokens | thousands }}{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.input_tokens | thousands }}{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.output_tokens | thousands }}{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.cache_hit_tokens | thousands }}{% endif %}</td>
                         <td style="padding: 4px 8px; text-align: right;">
                             {% if _mi.cost > 0 %}
                             ¥{{ "%.4f"|format(_mi.cost) }}

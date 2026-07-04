@@ -210,4 +210,5 @@ def is_market_open() -> bool:
         return _is_market_open_fallback(current_min)
 
     except Exception:
+        logger.warning("is_market_open 异常，保守返回 False", exc_info=True)
         return False  # 异常时保守处理：视为非交易时段

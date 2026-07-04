@@ -476,7 +476,7 @@ def _enrich_with_industry_api(merged: dict[str, Any]) -> None:
                                 info["concepts"] = id_rec["concepts"]
                             break
     except Exception:
-        logger.debug("穿透板块 API 补充失败（非关键）")
+        logger.debug("穿透板块 API 补充失败（非关键）", exc_info=True)
 
 
 def _build_penetration_result(

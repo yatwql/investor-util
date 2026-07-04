@@ -25,6 +25,46 @@
 
 ---
 
-**全部问题已修复并归档至 changelog.md，无待修复问题。**
+| 2026-07-04 | 全技术债务审计：版本漂移/except Exception 追踪/模板格式统一 | ✅ 已完成 |
+| 2026-07-04 | 待观察/优化项记录（R-148~R-153） | 📋 待决策 |
 
-> 所有已修复问题的详细变更记录见 `docs-stm/managements/changelog.md`。
+---
+
+## 待处理问题
+
+### [R-148] 模板 `.format()` 与 thousands filter 风格一致性（低优先级）
+
+**发现**：`report_template.html` 中 8 处使用 `{{ "{:,}".format(value) }}` 而非统一的 `{{ value | thousands }}`（已自定义 Jinja2 filter）。
+**状态**：✅ 已修复（v0.2.84）
+**后续建议**：后续新增模板变量时优先使用 filter 管道。
+
+### [R-149] 新闻富化关键词 `display` 字段隐式安全依赖（低风险）
+
+**发现**：模板第 598 行 `{{ ekw.display }}` 未标记 `|safe`，autoescape 生效防止 XSS。但 display 值来自外部 API（东方财富/新浪），当前安全依赖 autoescape 默认行为，后续若有 `|safe` 添加将暴露 XSS 风险。
+**状态**：📋 待观察 — 建议在 html_writer.py 的 render 调用处或模板变量注入前加 sanitize 注释标记。
+
+### [R-150] `llm/__init__.py` re-export 符号审计（低优先级）
+
+**发现**：`llm/__init__.py` 通过 `# noqa: F401` 批量 re-export 了多个模块的符号（`cache_get`、`cache_set` 等），部分可能已无外部调用者。
+**状态**：📋 待审计 — 建议每半年或大版本发布前核查一次导出符号的实际使用情况。
+
+### [R-151] 缓存命中率数据未在报告中展示（中低优先级）
+
+**发现**：`cache.py` 已有完善的 `get_cache_hit_rate()` 统计接口，跟踪命中/未命中和命中率，但 HTML 和 Excel 报告均未消费此数据。
+**状态**：📋 待决策 — 展示缓存命中率有助于用户判断数据新鲜度，建议在报告页脚或 LLM 用量页签追加。
+
+### [R-152] 测试运行时长的可扩展性关注（中优先级）
+
+**发现**：`unit` 模式已达 1997 项、耗时 ~25min，`verify` 模式 ~12min。虽然 `smoke`（24 项/2s）和 `regression`（222 项/~32s）保持快速，但长期趋势不乐观。
+**状态**：📋 待观察 — 建议新增模块级测试时考虑按文件修改时间增量执行，或对最重的 `unit_report`（667 项）做子分组。
+
+### [R-153] pyproject.toml 版本与 constants.py 长期脱节风险
+
+**发现**：pyproject.toml version = 0.2.52，但实际代码已到 0.2.83，脱节 31 个小版本。
+**状态**：✅ 已修复（v0.2.84）
+**后续建议**：建议将版本号声明收敛到单一源头（如 `constants.py`），`pyproject.toml` 通过 `setuptools.dynamic` 引用，而非重复声明。
+
+---
+
+**已修复问题详细变更记录见** `docs-stm/managements/changelog.md`。
+**待处理问题状态将随后续审查更新。**

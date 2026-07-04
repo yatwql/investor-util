@@ -111,7 +111,7 @@ def _load_dividend_data(holdings: List[Holding]) -> dict:
         stock_codes = [h.code for h in holdings if h.code.strip().startswith(("6", "0", "3"))]
         return get_dividend_data(stock_codes) if stock_codes else {}
     except Exception:
-        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --")
+        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
         return {}
 
 

@@ -210,7 +210,7 @@ def _load_profit_forecast() -> dict[str, Any]:
         from src.python.providers.akshare_extras import get_profit_forecast
         return get_profit_forecast()
     except Exception:
-        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --")
+        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --", exc_info=True)
         return {}
 
 

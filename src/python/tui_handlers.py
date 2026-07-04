@@ -177,7 +177,7 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
                 print(" 无数据")
         print(f"  [OK] 新增资产缓存预热完成")
     except Exception:
-        logger.warning("新资产预热过程异常，跳过（不影响后续生成）")
+        logger.warning("新资产预热过程异常，跳过（不影响后续生成）", exc_info=True)
 
 
 # ── 文件选择 ──────────────────────────────────────────────

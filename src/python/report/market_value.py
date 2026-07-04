@@ -437,7 +437,7 @@ def _generate_details(holdings: list[Holding], today_str: str) -> list[DetailRow
             try:
                 mkt = future.result()
             except Exception:
-                logger.warning("获取行情异常: %s (%s)", h.name, h.code)
+                logger.warning("获取行情异常: %s (%s)", h.name, h.code, exc_info=True)
                 mkt = None
             details.append(_compute_detail_row(h, mkt))
 

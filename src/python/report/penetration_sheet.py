@@ -63,7 +63,7 @@ def _load_profit_forecast_safe() -> dict:
         from src.python.providers.akshare_extras import get_profit_forecast
         return get_profit_forecast()
     except Exception:
-        logger.debug("盈利预测加载失败（非关键），EPS 列显示 --")
+        logger.debug("盈利预测加载失败（非关键），EPS 列显示 --", exc_info=True)
         return {}
 
 
@@ -75,7 +75,7 @@ def _load_dividend_data_safe(result: dict) -> dict:
         a_stock_codes = [c for c in all_top10_codes if c.startswith(("6", "0", "3"))]
         return get_dividend_data(a_stock_codes) if a_stock_codes else {}
     except Exception:
-        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --")
+        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
         return {}
 
 
