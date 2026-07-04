@@ -4,7 +4,7 @@
   - detect_manager_changes：变更检测、预警级别、首检、无基金持仓
   - _load_snapshot / _update_snapshot：快照读写
   - build_first_check_summary：引导文案生成
-  - _is_fund_code：基金代码判定
+  - 基金筛选使用 _is_fund（考虑账户上下文）
 
 场景覆盖：
   1. 首次运行（无快照）→ 全部首检
@@ -29,7 +29,6 @@ import pytest
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.report.fund_manager_analysis import (
     _calc_alert_level,
-    _is_fund_code,
     _load_snapshot,
     _update_snapshot,
     build_first_check_summary,
@@ -40,41 +39,12 @@ from src.python.models import Holding
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
-def _make_holding(code: str, name: str) -> Holding:
+def _make_holding(code: str, name: str, account: str = "测试账户") -> Holding:
     """构造测试用 Holding 对象。"""
     return Holding(
-        account="测试账户", name=name, code=code,
+        account=account, name=name, code=code,
         shares=1000, cost_price=1.0,
     )
-
-
-# ── _is_fund_code 测试 ──────────────────────────────────────────
-
-
-class TestIsFundCode(unittest.TestCase):
-    """_is_fund_code：基金代码判定"""
-
-    def test_fund_code_returns_true(self):
-        """普通基金代码返回 True。"""
-        self.assertTrue(_is_fund_code("110011"))
-        self.assertTrue(_is_fund_code("162605"))
-        self.assertTrue(_is_fund_code("519300"))
-
-    def test_stock_code_returns_false(self):
-        """股票代码返回 False。"""
-        self.assertFalse(_is_fund_code("600519"))  # 沪市
-        self.assertFalse(_is_fund_code("000001"))  # 深市
-        self.assertFalse(_is_fund_code("300750"))  # 创业板
-        self.assertFalse(_is_fund_code("002415"))  # 深市中小板
-
-    def test_non_digit_returns_false(self):
-        """非数字代码返回 False。"""
-        self.assertFalse(_is_fund_code("US123"))
-        self.assertFalse(_is_fund_code(""))
-
-    def test_short_code_returns_false(self):
-        """不足 6 位返回 False。"""
-        self.assertFalse(_is_fund_code("123"))
 
 
 # ── _calc_alert_level 测试 ─────────────────────────────────

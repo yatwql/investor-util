@@ -18,7 +18,8 @@ from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.models import Holding
 from src.python.fetcher.fund import fetch_fund_holdings
-from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary, _is_fund_code
+from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary
+from src.python.report.fund_performance import _is_fund
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_overlap import compute_overlap_matrix
 from src.python.report.fund_style_analysis import analyze_style_for_all_funds
@@ -428,7 +429,7 @@ def _render_overlap_matrix(
     prog.info("正在计算持仓重合度矩阵...")
     try:
         fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if _is_fund_code(h.code)
+            h.code for h in holdings if _is_fund(h)
         ))
         if len(fund_codes) < 2:
             return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
@@ -473,7 +474,7 @@ def _render_concentration(
     prog.info("正在计算持仓集中度...")
     try:
         fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if _is_fund_code(h.code)
+            h.code for h in holdings if _is_fund(h)
         ))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
@@ -508,7 +509,7 @@ def _render_style_analysis(
     prog.info("正在分析基金风格漂移...")
     try:
         fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if _is_fund_code(h.code)
+            h.code for h in holdings if _is_fund(h)
         ))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:

@@ -21,6 +21,7 @@ from typing import Any
 from src.python.cache import get as cache_get, set as cache_set
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
+from src.python.report.fund_performance import _is_fund
 
 logger = logging.getLogger("invest")
 
@@ -85,7 +86,7 @@ def detect_manager_changes(holdings: list[Holding]) -> list[dict[str, Any]]:
         仅含基金（非股票/现金），无基金时返回空列表。
     """
     # 筛选基金持仓
-    fund_holdings = [h for h in holdings if _is_fund_code(h.code)]
+    fund_holdings = [h for h in holdings if _is_fund(h)]
     if not fund_holdings:
         return []
 
@@ -181,17 +182,6 @@ def detect_manager_changes(holdings: list[Holding]) -> list[dict[str, Any]]:
         _update_snapshot(new_snapshot)
 
     return results
-
-
-def _is_fund_code(code: str) -> bool:
-    """判断代码是否为基金（6 位数字，非股票特征前缀）。"""
-    if not code or not code.isdigit():
-        return False
-    # 股票特征前缀：6=沪市主板A股, 0/3=深市, 4/8=北交所
-    # 基金代码通常为纯数字，但不存在上述股票特征
-    # 简单规则：非 0/3/4/6/8 开头的 6 位数字 = 基金
-    # 注意：部分 ETF 代码以 51/56/58 开头，此处不拦截
-    return len(code) == 6 and code[0] not in ("0", "3", "4", "6", "8")
 
 
 def build_first_check_summary(results: list[dict]) -> str:

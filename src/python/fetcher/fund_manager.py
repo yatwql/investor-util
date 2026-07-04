@@ -73,7 +73,7 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
     )
     if info_match:
         info_html = info_match.group(1)
-        # 查找基金经理行
+        # 旧格式：基金经理 独立 td → 下一个 td 含名字
         manager_row = re.search(
             r'基金经理\s*</td>\s*<td[^>]*>(.*?)</td>',
             info_html, re.DOTALL | re.IGNORECASE,
@@ -90,7 +90,7 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
                 if text:
                     manager_name = text.split("（")[0].split("(")[0].strip()
 
-            # 提取任职起始日（从同一行或附近行）
+            # 提取任职起始日（旧格式中在与经理名同一 cell）
             date_match = re.search(
                 r'任职起始日[：:]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})',
                 cell_html,
@@ -102,6 +102,15 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
                 )
             if date_match:
                 start_date = date_match.group(1).replace("/", "-")
+        else:
+            # 新格式：同一 td 内 "基金经理：<a>name</a>"
+            new_match = re.search(
+                r'基金经理[：:]\s*<a[^>]*>(.*?)</a>',
+                info_html,
+            )
+            if new_match:
+                manager_name = new_match.group(1).strip()
+            # 新格式 infoOfFund 不含任职起始日，留空由档案页回退补充
 
     # ── 策略 2：页面文本回退搜索 ──
     if not manager_name:
@@ -192,6 +201,11 @@ def _parse_manager_from_archive_page(code: str) -> dict[str, Any] | None:
     """从基金档案页 fundf10.eastmoney.com/jjjl_{code}.html 解析经理信息。
 
     基金经理明细页包含完整的历任信息，作为主页解析失败时的回退方案。
+    实际表格结构（天天基金）：
+      <table class="w782 comm jloff">
+        <thead><tr><th>起始期</th><th>截止期</th><th>基金经理</th><th>任职期间</th><th>任职回报</th></tr></thead>
+        <tbody><tr><td>date</td><td>至今/date</td><td><a>name</a></td><td>tenure</td><td>return</td></tr></tbody>
+      </table>
     """
     url = f"https://fundf10.eastmoney.com/jjjl_{code.strip()}.html"
     logger.debug("请求基金经理档案页(回退): %s", url)
@@ -204,22 +218,53 @@ def _parse_manager_from_archive_page(code: str) -> dict[str, Any] | None:
         logger.warning("基金经理档案页请求失败 %s: %s", code, e)
         return None
 
-    # 解析经理表格
-    # 天天基金档案页经理表格结构：<table class="table"><tr><td>经理名</td><td>任职日期</td>...
-    rows = re.findall(
-        r'<tr[^>]*>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>',
-        html, re.DOTALL,
+    # 找到经理信息表格
+    # 新格式（天天基金当前）：<table class="w782 comm jloff">
+    #   <thead><th>起始期</th>...<th>基金经理</th>...
+    #   <tbody><tr><td>date</td><td>至今</td><td><a>name</a></td>...
+    table_match = re.search(
+        r'<table[^>]*>(.*?起始期.*?基金经理.*?</thead>.*?<tbody>(.*?)</tbody>)',
+        html, re.DOTALL | re.IGNORECASE,
     )
 
-    if not rows:
+    if table_match:
+        tbody_html = table_match.group(2)
+        # 解析 tbody 中的行
+        row_htmls = re.findall(r'<tr[^>]*>(.*?)</tr>', tbody_html, re.DOTALL)
+    else:
+        # 旧格式（回退）：<tr><td><a>name</a></td><td>date</td></tr>
+        logger.debug("基金经理档案页未匹配新格式，尝试旧格式行解析: %s", code)
+        all_cells = re.findall(
+            r'<tr[^>]*>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>',
+            html, re.DOTALL,
+        )
+        row_htmls = []
+        for name_html, date_html in all_cells:
+            name_text = re.sub(r'<[^>]+>', '', name_html).strip()
+            date_text = re.sub(r'<[^>]+>', '', date_html).strip()
+            # 经理行特征：第二列是日期（不含中文导航文字），第一列是人名
+            if re.search(r'\d{4}', date_text) and not re.search(r'[一-鿿]{4,}', date_text):
+                row_htmls.append(f"<td>{date_text}</td><td></td><td>{name_html}</td>")
+
+    if not row_htmls:
+        logger.debug("基金经理档案页未找到经理行: %s", code)
         return None
 
-    # 第一行是当前经理
-    first_name = re.sub(r'<[^>]+>', '', rows[0][0]).strip()
-    first_date_str = re.sub(r'<[^>]+>', '', rows[0][1]).strip()
+    # 取每行的 td
+    def _parse_row(row_html: str) -> tuple[str, str]:
+        """从经理行提取（起始日期, 经理名）。"""
+        tds = re.findall(r'<td[^>]*>(.*?)</td>', row_html, re.DOTALL)
+        if len(tds) < 3:
+            return ("", "")
+        start_td = re.sub(r'<[^>]+>', '', tds[0]).strip()
+        name_td = re.sub(r'<[^>]+>', '', tds[2]).strip()
+        return (start_td, name_td)
+
+    # 第一行 = 当前经理
+    first_start, first_name = _parse_row(row_htmls[0])
 
     # 提取日期
-    date_match = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})', first_date_str)
+    date_match = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})', first_start)
     start_date = date_match.group(1).replace("/", "-") if date_match else ""
 
     tenure_days = 0
@@ -230,12 +275,11 @@ def _parse_manager_from_archive_page(code: str) -> dict[str, Any] | None:
         except (ValueError, TypeError):
             pass
 
-    # 历任经理
+    # 历任经理（从第二行起）
     history: list[dict] = []
-    for name_html, date_html in rows[1:]:
-        h_name = re.sub(r'<[^>]+>', '', name_html).strip()
-        h_date = re.sub(r'<[^>]+>', '', date_html).strip()
-        h_date_match = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})', h_date)
+    for row in row_htmls[1:]:
+        h_start, h_name = _parse_row(row)
+        h_date_match = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})', h_start)
         if h_name and h_date_match:
             history.append({
                 "name": h_name,

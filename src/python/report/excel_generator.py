@@ -305,11 +305,11 @@ def _write_fund_deep_sheets(
         prog.info("正在计算持仓重合度矩阵...")
         try:
             from src.python.fetcher.fund import fetch_fund_holdings
-            from src.python.report.fund_manager_analysis import _is_fund_code
+            from src.python.report.fund_performance import _is_fund
 
             # 筛选基金持仓，获取每只基金的持仓数据 + 市值
             fund_codes = list(dict.fromkeys(
-                h.code for h in holdings if _is_fund_code(h.code)
+                h.code for h in holdings if _is_fund(h)
             ))
             if len(fund_codes) < 2:
                 logger.info("持仓重合度矩阵：基金数 < 2（%d），跳过", len(fund_codes))
@@ -350,10 +350,10 @@ def _write_fund_deep_sheets(
         prog.info("正在计算持仓集中度...")
         try:
             from src.python.fetcher.fund import fetch_fund_holdings
-            from src.python.report.fund_manager_analysis import _is_fund_code
+            from src.python.report.fund_performance import _is_fund
 
             fund_codes = list(dict.fromkeys(
-                h.code for h in holdings if _is_fund_code(h.code)
+                h.code for h in holdings if _is_fund(h)
             ))
             fund_holdings: dict[str, dict] = {}
             for code in fund_codes:
@@ -385,10 +385,10 @@ def _write_fund_deep_sheets(
         prog.info("正在分析基金风格漂移...")
         try:
             from src.python.fetcher.fund import fetch_fund_holdings
-            from src.python.report.fund_manager_analysis import _is_fund_code
+            from src.python.report.fund_performance import _is_fund
 
             fund_codes = list(dict.fromkeys(
-                h.code for h in holdings if _is_fund_code(h.code)
+                h.code for h in holdings if _is_fund(h)
             ))
             fund_holdings: dict[str, dict] = {}
             for code in fund_codes:
