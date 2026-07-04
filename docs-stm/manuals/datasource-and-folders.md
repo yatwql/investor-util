@@ -242,9 +242,10 @@ investor-util/
 │
 ├── docs-stm/                         # 项目文档
 │   ├── plan/                         # 计划与设计文件
-│   │   ├── archived_plan.md          # 历史迭代归档（Iter 1.1~3.7）
-│   │   ├── iteration-plan.md         # 迭代计划细节
-│   │   └── test-coverage-map.md      # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
+│   │   ├── archived_plan.md              # 历史迭代归档（Iter 1.1~3.7）
+│   │   ├── iteration-plan.md             # 迭代计划细节
+│   │   ├── test-coverage-map.md          # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
+│   │   └── A5-test-runtime-optimization.md # R-152：测试运行时可扩展性优化设计
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
