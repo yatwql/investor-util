@@ -152,11 +152,15 @@ class TestDerivedMaps:
         assert etm["fund_benchmarks"] == "benchmark"
         assert etm["holdings_tracking"] == "tracking"
         assert etm["trading_calendar"] == "calendar"
+        assert etm["fund_manager_snapshot"] == "fund_manager"
+        assert etm["fund_concentration_snapshot"] == "fund_concentration"
+        assert etm["fund_style_snapshot"] == "fund_style_snapshot"
 
     def test_exact_type_map_no_extra_keys(self):
         """exact_map 不包含多余键名。"""
         etm = get_exact_type_map()
-        assert len(etm) == 3, f"预期 3 个精确键名，实际 {len(etm)}"
+        # 3 个已有（benchmark/tracking/calendar）+ 3 个 B 系列（manager/concentration/style）
+        assert len(etm) == 6, f"预期 6 个精确键名，实际 {len(etm)}"
 
     def test_registered_data_types(self):
         """get_registered_data_types 返回所有 data_type。"""

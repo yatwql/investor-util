@@ -146,6 +146,23 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
                   cache_prefixes=("dividend_",), cache_ttl=CACHE_MONTHLY,
                   cache_groups=("refresh",)),
 
+    # ── B 系列：基金深度分析模块 ──
+    DataModuleDef("基金经理", "fund_manager",
+                  cache_prefixes=("fund_manager_",),
+                  exact_cache_keys=("fund_manager_snapshot",),
+                  cache_ttl=CACHE_DAILY,
+                  cache_groups=("refresh",)),
+    DataModuleDef("持仓重合度", "fund_overlap",
+                  cache_prefixes=("fund_overlap_",),
+                  cache_ttl=CACHE_WEEKLY,
+                  cache_groups=("refresh",)),
+    DataModuleDef("基金集中度历史", "fund_concentration",
+                  exact_cache_keys=("fund_concentration_snapshot",),
+                  cache_ttl=CACHE_MONTHLY),
+    DataModuleDef("基金风格快照", "fund_style_snapshot",
+                  exact_cache_keys=("fund_style_snapshot",),
+                  cache_ttl=CACHE_MONTHLY),
+
     # ── 精确键名缓存（基准数据/持仓跟踪/交易日历）──
     DataModuleDef("基金业绩基准", "benchmark",
                   exact_cache_keys=("fund_benchmarks",),

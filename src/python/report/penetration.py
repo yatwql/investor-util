@@ -25,6 +25,7 @@ from datetime import datetime
 from typing import Any, List
 
 from src.python.fetcher.fund import fetch_fund_holdings
+from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name
 from src.python.report.market_value import DetailRow
@@ -381,6 +382,21 @@ def _classify_and_group(
     return classified, funds, direct_stocks, detail_map
 
 
+def _prefetch_manager_data(code: str) -> None:
+    """预取基金经理数据并写入缓存（供 B2 变更监控使用）。
+
+    与 fetch_fund_holdings 共用同一基金主页面 HTML，首次调用
+    时发起 HTTP 请求，后续运行命中缓存（TTL=1天）零额外请求。
+    此函数不阻塞穿透逻辑——经理数据不可用时仅打印调试日志。
+    """
+    try:
+        manager = fetch_fund_manager(code)
+        if manager is None:
+            logger.debug("基金经理预取失败 [%s]（不阻塞穿透计算）", code)
+    except Exception:
+        logger.debug("基金经理预取异常 [%s]（不阻塞穿透计算）", code, exc_info=True)
+
+
 def _merge_fund_layer(
     funds: list[Holding], detail_map: dict[str, float],
 ) -> tuple[dict[str, Any], float, int, list[dict[str, str]]]:
@@ -396,6 +412,9 @@ def _merge_fund_layer(
         tag = _fund_type_tag(ftype)
 
         holdings_data = fetch_fund_holdings(fund.code)
+        # 同页面顺带获取基金经理数据并缓存，供 B2 基金经理变更监控使用
+        _prefetch_manager_data(fund.code)
+
         if holdings_data is None or not holdings_data.get("holdings"):
             unknown_mv += fund_mv
             failed_count += 1
