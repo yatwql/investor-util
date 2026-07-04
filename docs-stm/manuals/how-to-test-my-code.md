@@ -1,6 +1,6 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 最后更新：2026-07-04（v0.2.79）
+> 最后更新：2026-07-04（v0.2.81）
 
 ## 概述
 
@@ -67,6 +67,21 @@ python scripts/test_runner.py --mode all
 
 测试框架围绕两个概念组织：**pytest 标记（marker）** 是测试用例的固有属性（标注"这是什么测试"）；**`--mode`** 是 `scripts/test_runner.py` 脚本对标记的预定义组合（定义"应该运行哪些测试"）。每个 mode 对应一个或多个标记表达式，脚本解析后传给 `pytest -m` 执行。
 
+### 回归测试级别
+
+每个回归项按影响范围分四级，与三级流水线的对应关系：
+
+| 级别 | 定义 | 阻断点 | 对应的流水线阶段 |
+|:-----|:-----|:-------|:----------------|
+| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `regression`（~30s） |
+| **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~12min） |
+| **P2** | 阻塞发布 | 不得 release | ③ `all`（~26min） |
+| **P3** | 建议修复 | 不阻断 | — |
+
+P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
+
+> 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
+
 ### 三级验证流水线
 
 项目推荐的三道质量门禁，按开发阶段逐级收紧：
@@ -74,6 +89,8 @@ python scripts/test_runner.py --mode all
 - **提交前验证（`--mode regression`）** — 每次代码变更后、commit 前必须执行。覆盖全部 207 项业务场景测试，确保 S0a-S0d + S1-S28 端到端用户路径和 T1-T21 日期/时间场景不被破坏。约 30s 即可完成。是编辑-验证循环中的第一道屏障，核心原则是"够快才能频繁跑，频繁跑才能尽早发现问题"。
 - **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。共 824 项，确保数据从抓取→缓存→计算的整条管道通畅且正确。约 12min，适合作为 PR CI 门禁或合入前的手动检查。
 - **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量 2225 项测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 26min，适合发布前的夜间或定时全量回归。
+
+> ⚠ 以上项数为撰写时的快照值，实际计数随版本迭代而变化，精确统计见 [`test-coverage.md`](../managements/test-coverage.md)。
 
 > `regression` 与 `scenario` 底层使用相同的标记表达式（`-m "scenario"`），测试项数同为 207。前者是语义别名——强调"提交前快速回归"的用途定位；后者是分类名——强调"业务场景测试"的数据性质。两者可互相替代，但建议按使用场合选用对应名称以增强代码意图可读性。
 
@@ -93,21 +110,6 @@ python scripts/test_runner.py --mode all
 4. 通过后 commit，积累多次提交后准备合并到 master
 5. 合并前跑 `--mode verify` 作为合入门禁
 6. 发布版本前跑 `--mode all`（26min）全量扫一遍
-
-### 回归测试级别
-
-每个回归项按影响范围分四级，与三级流水线的对应关系：
-
-| 级别 | 定义 | 阻断点 | 对应的流水线阶段 |
-|:-----|:-----|:-------|:----------------|
-| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `regression`（~30s） |
-| **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~12min） |
-| **P2** | 阻塞发布 | 不得 release | ③ `all`（~26min） |
-| **P3** | 建议修复 | 不阻断 | — |
-
-P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
-
-> 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
 
 ### 模式与覆盖范围说明
 
@@ -152,11 +154,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 python scripts/test_runner.py --mode scenario,edge
 ```
 
-脚本按 MODES 字典定义的 order 顺序依次执行各模式，结果汇总到同一份 HTML 报告中。适用于 CI 流水线中按阶段逐步收紧的场景。
-
-## 测试覆盖统计
-
-测试用例按 pytest 标记分组的详细统计数据（mode 对照表/功能域分布/场景分组明细/单元分组/跨类标记）见 **[test-coverage.md](../managements/test-coverage.md)**。精确实时计数请运行 `pytest src/test/ --collect-only -q`。
+脚本按 MODES 字典定义的 order 顺序依次执行各模式，结果汇总到同一份 HTML 报告中。适用于 CI 流水线中按阶段逐步收紧的场景。各模式的详细测试项数统计见 **[test-coverage.md](../managements/test-coverage.md)**，精确实时计数请运行 `pytest src/test/ --collect-only -q`。
 
 ## 查看报告
 
@@ -189,37 +187,6 @@ docs-stm/test-reports/latest/
 
 **打开方式**：直接用浏览器打开 `docs-stm/test-reports/latest/index.html`
 
-## 直接使用 pytest 组合查询
-
-```bash
-# 查看指定标记下有哪些测试（不执行）
-pytest src/test/ -m "edge" --collect-only
-
-# 运行单个测试文件
-pytest src/test/unit/report/test_category.py -v
-
-# 运行单个测试类
-pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
-
-# 冒烟测试（~2s 验证核心通路）
-pytest src/test/ -m "smoke" -v
-
-# 冒烟 + 边缘测试
-pytest src/test/ -m "smoke or edge" -v
-
-# 除 LLM 外的全部测试
-pytest src/test/ -m "not llm" -v
-
-# 仅 LLM 场景（S11-S20）
-pytest src/test/ -m "scenario_llm" -v
-
-# 基础业务链路 + 日期/时间场景
-pytest src/test/ -m "scenario_basic or scenario_datetime" -v
-
-# 输出 HTML 报告
-pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.html
-```
-
 ## 标记选择运行速查
 
 以 `pytest -m "<表达式>"` 形式快速选取特定标记组合，适合开发调试中定向验证。
@@ -231,14 +198,14 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
 | `scenario` | 全部业务场景 S0a-S0d + S1-S28 + T1-T21 |
-| `scenario_basic` | 基础链路 S1-S5 + S0a-S0d + S21-S28 |
+| `scenario_basic` | 基础链路 S0a-S0d + S1-S5 + S21-S28 |
+| ├ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量 |
 | ├ `scenario_stock` | S1: 纯股票组合 |
 | ├ `scenario_fund` | S2: 纯基金组合 |
 | ├ `scenario_mixed_accounts` | S3: 混合多账户 |
 | ├ `scenario_new_holdings` | S4: 新持仓无缓存 |
 | ├ `scenario_cache_hit` | S5: 缓存全命中 |
-| ├ `scenario_special_securities` | S21-S28: 特殊品种 |
-| └ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量 |
+| └ `scenario_special_securities` | S21-S28: 特殊品种 |
 | `scenario_resilience` | 异常容错场景 S6-S10 |
 | ├ `scenario_bond` | S6: 纯债券基金组合 |
 | ├ `scenario_network_down` | S7: 网络中断降级 |
@@ -292,6 +259,39 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 
 场景标记表末尾列出了常用的标记组合表达式（如 `scenario_basic or scenario_datetime`、`scenario_cache_hit or scenario_zero_cost`），可在此基础上按需调整。
 
+### 组合查询示例
+
+除上表按标记选择外，也可直接使用 `pytest` 进行灵活组合查询：
+
+```bash
+# 查看指定标记下有哪些测试（不执行）
+pytest src/test/ -m "edge" --collect-only
+
+# 运行单个测试文件
+pytest src/test/unit/report/test_category.py -v
+
+# 运行单个测试类
+pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
+
+# 冒烟测试（~2s 验证核心通路）
+pytest src/test/ -m "smoke" -v
+
+# 冒烟 + 边缘测试
+pytest src/test/ -m "smoke or edge" -v
+
+# 除 LLM 外的全部测试
+pytest src/test/ -m "not llm" -v
+
+# 仅 LLM 场景（S11-S20）
+pytest src/test/ -m "scenario_llm" -v
+
+# 基础业务链路 + 日期/时间场景
+pytest src/test/ -m "scenario_basic or scenario_datetime" -v
+
+# 输出 HTML 报告
+pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.html
+```
+
 ## 测试文件规范
 
 - **命名**：`test_<module>.py`
@@ -313,11 +313,20 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 
 ## 常见问题
 
+### 运行问题
+
 **Q: 运行报错 `no tests collected`？**
 A: 确认使用了正确的 marker 名：`pytest src/test/ -m "edge" --collect-only` 可预览匹配的测试。
 
+**Q: 报告中文乱码？**
+A: 确保操作系统编码为 UTF-8。Windows PowerShell：`chcp 65001`；Linux/Mac 默认即可。
+
+### LLM 相关
+
 **Q: 需要跳过 LLM 测试？**
 A: 使用 `--mode edge` 仅跑边缘用例，或 `python scripts/test_runner.py --mode scenario` 仅跑业务场景（不含 LLM 场景）。若要排除全部 LLM 相关（单元 + 场景），使用 `pytest src/test/ -m "not llm"`。注意 `--mode unit` **包含** `unit_llm`（均为 mock，无需 API key），不跳过 LLM。
+
+### 标记问题
 
 **Q: 新增测试文件后运行报错 `missing unit_* marker`？**
 A: `unit/conftest.py` 的验证模式要求每个单元测试文件必须包含 `unit_*` 子标记。在文件顶部添加 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]`，子组名见 `conftest.py` 注册表（如 `unit_providers`、`unit_report` 等）。
@@ -327,6 +336,3 @@ A: 在 `src/test/conftest.py` 的 `pytest_configure` 中注册新标记，然后
 
 **Q: 如何验证新增文件的标记是否正确？**
 A: 运行 `python scripts/check-test-markers.py`，脚本会静态扫描所有 `test_*.py` 文件，检查标记完整性、是否有拼写错误、`_edge.py` 是否漏标 `edge` 等。
-
-**Q: 报告中文乱码？**
-A: 确保操作系统编码为 UTF-8。Windows PowerShell：`chcp 65001`；Linux/Mac 默认即可。
