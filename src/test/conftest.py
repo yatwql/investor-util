@@ -32,7 +32,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "scenario_basic: 基础业务链路（S1-S5 + S0a-S0d + S21-S28 + S29-S33）")
     config.addinivalue_line("markers", "scenario_resilience: 异常容错场景（S6-S10）")
     config.addinivalue_line("markers", "scenario_llm: LLM 场景组合（S11-S20）")
-    config.addinivalue_line("markers", "scenario_datetime: 日期/时间场景（T1-T16）")
+    config.addinivalue_line("markers", "scenario_datetime: 日期/时间场景（T1-T21）")
     config.addinivalue_line("markers", "scenario_stock: 场景 S1 — 纯股票组合")
     config.addinivalue_line("markers", "scenario_fund: 场景 S2 — 纯基金组合")
     config.addinivalue_line("markers", "scenario_mixed_accounts: 场景 S3 — 混合多账户")

@@ -4,10 +4,35 @@
 
 ---
 
+## [0.2.83] - 2026-07-04
+
+### Changed
+
+- **Jinja2 autoescape 安全修复**：`html_writer.py` `_ENV` 启用 `autoescape=True`，4 个 LLM 内容变量（`global_macro`/`expert_review`/`health_check`/`penetration_deep`）显式使用 `|safe` 过滤器
+- **conftest.py marker 描述同步**：`scenario`（S1-S20→S1-S33）、`scenario_basic`（S1-S5→S1-S33）、`scenario_datetime`（T1-T16→T21）三个标记描述与当前覆盖范围对齐
+- **faq.md 5 处事实修正**：TTL 描述改为结构化列表（盘中30s/盘后24h/LLM 2h）；报告文件名修正（`report_*.xlsx`→`个人投资分析报告.xlsx`）；日志轮转说明纠正（保留7天每天备份→10MB按大小切割保留5份）；内存持仓表述澄清（"复用内存中的持仓数据"→"复用已获取的缓存数据"）
+- **reports-instruction.md 措辞修正**：持仓概况"各账户小计"→"持仓概况分类计数（分账户小计详见市值核算明细表）"
+- **testplan.md**：移除 §1.8 硬编码分组统计项数及 edge 文件行项数，测试覆盖改用"全量已覆盖"
+- **how-to-test-my-code.md**：移除 3 处硬编码测试计数引用，统一指向 test-coverage.md 作为权威计数源
+- **CLAUDE.md**：管理文档列表补充 `test-coverage.md`
+- **test-coverage.md**：全量测试及分组计数与最新状态同步
+- **版本号同步**：constants.py `APP_VERSION` 0.2.62→0.2.83，README.md 0.2.65→0.2.83，how-to-test-my-code.md/plan.md 同步至 v0.2.83（修复此前 20 个版本脱节）
+
+### Added
+
+- **test_security_edge.py 新增 4 项测试**：`test_template_autoescapes_html_tags`、`test_template_autoescapes_event_handler`、`test_money_filter_autoescape_safe`、`test_profit_color_filter_autoescape_safe`，验证 Jinja2 模板层自动转义生效
+
+### Fixed
+
+- **test_security_edge.py 测试更新**：`test_jinja2_autoescape_missing`→`test_jinja2_autoescape_enabled`，断言从 `assertFalse` 改为 `assertTrue`
+
+---
+
 ## [Unreleased]
 
 ### Added
 - **Z1 迭代完成（特殊品种场景 S21-S28，27 项 scenario_basic 测试）**：`test_scenario_special_securities.py` 新增 27 项测试，覆盖 S21 港股通持仓（3 项：分类/代码前缀/无行情不崩溃）、S22 可转债持仓（3 项：名称含"债"分类/市值计算/关键字匹配）、S23 公募 REITs（3 项：代码1开头分类/名称含REIT分类/市值计算）、S24 货币基金（3 项：货币关键字分类/净值恒为1/增利关键字分类）、S25 科创板+北交所混合（4 项：688分类/8xx分类/上海前缀/北京前缀）、S26 商品/黄金 ETF（3 项：黄金ETF分类/商品ETF分类/溢价率占位符）、S27 跨境 ETF（3 项：纳指ETF分类/恒生科技ETF分类/T-1净值 today_profit=0）、S28 纯债/国债持仓（5 项：国债ETF名称含"债"分类/关键字检测/国债分类/企业债分类/市值计算）。全量测试 2198→2225，场景测试 180→207，scenario_basic 30→57。
+- **Z2 迭代完成（操作行为场景 S29-S33，15 项 scenario_basic 测试）**：`test_scenario_operational_behavior.py` 新增 15 项测试，覆盖 S29 分红送转除权（3 项：送转后份额翻倍、除权后收益率、纯送股零成本 profit_rate=None）、S30 定投成本摊薄（3 项：两批加权平均、三批不等额、定投亏损）、S31 部分调仓卖出（3 项：卖出 50%/90%/全部清仓）、S32 跨账户转仓（3 项：同代码两账户各自明细、分类一致、不同代码独立）、S33 新股中签待上市（3 项：无行情降级 cost 正确、上市后正常计算、多只新股不干扰）。全量测试 2225→2240，场景测试 207→222，scenario_basic 57→72。
 - **Y1 迭代完成（API/网络异常纵深，23 项 edge 测试）**：`test_api_edge.py`（`unit/fetcher/`）新增 23 项测试，覆盖 Provider 层 HTTP 异常（4 项：超时/DNS 解析失败/连接拒绝/SSL 证书错误，均返回 None 不抛出）、Provider Chain 多级降级（4 项：主链路失败→备链路成功、全部失败→过期缓存降级、全部失败无缓存→返回 None、Provider 抛出异常→跳过该链路）、响应解析异常（5 项：空响应体/截断字段/非 JSON/空 JSON/编码异常）、LLM API 错误分类（8 项：429/503 可重试、401/500 retryable、超时可重试、连接错误 retryable、正常 200 success）、HTTP 客户端 SSL 验证（2 项：SSL_VERIFY=false 关闭验证、默认 true）。单元测试 1970→1993，edge 测试 175→198，全量 2175→2198。
 - **Y6 迭代完成（安全纵深，15 项 edge 测试）**：`test_security_edge.py`（`unit/report/`）新增 15 项测试，覆盖 CSV 公式注入（2 项：=`+/` 开头名称不执行公式）、XSS 缓存注入（3 项：`<script>`/`<img onerror>` 原样保留、Jinja2 autoescape=False 确认、payload 传递校验）、符号链接（2 项：目录遍历不跟随符号链接）、路径遍历（2 项：`../` 和 `..\\` 被 `_` 替换不逃逸缓存目录）、API Key 日志泄漏（1 项：交叉验证 _sanitize_endpoint）、JSON 原型污染（2 项：Python json.loads 无 __proto__ 风险、config.json 含 __proto__ 不被特殊处理）、临时文件竞争（3 项：mkstemp 原子写入检查 + 并发写入不崩溃）。确认 Jinja2 autoescape=False 为已知技术债务。
 - **Y4 迭代完成（数值计算纵深，16 项 edge 测试）**：`test_market_value_edge.py` 新增 `TestNumericalEdgeY4` 类（16 项），覆盖浮点累加误差（2 项）、极微份额 0.01/0.0001（2 项）、超高单价 20 万 + 万元级精度（2 项）、收益率超 ±1000%（2 项）、NaN 传播链 price/yclose（2 项）、int32/int64 溢出（2 项）、负成本（1 项）、零成本 profit_rate=None（1 项）、多数量级累加保留（2 项）。边缘场景测试总数从 ~86 增至 ~102 项。

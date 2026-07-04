@@ -35,7 +35,7 @@ logger = logging.getLogger("invest")
 _TEMPLATE_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "tmpl")
 )
-_ENV = Environment(loader=FileSystemLoader(_TEMPLATE_DIR))
+_ENV = Environment(loader=FileSystemLoader(_TEMPLATE_DIR), autoescape=True)
 
 
 # ── Jinja2 自定义过滤器 ─────────────────────────────────────

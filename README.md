@@ -2,7 +2,7 @@
 
 读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.2.65
+> 当前版本：0.2.83
 
 ```bash
 .\scripts\launch.ps1   # Windows
@@ -50,19 +50,20 @@
 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL |
 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | llm_key.json 字段说明、llm_settings.json 字段说明、LLM 密钥、参数调优、provider 选择 |
-| [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块流程 |
 | [报告文件结构 & 基金业绩评价标准](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价模型 |
 | [数据源一览 & 目录结构](docs-stm/manuals/datasource-and-folders.md) | 数据源说明、项目目录结构 |
+| [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块流程 |
 | [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试报告、新增测试指南 |
 
 ## 管理文档&设计概要
 
 | 文档 | 说明 |
 |------|------|
-| [实现计划](docs-stm/managements/plan.md) | 迭代计划 |
+| [迭代计划](docs-stm/managements/plan.md) | 迭代计划 |
 | [需求文档](docs-stm/managements/requirements.md) | 完整需求定义 |
 | [技术设计](docs-stm/managements/technical.md) | 技术设计 |
 | [质量控制与测试标准](docs-stm/managements/testplan.md) | 质量控制与测试标准 |
-| [变更日志](docs-stm/managements/changelog.md) | 版本更新记录 |
+| [测试覆盖情况](docs-stm/managements/test-coverage.md) | 测试覆盖情况 |
 | [自审记录](docs-stm/managements/review-findings.md) | 自我审查问题记录 |
+| [变更日志](docs-stm/managements/changelog.md) | 版本更新记录 |
 | [CLAUDE.md](CLAUDE.md) | AI 编程助手指引 |

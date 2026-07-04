@@ -172,12 +172,12 @@
 | 空持仓下菜单 L | 跳过 LLM 调用，输出空占位 | ✅ |
 | config.json 配置值异常 | 输出警告，使用代码默认值 | ✅ |
 | JSON null 自动兜底 | 不崩溃，降级为空列表 | ✅ |
-| market_hours UTC 时区 | `datetime.now(timezone(hours=8))` 一致 | ✅ `test_market_hours_edge.py`（8 项，UTC/JST/PST 时区） |
-| config 原子写入断电 | `tempfile.mkstemp` + `os.replace` | ✅ `test_config_atomic_edge.py`（3 项，模拟断电/部分写入） |
-| Provider 回退链路 | 主 provider 失败 → fallback provider | ✅ `test_chain_edge.py`（4 项，超时/429/503/全失败） |
-| 熔断器冷却恢复 | 熔断后 60s 半开探测 | ✅ `test_circuit_breaker_edge.py`（3 项，60s 边界/59s 仍开/多端点） |
+| market_hours UTC 时区 | `datetime.now(timezone(hours=8))` 一致 | ✅ `test_market_hours_edge.py`（UTC/JST/PST 时区） |
+| config 原子写入断电 | `tempfile.mkstemp` + `os.replace` | ✅ `test_config_atomic_edge.py`（模拟断电/部分写入） |
+| Provider 回退链路 | 主 provider 失败 → fallback provider | ✅ `test_chain_edge.py`（超时/429/503/全失败） |
+| 熔断器冷却恢复 | 熔断后 60s 半开探测 | ✅ `test_circuit_breaker_edge.py`（60s 边界/59s 仍开/多端点） |
 | 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | ✅ `test_cache_edge.py`（gzip 边界 100KB/损坏删除） |
-| LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | ✅ `test_api_edge.py`（2 项，恢复重试/仍空不回退） |
+| LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | ✅ `test_api_edge.py`（恢复重试/仍空不回退） |
 
 ### 1.7 日期/时间数据获取场景测试（T1-T21）
 

@@ -82,13 +82,45 @@ class TestXssCacheInjectionY6(unittest.TestCase):
         self.assertIn("<script>", detail.name)
         self.assertNotEqual(detail.name, "alert(\\\"xss\\\")")
 
-    def test_jinja2_autoescape_missing(self):
-        """确认 Jinja2 Environment 未启用 autoescape（技术债务，需使用者注意）。"""
+    def test_jinja2_autoescape_enabled(self):
+        """确认 Jinja2 Environment 已启用 autoescape（防止 XSS 注入）。"""
         from src.python.report.html_writer import _ENV
-        self.assertFalse(_ENV.autoescape)
+        self.assertTrue(_ENV.autoescape)
+
+    def test_template_autoescapes_html_tags(self):
+        """Jinja2 模板渲染 → 持仓名 <script> 被转义。"""
+        from src.python.report.html_writer import _ENV
+        template = _ENV.from_string("{{ name }}")
+        result = template.render(name='<script>alert("xss")</script>')
+        self.assertIn("&lt;script&gt;", result)
+        self.assertNotIn("<script>", result)
+
+    def test_template_autoescapes_event_handler(self):
+        """Jinja2 模板渲染 → onerror 事件处理器被转义。"""
+        from src.python.report.html_writer import _ENV
+        template = _ENV.from_string("{{ name }}")
+        result = template.render(name='<img src=x onerror=alert(1)>')
+        self.assertIn("&lt;img", result)
+        self.assertNotIn("<img", result)
+
+    def test_money_filter_autoescape_safe(self):
+        """money 过滤器输出纯文本 → autoescape 不影响数值显示。"""
+        from src.python.report.html_writer import _ENV
+        template = _ENV.from_string("{{ value | money }}")
+        result = template.render(value=1234.5)
+        self.assertIn("1,234.50", result)
+
+    def test_profit_color_filter_autoescape_safe(self):
+        """profit_color 过滤器输出颜色值 → autoescape 不影响。"""
+        from src.python.report.html_writer import _ENV
+        template = _ENV.from_string("{{ value | profit_color }}")
+        result = template.render(value=100)
+        self.assertIn("#CC0000", result)
+        result2 = template.render(value=-50)
+        self.assertIn("#009900", result2)
 
     def test_xss_payload_in_name_preserved(self):
-        """持仓名含 XSS payload → 原样传递（标记 autoescape=False 的现况）。"""
+        """持仓名含 XSS payload → DetailRow 中原样传递（需在模板层 autoescape）。"""
         from src.python.report.market_value import _compute_detail_row
         from src.python.models import Holding
 
