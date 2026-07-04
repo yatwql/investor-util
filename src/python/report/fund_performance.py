@@ -30,7 +30,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.market_value import DetailRow
-from src.python.registry import get_report_sheet_name
+from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.report.penetration import classify_penetration, QDII, ETF, INDEX_LINK, BOND_FUND, ACTIVE_EQUITY
 from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, RED_FONT
 
@@ -359,7 +359,7 @@ def write_fund_performance_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    ws.title = f"5.{get_report_sheet_name('fund_performance')}"
+    set_sheet_title(ws, "fund_performance")
 
     row = write_title_row(ws, 1, get_report_sheet_name('fund_performance'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)

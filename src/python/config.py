@@ -18,7 +18,11 @@ import threading
 from typing import Any
 
 from src.python.constants import MODEL_PRICING
-from src.python.registry import get_cache_ttl_defaults, get_known_llm_settings_keys
+from src.python.registry import (
+    get_cache_ttl_defaults,
+    get_known_llm_settings_keys,
+    get_report_section_keys,
+)
 
 logger = logging.getLogger("invest")
 
@@ -335,6 +339,59 @@ def _validate_market_hours(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_report_section_order(config: dict, issues: int) -> int:
+    """校验 report_section_order 配置段。
+
+    检查项：
+      - report_section_order 是否为 dict
+      - 模块标识是否合法（在 _REPORT_SECTION_DEFAULT 中）
+      - 配置的序号是否为正整数
+      - 序号是否重复
+      - llm_usage 不应出现在配置中（强制末尾）
+    """
+    order = config.get("report_section_order")
+    if order is None:
+        return issues
+    if not isinstance(order, dict):
+        logger.warning("config.json report_section_order = %r 不是对象(dict)，将使用默认顺序", order)
+        return issues + 1
+
+    valid_keys = get_report_section_keys()
+    seen_numbers: set[int] = set()
+
+    for key, num in order.items():
+        # 检查 llm_usage（设计上它不参与配置）
+        if key == "llm_usage":
+            logger.warning("config.json report_section_order 中不应包含 llm_usage，"
+                           "该模块固定为最后一位，配置将被忽略")
+            issues += 1
+            continue
+        # 检查未知标识
+        if key not in valid_keys:
+            logger.warning("config.json report_section_order 中存在未知的模块标识 %r，将被忽略", key)
+            issues += 1
+            continue
+        # 检查非整数 / 负值
+        try:
+            n = int(num)
+            if n < 1:
+                logger.warning("config.json report_section_order.%s = %s 不是正数，将使用默认序号", key, num)
+                issues += 1
+                continue
+        except (ValueError, TypeError):
+            logger.warning("config.json report_section_order.%s = %s 不是有效整数，将使用默认序号", key, num)
+            issues += 1
+            continue
+        # 检查重复序号
+        if n in seen_numbers:
+            logger.warning("config.json report_section_order 中存在重复序号 %s（%s），请检查", n, key)
+            issues += 1
+        else:
+            seen_numbers.add(n)
+
+    return issues
+
+
 def validate_config(config: dict | None = None) -> int:
     """校验 config.json 中的常见配置错误，输出 WARNING 日志。
 
@@ -356,6 +413,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_user_fund_benchmarks(config, issues)
     issues = _validate_early_warning(config, issues)
     issues = _validate_market_hours(config, issues)
+    issues = _validate_report_section_order(config, issues)
 
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)

@@ -12,7 +12,7 @@ from typing import Any
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.models import Holding
-from src.python.registry import get_llm_module_name, get_report_sheet_name
+from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -124,7 +124,7 @@ def write_penetration_sheet(
         penetration_data: 预计算穿透数据。为 None 时自动计算，提供时跳过
                           内部重复计算，用于调用方已算过一轮的场景
     """
-    ws.title = f"4.{get_report_sheet_name('penetration')}"
+    set_sheet_title(ws, "penetration")
     row = write_title_row(ws, 1, get_report_sheet_name('penetration'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 

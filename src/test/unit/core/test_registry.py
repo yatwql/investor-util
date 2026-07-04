@@ -13,6 +13,10 @@ from src.python.registry import (
     get_exact_type_map,
     get_known_llm_settings_keys,
     get_registered_data_types,
+    get_report_section_keys,
+    get_report_section_order,
+    set_sheet_title,
+    _REPORT_SECTION_DEFAULT,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
@@ -233,3 +237,214 @@ class TestDataModuleDef:
         m = DataModuleDef("测试", "test", cache_ttl=3600)
         with pytest.raises(AttributeError):
             m.data_type = "changed"  # type: ignore[misc]
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test Report Section Order (C-P1a)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestReportSectionDefault:
+    """_REPORT_SECTION_DEFAULT 完整性验证。"""
+
+    def test_total_16_sections(self):
+        """应有 16 个报告模块。"""
+        assert len(_REPORT_SECTION_DEFAULT) == 16
+
+    def test_every_entry_has_required_fields(self):
+        """每个条目必须有 key/name/number/type/data_flag。"""
+        for sec in _REPORT_SECTION_DEFAULT:
+            assert "key" in sec, f"缺少 key: {sec}"
+            assert "name" in sec, f"缺少 name: {sec}"
+            assert "number" in sec, f"缺少 number: {sec}"
+            assert "type" in sec, f"缺少 type: {sec}"
+            assert "data_flag" in sec, f"缺少 data_flag: {sec}"
+
+    def test_type_values_are_valid(self):
+        """type 只能是 always/b_series/news/llm 之一。"""
+        valid_types = {"always", "b_series", "news", "llm"}
+        for sec in _REPORT_SECTION_DEFAULT:
+            assert sec["type"] in valid_types, (
+                f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
+            )
+
+    def test_always_type_has_no_data_flag(self):
+        """always 类型的 data_flag 应为 None。"""
+        for sec in _REPORT_SECTION_DEFAULT:
+            if sec["type"] == "always":
+                assert sec["data_flag"] is None, (
+                    f"{sec['key']}: always 类型不应有 data_flag"
+                )
+
+    def test_non_always_type_has_data_flag(self):
+        """非 always 类型必须有 data_flag。"""
+        for sec in _REPORT_SECTION_DEFAULT:
+            if sec["type"] != "always":
+                assert sec["data_flag"] is not None, (
+                    f"{sec['key']}: {sec['type']} 类型缺少 data_flag"
+                )
+
+    def test_default_numbers_are_1_to_16(self):
+        """默认序号应为 1 到 16。"""
+        numbers = [sec["number"] for sec in _REPORT_SECTION_DEFAULT]
+        assert numbers == list(range(1, 17)), f"序号不连续: {numbers}"
+
+    def test_llm_usage_is_last(self):
+        """llm_usage 应在默认列表最后。"""
+        assert _REPORT_SECTION_DEFAULT[-1]["key"] == "llm_usage"
+
+    def test_no_duplicate_keys(self):
+        """key 不得重复。"""
+        keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
+        duplicates = {k for k in keys if keys.count(k) > 1}
+        assert not duplicates, f"重复的 key: {duplicates}"
+
+
+class TestGetReportSectionKeys:
+    """get_report_section_keys() 单元测试。"""
+
+    def test_returns_all_16_keys(self):
+        """应返回 16 个有效 key。"""
+        keys = get_report_section_keys()
+        assert len(keys) == 16
+
+    def test_contains_known_keys(self):
+        """应包含已知的几个关键 key。"""
+        keys = get_report_section_keys()
+        for k in ("summary", "fund_performance", "fund_manager", "llm_usage"):
+            assert k in keys, f"缺少 {k}"
+
+
+class MockWorksheet:
+    """模拟 openpyxl Worksheet，用于 set_sheet_title 测试。"""
+    def __init__(self):
+        self.title = ""
+
+
+class TestSetSheetTitle:
+    """set_sheet_title() 单元测试。"""
+
+    def test_sets_title_format(self):
+        """应设置标题为 "{number}.{name}"。"""
+        ws = MockWorksheet()
+        set_sheet_title(ws, "category")
+        assert ws.title == "3.持仓分类表", f"got {ws.title!r}"
+
+    def test_summary_sets_1(self):
+        """summary 页签应为 "1.投资分析汇总"。"""
+        ws = MockWorksheet()
+        set_sheet_title(ws, "summary")
+        assert ws.title == "1.投资分析汇总"
+
+    def test_llm_usage_sets_16(self):
+        """llm_usage 页签应为 "16.LLM API 用量"。"""
+        ws = MockWorksheet()
+        set_sheet_title(ws, "llm_usage")
+        assert ws.title == "16.LLM API 用量"
+
+    def test_unknown_key_fallback(self):
+        """未知 key 使用 key 本身作为标题。"""
+        ws = MockWorksheet()
+        set_sheet_title(ws, "nonexistent")
+        assert ws.title == "nonexistent"
+
+
+class TestGetReportSectionOrder:
+    """get_report_section_order() 单元测试。"""
+
+    def test_no_config_returns_defaults(self):
+        """config 为 None → 返回 16 项默认值。"""
+        order = get_report_section_order()
+        assert len(order) == 16
+        assert order[-1]["key"] == "llm_usage"
+        # 验证每个条目的 number 与原默认一致
+        for sec, default in zip(order, _REPORT_SECTION_DEFAULT):
+            assert sec["key"] == default["key"]
+            assert sec["number"] == default["number"]
+
+    def test_config_none_returns_deep_copy(self):
+        """返回的列表应为深拷贝，修改不影响原数据。"""
+        order = get_report_section_order()
+        order[0]["number"] = 999
+        assert _REPORT_SECTION_DEFAULT[0]["number"] == 1
+
+    def test_empty_config_returns_defaults(self):
+        """report_section_order 为空字典 → 返回默认。"""
+        order = get_report_section_order({"report_section_order": {}})
+        assert len(order) == 16
+        assert order[0]["key"] == "summary"
+
+    def test_non_dict_config_returns_defaults(self):
+        """report_section_order 不是 dict → 返回默认。"""
+        order = get_report_section_order({"report_section_order": "invalid"})
+        assert len(order) == 16
+        assert order[0]["key"] == "summary"
+
+    def test_partial_config_items_first(self):
+        """已配置项排在最前，按序号升序。"""
+        order = get_report_section_order({
+            "report_section_order": {"fund_manager": 1, "summary": 2}
+        })
+        assert order[0]["key"] == "fund_manager"
+        assert order[0]["number"] == 1
+        assert order[1]["key"] == "summary"
+        assert order[1]["number"] == 2
+        # 前两项之外应有 14 项（含 llm_usage 在最后）
+        assert len(order) == 16
+
+    def test_partial_config_unconfigured_after_configured(self):
+        """未配置项排在已配置项之后。"""
+        order = get_report_section_order({
+            "report_section_order": {"fund_manager": 1, "summary": 2}
+        })
+        # 检查前两项之后第一项是未配置的 market_value（默认顺序第 2 位）
+        # 但注意 market_value 默认序号是 2，与 summary 重复
+        keys_after = [s["key"] for s in order[2:]]
+        assert "market_value" in keys_after
+        assert "fund_overlap" in keys_after
+
+    def test_llm_usage_always_last(self):
+        """llm_usage 即使被配置也强制最后。"""
+        order = get_report_section_order({
+            "report_section_order": {"llm_usage": 1}
+        })
+        assert order[-1]["key"] == "llm_usage"
+
+    def test_llm_usage_config_in_middle(self):
+        """llm_usage 配了居中序号 → 仍强制最后。"""
+        order = get_report_section_order({
+            "report_section_order": {"summary": 5, "llm_usage": 3}
+        })
+        assert order[-1]["key"] == "llm_usage"
+        # summary 应该在前面（已配置）
+        assert order[0]["key"] == "summary"
+
+    def test_invalid_number_uses_default(self):
+        """无效序号回退默认值。"""
+        order = get_report_section_order({
+            "report_section_order": {"summary": "abc"}
+        })
+        summary_entry = [s for s in order if s["key"] == "summary"][0]
+        # summary 默认序号是 1，配置值 "abc" 无效应回退
+        assert summary_entry["number"] == 1
+
+    def test_negative_number_uses_user_value(self):
+        """注意：负数也作为用户配置值保留（校验由 config.py 负责）。"""
+        # 这里 get_report_section_order 不校验正负，只负责 int() 转换
+        order = get_report_section_order({
+            "report_section_order": {"summary": -5}
+        })
+        summary_entry = [s for s in order if s["key"] == "summary"][0]
+        assert summary_entry["number"] == -5
+
+    def test_full_config_reverse_order(self):
+        """全部 16 项都配了 → 按配置序号排序，llm_usage 最后。"""
+        all_keys = [s["key"] for s in _REPORT_SECTION_DEFAULT if s["key"] != "llm_usage"]
+        # 反序配置
+        full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}
+        order = get_report_section_order({"report_section_order": full_config})
+        assert len(order) == 16
+        assert order[-1]["key"] == "llm_usage"
+        # 第一个应为反序后的最后一个（即 fund_manager 的反序... 等等）
+        reversed_last = list(reversed(all_keys))[0]
+        assert order[0]["key"] == reversed_last

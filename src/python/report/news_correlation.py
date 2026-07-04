@@ -21,7 +21,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.models import Holding
-from src.python.registry import get_llm_module_name
+from src.python.registry import get_llm_module_name, set_sheet_title
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -506,7 +506,7 @@ def write_news_sheet(
         news_data: build_news_data() 返回的数据
         llm_meta: LLM 元数据，含 token_usage / llm_cached / llm_enabled
     """
-    ws.title = f"6.{get_llm_module_name('news_correlation')}"
+    set_sheet_title(ws, "news_correlation")
 
     has_llm = any(isinstance(item, dict) and item.get("llm_analysis") for item in news_data)
     ncols = _NCOLS + (1 if has_llm else 0)

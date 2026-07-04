@@ -14,7 +14,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python import cache
 from src.python.market_hours import is_market_open as _mh_is_market_open, is_midday_break as _mh_is_midday_break
-from src.python.registry import get_report_sheet_name
+from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.fetcher.price import fetch_market_data
 from src.python.models import Holding
 from src.python.report.excel_writer import auto_width, freeze_header, write_data_row, write_header_row, write_subtotal_row, \
@@ -589,7 +589,7 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
     """
-    ws.title = f"2.{get_report_sheet_name('market_value')}"
+    set_sheet_title(ws, "market_value")
     if details is None:
         details = _generate_details(holdings, today_str)
 

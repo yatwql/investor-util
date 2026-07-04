@@ -486,3 +486,81 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
         with open(cfg._CONFIG_FILE, encoding="utf-8") as f:
             payload = json.load(f)
         self.assertEqual(payload.get("holdings_dir"), "/safe/value")
+
+
+class TestValidateReportSectionOrder(unittest.TestCase):
+    """_validate_report_section_order 配置校验测试。"""
+
+    def test_no_order_returns_zero(self):
+        """report_section_order 未配置 → 0 问题。"""
+        n = cfg.validate_config({"holdings_dir": "data"})
+        self.assertEqual(n, 0)
+
+    def test_valid_order_returns_zero(self):
+        """有效配置 → 0 问题。"""
+        n = cfg.validate_config({
+            "report_section_order": {
+                "summary": 1,
+                "fund_manager": 6,
+                "global_macro": 12,
+            }
+        })
+        self.assertEqual(n, 0)
+
+    def test_non_dict_order_warns(self):
+        """report_section_order 不是 dict → 1 问题。"""
+        n = cfg.validate_config({"report_section_order": "invalid"})
+        self.assertEqual(n, 1)
+
+    def test_unknown_key_warns(self):
+        """未知模块标识 → 1 问题。"""
+        n = cfg.validate_config({
+            "report_section_order": {"nonexistent_module": 1}
+        })
+        self.assertEqual(n, 1)
+
+    def test_non_integer_value_warns(self):
+        """配置值不是整数 → 1 问题。"""
+        n = cfg.validate_config({
+            "report_section_order": {"summary": "abc"}
+        })
+        self.assertEqual(n, 1)
+
+    def test_negative_value_warns(self):
+        """负值序号 → 1 问题。"""
+        n = cfg.validate_config({
+            "report_section_order": {"summary": -5}
+        })
+        self.assertEqual(n, 1)
+
+    def test_zero_value_warns(self):
+        """零值序号 → 1 问题。"""
+        n = cfg.validate_config({
+            "report_section_order": {"summary": 0}
+        })
+        self.assertEqual(n, 1)
+
+    def test_duplicate_number_warns(self):
+        """重复序号 → 1 问题（仅第二次出现时告警）。"""
+        n = cfg.validate_config({
+            "report_section_order": {"summary": 1, "fund_manager": 1}
+        })
+        self.assertEqual(n, 1)
+
+    def test_llm_usage_in_config_warns(self):
+        """llm_usage 出现在配置中 → 1 问题。"""
+        n = cfg.validate_config({
+            "report_section_order": {"llm_usage": 1}
+        })
+        self.assertEqual(n, 1)
+
+    def test_multiple_issues_accumulate(self):
+        """多个问题累加计数。"""
+        n = cfg.validate_config({
+            "report_section_order": {
+                "unknown_key": 1,
+                "summary": "abc",
+                "fund_manager": -3,
+            }
+        })
+        self.assertEqual(n, 3)

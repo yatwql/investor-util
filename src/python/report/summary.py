@@ -11,7 +11,7 @@ from typing import Any
 from openpyxl.styles import Alignment, Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.registry import get_llm_module_name, get_report_sheet_name
+from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -251,7 +251,7 @@ def write_summary_sheet(
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
     """
-    ws.title = f"1.{get_report_sheet_name('summary')}"
+    set_sheet_title(ws, "summary")
 
     row = write_title_row(ws, 1, get_report_sheet_name('summary'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
@@ -273,15 +273,12 @@ def write_summary_sheet(
 
 
 
-def _init_llm_usage_sheet(wb: Any, title: str) -> tuple[Any, int]:
-    """创建 LLM 用量页签并移动到最右侧，返回 (ws, row)。"""
-    ws = wb.create_sheet()
-    ws.title = title
-    sheets = wb.sheetnames
-    current_idx = sheets.index(title)
-    last_idx = len(sheets) - 1
-    if current_idx != last_idx:
-        wb.move_sheet(title, offset=last_idx - current_idx)
+def _init_llm_usage_sheet(ws: Any) -> int:
+    """初始化 LLM 用量页签内容，返回当前行号。
+
+    页签已由 _create_sheets 按序预创建（含标题），此函数只写入内容。
+    """
+    title = ws.title
     row = write_title_row(ws, 1, title, 10)
     row += 1
     _SUB_FONT = Font(size=9, color="666666")
@@ -289,7 +286,7 @@ def _init_llm_usage_sheet(wb: Any, title: str) -> tuple[Any, int]:
             value="以下展示本次 LLM 全量生成的 API 调用统计和模块明细，帮助了解 Token 消耗和费用构成。")
     ws.cell(row=row, column=1).font = _SUB_FONT
     row += 2
-    return ws, row
+    return row
 
 
 def _write_llm_summary_section(ws: Any, row: int, session_usage: dict) -> int:
@@ -488,15 +485,15 @@ def _set_column_widths(ws: Any, widths: list[int]) -> None:
 
 
 def write_llm_usage_sheet(
-    wb: Any,
+    ws: Any,
     llm_session_usage: dict[str, Any] | None,
     llm_module_info: list[dict[str, Any]] | None,
     llm_endpoint: str = "",
 ) -> None:
-    """创建并写入 'LLM API 用量' 页签（放至最右侧）。
+    """写入 'LLM API 用量' 页签内容。
 
     Args:
-        wb: 工作簿
+        ws: 预创建的 LLM API 用量工作表（标题已由 _create_sheets 设置）
         llm_session_usage: format_session_usage() 返回值
         llm_module_info: 合并后的模块明细列表
         llm_endpoint: 全局 LLM endpoint
@@ -512,7 +509,7 @@ def write_llm_usage_sheet(
         "缓存命中 Token", "费用", "LLM 缓存", "Thinking",
     ]
 
-    ws, row = _init_llm_usage_sheet(wb, "12.LLM API 用量")
+    row = _init_llm_usage_sheet(ws)
     row = _write_llm_summary_section(ws, row, llm_session_usage)
 
     # 补充 endpoint 到汇总区（如果 llm_session_usage 没有 has_usage，添加在明细上方）

@@ -14,9 +14,12 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
+
+logger = logging.getLogger("invest")
 
 
 # ── 模块定义 ────────────────────────────────────────────────
@@ -308,3 +311,114 @@ def get_report_sheet_name(sheet_key: str) -> str:
         中文标题；未找到时返回 sheet_key 本身
     """
     return _REPORT_SHEET_NAMES.get(sheet_key, sheet_key)
+
+
+# ── 报告模块注册表（C 迭代：序号可配置） ──────────────────────
+
+_REPORT_SECTION_DEFAULT: list[dict] = [
+    # ── always 类型（始终显示，无 data_flag 依赖） ──
+    {"key": "summary",            "name": "投资分析汇总",                     "number": 1,  "type": "always",    "data_flag": None},
+    {"key": "market_value",       "name": "市值核算明细表",                   "number": 2,  "type": "always",    "data_flag": None},
+    {"key": "category",           "name": "持仓分类表",                       "number": 3,  "type": "always",    "data_flag": None},
+    {"key": "penetration",        "name": "资产穿透TOP10",                    "number": 4,  "type": "always",    "data_flag": None},
+    {"key": "fund_performance",   "name": "基金业绩分析",                     "number": 5,  "type": "always",    "data_flag": None},
+    # ── b_series 类型（有数据才显示） ──
+    {"key": "fund_manager",       "name": "基金经理变更监控",                 "number": 6,  "type": "b_series",  "data_flag": "manager_data"},
+    {"key": "fund_overlap",       "name": "持仓重合度矩阵",                   "number": 7,  "type": "b_series",  "data_flag": "overlap_data"},
+    {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8,  "type": "b_series",  "data_flag": "concentration_data"},
+    {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "b_series",  "data_flag": "style_data"},
+    # ── news 类型（需启用新闻功能） ──
+    {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10, "type": "news",      "data_flag": "include_news"},
+    {"key": "early_warning",      "name": "智能预警",                         "number": 11, "type": "news",      "data_flag": "early_warnings"},
+    # ── llm 类型（需启用 LLM 功能） ──
+    {"key": "global_macro",       "name": "全球政经局势",                     "number": 12, "type": "llm",       "data_flag": "llm_enabled"},
+    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13, "type": "llm",       "data_flag": "llm_enabled"},
+    {"key": "health_check",       "name": "持仓体检报告",                     "number": 14, "type": "llm",       "data_flag": "llm_enabled"},
+    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15, "type": "llm",       "data_flag": "llm_enabled"},
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 16, "type": "llm",       "data_flag": "llm_enabled"},
+]
+
+
+def get_report_section_keys() -> set[str]:
+    """返回所有有效的报告模块标识集合，供 config 校验使用。
+
+    Returns:
+        {"summary", "market_value", "category", ..., "llm_usage"}
+    """
+    return {sec["key"] for sec in _REPORT_SECTION_DEFAULT}
+
+
+def set_sheet_title(ws, key: str) -> None:
+    """根据注册表默认顺序设置 Excel 页签标题为 "{number}.{name}"。
+
+    在 C-P1b 中此函数将接收 section_order 参数以支持用户自定义顺序；
+    当前版本仅使用 _REPORT_SECTION_DEFAULT 默认值。
+
+    Args:
+        ws: openpyxl Worksheet 对象
+        key: 模块标识，如 "summary"、"category"
+    """
+    for sec in _REPORT_SECTION_DEFAULT:
+        if sec["key"] == key:
+            ws.title = f"{sec['number']}.{sec['name']}"
+            return
+    logger.warning("set_sheet_title: 未知的模块标识 %r，使用键名作为标题", key)
+    ws.title = key
+
+
+def get_report_section_order(config: dict | None = None) -> list[dict]:
+    """合并用户配置与默认顺序，返回排序后的报告模块列表。
+
+    处理逻辑：
+      1. 无配置或配置为空 → 返回完整 16 项默认顺序（与当前硬编码一致）
+      2. 用户配置的模块使用配置序号，其余保持默认序号
+      3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
+      4. llm_usage 始终固定在最后一位
+
+    Args:
+        config: 完整配置字典（含 report_section_order 键），
+                为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
+
+    Returns:
+        [{key, name, number, type, data_flag}, ...] 共 16 项
+    """
+    if config is None:
+        return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+
+    user_order = config.get("report_section_order", {})
+    if not user_order or not isinstance(user_order, dict):
+        return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+
+    configured_keys = set(user_order.keys())
+
+    # 分离已配置和未配置模块
+    configured: list[dict] = []
+    unconfigured: list[dict] = []
+
+    for sec in _REPORT_SECTION_DEFAULT:
+        entry = dict(sec)
+        if entry["key"] in configured_keys and entry["key"] != "llm_usage":
+            try:
+                entry["number"] = int(user_order[entry["key"]])
+            except (ValueError, TypeError):
+                entry["number"] = sec["number"]  # 配置无效时回退默认
+            configured.append(entry)
+        else:
+            unconfigured.append(entry)
+
+    # 已配置模块按序号升序
+    configured.sort(key=lambda x: x["number"])
+
+    # 合并：已配置在前，未配置在后（保持默认相对顺序）
+    result = configured + unconfigured
+
+    # llm_usage 强制末位
+    llm_entry: dict | None = None
+    for i, sec in enumerate(result):
+        if sec["key"] == "llm_usage":
+            llm_entry = result.pop(i)
+            break
+    if llm_entry:
+        result.append(llm_entry)
+
+    return result

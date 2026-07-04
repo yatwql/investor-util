@@ -32,7 +32,7 @@ from src.python.report.market_value import (
     price_update_status,
 )
 from src.python.report.penetration import compute_penetration_top10
-from src.python.registry import get_llm_module_name, get_llm_module_names
+from src.python.registry import get_llm_module_name, get_llm_module_names, get_report_section_order
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
 
 logger = logging.getLogger("invest")
@@ -128,6 +128,21 @@ def _jinja_thousands(value: Any) -> str:
         return str(value)
 
 
+def _jinja_section_visible(key: str) -> bool:
+    """Jinja2 全局函数：判断报告模块是否可见。
+
+    依赖模板上下文中的 section_visible_dict，在渲染前由
+    write_html_report 设置。
+
+    Usage in template:
+        {% if section_visible("fund_manager") %}
+        ...
+        {% endif %}
+    """
+    sv_dict = _ENV.globals.get("section_visible_dict", {})
+    return bool(sv_dict.get(key, False))
+
+
 # 注册过滤器
 _ENV.filters["money"] = _jinja_money
 _ENV.filters["pct"] = _jinja_pct
@@ -137,6 +152,9 @@ _ENV.filters["change"] = _jinja_change
 _ENV.filters["profit_color"] = _jinja_profit_color
 _ENV.filters["price_type_color"] = _jinja_price_type_color
 _ENV.filters["thousands"] = _jinja_thousands
+
+# 注册全局函数
+_ENV.globals["section_visible"] = _jinja_section_visible
 
 
 # ── 核心生成函数 ────────────────────────────────────────────
@@ -182,17 +200,17 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     perf_data = _render_fund_performance_section(holdings, details, prog)
 
     # ── 13) 基金经理变更监控（B 系列） ──
-    fund_deep = include_news  # B/L 菜单含基金深度分析
-    manager_analysis = _render_manager_analysis(holdings, fund_deep, prog)
+    enable_b_series = include_news  # B/L 菜单含基金深度分析
+    manager_analysis = _render_manager_analysis(holdings, enable_b_series, prog)
 
     # ── 14) 持仓重合度矩阵（B 系列） ──
-    overlap_matrix = _render_overlap_matrix(holdings, details, fund_deep, prog)
+    overlap_matrix = _render_overlap_matrix(holdings, details, enable_b_series, prog)
 
     # ── 15) 持仓集中度监控（B 系列） ──
-    concentration_analysis = _render_concentration(holdings, fund_deep, prog)
+    concentration_analysis = _render_concentration(holdings, enable_b_series, prog)
 
     # ── 16) 基金风格分析（B 系列） ──
-    style_analysis = _render_style_analysis(holdings, fund_deep, prog)
+    style_analysis = _render_style_analysis(holdings, enable_b_series, prog)
 
     # ── 8) 财经新闻 ──
     news_data, _news_llm_meta = _render_news_section(
@@ -210,6 +228,29 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     # ── 10) 渲染模板 ──
     prog.info("正在渲染 HTML...")
     has_llm_analysis = any(item.get("llm_analysis") for item in (news_data or []))
+
+    # 报告模块序号 & 可见性
+    section_order = get_report_section_order()
+    section_numbers = {sec["key"]: sec["number"] for sec in section_order}
+
+    raw_data_flags = {
+        "manager_data": bool(manager_analysis and manager_analysis.get("results")),
+        "overlap_data": bool(overlap_matrix and overlap_matrix.get("funds") and len(overlap_matrix.get("funds", [])) >= 2),
+        "concentration_data": bool(concentration_analysis and concentration_analysis.get("results")),
+        "style_data": bool(style_analysis and style_analysis.get("results")),
+        "include_news": include_news,
+        "early_warnings": bool(early_warnings),
+        "llm_enabled": llm_enabled_flag,
+    }
+    section_visible_dict = {}
+    for sec in section_order:
+        flag_name = sec.get("data_flag")
+        if not flag_name:
+            section_visible_dict[sec["key"]] = True
+        else:
+            section_visible_dict[sec["key"]] = raw_data_flags.get(flag_name, False)
+
+    _ENV.globals["section_visible_dict"] = section_visible_dict
 
     html = _ENV.get_template("report_template.html").render(
         now=now_str, today=today_str, trading_day=trading_day,
@@ -235,6 +276,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         module_labels=get_llm_module_names(), module_disabled=module_disabled,
         llm_module_info=llm_module_info, llm_endpoint=llm_endpoint,
         cache_stats=get_cache_hit_rate(),
+        # C 迭代：序号 & 可见性（模板使用 section_numbers/section_visible_dict）
+        section_order=section_order, section_numbers=section_numbers,
+        section_visible_dict=section_visible_dict,
     )
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
@@ -391,14 +435,14 @@ def _render_fund_performance_section(
 
 
 def _render_manager_analysis(
-    holdings: List[Holding], fund_deep: bool, prog: ProgressReporter,
+    holdings: List[Holding], enable_b_series: bool, prog: ProgressReporter,
 ) -> dict | None:
     """构建基金经理变更监控数据。
 
     Returns:
         {results: [...], first_check_summary: str | None} 或 None（不启用时）
     """
-    if not fund_deep:
+    if not enable_b_series:
         return None
     prog.info("正在分析基金经理变更...")
     try:
@@ -416,7 +460,7 @@ def _render_manager_analysis(
 def _render_overlap_matrix(
     holdings: list[Holding],
     details: list,
-    fund_deep: bool,
+    enable_b_series: bool,
     prog: ProgressReporter,
 ) -> dict | None:
     """构建持仓重合度矩阵数据。
@@ -424,7 +468,7 @@ def _render_overlap_matrix(
     Returns:
         compute_overlap_matrix() 的结果字典，或 None（不启用时）
     """
-    if not fund_deep:
+    if not enable_b_series:
         return None
     prog.info("正在计算持仓重合度矩阵...")
     try:
@@ -461,7 +505,7 @@ def _render_overlap_matrix(
 
 def _render_concentration(
     holdings: list[Holding],
-    fund_deep: bool,
+    enable_b_series: bool,
     prog: ProgressReporter,
 ) -> dict | None:
     """构建持仓集中度监控数据。
@@ -469,7 +513,7 @@ def _render_concentration(
     Returns:
         {results: [...], ...} 或 None（不启用时）
     """
-    if not fund_deep:
+    if not enable_b_series:
         return None
     prog.info("正在计算持仓集中度...")
     try:
@@ -496,7 +540,7 @@ def _render_concentration(
 
 def _render_style_analysis(
     holdings: list[Holding],
-    fund_deep: bool,
+    enable_b_series: bool,
     prog: ProgressReporter,
 ) -> dict | None:
     """构建基金风格分析数据。
@@ -504,7 +548,7 @@ def _render_style_analysis(
     Returns:
         {results: [...], ...} 或 None（不启用时）
     """
-    if not fund_deep:
+    if not enable_b_series:
         return None
     prog.info("正在分析基金风格漂移...")
     try:

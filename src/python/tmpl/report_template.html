@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; }
 
         .report-header { background: #2E75B6; color: #fff; padding: 20px 30px; border-radius: 8px; margin-bottom: 24px; }
         .report-header h1 { font-size: 22px; margin-bottom: 4px; }
@@ -217,26 +217,19 @@
     <!--  SECTION NAVIGATION (mobile-friendly)                  -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <nav class="section-nav">
-        <a href="#sec-summary">一、投资分析汇总</a>
-        <a href="#sec-market-value">二、市值核算明细</a>
-        <a href="#sec-category">三、持仓分类</a>
-        <a href="#sec-penetration">四、资产穿透TOP10</a>
-        <a href="#sec-fund-perf">五、基金业绩</a>
-        {% if manager_analysis and manager_analysis.get("results") %}<a href="#sec-manager">十三、经理变更</a>{% endif %}
-        {% if overlap_matrix and overlap_matrix.get("funds") and overlap_matrix["funds"]|length >= 2 %}<a href="#sec-overlap">十四、重合度矩阵</a>{% endif %}
-        {% if concentration_analysis and concentration_analysis.get("results") %}<a href="#sec-concentration">十五、集中度</a>{% endif %}
-        {% if style_analysis and style_analysis.get("results") %}<a href="#sec-style">十六、风格分析</a>{% endif %}
-        {% if news_enabled %}<a href="#sec-news">六、新闻关联</a>{% endif %}
-        {% if early_warnings %}<a href="#sec-early-warning">七、智能预警</a>{% endif %}
-        {% if llm_enabled %}<a href="#sec-llm">LLM分析</a>{% endif %}
+        {% for sec in section_order %}
+        {% if section_visible(sec["key"]) %}
+        <a href="#sec-{{ sec['key'] }}">{{ sec["number"] }}、{{ sec["name"] }}</a>
+        {% endif %}
+        {% endfor %}
     </nav>
 
     <!-- ═══════════════════════════════════════════════════════ -->
     <div id="sec-summary"></div>
     <!--  MODULE 1: 汇总 (Summary)                              -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">一、投资分析汇总</div>
+    <div class="section" style="order: {{ section_numbers['summary'] }};">
+        <div class="section-title">{{ section_numbers['summary'] }}、投资分析汇总</div>
         <div class="section-content">
 
             <!-- 基本信息 -->
@@ -351,11 +344,11 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div id="sec-market-value"></div>
+    <div id="sec-market_value"></div>
     <!--  MODULE 2: 市值核算 (Market Value)                     -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">二、市值核算明细表</div>
+    <div class="section" style="order: {{ section_numbers['market_value'] }};">
+        <div class="section-title">{{ section_numbers['market_value'] }}、市值核算明细表</div>
         <div class="section-content" style="padding: 0;">
             <table>
                 <thead>
@@ -428,8 +421,8 @@
     <div id="sec-category"></div>
     <!--  MODULE 3: 持仓分类表 (Category Summary)                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">三、持仓分类表</div>
+    <div class="section" style="order: {{ section_numbers['category'] }};">
+        <div class="section-title">{{ section_numbers['category'] }}、持仓分类表</div>
         <div class="section-content" style="padding: 0;">
             <table>
                 <thead>
@@ -489,8 +482,8 @@
     <div id="sec-penetration"></div>
     <!--  MODULE 4: 资产穿透TOP10 (Penetration)                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">四、资产穿透TOP10</div>
+    <div class="section" style="order: {{ section_numbers['penetration'] }};">
+        <div class="section-title">{{ section_numbers['penetration'] }}、资产穿透TOP10</div>
         {% if penetration and penetration.get("top10") %}
         <div class="section-content" style="padding: 0;">
             <table>
@@ -545,11 +538,11 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div id="sec-fund-perf"></div>
+    <div id="sec-fund_performance"></div>
     <!--  MODULE 5: 基金业绩分析 (Fund Performance)              -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">五、基金业绩分析</div>
+    <div class="section" style="order: {{ section_numbers['fund_performance'] }};">
+        <div class="section-title">{{ section_numbers['fund_performance'] }}、基金业绩分析</div>
         {% if perf_data %}
         <div class="section-content" style="padding: 0;">
             <table>
@@ -589,10 +582,10 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 13: 基金经理变更监控 (B 系列)                     -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if manager_analysis and manager_analysis.get("results") %}
-    <div id="sec-manager"></div>
-    <div class="section">
-        <div class="section-title">十三、基金经理变更监控</div>
+    {% if section_visible("fund_manager") %}
+    <div id="sec-fund_manager"></div>
+    <div class="section" style="order: {{ section_numbers['fund_manager'] }};">
+        <div class="section-title">{{ section_numbers['fund_manager'] }}、基金经理变更监控</div>
         <div class="section-content">
             {% if manager_analysis.get("first_check_summary") %}
             <div class="notice-banner">📋 {{ manager_analysis["first_check_summary"] }}</div>
@@ -639,14 +632,14 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 14: 持仓重合度矩阵 (B 系列)                      -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if overlap_matrix and overlap_matrix.get("funds") and overlap_matrix["funds"]|length >= 2 %}
+    {% if section_visible("fund_overlap") %}
     {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
     {% set _funds = overlap_matrix["funds"] %}
     {% set _matrix = overlap_matrix["matrix"] %}
     {% set _pairs = overlap_matrix.get("pairs", []) %}
-    <div id="sec-overlap"></div>
-    <div class="section">
-        <div class="section-title">十四、持仓重合度矩阵</div>
+    <div id="sec-fund_overlap"></div>
+    <div class="section" style="order: {{ section_numbers['fund_overlap'] }};">
+        <div class="section-title">{{ section_numbers['fund_overlap'] }}、持仓重合度矩阵</div>
         <div class="section-content">
             <div class="summary-tag" style="margin-bottom: 8px;">
                 📊 <strong>{{ _funds | length }}</strong> 只基金，共 <strong>{{ _pairs | length }}</strong> 对组合
@@ -743,11 +736,11 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 15: 持仓集中度监控 (B 系列)                       -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if concentration_analysis and concentration_analysis.get("results") %}
+    {% if section_visible("fund_concentration") %}
     {% set conc_results = concentration_analysis["results"] %}
-    <div id="sec-concentration"></div>
-    <div class="section">
-        <div class="section-title">十五、持仓集中度监控</div>
+    <div id="sec-fund_concentration"></div>
+    <div class="section" style="order: {{ section_numbers['fund_concentration'] }};">
+        <div class="section-title">{{ section_numbers['fund_concentration'] }}、持仓集中度监控</div>
         <div class="section-content">
             {% set high_risk = conc_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
             {% if high_risk %}
@@ -804,11 +797,11 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 16: 基金风格分析 (B 系列)                         -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if style_analysis and style_analysis.get("results") %}
+    {% if section_visible("fund_style") %}
     {% set style_results = style_analysis["results"] %}
-    <div id="sec-style"></div>
-    <div class="section">
-        <div class="section-title">十六、基金风格分析</div>
+    <div id="sec-fund_style"></div>
+    <div class="section" style="order: {{ section_numbers['fund_style'] }};">
+        <div class="section-title">{{ section_numbers['fund_style'] }}、基金风格分析</div>
         <div class="section-content">
             {% set drifted = style_results | selectattr("drift_level", "in", ["轻度", "中度", "严重"]) | list %}
             {% if drifted %}
@@ -850,12 +843,13 @@
     </div>
     {% endif %}
 
+    {% if section_visible("news_correlation") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div id="sec-news"></div>
+    <div id="sec-news_correlation"></div>
     <!--  MODULE 6: 财经新闻热点与持仓关联分析 (News)            -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">六、财经新闻热点与持仓关联分析</div>
+    <div class="section" style="order: {{ section_numbers['news_correlation'] }};">
+        <div class="section-title">{{ section_numbers['news_correlation'] }}、财经新闻热点与持仓关联分析</div>
         {% if news_data %}
         <div class="section-content" style="padding: 0;">
             <table>
@@ -948,13 +942,15 @@
 
     <!-- ═══════════════════════════════════════════════════════ -->
         </div>
+    {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <div id="sec-early-warning"></div>
+    {% if section_visible("early_warning") %}
+    <div id="sec-early_warning"></div>
     <!--  MODULE 7: 智能预警 (Early Warning)                     -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">七、智能预警</div>
+    <div class="section" style="order: {{ section_numbers['early_warning'] }};">
+        <div class="section-title">{{ section_numbers['early_warning'] }}、智能预警</div>
         {% if early_warnings and early_warnings.has_warnings %}
         <div class="section-content">
             {% if early_warnings.sector_alerts %}
@@ -1023,15 +1019,16 @@
         <div class="section-content">当前无预警信息。</div>
         {% endif %}
     </div>
+    {% endif %}
 
-    {% if llm_enabled %}
+    {% if section_visible("llm_usage") %}
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <div id="sec-llm"></div>
+    <div id="sec-global_macro"></div>
     <!--  MODULE 8: 全球政经局势 (Global Macro, LLM augment)     -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">八、全球政经局势</div>
+    <div class="section" style="order: {{ section_numbers['global_macro'] }};">
+        <div class="section-title">{{ section_numbers['global_macro'] }}、全球政经局势</div>
         {% if llm_enabled and global_macro %}
         <div class="section-content">
             {{ global_macro | safe }}
@@ -1059,8 +1056,8 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 9: 智囊团深度复盘 (Expert Review, LLM augment)  -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">九、智囊团深度复盘</div>
+    <div class="section" style="order: {{ section_numbers['expert_review'] }};">
+        <div class="section-title">{{ section_numbers['expert_review'] }}、智囊团深度复盘</div>
         {% if llm_enabled and expert_review %}
         <div class="section-content">
             {{ expert_review | safe }}
@@ -1088,8 +1085,8 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 10: 持仓体检报告 (Health Check, LLM augment)    -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">十、持仓体检报告</div>
+    <div class="section" style="order: {{ section_numbers['health_check'] }};">
+        <div class="section-title">{{ section_numbers['health_check'] }}、持仓体检报告</div>
         {% if llm_enabled and health_check %}
         <div class="section-content">
             {{ health_check | safe }}
@@ -1116,8 +1113,8 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 11: 穿透深度分析 (Penetration Deep, LLM augment)-->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section">
-        <div class="section-title">十一、穿透深度分析</div>
+    <div class="section" style="order: {{ section_numbers['penetration_deep'] }};">
+        <div class="section-title">{{ section_numbers['penetration_deep'] }}、穿透深度分析</div>
         {% if llm_enabled and penetration_deep %}
         <div class="section-content">
             {{ penetration_deep | safe }}
@@ -1142,8 +1139,8 @@
     </div>
 
     <!--  MODULE 12: LLM API Usage -->
-    <div class="section">
-        <div class="section-title">十二、LLM API 用量</div>
+    <div class="section" style="order: {{ section_numbers['llm_usage'] }};">
+        <div class="section-title">{{ section_numbers['llm_usage'] }}、LLM API 用量</div>
         <div class="section-content">
             {% if llm_session_usage and llm_session_usage.get("has_usage") %}
             <table class="kv-table">

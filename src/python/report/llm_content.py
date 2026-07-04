@@ -26,7 +26,7 @@ from src.python.llm import (
     FAIL_REASON_DISABLED,
 )
 from src.python.llm.prompts import _LLM_MODULE_FAILURE
-from src.python.registry import get_llm_module_name
+from src.python.registry import get_llm_module_name, get_report_section_order
 
 logger = logging.getLogger("invest")
 
@@ -100,21 +100,18 @@ _THINKING_FONT = Font(
 _MODULE_KEY_MAP: dict[str, str] = {}
 
 def _get_module_key_map() -> dict[str, str]:
-    """从 registry 构建 Excel 页签标题 → settings_suffix 映射。
+    """从 registry section_order 构建 Excel 页签标题 → settings_suffix 映射。
 
-    格式：{"8.全球政经局势": "global_macro", ...}
-    页签号由 LLM 模块遍历顺序派生（从 8 开始）。
-    注意：news_correlation 无独立 LLM 分析章节（合并到新闻章节），排除在外。
+    格式：{"12.全球政经局势": "global_macro", ...}
+    序号跟随 section_order 配置，news_correlation 无独立 LLM 分析章节，排除在外。
     """
     if _MODULE_KEY_MAP:
         return _MODULE_KEY_MAP
-    from src.python.registry import get_registry
-    idx = 8
-    for m in get_registry():
-        if m.is_llm and m.settings_suffix and m.settings_suffix != "news_correlation":
-            title = f"{idx}.{m.name}"
-            _MODULE_KEY_MAP[title] = m.settings_suffix
-            idx += 1
+    for sec in get_report_section_order():
+        mk = sec["key"]
+        if mk != "news_correlation" and mk != "llm_usage":
+            title = f"{sec['number']}.{sec['name']}"
+            _MODULE_KEY_MAP[title] = mk
     return _MODULE_KEY_MAP
 
 _PLACEHOLDER_BY_REASON: dict[str, str] = {
@@ -153,8 +150,6 @@ def _write_content_sheet(
         title: 页签标题行文本
         content: LLM 返回的 HTML 文本（已剥离标签），为 None 时写入占位符
     """
-    ws.title = title
-
     # 标题行
     row = write_title_row(ws, 1, title, _CONTENT_NCOLS)
 
@@ -202,17 +197,17 @@ def _write_content_sheet(
 
 
 def write_llm_sheets(
-    wb: Any,
+    sheets: dict[str, Any],
     llm_content: tuple[str | None, str | None, str | None, str | None],
 ) -> tuple[str, str, str, str]:
     """写入 LLM 分析章节（全球政经局势 & 智囊团深度复盘 & 持仓体检报告 & 穿透深度分析）。
 
-    调用方必须预先生成 llm_content，本函数仅负责写入 Excel。
+    调用方预创建页签并通过 sheets 字典传入，本函数仅负责写入 Excel 内容。
     底部标识行（模型名/Token用量/缓存/Extended Thinking）已嵌入 HTML 内容中，
     由 ``_extract_footer_text()`` 提取后追加到页签尾部。
 
     Args:
-        wb: 工作簿
+        sheets: {key: ws} 字典，页签已由 _create_sheets 按序预创建
         llm_content: (global_macro_html, expert_review_html, health_check_html, penetration_deep_html) 预生成内容
 
     Returns:
@@ -238,8 +233,10 @@ def write_llm_sheets(
         if _disabled[i]:
             logger.info("LLM 分析章节跳过（已禁用）: %s", get_llm_module_name(mk))
             continue
-        ws = wb.create_sheet()
-        ws.title = _reverse.get(mk, get_llm_module_name(mk))
+        ws = sheets.get(mk)
+        if ws is None:
+            logger.warning("LLM 分析章节页签 %s 未由 _create_sheets 创建，跳过", mk)
+            continue
         _write_content_sheet(ws, _reverse.get(mk, get_llm_module_name(mk)), content)
 
     logger.info("LLM 分析章节写入完成（含%s）", get_llm_module_name("penetration_deep"))

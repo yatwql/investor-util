@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from src.python.config import get_config
-from src.python.registry import get_llm_module_name, get_report_sheet_name
+from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,
@@ -306,7 +306,7 @@ def write_early_warning_sheet(ws, early_warnings: dict) -> None:
         ws: 目标工作表
         early_warnings: compute_early_warnings() 返回的字典
     """
-    ws.title = f"7.{get_report_sheet_name('early_warning')}"
+    set_sheet_title(ws, "early_warning")
     row = write_title_row(ws, 1, get_report_sheet_name('early_warning'), max(_SECTOR_COLS, _SENTIMENT_COLS))
 
     # ── 第一段：行业资金流向联动预警 ────────────────────────

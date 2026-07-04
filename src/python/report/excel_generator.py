@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.python.logger import setup_logger
-from src.python.registry import get_llm_module_name, get_report_sheet_name
+from src.python.registry import get_llm_module_name, get_report_sheet_name, get_report_section_order, set_sheet_title
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, _Timer
 
 logger = setup_logger()
@@ -195,22 +195,22 @@ def _write_content_sheets(
 ) -> dict:
     """写入汇总 / 分类 / 穿透 / 基金业绩页签，返回穿透结果。"""
     prog.call_sheet(get_report_sheet_name("summary"), modules.get("write_summary_sheet"),
-                    sheets["ws1"], data["total_mv"], data["total_cost"],
+                    sheets["summary"], data["total_mv"], data["total_cost"],
                     data["total_profit"], data["today_profit"],
                     categories=data["categories"], update_status=data["update_status"],
                     a_indices=a_indices, us_indices=us_indices)
 
     prog.call_sheet(get_report_sheet_name("category"), modules.get("write_category_sheet"),
-                    sheets["ws3"], holdings, data["details"])
+                    sheets["category"], holdings, data["details"])
 
     compute_pen = modules.get("compute_penetration_top10", lambda _a, _b: {})
     pen_result = compute_pen(holdings, data["details"])
     prog.ok("资产穿透TOP10 计算完成")
     prog.call_sheet(get_report_sheet_name("penetration"), modules.get("write_penetration_sheet"),
-                    sheets["ws4"], holdings, data["details"], penetration_data=pen_result)
+                    sheets["penetration"], holdings, data["details"], penetration_data=pen_result)
 
     prog.call_sheet(get_report_sheet_name("fund_performance"), modules.get("write_fund_performance_sheet"),
-                    sheets["ws5"], holdings, data["details"])
+                    sheets["fund_performance"], holdings, data["details"])
 
     return pen_result
 
@@ -254,10 +254,10 @@ def _write_news_and_early_warning(
             news_data, _meta = [], {}
 
     prog.call_sheet(get_llm_module_name("news_correlation"), write_news_sheet,
-                    sheets["ws6"], news_data, llm_meta=_meta)
+                    sheets["news_correlation"], news_data, llm_meta=_meta)
 
     # 智能预警页签
-    if sheets.get("ws7") is not None:
+    if sheets.get("early_warning") is not None:
         if early_warnings is None:
             _warnings = {"sector_alerts": [], "sentiment_alerts": [],
                          "has_warnings": False, "has_sector_data": False, "has_llm_news": False}
@@ -266,7 +266,7 @@ def _write_news_and_early_warning(
         try:
             from src.python.report.early_warning import write_early_warning_sheet
             prog.call_sheet(get_report_sheet_name("early_warning"), write_early_warning_sheet,
-                            sheets["ws7"], _warnings)
+                            sheets["early_warning"], _warnings)
         except ImportError as _ew_err:
             logger.warning("智能预警模块缺失: %s", _ew_err)
             prog.add_error("智能预警模块缺失，跳过")
@@ -274,16 +274,16 @@ def _write_news_and_early_warning(
 
 def _write_fund_deep_sheets(
     sheets: dict[str, Any], holdings: list,
-    fund_deep: bool, data: dict[str, Any],
+    enable_b_series: bool, data: dict[str, Any],
     modules: dict[str, Any],
     prog: ProgressReporter,
 ) -> None:
-    """写入基金深度分析页签（13-16）。"""
-    if not fund_deep:
+    """写入基金深度分析页签（B 系列）。"""
+    if not enable_b_series:
         return
-    # 13. 基金经理变更监控
+    # 基金经理变更监控
     detect = modules.get("detect_manager_changes", lambda h: [])
-    ws13 = sheets.get("ws13")
+    ws13 = sheets.get("fund_manager")
     if ws13 is not None:
         prog.info("正在分析基金经理变更...")
         try:
@@ -300,7 +300,7 @@ def _write_fund_deep_sheets(
     # 14. 持仓重合度矩阵
     compute_overlap = modules.get("compute_overlap_matrix")
     write_overlap = modules.get("write_overlap_matrix_sheet")
-    ws14 = sheets.get("ws14")
+    ws14 = sheets.get("fund_overlap")
     if ws14 is not None and compute_overlap is not None and write_overlap is not None:
         prog.info("正在计算持仓重合度矩阵...")
         try:
@@ -345,7 +345,7 @@ def _write_fund_deep_sheets(
     # 15. 持仓集中度监控
     compute_conc = modules.get("compute_concentration")
     write_conc = modules.get("write_concentration_sheet")
-    ws15 = sheets.get("ws15")
+    ws15 = sheets.get("fund_concentration")
     if ws15 is not None and compute_conc is not None and write_conc is not None:
         prog.info("正在计算持仓集中度...")
         try:
@@ -380,7 +380,7 @@ def _write_fund_deep_sheets(
     # 16. 基金风格分析
     analyze_style = modules.get("analyze_style_for_all_funds")
     write_style = modules.get("write_style_sheet")
-    ws16 = sheets.get("ws16")
+    ws16 = sheets.get("fund_style")
     if ws16 is not None and analyze_style is not None and write_style is not None:
         prog.info("正在分析基金风格漂移...")
         try:
@@ -414,7 +414,7 @@ def _write_fund_deep_sheets(
 
 
 def _write_llm_section_and_usage(
-    wb: Any, include_llm: bool, llm_content: tuple | None,
+    sheets: dict[str, Any], include_llm: bool, llm_content: tuple | None,
     prog: ProgressReporter,
 ) -> None:
     """写入 LLM 分析章节页签和 LLM API 用量页签。"""
@@ -425,7 +425,7 @@ def _write_llm_section_and_usage(
         prog.info("正在生成 LLM 分析章节...")
         try:
             from src.python.report.llm_content import write_llm_sheets
-            write_llm_sheets(wb, llm_content=llm_content)
+            write_llm_sheets(sheets, llm_content=llm_content)
             logger.info("LLM 分析章节已生成")
             prog.ok("LLM 分析章节生成完成")
         except ImportError:
@@ -435,10 +435,10 @@ def _write_llm_section_and_usage(
             logger.exception("生成 LLM 分析章节失败")
             prog.add_error("LLM 分析章节生成失败（详情请查看日志）")
 
-    _build_llm_usage_sheet(wb, prog)
+    _build_llm_usage_sheet(sheets, prog)
 
 
-def _build_llm_usage_sheet(wb: Any, prog: ProgressReporter) -> None:
+def _build_llm_usage_sheet(sheets: dict[str, Any], prog: ProgressReporter) -> None:
     """构建并写入 LLM API 用量页签。"""
     try:
         from src.python.llm import (
@@ -509,11 +509,47 @@ def _build_llm_usage_sheet(wb: Any, prog: ProgressReporter) -> None:
     if not excel_module_info:
         return
 
+    ws = sheets.get("llm_usage")
+    if ws is None:
+        logger.debug("llm_usage 页签未被创建，跳过 API 用量写入")
+        return
     glb_endpoint = next((mi["endpoint"] for mi in excel_module_info if mi.get("endpoint")), "")
     try:
-        write_llm_usage_sheet(wb, formatted, excel_module_info, llm_endpoint=glb_endpoint)
+        write_llm_usage_sheet(ws, formatted, excel_module_info, llm_endpoint=glb_endpoint)
     except Exception as e:
         logger.debug("创建 LLM API 用量页签失败（非关键）: %s", e)
+
+
+# ── 类型驱动的页签创建（C-P1b 新增） ──────────────────────────
+
+
+def _should_create_sheet(section: dict, enable_b_series: bool, include_news: bool, include_llm: bool) -> bool:
+    """按 section.type 判断是否创建页签。
+
+    新增模块只需在注册表标 type，无需修改此函数。
+    """
+    type_map = {
+        "always":    True,              # summary, market_value, category, penetration, fund_performance
+        "b_series":  enable_b_series,   # fund_manager, fund_overlap, fund_concentration, fund_style
+        "news":      include_news,      # news_correlation, early_warning
+        "llm":       include_llm,       # global_macro, expert_review, health_check, penetration_deep, llm_usage
+    }
+    return type_map.get(section.get("type", ""), False)
+
+
+def _create_sheets(
+    wb: Any, section_order: list[dict],
+    enable_b_series: bool = False, include_news: bool = False, include_llm: bool = False,
+) -> dict[str, Any]:
+    """按配置顺序创建所有可见页签，返回 {key: ws} 字典。"""
+    sheets: dict[str, Any] = {}
+    for sec in section_order:
+        if not _should_create_sheet(sec, enable_b_series, include_news, include_llm):
+            continue
+        ws = wb.create_sheet()
+        set_sheet_title(ws, sec["key"])
+        sheets[sec["key"]] = ws
+    return sheets
 
 
 def generate_excel_report(
@@ -525,7 +561,7 @@ def generate_excel_report(
     news_data: list | None = None,
     news_llm_meta: dict | None = None,
     early_warnings: dict | None = None,
-    include_fund_deep: bool | None = None,
+    include_b_series: bool | None = None,  # renamed from include_fund_deep
     progress: ProgressReporter | None = None,
 ) -> None:
     """生成 Excel 报告的核心逻辑。
@@ -543,14 +579,14 @@ def generate_excel_report(
         news_data: 预获取的新闻数据
         news_llm_meta: 新闻 LLM 元数据
         early_warnings: 智能预警数据
-        include_fund_deep: 是否包含基金深度分析页签（13-16）。
-            None 时跟随 include_news（B/L 含，E/H 不含）
+        include_b_series: 是否包含 B 系列页签（基金深度分析）。
+            None 时跟随 include_news（B/L 含，E/H 不含）。已从 include_fund_deep 重命名。
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
-    # B 系列菜单跟随 include_news（B/L 菜单含新闻 = 含基金深度分析）
-    fund_deep = include_news if include_fund_deep is None else include_fund_deep
+    # B 系列跟随 include_news（B/L 菜单含新闻 = 含 B 系列）
+    enable_b_series = include_news if include_b_series is None else include_b_series
 
     modules = _import_report_modules(prog)
     if not modules:
@@ -559,26 +595,17 @@ def generate_excel_report(
     create_workbook = modules["create_workbook"]
     save_workbook = modules["save_workbook"]
 
-    # ── 创建工作簿，预创建全部页签 ──
+    # ── 创建工作簿，按需创建全部页签 ──
     wb = create_workbook()
     wb.remove(wb.active)
-    ws1 = wb.create_sheet()   # 1. 汇总
-    ws2 = wb.create_sheet()   # 2. 市值核算
-    ws3 = wb.create_sheet()   # 3. 持仓分类
-    ws4 = wb.create_sheet()   # 4. 资产穿透TOP10
-    ws5 = wb.create_sheet()   # 5. 基金业绩分析
-    ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点与持仓关联分析
-    ws7 = wb.create_sheet() if include_news else None  # 7. 智能预警
-    ws13 = wb.create_sheet() if fund_deep else None    # 13. 基金经理变更监控
-    ws14 = wb.create_sheet() if fund_deep else None    # 14. 持仓重合度矩阵
-    ws15 = wb.create_sheet() if fund_deep else None    # 15. 持仓集中度监控
-    ws16 = wb.create_sheet() if fund_deep else None    # 16. 基金风格分析
-
-    sheets = {"ws1": ws1, "ws2": ws2, "ws3": ws3, "ws4": ws4, "ws5": ws5,
-              "ws6": ws6, "ws7": ws7, "ws13": ws13, "ws14": ws14, "ws15": ws15, "ws16": ws16}
+    section_order = get_report_section_order()
+    sheets = _create_sheets(wb, section_order,
+                            enable_b_series=enable_b_series,
+                            include_news=include_news,
+                            include_llm=include_llm)
 
     # ── 行情市值 + 指数 ──
-    data = _resolve_market_data(holdings, details, modules, ws2, prog)
+    data = _resolve_market_data(holdings, details, modules, sheets["market_value"], prog)
     a_idx, us_idx = _resolve_indices(a_indices, us_indices, modules, prog)
 
     # ── 各页签写入 ──
@@ -586,14 +613,8 @@ def generate_excel_report(
     _write_news_and_early_warning(sheets, holdings, pen_result, include_news,
                                   news_data, news_llm_meta, news_top_count,
                                   early_warnings, prog)
-    _write_fund_deep_sheets(sheets, holdings, fund_deep, data, modules, prog)
-    _write_llm_section_and_usage(wb, include_llm, llm_content, prog)
-
-    # ── 页签排序：B 模块页签（13-16）移至 LLM 页签（8-12）之后 ──
-    if fund_deep:
-        for ws in (ws13, ws14, ws15, ws16):
-            if ws is not None:
-                wb.move_sheet(ws, offset=len(wb.sheetnames))
+    _write_fund_deep_sheets(sheets, holdings, enable_b_series, data, modules, prog)
+    _write_llm_section_and_usage(sheets, include_llm, llm_content, prog)
 
     # ── 保存 ──
     with _Timer("保存 Excel/HTML 文件"):

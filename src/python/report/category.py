@@ -11,7 +11,7 @@ import logging
 
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.registry import get_report_sheet_name
+from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.models import Holding
 from src.python.report.excel_writer import (
     auto_width,
@@ -172,7 +172,7 @@ def write_category_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    ws.title = f"3.{get_report_sheet_name('category')}"
+    set_sheet_title(ws, "category")
 
     detail_map: dict[str, DetailRow] = {d.code: d for d in details}
 

@@ -112,6 +112,22 @@ A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled
 
 A: 编辑 `data/config/config.json` 的 `user_fund_benchmarks` 字段，可指定指数代码作为基金业绩基准。默认基准是沪深300（000300）。自定义基准会替换报告中基金业绩分析的基准对比列。
 
+**Q: 如何调整报告模块的显示顺序和编号？**
+
+A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式为 `{"模块标识": 序号}`。已配置的模块按序号升序排列在前，未配置的自动排后。`llm_usage`（LLM API 用量）强制末位不受配置影响。示例：
+
+```json
+{
+  "report_section_order": {
+    "fund_manager": 1,
+    "fund_overlap": 2,
+    "summary": 5
+  }
+}
+```
+
+空对象 `{}` 或缺失此字段时使用 16 项默认顺序，行为与旧版本一致。完整模块标识列表见 [配置指南](../manuals/how-to-config.md#report_section_order-报告序号配置v0286)。
+
 **Q: 如何开启财经新闻热点与持仓关联分析 LLM 关联分析？**
 
 A: 菜单 `S` 可交互切换各 LLM 模块的启停状态（立即生效），或将 `data/config/llm_settings.json` 中的 `enabled_llm.news_correlation` 设为 `true`。开启后菜单 B / L 生成的报告增加"LLM 关联分析"列，每条新闻获得 LLM 判定的关联度（高/中/低/无关）和原因分析。默认关闭以节省费用。
@@ -311,7 +327,9 @@ A: 程序自动识别：6 位数字代码 + 含"ETF"标记的走场内取价（�
 
 **Q: Excel 报告页签的编号（1.~16.）顺序是固定的吗？**
 
-A: 固定顺序。页签统一用数字前缀保证排序（1.投资分析汇总 → 16.基金风格分析），不可调整顺序。菜单 E/H/B/L 生成范围不同：E/H 为基础页签（1~7），B 增加 B 系列（1~7 + 13~16），L 为全量（1~16 + LLM 8~12）。
+A: 默认使用固定顺序（投资分析汇总 → LLM API 用量），但可通过 `config.json` 的 `report_section_order` 字段自定义各模块的序号和排列顺序。HTML 报告同样使用 CSS `order` 属性实现视觉重排。未配置时保持默认行为。详见[配置指南](../manuals/how-to-config.md#report_section_order-报告序号配置v0286)。
+
+菜单 E/H/B/L 生成范围不同：E/H 为基础页签（1~5），B 增加 B 系列（1~5 + 6~9），L 为全量（1~16）。各模块的条件可见性由运行时数据自动控制（B 系列需有对应数据、LLM 章节需启用 LLM 功能）。
 
 **Q: 为什么总市值和各账户小计之和有时对不上？**
 

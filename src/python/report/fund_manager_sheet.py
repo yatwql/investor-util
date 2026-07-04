@@ -20,7 +20,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.styles import NORMAL_FONT
-from src.python.registry import get_report_sheet_name
+from src.python.registry import get_report_sheet_name, set_sheet_title
 
 logger = logging.getLogger("invest")
 
@@ -62,7 +62,7 @@ def write_fund_manager_sheet(
         manager_data: detect_manager_changes() 的返回结果
     """
     _name = get_report_sheet_name('fund_manager')
-    ws.title = f"13.{_name}"
+    set_sheet_title(ws, "fund_manager")
     write_title_row(ws, 1, f"13. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 

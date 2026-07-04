@@ -29,6 +29,7 @@
     "official_source": true
   },
   "default_menu_key": "L",
+  "report_section_order": {},
   "user_fund_benchmarks": {},
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
@@ -72,6 +73,7 @@
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
 | `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
+| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（16 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
@@ -177,6 +179,56 @@
 ```
 
 > 内置基准库实时自动补充，`user_fund_benchmarks` 仅在置信度不足时作为兜底。空对象 `{}` 表示不添加自定义覆盖。
+
+## report_section_order 报告序号配置（v0.2.86+）
+
+`report_section_order` 用于自定义报告 16 个模块的显示序号和排列顺序。
+
+| 子字段 | 格式 | 说明 |
+|--------|:----:|------|
+| 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
+| 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
+
+**16 个模块标识及默认顺序：**
+
+| 默认序号 | 模块标识 | 显示名称 | 类型 |
+|:--------:|:---------|:---------|:-----|
+| 1 | `summary` | 投资分析汇总 | 始终显示 |
+| 2 | `market_value` | 市值核算明细表 | 始终显示 |
+| 3 | `category` | 持仓分类表 | 始终显示 |
+| 4 | `penetration` | 资产穿透TOP10 | 始终显示 |
+| 5 | `fund_performance` | 基金业绩分析 | 始终显示 |
+| 6 | `fund_manager` | 基金经理变更监控 | B 系列（有数据才显示） |
+| 7 | `fund_overlap` | 持仓重合度矩阵 | B 系列（有数据才显示） |
+| 8 | `fund_concentration` | 持仓集中度监控 | B 系列（有数据才显示） |
+| 9 | `fund_style` | 基金风格分析 | B 系列（有数据才显示） |
+| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻（需启用） |
+| 11 | `early_warning` | 智能预警 | 新闻（需启用） |
+| 12 | `global_macro` | 全球政经局势 | LLM |
+| 13 | `expert_review` | 智囊团深度复盘 | LLM |
+| 14 | `health_check` | 持仓体检报告 | LLM |
+| 15 | `penetration_deep` | 穿透深度分析 | LLM |
+| 16 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+
+**使用示例：**
+
+将基金深度分析模块提到最前面：
+
+```json
+{
+  "report_section_order": {
+    "fund_manager": 1,
+    "fund_overlap": 2,
+    "fund_concentration": 3,
+    "fund_style": 4,
+    "summary": 5
+  }
+}
+```
+
+> 效果：基金经理/重合度/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
+>
+> 空对象 `{}` 或缺失此字段时使用上述 16 项默认顺序，行为与旧版本一致。
 
 ## cache_ttl 可调参数
 

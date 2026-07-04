@@ -736,3 +736,168 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ============================================================
+#  C-P2: 报告序号可配置 → 模板渲染测试
+# ============================================================
+
+
+class TestSectionOrderTemplateRendering(unittest.TestCase):
+    """验证 section_order / section_visible / section_numbers 在 Jinja2 模板中的渲染结果。
+
+    测试目标：
+      - section_visible 正确过滤导航链接
+      - CSS order 属性值正确
+      - 章节标题序号正确显示
+      - 导航仅显示可见模块
+    """
+
+    def setUp(self):
+        from jinja2 import Environment
+        from src.python.report.html_writer import _jinja_section_visible, _ENV
+        self.env = Environment()
+        self._module_env = _ENV
+        # 注册 section_visible 全局函数（与 html_writer 中一致）
+        self.env.globals["section_visible"] = _jinja_section_visible
+        # 预计算 section_visible_dict，设置到模块级 _ENV.globals（_jinja_section_visible 读取的位置）
+        self._module_env.globals["section_visible_dict"] = {}
+        self._saved_visible_dict = self._module_env.globals.get("section_visible_dict")
+
+    def tearDown(self):
+        # 恢复模块级 env 原始状态
+        self._module_env.globals["section_visible_dict"] = self._saved_visible_dict
+
+    def _set_visible_dict(self, visible: dict[str, bool]) -> None:
+        """设置 section_visible_dict 到模块级 _ENV globals。"""
+        self._module_env.globals["section_visible_dict"] = visible
+
+    def _render_nav(self, section_order: list[dict]) -> str:
+        """渲染导航栏片段。"""
+        tpl = self.env.from_string(
+            "{% for sec in section_order %}"
+            "{% if section_visible(sec['key']) %}"
+            '<a href="#sec-{{ sec[\'key\'] }}">{{ sec["number"] }}、{{ sec["name"] }}</a>\n'
+            "{% endif %}"
+            "{% endfor %}"
+        )
+        return tpl.render(section_order=section_order)
+
+    def test_nav_shows_only_visible_sections(self):
+        """导航只显示 visible=True 的模块。"""
+        section_order = [
+            {"key": "summary", "name": "投资分析汇总", "number": 1},
+            {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
+            {"key": "llm_usage", "name": "LLM API 用量", "number": 16},
+        ]
+        self._set_visible_dict({"summary": True, "fund_manager": False, "llm_usage": True})
+        html = self._render_nav(section_order)
+        self.assertIn('#sec-summary', html)
+        self.assertNotIn('#sec-fund_manager', html)
+        self.assertIn('#sec-llm_usage', html)
+
+    def test_nav_renders_numbers(self):
+        """导航链接显示正确的序号。"""
+        section_order = [
+            {"key": "fund_performance", "name": "基金业绩分析", "number": 5},
+            {"key": "category", "name": "持仓分类表", "number": 3},
+        ]
+        self._set_visible_dict({"fund_performance": True, "category": True})
+        html = self._render_nav(section_order)
+        self.assertIn("5、基金业绩分析", html)
+        self.assertIn("3、持仓分类表", html)
+
+    def test_nav_all_hidden_shows_nothing(self):
+        """所有模块不可见 → 导航为空。"""
+        section_order = [
+            {"key": "summary", "name": "投资分析汇总", "number": 1},
+            {"key": "fund_performance", "name": "基金业绩分析", "number": 5},
+        ]
+        self._set_visible_dict({"summary": False, "fund_performance": False})
+        html = self._render_nav(section_order)
+        self.assertEqual(html.strip(), "")
+
+    def test_section_visible_default_true(self):
+        """未在 visible_dict 中的 key → section_visible 返回 False（安全兜底）。"""
+        section_order = [
+            {"key": "unknown_module", "name": "未知模块", "number": 99},
+        ]
+        self._set_visible_dict({})  # 无任何可见性记录
+        html = self._render_nav(section_order)
+        self.assertEqual(html.strip(), "")
+
+    # ── CSS order 渲染 ─────────────────────────────────
+
+    def _render_section_order_attr(self, key: str, number: int) -> str:
+        """渲染单个 section 的 order 属性。"""
+        tpl = self.env.from_string(
+            '<div class="section" style="order: {{ section_numbers[\'%s\'] }};">'
+            % key
+        )
+        return tpl.render(section_numbers={key: number})
+
+    def test_order_attribute_correct(self):
+        """CSS order 属性值等于配置序号。"""
+        html = self._render_section_order_attr("summary", 1)
+        self.assertIn('order: 1', html)
+        html = self._render_section_order_attr("fund_manager", 6)
+        self.assertIn('order: 6', html)
+
+    def test_order_attribute_large_number(self):
+        """大序号时 CSS order 正确渲染。"""
+        html = self._render_section_order_attr("llm_usage", 99)
+        self.assertIn('order: 99', html)
+
+    # ── 章节标题序号渲染 ───────────────────────────────
+
+    def _render_section_title(self, section_numbers: dict, key: str, name: str) -> str:
+        """渲染章节标题。"""
+        tpl = self.env.from_string(
+            '<h2 class="section-title">{{ section_numbers[\'%s\'] }}、%s</h2>'
+            % (key, name)
+        )
+        return tpl.render(section_numbers=section_numbers)
+
+    def test_section_title_renders_custom_number(self):
+        """章节标题使用 section_numbers 中的序号。"""
+        html = self._render_section_title(
+            {"fund_manager": 1}, "fund_manager", "基金经理变更监控"
+        )
+        self.assertIn('1、基金经理变更监控', html)
+
+    def test_section_title_reordered_number(self):
+        """章节标题展示重新排序后的序号。"""
+        html = self._render_section_title(
+            {"summary": 5}, "summary", "投资分析汇总"
+        )
+        self.assertIn('5、投资分析汇总', html)
+        self.assertNotIn('1、投资分析汇总', html)
+
+    # ── section_visible_dict 联动 ──────────────────────
+
+    def test_visible_dict_true_renders_content(self):
+        """visible=True → 内容块可见。"""
+        tpl = self.env.from_string(
+            "{% if section_visible('summary') %}内容可见{% endif %}"
+        )
+        self._set_visible_dict({"summary": True})
+        html = tpl.render()
+        self.assertIn("内容可见", html)
+
+    def test_visible_dict_false_hides_content(self):
+        """visible=False → 内容块隐藏。"""
+        tpl = self.env.from_string(
+            "{% if section_visible('fund_manager') %}内容可见{% endif %}"
+        )
+        self._set_visible_dict({"fund_manager": False})
+        html = tpl.render()
+        self.assertEqual(html.strip(), "")
+
+    def test_visible_dict_missing_key_false(self):
+        """字典中缺少的 key → section_visible 返回 False。"""
+        tpl = self.env.from_string(
+            "{% if section_visible('unknown') %}内容可见{% endif %}"
+        )
+        self._set_visible_dict({})
+        html = tpl.render()
+        self.assertEqual(html.strip(), "")

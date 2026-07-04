@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-04（v0.2.85 — B 迭代 + 系统缓存统计：LLM 用量页签追加数据缓存系统区域）
+最后更新：2026-07-05（v0.2.86 — C 迭代：报告序号可配置 + 4 种可见性类型 + CSS order 排序）
 
 ---
 
@@ -321,6 +321,110 @@ B 系列 4 个模块（ws13-ws16）通过 `fund_deep` 标志控制条件渲染�
 - **漂移检测**：网格曼哈顿距离 = |Δsize| + |Δstyle|（0~4），0=无、1=轻度、2=中度、≥3=严重
 - **降级方案**（push2 不可用）：60xxxx→大盘、000/002→中盘、300/688→小盘、4/8→小盘；估值方向统一标注"混合"+备注"估算风格"
 - **独立快照**：`fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
+
+---
+### C 迭代：报告序号可配置（v0.2.86+）
+
+C 迭代将报告 16 个模块的序号/显示名称从硬编码改为由 `registry.py` 的统一注册表驱动，支持用户通过 `config.json` 自定义序号和排列顺序。
+
+#### 设计目标
+
+- 消除 HTML 模板中 27 处硬编码序号和导航链接
+- 支持用户自定义各模块的显示序号和出现顺序
+- `llm_usage` 始终强制末位（对用户透明）
+- 未配置的模块自动按默认顺序排列
+
+#### 注册表结构
+
+`registry.py` 中定义 `_REPORT_SECTION_DEFAULT` 列表，每项包含 5 个字段：
+
+| 字段 | 类型 | 说明 |
+|:-----|:----:|:-----|
+| `key` | str | 模块标识，如 `"summary"`、`"fund_manager"` |
+| `name` | str | 显示名称，如 `"投资分析汇总"`、`"基金经理变更监控"` |
+| `number` | int | 默认序号 |
+| `type` | str | 可见性类型：`always` / `b_series` / `news` / `llm` |
+| `data_flag` | str\|None | 运行时数据标志键名，`None` 表示始终可见 |
+
+**4 种可见性类型：**
+
+| 类型 | 数量 | 含义 | data_flag |
+|:-----|:----:|:-----|:----------|
+| `always` | 5 | 始终显示，不依赖任何数据条件 | `None` |
+| `b_series` | 4 | 仅当对应基金分析数据可用时显示 | `manager_data` / `overlap_data` / `concentration_data` / `style_data` |
+| `news` | 2 | 仅当启用新闻功能时显示 | `include_news` / `early_warnings` |
+| `llm` | 5 | 仅当 LLM 功能启用时显示 | `llm_enabled` |
+
+#### 配置接口
+
+`config.json` 新增 `report_section_order` 字段（字典格式：`{"模块标识": 序号}`）：
+
+```json
+{
+  "report_section_order": {
+    "fund_manager": 1,
+    "summary": 2,
+    "fund_performance": 5
+  }
+}
+```
+
+合并规则（`get_report_section_order(config)`）：
+
+1. 无配置或配置为空 → 返回完整 16 项默认顺序
+2. 用户配置的模块使用配置序号，其余保持默认序号
+3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
+4. `llm_usage` 始终固定在最后一位
+
+#### section_visible_dict 统一可见性控制
+
+`html_writer.py` 在渲染前预计算一个 `section_visible_dict` 字典，包含每个模块的可见性（`True`/`False`），通过以下数据标志判断：
+
+```
+raw_data_flags = {
+    "manager_data":       bool(manager_analysis.results),
+    "overlap_data":       bool(overlap_matrix.funds >= 2),
+    "concentration_data": bool(concentration_analysis.results),
+    "style_data":         bool(style_analysis.results),
+    "include_news":       include_news,
+    "early_warnings":     bool(early_warnings),
+    "llm_enabled":        llm_enabled_flag,
+}
+```
+
+`always` 类型模块的 `data_flag` 为 `None`，默认 `True`。
+
+#### Jinja2 全局函数
+
+`_jinja_section_visible(key)` 注册为 `_ENV.globals["section_visible"]`，在模板中通过 `{% if section_visible("fund_manager") %}` 调用。该函数读取 `_ENV.globals["section_visible_dict"]`（预计算的可见性字典），而非模板 render 上下文变量，保证所有并发渲染使用同一状态。
+
+#### HTML 模板重构
+
+**导航栏：** 11 个硬编码 `<a>` 链接替换为：
+```jinja
+{% for sec in section_order %}
+  {% if section_visible(sec["key"]) %}
+    <a href="#sec-{{ sec['key'] }}">{{ sec["number"] }}、{{ sec["name"] }}</a>
+  {% endif %}
+{% endfor %}
+```
+
+**CSS order 视觉排序：** `.container { display: flex; flex-direction: column; }`，每个模块的 `<div class="section">` 使用 `style="order: {{ section_numbers['key'] }};"` 属性，在不改变 DOM 结构的前提下实现视觉重排。
+
+**章节标题：** 硬编码中文序号替换为 `{{ section_numbers['key'] }}、...`。
+
+**条件渲染：** 所有模块的最外层可见性条件从分散的 `{% if manager_analysis and ... %}`、`{% if llm_enabled %}` 等形式统一为 `{% if section_visible("fund_manager") %}` 等。
+
+#### 状态迁移
+
+C 迭代共涉及 4 个阶段（Phase），其中 C-P1a（注册表+配置校验）和 C-P2（HTML 全链路）已完成：
+
+| Phase | 范围 | 状态 |
+|:------|:-----|:----:|
+| C-P1a | `registry.py`：注册表 + `get_report_section_order()` / `set_sheet_title()` / `get_report_section_keys()` + 配置校验 + 测试 | ✅ 完成 |
+| C-P1b | `excel_generator.py`：`_create_sheets()` + 11 个写入器的 `ws.title` 统一改为 `set_sheet_title()` | ⏳ 待实施 |
+| C-P2 | HTML 全链路：`html_writer.py` + `report_template.html` 重构 + `_jinja_section_visible()` + section_visible_dict + CSS order | ✅ 完成 |
+| C-P3 | 文档更新：requirements / technical / how-to-config / config.json / datasource-and-folders / test-coverage / faq | 🏗️ 进行中 |
 
 ## LLM 客户端技术要点
 
