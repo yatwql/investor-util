@@ -72,6 +72,17 @@
 ## [Unreleased]
 
 ### Added
+- **B 迭代完成（基金持仓专属分析，4 个新报告页签 13-16）**：
+  - **B0：数据源可行性预研** — 确认东方财富 push2 扩展字段（f20/f9 等）支持市值+PE 抓取，天天基金 API 支持基金经理/持仓数据获取
+  - **B1：基金元数据增强** — registry 注册基金经理/持仓/新增缓存分组，fetcher.py 新增接口方法
+  - **B2：基金经理变更监控** — `fund_manager_analysis.py` 基于快照的变更检测（1 月/3 月/6 月窗口），`fund_manager_sheet.py` Excel 写入（8 列+预警着色），18 项测试
+  - **B3：持仓重合度矩阵** — `fund_overlap.py` Jaccard+Overlap Ratio 双指标矩阵（取 max），`fund_overlap_sheet.py` 热力图 Excel 输出，21 项测试
+  - **B4：持仓集中度监控** — `fund_concentration.py` top3/5/10 占比+环比变化+三级预警，`fund_concentration_sheet.py` 10 列输出+变化箭头/标识，15 项测试
+  - **B5：基金风格漂移检测** — `fund_style_analysis.py` 市值/PE 加权风格判定（六宫格）+网格曼哈顿距离漂移评分（0-4 分三档）+代码段降级，`fund_style_sheet.py` 8 列+漂移等级着色，32 项测试
+
+### Changed
+- **B 集成**：`excel_generator.py` 新增 ws13-ws16 页签创建+`_write_fund_deep_sheets` 统一编排；`html_writer.py` 新增 4 个 B 系列 `_render_*` 函数+模板参数；`report_template.html` 新增导航链接+Module 13-16 HTML 节
+- **datasource-and-folders.md**：目录树新增 3 个 B5 文件（fund_style_analysis.py/fund_style_sheet.py/test_fund_style_analysis.py），report 单元测试计数 667→699 项
 - **Z1 迭代完成（特殊品种场景 S21-S28，27 项 scenario_basic 测试）**：`test_scenario_special_securities.py` 新增 27 项测试，覆盖 S21 港股通持仓（3 项：分类/代码前缀/无行情不崩溃）、S22 可转债持仓（3 项：名称含"债"分类/市值计算/关键字匹配）、S23 公募 REITs（3 项：代码1开头分类/名称含REIT分类/市值计算）、S24 货币基金（3 项：货币关键字分类/净值恒为1/增利关键字分类）、S25 科创板+北交所混合（4 项：688分类/8xx分类/上海前缀/北京前缀）、S26 商品/黄金 ETF（3 项：黄金ETF分类/商品ETF分类/溢价率占位符）、S27 跨境 ETF（3 项：纳指ETF分类/恒生科技ETF分类/T-1净值 today_profit=0）、S28 纯债/国债持仓（5 项：国债ETF名称含"债"分类/关键字检测/国债分类/企业债分类/市值计算）。全量测试 2198→2225，场景测试 180→207，scenario_basic 30→57。
 - **Z2 迭代完成（操作行为场景 S29-S33，15 项 scenario_basic 测试）**：`test_scenario_operational_behavior.py` 新增 15 项测试，覆盖 S29 分红送转除权（3 项：送转后份额翻倍、除权后收益率、纯送股零成本 profit_rate=None）、S30 定投成本摊薄（3 项：两批加权平均、三批不等额、定投亏损）、S31 部分调仓卖出（3 项：卖出 50%/90%/全部清仓）、S32 跨账户转仓（3 项：同代码两账户各自明细、分类一致、不同代码独立）、S33 新股中签待上市（3 项：无行情降级 cost 正确、上市后正常计算、多只新股不干扰）。全量测试 2225→2240，场景测试 207→222，scenario_basic 57→72。
 - **Y1 迭代完成（API/网络异常纵深，23 项 edge 测试）**：`test_api_edge.py`（`unit/fetcher/`）新增 23 项测试，覆盖 Provider 层 HTTP 异常（4 项：超时/DNS 解析失败/连接拒绝/SSL 证书错误，均返回 None 不抛出）、Provider Chain 多级降级（4 项：主链路失败→备链路成功、全部失败→过期缓存降级、全部失败无缓存→返回 None、Provider 抛出异常→跳过该链路）、响应解析异常（5 项：空响应体/截断字段/非 JSON/空 JSON/编码异常）、LLM API 错误分类（8 项：429/503 可重试、401/500 retryable、超时可重试、连接错误 retryable、正常 200 success）、HTTP 客户端 SSL 验证（2 项：SSL_VERIFY=false 关闭验证、默认 true）。单元测试 1970→1993，edge 测试 175→198，全量 2175→2198。
