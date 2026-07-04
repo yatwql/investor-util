@@ -120,6 +120,14 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 #### 🔷 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
 
 - **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime）。这些测试模拟真实用户操作（如菜单 E/H/B/L 生成报告），组合多个模块进行端到端验证。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
+
+  场景测试按职责分为 **4 大类**：
+
+  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、超多持仓不崩溃、特殊字符不乱码）。
+  - **`scenario_resilience` — 异常容错场景**：验证系统在非正常输入或环境下的降级能力，包括纯债券基金组合（穿透无股权覆盖）、网络中断（价格从过期缓存读取）、单账户单持仓、零成本持仓（不除零崩溃）、极端值（超大市值正确定标）。
+  - **`scenario_llm` — LLM 场景组合**：验证 LLM 模块在各种状态下的行为，包括缓存/成功/失败混合状态的颜色渲染、五种失败原因独立映射、Extended Thinking 标记、禁用优先原则、断网降级、全缓存无调用、三种输出格式（Excel/HTML/Summary）一致性。
+  - **`scenario_datetime` — 日期/时间场景**：验证系统在不同市场时段（盘中/盘前/午休/盘后/非交易日/长假）、产品类型（场外基金/QDII/ETF/股票/混合）、边界条件（时段切换/缝隙/首次启动/断网）以及特殊日历（跨年/季末/汇率故障/调休/港股通假期）下的数据获取正确性和降级表现。
+
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
 - **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 - **`--mode verify`** 覆盖范围最广的组合模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。这是"快速回查"的上限——确保数据管道整条链路正常，但跳过纯 UI、纯 LLM 等不直接影响数据流的模块。
