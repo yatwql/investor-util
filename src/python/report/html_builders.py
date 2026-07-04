@@ -15,7 +15,6 @@ from src.python.report.category import _categorize_holding
 from src.python.report.fund_performance import (
     _RATING_COMMENT,
     _format_rank,
-    _format_return,
     _fund_display_type,
     _is_fund,
 )
@@ -133,9 +132,9 @@ def _build_single_perf_item(
         profit_str = "--"
         profit_rate_str = "--"
 
-    syl_3m = _format_return(rankings.get("近3月", {}).get("return"))
-    syl_6m = _format_return(rankings.get("近6月", {}).get("return"))
-    syl_1y = _format_return(rankings.get("近1年", {}).get("return"))
+    syl_3m = _format_return_pct(rankings.get("近3月", {}).get("return"))
+    syl_6m = _format_return_pct(rankings.get("近6月", {}).get("return"))
+    syl_1y = _format_return_pct(rankings.get("近1年", {}).get("return"))
 
     syl_3m_raw = _parse_return_raw(rankings.get("近3月", {}).get("return"))
     syl_6m_raw = _parse_return_raw(rankings.get("近6月", {}).get("return"))
@@ -219,3 +218,24 @@ def _parse_return_raw(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+def _format_return_pct(val: Any) -> str:
+    """格式化收益率为百分比字符串（供 HTML 报告使用）。
+
+    天天基金 API 返回的收益率已是百分数（如 5.23 表示 5.23%），
+    直接格式化为 "5.23%" 或 "--"。
+
+    Args:
+        val: 原始收益率值（如 5.23, -2.10, "--", None）
+
+    Returns:
+        百分比字符串（如 "5.23%"）或 "--"
+    """
+    if val is None or val == "--":
+        return "--"
+    try:
+        v = float(val)
+        return f"{v:+.2f}%"
+    except (ValueError, TypeError):
+        return "--"

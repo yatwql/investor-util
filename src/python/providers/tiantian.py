@@ -61,6 +61,9 @@ def _find_holdings_table(html: str) -> str | None:
 
     先按特征关键词（"占净值比例"+%等）匹配，
     再按足够数据行兜底。
+
+    注意：需排除含"近N周/月/年"等时间段标记的收益率排行表格，
+    这类表格也包含"涨跌幅"和"%"但非持仓数据。
     """
     tables = re.findall(r"<table[^>]*>(.*?)</table>", html, re.DOTALL | re.IGNORECASE)
 
@@ -69,6 +72,9 @@ def _find_holdings_table(html: str) -> str | None:
         if len(rows) >= 3:
             all_text = re.sub(r"<[^>]+>", " ", tbl)
             if re.search(r"[涨跌]|[占净值]", all_text) and re.search(r"%", all_text):
+                # 排除收益率/排行表格（含"近N"时间段标记如 近1年/近3月）
+                if re.search(r"近\d+(日|周|月|年|季度)", all_text):
+                    continue
                 return tbl
 
     for tbl in tables:
@@ -118,7 +124,8 @@ def _parse_holdings_rows(table_html: str) -> list[dict[str, Any]]:
             if pct_match:
                 ratio = _safe_float(pct_match.group(1))
                 break
-        if stock_name and ratio > 0:
+        # ratio > 100 不可能是有效持仓占比（占净值比例不会超 100%），跳过
+        if stock_name and 0 < ratio <= 100:
             holdings.append({"name": stock_name, "code": stock_code, "ratio": ratio})
 
     return holdings
@@ -281,7 +288,7 @@ def _parse_quarterly_holdings(html_content: str) -> list[dict[str, Any]]:
             if pct_match:
                 ratio = _safe_float(pct_match.group(1))
                 break
-        if ratio > 0:
+        if 0 < ratio <= 100:
             holdings.append({"name": stock_name, "code": stock_code, "ratio": ratio})
 
     return holdings
