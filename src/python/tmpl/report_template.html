@@ -45,6 +45,9 @@
         .gray-text { color: #888; }
         .notice-banner { background: #E3F2FD; border-left: 4px solid #1976D2; padding: 10px 14px; font-size: 13px; border-radius: 4px; }
         .summary-tag { font-size: 13px; color: #555; }
+        .heatmap-matrix { border-collapse: collapse; }
+        .heatmap-matrix th, .heatmap-matrix td { border: 1px solid #ccc; padding: 4px 8px; text-align: center; font-size: 12px; }
+        .heatmap-matrix th { background: #f5f5f5; font-weight: 600; }
 
         .text-left { text-align: left; }
         .text-right { text-align: right; }
@@ -220,6 +223,7 @@
         <a href="#sec-penetration">四、资产穿透TOP10</a>
         <a href="#sec-fund-perf">五、基金业绩</a>
         {% if manager_analysis and manager_analysis.get("results") %}<a href="#sec-manager">十三、经理变更</a>{% endif %}
+        {% if overlap_matrix and overlap_matrix.get("funds") and overlap_matrix["funds"]|length >= 2 %}<a href="#sec-overlap">十四、重合度矩阵</a>{% endif %}
         {% if news_enabled %}<a href="#sec-news">六、新闻关联</a>{% endif %}
         {% if early_warnings %}<a href="#sec-early-warning">七、智能预警</a>{% endif %}
         {% if llm_enabled %}<a href="#sec-llm">LLM分析</a>{% endif %}
@@ -626,6 +630,110 @@
             <div class="penetration-notes">
                 <div>* 预警级别标准：30天内变更→🔴紧急，90天内→⚠️关注，首次运行→📋首检（自下次起跟踪）</div>
             </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 14: 持仓重合度矩阵 (B 系列)                      -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    {% if overlap_matrix and overlap_matrix.get("funds") and overlap_matrix["funds"]|length >= 2 %}
+    {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
+    {% set _funds = overlap_matrix["funds"] %}
+    {% set _matrix = overlap_matrix["matrix"] %}
+    {% set _pairs = overlap_matrix.get("pairs", []) %}
+    <div id="sec-overlap"></div>
+    <div class="section">
+        <div class="section-title">十四、持仓重合度矩阵</div>
+        <div class="section-content">
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                📊 <strong>{{ _funds | length }}</strong> 只基金，共 <strong>{{ _pairs | length }}</strong> 对组合
+            </div>
+            {% if _pairs and _pairs[0].common_count > 0 %}
+            {% set top = _pairs[0] %}
+            {% set top_a = _fund_names.get(top.fund_a, top.fund_a) %}
+            {% set top_b = _fund_names.get(top.fund_b, top.fund_b) %}
+            <div class="notice-banner" style="margin-bottom: 12px;">
+                🔔 最高重叠：<strong>{{ top_a }}({{ top.fund_a }})</strong> × <strong>{{ top_b }}({{ top.fund_b }})</strong>
+                — Jaccard {{ "%.2f"|format(top.jaccard * 100) }}%，共同持有 {{ top.common_count }} 只标的
+            </div>
+            {% endif %}
+
+            <!-- 矩阵表 -->
+            <div style="overflow-x: auto;">
+            <table class="heatmap-matrix">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        {% for f in _funds %}
+                        <th style="font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _fund_names.get(f, f) }}">{{ _fund_names.get(f, f) }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(_funds | length) %}
+                    <tr>
+                        <td style="font-weight: bold; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _fund_names.get(_funds[i], _funds[i]) }}">{{ _fund_names.get(_funds[i], _funds[i]) }}</td>
+                        <td style="font-size: 11px; color: #888;">({{ _funds[i] }})</td>
+                        {% for j in range(_funds | length) %}
+                        {% set val = _matrix[i][j] %}
+                        <td style="text-align: center; font-size: 12px;
+                            {% if val >= 0.50 %}background-color: #FF4444; color: white; font-weight: bold;
+                            {% elif val >= 0.30 %}background-color: #FF8C00; color: white;
+                            {% elif val >= 0.15 %}background-color: #FFD700;
+                            {% elif val > 0 %}background-color: #CCFFCC;
+                            {% endif %}">
+                            {{ "%.2f"|format(val * 100) }}%
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            <!-- 配对明细 -->
+            {% if _pairs %}
+            <br>
+            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">配对明细（按重合度降序）</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>基金A</th>
+                        <th>基金B</th>
+                        <th>共同标的数</th>
+                        <th>Jaccard</th>
+                        <th>共同标的</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in _pairs %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="text-left">{{ _fund_names.get(p.fund_a, p.fund_a) }}({{ p.fund_a }})</td>
+                        <td class="text-left">{{ _fund_names.get(p.fund_b, p.fund_b) }}({{ p.fund_b }})</td>
+                        <td>{{ p.common_count }}</td>
+                        <td>{{ "%.2f"|format(p.jaccard * 100) }}%</td>
+                        <td class="text-left" style="font-size: 12px;">
+                            {% if p.common_stocks %}
+                            {% set stock_names = [] %}
+                            {% for s in p.common_stocks %}
+                            {% set _ = stock_names.append(s.name or s.code) %}
+                            {% endfor %}
+                            {{ stock_names | join("、") }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
         </div>
     </div>
     {% endif %}

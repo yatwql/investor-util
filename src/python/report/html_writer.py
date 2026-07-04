@@ -16,7 +16,9 @@ from jinja2 import Environment, FileSystemLoader
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.models import Holding
-from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary
+from src.python.fetcher.fund import fetch_fund_holdings
+from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary, _is_fund_code
+from src.python.report.fund_overlap import compute_overlap_matrix
 from src.python.report.html_builders import _build_category_data, _build_perf_data
 from src.python.report.market_value import (
     DetailRow,
@@ -179,6 +181,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     fund_deep = include_news  # B/L 菜单含基金深度分析
     manager_analysis = _render_manager_analysis(holdings, fund_deep, prog)
 
+    # ── 14) 持仓重合度矩阵（B 系列） ──
+    overlap_matrix = _render_overlap_matrix(holdings, details, fund_deep, prog)
+
     # ── 8) 财经新闻 ──
     news_data, _news_llm_meta = _render_news_section(
         include_news, news_data, news_llm_meta, holdings, news_top_count, penetration, prog)
@@ -208,6 +213,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         news_data=news_data, news_llm_meta=_news_llm_meta,
         has_llm_analysis=has_llm_analysis,
         manager_analysis=manager_analysis,
+        overlap_matrix=overlap_matrix,
         llm_enabled=llm_enabled_flag,
         global_macro=global_macro_content, expert_review=expert_review_content,
         health_check=health_check_content, penetration_deep=penetration_deep_content,
@@ -390,6 +396,52 @@ def _render_manager_analysis(
     except Exception as e:
         logger.warning("基金经理变更分析失败: %s", e)
         return {"results": [], "first_check_summary": None}
+
+
+def _render_overlap_matrix(
+    holdings: list[Holding],
+    details: list,
+    fund_deep: bool,
+    prog: ProgressReporter,
+) -> dict | None:
+    """构建持仓重合度矩阵数据。
+
+    Returns:
+        compute_overlap_matrix() 的结果字典，或 None（不启用时）
+    """
+    if not fund_deep:
+        return None
+    prog.info("正在计算持仓重合度矩阵...")
+    try:
+        fund_codes = list(dict.fromkeys(
+            h.code for h in holdings if _is_fund_code(h.code)
+        ))
+        if len(fund_codes) < 2:
+            return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
+
+        fund_holdings: dict[str, list[dict]] = {}
+        fund_names: dict[str, str] = {}
+        for code in fund_codes:
+            fh = fetch_fund_holdings(code)
+            if fh and fh.get("holdings"):
+                fund_holdings[code] = fh["holdings"]
+                fund_names[code] = fh.get("name", code)
+
+        if len(fund_holdings) < 2:
+            return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
+
+        fund_mv_map: dict[str, float] = {}
+        for d in details:
+            if d.code in fund_codes:
+                fund_mv_map[d.code] = fund_mv_map.get(d.code, 0.0) + d.market_value
+
+        result = compute_overlap_matrix(fund_holdings, fund_mv_map=fund_mv_map if fund_mv_map else None)
+        result["fund_names"] = fund_names
+        prog.ok("持仓重合度矩阵计算完成")
+        return result
+    except Exception as e:
+        logger.warning("持仓重合度矩阵计算失败: %s", e)
+        return None
 
 
 def _render_news_section(

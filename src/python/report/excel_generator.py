@@ -98,6 +98,16 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["write_fund_manager_sheet"] = None
         prog.add_error("基金经理变更监控模块缺失 (fund_manager)")
 
+    try:
+        from src.python.report.fund_overlap import compute_overlap_matrix
+        from src.python.report.fund_overlap_sheet import write_overlap_matrix_sheet
+        modules["compute_overlap_matrix"] = compute_overlap_matrix
+        modules["write_overlap_matrix_sheet"] = write_overlap_matrix_sheet
+    except ImportError:
+        modules["compute_overlap_matrix"] = lambda fh, mv=None: {}
+        modules["write_overlap_matrix_sheet"] = None
+        prog.add_error("持仓重合度矩阵模块缺失 (fund_overlap)")
+
     return modules
 
 
@@ -244,7 +254,8 @@ def _write_news_and_early_warning(
 
 def _write_fund_deep_sheets(
     sheets: dict[str, Any], holdings: list,
-    fund_deep: bool, modules: dict[str, Any],
+    fund_deep: bool, data: dict[str, Any],
+    modules: dict[str, Any],
     prog: ProgressReporter,
 ) -> None:
     """写入基金深度分析页签（13-16）。"""
@@ -265,6 +276,51 @@ def _write_fund_deep_sheets(
         except Exception as e:
             logger.warning("基金经理变更监控失败: %s", e)
             prog.add_error("基金经理变更监控失败")
+
+    # 14. 持仓重合度矩阵
+    compute_overlap = modules.get("compute_overlap_matrix")
+    write_overlap = modules.get("write_overlap_matrix_sheet")
+    ws14 = sheets.get("ws14")
+    if ws14 is not None and compute_overlap is not None and write_overlap is not None:
+        prog.info("正在计算持仓重合度矩阵...")
+        try:
+            from src.python.fetcher.fund import fetch_fund_holdings
+            from src.python.report.fund_manager_analysis import _is_fund_code
+
+            # 筛选基金持仓，获取每只基金的持仓数据 + 市值
+            fund_codes = list(dict.fromkeys(
+                h.code for h in holdings if _is_fund_code(h.code)
+            ))
+            if len(fund_codes) < 2:
+                logger.info("持仓重合度矩阵：基金数 < 2（%d），跳过", len(fund_codes))
+            else:
+                # 构建 fund_holdings（复用缓存，0 额外 HTTP）
+                fund_holdings: dict[str, list[dict]] = {}
+                fund_names: dict[str, str] = {}
+                for code in fund_codes:
+                    fh = fetch_fund_holdings(code)
+                    if fh and fh.get("holdings"):
+                        fund_holdings[code] = fh["holdings"]
+                        fund_names[code] = fh.get("name", code)
+
+                if len(fund_holdings) >= 2:
+                    # 构建 fund_mv_map（从市值核算明细中提取）
+                    details = data.get("details", [])
+                    fund_mv_map: dict[str, float] = {}
+                    for d in details:
+                        if d.code in fund_codes:
+                            fund_mv_map[d.code] = fund_mv_map.get(d.code, 0.0) + d.market_value
+
+                    result = compute_overlap(fund_holdings, fund_mv_map=fund_mv_map if fund_mv_map else None)
+                    # 将 fund_names 传入选填
+                    result["fund_names"] = fund_names
+                    write_overlap(ws14, result, fund_names=fund_names)
+                    prog.ok("持仓重合度矩阵页签写入完成")
+                else:
+                    logger.info("持仓重合度矩阵：无可用的基金持仓数据")
+        except Exception as e:
+            logger.warning("持仓重合度矩阵计算失败: %s", e)
+            prog.add_error("持仓重合度矩阵计算失败")
 
 
 def _write_llm_section_and_usage(
@@ -424,9 +480,10 @@ def generate_excel_report(
     ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点与持仓关联分析
     ws7 = wb.create_sheet() if include_news else None  # 7. 智能预警
     ws13 = wb.create_sheet() if fund_deep else None    # 13. 基金经理变更监控
+    ws14 = wb.create_sheet() if fund_deep else None    # 14. 持仓重合度矩阵
 
     sheets = {"ws1": ws1, "ws2": ws2, "ws3": ws3, "ws4": ws4, "ws5": ws5,
-              "ws6": ws6, "ws7": ws7, "ws13": ws13}
+              "ws6": ws6, "ws7": ws7, "ws13": ws13, "ws14": ws14}
 
     # ── 行情市值 + 指数 ──
     data = _resolve_market_data(holdings, details, modules, ws2, prog)
@@ -437,7 +494,7 @@ def generate_excel_report(
     _write_news_and_early_warning(sheets, holdings, pen_result, include_news,
                                   news_data, news_llm_meta, news_top_count,
                                   early_warnings, prog)
-    _write_fund_deep_sheets(sheets, holdings, fund_deep, modules, prog)
+    _write_fund_deep_sheets(sheets, holdings, fund_deep, data, modules, prog)
     _write_llm_section_and_usage(wb, include_llm, llm_content, prog)
 
     # ── 保存 ──
