@@ -67,6 +67,41 @@ def _refresh_one_fund_cache(fund) -> tuple:
     return ("fund", fund.code, fund.name, perf_ok, hold_ok, hold_count, bm_ok)
 
 
+def _refresh_industry_cache(holdings: list) -> int:
+    """刷新行业分类缓存。
+
+    提取持仓中所有 A 股代码，调用 batch_fetch_industry_data 重拉并写入缓存。
+
+    Returns:
+        成功获取的证券数量
+    """
+    from src.python.fetcher.industry import batch_fetch_industry_data
+
+    codes = [h.code.strip() for h in holdings if h.code and h.code.strip()]
+    if not codes:
+        return 0
+    result = batch_fetch_industry_data(codes)
+    return len(result)
+
+
+def _refresh_dividend_cache(holdings: list) -> int:
+    """刷新股票历史分红缓存。
+
+    提取持仓中所有代码，调用 get_dividend_data 重拉并写入缓存。
+    get_dividend_data 内部自动过滤非 A 股代码。
+
+    Returns:
+        成功获取的股票数量
+    """
+    from src.python.providers.akshare_extras import get_dividend_data
+
+    codes = [h.code.strip() for h in holdings if h.code and h.code.strip()]
+    if not codes:
+        return 0
+    result = get_dividend_data(codes)
+    return len(result)
+
+
 def _refresh_profit_forecast_cache() -> tuple[str, int]:
     """刷新盈利预测缓存。
 
@@ -126,28 +161,49 @@ def _print_cache_refresh_report(
         print(f"  [!] sector_flow.json               {_hint}")
 
 
-def _refresh_common_caches() -> tuple[int, int]:
-    """刷新不依赖基金持仓的公共缓存：盈利预测 + 行业资金流向。"""
-    pf_ok = sf_ok = 0
-    with ThreadPoolExecutor(max_workers=2) as _ex:
+def _refresh_common_caches(holdings: list | None = None) -> tuple[int, int, int, int]:
+    """刷新不依赖基金持仓的公共缓存：盈利预测 + 行业资金流向。
+
+    Args:
+        holdings: 可选持仓列表，提供时额外刷新行业分类和分红缓存。
+
+    Returns:
+        (pf_ok, sf_ok, ind_ok, div_ok)
+    """
+    pf_ok = sf_ok = ind_ok = div_ok = 0
+    max_workers = 4 if holdings else 2
+    with ThreadPoolExecutor(max_workers=max_workers) as _ex:
         _f1 = _ex.submit(_refresh_profit_forecast_cache)
         _f2 = _ex.submit(_refresh_sector_flow_cache)
-        try:
-            _, pf_ok = _f1.result()
-            print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
-                  else "  [!]   profit_forecast              获取失败")
-        except Exception as e:
-            logger.debug("profit_forecast Future 异常: %s", e)
-            print("  [!]   profit_forecast              获取失败")
-        try:
-            _, sf_ok = _f2.result()
-            _hint = "非交易时段无数据" if not is_market_open() and not sf_ok else ""
-            print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
-                  else f"  [!]   sector_flow                  {_hint}")
-        except Exception as e:
-            logger.debug("sector_flow Future 异常: %s", e)
-            print("  [!]   sector_flow                  获取失败")
-    return pf_ok, sf_ok
+        futures = [(_f1, "profit_forecast"), (_f2, "sector_flow")]
+        if holdings:
+            _f3 = _ex.submit(_refresh_industry_cache, holdings)
+            _f4 = _ex.submit(_refresh_dividend_cache, holdings)
+            futures.extend([(_f3, "industry"), (_f4, "dividend")])
+
+        for fut, tag in futures:
+            try:
+                if tag == "profit_forecast":
+                    _, pf_ok = fut.result()
+                    print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
+                          else "  [!]   profit_forecast              获取失败")
+                elif tag == "sector_flow":
+                    sf_ok = fut.result()[1]
+                    _hint = "非交易时段无数据" if not is_market_open() and not sf_ok else ""
+                    print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
+                          else f"  [!]   sector_flow                  {_hint}")
+                elif tag == "industry":
+                    ind_ok = fut.result()
+                    print(f"  [OK]   industry                     ({ind_ok} 只证券)" if ind_ok
+                          else "  [!]   industry                     获取失败")
+                elif tag == "dividend":
+                    div_ok = fut.result()
+                    print(f"  [OK]   dividend                     ({div_ok} 只股票)" if div_ok
+                          else "  [!]   dividend                     获取失败")
+            except Exception as e:
+                logger.debug("%s Future 异常: %s", tag, e)
+                print(f"  [!]   {tag:<30}获取失败")
+    return pf_ok, sf_ok, ind_ok, div_ok
 
 
 def _cmd_update_basic_cache() -> None:
@@ -161,10 +217,10 @@ def _cmd_update_basic_cache() -> None:
 
     if not funds:
         print("  [!!] 未检测到基金持仓，跳过基金业绩/持仓/基准缓存")
-        print("  [..] 继续刷新新闻/行业分类/分红/盈利预测/行业资金流向...")
+        print("  [..] 继续刷新行业分类/分红/盈利预测/行业资金流向...")
         print()
-        print("  [..]   并行获取新闻/行业/分红/盈利预测/行业资金流向...")
-        _refresh_common_caches()
+        print("  [..]   并行获取行业/分红/盈利预测/资金流向...")
+        _refresh_common_caches(holdings)
         _press_any_key()
         return
 

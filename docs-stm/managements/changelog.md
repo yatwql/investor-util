@@ -4,6 +4,27 @@
 
 ---
 
+## [0.2.85] - 2026-07-05
+
+### Added
+
+- **C 迭代：报告序号可配置（4 Phase）**：
+  - **C-P1a：注册表 + 配置校验** — `registry.py` 新增 `_REPORT_SECTION_DEFAULT` 注册表（16 模块/4 种 visibility）、`get_report_section_order()`（配置合并/缺省回退/稳定排序）、`set_sheet_title()`（Excel 页签统一命名）、`get_report_section_keys()`（key 集合查询）；`config.py` 新增 `validate_report_section_order()` 校验（重复序号/未知 key/零值）；`html_writer.py` 新增 `_jinja_section_visible()` + `section_visible_dict`（模板层条件渲染入口）。新增测试 31 项（registry 21 + config 10），含 edge 场景专项覆盖
+  - **C-P1b：Excel 全链路集成** — `excel_generator.py` `_create_sheets()` + 11 个写入器页签标题统一使用 `set_sheet_title()`；新增 `report_section_order` 配置读取与排序逻辑
+  - **C-P2：HTML 全链路重构** — `html_writer.py` `_write_html_report()` 按 `report_section_order` 动态渲染；`_ENV.globals` 注册 `section_visible` Jinja2 全局函数；`report_template.html` 导航栏/正文均使用 `{% for sec in report_section_order %}` 循环 + `section_visible(section.key)` 条件渲染；CSS order 统一管理
+  - **C-P3：文档更新** — `requirements.md` 补充报告序号可配置需求；`technical.md` 新增 C 迭代技术设计章节（注册表结构/4 种 visibility/section_visible_dict/CSS order/Jinja2 全局函数）；`how-to-config.md` + `config.json` 示例补充 `report_section_order` 配置说明；`datasource-and-folders.md` 目录树补充 registry.py；`test-coverage.md` 计数同步（单元 1990→2137，全量 2353→2384）
+  - `llm_usage` 固定末位机制；未配置模块按默认顺序排后；`b_series` 类型的 4 个模块通过 `enable_b_series` 控制可见性
+
+### Changed
+
+- **模块命名统一**：`excel_generator.py` 函数名 `_write_fund_deep_sheets` → `_write_b_series_sheets`，与 `enable_b_series` 标志命名对齐
+
+### Fixed
+
+- **plan.md 优先级排序**：C 迭代计划经四轮审查优化后定稿（O11-O14 优化：核数减半/dirty 文件/决策回顾/依赖冲突）
+
+---
+
 ## [0.2.84] - 2026-07-04
 
 ### Added

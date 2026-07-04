@@ -36,9 +36,9 @@
 | **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone) | `unit/report/` 共 17 文件含 test_html_writer、test_html_template 等 | 762 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton) | `unit/llm/`(10 文件) + `scenario/llm/test_llm_scenarios.py` | 360 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` | 331 |
-| **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 45 |
+| **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 65 |
 | **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 142 |
-| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 4 文件, resilience, llm, datetime 共 8 文件) | 222 |
+| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 5 文件, resilience, llm, datetime 共 9 文件) | 222 |
 
 ### 场景测试分组（scenario）
 

@@ -152,7 +152,7 @@ investor-util/
 通过 `registry.py` 的 `cache_groups` 字段定义分组：
 - **preload（6 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
 - **refresh（11 模块）**：fund_perf（基金业绩排名）, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, fund_benchmarks（基金业绩基准）, fund_manager（基金经理数据）, fund_overlap（持仓重合度）→ 菜单 `[1]` 触发清除
-- **独立模块**：tracking, calendar, fund_concentration_snapshot（集中度历史）, fund_style_snapshot（风格快照）→ 无分组保护，不被菜单缓存命令误删
+- **独立模块**：tracking, calendar, fund_concentration（集中度历史）, fund_style_snapshot（风格快照）→ 无分组保护，不被菜单缓存命令误删
 
 ---
 
@@ -256,8 +256,8 @@ handlers_report.py（菜单触发）
 ```
 
 - **Excel 页签写入器**：各 `_write_*_sheet()` 函数接收 `info` 字典 + `writer`，独立负责单个页签的内容和样式，互不依赖
-- **条件渲染**：B 系列基金分析模块 ws13-ws16（`fund_deep` 标志）、智能预警页签（菜单 B/L）、LLM 分析章节（菜单 L）在 `info` 中无对应数据时自动跳过
-- **汇总页（页签 1）** 非独立写入器，由各写入器通过 `summary.py` 以回调方式追加区块（含条件区块如 LLM 用量）
+- **条件渲染**：B 系列基金分析模块（`enable_b_series` 标志）、智能预警页签（菜单 B/L）、LLM 分析章节（菜单 L）在 `info` 中无对应数据时自动跳过
+- **汇总页（页签 1）** 由 `summary.py` 的 `write_summary_sheet()` 独立写入，采用与其他页签写入器相同的直接调用模式。区别仅在于该函数与 `write_llm_usage_sheet()` 同属于 `summary.py`，且命名上不遵循 `_write_*_sheet` 模式
 
 ### 持仓读取与列校验
 
@@ -271,7 +271,7 @@ handlers_report.py（菜单触发）
 ---
 ### B 系列：基金深度分析模块
 
-B 系列 4 个模块（ws13-ws16）通过 `fund_deep` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
+B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_style）通过 `enable_b_series` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
 
 #### 基金经理变更监控（B2）
 
@@ -422,9 +422,9 @@ C 迭代共涉及 4 个阶段（Phase），其中 C-P1a（注册表+配置校验
 | Phase | 范围 | 状态 |
 |:------|:-----|:----:|
 | C-P1a | `registry.py`：注册表 + `get_report_section_order()` / `set_sheet_title()` / `get_report_section_keys()` + 配置校验 + 测试 | ✅ 完成 |
-| C-P1b | `excel_generator.py`：`_create_sheets()` + 11 个写入器的 `ws.title` 统一改为 `set_sheet_title()` | ⏳ 待实施 |
+| C-P1b | `excel_generator.py`：`_create_sheets()` + 11 个写入器的 `ws.title` 统一改为 `set_sheet_title()` | ✅ 已完成 |
 | C-P2 | HTML 全链路：`html_writer.py` + `report_template.html` 重构 + `_jinja_section_visible()` + section_visible_dict + CSS order | ✅ 完成 |
-| C-P3 | 文档更新：requirements / technical / how-to-config / config.json / datasource-and-folders / test-coverage / faq | 🏗️ 进行中 |
+| C-P3 | 文档更新：requirements / technical / how-to-config / config.json / datasource-and-folders / test-coverage / faq | ✅ 已完成 |
 
 ## LLM 客户端技术要点
 
@@ -596,9 +596,7 @@ _session_usage (dict)
     │      _build_llm_usage_sheet()
     │        → get_session_usage()
     │        → format_session_usage()
-    │        → write_llm_usage_sheet()    写入页签 12
-    │        → write_llm_usage_block()    追加到汇总页
-    │        → write_llm_module_status_block()  追加模块状态
+    │        → write_llm_usage_sheet()    写入独立页签 16（LLM API 用量，不追加到汇总页）
     │
     ├─► HTML 报告                           [html_writer.py + template]
     │      _render_llm_module_info()
@@ -614,14 +612,14 @@ _session_usage (dict)
 
 #### 用量展示与 LLM 分析章节的关系
 
-LLM API 用量页签/章节（页签 12 / HTML 底部）**不是独立的 LLM 生成模块**，而是对同一会话中所有 LLM 分析章节调用量的被动统计汇总。
+LLM API 用量页签/章节（页签 16 / HTML 底部）**不是独立的 LLM 生成模块**，而是对同一会话中所有 LLM 分析章节调用量的被动统计汇总。
 
 | 方面 | 设计决策 |
 |:-----|:---------|
 | **触发条件** | 仅菜单 L（全系列完整版报告），与 LLM 分析章节共进退 |
 | **无用量不显示** | 无任何 LLM 调用时（API Key 未配置或所有模块已禁用），该页签/章节整个跳过不渲染 |
 | **全缓存场景** | 所有模块均为缓存命中（无实际 API 调用），汇总区标注"无新增 API 调用，数据全部来自缓存"，模块明细表正常显示 |
-| **与 LLM 章节的物理位置** | Excel 中作为页签 12（最后一位），HTML 中在所有 LLM 分析章节之后渲染 |
+| **与 LLM 章节的物理位置** | Excel 中作为页签 16（最后一位），HTML 中在所有 LLM 分析章节之后渲染 |
 | **新闻 LLM 关联分析** | 当 `enabled_llm.news_correlation = true` 时，其 token 使用量计入 `per_module["news_correlation"]`，与另外 4 个 LLM 主模块在同一明细表中展示 |
 
 #### 展示格式
@@ -686,8 +684,8 @@ LLM 用量页签/章节底部追加"▎数据缓存系统"区域，展示 `cache
 
 | 渠道 | 展示位置 | 实现 |
 |:-----|:---------|:-----|
-| Excel（页签 12） | 状态图例下方，2 列键值表 | `summary.py._write_cache_stats_section()` |
-| HTML（第 12 节） | "各模块明细"表格下方 | `report_template.html` 条件渲染 `{% if cache_stats.total > 0 %}` |
+| Excel（页签 16） | 状态图例下方，2 列键值表 | `summary.py._write_cache_stats_section()` |
+| HTML（第 16 节） | "各模块明细"表格下方 | `report_template.html` 条件渲染 `{% if cache_stats.total > 0 %}` |
 
 #### 会话生命周期
 
@@ -700,7 +698,7 @@ main.py 入口（菜单 L 选中文件后）
   │     ├─ 每个模块调用 → _track + _record（API 调用或缓存命中）
   │     └─ ...
   │
-  ├─ generate_excel_report(...)      // 写入页签 12 + 汇总页补充区块
+  ├─ generate_excel_report(...)      // 写入独立页签 16
   │     └─ _build_llm_usage_sheet()
   │
   ├─ write_html_report(...)          // 渲染 HTML 底部

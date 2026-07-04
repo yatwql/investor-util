@@ -272,7 +272,7 @@ def _write_news_and_early_warning(
             prog.add_error("智能预警模块缺失，跳过")
 
 
-def _write_fund_deep_sheets(
+def _write_b_series_sheets(
     sheets: dict[str, Any], holdings: list,
     enable_b_series: bool, data: dict[str, Any],
     modules: dict[str, Any],
@@ -613,7 +613,7 @@ def generate_excel_report(
     _write_news_and_early_warning(sheets, holdings, pen_result, include_news,
                                   news_data, news_llm_meta, news_top_count,
                                   early_warnings, prog)
-    _write_fund_deep_sheets(sheets, holdings, enable_b_series, data, modules, prog)
+    _write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
     _write_llm_section_and_usage(sheets, include_llm, llm_content, prog)
 
     # ── 保存 ──

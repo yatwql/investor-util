@@ -104,36 +104,39 @@ from src.python.registry import (
 **用途：**
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_sheet_name("penetration")` → `"资产穿透TOP10"`
-- 可选键名：`summary`, `market_value`, `category`, `penetration`, `fund_performance`, `early_warning`
+- 可选键名：`summary`, `market_value`, `category`, `penetration`, `fund_performance`, `early_warning`, `fund_manager`, `fund_overlap`, `fund_concentration`, `fund_style`
 
-| 键名 | 中文标题 | Excel 序号 |
-|------|---------|-----------|
+| 键名 | 中文标题 | 默认 Excel 序号 |
+|------|---------|:--------------:|
 | `summary` | 投资分析汇总 | 1. |
 | `market_value` | 市值核算明细表 | 2. |
 | `category` | 持仓分类表 | 3. |
 | `penetration` | 资产穿透TOP10 | 4. |
 | `fund_performance` | 基金业绩分析 | 5. |
-| — | 财经新闻热点与持仓关联分析（通过 `get_llm_module_name("news_correlation")` 获取标题） | 6. |
-| `early_warning` | 智能预警 | 7. |
-| — | 基金经理变更监控 | 13. |
-| — | 持仓重合度矩阵 | 14. |
-| — | 持仓集中度监控 | 15. |
-| — | 基金风格分析 | 16. |
-| — | LLM 分析模块（4 个页签，见下表） | 8. |
-| — | LLM API 用量 | 12.（注） |
+| `fund_manager` | 基金经理变更监控 | 6. |
+| `fund_overlap` | 持仓重合度矩阵 | 7. |
+| `fund_concentration` | 持仓集中度监控 | 8. |
+| `fund_style` | 基金风格分析 | 9. |
+| — | 财经新闻热点与持仓关联分析（通过 `get_llm_module_name("news_correlation")` 获取标题） | 10. |
+| `early_warning` | 智能预警 | 11. |
+| — | 全球政经局势 | 12. |
+| — | 智囊团深度复盘 | 13. |
+| — | 持仓体检报告 | 14. |
+| — | 穿透深度分析 | 15. |
+| — | LLM API 用量 | 16.（注） |
 
-第 8 号位置为 LLM 分析模块页签区，共 4 个页签，按 `write_llm_sheets()` 写入顺序排列：
+第 12 至 15 号位置为 LLM 分析模块页签区，共 4 个页签，按注册表 `_REPORT_SECTION_DEFAULT` 顺序排列：
 
-| 页签内容 | 对应 `settings_suffix` | Excel 子序号 |
-|---------|----------------------|:-----------:|
-| 全球政经局势 | `global_macro` | 8.1 |
-| 智囊团深度复盘 | `expert_review` | 8.2 |
-| 持仓体检报告 | `health_check` | 8.3 |
-| 穿透深度分析 | `penetration_deep` | 8.4 |
+| 页签内容 | 对应 `settings_suffix` | 默认 Excel 序号 |
+|---------|----------------------|:--------------:|
+| 全球政经局势 | `global_macro` | 12. |
+| 智囊团深度复盘 | `expert_review` | 13. |
+| 持仓体检报告 | `health_check` | 14. |
+| 穿透深度分析 | `penetration_deep` | 15. |
 
-> LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 6 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 8 号），在新闻数据就绪时写入。第 12 号的 LLM API 用量页签为程序生成，不依赖 registry。
-> 
-> **关于序号**：上表中 Excel 序号为页签标题中的编号前缀。因 B 模块页签（13-16）在 LLM 页签（8-12）之前创建、LLM 页签通过 `wb.create_sheet()` 默认追加到末尾，实际物理排序为 1-7→13-16→8-11→12，非严格递增。参见 [R-155](../managements/review-findings.md#r-155-excel-页签排序错位)。
+> LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 10 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 12~15 号），在新闻数据就绪时写入。第 16 号的 LLM API 用量页签为程序生成，不依赖 registry。
+>
+> 上表序号为**默认值**，用户可通过 `config.json` 的 `report_section_order` 字段自定义各模块序号和排列顺序。C 迭代后 `_create_sheets()` 按配置顺序创建页签，Excel 物理排序与显示顺序一致（不再有旧版 1-7→13-16→8-11→12 的错位问题）。
 
 ---
 

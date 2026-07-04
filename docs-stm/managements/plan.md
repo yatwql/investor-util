@@ -1,8 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-05（v0.2.85 — B 迭代完成：基金经理变更/重合度矩阵/集中度监控/风格漂移 4 模块）
-（C 迭代计划经四轮审查优化后定稿）
+最后更新：2026-07-05（v0.2.85 — C 迭代完成：报告序号可配置全链路）
 
 ---
 
@@ -127,3 +126,8 @@ Z 系列（Z1-Z4）已全部完成：
 - `llm_usage` 固定末位，未配置模块按默认顺序排后
 
 > 完整方案、设计要点、Phase 划分、代码示例见 `docs-stm/plan/c-iteration-design.md`。
+
+**C-P1b 已知限制 — Excel 页签编号不跟随用户配置**：
+- `set_sheet_title()` 当前始终查询 `_REPORT_SECTION_DEFAULT`（默认注册表）生成 `"{number}.{name}"` 标题，不接收 `section_order` 参数
+- 后果：用户配置 `report_section_order` 后，HTML 显示顺序 ✅ 正确，Excel 页签物理顺序 ✅ 正确，但 Excel 页签标题中的数字**始终显示默认序号**（如"6.基金经理变更监控"而非用户配置的序号）
+- **待研究突破方向**：`set_sheet_title()` 需扩展接收 `section_order list[dict]` 参数，从配置的 section 中取 `number` 而非默认注册表。需注意 `_create_sheets()` 调用处（`excel_generator.py:550`）一并传参
