@@ -55,6 +55,21 @@ pip install --only-binary :all: -r requirements.txt
 
 如仍失败，可尝试安装 Microsoft C++ Build Tools 或使用 Anaconda 环境。
 
+**Q: 能否将 .venv 放在项目目录外部管理？**
+
+A: 可以。设置环境变量 `VENV_PATH` 指向外部目录，启动脚本自动创建链接并复用。方便多项目共享或集中管理虚拟环境：
+
+```
+# Windows PowerShell
+$env:VENV_PATH = "D:\shared\venvs\investor-util"
+.\scripts\launch.ps1
+
+# Linux
+VENV_PATH=/opt/venvs/investor-util ./scripts/launch.sh
+```
+
+首次运行自动创建并链接，再次运行直接复用。
+
 **Q: Git clone 后运行脚本报错"项目不在正确的目录结构中"？**
 
 A: 确保 clone 后直接在项目根目录（`investor-util/`）下运行启动脚本，不要手动移动子目录。目录结构应保持：
