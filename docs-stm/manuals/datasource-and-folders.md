@@ -108,11 +108,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2225 passed）
+│   └── test/                             # 测试（按标记分组目录，2244 passed）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（1993 项，8 个子分组）
+│       ├── unit/                         # 单元测试（1997 项，8 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -174,7 +174,7 @@ investor-util/
 │       │   │   ├── test_early_warning.py # 智能预警页签 — 行业资金流出/新闻情绪聚合（25 项）
 │       │   │   ├── test_progress.py      # 进度报告 — ProgressReporter / 错误跟踪/耗时排行（33 项）
 │       │   │   ├── test_data_quality_edge.py # 数据质量异常场景 — 停牌/负净值/债券违约/FOF 嵌套（22 项 Y2）
-│       │   │   └── test_security_edge.py # 安全纵深 — 公式注入/XSS/符号链接/路径遍历/原型污染/临时文件竞争（15 项 Y6）
+│       │   │   └── test_security_edge.py # 安全纵深 — 公式注入/XSS/符号链接/路径遍历/原型污染/临时文件竞争（19 项 Y6，含 4 项 autoescape）
 │       │   ├── config/                   # 配置测试（55 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_config.py        # 配置管理 — config.json / llm_settings 读写/校验（31 项）
@@ -199,16 +199,17 @@ investor-util/
 │       │       ├── test_handlers.py      # 菜单命令 — 缓存刷新/配置/LLM 模块管理（23 项）
 │       │       └── test_log_sanitize.py  # 日志脱敏 — 敏感信息过滤/安全日志（40 项）
 │       │
-│       ├── integration/                # 集成测试（25 项，5 个子分组）
+│       ├── integration/                # 集成测试（25 项契约验证，5 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   └── test_integration_coverage.py  # 集成测试覆盖：接口契约/错误隔离/新闻流水线/缓存一致性/TUI 路由
-│       └── scenario/                     # 场景测试（207 项，4 个子分组）
+│       └── scenario/                     # 场景测试（222 项，4 个子分组）
 │           ├── __init__.py               # 子包标记（空文件）
-│           ├── basic/                    # 基础业务场景 S0a-S0d + S1-S5 + S21-S28（57 项）
+│           ├── basic/                    # 基础业务场景 S0a-S0d + S1-S5 + S21-S33（72 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   ├── test_integration.py              # S1-S5：持仓读取/行情获取/市值核算/分类汇总/报告生成
 │           │   ├── test_scenario_holdings_quality.py # S0a-S0d（Z3）：清仓跳过/A-C份额/200+持仓/特殊字符
 │           │   └── test_scenario_special_securities.py # S21-S28（Z1）：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债
+│           │   └── test_scenario_operational_behavior.py # S29-S33（Z2）：分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市
 │           ├── resilience/               # 异常容错场景 S6-S10（18 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   └── test_integration_scenarios.py  # S6-S10：纯债分类/网络降级/单行报告/零成本利润/极端份额
@@ -256,16 +257,16 @@ investor-util/
 │   ├── test-reports/                 # 测试报告输出（自动生成）
 │   │   ├── latest/                   # 最新测试报告（按 --mode 生成子目录）
 │       │   │   ├── index.html            # 汇总页 — 各模式通过/失败总览 + 最近运行时间
-│       │   │   ├── unit/report.html      # 单元测试报告（标记 -m "unit"，1993 项）
+│       │   │   ├── unit/report.html      # 单元测试报告（标记 -m "unit"，1997 项）
 │       │   │   ├── standard/report.html  # 常规单元报告（标记 -m "unit and not (edge or data)"，1730 项）
-│       │   │   ├── scenario/report.html  # 场景测试报告（标记 -m "scenario"，207 项）
-│       │   │   ├── regression/report.html # 回归测试报告（标记 -m "scenario"，模式别名，207 项）
-│       │   │   ├── verify/report.html    # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，824 项）
-│       │   │   ├── integration/report.html  # 集成测试报告（标记 -m "scenario or integration"，232 项）
+│       │   │   ├── scenario/report.html  # 场景测试报告（标记 -m "scenario"，222 项）
+│       │   │   ├── regression/report.html # 回归测试报告（标记 -m "scenario"，模式别名，222 项）
+│       │   │   ├── verify/report.html    # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，839 项）
+│       │   │   ├── integration/report.html  # 集成测试报告（标记 -m "scenario or integration"，247 项）
 │       │   │   ├── smoke/report.html     # 冒烟测试报告（标记 -m "smoke"，24 项）
-│       │   │   ├── edge/report.html      # 边缘场景报告（标记 -m "edge"，198 项）
+│       │   │   ├── edge/report.html      # 边缘场景报告（标记 -m "edge"，202 项）
 │       │   │   ├── data/report.html      # 数据正确性报告（标记 -m "data"，65 项）
-│       │   │   ├── all/report.html       # 全量测试报告（无标记筛选，2225 项）
+│       │   │   ├── all/report.html       # 全量测试报告（无标记筛选，2244 项）
 │       │   │   └── coverage/             # HTML 行覆盖率报告（--coverage 时生成）
 │   │   └── archives/                 # 历史报告存档
 │   │       └── <YYYYMMDD>/           # 按日期归档的子目录（含完整 latest/ 快照）
