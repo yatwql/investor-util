@@ -995,7 +995,7 @@ Step B3-1 → Step B3-2 → Step B3-3 → Step B3-4
 |:-----|:----|
 | **目标** | ~115 新增项 + 原有 regression 全部通过；菜单 B/L 生成报告含页签 13-16 |
 | **操作** | (1) `test_runner.py --mode unit` — report 标记项数不降<br>(2) `test_runner.py --mode regression` — 场景 0 failed<br>(3) 菜单 B/L 生成报告确认 4 个新页签存在<br>(4) 菜单 E/H 验证不包含新页签 |
-| **验证** | (1) `unit` 0 failed (2) `regression` 0 failed (3) 报告含 13-16 页签 |
+| **验证** | (1) `unit` 0 failed (2) `regression` 0 failed (3) 菜单 B/L 报告含 13-16 页签，**菜单 E/H 不含** |
 | **预期产出** | commit: "docs: B 迭代完成 — 基金深度分析 4 模块上线" |
 | **回滚** | 任一项 failed → 追踪到对应 Phase 修复 |
 

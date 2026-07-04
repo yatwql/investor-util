@@ -422,7 +422,7 @@ MODES = {
 | 包 | 用途 | 安装大小 | 风险 |
 |:---|:------|:--------:|:----:|
 | `pytest-xdist` | 并行测试执行 | ~200KB | ⚠️ Windows 需 `psutil` 或 `py` |
-| `pytest-testmon`（可选） | 增量测试选择 | ~100KB | 低 |
+| `pytest-rerunfailures` | flaky 测试重试（`test_cache_concurrency` 使用）| ~50KB | 低 |
 
 ### 5.2 兼容性
 
@@ -434,11 +434,13 @@ MODES = {
 
 ## 6. 实施步骤（拆细为 17 个原子步）
 
-### 6.1 依赖与基础设施（6 步）
+### 6.1 依赖与基础设施（7 步）
 
 ```
-Step A0 ──→ Step A1 ──→ Step A2 ──→ Step A3 ──→ Step A3b ──→ Step A3c
-(基线录制)  (pyproject)  (fixture审计)  (test_runner)  (单线程确认)  (加速比门)
+Step A0 ──→ Step A1 ──→ Step A2 ──→ Step A2a ──→ Step A3 ──→ Step A3b ──→ Step A3c
+(基线录制)  (pyproject)  (fixture审计)  (检查点)    (test_runner)  (单线程确认)  (加速比门)
+                                          │
+                                     Δ ≤ 5 OK? ──→ ⛔ 暂停/改道
 ```
 
 #### Step A0：录制变更前基线
@@ -478,6 +480,19 @@ Step A0 ──→ Step A1 ──→ Step A2 ──→ Step A3 ──→ Step A3b
 | **验证** | `pytest src/test/ -n 2 --collect-only` 无 warning；`pytest src/test/ -n 2` 0 failed |
 | **预期产出** | fixture scope 审核清单，标记为 safe 的 `✓` 和需要改 scope 的 `Δ` |
 | **回滚** | 修改的 fixture scope 可逐条 `git revert`；审核清单本身无副作用 |
+
+#### Step A2a（新增）：Fixture 不兼容检查点（提前退出门）
+
+> **背景**：如果 session/module scope fixture 不兼容问题过多，强行推进 Phase 1 可能引入大量耗时重构。
+> 本步骤提供明确的退出点，避免沉没成本。
+
+| 字段 | 值 |
+|:-----|:----|
+| **目标** | 根据 A2 审核结果决策：是否继续推进 Phase 1 并行化 |
+| **操作** | (1) 统计 A2 审核清单中标记为 `Δ`（需改 scope）的问题数量<br>(2) **Δ ≤ 5** → ✅ 继续 A3 并行逻辑<br>(3) **Δ > 5** → ⛔ 暂停，输出评估报告：逐一列出需重构的 fixture、预期工作量、推荐方案（彻底重构 / 不完全依赖并行 / 跳过 Phase 1 直接到 Phase 3 增量测试）<br>(4) 决策结果写入 `docs-stm/plan/notes/a5-fixture-gate.md` |
+| **验证** | 决策记录明确（继续/暂停/改道），fixture 评估报告完整 |
+| **预期产出** | commit: "docs: A5 A2a 检查点 — fixture 不兼容 {Δ} 项，决策{继续|暂停|改道}" |
+| **回滚** | 文档仅作记录，无代码影响；可在重构后重新进入 A3 |
 
 #### Step A3：test_runner.py 并行逻辑
 
@@ -600,11 +615,11 @@ Step B1 ──→ Step B2 ──→ Step B3
 
 ---
 
-### 6.3 增量测试（5 步）
+### 6.3 增量测试（4 步）
 
 ```
-Step X  ──→ Step C1 ──→ Step C2 ──→ Step C3 ──→ Step C4
-(决策门)    (映射表)     (CLI参数)    (映射测试)   (testmon可选)
+Step X  ──→ Step C1 ──→ Step C2 ──→ Step C3
+(决策门)    (映射表)     (CLI参数)    (映射测试)
 ```
 
 #### Step X（新增）：决策门 — 实测 verify 耗时决定 D1 去留
@@ -616,7 +631,7 @@ Step X  ──→ Step C1 ──→ Step C2 ──→ Step C3 ──→ Step C4
 | 字段 | 值 |
 |:-----|:----|
 | **目标** | 实测 Phase 1+2 后的 `verify` 耗时，明确 D1（`verify_fast` 是否实施）|
-| **操作** | (1) `python test_runner.py --mode verify` 记录耗时 T<br>(2) T ≤ 180s（3min）→ **跳过 D1**，D1 步骤标记为「不实施 — Phase 1+2 已达标」<br>(3) T > 180s → **实施 D1**，继续 C1→C2→C3→C4→D1→D2→D3→E<br>(4) 决策结果写入 `docs-stm/managements/test-coverage.md` 的 A5 决策日志 |
+| **操作** | (1) `python test_runner.py --mode verify` 记录耗时 T<br>(2) T ≤ 180s（3min）→ **跳过 D1**，D1 步骤标记为「不实施 — Phase 1+2 已达标」<br>(3) T > 180s → **实施 D1**，继续 C1→C2→C3→D1→D2→D3→E<br>(4) 决策结果写入 `docs-stm/managements/test-coverage.md` 的 A5 决策日志 |
 | **验证** | 决策记录明确（跳过/实施），后续步骤按决策路径执行 |
 | **预期产出** | commit: "docs: A5 决策门 — verify 耗时 T={T}s，D1 按需实施" |
 | **回滚** | 决策记录仅在文档中，无代码影响；可在 D1 实施后重新决策 |
@@ -650,16 +665,6 @@ Step X  ──→ Step C1 ──→ Step C2 ──→ Step C3 ──→ Step C4
 | **操作** | (1) mock `subprocess.run` 返回可控的 git diff 输出<br>(2) 覆盖场景：无变更、单文件变更、多域变更、测试文件变更、docs-only 变更、**未识别源文件（兜底 unit）**、**基准分支 fallback**<br>(3) 标记 `@pytest.mark.unit_core` |
 | **验证** | `pytest src/test/ -m "unit_core" -k "test_runner"` 全部通过 |
 | **预期产出** | commit: "test: 为 _get_changed_marker 添加 7 项单元测试（含兜底）" |
-
-#### Step C4（可选）：pytest-testmon 集成
-
-| 字段 | 值 |
-|:-----|:----|
-| **目标** | testmon 增量运行时仅执行受影响的测试，漏报率 = 0（可选，验证后决定是否启用） |
-| **操作** | (1) `pip install pytest-testmon` <br>(2) 种子运行：`pytest src/test/ --testmon` <br>(3) 验证增量：修改一个测试文件后，`pytest src/test/ --testmon` 仅运行受影响项 |
-| **验证** | 增量运行项数 < 全量运行项数，且漏报率为 0 |
-| **预期产出** | testmon 增量验证确认 |
-| **回滚** | `pip uninstall pytest-testmon` 完全恢复；不 commit 则无副作用 |
 
 ---
 
@@ -725,11 +730,11 @@ Step D1 ──→ Step D2 ──→ Step D3
 ```
 Week 1                          Week 2
 ┌──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┐
-│  A0  │  A1  │  A2  │  A3  │ A3b  │ A3c  │ B1~3 │ B4~6 │
-│基线  │  dep │scope │并行  │单线  │加速  │拆分  │验证  │
-│录制  │      │审计  │逻辑  │程确认│比门  │(可并行)│回归  │
+│  A0  │  A1  │  A2  │ A2a  │  A3  │ A3b  │ A3c  │ B1~3 │
+│基线  │  dep │scope │检查  │并行  │单线  │加速  │拆分  │
+│录制  │      │审计  │点    │逻辑  │程确认│比门  │(可并行)│
 ├──────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
-│  X   │  C1  │  C2  │  C3  │  C4  │ [D1] │  D2  │  D3  │
+│ B4~6 │  X   │  C1  │  C2  │  C3  │ [D1] │  D2  │  D3  │
 │决策  │映射  │CLI   │映射UT│test- │verify│report│文档  │
 │门    │      │      │      │mon   │_fast†│      │同步  │
 └──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┘
@@ -745,6 +750,7 @@ Week 1                          Week 2
 | A0 | 录制各模式耗时基线（3 次取中位数） | test-coverage.md 数据完整 | `git revert` A0 commit |
 | A1 | pyproject.toml 声明 xdist 依赖 | `pip install -e .` + `pytest -n auto --collect-only` 不报错 | `git revert` A1 commit |
 | A2 | 所有 fixture scope + tmpdir 路径确认并行安全 | `pytest -n 2` 0 failed | 逐条 `git revert` |
+| A2a | fixture 检查点：Δ ≤ 5 才继续 Phase 1 | 决策记录明确（继续/暂停/改道）| 文档回退无代码影响；暂停后可在重构后重新进入 |
 | A3 | `unit`/`verify`/`all` 使用并行；支持 `parallel: N` | 日志含 `-n auto` 或 `-n N` | `git revert`；无 xdist 自动降级 |
 | A3b | 并行与单线程结果一致 | F1（并行 failed） = F2（单线程 failed）| 有差异时定位 fixture 修复 |
 | A3c | verify 加速比 ≥ 2.5x 才进拆分 | 决策记录明确（继续/暂停分析）| 暂停分析时提交 profiling 报告后退回决策 |
@@ -758,7 +764,6 @@ Week 1                          Week 2
 | C1 | `_get_changed_marker()` 映射准确 + 兜底 unit | 5 种 diff 场景均返回正确 marker | `git revert` C1 commit |
 | C2 | `--changed` 语义完整（无 `--mode` 干扰） | clean tree 跳过；`--changed` + `--mode` 并用时报错提示互斥 | `git revert` C2 commit |
 | C3 | 7 项 mock 场景覆盖（含兜底+fallback） | `pytest -k "test_runner"` 全部通过 | `git revert` C3 commit |
-| C4 | testmon 增量漏报率 = 0（可选） | 修改后增量项 < 全量 50% | `pip uninstall` |
 | D1† | `verify_fast` < 3min（条件：Phase1+2 后 verify>3min） | `test_runner.py --mode verify_fast` 通过 | `git revert` D1 commit |
 | D2 | `report` < 90s | `test_runner.py --mode report` 通过 | `git revert` D2 commit |
 | D3 | 门禁文档 + 基线数据同步 | 阅读一致 | `git revert` D3 commit |
@@ -776,7 +781,7 @@ Week 1                          Week 2
 | xdist 并行误报（隐式数据依赖导致测试"通过"但实际失败）| 高 | 中 | Step A3b 新增单线程对比确认；F1（并行失败列表）= F2（单线程失败列表）才通过 |
 | 拆分测试文件导致标记遗漏 | 低 | 中 | 相对比较法 B4（子标记之和 = 父标记数）；`check-test-markers.py` 验证 |
 | pytest-xdist Windows 兼容问题 | 低 | 中 | `-n auto` 进程池模式已验证兼容；保留 `--strict` 回退 |
-| git diff → marker 映射漏测 | 中 | 中 | 映射表 + 兜底 `"unit"` + 未识别文件警告日志（`[!]`）；testmon 作为备选 |
+| git diff → marker 映射漏测 | 中 | 中 | 映射表 + 兜底 `"unit"` + 未识别文件警告日志（`[!]`）|
 | 并行测试输出混乱 | 高 | 低 | `pytest-xdist` 自动聚合输出；每个工作进程输出流独立 |
 | `--changed` 基准分支不存在 | 低 | 中 | fallback 链：`origin/main → main → HEAD~1`（C1）|
 | `test_cache_concurrency` 时序测试多负载下 flaky | 低 | 低 | 标记 `@pytest.mark.serial` + `@pytest.mark.flaky(reruns=2)`（B3）|
