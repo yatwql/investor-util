@@ -167,6 +167,11 @@
 ### Fixed
 - **`llm/fingerprint.py` health_check fallback TTL 修正**：`_get_cache_ttl_llm()` 硬编码 fallback 字典中 health_check 为 7200，与 registry.py 的 86400（CACHE_DAILY）不一致，修正为 86400。（第 130 行，import 失败降级路径）
 - **`data/config/config.json` 补齐 4 个 B 模块 cache_ttl 键**：实际配置文件中 `fund_manager`（86400）、`fund_overlap`（604800）、`fund_concentration`（2592000）、`fund_style_snapshot`（2592000）缺失，补齐后与文档范例和 registry 基准一致。
+- **faq.md — 5 处事实修正**：
+  - LLM TTL 描述从笼统"2h"改为按模块逐一列出（智囊团 2h / 全球/体检/穿透 24h / 新闻关联 1h）
+  - 持仓体检报告 TTL 从"2h"修正为"24h"
+  - 页签编号 `1.~12.` → `1.~16.`，菜单差异描述从"仅 LLM"扩展为 E/H/B/L 四档说明
+  - `provider` 可选值删除 `"deepseek"`（代码仅识别 claude/openai）
 
 ### Changed
 - **8 项管理/用户文档同步审计修复**：
@@ -175,6 +180,9 @@
   - `testplan.md`：版本号 v0.2.77→v0.2.85；S29-S33 范围同步（L78/L248）；§5 版本迭代表调整为严格降序 10 条（删除 v0.2.56/v0.2.55）
   - `review-findings.md`：R-154 追加 B 模块 4 sheet 硬编码标题技术债务关联问题
   - `how-to-config-llm.md`：§6 失败降级章节删除重复句首"各模块在以下降级场景下自动显示占位文本："
+- **plan.md**：移除 A5/B 已完成迭代详细章节（已有 changelog.md 完整记录），✅ 已完成迭代段落中保留摘要引用
+- **datasource-and-folders.md**：目录树补全 B2-B4 模块 6 个源文件（fund_concentration/fund_concentration_sheet/fund_manager_analysis/fund_manager_sheet/fund_overlap/fund_overlap_sheet）和 5 个测试文件（test_fund_concentration/test_data_integrity/test_fund_manager_analysis/test_fund_manager_sheet/test_fund_overlap）；全量测试计数 2244→2341；修复 basic/ 目录树层级标识（3 文件→4 文件）
+- **review-findings.md**：清理已完成问题 R-152（测试时长关注，A5 已实施 unit 20s/verify 49s）和 R-153（PE 阈值边界条件，B5 已修复 ✅）；摘要表统计更新：R-149~R-152→R-149~R-151，B 自审行标注 PE 边界条件 ✅ 已修复
 
 ---
 

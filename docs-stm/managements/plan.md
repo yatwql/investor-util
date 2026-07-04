@@ -79,53 +79,6 @@ LLM 配置拆分为两个独立文件：
 
 ---
 
-### ✅ 当前迭代 — [P2-2] A5. 测试运行时可扩展性优化（完成）
-
-**Phase 1 实施结果**（2026-07-04）：
-| 模式 | 优化前 | 优化后（parallel medium） | 加速比 |
-|:-----|:------:|:------------------------:|:------:|
-| `unit` | ~25min | **~20s** | 75x |
-| `verify` | ~12min | **~49s** | 14.7x |
-| `report` 🆕 | — | **~15s** | — |
-
-- ✅ pytest-xdist 安装并配置 `--parallel` 参数（high/medium/low 三档）
-- ✅ `test_runner.py` MODES 新增 `parallel` 字段 + `report` 模式
-- ✅ `conftest.py` 无 session/module scope fixture，并行安全零改动
-- ✅ 加速比远超 2.5x 门控，Phase 2（文件拆分）**跳过**——当前 20s 无需进一步优化
-- ✅ Phase 3（增量测试）**延期**——20s 全量已足够快，增量带来的复杂度不划算
-- ✅ Phase 4（report 模式）已实施
-
-**过渡到 B**：A5 Phase 2 文件拆分跳过，B 的新测试直接写入现有测试文件末尾即可。
-无需过渡步骤和交接记录。
-
-**详细设计**：[`docs-stm/plan/A5-test-runtime-optimization.md`](../plan/A5-test-runtime-optimization.md)
-
----
-
-### ✅ 当前迭代 — [P0] B. 基金持仓专属分析（完成）
-
-**实施结果**（2026-07-04）：
-
-| 模块 | 页签 | 核心功能 | 测试数 | 状态 |
-|:-----|:------|:----------|:------:|:----:|
-| B0 | — | 数据源预研（push2 扩展字段 f20/f9、天天基金 API） | — | ✅ |
-| B1 | — | 基金元数据增强（registry 注册、fetcher 接口） | — | ✅ |
-| B2 | 13. 基金经理变更监控 | 快照式变更检测（1/3/6 月窗口）+ 三级预警 | 37 项 | ✅ |
-| B3 | 14. 持仓重合度矩阵 | Jaccard+Overlap Ratio 双指标热力图 | 21 项 | ✅ |
-| B4 | 15. 持仓集中度监控 | top3/5/10 占比 + 环比变化 + 三级预警 | 15 项 | ✅ |
-| B5 | 16. 基金风格漂移检测 | 市值/PE 加权六宫格 + 网格曼哈顿距离漂移评分 | 32 项 | ✅ |
-
-- ✅ Excel 双通道输出：`excel_generator.py` ws13-ws16 + `_write_fund_deep_sheets` 统一编排
-- ✅ HTML 双通道输出：`html_writer.py` 4 个 `_render_*` 函数 + `report_template.html` 导航/模块节
-- ✅ 全量 105 项 B 系列单元测试通过（unit_report 766 项 + scenario 221 项均通过）
-- ✅ 测试计数：report 单元测试 667→699 项
-- ✅ 文档同步：changelog.md + datasource-and-folders.md
-- ✅ 版本：v0.2.85
-
-**详细设计**：[`docs-stm/plan/B1-fund-deep-analysis.md`](../plan/B1-fund-deep-analysis.md)
-
----
-
 ### 待实现方向（按风险收益比排序）
 
 > 注：字母编号跳跃出于历史分配——已完成迭代占用了相应字母（详见上方 ✅ 已完成迭代），剩余字母保留给此前已规划但优先级较低的后续迭代。
