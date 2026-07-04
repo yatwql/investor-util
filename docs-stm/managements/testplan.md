@@ -239,8 +239,8 @@
 
 | 覆盖状态 | 数量 | 说明 |
 |:---------|:----:|:-----|
-| ✅ 已覆盖 | 207 项 | 全量业务场景 S0a-S0d(16) + S1-S28(57) + T1-T21(100) + resilience(18) + LLM(32) — 项数见 [test-coverage.md](./test-coverage.md) → 场景测试分组 |
-| **合计** | **207 项** | 含 §1.3（S0a-S0d + S1-S28）+ §1.7（T1-T21）全量场景已覆盖，§1.6 异常场景由 edge 专项覆盖 |
+| ✅ 已覆盖 | 全量已覆盖 | 全量业务场景 S0a-S0d + S1-S28 + T1-T21 + resilience + LLM — 精确项数见 [test-coverage.md](./test-coverage.md) → 场景测试分组 |
+| **合计** | **全量已覆盖** | 含 §1.3（S0a-S0d + S1-S28）+ §1.7（T1-T21）全量场景已覆盖，§1.6 异常场景由 edge 专项覆盖 |
 
 ---
 > edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。

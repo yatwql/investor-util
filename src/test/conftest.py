@@ -1,11 +1,11 @@
 """conftest.py — 全局 pytest 配置与标记注册。
 
 标记分组（支持 -m 选择运行）：
-  - scenario: 全部业务场景（S1-S20 + T1-T16）
-    - scenario_basic: 基础业务链路（S1-S5 + S0a-S0d）
+  - scenario: 全部业务场景（S0a-S0d + S1-S33 + T1-T21）
+    - scenario_basic: 基础业务链路（S1-S5 + S0a-S0d + S21-S33）
     - scenario_resilience: 异常容错场景（S6-S10）
     - scenario_llm: LLM 场景组合（S11-S20）
-    - scenario_datetime: 日期/时间场景（T1-T16）
+    - scenario_datetime: 日期/时间场景（T1-T21）
   - llm: LLM 相关测试（unit_llm 336 + scenario_llm 24，均为 mock，无需 API key）
   - edge: 边缘/异常场景测试（~93 项，含 9 个 _edge.py 文件）
   - smoke: 冒烟测试（6 文件 × 4 项 = 24 项，~2s）
@@ -18,7 +18,7 @@
   pytest src/test/ -m "smoke"                                    # 仅冒烟
   pytest src/test/ -m "not llm"                                  # 排除 LLM
   pytest src/test/ -m "scenario"                                 # 全部场景 S1-S20 + T1-T16
-  pytest src/test/ -m "scenario_basic"                           # 仅基础链路 S1-S5 + S0a-S0d
+  pytest src/test/ -m "scenario_basic"                           # 仅基础链路 S1-S5 + S0a-S0d + S21-S33
   pytest src/test/ -m "scenario_llm or scenario_datetime"        # LLM + 日期时间场景
   pytest src/test/                                             # 全量运行
 """
@@ -28,8 +28,8 @@ from __future__ import annotations
 
 def pytest_configure(config):
     """注册自定义标记，避免 pytest 警告。"""
-    config.addinivalue_line("markers", "scenario: 业务场景集成测试（S1-S20 + T1-T16）")
-    config.addinivalue_line("markers", "scenario_basic: 基础业务链路（S1-S5 + S0a-S0d）")
+    config.addinivalue_line("markers", "scenario: 业务场景集成测试（S0a-S0d + S1-S33 + T1-T21）")
+    config.addinivalue_line("markers", "scenario_basic: 基础业务链路（S1-S5 + S0a-S0d + S21-S28 + S29-S33）")
     config.addinivalue_line("markers", "scenario_resilience: 异常容错场景（S6-S10）")
     config.addinivalue_line("markers", "scenario_llm: LLM 场景组合（S11-S20）")
     config.addinivalue_line("markers", "scenario_datetime: 日期/时间场景（T1-T16）")
