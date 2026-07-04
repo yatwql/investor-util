@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-04（v0.2.84 — 技术债务清理：版本同步/exc_info 模板格式统一）
+最后更新：2026-07-04（v0.2.85 — B 迭代审计：PE 边界条件/excel_writer API 签名风险）
 
 ---
 
@@ -27,6 +27,7 @@
 
 | 2026-07-04 | 全技术债务审计：版本漂移/except Exception 追踪/模板格式统一 | ✅ 已完成 |
 | 2026-07-04 | 待观察/优化项（R-149~R-152）：安全隐式依赖/re-export审计/缓存展示/测试时长 | 📋 待决策 |
+| 2026-07-04 | B 迭代自审：PE 阈值边界条件 / excel_writer API 签名系统性风险 | 📋 待观察 |
 
 ---
 
@@ -51,6 +52,20 @@
 
 **发现**：`unit` 模式已达 1997 项、耗时 ~25min，`verify` 模式 ~12min。虽然 `smoke`（24 项/2s）和 `regression`（222 项/~32s）保持快速，但长期趋势不乐观。
 **状态**：📋 待评审 — 设计方案（`docs-stm/plan/A5-test-runtime-optimization.md`）已完成 4 Phase 16 步详细设计，每步含 目标/验证/回滚。待决策是否进入实施。
+
+### [R-153] `_pe_to_style` PE 阈值边界条件（低风险，已修复）
+
+**发现**：`fund_style_analysis.py` 的 `_pe_to_style` 使用 `ratio > 1.3`（成长）和 `ratio < 0.7`（价值）判断估值倾向，边界值（恰好等于 1.3 或 0.7）落入"混合"分支。语义上 `>=` 和 `<=` 更合理——当 PE 恰好等于行业均值的 0.7 倍时应判为价值型而非混合型。该 bug 由单元测试 `test_growth_with_industry_avg` 捕获。
+
+**修复**：`fund_style_analysis.py:109-112` `>` → `>=`，`<` → `<=`。
+
+**状态**：✅ 已完成（随 B5 实施时修复）
+
+### [R-154] `excel_writer.py` API 签名系统性风险（低优先级）
+
+**发现**：B2 实施时 `fund_manager_sheet.py` 调用了错误的 `excel_writer.py` API 签名——`write_header_row(ws, _HEADERS, ncols=N)` 应改为 `write_header_row(ws, 2, _HEADERS)`；`freeze_header(ws, nrows, ncols)` 应改为 `freeze_header(ws, row=2)`；`auto_width(ws, ncols)` 应改为 `auto_width(ws)`。问题在 B2 集成测试阶段被捕获，但说明 `excel_writer.py` 的 API 签名变更（从旧式 `ncols` 参数改为无参/最小参数）已导致多个调用方出错，存在系统性风险。
+
+**状态**：📋 待观察 — 建议对所有调用 `excel_writer.py` 的 sheet 模块做一次 API 签名一致性审计，或在 `excel_writer.py` 增加参数类型校验和弃用警告。
 
 ---
 
