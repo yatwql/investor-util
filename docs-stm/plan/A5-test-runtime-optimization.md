@@ -94,6 +94,7 @@
 #### 3.2.1 变更说明
 
 引入 `pytest-xdist` 实现 CPU 级并行，`test_runner.py` 为指定 mode 启用 `-n auto`（自动使用所有 CPU 核心）。
+需要注意 `-n auto` 检测的是**逻辑核数**（超线程下翻倍），对于 openpyxl I/O-bound 测试，16 worker 争抢 IO 反而比 8 worker 慢。因此 `parallel: True` 实际使用 `max(1, cpu_count // 2)`。
 
 #### 3.2.2 核心设计
 
@@ -105,7 +106,7 @@ MODES = {
         "desc": "全量单元测试",
         "timeout_sec": 720,       # 从 1800 下调（预期 5min + 20% buffer）
         "order": 1,
-        "parallel": True,         # ✅ 新增（True = auto, 也可指定进程数如 4）
+        "parallel": True,         # ✅ 新增（True = max(1, cpu_count//2), 也可指定进程数如 4）
     },
     # ...
 }
@@ -116,9 +117,17 @@ MODES = {
 ```python
 parallel = mode_cfg.get("parallel", False)
 if parallel:
-    workers = "auto" if parallel is True else str(parallel)
-    args.extend(["-n", workers])
+    if parallel is True:
+        workers = max(1, os.cpu_count() // 2)  # 超线程减半，防 IO 争抢
+    else:
+        workers = str(parallel)
+    args.extend(["-n", str(workers)])
 ```
+
+> ⚠️ **为什么不是 `-n auto` 直接翻倍？**
+> 测试以 `openpyxl` I/O-bound 写入为主，逻辑核数翻倍（16 worker）会导致 IO 争抢加剧、切换成本上升。
+> 实测经验：`cpu_count // 2`（物理核数）在 I/O-bound 工作负载下吞吐最优。
+> 如遇 IO 争抢降速，可手动指定 `parallel: 4` 进一步压减。
 
 #### 3.2.3 预期加速
 
@@ -500,9 +509,9 @@ Step A0 ──→ Step A1 ──→ Step A2 ──→ Step A2a ──→ Step A3
 |:-----|:----|
 | **目标** | `unit`/`verify`/`all` 模式自动启用并行，xdist 不可用时无缝降级单线程；支持 `parallel: True`（auto）和 `parallel: 4`（显式指定进程数）|
 | **文件** | `scripts/test_runner.py` |
-| **操作** | (1) MODES 中 `unit`/`verify`/`all`/`integration` 新增 `"parallel": True`；`smoke`/`regression` 保持 `False` <br>(2) `_build_pytest_args()` 处理 `parallel`：True → `-n auto`，int → `-n <N>` <br>(3) 新增 `_check_xdist()` 函数检测 xdist 安装，不可用时降级（打印 `[!]` 警告）<br>(4) 收紧超时：`unit` 1800→720（+20% buffer）, `verify` 1200→360, `all` 2400→720 |
-| **验证** | `python test_runner.py --mode unit` 正常运行（有 xdist 时日志含 `-n auto`），无 xdist 时降级不报错 |
-| **预期产出** | commit: "feat: test_runner.py 并行模式 — MODES parallel 字段 + -n auto" |
+| **操作** | (1) MODES 中 `unit`/`verify`/`all`/`integration` 新增 `"parallel": True`；`smoke`/`regression` 保持 `False` <br>(2) `_build_pytest_args()` 处理 `parallel`：True → `max(1, os.cpu_count() // 2)`（超线程减半防 IO 争抢），int → `-n <N>` <br>(3) 新增 `_check_xdist()` 函数检测 xdist 安装，不可用时降级（打印 `[!]` 警告）<br>(4) 收紧超时：`unit` 1800→720（+20% buffer）, `verify` 1200→360, `all` 2400→720 |
+| **验证** | `python test_runner.py --mode unit` 正常运行（有 xdist 时日志含 `-n N`，N = max(1, cpu_count//2)），无 xdist 时降级不报错 |
+| **预期产出** | commit: "feat: test_runner.py 并行模式 — MODES parallel 字段 + cpu_count//2" |
 
 #### Step A3b（新增）：单线程对比确认（并行无误报）
 
@@ -642,8 +651,8 @@ Step X  ──→ Step C1 ──→ Step C2 ──→ Step C3
 |:-----|:----|
 | **目标** | 函数正确识别 git diff 中的变更文件，映射为对应 pytest marker 表达式；未识别源文件兜底 `"unit"`；无变更返回 None |
 | **文件** | `scripts/test_runner.py` |
-| **操作** | (1) 在文件顶部新增 `import subprocess`（如不存在）<br>(2) 实现 `_get_changed_marker(branch="origin/main") → str | None`<br>(3) 基准分支 fallback 链：`origin/main → main → HEAD~1`<br>(4) 通过 `git diff --name-only {branch}...HEAD` 获取变更文件列表<br>(5) 遍历 `FILE_TO_MARKER` 映射表，合并匹配的 marker<br>(6) 未匹配的 `src/` 文件 → 兜底 `"unit"` 确保不漏测；**同时输出 `[!] 未识别变更文件：xxx，建议更新 FILE_TO_MARKER 映射表` 警告**，让开发者知悉覆盖缺口<br>(7) 仅 docs/data 变更 → 返回 None 跳过<br>(8) `src/test/` 变更标记为哨兵值（不自动追加，由调用方根据测试文件决定模式）|
-| **验证** | (1) 无变更时返回 `None`<br>(2) 修改 `src/python/report/` 下文件后，返回 `"unit_report"` <br>(3) 同时修改 `src/python/providers/` + `src/python/tui_menu.py`，返回 `"unit_providers or unit_fetcher or unit_ui"` <br>(4) 修改未映射源文件（如 `src/python/constants.py`）→ 兜底返回 `"unit"` <br>(5) 仅修改 docs/ 文件 → 返回 `None` |
+| **操作** | (1) 在文件顶部新增 `import subprocess`（如不存在）<br>(2) 实现 `_get_changed_marker(branch="origin/main") → str | None`<br>(3) 基准分支 fallback 链：`origin/main → main → HEAD~1`<br>(4) 通过 `git diff --name-only {branch}...HEAD` 获取分支差异变更列表<br>(5) ⚠️ **追加 dirty 文件**：通过 `git diff --name-only HEAD` 获取未提交的 dirty 文件列表，与分支差异合并去重。防止开发者改了代码还没 commit 时 `--changed` 误判为"无变更"<br>(6) 遍历合并后的 `FILE_TO_MARKER` 映射表，合并匹配的 marker<br>(7) 未匹配的 `src/` 文件 → 兜底 `"unit"` 确保不漏测；**同时输出 `[!] 未识别变更文件：xxx，建议更新 FILE_TO_MARKER 映射表` 警告**，让开发者知悉覆盖缺口<br>(8) 仅 docs/data 变更 → 返回 None 跳过<br>(9) `src/test/` 变更标记为哨兵值（不自动追加，由调用方根据测试文件决定模式）|
+| **验证** | (1) 无变更时返回 `None`<br>(2) 修改 `src/python/report/` 下文件后，返回 `"unit_report"` <br>(3) 同时修改 `src/python/providers/` + `src/python/tui_menu.py`，返回 `"unit_providers or unit_fetcher or unit_ui"` <br>(4) 修改未映射源文件（如 `src/python/constants.py`）→ 兜底返回 `"unit"` <br>(5) 仅修改 docs/ 文件 → 返回 `None`<br>(6) 🔴 **dirty 文件验证**：修改 `src/python/report/fund_overlap.py` 但不 commit，运行 `--changed` 仍返回 `"unit_report"` |
 | **预期产出** | commit: "feat: test_runner.py 新增 _get_changed_marker() 增量测试映射" |
 
 #### Step C2：`--changed` CLI 参数集成
@@ -653,16 +662,16 @@ Step X  ──→ Step C1 ──→ Step C2 ──→ Step C3
 | **目标** | `test_runner.py --changed` 根据当前 git diff 自动选择测试模式，clean tree 时跳过 |
 | **文件** | `scripts/test_runner.py` |
 | **操作** | (1) `parse_args()` 新增 `--changed` 可选参数（`store_true`）<br>(2) `main()` 中：`--changed` 指定时，调用 `_get_changed_marker()`，若返回 marker 则运行对应模式；无变更时打印 "无变更文件，跳过"<br>(3) **⚠️ 交互语义**：`--changed` 和 `--mode` 互斥，同时指定时报错并提示"请选择其一：`--changed` 增量模式 或 `--mode <name>` 指定模式"。<br>&nbsp;&nbsp;&nbsp;理由：`--changed --mode verify` 混合语义会产生"用户以为跑 verify，实际只跑 changed 子集"的危险幻觉。<br>(4) Tab 补全和 help 文本注明二者互斥 |
-| **验证** | (1) `python test_runner.py --changed` → 根据当前 diff 运行对应模式<br>(2) clean working tree 下 `--changed` → 跳过<br>(3) `--changed --mode verify` → 报错并提示互斥 |
+| **验证** | (1) `python test_runner.py --changed` → 根据当前 diff + dirty 运行对应模式<br>(2) 无变更（committed + dirty 均为空）→ 跳过<br>(3) 改了文件未 commit → 仍检测到<br>(4) `--changed --mode verify` → 报错并提示互斥 |
 | **预期产出** | commit: "feat: test_runner.py --changed 参数 — git-aware 增量测试"  |
 
 #### Step C3：为 `_get_changed_marker()` 编写单元测试
 
 | 字段 | 值 |
 |:-----|:----|
-| **目标** | 新增 `test_test_runner.py` 覆盖 **7 种** git diff 场景，映射准确率 100% |
+| **目标** | 新增 `test_test_runner.py` 覆盖 **8 种** git diff + dirty 场景，映射准确率 100% |
 | **文件** | `src/test/unit/test_test_runner.py`（新文件） |
-| **操作** | (1) mock `subprocess.run` 返回可控的 git diff 输出<br>(2) 覆盖场景：无变更、单文件变更、多域变更、测试文件变更、docs-only 变更、**未识别源文件（兜底 unit）**、**基准分支 fallback**<br>(3) 标记 `@pytest.mark.unit_core` |
+| **操作** | (1) mock `subprocess.run` 返回可控的 git diff + dirty 输出<br>(2) 覆盖场景：无变更、单文件变更、多域变更、测试文件变更、docs-only 变更、**未识别源文件（兜底 unit）**、**基准分支 fallback**、**dirty 文件未 commit 仍被检测**<br>(3) 标记 `@pytest.mark.unit_core` |
 | **验证** | `pytest src/test/ -m "unit_core" -k "test_runner"` 全部通过 |
 | **预期产出** | commit: "test: 为 _get_changed_marker 添加 7 项单元测试（含兜底）" |
 
@@ -751,7 +760,7 @@ Week 1                          Week 2
 | A1 | pyproject.toml 声明 xdist 依赖 | `pip install -e .` + `pytest -n auto --collect-only` 不报错 | `git revert` A1 commit |
 | A2 | 所有 fixture scope + tmpdir 路径确认并行安全 | `pytest -n 2` 0 failed | 逐条 `git revert` |
 | A2a | fixture 检查点：Δ ≤ 5 才继续 Phase 1 | 决策记录明确（继续/暂停/改道）| 文档回退无代码影响；暂停后可在重构后重新进入 |
-| A3 | `unit`/`verify`/`all` 使用并行；支持 `parallel: N` | 日志含 `-n auto` 或 `-n N` | `git revert`；无 xdist 自动降级 |
+| A3 | `unit`/`verify`/`all` 使用并行；支持 `parallel: N` | 日志含 `-n N`（N = cpu_count//2）；`-n 4` 手动指定有效 | `git revert`；无 xdist 自动降级 |
 | A3b | 并行与单线程结果一致 | F1（并行 failed） = F2（单线程 failed）| 有差异时定位 fixture 修复 |
 | A3c | verify 加速比 ≥ 2.5x 才进拆分 | 决策记录明确（继续/暂停分析）| 暂停分析时提交 profiling 报告后退回决策 |
 | B1 | 拆分后 `unit_report` 收集数 = 672 | `test_runner.py --mode report` 0 failed | `git revert` B1 commit |
@@ -763,7 +772,7 @@ Week 1                          Week 2
 | X | 实测 verify 耗时，决策 D1 去留 | 决策记录明确，后续路径一致 | 文档回退无代码影响 |
 | C1 | `_get_changed_marker()` 映射准确 + 兜底 unit | 5 种 diff 场景均返回正确 marker | `git revert` C1 commit |
 | C2 | `--changed` 语义完整（无 `--mode` 干扰） | clean tree 跳过；`--changed` + `--mode` 并用时报错提示互斥 | `git revert` C2 commit |
-| C3 | 7 项 mock 场景覆盖（含兜底+fallback） | `pytest -k "test_runner"` 全部通过 | `git revert` C3 commit |
+| C3 | 8 项 mock 场景覆盖（含兜底+fallback+dirty） | `pytest -k "test_runner"` 全部通过 | `git revert` C3 commit |
 | D1† | `verify_fast` < 3min（条件：Phase1+2 后 verify>3min） | `test_runner.py --mode verify_fast` 通过 | `git revert` D1 commit |
 | D2 | `report` < 90s | `test_runner.py --mode report` 通过 | `git revert` D2 commit |
 | D3 | 门禁文档 + 基线数据同步 | 阅读一致 | `git revert` D3 commit |

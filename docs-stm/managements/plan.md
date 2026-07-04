@@ -92,7 +92,8 @@ A5 Step E（全量回归通过）后执行：
 1. 确认 A5 拆分后的测试文件结构（`test_market_value_*.py` / `test_llm_*.py` / `test_cache_*.py`）
 2. B 的新测试写入规则：属于已拆分域的测试写入对应子文件（如新增穿透测试 → `test_market_value_details.py`）；全新模块的测试新建独立文件
 3. `test_html_template.py` 作为跨迭代热点文件，B 新增的 4 个页签渲染测试追加到该文件末尾（不另建文件）
-4. 产出交接记录：`docs-stm/plan/notes/a5-b-transition.md`
+4. ⚠️ **pyproject.toml 依赖冲突预防**：汇总 A5 已新增的依赖（`pytest-xdist`、`pytest-rerunfailures`），B 先 rebase 到 A5 合入后的 master，再追加自己的依赖（如 B5 可能新增 `akshare`），交接记录中列出完整的依赖变更清单
+5. 产出交接记录：`docs-stm/plan/notes/a5-b-transition.md`
 
 **问题**：`unit` 已达 1998 项/~25min，`verify` 839 项/~12min，增长趋势不乐观。
 
@@ -111,7 +112,7 @@ A5 Step E（全量回归通过）后执行：
 > ⬆ A5 完成后立即启动。A5 先行拆分超大测试文件，B 再新增 ~115 项测试，避免交叉修改合并冲突。
 > 详细设计已输出：[B1-fund-deep-analysis.md](../plan/B1-fund-deep-analysis.md)
 > v2 修复：缓存指纹缺陷/首次运行体验/编号体系/性能估算/TUI 菜单设计/HTML 模板优化/数据源预研前置
-> 包含：B0 预研 + 5 Phase / 19 原子步 / 1 新增 fetcher + 4 报告模块 + 1 验证步 / ~115 项测试
+> 包含：B0 预研 + 5 Phase / 20 原子步 / 1 新增 fetcher + 4 报告模块 + 1 验证步 / ~115 项测试
 > v2 修复：缓存指纹缺陷/首次运行体验/编号体系/性能估算/TUI 菜单设计/HTML 模板优化/数据源预研前置
 
 | 模块 | Phase | 状态 |
