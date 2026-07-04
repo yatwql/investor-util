@@ -6,6 +6,15 @@
 
 ## [0.2.84] - 2026-07-04
 
+### Added
+
+- **A5 Phase 1：pytest-xdist 并行执行**：`test_runner.py` MODES 新增 `parallel` 字段，`--parallel` 参数支持 high/medium/low 三档（缺省 medium=50%核数）；新增 `report` 模式（`unit_report` 675 项~15s）。`conftest.py` 零改动（无共享 fixture）。
+
+### Changed
+
+- **CLAUDE.md/plan.md/test-coverage.md 门禁耗时同步**：P1 verify 从~12min→~49s，P0 regression/~30s 不变，P2 all/~待测
+- **A5 实施决策**：Phase 2 文件拆分跳过（unit 20s 无需拆分）、Phase 3 增量测试延期（全量够快无需增量复杂度）
+
 ### Fixed
 
 - **资产穿透TOP10 基金伪穿透垃圾数据污染**（#O15）：天天基金 API 对华安黄金ETF(518880)返回了无效持仓数据——3 只财通基金代码以 ratio=401%/399%/359%（>100%）作为黄金 ETF 的"持仓"出现。穿透模块未验证 ratio 合法性，照单全收导致：

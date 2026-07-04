@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-04（v0.2.84 — 穿透TOP10 ratio>100% 过滤 + A5 并行配置 high/medium/low 三档）
+最后更新：2026-07-04（v0.2.84 — A5 Phase 1 完成：parallel medium 优化 verify 49s/unit 20s）
 
 ---
 
@@ -79,34 +79,26 @@ LLM 配置拆分为两个独立文件：
 
 ---
 
-### 当前迭代 — [P2-2] A5. 测试运行时可扩展性优化（进行中）
+### ✅ 当前迭代 — [P2-2] A5. 测试运行时可扩展性优化（完成）
 
-**前置条件**：A5 优先于 B 实施。A5 完成超大文件拆分后，B 的新增测试可无缝合并，
-避免两迭代交叉修改同一测试文件导致 git 冲突。
+**Phase 1 实施结果**（2026-07-04）：
+| 模式 | 优化前 | 优化后（parallel medium） | 加速比 |
+|:-----|:------:|:------------------------:|:------:|
+| `unit` | ~25min | **~20s** | 75x |
+| `verify` | ~12min | **~49s** | 14.7x |
+| `report` 🆕 | — | **~15s** | — |
+
+- ✅ pytest-xdist 安装并配置 `--parallel` 参数（high/medium/low 三档）
+- ✅ `test_runner.py` MODES 新增 `parallel` 字段 + `report` 模式
+- ✅ `conftest.py` 无 session/module scope fixture，并行安全零改动
+- ✅ 加速比远超 2.5x 门控，Phase 2（文件拆分）**跳过**——当前 20s 无需进一步优化
+- ✅ Phase 3（增量测试）**延期**——20s 全量已足够快，增量带来的复杂度不划算
+- ✅ Phase 4（report 模式）已实施
+
+**过渡到 B**：A5 Phase 2 文件拆分跳过，B 的新测试直接写入现有测试文件末尾即可。
+无需过渡步骤和交接记录。
 
 **详细设计**：[`docs-stm/plan/A5-test-runtime-optimization.md`](../plan/A5-test-runtime-optimization.md)
-（v2 — 20 步 / 加速比门 A3c 控制进入文件拆分 / 7 项风险修复 / R1-R8 全部闭环）
-
-**过渡步 T（A5→B 交接）**：
-A5 Step E（全量回归通过）后执行：
-1. 确认 A5 拆分后的测试文件结构（`test_market_value_*.py` / `test_llm_*.py` / `test_cache_*.py`）
-2. B 的新测试写入规则：属于已拆分域的测试写入对应子文件（如新增穿透测试 → `test_market_value_details.py`）；全新模块的测试新建独立文件
-3. `test_html_template.py` 作为跨迭代热点文件，B 新增的 4 个页签渲染测试追加到该文件末尾（不另建文件）
-4. ⚠️ **pyproject.toml 依赖冲突预防**：汇总 A5 已新增的依赖（`pytest-xdist`、`pytest-rerunfailures`），B 先 rebase 到 A5 合入后的 master，再追加自己的依赖（如 B5 可能新增 `akshare`），交接记录中列出完整的依赖变更清单
-5. 产出交接记录：`docs-stm/plan/notes/a5-b-transition.md`
-
-**问题**：`unit` 已达 1998 项/~25min，`verify` 839 项/~12min，增长趋势不乐观。
-
-**方案**：四管齐下 — 并行执行（pytest-xdist）+ 超大文件拆分 + 增量测试（git-aware）+ 新增快速子模式。
-
-**pytest-xdist 并行策略**：`-n auto` 自动检测 CPU 核数，同时提供三档预设值：
-| 档位 | 并行数 | 说明 |
-|:----|:------|:-----|
-| `high` | `auto`（100% CPU 核数） | 最大吞吐，适合 CI 专用机 |
-| `medium` | `auto × 50%`（默认值） | 平衡本机开发，不影响前台操作 |
-| `low` | `auto × 25%`（最小 2） | 低负载模式，后台运行不抢资源 |
-
-`high`/`medium`/`low` 映射为 `scripts/test_runner.py` 的 `--parallel` 参数（如 `--parallel medium`），缺省值为 `medium`。具体数值在 `test_runner.py` 解析为 `max(1, int(n_cores * factor))`。
 
 ---
 

@@ -36,62 +36,79 @@ MODES: dict[str, dict] = {
     "unit": {
         "marker": "unit",
         "desc": "全量单元测试（含 edge/data，1993 项）",
-        "timeout_sec": 1800,
+        "timeout_sec": 720,
         "order": 1,
+        "parallel": True,
     },
     "standard": {
         "marker": "unit and not (edge or data)",
         "desc": "常规单元测试（排除 edge/data 标记，1730 项）",
-        "timeout_sec": 1800,
+        "timeout_sec": 720,
         "order": 2,
+        "parallel": True,
     },
     "scenario": {
         "marker": "scenario",
         "desc": "业务场景集成测试（S1-S28 + T1-T21，207 项）",
         "timeout_sec": 300,
         "order": 3,
+        "parallel": False,
     },
     "regression": {
         "marker": "scenario",
         "desc": "回归测试（场景 207 项，~30s 提交前极速验证）",
         "timeout_sec": 120,
         "order": 4,
+        "parallel": False,
     },
     "verify": {
         "marker": "scenario or unit_core or unit_providers or unit_fetcher",
         "desc": "合入验证（场景+核心模块 824 项，~12min）",
-        "timeout_sec": 1200,
+        "timeout_sec": 360,
         "order": 5,
+        "parallel": True,
     },
     "integration": {
         "marker": "scenario or integration",
         "desc": "集成测试（场景+模块契约/缓存/TUI 路由 232 项）",
-        "timeout_sec": 600,
+        "timeout_sec": 300,
         "order": 6,
+        "parallel": True,
     },
     "edge": {
         "marker": "edge",
         "desc": "边缘/异常场景测试（198 项）",
         "timeout_sec": 300,
         "order": 7,
+        "parallel": False,
     },
     "data": {
         "marker": "data",
         "desc": "数据正确性验证测试（65 项）",
         "timeout_sec": 60,
         "order": 8,
+        "parallel": False,
     },
     "all": {
         "marker": "",
         "desc": "全量测试（2225 项）",
-        "timeout_sec": 2400,
+        "timeout_sec": 720,
         "order": 9,
+        "parallel": True,
     },
     "smoke": {
         "marker": "smoke",
         "desc": "冒烟测试（24 项，~2s 快速验证核心通路）",
         "timeout_sec": 30,
         "order": 10,
+        "parallel": False,
+    },
+    "report": {
+        "marker": "unit_report",
+        "desc": "仅报告模块测试（675 项，开发期快速验证报告变更）",
+        "timeout_sec": 120,
+        "order": 11,
+        "parallel": True,
     },
 }
 
@@ -117,6 +134,7 @@ _HELP_TEXT += """\
 选项:
   --mode M[,M...]   运行指定模式（逗号分隔，默认: all）
   --coverage        同时生成 HTML 行覆盖率报告（pytest-cov）
+  --parallel [LVL]  并行级别: high(100%%核数) / medium(50%%,默认) / low(25%%)
   --help            显示本帮助信息
 
 输出目录结构:
@@ -140,6 +158,9 @@ def parse_args() -> argparse.Namespace:
                         help="运行模式 (unit/scenario/integration/regression/edge/all)，逗号分隔")
     parser.add_argument("--coverage", action="store_true",
                         help="同时生成 HTML 行覆盖率报告")
+    parser.add_argument("--parallel", nargs="?", const="medium", default=None,
+                        choices=["high", "medium", "low"],
+                        help="并行级别（high=100%核数, medium=50%核数, low=25%核数，缺省 medium）")
     parser.add_argument("--help", action="store_true", help="显示帮助")
     return parser.parse_args()
 
@@ -248,8 +269,45 @@ def _parse_pytest_output(output: str) -> dict:
     return result
 
 
+def _check_xdist() -> bool:
+    """检查 pytest-xdist 是否已安装。"""
+    try:
+        import xdist  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+_PARALLEL_FACTOR: dict[str, float] = {
+    "high": 1.0,
+    "medium": 0.5,
+    "low": 0.25,
+}
+
+
+def _calc_parallel_workers(level: str | bool) -> str:
+    """根据并行级别计算 worker 数。
+
+    Args:
+        level: "high"（100% 核数）/ "medium"（50%，默认）/ "low"（25%，最小 2）
+               或 True（等价 medium）
+
+    Returns:
+        "-n" 参数的字符串值，如 "8"、"4"、"2"
+    """
+    if level is True:
+        level = "medium"
+    factor = _PARALLEL_FACTOR.get(level, 0.5)
+    n_cores = os.cpu_count() or 4
+    workers = max(1, int(n_cores * factor))
+    if level == "low":
+        workers = max(2, workers)
+    return str(workers)
+
+
 def _build_pytest_args(mode_cfg: dict, mode_key: str,
-                       html_available: bool, coverage: bool) -> list[str]:
+                       html_available: bool, coverage: bool,
+                       parallel_level: str | None = None) -> list[str]:
     """构建 pytest 命令参数列表。"""
     args = [
         sys.executable, "-m", "pytest",
@@ -261,6 +319,16 @@ def _build_pytest_args(mode_cfg: dict, mode_key: str,
     marker = mode_cfg["marker"]
     if marker:
         args.extend(["-m", marker])
+
+    # ── 并行执行 ──
+    parallel_enabled = mode_cfg.get("parallel", False)
+    if parallel_enabled and _check_xdist():
+        level = parallel_level or "medium"
+        workers = _calc_parallel_workers(level)
+        args.extend(["-n", workers])
+        print(f"      [..] 并行 worker={workers}（级别: {level}）")
+    elif parallel_enabled:
+        print(f"      [!] pytest-xdist 未安装，降级单线程执行")
 
     if html_available:
         report_path = os.path.join(_LATEST_DIR, mode_key, "report.html")
@@ -280,7 +348,8 @@ def _build_pytest_args(mode_cfg: dict, mode_key: str,
     return args
 
 
-def run_mode(mode_key: str, coverage: bool = False) -> dict:
+def run_mode(mode_key: str, coverage: bool = False,
+             parallel_level: str | None = None) -> dict:
     """运行指定模式的测试。
 
     Args:
@@ -299,7 +368,7 @@ def run_mode(mode_key: str, coverage: bool = False) -> dict:
         print(f"  [!] pytest-html 未安装，将使用默认文本输出")
     print()
 
-    pytest_args = _build_pytest_args(mode_cfg, mode_key, html_available, coverage)
+    pytest_args = _build_pytest_args(mode_cfg, mode_key, html_available, coverage, parallel_level)
     timeout = mode_cfg.get("timeout_sec", 300)
 
     start = _time.time()
@@ -552,7 +621,8 @@ def main() -> None:
     # 运行各模式
     results: list[dict] = []
     for mode_key in modes_to_run:
-        result = run_mode(mode_key, coverage=args.coverage)
+        result = run_mode(mode_key, coverage=args.coverage,
+                          parallel_level=args.parallel)
         results.append(result)
 
     # 生成汇总页
