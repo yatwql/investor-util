@@ -61,7 +61,7 @@
 ### 1.3 业务场景测试（Scenario Tests）
 
 按真实用户行为组合设计的集成测试场景，通过分层 pytest 标记实现灵活选择。
-标记定义、覆盖规模和典型耗时见 `how-to-test-my-code.md` → § 测试覆盖统计 → 场景测试分组。
+标记定义、覆盖规模和典型耗时见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组。
 
 各场景的文件归属：
 
@@ -111,7 +111,7 @@
 
 **跨类标记**（如 `llm`、`edge`、`smoke`）不依附于父子层级，可跨越单元/场景分类独立筛选。
 
-各标记的定义、覆盖规模和典型耗时见 `how-to-test-my-code.md` → § 测试覆盖统计 → 单元测试分组 / 跨类标记。
+各标记的定义、覆盖规模和典型耗时见 [`test-coverage.md`](./test-coverage.md) → 单元测试分组 / 跨类标记。
 
 ### 1.5 集成测试
 
@@ -165,7 +165,7 @@
 
 ### 1.7 日期/时间数据获取场景测试（T1-T16）
 
-> **pytest marker**：`scenario_datetime`（含 `scenario` 父标记），`-m "scenario_datetime"` 可独立选择运行，共 **61 项**测试。
+> **pytest marker**：`scenario_datetime`（含 `scenario` 父标记），`-m "scenario_datetime"` 可独立选择运行（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）。
 
 按市场状态、产品类型、时间边界三重维度组合，验证各数据源在不同时段的正确性和降级表现。其中 T1-T6 按市场状态划分（盘中/盘前/午休/盘后/非交易日/长假），T7-T11 按产品类型划分（场外基金/QDII/ETF/股票/混合），T12-T16 按边界条件划分（时段切换/缝隙/首次启动/断网）。
 
@@ -207,7 +207,7 @@
 > 详细映射全文见 `docs-stm/plan/test-coverage-map.md`。
 >
 > **pytest marker 对照：** §1.3 场景 → `scenario_basic`/`scenario_resilience`/`scenario_llm`；
-> §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"` (143 项)。
+> §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）。
 
 **覆盖状态汇总：**
 
@@ -219,7 +219,7 @@
 | **合计** | **61 项** | 含 §1.3（S1-S20）+ §1.7（T1-T16）+ §1.6 异常场景 |
 
 ---
-> edge 异常场景测试另有专项覆盖（`_edge.py` 文件，当前 ~86 项），见 `how-to-test-my-code.md` → 跨类标记。
+> edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。
 
 ## 2. 数据正确性验证
 
