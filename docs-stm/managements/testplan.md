@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-04（v0.2.69 — §3 UI/UX 验证同步 X 迭代完成状态）
+最后更新：2026-07-04（v0.2.77 — §1.3/§1.7/§1.8 同步 S0a-S0d/S21-S28/T17-T21 覆盖状态）
 
 ---
 
@@ -70,36 +70,52 @@
 | `test_integration.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
 | `test_integration_scenarios.py` | S6-S10 | 异常容错场景：纯债/断网/单账户/零成本/极端值 |
 | `test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
-| `test_datetime_scenarios.py` | T1-T16 | 日期/时间场景：市场状态×产品类型×边界 |
+| `test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
+| `test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
+| `test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 
-**业务场景规格（S1-S20）：**
+**业务场景规格（S0a-S0d、S1-S28、T1-T21）：**
 
 | 场景 | 前置场景 | 前置条件 | 操作 | 验证点 |
 |:-----|:---------|:---------|:-----|:-------|
+| **S0a: 清仓持仓** | — | 持仓含份额=0 的已清仓品种 | 菜单 E | 清仓品种不计入市值、盈亏、总计；分类表跳过空行 |
+| **S0b: 同名多份额** | — | 同一基金分多笔买入（A 类+C 类同一代码） | 菜单 H | 多份额合并计算、穿透不崩溃、分类各计各 |
+| **S0c: 超多持仓** | — | 200 条持仓（覆盖各品种类型） | 菜单 L | 所有账户小计正确、总计正确、无性能问题 |
+| **S0d: 特殊字符** | — | 名称含全角括号/空格/日文/emoji | 菜单 L | 分类正确、穿透正常、Excel/HTML 不崩溃 |
 | **S1: 纯股票组合** | — | 持仓仅含 3 只 A 股，无基金 | 菜单 E → 菜单 H | 穿透 TOP10 等于直接持股；基金业绩显示"无基金"；总计正确 |
 | **S2: 纯基金组合** | — | 持仓仅含 5 只基金（ETF+主动+QDII） | 菜单 L | 穿透计算正确、分类表无"股票"行、LLM 正常生成 |
 | **S3: 混合多账户** | — | 3 个账户：证券（股票+ETF）、支付宝（场外基金）、微信（债基） | 菜单 L | 分账户小计正确、总计 = 小计和、分类表按账户分组 |
 | **S4: 新持仓无缓存** | — | 删除全部缓存后首次生成 | 菜单 L | 所有 API 正常获取、无缓存命中提示、生成时间 > 缓存命中场景 |
 | **S5: 缓存全命中** | **S4** | 连续两次执行菜单 L，间隔 < TTL | 菜单 L × 2 | 第二次所有 LLM 显示"缓存命中"页脚、总费用为 0 |
-| **S6: 切换持仓文件** | — | 两个不同 xlsx，先选 A 生成报告，再选 B | 菜单 L → 菜单 2 → 菜单 L | 价格/指数缓存因持仓变更而更新、LLM 缓存因指纹不同而重新生成 |
-| **S7: 非交易日生成** | — | 模拟周末执行 | 菜单 L | 取价方式显示"场内收盘价(T-1)"、"官方净值(T-1)"，不显示"实时价" |
-| **S8: 单一品种极限** | — | 全部资金买入同一只股票 | 菜单 E | 分类表仅一行、穿透 TOP10 仅一项、总计 = 单项 |
-| **S9: QDII 特殊处理** | — | 持仓含 QDII 基金（净值滞后 1 日） | 菜单 L | 取价方式显示"官方净值(T-1)"、净值日期标注、LLM 不会讨论该品种的"本日"盈亏 |
-| **S10: LLM 全部失败** | — | llm_key.json 缺失 API Key | 菜单 L | 所有 LLM 模块占位"本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）"、核心报告正常生成、不崩溃 |
-| **S11: LLM 混合缓存+真实调用** | — | 4 模块：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"LLM API 调用失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 页模块列表正确 |
+| **S21: 港股通** | — | 持仓含港股通股票（00700.HK 腾讯控股） | 菜单 E | 港股通代码正确分类（hk_stock），无行情不崩溃 |
+| **S22: 可转债** | — | 持仓含可转债（如 127005 长证转债） | 菜单 E | 可转债正确分类（convertible_bond），名称含"转债"关键字识别 |
+| **S23: REITs** | — | 持仓含 REITs（如 508000 张江REIT） | 菜单 E | REITs 正确分类（reit），名称含"REIT"关键字，市值计算正常 |
+| **S24: 货币基金** | — | 持仓含场外货币基金/理财产品 | 菜单 E | 货币基金分类正确（money_market），净值恒为 1 |
+| **S25: 科创板+北交所** | — | 持仓含科创板（688xxx）和北交所（8xxxxx）股票 | 菜单 E | 代码前缀正确触发分类（star_market/bse），腾讯前缀补全 |
+| **S26: 商品/黄金ETF** | — | 持仓含黄金ETF/商品ETF | 菜单 E | 商品ETF 分类正确（commodity），溢价率计算正常 |
+| **S27: 跨境ETF** | — | 持仓含跨境 ETF（如 159941 纳指ETF） | 菜单 L | 分类为 QDII，净值日期 T-1，T-1 净值正确计算 |
+| **S28: 纯债** | — | 持仓含纯债/国债/企业债 | 菜单 E | 纯债分类正确（bond），名称含"债"关键字，市值计算正常 |
+| **S6: 纯债券基金组合** | — | 持仓仅含债券基金（国债ETF + 场外债基） | 菜单 E | 穿透 TOP10 无股权覆盖或极小；债券基金正确分类 |
+| **S7: 网络中断降级** | — | 持仓缓存存在但网络断开 | 菜单 H | 价格从缓存读取（过期缓存降级）；报告完整不含空白页签 |
+| **S8: 单账户单持仓** | — | 仅一个账户一只持仓 | 菜单 E | 分类表仅一行、穿透 TOP10 仅该持仓、总计 = 该持仓市值 |
+| **S9: 零成本持仓** | — | 持仓成本=0（赠送/未记录买入价） | 菜单 H | 盈亏 = 市值 - 0、收益率不除零崩溃、显示合理占位 |
+| **S10: 极端值** | — | 超大市值/极小份额/极多小数位 | 菜单 E | 正确定标至万元/亿元单位，不溢出、不崩溃 |
+| **S11: LLM 混合缓存+真实调用** | — | 4 模块：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 模块列表正确 |
 | **S12: LLM 全部失败（5 种原因）** | — | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
-| **S13: Extended Thinking 混合** | — | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用的模块行，Excel/HTML/Summary 三种输出一致 |
-| **S14: LLM 不启用** | — | TUI 不按 L，直接生成报告 | 菜单 E / H / B 等（无 L） | 核心报告完整生成（市值/穿透/基金业绩/指数）；无十二.LLM API 用量页签（HTML 无该章节，Excel 无该页签）；无 LLM 分析章节 |
-| **S15: 禁用+缓存混合** | — | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），即使该模块有缓存或 per_module 数据，禁用优先 |
-| **S16: 断网下 LLM 降级** | — | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为占位文本"本节内容待生成 — LLM API 网络连接失败（请检查网络后重新生成）"，不阻塞报告生成，日志记录 NETWORK_ERROR |
-| **S17: LLM 部分缓存超期** | — | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示"缓存"状态，费用为 0 |
-| **S18: LLM 全缓存 + 无实际 API 调用** | — | 连续两次菜单 L（间隔 < TTL，所有模块命中缓存） | 菜单 L → 菜单 L | 第二次 LLM API 用量页签汇总区显示"无新增 API 调用，数据全部来自缓存"，模块明细表 5 行全部显示缓存状态、费用列"已计入原调用"、call_count=0 |
-| **S19: news_correlation 启用 + 5 模块混合** | — | `enabled_llm.news_correlation=true`，2 缓存 + 2 成功 + 1 新闻关联成功 | 菜单 L | LLM API 用量页签明细表含 5 行（含新闻关联分析(LLM)）、状态正确（蓝/蓝/绿/绿/绿）、费用计算含所有 5 模块、总 Token 为 5 模块之和 |
-| **S20: 无 LLM 用量不渲染** | **S14** | 菜单 E / H / B（不含 L） | 菜单 E → 菜单 H → 菜单 B | 报告无 LLM API 用量页签/章节（Excel 无页签 12、HTML 无第 12 节）；LLM 分析章节整体不出现 |
+| **S13: Extended Thinking 混合** | — | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用模块行，Excel/HTML/Summary 三种输出一致 |
+| **S14: LLM 不启用** | — | TUI 不按 L，直接生成报告 | 菜单 E / H / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 12、HTML 无第 12 节）；LLM 分析章节整体不出现 |
+| **S15: 禁用+缓存混合** | — | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），禁用优先于缓存或 per_module 数据 |
+| **S16: 断网下 LLM 降级** | — | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为 NETWORK_ERROR 占位文本，不阻塞报告生成 |
+| **S17: LLM 部分缓存超期** | — | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示缓存状态 |
+| **S18: 全缓存无 API 调用** | — | 连续两次菜单 L（间隔 < TTL，全部模块命中缓存） | 菜单 L → 菜单 L | 第二次 LLM API 用量汇总"无新增 API 调用，数据全部来自缓存"，call_count=0 |
+| **S19: 空持仓 LLM 降级** | — | 无持仓数据但按 L | 菜单 L（空目录） | LLM 调用跳过，输出空占位，报告不崩溃 |
+| **S20: 三种输出格式一致性** | — | 正常持仓 + 菜单 L | 菜单 L | Excel/HTML/Summary 三种输出对同一 module_info 的状态/颜色/费用一致 |
 
 > 添加新场景时，按复杂度选择文件。LLM 相关的场景统一放在 `test_llm_scenarios.py`。
+> S0a-S0d（持仓质量）统一放在 `test_scenario_holdings_quality.py`。
+> S21-S28（特殊品种）统一放在 `test_scenario_special_securities.py`。
 > T 类场景统一放在 `test_datetime_scenarios.py` 并标注 `scenario_datetime`。
-> 新增场景需要同时标注场景父标记（如 `scenario_llm`）和通用 `scenario` 标记，确保 `-m "scenario"` 能自动涵盖。
+> 新增场景需要同时标注场景子标记（如 `scenario_basic`、`scenario_llm`）和通用 `scenario` 父标记，确保 `-m "scenario"` 能自动涵盖。
 
 ### 1.4 单元测试标记分组（Unit Test Markers）
 
@@ -163,11 +179,11 @@
 | 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | ✅ `test_cache_edge.py`（gzip 边界 100KB/损坏删除） |
 | LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | ✅ `test_api_edge.py`（2 项，恢复重试/仍空不回退） |
 
-### 1.7 日期/时间数据获取场景测试（T1-T16）
+### 1.7 日期/时间数据获取场景测试（T1-T21）
 
 > **pytest marker**：`scenario_datetime`（含 `scenario` 父标记），`-m "scenario_datetime"` 可独立选择运行（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）。
 
-按市场状态、产品类型、时间边界三重维度组合，验证各数据源在不同时段的正确性和降级表现。其中 T1-T6 按市场状态划分（盘中/盘前/午休/盘后/非交易日/长假），T7-T11 按产品类型划分（场外基金/QDII/ETF/股票/混合），T12-T16 按边界条件划分（时段切换/缝隙/首次启动/断网）。
+按市场状态、产品类型、时间边界三重维度组合，验证各数据源在不同时段的正确性和降级表现。其中 T1-T6 按市场状态划分（盘中/盘前/午休/盘后/非交易日/长假），T7-T11 按产品类型划分（场外基金/QDII/ETF/股票/混合），T12-T16 按边界条件划分（时段切换/缝隙/首次启动/断网），T17-T21 按数据异常/特殊日历划分（净值空窗/汇率故障/跨年/调休/港股通假期）。
 
 **市场状态组合：**
 
@@ -200,6 +216,16 @@
 | **T15: 盘中断网** | 盘中网络断开 | 菜单 L | 价格从缓存读取（过期缓存降级）；LLM 全部失败降级；报告完整 |
 | **T16: 盘后断网** | 盘后网络断开 + 有当日缓存 | 菜单 E | 收盘价从缓存读取（当日缓存未过期）；全流程正常 |
 
+**数据异常与特殊日历（T17-T21）：**
+
+| 场景 | 前置条件 | 操作 | 预期结果 |
+|------|----------|------|----------|
+| **T17: 跨月/跨年报告** | 12 月 31 日和 1 月 2 日分别生成 | `get_last_trading_day` 调用 | 跨年行情数据连续性正确，get_last_trading_day 返回正确日期 |
+| **T18: 季末/年末效应** | 基金季末调仓日前后净值跳变 | 菜单 E | 大额净值变动时 today_profit 计算正确、profit_rate 无除零异常 |
+| **T19: 汇率中间价故障** | 美元/港币汇率数据暂不可用 | 菜单 L（含 QDII 持仓） | QDII 净值降级为 T-1，不崩溃，today_profit=0 |
+| **T20: 节假日调休** | 调休工作日（周日上班）vs 调休放假（周六休息） | _is_trading_day 判断 | 交易日历包含调休规则时 is_trading_day 正确识别工作日/休息日 |
+| **T21: 港股通假期差异** | A 股开市但港股通因香港假期关闭 | 菜单 E（含港股通持仓） | QDII 净值延迟 T-1，price_type 正确标记，today_profit=0 |
+
 ### 1.8 场景-测试文件覆盖率映射
 
 > **维护方式：** 详细映射（每场景 → 测试文件/类）由脚本 `scripts/validate_coverage_map.py` 半自动管理。
@@ -213,10 +239,8 @@
 
 | 覆盖状态 | 数量 | 说明 |
 |:---------|:----:|:-----|
-| ✅ 已覆盖 | 56 项 | S1-S20（20项）+ T1-T12/T14-T16（15项）+ 异常场景已覆盖（21项） |
-| ◐ 部分覆盖 | 3 项 | T13（时段切换缝隙）、非交易日+LLM、多账户混合+LLM 多轮 |
-| ❌ 未覆盖 | 2 项 | 净值数据空窗期、多时区 QDII 净值一致性 |
-| **合计** | **61 项** | 含 §1.3（S1-S20）+ §1.7（T1-T16）+ §1.6 异常场景 |
+| ✅ 已覆盖 | 207 项 | 全量业务场景 S0a-S0d(16) + S1-S28(57) + T1-T21(100) + resilience(18) + LLM(32) — 项数见 [test-coverage.md](./test-coverage.md) → 场景测试分组 |
+| **合计** | **207 项** | 含 §1.3（S0a-S0d + S1-S28）+ §1.7（T1-T21）全量场景已覆盖，§1.6 异常场景由 edge 专项覆盖 |
 
 ---
 > edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。
@@ -280,7 +304,7 @@
 
 | 优先级 | 回归范围 | 触发条件 | 备注 |
 |:------:|:---------|:---------|:-----|
-| **P0** | `python scripts/test_runner.py --mode regression` 通过（143 项业务场景） | **任何代码变更** | 提交前极速验证 |
+| **P0** | `python scripts/test_runner.py --mode regression` 通过（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组） | **任何代码变更** | 提交前极速验证 |
 | **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） | 验证缺陷场景的断言 |
 | **P0** | 测试隔离验证：`pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
 | **P1** | 手动菜单 E/H/B/L 各一次，检查报告完整性 | config / report / html / llm 变更 | Excel 页签完整、不崩溃 |
@@ -449,7 +473,7 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-- **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（143 项）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+- **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 - **P1 全通** — 不可合并 master：手动菜单 E/H/B/L + Excel/HTML 视觉检查 + Provider 联通性
 - **P2 已执行** — 可合入但不可发布：断网降级/旧缓存兼容/跨池污染
 
@@ -478,9 +502,11 @@ def test_get_ttl_closed(self, mock_open):
 |:---------|:-------|:-----|
 | **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache.py` 追加 `TestCacheEdgeCases` |
 | **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
-| **业务场景测试** | `test_integration.py`（基础链路）或 `test_integration_scenarios.py`（异常容错场景） | S1-S5 → `test_integration.py` |
+| **业务场景测试** | `test_integration.py`（基础链路 S1-S5）或 `test_integration_scenarios.py`（异常容错 S6-S10） | S1 → `test_integration.py` |
+| **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
+| **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
 | **LLM 场景测试** | `test_llm_scenarios.py` | S11-S20 |
-| **日期/时间场景** | `test_datetime_scenarios.py` | T1-T16 |
+| **日期/时间场景** | `test_datetime_scenarios.py` | T1-T21 |
 | **缺陷回归测试** | 对应模块的 `test_*.py` 或 `test_regression.py` | Bug fix 的断言 |
 | **边缘/异常场景测试** | 对应模块的 `test_<module>_edge.py` | 使用 `@pytest.mark.edge` 标记，放置于模块目录下 |
 
