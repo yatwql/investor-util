@@ -28,6 +28,23 @@
 
 ---
 
+## [0.2.84] - 2026-07-04
+
+### Changed
+
+- **pyproject.toml 版本同步**：`version` 0.2.52→0.2.83，与 `constants.py` APP_VERSION 对齐（修复 31 个小版本脱节）
+- **review-findings.md**：新增 R-148~R-153 审计项，R-148/R-153 已修复摘要留表，明细移入 changelog
+
+### Fixed
+
+- **12 处 `except Exception` 补充异常追踪**：`market_hours.py`（新增 `logger.warning`+`exc_info=True`）、`tui_handlers.py`、`providers/akshare_extras.py`（3 处）、`report/category.py`、`report/fund_performance.py`、`report/market_value.py`、`report/penetration_sheet.py`（2 处）、`report/penetration.py` — 确保非预期异常有完整 traceback
+
+### Style
+
+- **模板数字格式化统一**：`report_template.html` 中 8 处 `{{ "{:,}".format(value) }}` 替换为 `{{ value | thousands }}`，统一使用已有自定义 Jinja2 filter
+
+---
+
 ## [Unreleased]
 
 ### Added
