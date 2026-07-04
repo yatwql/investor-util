@@ -21,7 +21,7 @@ python scripts/test_runner.py --help
 
 # ===== ① 日常常用（快速反馈，提交前验证） =====
 
-# 快速回归 — 提交前验证（~25s）
+# 快速回归 — 提交前验证（~30s）
 python scripts/test_runner.py --mode regression
 
 # 冒烟测试（~2s 快速验证核心通路）
@@ -52,7 +52,7 @@ python scripts/test_runner.py --coverage
 
 # ===== ③ 全量/CI 门禁（耗时较长） =====
 
-# 合入验证 — PR 前检查（~10min）
+# 合入验证 — PR 前检查（~12min）
 python scripts/test_runner.py --mode verify
 
 # 运行全量测试（默认）
@@ -147,19 +147,7 @@ python scripts/test_runner.py --mode scenario,edge
 
 ## 测试覆盖统计
 
-测试用例按 pytest 标记分组的详细统计数据已移至管理文档，参见：
-
-- ➡️ **[测试覆盖统计 — test-coverage.md](../managements/test-coverage.md)**
-
-该文档包含：
-- 10 种 `--mode` 模式的覆盖项数对照表
-- 按功能域（Provider/调度/新闻/报告/LLM/核心/配置/TUI/场景）的测试源分布
-- 场景测试（S0a-S0d + S1-S28 + T1-T21）子分组明细
-- 单元测试 8 个子组的覆盖项数
-- 跨类标记（llm/smoke/edge/data）统计
-- Smoke 测试节点明细
-
-> 精确实时计数请运行 `pytest src/test/ --collect-only -q`。
+测试用例按 pytest 标记分组的详细统计数据（mode 对照表/功能域分布/场景分组明细/单元分组/跨类标记）见 **[test-coverage.md](../managements/test-coverage.md)**。精确实时计数请运行 `pytest src/test/ --collect-only -q`。
 
 ## 查看报告
 
@@ -293,24 +281,7 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 | ├─ `integration_cache` | 跨模块缓存一致性验证 |
 | └─ `integration_tui` | TUI → Handler 路由集成测试 |
 
-### 组合示例
-
-```bash
-# 仅运行 core 和 config 单元测试
-pytest src/test/ -m "unit_core or unit_config"
-
-# 边缘场景 + 日期场景
-pytest src/test/ -m "edge or scenario_datetime"
-
-# 运行所有单元测试，但排除 UI
-pytest src/test/ -m "unit and not unit_ui"
-
-# 只跑 report 模块的 edge 用例
-pytest src/test/ -m "unit_report and edge"
-
-# 验证 LLM 场景 + LLM 单元
-pytest src/test/ -m "scenario_llm or unit_llm"
-```
+更多的组合示例见上方的"标记选择运行速查"各分组表末尾的组合行。
 
 ## 测试文件规范
 
@@ -318,11 +289,8 @@ pytest src/test/ -m "scenario_llm or unit_llm"
 - **类名**：`Test<Feature>`，继承 `unittest.TestCase`
 - **方法**：`test_<场景>`
 - **单文件上限**：≤ 800 行 / ≤ 80 测试项 / ≤ 15 方法每类
-- **标记**：
-  - **单元测试**：使用模块级 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]` 列表，所有单元测试文件统一此模式
-  - **场景测试**：使用类级 `@pytest.mark.scenario` + `@pytest.mark.<子组>` 装饰器
-  - **edge 测试**：在 `pytestmark` 列表中追加 `pytest.mark.edge`
-  - 新增文件后运行 `python scripts/check-test-markers.py` 验证标记合规性
+- **标记规则**：单元测试用 `pytestmark` 模块级列表（`[pytest.mark.unit, pytest.mark.<子组>]`），场景测试用类级 `@pytest.mark.scenario + @pytest.mark.<子组>`，edge 测试在 `pytestmark` 中追加 `pytest.mark.edge`
+- 新增文件后运行 `python scripts/check-test-markers.py` 验证标记合规性
 
 ## 新增测试文件流程
 
@@ -330,10 +298,7 @@ pytest src/test/ -m "scenario_llm or unit_llm"
 
 1. **创建测试文件**：按功能域放入对应 `src/test/` 子目录，命名 `test_<模块>.py`
 2. **编写测试**：继承 `unittest.TestCase`，方法命名 `test_<场景>`
-3. **添加标记**：
-   - 单元测试：在文件顶部添加 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]`，子组名见下方标记说明
-   - 场景测试：在测试类前使用 `@pytest.mark.scenario` + `@pytest.mark.<子组>` 装饰器
-   - edge 测试：在 `pytestmark` 列表中追加 `pytest.mark.edge`
+3. **添加标记**：按上方"测试文件规范"中的标记规则标注
 4. **验证标记合规**：`python scripts/check-test-markers.py`，无报错继续
 5. **本地确认**：`pytest src/test/<子目录>/test_<模块>.py -v` 全部通过
 
@@ -343,7 +308,7 @@ pytest src/test/ -m "scenario_llm or unit_llm"
 A: 确认使用了正确的 marker 名：`pytest src/test/ -m "edge" --collect-only` 可预览匹配的测试。
 
 **Q: 需要跳过 LLM 测试？**
-A: 使用 `--mode edge` 仅跑边缘用例，或 `python scripts/test_runner.py --mode scenario` 仅跑业务场景（不含 LLM 场景）。若要排除全部 LLM 相关（单元 + 场景），使用 `pytest src/test/ -m "not llm"`。注意 `--mode unit` **包含** `unit_llm`（336 项，均为 mock），不跳过 LLM。
+A: 使用 `--mode edge` 仅跑边缘用例，或 `python scripts/test_runner.py --mode scenario` 仅跑业务场景（不含 LLM 场景）。若要排除全部 LLM 相关（单元 + 场景），使用 `pytest src/test/ -m "not llm"`。注意 `--mode unit` **包含** `unit_llm`（均为 mock，无需 API key），不跳过 LLM。
 
 **Q: 新增测试文件后运行报错 `missing unit_* marker`？**
 A: `unit/conftest.py` 的验证模式要求每个单元测试文件必须包含 `unit_*` 子标记。在文件顶部添加 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]`，子组名见 `conftest.py` 注册表（如 `unit_providers`、`unit_report` 等）。
