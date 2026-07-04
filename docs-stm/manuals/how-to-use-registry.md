@@ -144,12 +144,14 @@ registry 的派生产出被以下模块消费：
 | 消费方 | 调用的 API | 用途 |
 |--------|-----------|------|
 | `src/python/config.py` | `get_cache_ttl_defaults()`, `get_known_llm_settings_keys()` | 配置校验 + TTL 兜底 |
-| `src/python/cache.py` | `get_prefix_type_map()`, `get_exact_type_map()`, `get_cache_ttl_defaults()` | 缓存清理 |
+| `src/python/cache.py` | `get_prefix_type_map()`, `get_exact_type_map()`, `get_cache_ttl_defaults()`, `get_registry()` | 缓存清理 |
 | `src/python/llm/generators.py` | `get_llm_module_names()`, `_MN()` | 模块标签路由、日志 |
+| `src/python/llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架模块消息映射 |
 | `src/python/main.py` | `get_llm_module_names()` | 菜单显示 |
 | `src/python/tui_menu.py` | `get_llm_module_names()` | LLM 配置状态展示 |
 | `src/python/tui_handlers.py` | `get_llm_module_name()` | TUI 输出框标题 |
 | `src/python/handlers_report.py` | `get_llm_module_name()` | LLM 模块失败标签、报告生成 |
+| `src/python/handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 模块配置展示 |
 | `src/python/report/llm_content.py` | `get_registry()`, `get_llm_module_name()` | Excel LLM 分析章节生成 |
 | `src/python/report/news_correlation.py` | `get_llm_module_name()` | 新闻页签标题 |
 | `src/python/report/excel_generator.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 错误提示、`_Timer`/`_call_sheet` 标签 |
@@ -157,7 +159,7 @@ registry 的派生产出被以下模块消费：
 | `src/python/report/summary.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/market_value.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/category.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/penetration.py` | `get_report_sheet_name()` | 页签标题 |
+| `src/python/report/penetration_sheet.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 穿透 sheet 写入 |
 | `src/python/report/fund_performance.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/early_warning.py` | `get_report_sheet_name()` | 页签标题 |
 
