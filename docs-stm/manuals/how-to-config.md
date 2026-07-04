@@ -49,7 +49,11 @@
     "sector_flow": 900,
     "dividend": 2592000,
     "tracking": 2592000,
-    "calendar": 1209600
+    "calendar": 1209600,
+    "fund_manager": 86400,
+    "fund_overlap": 604800,
+    "fund_concentration": 2592000,
+    "fund_style_snapshot": 2592000
   }
 }
 ```
@@ -178,7 +182,7 @@
 
 > `—` 表示该缓存类型文件名为精确键名（无指纹后缀），不受持仓变化影响，仅在 TTL 到期后刷新。
 
-#### 行情/数据类
+### 行情/数据类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -193,7 +197,7 @@
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
 | `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
 
-#### LLM 分析类
+### LLM 分析类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -203,7 +207,16 @@
 | `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 |
 | `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 |
 
-#### 系统类
+### 基金深度分析类
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
+|------|-----------|:--------:|----------|------|
+| `fund_manager` | `fund_manager_{code}.json` + `fund_manager_snapshot.json` | 24h | — | 基金经理数据 + 快照（refresh 组） |
+| `fund_overlap` | `fund_overlap_{code}.json` | 7 天 | — | 基金持仓重合度数据（refresh 组） |
+| `fund_concentration` | `fund_concentration_snapshot.json` | 30 天 | — | 集中度历史快照（精确键名，无分组） |
+| `fund_style_snapshot` | `fund_style_snapshot.json` | 30 天 | — | 风格快照（精确键名，无分组） |
+
+### 系统类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -214,9 +227,6 @@
 > 
 > **TTL 兜底：** 即使指纹未变，缓存文件仍有 TTL 兜底到期自动刷新，防止数据"永久有效"。
 
-> **调整建议：** 持仓变动少可将 `hold` 改为 `2592000`（30天），减少基金持仓的重复拉取。
-> **交易时段短 TTL：** `price` 和 `index` 默认注册在 `market_hour_aware` 中，A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s）替代常规 TTL，确保盘中实时行情。收盘后自动回落长 TTL 保持收盘价。可通过 `market_hours.start`/`end` 手动覆盖时段，或设 `market_hours.official_source: false` 关闭东方财富 API 实时状态查询。
-
 ### 缓存分组
 
 所有缓存模块归入两个分组，控制菜单命令的缓存清除范围：
@@ -224,9 +234,9 @@
 | 分组 | 包含模块 | 使用场景 |
 |------|---------|----------|
 | `preload` | 股票价格、市场指数、LLM 全球政经局势、LLM 智囊团深度复盘、LLM 持仓体检报告、LLM 穿透深度分析 | **切换持仓文件后必须重取的数据。** 价格/指数随持仓变动，LLM 基础分析依赖持仓内容，切换到新持仓文件时必须清除旧缓存 |
-| `refresh` | 基金业绩排名、基金持仓、行业分类、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准 | **可随时独立刷新的补充数据。** 不依赖持仓文件切换，任何时候都可以主动刷新 — 如盘中更新行业资金流向、拉取最新基金排名 |
+| `refresh` | 基金业绩排名、基金持仓、行业分类、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准、基金经理数据、持仓重合度 | **可随时独立刷新的补充数据。** 不依赖持仓文件切换，任何时候都可以主动刷新 — 如盘中更新行业资金流向、拉取最新基金排名 |
 
-**无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.tracking` / `cache_ttl.calendar` 自行调整。
+**无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历、`fund_concentration` 集中度历史快照、`fund_style_snapshot` 风格快照）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.{key}` 自行调整。
 
 #### 与菜单命令的对应关系
 
@@ -238,6 +248,10 @@
 #### 工作原理
 
 缓存分组由 `src/python/registry.py` 中的模块注册表驱动。每个模块注册时指定所属分组（`cache_groups` 字段），`cache.py:clear_by_group()` 遍历注册表，只清除匹配分组的模块缓存文件。新增缓存模块时只需在注册表中声明分组，无需修改菜单代码。
+
+> **调整建议：** 持仓变动少可将 `hold` 改为 `2592000`（30天），减少基金持仓的重复拉取。
+>
+> **交易时段短 TTL：** `price` 和 `index` 默认注册在 `market_hour_aware` 中，A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s）替代常规 TTL，确保盘中实时行情。收盘后自动回落长 TTL 保持收盘价。可通过 `market_hours.start`/`end` 手动覆盖时段，或设 `market_hours.official_source: false` 关闭东方财富 API 实时状态查询。
 
 ## 技术细节：自动 gzip 压缩
 

@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-03（v0.2.66 — 代码反查修正：fetcher/news.py 已移除/熔断3次/链路径/结构优化）
+最后更新：2026-07-04（v0.2.85 — B 迭代完成：基金经理变更/重合度矩阵/集中度监控/风格漂移 4 模块）
 
 ---
 
@@ -62,12 +62,12 @@ investor-util/
 │   │   ├── tui.py                # 键盘输入封装
 │   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
 │   │   └── tui_menu.py           # 菜单交互
-│   └── test/                     # 测试（按标记分组目录，≈2056+ passed）
+│   └── test/                     # 测试（按标记分组目录）
 │       ├── conftest.py           # pytest 配置 + 19 个分层标记注册
 │       ├── helpers.py            # 测试辅助工具
-│       ├── unit/                 # 单元测试（8 子组，≈1888 项）
-│       ├── integration/          # 集成测试（5 子组，≈25 项）
-│       ├── scenario/             # 场景测试（4 子组，≈159 项）
+│       ├── unit/                 # 单元测试（8 子组）
+│       ├── integration/          # 集成测试（5 子组）
+│       ├── scenario/             # 场景测试（4 子组）
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志
@@ -76,7 +76,7 @@ investor-util/
 ├── CLAUDE.md / README.md / requirements.txt
 ```
 
-> 完整目录树（含所有 providers/ 和 report/ 子文件）见 [数据源一览 & 目录结构](../manuals/datasource-and-folders.md#目录结构)。
+> 完整目录树（含所有 providers/ 和 report/ 子文件）及最新测试计数见 [数据源一览 & 目录结构](../manuals/datasource-and-folders.md#目录结构)。
 
 ---
 
@@ -110,7 +110,7 @@ investor-util/
 
 ### 策略概览
 
-缓存统一存放在 `data/cache/` 目录，由 `cache.py` 提供泛用键值对存储接口。完整 TTL 表（17 种类型）、文件名模式、指纹机制见 [配置指南缓存章节](../manuals/how-to-config.md#cache_ttl-可调参数)。
+缓存统一存放在 `data/cache/` 目录，由 `cache.py` 提供泛用键值对存储接口。完整 TTL 表（21 种类型，含 B 系列 4 模块）、文件名模式、指纹机制见 [配置指南缓存章节](../manuals/how-to-config.md#cache_ttl-可调参数)。
 
 #### 行业/概念缓存
 
@@ -151,8 +151,8 @@ investor-util/
 
 通过 `registry.py` 的 `cache_groups` 字段定义分组：
 - **preload（6 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
-- **refresh（9 模块）**：fund_perf（基金业绩排名）, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, fund_benchmarks（基金业绩基准）→ 菜单 `[1]` 触发清除
-- **独立模块**：tracking, calendar → 无分组保护，不被菜单缓存命令误删
+- **refresh（11 模块）**：fund_perf（基金业绩排名）, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, fund_benchmarks（基金业绩基准）, fund_manager（基金经理数据）, fund_overlap（持仓重合度）→ 菜单 `[1]` 触发清除
+- **独立模块**：tracking, calendar, fund_concentration_snapshot（集中度历史）, fund_style_snapshot（风格快照）→ 无分组保护，不被菜单缓存命令误删
 
 ---
 
@@ -246,7 +246,8 @@ handlers_report.py（菜单触发）
    ├─ Excel 管线
    │     excel_generator.py → summary.py / market_value.py / category.py /
    │     penetration.py / fund_performance.py / news_correlation.py /
-   │     early_warning.py / llm_content.py（各页签写入器）
+   │     early_warning.py / llm_content.py / fund_manager_sheet.py /
+     overlap_matrix.py / concentration.py / fund_style_analysis.py（各页签写入器）
    │     → excel_writer.py（通用写入）+ styles.py（样式）
    │
    └─ HTML 管线
@@ -255,7 +256,7 @@ handlers_report.py（菜单触发）
 ```
 
 - **Excel 页签写入器**：各 `_write_*_sheet()` 函数接收 `info` 字典 + `writer`，独立负责单个页签的内容和样式，互不依赖
-- **条件渲染**：智能预警页签（菜单 B/L）、LLM 分析章节（菜单 L）在 `info` 中无对应数据时自动跳过
+- **条件渲染**：B 系列基金分析模块 ws13-ws16（`fund_deep` 标志）、智能预警页签（菜单 B/L）、LLM 分析章节（菜单 L）在 `info` 中无对应数据时自动跳过
 - **汇总页（页签 1）** 非独立写入器，由各写入器通过 `summary.py` 以回调方式追加区块（含条件区块如 LLM 用量）
 
 ### 持仓读取与列校验
@@ -266,6 +267,60 @@ handlers_report.py（菜单触发）
 - 列校验规则：必须存在且恰好 4 列（名称、代码、持仓份额、每份成本），列名匹配忽略首尾空格
 - 数据清洗：代码自动去除后缀（`.SH`/`.SZ`/`.OF`），份额/成本转为 float，空行跳过
 - 多文件选择：持仓目录下多个 xlsx 时弹出 TUI 选择器（`handlers_report.py` 中 `_select_holdings_file()`）
+
+---
+### B 系列：基金深度分析模块
+
+B 系列 4 个模块（ws13-ws16）通过 `fund_deep` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
+
+#### 基金经理变更监控（B2）
+
+`fund_manager_analysis.py` 基于快照比对检测基金经理变更：
+
+- **数据源**：天天基金 `fundf10.eastmoney.com` 基金经理列表（HTML 解析），获取当前基金经理姓名 + 任职起始日
+- **快照机制**：`fund_manager_snapshot`（精确键名，无指纹），每日更新，存储每个基金最后一次检查时的经理列表
+- **窗口期计算**：任职起始日距今天数：
+  - ≤30 天 → 🔴 紧急
+  - ≤90 天 → ⚠️ 关注
+  - 首次运行无快照 → 📋 首检（自下次起跟踪）
+  - 无变更 → ✅ 正常
+- **持股模式**：每个基金独立判断，互不干扰
+
+#### 持仓重合度矩阵（B3）
+
+`fund_overlap.py` 双指标持仓重合度计算：
+
+- **Jaccard 系数**：`|A ∩ B| / |A ∪ B|`
+- **重叠率**：`|A ∩ B| / min(|A|, |B|)`
+- **最终重合度**：取两者 max（避免分母差异造成的低估）
+- **热力图着色**（Excel 条件格式）：≥50% 红底白字、30-50% 橙底白字、15-30% 黄底黑字、>0 绿底黑字、0% 无着色
+- **配对明细表**：按重合度降序排列，含共同标的数 + 共同标的名称列表
+- **触发条件**：持仓中基金数量 ≥ 2 只
+
+#### 持仓集中度监控（B4）
+
+`fund_concentration.py` 基于持仓 TOP N 占比 + 环比变化：
+
+- **算法**：取每只基金持仓中权重最大的前 3/5/10 只标的，加总占比
+- **环比检测**：`fund_concentration_snapshot` 历史快照比对，记录前 10 占比的上期值
+- **预警规则**（与环比独立叠加）：
+  - 前 10 占比环比 +20% → 🔴 紧急
+  - 前 10 占比环比 +10% → ⚠️ 关注
+  - 当前前 10 占比 > 80% → ⚠️ 关注
+  - 首次运行 → 📋 首次（记录基线）
+- **环比变化箭头**：↑/↓ 标识方向
+
+#### 基金风格分析（B5）
+
+`fund_style_analysis.py` 基于持仓个股市值 + PE 数据的加权风格判定：
+
+- **数据源**：东方财富 push2 API（`f20`=总市值、`f9`=动态 PE），降级按代码前缀
+- **市值判定**：>500 亿=大盘、100~500 亿=中盘、<100 亿=小盘
+- **估值判定**：PE / 行业平均 PE，<70%=价值、>130%=成长、其余=混合
+- **加权投票**：最终风格 = 市值权重最大的 size + 估值权重最大的 style
+- **漂移检测**：网格曼哈顿距离 = |Δsize| + |Δstyle|（0~4），0=无、1=轻度、2=中度、≥3=严重
+- **降级方案**（push2 不可用）：60xxxx→大盘、000/002→中盘、300/688→小盘、4/8→小盘；估值方向统一标注"混合"+备注"估算风格"
+- **独立快照**：`fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
 ## LLM 客户端技术要点
 
@@ -599,7 +654,8 @@ reader.py (持仓解析)
 report/excel_generator.py (Excel 编排)
   → report/summary.py, market_value.py, category.py, penetration.py,
     fund_performance.py, news_correlation.py, early_warning.py,
-    llm_content.py (各页签写入)
+    llm_content.py, fund_manager_sheet.py, overlap_matrix.py,
+    concentration.py, fund_style_analysis.py (各页签写入)
   → report/excel_writer.py, styles.py (通用写入/样式)
   → report/html_writer.py (HTML 编排)
     → report/html_builders.py (数据构建器)

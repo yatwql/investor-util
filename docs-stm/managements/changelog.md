@@ -83,6 +83,12 @@
 ### Changed
 - **B 集成**：`excel_generator.py` 新增 ws13-ws16 页签创建+`_write_fund_deep_sheets` 统一编排；`html_writer.py` 新增 4 个 B 系列 `_render_*` 函数+模板参数；`report_template.html` 新增导航链接+Module 13-16 HTML 节
 - **datasource-and-folders.md**：目录树新增 3 个 B5 文件（fund_style_analysis.py/fund_style_sheet.py/test_fund_style_analysis.py），report 单元测试计数 667→699 项
+- **technical.md**：版本/日期 v0.2.66→v0.2.85；移除目录树中硬编码测试统计数（≈2056+ passed/≈1888 项/≈159 项/≈25 项），指向 datasource-and-folders.md 作为权威计数源；报告管线补充 B 模块写入器（fund_manager_sheet/overlap_matrix/concentration/fund_style_analysis）；条件渲染补充 B 系列 ws13-ws16；模块依赖补充 B 模块引用
+- **testplan.md**：§1.3 场景规格补充 S29-S33（操作行为 5 场景）；§3 页签编号 1.~12.→1.~16.；§5 测试重点补充 v0.2.84（A5 并行加速）+v0.2.85（B 迭代 105 项新测试）；§9.1 测试文件位置补充操作行为场景 `test_scenario_operational_behavior.py`（S29-S33）
+- **requirements.md**：§8 编号范围一~十二→一~十六、1.~12.→1.~16.；§5.1 三层→四层缓存架构；§6.2 B 模块版本号统一为 v0.2.85+
+- **technical.md**：缓存分组 refresh 9→11 模块（补充 fund_manager/fund_overlap），独立模块补充 fund_concentration_snapshot/fund_style_snapshot；TTL 类型 17→21 种；新增 B 系列 4 模块技术设计节（经理变更/重合度/集中度/风格分析）
+- **how-to-config.md**：cache_ttl 表新增基金深度分析类 4 项（fund_manager/fund_overlap/fund_concentration/fund_style_snapshot）；缓存分组 refresh 补充基金经理数据/持仓重合度；无分组模块补充集中度历史快照/风格快照；JSON 示例补全 4 个 B 模块 cache_ttl 键；集中度键名修正 fund_concentration_snapshot→fund_concentration；调整建议与交易时段短 TTL 两条 tip 之间加空行分隔
+- **review-findings.md**：新增 R-155 Excel 页签排序错位技术债（1-7→13-16→8-11→12）
 - **Z1 迭代完成（特殊品种场景 S21-S28，27 项 scenario_basic 测试）**：`test_scenario_special_securities.py` 新增 27 项测试，覆盖 S21 港股通持仓（3 项：分类/代码前缀/无行情不崩溃）、S22 可转债持仓（3 项：名称含"债"分类/市值计算/关键字匹配）、S23 公募 REITs（3 项：代码1开头分类/名称含REIT分类/市值计算）、S24 货币基金（3 项：货币关键字分类/净值恒为1/增利关键字分类）、S25 科创板+北交所混合（4 项：688分类/8xx分类/上海前缀/北京前缀）、S26 商品/黄金 ETF（3 项：黄金ETF分类/商品ETF分类/溢价率占位符）、S27 跨境 ETF（3 项：纳指ETF分类/恒生科技ETF分类/T-1净值 today_profit=0）、S28 纯债/国债持仓（5 项：国债ETF名称含"债"分类/关键字检测/国债分类/企业债分类/市值计算）。全量测试 2198→2225，场景测试 180→207，scenario_basic 30→57。
 - **Z2 迭代完成（操作行为场景 S29-S33，15 项 scenario_basic 测试）**：`test_scenario_operational_behavior.py` 新增 15 项测试，覆盖 S29 分红送转除权（3 项：送转后份额翻倍、除权后收益率、纯送股零成本 profit_rate=None）、S30 定投成本摊薄（3 项：两批加权平均、三批不等额、定投亏损）、S31 部分调仓卖出（3 项：卖出 50%/90%/全部清仓）、S32 跨账户转仓（3 项：同代码两账户各自明细、分类一致、不同代码独立）、S33 新股中签待上市（3 项：无行情降级 cost 正确、上市后正常计算、多只新股不干扰）。全量测试 2225→2240，场景测试 207→222，scenario_basic 57→72。
 - **Y1 迭代完成（API/网络异常纵深，23 项 edge 测试）**：`test_api_edge.py`（`unit/fetcher/`）新增 23 项测试，覆盖 Provider 层 HTTP 异常（4 项：超时/DNS 解析失败/连接拒绝/SSL 证书错误，均返回 None 不抛出）、Provider Chain 多级降级（4 项：主链路失败→备链路成功、全部失败→过期缓存降级、全部失败无缓存→返回 None、Provider 抛出异常→跳过该链路）、响应解析异常（5 项：空响应体/截断字段/非 JSON/空 JSON/编码异常）、LLM API 错误分类（8 项：429/503 可重试、401/500 retryable、超时可重试、连接错误 retryable、正常 200 success）、HTTP 客户端 SSL 验证（2 项：SSL_VERIFY=false 关闭验证、默认 true）。单元测试 1970→1993，edge 测试 175→198，全量 2175→2198。
@@ -132,6 +138,18 @@
 
 ### Removed
 - **`integration` 标记**：已注册但从未在测试类/方法上使用，移除 conftest.py 注册及 KNOWN_MARKERS 集合。
+
+### Fixed
+- **`llm/fingerprint.py` health_check fallback TTL 修正**：`_get_cache_ttl_llm()` 硬编码 fallback 字典中 health_check 为 7200，与 registry.py 的 86400（CACHE_DAILY）不一致，修正为 86400。（第 130 行，import 失败降级路径）
+- **`data/config/config.json` 补齐 4 个 B 模块 cache_ttl 键**：实际配置文件中 `fund_manager`（86400）、`fund_overlap`（604800）、`fund_concentration`（2592000）、`fund_style_snapshot`（2592000）缺失，补齐后与文档范例和 registry 基准一致。
+
+### Changed
+- **8 项管理/用户文档同步审计修复**：
+  - `how-to-test-my-code.md`：版本号 v0.2.83→v0.2.85；三处 S29-S33 范围遗漏补齐（L89/L200/L203）；`scenario_basic` 描述追加操作行为场景说明
+  - `how-to-use-registry.md`：注册表结构总表新增基金深度分析 2 行（refresh/无分组）；报表页签表新增 13-16 B 模块行；LLM API 用量序号 9→12 并加排序错位脚注
+  - `testplan.md`：版本号 v0.2.77→v0.2.85；S29-S33 范围同步（L78/L248）；§5 版本迭代表调整为严格降序 10 条（删除 v0.2.56/v0.2.55）
+  - `review-findings.md`：R-154 追加 B 模块 4 sheet 硬编码标题技术债务关联问题
+  - `how-to-config-llm.md`：§6 失败降级章节删除重复句首"各模块在以下降级场景下自动显示占位文本："
 
 ---
 

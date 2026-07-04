@@ -127,5 +127,5 @@ def _get_cache_ttl_llm(subtype: str = "global_macro") -> float:
         return get_ttl(data_type)
     except (ImportError, TypeError, AttributeError):
         logger.debug("_get_llm_ttl: 获取 TTL 失败，使用 LLM 默认值")
-        defaults: dict[str, float] = {"global_macro": 86400, "expert_review": 7200, "news_correlation": 3600, "health_check": 7200, "penetration_deep": 86400}
+        defaults: dict[str, float] = {"global_macro": 86400, "expert_review": 7200, "news_correlation": 3600, "health_check": 86400, "penetration_deep": 86400}
         return defaults.get(subtype, 3600)

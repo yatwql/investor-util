@@ -58,6 +58,8 @@ class DataModuleDef:
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
 | **补充数据（refresh）** | 盈利预测、资金流向、分红 | `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
+| **基金深度分析（refresh）** | 基金经理、持仓重合度 | `fund_manager`, `fund_overlap` | 24h~7d | B 迭代模块，主动刷新触发 |
+| **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
 | **精确键名** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | 固定键名，非前缀匹配 |
 
 ---
@@ -113,8 +115,12 @@ from src.python.registry import (
 | `fund_performance` | 基金业绩分析 | 5. |
 | — | 财经新闻热点与持仓关联分析（通过 `get_llm_module_name("news_correlation")` 获取标题） | 6. |
 | `early_warning` | 智能预警 | 7. |
+| — | 基金经理变更监控 | 13. |
+| — | 持仓重合度矩阵 | 14. |
+| — | 持仓集中度监控 | 15. |
+| — | 基金风格分析 | 16. |
 | — | LLM 分析模块（4 个页签，见下表） | 8. |
-| — | LLM API 用量 | 9. |
+| — | LLM API 用量 | 12.（注） |
 
 第 8 号位置为 LLM 分析模块页签区，共 4 个页签，按 `write_llm_sheets()` 写入顺序排列：
 
@@ -125,7 +131,9 @@ from src.python.registry import (
 | 持仓体检报告 | `health_check` | 8.3 |
 | 穿透深度分析 | `penetration_deep` | 8.4 |
 
-> LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 6 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 8 号），在新闻数据就绪时写入。第 9 号的 LLM API 用量页签为程序生成，不依赖 registry。
+> LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 6 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 8 号），在新闻数据就绪时写入。第 12 号的 LLM API 用量页签为程序生成，不依赖 registry。
+> 
+> **关于序号**：上表中 Excel 序号为页签标题中的编号前缀。因 B 模块页签（13-16）在 LLM 页签（8-12）之前创建、LLM 页签通过 `wb.create_sheet()` 默认追加到末尾，实际物理排序为 1-7→13-16→8-11→12，非严格递增。参见 [R-155](../managements/review-findings.md#r-155-excel-页签排序错位)。
 
 ---
 

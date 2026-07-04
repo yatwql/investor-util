@@ -35,7 +35,11 @@
     "sector_flow": 900,
     "dividend": 2592000,
     "tracking": 2592000,
-    "calendar": 1209600
+    "calendar": 1209600,
+    "fund_manager": 86400,
+    "fund_overlap": 604800,
+    "fund_concentration": 2592000,
+    "fund_style_snapshot": 2592000
   },
   "user_fund_benchmarks": {},
   "llm_key_file": "data/config/llm_key.json",
