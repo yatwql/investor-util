@@ -35,6 +35,12 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 class TestMenuItems(unittest.TestCase):
     """MENU_ITEMS 结构完整性测试。"""
 
+    def setUp(self):
+        """重置 MENU_ITEMS 回调为 None，防止前序测试副作用。"""
+        import src.python.tui_menu as _tm
+        for i, (key, label, _cb, is_exit) in enumerate(_tm.MENU_ITEMS):
+            _tm.MENU_ITEMS[i] = (key, label, None, is_exit)
+
     def test_item_count(self) -> None:
         """菜单项应为 14 个。"""
         self.assertEqual(len(MENU_ITEMS), 14)

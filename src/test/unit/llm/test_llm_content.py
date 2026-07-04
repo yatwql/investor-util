@@ -186,26 +186,27 @@ class TestWriteContentSheet(unittest.TestCase):
 class TestWriteLlmSheets(unittest.TestCase):
     """测试 write_llm_sheets 集成行为。"""
 
+    _LLM_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    _LLM_TITLES = ["12.全球政经局势", "13.智囊团深度复盘", "14.持仓体检报告", "15.穿透深度分析"]
+
     def setUp(self):
         self.wb = Workbook()
-
-    def _get_llm_sheets(self):
-        """返回 write_llm_sheets 创建的四个 sheet（跳过 Workbook 默认 sheet）。"""
-        return self.wb.worksheets[-4:]
+        self.sheets = {}
+        for key, title in zip(self._LLM_KEYS, self._LLM_TITLES):
+            ws = self.wb.create_sheet(title=title)
+            self.sheets[key] = ws
 
     def test_sheet_titles(self):
         """四个 sheet 标题正确。"""
-        write_llm_sheets(self.wb, ("<p>宏观</p>", "<p>复盘</p>", None, None))
+        write_llm_sheets(self.sheets, ("<p>宏观</p>", "<p>复盘</p>", None, None))
         sheet_names = [ws.title for ws in self.wb.worksheets]
-        self.assertIn("8.全球政经局势", sheet_names)
-        self.assertIn("9.智囊团深度复盘", sheet_names)
-        self.assertIn("10.持仓体检报告", sheet_names)
-        self.assertIn("11.穿透深度分析", sheet_names)
+        for title in self._LLM_TITLES:
+            self.assertIn(title, sheet_names)
 
     def test_return_text_quad(self):
         """返回 (text7, text8, text9, textA) 纯文本四元组。"""
         text7, text8, text9, textA = write_llm_sheets(
-            self.wb, ("<p>全球政经局势</p>", "<p>复盘内容</p>", "<p>持仓体检报告</p>", "<p>穿透深度分析</p>"))
+            self.sheets, ("<p>全球政经局势</p>", "<p>复盘内容</p>", "<p>持仓体检报告</p>", "<p>穿透深度分析</p>"))
         self.assertEqual(text7, "全球政经局势")
         self.assertEqual(text8, "复盘内容")
         self.assertEqual(text9, "持仓体检报告")
@@ -213,49 +214,52 @@ class TestWriteLlmSheets(unittest.TestCase):
 
     def test_content_none(self):
         """content=(None, None, None, None) → 占位符，不崩溃。"""
-        text7, text8, text9, textA = write_llm_sheets(self.wb, (None, None, None, None))
+        text7, text8, text9, textA = write_llm_sheets(self.sheets, (None, None, None, None))
         self.assertEqual(text7, "")
         self.assertEqual(text8, "")
         self.assertEqual(text9, "")
         self.assertEqual(textA, "")
-        ws7, ws8, ws9, wsA = self._get_llm_sheets()
-        self.assertIn("LLM API Key", str(ws7.cell(row=2, column=1).value or ""))
-        self.assertIn("LLM API Key", str(ws8.cell(row=2, column=1).value or ""))
+        ws_list = [self.sheets[k] for k in self._LLM_KEYS]
+        self.assertIn("LLM API Key", str(ws_list[0].cell(row=2, column=1).value or ""))
+        self.assertIn("LLM API Key", str(ws_list[1].cell(row=2, column=1).value or ""))
 
 
 class TestWriteLlmSheetsDisabled(unittest.TestCase):
     """测试 write_llm_sheets 在模块禁用时的行为。"""
 
+    _LLM_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    _LLM_TITLES = ["12.全球政经局势", "13.智囊团深度复盘", "14.持仓体检报告", "15.穿透深度分析"]
+
     def setUp(self):
         self.wb = Workbook()
-
-    def _get_llm_sheets(self):
-        return self.wb.worksheets
+        self.sheets = {}
+        for key, title in zip(self._LLM_KEYS, self._LLM_TITLES):
+            ws = self.wb.create_sheet(title=title)
+            self.sheets[key] = ws
 
     def test_disabled_global_macro_skips_sheet(self):
-        """global_macro 禁用 → 不创建该页签，其他页签正常。"""
+        """global_macro 禁用 → 不写入该页签，其他页签正常。"""
         from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
         # 清除可能残留的状态
         _LLM_MODULE_FAILURE.clear()
         _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
         try:
             text7, text8, text9, textA = write_llm_sheets(
-                self.wb, ("<p>宏观</p>", "<p>复盘</p>", "<p>体检</p>", "<p>穿透</p>"))
+                self.sheets, ("<p>宏观</p>", "<p>复盘</p>", "<p>体检</p>", "<p>穿透</p>"))
             # 禁用模块返回空文本
             self.assertEqual(text7, "")
             self.assertNotEqual(text8, "")
-            # 只创建了 3 个新 sheet（默认 sheet + 3 个非禁用）
-            sheets = self._get_llm_sheets()
-            sheet_titles = [s.title for s in sheets]
-            self.assertNotIn("8.全球政经局势", sheet_titles)
-            self.assertIn("9.智囊团深度复盘", sheet_titles)
-            self.assertIn("10.持仓体检报告", sheet_titles)
-            self.assertIn("11.穿透深度分析", sheet_titles)
+            # global_macro 页签存在但未写入，其他页签正常写入
+            sheet_titles = [ws.title for ws in self.wb.worksheets]
+            self.assertIn("12.全球政经局势", sheet_titles)  # 页签仍存在（预创建）
+            self.assertIn("13.智囊团深度复盘", sheet_titles)
+            self.assertIn("14.持仓体检报告", sheet_titles)
+            self.assertIn("15.穿透深度分析", sheet_titles)
         finally:
             _LLM_MODULE_FAILURE.clear()
 
     def test_all_disabled_no_sheets_created(self):
-        """所有 4 个模块都禁用 → 不创建任何 LLM sheet。"""
+        """所有 4 个模块都禁用 → sheets 字典中的页签不写入内容（不修改）。"""
         from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
 
         _LLM_MODULE_FAILURE.clear()
@@ -267,18 +271,16 @@ class TestWriteLlmSheetsDisabled(unittest.TestCase):
         )
         try:
             text7, text8, text9, textA = write_llm_sheets(
-                self.wb, (None, None, None, None))
+                self.sheets, (None, None, None, None))
             # 全部返回空文本
             self.assertEqual(text7, "")
             self.assertEqual(text8, "")
             self.assertEqual(text9, "")
             self.assertEqual(textA, "")
-            # 只有默认 sheet，没有新创建的 LLM sheet
-            sheets = self._get_llm_sheets()
-            sheet_titles = [s.title for s in sheets]
-            for title in ["8.全球政经局势", "9.智囊团深度复盘",
-                          "10.持仓体检报告", "11.穿透深度分析"]:
-                self.assertNotIn(title, sheet_titles)
+            # 页签仍存在（预创建传入），但禁用模块不写入内容
+            sheet_titles = [ws.title for ws in self.wb.worksheets]
+            for title in self._LLM_TITLES:
+                self.assertIn(title, sheet_titles)
         finally:
             _LLM_MODULE_FAILURE.clear()
 
