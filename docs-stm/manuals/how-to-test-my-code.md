@@ -229,27 +229,29 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 
 ### 场景标记
 
-| 表达式 | 覆盖范围 | 测试项数 |
-|:-------|:---------|:--------:|
-| `scenario` | 全部业务场景 S0a-S0d + S1-S28 + T1-T21 | 207 |
-| `scenario_basic` | 基础链路 S1-S5 + S0a-S0d + S21-S28 | 57 |
-| ├ `scenario_stock` | S1: 纯股票组合 | 3 |
-| ├ `scenario_fund` | S2: 纯基金组合 | 2 |
-| ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 |
-| ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 |
-| ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 |
-| ├ `scenario_special_securities` | S21-S28: 特殊品种 | 27 |
-| └ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量 | 16 |
-| `scenario_resilience` | 异常容错场景 S6-S10 | 18 |
-| ├ `scenario_bond` | S6: 纯债券基金组合 | 3 |
-| ├ `scenario_network_down` | S7: 网络中断降级 | 3 |
-| ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 |
-| ├ `scenario_zero_cost` | S9: 零成本持仓 | 4 |
-| └ `scenario_extreme` | S10: 极端值 | 5 |
-| `scenario_llm` | LLM 场景 S11-S20 | 32 |
-| `scenario_datetime` | 日期/时间场景 T1-T21 | 100 |
-| `scenario_basic or scenario_datetime` | 基础链路 + 日期场景 | 157 |
-| `scenario_cache_hit or scenario_zero_cost` | 缓存 + 零成本组合 | 6 |
+以 `pytest -m "<表达式>"` 形式快速选取特定标记组合。项数见 [`test-coverage.md`](../managements/test-coverage.md) → 场景测试分组。
+
+| 表达式 | 覆盖范围 |
+|:-------|:---------|
+| `scenario` | 全部业务场景 S0a-S0d + S1-S28 + T1-T21 |
+| `scenario_basic` | 基础链路 S1-S5 + S0a-S0d + S21-S28 |
+| ├ `scenario_stock` | S1: 纯股票组合 |
+| ├ `scenario_fund` | S2: 纯基金组合 |
+| ├ `scenario_mixed_accounts` | S3: 混合多账户 |
+| ├ `scenario_new_holdings` | S4: 新持仓无缓存 |
+| ├ `scenario_cache_hit` | S5: 缓存全命中 |
+| ├ `scenario_special_securities` | S21-S28: 特殊品种 |
+| └ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量 |
+| `scenario_resilience` | 异常容错场景 S6-S10 |
+| ├ `scenario_bond` | S6: 纯债券基金组合 |
+| ├ `scenario_network_down` | S7: 网络中断降级 |
+| ├ `scenario_single_holding` | S8: 单账户单持仓 |
+| ├ `scenario_zero_cost` | S9: 零成本持仓 |
+| └ `scenario_extreme` | S10: 极端值 |
+| `scenario_llm` | LLM 场景 S11-S20 |
+| `scenario_datetime` | 日期/时间场景 T1-T21 |
+| `scenario_basic or scenario_datetime` | 基础链路 + 日期场景 |
+| `scenario_cache_hit or scenario_zero_cost` | 缓存 + 零成本组合 |
 
 ### 单元子模块标记
 
