@@ -179,7 +179,29 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
 # ── 基金季报持仓（回退链路：QDII/联接/债券等） ─────────────
 
 
-def _request_quarterly_api(code: str, api_type: str) -> str | None:
+def _recent_quarters(n: int = 4) -> list[tuple[int, int]]:
+    """返回最近 n 个完整季度的 (year, month) 列表，按时间降序。
+
+    month 取季度末月（3/6/9/12），对应季报 API 参数要求。
+    如当前为 2026-07（Q3），则最近完整季度为 2026-06（Q2）。
+    """
+    now = datetime.now()
+    qe = ((now.month - 1) // 3) * 3  # 0 → 12(prev year), 3, 6, 9
+    quarters: list[tuple[int, int]] = []
+    y, m = now.year, qe
+    for _ in range(n):
+        if m == 0:
+            y -= 1
+            m = 12
+        quarters.append((y, m))
+        m -= 3
+        if m <= 0:
+            m += 12
+            y -= 1
+    return quarters
+
+
+def _request_quarterly_api(code: str, api_type: str, year: int | None = None, month: int | None = None) -> str | None:
     """请求季报 API 并解析 JS 字符串内容。"""
     url = "https://fundf10.eastmoney.com/FundArchivesDatas.aspx"
     headers = {
@@ -190,8 +212,8 @@ def _request_quarterly_api(code: str, api_type: str) -> str | None:
         "type": api_type,
         "code": code.strip(),
         "topline": 10,
-        "year": "",
-        "month": "",
+        "year": str(year) if year is not None else "",
+        "month": str(month) if month is not None else "",
         "rt": str(random.random()),
     }
     try:
@@ -288,9 +310,10 @@ def fetch_quarterly_holdings(code: str) -> dict[str, Any] | None:
     """从东方财富基金持仓 API 获取基金前 10 大持仓。
 
     当主页面 HTML 解析无数据时调用（QDII/联接/短期债券基金常见）。
-    自动尝试股票持仓（jjcc）和债券持仓（zqcc）两种类型并合并结果。
+    自动按最近完整季度→上季度 逐季尝试，最多回溯 4 个季度。
+    若指定季度均无数据，回退到不指定年份的默认请求（部分基金仅有早期年报数据）。
 
-    API: fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={code}
+    API: fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={code}&year={year}&month={month}
     返回 JavaScript 变量 apidata.content，包含 HTML 持仓表格。
 
     Args:
@@ -299,12 +322,31 @@ def fetch_quarterly_holdings(code: str) -> dict[str, Any] | None:
     Returns:
         同 fetch_fund_holdings，或 None
     """
+    # ── 优先策略：指定最近完整季度，从新到旧回溯 ──
+    for year, month in _recent_quarters(4):
+        result = _fetch_single_quarter(code, year, month)
+        if result:
+            return result
+
+    # ── 回退策略：不指定年份，让 API 返回默认数据（部分基金仅有早期报告） ──
+    logger.info("基金持仓 API %s: 最近 4 季度均无持仓，尝试默认请求...", code)
+    result = _fetch_single_quarter(code)
+    if result:
+        logger.info("基金持仓 API %s 默认请求成功（报告期 %s）", code, result.get("date", "未知"))
+        return result
+
+    logger.info("基金持仓 API 全部无有效持仓: %s", code)
+    return None
+
+
+def _fetch_single_quarter(code: str, year: int | None = None, month: int | None = None) -> dict[str, Any] | None:
+    """尝试获取指定季度的持仓数据，返回结构化结果或 None。"""
     all_holdings: list[dict[str, Any]] = []
     fund_name = ""
     report_date = ""
 
     for api_type in ("jjcc", "zqcc"):
-        html_content = _request_quarterly_api(code, api_type)
+        html_content = _request_quarterly_api(code, api_type, year=year, month=month)
         if html_content is None:
             continue
 
@@ -317,14 +359,14 @@ def fetch_quarterly_holdings(code: str) -> dict[str, Any] | None:
         all_holdings.extend(holdings)
 
         if all_holdings:
-            break  # 已有持仓数据，无需尝试其它类型
+            break
 
     if not all_holdings:
-        logger.info("基金持仓 API 全部类型无有效持仓: %s", code)
         return None
 
-    logger.info("基金持仓 API %s（%s）: %d 条持仓, 报告期 %s",
-                fund_name or code, code, len(all_holdings), report_date or "未知")
+    label = f"{year}-{month:02d}" if year is not None else "默认"
+    logger.info("基金持仓 API %s（%s）: %d 条持仓, 报告期 %s（%s）",
+                fund_name or code, code, len(all_holdings), report_date or "未知", label)
     return {"code": code.strip(), "name": fund_name, "date": report_date, "holdings": all_holdings}
 
 
