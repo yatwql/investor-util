@@ -58,7 +58,7 @@ python scripts/test_runner.py --mode verify
 # 运行全量测试（默认）
 python scripts/test_runner.py
 
-# 全量测试（2225 项，~26min）
+# 全量测试（~26min）
 python scripts/test_runner.py --mode all
 ```
 
@@ -99,14 +99,14 @@ python scripts/test_runner.py --mode all
 
 | 级别 | 定义 | 阻断点 | 对应的流水线阶段 |
 |:-----|:-----|:-------|:----------------|
-| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `regression`（~25s） |
-| **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~10min） |
+| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `regression`（~30s） |
+| **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~12min） |
 | **P2** | 阻塞发布 | 不得 release | ③ `all`（~26min） |
 | **P3** | 建议修复 | 不阻断 | — |
 
 P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
 
-> 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式（143 项场景测试）中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
+> 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
 
 ### 模式与覆盖范围说明
 
@@ -204,7 +204,7 @@ pytest src/test/unit/report/test_category.py -v
 # 运行单个测试类
 pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
 
-# 冒烟测试（24 项，~2s 验证核心通路）
+# 冒烟测试（~2s 验证核心通路）
 pytest src/test/ -m "smoke" -v
 
 # 冒烟 + 边缘测试
@@ -229,7 +229,7 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 
 ### 场景标记
 
-以 `pytest -m "<表达式>"` 形式快速选取特定标记组合。项数见 [`test-coverage.md`](../managements/test-coverage.md) → 场景测试分组。
+项数见 [`test-coverage.md`](../managements/test-coverage.md) → 场景测试分组。
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
@@ -276,7 +276,7 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
-| `smoke` | 冒烟（6 文件 × 4 项） |
+| `smoke` | 冒烟 |
 | `edge` | 边缘/异常场景 |
 | `data` | 数据正确性验证 |
 | `llm` | 全部 LLM（单元 + 场景） |
