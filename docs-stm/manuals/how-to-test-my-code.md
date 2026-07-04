@@ -1,5 +1,7 @@
 # 如何驱动测试 — 测试组合运行指南
 
+> 最后更新：2026-07-04（v0.2.79）
+
 ## 概述
 
 本项目的测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行。使用 `scripts/test_runner.py` 脚本统一驱动，自动输出结构化报告。
@@ -12,6 +14,8 @@ pip install pytest pytest-html pytest-mock
 # 可选：覆盖率报告
 pip install pytest-cov coverage
 ```
+
+> 以上仅安装测试插件。项目主依赖（httpx、openpyxl、akshare 等）见 `requirements.txt`：`pip install -r requirements.txt`。
 
 ## 快速开始
 
@@ -55,10 +59,7 @@ python scripts/test_runner.py --coverage
 # 合入验证 — PR 前检查（~12min）
 python scripts/test_runner.py --mode verify
 
-# 运行全量测试（默认）
-python scripts/test_runner.py
-
-# 全量测试（~26min）
+# 全量测试（~26min，--mode all 为默认值，可省略）
 python scripts/test_runner.py --mode all
 ```
 
@@ -70,7 +71,7 @@ python scripts/test_runner.py --mode all
 
 项目推荐的三道质量门禁，按开发阶段逐级收紧：
 
-- **提交前验证（`--mode regression`）** — 每次代码变更后、commit 前必须执行。覆盖全部 207 项业务场景测试，确保 S1-S28 端到端用户路径和 T1-T21 日期/时间场景不被破坏。约 30s 即可完成。是编辑-验证循环中的第一道屏障，核心原则是"够快才能频繁跑，频繁跑才能尽早发现问题"。
+- **提交前验证（`--mode regression`）** — 每次代码变更后、commit 前必须执行。覆盖全部 207 项业务场景测试，确保 S0a-S0d + S1-S28 端到端用户路径和 T1-T21 日期/时间场景不被破坏。约 30s 即可完成。是编辑-验证循环中的第一道屏障，核心原则是"够快才能频繁跑，频繁跑才能尽早发现问题"。
 - **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。共 824 项，确保数据从抓取→缓存→计算的整条管道通畅且正确。约 12min，适合作为 PR CI 门禁或合入前的手动检查。
 - **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量 2225 项测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 26min，适合发布前的夜间或定时全量回归。
 
@@ -289,7 +290,7 @@ pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.ht
 | ├─ `integration_cache` | 跨模块缓存一致性验证 |
 | └─ `integration_tui` | TUI → Handler 路由集成测试 |
 
-更多的组合示例见上方的"标记选择运行速查"各分组表末尾的组合行。
+场景标记表末尾列出了常用的标记组合表达式（如 `scenario_basic or scenario_datetime`、`scenario_cache_hit or scenario_zero_cost`），可在此基础上按需调整。
 
 ## 测试文件规范
 
