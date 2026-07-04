@@ -161,7 +161,7 @@ python scripts/test_runner.py --mode scenario,edge
 每次运行后，测试报告输出到：
 
 ```
-docs-stm/test-reports/latest/
+test-reports/latest/
 ├── index.html            # 汇总页（打开此文件查看总览）
 ├── unit/
 │   └── report.html       # 单元测试
@@ -185,7 +185,7 @@ docs-stm/test-reports/latest/
     └── report.html       # 冒烟测试
 ```
 
-**打开方式**：直接用浏览器打开 `docs-stm/test-reports/latest/index.html`
+**打开方式**：直接用浏览器打开 `test-reports/latest/index.html`
 
 ## 标记选择运行速查
 
@@ -289,7 +289,7 @@ pytest src/test/ -m "scenario_llm" -v
 pytest src/test/ -m "scenario_basic or scenario_datetime" -v
 
 # 输出 HTML 报告
-pytest src/test/ -m "edge" -v --html=docs-stm/test-reports/latest/edge/report.html
+pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 ```
 
 ## 测试文件规范

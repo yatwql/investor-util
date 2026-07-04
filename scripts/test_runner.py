@@ -25,7 +25,7 @@ from datetime import datetime
 # ── 路径常量 ─────────────────────────────────────────────────
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_REPORTS_DIR = os.path.join(_PROJECT_ROOT, "docs-stm", "test-reports")
+_REPORTS_DIR = os.path.join(_PROJECT_ROOT, "test-reports")
 _LATEST_DIR = os.path.join(_REPORTS_DIR, "latest")
 _ARCHIVES_DIR = os.path.join(_REPORTS_DIR, "archives")
 _SRC_DIR = os.path.join(_PROJECT_ROOT, "src", "test")
@@ -138,13 +138,13 @@ _HELP_TEXT += """\
   --help            显示本帮助信息
 
 输出目录结构:
-  docs-stm/test-reports/latest/
+  test-reports/latest/
     ├── index.html            汇总页
     ├── unit/report.html      单元测试报告
     ├── scenario/report.html  场景测试报告
     └── ...
   历史报告自动归档至:
-  docs-stm/test-reports/archives/<YYYYMMDD>/<HHMMSS>/
+  test-reports/archives/<YYYYMMDD>/<HHMMSS>/
 """
 
 
@@ -631,7 +631,7 @@ def main() -> None:
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_html)
 
-    print(f"\n  [OK] 汇总页已生成: docs-stm/test-reports/latest/index.html")
+    print(f"\n  [OK] 汇总页已生成: test-reports/latest/index.html")
 
     # 总体结果
     exit_codes = [r.get("exit_code", -1) for r in results]
@@ -646,7 +646,7 @@ def main() -> None:
               f"  (总耗时 {sum(r.get('duration', 0) for r in results):.1f}s)")
     else:
         print(f"  [ERR] 存在失败的测试 — {total_passed} 通过, {total_failed} 失败")
-        print(f"        请检查 docs-stm/test-reports/latest/ 中的详细报告")
+        print(f"        请检查 test-reports/latest/ 中的详细报告")
     print()
 
     sys.exit(overall)

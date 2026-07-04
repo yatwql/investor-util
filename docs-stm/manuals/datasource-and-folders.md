@@ -247,6 +247,23 @@ investor-util/
 ├── reports/                          # 生成报告输出（最新版 + 按日期存档，自动生成）
 ├── logs/                             # 程序日志（app.log，自动生成）
 │
+├── test-reports/                      # 测试报告输出（自动生成）
+│   ├── latest/                        # 最新测试报告（按 --mode 生成子目录）
+│       │   ├── index.html                 # 汇总页 — 各模式通过/失败总览 + 最近运行时间
+│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，1997 项）
+│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，1730 项）
+│       │   ├── scenario/report.html       # 场景测试报告（标记 -m "scenario"，222 项）
+│       │   ├── regression/report.html     # 回归测试报告（标记 -m "scenario"，模式别名，222 项）
+│       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，839 项）
+│       │   ├── integration/report.html    # 集成测试报告（标记 -m "scenario or integration"，247 项）
+│       │   ├── smoke/report.html          # 冒烟测试报告（标记 -m "smoke"，24 项）
+│       │   ├── edge/report.html           # 边缘场景报告（标记 -m "edge"，202 项）
+│       │   ├── data/report.html           # 数据正确性报告（标记 -m "data"，65 项）
+│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2353 项）
+│       │   └── coverage/                  # HTML 行覆盖率报告（--coverage 时生成）
+│   └── archives/                      # 历史报告存档
+│       └── <YYYYMMDD>/                # 按日期归档的子目录（含完整 latest/ 快照）
+│
 ├── scripts/                          # 启动脚本 + 测试工具
 │   ├── launch.ps1                    # Windows PowerShell 启动脚本
 │   ├── launch.sh                     # Linux Bash 启动脚本
@@ -269,22 +286,6 @@ investor-util/
 │   │   ├── faq.md                    # 常见问题解答 — 使用中的高频问题，按类别组织
 │   │   ├── how-to-test-my-code.md    # 如何测试我的代码 — 本地运行测试、测试报告系统、新增测试指南
 │   │   └── reports-instruction.md    # 报告文件结构说明
-│   ├── test-reports/                 # 测试报告输出（自动生成）
-│   │   ├── latest/                   # 最新测试报告（按 --mode 生成子目录）
-│       │   │   ├── index.html            # 汇总页 — 各模式通过/失败总览 + 最近运行时间
-│       │   │   ├── unit/report.html      # 单元测试报告（标记 -m "unit"，1997 项）
-│       │   │   ├── standard/report.html  # 常规单元报告（标记 -m "unit and not (edge or data)"，1730 项）
-│       │   │   ├── scenario/report.html  # 场景测试报告（标记 -m "scenario"，222 项）
-│       │   │   ├── regression/report.html # 回归测试报告（标记 -m "scenario"，模式别名，222 项）
-│       │   │   ├── verify/report.html    # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，839 项）
-│       │   │   ├── integration/report.html  # 集成测试报告（标记 -m "scenario or integration"，247 项）
-│       │   │   ├── smoke/report.html     # 冒烟测试报告（标记 -m "smoke"，24 项）
-│       │   │   ├── edge/report.html      # 边缘场景报告（标记 -m "edge"，202 项）
-│       │   │   ├── data/report.html      # 数据正确性报告（标记 -m "data"，65 项）
-│       │   │   ├── all/report.html       # 全量测试报告（无标记筛选，2353 项）
-│       │   │   └── coverage/             # HTML 行覆盖率报告（--coverage 时生成）
-│   │   └── archives/                 # 历史报告存档
-│   │       └── <YYYYMMDD>/           # 按日期归档的子目录（含完整 latest/ 快照）
 │   ├── tmp/                          # 临时文件 / 过程文件（git 忽略）
 │   └── managements/                  # 管理文档
 │       ├── plan.md                   # 实现计划（关键技术决策 + 下一步迭代计划）
