@@ -99,6 +99,11 @@
 - **新增边缘场景测试文件（6 项共 19 个新测试）**：`test_config_atomic_edge.py`（3 项）、`test_cache_edge.py`（12 项）、`test_market_hours_edge.py`（8 项）、`test_chain_edge.py`（4 项）、`test_api_edge.py`（2 项）、`test_circuit_breaker_edge.py`（3 项）、`test_market_value_edge.py`（从 15→40 项）、`test_penetration_edge.py`（从 12→14 项）。边缘场景测试总数从 ~39 增至 ~86 项。
 - **集成测试覆盖增补（迭代 U）**：新增 `src/test/integration/test_integration_coverage.py`（24 项集成测试，5 类标记），覆盖模块间接口契约验证（`integration_contract`，7 项）、错误隔离语义验证（`integration_isolation`，3 项）、新闻流水线全链路集成（`integration_news_pipeline`，4 项）、跨模块缓存一致性（`integration_cache`，4 项）、TUI → Handler 路由集成（`integration_tui`，6 项）。修复 7 个已实现但引用错误/挂起的问题测试。
 - **`scripts/check-test-markers.py`**：基于 AST 的静态标记合规检查脚本，CI 模式下检测缺失/废弃/未知标记，全覆盖 66 个测试文件。
+
+### Fixed
+- **requirements.md §2 TUI 菜单表 — 菜单 B/L/1 描述补全 B 模块（3 处同步修正）**：
+  - 菜单 B 和 L：追加"B 系列基金深度分析（基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析）"
+  - 菜单 1：清除范围补充 fund_manager_*/fund_overlap_*，与 §5.3 对齐
 - **W 迭代完成（剩余场景与数据正确性验证增补）**：
   - 场景补全 5 项：T13 交易时段切换缝隙（7 个边界点）、非交易日+LLM 混合（2 项）、多账户+LLM 多轮（3 项）、净值数据空窗期（4 项）、多时区 QDII 净值一致性（6 项）—— 确认均已在 `test_datetime_scenarios.py` 和 `test_llm_scenarios.py` 中实现
   - 数据正确性验证 9 项：三维度分类聚合一致、穿透行业占比归一化、指数行情数值合理、多币种转换正确、QDII 估值净值 vs 官方净值、基金业绩排名合理性、溢价率计算、本日盈亏场外非 T 日更新、穿透市值占比归一化——确认均在 `test_data_integrity.py` 中实现

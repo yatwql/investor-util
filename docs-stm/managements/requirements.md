@@ -22,12 +22,12 @@
 |---|---|---|
 | E | 生成基础版Excel分析报告 | 读取持仓信息生成 Excel 报告（投资分析汇总/市值核算明细表/持仓分类表/资产穿透TOP10/基金业绩分析） |
 | H | 生成基础版HTML分析报告 | 读取持仓信息生成 HTML 报告，不含 LLM 增补内容 |
-| B | 生成全系列包含新闻的报告(Excel+HTML) | 同时生成 HTML + 含新闻的 Excel 报告，不含 LLM 增补内容 |
-| L | 生成全系列完整版报告(Excel+HTML) | 同时生成 HTML + Excel，含新闻、智能预警、LLM 增补内容（全球政经局势+智囊团深度复盘+持仓体检报告+穿透深度分析+LLM API 用量） |
+| B | 生成全系列包含新闻的报告(Excel+HTML) | 同时生成 HTML + 含新闻的 Excel 报告，含 B 系列基金深度分析（基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析），不含 LLM 增补内容 |
+| L | 生成全系列完整版报告(Excel+HTML) | 同时生成 HTML + Excel，含新闻、智能预警、B 系列基金深度分析（基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析）、LLM 增补内容（全球政经局势+智囊团深度复盘+持仓体检报告+穿透深度分析+LLM API 用量） |
 | C | 配置持仓信息目录 | 配置持仓文件的存放目录 |
 | F | 配置持仓信息文件名 | 配置持仓文件的文件名 |
 | O | 配置报告输出目录 | 配置报告文件的输出目录（默认 reports） |
-| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/行业资金流向/分红缓存（含 fund_perf_*、fund_hold_*、fund_benchmarks.json、industry_*、news_*、llm_news_item_*、profit_forecast_*、sector_flow_*、dividend_*） |
+| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/行业资金流向/分红/基金经理/持仓重合度缓存（含 fund_perf_*、fund_hold_*、fund_benchmarks.json、industry_*、news_*、llm_news_item_*、profit_forecast_*、sector_flow_*、dividend_*、fund_manager_*、fund_overlap_*） |
 | 2 | 更新持仓类缓存 | 主动更新价格/指数行情，清除关联 LLM 缓存（智囊团深度复盘、全球政经局势、持仓体检报告、穿透深度分析；另：`llm_news_correlation` 由菜单 1 清理） |
 | 3 | 清理过期缓存文件 | 扫描 data/cache/ 目录，删除已过期的缓存文件 |
 | 4 | 查看缓存统计信息 | 显示缓存文件总数/大小/按前缀分类/过期预览 |
@@ -83,7 +83,7 @@
 |------|---------|------|
 | **单条缓存**（引擎自动管理） | `{类型前缀}_{键名}.json`，按 TTL 自动过期 | `price_600900.json`、`llm_global_macro_{fingerprint}.json` |
 | **合并缓存**（菜单手动生成 + 自动管理） | 固定文件名，跨会话复用 | `fund_benchmarks.json`（30天）、`holdings_tracking.json`（永久） |
-| **特殊独立缓存**（无 cache_group 保护） | 固定文件名，不受菜单 [1][2] 清除 | `holdings_tracking.json`（持仓跟踪）、`trading_calendar`（交易日历） |
+| **特殊独立缓存**（无 cache_group 保护） | 固定文件名，不受菜单 [1][2] 清除 | `holdings_tracking.json`（持仓跟踪）、`trading_calendar.json`（交易日历）、`fund_concentration_snapshot.json`（集中度快照）、`fund_style_snapshot.json`（风格快照） |
 | **进程级内存缓存**（memo） | 同一会话内减少文件 IO，短 TTL | 指数数据 60s、盈利预测 5min、分红 10min |
 
 ### 5.2 指纹驱动失效机制
@@ -105,12 +105,12 @@
 
 | 菜单 | 功能 | 清除范围 |
 |---|---|---|
-| `[1] 更新基础类缓存` | 基金业绩/持仓/基准/行业/新闻/新闻 LLM/盈利预测/资金流向/分红 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_item_*`（对应 `llm_news_correlation` 分组）、`profit_forecast_*`、`sector_flow_*`、`dividend_*` |
+| `[1] 更新基础类缓存` | 基金业绩/持仓/基准/行业/新闻/新闻 LLM/盈利预测/资金流向/分红/基金经理/重合度 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_item_*`（对应 `llm_news_correlation` 分组）、`profit_forecast_*`、`sector_flow_*`、`dividend_*`、`fund_manager_*`、`fund_overlap_*` |
 | `[2] 更新持仓类缓存` | 价格/指数行情，并清除关联 LLM 缓存 | `price_*`、`index_*`、`llm_*`（四大分析模块；`llm_news_correlation` 归菜单 [1]） |
 | `[3] 清理过期缓存` | 按 TTL 扫描删除过期文件 | 全部过期缓存 |
 | `[4] 查看缓存统计` | 只读统计 | — |
 
-> **特殊场景独立缓存**：`holdings_tracking.json`（持仓跟踪）和 `trading_calendar`（交易日历）不隶属于任何 cache_group，不受菜单 [1] 和 [2] 清除命令影响，仅通过菜单 [3] 过期自动清理。
+> **特殊场景独立缓存**：`holdings_tracking.json`（持仓跟踪）、`trading_calendar.json`（交易日历）、`fund_concentration_snapshot.json`（集中度历史快照）、`fund_style_snapshot.json`（风格快照）不隶属于任何 cache_group，不受菜单 [1] 和 [2] 清除命令影响，仅通过菜单 [3] 过期自动清理。
 
 ### 5.4 降级规则
 
@@ -632,7 +632,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | `market_hour_aware` | list | `["price", "index"]` | 手动 | 交易时段短 TTL 的数据类型 |
 | `market_hour_ttl` | int | `30` | 手动 | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30", end:"15:00", official_source:true}` | 手动 | 交易时段配置 + 官方 API 开关 |
-| `cache_ttl` | dict | 17 项 | 手动 | 各缓存类型 TTL（秒） |
+| `cache_ttl` | dict | 21 项 | 手动 | 各缓存类型 TTL（秒） |
 | `llm_key_file` | str | `data/config/llm_key.json` | 手动 | LLM 密钥文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | 手动 | LLM 参数文件路径 |
 
