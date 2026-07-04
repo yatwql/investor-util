@@ -445,9 +445,9 @@ Step A0 ──→ Step A1 ──→ Step A2 ──→ Step A3 ──→ Step A3b
 
 | 字段 | 值 |
 |:-----|:----|
-| **目标** | 实测各模式耗时精确基线（去 3 次取中位数），写入 test-coverage.md |
+| **目标** | 实测各模式耗时精确基线（warmup + 去 3 次取中位数），写入 test-coverage.md |
 | **文件** | `docs-stm/managements/test-coverage.md` |
-| **操作** | (1) 运行 `python test_runner.py --mode smoke` / `regression` / `verify` / `unit` / `all` 各 3 次 <br>(2) 取中位数记录到 test-coverage.md <br>(3) 标记为"A5 优化前基线" |
+| **操作** | (1) **先跑 1 次 warmup**（`python test_runner.py --mode unit`），结果不计入，仅预热文件系统缓存 <br>(2) 再正式跑 `python test_runner.py --mode smoke` / `regression` / `verify` / `unit` / `all` 各 3 次 <br>(3) 去 3 次取中位数记录到 test-coverage.md <br>(4) 标记为"A5 优化前基线"，注明 warmup 后的中位数 |
 | **验证** | test-coverage.md 基线数据完整，各模式耗时 ±10% 内合理 |
 | **预期产出** | commit: "docs: 录制 A5 优化前测试耗时基线" |
 | **回滚** | `git revert` 该 commit；原始耗时在 git 历史中完好 |
@@ -572,9 +572,9 @@ Step B1 ──→ Step B2 ──→ Step B3
 
 | 字段 | 值 |
 |:-----|:----|
-| **目标** | 拆分后各子标记收集数之和 = 拆分前父标记数，无漏无双计 |
-| **操作** | (1) 从 A0 基线和 `docs-stm/managements/test-coverage.md` 读取拆分前各标记收集数<br>(2) 运行 `pytest src/test/ --collect-only -q` 获取全量<br>(3) 核对 `unit_report` 拆分后子文件收集数之和 = 拆分前父标记数<br>(4) 核对 `unit_llm`、`unit_core` 同理 |
-| **验证** | `Σ(test_market_value_*)` 原来 `test_market_value` 标记数；`Σ(test_llm_*)` = 原来 `test_llm` 标记数；`Σ(test_cache_*)` = 原来 `test_cache` 标记数 |
+| **目标** | 拆分后各子标记收集数之和 = 拆分前父标记数，无漏无双计；标记值精确继承无丢失 |
+| **操作** | (1) 从 A0 基线和 `docs-stm/managements/test-coverage.md` 读取拆分前各标记收集数<br>(2) 运行 `pytest src/test/ --collect-only -q` 获取全量<br>(3) 核对 `unit_report` 拆分后子文件收集数之和 = 拆分前父标记数<br>(4) 核对 `unit_llm`、`unit_core` 同理<br>(5) ⚠️ **标记值精确比对**：运行 `pytest src/test/ --co -q --markers --tb=no 2>&1 | grep -E "^\s+" > /tmp/markers_pre.txt`（拆分前已保存）+ 拆后同样输出，用 `diff /tmp/markers_pre.txt /tmp/markers_post.txt` 确保标记字符串完全继承（无丢失、无新增、无拼写错误）|
+| **验证** | `Σ(test_market_value_*)` 原来 `test_market_value` 标记数；`Σ(test_llm_*)` = 原来 `test_llm` 标记数；`Σ(test_cache_*)` = 原来 `test_cache` 标记数；标记值 diff 输出为空 |
 | **预期产出** | 收集数一致确认（如有偏差，回溯到具体拆分步骤修正） |
 | **回滚** | 任一标记收集数不匹配 → 回退对应 B1/B2/B3 的拆分 |
 
