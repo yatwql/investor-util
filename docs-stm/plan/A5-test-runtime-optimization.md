@@ -346,37 +346,239 @@ MODES = {
 
 ---
 
-## 6. 实施步骤
+## 6. 实施步骤（拆细为 16 个原子步）
 
-### Step A：基础设施准备（1d）
+### 6.1 依赖与基础设施（3 步）
 
-1. 安装 `pytest-xdist`
-2. 审核 `conftest.py` 中所有 fixture scope
-3. `test_runner.py` 增加 `parallel` 字段 + `-n auto` 逻辑
-4. 修改超时时间（并行后预期缩短）
-5. 运行 `python test_runner.py --mode unit` 验证并行
-6. 记录基线耗时
+```
+Step A1 ──→ Step A2 ──→ Step A3
+(pyproject)  (fixture审计)  (test_runner)
+```
 
-### Step B：超大测试文件拆分（2d）
+#### Step A1：添加 pytest-xdist 依赖
 
-1. 拆分 `test_market_value.py` → 3 子文件
-2. 拆分 `test_llm.py` → 4 子文件
-3. 拆分 `test_cache.py` → 3 子文件
-4. 验证拆分后 `unit_report` / `unit_llm` / `unit_core` 标记收集数不变
-5. 运行全量测试确认无回归
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `pyproject.toml` |
+| **操作** | 在 `[project.dependencies]` 或 `[project.optional-dependencies]` 中新增 `pytest-xdist>=3.6` |
+| **验证** | `pip install -e .` 后 `pytest src/test/ -n auto --collect-only -q` 不报错 |
+| **回滚** | `git revert` 该 commit |
 
-### Step C：增量测试（1d）
+#### Step A2：审计 conftest.py fixture scope
 
-1. `test_runner.py` 新增 `--changed` 参数 + `_get_changed_marker()` 实现
-2. 验证 git diff → marker 映射准确度
-3. 可选安装 pytest-testmon 作为备选
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `src/test/conftest.py`, `src/test/unit/conftest.py` |
+| **操作** | 扫描所有 `@pytest.fixture(scope="session")` 和 `@pytest.fixture(scope="module")`，确认 fixture 产生或修改的对象不跨进程共享。重点关注：缓存临时目录、mock 单例、openpyxl Workbook |
+| **验证** | 运行 `pytest src/test/ -n 2 --collect-only` 无 warning。如有 session-scope fixture 要改为 module-scope，逐个改完验证 |
+| **预期产出** | fixture scope 审核清单，标记为 safe 的 `✓` 和需要改 scope 的 `Δ` |
 
-### Step D：快速 verify 子模式（0.5d）
+#### Step A3：test_runner.py 并行逻辑
 
-1. MODES 新增 `verify_fast` 和 `report`
-2. 更新 CLAUDE.md 门禁时间说明
-3. 更新 test-coverage.md 耗时预期
-4. 更新 testplan.md
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `scripts/test_runner.py` |
+| **操作** | (1) MODES 中 `unit`/`verify`/`all`/`integration` 新增 `"parallel": True`；`smoke`/`regression` 保持 `False` <br>(2) `_build_pytest_args()` 检测 `mode_cfg.get("parallel")` 且 xdist 可用时追加 `-n auto` <br>(3) 新增 `_check_xdist()` 函数检测 xdist 安装，不可用时降级（打印 `[!]` 警告）<br>(4) 收紧超时：`unit` 1800→600, `verify` 1200→300, `all` 2400→600 |
+| **验证** | `python test_runner.py --mode unit` 正常运行（有 xdist 时 print 中包含 `-n auto`），无 xdist 时降级不报错 |
+| **预期产出** | commit: "feat: test_runner.py 并行模式 — MODES parallel 字段 + -n auto" |
+
+---
+
+### 6.2 文件拆分（6 步，可并行）
+
+```
+Step B1 ──→ Step B2 ──→ Step B3
+(market_value   (llm_split)   (cache_split)
+ _split)
+
+各步之间无依赖，可并行执行，但建议顺序执行以便逐项验证。
+```
+
+#### Step B1：拆 test_market_value.py（1918 行 → 1+3 文件）
+
+| 字段 | 值 |
+|:-----|:----|
+| **源文件** | `src/test/unit/report/test_market_value.py` |
+| **目标** | `test_market_value.py`（骨架 ~118 行）+ `test_market_value_classify.py`（分类逻辑） + `test_market_value_details.py`（明细行生成） + `test_market_value_sheet.py`（页签写入 + Excel 格式） |
+| **操作** | (1) 识别可独立测试的函数域（按文件顶部 docstring 中的组）<br>(2) 每个子文件自包含 import，共享 fixture 提升到新 `conftest.py` 或放入测试类<br>(3) 源文件保留公共 fixture + import，删减为骨架 |
+| **验证** | `pytest src/test/ -m "unit_report" --collect-only -q` 收集数 = 原 672 项；`python test_runner.py --mode report` 全部通过 |
+| **预期产出** | commit: "refactor: 拆分 test_market_value.py 为 4 文件 — classify/details/sheet" |
+
+#### Step B2：拆 test_llm.py（2040 行 → 1+4 文件）
+
+| 字段 | 值 |
+|:-----|:----|
+| **源文件** | `src/test/unit/llm/test_llm.py` |
+| **目标** | `test_llm.py`（骨架）+ `test_llm_api.py`（API 路由/请求）+ `test_llm_session.py`（会话管理）+ `test_llm_generators.py`（生成器）+ `test_llm_fingerprint.py`（指纹） |
+| **验证** | `pytest src/test/ -m "unit_llm" --collect-only -q` 收集数 = 原 337 项；`pytest src/test/ -m "unit_llm" -q` 全部通过 |
+| **预期产出** | commit: "refactor: 拆分 test_llm.py 为 5 文件 — api/session/generators/fingerprint" |
+
+#### Step B3：拆 test_cache.py（1361 行 → 1+4 文件）
+
+| 字段 | 值 |
+|:-----|:----|
+| **源文件** | `src/test/unit/core/test_cache.py` |
+| **目标** | `test_cache.py`（骨架）+ `test_cache_core.py`（核心读写逻辑）+ `test_cache_edge.py`（边界条件）+ `test_cache_ttl.py`（TTL/过期）+ `test_cache_concurrency.py`（并发安全） |
+| **验证** | `pytest src/test/ -m "unit_core" --collect-only -q` 收集数 = 原 307 项；`pytest src/test/ -m "unit_core" -q` 全部通过 |
+| **预期产出** | commit: "refactor: 拆分 test_cache.py 为 5 文件 — core/edge/ttl/concurrency" |
+
+#### Step B4：验证单元测试收集总数一致
+
+| 字段 | 值 |
+|:-----|:----|
+| **操作** | (1) 运行 `pytest src/test/ --collect-only -q -m "unit"` 统计总数 <br>(2) 与拆分前的基线对比（1998 项）<br>(3) 逐个标记核对：`unit_report`/`unit_llm`/`unit_core` |
+| **验证** | 收集数 = 1998 (每个标记与原基线一致) |
+| **预期产出** | 收集数一致确认（如有偏差，回溯到具体拆分步骤修正） |
+
+#### Step B5：运行全量单元测试确认无回归
+
+| 字段 | 值 |
+|:-----|:----|
+| **操作** | `python test_runner.py --mode unit` |
+| **验证** | 全部通过（允许因计时波动的少量 flaky，但数量 < 拆分前） |
+| **预期产出** | 基准耗时记录：`unit` 模式在并行下的首次耗时 |
+
+#### Step B6：运行回归测试确认场景无影响
+
+| 字段 | 值 |
+|:-----|:----|
+| **操作** | `python test_runner.py --mode regression` |
+| **验证** | 0 failed（场景测试不受文件拆分影响，但确保 import 路径无错） |
+| **预期产出** | 回归确认 |
+
+---
+
+### 6.3 增量测试（4 步）
+
+```
+Step C1 ──→ Step C2 ──→ Step C3 ──→ Step C4
+(mapping表)  (CLI参数)   (映射测试)   (testmon可选)
+```
+
+#### Step C1：实现 `_get_changed_marker()` 映射函数
+
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `scripts/test_runner.py` |
+| **操作** | (1) 在文件顶部新增 `import subprocess`（如不存在）<br>(2) 实现 `_get_changed_marker(branch="origin/main") → str | None`<br>(3) 通过 `git diff --name-only {branch}...HEAD` 获取变更文件列表<br>(4) 遍历 `FILE_TO_MARKER` 映射表，合并匹配的 marker<br>(5) 无变更时返回 `None` |
+| **验证** | (1) 无变更时返回 `None`<br>(2) 修改 `src/python/report/` 下文件后，返回 `"unit_report"` <br>(3) 同时修改 `src/python/providers/` + `src/python/tui_menu.py`，返回 `"unit_providers or unit_fetcher or unit_ui"` |
+| **预期产出** | commit: "feat: test_runner.py 新增 _get_changed_marker() 增量测试映射" |
+
+#### Step C2：`--changed` CLI 参数集成
+
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `scripts/test_runner.py` |
+| **操作** | (1) `parse_args()` 新增 `--changed` 可选参数（`store_true`）<br>(2) `main()` 中：`--changed` 指定时，调用 `_get_changed_marker()`，若返回 marker 则运行对应模式；无变更时打印 "无变更文件，跳过"<br>(3) `--changed` 可与 `--mode` 叠加，`--changed` 优先级更高 |
+| **验证** | (1) `python test_runner.py --changed` → 根据当前 diff 运行对应模式<br>(2) clean working tree 下 `--changed` → 跳过 |
+| **预期产出** | commit: "feat: test_runner.py --changed 参数 — git-aware 增量测试"  |
+
+#### Step C3：为 `_get_changed_marker()` 编写单元测试
+
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `src/test/unit/test_test_runner.py`（新文件） |
+| **操作** | (1) mock `subprocess.run` 返回可控的 git diff 输出<br>(2) 覆盖场景：无变更、单文件变更、多域变更、测试文件变更、docs-only 变更<br>(3) 标记 `@pytest.mark.unit_core` |
+| **验证** | `pytest src/test/ -m "unit_core" -k "test_runner"` 全部通过 |
+| **预期产出** | commit: "test: 为 _get_changed_marker 添加 5 项单元测试" |
+
+#### Step C4（可选）：pytest-testmon 集成
+
+| 字段 | 值 |
+|:-----|:----|
+| **操作** | (1) `pip install pytest-testmon` <br>(2) 种子运行：`pytest src/test/ --testmon` <br>(3) 验证增量：修改一个测试文件后，`pytest src/test/ --testmon` 仅运行受影响项 |
+| **验证** | 增量运行项数 < 全量运行项数，且漏报率为 0 |
+| **预期产出** | testmon 增量验证确认 |
+
+---
+
+### 6.4 新增快速子模式（3 步）
+
+```
+Step D1 ──→ Step D2 ──→ Step D3
+(verify_fast)  (report模式)  (门禁文档同步)
+```
+
+#### Step D1：新增 `verify_fast` 模式
+
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `scripts/test_runner.py` |
+| **操作** | (1) MODES 中 `"verify"` 之后插入 `"verify_fast"` 条目：marker=`"scenario or unit_core"`，parallel=`True`，timeout=`300`<br>(2) order 设为 5（紧接 verify 之后） |
+| **验证** | `python test_runner.py --mode verify_fast` 运行成功，耗时预期 ~2min |
+| **预期产出** | commit: "feat: test_runner 新增 verify_fast 模式（场景+核心~529项）" |
+
+#### Step D2：新增 `report` 模式
+
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `scripts/test_runner.py` |
+| **操作** | (1) MODES 末尾插入 `"report"` 条目：marker=`"unit_report"`，parallel=`True`，timeout=`180`<br>(2) order 设为 11 |
+| **验证** | `python test_runner.py --mode report` 运行成功，耗时预期 ~60s |
+| **预期产出** | commit: "feat: test_runner 新增 report 模式（unit_report ~672项）" |
+
+#### Step D3：门禁文档同步
+
+| 字段 | 值 |
+|:-----|:----|
+| **文件** | `CLAUDE.md`, `docs-stm/managements/test-coverage.md` |
+| **操作** | (1) CLAUDE.md 提交前门禁说明更新为使用 `verify_fast` 作为日常 P1 门禁<br>(2) test-coverage.md 新增 `verify_fast`/`report` 行 |
+| **验证** | 阅读确认一致 |
+| **预期产出** | commit: "docs: 同步 verify_fast/report 模式到门禁文档" |
+
+---
+
+### 6.5 最终验证（1 步）
+
+#### Step E：全量回归 + 基线记录
+
+| 字段 | 值 |
+|:-----|:----|
+| **操作** | (1) `python test_runner.py --mode all` — 全量并行回归<br>(2) `python test_runner.py --mode verify_fast` — 记录新基线<br>(3) `python test_runner.py --mode report` — 记录新基线<br>(4) 将耗时数据填入 test-coverage.md |
+| **验证** | (1) `all` 0 failed，耗时 < 8min（当前 26min 基线）<br>(2) `verify_fast` 耗时 < 3min<br>(3) `report` 耗时 < 90s |
+| **预期产出** | commit: "docs: A5 迭代完成 — 测试耗时基线更新" |
+
+---
+
+### 实施步骤总览
+
+```
+Week 1                          Week 2
+┌──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┐
+│  A1  │  A2  │  A3  │  B1  │  B2  │  B3  │  C1  │  C2  │
+│  dep │scope │并行  │拆分MV│拆分LLM│拆分  │映射  │CLI   │
+│      │审计  │逻辑  │      │      │Cache │      │      │
+├──────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
+│  C3  │  C4  │  D1  │  D2  │  D3  │ B4~6 │  E   │      │
+│映射UT│test- │verify│report│文档  │验证  │全量  │      │
+│      │mon   │_fast │      │同步  │回归  │基线  │      │
+└──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┘
+        ↑第一阶段目标:     ↑第二阶段目标:     ↑第三阶段目标:
+         verify_fast       unit 并行跑通     全量回归
+         跑通(~2min)       (~5min)           (<8min 基线)
+```
+
+### 每步可独立 commit + 验证
+
+| 步骤 | 可独立 commit? | 验证方法 | 失败回退 |
+|:-----|:--------------:|:---------|:---------|
+| A1 | ✅ | pip install 成功 | git revert |
+| A2 | ✅ | pytest -n 2 无 warning | git revert |
+| A3 | ✅ | unit 并行跑通 | git revert |
+| B1 | ✅ | unit_report 收集数一致 | git revert |
+| B2 | ✅ | unit_llm 收集数一致 | git revert |
+| B3 | ✅ | unit_core 收集数一致 | git revert |
+| B4 | ✅ | 全标记收集数 = 1998 | 回溯 B1~B3 |
+| B5 | ✅ | unit 0 failed | 回溯 B1~B3 |
+| B6 | ✅ | regression 0 failed | git revert |
+| C1 | ✅ | 函数逻辑正确 | git revert |
+| C2 | ✅ | --changed 生效 | git revert |
+| C3 | ✅ | 单元测试通过 | git revert |
+| C4 | ❌(可选) | 增量运行漏报率=0 | 跳过 |
+| D1 | ✅ | verify_fast ~2min | git revert |
+| D2 | ✅ | report ~60s | git revert |
+| D3 | ✅ | 文档一致 | git revert |
+| E | ✅ | all < 8min | 记录偏差基线 |
 
 ---
 
