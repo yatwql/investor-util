@@ -208,7 +208,10 @@ def fetch_fund_manager(code: str) -> dict[str, Any] | None:
 |:-------|:------|:--------|
 | 东方财富 push2 行业分类 API | 向现有 API 请求目标代码的流通市值字段 | 返回字段中包含 `market_cap` 或 `circulating_market_cap` |
 | akshare `stock_profile_em` | 调用 `stock_profile_em(code)` 检查返回值 | 返回市值 + PE/PB 且数据完整率 > 80% |
-| 降级方案可行性 | 抽样 20 只穿透持仓股票对比代码段近似分类 vs 实际分类命中率 | 命中率 > 60% 则降级方案可用 |
+| **天天基金持仓市值占比（备选）** | 从已有持仓数据中提取每只个股的"占净值比例"，结合股票代码前缀判定规模（600/601/603=大盘，000/002/300=中小盘）；用于方案 A/B 均不可用时的兜底分类 | 至少能分出"大盘/中盘/小盘"三个档次，标注为"估算风格" |
+| 代码段降级方案可行性 | 抽样 20 只穿透持仓股票对比代码段近似分类 vs 实际分类命中率 | 命中率 > 60% 则降级方案可用 |
+
+预研结果决定 Phase B5 的实施方案。预研产出写入 `docs-stm/plan/notes/data-source-pre-study.md`。
 
 预研结果决定 Phase B5 的实施方案。预研产出写入 `docs-stm/plan/notes/data-source-pre-study.md`。
 

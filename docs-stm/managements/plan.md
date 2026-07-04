@@ -85,7 +85,14 @@ LLM 配置拆分为两个独立文件：
 避免两迭代交叉修改同一测试文件导致 git 冲突。
 
 **详细设计**：[`docs-stm/plan/A5-test-runtime-optimization.md`](../plan/A5-test-runtime-optimization.md)
-（v2 — 19 步 / 7 项风险修复 / R1-R8 全部闭环）
+（v2 — 20 步 / 加速比门 A3c 控制进入文件拆分 / 7 项风险修复 / R1-R8 全部闭环）
+
+**过渡步 T（A5→B 交接）**：
+A5 Step E（全量回归通过）后执行：
+1. 确认 A5 拆分后的测试文件结构（`test_market_value_*.py` / `test_llm_*.py` / `test_cache_*.py`）
+2. B 的新测试写入规则：属于已拆分域的测试写入对应子文件（如新增穿透测试 → `test_market_value_details.py`）；全新模块的测试新建独立文件
+3. `test_html_template.py` 作为跨迭代热点文件，B 新增的 4 个页签渲染测试追加到该文件末尾（不另建文件）
+4. 产出交接记录：`docs-stm/plan/notes/a5-b-transition.md`
 
 **问题**：`unit` 已达 1998 项/~25min，`verify` 839 项/~12min，增长趋势不乐观。
 

@@ -170,6 +170,7 @@ except ImportError:
 | `test_market_value.py` | 1918 | 按函数域拆分为 `_classify` / `_details` / `_sheet_writer` | 3 |
 | `test_llm.py` | 2040 | 按模块拆分为 `_api` / `_session` / `_generators` / `_fingerprint` | 4 |
 | `test_cache.py` | 1361 | 拆分为 `_core` / `_edge` / `_ttl` / `_concurrency` | 3 |
+| **`test_html_template.py`** | **438** | 新增文件独立存放；B 系列 4 个页签的渲染测试写入此文件（不新增文件） | **1（不拆分，仅作为跨迭代共存热点标记）**|
 | `test_fund_performance.py` | 975 | 暂不拆分（排名+评级逻辑高度耦合） | 1 |
 | `test_summary.py` | 892 | 暂不拆分 | 1 |
 
@@ -433,11 +434,11 @@ MODES = {
 
 ## 6. 实施步骤（拆细为 17 个原子步）
 
-### 6.1 依赖与基础设施（4 步）
+### 6.1 依赖与基础设施（6 步）
 
 ```
-Step A0 ──→ Step A1 ──→ Step A2 ──→ Step A3 ──→ Step A3b
-(基线录制)  (pyproject)  (fixture审计)  (test_runner)  (单线程确认)
+Step A0 ──→ Step A1 ──→ Step A2 ──→ Step A3 ──→ Step A3b ──→ Step A3c
+(基线录制)  (pyproject)  (fixture审计)  (test_runner)  (单线程确认)  (加速比门)
 ```
 
 #### Step A0：录制变更前基线
@@ -502,6 +503,19 @@ Step A0 ──→ Step A1 ──→ Step A2 ──→ Step A3 ──→ Step A3b
 | **回滚** | 出现差异 → 定位到具体 fixture 或测试文件修复；无法修复 → 回到 A3 前的单线程模式 |
 
 `--no-parallel` 实现方式：`_build_pytest_args` 检测 `--no-parallel` 时设置 `parallel=False`，追加 `-n 0`。
+
+#### Step A3c（新增）：加速比检测门（决定是否进入 Phase 2 拆分）
+
+> **背景**：如果测试以 I/O（openpyxl 写入）为主而非 CPU，xdist 并行加速可能不足 2.5x。
+> 此时先 profiling 再决定是否拆分文件，避免无效拆分增加维护成本。
+
+| 字段 | 值 |
+|:-----|:----|
+| **目标** | 实测 `verify` 并行加速比，≥ 2.5x（从 12min 降至 ≤ 5min）才进入 Phase 2 文件拆分 |
+| **操作** | (1) 从 A0 基线读取 `verify` 耗时 T_baseline（约 12min）<br>(2) `python test_runner.py --mode verify` 记录耗时 T_parallel<br>(3) 计算加速比 R = T_baseline / T_parallel<br>(4) **R ≥ 2.5** → ✅ 进入 Phase 2 文件拆分<br>(5) **R < 2.5** → ⛔ 暂停，运行 `python -m cProfile -s time -m pytest src/test/ -m "unit_report" -n auto -q` 分析瓶颈；输出 profiling 报告到 `docs-stm/plan/notes/a5-profile-report.md`；根据报告决策：瓶颈在 CPU（继续拆分）或 IO（优化写入模式而非拆分）|
+| **验证** | 决策记录明确（继续拆分/暂停分析），结果写入 A5 决策日志 |
+| **预期产出** | commit: "docs: A5 加速比检测 — verify R={R:.1f}x，进入{'拆分' if ok else '分析'}" |
+| **回滚** | 决策记录仅在文档中；如误判可重新运行检测后调整 |
 
 ---
 
@@ -711,17 +725,17 @@ Step D1 ──→ Step D2 ──→ Step D3
 ```
 Week 1                          Week 2
 ┌──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┐
-│  A0  │  A1  │  A2  │  A3  │ A3b  │ B1~3 │ B4~6 │  X   │
-│基线  │  dep │scope │并行  │单线  │拆分  │验证  │决策  │
-│录制  │      │审计  │逻辑  │程确认│(可并行)│回归  │门    │
+│  A0  │  A1  │  A2  │  A3  │ A3b  │ A3c  │ B1~3 │ B4~6 │
+│基线  │  dep │scope │并行  │单线  │加速  │拆分  │验证  │
+│录制  │      │审计  │逻辑  │程确认│比门  │(可并行)│回归  │
 ├──────┼──────┼──────┼──────┼──────┼──────┼──────┼──────┤
-│  C1  │  C2  │  C3  │  C4  │ [D1] │  D2  │  D3  │  E   │
-│映射  │CLI   │映射UT│test- │verify│report│文档  │全量  │
-│      │      │      │mon   │_fast†│      │同步  │基线  │
+│  X   │  C1  │  C2  │  C3  │  C4  │ [D1] │  D2  │  D3  │
+│决策  │映射  │CLI   │映射UT│test- │verify│report│文档  │
+│门    │      │      │      │mon   │_fast†│      │同步  │
 └──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┘
-        ↑Phase 1+2 完成         ↑决策门 X           ↑增量测试完成
-         verify 实测达标         (决定 D1 去留)       —changed
-         A3b 防误报确认                                                (<8min 基线)
+        ↑Phase 1 完成            ↑文件拆分完成     ↑增量测试完成   ↑全量回归
+         verify 加速比门          B4 收集数确认    —changed        (<8min)
+         ≥2.5x 才进拆分
 ```
 
 ### 每步验收卡片
@@ -733,6 +747,7 @@ Week 1                          Week 2
 | A2 | 所有 fixture scope + tmpdir 路径确认并行安全 | `pytest -n 2` 0 failed | 逐条 `git revert` |
 | A3 | `unit`/`verify`/`all` 使用并行；支持 `parallel: N` | 日志含 `-n auto` 或 `-n N` | `git revert`；无 xdist 自动降级 |
 | A3b | 并行与单线程结果一致 | F1（并行 failed） = F2（单线程 failed）| 有差异时定位 fixture 修复 |
+| A3c | verify 加速比 ≥ 2.5x 才进拆分 | 决策记录明确（继续/暂停分析）| 暂停分析时提交 profiling 报告后退回决策 |
 | B1 | 拆分后 `unit_report` 收集数 = 672 | `test_runner.py --mode report` 0 failed | `git revert` B1 commit |
 | B2 | 拆分后 `unit_llm` 收集数 = 337 | `pytest -m "unit_llm" -q` 全部通过 | `git revert` B2 commit |
 | B3 | 拆分后 `unit_core` 收集数 = 307；concurrency 文件标记 serial | `pytest -m "unit_core" -q` 全部通过 | `git revert` B3 commit |
