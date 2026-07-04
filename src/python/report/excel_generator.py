@@ -87,6 +87,17 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["write_fund_performance_sheet"] = None
         prog.add_error("基金业绩模块缺失 (fund_performance)")
 
+    try:
+        from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary
+        from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+        modules["detect_manager_changes"] = detect_manager_changes
+        modules["write_fund_manager_sheet"] = write_fund_manager_sheet
+        modules["build_first_check_summary"] = build_first_check_summary
+    except ImportError:
+        modules["detect_manager_changes"] = lambda h: []
+        modules["write_fund_manager_sheet"] = None
+        prog.add_error("基金经理变更监控模块缺失 (fund_manager)")
+
     return modules
 
 
@@ -231,6 +242,31 @@ def _write_news_and_early_warning(
             prog.add_error("智能预警模块缺失，跳过")
 
 
+def _write_fund_deep_sheets(
+    sheets: dict[str, Any], holdings: list,
+    fund_deep: bool, modules: dict[str, Any],
+    prog: ProgressReporter,
+) -> None:
+    """写入基金深度分析页签（13-16）。"""
+    if not fund_deep:
+        return
+    # 13. 基金经理变更监控
+    detect = modules.get("detect_manager_changes", lambda h: [])
+    ws13 = sheets.get("ws13")
+    if ws13 is not None:
+        prog.info("正在分析基金经理变更...")
+        try:
+            manager_data = detect(holdings)
+            if manager_data:
+                modules.get("write_fund_manager_sheet")(ws13, manager_data)
+                prog.ok("基金经理变更监控页签写入完成")
+            else:
+                logger.info("基金深度分析：无基金持仓，跳过基金经理变更监控")
+        except Exception as e:
+            logger.warning("基金经理变更监控失败: %s", e)
+            prog.add_error("基金经理变更监控失败")
+
+
 def _write_llm_section_and_usage(
     wb: Any, include_llm: bool, llm_content: tuple | None,
     prog: ProgressReporter,
@@ -343,6 +379,7 @@ def generate_excel_report(
     news_data: list | None = None,
     news_llm_meta: dict | None = None,
     early_warnings: dict | None = None,
+    include_fund_deep: bool | None = None,
     progress: ProgressReporter | None = None,
 ) -> None:
     """生成 Excel 报告的核心逻辑。
@@ -360,9 +397,14 @@ def generate_excel_report(
         news_data: 预获取的新闻数据
         news_llm_meta: 新闻 LLM 元数据
         early_warnings: 智能预警数据
+        include_fund_deep: 是否包含基金深度分析页签（13-16）。
+            None 时跟随 include_news（B/L 含，E/H 不含）
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
     """
     prog = progress if progress is not None else SilentProgressReporter()
+
+    # B 系列菜单跟随 include_news（B/L 菜单含新闻 = 含基金深度分析）
+    fund_deep = include_news if include_fund_deep is None else include_fund_deep
 
     modules = _import_report_modules(prog)
     if not modules:
@@ -381,8 +423,10 @@ def generate_excel_report(
     ws5 = wb.create_sheet()   # 5. 基金业绩分析
     ws6 = wb.create_sheet() if include_news else None  # 6. 财经新闻热点与持仓关联分析
     ws7 = wb.create_sheet() if include_news else None  # 7. 智能预警
+    ws13 = wb.create_sheet() if fund_deep else None    # 13. 基金经理变更监控
 
-    sheets = {"ws1": ws1, "ws2": ws2, "ws3": ws3, "ws4": ws4, "ws5": ws5, "ws6": ws6, "ws7": ws7}
+    sheets = {"ws1": ws1, "ws2": ws2, "ws3": ws3, "ws4": ws4, "ws5": ws5,
+              "ws6": ws6, "ws7": ws7, "ws13": ws13}
 
     # ── 行情市值 + 指数 ──
     data = _resolve_market_data(holdings, details, modules, ws2, prog)
@@ -393,6 +437,7 @@ def generate_excel_report(
     _write_news_and_early_warning(sheets, holdings, pen_result, include_news,
                                   news_data, news_llm_meta, news_top_count,
                                   early_warnings, prog)
+    _write_fund_deep_sheets(sheets, holdings, fund_deep, modules, prog)
     _write_llm_section_and_usage(wb, include_llm, llm_content, prog)
 
     # ── 保存 ──

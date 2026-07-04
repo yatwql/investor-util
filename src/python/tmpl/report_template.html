@@ -34,6 +34,18 @@
         .rating-poor { color: #006400; font-weight: 600; }
         .rating-stable { color: #0066CC; font-weight: 600; }
 
+        .row-danger { background: #FFF0F0 !important; }
+        .row-danger td { border-top: 1px solid #FFCCCC; }
+        .row-warning { background: #FFF8E1 !important; }
+        .row-warning td { border-top: 1px solid #FFE082; }
+        .row-first-check { background: #F5F5F5 !important; }
+        .row-first-check td { color: #888; }
+        .red-text { color: #CC0000; font-weight: 600; }
+        .orange-text { color: #E65100; font-weight: 600; }
+        .gray-text { color: #888; }
+        .notice-banner { background: #E3F2FD; border-left: 4px solid #1976D2; padding: 10px 14px; font-size: 13px; border-radius: 4px; }
+        .summary-tag { font-size: 13px; color: #555; }
+
         .text-left { text-align: left; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
@@ -207,6 +219,7 @@
         <a href="#sec-category">三、持仓分类</a>
         <a href="#sec-penetration">四、资产穿透TOP10</a>
         <a href="#sec-fund-perf">五、基金业绩</a>
+        {% if manager_analysis and manager_analysis.get("results") %}<a href="#sec-manager">十三、经理变更</a>{% endif %}
         {% if news_enabled %}<a href="#sec-news">六、新闻关联</a>{% endif %}
         {% if early_warnings %}<a href="#sec-early-warning">七、智能预警</a>{% endif %}
         {% if llm_enabled %}<a href="#sec-llm">LLM分析</a>{% endif %}
@@ -566,6 +579,56 @@
             <div>* 业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
         </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 13: 基金经理变更监控 (B 系列)                     -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    {% if manager_analysis and manager_analysis.get("results") %}
+    <div id="sec-manager"></div>
+    <div class="section">
+        <div class="section-title">十三、基金经理变更监控</div>
+        <div class="section-content">
+            {% if manager_analysis.get("first_check_summary") %}
+            <div class="notice-banner">📋 {{ manager_analysis["first_check_summary"] }}</div>
+            <br>
+            {% endif %}
+            {% set high_risk = manager_analysis["results"] | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
+            {% if high_risk %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                ⚠️ <strong>{{ high_risk | length }}</strong> 只基金存在变更风险
+            </div>
+            {% endif %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金名称</th><th>代码</th><th>当前基金经理</th><th>任职天数</th>
+                        <th>1月内变更</th><th>3月内变更</th><th>6月内变更</th><th>预警级别</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in manager_analysis["results"] %}
+                    {% set _alert = r.get("alert_level", "") %}
+                    <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% elif _alert == '首检' %}row-first-check{% endif %}">
+                        <td class="text-left">{{ r["name"] }}</td>
+                        <td>{{ r["code"] }}</td>
+                        <td class="text-left">{{ r["current_manager"] }}</td>
+                        <td>{{ r["tenure_days"] }}</td>
+                        <td>{{ "—" if r["is_first_check"] else ("🔴 是" if r["changed_1m"] else "✅ 否") }}</td>
+                        <td>{{ "—" if r["is_first_check"] else ("⚠️ 是" if r["changed_3m"] else "✅ 否") }}</td>
+                        <td>{{ "—" if r["is_first_check"] else ("⚠️ 是" if r["changed_6m"] else "✅ 否") }}</td>
+                        <td class="{% if _alert == '紧急' %}red-text{% elif _alert == '关注' %}orange-text{% elif _alert == '首检' %}gray-text{% endif %}">
+                            {% if _alert == "紧急" %}🔴 {{ _alert }}{% elif _alert == "关注" %}⚠️ {{ _alert }}{% elif _alert == "首检" %}📋 {{ _alert }}{% else %}✅ {{ _alert }}{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 预警级别标准：30天内变更→🔴紧急，90天内→⚠️关注，首次运行→📋首检（自下次起跟踪）</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
     <div id="sec-news"></div>

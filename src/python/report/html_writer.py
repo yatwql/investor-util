@@ -16,6 +16,7 @@ from jinja2 import Environment, FileSystemLoader
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.models import Holding
+from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary
 from src.python.report.html_builders import _build_category_data, _build_perf_data
 from src.python.report.market_value import (
     DetailRow,
@@ -174,6 +175,10 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     penetration = _render_penetration_section(holdings, details, prog)
     perf_data = _render_fund_performance_section(holdings, details, prog)
 
+    # ── 13) 基金经理变更监控（B 系列） ──
+    fund_deep = include_news  # B/L 菜单含基金深度分析
+    manager_analysis = _render_manager_analysis(holdings, fund_deep, prog)
+
     # ── 8) 财经新闻 ──
     news_data, _news_llm_meta = _render_news_section(
         include_news, news_data, news_llm_meta, holdings, news_top_count, penetration, prog)
@@ -202,6 +207,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         cat_data=cat_data, penetration=penetration, perf_data=perf_data,
         news_data=news_data, news_llm_meta=_news_llm_meta,
         has_llm_analysis=has_llm_analysis,
+        manager_analysis=manager_analysis,
         llm_enabled=llm_enabled_flag,
         global_macro=global_macro_content, expert_review=expert_review_content,
         health_check=health_check_content, penetration_deep=penetration_deep_content,
@@ -361,6 +367,29 @@ def _render_fund_performance_section(
     """构建基金业绩分析数据。"""
     prog.info("正在获取基金业绩排名...")
     return _build_perf_data(holdings, details, progress=prog)
+
+
+def _render_manager_analysis(
+    holdings: List[Holding], fund_deep: bool, prog: ProgressReporter,
+) -> dict | None:
+    """构建基金经理变更监控数据。
+
+    Returns:
+        {results: [...], first_check_summary: str | None} 或 None（不启用时）
+    """
+    if not fund_deep:
+        return None
+    prog.info("正在分析基金经理变更...")
+    try:
+        results = detect_manager_changes(holdings)
+        if not results:
+            return {"results": [], "first_check_summary": None}
+        summary = build_first_check_summary(results) if any(r.get("is_first_check") for r in results) else None
+        prog.ok("基金经理变更分析完成")
+        return {"results": results, "first_check_summary": summary}
+    except Exception as e:
+        logger.warning("基金经理变更分析失败: %s", e)
+        return {"results": [], "first_check_summary": None}
 
 
 def _render_news_section(
