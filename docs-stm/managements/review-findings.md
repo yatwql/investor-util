@@ -50,7 +50,7 @@
 ### [R-152] 测试运行时长的可扩展性关注（中优先级）
 
 **发现**：`unit` 模式已达 1997 项、耗时 ~25min，`verify` 模式 ~12min。虽然 `smoke`（24 项/2s）和 `regression`（222 项/~32s）保持快速，但长期趋势不乐观。
-**状态**：🔄 迭代中 — 设计方案已输出（`docs-stm/plan/A5-test-runtime-optimization.md`），待评审实施。
+**状态**：📋 待评审 — 设计方案（`docs-stm/plan/A5-test-runtime-optimization.md`）已完成 4 Phase 16 步详细设计，每步含 目标/验证/回滚。待决策是否进入实施。
 
 ---
 
