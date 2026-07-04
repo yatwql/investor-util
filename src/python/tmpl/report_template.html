@@ -224,6 +224,7 @@
         <a href="#sec-fund-perf">五、基金业绩</a>
         {% if manager_analysis and manager_analysis.get("results") %}<a href="#sec-manager">十三、经理变更</a>{% endif %}
         {% if overlap_matrix and overlap_matrix.get("funds") and overlap_matrix["funds"]|length >= 2 %}<a href="#sec-overlap">十四、重合度矩阵</a>{% endif %}
+        {% if concentration_analysis and concentration_analysis.get("results") %}<a href="#sec-concentration">十五、集中度</a>{% endif %}
         {% if news_enabled %}<a href="#sec-news">六、新闻关联</a>{% endif %}
         {% if early_warnings %}<a href="#sec-early-warning">七、智能预警</a>{% endif %}
         {% if llm_enabled %}<a href="#sec-llm">LLM分析</a>{% endif %}
@@ -734,6 +735,67 @@
                 </tbody>
             </table>
             {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 15: 持仓集中度监控 (B 系列)                       -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    {% if concentration_analysis and concentration_analysis.get("results") %}
+    {% set conc_results = concentration_analysis["results"] %}
+    <div id="sec-concentration"></div>
+    <div class="section">
+        <div class="section-title">十五、持仓集中度监控</div>
+        <div class="section-content">
+            {% set high_risk = conc_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
+            {% if high_risk %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                ⚠️ <strong>{{ high_risk | length }}</strong> 只基金存在集中度风险
+            </div>
+            {% endif %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金名称</th><th>代码</th><th>前3占比</th><th>前5占比</th><th>前10占比</th>
+                        <th>上期前10</th><th>环比变化</th><th>预警</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in conc_results %}
+                    {% set _alert = r.get("alert_level", "") %}
+                    <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% endif %}">
+                        <td class="text-left">{{ r["name"] }}</td>
+                        <td>{{ r["code"] }}</td>
+                        <td>{{ "%.2f"|format(r["top3_pct"]) }}%</td>
+                        <td>{{ "%.2f"|format(r["top5_pct"]) }}%</td>
+                        <td>{{ "%.2f"|format(r["top10_pct"]) }}%</td>
+                        {% if r.get("prev_top10_pct") is not none %}
+                        <td>{{ "%.2f"|format(r["prev_top10_pct"]) }}%</td>
+                        {% else %}
+                        <td style="color: #888;">—</td>
+                        {% endif %}
+                        {% if r.get("is_first_check") %}
+                        <td><span class="gray-text">基线已记录</span></td>
+                        <td><span class="gray-text">📋 首次</span></td>
+                        {% elif r.get("change_pct") is not none %}
+                        {% set cp = r["change_pct"] %}
+                        <td style="{% if cp > 10 %}color: #CC0000; font-weight: bold;{% endif %}">
+                            {% if cp > 0 %}↑{% elif cp < 0 %}↓{% else %}→{% endif %}
+                            {{ "%+.2f"|format(cp) }}%
+                        </td>
+                        <td>{{ r["alert_level"] }}</td>
+                        {% else %}
+                        <td>—</td>
+                        <td>{{ r["alert_level"] }}</td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 环比变化 >+20% → 🔴 紧急，>+10% → ⚠️ 关注，前10占比 >80% → ⚠️ 关注</div>
+            </div>
         </div>
     </div>
     {% endif %}

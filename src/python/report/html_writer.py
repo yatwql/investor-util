@@ -18,6 +18,7 @@ from src.python.report.excel_writer import _cleanup_old_archives, _ensure_report
 from src.python.models import Holding
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary, _is_fund_code
+from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_overlap import compute_overlap_matrix
 from src.python.report.html_builders import _build_category_data, _build_perf_data
 from src.python.report.market_value import (
@@ -184,6 +185,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     # ── 14) 持仓重合度矩阵（B 系列） ──
     overlap_matrix = _render_overlap_matrix(holdings, details, fund_deep, prog)
 
+    # ── 15) 持仓集中度监控（B 系列） ──
+    concentration_analysis = _render_concentration(holdings, fund_deep, prog)
+
     # ── 8) 财经新闻 ──
     news_data, _news_llm_meta = _render_news_section(
         include_news, news_data, news_llm_meta, holdings, news_top_count, penetration, prog)
@@ -214,6 +218,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         has_llm_analysis=has_llm_analysis,
         manager_analysis=manager_analysis,
         overlap_matrix=overlap_matrix,
+        concentration_analysis=concentration_analysis,
         llm_enabled=llm_enabled_flag,
         global_macro=global_macro_content, expert_review=expert_review_content,
         health_check=health_check_content, penetration_deep=penetration_deep_content,
@@ -442,6 +447,41 @@ def _render_overlap_matrix(
     except Exception as e:
         logger.warning("持仓重合度矩阵计算失败: %s", e)
         return None
+
+
+def _render_concentration(
+    holdings: list[Holding],
+    fund_deep: bool,
+    prog: ProgressReporter,
+) -> dict | None:
+    """构建持仓集中度监控数据。
+
+    Returns:
+        {results: [...], ...} 或 None（不启用时）
+    """
+    if not fund_deep:
+        return None
+    prog.info("正在计算持仓集中度...")
+    try:
+        fund_codes = list(dict.fromkeys(
+            h.code for h in holdings if _is_fund_code(h.code)
+        ))
+        fund_holdings: dict[str, dict] = {}
+        for code in fund_codes:
+            fh = fetch_fund_holdings(code)
+            if fh and fh.get("holdings"):
+                fund_holdings[code] = {
+                    "name": fh.get("name", code),
+                    "holdings": fh["holdings"],
+                }
+        if not fund_holdings:
+            return {"results": []}
+        results = compute_concentration(fund_holdings)
+        prog.ok("持仓集中度计算完成")
+        return {"results": results}
+    except Exception as e:
+        logger.warning("持仓集中度计算失败: %s", e)
+        return {"results": []}
 
 
 def _render_news_section(

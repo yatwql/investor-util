@@ -108,6 +108,16 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["write_overlap_matrix_sheet"] = None
         prog.add_error("持仓重合度矩阵模块缺失 (fund_overlap)")
 
+    try:
+        from src.python.report.fund_concentration import compute_concentration
+        from src.python.report.fund_concentration_sheet import write_concentration_sheet
+        modules["compute_concentration"] = compute_concentration
+        modules["write_concentration_sheet"] = write_concentration_sheet
+    except ImportError:
+        modules["compute_concentration"] = lambda fh: []
+        modules["write_concentration_sheet"] = None
+        prog.add_error("持仓集中度监控模块缺失 (fund_concentration)")
+
     return modules
 
 
@@ -322,6 +332,41 @@ def _write_fund_deep_sheets(
             logger.warning("持仓重合度矩阵计算失败: %s", e)
             prog.add_error("持仓重合度矩阵计算失败")
 
+    # 15. 持仓集中度监控
+    compute_conc = modules.get("compute_concentration")
+    write_conc = modules.get("write_concentration_sheet")
+    ws15 = sheets.get("ws15")
+    if ws15 is not None and compute_conc is not None and write_conc is not None:
+        prog.info("正在计算持仓集中度...")
+        try:
+            from src.python.fetcher.fund import fetch_fund_holdings
+            from src.python.report.fund_manager_analysis import _is_fund_code
+
+            fund_codes = list(dict.fromkeys(
+                h.code for h in holdings if _is_fund_code(h.code)
+            ))
+            fund_holdings: dict[str, dict] = {}
+            for code in fund_codes:
+                fh = fetch_fund_holdings(code)
+                if fh and fh.get("holdings"):
+                    fund_holdings[code] = {
+                        "name": fh.get("name", code),
+                        "holdings": fh["holdings"],
+                    }
+
+            if fund_holdings:
+                conc_data = compute_conc(fund_holdings)
+                if conc_data:
+                    write_conc(ws15, conc_data)
+                    prog.ok("持仓集中度监控页签写入完成")
+                else:
+                    logger.info("持仓集中度监控：无持仓数据")
+            else:
+                logger.info("持仓集中度监控：无基金持仓数据")
+        except Exception as e:
+            logger.warning("持仓集中度监控失败: %s", e)
+            prog.add_error("持仓集中度监控失败")
+
 
 def _write_llm_section_and_usage(
     wb: Any, include_llm: bool, llm_content: tuple | None,
@@ -481,9 +526,10 @@ def generate_excel_report(
     ws7 = wb.create_sheet() if include_news else None  # 7. 智能预警
     ws13 = wb.create_sheet() if fund_deep else None    # 13. 基金经理变更监控
     ws14 = wb.create_sheet() if fund_deep else None    # 14. 持仓重合度矩阵
+    ws15 = wb.create_sheet() if fund_deep else None    # 15. 持仓集中度监控
 
     sheets = {"ws1": ws1, "ws2": ws2, "ws3": ws3, "ws4": ws4, "ws5": ws5,
-              "ws6": ws6, "ws7": ws7, "ws13": ws13, "ws14": ws14}
+              "ws6": ws6, "ws7": ws7, "ws13": ws13, "ws14": ws14, "ws15": ws15}
 
     # ── 行情市值 + 指数 ──
     data = _resolve_market_data(holdings, details, modules, ws2, prog)
