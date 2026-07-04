@@ -400,16 +400,8 @@ def _merge_fund_layer(
             unknown_mv += fund_mv
             failed_count += 1
             failed_fund_details.append({"name": fund.name, "code": fund.code})
-            fund_node = normalize_name(fund.name)
-            if fund_node not in merged:
-                sector = classify_sector(fund.name, fund.code)
-                merged[fund_node] = {
-                    "name": fund.name, "codes": {fund.code},
-                    "mv": 0.0, "funds": [], "sector": sector or "--",
-                }
-            merged[fund_node]["mv"] += fund_mv
-            merged[fund_node]["codes"].add(fund.code)
-            merged[fund_node]["funds"].append(f"[{tag}] {fund.name}({fund.code})")
+            # 不把基金本身加入 merged — 穿透结果只反映可识别的底层标的
+            # 基金全值计入 unknown_mv 并在页脚提示，不污染 TOP10
             continue
 
         for item in holdings_data["holdings"]:

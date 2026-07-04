@@ -741,5 +741,95 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
                                     f"{item.get('name')} 占比为负")
 
 
+class TestFundsWithUnavailableHoldings(unittest.TestCase):
+    """验证基金持仓不可获取时，不污染穿透 TOP10。"""
+
+    def _make_detail(self, code: str, market_value: float) -> MockDetailRow:
+        return MockDetailRow(code, market_value)
+
+    @patch("src.python.report.penetration.fetch_fund_holdings")
+    def test_failed_fund_not_in_top10(self, mock_fetch):
+        """持仓数据取不到的基金 → 不进入 top10，基金全值计入 unknown_mv。"""
+        # 一只持仓数据可获取的基金（电池ETF → 宁德时代）
+        # 两只持仓数据不可获取的基金（财通基金 → fetch 返回 None）
+        mock_fetch.side_effect = lambda code: {
+            "561910": {
+                "code": "561910", "name": "电池ETF", "date": "2026-03-31",
+                "holdings": [
+                    {"name": "宁德时代", "code": "300750", "ratio": 15.0},
+                    {"name": "比亚迪", "code": "002594", "ratio": 10.0},
+                ],
+            },
+        }.get(code, None)
+
+        holdings = [
+            Holding("证券账户", "电池ETF", "561910", 1000, 1.0),
+            Holding("支付宝", "财通成长优选混合A", "001480", 1000, 1.0),
+            Holding("支付宝", "财通成长优选混合C", "021528", 500, 1.0),
+        ]
+        details = [
+            self._make_detail("561910", 10000.0),
+            self._make_detail("001480", 31299.59),
+            self._make_detail("021528", 31152.86),
+        ]
+
+        result = pene.compute_penetration_top10(holdings, details)
+
+        # 财通基金不应该出现在 top10 的名称中
+        top10_names = [e["name"] for e in result["top10"]]
+        for name in top10_names:
+            self.assertNotIn("财通", name,
+                             f"穿透 TOP10 不应包含基金名称「{name}」")
+
+        # 宁德时代和比亚迪应为穿透结果（来自电池ETF）
+        self.assertIn("宁德时代", top10_names)
+        self.assertIn("比亚迪", top10_names)
+
+        # 宁德时代市值 = 10000 * 15% = 1500
+        nd = next(e for e in result["top10"] if e["name"] == "宁德时代")
+        self.assertAlmostEqual(nd["mv"], 1500.0, places=1)
+
+        # unknown_mv 包含两只财通基金的全值
+        self.assertAlmostEqual(result["summary"]["unknown_mv"],
+                               31299.59 + 31152.86, delta=0.02)
+
+        # failed_funds 应正确计数
+        self.assertEqual(result["summary"]["failed_funds"], 2)
+
+    @patch("src.python.report.penetration.fetch_fund_holdings")
+    def test_failed_fund_ratio_not_distorted(self, mock_fetch):
+        """未穿透的基金不参与总市值计算，ratio_pct 仅基于可识别资产。"""
+        mock_fetch.side_effect = lambda code: {
+            "561910": {
+                "code": "561910", "name": "电池ETF", "date": "2026-03-31",
+                "holdings": [
+                    {"name": "宁德时代", "code": "300750", "ratio": 50.0},
+                ],
+            },
+        }.get(code, None)
+
+        holdings = [
+            Holding("证券账户", "电池ETF", "561910", 1000, 1.0),
+            Holding("支付宝", "财通成长优选混合A", "001480", 1000, 1.0),
+        ]
+        details = [
+            self._make_detail("561910", 20000.0),
+            self._make_detail("001480", 100000.0),
+        ]
+
+        result = pene.compute_penetration_top10(holdings, details)
+
+        # 电池ETF 穿透宁德时代 = 20000 * 50% = 10000
+        # 财通不进 merged，总市值 = 10000
+        nd = next(e for e in result["top10"] if e["name"] == "宁德时代")
+        self.assertAlmostEqual(nd["mv"], 10000.0, places=1)
+        # 占比应 ≈ 100%
+        self.assertAlmostEqual(nd["ratio_pct"], 100.0, places=1)
+
+        # unknown_mv 正确
+        self.assertAlmostEqual(result["summary"]["unknown_mv"], 100000.0, delta=0.02)
+        self.assertEqual(result["summary"]["failed_funds"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
