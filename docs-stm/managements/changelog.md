@@ -113,7 +113,10 @@
   - 新增 `llm/skeleton.py` 消费方行（`get_llm_module_name()`）
   - 新增 `handlers_config.py` 消费方行（`get_llm_module_names()`）
   - `penetration.py` → `penetration_sheet.py`，API 列补全 `get_llm_module_name()`（路径漂移 + API 遗漏）
-- **W 迭代完成（剩余场景与数据正确性验证增补）**：
+	- **W 迭代完成（剩余场景与数据正确性验证增补）**：
+	- **how-to-config-llm.md — 指纹表/模型名描述修正（2 处）**：
+	  - 指纹成分表：穿透深度分析拆分为独立行，标注  额外字段；智囊团复盘/体检报告补全本日盈亏
+	  - DeepSeek 模型名大小写描述：纠正"混合大小写导致无法识别"为"代码已全小写归一化，推荐风格统一"
   - 场景补全 5 项：T13 交易时段切换缝隙（7 个边界点）、非交易日+LLM 混合（2 项）、多账户+LLM 多轮（3 项）、净值数据空窗期（4 项）、多时区 QDII 净值一致性（6 项）—— 确认均已在 `test_datetime_scenarios.py` 和 `test_llm_scenarios.py` 中实现
   - 数据正确性验证 9 项：三维度分类聚合一致、穿透行业占比归一化、指数行情数值合理、多币种转换正确、QDII 估值净值 vs 官方净值、基金业绩排名合理性、溢价率计算、本日盈亏场外非 T 日更新、穿透市值占比归一化——确认均在 `test_data_integrity.py` 中实现
   - 相关文档同步更新（plan.md、conftest.py）

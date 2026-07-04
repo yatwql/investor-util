@@ -152,7 +152,8 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | 模块 | 指纹包含 |
 |:-----|:---------|
 | **全球政经局势** | 市场指数 + 总市值 + 总盈亏 + 分类 |
-| **智囊团复盘/体检报告/穿透分析** | 总市值/成本/盈亏 + 每笔持仓明细 + 穿透资产 + 分类 |
+| **智囊团复盘 / 持仓体检报告** | 总市值/成本/盈亏/本日盈亏 + 每笔持仓明细 + 穿透资产 + 分类 |
+| **穿透深度分析** | 总市值/成本/盈亏/本日盈亏 + 每笔持仓明细 + 穿透资产(含 mv/sector/ratio 字段, `full_penetration=True`) + 分类 |
 
 指纹哈希值随数据变化而改变，缓存自动失效：
 
@@ -577,7 +578,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
 - 模型：`deepseek-v4-flash`（推荐，**注意全小写**，当前主版本）、`deepseek-chat`（V3 旧版，功能受限）
-- ⚠️ **模型名大小写敏感**：代码中以全小写前缀匹配（如 `deepseek-v4-`），`DeepSeek-V4-Flash` 等大小写混合写法会导致 Extended Thinking 等功能无法识别，请统一使用小写
+- ⚠️ 代码内部使用全小写前缀匹配，推荐统一使用全小写（如 `deepseek-v4-flash`）以保持风格一致；混合大小写亦可正常识别
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
 
