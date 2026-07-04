@@ -339,8 +339,13 @@ def normalize_name(name: str) -> str:
 
 def _classify_and_group(
     holdings: list[Holding], details: list[DetailRow],
-) -> tuple[dict[str, list[Holding]], list[Holding], list[Holding], dict[str, DetailRow]]:
-    """按穿透类型分类持仓，分离基金/直接持股，构建市值映射。"""
+) -> tuple[dict[str, list[Holding]], list[Holding], list[Holding], dict[str, float]]:
+    """按穿透类型分类持仓，分离基金/直接持股，构建市值映射。
+
+    Note:
+        detail_map 返回 ``{code: total_market_value}``，已按代码聚合所有账户市值。
+        funds / direct_stocks 已按代码去重，避免同一基金/股票因跨账户多次归属。
+    """
     classified: dict[str, list[Holding]] = {
         QDII: [], ETF: [], INDEX_LINK: [],
         BOND_FUND: [], ACTIVE_EQUITY: [], STOCK: [], IGNORE: [],
@@ -354,12 +359,30 @@ def _classify_and_group(
     for ft in fund_types:
         funds.extend(classified[ft])
     direct_stocks = classified[STOCK]
-    detail_map = {d.code: d for d in details}
+
+    # ── detail_map：按代码聚合总市值（同一代码跨账户时累加） ──
+    detail_map: dict[str, float] = {}
+    for d in details:
+        detail_map[d.code] = detail_map.get(d.code, 0.0) + d.market_value
+
+    # ── funds / direct_stocks 按代码去重（跨账户时只处理一次） ──
+    def _dedup_by_code(items: list[Holding]) -> list[Holding]:
+        seen: set[str] = set()
+        result: list[Holding] = []
+        for item in items:
+            if item.code not in seen:
+                seen.add(item.code)
+                result.append(item)
+        return result
+
+    funds = _dedup_by_code(funds)
+    direct_stocks = _dedup_by_code(direct_stocks)
+
     return classified, funds, direct_stocks, detail_map
 
 
 def _merge_fund_layer(
-    funds: list[Holding], detail_map: dict[str, DetailRow],
+    funds: list[Holding], detail_map: dict[str, float],
 ) -> tuple[dict[str, Any], float, int, list[dict[str, str]]]:
     """合并基金层穿透，返回 merged 字典 + 统计值。"""
     merged: dict[str, Any] = {}
@@ -368,8 +391,7 @@ def _merge_fund_layer(
     failed_fund_details: list[dict[str, str]] = []
 
     for fund in funds:
-        detail = detail_map.get(fund.code)
-        fund_mv = detail.market_value if detail else 0.0
+        fund_mv = detail_map.get(fund.code, 0.0)
         ftype = classify_penetration(fund)
         tag = _fund_type_tag(ftype)
 
@@ -414,13 +436,12 @@ def _merge_fund_layer(
 
 def _merge_stock_layer(
     direct_stocks: list[Holding],
-    detail_map: dict[str, DetailRow],
+    detail_map: dict[str, float],
     merged: dict[str, Any],
 ) -> None:
     """将直接持股合并入 merged 字典（原地修改）。"""
     for stock in direct_stocks:
-        detail = detail_map.get(stock.code)
-        stock_mv = detail.market_value if detail else 0.0
+        stock_mv = detail_map.get(stock.code, 0.0)
         norm_name = normalize_name(stock.name)
         sector = classify_sector(stock.name, stock.code)
         if norm_name not in merged:

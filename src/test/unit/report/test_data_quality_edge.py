@@ -110,10 +110,9 @@ class TestNewFundEmptyHoldingsY2(unittest.TestCase):
     def test_empty_holdings_moves_to_unknown(self, mock_fetch):
         """空持仓基金 → 归入 unknown_mv，不崩溃。"""
         from src.python.report.penetration import _merge_fund_layer
-        from src.python.report.market_value import DetailRow
 
         funds = [_make_holding("新发基金", "019999", 100, 1.0, account="支付宝")]
-        detail_map = {"019999": _make_detail_row("019999", 100.0, "新发基金")}
+        detail_map = {"019999": 100.0}
         merged, unknown_mv, failed_count, failed_details = _merge_fund_layer(funds, detail_map)
 
         self.assertEqual(failed_count, 1)
@@ -136,8 +135,8 @@ class TestNewFundEmptyHoldingsY2(unittest.TestCase):
         mock_fetch.side_effect = side_effect
 
         detail_map = {
-            "005827": _make_detail_row("005827", 1000.0, "易方达蓝筹"),
-            "019999": _make_detail_row("019999", 100.0, "新发基金"),
+            "005827": 1000.0,
+            "019999": 100.0,
         }
         funds = [
             _make_holding("易方达蓝筹", "005827", 100, 10.0, account="支付宝"),
