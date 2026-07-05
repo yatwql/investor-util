@@ -22,6 +22,7 @@ from src.python.report.excel_writer import (
     write_title_row,
     write_total_row,
 )
+from src.python.report.classification_utils import INDEX_KEYWORDS, is_bond_fund, is_etf, is_offsite_fund, is_qdii, is_stock_code
 from src.python.report.market_value import DetailRow
 from src.python.report.styles import FMT_MONEY, FMT_PERCENT, profit_font
 
@@ -35,18 +36,8 @@ _HEADERS = [
 
 # ── 分类映射规则 ──────────────────────────────────────────
 
-# 场外基金渠道关键词
-_FUND_ACCOUNT_KEYWORDS = ("基金", "支付宝", "微信", "银行")
-
-# 固收类关键词（名称中包含）
-_BOND_KEYWORDS = ("债", "纯债", "短债", "中短债", "信用")
-
-# 货币类关键词
+# 货币类关键词（category 模块特有，无需集中管理）
 _MONEY_KEYWORDS = ("货币", "现金", "增利", "宝")
-
-# 指数类关键词
-_INDEX_KEYWORDS = ("指数", "ETF联接", "ETF 联接", "中证", "沪深300",
-                   "中证500", "中证1000", "科创50", "创业板", "上证")
 
 
 def _categorize_holding(h: Holding) -> tuple[str, str]:
@@ -71,14 +62,13 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
     name = h.name.strip()
     code = h.code.strip()
     account = h.account.strip()
-    name_upper = name.upper()
 
     # 1) QDII
-    if "QDII" in name_upper:
+    if is_qdii(name):
         return ("基金", "QDII")
 
     # 2) 固收类
-    if any(kw in name for kw in _BOND_KEYWORDS):
+    if is_bond_fund(name):
         return ("债券", "纯债")
 
     # 3) 货币类
@@ -86,18 +76,18 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
         return ("现金", "货币")
 
     # 4) 场外渠道
-    is_offsite = any(kw in account for kw in _FUND_ACCOUNT_KEYWORDS)
+    is_offsite = is_offsite_fund(account)
     if is_offsite:
-        if any(kw in name for kw in _INDEX_KEYWORDS):
+        if any(kw in name for kw in INDEX_KEYWORDS):
             return ("基金", "被动")
         return ("基金", "主动")
 
     # 5) 场内 ETF（名称含ETF或代码5/1开头）
-    if "ETF" in name_upper or code.startswith(("5", "1")):
+    if is_etf(name, code):
         return ("基金", "指数")
 
     # 6) 场内股票（代码6/0/3开头）
-    if code.startswith(("6", "0", "3")):
+    if is_stock_code(code):
         return ("股票", "A股")
 
     # 7) 其余归为基金/混合

@@ -10,20 +10,20 @@
 |:------------|:--------:|:----------:|:----------------------------:|:------:|
 | `unit` | 2177 | ~25min | **~20s** | 75x |
 | `standard` | 1896 | ~25min | **~20s** | 75x |
-| `scenario` | 240 | ~32s | ~32s（不并行）| — |
-| `regression` | 240 | ~32s | ~32s（不并行）| — |
-| `verify` | 907 | ~12min | **~49s** | 14.7x |
-| `integration` | 265 | ~42s | — | — |
+| `scenario` | 277 | ~32s | ~32s（不并行）| — |
+| `regression` | 277 | ~32s | ~32s（不并行）| — |
+| `verify` | 944 | ~12min | **~49s** | 14.7x |
+| `integration` | 302 | ~42s | — | — |
 | `edge` | 216 | ~15s | ~15s（不并行）| — |
 | `data` | 65 | ~10s | ~10s（不并行）| — |
-| `all` | 2442 | ~26min | **~待测** | — |
+| `all` | 2479 | ~26min | **~待测** | — |
 | `smoke` | 24 | ~2s | ~2s（不并行）| — |
 | `report` 🆕 | 776 | — | **~15s** | — |
 
-> 注：`all` 模式收集总数 2442 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2430 passed / 12 skipped。
+> 注：`all` 模式收集总数 2479 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2467 passed / 12 skipped。
 > 🆕 `report` 模式为 A5 新增，标记 `unit_report`（776 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）启用 `--parallel medium`（默认）自动并行，场景/边缘/冒烟等轻量模式保持单线程避免进程调度开销。
-> C-P1b（v0.2.86）新增 16 项 LLM 内容/section_order 场景测试，单元测试从 2137→2177，场景从 222→240，全量从 2384→2442。
+> C-P1b（v0.2.86）新增 16 项 LLM 内容/section_order 场景测试，单元测试从 2137→2177，场景从 222→240，全量从 2384→2442。穿透 TOP10 场景（S-P1~S-P10）新增 37 项 → 场景 240→277，全量 2442→2479。
 
 ### 功能域对应测试源
 
@@ -39,14 +39,14 @@
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 342 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 71 |
 | **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 142 |
-| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 5 文件, resilience, llm, datetime 共 9 文件) | 240 |
+| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 6 文件, resilience, llm, datetime 共 10 文件) | 277 |
 
 ### 场景测试分组（scenario）
 
 | 标记 | 覆盖场景 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 全量业务场景 | **240** |
-| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 | 90 |
+| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 + S-P1~S-P10 全量业务场景 | **277** |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 + S-P1~S-P10 | 127 |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 |
 | │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 |
@@ -55,6 +55,7 @@
 | │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 |
 | │  ├ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量（清仓/同名多份额/超多持仓/特殊字符） | 16 |
 | │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 |
+| │  ├ `scenario_penetration` 🆕 | S-P1~S-P10: 穿透 TOP10 场景（股票/债券/ETF/主动/QDII/黄金ETF/联接/国内指数基金/交叉持股） | 37 |
 | │  └ `—` | S29-S33: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市），仅 `scenario_basic` 父标记 | 15 |
 | ├─ `scenario_resilience` | 异常容错场景 S6-S10 | 18 |
 | │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 |

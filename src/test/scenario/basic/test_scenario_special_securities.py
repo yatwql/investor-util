@@ -94,7 +94,7 @@ class TestS22ConvertibleBond(unittest.TestCase):
         # 验证当前逻辑：名称含"债"可能被分类为 债券/纯债
         if "债" in h.name:
             # 检查是否命中 _BOND_KEYWORDS
-            from src.python.report.category import _BOND_KEYWORDS
+            from src.python.report.classification_utils import BOND_KEYWORDS as _BOND_KEYWORDS
             if any(kw in h.name for kw in _BOND_KEYWORDS):
                 self.assertEqual(prop, "债券")
                 self.assertEqual(sub, "纯债")
@@ -284,12 +284,12 @@ class TestS27CrossBorderEtf(unittest.TestCase):
     """S27: 跨境 ETF — 净值延迟和溢价率。"""
 
     def test_us_etf_classification(self):
-        """纳指 ETF → 基金/指数。"""
+        """纳指 ETF → 基金/QDII（隐式 QDII 识别）。"""
         from src.python.report.category import _categorize_holding
         h = Holding("证券", "纳斯达克ETF", "513100", shares=200, cost_price=1.5)
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "基金")
-        self.assertEqual(sub, "指数")
+        self.assertEqual(sub, "QDII")
 
     def test_hk_etf_classification(self):
         """恒生科技 ETF → 基金/指数。"""
@@ -336,9 +336,9 @@ class TestS28BondHoldings(unittest.TestCase):
 
     def test_treasury_name_contains_bond_keyword(self):
         """国债名称含"债" → 命中 _BOND_KEYWORDS。"""
-        from src.python.report.category import _BOND_KEYWORDS
+        from src.python.report.classification_utils import BOND_KEYWORDS
         h = Holding("证券", "20国债01", "019641", shares=100, cost_price=100.0)
-        self.assertTrue(any(kw in h.name for kw in _BOND_KEYWORDS))
+        self.assertTrue(any(kw in h.name for kw in BOND_KEYWORDS))
 
     def test_treasury_classification(self):
         """国债 01xxxx + 名称含"债" → 债券/纯债。"""

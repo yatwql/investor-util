@@ -24,6 +24,7 @@ from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_overlap import compute_overlap_matrix
 from src.python.report.fund_style_analysis import analyze_style_for_all_funds
 from src.python.report.html_builders import _build_category_data, _build_perf_data
+from src.python.report.classification_utils import is_qdii
 from src.python.report.market_value import (
     DetailRow,
     _generate_details,
@@ -102,7 +103,7 @@ def _jinja_price_type_color(price_type: str, name: str = "") -> str:
     if price_type in ("场内收盘价(T)", "场内午市收盘(T)", "官方净值(T)"):
         return "#0066CC"
     if price_type == "官方净值(T-1)":
-        if name and "QDII" in name.upper():
+        if name and is_qdii(name):
             return "#0066CC"
     return ""
 

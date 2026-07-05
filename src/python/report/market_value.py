@@ -17,6 +17,7 @@ from src.python.market_hours import is_market_open as _mh_is_market_open, is_mid
 from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.fetcher.price import fetch_market_data
 from src.python.models import Holding
+from src.python.report.classification_utils import is_etf, is_offsite_fund, is_qdii, is_stock_code
 from src.python.report.excel_writer import auto_width, freeze_header, write_data_row, write_header_row, write_subtotal_row, \
     write_title_row, write_total_row
 from src.python.report.styles import BLUE_FONT, FMT_MONEY, FMT_PERCENT, FMT_PRICE, FMT_SHARES, profit_font
@@ -56,13 +57,6 @@ class DetailRow:
     source_api: str = ""
 
 
-def _is_qdii(name: str) -> bool:
-    return "QDII" in name.upper()
-
-
-def _is_etf(name: str) -> bool:
-    return "ETF" in name.upper()
-
 
 def classify_holdings(holdings: list[Holding]) -> dict[str, list]:
     """按类型分类持仓。
@@ -90,25 +84,22 @@ def classify_holdings(holdings: list[Holding]) -> dict[str, list]:
         "QDII": [],
     }
 
-    # 场外渠道关键词（账户名中包含则视为场外基金账户）
-    _FUND_ACCOUNT_KEYWORDS = ("基金", "支付宝", "微信", "银行")
-
     for h in holdings:
         code = h.code.strip()
         name = h.name.strip()
         account = h.account.strip()
 
-        # 1) QDII（名称含 QDII）
-        if _is_qdii(name):
+        # 1) QDII（名称含 QDII 或海外关键词）
+        if is_qdii(name):
             categories["QDII"].append(h)
         # 2) 场外渠道 → 国内场外（基金账户不会持有场内品种）
-        elif any(kw in account for kw in _FUND_ACCOUNT_KEYWORDS):
+        elif is_offsite_fund(account):
             categories["国内场外"].append(h)
         # 3) 场内 ETF（名称含 ETF，或代码 5/1 开头的场内品种）
-        elif _is_etf(name) or code.startswith(("5", "1")):
+        elif is_etf(name, code):
             categories["场内ETF"].append(h)
         # 4) A 股股票（代码 6/0/3 开头）
-        elif code.startswith(("6", "0", "3")):
+        elif is_stock_code(code):
             categories["场内股票"].append(h)
         # 5) 其余归入场外
         else:
@@ -142,7 +133,7 @@ def price_update_status(details: list[DetailRow], trading_day: str) -> tuple[int
             # 场内资产：净值日期等于交易日即视为已更新（收市价）
             if d.nav_date == trading_day:
                 updated += 1
-        elif d.source_api == "eastmoney" and _is_qdii(d.name):
+        elif d.source_api == "eastmoney" and is_qdii(d.name):
             # QDII：净值日期等于交易日(T)或前一个交易日(T-1)即视为已更新
             if d.nav_date == trading_day or (prev_td and d.nav_date == prev_td):
                 updated += 1
@@ -527,7 +518,7 @@ def _apply_price_type_colors(ws, start_row: int, end_row: int) -> None:
         elif val == "官方净值(T-1)":
             name_cell = ws.cell(row=r, column=_NAME_COL)
             name = str(name_cell.value) if name_cell.value else ""
-            if _is_qdii(name):
+            if is_qdii(name):
                 cell.font = BLUE_FONT
 
 

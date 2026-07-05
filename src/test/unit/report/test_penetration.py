@@ -2,7 +2,7 @@
 
 测试目标：
   - classify_penetration — 各类型基金/股票/忽略的正确分类
-  - _is_bond_fund / _is_index_link — 债券/联接识别
+  - is_bond_fund / is_index_link (classification_utils) — 债券/联接识别
   - _fund_type_tag — 类型→标签映射
   - normalize_name — 名称归一化
   - write_penetration_sheet (mock) — 合并/排序/TOP10 逻辑
@@ -20,6 +20,7 @@ from typing import Any
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from src.python.models import Holding
+from src.python.report import classification_utils as cu
 from src.python.report import penetration as pene
 from src.python.report.market_value import DetailRow
 import pytest
@@ -185,12 +186,12 @@ class TestIsBondFund(unittest.TestCase):
             "南方利率债A", "富国信用债A", "某纯债A", "某债券A",
         ]:
             with self.subTest(name=name):
-                self.assertTrue(pene._is_bond_fund(name))
+                self.assertTrue(cu.is_bond_fund(name))
 
     def test_not_bond(self):
-        self.assertFalse(pene._is_bond_fund("中欧医疗健康混合"))
-        self.assertFalse(pene._is_bond_fund("华夏纳斯达克100ETF(QDII)"))
-        self.assertFalse(pene._is_bond_fund("电池ETF"))
+        self.assertFalse(cu.is_bond_fund("中欧医疗健康混合"))
+        self.assertFalse(cu.is_bond_fund("华夏纳斯达克100ETF(QDII)"))
+        self.assertFalse(cu.is_bond_fund("电池ETF"))
 
 
 class TestIsIndexLink(unittest.TestCase):
@@ -204,12 +205,12 @@ class TestIsIndexLink(unittest.TestCase):
             "某指数联接A",
         ]:
             with self.subTest(name=name):
-                self.assertTrue(pene._is_index_link(name))
+                self.assertTrue(cu.is_index_link(name))
 
     def test_not_link(self):
-        self.assertFalse(pene._is_index_link("中欧医疗健康混合"))
-        self.assertFalse(pene._is_index_link("电池ETF"))
-        self.assertFalse(pene._is_index_link("招商鑫福中短债A"))
+        self.assertFalse(cu.is_index_link("中欧医疗健康混合"))
+        self.assertFalse(cu.is_index_link("电池ETF"))
+        self.assertFalse(cu.is_index_link("招商鑫福中短债A"))
 
 
 class TestFundTypeTag(unittest.TestCase):

@@ -4,6 +4,37 @@
 
 ---
 
+## [0.2.87] - 2026-07-05
+
+### Changed
+
+- **资产分类函数集中重构**：将分散在 `category.py` / `penetration.py` / `market_value.py` / `fund_performance.py` / `html_writer.py` / `llm/prompts.py` 的 7 个资产分类判定函数（`_is_qdii` / `_is_etf` / `_is_bond_fund` / `_is_index_link` / `_is_offsite_fund` / `_is_stock_code` / `is_stock_code`）统一迁移至 `classification_utils.py`，消除定义不一致
+  - 新增 `classification_utils.py`：6 个统一判定函数（`is_stock_code` / `is_etf` / `is_bond_fund` / `is_index_link` / `is_offsite_fund` / `is_qdii`）+ 4 组常量（`FUND_ACCOUNT_KEYWORDS` / `BOND_KEYWORDS` / `BOND_KEYWORDS_STRICT` / `INDEX_KEYWORDS`）
+  - 新增 `BOND_KEYWORDS_STRICT` 常量解决"国债ETF"在穿透分析中被误判为债券基金的问题
+  - 穿透分类优先级：QDII > BOND_FUND(严格) > INDEX_LINK > ETF > ACTIVE_EQUITY > STOCK > IGNORE
+  - 6 个模块移除内联判定逻辑，统一 import `classification_utils`
+  - 新增测试 42 项（`test_classification_utils.py`），回归验证 276 项通过
+
+### Fixed
+
+- **HTML 报告导航锚点修复**：移除空锚点 `<div id="sec-{key}"></div>` 占位，`id` 直接移至 `.section` 容器并配合 CSS `order` 属性，解决导航链接堆叠在顶部的问题
+- **`.section-nav` flex-wrap**：`nowrap; overflow-x: auto` → `wrap`，使导航链接能自动换行
+- **"国债ETF"穿透分类**：`BOND_KEYWORDS_STRICT` 不含独立"债"字，排除可转债和债券 ETF 被误判为债券基金
+
+### Docs
+
+- `scripts/test_runner.py`：移除 8 个模式描述中的硬编码统计项数避免过期误导
+- `docs-stm/manuals/datasource-and-folders.md`：目录树新增 `classification_utils.py` / `test_classification_utils.py`，统计计数同步
+- `docs-stm/managements/test-coverage.md`：计数同步
+- `docs-stm/manuals/how-to-test-my-code.md`：新增 `--mode report` 专项验证说明、穿透场景 S-P1~S-P10 文档
+- `docs-stm/manuals/faq.md`：DeepSeek 兼容端点更新，FAQ 去噪
+- `docs-stm/managements/plan.md`：更新最后版本标记
+
+### Internal
+
+- `src/python/constants.py`：Claude 模型计费前缀回退（`claude-sonnet-4-` / `claude-opus-4-` / `claude-haiku-4-`），覆盖所有日期戳变体，避免费用显示"-"
+- `CLAUDE.md`：管理文档/用户文档列表格式修正
+
 ## [0.2.86] - 2026-07-05
 
 ### Fixed

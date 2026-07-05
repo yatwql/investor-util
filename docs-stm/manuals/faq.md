@@ -97,7 +97,7 @@ A: 删除 `data/config/` 目录下的配置文件后重新启动程序，会自�
 
 **Q: llm_key.json 中的 endpoint 应该填什么？**
 
-A: Claude API 端点：`https://api.anthropic.com/v1/messages`；DeepSeek Anthropic 兼容端点：`https://api.deepseek.com/v1`；OpenAI 兼容端点：`https://api.openai.com/v1/chat/completions`。使用中转代理时请替换为对应地址。
+A: Claude API 端点：`https://api.anthropic.com/v1/messages`；DeepSeek Anthropic 兼容端点：`https://api.deepseek.com/anthropic/v1/messages`；OpenAI 兼容端点：`https://api.openai.com/v1/chat/completions`。使用中转代理时请替换为对应地址。
 
 **Q: 如何配置多个不同的 LLM 模型？**
 
@@ -444,7 +444,7 @@ A: 可以。完成一次菜单 L 后，可再次执行菜单 E/H/B 生成指定�
 
 **Q: 能否设置定时自动生成报告？**
 
-A: 程序本身是交互式 TUI，无内置定时任务。但可通过脚本调用实现自动化：在虚拟环境下执行 `python src/python/main.py --mode batch`（如已实现批处理模式）或通过外部计划任务（Windows 任务计划程序 / Linux cron）驱动菜单 L 的操作流程。
+A: 程序本身是交互式 TUI，无内置定时任务。但可通过外部计划任务（Windows 任务计划程序 / Linux cron）在虚拟环境下驱动菜单 L 的操作流程：`cd /path/to/project && .venv/bin/python src/python/main.py`。
 
 **Q: 持仓变更后旧报告还有保留吗？**
 

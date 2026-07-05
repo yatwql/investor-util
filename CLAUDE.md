@@ -17,8 +17,8 @@
 - **测试标记强制**：所有新增/修改的测试用例（测试类或测试方法）**必须**标注对应的 pytest marker（如 `@pytest.mark.unit_providers`、`@pytest.mark.scenario_basic` 等），marker 定义见 `src/test/conftest.py` 的 `pytest_configure`。新增 marker 需同步注册到 `conftest.py` 和维护文档。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/manuals/datasource-and-folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/latest/` 的子目录（`unit/`、`scenario/`、`integration/`、`regression/`、`edge/`、`all/`）需逐行说明，汇总文件 `index.html` 需标注其作用；`archives/` 下一级仅需一行描述，`<YYYYMMDD>/` 子目录不展开。
-- **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, testplan.md, review-findings.md, changelog.md,test-coverage.md）
-- **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource-and-folders.md, reports-instruction.md, faq.md,how-to-test-my-code.md）
+- **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md）
+- **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource-and-folders.md, reports-instruction.md, faq.md, how-to-test-my-code.md）
 - **中间文件**：中间过程及设计文件 → `docs-stm/plan/`；除日志以外的临时文件 → `docs-stm/tmp/`。禁止放在全局 `.claude/` 目录下
 - **版本号一致**：发布版本时，**必须**同步更新以下位置的版本号/日期，确保程序、用户文档、管理文档统一：`src/python/constants.py`（`APP_VERSION`）、`README.md`（首页版本标记）、`docs-stm/manuals/how-to-test-my-code.md`（头部版本日期）、`docs-stm/managements/changelog.md`（新版本条目）、`docs-stm/managements/plan.md`（最后更新）、以及报告中引用的版本号。任何版本号变更均应全局覆盖，避免遗漏。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功）、`[!]`（部分失败）、`[ERR]`（错误）

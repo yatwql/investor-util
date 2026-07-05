@@ -6,7 +6,7 @@
 
 # ── 项目版本 ──────────────────────────────────────────────
 
-APP_VERSION = "0.2.86"
+APP_VERSION = "0.2.87"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
@@ -23,11 +23,16 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     # input: 标准输入（缓存未命中）
     # output: 输出
     # input_cache_hit: 缓存命中输入（可选，默认等于 input 即无折扣）
+    # 通用前缀（如 "claude-sonnet-4-"）用作 startswith() 回退匹配，
+    # 覆盖所有日期戳变体（如 claude-sonnet-4-20250514），避免费用显示 "-"。
     "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
     "claude-sonnet-4-8": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
+    "claude-sonnet-4-": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
     "claude-opus-4-6": {"input": 15.0, "output": 75.0, "input_cache_hit": 1.50},
     "claude-opus-4-8": {"input": 15.0, "output": 75.0, "input_cache_hit": 1.50},
+    "claude-opus-4-": {"input": 15.0, "output": 75.0, "input_cache_hit": 1.50},
     "claude-haiku-4-5": {"input": 0.25, "output": 1.25, "input_cache_hit": 0.025},
+    "claude-haiku-4-": {"input": 0.25, "output": 1.25, "input_cache_hit": 0.025},
     "claude-fable-5": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
     "gpt-4o": {"input": 2.5, "output": 10.0, "input_cache_hit": 2.5},
     "gpt-4o-mini": {"input": 0.15, "output": 0.6, "input_cache_hit": 0.15},

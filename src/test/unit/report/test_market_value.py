@@ -30,6 +30,7 @@ from unittest.mock import MagicMock, call, patch
 from openpyxl import Workbook
 
 from src.python.models import Holding
+from src.python.report import classification_utils as cu
 from src.python.report import market_value as mv
 from src.python.report.styles import BLUE_FONT
 import pytest
@@ -56,27 +57,27 @@ class TestIsQdii(unittest.TestCase):
 
     def test_qdii_in_name(self):
         """名称含 QDII → True。"""
-        self.assertTrue(mv._is_qdii("华夏纳斯达克100ETF(QDII)"))
+        self.assertTrue(cu.is_qdii("华夏纳斯达克100ETF(QDII)"))
 
     def test_qdii_lowercase(self):
         """名称含小写 qdii → True（大小写不敏感）。"""
-        self.assertTrue(mv._is_qdii("华夏纳斯达克100ETF(qdii)"))
+        self.assertTrue(cu.is_qdii("华夏纳斯达克100ETF(qdii)"))
 
     def test_qdii_mixed_case(self):
         """名称含混合大小写 QdIi → True。"""
-        self.assertTrue(mv._is_qdii("测试(QdIi)"))
+        self.assertTrue(cu.is_qdii("测试(QdIi)"))
 
     def test_non_qdii(self):
         """不含 QDII → False。"""
-        self.assertFalse(mv._is_qdii("电池ETF"))
+        self.assertFalse(cu.is_qdii("电池ETF"))
 
     def test_empty_string(self):
         """空字符串 → False。"""
-        self.assertFalse(mv._is_qdii(""))
+        self.assertFalse(cu.is_qdii(""))
 
     def test_no_market_value_keyword(self):
         """含有其他相似关键词但不含 QDII → False。"""
-        self.assertFalse(mv._is_qdii("QD股票基金"))
+        self.assertFalse(cu.is_qdii("QD股票基金"))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -89,23 +90,23 @@ class TestIsEtf(unittest.TestCase):
 
     def test_etf_in_name(self):
         """名称含 ETF → True。"""
-        self.assertTrue(mv._is_etf("电池ETF"))
+        self.assertTrue(cu.is_etf("电池ETF"))
 
     def test_etf_lowercase(self):
         """名称含小写 etf → True。"""
-        self.assertTrue(mv._is_etf("电池etf"))
+        self.assertTrue(cu.is_etf("电池etf"))
 
     def test_etf_mixed_case(self):
         """名称含混合大小写 Etf → True。"""
-        self.assertTrue(mv._is_etf("电池Etf"))
+        self.assertTrue(cu.is_etf("电池Etf"))
 
     def test_non_etf(self):
         """不含 ETF → False。"""
-        self.assertFalse(mv._is_etf("长江电力"))
+        self.assertFalse(cu.is_etf("长江电力"))
 
     def test_empty_string(self):
         """空字符串 → False。"""
-        self.assertFalse(mv._is_etf(""))
+        self.assertFalse(cu.is_etf(""))
 
 
 # ═══════════════════════════════════════════════════════════

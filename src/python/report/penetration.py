@@ -28,6 +28,7 @@ from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name
+from src.python.report.classification_utils import BOND_KEYWORDS_STRICT, is_etf, is_index_link, is_offsite_fund, is_qdii, is_stock_code
 from src.python.report.market_value import DetailRow
 
 
@@ -52,9 +53,6 @@ _FUND_TYPE_TAG: dict[str, str] = {
     BOND_FUND: "债券",
     ACTIVE_EQUITY: "权益",
 }
-
-# 场外账户关键词
-_FUND_ACCOUNT_KW = ("基金", "支付宝", "微信", "银行")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -86,63 +84,31 @@ def classify_penetration(h: Holding) -> str:
     account = h.account.strip()
 
     # 1) QDII 基金（最优先，名称明确）
-    if "QDII" in name.upper():
+    if is_qdii(name):
         return QDII
 
-    # 2) 债券基金
-    if _is_bond_fund(name):
+    # 2) 债券基金（使用严格关键词，排除可转债和债券 ETF）
+    if any(k in name for k in BOND_KEYWORDS_STRICT):
         return BOND_FUND
 
     # 3) 场外指数联接
-    if _is_index_link(name):
+    if is_index_link(name):
         return INDEX_LINK
 
     # 4) 场内 ETF（名称含 ETF 或代码 5 开头）
-    if "ETF" in name.upper() or code.startswith("5"):
+    if is_etf(name, code):
         return ETF
 
     # 5) 场外账户中的基金 → 主动权益基金（兜底）
-    if any(kw in account for kw in _FUND_ACCOUNT_KW):
+    if is_offsite_fund(account):
         return ACTIVE_EQUITY
 
     # 6) A 股股票
-    if code.startswith(("6", "0", "3")):
+    if is_stock_code(code):
         return STOCK
 
     # 7) 其余忽略
     return IGNORE
-
-
-def _is_bond_fund(name: str) -> bool:
-    """判断名称是否为债券基金。
-
-    识别关键词：纯债 / 短债 / 中短债 / 利率债 / 信用债 / 债券
-
-    Args:
-        name: 基金名称
-
-    Returns:
-        True 表示名称匹配债券基金特征
-    """
-    kw = ("纯债", "短债", "中短债", "利率债", "信用债", "债券")
-    return any(k in name for k in kw)
-
-
-def _is_index_link(name: str) -> bool:
-    """判断是否为场外指数联接基金。
-
-    识别关键词：ETF联接 / ETF链接 / 联接 / 链接（单独出现时也视为联接基金）。
-
-    Args:
-        name: 基金名称
-
-    Returns:
-        True 表示名称匹配指数联接特征
-    """
-    clean = name.replace(" ", "").upper()
-    if "ETF联接" in clean or "ETF链接" in clean:
-        return True
-    return any(kw in name for kw in ("联接", "链接"))
 
 
 def _fund_type_tag(ftype: str) -> str:
