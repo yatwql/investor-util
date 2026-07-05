@@ -5,6 +5,10 @@
   - _industry_transform — 原始数据转换
   - fetch_industry_data — 单只证券行业查询（mock chain）
   - batch_fetch_industry_data — 批量查询（含非 A 股过滤）
+  - eastmoney_industry_rest 模块：
+    - _quote_prefix — A 股交易所前缀
+    - _extract_quotedata — 行情页 JS 变量解析
+    - fetch_industry_and_concepts — mock HTTP 后的业务逻辑
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -15,6 +19,8 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import MagicMock, patch
+
+import httpx
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 
@@ -179,9 +185,9 @@ class TestBatchFetchIndustryData(unittest.TestCase):
         """美股代码自动过滤，不调 API。"""
         from src.python.fetcher.industry import batch_fetch_industry_data
         result = batch_fetch_industry_data(["600900", "AAPL", "00700", "PEP"])
-        # AAPL/00700/PEP 被过滤，只调用了 600900
-        self.assertEqual(mock_fetch.call_count, 1)
-        # 600900 返回 None，全空
+        # AAPL/00700/PEP 被过滤，只调用了 600900（首次失败后重试一次）
+        self.assertEqual(mock_fetch.call_count, 2)
+        # 600900 两次均返回 None，全空
         self.assertEqual(result, {})
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
@@ -206,3 +212,122 @@ class TestBatchFetchIndustryData(unittest.TestCase):
         self.assertIn("sh600000", result)
         self.assertIn("sz000001", result)
         self.assertNotIn("AAPL", result)
+
+
+# ──────────────────────────────────────────────────────────────
+# eastmoney_industry_rest 模块单元测试
+# ──────────────────────────────────────────────────────────────
+
+class TestRestQuotePrefix(unittest.TestCase):
+    """_quote_prefix 纯函数测试。"""
+
+    def _call(self, code: str) -> str:
+        from src.python.providers.eastmoney_industry_rest import _quote_prefix
+        return _quote_prefix(code)
+
+    def test_sh_60(self):
+        """60xxxx → sh。"""
+        self.assertEqual(self._call("600000"), "sh")
+
+    def test_sh_68(self):
+        """68xxxx → sh。"""
+        self.assertEqual(self._call("688001"), "sh")
+
+    def test_sz_00(self):
+        """00xxxx → sz。"""
+        self.assertEqual(self._call("000001"), "sz")
+
+    def test_sz_30(self):
+        """30xxxx → sz。"""
+        self.assertEqual(self._call("300001"), "sz")
+
+    def test_bj_8(self):
+        """8xxxxx → bj。"""
+        self.assertEqual(self._call("830001"), "bj")
+
+
+class TestRestExtractQuotedata(unittest.TestCase):
+    """_extract_quotedata 纯函数测试。"""
+
+    def _call(self, html: str) -> dict | None:
+        from src.python.providers.eastmoney_industry_rest import _extract_quotedata
+        return _extract_quotedata(html)
+
+    def test_normal(self):
+        """正常 HTML 含 quotedata → 正确解析。"""
+        html = (
+            '<html><body><script>'
+            'var quotedata = {"name":"test","code":"600000",'
+            '"bk_name":"白酒Ⅱ","bk_id":"BK1277"};'
+            '</script></body></html>'
+        )
+        result = self._call(html)
+        self.assertEqual(result["bk_name"], "白酒Ⅱ")
+        self.assertEqual(result["bk_id"], "BK1277")
+
+    def test_no_quotedata(self):
+        """不含 quotedata → None。"""
+        html = "<html><body>no data here</body></html>"
+        self.assertIsNone(self._call(html))
+
+    def test_empty_html(self):
+        """空 HTML → None。"""
+        self.assertIsNone(self._call(""))
+
+    def test_sz_stock(self):
+        """深圳股票 quotedata → 正确解析。"""
+        html = (
+            '<script>var quotedata = {"name":"平安银行","code":"000001",'
+            '"bk_name":"银行","bk_id":"BK0477","type111":2};</script>'
+        )
+        result = self._call(html)
+        self.assertEqual(result["bk_name"], "银行")
+        self.assertEqual(result["bk_id"], "BK0477")
+
+
+class TestRestFetchIndustryAndConcepts(unittest.TestCase):
+    """eastmoney_industry_rest.fetch_industry_and_concepts 测试。"""
+
+    @patch("src.python.providers.eastmoney_industry_rest.make_http_client")
+    def test_success(self, mock_client_factory):
+        """正常返回 → 返回行业数据，概念列表为空。"""
+        from src.python.providers.eastmoney_industry_rest import fetch_industry_and_concepts
+
+        # mock HTTP 响应
+        mock_client = mock_client_factory.return_value.__enter__.return_value
+        mock_resp = mock_client.get.return_value
+        mock_resp.text = (
+            '<script>var quotedata = {"name":"贵州茅台","code":"600519",'
+            '"bk_name":"白酒Ⅱ","bk_id":"BK1277"};</script>'
+        )
+
+        result = fetch_industry_and_concepts("600519")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["code"], "600519")
+        self.assertEqual(result["industry"], "白酒Ⅱ")
+        self.assertEqual(result["industry_id"], "BK1277")
+        self.assertEqual(result["concepts"], [])
+        self.assertEqual(result["concept_ids"], [])
+
+    @patch("src.python.providers.eastmoney_industry_rest.make_http_client")
+    def test_no_quotedata(self, mock_client_factory):
+        """页面无 quotedata → None。"""
+        from src.python.providers.eastmoney_industry_rest import fetch_industry_and_concepts
+
+        mock_client = mock_client_factory.return_value.__enter__.return_value
+        mock_resp = mock_client.get.return_value
+        mock_resp.text = "<html><body>no data</body></html>"
+
+        result = fetch_industry_and_concepts("600519")
+        self.assertIsNone(result)
+
+    @patch("src.python.providers.eastmoney_industry_rest.make_http_client")
+    def test_http_error_returns_none(self, mock_client_factory):
+        """HTTP 请求异常 → None。"""
+        from src.python.providers.eastmoney_industry_rest import fetch_industry_and_concepts
+
+        mock_client = mock_client_factory.return_value.__enter__.return_value
+        mock_client.get.side_effect = httpx.TimeoutException("timeout")
+
+        result = fetch_industry_and_concepts("000001")
+        self.assertIsNone(result)

@@ -29,4 +29,7 @@
 | 2026-07-04 | R-149~R-155 全部 5 项修复（安全注释/re-export审计/缓存展示/API签名验证/页签排序） | ✅ 已完成 |
 | 2026-07-05 | C 迭代实施后文档审核：`_ENV.globals` vs 模板上下文不匹配/CSS order 顺序修复/模块 data rows Border/Side 隐式导入依赖/`fund_deep`→`enable_b_series` 命名对齐 | ✅ 已完成 |
 
+| 2026-07-05 | R-156：push2 行业数据频繁 "Server disconnected" — 重试次数 1→3、指数退避+抖动、超时 10s→15s、批量级失败重试 | ✅ 已完成 |
+| 2026-07-05 | R-157：push2 全线不可用时无 fallback — 新增 `eastmoney_industry_rest` 备用链路（行情页 scraped quotedata），`industry` chain 扩展为双链路 | 🔄 待验证 |
+
 _已修复问题详细变更记录见 `docs-stm/managements/changelog.md`。_

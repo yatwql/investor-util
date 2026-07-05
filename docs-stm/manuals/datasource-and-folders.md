@@ -64,6 +64,7 @@ investor-util/
 │       │   │   ├── eastmoney.py          # 东方财富 — 场外基金净值 + 备用价格链路（push2.eastmoney.com）
 │       │   │   ├── tiantian.py           # 天天基金 — 基金业绩排名 + 季报持仓（JS 变量解析 + HTML 解析）
 │       │   │   ├── eastmoney_industry.py # 东方财富行业分类 — 三级行业 + 概念板块归属（push2 API）
+│       │   │   ├── eastmoney_industry_rest.py # 东方财富行业分类备用 — 行情页 quotedata 解析（push2 不可用时 fallback）
 │       │   │   ├── akshare_extras.py     # akshare 封装 — 盈利预测 / 行业资金流向 / 股票历史分红
 │       │   │   ├── akshare_news.py       # akshare 新闻 — 财新网要闻 + CCTV 财经新闻
 │       │   │   ├── sina_news.py          # 新浪财经新闻 — feed.mix.sina.com.cn
@@ -116,11 +117,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2442 tests）
+│   └── test/                             # 测试（按标记分组目录，2455 tests）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2177 项，8 个子分组）
+│       ├── unit/                         # 单元测试（2190 项，8 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）

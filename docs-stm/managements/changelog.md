@@ -4,6 +4,25 @@
 
 ---
 
+## [0.2.87] - 2026-07-05
+
+### Fixed
+
+- **R-156：push2 行业数据频繁 "Server disconnected" 容错增强**：
+  - `eastmoney_industry.py`：重试次数 1→3（4 次总请求），指数退避（0.5s→1s→2s）+ 随机抖动 0.3s
+  - `eastmoney_industry.py`：超时 10s→15s，增加随机/隐式导入
+  - `industry.py`：`batch_fetch_industry_data` 新增批量级重试，首次失败后短暂等待（0.8s+抖动）重试一次
+  - 对应更新测试 `test_us_stock_filtered_out` 断言（call_count 1→2）
+
+### Added
+
+- **R-157：push2 全线不可用时 fallback 链路 — eastmoney_industry_rest**：
+  - 新增 `src/python/providers/eastmoney_industry_rest.py`：行情页 HTML scraped 备用链路，解析 `quotedata.bk_name`（行业名称）/ `bk_id`（行业 BK 代码）
+  - `chain.py`：`industry` 链扩展为 `["eastmoney_industry", "eastmoney_industry_rest"]`
+  - `industry.py`：注册 `eastmoney_industry_rest` 到 provider 映射表
+  - 新增测试 13 项：`_quote_prefix`（5 类代码前缀）、`_extract_quotedata`（4 场景）、`fetch_industry_and_concepts`（3 场景，含 mock HTTP 异常）
+  - 注意：概念板块数据依赖 push2 XHR 动态加载，fallback 仅提供行业分类，概念列表留空（graceful degradation）
+
 ## [0.2.86] - 2026-07-05
 
 ### Fixed

@@ -21,7 +21,7 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "price": ["tencent", "eastmoney"],
     "fund_rank": ["tiantian"],
     "fund_hold": ["tiantian"],
-    "industry": ["eastmoney_industry"],
+    "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
 }
 
 
