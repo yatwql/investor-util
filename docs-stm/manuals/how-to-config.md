@@ -132,7 +132,7 @@
 | `price` | `tencent → eastmoney` | `tencent`, `eastmoney` | 股票/ETF 实时收盘价首选源 |
 | `fund_rank` | `tiantian`（仅此一个） | `tiantian` | 基金业绩排名首选源 |
 | `fund_hold` | `tiantian`（仅此一个） | `tiantian` | 基金持仓穿透首选源 |
-| `industry` | `eastmoney_industry`（仅此一个） | `eastmoney_industry` | 行业分类/概念板块首选源 |
+| `industry` | `eastmoney_industry → eastmoney_industry_rest` | `eastmoney_industry`, `eastmoney_industry_rest` | 行业分类/概念板块首选源（push2 不稳时可切到 REST 行情页） |
 
 示例 — 将行情首选从腾讯改为东方财富：
 
@@ -140,6 +140,16 @@
 {
   "preferred_provider": {
     "price": "eastmoney"
+  }
+}
+```
+
+示例 — 行业 push2 不稳定时直接走行情页 REST 链路（跳过 push2，仅行业分类，无概念板块）：
+
+```json
+{
+  "preferred_provider": {
+    "industry": "eastmoney_industry_rest"
   }
 }
 ```
