@@ -16,6 +16,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 import pytest
+from src.python.fetcher.chain import reset_provider_skip
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.edge]
 
@@ -24,6 +25,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     """Provider Chain HTTP 特定错误回退 edge 场景。"""
 
     def setUp(self):
+        reset_provider_skip()  # 清除前序测试的熔断状态
         self.provider_fn_map = {
             "p1": ("Provider1", None),
             "p2": ("Provider2", None),
@@ -34,7 +36,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_timeout_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """Provider 超时 → 回退到下一链路。"""
-        from src.python.fetcher.chain import _fetch_with_fallback
+        from src.python.fetcher.chain import _fetch_with_fallback, reset_provider_skip
         import httpx
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
@@ -53,7 +55,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_429_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """HTTP 429 限流 → 回退到下一链路。"""
-        from src.python.fetcher.chain import _fetch_with_fallback
+        from src.python.fetcher.chain import _fetch_with_fallback, reset_provider_skip
         import httpx
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
@@ -72,7 +74,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_503_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """HTTP 503 服务不可用 → 回退到下一链路。"""
-        from src.python.fetcher.chain import _fetch_with_fallback
+        from src.python.fetcher.chain import _fetch_with_fallback, reset_provider_skip
         import httpx
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
@@ -91,7 +93,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_all_providers_http_errors_fall_to_stale(self, mock_chain, mock_set, mock_get):
         """全部 Provider 各抛不同 HTTP 错误 → 降级到过期缓存。"""
-        from src.python.fetcher.chain import _fetch_with_fallback
+        from src.python.fetcher.chain import _fetch_with_fallback, reset_provider_skip
         import httpx
         mock_chain.return_value = ["p1", "p2"]
         # 第一次 cache_get（新鲜缓存）→ None；第二次（过期降级）→ stale

@@ -43,7 +43,18 @@ def _get_chain(data_type: str) -> list[str]:
     return chain
 
 
-# ── Provider 函数类型 ────────────────────────────────────────
+# ── 会话级 Provider 熔断 ────────────────────────────────────
+# 同一 provider 连续失败 _PROVIDER_SKIP_THRESHOLD 次后，
+# 本会话剩余请求跳过该 provider，避免每次等待超时/断连。
+_PROVIDER_CONSECUTIVE_FAILURES: dict[str, int] = {}
+_PROVIDER_SKIP: set[str] = set()
+_PROVIDER_SKIP_THRESHOLD = 3
+
+
+def reset_provider_skip() -> None:
+    """重置 Provider 熔断状态（测试用）。"""
+    _PROVIDER_CONSECUTIVE_FAILURES.clear()
+    _PROVIDER_SKIP.clear()
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
@@ -128,6 +139,12 @@ def _fetch_with_fallback(
     # 2) 遍历 chain 尝试
     kwargs = fn_kwargs or {}
     for provider_name in chain:
+        # 会话级熔断：连续失败已达阈值 → 跳过
+        if provider_name in _PROVIDER_SKIP:
+            logger.info("[%s] %s 已被熔断（连续 %d 次失败），跳过",
+                         data_type, provider_name, _PROVIDER_SKIP_THRESHOLD)
+            continue
+
         entry = provider_fn_map.get(provider_name)
         if not entry:
             logger.warning("[%s] 未知 Provider '%s'，跳过", data_type, provider_name)
@@ -142,8 +159,19 @@ def _fetch_with_fallback(
 
         result = _try_provider_fetch(data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform)
         if result is not None:
+            # 成功 → 恢复熔断计数器
+            _PROVIDER_CONSECUTIVE_FAILURES.pop(provider_name, None)
+            _PROVIDER_SKIP.discard(provider_name)
             cache_set(cache_key, result)
             return result
+
+        # 失败 → 累计连续失败计数
+        count = _PROVIDER_CONSECUTIVE_FAILURES.get(provider_name, 0) + 1
+        _PROVIDER_CONSECUTIVE_FAILURES[provider_name] = count
+        if count >= _PROVIDER_SKIP_THRESHOLD:
+            _PROVIDER_SKIP.add(provider_name)
+            logger.warning("[%s] %s 连续 %d 次失败，本会话后续请求跳过",
+                           data_type, provider_name, count)
 
     # 3) 降级：全部 Provider 失败时尝试过期缓存
     stale = cache_get(cache_key, CACHE_WEEKLY)
