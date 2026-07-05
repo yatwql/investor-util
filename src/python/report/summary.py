@@ -251,8 +251,6 @@ def write_summary_sheet(
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
     """
-    set_sheet_title(ws, "summary")
-
     row = write_title_row(ws, 1, get_report_sheet_name('summary'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 

@@ -62,7 +62,6 @@ def write_fund_manager_sheet(
         manager_data: detect_manager_changes() 的返回结果
     """
     _name = get_report_sheet_name('fund_manager')
-    set_sheet_title(ws, "fund_manager")
     write_title_row(ws, 1, f"13. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 

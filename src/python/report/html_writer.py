@@ -160,7 +160,7 @@ _ENV.globals["section_visible"] = _jinja_section_visible
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None) -> str:
+def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     通过各子函数获取分析数据，渲染 Jinja2 模板，
@@ -229,9 +229,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     prog.info("正在渲染 HTML...")
     has_llm_analysis = any(item.get("llm_analysis") for item in (news_data or []))
 
-    # 报告模块序号 & 可见性
-    section_order = get_report_section_order()
-    section_numbers = {sec["key"]: sec["number"] for sec in section_order}
+    # 报告模块序号 & 可见性（优先使用传入的 section_order，避免影子覆盖参数）
+    order = section_order or get_report_section_order()
+    section_numbers = {sec["key"]: sec["number"] for sec in order}
 
     raw_data_flags = {
         "manager_data": bool(manager_analysis and manager_analysis.get("results")),
@@ -243,7 +243,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         "llm_enabled": llm_enabled_flag,
     }
     section_visible_dict = {}
-    for sec in section_order:
+    for sec in order:
         flag_name = sec.get("data_flag")
         if not flag_name:
             section_visible_dict[sec["key"]] = True
@@ -277,7 +277,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         llm_module_info=llm_module_info, llm_endpoint=llm_endpoint,
         cache_stats=get_cache_hit_rate(),
         # C 迭代：序号 & 可见性（模板使用 section_numbers/section_visible_dict）
-        section_order=section_order, section_numbers=section_numbers,
+        section_order=order, section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,
     )
 

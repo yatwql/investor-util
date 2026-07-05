@@ -4,6 +4,19 @@
 
 ---
 
+## [0.2.86] - 2026-07-05
+
+### Fixed
+
+- **C-P1b：Excel 页签标题跟随用户 `report_section_order` 配置**：
+  - `registry.py`：`set_sheet_title()` 扩展接收 `section_order: list[dict] | None` 参数，优先从配置取 number，未命中时回退默认值
+  - `excel_generator.py`：`_create_sheets()` 传入 `section_order`，新增 `section_order` 参数到 `generate_excel_report()` → `_write_llm_section_and_usage()`
+  - 11 个 sheet 写入器移除冗余 `set_sheet_title()` 调用，标题统一由 `_create_sheets()` 设置
+  - `llm_content.py`：`_get_module_key_map()` 移除模块级缓存 `_MODULE_KEY_MAP`，改为每次按 `section_order` 动态构建；`_get_placeholder()`、`_write_content_sheet()`、`write_llm_sheets()` 均接收并传递 `section_order`
+  - `html_writer.py`：`write_html_report()` 接收 `section_order` 参数，内部传递至模板渲染
+  - `handlers_report.py`：4 条命令函数（`_cmd_generate_excel` / `_cmd_generate_html` / `_cmd_generate_both` / `_cmd_generate_full`）从 config 读取 `section_order` 传入生成管线
+  - 新增测试 16 项（llm_content 10 + scenario 6），回归验证 906 项通过
+
 ## [0.2.85] - 2026-07-05
 
 ### Added

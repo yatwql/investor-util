@@ -133,3 +133,94 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(type_counts["b_series"], 4)
         self.assertEqual(type_counts["news"], 2)
         self.assertEqual(type_counts["llm"], 5)
+
+
+class TestScenarioCustomSectionOrder(unittest.TestCase):
+    """C 迭代报告序号可配置 — 自定义顺序场景验证。
+
+    验证 `get_report_section_order(config)` 在用户自定义配置下的合并行为，
+    以及 set_sheet_title 在自定义序号下的正确性。
+    """
+
+    def setUp(self):
+        from src.python.registry import (
+            get_report_section_order,
+            set_sheet_title,
+        )
+        self._get_order = get_report_section_order
+        self._set_title = set_sheet_title
+
+    def _partial_config(self) -> dict:
+        """部分自定义配置：只覆盖前 3 个模块的序号。"""
+        return {
+            "report_section_order": {
+                "fund_performance": 1,
+                "summary": 2,
+                "market_value": 3,
+            }
+        }
+
+    def _mock_ws(self):
+        class MockWs:
+            def __init__(self):
+                self.title = ""
+        return MockWs()
+
+    def test_partial_custom_preserves_remaining_16_items(self):
+        """部分自定义 → 仍返回 16 个模块，未配置项自动续编。"""
+        order = self._get_order(self._partial_config())
+        self.assertEqual(len(order), 16)
+
+    def test_partial_custom_reorders_modules(self):
+        """部分自定义 → fund_performance 排第 1，summary 排第 2，market_value 排第 3。"""
+        order = self._get_order(self._partial_config())
+        self.assertEqual(order[0]["key"], "fund_performance")
+        self.assertEqual(order[0]["number"], 1)
+        self.assertEqual(order[1]["key"], "summary")
+        self.assertEqual(order[1]["number"], 2)
+        self.assertEqual(order[2]["key"], "market_value")
+        self.assertEqual(order[2]["number"], 3)
+
+    def test_partial_custom_auto_numbers_remaining(self):
+        """部分自定义 → 未配置项保留原始序号（部分配置仅更改顺序和已配置项的序号）。"""
+        order = self._get_order(self._partial_config())
+        # 已配置项出现在前 3 位
+        configured = {s["key"] for s in order[:3]}
+        self.assertEqual(configured, {"fund_performance", "summary", "market_value"})
+        # 未配置项 key 个数 = 13（总 16 - 3 已配置）
+        remaining = order[3:]
+        self.assertEqual(len(remaining), 13)
+        # number 列应单调递增（可包含重复因部分配置和默认序号冲突）
+        numbers = [s["number"] for s in remaining]
+        for i in range(1, len(numbers)):
+            self.assertGreaterEqual(numbers[i], numbers[i-1],
+                                    f"剩余项序号不单调递增: {numbers}")
+
+    def test_partial_custom_all_keys_present(self):
+        """部分自定义 → 所有 16 个 key 都出现且不重复。"""
+        order = self._get_order(self._partial_config())
+        keys = [s["key"] for s in order]
+        self.assertEqual(len(set(keys)), 16)
+
+    def test_partial_custom_assigns_correct_number_and_name(self):
+        """部分自定义 → set_sheet_title 使用配置的 number。"""
+        order = self._get_order(self._partial_config())
+        for sec in order[:3]:
+            ws = self._mock_ws()
+            self._set_title(ws, sec["key"], order)
+            expected = f"{sec['number']}.{sec['name']}"
+            self.assertEqual(ws.title, expected,
+                             f"{sec['key']}: 预期 {expected!r}，实际 {ws.title!r}")
+
+    def test_custom_unknown_key_falls_back_to_default(self):
+        """自定义配置中有不再注册表中的 key → 忽略，不影响合并结果。"""
+        config = {
+            "report_section_order": {
+                "summary": 1,
+                "nonexistent_key": 99,
+            }
+        }
+        order = self._get_order(config)
+        self.assertEqual(len(order), 16)
+        keys = [s["key"] for s in order]
+        self.assertNotIn("nonexistent_key", keys)

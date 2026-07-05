@@ -1358,6 +1358,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_hdr.return_value = 3
 
         ws = MagicMock()
+        ws.title = "fixture_title"  # 写入器不再修改标题
         result = mv.write_market_value_sheet(ws, self.holdings, "2026-06-26")
 
         grand_mv, grand_cost, grand_profit, grand_today, details = result
@@ -1387,8 +1388,8 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_freeze.assert_called_once_with(ws, 2)
         mock_aw.assert_called_once_with(ws)
 
-        # 验证工作表标题
-        self.assertEqual(ws.title, "2.市值核算明细表")
+        # 验证写入器不修改页签标题
+        self.assertEqual(ws.title, "fixture_title")
 
     @patch("src.python.report.market_value.write_total_row")
     @patch("src.python.report.market_value.write_subtotal_row")

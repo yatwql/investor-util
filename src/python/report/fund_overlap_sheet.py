@@ -74,7 +74,6 @@ def write_overlap_matrix_sheet(
 
     # ── 标题 ──
     _name = get_report_sheet_name('fund_overlap')
-    set_sheet_title(ws, "fund_overlap")
     write_title_row(ws, 1, f"14. {_name}", ncols=n + 2)
 
     if n < 2:

@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-04（v0.2.85 — 同步 S29-S33/版本迭代表）
+最后更新：2026-07-05（v0.2.86 — C-P1b 修复 + test_scenario_section_order）
 
 ---
 
@@ -73,6 +73,7 @@
 | `test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
 | `test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
 | `test_scenario_operational_behavior.py` | S29-S33 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 |
+| `test_scenario_section_order.py` | C-P1b | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 
 **业务场景规格（S0a-S0d、S1-S33、T1-T21）：**
@@ -334,7 +335,7 @@
 
 | 版本 | 测试重点 |
 |:-----|:---------|
-| v0.2.86 | **C 迭代完成**：`report_section_order` 注册表驱动 + HTML 全链路重构 + 文档同步（P3 已签收，测试无新增） |
+| v0.2.86 | **C-P1b 修复**：Excel 页签标题跟随 `report_section_order` 配置；`_get_module_key_map()` 移除模块级缓存；新增 16 项测试 |
 | v0.2.85 | **B 迭代完成**：基金经理变更监控/重合度矩阵/集中度监控/风格漂移检测 4 模块 105 项新测试，report 单元 667→699 项，全量 2341 项 |
 | v0.2.84 | **A5 Phase 1**：pytest-xdist 并行执行，unit 模式 25min→20s（75x），verify 12min→49s（14.7x）；report 模式新增～15s |
 | v0.2.66 | 全量测试计数 2056（scenario 143）、标记污染修复、8 项非场景测试迁至 unit/report/ |
@@ -513,6 +514,7 @@ def test_get_ttl_closed(self, mock_open):
 | **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
 | **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
 | **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S33 |
+| **报告序号场景** | `test_scenario_section_order.py` | C-P1b |
 | **LLM 场景测试** | `test_llm_scenarios.py` | S11-S20 |
 | **日期/时间场景** | `test_datetime_scenarios.py` | T1-T21 |
 | **缺陷回归测试** | 对应模块的 `test_*.py` 或 `test_regression.py` | Bug fix 的断言 |
