@@ -8,13 +8,35 @@
 
 ### Fixed
 
+- **R-158：Excel "LLM API 用量" 页签未显示模块明细**：
+  - `excel_generator.py`：`_build_llm_usage_sheet` 中 `per_module` 从 `formatted` 取改为从 `raw_session` 取
+  - 根本原因：`format_session_usage` 在特定状态返回 `{"has_usage": False}`（不含 `per_module` 键），导致 `formatted.get("per_module", {})` 返回空字典，进而 `excel_module_info` 为空、函数提前返回，页签无数据
+  - 修复：优先从始终含 `per_module` 的 `raw_session` 读取数据，`formatted` 作为降级回退
+  - 新增回归测试 `test_raw_session_per_module_fallback`
+
 - **R-156：push2 行业数据频繁 "Server disconnected" 容错增强**：
   - `eastmoney_industry.py`：重试次数 1→3（4 次总请求），指数退避（0.5s→1s→2s）+ 随机抖动 0.3s
   - `eastmoney_industry.py`：超时 10s→15s，增加随机/隐式导入
   - `industry.py`：`batch_fetch_industry_data` 新增批量级重试，首次失败后短暂等待（0.8s+抖动）重试一次
   - 对应更新测试 `test_us_stock_filtered_out` 断言（call_count 1→2）
 
+- **R-159a：Provider Chain 熔断器线程竞争**：
+  - `chain.py`：`batch_fetch_industry_data` 多线程（`ThreadPoolExecutor(max_workers=3)`）同时写入 `_PROVIDER_CONSECUTIVE_FAILURES`，无锁覆盖导致熔断计数器永远达不到阈值
+  - 修复：新增 `_PROVIDER_LOCK = threading.Lock()`，所有读写操作线程安全
+
+- **R-159b：A 股代码判定修复 — 250361 基金代码误入行业链路**：
+  - `industry._is_a_share_code`：从仅检查"6 位数字"升级为前缀区间检查（60/68/00/30/8），基金代码（250361 等）不再被误判为 A 股
+  - 250361 不再触发东方财富 REST 行情页 404 错误
+
 ### Added
+
+- **R-159c：代码类型判定中心化 — code_utils.py**：
+  - 新增 `src/python/code_utils.py`：资产代码/名称类型识别唯一入口，集中管理所有前缀区间和名称关键词知识
+  - 新增函数：`is_a_share_code`、`is_fund_code`、`is_stock_like_code`、`is_exchange_fund_code`、`is_hk_stock_code`、`get_exchange_prefix`、`get_push2_secid`、`is_qdii_by_name`、`is_etf_by_name`、`is_bond_related_by_name`、`is_index_link_by_name`
+  - 全量迁移 12 个调用方：`fetcher/industry.py`、`providers/eastmoney_industry.py`、`providers/eastmoney_industry_rest.py`、`providers/tencent.py`、`providers/akshare_extras.py`、`report/penetration.py`、`report/category.py`、`report/market_value.py`、`report/fund_performance.py`、`report/penetration_sheet.py`、`llm/prompts.py`
+  - 删除 4 个重复的内部函数：`penetration._is_bond_fund`、`penetration._is_index_link`、`market_value._is_qdii`、`market_value._is_etf`
+  - `llm/prompts._is_qdii` 委托至 `code_utils.is_qdii_by_name`
+  - `CLAUDE.md` + `technical.md` 添加"代码类型判定中心化"约束
 
 - **R-157：push2 全线不可用时 fallback 链路 — eastmoney_industry_rest**：
   - 新增 `src/python/providers/eastmoney_industry_rest.py`：行情页 HTML scraped 备用链路，解析 `quotedata.bk_name`（行业名称）/ `bk_id`（行业 BK 代码）

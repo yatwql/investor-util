@@ -17,6 +17,7 @@ from typing import Any
 from src.python.cache import get_ttl
 from src.python.fetcher.chain import _fetch_with_fallback
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
+from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
 
@@ -70,21 +71,8 @@ def fetch_industry_data(code: str) -> dict | None:
 
 
 def _is_a_share_code(code: str) -> bool:
-    """判断是否为 A 股代码（含 sh/sz/bj 前缀的 6 位数字）。
-
-    美股（AAPL）、港股（00700）等非 A 股代码直接跳过，
-    避免无效 API 调用和误导性日志。
-    """
-    raw = code.strip()
-    if not raw:
-        return False
-    # 去除已知前缀
-    for prefix in ("sh", "sz", "bj"):
-        if raw.startswith(prefix):
-            raw = raw[len(prefix):]
-            break
-    # A 股代码必须为纯数字 6 位
-    return len(raw) == 6 and raw.isdigit()
+    """判断是否为 A 股代码（委托至 code_utils.is_a_share_code）。"""
+    return is_a_share_code(code)
 
 
 def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[str, dict]:

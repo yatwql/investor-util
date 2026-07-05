@@ -8,6 +8,7 @@ chain 中按优先级列出 provider，主链路失败后自动递补。
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any, Callable
 
 from src.python.cache import CACHE_WEEKLY, get as cache_get, set as cache_set
@@ -49,12 +50,15 @@ def _get_chain(data_type: str) -> list[str]:
 _PROVIDER_CONSECUTIVE_FAILURES: dict[str, int] = {}
 _PROVIDER_SKIP: set[str] = set()
 _PROVIDER_SKIP_THRESHOLD = 3
+# 线程锁：熔断计数器被 batch_fetch_industry_data 等从多线程写入
+_PROVIDER_LOCK = threading.Lock()
 
 
 def reset_provider_skip() -> None:
     """重置 Provider 熔断状态（测试用）。"""
-    _PROVIDER_CONSECUTIVE_FAILURES.clear()
-    _PROVIDER_SKIP.clear()
+    with _PROVIDER_LOCK:
+        _PROVIDER_CONSECUTIVE_FAILURES.clear()
+        _PROVIDER_SKIP.clear()
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
@@ -140,7 +144,9 @@ def _fetch_with_fallback(
     kwargs = fn_kwargs or {}
     for provider_name in chain:
         # 会话级熔断：连续失败已达阈值 → 跳过
-        if provider_name in _PROVIDER_SKIP:
+        with _PROVIDER_LOCK:
+            _skip = provider_name in _PROVIDER_SKIP
+        if _skip:
             logger.info("[%s] %s 已被熔断（连续 %d 次失败），跳过",
                          data_type, provider_name, _PROVIDER_SKIP_THRESHOLD)
             continue
@@ -160,16 +166,19 @@ def _fetch_with_fallback(
         result = _try_provider_fetch(data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform)
         if result is not None:
             # 成功 → 恢复熔断计数器
-            _PROVIDER_CONSECUTIVE_FAILURES.pop(provider_name, None)
-            _PROVIDER_SKIP.discard(provider_name)
+            with _PROVIDER_LOCK:
+                _PROVIDER_CONSECUTIVE_FAILURES.pop(provider_name, None)
+                _PROVIDER_SKIP.discard(provider_name)
             cache_set(cache_key, result)
             return result
 
-        # 失败 → 累计连续失败计数
-        count = _PROVIDER_CONSECUTIVE_FAILURES.get(provider_name, 0) + 1
-        _PROVIDER_CONSECUTIVE_FAILURES[provider_name] = count
+        # 失败 → 累计连续失败计数（线程安全：counter 被多个 worker 同时读写）
+        with _PROVIDER_LOCK:
+            count = _PROVIDER_CONSECUTIVE_FAILURES.get(provider_name, 0) + 1
+            _PROVIDER_CONSECUTIVE_FAILURES[provider_name] = count
+            if count >= _PROVIDER_SKIP_THRESHOLD:
+                _PROVIDER_SKIP.add(provider_name)
         if count >= _PROVIDER_SKIP_THRESHOLD:
-            _PROVIDER_SKIP.add(provider_name)
             logger.warning("[%s] %s 连续 %d 次失败，本会话后续请求跳过",
                            data_type, provider_name, count)
 

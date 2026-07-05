@@ -16,55 +16,81 @@ from __future__ import annotations
 
 import json
 import logging
+import random
+import time
 from typing import Any
 
 import httpx
 
 from src.python.http_client import make_http_client
+from src.python.code_utils import get_push2_secid
 
 logger = logging.getLogger("invest")
 
 _PUSH2_BASE = "https://push2.eastmoney.com/api/qt/stock/get"
-_TIMEOUT = 10.0
+_TIMEOUT = 15.0
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Referer": "https://www.eastmoney.com/",
 }
+# 最大重试次数（总请求数 = _MAX_RETRIES + 1）
+_MAX_RETRIES = 3
+
+# ── 熔断器 ──────────────────────────────────────────────
+_PUSH2_CIRCUIT_OPEN = False     # 是否已熔断
+_PUSH2_FAILURE_COUNT = 0        # 连续失败计数
+_PUSH2_CIRCUIT_THRESHOLD = 5    # 连续失败 N 次后熔断
+
+# 查询字段（行业分类 + 扩展行情，供 fund_style 等模块使用）
+#   f9=动态市盈率(PE), f20=总市值, f23=市净率(PB)
+#   f57=代码, f58=名称, f127=行业, f128=地域, f129=概念, f198=行业BK
+_FIELDS = "f57,f58,f127,f128,f129,f198,f9,f20,f23"
 
 
 def _secid(code: str) -> str:
-    """根据代码生成 secid 参数。
-
-    上海股票 (60xxxx、68xxxx) 及沪市 ETF (51xxxx、56xxxx、58xxxx)
-    使用 1.{code} 前缀。
-    深圳股票 (00xxxx、30xxxx) 及深市 ETF (15xxxx、2xxxxx)
-    使用 0.{code} 前缀。
-    """
-    code = code.strip()
-    if code.startswith(("0", "1", "2", "3")):  # 深市
-        return f"0.{code}"
-    return f"1.{code}"  # 沪市（含 5/6/8/4 开头）
+    """根据代码生成 secid 参数（委托至 code_utils.get_push2_secid）。"""
+    return get_push2_secid(code)
 
 
-def _make_push2_request(code: str, retries: int = 1) -> dict | None:
+def _circuit_breaker_record_failure() -> None:
+    """累加连续失败计数，达到阈值时打开熔断。"""
+    global _PUSH2_FAILURE_COUNT, _PUSH2_CIRCUIT_OPEN
+    _PUSH2_FAILURE_COUNT += 1
+    if _PUSH2_FAILURE_COUNT >= _PUSH2_CIRCUIT_THRESHOLD:
+        _PUSH2_CIRCUIT_OPEN = True
+        logger.warning("东方财富 push2 连续 %d 次失败，触发熔断，本运行周期跳过",
+                        _PUSH2_CIRCUIT_THRESHOLD)
+
+
+def _circuit_breaker_reset() -> None:
+    """请求成功时重置熔断计数。"""
+    global _PUSH2_FAILURE_COUNT
+    _PUSH2_FAILURE_COUNT = 0
+
+
+def _make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
     """执行 push2 行业/概念 API 请求，返回 data 内层字典或 None。
 
-    支持自动重试：对连接断开等瞬态错误，间隔 0.5s 重试。
+    支持自动重试：对连接断开等瞬态错误，使用指数退避 + 随机抖动重试。
+    支持熔断：连续 `_PUSH2_CIRCUIT_THRESHOLD` 次失败后本进程周期跳过。
 
     Args:
         code: 6 位证券代码
-        retries: 失败重试次数（默认 1 次，总请求数 = retries + 1）
+        retries: 失败重试次数（默认 3 次，总请求数 = retries + 1）
 
     Returns:
         data 内层字典；全部失败返回 None
     """
+    global _PUSH2_CIRCUIT_OPEN
+    if _PUSH2_CIRCUIT_OPEN:
+        logger.debug("东方财富 push2 熔断已开启，跳过 [%s]", code)
+        return None
+
     params = {
         "secid": _secid(code),
-        "fields": "f57,f58,f127,f128,f129,f198",
+        "fields": _FIELDS,
     }
-    logger.debug("东方财富 push2 行业/概念请求: %s", code)
-
-    import time
+    logger.debug("东方财富 push2 请求: %s", code)
 
     for attempt in range(retries + 1):
         try:
@@ -73,10 +99,13 @@ def _make_push2_request(code: str, retries: int = 1) -> dict | None:
                 text = resp.text
         except (httpx.TimeoutException, httpx.RequestError) as e:
             if attempt < retries:
-                logger.debug("东方财富 push2 请求失败 [%s]（第 %d 次重试）: %s", code, attempt + 1, e)
-                time.sleep(0.5)
+                delay = (0.5 * (2 ** attempt)) + random.uniform(0, 0.3)
+                logger.debug("东方财富 push2 请求失败 [%s]（第 %d 次重试，%.1fs 后）: %s",
+                             code, attempt + 1, delay, e)
+                time.sleep(delay)
                 continue
             logger.warning("东方财富 push2 请求失败 [%s]: %s", code, e)
+            _circuit_breaker_record_failure()
             return None
 
         try:
@@ -89,8 +118,11 @@ def _make_push2_request(code: str, retries: int = 1) -> dict | None:
         if not inner or not isinstance(inner, dict):
             logger.warning("东方财富 push2 返回空数据 [%s]", code)
             return None
+
+        _circuit_breaker_reset()
         return inner
-    return None
+
+    return None  # 所有重试耗尽（理论上不会执行到）
 
 
 def _extract_concept_list(inner: dict) -> list[str]:

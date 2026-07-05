@@ -21,6 +21,7 @@ import threading as _threading
 import time as _time
 
 from src.python.cache import get as cache_get, set as cache_set
+from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
 
@@ -430,7 +431,7 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
         return {}
 
     # ── 只处理 A 股代码 ──
-    a_codes = [c for c in codes if c.startswith(("6", "0", "3"))]
+    a_codes = [c for c in codes if is_a_share_code(c)]
     if not a_codes:
         logger.debug("分红数据: 无 A 股代码，跳过")
         return {}

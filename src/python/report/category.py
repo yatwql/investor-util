@@ -11,6 +11,13 @@ import logging
 
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.code_utils import (
+    is_a_share_code,
+    is_bond_related_by_name,
+    is_exchange_fund_code,
+    is_hk_stock_code,
+    is_qdii_by_name,
+)
 from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.models import Holding
 from src.python.report.excel_writer import (
@@ -37,9 +44,6 @@ _HEADERS = [
 
 # 场外基金渠道关键词
 _FUND_ACCOUNT_KEYWORDS = ("基金", "支付宝", "微信", "银行")
-
-# 固收类关键词（名称中包含）
-_BOND_KEYWORDS = ("债", "纯债", "短债", "中短债", "信用")
 
 # 货币类关键词
 _MONEY_KEYWORDS = ("货币", "现金", "增利", "宝")
@@ -74,11 +78,12 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
     name_upper = name.upper()
 
     # 1) QDII
-    if "QDII" in name_upper:
+    if is_qdii_by_name(name):
         return ("基金", "QDII")
 
-    # 2) 固收类
-    if any(kw in name for kw in _BOND_KEYWORDS):
+    # 2) 固收类（使用 is_bond_related_by_name + "债" 宽匹配，
+    #    覆盖纯债基金和可转债等含"债"字段的品种）
+    if is_bond_related_by_name(name) or "债" in name:
         return ("债券", "纯债")
 
     # 3) 货币类
@@ -93,11 +98,11 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
         return ("基金", "主动")
 
     # 5) 场内 ETF（名称含ETF或代码5/1开头）
-    if "ETF" in name_upper or code.startswith(("5", "1")):
+    if "ETF" in name_upper or is_exchange_fund_code(code):
         return ("基金", "指数")
 
-    # 6) 场内股票（代码6/0/3开头）
-    if code.startswith(("6", "0", "3")):
+    # 6) 场内股票（A股或港股通）
+    if is_a_share_code(code) or is_hk_stock_code(code):
         return ("股票", "A股")
 
     # 7) 其余归为基金/混合
@@ -108,7 +113,7 @@ def _load_dividend_data(holdings: List[Holding]) -> dict:
     """加载分红数据（非关键，失败时返回空字典）。"""
     try:
         from src.python.providers.akshare_extras import get_dividend_data
-        stock_codes = [h.code for h in holdings if h.code.strip().startswith(("6", "0", "3"))]
+        stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         return get_dividend_data(stock_codes) if stock_codes else {}
     except Exception:
         logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)

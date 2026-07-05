@@ -11,6 +11,7 @@ from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.code_utils import is_a_share_code
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
 from src.python.report.excel_writer import (
@@ -72,7 +73,7 @@ def _load_dividend_data_safe(result: dict) -> dict:
     try:
         from src.python.providers.akshare_extras import get_dividend_data
         all_top10_codes = list(set().union(*(entry.get("codes", []) for entry in result["top10"])))
-        a_stock_codes = [c for c in all_top10_codes if c.startswith(("6", "0", "3"))]
+        a_stock_codes = [c for c in all_top10_codes if is_a_share_code(c)]
         return get_dividend_data(a_stock_codes) if a_stock_codes else {}
     except Exception:
         logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)

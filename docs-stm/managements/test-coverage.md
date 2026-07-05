@@ -2,29 +2,28 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-05）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-06）测试覆盖规模：
 
 ### 模式对应测试量
 
 | `--mode` 值 | 覆盖项数 | 优化前耗时 | 优化后耗时（parallel medium） | 加速比 |
 |:------------|:--------:|:----------:|:----------------------------:|:------:|
-| `unit` | 2190 | ~25min | **~20s** | 75x |
-| `standard` | 1909 | ~25min | **~20s** | 75x |
+| `unit` | 2188 | ~25min | **~20s** | 75x |
+| `standard` | 1907 | ~25min | **~20s** | 75x |
 | `scenario` | 240 | ~32s | ~32s（不并行）| — |
 | `regression` | 240 | ~32s | ~32s（不并行）| — |
 | `verify` | 907 | ~12min | **~49s** | 14.7x |
-| `integration` | 265 | ~42s | — | — |
-| `edge` | 216 | ~15s | ~15s（不并行）| — |
-| `data` | 65 | ~10s | ~10s（不并行）| — |
-| `all` | 2455 | ~26min | **~待测** | — |
+| `integration` | 263 | ~42s | — | — |
+| `edge` | 214 | ~15s | ~15s（不并行）| — |
+| `data` | 63 | ~10s | ~10s（不并行）| — |
+| `all` | 2453 | ~26min | **~待测** | — |
 | `smoke` | 24 | ~2s | ~2s（不并行）| — |
-| `report` 🆕 | 776 | — | **~15s** | — |
+| `report` 🆕 | 773 | — | **~15s** | — |
 
-> 注：`all` 模式收集总数 2442 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2430 passed / 12 skipped。
-> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（776 项），供报告模块开发期快速验证。
+> 注：`all` 模式收集总数 2453 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2441 passed / 12 skipped。
+> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（773 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）启用 `--parallel medium`（默认）自动并行，场景/边缘/冒烟等轻量模式保持单线程避免进程调度开销。
-> C-P1b（v0.2.86）新增 16 项 LLM 内容/section_order 场景测试，单元测试从 2137→2177，场景从 222→240，全量从 2384→2442。
-> R-157（v0.2.87）新增 13 项 eastmoney_industry_rest 备用链路单元测试，fetcher 组 159→172，单元总计 2177→2190，全量 2442→2455。
+> v0.2.87 完成 code_utils 代码类型判定中心化迁移，全量 2453 项（2441 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 

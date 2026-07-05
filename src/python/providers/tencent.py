@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from src.python.http_client import make_http_client
+from src.python.code_utils import get_exchange_prefix
 
 logger = logging.getLogger("invest")
 
@@ -39,17 +40,11 @@ _FIELD_MAP: dict[str, int] = {
 
 
 def _add_prefix(code: str) -> str:
-    """根据代码前缀添加交易所标识。"""
+    """根据代码前缀添加交易所标识（委托至 code_utils.get_exchange_prefix）。"""
     code = code.strip()
     if len(code) != 6:
         return code
-    if code.startswith(("5", "6")):
-        return f"sh{code}"
-    if code.startswith(("0", "1", "2", "3", "9")):
-        return f"sz{code}"
-    if code.startswith(("4", "8")):
-        return f"bj{code}"
-    return code
+    return get_exchange_prefix(code) + code
 
 
 def _parse_response(text: str) -> dict[str, Any] | None:

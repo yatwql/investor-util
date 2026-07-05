@@ -1,7 +1,7 @@
 """市值核算模块单元测试。
 
 测试目标：
-  - _is_qdii / _is_etf  — 基金类型识别
+  - is_qdii_by_name / is_etf_by_name — 基金类型识别（委派 code_utils）
   - _date_within_days   — 日期范围判断
   - classify_holdings   — 持仓分类逻辑
   - price_update_status — 价格更新状态检测
@@ -47,65 +47,52 @@ from src.python.report.market_value import (
 
 
 # ═══════════════════════════════════════════════════════════
-#  _is_qdii
+#  is_qdii_by_name（委派 code_utils）
 # ═══════════════════════════════════════════════════════════
 
 
 class TestIsQdii(unittest.TestCase):
-    """测试 _is_qdii 名称含 QDII 判断。"""
+    """测试 is_qdii_by_name 名称含 QDII 判断。"""
 
     def test_qdii_in_name(self):
         """名称含 QDII → True。"""
-        self.assertTrue(mv._is_qdii("华夏纳斯达克100ETF(QDII)"))
+        from src.python.code_utils import is_qdii_by_name
+        self.assertTrue(is_qdii_by_name("华夏纳斯达克100ETF(QDII)"))
 
     def test_qdii_lowercase(self):
         """名称含小写 qdii → True（大小写不敏感）。"""
-        self.assertTrue(mv._is_qdii("华夏纳斯达克100ETF(qdii)"))
+        from src.python.code_utils import is_qdii_by_name
+        self.assertTrue(is_qdii_by_name("华夏纳斯达克100ETF(qdii)"))
 
     def test_qdii_mixed_case(self):
         """名称含混合大小写 QdIi → True。"""
-        self.assertTrue(mv._is_qdii("测试(QdIi)"))
+        from src.python.code_utils import is_qdii_by_name
+        self.assertTrue(is_qdii_by_name("测试(QdIi)"))
 
     def test_non_qdii(self):
         """不含 QDII → False。"""
-        self.assertFalse(mv._is_qdii("电池ETF"))
+        from src.python.code_utils import is_qdii_by_name
+        self.assertFalse(is_qdii_by_name("电池ETF"))
 
     def test_empty_string(self):
         """空字符串 → False。"""
-        self.assertFalse(mv._is_qdii(""))
+        from src.python.code_utils import is_qdii_by_name
+        self.assertFalse(is_qdii_by_name(""))
 
     def test_no_market_value_keyword(self):
         """含有其他相似关键词但不含 QDII → False。"""
-        self.assertFalse(mv._is_qdii("QD股票基金"))
-
-
-# ═══════════════════════════════════════════════════════════
-#  _is_etf
-# ═══════════════════════════════════════════════════════════
-
-
-class TestIsEtf(unittest.TestCase):
-    """测试 _is_etf 名称含 ETF 判断。"""
-
-    def test_etf_in_name(self):
-        """名称含 ETF → True。"""
-        self.assertTrue(mv._is_etf("电池ETF"))
-
-    def test_etf_lowercase(self):
-        """名称含小写 etf → True。"""
-        self.assertTrue(mv._is_etf("电池etf"))
-
-    def test_etf_mixed_case(self):
-        """名称含混合大小写 Etf → True。"""
-        self.assertTrue(mv._is_etf("电池Etf"))
+        from src.python.code_utils import is_qdii_by_name
+        self.assertFalse(is_qdii_by_name("QD股票基金"))
 
     def test_non_etf(self):
-        """不含 ETF → False。"""
-        self.assertFalse(mv._is_etf("长江电力"))
+        """不含 ETF → False（通过 _etf_by_name 委派 code_utils）。"""
+        from src.python.code_utils import is_etf_by_name
+        self.assertFalse(is_etf_by_name("长江电力"))
 
     def test_empty_string(self):
         """空字符串 → False。"""
-        self.assertFalse(mv._is_etf(""))
+        from src.python.code_utils import is_etf_by_name
+        self.assertFalse(is_etf_by_name(""))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -206,8 +193,8 @@ class TestClassifyHoldings(unittest.TestCase):
     # ── 兜底 ─────────────────────────────────────────────
 
     def test_other_code_falls_back(self):
-        """其余（代码非 6/0/3/5/1）→ 国内场外。"""
-        h = self._h("某基金", "888888")
+        """其余（非 A 股/ETF 前缀）→ 国内场外。"""
+        h = self._h("某基金", "400000")
         result = mv.classify_holdings([h])
         self.assertEqual(len(result["国内场外"]), 1)
 

@@ -24,6 +24,7 @@ import logging
 from datetime import datetime
 from typing import Any, List
 
+from src.python.code_utils import is_a_share_code, is_bond_related_by_name, is_index_link_by_name
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
@@ -90,11 +91,11 @@ def classify_penetration(h: Holding) -> str:
         return QDII
 
     # 2) 债券基金
-    if _is_bond_fund(name):
+    if is_bond_related_by_name(name):
         return BOND_FUND
 
     # 3) 场外指数联接
-    if _is_index_link(name):
+    if is_index_link_by_name(name):
         return INDEX_LINK
 
     # 4) 场内 ETF（名称含 ETF 或代码 5 开头）
@@ -106,43 +107,11 @@ def classify_penetration(h: Holding) -> str:
         return ACTIVE_EQUITY
 
     # 6) A 股股票
-    if code.startswith(("6", "0", "3")):
+    if is_a_share_code(code):
         return STOCK
 
     # 7) 其余忽略
     return IGNORE
-
-
-def _is_bond_fund(name: str) -> bool:
-    """判断名称是否为债券基金。
-
-    识别关键词：纯债 / 短债 / 中短债 / 利率债 / 信用债 / 债券
-
-    Args:
-        name: 基金名称
-
-    Returns:
-        True 表示名称匹配债券基金特征
-    """
-    kw = ("纯债", "短债", "中短债", "利率债", "信用债", "债券")
-    return any(k in name for k in kw)
-
-
-def _is_index_link(name: str) -> bool:
-    """判断是否为场外指数联接基金。
-
-    识别关键词：ETF联接 / ETF链接 / 联接 / 链接（单独出现时也视为联接基金）。
-
-    Args:
-        name: 基金名称
-
-    Returns:
-        True 表示名称匹配指数联接特征
-    """
-    clean = name.replace(" ", "").upper()
-    if "ETF联接" in clean or "ETF链接" in clean:
-        return True
-    return any(kw in name for kw in ("联接", "链接"))
 
 
 def _fund_type_tag(ftype: str) -> str:

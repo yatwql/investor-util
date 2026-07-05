@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-05（v0.2.86 — C 迭代：报告序号可配置 + 4 种可见性类型 + CSS order 排序）
+最后更新：2026-07-06（v0.2.87 — R-159：代码类型判定中心化 + 行业数据容错增强）
 
 ---
 
@@ -43,6 +43,7 @@ investor-util/
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
 │   │   ├── cache.py              # 缓存引擎
+│   │   ├── code_utils.py         # 代码类型判定中心化（A 股/基金/QDII 等识别原语）
 │   │   ├── config.py             # 配置读写
 │   │   ├── constants.py          # 共享常量
 │   │   ├── fetcher/               # 数据获取调度
@@ -77,6 +78,38 @@ investor-util/
 ```
 
 > 完整目录树（含所有 providers/ 和 report/ 子文件）及最新测试计数见 [数据源一览 & 目录结构](../manuals/datasource-and-folders.md#目录结构)。
+
+---
+
+## 代码类型判定中心化
+
+`src/python/code_utils.py` 是资产代码类型识别的唯一入口，集中管理所有前缀区间和名称关键词知识。
+
+### 设计原则
+
+- **code_utils 只提供底层原语**：基于代码前缀/名称关键词的纯技术判定，无业务上下文
+- **业务层可组合使用**：category/penetration/market_value 等模块组合多个原语 + 账户上下文做业务分类
+- **不允许自行实现**：任何模块不得出现 `code.startswith(("6", "0", "3"))` 或 `"QDII" in name.upper()` 等判定，必须调用 code_utils
+
+### 函数清单
+
+| 函数 | 类型 | 用途 |
+|------|------|------|
+| `is_a_share_code(code)` | 前缀 | A 股（60/68/00/30/8 开头） |
+| `is_fund_code(code)` | 前缀 | 无歧义基金代码（16/50/51/52/159/184） |
+| `is_stock_like_code(code)` | 前缀 | 股票类（A+B 股 + 北交所） |
+| `is_exchange_fund_code(code)` | 前缀 | 场内基金/ETF（5/1 开头） |
+| `is_hk_stock_code(code)` | 前缀 | 港股通（5 位数字） |
+| `get_exchange_prefix(code)` | 前缀 | sh/sz/bj 交易所前缀 |
+| `get_push2_secid(code)` | 前缀 | push2 API secid 参数 |
+| `is_qdii_by_name(name)` | 名称 | QDII 识别 |
+| `is_etf_by_name(name)` | 名称 | ETF 识别 |
+| `is_bond_related_by_name(name)` | 名称 | 债券基金/品种识别 |
+| `is_index_link_by_name(name)` | 名称 | 指数联接基金识别 |
+
+### 迁移状态
+
+v0.2.87 已完成全量迁移，所有 `code.startswith()` 和名称关键词判定已收敛到 code_utils。
 
 ---
 
@@ -161,7 +194,7 @@ investor-util/
 ### 资产穿透TOP10
 
 - `compute_penetration_top10()` 纯计算函数，不依赖 openpyxl
-- 分类逻辑（QDII/ETF/联接/债券/主动/直接持股）基于代码前缀 + 名称规则
+- 分类逻辑（QDII/ETF/联接/债券/主动/直接持股）基于代码前缀 + 名称规则，所有底层判定委托至 `code_utils`（见[代码类型判定中心化](#代码类型判定中心化)）
 - 板块分类 `classify_sector()` 使用静态关键词映射，同时支持 API 行业数据补充
 - 调用 `batch_fetch_industry_data()` 为穿透结果注入行业信息（覆盖静态关键词的局限）
 
@@ -227,7 +260,7 @@ Provider Chain 注册表（registry.py）
 | `price.py` | 股票/基金最新价 | tencent, eastmoney | `price_*` |
 | `index.py` | A 股/美股指数 | tencent, sina | `index_*` |
 | `fund.py` | 基金排名/持仓/基准 | tiantian, eastmoney | `fund_perf_*`, `fund_hold_*`, `fund_benchmarks` |
-| `industry.py` | 行业分类+概念板块 | eastmoney_industry | `industry_*` |
+| `industry.py` | 行业分类+概念板块 | eastmoney_industry, eastmoney_industry_rest | `industry_*` |
 
 - **并行预热**：`preload_cache()` 对 preload 组（6 模块）使用 `ThreadPoolExecutor` 并行获取，减少串行等待
 - **菜单驱动**：菜单 [1] 和 [2] 分别清除 + 重拉 refresh 和 preload 组，复用 fetcher 模块的预热入口

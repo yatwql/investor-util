@@ -33,6 +33,7 @@ investor-util/
 │   ├── python/                       # 主程序代码 — 业务子包声明
 │   │   ├── __init__.py               # 包标记（空文件）
 │   │   ├── cache.py                  # 缓存引擎 — 泛用 JSON 文件缓存、TTL 管理、过期清理、指纹失效
+│   │   ├── code_utils.py             # 证券代码/名称类型判定中心 — A股/基金/债券/港股通/ETF/QDII 识别原语
 │   │   ├── config.py                 # 配置管理 — config.json / llm_key.json / llm_settings.json 读写、校验
 │   │   ├── constants.py              # 共享常量 — 版本号、缓存频率常量（CACHE_DAILY 等）、模型定价
 │   │   ├── http_client.py            # HTTP 客户端工厂 — 统一 httpx.Client 创建、超时/重试配置

@@ -22,6 +22,7 @@ from typing import Any
 import httpx
 
 from src.python.http_client import make_http_client
+from src.python.code_utils import get_exchange_prefix
 
 logger = logging.getLogger("invest")
 
@@ -34,18 +35,8 @@ _HEADERS = {
 
 
 def _quote_prefix(code: str) -> str:
-    """生成行情页面所需的交易所前缀。
-
-    - 上海（60xxxx、68xxxx、51xxxx、56xxxx、58xxxx）→ sh
-    - 深圳（00xxxx、30xxxx、15xxxx、2xxxxx）→ sz
-    - 北京（8xxxxx）→ bj
-    """
-    code = code.strip()
-    if code.startswith(("0", "1", "2", "3")):
-        return "sz"
-    if code.startswith("8"):
-        return "bj"
-    return "sh"
+    """生成行情页面所需的交易所前缀（委托至 code_utils.get_exchange_prefix）。"""
+    return get_exchange_prefix(code)
 
 
 def _extract_quotedata(html: str) -> dict | None:

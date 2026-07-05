@@ -110,9 +110,9 @@ class TestIsFund(unittest.TestCase):
     # -- 非股票前缀代码始终为基金 --
 
     def test_non_stock_prefix_codes(self):
-        """1 / 5 / 8 开头代码（非股票前缀）-> True"""
+        """非 A 股/港股通前缀代码 -> True"""
         cases = [("某债券", "110011"), ("某ETF", "510050"),
-                 ("某产品", "888888")]
+                 ("某产品", "400000")]
         for name, code in cases:
             with self.subTest(code=code):
                 h = self._h(name, code)
