@@ -22,6 +22,8 @@ from src.python.report.llm_content import (
     _ROW_HEIGHT_PER_LINE,
     _CHARS_PER_LINE,
     _calc_row_height,
+    _get_module_key_map,
+    _get_placeholder,
     _strip_html,
     _extract_footer_text,
     _write_content_sheet,
@@ -176,6 +178,135 @@ class TestWriteContentSheet(unittest.TestCase):
         """冻结首行。"""
         ws = self._write_and_get_sheet(content="测试")
         self.assertEqual(ws.freeze_panes, "A2")
+
+
+# ═══════════════════════════════════════════════════════════
+#  _get_module_key_map
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGetModuleKeyMap(unittest.TestCase):
+    """测试 _get_module_key_map 在自定义 section_order 下的行为。"""
+
+    _CUSTOM_ORDER = [
+        {"key": "global_macro",     "name": "全球局势",  "number": 1},
+        {"key": "expert_review",    "name": "专家复盘",  "number": 2},
+        {"key": "news_correlation", "name": "新闻关联",  "number": 3},
+        {"key": "health_check",     "name": "持仓体检",  "number": 4},
+        {"key": "penetration_deep", "name": "穿透分析",  "number": 5},
+        {"key": "llm_usage",        "name": "LLM 用量",  "number": 6},
+    ]
+
+    def test_custom_order_maps_correctly(self):
+        """自定义 section_order → 映射使用配置序号，排除 news_correlation/llm_usage。"""
+        result = _get_module_key_map(self._CUSTOM_ORDER)
+        expected = {
+            "1.全球局势":  "global_macro",
+            "2.专家复盘":  "expert_review",
+            "4.持仓体检":  "health_check",
+            "5.穿透分析":  "penetration_deep",
+        }
+        self.assertEqual(result, expected)
+
+    def test_skips_news_correlation_and_llm_usage(self):
+        """news_correlation 和 llm_usage 被排除。"""
+        result = _get_module_key_map(self._CUSTOM_ORDER)
+        self.assertNotIn("3.新闻关联", result)
+        self.assertNotIn("6.LLM 用量", result)
+
+    def test_none_falls_back_to_default(self):
+        """section_order=None → 使用默认全局顺序（14 个模块，排除 news_correlation/llm_usage）。"""
+        result = _get_module_key_map(None)
+        self.assertIn("global_macro", result.values())
+        self.assertNotIn("news_correlation", result.values())
+        self.assertNotIn("llm_usage", result.values())
+        # 默认 16 个模块排除 2 个 = 14 个
+        self.assertEqual(len(result), 14)
+
+    def test_empty_list_falls_back_to_default(self):
+        """空列表（falsy）→ 回退到默认全局顺序。"""
+        result = _get_module_key_map([])
+        # 空列表 falsy → section_order or get_report_section_order() → 默认值
+        self.assertIn("summary", result.values())
+        self.assertGreater(len(result), 4)
+
+
+# ═══════════════════════════════════════════════════════════
+#  _get_placeholder — failure reason lookup
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGetPlaceholder(unittest.TestCase):
+    """测试 _get_placeholder 在自定义 section_order 下的占位符查找。"""
+
+    _CUSTOM_ORDER = [
+        {"key": "global_macro",  "name": "全球局势", "number": 1, "type": "llm"},
+        {"key": "expert_review", "name": "专家复盘", "number": 2, "type": "llm"},
+    ]
+
+    def test_custom_order_finds_placeholder(self):
+        """自定义 section_order → 占位符按配置序号查找。"""
+        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_NOT_CONFIGURED
+        _LLM_MODULE_FAILURE.clear()
+        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_NOT_CONFIGURED
+        try:
+            text = _get_placeholder("1.全球局势", self._CUSTOM_ORDER)
+            self.assertIn("LLM 未配置", text)
+        finally:
+            _LLM_MODULE_FAILURE.clear()
+
+    def test_unknown_title_returns_generic(self):
+        """未知标题 → 通用占位符文本。"""
+        text = _get_placeholder("99.不存在的页签", self._CUSTOM_ORDER)
+        self.assertIn("LLM API Key", text)
+
+    def test_none_falls_back_to_default_order(self):
+        """section_order=None → 使用默认顺序查找。"""
+        text = _get_placeholder("12.全球政经局势", None)
+        self.assertIn("LLM API Key", text)  # 默认状态未设置失败原因
+
+
+# ═══════════════════════════════════════════════════════════
+#  write_llm_sheets — custom section_order
+# ═══════════════════════════════════════════════════════════
+
+
+class TestWriteLlmSheetsCustomOrder(unittest.TestCase):
+    """测试 write_llm_sheets 在自定义 section_order 下的标题行。"""
+
+    _CUSTOM_ORDER = [
+        {"key": "fund_performance",  "name": "基金业绩", "number": 1, "type": "always"},
+        {"key": "global_macro",      "name": "全球局势", "number": 2, "type": "llm"},
+        {"key": "expert_review",     "name": "专家复盘", "number": 3, "type": "llm"},
+        {"key": "health_check",      "name": "持仓体检", "number": 4, "type": "llm"},
+        {"key": "penetration_deep",  "name": "穿透分析", "number": 5, "type": "llm"},
+        {"key": "summary",           "name": "投资汇总", "number": 6, "type": "always"},
+    ]
+    _LLM_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep"]
+    _CUSTOM_TITLES = ["2.全球局势", "3.专家复盘", "4.持仓体检", "5.穿透分析"]
+
+    def setUp(self):
+        self.wb = Workbook()
+        self.sheets = {}
+        for key, title in zip(self._LLM_KEYS, self._CUSTOM_TITLES):
+            ws = self.wb.create_sheet(title=title)
+            self.sheets[key] = ws
+
+    def test_title_row_uses_custom_numbers(self):
+        """自定义 section_order → 标题行使用配置序号。"""
+        write_llm_sheets(self.sheets, ("<p>宏观</p>", "<p>复盘</p>", "<p>体检</p>", "<p>穿透</p>"),
+                         section_order=self._CUSTOM_ORDER)
+        for key, expected in zip(self._LLM_KEYS, self._CUSTOM_TITLES):
+            cell = self.sheets[key].cell(row=1, column=1)
+            self.assertEqual(cell.value, expected, f"{key} 标题行应为 {expected!r}")
+
+    def test_content_none_uses_custom_order_placeholder(self):
+        """自定义 section_order + content=None → 占位符正确。"""
+        write_llm_sheets(self.sheets, (None, None, None, None),
+                         section_order=self._CUSTOM_ORDER)
+        for ws in self.sheets.values():
+            cell = ws.cell(row=2, column=1)
+            self.assertIn("LLM API Key", str(cell.value or ""))
 
 
 # ═══════════════════════════════════════════════════════════

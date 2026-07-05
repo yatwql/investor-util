@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-05（v0.2.85 — C 迭代完成：报告序号可配置全链路）
+最后更新：2026-07-05（v0.2.86 — C-P1b 修复：Excel 页签标题跟随配置）
 
 ---
 
@@ -75,7 +75,7 @@ LLM 配置拆分为两个独立文件：
 
 ## ✅ 已完成迭代
 
-所有已完成迭代（A/A2/A3/A4/A5/B/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md).
+所有已完成迭代（A/A2/A3/A4/A5/B/C/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md).
 
 ---
 
@@ -84,23 +84,6 @@ LLM 配置拆分为两个独立文件：
 > 注：字母编号跳跃出于历史分配——已完成迭代占用了相应字母（详见上方 ✅ 已完成迭代），剩余字母保留给此前已规划但优先级较低的后续迭代。
 
 ---
-
-### [P2-2] Y. Edge Case 纵深覆盖增补（四期）（低难度 / 中价值）
-
-Y 系列（Y1-Y6）已全部完成，共 ~198 项 edge 测试覆盖了零值/空集/时区/缓存/API 异常/数据质量/文件系统/数值计算/安全纵深/配置环境等维度。
-
-详细变更见 changelog.md Unreleased 章节。
-
----
-
-Z 系列（Z1-Z4）已全部完成：
-- Z1（特殊品种 S21-S28，27 项）
-- Z2（操作行为 S29-S33，15 项）
-- Z3（持仓质量 S0a-S0d，16 项）
-- Z4（时间补充 T17-T21，21 项）
-
-详细变更见 changelog.md Unreleased 章节。
-
 
 ### [P4] F. LLM 分析增强（低难度 / 中价值）
 
@@ -117,17 +100,12 @@ Z 系列（Z1-Z4）已全部完成：
 
 ---
 
-### [P3] C. 报告序号可配置（中难度 / 高价值）
+### ✅ C. 报告序号可配置（v0.2.85~v0.2.86 — 已全部完成）
 
-**需求要点**：
-- HTML 报告序号跳号（五→十三→六），16 个模块按 always/b_series/news/llm 四类控制可见性
-- 用户在 config.json 中配置 `report_section_order`，自定义显示序号和排列顺序
-- Excel 页签、HTML 导航栏、HTML 正文标题三端序号均跟随配置
-- `llm_usage` 固定末位，未配置模块按默认顺序排后
+16 个模块统一注册表驱动，支持用户通过 `config.json` 自定义序号和排列顺序。
+- **C-P1a**：注册表 `_REPORT_SECTION_DEFAULT` + `get_report_section_order()` + 配置校验
+- **C-P1b**：Excel 页签标题跟随 `section_order` 配置；`_get_module_key_map()` 动态构建
+- **C-P2**：HTML 全链路重构（Jinja2 模板 / CSS order / section_visible_dict）
+- **C-P3**：文档同步
 
-> 完整方案、设计要点、Phase 划分、代码示例见 `docs-stm/plan/c-iteration-design.md`。
-
-**C-P1b 已知限制 — Excel 页签编号不跟随用户配置**：
-- `set_sheet_title()` 当前始终查询 `_REPORT_SECTION_DEFAULT`（默认注册表）生成 `"{number}.{name}"` 标题，不接收 `section_order` 参数
-- 后果：用户配置 `report_section_order` 后，HTML 显示顺序 ✅ 正确，Excel 页签物理顺序 ✅ 正确，但 Excel 页签标题中的数字**始终显示默认序号**（如"6.基金经理变更监控"而非用户配置的序号）
-- **待研究突破方向**：`set_sheet_title()` 需扩展接收 `section_order list[dict]` 参数，从配置的 section 中取 `number` 而非默认注册表。需注意 `_create_sheets()` 调用处（`excel_generator.py:550`）一并传参
+详见 `docs-stm/plan/c-iteration-design.md`、`docs-stm/plan/c-p1b-excel-title-number-fix.md`。

@@ -306,7 +306,6 @@ def write_early_warning_sheet(ws, early_warnings: dict) -> None:
         ws: 目标工作表
         early_warnings: compute_early_warnings() 返回的字典
     """
-    set_sheet_title(ws, "early_warning")
     row = write_title_row(ws, 1, get_report_sheet_name('early_warning'), max(_SECTOR_COLS, _SENTIMENT_COLS))
 
     # ── 第一段：行业资金流向联动预警 ────────────────────────

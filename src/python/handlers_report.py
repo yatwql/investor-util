@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.python.logger import setup_logger
 from src.python.tui_menu import get_config_cache
-from src.python.registry import get_llm_module_name
+from src.python.registry import get_llm_module_name, get_report_section_order
 from src.python.llm import FAIL_REASON_DISABLED
 from src.python.llm.prompts import _LLM_MODULE_FAILURE
 from src.python.report.progress import TuiProgressReporter
@@ -32,12 +32,14 @@ def _cmd_generate_excel() -> None:
     """生成 Excel 分析报告（必选内容）。"""
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
+    sec_order = get_report_section_order(config)
     holdings = _prepare_holdings()
     if not holdings:
         return
     try:
         _generate_excel_report(holdings, include_news=False,
                                output_dir=config.get("output_dir", "reports"),
+                               section_order=sec_order,
                                progress=reporter)
     except Exception as e:
         reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
@@ -50,6 +52,7 @@ def _cmd_generate_html(news: bool = False) -> None:
     """生成基础的 HTML 分析报告。"""
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
+    sec_order = get_report_section_order(config)
     holdings = _prepare_holdings()
     if not holdings:
         return
@@ -61,6 +64,7 @@ def _cmd_generate_html(news: bool = False) -> None:
         path = write_html_report(
             holdings, output_dir=config.get("output_dir", "reports"),
             news_top_count=news_top_count, include_news=news,
+            section_order=sec_order,
             progress=reporter,
         )
         print()
@@ -76,6 +80,7 @@ def _cmd_generate_both() -> None:
     """生成全系列包含新闻的报告（Excel+HTML，不含 LLM 分析章节）。"""
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
+    sec_order = get_report_section_order(config)
     holdings = _prepare_holdings()
     if not holdings:
         return
@@ -97,7 +102,8 @@ def _cmd_generate_both() -> None:
             path = write_html_report(
                 holdings, output_dir=output_dir,
                 news_top_count=news_top_count, include_news=True,
-                details=details, progress=reporter,
+                details=details, section_order=sec_order,
+                progress=reporter,
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception as e:
@@ -110,6 +116,7 @@ def _cmd_generate_both() -> None:
         _generate_excel_report(
             holdings, include_news=True, output_dir=output_dir,
             news_top_count=news_top_count, details=details,
+            section_order=sec_order,
             progress=reporter,
         )
     except Exception as e:
@@ -286,6 +293,7 @@ def _cmd_generate_full() -> None:
 
     try:
         prep = _prepare_report_data(holdings, reporter)
+        sec_order = get_report_section_order(get_config_cache() or {})
 
         from src.python.llm import generate_all_llm
         from src.python.providers.akshare_extras import get_sector_fund_flow
@@ -327,7 +335,8 @@ def _cmd_generate_full() -> None:
                 news_top_count=prep["news_top_count"], include_news=True,
                 llm_content=llm_content, details=prep["details"],
                 news_data=news_data, news_llm_meta=news_llm_meta,
-                early_warnings=_early_warnings, progress=reporter,
+                early_warnings=_early_warnings, section_order=sec_order,
+                progress=reporter,
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception as e:
@@ -345,6 +354,7 @@ def _cmd_generate_full() -> None:
             us_indices=prep["us_indices"],
             news_data=news_data,
             news_llm_meta=news_llm_meta,
+            section_order=sec_order,
             early_warnings=_early_warnings, progress=reporter,
         )
     except Exception as e:

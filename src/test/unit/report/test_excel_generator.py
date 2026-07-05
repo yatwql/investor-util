@@ -615,5 +615,64 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
         self.assertEqual(len(excel_module_info), 4)
 
 
+
+
+class TestCreateSheets(unittest.TestCase):
+    """_create_sheets 页签创建与标题设置测试。"""
+
+    _CUSTOM_ORDER = [
+        {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
+        {"key": "summary",           "name": "投资分析汇总",   "number": 2, "type": "always"},
+        {"key": "market_value",      "name": "市值核算明细表", "number": 3, "type": "always"},
+    ]
+
+    def _make_wb(self):
+        """创建一个空 Workbook。"""
+        from openpyxl import Workbook
+        wb = Workbook()
+        # 删除默认 Sheet
+        wb.remove(wb.active)
+        return wb
+
+    def test_default_order_uses_default_titles(self):
+        """默认 section_order → 标题使用 _REPORT_SECTION_DEFAULT 的序号。"""
+        from src.python.registry import _REPORT_SECTION_DEFAULT
+        from src.python.report.excel_generator import _create_sheets
+        wb = self._make_wb()
+        # always 类型只创建 5 个核心页签
+        sheets = _create_sheets(wb, _REPORT_SECTION_DEFAULT,
+                                enable_b_series=False, include_news=False, include_llm=False)
+        self.assertEqual(len(sheets), 5)
+        for sec in _REPORT_SECTION_DEFAULT[:5]:
+            ws = sheets[sec["key"]]
+            expected = f"{sec['number']}.{sec['name']}"
+            self.assertEqual(ws.title, expected, f"{sec['key']} title mismatch")
+
+    def test_custom_order_uses_custom_titles(self):
+        """自定义 section_order → 标题使用配置序号。"""
+        from src.python.report.excel_generator import _create_sheets
+        wb = self._make_wb()
+        sheets = _create_sheets(wb, self._CUSTOM_ORDER,
+                                enable_b_series=False, include_news=False, include_llm=False)
+        self.assertEqual(len(sheets), 3)
+        self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析")
+        self.assertEqual(sheets["summary"].title, "2.投资分析汇总")
+        self.assertEqual(sheets["market_value"].title, "3.市值核算明细表")
+
+    def test_visibility_filtering(self):
+        """可见性过滤 → 只创建匹配 type 的页签。"""
+        from src.python.registry import _REPORT_SECTION_DEFAULT
+        from src.python.report.excel_generator import _create_sheets
+        wb = self._make_wb()
+        # 只启用 news 类型（news_correlation + early_warning）
+        sheets = _create_sheets(wb, _REPORT_SECTION_DEFAULT,
+                                enable_b_series=False, include_news=True, include_llm=False)
+        news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
+        # always(5) + news(2) = 7
+        self.assertEqual(len(sheets), 7)
+        for key in news_keys:
+            self.assertIn(key, sheets)
+
+
 if __name__ == "__main__":
     unittest.main()

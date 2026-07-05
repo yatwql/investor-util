@@ -82,7 +82,6 @@ def write_concentration_sheet(
         concentration_data: compute_concentration() 的返回结果
     """
     _name = get_report_sheet_name('fund_concentration')
-    set_sheet_title(ws, "fund_concentration")
     write_title_row(ws, 1, f"15. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 

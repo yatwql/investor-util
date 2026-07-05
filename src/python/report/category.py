@@ -172,8 +172,6 @@ def write_category_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    set_sheet_title(ws, "category")
-
     detail_map: dict[str, DetailRow] = {d.code: d for d in details}
 
     cat_groups: dict[Tuple[str, str], List[Holding]] = {}

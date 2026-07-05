@@ -448,3 +448,33 @@ class TestGetReportSectionOrder:
         # 第一个应为反序后的最后一个（即 fund_manager 的反序... 等等）
         reversed_last = list(reversed(all_keys))[0]
         assert order[0]["key"] == reversed_last
+
+
+class TestSetSheetTitleWithOrder:
+    """set_sheet_title() 传入 section_order 参数的测试。"""
+
+    _CUSTOM_ORDER = [
+        {"key": "fund_performance", "name": "基金业绩分析", "number": 1},
+        {"key": "summary",           "name": "投资分析汇总",   "number": 2},
+        {"key": "market_value",      "name": "市值核算明细表", "number": 3},
+    ]
+
+    def test_custom_order_uses_section_numbers(self):
+        """自定义 section_order → 标题使用配置序号。"""
+        ws = MockWorksheet()
+        set_sheet_title(ws, "fund_performance", self._CUSTOM_ORDER)
+        assert ws.title == "1.基金业绩分析"
+
+    def test_partial_custom_falls_back_to_default(self):
+        """部分自定义 → 未配置项使用默认 _REPORT_SECTION_DEFAULT。"""
+        ws = MockWorksheet()
+        # "fund_performance" 在 CUSTOM_ORDER 中，但 "category" 不在
+        set_sheet_title(ws, "category", self._CUSTOM_ORDER)
+        # category 不在 CUSTOM_ORDER 中 → 从 _REPORT_SECTION_DEFAULT 取
+        assert ws.title == "3.持仓分类表"
+
+    def test_none_order_uses_default(self):
+        """section_order=None → 向后兼容默认行为。"""
+        ws = MockWorksheet()
+        set_sheet_title(ws, "summary")
+        assert ws.title == "1.投资分析汇总"

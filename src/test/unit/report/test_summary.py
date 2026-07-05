@@ -217,7 +217,7 @@ class TestWriteSummarySheet(unittest.TestCase):
 
     def setUp(self):
         self.ws = MagicMock()
-        self.ws.title = ""
+        self.ws.title = "fixture_title"  # 写入器不再修改标题，仅做 fixture 预设
         self.cell = MagicMock()
         self.ws.cell.return_value = self.cell
 
@@ -680,12 +680,12 @@ class TestWriteSummarySheet(unittest.TestCase):
         mocks["mock_freeze"].assert_called_once_with(self.ws, 2)
         mocks["mock_auto"].assert_called_once_with(self.ws)
 
-    def test_worksheet_title_set(self):
-        """工作页标签名设为 '汇总'。"""
+    def test_worksheet_title_not_overwritten(self):
+        """写入器不修改页签标题（职责在 _create_sheets）。"""
         self._call_summary_sheet(
             self.ws, self.mv, self.cost, self.profit, self.today,
         )
-        self.assertEqual(self.ws.title, "1.投资分析汇总")
+        self.assertEqual(self.ws.title, "fixture_title")
 
     def test_section_headers_written(self):
         """三个章节标题（持仓概况/盈亏汇总/市场指数）通过 section 写入。"""

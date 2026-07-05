@@ -266,6 +266,7 @@ class TestWriteEarlyWarningSheet:
         from openpyxl import Workbook
         wb = Workbook()
         ws = wb.active
+        ws.title = "fixture_title"  # 写入器不再修改标题
         from src.python.report.early_warning import write_early_warning_sheet
 
         early_warnings = {
@@ -285,18 +286,18 @@ class TestWriteEarlyWarningSheet:
             "has_llm_news": True,
         }
         write_early_warning_sheet(ws, early_warnings)
-        assert ws.title == "11.智能预警"
+        assert ws.title == "fixture_title"
 
     def test_write_empty(self):
         """无数据写入不抛出异常。"""
         from openpyxl import Workbook
         wb = Workbook()
         ws = wb.active
+        ws.title = "fixture_title"  # 写入器不再修改标题
         from src.python.report.early_warning import write_early_warning_sheet
-
 
         write_early_warning_sheet(ws, {
             "sector_alerts": [], "sentiment_alerts": [],
             "has_warnings": False, "has_sector_data": False, "has_llm_news": False,
         })
-        assert ws.title == "11.智能预警"
+        assert ws.title == "fixture_title"

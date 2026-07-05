@@ -63,7 +63,6 @@ def write_style_sheet(
         style_data: analyze_style_for_all_funds 的结果中的 results 列表
     """
     _name = get_report_sheet_name('fund_style')
-    set_sheet_title(ws, "fund_style")
     write_title_row(ws, 1, f"16. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 

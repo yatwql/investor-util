@@ -415,7 +415,7 @@ def _write_b_series_sheets(
 
 def _write_llm_section_and_usage(
     sheets: dict[str, Any], include_llm: bool, llm_content: tuple | None,
-    prog: ProgressReporter,
+    prog: ProgressReporter, section_order: list[dict] | None = None,
 ) -> None:
     """写入 LLM 分析章节页签和 LLM API 用量页签。"""
     if not include_llm:
@@ -425,7 +425,7 @@ def _write_llm_section_and_usage(
         prog.info("正在生成 LLM 分析章节...")
         try:
             from src.python.report.llm_content import write_llm_sheets
-            write_llm_sheets(sheets, llm_content=llm_content)
+            write_llm_sheets(sheets, llm_content=llm_content, section_order=section_order)
             logger.info("LLM 分析章节已生成")
             prog.ok("LLM 分析章节生成完成")
         except ImportError:
@@ -547,7 +547,7 @@ def _create_sheets(
         if not _should_create_sheet(sec, enable_b_series, include_news, include_llm):
             continue
         ws = wb.create_sheet()
-        set_sheet_title(ws, sec["key"])
+        set_sheet_title(ws, sec["key"], section_order)
         sheets[sec["key"]] = ws
     return sheets
 
@@ -563,6 +563,7 @@ def generate_excel_report(
     early_warnings: dict | None = None,
     include_b_series: bool | None = None,  # renamed from include_fund_deep
     progress: ProgressReporter | None = None,
+    section_order: list[dict] | None = None,
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -582,6 +583,7 @@ def generate_excel_report(
         include_b_series: 是否包含 B 系列页签（基金深度分析）。
             None 时跟随 include_news（B/L 含，E/H 不含）。已从 include_fund_deep 重命名。
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
+        section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
@@ -598,8 +600,8 @@ def generate_excel_report(
     # ── 创建工作簿，按需创建全部页签 ──
     wb = create_workbook()
     wb.remove(wb.active)
-    section_order = get_report_section_order()
-    sheets = _create_sheets(wb, section_order,
+    order = section_order or get_report_section_order()  # 内部名 order，避免影子覆盖参数
+    sheets = _create_sheets(wb, order,
                             enable_b_series=enable_b_series,
                             include_news=include_news,
                             include_llm=include_llm)
@@ -614,7 +616,7 @@ def generate_excel_report(
                                   news_data, news_llm_meta, news_top_count,
                                   early_warnings, prog)
     _write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
-    _write_llm_section_and_usage(sheets, include_llm, llm_content, prog)
+    _write_llm_section_and_usage(sheets, include_llm, llm_content, prog, section_order=order)
 
     # ── 保存 ──
     with _Timer("保存 Excel/HTML 文件"):

@@ -422,7 +422,7 @@ C 迭代共涉及 4 个阶段（Phase），其中 C-P1a（注册表+配置校验
 | Phase | 范围 | 状态 |
 |:------|:-----|:----:|
 | C-P1a | `registry.py`：注册表 + `get_report_section_order()` / `set_sheet_title()` / `get_report_section_keys()` + 配置校验 + 测试 | ✅ 完成 |
-| C-P1b | `excel_generator.py`：`_create_sheets()` + 11 个写入器的 `ws.title` 统一改为 `set_sheet_title()` | ✅ 已完成 |
+| C-P1b | `excel_generator.py`：`_create_sheets()` + `set_sheet_title()` 接收 `section_order` 参数 + 11 写入器移除冗余调用；`llm_content.py`：`_get_module_key_map()` 动态构建（移除模块级缓存）；`handlers_report.py`：4 条命令函数传递 `section_order` → Excel 页签标题跟随配置 | ✅ 完成（v0.2.86） |
 | C-P2 | HTML 全链路：`html_writer.py` + `report_template.html` 重构 + `_jinja_section_visible()` + section_visible_dict + CSS order | ✅ 完成 |
 | C-P3 | 文档更新：requirements / technical / how-to-config / config.json / datasource-and-folders / test-coverage / faq | ✅ 已完成 |
 

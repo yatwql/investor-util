@@ -97,22 +97,21 @@ _THINKING_FONT = Font(
 )
 
 
-_MODULE_KEY_MAP: dict[str, str] = {}
-
-def _get_module_key_map() -> dict[str, str]:
-    """从 registry section_order 构建 Excel 页签标题 → settings_suffix 映射。
+def _get_module_key_map(section_order: list[dict] | None = None) -> dict[str, str]:
+    """从 section_order 构建 Excel 页签标题 → 模块键映射。
 
     格式：{"12.全球政经局势": "global_macro", ...}
     序号跟随 section_order 配置，news_correlation 无独立 LLM 分析章节，排除在外。
+    注：从 section_order 动态构建，不缓存（最多 14 项，< 0.01ms）。
     """
-    if _MODULE_KEY_MAP:
-        return _MODULE_KEY_MAP
-    for sec in get_report_section_order():
+    result: dict[str, str] = {}
+    order = section_order or get_report_section_order()
+    for sec in order:
         mk = sec["key"]
         if mk != "news_correlation" and mk != "llm_usage":
             title = f"{sec['number']}.{sec['name']}"
-            _MODULE_KEY_MAP[title] = mk
-    return _MODULE_KEY_MAP
+            result[title] = mk
+    return result
 
 _PLACEHOLDER_BY_REASON: dict[str, str] = {
     FAIL_REASON_NOT_CONFIGURED: "本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）",
@@ -123,9 +122,9 @@ _PLACEHOLDER_BY_REASON: dict[str, str] = {
 }
 
 
-def _get_placeholder(title: str) -> str:
+def _get_placeholder(title: str, section_order: list[dict] | None = None) -> str:
     """根据页签标题查找对应的失败原因占位文本。"""
-    mk = _get_module_key_map().get(title)
+    mk = _get_module_key_map(section_order).get(title)
     if mk:
         reason = _LLM_MODULE_FAILURE.get(mk)
         if reason in _PLACEHOLDER_BY_REASON:
@@ -137,6 +136,7 @@ def _write_content_sheet(
     ws: Worksheet,
     title: str,
     content: str | None,
+    section_order: list[dict] | None = None,
 ) -> None:
     """写入一个 LLM 分析章节。
 
@@ -149,6 +149,7 @@ def _write_content_sheet(
         ws: 目标工作表
         title: 页签标题行文本
         content: LLM 返回的 HTML 文本（已剥离标签），为 None 时写入占位符
+        section_order: 可选，用于占位符查找的 section_order
     """
     # 标题行
     row = write_title_row(ws, 1, title, _CONTENT_NCOLS)
@@ -185,7 +186,7 @@ def _write_content_sheet(
             ws.row_dimensions[row].height = 20
             row += 1
     else:
-        placeholder = _get_placeholder(title)
+        placeholder = _get_placeholder(title, section_order)
         cell = ws.cell(row=row, column=1, value=placeholder)
         cell.font = CONTENT_FONT
         cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -199,6 +200,7 @@ def _write_content_sheet(
 def write_llm_sheets(
     sheets: dict[str, Any],
     llm_content: tuple[str | None, str | None, str | None, str | None],
+    section_order: list[dict] | None = None,
 ) -> tuple[str, str, str, str]:
     """写入 LLM 分析章节（全球政经局势 & 智囊团深度复盘 & 持仓体检报告 & 穿透深度分析）。
 
@@ -209,11 +211,12 @@ def write_llm_sheets(
     Args:
         sheets: {key: ws} 字典，页签已由 _create_sheets 按序预创建
         llm_content: (global_macro_html, expert_review_html, health_check_html, penetration_deep_html) 预生成内容
+        section_order: 可选，用于 LLM 内部标题行序号跟随用户配置
 
     Returns:
         (global_macro_text, expert_review_text, health_check_text, penetration_deep_text) 纯文本四元组，供 TUI 展示
     """
-    _reverse = {v: k for k, v in _get_module_key_map().items()}
+    _reverse = {v: k for k, v in _get_module_key_map(section_order).items()}
 
     _module_keys = ["global_macro", "expert_review", "health_check", "penetration_deep"]
     _disabled = tuple(
@@ -237,7 +240,7 @@ def write_llm_sheets(
         if ws is None:
             logger.warning("LLM 分析章节页签 %s 未由 _create_sheets 创建，跳过", mk)
             continue
-        _write_content_sheet(ws, _reverse.get(mk, get_llm_module_name(mk)), content)
+        _write_content_sheet(ws, _reverse.get(mk, get_llm_module_name(mk)), content, section_order)
 
     logger.info("LLM 分析章节写入完成（含%s）", get_llm_module_name("penetration_deep"))
 

@@ -589,7 +589,6 @@ def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
     """
-    set_sheet_title(ws, "market_value")
     if details is None:
         details = _generate_details(holdings, today_str)
 

@@ -348,20 +348,29 @@ def get_report_section_keys() -> set[str]:
     return {sec["key"] for sec in _REPORT_SECTION_DEFAULT}
 
 
-def set_sheet_title(ws, key: str) -> None:
-    """根据注册表默认顺序设置 Excel 页签标题为 "{number}.{name}"。
+def set_sheet_title(ws, key: str, section_order: list[dict] | None = None) -> None:
+    """设置 Excel 页签标题为 "{number}.{name}"。
 
-    在 C-P1b 中此函数将接收 section_order 参数以支持用户自定义顺序；
-    当前版本仅使用 _REPORT_SECTION_DEFAULT 默认值。
+    section_order 优先于 _REPORT_SECTION_DEFAULT：
+    - section_order 不为 None 时，遍历 section_order 匹配 key 取 sec["number"]
+    - section_order 为 None 时，使用 _REPORT_SECTION_DEFAULT 默认值
 
     Args:
         ws: openpyxl Worksheet 对象
         key: 模块标识，如 "summary"、"category"
+        section_order: 可选的排序配置，来自 get_report_section_order()
     """
-    for sec in _REPORT_SECTION_DEFAULT:
+    source = section_order or _REPORT_SECTION_DEFAULT
+    for sec in source:
         if sec["key"] == key:
             ws.title = f"{sec['number']}.{sec['name']}"
             return
+    # section_order 中未命中时回退到默认值（防御性编程）
+    if section_order is not None:
+        for sec in _REPORT_SECTION_DEFAULT:
+            if sec["key"] == key:
+                ws.title = f"{sec['number']}.{sec['name']}"
+                return
     logger.warning("set_sheet_title: 未知的模块标识 %r，使用键名作为标题", key)
     ws.title = key
 
