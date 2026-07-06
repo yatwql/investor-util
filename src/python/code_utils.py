@@ -52,6 +52,9 @@ INDEX_KEYWORDS = ("指数", "ETF联接", "ETF 联接", "中证", "沪深300",
 # 隐式 QDII 关键词
 _OVERSEA_KW = ("纳斯达克", "标普", "纳指", "道琼斯", "日经")
 
+# 货币类关键词
+MONEY_KEYWORDS = ("货币", "现金", "增利", "宝")
+
 
 # ═══════════════════════════════════════════════════════════════
 #  代码前缀型判定（6 位证券代码，可含 sh/sz/bj 前缀）
@@ -288,6 +291,40 @@ def is_qdii_extended(name: str | None) -> bool:
     if is_qdii_by_name(name):
         return True
     return any(kw in name for kw in _OVERSEA_KW)
+
+
+def is_money_fund_by_name(name: str) -> bool:
+    """判断名称是否为货币类基金。
+
+    识别关键词：货币、现金、增利、宝。
+
+    Args:
+        name: 基金名称
+
+    Returns:
+        True 表示名称匹配货币基金特征
+    """
+    return any(kw in name for kw in MONEY_KEYWORDS)
+
+
+def is_fund_holding(name: str, code: str, account: str) -> bool:
+    """判断持仓是否需要基金业绩分析。
+
+    识别逻辑：纯 A 股/港股通（代码前缀匹配且名称不含 ETF）
+    且不在场外基金账户中 → 非基金，其余全部视为基金。
+
+    Args:
+        name: 持仓名称
+        code: 证券代码
+        account: 账户名称
+
+    Returns:
+        True 表示需要基金业绩分析
+    """
+    if (is_a_share_code(code) or is_hk_stock_code(code)) and "ETF" not in name.upper():
+        if not is_offsite_fund(account):
+            return False
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════

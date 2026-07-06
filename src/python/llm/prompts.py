@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-from src.python.code_utils import is_qdii_by_name
+from src.python.code_utils import is_qdii_extended
 
 logger = logging.getLogger("invest")
 
@@ -142,10 +142,6 @@ sentiment 字段判断该新闻对持仓的利好/利空影响（结合行业和
 # ═══════════════════════════════════════════════════════════
 
 
-def _is_qdii(name: str) -> bool:
-    return is_qdii_by_name(name) if name else False
-
-
 def _fmt_wan(num: float) -> str:
     """将数值格式化为中文单位（万/亿），减少 token 消耗。"""
     if abs(num) >= 100_000_000:
@@ -173,7 +169,7 @@ def _fmt_holding_line(h: dict, show_cost: bool = False, compact: bool = False) -
     nav_date = h.get("nav_date", "")
     source_api = h.get("source_api", "")
     name = h.get("name", "")
-    qdii_suffix = "(QDII滞后1日)" if _is_qdii(name) else ""
+    qdii_suffix = "(QDII滞后1日)" if is_qdii_extended(name) else ""
 
     if show_cost:
         cost = h.get("cost", 0)

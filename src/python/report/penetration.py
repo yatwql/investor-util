@@ -24,7 +24,11 @@ import logging
 from datetime import datetime
 from typing import Any, List
 
-from src.python.code_utils import FUND_ACCOUNT_KEYWORDS, is_a_share_code, is_bond_related_by_name, is_index_link_by_name, is_qdii_extended
+from src.python.code_utils import (
+    is_a_share_code, is_bond_related_by_name,
+    is_etf_by_name,
+    is_index_link_by_name, is_offsite_fund, is_qdii_extended,
+)
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
@@ -54,8 +58,6 @@ _FUND_TYPE_TAG: dict[str, str] = {
     ACTIVE_EQUITY: "权益",
 }
 
-# 场外账户关键词
-# FUND_ACCOUNT_KEYWORDS 定义于 code_utils.py，统一定义
 
 
 # ═══════════════════════════════════════════════════════════
@@ -98,12 +100,12 @@ def classify_penetration(h: Holding) -> str:
     if is_index_link_by_name(name):
         return INDEX_LINK
 
-    # 4) 场内 ETF（名称含 ETF 或代码 5 开头）
-    if "ETF" in name.upper() or code.startswith("5"):
+    # 4) 场内 ETF（名称含 ETF 或代码 5 开头，不含 1 开头可转债）
+    if is_etf_by_name(name) or code.startswith("5"):
         return ETF
 
     # 5) 场外账户中的基金 → 主动权益基金（兜底）
-    if any(kw in account for kw in FUND_ACCOUNT_KEYWORDS):
+    if is_offsite_fund(account):
         return ACTIVE_EQUITY
 
     # 6) A 股股票

@@ -15,10 +15,11 @@ from src.python.code_utils import (
     FUND_ACCOUNT_KEYWORDS,
     INDEX_KEYWORDS,
     is_a_share_code,
-    is_bond_related_by_name,
-    is_exchange_fund_code,
+    is_bond_fund_by_name,
+    is_etf_by_name_or_code,
     is_hk_stock_code,
-    is_qdii_by_name,
+    is_money_fund_by_name,
+    is_qdii_extended,
 )
 from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.models import Holding
@@ -44,10 +45,10 @@ _HEADERS = [
 
 # ── 分类映射规则 ──────────────────────────────────────────
 
-# 货币类关键词（仅 category.py 使用）
-_MONEY_KEYWORDS = ("货币", "现金", "增利", "宝")
-
-# _FUND_ACCOUNT_KEYWORDS 和 INDEX_KEYWORDS 定义于 code_utils.py，统一定义
+# 分类关键词统一定义于 code_utils.py：
+#   FUND_ACCOUNT_KEYWORDS — 场外基金账户
+#   INDEX_KEYWORDS        — 指数类
+#   MONEY_KEYWORDS        — 货币类
 
 
 def _categorize_holding(h: Holding) -> tuple[str, str]:
@@ -72,19 +73,17 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
     name = h.name.strip()
     code = h.code.strip()
     account = h.account.strip()
-    name_upper = name.upper()
 
     # 1) QDII
-    if is_qdii_by_name(name):
+    if is_qdii_extended(name):
         return ("基金", "QDII")
 
-    # 2) 固收类（使用 is_bond_related_by_name + "债" 宽匹配，
-    #    覆盖纯债基金和可转债等含"债"字段的品种）
-    if is_bond_related_by_name(name) or "债" in name:
+    # 2) 固收类
+    if is_bond_fund_by_name(name):
         return ("债券", "纯债")
 
     # 3) 货币类
-    if any(kw in name for kw in _MONEY_KEYWORDS):
+    if is_money_fund_by_name(name):
         return ("现金", "货币")
 
     # 4) 场外渠道
@@ -95,7 +94,7 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
         return ("基金", "主动")
 
     # 5) 场内 ETF（名称含ETF或代码5/1开头）
-    if "ETF" in name_upper or is_exchange_fund_code(code):
+    if is_etf_by_name_or_code(name, code):
         return ("基金", "指数")
 
     # 6) 场内股票（A股或港股通）

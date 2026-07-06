@@ -275,12 +275,12 @@ class TestS27CrossBorderEtf(unittest.TestCase):
     """S27: 跨境 ETF — 净值延迟和溢价率。"""
 
     def test_us_etf_classification(self):
-        """纳指 ETF → 基金/指数。"""
+        """纳指 ETF → 基金/QDII（隐式海外关键词识别）。"""
         from src.python.report.category import _categorize_holding
         h = Holding("证券", "纳斯达克ETF", "513100", shares=200, cost_price=1.5)
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "基金")
-        self.assertEqual(sub, "指数")
+        self.assertEqual(sub, "QDII")
 
     def test_hk_etf_classification(self):
         """恒生科技 ETF → 基金/指数。"""
