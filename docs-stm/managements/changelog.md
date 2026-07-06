@@ -4,6 +4,12 @@
 
 ---
 
+## [0.2.90] - 2026-07-07
+
+### Fixed
+
+- **基金风格分析 `UnboundLocalError`**：`_tencent_failures` 模块级变量在 `classify_fund_style` 内被赋值（`+=1`/`=0`）但缺少 `global` 声明，导致首次 push2 请求失败→触发 Tencent 备用链路时报 `cannot access local variable '_tencent_failures'`。修复：添加 `global _tencent_failures` 声明。
+
 ## [0.2.89] - 2026-07-06
 
 ### Added
