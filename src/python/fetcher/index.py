@@ -63,6 +63,7 @@ def _fetch_indices_from_tencent(uncached: list[str]) -> dict[str, dict[str, Any]
                 "price_date": result.get("price_date", ""),
                 "change": change,
                 "change_pct": change_pct,
+                "_source": "tencent",
             }
             cache_set(_index_cache_key(index_code), data)
             return index_code, data
@@ -96,6 +97,7 @@ def _fetch_indices_from_sina(uncached: list[str]) -> dict[str, dict[str, Any]]:
     for sina_code, data in sina_results.items():
         internal_code = _A_SINA_TO_INTERNAL.get(sina_code)
         if internal_code and data.get("price", 0) > 0:
+            data["_source"] = "sina"
             cache_set(_index_cache_key(internal_code), data)
             results[internal_code] = data
 
@@ -115,6 +117,7 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
         cache_key = _index_cache_key(index_code)
         cached = cache_get(cache_key, get_ttl("index"))
         if cached is not None:
+            cached["_source"] = "cache"
             indices[index_code] = cached
         else:
             uncached_codes.append(index_code)
@@ -140,6 +143,7 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
         for code in still_missing:
             stale = cache_get(_index_cache_key(code), CACHE_WEEKLY)
             if stale is not None:
+                stale["_source"] = "stale_cache"
                 indices[code] = stale
                 logger.info("A 股指数 %s 降级为过期缓存数据", code)
 
@@ -180,6 +184,7 @@ def _fetch_us_from_tencent(missing: list[str]) -> dict[str, dict[str, Any]]:
                 "price_date": result.get("price_date", ""),
                 "change": change,
                 "change_pct": change_pct,
+                "_source": "tencent",
             }
             cache_set(_index_cache_key(code), data)
             results[code] = data
@@ -198,6 +203,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
         cache_key = _index_cache_key(code)
         cached = cache_get(cache_key, get_ttl("index"))
         if cached is not None:
+            cached["_source"] = "cache"
             indices[code] = cached
         else:
             stale = cache_get(cache_key, 604800)
@@ -214,6 +220,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
             sina_data = sina.fetch_us_indices()
             if sina_data:
                 for code, data in sina_data.items():
+                    data["_source"] = "sina"
                     cache_set(_index_cache_key(code), data)
                     indices[code] = data
                 return indices
@@ -239,6 +246,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
     if still_missing and expired_cached:
         logger.info("美股指数全部 API 不可用，使用过期缓存数据")
         for code, data in expired_cached.items():
+            data["_source"] = "stale_cache"
             indices[code] = data
             cache_set(_index_cache_key(code), data)
             logger.info("美股指数 %s 降级为缓存数据", code)

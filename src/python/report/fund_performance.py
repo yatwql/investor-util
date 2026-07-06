@@ -22,7 +22,14 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
 from src.python.models import Holding
+from src.python.report.data_status import (
+    DataStatus,
+    DataStatusItem,
+    STATUS_MESSAGES,
+    DegradationTracker,
+)
 from src.python.report.excel_writer import (
+    _write_data_status_foot,
     auto_width,
     freeze_header,
     write_data_row,
@@ -36,6 +43,9 @@ from src.python.report.penetration import classify_penetration, QDII, ETF, INDEX
 from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, RED_FONT
 
 logger = logging.getLogger("invest")
+
+# 模块级降级阈值控制器（单会话内共享）
+_tracker = DegradationTracker()
 
 _NCOLS = 12
 _HEADERS = [
@@ -190,18 +200,18 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
     return adjusted
 
 
-def _load_profit_forecast() -> dict[str, Any]:
+def _load_profit_forecast() -> tuple[dict[str, Any], bool]:
     """加载盈利预测数据（非关键，失败时返回空字典）。
 
     Returns:
-        盈利预测字典 {code: {reports, eps_2025e}} 或空字典
+        (forecast_dict, success) — success=False 表示 API 调用异常。
     """
     try:
         from src.python.providers.akshare_extras import get_profit_forecast
-        return get_profit_forecast()
+        return get_profit_forecast(), True
     except Exception:
-        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --", exc_info=True)
-        return {}
+        logger.warning("[fund_performance] 盈利预测获取失败（非关键），机构覆盖列显示 --", exc_info=True)
+        return {}, False
 
 
 def _coverage_text(code: str, profit_forecast: dict[str, Any]) -> str:
@@ -334,6 +344,49 @@ def _write_rating_distribution(ws: Worksheet, row: int, fund_count: int, adjuste
     return row + 1
 
 
+def _build_perf_data_status(
+    adjusted_ratings: dict[str, str],
+    total_funds: int,
+    profit_success: bool,
+) -> DataStatus:
+    """根据基金业绩数据获取结果构建数据源状态字典。
+
+    Args:
+        adjusted_ratings: 成功获取评级的基金 {code: rating}
+        total_funds: 需分析的基金总数
+        profit_success: 盈利预测 API 是否成功
+
+    Returns:
+        数据源状态字典（可能为空 = 全部正常）
+    """
+    status: DataStatus = {}
+
+    # 排名数据（T2）— 全部失败
+    if not adjusted_ratings and total_funds > 0:
+        degraded, _, _ = _tracker.record(
+            "perf_rank", "T2", success=False,
+            failure_type="empty",
+        )
+        if degraded:
+            status["rank"] = DataStatusItem(
+                available=False, tier="T2",
+                message=STATUS_MESSAGES["rank_unavailable"],
+            )
+
+    # 盈利预测（T4）
+    if not profit_success:
+        degraded, _, _ = _tracker.record(
+            "perf_profit_forecast", "T4", success=False,
+        )
+        if degraded:
+            status["profit_forecast"] = DataStatusItem(
+                available=False, tier="T4",
+                message=STATUS_MESSAGES["profit_forecast_unavailable"],
+            )
+
+    return status
+
+
 def write_fund_performance_sheet(
     ws: Worksheet,
     holdings: list[Holding],
@@ -370,7 +423,7 @@ def write_fund_performance_sheet(
         reverse=True,
     )
 
-    profit_forecast = _load_profit_forecast()
+    profit_forecast, profit_success = _load_profit_forecast()
     adjusted_ratings: dict[str, str] = {}
 
     for idx, fund in enumerate(fund_holdings_sorted, 1):
@@ -381,6 +434,10 @@ def write_fund_performance_sheet(
         row += 1
 
     row = _write_rating_distribution(ws, row, len(fund_holdings_sorted), adjusted_ratings)
+
+    # 数据源状态
+    data_status = _build_perf_data_status(adjusted_ratings, len(fund_holdings_sorted), profit_success)
+    _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
 

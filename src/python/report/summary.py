@@ -12,7 +12,14 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
+from src.python.report.data_status import (
+    DataStatus,
+    DataStatusItem,
+    STATUS_MESSAGES,
+    DegradationTracker,
+)
 from src.python.report.excel_writer import (
+    _write_data_status_foot,
     auto_width,
     freeze_header,
     write_data_row,
@@ -22,6 +29,8 @@ from src.python.report.excel_writer import (
 from src.python.report.market_value import get_last_trading_day
 from src.python.report.styles import profit_font
 
+logger = logging.getLogger("invest")
+
 # 指数涨跌颜色
 _INDEX_UP_FONT = Font(size=10, bold=True, color="CC0000")    # 涨→红
 _INDEX_DOWN_FONT = Font(size=10, bold=True, color="009900")  # 跌→绿
@@ -29,7 +38,8 @@ _INDEX_DOWN_FONT = Font(size=10, bold=True, color="009900")  # 跌→绿
 # 单元格对齐
 _CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
 
-logger = logging.getLogger("invest")
+# 模块级降级阈值控制器（单会话内共享）
+_tracker = DegradationTracker()
 
 _NCOLS = 8
 _HEADERS = ["指标", "数值"]
@@ -227,6 +237,58 @@ def _write_us_indices(ws: Worksheet, row: int, us_indices: dict[str, dict[str, A
     return row
 
 
+def _build_index_data_status(
+    a_indices: dict[str, dict[str, Any]] | None,
+    us_indices: dict[str, dict[str, Any]] | None,
+) -> DataStatus:
+    """检查指数数据来源，构建数据源状态字典。
+
+    腾讯为 A 股主链路 → 新浪备用为降级。
+    新浪为美股主链路 → 腾讯备用为降级。
+    过期缓存同样视为降级。
+
+    Returns:
+        数据源状态字典（可能为空 = 全部正常）
+    """
+    status: DataStatus = {}
+
+    # A 股指数（T2）
+    if a_indices:
+        has_degraded = any(
+            idx.get("_source") in ("sina", "stale_cache")
+            for idx in a_indices.values()
+        )
+        if has_degraded:
+            degraded, _, _ = _tracker.record(
+                "index_a", "T2", success=False,
+                failure_type="unreachable",
+            )
+            if degraded:
+                status["index_a"] = DataStatusItem(
+                    available=False, tier="T2",
+                    message=STATUS_MESSAGES["index_degraded"],
+                )
+
+    # 美股指数（T2）
+    if us_indices:
+        has_degraded = any(
+            idx.get("_source") in ("tencent", "stale_cache")
+            for idx in us_indices.values()
+        )
+        if has_degraded:
+            degraded, _, _ = _tracker.record(
+                "index_us", "T2", success=False,
+                failure_type="unreachable",
+            )
+            if degraded:
+                status["index_us"] = DataStatusItem(
+                    available=False, tier="T2",
+                    message=STATUS_MESSAGES["index_degraded"],
+                )
+
+    return status
+
+
 def write_summary_sheet(
     ws: Worksheet,
     total_mv: float,
@@ -265,6 +327,9 @@ def write_summary_sheet(
     row = _write_blanks(ws, row)
     row = _write_us_indices(ws, row, us_indices)
 
+    # 指数数据源状态
+    data_status = _build_index_data_status(a_indices, us_indices)
+    _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
     auto_width(ws)
     logger.info("投资分析汇总写入完成，共 %d 行", row)
