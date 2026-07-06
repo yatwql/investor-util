@@ -23,7 +23,7 @@
 > 注：`all` 模式收集总数 2572 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2560 passed / 12 skipped。
 > 🆕 `report` 模式为 A5 新增，标记 `unit_report`（774 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）启用 `--parallel medium`（默认）自动并行，场景/边缘/冒烟等轻量模式保持单线程避免进程调度开销。
-> v0.2.87 完成 B 迭代（基金深度分析 4 模块）上线，全量 2572 项（2560 passed / 12 skipped for Windows）。
+> v0.2.88 文档审计与同步，全量 2572 项（2560 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 

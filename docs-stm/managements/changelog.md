@@ -4,6 +4,29 @@
 
 ---
 
+## [0.2.88] - 2026-07-06
+
+### Changed
+
+- **文档审计（10 文档）**：全量核对代码与实际行为，修正 12+ 处过期/错误描述
+  - `how-to-config-llm.md`：`thinking_budget` 描述修正
+  - `faq.md`：3 处内部链接修复
+  - `requirements.md`：`2025E` → `2026E`、LLM 模块数修正、版本标记清理
+  - `reports-instruction.md`：`2025E` → `2026E`
+  - `technical.md`：`tui_handlers.py` 职责描述修正、chain.py 补入调度表
+  - `how-to-start.md`：智能预警脚注修正、函数名中文化
+  - `how-to-config.md`：`fund_overlap` 缓存描述修正、`cache_ttl` 按逻辑分组重排
+  - `README.md`：移除不存在的"TUI 智能摘要"特性、"多源备线" → "多数据源自动 fallback"
+  - `datasource-and-folders.md`：目录树补入 7 个缺失测试文件 + 1 个归档文件，测试计数全面更新
+  - `test-coverage.md`：全量 2454 → 2572，所有 mode/分组/跨类标记同步更新
+- **CLAUDE.md**：门禁描述移除快照项数，避免版本迭代过期
+- **配置文件同步**：`data/config/config.json` 的 `cache_ttl` 按逻辑分组重排
+- **代码同步**：`penetration.py`/`penetration_sheet.py` 中 `2025E` → `2026E`
+
+### Removed
+
+- `docs-stm/plan/notes/data-source-pre-study.md`：已归档至 `docs-stm/archive/archived-data-source-pre-study.md`
+
 ## [0.2.87] - 2026-07-06
 
 ### Added
