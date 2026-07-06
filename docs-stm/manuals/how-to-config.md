@@ -318,6 +318,7 @@
 > **调整建议：** 持仓变动少可将 `hold` 改为 `2592000`（30天），减少基金持仓的重复拉取。
 >
 > **交易时段短 TTL：** `price` 和 `index` 默认注册在 `market_hour_aware` 中，A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s）替代常规 TTL，确保盘中实时行情。收盘后自动回落长 TTL 保持收盘价。可通过 `market_hours.start`/`end` 手动覆盖时段，或设 `market_hours.official_source: false` 关闭东方财富 API 实时状态查询。
+> **收市后价格缓存新鲜度校验：** 盘后长 TTL 场景下，`fetcher/price.py` 自动校验缓存是否来自当前交易日。若盘中因 Tencent 名称校验失败降级到 EastMoney 写入了上一交易日净值，收市后首次请求时将检测到该残留数据（`price_date < trading_day`），自动清除缓存并强制从 Provider Chain 重取。此行为不依赖额外配置，对所有 `price_*` 缓存全局生效。
 
 ## 技术细节：自动 gzip 压缩
 

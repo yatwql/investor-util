@@ -256,6 +256,7 @@ Provider Chain 注册表（registry.py）
 - **默认优先级**硬编码在 `fetcher/chain.py:_DEFAULT_CHAINS` 中，`preferred_provider` 可在 `config.json` 中手动将某类型首选调整到链首
 - 失败检测：空返回、HTTP 错误、JSON 解析异常均视为失败触发递补
 - 全链路失败 → 尝试过期缓存降级 → 仍失败则抛异常由调用方处理
+- **价格缓存收市后新鲜度验证**（`fetcher/price.py:_price_cache_fresh`）：盘后首次请求时校验缓存 `price_date` 是否为当前交易日。若盘中因 Tencent 名称校验降级写入 EastMoney 净值（上一交易日价格），收市后自动清除该残留缓存并强制重走 Provider Chain，确保收盘价更新。
 
 ### Fetcher 调度架构
 

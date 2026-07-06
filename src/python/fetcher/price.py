@@ -91,6 +91,27 @@ _PRICE_TRANSFORMS: dict[str, Callable] = {
 # ── 公开接口 ─────────────────────────────────────────────────
 
 
+def _price_cache_fresh(data: dict) -> bool:
+    """收市后验证价格缓存数据是否来自当前交易日。
+
+    缓存命中的缓存若 price_date 早于最近交易日，说明是跨日残留的过时数据
+    （例如盘中 Tencent 降级到 EastMoney 写入的上一交易日净值），应强制刷新。
+    盘中不验证（短 TTL 已保证实时性）。
+    """
+    try:
+        from src.python.market_hours import is_market_open as _mh_open
+        from src.python.report.market_value import get_last_trading_day as _gtd
+        if _mh_open():
+            return True
+        pd = data.get("price_date", "")
+        if not pd:
+            return False
+        td = _gtd()
+        return pd >= td
+    except Exception:
+        return True
+
+
 def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | None:
     """获取一只证券的市场行情（含自动/手动备用链路切换）。
 
@@ -117,7 +138,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
             return bool(raw.get("nav") and raw.get("nav", 0.0) > 0)
         return True
 
-    return _fetch_with_fallback(
+    result = _fetch_with_fallback(
         data_type="price",
         provider_fn_map=_PRICE_PROVIDERS,
         cache_key=cache_key,
@@ -126,3 +147,24 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
         transform=_PRICE_TRANSFORMS,
         validate=_validate,
     )
+
+    # 收市后验证：缓存 price_date 是否仍是当前交易日
+    # 盘中命中缓存时短 TTL 已保证实时性，收市后长 TTL 可能导致跨日残留
+    if result is not None and not _price_cache_fresh(result):
+        from src.python.cache import clear as _cache_clear
+        from src.python.report.market_value import get_last_trading_day as _gtd
+        _td = _gtd()
+        logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新",
+                     result.get("price_date", "?"), _td)
+        _cache_clear(cache_key)
+        result = _fetch_with_fallback(
+            data_type="price",
+            provider_fn_map=_PRICE_PROVIDERS,
+            cache_key=cache_key,
+            cache_ttl=get_ttl("price"),
+            fn_kwargs={"code": code},
+            transform=_PRICE_TRANSFORMS,
+            validate=_validate,
+        )
+
+    return result

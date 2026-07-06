@@ -21,6 +21,7 @@
 - **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource-and-folders.md, reports-instruction.md, faq.md, how-to-test-my-code.md）
 - **中间文件**：中间过程及设计文件 → `docs-stm/plan/`；除日志以外的临时文件 → `docs-stm/tmp/`。禁止放在全局 `.claude/` 目录下
 - **版本号一致**：发布版本时，**必须**同步更新以下位置的版本号/日期，确保程序、用户文档、管理文档统一：`src/python/constants.py`（`APP_VERSION`）、`README.md`（首页版本标记）、`docs-stm/manuals/how-to-test-my-code.md`（头部版本日期）、`docs-stm/managements/changelog.md`（新版本条目）、`docs-stm/managements/plan.md`（最后更新）、以及报告中引用的版本号。任何版本号变更均应全局覆盖，避免遗漏。
+- **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功）、`[!]`（部分失败）、`[ERR]`（错误）
 - **架构遵从**：`docs-stm/managements/technical.md` 中的架构设计约定（包括代码类型判定中心化、缓存设计、Provider Chain 等），所有模块必须遵守。
 
