@@ -425,7 +425,7 @@
                 <thead>
                     <tr>
                         <th>资产属性</th><th>投资分类</th><th>名称</th><th>代码</th>
-                        <th>市值</th><th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th>
+                        <th>市值</th><th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>年均股息率</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -445,6 +445,7 @@
                             <td class="text-right" style="color: {{ item["profit"] | profit_color }}">{{ item["profit"] | money }}</td>
                             <td class="text-right" style="color: {{ item["profit_rate"] | profit_color }}">{{ item["profit_rate"] | pct }}</td>
                             <td class="text-right" style="color: {{ item["today_profit"] | profit_color }}">{{ item["today_profit"] | money }}</td>
+                            <td>{{ item.get("yield_text", "--") }}</td>
                         </tr>
                         {% endfor %}
                         <tr class="subtotal-row">
@@ -455,6 +456,8 @@
                             <td class="text-right" style="color: {{ group["sub_profit"] | profit_color }}">{{ group["sub_profit"] | money }}</td>
                             <td class="text-right" style="color: {{ group["sub_rate"] | profit_color }}">{{ group["sub_rate"] | pct }}</td>
                             <td class="text-right" style="color: {{ group["sub_today"] | profit_color }}">{{ group["sub_today"] | money }}</td>
+                            <td></td>
+                        </tr>
                         </tr>
                         {% set cat_grand_mv.v = cat_grand_mv.v + group["sub_mv"] %}
                         {% set cat_grand_cost.v = cat_grand_cost.v + group["sub_cost"] %}
@@ -469,6 +472,7 @@
                         <td class="text-right" style="color: {{ cat_grand_profit.v | profit_color }}">{{ cat_grand_profit.v | money }}</td>
                         <td class="text-right" style="color: {{ (cat_g_rate / 100) | profit_color }}">{{ cat_g_rate | change }}</td>
                         <td class="text-right" style="color: {{ cat_grand_today.v | profit_color }}">{{ cat_grand_today.v | money }}</td>
+                        <td></td>
                     </tr>
                 </tbody>
             </table>
@@ -485,7 +489,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>来源明细</th>
+                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>预测EPS(2026E)</th><th>年均股息率</th><th>来源明细</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -499,6 +503,8 @@
                         <td class="text-right">{{ (entry["ratio_pct"] / 100) | pct }}</td>
                         <td>{{ entry.get("sector", "--") }}</td>
                         <td style="font-size: 12px;">{{ entry.get("concepts", []) | join(" / ") if entry.get("concepts") else "--" }}</td>
+                        <td>{{ entry.get("eps_text", "--") }}</td>
+                        <td>{{ entry.get("dividend_text", "--") }}</td>
                         <td class="text-left" style="font-size: 12px;">
                             {% for src in entry["sources"] %}
                             <span class="source-tag">{{ src }}</span>
@@ -544,7 +550,7 @@
                 <thead>
                     <tr>
                         <th>基金</th><th>代码</th><th>类型</th><th>近3月</th><th>近6月</th><th>近12月</th>
-                        <th>持仓累计盈亏(¥)</th><th>持仓收益率</th><th>业绩基准</th><th>业绩评价</th><th>同类排名</th>
+                        <th>持仓累计盈亏(¥)</th><th>持仓收益率</th><th>业绩基准</th><th>业绩评价</th><th>同类排名</th><th>机构覆盖</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -561,6 +567,7 @@
                         <td class="text-left" style="font-size: 12px;">{{ p["benchmark"] }}</td>
                         <td class="text-left" style="font-size: 12px;{{ ' color: #CC0000; font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: #006400; font-weight: 600;' if p['rating_tag'] == '较差' }}{{ ' color: #009900; font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: #0066CC; font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
                         <td>{{ p["rank"] }}</td>
+                        <td style="font-size: 12px;">{{ p.get("coverage", "--") }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -1240,6 +1247,13 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  FOOTER                                                -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" style="text-align: center; padding: 14px 20px; color: #999; font-size: 12px;">
+        个人投资分析报告 v{{ app_version }} | 生成时间: {{ now }}
+    </div>
 
 </div>
 

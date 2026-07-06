@@ -252,6 +252,22 @@
 ---
 > edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。
 
+### 1.9 边缘测试文件隔离规范（强制）
+
+所有 `@pytest.mark.edge` 标记的测试**必须**遵守以下文件级约束：
+
+| 规则 | 说明 |
+|:-----|:------|
+| **文件独立** | edge 测试必须放置在 `*_edge.py` 文件中，禁止与普通（non-edge）测试混搭在同一 `.py` 文件 |
+| **标记唯一** | `*_edge.py` 文件中的所有测试类/方法**必须**标注 `@pytest.mark.edge`，但允许同时标注其他合法标记（如 `@pytest.mark.unit_report`） |
+| **自动校验** | `conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动检查：任何含有 `@pytest.mark.edge` 的测试项，其所属文件必须以 `_edge.py` 结尾；反之，`*_edge.py` 文件中的所有测试项必须有 `@pytest.mark.edge` 标记。违规项将报错停止 |
+
+**例外：** 基类/混入类（Mixin）中定义的辅助方法不受此限，但调用这些方法的子类测试方法仍需遵守。
+
+此规范在 `scripts/check-test-markers.py` 中另有 AST 级别的静态扫描补充验证。
+
+---
+
 ## 2. 数据正确性验证
 
 | 验证项 | 方法 | 现有测试 |

@@ -24,6 +24,23 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter
 logger = logging.getLogger("invest")
 
 
+def _calc_yield_text(code: str, d: DetailRow | None, dividend_data: dict) -> str:
+    """计算单条持仓的年均股息率文本（非关键，失败返回"--"）。"""
+    try:
+        info = dividend_data.get(code)
+        if not info:
+            return "--"
+        avg_div = info.get("avg_dividend")
+        if avg_div is None:
+            return "--"
+        price = d.price if d and d.price > 0 else 0.0
+        if price <= 0:
+            return "--"
+        return f"{avg_div / price * 100:.2f}%"
+    except Exception:
+        return "--"
+
+
 def _build_category_data(
     holdings: list[Holding],
     details: list[DetailRow],
@@ -31,7 +48,7 @@ def _build_category_data(
     """构建持仓分类表数据结构。
 
     按 (资产属性, 投资分类) 分组，汇总每组内的明细数据，
-    按 股票→基金→债券→现金 顺序排列。
+    按 股票→基金→债券→现金 顺序排列。附带年均股息率（A 股标的）。
 
     Args:
         holdings: 原始持仓列表
@@ -41,6 +58,16 @@ def _build_category_data(
         持仓分类数据列表，每个元素含 property / sub_category / items / 小计字段
     """
     detail_map: Dict[str, DetailRow] = {d.code: d for d in details}
+
+    # 加载 A 股分红数据（非关键，失败时所有 yield_text → "--"）
+    dividend_data: dict = {}
+    try:
+        from src.python.providers.akshare_extras import get_dividend_data
+        from src.python.code_utils import is_a_share_code
+        stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
+        dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
+    except Exception:
+        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
 
     cat_groups: dict[tuple[str, str], list[Holding]] = {}
     for h in holdings:
@@ -73,6 +100,7 @@ def _build_category_data(
                 "profit": d.profit if d else 0.0,
                 "profit_rate": d.profit_rate if d else 0.0,
                 "today_profit": d.today_profit if d else 0.0,
+                "yield_text": _calc_yield_text(h.code, d, dividend_data),
             })
 
         sub_mv = sum(i["market_value"] for i in items)
@@ -95,9 +123,33 @@ def _build_category_data(
     return result
 
 
+def _load_profit_forecast() -> dict[str, Any]:
+    """加载盈利预测数据（非关键，失败时返回空字典）。"""
+    try:
+        from src.python.providers.akshare_extras import get_profit_forecast
+        return get_profit_forecast()
+    except Exception:
+        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --", exc_info=True)
+        return {}
+
+
+def _coverage_text(code: str, profit_forecast: dict[str, Any]) -> str:
+    """根据基金代码查找机构覆盖信息。"""
+    info = profit_forecast.get(code)
+    if info:
+        reports = info.get("reports", 0)
+        eps = info.get("eps_2025e")
+        if reports and eps is not None:
+            return f"{reports}家研报 EPS¥{eps:.2f}"
+        elif reports:
+            return f"{reports}家研报"
+    return "--"
+
+
 def _build_single_perf_item(
     idx: int, fund: Holding, detail_map: dict,
     prog: ProgressReporter, fund_count: int,
+    profit_forecast: dict | None = None,
 ) -> dict[str, Any]:
     """构建单只基金的业绩分析条目。"""
     logger.info(
@@ -161,6 +213,7 @@ def _build_single_perf_item(
         "rating": rating_comment,
         "rating_tag": rating,
         "rank": rank_str,
+        "coverage": _coverage_text(fund.code, profit_forecast) if profit_forecast else "--",
     }
 
 
@@ -191,9 +244,10 @@ def _build_perf_data(
         reverse=True,
     )
 
+    profit_forecast = _load_profit_forecast()
     result: List[Dict[str, Any]] = []
     for idx, fund in enumerate(fund_holdings_sorted, 1):
-        result.append(_build_single_perf_item(idx, fund, detail_map, prog, len(fund_holdings_sorted)))
+        result.append(_build_single_perf_item(idx, fund, detail_map, prog, len(fund_holdings_sorted), profit_forecast))
 
     if result:
         logger.info("基金业绩分析完成，%d 只基金获取成功", len(result))

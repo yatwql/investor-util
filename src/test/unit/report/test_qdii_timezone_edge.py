@@ -1,4 +1,4 @@
-"""QDII 多时区净值日期一致性测试 — R-099。
+"""QDII 多时区净值日期一致性边缘测试 — R-099。
 
 测试目标：
   - QDII 基金在不同时区场景下的净值日期判定
@@ -8,7 +8,7 @@
 
 运行：
   cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_qdii_timezone.py -v
+  pytest src/test/unit/report/test_qdii_timezone_edge.py -v
 """
 
 from __future__ import annotations
@@ -16,13 +16,13 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from src.python.models import Holding
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+
+from src.python.models import Holding
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
-
-@pytest.mark.edge
 class TestQdiiNavDateConsistency(unittest.TestCase):
     """R-099: 多时区 QDII 净值日期一致性验证。"""
 
@@ -60,7 +60,6 @@ class TestQdiiNavDateConsistency(unittest.TestCase):
         detail = self._make_us_qdii_detail(nav_date="2026-06-30",
                                             trading_day="2026-07-01")
         updated, total, all_updated = price_update_status([detail], "2026-07-01")
-        # 当前实现：QDII 认可 T 或 T-1 为已更新
         self.assertEqual(updated, 1, "美股 QDII T-1 应视为已更新")
         self.assertTrue(all_updated)
 
@@ -70,8 +69,6 @@ class TestQdiiNavDateConsistency(unittest.TestCase):
         detail = self._make_us_qdii_detail(nav_date="2026-06-28",
                                             trading_day="2026-07-01")
         updated, total, all_updated = price_update_status([detail], "2026-07-01")
-        # 当前实现：QDII 仅认可 T 或 T-1，T-2 视为未更新
-        # 注意：这是已知限制（R-099），需后续扩展
         self.assertEqual(updated, 0, "美股 QDII T-2 应视为未更新")
 
     def test_hk_qdii_nav_date_t1(self):
@@ -92,8 +89,6 @@ class TestQdiiNavDateConsistency(unittest.TestCase):
         """QDII 净值日期 = T-1 → today_profit = 0（当前限制）。"""
         detail = self._make_us_qdii_detail(nav_date="2026-06-30",
                                             trading_day="2026-07-01")
-        # _compute_detail_row 仅当 nav_date == trading_day 时计算 today_profit
-        # QDII T-1 延迟在此处未被特殊处理
         self.assertEqual(detail.today_profit, 0.0)
 
     def test_mixed_qdii_types_updated_status(self):

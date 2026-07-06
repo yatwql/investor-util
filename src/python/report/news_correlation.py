@@ -414,7 +414,9 @@ def build_news_data(
     logger.info("%s关键词（含穿透）: %s", get_llm_module_name("news_correlation"), keywords)
 
     keywords, industry_data = _expand_industry_keywords(holdings, penetrated_assets, keywords)
-    news_items = aggregate_news(keywords, top_n=top_n, progress_callback=_news_source_cb)
+    # per_source 取大值保证召回覆盖面，避免去重后候选不足
+    per_source = max(500, top_n * 2)
+    news_items = aggregate_news(keywords, top_n=top_n, per_source=per_source, progress_callback=_news_source_cb)
 
     active_sources = _extract_active_sources(news_items)
     meta: dict = {

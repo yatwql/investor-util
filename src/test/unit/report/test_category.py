@@ -188,5 +188,35 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
                 )
 
 
+class TestYieldText(unittest.TestCase):
+    """_yield_text 基础功能测试。"""
+
+    def setUp(self):
+        self.d = cat.DetailRow()
+        self.d.name = "长江电力"
+        self.d.code = "600900"
+        self.d.price = 50.0
+        self.d.market_value = 5000.0
+        self.d.cost = 4500.0
+        self.d.profit = 500.0
+        self.d.profit_rate = 0.10
+        self.d.today_profit = 10.0
+
+    def test_normal(self):
+        """正常数据 → 正确的股息率百分比。"""
+        result = cat._yield_text("600900", self.d, {"600900": {"avg_dividend": 0.85}})
+        self.assertEqual(result, "1.70%")
+
+    def test_code_not_found(self):
+        """代码不在分红数据中 → "--"。"""
+        result = cat._yield_text("600900", self.d, {})
+        self.assertEqual(result, "--")
+
+    def test_avg_dividend_none(self):
+        """avg_dividend 为 None → "--"。"""
+        result = cat._yield_text("600900", self.d, {"600900": {"avg_dividend": None}})
+        self.assertEqual(result, "--")
+
+
 if __name__ == "__main__":
     unittest.main()

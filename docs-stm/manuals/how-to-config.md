@@ -72,7 +72,7 @@
 | `holdings_dir` | `data/holdings` | 持仓 xlsx 文件所在目录 | 菜单 `C` |
 | `holdings_filename` | `个人投资持仓信息.xlsx` | 要读取的持仓文件名 | 菜单 `F` |
 | `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `O` |
-| `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限 | 手动编辑 |
+| `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量自动加倍保障召回） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |

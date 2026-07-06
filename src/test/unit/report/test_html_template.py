@@ -78,6 +78,13 @@ class TestHtmlTemplateBranchAudit(unittest.TestCase):
         self.assertIn("news_data", self.tmpl,
                        "模板应包含 news_data 条件守卫")
 
+    def test_footer_version_and_time(self):
+        """页脚含版本号和生成时间占位符。"""
+        self.assertIn("app_version", self.tmpl,
+                       "模板页脚应包含 app_version 变量")
+        self.assertIn("{{ now }}", self.tmpl,
+                       "模板页脚应包含生成时间 now 变量")
+
 
 if __name__ == "__main__":
     unittest.main()

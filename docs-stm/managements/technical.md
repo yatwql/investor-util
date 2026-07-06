@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-06（v0.2.88 — 文档审计与同步）
+最后更新：2026-07-06（v0.2.89 — 设计约束表 + 新闻召回策略）
 
 ---
 
@@ -195,7 +195,7 @@ v0.2.88 已完成全量迁移，所有 `code.startswith()` 和名称关键词判
 
 ---
 
-## 模块技术要点
+## 功能模块详解
 
 ### 资产穿透TOP10
 
@@ -213,6 +213,7 @@ v0.2.88 已完成全量迁移，所有 `code.startswith()` 和名称关键词判
 - 概念类型：来源为东方财富 push2 API 的行业分类和概念板块
 - HTML 富化显示：蓝(持仓) / 紫(穿透) / 橙(概念) / 灰(行业)
 - LLM 二次关联分析（可选）：`enabled_llm.news_correlation` 配置开启
+- **召回策略**：每个新闻源原始获取量 `per_source = max(500, news_top_count × 2)`，保证去重后候选充足；最终截取 `news_top_count` 条按关联度排序输出
 
 ### 行业/概念数据流
 
@@ -829,3 +830,24 @@ llm/generators.py (LLM 编排)
 config.py → registry.py (注册表驱动的 TTL/分组/键名)
 handlers_*.py → 各模块入口函数编排
 ```
+
+---
+
+## 设计约束
+
+以下跨模块约束对所有代码生效，违反即视为架构违规。
+
+| # | 约束 | 说明 | 违反后果 | 参考来源 |
+|:---|:-----|:------|:---------|:---------|
+| C1 | **代码类型判定中心化** | 任何模块不得自行实现资产类型判定（`code.startswith()`、`"QDII" in name.upper()` 等），必须调用 `code_utils` 提供的原语组合 | 代码评审不通过 | [代码类型判定中心化](#代码类型判定中心化) |
+| C2 | **缓存统一管理** | 所有持久化缓存必须通过 `cache.py` 的 `get()`/`set()` 读写，不得直接操作 `data/cache/` 文件系统 | 缓存不一致、TTL 失效 | [缓存设计](#缓存设计) |
+| C3 | **缓存原子写入** | 缓存和配置文件写入必须使用 `tempfile.mkstemp` + `os.replace` 模式，禁止直接覆写文件 | 断电/崩溃后半写文件损坏 | [原子写入](#原子写入) |
+| C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用模块级 `_ext_memo: dict` 缓存结果，避免重复 HTTP 调用（参考 `fund_style_analysis.py._ext_memo`） | 性能退化、API 限频 | B5 基金风格分析 |
+| C5 | **HTTP 客户端统一** | 所有 HTTP 请求必须使用 `http_client.py` 的 `make_http_client()` 工厂方法，不得直接实例化 `httpx.Client()` / `httpx.AsyncClient()` | SSL 配置不一致、连接池泄漏 | `http_client.py` |
+| C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()` / `batch_fetch_with_fallback()`，不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
+| C7 | **报告序号不可硬编码** | 报告 16 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [C 迭代：报告序号可配置](#c-迭代报告序号可配置-v0286) |
+| C8 | **日志统一** | 所有模块必须使用 `logger = logging.getLogger("invest")`，不得创建独立的 logger 实例 | 日志碎片化、归档/轮转失效 | `logger.py` |
+| C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须**在 `llm/skeleton.py` 中注册生成器函数和配置字段，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
+| C10 | **新闻召回策略** | `per_source`（每源原始获取量）与 `top_n`（最终输出量）解耦：各源原始获取量 = `max(500, news_top_count × 2)`，不可写死为固定值。华尔街见闻 API 硬上限 100 条除外 | 配置 `news_top_count` 不生效 | [财经新闻热点与持仓关联分析](#财经新闻热点与持仓关联分析) |
+| C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker，新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure` | CI 门禁不通过 | `src/test/conftest.py` |
+| C12 | **边缘测试文件隔离** | `@pytest.mark.edge` 测试**必须**放在 `*_edge.py` 文件中，不得与普通测试混搭。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动校验 | 测试收集失败 | `src/test/conftest.py`、`docs-stm/managements/testplan.md §1.9` |

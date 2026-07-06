@@ -4,9 +4,10 @@
   - 导航链接 ↔ section 容器一一对应（无断链/无悬空锚点）
   - 所有 section 的 CSS order 值唯一且与 section_numbers 一致
   - 不可见模块不在导航中出现
-  - CSS flex-wrap 配置正确、无 nowrap 残留（R-168）
   - 自定义 section_order 下的排序正确性
   - llm_usage 始终强制末位
+
+边缘/异常测试见 test_html_report_structure_edge.py。
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -153,113 +154,8 @@ def _get_section_id_from_href(href: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Test: Template CSS Structure (static, no rendering)
+#  Test: Rendered Navigation Structure (default order)
 # ═══════════════════════════════════════════════════════════════
-
-
-@pytest.mark.edge
-class TestHtmlCssStructure(unittest.TestCase):
-    """HTML 模板 CSS 静态结构检查 — 不依赖渲染。"""
-
-    def setUp(self):
-        with open(_TEMPLATE_PATH, "r", encoding="utf-8") as f:
-            self.tmpl = f.read()
-
-    # ── .section-nav flex-wrap ─────────────────────────────────
-
-    def test_section_nav_flex_wrap_is_wrap(self):
-        """.section-nav 必须使用 flex-wrap: wrap（R-168 修复）。"""
-        # 匹配 .section-nav { ... flex-wrap: ... }
-        match = re.search(
-            r"\.section-nav\s*\{[^}]*flex-wrap\s*:\s*([^;}]+)",
-            self.tmpl,
-        )
-        self.assertIsNotNone(match, ".section-nav CSS 中未找到 flex-wrap 属性")
-        wrap_value = match.group(1).strip()
-        self.assertEqual(wrap_value, "wrap",
-                         f".section-nav flex-wrap 应为 wrap，当前为 '{wrap_value}'")
-
-    def test_no_nowrap_in_section_nav(self):
-        """.section-nav 不应包含 nowrap 或 overflow-x: auto。"""
-        nav_css = re.search(r"\.section-nav\s*\{[^}]*\}", self.tmpl)
-        self.assertIsNotNone(nav_css)
-        block = nav_css.group(0)
-        self.assertNotIn("nowrap", block,
-                         ".section-nav 中不应有 nowrap，否则导航不换行")
-        self.assertNotIn("overflow-x", block,
-                         ".section-nav 中不应有 overflow-x，否则导航不换行")
-
-    # ── Nav <a> white-space ────────────────────────────────────
-
-    def test_nav_link_nowrap(self):
-        """.section-nav a 应保持 white-space: nowrap（单行不折）。"""
-        match = re.search(
-            r"\.section-nav\s+a[^{]*\{[^}]*white-space\s*:\s*([^;}]+)",
-            self.tmpl,
-        )
-        self.assertIsNotNone(match, ".section-nav a 中未找到 white-space 属性")
-        ws_value = match.group(1).strip()
-        self.assertEqual(ws_value, "nowrap",
-                         f".section-nav a white-space 应为 nowrap，当前为 '{ws_value}'")
-
-    # ── No empty anchor divs ───────────────────────────────────
-
-    def test_no_empty_anchor_divs(self):
-        """模板中不应有 <div id="sec-xxx"></div> 空锚点（R-168）。"""
-        empty_anchors = re.findall(
-            r'<div\s+id="sec-\w+"\s*>\s*</div>',
-            self.tmpl,
-        )
-        self.assertEqual(
-            len(empty_anchors), 0,
-            f"发现 {len(empty_anchors)} 个空锚点 div，应直接使用 .section 容器作为锚点: {empty_anchors}",
-        )
-
-    # ── All section divs have id ───────────────────────────────
-
-    def test_all_section_divs_have_id(self):
-        """每个 <div class="section"> 必须有 id 属性。"""
-        sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
-        for sec_tag in sections:
-            self.assertIn(" id=\"", sec_tag,
-                          f"section div 缺少 id 属性: {sec_tag}")
-
-    def test_all_section_divs_have_order(self):
-        """每个 <div class="section"> 必须有 style="order: ..."。"""
-        sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
-        for sec_tag in sections:
-            self.assertIn("style=\"order:", sec_tag,
-                          f"section div 缺少 order 样式: {sec_tag}")
-
-    def test_section_count(self):
-        """模板应包含 16 个 .section 容器。"""
-        sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
-        self.assertEqual(len(sections), 16,
-                         f"应有 16 个 .section 容器，实际 {len(sections)}")
-
-    # ── section-title pattern ──────────────────────────────────
-
-    def test_section_title_has_number(self):
-        """section-title 应包含 {{ section_numbers['xxx'] }} 序号。"""
-        title_divs = re.findall(
-            r'<div\s+class="section-title"[^>]*>.*?</div>',
-            self.tmpl,
-            re.DOTALL,
-        )
-        for title_html in title_divs:
-            self.assertIn("section_numbers['", title_html,
-                          f"section-title 缺少 section_numbers 引用: {title_html[:80]}")
-
-    # ── 16 nav <a> in section-nav ──────────────────────────────
-
-    def test_nav_links_count_in_source(self):
-        """模板中 nav 循环应包含 16 个 <a> 标签（不考虑可见性）。"""
-        nav_links = re.findall(
-            r'<a\s+href="#sec-[^"]+">',
-            self.tmpl,
-        )
-        # 模板源中只有 1 个 <a>（在 for 循环内），渲染后才展开
-        # 所以这里不检查数量，渲染后才展开
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -592,65 +488,6 @@ class TestHtmlAnchorValidity(unittest.TestCase):
         hrefs = [link.get("href", "") for link in links]
         self.assertEqual(len(hrefs), len(set(hrefs)),
                          f"导航 href 重复: {set(h for h in hrefs if hrefs.count(h) > 1)}")
-
-
-# ═══════════════════════════════════════════════════════════════
-#  Test: Template regression — old bugs
-# ═══════════════════════════════════════════════════════════════
-
-
-@pytest.mark.edge
-class TestHtmlRegressionChecks(unittest.TestCase):
-    """旧 bug 回归检查 — 防止同一问题再次出现。"""
-
-    def setUp(self):
-        with open(_TEMPLATE_PATH, "r", encoding="utf-8") as f:
-            self.tmpl = f.read()
-
-    def test_no_lonely_anchor_div(self):
-        """不存在 <div id="sec-xxx">（不含 class="section"）的空锚点。"""
-        # 匹配所有带 id 的 div，排除 section 类的
-        lonely = re.findall(
-            r'<div\s+id="sec-\w+"[^>]*>(?!\s*<div\s+class="section)',
-            self.tmpl,
-        )
-        # 允许正常的 <div class="section" id="sec-xxx">
-        lonely_clean = [
-            d for d in lonely
-            if 'class="section"' not in d
-        ]
-        self.assertEqual(
-            len(lonely_clean), 0,
-            f"发现孤立锚点 div（无 section class）: {lonely_clean}",
-        )
-
-    def test_section_nav_scrollbar_hidden(self):
-        """.section-nav 有 scrollbar-width: none（隐藏滚动条不占空间）。"""
-        # 检查 .section-nav { ... scrollbar-width: none ... }
-        match = re.search(
-            r"\.section-nav\s*\{[^}]*scrollbar-width\s*:\s*none",
-            self.tmpl,
-        )
-        self.assertIsNotNone(match,
-                             ".section-nav 应设置 scrollbar-width: none 以避免滚动条占位")
-
-    def test_print_hides_nav(self):
-        """打印样式应隐藏导航栏（.section-nav { display: none }）。"""
-        # @media print 内有 .back-to-top, .section-nav { display: none !important; }
-        # 无需精准匹配大括号嵌套，只需确认 .section-nav + display: none 组合存在
-        self.assertIn(".section-nav", self.tmpl,
-                       "模板中应有 .section-nav 选择器")
-        self.assertIn("display: none", self.tmpl,
-                      "打印样式应包含 display: none")
-        # 确认二者在同一 @media print 上下文中
-        # 找 @media print → 往后 500 字符内同时含 .section-nav 和 display: none
-        print_pos = self.tmpl.find("@media print")
-        self.assertGreater(print_pos, -1, "模板中缺少 @media print")
-        block = self.tmpl[print_pos:print_pos + 800]
-        self.assertIn(".section-nav", block,
-                      ".section-nav 应出现在 @media print 块中")
-        self.assertIn("display: none", block,
-                      "display: none 应出现在 @media print 块中")
 
 
 if __name__ == "__main__":

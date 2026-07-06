@@ -901,3 +901,68 @@ class TestSectionOrderTemplateRendering(unittest.TestCase):
         self._set_visible_dict({})
         html = tpl.render()
         self.assertEqual(html.strip(), "")
+
+
+# ============================================================
+#  app_version 页脚 — 版本号透传测试
+# ============================================================
+
+
+class TestAppVersionInTemplate(unittest.TestCase):
+    """验证 app_version 从 html_writer 透传到模板。"""
+
+    def setUp(self):
+        self.holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]
+        self._tmp = tempfile.mkdtemp(prefix="test_html_appver_")
+        self.detail = MagicMock()
+        self.detail.market_value = 1000.0
+        self.detail.cost = 500.0
+        self.detail.profit = 500.0
+        self.detail.today_profit = 50.0
+        self.detail.name = "长江电力"
+        self.detail.code = "600900"
+        self.detail.price = 55.0
+        self.detail.yesterday_close = 54.0
+        self.detail.profit_rate = 1.0
+        self.detail.source = "腾讯"
+        self.detail.price_type = "实时"
+        self.detail.premium = ""
+        self.detail.shares = 100
+        self.detail.cost_price = 50.0
+        self.detail.nav_date = ""
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def test_app_version_passed_to_template(self):
+        """write_html_report → 模板渲染参数含 app_version（字符串非空）。"""
+        from src.python.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            mock_details = stack.enter_context(patch("src.python.report.html_writer._generate_details"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
+            mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
+            mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
+
+            mock_details.return_value = [self.detail]
+            mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
+            mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
+            mock_penetration.return_value = {}
+            mock_cat.return_value = {}
+            mock_status.return_value = (0, 0, True)
+            mock_perf.return_value = {}
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html>ok</html>"
+            mock_template.return_value = tmpl
+
+            write_html_report(self.holdings, output_dir=self._tmp,
+                              include_news=False)
+
+        _, kwargs = tmpl.render.call_args
+        self.assertIn("app_version", kwargs)
+        self.assertIsInstance(kwargs["app_version"], str)
+        self.assertGreater(len(kwargs["app_version"]), 0)

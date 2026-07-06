@@ -113,17 +113,20 @@ def _load_dividend_data(holdings: List[Holding]) -> dict:
 
 
 def _yield_text(code: str, d, dividend_data: dict) -> str:
-    """计算单条持仓的年均股息率文本。"""
-    info = dividend_data.get(code)
-    if not info:
+    """计算单条持仓的年均股息率文本（非关键，失败返回"--"）。"""
+    try:
+        info = dividend_data.get(code)
+        if not info:
+            return "--"
+        avg_div = info.get("avg_dividend")
+        if avg_div is None:
+            return "--"
+        price = d.price if d and d.price > 0 else 0.0
+        if price <= 0:
+            return "--"
+        return f"{avg_div / price * 100:.2f}%"
+    except Exception:
         return "--"
-    avg_div = info.get("avg_dividend")
-    if avg_div is None:
-        return "--"
-    price = d.price if d and d.price > 0 else 0.0
-    if price <= 0:
-        return "--"
-    return f"{avg_div / price * 100:.2f}%"
 
 
 def _write_category_group(

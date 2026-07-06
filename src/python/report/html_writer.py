@@ -14,6 +14,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 from src.python.cache import get_cache_hit_rate
+from src.python.constants import APP_VERSION
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.models import Holding
@@ -277,6 +278,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         module_labels=get_llm_module_names(), module_disabled=module_disabled,
         llm_module_info=llm_module_info, llm_endpoint=llm_endpoint,
         cache_stats=get_cache_hit_rate(),
+        app_version=APP_VERSION,
         # C 迭代：序号 & 可见性（模板使用 section_numbers/section_visible_dict）
         section_order=order, section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,
@@ -422,9 +424,45 @@ def _render_category_table(
 def _render_penetration_section(
     holdings: List[Holding], details: list, prog: ProgressReporter,
 ) -> dict | None:
-    """计算资产穿透TOP10。"""
+    """计算资产穿透TOP10，附加盈利预测和股息率。"""
     prog.info("正在计算资产穿透TOP10...")
-    return compute_penetration_top10(holdings, details)
+    pen_result = compute_penetration_top10(holdings, details)
+    if not pen_result or not pen_result.get("top10"):
+        return pen_result
+
+    # 加载盈利预测和股息率（同 Excel 端 penetration_sheet 逻辑）
+    try:
+        from src.python.providers.akshare_extras import get_profit_forecast, get_dividend_data
+        from src.python.code_utils import is_a_share_code
+
+        profit_forecast = get_profit_forecast()
+        all_codes = list(set().union(*(e.get("codes", []) for e in pen_result["top10"])))
+        a_codes = [c for c in all_codes if is_a_share_code(c)]
+        dividend_data = get_dividend_data(a_codes) if a_codes else {}
+    except Exception:
+        profit_forecast, dividend_data = {}, {}
+        logger.debug("盈利预测/股息率加载失败（非关键）", exc_info=True)
+
+    for entry in pen_result["top10"]:
+        codes = entry.get("codes", [])
+        # EPS
+        eps_text = "--"
+        for c in codes:
+            info = profit_forecast.get(c)
+            if info and info.get("eps_2025e") is not None:
+                eps_text = f"¥{info['eps_2025e']:.2f}"
+                break
+        entry["eps_text"] = eps_text
+        # 股息率
+        div_text = "--"
+        for c in codes:
+            info = dividend_data.get(c)
+            if info and info.get("avg_dividend"):
+                div_text = f"{info['avg_dividend']:.4f}元/年"
+                break
+        entry["dividend_text"] = div_text
+
+    return pen_result
 
 
 def _render_fund_performance_section(

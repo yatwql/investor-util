@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- **`news_top_count` 配置不生效（各源始终只取 100 条）**：`build_news_data()` 调用 `aggregate_news()` 仅传 `top_n`，未传 `per_source`，后者默认硬编码为 100。即使 `news_top_count=300`，各源仍只取 100 条。修复：传 `per_source=max(500, news_top_count × 2)` 保障召回，最终按关联度截取 `news_top_count` 条输出。同步更新 `requirements.md`、`technical.md`、`how-to-config.md` 说明召回策略。
 - **基金风格分析跳过日志**：无持仓数据的基金（如黄金 ETF）被跳过时补充 debug 日志，消除 12→11 数量疑问
 
 ## [0.2.88] - 2026-07-06
