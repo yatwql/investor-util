@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
 from src.python.report.styles import (
@@ -310,5 +311,88 @@ def auto_width(ws, min_width: int = 8, max_width: int = 30) -> None:
 def freeze_header(ws, row: int = 1) -> None:
     """冻结指定行以上的区域（默认首行表头）。"""
     ws.freeze_panes = f"A{row + 1}"
+
+
+# ── 数据源状态页脚 / 占位 ─────────────────────
+
+
+def _write_data_status_foot(
+    ws,
+    data_status: dict,
+    start_row: int | None = None,
+    max_cols: int = 5,
+) -> int:
+    """写入数据源加载状态摘要页脚。
+
+    全部 ``available=True`` 时不渲染。有失败项时写入空行+状态行。
+    T2 用 ⚠ 前缀，T3/T4 用 ℹ 前缀，灰色 9 号字体。
+
+    Args:
+        ws: 工作表
+        data_status: DataStatus 字典。形如 ``{"key": {"available": bool, "tier": str, "message": str}}``
+        start_row: 起始行号，None 自动取最大行 + 2
+        max_cols: 标题栏跨列数，默认 5
+
+    Returns:
+        写入后的下一个行号
+    """
+    if not data_status:
+        return start_row or ws.max_row + 1
+
+    # 筛选失败项
+    failed = {k: v for k, v in data_status.items()
+              if isinstance(v, dict) and not v.get("available", True)}
+
+    if not failed:
+        return start_row or ws.max_row + 1
+
+    # 延迟导入避免循环依赖（report 内模块互相引用）
+    from src.python.report.data_status import TIER_PREFIX  # noqa: PLC0415
+
+    row = start_row if start_row is not None else ws.max_row + 2
+
+    # 标题
+    _write_status_title(ws, row, max_cols)
+    row += 1
+
+    # 逐条状态
+    for key, item in failed.items():
+        tier = item.get("tier", "T4")
+        prefix = TIER_PREFIX.get(tier, "ℹ")
+        msg = item.get("message", "数据不可用")
+        cell = ws.cell(row=row, column=1, value=f"{prefix} {msg}")
+        cell.font = Font(size=9, color="999999")  # 灰色
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        row += 1
+
+    return row
+
+
+def _write_placeholder(ws, text: str, row: int | None = None, max_cols: int = 5) -> int:
+    """写入占位提示行（页签中央浅灰色提示）。
+
+    Args:
+        ws: 工作表
+        text: 占位文本
+        row: 起始行号，None 自动取最大行 + 2
+        max_cols: 跨列数，默认 5
+
+    Returns:
+        写入后的下一个行号
+    """
+    r = row if row is not None else ws.max_row + 2
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=max_cols)
+    cell = ws.cell(row=r, column=1, value=text)
+    cell.font = Font(size=11, color="AAAAAA")  # 浅灰色
+    cell.alignment = Alignment(horizontal="center", vertical="center")
+    return r + 1
+
+
+def _write_status_title(ws, row: int, ncols: int) -> None:
+    """写入状态摘要标题行（深灰色加粗）。"""
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+    cell = ws.cell(row=row, column=1, value="数据加载状态")
+    cell.font = Font(size=10, bold=True, color="666666")
+    cell.alignment = Alignment(horizontal="left", vertical="center")
 
 

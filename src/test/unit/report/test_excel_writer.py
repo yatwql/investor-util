@@ -208,3 +208,106 @@ class TestFreezeHeader(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ═══════════════════════════════════════════════════════════
+#  数据源状态页脚 / 占位测试
+# ═══════════════════════════════════════════════════════════
+
+
+class TestDataStatusFoot(unittest.TestCase):
+    """_write_data_status_foot 页脚写入测试。"""
+
+    def setUp(self):
+        self.wb = ew.create_workbook()
+        self.ws = self.wb.active
+
+    def test_all_available_no_render(self):
+        """全部 available=True → 不新增任何行。"""
+        max_row_before = self.ws.max_row
+        ew._write_data_status_foot(self.ws, {
+            "source_a": {"available": True, "tier": "T2", "message": "OK"},
+            "source_b": {"available": True, "tier": "T3", "message": "OK"},
+        })
+        self.assertEqual(self.ws.max_row, max_row_before)
+
+    def test_empty_dict_no_render(self):
+        """空字典 → 不新增行。"""
+        max_row_before = self.ws.max_row
+        ew._write_data_status_foot(self.ws, {})
+        self.assertEqual(self.ws.max_row, max_row_before)
+
+    def test_with_failures(self):
+        """有失败项 → 渲染标题行 + 状态行。"""
+        row_start = 5
+        next_row = ew._write_data_status_foot(self.ws, {
+            "industry": {"available": False, "tier": "T3", "message": "行业分类数据不可用"},
+            "rank": {"available": False, "tier": "T2", "message": "排名数据不可用"},
+        }, start_row=row_start)
+        # 标题行 + 2 条状态 = 3 行
+        self.assertEqual(next_row, row_start + 3)
+        # 验证标题行
+        title_val = self.ws.cell(row=row_start, column=1).value
+        self.assertIsNotNone(title_val)
+        self.assertIn("数据加载状态", str(title_val))
+        # 验证 ℹ 前缀
+        industry_val = self.ws.cell(row=row_start + 1, column=1).value
+        self.assertIn("ℹ", str(industry_val))
+        # 验证 ⚠ 前缀
+        rank_val = self.ws.cell(row=row_start + 2, column=1).value
+        self.assertIn("⚠", str(rank_val))
+
+    def test_with_mixed_available(self):
+        """混合 available=True/False → 只渲染失败项。"""
+        ew._write_data_status_foot(self.ws, {
+            "source_a": {"available": True, "tier": "T2", "message": "OK"},
+            "source_b": {"available": False, "tier": "T3", "message": "出错啦"},
+        }, start_row=1)
+        # 标题 + 1 行 = 3 行
+        row_val = self.ws.cell(row=2, column=1).value
+        self.assertIn("ℹ", str(row_val))
+
+    def test_tier_font_color(self):
+        """状态行字体为灰色。"""
+        ew._write_data_status_foot(self.ws, {
+            "test": {"available": False, "tier": "T2", "message": "测试失败"},
+        }, start_row=1)
+        cell = self.ws.cell(row=2, column=1)
+        font_color = cell.font.color
+        self.assertIsNotNone(font_color)
+        # openpyxl 可能返回 Color 对象，也可能返回 str
+        color_str = str(font_color.rgb if hasattr(font_color, 'rgb') else font_color)
+        self.assertTrue("999" in color_str or "99" in color_str,
+                        f"字体颜色 {color_str} 不是灰色")
+
+
+class TestWritePlaceholder(unittest.TestCase):
+    """_write_placeholder 占位写入测试。"""
+
+    def setUp(self):
+        self.wb = ew.create_workbook()
+        self.ws = self.wb.active
+
+    def test_placeholder_basic(self):
+        """占位文本写入。"""
+        self.ws.cell(row=1, column=1, value="已有内容")
+        next_row = ew._write_placeholder(self.ws, "测试占位文本")
+        # 应写在已有内容 + 2 空行后
+        self.assertEqual(next_row, 4)
+        cell_val = self.ws.cell(row=3, column=1).value
+        self.assertEqual(cell_val, "测试占位文本")
+
+
+class TestWriteStatusTitle(unittest.TestCase):
+    """_write_status_title 标题写入测试。"""
+
+    def setUp(self):
+        self.wb = ew.create_workbook()
+        self.ws = self.wb.active
+
+    def test_stauts_title_text(self):
+        """标题文本为 '数据加载状态'。"""
+        ew._write_status_title(self.ws, 3, 5)
+        cell_val = self.ws.cell(row=3, column=1).value
+        self.assertEqual(cell_val, "数据加载状态")
+

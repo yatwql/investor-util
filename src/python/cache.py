@@ -253,6 +253,29 @@ def set(key: str, data: Any) -> None:
             pass
 
 
+def get_cache_age(key: str) -> float | None:
+    """返回缓存数据年龄（秒），无缓存或损坏时返回 None。
+
+    同时检查 .json 和 .json.gz 变体，返回最先找到的有效缓存年龄。
+
+    Args:
+        key: 缓存键名
+
+    Returns:
+        缓存数据距今的秒数，缓存不存在/损坏时返回 None
+    """
+    path = _cache_path(key)
+    gz_path = path + _GZIP_SUFFIX
+
+    for fpath in (gz_path, path):
+        data = _read_cache_data(fpath, key)
+        if data is not None:
+            ts = data.get("_ts", 0)
+            if isinstance(ts, (int, float)) and ts > 0:
+                return time.time() - ts
+    return None
+
+
 def clear(key: str) -> None:
     """删除指定缓存文件（同时处理 .json 和 .json.gz）。"""
     with _cache_lock:

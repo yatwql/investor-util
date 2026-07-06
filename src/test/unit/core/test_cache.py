@@ -1074,6 +1074,57 @@ if __name__ == "__main__":
 
 
 # ═══════════════════════════════════════════════════════════
+#  get_cache_age 测试
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGetCacheAge(CacheTestBase):
+    """测试 get_cache_age() 函数。"""
+
+    @patch("src.python.cache.time.time")
+    def test_get_cache_age_fresh(self, mock_time):
+        """缓存刚写入 → 年龄 ≈0。"""
+        from src.python.cache import set, get_cache_age
+
+        mock_time.return_value = 1000.0
+        set("age_test", "data")
+
+        age = get_cache_age("age_test")
+        self.assertIsNotNone(age)
+        self.assertAlmostEqual(age, 0, delta=0.1)
+
+    @patch("src.python.cache.time.time")
+    def test_get_cache_age_aged(self, mock_time):
+        """写入后快进 → 年龄 = 时间差。"""
+        from src.python.cache import set, get_cache_age
+
+        mock_time.return_value = 1000.0
+        set("age_test2", "data")
+
+        mock_time.return_value = 2000.0
+        age = get_cache_age("age_test2")
+        self.assertIsNotNone(age)
+        self.assertAlmostEqual(age, 1000.0, delta=0.1)
+
+    def test_get_cache_age_missing(self):
+        """缓存不存在 → 返回 None。"""
+        from src.python.cache import get_cache_age
+
+        self.assertIsNone(get_cache_age("nonexistent_key"))
+
+    def test_get_cache_age_gz(self):
+        """gzip 压缩的缓存也正确返回年龄。"""
+        ts_now = 10000.0
+        self._write_gz_cache("gz_age", "some_data", ts=ts_now)
+        from src.python.cache import get_cache_age
+
+        age = get_cache_age("gz_age")
+        self.assertIsNotNone(age)
+        # age 应接近 now - ts_now
+        self.assertGreaterEqual(age, 0)
+
+
+# ═══════════════════════════════════════════════════════════
 #  _is_market_open 测试（多渠道市场时段判断）
 # ═══════════════════════════════════════════════════════════
 
