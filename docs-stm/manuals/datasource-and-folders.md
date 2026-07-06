@@ -282,7 +282,6 @@ investor-util/
 │   │   ├── archived_plan.0.1.x.md       # v0.1.x 实现计划归档（Iter 1.1~1.5）
 │   │   └── archived_review-findings.0.1.x.md  # v0.1.x 自审问题记录归档
 │   ├── plan/                         # 计划与设计文件
-│   │   ├── iteration-plan.md             # 迭代计划细节
 │   │   ├── test-coverage-map.md          # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   │   ├── A5-test-runtime-optimization.md # R-152：测试运行时可扩展性优化设计
 │   │   ├── B1-fund-deep-analysis.md      # B 迭代基金深度分析 4 模块设计
