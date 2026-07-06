@@ -384,9 +384,12 @@ def write_fund_performance_sheet(
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
 
-    logger.info("%s写入完成，%d/%d 只基金获取成功",
-                get_report_sheet_name('fund_performance'),
-                len(adjusted_ratings), len(fund_holdings_sorted))
+    if not adjusted_ratings:
+        logger.warning("[fund_performance] 天天基金排名接口均返回空数据，排名列显示 --")
+    else:
+        logger.info("%s写入完成，%d/%d 只基金获取成功",
+                    get_report_sheet_name('fund_performance'),
+                    len(adjusted_ratings), len(fund_holdings_sorted))
 
 
 def _write_empty_row(ws, row: int, fund: Holding) -> None:

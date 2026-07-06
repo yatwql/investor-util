@@ -808,7 +808,7 @@ def _render_llm_module_info(
         from src.python.llm.prompts import _LLM_MODULE_FAILURE
         _llm_failure = dict(_LLM_MODULE_FAILURE)
     except ImportError:
-        pass
+        logger.info("llm/session 模块未就绪，略过用量统计")
     if _llm_session_usage:
         _per_module = _llm_session_usage.get("per_module", {}) or {}
 

@@ -135,6 +135,8 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
                 try:
                     res = future.result()
                 except Exception:
+                    _failed_code = futures[future]
+                    logger.warning("[industry] 重试批量 %s 仍失败", _failed_code, exc_info=True)
                     continue
                 if res is not None:
                     code, data = res

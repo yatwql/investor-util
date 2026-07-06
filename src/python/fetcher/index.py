@@ -129,7 +129,8 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
     # 检查哪些还没获取到，尝试备用链路
     still_missing = [c for c in uncached_codes if c not in indices]
     if still_missing:
-        logger.info("A 股指数腾讯链路未完全获取，尝试新浪备用链路: %s", still_missing)
+        logger.warning("[index] A 股指数腾讯链路失败（未获取 %d 个指数），降级至新浪备用链路: %s",
+                        len(still_missing), still_missing)
         sina_results = _fetch_indices_from_sina(still_missing)
         indices.update(sina_results)
 

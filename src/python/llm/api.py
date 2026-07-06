@@ -330,11 +330,14 @@ def _attempt_api_call(
         resp.raise_for_status()
         return ("success", resp.json())
     except httpx.TimeoutException:
+        logger.debug("[llm/api] 请求超时: %s", _sanitize_endpoint(url))
         return ("retryable", None)
     except httpx.HTTPError:
         host = _sanitize_endpoint(url)
+        logger.debug("[llm/api] HTTP 异常: %s", host)
         return ("retryable", host)
     except (ValueError, KeyError) as e:
+        logger.warning("[llm/api] 响应解析失败: %s", e)
         return ("fatal", str(e))
 
 

@@ -235,7 +235,7 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
 
         return result if result else None
     except Exception:
-        logger.debug("push2 扩展数据获取失败 [%s]", code, exc_info=True)
+        logger.warning("push2 扩展数据获取失败 [%s]", code, exc_info=True)
         return None
 
 
@@ -266,7 +266,7 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
 
         return result if result else None
     except Exception:
-        logger.debug("Tencent 扩展数据获取失败 [%s]", code, exc_info=True)
+        logger.warning("Tencent 扩展数据获取失败 [%s]", code, exc_info=True)
         return None
 
 

@@ -512,6 +512,9 @@ def _build_penetration_result(
             "sources": sorted(set(info["funds"])),
         })
 
+    if not top10_list:
+        logger.warning("[penetration] 天天基金持仓解析结果为空，穿透表不可用")
+
     top10_coverage = (
         sum(v["mv"] for _, v in sorted_items[:10]) / total_mv * 100
         if total_mv > 0 else 0.0

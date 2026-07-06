@@ -109,6 +109,7 @@ def _price_cache_fresh(data: dict) -> bool:
         td = _gtd()
         return pd >= td
     except Exception:
+        logger.warning("[price] _is_cache_fresh 校验异常，保守视作新鲜", exc_info=True)
         return True
 
 

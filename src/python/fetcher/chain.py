@@ -40,7 +40,7 @@ def _get_chain(data_type: str) -> list[str]:
             chain.insert(0, preferred)
             logger.info("%s Provider Chain: 根据配置首选 '%s'", data_type, preferred)
     except (KeyError, TypeError):
-        pass
+        logger.debug("[chain] preferred_provider 配置解析失败，使用默认链")
     return chain
 
 

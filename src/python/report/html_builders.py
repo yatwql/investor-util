@@ -38,6 +38,7 @@ def _calc_yield_text(code: str, d: DetailRow | None, dividend_data: dict) -> str
             return "--"
         return f"{avg_div / price * 100:.2f}%"
     except Exception:
+        logger.warning("[html_builders] 股息率计算异常", exc_info=True)
         return "--"
 
 

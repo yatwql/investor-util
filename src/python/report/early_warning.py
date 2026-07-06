@@ -82,6 +82,12 @@ def compute_early_warnings(
             "has_llm_news": bool,
         }
     """
+    # 上游数据全空时直接返回（非异常，正常跳过）
+    if not sector_flow and not news_data:
+        logger.info("[early_warning] 上游数据（行业资金流向/新闻）均为空，预警模块跳过（非异常）")
+        return {"sector_alerts": [], "sentiment_alerts": [],
+                "has_warnings": False, "has_sector_data": False, "has_llm_news": False}
+
     sector_alerts = _compute_sector_alerts(penetration_top10, sector_flow)
     sentiment_alerts = _compute_sentiment_alerts(holdings, news_data, news_llm_meta)
 

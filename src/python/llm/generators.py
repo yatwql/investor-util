@@ -414,8 +414,8 @@ def _finalize_news_token_usage(
         if _cost != "-":
             try:
                 _cost_val = float(_cost.lstrip("$¥€£"))
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.warning("[llm] 费用估值 JSON 解码失败: %s", e)
         _endpoint = llm_config.get("endpoint", "") or ""
         _record_per_module(
             "news_correlation", _model, inp=total_in, out=total_out,
@@ -621,6 +621,7 @@ def _dispatch_llm_workers(
                 c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)
             except ImportError:
                 # h2 包未安装时降级到 HTTP/1.1
+                logger.info("h2 包未安装，降级到 HTTP/1.1")
                 _settings = dict(_LLM_CLIENT_SETTINGS)
                 _settings.pop("http2", None)
                 c = httpx.Client(timeout=_LLM_TIMEOUT, **_settings)
