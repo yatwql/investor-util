@@ -277,6 +277,8 @@ investor-util/
 │   └── validate_coverage_map.py      # 覆盖率映射验证 — 校验 test-coverage-map.md 与实际测试文件一致性
 │
 ├── docs-stm/                         # 项目文档
+│   ├── archive/                       # 历史文件归档
+│   │   └── archived_changelog.0.1.x.md  # v0.1.x 版本变更日志归档
 │   ├── plan/                         # 计划与设计文件
 │   │   ├── archived_plan.md              # 历史迭代归档（Iter 1.1~3.7）
 │   │   ├── iteration-plan.md             # 迭代计划细节
