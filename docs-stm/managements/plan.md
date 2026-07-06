@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-05（v0.2.87 — 资产分类函数集中重构）
+最后更新：2026-07-06（v0.2.87 — B 迭代基金深度分析 4 模块上线）
 
 ---
 
@@ -75,7 +75,9 @@ LLM 配置拆分为两个独立文件：
 
 ## ✅ 已完成迭代
 
-所有已完成迭代（A/A2/A3/A4/A5/B/C/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md).
+所有已完成迭代（A/A2/A3/A4/A5/B/C/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md)。
+
+B 迭代（基金深度分析 4 模块：基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析）和 C 迭代（报告序号可配置）已完结，详见 changelog.md 及 `docs-stm/plan/c-iteration-design.md`、`docs-stm/plan/c-p1b-excel-title-number-fix.md`。
 
 ---
 
@@ -97,15 +99,3 @@ LLM 配置拆分为两个独立文件：
 
 - **CI/CD 集成**：添加 GitHub Actions 自动化流水线，每次 Push 自动运行 `pytest`
 - **Excel 页签并行写入**：报告生成时每个页签独立写入，可考虑并行加速
-
----
-
-### ✅ C. 报告序号可配置（v0.2.85~v0.2.86 — 已全部完成）
-
-16 个模块统一注册表驱动，支持用户通过 `config.json` 自定义序号和排列顺序。
-- **C-P1a**：注册表 `_REPORT_SECTION_DEFAULT` + `get_report_section_order()` + 配置校验
-- **C-P1b**：Excel 页签标题跟随 `section_order` 配置；`_get_module_key_map()` 动态构建
-- **C-P2**：HTML 全链路重构（Jinja2 模板 / CSS order / section_visible_dict）
-- **C-P3**：文档同步
-
-详见 `docs-stm/plan/c-iteration-design.md`、`docs-stm/plan/c-p1b-excel-title-number-fix.md`。

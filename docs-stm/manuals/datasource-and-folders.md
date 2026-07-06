@@ -13,7 +13,7 @@
 | 财经新闻（源5） | akshare 封装：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — |
 | A 股指数 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn`（s_* 前缀） |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析，gb_* 前缀） | 腾讯财经 `qt.gtimg.cn` |
-| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业分类 + 概念板块归属） | — |
+| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业分类 + 概念板块归属） | 行情页 `quotedata` 解析（仅行业，无概念） |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — |
@@ -33,6 +33,7 @@ investor-util/
 │   ├── python/                       # 主程序代码 — 业务子包声明
 │   │   ├── __init__.py               # 包标记（空文件）
 │   │   ├── cache.py                  # 缓存引擎 — 泛用 JSON 文件缓存、TTL 管理、过期清理、指纹失效
+│   │   ├── code_utils.py             # 证券代码/名称类型判定中心 — A股/基金/债券/港股通/ETF/QDII 识别原语
 │   │   ├── config.py                 # 配置管理 — config.json / llm_key.json / llm_settings.json 读写、校验
 │   │   ├── constants.py              # 共享常量 — 版本号、缓存频率常量（CACHE_DAILY 等）、模型定价
 │   │   ├── http_client.py            # HTTP 客户端工厂 — 统一 httpx.Client 创建、超时/重试配置
@@ -55,6 +56,7 @@ investor-util/
 │       │   │   ├── fund.py               # 基金数据获取 — 净值/持仓/排名/基准的缓存感知封装
 │       │   │   ├── index.py              # 指数行情获取 — A股 + 美股指数、缓存 TTL 管理
 │       │   │   ├── industry.py           # 行业/概念数据获取 — 行业分类、概念板块归属、批量接口
+│       │   │   ├── fund_manager.py       # 基金经理数据获取 — 主页 HTML 解析 + 档案页回退
 │       │   │   └── price.py              # 价格行情获取 — 场内实时价/收盘价/ETF 溢价
 │   │   │
 │   │   ├── providers/                # 数据源提供商（各 API 的具体实现）
@@ -64,6 +66,7 @@ investor-util/
 │       │   │   ├── eastmoney.py          # 东方财富 — 场外基金净值 + 备用价格链路（push2.eastmoney.com）
 │       │   │   ├── tiantian.py           # 天天基金 — 基金业绩排名 + 季报持仓（JS 变量解析 + HTML 解析）
 │       │   │   ├── eastmoney_industry.py # 东方财富行业分类 — 三级行业 + 概念板块归属（push2 API）
+│       │   │   ├── eastmoney_industry_rest.py # 东方财富行业分类备用 — 行情页 quotedata 解析（push2 不可用时 fallback）
 │       │   │   ├── akshare_extras.py     # akshare 封装 — 盈利预测 / 行业资金流向 / 股票历史分红
 │       │   │   ├── akshare_news.py       # akshare 新闻 — 财新网要闻 + CCTV 财经新闻
 │       │   │   ├── sina_news.py          # 新浪财经新闻 — feed.mix.sina.com.cn
@@ -95,7 +98,6 @@ investor-util/
 │       │   │   ├── summary.py            # 投资分析汇总页签 — 指数行情、账户汇总、LLM 用量
 │       │   │   ├── market_value.py       # 市值核算明细表页签 — 15 列持仓行情、盈亏计算
 │       │   │   ├── category.py           # 持仓分类表页签 — 按资产属性+投资分类聚合
-│       │   │   ├── classification_utils.py # 资产类型判定工具 — 股票/ETF/债券/QDII 统一判定入口
 │       │   │   ├── penetration.py        # 资产穿透 TOP10 — 基金穿透合并、行业分类、板块映射
 │       │   │   ├── penetration_sheet.py  # 穿透 TOP10 Excel 写入 — 从 penetration.py 拆分的页签写入函数
 │       │   │   ├── fund_performance.py   # 基金业绩分析页签 — 排名/收益率/基准对比/评级
@@ -117,11 +119,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2521 tests）
+│   └── test/                             # 测试（按标记分组目录，2454 tests）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2219 项，8 个子分组）
+│       ├── unit/                         # 单元测试（2189 项，8 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -131,16 +133,16 @@ investor-util/
 │       │   │   ├── test_sina.py          # 新浪财经指数 — _parse_us_index / fetch_us_indices（10 项）
 │       │   │   ├── test_tiantian.py      # 天天基金 — _find_holdings_table / _parse_syl_returns / _calc_rating_from_entry（65 项）
 │       │   │   └── test_akshare_extras.py # akshare 封装 — 盈利预测/行业资金流向/分红（16 项）
-│       │   ├── fetcher/                  # 抓取器测试（159 项）
+│       │   ├── fetcher/                  # 抓取器测试（145 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_chain.py         # Provider Chain — _get_chain / _fetch_with_fallback 全链路（23 项）
-│       │   │   ├── test_chain_edge.py    # Provider Chain 异常场景 — 全链 fallback/超时/空响应（4 项）
+│       │   │   ├── test_chain_edge.py    # Provider Chain 异常场景 — 全链 fallback/超时/空响应
 │       │   │   ├── test_fetcher.py       # 抓取器调度 — 指数/行业/价格聚合入口（5 项）
 │       │   │   ├── test_fetcher_price.py # 行情抓取 — _name_matches / _price_cache_key / _price_transform（21 项）
 │       │   │   ├── test_fetcher_index.py # 指数抓取 — 腾讯→新浪 fallback 双链路（13 项）
 │       │   │   ├── test_fetcher_industry.py # 行业抓取 — _industry_transform / fetch_industry_data（10 项）
 │       │   │   ├── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
-│       │   │   ├── test_fund_manager.py  # 基金经理抓取 — _extract_fund_manager / F2 流程（14 项 B2）
+│   │   │   ├── test_fund_manager.py  # 基金经理师数据获取 — HTML 解析、当页面退 回档（14 项）
 │       │   │   └── test_api_edge.py      # HTTP Provider 异常场景 — 超时/DNS/SSL/429/503/JSON 异常（23 项 Y1）
 │       │   ├── llm/                      # LLM 相关测试（345 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -165,7 +167,7 @@ investor-util/
 │       │   │   ├── test_wallstreetcn_news.py # 华尔街见闻新闻 — _parse_news_item HTML 剥离（15 项）
 │       │   │   ├── test_cls_news.py      # 财联社新闻 — _parse_news_item 缺字段测试（21 项）
 │       │   │   └── test_akshare_news.py  # akshare 新闻 — 财新网 + CCTV 双链路（16 项）
-│       │   ├── report/                   # 报表生成测试（818 项）
+│       │   ├── report/                   # 报表生成测试（776 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_excel_writer.py  # Excel 写入引擎 — Workbook 创建/页签管理（30 项）
 │       │   │   ├── test_excel_roundtrip.py # Excel 读写回环测试 — 保存后重开验证数据完整性
@@ -179,7 +181,6 @@ investor-util/
 │       │   │   ├── test_fund_concentration.py # 持仓集中度监控测试（15 项 B4）
 │       │   │   ├── test_fund_performance.py # 基金业绩分析 — 排名/评级/评级分布直方图（48 项）
 │       │   │   ├── test_category.py      # 持仓分类表 — 按资产属性+投资分类聚合（30 项）
-│       │   │   ├── test_classification_utils.py # 资产类型判定工具 — 股票/ETF/债券/QDII 统一判定（42 项）
 │       │   │   ├── test_data_integrity.py # 数据正确性验证 — 分类聚合/行业占比/指数合理性/多币种/多时区
 │       │   │   ├── test_market_value_edge.py # 行情异常场景 — NAV 空窗期/交易时段切换/溢价率（37 项）
 │       │   │   ├── test_qdii_timezone.py # QDII 多时区 — _is_qdii / 多时区日期转换（26 项）
@@ -200,15 +201,14 @@ investor-util/
 │       │   ├── core/                     # 核心模块测试（342 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_cache.py         # 缓存引擎 — TTL 管理/过期清理/市场时段感知（181 项）
+│       │   │   ├── test_cache_edge.py      # 缓存异常场景 — 文件损坏/并发写入/目录权限
 │       │   │   ├── test_filesystem_edge.py # 文件系统异常场景 — 加密 Excel/损坏文件/权限/超长路径（18 项 Y3）
 │       │   │   ├── test_http_client.py   # HTTP 客户端工厂 — _should_verify / make_http_client（17 项）
 │       │   │   ├── test_market_hours.py  # 交易时段判断 — _is_market_open 三层编排（41 项）
 │       │   │   ├── test_market_hours_edge.py # 交易时段异常场景 — 跨时区/节假日/午夜边界
 │       │   │   ├── test_models.py        # 数据模型 — NamedTuple / dataclass 定义校验（17 项）
 │       │   │   ├── test_reader.py        # 持仓读取 — xlsx 解析/多 worksheet/列校验（11 项）
-│       │   │   ├── test_registry.py      # 中央注册表 — 模块注册/TTL 映射/设置键派生/section_order 测试（21 项）
-│       │   │   ├── test_registry_edge.py # 注册表异常场景 — 查找失败/section_order 异常输入（8 项）
-│       │   │   └── test_cache_edge.py      # 缓存异常场景 — 文件损坏/并发写入/目录权限
+│       │   │   └── test_registry.py      # 中央注册表 — 模块注册/TTL 映射/设置键派生（21 项）
 │       │   └── ui/                       # TUI 测试（≈142 项）
 │       │       ├── __init__.py           # 子包标记（空文件）
 │       │       ├── test_tui.py           # 键盘输入 — getch() 跨平台/方向键解析（32 项）
@@ -220,16 +220,15 @@ investor-util/
 │       ├── integration/                # 集成测试（25 项契约验证，5 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   └── test_integration_coverage.py  # 集成测试覆盖：接口契约/错误隔离/新闻流水线/缓存一致性/TUI 路由
-│       └── scenario/                     # 场景测试（277 项，4 个子分组）
+│       └── scenario/                     # 场景测试（240 项，4 个子分组）
 │           ├── __init__.py               # 子包标记（空文件）
-│           ├── basic/                    # 基础业务场景 S0a-S0d + S1-S5 + S21-S33 + C-P1b + S-P1~S-P10（127 项）
+│           ├── basic/                    # 基础业务场景 S0a-S0d + S1-S5 + S21-S33 + C-P1b（90 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   ├── test_integration.py              # S1-S5：持仓读取/行情获取/市值核算/分类汇总/报告生成
 │           │   ├── test_scenario_holdings_quality.py # S0a-S0d（Z3）：清仓跳过/A-C份额/200+持仓/特殊字符
 │           │   ├── test_scenario_special_securities.py # S21-S28（Z1）：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债
 │           │   ├── test_scenario_operational_behavior.py # S29-S33（Z2）：分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市
-│           │   ├── test_scenario_section_order.py # C-P1b：报告序号可配置（自定义/部分配置/未知 key 合并场景，6 项）
-│           │   └── test_scenario_penetration.py # S-P1~S-P10：穿透 TOP10 场景 — 股票/债券/ETF/主动/QDII/黄金ETF/联接/交叉持股（37 项）
+│           │   └── test_scenario_section_order.py # C-P1b：报告序号可配置（自定义/部分配置/未知 key 合并场景，6 项）
 │           ├── resilience/               # 异常容错场景 S6-S10（18 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   └── test_integration_scenarios.py  # S6-S10：纯债分类/网络降级/单行报告/零成本利润/极端份额
@@ -256,16 +255,16 @@ investor-util/
 ├── test-reports/                      # 测试报告输出（自动生成）
 │   ├── latest/                        # 最新测试报告（按 --mode 生成子目录）
 │       │   ├── index.html                 # 汇总页 — 各模式通过/失败总览 + 最近运行时间
-│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2219 项）
-│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，1938 项）
-│       │   ├── scenario/report.html       # 场景测试报告（标记 -m "scenario"，277 项）
-│       │   ├── regression/report.html     # 回归测试报告（标记 -m "scenario"，模式别名，277 项）
-│       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，944 项）
-│       │   ├── integration/report.html    # 集成测试报告（标记 -m "scenario or integration"，302 项）
+│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2189 项）
+│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，1908 项）
+│       │   ├── scenario/report.html       # 场景测试报告（标记 -m "scenario"，240 项）
+│       │   ├── regression/report.html     # 回归测试报告（标记 -m "scenario"，模式别名，240 项）
+│       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，921 项）
+│       │   ├── integration/report.html    # 集成测试报告（标记 -m "scenario or integration"，265 项）
 │       │   ├── smoke/report.html          # 冒烟测试报告（标记 -m "smoke"，24 项）
 │       │   ├── edge/report.html           # 边缘场景报告（标记 -m "edge"，216 项）
 │       │   ├── data/report.html           # 数据正确性报告（标记 -m "data"，65 项）
-│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2521 项）
+│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2454 项）
 │       │   └── coverage/                  # HTML 行覆盖率报告（--coverage 时生成）
 │   └── archives/                      # 历史报告存档
 │       └── <YYYYMMDD>/                # 按日期归档的子目录（含完整 latest/ 快照）
@@ -282,7 +281,12 @@ investor-util/
 │   │   ├── archived_plan.md              # 历史迭代归档（Iter 1.1~3.7）
 │   │   ├── iteration-plan.md             # 迭代计划细节
 │   │   ├── test-coverage-map.md          # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
-│   │   └── A5-test-runtime-optimization.md # R-152：测试运行时可扩展性优化设计
+│   │   ├── A5-test-runtime-optimization.md # R-152：测试运行时可扩展性优化设计
+│   │   ├── B1-fund-deep-analysis.md      # B 迭代基金深度分析 4 模块设计
+│   │   ├── c-iteration-design.md         # C 迭代设计
+│   │   ├── c-p1b-excel-title-number-fix.md # C-P1b: Excel 报告可配置序号修复设计
+│   │   └── notes/                        # 源码预研笔记
+│   │       └── data-source-pre-study.md  # 数据源预研笔记
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组

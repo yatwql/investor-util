@@ -2,28 +2,28 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-05）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-06）测试覆盖规模：
 
 ### 模式对应测试量
 
 | `--mode` 值 | 覆盖项数 | 优化前耗时 | 优化后耗时（parallel medium） | 加速比 |
 |:------------|:--------:|:----------:|:----------------------------:|:------:|
-| `unit` | 2177 | ~25min | **~20s** | 75x |
-| `standard` | 1896 | ~25min | **~20s** | 75x |
-| `scenario` | 277 | ~32s | ~32s（不并行）| — |
-| `regression` | 277 | ~32s | ~32s（不并行）| — |
-| `verify` | 944 | ~12min | **~49s** | 14.7x |
-| `integration` | 302 | ~42s | — | — |
+| `unit` | 2189 | ~25min | **~20s** | 75x |
+| `standard` | 1908 | ~25min | **~20s** | 75x |
+| `scenario` | 240 | ~32s | ~32s（不并行）| — |
+| `regression` | 240 | ~32s | ~32s（不并行）| — |
+| `verify` | 921 | ~12min | **~49s** | 14.7x |
+| `integration` | 265 | ~42s | — | — |
 | `edge` | 216 | ~15s | ~15s（不并行）| — |
 | `data` | 65 | ~10s | ~10s（不并行）| — |
-| `all` | 2479 | ~26min | **~待测** | — |
+| `all` | 2454 | ~26min | **~待测** | — |
 | `smoke` | 24 | ~2s | ~2s（不并行）| — |
-| `report` 🆕 | 776 | — | **~15s** | — |
+| `report` 🆕 | 774 | — | **~15s** | — |
 
-> 注：`all` 模式收集总数 2479 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2467 passed / 12 skipped。
-> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（776 项），供报告模块开发期快速验证。
+> 注：`all` 模式收集总数 2454 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2442 passed / 12 skipped。
+> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（774 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）启用 `--parallel medium`（默认）自动并行，场景/边缘/冒烟等轻量模式保持单线程避免进程调度开销。
-> C-P1b（v0.2.86）新增 16 项 LLM 内容/section_order 场景测试，单元测试从 2137→2177，场景从 222→240，全量从 2384→2442。穿透 TOP10 场景（S-P1~S-P10）新增 37 项 → 场景 240→277，全量 2442→2479。
+> v0.2.87 完成 B 迭代（基金深度分析 4 模块）上线，全量 2454 项（2442 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 
@@ -32,21 +32,21 @@
 | 功能域 | 源模块（`src/python/`） | 对应测试文件（`src/test/`） | 覆盖项数 |
 |:-------|:-----------------------|:---------------------------|:--------:|
 | **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 166 |
-| **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 159 |
+| **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 173 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
 | **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 17 文件含 test_html_writer、test_html_template 等 | 776 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(10 文件) + `scenario/llm/test_llm_scenarios.py` | 369 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 342 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 71 |
 | **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 142 |
-| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 6 文件, resilience, llm, datetime 共 10 文件) | 277 |
+| **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 5 文件, resilience, llm, datetime 共 9 文件) | 240 |
 
 ### 场景测试分组（scenario）
 
 | 标记 | 覆盖场景 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 + S-P1~S-P10 全量业务场景 | **277** |
-| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 + S-P1~S-P10 | 127 |
+| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 全量业务场景 | **240** |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 | 90 |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 |
 | │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 |
@@ -55,7 +55,6 @@
 | │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 |
 | │  ├ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量（清仓/同名多份额/超多持仓/特殊字符） | 16 |
 | │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 |
-| │  ├ `scenario_penetration` 🆕 | S-P1~S-P10: 穿透 TOP10 场景（股票/债券/ETF/主动/QDII/黄金ETF/联接/国内指数基金/交叉持股） | 37 |
 | │  └ `—` | S29-S33: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市），仅 `scenario_basic` 父标记 | 15 |
 | ├─ `scenario_resilience` | 异常容错场景 S6-S10 | 18 |
 | │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 |
@@ -70,9 +69,9 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 8 个子组合计 | **2177** |
+| `unit`（父标记） | 8 个子组合计 | **2189** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 166 |
-| ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常） | 159 |
+| ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常） | 173 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/llm_content 写入） | 345 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
 | ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列模块、C 迭代序号可配置分支；含 65 项 data 标记测试） | 776 |

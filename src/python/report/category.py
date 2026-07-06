@@ -11,6 +11,13 @@ import logging
 
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.code_utils import (
+    is_a_share_code,
+    is_bond_related_by_name,
+    is_exchange_fund_code,
+    is_hk_stock_code,
+    is_qdii_by_name,
+)
 from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.models import Holding
 from src.python.report.excel_writer import (
@@ -22,7 +29,6 @@ from src.python.report.excel_writer import (
     write_title_row,
     write_total_row,
 )
-from src.python.report.classification_utils import INDEX_KEYWORDS, is_bond_fund, is_etf, is_offsite_fund, is_qdii, is_stock_code
 from src.python.report.market_value import DetailRow
 from src.python.report.styles import FMT_MONEY, FMT_PERCENT, profit_font
 
@@ -36,8 +42,15 @@ _HEADERS = [
 
 # ── 分类映射规则 ──────────────────────────────────────────
 
-# 货币类关键词（category 模块特有，无需集中管理）
+# 场外基金渠道关键词
+_FUND_ACCOUNT_KEYWORDS = ("基金", "支付宝", "微信", "银行")
+
+# 货币类关键词
 _MONEY_KEYWORDS = ("货币", "现金", "增利", "宝")
+
+# 指数类关键词
+_INDEX_KEYWORDS = ("指数", "ETF联接", "ETF 联接", "中证", "沪深300",
+                   "中证500", "中证1000", "科创50", "创业板", "上证")
 
 
 def _categorize_holding(h: Holding) -> tuple[str, str]:
@@ -62,13 +75,15 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
     name = h.name.strip()
     code = h.code.strip()
     account = h.account.strip()
+    name_upper = name.upper()
 
     # 1) QDII
-    if is_qdii(name):
+    if is_qdii_by_name(name):
         return ("基金", "QDII")
 
-    # 2) 固收类
-    if is_bond_fund(name):
+    # 2) 固收类（使用 is_bond_related_by_name + "债" 宽匹配，
+    #    覆盖纯债基金和可转债等含"债"字段的品种）
+    if is_bond_related_by_name(name) or "债" in name:
         return ("债券", "纯债")
 
     # 3) 货币类
@@ -76,18 +91,18 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
         return ("现金", "货币")
 
     # 4) 场外渠道
-    is_offsite = is_offsite_fund(account)
+    is_offsite = any(kw in account for kw in _FUND_ACCOUNT_KEYWORDS)
     if is_offsite:
-        if any(kw in name for kw in INDEX_KEYWORDS):
+        if any(kw in name for kw in _INDEX_KEYWORDS):
             return ("基金", "被动")
         return ("基金", "主动")
 
     # 5) 场内 ETF（名称含ETF或代码5/1开头）
-    if is_etf(name, code):
+    if "ETF" in name_upper or is_exchange_fund_code(code):
         return ("基金", "指数")
 
-    # 6) 场内股票（代码6/0/3开头）
-    if is_stock_code(code):
+    # 6) 场内股票（A股或港股通）
+    if is_a_share_code(code) or is_hk_stock_code(code):
         return ("股票", "A股")
 
     # 7) 其余归为基金/混合
@@ -98,7 +113,7 @@ def _load_dividend_data(holdings: List[Holding]) -> dict:
     """加载分红数据（非关键，失败时返回空字典）。"""
     try:
         from src.python.providers.akshare_extras import get_dividend_data
-        stock_codes = [h.code for h in holdings if h.code.strip().startswith(("6", "0", "3"))]
+        stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         return get_dividend_data(stock_codes) if stock_codes else {}
     except Exception:
         logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)

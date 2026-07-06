@@ -1,6 +1,6 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 最后更新：2026-07-05（v0.2.87）
+> 最后更新：2026-07-06（v0.2.87）
 
 ## 概述
 
@@ -50,9 +50,6 @@ python scripts/test_runner.py --mode edge
 
 # 数据正确性验证（~10s）
 python scripts/test_runner.py --mode data
-
-# 报告模块快速验证（~15s，开发期快速检查报告变更）
-python scripts/test_runner.py --mode report
 
 # 运行全量 + 行覆盖率报告
 python scripts/test_runner.py --coverage
@@ -129,7 +126,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
   场景测试按职责分为 **4 大类**：
 
-  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、超多持仓不崩溃、特殊字符不乱码），以及操作行为场景（S29-S33：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市），以及穿透 TOP10 场景（S-P1~S-P10：纯股票/债券/ETF/主动权益/QDII/黄金ETF/指数联接/交叉持股合并等 9 类资产类型覆盖）。
+  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、超多持仓不崩溃、特殊字符不乱码），以及操作行为场景（S29-S33：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市）。
   - **`scenario_resilience` — 异常容错场景**：验证系统在非正常输入或环境下的降级能力，包括纯债券基金组合（穿透无股权覆盖）、网络中断（价格从过期缓存读取）、单账户单持仓、零成本持仓（不除零崩溃）、极端值（超大市值正确定标）。
   - **`scenario_llm` — LLM 场景组合**：验证 LLM 模块在各种状态下的行为，包括缓存/成功/失败混合状态的颜色渲染、五种失败原因独立映射、Extended Thinking 标记、禁用优先原则、断网降级、全缓存无调用、三种输出格式（Excel/HTML/Summary）一致性。
   - **`scenario_datetime` — 日期/时间场景**：验证系统在不同市场时段（盘中/盘前/午休/盘后/非交易日/长假）、产品类型（场外基金/QDII/ETF/股票/混合）、边界条件（时段切换/缝隙/首次启动/断网）以及特殊日历（跨年/季末/汇率故障/调休/港股通假期）下的数据获取正确性和降级表现。
@@ -138,12 +135,11 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 - **`--mode verify`** 覆盖范围最广的组合模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。这是"快速回查"的上限——确保数据管道整条链路正常，但跳过纯 UI、纯 LLM 等不直接影响数据流的模块。
 
-#### 🔷 专项验证系列（`edge` / `data` / `smoke` / `report`）
+#### 🔷 专项验证系列（`edge` / `data` / `smoke`）
 
 - **`--mode edge`** 仅运行标记为 `edge` 的测试，覆盖各种异常和边界情况：零值、空数据集、并发竞态、Unicode、时区安全、文件系统边界、API 网络异常等。适用于修改了函数内部错误处理逻辑后的针对性验证。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 - **`--mode data`** 仅运行标记为 `data` 的测试，覆盖数据精确性：市值=价格×份额、盈亏=市值-成本、收益率=盈亏÷成本（成本>0）、穿透 TOP10 占比归一化等。适用于修改了数值计算逻辑后的回归。
 - **`--mode smoke`** 仅运行标记为 `smoke` 的测试，从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s，合计 ~2s。适用于部署后冒烟或极速"通不通"检查。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
-- **`--mode report`** 运行标记为 `unit_report` 的测试（776 项），覆盖 Excel/HTML 报告全部页签生成逻辑。不依赖外部 API（全 mock），开发期快速验证报告变更的唯一入口。约 15s。
 
 #### 🔷 全量（`all`）
 
@@ -201,16 +197,15 @@ test-reports/latest/
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
-| `scenario` | 全部业务场景 S0a-S0d + S1-S28 + S29-S33 + T1-T21 + S-P1~S-P10 |
-| `scenario_basic` | 基础链路 S0a-S0d + S1-S5 + S21-S33 + S-P1~S-P10 |
+| `scenario` | 全部业务场景 S0a-S0d + S1-S28 + S29-S33 + T1-T21 |
+| `scenario_basic` | 基础链路 S0a-S0d + S1-S5 + S21-S33 |
 | ├ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量 |
 | ├ `scenario_stock` | S1: 纯股票组合 |
 | ├ `scenario_fund` | S2: 纯基金组合 |
 | ├ `scenario_mixed_accounts` | S3: 混合多账户 |
 | ├ `scenario_new_holdings` | S4: 新持仓无缓存 |
 | ├ `scenario_cache_hit` | S5: 缓存全命中 |
-| ├ `scenario_special_securities` | S21-S28: 特殊品种 |
-| └ `scenario_penetration` 🆕 | S-P1~S-P10: 穿透 TOP10 场景 |
+| └ `scenario_special_securities` | S21-S28: 特殊品种 |
 | `scenario_resilience` | 异常容错场景 S6-S10 |
 | ├ `scenario_bond` | S6: 纯债券基金组合 |
 | ├ `scenario_network_down` | S7: 网络中断降级 |

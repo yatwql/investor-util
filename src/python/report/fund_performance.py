@@ -29,9 +29,9 @@ from src.python.report.excel_writer import (
     write_header_row,
     write_title_row,
 )
-from src.python.report.classification_utils import is_etf, is_offsite_fund, is_stock_code
 from src.python.report.market_value import DetailRow
 from src.python.registry import get_report_sheet_name, set_sheet_title
+from src.python.code_utils import is_a_share_code, is_hk_stock_code
 from src.python.report.penetration import classify_penetration, QDII, ETF, INDEX_LINK, BOND_FUND, ACTIVE_EQUITY
 from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, RED_FONT
 
@@ -78,10 +78,15 @@ def _fund_display_type(h: Holding) -> str:
 
 def _is_fund(h: Holding) -> bool:
     """判断持仓是否为基金（需要业绩分析）。"""
-    # 纯股票直接排除（ETF 虽是股票代码但属于基金，保留）
-    if is_stock_code(h.code) and not is_etf(h.name, h.code):
+    name = h.name.strip().upper()
+    code = h.code.strip()
+
+    # 纯股票直接排除（A 股或港股通）
+    if (is_a_share_code(code) or is_hk_stock_code(code)) and "ETF" not in name:
         # 双重确认：A股渠道
-        if not is_offsite_fund(h.account):
+        account = h.account.strip()
+        fund_keywords = ("基金", "支付宝", "微信", "银行")
+        if not any(kw in account for kw in fund_keywords):
             return False
 
     return True

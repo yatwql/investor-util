@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
-from src.python.report.classification_utils import is_qdii
+from src.python.code_utils import is_qdii_by_name
 
 logger = logging.getLogger("invest")
 
@@ -17,7 +17,7 @@ __all__ = [
     "_LLM_MODULE_FAILURE",
     "_SYSTEM_GLOBAL_MACRO", "_SYSTEM_EXPERT_REVIEW", "_SYSTEM_HEALTH_CHECK",
     "_SYSTEM_PENETRATION_DEEP", "_SYSTEM_NEWS_CORRELATION",
-    "_is_qdii", "_fmt_wan", "_fmt_holding_line",
+    "_fmt_wan", "_fmt_holding_line",
     "_build_global_macro_prompt", "_build_expert_review_prompt", "_build_health_check_prompt",
     "_build_penetration_deep_prompt", "_build_holdings_summary", "_build_news_correlation_summary",
 ]
@@ -142,6 +142,10 @@ sentiment 字段判断该新闻对持仓的利好/利空影响（结合行业和
 # ═══════════════════════════════════════════════════════════
 
 
+def _is_qdii(name: str) -> bool:
+    return is_qdii_by_name(name) if name else False
+
+
 def _fmt_wan(num: float) -> str:
     """将数值格式化为中文单位（万/亿），减少 token 消耗。"""
     if abs(num) >= 100_000_000:
@@ -169,7 +173,7 @@ def _fmt_holding_line(h: dict, show_cost: bool = False, compact: bool = False) -
     nav_date = h.get("nav_date", "")
     source_api = h.get("source_api", "")
     name = h.get("name", "")
-    qdii_suffix = "(QDII滞后1日)" if is_qdii(name) else ""
+    qdii_suffix = "(QDII滞后1日)" if _is_qdii(name) else ""
 
     if show_cost:
         cost = h.get("cost", 0)

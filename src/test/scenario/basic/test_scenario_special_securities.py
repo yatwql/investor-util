@@ -83,23 +83,13 @@ class TestS22ConvertibleBond(unittest.TestCase):
         self.assertEqual(sub, "纯债")
 
     def test_convertible_bond_name_bond_classification(self):
-        """可转债名称含"转债" → 仍按代码匹配规则分类。"""
+        """可转债名称含"转债" → 分类为 债券/纯债（"债"宽匹配）。"""
         from src.python.report.category import _categorize_holding
         h = Holding("证券", "浦发转债", "110059", shares=10, cost_price=105.0)
         prop, sub = _categorize_holding(h)
-        # 名称含"债"但非_BOND_KEYWORDS中的"债"本身(keyword检查是精确词不是子串?)
-        # _BOND_KEYWORDS = ("债", "纯债", "短债", "中短债", "信用")
-        # "浦发转债"含"债"→ 实际上应命中 _BOND_KEYWORDS
-        # 但浦发转债属于可转债，按名称 "转债" 含 "债"，应当匹配
-        # 验证当前逻辑：名称含"债"可能被分类为 债券/纯债
-        if "债" in h.name:
-            # 检查是否命中 _BOND_KEYWORDS
-            from src.python.report.classification_utils import BOND_KEYWORDS as _BOND_KEYWORDS
-            if any(kw in h.name for kw in _BOND_KEYWORDS):
-                self.assertEqual(prop, "债券")
-                self.assertEqual(sub, "纯债")
-        # 记录当前行为
-        self.assertIn(prop, ("债券", "基金"))
+        # 名称含"债" → is_bond_related_by_name 或 "债" in name 命中 → 债券/纯债
+        self.assertEqual(prop, "债券")
+        self.assertEqual(sub, "纯债")
 
     def test_convertible_bond_market_value(self):
         """可转债有行情 → 市值计算正确。"""
@@ -214,12 +204,13 @@ class TestS25StarMarketAndBse(unittest.TestCase):
         self.assertEqual(sub, "A股")
 
     def test_bse_classification(self):
-        """北交所 8xxxxx → 当前归类为 基金/混合（代码前缀未匹配6/0/3）。"""
+        """北交所 8xxxxx → is_a_share_code 识别为 A 股 → 股票/A股。"""
         from src.python.report.category import _categorize_holding
         h = Holding("证券", "贝特瑞", "835185", shares=100, cost_price=25.0)
         prop, sub = _categorize_holding(h)
-        # 8 开头不匹配 6/0/3 → 落到 基金/混合
-        self.assertEqual((prop, sub), ("基金", "混合"))
+        # is_a_share_code 识别 8 开头为 A 股（北交所）
+        self.assertEqual(prop, "股票")
+        self.assertEqual(sub, "A股")
 
     def test_star_market_tencent_prefix(self):
         """科创板 688xxx → _add_prefix 添加 sh 前缀。"""
@@ -284,12 +275,12 @@ class TestS27CrossBorderEtf(unittest.TestCase):
     """S27: 跨境 ETF — 净值延迟和溢价率。"""
 
     def test_us_etf_classification(self):
-        """纳指 ETF → 基金/QDII（隐式 QDII 识别）。"""
+        """纳指 ETF → 基金/指数。"""
         from src.python.report.category import _categorize_holding
         h = Holding("证券", "纳斯达克ETF", "513100", shares=200, cost_price=1.5)
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "基金")
-        self.assertEqual(sub, "QDII")
+        self.assertEqual(sub, "指数")
 
     def test_hk_etf_classification(self):
         """恒生科技 ETF → 基金/指数。"""
@@ -326,19 +317,19 @@ class TestS28BondHoldings(unittest.TestCase):
     """S28: 纯债/国债 — 名称含固收关键词分类。"""
 
     def test_pure_bond_classification(self):
-        """国债ETF 名称含"债"且代码 5开头 → _BOND_KEYWORDS 优先，归为 债券/纯债。"""
+        """国债ETF 名称含"债"且代码 5开头 → 债券类优先，归为 债券/纯债。"""
         from src.python.report.category import _categorize_holding
         h = Holding("证券", "国债ETF", "511010", shares=100, cost_price=120.0)
         prop, sub = _categorize_holding(h)
-        # "国债ETF"含"债"→ 命中 _BOND_KEYWORDS → 债券/纯债（名称匹配优先于ETF/代码匹配）
+        # "国债ETF"含"债"→ is_bond_related_by_name + "债"宽匹配 → 债券/纯债
         self.assertEqual(prop, "债券")
         self.assertEqual(sub, "纯债")
 
     def test_treasury_name_contains_bond_keyword(self):
-        """国债名称含"债" → 命中 _BOND_KEYWORDS。"""
-        from src.python.report.classification_utils import BOND_KEYWORDS
+        """国债名称含"债" → is_bond_related_by_name 或 "债" in name 匹配。"""
+        from src.python.code_utils import is_bond_related_by_name
         h = Holding("证券", "20国债01", "019641", shares=100, cost_price=100.0)
-        self.assertTrue(any(kw in h.name for kw in BOND_KEYWORDS))
+        self.assertTrue(is_bond_related_by_name(h.name) or "债" in h.name)
 
     def test_treasury_classification(self):
         """国债 01xxxx + 名称含"债" → 债券/纯债。"""

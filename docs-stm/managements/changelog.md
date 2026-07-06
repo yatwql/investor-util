@@ -4,36 +4,60 @@
 
 ---
 
-## [0.2.87] - 2026-07-05
+## [0.2.87] - 2026-07-06
 
-### Changed
+### Added
 
-- **资产分类函数集中重构**：将分散在 `category.py` / `penetration.py` / `market_value.py` / `fund_performance.py` / `html_writer.py` / `llm/prompts.py` 的 7 个资产分类判定函数（`_is_qdii` / `_is_etf` / `_is_bond_fund` / `_is_index_link` / `_is_offsite_fund` / `_is_stock_code` / `is_stock_code`）统一迁移至 `classification_utils.py`，消除定义不一致
-  - 新增 `classification_utils.py`：6 个统一判定函数（`is_stock_code` / `is_etf` / `is_bond_fund` / `is_index_link` / `is_offsite_fund` / `is_qdii`）+ 4 组常量（`FUND_ACCOUNT_KEYWORDS` / `BOND_KEYWORDS` / `BOND_KEYWORDS_STRICT` / `INDEX_KEYWORDS`）
-  - 新增 `BOND_KEYWORDS_STRICT` 常量解决"国债ETF"在穿透分析中被误判为债券基金的问题
-  - 穿透分类优先级：QDII > BOND_FUND(严格) > INDEX_LINK > ETF > ACTIVE_EQUITY > STOCK > IGNORE
-  - 6 个模块移除内联判定逻辑，统一 import `classification_utils`
-  - 新增测试 42 项（`test_classification_utils.py`），回归验证 276 项通过
+- **B 迭代（基金持仓深度分析）全模块上线** — 新增 4 页签（13~16）：
+  - **基金经理变更监控（B2）**：`src/python/report/fund_manager_analysis.py` + `fund_manager_sheet.py` — 快照式变更检测（1/3/6 月窗口），独立快照键 `fund_manager_snapshot`（不受持仓指纹影响），首次运行引导文案
+  - **持仓重合度矩阵（B3）**：`src/python/report/fund_overlap.py` + `fund_overlap_sheet.py` — Jaccard + Overlap Ratio 双指标，热力图矩阵，含/不含市值数据双模式
+  - **持仓集中度监控（B4）**：`src/python/report/fund_concentration.py` + `fund_concentration_sheet.py` — 前3/5/10集中度，环比变化+三级预警，独立快照键 `fund_concentration_snapshot`
+  - **基金风格分析（B5）**：`src/python/report/fund_style_analysis.py` + `fund_style_sheet.py` — 六宫格风格箱（大盘/中盘/小盘×价值/混合/成长），三级降级链路（push2→Tencent→代码段估算），网格曼哈顿距离漂移检测，独立快照键 `fund_style_snapshot`
+- **基金经理数据获取模块**：`src/python/fetcher/fund_manager.py` — 天天基金主页 HTML 解析 + 档案页回退
+- **Tencent 扩展字段（市值/PE）**：`src/python/providers/tencent.py` — 新增 `market_cap`(f46) 和 `pe`(f40) 字段
+- **TUI 菜单描述同步**：B/L 菜单标注「含基金深度分析」，[1] 菜单描述含基金经理缓存
+- **测试覆盖**：B 系列 6 个测试文件共 ~115 项（fetter fund_manager 14 项 + report 模块 101 项）
 
 ### Fixed
 
-- **HTML 报告导航锚点修复**：移除空锚点 `<div id="sec-{key}"></div>` 占位，`id` 直接移至 `.section` 容器并配合 CSS `order` 属性，解决导航链接堆叠在顶部的问题
-- **`.section-nav` flex-wrap**：`nowrap; overflow-x: auto` → `wrap`，使导航链接能自动换行
-- **"国债ETF"穿透分类**：`BOND_KEYWORDS_STRICT` 不含独立"债"字，排除可转债和债券 ETF 被误判为债券基金
+- **R-158：Excel "LLM API 用量" 页签未显示模块明细**：
 
-### Docs
+- **R-158：Excel "LLM API 用量" 页签未显示模块明细**：
+  - `excel_generator.py`：`_build_llm_usage_sheet` 中 `per_module` 从 `formatted` 取改为从 `raw_session` 取
+  - 根本原因：`format_session_usage` 在特定状态返回 `{"has_usage": False}`（不含 `per_module` 键），导致 `formatted.get("per_module", {})` 返回空字典，进而 `excel_module_info` 为空、函数提前返回，页签无数据
+  - 修复：优先从始终含 `per_module` 的 `raw_session` 读取数据，`formatted` 作为降级回退
+  - 新增回归测试 `test_raw_session_per_module_fallback`
 
-- `scripts/test_runner.py`：移除 8 个模式描述中的硬编码统计项数避免过期误导
-- `docs-stm/manuals/datasource-and-folders.md`：目录树新增 `classification_utils.py` / `test_classification_utils.py`，统计计数同步
-- `docs-stm/managements/test-coverage.md`：计数同步
-- `docs-stm/manuals/how-to-test-my-code.md`：新增 `--mode report` 专项验证说明、穿透场景 S-P1~S-P10 文档
-- `docs-stm/manuals/faq.md`：DeepSeek 兼容端点更新，FAQ 去噪
-- `docs-stm/managements/plan.md`：更新最后版本标记
+- **R-156：push2 行业数据频繁 "Server disconnected" 容错增强**：
+  - `eastmoney_industry.py`：重试次数 1→3（4 次总请求），指数退避（0.5s→1s→2s）+ 随机抖动 0.3s
+  - `eastmoney_industry.py`：超时 10s→15s，增加随机/隐式导入
+  - `industry.py`：`batch_fetch_industry_data` 新增批量级重试，首次失败后短暂等待（0.8s+抖动）重试一次
+  - 对应更新测试 `test_us_stock_filtered_out` 断言（call_count 1→2）
 
-### Internal
+- **R-159a：Provider Chain 熔断器线程竞争**：
+  - `chain.py`：`batch_fetch_industry_data` 多线程（`ThreadPoolExecutor(max_workers=3)`）同时写入 `_PROVIDER_CONSECUTIVE_FAILURES`，无锁覆盖导致熔断计数器永远达不到阈值
+  - 修复：新增 `_PROVIDER_LOCK = threading.Lock()`，所有读写操作线程安全
 
-- `src/python/constants.py`：Claude 模型计费前缀回退（`claude-sonnet-4-` / `claude-opus-4-` / `claude-haiku-4-`），覆盖所有日期戳变体，避免费用显示"-"
-- `CLAUDE.md`：管理文档/用户文档列表格式修正
+- **R-159b：A 股代码判定修复 — 250361 基金代码误入行业链路**：
+  - `industry._is_a_share_code`：从仅检查"6 位数字"升级为前缀区间检查（60/68/00/30/8），基金代码（250361 等）不再被误判为 A 股
+  - 250361 不再触发东方财富 REST 行情页 404 错误
+
+### Added
+
+- **R-159c：代码类型判定中心化 — code_utils.py**：
+  - 新增 `src/python/code_utils.py`：资产代码/名称类型识别唯一入口，集中管理所有前缀区间和名称关键词知识
+  - 新增函数：`is_a_share_code`、`is_fund_code`、`is_stock_like_code`、`is_exchange_fund_code`、`is_hk_stock_code`、`get_exchange_prefix`、`get_push2_secid`、`is_qdii_by_name`、`is_etf_by_name`、`is_bond_related_by_name`、`is_index_link_by_name`
+  - 全量迁移 12 个调用方：`fetcher/industry.py`、`providers/eastmoney_industry.py`、`providers/eastmoney_industry_rest.py`、`providers/tencent.py`、`providers/akshare_extras.py`、`report/penetration.py`、`report/category.py`、`report/market_value.py`、`report/fund_performance.py`、`report/penetration_sheet.py`、`llm/prompts.py`
+  - 删除 4 个重复的内部函数：`penetration._is_bond_fund`、`penetration._is_index_link`、`market_value._is_qdii`、`market_value._is_etf`
+  - `llm/prompts._is_qdii` 委托至 `code_utils.is_qdii_by_name`
+  - `CLAUDE.md` + `technical.md` 添加"代码类型判定中心化"约束
+
+- **R-157：push2 全线不可用时 fallback 链路 — eastmoney_industry_rest**：
+  - 新增 `src/python/providers/eastmoney_industry_rest.py`：行情页 HTML scraped 备用链路，解析 `quotedata.bk_name`（行业名称）/ `bk_id`（行业 BK 代码）
+  - `chain.py`：`industry` 链扩展为 `["eastmoney_industry", "eastmoney_industry_rest"]`
+  - `industry.py`：注册 `eastmoney_industry_rest` 到 provider 映射表
+  - 新增测试 13 项：`_quote_prefix`（5 类代码前缀）、`_extract_quotedata`（4 场景）、`fetch_industry_and_concepts`（3 场景，含 mock HTTP 异常）
+  - 注意：概念板块数据依赖 push2 XHR 动态加载，fallback 仅提供行业分类，概念列表留空（graceful degradation）
 
 ## [0.2.86] - 2026-07-05
 

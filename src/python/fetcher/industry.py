@@ -1,18 +1,23 @@
 """行业分类 / 概念板块数据获取。
 
-Provider Chain（可配置）：东方财富 push2
+Provider Chain（可配置）：
+  1. eastmoney_industry — 东方财富 push2（主链路，含概念板块）
+  2. eastmoney_industry_rest — 东方财富行情页（备用，纯行业分类）
 """
 
 from __future__ import annotations
 
 import logging
+import random
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from src.python.cache import get_ttl
 from src.python.fetcher.chain import _fetch_with_fallback
-from src.python.providers import eastmoney_industry
+from src.python.providers import eastmoney_industry, eastmoney_industry_rest
+from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
 
@@ -21,7 +26,12 @@ _INDUSTRY_CACHE_PREFIX = "industry_"
 
 _INDUSTRY_PROVIDERS: dict[str, tuple[str, Any]] = {
     "eastmoney_industry": ("东方财富行业", eastmoney_industry.fetch_industry_and_concepts),
+    "eastmoney_industry_rest": ("东方财富行业(行情页)", eastmoney_industry_rest.fetch_industry_and_concepts),
 }
+
+# 批量获取失败重试：重试等待基秒数 + 随机抖动
+_BATCH_RETRY_DELAY = 0.8
+_BATCH_RETRY_JITTER = 0.4
 
 
 def _industry_transform(raw: dict, source: str) -> dict | None:
@@ -61,21 +71,8 @@ def fetch_industry_data(code: str) -> dict | None:
 
 
 def _is_a_share_code(code: str) -> bool:
-    """判断是否为 A 股代码（含 sh/sz/bj 前缀的 6 位数字）。
-
-    美股（AAPL）、港股（00700）等非 A 股代码直接跳过，
-    避免无效 API 调用和误导性日志。
-    """
-    raw = code.strip()
-    if not raw:
-        return False
-    # 去除已知前缀
-    for prefix in ("sh", "sz", "bj"):
-        if raw.startswith(prefix):
-            raw = raw[len(prefix):]
-            break
-    # A 股代码必须为纯数字 6 位
-    return len(raw) == 6 and raw.isdigit()
+    """判断是否为 A 股代码（委托至 code_utils.is_a_share_code）。"""
+    return is_a_share_code(code)
 
 
 def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[str, dict]:
@@ -125,6 +122,24 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
                 code, data = res
                 with lock:
                     result[code] = data
+
+    # 首次获取失败的代码，短暂等幅后重试一次
+    failed = [c for c in a_codes if c not in result]
+    if failed:
+        delay = _BATCH_RETRY_DELAY + random.uniform(0, _BATCH_RETRY_JITTER)
+        logger.info("批量行业数据重试 %d 个失败代码（%.1fs 后）", len(failed), delay)
+        time.sleep(delay)
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(failed))) as executor:
+            futures = {executor.submit(_fetch_one, code): code for code in failed}
+            for future in as_completed(futures):
+                try:
+                    res = future.result()
+                except Exception:
+                    continue
+                if res is not None:
+                    code, data = res
+                    with lock:
+                        result[code] = data
 
     logger.info("批量行业数据获取完成: 共 %d 个代码, 成功 %d 个",
                 len(a_codes), len(result))

@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-05（v0.2.86 — C 迭代：报告序号可配置 + 4 种可见性类型 + CSS order 排序）
+最后更新：2026-07-06（v0.2.87 — R-159：代码类型判定中心化 + 行业数据容错增强）
 
 ---
 
@@ -43,6 +43,7 @@ investor-util/
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
 │   │   ├── cache.py              # 缓存引擎
+│   │   ├── code_utils.py         # 代码类型判定中心化（A 股/基金/QDII 等识别原语）
 │   │   ├── config.py             # 配置读写
 │   │   ├── constants.py          # 共享常量
 │   │   ├── fetcher/               # 数据获取调度
@@ -80,6 +81,38 @@ investor-util/
 
 ---
 
+## 代码类型判定中心化
+
+`src/python/code_utils.py` 是资产代码类型识别的唯一入口，集中管理所有前缀区间和名称关键词知识。
+
+### 设计原则
+
+- **code_utils 只提供底层原语**：基于代码前缀/名称关键词的纯技术判定，无业务上下文
+- **业务层可组合使用**：category/penetration/market_value 等模块组合多个原语 + 账户上下文做业务分类
+- **不允许自行实现**：任何模块不得出现 `code.startswith(("6", "0", "3"))` 或 `"QDII" in name.upper()` 等判定，必须调用 code_utils
+
+### 函数清单
+
+| 函数 | 类型 | 用途 |
+|------|------|------|
+| `is_a_share_code(code)` | 前缀 | A 股（60/68/00/30/8 开头） |
+| `is_fund_code(code)` | 前缀 | 无歧义基金代码（16/50/51/52/159/184） |
+| `is_stock_like_code(code)` | 前缀 | 股票类（A+B 股 + 北交所） |
+| `is_exchange_fund_code(code)` | 前缀 | 场内基金/ETF（5/1 开头） |
+| `is_hk_stock_code(code)` | 前缀 | 港股通（5 位数字） |
+| `get_exchange_prefix(code)` | 前缀 | sh/sz/bj 交易所前缀 |
+| `get_push2_secid(code)` | 前缀 | push2 API secid 参数 |
+| `is_qdii_by_name(name)` | 名称 | QDII 识别 |
+| `is_etf_by_name(name)` | 名称 | ETF 识别 |
+| `is_bond_related_by_name(name)` | 名称 | 债券基金/品种识别 |
+| `is_index_link_by_name(name)` | 名称 | 指数联接基金识别 |
+
+### 迁移状态
+
+v0.2.87 已完成全量迁移，所有 `code.startswith()` 和名称关键词判定已收敛到 code_utils。
+
+---
+
 ## 数据源一览
 
 | 用途 | 主链路 API | 备用链路 | Provider 文件 |
@@ -95,10 +128,11 @@ investor-util/
 | 财经新闻（财联社） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | — | `cls_news.py` |
 | 财经新闻（华尔街见闻） | 华尔街见闻 `api-one.wallstcn.com/apiv1/content/lives`（JSON API，无需鉴权） | — | `wallstreetcn_news.py` |
 | 财经新闻（akshare） | akshare 封装：财新网 + CCTV | — | `akshare_news.py` |
-| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com` 三级行业 + 概念板块 | — | `eastmoney_industry.py` |
+| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com` 三级行业 + 概念板块 | 行情页 `quotedata` 解析（仅行业，无概念） | `eastmoney_industry.py` / `eastmoney_industry_rest.py` |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `akshare_extras.py` |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `akshare_extras.py` |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `akshare_extras.py` |
+| 基金经理数据 | 天天基金 `fundf10.eastmoney.com` 经理列表 HTML 解析 | 档案页回退 | `fetcher/fund_manager.py` |
 
 > 指数数据由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存。
 
@@ -161,7 +195,7 @@ investor-util/
 ### 资产穿透TOP10
 
 - `compute_penetration_top10()` 纯计算函数，不依赖 openpyxl
-- 分类逻辑（QDII/ETF/联接/债券/主动/直接持股）基于代码前缀 + 名称规则
+- 分类逻辑（QDII/ETF/联接/债券/主动/直接持股）基于代码前缀 + 名称规则，所有底层判定委托至 `code_utils`（见[代码类型判定中心化](#代码类型判定中心化)）
 - 板块分类 `classify_sector()` 使用静态关键词映射，同时支持 API 行业数据补充
 - 调用 `batch_fetch_industry_data()` 为穿透结果注入行业信息（覆盖静态关键词的局限）
 
@@ -198,7 +232,7 @@ penetration_sector = fetch_industry_data(code).industry  // API优先
 
 ### Provider Chain 路由与 fallback
 
-`src/python/providers/` 下的 Provider 按数据类型的优先级注册在 `registry.py` 中，`fetcher/price.py` 的 `get_price()` 遍历 Provider Chain：
+`src/python/providers/` 下的 Provider 按数据类型的优先级定义在 `fetcher/chain.py:_DEFAULT_CHAINS` 中（`price`→`tencent`,`eastmoney`；`industry`→`eastmoney_industry`,`eastmoney_industry_rest` 等），`fetcher/price.py` 的 `get_price()` 通过 `_fetch_with_fallback()` 遍历 Provider Chain：
 
 ```
 Provider Chain 注册表（registry.py）
@@ -227,7 +261,8 @@ Provider Chain 注册表（registry.py）
 | `price.py` | 股票/基金最新价 | tencent, eastmoney | `price_*` |
 | `index.py` | A 股/美股指数 | tencent, sina | `index_*` |
 | `fund.py` | 基金排名/持仓/基准 | tiantian, eastmoney | `fund_perf_*`, `fund_hold_*`, `fund_benchmarks` |
-| `industry.py` | 行业分类+概念板块 | eastmoney_industry | `industry_*` |
+| `fund_manager.py` | 基金经理数据 | tiantian HTML 解析 | `fund_manager_*`, `fund_manager_snapshot` |
+| `industry.py` | 行业分类+概念板块 | eastmoney_industry, eastmoney_industry_rest | `industry_*` |
 
 - **并行预热**：`preload_cache()` 对 preload 组（6 模块）使用 `ThreadPoolExecutor` 并行获取，减少串行等待
 - **菜单驱动**：菜单 [1] 和 [2] 分别清除 + 重拉 refresh 和 preload 组，复用 fetcher 模块的预热入口
@@ -314,12 +349,12 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 
 `fund_style_analysis.py` 基于持仓个股市值 + PE 数据的加权风格判定：
 
-- **数据源**：东方财富 push2 API（`f20`=总市值、`f9`=动态 PE），降级按代码前缀
+- **数据源**：东方财富 push2 API（`f20`=总市值、`f9`=动态 PE）；三级降级链路：push2（精确）→ Tencent 扩展字段（可靠，`qt.gtimg.cn` f46=总市值、f40=PE TTM）→ 代码前缀估算（兜底）
 - **市值判定**：>500 亿=大盘、100~500 亿=中盘、<100 亿=小盘
 - **估值判定**：PE / 行业平均 PE，<70%=价值、>130%=成长、其余=混合
 - **加权投票**：最终风格 = 市值权重最大的 size + 估值权重最大的 style
 - **漂移检测**：网格曼哈顿距离 = |Δsize| + |Δstyle|（0~4），0=无、1=轻度、2=中度、≥3=严重
-- **降级方案**（push2 不可用）：60xxxx→大盘、000/002→中盘、300/688→小盘、4/8→小盘；估值方向统一标注"混合"+备注"估算风格"
+- **三级降级**：push2（一级，精确）→ Tencent 扩展字段（二级，可靠，Tencent 数据不标注估算）→ 代码前缀（三级，兜底）：60xxxx→大盘、000/002→中盘、300/688→小盘、4/8→小盘；估值方向统一"混合"+备注"估算风格"
 - **独立快照**：`fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
 ---

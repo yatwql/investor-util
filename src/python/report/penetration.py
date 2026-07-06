@@ -24,11 +24,11 @@ import logging
 from datetime import datetime
 from typing import Any, List
 
+from src.python.code_utils import is_a_share_code, is_bond_related_by_name, is_index_link_by_name
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name
-from src.python.report.classification_utils import BOND_KEYWORDS_STRICT, is_etf, is_index_link, is_offsite_fund, is_qdii, is_stock_code
 from src.python.report.market_value import DetailRow
 
 
@@ -53,6 +53,9 @@ _FUND_TYPE_TAG: dict[str, str] = {
     BOND_FUND: "债券",
     ACTIVE_EQUITY: "权益",
 }
+
+# 场外账户关键词
+_FUND_ACCOUNT_KW = ("基金", "支付宝", "微信", "银行")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -84,27 +87,27 @@ def classify_penetration(h: Holding) -> str:
     account = h.account.strip()
 
     # 1) QDII 基金（最优先，名称明确）
-    if is_qdii(name):
+    if "QDII" in name.upper():
         return QDII
 
-    # 2) 债券基金（使用严格关键词，排除可转债和债券 ETF）
-    if any(k in name for k in BOND_KEYWORDS_STRICT):
+    # 2) 债券基金
+    if is_bond_related_by_name(name):
         return BOND_FUND
 
     # 3) 场外指数联接
-    if is_index_link(name):
+    if is_index_link_by_name(name):
         return INDEX_LINK
 
     # 4) 场内 ETF（名称含 ETF 或代码 5 开头）
-    if is_etf(name, code):
+    if "ETF" in name.upper() or code.startswith("5"):
         return ETF
 
     # 5) 场外账户中的基金 → 主动权益基金（兜底）
-    if is_offsite_fund(account):
+    if any(kw in account for kw in _FUND_ACCOUNT_KW):
         return ACTIVE_EQUITY
 
     # 6) A 股股票
-    if is_stock_code(code):
+    if is_a_share_code(code):
         return STOCK
 
     # 7) 其余忽略

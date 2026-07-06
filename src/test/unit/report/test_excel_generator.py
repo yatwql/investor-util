@@ -571,6 +571,33 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
         mock_write = self._run({}, formatted)
         mock_write.assert_not_called()
 
+    def test_raw_session_per_module_fallback(self):
+        """raw_session 有 per_module 数据但 formatted 无 per_module → 仍应正确写入。
+
+        回归验证：format_session_usage 在 call_count=0 且 per_module 有数据时返回
+        has_usage=True（含 per_module），但如果时序/状态导致返回 {"has_usage": False}
+        （不含 per_module），_build_llm_usage_sheet 应通过 raw_session 拿到数据。
+        """
+        raw_session = {
+            "per_module": {
+                "global_macro": {
+                    "model": "deepseek-v4-flash", "cached": True,
+                    "input_tokens": 0, "output_tokens": 0,
+                    "cache_hit_tokens": 500, "cost": 0.0,
+                    "thinking": False, "endpoint": "",
+                },
+            },
+        }
+        # format_session_usage 返回无 per_module 的"空"结果（模拟边界情况）
+        formatted = {"has_usage": False}
+        mock_write = self._run(raw_session, formatted)
+        # 必须仍被调用，而非因 excel_module_info 为空而跳过
+        mock_write.assert_called_once()
+        excel_module_info = mock_write.call_args[0][2]
+        self.assertEqual(len(excel_module_info), 1)
+        self.assertEqual(excel_module_info[0]["key"], "global_macro")
+        self.assertEqual(excel_module_info[0]["status"], "cached")
+
     def test_all_states_mixed(self):
         """禁用、失败、缓存、成功混合 → 各模块正确渲染且数量正确。"""
         from src.python.llm import FAIL_REASON_DISABLED, FAIL_REASON_TIMEOUT

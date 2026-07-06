@@ -457,7 +457,12 @@ def _build_llm_usage_sheet(sheets: dict[str, Any], prog: ProgressReporter) -> No
     if not formatted:
         return
 
-    per_module = formatted.get("per_module", {})
+    # 从原始会话数据获取 per_module（raw_session 始终有该键，而 formatted
+    # 在 has_usage=False 时可能不含 per_module），确保缓存场景等所有路径都能拿到数据
+    per_module = raw_session.get("per_module", {}) or {}
+    if not per_module:
+        logger.debug("LLM 会话数据中 per_module 为空，尝试从 formatted 获取")
+        per_module = formatted.get("per_module", {}) or {}
     all_failure = dict(_LLM_MODULE_FAILURE)
     names_map = get_llm_module_names()
 

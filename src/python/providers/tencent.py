@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from src.python.http_client import make_http_client
+from src.python.code_utils import get_exchange_prefix
 
 logger = logging.getLogger("invest")
 
@@ -35,21 +36,17 @@ _FIELD_MAP: dict[str, int] = {
     "price_date": 31,   # 日期时间 YYYYMMDDHHMMSS
     "high": 34,         # 最高价
     "low": 35,          # 最低价
+    "market_cap": 46,   # 总市值（API 返回亿，内部保持原始值，下游按需转换）
+    "pe": 40,           # 动态市盈率
 }
 
 
 def _add_prefix(code: str) -> str:
-    """根据代码前缀添加交易所标识。"""
+    """根据代码前缀添加交易所标识（委托至 code_utils.get_exchange_prefix）。"""
     code = code.strip()
     if len(code) != 6:
         return code
-    if code.startswith(("5", "6")):
-        return f"sh{code}"
-    if code.startswith(("0", "1", "2", "3", "9")):
-        return f"sz{code}"
-    if code.startswith(("4", "8")):
-        return f"bj{code}"
-    return code
+    return get_exchange_prefix(code) + code
 
 
 def _parse_response(text: str) -> dict[str, Any] | None:
@@ -110,6 +107,8 @@ def _parse_response(text: str) -> dict[str, Any] | None:
         "low": _parse_float(_get(_FIELD_MAP["low"])),
         "volume": _parse_float(_get(_FIELD_MAP["volume"])),
         "turnover": _parse_float(_get(_FIELD_MAP["turnover"])),
+        "market_cap": _parse_float(_get(_FIELD_MAP["market_cap"])),
+        "pe": _parse_float(_get(_FIELD_MAP["pe"])),
         "source": "腾讯财经",
     }
 

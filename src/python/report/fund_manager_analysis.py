@@ -7,7 +7,7 @@
   4. 首次运行时输出"首检"状态 + 引导文案
 
 关键设计：
-  - 历史快照使用独立键 fund_manager_snapshot（固定键名，无指纹后缀）
+  - 快照使用固定键名 fund_manager_snapshot（无指纹后缀），属 refresh 缓存组，菜单 [1] 可清除
   - 持仓指纹变化不会影响快照数据，确保变更检测独立于持仓变化
   - 每次分析后覆写快照，记录 {code: {manager_name, check_date}}
 """

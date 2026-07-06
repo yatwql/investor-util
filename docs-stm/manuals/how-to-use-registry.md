@@ -165,6 +165,8 @@ registry 的派生产出被以下模块消费：
 | `src/python/report/penetration_sheet.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 穿透 sheet 写入 |
 | `src/python/report/fund_performance.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/early_warning.py` | `get_report_sheet_name()` | 页签标题 |
+| `src/python/report/fund_manager_sheet.py` | `get_report_sheet_name()` | 页签标题 |
+| `src/python/report/fund_style_sheet.py` | `get_report_sheet_name()` | 页签标题 |
 
 ---
 

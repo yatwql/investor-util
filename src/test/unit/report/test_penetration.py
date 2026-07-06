@@ -2,7 +2,7 @@
 
 测试目标：
   - classify_penetration — 各类型基金/股票/忽略的正确分类
-  - is_bond_fund / is_index_link (classification_utils) — 债券/联接识别
+  - is_bond_related_by_name / is_index_link_by_name — 债券/联接识别（委派 code_utils）
   - _fund_type_tag — 类型→标签映射
   - normalize_name — 名称归一化
   - write_penetration_sheet (mock) — 合并/排序/TOP10 逻辑
@@ -20,7 +20,6 @@ from typing import Any
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from src.python.models import Holding
-from src.python.report import classification_utils as cu
 from src.python.report import penetration as pene
 from src.python.report.market_value import DetailRow
 import pytest
@@ -160,7 +159,7 @@ class TestClassifyPenetration(unittest.TestCase):
 
     def test_ignore_unknown_asset(self):
         """未知类型 → IGNORE。"""
-        h = self._h("某现金管理", "888888")
+        h = self._h("某现金管理", "400000")
         self.assertEqual(pene.classify_penetration(h), pene.IGNORE)
 
     # ── 债券优先级高于联接/ETF ────────────────────────────
@@ -178,26 +177,29 @@ class TestClassifyPenetration(unittest.TestCase):
 
 
 class TestIsBondFund(unittest.TestCase):
-    """测试 _is_bond_fund。"""
+    """测试 is_bond_related_by_name。"""
 
     def test_bond_keywords(self):
+        from src.python.code_utils import is_bond_related_by_name
         for name in [
             "招商鑫福中短债A", "博时安盈短债A", "广发景明中短债A",
             "南方利率债A", "富国信用债A", "某纯债A", "某债券A",
         ]:
             with self.subTest(name=name):
-                self.assertTrue(cu.is_bond_fund(name))
+                self.assertTrue(is_bond_related_by_name(name))
 
     def test_not_bond(self):
-        self.assertFalse(cu.is_bond_fund("中欧医疗健康混合"))
-        self.assertFalse(cu.is_bond_fund("华夏纳斯达克100ETF(QDII)"))
-        self.assertFalse(cu.is_bond_fund("电池ETF"))
+        from src.python.code_utils import is_bond_related_by_name
+        self.assertFalse(is_bond_related_by_name("中欧医疗健康混合"))
+        self.assertFalse(is_bond_related_by_name("华夏纳斯达克100ETF(QDII)"))
+        self.assertFalse(is_bond_related_by_name("电池ETF"))
 
 
 class TestIsIndexLink(unittest.TestCase):
-    """测试 _is_index_link。"""
+    """测试 is_index_link_by_name。"""
 
     def test_link_keywords(self):
+        from src.python.code_utils import is_index_link_by_name
         for name in [
             "天弘沪深300ETF联接A",
             "天弘沪深300ETF联接",
@@ -205,12 +207,13 @@ class TestIsIndexLink(unittest.TestCase):
             "某指数联接A",
         ]:
             with self.subTest(name=name):
-                self.assertTrue(cu.is_index_link(name))
+                self.assertTrue(is_index_link_by_name(name))
 
     def test_not_link(self):
-        self.assertFalse(cu.is_index_link("中欧医疗健康混合"))
-        self.assertFalse(cu.is_index_link("电池ETF"))
-        self.assertFalse(cu.is_index_link("招商鑫福中短债A"))
+        from src.python.code_utils import is_index_link_by_name
+        self.assertFalse(is_index_link_by_name("中欧医疗健康混合"))
+        self.assertFalse(is_index_link_by_name("电池ETF"))
+        self.assertFalse(is_index_link_by_name("招商鑫福中短债A"))
 
 
 class TestFundTypeTag(unittest.TestCase):
@@ -484,7 +487,7 @@ class TestPenetrationEdgeCases(unittest.TestCase):
         """全部忽略类型 → merged 为空。"""
         holdings = [
             Holding("证券账户", "浦发转债", "110059", 10, 100.0),
-            Holding("证券账户", "现金管理", "888888", 1000, 1.0),
+            Holding("证券账户", "现金管理", "400000", 1000, 1.0),
         ]
         details = []
         classified: dict[str, list[Holding]] = {

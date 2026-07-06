@@ -232,6 +232,37 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
         return None
 
 
+def _tencent_extended(code: str) -> dict[str, Any] | None:
+    """从腾讯财经 API 获取市值+PE 扩展数据（二级降级）。
+
+    Args:
+        code: 6 位 A 股代码
+
+    Returns:
+        {"market_cap": float, "pe": float} 或 None
+    """
+    try:
+        from src.python.providers.tencent import fetch_price
+        data = fetch_price(code)
+        if data is None:
+            return None
+
+        result: dict[str, Any] = {}
+        # Tencent f46 总市值单位为亿，转换为元以与 push2 单位一致
+        market_cap = data.get("market_cap")
+        if market_cap is not None and market_cap > 0:
+            result["market_cap"] = market_cap * 1e8  # 亿 → 元
+
+        pe = data.get("pe")
+        if pe is not None and pe > 0:
+            result["pe"] = pe
+
+        return result if result else None
+    except Exception:
+        logger.debug("Tencent 扩展数据获取失败 [%s]", code, exc_info=True)
+        return None
+
+
 def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
     """获取每只股票对应行业的平均 PE。
 
@@ -283,13 +314,15 @@ def classify_fund_style(
         if ratio <= 0:
             continue
 
-        # 优先 push2 数据，失败则降级
-        push2_data = _push2_extended(code) if code else None
+        # 三级降级：push2（精确）→ Tencent（可靠）→ 代码段估算（兜底）
+        ext_data = _push2_extended(code) if code else None
+        if ext_data is None:
+            ext_data = _tencent_extended(code) if code else None
         industry_avg_pe = industry_avg_pe_map.get(code)
 
-        if push2_data:
-            mc = push2_data.get("market_cap")
-            pe = push2_data.get("pe")
+        if ext_data:
+            mc = ext_data.get("market_cap")
+            pe = ext_data.get("pe")
             result = _classify_stock(code, mc, pe, industry_avg_pe)
         else:
             result = _classify_stock(code, None, None)
