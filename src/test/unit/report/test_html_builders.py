@@ -26,8 +26,8 @@ class TestCalcYieldText(unittest.TestCase):
     """_calc_yield_text 基础功能测试。"""
 
     def setUp(self):
-        from src.python.report.html_builders import _calc_yield_text
-        self.fn = _calc_yield_text
+        from src.python.report.category import calc_yield_text
+        self.fn = calc_yield_text
         self.d = MagicMock(spec=DetailRow)
         self.d.price = 50.0
         self.d.cost = 0.0

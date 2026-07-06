@@ -288,14 +288,20 @@ def _write_b_series_sheets(
         prog.info("正在分析基金经理变更...")
         try:
             manager_data = detect(holdings)
-            if manager_data:
+        except Exception as e:
+            logger.warning("基金经理变更监控数据获取失败: %s", e)
+            prog.add_error("基金经理变更监控数据获取失败")
+            manager_data = None
+
+        if manager_data:
+            try:
                 modules.get("write_fund_manager_sheet")(ws13, manager_data)
                 prog.ok("基金经理变更监控页签写入完成")
-            else:
-                logger.info("基金深度分析：无基金持仓，跳过基金经理变更监控")
-        except Exception as e:
-            logger.warning("基金经理变更监控失败: %s", e)
-            prog.add_error("基金经理变更监控失败")
+            except Exception as e:
+                logger.warning("基金经理变更监控页签写入失败: %s", e)
+                prog.add_error("基金经理变更监控页签写入失败")
+        else:
+            logger.info("基金深度分析：无基金持仓，跳过基金经理变更监控")
 
     # 14. 持仓重合度矩阵
     compute_overlap = modules.get("compute_overlap_matrix")
@@ -303,6 +309,8 @@ def _write_b_series_sheets(
     ws14 = sheets.get("fund_overlap")
     if ws14 is not None and compute_overlap is not None and write_overlap is not None:
         prog.info("正在计算持仓重合度矩阵...")
+        fund_names: dict[str, str] = {}
+        overlap_result = None
         try:
             from src.python.fetcher.fund import fetch_fund_holdings
             from src.python.report.fund_performance import _is_fund
@@ -316,7 +324,6 @@ def _write_b_series_sheets(
             else:
                 # 构建 fund_holdings（复用缓存，0 额外 HTTP）
                 fund_holdings: dict[str, list[dict]] = {}
-                fund_names: dict[str, str] = {}
                 for code in fund_codes:
                     fh = fetch_fund_holdings(code)
                     if fh and fh.get("holdings"):
@@ -331,16 +338,25 @@ def _write_b_series_sheets(
                         if d.code in fund_codes:
                             fund_mv_map[d.code] = fund_mv_map.get(d.code, 0.0) + d.market_value
 
-                    result = compute_overlap(fund_holdings, fund_mv_map=fund_mv_map if fund_mv_map else None)
-                    # 将 fund_names 传入选填
-                    result["fund_names"] = fund_names
-                    write_overlap(ws14, result, fund_names=fund_names)
-                    prog.ok("持仓重合度矩阵页签写入完成")
+                    overlap_result = compute_overlap(
+                        fund_holdings,
+                        fund_mv_map=fund_mv_map if fund_mv_map else None,
+                    )
+                    if overlap_result:
+                        overlap_result["fund_names"] = fund_names
                 else:
                     logger.info("持仓重合度矩阵：无可用的基金持仓数据")
         except Exception as e:
-            logger.warning("持仓重合度矩阵计算失败: %s", e)
-            prog.add_error("持仓重合度矩阵计算失败")
+            logger.warning("持仓重合度矩阵数据获取/计算失败: %s", e)
+            prog.add_error("持仓重合度矩阵数据获取失败")
+
+        if overlap_result:
+            try:
+                write_overlap(ws14, overlap_result, fund_names=fund_names)
+                prog.ok("持仓重合度矩阵页签写入完成")
+            except Exception as e:
+                logger.warning("持仓重合度矩阵页签写入失败: %s", e)
+                prog.add_error("持仓重合度矩阵页签写入失败")
 
     # 15. 持仓集中度监控
     compute_conc = modules.get("compute_concentration")
@@ -348,6 +364,7 @@ def _write_b_series_sheets(
     ws15 = sheets.get("fund_concentration")
     if ws15 is not None and compute_conc is not None and write_conc is not None:
         prog.info("正在计算持仓集中度...")
+        conc_data = None
         try:
             from src.python.fetcher.fund import fetch_fund_holdings
             from src.python.report.fund_performance import _is_fund
@@ -367,15 +384,22 @@ def _write_b_series_sheets(
             if fund_holdings:
                 conc_data = compute_conc(fund_holdings)
                 if conc_data:
-                    write_conc(ws15, conc_data)
-                    prog.ok("持仓集中度监控页签写入完成")
+                    prog.ok("持仓集中度计算完成")
                 else:
                     logger.info("持仓集中度监控：无持仓数据")
             else:
                 logger.info("持仓集中度监控：无基金持仓数据")
         except Exception as e:
-            logger.warning("持仓集中度监控失败: %s", e)
-            prog.add_error("持仓集中度监控失败")
+            logger.warning("持仓集中度数据获取/计算失败: %s", e)
+            prog.add_error("持仓集中度数据获取失败")
+
+        if conc_data:
+            try:
+                write_conc(ws15, conc_data)
+                prog.ok("持仓集中度监控页签写入完成")
+            except Exception as e:
+                logger.warning("持仓集中度监控页签写入失败: %s", e)
+                prog.add_error("持仓集中度监控页签写入失败")
 
     # 16. 基金风格分析
     analyze_style = modules.get("analyze_style_for_all_funds")
@@ -383,6 +407,7 @@ def _write_b_series_sheets(
     ws16 = sheets.get("fund_style")
     if ws16 is not None and analyze_style is not None and write_style is not None:
         prog.info("正在分析基金风格漂移...")
+        style_result = None
         try:
             from src.python.fetcher.fund import fetch_fund_holdings
             from src.python.report.fund_performance import _is_fund
@@ -402,15 +427,22 @@ def _write_b_series_sheets(
             if fund_holdings:
                 style_result = analyze_style(fund_holdings)
                 if style_result.get("results"):
-                    write_style(ws16, style_result["results"])
-                    prog.ok("基金风格分析页签写入完成")
+                    prog.ok("基金风格分析计算完成")
                 else:
                     logger.info("基金风格分析：无结果")
             else:
                 logger.info("基金风格分析：无基金持仓数据")
         except Exception as e:
-            logger.warning("基金风格分析失败: %s", e)
-            prog.add_error("基金风格分析失败")
+            logger.warning("基金风格分析数据获取/计算失败: %s", e)
+            prog.add_error("基金风格分析数据获取失败")
+
+        if style_result and style_result.get("results"):
+            try:
+                write_style(ws16, style_result["results"])
+                prog.ok("基金风格分析页签写入完成")
+            except Exception as e:
+                logger.warning("基金风格分析页签写入失败: %s", e)
+                prog.add_error("基金风格分析页签写入失败")
 
 
 def _write_llm_section_and_usage(

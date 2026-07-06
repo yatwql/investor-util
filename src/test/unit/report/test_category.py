@@ -189,7 +189,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
 
 
 class TestYieldText(unittest.TestCase):
-    """_yield_text 基础功能测试。"""
+    """calc_yield_text 基础功能测试。"""
 
     def setUp(self):
         self.d = cat.DetailRow()
@@ -204,17 +204,17 @@ class TestYieldText(unittest.TestCase):
 
     def test_normal(self):
         """正常数据 → 正确的股息率百分比。"""
-        result = cat._yield_text("600900", self.d, {"600900": {"avg_dividend": 0.85}})
+        result = cat.calc_yield_text("600900", self.d, {"600900": {"avg_dividend": 0.85}})
         self.assertEqual(result, "1.70%")
 
     def test_code_not_found(self):
         """代码不在分红数据中 → "--"。"""
-        result = cat._yield_text("600900", self.d, {})
+        result = cat.calc_yield_text("600900", self.d, {})
         self.assertEqual(result, "--")
 
     def test_avg_dividend_none(self):
         """avg_dividend 为 None → "--"。"""
-        result = cat._yield_text("600900", self.d, {"600900": {"avg_dividend": None}})
+        result = cat.calc_yield_text("600900", self.d, {"600900": {"avg_dividend": None}})
         self.assertEqual(result, "--")
 
 

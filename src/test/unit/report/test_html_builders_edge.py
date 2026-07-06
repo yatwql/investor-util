@@ -27,8 +27,8 @@ class TestCalcYieldTextEdge(unittest.TestCase):
     """_calc_yield_text 边界/异常情况。"""
 
     def setUp(self):
-        from src.python.report.html_builders import _calc_yield_text
-        self.fn = _calc_yield_text
+        from src.python.report.category import calc_yield_text
+        self.fn = calc_yield_text
 
     def test_price_zero(self):
         """最新价为 0 → "--"。"""

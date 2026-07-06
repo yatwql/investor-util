@@ -112,8 +112,11 @@ def _load_dividend_data(holdings: List[Holding]) -> dict:
         return {}
 
 
-def _yield_text(code: str, d, dividend_data: dict) -> str:
-    """计算单条持仓的年均股息率文本（非关键，失败返回"--"）。"""
+def calc_yield_text(code: str, d, dividend_data: dict) -> str:
+    """计算单条持仓的年均股息率文本（非关键，失败返回"--"）。
+
+    合并 category 和 html_builders 两处的重复实现，统一此公共函数。
+    """
     try:
         info = dividend_data.get(code)
         if not info:
@@ -140,7 +143,7 @@ def _write_category_group(
         if d:
             vals = [prop, sub, h.name, h.code,
                     d.market_value, d.cost, d.profit, d.profit_rate,
-                    d.today_profit, _yield_text(h.code, d, dividend_data)]
+                    d.today_profit, calc_yield_text(h.code, d, dividend_data)]
         else:
             vals = [prop, sub, h.name, h.code, 0.0, 0.0, 0.0, 0.0, 0.0, "--"]
         write_data_row(ws, row, vals, _num_formats())

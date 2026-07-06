@@ -1,7 +1,7 @@
-"""持仓分类模块边缘/异常测试 — _yield_text 容错。
+"""持仓分类模块边缘/异常测试 — calc_yield_text 容错。
 
 测试目标：
-  - _yield_text：零价格、None 对象、类型异常时的降级
+  - calc_yield_text：零价格、None 对象、类型异常时的降级
 
 运行：
   pytest src/test/unit/report/test_category_edge.py -v
@@ -19,7 +19,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 class TestYieldTextEdge(unittest.TestCase):
-    """_yield_text 边界/异常情况。"""
+    """calc_yield_text 边界/异常情况。"""
 
     def setUp(self):
         self.d = cat.DetailRow()
@@ -36,17 +36,17 @@ class TestYieldTextEdge(unittest.TestCase):
         """最新价为 0 → "--"。"""
         d = cat.DetailRow()
         d.price = 0.0
-        result = cat._yield_text("000001", d, {"000001": {"avg_dividend": 0.50}})
+        result = cat.calc_yield_text("000001", d, {"000001": {"avg_dividend": 0.50}})
         self.assertEqual(result, "--")
 
     def test_detail_none(self):
         """detail 为 None → "--"。"""
-        result = cat._yield_text("600900", None, {"600900": {"avg_dividend": 0.85}})
+        result = cat.calc_yield_text("600900", None, {"600900": {"avg_dividend": 0.85}})
         self.assertEqual(result, "--")
 
     def test_type_error_handled(self):
         """非法类型 → try/except 兜底返回 "--"。"""
-        result = cat._yield_text("600900", self.d, {"600900": {"avg_dividend": "invalid"}})
+        result = cat.calc_yield_text("600900", self.d, {"600900": {"avg_dividend": "invalid"}})
         self.assertEqual(result, "--")
 
 

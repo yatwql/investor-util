@@ -11,7 +11,7 @@ from typing import Any
 
 from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
 from src.python.models import Holding
-from src.python.report.category import _categorize_holding
+from src.python.report.category import _categorize_holding, calc_yield_text
 from src.python.report.fund_performance import (
     _RATING_COMMENT,
     _format_rank,
@@ -24,22 +24,6 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter
 logger = logging.getLogger("invest")
 
 
-def _calc_yield_text(code: str, d: DetailRow | None, dividend_data: dict) -> str:
-    """计算单条持仓的年均股息率文本（非关键，失败返回"--"）。"""
-    try:
-        info = dividend_data.get(code)
-        if not info:
-            return "--"
-        avg_div = info.get("avg_dividend")
-        if avg_div is None:
-            return "--"
-        price = d.price if d and d.price > 0 else 0.0
-        if price <= 0:
-            return "--"
-        return f"{avg_div / price * 100:.2f}%"
-    except Exception:
-        logger.warning("[html_builders] 股息率计算异常", exc_info=True)
-        return "--"
 
 
 def _build_category_data(
@@ -101,7 +85,7 @@ def _build_category_data(
                 "profit": d.profit if d else 0.0,
                 "profit_rate": d.profit_rate if d else 0.0,
                 "today_profit": d.today_profit if d else 0.0,
-                "yield_text": _calc_yield_text(h.code, d, dividend_data),
+                "yield_text": calc_yield_text(h.code, d, dividend_data),
             })
 
         sub_mv = sum(i["market_value"] for i in items)
