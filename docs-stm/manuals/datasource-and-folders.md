@@ -13,7 +13,7 @@
 | 财经新闻（源5） | akshare 封装：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — |
 | A 股指数 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn`（s_* 前缀） |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（JS 变量解析，gb_* 前缀） | 腾讯财经 `qt.gtimg.cn` |
-| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业分类 + 概念板块归属） | — |
+| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业分类 + 概念板块归属） | 行情页 `quotedata` 解析（仅行业，无概念） |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — |
@@ -57,7 +57,7 @@ investor-util/
 │       │   │   ├── index.py              # 指数行情获取 — A股 + 美股指数、缓存 TTL 管理
 │       │   │   ├── industry.py           # 行业/概念数据获取 — 行业分类、概念板块归属、批量接口
 │       │   │   ├── fund_manager.py       # 基金经理数据获取 — 主页 HTML 解析 + 档案页回退
-│   │   └── price.py              # 价格行情获取 — 场内实时价/收盘价/ETF 溢价
+│       │   │   └── price.py              # 价格行情获取 — 场内实时价/收盘价/ETF 溢价
 │   │   │
 │   │   ├── providers/                # 数据源提供商（各 API 的具体实现）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -119,11 +119,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2455 tests）
+│   └── test/                             # 测试（按标记分组目录，2454 tests）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2190 项，8 个子分组）
+│       ├── unit/                         # 单元测试（2189 项，8 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -255,16 +255,16 @@ investor-util/
 ├── test-reports/                      # 测试报告输出（自动生成）
 │   ├── latest/                        # 最新测试报告（按 --mode 生成子目录）
 │       │   ├── index.html                 # 汇总页 — 各模式通过/失败总览 + 最近运行时间
-│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2177 项）
-│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，1896 项）
+│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2189 项）
+│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，1908 项）
 │       │   ├── scenario/report.html       # 场景测试报告（标记 -m "scenario"，240 项）
 │       │   ├── regression/report.html     # 回归测试报告（标记 -m "scenario"，模式别名，240 项）
-│       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，907 项）
+│       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，921 项）
 │       │   ├── integration/report.html    # 集成测试报告（标记 -m "scenario or integration"，265 项）
 │       │   ├── smoke/report.html          # 冒烟测试报告（标记 -m "smoke"，24 项）
 │       │   ├── edge/report.html           # 边缘场景报告（标记 -m "edge"，216 项）
 │       │   ├── data/report.html           # 数据正确性报告（标记 -m "data"，65 项）
-│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2442 项）
+│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2454 项）
 │       │   └── coverage/                  # HTML 行覆盖率报告（--coverage 时生成）
 │   └── archives/                      # 历史报告存档
 │       └── <YYYYMMDD>/                # 按日期归档的子目录（含完整 latest/ 快照）
@@ -281,7 +281,12 @@ investor-util/
 │   │   ├── archived_plan.md              # 历史迭代归档（Iter 1.1~3.7）
 │   │   ├── iteration-plan.md             # 迭代计划细节
 │   │   ├── test-coverage-map.md          # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
-│   │   └── A5-test-runtime-optimization.md # R-152：测试运行时可扩展性优化设计
+│   │   ├── A5-test-runtime-optimization.md # R-152：测试运行时可扩展性优化设计
+│   │   ├── B1-fund-deep-analysis.md      # B 迭代基金深度分析 4 模块设计
+│   │   ├── c-iteration-design.md         # C 迭代设计
+│   │   ├── c-p1b-excel-title-number-fix.md # C-P1b: Excel 报告可配置序号修复设计
+│   │   └── notes/                        # 源码预研笔记
+│   │       └── data-source-pre-study.md  # 数据源预研笔记
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
