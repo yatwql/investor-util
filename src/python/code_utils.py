@@ -39,6 +39,19 @@ _BOND_KEYWORDS = ("纯债", "短债", "中短债", "利率债", "信用债", "�
 # 指数联接关键词
 _INDEX_LINK_KEYWORDS = ("ETF联接", "ETF链接", "联接", "链接")
 
+# 债券关键词宽松版（含单字"债"，覆盖可转债等含"债"字段的品种）
+_BOND_KEYWORDS_BROAD = ("债", "纯债", "短债", "中短债", "利率债", "信用债", "债券")
+
+# 场外基金账户关键词（用于 account 维度的判断）
+FUND_ACCOUNT_KEYWORDS = ("基金", "支付宝", "微信", "银行")
+
+# 指数类关键词（用于场外被动基金判定）
+INDEX_KEYWORDS = ("指数", "ETF联接", "ETF 联接", "中证", "沪深300",
+                  "中证500", "中证1000", "科创50", "创业板", "上证")
+
+# 隐式 QDII 关键词
+_OVERSEA_KW = ("纳斯达克", "标普", "纳指", "道琼斯", "日经")
+
 
 # ═══════════════════════════════════════════════════════════════
 #  代码前缀型判定（6 位证券代码，可含 sh/sz/bj 前缀）
@@ -190,6 +203,91 @@ def is_index_link_by_name(name: str) -> bool:
     if "ETF联接" in clean or "ETF链接" in clean:
         return True
     return any(kw in name for kw in ("联接", "链接"))
+
+
+def is_stock_code(code: str) -> bool:
+    """判断是否为 A 股股票代码（6/0/3 开头）。
+
+    与 :func:`is_a_share_code` 的区别：不含北交所（8xxxxx），
+    用于穿透分析等需要严格排除北交所的场景。
+
+    Args:
+        code: 6 位证券代码
+
+    Returns:
+        True 表示符合 A 股股票代码格式
+    """
+    raw = code.strip()
+    return raw.startswith(("6", "0", "3"))
+
+
+def is_etf_by_name_or_code(name: str, code: str = "") -> bool:
+    """判断是否为 ETF（名称 + 代码双维度检测）。
+
+    识别依据：
+      1. 名称含 "ETF"（大小写不敏感）
+      2. 代码以 5（上海 ETF）或 1（深圳 ETF/LOF）开头
+
+    Args:
+        name: 持仓名称
+        code: 证券代码（可选，提升识别准确率）
+
+    Returns:
+        True 表示符合 ETF 特征
+    """
+    if "ETF" in name.upper():
+        return True
+    if code and code.strip().startswith(("5", "1")):
+        return True
+    return False
+
+
+def is_bond_fund_by_name(name: str) -> bool:
+    """判断名称是否为债券基金（宽松匹配）。
+
+    使用 ``_BOND_KEYWORDS_BROAD``（含"债"）进行匹配，
+    覆盖纯债/短债/可转债等含"债"字段的品种。
+
+    Args:
+        name: 基金名称
+
+    Returns:
+        True 表示名称匹配债券基金特征
+    """
+    return any(k in name for k in _BOND_KEYWORDS_BROAD)
+
+
+def is_offsite_fund(account: str) -> bool:
+    """判断账户是否为场外基金渠道。
+
+    场外渠道指通过基金公司、支付宝、微信、银行购买的基金。
+
+    Args:
+        account: 账户名称
+
+    Returns:
+        True 表示为场外基金账户
+    """
+    return any(kw in account for kw in FUND_ACCOUNT_KEYWORDS)
+
+
+def is_qdii_extended(name: str | None) -> bool:
+    """判断是否为 QDII 基金（含隐式海外基金识别）。
+
+    显式 QDII：名称含 "QDII"（大小写不敏感）。
+    隐式 QDII：名称含海外指数关键词（纳斯达克、标普、纳指、道琼斯、日经）。
+
+    Args:
+        name: 基金名称
+
+    Returns:
+        True 表示 QDII 基金（含隐式海外）
+    """
+    if not name:
+        return False
+    if is_qdii_by_name(name):
+        return True
+    return any(kw in name for kw in _OVERSEA_KW)
 
 
 # ═══════════════════════════════════════════════════════════════

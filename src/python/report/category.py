@@ -12,6 +12,8 @@ import logging
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.code_utils import (
+    FUND_ACCOUNT_KEYWORDS,
+    INDEX_KEYWORDS,
     is_a_share_code,
     is_bond_related_by_name,
     is_exchange_fund_code,
@@ -42,15 +44,10 @@ _HEADERS = [
 
 # ── 分类映射规则 ──────────────────────────────────────────
 
-# 场外基金渠道关键词
-_FUND_ACCOUNT_KEYWORDS = ("基金", "支付宝", "微信", "银行")
-
-# 货币类关键词
+# 货币类关键词（仅 category.py 使用）
 _MONEY_KEYWORDS = ("货币", "现金", "增利", "宝")
 
-# 指数类关键词
-_INDEX_KEYWORDS = ("指数", "ETF联接", "ETF 联接", "中证", "沪深300",
-                   "中证500", "中证1000", "科创50", "创业板", "上证")
+# _FUND_ACCOUNT_KEYWORDS 和 INDEX_KEYWORDS 定义于 code_utils.py，统一定义
 
 
 def _categorize_holding(h: Holding) -> tuple[str, str]:
@@ -91,9 +88,9 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
         return ("现金", "货币")
 
     # 4) 场外渠道
-    is_offsite = any(kw in account for kw in _FUND_ACCOUNT_KEYWORDS)
+    is_offsite = any(kw in account for kw in FUND_ACCOUNT_KEYWORDS)
     if is_offsite:
-        if any(kw in name for kw in _INDEX_KEYWORDS):
+        if any(kw in name for kw in INDEX_KEYWORDS):
             return ("基金", "被动")
         return ("基金", "主动")
 

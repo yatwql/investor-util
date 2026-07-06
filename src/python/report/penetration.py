@@ -24,7 +24,7 @@ import logging
 from datetime import datetime
 from typing import Any, List
 
-from src.python.code_utils import is_a_share_code, is_bond_related_by_name, is_index_link_by_name
+from src.python.code_utils import FUND_ACCOUNT_KEYWORDS, is_a_share_code, is_bond_related_by_name, is_index_link_by_name, is_qdii_extended
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
@@ -55,7 +55,7 @@ _FUND_TYPE_TAG: dict[str, str] = {
 }
 
 # 场外账户关键词
-_FUND_ACCOUNT_KW = ("基金", "支付宝", "微信", "银行")
+# FUND_ACCOUNT_KEYWORDS 定义于 code_utils.py，统一定义
 
 
 # ═══════════════════════════════════════════════════════════
@@ -86,8 +86,8 @@ def classify_penetration(h: Holding) -> str:
     code = h.code.strip()
     account = h.account.strip()
 
-    # 1) QDII 基金（最优先，名称明确）
-    if "QDII" in name.upper():
+    # 1) QDII 基金（最优先，含隐式海外基金识别）
+    if is_qdii_extended(name):
         return QDII
 
     # 2) 债券基金
@@ -103,7 +103,7 @@ def classify_penetration(h: Holding) -> str:
         return ETF
 
     # 5) 场外账户中的基金 → 主动权益基金（兜底）
-    if any(kw in account for kw in _FUND_ACCOUNT_KW):
+    if any(kw in account for kw in FUND_ACCOUNT_KEYWORDS):
         return ACTIVE_EQUITY
 
     # 6) A 股股票
