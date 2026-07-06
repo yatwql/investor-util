@@ -564,6 +564,9 @@ def _render_style_analysis(
                     "name": fh.get("name", code),
                     "holdings": fh["holdings"],
                 }
+            else:
+                _name = fh.get("name", code) if fh else code
+                logger.debug("基金风格分析跳过（无持仓数据）: %s (%s)", _name, code)
         if not fund_holdings:
             return {"results": []}
         result = analyze_style_for_all_funds(fund_holdings)

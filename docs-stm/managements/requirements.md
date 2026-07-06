@@ -194,7 +194,7 @@
 
 #### 财经新闻热点与持仓关联分析（Excel + HTML）
 
-关键词来源（直接持仓名称/代码 + 穿透TOP10 资产 + 东方财富三级行业/概念板块），5 源并行获取，子串匹配 → 按匹配关键词数降序 → TOP N（`news_top_count` 配置，默认 100）。
+关键词来源（直接持仓名称/代码 + 穿透TOP10 资产 + 东方财富三级行业/概念板块），5 源并行获取，子串匹配 → 按匹配关键词数降序 → TOP N（`news_top_count` 配置，默认 300）。
 
 可选 LLM 二次关联分析（`enabled_llm.news_correlation=true` 时开启）生成关联度评级（高/中/低/无关）。详见 §8.2.10。
 
@@ -636,7 +636,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | `holdings_dir` | str | `data/holdings` | C | 持仓 xlsx 目录 |
 | `holdings_filename` | str | `个人投资持仓信息.xlsx` | F | 持仓文件名 |
 | `output_dir` | str | `reports` | O | 报告输出根目录 |
-| `news_top_count` | int | `100` | 手动 | 新闻关联输出 TOP N |
+| `news_top_count` | int | `300` | 手动 | 新闻关联输出 TOP N |
 | `news_sources` | dict | {sina:true, eastmoney:true, cls:false, wallstreetcn:true, akshare:true} | 手动 | 各新闻源启停 |
 | `preferred_provider` | dict | `{}` | 手动 | Provider Chain 首选覆写（price/fund_rank/fund_hold/industry） |
 | `user_fund_benchmarks` | dict | `{}` | 手动 | 自定义基金基准 {代码: 基准代码} |
