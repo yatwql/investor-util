@@ -1,6 +1,7 @@
 {
   // ── 全局配置 ────────────────────────────────────────────
   "max_retries": 2,
+  "llm_max_concurrency": 3,
   "enabled_llm": {
     "global_macro": true,
     "expert_review": true,

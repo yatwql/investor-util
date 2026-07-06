@@ -475,7 +475,7 @@ C 迭代共涉及 4 个阶段（Phase），其中 C-P1a（注册表+配置校验
 |------|------|
 | `api.py` | API 调用路由 (Claude/OpenAI)、重试、截断检测、熔断器集成 |
 | `prompts.py` | System Prompt 常量与构建函数 |
-| `generators.py` | LLM 生成编排（4+1 模块：4 个 LLM 分析模块 + 可选的新闻关联分析） |
+| `generators.py` | LLM 生成编排（4+1 模块，线程池并行，并发数由 `llm_max_concurrency` 配置） |
 | `pricing.py` | 模型定价加载、费用估算 |
 | `session.py` | 会话用量累计、追踪 |
 | `circuit_breaker.py` | 端点熔断器 |

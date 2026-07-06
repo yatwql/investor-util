@@ -455,6 +455,7 @@ def _ensure_llm_settings_file() -> None:
         os.makedirs(os.path.dirname(settings_path), exist_ok=True)
         _DEFAULT_LLM_SETTINGS = {
             "max_retries": 2,
+            "llm_max_concurrency": 3,
             "temperature_global_macro": 0.3,
             "temperature_expert_review": 0.8,
             "temperature_news_correlation": 0.1,

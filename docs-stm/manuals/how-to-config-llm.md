@@ -272,9 +272,10 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 
 > 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation）。
 
-配置分为**全局配置**和**模块级配置**两类。全局配置仅有 3 项：
+配置分为**全局配置**和**模块级配置**两类。全局配置共有 4 项：
 
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
+- `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关，关闭的模块在报告中自动跳过
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 
@@ -283,6 +284,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 ```json
 {
   "max_retries": 2,
+  "llm_max_concurrency": 3,
   "enabled_llm": {
     "global_macro": true,
     "expert_review": true,

@@ -655,7 +655,8 @@ def _dispatch_llm_workers(
         ),
     }
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    _max_workers = (llm_config or {}).get("llm_max_concurrency", 3)
+    with ThreadPoolExecutor(max_workers=_max_workers) as executor:
         _futures: dict[Future, str] = {
             executor.submit(_make_runner(k, fn)): k
             for k, fn in _MODULE_FNS.items() if needs.get(k)

@@ -207,11 +207,13 @@ def _prepare_report_data(holdings: list, reporter: TuiProgressReporter) -> dict:
     total_today_profit = sum(d.today_profit for d in details)
     categories = classify_holdings(holdings)
 
+    reporter.info("正在获取指数行情...")
     with ThreadPoolExecutor(max_workers=2) as _idx_ex:
         _a_fut = _idx_ex.submit(fetch_indices)
         _us_fut = _idx_ex.submit(fetch_us_indices)
         a_indices = _a_fut.result()
         us_indices = _us_fut.result()
+    reporter.info("正在计算资产穿透 TOP10...")
     pen_result = compute_penetration_top10(holdings, details)
     penetrated_assets = (pen_result or {}).get("top10", [])
 
@@ -299,8 +301,10 @@ def _cmd_generate_full() -> None:
         from src.python.providers.akshare_extras import get_sector_fund_flow
         from src.python.report.news_correlation import build_news_data
 
-        reporter.info("正在并行获取新闻 + LLM 内容...")
+        reporter.info("正在获取行业资金流向...")
         _sector_flow = get_sector_fund_flow()
+        if _sector_flow:
+            reporter.ok("行业资金流向获取完成")
         _force_llm = _prompt_force_llm(reporter)
 
         with ThreadPoolExecutor(max_workers=2) as _llm_ex:

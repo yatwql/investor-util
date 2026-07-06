@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import Any
 
 from src.python.cache import get as cache_get, set as cache_set
+from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
 
@@ -315,9 +316,12 @@ def classify_fund_style(
             continue
 
         # 三级降级：push2（精确）→ Tencent（可靠）→ 代码段估算（兜底）
-        ext_data = _push2_extended(code) if code else None
-        if ext_data is None:
-            ext_data = _tencent_extended(code) if code else None
+        # 非 A 股（美股/港股/基金等）跳过 API 调用，直接估算
+        ext_data = None
+        if code and is_a_share_code(code):
+            ext_data = _push2_extended(code)
+            if ext_data is None:
+                ext_data = _tencent_extended(code)
         industry_avg_pe = industry_avg_pe_map.get(code)
 
         if ext_data:
@@ -422,9 +426,11 @@ def analyze_style_for_all_funds(
     new_snapshot: dict[str, Any] = {}
     results: list[dict[str, Any]] = []
 
-    for code, info in fund_holdings.items():
+    _total = len(fund_holdings)
+    for idx, (code, info) in enumerate(fund_holdings.items(), 1):
         name = info.get("name", code)
         holdings = info.get("holdings", [])
+        logger.info("基金风格分析 [%d/%d]: %s (%s)", idx, _total, name, code)
         if not holdings:
             continue
 
