@@ -25,7 +25,7 @@
 |------|------|------|
 | TUI 入口 | 主循环、流程编排 | `src/python/main.py` |
 | 菜单交互 | 菜单定义、渲染、导航 | `src/python/tui_menu.py` |
-| 菜单功能执行 | 命令处理器、各功能入口 | `src/python/tui_handlers.py` |
+| 菜单通用辅助 | 退出/按任意键继续/LLM用量输出 | `src/python/tui_handlers.py` |
 | 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config.py` |
 | 中央注册表 | 数据模块的 name/缓存前缀/TTL/分组/LLM Settings 键名统一注册与查询 | `src/python/registry.py` |
 | 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache.py` |
@@ -61,7 +61,7 @@ investor-util/
 │   │   ├── registry.py           # 中央注册表
 │   │   ├── report/               # 报告生成
 │   │   ├── tui.py                # 键盘输入封装
-│   │   ├── tui_handlers.py       # 菜单功能执行（通用辅助）
+│   │   ├── tui_handlers.py       # 菜单通用辅助（退出/按任意键/LLM用量输出）
 │   │   └── tui_menu.py           # 菜单交互
 │   └── test/                     # 测试（按标记分组目录）
 │       ├── conftest.py           # pytest 配置 + 19 个分层标记注册
@@ -96,16 +96,21 @@ investor-util/
 | 函数 | 类型 | 用途 |
 |------|------|------|
 | `is_a_share_code(code)` | 前缀 | A 股（60/68/00/30/8 开头） |
-| `is_fund_code(code)` | 前缀 | 无歧义基金代码（16/50/51/52/159/184） |
-| `is_stock_like_code(code)` | 前缀 | 股票类（A+B 股 + 北交所） |
 | `is_exchange_fund_code(code)` | 前缀 | 场内基金/ETF（5/1 开头） |
 | `is_hk_stock_code(code)` | 前缀 | 港股通（5 位数字） |
 | `get_exchange_prefix(code)` | 前缀 | sh/sz/bj 交易所前缀 |
 | `get_push2_secid(code)` | 前缀 | push2 API secid 参数 |
-| `is_qdii_by_name(name)` | 名称 | QDII 识别 |
-| `is_etf_by_name(name)` | 名称 | ETF 识别 |
-| `is_bond_related_by_name(name)` | 名称 | 债券基金/品种识别 |
+| `is_qdii_by_name(name)` | 名称 | QDII 标识识别 |
+| `is_qdii_extended(name)` | 名称 | QDII + 隐式海外基金（纳斯达克/标普等） |
+| `is_etf_by_name(name)` | 名称 | ETF 标识识别 |
+| `is_etf_by_name_or_code(name, code)` | 名称+代码 | ETF 识别（名称 + 代码 5/1 开头双维度） |
+| `is_bond_related_by_name(name)` | 名称 | 债券基金识别（严格版，不含单字"债"） |
+| `is_bond_fund_by_name(name)` | 名称 | 债券基金识别（宽松版，含可转债） |
 | `is_index_link_by_name(name)` | 名称 | 指数联接基金识别 |
+| `is_index_fund_by_name(name)` | 名称 | 场外指数/被动型基金识别 |
+| `is_offsite_fund(account)` | 名称 | 场外基金账户（基金/支付宝/微信/银行） |
+| `is_money_fund_by_name(name)` | 名称 | 货币基金识别 |
+| `is_fund_holding(name, code, account)` | 复合 | 持仓是否需要基金业绩分析 |
 
 ### 迁移状态
 
@@ -263,6 +268,7 @@ Provider Chain 注册表（registry.py）
 | `fund.py` | 基金排名/持仓/基准 | tiantian, eastmoney | `fund_perf_*`, `fund_hold_*`, `fund_benchmarks` |
 | `fund_manager.py` | 基金经理数据 | tiantian HTML 解析 | `fund_manager_*`, `fund_manager_snapshot` |
 | `industry.py` | 行业分类+概念板块 | eastmoney_industry, eastmoney_industry_rest | `industry_*` |
+| `chain.py` | Provider 优先链定义 + fallback 路由 | —（纯路由逻辑） | — |
 
 - **并行预热**：`preload_cache()` 对 preload 组（6 模块）使用 `ThreadPoolExecutor` 并行获取，减少串行等待
 - **菜单驱动**：菜单 [1] 和 [2] 分别清除 + 重拉 refresh 和 preload 组，复用 fetcher 模块的预热入口

@@ -1214,6 +1214,12 @@
             </div>
             {% endif %}
 
+            {# 调用次数 vs 模块明细差异注释 #}
+            <div style="margin-top: 8px; font-size: 11px; color: #999;">
+                注：API 调用次数统计实际发起的 API 请求总数（含截断后自动重试等），
+                各模块明细仅列最终结果；两者不一致属正常现象。
+            </div>
+
             {% if cache_stats and cache_stats.get("total", 0) > 0 %}
             <div style="margin-top: 16px; font-size: 13px; color: #555;">
                 <strong>系统数据缓存：</strong>

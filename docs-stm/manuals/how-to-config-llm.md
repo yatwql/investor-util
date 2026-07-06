@@ -308,7 +308,7 @@ LLM 配置拆分为两个独立文件（v0.2.15+），分工明确：
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
 | `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式不支持** |
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude 或 DeepSeek） |
-| `thinking_budget_{module}` | int | 4000~16000（模块差异） | **仅 Claude** Thinking token 预算。自动兜底 ≥ `max_tokens` + 4096 |
+| `thinking_budget_{module}` | int | 4000~16000（模块差异） | **仅 Claude** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足到 `max_tokens` + 4096 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
 > **各模块默认值差异表**：详细推荐值见下方「各模块推荐参数值」章节。

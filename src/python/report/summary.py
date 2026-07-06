@@ -435,6 +435,12 @@ def _write_legend(ws: Any, row: int) -> None:
         ws.cell(row=row, column=1, value=lbl).font = Font(size=9, color=clr)
         ws.cell(row=row, column=2, value=desc).font = Font(size=8, color="999999")
         row += 1
+    # 调用次数 vs 模块明细差异注释
+    row += 1
+    ws.cell(row=row, column=1,
+            value="注：API 调用次数统计实际发起的 API 请求总数（含截断后自动重试等），"
+                  "各模块明细仅列最终结果；两者不一致属正常现象。").font = Font(size=8, color="999999")
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=10)
 
 
 def _write_cache_stats_section(ws: Any) -> None:

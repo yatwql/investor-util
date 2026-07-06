@@ -19,15 +19,6 @@ logger = logging.getLogger("invest")
 #   8xxxxx（北交所）
 _A_SHARE_PREFIXES = ("60", "68", "00", "30")
 
-# 无歧义基金代码前缀（凭前缀即可断定是基金而非股票）
-#   16xxxx（深圳 LOF）、50xxxx（上海 LOF/ETF）
-#   51xxxx~52xxxx（上海 ETF）、159xxx（深圳 ETF）
-#   184xxx（传统封基）
-_FUND_PREFIXES = ("16", "50", "51", "52", "184")
-
-# 股票类代码基本范围（A 股 + B 股 + 少量特殊品种）
-_STOCK_PREFIXES = ("60", "68", "00", "30", "20", "8", "9")
-
 # 场内基金 / ETF 前缀（1 开头含深市 ETF/LOF/Reits/可转债，5 开头含沪市 ETF）
 _EXCHANGE_FUND_PREFIXES = ("5", "1")
 
@@ -76,42 +67,6 @@ def is_a_share_code(code: str) -> bool:
     if not raw:
         return False
     return raw.startswith(_A_SHARE_PREFIXES) or raw.startswith("8")
-
-
-def is_fund_code(code: str) -> bool:
-    """判断 6 位代码是否属于明确的基金前缀区间。
-
-    仅返回**无歧义**的基金代码（通过前缀即可断定是基金而非股票）。
-    000xxx/001xxx 等股基重叠区间返回 False，由调用方结合名称判断。
-
-    Args:
-        code: 6 位证券代码
-
-    Returns:
-        True 为明确基金代码
-    """
-    raw = _strip_prefix(code)
-    if not raw:
-        return False
-    return raw.startswith(_FUND_PREFIXES) or raw.startswith("159")
-
-
-def is_stock_like_code(code: str) -> bool:
-    """判断 6 位代码是否属于股票类（A 股 + B 股 + 北交所）。
-
-    is_a_share_code 的放宽版：除 A 股外还包含 B 股（20xxxx）
-    和部分特殊品种（9xxxxx），用于行情获取类场景。
-
-    Args:
-        code: 6 位证券代码
-
-    Returns:
-        True 为股票类代码
-    """
-    raw = _strip_prefix(code)
-    if not raw:
-        return False
-    return raw.startswith(_STOCK_PREFIXES)
 
 
 def is_exchange_fund_code(code: str) -> bool:
@@ -166,9 +121,11 @@ def is_qdii_by_name(name: str) -> bool:
 
 
 def is_bond_related_by_name(name: str) -> bool:
-    """判断名称是否含债券类关键词。
+    """判断名称是否含债券类关键词（严格版）。
 
-    覆盖纯债/短债/中短债/利率债/信用债/债券/债，包括可转债。
+    匹配纯债/短债/中短债/利率债/信用债/债券，不含单字"债"，
+    因此可转债等品种不会被误判。如需覆盖可转债请使用
+    :func:`is_bond_fund_by_name`。
 
     Args:
         name: 持仓名称
@@ -208,22 +165,6 @@ def is_index_link_by_name(name: str) -> bool:
     return any(kw in name for kw in ("联接", "链接"))
 
 
-def is_stock_code(code: str) -> bool:
-    """判断是否为 A 股股票代码（6/0/3 开头）。
-
-    与 :func:`is_a_share_code` 的区别：不含北交所（8xxxxx），
-    用于穿透分析等需要严格排除北交所的场景。
-
-    Args:
-        code: 6 位证券代码
-
-    Returns:
-        True 表示符合 A 股股票代码格式
-    """
-    raw = code.strip()
-    return raw.startswith(("6", "0", "3"))
-
-
 def is_etf_by_name_or_code(name: str, code: str = "") -> bool:
     """判断是否为 ETF（名称 + 代码双维度检测）。
 
@@ -240,8 +181,10 @@ def is_etf_by_name_or_code(name: str, code: str = "") -> bool:
     """
     if "ETF" in name.upper():
         return True
-    if code and code.strip().startswith(("5", "1")):
-        return True
+    if code:
+        raw = _strip_prefix(code)
+        if raw.startswith(("5", "1")):
+            return True
     return False
 
 
@@ -305,6 +248,22 @@ def is_money_fund_by_name(name: str) -> bool:
         True 表示名称匹配货币基金特征
     """
     return any(kw in name for kw in MONEY_KEYWORDS)
+
+
+def is_index_fund_by_name(name: str) -> bool:
+    """判断名称是否为场外指数/被动型基金。
+
+    通过 INDEX_KEYWORDS（指数/ETF联接/中证/沪深300/中证500/
+    中证1000/科创50/创业板/上证）进行匹配，用于区分场外
+    被动基金与场外主动基金。
+
+    Args:
+        name: 基金名称
+
+    Returns:
+        True 表示名称匹配指数/被动基金特征
+    """
+    return any(kw in name for kw in INDEX_KEYWORDS)
 
 
 def is_fund_holding(name: str, code: str, account: str) -> bool:

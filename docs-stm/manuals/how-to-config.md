@@ -34,27 +34,31 @@
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
   "cache_ttl": {
+    // ── 行情/数据类 ──
     "price": 86400,
     "index": 86400,
-    "rank": 86400,
-    "hold": 604800,
     "news": 900,
-    "llm_news_correlation": 3600,
+    "sector_flow": 900,
+    "rank": 86400,
+    "profit_forecast": 86400,
+    "hold": 604800,
     "industry": 604800,
+    "dividend": 2592000,
     "benchmark": 2592000,
-    "llm_global_macro": 86400,
+    // ── LLM 分析类 ──
     "llm_expert_review": 7200,
+    "llm_news_correlation": 3600,
+    "llm_global_macro": 86400,
     "llm_health_check": 86400,
     "llm_penetration_deep": 86400,
-    "profit_forecast": 86400,
-    "sector_flow": 900,
-    "dividend": 2592000,
-    "tracking": 2592000,
-    "calendar": 1209600,
+    // ── 基金深度分析类 ──
     "fund_manager": 86400,
     "fund_overlap": 604800,
     "fund_concentration": 2592000,
-    "fund_style_snapshot": 2592000
+    "fund_style_snapshot": 2592000,
+    // ── 系统类 ──
+    "tracking": 2592000,
+    "calendar": 1209600
   }
 }
 ```
@@ -274,7 +278,7 @@
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
 | `fund_manager` | `fund_manager_{code}.json` + `fund_manager_snapshot.json` | 24h | — | 基金经理数据 + 快照（refresh 组） |
-| `fund_overlap` | `fund_overlap_{code}.json` | 7 天 | — | 基金持仓重合度数据（refresh 组） |
+| `fund_overlap` | （实时计算，无独立缓存，推导自 `fund_hold_{code}.json`） | 7 天 | — | 基金持仓重合度数据（refresh 组，前缀用于清理注册） |
 | `fund_concentration` | `fund_concentration_snapshot.json` | 30 天 | — | 集中度历史快照（精确键名，无分组） |
 | `fund_style_snapshot` | `fund_style_snapshot.json` | 30 天 | — | 风格快照（精确键名，无分组） |
 

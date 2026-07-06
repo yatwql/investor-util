@@ -1,7 +1,6 @@
 """classification_utils → code_utils 合并后的遗留测试。
 
 测试原 classification_utils 的独有函数，现已迁入 code_utils：
-  - is_stock_code          — A 股股票代码判定
   - is_etf_by_name_or_code — ETF 识别（名称含 ETF / 代码 5/1 开头）
   - is_bond_fund_by_name   — 债券基金名称匹配（宽松）
   - is_offsite_fund        — 场外基金账户判定
@@ -22,48 +21,10 @@ from src.python.code_utils import (
     is_etf_by_name_or_code,
     is_offsite_fund,
     is_qdii_extended,
-    is_stock_code,
 )
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
-
-# ═══════════════════════════════════════════════════════════
-#  is_stock_code
-# ═══════════════════════════════════════════════════════════
-
-
-class TestIsStockCode(unittest.TestCase):
-    """测试 is_stock_code A 股股票代码判定。"""
-
-    def test_shanghai_6(self):
-        """6 开头 → True。"""
-        self.assertTrue(is_stock_code("600000"))
-
-    def test_shenzhen_0(self):
-        """0 开头 → True。"""
-        self.assertTrue(is_stock_code("000001"))
-
-    def test_gem_3(self):
-        """3 开头 → True。"""
-        self.assertTrue(is_stock_code("300750"))
-
-    def test_etf_code_5(self):
-        """5 开头（ETF）→ False。"""
-        self.assertFalse(is_stock_code("510050"))
-
-    def test_fund_code_1(self):
-        """1 开头 → False。"""
-        self.assertFalse(is_stock_code("159915"))
-
-    def test_empty(self):
-        """空字符串 → False。"""
-        self.assertFalse(is_stock_code(""))
-
-    def test_non_numeric(self):
-        """非数字代码 → False。"""
-        self.assertFalse(is_stock_code("AAPL"))
 
 
 # ═══════════════════════════════════════════════════════════

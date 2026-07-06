@@ -8,22 +8,22 @@
 
 | `--mode` 值 | 覆盖项数 | 优化前耗时 | 优化后耗时（parallel medium） | 加速比 |
 |:------------|:--------:|:----------:|:----------------------------:|:------:|
-| `unit` | 2189 | ~25min | **~20s** | 75x |
-| `standard` | 1908 | ~25min | **~20s** | 75x |
-| `scenario` | 240 | ~32s | ~32s（不并行）| — |
-| `regression` | 240 | ~32s | ~32s（不并行）| — |
-| `verify` | 921 | ~12min | **~49s** | 14.7x |
-| `integration` | 265 | ~42s | — | — |
-| `edge` | 216 | ~15s | ~15s（不并行）| — |
+| `unit` | 2270 | ~25min | **~20s** | 75x |
+| `standard` | 1977 | ~25min | **~20s** | 75x |
+| `scenario` | 277 | ~35s | ~35s（不并行）| — |
+| `regression` | 277 | ~35s | ~35s（不并行）| — |
+| `verify` | 958 | ~12min | **~49s** | 14.7x |
+| `integration` | 302 | ~50s | — | — |
+| `edge` | 228 | ~15s | ~15s（不并行）| — |
 | `data` | 65 | ~10s | ~10s（不并行）| — |
-| `all` | 2454 | ~26min | **~待测** | — |
+| `all` | 2572 | ~26min | **~待测** | — |
 | `smoke` | 24 | ~2s | ~2s（不并行）| — |
-| `report` 🆕 | 774 | — | **~15s** | — |
+| `report` 🆕 | 855 | — | **~15s** | — |
 
-> 注：`all` 模式收集总数 2454 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2442 passed / 12 skipped。
+> 注：`all` 模式收集总数 2572 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2560 passed / 12 skipped。
 > 🆕 `report` 模式为 A5 新增，标记 `unit_report`（774 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）启用 `--parallel medium`（默认）自动并行，场景/边缘/冒烟等轻量模式保持单线程避免进程调度开销。
-> v0.2.87 完成 B 迭代（基金深度分析 4 模块）上线，全量 2454 项（2442 passed / 12 skipped for Windows）。
+> v0.2.87 完成 B 迭代（基金深度分析 4 模块）上线，全量 2572 项（2560 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 
@@ -34,8 +34,8 @@
 | **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 166 |
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 173 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
-| **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 17 文件含 test_html_writer、test_html_template 等 | 776 |
-| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(10 文件) + `scenario/llm/test_llm_scenarios.py` | 369 |
+| **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 20 文件含 test_html_writer、test_html_template 等 | 855 |
+| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(10 文件) + `scenario/llm/test_llm_scenarios.py` | 377 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 342 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 71 |
 | **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 142 |
@@ -45,8 +45,8 @@
 
 | 标记 | 覆盖场景 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 全量业务场景 | **240** |
-| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 | 90 |
+| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 全量业务场景 | **277** |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 + P1p | 97 |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 |
 | │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 |
@@ -69,12 +69,12 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 8 个子组合计 | **2189** |
+| `unit`（父标记） | 8 个子组合计 | **2270** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 166 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常） | 173 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/llm_content 写入） | 345 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
-| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列模块、C 迭代序号可配置分支；含 65 项 data 标记测试） | 776 |
+| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列模块、C 迭代序号可配置分支；含 65 项 data 标记测试） | 855 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含 C 迭代 report_section_order 校验） | 71 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表；含 C 迭代注册表测试） | 342 |
 | └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 142 |
@@ -83,7 +83,7 @@
 
 | 标记 | 覆盖范围 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `llm` | 全部 LLM 相关（unit_llm 345 + scenario_llm 24），**全部为 mock 测试，无需真实 API key** | **369** |
+| `llm` | 全部 LLM 相关（unit_llm 345 + scenario_llm 32），**全部为 mock 测试，无需真实 API key** | **377** |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** |
 | `edge` | 异常/边界场景 | **216** |
 | `data` | 数据正确性验证 | **65** |
