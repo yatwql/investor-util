@@ -297,6 +297,8 @@ def classify_fund_style(
          "is_estimated": bool,
          "details": [{"name", "code", "size", "style", "ratio", "is_estimated"}, ...]}
     """
+    global _tencent_failures
+
     if not holdings:
         return {"code": fund_code, "style": "--", "is_estimated": False, "details": []}
 
