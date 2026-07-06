@@ -330,7 +330,7 @@
 
 ## 5. 各迭代测试重点（快速索引）
 
-> 完整变更日志详 `docs-stm/managements/changelog.md`，旧版本（Iter 1.1~v0.2.36）的详细记录已归档至 `docs-stm/plan/archived_plan.md`。
+> 完整变更日志详 `docs-stm/managements/changelog.md`，v0.1.x 详细设计归档至 `docs-stm/archive/archived_plan.0.1.x.md`。
 > 此处仅列近 10 个版本的测试重点作为快速参考。
 
 | 版本 | 测试重点 |

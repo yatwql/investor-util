@@ -1370,7 +1370,7 @@
 ## [0.2.17] - 2026-06-28
 
 ### Changed
-- **文档精简**：`plan.md` 历史迭代（Iter 1.1~3.7）归档至 `docs-stm/plan/archived_plan.md`，原文件从 525 行精简至 70 行；`review-findings.md` 审计记录精简保留典型问题，从 135 行压缩至 50 行
+- **文档精简**：`plan.md` 历史迭代（Iter 1.1~3.7）归档至 `docs-stm/plan/archived_plan.md`（已删除，内容分别并入 `docs-stm/archive/archived_plan.0.1.x.md` 和 changelog.md），原文件从 525 行精简至 70 行；`review-findings.md` 审计记录精简保留典型问题，从 135 行压缩至 50 行
 - **main.py 职责拆分**：拆分为 `tui_menu.py`（菜单定义/渲染）、`tui_handlers.py`（命令处理器），`main.py` 从 1177 行降至 100 行（纯入口+主循环）
 - **news_aggregator.py 模块拆分**：拆分为 `news_keywords.py`（关键词提取）、`news_correlator.py`（关联匹配）、`news_sources.py`（源获取注册），`news_aggregator.py` 保留聚合逻辑
 - **technical.md**：`llm.json` 引用更新为 `llm_key.json` / `llm_settings.json`
