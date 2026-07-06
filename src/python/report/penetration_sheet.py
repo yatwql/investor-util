@@ -11,10 +11,19 @@ from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.cache import get_cache_age
 from src.python.code_utils import is_a_share_code
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
+from src.python.report.data_status import (
+    DataStatus,
+    DataStatusItem,
+    STATUS_MESSAGES,
+    DegradationTracker,
+)
 from src.python.report.excel_writer import (
+    _write_data_status_foot,
+    _write_status_title,
     auto_width,
     freeze_header,
     write_data_row,
@@ -26,6 +35,9 @@ from src.python.report.penetration import compute_penetration_top10
 from src.python.report.styles import FMT_MONEY, FMT_PERCENT
 
 logger = logging.getLogger("invest")
+
+# 模块级降级阈值控制器（单会话内共享）
+_tracker = DegradationTracker()
 
 _NCOLS = 10
 _HEADERS = [
@@ -58,26 +70,95 @@ def _get_dividend_text(dividend_data: dict, codes: list[str]) -> str:
     return "--"
 
 
-def _load_profit_forecast_safe() -> dict:
-    """加载盈利预测数据，失败时返回空字典。"""
+def _load_profit_forecast_safe() -> tuple[dict, bool]:
+    """加载盈利预测数据，失败时返回空字典。
+
+    Returns:
+        (forecast_dict, success) — success=False 表示 API 调用异常。
+    """
     try:
         from src.python.providers.akshare_extras import get_profit_forecast
-        return get_profit_forecast()
+        return get_profit_forecast(), True
     except Exception:
-        logger.debug("盈利预测加载失败（非关键），EPS 列显示 --", exc_info=True)
-        return {}
+        logger.warning("[penetration] 盈利预测获取失败（非关键），EPS 列显示 --", exc_info=True)
+        return {}, False
 
 
-def _load_dividend_data_safe(result: dict) -> dict:
-    """加载分红数据，失败时返回空字典。"""
+def _load_dividend_data_safe(result: dict) -> tuple[dict, bool]:
+    """加载分红数据，失败时返回空字典。
+
+    Returns:
+        (dividend_dict, success) — success=False 表示 API 调用异常。
+    """
     try:
         from src.python.providers.akshare_extras import get_dividend_data
         all_top10_codes = list(set().union(*(entry.get("codes", []) for entry in result["top10"])))
         a_stock_codes = [c for c in all_top10_codes if is_a_share_code(c)]
-        return get_dividend_data(a_stock_codes) if a_stock_codes else {}
+        data = get_dividend_data(a_stock_codes) if a_stock_codes else {}
+        return data, True
     except Exception:
-        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
-        return {}
+        logger.warning("[penetration] 分红数据获取失败（非关键），年均股息率列显示 --", exc_info=True)
+        return {}, False
+
+
+def _build_data_status(
+    result: dict,
+    profit_success: bool = True,
+    dividend_success: bool = True,
+) -> DataStatus:
+    """根据数据获取结果构建数据源状态字典。
+
+    综合利用 DegradationTracker 阈值判断和缓存新鲜度，
+    仅当超过阈值时才标记为不可用。
+
+    Args:
+        result: compute_penetration_top10 返回的结果字典
+        profit_success: 盈利预测 API 是否成功
+        dividend_success: 分红 API 是否成功
+
+    Returns:
+        数据源状态字典（可能为空 = 全部正常）
+    """
+    status: DataStatus = {}
+
+    # 行业分类（T3，push2）
+    if not result.get("industry_success", True):
+        cache_age = get_cache_age("industry_data")
+        degraded, _, _ = _tracker.record(
+            "penetration_industry", "T3", success=False,
+            failure_type="unreachable",
+            cache_age_hours=cache_age / 3600 if cache_age else None,
+            cache_ttl_hours=24,
+        )
+        if degraded:
+            status["industry"] = DataStatusItem(
+                available=False, tier="T3",
+                message=STATUS_MESSAGES["industry_unavailable"],
+            )
+
+    # 盈利预测（T4，akshare）
+    if not profit_success:
+        degraded, _, _ = _tracker.record(
+            "penetration_profit_forecast", "T4", success=False,
+        )
+        if degraded:
+            status["profit_forecast"] = DataStatusItem(
+                available=False, tier="T4",
+                message=STATUS_MESSAGES["profit_forecast_unavailable"],
+            )
+
+    # 分红数据（T4，akshare）
+    if not dividend_success:
+        degraded, _, _ = _tracker.record(
+            "penetration_dividend", "T4", success=False,
+        )
+        if degraded:
+            status["dividend"] = DataStatusItem(
+                available=False, tier="T4",
+                message=STATUS_MESSAGES["dividend_unavailable"],
+            )
+
+    return status
 
 
 def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
@@ -135,14 +216,17 @@ def write_penetration_sheet(
 
     if not result["top10"]:
         write_data_row(ws, row, ["暂无穿透数据"])
+        # 即使无 TOP10 数据，也检查是否有数据源失败需要展示状态
+        data_status = _build_data_status(result)
+        _write_data_status_foot(ws, data_status, start_row=row + 1)
         freeze_header(ws, 2)
         auto_width(ws)
         logger.warning("%s无数据", get_llm_module_name("penetration_deep"))
         return
 
     summary = result["summary"]
-    profit_forecast = _load_profit_forecast_safe()
-    dividend_data = _load_dividend_data_safe(result)
+    profit_forecast, profit_success = _load_profit_forecast_safe()
+    dividend_data, dividend_success = _load_dividend_data_safe(result)
 
     for entry in result["top10"]:
         concepts = entry.get("concepts", [])
@@ -165,7 +249,9 @@ def write_penetration_sheet(
         write_data_row(ws, row, vals, _num_formats())
         row += 1
 
-    _write_penetration_footer(ws, row, summary)
+    row = _write_penetration_footer(ws, row, summary)
+    data_status = _build_data_status(result, profit_success, dividend_success)
+    _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=40)
 

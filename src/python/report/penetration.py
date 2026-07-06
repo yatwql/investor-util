@@ -452,28 +452,37 @@ def _merge_stock_layer(
         merged[norm_name]["funds"].append("直接持有")
 
 
-def _enrich_with_industry_api(merged: dict[str, Any]) -> None:
-    """用 API 行业数据补充板块分类和概念（原地修改）。"""
+def _enrich_with_industry_api(merged: dict[str, Any]) -> bool:
+    """用 API 行业数据补充板块分类和概念（原地修改）。
+
+    Returns:
+        True 表示 API 获取成功（可能有部分数据），False 表示完全失败。
+    """
     try:
         all_codes: list[str] = []
         for info in merged.values():
             all_codes.extend(info.get("codes") or [])
-        if all_codes:
-            from src.python.fetcher.industry import batch_fetch_industry_data as batch_ind
-            ind_data = batch_ind(list(set(all_codes)))
-            if ind_data:
-                for info in merged.values():
-                    for code in info.get("codes") or []:
-                        if code in ind_data:
-                            id_rec = ind_data[code]
-                            if id_rec.get("industry"):
-                                info["sector_api"] = id_rec["industry"]
-                                info["sector"] = id_rec["industry"]
-                            if id_rec.get("concepts"):
-                                info["concepts"] = id_rec["concepts"]
-                            break
+        if not all_codes:
+            return False
+        from src.python.fetcher.industry import batch_fetch_industry_data as batch_ind
+        ind_data = batch_ind(list(set(all_codes)))
+        if ind_data:
+            for info in merged.values():
+                for code in info.get("codes") or []:
+                    if code in ind_data:
+                        id_rec = ind_data[code]
+                        if id_rec.get("industry"):
+                            info["sector_api"] = id_rec["industry"]
+                            info["sector"] = id_rec["industry"]
+                        if id_rec.get("concepts"):
+                            info["concepts"] = id_rec["concepts"]
+                        break
+            return True
+        logger.warning("[penetration] 行业分类 API 返回空数据（非关键）")
+        return False
     except Exception:
-        logger.debug("穿透板块 API 补充失败（非关键）", exc_info=True)
+        logger.warning("[penetration] 行业分类 API 获取失败（非关键）", exc_info=True)
+        return False
 
 
 def _build_penetration_result(
@@ -559,9 +568,11 @@ def compute_penetration_top10(
     classified, funds, direct_stocks, detail_map = _classify_and_group(holdings, details)
     merged, unknown_mv, failed_count, failed_fund_details = _merge_fund_layer(funds, detail_map)
     _merge_stock_layer(direct_stocks, detail_map, merged)
-    _enrich_with_industry_api(merged)
-    return _build_penetration_result(
+    industry_success = _enrich_with_industry_api(merged)
+    result = _build_penetration_result(
         merged, classified, funds, direct_stocks,
         unknown_mv, failed_count, failed_fund_details,
     )
+    result["industry_success"] = industry_success
+    return result
 
