@@ -232,7 +232,7 @@ penetration_sector = fetch_industry_data(code).industry  // API优先
 
 ### Provider Chain 路由与 fallback
 
-`src/python/providers/` 下的 Provider 按数据类型的优先级注册在 `registry.py` 中，`fetcher/price.py` 的 `get_price()` 遍历 Provider Chain：
+`src/python/providers/` 下的 Provider 按数据类型的优先级定义在 `fetcher/chain.py:_DEFAULT_CHAINS` 中（`price`→`tencent`,`eastmoney`；`industry`→`eastmoney_industry`,`eastmoney_industry_rest` 等），`fetcher/price.py` 的 `get_price()` 通过 `_fetch_with_fallback()` 遍历 Provider Chain：
 
 ```
 Provider Chain 注册表（registry.py）
