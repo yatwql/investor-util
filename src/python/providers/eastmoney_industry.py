@@ -28,18 +28,19 @@ from src.python.code_utils import get_push2_secid
 logger = logging.getLogger("invest")
 
 _PUSH2_BASE = "https://push2.eastmoney.com/api/qt/stock/get"
-_TIMEOUT = 15.0
+_TIMEOUT = 5.0
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Referer": "https://www.eastmoney.com/",
 }
 # 最大重试次数（总请求数 = _MAX_RETRIES + 1）
-_MAX_RETRIES = 3
+# fund_style 等降级场景可容忍偶尔失败，减少重试加快 fallback
+_MAX_RETRIES = 1
 
 # ── 熔断器 ──────────────────────────────────────────────
 _PUSH2_CIRCUIT_OPEN = False     # 是否已熔断
 _PUSH2_FAILURE_COUNT = 0        # 连续失败计数
-_PUSH2_CIRCUIT_THRESHOLD = 5    # 连续失败 N 次后熔断
+_PUSH2_CIRCUIT_THRESHOLD = 3    # 连续失败 N 次后熔断
 
 # 查询字段（行业分类 + 扩展行情，供 fund_style 等模块使用）
 #   f9=动态市盈率(PE), f20=总市值, f23=市净率(PB)

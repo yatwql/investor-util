@@ -28,6 +28,12 @@ from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
 
+# 会话级扩展数据内存缓存 — 同一股票出现在多只基金时复用，避免重复 HTTP
+_ext_memo: dict[str, dict | None] = {}
+# Tencent 二级降级熔断：连续失败 N 次后跳过（网络不可达时无需逐只等待超时）
+_tencent_failures = 0
+_TENCENT_SKIP_THRESHOLD = 2
+
 _SNAPSHOT_KEY = "fund_style_snapshot"
 _SNAPSHOT_TTL = 365 * 86400
 
@@ -317,11 +323,20 @@ def classify_fund_style(
 
         # 三级降级：push2（精确）→ Tencent（可靠）→ 代码段估算（兜底）
         # 非 A 股（美股/港股/基金等）跳过 API 调用，直接估算
+        # 会话级内存复用：同一股票跨基金不重复 HTTP
         ext_data = None
         if code and is_a_share_code(code):
-            ext_data = _push2_extended(code)
-            if ext_data is None:
-                ext_data = _tencent_extended(code)
+            if code in _ext_memo:
+                ext_data = _ext_memo[code]
+            else:
+                ext_data = _push2_extended(code)
+                if ext_data is None and _tencent_failures < _TENCENT_SKIP_THRESHOLD:
+                    ext_data = _tencent_extended(code)
+                    if ext_data is None:
+                        _tencent_failures += 1
+                    else:
+                        _tencent_failures = 0
+                _ext_memo[code] = ext_data
         industry_avg_pe = industry_avg_pe_map.get(code)
 
         if ext_data:
