@@ -56,7 +56,8 @@ investor-util/
 │       │   │   ├── fund.py               # 基金数据获取 — 净值/持仓/排名/基准的缓存感知封装
 │       │   │   ├── index.py              # 指数行情获取 — A股 + 美股指数、缓存 TTL 管理
 │       │   │   ├── industry.py           # 行业/概念数据获取 — 行业分类、概念板块归属、批量接口
-│       │   │   └── price.py              # 价格行情获取 — 场内实时价/收盘价/ETF 溢价
+│       │   │   ├── fund_manager.py       # 基金经理数据获取 — 主页 HTML 解析 + 档案页回退
+│   │   └── price.py              # 价格行情获取 — 场内实时价/收盘价/ETF 溢价
 │   │   │
 │   │   ├── providers/                # 数据源提供商（各 API 的具体实现）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -141,6 +142,7 @@ investor-util/
 │       │   │   ├── test_fetcher_index.py # 指数抓取 — 腾讯→新浪 fallback 双链路（13 项）
 │       │   │   ├── test_fetcher_industry.py # 行业抓取 — _industry_transform / fetch_industry_data（10 项）
 │       │   │   ├── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
+│   │   │   ├── test_fund_manager.py  # 基金经理师数据获取 — HTML 解析、当页面退 回档（14 项）
 │       │   │   └── test_api_edge.py      # HTTP Provider 异常场景 — 超时/DNS/SSL/429/503/JSON 异常（23 项 Y1）
 │       │   ├── llm/                      # LLM 相关测试（345 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）

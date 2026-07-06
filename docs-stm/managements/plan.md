@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-05（v0.2.86 — C-P1b 修复：Excel 页签标题跟随配置）
+最后更新：2026-07-06（v0.2.87 — B 迭代基金深度分析 4 模块上线）
 
 ---
 
@@ -99,6 +99,15 @@ LLM 配置拆分为两个独立文件：
 - **Excel 页签并行写入**：报告生成时每个页签独立写入，可考虑并行加速
 
 ---
+
+### ✅ B. 基金深度分析 4 模块（v0.2.85~v0.2.87 — 已全部完成）
+
+基金持仓深度分析：基金经理变更监控（B2）、持仓重合度矩阵（B3）、持仓集中度监控（B4）、基金风格分析（B5）。
+- **B-P1**：基金风格分析（B5）上线 — `fund_style_analysis.py` + `fund_style_sheet.py`，push2→Tencent→代码段三级降级，网格曼哈顿距离漂移
+- **B-P2**：基金经理变更监控（B2）上线 — `fund_manager_analysis.py` + `fund_manager_sheet.py`，天天基金 HTML 解析
+- **B-P3**：持仓重合度矩阵（B3）上线 — `fund_overlap.py` + `fund_overlap_sheet.py`，Jaccard + Overlap Ratio 双指标
+- **B-P4**：持仓集中度监控（B4）上线 — `fund_concentration.py` + `fund_concentration_sheet.py`，环比 + 三级预警
+- **B-P5**：TUI 菜单同步 + 管理文档 + 版本发布
 
 ### ✅ C. 报告序号可配置（v0.2.85~v0.2.86 — 已全部完成）
 

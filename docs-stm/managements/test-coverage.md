@@ -8,22 +8,22 @@
 
 | `--mode` 值 | 覆盖项数 | 优化前耗时 | 优化后耗时（parallel medium） | 加速比 |
 |:------------|:--------:|:----------:|:----------------------------:|:------:|
-| `unit` | 2188 | ~25min | **~20s** | 75x |
-| `standard` | 1907 | ~25min | **~20s** | 75x |
+| `unit` | 2189 | ~25min | **~20s** | 75x |
+| `standard` | 2454 | ~25min | **~20s** | 75x |
 | `scenario` | 240 | ~32s | ~32s（不并行）| — |
 | `regression` | 240 | ~32s | ~32s（不并行）| — |
-| `verify` | 907 | ~12min | **~49s** | 14.7x |
-| `integration` | 263 | ~42s | — | — |
-| `edge` | 214 | ~15s | ~15s（不并行）| — |
-| `data` | 63 | ~10s | ~10s（不并行）| — |
-| `all` | 2453 | ~26min | **~待测** | — |
+| `verify` | 921 | ~12min | **~49s** | 14.7x |
+| `integration` | 265 | ~42s | — | — |
+| `edge` | 216 | ~15s | ~15s（不并行）| — |
+| `data` | 65 | ~10s | ~10s（不并行）| — |
+| `all` | 2454 | ~26min | **~待测** | — |
 | `smoke` | 24 | ~2s | ~2s（不并行）| — |
-| `report` 🆕 | 773 | — | **~15s** | — |
+| `report` 🆕 | 774 | — | **~15s** | — |
 
-> 注：`all` 模式收集总数 2453 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2441 passed / 12 skipped。
-> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（773 项），供报告模块开发期快速验证。
+> 注：`all` 模式收集总数 2454 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2442 passed / 12 skipped。
+> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（774 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）启用 `--parallel medium`（默认）自动并行，场景/边缘/冒烟等轻量模式保持单线程避免进程调度开销。
-> v0.2.87 完成 code_utils 代码类型判定中心化迁移，全量 2453 项（2441 passed / 12 skipped for Windows）。
+> v0.2.87 完成 B 迭代（基金深度分析 4 模块）上线，全量 2454 项（2442 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 

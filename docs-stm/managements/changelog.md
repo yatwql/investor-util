@@ -4,9 +4,23 @@
 
 ---
 
-## [0.2.87] - 2026-07-05
+## [0.2.87] - 2026-07-06
+
+### Added
+
+- **B 迭代（基金持仓深度分析）全模块上线** — 新增 4 页签（13~16）：
+  - **基金经理变更监控（B2）**：`src/python/report/fund_manager_analysis.py` + `fund_manager_sheet.py` — 快照式变更检测（1/3/6 月窗口），独立快照键 `fund_manager_snapshot`（不受持仓指纹影响），首次运行引导文案
+  - **持仓重合度矩阵（B3）**：`src/python/report/fund_overlap.py` + `fund_overlap_sheet.py` — Jaccard + Overlap Ratio 双指标，热力图矩阵，含/不含市值数据双模式
+  - **持仓集中度监控（B4）**：`src/python/report/fund_concentration.py` + `fund_concentration_sheet.py` — 前3/5/10集中度，环比变化+三级预警，独立快照键 `fund_concentration_snapshot`
+  - **基金风格分析（B5）**：`src/python/report/fund_style_analysis.py` + `fund_style_sheet.py` — 六宫格风格箱（大盘/中盘/小盘×价值/混合/成长），三级降级链路（push2→Tencent→代码段估算），网格曼哈顿距离漂移检测，独立快照键 `fund_style_snapshot`
+- **基金经理数据获取模块**：`src/python/fetcher/fund_manager.py` — 天天基金主页 HTML 解析 + 档案页回退
+- **Tencent 扩展字段（市值/PE）**：`src/python/providers/tencent.py` — 新增 `market_cap`(f46) 和 `pe`(f40) 字段
+- **TUI 菜单描述同步**：B/L 菜单标注「含基金深度分析」，[1] 菜单描述含基金经理缓存
+- **测试覆盖**：B 系列 6 个测试文件共 ~115 项（fetter fund_manager 14 项 + report 模块 101 项）
 
 ### Fixed
+
+- **R-158：Excel "LLM API 用量" 页签未显示模块明细**：
 
 - **R-158：Excel "LLM API 用量" 页签未显示模块明细**：
   - `excel_generator.py`：`_build_llm_usage_sheet` 中 `per_module` 从 `formatted` 取改为从 `raw_session` 取

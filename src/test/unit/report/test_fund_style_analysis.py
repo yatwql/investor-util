@@ -196,15 +196,29 @@ class TestClassifyFundStyle(unittest.TestCase):
         result = classify_fund_style("110011", [])
         self.assertEqual(result["style"], "--")
 
+    @patch("src.python.report.fund_style_analysis._tencent_extended")
     @patch("src.python.report.fund_style_analysis._push2_extended")
-    def test_no_push2_fallback_code(self, mock_push2):
+    def test_no_push2_fallback_code(self, mock_push2, mock_tencent):
         """push2 不可用 → 代码段降级"""
         mock_push2.return_value = None
+        mock_tencent.return_value = None
         # 60开头 → 大盘
         holdings = [{"name": "茅台", "code": "600519", "ratio": 100}]
         result = classify_fund_style("110011", holdings)
         self.assertEqual(result["style"], "大盘混合")
         self.assertTrue(result["is_estimated"])
+
+    @patch("src.python.report.fund_style_analysis._tencent_extended")
+    @patch("src.python.report.fund_style_analysis._push2_extended")
+    def test_push2_fallback_to_tencent(self, mock_push2, mock_tencent):
+        """push2 不可用，Tencent 可用 → 使用 Tencent 数据"""
+        mock_push2.return_value = None
+        mock_tencent.return_value = {"market_cap": 1000e8, "pe": 25.0}
+        holdings = [{"name": "茅台", "code": "600519", "ratio": 100}]
+        result = classify_fund_style("110011", holdings)
+        self.assertIn("大盘", result["style"])
+        # Tencent 数据视为精确（非降级）
+        self.assertFalse(result["is_estimated"])
 
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_with_push2_data(self, mock_push2):
@@ -243,12 +257,14 @@ class TestClassifyFundStyle(unittest.TestCase):
 class TestAnalyzeStyleForAllFunds(unittest.TestCase):
     """analyze_style_for_all_funds：全流程集成"""
 
+    @patch("src.python.report.fund_style_analysis._tencent_extended")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     @patch("src.python.report.fund_style_analysis._load_snapshot")
-    def test_first_run_all_baseline(self, mock_load, mock_push2):
+    def test_first_run_all_baseline(self, mock_load, mock_push2, mock_tencent):
         """首次运行 → 全部基准确立中"""
         mock_load.return_value = None
         mock_push2.return_value = None  # 降级模式
+        mock_tencent.return_value = None
         fund_holdings = {
             "110011": {
                 "name": "易方达中小盘",

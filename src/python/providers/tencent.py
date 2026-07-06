@@ -36,6 +36,8 @@ _FIELD_MAP: dict[str, int] = {
     "price_date": 31,   # 日期时间 YYYYMMDDHHMMSS
     "high": 34,         # 最高价
     "low": 35,          # 最低价
+    "market_cap": 46,   # 总市值（API 返回亿，内部保持原始值，下游按需转换）
+    "pe": 40,           # 动态市盈率
 }
 
 
@@ -105,6 +107,8 @@ def _parse_response(text: str) -> dict[str, Any] | None:
         "low": _parse_float(_get(_FIELD_MAP["low"])),
         "volume": _parse_float(_get(_FIELD_MAP["volume"])),
         "turnover": _parse_float(_get(_FIELD_MAP["turnover"])),
+        "market_cap": _parse_float(_get(_FIELD_MAP["market_cap"])),
+        "pe": _parse_float(_get(_FIELD_MAP["pe"])),
         "source": "腾讯财经",
     }
 
