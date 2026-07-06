@@ -79,7 +79,7 @@ v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel �
 
 所有已完成迭代（A/A2/A3/A4/A5/B/C/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md)。
 
-B 迭代（基金深度分析 4 模块：基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析）和 C 迭代（报告序号可配置）已完结，详见 changelog.md 及 `docs-stm/plan/c-iteration-design.md`、`docs-stm/plan/c-p1b-excel-title-number-fix.md`。
+B 迭代（基金深度分析 4 模块：基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析）和 C 迭代（报告序号可配置）已完结，详见 changelog.md 及 `docs-stm/archive/c-iteration-design.md`、`docs-stm/archive/c-p1b-excel-title-number-fix.md`。
 
 ---
 

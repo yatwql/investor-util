@@ -1,5 +1,8 @@
 # C 迭代：报告序号可配置 — 详细设计
 
+> **状态**：✅ 已实现（v0.2.85~v0.2.86）— C-P1a/P1b/P2/P3 全 Phase 上线
+> **归档**：设计文档保留供回溯参考。实现详情见 `docs-stm/managements/changelog.md`。
+>
 > 本文档包含 C 迭代的完整设计过程、五轮审查发现、风险分析、技术债务记录和逐 Phase 实施方案。
 >
 > 管理层面摘要见 `docs-stm/managements/plan.md`。
