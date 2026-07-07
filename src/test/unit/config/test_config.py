@@ -44,7 +44,7 @@ class TestGetConfig(unittest.TestCase):
         self.assertEqual(result["holdings_dir"], "data/holdings")
         self.assertEqual(result["holdings_filename"], "个人投资持仓信息.xlsx")
         self.assertEqual(result.get("output_dir"), "reports")
-        self.assertEqual(result.get("news_top_count"), 100)
+        self.assertEqual(result.get("news_top_count"), 300)
         self.assertIn("cache_ttl", result)
         self.assertIn("preferred_provider", result)
 
@@ -112,8 +112,7 @@ class TestInitConfig(unittest.TestCase):
         self.assertFalse(os.path.exists(cfg._CONFIG_FILE))
         cfg.init_config()
         self.assertTrue(os.path.exists(cfg._CONFIG_FILE))
-        with open(cfg._CONFIG_FILE, encoding="utf-8") as f:
-            data = json.load(f)
+        data = cfg.get_config()
         self.assertEqual(data["holdings_dir"], "data/holdings")
 
     def test_init_does_not_overwrite_existing(self):

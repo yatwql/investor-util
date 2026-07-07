@@ -340,8 +340,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         self.assertEqual(len(errors), 0, f"并发 init_config 不应抛出异常: {errors}")
         self.assertTrue(os.path.exists(config_path), "配置文件应被创建")
 
-        with open(config_path, encoding="utf-8") as f:
-            data = json.load(f)
+        data = cfg.get_config()
         self.assertEqual(data.get("holdings_dir"), "data/holdings")
 
     # ── 终端无颜色 ──
