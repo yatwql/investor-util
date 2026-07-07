@@ -290,12 +290,13 @@ Provider Chain 注册表（registry.py）
 
 **与 LLM Circuit Breaker 的差异：**
 
-| 维度 | Provider Chain 熔断 | LLM Circuit Breaker |
-|:-----|:-------------------|:--------------------|
-| 作用域 | 数据 provider（price/industry 等） | LLM API endpoint |
-| 冷却时长 | 300s | 60s |
-| 试探次数 | 冷却期满放行一次 | 半开状态放行一次 |
-| 恢复条件 | 试探成功 → 移出跳过集合 | 半开成功 → 关闭熔断 |
+| 维度 | Provider Chain 熔断 | push2 模块级熔断 | LLM Circuit Breaker |
+|:-----|:-------------------|:-----------------|:--------------------|
+| 作用域 | 数据 provider（price/industry 等） | push2 行业分类/概念板块 API | LLM API endpoint |
+| 实现位置 | `chain.py` 全局状态 | `eastmoney_industry.py` 模块级全局变量 | `llm/circuit_breaker.py` |
+| 冷却时长 | 300s | 300s | 60s |
+| 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
+| 恢复条件 | 试探成功 → 移出跳过集合 | 试探成功 → 关闭熔断标记 | 半开成功 → 关闭熔断 |
 
 **消费方感知：** 无任何配置变更，逻辑对 batch 调用方透明。batch 场景日志从 N 条"已被熔断，跳过"降级为 1 条入口 WARNING + 1 条重试预检 INFO。
 
