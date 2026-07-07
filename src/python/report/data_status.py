@@ -67,9 +67,9 @@ TIER_PREFIX: dict[str, str] = {"T2": "⚠", "T3": "ℹ", "T4": "ℹ"}
 # ── 默认阈值 ──────────────────────────────────
 # 硬编码兜底值，config.json 未配置时使用
 
-_DEFAULT_UNREACHABLE: dict[str, int] = {"t2": 3, "t3": 4, "t4": 1}
-_DEFAULT_EMPTY: dict[str, int] = {"t2": 5, "t3": 6, "t4": 2}
-_DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 1, "t3": 14, "t4": 14}
+_DEFAULT_UNREACHABLE: dict[str, int] = {"t2": 2, "t3": 2, "t4": 1}
+_DEFAULT_EMPTY: dict[str, int] = {"t2": 3, "t3": 3, "t4": 1}
+_DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 3, "t3": 14, "t4": 14}
 
 # 持久化文件路径
 _DEGRADATION_STATE_FILE = os.path.join(
@@ -161,7 +161,10 @@ class DegradationTracker:
             cache_ttl_hours: 缓存标准 TTL（小时），用于自适应调节
 
         Returns:
-            (是否降级, 当前最大失败计数, 有效阈值)
+            (是否降级, 当前最大失败计数, 最低有效阈值)
+            注意：最低有效阈值 = min(unreachable_eff, empty_eff)，
+            实际降级由对应的单类型阈值触发（OR 条件），
+            该值仅反映最先可能被触发的阈值下限。
 
             成功时返回 (False, 0, 0)。
         """
@@ -249,7 +252,7 @@ class DegradationTracker:
         """信号2：检查数据是否超过容忍期限。
 
         优先用缓存年龄判断；无缓存时用持久化上次成功时间判断。
-        两者均无时返回 False（全新数据源，由信号1处理）。
+        两者均无时返回 False（全新数据源，由信号1自适应调节处理）。
         """
         stale_days = cfg.get("stale_days", _DEFAULT_STALE_DAYS.get(tier.lower(), 3))
         stale_hours = stale_days * 24
@@ -265,6 +268,7 @@ class DegradationTracker:
             return age_hours > stale_hours
 
         # 两者均无 → 全新数据源，由信号1自适应调节处理
+        # （首次运行 count=1 + 无缓存 −1 = 阈=1 → 信号1快速触发）
         return False
 
     @staticmethod
@@ -275,4 +279,9 @@ class DegradationTracker:
         tier_key = tier.lower()
         if not isinstance(degradation, dict):
             return {}
-        return degradation.get(tier_key, {}) if isinstance(degradation.get(tier_key), dict) else {}
+        result = degradation.get(tier_key, {}) if isinstance(degradation.get(tier_key), dict) else {}
+        # 合理性校验：≤0 的值会被夹紧逻辑静默限制，记警告让用户自查
+        for k, v in result.items():
+            if isinstance(v, (int, float)) and v <= 0:
+                logger.warning("[degradation] %s.%s=%s 配置值异常（≤0），使用默认值", tier, k, v)
+        return result

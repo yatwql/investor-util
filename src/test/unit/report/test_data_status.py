@@ -32,37 +32,16 @@ class TestDegradationSignal1:
             failure_type="unreachable",
             cache_age_hours=12, cache_ttl_hours=24,
         )
-        # 新鲜缓存 → 阈值 +1 = 4，count=1 < 4 → 不降级
+        # T2 base=2，新鲜缓存 +1 = 3，count=1 < 3 → 不降级
+        # effective = min(unreachable_eff=3, empty_eff=4) = 3
         assert count == 1
-        assert effective <= 4  # base 3 + fresh bonus 1 = 4
+        assert effective == 3
         assert not degraded
 
     def test_signal1_exceeds_threshold(self):
-        """T2 源连续失败 3 次，缓存新鲜 → 降级。"""
+        """T2 源连续失败 3 次，缓存新鲜 → 第 3 次降级（T2 base=2，新鲜+1=3）。"""
         tracker = DegradationTracker()
-        # 第 1 次
-        tracker.record("test_source", "T2", success=False,
-                        failure_type="unreachable",
-                        cache_age_hours=12, cache_ttl_hours=24)
-        # 第 2 次
-        tracker.record("test_source", "T2", success=False,
-                        failure_type="unreachable",
-                        cache_age_hours=12, cache_ttl_hours=24)
-        # 第 3 次
-        degraded, count, effective = tracker.record(
-            "test_source", "T2", success=False,
-            failure_type="unreachable",
-            cache_age_hours=12, cache_ttl_hours=24,
-        )
-        # 新鲜缓存 T2 +1=4，count=3 < 4 → 应还不降级！
-        # 需要第 4 次
-        assert count == 3
-        assert not degraded
-
-    def test_signal1_exceeds_at_fourth(self):
-        """T2 源连续失败 4 次，缓存新鲜 → 第 4 次降级。"""
-        tracker = DegradationTracker()
-        for _ in range(3):
+        for _ in range(2):
             tracker.record("test_source", "T2", success=False,
                             failure_type="unreachable",
                             cache_age_hours=12, cache_ttl_hours=24)
@@ -71,22 +50,52 @@ class TestDegradationSignal1:
             failure_type="unreachable",
             cache_age_hours=12, cache_ttl_hours=24,
         )
-        assert count == 4
-        assert effective <= 4
+        assert count == 3
+        assert effective == 3
         assert degraded
 
-    def test_signal1_t3_higher_threshold(self):
-        """T3 源连续失败 3 次，无缓存 → 有效阈=3，第 3 次降级。"""
+    def test_signal1_exceeds_at_fourth(self):
+        """T2 源连续失败 4 次（无缓存）→ 即使阈降到最低也降级。"""
         tracker = DegradationTracker()
+        for _ in range(4):
+            tracker.record("test_source", "T2", success=False,
+                            failure_type="unreachable")
+        # T2 base=2, 无缓存 -1=1, count=4≥1 → 降级
+        counts = tracker.get_counts("test_source")
+        assert counts["unreachable"] == 4
+
+    def test_signal1_t3_higher_empty_threshold(self):
+        """T3 empty（base=3）比 unreachable（base=2）需要更多失败才降级。"""
+        tracker = DegradationTracker()
+        # T3 empty 在新鲜缓存下 effective empty=4，2 次不降级
         for _ in range(2):
             tracker.record("test_source", "T3", success=False,
-                            failure_type="unreachable")
+                            failure_type="empty",
+                            cache_age_hours=12, cache_ttl_hours=24)
+        # 第 3 次：empty_count=3 < empty_eff=4 → 不降级
+        # effective = min(unreachable_eff=3, empty_eff=4) = 3
         degraded, count, effective = tracker.record(
             "test_source", "T3", success=False,
-            failure_type="unreachable",
+            failure_type="empty",
+            cache_age_hours=12, cache_ttl_hours=24,
         )
-        # T3 base=4, 无缓存 -1 = 3，count=3 ≥ 3 → 降级
         assert count == 3
+        assert not degraded
+
+    def test_signal1_t3_empty_reaches_threshold(self):
+        """T3 连续 4 次 empty，新鲜缓存 → 第 4 次降级。"""
+        tracker = DegradationTracker()
+        for _ in range(3):
+            tracker.record("test_source", "T3", success=False,
+                            failure_type="empty",
+                            cache_age_hours=12, cache_ttl_hours=24)
+        # 第 4 次：empty_count=4 ≥ empty_eff=4 → 降级
+        degraded, count, effective = tracker.record(
+            "test_source", "T3", success=False,
+            failure_type="empty",
+            cache_age_hours=12, cache_ttl_hours=24,
+        )
+        assert count == 4
         assert degraded
 
     def test_self_heal(self):
@@ -118,13 +127,28 @@ class TestDegradationSignal1:
         assert degraded
 
     def test_no_cache_penalty(self):
-        """T3 源失败 1 次，无缓存 → 有效阈=3，count=1 < 3 → 不降级。"""
+        """T3 源失败 1 次，无缓存 → 信号1自适应触达阈值（T3 base=2→无缓存-1=1）。"""
         tracker = DegradationTracker()
         degraded, count, effective = tracker.record(
             "test_source", "T3", success=False,
             failure_type="unreachable",
         )
-        # T3 base=4, 无缓存 -1 = 3, count=1 < 3 → 不降级
+        # T3 base=2, 无缓存 -1=1, count=1 ≥ 1 → 信号1触发降级
+        # count 尚未达到新鲜缓存时的阈=3，但无缓存惩罚让阈降到最低=1
+        assert count == 1
+        assert degraded
+
+    def test_fresh_cache_prevents_premature_degrade(self):
+        """T3 源失败 1 次，新鲜缓存 → 有效阈=3，count=1 < 3 → 不降级。"""
+        tracker = DegradationTracker()
+        degraded, count, effective = tracker.record(
+            "test_source", "T3", success=False,
+            failure_type="unreachable",
+            cache_age_hours=12, cache_ttl_hours=24,
+        )
+        # T3 base=2, 新鲜缓存+1=3, count=1 < 3 → 不降级
+        # effective = min(unreachable_eff=3, empty_eff=4) = 3
+        # cache_age=12h < stale_days=14d=336h → 信号2不触发
         assert count == 1
         assert effective == 3
         assert not degraded
@@ -141,7 +165,7 @@ class TestDegradationSignal2:
             failure_type="unreachable",
             cache_age_hours=96, cache_ttl_hours=24,
         )
-        # cache_age=96h > stale_days*t4=3*24=72h → signal2 True
+        # cache_age=96h > stale_days*t2=3*24=72h → signal2 True
         assert degraded
 
     def test_signal2_fresh_cache_no_stale(self):
@@ -153,56 +177,72 @@ class TestDegradationSignal2:
             cache_age_hours=2, cache_ttl_hours=24,
         )
         # cache_age=2h < stale_days=72h → signal2 False
-        # count=1 < base=3, fresh cache +1 = 4 → signal1 False
+        # count=1 < 有效阈=3（T2 base=2, fresh+1）→ signal1 False
         assert not degraded
 
     def test_signal2_no_cache_triggers(self):
-        """全新数据源，无缓存 → signal2 不触发（由信号1适应性调节处理）。"""
+        """全新数据源，无缓存 → 信号1自适应触达阈值（T2 base=2→无缓存-1=1）。"""
         tracker = DegradationTracker()
         degraded, count, effective = tracker.record(
             "test_source", "T2", success=False,
             failure_type="unreachable",
             cache_age_hours=None, cache_ttl_hours=None,
         )
-        # T2 base=3, 无缓存 -1=2, count=1 < 2 → 不降级
+        # T2 base=2, 无缓存 -1=1 → count=1 ≥ 1 → 降级
+        # effective = min(unreachable_eff=1, empty_eff=2) = 1
         assert count == 1
-        assert effective == 2
-        assert not degraded
+        assert effective == 1
+        assert degraded
 
 
 class TestDegradationFailureType:
     """失败类型区分：unreachable vs empty 各走独立计数器。"""
 
     def test_empty_data_higher_threshold(self):
-        """T2 连续 3 次 empty，不降级。"""
+        """T2 empty（base=3）比 unreachable（base=2）需要更多失败才降级。"""
+        tracker = DegradationTracker()
+        # fresh cache 下 unreachable_eff=3, empty_eff=4
+        # 2 次 empty：count=2 < 4 → 不降级
+        for _ in range(2):
+            tracker.record("test_source", "T2", success=False,
+                            failure_type="empty",
+                            cache_age_hours=12, cache_ttl_hours=24)
+        # 第 3 次仍小于 empty 有效阈
+        degraded, count, effective = tracker.record(
+            "test_source", "T2", success=False,
+            failure_type="empty",
+            cache_age_hours=12, cache_ttl_hours=24,
+        )
+        # empty_count=3 < empty_eff=4 → 不降级
+        assert count == 3
+        assert not degraded
+        # 而 3 次 unreachable 在此环境下会降级（unreachable_eff=3）
+        for _ in range(2):
+            tracker.record("test_source2", "T2", success=False,
+                            failure_type="unreachable",
+                            cache_age_hours=12, cache_ttl_hours=24)
+        degraded2, count2, _ = tracker.record(
+            "test_source2", "T2", success=False,
+            failure_type="unreachable",
+            cache_age_hours=12, cache_ttl_hours=24,
+        )
+        assert count2 == 3
+        assert degraded2
+
+    def test_empty_data_reaches_threshold(self):
+        """T2 连续 4 次 empty，新鲜缓存 → 第 4 次降级（base=3, fresh+1=4）。"""
         tracker = DegradationTracker()
         for _ in range(3):
             tracker.record("test_source", "T2", success=False,
                             failure_type="empty",
                             cache_age_hours=12, cache_ttl_hours=24)
-        # 第 4 次：count=4 < 新鲜阈=6 → 不降级
         degraded, count, effective = tracker.record(
             "test_source", "T2", success=False,
             failure_type="empty",
             cache_age_hours=12, cache_ttl_hours=24,
         )
+        # empty_count=4 ≥ empty_eff=4 → 降级
         assert count == 4
-        assert not degraded
-
-    def test_empty_data_reaches_threshold(self):
-        """T2 连续 6 次 empty，新鲜缓存 → 第 6 次降级。"""
-        tracker = DegradationTracker()
-        for _ in range(5):
-            tracker.record("test_source", "T2", success=False,
-                            failure_type="empty",
-                            cache_age_hours=12, cache_ttl_hours=24)
-        degraded, count, effective = tracker.record(
-            "test_source", "T2", success=False,
-            failure_type="empty",
-            cache_age_hours=12, cache_ttl_hours=24,
-        )
-        # T2 empty base=5, fresh cache +1 = 6, count=6 → 降级
-        assert count == 6
         assert degraded
 
     def test_mixed_failure_types_separate_counters(self):
@@ -217,18 +257,18 @@ class TestDegradationFailureType:
             tracker.record("test_source", "T2", success=False,
                             failure_type="empty",
                             cache_age_hours=12, cache_ttl_hours=24)
-        # unreachable=2 < 新鲜阈=4, empty=3 < 新鲜阈=6 → 都不降级
+        # unreachable=2 < 新鲜有效阈=3, empty=3 < 新鲜有效阈=4 → 都不降级
         counts = tracker.get_counts("test_source")
         assert counts["unreachable"] == 2
         assert counts["empty"] == 3
-        # 第 2 次 unreachable
+        # 第 3 次 unreachable（独立计数器，不受 empty 影响）
         degraded, _, _ = tracker.record(
             "test_source", "T2", success=False,
             failure_type="unreachable",
             cache_age_hours=12, cache_ttl_hours=24,
         )
-        # unreachable=3 < 4 → 仍不降级
-        assert not degraded
+        # unreachable=3 ≥ 新鲜有效阈=3 → 降级（empty=3 未达自身阈值但独立不影响）
+        assert degraded
 
     def test_success_resets_all_counters(self):
         """任何失败类型成功后，所有计数器全部归零。"""
@@ -315,14 +355,14 @@ class TestDegradationPersistence:
         # 将会话1抛弃，模拟重启
         import json
         state = json.loads(p.read_text(encoding="utf-8"))
-        # 把时间戳改到 100 天前（超过 stale_days=1）
+        # 把时间戳改到极旧（超过 stale_days=3）
         old_ts = 1000000.0
         state["src_a"] = old_ts
         p.write_text(json.dumps(state), encoding="utf-8")
         # 会话 2：加载旧状态，检测到陈旧
         t2 = DegradationTracker(persist_path=str(p))
-        # 一次失败 + 无缓存 → 本应走自适应调节阈值-1（T2 base=3→2）
-        # 但持久化时间戳 100 天前 > stale_days 1d → 信号2应触发
+        # 一次失败 + 无缓存 → 自适应调节阈值-1（T2 base=2→1）
+        # 而持久化时间戳 56 年前 > stale_days 3d → 信号2应触发
         degraded, _, _ = t2.record(
             "src_a", "T2", success=False,
             failure_type="unreachable",
