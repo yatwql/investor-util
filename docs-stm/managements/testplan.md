@@ -243,14 +243,8 @@
 > **pytest marker 对照：** §1.3 场景 → `scenario_basic`/`scenario_resilience`/`scenario_llm`；
 > §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）。
 
-**覆盖状态汇总：**
 
-| 覆盖状态 | 数量 | 说明 |
-|:---------|:----:|:-----|
-| ✅ 已覆盖 | 全量已覆盖 + 新增 34 项 | 全量业务场景 S0a-S0d + S1-S33 + T1-T21 + resilience + LLM — 精确项数见 [test-coverage.md](./test-coverage.md) → 场景测试分组；新增测试覆盖打印样式/首次运行引导/占位文本区分/日志分级/数字格式/错误隔离语义/新闻流水线 |
-| **合计** | **全量已覆盖（34 项新增）** | 含 §1.3（S0a-S0d + S1-S28）+ §1.7（T1-T21）全量场景已覆盖，§1.6 异常场景由 edge 专项覆盖；v0.3.0 新增 7 个测试文件/类共 34 项 |
 
----
 > edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。
 
 ### 1.9 边缘测试文件隔离规范（强制）
