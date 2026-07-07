@@ -473,22 +473,34 @@ def _render_penetration_section(
     if not pen_result or not pen_result.get("top10"):
         return pen_result, True, True
 
-    # 加载盈利预测和股息率（同 Excel 端 penetration_sheet 逻辑）
+    # 加载盈利预测（独立 try）
     profit_success = True
-    dividend_success = True
+    profit_forecast: dict[str, dict] = {}
     try:
-        from src.python.providers.akshare_extras import get_profit_forecast, get_dividend_data
-        from src.python.code_utils import is_a_share_code
-
+        from src.python.providers.akshare_extras import get_profit_forecast
         profit_forecast = get_profit_forecast()
+        if not profit_forecast:
+            profit_success = False
+            logger.warning("[penetration] 盈利预测数据为空（API 返回空结果），EPS 列将显示 --")
+    except Exception:
+        profit_success = False
+        logger.warning("[penetration] 盈利预测加载异常（非关键），EPS 列显示 --", exc_info=True)
+
+    # 加载股息率（独立 try）
+    dividend_success = True
+    dividend_data: dict[str, dict] = {}
+    try:
+        from src.python.providers.akshare_extras import get_dividend_data
+        from src.python.code_utils import is_a_share_code
         all_codes = list(set().union(*(e.get("codes", []) for e in pen_result["top10"])))
         a_codes = [c for c in all_codes if is_a_share_code(c)]
         dividend_data = get_dividend_data(a_codes) if a_codes else {}
+        if not dividend_data and a_codes:
+            dividend_success = False
+            logger.warning("[penetration] 股息率数据为空（API 返回空结果）")
     except Exception:
-        profit_forecast, dividend_data = {}, {}
-        profit_success = False
         dividend_success = False
-        logger.debug("盈利预测/股息率加载失败（非关键）", exc_info=True)
+        logger.warning("[penetration] 股息率加载异常（非关键），股息率列显示 --", exc_info=True)
 
     for entry in pen_result["top10"]:
         codes = entry.get("codes", [])
