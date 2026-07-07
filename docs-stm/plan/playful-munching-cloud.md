@@ -759,24 +759,22 @@ def _write_manager_sheet(ws, manager_data):
 
 | 文件 | 占位条件 | 占位文本 |
 |:-----|:---------|:---------|
-| `report/fund_manager_sheet.py` | 结果列表为空 | 通过 `DegradationTracker.record("manager", "T4", ...)` 判断后显示占位 |
+| `report/fund_manager_sheet.py` | 结果列表为空 | 直接判空后显示占位（见下方设计说明）|
 | `report/overlap_matrix.py` / `fund_overlap_sheet.py` | 基金数 < 2 或持仓全空 | 同上 |
 | `report/concentration_sheet.py` | 结果列表为空 | 同上 |
 | `report/fund_style_sheet.py` | 结果列表为空 | 同上 |
 | `report/html_writer.py` | `_render_*` 对应占位检测 | 与 Excel 端一致 |
 
-> **B 系列均为 T4：** 阈值=1（立即降级），无缓存数据，因此 `record()` 的缓存年龄传 None。`DegradationTracker` 对 T4 无缓存的默认行为是：
-> - 信号 1：有效阈= max(1, 1-1) = 1 → 第一次失败即降级（与之前行为一致）
-> - B 系列 T4 模块阈值设计的整体逻辑同上。如果后续某模块被调整为 T3 或 T2，阈值相应改变。
+> **设计决策：跳过 DegradationTracker。** B 系列 4 模块均为 T4 且无缓存数据，`record()` 的实际效果等价于 `if not data`（T4 默认有效阈=1，无缓存自适应惩罚后仍为 1）。直接 `if not data` 判空避免了不必要的导入和调用，语义同样清晰。如果后续某模块调整为 T3/T2 或有了缓存，再恢复 `DegradationTracker.record()` 调用。
 
 ### 验收标准
 
 - [ ] 4 个模块在数据为空时不再隐藏页签，而是调用 `_write_placeholder()` 在页签中央显示占位文本
 - [ ] 占位文本来自 `STATUS_MESSAGES` 常量，非硬编码字符串
 - [ ] 页签标题和结构完整保留（用户能看到页签标签）
-- [ ] 每个模块通过 `DegradationTracker.record(source_key, "T4", ...)` 判断是否降级
-- [ ] 新闻模块（T4）通过 `DegradationTracker` 阈值判断（T4=1，pipeline 计算源的状态）后显示占位
-- [ ] 预警模块（T4）通过跟踪子源的 cumulative 状态判断
+- [ ] 空数据判空使用 `if not data`（跳过 DegradationTracker，原因见上方设计说明）
+- [ ] （待 D-7b 恢复）新闻模块（T4）通过 `DegradationTracker` 阈值判断后显示占位
+- [ ] （待 D-7b 恢复）预警模块（T4）通过跟踪子源的 cumulative 状态判断
 - [ ] 每条 `_data_status` 失败记录均有紧邻的日志说明具体原因（§2.2.1 双通道协作规则）
 - [ ] HTML 端占位表现与 Excel 端一致
 - [ ] 4+3 条 edge 测试覆盖：每个模块的空数据场景
@@ -864,8 +862,7 @@ pytest src/test/unit/report/ -k "early_warning" -m edge  # 1 条：预警空数�
 
 | 文件 | 改动内容 |
 |:-----|:---------|
-| `test/.../test_html_writer_edge.py` | 消息一致性测试 |
-| `test/.../test_excel_generator_edge.py` | **新建**：全局降级冒烟 |
+| `test/.../test_excel_generator_edge.py` | **新建**：全局降级冒烟 + 消息一致性测试（含 Excel ⚠/ℹ 渲染 vs HTML 宏渲染的结构等价验证）|
 
 ### 验收标准
 
@@ -879,6 +876,15 @@ pytest src/test/unit/report/ -k "early_warning" -m edge  # 1 条：预警空数�
 - **不改任何生产代码**
 - **不改现有测试断言**
 - **不改测试框架配置**
+
+### ⚠️ D-7b 延期影响
+
+D-7b（新闻/预警模块占位）已延期，因此 D-8 的降级测试范围仅限于已实现占位的模块：
+- 指数降级 ✓（summary `_write_data_status_foot`）
+- 穿透数据降级 ✓（penetration `_write_data_status_foot`）  
+- 基金业绩降级 ✓（fund_performance `_write_data_status_foot`）
+- B 系列空态占位 ✓（4 个 `_write_placeholder`）
+- **新闻/预警模块占位尚未实现**，待 D-7b 恢复后补测
 
 ### 验证方法
 

@@ -36,7 +36,7 @@ from src.python.report.market_value import (
 from src.python.report.penetration import compute_penetration_top10
 from src.python.registry import get_llm_module_name, get_llm_module_names, get_report_section_order
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
-from src.python.report.data_status import DataStatus, DataStatusItem, STATUS_MESSAGES
+from src.python.report.data_status import DataStatus
 from src.python.report.summary import _build_index_data_status
 from src.python.report.penetration_sheet import _build_penetration_data_status
 from src.python.report.fund_performance import _build_perf_data_status
@@ -265,10 +265,11 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     section_numbers = {sec["key"]: sec["number"] for sec in order}
 
     raw_data_flags = {
-        "manager_data": bool(manager_analysis and manager_analysis.get("results")),
-        "overlap_data": bool(overlap_matrix and overlap_matrix.get("funds") and len(overlap_matrix.get("funds", [])) >= 2),
-        "concentration_data": bool(concentration_analysis and concentration_analysis.get("results")),
-        "style_data": bool(style_analysis and style_analysis.get("results")),
+        # B 系列：返回非 None = 模块已启用 → section 始终可见（空数据时显示占位）
+        "manager_data": manager_analysis is not None,
+        "overlap_data": overlap_matrix is not None,
+        "concentration_data": concentration_analysis is not None,
+        "style_data": style_analysis is not None,
         "include_news": include_news,
         "early_warnings": bool(early_warnings),
         "llm_enabled": llm_enabled_flag,
@@ -526,8 +527,8 @@ def _render_penetration_section(
         eps_text = "--"
         for c in codes:
             info = profit_forecast.get(c)
-            if info and info.get("eps_2025e") is not None:
-                eps_text = f"¥{info['eps_2025e']:.2f}"
+            if info and info.get("eps_2026e") is not None:
+                eps_text = f"¥{info['eps_2026e']:.2f}"
                 break
         entry["eps_text"] = eps_text
         # 股息率
@@ -626,7 +627,7 @@ def _render_overlap_matrix(
         return result
     except Exception as e:
         logger.warning("持仓重合度矩阵计算失败: %s", e)
-        return None
+        return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
 
 
 def _render_concentration(

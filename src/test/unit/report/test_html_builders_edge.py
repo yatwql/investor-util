@@ -73,7 +73,7 @@ class TestCoverageTextEdge(unittest.TestCase):
 
     def test_reports_is_zero(self):
         """研报数为 0 → "--"。"""
-        result = self.fn("000001", {"000001": {"reports": 0, "eps_2025e": 1.23}})
+        result = self.fn("000001", {"000001": {"reports": 0, "eps_2026e": 1.23}})
         self.assertEqual(result, "--")
 
 

@@ -16,6 +16,7 @@
         .section { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
         .section-title { background: #2E75B6; color: #fff; padding: 12px 20px; font-size: 16px; font-weight: 600; }
         .section-content { padding: 16px 20px; }
+        .report-footer { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
 
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
         th { background: #f0f4f8; padding: 8px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #ddd; white-space: nowrap; }
@@ -45,6 +46,7 @@
         .gray-text { color: #888; }
         .notice-banner { background: #E3F2FD; border-left: 4px solid #1976D2; padding: 10px 14px; font-size: 13px; border-radius: 4px; }
         .summary-tag { font-size: 13px; color: #555; }
+        .empty-section { padding: 24px 16px; text-align: center; color: #888; font-size: 14px; background: #fafafa; border: 1px dashed #ddd; border-radius: 6px; margin: 8px 0; }
         .heatmap-matrix { border-collapse: collapse; }
         .heatmap-matrix th, .heatmap-matrix td { border: 1px solid #ccc; padding: 4px 8px; text-align: center; font-size: 12px; }
         .heatmap-matrix th { background: #f5f5f5; font-weight: 600; }
@@ -136,6 +138,7 @@
             .section { margin-bottom: 14px; border-radius: 6px; }
             .section-title { font-size: 14px; padding: 10px 12px; }
             .section-content { padding: 8px 10px; }
+            .report-footer { margin-bottom: 14px; border-radius: 6px; }
 
             /* 表格横向滚动 + 阴影提示 */
             .section { position: relative; }
@@ -203,6 +206,7 @@
             .container { max-width: 100%; padding: 0; }
             .section { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
             .section-content { padding: 8px 12px; }
+            .report-footer { box-shadow: none; border: 1px solid #ccc; }
 
             /* 隐藏屏幕交互元素 */
             .back-to-top,
@@ -611,6 +615,7 @@
     <div class="section" id="sec-fund_manager" style="order: {{ section_numbers['fund_manager'] }};">
         <div class="section-title">{{ section_numbers['fund_manager'] }}、基金经理变更监控</div>
         <div class="section-content">
+            {% if manager_analysis["results"] %}
             {% if manager_analysis.get("first_check_summary") %}
             <div class="notice-banner">📋 {{ manager_analysis["first_check_summary"] }}</div>
             <br>
@@ -649,6 +654,9 @@
             <div class="penetration-notes">
                 <div>* 预警级别标准：30天内变更→🔴紧急，90天内→⚠️关注，首次运行→📋首检（自下次起跟踪）</div>
             </div>
+            {% else %}
+            <div class="empty-section">📭 暂无基金经理变更数据（本次分析未检测到基金经理任职未满180天）</div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -658,12 +666,13 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_overlap") %}
     {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
-    {% set _funds = overlap_matrix["funds"] %}
-    {% set _matrix = overlap_matrix["matrix"] %}
+    {% set _funds = overlap_matrix.get("funds", []) %}
+    {% set _matrix = overlap_matrix.get("matrix", []) %}
     {% set _pairs = overlap_matrix.get("pairs", []) %}
     <div class="section" id="sec-fund_overlap" style="order: {{ section_numbers['fund_overlap'] }};">
         <div class="section-title">{{ section_numbers['fund_overlap'] }}、持仓重合度矩阵</div>
         <div class="section-content">
+            {% if _funds and _pairs %}
             <div class="summary-tag" style="margin-bottom: 8px;">
                 📊 <strong>{{ _funds | length }}</strong> 只基金，共 <strong>{{ _pairs | length }}</strong> 对组合
             </div>
@@ -752,6 +761,9 @@
                 </tbody>
             </table>
             {% endif %}
+            {% else %}
+            <div class="empty-section">📭 暂无重合度数据（需要至少 2 只基金持仓方可计算持仓重合度矩阵）</div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -764,6 +776,7 @@
     <div class="section" id="sec-fund_concentration" style="order: {{ section_numbers['fund_concentration'] }};">
         <div class="section-title">{{ section_numbers['fund_concentration'] }}、持仓集中度监控</div>
         <div class="section-content">
+            {% if conc_results %}
             {% set high_risk = conc_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
             {% if high_risk %}
             <div class="summary-tag" style="margin-bottom: 8px;">
@@ -812,6 +825,9 @@
             <div class="penetration-notes">
                 <div>* 环比变化 >+20% → 🔴 紧急，>+10% → ⚠️ 关注，前10占比 >80% → ⚠️ 关注</div>
             </div>
+            {% else %}
+            <div class="empty-section">📭 暂无持仓集中度数据（未检测到基金持仓或 API 返回为空）</div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -824,6 +840,7 @@
     <div class="section" id="sec-fund_style" style="order: {{ section_numbers['fund_style'] }};">
         <div class="section-title">{{ section_numbers['fund_style'] }}、基金风格分析</div>
         <div class="section-content">
+            {% if style_results %}
             {% set drifted = style_results | selectattr("drift_level", "in", ["轻度", "中度", "严重"]) | list %}
             {% if drifted %}
             <div class="summary-tag" style="margin-bottom: 8px;">
@@ -860,6 +877,9 @@
                 <div>* 漂移评分 = 网格曼哈顿距离（size差 + style差，0~4）</div>
                 <div>* 轻度(1分) / 中度(2分) / 严重(≥3分) — 首次运行记录基线，基准确立中</div>
             </div>
+            {% else %}
+            <div class="empty-section">📭 暂无基金风格分析数据（未检测到基金持仓或 API 返回为空）</div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -1274,7 +1294,7 @@
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  FOOTER                                                -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section" style="text-align: center; padding: 14px 20px; color: #999; font-size: 12px;">
+    <div class="report-footer" style="text-align: center; padding: 14px 20px; color: #999; font-size: 12px;">
         个人投资分析报告 v{{ app_version }} | 生成时间: {{ now }}
     </div>
 

@@ -293,15 +293,12 @@ def _write_b_series_sheets(
             prog.add_error("基金经理变更监控数据获取失败")
             manager_data = None
 
-        if manager_data:
-            try:
-                modules.get("write_fund_manager_sheet")(ws13, manager_data)
-                prog.ok("基金经理变更监控页签写入完成")
-            except Exception as e:
-                logger.warning("基金经理变更监控页签写入失败: %s", e)
-                prog.add_error("基金经理变更监控页签写入失败")
-        else:
-            logger.info("基金深度分析：无基金持仓，跳过基金经理变更监控")
+        try:
+            modules.get("write_fund_manager_sheet")(ws13, manager_data or [])
+            prog.ok("基金经理变更监控页签写入完成")
+        except Exception as e:
+            logger.warning("基金经理变更监控页签写入失败: %s", e)
+            prog.add_error("基金经理变更监控页签写入失败")
 
     # 14. 持仓重合度矩阵
     compute_overlap = modules.get("compute_overlap_matrix")
@@ -350,13 +347,12 @@ def _write_b_series_sheets(
             logger.warning("持仓重合度矩阵数据获取/计算失败: %s", e)
             prog.add_error("持仓重合度矩阵数据获取失败")
 
-        if overlap_result:
-            try:
-                write_overlap(ws14, overlap_result, fund_names=fund_names)
-                prog.ok("持仓重合度矩阵页签写入完成")
-            except Exception as e:
-                logger.warning("持仓重合度矩阵页签写入失败: %s", e)
-                prog.add_error("持仓重合度矩阵页签写入失败")
+        try:
+            write_overlap(ws14, overlap_result or {}, fund_names=fund_names)
+            prog.ok("持仓重合度矩阵页签写入完成")
+        except Exception as e:
+            logger.warning("持仓重合度矩阵页签写入失败: %s", e)
+            prog.add_error("持仓重合度矩阵页签写入失败")
 
     # 15. 持仓集中度监控
     compute_conc = modules.get("compute_concentration")
@@ -393,13 +389,12 @@ def _write_b_series_sheets(
             logger.warning("持仓集中度数据获取/计算失败: %s", e)
             prog.add_error("持仓集中度数据获取失败")
 
-        if conc_data:
-            try:
-                write_conc(ws15, conc_data)
-                prog.ok("持仓集中度监控页签写入完成")
-            except Exception as e:
-                logger.warning("持仓集中度监控页签写入失败: %s", e)
-                prog.add_error("持仓集中度监控页签写入失败")
+        try:
+            write_conc(ws15, conc_data or [])
+            prog.ok("持仓集中度监控页签写入完成")
+        except Exception as e:
+            logger.warning("持仓集中度监控页签写入失败: %s", e)
+            prog.add_error("持仓集中度监控页签写入失败")
 
     # 16. 基金风格分析
     analyze_style = modules.get("analyze_style_for_all_funds")
@@ -436,13 +431,12 @@ def _write_b_series_sheets(
             logger.warning("基金风格分析数据获取/计算失败: %s", e)
             prog.add_error("基金风格分析数据获取失败")
 
-        if style_result and style_result.get("results"):
-            try:
-                write_style(ws16, style_result["results"])
-                prog.ok("基金风格分析页签写入完成")
-            except Exception as e:
-                logger.warning("基金风格分析页签写入失败: %s", e)
-                prog.add_error("基金风格分析页签写入失败")
+        try:
+            write_style(ws16, (style_result or {}).get("results", []))
+            prog.ok("基金风格分析页签写入完成")
+        except Exception as e:
+            logger.warning("基金风格分析页签写入失败: %s", e)
+            prog.add_error("基金风格分析页签写入失败")
 
 
 def _write_llm_section_and_usage(

@@ -282,6 +282,10 @@ def get_cache_age_by_data_type(data_type: str, identifier: str | None = None) ->
     从 registry 查找数据类型的缓存前缀，拼接 identifier 组成完整键名。
     适用于前缀+代码/标识符结构的缓存键（如 ``"index_sh000001"``）。
 
+    特殊处理：
+      - ``"profit_forecast"``：缓存键含动态指数指纹，无需 identifier，
+        内部委托给 :func:`get_profit_forecast_cache_key` 获取键名。
+
     Args:
         data_type: registry 中注册的数据类型，如 ``"index"``
         identifier: 拼接在缓存前缀后的标识符，
@@ -290,6 +294,11 @@ def get_cache_age_by_data_type(data_type: str, identifier: str | None = None) ->
     Returns:
         缓存年龄（秒），无缓存或类型未注册时返回 None
     """
+    # 特殊处理：profit_forecast 使用动态指纹，不走 prefix+identifier 模式
+    if data_type == "profit_forecast":
+        from src.python.providers.akshare_extras import get_profit_forecast_cache_key
+        return get_cache_age(get_profit_forecast_cache_key())
+    # 标准路径：prefix + identifier
     from src.python.registry import get_registry  # 延迟导入避免循环依赖
     for module in get_registry():
         if module.data_type == data_type and identifier is not None and module.cache_prefixes:

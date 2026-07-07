@@ -509,12 +509,12 @@ class TestCrossModuleCacheConsistency(unittest.TestCase):
         # 先写入缓存，再调用 fetch_market_data 应直接命中缓存
         cache_set(cache_key, cached_data)
 
-        with (
-            patch("src.python.providers.tencent.fetch_price",
-                  return_value=None),
-            patch("src.python.providers.eastmoney.fetch_nav",
-                  return_value=None),
-        ):
+        # 注意：_PRICE_PROVIDERS 在 import 时捕获了 provider 函数对象直接引用，
+        # 通过 patch("src.python.providers.tencent.fetch_price") 等方式无法拦截。
+        # 此处 mock _price_cache_fresh 使缓存数据直接生效，避免因 price_date
+        # 早于最近交易日而触发的跨日重取。
+        with patch("src.python.fetcher.price._price_cache_fresh",
+                    return_value=True):
             result = fetch_market_data("600519", "贵州茅台")
 
         self.assertIsNotNone(result)

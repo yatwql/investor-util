@@ -156,7 +156,7 @@ def get_profit_forecast() -> dict[str, dict]:
       指数变化 → 指纹改变 → 缓存键不同 → 自动取新数据
 
     Returns:
-        {code: {name, reports, eps_2025e, eps_2026e, buy, sell}, ...}
+        {code: {name, reports, eps_2026e, eps_2027e, buy, sell}, ...}
         失败时返回空 dict
     """
     # ── 内存缓存 ──
@@ -199,7 +199,6 @@ def get_profit_forecast() -> dict[str, dict]:
             result[code] = {
                 "name": str(row.get("名称", "") or "").strip(),
                 "reports": int(row.get("研报数", 0) or 0),
-                "eps_2025e": _safe_float(row.get("2025预测每股收益")),
                 "eps_2026e": _safe_float(row.get("2026预测每股收益")),
                 "eps_2027e": _safe_float(row.get("2027预测每股收益")),
                 "buy": int(row.get("机构投资评级(近六个月)-买入", 0) or 0),

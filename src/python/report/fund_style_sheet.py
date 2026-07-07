@@ -13,7 +13,9 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
+    _write_placeholder,
     auto_width,
     freeze_header,
     write_data_row,
@@ -65,6 +67,13 @@ def write_style_sheet(
     _name = get_report_sheet_name('fund_style')
     write_title_row(ws, 1, f"16. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
+
+    if not style_data:
+        _write_placeholder(ws, STATUS_MESSAGES["style_unavailable"], row=4, max_cols=_NCOLS)
+        freeze_header(ws, row=2)
+        auto_width(ws)
+        logger.info("基金风格分析：无数据，写入占位")
+        return
 
     for i, item in enumerate(style_data, start=3):
         drift_level = item.get("drift_level", "")

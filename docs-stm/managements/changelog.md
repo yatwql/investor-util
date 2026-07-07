@@ -6,9 +6,19 @@
 
 ## [0.2.90] - 2026-07-07
 
+### Added
+
+- **D-7a：B 系列模块空态占位** — 基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析 4 模块在数据为空时不再隐藏页签，改为显示占位文本（来自 `STATUS_MESSAGES` 常量）。`excel_generator.py` 中 B 系列 4 模块改为无条件调用 sheet 写入函数（空数据由 sheet 层自行判断写占位）。HTML 模板同步新增 `empty-section` CSS 类 + 4 模块有条件渲染占位块。
+- **D-8：全链路回归基线锁定** — 新增 `test_excel_generator_edge.py`（全局降级冒烟 2 条 + 消息一致性 8 条测试）、`test_fund_bseries_sheet_edge.py`（B 系列 4 模块空数据占位 6 条测试），覆盖所有降级路径的消息一致性验证。
+
 ### Fixed
 
+- **`llm_max_concurrency` 配置键未注册**：`llm_settings.json` 中的 `llm_max_concurrency` 键未在 `get_known_llm_settings_keys()` 中登记，导致 `test_all_keys_tracked` 断言失败。修复：在 `registry.py` 的全局键名集合中加入 `"llm_max_concurrency"`。
+- **缓存测试 `test_cache_sharing_between_fetcher_and_market_value` 跨日新鲜度校验干扰**：`_price_cache_fresh` 因 `price_date` 早于交易日判定跨日残留并清空缓存，导致 patch provider 不生效（`_PRICE_PROVIDERS` 持有 import 时的函数对象直接引用）。修复：改用 mock `_price_cache_fresh` 返回 True 直接命中缓存。
 - **基金风格分析 `UnboundLocalError`**：`_tencent_failures` 模块级变量在 `classify_fund_style` 内被赋值（`+=1`/`=0`）但缺少 `global` 声明，导致首次 push2 请求失败→触发 Tencent 备用链路时报 `cannot access local variable '_tencent_failures'`。修复：添加 `global _tencent_failures` 声明。
+- **HTML 结构测试 7 条已存在失败（D-8 修复）**：`report_template.html` 页脚 div 使用 `class="section"` 导致 `div.section` 选择器匹配 17 个元素（期望 16），尾部 section 缺 id/order 属性触发 HTML 结构验证失败。修复：页脚 div `class="section"` → `class="report-footer"`，新增 `.report-footer` CSS 类（base/mobile/print 三段式），使其不被 `div.section` 选择器匹配。
+- **基金风格分析 3 条测试已存在失败（D-8 修复）**：`TestClassifyFundStyle` 中 `test_push2_fallback_to_tencent`/`test_weighted_style`/`test_with_push2_data` 因 `_ext_memo` 模块级缓存污染跨测试用例而失败——`test_no_push2_fallback_code` 先运行并缓存 `"600519": None`，后续测试读取缓存结果而非执行 mock 函数，导致 `is_estimated` 断言不符。修复：`TestClassifyFundStyle.setUp()` 中添加 `_ext_memo.clear()`。
+- **回归测试 2 条因价格缓存新鲜度校验引发失败**：`test_datetime_scenarios.py::TestFetchMarketDataMarketAware` 中 `test_fetch_price_calls_get_ttl`/`test_get_ttl_called_with_price` 断言 `get_ttl("price")` 仅调用 1 次，但 v0.2.89 新增 `_price_cache_fresh` 跨日残留检测在缓存无 `price_date` 时触发第二次 `get_ttl("price")` 调用。修复：断言改为 `call_count=2` + `assert_any_call("price")`。
 
 ## [0.2.89] - 2026-07-06
 

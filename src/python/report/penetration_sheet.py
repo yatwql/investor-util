@@ -53,7 +53,7 @@ def _get_eps_text(forecast: dict, codes: list[str]) -> str:
     for code in codes:
         info = forecast.get(code)
         if info:
-            eps = info.get("eps_2025e")
+            eps = info.get("eps_2026e")
             if eps is not None:
                 return f"¥{eps:.2f}"
     return "--"

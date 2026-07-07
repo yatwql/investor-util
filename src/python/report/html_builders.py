@@ -123,7 +123,7 @@ def _coverage_text(code: str, profit_forecast: dict[str, Any]) -> str:
     info = profit_forecast.get(code)
     if info:
         reports = info.get("reports", 0)
-        eps = info.get("eps_2025e")
+        eps = info.get("eps_2026e")
         if reports and eps is not None:
             return f"{reports}家研报 EPS¥{eps:.2f}"
         elif reports:

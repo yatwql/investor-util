@@ -20,7 +20,14 @@ from typing import Any
 from openpyxl.styles import PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.report.excel_writer import auto_width, write_data_row, write_header_row, write_title_row
+from src.python.report.data_status import STATUS_MESSAGES
+from src.python.report.excel_writer import (
+    _write_placeholder,
+    auto_width,
+    write_data_row,
+    write_header_row,
+    write_title_row,
+)
 from src.python.registry import get_report_sheet_name, set_sheet_title
 
 logger = logging.getLogger("invest")
@@ -77,9 +84,9 @@ def write_overlap_matrix_sheet(
     write_title_row(ws, 1, f"14. {_name}", ncols=n + 2)
 
     if n < 2:
-        write_data_row(ws, 2, ["无可比较的基金（至少需要 2 只基金）"])
+        _write_placeholder(ws, STATUS_MESSAGES["overlap_unavailable"], row=3, max_cols=8)
         auto_width(ws)
-        logger.info("持仓重合度矩阵：基金数 < 2，仅输出提示")
+        logger.info("持仓重合度矩阵：基金数 < 2，写入占位")
         return
 
     row = 2  # 当前行号

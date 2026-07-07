@@ -813,8 +813,10 @@ class TestFetchMarketDataMarketAware(unittest.TestCase):
         from src.python.fetcher.price import fetch_market_data
         fetch_market_data("600900", "长江电力")
 
-        mock_get_ttl.assert_called_once_with("price")
-        # _fetch_with_fallback 被调用时 cache_ttl 参数为 30
+        # v0.2.89 新增价格缓存新鲜度校验，两次调用：首次获取 + 跨日刷新
+        self.assertEqual(mock_get_ttl.call_count, 2)
+        mock_get_ttl.assert_any_call("price")
+        # _fetch_with_fallback 第二次（刷新）调用时 cache_ttl 参数为 30
         call_kwargs = mock_fetch.call_args[1]
         self.assertEqual(call_kwargs["cache_ttl"], 30)
 
@@ -828,7 +830,9 @@ class TestFetchMarketDataMarketAware(unittest.TestCase):
         from src.python.fetcher.price import fetch_market_data
         fetch_market_data("003095")
 
-        mock_get_ttl.assert_called_once_with("price")
+        # v0.2.89 新增价格缓存新鲜度校验，两次调用
+        self.assertEqual(mock_get_ttl.call_count, 2)
+        mock_get_ttl.assert_any_call("price")
 
 
 # ═══════════════════════════════════════════════════════════

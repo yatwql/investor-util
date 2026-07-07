@@ -100,8 +100,8 @@ class TestRenderPenetrationSection(unittest.TestCase):
                                       return_value=mock_top10))
             stack.enter_context(patch("src.python.providers.akshare_extras.get_profit_forecast",
                                       return_value={
-                                          "600900": {"eps_2025e": 1.23},
-                                          "600519": {"eps_2025e": 58.5},
+                                          "600900": {"eps_2026e": 1.23},
+                                          "600519": {"eps_2026e": 58.5},
                                       }))
             stack.enter_context(patch("src.python.providers.akshare_extras.get_dividend_data",
                                       return_value={
@@ -321,6 +321,126 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
         # 基金业绩状态正常保留，不受穿透异常影响
         self.assertIn("benchmark", kwargs["data_status_perf"])
         self.assertFalse(kwargs["data_status_perf"]["benchmark"]["available"])
+
+
+# ============================================================
+#  B 系列模块空态占位（D-7a）
+# ============================================================
+
+
+class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
+    """B 系列模块在 enable_b_series=True 且数据为空时 → section 可见 + 占位文本。"""
+
+    def setUp(self):
+        self.holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]
+        self._tmp = tempfile.mkdtemp(prefix="test_html_bs_")
+        self.detail = MagicMock()
+        self.detail.market_value = 1000.0
+        self.detail.cost = 500.0
+        self.detail.profit = 500.0
+        self.detail.today_profit = 50.0
+        self.detail.name = "长江电力"
+        self.detail.code = "600900"
+        self.detail.price = 55.0
+        self.detail.yesterday_close = 54.0
+        self.detail.profit_rate = 1.0
+        self.detail.source = "腾讯"
+        self.detail.price_type = "实时"
+        self.detail.premium = ""
+        self.detail.shares = 100
+        self.detail.cost_price = 50.0
+        self.detail.nav_date = ""
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _make_b_series_mocks(self, stack):
+        """mock 标准依赖 + 4 个 B 系列 _render_* 返回空数据。"""
+        stack.enter_context(patch("src.python.report.html_writer._generate_details",
+                                   return_value=[self.detail]))
+        stack.enter_context(patch("src.python.report.html_writer.fetch_indices",
+                                   return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
+        stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
+                                   return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
+        stack.enter_context(patch("src.python.report.html_writer._build_category_data",
+                                   return_value={}))
+        stack.enter_context(patch("src.python.report.html_writer.price_update_status",
+                                   return_value=(0, 0, True)))
+        # 穿透 + 基金业绩返回（标准）
+        stack.enter_context(patch(
+            "src.python.report.html_writer._render_penetration_section",
+            return_value=({"top10": [], "summary": {}, "industry_success": False}, False, True),
+        ))
+        stack.enter_context(patch(
+            "src.python.report.html_writer._render_fund_performance_section",
+            return_value=([], True),
+        ))
+        # 4 个 B 系列模块返回空数据
+        stack.enter_context(patch(
+            "src.python.report.html_writer._render_manager_analysis",
+            return_value={"results": [], "first_check_summary": None},
+        ))
+        stack.enter_context(patch(
+            "src.python.report.html_writer._render_overlap_matrix",
+            return_value={"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False},
+        ))
+        stack.enter_context(patch(
+            "src.python.report.html_writer._render_concentration",
+            return_value={"results": []},
+        ))
+        stack.enter_context(patch(
+            "src.python.report.html_writer._render_style_analysis",
+            return_value={"results": []},
+        ))
+        # data_status 构建（标准）
+        stack.enter_context(patch("src.python.report.html_writer._build_index_data_status",
+                                   return_value={}))
+        stack.enter_context(patch("src.python.report.html_writer._build_penetration_data_status",
+                                   return_value={}))
+        stack.enter_context(patch("src.python.report.html_writer._build_perf_data_status",
+                                   return_value={}))
+        # 模板
+        tmpl = MagicMock()
+        tmpl.render.return_value = "<html>ok</html>"
+        stack.enter_context(patch("src.python.report.html_writer._ENV.get_template",
+                                   return_value=tmpl))
+        return tmpl
+
+    def test_all_bseries_sections_visible_when_empty(self):
+        """B 系列 4 模块全部返回空数据 → 4 个 section 均可见（section_visible=True）。"""
+        from src.python.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            self._make_b_series_mocks(stack)
+            write_html_report(self.holdings, include_news=True, output_dir=self._tmp)
+
+        from src.python.report.html_writer import _ENV
+        svis = _ENV.globals.get("section_visible_dict", {})
+        self.assertTrue(svis.get("fund_manager"), "基金经理 section 应可见")
+        self.assertTrue(svis.get("fund_overlap"), "重合度 section 应可见")
+        self.assertTrue(svis.get("fund_concentration"), "集中度 section 应可见")
+        self.assertTrue(svis.get("fund_style"), "风格分析 section 应可见")
+
+    def test_bseries_empty_data_passed_to_template(self):
+        """空数据时 manager_analysis / overlap_matrix / concentration_analysis / style_analysis
+        正确传递给模板且为 dict。"""
+        from src.python.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            tmpl = self._make_b_series_mocks(stack)
+            write_html_report(self.holdings, include_news=True, output_dir=self._tmp)
+
+        _, kwargs = tmpl.render.call_args
+        # 每个 B 系列数据都为 dict（非 None），确保模板不会因 .get("results") 而炸
+        self.assertIsInstance(kwargs.get("manager_analysis"), dict)
+        self.assertIsInstance(kwargs.get("overlap_matrix"), dict)
+        self.assertIsInstance(kwargs.get("concentration_analysis"), dict)
+        self.assertIsInstance(kwargs.get("style_analysis"), dict)
+        # 空数据确认
+        self.assertEqual(kwargs["manager_analysis"]["results"], [])
+        self.assertEqual(kwargs["overlap_matrix"]["funds"], [])
+        self.assertEqual(kwargs["concentration_analysis"]["results"], [])
+        self.assertEqual(kwargs["style_analysis"]["results"], [])
 
 
 if __name__ == "__main__":

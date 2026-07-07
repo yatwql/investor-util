@@ -29,6 +29,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
+# 在每个 TestClassifyFundStyle 测试前清除模块级缓存
+import src.python.report.fund_style_analysis as _fsa_module
+
 import pytest
 
 from src.python.report.fund_style_analysis import (
@@ -190,6 +193,10 @@ class TestDriftLevel(unittest.TestCase):
 
 class TestClassifyFundStyle(unittest.TestCase):
     """classify_fund_style：基金风格判定"""
+
+    def setUp(self):
+        """每个测试前清除模块级 _ext_memo 缓存，避免跨测试污染。"""
+        _fsa_module._ext_memo.clear()
 
     def test_empty_holdings(self):
         """空持仓 → '--'"""

@@ -69,7 +69,7 @@ class TestCoverageText(unittest.TestCase):
 
     def test_reports_and_eps(self):
         """有研报数 + EPS → 格式化文本。"""
-        result = self.fn("000001", {"000001": {"reports": 5, "eps_2025e": 1.23}})
+        result = self.fn("000001", {"000001": {"reports": 5, "eps_2026e": 1.23}})
         self.assertEqual(result, "5家研报 EPS¥1.23")
 
     def test_reports_only(self):
@@ -79,7 +79,7 @@ class TestCoverageText(unittest.TestCase):
 
     def test_eps_is_none_with_reports(self):
         """EPS 为 None 但有研报数 → 显示研报家数。"""
-        result = self.fn("000001", {"000001": {"reports": 2, "eps_2025e": None}})
+        result = self.fn("000001", {"000001": {"reports": 2, "eps_2026e": None}})
         self.assertEqual(result, "2家研报")
 
     def test_no_data(self):
