@@ -343,32 +343,11 @@
 | **P3** | 非 UTC+8 时区运行 | 日期/时间/时区相关变更 | `datetime.now(timezone(hours=8))` 一致 |
 | **P3** | 长假期前后跨日运行 | TTL / market_hours 变更 | 长假后首个交易日恢复正常 |
 
----
 
-## 5. 各迭代测试重点（快速索引）
 
-> 完整变更日志详 `docs-stm/managements/changelog.md`，v0.1.x 详细设计归档至 `docs-stm/archive/archived_plan.0.1.x.md`。
-> 此处仅列近 10 个版本的测试重点作为快速参考。
+## 5. 测试数据与 Mock 策略
 
-| 版本 | 测试重点 |
-|:-----|:---------|
-| v0.2.87 | **B 迭代完成**：基金深度分析 4 模块（基金经理变更监控/重合度矩阵/集中度监控/风格漂移检测）105 项新测试，全量 2454 项 |
-| v0.2.86 | **C-P1b 修复 + 行业数据容错增强**：Excel 页签标题跟随配置；push2 行业数据重试容错 + eastmoney_industry_rest 备用链路；新增 16 项测试 |
-| v0.2.85 | **C 迭代 Phase 1+2**：报告序号可配置注册表 + 配置校验 + Excel 全链路集成；新增 31 项测试 |
-| v0.2.84 | **A5 Phase 1**：pytest-xdist 并行执行，unit 模式 25min→20s（75x），verify 12min→49s（14.7x）；report 模式新增～15s |
-| v0.2.66 | 全量测试计数 2056（scenario 143）、标记污染修复、8 项非场景测试迁至 unit/report/ |
-| v0.2.64 | pytest 标记语义化改造（S1-S10 编号→语义名、`scenario_resilience`、`check-test-markers.py`）、`integration` 标记移除、全量测试 1978 项 |
-| v0.2.63 | 异常场景测试增补（6 个 `_edge.py` 文件共 19 项新测试）、edge 总数 ~39→~86 |
-| v0.2.62 | pytest 标记分层体系（6→28 标记）+ 目录分组搬迁（60 文件）+ 冒烟测试 24 项 + 三级流水线模式系统 + 全量管理文档一致性审阅 |
-| v0.2.61 | datasource-and-folders 表格截断修复 + requirements 缓存前缀修正（文档同步，无测试变更） |
-| v0.2.60 | 文档分拆与全量核对、三文档一致性对齐（文档同步，无测试变更） |
-| v0.2.59 | LLM 全场景组合测试 S11-S20（33 项）、日期/时间场景 T1-T16（61 项）、plan.md/testplan.md 需求同步 |
-| v0.2.58 | 指数双链路 fallback（A股腾讯→新浪、美股新浪→腾讯）、test_fetcher_index 8→13 项 |
----
-
-## 6. 测试数据与 Mock 策略
-
-### 6.1 通用 Mock 约定
+### 5.1 通用 Mock 约定
 
 ```python
 # 所有 mock 使用 unittest.mock.patch，统一路径规则：
@@ -377,7 +356,7 @@
 #   内部 import → patch("src.python.<module>.<symbol>")
 ```
 
-### 6.2 Mock HTTP 请求
+### 5.2 Mock HTTP 请求
 
 所有 `providers/*.py` 测试通过 mock `httpx.Client` 规避真实网络：
 
@@ -395,7 +374,7 @@ def test_fetch_price_normal(self, mock_client_cls):
 > 注意：provider 通过 `http_client.py` 创建 client（`with get_httpx_client() as client:`），
 > 应 mock `httpx.Client` 类的构造，而非直接 mock 模块函数。
 
-### 6.3 Mock LLM API
+### 5.3 Mock LLM API
 
 ```python
 # LLM API 调用统一 mock 入口
@@ -408,7 +387,7 @@ def test_generate_global_macro_cached(self, mock_call):
     assert mock_call.call_count == 1
 ```
 
-### 6.4 Mock 交易日历 & 市场时段
+### 5.4 Mock 交易日历 & 市场时段
 
 ```python
 # 交易日历 — akshare 在 _get_trading_calendar 内部以 "import akshare as ak" 导入
@@ -429,7 +408,7 @@ def test_get_ttl_closed(self, mock_open):
     mock_open.return_value = False  # 盘后/非交易日 → long TTL
 ```
 
-### 6.5 Mock 配置文件
+### 5.5 Mock 配置文件
 
 ```python
 # config.json — get_config() 在不同函数体内导入
@@ -441,7 +420,7 @@ def test_get_ttl_closed(self, mock_open):
 @patch("src.python.llm.api.load_llm_key")
 ```
 
-### 6.6 测试数据构造
+### 5.6 测试数据构造
 
 | 数据类型 | 构造方式 | 说明 |
 |:---------|:---------|:-----|
@@ -454,7 +433,7 @@ def test_get_ttl_closed(self, mock_open):
 | **天天基金 JS** | 模拟 `var data = { ... }` 格式的 JavaScript 变量 | 模拟 pingzhongdata 响应 |
 | **新闻** | `{"title": "...", "content": "..."}` 列表 | 模拟各新闻源返回 |
 
-### 6.7 不应 Mock 的场景
+### 5.7 不应 Mock 的场景
 
 以下场景需要手动运行真实代码（不可 mock）验证：
 
@@ -466,7 +445,7 @@ def test_get_ttl_closed(self, mock_open):
 | 断网降级 | 网络相关变更时 | 真实断网 vs mock 超时的行为差异 |
 | 旧缓存格式兼容 | cache.py 变更时 | 真实旧缓存文件 vs mock 行为差异 |
 
-### 6.8 测试隔离要求
+### 5.8 测试隔离要求
 
 - 测试不操作真实 `data/cache/`，所有缓存操作使用 `tempfile.mkdtemp` 临时目录
 - 测试不写磁盘配置，`config.json` 通过 `os.environ` 或 `tempfile` 隔离
@@ -477,7 +456,7 @@ def test_get_ttl_closed(self, mock_open):
 
 ---
 
-## 7. 验收标准
+## 6. 验收标准
 
 每个迭代完成后必须满足以下条件方可进入下一迭代：
 
@@ -511,14 +490,14 @@ def test_get_ttl_closed(self, mock_open):
 
 ---
 
-## 8. 测试记录
+## 7. 测试记录
 
 测试记录和发现的问题记录在 `docs-stm/managements/changelog.md` 中。
 审查发现的问题（无论是否已修复）记录在 `docs-stm/managements/review-findings.md`。
 
 ---
 
-## 9. 新增测试指南
+## 8. 新增测试指南
 
 新增测试用例时，按以下流程操作：
 
