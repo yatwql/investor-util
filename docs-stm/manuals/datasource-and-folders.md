@@ -229,7 +229,7 @@ investor-util/
 │       │   │   ├── test_reader.py        # 持仓读取 — xlsx 解析/多 worksheet/列校验（11 项）
 │       │   │   ├── test_registry.py      # 中央注册表 — 模块注册/TTL 映射/设置键派生（21 项）
 │       │   │   └── test_registry_edge.py # 注册表异常场景 — 重复注册/不存在的模块/别名冲突
-│       │   └── ui/                       # TUI 测试（147 项）
+│       │   └── ui/                       # TUI 测试（165 项）
 │       │       ├── __init__.py           # 子包标记（空文件）
 │       │       ├── test_tui.py           # 键盘输入 — getch() 跨平台/方向键解析（32 项）
 │       │       ├── test_tui_edge.py      # TUI 异常友好提示 — _print_error_with_hint 7 种异常分类 + 菜单调度异常捕获（18 项 edge）

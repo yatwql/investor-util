@@ -151,9 +151,9 @@
 | **缓存与 API 协同**：缓存命中不调 API，缓存缺失调 API 并写入 | ✅ | `test_cache.py` |
 | **原子写入恢复**：磁盘满/断电后缓存和配置文件完整性 | ✅ | `test_config_atomic.py` |
 | **模块间接口契约**：reader 输出 → market_value 输入 → penetration 输入 → ... 类型链正确 | ✅ | `test_integration_coverage.py` (integration_contract) |
-| **错误隔离**：penetration/LLM/news_correlation 任一模块失败，不阻塞其他模块写入 | ✅ | `test_excel_generator.py` `test_sheet_exception_others_still_called` 验证失败时穿透/市值模块仍被调用 |
+| **错误隔离**：penetration/LLM/news_correlation 任一模块失败，不阻塞其他模块写入 | ✅ | `test_excel_generator.py` `test_sheet_exception_others_still_called` |
 | **LLM 输出→报告渲染**：Markdown → HTML/Jinja2 → 条件段落的渲染链路 | ✅ | `test_llm_scenarios.py` S14/S20（无 LLM 不渲染） |
-| **新闻流水线集成**：fetch_all → aggregate → deduplicate → correlate_with_holdings → write_to_report | ✅ | `test_news_pipeline_edge.py` `test_aggregate_deduplicate_correlate_chain` + `test_correlator_sorts_by_relevance` |
+| **新闻流水线集成**：fetch_all → aggregate → deduplicate → correlate_with_holdings → write_to_report | ✅ | `test_news_pipeline_edge.py` |
 | **多模块缓存一致性**：price 刷新后，market_value / fund_performance 使用同一缓存源 | ✅ | `test_integration_coverage.py` (integration_cache) |
 | **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ✅ | `test_integration_coverage.py` (integration_tui) |
 | **API 联通性验证**：手动运行确认腾讯/东方财富/天天基金 API 实际可调通 | ✅ | 每次迭代人工执行 |
@@ -299,23 +299,23 @@
 | **TUI 菜单** | 14 选项完整、中文字符正常、按键响应正确 | ✅ |
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
-| **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | 🟡 |
+| **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
 | **Excel 页签结构** | 页签编号排序（1.~16.）、冻结首行、列宽自适应 | ✅ |
 | **Excel 盈亏着色** | 正数绿/红色（RGB 正绿/红），覆盖所有盈亏列（本日盈亏/持仓盈亏/收益率） | ✅ |
 | **Excel LLM 状态颜色** | 蓝底=缓存、绿底=成功、红底=失败、灰底=禁用+各色图标 | ✅ |
 | **Excel 取价方式标识** | 蓝色字体标注（实时价/收盘价/官方净值） | ✅ |
 | **Excel 评级颜色** | 5 级评级对应深绿/绿/黄/橙/红，与 HTML 一致 | ✅ |
-| **Excel 数字格式** | 收益率列 % 格式，金额列千分位，小数位数统一 | ✅ | `test_excel_format_edge.py` 7 条断言验证 styles.py 常量 |
+| **Excel 数字格式** | 收益率列 % 格式，金额列千分位，小数位数统一 | ✅ | `test_excel_format_edge.py` |
 | **HTML 渲染** | 浏览器渲染正常、中文无乱码、章节锚点导航 | ✅ |
 | **HTML 响应式布局** | 移动端和桌面端均排版正常 | ✅ |
 | **HTML LLM 条件渲染** | 无 LLM 时整节消失，有 LLM 时显示状态颜色标签 | ✅ |
 | **HTML 评级色** | 深绿/绿/黄/橙/红与 Excel 一致 | ✅ |
-| **HTML 打印样式** | 打印时隐藏导航、展开全部内容、黑白友好 | ✅ | `test_html_template.py` `TestHtmlTemplatePrintStyles` 9 条断言 |
-| **日志输出** | `logs/app.log` 含 INFO/WARNING/ERROR 三级，无敏感信息（API Key 脱敏） | ✅ | `test_log_sanitize.py` 脱敏 + `TestLogLevels` 分级验证 |
-| **LLM 占位文本区分** | "未配置"/"已禁用"/"生成失败"三种文本用户可辨别 | ✅ | `test_llm_placeholder_distinction_edge.py` 6 条断言（互斥 + 内容引导）|
+| **HTML 打印样式** | 打印时隐藏导航、展开全部内容、黑白友好 | ✅ | `test_html_template.py` `TestHtmlTemplatePrintStyles` |
+| **日志输出** | `logs/app.log` 含 INFO/WARNING/ERROR 三级，无敏感信息（API Key 脱敏） | ✅ | `test_log_sanitize.py` |
+| **LLM 占位文本区分** | "未配置"/"已禁用"/"生成失败"三种文本用户可辨别 | ✅ | `test_llm_placeholder_distinction_edge.py` |
 | **LLM 缓存提示** | 缓存命中显示灰字"本次使用LLM缓存" | ✅ |
 | **报告文件管理** | 按日期归档、文件名含时间戳、不覆盖旧报告，自动清理 180 天前归档 | ✅ |
-| **首次运行引导** | 配置缺失时提示操作步骤而非直接报错 | ✅ | `test_config_firstrun_edge.py` 4 条断言 |
+| **首次运行引导** | 配置缺失时提示操作步骤而非直接报错 | ✅ | `test_config_firstrun_edge.py` |
 
 ---
 

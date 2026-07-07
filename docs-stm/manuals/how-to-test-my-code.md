@@ -59,7 +59,7 @@ python scripts/test_runner.py --coverage
 # 合入验证 — PR 前检查（~49s）
 python scripts/test_runner.py --mode verify
 
-# 全量测试（待测，--mode all 为默认值，可省略）
+# 全量测试（~80s，--mode all 为默认值，可省略）
 python scripts/test_runner.py --mode all
 ```
 
@@ -75,7 +75,7 @@ python scripts/test_runner.py --mode all
 |:-----|:-----|:-------|:----------------|
 | **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `regression`（~30s） |
 | **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~49s） |
-| **P2** | 阻塞发布 | 不得 release | ③ `all`（待测） |
+| **P2** | 阻塞发布 | 不得 release | ③ `all`（~80s） |
 | **P3** | 建议修复 | 不阻断 | — |
 
 P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
@@ -88,7 +88,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 - **提交前验证（`--mode regression`）** — 每次代码变更后、commit 前必须执行。覆盖全部 `scenario` 业务场景测试（含 S0a-S0d + S1-S28 + S29-S33 + T1-T21），确保端到端用户路径不被破坏。约 30s 即可完成。是编辑-验证循环中的第一道屏障，核心原则是"够快才能频繁跑，频繁跑才能尽早发现问题"。
 - **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。约 49s，适合作为 PR CI 门禁或合入前的手动检查。
-- **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约待测，适合发布前的夜间或定时全量回归。
+- **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 80s，适合发布前的快速全量回归。
 
 > ⚠ 以上项数为撰写时的快照值，实际计数随版本迭代而变化，精确统计见 [`test-coverage.md`](../managements/test-coverage.md)。
 
@@ -97,7 +97,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 **推荐工作流：**
 
 ```
-编码 → --mode regression(30s) → commit → 多次积累 → --mode verify(49s) → merge → release前 → --mode all(待测)
+编码 → --mode regression(30s) → commit → 多次积累 → --mode verify(49s) → merge → release前 → --mode all(~80s)
                                   ↑                     ↗
                           此处可反复跑 regression   若改跨模块调用
                                                    先跑 --mode integration(40s)
@@ -109,7 +109,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 3. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify`（49s）确认整条管道通畅
 4. 通过后 commit，积累多次提交后准备合并到 master
 5. 合并前跑 `--mode verify` 作为合入门禁
-6. 发布版本前跑 `--mode all`（待测）全量扫一遍
+6. 发布版本前跑 `--mode all`（~80s）全量扫一遍
 
 ### 模式与覆盖范围说明
 
