@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-05（v0.2.85 — C 迭代实施后文档审核同步）
+最后更新：2026-07-07（D-6 优化 + 待处理问题优先级排序）
 
 ---
 
@@ -25,9 +25,11 @@
 | 2026-07-06 | R-159：代码类型判定逻辑散落 8 个文件 — 创建 `code_utils.py`，收敛 `is_a_share_code`/`is_fund_code`/`is_exchange_fund_code`/`is_hk_stock_code`/`is_qdii_by_name`/`is_bond_related_by_name`/`is_index_link_by_name`/`is_etf_by_name` 等所有判定原语；全量迁移 12 个调用方（penetration/category/market_value/akshare_extras/penetration_sheet/fund_performance/llm/prompts/eastmoney_industry/eastmoney_industry_rest/tencent/fetcher/industry）；删除重复的 `_is_qdii`/`_is_etf`/`_is_bond_fund`/`_is_index_link` | ✅ 已完成 |
 
 ---
-## 待处理
+## 待处理（按优先级降序）
 
-| 2026-07-07 | D-6 审计发现：基金风格分析 3 条测试已存在失败（`test_push2_fallback_to_tencent`/`test_weighted_style`/`test_with_push2_data`），与 D 迭代无关，D-5 前即存在 | 🔴 待处理 |
-| 2026-07-07 | D-6 审计发现：HTML 结构测试 7 条已存在失败（section 计数期望 16 实际 17，一个 section div 缺 id/order），与 D 迭代无关，D-5 模板变更后即出现 | 🔴 待处理 |
+| 日期 | 问题 | 优先级 |
+|:-----|:-----|:------:|
+| 2026-07-07 | **HTML 结构测试 7 条已存在失败** — `test_html_report_structure.py` 和 `test_html_report_structure_edge.py` 的 section 计数期望 16 实际 17，一个 section div 缺 id/order 属性。D-5 模板变更后即出现，影响 HTML 报告结构验证全链路。建议 D-8 排期修复 | 🔴 P1 |
+| 2026-07-07 | **基金风格分析 3 条测试已存在失败** — `test_push2_fallback_to_tencent`/`test_weighted_style`/`test_with_push2_data`，D-5 前即存在，影响 B5 模块 push2/Tencent 双链路降级验证。建议 D-8 排期修复 | 🔴 P2 |
 
 _已修复问题详细变更记录见 `docs-stm/managements/changelog.md`。_
