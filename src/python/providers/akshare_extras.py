@@ -215,6 +215,19 @@ def get_profit_forecast() -> dict[str, dict]:
     return result
 
 
+def get_profit_forecast_cache_key() -> str:
+    """获取盈利预测数据的文件缓存键名（含指数指纹）。
+
+    键名包含指数指纹，指数变化时指纹改变 → 缓存自动失效。
+    供外部模块（如 fund_performance.py）获取正确键名后调 get_cache_age()。
+
+    Returns:
+        完整缓存键名（如 ``"profit_forecast_a1b2c3d4e5f6"``）
+    """
+    fp = _compute_index_fingerprint()
+    return _cache_key(_CACHE_PROFIT_PREFIX, fp)
+
+
 def get_sector_fund_flow() -> list[dict[str, Any]]:
     """获取行业资金流向排名（今日）。
 

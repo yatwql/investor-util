@@ -347,11 +347,21 @@
                 </div>
             </div>
         </div>
+
+        {% if data_status_summary %}
+        <div class="data-status">
+            <div class="data-status-title">数据加载状态</div>
+            {% for key, item in data_status_summary.items() %}
+            <div class="{% if item.tier == 'T2' %}data-status-warn{% else %}data-status-info{% endif %}">
+                {{ item.message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 2: 市值核算 (Market Value)                     -->
-    <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-market_value" style="order: {{ section_numbers['market_value'] }};">
         <div class="section-title">{{ section_numbers['market_value'] }}、市值核算明细表</div>
         <div class="section-content" style="padding: 0;">
@@ -544,6 +554,16 @@
         {% else %}
         <div class="empty-note">暂无穿透数据</div>
         {% endif %}
+        {% if data_status_penetration %}
+        <div class="data-status">
+            <div class="data-status-title">数据加载状态</div>
+            {% for key, item in data_status_penetration.items() %}
+            <div class="{% if item.tier == 'T2' %}data-status-warn{% else %}data-status-info{% endif %}">
+                {{ item.message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -586,6 +606,16 @@
         <div class="penetration-notes">
             <div>* 业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
         </div>
+        {% if data_status_perf %}
+        <div class="data-status">
+            <div class="data-status-title">数据加载状态</div>
+            {% for key, item in data_status_perf.items() %}
+            <div class="{% if item.tier == 'T2' %}data-status-warn{% else %}data-status-info{% endif %}">
+                {{ item.message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->

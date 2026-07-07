@@ -49,7 +49,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
 
         with patch("src.python.report.html_writer.compute_penetration_top10",
                    return_value={}):
-            result = _render_penetration_section(self.holdings, [self.detail], self.prog)
+            result, _, _ = _render_penetration_section(self.holdings, [self.detail], self.prog)
         self.assertEqual(result, {})
 
     def test_penetration_top10_has_eps_and_dividend_defaults(self):
@@ -71,11 +71,13 @@ class TestRenderPenetrationSection(unittest.TestCase):
                                       side_effect=Exception("API 失败")))
             stack.enter_context(patch("src.python.providers.akshare_extras.get_dividend_data",
                                       side_effect=Exception("API 失败")))
-            result = _render_penetration_section(self.holdings, [self.detail], self.prog)
+            result, prof_ok, div_ok = _render_penetration_section(self.holdings, [self.detail], self.prog)
 
         for entry in result["top10"]:
             self.assertEqual(entry.get("eps_text"), "--")
             self.assertEqual(entry.get("dividend_text"), "--")
+        self.assertFalse(prof_ok)
+        self.assertFalse(div_ok)
 
     def test_penetration_partial_data(self):
         """部分数据有值 → 仅匹配到的 entry 有 EPS/股息率。"""
@@ -101,7 +103,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
                                       return_value={
                                           "600900": {"avg_dividend": 0.85},
                                       }))
-            result = _render_penetration_section(self.holdings, [self.detail], self.prog)
+            result, prof_ok, div_ok = _render_penetration_section(self.holdings, [self.detail], self.prog)
 
         entry_600900 = next(e for e in result["top10"] if "600900" in (e.get("codes") or []))
         entry_600519 = next(e for e in result["top10"] if "600519" in (e.get("codes") or []))
@@ -110,6 +112,8 @@ class TestRenderPenetrationSection(unittest.TestCase):
         self.assertEqual(entry_600900["dividend_text"], "0.8500元/年")
         self.assertEqual(entry_600519["eps_text"], "¥58.50")
         self.assertEqual(entry_600519["dividend_text"], "--")
+        self.assertTrue(prof_ok)
+        self.assertTrue(div_ok)
 
     def test_penetration_no_codes_key(self):
         """entry 无 codes 键 → 跳过，eps_text/dividend_text 为 "--"。"""
@@ -129,7 +133,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
                                       return_value={}))
             stack.enter_context(patch("src.python.providers.akshare_extras.get_dividend_data",
                                       return_value={}))
-            result = _render_penetration_section(self.holdings, [self.detail], self.prog)
+            result, _, _ = _render_penetration_section(self.holdings, [self.detail], self.prog)
 
         entry = result["top10"][0]
         self.assertEqual(entry.get("eps_text"), "--")

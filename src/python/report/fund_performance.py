@@ -380,11 +380,14 @@ def _build_perf_data_status(
 
     # 盈利预测（T4）
     if not profit_success:
-        pf_cache_age = get_cache_age("profit_forecast_000001")
+        from src.python.providers.akshare_extras import get_profit_forecast_cache_key
+        pf_key = get_profit_forecast_cache_key()
+        pf_cache_age = get_cache_age(pf_key)
+        _pf_ttl = get_ttl("profit_forecast")
         degraded, _, _ = _tracker.record(
             "perf_profit_forecast", "T4", success=False,
             cache_age_hours=pf_cache_age / 3600 if pf_cache_age else None,
-            cache_ttl_hours=4,
+            cache_ttl_hours=_pf_ttl / 3600 if _pf_ttl else 24,
         )
         if degraded:
             status["profit_forecast"] = DataStatusItem(

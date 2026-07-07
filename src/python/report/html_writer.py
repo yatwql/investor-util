@@ -36,6 +36,7 @@ from src.python.report.market_value import (
 from src.python.report.penetration import compute_penetration_top10
 from src.python.registry import get_llm_module_name, get_llm_module_names, get_report_section_order
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
+from src.python.report.data_status import DataStatus, DataStatusItem, STATUS_MESSAGES
 
 logger = logging.getLogger("invest")
 
@@ -198,8 +199,8 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
 
     # ── 5~7) 分类表 / 穿透 / 基金业绩 ──
     cat_data = _render_category_table(holdings, details, prog)
-    penetration = _render_penetration_section(holdings, details, prog)
-    perf_data = _render_fund_performance_section(holdings, details, prog)
+    penetration, penetration_profit_ok, penetration_dividend_ok = _render_penetration_section(holdings, details, prog)
+    perf_data, perf_profit_ok = _render_fund_performance_section(holdings, details, prog)
 
     # ── 13) 基金经理变更监控（B 系列） ──
     enable_b_series = include_news  # B/L 菜单含基金深度分析
@@ -254,6 +255,40 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
 
     _ENV.globals["section_visible_dict"] = section_visible_dict
 
+    # ── 11) 构建各章节数据源状态摘要 ──
+    data_status_summary: DataStatus = {}
+    data_status_penetration: DataStatus = {}
+    data_status_perf: DataStatus = {}
+    try:
+        from src.python.report.summary import _build_index_data_status
+        data_status_summary = _build_index_data_status(a_indices, us_indices)
+    except Exception:
+        logger.debug("HTML 报告构建指数数据状态失败（非关键）", exc_info=True)
+    try:
+        from src.python.report.penetration_sheet import _build_penetration_data_status
+        if penetration:
+            data_status_penetration = _build_penetration_data_status(penetration, penetration_profit_ok, penetration_dividend_ok)
+    except Exception:
+        logger.debug("HTML 报告构建穿透数据状态失败（非关键）", exc_info=True)
+    try:
+        from src.python.report.fund_performance import _build_perf_data_status
+        has_funds = sum(1 for h in holdings if _is_fund(h))
+        # 从 perf_data 提取真实 adjusted_ratings，替代 {"ok": "ok"} 欺骗
+        _adj_ratings = {}
+        if perf_data:
+            for _entry in perf_data:
+                _code = _entry.get("code")
+                _tag = _entry.get("rating_tag")
+                if _code and _tag:
+                    _adj_ratings[_code] = _tag
+        data_status_perf = _build_perf_data_status(
+            _adj_ratings,
+            has_funds,
+            profit_success=perf_profit_ok,
+        )
+    except Exception:
+        logger.debug("HTML 报告构建基金业绩数据状态失败（非关键）", exc_info=True)
+
     html = _ENV.get_template("report_template.html").render(
         now=now_str, today=today_str, trading_day=trading_day,
         total_mv=total_mv, total_cost=total_cost,
@@ -282,6 +317,10 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         # C 迭代：序号 & 可见性（模板使用 section_numbers/section_visible_dict）
         section_order=order, section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,
+        # D 迭代：数据源状态摘要
+        data_status_summary=data_status_summary,
+        data_status_penetration=data_status_penetration,
+        data_status_perf=data_status_perf,
     )
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
@@ -423,14 +462,20 @@ def _render_category_table(
 
 def _render_penetration_section(
     holdings: List[Holding], details: list, prog: ProgressReporter,
-) -> dict | None:
-    """计算资产穿透TOP10，附加盈利预测和股息率。"""
+) -> tuple[dict | None, bool, bool]:
+    """计算资产穿透TOP10，附加盈利预测和股息率。
+
+    Returns:
+        (pen_result, profit_success, dividend_success)
+    """
     prog.info("正在计算资产穿透TOP10...")
     pen_result = compute_penetration_top10(holdings, details)
     if not pen_result or not pen_result.get("top10"):
-        return pen_result
+        return pen_result, True, True
 
     # 加载盈利预测和股息率（同 Excel 端 penetration_sheet 逻辑）
+    profit_success = True
+    dividend_success = True
     try:
         from src.python.providers.akshare_extras import get_profit_forecast, get_dividend_data
         from src.python.code_utils import is_a_share_code
@@ -441,6 +486,8 @@ def _render_penetration_section(
         dividend_data = get_dividend_data(a_codes) if a_codes else {}
     except Exception:
         profit_forecast, dividend_data = {}, {}
+        profit_success = False
+        dividend_success = False
         logger.debug("盈利预测/股息率加载失败（非关键）", exc_info=True)
 
     for entry in pen_result["top10"]:
@@ -462,15 +509,25 @@ def _render_penetration_section(
                 break
         entry["dividend_text"] = div_text
 
-    return pen_result
+    return pen_result, profit_success, dividend_success
 
 
 def _render_fund_performance_section(
     holdings: List[Holding], details: list, prog: ProgressReporter,
-) -> List[Dict[str, Any]]:
-    """构建基金业绩分析数据。"""
+) -> tuple[List[Dict[str, Any]], bool]:
+    """构建基金业绩分析数据。
+
+    Returns:
+        (perf_data, profit_success) — profit_success 表示盈利预测数据是否加载成功
+    """
     prog.info("正在获取基金业绩排名...")
-    return _build_perf_data(holdings, details, progress=prog)
+    perf_data = _build_perf_data(holdings, details, progress=prog)
+    try:
+        from src.python.report.html_builders import _load_profit_forecast
+        profit_success = bool(_load_profit_forecast())
+    except Exception:
+        profit_success = False
+    return perf_data, profit_success
 
 
 def _render_manager_analysis(

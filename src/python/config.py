@@ -60,6 +60,11 @@ _DEFAULT_CONFIG = {
         "official_source": True,
     },
     "default_menu_key": "L",
+    "degradation": {
+        "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
+        "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
+        "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14},
+    },
 }
 
 

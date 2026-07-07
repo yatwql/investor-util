@@ -11,7 +11,7 @@ from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.cache import get_cache_age
+from src.python.cache import get_cache_age, get_cache_age_by_data_type, get_ttl
 from src.python.code_utils import is_a_share_code
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
@@ -101,7 +101,7 @@ def _load_dividend_data_safe(result: dict) -> tuple[dict, bool]:
         return {}, False
 
 
-def _build_data_status(
+def _build_penetration_data_status(
     result: dict,
     profit_success: bool = True,
     dividend_success: bool = True,
@@ -123,12 +123,18 @@ def _build_data_status(
 
     # 行业分类（T3，push2）
     if not result.get("industry_success", True):
-        cache_age = get_cache_age("industry_data")
+        # 行业缓存按股票代码存储，取第一个可用代码检查缓存新鲜度
+        _first_code = next(
+            (_code for _entry in result.get("top10", []) for _code in (_entry.get("codes") or [])),
+            None,
+        )
+        cache_age = get_cache_age_by_data_type("industry", _first_code) if _first_code else None
+        _ind_ttl = get_ttl("industry")
         degraded, _, _ = _tracker.record(
             "penetration_industry", "T3", success=False,
             failure_type="unreachable",
             cache_age_hours=cache_age / 3600 if cache_age else None,
-            cache_ttl_hours=24,
+            cache_ttl_hours=_ind_ttl / 3600 if _ind_ttl else 24,
         )
         if degraded:
             status["industry"] = DataStatusItem(
@@ -217,7 +223,7 @@ def write_penetration_sheet(
     if not result["top10"]:
         write_data_row(ws, row, ["暂无穿透数据"])
         # 即使无 TOP10 数据，也检查是否有数据源失败需要展示状态
-        data_status = _build_data_status(result)
+        data_status = _build_penetration_data_status(result)
         _write_data_status_foot(ws, data_status, start_row=row + 1)
         freeze_header(ws, 2)
         auto_width(ws)
@@ -250,7 +256,7 @@ def write_penetration_sheet(
         row += 1
 
     row = _write_penetration_footer(ws, row, summary)
-    data_status = _build_data_status(result, profit_success, dividend_success)
+    data_status = _build_penetration_data_status(result, profit_success, dividend_success)
     _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=40)

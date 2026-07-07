@@ -21,6 +21,7 @@ import threading
 import time
 from typing import Any, TypedDict
 
+from src.python.cache import get_cache_dir
 from src.python.config import get_config
 
 logger = logging.getLogger("invest")
@@ -71,11 +72,9 @@ _DEFAULT_UNREACHABLE: dict[str, int] = {"t2": 2, "t3": 2, "t4": 1}
 _DEFAULT_EMPTY: dict[str, int] = {"t2": 3, "t3": 3, "t4": 1}
 _DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 3, "t3": 14, "t4": 14}
 
-# 持久化文件路径
-_DEGRADATION_STATE_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "data", "cache", ".degradation_state.json",
-)
+def _default_persist_path() -> str:
+    """返回默认持久化文件路径（延迟求值，避免模块导入时的 cwd 依赖）。"""
+    return os.path.join(get_cache_dir(), ".degradation_state.json")
 
 
 # ── 降级阈值控制 ──────────────────────────────
@@ -112,8 +111,15 @@ class DegradationTracker:
         self._counts: dict[str, dict[str, int]] = {}
 
         # 跨会话持久化：{source_key: last_success_unix_ts}
-        self._persist_path = persist_path or _DEGRADATION_STATE_FILE
+        self._persist_path = persist_path or _default_persist_path()
         self._last_success: dict[str, float] = self._load_persisted_state()
+
+        # 降级配置缓存（在构造时加载一次，避免每次 record() 重复读配置文件）
+        self._degradation_config: dict[str, Any] = self._load_degradation_config()
+
+        # 持久化写节流
+        self._last_persist_ts: float = 0.0
+        self._persist_dirty: bool = False
 
     # ── 持久化 ─────────────────────────────────
 
@@ -129,12 +135,27 @@ class DegradationTracker:
             logger.debug("[degradation] 持久化状态加载失败，使用空状态", exc_info=True)
         return {}
 
-    def _persist_state(self) -> None:
-        """将当前 last_success 写入 JSON 文件。"""
+    _PERSIST_INTERVAL = 5.0  # 连续写磁盘的最小间隔（秒）
+    _VALID_TIERS: frozenset = frozenset({"T2", "T3", "T4", "t2", "t3", "t4"})
+
+    def _persist_state(self, force: bool = False) -> None:
+        """将当前 last_success 写入 JSON 文件（带节流）。
+
+        高频 record(success=True) 调用时跳过中间写，仅当距离上次写入
+        超过 _PERSIST_INTERVAL 秒才实际写盘。force=True 强制立即写入。
+
+        Args:
+            force: 是否强制立即写入（reset() 时使用）
+        """
+        now = time.time()
+        if not force and self._persist_dirty and now - self._last_persist_ts < self._PERSIST_INTERVAL:
+            return  # 节流：距上次写入不足间隔，跳过
         try:
             os.makedirs(os.path.dirname(self._persist_path), exist_ok=True)
             with open(self._persist_path, "w", encoding="utf-8") as f:
                 json.dump(self._last_success, f, ensure_ascii=False)
+            self._last_persist_ts = now
+            self._persist_dirty = False
         except Exception:
             logger.debug("[degradation] 持久化状态保存失败（非关键）", exc_info=True)
 
@@ -168,6 +189,8 @@ class DegradationTracker:
 
             成功时返回 (False, 0, 0)。
         """
+        if tier not in self._VALID_TIERS:
+            raise ValueError(f"无效的 tier 参数: {tier!r}，必须为 T2/T3/T4")
         with self._lock:
             return self._record_unsafe(
                 source_key, tier, success, failure_type,
@@ -179,7 +202,7 @@ class DegradationTracker:
         with self._lock:
             self._counts.pop(source_key, None)
             self._last_success.pop(source_key, None)
-            self._persist_state()
+            self._persist_state(force=True)
 
     def get_counts(self, source_key: str) -> dict[str, int]:
         """读取当前失败计数（线程安全）。"""
@@ -197,10 +220,11 @@ class DegradationTracker:
         cache_age_hours: float | None,
         cache_ttl_hours: float | None,
     ) -> tuple[bool, int, int]:
-        # 成功 → 全部归零 + 更新持久化时间戳
+        # 成功 → 全部归零 + 更新持久化时间戳（带写节流）
         if success:
             self._counts.pop(source_key, None)
             self._last_success[source_key] = time.time()
+            self._persist_dirty = True
             self._persist_state()
             return False, 0, 0
 
@@ -272,14 +296,22 @@ class DegradationTracker:
         return False
 
     @staticmethod
-    def _get_tier_config(tier: str) -> dict[str, Any]:
-        """从 config.json 读取单层级降级配置（懒加载，每次调用均重读）。"""
+    def _load_degradation_config() -> dict[str, Any]:
+        """从 config.json 加载完整的 degradation 配置段。"""
         cfg = get_config()
-        degradation = cfg.get("degradation", {}) if isinstance(cfg, dict) else {}
+        raw = cfg.get("degradation", {}) if isinstance(cfg, dict) else {}
+        return raw if isinstance(raw, dict) else {}
+
+    def _get_tier_config(self, tier: str) -> dict[str, Any]:
+        """从实例缓存的 degradation 配置中读取单层级降级配置。
+
+        配置在构造时通过 _load_degradation_config() 一次性加载，
+        避免每次 record() 重复读配置文件。
+        """
         tier_key = tier.lower()
-        if not isinstance(degradation, dict):
-            return {}
-        result = degradation.get(tier_key, {}) if isinstance(degradation.get(tier_key), dict) else {}
+        result = self._degradation_config.get(tier_key, {})
+        if not isinstance(result, dict):
+            result = {}
         # 合理性校验：≤0 的值会被夹紧逻辑静默限制，记警告让用户自查
         for k, v in result.items():
             if isinstance(v, (int, float)) and v <= 0:

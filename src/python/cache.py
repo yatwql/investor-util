@@ -276,6 +276,28 @@ def get_cache_age(key: str) -> float | None:
     return None
 
 
+def get_cache_age_by_data_type(data_type: str, identifier: str | None = None) -> float | None:
+    """按 registry 数据类型获取缓存年龄，替换硬编码 get_cache_age() 调用。
+
+    从 registry 查找数据类型的缓存前缀，拼接 identifier 组成完整键名。
+    适用于前缀+代码/标识符结构的缓存键（如 ``"index_sh000001"``）。
+
+    Args:
+        data_type: registry 中注册的数据类型，如 ``"index"``
+        identifier: 拼接在缓存前缀后的标识符，
+                    如 ``"sh000001"`` → 完整键名 ``"index_sh000001"``
+
+    Returns:
+        缓存年龄（秒），无缓存或类型未注册时返回 None
+    """
+    from src.python.registry import get_registry  # 延迟导入避免循环依赖
+    for module in get_registry():
+        if module.data_type == data_type and identifier is not None and module.cache_prefixes:
+            key = f"{module.cache_prefixes[0]}{identifier}"
+            return get_cache_age(key)
+    return None
+
+
 def clear(key: str) -> None:
     """删除指定缓存文件（同时处理 .json 和 .json.gz）。"""
     with _cache_lock:
