@@ -86,6 +86,19 @@
         .data-status-info { border-left: 3px solid #95a5a6; padding-left: 8px; margin: 3px 0; color: #666; }
         .data-status-ok { border-left: 3px solid #27ae60; padding-left: 8px; margin: 3px 0; color: #27ae60; }
 
+{% macro render_data_status(data_status_dict) %}
+{% if data_status_dict %}
+<div class="data-status">
+    <div class="data-status-title">数据加载状态</div>
+    {% for key, item in data_status_dict.items() %}
+    <div class="{% if item.tier == 'T2' %}data-status-warn{% else %}data-status-info{% endif %}">
+        {% if item.tier == 'T2' %}⚠{% else %}ℹ{% endif %} {{ item.message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
         .source-tag { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; }
         .source-tag-holding { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #1a56db; }
         .source-tag-penetration { display: inline-block; background: #f0e8fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #7c3aed; }
@@ -348,16 +361,7 @@
             </div>
         </div>
 
-        {% if data_status_summary %}
-        <div class="data-status">
-            <div class="data-status-title">数据加载状态</div>
-            {% for key, item in data_status_summary.items() %}
-            <div class="{% if item.tier == 'T2' %}data-status-warn{% else %}data-status-info{% endif %}">
-                {{ item.message }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+        {{ render_data_status(data_status_summary) }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -554,16 +558,7 @@
         {% else %}
         <div class="empty-note">暂无穿透数据</div>
         {% endif %}
-        {% if data_status_penetration %}
-        <div class="data-status">
-            <div class="data-status-title">数据加载状态</div>
-            {% for key, item in data_status_penetration.items() %}
-            <div class="{% if item.tier == 'T2' %}data-status-warn{% else %}data-status-info{% endif %}">
-                {{ item.message }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+        {{ render_data_status(data_status_penetration) }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -606,16 +601,7 @@
         <div class="penetration-notes">
             <div>* 业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
         </div>
-        {% if data_status_perf %}
-        <div class="data-status">
-            <div class="data-status-title">数据加载状态</div>
-            {% for key, item in data_status_perf.items() %}
-            <div class="{% if item.tier == 'T2' %}data-status-warn{% else %}data-status-info{% endif %}">
-                {{ item.message }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+        {{ render_data_status(data_status_perf) }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->

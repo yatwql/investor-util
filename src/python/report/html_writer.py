@@ -37,6 +37,9 @@ from src.python.report.penetration import compute_penetration_top10
 from src.python.registry import get_llm_module_name, get_llm_module_names, get_report_section_order
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
 from src.python.report.data_status import DataStatus, DataStatusItem, STATUS_MESSAGES
+from src.python.report.summary import _build_index_data_status
+from src.python.report.penetration_sheet import _build_penetration_data_status
+from src.python.report.fund_performance import _build_perf_data_status
 
 logger = logging.getLogger("invest")
 
@@ -160,6 +163,31 @@ _ENV.filters["thousands"] = _jinja_thousands
 _ENV.globals["section_visible"] = _jinja_section_visible
 
 
+# ── 辅助函数 ──────────────────────────────────────────────
+
+
+def _safe_build_data_status(builder, *args, label: str = "", **kwargs) -> DataStatus:
+    """安全构建数据状态，异常时返回空字典并记录日志。
+
+    统一处理 data_status 构建中的 try/except/log 三步骤，
+    避免 3 个 try 块重复此模式。
+
+    Args:
+        builder: 状态构建函数（如 _build_index_data_status）
+        label: 模块名称（用于日志消息），如 "指数"/"穿透"/"基金业绩"
+        *args, **kwargs: 透传给 builder 的参数
+
+    Returns:
+        构建成功返回 DataStatus 字典，异常返回 {}
+    """
+    try:
+        result = builder(*args, **kwargs)
+        return result if isinstance(result, dict) else {}
+    except Exception:
+        logger.debug("HTML 报告构建%s数据状态失败（非关键）", label, exc_info=True)
+        return {}
+
+
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
@@ -256,38 +284,28 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     _ENV.globals["section_visible_dict"] = section_visible_dict
 
     # ── 11) 构建各章节数据源状态摘要 ──
-    data_status_summary: DataStatus = {}
+    data_status_summary: DataStatus = _safe_build_data_status(
+        _build_index_data_status, a_indices, us_indices, label="指数",
+    )
     data_status_penetration: DataStatus = {}
-    data_status_perf: DataStatus = {}
-    try:
-        from src.python.report.summary import _build_index_data_status
-        data_status_summary = _build_index_data_status(a_indices, us_indices)
-    except Exception:
-        logger.debug("HTML 报告构建指数数据状态失败（非关键）", exc_info=True)
-    try:
-        from src.python.report.penetration_sheet import _build_penetration_data_status
-        if penetration:
-            data_status_penetration = _build_penetration_data_status(penetration, penetration_profit_ok, penetration_dividend_ok)
-    except Exception:
-        logger.debug("HTML 报告构建穿透数据状态失败（非关键）", exc_info=True)
-    try:
-        from src.python.report.fund_performance import _build_perf_data_status
-        has_funds = sum(1 for h in holdings if _is_fund(h))
-        # 从 perf_data 提取真实 adjusted_ratings，替代 {"ok": "ok"} 欺骗
-        _adj_ratings = {}
-        if perf_data:
-            for _entry in perf_data:
-                _code = _entry.get("code")
-                _tag = _entry.get("rating_tag")
-                if _code and _tag:
-                    _adj_ratings[_code] = _tag
-        data_status_perf = _build_perf_data_status(
-            _adj_ratings,
-            has_funds,
-            profit_success=perf_profit_ok,
+    if penetration:
+        data_status_penetration = _safe_build_data_status(
+            _build_penetration_data_status, penetration,
+            penetration_profit_ok, penetration_dividend_ok, label="穿透",
         )
-    except Exception:
-        logger.debug("HTML 报告构建基金业绩数据状态失败（非关键）", exc_info=True)
+    # 从 perf_data 提取真实 adjusted_ratings（无异常风险，放外面不吞）
+    _adj_ratings: dict[str, str] = {}
+    if perf_data:
+        for _entry in perf_data:
+            _code = _entry.get("code")
+            _tag = _entry.get("rating_tag")
+            if _code and _tag:
+                _adj_ratings[_code] = _tag
+    data_status_perf: DataStatus = _safe_build_data_status(
+        _build_perf_data_status, _adj_ratings,
+        sum(1 for h in holdings if _is_fund(h)),
+        profit_success=perf_profit_ok, label="基金业绩",
+    )
 
     html = _ENV.get_template("report_template.html").render(
         now=now_str, today=today_str, trading_day=trading_day,

@@ -646,50 +646,67 @@ D-4 和 D-5 只在 Excel 页签底部加了状态摘要，D-6 把同样的信息
 
 两端共享 D-3 的 `STATUS_MESSAGES` 常量，文字完全一致。
 
-**D-6 还额外处理 `_render_penetration_section` 内部的大 try/except 拆分：**
-行 434~444 当前一个 try 包了"加载盈利预测 + 股息率 + 板块补充"三个数据源，拆为各自独立 try：
+**D-6 还额外处理：**
 
-```python
-# 改之前：一个 try 包了三个数据源
-try:
-    profit_forecast = get_profit_forecast()
-    dividend_data = get_dividend_data(a_codes)
-    # 随后的板块补充也在外面
-except Exception:
-    profit_forecast, dividend_data = {}, {}
+1. **`_render_penetration_section` 内部的大 try/except 拆分：** 原来一个 try 包了"加载盈利预测 + 股息率"两个数据源，拆为各自独立 try，各带独立 success 标志位和明确的 warning 日志：
 
-# 改之后：各数据源独立 try
-try:
-    profit_forecast = get_profit_forecast()
-except Exception:
-    profit_forecast = {}
-    logger.warning(...)
+    ```python
+    # 改之前：一个 try 包了两个数据源
+    try:
+        profit_forecast = get_profit_forecast()
+        dividend_data = get_dividend_data(a_codes)
+    except Exception:
+        profit_forecast, dividend_data = {}, {}
 
-try:
-    dividend_data = get_dividend_data(a_codes)
-except Exception:
-    dividend_data = {}
-    logger.warning(...)
-```
+    # 改之后：各数据源独立 try
+    profit_success = True
+    try:
+        profit_forecast = get_profit_forecast()
+    except Exception:
+        profit_success = False
+        logger.warning("[penetration] 盈利预测加载异常...", exc_info=True)
 
-> 这个拆分原本在 D-2，但 D-2 主要改 `excel_generator.py` 的 B 系列 4 个大 try。`_render_penetration_section` 的 try 涉及穿透数据，与 D-6 的 `data_status` 关联更紧密——拆分后各数据源可各自独立设置 `_data_status`。移至 D-6 避免先拆后改的冲突。
+    dividend_success = True
+    try:
+        dividend_data = get_dividend_data(a_codes)
+    except Exception:
+        dividend_success = False
+        logger.warning("[penetration] 股息率加载异常...", exc_info=True)
+    ```
+
+    > 这个拆分原本在 D-2，但 D-2 主要改 `excel_generator.py` 的 B 系列 4 个大 try。`_render_penetration_section` 的 try 涉及穿透数据，与 D-6 的 `data_status` 关联更紧密——拆分后 profit_forecast/dividend 可各自独立设置 success 标志用于上层构建 `_data_status`。移至 D-6 避免先拆后改的冲突。
+
+2. **移除 `{"ok": "ok"}` 欺骗性字典：** 原代码用 `{"ok": "ok"}` 作为 `adjusted_ratings` 的占位传递给 `_build_perf_data_status`，实为欺骗语法检测。改为从 `perf_data` 中提取真实 `rating_tag`，使语义正确。
+
+3. **`html_writer.py` 主体函数内直接构建 data_status：** 3 个 data_status 字典（summary/penetration/perf）在 `write_html_report()` 函数体内直接构建并通过 `tmpl.render(**kwargs)` 传入模板，非通过 `_render_*` 函数返回值传递。
 
 ### 改哪些文件
 
 | 文件 | 改动内容 |
 |:-----|:---------|
-| `report/html_writer.py` | D-4（penetration）和 D-5（perf、summary）的 `_render_*` 函数在返回字典中加 `data_status` 字段；同时拆分行 434~444 的大 try/except |
-| `report/html_builders.py` | 数据构建阶段透传 `_data_status` |
-| `tmpl/report_template.html` | 引用 D-3 的 CSS 和模板块，绑定具体数据 |
+| `report/html_writer.py` | 在 `write_html_report()` 函数内新增 3 个独立的 try 块构建 `data_status_summary`/`data_status_penetration`/`data_status_perf`；`_render_penetration_section` 拆分 profit_forecast/dividend 为独立 try；移除 `{"ok":"ok"}` 欺骗性字典，改用真实 `rating_tag`；3 个 data_status try 块各自有完整 logging |
+| `report/penetration_sheet.py` | 将 `_build_data_status` 重命名为 `_build_penetration_data_status` 避免命名冲突；`cache_ttl_hours=24` 硬编码改为 `get_ttl("industry") / 3600` |
+| `report/fund_performance.py` | `cache_ttl_hours=4` 硬编码改为 `get_ttl("profit_forecast") / 3600` |
+| `report/summary.py` | 2 处 `get_cache_age("index_sh000001")` 等硬编码 key 替换为 `get_cache_age_by_data_type("index", "sh000001")` |
+| `cache.py` | 新增 `get_cache_age_by_data_type(data_type, identifier)` 函数，通过 registry 解析 cache_prefix 匹配查找缓存 |
+| `providers/akshare_extras.py` | 新增 `get_profit_forecast_cache_key()` 公共函数，供 `get_cache_age_by_data_type("profit_forecast", ...)` 内部调用 |
+| `config.py` / `config.json` | 新增 `degradation` 配置段（t2/t3/t4 阈值，含 unreachable_threshold/empty_data_threshold/stale_days）|
+| `tmpl/report_template.html` | Section 1(summary), Section 4(penetration), Section 5(fund_performance) 新增 data_status 条件渲染块，使用 `.data-status-warn`(T2) 和 `.data-status-info`(T3/T4) CSS 类 |
 
 ### 验收标准
 
-- [ ] HTML 端每个对应模块的 `_render_*` 函数返回字典含 `data_status` 字段，结构与 `DataStatus` 类型一致
-- [ ] `_render_penetration_section` 行 434~444 的大 try/except 已拆为三个独立 try（盈利预测/股息率/板块数据），各数据源各自设置 `_data_status`
-- [ ] HTML 模板在数据源失败时渲染 D-3 定义的状态摘要区块，文字取自 `STATUS_MESSAGES`（与 Excel 端同源），使用 `message` 字段直接渲染（不拼接 `label`+`detail`）
+- [ ] HTML 端在 `write_html_report()` 内通过 3 个独立 try 块构建 `data_status_summary`/`data_status_penetration`/`data_status_perf`，传入模板 kwargs
+- [ ] `_render_penetration_section` 的盈利预测/股息率已拆为两个独立 try，各带独立 success 标志和具体 warning 日志
+- [ ] 移除 `{"ok": "ok"}` 欺骗性字典，`adjusted_ratings` 从 `perf_data` 真实提取 `rating_tag`
+- [ ] 3 处 data_status try 块（summary/penetration/perf）均有 `exc_info=True` 的日志记录
+- [ ] 4 处 `get_cache_age()` 硬编码 key 已替换为 `get_cache_age_by_data_type()` 注册表驱动版本
+- [ ] 2 处 `cache_ttl_hours` 硬编码（24/4）已替换为 `get_ttl()` 注册表版本
+- [ ] 新增 `degradation` 配置段到 `config.json` 和 `DEFAULT_CONFIG`，阈值与 data_status.py 默认值一致
+- [ ] HTML 模板在数据源失败时渲染 D-3 定义的状态摘要区块，文字取自 `STATUS_MESSAGES`（与 Excel 端同源）
 - [ ] 状态区块视觉：T2 用 ⚠ 橙色左边框（`.data-status-warn`），T3/T4 用 ℹ 灰色左边框（`.data-status-info`）
 - [ ] 全部可用时不渲染状态区块（与 Excel 端一致）
-- [ ] 3 条 edge 测试覆盖：mock penetration 数据源失败 → HTML 区块含预期文字；mock perf 数据源失败 → HTML 区块含预期文字；mock try-split 验证各数据源独立设置 `_data_status`
+- [ ] 3 条 edge 测试覆盖：mock penetration data_status → template kwargs 含失败项；mock perf data_status → template kwargs 含失败项；mock penetration data_status 抛异常不影响 perf data_status
+- [ ] 4 条已有 `_render_penetration_section` edge 测试原本存在（空 top10/全 API 失败/部分数据/无 codes 键）
 - [ ] P0 门禁通过
 - [ ] Excel 端 D-4/D-5 已有测试不因本步改动而失败
 
@@ -703,7 +720,8 @@ except Exception:
 
 ```bash
 python scripts/test_runner.py --mode regression      # P0 门禁
-pytest src/test/unit/report/ -k "html" -m edge       # 2 条新增
+pytest src/test/unit/report/ -k "html" -m edge       # 4 条 edge（1 旧 + 3 新增）
+pytest src/test/unit/report/test_html_writer_edge.py  # 7 条全通过
 ```
 
 ---
@@ -925,7 +943,7 @@ D 迭代涉及 20+ 文件变更，需要同步更新管理文档，避免下次�
 | D-3 | 数据源状态追踪+阈值基础设施 | DataStatus 类型/常量/写入/占位 + DegradationTracker 双信号决策 + get_cache_age() | 4 | +160 行 | 6 | 🟢 低 |
 | D-4 | 穿透模块接入阈值+状态 | penetration 3 源调 record() + 缓存新鲜度自适应 | 3~4 | +70 行 | 5 | 🟡 中 |
 | D-5 | 基金排名与指数降级标识+阈值 | perf/summary 调 record() + index.py 加 _source | 5 | +90 行 | 7 | 🟡 中 |
-| D-6 | HTML 报告状态摘要渲染+try拆分 | D-4/D-5 状态同步到 HTML；_render_penetration try 拆细 | 3 | ~80 行 | 3 | 🟡 中低 |
+| D-6 | HTML 报告状态摘要渲染+try拆分 | data_status 传入模板 + _render_penetration try 拆细 + 4个硬编码key替换 + 2个cache_ttl修复 + config新增degradation + {"ok":"ok"}移除 | 9 | ~180 行 | 3(按计划)+7(连带修复) | 🟡 中低 |
 | D-7a | B 系列模块空态占位 | 4 个 B 系列模块占位替代隐藏 | 5 | +60 行 | 4 | 🟡 中低 |
 | D-7b | 新闻与预警模块空态占位 | news + early_warning 占位 | 4 | +50 行 | 3 | 🟡 中低 |
 | D-8 | 全链路回归基线锁定 | 全局降级冒烟 + 消息一致性 | 2 | +100 行 | 5 | 🟢 低 |

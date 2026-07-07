@@ -24,4 +24,10 @@
 | 2026-07-05 | R-157：push2 全线不可用时无 fallback — 新增 `eastmoney_industry_rest` 备用链路（行情页 scraped quotedata），`industry` chain 扩展为双链路 | ✅ 已完成 |
 | 2026-07-06 | R-159：代码类型判定逻辑散落 8 个文件 — 创建 `code_utils.py`，收敛 `is_a_share_code`/`is_fund_code`/`is_exchange_fund_code`/`is_hk_stock_code`/`is_qdii_by_name`/`is_bond_related_by_name`/`is_index_link_by_name`/`is_etf_by_name` 等所有判定原语；全量迁移 12 个调用方（penetration/category/market_value/akshare_extras/penetration_sheet/fund_performance/llm/prompts/eastmoney_industry/eastmoney_industry_rest/tencent/fetcher/industry）；删除重复的 `_is_qdii`/`_is_etf`/`_is_bond_fund`/`_is_index_link` | ✅ 已完成 |
 
+---
+## 待处理
+
+| 2026-07-07 | D-6 审计发现：基金风格分析 3 条测试已存在失败（`test_push2_fallback_to_tencent`/`test_weighted_style`/`test_with_push2_data`），与 D 迭代无关，D-5 前即存在 | 🔴 待处理 |
+| 2026-07-07 | D-6 审计发现：HTML 结构测试 7 条已存在失败（section 计数期望 16 实际 17，一个 section div 缺 id/order），与 D 迭代无关，D-5 模板变更后即出现 | 🔴 待处理 |
+
 _已修复问题详细变更记录见 `docs-stm/managements/changelog.md`。_

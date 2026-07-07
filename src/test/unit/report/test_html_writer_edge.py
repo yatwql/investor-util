@@ -1,7 +1,8 @@
-"""HTML 报告生成模块边缘/异常测试 — 穿透数据降级。
+"""HTML 报告生成模块边缘/异常测试。
 
 测试目标：
   - _render_penetration_section：API 失败、空数据、缺失键时的降级
+  - write_html_report：数据源状态摘要渲染（穿透/基金业绩/独立性）
 
 运行：
   pytest src/test/unit/report/test_html_writer_edge.py -v
@@ -9,6 +10,8 @@
 
 from __future__ import annotations
 
+import shutil
+import tempfile
 import unittest
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
@@ -16,6 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.python.models import Holding
+from src.python.report.data_status import DataStatusItem, STATUS_MESSAGES
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
@@ -138,6 +142,185 @@ class TestRenderPenetrationSection(unittest.TestCase):
         entry = result["top10"][0]
         self.assertEqual(entry.get("eps_text"), "--")
         self.assertEqual(entry.get("dividend_text"), "--")
+
+
+# ============================================================
+#  write_html_report — data_status 渲染（D-6 新增）
+# ============================================================
+
+
+class TestWriteHtmlReportDataStatus(unittest.TestCase):
+    """测试 write_html_report 的数据源状态摘要（data_status_xxx）渲染。"""
+
+    def setUp(self):
+        self.holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]
+        self._tmp = tempfile.mkdtemp(prefix="test_html_ds_")
+        self.detail = MagicMock()
+        self.detail.market_value = 1000.0
+        self.detail.cost = 500.0
+        self.detail.profit = 500.0
+        self.detail.today_profit = 50.0
+        self.detail.name = "长江电力"
+        self.detail.code = "600900"
+        self.detail.price = 55.0
+        self.detail.yesterday_close = 54.0
+        self.detail.profit_rate = 1.0
+        self.detail.source = "腾讯"
+        self.detail.price_type = "实时"
+        self.detail.premium = ""
+        self.detail.shares = 100
+        self.detail.cost_price = 50.0
+        self.detail.nav_date = ""
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def test_data_status_penetration_on_failure(self):
+        """穿透数据源失败 → data_status_penetration 含失败项。"""
+        from src.python.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            # 标准外部依赖 mock
+            stack.enter_context(patch("src.python.report.html_writer._generate_details",
+                                       return_value=[self.detail]))
+            stack.enter_context(patch("src.python.report.html_writer.fetch_indices",
+                                       return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
+            stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
+                                       return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
+            stack.enter_context(patch("src.python.report.html_writer._build_category_data",
+                                       return_value={}))
+            stack.enter_context(patch("src.python.report.html_writer.price_update_status",
+                                       return_value=(0, 0, True)))
+            # 穿透子函数 mock — 返回空穿透结果（industry_success=False）
+            stack.enter_context(patch(
+                "src.python.report.html_writer._render_penetration_section",
+                return_value=({"top10": [], "summary": {}, "industry_success": False}, False, True),
+            ))
+            # 基金业绩子函数 mock
+            stack.enter_context(patch(
+                "src.python.report.html_writer._render_fund_performance_section",
+                return_value=([], True),
+            ))
+            # data_status mock — industry 失败
+            stack.enter_context(patch(
+                "src.python.report.html_writer._build_penetration_data_status",
+                return_value={
+                    "industry": DataStatusItem(
+                        available=False, tier="T3",
+                        message=STATUS_MESSAGES["industry_unavailable"],
+                    ),
+                },
+            ))
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html>ok</html>"
+            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template",
+                                       return_value=tmpl))
+
+            write_html_report(self.holdings, output_dir=self._tmp)
+
+        _, kwargs = tmpl.render.call_args
+        self.assertIn("data_status_penetration", kwargs)
+        self.assertIn("industry", kwargs["data_status_penetration"])
+        self.assertFalse(kwargs["data_status_penetration"]["industry"]["available"])
+        self.assertEqual(kwargs["data_status_penetration"]["industry"]["tier"], "T3")
+
+    def test_data_status_perf_on_failure(self):
+        """基金业绩数据源失败 → data_status_perf 含失败项。"""
+        from src.python.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            stack.enter_context(patch("src.python.report.html_writer._generate_details",
+                                       return_value=[self.detail]))
+            stack.enter_context(patch("src.python.report.html_writer.fetch_indices",
+                                       return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
+            stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
+                                       return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
+            stack.enter_context(patch("src.python.report.html_writer._build_category_data",
+                                       return_value={}))
+            stack.enter_context(patch("src.python.report.html_writer.price_update_status",
+                                       return_value=(0, 0, True)))
+            stack.enter_context(patch(
+                "src.python.report.html_writer._render_penetration_section",
+                return_value=({"top10": [], "summary": {}, "industry_success": True}, True, True),
+            ))
+            # 基金业绩子函数 — profit_success=False
+            stack.enter_context(patch(
+                "src.python.report.html_writer._render_fund_performance_section",
+                return_value=([], False),
+            ))
+            stack.enter_context(patch(
+                "src.python.report.html_writer._build_perf_data_status",
+                return_value={
+                    "rank": DataStatusItem(
+                        available=False, tier="T2",
+                        message=STATUS_MESSAGES["rank_unavailable"],
+                    ),
+                },
+            ))
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html>ok</html>"
+            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template",
+                                       return_value=tmpl))
+
+            write_html_report(self.holdings, output_dir=self._tmp)
+
+        _, kwargs = tmpl.render.call_args
+        self.assertIn("data_status_perf", kwargs)
+        self.assertIn("rank", kwargs["data_status_perf"])
+        self.assertFalse(kwargs["data_status_perf"]["rank"]["available"])
+
+    def test_data_status_try_split_independent(self):
+        """穿透和基金业绩的 data_status try 块独立：一方异常不影响另一方。"""
+        from src.python.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            stack.enter_context(patch("src.python.report.html_writer._generate_details",
+                                       return_value=[self.detail]))
+            stack.enter_context(patch("src.python.report.html_writer.fetch_indices",
+                                       return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
+            stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
+                                       return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
+            stack.enter_context(patch("src.python.report.html_writer._build_category_data",
+                                       return_value={}))
+            stack.enter_context(patch("src.python.report.html_writer.price_update_status",
+                                       return_value=(0, 0, True)))
+            # 穿透有数据（truthy），profit_success/dividend_success 不影响 data_status mock
+            stack.enter_context(patch(
+                "src.python.report.html_writer._render_penetration_section",
+                return_value=({"top10": [{"rank": 1, "codes": ["600900"]}], "summary": {}}, True, True),
+            ))
+            stack.enter_context(patch(
+                "src.python.report.html_writer._render_fund_performance_section",
+                return_value=([], True),
+            ))
+            # 穿透 data_status 抛异常 → 被辅助函数捕获，结果为 {}
+            stack.enter_context(patch(
+                "src.python.report.html_writer._build_penetration_data_status",
+                side_effect=Exception("模拟穿透状态构建失败"),
+            ))
+            # 基金业绩 data_status 正常返回
+            stack.enter_context(patch(
+                "src.python.report.html_writer._build_perf_data_status",
+                return_value={
+                    "benchmark": DataStatusItem(
+                        available=False, tier="T3",
+                        message=STATUS_MESSAGES["benchmark_unavailable"],
+                    ),
+                },
+            ))
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html>ok</html>"
+            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template",
+                                       return_value=tmpl))
+
+            write_html_report(self.holdings, output_dir=self._tmp)
+
+        _, kwargs = tmpl.render.call_args
+        # 穿透状态为空（异常被捕获，变量保持初始值 {}）
+        self.assertEqual(kwargs["data_status_penetration"], {})
+        # 基金业绩状态正常保留，不受穿透异常影响
+        self.assertIn("benchmark", kwargs["data_status_perf"])
+        self.assertFalse(kwargs["data_status_perf"]["benchmark"]["available"])
 
 
 if __name__ == "__main__":
