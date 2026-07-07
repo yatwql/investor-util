@@ -12,6 +12,7 @@ APP_VERSION = "0.2.89"
 
 CACHE_DAILY = 86400         # 每日（24h）
 CACHE_WEEKLY = 604800       # 每周（7d）
+CACHE_TWO_WEEKS = 1209600   # 两周（14d）
 CACHE_MONTHLY = 2592000     # 每月（30d）
 
 # ── LLM 模型定价表（每百万 token，CNY） ───────────────────

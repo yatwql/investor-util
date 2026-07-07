@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
+from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_TWO_WEEKS, CACHE_MONTHLY
 
 logger = logging.getLogger("invest")
 
@@ -108,7 +108,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
 
     # ── 行业分类（refresh 组）──
     DataModuleDef("行业分类", "industry",
-                  cache_prefixes=("industry_",), cache_ttl=CACHE_WEEKLY,
+                  cache_prefixes=("industry_",), cache_ttl=CACHE_TWO_WEEKS,
                   cache_groups=("refresh",)),
 
     # ── 新闻（refresh 组）──
