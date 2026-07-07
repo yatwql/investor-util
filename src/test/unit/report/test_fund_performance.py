@@ -323,7 +323,7 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         # ws.cell 必须通过 side_effect 返回独立 mock，否则 Python 3.13+ 中
         # _Call 不可 hash，所有 ws.cell() 返回同一对象，font 会相互覆盖
         _cell_cache: dict[tuple[int, int], MagicMock] = {}
-        def _cell_side_effect(*, row: int, column: int) -> MagicMock:
+        def _cell_side_effect(*, row: int, column: int, **kwargs) -> MagicMock:
             key = (row, column)
             if key not in _cell_cache:
                 _cell_cache[key] = MagicMock()
@@ -518,7 +518,8 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         # benchmark 不应被调用（continue 跳过）
         self.mocks["fetch_fund_benchmark"].assert_not_called()
 
-        # ws.cell 不应被调用（无成功基金）
+        # ws.cell 不会被 _write_data_status_foot 调用
+        # （首次失败未达降级阈值 → data_status 为空 → foot 提前返回）
         self.assertEqual(self.ws.cell.call_count, 0)
 
     # -- partial fail ------------------------------------------------
@@ -888,7 +889,7 @@ class TestRankDataReasonableRange(unittest.TestCase):
     def setUp(self):
         self.ws = MagicMock()
         _cell_cache: dict = {}
-        def _cell_side_effect(*, row: int, column: int) -> MagicMock:
+        def _cell_side_effect(*, row: int, column: int, **kwargs) -> MagicMock:
             key = (row, column)
             if key not in _cell_cache:
                 _cell_cache[key] = MagicMock()

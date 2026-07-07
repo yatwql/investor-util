@@ -364,17 +364,12 @@ def _build_perf_data_status(
 
     # 排名数据（T2）— 全部失败
     if not adjusted_ratings and total_funds > 0:
-        # 取第一只基金的缓存年龄作为代表
-        rank_cache_age: float | None = None
-        for code in adjusted_ratings:
-            rank_cache_age = get_cache_age(f"fund_perf_{code}")
-            if rank_cache_age is not None:
-                break
+        # 所有基金均未获取到排名数据（无代表性缓存年龄可查）
         ttl = get_ttl("fund_rank")
         degraded, _, _ = _tracker.record(
             "perf_rank", "T2", success=False,
             failure_type="empty",
-            cache_age_hours=rank_cache_age / 3600 if rank_cache_age else None,
+            cache_age_hours=None,
             cache_ttl_hours=ttl / 3600 if ttl else 24,
         )
         if degraded:
