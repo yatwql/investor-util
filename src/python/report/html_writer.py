@@ -40,6 +40,7 @@ from src.python.report.data_status import DataStatus
 from src.python.report.summary import _build_index_data_status
 from src.python.report.penetration_sheet import _build_penetration_data_status
 from src.python.report.fund_performance import _build_perf_data_status
+from src.python.report.category import _build_category_data_status
 
 logger = logging.getLogger("invest")
 
@@ -226,7 +227,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
     a_indices, us_indices, a_indices_list, us_indices_list = _render_index_section(prog)
 
     # ── 5~7) 分类表 / 穿透 / 基金业绩 ──
-    cat_data = _render_category_table(holdings, details, prog)
+    cat_data, cat_dividend_ok = _render_category_table(holdings, details, prog)
     penetration, penetration_profit_ok, penetration_dividend_ok = _render_penetration_section(holdings, details, prog)
     perf_data, perf_profit_ok = _render_fund_performance_section(holdings, details, prog)
 
@@ -307,6 +308,9 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         sum(1 for h in holdings if _is_fund(h)),
         profit_success=perf_profit_ok, label="基金业绩",
     )
+    data_status_category: DataStatus = _safe_build_data_status(
+        _build_category_data_status, cat_dividend_ok, label="持仓分类",
+    )
 
     html = _ENV.get_template("report_template.html").render(
         now=now_str, today=today_str, trading_day=trading_day,
@@ -340,6 +344,7 @@ def write_html_report(holdings: List[Holding], output_dir: str = "reports", news
         data_status_summary=data_status_summary,
         data_status_penetration=data_status_penetration,
         data_status_perf=data_status_perf,
+        data_status_category=data_status_category,
     )
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
@@ -473,10 +478,16 @@ def _render_index_section(
 
 def _render_category_table(
     holdings: List[Holding], details: list, prog: ProgressReporter,
-) -> List[Dict[str, Any]]:
-    """构建持仓分类表数据。"""
+) -> tuple[list[Dict[str, Any]], bool]:
+    """构建持仓分类表数据。
+
+    Returns:
+        (cat_data, dividend_success)
+    """
     prog.info("正在生成持仓分类表...")
-    return _build_category_data(holdings, details)
+    from src.python.report.html_builders import _build_category_data
+    cat_data, dividend_success = _build_category_data(holdings, details)
+    return cat_data, dividend_success
 
 
 def _render_penetration_section(

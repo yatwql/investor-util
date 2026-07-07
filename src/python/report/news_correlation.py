@@ -22,7 +22,9 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name, set_sheet_title
+from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
+    _write_placeholder,
     auto_width,
     freeze_header,
     write_data_row,
@@ -424,9 +426,16 @@ def build_news_data(
         "llm_cached": False,
         "llm_enabled": False,
         "active_sources": active_sources,
+        "source_status": {},
     }
 
     if not news_items:
+        # 即使 news_items 为空，也能从 aggregate_news 获取各源状态
+        try:
+            from src.python.providers.news_aggregator import get_last_source_status as _glss
+            meta["source_status"] = _glss()
+        except Exception:
+            pass
         logger.warning("新闻获取失败")
         return news_items, meta
 
@@ -436,6 +445,13 @@ def build_news_data(
 
     meta = _apply_llm_enhancement(news_items, holdings, penetrated_assets, industry_data, meta)
     _enrich_news_keywords(news_items, holdings, penetrated_assets, industry_data)
+
+    # 补充各源状态（在 aggregate_news 之后获取）
+    try:
+        from src.python.providers.news_aggregator import get_last_source_status as _glss
+        meta["source_status"] = _glss()
+    except Exception:
+        pass
 
     return news_items, meta
 
@@ -456,11 +472,20 @@ def _build_news_footer(news_data: list[dict], llm_meta: dict | None, has_llm: bo
             parts.append("（含 LLM 智能关联分析）")
         parts.append("，关键词匹配基于持仓名称和代码")
         return "".join(parts)
-    return (
+    result = (
         f"共获取 {len(news_data)} 条关联新闻。"
         "基于持仓名称和代码进行关键词匹配。"
         "本次未使用LLM服务能力增强支持，使用传统关键字匹配技术"
     )
+    # 追加部分源失败信息
+    _source_status = (llm_meta or {}).get("source_status", {})
+    _failed_sources = [
+        s["label"] for s in _source_status.values()
+        if not s["success"]
+    ]
+    if _failed_sources:
+        result += f" 以下新闻源不可用：{'、'.join(_failed_sources)}"
+    return result
 
 
 def _write_news_token_footer(ws: Worksheet, row: int, llm_meta: dict | None) -> int:
@@ -516,8 +541,18 @@ def write_news_sheet(
     row = write_header_row(ws, row, headers)
 
     if not news_data:
-        write_data_row(ws, row, ["暂无关联新闻"])
-        logger.info("%s：无数据", get_llm_module_name("news_correlation"))
+        # 全源失败 → 写占位
+        _source_status = (llm_meta or {}).get("source_status", {})
+        _all_failed = _source_status and all(
+            not s["success"] for s in _source_status.values()
+        )
+        if _all_failed:
+            _write_placeholder(ws, STATUS_MESSAGES["news_all_failed"], row=row, max_cols=ncols)
+            logger.warning("%s：所有新闻源均获取失败，写入占位",
+                          get_llm_module_name("news_correlation"))
+        else:
+            write_data_row(ws, row, ["暂无关联新闻"])
+            logger.info("%s：无数据", get_llm_module_name("news_correlation"))
         freeze_header(ws, 2)
         auto_width(ws)
         return

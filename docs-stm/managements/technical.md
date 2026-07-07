@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-06（v0.2.89 — 设计约束表 + 新闻召回策略）
+最后更新：2026-07-08（v0.2.90 — D 迭代数据降级分层治理 + _data_status 机制）
 
 ---
 
@@ -64,11 +64,11 @@ investor-util/
 │   │   ├── tui_handlers.py       # 菜单通用辅助（退出/按任意键/LLM用量输出）
 │   │   └── tui_menu.py           # 菜单交互
 │   └── test/                     # 测试（按标记分组目录）
-│       ├── conftest.py           # pytest 配置 + 19 个分层标记注册
+│       ├── conftest.py           # pytest 配置 + 分层标记注册
 │       ├── helpers.py            # 测试辅助工具
-│       ├── unit/                 # 单元测试（8 子组）
-│       ├── integration/          # 集成测试（5 子组）
-│       ├── scenario/             # 场景测试（4 子组）
+│       ├── unit/                 # 单元测试
+│       ├── integration/          # 集成测试
+│       ├── scenario/             # 场景测试
 ├── data/                         # 运行时数据
 ├── reports/                      # 生成报告
 ├── logs/                         # 程序日志
@@ -142,6 +142,8 @@ v0.2.88 已完成全量迁移，所有 `code.startswith()` 和名称关键词判
 > 指数数据由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存。
 
 > 各新闻源的完整端点格式及通用数据源说明参见 [数据源一览](../manuals/datasource-and-folders.md)。
+>
+> 新闻数据的编排/处理层由 `news_aggregator.py`（多源聚合去重）、`news_correlator.py`（持仓关联分析）、`news_keywords.py`（关键词提取）、`news_sources.py`（源元数据定义）4 个模块组成，位于 `providers/` 下，与上述 Provider 分离。
 
 ---
 
@@ -272,7 +274,7 @@ Provider Chain 注册表（registry.py）
 | `industry.py` | 行业分类+概念板块 | eastmoney_industry, eastmoney_industry_rest | `industry_*` |
 | `chain.py` | Provider 优先链定义 + fallback 路由 | —（纯路由逻辑） | — |
 
-- **并行预热**：`preload_cache()` 对 preload 组（6 模块）使用 `ThreadPoolExecutor` 并行获取，减少串行等待
+- **并行预热**：`preload_cache()` 对 preload 组使用 `ThreadPoolExecutor` 并行获取，减少串行等待
 - **菜单驱动**：菜单 [1] 和 [2] 分别清除 + 重拉 refresh 和 preload 组，复用 fetcher 模块的预热入口
 - **指数独立**：`fetcher/index.py` 直调 Provider，不走 Provider Chain（双链路 fallback 硬编码在此）
 
@@ -288,9 +290,11 @@ handlers_report.py（菜单触发）
    │
    ├─ Excel 管线
    │     excel_generator.py → summary.py / market_value.py / category.py /
-   │     penetration.py / fund_performance.py / news_correlation.py /
-   │     early_warning.py / llm_content.py / fund_manager_sheet.py /
-     overlap_matrix.py / concentration.py / fund_style_analysis.py（各页签写入器）
+   │     penetration.py / penetration_sheet.py / fund_performance.py /
+   │     news_correlation.py / early_warning.py / llm_content.py /
+   │     fund_manager_sheet.py / fund_overlap_sheet.py /
+   │     fund_concentration_sheet.py / fund_style_analysis.py /
+   │     fund_style_sheet.py（各页签写入器，B 系列 4 模块采用计算引擎+写入器分离模式）
    │     → excel_writer.py（通用写入）+ styles.py（样式）
    │
    └─ HTML 管线
@@ -302,6 +306,25 @@ handlers_report.py（菜单触发）
 - **条件渲染**：B 系列基金分析模块（`enable_b_series` 标志）、智能预警页签（菜单 B/L）、LLM 分析章节（菜单 L）在 `info` 中无对应数据时自动跳过
 - **汇总页（页签 1）** 由 `summary.py` 的 `write_summary_sheet()` 独立写入，采用与其他页签写入器相同的直接调用模式。区别仅在于该函数与 `write_llm_usage_sheet()` 同属于 `summary.py`，且命名上不遵循 `_write_*_sheet` 模式
 
+### 数据降级治理（D 迭代）
+
+`src/python/report/data_status.py` 提供数据状态追踪基础设施，被 Excel 和 HTML 两端共享：
+
+- **`DataStatusItem`（TypedDict）**：`{"available": bool, "tier": str, "message": str}` — 单一数据源的可用状态
+- **`STATUS_MESSAGES`（dict）**：Excel 和 HTML 两端共享的常量字典，保证消息一致性。按数据源类型分 T2（⚠ 前缀）和 T3/T4（ℹ 前缀）两类
+- **`TIER_PREFIX`**：`{"T2": "⚠", "T3": "ℹ", "T4": "ℹ"}` — 按层级自动选择前缀符号
+- **`DegradationTracker`**：双信号降级阈值控制器（连续失败计数 + 缓存陈旧度），支持跨会话持久化到 `.degradation_state.json`
+
+Excel 端降级辅助函数（`category.py`等模块中使用）：
+
+- **`_write_placeholder(ws, message)`**：数据为空时写入灰色占位文本（合并单元格），替代隐藏页签行为
+- **`_write_data_status_foot(ws, status)`**：在页签底部追加数据源状态摘要行，根据 tier 自动匹配前缀
+
+HTML 端降级机制：
+
+- **`_safe_build_data_status(builder_fn, *args)`**：异常安全的 `DataStatus` 构建包装器，构建失败返回空状态
+- **`render_data_status(status)` Jinja2 宏**：在 `report_template.html` 中条件渲染状态摘要区域
+
 ### 持仓读取与列校验
 
 `reader.py` 基于 openpyxl 解析持仓 xlsx：
@@ -309,7 +332,7 @@ handlers_report.py（菜单触发）
 - `load_holdings(filepath)` 遍历所有 worksheet，每 worksheet = 一个账户
 - 列校验规则：必须存在且恰好 4 列（名称、代码、持仓份额、每份成本），列名匹配忽略首尾空格
 - 数据清洗：代码自动去除后缀（`.SH`/`.SZ`/`.OF`），份额/成本转为 float，空行跳过
-- 多文件选择：持仓目录下多个 xlsx 时弹出 TUI 选择器（`handlers_report.py` 中 `_select_holdings_file()`）
+- 多文件选择：持仓目录下多个 xlsx 时弹出 TUI 选择器（`tui_handlers.py` 中 `_select_holdings_file()`）
 
 ---
 ### B 系列：基金深度分析模块
@@ -325,6 +348,7 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 - **窗口期计算**：任职起始日距今天数：
   - ≤30 天 → 🔴 紧急
   - ≤90 天 → ⚠️ 关注
+  - ≤180 天 → ⚠️ 关注（与 90 天同级，用于 91-180 天范围内的变更提示）
   - 首次运行无快照 → 📋 首检（自下次起跟踪）
   - 无变更 → ✅ 正常
 - **持股模式**：每个基金独立判断，互不干扰
@@ -380,7 +404,7 @@ C 迭代将报告 16 个模块的序号/显示名称从硬编码改为由 `regis
 
 #### 注册表结构
 
-`registry.py` 中定义 `_REPORT_SECTION_DEFAULT` 列表，每项包含 5 个字段：
+`registry.py` 中定义 `_REPORT_SECTION_DEFAULT` 列表：
 
 | 字段 | 类型 | 说明 |
 |:-----|:----:|:-----|
@@ -390,7 +414,7 @@ C 迭代将报告 16 个模块的序号/显示名称从硬编码改为由 `regis
 | `type` | str | 可见性类型：`always` / `b_series` / `news` / `llm` |
 | `data_flag` | str\|None | 运行时数据标志键名，`None` 表示始终可见 |
 
-**4 种可见性类型：**
+**可见性类型：**
 
 | 类型 | 数量 | 含义 | data_flag |
 |:-----|:----:|:-----|:----------|
@@ -444,7 +468,7 @@ raw_data_flags = {
 
 #### HTML 模板重构
 
-**导航栏：** 11 个硬编码 `<a>` 链接替换为：
+**导航栏：** 使用 `section_order` 动态循环生成，只渲染当前可见的模块：
 ```jinja
 {% for sec in section_order %}
   {% if section_visible(sec["key"]) %}
@@ -814,9 +838,11 @@ report/excel_generator.py (Excel 编排)
     llm_content.py, fund_manager_sheet.py, overlap_matrix.py,
     concentration.py, fund_style_analysis.py (各页签写入)
   → report/excel_writer.py, styles.py (通用写入/样式)
+  → report/data_status.py (降级状态追踪，Excel/HTML 共享)
   → report/html_writer.py (HTML 编排)
     → report/html_builders.py (数据构建器)
-    → tmpl/report_template.html (Jinja2 模板)
+    → report/data_status.py (STATUS_MESSAGES / DataStatusItem)
+    → tmpl/report_template.html (Jinja2 模板 + render_data_status 宏)
 
 llm/generators.py (LLM 编排)
   → llm/skeleton.py (共享生成骨架)

@@ -98,6 +98,7 @@ investor-util/
 │       │   │   ├── summary.py            # 投资分析汇总页签 — 指数行情、账户汇总、LLM 用量
 │       │   │   ├── market_value.py       # 市值核算明细表页签 — 15 列持仓行情、盈亏计算
 │       │   │   ├── category.py           # 持仓分类表页签 — 按资产属性+投资分类聚合
+│       │   │   ├── data_status.py        # 数据源状态追踪 — DataStatusItem / STATUS_MESSAGES / DegradationTracker
 │       │   │   ├── penetration.py        # 资产穿透 TOP10 — 基金穿透合并、行业分类、板块映射
 │       │   │   ├── penetration_sheet.py  # 穿透 TOP10 Excel 写入 — 从 penetration.py 拆分的页签写入函数
 │       │   │   ├── fund_performance.py   # 基金业绩分析页签 — 排名/收益率/基准对比/评级
@@ -119,11 +120,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2572 tests）
+│   └── test/                             # 测试（按标记分组目录，2669 tests）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2270 项，8 个子分组）
+│       ├── unit/                         # 单元测试（2367 项，8 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── conftest.py               # 单元测试级 pytest fixture/配置
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
@@ -143,9 +144,9 @@ investor-util/
 │       │   │   ├── test_fetcher_index.py # 指数抓取 — 腾讯→新浪 fallback 双链路（13 项）
 │       │   │   ├── test_fetcher_industry.py # 行业抓取 — _industry_transform / fetch_industry_data（10 项）
 │       │   │   ├── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
-│   │   │   ├── test_fund_manager.py  # 基金经理师数据获取 — HTML 解析、当页面退 回档（14 项）
+│   │   │   ├── test_fund_manager.py  # 基金经理师数据获取 — HTML 解析、当页面退回档（14 项）
 │       │   │   └── test_api_edge.py      # HTTP Provider 异常场景 — 超时/DNS/SSL/429/503/JSON 异常（23 项 Y1）
-│       │   ├── llm/                      # LLM 相关测试（345 项）
+│       │   ├── llm/                      # LLM 相关测试（369 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_api.py           # LLM API 调用 — 重试/熔断/回退/截断/Provider 路由（44 项）
 │       │   │   ├── test_api_edge.py         # LLM API 异常场景 — 网络错误/HTTP 错误码/超时
@@ -168,14 +169,16 @@ investor-util/
 │       │   │   ├── test_wallstreetcn_news.py # 华尔街见闻新闻 — _parse_news_item HTML 剥离（15 项）
 │       │   │   ├── test_cls_news.py      # 财联社新闻 — _parse_news_item 缺字段测试（21 项）
 │       │   │   └── test_akshare_news.py  # akshare 新闻 — 财新网 + CCTV 双链路（16 项）
-│       │   ├── report/                   # 报表生成测试（855 项）
+│       │   ├── report/                   # 报表生成测试（≈928 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_excel_writer.py  # Excel 写入引擎 — Workbook 创建/页签管理（30 项）
 │       │   │   ├── test_excel_roundtrip.py # Excel 读写回环测试 — 保存后重开验证数据完整性
 │       │   │   ├── test_excel_report_structure.py # Excel 报告结构验证 — 页签序号/条件显示/命名
 │       │   │   ├── test_html_writer.py   # HTML 报告生成 — Jinja2 渲染/LLM 章节分支（89 项）
+│       │   │   ├── test_html_writer_edge.py # HTML 写入器异常场景 — 降级渲染/条件分支边界
 │       │   │   ├── test_html_template.py  # HTML 模板分支审计 — 评级颜色/模块启停/条件渲染
 │       │   │   ├── test_html_report_structure.py # HTML 报告结构验证 — 章节顺序/条件渲染/导航
+│       │   │   ├── test_html_report_structure_edge.py # HTML 结构验证异常场景 — 缺失 section/降级页脚
 │       │   │   ├── test_excel_generator.py # Excel 报告编排 — 懒导入/异常隔离/计时（15 项）
 │       │   │   ├── test_summary.py       # 投资分析汇总页签 — 指数行情/账户汇总/LLM 用量（85 项）
 │       │   │   ├── test_market_value.py  # 市值核算明细表 — 15 列持仓盈亏计算（59 项）
@@ -184,18 +187,26 @@ investor-util/
 │       │   │   ├── test_fund_concentration.py # 持仓集中度监控测试（15 项 B4）
 │       │   │   ├── test_fund_performance.py # 基金业绩分析 — 排名/评级/评级分布直方图（48 项）
 │       │   │   ├── test_category.py      # 持仓分类表 — 按资产属性+投资分类聚合（30 项）
+│       │   │   ├── test_category_edge.py # 持仓分类异常场景 — 空数据/降级分红/占位文本
 │       │   │   ├── test_classification_utils.py # 分类工具函数 — 资产分类/映射/判定（B 系列辅助）
 │       │   │   ├── test_data_integrity.py # 数据正确性验证 — 分类聚合/行业占比/指数合理性/多币种/多时区
+│       │   │   ├── test_data_quality_edge.py # 数据质量异常场景 — 停牌/负净值/债券违约/FOF 嵌套（22 项 Y2）
+│       │   │   ├── test_data_status.py   # DataStatusItem / DegradationTracker / STATUS_MESSAGES 常量（D 迭代）
 │       │   │   ├── test_market_value_edge.py # 行情异常场景 — NAV 空窗期/交易时段切换/溢价率（37 项）
-│       │   │   ├── test_qdii_timezone.py # QDII 多时区 — _is_qdii / 多时区日期转换（26 项）
+│       │   │   ├── test_qdii_timezone_edge.py # QDII 多时区 — _is_qdii / 多时区日期转换（26 项）
 │       │   │   ├── test_news_correlation.py # 新闻关联分析页签 — 新闻匹配/关键词写入（49 项）
 │       │   │   ├── test_early_warning.py # 智能预警页签 — 行业资金流出/新闻情绪聚合（25 项）
+│       │   │   ├── test_early_warning_edge.py # D-7b 预警空态占位（5 项）
+│       │   │   ├── test_excel_generator_edge.py # D-8 全局降级冒烟 + 消息一致性（10 项）
+│       │   │   ├── test_fund_bseries_sheet_edge.py # D-8 B 系列空数据占位（6 项）
+│       │   │   ├── test_html_builders.py # HTML 数据构建器 — 持仓分类表/基金业绩数据构建
+│       │   │   ├── test_html_builders_edge.py # HTML 数据构建器异常场景 — 分红 API 降级/盈利预测失败
+│       │   │   ├── test_news_degradation_edge.py # D-7b 新闻全源/部分失败占位（7 项）
 │       │   │   ├── test_progress.py      # 进度报告 — ProgressReporter / 错误跟踪/耗时排行（33 项）
 │       │   │   ├── test_fund_style_analysis.py # 基金风格分析 — 市值/PE 加权、网格距离、漂移检测（32 项）
 │       │   │   ├── test_fund_manager_analysis.py # 基金经理变更分析测试（B2）
 │       │   │   ├── test_fund_manager_sheet.py # 基金经理变更监控 Excel 写入测试（B2）
 │       │   │   ├── test_fund_overlap.py # 持仓重合度矩阵测试（21 项 B3）
-│       │   │   ├── test_data_quality_edge.py # 数据质量异常场景 — 停牌/负净值/债券违约/FOF 嵌套（22 项 Y2）
 │       │   │   └── test_security_edge.py # 安全纵深 — 公式注入/XSS/符号链接/路径遍历/原型污染/临时文件竞争（19 项 Y6，含 4 项 autoescape）
 │       │   ├── config/                   # 配置测试（71 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -262,16 +273,16 @@ investor-util/
 ├── test-reports/                      # 测试报告输出（自动生成）
 │   ├── latest/                        # 最新测试报告（按 --mode 生成子目录）
 │       │   ├── index.html                 # 汇总页 — 各模式通过/失败总览 + 最近运行时间
-│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2270 项）
-│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，1977 项）
+│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2367 项）
+│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，2027 项）
 │       │   ├── scenario/report.html       # 场景测试报告（标记 -m "scenario"，277 项）
 │       │   ├── regression/report.html     # 回归测试报告（标记 -m "scenario"，模式别名，277 项）
 │       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，958 项）
 │       │   ├── integration/report.html    # 集成测试报告（标记 -m "scenario or integration"，302 项）
 │       │   ├── smoke/report.html          # 冒烟测试报告（标记 -m "smoke"，24 项）
-│       │   ├── edge/report.html           # 边缘场景报告（标记 -m "edge"，228 项）
+│       │   ├── edge/report.html           # 边缘场景报告（标记 -m "edge"，275 项）
 │       │   ├── data/report.html           # 数据正确性报告（标记 -m "data"，65 项）
-│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2572 项）
+│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2669 项）
 │       │   └── coverage/                  # HTML 行覆盖率报告（--coverage 时生成）
 │   └── archives/                      # 历史报告存档
 │       └── <YYYYMMDD>/                # 按日期归档的子目录（含完整 latest/ 快照）
@@ -292,7 +303,13 @@ investor-util/
 │   │   ├── A5-test-runtime-optimization.md    # ✅ 已实现 — A5：测试运行时可扩展性优化设计
 │   │   ├── B1-fund-deep-analysis.md           # ✅ 已实现 — B 迭代基金深度分析 4 模块设计
 │   │   ├── c-iteration-design.md              # ✅ 已实现 — C 迭代设计
-│   │   └── c-p1b-excel-title-number-fix.md    # ✅ 已实现 — C-P1b：Excel 报告可配置序号修复设计
+│   │   ├── c-p1b-excel-title-number-fix.md    # ✅ 已实现 — C-P1b：Excel 报告可配置序号修复设计
+│   │   ├── akshare-integration-profit-forecast-sector-flow.md  # ✅ 已归档 — akshare 集成（profit_forecast + sector_fund_flow）
+│   │   ├── d-iteration-data-degradation-design.md              # ✅ 已归档 — D 迭代数据降级分层治理完整设计
+│   │   ├── early-warning-and-p1-optimization.md                # ✅ 已归档 — 智能预警 + P1 代码优化实施计划
+│   │   ├── y5-edge-test-config-env.md                          # ✅ 已归档 — Y5 配置/环境纵深测试实施计划
+│   │   ├── d-iteration-data-degradation-iteration-plan.md      # ✅ 已归档 — D 迭代精细化子迭代拆分方案
+│   │   └── c-p1b-excel-title-number-follow-config.md           # ✅ 已归档 — C-P1b 页签编号配置实施计划
 │   ├── plan/                         # 计划与设计文件
 │   │   ├── test-coverage-map.md          # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   │   └── notes/                        # 源码预研笔记（当前为空，原 data-source-pre-study.md 已归档至 archive/）

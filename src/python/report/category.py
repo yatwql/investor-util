@@ -23,7 +23,9 @@ from src.python.code_utils import (
 )
 from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.models import Holding
+from src.python.report.data_status import DataStatus, DataStatusItem, STATUS_MESSAGES
 from src.python.report.excel_writer import (
+    _write_data_status_foot,
     auto_width,
     freeze_header,
     write_data_row,
@@ -101,15 +103,41 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
     return ("基金", "混合")
 
 
-def _load_dividend_data(holdings: List[Holding]) -> dict:
-    """加载分红数据（非关键，失败时返回空字典）。"""
+def _load_dividend_data(holdings: list) -> tuple[dict, bool]:
+    """加载分红数据（非关键，失败时返回空字典）。
+
+    Returns:
+        (dividend_data, success) — success=False 表示 API 调用异常。
+    """
     try:
         from src.python.providers.akshare_extras import get_dividend_data
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
-        return get_dividend_data(stock_codes) if stock_codes else {}
+        if not stock_codes:
+            return {}, True
+        data = get_dividend_data(stock_codes)
+        return data, True
     except Exception:
-        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
-        return {}
+        logger.warning("[category] 分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
+        return {}, False
+
+
+def _build_category_data_status(dividend_success: bool) -> DataStatus:
+    """构建持仓分类表的数据源状态摘要。
+
+    Args:
+        dividend_success: 分红 API 是否成功
+
+    Returns:
+        DataStatus 字典；全部成功时返回空 dict。
+    """
+    status: DataStatus = {}
+    if not dividend_success:
+        status["dividend"] = DataStatusItem(
+            available=False,
+            tier="T4",
+            message=STATUS_MESSAGES["dividend_unavailable"],
+        )
+    return status
 
 
 def calc_yield_text(code: str, d, dividend_data: dict) -> str:
@@ -195,7 +223,7 @@ def write_category_sheet(
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
-    dividend_data = _load_dividend_data(holdings)
+    dividend_data, dividend_success = _load_dividend_data(holdings)
     grand_mv = grand_cost = grand_profit = grand_today = 0.0
 
     for (prop, sub), group in sorted_groups:
@@ -216,6 +244,9 @@ def write_category_sheet(
     auto_width(ws)
     logger.info("%s写入完成，共 %d 个分组，%d 条持仓",
                 get_report_sheet_name('category'), len(sorted_groups), len(holdings))
+
+    data_status = _build_category_data_status(dividend_success)
+    _write_data_status_foot(ws, data_status, start_row=row + 1, max_cols=_NCOLS)
 
 
 def _num_formats() -> list[str]:

@@ -4,12 +4,26 @@
 
 ---
 
-## [0.2.90] - 2026-07-07
+## [Unreleased]
+
+### Changed
+
+- **已完成迭代设计文件归档**：将 `docs-stm/plan/` 中的 6 个已完成迭代设计文件移至 `docs-stm/archive/`：`d-iteration-data-degradation-design.md`（D 迭代）、`d-iteration-data-degradation-iteration-plan.md`（D 迭代子拆分）、`y5-edge-test-config-env.md`（Y5）、`c-p1b-excel-title-number-follow-config.md`（C-P1b）、`akshare-integration-profit-forecast-sector-flow.md`（akshare 集成）、`early-warning-and-p1-optimization.md`（智能预警+P1）。`plan.md` 引用路径同步更新，`datasource-and-folders.md` 目录树同步更新。
+
+---
+
+## [0.2.90] - 2026-07-08
 
 ### Added
 
 - **D-7a：B 系列模块空态占位** — 基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析 4 模块在数据为空时不再隐藏页签，改为显示占位文本（来自 `STATUS_MESSAGES` 常量）。`excel_generator.py` 中 B 系列 4 模块改为无条件调用 sheet 写入函数（空数据由 sheet 层自行判断写占位）。HTML 模板同步新增 `empty-section` CSS 类 + 4 模块有条件渲染占位块。
+- **D-7b：新闻模块降级 + source_status 追踪** — `news_aggregator.py` 新增 `_last_src_results` 模块级字典 + `get_last_source_status()` 函数，按 `{source_key: {"label", "success", "count", "error"}}` 格式追踪各源拉取结果。`news_correlation.py` 的 `build_news_data()` 提取 `source_status` 注入 `info` 字典；`_build_news_footer()` 在部分源失败时底部列出失败源清单。全源失败时 `write_news_sheet()` 写入 `STATUS_MESSAGES["news_all_failed"]` 占位文本。
+- **D-7b 配套：预警模块空态占位** — `early_warning.py` 增加 `None`/空数据容错，行业预警表缺数据时显示"暂无预警数据"，新闻情绪聚合表缺数据时显示"暂无新闻情绪数据"（来自 STATUS_MESSAGES 常量）。
+- **akshare Phase 2：持仓分类表分红降级 + _data_status** — `category.py` 新增 `_build_category_data_status(dividend_success)` 和 `_write_data_status_foot()` 调用，分红数据加载失败时在持仓分类表页脚追加状态摘要。`html_builders.py` 的 `_build_category_data()` 返回类型从 `list` 改为 `tuple[list, bool]`，通过 `dividend_success` 追踪 API 异常和空返回两种失败场景。`html_writer.py` 集成 `_build_category_data_status`、`_safe_build_data_status`、`data_status_category` 模板上下文。`report_template.html` 新增 `{{ render_data_status(data_status_category) }}` 条件渲染。
 - **D-8：全链路回归基线锁定** — 新增 `test_excel_generator_edge.py`（全局降级冒烟 2 条 + 消息一致性 8 条测试）、`test_fund_bseries_sheet_edge.py`（B 系列 4 模块空数据占位 6 条测试），覆盖所有降级路径的消息一致性验证。
+- **新闻降级边缘测试**：新增 `test_news_degradation_edge.py`（7 项测试）覆盖全源失败占位/部分失败"暂无"/source_status 兜底/页脚失败源列表等场景。
+- **预警空态边缘测试**：新增 `test_early_warning_edge.py`（5 项测试）覆盖行业/新闻两表缺数据时的占位文本断言。
+- **HTML 构建器降级测试**：`test_html_builders.py` 和 `test_html_builders_edge.py` 更新 `_build_category_data()` 的 `(list, bool)` 返回类型断言，新增 `dividend_success` 状态验证。
 
 ### Fixed
 
@@ -210,130 +224,6 @@
 ### Style
 
 - **模板数字格式化统一**：`report_template.html` 中 8 处 `{{ "{:,}".format(value) }}` 替换为 `{{ value | thousands }}`，统一使用已有自定义 Jinja2 filter
-
----
-
-## [Unreleased]
-
-### Added
-- **B 迭代完成（基金持仓专属分析，4 个新报告页签 13-16）**：
-  - **B0：数据源可行性预研** — 确认东方财富 push2 扩展字段（f20/f9 等）支持市值+PE 抓取，天天基金 API 支持基金经理/持仓数据获取
-  - **B1：基金元数据增强** — registry 注册基金经理/持仓/新增缓存分组，fetcher.py 新增接口方法
-  - **B2：基金经理变更监控** — `fund_manager_analysis.py` 基于快照的变更检测（1 月/3 月/6 月窗口），`fund_manager_sheet.py` Excel 写入（8 列+预警着色），18 项测试
-  - **B3：持仓重合度矩阵** — `fund_overlap.py` Jaccard+Overlap Ratio 双指标矩阵（取 max），`fund_overlap_sheet.py` 热力图 Excel 输出，21 项测试
-  - **B4：持仓集中度监控** — `fund_concentration.py` top3/5/10 占比+环比变化+三级预警，`fund_concentration_sheet.py` 10 列输出+变化箭头/标识，15 项测试
-  - **B5：基金风格漂移检测** — `fund_style_analysis.py` 市值/PE 加权风格判定（六宫格）+网格曼哈顿距离漂移评分（0-4 分三档）+代码段降级，`fund_style_sheet.py` 8 列+漂移等级着色，32 项测试
-
-### Changed
-- **B 集成**：`excel_generator.py` 新增 ws13-ws16 页签创建+`_write_fund_deep_sheets` 统一编排；`html_writer.py` 新增 4 个 B 系列 `_render_*` 函数+模板参数；`report_template.html` 新增导航链接+Module 13-16 HTML 节
-- **datasource-and-folders.md**：目录树新增 3 个 B5 文件（fund_style_analysis.py/fund_style_sheet.py/test_fund_style_analysis.py），report 单元测试计数 667→699 项
-- **technical.md**：版本/日期 v0.2.66→v0.2.85；移除目录树中硬编码测试统计数（≈2056+ passed/≈1888 项/≈159 项/≈25 项），指向 datasource-and-folders.md 作为权威计数源；报告管线补充 B 模块写入器（fund_manager_sheet/overlap_matrix/concentration/fund_style_analysis）；条件渲染补充 B 系列 ws13-ws16；模块依赖补充 B 模块引用
-- **testplan.md**：§1.3 场景规格补充 S29-S33（操作行为 5 场景）；§3 页签编号 1.~12.→1.~16.；§5 测试重点补充 v0.2.84（A5 并行加速）+v0.2.85（B 迭代 105 项新测试）；§9.1 测试文件位置补充操作行为场景 `test_scenario_operational_behavior.py`（S29-S33）
-- **requirements.md**：§8 编号范围一~十二→一~十六、1.~12.→1.~16.；§5.1 三层→四层缓存架构；§6.2 B 模块版本号统一为 v0.2.85+
-- **technical.md**：缓存分组 refresh 9→11 模块（补充 fund_manager/fund_overlap），独立模块补充 fund_concentration_snapshot/fund_style_snapshot；TTL 类型 17→21 种；新增 B 系列 4 模块技术设计节（经理变更/重合度/集中度/风格分析）
-- **how-to-config.md**：cache_ttl 表新增基金深度分析类 4 项（fund_manager/fund_overlap/fund_concentration/fund_style_snapshot）；缓存分组 refresh 补充基金经理数据/持仓重合度；无分组模块补充集中度历史快照/风格快照；JSON 示例补全 4 个 B 模块 cache_ttl 键；集中度键名修正 fund_concentration_snapshot→fund_concentration；调整建议与交易时段短 TTL 两条 tip 之间加空行分隔
-- **review-findings.md**：新增 R-155 Excel 页签排序错位技术债（1-7→13-16→8-11→12）
-- **Z1 迭代完成（特殊品种场景 S21-S28，27 项 scenario_basic 测试）**：`test_scenario_special_securities.py` 新增 27 项测试，覆盖 S21 港股通持仓（3 项：分类/代码前缀/无行情不崩溃）、S22 可转债持仓（3 项：名称含"债"分类/市值计算/关键字匹配）、S23 公募 REITs（3 项：代码1开头分类/名称含REIT分类/市值计算）、S24 货币基金（3 项：货币关键字分类/净值恒为1/增利关键字分类）、S25 科创板+北交所混合（4 项：688分类/8xx分类/上海前缀/北京前缀）、S26 商品/黄金 ETF（3 项：黄金ETF分类/商品ETF分类/溢价率占位符）、S27 跨境 ETF（3 项：纳指ETF分类/恒生科技ETF分类/T-1净值 today_profit=0）、S28 纯债/国债持仓（5 项：国债ETF名称含"债"分类/关键字检测/国债分类/企业债分类/市值计算）。全量测试 2198→2225，场景测试 180→207，scenario_basic 30→57。
-- **Z2 迭代完成（操作行为场景 S29-S33，15 项 scenario_basic 测试）**：`test_scenario_operational_behavior.py` 新增 15 项测试，覆盖 S29 分红送转除权（3 项：送转后份额翻倍、除权后收益率、纯送股零成本 profit_rate=None）、S30 定投成本摊薄（3 项：两批加权平均、三批不等额、定投亏损）、S31 部分调仓卖出（3 项：卖出 50%/90%/全部清仓）、S32 跨账户转仓（3 项：同代码两账户各自明细、分类一致、不同代码独立）、S33 新股中签待上市（3 项：无行情降级 cost 正确、上市后正常计算、多只新股不干扰）。全量测试 2225→2240，场景测试 207→222，scenario_basic 57→72。
-- **Y1 迭代完成（API/网络异常纵深，23 项 edge 测试）**：`test_api_edge.py`（`unit/fetcher/`）新增 23 项测试，覆盖 Provider 层 HTTP 异常（4 项：超时/DNS 解析失败/连接拒绝/SSL 证书错误，均返回 None 不抛出）、Provider Chain 多级降级（4 项：主链路失败→备链路成功、全部失败→过期缓存降级、全部失败无缓存→返回 None、Provider 抛出异常→跳过该链路）、响应解析异常（5 项：空响应体/截断字段/非 JSON/空 JSON/编码异常）、LLM API 错误分类（8 项：429/503 可重试、401/500 retryable、超时可重试、连接错误 retryable、正常 200 success）、HTTP 客户端 SSL 验证（2 项：SSL_VERIFY=false 关闭验证、默认 true）。单元测试 1970→1993，edge 测试 175→198，全量 2175→2198。
-- **Y6 迭代完成（安全纵深，15 项 edge 测试）**：`test_security_edge.py`（`unit/report/`）新增 15 项测试，覆盖 CSV 公式注入（2 项：=`+/` 开头名称不执行公式）、XSS 缓存注入（3 项：`<script>`/`<img onerror>` 原样保留、Jinja2 autoescape=False 确认、payload 传递校验）、符号链接（2 项：目录遍历不跟随符号链接）、路径遍历（2 项：`../` 和 `..\\` 被 `_` 替换不逃逸缓存目录）、API Key 日志泄漏（1 项：交叉验证 _sanitize_endpoint）、JSON 原型污染（2 项：Python json.loads 无 __proto__ 风险、config.json 含 __proto__ 不被特殊处理）、临时文件竞争（3 项：mkstemp 原子写入检查 + 并发写入不崩溃）。确认 Jinja2 autoescape=False 为已知技术债务。
-- **Y4 迭代完成（数值计算纵深，16 项 edge 测试）**：`test_market_value_edge.py` 新增 `TestNumericalEdgeY4` 类（16 项），覆盖浮点累加误差（2 项）、极微份额 0.01/0.0001（2 项）、超高单价 20 万 + 万元级精度（2 项）、收益率超 ±1000%（2 项）、NaN 传播链 price/yclose（2 项）、int32/int64 溢出（2 项）、负成本（1 项）、零成本 profit_rate=None（1 项）、多数量级累加保留（2 项）。边缘场景测试总数从 ~86 增至 ~102 项。
-- **Y3 迭代完成（文件系统纵深，18 项 edge 测试）**：`test_filesystem_edge.py` 新增 18 项测试，覆盖加密 Excel/xlsm 宏（2 项：加密文件 ValueError、xlsm 不被 list_xlsx_files 识别）、隐藏工作表（1 项：veryHidden 跳过）、损坏 xlsx（2 项：非 zip 格式/截断 zip → ValueError）、UNC 网络路径（2 项：UNC 传递到 load_workbook/不存在 UNC 返回空列表）、文件占用（2 项：PermissionError/OSError 不崩溃）、权限变更（2 项：只读文件可读取、无权限目录返回空）、超长路径（2 项：不崩溃返回空/允许 OSError）、缓存篡改（4 项：损坏 JSON/空字节/0 字节/非 UTF-8 均自动删除）、空字节 xlsx（1 项：空字节不崩溃）。修复 cache.py UnicodeDecodeError 未捕获 bug（导致非 UTF-8 缓存文件无法自动恢复）。
-- **Y2 迭代完成（数据质量纵深，22 项 edge 测试）**：`test_data_quality_edge.py` 新增 22 项测试，覆盖停牌无交易（3 项：价格不变/昨日价类型/零价格不崩溃）、新基金空持仓（2 项：混合正常/归入 unknown）、穿透数据重复（2 项：同代码基金+直接持仓去重、多基金同代码合并）、多层嵌套 FOF（1 项：FOF 持有 FOF 不崩溃）、ETF 超多持仓（2 项：200 持仓不崩溃、TOP10 占比计算正确）、负价格净值（3 项：负净值穿透/负价格市值/负昨日价）、极低流动性（2 项：sub-cent 价格/零量价格不变）、债券违约（2 项：含违约债不崩溃/零净值）、同基金多层份额（3 项：A/C 穿透合并/分类检测/统一 ETF 标记）、跨市场停牌时差（2 项：A 停牌 H 正常、H 停牌 A 正常）。
-- **新增边缘场景测试文件（6 项共 19 个新测试）**：`test_config_atomic_edge.py`（3 项）、`test_cache_edge.py`（12 项）、`test_market_hours_edge.py`（8 项）、`test_chain_edge.py`（4 项）、`test_api_edge.py`（2 项）、`test_circuit_breaker_edge.py`（3 项）、`test_market_value_edge.py`（从 15→40 项）、`test_penetration_edge.py`（从 12→14 项）。边缘场景测试总数从 ~39 增至 ~86 项。
-- **集成测试覆盖增补（迭代 U）**：新增 `src/test/integration/test_integration_coverage.py`（24 项集成测试，5 类标记），覆盖模块间接口契约验证（`integration_contract`，7 项）、错误隔离语义验证（`integration_isolation`，3 项）、新闻流水线全链路集成（`integration_news_pipeline`，4 项）、跨模块缓存一致性（`integration_cache`，4 项）、TUI → Handler 路由集成（`integration_tui`，6 项）。修复 7 个已实现但引用错误/挂起的问题测试。
-- **`scripts/check-test-markers.py`**：基于 AST 的静态标记合规检查脚本，CI 模式下检测缺失/废弃/未知标记，全覆盖 66 个测试文件。
-
-### Fixed
-- **requirements.md §2 TUI 菜单表 — 菜单 B/L/1 描述补全 B 模块（3 处同步修正）**：
-  - 菜单 B 和 L：追加"B 系列基金深度分析（基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析）"
-  - 菜单 1：清除范围补充 fund_manager_*/fund_overlap_*，与 §5.3 对齐
-- **how-to-test-my-code.md — Verify/All 耗时同步（12 处修正）**：
-  - Verify 耗时 ~12min → ~49s（7 处：快速开始、回归级别表、三级验证、推荐工作流）
-  - All 耗时 ~26min → 待测（4 处：快速开始、回归级别表、发布验证、推荐工作流）
-  - 安装依赖追加 pytest-xdist（1 处）
-- **how-to-use-registry.md — 消费方清单补全/修正（4 处）**：
-  - cache.py API 列补全 `get_registry()`（代码已引入但文档遗漏）
-  - 新增 `llm/skeleton.py` 消费方行（`get_llm_module_name()`）
-  - 新增 `handlers_config.py` 消费方行（`get_llm_module_names()`）
-  - `penetration.py` → `penetration_sheet.py`，API 列补全 `get_llm_module_name()`（路径漂移 + API 遗漏）
-	- **W 迭代完成（剩余场景与数据正确性验证增补）**：
-	- **how-to-config-llm.md — 指纹表/模型名描述修正（2 处）**：
-	  - 指纹成分表：穿透深度分析拆分为独立行，标注  额外字段；智囊团复盘/体检报告补全本日盈亏
-	  - DeepSeek 模型名大小写描述：纠正"混合大小写导致无法识别"为"代码已全小写归一化，推荐风格统一"
-  - 场景补全 5 项：T13 交易时段切换缝隙（7 个边界点）、非交易日+LLM 混合（2 项）、多账户+LLM 多轮（3 项）、净值数据空窗期（4 项）、多时区 QDII 净值一致性（6 项）—— 确认均已在 `test_datetime_scenarios.py` 和 `test_llm_scenarios.py` 中实现
-	- **how-to-config.md — default_menu_key 可选值补全 X**：菜单缺省选项可取值列表补充 X（退出），与 §2 菜单表 14 个选项一致
-	- **how-to-start.md — 报告内容表/B/L 菜单说明/菜单 1 补全 B 模块（3 处同步修正）**：
-	  - 报告内容对照表：新增基金深度分析列（B 系列 4 模块），B/L 标注 ✅
-	  - 菜单 B/L 说明：追加 B 系列基金深度分析（与 requirements.md §2 已修内容对齐）
-	  - 菜单 1 说明：补充 /基金经理/持仓重合度（refresh 组 11 模块）
-	- **reports-instruction.md — 页签表补全 B 模块 13-16 / HTML 页签计数修正**：
-	  - Excel 页签表追加 13-16 行（基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析）
-	  - HTML 说明页签计数 12→B 系列启用时最多 16 个
-  - 数据正确性验证 9 项：三维度分类聚合一致、穿透行业占比归一化、指数行情数值合理、多币种转换正确、QDII 估值净值 vs 官方净值、基金业绩排名合理性、溢价率计算、本日盈亏场外非 T 日更新、穿透市值占比归一化——确认均在 `test_data_integrity.py` 中实现
-  - 相关文档同步更新（plan.md、conftest.py）
-- **Z3 迭代完成（持仓质量场景，scenario_basic）**：
-  - S0a: 含已清仓记录（4 项测试 — shares=0 市值/成本/盈亏均为 0，不触发除零，不影响合计）
-  - S0b: 同名基金多份额（4 项测试 — A/C 类分类正确、穿透计算不崩溃、市值合计正确）
-  - S0c: 超多持仓 200+ 条（3 项测试 — 批量明细生成、市值合计正确、多账户分组小计一致）
-  - S0d: 持仓名称含特殊字符（6 项测试 — ®/™/♥/全角括号/繁体/空格——分类、穿透、行情计算、Excel 写入、HTML 过滤器均不崩溃）
-  - 新增 `src/test/scenario/basic/test_scenario_holdings_quality.py`（16 项测试）
-
-### Changed
-- **Y5 迭代完成（配置/环境纵深 edge 测试）**：
-  - 生产代码修复 8 处：JSON 读取 `utf-8`→`utf-8-sig`（config.py/cache.py/handlers_config.py 共 5 处，兼容 Windows BOM）；`get_llm_config()` 中 `api_key` 自动 `.strip()`（防配置文件空格导致认证失败）；TUI 颜色输出检测 `NO_COLOR`/非 TTY 时禁用 ANSI 转义码（tui_menu.py/handlers_config.py）
-  - 新增 11 项 edge 测试：BOM JSON（config + llm_settings + cache 3 项）、CRLF 行尾 + 注释（1 项）、api_key 空格 llm_key + settings（2 项）、缺失嵌套键 pricing + system_prompt（2 项）、并发 init_config（1 项）、NO_COLOR ANSI 抑制（2 项）
-  - 涉及文件：`config.py`、`cache.py`、`handlers_config.py`、`tui_menu.py`、`test_config_atomic_edge.py`、`test_cache_edge.py`
-- **X 迭代完成（UI/UX 验证增补）**：
-  - TUI Ctrl+C 中断友好化：`handlers_config.py` 中 `_cmd_config_llm_modules` 的 `input()` 增加 `try/except (EOFError, KeyboardInterrupt)`；`tui_handlers.py` 中 `_select_holdings_file` 的 `except` 增加 `KeyboardInterrupt` 捕获
-  - Excel 数字格式统一：`fund_performance.py` 和 `summary.py` 中硬编码 `'0.00%'` 和 `'#,##0.00'` 替换为 `FMT_PERCENT` 和 `FMT_MONEY`（来自 `styles.py`）
-  - 报告文件管理：`excel_writer.py` 新增 `_cleanup_old_archives()` 归档清理函数（保留 180 天），Excel 和 HTML 报告保存后自动清理过期归档目录
-  - 首次运行引导：`tui_menu.py` `_print_header()` 增加检测逻辑，缺失持仓文件或 LLM 配置时打印操作提示
-  - 涉及文件：`handlers_config.py`、`tui_handlers.py`、`tui_menu.py`、`excel_writer.py`、`html_writer.py`、`fund_performance.py`、`summary.py`
-- **Z4 迭代完成（场景补充场景，T17-T21 时间补充分组）**：
-  - T17: 跨月/跨年报告 — `get_last_trading_day`/`get_prev_trading_day` 跨年边界（12月31日→1月4日），5 项测试
-  - T18: 季末/年末效应 — 基金调仓日前后净值跳变（+10%/-5%/+20%），today_profit 计算正确，5 项测试
-  - T19: 汇率中间价故障 — QDII 行情数据不可用时的零值降级、净值延迟到 T-3 的价格类型标注、price_update_status 未更新标记，3 项测试
-  - T20: 节假日调休 — 周六调休上班/周六调休放假的 `_is_trading_day` 判断、调休工作日 `is_market_open` 已知局限、get_last_trading_day 回退行为，5 项测试
-  - T21: 港股通假期差异 — A 股开市但港股通关闭时 QDII 净值 T-1 的价格类型和 today_profit、price_update_status 时差容忍，3 项测试
-  - 新增 21 项场景测试到 `test_datetime_scenarios.py`
-- **pytest 标记重命名 — 语义化改造**：
-  - S1-S10 原子标记从编号式 `scenario_s1`→`scenario_s10` 改为语义名：`scenario_stock`、`scenario_fund`、`scenario_mixed_accounts`、`scenario_new_holdings`、`scenario_cache_hit`、`scenario_bond`、`scenario_network_down`、`scenario_single_holding`、`scenario_zero_cost`、`scenario_extreme`
-  - S1-S10 测试类同步重命名：`TestScenarioS1`~`TestScenarioS10` → `TestScenarioStock`~`TestScenarioExtreme`
-  - 主分组标记 `scenario_extended` → `scenario_resilience`，`extended/` 目录同步重命名为 `resilience/`
-- **`unit/conftest.py`**：从自动注入模式改为验证模式，新文件漏标 `unit_*` 标记时抛出 `pytest.UsageError`
-- **`test_market_value_edge.py`**：从方法级 `@pytest.mark.edge` 统一为模块级 `pytestmark` 列表，与其他 8 个 `_edge.py` 文件风格一致
-- **全量测试计数更新**：单元测试 1810→1993，场景测试 107→207，集成测试 0→25，全量 1938→2225
-
-### Removed
-- **`integration` 标记**：已注册但从未在测试类/方法上使用，移除 conftest.py 注册及 KNOWN_MARKERS 集合。
-
-### Fixed
-- **`llm/fingerprint.py` health_check fallback TTL 修正**：`_get_cache_ttl_llm()` 硬编码 fallback 字典中 health_check 为 7200，与 registry.py 的 86400（CACHE_DAILY）不一致，修正为 86400。（第 130 行，import 失败降级路径）
-- **`data/config/config.json` 补齐 4 个 B 模块 cache_ttl 键**：实际配置文件中 `fund_manager`（86400）、`fund_overlap`（604800）、`fund_concentration`（2592000）、`fund_style_snapshot`（2592000）缺失，补齐后与文档范例和 registry 基准一致。
-- **faq.md — 5 处事实修正**：
-  - LLM TTL 描述从笼统"2h"改为按模块逐一列出（智囊团 2h / 全球/体检/穿透 24h / 新闻关联 1h）
-  - 持仓体检报告 TTL 从"2h"修正为"24h"
-  - 页签编号 `1.~12.` → `1.~16.`，菜单差异描述从"仅 LLM"扩展为 E/H/B/L 四档说明
-  - `provider` 可选值删除 `"deepseek"`（代码仅识别 claude/openai）
-
-### Changed
-- **8 项管理/用户文档同步审计修复**：
-  - `how-to-test-my-code.md`：版本号 v0.2.83→v0.2.85；三处 S29-S33 范围遗漏补齐（L89/L200/L203）；`scenario_basic` 描述追加操作行为场景说明
-  - `how-to-use-registry.md`：注册表结构总表新增基金深度分析 2 行（refresh/无分组）；报表页签表新增 13-16 B 模块行；LLM API 用量序号 9→12 并加排序错位脚注
-  - `testplan.md`：版本号 v0.2.77→v0.2.85；S29-S33 范围同步（L78/L248）；§5 版本迭代表调整为严格降序 10 条（删除 v0.2.56/v0.2.55）
-  - `review-findings.md`：R-154 追加 B 模块 4 sheet 硬编码标题技术债务关联问题
-  - `how-to-config-llm.md`：§6 失败降级章节删除重复句首"各模块在以下降级场景下自动显示占位文本："
-- **plan.md**：移除 A5/B 已完成迭代详细章节（已有 changelog.md 完整记录），✅ 已完成迭代段落中保留摘要引用
-- **datasource-and-folders.md**：目录树补全 B2-B4 模块 6 个源文件（fund_concentration/fund_concentration_sheet/fund_manager_analysis/fund_manager_sheet/fund_overlap/fund_overlap_sheet）和 5 个测试文件（test_fund_concentration/test_data_integrity/test_fund_manager_analysis/test_fund_manager_sheet/test_fund_overlap）；全量测试计数 2244→2341；修复 basic/ 目录树层级标识（3 文件→4 文件）
-- **review-findings.md**：清理已完成问题 R-152（测试时长关注，A5 已实施 unit 20s/verify 49s）和 R-153（PE 阈值边界条件，B5 已修复 ✅）；摘要表统计更新：R-149~R-152→R-149~R-151，B 自审行标注 PE 边界条件 ✅ 已修复
-
-### Fixed
-- **R-155：Excel 页签排序错位**（#O17）：在 `excel_generator.py` LLM 页签写入完成后使用 `wb.move_sheet()` 将 B 模块页签（13-16）移至末尾，页签序恢复为 1~16 连续编号。
-- **R-154：`excel_writer.py` API 签名验证 + B 模块硬编码标题**：为 `write_header_row` 添加参数类型校验（旧式 `(ws, headers, ncols)` 引发 TypeError）；B 模块 4 sheet 标题去硬编码 — 注册 `fund_manager/fund_overlap/fund_concentration/fund_style` 到 `registry.py._REPORT_SHEET_NAMES`，各 sheet 模块改用 `get_report_sheet_name()` + 设置 `ws.title`；`penetration_sheet.py` 传 `formats=[]` → `formats=None` 一致性修复。
-- **R-151：缓存命中率数据展示**：Excel LLM 用量页签追加"▎数据缓存系统"区域（命中/未命中/总请求/命中率）；HTML LLM 用量模块追加"系统数据缓存"表格；涉及 `summary.py._write_cache_stats_section`、`html_writer.py` 模板上下文、`report_template.html`。
-- **R-149：新闻富化关键词 XSS 安全注释**：`report_template.html` `{{ ekw.display }}` 前添加 Jinja2 注释警告勿加 `|safe`；`html_writer.py` render 调用处添加 SAC 注释标记。
-- **R-150：`llm/__init__.py` re-export 符号清理**：移除 4 个无生产消费者的生成器函数（`generate_global_macro`/`generate_expert_review`/`generate_health_check`/`generate_penetration_deep_analysis`）和 `reset_session_usage` 的 re-export；`handlers_report.py` 改用 `from src.python.llm import FAIL_REASON_DISABLED` 一致性修复；测试文件相应更新导入路径。全部 15 个 re-export 符号经审计确认，保留 10 个有效导出。
 
 ---
 

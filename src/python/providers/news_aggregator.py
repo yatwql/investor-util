@@ -57,6 +57,30 @@ def _save_news_cache(cache_key: str, result: list[dict]) -> None:
     _nset(cache_key, result)
 
 
+# ── 上次获取的各源状态（用于 D-7b 空态占位） ──────────────────
+
+_last_src_results: dict[str, tuple[int, str]] = {}
+
+
+def get_last_source_status() -> dict[str, dict]:
+    """返回上次 aggregate_news() 调用的各源状态字典。
+
+    Returns:
+        {source_key: {"label": str, "success": bool, "count": int, "error": str | None}}
+        source_key 是内部键名（如 "sina"、"eastmoney"），label 是中文标签。
+    """
+    result: dict[str, dict] = {}
+    for src, (count, status) in _last_src_results.items():
+        label = _SOURCE_LABELS.get(src, src)
+        result[src] = {
+            "label": label,
+            "success": status == "OK",
+            "count": count,
+            "error": None if status == "OK" else status,
+        }
+    return result
+
+
 def _fetch_from_all_sources(
     sources: list[str], per_source: int,
     progress_callback: Optional[Callable[[str, int, str], None]] = None,
@@ -161,16 +185,19 @@ def aggregate_news(
     Returns:
         关联后的新闻列表，每项含 matched_keywords 字段
     """
+    global _last_src_results
+
     if sources is None:
         sources = get_enabled_sources()
 
     cache_key = _compute_cache_key(keywords, top_n, sources, per_source)
     cached = _check_news_cache(cache_key, sources)
     if cached is not None:
+        _last_src_results = {s: (0, "cache") for s in sources}
         return cached
 
     all_raw, src_results = _fetch_from_all_sources(sources, per_source, progress_callback)
-    _log_source_status(src_results)
+    _last_src_results = src_results
 
     if not all_raw:
         logger.warning("所有新闻源均获取失败，请检查网络连接")

@@ -124,7 +124,8 @@ class TestBuildCategoryDataDividendDegradation(unittest.TestCase):
 
         with patch("src.python.providers.akshare_extras.get_dividend_data",
                    side_effect=Exception("API 失败")):
-            result = _build_category_data(self.holdings, list(self.detail_map.values()))
+            result, dividend_success = _build_category_data(self.holdings, list(self.detail_map.values()))
+            self.assertFalse(dividend_success)
 
         for group in result:
             for item in group["items"]:

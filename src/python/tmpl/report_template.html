@@ -502,6 +502,7 @@
                 </tbody>
             </table>
         </div>
+        {{ render_data_status(data_status_category) }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -974,9 +975,21 @@
             {% if _active_src %}
             <div>* 本次抓取财经资讯所使用的数据源：{{ _active_src | join("、") }}</div>
             {% endif %}
+            {% set _ns_failed_all = (news_llm_meta or {}).get("source_status", {}).values() | selectattr("success", "equalto", false) | list %}
+            {% if _ns_failed_all %}
+            <div>* 以下新闻源不可用：{{ _ns_failed_all | map(attribute="label") | join("、") }}</div>
+            {% endif %}
         </div>
         {% else %}
-        <div class="empty-note">暂无关联新闻</div>
+        {% set _ns_source_status = (news_llm_meta or {}).get("source_status", {}) %}
+        {% set _ns_failed = _ns_source_status.values() | selectattr("success", "equalto", false) | list %}
+        {% if _ns_source_status and _ns_failed | length == _ns_source_status | length %}
+        <div class="empty-section">📭 新闻数据暂不可用，请检查网络连接</div>
+        {% elif _ns_failed %}
+        <div class="empty-section">📭 暂无关联新闻。以下新闻源不可用：{{ _ns_failed | map(attribute="label") | join("、") }}</div>
+        {% else %}
+        <div class="empty-section">📭 暂无关联新闻</div>
+        {% endif %}
         {% endif %}
     </div>
 
@@ -1055,7 +1068,17 @@
             {% endif %}
         </div>
         {% else %}
+        {% set _ew_sector = early_warnings.has_sector_data if early_warnings else false %}
+        {% set _ew_llm = early_warnings.has_llm_news if early_warnings else false %}
+        {% if not _ew_sector and not _ew_llm %}
+        <div class="empty-section">📭 预警数据暂不可用（上游行业资金流向和新闻数据均为空）</div>
+        {% elif not _ew_sector %}
+        <div class="empty-section">📭 行业资金流向数据不可用，无法生成行业预警</div>
+        {% elif not _ew_llm %}
+        <div class="empty-section">📭 新闻情绪聚合数据不可用（需启用 LLM 新闻关联分析）</div>
+        {% else %}
         <div class="section-content">当前无预警信息。</div>
+        {% endif %}
         {% endif %}
     </div>
     {% endif %}

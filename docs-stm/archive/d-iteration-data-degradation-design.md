@@ -1,10 +1,10 @@
 # D 迭代：数据降级分层治理 — 详细设计
 
 创建日期：2026-07-06
-状态：设计阶段（Phase 0）
+状态：✅ 已实施（Phase 0-3 全部完成，v0.2.90）
 
-> 本文件是 D 迭代的完整架构设计文档，在开始编码前需经评审确认。
-> 迭代概要见 [`docs-stm/managements/plan.md`](../managements/plan.md) → D 迭代。
+> 本文件是 D 迭代的完整架构设计文档，已全部实现完毕。
+> 变更记录见 [`docs-stm/managements/changelog.md`](../managements/changelog.md) → v0.2.90。
 
 ---
 

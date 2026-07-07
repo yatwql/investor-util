@@ -29,7 +29,7 @@ logger = logging.getLogger("invest")
 def _build_category_data(
     holdings: list[Holding],
     details: list[DetailRow],
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], bool]:
     """构建持仓分类表数据结构。
 
     按 (资产属性, 投资分类) 分组，汇总每组内的明细数据，
@@ -40,19 +40,24 @@ def _build_category_data(
         details: 市值核算明细行列表
 
     Returns:
-        持仓分类数据列表，每个元素含 property / sub_category / items / 小计字段
+        (持仓分类数据列表, dividend_success) —
+        每个元素含 property / sub_category / items / 小计字段
     """
     detail_map: Dict[str, DetailRow] = {d.code: d for d in details}
 
     # 加载 A 股分红数据（非关键，失败时所有 yield_text → "--"）
     dividend_data: dict = {}
+    dividend_success = True
     try:
         from src.python.providers.akshare_extras import get_dividend_data
         from src.python.code_utils import is_a_share_code
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
+        if not dividend_data and stock_codes:
+            dividend_success = False
     except Exception:
-        logger.debug("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
+        dividend_success = False
+        logger.warning("分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
 
     cat_groups: dict[tuple[str, str], list[Holding]] = {}
     for h in holdings:
@@ -105,7 +110,7 @@ def _build_category_data(
             "sub_today": sub_today,
         })
 
-    return result
+    return result, dividend_success
 
 
 def _load_profit_forecast() -> dict[str, Any]:

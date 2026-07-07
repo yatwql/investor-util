@@ -126,7 +126,8 @@ class TestBuildCategoryDataDividend(unittest.TestCase):
         with patch("src.python.providers.akshare_extras.get_dividend_data",
                    return_value={"600900": {"avg_dividend": 0.85},
                                  "601398": {"avg_dividend": 0.30}}):
-            result = _build_category_data(self.holdings, list(self.detail_map.values()))
+            result, dividend_success = _build_category_data(self.holdings, list(self.detail_map.values()))
+            self.assertTrue(dividend_success)
 
         for group in result:
             for item in group["items"]:
@@ -155,8 +156,9 @@ class TestBuildCategoryDataDividend(unittest.TestCase):
         d.code = "00700"
 
         with patch("src.python.providers.akshare_extras.get_dividend_data") as mock_dd:
-            result = _build_category_data(non_a_holdings, [d])
+            result, dividend_success = _build_category_data(non_a_holdings, [d])
             mock_dd.assert_not_called()
+            self.assertTrue(dividend_success)
 
         for group in result:
             for item in group["items"]:

@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-06（v0.2.88 — 文档审计与同步）
+最后更新：2026-07-08（v0.2.90 — D 迭代数据降级分层治理完成）
 
 ---
 
@@ -67,14 +67,15 @@
 
 | 测试文件 | 覆盖场景 | 职责范围 |
 |:---------|:---------|:---------|
-| `test_integration.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
-| `test_integration_scenarios.py` | S6-S10 | 异常容错场景：纯债/断网/单账户/零成本/极端值 |
-| `test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
-| `test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
-| `test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
-| `test_scenario_operational_behavior.py` | S29-S33 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 |
-| `test_scenario_section_order.py` | C-P1b | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
-| `test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
+| `scenario/basic/test_integration.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
+| `scenario/resilience/test_integration_scenarios.py` | S6-S10 | 异常容错场景：纯债/断网/单账户/零成本/极端值 |
+| `scenario/llm/test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
+| `scenario/basic/test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
+| `scenario/basic/test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
+| `scenario/basic/test_scenario_operational_behavior.py` | S29-S33 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 |
+| `scenario/basic/test_scenario_penetration.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
+| `scenario/basic/test_scenario_section_order.py` | C-P1b | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
+| `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 
 **业务场景规格（S0a-S0d、S1-S33、T1-T21）：**
 
@@ -149,12 +150,12 @@
 | **Provider 回退链路端到端**：腾讯不可用 → 东方财富 → 过期缓存 | ✅ | `test_chain.py` |
 | **缓存与 API 协同**：缓存命中不调 API，缓存缺失调 API 并写入 | ✅ | `test_cache.py` |
 | **原子写入恢复**：磁盘满/断电后缓存和配置文件完整性 | ✅ | `test_config_atomic.py` |
-| **模块间接口契约**：reader 输出 → market_value 输入 → penetration 输入 → ... 类型链正确 | ❌ | 待补 — 缺少 data contract 验证 |
+| **模块间接口契约**：reader 输出 → market_value 输入 → penetration 输入 → ... 类型链正确 | ✅ | `test_integration_coverage.py` (integration_contract) |
 | **错误隔离**：penetration/LLM/news_correlation 任一模块失败，不阻塞其他模块写入 | ◐ | `test_excel_generator.py` 有异常隔离，缺业务语义验证 |
 | **LLM 输出→报告渲染**：Markdown → HTML/Jinja2 → 条件段落的渲染链路 | ✅ | `test_llm_scenarios.py` S14/S20（无 LLM 不渲染） |
 | **新闻流水线集成**：fetch_all → aggregate → deduplicate → correlate_with_holdings → write_to_report | ◐ | 子步骤有单元测试，全链路缺 |
-| **多模块缓存一致性**：price 刷新后，market_value / fund_performance 使用同一缓存源 | ❌ | 待补 — 缺少跨模块缓存穿透验证 |
-| **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ❌ | 待补 — mock UI 事件触发 handler 链 |
+| **多模块缓存一致性**：price 刷新后，market_value / fund_performance 使用同一缓存源 | ✅ | `test_integration_coverage.py` (integration_cache) |
+| **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ✅ | `test_integration_coverage.py` (integration_tui) |
 | **API 联通性验证**：手动运行确认腾讯/东方财富/天天基金 API 实际可调通 | ✅ | 每次迭代人工执行 |
 
 ### 1.6 异常场景全覆盖
@@ -282,12 +283,12 @@
 | 溢价率 = (市价 - 净值) / 净值 | QDII ETF 验证 | 🟡 |
 | 本日盈亏 — 场外非 T 日更新 | 场外基金 nav_date ≠ T → today_profit = 0 | 🟡 |
 | 穿透市值占比归一化 | TOP10 占比总和 ≤ 100% | 🟡 |
-| **三维度分类聚合一致**：资产属性/投资分类/账户的小计各自 = 总计 | 三类分类各自独立聚合，交叉验证无遗漏/无重复 | ❌ 待补 |
-| **穿透行业占比归一化**：各行业占比之和 ≤ 100% | 穿透行业分布验证 | ❌ 待补 |
-| **指数行情数值合理**：上证≈3000、沪深300≈4000、恒指≈20000、标普≈5000 | 数量级确认，非精确值 | ❌ 待补 |
-| **多币种转换正确**：美元份额 × 汇率中间价 = 人民币市值 | 构造美元/港币持仓，验证币种转换 | ❌ 待补 |
-| **QDII 估值净值 vs 官方净值关系**：估值净值 ≥ 0，官方净值延迟 T-2 | 双列数值关系合理性断言 | ❌ 待补 |
-| **基金业绩排名数据合理性**：排名/收益率在 0-100% 范围内 | 天天基金排名数值验证 | ❌ 待补 |
+| **三维度分类聚合一致**：资产属性/投资分类/账户的小计各自 = 总计 | 三类分类各自独立聚合，交叉验证无遗漏/无重复 | ✅ `test_data_integrity.py` |
+| **穿透行业占比归一化**：各行业占比之和 ≤ 100% | 穿透行业分布验证 | ✅ `test_data_integrity.py` |
+| **指数行情数值合理**：上证≈3000、沪深300≈4000、恒指≈20000、标普≈5000 | 数量级确认，非精确值 | ✅ `test_data_integrity.py` |
+| **多币种转换正确**：美元份额 × 汇率中间价 = 人民币市值 | 构造美元/港币持仓，验证币种转换 | ✅ `test_data_integrity.py` |
+| **QDII 估值净值 vs 官方净值关系**：估值净值 ≥ 0，官方净值延迟 T-2 | 双列数值关系合理性断言 | ✅ `test_data_integrity.py` |
+| **基金业绩排名数据合理性**：排名/收益率在 0-100% 范围内 | 天天基金排名数值验证 | ✅ `test_data_integrity.py` |
 
 ---
 
