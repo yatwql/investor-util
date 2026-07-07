@@ -21,7 +21,17 @@
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/manuals/datasource-and-folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/latest/` 的子目录（`unit/`、`scenario/`、`integration/`、`regression/`、`edge/`、`all/`）需逐行说明，汇总文件 `index.html` 需标注其作用；`archives/` 下一级仅需一行描述，`<YYYYMMDD>/` 子目录不展开。
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md）
 - **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource-and-folders.md, reports-instruction.md, faq.md, how-to-test-my-code.md）
-- **中间文件**：中间过程及设计文件 → `docs-stm/plan/`；除日志以外的临时文件 → `docs-stm/tmp/`。禁止放在全局 `.claude/` 目录下
+- **文件归属三原则**：
+  - **中间计划文件**（设计方案、迭代计划、架构决策）→ `docs-stm/plan/`
+  - **运行时临时文件**（除log以外的临时输出、调试产物、缓存转储）→ `docs-stm/tmp/`
+  - **`.claude/` 全局目录** — 只存放 Claude Code 工具自动管理的运行时数据（sessions/tasks/file-history 等），**禁止主动写入**任何文件（包括记忆/memory/、计划/plans/、临时数据等）
+- **自检清单（文件写入前必答）**：
+  1. 这个文件是项目源码/配置/文档？→ 放仓库对应路径
+  2. 是中间计划？→ `docs-stm/plan/`
+  3. 是运行时临时产物？→ `docs-stm/tmp/`
+  4. 以上都不是，想放 `.claude/`？→ **停，不允许，重新分类**
+- **违规补救**：发现 `.claude/` 下出现本应放在 `docs-stm/` 的文件时，**必须立即迁移**，不留存待办
+- **注意**：`EnterPlanMode` 等工具自动写入 `.claude/plans/` 的行为不可控，使用后**必须手动迁移**到 `docs-stm/plan/`
 - **版本号一致**：发布版本时，**必须**同步更新以下位置的版本号/日期，确保程序、用户文档、管理文档统一：`src/python/constants.py`（`APP_VERSION`）、`README.md`（首页版本标记）、`docs-stm/manuals/how-to-test-my-code.md`（头部版本日期）、`docs-stm/managements/changelog.md`（新版本条目）、`docs-stm/managements/plan.md`（最后更新）、以及报告中引用的版本号。任何版本号变更均应全局覆盖，避免遗漏。
 - **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功）、`[!]`（部分失败）、`[ERR]`（错误）
