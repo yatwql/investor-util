@@ -34,7 +34,7 @@ _DEFAULT_CONFIG = {
     "holdings_dir": "data/holdings",
     "holdings_filename": "个人投资持仓信息.xlsx",
     "output_dir": "reports",
-    "news_top_count": 100,
+    "news_top_count": 300,
     "news_sources": {
         "sina": True,
         "eastmoney": True,
@@ -166,7 +166,7 @@ _KNOWN_NEWS_SOURCES: set[str] = {"sina", "eastmoney", "cls", "wallstreetcn", "ak
 
 _KNOWN_PROVIDER_TYPES: set[str] = {"price", "fund_rank", "fund_hold", "industry"}
 
-_KNOWN_PROVIDER_NAMES: set[str] = {"tencent", "eastmoney", "sina", "tiantian", "eastmoney_industry"}
+_KNOWN_PROVIDER_NAMES: set[str] = {"tencent", "eastmoney", "sina", "tiantian", "eastmoney_industry", "eastmoney_industry_rest"}
 
 _STRING_CONFIG_KEYS: set[str] = {"holdings_dir", "holdings_filename", "output_dir",
                                   "llm_key_file", "llm_settings_file"}

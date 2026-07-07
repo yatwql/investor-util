@@ -29,6 +29,11 @@
     "official_source": true
   },
   "default_menu_key": "L",
+  "degradation": {
+    "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
+    "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
+    "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}
+  },
   "report_section_order": {},
   "user_fund_benchmarks": {},
   "llm_key_file": "data/config/llm_key.json",
@@ -42,7 +47,7 @@
     "rank": 86400,
     "profit_forecast": 86400,
     "hold": 604800,
-    "industry": 604800,
+    "industry": 1209600,
     "dividend": 2592000,
     "benchmark": 2592000,
     // ── LLM 分析类 ──
@@ -77,6 +82,7 @@
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
 | `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
+| `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数） | 手动编辑 |
 | `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（16 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
@@ -176,6 +182,36 @@
 
 > 阈值均为负值（元），绝对值越大越不容易触发预警。默认值适合 A 股中等市值组合；持仓规模较大时可适当调高（如 warning 调至 -1 亿、danger 调至 -5 亿）。
 
+## degradation 数据降级策略
+
+`degradation` 控制数据降级行为（D 迭代引入），定义各层级数据在连续失败或空数据返回时切换到降级模式的阈值。
+
+降级机制三层模型：
+
+| 层级 | 含义 | 示例数据 |
+|:----|:-----|:---------|
+| **T2** | 功能级 — 某个功能模块不可用 | 新闻聚合、行业资金流向 |
+| **T3** | 模块级 — 相对独立的数据模块 | 基金业绩排名、基金持仓穿透 |
+| **T4** | 核心级 — 影响全局核心功能 | 股票价格、市场指数 |
+
+每层三个参数：
+
+| 参数 | 说明 |
+|:-----|:-----|
+| `unreachable_threshold` | 连续连接失败次数，达到后标记降级 |
+| `empty_data_threshold` | 连续返回空数据的次数，达到后标记降级 |
+| `stale_days` | 缓存过期天数，超过此天数的数据视为不可用 |
+
+| 子字段 | `t2` | `t3` | `t4` |
+|:-------|:----:|:----:|:----:|
+| `unreachable_threshold` | `2` | `2` | `1` |
+| `empty_data_threshold` | `3` | `3` | `1` |
+| `stale_days` | `3` | `14` | `14` |
+
+> 两个信号（连续失败 / 空数据）任一达到阈值即触发降级，取最低有效阈值。`stale_days` 仅在缓存存在时参与计算——当缓存过期天数超过此值且连续失败计数 ≥ `unreachable_threshold` 时强化降级判定。
+> 
+> T4 阈值最严格（1 次失败即降级）：核心价格/指数数据需要快速切换降级策略。T2/T3 允许更多容错（2~3 次），避免偶发网络波动触发不必要的降级。
+
 ## user_fund_benchmarks 自定义基准
 
 `user_fund_benchmarks` 用于覆盖部分基金的业绩比较基准。代码内置了主流宽基/行业指数（沪深 300、中证 500、纳斯达克 100 等），遇到不在内置库中的基金时，可通过此字段手动指定。
@@ -259,7 +295,7 @@
 | `rank` | `fund_perf_{code}.json` | 24h | — | 基金同类排名+区间收益率 |
 | `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
 | `hold` | `fund_hold_{code}.json` | 7 天 | — | 基金前 10 持仓明细 |
-| `industry` | `industry_{code}.json` | 7 天 | — | 行业分类/概念板块 |
+| `industry` | `industry_{code}.json` | 14 天 | — | 行业分类/概念板块 |
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
 | `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
 
