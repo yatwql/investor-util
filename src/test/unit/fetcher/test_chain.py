@@ -432,5 +432,53 @@ class TestFetchWithFallback(unittest.TestCase):
         fn2.assert_called_once()
 
 
+class TestIsProviderChainBroken(unittest.TestCase):
+    """is_provider_chain_broken 全链健康查询测试。"""
+
+    def setUp(self):
+        reset_provider_skip()
+
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_all_skipped(self, mock_chain):
+        """全部 provider 在熔断中 → True。"""
+        from src.python.fetcher.chain import is_provider_chain_broken
+        mock_chain.return_value = ["p1", "p2"]
+        from src.python.fetcher.chain import _PROVIDER_SKIP
+        _PROVIDER_SKIP.update(["p1", "p2"])
+        self.assertTrue(is_provider_chain_broken("test"))
+
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_partial_skipped(self, mock_chain):
+        """仅部分 provider 熔断 → False。"""
+        from src.python.fetcher.chain import is_provider_chain_broken
+        mock_chain.return_value = ["p1", "p2"]
+        from src.python.fetcher.chain import _PROVIDER_SKIP
+        _PROVIDER_SKIP.add("p1")
+        self.assertFalse(is_provider_chain_broken("test"))
+
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_none_skipped(self, mock_chain):
+        """无 provider 熔断 → False。"""
+        from src.python.fetcher.chain import is_provider_chain_broken
+        mock_chain.return_value = ["p1", "p2"]
+        self.assertFalse(is_provider_chain_broken("test"))
+
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_empty_chain(self, mock_chain):
+        """空链 → True（无可用 provider）。"""
+        from src.python.fetcher.chain import is_provider_chain_broken
+        mock_chain.return_value = []
+        self.assertTrue(is_provider_chain_broken("test"))
+
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_single_provider_skipped(self, mock_chain):
+        """单 provider 链且已熔断 → True。"""
+        from src.python.fetcher.chain import is_provider_chain_broken
+        mock_chain.return_value = ["p1"]
+        from src.python.fetcher.chain import _PROVIDER_SKIP
+        _PROVIDER_SKIP.add("p1")
+        self.assertTrue(is_provider_chain_broken("test"))
+
+
 if __name__ == "__main__":
     unittest.main()

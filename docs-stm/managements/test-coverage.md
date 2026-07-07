@@ -8,22 +8,23 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2417 | ~20s |
+| `unit` | 2430 | ~20s |
 | `standard` | 2042 | ~20s |
 | `scenario` | 277 | ~35s |
 | `regression` | 277 | ~35s |
 | `verify` | 958 | ~49s |
 | `integration` | 304 | ~50s |
-| `edge` | 312 | ~15s |
+| `edge` | 316 | ~15s |
 | `data` | 65 | ~10s |
-| `all` | 2721 | ~80s |
+| `all` | 2726 | ~80s |
 | `smoke` | 24 | ~2s |
 | `report` 🆕 | ≈945 | ~15s |
 
-> 注：`all` 模式收集总数 2721 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2709 passed / 12 skipped。
+> 注：`all` 模式收集总数 2726 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2714 passed / 12 skipped。
 > 🆕 `report` 模式为 A5 新增，标记 `unit_report`（≈945 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）默认启用 `--parallel medium` 自动并行，"典型耗时"即 medium 并行耗时；场景/边缘/冒烟等轻量模式保持单线程（不并行），避免进程调度开销。
 > v0.3.0 测试增量覆盖补全（52 项新增），全量 2721 项（2709 passed / 12 skipped for Windows）。
+> v0.3.1 Provider Chain 熔断架构升级（13 项新增：熔断预检 9 项 + 冷却探针 4 项 edge），全量 2726 项（2714 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 
@@ -32,7 +33,7 @@
 | 功能域 | 源模块（`src/python/`） | 对应测试文件（`src/test/`） | 覆盖项数 |
 |:-------|:-----------------------|:---------------------------|:--------:|
 | **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 166 |
-| **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 173 |
+| **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 186 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
 | **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 25 文件含 test_html_writer、test_html_template 等 | ≈945 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(10 文件) + `scenario/llm/test_llm_scenarios.py` | 383 |
@@ -69,9 +70,9 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 8 个子组合计 | **2417** |
+| `unit`（父标记） | 8 个子组合计 | **2430** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 166 |
-| ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常） | 173 |
+| ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 186 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/llm_content 写入） | 375 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
 | ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列模块、C/D 迭代降级/占位；含 65 项 data 标记测试） | ≈945 |
@@ -85,7 +86,7 @@
 |:-------|:---------|:--------:|
 | `llm` | 全部 LLM 相关（unit_llm 375 + scenario_llm 32），**全部为 mock 测试，无需真实 API key** | **375** |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** |
-| `edge` | 异常/边界场景 | **312** |
+| `edge` | 异常/边界场景（含熔断冷却探针） | **316** |
 | `data` | 数据正确性验证 | **65** |
 
 详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。

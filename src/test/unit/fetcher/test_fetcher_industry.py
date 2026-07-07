@@ -214,6 +214,49 @@ class TestBatchFetchIndustryData(unittest.TestCase):
         self.assertNotIn("AAPL", result)
 
 
+class TestBatchFetchIndustryDataBroken(unittest.TestCase):
+    """batch_fetch_industry_data 熔断预检测试。
+
+    全链已熔断时跳过批量请求和重试，避免逐条冗余调用。
+    """
+
+    @patch("src.python.fetcher.industry.is_provider_chain_broken", return_value=True)
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    def test_entry_skipped_on_full_broken(self, mock_fetch, mock_broken):
+        """全链熔断 → 入口预检返回空，不调用 fetch。"""
+        from src.python.fetcher.industry import batch_fetch_industry_data
+        result = batch_fetch_industry_data(["000001", "600900"])
+        self.assertEqual(result, {})
+        mock_fetch.assert_not_called()
+
+    @patch("src.python.fetcher.industry.is_provider_chain_broken")
+    def test_entry_logs_warning(self, mock_broken):
+        """全链熔断 → 日志含熔断提示。"""
+        mock_broken.return_value = True
+        with self.assertLogs("invest", level="WARNING") as log:
+            from src.python.fetcher.industry import batch_fetch_industry_data
+            batch_fetch_industry_data(["000001"])
+            self.assertTrue(any("全链不可用（熔断）" in msg for msg in log.output))
+
+    @patch("src.python.fetcher.industry.is_provider_chain_broken", return_value=True)
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    def test_empty_returned_on_full_broken(self, mock_fetch, mock_broken):
+        """全链熔断 → 即使有代码也不调 API。"""
+        from src.python.fetcher.industry import batch_fetch_industry_data
+        result = batch_fetch_industry_data(["sh600000", "sz000001"])
+        self.assertEqual(result, {})
+        mock_fetch.assert_not_called()
+
+    @patch("src.python.fetcher.industry.is_provider_chain_broken", return_value=False)
+    @patch("src.python.fetcher.industry.fetch_industry_data", return_value={"code": "000001", "industry": "银行"})
+    def test_normal_when_not_broken(self, mock_fetch, mock_broken):
+        """未熔断 → 正常调用不受影响。"""
+        from src.python.fetcher.industry import batch_fetch_industry_data
+        result = batch_fetch_industry_data(["000001"])
+        self.assertEqual(len(result), 1)
+        mock_fetch.assert_called()
+
+
 # ──────────────────────────────────────────────────────────────
 # eastmoney_industry_rest 模块单元测试
 # ──────────────────────────────────────────────────────────────

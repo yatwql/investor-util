@@ -261,6 +261,43 @@ Provider Chain 注册表（registry.py）
 - 全链路失败 → 尝试过期缓存降级 → 仍失败则抛异常由调用方处理
 - **价格缓存收市后新鲜度验证**（`fetcher/price.py:_price_cache_fresh`）：盘后首次请求时校验缓存 `price_date` 是否为当前交易日。若盘中因 Tencent 名称校验降级写入 EastMoney 净值（上一交易日价格），收市后自动清除该残留缓存并强制重走 Provider Chain，确保收盘价更新。
 
+### Provider Chain 三层熔断架构（v0.3.1+）
+
+自 v0.3.1 起，Provider Chain 熔断从单层 per-provider 跳过升级为**三层架构**，解决批量场景下的日志噪音和 1-provider chain 永不恢复问题：
+
+```
+┌─────────────────────────────────────────┐
+│  第 1 层：Batch 入口熔断预检              │
+│  is_provider_chain_broken(data_type)     │
+│  全链熔断 → 入口一次判断，跳过批量请求+重试  │
+├─────────────────────────────────────────┤
+│  第 2 层：Provider 级熔断                 │
+│  _fetch_with_fallback 内部               │
+│  连续 3 次失败 → 熔断，跳过该 provider    │
+├─────────────────────────────────────────┤
+│  第 3 层：冷却试探恢复                     │
+│  熔断 300s 后自动放行一次试探请求           │
+│  成功 → 恢复；失败 → 重新计时               │
+└─────────────────────────────────────────┘
+```
+
+**实现细节：**
+
+- **第 1 层** — `is_provider_chain_broken(data_type)` 查询 `_PROVIDER_SKIP` 集合，若 data_type 对应 chain 中所有 provider 均在集合中，返回 True。`batch_fetch_industry_data` 入口和重试两处调用，分别跳过批量获取和 0.8s 等待+重试。
+- **第 2 层** — 同原有逻辑：`_fetch_with_fallback` 中每次失败累计计数器 >=3 时加入 `_PROVIDER_SKIP`，后续请求直接 `continue`。
+- **第 3 层** — 新增 `_PROVIDER_SKIP_TIME` (dict, provider_name→timestamp) 记录熔断触发时刻。跳过检查时校验 `time.time() - _skip_time >= _PROVIDER_COOLDOWN_SECS(300)`，到期则从 `_PROVIDER_SKIP` 移除并放行一次试探。试探失败回退到 fallback provider，计数器从 1 开始累计。
+
+**与 LLM Circuit Breaker 的差异：**
+
+| 维度 | Provider Chain 熔断 | LLM Circuit Breaker |
+|:-----|:-------------------|:--------------------|
+| 作用域 | 数据 provider（price/industry 等） | LLM API endpoint |
+| 冷却时长 | 300s | 60s |
+| 试探次数 | 冷却期满放行一次 | 半开状态放行一次 |
+| 恢复条件 | 试探成功 → 移出跳过集合 | 半开成功 → 关闭熔断 |
+
+**消费方感知：** 无任何配置变更，逻辑对 batch 调用方透明。batch 场景日志从 N 条"已被熔断，跳过"降级为 1 条入口 WARNING + 1 条重试预检 INFO。
+
 ### Fetcher 调度架构
 
 `src/python/fetcher/` 各模块按数据类型独立封装，由 `handlers_report.py` 或 `handlers_cache.py` 的菜单命令统一编排调用：

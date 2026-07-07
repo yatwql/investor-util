@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from src.python.cache import get_ttl
-from src.python.fetcher.chain import _fetch_with_fallback
+from src.python.fetcher.chain import _fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
 from src.python.code_utils import is_a_share_code
 
@@ -101,6 +101,12 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
     if not a_codes:
         return {}
 
+    # 熔断预检：全链已熔断时跳过批量请求，避免逐条冗余调用
+    if is_provider_chain_broken("industry"):
+        logger.warning("[industry] 行业数据 API 全链不可用（熔断），跳过 %d 个代码的批量获取",
+                       len(a_codes))
+        return {}
+
     result: dict[str, dict] = {}
     lock = threading.Lock()
 
@@ -126,22 +132,27 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
     # 首次获取失败的代码，短暂等幅后重试一次
     failed = [c for c in a_codes if c not in result]
     if failed:
-        delay = _BATCH_RETRY_DELAY + random.uniform(0, _BATCH_RETRY_JITTER)
-        logger.info("批量行业数据重试 %d 个失败代码（%.1fs 后）", len(failed), delay)
-        time.sleep(delay)
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(failed))) as executor:
-            futures = {executor.submit(_fetch_one, code): code for code in failed}
-            for future in as_completed(futures):
-                try:
-                    res = future.result()
-                except Exception:
-                    _failed_code = futures[future]
-                    logger.warning("[industry] 重试批量 %s 仍失败", _failed_code, exc_info=True)
-                    continue
-                if res is not None:
-                    code, data = res
-                    with lock:
-                        result[code] = data
+        # 重试预检：如熔断未恢复则跳过重试，避免无效等待
+        if is_provider_chain_broken("industry"):
+            logger.info("[industry] 行业数据全链熔断未恢复，跳过 %d 个失败代码重试",
+                        len(failed))
+        else:
+            delay = _BATCH_RETRY_DELAY + random.uniform(0, _BATCH_RETRY_JITTER)
+            logger.info("批量行业数据重试 %d 个失败代码（%.1fs 后）", len(failed), delay)
+            time.sleep(delay)
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(failed))) as executor:
+                futures = {executor.submit(_fetch_one, code): code for code in failed}
+                for future in as_completed(futures):
+                    try:
+                        res = future.result()
+                    except Exception:
+                        _failed_code = futures[future]
+                        logger.warning("[industry] 重试批量 %s 仍失败", _failed_code, exc_info=True)
+                        continue
+                    if res is not None:
+                        code, data = res
+                        with lock:
+                            result[code] = data
 
     logger.info("批量行业数据获取完成: 共 %d 个代码, 成功 %d 个",
                 len(a_codes), len(result))

@@ -120,11 +120,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2703 tests）
+│   └── test/                             # 测试（按标记分组目录，2726 tests）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2399 项，8 个子分组）
+│       ├── unit/                         # 单元测试（2430 项，8 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── conftest.py               # 单元测试级 pytest fixture/配置
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
@@ -135,14 +135,14 @@ investor-util/
 │       │   │   ├── test_sina.py          # 新浪财经指数 — _parse_us_index / fetch_us_indices（10 项）
 │       │   │   ├── test_tiantian.py      # 天天基金 — _find_holdings_table / _parse_syl_returns / _calc_rating_from_entry（65 项）
 │       │   │   └── test_akshare_extras.py # akshare 封装 — 盈利预测/行业资金流向/分红（16 项）
-│       │   ├── fetcher/                  # 抓取器测试（145 项）
+│       │   ├── fetcher/                  # 抓取器测试（186 项，含熔断预检/冷却恢复）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
-│       │   │   ├── test_chain.py         # Provider Chain — _get_chain / _fetch_with_fallback 全链路（23 项）
-│       │   │   ├── test_chain_edge.py    # Provider Chain 异常场景 — 全链 fallback/超时/空响应
+│       │   │   ├── test_chain.py         # Provider Chain — _get_chain / _fetch_with_fallback 全链路 + 熔断预检（30 项）
+│       │   │   ├── test_chain_edge.py    # Provider Chain 异常场景 — 全链 fallback/超时/空响应/冷却探针（8 项）
 │       │   │   ├── test_fetcher.py       # 抓取器调度 — 指数/行业/价格聚合入口（5 项）
 │       │   │   ├── test_fetcher_price.py # 行情抓取 — _name_matches / _price_cache_key / _price_transform（21 项）
 │       │   │   ├── test_fetcher_index.py # 指数抓取 — 腾讯→新浪 fallback 双链路（13 项）
-│       │   │   ├── test_fetcher_industry.py # 行业抓取 — _industry_transform / fetch_industry_data（10 项）
+│       │   │   ├── test_fetcher_industry.py # 行业抓取 — _industry_transform / fetch_industry_data / 熔断预检 batch（41 项）
 │       │   │   ├── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
 │   │   │   ├── test_fund_manager.py  # 基金经理师数据获取 — HTML 解析、当页面退回档（14 项）
 │       │   │   └── test_api_edge.py      # HTTP Provider 异常场景 — 超时/DNS/SSL/429/503/JSON 异常（23 项 Y1）

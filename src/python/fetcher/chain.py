@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Any, Callable
 
 from src.python.cache import CACHE_WEEKLY, get as cache_get, set as cache_set
@@ -47,9 +48,13 @@ def _get_chain(data_type: str) -> list[str]:
 # ── 会话级 Provider 熔断 ────────────────────────────────────
 # 同一 provider 连续失败 _PROVIDER_SKIP_THRESHOLD 次后，
 # 本会话剩余请求跳过该 provider，避免每次等待超时/断连。
+# 跳过时记录时间戳，冷却期满（_PROVIDER_COOLDOWN_SECS）后允许
+# 一次试探请求，成功则恢复，失败则重新计时。
 _PROVIDER_CONSECUTIVE_FAILURES: dict[str, int] = {}
 _PROVIDER_SKIP: set[str] = set()
+_PROVIDER_SKIP_TIME: dict[str, float] = {}  # provider_name → 进入熔断的时间戳
 _PROVIDER_SKIP_THRESHOLD = 3
+_PROVIDER_COOLDOWN_SECS = 300  # 5 分钟后允许试探恢复
 # 线程锁：熔断计数器被 batch_fetch_industry_data 等从多线程写入
 _PROVIDER_LOCK = threading.Lock()
 
@@ -59,6 +64,23 @@ def reset_provider_skip() -> None:
     with _PROVIDER_LOCK:
         _PROVIDER_CONSECUTIVE_FAILURES.clear()
         _PROVIDER_SKIP.clear()
+        _PROVIDER_SKIP_TIME.clear()
+
+
+def is_provider_chain_broken(data_type: str) -> bool:
+    """检查指定数据类型的全部 Provider 是否都已熔断。
+
+    batch 入口调用一次即可预判全链不可用，避免逐条重复尝试。
+
+    Returns:
+        True — 链上所有 provider 均在熔断中，全链不可用
+        False — 至少有一个 provider 可用
+    """
+    chain = _get_chain(data_type)
+    if not chain:
+        return True
+    with _PROVIDER_LOCK:
+        return all(p in _PROVIDER_SKIP for p in chain)
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
@@ -143,13 +165,23 @@ def _fetch_with_fallback(
     # 2) 遍历 chain 尝试
     kwargs = fn_kwargs or {}
     for provider_name in chain:
-        # 会话级熔断：连续失败已达阈值 → 跳过
+        # 会话级熔断：连续失败已达阈值 → 跳过（冷却期后允许试探恢复）
         with _PROVIDER_LOCK:
             _skip = provider_name in _PROVIDER_SKIP
         if _skip:
-            logger.debug("[%s] %s 已被熔断（连续 %d 次失败），跳过",
-                          data_type, provider_name, _PROVIDER_SKIP_THRESHOLD)
-            continue
+            with _PROVIDER_LOCK:
+                _skip_time = _PROVIDER_SKIP_TIME.get(provider_name, 0)
+            if time.time() - _skip_time >= _PROVIDER_COOLDOWN_SECS:
+                # 冷却期满 → 移除熔断标记，放行一次试探请求
+                with _PROVIDER_LOCK:
+                    _PROVIDER_SKIP.discard(provider_name)
+                    _PROVIDER_SKIP_TIME.pop(provider_name, None)
+                logger.info("[%s] %s 冷却期满，允许试探请求",
+                            data_type, provider_name)
+            else:
+                logger.debug("[%s] %s 已被熔断（连续 %d 次失败），跳过",
+                              data_type, provider_name, _PROVIDER_SKIP_THRESHOLD)
+                continue
 
         entry = provider_fn_map.get(provider_name)
         if not entry:
@@ -178,6 +210,7 @@ def _fetch_with_fallback(
             _PROVIDER_CONSECUTIVE_FAILURES[provider_name] = count
             if count >= _PROVIDER_SKIP_THRESHOLD:
                 _PROVIDER_SKIP.add(provider_name)
+                _PROVIDER_SKIP_TIME[provider_name] = time.time()
         if count >= _PROVIDER_SKIP_THRESHOLD:
             logger.warning("[%s] %s 连续 %d 次失败，本会话后续请求跳过",
                            data_type, provider_name, count)

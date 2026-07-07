@@ -8,6 +8,13 @@
 
 ### Changed
 
+- **Provider Chain 熔断架构升级**（三层熔断 + 冷却恢复 + batch 预检）：
+  - 新增 `is_provider_chain_broken()` 全链熔断查询 API，batch 入口一次预检替换逐条重复判断
+  - 新增熔断冷却恢复机制（`_PROVIDER_COOLDOWN_SECS=300`），冷却期满后放行试探请求，成功则恢复
+  - `batch_fetch_industry_data` 入口预检：全链熔断时跳过批量获取，不调 API
+  - `batch_fetch_industry_data` 重试预检：熔断未恢复时跳过 0.8s 等待+重试
+  - 新增 13 项 edge 测试覆盖：`is_provider_chain_broken`（5 项）、冷却探针 4 态（4 项）、batch 预检（4 项）
+
 
 
 ---
