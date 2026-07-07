@@ -452,18 +452,20 @@ def _merge_stock_layer(
         merged[norm_name]["funds"].append("直接持有")
 
 
-def _enrich_with_industry_api(merged: dict[str, Any]) -> bool:
+def _enrich_with_industry_api(merged: dict[str, Any]) -> tuple[bool, str]:
     """用 API 行业数据补充板块分类和概念（原地修改）。
 
     Returns:
-        True 表示 API 获取成功（可能有部分数据），False 表示完全失败。
+        (success, failure_type)
+        - success=True 表示 API 获取成功（可能有部分数据）
+        - success=False 时 failure_type 为 ``"unreachable"``（连接失败）或 ``"empty"``（无可用代码/空响应）
     """
     try:
         all_codes: list[str] = []
         for info in merged.values():
             all_codes.extend(info.get("codes") or [])
         if not all_codes:
-            return False
+            return False, "empty"
         from src.python.fetcher.industry import batch_fetch_industry_data as batch_ind
         ind_data = batch_ind(list(set(all_codes)))
         if ind_data:
@@ -477,12 +479,12 @@ def _enrich_with_industry_api(merged: dict[str, Any]) -> bool:
                         if id_rec.get("concepts"):
                             info["concepts"] = id_rec["concepts"]
                         break
-            return True
+            return True, ""
         logger.warning("[penetration] 行业分类 API 返回空数据（非关键）")
-        return False
+        return False, "empty"
     except Exception:
         logger.warning("[penetration] 行业分类 API 获取失败（非关键）", exc_info=True)
-        return False
+        return False, "unreachable"
 
 
 def _build_penetration_result(
@@ -568,11 +570,13 @@ def compute_penetration_top10(
     classified, funds, direct_stocks, detail_map = _classify_and_group(holdings, details)
     merged, unknown_mv, failed_count, failed_fund_details = _merge_fund_layer(funds, detail_map)
     _merge_stock_layer(direct_stocks, detail_map, merged)
-    industry_success = _enrich_with_industry_api(merged)
+    industry_success, industry_failure_type = _enrich_with_industry_api(merged)
     result = _build_penetration_result(
         merged, classified, funds, direct_stocks,
         unknown_mv, failed_count, failed_fund_details,
     )
     result["industry_success"] = industry_success
+    if not industry_success:
+        result["industry_failure_type"] = industry_failure_type
     return result
 

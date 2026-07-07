@@ -120,7 +120,7 @@ class TestModuleContractChain(unittest.TestCase):
 
         with (
             patch("src.python.report.penetration._enrich_with_industry_api",
-                  return_value=None),
+                  return_value=(True, "")),
         ):
             result = compute_penetration_top10(holdings, details)
 
