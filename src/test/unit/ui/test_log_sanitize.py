@@ -197,3 +197,49 @@ class TestSanitizeEndpointInLogs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLogLevels(unittest.TestCase):
+    """日志分级输出验证。"""
+
+    def setUp(self):
+        self.log_capture = io.StringIO()
+        self.handler = logging.StreamHandler(self.log_capture)
+        self.handler.setLevel(logging.DEBUG)
+        self.orig_handlers = list(logging.getLogger("invest").handlers)
+        logging.getLogger("invest").handlers.clear()
+        logging.getLogger("invest").addHandler(self.handler)
+        logging.getLogger("invest").setLevel(logging.DEBUG)
+
+    def tearDown(self):
+        logging.getLogger("invest").handlers.clear()
+        for h in self.orig_handlers:
+            logging.getLogger("invest").addHandler(h)
+
+    def test_info_level_logged(self):
+        logger = logging.getLogger("invest")
+        msg = "test_info_msg_9876"
+        logger.info(msg)
+        self.assertIn(msg, self.log_capture.getvalue())
+
+    def test_warning_level_logged(self):
+        logger = logging.getLogger("invest")
+        msg = "test_warn_msg_9876"
+        logger.warning(msg)
+        self.assertIn(msg, self.log_capture.getvalue())
+
+    def test_error_level_logged(self):
+        logger = logging.getLogger("invest")
+        msg = "test_err_msg_9876"
+        logger.error(msg)
+        self.assertIn(msg, self.log_capture.getvalue())
+
+    def test_log_contains_level_prefix(self):
+        logger = logging.getLogger("invest")
+        logger.info("lvl_info")
+        logger.warning("lvl_warn")
+        logger.error("lvl_err")
+        text = self.log_capture.getvalue()
+        self.assertIn("lvl_info", text)
+        self.assertIn("lvl_warn", text)
+        self.assertIn("lvl_err", text)

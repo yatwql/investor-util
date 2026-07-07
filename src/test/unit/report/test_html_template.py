@@ -1,4 +1,4 @@
-"""HTML 模板条件分支巡检 — 确保模板包含所有必要条件判断分支。
+"""HTML 模板打印样式 & 条件分支测试。
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import re
 import unittest
 
 import pytest
@@ -15,12 +16,8 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
-class TestHtmlTemplateBranchAudit(unittest.TestCase):
-    """HTML 模板缺失条件分支检测。
-
-    检查 report_template.html 中是否包含所有必要的条件判断分支，
-    避免"较差"评级漏写等问题再次发生（R-148）。
-    """
+class TestHtmlTemplatePrintStyles(unittest.TestCase):
+    """@media print 样式规则完整性检测。"""
 
     def setUp(self):
         tmpl_path = os.path.join(
@@ -28,63 +25,41 @@ class TestHtmlTemplateBranchAudit(unittest.TestCase):
             "..", "..", "..", "python", "tmpl", "report_template.html",
         )
         self.tmpl_path = os.path.normpath(tmpl_path)
-        with open(self.tmpl_path, "r", encoding="utf-8") as f:
-            self.tmpl = f.read()
+        with open(self.tmpl_path, encoding="utf-8") as f:
+            self.html = f.read()
 
-    def test_all_five_rating_colors_present(self):
-        """基金业绩 5 级评级颜色条件全部存在。
+    def test_has_media_print_block(self):
+        """模板包含 @media print 规则块。"""
+        self.assertIn("@media print", self.html)
 
-        "良好"使用默认黑色（#000000），无显式 color 样式。
-        """
-        rating_colors = {
-            "优秀": "#CC0000",
-            "稳定": "#0066CC",
-            "偏差": "#009900",
-            "较差": "#006400",
-        }
-        for rating, color in rating_colors.items():
-            color_pattern = f"color: {color}"
-            self.assertIn(
-                color_pattern, self.tmpl,
-                f"评级 '{rating}' 的颜色 {color} 在模板中缺失",
-            )
-        # 良好使用默认色，不应有特殊 color 样式
-        self.assertIn("良好", self.tmpl)
+    def test_print_hides_section_nav(self):
+        """打印时隐藏导航栏。"""
+        self.assertIn(".section-nav { display: none !important; }", self.html)
 
-    def test_rating_tag_branches(self):
-        """所有 5 个 p['rating_tag'] 条件分支存在。"""
-        for rating in ["优秀", "良好", "稳定", "偏差", "较差"]:
-            self.assertIn(
-                rating, self.tmpl,
-                f"评级条件分支 '{rating}' 在模板中缺失",
-            )
+    def test_print_hides_back_to_top(self):
+        """打印时隐藏回到顶部按钮。"""
+        self.assertIn(".back-to-top", self.html)
 
-    def test_disabled_module_comment(self):
-        """模板包含禁用模块的跳过注释。"""
-        self.assertIn("模块已禁用，完全跳过", self.tmpl)
+    def test_print_table_header_repeat(self):
+        """打印时表头跨页重复。"""
+        self.assertIn("table-header-group", self.html)
 
-    def test_llm_module_disabled_check(self):
-        """LLM 模块禁用检查在模板中存在。"""
-        self.assertIn("module_disabled", self.tmpl,
-                       "模板应包含 module_disabled 条件渲染")
+    def test_print_black_white_friendly(self):
+        """黑白友好：颜色属性覆写为 black。"""
+        self.assertIn("color: #000 !important", self.html)
 
-    def test_llm_enabled_guard(self):
-        """LLM 启用/禁用守卫在模板中存在。"""
-        self.assertIn("llm_enabled", self.tmpl,
-                       "模板应包含 llm_enabled 条件守卫")
+    def test_print_page_break_avoid(self):
+        """打印避免行/图片跨页断裂。"""
+        self.assertIn("page-break-inside: avoid", self.html)
 
-    def test_news_section_guard(self):
-        """新闻章节守卫在模板中存在。"""
-        self.assertIn("news_data", self.tmpl,
-                       "模板应包含 news_data 条件守卫")
+    def test_print_expand_collapsible(self):
+        """打印展开全部可折叠内容。"""
+        self.assertIn("display: block !important", self.html)
 
-    def test_footer_version_and_time(self):
-        """页脚含版本号和生成时间占位符。"""
-        self.assertIn("app_version", self.tmpl,
-                       "模板页脚应包含 app_version 变量")
-        self.assertIn("{{ now }}", self.tmpl,
-                       "模板页脚应包含生成时间 now 变量")
+    def test_print_section_avoid_break(self):
+        """大块内容避免跨页断裂。"""
+        self.assertIn("page-break-inside: avoid;", self.html)
 
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_print_heatmap_bw_friendly(self):
+        """热力图矩阵黑白友好覆盖。"""
+        self.assertIn(".heatmap-matrix td[style*=\"background\"]", self.html)

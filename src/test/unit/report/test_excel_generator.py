@@ -316,6 +316,41 @@ class TestGenerateExcelReport(unittest.TestCase):
             self.assertNotIn("ValueError", e,
                              f"错误信息不应包含原始异常类型: {e}")
 
+    def test_sheet_exception_others_still_called(self):
+        """某页签失败 → 其他页签仍被调用（业务语义验证）。"""
+        from src.python.report.excel_generator import generate_excel_report
+
+        mocks = _SheetMocks()
+        patchers = mocks.start()
+        try:
+            # 让 summary 抛出异常
+            mocks.write_summary.side_effect = ValueError("写入失败")
+            # 同时让穿透模块成功返回有效数据
+            mocks.compute_penetration.return_value = {
+                "top10": [{"rank": 1, "name": "茅台", "mv": 10000.0, "ratio_pct": 50.0,
+                           "sources": [], "codes": ["600519"]}],
+                "summary": {"total_mv": 20000.0, "total_funds": 0, "total_stocks": 1,
+                            "fund_breakdown": "", "merged_count": 1, "top10_coverage_pct": "50.0%",
+                            "unknown_mv": 0, "failed_funds": 0},
+            }
+            details = [_make_detail()]
+            generate_excel_report(
+                self.holdings, details=details,
+                a_indices={}, us_indices={},
+                progress=self.progress,
+            )
+            errors = self.progress.get_errors()
+            self.assertTrue(any("生成失败" in e for e in errors),
+                            f"预期 summary 写入错误，得到: {errors}")
+            # 业务语义：穿透模块仍应被调用
+            mocks.compute_penetration.assert_called_once()
+            mocks.write_penetration.assert_called_once()
+            # 市值模块仍应被调用
+            mocks.write_market_value.assert_called_once()
+        finally:
+            for p in patchers:
+                p.stop()
+
     # ── ProgressReporter 默认值 ──
 
     @pytest.mark.smoke

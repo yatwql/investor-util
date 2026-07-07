@@ -156,6 +156,7 @@ investor-util/
 │       │   │   ├── test_llm.py           # LLM 客户端 — _markdown_to_html / generate_all_llm / prompt 构建（50 项）
 │       │   │   ├── test_llm_content.py   # LLM 内容 Excel 写入 — _strip_html / _write_content_sheet / section_order（18 项）
 │       │   │   ├── test_llm_placeholder.py # LLM 占位文本 — 未配置/已禁用/API 失败三种状态（3 项）
+│       │   │   ├── test_llm_placeholder_distinction_edge.py # LLM 三态互斥 — NOT_CONFIGURED/MODULE_DISABLED/API_ERROR 文本区分（6 项）
 │       │   │   ├── test_session.py       # 会话统计 — reset / get / format / _track_session_usage（32 项）
 │       │   │   └── test_skeleton.py      # 共享骨架 — _is_llm_module_enabled / _handle_truncation（9 项）
 │       │   ├── news/                     # 新闻抓取测试（≈176 项）
@@ -169,7 +170,7 @@ investor-util/
 │       │   │   ├── test_wallstreetcn_news.py # 华尔街见闻新闻 — _parse_news_item HTML 剥离（15 项）
 │       │   │   ├── test_cls_news.py      # 财联社新闻 — _parse_news_item 缺字段测试（21 项）
 │       │   │   └── test_akshare_news.py  # akshare 新闻 — 财新网 + CCTV 双链路（16 项）
-│       │   ├── report/                   # 报表生成测试（≈928 项）
+│       │   ├── report/                   # 报表生成测试（≈945 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_excel_writer.py  # Excel 写入引擎 — Workbook 创建/页签管理（30 项）
 │       │   │   ├── test_excel_roundtrip.py # Excel 读写回环测试 — 保存后重开验证数据完整性
@@ -177,6 +178,7 @@ investor-util/
 │       │   │   ├── test_html_writer.py   # HTML 报告生成 — Jinja2 渲染/LLM 章节分支（89 项）
 │       │   │   ├── test_html_writer_edge.py # HTML 写入器异常场景 — 降级渲染/条件分支边界
 │       │   │   ├── test_html_template.py  # HTML 模板分支审计 — 评级颜色/模块启停/条件渲染
+│       │   │   ├── test_excel_format_edge.py # Excel 数字格式 — 金额/百分比/份额千分位 styles.py 常量（7 项）
 │       │   │   ├── test_html_report_structure.py # HTML 报告结构验证 — 章节顺序/条件渲染/导航
 │       │   │   ├── test_html_report_structure_edge.py # HTML 结构验证异常场景 — 缺失 section/降级页脚
 │       │   │   ├── test_excel_generator.py # Excel 报告编排 — 懒导入/异常隔离/计时（15 项）
@@ -208,12 +210,13 @@ investor-util/
 │       │   │   ├── test_fund_manager_sheet.py # 基金经理变更监控 Excel 写入测试（B2）
 │       │   │   ├── test_fund_overlap.py # 持仓重合度矩阵测试（21 项 B3）
 │       │   │   └── test_security_edge.py # 安全纵深 — 公式注入/XSS/符号链接/路径遍历/原型污染/临时文件竞争（19 项 Y6，含 4 项 autoescape）
-│       │   ├── config/                   # 配置测试（71 项）
+│       │   ├── config/                   # 配置测试（75 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_config.py        # 配置管理 — config.json / llm_settings 读写/校验（31 项）
 │       │   │   ├── test_config_atomic.py # 原子写入 — 创建/覆盖/异常清理/缓存失效（11 项）
 │       │   │   ├── test_config_atomic_edge.py # 原子写入异常场景 — 写入失败/目录不可写/权限拒绝
-│       │   │   └── test_config_edge.py   # 配置异常场景 — 文件损坏/格式错误/缺失字段
+│       │   │   ├── test_config_edge.py   # 配置异常场景 — 文件损坏/格式错误/缺失字段
+│       │   │   └── test_config_firstrun_edge.py # 首次运行引导 — 配置缺失自动初始化/目录创建/损坏降级（4 项）
 │       │   ├── core/                     # 核心模块测试（342 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_cache.py         # 缓存引擎 — TTL 管理/过期清理/市场时段感知（181 项）
@@ -234,9 +237,10 @@ investor-util/
 │       │       ├── test_handlers.py      # 菜单命令 — 缓存刷新/配置/LLM 模块管理（23 项）
 │       │       └── test_log_sanitize.py  # 日志脱敏 — 敏感信息过滤/安全日志（40 项）
 │       │
-│       ├── integration/                # 集成测试（25 项契约验证，5 个子分组）
+│       ├── integration/                # 集成测试（27 项，含新闻流水线全链路/契约验证）
 │       │   ├── __init__.py               # 子包标记（空文件）
-│       │   └── test_integration_coverage.py  # 集成测试覆盖：接口契约/错误隔离/新闻流水线/缓存一致性/TUI 路由
+│       │   ├── test_integration_coverage.py  # 集成测试覆盖：接口契约/错误隔离/新闻流水线/缓存一致性/TUI 路由
+│       │   └── test_news_pipeline_edge.py # 新闻全链路集成 — 聚合/去重/关联端到端 mock 验证（2 项）
 │       └── scenario/                     # 场景测试（277 项，4 个子分组）
 │           ├── __init__.py               # 子包标记（空文件）
 │           ├── basic/                    # 基础业务场景 S0a-S0d + S1-S5 + S21-S33 + C-P1b + P1p（97 项）
