@@ -244,7 +244,6 @@
 > §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）。
 
 
-
 > edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。
 
 ### 1.9 边缘测试文件隔离规范（强制）
@@ -336,8 +335,6 @@
 | **P2** | 跨缓存池污染验证 | 缓存 Key/TTL 策略变更 | price TTL 变化不污染 rank/hold TTL |
 | **P3** | 非 UTC+8 时区运行 | 日期/时间/时区相关变更 | `datetime.now(timezone(hours=8))` 一致 |
 | **P3** | 长假期前后跨日运行 | TTL / market_hours 变更 | 长假后首个交易日恢复正常 |
-
-
 
 ## 5. 测试数据与 Mock 策略
 
@@ -454,13 +451,13 @@ def test_get_ttl_closed(self, mock_open):
 
 每个迭代完成后必须满足以下条件方可进入下一迭代：
 
-### 7.1 功能完整性
+### 6.1 功能完整性
 
 1. **功能完成**：当前迭代的所有计划功能已实现（对应 `plan.md` 条目全部标注完成）
 2. **文档同步**：新增/重命名/删除的文件或目录已同步更新 `datasource-and-folders.md` 目录树
 3. **自审记录**：自查问题已写入 `review-findings.md`，修复后已同步到 `changelog.md`
 
-### 7.2 自动化测试门禁
+### 6.2 自动化测试门禁
 
 4. **全量 pytest 通过**：`pytest src/test/` 全部通过（0 failed, 0 error）
 5. **无测试污染**：`pytest --co` 验证无跨文件 patch 残留冲突
@@ -468,7 +465,7 @@ def test_get_ttl_closed(self, mock_open):
 7. **测试用例 MUST**：新增功能必有对应测试用例，Bug 修复必有对应回归用例（验证缺陷场景的具体断言，非仅正常路径）
 8. **§1.8 覆盖率映射更新**：新场景（S/Txx）必须映射到对应测试文件，并更新覆盖状态
 
-### 7.3 回归检查门禁
+### 6.3 回归检查门禁
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
@@ -476,7 +473,7 @@ def test_get_ttl_closed(self, mock_open):
 - **P1 全通** — 不可合并 master：手动菜单 E/H/B/L + Excel/HTML 视觉检查 + Provider 联通性
 - **P2 已执行** — 可合入但不可发布：断网降级/旧缓存兼容/跨池污染
 
-### 7.4 人工验证
+### 6.4 人工验证
 
 12. **异常场景不崩溃**：对 §1.6 异常场景清单中的 🔴/🟡 状态项，人工确认至少不导致程序崩溃
 13. **报告文件视觉检查**：Excel 和 HTML 输出文件无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）
@@ -495,7 +492,7 @@ def test_get_ttl_closed(self, mock_open):
 
 新增测试用例时，按以下流程操作：
 
-### 9.1 确定测试类型和文件位置
+### 8.1 确定测试类型和文件位置
 
 | 测试类型 | 放哪里 | 示例 |
 |:---------|:-------|:-----|
@@ -511,7 +508,7 @@ def test_get_ttl_closed(self, mock_open):
 | **缺陷回归测试** | 对应模块的 `test_*.py` 或 `test_regression.py` | Bug fix 的断言 |
 | **边缘/异常场景测试** | 对应模块的 `test_<module>_edge.py` | 使用 `@pytest.mark.edge` 标记，放置于模块目录下 |
 
-### 9.2 命名规范
+### 8.2 命名规范
 
 ```python
 # 测试类名 — 模块/场景名 + 测试维度
@@ -525,7 +522,7 @@ def test_ttl_during_trading_hours_returns_30s(self):
 def test_qdii_nav_date_delayed_t2(self):
 ```
 
-### 9.3 新增后必须更新的文件
+### 8.3 新增后必须更新的文件
 
 1. **`testplan.md §1.8`** — 运行 `python scripts/validate_coverage_map.py` 并确保通过
 2. **`datasource-and-folders.md`** — 新增 test_*.py 文件后更新目录树（test 目录下的测试文件数）
@@ -533,7 +530,7 @@ def test_qdii_nav_date_delayed_t2(self):
 4. **`plan.md`** — 如果在迭代中新增的功能，更新对应条目的完成状态
 5. **`unit/conftest.py`** — 新增 `unit/` 下测试文件时确认 `pytestmark` 列表包含正确的 `unit_*` 子标记
 
-### 9.4 新增后必须执行的验证
+### 8.4 新增后必须执行的验证
 
 ```bash
 pytest src/test/                                   # 全量通过
@@ -543,7 +540,7 @@ python scripts/validate_coverage_map.py             # §1.8 映射验证
 python scripts/check-test-markers.py                # 标记合规性检查（AST 静态扫描）
 ```
 
-### 9.5 文件膨胀阈值
+### 8.5 文件膨胀阈值
 
 | 指标 | 警告线 | 红线 | 措施 |
 |:-----|:------:|:----:|:-----|
