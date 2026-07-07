@@ -147,8 +147,8 @@ def _fetch_with_fallback(
         with _PROVIDER_LOCK:
             _skip = provider_name in _PROVIDER_SKIP
         if _skip:
-            logger.info("[%s] %s 已被熔断（连续 %d 次失败），跳过",
-                         data_type, provider_name, _PROVIDER_SKIP_THRESHOLD)
+            logger.debug("[%s] %s 已被熔断（连续 %d 次失败），跳过",
+                          data_type, provider_name, _PROVIDER_SKIP_THRESHOLD)
             continue
 
         entry = provider_fn_map.get(provider_name)
