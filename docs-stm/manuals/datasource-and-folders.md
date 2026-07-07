@@ -297,8 +297,11 @@ investor-util/
 ├── docs-stm/                         # 项目文档
 │   ├── archive/                       # 历史文件归档
 │   │   ├── archived_changelog.0.1.x.md        # v0.1.x 版本变更日志归档
+│   │   ├── archived_changelog.0.2.x.md        # v0.2.x 版本变更日志归档（v0.2.0 ~ v0.2.91 共 47 个版本）
 │   │   ├── archived_plan.0.1.x.md             # v0.1.x 实现计划归档（Iter 1.1~1.5）
+│   │   ├── archived_plan.0.2.x.md             # v0.2.x 实现计划归档（B/C/D 等迭代详情）
 │   │   ├── archived_review-findings.0.1.x.md  # v0.1.x 自审问题记录归档
+│   │   ├── archived_review-findings.0.2.x.md  # v0.2.x 自审问题记录归档（R-149~R-159 等 8 条）
 │   │   ├── archived-data-source-pre-study.md  # ✅ 已归档 — 数据源预研笔记（原位于 plan/notes/）
 │   │   ├── A5-test-runtime-optimization.md    # ✅ 已实现 — A5：测试运行时可扩展性优化设计
 │   │   ├── B1-fund-deep-analysis.md           # ✅ 已实现 — B 迭代基金深度分析 4 模块设计
@@ -328,7 +331,7 @@ investor-util/
 │       ├── requirements.md           # 需求文档（完整需求规格）
 │       ├── technical.md              # 技术设计文档
 │       ├── testplan.md               # 质量控制与测试标准
-│       ├── changelog.md              # 变更日志 — 所有版本的详细更新记录
+│       ├── changelog.md              # 变更日志 — 当前 [Unreleased] 版本；v0.1.x/v0.2.x 完整记录见 archives/
 │       ├── test-coverage.md          # 测试覆盖统计（mode/功能域/场景分组/单元分组/跨类标记）
 │       └── review-findings.md        # 自审问题记录
 │

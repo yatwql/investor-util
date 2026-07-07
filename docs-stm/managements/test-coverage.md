@@ -16,14 +16,14 @@
 | `integration` | 302 | ~50s | — | — |
 | `edge` | 275 | ~15s | ~15s（不并行）| — |
 | `data` | 65 | ~10s | ~10s（不并行）| — |
-| `all` | 2669 | ~26min | **~待测** | — |
+| `all` | 2669 | ~26min | **~80s** | ~19.5x |
 | `smoke` | 24 | ~2s | ~2s（不并行）| — |
 | `report` 🆕 | ≈928 | — | **~15s** | — |
 
 > 注：`all` 模式收集总数 2669 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2657 passed / 12 skipped。
 > 🆕 `report` 模式为 A5 新增，标记 `unit_report`（≈928 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）启用 `--parallel medium`（默认）自动并行，场景/边缘/冒烟等轻量模式保持单线程避免进程调度开销。
-> v0.2.91 文档核对 + config.json 分组优化发布，全量 2669 项（2657 passed / 12 skipped for Windows）。
+> v0.3.0 管理文档归档 + 版本号同步发布，全量 2669 项（2657 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 
