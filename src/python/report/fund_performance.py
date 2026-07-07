@@ -20,6 +20,7 @@ from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.cache import get_cache_age, get_ttl
 from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
 from src.python.models import Holding
 from src.python.report.data_status import (
@@ -363,9 +364,18 @@ def _build_perf_data_status(
 
     # 排名数据（T2）— 全部失败
     if not adjusted_ratings and total_funds > 0:
+        # 取第一只基金的缓存年龄作为代表
+        rank_cache_age: float | None = None
+        for code in adjusted_ratings:
+            rank_cache_age = get_cache_age(f"fund_perf_{code}")
+            if rank_cache_age is not None:
+                break
+        ttl = get_ttl("fund_rank")
         degraded, _, _ = _tracker.record(
             "perf_rank", "T2", success=False,
             failure_type="empty",
+            cache_age_hours=rank_cache_age / 3600 if rank_cache_age else None,
+            cache_ttl_hours=ttl / 3600 if ttl else 24,
         )
         if degraded:
             status["rank"] = DataStatusItem(
@@ -375,8 +385,11 @@ def _build_perf_data_status(
 
     # 盈利预测（T4）
     if not profit_success:
+        pf_cache_age = get_cache_age("profit_forecast_000001")
         degraded, _, _ = _tracker.record(
             "perf_profit_forecast", "T4", success=False,
+            cache_age_hours=pf_cache_age / 3600 if pf_cache_age else None,
+            cache_ttl_hours=4,
         )
         if degraded:
             status["profit_forecast"] = DataStatusItem(

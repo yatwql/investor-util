@@ -288,6 +288,49 @@ class TestDegradationReset:
 
 
 # ═══════════════════════════════════════════════════════════
+#  DegradationTracker — 跨会话持久化
+# ═══════════════════════════════════════════════════════════
+
+
+class TestDegradationPersistence:
+    """跨会话持久化机制（模拟会话重启）。"""
+
+    def test_success_writes_persist_file(self, tmp_path):
+        """成功 record() 后持久化文件应包含时间戳。"""
+        p = tmp_path / "test_state.json"
+        tracker = DegradationTracker(persist_path=str(p))
+        tracker.record("src_a", "T2", success=True)
+        assert p.exists()
+        import json
+        state = json.loads(p.read_text(encoding="utf-8"))
+        assert "src_a" in state
+        assert isinstance(state["src_a"], float)
+
+    def test_cross_session_stale_detected(self, tmp_path):
+        """新会话能读取旧会话的成功时间戳 → 信号2跨会话触发。"""
+        p = tmp_path / "test_cross.json"
+        # 会话 1：记录一次成功
+        t1 = DegradationTracker(persist_path=str(p))
+        t1.record("src_a", "T2", success=True)
+        # 将会话1抛弃，模拟重启
+        import json
+        state = json.loads(p.read_text(encoding="utf-8"))
+        # 把时间戳改到 100 天前（超过 stale_days=1）
+        old_ts = 1000000.0
+        state["src_a"] = old_ts
+        p.write_text(json.dumps(state), encoding="utf-8")
+        # 会话 2：加载旧状态，检测到陈旧
+        t2 = DegradationTracker(persist_path=str(p))
+        # 一次失败 + 无缓存 → 本应走自适应调节阈值-1（T2 base=3→2）
+        # 但持久化时间戳 100 天前 > stale_days 1d → 信号2应触发
+        degraded, _, _ = t2.record(
+            "src_a", "T2", success=False,
+            failure_type="unreachable",
+        )
+        assert degraded
+
+
+# ═══════════════════════════════════════════════════════════
 #  常量和类型
 # ═══════════════════════════════════════════════════════════
 

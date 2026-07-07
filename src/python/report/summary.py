@@ -11,6 +11,7 @@ from typing import Any
 from openpyxl.styles import Alignment, Font
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.cache import get_cache_age, get_ttl
 from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
 from src.python.report.data_status import (
     DataStatus,
@@ -259,9 +260,13 @@ def _build_index_data_status(
             for idx in a_indices.values()
         )
         if has_degraded:
+            cache_age = get_cache_age("index_sh000001")
+            ttl = get_ttl("index")
             degraded, _, _ = _tracker.record(
                 "index_a", "T2", success=False,
                 failure_type="unreachable",
+                cache_age_hours=cache_age / 3600 if cache_age else None,
+                cache_ttl_hours=ttl / 3600 if ttl else 24,
             )
             if degraded:
                 status["index_a"] = DataStatusItem(
@@ -276,9 +281,13 @@ def _build_index_data_status(
             for idx in us_indices.values()
         )
         if has_degraded:
+            cache_age = get_cache_age("index_gb_dji")
+            ttl = get_ttl("index")
             degraded, _, _ = _tracker.record(
                 "index_us", "T2", success=False,
                 failure_type="unreachable",
+                cache_age_hours=cache_age / 3600 if cache_age else None,
+                cache_ttl_hours=ttl / 3600 if ttl else 24,
             )
             if degraded:
                 status["index_us"] = DataStatusItem(

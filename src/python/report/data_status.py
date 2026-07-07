@@ -14,8 +14,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
+import time
 from typing import Any, TypedDict
 
 from src.python.config import get_config
@@ -66,14 +69,20 @@ TIER_PREFIX: dict[str, str] = {"T2": "⚠", "T3": "ℹ", "T4": "ℹ"}
 
 _DEFAULT_UNREACHABLE: dict[str, int] = {"t2": 3, "t3": 4, "t4": 1}
 _DEFAULT_EMPTY: dict[str, int] = {"t2": 5, "t3": 6, "t4": 2}
-_DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 3, "t3": 14, "t4": 2}
+_DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 1, "t3": 14, "t4": 14}
+
+# 持久化文件路径
+_DEGRADATION_STATE_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "cache", ".degradation_state.json",
+)
 
 
 # ── 降级阈值控制 ──────────────────────────────
 
 
 class DegradationTracker:
-    """双信号降级阈值控制器。
+    """双信号降级阈值控制器 + 跨会话持久化。
 
     信号1（连续失败）：
       会话内同一数据源按失败类型分别计数，成功后全部归零。
@@ -81,22 +90,53 @@ class DegradationTracker:
         - unreachable（连接不上/超时）→ 低阈值，快速确认故障
         - empty（API 返回了但数据为空）→ 高阈值，容忍瞬态空响应
 
-    信号2（缓存陈旧）：
+    信号2（缓存陈旧 / 持久化陈旧）：
       缓存最后成功写入距今超过层级容忍天数。
-      无缓存时等价于直接触发。
+      无缓存但持久化有上次成功时间戳时也用此天数判断。
+      无缓存且无持久化记录（全新数据源）时不触发——由信号1自适应调节处理。
 
     自适应调节：
       新鲜缓存（≤TTL）→ 阈值 +1（更宽容）
       无缓存 / 严重过期（>3×TTL）→ 阈值 -1，最小为 1（更敏感）
 
+    跨会话持久化：
+      每次成功 record() 将时间戳写入 ``.degradation_state.json``。
+      下次会话启动时加载，令信号 2 在无缓存源（如 push2）上仍可跨会话触发。
+
     线程安全：计数器操作使用 threading.Lock。
-    无状态持久化：全在内存；跨会话信号通过缓存 _ts 时间戳实现。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, persist_path: str | None = None) -> None:
         self._lock = threading.Lock()
         # _counts[source_key] = {"unreachable": int, "empty": int}
         self._counts: dict[str, dict[str, int]] = {}
+
+        # 跨会话持久化：{source_key: last_success_unix_ts}
+        self._persist_path = persist_path or _DEGRADATION_STATE_FILE
+        self._last_success: dict[str, float] = self._load_persisted_state()
+
+    # ── 持久化 ─────────────────────────────────
+
+    def _load_persisted_state(self) -> dict[str, float]:
+        """从 JSON 文件加载保存的上次成功时间戳。"""
+        try:
+            if os.path.exists(self._persist_path):
+                with open(self._persist_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return {k: float(v) for k, v in data.items() if isinstance(v, (int, float))}
+        except Exception:
+            logger.debug("[degradation] 持久化状态加载失败，使用空状态", exc_info=True)
+        return {}
+
+    def _persist_state(self) -> None:
+        """将当前 last_success 写入 JSON 文件。"""
+        try:
+            os.makedirs(os.path.dirname(self._persist_path), exist_ok=True)
+            with open(self._persist_path, "w", encoding="utf-8") as f:
+                json.dump(self._last_success, f, ensure_ascii=False)
+        except Exception:
+            logger.debug("[degradation] 持久化状态保存失败（非关键）", exc_info=True)
 
     # ── 公开 API ──────────────────────────────
 
@@ -132,9 +172,11 @@ class DegradationTracker:
             )
 
     def reset(self, source_key: str) -> None:
-        """手动重置指定数据源的计数器。"""
+        """手动重置指定数据源的计数器和持久化记录。"""
         with self._lock:
             self._counts.pop(source_key, None)
+            self._last_success.pop(source_key, None)
+            self._persist_state()
 
     def get_counts(self, source_key: str) -> dict[str, int]:
         """读取当前失败计数（线程安全）。"""
@@ -152,9 +194,11 @@ class DegradationTracker:
         cache_age_hours: float | None,
         cache_ttl_hours: float | None,
     ) -> tuple[bool, int, int]:
-        # 成功 → 全部归零
+        # 成功 → 全部归零 + 更新持久化时间戳
         if success:
             self._counts.pop(source_key, None)
+            self._last_success[source_key] = time.time()
+            self._persist_state()
             return False, 0, 0
 
         # 读取层级配置
@@ -178,8 +222,8 @@ class DegradationTracker:
             or counts["empty"] >= empty_eff
         )
 
-        # 信号2：缓存陈旧度
-        signal2 = self._check_stale(tier, cfg, cache_age_hours)
+        # 信号2：缓存陈旧度 or 持久化跨会话陈旧度
+        signal2 = self._check_stale(tier, cfg, cache_age_hours, source_key)
 
         return signal1 or signal2, max(counts.values()), min(unreachable_eff, empty_eff)
 
@@ -195,18 +239,33 @@ class DegradationTracker:
         # 无缓存 → 更敏感
         return max(1, base - 1)
 
-    @staticmethod
-    def _check_stale(tier: str, cfg: dict[str, Any], cache_age_hours: float | None) -> bool:
-        """信号2：检查缓存是否超过容忍期限。
+    def _check_stale(
+        self,
+        tier: str,
+        cfg: dict[str, Any],
+        cache_age_hours: float | None,
+        source_key: str,
+    ) -> bool:
+        """信号2：检查数据是否超过容忍期限。
 
-        仅当存在缓存且年龄超过 stale_days 时触发。
-        无缓存时不触发——由信号1的适应性调节（threshold -1）处理。
+        优先用缓存年龄判断；无缓存时用持久化上次成功时间判断。
+        两者均无时返回 False（全新数据源，由信号1处理）。
         """
-        if cache_age_hours is None:
-            return False
         stale_days = cfg.get("stale_days", _DEFAULT_STALE_DAYS.get(tier.lower(), 3))
         stale_hours = stale_days * 24
-        return cache_age_hours > stale_hours
+
+        # 有缓存 → 用缓存年龄
+        if cache_age_hours is not None:
+            return cache_age_hours > stale_hours
+
+        # 无缓存但有跨会话持久化记录 → 用 persistence age
+        last_ts = self._last_success.get(source_key)
+        if last_ts is not None:
+            age_hours = (time.time() - last_ts) / 3600
+            return age_hours > stale_hours
+
+        # 两者均无 → 全新数据源，由信号1自适应调节处理
+        return False
 
     @staticmethod
     def _get_tier_config(tier: str) -> dict[str, Any]:
