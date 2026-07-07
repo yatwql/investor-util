@@ -8,7 +8,32 @@
 
 ### Changed
 
-- **已完成迭代设计文件归档**：将 `docs-stm/plan/` 中的 6 个已完成迭代设计文件移至 `docs-stm/archive/`：`d-iteration-data-degradation-design.md`（D 迭代）、`d-iteration-data-degradation-iteration-plan.md`（D 迭代子拆分）、`y5-edge-test-config-env.md`（Y5）、`c-p1b-excel-title-number-follow-config.md`（C-P1b）、`akshare-integration-profit-forecast-sector-flow.md`（akshare 集成）、`early-warning-and-p1-optimization.md`（智能预警+P1）。`plan.md` 引用路径同步更新，`datasource-and-folders.md` 目录树同步更新。
+
+
+---
+
+## [0.2.91] - 2026-07-08
+
+### Added
+
+- **config.json 分组注释**：首次启动生成的 `config.json` 使用 `//` 注释分为 5 组（A.路径与文件 / B.数据源与提供商 / C.市场时段与缓存 / D.行为调优 / E.业绩基准），用户编辑时一目了然。
+- **config.json 注释支持**：`get_config()` 读取时自动剥离 `//` 和 `/* */` 注释，`config.json` 从此支持内联注释，与 `llm_settings.json` 行为统一。
+
+### Changed
+
+- **`_DEFAULT_CONFIG` 字段顺序重排**：按业务分组（路径/数据源/市场时段/行为调优/业绩基准），与带注释模板一致。
+- **how-to-config.md 同步**：JSON 示例重写为分组注释版；字段说明表顺序与分组对齐，新增 `degradation` 行和独立章节。
+
+### Fixed
+
+- **`industry` 缓存 TTL 文档不同步**：`how-to-config.md` cache_ttl 表写为 `7 天`，代码 `registry.py` 已是 `14 天`（D-4.5 优化），`technical.md` 同理。三处统一为 14 天。
+- **`_KNOWN_PROVIDER_NAMES` 缺少 `eastmoney_industry_rest`**：用户配 `"industry": "eastmoney_industry_rest"` 时误报 WARNING，已补入验证集合。
+- **`_DEFAULT_CONFIG` `news_top_count` 不一致**：代码为 `100` 但文档写 `300`，经确认推荐值为 `300`，代码改为 `300` 与文档对齐。
+
+### Docs
+
+- **用户手册内部核对**（6 份）：how-to-start.md 方向键操作表新增 `### 键盘操作` 子标题；reports-instruction.md `# 基金业绩评价标准` H1→H2 降级；其余 4 份无调整。
+- **how-to-config.md 完整审计**：3 项文档错误修复（industry TTL / degradation 缺失 / 字段表顺序），1 项代码缺陷修复（`_KNOWN_PROVIDER_NAMES`）。
 
 ---
 
