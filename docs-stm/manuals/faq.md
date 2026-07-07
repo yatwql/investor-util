@@ -57,18 +57,81 @@ pip install --only-binary :all: -r requirements.txt
 
 **Q: 能否将 .venv 放在项目目录外部管理？**
 
-A: 可以。设置环境变量 `VENV_PATH` 指向外部目录，启动脚本自动创建链接并复用。方便多项目共享或集中管理虚拟环境：
+A: 可以。项目启动脚本（`launch.ps1` / `launch.sh`）已原生支持外置虚拟环境。共 3 种方案，按场景选择：
 
+**方案 A：符号链接 / Junction（零环境变量，最推荐）**
+
+直接在项目根目录创建指向外部的链接，一次创建，永久有效：
+
+```bash
+# Linux / macOS
+ln -s /data/shared/venvs/investor-util .venv
+
+# Windows (Git Bash / WSL)
+ln -s /d/shared/venvs/investor-util .venv
+
+# Windows (cmd，管理员)
+mklink /J .venv D:\shared\venvs\investor-util
+
+# Windows (PowerShell 7+，无需管理员)
+New-Item -ItemType SymbolicLink -Path .venv -Target D:\shared\venvs\investor-util
 ```
-# Windows PowerShell
+
+创建后，Python、pip、pytest、VSCode 全部自动跟随到实际目录，无需环境变量、无需 `activate`。`.gitignore` 已有 `.venv/`，不污染仓库。多个项目可指向同一个外部 `.venv` 节省磁盘空间。
+
+启动脚本会自动识别链接：检测到 `.venv` 是符号链接/Junction 时，直接使用（`launch.sh` 第 21~26 行、`launch.ps1` 第 29~33 行）。
+
+**方案 B：VENV_PATH 环境变量（启动脚本原生支持）**
+
+设置环境变量后启动脚本自动创建外部 venv 并建立链接：
+
+```bash
+# Windows PowerShell（一次性）
 $env:VENV_PATH = "D:\shared\venvs\investor-util"
 .\scripts\launch.ps1
 
-# Linux
+# Windows（用户环境变量，永久）
+[System.Environment]::SetEnvironmentVariable("VENV_PATH", "D:\shared\venvs\investor-util", "User")
+
+# Linux（一次性）
 VENV_PATH=/opt/venvs/investor-util ./scripts/launch.sh
+
+# Linux（~/.bashrc，永久）
+echo 'export VENV_PATH=/data/shared/venvs/investor-util' >> ~/.bashrc && source ~/.bashrc
 ```
 
-首次运行自动创建并链接，再次运行直接复用。
+原理（`launch.sh` 第 27~38 行 / `launch.ps1` 第 35~47 行）：
+1. 检测到 `VENV_PATH` → 外部目录不存在时自动 `python -m venv` 创建
+2. 自动创建 `.venv` 符号链接（`ln -s` / `New-Item -ItemType Junction`）
+3. 下次启动时走到方案 A 的检测逻辑，直接复用
+
+**方案 C：直接指定解释器路径（CI/CD / 部署脚本首选）**
+
+不依赖 `.venv` 目录结构、不依赖环境变量、不依赖 `activate`，最可靠：
+
+```bash
+# Linux（Docker / Jenkins / GitHub Actions）
+/data/shared/venvs/investor-util/bin/python scripts/test_runner.py --mode regression
+/data/shared/venvs/investor-util/bin/python src/python/main.py
+
+# Windows（部署脚本）
+& "D:\shared\venvs\investor-util\Scripts\python.exe" scripts\test_runner.py --mode regression
+& "D:\shared\venvs\investor-util\Scripts\python.exe" src\python\main.py
+```
+
+原理：**PEP 405** 规定 Python 解释器启动时会自动读取同级目录下的 `pyvenv.cfg`，知道自己在虚拟环境中。使用 `.venv/bin/python` 直接执行等效于先 `activate` 再运行——自动使用 venv 内的 site-packages，无需任何环境变量。pip 安装也同理：
+
+```bash
+/data/shared/venvs/investor-util/bin/pip install -r requirements.txt
+```
+
+**方案对比：**
+
+| 方案 | Windows | Linux | 设环境变量？ | 适合场景 |
+|:-----|:--------|:------|:------------|:---------|
+| A. 符号链接 | `mklink /J` / `New-Item -ItemType SymbolicLink` | `ln -s` | ❌ | 开发者日常 CLI |
+| B. VENV_PATH | `$env:VENV_PATH` | `export VENV_PATH` | ✅ 设一次 | 多项目共享 |
+| C. 解释器路径 | `外/Scripts/python.exe` | `外/bin/python` | ❌ | CI/CD / 部署 |
 
 **Q: Git clone 后运行脚本报错"项目不在正确的目录结构中"？**
 
