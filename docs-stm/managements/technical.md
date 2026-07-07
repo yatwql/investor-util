@@ -273,7 +273,8 @@ Provider Chain 注册表（registry.py）
 ├─────────────────────────────────────────┤
 │  第 2 层：Provider 级熔断                 │
 │  _fetch_with_fallback 内部               │
-│  连续 3 次失败 → 熔断，跳过该 provider    │
+│  仅传输级异常（超时/断连/DNS/5xx）计入    │
+│  连续 3 次 → 熔断；代码级空结果不计入      │
 ├─────────────────────────────────────────┤
 │  第 3 层：冷却试探恢复                     │
 │  熔断 300s 后自动放行一次试探请求           │
@@ -284,7 +285,7 @@ Provider Chain 注册表（registry.py）
 **实现细节：**
 
 - **第 1 层** — `is_provider_chain_broken(data_type)` 查询 `_PROVIDER_SKIP` 集合，若 data_type 对应 chain 中所有 provider 均在集合中，返回 True。`batch_fetch_industry_data` 入口和重试两处调用，分别跳过批量获取和 0.8s 等待+重试。
-- **第 2 层** — 同原有逻辑：`_fetch_with_fallback` 中每次失败累计计数器 >=3 时加入 `_PROVIDER_SKIP`，后续请求直接 `continue`。
+- **第 2 层** — `_try_provider_fetch` 返回 `_TRANSPORT_FAILURE` sentinel（传输级异常：超时/断连/DNS 解析/SSL 错误/5xx）时计入熔断计数器 ≥3 次后加入 `_PROVIDER_SKIP`，后续请求直接 `continue`。返回 `None`（代码级空结果：API 正常响应但不识别该代码，如 QDII 代码在 Tencent 上无数据）**不计入**熔断计数器。该区分防止特定代码无数据（如 QDII/港股/停牌）误触发熔断影响其他正常代码。
 - **第 3 层** — 新增 `_PROVIDER_SKIP_TIME` (dict, provider_name→timestamp) 记录熔断触发时刻。跳过检查时校验 `time.time() - _skip_time >= _PROVIDER_COOLDOWN_SECS(300)`，到期则从 `_PROVIDER_SKIP` 移除并放行一次试探。试探失败回退到 fallback provider，计数器从 1 开始累计。
 
 **与 LLM Circuit Breaker 的差异：**

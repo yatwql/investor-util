@@ -169,7 +169,7 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         # 将 p1 置于熔断状态且冷却已过期
         _PROVIDER_SKIP.add("p1")
         _PROVIDER_SKIP_TIME["p1"] = time.time() - _PROVIDER_COOLDOWN_SECS - 1
-        p1_fn = MagicMock(return_value=None)  # 试探仍然失败
+        p1_fn = MagicMock(side_effect=RuntimeError("transport error"))  # 传输级异常
         self.provider_map["p1"] = ("P1", p1_fn)
 
         # 第1次：探头失败 → p2 兜底 → p1 计数器 = 1，尚未重新熔断

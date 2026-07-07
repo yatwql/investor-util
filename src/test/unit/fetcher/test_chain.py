@@ -376,7 +376,7 @@ class TestFetchWithFallback(unittest.TestCase):
         """同一 provider 连续失败 3 次 → 第 4 次被跳过。"""
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None  # 缓存未命中
-        fn1 = MagicMock(return_value=None)  # p1 始终失败
+        fn1 = MagicMock(side_effect=RuntimeError("transport error"))  # 传输级异常
         fn2 = MagicMock(return_value={"data": "p2_ok"})
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
@@ -398,7 +398,7 @@ class TestFetchWithFallback(unittest.TestCase):
     @patch("src.python.fetcher.chain.cache_get")
     @patch("src.python.fetcher.chain._get_chain")
     def test_success_resets_failure_counter(self, mock_chain, mock_get):
-        """连续 2 次失败后第 3 次成功 → 计数器重置，后续不会跳过。"""
+        """连续 2 次异常后第 3 次成功 → 计数器重置，后续不会跳过。"""
         mock_chain.return_value = ["p1"]
         mock_get.return_value = None
         call_count = [0]  # 用 list 引用可跟踪
@@ -407,14 +407,14 @@ class TestFetchWithFallback(unittest.TestCase):
             call_count[0] += 1
             if call_count[0] == 3:
                 return {"data": "success"}
-            return None
+            raise RuntimeError("transport error")  # 传输级异常
 
         fn1 = MagicMock(side_effect=fn1_side_effect)
         provider_map = {"p1": ("P1", fn1)}
 
-        # 第 1 次：失败
+        # 第 1 次：异常
         self.assertIsNone(_fetch_with_fallback("price", provider_map, "k1", 3600))
-        # 第 2 次：失败
+        # 第 2 次：异常
         self.assertIsNone(_fetch_with_fallback("price", provider_map, "k2", 3600))
         # 第 3 次：成功（计数器应重置）
         self.assertEqual(

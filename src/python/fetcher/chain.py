@@ -84,6 +84,10 @@ def is_provider_chain_broken(data_type: str) -> bool:
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
+# 熔断计数器增量标记：_try_provider_fetch 返回此值表示传输级异常
+# （非代码级空结果），应计入熔断计数器。
+_TRANSPORT_FAILURE: dict[str, Any] | None = object()  # type: ignore[assignment]
+
 
 # ── 通用带缓存的 Fallback 调用 ──────────────────────────────
 
@@ -104,7 +108,7 @@ def _try_provider_fetch(
         raw = fetch_fn(**kwargs)
     except Exception as e:
         logger.warning("[%s] %s 调用异常: %s", data_type, provider_name, e)
-        return None
+        return _TRANSPORT_FAILURE  # 传输级异常 → 应计入熔断
 
     if raw is None:
         logger.info("[%s] %s 返回空，尝试下一链路", data_type, provider_name)
@@ -196,7 +200,7 @@ def _fetch_with_fallback(
             continue
 
         result = _try_provider_fetch(data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform)
-        if result is not None:
+        if result is not None and result is not _TRANSPORT_FAILURE:
             # 成功 → 恢复熔断计数器
             with _PROVIDER_LOCK:
                 _PROVIDER_CONSECUTIVE_FAILURES.pop(provider_name, None)
@@ -204,16 +208,18 @@ def _fetch_with_fallback(
             cache_set(cache_key, result)
             return result
 
-        # 失败 → 累计连续失败计数（线程安全：counter 被多个 worker 同时读写）
-        with _PROVIDER_LOCK:
-            count = _PROVIDER_CONSECUTIVE_FAILURES.get(provider_name, 0) + 1
-            _PROVIDER_CONSECUTIVE_FAILURES[provider_name] = count
+        if result is _TRANSPORT_FAILURE:
+            # 传输级异常（超时/断连/DNS/5xx）→ 累计连续失败计数
+            with _PROVIDER_LOCK:
+                count = _PROVIDER_CONSECUTIVE_FAILURES.get(provider_name, 0) + 1
+                _PROVIDER_CONSECUTIVE_FAILURES[provider_name] = count
+                if count >= _PROVIDER_SKIP_THRESHOLD:
+                    _PROVIDER_SKIP.add(provider_name)
+                    _PROVIDER_SKIP_TIME[provider_name] = time.time()
             if count >= _PROVIDER_SKIP_THRESHOLD:
-                _PROVIDER_SKIP.add(provider_name)
-                _PROVIDER_SKIP_TIME[provider_name] = time.time()
-        if count >= _PROVIDER_SKIP_THRESHOLD:
-            logger.warning("[%s] %s 连续 %d 次失败，本会话后续请求跳过",
-                           data_type, provider_name, count)
+                logger.warning("[%s] %s 连续 %d 次失败，本会话后续请求跳过",
+                               data_type, provider_name, count)
+        # else: 代码级空结果（API 不识别该代码）→ 不计入熔断计数器
 
     # 3) 降级：全部 Provider 失败时尝试过期缓存
     stale = cache_get(cache_key, CACHE_WEEKLY)
