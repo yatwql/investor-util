@@ -4,7 +4,7 @@
 - 基础配置（持仓目录/文件名/输出目录等）
 - 缓存 TTL 自定义
 - LLM 外部配置文件引用（API Key 不直接存储在 config.json 中）
-- llm_settings.json / llm_key.json 支持 ``//`` 单行注释和 ``/* */`` 多行注释
+- config.json / llm_settings.json / llm_key.json 支持 ``//`` 单行注释和 ``/* */`` 多行注释
   （自动剥离后解析），方便按业务场景分组管理配置项。
 """
 
@@ -29,11 +29,15 @@ logger = logging.getLogger("invest")
 # 配置文件路径
 _CONFIG_FILE = "data/config/config.json"
 
-# 默认配置
+# 默认配置（按业务分组排列顺序，与模板 _get_default_config_template() 一致）
 _DEFAULT_CONFIG = {
+    # ── A. 路径与文件 ──
     "holdings_dir": "data/holdings",
     "holdings_filename": "个人投资持仓信息.xlsx",
     "output_dir": "reports",
+    "llm_key_file": "data/config/llm_key.json",
+    "llm_settings_file": "data/config/llm_settings.json",
+    # ── B. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
         "sina": True,
@@ -43,15 +47,7 @@ _DEFAULT_CONFIG = {
         "akshare": True,
     },
     "preferred_provider": {},
-    "cache_ttl": get_cache_ttl_defaults(),
-    "user_fund_benchmarks": {},
-    "llm_key_file": "data/config/llm_key.json",
-    "llm_settings_file": "data/config/llm_settings.json",
-    "early_warning": {
-        "sector_alert_threshold_warning": -50_000_000,
-        "sector_alert_threshold_danger": -200_000_000,
-        "sentiment_top_n": 10,
-    },
+    # ── C. 市场时段与缓存 ──
     "market_hour_aware": ["price", "index"],
     "market_hour_ttl": 30,
     "market_hours": {
@@ -59,16 +55,85 @@ _DEFAULT_CONFIG = {
         "end": "15:00",
         "official_source": True,
     },
+    "cache_ttl": get_cache_ttl_defaults(),
+    # ── D. 行为调优 ──
     "default_menu_key": "L",
+    "report_section_order": {},
+    "early_warning": {
+        "sector_alert_threshold_warning": -50_000_000,
+        "sector_alert_threshold_danger": -200_000_000,
+        "sentiment_top_n": 10,
+    },
     "degradation": {
         "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
         "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
         "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14},
     },
+    # ── E. 业绩基准 ──
+    "user_fund_benchmarks": {},
 }
 
 
 # ── 配置缓存（线程安全，按 mtime 自动失效） ─────────────
+
+
+def _get_default_config_template() -> str:
+    """返回带分组注释的默认 config.json 模板字符串。
+
+    与 _DEFAULT_CONFIG 保持语义一致，首次创建 config.json 时写入。
+    使用 ``//`` 注释分组，由 _strip_json_comments() 剥离后解析。
+    """
+    ttl_json = json.dumps(get_cache_ttl_defaults(), ensure_ascii=False, indent=2)
+    lines = ttl_json.split("\n")
+    indented_ttl = "\n".join([lines[0]] + ["  " + l for l in lines[1:]])
+    return (
+        '{\n'
+        '  // ── A. 路径与文件 ──\n'
+        '  "holdings_dir": "data/holdings",\n'
+        '  "holdings_filename": "个人投资持仓信息.xlsx",\n'
+        '  "output_dir": "reports",\n'
+        '  "llm_key_file": "data/config/llm_key.json",\n'
+        '  "llm_settings_file": "data/config/llm_settings.json",\n'
+        '\n'
+        '  // ── B. 数据源与提供商 ──\n'
+        '  "news_top_count": 300,\n'
+        '  "news_sources": {\n'
+        '    "sina": true,\n'
+        '    "eastmoney": true,\n'
+        '    "cls": false,\n'
+        '    "wallstreetcn": true,\n'
+        '    "akshare": true\n'
+        '  },\n'
+        '  "preferred_provider": {},\n'
+        '\n'
+        '  // ── C. 市场时段与缓存 ──\n'
+        '  "market_hour_aware": ["price", "index"],\n'
+        '  "market_hour_ttl": 30,\n'
+        '  "market_hours": {\n'
+        '    "start": "09:30",\n'
+        '    "end": "15:00",\n'
+        '    "official_source": true\n'
+        '  },\n'
+        f'  "cache_ttl": {indented_ttl},\n'
+        '\n'
+        '  // ── D. 行为调优 ──\n'
+        '  "default_menu_key": "L",\n'
+        '  "report_section_order": {},\n'
+        '  "early_warning": {\n'
+        '    "sector_alert_threshold_warning": -50000000,\n'
+        '    "sector_alert_threshold_danger": -200000000,\n'
+        '    "sentiment_top_n": 10\n'
+        '  },\n'
+        '  "degradation": {\n'
+        '    "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},\n'
+        '    "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},\n'
+        '    "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}\n'
+        '  },\n'
+        '\n'
+        '  // ── E. 业绩基准 ──\n'
+        '  "user_fund_benchmarks": {}\n'
+        '}\n'
+    )
 
 _config_cache: dict | None = None
 _config_mtime: float = 0
@@ -103,7 +168,9 @@ def get_config() -> dict:
 
         try:
             with open(config_path, "r", encoding="utf-8-sig") as f:
-                config = json.load(f)
+                raw = f.read()
+                cleaned = _strip_json_comments(raw)
+                config = json.loads(cleaned)
             merged = dict(_DEFAULT_CONFIG)
             # 过滤 null 值：不允许 config.json 中的 null 覆盖默认值
             for key, val in config.items():
@@ -441,7 +508,7 @@ def init_config() -> None:
     config_dir = os.path.dirname(config_path)
     os.makedirs(config_dir, exist_ok=True)
     with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(_DEFAULT_CONFIG, f, ensure_ascii=False, indent=2)
+        f.write(_get_default_config_template())
     # 清除缓存，使后续 get_config() 从新文件读取
     _config_cache = None
     _config_mtime = 0

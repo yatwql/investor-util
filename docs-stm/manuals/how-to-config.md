@@ -4,9 +4,14 @@
 
 ```json
 {
+  // ── A. 路径与文件 ──
   "holdings_dir": "data/holdings",
   "holdings_filename": "个人投资持仓信息.xlsx",
   "output_dir": "reports",
+  "llm_key_file": "data/config/llm_key.json",
+  "llm_settings_file": "data/config/llm_settings.json",
+
+  // ── B. 数据源与提供商 ──
   "news_top_count": 300,
   "news_sources": {
     "sina": true,
@@ -16,11 +21,8 @@
     "akshare": true
   },
   "preferred_provider": {},
-  "early_warning": {
-    "sector_alert_threshold_warning": -50000000,
-    "sector_alert_threshold_danger": -200000000,
-    "sentiment_top_n": 10
-  },
+
+  // ── C. 市场时段与缓存 ──
   "market_hour_aware": ["price", "index"],
   "market_hour_ttl": 30,
   "market_hours": {
@@ -28,43 +30,28 @@
     "end": "15:00",
     "official_source": true
   },
+  "cache_ttl": {
+    "price": 86400,
+    "index": 86400,
+    // ...（完整列表见下方 cache_ttl 章节）
+  },
+
+  // ── D. 行为调优 ──
   "default_menu_key": "L",
+  "report_section_order": {},
+  "early_warning": {
+    "sector_alert_threshold_warning": -50000000,
+    "sector_alert_threshold_danger": -200000000,
+    "sentiment_top_n": 10
+  },
   "degradation": {
     "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
     "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
     "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}
   },
-  "report_section_order": {},
-  "user_fund_benchmarks": {},
-  "llm_key_file": "data/config/llm_key.json",
-  "llm_settings_file": "data/config/llm_settings.json",
-  "cache_ttl": {
-    // ── 行情/数据类 ──
-    "price": 86400,
-    "index": 86400,
-    "news": 900,
-    "sector_flow": 900,
-    "rank": 86400,
-    "profit_forecast": 86400,
-    "hold": 604800,
-    "industry": 1209600,
-    "dividend": 2592000,
-    "benchmark": 2592000,
-    // ── LLM 分析类 ──
-    "llm_expert_review": 7200,
-    "llm_news_correlation": 3600,
-    "llm_global_macro": 86400,
-    "llm_health_check": 86400,
-    "llm_penetration_deep": 86400,
-    // ── 基金深度分析类 ──
-    "fund_manager": 86400,
-    "fund_overlap": 604800,
-    "fund_concentration": 2592000,
-    "fund_style_snapshot": 2592000,
-    // ── 系统类 ──
-    "tracking": 2592000,
-    "calendar": 1209600
-  }
+
+  // ── E. 业绩基准 ──
+  "user_fund_benchmarks": {}
 }
 ```
 
@@ -77,20 +64,20 @@
 | `holdings_dir` | `data/holdings` | 持仓 xlsx 文件所在目录 | 菜单 `C` |
 | `holdings_filename` | `个人投资持仓信息.xlsx` | 要读取的持仓文件名 | 菜单 `F` |
 | `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `O` |
+| `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
+| `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
 | `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量自动加倍保障召回） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
-| `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
-| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
-| `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数） | 手动编辑 |
-| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（16 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
-| `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
-| `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
-| `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
+| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
+| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（16 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
+| `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
+| `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
+| `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 
 ## news_sources 可调字段
 
