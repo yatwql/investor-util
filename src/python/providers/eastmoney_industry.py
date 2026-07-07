@@ -37,10 +37,14 @@ _HEADERS = {
 # fund_style 等降级场景可容忍偶尔失败，减少重试加快 fallback
 _MAX_RETRIES = 1
 
-# ── 熔断器 ──────────────────────────────────────────────
+# ── 熔断器（含冷却恢复） ────────────────────────────────────
+# 连续 _PUSH2_CIRCUIT_THRESHOLD 次失败后熔断，
+# 冷却 _PUSH2_COOLDOWN_SECS 秒后自动放行一次试探请求。
 _PUSH2_CIRCUIT_OPEN = False     # 是否已熔断
+_PUSH2_CIRCUIT_OPEN_TIME = 0.0  # 熔断开启时的时间戳
 _PUSH2_FAILURE_COUNT = 0        # 连续失败计数
 _PUSH2_CIRCUIT_THRESHOLD = 3    # 连续失败 N 次后熔断
+_PUSH2_COOLDOWN_SECS = 300      # 冷却期（秒）
 
 # 查询字段（行业分类 + 扩展行情，供 fund_style 等模块使用）
 #   f9=动态市盈率(PE), f20=总市值, f23=市净率(PB)
@@ -54,19 +58,21 @@ def _secid(code: str) -> str:
 
 
 def _circuit_breaker_record_failure() -> None:
-    """累加连续失败计数，达到阈值时打开熔断。"""
-    global _PUSH2_FAILURE_COUNT, _PUSH2_CIRCUIT_OPEN
+    """累加连续失败计数，达到阈值时打开熔断并记录时间戳。"""
+    global _PUSH2_FAILURE_COUNT, _PUSH2_CIRCUIT_OPEN, _PUSH2_CIRCUIT_OPEN_TIME
     _PUSH2_FAILURE_COUNT += 1
     if _PUSH2_FAILURE_COUNT >= _PUSH2_CIRCUIT_THRESHOLD:
         _PUSH2_CIRCUIT_OPEN = True
+        _PUSH2_CIRCUIT_OPEN_TIME = time.time()
         logger.warning("东方财富 push2 连续 %d 次失败，触发熔断，本运行周期跳过",
                         _PUSH2_CIRCUIT_THRESHOLD)
 
 
 def _circuit_breaker_reset() -> None:
     """请求成功时重置熔断计数。"""
-    global _PUSH2_FAILURE_COUNT
+    global _PUSH2_FAILURE_COUNT, _PUSH2_CIRCUIT_OPEN
     _PUSH2_FAILURE_COUNT = 0
+    _PUSH2_CIRCUIT_OPEN = False
 
 
 def _make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
@@ -84,8 +90,14 @@ def _make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
     """
     global _PUSH2_CIRCUIT_OPEN
     if _PUSH2_CIRCUIT_OPEN:
-        logger.debug("东方财富 push2 熔断已开启，跳过 [%s]", code)
-        return None
+        # 冷却期满 → 放行一次试探请求
+        if time.time() - _PUSH2_CIRCUIT_OPEN_TIME >= _PUSH2_COOLDOWN_SECS:
+            _PUSH2_CIRCUIT_OPEN = False
+            _PUSH2_FAILURE_COUNT = 0
+            logger.info("东方财富 push2 冷却期满，允许试探请求 [%s]", code)
+        else:
+            logger.debug("东方财富 push2 熔断已开启，跳过 [%s]", code)
+            return None
 
     params = {
         "secid": _secid(code),
