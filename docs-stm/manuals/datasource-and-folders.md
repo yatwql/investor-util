@@ -120,11 +120,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2669 tests）
+│   └── test/                             # 测试（按标记分组目录，2703 tests）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2367 项，8 个子分组）
+│       ├── unit/                         # 单元测试（2399 项，8 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── conftest.py               # 单元测试级 pytest fixture/配置
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
@@ -146,7 +146,7 @@ investor-util/
 │       │   │   ├── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
 │   │   │   ├── test_fund_manager.py  # 基金经理师数据获取 — HTML 解析、当页面退回档（14 项）
 │       │   │   └── test_api_edge.py      # HTTP Provider 异常场景 — 超时/DNS/SSL/429/503/JSON 异常（23 项 Y1）
-│       │   ├── llm/                      # LLM 相关测试（369 项）
+│       │   ├── llm/                      # LLM 相关测试（375 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_api.py           # LLM API 调用 — 重试/熔断/回退/截断/Provider 路由（44 项）
 │       │   │   ├── test_api_edge.py         # LLM API 异常场景 — 网络错误/HTTP 错误码/超时
@@ -229,9 +229,10 @@ investor-util/
 │       │   │   ├── test_reader.py        # 持仓读取 — xlsx 解析/多 worksheet/列校验（11 项）
 │       │   │   ├── test_registry.py      # 中央注册表 — 模块注册/TTL 映射/设置键派生（21 项）
 │       │   │   └── test_registry_edge.py # 注册表异常场景 — 重复注册/不存在的模块/别名冲突
-│       │   └── ui/                       # TUI 测试（≈142 项）
+│       │   └── ui/                       # TUI 测试（147 项）
 │       │       ├── __init__.py           # 子包标记（空文件）
 │       │       ├── test_tui.py           # 键盘输入 — getch() 跨平台/方向键解析（32 项）
+│       │       ├── test_tui_edge.py      # TUI 异常友好提示 — _print_error_with_hint 7 种异常分类 + 菜单调度异常捕获（18 项 edge）
 │       │       ├── test_tui_menu.py      # 菜单交互 — 菜单渲染/导航/快捷键（27 项）
 │       │       ├── test_tui_handlers.py  # 通用辅助 — 文件选择器/输出框/进度显示（20 项）
 │       │       ├── test_handlers.py      # 菜单命令 — 缓存刷新/配置/LLM 模块管理（23 项）
@@ -277,16 +278,16 @@ investor-util/
 ├── test-reports/                      # 测试报告输出（自动生成）
 │   ├── latest/                        # 最新测试报告（按 --mode 生成子目录）
 │       │   ├── index.html                 # 汇总页 — 各模式通过/失败总览 + 最近运行时间
-│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2367 项）
-│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，2027 项）
+│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2399 项）
+│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，2042 项）
 │       │   ├── scenario/report.html       # 场景测试报告（标记 -m "scenario"，277 项）
 │       │   ├── regression/report.html     # 回归测试报告（标记 -m "scenario"，模式别名，277 项）
 │       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，958 项）
-│       │   ├── integration/report.html    # 集成测试报告（标记 -m "scenario or integration"，302 项）
+│       │   ├── integration/report.html    # 集成测试报告（标记 -m "scenario or integration"，304 项）
 │       │   ├── smoke/report.html          # 冒烟测试报告（标记 -m "smoke"，24 项）
-│       │   ├── edge/report.html           # 边缘场景报告（标记 -m "edge"，275 项）
+│       │   ├── edge/report.html           # 边缘场景报告（标记 -m "edge"，294 项）
 │       │   ├── data/report.html           # 数据正确性报告（标记 -m "data"，65 项）
-│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2669 项）
+│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2703 项）
 │       │   └── coverage/                  # HTML 行覆盖率报告（--coverage 时生成）
 │   └── archives/                      # 历史报告存档
 │       └── <YYYYMMDD>/                # 按日期归档的子目录（含完整 latest/ 快照）

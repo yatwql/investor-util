@@ -8,22 +8,22 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2399 | ~20s |
+| `unit` | 2417 | ~20s |
 | `standard` | 2042 | ~20s |
 | `scenario` | 277 | ~35s |
 | `regression` | 277 | ~35s |
 | `verify` | 958 | ~49s |
 | `integration` | 304 | ~50s |
-| `edge` | 294 | ~15s |
+| `edge` | 312 | ~15s |
 | `data` | 65 | ~10s |
-| `all` | 2703 | ~80s |
+| `all` | 2721 | ~80s |
 | `smoke` | 24 | ~2s |
 | `report` 🆕 | ≈945 | ~15s |
 
-> 注：`all` 模式收集总数 2703 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2691 passed / 12 skipped。
+> 注：`all` 模式收集总数 2721 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2709 passed / 12 skipped。
 > 🆕 `report` 模式为 A5 新增，标记 `unit_report`（≈945 项），供报告模块开发期快速验证。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）默认启用 `--parallel medium` 自动并行，"典型耗时"即 medium 并行耗时；场景/边缘/冒烟等轻量模式保持单线程（不并行），避免进程调度开销。
-> v0.3.0 测试增量覆盖补全（34 项新增），全量 2703 项（2691 passed / 12 skipped for Windows）。
+> v0.3.0 测试增量覆盖补全（52 项新增），全量 2721 项（2709 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 
@@ -38,7 +38,7 @@
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(10 文件) + `scenario/llm/test_llm_scenarios.py` | 383 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 342 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 75 |
-| **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 147 |
+| **TUI 交互** | `tui*.py`, `handlers_*.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 165 |
 | **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 5 文件, resilience, llm, datetime 共 9 文件) | 240 |
 
 ### 场景测试分组（scenario）
@@ -69,7 +69,7 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 8 个子组合计 | **2399** |
+| `unit`（父标记） | 8 个子组合计 | **2417** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 166 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常） | 173 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/llm_content 写入） | 375 |
@@ -77,7 +77,7 @@
 | ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列模块、C/D 迭代降级/占位；含 65 项 data 标记测试） | ≈945 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含 C 迭代 report_section_order 校验） | 75 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表；含 C 迭代注册表测试） | 342 |
-| └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 147 |
+| └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 165 |
 
 ### 跨类标记
 
@@ -85,7 +85,7 @@
 |:-------|:---------|:--------:|
 | `llm` | 全部 LLM 相关（unit_llm 375 + scenario_llm 32），**全部为 mock 测试，无需真实 API key** | **375** |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** |
-| `edge` | 异常/边界场景 | **294** |
+| `edge` | 异常/边界场景 | **312** |
 | `data` | 数据正确性验证 | **65** |
 
 详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。
