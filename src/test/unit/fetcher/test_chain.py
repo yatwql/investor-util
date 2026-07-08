@@ -442,25 +442,43 @@ class TestIsProviderChainBroken(unittest.TestCase):
     def test_all_skipped(self, mock_chain):
         """全部 provider 在熔断中 → True。"""
         from src.python.fetcher.chain import is_provider_chain_broken
+        from src.python.provider_registry import get_registry
         mock_chain.return_value = ["p1", "p2"]
-        from src.python.fetcher.chain import _PROVIDER_SKIP
-        _PROVIDER_SKIP.update(["p1", "p2"])
+        reg = get_registry()
+        reg.register_provider("p1", 2)
+        reg.register_provider("p2", 2)
+        reg.record_failure("p1", "test")
+        reg.record_failure("p1", "test")
+        reg.record_failure("p1", "test")
+        reg.record_failure("p2", "test")
+        reg.record_failure("p2", "test")
+        reg.record_failure("p2", "test")
         self.assertTrue(is_provider_chain_broken("test"))
 
     @patch("src.python.fetcher.chain._get_chain")
     def test_partial_skipped(self, mock_chain):
         """仅部分 provider 熔断 → False。"""
         from src.python.fetcher.chain import is_provider_chain_broken
+        from src.python.provider_registry import get_registry
         mock_chain.return_value = ["p1", "p2"]
-        from src.python.fetcher.chain import _PROVIDER_SKIP
-        _PROVIDER_SKIP.add("p1")
+        reg = get_registry()
+        reg.register_provider("p1", 2)
+        reg.register_provider("p2", 2)
+        # 仅 p1 触发熔断
+        reg.record_failure("p1", "test")
+        reg.record_failure("p1", "test")
+        reg.record_failure("p1", "test")
         self.assertFalse(is_provider_chain_broken("test"))
 
     @patch("src.python.fetcher.chain._get_chain")
     def test_none_skipped(self, mock_chain):
         """无 provider 熔断 → False。"""
         from src.python.fetcher.chain import is_provider_chain_broken
+        from src.python.provider_registry import get_registry
         mock_chain.return_value = ["p1", "p2"]
+        reg = get_registry()
+        reg.register_provider("p1", 2)
+        reg.register_provider("p2", 2)
         self.assertFalse(is_provider_chain_broken("test"))
 
     @patch("src.python.fetcher.chain._get_chain")
@@ -474,9 +492,13 @@ class TestIsProviderChainBroken(unittest.TestCase):
     def test_single_provider_skipped(self, mock_chain):
         """单 provider 链且已熔断 → True。"""
         from src.python.fetcher.chain import is_provider_chain_broken
+        from src.python.provider_registry import get_registry
         mock_chain.return_value = ["p1"]
-        from src.python.fetcher.chain import _PROVIDER_SKIP
-        _PROVIDER_SKIP.add("p1")
+        reg = get_registry()
+        reg.register_provider("p1", 2)
+        reg.record_failure("p1", "test")
+        reg.record_failure("p1", "test")
+        reg.record_failure("p1", "test")
         self.assertTrue(is_provider_chain_broken("test"))
 
 

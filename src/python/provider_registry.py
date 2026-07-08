@@ -188,11 +188,17 @@ class DataSourceRegistry:
 
         调用方应仅在『传输级异常』（超时/断连/DNS/SSL/5xx）时调用此方法。
         代码级空结果（API 正常响应但无匹配数据）不计入熔断。
+
+        未注册的 provider 自动注册（默认 tier=4），兼容 _fetch_with_fallback
+        等不提前注册 provider 的调用方。
         """
         with self._provider_lock:
             state = self._providers.get(provider)
             if state is None:
-                return
+                state = ProviderState(
+                    name=provider, tier=4, fallback=None, timeout=10.0,
+                )
+                self._providers[provider] = state
             now = time.time()
             state.consecutive_failures += 1
             state.last_failure_time = now
@@ -218,6 +224,7 @@ class DataSourceRegistry:
             elapsed = time.time() - state.last_failure_time
             if elapsed >= _PROVIDER_COOLDOWN_SECS:
                 state.is_skipped = False
+                state.consecutive_failures = 0
                 logger.info(
                     "[registry] %s 冷却期满（%.0fs），解除熔断",
                     provider, elapsed,
@@ -243,6 +250,7 @@ class DataSourceRegistry:
                 state = self._providers[p]
                 if now - state.last_failure_time >= _PROVIDER_COOLDOWN_SECS:
                     state.is_skipped = False
+                    state.consecutive_failures = 0
                     any_recovered = True
                     logger.info(
                         "[registry] %s 冷却期满（链式检查，%.0fs），解除熔断",

@@ -8,15 +8,14 @@ chain 中按优先级列出 provider，主链路失败后自动递补。
 from __future__ import annotations
 
 import logging
-import threading
-import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from src.python.constants import CACHE_WEEKLY
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.config import get_config
+from src.python.provider_registry import get_registry
 
 logger = logging.getLogger("invest")
 
@@ -48,26 +47,17 @@ def _get_chain(data_type: str) -> list[str]:
     return chain
 
 
-# ── 会话级 Provider 熔断 ────────────────────────────────────
-# 同一 provider 连续失败 _PROVIDER_SKIP_THRESHOLD 次后，
-# 本会话剩余请求跳过该 provider，避免每次等待超时/断连。
-# 跳过时记录时间戳，冷却期满（_PROVIDER_COOLDOWN_SECS）后允许
-# 一次试探请求，成功则恢复，失败则重新计时。
-_PROVIDER_CONSECUTIVE_FAILURES: dict[str, int] = {}
-_PROVIDER_SKIP: set[str] = set()
-_PROVIDER_SKIP_TIME: dict[str, float] = {}  # provider_name → 进入熔断的时间戳
-_PROVIDER_SKIP_THRESHOLD = 3
-_PROVIDER_COOLDOWN_SECS = 300  # 5 分钟后允许试探恢复
-# 线程锁：熔断计数器被 batch_fetch_industry_data 等从多线程写入
-_PROVIDER_LOCK = threading.Lock()
+# ── 会话级 Provider 熔断（委托 DataSourceRegistry） ──────
+# 熔断逻辑集中在 provider_registry.py：
+#   - 连续 3 次传输级失败 → 熔断 300s → 冷却期满自动恢复
+#   - record_failure(provider, context) / record_success(provider)
+#   - is_circuit_broken(provider) → bool
+#   - is_chain_broken(chain) → bool
 
 
 def reset_provider_skip() -> None:
-    """重置 Provider 熔断状态（测试用）。"""
-    with _PROVIDER_LOCK:
-        _PROVIDER_CONSECUTIVE_FAILURES.clear()
-        _PROVIDER_SKIP.clear()
-        _PROVIDER_SKIP_TIME.clear()
+    """重置 Provider 熔断状态（测试用）。委托 DataSourceRegistry.reset()。"""
+    get_registry().reset()
 
 
 def is_provider_chain_broken(data_type: str) -> bool:
@@ -82,8 +72,7 @@ def is_provider_chain_broken(data_type: str) -> bool:
     chain = _get_chain(data_type)
     if not chain:
         return True
-    with _PROVIDER_LOCK:
-        return all(p in _PROVIDER_SKIP for p in chain)
+    return get_registry().is_chain_broken(chain)
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
@@ -115,7 +104,7 @@ def _try_provider_fetch(
             logger.warning("[%s] %s API 限速(429): %s", data_type, provider_name, err_str)
         else:
             logger.warning("[%s] %s 调用异常: %s", data_type, provider_name, err_str)
-        return _TRANSPORT_FAILURE  # type: ignore[return-value]  # 传输级异常 → 应计入熔断
+        return cast("dict[str, Any] | None", _TRANSPORT_FAILURE)  # 传输级异常 → 应计入熔断
 
     if raw is None:
         logger.info("[%s] %s 返回空，尝试下一链路", data_type, provider_name)
@@ -164,6 +153,8 @@ def _fetch_with_fallback(
 
     对于指定数据类型，依次尝试 chain 中的每个 provider，
     第一个成功的返回结果，全部失败返回 None。
+
+    熔断逻辑委托 DataSourceRegistry，取代旧版 _PROVIDER_SKIP 等全局变量。
     """
     chain = _get_chain(data_type)
 
@@ -173,25 +164,14 @@ def _fetch_with_fallback(
         logger.debug("缓存命中: %s", cache_key)
         return cached
 
-    # 2) 遍历 chain 尝试
+    # 2) 遍历 chain 尝试（熔断委托 registry）
     kwargs = fn_kwargs or {}
+    reg = get_registry()
     for provider_name in chain:
-        # 会话级熔断：连续失败已达阈值 → 跳过（冷却期后允许试探恢复）
-        with _PROVIDER_LOCK:
-            _skip = provider_name in _PROVIDER_SKIP
-            _skip_time = _PROVIDER_SKIP_TIME.get(provider_name, 0) if _skip else 0
-        if _skip:
-            if time.time() - _skip_time >= _PROVIDER_COOLDOWN_SECS:
-                # 冷却期满 → 移除熔断标记，放行一次试探请求
-                with _PROVIDER_LOCK:
-                    _PROVIDER_SKIP.discard(provider_name)
-                    _PROVIDER_SKIP_TIME.pop(provider_name, None)
-                logger.info("[%s] %s 冷却期满，允许试探请求",
-                            data_type, provider_name)
-            else:
-                logger.debug("[%s] %s 已被熔断（连续 %d 次失败），跳过",
-                              data_type, provider_name, _PROVIDER_SKIP_THRESHOLD)
-                continue
+        # 熔断检查（含自动冷却恢复）
+        if reg.is_circuit_broken(provider_name):
+            logger.debug("[%s] %s 已被熔断，跳过", data_type, provider_name)
+            continue
 
         entry = provider_fn_map.get(provider_name)
         if not entry:
@@ -208,23 +188,16 @@ def _fetch_with_fallback(
         result = _try_provider_fetch(data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform)
         if result is not None and result is not _TRANSPORT_FAILURE:
             # 成功 → 恢复熔断计数器
-            with _PROVIDER_LOCK:
-                _PROVIDER_CONSECUTIVE_FAILURES.pop(provider_name, None)
-                _PROVIDER_SKIP.discard(provider_name)
+            reg.record_success(provider_name)
             cache_set(cache_key, result)
             return result
 
         if result is _TRANSPORT_FAILURE:
             # 传输级异常（超时/断连/DNS/5xx）→ 累计连续失败计数
-            with _PROVIDER_LOCK:
-                count = _PROVIDER_CONSECUTIVE_FAILURES.get(provider_name, 0) + 1
-                _PROVIDER_CONSECUTIVE_FAILURES[provider_name] = count
-                if count >= _PROVIDER_SKIP_THRESHOLD:
-                    _PROVIDER_SKIP.add(provider_name)
-                    _PROVIDER_SKIP_TIME[provider_name] = time.time()
-            if count >= _PROVIDER_SKIP_THRESHOLD:
-                logger.warning("[%s] %s 连续 %d 次失败，本会话后续请求跳过",
-                               data_type, provider_name, count)
+            reg.record_failure(provider_name, f"{data_type}:transport")
+            if reg.is_circuit_broken(provider_name):
+                logger.warning("[%s] %s 连续失败，本会话后续请求跳过",
+                               data_type, provider_name)
         # else: 代码级空结果（API 不识别该代码）→ 不计入熔断计数器
 
     # 3) 降级：全部 Provider 失败时尝试过期缓存
