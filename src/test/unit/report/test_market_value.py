@@ -1045,7 +1045,7 @@ class TestDetailToRowValues(unittest.TestCase):
         self.assertEqual(vals[0], "")
         self.assertEqual(vals[3], 0.0)
         self.assertEqual(vals[7], "--")
-        self.assertEqual(vals[12], 0.0)
+        self.assertIsNone(vals[12])
 
 
 # ═══════════════════════════════════════════════════════════

@@ -36,23 +36,21 @@ class TestExcelNumberFormats(unittest.TestCase):
 
     def test_money_builtin_format(self):
         """检查 openpyxl 内建金额格式。"""
-        # openpyxl 中 '¥#,##0.00' 是自定义格式
-        from openpyxl.styles import Font, PatternFill, Alignment, Border
-        from src.python.report.styles import MONEY_FORMAT
-        self.assertIn("#,##0", MONEY_FORMAT)
+        from src.python.report.styles import FMT_MONEY
+        self.assertIn("#,##0", FMT_MONEY)
 
     def test_pct_builtin_format(self):
         """检查 openpyxl 内建百分比格式。"""
-        from src.python.report.styles import PCT_FORMAT
-        self.assertIn("0.00%", PCT_FORMAT)
+        from src.python.report.styles import FMT_PERCENT
+        self.assertIn("0.00%", FMT_PERCENT)
 
     def test_thousands_builtin_format(self):
         """检查千分位格式。"""
-        from src.python.report.styles import THOUSANDS_FORMAT
-        self.assertIn("#,##0", THOUSANDS_FORMAT)
+        from src.python.report.styles import FMT_SHARES
+        self.assertIn("#,##0", FMT_SHARES)
 
     def test_styles_module_has_all_formats(self):
         """styles.py 模块包含金额/百分比/千分位/份额格式常量。"""
         import src.python.report.styles as s
-        for name in ["MONEY_FORMAT", "PCT_FORMAT", "THOUSANDS_FORMAT"]:
+        for name in ["FMT_MONEY", "FMT_PERCENT", "FMT_SHARES", "FMT_PRICE"]:
             self.assertTrue(hasattr(s, name), f"styles.py 缺少 {name}")

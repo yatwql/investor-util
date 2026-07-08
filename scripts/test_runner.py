@@ -63,7 +63,7 @@ MODES: dict[str, dict] = {
     },
     "verify": {
         "marker": "scenario or unit_core or unit_providers or unit_fetcher",
-        "desc": "合入验证（场景+核心模块，~12min）",
+        "desc": "合入验证（场景+核心模块，并行~1min）",
         "timeout_sec": 360,
         "order": 5,
         "parallel": True,

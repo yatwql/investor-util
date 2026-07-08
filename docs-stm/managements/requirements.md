@@ -292,7 +292,7 @@ LLM 调用子模块（共 5 个，1 个可选）：
 - **模块失败/跳过**：在模块状态中以"失败"/"已禁用"标记，不产生用量数据
 
 不纳入统计：
-- 因 LLM API Key 未配置而跳过的模块（整会话无用量数据，页签/章节不显示）
+- 因 LLM API Key 未配置而跳过的模块（整会话无用量数据，API 用量页签不显示；LLM 分析各章节仍写入占位文本）
 - 菜单 B/H/E（不含 LLM 章节）不触发任何 LLM 调用，用量页签不生成
 
 **输出内容格式：**
@@ -660,6 +660,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | `market_hour_aware` | list | `["price", "index"]` | 手动 | 交易时段短 TTL 的数据类型 |
 | `market_hour_ttl` | int | `30` | 手动 | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30", end:"15:00", official_source:true}` | 手动 | 交易时段配置。`official_source=true` 时优先通过东方财富 push2 API 获取实时交易状态，false 时仅依赖内置默认时段 |
+| `degradation` | dict | T2/T3/T4 三级配置 | 手动 | 双信号降级阈值（不可达次数/空数据次数/过期降级天数），详见 DegradationTracker |
 | `cache_ttl` | dict | 21 项 | 手动 | 各缓存类型 TTL（秒） |
 | `llm_key_file` | str | `data/config/llm_key.json` | 手动 | LLM 密钥文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | 手动 | LLM 参数文件路径 |
@@ -684,6 +685,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 键 | 类型 | 默认值 | 说明 |
 |:---|:----:|:------:|:-----|
 | `max_retries` | int | `2` | 429/503 最大重试次数 |
+| `llm_max_concurrency` | int | `3` | LLM 4+1 模块并发生成最大线程数 |
 | `enabled_llm` | dict | 全局开启 + news_correlation 默认关闭 | 各模块独立启停开关 |
 | `pricing` | dict | `{currency:"CNY"}` | 模型定价表覆盖 |
 
@@ -715,7 +717,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 配置值异常 | 启动时输出 WARNING | 使用代码默认值兜底 |
 | LLM API Key 未配置 | 显示占位文本"本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）" | 跳过 LLM 模块，不阻塞 |
 | LLM 模块已禁用 | 主分析章节（页签 12~15）完全跳过不渲染，不留空位；LLM API 用量页签（页签 16）中对应模块行显示"已禁用"灰色状态 | `continue` 跳过 / `{# 模块已禁用，完全跳过 #}` |
-| LLM 超时/失败 | 占位"（本节内容生成失败）" | 熔断器自动冷却，支持 fallback_provider 回退 |
+| LLM 超时/失败 | 根据 FAIL_REASON_* 类型输出差异化占位（见 llm_content.py _PLACEHOLDER_BY_REASON） | 熔断器自动冷却，支持 fallback_provider 回退 |
 | LLM 输出截断 | 自动增大 max_tokens 1.5× 重试 | 日志 ERROR 提示 |
 | LLM 内容过滤（空返回） | 追加安抚指令重试 | 日志 WARNING |
 | config.json 损坏 | 回退到全默认配置 | 日志 WARNING |

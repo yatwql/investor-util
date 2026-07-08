@@ -63,8 +63,11 @@ class TestFirstRunGuidance(unittest.TestCase):
             result = cfg.get_config()
             self.assertEqual(result["holdings_dir"], "data/holdings")
             mock_warn.assert_called()
-            warning_text = mock_warn.call_args[0][0]
-            self.assertIn("config", str(warning_text).lower())
+            warning_text = str(mock_warn.call_args[0][0])
+            self.assertTrue(
+                "配置" in warning_text or "config" in warning_text.lower(),
+                f"警告消息应提及配置: {warning_text}",
+            )
 
     def test_first_run_menu_options_available(self):
         """首次运行时菜单 [C]/[F] 配置选项应可用。"""

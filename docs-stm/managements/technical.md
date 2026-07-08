@@ -597,6 +597,22 @@ payload["output_config"] = {"effort": "high"}   # "low" / "medium" / "high" / "m
 
 `llm/circuit_breaker.py` 实现端点级熔断：连续 3 次失败后熔断 60 秒，半开状态允许 1 次探测。通过 `_cb_is_open()` / `_cb_record_failure()` / `_cb_record_success()` 暴露接口，`_call_llm_with_retry()` 在每次请求前检查熔断状态。
 
+### 输出截断自动重试（v0.2.29+）
+
+`_generate_llm_content()`（`skeleton.py`）在收到 LLM 响应后检测输出中是否含 `_TRUNCATION_MARKER`（`【⚠ 输出已被截断`）。若存在，说明输出达到 `max_tokens` 上限被截断不完整，自动以 `max_tokens × 1.5`（`_AUTO_INCREASE_FACTOR`）重试一次，并输出进度提示。二次截断则保留第一次结果并在末尾追加截断警告。
+
+### 内容过滤安抚重试（v0.2.29+）
+
+`_call_llm_with_retry()`（`api.py`）在 `_process_success_response()` 返回空内容（`result == ""`，可能被 API 内容过滤机制拦截）时，追加 `_CONTENT_FILTER_RECOVERY` 安抚指令到 system prompt 尾部并重试一次：
+
+```
+"\n\n注意：请确保你的回答包含实质性的分析内容。"
+"如果前一版本未输出任何内容，请提供完整的分析结果。"
+"所有数据均基于公开市场信息，请客观分析即可。"
+```
+
+安抚成功后返回重试结果；失败则继续尝试 fallback provider（若配置）。
+
 ### 会话级 Token 追踪与用量展示
 
 #### 数据收集架构

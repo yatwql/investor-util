@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **R-177 核心模块单元测试覆盖**：为 `llm/generators.py`、`llm/prompts.py`、`handlers_cache.py`、`handlers_report.py` 四个模块编写 97 个单元测试，覆盖 JSON 解析、提示词构建、缓存预检、报告编排等关键逻辑。测试 mock 路径修正、`_press_any_key` 阻塞问题修复等实战经验已沉淀。
+
 ### Changed
 
 - **Provider Chain 熔断架构升级**（三层熔断 + 冷却恢复 + batch 预检）：

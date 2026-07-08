@@ -188,7 +188,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
             stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
                                        return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
             stack.enter_context(patch("src.python.report.html_writer._build_category_data",
-                                       return_value={}))
+                                       return_value=([], True)))
             stack.enter_context(patch("src.python.report.html_writer.price_update_status",
                                        return_value=(0, 0, True)))
             # 穿透子函数 mock — 返回空穿透结果（industry_success=False）
@@ -236,7 +236,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
             stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
                                        return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
             stack.enter_context(patch("src.python.report.html_writer._build_category_data",
-                                       return_value={}))
+                                       return_value=([], True)))
             stack.enter_context(patch("src.python.report.html_writer.price_update_status",
                                        return_value=(0, 0, True)))
             stack.enter_context(patch(
@@ -281,7 +281,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
             stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
                                        return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
             stack.enter_context(patch("src.python.report.html_writer._build_category_data",
-                                       return_value={}))
+                                       return_value=([], True)))
             stack.enter_context(patch("src.python.report.html_writer.price_update_status",
                                        return_value=(0, 0, True)))
             # 穿透有数据（truthy），profit_success/dividend_success 不影响 data_status mock
@@ -363,7 +363,7 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
         stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
                                    return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
         stack.enter_context(patch("src.python.report.html_writer._build_category_data",
-                                   return_value={}))
+                                   return_value=([], True)))
         stack.enter_context(patch("src.python.report.html_writer.price_update_status",
                                    return_value=(0, 0, True)))
         # 穿透 + 基金业绩返回（标准）

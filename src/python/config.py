@@ -147,6 +147,12 @@ def get_config_path() -> str:
     return _CONFIG_FILE
 
 
+def _clear_config_cache() -> None:
+    """清空配置内存缓存（测试隔离用）。"""
+    global _config_cache
+    _config_cache = None
+
+
 def get_config() -> dict:
     """
     读取配置文件并返回配置字典（带线程安全缓存）。
@@ -192,6 +198,7 @@ def get_config() -> dict:
             return merged
         except (OSError, json.JSONDecodeError):
             _config_cache = None
+            logger.warning("配置文件 %s 读取失败，已回退到默认配置", config_path)
             return dict(_DEFAULT_CONFIG)
 
 

@@ -7,8 +7,8 @@
 
 from __future__ import annotations
 
+import os
 import unittest
-from unittest.mock import patch, MagicMock
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.edge]
@@ -16,48 +16,52 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.edge]
 
 @pytest.mark.edge
 class TestLlmPlaceholderDistinction(unittest.TestCase):
-    """LLM 三种占位文本互不相同。"""
+    """LLM 三种占位文本互不相同。
+
+    占位文本实现在 report/llm_content.py:_PLACEHOLDER_BY_REASON 中，
+    按失败原因（FAIL_REASON_*）区分。
+
+    MODULE_DISABLED（已禁用）对应的模块完全跳过不渲染，
+    无占位文本，但在 LLM API 用量页签的模块明细表中以"已禁用"状态显示。
+    """
 
     def setUp(self):
-        self.config_not_configured = "NOT_CONFIGURED"
-        self.config_disabled = "DISABLED"
-        self.config_api_error = "API_ERROR"
+        from src.python.report.llm_content import _PLACEHOLDER_BY_REASON
+        from src.python.llm.prompts import (
+            FAIL_REASON_NOT_CONFIGURED,
+            FAIL_REASON_API_ERROR,
+            FAIL_REASON_DISABLED,
+        )
+        self._placeholder = _PLACEHOLDER_BY_REASON
+        self._not_configured_key = FAIL_REASON_NOT_CONFIGURED
+        self._api_error_key = FAIL_REASON_API_ERROR
+        self._disabled_label = "已禁用"
 
     def test_not_configured_text_differs_from_disabled(self):
         """未配置与已禁用应为不同文本。"""
-        from src.python.llm.skeleton import STATUS_MESSAGES as SM
-        self.assertNotEqual(
-            SM.get("NOT_CONFIGURED", ""),
-            SM.get("MODULE_DISABLED", ""),
-        )
+        nc_text = self._placeholder.get(self._not_configured_key, "")
+        self.assertNotEqual(nc_text, self._disabled_label)
 
     def test_api_error_text_differs_from_disabled(self):
         """API 错误与已禁用应为不同文本。"""
-        from src.python.llm.skeleton import STATUS_MESSAGES as SM
-        self.assertNotEqual(
-            SM.get("API_ERROR", ""),
-            SM.get("MODULE_DISABLED", ""),
-        )
+        ae_text = self._placeholder.get(self._api_error_key, "")
+        self.assertNotEqual(ae_text, self._disabled_label)
 
     def test_not_configured_mentions_config(self):
         """未配置文本包含"配置"相关提示。"""
-        from src.python.llm.skeleton import STATUS_MESSAGES as SM
-        text = SM.get("NOT_CONFIGURED", "")
+        text = self._placeholder.get(self._not_configured_key, "")
         self.assertTrue(
             "配置" in text or "API" in text or "Key" in text,
             f"未配置提示应含配置引导: {text}",
         )
 
     def test_disabled_mentions_disabled(self):
-        """已禁用文本包含"禁用"相关词汇。"""
-        from src.python.llm.skeleton import STATUS_MESSAGES as SM
-        text = SM.get("MODULE_DISABLED", "")
-        self.assertIn("禁用", text)
+        """已禁用标签包含"禁用"相关词汇。"""
+        self.assertIn("禁用", self._disabled_label)
 
     def test_api_error_mentions_failure(self):
         """API 失败文本提及失败原因。"""
-        from src.python.llm.skeleton import STATUS_MESSAGES as SM
-        text = SM.get("API_ERROR", "")
+        text = self._placeholder.get(self._api_error_key, "")
         self.assertTrue(
             "失败" in text or "error" in text.lower() or "网络" in text,
             f"API 失败提示应说明原因: {text}",
@@ -65,7 +69,6 @@ class TestLlmPlaceholderDistinction(unittest.TestCase):
 
     def test_html_renders_not_configured_placeholder(self):
         """模板在未配置 LLM 时显示占位提示。"""
-        import os
         tmpl_path = os.path.join(
             os.path.dirname(__file__),
             "..", "..", "..", "python", "tmpl", "report_template.html",
