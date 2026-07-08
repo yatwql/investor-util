@@ -413,7 +413,7 @@ class DataSourceRegistry:
             from src.python import cache as _cache
 
             key = cache_key_fn(code)
-            data = _cache.get(key, max_age=86400 * 7)
+            data = _cache.get(key, 86400 * 7)
             if data is not None:
                 # 检查 price_date 是否匹配今天
                 data["_cache_date_mismatch"] = True  # 默认标记（文件缓存总是旧数据）

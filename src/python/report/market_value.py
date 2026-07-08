@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python import cache
@@ -22,6 +23,7 @@ from src.python.code_utils import (
 )
 from src.python.fetcher.price import fetch_market_data
 from src.python.market_hours import is_market_open as _mh_is_market_open
+from src.python.provider_registry import FetchStrategy, get_registry
 from src.python.market_hours import is_midday_break as _mh_is_midday_break
 from src.python.models import Holding
 from src.python.registry import get_report_sheet_name
@@ -383,10 +385,10 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
         return DetailRow(
             account=h.account.strip(), name=h.name, code=h.code,
             price=0.0, nav_date="", yesterday_close=0.0,
-            price_type="--", shares=h.shares,
+            price_type="暂无行情", shares=h.shares,
             market_value=0.0, cost=round(h.cost_price * h.shares, 2),
-            profit=0.0, profit_rate=0.0, today_profit=0.0,
-            source="--", source_api="",
+            profit=0.0, profit_rate=None, today_profit=0.0,
+            source="无数据", source_api="",
         )
 
     price = mkt.get("price", 0.0) or 0.0
@@ -420,27 +422,81 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     )
 
 
+def _price_cache_key(code: str) -> str:
+    """文件缓存键生成：价格数据的缓存键。"""
+    return f"price_{code}"
+
+
 def _generate_details(holdings: list[Holding], today_str: str) -> list[DetailRow]:
-    """获取所有持仓的行情数据并生成明细行（并行 HTTP 请求）。"""
+    """获取所有持仓的行情数据并生成明细行（策略感知：非交易时段/全链熔断时只读缓存）。"""
     details: list[DetailRow] = []
     today_str = today_str or datetime.now().strftime("%Y-%m-%d")
 
-    # 并行发起行情请求（缓存命中时秒回，冷启动加速最高 8×）
-    future_map = {}
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        for h in holdings:
-            future = executor.submit(fetch_market_data, h.code, h.name)
-            future_map[future] = h
+    # 1. 分类持仓，按类型决定获取策略
+    categories = classify_holdings(holdings)
+    registry = get_registry()
+    market_open = is_market_open()
 
-        for future in as_completed(future_map):
-            h = future_map[future]
-            try:
-                mkt = future.result()
-            except Exception:
-                logger.warning("获取行情异常: %s (%s)", h.name, h.code, exc_info=True)
-                mkt = None
-            details.append(_compute_detail_row(h, mkt))
+    # 类型 → (code_type, chain) 映射
+    _TYPE_CONFIG: dict[str, tuple[str, list[str] | None]] = {
+        "QDII": ("qdii", None),
+        "场内股票": ("a_share", registry.get_chain("price")),
+        "场内ETF": ("a_share", registry.get_chain("price")),
+        "国内场外": ("a_share", registry.get_chain("price")),
+    }
 
+    # 2. 按策略分组：CACHE_ONLY 走缓存，LIVE_FETCH 走并行 HTTP
+    cache_holdings: list[Holding] = []
+    live_holdings: list[Holding] = []
+
+    for cat_name, cat_holdings in categories.items():
+        code_type, chain = _TYPE_CONFIG.get(cat_name, ("a_share", None))
+        # 仅在有 chain 配置时启用策略选择（空 chain = 未注册 = 回退 LIVE_FETCH）
+        if chain:
+            strategy = registry.get_effective_strategy(code_type, chain, market_open)
+            if strategy == FetchStrategy.CACHE_ONLY:
+                cache_holdings.extend(cat_holdings)
+                continue
+        live_holdings.extend(cat_holdings)
+
+    # 3. 缓存路径：session cache → file cache（零 HTTP）
+    result_map: dict[tuple[str, str], dict | None] = {}
+    for h in cache_holdings:
+        mkt = registry._fetch_cached_only(h.code, "price", _price_cache_key)
+        result_map[(h.account.strip(), h.code.strip())] = mkt
+
+    # 4. 并行 HTTP 路径
+    if live_holdings:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            future_map = {}
+            for h in live_holdings:
+                future = executor.submit(fetch_market_data, h.code, h.name)
+                future_map[future] = h
+            for future in as_completed(future_map):
+                h = future_map[future]
+                try:
+                    mkt = future.result()
+                except Exception:
+                    logger.warning("获取行情异常: %s (%s)", h.name, h.code, exc_info=True)
+                    mkt = None
+                result_map[(h.account.strip(), h.code.strip())] = mkt
+
+    # 5. 按原始顺序构建 DetailRow
+    for h in holdings:
+        mkt = result_map.get((h.account.strip(), h.code.strip()))
+        details.append(_compute_detail_row(h, mkt))
+
+    # 6. 统计失败/成功数
+    _ok_count = sum(1 for d in details if d.price > 0)
+    _fail_count = len(details) - _ok_count
+    if _fail_count > 0:
+        logger.warning("市场行情获取：%d 成功，%d 失败（网络/非交易时段/限速），"
+                       "报告部分数据将不可用", _ok_count, _fail_count)
+        if _ok_count == 0:
+            logger.warning("所有行情数据均获取失败，报告将显示占位文本 "
+                           "'暂无行情' 而非实际数据")
+    else:
+        logger.info("市场行情获取：全部 %d 条成功", _ok_count)
     logger.info("市值核算明细数据生成完成，共 %d 条", len(details))
     return details
 
@@ -595,6 +651,15 @@ def write_market_value_sheet(ws: Worksheet, holdings: list[Holding],
     row = write_title_row(ws, 1, get_report_sheet_name('market_value'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
+
+    # 若所有行情数据全零，写一行醒目提示
+    _all_zero = all(d.price == 0 for d in details)
+    if _all_zero and details:
+        _WARN_FONT = Font(size=10, bold=True, color="CC0000")
+        ws.cell(row=row, column=1).font = _WARN_FONT
+        ws.cell(row=row, column=1, value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=15)
+        row += 1
 
     # 按账户分组写入明细 + 小计
     grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(ws, details, data_start)
