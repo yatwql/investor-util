@@ -697,7 +697,7 @@ def generate_all_llm(
       - 预计算指纹 + 缓存键，仅对缓存未命中的模块提交线程池任务
       - 缓存命中的模块直接读取内容，节省线程开销
 
-    使用 ThreadPoolExecutor(max_workers=4) 并发调用四个 LLM 生成任务。
+    使用 ThreadPoolExecutor(max_workers=llm_config.llm_max_concurrency, 默认 3) 并发调用四个 LLM 生成任务。
     每个工作线程创建独立的 httpx.Client，避免全局共享连接池的线程安全问题。
 
     Returns:
