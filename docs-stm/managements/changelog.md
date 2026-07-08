@@ -46,6 +46,17 @@
 - **R-181 ThreadPoolExecutor 集中管理（handlers_cache）**：`handlers_cache.py` 新增模块级共享 `_POOL + _get_pool()`，替代原来 3 处 `with ThreadPoolExecutor() as _:` 现场创建模式，附带 `atexit` 清理注册
 - **R-178 文件导览注释**：`html_writer.py` 顶部新增完整文件导览 TOC（L44-L78），列出所有区段（路径/过滤器/辅助函数/核心生成/子渲染/报告保存）及其行号范围，替代原拆分方案
 
+### Added
+
+- **`all_no_unit` 快捷测试模式**：`scripts/test_runner.py` 新增 `all_no_unit` 模式（`-m "not unit"`），排除单元测试运行其余全部场景/集成/边缘测试（306 项），方便快速验证非单元逻辑。
+
+### Fixed
+
+- **tui_menu.py `_YELLOW` 缺失导致 ImportError**：`else` 分支漏定义 `_YELLOW`，补上 `_YELLOW = "\033[93m"`，修复 `handlers_cache.py` 导入崩溃。
+- **TUI 全颜色统一**：`handlers_cache.py` / `handlers_config.py` / `handlers_report.py` 中所有 `[OK]`/`[!]`/`[ERR]` 前缀改用 `_GREEN`/`_YELLOW`/`_RED` ANSI 颜色常量；`handlers_config.py` 移除内联重复颜色定义。
+- **`llm_settings.json` JSON 注释清理**：移除文件中所有 `//` 和 `/* */` 注释（JSON 标准不支持注释），同步默认关闭 `penetration_deep` 和 `news_correlation`。
+- **集成测试 mock 返回值修复**：`test_integration_coverage.py::TestErrorIsolationSemantics::test_html_generation_ok_llm_crash` 中 `_build_category_data` 的 mock 返回值从 `{}` 修正为 `([], False)`，匹配函数真实的二元组签名，修复 `ValueError: not enough values to unpack`。
+
 ---
 
 ## [0.3.0] - 2026-07-08

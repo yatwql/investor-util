@@ -8,24 +8,27 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2526 | ~21s |
-| `standard` | 2138 | ~21s |
+| `unit` | 2520 | ~21s |
+| `standard` | 2141 | ~21s |
 | `scenario` | 277 | ~35s |
 | `regression` | 277 | ~35s |
-| `verify` | 1054 | ~50s |
-| `integration` | 304 | ~50s |
-| `edge` | 316 | ~15s |
+| `verify` | 1006 | ~50s |
+| `integration` | 306 | ~50s |
+| `edge` | 318 | ~15s |
 | `data` | 65 | ~10s |
-| `all` | 2822 | ~82s |
+| `all` | 2826 | ~82s |
 | `smoke` | 24 | ~2s |
-| `report` 🆕 | ≈945 | ~15s |
+| `report` 🆕 | ≈958 | ~15s |
+| `all_no_unit` 🆕 | 306 | ~55s |
 
-> 注：`all` 模式收集总数 2726 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2714 passed / 12 skipped。
-> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（≈945 项），供报告模块开发期快速验证。
+> 注：`all` 模式收集总数 2826 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2814 passed / 12 skipped。
+> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（≈958 项），供报告模块开发期快速验证。
+> 🆕 `all_no_unit` 模式标记 `not unit`（306 项），包含 scenario/integration/edge/data/smoke/report 等非单元测试。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）默认启用 `--parallel medium` 自动并行，"典型耗时"即 medium 并行耗时；场景/边缘/冒烟等轻量模式保持单线程（不并行），避免进程调度开销。
 > v0.3.0 测试增量覆盖补全（52 项新增），全量 2721 项（2709 passed / 12 skipped for Windows）。
 > v0.3.1 Provider Chain 熔断架构升级（13 项新增：熔断预检 9 项 + 冷却探针 4 项 edge），全量 2726 项（2714 passed / 12 skipped for Windows）。
 > v0.3.2 核心模块单元测试补全（96 项新增：generators 21 + prompts 44 + handlers_cache 18 + handlers_report 13），全量 2822 项（2810 passed / 12 skipped for Windows）。
+> v0.3.2+ 颜色统一 + 测试框架扩展（新增 all_no_unit 模式，修复集成测试 mock），全量 2826 项（2814 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 
