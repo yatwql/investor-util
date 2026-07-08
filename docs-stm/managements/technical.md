@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-08（v0.3.1 — config.py 拆为 config/ 子包 + conftest 标记遗漏自动警告 + 测试隔离 autouse fixture）
+最后更新：2026-07-09（v0.3.2 — 数据降级重构 Step A~E：DataSourceRegistry 熔断器/会话缓存/策略选择器集中管理 + 文档同步）
 
 ---
 
@@ -261,44 +261,58 @@ Provider Chain 注册表（registry.py）
 - 全链路失败 → 尝试过期缓存降级 → 仍失败则抛异常由调用方处理
 - **价格缓存收市后新鲜度验证**（`fetcher/price.py:_price_cache_fresh`）：盘后首次请求时校验缓存 `price_date` 是否为当前交易日。若盘中因 Tencent 名称校验降级写入 EastMoney 净值（上一交易日价格），收市后自动清除该残留缓存并强制重走 Provider Chain，确保收盘价更新。
 
-### Provider Chain 三层熔断架构（v0.3.1+）
+### Provider Chain 三层熔断架构（v0.3.2+ 重构为 DataSourceRegistry）
 
-自 v0.3.1 起，Provider Chain 熔断从单层 per-provider 跳过升级为**三层架构**，解决批量场景下的日志噪音和 1-provider chain 永不恢复问题：
+自 v0.3.2 起，Provider Chain 熔断从 `chain.py` 的 4 个全局变量重构为 **DataSourceRegistry 单例**（`src/python/provider_registry.py`），统一管理熔断状态、会话缓存和获取策略：
 
 ```
-┌─────────────────────────────────────────┐
-│  第 1 层：Batch 入口熔断预检              │
-│  is_provider_chain_broken(data_type)     │
-│  全链熔断 → 入口一次判断，跳过批量请求+重试  │
-├─────────────────────────────────────────┤
-│  第 2 层：Provider 级熔断                 │
-│  _fetch_with_fallback 内部               │
-│  仅传输级异常（超时/断连/DNS/5xx）计入    │
-│  连续 3 次 → 熔断；代码级空结果不计入      │
-├─────────────────────────────────────────┤
-│  第 3 层：冷却试探恢复                     │
-│  熔断 300s 后自动放行一次试探请求           │
-│  成功 → 恢复；失败 → 重新计时               │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  DataSourceRegistry（单例，双锁线程安全）            │
+│                                                    │
+│  ┌─ Provider 熔断器 ──────────────────────────┐    │
+│  │  • register_provider(name, tier, fallback)  │    │
+│  │  • record_success / record_failure(provider) │    │
+│  │  • is_circuit_broken / is_chain_broken      │    │
+│  │  • 连续 3 次 → 熔断 300s → 冷却期满自动恢复 │    │
+│  └────────────────────────────────────────────┘    │
+│                                                    │
+│  ┌─ 会话级缓存（C4 约束） ─────────────────────┐    │
+│  │  • session_cache_get/set(domain, code)        │    │
+│  │  • _NOT_FOUND sentinel 区分 None vs 未缓存    │    │
+│  │  • 2000 条/domain LRU 淘汰                    │    │
+│  │  • domain:"industry"/"industry_rest"/         │    │
+│  │           "extended"/"price"                   │    │
+│  └────────────────────────────────────────────┘    │
+│                                                    │
+│  ┌─ 策略选择器 ───────────────────────────────┐    │
+│  │  • get_effective_strategy(code_type, chain,  │    │
+│  │    market_open) → LIVE_FETCH/CACHE_ONLY      │    │
+│  │  • QDII/港股恒为 LIVE_FETCH                  │    │
+│  │  • 交易时段外 → CACHE_ONLY                    │    │
+│  │  • 全链熔断 → CACHE_ONLY 降级                │    │
+│  └────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────┘
 ```
 
-**实现细节：**
+**三层熔断架构（实现于 DataSourceRegistry）：**
 
-- **第 1 层** — `is_provider_chain_broken(data_type)` 查询 `_PROVIDER_SKIP` 集合，若 data_type 对应 chain 中所有 provider 均在集合中，返回 True。`batch_fetch_industry_data` 入口和重试两处调用，分别跳过批量获取和 0.8s 等待+重试。
-- **第 2 层** — `_try_provider_fetch` 返回 `_TRANSPORT_FAILURE` sentinel（传输级异常：超时/断连/DNS 解析/SSL 错误/5xx）时计入熔断计数器 ≥3 次后加入 `_PROVIDER_SKIP`，后续请求直接 `continue`。返回 `None`（代码级空结果：API 正常响应但不识别该代码，如 QDII 代码在 Tencent 上无数据）**不计入**熔断计数器。该区分防止特定代码无数据（如 QDII/港股/停牌）误触发熔断影响其他正常代码。
-- **第 3 层** — 新增 `_PROVIDER_SKIP_TIME` (dict, provider_name→timestamp) 记录熔断触发时刻。跳过检查时校验 `time.time() - _skip_time >= _PROVIDER_COOLDOWN_SECS(300)`，到期则从 `_PROVIDER_SKIP` 移除并放行一次试探。试探失败回退到 fallback provider，计数器从 1 开始累计。
+- **第 1 层 — 熔断预检**：`is_chain_broken(chain)` 检查 chain 中所有 provider 是否全部熔断。`market_value.py` 在批量请求前调用 `get_effective_strategy` 判断是否全链降级到 CACHE_ONLY，避免无效 HTTP 请求。
+- **第 2 层 — Provider 级熔断**：`_fetch_with_fallback` 中每次调用前检查 `is_circuit_broken(provider)`。仅传输级异常（超时/断连/DNS/5xx）触发 `record_failure` 计入熔断计数器；代码级空结果（API 正常返回 None）不计入。
+- **第 3 层 — 冷却试探恢复**：熔断 300s 后 `is_circuit_broken` 自动解除标记并重置 `consecutive_failures=0`，下次调用即为试探。
 
 **与 LLM Circuit Breaker 的差异：**
 
 | 维度 | Provider Chain 熔断 | push2 模块级熔断 | LLM Circuit Breaker |
 |:-----|:-------------------|:-----------------|:--------------------|
 | 作用域 | 数据 provider（price/industry 等） | push2 行业分类/概念板块 API | LLM API endpoint |
-| 实现位置 | `chain.py` 全局状态 | `eastmoney_industry.py` 模块级全局变量 | `llm/circuit_breaker.py` |
+| 实现位置 | `provider_registry.py` DataSourceRegistry | `eastmoney_industry.py` 模块级全局变量（待迁移） | `llm/circuit_breaker.py` |
 | 冷却时长 | 300s | 300s | 60s |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
-| 恢复条件 | 试探成功 → 移出跳过集合 | 试探成功 → 关闭熔断标记 | 半开成功 → 关闭熔断 |
+| 恢复条件 | 试探成功 → record_success | 试探成功 → 关闭熔断标记 | 半开成功 → 关闭熔断 |
 
-**消费方感知：** 无任何配置变更，逻辑对 batch 调用方透明。batch 场景日志从 N 条"已被熔断，跳过"降级为 1 条入口 WARNING + 1 条重试预检 INFO。
+**Chain 自动注册：** `fetcher/chain.py` 在模块加载时自动调用 `get_registry().register_default_chains()`，从 `_DEFAULT_CHAINS` 配置注册所有 provider 和 chain。`get_chain(data_type)` 从 registry 返回对应 chain 列表供策略选择器使用。
+
+**消费方感知：** 对 batch 调用方透明。batch 场景日志从 N 条"已被熔断，跳过"降级为 1 条入口 WARNING + 1 条熔断降级 LOG。
 
 ### Fetcher 调度架构
 
@@ -426,7 +440,7 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 - **加权投票**：最终风格 = 市值权重最大的 size + 估值权重最大的 style
 - **漂移检测**：网格曼哈顿距离 = |Δsize| + |Δstyle|（0~4），0=无、1=轻度、2=中度、≥3=严重
 - **三级降级**：push2（一级，精确）→ Tencent 扩展字段（二级，可靠，Tencent 数据不标注估算）→ 代码前缀（三级，兜底）：60xxxx→大盘、000/002→中盘、300/688→小盘、4/8→小盘；估值方向统一"混合"+备注"估算风格"
-- **性能优化**：会话级 `_ext_memo` 字典缓存已查过的股票扩展数据，同一股票跨基金复用（如 300750 出现在多只基金持仓中时仅首次 HTTP）；Tencent 二级降级带轻量熔断（连续 2 次失败后跳过，避免网络不可达时逐只等超时）
+- **性能优化**：会话级缓存委托 DataSourceRegistry session_cache（domain="extended"）跨基金复用，同一股票仅首次 HTTP；Tencent 二级降级基于 registry 熔断器（provider="tencent_style"），避免网络不可达时逐只等待超时
 - **独立快照**：`fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
 ---
@@ -925,7 +939,7 @@ handlers_*.py → 各模块入口函数编排
 | C1 | **代码类型判定中心化** | 任何模块不得自行实现资产类型判定（`code.startswith()`、`"QDII" in name.upper()` 等），必须调用 `code_utils` 提供的原语组合 | 代码评审不通过 | [代码类型判定中心化](#代码类型判定中心化) |
 | C2 | **缓存统一管理** | 所有持久化缓存必须通过 `cache.py` 的 `get()`/`set()` 读写，不得直接操作 `data/cache/` 文件系统 | 缓存不一致、TTL 失效 | [缓存设计](#缓存设计) |
 | C3 | **缓存原子写入** | 缓存和配置文件写入必须使用 `tempfile.mkstemp` + `os.replace` 模式，禁止直接覆写文件 | 断电/崩溃后半写文件损坏 | [原子写入](#原子写入) |
-| C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用模块级 `_ext_memo: dict` 缓存结果，避免重复 HTTP 调用（参考 `fund_style_analysis.py._ext_memo`） | 性能退化、API 限频 | B5 基金风格分析 |
+| C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用 `DataSourceRegistry.session_cache` 缓存结果，避免重复 HTTP 调用（参考 `provider_registry.py`） | 性能退化、API 限频 | 数据降级重构 |
 | C5 | **HTTP 客户端统一** | 所有 HTTP 请求必须使用 `http_client.py` 的 `make_http_client()` / `make_async_http_client()` 工厂方法，不得直接实例化 `httpx.Client()` / `httpx.AsyncClient()` | SSL 配置不一致、连接池泄漏 | `http_client.py` |
 | C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()` / `batch_fetch_with_fallback()`，不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
 | C7 | **报告序号不可硬编码** | 报告 16 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [C 迭代：报告序号可配置](#c-迭代报告序号可配置-v0286) |

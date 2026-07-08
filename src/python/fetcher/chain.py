@@ -207,3 +207,7 @@ def _fetch_with_fallback(
         return stale
 
     return None
+
+
+# 模块加载时自动注册默认 Provider Chain，使 registry.get_chain() 和策略选择器生效
+get_registry().register_default_chains()

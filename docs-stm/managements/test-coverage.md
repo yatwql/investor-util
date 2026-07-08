@@ -2,33 +2,33 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-08）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-09）测试覆盖规模：
 
 ### 模式对应测试量
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2520 | ~21s |
-| `standard` | 2141 | ~21s |
+| `unit` | 2583 | ~22s |
+| `standard` | 2204 | ~22s |
 | `scenario` | 277 | ~35s |
 | `regression` | 277 | ~35s |
 | `verify` | 1006 | ~50s |
 | `integration` | 306 | ~50s |
 | `edge` | 318 | ~15s |
 | `data` | 65 | ~10s |
-| `all` | 2826 | ~82s |
+| `all` | 2889 | ~85s |
 | `smoke` | 24 | ~2s |
 | `report` 🆕 | ≈958 | ~15s |
 | `all_no_unit` 🆕 | 306 | ~55s |
 
-> 注：`all` 模式收集总数 2826 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2814 passed / 12 skipped。
+> 注：`all` 模式收集总数 2889 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2877 passed / 12 skipped。
 > 🆕 `report` 模式为 A5 新增，标记 `unit_report`（≈958 项），供报告模块开发期快速验证。
 > 🆕 `all_no_unit` 模式标记 `not unit`（306 项），包含 scenario/integration/edge/data/smoke/report 等非单元测试。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）默认启用 `--parallel medium` 自动并行，"典型耗时"即 medium 并行耗时；场景/边缘/冒烟等轻量模式保持单线程（不并行），避免进程调度开销。
 > v0.3.0 测试增量覆盖补全（52 项新增），全量 2721 项（2709 passed / 12 skipped for Windows）。
 > v0.3.1 Provider Chain 熔断架构升级（13 项新增：熔断预检 9 项 + 冷却探针 4 项 edge），全量 2726 项（2714 passed / 12 skipped for Windows）。
 > v0.3.2 核心模块单元测试补全（96 项新增：generators 21 + prompts 44 + handlers_cache 18 + handlers_report 13），全量 2822 项（2810 passed / 12 skipped for Windows）。
-> v0.3.2+ 颜色统一 + 测试框架扩展（新增 all_no_unit 模式，修复集成测试 mock），全量 2826 项（2814 passed / 12 skipped for Windows）。
+> v0.3.2e 数据降级重构 Step A~E（45 项新增：provider_registry 37 + phase_timeout 8；原 test_config 单元从 standard 迁移至 unit），全量 2889 项（2877 passed / 12 skipped for Windows）。
 
 ### 功能域对应测试源
 
@@ -37,6 +37,7 @@
 | 功能域 | 源模块（`src/python/`） | 对应测试文件（`src/test/`） | 覆盖项数 |
 |:-------|:-----------------------|:---------------------------|:--------:|
 | **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 166 |
+| **数据源注册中心** | `provider_registry.py` | `unit/core/test_provider_registry.py` + `test_phase_timeout.py` + `test_market_value_strategy_edge.py` | 53 |
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 186 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
 | **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 25 文件含 test_html_writer、test_html_template 等 | ≈945 |

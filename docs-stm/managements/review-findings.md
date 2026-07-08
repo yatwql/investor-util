@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-08（R-185/R-186 已修复，config 文档同步更新）
+最后更新：2026-07-09（D-10 审查：数据降级重构 6 维复盘，新增 R-188~R-191）
 
 ---
 
@@ -13,6 +13,7 @@
 | 2026-07-08 | v0.3.1 conftest 增强 + config.py 拆包 + 动态年份 | R-185/R-186 已修复，config 文档同步 |
 | 2026-07-08 | D-8b 全面审查：代码质量/并发安全/工程化 | 已完成（全部修复） |
 | 2026-07-08 | D-8c 审查：v0.3.0 代码健康度检查（R-177~R-183） | 已完成（全部修复） |
+| 2026-07-09 | **D-10 审查：数据降级重构 6 维复盘（Step A~E）** | 新增 5 项 |
 
 > **v0.1.x ~ v0.2.52 早期审计记录已归档**：详见 [docs-stm/archive/archived_review-findings.0.1.x.md](../archive/archived_review-findings.0.1.x.md)。
 > 涵盖：初始全量审计、P3 现代化、场景审计、第二/三波深度审计、R-131~R-147、T-001~T-003 等 13 条。
@@ -35,6 +36,15 @@
 | # | 问题 | 模块 | 备注 |
 |:-:|:-----|:----|:----:|
 | R-187 | **TUI Windows 平台 12 个测试跳过**：`termios`/`tty` 为 Linux 特有模块，Windows 上 `_get_key_linux()` 已加 try/except 保护 | `tui.py` + `test_tui_edge.py` | 功能降级但无错误，可考虑 CI 加 Windows runner |
+| R-188 | **eastmoney_industry.py 局部熔断器未迁移到 DataSourceRegistry**：`_PUSH2_CIRCUIT_OPEN`等 6 个全局变量 + `_circuit_breaker_record_failure/reset` 与注册表独立运行，异常被局部 CB 捕获后未传播到 registry.is_chain_broken，industry 链熔断预检失效 | `providers/eastmoney_industry.py` | 本重构最严重遗留问题；局部 CB 无锁保护，多线程不安全 |
+
+### 🟡 中优先级
+
+| # | 问题 | 模块 | 备注 |
+|:-:|:-----|:----|:----:|
+| R-189 | **market_value.py 调用 DataSourceRegistry 私有方法 `_fetch_cached_only()`**：前导下划线表明实现细节，非公共 API，模块边界泄漏 | `report/market_value.py` | 建议改为公共方法或改用 `fetch_or_cached` |
+| R-190 | **哨兵 `_TRANSPORT_FAILURE` 重复定义**：`provider_registry.py` 和 `chain.py` 各有一套，后者 unused | `provider_registry.py` + `chain.py` | 应统一至一处 |
+| R-191 | **`test_eviction_order` 未实际触发淘汰**：写入 100 条/阈值 2000，断言永远为真，不能验证淘汰逻辑 | `test_provider_registry.py` | `fetch_or_cached` 和 `_fetch_cached_only` 无单元覆盖 |
 
 ### ✅ 近期已修复
 

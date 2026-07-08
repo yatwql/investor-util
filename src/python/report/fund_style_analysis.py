@@ -33,6 +33,8 @@ logger = logging.getLogger("invest")
 
 # 会话级扩展数据缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="extended"）
 # Tencent 二级降级熔断 — 委托 DataSourceRegistry 熔断器（provider="tencent_style"）
+from src.python.provider_registry import get_registry
+get_registry().register_provider("tencent_style", tier=4, timeout=15.0)
 
 _SNAPSHOT_KEY = "fund_style_snapshot"
 _SNAPSHOT_TTL = 365 * 86400

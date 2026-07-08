@@ -41,6 +41,7 @@ investor-util/
 │   │   ├── main.py                   # 程序入口 — TUI 主循环、流程编排、菜单路由
 │   │   ├── market_hours.py           # 交易时段判断 — A 股盘中/盘后识别、东方财富 API 实时状态、可配置时段
 │   │   ├── models.py                 # 数据模型 — NamedTuple / dataclass 定义
+│   │   ├── provider_registry.py      # 数据源注册中心 — 熔断器、会话级缓存、获取策略选择、审计报告
 │   │   ├── reader.py                 # 持仓读取 — xlsx 解析、多 worksheet、列校验
 │   │   ├── registry.py               # 中央注册表 — 所有数据模块的 name/缓存前缀/TTL/分组 统一注册
 │   │   ├── tui.py                    # 键盘输入封装 — getch() 跨平台实现、方向键/快捷键解析
@@ -217,7 +218,7 @@ investor-util/
 │       │   │   ├── test_config_atomic_edge.py # 原子写入异常场景 — 写入失败/目录不可写/权限拒绝
 │       │   │   ├── test_config_edge.py   # 配置异常场景 — 文件损坏/格式错误/缺失字段
 │       │   │   └── test_config_firstrun_edge.py # 首次运行引导 — 配置缺失自动初始化/目录创建/损坏降级（4 项）
-│       │   ├── core/                     # 核心模块测试（342 项）
+│       │   ├── core/                     # 核心模块测试（391 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_cache.py         # 缓存引擎 — TTL 管理/过期清理/市场时段感知（181 项）
 │       │   │   ├── test_cache_edge.py      # 缓存异常场景 — 文件损坏/并发写入/目录权限
@@ -227,6 +228,8 @@ investor-util/
 │       │   │   ├── test_market_hours_edge.py # 交易时段异常场景 — 跨时区/节假日/午夜边界
 │       │   │   ├── test_models.py        # 数据模型 — NamedTuple / dataclass 定义校验（17 项）
 │       │   │   ├── test_reader.py        # 持仓读取 — xlsx 解析/多 worksheet/列校验（11 项）
+│       │   │   ├── test_provider_registry.py # 数据源注册中心 — 熔断/会话缓存/策略选择/并发安全（37 项）
+│       │   │   ├── test_phase_timeout.py     # 全局超时上下文管理器 — phase_timeout 嵌套保护/超时行为（8 项）
 │       │   │   ├── test_registry.py      # 中央注册表 — 模块注册/TTL 映射/设置键派生（21 项）
 │       │   │   └── test_registry_edge.py # 注册表异常场景 — 重复注册/不存在的模块/别名冲突
 │       │   └── ui/                       # TUI 测试（165 项）

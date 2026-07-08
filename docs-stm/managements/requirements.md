@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
 创建日期：2026-06-26
-最后更新：2026-07-08（v0.3.0 — 管理文档归档 + 版本号同步 + push2 熔断冷却恢复描述）
+最后更新：2026-07-09（v0.3.2 — 数据降级重构：DataSourceRegistry 统管熔断/会话缓存/策略选择 + 文档同步）
 
 ---
 
@@ -725,7 +725,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 持仓文件格式异常 | 跳过异常行，继续解析 | 提示具体行号错误 |
 | 空持仓 | 暂停生成 | 直接返回，不生成报告 |
 | 熔断器触发 | 跳过该端点请求 | 冷却期后自动恢复 |
-| push2 数据源熔断 | 行业分类/概念板块/基金风格分析自动降级为备用数据或代码估算结果 | 连续 3 次失败后熔断 push2（`eastmoney_industry.py`），冷却 5 分钟后自动放行试探请求；冷却期内走备用链路或兜底方案 |
+| push2 数据源熔断 | 行业分类/概念板块/基金风格分析自动降级为备用数据或代码估算结果 | DataSourceRegistry 熔断器（连续 3 次失败后熔断 push2，冷却 5 分钟后自动放行试探）；eastmoney_industry.py 局部熔断器并行存在（待统一） |
 | 收市后价格缓存过期（盘中降级残留） | 无感知（透明修复） | `_price_cache_fresh()` 校验缓存 `price_date`，发现非当日时自动清除缓存并重新请求 |
 | T2/T3 增强数据源失败（指数/排名/穿透/行业分类） | 列级 `--` + 页脚 ⚠/ℹ 状态摘要 | `_data_status` 字典（DataStatusItem）追踪各源 available/tier/message；Excel 端 `_write_data_status_foot()` 写入灰色页脚；HTML 端 `render_data_status` Jinja2 宏渲染 |
 | T4 附加数据不可用（B 系列 4 模块——基金经理变更/重合度/集中度/风格） | 模块级占位文本，不隐藏页签 | `STATUS_MESSAGES` 共享常量 + `_write_placeholder()` grey-bg 占位（Excel）；HTML 模板 `empty-section` 条件占位块 |
@@ -740,7 +740,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 约束项 | 设计决策 |
 |:-------|:---------|
 | **并发策略** | ThreadPoolExecutor：新闻 5 源并发获取、LLM 4+1 模块（4 个 LLM 分析模块 + 可选的新闻关联分析）并发生成（并行数由 `llm_max_concurrency` 配置，默认 3）、取价批量异步 |
-| **基金风格加速** | 会话级 `_ext_memo` 缓存股票扩展数据跨基金复用；Tencent 二级降级带轻量熔断（连续 2 次失败跳过）；push2 超时 5s、重试 1 次、熔断阈值 3 |
+| **基金风格加速** | DataSourceRegistry session_cache（domain="extended"）跨基金复用；Tencent 二级降级基于 registry 熔断器；push2 超时 5s、重试 1 次、熔断阈值 3 |
 | **HTTP 连接池** | LLM 客户端专用 HTTP/2 多路复用 + 连接池上限 20 / 空闲保持 10（`llm/generators.py` `_LLM_CLIENT_SETTINGS`），通用 HTTP 客户端仅 SSL 配置 |
 | **缓存原子写入** | `tempfile.mkstemp` + `os.replace` 模式，防断电半写导致文件截断 |
 | **配置原子写入** | 同上，防 config.json 截断导致下次启动丢失全部自定义配置 |
