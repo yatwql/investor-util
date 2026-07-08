@@ -536,6 +536,112 @@ def init_config() -> None:
     _ensure_llm_settings_file()
 
 
+def _get_default_llm_settings_template() -> str:
+    """返回带分组注释的默认 llm_settings.json 模板字符串。
+
+    模块按业务分组：全局设置 → 模块开关 → 各 LLM 模块 → 计价配置。
+    使用 ``//`` 注释分组，由 _strip_json_comments() 剥离后解析。
+    """
+    pricing_json = json.dumps({"currency": "CNY", **MODEL_PRICING}, ensure_ascii=False, indent=4)
+    pricing_lines = pricing_json.split("\n")
+    indented_pricing = "\n".join([pricing_lines[0]] + ["    " + line for line in pricing_lines[1:]])
+    return (
+        '{\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  // 全局设置\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  "max_retries": 2,\n'
+        '  "llm_max_concurrency": 3,\n'
+        '\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  // 模块开关 — 控制各 LLM 分析功能的启用/停用\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  "enabled_llm": {\n'
+        '    "global_macro": true,\n'
+        '    "expert_review": true,\n'
+        '    "health_check": true,\n'
+        '    "penetration_deep": true,\n'
+        '    "news_correlation": false\n'
+        '  },\n'
+        '\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  // 全球政经局势 — global_macro\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  "system_prompt_global_macro": null,\n'
+        '  "model_global_macro": null,\n'
+        '  "temperature_global_macro": 0.3,\n'
+        '  "max_tokens_global_macro": 1024,\n'
+        '  "timeout_global_macro": 60,\n'
+        '  "cache_enabled_global_macro": true,\n'
+        '  "output_brief_global_macro": false,\n'
+        '  "thinking_enabled_global_macro": false,\n'
+        '  "thinking_budget_global_macro": 4000,\n'
+        '  "reasoning_effort_global_macro": "high",\n'
+        '\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  // 智囊团深度复盘 — expert_review\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  "system_prompt_expert_review": null,\n'
+        '  "model_expert_review": null,\n'
+        '  "temperature_expert_review": 0.8,\n'
+        '  "max_tokens_expert_review": 8192,\n'
+        '  "timeout_expert_review": 120,\n'
+        '  "cache_enabled_expert_review": true,\n'
+        '  "output_brief_expert_review": false,\n'
+        '  "thinking_enabled_expert_review": true,\n'
+        '  "thinking_budget_expert_review": 16000,\n'
+        '  "reasoning_effort_expert_review": "high",\n'
+        '\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  // 持仓体检报告 — health_check\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  "system_prompt_health_check": null,\n'
+        '  "model_health_check": null,\n'
+        '  "temperature_health_check": 0.5,\n'
+        '  "max_tokens_health_check": 4096,\n'
+        '  "timeout_health_check": 120,\n'
+        '  "cache_enabled_health_check": true,\n'
+        '  "output_brief_health_check": false,\n'
+        '  "thinking_enabled_health_check": true,\n'
+        '  "thinking_budget_health_check": 12000,\n'
+        '  "reasoning_effort_health_check": "high",\n'
+        '\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  // 穿透深度分析 — penetration_deep\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  "system_prompt_penetration_deep": null,\n'
+        '  "model_penetration_deep": null,\n'
+        '  "temperature_penetration_deep": 0.4,\n'
+        '  "max_tokens_penetration_deep": 4096,\n'
+        '  "timeout_penetration_deep": 90,\n'
+        '  "cache_enabled_penetration_deep": true,\n'
+        '  "output_brief_penetration_deep": false,\n'
+        '  "thinking_enabled_penetration_deep": false,\n'
+        '  "thinking_budget_penetration_deep": 8000,\n'
+        '  "reasoning_effort_penetration_deep": "high",\n'
+        '\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  // 财经新闻热点与持仓关联分析 — news_correlation\n'
+        '  // （注：news_correlation 不支持 output_brief 模式）\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  "system_prompt_news_correlation": null,\n'
+        '  "model_news_correlation": null,\n'
+        '  "temperature_news_correlation": 0.1,\n'
+        '  "max_tokens_news_correlation": 2000,\n'
+        '  "timeout_news_correlation": 60,\n'
+        '  "cache_enabled_news_correlation": true,\n'
+        '  "thinking_enabled_news_correlation": false,\n'
+        '  "thinking_budget_news_correlation": 4000,\n'
+        '  "reasoning_effort_news_correlation": "high",\n'
+        '\n'
+        '  // ═══════════════════════════════════════════\n'
+        '  // 计价配置\n'
+        '  // ═══════════════════════════════════════════\n'
+        f'  "pricing": {indented_pricing}\n'
+        '}\n'
+    )
+
+
 def _ensure_llm_settings_file() -> None:
     """若 llm_settings.json 不存在，用默认值自动创建。"""
     settings_path = get_llm_settings_path()
@@ -543,72 +649,8 @@ def _ensure_llm_settings_file() -> None:
         return
     try:
         os.makedirs(os.path.dirname(settings_path), exist_ok=True)
-        _DEFAULT_LLM_SETTINGS = {
-            "max_retries": 2,
-            "llm_max_concurrency": 3,
-            "temperature_global_macro": 0.3,
-            "temperature_expert_review": 0.8,
-            "temperature_news_correlation": 0.1,
-            "temperature_health_check": 0.5,
-            "temperature_penetration_deep": 0.4,
-            "timeout_global_macro": 60,
-            "timeout_expert_review": 120,
-            "timeout_news_correlation": 60,
-            "timeout_health_check": 120,
-            "timeout_penetration_deep": 90,
-            "cache_enabled_global_macro": True,
-            "cache_enabled_expert_review": True,
-            "cache_enabled_news_correlation": True,
-            "cache_enabled_health_check": True,
-            "cache_enabled_penetration_deep": True,
-            "output_brief_global_macro": False,
-            "output_brief_expert_review": False,
-            "output_brief_health_check": False,
-            "output_brief_penetration_deep": False,
-            "max_tokens_global_macro": 1024,
-            "max_tokens_expert_review": 8192,
-            "max_tokens_news_correlation": 2000,
-            "max_tokens_health_check": 4096,
-            "max_tokens_penetration_deep": 4096,
-            "model_global_macro": None,
-            "model_expert_review": None,
-            "model_news_correlation": None,
-            "model_health_check": None,
-            "model_penetration_deep": None,
-            "system_prompt_global_macro": None,
-            "system_prompt_expert_review": None,
-            "system_prompt_news_correlation": None,
-            "system_prompt_health_check": None,
-            "system_prompt_penetration_deep": None,
-            "enabled_llm": {
-                "global_macro": True,
-                "expert_review": True,
-                "health_check": True,
-                "penetration_deep": True,
-                "news_correlation": False,
-            },
-            "thinking_enabled_global_macro": False,
-            "thinking_enabled_expert_review": True,
-            "thinking_enabled_news_correlation": False,
-            "thinking_enabled_health_check": True,
-            "thinking_enabled_penetration_deep": False,
-            "thinking_budget_global_macro": 4000,
-            "thinking_budget_expert_review": 16000,
-            "thinking_budget_news_correlation": 4000,
-            "thinking_budget_health_check": 12000,
-            "thinking_budget_penetration_deep": 8000,
-            "reasoning_effort_global_macro": "high",
-            "reasoning_effort_expert_review": "high",
-            "reasoning_effort_news_correlation": "high",
-            "reasoning_effort_health_check": "high",
-            "reasoning_effort_penetration_deep": "high",
-            "pricing": {
-                "currency": "CNY",
-                **MODEL_PRICING,
-            },
-        }
         with open(settings_path, "w", encoding="utf-8") as f:
-            json.dump(_DEFAULT_LLM_SETTINGS, f, ensure_ascii=False, indent=2)
+            f.write(_get_default_llm_settings_template())
         logger.info("LLM 设置文件已自动生成: %s", settings_path)
     except OSError as e:
         logger.warning("无法自动创建 LLM 设置文件: %s", e)

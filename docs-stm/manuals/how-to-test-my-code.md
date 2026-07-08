@@ -61,6 +61,9 @@ python scripts/test_runner.py --mode verify
 
 # 全量测试（~80s，--mode all 为默认值，可省略）
 python scripts/test_runner.py --mode all
+
+# 全量测试（排除单元测试，~30s 快速全场景覆盖）
+python scripts/test_runner.py --mode all_no_unit
 ```
 
 ## 测试模式详解
@@ -144,6 +147,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 #### 🔷 全量（`all`）
 
 - **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试。包含所有单元测试、场景测试、集成测试、跨类标记测试。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 
 #### 多模式组合
 
@@ -181,6 +185,8 @@ test-reports/latest/
 │   └── report.html       # 数据正确性验证
 ├── all/
 │   └── report.html       # 全量测试
+├── all_no_unit/
+│   └── report.html       # 全量测试（排除单元测试）
 └── smoke/
     └── report.html       # 冒烟测试
 ```

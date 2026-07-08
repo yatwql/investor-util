@@ -36,11 +36,112 @@ def _read_llm_settings() -> tuple[dict, str] | None:
 
 
 def _write_llm_settings(settings: dict, path: str) -> None:
-    """写入 llm_settings.json 并刷新 LLM 配置缓存。"""
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(settings, f, ensure_ascii=False, indent=2)
+    """写入 llm_settings.json 并刷新 LLM 配置缓存，保留文件中的注释。
+
+    仅更新 settings 中发生变化的字段对应的文本区块，注释和其他字段原样保留。
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        raw = ""
+
+    if raw.strip():
+        from src.python.config import _strip_json_comments
+        current = json.loads(_strip_json_comments(raw))
+        updated_raw = _update_json_raw_text(raw, current, settings)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(updated_raw)
+    else:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+
     from src.python.config import get_llm_config
     get_llm_config()
+
+
+def _update_json_raw_text(raw: str, current: dict, new: dict) -> str:
+    """在原始 JSON 文本中做精确的字段级替换，保留注释和空白。
+
+    对 dict 类型值使用 brace 平衡算法 + 自适应缩进替换，
+    对简单值（str/int/bool/None）使用正则替换。
+
+    Args:
+        raw: 原始 JSON 文本（含注释）
+        current: 当前解析后的值
+        new: 要写入的新值
+
+    Returns:
+        经字段级替换后的新文本
+    """
+    import re
+
+    result = raw
+    for key, new_val in new.items():
+        old_val = current.get(key)
+        if old_val == new_val:
+            continue
+
+        if isinstance(old_val, dict):
+            result = _replace_dict_block(result, key, new_val)
+        else:
+            old_json = json.dumps(old_val, ensure_ascii=False, indent=2) if old_val is not None else "null"
+            new_json = json.dumps(new_val, ensure_ascii=False, indent=2) if new_val is not None else "null"
+            result = re.sub(
+                re.escape(f'"{key}":') + r'\s*' + re.escape(old_json),
+                f'"{key}": {new_json}',
+                result,
+                count=1,
+            )
+    return result
+
+
+def _replace_dict_block(text: str, key: str, new_val: dict) -> str:
+    """在 JSON 文本中找到指定 key 的 dict 值区块，自适应缩进替换。
+
+    使用 brace 平衡算法确保正确匹配嵌套大括号，自动检测周围缩进层级，
+    使替换后的 JSON 与文件缩进风格一致。
+    """
+    import re
+    import json as _json
+
+    match = re.search(re.escape(f'"{key}":') + r'\s*\{', text)
+    if not match:
+        return text
+
+    # 检测 key 所在的当前行缩进
+    line_start = text.rfind("\n", 0, match.start()) + 1
+    base_indent = match.start() - line_start  # ""{key}"" 前的空格数
+
+    # 序列化新值，使用 4 空格内缩
+    INNER_INDENT = 4
+    lines = _json.dumps(new_val, ensure_ascii=False, indent=INNER_INDENT).split("\n")
+
+    # 第一行是 "{"，续行加 base_indent 前缀，末行 "}" 也加 base_indent
+    block_lines = [lines[0]]
+    for line in lines[1:]:
+        stripped = line.lstrip()
+        leading = len(line) - len(stripped)
+        if leading == 0:
+            block_lines.append(" " * base_indent + stripped)
+        else:
+            block_lines.append(" " * base_indent + line)
+    block_text = "\n".join(block_lines)
+
+    # 从 opening brace 开始逐字符查找 matching closing brace
+    brace_start = match.end() - 1  # '{' 的位置
+    depth = 0
+    pos = brace_start
+    while pos < len(text):
+        ch = text[pos]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[:match.start()] + f'"{key}": {block_text}' + text[pos + 1:]
+        pos += 1
+    return text  # brace 不平衡，放弃替换
 
 
 def _cmd_config_dir() -> None:
