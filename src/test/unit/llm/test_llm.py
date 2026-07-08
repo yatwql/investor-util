@@ -456,7 +456,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     def setUp(self) -> None:
         self.base_kw = dict(
             system="system", user="user", api_key="sk-test",
-            endpoint="", max_tokens=800,
+            endpoint="", max_tokens=800, http_client=MagicMock(),
         )
         self.llm_config = {
             "thinking_enabled_global_macro": True,

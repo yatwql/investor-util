@@ -232,7 +232,7 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
             mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
             mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
             mock_penetration.return_value = {}
-            mock_cat.return_value = {}
+            mock_cat.return_value = ([], True)
             mock_status.return_value = (0, 0, True)
             mock_perf.return_value = {}
             tmpl = MagicMock()
@@ -272,7 +272,7 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
             mock_a_idx.return_value = {}
             mock_us_idx.return_value = {}
             mock_penetration.return_value = {}
-            mock_cat.return_value = {}
+            mock_cat.return_value = ([], True)
             mock_status.return_value = (0, 0, True)
             mock_perf.return_value = {}
             tmpl = MagicMock()
@@ -307,7 +307,7 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
             mock_a_idx.return_value = {}
             mock_us_idx.return_value = {}
             mock_penetration.return_value = {}
-            mock_cat.return_value = {}
+            mock_cat.return_value = ([], True)
             mock_status.return_value = (0, 0, True)
             mock_perf.return_value = {}
             tmpl = MagicMock()
@@ -381,7 +381,7 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
                 "gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29},
             }
             mock_penetration.return_value = {}
-            mock_cat.return_value = {}
+            mock_cat.return_value = ([], True)
             mock_status.return_value = (0, 0, True)
             mock_perf.return_value = {}
             mock_llm.return_value = ("<p>宏观</p>", "<p>复盘</p>", None, None, False, False, False, False)
@@ -450,7 +450,7 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
             mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
             mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
             mock_penetration.return_value = {}
-            mock_cat.return_value = {}
+            mock_cat.return_value = ([], True)
             mock_status.return_value = (0, 0, True)
             mock_perf.return_value = {}
             mock_llm.return_value = ("<p>宏观</p>", "<p>复盘</p>", None, None, False, False, False, False)
@@ -952,7 +952,7 @@ class TestAppVersionInTemplate(unittest.TestCase):
             mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
             mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
             mock_penetration.return_value = {}
-            mock_cat.return_value = {}
+            mock_cat.return_value = ([], True)
             mock_status.return_value = (0, 0, True)
             mock_perf.return_value = {}
             tmpl = MagicMock()

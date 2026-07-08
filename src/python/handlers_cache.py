@@ -9,7 +9,6 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any
 
 from src.python.logger import setup_logger
-from src.python.market_hours import is_market_open
 from src.python.reader import read_holdings
 from src.python.tui_handlers import _print_error_with_hint, _select_holdings_file
 from src.python.tui_menu import _press_any_key, _refresh_config
@@ -138,6 +137,16 @@ def _refresh_sector_flow_cache() -> tuple[str, int]:
     return ("sector_flow", len(data) if data else 0)
 
 
+def _sector_flow_hint() -> str:
+    """根据最近一次行业资金流向失败类型返回提示文案。"""
+    from src.python.providers.akshare_extras import _SECTOR_FLOW_FAILURE
+    if _SECTOR_FLOW_FAILURE == "connection":
+        return "连接失败"
+    if _SECTOR_FLOW_FAILURE == "empty":
+        return "暂无数据"
+    return "获取失败"
+
+
 def _print_cache_refresh_report(
     funds: list, perf_ok: int, hold_ok: int, bm_ok: int,
     pf_ok: int = 0, sf_ok: int = 0,
@@ -170,8 +179,7 @@ def _print_cache_refresh_report(
     if sf_ok:
         print(f"  [OK] sector_flow.json               ({sf_ok} 个行业)")
     elif funds:
-        _hint = "非交易时段无数据" if not is_market_open() else "获取失败"
-        print(f"  [!] sector_flow.json               {_hint}")
+        print(f"  [!] sector_flow.json               {_sector_flow_hint()}")
 
 
 def _refresh_common_caches(holdings: list | None = None) -> tuple[int, int, int, int]:
@@ -201,9 +209,8 @@ def _refresh_common_caches(holdings: list | None = None) -> tuple[int, int, int,
                           else "  [!]   profit_forecast              获取失败")
                 elif tag == "sector_flow":
                     sf_ok = fut.result()[1]
-                    _hint = "非交易时段无数据" if not is_market_open() and not sf_ok else ""
                     print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
-                          else f"  [!]   sector_flow                  {_hint}")
+                          else f"  [!]   sector_flow                  {_sector_flow_hint()}")
                 elif tag == "industry":
                     ind_ok = fut.result()
                     print(f"  [OK]   industry                     ({ind_ok} 只证券)" if ind_ok
@@ -272,9 +279,8 @@ def _cmd_update_basic_cache() -> None:
                           else "  [!]   profit_forecast              获取失败")
                 elif result[0] == "sector_flow":
                     sf_ok = result[1]
-                    _hint = "非交易时段无数据" if not is_market_open() and not sf_ok else ""
                     print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
-                          else f"  [!]   sector_flow                  {_hint}")
+                          else f"  [!]   sector_flow                  {_sector_flow_hint()}")
             except Exception as e:
                 logger.debug("缓存刷新 Future 异常 (%s): %s", tag, e)
                 print(f"  [!]   {'基金刷新异常' if tag == 'fund' else '其他缓存刷新异常'}")

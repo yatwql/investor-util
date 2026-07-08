@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx
 
-from src.python.code_utils import get_exchange_prefix
+from src.python.code_utils import get_exchange_prefix, is_a_share_code, is_exchange_fund_code
 from src.python.http_client import make_http_client
 
 logger = logging.getLogger("invest")
@@ -138,6 +138,11 @@ def fetch_price(code: str) -> dict[str, Any] | None:
             - source: "腾讯财经"
         None: 网络异常或解析失败
     """
+    # Tencent 仅支持 A 股代码和场内 ETF/LOF/可转债，场外基金等直接跳过
+    if not is_a_share_code(code) and not is_exchange_fund_code(code):
+        logger.debug("Tencent 跳过不支持的类型: %s", code)
+        return None
+
     full_code = _add_prefix(code)
     url = f"{_BASE_URL}{full_code}"
 

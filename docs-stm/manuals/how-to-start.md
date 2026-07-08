@@ -39,6 +39,9 @@ source .venv/bin/activate
 # 3. 安装依赖
 pip install -r requirements.txt
 
+# （可选）Windows 用户若需终端彩色输出：
+pip install colorama
+
 # 4. 启动
 python src/python/main.py
 ```

@@ -127,18 +127,15 @@ class TestPrintCacheRefreshReport(unittest.TestCase):
         self.assertIn("sector_flow", output)
 
     def test_sector_flow_fail_hint(self):
-        """资金流向获取失败且非交易时段时提示。"""
+        """资金流向获取失败时的提示。"""
         from src.python.handlers_cache import _print_cache_refresh_report
-        with (
-            patch("sys.stdout", self._stdout),
-            patch("src.python.handlers_cache.is_market_open", return_value=False),
-        ):
+        with patch("sys.stdout", self._stdout):
             _print_cache_refresh_report(
                 funds=["基金A"], perf_ok=1, hold_ok=1, bm_ok=1,
                 pf_ok=0, sf_ok=0,
             )
         output = self._stdout.getvalue()
-        self.assertIn("非交易时段", output)
+        self.assertIn("获取失败", output)
 
     def test_empty_funds_with_pf_only(self):
         """无基金仅盈利预测成功。"""

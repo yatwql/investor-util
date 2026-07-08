@@ -227,6 +227,10 @@ def get_profit_forecast_cache_key() -> str:
     return _cache_key(_CACHE_PROFIT_PREFIX, fp)
 
 
+# 行业资金流向最近失败类型: "" / "connection" / "empty"
+_SECTOR_FLOW_FAILURE: str = ""
+
+
 def get_sector_fund_flow() -> list[dict[str, Any]]:
     """获取行业资金流向排名（今日）。
 
@@ -266,9 +270,11 @@ def get_sector_fund_flow() -> list[dict[str, Any]]:
 
     df = _run_with_timeout(_fetch)
     if df is None:
+        _SECTOR_FLOW_FAILURE = "connection"
         logger.warning("行业资金流向获取失败")
         return []
     if df.empty:
+        _SECTOR_FLOW_FAILURE = "empty"
         logger.debug("行业资金流向: 结果为空")
         return []
 
