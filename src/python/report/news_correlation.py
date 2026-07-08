@@ -21,7 +21,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.models import Holding
-from src.python.registry import get_llm_module_name, set_sheet_title
+from src.python.registry import get_llm_module_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -275,9 +275,9 @@ def _expand_industry_keywords(
                 for idata in industry_data.values():
                     if idata.get("industry"):
                         extra_kw.append(idata["industry"])
-                    for cname in idata.get("concepts", []):
-                        if cname.strip():
-                            extra_kw.append(cname.strip())
+                    extra_kw.extend(
+                        cname.strip() for cname in idata.get("concepts", []) if cname.strip()
+                    )
                 if extra_kw:
                     all_kw = list(set(keywords + extra_kw))
                     all_kw.sort(key=lambda x: (-len(x), x))
@@ -311,8 +311,8 @@ def _news_source_cb(label: str, count: int, status: str) -> None:
 
 def _apply_llm_enhancement(
     news_items: list[dict[str, Any]],
-    holdings: List[Holding],
-    penetrated_assets: Optional[List[dict]],
+    holdings: list[Holding],
+    penetrated_assets: list[dict] | None,
     industry_data: dict[str, dict],
     meta: dict,
 ) -> dict:
@@ -367,8 +367,8 @@ def _apply_llm_enhancement(
 
 def _enrich_news_keywords(
     news_items: list[dict[str, Any]],
-    holdings: List[Holding],
-    penetrated_assets: Optional[List[dict]],
+    holdings: list[Holding],
+    penetrated_assets: list[dict] | None,
     industry_data: dict[str, dict],
 ) -> None:
     """为每条新闻做关键词富化（标注来源为持仓/穿透/概念）。"""
@@ -379,9 +379,9 @@ def _enrich_news_keywords(
 
 
 def build_news_data(
-    holdings: List[Holding],
+    holdings: list[Holding],
     top_n: int = 100,
-    penetrated_assets: Optional[List[dict]] = None,
+    penetrated_assets: list[dict] | None = None,
 ) -> tuple[list[dict[str, Any]], dict]:
     """获取新闻数据并与持仓关联。
 

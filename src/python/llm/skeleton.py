@@ -8,34 +8,31 @@ from typing import Any
 
 import httpx
 
-from src.python.cache import get as cache_get, set as cache_set  # noqa: F401
+from src.python.cache import get as cache_get  # noqa: F401
+from src.python.cache import set as cache_set
 from src.python.config import get_llm_config
 from src.python.llm.api import (
     _AUTO_INCREASE_FACTOR,
-    _call_llm,
     _CACHE_LINE_HTML,
-    _cache_line_model_tpl,
-    _clear_last_llm_failure,
-    _get_last_llm_failure,
     _LLM_TIMEOUT,
     _TRUNCATION_MARKER,
+    _cache_line_model_tpl,
+    _call_llm,
+    _clear_last_llm_failure,
     _extract_model_from_cached,
+    _get_last_llm_failure,
 )
 from src.python.llm.fingerprint import _get_cache_ttl_llm
 from src.python.llm.markdown import _markdown_to_html
 from src.python.llm.pricing import _estimate_cost
-from src.python.llm.session import _record_per_module
 from src.python.llm.prompts import (
     _CACHE_PREFIX_LLM,
     _LLM_MODULE_FAILURE,
-    FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_API_ERROR,
-    FAIL_REASON_CIRCUIT_OPEN,
     FAIL_REASON_DISABLED,
-    FAIL_REASON_NETWORK_ERROR,
-    FAIL_REASON_TIMEOUT,
+    FAIL_REASON_NOT_CONFIGURED,
 )
-
+from src.python.llm.session import _record_per_module
 from src.python.registry import get_llm_module_name
 
 _MN = get_llm_module_name
@@ -85,10 +82,7 @@ def _handle_cache_hit(
     logger.info("LLM 缓存命中: %s", cache_key)
     cached_clean = cached
     _orig_model = _extract_model_from_cached(cached)
-    if _orig_model:
-        _hint = _cache_line_model_tpl(_orig_model)
-    else:
-        _hint = _CACHE_LINE_HTML
+    _hint = _cache_line_model_tpl(_orig_model) if _orig_model else _CACHE_LINE_HTML
     if thinking_enabled:
         _hint = _hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
     cached_clean += _hint
@@ -108,7 +102,7 @@ def _finalize_and_cache(
     model: str | None,
     llm_config: dict,
     thinking_enabled: bool,
-) -> tuple[str, bool]:
+) -> tuple[str | None, bool]:
     """处理 LLM 返回结果：Markdown→HTML → 拼接页脚 → 缓存 → 记录。
 
     Returns:
@@ -491,7 +485,7 @@ def _run_batch_mode(
                     inp, out = future.result()
                     total_in += inp
                     total_out += out
-                except Exception as e:
+                except Exception as e:  # noqa: PERF203
                     logger.warning("批处理异常: %s", e)
 
     return (results_map, all_cached, {"input": total_in, "output": total_out, "model": _model}, cached_count)

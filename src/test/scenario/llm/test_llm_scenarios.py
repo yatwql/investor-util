@@ -409,7 +409,7 @@ class TestS14LlmDisabled(unittest.TestCase):
             mock_a_idx.return_value = {}
             mock_us_idx.return_value = {}
             mock_pen.return_value = {}
-            mock_cat.return_value = {}
+            mock_cat.return_value = ([], True)
             mock_status.return_value = (0, 0, True)
             mock_perf.return_value = {}
             tmpl = MagicMock()

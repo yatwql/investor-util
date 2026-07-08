@@ -27,15 +27,12 @@ def _compute_fingerprint(*args: Any) -> str:
 
 def _extract_stable_holdings(holdings_details: list[dict] | None) -> list[dict]:
     """从持仓明细中提取稳定的（无行情波动）字段。"""
-    result: list[dict] = []
-    if holdings_details:
-        for d in holdings_details:
-            result.append({
-                "name": d.get("name", ""),
-                "code": d.get("code", ""),
-                "cost": d.get("cost", 0),
-            })
-    return result
+    if not holdings_details:
+        return []
+    return [
+        {"name": d.get("name", ""), "code": d.get("code", ""), "cost": d.get("cost", 0)}
+        for d in holdings_details
+    ]
 
 
 def _extract_stable_penetration(penetrated_assets: list[dict] | None,

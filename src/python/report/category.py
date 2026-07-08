@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 
-
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.code_utils import (
@@ -21,9 +20,9 @@ from src.python.code_utils import (
     is_offsite_fund,
     is_qdii_extended,
 )
-from src.python.registry import get_report_sheet_name, set_sheet_title
 from src.python.models import Holding
-from src.python.report.data_status import DataStatus, DataStatusItem, STATUS_MESSAGES
+from src.python.registry import get_report_sheet_name
+from src.python.report.data_status import STATUS_MESSAGES, DataStatus, DataStatusItem
 from src.python.report.excel_writer import (
     _write_data_status_foot,
     auto_width,
@@ -162,7 +161,7 @@ def calc_yield_text(code: str, d, dividend_data: dict) -> str:
 
 
 def _write_category_group(
-    ws: Worksheet, row: int, group: List[Holding], prop: str, sub: str,
+    ws: Worksheet, row: int, group: list[Holding], prop: str, sub: str,
     detail_map: dict, dividend_data: dict,
 ) -> tuple[int, float, float, float, float]:
     """写入一个分类分组的明细行和小计，返回 (next_row, mv, cost, profit, today)。"""
@@ -191,7 +190,7 @@ def _write_category_group(
 def write_category_sheet(
     ws: Worksheet,
     holdings: list[Holding],
-    details: List[DetailRow],
+    details: list[DetailRow],
 ) -> None:
     """写入持仓分类表。
 
@@ -206,7 +205,7 @@ def write_category_sheet(
     """
     detail_map: dict[str, DetailRow] = {d.code: d for d in details}
 
-    cat_groups: dict[Tuple[str, str], List[Holding]] = {}
+    cat_groups: dict[tuple[str, str], list[Holding]] = {}
     for h in holdings:
         prop, sub = _categorize_holding(h)
         cat_groups.setdefault((prop, sub), []).append(h)
@@ -249,7 +248,7 @@ def write_category_sheet(
     _write_data_status_foot(ws, data_status, start_row=row + 1, max_cols=_NCOLS)
 
 
-def _num_formats() -> list[str]:
+def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
     return [
         "",           # 1  资产属性

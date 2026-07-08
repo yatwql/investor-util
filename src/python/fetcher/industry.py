@@ -15,9 +15,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from src.python.cache import get_ttl
+from src.python.code_utils import is_a_share_code
 from src.python.fetcher.chain import _fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
-from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
 
@@ -34,7 +34,7 @@ _BATCH_RETRY_DELAY = 0.8
 _BATCH_RETRY_JITTER = 0.4
 
 
-def _industry_transform(raw: dict, source: str) -> dict | None:
+def _industry_transform(raw: dict, _source: str) -> dict | None:
     """东方财富行业原始数据 → 统一行业格式。"""
     if not raw:
         return None

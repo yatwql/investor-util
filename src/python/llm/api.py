@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
+
 import httpx
 
 from src.python.llm.circuit_breaker import (
@@ -96,7 +98,7 @@ def _cache_line_model_tpl(model: str) -> str:
         f"本次使用LLM缓存（原始模型：{model}）"
         "</p>"
     )
-"""含原始模型名称的缓存提示行模板。"""
+# 含原始模型名称的缓存提示行模板。
 
 _MODEL_LINE_RE = re.compile(r'模型[：:]\s*([^|<\s][^|]*)')
 """从 token 行中提取模型名称的正则。"""
@@ -341,7 +343,7 @@ def _attempt_api_call(
         return ("fatal", str(e))
 
 
-def _is_retry_available(label: str, attempt: int, max_retries: int, detail: str, url: str) -> bool:
+def _is_retry_available(label: str, attempt: int, max_retries: int, detail: str, _url: str) -> bool:
     """判断是否可重试；若可则等待后返回 True，否则 False。"""
     if attempt < max_retries:
         delay = _RETRY_DELAYS[attempt]
@@ -370,7 +372,7 @@ def _call_llm_with_retry(
     check_truncation_fn: Callable[[dict, int], bool],
     provider: str,
     model_name: str = "",
-) -> tuple[Optional[str], Optional[dict]]:
+) -> tuple[str | None, dict | None]:
     """LLM API 调用通用重试骨架。
 
     合并 _call_claude 和 _call_openai 中完全相同的重试/超时/错误处理逻辑。
@@ -443,7 +445,7 @@ def _call_single_provider(
     config_field: str,
     temperature: float | None,
     llm_config: dict | None,
-) -> tuple[Optional[str], Optional[dict]]:
+) -> tuple[str | None, dict | None]:
     """调用单个 LLM provider。"""
     if provider == "claude":
         return _call_claude(system_prompt, user_prompt, api_key, resolved_model, endpoint,
@@ -470,7 +472,7 @@ def _call_llm(
     config_field: str = "max_tokens",
     temperature: float | None = None,
     model: str | None = None,
-) -> tuple[Optional[str], Optional[dict]]:
+) -> tuple[str | None, dict | None]:
     """调用 LLM API 生成文本。
 
     Args:
@@ -511,7 +513,7 @@ def _call_llm(
             max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
         )
         if result2 and result2.strip():
-            print(f"  [OK] 安抚重试成功")
+            print("  [OK] 安抚重试成功")
             return result2, usage2
         logger.warning("安抚重试后仍返回空内容，继续尝试回退 provider")
 
@@ -592,7 +594,7 @@ def _call_claude(
     config_field: str = "max_tokens",
     temperature: float | None = None,
     llm_config: dict | None = None,
-) -> tuple[Optional[str], Optional[dict]]:
+) -> tuple[str | None, dict | None]:
     """调用 Claude API (Messages API)，带重试 + 用量日志。
 
     实际 HTTP 重试逻辑委托给 _call_llm_with_retry。
@@ -630,6 +632,7 @@ def _call_claude(
     if temperature is not None and "thinking" not in payload:
         payload["temperature"] = temperature
     client = http_client
+    assert client is not None
 
     return _call_llm_with_retry(
         label="Claude", client=client, url=url, headers=headers,
@@ -653,7 +656,7 @@ def _call_openai(
     http_client: httpx.Client | None = None,
     config_field: str = "max_tokens",
     temperature: float | None = None,
-) -> tuple[Optional[str], Optional[dict]]:
+) -> tuple[str | None, dict | None]:
     """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。
 
     实际 HTTP 重试逻辑委托给 _call_llm_with_retry。
@@ -681,6 +684,7 @@ def _call_openai(
     if temperature is not None:
         payload["temperature"] = temperature
     client = http_client
+    assert client is not None
 
     def _extract_openai(data: dict) -> str | None:
         try:

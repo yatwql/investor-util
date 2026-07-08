@@ -4,15 +4,28 @@
 """
 from __future__ import annotations
 
+import atexit
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from src.python.logger import setup_logger
-from src.python.reader import read_holdings
-from src.python.tui_menu import _press_any_key, _refresh_config
-from src.python.tui_handlers import _print_error_with_hint, _select_holdings_file
 from src.python.market_hours import is_market_open
+from src.python.reader import read_holdings
+from src.python.tui_handlers import _print_error_with_hint, _select_holdings_file
+from src.python.tui_menu import _press_any_key, _refresh_config
+
 logger = setup_logger()
+
+# 共享线程池 — handlers_cache 内多处并发任务复用同一实例
+_POOL: ThreadPoolExecutor | None = None
+
+
+def _get_pool() -> ThreadPoolExecutor:
+    global _POOL
+    if _POOL is None:
+        _POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="cache")
+        atexit.register(_POOL.shutdown, wait=False)
+    return _POOL
 
 
 def _read_holdings_and_clear_cache(group_name: str) -> list | None:
@@ -153,7 +166,7 @@ def _print_cache_refresh_report(
     if pf_ok:
         print(f"  [OK] profit_forecast.json           ({pf_ok} 只股票)")
     elif funds:
-        print(f"  [!] profit_forecast.json           获取失败")
+        print("  [!] profit_forecast.json           获取失败")
     if sf_ok:
         print(f"  [OK] sector_flow.json               ({sf_ok} 个行业)")
     elif funds:
@@ -171,15 +184,14 @@ def _refresh_common_caches(holdings: list | None = None) -> tuple[int, int, int,
         (pf_ok, sf_ok, ind_ok, div_ok)
     """
     pf_ok = sf_ok = ind_ok = div_ok = 0
-    max_workers = 4 if holdings else 2
-    with ThreadPoolExecutor(max_workers=max_workers) as _ex:
-        _f1 = _ex.submit(_refresh_profit_forecast_cache)
-        _f2 = _ex.submit(_refresh_sector_flow_cache)
-        futures = [(_f1, "profit_forecast"), (_f2, "sector_flow")]
-        if holdings:
-            _f3 = _ex.submit(_refresh_industry_cache, holdings)
-            _f4 = _ex.submit(_refresh_dividend_cache, holdings)
-            futures.extend([(_f3, "industry"), (_f4, "dividend")])
+    _ex = _get_pool()
+    _f1 = _ex.submit(_refresh_profit_forecast_cache)
+    _f2 = _ex.submit(_refresh_sector_flow_cache)
+    futures: list[tuple[Future[Any], str]] = [(_f1, "profit_forecast"), (_f2, "sector_flow")]
+    if holdings:
+        _f3 = _ex.submit(_refresh_industry_cache, holdings)
+        _f4 = _ex.submit(_refresh_dividend_cache, holdings)
+        futures.extend([(_f3, "industry"), (_f4, "dividend")])
 
         for fut, tag in futures:
             try:
@@ -200,7 +212,7 @@ def _refresh_common_caches(holdings: list | None = None) -> tuple[int, int, int,
                     div_ok = fut.result()
                     print(f"  [OK]   dividend                     ({div_ok} 只股票)" if div_ok
                           else "  [!]   dividend                     获取失败")
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 logger.debug("%s Future 异常: %s", tag, e)
                 print(f"  [!]   {tag:<30}获取失败")
     return pf_ok, sf_ok, ind_ok, div_ok
@@ -231,42 +243,41 @@ def _cmd_update_basic_cache() -> None:
         perf_ok = hold_ok = bm_ok = 0
         pf_ok = sf_ok = 0
 
-        max_workers_val = max(3, min(len(funds) + 2, 7))
-        with ThreadPoolExecutor(max_workers=max_workers_val) as executor:
-            all_futures: dict = {}
-            for f in funds:
-                all_futures[executor.submit(_refresh_one_fund_cache, f)] = "fund"
-            all_futures[executor.submit(_refresh_profit_forecast_cache)] = "other"
-            all_futures[executor.submit(_refresh_sector_flow_cache)] = "other"
+        _ex = _get_pool()
+        all_futures: dict = {}
+        for f in funds:
+            all_futures[_ex.submit(_refresh_one_fund_cache, f)] = "fund"
+        all_futures[_ex.submit(_refresh_profit_forecast_cache)] = "other"
+        all_futures[_ex.submit(_refresh_sector_flow_cache)] = "other"
 
-            for future in as_completed(all_futures):
-                tag = all_futures[future]
-                try:
-                    result = future.result()
-                    if result[0] == "fund":
-                        _, code, name, p_ok, h_ok, h_cnt, b_ok = result
-                        if p_ok: perf_ok += 1
-                        if h_ok: hold_ok += 1
-                        if b_ok: bm_ok += 1
-                        parts = [f"业绩={'OK' if p_ok else '失败'}"]
-                        if h_ok:
-                            parts.append(f"持仓={h_cnt}条")
-                        else:
-                            parts.append("持仓=无数据")
-                        parts.append(f"基准={'OK' if b_ok else '未找到'}")
-                        print(f"  [OK]   {name} ({code}) — {' | '.join(parts)}")
-                    elif result[0] == "profit_forecast":
-                        pf_ok = result[1]
-                        print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
-                              else "  [!]   profit_forecast              获取失败")
-                    elif result[0] == "sector_flow":
-                        sf_ok = result[1]
-                        _hint = "非交易时段无数据" if not is_market_open() and not sf_ok else ""
-                        print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
-                              else f"  [!]   sector_flow                  {_hint}")
-                except Exception as e:
-                    logger.debug("缓存刷新 Future 异常 (%s): %s", tag, e)
-                    print(f"  [!]   {'基金刷新异常' if tag == 'fund' else '其他缓存刷新异常'}")
+        for future in as_completed(all_futures):
+            tag = all_futures[future]
+            try:
+                result = future.result()
+                if result[0] == "fund":
+                    _, code, name, p_ok, h_ok, h_cnt, b_ok = result
+                    if p_ok: perf_ok += 1
+                    if h_ok: hold_ok += 1
+                    if b_ok: bm_ok += 1
+                    parts = [f"业绩={'OK' if p_ok else '失败'}"]
+                    if h_ok:
+                        parts.append(f"持仓={h_cnt}条")
+                    else:
+                        parts.append("持仓=无数据")
+                    parts.append(f"基准={'OK' if b_ok else '未找到'}")
+                    print(f"  [OK]   {name} ({code}) — {' | '.join(parts)}")
+                elif result[0] == "profit_forecast":
+                    pf_ok = result[1]
+                    print(f"  [OK]   profit_forecast              ({pf_ok} 只股票)" if pf_ok
+                          else "  [!]   profit_forecast              获取失败")
+                elif result[0] == "sector_flow":
+                    sf_ok = result[1]
+                    _hint = "非交易时段无数据" if not is_market_open() and not sf_ok else ""
+                    print(f"  [OK]   sector_flow                  ({sf_ok} 个行业)" if sf_ok
+                          else f"  [!]   sector_flow                  {_hint}")
+            except Exception as e:
+                logger.debug("缓存刷新 Future 异常 (%s): %s", tag, e)
+                print(f"  [!]   {'基金刷新异常' if tag == 'fund' else '其他缓存刷新异常'}")
 
         _print_cache_refresh_report(funds, perf_ok, hold_ok, bm_ok, pf_ok, sf_ok)
     except Exception as e:
@@ -279,49 +290,48 @@ def _fetch_prices_and_indices(holdings: list) -> tuple[int, dict, dict]:
     """并行获取持仓价格 + 市场指数并逐条输出。"""
     from src.python.fetcher.index import fetch_indices, fetch_us_indices
     from src.python.fetcher.price import fetch_market_data
-    from concurrent.futures import ThreadPoolExecutor, as_completed as _ac
 
     price_ok = 0
     a_idx: dict = {}
     us_idx: dict = {}
-    with ThreadPoolExecutor(max_workers=max(3, min(len(holdings) + 2, 7))) as executor:
-        fut_map: dict[Any, Any] = {}
-        for h in holdings:
-            fut_map[executor.submit(fetch_market_data, h.code, h.name)] = h
-        idx_a_fut = executor.submit(fetch_indices)
-        idx_us_fut = executor.submit(fetch_us_indices)
-        fut_map[idx_a_fut] = None
-        fut_map[idx_us_fut] = None
+    _ex = _get_pool()
+    fut_map: dict[Any, Any] = {}
+    for h in holdings:
+        fut_map[_ex.submit(fetch_market_data, h.code, h.name)] = h
+    idx_a_fut = _ex.submit(fetch_indices)
+    idx_us_fut = _ex.submit(fetch_us_indices)
+    fut_map[idx_a_fut] = None
+    fut_map[idx_us_fut] = None
 
-        for future in _ac(fut_map):
-            h_or_none = fut_map[future]
-            try:
-                if h_or_none is None:
-                    result = future.result()
-                    if future is idx_a_fut:
-                        a_idx = result or {}
-                        print(f"  [OK]   A 股指数: {len(a_idx)} 个")
-                    else:
-                        us_idx = result or {}
-                        print(f"  [OK]   美股指数: {len(us_idx)} 个")
+    for future in as_completed(fut_map):
+        h_or_none = fut_map[future]
+        try:
+            if h_or_none is None:
+                result = future.result()
+                if future is idx_a_fut:
+                    a_idx = result or {}
+                    print(f"  [OK]   A 股指数: {len(a_idx)} 个")
                 else:
-                    h = h_or_none
-                    result = future.result()
-                    if result and result.get("price", 0) > 0:
-                        price_ok += 1
-                        print(f"  [OK]   {h.name} ({h.code}) → {result['price']:.4f}")
-                    else:
-                        print(f"  [!]   {h.name} ({h.code}) → 失败")
-            except Exception as e:
-                if h_or_none is not None:
-                    _msg = str(e)
-                    if any(kw in _msg.lower() for kw in ("connect", "timeout", "network", "reset")):
-                        _hint = "网络异常"
-                    elif "parse" in _msg.lower() or "decode" in _msg.lower():
-                        _hint = "数据解析失败"
-                    else:
-                        _hint = "获取失败"
-                    print(f"  [ERR]  {h_or_none.name} ({h_or_none.code}) → {_hint}")
+                    us_idx = result or {}
+                    print(f"  [OK]   美股指数: {len(us_idx)} 个")
+            else:
+                h = h_or_none
+                result = future.result()
+                if result and result.get("price", 0) > 0:
+                    price_ok += 1
+                    print(f"  [OK]   {h.name} ({h.code}) → {result['price']:.4f}")
+                else:
+                    print(f"  [!]   {h.name} ({h.code}) → 失败")
+        except Exception as e:
+            if h_or_none is not None:
+                _msg = str(e)
+                if any(kw in _msg.lower() for kw in ("connect", "timeout", "network", "reset")):
+                    _hint = "网络异常"
+                elif "parse" in _msg.lower() or "decode" in _msg.lower():
+                    _hint = "数据解析失败"
+                else:
+                    _hint = "获取失败"
+                print(f"  [ERR]  {h_or_none.name} ({h_or_none.code}) → {_hint}")
 
     return price_ok, a_idx, us_idx
 
@@ -334,7 +344,7 @@ def _cmd_update_position_cache() -> None:
 
     try:
         print()
-        print(f"  [..]   并行获取持仓价格/净值 + 市场指数...")
+        print("  [..]   并行获取持仓价格/净值 + 市场指数...")
         price_ok, a_idx, us_idx = _fetch_prices_and_indices(holdings)
 
         print()
@@ -348,7 +358,7 @@ def _cmd_update_position_cache() -> None:
         else:
             print(f"  [!] price_{{code}}.json          ({price_ok}/{len(holdings)} 成功, {price_fail} 条失败)")
         print(f"  [OK] index_{{code}}.json           (A股 {len(a_idx)} 个 + 美股 {len(us_idx)} 个 = {total_idx} 个指数)")
-        print(f"  [OK] LLM 关联缓存已清除（下次菜单 L 自动使用最新数据）")
+        print("  [OK] LLM 关联缓存已清除（下次菜单 L 自动使用最新数据）")
     except Exception as e:
         logger.exception("更新持仓缓存失败")
         _print_error_with_hint(e, "更新持仓缓存")
@@ -380,7 +390,7 @@ def _cmd_show_cache_stats() -> None:
     if hit_rate["total"] > 0:
         pct = hit_rate["rate"] * 100
         print(f"  命中率:   {pct:.1f}% ({hit_rate['hits']} 命中 / {hit_rate['total']} 次请求)")
-    print(f"  按前缀分类:")
+    print("  按前缀分类:")
     for prefix, count in sorted(stats.get("by_prefix", {}).items()):
         print(f"    {prefix}_*: {count} 个文件")
     print()

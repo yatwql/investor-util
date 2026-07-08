@@ -12,10 +12,9 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 
 from src.python.config import get_config
-from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
+from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,

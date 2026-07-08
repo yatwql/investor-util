@@ -14,18 +14,21 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 from src.python.cache import get_cache_hit_rate
+from src.python.code_utils import is_qdii_extended
 from src.python.constants import APP_VERSION
-from src.python.fetcher.index import fetch_indices, fetch_us_indices
-from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
-from src.python.models import Holding
 from src.python.fetcher.fund import fetch_fund_holdings
-from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary
-from src.python.report.fund_performance import _is_fund
+from src.python.fetcher.index import fetch_indices, fetch_us_indices
+from src.python.models import Holding
+from src.python.registry import get_llm_module_name, get_llm_module_names, get_report_section_order
+from src.python.report.category import _build_category_data_status
+from src.python.report.data_status import DataStatus
+from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.report.fund_concentration import compute_concentration
+from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix
+from src.python.report.fund_performance import _build_perf_data_status, _is_fund
 from src.python.report.fund_style_analysis import analyze_style_for_all_funds
 from src.python.report.html_builders import _build_category_data, _build_perf_data
-from src.python.code_utils import is_qdii_extended
 from src.python.report.market_value import (
     DetailRow,
     _generate_details,
@@ -34,15 +37,44 @@ from src.python.report.market_value import (
     price_update_status,
 )
 from src.python.report.penetration import compute_penetration_top10
-from src.python.registry import get_llm_module_name, get_llm_module_names, get_report_section_order
-from src.python.report.progress import ProgressReporter, SilentProgressReporter
-from src.python.report.data_status import DataStatus
-from src.python.report.summary import _build_index_data_status
 from src.python.report.penetration_sheet import _build_penetration_data_status
-from src.python.report.fund_performance import _build_perf_data_status
-from src.python.report.category import _build_category_data_status
+from src.python.report.progress import ProgressReporter, SilentProgressReporter
+from src.python.report.summary import _build_index_data_status
 
 logger = logging.getLogger("invest")
+
+# ═══════════════════════════════════════════════════════════════
+#  文件导览
+# ═══════════════════════════════════════════════════════════════
+#
+#   路径 + Jinja2 环境         L46  ~ L52
+#   Jinja2 自定义过滤器         L54  ~ L165
+#     过滤器函数                L57  ~ L134
+#     全局函数                  L136 ~ L150
+#     注册                      L153 ~ L164
+#   辅助函数                    L167 ~ L190
+#   核心生成函数                L192 ~ L351
+#     write_html_report()       L195 ~ L350
+#   子渲染函数                  L353 ~ L919
+#     时间辅助                  L356 ~ L362
+#     市场行情                  L365 ~ L393
+#     账户分组                  L396 ~ L423
+#     分类信息                  L426 ~ L444
+#     市场指数                  L447 ~ L476
+#     持仓分类表                L479 ~ L489
+#     穿透 TOP10                L492 ~ L553
+#     基金业绩                  L556 ~ L571
+#     基金经理变更              L574 ~ L594
+#     持仓重合度矩阵            L597 ~ L640
+#     集中度                    L643 ~ L675
+#     风格分析                  L678 ~ L713
+#     新闻关联                  L716 ~ L753
+#     LLM 内容                  L756 ~ L820
+#     LLM 模块信息              L823 ~ L918
+#   报告保存                    L921 ~ L958
+#     _save_html_report()       L921 ~ L957
+#
+# ═══════════════════════════════════════════════════════════════
 
 # ── 路径 ─────────────────────────────────────────────────────
 
@@ -108,9 +140,8 @@ def _jinja_price_type_color(price_type: str, name: str = "") -> str:
     """
     if price_type in ("场内收盘价(T)", "场内午市收盘(T)", "官方净值(T)"):
         return "#0066CC"
-    if price_type == "官方净值(T-1)":
-        if name and is_qdii_extended(name):
-            return "#0066CC"
+    if price_type == "官方净值(T-1)" and name and is_qdii_extended(name):
+        return "#0066CC"
     return ""
 
 
@@ -147,6 +178,8 @@ def _jinja_section_visible(key: str) -> bool:
         {% endif %}
     """
     sv_dict = _ENV.globals.get("section_visible_dict", {})
+    if not isinstance(sv_dict, dict):
+        return False
     return bool(sv_dict.get(key, False))
 
 
@@ -192,7 +225,7 @@ def _safe_build_data_status(builder, *args, label: str = "", **kwargs) -> DataSt
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: List[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None) -> str:
+def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     通过各子函数获取分析数据，渲染 Jinja2 模板，
@@ -363,7 +396,7 @@ def _time_strings() -> tuple[str, str, str]:
 
 
 def _render_market_value_section(
-    holdings: List[Holding],
+    holdings: list[Holding],
     details: list | None,
     today_str: str,
     prog: ProgressReporter,
@@ -424,7 +457,7 @@ def _render_account_grouping(
 
 
 def _render_category_info(
-    holdings: List[Holding],
+    holdings: list[Holding],
     details: list,
     trading_day: str,
 ) -> tuple[dict[str, int], dict[str, Any]]:
@@ -446,7 +479,7 @@ def _render_category_info(
 
 def _render_index_section(
     prog: ProgressReporter,
-) -> tuple[dict, dict, List[Dict[str, Any]], List[Dict[str, Any]]]:
+) -> tuple[dict, dict, list[dict[str, Any]], list[dict[str, Any]]]:
     """获取市场指数并转为模板可迭代列表。
 
     Returns:
@@ -477,21 +510,20 @@ def _render_index_section(
 
 
 def _render_category_table(
-    holdings: List[Holding], details: list, prog: ProgressReporter,
-) -> tuple[list[Dict[str, Any]], bool]:
+    holdings: list[Holding], details: list, prog: ProgressReporter,
+) -> tuple[list[dict[str, Any]], bool]:
     """构建持仓分类表数据。
 
     Returns:
         (cat_data, dividend_success)
     """
     prog.info("正在生成持仓分类表...")
-    from src.python.report.html_builders import _build_category_data
     cat_data, dividend_success = _build_category_data(holdings, details)
     return cat_data, dividend_success
 
 
 def _render_penetration_section(
-    holdings: List[Holding], details: list, prog: ProgressReporter,
+    holdings: list[Holding], details: list, prog: ProgressReporter,
 ) -> tuple[dict | None, bool, bool]:
     """计算资产穿透TOP10，附加盈利预测和股息率。
 
@@ -520,8 +552,8 @@ def _render_penetration_section(
     dividend_success = True
     dividend_data: dict[str, dict] = {}
     try:
-        from src.python.providers.akshare_extras import get_dividend_data
         from src.python.code_utils import is_a_share_code
+        from src.python.providers.akshare_extras import get_dividend_data
         all_codes = list(set().union(*(e.get("codes", []) for e in pen_result["top10"])))
         a_codes = [c for c in all_codes if is_a_share_code(c)]
         dividend_data = get_dividend_data(a_codes) if a_codes else {}
@@ -555,8 +587,8 @@ def _render_penetration_section(
 
 
 def _render_fund_performance_section(
-    holdings: List[Holding], details: list, prog: ProgressReporter,
-) -> tuple[List[Dict[str, Any]], bool]:
+    holdings: list[Holding], details: list, prog: ProgressReporter,
+) -> tuple[list[dict[str, Any]], bool]:
     """构建基金业绩分析数据。
 
     Returns:
@@ -573,7 +605,7 @@ def _render_fund_performance_section(
 
 
 def _render_manager_analysis(
-    holdings: List[Holding], enable_b_series: bool, prog: ProgressReporter,
+    holdings: list[Holding], enable_b_series: bool, prog: ProgressReporter,
 ) -> dict | None:
     """构建基金经理变更监控数据。
 
@@ -718,7 +750,7 @@ def _render_news_section(
     include_news: bool,
     news_data: list | None,
     news_llm_meta: dict | None,
-    holdings: List[Holding],
+    holdings: list[Holding],
     news_top_count: int,
     penetration: dict | None,
     prog: ProgressReporter,
@@ -764,8 +796,8 @@ def _render_llm_content_section(
     total_cost: float,
     total_profit: float,
     total_today_profit: float,
-    holdings: List[Holding],
-    cat_counts: Dict[str, int],
+    holdings: list[Holding],
+    cat_counts: dict[str, int],
     penetration: dict | None,
     details: list,
     sector_flow: list | None,
@@ -828,9 +860,12 @@ def _build_module_info_list(
     """构建 LLM 模块信息列表（状态、Token 用量、费用等）。"""
     try:
         from src.python.llm import (
-            FAIL_REASON_DISABLED, FAIL_REASON_NOT_CONFIGURED,
-            FAIL_REASON_API_ERROR, FAIL_REASON_NETWORK_ERROR,
-            FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
+            FAIL_REASON_API_ERROR,
+            FAIL_REASON_CIRCUIT_OPEN,
+            FAIL_REASON_DISABLED,
+            FAIL_REASON_NETWORK_ERROR,
+            FAIL_REASON_NOT_CONFIGURED,
+            FAIL_REASON_TIMEOUT,
         )
     except ImportError:
         FAIL_REASON_DISABLED = FAIL_REASON_NOT_CONFIGURED = "disabled"
@@ -889,21 +924,16 @@ def _render_llm_module_info(
     _llm_session_usage = None
     if llm_enabled_flag:
         try:
-            from src.python.llm import get_session_usage, format_session_usage
+            from src.python.llm import format_session_usage, get_session_usage
             _llm_session_usage = format_session_usage(get_session_usage())
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键）")
 
     _llm_failure = {}
-    _per_module = {}
-    FAIL_REASON_DISABLED, FAIL_REASON_NOT_CONFIGURED = None, None
-    FAIL_REASON_API_ERROR = FAIL_REASON_NETWORK_ERROR = FAIL_REASON_TIMEOUT = FAIL_REASON_CIRCUIT_OPEN = None
+    _per_module: dict[str, Any] = {}
+    from src.python.llm import FAIL_REASON_DISABLED as _FAIL_REASON_DISABLED_IMPORT
+    FAIL_REASON_DISABLED: str | None = _FAIL_REASON_DISABLED_IMPORT
     try:
-        from src.python.llm import (
-            FAIL_REASON_DISABLED,
-            FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
-            FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
-        )
         from src.python.llm.prompts import _LLM_MODULE_FAILURE
         _llm_failure = dict(_LLM_MODULE_FAILURE)
     except ImportError:

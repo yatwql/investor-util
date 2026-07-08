@@ -82,16 +82,13 @@ def _parse_news_item(item: dict[str, Any]) -> dict[str, Any] | None:
 
     raw_ctime = item.get("display_time")
     try:
-        ctime_str = _ts_to_str(int(raw_ctime))
+        ctime_str = _ts_to_str(int(raw_ctime))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         ctime_str = ""
 
     # uri 可能是相对路径 "/live/xxxxx"，拼接完整 URL
     uri = (item.get("uri") or "").strip()
-    if uri and not uri.startswith("http"):
-        url = f"https://wallstreetcn.com{uri}"
-    else:
-        url = uri or ""
+    url = f"https://wallstreetcn.com{uri}" if uri and not uri.startswith("http") else uri or ""
 
     return {
         "title": title,

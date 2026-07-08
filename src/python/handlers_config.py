@@ -4,14 +4,14 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
-import json
 
-from src.python.logger import setup_logger
-from src.python.tui_menu import _press_any_key, _refresh_config, get_config_cache
-from src.python.reader import list_xlsx_files
 from src.python.config import set_config
+from src.python.logger import setup_logger
+from src.python.reader import list_xlsx_files
+from src.python.tui_menu import _press_any_key, _refresh_config, get_config_cache
 
 logger = setup_logger()
 
@@ -25,7 +25,7 @@ def _read_llm_settings() -> tuple[dict, str] | None:
     from src.python.config import _strip_json_comments
     path = "data/config/llm_settings.json"
     try:
-        with open(path, "r", encoding="utf-8-sig") as f:
+        with open(path, encoding="utf-8-sig") as f:
             raw = f.read()
         settings = json.loads(_strip_json_comments(raw))
         return settings, path
@@ -165,11 +165,10 @@ def _cmd_config_llm_modules() -> None:
 
 def _cmd_refresh_config() -> None:
     """重新加载所有配置（config.json + llm_settings.json + llm_key.json）。"""
-    from src.python.config import get_config, get_llm_config
-    from src.python.llm.pricing import _reload_pricing
-
     # 破坏内部缓存强制重新读取
     import src.python.config as _cfg_mod
+    from src.python.config import get_config, get_llm_config
+    from src.python.llm.pricing import _reload_pricing
     _cfg_mod._config_cache = None
     _cfg_mod._config_mtime = 0
     _cfg_mod._llm_config_cache = None

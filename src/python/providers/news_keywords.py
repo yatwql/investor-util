@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import re
 
-
 from src.python.models import Holding
 
 logger = logging.getLogger("invest")

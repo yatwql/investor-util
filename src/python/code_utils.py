@@ -280,10 +280,7 @@ def is_fund_holding(name: str, code: str, account: str) -> bool:
     Returns:
         True 表示需要基金业绩分析
     """
-    if (is_a_share_code(code) or is_hk_stock_code(code)) and "ETF" not in name.upper():
-        if not is_offsite_fund(account):
-            return False
-    return True
+    return not ((is_a_share_code(code) or is_hk_stock_code(code)) and "ETF" not in name.upper() and not is_offsite_fund(account))
 
 
 # ═══════════════════════════════════════════════════════════════

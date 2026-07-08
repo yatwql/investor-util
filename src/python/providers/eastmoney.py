@@ -65,7 +65,7 @@ def fetch_nav(code: str) -> dict[str, Any] | None:
 
     try:
         with make_http_client(timeout=_TIMEOUT) as client:
-            resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)
+            resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)  # type: ignore[arg-type]
             text = resp.text
     except httpx.TimeoutException:
         logger.warning("东方财富 API 超时: %s", code)

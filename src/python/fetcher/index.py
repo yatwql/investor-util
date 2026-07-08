@@ -11,7 +11,10 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from src.python.cache import CACHE_WEEKLY, get as cache_get, get_ttl, set as cache_set
+from src.python.constants import CACHE_WEEKLY
+from src.python.cache import get_ttl
+from src.python.cache import get as cache_get
+from src.python.cache import set as cache_set
 from src.python.providers import sina, tencent
 
 logger = logging.getLogger("invest")
@@ -224,7 +227,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
                     cache_set(_index_cache_key(code), data)
                     indices[code] = data
                 return indices
-        except Exception as e:
+        except Exception as e:  # noqa: PERF203
             logger.warning("美股指数新浪 API 请求失败（第 %d 次）: %s", attempt + 1, e)
             if attempt == 0:
                 _time.sleep(1)

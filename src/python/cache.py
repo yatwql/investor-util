@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import builtins
+import contextlib
 import gzip
 import hashlib
 import json
@@ -17,11 +18,9 @@ import threading
 import time
 from typing import Any
 
-from datetime import datetime, timezone, timedelta
-
-from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
-from src.python.registry import get_cache_ttl_defaults, get_prefix_type_map, get_exact_type_map, get_registry
+from src.python.constants import CACHE_DAILY
 from src.python.market_hours import is_market_open as _is_market_open
+from src.python.registry import get_cache_ttl_defaults, get_exact_type_map, get_prefix_type_map, get_registry
 
 _CACHE_DIR = "data/cache"
 _GZIP_THRESHOLD = 100 * 1024  # 100KB 以上的缓存自动 gzip
@@ -102,7 +101,7 @@ def _read_cache_data(fpath: str, key: str, dry_run: bool = False) -> dict | None
         if is_gz:
             with open(fpath, "rb") as f:
                 return json.loads(gzip.decompress(f.read()).decode("utf-8"))
-        with open(fpath, "r", encoding="utf-8-sig") as f:
+        with open(fpath, encoding="utf-8-sig") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
         if dry_run:
@@ -188,10 +187,8 @@ def _write_atomic(
     # 清理旧格式文件（防止 .json 和 .json.gz 同时存在）
     other_path = path if use_gzip else (path + _GZIP_SUFFIX)
     if os.path.exists(other_path):
-        try:
+        with contextlib.suppress(OSError):
             os.remove(other_path)
-        except OSError:
-            pass
 
 
 def set(key: str, data: Any) -> None:
@@ -217,7 +214,7 @@ def set(key: str, data: Any) -> None:
     # 先写临时文件，再 os.replace 原子替换，防止并发读取时读到不完整的 JSON
     try:
         fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
-    except (IOError, OSError):
+    except OSError:
         # tempfile.mkstemp 失败（如磁盘满、权限不足），直接返回
         logger.warning("缓存写入失败 %s: 无法创建临时文件", key)
         return
@@ -227,30 +224,24 @@ def set(key: str, data: Any) -> None:
         logger.debug("缓存已写入: %s", key)
     except FileNotFoundError:
         # 目录可能在 makedirs 后被外部删除，重试一次
-        try:
+        with contextlib.suppress(OSError):
             os.remove(tmp_path)
-        except OSError:
-            pass
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             fd2, tmp_path2 = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
             try:
                 _write_atomic(fd2, tmp_path2, final_path, path, json_str, raw_bytes, use_gzip)
                 logger.debug("缓存已写入(重试成功): %s", key)
-            except (IOError, OSError) as e2:
+            except OSError as e2:
                 logger.warning("缓存写入失败(重试后) %s: %s", key, e2)
-                try:
+                with contextlib.suppress(OSError):
                     os.remove(tmp_path2)
-                except OSError:
-                    pass
-        except (IOError, OSError) as e2:
+        except OSError as e2:
             logger.warning("缓存写入失败(重试后) %s: %s", key, e2)
-    except (IOError, OSError) as e:
+    except OSError as e:
         logger.warning("缓存写入失败 %s: %s", key, e)
-        try:
+        with contextlib.suppress(OSError):
             os.remove(tmp_path)
-        except OSError:
-            pass
 
 
 def get_cache_age(key: str) -> float | None:
@@ -317,7 +308,7 @@ def clear(key: str) -> None:
                 if os.path.exists(p):
                     os.remove(p)
                     logger.debug("缓存已清除: %s", key)
-            except OSError as e:
+            except OSError as e:  # noqa: PERF203
                 logger.warning("缓存清除失败 %s: %s", key, e)
 
 
@@ -519,7 +510,7 @@ def compute_holdings_fingerprint(holdings: list) -> str:
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 
-def compute_holdings_codes(holdings: list) -> set[str]:
+def compute_holdings_codes(holdings: list) -> builtins.set[str]:
     """提取持仓中的证券代码集合。
 
     Args:
@@ -541,7 +532,7 @@ def _read_holdings_tracking(tracking_key: str) -> dict | None:
     if not os.path.exists(track_path):
         return None
     try:
-        with open(track_path, "r", encoding="utf-8") as f:
+        with open(track_path, encoding="utf-8") as f:
             payload = json.load(f)
         return payload.get("_data")
     except (json.JSONDecodeError, OSError, KeyError):

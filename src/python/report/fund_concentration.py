@@ -15,7 +15,8 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from src.python.cache import get as cache_get, set as cache_set
+from src.python.cache import get as cache_get
+from src.python.cache import set as cache_set
 
 logger = logging.getLogger("invest")
 
@@ -136,10 +137,7 @@ def compute_concentration(
         change_pct = round(top10 - prev_top10, 2) if prev_top10 is not None else None
 
         # 预警级别
-        if is_first_run:
-            alert_level = "正常"  # 首次运行显示"基线已记录"
-        else:
-            alert_level = _calc_alert_level(top10, change_pct)
+        alert_level = "正常" if is_first_run else _calc_alert_level(top10, change_pct)  # 首次运行显示"基线已记录"
 
         results.append({
             "code": code,

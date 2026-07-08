@@ -183,7 +183,4 @@ def _match_header(actual: list[str], expected: list[str]) -> bool:
     """判断表头是否与期望匹配（允许比预期更多的列）。"""
     if len(actual) < len(expected):
         return False
-    for a, e in zip(actual, expected):
-        if a != e:
-            return False
-    return True
+    return all(a == e for a, e in zip(actual, expected))

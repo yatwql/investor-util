@@ -21,12 +21,14 @@ from typing import Any
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.cache import get_cache_age, get_ttl
+from src.python.code_utils import is_fund_holding
 from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
 from src.python.models import Holding
+from src.python.registry import get_report_sheet_name
 from src.python.report.data_status import (
+    STATUS_MESSAGES,
     DataStatus,
     DataStatusItem,
-    STATUS_MESSAGES,
     DegradationTracker,
 )
 from src.python.report.excel_writer import (
@@ -38,9 +40,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.market_value import DetailRow
-from src.python.registry import get_report_sheet_name, set_sheet_title
-from src.python.code_utils import is_fund_holding
-from src.python.report.penetration import classify_penetration, QDII, ETF, INDEX_LINK, BOND_FUND, ACTIVE_EQUITY
+from src.python.report.penetration import ACTIVE_EQUITY, BOND_FUND, ETF, INDEX_LINK, QDII, classify_penetration
 from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, RED_FONT
 
 logger = logging.getLogger("invest")
@@ -401,7 +401,7 @@ def _build_perf_data_status(
 def write_fund_performance_sheet(
     ws: Worksheet,
     holdings: list[Holding],
-    details: List[DetailRow],
+    details: list[DetailRow],
 ) -> None:
     """写入基金业绩分析。
 
@@ -430,7 +430,7 @@ def write_fund_performance_sheet(
     # 按市值降序排列
     fund_holdings_sorted = sorted(
         fund_holdings,
-        key=lambda h: detail_map.get(h.code).market_value if detail_map.get(h.code) else 0.0,
+        key=lambda h: detail_map.get(h.code).market_value if detail_map.get(h.code) else 0.0,  # type: ignore[union-attr]
         reverse=True,
     )
 
@@ -478,7 +478,7 @@ def _write_empty_row(ws, row: int, fund: Holding) -> None:
 
 def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
-    from src.python.report.styles import FMT_PERCENT, FMT_MONEY
+    from src.python.report.styles import FMT_MONEY, FMT_PERCENT
     return [
         None,          # 1  基金（文本）
         None,          # 2  代码（文本）

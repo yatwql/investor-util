@@ -14,13 +14,13 @@ import hashlib
 import json
 import logging
 import math
+import threading as _threading
+import time as _time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from typing import Any
 
-import threading as _threading
-import time as _time
-
-from src.python.cache import get as cache_get, set as cache_set
+from src.python.cache import get as cache_get
+from src.python.cache import set as cache_set
 from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
@@ -29,7 +29,7 @@ logger = logging.getLogger("invest")
 try:
     import akshare as ak
 except ImportError:
-    ak = None  # type: ignore[assignment]
+    ak = None
     logger.info("akshare 模块未安装，akshare_extras 功能将跳过")
 
 # ── 进程级内存 TTL 缓存（位于文件缓存之上） ──
@@ -283,7 +283,7 @@ def get_sector_fund_flow() -> list[dict[str, Any]]:
                 "main_net_inflow_pct": _safe_float(row.get("今日主力净流入-净占比")),
                 "top_stock": str(row.get("今日主力净流入最大股", "") or "").strip(),
             })
-        except (ValueError, TypeError):
+        except (ValueError, TypeError):  # noqa: PERF203
             continue
 
     logger.info("行业资金流向加载完成: %d 个行业", len(result))
@@ -375,7 +375,7 @@ def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
             df = ak.stock_history_dividend(symbol=code, indicator="分红")
             summary = _calc_dividend_summary(df)
             if summary:
-                name_col = next((c for c in (df or {}).columns if "简称" in c or "名称" in c), None)
+                name_col = next((c for c in (df or {}).columns if "简称" in c or "名称" in c), None)  # type: ignore[union-attr]
                 name = str(df.iloc[0].get(name_col, "")) if name_col and df is not None and not df.empty else ""
                 summary["name"] = name
             return (code, summary)

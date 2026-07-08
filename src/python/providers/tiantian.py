@@ -9,6 +9,7 @@ API 来源：
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import random
@@ -225,7 +226,7 @@ def _request_quarterly_api(code: str, api_type: str, year: int | None = None, mo
     }
     try:
         with make_http_client(timeout=_TIMEOUT) as client:
-            resp = client.get(url, params=params, headers=headers)
+            resp = client.get(url, params=params, headers=headers)  # type: ignore[arg-type]
             resp.encoding = "utf-8"
             text = resp.text
     except httpx.RequestError as e:
@@ -580,10 +581,8 @@ def _parse_risk_analysis(text: str) -> dict[str, Any] | None:
             if isinstance(item, (list, tuple)) and len(item) >= 2:
                 k, v = item[0], item[1]
                 if k is not None and v is not None:
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         result[str(k)] = float(v)
-                    except (ValueError, TypeError):
-                        pass
         if result:
             return result
 

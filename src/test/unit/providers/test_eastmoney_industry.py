@@ -195,6 +195,10 @@ class TestSecid(unittest.TestCase):
 class TestFetchIndustryAndConcepts(unittest.TestCase):
     """测试 fetch_industry_and_concepts 主函数。"""
 
+    def setUp(self):
+        from src.python.providers.eastmoney_industry import _ext_memo_clear
+        _ext_memo_clear()
+
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_success_with_concepts(self, mock_client_cls):
         """正常返回：正确解析行业和概念。"""
@@ -340,6 +344,10 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
 class TestFetchIndustry(unittest.TestCase):
     """测试 fetch_industry 便捷接口。"""
 
+    def setUp(self):
+        from src.python.providers.eastmoney_industry import _ext_memo_clear
+        _ext_memo_clear()
+
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_industry_found(self, mock_client_cls):
         """有行业数据时返回行业名称。"""
@@ -379,6 +387,10 @@ class TestFetchIndustry(unittest.TestCase):
 
 class TestFetchConcepts(unittest.TestCase):
     """测试 fetch_concepts 便捷接口。"""
+
+    def setUp(self):
+        from src.python.providers.eastmoney_industry import _ext_memo_clear
+        _ext_memo_clear()
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_concepts_found(self, mock_client_cls):

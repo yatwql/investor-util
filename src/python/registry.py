@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_TWO_WEEKS, CACHE_MONTHLY
+from src.python.constants import CACHE_DAILY, CACHE_MONTHLY, CACHE_TWO_WEEKS, CACHE_WEEKLY
 
 logger = logging.getLogger("invest")
 
@@ -278,7 +278,7 @@ def get_llm_module_names() -> dict[str, str]:
     return {
         m.settings_suffix: m.name
         for m in _MODULE_REGISTRY
-        if m.is_llm
+        if m.is_llm and m.settings_suffix is not None
     }
 
 

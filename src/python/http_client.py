@@ -44,3 +44,20 @@ def make_http_client(**kwargs) -> httpx.Client:
     if "verify" not in kwargs:
         kwargs["verify"] = _SSL_VERIFY
     return httpx.Client(**kwargs)
+
+
+def make_async_http_client(**kwargs) -> httpx.AsyncClient:
+    """创建一个 ``httpx.AsyncClient``，自动从环境变量读取 SSL 验证策略。
+
+    当调用者需要异步 HTTP 请求时使用此工厂方法（如配合 ``asyncio``）。
+    用法与 ``make_http_client()`` 一致，返回 AsyncClient 以支持 ``async with`` 上下文。
+
+    Args:
+        **kwargs: 传递给 ``httpx.AsyncClient`` 的额外参数。
+
+    Returns:
+        配置好的 ``httpx.AsyncClient`` 实例。
+    """
+    if "verify" not in kwargs:
+        kwargs["verify"] = _SSL_VERIFY
+    return httpx.AsyncClient(**kwargs)

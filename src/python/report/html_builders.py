@@ -43,14 +43,14 @@ def _build_category_data(
         (持仓分类数据列表, dividend_success) —
         每个元素含 property / sub_category / items / 小计字段
     """
-    detail_map: Dict[str, DetailRow] = {d.code: d for d in details}
+    detail_map: dict[str, DetailRow] = {d.code: d for d in details}
 
     # 加载 A 股分红数据（非关键，失败时所有 yield_text → "--"）
     dividend_data: dict = {}
     dividend_success = True
     try:
-        from src.python.providers.akshare_extras import get_dividend_data
         from src.python.code_utils import is_a_share_code
+        from src.python.providers.akshare_extras import get_dividend_data
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
         if not dividend_data and stock_codes:
@@ -77,7 +77,7 @@ def _build_category_data(
         ),
     )
 
-    result: List[Dict[str, Any]] = []
+    result: list[dict[str, Any]] = []
     for (prop, sub), group in sorted_groups:
         items: list[dict[str, Any]] = []
         for h in group:
@@ -226,7 +226,7 @@ def _build_perf_data(
     """
     prog = progress if progress is not None else SilentProgressReporter()
     fund_holdings = [h for h in holdings if _is_fund(h)]
-    detail_map: Dict[str, DetailRow] = {d.code: d for d in details}
+    detail_map: dict[str, DetailRow] = {d.code: d for d in details}
 
     fund_holdings_sorted = sorted(
         fund_holdings,
@@ -235,7 +235,7 @@ def _build_perf_data(
     )
 
     profit_forecast = _load_profit_forecast()
-    result: List[Dict[str, Any]] = []
+    result: list[dict[str, Any]] = []
     for idx, fund in enumerate(fund_holdings_sorted, 1):
         result.append(_build_single_perf_item(idx, fund, detail_map, prog, len(fund_holdings_sorted), profit_forecast))
 

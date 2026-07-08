@@ -127,7 +127,7 @@ class DegradationTracker:
         """从 JSON 文件加载保存的上次成功时间戳。"""
         try:
             if os.path.exists(self._persist_path):
-                with open(self._persist_path, "r", encoding="utf-8") as f:
+                with open(self._persist_path, encoding="utf-8") as f:
                     data = json.load(f)
                 if isinstance(data, dict):
                     return {k: float(v) for k, v in data.items() if isinstance(v, (int, float))}

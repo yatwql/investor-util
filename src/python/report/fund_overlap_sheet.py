@@ -20,6 +20,7 @@ from typing import Any
 from openpyxl.styles import PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -28,7 +29,6 @@ from src.python.report.excel_writer import (
     write_header_row,
     write_title_row,
 )
-from src.python.registry import get_report_sheet_name, set_sheet_title
 
 logger = logging.getLogger("invest")
 

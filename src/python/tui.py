@@ -66,8 +66,8 @@ def _get_key_windows() -> str:
 
 def _get_key_linux() -> str:
     import select
-    import tty
     import termios
+    import tty
 
     if not sys.stdin.isatty():
         # 非 TTY 环境（管道/重定向/CI），无法读取方向键
@@ -75,10 +75,10 @@ def _get_key_linux() -> str:
     ch = ""
     try:
         fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        tty.setraw(fd)
+        old = termios.tcgetattr(fd)  # type: ignore[attr-defined]
+        tty.setraw(fd)  # type: ignore[attr-defined]
         ch = sys.stdin.read(1)
-    except (termios.error, ValueError, OSError):
+    except (termios.error, ValueError, OSError):  # type: ignore[attr-defined]
         pass
     except KeyboardInterrupt:
         ch = "\x03"  # 让下游 KEY_CTRL_C 分支处理
@@ -109,4 +109,4 @@ def _get_key_linux() -> str:
             return ch.upper()
         return KEY_UNKNOWN
     finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)  # type: ignore[attr-defined]

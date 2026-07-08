@@ -16,7 +16,7 @@ A 股市场当前是否在交易时段。
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger("invest")
 

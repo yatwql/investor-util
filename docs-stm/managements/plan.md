@@ -1,7 +1,34 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-08（v0.3.0 — 管理文档归档 + 版本号同步）
+最后更新：2026-07-08（v0.3.0 — 管理文档归档 + 版本号同步 + review-findings 移除已修复项）
+
+---
+
+## 审查问题索引（R-160 ~ R-176）
+
+下表汇总 D-8b 审查发现及修复的 17 项问题，便于在新文档中引用时快速定位。
+
+| # | 标题 | 修复版本 | changelog 位置 |
+|:-:|:-----|:--------|:---------------|
+| R-161 | TOCTOU 竞态 — fetcher/chain.py 锁合并 | v0.3.0+ | Unreleased / Fixed |
+| R-162 | `_TRANSPORT_FAILURE` 类型污染 — 纯哨兵替换 | v0.3.0+ | Unreleased / Fixed |
+| R-163 | 废弃 build-backend — setuptools 切换 | v0.3.0+ | Unreleased / Fixed |
+| R-164 | 配置模板一致性防护 — 新增测试 | v0.3.0+ | Unreleased / Fixed |
+| R-165 | Ruff 规则集升级 — SIM/UP/ARG/PERF | v0.3.0+ | Unreleased / Fixed |
+| R-166 | mypy 严格模式升级 — 77 errors → 0 | v0.3.0+ | Unreleased / Fixed |
+| R-167 | `_ext_memo` 会话级复用缓存推广 | v0.3.0+ | Unreleased / Fixed |
+| R-168 | 配置 mtime+size 双因子缓存 | v0.3.0+ | Unreleased / Fixed |
+| R-169 | 429 API 限速差异化提示 | v0.3.0+ | Unreleased / Fixed |
+| R-170 | 新闻流水线集成测试修复 | v0.3.0+ | Unreleased / Fixed |
+| R-171 | CI/CD 流水线配置 | v0.3.0+ | Unreleased / Fixed |
+| R-172 | HTTP 异步客户端支持 | v0.3.0+ | Unreleased / Fixed |
+| R-173 | ThreadPoolExecutor 集中管理 | v0.3.0+ | Unreleased / Fixed |
+| R-174 | 配置校验去重 — `_section()` 辅助函数 | v0.3.0+ | Unreleased / Fixed |
+| R-175 | colorama 降级为可选依赖 | v0.3.0+ | Unreleased / Fixed |
+| R-176 | docstring 误放修复 | v0.3.0+ | Unreleased / Fixed |
+
+> 当前审查（D-8c）发现的问题见 `review-findings.md`，其中 R-181/182/183 已修复。
 
 ---
 
@@ -101,5 +128,5 @@ v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel �
 
 ### [P5] O. 工程化增强（低难度 / 低价值）
 
-- **CI/CD 集成**：添加 GitHub Actions 自动化流水线，每次 Push 自动运行 `pytest`
+- ~~**CI/CD 集成**~~ **（已完成 v0.3.0 R-171）**：`.github/workflows/ci.yml`，三档门禁 + 多版本矩阵 + mypy/Ruff
 - **Excel 页签并行写入**：报告生成时每个页签独立写入，可考虑并行加速

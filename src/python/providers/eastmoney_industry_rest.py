@@ -21,8 +21,8 @@ from typing import Any
 
 import httpx
 
-from src.python.http_client import make_http_client
 from src.python.code_utils import get_exchange_prefix
+from src.python.http_client import make_http_client
 
 logger = logging.getLogger("invest")
 
@@ -32,6 +32,14 @@ _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Referer": "https://quote.eastmoney.com/",
 }
+
+# 会话级内存缓存 — 同一代码在会话内不重复 HTTP 请求（C4 约束）
+_ext_memo: dict[str, dict[str, Any] | None] = {}
+
+
+def _ext_memo_clear() -> None:
+    """测试用：清空会话级内存缓存。"""
+    _ext_memo.clear()
 
 
 def _quote_prefix(code: str) -> str:
@@ -60,6 +68,9 @@ def _extract_quotedata(html: str) -> dict | None:
 def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     """通过行情页 REST API 获取一只证券的行业分类。
 
+    会话级内存复用（C4）：同一代码在同一会话内仅首次发起 HTTP 请求，
+    后续调用直接返回缓存结果。
+
     当 push2 不可用时作为 fallback 使用。
     仅返回行业名称和板块代码，概念板块列表留空。
 
@@ -75,6 +86,9 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
             - concept_ids: 空列表
         None: 页面请求失败或未找到行业数据
     """
+    if code in _ext_memo:
+        return _ext_memo[code]
+
     prefix = _quote_prefix(code)
     url = _QUOTE_BASE.format(prefix=prefix, code=code)
 
@@ -86,11 +100,13 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
             html = resp.text
     except (httpx.TimeoutException, httpx.RequestError) as e:
         logger.warning("东方财富 REST 行情页请求失败 [%s]: %s", code, e)
+        _ext_memo[code] = None
         return None
 
     qd = _extract_quotedata(html)
     if not qd:
         logger.warning("东方财富 REST 行情页未找到行业数据 [%s]", code)
+        _ext_memo[code] = None
         return None
 
     industry = qd.get("bk_name", "") or ""
@@ -98,7 +114,7 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
 
     logger.debug("东方财富 REST 行业 [%s]: 行业=%s", code, industry or "无")
 
-    return {
+    result: dict[str, Any] = {
         "code": code.strip(),
         "industry": industry,
         "industry_id": industry_id,
@@ -106,3 +122,5 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
         "concepts": [],
         "concept_ids": [],
     }
+    _ext_memo[code] = result
+    return result

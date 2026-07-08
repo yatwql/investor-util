@@ -10,9 +10,12 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-from src.python.cache import CACHE_WEEKLY, get as cache_get, set as cache_set
+from src.python.constants import CACHE_WEEKLY
+from src.python.cache import get as cache_get
+from src.python.cache import set as cache_set
 from src.python.config import get_config
 
 logger = logging.getLogger("invest")
@@ -86,7 +89,7 @@ _ProviderFunc = Callable[..., dict[str, Any] | None]
 
 # 熔断计数器增量标记：_try_provider_fetch 返回此值表示传输级异常
 # （非代码级空结果），应计入熔断计数器。
-_TRANSPORT_FAILURE: dict[str, Any] | None = object()  # type: ignore[assignment]
+_TRANSPORT_FAILURE: object = object()
 
 
 # ── 通用带缓存的 Fallback 调用 ──────────────────────────────
@@ -107,8 +110,12 @@ def _try_provider_fetch(
     try:
         raw = fetch_fn(**kwargs)
     except Exception as e:
-        logger.warning("[%s] %s 调用异常: %s", data_type, provider_name, e)
-        return _TRANSPORT_FAILURE  # 传输级异常 → 应计入熔断
+        err_str = str(e)
+        if "429" in err_str or "Too Many Requests" in err_str or "rate" in err_str.lower():
+            logger.warning("[%s] %s API 限速(429): %s", data_type, provider_name, err_str)
+        else:
+            logger.warning("[%s] %s 调用异常: %s", data_type, provider_name, err_str)
+        return _TRANSPORT_FAILURE  # type: ignore[return-value]  # 传输级异常 → 应计入熔断
 
     if raw is None:
         logger.info("[%s] %s 返回空，尝试下一链路", data_type, provider_name)
@@ -172,9 +179,8 @@ def _fetch_with_fallback(
         # 会话级熔断：连续失败已达阈值 → 跳过（冷却期后允许试探恢复）
         with _PROVIDER_LOCK:
             _skip = provider_name in _PROVIDER_SKIP
+            _skip_time = _PROVIDER_SKIP_TIME.get(provider_name, 0) if _skip else 0
         if _skip:
-            with _PROVIDER_LOCK:
-                _skip_time = _PROVIDER_SKIP_TIME.get(provider_name, 0)
             if time.time() - _skip_time >= _PROVIDER_COOLDOWN_SECS:
                 # 冷却期满 → 移除熔断标记，放行一次试探请求
                 with _PROVIDER_LOCK:

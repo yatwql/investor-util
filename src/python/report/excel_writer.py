@@ -228,7 +228,7 @@ def write_data_row(ws, row: int, values: list[Any], formats: list[str | None] | 
     return row + 1
 
 
-def write_subtotal_row(ws, row: int, label: str, values: List[Any], ncols: int,
+def write_subtotal_row(ws, row: int, label: str, values: list[Any], ncols: int,
                        formats: list[str | None] | None = None) -> int:
     """写小计行（首列标签，后续各列居中对齐，黄底）。
 
@@ -263,8 +263,8 @@ def write_subtotal_row(ws, row: int, label: str, values: List[Any], ncols: int,
     return row + 1
 
 
-def write_total_row(ws, row: int, label: str, values: List[Any], ncols: int,
-                    formats: Optional[List[Optional[str]]] = None) -> int:
+def write_total_row(ws, row: int, label: str, values: list[Any], ncols: int,
+                    formats: list[str | None] | None = None) -> int:
     """写总计行（绿底加粗，与上方的分隔线）。"""
     cell = ws.cell(row=row, column=1, value=label)
     cell.font = BOLD_FONT
@@ -356,7 +356,7 @@ def _write_data_status_foot(
     row += 1
 
     # 逐条状态
-    for key, item in failed.items():
+    for item in failed.values():
         tier = item.get("tier", "T4")
         prefix = TIER_PREFIX.get(tier, "ℹ")
         msg = item.get("message", "数据不可用")

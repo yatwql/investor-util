@@ -19,11 +19,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from datetime import datetime
 from typing import Any
 
-from src.python.cache import get as cache_get, set as cache_set
+from src.python.cache import get as cache_get
+from src.python.cache import set as cache_set
 from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
@@ -134,13 +136,9 @@ def _estimate_style_by_code(code: str) -> str:
     """
     if code.startswith(("60",)):
         return "大盘"
-    elif code.startswith(("000",)):
+    elif code.startswith(("000",)) or code.startswith(("002",)):
         return "中盘"
-    elif code.startswith(("002",)):
-        return "中盘"
-    elif code.startswith(("300",)):
-        return "中小盘"
-    elif code.startswith(("688",)):
+    elif code.startswith(("300",)) or code.startswith(("688",)):
         return "中小盘"
     elif code.startswith(("4", "8")):
         return "小盘"
@@ -182,7 +180,6 @@ def _classify_stock(
         size = _market_cap_to_size(market_cap)
     else:
         size = _get_size_from_code(code)
-        is_estimated = True
         return {"size": size, "style": "混合", "is_estimated": True}
 
     if pe is not None and pe > 0:
@@ -218,20 +215,14 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
 
         result: dict[str, Any] = {}
         if market_cap is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["market_cap"] = float(market_cap)
-            except (ValueError, TypeError):
-                pass
         if pe is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["pe"] = float(pe)
-            except (ValueError, TypeError):
-                pass
         if pb is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["pb"] = float(pb)
-            except (ValueError, TypeError):
-                pass
 
         return result if result else None
     except Exception:
@@ -270,14 +261,11 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
         return None
 
 
-def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
+def _get_industry_avg_pe(_codes: list[str]) -> dict[str, float]:
     """获取每只股票对应行业的平均 PE。
 
     使用行业平均 PE 作为基准来判断估值倾向。
-    暂不实现行业平均 PE 查询，直接返回空字典。
-    后续可通过 akshare stock_industry_pe_ratio_cninfo 补全。
-    """
-    # TODO: 实现行业平均 PE 查询
+    当前暂未实现，返回空字典。"""
     return {}
 
 
@@ -371,8 +359,8 @@ def classify_fund_style(
         return {"code": fund_code, "style": "--", "is_estimated": False, "details": []}
 
     # 按权重确定最终风格
-    dominant_size = max(size_weights, key=size_weights.get)
-    dominant_style = max(style_weights, key=style_weights.get)
+    dominant_size = max(size_weights, key=lambda k: size_weights[k])
+    dominant_style = max(style_weights, key=lambda k: style_weights[k])
 
     style_label = f"{dominant_size}{dominant_style}"
 

@@ -77,11 +77,7 @@ def _markdown_to_html(text: str) -> str:
         # 无序列表
         ul_match = re.match(r"^[-*+]\s+(.+)$", line)
         if ul_match:
-            if not in_ul:
-                in_ul, in_ol = _md_close_list(parts, in_ul, in_ol)
-                parts.append("<ul>")
-                in_ul = True
-            elif in_ol:
+            if not in_ul or in_ol:
                 in_ul, in_ol = _md_close_list(parts, in_ul, in_ol)
                 parts.append("<ul>")
                 in_ul = True
@@ -91,11 +87,7 @@ def _markdown_to_html(text: str) -> str:
         # 有序列表
         ol_match = re.match(r"^\d+[.)]\s+(.+)$", line)
         if ol_match:
-            if not in_ol:
-                in_ul, in_ol = _md_close_list(parts, in_ul, in_ol)
-                parts.append("<ol>")
-                in_ol = True
-            elif in_ul:
+            if not in_ol or in_ul:
                 in_ul, in_ol = _md_close_list(parts, in_ul, in_ol)
                 parts.append("<ol>")
                 in_ol = True

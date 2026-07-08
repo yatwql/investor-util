@@ -22,19 +22,20 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, List
+from typing import Any
 
 from src.python.code_utils import (
-    is_a_share_code, is_bond_related_by_name,
+    is_a_share_code,
+    is_bond_related_by_name,
     is_etf_by_name,
-    is_index_link_by_name, is_offsite_fund, is_qdii_extended,
+    is_index_link_by_name,
+    is_offsite_fund,
+    is_qdii_extended,
 )
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
-from src.python.registry import get_llm_module_name
 from src.python.report.market_value import DetailRow
-
 
 logger = logging.getLogger("invest")
 
@@ -249,7 +250,7 @@ _SECTOR_KEYWORDS: dict[str, str] = {
     "工程": "地产基建", "中铁": "地产基建", "中交": "地产基建",
     "路桥": "地产基建", "市政": "地产基建",
     # 军工
-    "军工": "军工", "航天": "军工", "航空": "军工", "国防": "军工",
+    "军工": "军工", "航天": "军工", "国防": "军工",
     "中航": "军工", "船舶": "军工", "中国重工": "军工",
     # 能源资源
     "能源": "能源资源", "煤炭": "能源资源", "石油": "能源资源",
@@ -269,7 +270,7 @@ _SECTOR_KEYWORDS: dict[str, str] = {
 }
 
 
-def classify_sector(name: str, code: str = "") -> str:
+def classify_sector(name: str, _code: str = "") -> str:
     """根据证券名称和代码判断所属板块。
 
     Args:

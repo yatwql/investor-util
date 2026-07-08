@@ -8,25 +8,26 @@ from __future__ import annotations
 import logging
 import re
 from math import ceil
+from typing import Any
 
 from openpyxl.styles import Alignment, Font
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.llm import (
+    FAIL_REASON_API_ERROR,
+    FAIL_REASON_CIRCUIT_OPEN,
+    FAIL_REASON_DISABLED,
+    FAIL_REASON_NETWORK_ERROR,
+    FAIL_REASON_NOT_CONFIGURED,
+    FAIL_REASON_TIMEOUT,
+)
+from src.python.llm.prompts import _LLM_MODULE_FAILURE
+from src.python.registry import get_llm_module_name, get_report_section_order
 from src.python.report.excel_writer import (
     freeze_header,
     write_title_row,
 )
 from src.python.report.styles import CONTENT_FONT
-from src.python.llm import (
-    FAIL_REASON_NOT_CONFIGURED,
-    FAIL_REASON_API_ERROR,
-    FAIL_REASON_NETWORK_ERROR,
-    FAIL_REASON_TIMEOUT,
-    FAIL_REASON_CIRCUIT_OPEN,
-    FAIL_REASON_DISABLED,
-)
-from src.python.llm.prompts import _LLM_MODULE_FAILURE
-from src.python.registry import get_llm_module_name, get_report_section_order
 
 logger = logging.getLogger("invest")
 

@@ -6,7 +6,7 @@ import logging
 import threading
 from typing import Any
 
-from src.python.llm.pricing import _PRICING_CURRENCY, _CURRENCY_SYMBOLS, _estimate_cost
+from src.python.llm.pricing import _CURRENCY_SYMBOLS, _PRICING_CURRENCY, _estimate_cost
 
 logger = logging.getLogger("invest")
 

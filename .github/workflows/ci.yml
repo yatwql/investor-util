@@ -1,0 +1,76 @@
+# CI/CD 流水线 — GitHub Actions
+#
+# 门禁等级（与 CLAUDE.md 一致）：
+#   P0（提交前）→ regression 模式 — dev 分支每次推送
+#   P1（合入前）→ verify 模式   — master 分支 PR/推送
+#   P2（发布前）→ all 模式       — 版本标签推送
+
+name: CI
+
+on:
+  push:
+    branches: [dev, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: P0 — 回归测试（dev 提交门禁）
+        if: github.ref_name == 'dev' && github.event_name == 'push'
+        run: python scripts/test_runner.py --mode regression
+
+      - name: P1 — 合入验证（master 门禁）
+        if: github.ref_name == 'master' || github.event_name == 'pull_request'
+        run: python scripts/test_runner.py --mode verify
+
+      - name: P2 — 全量测试（版本发布门禁）
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python scripts/test_runner.py --mode all
+
+      - name: 类型检查（mypy）
+        run: python -m mypy src/python/ --no-incremental
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Ruff 代码检查
+        run: python -m ruff check src/python/ scripts/
+
+      - name: Ruff 格式检查
+        run: python -m ruff format --check src/python/ scripts/

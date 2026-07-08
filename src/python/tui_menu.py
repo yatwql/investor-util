@@ -11,12 +11,15 @@
 
 from __future__ import annotations
 
-import colorama
 import os
 import sys
-from typing import Any, Callable, Optional
+from collections.abc import Callable
 
-colorama.just_fix_windows_console()
+try:
+    import colorama  # type: ignore[import-untyped]
+    colorama.just_fix_windows_console()
+except ImportError:
+    pass  # 无 colorama 时 Windows 控制台可能无法正确显示颜色，但功能不受影响
 
 # ANSI 颜色：非 TTY 或设置了 NO_COLOR 环境变量时禁用颜色输出
 if "NO_COLOR" in os.environ or not sys.stdout.isatty():
@@ -29,7 +32,7 @@ else:
 from src.python.config import get_config, get_llm_config
 
 # 每个菜单项：(快捷键, 显示标签, 回调函数, 是否退出项)
-MenuItem = tuple[str, str, Optional[Callable[[], None]], bool]
+MenuItem = tuple[str, str, Callable[[], None] | None, bool]
 
 MENU_ITEMS: list[MenuItem] = [
     ("E", "生成基础版Excel分析报告", None, False),
@@ -113,9 +116,9 @@ def _show_config() -> None:
     print(f"  输出目录: {config.get('output_dir', 'reports')}")
     print(f"  新闻 TOP: {config.get('news_top_count', '100')} 条")
     if os.path.exists(holdings_path):
-        print(f"  状态: [OK] 文件就绪")
+        print("  状态: [OK] 文件就绪")
     else:
-        print(f"  状态: [!!] 文件未找到")
+        print("  状态: [!!] 文件未找到")
     _show_llm_config_status()
     print()
 

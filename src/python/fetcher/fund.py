@@ -11,13 +11,16 @@ from __future__ import annotations
 import logging
 import re
 import threading
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-from src.python.cache import get as cache_get, get_ttl, set as cache_set
+from src.python.cache import get as cache_get
+from src.python.cache import get_ttl
+from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.fetcher.chain import _fetch_with_fallback
-from src.python.providers import tiantian
 from src.python.http_client import make_http_client
+from src.python.providers import tiantian
 
 logger = logging.getLogger("invest")
 

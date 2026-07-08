@@ -8,15 +8,15 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.cache import get_cache_age_by_data_type, get_cache_age, get_ttl
-from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
+from src.python.cache import get_cache_age_by_data_type, get_ttl
+from src.python.registry import get_report_sheet_name
 from src.python.report.data_status import (
+    STATUS_MESSAGES,
     DataStatus,
     DataStatusItem,
-    STATUS_MESSAGES,
     DegradationTracker,
 )
 from src.python.report.excel_writer import (
@@ -98,7 +98,7 @@ def _write_index_row(ws, row: int, name: str, price: float, change_pct: float) -
     return row + 1
 
 
-def _write_blanks(ws, row: int, n: int = 1) -> int:
+def _write_blanks(_ws, row: int, n: int = 1) -> int:
     """写入 n 行空白。"""
     return row + n
 
@@ -172,9 +172,7 @@ def _write_profit_summary(
     for label, val, fmt in summary_data:
         write_data_row(ws, row, [label, val])
         ws.cell(row=row, column=2).number_format = fmt
-        if "盈亏" in label and isinstance(val, (int, float)):
-            ws.cell(row=row, column=2).font = profit_font(val)
-        elif "收益率" in label and isinstance(val, (int, float)):
+        if "盈亏" in label and isinstance(val, (int, float)) or "收益率" in label and isinstance(val, (int, float)):
             ws.cell(row=row, column=2).font = profit_font(val)
         row += 1
 
@@ -361,7 +359,7 @@ def _init_llm_usage_sheet(ws: Any) -> int:
     return row
 
 
-def _write_llm_summary_section(ws: Any, row: int, session_usage: dict) -> int:
+def _write_llm_summary_section(ws: Any, row: int, session_usage: dict[str, Any] | None) -> int:
     """写入 LLM 用量汇总数据区，返回下一行号。"""
     if not session_usage or not session_usage.get("has_usage"):
         return row
@@ -579,7 +577,6 @@ def write_llm_usage_sheet(
     if not llm_module_info:
         return
 
-    from openpyxl.styles import Alignment, Border, Side, PatternFill
 
     _HEADERS = [
         "模块", "状态", "模型",

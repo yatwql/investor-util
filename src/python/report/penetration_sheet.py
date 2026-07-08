@@ -7,23 +7,21 @@ compute_penetration_top10 进行计算。
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.cache import get_cache_age, get_cache_age_by_data_type, get_ttl
+from src.python.cache import get_cache_age_by_data_type, get_ttl
 from src.python.code_utils import is_a_share_code
 from src.python.models import Holding
-from src.python.registry import get_llm_module_name, get_report_sheet_name, set_sheet_title
+from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.data_status import (
+    STATUS_MESSAGES,
     DataStatus,
     DataStatusItem,
-    STATUS_MESSAGES,
     DegradationTracker,
 )
 from src.python.report.excel_writer import (
     _write_data_status_foot,
-    _write_status_title,
     auto_width,
     freeze_header,
     write_data_row,
@@ -215,10 +213,7 @@ def write_penetration_sheet(
     row = write_title_row(ws, 1, get_report_sheet_name('penetration'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
-    if penetration_data is not None:
-        result = penetration_data
-    else:
-        result = compute_penetration_top10(holdings, details)
+    result = penetration_data if penetration_data is not None else compute_penetration_top10(holdings, details)
 
     if not result["top10"]:
         write_data_row(ws, row, ["暂无穿透数据"])
@@ -265,7 +260,7 @@ def write_penetration_sheet(
                 get_report_sheet_name('penetration'), summary["merged_count"])
 
 
-def _num_formats() -> list[str]:
+def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
     return [
         "",           # 1  排名

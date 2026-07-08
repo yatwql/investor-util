@@ -20,8 +20,8 @@ from typing import Any
 
 import httpx
 
-from src.python.cache import get as cache_get, set as cache_set
-from src.python.fetcher.fund import _FUND_HOLD_CACHE_PREFIX  # 复用基金持仓的 HTTP 响应
+from src.python.cache import get as cache_get
+from src.python.cache import set as cache_set
 from src.python.http_client import make_http_client
 
 logger = logging.getLogger("invest")
@@ -240,7 +240,7 @@ def _parse_manager_from_archive_page(code: str) -> dict[str, Any] | None:
         )
         row_htmls = []
         for name_html, date_html in all_cells:
-            name_text = re.sub(r'<[^>]+>', '', name_html).strip()
+            re.sub(r'<[^>]+>', '', name_html).strip()
             date_text = re.sub(r'<[^>]+>', '', date_html).strip()
             # 经理行特征：第二列是日期（不含中文导航文字），第一列是人名
             if re.search(r'\d{4}', date_text) and not re.search(r'[一-鿿]{4,}', date_text):

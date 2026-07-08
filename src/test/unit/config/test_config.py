@@ -563,3 +563,52 @@ class TestValidateReportSectionOrder(unittest.TestCase):
             }
         })
         self.assertEqual(n, 3)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R-164: _get_default_config_template() 与 _DEFAULT_CONFIG 一致性
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestDefaultConfigTemplateConsistency:
+    """验证 _get_default_config_template() 生成的 JSON 模板与 _DEFAULT_CONFIG 等效。
+
+    当在 _DEFAULT_CONFIG 中新增配置项时，必须在模板字符串中同步添加；
+    反之，从模板中移除的键也应在 _DEFAULT_CONFIG 中删除。
+    本测试通过解析模板并与 _DEFAULT_CONFIG 深度比较来检测不一致。
+    """
+
+    @pytest.mark.unit_config
+    def test_template_equals_default_config(self):
+        """模板 JSON 解析后应与 _DEFAULT_CONFIG 深度相等。"""
+        import json
+
+        template_str = cfg._get_default_config_template()
+        cleaned = cfg._strip_json_comments(template_str)
+        parsed = json.loads(cleaned)
+
+        # 深度比较：排除可能因运行时环境动态变化的 cache_ttl
+        # （由 get_cache_ttl_defaults() 生成，模板和 _DEFAULT_CONFIG 均引用同一函数，
+        #  但 registry 可能在不同测试间被修改）
+        assert parsed.keys() == cfg._DEFAULT_CONFIG.keys(), (
+            f"模板与 _DEFAULT_CONFIG 键集不一致\n"
+            f"模板独有: {parsed.keys() - cfg._DEFAULT_CONFIG.keys()}\n"
+            f"配置独有: {cfg._DEFAULT_CONFIG.keys() - parsed.keys()}"
+        )
+
+        for key in parsed:
+            if key == "cache_ttl":
+                # cache_ttl 动态生成，兜底比较键集与值类型
+                assert parsed["cache_ttl"].keys() == cfg._DEFAULT_CONFIG["cache_ttl"].keys(), (
+                    f"cache_ttl 键集不一致: {parsed['cache_ttl'].keys() ^ cfg._DEFAULT_CONFIG['cache_ttl'].keys()}"
+                )
+                for k in parsed["cache_ttl"]:
+                    assert type(parsed["cache_ttl"][k]) == type(cfg._DEFAULT_CONFIG["cache_ttl"][k]), (
+                        f"cache_ttl.{k} 类型不匹配: {type(parsed['cache_ttl'][k])} vs {type(cfg._DEFAULT_CONFIG['cache_ttl'][k])}"
+                    )
+            else:
+                assert parsed[key] == cfg._DEFAULT_CONFIG[key], (
+                    f"键 {key!r} 值不匹配:\n"
+                    f"  模板: {parsed[key]!r}\n"
+                    f"  配置: {cfg._DEFAULT_CONFIG[key]!r}"
+                )

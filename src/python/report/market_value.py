@@ -6,20 +6,34 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python import cache
-from src.python.code_utils import is_a_share_code, is_etf_by_name, is_exchange_fund_code, is_offsite_fund, is_qdii_extended
-from src.python.market_hours import is_market_open as _mh_is_market_open, is_midday_break as _mh_is_midday_break
-from src.python.registry import get_report_sheet_name, set_sheet_title
+from src.python.code_utils import (
+    is_a_share_code,
+    is_etf_by_name,
+    is_exchange_fund_code,
+    is_offsite_fund,
+    is_qdii_extended,
+)
 from src.python.fetcher.price import fetch_market_data
+from src.python.market_hours import is_market_open as _mh_is_market_open
+from src.python.market_hours import is_midday_break as _mh_is_midday_break
 from src.python.models import Holding
-from src.python.report.excel_writer import auto_width, freeze_header, write_data_row, write_header_row, write_subtotal_row, \
-    write_title_row, write_total_row
+from src.python.registry import get_report_sheet_name
+from src.python.report.excel_writer import (
+    auto_width,
+    freeze_header,
+    write_data_row,
+    write_header_row,
+    write_subtotal_row,
+    write_title_row,
+    write_total_row,
+)
 from src.python.report.styles import BLUE_FONT, FMT_MONEY, FMT_PERCENT, FMT_PRICE, FMT_SHARES, profit_font
 
 logger = logging.getLogger("invest")
@@ -51,7 +65,7 @@ class DetailRow:
     market_value: float = 0.0
     cost: float = 0.0
     profit: float = 0.0
-    profit_rate: float = 0.0
+    profit_rate: float | None = None
     today_profit: float = 0.0
     source: str = ""
     source_api: str = ""
@@ -136,10 +150,9 @@ def price_update_status(details: list[DetailRow], trading_day: str) -> tuple[int
             # QDII：净值日期等于交易日(T)或前一个交易日(T-1)即视为已更新
             if d.nav_date == trading_day or (prev_td and d.nav_date == prev_td):
                 updated += 1
-        elif d.source_api == "eastmoney":
+        elif d.source_api == "eastmoney" and d.nav_date == trading_day:
             # 国内场外：仅净值日期等于交易日(T)视为已更新
-            if d.nav_date == trading_day:
-                updated += 1
+            updated += 1
     return updated, total, updated >= total
 
 
@@ -222,10 +235,7 @@ def get_last_trading_day() -> str:
     """
     now = datetime.now(timezone(timedelta(hours=8)))
     # 若盘前（< 9:30），基准日设为昨天
-    if now.hour < 9 or (now.hour == 9 and now.minute < 30):
-        check = now - timedelta(days=1)
-    else:
-        check = now
+    check = now - timedelta(days=1) if now.hour < 9 or now.hour == 9 and now.minute < 30 else now
 
     # 从基准日起向前查找最近一个交易日
     for _ in range(14):  # 最多回溯 14 天（覆盖长假）
@@ -456,7 +466,7 @@ def _detail_to_row_values(d: DetailRow) -> list[Any]:
     ]
 
 
-def _num_formats() -> list[str]:
+def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
     return [
         "",           # 1  账户
@@ -565,9 +575,9 @@ def _write_account_groupings(
     return grand_mv, grand_cost, grand_profit, grand_today, row
 
 
-def write_market_value_sheet(ws: Worksheet, holdings: List[Holding],
+def write_market_value_sheet(ws: Worksheet, holdings: list[Holding],
                              today_str: str = "",
-                             details: List[DetailRow] | None = None) -> tuple[float, float, float, float, List[DetailRow]]:
+                             details: list[DetailRow] | None = None) -> tuple[float, float, float, float, list[DetailRow]]:
     """写入市值核算明细表，返回汇总数据供汇总页签使用。
 
     Args:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from src.python.code_utils import is_qdii_extended
@@ -268,10 +268,10 @@ def _format_holdings_block(holdings_details: list[dict] | None, show_cost: bool 
     """
     if not holdings_details:
         return ""
-    lines = []
-    for h in holdings_details[:limit]:
-        lines.append(_fmt_holding_line(h, show_cost=show_cost, compact=compact))
-    return "\n".join(lines)
+    return "\n".join(
+        _fmt_holding_line(h, show_cost=show_cost, compact=compact)
+        for h in holdings_details[:limit]
+    )
 
 
 def _format_penetration_block(penetrated_assets: list[dict] | None, limit: int = 10) -> str:

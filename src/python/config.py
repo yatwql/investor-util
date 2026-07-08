@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -85,7 +86,7 @@ def _get_default_config_template() -> str:
     """
     ttl_json = json.dumps(get_cache_ttl_defaults(), ensure_ascii=False, indent=2)
     lines = ttl_json.split("\n")
-    indented_ttl = "\n".join([lines[0]] + ["  " + l for l in lines[1:]])
+    indented_ttl = "\n".join([lines[0]] + ["  " + line for line in lines[1:]])
     return (
         '{\n'
         '  // ── A. 路径与文件 ──\n'
@@ -137,6 +138,7 @@ def _get_default_config_template() -> str:
 
 _config_cache: dict | None = None
 _config_mtime: float = 0
+_config_size: int = 0
 _config_lock = threading.Lock()
 
 
@@ -151,7 +153,7 @@ def get_config() -> dict:
 
     缓存按文件修改时间自动失效。若配置文件不存在或内容损坏，返回默认配置。
     """
-    global _config_cache, _config_mtime
+    global _config_cache, _config_mtime, _config_size
 
     config_path = get_config_path()
     if not os.path.exists(config_path):
@@ -161,13 +163,16 @@ def get_config() -> dict:
     with _config_lock:
         try:
             current_mtime = os.path.getmtime(config_path)
-            if _config_cache is not None and current_mtime <= _config_mtime:
+            current_size = os.path.getsize(config_path)
+            if (_config_cache is not None
+                    and current_mtime <= _config_mtime
+                    and current_size == _config_size):
                 return _config_cache
         except OSError:
             pass
 
         try:
-            with open(config_path, "r", encoding="utf-8-sig") as f:
+            with open(config_path, encoding="utf-8-sig") as f:
                 raw = f.read()
                 cleaned = _strip_json_comments(raw)
                 config = json.loads(cleaned)
@@ -180,10 +185,12 @@ def get_config() -> dict:
             _config_cache = merged
             try:
                 _config_mtime = os.path.getmtime(config_path)
+                _config_size = os.path.getsize(config_path)
             except OSError:
                 _config_mtime = 0
+                _config_size = 0
             return merged
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             _config_cache = None
             return dict(_DEFAULT_CONFIG)
 
@@ -198,7 +205,7 @@ def set_config(key: str, value: Any) -> None:
         key: 配置键名
         value: 配置值
     """
-    global _config_cache, _config_mtime
+    global _config_cache, _config_mtime, _config_size
 
     config = get_config()
     config[key] = value
@@ -216,15 +223,14 @@ def set_config(key: str, value: Any) -> None:
             json.dump(config, f, ensure_ascii=False, indent=2)
         os.replace(tmp_path, config_path)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.remove(tmp_path)
-        except OSError:
-            pass
         raise
 
     # 清除缓存，使下次 get_config() 重新读取
     _config_cache = None
     _config_mtime = 0
+    _config_size = 0
 
 
 # ── 已知的配置项枚举（用于配置校验） ──────────────────
@@ -240,6 +246,28 @@ _STRING_CONFIG_KEYS: set[str] = {"holdings_dir", "holdings_filename", "output_di
 
 
 # ── 配置校验辅助函数 ────────────────────────────────────────
+
+_MISSING = object()
+
+
+def _section(config: dict, key: str, expected_type: type, warn_msg: str,
+             issues: int = 0) -> tuple[Any, int]:
+    """读取配置段，校验类型，不存在/类型不匹配时返回 (_MISSING, issues)。
+
+    封装所有校验函数重复的"get → None 检查 → isinstance → 日志"模式。
+    调用方::
+
+        val, issues = _section(config, "cache_ttl", dict, "消息")
+        if val is _MISSING:
+            return issues
+    """
+    val = config.get(key)
+    if val is None:
+        return _MISSING, issues
+    if not isinstance(val, expected_type):
+        logger.warning("config.json %s = %r 不是 %s，%s", key, val, expected_type.__name__, warn_msg)
+        return _MISSING, issues + 1
+    return val, issues
 
 
 def _validate_string_configs(config: dict, issues: int) -> int:
@@ -275,19 +303,16 @@ def _validate_news_top_count(config: dict, issues: int) -> int:
 
 def _validate_cache_ttl(config: dict, issues: int) -> int:
     """校验 cache_ttl 配置段。"""
-    cache_ttl = config.get("cache_ttl")
-    if cache_ttl is None:
+    cache_ttl, issues = _section(config, "cache_ttl", dict, "所有缓存 TTL 将使用默认值", issues)
+    if cache_ttl is _MISSING:
         return issues
-    if not isinstance(cache_ttl, dict):
-        logger.warning("config.json cache_ttl = %r 不是对象(dict)，所有缓存 TTL 将使用默认值", cache_ttl)
-        return issues + 1
     for k, v in cache_ttl.items():
         try:
             val = float(v)
             if val <= 0:
                 logger.warning("config.json cache_ttl.%s = %s 不是正数，将使用默认值", k, v)
                 issues += 1
-        except (ValueError, TypeError):
+        except (ValueError, TypeError):  # noqa: PERF203
             logger.warning("config.json cache_ttl.%s = %s 不是有效数字，将使用默认值", k, v)
             issues += 1
     return issues
@@ -295,12 +320,9 @@ def _validate_cache_ttl(config: dict, issues: int) -> int:
 
 def _validate_news_sources(config: dict, issues: int) -> int:
     """校验 news_sources 配置段。"""
-    news_src = config.get("news_sources")
-    if news_src is None:
+    news_src, issues = _section(config, "news_sources", dict, "所有源将使用默认开关状态", issues)
+    if news_src is _MISSING:
         return issues
-    if not isinstance(news_src, dict):
-        logger.warning("config.json news_sources = %r 不是对象(dict)，所有源将使用默认开关状态", news_src)
-        return issues + 1
     for key, val in news_src.items():
         if key not in _KNOWN_NEWS_SOURCES:
             logger.warning("config.json news_sources 中存在未知的源 %r，将被忽略", key)
@@ -314,12 +336,9 @@ def _validate_news_sources(config: dict, issues: int) -> int:
 
 def _validate_preferred_provider(config: dict, issues: int) -> int:
     """校验 preferred_provider 配置段。"""
-    pref = config.get("preferred_provider")
-    if pref is None:
+    pref, issues = _section(config, "preferred_provider", dict, "配置无效", issues)
+    if pref is _MISSING:
         return issues
-    if not isinstance(pref, dict):
-        logger.warning("config.json preferred_provider = %r 不是对象(dict)，配置无效", pref)
-        return issues + 1
     for data_type, provider in pref.items():
         if data_type not in _KNOWN_PROVIDER_TYPES:
             logger.warning("config.json preferred_provider 中存在未知的数据类型 %r，"
@@ -335,23 +354,18 @@ def _validate_preferred_provider(config: dict, issues: int) -> int:
 
 def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
     """校验 user_fund_benchmarks 配置段。"""
-    ufb = config.get("user_fund_benchmarks")
-    if ufb is None:
+    ufb, issues = _section(config, "user_fund_benchmarks", dict, "自定义基准将忽略", issues)
+    if ufb is _MISSING:
         return issues
-    if not isinstance(ufb, dict):
-        logger.warning("config.json user_fund_benchmarks = %r 不是对象(dict)，自定义基准将忽略", ufb)
-        issues += 1
+    # 存在且类型正确 = 不需要进一步校验
     return issues
 
 
 def _validate_early_warning(config: dict, issues: int) -> int:
     """校验 early_warning 配置段。"""
-    ew = config.get("early_warning")
-    if ew is None:
+    ew, issues = _section(config, "early_warning", dict, "智能预警阈值将使用默认值", issues)
+    if ew is _MISSING:
         return issues
-    if not isinstance(ew, dict):
-        logger.warning("config.json early_warning = %r 不是对象(dict)，智能预警阈值将使用默认值", ew)
-        return issues + 1
     for ew_key in ("sector_alert_threshold_warning", "sector_alert_threshold_danger"):
         ew_val = ew.get(ew_key)
         if ew_val is not None:
@@ -381,10 +395,9 @@ def _validate_market_hours(config: dict, issues: int) -> int:
     """校验 market_hour_aware / market_hour_ttl / market_hours 配置段。"""
     # market_hour_aware：必须为列表，元素为字符串
     mha = config.get("market_hour_aware")
-    if mha is not None:
-        if not isinstance(mha, list) or not all(isinstance(x, str) for x in mha):
-            logger.warning("config.json market_hour_aware = %r 不是字符串列表，将使用默认值 [\"price\", \"index\"]", mha)
-            issues += 1
+    if mha is not None and (not isinstance(mha, list) or not all(isinstance(x, str) for x in mha)):
+        logger.warning("config.json market_hour_aware = %r 不是字符串列表，将使用默认值 [\"price\", \"index\"]", mha)
+        issues += 1
     # market_hour_ttl：必须为正整数
     mht = config.get("market_hour_ttl")
     if mht is not None:
@@ -421,12 +434,9 @@ def _validate_report_section_order(config: dict, issues: int) -> int:
       - 序号是否重复
       - llm_usage 不应出现在配置中（强制末尾）
     """
-    order = config.get("report_section_order")
-    if order is None:
+    order, issues = _section(config, "report_section_order", dict, "将使用默认顺序", issues)
+    if order is _MISSING:
         return issues
-    if not isinstance(order, dict):
-        logger.warning("config.json report_section_order = %r 不是对象(dict)，将使用默认顺序", order)
-        return issues + 1
 
     valid_keys = get_report_section_keys()
     seen_numbers: set[int] = set()
@@ -498,7 +508,7 @@ def init_config() -> None:
     若 config.json 不存在，则自动用默认配置创建并写入磁盘。
     若文件已存在，不做任何操作。
     """
-    global _config_cache, _config_mtime
+    global _config_cache, _config_mtime, _config_size
 
     config_path = get_config_path()
     if os.path.exists(config_path):
@@ -512,6 +522,7 @@ def init_config() -> None:
     # 清除缓存，使后续 get_config() 从新文件读取
     _config_cache = None
     _config_mtime = 0
+    _config_size = 0
     logger.info("配置文件已自动生成: %s", config_path)
 
     # 同时初始化 llm_settings.json
@@ -632,10 +643,7 @@ def _check_unknown_llm_keys(settings: dict) -> None:
     Args:
         settings: 从 llm_settings.json 读取的配置字典
     """
-    unknown: list[str] = []
-    for key in settings:
-        if key not in _KNOWN_LLM_SETTINGS_KEYS:
-            unknown.append(key)
+    unknown = [key for key in settings if key not in _KNOWN_LLM_SETTINGS_KEYS]
     if unknown:
         logger.warning(
             "llm_settings.json 中检测到 %d 个未知配置项，可能是拼写错误或已废弃的配置: %s。"
@@ -645,6 +653,7 @@ def _check_unknown_llm_keys(settings: dict) -> None:
 
 _llm_config_cache: dict | None = None
 _llm_config_mtime: float = 0
+_llm_config_size: int = 0
 _llm_config_lock = threading.Lock()
 
 
@@ -734,7 +743,7 @@ def get_llm_config() -> dict | None:
 
     缓存按 llm_settings.json 和 llm_key.json 的修改时间联合失效。
     """
-    global _llm_config_cache, _llm_config_mtime
+    global _llm_config_cache, _llm_config_mtime, _llm_config_size
 
     with _llm_config_lock:
         # ── 基础层：llm_settings.json ──
@@ -743,7 +752,7 @@ def get_llm_config() -> dict | None:
         settings_path = get_llm_settings_path()
         if os.path.exists(settings_path):
             try:
-                with open(settings_path, "r", encoding="utf-8-sig") as f:
+                with open(settings_path, encoding="utf-8-sig") as f:
                     raw = f.read()
                     cleaned = _strip_json_comments(raw)
                     base_settings = json.loads(cleaned)
@@ -751,7 +760,7 @@ def get_llm_config() -> dict | None:
                 # 首次加载时检测未知键名（仅在 cache 未初始化时告警一次）
                 if _llm_config_cache is None and base_settings:
                     _check_unknown_llm_keys(base_settings)
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.warning("LLM 设置文件读取失败: %s", e)
 
         # ── 覆盖层：llm_key.json ──
@@ -762,18 +771,24 @@ def get_llm_config() -> dict | None:
                 base_settings["api_key"] = base_settings["api_key"].strip()
                 _llm_config_cache = base_settings
                 _llm_config_mtime = 0
+                _llm_config_size = 0
                 return base_settings
             _llm_config_cache = None
             return None
 
         try:
             key_mtime = os.path.getmtime(key_path)
+            key_size = os.path.getsize(key_path)
+            settings_size = os.path.getsize(settings_path) if os.path.exists(settings_path) else 0
             combined_mtime = max(key_mtime, settings_mtime)
+            combined_size = key_size + settings_size
 
-            if _llm_config_cache is not None and combined_mtime <= _llm_config_mtime:
+            if (_llm_config_cache is not None
+                    and combined_mtime <= _llm_config_mtime
+                    and combined_size == _llm_config_size):
                 return _llm_config_cache
 
-            with open(key_path, "r", encoding="utf-8-sig") as f:
+            with open(key_path, encoding="utf-8-sig") as f:
                 key_raw = f.read()
                 key_config = json.loads(_strip_json_comments(key_raw))
 
@@ -794,8 +809,9 @@ def get_llm_config() -> dict | None:
 
             _llm_config_cache = merged
             _llm_config_mtime = combined_mtime
+            _llm_config_size = combined_size
             return merged
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning("LLM 密钥文件读取失败: %s", e)
             _llm_config_cache = None
             return None

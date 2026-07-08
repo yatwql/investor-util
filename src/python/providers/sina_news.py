@@ -72,7 +72,7 @@ def _parse_news_item(item: dict[str, Any]) -> dict[str, Any] | None:
 
     raw_ctime = item.get("ctime")
     try:
-        ctime_str = _ts_to_str(int(raw_ctime))
+        ctime_str = _ts_to_str(int(raw_ctime))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         ctime_str = ""
 

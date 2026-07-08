@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import logging
 import time as _time_module
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger("invest")
 
@@ -83,7 +84,7 @@ class ProgressReporter:
             try:
                 fn(*args, **kwargs)
                 return True
-            except Exception as e:
+            except Exception:
                 self.add_error(f"{label}生成失败（详情请查看日志）")
                 logger.exception("%s写入异常", label)
                 return False
@@ -132,7 +133,7 @@ class TuiProgressReporter(ProgressReporter):
         try:
             with _Timer(label):
                 fn(*args, **kwargs)
-        except Exception as e:
+        except Exception:
             self.add_error(f"{label}生成失败（详情请查看日志）")
             logger.exception("%s写入异常", label)
             return False
@@ -165,7 +166,7 @@ class TuiProgressReporter(ProgressReporter):
         """如果存在错误，在终端输出汇总。"""
         if not self._errors:
             return
-        print(f"\n  [!] 以下模块遇到问题（不影响已有结果）:")
+        print("\n  [!] 以下模块遇到问题（不影响已有结果）:")
         for e in self._errors:
             print(f"    - {e}")
         self._errors.clear()

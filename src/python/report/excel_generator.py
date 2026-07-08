@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.python.logger import setup_logger
-from src.python.registry import get_llm_module_name, get_report_sheet_name, get_report_section_order, set_sheet_title
+from src.python.registry import get_llm_module_name, get_report_section_order, get_report_sheet_name, set_sheet_title
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, _Timer
 
 logger = setup_logger()
@@ -19,8 +19,10 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
     try:
         from src.python.fetcher.index import fetch_indices, fetch_us_indices
     except ImportError:
-        fetch_indices = lambda: {}
-        fetch_us_indices = lambda: {}
+        def fetch_indices() -> dict[str, dict[str, Any]]:
+            return {}
+        def fetch_us_indices() -> dict[str, dict[str, Any]]:
+            return {}
         prog.add_error("市场指数模块缺失 (fetcher)")
 
     try:
@@ -52,8 +54,10 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
 
     try:
         from src.python.report.market_value import (
-            classify_holdings, get_last_trading_day,
-            price_update_status, write_market_value_sheet,
+            classify_holdings,
+            get_last_trading_day,
+            price_update_status,
+            write_market_value_sheet,
         )
         modules.update(
             classify_holdings=classify_holdings,
@@ -88,13 +92,13 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("基金业绩模块缺失 (fund_performance)")
 
     try:
-        from src.python.report.fund_manager_analysis import detect_manager_changes, build_first_check_summary
+        from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
         from src.python.report.fund_manager_sheet import write_fund_manager_sheet
         modules["detect_manager_changes"] = detect_manager_changes
         modules["write_fund_manager_sheet"] = write_fund_manager_sheet
         modules["build_first_check_summary"] = build_first_check_summary
     except ImportError:
-        modules["detect_manager_changes"] = lambda h: []
+        modules["detect_manager_changes"] = lambda _h: []
         modules["write_fund_manager_sheet"] = None
         prog.add_error("基金经理变更监控模块缺失 (fund_manager)")
 
@@ -104,7 +108,7 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["compute_overlap_matrix"] = compute_overlap_matrix
         modules["write_overlap_matrix_sheet"] = write_overlap_matrix_sheet
     except ImportError:
-        modules["compute_overlap_matrix"] = lambda fh, mv=None: {}
+        modules["compute_overlap_matrix"] = lambda _fh, _mv=None: {}
         modules["write_overlap_matrix_sheet"] = None
         prog.add_error("持仓重合度矩阵模块缺失 (fund_overlap)")
 
@@ -114,7 +118,7 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["compute_concentration"] = compute_concentration
         modules["write_concentration_sheet"] = write_concentration_sheet
     except ImportError:
-        modules["compute_concentration"] = lambda fh: []
+        modules["compute_concentration"] = lambda _fh: []
         modules["write_concentration_sheet"] = None
         prog.add_error("持仓集中度监控模块缺失 (fund_concentration)")
 
@@ -124,7 +128,7 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["analyze_style_for_all_funds"] = analyze_style_for_all_funds
         modules["write_style_sheet"] = write_style_sheet
     except ImportError:
-        modules["analyze_style_for_all_funds"] = lambda fh: {"results": []}
+        modules["analyze_style_for_all_funds"] = lambda _fh: {"results": []}
         modules["write_style_sheet"] = None
         prog.add_error("基金风格分析模块缺失 (fund_style)")
 
@@ -169,7 +173,7 @@ def _resolve_market_data(
         prog.ok("行情数据获取完成")
 
     data["categories"] = classify(holdings) if classify else {}
-    data["update_status"] = price_status(data["details"], last_trading()) if price_status else (0, 0, True)
+    data["update_status"] = price_status(data["details"], last_trading()) if price_status else (0, 0, True)  # type: ignore[misc]
     return data
 
 
@@ -230,7 +234,7 @@ def _write_news_and_early_warning(
     try:
         from src.python.report.news_correlation import write_news_sheet
     except ImportError:
-        write_news_sheet = None
+        write_news_sheet = None  # type: ignore[assignment]
         prog.add_error(f"{get_llm_module_name('news_correlation')}模块缺失 (news_correlation)")
 
     if news_data is not None:
@@ -242,11 +246,11 @@ def _write_news_and_early_warning(
         try:
             from src.python.report.news_correlation import build_news_data
         except ImportError:
-            build_news_data = None
-        if build_news_data:
+            build_news_data = None  # type: ignore[assignment]
+        if build_news_data is not None:
             try:
                 news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
-            except Exception as e:
+            except Exception:
                 prog.add_error("新闻数据获取失败（详情请查看日志）")
                 news_data, _meta = [], {}
         else:
@@ -282,7 +286,7 @@ def _write_b_series_sheets(
     if not enable_b_series:
         return
     # 基金经理变更监控
-    detect = modules.get("detect_manager_changes", lambda h: [])
+    detect = modules.get("detect_manager_changes", lambda _h: [])
     ws13 = sheets.get("fund_manager")
     if ws13 is not None:
         prog.info("正在分析基金经理变更...")
@@ -294,7 +298,7 @@ def _write_b_series_sheets(
             manager_data = None
 
         try:
-            modules.get("write_fund_manager_sheet")(ws13, manager_data or [])
+            modules.get("write_fund_manager_sheet")(ws13, manager_data or [])  # type: ignore[misc]
             prog.ok("基金经理变更监控页签写入完成")
         except Exception as e:
             logger.warning("基金经理变更监控页签写入失败: %s", e)
@@ -368,17 +372,17 @@ def _write_b_series_sheets(
             fund_codes = list(dict.fromkeys(
                 h.code for h in holdings if _is_fund(h)
             ))
-            fund_holdings: dict[str, dict] = {}
+            conc_fund_holdings: dict[str, dict] = {}
             for code in fund_codes:
                 fh = fetch_fund_holdings(code)
                 if fh and fh.get("holdings"):
-                    fund_holdings[code] = {
+                    conc_fund_holdings[code] = {
                         "name": fh.get("name", code),
                         "holdings": fh["holdings"],
                     }
 
-            if fund_holdings:
-                conc_data = compute_conc(fund_holdings)
+            if conc_fund_holdings:
+                conc_data = compute_conc(conc_fund_holdings)
                 if conc_data:
                     prog.ok("持仓集中度计算完成")
                 else:
@@ -410,17 +414,17 @@ def _write_b_series_sheets(
             fund_codes = list(dict.fromkeys(
                 h.code for h in holdings if _is_fund(h)
             ))
-            fund_holdings: dict[str, dict] = {}
+            style_fund_holdings: dict[str, dict] = {}
             for code in fund_codes:
                 fh = fetch_fund_holdings(code)
                 if fh and fh.get("holdings"):
-                    fund_holdings[code] = {
+                    style_fund_holdings[code] = {
                         "name": fh.get("name", code),
                         "holdings": fh["holdings"],
                     }
 
-            if fund_holdings:
-                style_result = analyze_style(fund_holdings)
+            if style_fund_holdings:
+                style_result = analyze_style(style_fund_holdings)
                 if style_result.get("results"):
                     prog.ok("基金风格分析计算完成")
                 else:
@@ -451,25 +455,26 @@ def _write_llm_section_and_usage(
         prog.info("正在生成 LLM 分析章节...")
         try:
             from src.python.report.llm_content import write_llm_sheets
-            write_llm_sheets(sheets, llm_content=llm_content, section_order=section_order)
+            write_llm_sheets(sheets, llm_content=llm_content, section_order=section_order)  # type: ignore[arg-type]
             logger.info("LLM 分析章节已生成")
             prog.ok("LLM 分析章节生成完成")
         except ImportError:
             logger.warning("LLM 分析章节模块 (src.python.report.llm_content) 未就绪，跳过")
             prog.add_error("LLM 分析章节模块未就绪，跳过")
-        except Exception as e:
+        except Exception:
             logger.exception("生成 LLM 分析章节失败")
             prog.add_error("LLM 分析章节生成失败（详情请查看日志）")
 
     _build_llm_usage_sheet(sheets, prog)
 
 
-def _build_llm_usage_sheet(sheets: dict[str, Any], prog: ProgressReporter) -> None:
+def _build_llm_usage_sheet(sheets: dict[str, Any], _prog: ProgressReporter) -> None:
     """构建并写入 LLM API 用量页签。"""
     try:
         from src.python.llm import (
             FAIL_REASON_DISABLED,
-            get_session_usage, format_session_usage,
+            format_session_usage,
+            get_session_usage,
         )
         from src.python.llm.prompts import _LLM_MODULE_FAILURE
         from src.python.registry import get_llm_module_names

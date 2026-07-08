@@ -4,20 +4,37 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
+import atexit
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 
-from src.python.logger import setup_logger
-from src.python.tui_menu import get_config_cache
-from src.python.registry import get_llm_module_name, get_report_section_order
 from src.python.llm import FAIL_REASON_DISABLED
 from src.python.llm.prompts import _LLM_MODULE_FAILURE
+from typing import Any
+
+from src.python.logger import setup_logger
+from src.python.registry import get_llm_module_name, get_report_section_order
 from src.python.report.progress import TuiProgressReporter
 from src.python.tui_handlers import (
-    _check_network_available, _finish_report, _prepare_holdings, _print_error_with_hint,
+    _check_network_available,
+    _finish_report,
+    _prepare_holdings,
+    _print_error_with_hint,
     _print_llm_session_usage,
 )
+from src.python.tui_menu import get_config_cache
+
+# 共享线程池 — 多处并行任务复用同一实例，避免反复创建/销毁
+_POOL: ThreadPoolExecutor | None = None
+
+
+def _get_pool() -> ThreadPoolExecutor:
+    global _POOL
+    if _POOL is None:
+        _POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="report")
+        atexit.register(_POOL.shutdown, wait=False)
+    return _POOL
+
 logger = setup_logger()
 
 
@@ -25,7 +42,7 @@ def _generate_excel_report(*args, progress=None, **kwargs):
     """生成 Excel 报告（委托给 excel_generator 模块）。"""
     from src.python.report.excel_generator import generate_excel_report
     prog = progress if progress is not None else TuiProgressReporter()
-    return generate_excel_report(*args, **kwargs, progress=prog)
+    return generate_excel_report(*args, **kwargs, progress=prog)  # type: ignore[misc]
 
 
 def _cmd_generate_excel() -> None:
@@ -106,7 +123,7 @@ def _cmd_generate_both() -> None:
                 progress=reporter,
             )
             reporter.ok(f"HTML 报告已生成: {path}")
-        except Exception as e:
+        except Exception:
             reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
             logger.exception("HTML 报告写入失败")
             reporter.error("HTML 报告生成失败（详情请查看日志）")
@@ -173,14 +190,14 @@ def _process_llm_news_futures(
                     reporter.warn("LLM 均未生成（请检查 LLM 配置）")
                 elif ok_count == 0 and not failed:
                     reporter.info("所有 LLM 内容已跳过，未调用 LLM")
-            except Exception as e:
+            except Exception:
                 reporter.add_error("LLM 内容生成异常（详情请查看日志文件 logs/app.log）")
                 reporter.error("LLM 内容生成异常（详情请查看日志）")
         else:
             try:
                 news_data, news_llm_meta = fut.result()
                 reporter.ok(f"新闻获取完成，共 {len(news_data)} 条")
-            except Exception as e:
+            except Exception:
                 reporter.add_error("新闻获取异常（详情请查看日志文件 logs/app.log）")
                 reporter.warn("新闻获取异常（详情请查看日志）")
 
@@ -208,11 +225,11 @@ def _prepare_report_data(holdings: list, reporter: TuiProgressReporter) -> dict:
     categories = classify_holdings(holdings)
 
     reporter.info("正在获取指数行情...")
-    with ThreadPoolExecutor(max_workers=2) as _idx_ex:
-        _a_fut = _idx_ex.submit(fetch_indices)
-        _us_fut = _idx_ex.submit(fetch_us_indices)
-        a_indices = _a_fut.result()
-        us_indices = _us_fut.result()
+    _idx_ex = _get_pool()
+    _a_fut = _idx_ex.submit(fetch_indices)
+    _us_fut = _idx_ex.submit(fetch_us_indices)
+    a_indices = _a_fut.result()
+    us_indices = _us_fut.result()
     reporter.info("正在计算资产穿透 TOP10...")
     pen_result = compute_penetration_top10(holdings, details)
     penetrated_assets = (pen_result or {}).get("top10", [])
@@ -263,7 +280,7 @@ def _prompt_force_llm(reporter: TuiProgressReporter) -> bool:
 
 
 def _compute_early_warnings(
-    holdings: list, penetrated_assets: list, sector_flow: dict,
+    holdings: list, penetrated_assets: list, sector_flow: list[dict[str, Any]],
     news_data: list, news_llm_meta: dict, reporter: TuiProgressReporter,
 ) -> dict | None:
     """计算智能预警（行业资金流向联动 + 新闻情绪聚合）。"""
@@ -307,22 +324,22 @@ def _cmd_generate_full() -> None:
             reporter.ok("行业资金流向获取完成")
         _force_llm = _prompt_force_llm(reporter)
 
-        with ThreadPoolExecutor(max_workers=2) as _llm_ex:
-            _news_fut = _llm_ex.submit(
-                build_news_data, holdings, prep["news_top_count"], prep["penetrated_assets"],
-            )
-            _llm_fut = _llm_ex.submit(
-                generate_all_llm,
-                prep["a_indices"], prep["us_indices"],
-                prep["total_mv"], prep["total_cost"], prep["total_profit"],
-                prep["total_today_profit"], len(holdings), prep["categories"],
-                penetrated_assets=prep["penetrated_assets"],
-                holdings_details=prep["holdings_details"],
-                sector_flow=_sector_flow, force=_force_llm,
-            )
-            llm_content, news_data, news_llm_meta = _process_llm_news_futures(
-                _llm_fut, _news_fut, reporter,
-            )
+        _llm_ex = _get_pool()
+        _news_fut = _llm_ex.submit(
+            build_news_data, holdings, prep["news_top_count"], prep["penetrated_assets"],
+        )
+        _llm_fut = _llm_ex.submit(
+            generate_all_llm,
+            prep["a_indices"], prep["us_indices"],
+            prep["total_mv"], prep["total_cost"], prep["total_profit"],
+            prep["total_today_profit"], len(holdings), prep["categories"],
+            penetrated_assets=prep["penetrated_assets"],
+            holdings_details=prep["holdings_details"],
+            sector_flow=_sector_flow, force=_force_llm,
+        )
+        llm_content, news_data, news_llm_meta = _process_llm_news_futures(
+            _llm_fut, _news_fut, reporter,
+        )
 
         _print_llm_session_usage()
 
@@ -343,7 +360,7 @@ def _cmd_generate_full() -> None:
                 progress=reporter,
             )
             reporter.ok(f"HTML 报告已生成: {path}")
-        except Exception as e:
+        except Exception:
             reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
             logger.exception("HTML 报告写入失败")
             reporter.error("HTML 报告生成失败（详情请查看日志）")

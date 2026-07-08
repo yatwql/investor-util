@@ -773,13 +773,15 @@ class TestGetTTL(unittest.TestCase):
 
     def test_hold_returns_weekly(self):
         """hold 类型 → 默认返回 CACHE_WEEKLY。"""
-        from src.python.cache import CACHE_WEEKLY, get_ttl
+        from src.python.constants import CACHE_WEEKLY
+        from src.python.cache import get_ttl
 
         self.assertEqual(get_ttl("hold"), CACHE_WEEKLY)
 
     def test_benchmark_returns_monthly(self):
         """benchmark 类型 → 默认返回 CACHE_MONTHLY。"""
-        from src.python.cache import CACHE_MONTHLY, get_ttl
+        from src.python.constants import CACHE_MONTHLY
+        from src.python.cache import get_ttl
 
         self.assertEqual(get_ttl("benchmark"), CACHE_MONTHLY)
 
@@ -887,11 +889,11 @@ class TestCacheConstants(unittest.TestCase):
         self.assertEqual(CACHE_DAILY, 86400)
 
     def test_cache_weekly(self):
-        from src.python.cache import CACHE_WEEKLY
+        from src.python.constants import CACHE_WEEKLY
         self.assertEqual(CACHE_WEEKLY, 604800)
 
     def test_cache_monthly(self):
-        from src.python.cache import CACHE_MONTHLY
+        from src.python.constants import CACHE_MONTHLY
         self.assertEqual(CACHE_MONTHLY, 2592000)
 
 

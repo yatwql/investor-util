@@ -22,8 +22,8 @@ from typing import Any
 
 import httpx
 
-from src.python.http_client import make_http_client
 from src.python.code_utils import get_push2_secid
+from src.python.http_client import make_http_client
 
 logger = logging.getLogger("invest")
 
@@ -50,6 +50,15 @@ _PUSH2_COOLDOWN_SECS = 300      # 冷却期（秒）
 #   f9=动态市盈率(PE), f20=总市值, f23=市净率(PB)
 #   f57=代码, f58=名称, f127=行业, f128=地域, f129=概念, f198=行业BK
 _FIELDS = "f57,f58,f127,f128,f129,f198,f9,f20,f23"
+
+
+# 会话级内存缓存 — 同一代码在会话内不重复 HTTP 请求（C4 约束）
+_ext_memo: dict[str, dict[str, Any] | None] = {}
+
+
+def _ext_memo_clear() -> None:
+    """测试用：清空会话级内存缓存。"""
+    _ext_memo.clear()
 
 
 def _secid(code: str) -> str:
@@ -159,14 +168,21 @@ def _extract_industry(inner: dict, key: str) -> str:
 def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     """获取一只证券的行业分类和概念板块归属。
 
+    会话级内存复用（C4）：同一代码在同一会话内仅首次发起 HTTP 请求，
+    后续调用直接返回缓存结果，避免重复网络/文件 I/O。
+
     Args:
         code: 6 位证券代码
 
     Returns:
         {...} 详见函数内结果字典定义；None: API 异常或解析失败
     """
+    if code in _ext_memo:
+        return _ext_memo[code]
+
     inner = _make_push2_request(code)
     if inner is None:
+        _ext_memo[code] = None
         return None
 
     result: dict[str, Any] = {
@@ -179,6 +195,7 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
 
     logger.debug("东方财富行业/概念 [%s]: 行业=%s, 概念=%d个",
                  code, result["industry"] or "无", len(result["concepts"]))
+    _ext_memo[code] = result
     return result
 
 

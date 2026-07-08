@@ -8,14 +8,15 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable
+from typing import Any
 
+from src.python.providers.news_correlator import correlate_news_with_holdings
 from src.python.providers.news_sources import (
     _FETCH_MAP,
     _SOURCE_LABELS,
 )
-from src.python.providers.news_correlator import correlate_news_with_holdings
 
 logger = logging.getLogger("invest")
 
@@ -44,7 +45,8 @@ def _compute_cache_key(
 
 def _check_news_cache(cache_key: str, sources: list[str]) -> list[dict] | None:
     """检查新闻缓存，命中则直接返回缓存结果。"""
-    from src.python.cache import get as _nget, get_ttl as _get_news_ttl
+    from src.python.cache import get as _nget
+    from src.python.cache import get_ttl as _get_news_ttl
     cached = _nget(cache_key, _get_news_ttl("news"))
     if cached is not None:
         logger.info("新闻缓存命中，跳过 %d 个源获取", len(sources))
@@ -83,7 +85,7 @@ def get_last_source_status() -> dict[str, dict]:
 
 def _fetch_from_all_sources(
     sources: list[str], per_source: int,
-    progress_callback: Optional[Callable[[str, int, str], None]] = None,
+    progress_callback: Callable[[str, int, str], None] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, tuple[int, str]]]:
     """从多个新闻源并行获取，去重合并。返回 (all_raw, src_results)。"""
     all_raw: list[dict[str, Any]] = []
@@ -163,7 +165,7 @@ def aggregate_news(
     top_n: int = 100,
     sources: list[str] | None = None,
     per_source: int = 100,
-    progress_callback: Optional[Callable[[str, int, str], None]] = None,
+    progress_callback: Callable[[str, int, str], None] | None = None,
 ) -> list[dict[str, Any]]:
     """从多个新闻源获取新闻，去重后按关键词关联度排序。
 

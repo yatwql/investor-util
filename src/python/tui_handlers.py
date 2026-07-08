@@ -12,13 +12,12 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
-from typing import Any
 
-from src.python.tui_menu import MENU_ITEMS, _press_any_key, _refresh_config, get_config_cache
+from src.python.llm.pricing import _CURRENCY_SYMBOLS
 from src.python.logger import setup_logger
 from src.python.reader import get_xlsx_info, list_xlsx_files, read_holdings
-from src.python.llm.pricing import _CURRENCY_SYMBOLS
 from src.python.report.progress import TuiProgressReporter
+from src.python.tui_menu import MENU_ITEMS, _press_any_key, _refresh_config, get_config_cache
 
 logger = setup_logger()
 
@@ -63,20 +62,20 @@ def _print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
         print(f"        详情: {msg}")
     elif isinstance(e, PermissionError):
         print(f"  [ERR] {prefix}: 文件读取/写入权限不足")
-        print(f"        请检查文件或目录的权限设置")
+        print("        请检查文件或目录的权限设置")
     elif isinstance(e, FileNotFoundError):
         print(f"  [ERR] {prefix}: 文件未找到，请检查路径是否正确")
         print(f"        详情: {msg}")
     elif isinstance(e, json.JSONDecodeError):
         print(f"  [ERR] {prefix}: 配置文件格式错误（JSON 语法错误）")
-        print(f"        请检查配置文件是否为有效 JSON 格式")
+        print("        请检查配置文件是否为有效 JSON 格式")
     elif isinstance(e, (KeyError, ValueError, AttributeError, TypeError)):
         logger.warning("%s: %s", prefix, msg, exc_info=True)
         print(f"  [ERR] {prefix}: 数据处理异常，详情请查看日志文件 logs/app.log")
     elif isinstance(e, ImportError):
         logger.warning("%s: %s", prefix, msg, exc_info=True)
         print(f"  [ERR] {prefix}: 模块加载失败，请检查依赖是否完整安装")
-        print(f"        pip install -r requirements.txt")
+        print("        pip install -r requirements.txt")
     else:
         logger.warning("%s: %s", prefix, msg, exc_info=True)
         print(f"  [ERR] {prefix}: 操作异常，详情请查看日志文件 logs/app.log")
@@ -135,8 +134,8 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
     """检测持仓是否变化，若有新增资产则主动预热其缓存数据。"""
     try:
         from src.python.cache import check_and_refresh_caches
-        from src.python.fetcher.industry import batch_fetch_industry_data
         from src.python.fetcher.fund import fetch_fund_holdings, fetch_fund_rankings
+        from src.python.fetcher.industry import batch_fetch_industry_data
         from src.python.fetcher.price import fetch_market_data
         from src.python.report.fund_performance import _is_fund
 
@@ -175,7 +174,7 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
                 print(f" {ind_name} ({conc_count} 个概念)")
             else:
                 print(" 无数据")
-        print(f"  [OK] 新增资产缓存预热完成")
+        print("  [OK] 新增资产缓存预热完成")
     except Exception:
         logger.warning("新资产预热过程异常，跳过（不影响后续生成）", exc_info=True)
 

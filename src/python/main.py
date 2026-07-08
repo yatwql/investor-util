@@ -6,6 +6,7 @@ from __future__ import annotations
 import atexit
 import os
 import sys
+from collections.abc import Callable
 
 # 确保项目根目录在 sys.path 中，并切换工作目录
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,10 +14,11 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 os.chdir(_project_root)
 
-from src.python.logger import setup_logger
 from src.python.config import init_config
+from src.python.llm.pricing import _CURRENCY_SYMBOLS
+from src.python.logger import setup_logger
 from src.python.tui import KEY_CTRL_C, KEY_DOWN, KEY_ENTER, KEY_UP, get_key
-
+from src.python.tui_handlers import _execute_item
 from src.python.tui_menu import (
     MENU_ITEMS,
     _exit_app,
@@ -25,8 +27,6 @@ from src.python.tui_menu import (
     _render_menu,
     _show_config,
 )
-from src.python.tui_handlers import _execute_item
-from src.python.llm.pricing import _CURRENCY_SYMBOLS
 
 logger = setup_logger()
 
@@ -46,7 +46,7 @@ def _print_session_usage_on_exit() -> None:
             currency = usage.get("currency", "CNY")
             symbol = _CURRENCY_SYMBOLS.get(currency, "¥")
             model = usage.get("model", "")
-            print(f"\n── LLM 会话统计 ──")
+            print("\n── LLM 会话统计 ──")
             print(f"  模型: {model}")
             per_module = usage.get("per_module", {})
             if per_module:
@@ -65,7 +65,7 @@ def _print_session_usage_on_exit() -> None:
                 print(f"  缓存命中: {cache_hit:,}")
             print(f"  总 tokens: {total_tok:,}")
             print(f"  累计费用: {symbol}{cost:.4f}")
-            print(f"──────────────────")
+            print("──────────────────")
     except (KeyError, TypeError, AttributeError):
         logger.warning("打印 LLM 会话统计时出错", exc_info=True)
         pass
@@ -73,27 +73,26 @@ def _print_session_usage_on_exit() -> None:
 
 def _bind_callbacks() -> None:
     """运行时将函数引用填入 MENU_ITEMS。"""
-    from src.python.tui_handlers import _execute_item
-    from src.python.handlers_report import (
-        _cmd_generate_excel,
-        _cmd_generate_html,
-        _cmd_generate_both,
-        _cmd_generate_full,
-    )
     from src.python.handlers_cache import (
-        _cmd_update_basic_cache,
-        _cmd_update_position_cache,
         _cmd_cleanup_cache,
         _cmd_show_cache_stats,
+        _cmd_update_basic_cache,
+        _cmd_update_position_cache,
     )
     from src.python.handlers_config import (
         _cmd_config_dir,
         _cmd_config_filename,
-        _cmd_config_output_dir,
         _cmd_config_llm_modules,
+        _cmd_config_output_dir,
         _cmd_refresh_config,
     )
-    callbacks: dict[str, callable] = {
+    from src.python.handlers_report import (
+        _cmd_generate_both,
+        _cmd_generate_excel,
+        _cmd_generate_full,
+        _cmd_generate_html,
+    )
+    callbacks: dict[str, Callable] = {
         "E": _cmd_generate_excel,
         "H": _cmd_generate_html,
         "B": _cmd_generate_both,
@@ -132,7 +131,8 @@ def main() -> None:
     # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/C/F/O/1/2/3/4/S/R
     from src.python.config import get_config
     _default_key = get_config().get("default_menu_key", "L").upper()
-    sel: int = _index_by_key(_default_key) if _index_by_key(_default_key) is not None else 0
+    _idx = _index_by_key(_default_key)
+    sel: int = _idx if _idx is not None else 0
 
     while True:
         _show_config()

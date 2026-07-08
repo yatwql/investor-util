@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -22,8 +23,8 @@ from src.python.cache import get as cache_get
 from src.python.config import get_llm_config
 from src.python.llm.api import (
     _CACHE_LINE_HTML,
-    _cache_line_model_tpl,
     _LLM_TIMEOUT,
+    _cache_line_model_tpl,
     _extract_model_from_cached,
     _log_token_usage,
 )
@@ -32,28 +33,28 @@ from src.python.llm.fingerprint import (
     _compute_fingerprint,
     _get_cache_ttl_llm,
 )
+from src.python.llm.pricing import _estimate_cost
 from src.python.llm.prompts import (
     _CACHE_PREFIX_LLM,
     _LLM_MODULE_FAILURE,
-    FAIL_REASON_DISABLED,
-    _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_EXPERT_REVIEW,
+    _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_HEALTH_CHECK,
-    _SYSTEM_PENETRATION_DEEP,
     _SYSTEM_NEWS_CORRELATION,
-    _build_global_macro_prompt,
+    _SYSTEM_PENETRATION_DEEP,
+    FAIL_REASON_DISABLED,
     _build_expert_review_prompt,
+    _build_global_macro_prompt,
     _build_health_check_prompt,
-    _build_penetration_deep_prompt,
     _build_holdings_summary,
     _build_news_correlation_summary,
+    _build_penetration_deep_prompt,
 )
 from src.python.llm.session import _record_per_module
-from src.python.llm.pricing import _estimate_cost
 from src.python.llm.skeleton import (
-    _is_llm_module_enabled,
     _generate_llm_content,
     _generate_llm_module,
+    _is_llm_module_enabled,
 )
 from src.python.registry import get_llm_module_name, get_llm_module_names
 
@@ -316,7 +317,7 @@ def _select_top_news(
 def _build_news_hooks(
     top_news: list[dict], holdings: list, penetrated_assets: list | None,
     industry_data: dict[str, dict] | None, llm_config: dict | None,
-) -> tuple[callable, callable, callable, str]:
+) -> tuple[Callable, Callable, Callable, str]:
     """构建批量处理 hooks。
 
     Args:
@@ -333,12 +334,12 @@ def _build_news_hooks(
         holdings_fp = _compute_fingerprint(holdings_summary, penetrated_assets)
         return top_news, holdings_fp
 
-    def _per_item_cache(idx: int, item: dict, context_fp: str) -> str:
+    def _per_item_cache(_idx: int, item: dict, context_fp: str) -> str:
         title_prefix = (item.get("title", "") or "")[:80]
         article_fp = _compute_fingerprint({"title": title_prefix, "holdings_fp": context_fp})
         return _CACHE_PREFIX_LLM + f"news_item_{article_fp}"
 
-    def _batch_prompt(batch_items: list[dict], context_fp: str) -> str:
+    def _batch_prompt(batch_items: list[dict], _context_fp: str) -> str:
         holdings_text = _build_holdings_summary(holdings, penetrated_assets, industry_data)
         news_text = _build_news_correlation_summary(batch_items)
         return (
@@ -436,7 +437,7 @@ def enhance_news_correlation(
     penetrated_assets: list | None = None,
     industry_data: dict[str, dict] | None = None,
     force: bool = False,
-    http_client: httpx.Client | None = None,
+    _http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
 ) -> tuple[list[dict], bool, dict]:
     """使用 LLM 增强新闻与持仓的关联分析。
@@ -496,7 +497,7 @@ def enhance_news_correlation(
 def _compute_module_cache_info(
     llm_config: dict, a_indices, us_indices,
     total_mv: float, total_cost: float, total_profit: float,
-    total_today_profit: float, holdings_count: int, categories: dict,
+    total_today_profit: float, _holdings_count: int, categories: dict,
     penetrated_assets: list[dict] | None, holdings_details: list[dict] | None,
     force: bool,
 ) -> dict[str, dict]:
@@ -582,7 +583,7 @@ def _precheck_one_cache(
 
 
 def _precheck_all_modules(
-    llm_config: dict, cache_info: dict[str, dict], force: bool,
+    llm_config: dict, cache_info: dict[str, dict], _force: bool,
 ) -> dict[str, dict]:
     """检查所有模块的状态（已禁用/缓存命中/缓存未命中）。"""
     results: dict[str, dict] = {}
@@ -613,25 +614,25 @@ def _dispatch_llm_workers(
     results_dict: dict[str, dict] = {}
     _label_map: dict[str, str] = get_llm_module_names()
 
-    def _make_runner(label: str, fn: callable) -> callable:
+    def _make_runner(label: str, fn: Callable) -> Callable:
         """创建闭包：持 httpx.Client（HTTP/2 + 连接池）运行 fn(c, llm_config)。"""
         def _run() -> tuple[str | None, bool]:
             logger.info("正在生成：%s...", _label_map.get(label, label))
             try:
-                c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)
+                c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)  # type: ignore[arg-type]
             except ImportError:
                 # h2 包未安装时降级到 HTTP/1.1
                 logger.info("h2 包未安装，降级到 HTTP/1.1")
                 _settings = dict(_LLM_CLIENT_SETTINGS)
                 _settings.pop("http2", None)
-                c = httpx.Client(timeout=_LLM_TIMEOUT, **_settings)
+                c = httpx.Client(timeout=_LLM_TIMEOUT, **_settings)  # type: ignore[arg-type]
             try:
                 return fn(c, llm_config)
             finally:
                 c.close()
         return _run
 
-    _MODULE_FNS: dict[str, callable] = {
+    _MODULE_FNS: dict[str, Callable] = {
         "global_macro": lambda c, lc: generate_global_macro(
             a_indices, us_indices, total_mv, total_profit, categories,
             sector_flow=sector_flow, force=force, http_client=c, llm_config=lc,
@@ -669,7 +670,7 @@ def _dispatch_llm_workers(
                 key = _futures[future]
                 results_dict[key] = {"result": result, "cached": from_cache}
                 logger.info("%s生成完成" if result else "%s生成失败（跳过）", _label_map.get(key, key))
-            except Exception:
+            except Exception:  # noqa: PERF203
                 logger.warning("LLM 生成线程异常", exc_info=True)
 
     return results_dict

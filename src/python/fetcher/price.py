@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from src.python.cache import get_ttl
 from src.python.fetcher.chain import _fetch_with_fallback
@@ -132,9 +133,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
             if not raw.get("name"):
                 return False
             tencent_name = raw.get("name", "").strip()
-            if expected_name and tencent_name and not _name_matches(tencent_name, expected_name):
-                return False
-            return True
+            return not (expected_name and tencent_name and not _name_matches(tencent_name, expected_name))
         if provider_name == "eastmoney":
             return bool(raw.get("nav") and raw.get("nav", 0.0) > 0)
         return True
