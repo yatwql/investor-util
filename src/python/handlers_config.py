@@ -11,7 +11,7 @@ import sys
 from src.python.config import set_config
 from src.python.logger import setup_logger
 from src.python.reader import list_xlsx_files
-from src.python.tui_menu import _press_any_key, _refresh_config, get_config_cache
+from src.python.tui_menu import _GREEN, _RED, _YELLOW, _RESET, _press_any_key, _refresh_config, get_config_cache
 
 logger = setup_logger()
 
@@ -30,7 +30,7 @@ def _read_llm_settings() -> tuple[dict, str] | None:
         settings = json.loads(_strip_json_comments(raw))
         return settings, path
     except (FileNotFoundError, json.JSONDecodeError):
-        print("  [ERR] 无法读取 llm_settings.json")
+        print(f"  {_RED}[ERR]{_RESET} 无法读取 llm_settings.json")
         _press_any_key()
         return None
 
@@ -58,7 +58,7 @@ def _cmd_config_dir() -> None:
     if new_dir:
         set_config("holdings_dir", new_dir)
         _refresh_config()
-        print(f"  [OK] 目录已更新为: {new_dir}")
+        print(f"  {_GREEN}[OK]{_RESET} 目录已更新为: {new_dir}")
     else:
         print("  未修改")
 
@@ -84,7 +84,7 @@ def _cmd_config_filename() -> None:
     if new_name:
         set_config("holdings_filename", new_name)
         _refresh_config()
-        print(f"  [OK] 文件名已更新为: {new_name}")
+        print(f"  {_GREEN}[OK]{_RESET} 文件名已更新为: {new_name}")
     else:
         print("  未修改")
 
@@ -104,7 +104,7 @@ def _cmd_config_output_dir() -> None:
     if new_dir:
         set_config("output_dir", new_dir)
         _refresh_config()
-        print(f"  [OK] 输出目录已更新为: {new_dir}")
+        print(f"  {_GREEN}[OK]{_RESET} 输出目录已更新为: {new_dir}")
     else:
         print("  未修改")
 
@@ -127,10 +127,6 @@ def _cmd_config_llm_modules() -> None:
         items = []
         for i, (sfx, name) in enumerate(module_names.items(), 1):
             status = enabled_map.get(sfx, True)
-            if os.environ.get("NO_COLOR") or not sys.stdout.isatty():
-                _GREEN = _RED = _RESET = ""
-            else:
-                _GREEN, _RED, _RESET = "\033[92m", "\033[91m", "\033[0m"
             status_str = f"{_GREEN}开启{_RESET}" if status else f"{_RED}关闭{_RESET}"
             items.append((i, sfx, name, status))
             print(f"  │ {i}. {name:<14s} [{status_str}]{' ' * 4}│")
@@ -154,11 +150,11 @@ def _cmd_config_llm_modules() -> None:
                 enabled_map[sfx] = not curr
                 settings["enabled_llm"] = enabled_map
                 _write_llm_settings(settings, settings_path)
-                print(f"  [OK] {name} 已{'开启' if not curr else '关闭'}")
+                print(f"  {_GREEN}[OK]{_RESET} {name} 已{'开启' if not curr else '关闭'}")
             else:
-                print("  [!] 无效编号")
+                print(f"  {_YELLOW}[!]{_RESET} 无效编号")
         except (ValueError, TypeError):
-            print("  [!] 请输入有效编号")
+            print(f"  {_YELLOW}[!]{_RESET} 请输入有效编号")
 
     _press_any_key()
 
@@ -182,9 +178,9 @@ def _cmd_refresh_config() -> None:
     _refresh_config()
 
     if config:
-        print("  [OK] config.json 已重新加载")
+        print(f"  {_GREEN}[OK]{_RESET} config.json 已重新加载")
     if llm_config:
-        print("  [OK] llm_settings.json + llm_key.json 已重新加载")
+        print(f"  {_GREEN}[OK]{_RESET} llm_settings.json + llm_key.json 已重新加载")
     else:
-        print("  [!] LLM 未配置（llm_key.json 缺失或无效）")
+        print(f"  {_YELLOW}[!]{_RESET} LLM 未配置（llm_key.json 缺失或无效）")
     _press_any_key()

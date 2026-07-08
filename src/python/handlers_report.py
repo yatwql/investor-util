@@ -85,7 +85,7 @@ def _cmd_generate_html(news: bool = False) -> None:
             progress=reporter,
         )
         print()
-        print(f"  [OK] HTML 报告已生成: {path}")
+        print(f"  {_GREEN}[OK]{_RESET} HTML 报告已生成: {path}")
     except Exception as e:
         reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成 HTML 报告失败")
