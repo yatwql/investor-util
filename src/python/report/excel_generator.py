@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from src.python.logger import setup_logger
 from src.python.registry import get_llm_module_name, get_report_section_order, get_report_sheet_name, set_sheet_title
@@ -142,8 +142,6 @@ def _resolve_market_data(
     """行情市值页写入，返回核心数据字典。"""
     mvs = modules.get("write_market_value_sheet")
     classify = modules.get("classify_holdings")
-    last_trading = modules.get("get_last_trading_day")
-    price_status = modules.get("price_update_status")
 
     if mvs is None:
         data = {"total_mv": 0.0, "total_cost": 0.0, "total_profit": 0.0,
@@ -173,7 +171,18 @@ def _resolve_market_data(
         prog.ok("行情数据获取完成")
 
     data["categories"] = classify(holdings) if classify else {}
-    data["update_status"] = price_status(data["details"], last_trading()) if price_status else (0, 0, True)  # type: ignore[misc]
+
+    # 检测行情数据是否全部不可用 — 有持仓成本但市值全零
+    _mkt_all_zero = data["total_mv"] == 0 and data["total_cost"] > 0
+    if _mkt_all_zero:
+        prog.add_error("行情数据全部不可用（非交易时段/网络异常），报告部分数据为占位显示")
+    # price_status 来自 modules dict，可能为 None（未注册）
+    _price_fn = modules.get("price_update_status")
+    _last_trading_fn = modules.get("get_last_trading_day")
+    if _price_fn is not None and _last_trading_fn is not None:
+        data["update_status"] = _price_fn(data["details"], _last_trading_fn())
+    else:
+        data["update_status"] = (0, 0, True)
     return data
 
 
@@ -231,10 +240,11 @@ def _write_news_and_early_warning(
         return
     penetrated_assets = pen_result.get("top10", []) if pen_result else []
 
+    write_news_sheet: Callable[..., Any] | None
     try:
         from src.python.report.news_correlation import write_news_sheet
     except ImportError:
-        write_news_sheet = None  # type: ignore[assignment]
+        write_news_sheet = None
         prog.add_error(f"{get_llm_module_name('news_correlation')}模块缺失 (news_correlation)")
 
     if news_data is not None:
@@ -243,10 +253,11 @@ def _write_news_and_early_warning(
         prog.ok(f"复用预取新闻数据（{len(news_data)} 条）")
     else:
         prog.info("正在获取财经新闻（含穿透资产关键词）...")
+        build_news_data: Callable[..., Any] | None
         try:
             from src.python.report.news_correlation import build_news_data
         except ImportError:
-            build_news_data = None  # type: ignore[assignment]
+            build_news_data = None
         if build_news_data is not None:
             try:
                 news_data, _meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
@@ -297,12 +308,14 @@ def _write_b_series_sheets(
             prog.add_error("基金经理变更监控数据获取失败")
             manager_data = None
 
-        try:
-            modules.get("write_fund_manager_sheet")(ws13, manager_data or [])  # type: ignore[misc]
-            prog.ok("基金经理变更监控页签写入完成")
-        except Exception as e:
-            logger.warning("基金经理变更监控页签写入失败: %s", e)
-            prog.add_error("基金经理变更监控页签写入失败")
+        write_fund_mgr = modules.get("write_fund_manager_sheet")
+        if write_fund_mgr:
+            try:
+                write_fund_mgr(ws13, manager_data or [])
+                prog.ok("基金经理变更监控页签写入完成")
+            except Exception as e:
+                logger.warning("基金经理变更监控页签写入失败: %s", e)
+                prog.add_error("基金经理变更监控页签写入失败")
 
     # 14. 持仓重合度矩阵
     compute_overlap = modules.get("compute_overlap_matrix")
@@ -444,7 +457,7 @@ def _write_b_series_sheets(
 
 
 def _write_llm_section_and_usage(
-    sheets: dict[str, Any], include_llm: bool, llm_content: tuple | None,
+    sheets: dict[str, Any], include_llm: bool, llm_content: tuple[str | None, str | None, str | None, str | None] | None,
     prog: ProgressReporter, section_order: list[dict] | None = None,
 ) -> None:
     """写入 LLM 分析章节页签和 LLM API 用量页签。"""
@@ -455,7 +468,7 @@ def _write_llm_section_and_usage(
         prog.info("正在生成 LLM 分析章节...")
         try:
             from src.python.report.llm_content import write_llm_sheets
-            write_llm_sheets(sheets, llm_content=llm_content, section_order=section_order)  # type: ignore[arg-type]
+            write_llm_sheets(sheets, llm_content=llm_content or (None, None, None, None), section_order=section_order)
             logger.info("LLM 分析章节已生成")
             prog.ok("LLM 分析章节生成完成")
         except ImportError:
@@ -591,7 +604,7 @@ def _create_sheets(
 def generate_excel_report(
     holdings: list, include_news: bool = False, output_dir: str = "reports",
     news_top_count: int = 100, include_llm: bool = False,
-    llm_content: tuple | None = None,
+    llm_content: tuple[str | None, str | None, str | None, str | None] | None = None,
     details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
     news_data: list | None = None,

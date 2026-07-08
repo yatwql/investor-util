@@ -378,6 +378,10 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         data_status_penetration=data_status_penetration,
         data_status_perf=data_status_perf,
         data_status_category=data_status_category,
+        # 报告年份（穿透表预测EPS列使用）
+        report_year=datetime.now().year,
+        # 数据不可用标记 — 模板用于显示/隐藏 暂无数据 横幅
+        data_unavailable=bool(total_mv == 0 and total_cost > 0),
     )
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)

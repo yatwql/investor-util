@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Any
 
@@ -30,11 +31,8 @@ from src.python.code_utils import is_a_share_code
 
 logger = logging.getLogger("invest")
 
-# 会话级扩展数据内存缓存 — 同一股票出现在多只基金时复用，避免重复 HTTP
-_ext_memo: dict[str, dict | None] = {}
-# Tencent 二级降级熔断：连续失败 N 次后跳过（网络不可达时无需逐只等待超时）
-_tencent_failures = 0
-_TENCENT_SKIP_THRESHOLD = 2
+# 会话级扩展数据缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="extended"）
+# Tencent 二级降级熔断 — 委托 DataSourceRegistry 熔断器（provider="tencent_style"）
 
 _SNAPSHOT_KEY = "fund_style_snapshot"
 _SNAPSHOT_TTL = 365 * 86400
@@ -239,6 +237,8 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
     Returns:
         {"market_cap": float, "pe": float} 或 None
     """
+    from src.python.provider_registry import get_registry
+    reg = get_registry()
     try:
         from src.python.providers.tencent import fetch_price
         data = fetch_price(code)
@@ -255,18 +255,126 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
         if pe is not None and pe > 0:
             result["pe"] = pe
 
-        return result if result else None
+        if result:
+            reg.record_success("tencent_style")
+            return result
+        return None
     except Exception:
         logger.warning("Tencent 扩展数据获取失败 [%s]", code, exc_info=True)
+        reg.record_failure("tencent_style", f"extended:{code}")
         return None
 
 
-def _get_industry_avg_pe(_codes: list[str]) -> dict[str, float]:
+def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
     """获取每只股票对应行业的平均 PE。
 
-    使用行业平均 PE 作为基准来判断估值倾向。
-    当前暂未实现，返回空字典。"""
-    return {}
+    利用 push2 API 获取持仓各股的行业归属和 PE 数据，
+    按行业分组后以 **中位数** 作为行业平均 PE 基准（抗离群值）。
+
+    副作用：同时填充 registry session_cache（domain="extended"），
+    使 ``classify_fund_style`` 主循环直接命中缓存，不会重复请求。
+
+    Args:
+        codes: 6 位 A 股代码列表
+
+    Returns:
+        {code: industry_avg_pe, ...} 映射；
+        仅包含有行业分类且 PE > 0 的股票；
+        当无可用数据时返回 ``{}``（方案 C 降级走代码段估算）。
+    """
+    try:
+        from src.python.providers.eastmoney_industry import fetch_industry
+    except ImportError:
+        logger.warning("eastmoney_industry 模块不可用，行业平均 PE 功能降级")
+        return {}
+
+    if not codes:
+        return {}
+
+    try:
+        # ── 第一遍：获取行业归属 + PE 数据 ──────────────────────
+        code_industry: dict[str, str] = {}
+        industry_pes: dict[str, list[float]] = {}
+
+        for code in codes:
+            if not is_a_share_code(code):
+                continue
+
+            # push2 行业分类（eastmoney_industry 通过 registry session_cache 缓存）
+            industry = fetch_industry(code)
+            if not industry:
+                continue
+
+            # push2 扩展行情 PE（同时填充 registry session_cache，主循环复用）
+            ext = _push2_extended(code)
+            if ext is None:
+                continue
+            pe = ext.get("pe")
+            if pe is None or pe <= 0:
+                continue
+
+            code_industry[code] = industry
+            if industry not in industry_pes:
+                industry_pes[industry] = []
+            industry_pes[industry].append(pe)
+
+        if not industry_pes:
+            return {}
+
+        # ── 第二遍：计算各行业 PE 中位数 ────────────────────────
+        industry_avg: dict[str, float] = {}
+        for ind, pe_list in industry_pes.items():
+            sorted_pe = sorted(pe_list)
+            n = len(sorted_pe)
+            if n == 1:
+                industry_avg[ind] = sorted_pe[0]
+            elif n % 2 == 1:
+                industry_avg[ind] = sorted_pe[n // 2]
+            else:
+                industry_avg[ind] = (sorted_pe[n // 2 - 1] + sorted_pe[n // 2]) / 2.0
+
+        # ── 第三遍：代码 → 行业平均 PE 映射 ─────────────────────
+        return {code: industry_avg[ind] for code, ind in code_industry.items()
+                if ind in industry_avg}
+    except Exception:
+        logger.warning("行业平均 PE 获取异常", exc_info=True)
+        return {}
+
+
+def _batch_tencent_extended(codes: list[str]) -> dict[str, dict[str, Any]]:
+    """并发批量通过腾讯 API 获取多只股票的扩展数据。
+
+    当 push2 熔断时作为批量降级方案，避免逐个串行请求。
+    结果同时写入 registry session_cache（domain="extended"）供主循环复用。
+
+    Args:
+        codes: 6 位 A 股代码列表
+
+    Returns:
+        {code: {"market_cap": float, "pe": float}, ...} —
+        仅包含有成功返回的股票代码
+    """
+    if not codes:
+        return {}
+    results: dict[str, dict[str, Any]] = {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        fut_map = {ex.submit(_tencent_extended, c): c for c in codes}
+        for fut in as_completed(fut_map):
+            c = fut_map[fut]
+            try:
+                data = fut.result()
+            except Exception:
+                logger.warning("Tencent 批量并发获取失败 [%s]", c, exc_info=True)
+                data = None
+            if data is not None:
+                results[c] = data
+    # 同步写入 registry session_cache（主循环不会重复请求）
+    if results:
+        from src.python.provider_registry import get_registry
+        reg = get_registry()
+        for c, d in results.items():
+            reg.session_cache_set("extended", c, d)
+    return results
 
 
 def classify_fund_style(
@@ -285,7 +393,8 @@ def classify_fund_style(
          "is_estimated": bool,
          "details": [{"name", "code", "size", "style", "ratio", "is_estimated"}, ...]}
     """
-    global _tencent_failures
+    from src.python.provider_registry import get_registry, _NOT_FOUND
+    reg = get_registry()
 
     if not holdings:
         return {"code": fund_code, "style": "--", "is_estimated": False, "details": []}
@@ -297,7 +406,31 @@ def classify_fund_style(
     # 获取行业平均 PE（当前为空）
     industry_avg_pe_map = _get_industry_avg_pe(stock_codes) if stock_codes else {}
 
-    # 逐只股票判定风格
+    # ── 预取阶段：并行填充 registry session_cache ──────────────────
+    # 三级降级：push2（精确）→ Tencent 批量并发（可靠）→ 代码段估算（兜底）
+    # 非 A 股（美股/港股/基金等）跳过 API 调用，直接估算
+    _codes_to_fetch = [
+        c for h in holdings if (c := (h.get("code") or "").strip())
+        and c and is_a_share_code(c)
+    ]
+    # 去重：同一股票跨基金不重复请求
+    _seen: set[str] = set()
+    _unique_codes = [c for c in _codes_to_fetch if not (c in _seen or _seen.add(c))]
+    # 仅处理尚未缓存到 registry session_cache 的代码
+    _need_tencent: list[str] = []
+    for code in _unique_codes:
+        if reg.session_cache_contains("extended", code):
+            continue
+        ext_data = _push2_extended(code)
+        if ext_data is None:
+            _need_tencent.append(code)
+        else:
+            reg.session_cache_set("extended", code, ext_data)
+    # 并发批量腾讯回退（push2 熔断时效果明显，~60s → ~8s）
+    if _need_tencent and not reg.is_circuit_broken("tencent_style"):
+        _batch_tencent_extended(_need_tencent)
+
+    # ── 判定阶段：逐只股票读取 registry session_cache 判定风格 ──
     stock_styles: list[dict[str, Any]] = []
     total_weight = 0.0
     size_weights: dict[str, float] = {"大盘": 0.0, "中盘": 0.0, "小盘": 0.0}
@@ -311,22 +444,8 @@ def classify_fund_style(
         if ratio <= 0:
             continue
 
-        # 三级降级：push2（精确）→ Tencent（可靠）→ 代码段估算（兜底）
-        # 非 A 股（美股/港股/基金等）跳过 API 调用，直接估算
-        # 会话级内存复用：同一股票跨基金不重复 HTTP
-        ext_data = None
-        if code and is_a_share_code(code):
-            if code in _ext_memo:
-                ext_data = _ext_memo[code]
-            else:
-                ext_data = _push2_extended(code)
-                if ext_data is None and _tencent_failures < _TENCENT_SKIP_THRESHOLD:
-                    ext_data = _tencent_extended(code)
-                    if ext_data is None:
-                        _tencent_failures += 1
-                    else:
-                        _tencent_failures = 0
-                _ext_memo[code] = ext_data
+        _cached = reg.session_cache_get("extended", code) if code and is_a_share_code(code) else _NOT_FOUND
+        ext_data = _cached if _cached is not _NOT_FOUND else None
         industry_avg_pe = industry_avg_pe_map.get(code)
 
         if ext_data:

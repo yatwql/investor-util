@@ -66,11 +66,13 @@ def _get_key_windows() -> str:
 
 def _get_key_linux() -> str:
     import select
-    import termios
-    import tty
 
     if not sys.stdin.isatty():
-        # 非 TTY 环境（管道/重定向/CI），无法读取方向键
+        return KEY_UNKNOWN
+    try:
+        import termios  # Linux/macOS only
+        import tty  # Linux/macOS only
+    except ImportError:
         return KEY_UNKNOWN
     ch = ""
     try:
@@ -89,16 +91,15 @@ def _get_key_linux() -> str:
         if ch in ("\r", "\n"):
             return KEY_ENTER
         if ch == "\x1b":  # ESC 序列 -> 方向键
-            # 带超时逐字节读取，每字节使用 select 确保可读，防止 read(2) 死等
             rdy, _, _ = select.select([sys.stdin], [], [], _ESC_TIMEOUT)
             if not rdy:
-                return KEY_UNKNOWN  # 单独 ESC 键
+                return KEY_UNKNOWN
             b1 = sys.stdin.read(1)
             if not b1:
                 return KEY_UNKNOWN
             rdy2, _, _ = select.select([sys.stdin], [], [], _ESC_TIMEOUT)
             if not rdy2:
-                return KEY_UNKNOWN  # 仅收到一个后续字节（不完整序列）
+                return KEY_UNKNOWN
             b2 = sys.stdin.read(1)
             if not b2:
                 return KEY_UNKNOWN

@@ -54,7 +54,7 @@ def fetch_nav(code: str) -> dict[str, Any] | None:
             - source: "东方财富" 或 "天天基金"
         None: 网络异常或解析失败
     """
-    params = {
+    params: dict[str, Any] = {
         "callback": "jQuery",
         "fundCode": code.strip(),
         "pageIndex": 1,
@@ -65,7 +65,7 @@ def fetch_nav(code: str) -> dict[str, Any] | None:
 
     try:
         with make_http_client(timeout=_TIMEOUT) as client:
-            resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)  # type: ignore[arg-type]
+            resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)
             text = resp.text
     except httpx.TimeoutException:
         logger.warning("东方财富 API 超时: %s", code)

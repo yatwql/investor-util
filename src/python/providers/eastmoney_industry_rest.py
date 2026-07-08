@@ -33,13 +33,13 @@ _HEADERS = {
     "Referer": "https://quote.eastmoney.com/",
 }
 
-# 会话级内存缓存 — 同一代码在会话内不重复 HTTP 请求（C4 约束）
-_ext_memo: dict[str, dict[str, Any] | None] = {}
+# 会话级内存缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="industry_rest"）
 
 
 def _ext_memo_clear() -> None:
-    """测试用：清空会话级内存缓存。"""
-    _ext_memo.clear()
+    """测试用：清空行业 REST 缓存。"""
+    from src.python.provider_registry import get_registry
+    get_registry().session_cache_clear("industry_rest")
 
 
 def _quote_prefix(code: str) -> str:
@@ -86,8 +86,11 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
             - concept_ids: 空列表
         None: 页面请求失败或未找到行业数据
     """
-    if code in _ext_memo:
-        return _ext_memo[code]
+    from src.python.provider_registry import get_registry, _NOT_FOUND
+    reg = get_registry()
+    cached = reg.session_cache_get("industry_rest", code)
+    if cached is not _NOT_FOUND:
+        return cached
 
     prefix = _quote_prefix(code)
     url = _QUOTE_BASE.format(prefix=prefix, code=code)
@@ -100,13 +103,13 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
             html = resp.text
     except (httpx.TimeoutException, httpx.RequestError) as e:
         logger.warning("东方财富 REST 行情页请求失败 [%s]: %s", code, e)
-        _ext_memo[code] = None
+        reg.session_cache_set("industry_rest", code, None)
         return None
 
     qd = _extract_quotedata(html)
     if not qd:
         logger.warning("东方财富 REST 行情页未找到行业数据 [%s]", code)
-        _ext_memo[code] = None
+        reg.session_cache_set("industry_rest", code, None)
         return None
 
     industry = qd.get("bk_name", "") or ""
@@ -122,5 +125,5 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
         "concepts": [],
         "concept_ids": [],
     }
-    _ext_memo[code] = result
+    reg.session_cache_set("industry_rest", code, result)
     return result

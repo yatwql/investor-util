@@ -227,13 +227,13 @@ class TestJsonPrototypePollutionY6(unittest.TestCase):
 
     def test_config_json_with_proto(self):
         """config.json 含 __proto__ → 不被特殊处理。"""
-        from src.python.config import get_config, get_config_path
+        from src.python.config import get_config
         import builtins
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = os.path.join(tmpdir, "config.json")
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump({"__proto__": {"admin": True}, "output_dir": "reports"}, f)
-            with patch("src.python.config.get_config_path", return_value=config_path):
+            with patch("src.python.config._defaults._CONFIG_FILE", config_path):
                 config = get_config()
             self.assertIn("__proto__", config)
             self.assertEqual(config["output_dir"], "reports")

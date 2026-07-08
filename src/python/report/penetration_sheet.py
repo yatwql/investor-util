@@ -7,6 +7,7 @@ compute_penetration_top10 进行计算。
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -38,9 +39,10 @@ logger = logging.getLogger("invest")
 _tracker = DegradationTracker()
 
 _NCOLS = 10
+_CURRENT_YEAR = datetime.now().year
 _HEADERS = [
     "排名", "名称", "代码", "穿透市值", "占比", "板块", "概念",
-    "预测EPS(2026E)", "年均股息率", "来源明细",
+    f"预测EPS({_CURRENT_YEAR}E)", "年均股息率", "来源明细",
 ]
 
 
@@ -270,7 +272,7 @@ def _num_formats() -> list[str | None]:
         FMT_PERCENT,  # 5  占比
         "",           # 6  板块
         "",           # 7  概念
-        "",           # 8  预测EPS(2026E)
+        "",           # 8  预测EPS(动态年份)
         "",           # 9  年均股息率
         "",           # 10 来源明细
     ]

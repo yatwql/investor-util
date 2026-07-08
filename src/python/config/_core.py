@@ -1,13 +1,4 @@
-"""配置管理模块 — 读写 data/config/config.json。
-
-支持：
-- 基础配置（持仓目录/文件名/输出目录等）
-- 缓存 TTL 自定义
-- LLM 外部配置文件引用（API Key 不直接存储在 config.json 中）
-- config.json / llm_settings.json / llm_key.json 支持 ``//`` 单行注释和 ``/* */`` 多行注释
-  （自动剥离后解析），方便按业务场景分组管理配置项。
-"""
-
+"""核心配置逻辑 — 配置读写缓存 / 校验 / LLM 配置合并。"""
 from __future__ import annotations
 
 import contextlib
@@ -18,133 +9,20 @@ import tempfile
 import threading
 from typing import Any
 
-from src.python.constants import MODEL_PRICING
-from src.python.registry import (
-    get_cache_ttl_defaults,
-    get_known_llm_settings_keys,
-    get_report_section_keys,
-)
+from src.python.config import _comments
+from src.python.config import _defaults
+from src.python.registry import get_known_llm_settings_keys, get_report_section_keys
 
 logger = logging.getLogger("invest")
 
-# 配置文件路径
-_CONFIG_FILE = "data/config/config.json"
-
-# 默认配置（按业务分组排列顺序，与模板 _get_default_config_template() 一致）
-_DEFAULT_CONFIG = {
-    # ── A. 路径与文件 ──
-    "holdings_dir": "data/holdings",
-    "holdings_filename": "个人投资持仓信息.xlsx",
-    "output_dir": "reports",
-    "llm_key_file": "data/config/llm_key.json",
-    "llm_settings_file": "data/config/llm_settings.json",
-    # ── B. 数据源与提供商 ──
-    "news_top_count": 300,
-    "news_sources": {
-        "sina": True,
-        "eastmoney": True,
-        "cls": False,
-        "wallstreetcn": True,
-        "akshare": True,
-    },
-    "preferred_provider": {},
-    # ── C. 市场时段与缓存 ──
-    "market_hour_aware": ["price", "index"],
-    "market_hour_ttl": 30,
-    "market_hours": {
-        "start": "09:30",
-        "end": "15:00",
-        "official_source": True,
-    },
-    "cache_ttl": get_cache_ttl_defaults(),
-    # ── D. 行为调优 ──
-    "default_menu_key": "L",
-    "report_section_order": {},
-    "early_warning": {
-        "sector_alert_threshold_warning": -50_000_000,
-        "sector_alert_threshold_danger": -200_000_000,
-        "sentiment_top_n": 10,
-    },
-    "degradation": {
-        "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
-        "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
-        "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14},
-    },
-    # ── E. 业绩基准 ──
-    "user_fund_benchmarks": {},
-}
-
-
-# ── 配置缓存（线程安全，按 mtime 自动失效） ─────────────
-
-
-def _get_default_config_template() -> str:
-    """返回带分组注释的默认 config.json 模板字符串。
-
-    与 _DEFAULT_CONFIG 保持语义一致，首次创建 config.json 时写入。
-    使用 ``//`` 注释分组，由 _strip_json_comments() 剥离后解析。
-    """
-    ttl_json = json.dumps(get_cache_ttl_defaults(), ensure_ascii=False, indent=2)
-    lines = ttl_json.split("\n")
-    indented_ttl = "\n".join([lines[0]] + ["  " + line for line in lines[1:]])
-    return (
-        '{\n'
-        '  // ── A. 路径与文件 ──\n'
-        '  "holdings_dir": "data/holdings",\n'
-        '  "holdings_filename": "个人投资持仓信息.xlsx",\n'
-        '  "output_dir": "reports",\n'
-        '  "llm_key_file": "data/config/llm_key.json",\n'
-        '  "llm_settings_file": "data/config/llm_settings.json",\n'
-        '\n'
-        '  // ── B. 数据源与提供商 ──\n'
-        '  "news_top_count": 300,\n'
-        '  "news_sources": {\n'
-        '    "sina": true,\n'
-        '    "eastmoney": true,\n'
-        '    "cls": false,\n'
-        '    "wallstreetcn": true,\n'
-        '    "akshare": true\n'
-        '  },\n'
-        '  "preferred_provider": {},\n'
-        '\n'
-        '  // ── C. 市场时段与缓存 ──\n'
-        '  "market_hour_aware": ["price", "index"],\n'
-        '  "market_hour_ttl": 30,\n'
-        '  "market_hours": {\n'
-        '    "start": "09:30",\n'
-        '    "end": "15:00",\n'
-        '    "official_source": true\n'
-        '  },\n'
-        f'  "cache_ttl": {indented_ttl},\n'
-        '\n'
-        '  // ── D. 行为调优 ──\n'
-        '  "default_menu_key": "L",\n'
-        '  "report_section_order": {},\n'
-        '  "early_warning": {\n'
-        '    "sector_alert_threshold_warning": -50000000,\n'
-        '    "sector_alert_threshold_danger": -200000000,\n'
-        '    "sentiment_top_n": 10\n'
-        '  },\n'
-        '  "degradation": {\n'
-        '    "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},\n'
-        '    "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},\n'
-        '    "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}\n'
-        '  },\n'
-        '\n'
-        '  // ── E. 业绩基准 ──\n'
-        '  "user_fund_benchmarks": {}\n'
-        '}\n'
-    )
+# ═══════════════════════════════════════════════════════════════
+# 配置缓存（线程安全，按 mtime 自动失效）
+# ═══════════════════════════════════════════════════════════════
 
 _config_cache: dict | None = None
 _config_mtime: float = 0
 _config_size: int = 0
 _config_lock = threading.Lock()
-
-
-def get_config_path() -> str:
-    """返回配置文件路径。"""
-    return _CONFIG_FILE
 
 
 def _clear_config_cache() -> None:
@@ -161,10 +39,10 @@ def get_config() -> dict:
     """
     global _config_cache, _config_mtime, _config_size
 
-    config_path = get_config_path()
+    config_path = _defaults.get_config_path()
     if not os.path.exists(config_path):
         _config_cache = None
-        return dict(_DEFAULT_CONFIG)
+        return dict(_defaults._DEFAULT_CONFIG)
 
     with _config_lock:
         try:
@@ -180,12 +58,12 @@ def get_config() -> dict:
         try:
             with open(config_path, encoding="utf-8-sig") as f:
                 raw = f.read()
-                cleaned = _strip_json_comments(raw)
+                cleaned = _comments._strip_json_comments(raw)
                 config = json.loads(cleaned)
-            merged = dict(_DEFAULT_CONFIG)
+            merged = dict(_defaults._DEFAULT_CONFIG)
             # 过滤 null 值：不允许 config.json 中的 null 覆盖默认值
             for key, val in config.items():
-                if val is None and key in _DEFAULT_CONFIG:
+                if val is None and key in _defaults._DEFAULT_CONFIG:
                     continue
                 merged[key] = val
             _config_cache = merged
@@ -199,7 +77,7 @@ def get_config() -> dict:
         except (OSError, json.JSONDecodeError):
             _config_cache = None
             logger.warning("配置文件 %s 读取失败，已回退到默认配置", config_path)
-            return dict(_DEFAULT_CONFIG)
+            return dict(_defaults._DEFAULT_CONFIG)
 
 
 def set_config(key: str, value: Any) -> None:
@@ -217,13 +95,12 @@ def set_config(key: str, value: Any) -> None:
     config = get_config()
     config[key] = value
 
-    config_path = get_config_path()
+    config_path = _defaults.get_config_path()
     config_dir = os.path.dirname(config_path)
 
-    # 确保父目录存在
     os.makedirs(config_dir, exist_ok=True)
 
-    # 原子写入：先写临时文件再 os.replace，防止断电半写导致 config.json 截断
+    # 原子写入：先写临时文件再 os.replace
     fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -234,40 +111,60 @@ def set_config(key: str, value: Any) -> None:
             os.remove(tmp_path)
         raise
 
-    # 清除缓存，使下次 get_config() 重新读取
     _config_cache = None
     _config_mtime = 0
     _config_size = 0
 
 
-# ── 已知的配置项枚举（用于配置校验） ──────────────────
+def init_config() -> None:
+    """初始化配置文件。
+
+    若 config.json 不存在，则自动用默认配置创建并写入磁盘。
+    若文件已存在，不做任何操作。
+    """
+    global _config_cache, _config_mtime, _config_size
+
+    config_path = _defaults.get_config_path()
+    if os.path.exists(config_path):
+        config = get_config()
+        validate_config(config)
+        return
+    config_dir = os.path.dirname(config_path)
+    os.makedirs(config_dir, exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as f:
+        f.write(_defaults._get_default_config_template())
+    _config_cache = None
+    _config_mtime = 0
+    _config_size = 0
+    logger.info("配置文件已自动生成: %s", config_path)
+
+    _ensure_llm_settings_file()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 配置校验
+# ═══════════════════════════════════════════════════════════════
 
 _KNOWN_NEWS_SOURCES: set[str] = {"sina", "eastmoney", "cls", "wallstreetcn", "akshare"}
 
 _KNOWN_PROVIDER_TYPES: set[str] = {"price", "fund_rank", "fund_hold", "industry"}
 
-_KNOWN_PROVIDER_NAMES: set[str] = {"tencent", "eastmoney", "sina", "tiantian", "eastmoney_industry", "eastmoney_industry_rest"}
+_KNOWN_PROVIDER_NAMES: set[str] = {
+    "tencent", "eastmoney", "sina", "tiantian",
+    "eastmoney_industry", "eastmoney_industry_rest",
+}
 
-_STRING_CONFIG_KEYS: set[str] = {"holdings_dir", "holdings_filename", "output_dir",
-                                  "llm_key_file", "llm_settings_file"}
-
-
-# ── 配置校验辅助函数 ────────────────────────────────────────
+_STRING_CONFIG_KEYS: set[str] = {
+    "holdings_dir", "holdings_filename", "output_dir",
+    "llm_key_file", "llm_settings_file",
+}
 
 _MISSING = object()
 
 
 def _section(config: dict, key: str, expected_type: type, warn_msg: str,
              issues: int = 0) -> tuple[Any, int]:
-    """读取配置段，校验类型，不存在/类型不匹配时返回 (_MISSING, issues)。
-
-    封装所有校验函数重复的"get → None 检查 → isinstance → 日志"模式。
-    调用方::
-
-        val, issues = _section(config, "cache_ttl", dict, "消息")
-        if val is _MISSING:
-            return issues
-    """
+    """读取配置段，校验类型。"""
     val = config.get(key)
     if val is None:
         return _MISSING, issues
@@ -278,13 +175,11 @@ def _section(config: dict, key: str, expected_type: type, warn_msg: str,
 
 
 def _validate_string_configs(config: dict, issues: int) -> int:
-    """校验字符串类型配置项。"""
     for key in _STRING_CONFIG_KEYS:
         val = config.get(key)
         if val is not None and not isinstance(val, str):
             logger.warning("config.json %s = %r 不是字符串类型，可能导致运行时 TypeError", key, val)
             issues += 1
-    # holdings_filename 为空字符串时会导致 os.path.join 返回目录路径
     fn = config.get("holdings_filename")
     if isinstance(fn, str) and fn.strip() == "":
         logger.warning("config.json holdings_filename 为空字符串，将使用默认文件名")
@@ -293,7 +188,6 @@ def _validate_string_configs(config: dict, issues: int) -> int:
 
 
 def _validate_news_top_count(config: dict, issues: int) -> int:
-    """校验 news_top_count 配置项。"""
     ntc = config.get("news_top_count")
     if ntc is None:
         return issues
@@ -309,7 +203,6 @@ def _validate_news_top_count(config: dict, issues: int) -> int:
 
 
 def _validate_cache_ttl(config: dict, issues: int) -> int:
-    """校验 cache_ttl 配置段。"""
     cache_ttl, issues = _section(config, "cache_ttl", dict, "所有缓存 TTL 将使用默认值", issues)
     if cache_ttl is _MISSING:
         return issues
@@ -319,14 +212,13 @@ def _validate_cache_ttl(config: dict, issues: int) -> int:
             if val <= 0:
                 logger.warning("config.json cache_ttl.%s = %s 不是正数，将使用默认值", k, v)
                 issues += 1
-        except (ValueError, TypeError):  # noqa: PERF203
+        except (ValueError, TypeError):
             logger.warning("config.json cache_ttl.%s = %s 不是有效数字，将使用默认值", k, v)
             issues += 1
     return issues
 
 
 def _validate_news_sources(config: dict, issues: int) -> int:
-    """校验 news_sources 配置段。"""
     news_src, issues = _section(config, "news_sources", dict, "所有源将使用默认开关状态", issues)
     if news_src is _MISSING:
         return issues
@@ -342,7 +234,6 @@ def _validate_news_sources(config: dict, issues: int) -> int:
 
 
 def _validate_preferred_provider(config: dict, issues: int) -> int:
-    """校验 preferred_provider 配置段。"""
     pref, issues = _section(config, "preferred_provider", dict, "配置无效", issues)
     if pref is _MISSING:
         return issues
@@ -360,16 +251,13 @@ def _validate_preferred_provider(config: dict, issues: int) -> int:
 
 
 def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
-    """校验 user_fund_benchmarks 配置段。"""
     ufb, issues = _section(config, "user_fund_benchmarks", dict, "自定义基准将忽略", issues)
     if ufb is _MISSING:
         return issues
-    # 存在且类型正确 = 不需要进一步校验
     return issues
 
 
 def _validate_early_warning(config: dict, issues: int) -> int:
-    """校验 early_warning 配置段。"""
     ew, issues = _section(config, "early_warning", dict, "智能预警阈值将使用默认值", issues)
     if ew is _MISSING:
         return issues
@@ -379,7 +267,7 @@ def _validate_early_warning(config: dict, issues: int) -> int:
             try:
                 fv = float(ew_val)
                 if fv >= 0:
-                    logger.warning("config.json early_warning.%s = %s 应为负值（净流出阈值），当前值为正", ew_key, ew_val)
+                    logger.warning("config.json early_warning.%s = %s 应为负值（净流出阈值）", ew_key, ew_val)
                     issues += 1
             except (ValueError, TypeError):
                 logger.warning("config.json early_warning.%s = %s 不是有效数字", ew_key, ew_val)
@@ -399,13 +287,10 @@ def _validate_early_warning(config: dict, issues: int) -> int:
 
 
 def _validate_market_hours(config: dict, issues: int) -> int:
-    """校验 market_hour_aware / market_hour_ttl / market_hours 配置段。"""
-    # market_hour_aware：必须为列表，元素为字符串
     mha = config.get("market_hour_aware")
     if mha is not None and (not isinstance(mha, list) or not all(isinstance(x, str) for x in mha)):
-        logger.warning("config.json market_hour_aware = %r 不是字符串列表，将使用默认值 [\"price\", \"index\"]", mha)
+        logger.warning("config.json market_hour_aware = %r 不是字符串列表", mha)
         issues += 1
-    # market_hour_ttl：必须为正整数
     mht = config.get("market_hour_ttl")
     if mht is not None:
         try:
@@ -416,7 +301,6 @@ def _validate_market_hours(config: dict, issues: int) -> int:
         except (ValueError, TypeError):
             logger.warning("config.json market_hour_ttl = %r 不是有效整数，将使用默认值 30", mht)
             issues += 1
-    # market_hours：必须为 dict，含有效 start/end 时间
     mh = config.get("market_hours")
     if mh is not None:
         if not isinstance(mh, dict):
@@ -426,58 +310,41 @@ def _validate_market_hours(config: dict, issues: int) -> int:
             for time_key in ("start", "end"):
                 tv = mh.get(time_key)
                 if tv is not None and not isinstance(tv, str):
-                    logger.warning("config.json market_hours.%s = %r 不是字符串，将使用默认值", time_key, tv)
+                    logger.warning("config.json market_hours.%s = %r 不是字符串", time_key, tv)
                     issues += 1
     return issues
 
 
 def _validate_report_section_order(config: dict, issues: int) -> int:
-    """校验 report_section_order 配置段。
-
-    检查项：
-      - report_section_order 是否为 dict
-      - 模块标识是否合法（在 _REPORT_SECTION_DEFAULT 中）
-      - 配置的序号是否为正整数
-      - 序号是否重复
-      - llm_usage 不应出现在配置中（强制末尾）
-    """
     order, issues = _section(config, "report_section_order", dict, "将使用默认顺序", issues)
     if order is _MISSING:
         return issues
-
     valid_keys = get_report_section_keys()
     seen_numbers: set[int] = set()
-
     for key, num in order.items():
-        # 检查 llm_usage（设计上它不参与配置）
         if key == "llm_usage":
-            logger.warning("config.json report_section_order 中不应包含 llm_usage，"
-                           "该模块固定为最后一位，配置将被忽略")
+            logger.warning("config.json report_section_order 中不应包含 llm_usage")
             issues += 1
             continue
-        # 检查未知标识
         if key not in valid_keys:
-            logger.warning("config.json report_section_order 中存在未知的模块标识 %r，将被忽略", key)
+            logger.warning("config.json report_section_order 中存在未知的模块标识 %r", key)
             issues += 1
             continue
-        # 检查非整数 / 负值
         try:
             n = int(num)
             if n < 1:
-                logger.warning("config.json report_section_order.%s = %s 不是正数，将使用默认序号", key, num)
+                logger.warning("config.json report_section_order.%s = %s 不是正数", key, num)
                 issues += 1
                 continue
         except (ValueError, TypeError):
-            logger.warning("config.json report_section_order.%s = %s 不是有效整数，将使用默认序号", key, num)
+            logger.warning("config.json report_section_order.%s = %s 不是有效整数", key, num)
             issues += 1
             continue
-        # 检查重复序号
         if n in seen_numbers:
-            logger.warning("config.json report_section_order 中存在重复序号 %s（%s），请检查", n, key)
+            logger.warning("config.json report_section_order 中存在重复序号 %s（%s）", n, key)
             issues += 1
         else:
             seen_numbers.add(n)
-
     return issues
 
 
@@ -493,7 +360,6 @@ def validate_config(config: dict | None = None) -> int:
     if config is None:
         config = get_config()
     issues = 0
-
     issues = _validate_string_configs(config, issues)
     issues = _validate_news_top_count(config, issues)
     issues = _validate_cache_ttl(config, issues)
@@ -503,48 +369,34 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_early_warning(config, issues)
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
-
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)
     return issues
 
 
-def init_config() -> None:
-    """初始化配置文件。
+# ═══════════════════════════════════════════════════════════════
+# LLM 配置
+# ═══════════════════════════════════════════════════════════════
 
-    若 config.json 不存在，则自动用默认配置创建并写入磁盘。
-    若文件已存在，不做任何操作。
-    """
-    global _config_cache, _config_mtime, _config_size
+_KNOWN_LLM_SETTINGS_KEYS: set[str] = get_known_llm_settings_keys()
+_llm_config_cache: dict | None = None
+_llm_config_mtime: float = 0
+_llm_config_size: int = 0
+_llm_config_lock = threading.Lock()
 
-    config_path = get_config_path()
-    if os.path.exists(config_path):
-        config = get_config()
-        validate_config(config)  # 全面校验配置
-        return
-    config_dir = os.path.dirname(config_path)
-    os.makedirs(config_dir, exist_ok=True)
-    with open(config_path, "w", encoding="utf-8") as f:
-        f.write(_get_default_config_template())
-    # 清除缓存，使后续 get_config() 从新文件读取
-    _config_cache = None
-    _config_mtime = 0
-    _config_size = 0
-    logger.info("配置文件已自动生成: %s", config_path)
 
-    # 同时初始化 llm_settings.json
-    _ensure_llm_settings_file()
+def _check_unknown_llm_keys(settings: dict) -> None:
+    """检查 llm_settings.json 中是否存在未知键名。"""
+    unknown = [key for key in settings if key not in _KNOWN_LLM_SETTINGS_KEYS]
+    if unknown:
+        logger.warning(
+            "llm_settings.json 中检测到 %d 个未知配置项，可能是拼写错误或已废弃的配置: %s。"
+            "请核对后删除，避免混淆。",
+            len(unknown), ", ".join(repr(k) for k in sorted(unknown)),
+        )
 
 
 def _get_default_llm_settings_template() -> str:
-    """返回带分组注释的默认 llm_settings.json 模板字符串。
-
-    模块按业务分组：全局设置 → 模块开关 → 各 LLM 模块 → 计价配置。
-    使用 ``//`` 注释分组，由 _strip_json_comments() 剥离后解析。
-    """
-    pricing_json = json.dumps({"currency": "CNY", **MODEL_PRICING}, ensure_ascii=False, indent=4)
-    pricing_lines = pricing_json.split("\n")
-    indented_pricing = "\n".join([pricing_lines[0]] + ["    " + line for line in pricing_lines[1:]])
     return (
         '{\n'
         '  // ═══════════════════════════════════════════\n'
@@ -622,7 +474,6 @@ def _get_default_llm_settings_template() -> str:
         '\n'
         '  // ═══════════════════════════════════════════\n'
         '  // 财经新闻热点与持仓关联分析 — news_correlation\n'
-        '  // （注：news_correlation 不支持 output_brief 模式）\n'
         '  // ═══════════════════════════════════════════\n'
         '  "system_prompt_news_correlation": null,\n'
         '  "model_news_correlation": null,\n'
@@ -633,18 +484,22 @@ def _get_default_llm_settings_template() -> str:
         '  "thinking_enabled_news_correlation": false,\n'
         '  "thinking_budget_news_correlation": 4000,\n'
         '  "reasoning_effort_news_correlation": "high",\n'
-        '\n'
         '  // ═══════════════════════════════════════════\n'
-        '  // 计价配置\n'
+        '  // 计价配置（可选）— 仅用于覆盖 constants.py 默认定价\n'
+        '  // 单一来源：constants.py MODEL_PRICING 是唯一默认定价表\n'
+        '  // 此段仅在需要临时覆盖某模型价格时取消注释，无需在此维护全量\n'
+        '  // "pricing": {\n'
+        '  //   "currency": "CNY",\n'
+        '  // }\n'
         '  // ═══════════════════════════════════════════\n'
-        f'  "pricing": {indented_pricing}\n'
         '}\n'
     )
 
 
 def _ensure_llm_settings_file() -> None:
     """若 llm_settings.json 不存在，用默认值自动创建。"""
-    settings_path = get_llm_settings_path()
+    config = get_config()
+    settings_path = config.get("llm_settings_file", "data/config/llm_settings.json")
     if os.path.exists(settings_path):
         return
     try:
@@ -656,146 +511,23 @@ def _ensure_llm_settings_file() -> None:
         logger.warning("无法自动创建 LLM 设置文件: %s", e)
 
 
-# ── LLM 配置读取（外部文件） ─────────────────────────────────
-
-
 def get_llm_key_path() -> str:
-    """返回 LLM 密钥配置文件的路径 (llm_key.json)。
-
-    从 data/config/config.json 中的 llm_key_file 字段读取，
-    若未配置则默认返回 "data/config/llm_key.json"。
-    """
+    """返回 LLM 密钥配置文件路径 (llm_key.json)。"""
     config = get_config()
     return config.get("llm_key_file", "data/config/llm_key.json")
 
 
 def get_llm_settings_path() -> str:
-    """返回 LLM 非敏感配置文件的路径 (llm_settings.json)。
-
-    从 data/config/config.json 中的 llm_settings_file 字段读取，
-    若未配置则默认返回 "data/config/llm_settings.json"。
-    """
+    """返回 LLM 非敏感配置文件的路径 (llm_settings.json)。"""
     config = get_config()
     return config.get("llm_settings_file", "data/config/llm_settings.json")
 
 
-# ── LLM 配置缓存（按文件修改时间自动失效） ──────────────────
-
-# 已知的 llm_settings.json 合法键名集合，用于启动时未知键名告警
-# 由中央注册表 registry.py 自动派生，不再硬编码
-_KNOWN_LLM_SETTINGS_KEYS: set[str] = get_known_llm_settings_keys()
-
-
-def _check_unknown_llm_keys(settings: dict) -> None:
-    """检查 llm_settings.json 中是否存在未知键名，若有则输出 WARNING。
-
-    Args:
-        settings: 从 llm_settings.json 读取的配置字典
-    """
-    unknown = [key for key in settings if key not in _KNOWN_LLM_SETTINGS_KEYS]
-    if unknown:
-        logger.warning(
-            "llm_settings.json 中检测到 %d 个未知配置项，可能是拼写错误或已废弃的配置: %s。"
-            "请核对后删除，避免混淆。",
-            len(unknown), ", ".join(repr(k) for k in sorted(unknown)),
-        )
-
-_llm_config_cache: dict | None = None
-_llm_config_mtime: float = 0
-_llm_config_size: int = 0
-_llm_config_lock = threading.Lock()
-
-
-# ── JSON 注释剥离（用于 llm_settings.json / llm_key.json） ──
-
-
-def _strip_json_comments(text: str) -> str:
-    """剥离 JSON 中的 ``//`` 单行注释和 ``/* */`` 多行注释。
-
-    正确处理字符串中的转义引号，不会将字符串内的 ``//`` / ``/*`` 误伤。
-
-    Args:
-        text: 可能包含注释的 JSON 文本
-
-    Returns:
-        不含注释的纯 JSON 文本
-    """
-    # 逐个字符扫描，仅在字符串外识别注释
-    result: list[str] = []
-    i = 0
-    length = len(text)
-    in_string = False
-    in_single_line_comment = False
-    in_multi_line_comment = False
-
-    while i < length:
-        ch = text[i]
-
-        # ── 字符串内：只处理转义引号 ────────────────────────
-        if in_string:
-            result.append(ch)
-            if ch == '\\':
-                i += 1
-                if i < length:
-                    result.append(text[i])
-            elif ch == '"':
-                in_string = False
-            i += 1
-            continue
-
-        # ── 多行注释内 ──────────────────────────────────────
-        if in_multi_line_comment:
-            if ch == '*' and i + 1 < length and text[i + 1] == '/':
-                i += 2  # 跳过 */
-                in_multi_line_comment = False
-            else:
-                i += 1
-            continue
-
-        # ── 单行注释内 ──────────────────────────────────────
-        if in_single_line_comment:
-            if ch == '\n':
-                in_single_line_comment = False
-                result.append(ch)
-            i += 1
-            continue
-
-        # ── 注释起始检测（仅在字符串外） ─────────────────────
-        if ch == '/' and i + 1 < length:
-            nxt = text[i + 1]
-            if nxt == '/':
-                in_single_line_comment = True
-                i += 2
-                continue
-            if nxt == '*':
-                in_multi_line_comment = True
-                i += 2
-                continue
-
-        # ── 字符串起始 ────────────────────────────────────
-        if ch == '"':
-            in_string = True
-
-        result.append(ch)
-        i += 1
-
-    return "".join(result)
-
-
 def get_llm_config() -> dict | None:
-    """读取 LLM 配置（合并 llm_settings.json + llm_key.json）。
-
-    配置优先级（高 → 低）：
-      1. llm_key.json 中的字段（provider, api_key, model, endpoint）
-      2. llm_settings.json 中的字段（其余所有非敏感配置）
-      3. 代码内置默认值（_ensure_llm_settings_file() 自动创建时写入）
-
-    缓存按 llm_settings.json 和 llm_key.json 的修改时间联合失效。
-    """
+    """读取 LLM 配置（合并 llm_settings.json + llm_key.json）。"""
     global _llm_config_cache, _llm_config_mtime, _llm_config_size
 
     with _llm_config_lock:
-        # ── 基础层：llm_settings.json ──
         base_settings: dict = {}
         settings_mtime: float = 0
         settings_path = get_llm_settings_path()
@@ -803,16 +535,14 @@ def get_llm_config() -> dict | None:
             try:
                 with open(settings_path, encoding="utf-8-sig") as f:
                     raw = f.read()
-                    cleaned = _strip_json_comments(raw)
+                    cleaned = _comments._strip_json_comments(raw)
                     base_settings = json.loads(cleaned)
                 settings_mtime = os.path.getmtime(settings_path)
-                # 首次加载时检测未知键名（仅在 cache 未初始化时告警一次）
                 if _llm_config_cache is None and base_settings:
                     _check_unknown_llm_keys(base_settings)
             except (OSError, json.JSONDecodeError) as e:
                 logger.warning("LLM 设置文件读取失败: %s", e)
 
-        # ── 覆盖层：llm_key.json ──
         key_path = get_llm_key_path()
         if not os.path.exists(key_path):
             logger.warning("LLM 密钥文件不存在: %s", key_path)
@@ -839,20 +569,17 @@ def get_llm_config() -> dict | None:
 
             with open(key_path, encoding="utf-8-sig") as f:
                 key_raw = f.read()
-                key_config = json.loads(_strip_json_comments(key_raw))
+                key_config = json.loads(_comments._strip_json_comments(key_raw))
 
-            # 校验配置
             provider = key_config.get("provider", "")
             endpoint = key_config.get("endpoint", "")
             if provider and provider not in ("claude", "openai"):
-                logger.warning("llm_key.json provider = '%s' 不是有效值（应为 'claude' 或 'openai'）", provider)
+                logger.warning("llm_key.json provider = '%s' 不是有效值", provider)
             if endpoint and not endpoint.startswith("http"):
-                logger.warning("llm_key.json endpoint = '%s' 不是有效 URL（应以 http 开头）", endpoint)
+                logger.warning("llm_key.json endpoint = '%s' 不是有效 URL", endpoint)
 
-            # 合并：base_settings 为基础，key_config 覆盖（仅敏感字段）
             merged = dict(base_settings)
             merged.update(key_config)
-            # 去除 api_key 首尾空格，避免因配置文件误含空格导致认证失败
             if merged.get("api_key"):
                 merged["api_key"] = merged["api_key"].strip()
 

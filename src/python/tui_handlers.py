@@ -82,7 +82,7 @@ def _print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
 
 
 def _check_network_available(details: list) -> bool:
-    """检查行情数据是否全部不可用（网络完全中断）。"""
+    """检查行情数据是否全部不可用并在 TUI 上显示友好提示。"""
     if not details:
         return False
     all_unavailable = all(
@@ -90,8 +90,12 @@ def _check_network_available(details: list) -> bool:
         for d in details
     )
     if all_unavailable:
-        print("  [!!] 网络连接异常：所有行情数据均获取失败")
-        print("     请检查网络连接后重试（部分报告内容可能为空）")
+        print("  " + "=" * 54)
+        print("  [!] 所有行情数据均获取失败")
+        print("      可能原因：非交易时段 / 网络异常 / API 限速")
+        print("      报告中将显示「暂无行情」占位符，不影响持仓成本统计")
+        print("      请于交易时段或在网络通畅时重新生成")
+        print("  " + "=" * 54)
         return False
     return True
 

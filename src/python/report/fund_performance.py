@@ -430,7 +430,7 @@ def write_fund_performance_sheet(
     # 按市值降序排列
     fund_holdings_sorted = sorted(
         fund_holdings,
-        key=lambda h: detail_map.get(h.code).market_value if detail_map.get(h.code) else 0.0,  # type: ignore[union-attr]
+        key=lambda h: detail_map[h.code].market_value if h.code in detail_map else 0.0,
         reverse=True,
     )
 

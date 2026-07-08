@@ -216,7 +216,7 @@ def _request_quarterly_api(code: str, api_type: str, year: int | None = None, mo
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Referer": "https://fundf10.eastmoney.com/",
     }
-    params = {
+    params: dict[str, Any] = {
         "type": api_type,
         "code": code.strip(),
         "topline": 10,
@@ -226,7 +226,7 @@ def _request_quarterly_api(code: str, api_type: str, year: int | None = None, mo
     }
     try:
         with make_http_client(timeout=_TIMEOUT) as client:
-            resp = client.get(url, params=params, headers=headers)  # type: ignore[arg-type]
+            resp = client.get(url, params=params, headers=headers)
             resp.encoding = "utf-8"
             text = resp.text
     except httpx.RequestError as e:

@@ -34,7 +34,7 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    @patch("src.python.config.get_config_path")
+    @patch("src.python.config._defaults.get_config_path")
     def test_concurrent_set_config_thread_safe(self, mock_get_path):
         """多个线程同时 set_config → 不损坏文件（Windows 允许部分线程失败）。"""
         mock_get_path.return_value = self.config_path
@@ -80,7 +80,7 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
         # 初始 key 保持完整
         self.assertEqual(final.get("base"), 0, "初始 key 不应被覆盖")
 
-    @patch("src.python.config.get_config_path")
+    @patch("src.python.config._defaults.get_config_path")
     def test_power_failure_during_replace(self, mock_get_path):
         """模拟断电：os.replace 抛出异常 → 原文件完整，无临时文件残留。"""
         mock_get_path.return_value = self.config_path
@@ -94,7 +94,7 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
             original_content = f.read()
 
         # 模拟 os.replace 断电失败
-        with patch("src.python.config.os.replace",
+        with patch("src.python.config._core.os.replace",
                    side_effect=OSError("Power failure simulated")):
             with self.assertRaises(OSError):
                 set_config("new_key", "new_value")
@@ -109,7 +109,7 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
         self.assertEqual(after_content, original_content, "磁盘文件应在断电后保持不变")
         self.assertNotIn("new_key", after_content, "断电后磁盘文件不应含新数据")
 
-    @patch("src.python.config.get_config_path")
+    @patch("src.python.config._defaults.get_config_path")
     def test_partial_write_after_replace_failure(self, mock_get_path):
         """os.replace 写入失败（如磁盘满）→ 恢复旧文件内容。"""
         mock_get_path.return_value = self.config_path
@@ -127,7 +127,7 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
             replace_attempts[0] += 1
             raise OSError("Disk full")
 
-        with patch("src.python.config.os.replace", side_effect=_failing_replace):
+        with patch("src.python.config._core.os.replace", side_effect=_failing_replace):
             with self.assertRaises(OSError):
                 set_config("key_a", "overwritten")
 
@@ -153,7 +153,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
     def tearDown(self):
         if self._orig_config is not None:
             import src.python.config as cfg
-            cfg._CONFIG_FILE = self._orig_config
+            cfg._defaults._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
     # ── BOM 头 JSON ──
@@ -161,12 +161,12 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
     def test_bom_config_json_readable(self):
         """含 UTF-8 BOM 的 config.json → 能被 get_config() 正常解析。"""
         import src.python.config as cfg
-        self._orig_config = cfg._CONFIG_FILE
-        cfg._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        self._orig_config = cfg._defaults._CONFIG_FILE
+        cfg._defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
 
         # 用 utf-8-sig 写入（自动添加 BOM），内容不含
         raw = '{"holdings_dir": "data/holdings", "holdings_filename": "test.xlsx"}'
-        with open(cfg._CONFIG_FILE, "w", encoding="utf-8-sig") as f:
+        with open(cfg._defaults._CONFIG_FILE, "w", encoding="utf-8-sig") as f:
             f.write(raw)
 
         result = cfg.get_config()
@@ -187,10 +187,10 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config.get_llm_key_path", return_value=key_path):
+        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+             patch("src.python.config._core.get_llm_key_path", return_value=key_path):
             # 清缓存
-            cfg._llm_config_cache = None
+            cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -218,9 +218,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config.get_llm_key_path", return_value=key_path):
-            cfg._llm_config_cache = None
+        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+             patch("src.python.config._core.get_llm_key_path", return_value=key_path):
+            cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -241,9 +241,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "  sk-test-with-spaces  ", "provider": "claude"}, f)
 
-        with patch("src.python.config.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config.get_llm_key_path", return_value=key_path):
-            cfg._llm_config_cache = None
+        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+             patch("src.python.config._core.get_llm_key_path", return_value=key_path):
+            cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -259,9 +259,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "\t sk-ant-from-settings \n", "temperature": 0.7}, f)
 
-        with patch("src.python.config.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config.get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")):
-            cfg._llm_config_cache = None
+        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+             patch("src.python.config._core.get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")):
+            cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -283,9 +283,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "openai"}, f)
 
-        with patch("src.python.config.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config.get_llm_key_path", return_value=key_path):
-            cfg._llm_config_cache = None
+        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+             patch("src.python.config._core.get_llm_key_path", return_value=key_path):
+            cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -304,9 +304,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config.get_llm_key_path", return_value=key_path):
-            cfg._llm_config_cache = None
+        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+             patch("src.python.config._core.get_llm_key_path", return_value=key_path):
+            cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -318,9 +318,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
     def test_concurrent_init_config_no_crash(self):
         """config.json 缺失时双线程同时 init_config() → 不崩溃。"""
         import src.python.config as cfg
-        self._orig_config = cfg._CONFIG_FILE
+        self._orig_config = cfg._defaults._CONFIG_FILE
         config_path = os.path.join(self.tmp.name, "config.json")
-        cfg._CONFIG_FILE = config_path
+        cfg._defaults._CONFIG_FILE = config_path
 
         import threading
         errors = []

@@ -15,15 +15,16 @@ CACHE_WEEKLY = 604800       # 每周（7d）
 CACHE_TWO_WEEKS = 1209600   # 两周（14d）
 CACHE_MONTHLY = 2592000     # 每月（30d）
 
-# ── LLM 模型定价表（每百万 token，CNY） ───────────────────
+# ── LLM 模型定价表（每百万 token，CNY）══ 唯一默认源 ══
 
 MODEL_PRICING: dict[str, dict[str, float]] = {
-    # Per 1M token 定价 — 硬编码默认值（具体货币由 llm_settings.json → pricing.currency 决定）
-    # 可通过 llm_settings.json 的 "pricing" 段覆盖或新增模型，
-    # 文件配置优先级高于此默认表。
-    # input: 标准输入（缓存未命中）
-    # output: 输出
-    # input_cache_hit: 缓存命中输入（可选，默认等于 input 即无折扣）
+    # 单一来源：此表为唯一默认定价。pricing.py 以此为基，从 llm_settings.json
+    # 的 "pricing" 段加载覆盖（若存在），运行时合并到 _PRICING_MERGED。
+    # 新增模型请在此处添加，不要仅修改 llm_settings.json。
+    # Per 1M token:
+    #   input: 标准输入（缓存未命中）
+    #   output: 输出
+    #   input_cache_hit: 缓存命中输入（可选，默认等于 input 即无折扣）
     # 通用前缀（如 "claude-sonnet-4-"）用作 startswith() 回退匹配，
     # 覆盖所有日期戳变体（如 claude-sonnet-4-20250514），避免费用显示 "-"。
     "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},

@@ -155,6 +155,20 @@ def _write_profit_summary(
     total_mv: float, total_cost: float, total_profit: float, today_profit: float,
 ) -> int:
     """写入盈亏汇总（数值以原始小数/金额写入，由 Excel 数字格式控制显示）。"""
+    # 检测行情数据是否全部不可用 — 有持仓成本但市值全零
+    _data_unavailable = total_mv == 0 and total_cost > 0
+    if _data_unavailable:
+        _WARN_FILL = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
+        _WARN_FONT = Font(size=10, bold=True, color="CC0000")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=_NCOLS)
+        cell = ws.cell(row=row, column=1,
+                       value="⚠ 行情数据全部不可用（非交易时段/网络异常/API限速），以下市值为 0，"
+                             "请于交易时段重新生成")
+        cell.font = _WARN_FONT
+        cell.fill = _WARN_FILL
+        row += 1
+        row = _write_blanks(ws, row)
+
     profit_rate = (total_profit / total_cost) if total_cost > 0 else 0.0  # 小数，0.00% 格式
     denominator = total_cost + total_profit - today_profit
     today_rate = (today_profit / denominator) if denominator > 0 else 0.0  # 小数，0.00% 格式

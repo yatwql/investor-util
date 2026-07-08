@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 
+from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.code_utils import (
@@ -221,6 +222,14 @@ def write_category_sheet(
     row = write_title_row(ws, 1, get_report_sheet_name('category'), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
+
+    # 若所有行情数据全零，写一行醒目提示
+    _all_zero = all(d.market_value == 0 for d in details)
+    if _all_zero and details:
+        cell = ws.cell(row=row, column=1,
+                       value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
+        cell.font = Font(size=10, bold=True, color="CC0000")
+        row += 1
 
     dividend_data, dividend_success = _load_dividend_data(holdings)
     grand_mv = grand_cost = grand_profit = grand_today = 0.0

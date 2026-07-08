@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-08（v0.3.0 — 管理文档归档 + 版本号同步）
+最后更新：2026-07-08（v0.3.1 — config.py 拆为 config/ 子包 + conftest 标记遗漏自动警告 + 测试隔离 autouse fixture）
 
 ---
 
@@ -26,7 +26,7 @@
 | TUI 入口 | 主循环、流程编排 | `src/python/main.py` |
 | 菜单交互 | 菜单定义、渲染、导航 | `src/python/tui_menu.py` |
 | 菜单通用辅助 | 退出/按任意键继续/LLM用量输出 | `src/python/tui_handlers.py` |
-| 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config.py` |
+| 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config/`（v0.3.1 拆为子包） |
 | 中央注册表 | 数据模块的 name/缓存前缀/TTL/分组/LLM Settings 键名统一注册与查询 | `src/python/registry.py` |
 | 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache.py` |
 | 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher/` |
@@ -44,7 +44,7 @@ investor-util/
 │   │   ├── __init__.py
 │   │   ├── cache.py              # 缓存引擎
 │   │   ├── code_utils.py         # 代码类型判定中心化（A 股/基金/QDII 等识别原语）
-│   │   ├── config.py             # 配置读写
+│   │   ├── config/               # 配置管理子包（_defaults / _comments / _core）
 │   │   ├── constants.py          # 共享常量
 │   │   ├── fetcher/               # 数据获取调度
 │   │   ├── handlers_cache.py     # TUI 缓存管理命令
@@ -161,7 +161,7 @@ v0.2.88 已完成全量迁移，所有 `code.startswith()` 和名称关键词判
 
 ### 原子写入
 
-`cache.py` 和 `config.py` 共享 `tempfile.mkstemp` + `os.replace` 模式：
+`cache.py` 和 `config/` 子包共享 `tempfile.mkstemp` + `os.replace` 模式：
 - 先通过 `tempfile.mkstemp` 写临时文件，成功后 `os.replace` 原子替换原文件
 - 防止断电/崩溃导致文件截断（半写文件）
 - 缓存文件 PermissionError 时自动降级到直接写入（Windows 兼容）
@@ -848,7 +848,7 @@ llm_key.json (敏感密钥)    ──→ 覆盖 llm_settings.json 的同名字�
 
 ### JSON 注释支持
 
-`config.py:_strip_json_comments()` 逐字符扫描，支持 `//` 单行注释和 `/* */` 多行注释。正确处理字符串内的转义引号，不会将字符串内的 `//` / `/*` 误伤。
+`config/_comments.py:_strip_json_comments()` 逐字符扫描，支持 `//` 单行注释和 `/* */` 多行注释。正确处理字符串内的转义引号，不会将字符串内的 `//` / `/*` 误伤。
 
 ### 原子写入
 
@@ -910,7 +910,7 @@ llm/generators.py (LLM 编排)
     → llm/pricing.py, session.py (定价+用量)
   → cache.py (LLM 结果缓存)
 
-config.py → registry.py (注册表驱动的 TTL/分组/键名)
+config/ → registry.py (注册表驱动的 TTL/分组/键名)
 handlers_*.py → 各模块入口函数编排
 ```
 
@@ -932,5 +932,6 @@ handlers_*.py → 各模块入口函数编排
 | C8 | **日志统一** | 所有模块必须使用 `logger = logging.getLogger("invest")`，不得创建独立的 logger 实例 | 日志碎片化、归档/轮转失效 | `logger.py` |
 | C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须**在 `llm/skeleton.py` 中注册生成器函数和配置字段，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
 | C10 | **新闻召回策略** | `per_source`（每源原始获取量）与 `top_n`（最终输出量）解耦：各源原始获取量 = `max(500, news_top_count × 2)`，不可写死为固定值。华尔街见闻 API 硬上限 100 条除外 | 配置 `news_top_count` 不生效 | [财经新闻热点与持仓关联分析](#财经新闻热点与持仓关联分析) |
-| C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker，新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure` | CI 门禁不通过 | `src/test/conftest.py` |
+| C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker（通过 `pytestmark` 模块级变量），新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure`。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动检查标记遗漏并发出 `PytestWarning` | CI 门禁不通过 | `src/test/conftest.py` |
 | C12 | **边缘测试文件隔离** | `@pytest.mark.edge` 测试**必须**放在 `*_edge.py` 文件中，不得与普通测试混搭。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动校验 | 测试收集失败 | `src/test/conftest.py`、`docs-stm/managements/testplan.md §1.9` |
+| C13 | **测试敏感路径隔离** | 运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`conftest.py` 的 `_isolate_sensitive_paths` autouse fixture 自动将 `config.json` 和缓存目录重定向到临时目录 | 用户数据被污染 | `src/test/conftest.py` |

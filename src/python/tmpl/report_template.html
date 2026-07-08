@@ -311,6 +311,13 @@
 
             <br>
 
+            {% if data_unavailable %}
+            <div class="empty-section" style="background: #FFF3CD; border-color: #FFC107; color: #856404;">
+                ⚠ 行情数据全部不可用（非交易时段/网络异常/API限速），以下市值/盈亏为占位显示，不影响持仓成本统计
+            </div>
+            <br>
+            {% endif %}
+
             <!-- 盈亏汇总 -->
             <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【盈亏汇总】</h3>
             <div class="summary-grid">
@@ -534,7 +541,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>预测EPS(2026E)</th><th>年均股息率</th><th>来源明细</th>
+                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>预测EPS({{ report_year }}E)</th><th>年均股息率</th><th>来源明细</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -11,7 +11,7 @@ import httpx
 
 # ── HTTP 客户端配置 ──────────────────────────────────────────
 # 各工作线程共享同一组连接参数，通过 HTTP/2 + keepalive 减少连接建立开销
-_LLM_CLIENT_SETTINGS = {
+_LLM_CLIENT_SETTINGS: dict[str, Any] = {
     "http2": True,                               # HTTP/2 多路复用
     "limits": httpx.Limits(
         max_connections=20,                      # 总连接池上限
@@ -619,13 +619,13 @@ def _dispatch_llm_workers(
         def _run() -> tuple[str | None, bool]:
             logger.info("正在生成：%s...", _label_map.get(label, label))
             try:
-                c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)  # type: ignore[arg-type]
+                c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)
             except ImportError:
                 # h2 包未安装时降级到 HTTP/1.1
                 logger.info("h2 包未安装，降级到 HTTP/1.1")
                 _settings = dict(_LLM_CLIENT_SETTINGS)
                 _settings.pop("http2", None)
-                c = httpx.Client(timeout=_LLM_TIMEOUT, **_settings)  # type: ignore[arg-type]
+                c = httpx.Client(timeout=_LLM_TIMEOUT, **_settings)
             try:
                 return fn(c, llm_config)
             finally:

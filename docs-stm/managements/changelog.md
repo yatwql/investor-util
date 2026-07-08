@@ -8,9 +8,14 @@
 
 ### Added
 
+- **测试隔离 autouse fixture**：`conftest.py` 新增 `_isolate_sensitive_paths` autouse fixture，自动将 `_defaults._CONFIG_FILE` 和 `cache._CACHE_DIR` 重定向到 `tmp_path`，防止测试污染用户真实配置文件/缓存。配合 `_clear_config_cache()` 确保 `get_config()` 从临时路径读取后回退到默认值。
+- **测试标记遗漏自动检查**：`conftest.py` 的 `pytest_collection_modifyitems` 新增标记遗漏检查，新测试文件若缺少 `pytestmark` 变量则发出 `PytestWarning` 提醒。`_KNOWN_MARKERS` 全集与 `pytest_configure` 注册的 31 个标记保持同步。
+
 - **R-177 核心模块单元测试覆盖**：为 `llm/generators.py`、`llm/prompts.py`、`handlers_cache.py`、`handlers_report.py` 四个模块编写 97 个单元测试，覆盖 JSON 解析、提示词构建、缓存预检、报告编排等关键逻辑。测试 mock 路径修正、`_press_any_key` 阻塞问题修复等实战经验已沉淀。
 
 ### Changed
+
+- **`config.py` → `config/` 子包拆分（R-179）**：原单文件 817 行/30+ 模块导入的 `config.py` 拆分为 `_defaults.py`（默认配置 & 模板）、`_comments.py`（JSON 注释剥离）、`_core.py`（配置读写/校验/LLM 配置）三个独立子模块。`__init__.py` 统一导出，保持外部导入兼容。
 
 - **Provider Chain 熔断架构升级**（三层熔断 + 冷却恢复 + batch 预检）：
   - 新增 `is_provider_chain_broken()` 全链熔断查询 API，batch 入口一次预检替换逐条重复判断
@@ -20,6 +25,10 @@
   - 新增 13 项 edge 测试覆盖：`is_provider_chain_broken`（5 项）、冷却探针 4 态（4 项）、batch 预检（4 项）
 
 ### Fixed
+
+- **R-185 预测年份硬编码 → 动态计算**：穿透表列名「预测EPS(2026E)」从 `datetime.now().year` 获取当前年份，跨年自动更新。涉及 `penetration_sheet.py`（_HEADERS + _num_formats 注释）、`penetration.py`（docstring）、`report_template.html`（Jinja2 `{{ report_year }}`）、`html_writer.py`（render 传参）4 个文件。
+- **R-186 定价双源消除 — constants.py 为单一来源**：`config/_core.py` 中 llm_settings 模板的定价段注释改为指导性说明（"仅用于覆盖 constants.py 默认定价"），移除型号示例消除维护歧义。`constants.py MODEL_PRICING` 声明为唯一默认源。`pricing.py` 合并逻辑不变。
+- **`test_security_edge.py` mock 路径修正**：`test_config_json_with_proto` 中 `patch("src.python.config.get_config_path")` 实际上不影响 `_core.get_config()`（因内部调用 `_defaults.get_config_path()`），改为 `patch("src.python.config._defaults._CONFIG_FILE")`，测试真正生效。
 
 - **R-166 mypy 严格模式升级**：启用 `no_implicit_optional`、`warn_unused_ignores`、`check_untyped_defs` 三个严格标记，修复 77 处 mypy 错误（覆盖 24 文件），包括：attr-defined（termios 平台特化）、valid-type（`Callable`/`builtins.set`）、arg-type（httpx 参数、list 不变性—改用 `Sequence`）、return-value（返回 None 路径添加 `| None`）、union-attr（Optional 属性访问保护）、misc（None 可调用检查、条件分支签名对齐）、list-item（异构 Future 列表用 `Future[Any]`）、assignment（窄化/类型收窄）、name-defined（`Any` 导入）等模式。mypy 零残留错误。
 - **R-167 `_ext_memo` 会话级复用缓存推广**：`eastmoney_industry.py` 和 `eastmoney_industry_rest.py` 新增 `_ext_memo` 模块级字典缓存（C4 约束），同一证券代码在同一会话内仅首次发起 HTTP 请求，后续调用直接返回缓存结果。两个模块各新增 `_ext_memo_clear()` 测试辅助方法。
@@ -45,6 +54,7 @@
 - **R-183 文档引用索引表**：`plan.md` 新增 R-160~R-176 索引表（编号/标题/修复版本/changelog 位置），新场景引用时可直接定位
 - **R-181 ThreadPoolExecutor 集中管理（handlers_cache）**：`handlers_cache.py` 新增模块级共享 `_POOL + _get_pool()`，替代原来 3 处 `with ThreadPoolExecutor() as _:` 现场创建模式，附带 `atexit` 清理注册
 - **R-178 文件导览注释**：`html_writer.py` 顶部新增完整文件导览 TOC（L44-L78），列出所有区段（路径/过滤器/辅助函数/核心生成/子渲染/报告保存）及其行号范围，替代原拆分方案
+- **R-184 `_get_industry_avg_pe()` 空实现 → 完整实现**：基金风格分析的行业平均 PE 基准从 `return {}` 空桩改为接入 push2 API（f127 获取行业归属、f9 获取动态 PE），按行业分组以中位数聚合（抗离群值），三级降级链路（push2→Tencent→代码前缀）兼容原 `return {}` 退化路径。副作用：同时填充 `_ext_memo` 缓存供 `classify_fund_style()` 主循环复用。新增 10 项单元测试覆盖全部场景。
 
 ### Added
 

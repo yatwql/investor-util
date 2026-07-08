@@ -22,7 +22,8 @@ from src.python.tui_handlers import (
     _print_error_with_hint,
     _print_llm_session_usage,
 )
-from src.python.tui_menu import get_config_cache
+from src.python.report.progress import ProgressReporter
+from src.python.tui_menu import _GREEN, _RESET, get_config_cache
 
 # 共享线程池 — 多处并行任务复用同一实例，避免反复创建/销毁
 _POOL: ThreadPoolExecutor | None = None
@@ -38,11 +39,11 @@ def _get_pool() -> ThreadPoolExecutor:
 logger = setup_logger()
 
 
-def _generate_excel_report(*args, progress=None, **kwargs):
+def _generate_excel_report(*args: Any, **kwargs: Any) -> None:
     """生成 Excel 报告（委托给 excel_generator 模块）。"""
     from src.python.report.excel_generator import generate_excel_report
-    prog = progress if progress is not None else TuiProgressReporter()
-    return generate_excel_report(*args, **kwargs, progress=prog)  # type: ignore[misc]
+    kwargs.setdefault("progress", TuiProgressReporter())
+    generate_excel_report(*args, **kwargs)
 
 
 def _cmd_generate_excel() -> None:

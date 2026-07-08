@@ -381,7 +381,7 @@ def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
             df = ak.stock_history_dividend(symbol=code, indicator="分红")
             summary = _calc_dividend_summary(df)
             if summary:
-                name_col = next((c for c in (df or {}).columns if "简称" in c or "名称" in c), None)  # type: ignore[union-attr]
+                name_col = next((c for c in df.columns if "简称" in c or "名称" in c), None) if df is not None else None
                 name = str(df.iloc[0].get(name_col, "")) if name_col and df is not None and not df.empty else ""
                 summary["name"] = name
             return (code, summary)

@@ -52,13 +52,13 @@ _PUSH2_COOLDOWN_SECS = 300      # 冷却期（秒）
 _FIELDS = "f57,f58,f127,f128,f129,f198,f9,f20,f23"
 
 
-# 会话级内存缓存 — 同一代码在会话内不重复 HTTP 请求（C4 约束）
-_ext_memo: dict[str, dict[str, Any] | None] = {}
+# 会话级内存缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="industry"）
 
 
 def _ext_memo_clear() -> None:
-    """测试用：清空会话级内存缓存。"""
-    _ext_memo.clear()
+    """测试用：清空行业数据会话级缓存。"""
+    from src.python.provider_registry import get_registry
+    get_registry().session_cache_clear("industry")
 
 
 def _secid(code: str) -> str:
@@ -177,12 +177,15 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     Returns:
         {...} 详见函数内结果字典定义；None: API 异常或解析失败
     """
-    if code in _ext_memo:
-        return _ext_memo[code]
+    from src.python.provider_registry import get_registry, _NOT_FOUND
+    reg = get_registry()
+    cached = reg.session_cache_get("industry", code)
+    if cached is not _NOT_FOUND:
+        return cached
 
     inner = _make_push2_request(code)
     if inner is None:
-        _ext_memo[code] = None
+        reg.session_cache_set("industry", code, None)
         return None
 
     result: dict[str, Any] = {
@@ -195,7 +198,7 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
 
     logger.debug("东方财富行业/概念 [%s]: 行业=%s, 概念=%d个",
                  code, result["industry"] or "无", len(result["concepts"]))
-    _ext_memo[code] = result
+    reg.session_cache_set("industry", code, result)
     return result
 
 

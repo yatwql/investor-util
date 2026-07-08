@@ -61,7 +61,7 @@ def _reload_pricing() -> None:
                             # 文件未指定缓存命中价时，继承内置默认或等于 input
                             existing = _PRICING_MERGED.get(model, {})
                             entry["input_cache_hit"] = float(
-                                existing.get("input_cache_hit", prices["input"])  # type: ignore[arg-type]
+                                existing.get("input_cache_hit", float(prices["input"]))
                             )
                         _PRICING_MERGED[model] = entry
                     elif isinstance(prices, dict):
