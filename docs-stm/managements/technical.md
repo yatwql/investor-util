@@ -308,7 +308,7 @@ Provider Chain 注册表（registry.py）
 |:-----|:-----|:---------------|:---------|
 | `price.py` | 股票/基金最新价 | tencent, eastmoney | `price_*` |
 | `index.py` | A 股/美股指数 | tencent, sina | `index_*` |
-| `fund.py` | 基金排名/持仓/基准 | tiantian, eastmoney | `fund_perf_*`, `fund_hold_*`, `fund_benchmarks` |
+| `fund.py` | 基金排名/持仓/基准 | tiantian | `fund_perf_*`, `fund_hold_*`, `fund_benchmarks` |
 | `fund_manager.py` | 基金经理数据 | tiantian HTML 解析 | `fund_manager_*`, `fund_manager_snapshot` |
 | `industry.py` | 行业分类+概念板块 | eastmoney_industry, eastmoney_industry_rest | `industry_*` |
 | `chain.py` | Provider 优先链定义 + fallback 路由 | —（纯路由逻辑） | — |
@@ -489,10 +489,11 @@ C 迭代将报告 16 个模块的序号/显示名称从硬编码改为由 `regis
 
 ```
 raw_data_flags = {
-    "manager_data":       bool(manager_analysis.results),
-    "overlap_data":       bool(overlap_matrix.funds >= 2),
-    "concentration_data": bool(concentration_analysis.results),
-    "style_data":         bool(style_analysis.results),
+    # B 系列：返回非 None = 模块已启用 → section 始终可见（空数据时显示占位）
+    "manager_data":       manager_analysis is not None,
+    "overlap_data":       overlap_matrix is not None,
+    "concentration_data": concentration_analysis is not None,
+    "style_data":         style_analysis is not None,
     "include_news":       include_news,
     "early_warnings":     bool(early_warnings),
     "llm_enabled":        llm_enabled_flag,
@@ -555,6 +556,7 @@ C 迭代共涉及 4 个阶段（Phase），其中 C-P1a（注册表+配置校验
 - **`_call_llm_with_retry()`** 共享重试/超时/错误处理骨架
 - **`_generate_llm_content()` / `_generate_llm_module()`** 共享骨架函数（`skeleton.py`），封装缓存检查 + 调用 + markdown→HTML + 写入的 85% 公共逻辑
 - **`generate_global_macro()` / `generate_expert_review()`** 仅保留 prompt 构建 + 配置解析，其余委托 `_generate_llm_module()`（`skeleton.py`）
+- **注册表键名派生**（`registry.py`）：每个 LLM 模块的 `settings_suffix` 自动派生出 9 个 `llm_settings.json` 合法键名：`model_`、`temperature_`、`timeout_`、`cache_enabled_`、`max_tokens_`、`system_prompt_`、`thinking_enabled_`、`thinking_budget_`、`reasoning_effort_`。`news_correlation` 外的模块额外增加 `output_brief_`。所有键名由注册表统一校验，新增模块只需在注册表添加一行。详情见 [配置管理 → LLM 设置键名](../manuals/how-to-config-llm.md#模块级配置)。
 
 ### Extended Thinking（v0.2.22+）
 
@@ -890,8 +892,8 @@ reader.py (持仓解析)
 report/excel_generator.py (Excel 编排)
   → report/summary.py, market_value.py, category.py, penetration.py,
     fund_performance.py, news_correlation.py, early_warning.py,
-    llm_content.py, fund_manager_sheet.py, overlap_matrix.py,
-    concentration.py, fund_style_analysis.py (各页签写入)
+    llm_content.py, fund_manager_sheet.py, fund_overlap.py,
+    fund_concentration.py, fund_style_analysis.py (各页签写入)
   → report/excel_writer.py, styles.py (通用写入/样式)
   → report/data_status.py (降级状态追踪，Excel/HTML 共享)
   → report/html_writer.py (HTML 编排)
