@@ -96,6 +96,13 @@ MODES: dict[str, dict] = {
         "order": 9,
         "parallel": True,
     },
+    "all_no_unit": {
+        "marker": "not unit",
+        "desc": "全量测试（排除单元测试）",
+        "timeout_sec": 720,
+        "order": 9,
+        "parallel": True,
+    },
     "smoke": {
         "marker": "smoke",
         "desc": "冒烟测试（24 项，~2s 快速验证核心通路）",

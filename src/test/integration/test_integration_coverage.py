@@ -289,7 +289,7 @@ class TestErrorIsolationSemantics(unittest.TestCase):
             patch("src.python.report.html_writer.compute_penetration_top10",
                   return_value={}),
             patch("src.python.report.html_writer._build_category_data",
-                  return_value={}),
+                  return_value=([], False)),
             patch("src.python.report.html_writer.price_update_status",
                   return_value=(1, 1, True)),
             patch("src.python.report.html_writer._build_perf_data",
