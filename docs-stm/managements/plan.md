@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-08（v0.3.0 — 管理文档归档 + 版本号同步 + review-findings 移除已修复项）
+最后更新：2026-07-09（D-10 数据降级重构 Step A~E 完成 + 已修复项归档清理）
 
 ---
 
@@ -28,7 +28,7 @@
 | R-175 | colorama 降级为可选依赖 | v0.3.0+ | Unreleased / Fixed |
 | R-176 | docstring 误放修复 | v0.3.0+ | Unreleased / Fixed |
 
-> 当前审查（D-8c）发现的问题见 `review-findings.md`，其中 R-181/182/183 已修复。
+> ✅ **D-10 数据降级重构（Step A~E）已完成**：`DataSourceRegistry` 单例集中管理熔断器/会话缓存/获取策略选择，`chain.py` 全局变量迁移，`_ext_memo` 模块级缓存迁移，R-203/M-004 提交前已修复。剩余待修复问题（R-188~R-191）见 `review-findings.md`。
 
 ---
 

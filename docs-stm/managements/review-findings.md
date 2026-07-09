@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-09（D-10 审查：数据降级重构 6 维复盘，新增 R-188~R-191）
+最后更新：2026-07-09（D-10 审查：数据降级重构 6 维复盘 + 归档清理）
 
 ---
 
@@ -13,7 +13,7 @@
 | 2026-07-08 | v0.3.1 conftest 增强 + config.py 拆包 + 动态年份 | R-185/R-186 已修复，config 文档同步 |
 | 2026-07-08 | D-8b 全面审查：代码质量/并发安全/工程化 | 已完成（全部修复） |
 | 2026-07-08 | D-8c 审查：v0.3.0 代码健康度检查（R-177~R-183） | 已完成（全部修复） |
-| 2026-07-09 | **D-10 审查：数据降级重构 6 维复盘（Step A~E）** | 新增 5 项 |
+| 2026-07-09 | **D-10 审查：数据降级重构 6 维复盘（Step A~E）** | 新增 4 项待修复 + 2 立即修复 |
 
 > **v0.1.x ~ v0.2.52 早期审计记录已归档**：详见 [docs-stm/archive/archived_review-findings.0.1.x.md](../archive/archived_review-findings.0.1.x.md)。
 > 涵盖：初始全量审计、P3 现代化、场景审计、第二/三波深度审计、R-131~R-147、T-001~T-003 等 13 条。
@@ -50,8 +50,10 @@
 
 | # | 问题 | 修复说明 |
 |:-:|:-----|:---------|
-| R-185 | **预测年份 `2026E` 硬编码 → 动态计算**：穿透表列名「预测EPS(2026E)」从 `datetime.now().year` 获取当前年份，跨年自动更新。涉及 `penetration_sheet.py`（_HEADERS + _num_formats 注释）、`penetration.py`（docstring）、`report_template.html`（Jinja2 `{{ report_year }}`）、`html_writer.py`（render 传参）4 个文件 | 2026-07-08 修复，`# 8` 列注释同时更新。下一日历年度（2027-01-01）起报告自动显示 2027E |
-| R-186 | **`llm_settings.json` 定价段与 `constants.py` 重复 → 单一来源**：`constants.py MODEL_PRICING` 声明为唯一默认定价源，`config/_core.py` 中的 llm_settings 模板移除型号示例注释，改为指导性说明（"仅用于覆盖 constants.py"）。`pricing.py` 的 `_reload_pricing()` 合并逻辑不变 | 2026-07-08 消歧。新增模型在 `constants.py` 中添加，无需修改 `llm_settings.json` |
-| R-180 | **`type: ignore` 累计 22 处 → 4 处**：系统性清理 13 个文件的 `type: ignore` 注释 | 剩余 4 处均为 `tui.py` 平台特定 `termios[attr-defined]`（Linux 专用，已加 try/except 保护 Windows），属合理保留 |
-| R-179 | **`config.py` 817 行**：混合配置加载/校验/LLM 配置/JSON 注释剥离，30+ 模块导入 → v0.3.1 已拆为 `config/` 子包（`_defaults.py`/`_comments.py`/`_core.py`），原 `config.py` 删除 | 2026-07-08 完成重构，原 `D src/python/config.py` 已验证删除，新 `config/` 子包正常运转 |
-| R-184 | **`_get_industry_avg_pe()` 空实现 → 完整实现**：接入 push2 API（f127 行业归属 + f9 PE），按行业中位数聚合作为估值基准，三级降级（push2→Tencent→代码前缀）兼容原 `return {}` 退化路径 | 同步编写 10 个测试覆盖：同行业/跨行业/全失败/部分失败/空列表/偶数中位数/负 PE 跳过/非 A 股跳过/`_ext_memo` 填充/集成验证 |
+| R-203 | **`register_default_chains()` 未在生产环境调用（P0）**：`DataSourceRegistry.register_default_chains()` 仅在测试中运行，导致 `get_chain()` 始终返回空，CACHE_ONLY 降级失效。修复：`chain.py` 末尾添加模块导入时自动注册 | 2026-07-09 修复 |
+| M-004 | **tencent_style 隐式自注册 → 显式注册**：`record_failure("tencent_style")` 隐式创建 tier=4 最低优先级注册。修复：`fund_style_analysis.py` 模块级新增 `register_provider("tencent_style", tier=4, timeout=15.0)` | 2026-07-09 修复 |
+| R-185 | **预测年份硬编码 → 动态计算**：穿透表列名「预测EPS(XXXXE)」从 `datetime.now().year` 获取当前年份，跨年自动更新 | 2026-07-08 修复 |
+| R-186 | **定价双源消除 — constants.py 为单一来源**：`llm_settings.json` 模板移除型号示例，改为覆盖说明 | 2026-07-08 修复 |
+| R-180 | **`type: ignore` 累计 22 处 → 4 处**：系统性清理 13 个文件，剩余 4 处为 `tui.py` 平台特定，属合理保留 | 2026-07-08 修复 |
+| R-179 | **`config.py` 817 行 → `config/` 子包**：拆为 `_defaults.py` / `_comments.py` / `_core.py`，原文件删除 | 2026-07-08 修复 |
+| R-184 | **`_get_industry_avg_pe()` 空实现 → 完整实现**：接入 push2 API 三级降级（push2→Tencent→代码前缀），10 项测试覆盖 | 2026-07-08 修复 |

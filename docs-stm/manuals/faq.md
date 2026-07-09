@@ -463,7 +463,7 @@ A: 复制整个项目目录（含 `data/cache/` 和 `data/config/`）到新电�
 
 **Q: 日志文件在哪？如何查看详细错误？**
 
-A: 日志文件在 `logs/app.log`，默认记录 INFO 及以上级别。如需 DEBUG 级别的详细信息（如 LLM 发出的完整 prompt），可在 `src/python/logger.py` 中将 `level` 改为 `logging.DEBUG`。
+A: 日志文件在 `logs/app.log`，DEBUG 级别的详细信息（如 LLM 发出的完整 prompt）已自动写入该文件，查看即可。如需在终端也显示 DEBUG 输出，可在 `src/python/logger.py` 第 48 行将 `console_handler.setLevel(logging.INFO)` 改为 `logging.DEBUG`。
 
 **Q: 程序有没有日志轮转（log rotation）？**
 
@@ -491,7 +491,7 @@ A: 不会。程序完全离线运行，不发送任何使用统计、埋点或�
 
 **Q: API Key 以明文存储在 json 文件中安全吗？**
 
-A: `llm_key.json` 中的 API Key 以明文存储。程序不主动上报或同步该文件，但建议：① 不要将项目目录上传到公开仓库（`.gitignore` 默认该文件在忽略列表；`data/config/` 非排除项的建议单独将 `llm_key.json` 加入 `.gitignore`）；② 为 API Key 设置调用额度限制和权限范围；③ 定期轮换密钥。
+A: `llm_key.json` 中的 API Key 以明文存储。程序不主动上报或同步该文件，但建议：① 不要将项目目录上传到公开仓库（`.gitignore` 中 `data/` 通配已排除整个数据目录，`llm_key.json` 默认不会被 git 跟踪；`config.json` 和 `llm_settings.json` 是特例放行用于参考配置，若需移除这两个文件的跟踪可自行修改 `.gitignore`）；② 为 API Key 设置调用额度限制和权限范围；③ 定期轮换密钥。
 
 **Q: 日志中会记录敏感信息吗？**
 

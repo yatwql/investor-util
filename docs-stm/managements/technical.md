@@ -32,6 +32,7 @@
 | 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher/` |
 | 持仓读取 | xlsx 解析、多工作表、列校验 | `src/python/reader.py` |
 | LLM 客户端 | Claude / OpenAI / DeepSeek API 调用 | `src/python/llm/` |
+| 数据源注册中心 | 熔断器/会话缓存/策略选择/审计报告 | `src/python/provider_registry.py` |
 | 报告生成 | Excel (openpyxl) + HTML (Jinja2) | `src/python/report/*.py` |
 
 ## 目录结构
@@ -56,6 +57,7 @@ investor-util/
 │   │   ├── main.py               # TUI 入口 + 菜单循环
 │   │   ├── market_hours.py       # A 股交易时段判断
 │   │   ├── models.py             # 数据模型
+│   │   ├── provider_registry.py  # 数据源注册中心 — 熔断器/会话缓存/策略选择/审计报告
 │   │   ├── providers/            # 数据源提供商
 │   │   ├── reader.py             # 持仓 Excel 解析
 │   │   ├── registry.py           # 中央注册表
@@ -77,7 +79,6 @@ investor-util/
 ├── CLAUDE.md / README.md / requirements.txt
 ```
 
-> 完整目录树（含所有 providers/ 和 report/ 子文件）及最新测试计数见 [数据源一览 & 目录结构](../manuals/datasource-and-folders.md#目录结构)。
 
 ---
 
@@ -141,7 +142,7 @@ v0.2.88 已完成全量迁移，所有 `code.startswith()` 和名称关键词判
 
 > 指数数据由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存。
 
-> 各新闻源的完整端点格式及通用数据源说明参见 [数据源一览](../manuals/datasource-and-folders.md)。
+> 各新闻源的完整端点格式见 [需求文档 §4 — 数据源](requirements.md#4-数据源) 及 [§4.1 DataSourceRegistry](requirements.md#41-datasourceregistry-数据源注册中心v032)。
 >
 > 新闻数据的编排/处理层由 `news_aggregator.py`（多源聚合去重）、`news_correlator.py`（持仓关联分析）、`news_keywords.py`（关键词提取）、`news_sources.py`（源元数据定义）4 个模块组成，位于 `providers/` 下，与上述 Provider 分离。
 
@@ -151,7 +152,7 @@ v0.2.88 已完成全量迁移，所有 `code.startswith()` 和名称关键词判
 
 ### 策略概览
 
-缓存统一存放在 `data/cache/` 目录，由 `cache.py` 提供泛用键值对存储接口。完整 TTL 表（21 种类型，含 B 系列 4 模块）、文件名模式、指纹机制见 [配置指南缓存章节](../manuals/how-to-config.md#cache_ttl-可调参数)。
+缓存统一存放在 `data/cache/` 目录，由 `cache.py` 提供泛用键值对存储接口。完整 TTL 表（21 种类型，含 B 系列 4 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
 
 #### 行业/概念缓存
 
@@ -194,6 +195,21 @@ v0.2.88 已完成全量迁移，所有 `code.startswith()` 和名称关键词判
 - **preload（6 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
 - **refresh（11 模块）**：fund_perf（基金业绩排名）, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, fund_benchmarks（基金业绩基准）, fund_manager（基金经理数据）, fund_overlap（持仓重合度）→ 菜单 `[1]` 触发清除
 - **独立模块**：tracking, calendar, fund_concentration（集中度历史）, fund_style_snapshot（风格快照）→ 无分组保护，不被菜单缓存命令误删
+
+### 指纹驱动失效机制
+
+文件名中嵌入 **MD5 指纹哈希**，输入源数据变化时缓存键自动不匹配，等效于缓存未命中：
+
+| 指纹类型 | 指纹来源 | 作用范围 |
+|---------|---------|---------|
+| **指数指纹** | A股 + 美股指数行情 | `profit_forecast_*`、`sector_flow_*` |
+| **代码列表指纹** | 持仓+穿透 A 股代码排序 MD5 | `dividend_*` |
+| **输入参数指纹** | 新闻源参数 + 关键词 | `news_*` |
+| **输入数据指纹** | 指数+持仓汇总/持仓结构 | `llm_global_macro_*`、`llm_expert_review_*`、`llm_health_check_*`、`llm_penetration_deep_*`、`llm_news_item_*` |
+
+> **TTL 兜底**：即使指纹未变，缓存文件仍有 TTL 到期自动刷新。
+> **LLM 指纹策略**：智囊团深度复盘、持仓体检报告、穿透深度分析排除行情波动字段（price/change_pct），仅品种/份额/成本变化时失效。
+> **精确键名**（`fund_benchmarks.json`、`holdings_tracking.json`、`trading_calendar.json`、`fund_manager_snapshot.json`、`fund_concentration_snapshot.json`、`fund_style_snapshot.json`）不带指纹后缀，仅在 TTL 到期后刷新。
 
 ---
 
@@ -243,7 +259,7 @@ penetration_sector = fetch_industry_data(code).industry  // API优先
 `src/python/providers/` 下的 Provider 按数据类型的优先级定义在 `fetcher/chain.py:_DEFAULT_CHAINS` 中（`price`→`tencent`,`eastmoney`；`industry`→`eastmoney_industry`,`eastmoney_industry_rest` 等），`fetcher/price.py` 的 `get_price()` 通过 `_fetch_with_fallback()` 遍历 Provider Chain：
 
 ```
-Provider Chain 注册表（registry.py）
+Provider Chain 注册表（provider_registry.py:DataSourceRegistry）
     ↓
 路由此类型首个 Provider（如 price→tencent）
     ↓ 成功? → 返回并缓存
@@ -253,7 +269,7 @@ Provider Chain 注册表（registry.py）
     ↓ 成功? → 返回并缓存
     ↓ 失败?
     ↓
-尝试最近 7 天内过期缓存（降级）
+尝试最近 `CACHE_WEEKLY`（7天）内过期缓存（降级）
 ```
 
 - **默认优先级**硬编码在 `fetcher/chain.py:_DEFAULT_CHAINS` 中，`preferred_provider` 可在 `config.json` 中手动将某类型首选调整到链首
@@ -570,7 +586,7 @@ C 迭代共涉及 4 个阶段（Phase），其中 C-P1a（注册表+配置校验
 - **`_call_llm_with_retry()`** 共享重试/超时/错误处理骨架
 - **`_generate_llm_content()` / `_generate_llm_module()`** 共享骨架函数（`skeleton.py`），封装缓存检查 + 调用 + markdown→HTML + 写入的 85% 公共逻辑
 - **`generate_global_macro()` / `generate_expert_review()`** 仅保留 prompt 构建 + 配置解析，其余委托 `_generate_llm_module()`（`skeleton.py`）
-- **注册表键名派生**（`registry.py`）：每个 LLM 模块的 `settings_suffix` 自动派生出 9 个 `llm_settings.json` 合法键名：`model_`、`temperature_`、`timeout_`、`cache_enabled_`、`max_tokens_`、`system_prompt_`、`thinking_enabled_`、`thinking_budget_`、`reasoning_effort_`。`news_correlation` 外的模块额外增加 `output_brief_`。所有键名由注册表统一校验，新增模块只需在注册表添加一行。详情见 [配置管理 → LLM 设置键名](../manuals/how-to-config-llm.md#模块级配置)。
+- **注册表键名派生**（`registry.py`）：每个 LLM 模块的 `settings_suffix` 自动派生出 9 个 `llm_settings.json` 合法键名：`model_`、`temperature_`、`timeout_`、`cache_enabled_`、`max_tokens_`、`system_prompt_`、`thinking_enabled_`、`thinking_budget_`、`reasoning_effort_`。`news_correlation` 外的模块额外增加 `output_brief_`。所有键名由注册表统一校验，新增模块只需在注册表添加一行。
 
 ### Extended Thinking（v0.2.22+）
 

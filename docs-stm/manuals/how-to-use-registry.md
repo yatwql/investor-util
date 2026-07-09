@@ -54,7 +54,7 @@ class DataModuleDef:
 |------|---------|-----------|:---:|------|
 | **行情（preload）** | 股票价格、市场指数 | `price`, `index` | 24h（交易时段 30s） | 换持仓后需重新获取 |
 | **基金数据（refresh）** | 基金业绩排名、基金持仓 | `rank`, `hold` | 1d~1w | 主动刷新按钮触发 |
-| **行业分类（refresh）** | 行业分类 | `industry` | 1w | 主动刷新触发 |
+| **行业分类（refresh）** | 行业分类 | `industry` | 14天 | 主动刷新触发 |
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
 | **补充数据（refresh）** | 盈利预测、资金流向、分红 | `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
@@ -146,14 +146,14 @@ registry 的派生产出被以下模块消费：
 
 | 消费方 | 调用的 API | 用途 |
 |--------|-----------|------|
-| `src/python/config.py` | `get_cache_ttl_defaults()`, `get_known_llm_settings_keys()` | 配置校验 + TTL 兜底 |
+| `src/python/config/_core.py` | `get_cache_ttl_defaults()`, `get_known_llm_settings_keys()` | 配置校验 + TTL 兜底 |
+| `src/python/config/_defaults.py` | `get_cache_ttl_defaults()` | 默认配置模板生成 |
 | `src/python/cache.py` | `get_prefix_type_map()`, `get_exact_type_map()`, `get_cache_ttl_defaults()`, `get_registry()` | 缓存清理 |
 | `src/python/llm/generators.py` | `get_llm_module_names()`, `_MN()` | 模块标签路由、日志 |
 | `src/python/llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架模块消息映射 |
 | `src/python/main.py` | `get_llm_module_names()` | 菜单显示 |
 | `src/python/tui_menu.py` | `get_llm_module_names()` | LLM 配置状态展示 |
-| `src/python/tui_handlers.py` | `get_llm_module_name()` | TUI 输出框标题 |
-| `src/python/handlers_report.py` | `get_llm_module_name()` | LLM 模块失败标签、报告生成 |
+| `src/python/handlers_report.py` | `get_llm_module_name()`, `get_report_section_order()` | LLM 模块失败标签、报告生成 |
 | `src/python/handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 模块配置展示 |
 | `src/python/report/llm_content.py` | `get_registry()`, `get_llm_module_name()` | Excel LLM 分析章节生成 |
 | `src/python/report/news_correlation.py` | `get_llm_module_name()` | 新闻页签标题 |
@@ -203,7 +203,7 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 添加后还需在以下位置补充配套代码：
 
-1. **`llm_settings.json`** — 新增同名配置键组，键名为 `{model|temperature|...}_{my_analysis}`，共 10 个键
+1. **`llm_settings.json`** — 新增同名配置键组，键名为 `{model|temperature|...}_{my_analysis}`，共 9~10 个键（`news_correlation` 不含 `output_brief`）
 2. **`llm/generators.py`** — 添加 LLM 调用函数，调用 `_call_llm("my_analysis", context)` 并处理返回
 3. **`report/llm_content.py`** — 在 `write_llm_sheets()` 中注册新页签，调用 generators 中的新函数写入对应单元格
 4. **`llm/__init__.py`** — 将新生成函数加入 `__all__` 供外部导入

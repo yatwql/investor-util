@@ -13,6 +13,8 @@
 
 - **R-177 核心模块单元测试覆盖**：为 `llm/generators.py`、`llm/prompts.py`、`handlers_cache.py`、`handlers_report.py` 四个模块编写 97 个单元测试，覆盖 JSON 解析、提示词构建、缓存预检、报告编排等关键逻辑。测试 mock 路径修正、`_press_any_key` 阻塞问题修复等实战经验已沉淀。
 
+- **DataSourceRegistry 数据源注册中心（Step A）**：`provider_registry.py` 新增 `DataSourceRegistry` 单例，统一管理熔断器（3 次失败 / 300s 冷却）、会话级缓存（OrderedDict O(1) 淘汰、2000 条阈值）、获取策略选择（`LIVE_FETCH`/`CACHE_ONLY`/`PLACEHOLDER`）及审计报告生成。双锁设计（`_provider_lock` + `_cache_lock`）保证并发安全。新增 45 项单元测试（`test_provider_registry.py` 37 + `test_phase_timeout.py` 8）。
+
 ### Changed
 
 - **`config.py` → `config/` 子包拆分（R-179）**：原单文件 817 行/30+ 模块导入的 `config.py` 拆分为 `_defaults.py`（默认配置 & 模板）、`_comments.py`（JSON 注释剥离）、`_core.py`（配置读写/校验/LLM 配置）三个独立子模块。`__init__.py` 统一导出，保持外部导入兼容。
@@ -24,10 +26,26 @@
   - `batch_fetch_industry_data` 重试预检：熔断未恢复时跳过 0.8s 等待+重试
   - 新增 13 项 edge 测试覆盖：`is_provider_chain_broken`（5 项）、冷却探针 4 态（4 项）、batch 预检（4 项）
 
+- **数据降级策略选择器（Step B）**：`market_value.py` 使用 `DataSourceRegistry.get_effective_strategy()` 区分 CACHE_ONLY（非交易时段 / 链熔断）和 LIVE_FETCH（交易时段），通过 `classify_holdings()` 拆分为两组并发获取。新增 8 项 edge 测试（`test_market_value_strategy_edge.py`）。
+
+- **Provider Chain 全局变量迁移至注册表（Step C）**：`chain.py` 移除 4 个旧全局熔断变量（`_PROVIDER_SKIP`、`_PROVIDER_SKIP_TIME`、`_PROVIDER_CONSECUTIVE_FAILURES`、`_PROVIDER_LOCK`），全面改用 `DataSourceRegistry` 熔断 API。`chain.py` 末尾新增 `get_registry().register_default_chains()` 模块级自动注册，确保 `get_chain()` 在生产环境返回有效 Provider 列表。旧测试模块全部同步更新。
+
+- **_ext_memo 模块级缓存迁移至注册表（Step D）**：`eastmoney_industry.py`、`eastmoney_industry_rest.py`、`fund_style_analysis.py` 三模块的 `_ext_memo` 模块级字典替换为 `DataSourceRegistry.session_cache`，使用独立域名（`"industry"` / `"industry_rest"` / `"extended"`）。`_ext_memo_clear()` 保留为兼容包装。
+
+- **tencent_style 显式注册（M-004）**：`fund_style_analysis.py` 模块级新增 `get_registry().register_provider("tencent_style", tier=4, timeout=15.0)`，消除 `record_failure` 隐式最低优先级注册行为。`_tencent_extended()` 在成功/异常时调用 `record_success`/`record_failure` 通知注册表。
+
+- **集成审计报告（Step E）**：`report/data_status.py` 的 `DegradationTracker` 集成 `DataSourceRegistry.generate_status_report()`，在报告中输出数据源注册与熔断状态。TUI 的 `[!]` 降级提示信息包含策略来源（CACHE_ONLY / PLACEHOLDER）。
+
 ### Fixed
 
 - **R-185 预测年份硬编码 → 动态计算**：穿透表列名「预测EPS(2026E)」从 `datetime.now().year` 获取当前年份，跨年自动更新。涉及 `penetration_sheet.py`（_HEADERS + _num_formats 注释）、`penetration.py`（docstring）、`report_template.html`（Jinja2 `{{ report_year }}`）、`html_writer.py`（render 传参）4 个文件。
 - **R-186 定价双源消除 — constants.py 为单一来源**：`config/_core.py` 中 llm_settings 模板的定价段注释改为指导性说明（"仅用于覆盖 constants.py 默认定价"），移除型号示例消除维护歧义。`constants.py MODEL_PRICING` 声明为唯一默认源。`pricing.py` 合并逻辑不变。
+
+### Docs
+
+- **文档引用层级规范化**：`requirements.md` 移除所有用户文档引用，改为自包含（TTL 明细指纹来源表、LLM 定价公式等）；新增 §4.1 DataSourceRegistry 独立章节。`technical.md` 清理 4 处用户文档引用，迁移指纹机制至技术设计文档。文档引用链确立：requirements.md → 自包含（可引资料手册），technical.md → 仅引 requirements.md
+- **用户文档交叉优化**：`how-to-config.md` 补充 `market_hour_ttl` 运行时钳位说明和 `news_top_count` 完整公式。`how-to-use-registry.md` 修正行业分类 TTL（1w→14天）和 LLM 键数描述（10→9~10）。`faq.md` 修正 DEBUG 日志查看指引和 `.gitignore` 描述。`README.md` 页签列表改为分组列表，用户/开发者文档分表，LLM TTL 概述精简
+- **目录归档与同步**：`data-degradation-refactoring.md` 归档至 `archive/`，`plan/notes/` 已归档预研笔记删除。`datasource-and-folders.md` 目录树同步更新
 - **`test_security_edge.py` mock 路径修正**：`test_config_json_with_proto` 中 `patch("src.python.config.get_config_path")` 实际上不影响 `_core.get_config()`（因内部调用 `_defaults.get_config_path()`），改为 `patch("src.python.config._defaults._CONFIG_FILE")`，测试真正生效。
 
 - **R-166 mypy 严格模式升级**：启用 `no_implicit_optional`、`warn_unused_ignores`、`check_untyped_defs` 三个严格标记，修复 77 处 mypy 错误（覆盖 24 文件），包括：attr-defined（termios 平台特化）、valid-type（`Callable`/`builtins.set`）、arg-type（httpx 参数、list 不变性—改用 `Sequence`）、return-value（返回 None 路径添加 `| None`）、union-attr（Optional 属性访问保护）、misc（None 可调用检查、条件分支签名对齐）、list-item（异构 Future 列表用 `Future[Any]`）、assignment（窄化/类型收窄）、name-defined（`Any` 导入）等模式。mypy 零残留错误。
@@ -66,6 +84,10 @@
 - **TUI 全颜色统一**：`handlers_cache.py` / `handlers_config.py` / `handlers_report.py` 中所有 `[OK]`/`[!]`/`[ERR]` 前缀改用 `_GREEN`/`_YELLOW`/`_RED` ANSI 颜色常量；`handlers_config.py` 移除内联重复颜色定义。
 - **`llm_settings.json` JSON 注释清理**：移除文件中所有 `//` 和 `/* */` 注释（JSON 标准不支持注释），同步默认关闭 `penetration_deep` 和 `news_correlation`。
 - **集成测试 mock 返回值修复**：`test_integration_coverage.py::TestErrorIsolationSemantics::test_html_generation_ok_llm_crash` 中 `_build_category_data` 的 mock 返回值从 `{}` 修正为 `([], False)`，匹配函数真实的二元组签名，修复 `ValueError: not enough values to unpack`。
+
+- **R-203 `register_default_chains()` 未在生产环境调用（P0）**：`DataSourceRegistry.register_default_chains()` 仅在测试中被调用，导致 `get_chain()` 在生产环境始终返回空列表 `[]`，CACHE_ONLY 降级策略失效。修复：`chain.py` 末尾添加 `get_registry().register_default_chains()` 模块导入时执行。
+
+- **M-004 tencent_style 隐式自注册 → 显式注册**：`record_failure("tencent_style")` 的隐式创建行为使熔断配置不可见。修复：`fund_style_analysis.py` 模块级新增 `get_registry().register_provider("tencent_style", tier=4, timeout=15.0)`。
 
 ---
 

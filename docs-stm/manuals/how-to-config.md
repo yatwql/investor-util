@@ -66,11 +66,11 @@
 | `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `O` |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
-| `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量自动加倍保障召回） | 手动编辑 |
+| `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量 = max(500, news_top_count × 2)，华尔街见闻硬上限 100 条除外） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
-| `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s | 手动编辑 |
+| `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 | `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
@@ -78,6 +78,9 @@
 | `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
+
+---
+### B. 数据源与提供商
 
 ## news_sources 可调字段
 
@@ -90,33 +93,6 @@
 | `akshare` | `true` | akshare（财新网要闻 + CCTV 财经新闻，开源封装，推荐开启） |
 
 > **用法：** 将值改为 `true` 或 `false` 即可启用/禁用对应新闻源。
-
-## market_hours 可调参数
-
-`market_hours` 控制 A 股交易时段判断，用于盘中实时行情（短 TTL）和盘后收盘价（长 TTL）的自动切换。
-
-判断逻辑为三层逐级 fallback：
-
-1. **config.json 手动覆盖** — 以下 `start`/`end` 优先级最高
-2. **东方财富 push2 API** — 实时交易状态（缓存 TTL：盘中 60s，盘后 7 天）
-3. **内置默认值** — 北京时区工作日 09:30–11:30 + 13:00–15:00，自动排除午餐和周末
-
-| 子字段 | 默认值 | 说明 |
-|--------|:------:|------|
-| `start` | `"09:30"` | 手动覆盖开盘时间（HH:MM），覆盖内置默认值 09:30 |
-| `end` | `"15:00"` | 手动覆盖收盘时间（HH:MM），覆盖内置默认值 15:00 |
-| `official_source` | `true` | 是否尝试从东方财富 push2 API 获取实时交易状态。设为 `false` 时跳过本层直接 fallback 内置默认值 |
-
-`official_source` 启用时，API 返回 `f100` 字段表示实时交易状态，结果缓存策略因时段而异：
-
-| `f100` 值 | 含义 | API 缓存 TTL |
-|:---------:|------|:------------:|
-| `0` | 未开盘（盘前） | 7 天（盘后长效缓存） |
-| `1` | 交易中 | 60 秒（盘中高频刷新） |
-| `2` | 已收盘（盘后） | 7 天（盘后长效缓存） |
-| `3` | 午间休市 | 60 秒（午休后快速恢复） |
-
-> **午餐休市：** 实际交易分为 09:30–11:30（上午）和 13:00–15:00（下午）两段。即使 `start`/`end` 覆盖为 `"09:30"`/`"15:00"`，午餐时段（11:30–13:00）自动视为非交易时段并回落长 TTL。`official_source: true` 时 API 返回 `status=3`（午间休市）也会让系统识别午餐休市。
 
 ## preferred_provider 可调字段
 
@@ -156,6 +132,88 @@
 > **💡 指数数据说明：** A 股/美股指数由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**，不受 `preferred_provider` 控制。双链路自动 fallback：
 >   - A 股：**腾讯财经→新浪财经→过期缓存**
 >   - 美股：**新浪财经（2次重试）→腾讯财经→过期缓存**
+
+---
+### C. 市场时段与缓存
+
+## market_hours 可调参数
+
+`market_hours` 控制 A 股交易时段判断，用于盘中实时行情（短 TTL）和盘后收盘价（长 TTL）的自动切换。
+
+判断逻辑为三层逐级 fallback：
+
+1. **config.json 手动覆盖** — 以下 `start`/`end` 优先级最高
+2. **东方财富 push2 API** — 实时交易状态（缓存 TTL：盘中 60s，盘后 7 天）
+3. **内置默认值** — 北京时区工作日 09:30–11:30 + 13:00–15:00，自动排除午餐和周末
+
+| 子字段 | 默认值 | 说明 |
+|--------|:------:|------|
+| `start` | `"09:30"` | 手动覆盖开盘时间（HH:MM），覆盖内置默认值 09:30 |
+| `end` | `"15:00"` | 手动覆盖收盘时间（HH:MM），覆盖内置默认值 15:00 |
+| `official_source` | `true` | 是否尝试从东方财富 push2 API 获取实时交易状态。设为 `false` 时跳过本层直接 fallback 内置默认值 |
+
+`official_source` 启用时，API 返回 `f100` 字段表示实时交易状态，结果缓存策略因时段而异：
+
+| `f100` 值 | 含义 | API 缓存 TTL |
+|:---------:|------|:------------:|
+| `0` | 未开盘（盘前） | 7 天（盘后长效缓存） |
+| `1` | 交易中 | 60 秒（盘中高频刷新） |
+| `2` | 已收盘（盘后） | 7 天（盘后长效缓存） |
+| `3` | 午间休市 | 60 秒（午休后快速恢复） |
+
+> **午餐休市：** 实际交易分为 09:30–11:30（上午）和 13:00–15:00（下午）两段。即使 `start`/`end` 覆盖为 `"09:30"`/`"15:00"`，午餐时段（11:30–13:00）自动视为非交易时段并回落长 TTL。`official_source: true` 时 API 返回 `status=3`（午间休市）也会让系统识别午餐休市。
+
+## cache_ttl 可调参数
+
+> `—` 表示该缓存类型文件名为精确键名（无指纹后缀），不受持仓变化影响，仅在 TTL 到期后刷新。
+
+### 行情/数据类
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
+|------|-----------|:--------:|----------|------|
+| `price` | `price_{code}.json` | 24h（交易时段 30s） | — | 股票/基金最新价、昨收 |
+| `index` | `index_{code}.json` | 24h（交易时段 30s） | — | 市场指数行情 |
+| `news` | `news_{md5}.json` | 15 分钟 | 新闻源参数 + 关键词 | 多源新闻聚合结果 |
+| `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | A股+美股指数 | 行业资金流向排名 |
+| `rank` | `fund_perf_{code}.json` | 24h | — | 基金同类排名+区间收益率 |
+| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
+| `hold` | `fund_hold_{code}.json` | 7 天 | — | 基金前 10 持仓明细 |
+| `industry` | `industry_{code}.json` | 14 天 | — | 行业分类/概念板块 |
+| `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
+| `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
+
+### LLM 分析类
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
+|------|-----------|:--------:|----------|------|
+| `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | 持仓汇总 + 分类计数 + 穿透 TOP10 + 持仓明细 | 智囊团深度复盘 |
+| `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 1h | 标题前 80 字 + 持仓指纹 | 财经新闻热点与持仓关联分析 |
+| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | A股/美股指数 + 持仓汇总 | 全球政经局势 |
+| `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 |
+| `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 |
+
+### 基金深度分析类
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
+|------|-----------|:--------:|----------|------|
+| `fund_manager` | `fund_manager_{code}.json` + `fund_manager_snapshot.json` | 24h | — | 基金经理数据 + 快照（refresh 组） |
+| `fund_overlap` | （实时计算，无独立缓存，推导自 `fund_hold_{code}.json`） | 7 天 | — | 基金持仓重合度数据（refresh 组，前缀用于清理注册） |
+| `fund_concentration` | `fund_concentration_snapshot.json` | 30 天 | — | 集中度历史快照（精确键名，无分组） |
+| `fund_style_snapshot` | `fund_style_snapshot.json` | 30 天 | — | 风格快照（精确键名，无分组） |
+
+### 系统类
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
+|------|-----------|:--------:|----------|------|
+| `tracking` | `holdings_tracking.json` | 30 天 | — | 持仓跟踪数据（精确键名，无指纹） |
+| `calendar` | `trading_calendar.json` | 14 天 | — | A 股交易日历（精确键名，无指纹） |
+
+> **指纹驱动失效：** 文件名中的 `{fingerprint}` 是输入数据的 MD5 哈希。持仓/指数数据变化时指纹自动改变，原缓存失效，无需手动清除。
+> 
+> **TTL 兜底：** 即使指纹未变，缓存文件仍有 TTL 兜底到期自动刷新，防止数据"永久有效"。
+
+---
+### D. 行为调优
 
 ## early_warning 可调参数
 
@@ -198,24 +256,6 @@
 > 两个信号（连续失败 / 空数据）任一达到阈值即触发降级，取最低有效阈值。`stale_days` 仅在缓存存在时参与计算——当缓存过期天数超过此值且连续失败计数 ≥ `unreachable_threshold` 时强化降级判定。
 > 
 > T4 阈值最严格（1 次失败即降级）：核心价格/指数数据需要快速切换降级策略。T2/T3 允许更多容错（2~3 次），避免偶发网络波动触发不必要的降级。
-
-## user_fund_benchmarks 自定义基准
-
-`user_fund_benchmarks` 用于覆盖部分基金的业绩比较基准。代码内置了主流宽基/行业指数（沪深 300、中证 500、纳斯达克 100 等），遇到不在内置库中的基金时，可通过此字段手动指定。
-
-格式：`{"基金代码": "基准代码"}`，键值均为六位基金代码（字符串或数字均可）。
-
-```json
-{
-  "user_fund_benchmarks": {
-    "000001": "000300",
-    "005827": "399001",
-    "110011": "000300"
-  }
-}
-```
-
-> 内置基准库实时自动补充，`user_fund_benchmarks` 仅在置信度不足时作为兜底。空对象 `{}` 表示不添加自定义覆盖。
 
 ## report_section_order 报告序号配置（v0.2.86+）
 
@@ -267,56 +307,29 @@
 >
 > 空对象 `{}` 或缺失此字段时使用上述 16 项默认顺序，行为与旧版本一致。
 
-## cache_ttl 可调参数
+---
+### E. 业绩基准
 
-> `—` 表示该缓存类型文件名为精确键名（无指纹后缀），不受持仓变化影响，仅在 TTL 到期后刷新。
+## user_fund_benchmarks 自定义基准
 
-### 行情/数据类
+`user_fund_benchmarks` 用于覆盖部分基金的业绩比较基准。代码内置了主流宽基/行业指数（沪深 300、中证 500、纳斯达克 100 等），遇到不在内置库中的基金时，可通过此字段手动指定。
 
-| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
-|------|-----------|:--------:|----------|------|
-| `price` | `price_{code}.json` | 24h（交易时段 30s） | — | 股票/基金最新价、昨收 |
-| `index` | `index_{code}.json` | 24h（交易时段 30s） | — | 市场指数行情 |
-| `news` | `news_{md5}.json` | 15 分钟 | 新闻源参数 + 关键词 | 多源新闻聚合结果 |
-| `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | A股+美股指数 | 行业资金流向排名 |
-| `rank` | `fund_perf_{code}.json` | 24h | — | 基金同类排名+区间收益率 |
-| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
-| `hold` | `fund_hold_{code}.json` | 7 天 | — | 基金前 10 持仓明细 |
-| `industry` | `industry_{code}.json` | 14 天 | — | 行业分类/概念板块 |
-| `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
-| `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
+格式：`{"基金代码": "基准代码"}`，键值均为六位基金代码（字符串或数字均可）。
 
-### LLM 分析类
+```json
+{
+  "user_fund_benchmarks": {
+    "000001": "000300",
+    "005827": "399001",
+    "110011": "000300"
+  }
+}
+```
 
-| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
-|------|-----------|:--------:|----------|------|
-| `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | 持仓汇总 + 分类计数 + 穿透 TOP10 + 持仓明细 | 智囊团深度复盘 |
-| `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 1h | 标题前 80 字 + 持仓指纹 | 财经新闻热点与持仓关联分析 |
-| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | A股/美股指数 + 持仓汇总 | 全球政经局势 |
-| `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 |
-| `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 |
+> 内置基准库实时自动补充，`user_fund_benchmarks` 仅在置信度不足时作为兜底。空对象 `{}` 表示不添加自定义覆盖。
 
-### 基金深度分析类
-
-| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
-|------|-----------|:--------:|----------|------|
-| `fund_manager` | `fund_manager_{code}.json` + `fund_manager_snapshot.json` | 24h | — | 基金经理数据 + 快照（refresh 组） |
-| `fund_overlap` | （实时计算，无独立缓存，推导自 `fund_hold_{code}.json`） | 7 天 | — | 基金持仓重合度数据（refresh 组，前缀用于清理注册） |
-| `fund_concentration` | `fund_concentration_snapshot.json` | 30 天 | — | 集中度历史快照（精确键名，无分组） |
-| `fund_style_snapshot` | `fund_style_snapshot.json` | 30 天 | — | 风格快照（精确键名，无分组） |
-
-### 系统类
-
-| 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
-|------|-----------|:--------:|----------|------|
-| `tracking` | `holdings_tracking.json` | 30 天 | — | 持仓跟踪数据（精确键名，无指纹） |
-| `calendar` | `trading_calendar.json` | 14 天 | — | A 股交易日历（精确键名，无指纹） |
-
-> **指纹驱动失效：** 文件名中的 `{fingerprint}` 是输入数据的 MD5 哈希。持仓/指数数据变化时指纹自动改变，原缓存失效，无需手动清除。
-> 
-> **TTL 兜底：** 即使指纹未变，缓存文件仍有 TTL 兜底到期自动刷新，防止数据"永久有效"。
-
-### 缓存分组
+---
+## 缓存分组
 
 所有缓存模块归入两个分组，控制菜单命令的缓存清除范围：
 
@@ -327,14 +340,14 @@
 
 **无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历、`fund_concentration` 集中度历史快照、`fund_style_snapshot` 风格快照）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.{key}` 自行调整。
 
-#### 与菜单命令的对应关系
+### 与菜单命令的对应关系
 
 - **菜单 `[1]` 更新基础类缓存** → 清除 `refresh` 组全部缓存，然后重新拉取。适合：启动后先刷新补充数据，再生成报告。纯股票组合时自动跳过基金排名/持仓/基准刷新，仍主动重拉行业分类、分红、盈利预测、资金流向。新闻缓存清除后由后续报告生成按需重建。
 - **菜单 `[2]` 更新持仓类缓存** → 清除 `preload` 组全部缓存，然后并行拉取新持仓的价格和指数。适合：切换到另一份持仓文件时一键清理依赖旧持仓的缓存。
 
 两组互不重叠：`[1]` 不会误删价格/指数缓存，`[2]` 不会误删基金排名/行业分类缓存。
 
-#### 工作原理
+### 工作原理
 
 缓存分组由 `src/python/registry.py` 中的模块注册表驱动。每个模块注册时指定所属分组（`cache_groups` 字段），`cache.py:clear_by_group()` 遍历注册表，只清除匹配分组的模块缓存文件。新增缓存模块时只需在注册表中声明分组，无需修改菜单代码。
 
