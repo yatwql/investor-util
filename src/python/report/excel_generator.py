@@ -10,40 +10,12 @@ from typing import Any, Callable
 from src.python.logger import setup_logger
 from src.python.registry import get_llm_module_name, get_report_section_order, get_report_sheet_name
 from src.python.report.excel_module_loader import load_report_modules
+from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_market_data import resolve_market_data, resolve_indices
 from src.python.report.excel_sheet_factory import create_sheets
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, _Timer
 
 logger = setup_logger()
-
-
-
-
-def _write_content_sheets(
-    sheets: dict[str, Any], holdings: list, data: dict[str, Any],
-    a_indices: dict, us_indices: dict, modules: dict[str, Any],
-    prog: ProgressReporter,
-) -> dict:
-    """写入汇总 / 分类 / 穿透 / 基金业绩页签，返回穿透结果。"""
-    prog.call_sheet(get_report_sheet_name("summary"), modules.get("write_summary_sheet"),
-                    sheets["summary"], data["total_mv"], data["total_cost"],
-                    data["total_profit"], data["today_profit"],
-                    categories=data["categories"], update_status=data["update_status"],
-                    a_indices=a_indices, us_indices=us_indices)
-
-    prog.call_sheet(get_report_sheet_name("category"), modules.get("write_category_sheet"),
-                    sheets["category"], holdings, data["details"])
-
-    compute_pen = modules.get("compute_penetration_top10", lambda _a, _b: {})
-    pen_result = compute_pen(holdings, data["details"])
-    prog.ok("资产穿透TOP10 计算完成")
-    prog.call_sheet(get_report_sheet_name("penetration"), modules.get("write_penetration_sheet"),
-                    sheets["penetration"], holdings, data["details"], penetration_data=pen_result)
-
-    prog.call_sheet(get_report_sheet_name("fund_performance"), modules.get("write_fund_performance_sheet"),
-                    sheets["fund_performance"], holdings, data["details"])
-
-    return pen_result
 
 
 def _write_news_and_early_warning(
@@ -446,7 +418,7 @@ def generate_excel_report(
     a_idx, us_idx = resolve_indices(a_indices, us_indices, modules, prog)
 
     # ── 各页签写入 ──
-    pen_result = _write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
+    pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
     _write_news_and_early_warning(sheets, holdings, pen_result, include_news,
                                   news_data, news_llm_meta, news_top_count,
                                   early_warnings, prog)
