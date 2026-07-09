@@ -2,7 +2,7 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-09）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-09 R-200 更新）测试覆盖规模：
 
 ### 模式对应测试量
 
@@ -10,27 +10,24 @@
 |:------------|:--------:|:--------:|
 | `unit` | 2589 | ~22s |
 | `standard` | 2204 | ~22s |
-| `scenario` | 277 | ~35s |
-| `regression` | 277 | ~35s |
-| `verify` | 1057 | ~5min |
+| `scenario` | **269** | **~5min** |
+| `regression` | **269** | **~5min** |
+| `dev-verify` 🆕 | **2327** | **~2min** |
+| `verify` | **1049** | **~6min** |
 | `integration` | 306 | ~50s |
 | `edge` | 318 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | 2895 | ~6min |
+| `all` | **2901** | **~6min** |
 | `smoke` | 24 | ~2s |
-| `report` 🆕 | ≈958 | ~15s |
-| `all_no_unit` 🆕 | 306 | ~55s |
+| `report` | ≈945 | ~15s |
+| `all_no_unit` | 306 | ~55s |
+| `scenario_extreme` 🆕 | **9** | **~1min 45s** |
 
-> 注：`all` 模式收集总数 2895 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2883 passed / 12 skipped。
-> 🆕 `report` 模式为 A5 新增，标记 `unit_report`（≈958 项），供报告模块开发期快速验证。
-> 🆕 `all_no_unit` 模式标记 `not unit`（306 项），包含 scenario/integration/edge/data/smoke/report 等非单元测试。
-> 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）默认启用 `--parallel medium` 自动并行，"典型耗时"即 medium 并行耗时；场景/边缘/冒烟等轻量模式保持单线程（不并行），避免进程调度开销。
-> v0.3.0 测试增量覆盖补全（52 项新增），全量 2721 项（2709 passed / 12 skipped for Windows）。
-> v0.3.1 Provider Chain 熔断架构升级（13 项新增：熔断预检 9 项 + 冷却探针 4 项 edge），全量 2726 项（2714 passed / 12 skipped for Windows）。
-> v0.3.2 核心模块单元测试补全（96 项新增：generators 21 + prompts 44 + handlers_cache 18 + handlers_report 13），全量 2822 项（2810 passed / 12 skipped for Windows）。
-> v0.3.2e 数据降级重构 Step A~E（45 项新增：provider_registry 37 + phase_timeout 8；原 test_config 单元从 standard 迁移至 unit），全量 2895 项。
-> v0.3.3 测试断言同步修复（R-192/R-193：6 项文案对齐 + 3 项存量 mock/路径修复），全量 2895 项。
+> 注：`all` 模式收集总数 2901 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2889 passed / 12 skipped。
+> 🆕 `dev-verify` 模式（R-200）组合全部 8 个 unit 子模块（排除 edge/data）并行 + `scenario_basic`，供开发期快速验证。
+> 🆕 `scenario_extreme` 模式（R-200）含 S0c（超多持仓 4 项）+ S10（极端值 5 项），标记 `scenario_extreme`，不包含在 `scenario` 父标记中。
 > v0.3.4 测试隔离 + 文档归档清理，全量 2895 项。
+> **v0.3.5 R-200 三模式优化：** scenario 从 277 项降为 269 项（S0c+S10 共 8 项迁至 scenario_extreme）；新增 scenario_extreme 9 项（含 500 条极限验证）；all 从 2895 升至 2901（+6 项新极限测试）。
 
 ### 功能域对应测试源
 
@@ -54,23 +51,23 @@
 
 | 标记 | 覆盖场景 | 覆盖项数 | 参考测试类 |
 |:-------|:---------|:--------:|:-----------|
-| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 全量业务场景 | **277** | 见下 |
-| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 + P1p | 97 | |
+| `scenario`（父标记） | S0a/S0b/S0d + S1-S33 + T1-T21 全量业务场景（不含 S0c+S10） | **269** | 见下 |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a/S0b/S0d + S21-S33 + P1p | **124** | |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_integration.py::TestScenarioS1` |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_integration.py::TestScenarioS2` |
 | │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 | `test_integration.py::TestScenarioS3` |
 | │  ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 | `test_integration.py::TestScenarioS4` |
 | │  ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 | `test_integration.py::TestScenarioS5` |
 | │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 | `test_integration.py`（多类） |
-| │  ├ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量（清仓/同名多份额/超多持仓/特殊字符） | 16 | `test_integration.py`（多类） |
-| │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 | `test_integration.py`（多类） |
-| │  └ `—` | S29-S33: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市），仅 `scenario_basic` 父标记 | 15 | `test_integration.py`（多类） |
-| ├─ `scenario_resilience` | 异常容错场景 S6-S10 | 18 | |
-| │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | `test_integration_scenarios.py::TestScenarioS6` |
-| │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_integration_scenarios.py::TestScenarioS7` |
-| │  ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 | `test_integration_scenarios.py::TestScenarioS8` |
-| │  ├ `scenario_zero_cost` | S9: 零成本持仓 | 4 | `test_integration_scenarios.py::TestScenarioS9` |
-| │  └ `scenario_extreme` | S10: 极端值 | 5 | `test_integration_scenarios.py::TestScenarioS10` |
+| │  ├ `scenario_s0_holdings_quality` | S0a/S0b/S0d: 持仓质量（清仓/同名多份额/特殊字符；S0c 已移至 scenario_extreme） | **13** | `test_scenario_holdings_quality.py::TestS0a/TestS0b/TestS0d` |
+| │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 | `test_scenario_section_order.py` |
+| │  └ `—` | S29-S33: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市） | 15 | `test_scenario_operational_behavior.py` |
+| ├─ `scenario_resilience` | 异常容错场景 S6-S9（S10 已移至 scenario_extreme） | **13** | |
+| │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | `test_integration_scenarios.py::TestScenarioBond` |
+| │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_integration_scenarios.py::TestScenarioNetworkDown` |
+| │  ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 | `test_integration_scenarios.py::TestScenarioSingleHolding` |
+| │  └ `scenario_zero_cost` | S9: 零成本持仓 | 4 | `test_integration_scenarios.py::TestScenarioZeroCost` |
+| ├─ `scenario_extreme`（独立标记） | 极限场景 S0c+S10（超多持仓/极端份额/高精度净值/零值组合），不包含在 `scenario` 父标记中 | **9** | `test_scenario_extreme.py::TestS0cLargeHoldings/TestScenarioExtreme` |
 | ├─ `scenario_llm` | LLM 场景组合 S11-S20（10 个类共 32 项，其中 24 项同时标记为 llm） | 32 | `test_llm_scenarios.py`（TestS11~S20，每场景一独立类） |
 | └─ `scenario_datetime` | 日期/时间场景 T1-T21（含跨月/跨年/调休/港股通假期） | 100 | |
 |    ├ T1-T2/T4-T5 | 交易时段 TTL（盘中短 TTL / 盘前/盘后/非交易日长 TTL） | 8 | `test_datetime_scenarios.py::TestGetTtlMarketAware` |
