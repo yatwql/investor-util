@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-09（D-10 数据降级重构 Step A~E 完成 + 已修复项归档清理）
+最后更新：2026-07-09（v0.3.3 发布）
 
 ---
 
@@ -11,22 +11,22 @@
 
 | # | 标题 | 修复版本 | changelog 位置 |
 |:-:|:-----|:--------|:---------------|
-| R-161 | TOCTOU 竞态 — fetcher/chain.py 锁合并 | v0.3.0+ | Unreleased / Fixed |
-| R-162 | `_TRANSPORT_FAILURE` 类型污染 — 纯哨兵替换 | v0.3.0+ | Unreleased / Fixed |
-| R-163 | 废弃 build-backend — setuptools 切换 | v0.3.0+ | Unreleased / Fixed |
-| R-164 | 配置模板一致性防护 — 新增测试 | v0.3.0+ | Unreleased / Fixed |
-| R-165 | Ruff 规则集升级 — SIM/UP/ARG/PERF | v0.3.0+ | Unreleased / Fixed |
-| R-166 | mypy 严格模式升级 — 77 errors → 0 | v0.3.0+ | Unreleased / Fixed |
-| R-167 | `_ext_memo` 会话级复用缓存推广 | v0.3.0+ | Unreleased / Fixed |
-| R-168 | 配置 mtime+size 双因子缓存 | v0.3.0+ | Unreleased / Fixed |
-| R-169 | 429 API 限速差异化提示 | v0.3.0+ | Unreleased / Fixed |
-| R-170 | 新闻流水线集成测试修复 | v0.3.0+ | Unreleased / Fixed |
-| R-171 | CI/CD 流水线配置 | v0.3.0+ | Unreleased / Fixed |
-| R-172 | HTTP 异步客户端支持 | v0.3.0+ | Unreleased / Fixed |
-| R-173 | ThreadPoolExecutor 集中管理 | v0.3.0+ | Unreleased / Fixed |
-| R-174 | 配置校验去重 — `_section()` 辅助函数 | v0.3.0+ | Unreleased / Fixed |
-| R-175 | colorama 降级为可选依赖 | v0.3.0+ | Unreleased / Fixed |
-| R-176 | docstring 误放修复 | v0.3.0+ | Unreleased / Fixed |
+| R-161 | TOCTOU 竞态 — fetcher/chain.py 锁合并 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-162 | `_TRANSPORT_FAILURE` 类型污染 — 纯哨兵替换 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-163 | 废弃 build-backend — setuptools 切换 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-164 | 配置模板一致性防护 — 新增测试 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-165 | Ruff 规则集升级 — SIM/UP/ARG/PERF | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-166 | mypy 严格模式升级 — 77 errors → 0 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-167 | `_ext_memo` 会话级复用缓存推广 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-168 | 配置 mtime+size 双因子缓存 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-169 | 429 API 限速差异化提示 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-170 | 新闻流水线集成测试修复 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-171 | CI/CD 流水线配置 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-172 | HTTP 异步客户端支持 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-173 | ThreadPoolExecutor 集中管理 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-174 | 配置校验去重 — `_section()` 辅助函数 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-175 | colorama 降级为可选依赖 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
+| R-176 | docstring 误放修复 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
 
 > ✅ **D-10 数据降级重构（Step A~E）已完成**：`DataSourceRegistry` 单例集中管理熔断器/会话缓存/获取策略选择，`chain.py` 全局变量迁移，`_ext_memo` 模块级缓存迁移，R-203/M-004 提交前已修复。剩余待修复问题（R-188~R-191）见 `review-findings.md`。
 
