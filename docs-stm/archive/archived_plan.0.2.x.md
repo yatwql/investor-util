@@ -16,7 +16,7 @@
 
 ## D 迭代 — 数据降级分层治理（v0.2.88 ~ v0.2.91）
 
-D 迭代（数据降级分层治理，Phase 0-3）已完结，详见设计文档 `docs-stm/archive/d-iteration-data-degradation-design.md` 及 changelog.md。核心产出：
+D 迭代（数据降级分层治理，Phase 0-3）已完结，详见设计文档 `docs-stm/archive/data-degradation/d-iteration-data-degradation-design.md` 及 changelog.md。核心产出：
 
 - **T1/T2/T3/T4 分层模型**：按数据源稳定性四层分级，每层降级行为不同
 - **`_data_status` 机制**：`DataStatusItem(available, tier, message)` 字典 + `STATUS_MESSAGES` 共享常量 + 层前缀（T2→⚠ / T3/T4→ℹ）

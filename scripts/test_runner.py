@@ -105,7 +105,7 @@ MODES: dict[str, dict] = {
     },
     "smoke": {
         "marker": "smoke",
-        "desc": "冒烟测试（24 项，~2s 快速验证核心通路）",
+        "desc": "冒烟测试（24 项，~15s 快速验证核心通路）",
         "timeout_sec": 30,
         "order": 10,
         "parallel": False,

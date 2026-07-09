@@ -45,7 +45,7 @@
 
 - **文档引用层级规范化**：`requirements.md` 移除所有用户文档引用，改为自包含（TTL 明细指纹来源表、LLM 定价公式等）；新增 §4.1 DataSourceRegistry 独立章节。`technical.md` 清理 4 处用户文档引用，迁移指纹机制至技术设计文档。文档引用链确立：requirements.md → 自包含（可引资料手册），technical.md → 仅引 requirements.md
 - **用户文档交叉优化**：`how-to-config.md` 补充 `market_hour_ttl` 运行时钳位说明和 `news_top_count` 完整公式。`how-to-use-registry.md` 修正行业分类 TTL（1w→14天）和 LLM 键数描述（10→9~10）。`faq.md` 修正 DEBUG 日志查看指引和 `.gitignore` 描述。`README.md` 页签列表改为分组列表，用户/开发者文档分表，LLM TTL 概述精简
-- **目录归档与同步**：`data-degradation-refactoring.md` 归档至 `archive/`，`plan/notes/` 已归档预研笔记删除。`datasource-and-folders.md` 目录树同步更新
+- **目录归档与同步**：`data-degradation-refactoring.md` 归档至 `archive/data-degradation/`，`plan/notes/` 已归档预研笔记删除。`datasource-and-folders.md` 目录树同步更新
 - **`test_security_edge.py` mock 路径修正**：`test_config_json_with_proto` 中 `patch("src.python.config.get_config_path")` 实际上不影响 `_core.get_config()`（因内部调用 `_defaults.get_config_path()`），改为 `patch("src.python.config._defaults._CONFIG_FILE")`，测试真正生效。
 
 - **R-166 mypy 严格模式升级**：启用 `no_implicit_optional`、`warn_unused_ignores`、`check_untyped_defs` 三个严格标记，修复 77 处 mypy 错误（覆盖 24 文件），包括：attr-defined（termios 平台特化）、valid-type（`Callable`/`builtins.set`）、arg-type（httpx 参数、list 不变性—改用 `Sequence`）、return-value（返回 None 路径添加 `| None`）、union-attr（Optional 属性访问保护）、misc（None 可调用检查、条件分支签名对齐）、list-item（异构 Future 列表用 `Future[Any]`）、assignment（窄化/类型收窄）、name-defined（`Any` 导入）等模式。mypy 零残留错误。

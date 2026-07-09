@@ -317,11 +317,12 @@ investor-util/
 │   │   ├── c-iteration-design.md              # ✅ 已实现 — C 迭代设计
 │   │   ├── c-p1b-excel-title-number-fix.md    # ✅ 已实现 — C-P1b：Excel 报告可配置序号修复设计
 │   │   ├── akshare-integration-profit-forecast-sector-flow.md  # ✅ 已归档 — akshare 集成（profit_forecast + sector_fund_flow）
-│   │   ├── d-iteration-data-degradation-design.md              # ✅ 已归档 — D 迭代数据降级分层治理完整设计
 │   │   ├── early-warning-and-p1-optimization.md                # ✅ 已归档 — 智能预警 + P1 代码优化实施计划
 │   │   ├── y5-edge-test-config-env.md                          # ✅ 已归档 — Y5 配置/环境纵深测试实施计划
-│   │   ├── d-iteration-data-degradation-iteration-plan.md      # ✅ 已归档 — D 迭代精细化子迭代拆分方案
-│   │   ├── data-degradation-refactoring.md                    # ✅ 已归档 — 数据降级系统重构精细化子迭代方案（v0.3.2）
+│   │   ├── data-degradation/                                   # 📁 数据降级重构归档
+│   │   │   ├── d-iteration-data-degradation-design.md          # ✅ 已归档 — D 迭代数据降级分层治理完整设计
+│   │   │   ├── d-iteration-data-degradation-iteration-plan.md  # ✅ 已归档 — D 迭代精细化子迭代拆分方案
+│   │   │   └── data-degradation-refactoring.md                 # ✅ 已归档 — 数据降级系统重构精细化子迭代方案（v0.3.2）
 │   │   └── c-p1b-excel-title-number-follow-config.md           # ✅ 已归档 — C-P1b 页签编号配置实施计划
 │   ├── plan/                         # 计划与设计文件
 │   │   └── test-coverage-map.md          # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
