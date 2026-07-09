@@ -97,6 +97,10 @@
 
 - **Provider Chain 日志增加代码上下文**：`chain.py` `_try_provider_fetch` 和 `_fetch_with_fallback` 的日志输出（尝试/返回空/成功/异常/限速）末尾追加 `[{code}]` 标签，用户可直接看到哪个证券代码的请求在 fallback。
 
+- **R-192 verify 测试 3 项 price_type 断言同步**：`test_scenario_special_securities.py` 和 `test_scenario_operational_behavior.py` 中 3 处 `row.price_type == "--"` 改为 `"暂无行情"`，匹配 Step B 中 `_compute_detail_row` 的当前实现。
+- **R-193 unit 测试 3 项 _check_network_available 断言同步**：`test_tui_handlers.py::TestCheckNetworkAvailablePrint` 中 3 处预期文案从 `"网络连接异常"`/`"请检查网络连接"` 改为 `"所有行情数据均获取失败"`/`"请于交易时段或在网络通畅时重新生成"`。
+- **test_runner.py verify 模式描述时间修正**：`"并行~1min"` → `"并行~5min"`，匹配实际 323s 运行耗时。
+
 ---
 
 ## [0.3.0] - 2026-07-08

@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-09（D-10 审查：数据降级重构 6 维复盘 + 归档清理）
+最后更新：2026-07-09（R-192/R-193 测试断言同步修复）
 
 ---
 
@@ -52,3 +52,5 @@
 | R-180 | **`type: ignore` 累计 22 处 → 4 处**：系统性清理 13 个文件，剩余 4 处为 `tui.py` 平台特定，属合理保留 | 2026-07-08 修复 |
 | R-179 | **`config.py` 817 行 → `config/` 子包**：拆为 `_defaults.py` / `_comments.py` / `_core.py`，原文件删除 | 2026-07-08 修复 |
 | R-184 | **`_get_industry_avg_pe()` 空实现 → 完整实现**：接入 push2 API 三级降级（push2→Tencent→代码前缀），10 项测试覆盖 | 2026-07-08 修复 |
+| R-192 | **verify 测试 3 项 price_type 断言未同步**：Step B 将 `_compute_detail_row` 无行情分支的 `price_type` 从 `"--"` 改为 `"暂无行情"`，但 2 个场景测试共 3 处未同步，导致 verify 失败 | 2026-07-09 修复 |
+| R-193 | **unit 测试 3 项 _check_network_available 断言未同步**：`_check_network_available` 文案变更后 TestCheckNetworkAvailablePrint 中 3 项测试未同步，导致 unit 失败 | 2026-07-09 修复 |

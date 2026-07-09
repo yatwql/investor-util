@@ -8,15 +8,15 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2583 | ~22s |
+| `unit` | 2589 | ~22s |
 | `standard` | 2204 | ~22s |
 | `scenario` | 277 | ~35s |
 | `regression` | 277 | ~35s |
-| `verify` | 1006 | ~50s |
+| `verify` | 1057 | ~5min |
 | `integration` | 306 | ~50s |
 | `edge` | 318 | ~15s |
 | `data` | 65 | ~10s |
-| `all` | 2889 | ~85s |
+| `all` | 2895 | ~85s |
 | `smoke` | 24 | ~2s |
 | `report` 🆕 | ≈958 | ~15s |
 | `all_no_unit` 🆕 | 306 | ~55s |
@@ -28,7 +28,8 @@
 > v0.3.0 测试增量覆盖补全（52 项新增），全量 2721 项（2709 passed / 12 skipped for Windows）。
 > v0.3.1 Provider Chain 熔断架构升级（13 项新增：熔断预检 9 项 + 冷却探针 4 项 edge），全量 2726 项（2714 passed / 12 skipped for Windows）。
 > v0.3.2 核心模块单元测试补全（96 项新增：generators 21 + prompts 44 + handlers_cache 18 + handlers_report 13），全量 2822 项（2810 passed / 12 skipped for Windows）。
-> v0.3.2e 数据降级重构 Step A~E（45 项新增：provider_registry 37 + phase_timeout 8；原 test_config 单元从 standard 迁移至 unit），全量 2889 项（2877 passed / 12 skipped for Windows）。
+> v0.3.2e 数据降级重构 Step A~E（45 项新增：provider_registry 37 + phase_timeout 8；原 test_config 单元从 standard 迁移至 unit），全量 2895 项。
+> v0.3.3 测试断言同步修复（R-192/R-193：6 项测试对齐实现文案），全量 2895 项。
 
 ### 功能域对应测试源
 
