@@ -83,8 +83,9 @@ class _SheetMocks:
             patch("src.python.report.penetration.compute_penetration_top10", self.compute_penetration),
             patch("src.python.report.penetration_sheet.write_penetration_sheet", self.write_penetration),
             patch("src.python.report.fund_performance.write_fund_performance_sheet", self.write_fund_performance),
-            patch("src.python.report.excel_generator.get_report_sheet_name", side_effect=lambda k: k),
-            patch("src.python.report.excel_generator.get_llm_module_name", MagicMock()),
+            patch("src.python.report.excel_content_sheets.get_report_sheet_name", side_effect=lambda k: k),
+            patch("src.python.report.excel_news_warning.get_report_sheet_name", side_effect=lambda k: k),
+            patch("src.python.report.excel_news_warning.get_llm_module_name", MagicMock()),
         ]
         for p in self.patchers:
             p.start()
