@@ -318,9 +318,12 @@ investor-util/
 │   │   │   └── B1-fund-deep-analysis.md       # ✅ 已实现 — B 迭代基金深度分析 4 模块设计
 │   │   ├── report-section-order-config/                        # 📁 报告序号可配置设计归档
 │   │   │   └── report-section-order-config.md                  # ✅ 已实现 — C 迭代：报告序号可配置设计（含 C-P1b 详细方案）
-│   │   ├── akshare-integration-profit-forecast-sector-flow.md  # ✅ 已归档 — akshare 集成（profit_forecast + sector_fund_flow）
-│   │   ├── early-warning-and-p1-optimization.md                # ✅ 已归档 — 智能预警 + P1 代码优化实施计划
-│   │   ├── y5-edge-test-config-env.md                          # ✅ 已归档 — Y5 配置/环境纵深测试实施计划
+│   │   ├── akshare-integration/                        # 📁 akshare 数据源集成归档
+│   │   │   └── akshare-integration-profit-forecast-sector-flow.md  # ✅ 已归档 — akshare 盈利预测 + 资金流向集成
+│   │   ├── report-early-warning/                       # 📁 智能预警 + P1 代码优化归档
+│   │   │   └── early-warning-and-p1-optimization.md    # ✅ 已归档 — 智能预警 + P1 代码优化实施计划
+│   │   ├── edge-test-coverage/                         # 📁 配置/环境纵深测试归档
+│   │   │   └── y5-edge-test-config-env.md              # ✅ 已归档 — Y5 配置/环境纵深测试实施计划
 │   │   ├── data-degradation/                                   # 📁 数据降级重构归档
 │   │   │   ├── d-iteration-data-degradation-design.md          # ✅ 已归档 — D 迭代数据降级分层治理完整设计
 │   │   │   ├── d-iteration-data-degradation-iteration-plan.md  # ✅ 已归档 — D 迭代精细化子迭代拆分方案
