@@ -407,15 +407,15 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
         return tmpl
 
     def test_all_bseries_sections_visible_when_empty(self):
-        """B 系列 4 模块全部返回空数据 → 4 个 section 均可见（section_visible=True）。"""
+        """B 系列 4 模块全部返回空数据 → 4 个 section 均可见（section_visible_dict=True）。"""
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            self._make_b_series_mocks(stack)
+            tmpl = self._make_b_series_mocks(stack)
             write_html_report(self.holdings, include_news=True, output_dir=self._tmp)
 
-        from src.python.report.html_jinja_env import _ENV
-        svis = _ENV.globals.get("section_visible_dict", {})
+        _, kwargs = tmpl.render.call_args
+        svis = kwargs.get("section_visible_dict", {})
         self.assertTrue(svis.get("fund_manager"), "基金经理 section 应可见")
         self.assertTrue(svis.get("fund_overlap"), "重合度 section 应可见")
         self.assertTrue(svis.get("fund_concentration"), "集中度 section 应可见")

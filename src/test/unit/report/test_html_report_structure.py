@@ -132,18 +132,12 @@ def _render_template(render_data: dict) -> BeautifulSoup:
     """用 html_writer._ENV 渲染模板并返回 BeautifulSoup 对象。"""
     from src.python.report.html_jinja_env import _ENV
 
-    # 保存/恢复 section_visible_dict 全局
-    old_global = _ENV.globals.get("section_visible_dict")
-    _ENV.globals["section_visible_dict"] = render_data.get("section_visible_dict", {})
-
-    try:
-        html = _ENV.get_template("report_template.html").render(**render_data)
-        return BeautifulSoup(html, "html.parser")
-    finally:
-        if old_global is not None:
-            _ENV.globals["section_visible_dict"] = old_global
-        else:
-            _ENV.globals.pop("section_visible_dict", None)
+    # 注入 section_visible 闭包（与生产代码相同的 context 变量方式，不写入 _ENV.globals）
+    _sv_dict = render_data.get("section_visible_dict", {})
+    _sv_fn = lambda key, _d=_sv_dict: bool(_d.get(key, False))
+    html = _ENV.get_template("report_template.html").render(
+        **render_data, section_visible=_sv_fn)
+    return BeautifulSoup(html, "html.parser")
 
 
 def _get_section_id_from_href(href: str) -> str:

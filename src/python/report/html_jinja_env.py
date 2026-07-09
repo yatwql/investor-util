@@ -127,4 +127,4 @@ _ENV.filters["profit_color"] = _jinja_profit_color
 _ENV.filters["price_type_color"] = _jinja_price_type_color
 _ENV.filters["thousands"] = _jinja_thousands
 
-_ENV.globals["section_visible"] = _jinja_section_visible
+_ENV.globals["section_visible"] = lambda key: False  # fail-closed 默认值，生产环境由 context 变量覆盖

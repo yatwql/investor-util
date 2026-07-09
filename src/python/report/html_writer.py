@@ -184,7 +184,8 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         else:
             section_visible_dict[sec["key"]] = raw_data_flags.get(flag_name, False)
 
-    _ENV.globals["section_visible_dict"] = section_visible_dict
+    # 创建渲染期 section_visible 闭包（不写入 _ENV.globals，遵守 C14 约束）
+    _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
 
     # ── 11) 构建各章节数据源状态摘要 ──
     data_status_summary: DataStatus = _safe_build_data_status(
@@ -241,6 +242,8 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         # C 迭代：序号 & 可见性（模板使用 section_numbers/section_visible_dict）
         section_order=order, section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,
+        # PF 修复：section_visible 函数由 context 变量传入，不写入 _ENV.globals
+        section_visible=_sv_fn,
         # D 迭代：数据源状态摘要
         data_status_summary=data_status_summary,
         data_status_penetration=data_status_penetration,
