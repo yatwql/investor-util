@@ -56,5 +56,5 @@
 > v0.3.3：R-188~R-193、R-203、M-004（eastmoney_industry 熔断器迁移/assert 同步/自动注册等 8 项）
 > v0.3.4：R-194~R-196（technical.md 标记同步/版本一致性检查/溢价率真实计算 3 项）
 > v0.3.4（R-178）：R-178 html_writer.py 5 步分拆（html_save.py/html_jinja_env.py/html_renderers.py 外迁 + Step PF + 编排器精简）
-> **v0.3.5（R-200）：R-200 scenario/regression/verify 三模式耗时优化（Step 0 push2 mock、B-2b 标记拆分+文件搬迁、D-4 dev-verify 新增）**
+> **v0.3.5（R-200）：R-200 scenario/regression/verify 三模式耗时优化（Step 0 push2 mock、B-2b 标记拆分+文件搬迁、D-4 dev-verify 新增、C verify 子阶段 --phased）**
 > v0.3.3（早期）：R-179~R-180、R-184~R-186（config.py 子包拆分/type:ignore 清理/预测年份动态化/定价单源 5 项）
