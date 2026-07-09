@@ -26,29 +26,6 @@
 - **代码库兼容性/死代码审计**：全局扫描 `src/python/` 中 config.json/llm_settings.json/缓存/API 响应的历史兼容代码，结论：代码库干净，仅 4 处微小负担，已处理其中 1 处（`get_skip_*_copy` 旧测试接口）。
 - **配置 + 代码全局一致性检查**：config.json 17 键 / llm_settings.json 53 键 / registry 21 缓存 TTL 项 / 所有 `.py` 文件导入引用 — 无死键、无死文件、无冲突。
 
-## [0.3.4] - 2026-07-09
-
-### Added
-
-- **溢价率真实计算**：`market_value.py` 新增 `_compute_premium()` 函数，QDII 基金（含隐式海外基金如标普500ETF/纳指ETF）的溢价率从固定占位符 `"--"` 改为 `(现价-参考净值)/参考净值` 实时计算，输出格式 `"+X.XX%"`。非 QDII 或无参考净值时保持 `"--"`。新增 4 项 `@pytest.mark.data` 测试覆盖正/负/非QDII/零净值场景。
-- **版本号一致性检查脚本**：`scripts/check-version-consistency.py` 以 `constants.py` 的 `APP_VERSION` 为单一事实源，自动校验 `pyproject.toml` + 7 份管理/用户文档的版本号一致性。已同步修复 `pyproject.toml` 从 `0.3.0` → `0.3.4` 的过期问题。`CLAUDE.md` 发布流程引用该脚本。
-
-### Fixed
-
-- **R-178 html_writer.py 5 步分拆完成**：`html_writer.py` 从 996 行/5 重职责精简为专注编排。Step 1：`_save_html_report` → `html_save.py`；Step 2：Jinja2 环境 → `html_jinja_env.py`；Step 3：14 个 `_render_*` 函数 → `html_renderers.py`；Step PF：修复 `_ENV.globals` 运行时变异；Step 4：编排器精简。设计文档归档至 `docs-stm/archive/refactor-html_writer/`。
-- **R-211 测试隔离补完**：`test_excel_generator_edge.py` 调用 `generate_excel_report` 补传 `output_dir=tmp_path`，消除测试报告对 `reports/` 目录的污染。`logger.py` 新增 `INVEST_RUNNING_TESTS` 环境变量检测 + `"pytest" in sys.modules` 回退，修复 xdist worker 子进程日志误写入 `app.log`。`test_runner.py` 子进程显式设置 `INVEST_RUNNING_TESTS=1` 确保全链路继承。
-
-- **technical.md C12 约束老化引用**：`testplan.md §1.9` → `§1.8`（随 testplan.md 编号修复同步）。
-
-### Docs
-
-- **R-194 technical.md push2 熔断标记同步**：`technical.md` 三层熔断对比表的 push2 实现位置从"模块级全局变量（待迁移）"修正为"已迁移，见 R-188"，与代码实况保持一致。
-- **test-coverage-map.md 归档**：`test-coverage-map.md` + `validate_coverage_map.py` 迁移至 `docs-stm/archive/test-coverage-map/`，缩略条目对应更新。
-- **testplan.md 组织清理**：已归档的旧 §1.8（场景-测试文件覆盖率映射）移除，后续 §1.9→§1.8 重编号；§6.2.8、§8.3.1 老化引用同步更新。
-- **plan.md R-188~R-191 引用更新**：blockquote 标记为已完成，移除"剩余待修复问题"描述。
-- **多批计划文件/设计文档归档**：B1-fund-deep-analysis / C-P1b / A5-test-runtime-optimization / 数据降级复盘文档迁入 `archive/` 子目录归类。
-
----
 
 ## [0.3.5] - 2026-07-10
 
@@ -156,6 +133,32 @@
 - **文档版本号统一更新**：constants.py、README.md、how-to-test-my-code.md、plan.md、changelog.md 同步至 v0.3.3
 
 ---
+
+## [0.3.4] - 2026-07-09
+
+### Added
+
+- **溢价率真实计算**：`market_value.py` 新增 `_compute_premium()` 函数，QDII 基金（含隐式海外基金如标普500ETF/纳指ETF）的溢价率从固定占位符 `"--"` 改为 `(现价-参考净值)/参考净值` 实时计算，输出格式 `"+X.XX%"`。非 QDII 或无参考净值时保持 `"--"`。新增 4 项 `@pytest.mark.data` 测试覆盖正/负/非QDII/零净值场景。
+- **版本号一致性检查脚本**：`scripts/check-version-consistency.py` 以 `constants.py` 的 `APP_VERSION` 为单一事实源，自动校验 `pyproject.toml` + 7 份管理/用户文档的版本号一致性。已同步修复 `pyproject.toml` 从 `0.3.0` → `0.3.4` 的过期问题。`CLAUDE.md` 发布流程引用该脚本。
+
+### Fixed
+
+- **R-178 html_writer.py 5 步分拆完成**：`html_writer.py` 从 996 行/5 重职责精简为专注编排。Step 1：`_save_html_report` → `html_save.py`；Step 2：Jinja2 环境 → `html_jinja_env.py`；Step 3：14 个 `_render_*` 函数 → `html_renderers.py`；Step PF：修复 `_ENV.globals` 运行时变异；Step 4：编排器精简。设计文档归档至 `docs-stm/archive/refactor-html_writer/`。
+- **R-211 测试隔离补完**：`test_excel_generator_edge.py` 调用 `generate_excel_report` 补传 `output_dir=tmp_path`，消除测试报告对 `reports/` 目录的污染。`logger.py` 新增 `INVEST_RUNNING_TESTS` 环境变量检测 + `"pytest" in sys.modules` 回退，修复 xdist worker 子进程日志误写入 `app.log`。`test_runner.py` 子进程显式设置 `INVEST_RUNNING_TESTS=1` 确保全链路继承。
+
+- **technical.md C12 约束老化引用**：`testplan.md §1.9` → `§1.8`（随 testplan.md 编号修复同步）。
+
+### Docs
+
+- **R-194 technical.md push2 熔断标记同步**：`technical.md` 三层熔断对比表的 push2 实现位置从"模块级全局变量（待迁移）"修正为"已迁移，见 R-188"，与代码实况保持一致。
+- **test-coverage-map.md 归档**：`test-coverage-map.md` + `validate_coverage_map.py` 迁移至 `docs-stm/archive/test-coverage-map/`，缩略条目对应更新。
+- **testplan.md 组织清理**：已归档的旧 §1.8（场景-测试文件覆盖率映射）移除，后续 §1.9→§1.8 重编号；§6.2.8、§8.3.1 老化引用同步更新。
+- **plan.md R-188~R-191 引用更新**：blockquote 标记为已完成，移除"剩余待修复问题"描述。
+- **多批计划文件/设计文档归档**：B1-fund-deep-analysis / C-P1b / A5-test-runtime-optimization / 数据降级复盘文档迁入 `archive/` 子目录归类。
+
+---
+
+
 
 ## [0.3.0] - 2026-07-08
 
