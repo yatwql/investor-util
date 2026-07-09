@@ -312,7 +312,8 @@ investor-util/
 │   │   ├── archived_review-findings.0.1.x.md  # v0.1.x 自审问题记录归档
 │   │   ├── archived_review-findings.0.2.x.md  # v0.2.x 自审问题记录归档（R-149~R-159 等 8 条）
 │   │   ├── archived-data-source-pre-study.md  # ✅ 已归档 — 数据源预研笔记（原位于 plan/notes/）
-│   │   ├── A5-test-runtime-optimization.md    # ✅ 已实现 — A5：测试运行时可扩展性优化设计
+│   │   ├── test-runtime-optimization/         # 📁 测试可扩展性优化设计归档
+│   │   │   └── A5-test-runtime-optimization.md # ✅ 已实现 — A5：测试运行时可扩展性优化设计（pytest-xdist 并行）
 │   │   ├── fund-deep-analysis/                # 📁 基金深度分析设计归档
 │   │   │   └── B1-fund-deep-analysis.md       # ✅ 已实现 — B 迭代基金深度分析 4 模块设计
 │   │   ├── report-section-order-config/                        # 📁 报告序号可配置设计归档
