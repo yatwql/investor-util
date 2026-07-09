@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-09（D-11 全景复查 + 新增 8 项）
+最后更新：2026-07-09（D-11 全景复查 + 新增 8 项；R-204 C4 冗余记录；R-205 cwd 依赖问题）
 
 ---
 
@@ -30,7 +30,7 @@
 
 | # | 问题 | 模块 | 备注 |
 |:-:|:-----|:----|:----:|
-| R-178 | **`html_writer.py` 995 行严重超重**：导入 20+ 模块，混合 HTML 构建/数据准备/模板渲染/文件写入 | `report/html_writer.py` | 已添加文件导览 TOC，拆分暂缓，待某区段需大改时顺手拆出 |
+| R-178 | **`html_writer.py` 996 行严重超重**：导入 25+ 模块，混合 Jinja2 环境/数据准备/内容渲染/LLM 状态/文件 I/O 5 重职责 | `report/html_writer.py` | 分拆计划已制定 → `docs-stm/plan/r178_html_writer_split.md`（5 步 + 前置修复），待执行 |
 | R-197 | **`market_value.py` 711 行持续增长**：第 3 大源文件，混合核心计算（`_compute_detail_row`）与 Excel 写入（`_write_market_value_sheet`）两重职责，随溢价率、空行情、策略选择器等新功能持续膨胀 | `report/market_value.py` | 可拆为 `market_value.py`（计算）+ `market_value_write.py`（写入）|
 
 ### 🟡 中优先级
@@ -42,6 +42,13 @@
 | R-199 | **akshare 依赖老化风险**：`requirements.txt` 未锁定 akshare 版本，pytest 收集期已有 `FutureWarning`（DataFrame concat 行为变更），大版本升级可能引入兼容问题 | `requirements.txt` | 建议锁定 `akshare>=1.16,<2.0` 或类似区间 |
 | R-200 | **verify 模式 ~5min 耗时**：场景/集成测试单线程运行，llm 场景 mock 串行调度可能为瓶颈 | `scripts/test_runner.py` | 可分析瓶颈后对 verify 模式引入增量运行策略 |
 | R-201 | **HTML 打印预览缺少浏览器渲染集成测试**：当前仅 9 项 UT 覆盖 CSS `@media print` 规则，无 Playwright 快照对比确保打印输出视觉正确 | `test_html_template.py` | Playwright 快照测试，但跨系统工具优先级低 |
+| R-205 | **`DegradationTracker` 跨会话持久化因 cwd 依赖从未生效**：`data_status.py` 写 `os.path.join(get_cache_dir(), ".degradation_state.json")`，`get_cache_dir()` = `os.path.abspath("data/cache")` 受运行 cwd 影响。若在 `src/` 下启动程序，路径解析为 `src/data/cache/`，持久化文件被写入错误目录，跨会话降级记忆从未生效。被双层 `try/except` 静默吞掉 | `report/data_status.py` + `cache.py` | 修复：`cache.py` 的 `get_cache_dir()` / `_CACHE_DIR` 改用相对于项目根目录的绝对路径（如 `os.path.dirname(os.path.dirname(__file__))` 推导），消除 cwd 依赖。同时删除已清除的 `src/data/cache/` 残留目录 |
+
+### 🟢 低优先级
+
+| # | 问题 | 模块 | 备注 |
+|:-:|:-----|:----|:----:|
+| R-204 | **B 系列模块文件缓存冗余读取**：`_render_overlap_matrix`/`_render_concentration`/`_render_style_analysis` 各自独立调用 `fetch_fund_holdings(code)`，同基金持仓在一次报告中读取文件缓存 3 次。无额外 API 调用（文件缓存命中），~20 只基金多 ~20ms | `html_writer.py` | 可在 R-178 分拆后用 `DataSourceRegistry.session_cache`（域名 `"fund_hold"`）消除冗余文件读 |
 
 ### ✅ 近期已修复
 

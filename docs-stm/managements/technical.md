@@ -534,7 +534,11 @@ raw_data_flags = {
 
 #### Jinja2 全局函数
 
-`_jinja_section_visible(key)` 注册为 `_ENV.globals["section_visible"]`，在模板中通过 `{% if section_visible("fund_manager") %}` 调用。该函数读取 `_ENV.globals["section_visible_dict"]`（预计算的可见性字典），而非模板 render 上下文变量，保证所有并发渲染使用同一状态。
+`_jinja_section_visible(key)` 在模块级注册为 `_ENV.globals["section_visible"] = lambda key: False`（fail-closed 默认值），渲染时由 `write_html_report` 通过 `render(section_visible=sv_fn, ...)` 传入 context 变量覆盖该默认值。模板中通过 `{% if section_visible("fund_manager") %}` 调用，Jinja2 的 context > globals 解析顺序自动覆盖。
+
+**不写入 `_ENV.globals` 作为渲染期通信渠道**（参见约束 C14）。
+
+> 历史：C 迭代原始实现将预计算的 `section_visible_dict` 写入 `_ENV.globals["section_visible_dict"]` 供 `_jinja_section_visible` 读取。该设计违反 C14，已于 R-178 修复为 context 变量传递。
 
 #### HTML 模板重构
 
@@ -965,3 +969,4 @@ handlers_*.py → 各模块入口函数编排
 | C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker（通过 `pytestmark` 模块级变量），新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure`。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动检查标记遗漏并发出 `PytestWarning` | CI 门禁不通过 | `src/test/conftest.py` |
 | C12 | **边缘测试文件隔离** | `@pytest.mark.edge` 测试**必须**放在 `*_edge.py` 文件中，不得与普通测试混搭。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动校验 | 测试收集失败 | `src/test/conftest.py`、`docs-stm/managements/testplan.md §1.8` |
 | C13 | **测试敏感路径隔离** | 运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`conftest.py` 的 `_isolate_sensitive_paths` autouse fixture 自动将 `config.json` 和缓存目录重定向到临时目录 | 用户数据被污染 | `src/test/conftest.py` |
+| C14 | **渲染期数据不可写入模块级全局变量** | 任何渲染期数据（section_visible_dict 等）必须通过模板 render context 或函数参数传递，**不得**写入 `_ENV.globals`、模块级 dict 等作为跨函数通信渠道。单次会话中不变的数据（如 _ENV 过滤器注册）不受此限 | 并发不安全、状态污染、跨请求泄漏 | R-178 |
