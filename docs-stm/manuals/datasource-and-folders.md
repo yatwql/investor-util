@@ -336,7 +336,7 @@ investor-util/
 │   │   ├── test-coverage-map/                        # 📁 场景-测试文件覆盖率映射归档
 │   │   │   ├── test-coverage-map.md                  # ✅ 已归档 — 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   │   │   └── validate_coverage_map.py              # ✅ 已归档 — 覆盖率映射验证脚本
-│   │   ├── refactor_html_writer/                     # 📁 html_writer.py 分拆设计归档
+│   │   ├── refactor-html_writer/                     # 📁 html_writer.py 分拆设计归档
 │   │   │   └── r178_html_writer_split.md             # ✅ 已实现 — R-178：html_writer.py 5 步分拆计划（含 C14 约束引入）
 │   ├── plan/                         # 计划与设计文件（当前空，待填入新迭代计划）
 │   ├── manuals/                      # 用户文档分册

@@ -15,7 +15,7 @@
 
 ### Fixed
 
-- **R-178 html_writer.py 5 步分拆完成**：`html_writer.py` 从 996 行/5 重职责精简为专注编排。Step 1：`_save_html_report` → `html_save.py`；Step 2：Jinja2 环境 → `html_jinja_env.py`；Step 3：14 个 `_render_*` 函数 → `html_renderers.py`；Step PF：修复 `_ENV.globals` 运行时变异；Step 4：编排器精简。设计文档归档至 `docs-stm/archive/refactor_html_writer/`。
+- **R-178 html_writer.py 5 步分拆完成**：`html_writer.py` 从 996 行/5 重职责精简为专注编排。Step 1：`_save_html_report` → `html_save.py`；Step 2：Jinja2 环境 → `html_jinja_env.py`；Step 3：14 个 `_render_*` 函数 → `html_renderers.py`；Step PF：修复 `_ENV.globals` 运行时变异；Step 4：编排器精简。设计文档归档至 `docs-stm/archive/refactor-html_writer/`。
 - **R-211 测试隔离补完**：`test_excel_generator_edge.py` 调用 `generate_excel_report` 补传 `output_dir=tmp_path`，消除测试报告对 `reports/` 目录的污染。`logger.py` 新增 `INVEST_RUNNING_TESTS` 环境变量检测 + `"pytest" in sys.modules` 回退，修复 xdist worker 子进程日志误写入 `app.log`。`test_runner.py` 子进程显式设置 `INVEST_RUNNING_TESTS=1` 确保全链路继承。
 
 - **technical.md C12 约束老化引用**：`testplan.md §1.9` → `§1.8`（随 testplan.md 编号修复同步）。
@@ -43,7 +43,7 @@
 
 ### Docs
 
-- **计划文档 v5 终版**：`r200_verify_mode_optimization.md` 同步迭代更新
+- **计划文档 v5 终版**：`r200_verify_mode_optimization.md` 同步迭代更新（已完成，归档至 `docs-stm/archive/test-verify-mode-optimization/`）
 - **测试模式文档同步**：`how-to-test-my-code.md`、`testplan.md`、`datasource-and-folders.md` 更新 scenario_extreme 文件位置和 dev-verify 模式说明
 - **review-findings.md R-200 → ✅**：已修复转归档
 

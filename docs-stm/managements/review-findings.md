@@ -39,7 +39,6 @@
 | R-187 | **TUI Windows 平台 12 个测试跳过**：`termios`/`tty` 为 Linux 特有模块，Windows 上 `_get_key_linux()` 已加 try/except 保护 | `tui.py` + `test_tui_edge.py` | 功能降级但无错误，可考虑 CI 加 Windows runner |
 | R-198 | **LLM 模块两巨头膨胀**：`generators.py`（750 行，第 2 大）+ `api.py`（702 行，第 4 大），如新增环比分析等 LLM 模块建议先横向拆分 | `llm/generators.py` + `llm/api.py` | `generators.py` 可拆出 `generators_news.py`；`api.py` 可按 provider 拆为 `api_claude.py`/`api_openai.py` |
 | R-199 | **akshare 依赖老化风险**：`requirements.txt` 未锁定 akshare 版本，pytest 收集期已有 `FutureWarning`（DataFrame concat 行为变更），大版本升级可能引入兼容问题 | `requirements.txt` | 建议锁定 `akshare>=1.16,<2.0` 或类似区间 |
-| ~~R-200~~ | ~~verify 模式 ~5min 耗时~~ | ~~`scripts/test_runner.py`~~ | ~~可分析瓶颈后引入增量运行~~ |
 | R-201 | **HTML 打印预览缺少浏览器渲染集成测试**：当前仅 9 项 UT 覆盖 CSS `@media print` 规则，无 Playwright 快照对比确保打印输出视觉正确 | `test_html_template.py` | Playwright 快照测试，但跨系统工具优先级低 |
 | R-205 | **`DegradationTracker` 跨会话持久化因 cwd 依赖从未生效**：`data_status.py` 写 `os.path.join(get_cache_dir(), ".degradation_state.json")`，`get_cache_dir()` = `os.path.abspath("data/cache")` 受运行 cwd 影响。若在 `src/` 下启动程序，路径解析为 `src/data/cache/`，持久化文件被写入错误目录，跨会话降级记忆从未生效。被双层 `try/except` 静默吞掉 | `report/data_status.py` + `cache.py` | 修复：`cache.py` 的 `get_cache_dir()` / `_CACHE_DIR` 改用相对于项目根目录的绝对路径（如 `os.path.dirname(os.path.dirname(__file__))` 推导），消除 cwd 依赖。同时删除已清除的 `src/data/cache/` 残留目录 |
 
