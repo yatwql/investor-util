@@ -26,11 +26,30 @@ try {
 Write-Host "检测到 Python: $($pythonCmd)"
 
 # 2. 检查/创建虚拟环境
+function _Ensure-VenvInitialized {
+    param([string]$Path)
+    $activateScript = Join-Path $Path "Scripts\Activate.ps1"
+    $pyvenvCfg = Join-Path $Path "pyvenv.cfg"
+    if (-not (Test-Path $activateScript) -and -not (Test-Path $pyvenvCfg)) {
+        Write-Host "虚拟环境目录为空，正在创建: $Path" -ForegroundColor Yellow
+        & $pythonCmd -m venv $Path
+        if (-not (Test-Path $Path)) {
+            Write-Host "错误: 创建虚拟环境失败: $Path" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "虚拟环境创建完成: $Path" -ForegroundColor Cyan
+    }
+}
+
 if (Test-Path ".venv") {
-    if ((Get-Item ".venv").LinkType -eq "Junction") {
-        Write-Host "检测到外部虚拟环境链接: $((Get-Item ".venv").Target)" -ForegroundColor Cyan
+    $item = Get-Item ".venv"
+    if ($item.LinkType -eq "Junction") {
+        $venvTarget = $item.Target
+        Write-Host "检测到外部虚拟环境链接: $venvTarget" -ForegroundColor Cyan
+        _Ensure-VenvInitialized -Path $venvTarget
     } else {
         Write-Host "检测到本地虚拟环境。" -ForegroundColor Cyan
+        _Ensure-VenvInitialized -Path ".venv"
     }
 } elseif ($env:VENV_PATH) {
     # VENV_PATH 环境变量指向外部管理的 .venv 目录
@@ -44,6 +63,7 @@ if (Test-Path ".venv") {
             exit 1
         }
     }
+    _Ensure-VenvInitialized -Path $externalVenv
     New-Item -ItemType Junction -Path ".venv" -Target $externalVenv | Out-Null
     Write-Host "已创建链接: .venv → $externalVenv" -ForegroundColor Cyan
 } else {
@@ -58,8 +78,13 @@ if (Test-Path ".venv") {
 
 # 3. 激活虚拟环境
 Write-Host "正在激活虚拟环境 ..."
+$activateScript = ".\.venv\Scripts\Activate.ps1"
+if (-not (Test-Path $activateScript)) {
+    Write-Host "错误: 未找到虚拟环境激活脚本 ($activateScript)。" -ForegroundColor Red
+    exit 1
+}
 try {
-    . .\.venv\Scripts\Activate.ps1
+    . $activateScript
 } catch {
     Write-Host "错误: 激活虚拟环境失败。请检查执行策略: Set-ExecutionPolicy RemoteSigned -Scope CurrentUser" -ForegroundColor Red
     exit 1

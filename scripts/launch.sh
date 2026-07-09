@@ -18,11 +18,27 @@ fi
 echo "检测到 Python: $PYTHON_CMD"
 
 # 2. 检查/创建虚拟环境
+_init_venv_if_needed() {
+    local target="$1"
+    if [ ! -f "$target/pyvenv.cfg" ] && [ ! -f "$target/bin/activate" ] && [ ! -f "$target/Scripts/activate" ]; then
+        echo "虚拟环境目录为空，正在创建: $target"
+        $PYTHON_CMD -m venv "$target"
+        if [ $? -ne 0 ]; then
+            echo "错误: 创建虚拟环境失败: $target" >&2
+            exit 1
+        fi
+        echo "虚拟环境创建完成: $target"
+    fi
+}
+
 if [ -d ".venv" ] || [ -L ".venv" ]; then
     if [ -L ".venv" ]; then
-        echo "检测到外部虚拟环境链接: $(readlink .venv)"
+        VENV_TARGET=$(readlink .venv)
+        echo "检测到外部虚拟环境链接: $VENV_TARGET"
+        _init_venv_if_needed "$VENV_TARGET"
     else
         echo "检测到本地虚拟环境。"
+        _init_venv_if_needed ".venv"
     fi
 elif [ -n "$VENV_PATH" ]; then
     # VENV_PATH 环境变量指向外部管理的 .venv 目录
@@ -35,6 +51,7 @@ elif [ -n "$VENV_PATH" ]; then
             exit 1
         fi
     fi
+    _init_venv_if_needed "$VENV_PATH"
     ln -s "$VENV_PATH" .venv
     echo "已创建链接: .venv → $VENV_PATH"
 else
@@ -47,9 +64,16 @@ else
     fi
 fi
 
-# 3. 激活虚拟环境
+# 3. 激活虚拟环境（兼容 Linux bin/activate 和 Windows Git Bash Scripts/activate）
 echo "正在激活虚拟环境 ..."
-source .venv/bin/activate
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+elif [ -f ".venv/Scripts/activate" ]; then
+    source .venv/Scripts/activate
+else
+    echo "错误: 未找到虚拟环境激活脚本（.venv/bin/activate 或 .venv/Scripts/activate）。" >&2
+    exit 1
+fi
 if [ $? -ne 0 ]; then
     echo "错误: 激活虚拟环境失败。" >&2
     exit 1
