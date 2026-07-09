@@ -313,7 +313,8 @@ investor-util/
 │   │   ├── archived_review-findings.0.2.x.md  # v0.2.x 自审问题记录归档（R-149~R-159 等 8 条）
 │   │   ├── archived-data-source-pre-study.md  # ✅ 已归档 — 数据源预研笔记（原位于 plan/notes/）
 │   │   ├── A5-test-runtime-optimization.md    # ✅ 已实现 — A5：测试运行时可扩展性优化设计
-│   │   ├── B1-fund-deep-analysis.md           # ✅ 已实现 — B 迭代基金深度分析 4 模块设计
+│   │   ├── fund-deep-analysis/                # 📁 基金深度分析设计归档
+│   │   │   └── B1-fund-deep-analysis.md       # ✅ 已实现 — B 迭代基金深度分析 4 模块设计
 │   │   ├── c-iteration-design.md              # ✅ 已实现 — C 迭代设计
 │   │   ├── c-p1b-excel-title-number-fix.md    # ✅ 已实现 — C-P1b：Excel 报告可配置序号修复设计
 │   │   ├── akshare-integration-profit-forecast-sector-flow.md  # ✅ 已归档 — akshare 集成（profit_forecast + sector_fund_flow）
