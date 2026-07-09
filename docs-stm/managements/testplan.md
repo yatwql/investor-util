@@ -235,14 +235,10 @@
 | **T20: 节假日调休** | 调休工作日（周日上班）vs 调休放假（周六休息） | _is_trading_day 判断 | 交易日历包含调休规则时 is_trading_day 正确识别工作日/休息日 |
 | **T21: 港股通假期差异** | A 股开市但港股通因香港假期关闭 | 菜单 E（含港股通持仓） | QDII 净值延迟 T-1，price_type 正确标记，today_profit=0 |
 
-### 1.8 场景-测试文件覆盖率映射（已归档）
-
-> **维护方式：** 该映射已归档至 `docs-stm/archive/test-coverage-map/`，其核心信息（每一场景对应的测试标记与覆盖项数）已整合至 [`test-coverage.md`](./test-coverage.md) → 场景测试分组表。
-> 如需查阅某场景的具体测试类名，可参考归档文档 `docs-stm/archive/test-coverage-map/test-coverage-map.md`。
-> 对应的验证脚本 `validate_coverage_map.py` 同步归档至同目录。
->
 > **pytest marker 对照：** §1.3 场景 → `scenario_basic`/`scenario_resilience`/`scenario_llm`；
-> §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）。
+> §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"`。
+> 每场景的测试类参考见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组表。
+> 详细场景-测试文件映射已归档：`docs-stm/archive/test-coverage-map/`。
 
 
 > edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。
