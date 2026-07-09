@@ -763,7 +763,7 @@ class TestWriteModuleDataRows(unittest.TestCase):
 
     def _run(self, module_info):
         """执行 _write_module_data_rows 并返回写入的单元格值字典。"""
-        from src.python.report.summary import _write_module_data_rows
+        from src.python.report.summary_llm_usage import _write_module_data_rows
 
         end_row = _write_module_data_rows(self.ws, self.start_row, module_info)
         result = {}

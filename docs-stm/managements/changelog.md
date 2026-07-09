@@ -15,7 +15,11 @@
 
 ### Changed
 
-- **R-206 excel_generator.py 拆分（692→98 行，-86%）**：按 7 轮迭代拆出 7 个专业模块（excel_module_loader/sheet_factory/market_data/content_sheets/news_warning/b_series/llm_usage）。excel_generator.py 从 12 函数/692 行精简为核心编排器 5 函数/98 行。`_process_b_module` 消除重合度/集中度/风格 3 模块的重复数据准备模板（~90 行→30 行）。更新 5 个测试文件的 import/mock 路径，零行为变更。全量 989 项报告单元测试通过。新增 `docs-stm/manuals/datasource-and-folders.md` 目录树 7 项记录。
+- **R-206 excel_generator.py 拆分（692→98 行，-86%）**：按 7 轮迭代拆出 7 个专业模块（excel_module_loader/sheet_factory/market_data/content_sheets/news_warning/b_series/llm_usage）。excel_generator.py 从 12 函数/692 行精简为核心编排器 5 函数/98 行。`_process_b_module` 消除重合度/集中度/风格 3 模块的重复数据准备模板（~90 行→30 行）。更新 5 个测试文件的 import/mock 路径，零行为变更。全量 989 项报告单元测试通过。设计文档已归档至 `docs-stm/archive/refactor-excel-generator/`。
+
+- **R-207 summary.py LLM 用量拆分（617→350 行，-43%）**：8 个 LLM 用量函数（`write_llm_usage_sheet`/`_init_llm_usage_sheet`/`_write_llm_summary_section`/`_write_module_table_header`/`_write_module_data_rows`/`_write_legend`/`_write_cache_stats_section`/`_set_column_widths`）迁出至 `summary_llm_usage.py`。summary.py 通过 re-export 保持向后兼容。3 个测试文件 import 路径同步更新。设计文档已归档至 `docs-stm/archive/refactor-summary-llm-usage/`。
+
+- **akshare 依赖版本区间锁定**：`requirements.txt` 从 `==1.18.64` 改为 `>=1.16,<2.0`，允许非破坏性更新同时防止大版本兼容风险（R-199）。
 
 - **technical.md 迭代历史痕迹清理**：移除 16 处 A 类（纯迭代记录）和 B 类（版本标记）历史痕迹，恢复为永恒技术设计文档。
 - **how-to-config.md 版本标记清理**：移除 2 处 v0.2.xx 版本标记。
@@ -27,6 +31,12 @@
 
 - **代码库兼容性/死代码审计**：全局扫描 `src/python/` 中 config.json/llm_settings.json/缓存/API 响应的历史兼容代码，结论：代码库干净，仅 4 处微小负担，已处理其中 1 处（`get_skip_*_copy` 旧测试接口）。
 - **配置 + 代码全局一致性检查**：config.json 17 键 / llm_settings.json 53 键 / registry 21 缓存 TTL 项 / 所有 `.py` 文件导入引用 — 无死键、无死文件、无冲突。
+
+- **technical.md 报告管线/依赖树/LLM 用量引用更新**：反映 R-206（7 个 excel_* 中间模块）和 R-207（summary_llm_usage.py）拆分后的新模块结构。Excel 管线从单行描述改为分步编排架构。`build_llm_usage_sheet`/`_write_cache_stats_section` 引用路径从 `summary.py` 更新至 `excel_llm_usage.py`/`summary_llm_usage.py`。
+- **test-coverage.md 报告生成模块列表更新**：补充 R-206/R-207 新增的 8 个模块（excel_module_loader/sheet_factory/market_data/content_sheets/news_warning/b_series/llm_usage/summary_llm_usage）。
+- **datasource-and-folders.md 目录树同步**：新增 `summary_llm_usage.py` 文件条目 + 2 个归档目录（refactor-excel-generator、refactor-summary-llm-usage）。`summary.py` 描述修正为"不含 LLM 用量"。
+- **review-findings.md 全部清空**：24 项自审问题已全部修复/归档，当前无待修复问题。R-187（TUI Windows 12 测试跳过，平台限制已标记 `skipIf`）/R-199（akshare 版本区间锁定）/R-201（HTML 打印预览 Playwright 测试，低优先级暂不修复）已处理归档。
+- **R-206/R-207 设计文档归档**：plan/ 下 2 份迭代设计文件迁至 `docs-stm/archive/refactor-excel-generator/` 和 `docs-stm/archive/refactor-summary-llm-usage/`。
 
 
 ## [0.3.5] - 2026-07-10

@@ -221,16 +221,16 @@ class TestExcelTextWrapping(unittest.TestCase):
     """Excel 文本换行设置测试 — 避免长文本截断不显示。"""
 
     def test_summary_uses_wrap_text(self):
-        """汇总表关键列设置了 wrap_text。"""
-        from src.python.report import summary as sm
+        """汇总表关键列设置了 wrap_text（现位于 summary_llm_usage.py）。"""
+        from src.python.report import summary_llm_usage as slu
         import inspect
-        source = inspect.getsource(sm)
+        source = inspect.getsource(slu)
         self.assertIn("wrap_text", source,
-                      "summary.py 应使用 wrap_text 避免长文本截断")
+                      "summary_llm_usage.py 应使用 wrap_text 避免长文本截断")
         # 确认有列宽设置
         has_width = "column_width" in source.lower() or "_set_column_widths" in source
         self.assertTrue(has_width,
-                        "summary.py 应设置列宽")
+                        "summary_llm_usage.py 应设置列宽")
 
     def test_news_uses_wrap_text(self):
         """新闻模块使用 wrap_text 避免摘要截断。"""
@@ -242,7 +242,7 @@ class TestExcelTextWrapping(unittest.TestCase):
 
     def test_summary_has_column_widths(self):
         """汇总表定义了列宽数组。"""
-        from src.python.report.summary import _set_column_widths
+        from src.python.report.summary_llm_usage import _set_column_widths
         # 函数存在即可（会在写入时调用）
         self.assertTrue(callable(_set_column_widths))
 
@@ -253,7 +253,7 @@ class TestExcelTextWrapping(unittest.TestCase):
 
     def test_summary_column_widths_reasonable(self):
         """汇总列宽不小于 10（避免数字显示不全）。"""
-        from src.python.report.summary import _set_column_widths
+        from src.python.report.summary_llm_usage import _set_column_widths
         import inspect
         source = inspect.getsource(_set_column_widths)
         # 查找调用处的列宽数组

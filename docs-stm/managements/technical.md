@@ -355,12 +355,21 @@ handlers_report.py（菜单触发）
    │     └─ report_prepare() 收集所有数据 → info 字典
    │
    ├─ Excel 管线
-   │     excel_generator.py → summary.py / market_value.py + market_value_sheet.py / category.py /
-   │     penetration.py / penetration_sheet.py / fund_performance.py /
-   │     news_correlation.py / early_warning.py / llm_content.py /
-   │     fund_manager_sheet.py / fund_overlap_sheet.py /
-   │     fund_concentration_sheet.py / fund_style_analysis.py /
-   │     fund_style_sheet.py（各页签写入器，B 系列 4 模块采用计算引擎+写入器分离模式）
+   │     excel_generator.py（编排器 98 行）
+   │       → excel_sheet_factory.py（页签创建）
+   │       → excel_module_loader.py（模块动态加载）
+   │       → excel_market_data.py（行情+指数解析）
+   │       → excel_content_sheets.py（穿透/基金业绩/股指期货）
+   │       → excel_news_warning.py（新闻+智能预警）
+   │       → excel_b_series.py（B 系列 4 模块）
+   │       → excel_llm_usage.py（LLM 分析章节+用量页签）
+   │       → summary.py / summary_llm_usage.py /
+   │         market_value.py + market_value_sheet.py / category.py /
+   │         penetration.py / penetration_sheet.py / fund_performance.py /
+   │         news_correlation.py / early_warning.py / llm_content.py /
+   │         fund_manager_sheet.py / fund_overlap_sheet.py /
+   │         fund_concentration_sheet.py / fund_style_analysis.py /
+   │         fund_style_sheet.py（各页签写入器，B 系列 4 模块采用计算引擎+写入器分离模式）
    │     → excel_writer.py（通用写入）+ styles.py（样式）
    │
    └─ HTML 管线
@@ -370,7 +379,7 @@ handlers_report.py（菜单触发）
 
 - **Excel 页签写入器**：各 `_write_*_sheet()` 函数接收 `info` 字典 + `writer`，独立负责单个页签的内容和样式，互不依赖
 - **条件渲染**：B 系列基金分析模块（`enable_b_series` 标志）、智能预警页签（菜单 B/L）、LLM 分析章节（菜单 L）在 `info` 中无对应数据时自动跳过
-- **汇总页（页签 1）** 由 `summary.py` 的 `write_summary_sheet()` 独立写入，采用与其他页签写入器相同的直接调用模式。区别仅在于该函数与 `write_llm_usage_sheet()` 同属于 `summary.py`，且命名上不遵循 `_write_*_sheet` 模式
+- **汇总页（页签 1）** 由 `summary.py` 的 `write_summary_sheet()` 独立写入。LLM API 用量页签由 `summary_llm_usage.py` 的 `write_llm_usage_sheet()` 写入（从 summary.py 拆分），两者通过 summary.py 的 re-export 保持向后兼容
 
 ### 数据降级治理
 
@@ -738,8 +747,8 @@ _session_usage (dict)
     │       "per_module": dict,        # 各模块原始数据（由消费方自行格式化为明细表）
     │     }
     │
-    ├─► Excel 报告                          [excel_generator.py + summary.py]
-    │      _build_llm_usage_sheet()
+    ├─► Excel 报告                          [excel_llm_usage.py]
+    │      build_llm_usage_sheet()
     │        → get_session_usage()
     │        → format_session_usage()
     │        → write_llm_usage_sheet()    写入独立页签 16（LLM API 用量，不追加到汇总页）
@@ -830,7 +839,7 @@ LLM 用量页签/章节底部追加"▎数据缓存系统"区域，展示 `cache
 
 | 渠道 | 展示位置 | 实现 |
 |:-----|:---------|:-----|
-| Excel（页签 16） | 状态图例下方，2 列键值表 | `summary.py._write_cache_stats_section()` |
+| Excel（页签 16） | 状态图例下方，2 列键值表 | `summary_llm_usage.py._write_cache_stats_section()` |
 | HTML（第 16 节） | "各模块明细"表格下方 | `report_template.html` 条件渲染 `{% if cache_stats.total > 0 %}` |
 
 #### 会话生命周期
@@ -845,7 +854,7 @@ main.py 入口（菜单 L 选中文件后）
   │     └─ ...
   │
   ├─ generate_excel_report(...)      // 写入独立页签 16
-  │     └─ _build_llm_usage_sheet()
+  │     └─ build_llm_usage_sheet()
   │
   ├─ write_html_report(...)          // 渲染 HTML 底部
   │     └─ _render_llm_module_info()
@@ -910,11 +919,18 @@ reader.py (持仓解析)
     → market_hours.py (交易时段感知 TTL)
     → registry.py (TTL 默认值、缓存分组)
 
-report/excel_generator.py (Excel 编排)
-  → report/summary.py, market_value.py, category.py, penetration.py,
-    fund_performance.py, news_correlation.py, early_warning.py,
-    llm_content.py, fund_manager_sheet.py, fund_overlap.py,
-    fund_concentration.py, fund_style_analysis.py (各页签写入)
+report/excel_generator.py (Excel 编排器，98 行)
+  → report/excel_module_loader.py (模块动态加载)
+  → report/excel_sheet_factory.py (页签创建/可见性判定)
+  → report/excel_market_data.py (行情/指数解析)
+  → report/excel_content_sheets.py (穿透/基金业绩/股指期货)
+  → report/excel_news_warning.py (新闻+智能预警)
+  → report/excel_b_series.py (B 系列 4 模块)
+  → report/excel_llm_usage.py (LLM 章节+用量页签)
+    → report/summary.py, summary_llm_usage.py, market_value.py,
+      category.py, penetration.py, fund_performance.py,
+      news_correlation.py, llm_content.py, fund_manager_sheet.py,
+      fund_overlap.py, fund_concentration.py, fund_style_analysis.py (各页签写入)
   → report/excel_writer.py, styles.py (通用写入/样式)
   → report/data_status.py (降级状态追踪，Excel/HTML 共享)
   → report/html_writer.py (HTML 编排)

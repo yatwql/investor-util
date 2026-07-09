@@ -106,7 +106,8 @@ investor-util/
 │       │   │   ├── excel_b_series.py      # B 系列页签写入（基金经理/重合度/集中度/风格，从 excel_generator.py 拆分）
 │       │   │   ├── excel_llm_usage.py     # LLM 分析章节+API 用量页签（从 excel_generator.py 拆分）
 │       │   │   ├── styles.py             # Excel 样式 — 颜色/字体/边框/对齐/数字格式定义
-│       │   │   ├── summary.py            # 投资分析汇总页签 — 指数行情、账户汇总、LLM 用量
+│       │   │   ├── summary_llm_usage.py   # LLM API 用量页签（从 summary.py 拆分）
+│       │   │   ├── summary.py            # 投资分析汇总页签 — 指数行情、账户汇总
 │       │   │   ├── market_value.py       # 市值核算计算引擎 — 行情获取、细节行生成、盈亏计算
 │       │   │   ├── market_value_sheet.py # 市值核算 Excel 写入层 — 行值转换、着色、分组写入
 │       │   │   ├── category.py           # 持仓分类表页签 — 按资产属性+投资分类聚合
@@ -351,12 +352,16 @@ investor-util/
 │   │   ├── test-coverage-map/                        # 📁 场景-测试文件覆盖率映射归档
 │   │   │   ├── test-coverage-map.md                  # ✅ 已归档 — 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   │   │   └── validate_coverage_map.py              # ✅ 已归档 — 覆盖率映射验证脚本
+│   │   ├── refactor-excel-generator/              # 📁 excel_generator.py 拆分为 7 模块设计归档
+│   │   │   └── R-206-excel-generator-split-plan.md # ✅ 已实现 — R-206：excel_generator.py 7 模块拆分（692→98 行）
 │   │   ├── refactor-html_writer/                     # 📁 html_writer.py 分拆设计归档
 │   │   │   └── r178_html_writer_split.md             # ✅ 已实现 — R-178：html_writer.py 5 步分拆计划（含 C14 约束引入）
 │   │   ├── refactor-market_value_split_design/       # 📁 market_value.py 分拆设计归档
 │   │   │   └── r197_market_value_split.md            # ✅ 已实现 — R-197：market_value.py 拆分为计算层+写入层
 │   │   └── refactor-llm_split_design/                # 📁 LLM 模块分拆设计归档
 │   │       └── r198_llm_split_design.md              # ✅ 已实现 — R-198：LLM 模块横向拆分
+│   │   └── refactor-summary-llm-usage/             # 📁 summary.py LLM 用量拆分设计归档
+│   │       └── R-207-summary-llm-usage-split-plan.md # ✅ 已实现 — R-207：summary.py LLM 用量拆分（617→350 行）
 │   ├── plan/                         # 计划与设计文件（当前空，已全部归档至 archive/）
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明

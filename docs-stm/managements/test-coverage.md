@@ -2,7 +2,7 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-10 R-200 + 审计修复更新）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-10）测试覆盖规模：
 
 ### 模式对应测试量
 
@@ -12,7 +12,7 @@
 | `standard` | 2265 | ~22s |
 | `scenario` | **269** | **~5min** |
 | `regression` | **269** | **~5min** |
-| `dev-verify` 🆕 | **2389** | **~2min** |
+| `dev-verify` | **2389** | **~2min** |
 | `verify` | **1049** | **~6min** |
 | `integration` | 298 | ~50s |
 | `edge` | 335 | ~15s |
@@ -21,14 +21,9 @@
 | `smoke` | 24 | ~2s |
 | `report` | 989 | ~15s |
 | `all_no_unit` | 307 | ~55s |
-| `scenario_extreme` 🆕 | **9** | **~1min 45s** |
+| `scenario_extreme` | **9** | **~1min 45s** |
 
 > 注：`all` 模式收集总数 2901 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2889 passed / 12 skipped。
-> 🆕 `dev-verify` 模式（R-200）组合全部 8 个 unit 子模块（排除 edge/data）并行 + `scenario_basic`，供开发期快速验证。
-> 🆕 `scenario_extreme` 模式（R-200）含 S0c（超多持仓 4 项）+ S10（极端值 5 项），标记 `scenario_extreme`，不包含在 `scenario` 父标记中。
-> v0.3.4 测试隔离 + 文档归档清理，全量 2895 项。
-> **v0.3.6 R-197/R-198 审计修复 + 预存测试修复：** all 从 2901 升至 2972（+71 项预存测试修复归队）；unit 从 2589 升至 2665（+76 项，含 3 项 TUI ESC 修复 + 18 项 html_writer mock 修复）。
-> **v0.3.5 R-200 三模式优化：** scenario 从 277 项降为 269 项（S0c+S10 共 8 项迁至 scenario_extreme）；新增 scenario_extreme 9 项（含 500 条极限验证）；all 从 2895 升至 2901（+6 项新极限测试）。
 
 ### 功能域对应测试源
 
@@ -40,7 +35,7 @@
 | **数据源注册中心** | `provider_registry.py` | `unit/core/test_provider_registry.py` + `test_phase_timeout.py` + `test_market_value_strategy_edge.py` | 53 |
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 186 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
-| **报告生成** | `report/`(excel, html, category, penetration, fund_performance, market_value, summary, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 25 文件含 test_html_writer、test_html_template 等 | ≈945 |
+| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 25 文件含 test_html_writer、test_html_template 等 | ≈945 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(12 文件) + `scenario/llm/test_llm_scenarios.py` | 440 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 342 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 75 |
@@ -107,17 +102,4 @@
 
 详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。
 
-### R-198 拆分基线（2026-07-09）
-
-| 文件 | 行数 | 测试文件 | 测试数 |
-|:-----|:----:|:---------|:------:|
-| `generators.py` | 750 | test_generators.py + test_llm.py(部分) | 417 (llm UT) |
-| `api.py` | 702 | test_api.py + test_api_edge.py + test_llm.py(部分) | 417 (llm UT) |
-| `skeleton.py` | 491 | test_skeleton.py + test_llm.py(部分) | 417 (llm UT) |
-| 新增骨架 | — | test_api_base.py / edge | 0 (skipped I-01) |
-| 新增骨架 | — | test_generators_news.py / edge | 0 (skipped I-01) |
-| 新增骨架 | — | test_generators_orch.py / edge | 0 (skipped I-01) |
-
-导入时间基线：`import src.python.llm` = 0.047s
-场景测试基线：32 passed (llm_scenarios)
 
