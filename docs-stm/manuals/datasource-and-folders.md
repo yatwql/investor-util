@@ -302,7 +302,6 @@ investor-util/
 │   ├── launch.sh                     # Linux Bash 启动脚本
 │   ├── test_runner.py                # 测试驱动脚本 — pytest 统一运行 + 结构化 HTML 报告输出
 │   ├── check-test-markers.py         # 标记合规检查 — AST 静态扫描 test_*.py 的 pytest 标记完整性
-│   └── validate_coverage_map.py      # 覆盖率映射验证 — 校验 test-coverage-map.md 与实际测试文件一致性
 │
 ├── docs-stm/                         # 项目文档
 │   ├── archive/                       # 历史文件归档
@@ -329,8 +328,10 @@ investor-util/
 │   │   │   ├── d-iteration-data-degradation-design.md          # ✅ 已归档 — D 迭代数据降级分层治理完整设计
 │   │   │   ├── d-iteration-data-degradation-iteration-plan.md  # ✅ 已归档 — D 迭代精细化子迭代拆分方案
 │   │   │   └── data-degradation-refactoring.md                 # ✅ 已归档 — 数据降级系统重构精细化子迭代方案（v0.3.2）
+│   │   ├── test-coverage-map/                        # 📁 场景-测试文件覆盖率映射归档
+│   │   │   ├── test-coverage-map.md                  # ✅ 已归档 — 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
+│   │   │   └── validate_coverage_map.py              # ✅ 已归档 — 覆盖率映射验证脚本
 │   ├── plan/                         # 计划与设计文件
-│   │   └── test-coverage-map.md          # 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组

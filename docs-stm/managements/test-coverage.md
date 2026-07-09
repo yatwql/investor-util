@@ -51,27 +51,37 @@
 
 ### 场景测试分组（scenario）
 
-| 标记 | 覆盖场景 | 覆盖项数 |
-|:-------|:---------|:--------:|
-| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 全量业务场景 | **277** |
-| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 + P1p | 97 |
-| │  ├ `scenario_stock` | S1: 纯股票组合 | 3 |
-| │  ├ `scenario_fund` | S2: 纯基金组合 | 2 |
-| │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 |
-| │  ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 |
-| │  ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 |
-| │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 |
-| │  ├ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量（清仓/同名多份额/超多持仓/特殊字符） | 16 |
-| │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 |
-| │  └ `—` | S29-S33: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市），仅 `scenario_basic` 父标记 | 15 |
-| ├─ `scenario_resilience` | 异常容错场景 S6-S10 | 18 |
-| │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 |
-| │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 |
-| │  ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 |
-| │  ├ `scenario_zero_cost` | S9: 零成本持仓 | 4 |
-| │  └ `scenario_extreme` | S10: 极端值 | 5 |
-| ├─ `scenario_llm` | LLM 场景组合 S11-S20（10 个类共 32 项，其中 24 项同时标记为 llm） | 32 |
-| └─ `scenario_datetime` | 日期/时间场景 T1-T21（含跨月/跨年/调休/港股通假期） | 100 |
+| 标记 | 覆盖场景 | 覆盖项数 | 参考测试类 |
+|:-------|:---------|:--------:|:-----------|
+| `scenario`（父标记） | S0a-S0d + S1-S33 + T1-T21 全量业务场景 | **277** | 见下 |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a-S0d + S21-S33 + P1p | 97 | |
+| │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_integration.py::TestScenarioS1` |
+| │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_integration.py::TestScenarioS2` |
+| │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 | `test_integration.py::TestScenarioS3` |
+| │  ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 | `test_integration.py::TestScenarioS4` |
+| │  ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 | `test_integration.py::TestScenarioS5` |
+| │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 | `test_integration.py`（多类） |
+| │  ├ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量（清仓/同名多份额/超多持仓/特殊字符） | 16 | `test_integration.py`（多类） |
+| │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 | `test_integration.py`（多类） |
+| │  └ `—` | S29-S33: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市），仅 `scenario_basic` 父标记 | 15 | `test_integration.py`（多类） |
+| ├─ `scenario_resilience` | 异常容错场景 S6-S10 | 18 | |
+| │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | `test_integration_scenarios.py::TestScenarioS6` |
+| │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_integration_scenarios.py::TestScenarioS7` |
+| │  ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 | `test_integration_scenarios.py::TestScenarioS8` |
+| │  ├ `scenario_zero_cost` | S9: 零成本持仓 | 4 | `test_integration_scenarios.py::TestScenarioS9` |
+| │  └ `scenario_extreme` | S10: 极端值 | 5 | `test_integration_scenarios.py::TestScenarioS10` |
+| ├─ `scenario_llm` | LLM 场景组合 S11-S20（10 个类共 32 项，其中 24 项同时标记为 llm） | 32 | `test_llm_scenarios.py`（TestS11~S20，每场景一独立类） |
+| └─ `scenario_datetime` | 日期/时间场景 T1-T21（含跨月/跨年/调休/港股通假期） | 100 | |
+|    ├ T1-T2/T4-T5 | 交易时段 TTL（盘中短 TTL / 盘前/盘后/非交易日长 TTL） | 8 | `test_datetime_scenarios.py::TestGetTtlMarketAware` |
+|    ├ T3 | 午间休市边界 | 7 | `test_datetime_scenarios.py::TestIsMiddayBreak` |
+|    ├ T6 | 长假边界（国庆/跨年/缓存） | 6 | `test_datetime_scenarios.py::TestLastTradingDayExtended` + `TestGetTradingCalendarCache` |
+|    ├ T7-T11 | 产品类型分类（场外/QDII/ETF/股票/混合） | 10 | `test_datetime_scenarios.py::TestClassifyHoldings` |
+|    ├ T12 | 盘中转盘后 TTL 切换 | 2 | `test_datetime_scenarios.py::TestGetTtlTransition` |
+|    ├ T13 | 时段切换缝隙边界 | — | `test_market_hours.py`（分钟级边界） |
+|    ├ T14 | 首次启动+非交易日 | — | `test_datetime_scenarios.py::TestFirstLaunchNonTradingDay` |
+|    ├ T15-T16 | 盘中断网/盘后断网 fetch TTL | — | `test_datetime_scenarios.py::TestFetchMarketDataMarketAware` |
+|    ├ T17 | 国内/美股指数盘前盘后 | — | `test_market_hours.py::TestIndexMarketHours` |
+|    └ T18-T21 | 跨境 ETF 溢价率、非 T 日汇率、港股通假期、多重 N/A 叠加 | — | `test_datetime_scenarios.py::TestCrossBorderEtfPremium` + `TestHolidayShiftCalculation` + `TestMultiHkConnectHoliday` + `TestMultiNAStacking` |
 
 ### 单元测试分组（unit）
 
