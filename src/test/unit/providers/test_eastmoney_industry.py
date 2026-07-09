@@ -198,6 +198,8 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
     def setUp(self):
         from src.python.providers.eastmoney_industry import _ext_memo_clear
         _ext_memo_clear()
+        from src.python.provider_registry import get_registry
+        get_registry().reset()
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_success_with_concepts(self, mock_client_cls):
@@ -249,6 +251,22 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         import httpx
         mock_client_cls.side_effect = _mock_httpx(error=httpx.TimeoutException)
         result = fetch_industry_and_concepts("600900")
+        self.assertIsNone(result)
+
+    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    def test_timeout_triggers_registry_failure(self, mock_client_cls):
+        """连续 3 次 API 超时 → registry 熔断打开。"""
+        import httpx
+        from src.python.provider_registry import get_registry
+        reg = get_registry()
+        reg.reset()
+        mock_client_cls.side_effect = _mock_httpx(error=httpx.TimeoutException)
+        # 熔断阈值 = 3 次失败；每次用不同 code 绕过会话级缓存
+        for code in ("600900", "600905", "600919"):
+            fetch_industry_and_concepts(code)
+        self.assertTrue(reg.is_circuit_broken("eastmoney_industry"))
+        # 熔断后请求直接跳过，不再调 API
+        result = fetch_industry_and_concepts("600601")
         self.assertIsNone(result)
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")

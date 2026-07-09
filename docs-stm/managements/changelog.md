@@ -87,7 +87,7 @@
 
 - **R-203 `register_default_chains()` 未在生产环境调用（P0）**：`DataSourceRegistry.register_default_chains()` 仅在测试中被调用，导致 `get_chain()` 在生产环境始终返回空列表 `[]`，CACHE_ONLY 降级策略失效。修复：`chain.py` 末尾添加 `get_registry().register_default_chains()` 模块导入时执行。
 
-- **M-004 tencent_style 隐式自注册 → 显式注册**：`record_failure("tencent_style")` 的隐式创建行为使熔断配置不可见。修复：`fund_style_analysis.py` 模块级新增 `get_registry().register_provider("tencent_style", tier=4, timeout=15.0)`。
+- **R-188 eastmoney_industry 局部熔断器迁移至 DataSourceRegistry（Step C 补遗）**：`eastmoney_industry.py` 删除 6 个局部熔断全局变量 + `_circuit_breaker_record_failure/reset` 辅助函数，`_make_push2_request` 改用 DataSourceRegistry 的 `is_circuit_broken`/`record_failure`/`record_success` API。测试 `setUp()` 补充 `get_registry().reset()` 确保隔离。新增 `test_timeout_triggers_registry_failure` 验证 3 次连续超时后熔断器正确打开。 的隐式创建行为使熔断配置不可见。修复：`fund_style_analysis.py` 模块级新增 `get_registry().register_provider("tencent_style", tier=4, timeout=15.0)`。
 
 ---
 

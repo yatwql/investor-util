@@ -37,14 +37,10 @@ _HEADERS = {
 # fund_style 等降级场景可容忍偶尔失败，减少重试加快 fallback
 _MAX_RETRIES = 1
 
-# ── 熔断器（含冷却恢复） ────────────────────────────────────
-# 连续 _PUSH2_CIRCUIT_THRESHOLD 次失败后熔断，
-# 冷却 _PUSH2_COOLDOWN_SECS 秒后自动放行一次试探请求。
-_PUSH2_CIRCUIT_OPEN = False     # 是否已熔断
-_PUSH2_CIRCUIT_OPEN_TIME = 0.0  # 熔断开启时的时间戳
-_PUSH2_FAILURE_COUNT = 0        # 连续失败计数
-_PUSH2_CIRCUIT_THRESHOLD = 3    # 连续失败 N 次后熔断
-_PUSH2_COOLDOWN_SECS = 300      # 冷却期（秒）
+# ── 熔断器 ─────────────────────────────────────────────────
+# 熔断逻辑已统一委托 DataSourceRegistry（provider_registry.py）。
+# 连续 3 次传输级失败 → 熔断 300s → 冷却期满自动放行试探。
+# 不再使用独立的局部熔断全局变量。
 
 # 查询字段（行业分类 + 扩展行情，供 fund_style 等模块使用）
 #   f9=动态市盈率(PE), f20=总市值, f23=市净率(PB)
@@ -66,29 +62,11 @@ def _secid(code: str) -> str:
     return get_push2_secid(code)
 
 
-def _circuit_breaker_record_failure() -> None:
-    """累加连续失败计数，达到阈值时打开熔断并记录时间戳。"""
-    global _PUSH2_FAILURE_COUNT, _PUSH2_CIRCUIT_OPEN, _PUSH2_CIRCUIT_OPEN_TIME
-    _PUSH2_FAILURE_COUNT += 1
-    if _PUSH2_FAILURE_COUNT >= _PUSH2_CIRCUIT_THRESHOLD:
-        _PUSH2_CIRCUIT_OPEN = True
-        _PUSH2_CIRCUIT_OPEN_TIME = time.time()
-        logger.warning("东方财富 push2 连续 %d 次失败，触发熔断，本运行周期跳过",
-                        _PUSH2_CIRCUIT_THRESHOLD)
-
-
-def _circuit_breaker_reset() -> None:
-    """请求成功时重置熔断计数。"""
-    global _PUSH2_FAILURE_COUNT, _PUSH2_CIRCUIT_OPEN
-    _PUSH2_FAILURE_COUNT = 0
-    _PUSH2_CIRCUIT_OPEN = False
-
-
 def _make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
     """执行 push2 行业/概念 API 请求，返回 data 内层字典或 None。
 
     支持自动重试：对连接断开等瞬态错误，使用指数退避 + 随机抖动重试。
-    支持熔断：连续 `_PUSH2_CIRCUIT_THRESHOLD` 次失败后本进程周期跳过。
+    熔断逻辑委托 DataSourceRegistry（3 次失败 / 300s 冷却）。
 
     Args:
         code: 6 位证券代码
@@ -97,16 +75,11 @@ def _make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
     Returns:
         data 内层字典；全部失败返回 None
     """
-    global _PUSH2_CIRCUIT_OPEN
-    if _PUSH2_CIRCUIT_OPEN:
-        # 冷却期满 → 放行一次试探请求
-        if time.time() - _PUSH2_CIRCUIT_OPEN_TIME >= _PUSH2_COOLDOWN_SECS:
-            _PUSH2_CIRCUIT_OPEN = False
-            _PUSH2_FAILURE_COUNT = 0
-            logger.info("东方财富 push2 冷却期满，允许试探请求 [%s]", code)
-        else:
-            logger.debug("东方财富 push2 熔断已开启，跳过 [%s]", code)
-            return None
+    from src.python.provider_registry import get_registry
+    reg = get_registry()
+    if reg.is_circuit_broken("eastmoney_industry"):
+        logger.debug("东方财富 push2 已被 DataSourceRegistry 熔断，跳过 [%s]", code)
+        return None
 
     params = {
         "secid": _secid(code),
@@ -127,7 +100,7 @@ def _make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
                 time.sleep(delay)
                 continue
             logger.warning("东方财富 push2 请求失败 [%s]: %s", code, e)
-            _circuit_breaker_record_failure()
+            reg.record_failure("eastmoney_industry", f"push2:{code}")
             return None
 
         try:
@@ -141,7 +114,7 @@ def _make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
             logger.warning("东方财富 push2 返回空数据 [%s]", code)
             return None
 
-        _circuit_breaker_reset()
+        reg.record_success("eastmoney_industry")
         return inner
 
     return None  # 所有重试耗尽（理论上不会执行到）
