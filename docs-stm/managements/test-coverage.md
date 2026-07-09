@@ -15,7 +15,7 @@
 | `verify` | 1057 | ~5min |
 | `integration` | 306 | ~50s |
 | `edge` | 318 | ~15s |
-| `data` | 65 | ~10s |
+| `data` | 69 | ~10s |
 | `all` | 2895 | ~6min |
 | `smoke` | 24 | ~2s |
 | `report` 🆕 | ≈958 | ~15s |
@@ -105,6 +105,6 @@
 | `llm` | 全部 LLM 相关（unit_llm 440 + scenario_llm 32），**全部为 mock 测试，无需真实 API key** | **440** |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** |
 | `edge` | 异常/边界场景（含熔断冷却探针） | **316** |
-| `data` | 数据正确性验证 | **65** |
+| `data` | 数据正确性验证 | **69** |
 
 详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。

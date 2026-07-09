@@ -8,6 +8,11 @@
 
 ## [0.3.4] - 2026-07-09
 
+### Added
+
+- **溢价率真实计算**：`market_value.py` 新增 `_compute_premium()` 函数，QDII 基金（含隐式海外基金如标普500ETF/纳指ETF）的溢价率从固定占位符 `"--"` 改为 `(现价-参考净值)/参考净值` 实时计算，输出格式 `"+X.XX%"`。非 QDII 或无参考净值时保持 `"--"`。新增 4 项 `@pytest.mark.data` 测试覆盖正/负/非QDII/零净值场景。
+- **版本号一致性检查脚本**：`scripts/check-version-consistency.py` 以 `constants.py` 的 `APP_VERSION` 为单一事实源，自动校验 `pyproject.toml` + 7 份管理/用户文档的版本号一致性。已同步修复 `pyproject.toml` 从 `0.3.0` → `0.3.4` 的过期问题。`CLAUDE.md` 发布流程引用该脚本。
+
 ### Fixed
 
 - **R-211 测试隔离补完**：`test_excel_generator_edge.py` 调用 `generate_excel_report` 补传 `output_dir=tmp_path`，消除测试报告对 `reports/` 目录的污染。`logger.py` 新增 `INVEST_RUNNING_TESTS` 环境变量检测 + `"pytest" in sys.modules` 回退，修复 xdist worker 子进程日志误写入 `app.log`。`test_runner.py` 子进程显式设置 `INVEST_RUNNING_TESTS=1` 确保全链路继承。

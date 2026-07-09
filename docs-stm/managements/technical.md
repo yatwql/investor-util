@@ -318,13 +318,13 @@ Provider Chain 注册表（provider_registry.py:DataSourceRegistry）
 
 **与 LLM Circuit Breaker 的差异：**
 
-| 维度 | Provider Chain 熔断 | push2 模块级熔断 | LLM Circuit Breaker |
-|:-----|:-------------------|:-----------------|:--------------------|
+| 维度 | Provider Chain 熔断 | push2 行业/概念熔断 | LLM Circuit Breaker |
+|:-----|:-------------------|:--------------------|:--------------------|
 | 作用域 | 数据 provider（price/industry 等） | push2 行业分类/概念板块 API | LLM API endpoint |
-| 实现位置 | `provider_registry.py` DataSourceRegistry | `eastmoney_industry.py` 模块级全局变量（待迁移） | `llm/circuit_breaker.py` |
+| 实现位置 | `provider_registry.py` DataSourceRegistry | `provider_registry.py` DataSourceRegistry（已迁移，见 R-188） | `llm/circuit_breaker.py` |
 | 冷却时长 | 300s | 300s | 60s |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
-| 恢复条件 | 试探成功 → record_success | 试探成功 → 关闭熔断标记 | 半开成功 → 关闭熔断 |
+| 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 |
 
 **Chain 自动注册：** `fetcher/chain.py` 在模块加载时自动调用 `get_registry().register_default_chains()`，从 `_DEFAULT_CHAINS` 配置注册所有 provider 和 chain。`get_chain(data_type)` 从 registry 返回对应 chain 列表供策略选择器使用。
 

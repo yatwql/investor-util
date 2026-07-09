@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-09（v0.3.4 — 测试隔离 + 文档归档清理）
+最后更新：2026-07-09（v0.3.4 — 测试隔离 + 文档归档清理 + 3 项 🟡 数据正确性覆盖完成）
 
 ---
 
@@ -270,9 +270,9 @@
 | 穿透 TOP10 合并逻辑 | 构造两个基金持相同股票 + 直接持有 | ✅ |
 | 本日盈亏计算 | 给定时价、昨收、份额 | ✅ |
 | 收益率 = 盈亏 / 成本（成本 > 0） | 验证边界值 cost=0 | ✅ |
-| 溢价率 = (市价 - 净值) / 净值 | QDII ETF 验证 | 🟡 |
-| 本日盈亏 — 场外非 T 日更新 | 场外基金 nav_date ≠ T → today_profit = 0 | 🟡 |
-| 穿透市值占比归一化 | TOP10 占比总和 ≤ 100% | 🟡 |
+| 溢价率 = (市价 - 净值) / 净值 | QDII ETF 验证，仅 QDII 基金显示 | ✅ `test_data_integrity.py` `_compute_premium()` |
+| 本日盈亏 — 场外非 T 日更新 | 场外基金 nav_date ≠ T → today_profit = 0 | ✅ `test_data_integrity.py` `TestTodayProfitOffsiteNavDate` |
+| 穿透市值占比归一化 | TOP10 占比总和 ≤ 100% | ✅ `test_data_integrity.py` `TestPenetrationTop10RatioNormalization` |
 | **三维度分类聚合一致**：资产属性/投资分类/账户的小计各自 = 总计 | 三类分类各自独立聚合，交叉验证无遗漏/无重复 | ✅ `test_data_integrity.py` |
 | **穿透行业占比归一化**：各行业占比之和 ≤ 100% | 穿透行业分布验证 | ✅ `test_data_integrity.py` |
 | **指数行情数值合理**：上证≈3000、沪深300≈4000、恒指≈20000、标普≈5000 | 数量级确认，非精确值 | ✅ `test_data_integrity.py` |

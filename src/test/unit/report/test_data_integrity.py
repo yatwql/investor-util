@@ -449,8 +449,8 @@ class TestPremiumRateCalculation(unittest.TestCase):
         from src.python.report.market_value import _FUND_PREMIUM_PLACEHOLDER
         self.assertEqual(_FUND_PREMIUM_PLACEHOLDER, "--")
 
-    def test_compute_detail_row_premium_placeholder(self):
-        """_compute_detail_row 返回溢价率为 "--"。"""
+    def test_compute_detail_row_premium_qdii_etf(self):
+        """QDII ETF _compute_detail_row 溢价率正确计算。"""
         from src.python.report.market_value import _compute_detail_row
 
         h = Holding("证券", "标普500ETF", "513500", 100, 2.0)
@@ -469,7 +469,33 @@ class TestPremiumRateCalculation(unittest.TestCase):
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             row = _compute_detail_row(h, mkt)
-        self.assertEqual(row.premium, "--")
+        self.assertEqual(row.premium, "+2.04%")
+
+    # ── 溢价率计算（真实计算，非占位符）───────────────────────
+
+    def test_premium_qdii_etf_positive(self):
+        """QDII ETF + 现价 > 参考净值 → 正溢价率。"""
+        from src.python.report.market_value import _compute_premium
+        result = _compute_premium(2.50, 2.45, "标普500ETF")
+        self.assertEqual(result, "+2.04%")
+
+    def test_premium_qdii_etf_negative(self):
+        """QDII ETF + 现价 < 参考净值 → 负溢价率。"""
+        from src.python.report.market_value import _compute_premium
+        result = _compute_premium(2.40, 2.45, "纳指ETF")
+        self.assertEqual(result, "-2.04%")
+
+    def test_premium_non_qdii_placeholder(self):
+        """非 QDII 基金 → 返回占位符 "--"。"""
+        from src.python.report.market_value import _compute_premium
+        result = _compute_premium(10.0, 9.5, "沪深300ETF")
+        self.assertEqual(result, "--")
+
+    def test_premium_nav_zero_placeholder(self):
+        """QDII 基金但参考净值为 0 → 返回占位符 "--"。"""
+        from src.python.report.market_value import _compute_premium
+        result = _compute_premium(10.0, 0.0, "标普500ETF")
+        self.assertEqual(result, "--")
 
 
 # ═══════════════════════════════════════════════════════════════

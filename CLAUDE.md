@@ -33,7 +33,7 @@
   4. 以上都不是，想放 `.claude/`？→ **停，不允许，重新分类**
 - **违规补救**：发现 `.claude/` 下出现本应放在 `docs-stm/` 的文件时，**必须立即迁移**，不留存待办
 - **注意**：`EnterPlanMode` 等工具自动写入 `.claude/plans/` 的行为不可控，使用后**必须手动迁移**到 `docs-stm/plan/`
-- **版本号一致**：发布版本时，**必须**同步更新以下位置的版本号/日期，确保程序、用户文档、管理文档统一：`src/python/constants.py`（`APP_VERSION`）、`README.md`（首页版本标记）、`docs-stm/manuals/how-to-test-my-code.md`（头部版本日期）、`docs-stm/managements/changelog.md`（新版本条目）、`docs-stm/managements/plan.md`（最后更新）、以及报告中引用的版本号。任何版本号变更均应全局覆盖，避免遗漏。
+- **版本号一致**：发布版本时，先修改 `src/python/constants.py`（`APP_VERSION`），然后运行 `python scripts/check-version-consistency.py`，按 [ERR] 提示逐个同步其余文件，直到全部 [OK] 再提交。受检文件：`README.md`、`pyproject.toml`、4 份管理文档头部、`how-to-test-my-code.md`、`changelog.md`。任何版本号变更均应全局覆盖，避免遗漏。
 - **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功，绿色）、`[!]`（部分失败/告警，黄色）、`[ERR]`（错误，红色）。终端不支持颜色时自动降级。
 - **架构遵从**：`docs-stm/managements/technical.md`「设计约束」章节（C1~C12，含代码类型判定中心化、缓存设计、Provider Chain、会话级复用缓存、边缘测试文件隔离等），所有模块必须遵守。

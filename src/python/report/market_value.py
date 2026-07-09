@@ -48,8 +48,27 @@ _HEADERS = [
 ]
 _NCOLS = len(_HEADERS)
 
-# 常见管理费率，用于估算 QDII 溢价（简化处理，不考虑实时溢价）
+# 占位符 — 非 QDII 或无参考净值时使用
 _FUND_PREMIUM_PLACEHOLDER = "--"
+
+
+def _compute_premium(price: float, nav: float, name: str) -> str:
+    """计算溢价率（百分比字符串），仅 QDII 基金显示。
+
+    Args:
+        price: 当前价格/净值
+        nav:   参考净值（昨收 / 最近公布净值）
+        name:  资产名称（用于判断是否 QDII）
+
+    Returns:
+        格式如 "+1.23%"、"-0.56%"，非 QDII 或无参考净值时返回 "--"。
+    """
+    if nav <= 0:
+        return _FUND_PREMIUM_PLACEHOLDER
+    if not is_qdii_extended(name):
+        return _FUND_PREMIUM_PLACEHOLDER
+    pct = (price - nav) / nav * 100
+    return f"{pct:+.2f}%"
 
 
 @dataclass
@@ -404,7 +423,7 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     profit = round(mv - cost, 2)
     profit_rate = profit / cost if cost > 0 else None
 
-    # 本日盈亏
+        # 本日盈亏
     if source_api == "tencent":
         today_profit = round((price - yclose) * h.shares, 2)
     elif nav_date:
@@ -413,10 +432,13 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     else:
         today_profit = 0.0
 
+    # 溢价率 — (现价 - 参考净值) / 参考净值，仅 QDII 基金显示
+    premium = _compute_premium(price, yclose, mkt.get("name", ""))
+
     return DetailRow(
         account=h.account.strip(), name=h.name, code=h.code,
         price=price, nav_date=nav_date, yesterday_close=yclose,
-        price_type=price_type, premium=_FUND_PREMIUM_PLACEHOLDER,
+        price_type=price_type, premium=premium,
         shares=h.shares, market_value=mv, cost=cost,
         profit=profit, profit_rate=profit_rate, today_profit=today_profit,
         source=source, source_api=source_api,
