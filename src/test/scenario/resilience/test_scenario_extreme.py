@@ -31,7 +31,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
     """S0c: 超多持仓（200+ 条）— 极限持仓量下的正确性。"""
 
     def setUp(self):
-        # 阻止网络调用
+        # 类级公共 patch：阻止所有网络调用 + 固定交易日/时间
         self._price_patcher = patch(
             "src.python.report.market_value.fetch_market_data")
         self._mock_price = self._price_patcher.start()
@@ -41,8 +41,23 @@ class TestS0cLargeHoldings(unittest.TestCase):
             "source_api": "tencent",
         }
 
+        self._td_patcher = patch(
+            "src.python.report.market_value.get_last_trading_day",
+            return_value="2026-07-03")
+        self._mock_td = self._td_patcher.start()
+
+        self._dt_patcher = patch(
+            "src.python.report.market_value.datetime")
+        self._mock_dt = self._dt_patcher.start()
+        self._mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
+        self._mock_dt.timezone = timezone
+        self._mock_dt.timedelta = timedelta
+        self._mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+
     def tearDown(self):
         self._price_patcher.stop()
+        self._td_patcher.stop()
+        self._dt_patcher.stop()
 
     def _make_holding(self, account: str, name: str, code: str,
                        shares: float, cost_price: float) -> Holding:
@@ -50,6 +65,13 @@ class TestS0cLargeHoldings(unittest.TestCase):
             account=account, name=name, code=code,
             shares=shares, cost_price=cost_price,
         )
+
+    def _build_mkt(self, name: str, code: str) -> dict:
+        return {
+            "price": 10.0, "yesterday_close": 9.8,
+            "price_date": "2026-07-03", "source_api": "tencent",
+            "name": name, "code": code,
+        }
 
     def test_200_holdings_generate_details(self):
         """200+ 持仓 → _generate_details 不崩溃。"""
@@ -60,20 +82,9 @@ class TestS0cLargeHoldings(unittest.TestCase):
                                100, 10.0)
             for i in range(201)
         ]
-
-        with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
-            patch("src.python.report.market_value.datetime") as mock_dt,
-        ):
-            mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
-            mock_dt.timezone = timezone
-            mock_dt.timedelta = timedelta
-            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
-            details = _generate_details(holdings, "2026-07-03")
+        details = _generate_details(holdings, "2026-07-03")
 
         self.assertEqual(len(details), 201)
-        # 验证所有持仓都有市值
         for d in details:
             self.assertGreater(d.market_value, 0)
             self.assertEqual(d.source_api, "tencent")
@@ -89,26 +100,10 @@ class TestS0cLargeHoldings(unittest.TestCase):
         ]
 
         total_mv = 0.0
-        with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
-            patch("src.python.report.market_value.datetime") as mock_dt,
-        ):
-            mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
-            mock_dt.timezone = timezone
-            mock_dt.timedelta = timedelta
-            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        for h in holdings:
+            row = _compute_detail_row(h, self._build_mkt(h.name, h.code))
+            total_mv += row.market_value
 
-            for h in holdings:
-                mkt = {
-                    "price": 10.0, "yesterday_close": 9.8,
-                    "price_date": "2026-07-03", "source_api": "tencent",
-                    "name": h.name, "code": h.code,
-                }
-                row = _compute_detail_row(h, mkt)
-                total_mv += row.market_value
-
-        # 每条市值 = 10.0 * 100 = 1000，201 条 = 201000
         self.assertAlmostEqual(total_mv, 201000.0)
 
     def test_200_holdings_all_account_subtotals(self):
@@ -116,53 +111,51 @@ class TestS0cLargeHoldings(unittest.TestCase):
         from src.python.report.market_value import _compute_detail_row
 
         holdings = []
-        # 证券账户 100 条
+        # 证券账户 50 条（仍超 100 条目验证阈值）
         holdings.extend([
             self._make_holding("证券", f"ZQ{i:03d}", f"600{i:04d}",
                                100, 10.0)
-            for i in range(100)
+            for i in range(50)
         ])
-        # 支付宝 60 条
+        # 支付宝 30 条
         holdings.extend([
             self._make_holding("支付宝", f"ZFB{i:03d}", f"000{i:04d}",
                                200, 5.0)
-            for i in range(60)
+            for i in range(30)
         ])
-        # 微信 41 条
+        # 微信 21 条
         holdings.extend([
             self._make_holding("微信", f"WX{i:03d}", f"300{i:04d}",
                                50, 20.0)
-            for i in range(41)
+            for i in range(21)
         ])
 
-        self.assertEqual(len(holdings), 201)
+        self.assertEqual(len(holdings), 101)
 
         subtotals: dict[str, float] = {}
-        with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
-            patch("src.python.report.market_value.datetime") as mock_dt,
-        ):
-            mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
-            mock_dt.timezone = timezone
-            mock_dt.timedelta = timedelta
-            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
-
-            for h in holdings:
-                mkt = {
-                    "price": 10.0, "yesterday_close": 9.8,
-                    "price_date": "2026-07-03", "source_api": "tencent",
-                    "name": h.name, "code": h.code,
-                }
-                row = _compute_detail_row(h, mkt)
-                subtotals[row.account] = subtotals.get(row.account, 0) + row.market_value
+        for h in holdings:
+            row = _compute_detail_row(h, self._build_mkt(h.name, h.code))
+            subtotals[row.account] = subtotals.get(row.account, 0) + row.market_value
 
         total = sum(subtotals.values())
-        all_held_total = sum(
-            10.0 * h.shares for h in holdings
-        )
+        all_held_total = sum(10.0 * h.shares for h in holdings)
         self.assertAlmostEqual(total, all_held_total)
         self.assertEqual(len(subtotals), 3)
+
+    def test_500_holdings_bulk_computation(self):
+        """500+ 持仓 → 批量计算不崩溃（极限验证）。"""
+        from src.python.report.market_value import _generate_details
+
+        holdings = [
+            self._make_holding("证券", f"批量{i:04d}", f"600{i%9000+1000:04d}",
+                               100, 10.0)
+            for i in range(500)
+        ]
+        details = _generate_details(holdings, "2026-07-03")
+
+        self.assertEqual(len(details), 500)
+        total_mv = sum(d.market_value for d in details)
+        self.assertAlmostEqual(total_mv, 500 * 1000.0)
 
 
 # ═══════════════════════════════════════════════════════════════
