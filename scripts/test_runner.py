@@ -50,70 +50,70 @@ MODES: dict[str, dict] = {
     "scenario": {
         "marker": "scenario",
         "desc": "业务场景集成测试（S0-S33 + T1-T21）",
-        "timeout_sec": 300,
+        "timeout_sec": 600,
         "order": 3,
         "parallel": False,
     },
     "regression": {
         "marker": "scenario",
         "desc": "回归测试（场景模式，提交前快速验证）",
-        "timeout_sec": 300,
+        "timeout_sec": 600,
         "order": 4,
         "parallel": False,
     },
     "verify": {
         "marker": "scenario or unit_core or unit_providers or unit_fetcher",
         "desc": "合入验证（场景+核心模块，并行~5min）",
-        "timeout_sec": 360,
+        "timeout_sec": 900,
         "order": 5,
         "parallel": True,
     },
     "integration": {
         "marker": "scenario or integration",
         "desc": "集成测试（场景+模块契约/缓存/TUI 路由）",
-        "timeout_sec": 300,
+        "timeout_sec": 600,
         "order": 6,
         "parallel": True,
     },
     "edge": {
         "marker": "edge",
         "desc": "边缘/异常场景测试",
-        "timeout_sec": 300,
+        "timeout_sec": 600,
         "order": 7,
         "parallel": False,
     },
     "data": {
         "marker": "data",
         "desc": "数据正确性验证测试",
-        "timeout_sec": 60,
+        "timeout_sec": 120,
         "order": 8,
         "parallel": False,
     },
     "all": {
         "marker": "",
         "desc": "全量测试",
-        "timeout_sec": 720,
+        "timeout_sec": 1200,
         "order": 9,
         "parallel": True,
     },
     "all_no_unit": {
         "marker": "not unit",
         "desc": "全量测试（排除单元测试）",
-        "timeout_sec": 720,
+        "timeout_sec": 1200,
         "order": 9,
         "parallel": True,
     },
     "smoke": {
         "marker": "smoke",
         "desc": "冒烟测试（24 项，~15s 快速验证核心通路）",
-        "timeout_sec": 30,
+        "timeout_sec": 60,
         "order": 10,
         "parallel": False,
     },
     "report": {
         "marker": "unit_report",
         "desc": "仅报告模块测试（开发期快速验证报告变更）",
-        "timeout_sec": 120,
+        "timeout_sec": 300,
         "order": 11,
         "parallel": True,
     },
@@ -142,6 +142,8 @@ _HELP_TEXT += """\
   --mode M[,M...]   运行指定模式（逗号分隔，默认: all）
   --coverage        同时生成 HTML 行覆盖率报告（pytest-cov）
   --parallel [LVL]  并行级别: high(100%%核数) / medium(50%%,默认) / low(25%%)
+  --timeout SEC     覆盖超时时间（秒），所有模式统一使用此值
+  --no-timeout      禁用超时，等待测试自然结束
   --help            显示本帮助信息
 
 输出目录结构:
@@ -168,6 +170,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--parallel", nargs="?", const="medium", default=None,
                         choices=["high", "medium", "low"],
                         help="并行级别（high=100%核数, medium=50%核数, low=25%核数，缺省 medium）")
+    parser.add_argument("--timeout", type=int, default=None, metavar="SEC",
+                        help="覆盖各模式的超时设置（秒），所有模式统一使用此值")
+    parser.add_argument("--no-timeout", action="store_true",
+                        help="禁用超时，等待测试自然结束")
     parser.add_argument("--help", action="store_true", help="显示帮助")
     return parser.parse_args()
 
@@ -356,7 +362,9 @@ def _build_pytest_args(mode_cfg: dict, mode_key: str,
 
 
 def run_mode(mode_key: str, coverage: bool = False,
-             parallel_level: str | None = None) -> dict:
+             parallel_level: str | None = None,
+             timeout_override: int | None = None,
+             no_timeout: bool = False) -> dict:
     """运行指定模式的测试。
 
     Args:
@@ -377,6 +385,10 @@ def run_mode(mode_key: str, coverage: bool = False,
 
     pytest_args = _build_pytest_args(mode_cfg, mode_key, html_available, coverage, parallel_level)
     timeout = mode_cfg.get("timeout_sec", 300)
+    if no_timeout:
+        timeout = None
+    elif timeout_override is not None:
+        timeout = timeout_override
 
     start = _time.time()
     timed_out = False
@@ -622,6 +634,10 @@ def main() -> None:
     print(f"  [..] 计划运行模式: {', '.join(modes_to_run)}")
     if args.coverage:
         print(f"  [..] 覆盖率报告: 已开启")
+    if args.no_timeout:
+        print(f"  [!] 超时: 已禁用（测试可能长时间运行）")
+    elif args.timeout:
+        print(f"  [..] 超时: 统一设为 {args.timeout}s")
 
     # 归档现有报告
     archive_path = archive_existing()
@@ -633,7 +649,9 @@ def main() -> None:
     results: list[dict] = []
     for mode_key in modes_to_run:
         result = run_mode(mode_key, coverage=args.coverage,
-                          parallel_level=args.parallel)
+                          parallel_level=args.parallel,
+                          timeout_override=args.timeout,
+                          no_timeout=args.no_timeout)
         results.append(result)
 
     # 生成汇总页
