@@ -316,7 +316,6 @@ investor-util/
 │   │   ├── fund-deep-analysis/                # 📁 基金深度分析设计归档
 │   │   │   └── B1-fund-deep-analysis.md       # ✅ 已实现 — B 迭代基金深度分析 4 模块设计
 │   │   ├── c-iteration-design.md              # ✅ 已实现 — C 迭代设计
-│   │   ├── c-p1b-excel-title-number-fix.md    # ✅ 已实现 — C-P1b：Excel 报告可配置序号修复设计
 │   │   ├── akshare-integration-profit-forecast-sector-flow.md  # ✅ 已归档 — akshare 集成（profit_forecast + sector_fund_flow）
 │   │   ├── early-warning-and-p1-optimization.md                # ✅ 已归档 — 智能预警 + P1 代码优化实施计划
 │   │   ├── y5-edge-test-config-env.md                          # ✅ 已归档 — Y5 配置/环境纵深测试实施计划

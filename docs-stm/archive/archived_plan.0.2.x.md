@@ -8,11 +8,11 @@
 
 ## B 迭代 — 基金深度分析（v0.2.87）
 
-基金深度分析 4 模块：基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析。详见 changelog.md 及 `docs-stm/archive/c-iteration-design.md`、`docs-stm/archive/c-p1b-excel-title-number-fix.md`。
+基金深度分析 4 模块：基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析。详见 changelog.md 及 `docs-stm/archive/c-iteration-design.md`。
 
 ## C 迭代 — 报告序号可配置（v0.2.85 ~ v0.2.86）
 
-报告序号可配置，详见 changelog.md 及 `docs-stm/archive/c-iteration-design.md`、`docs-stm/archive/c-p1b-excel-title-number-fix.md`。
+报告序号可配置，详见 changelog.md 及 `docs-stm/archive/c-iteration-design.md`、`docs-stm/archive/c-p1b-excel-title-number-follow-config.md`。
 
 ## D 迭代 — 数据降级分层治理（v0.2.88 ~ v0.2.91）
 
