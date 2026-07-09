@@ -6,6 +6,26 @@
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **修复 22 项预存测试失败**：R-178 分拆后 18 项 `html_writer` mock 路径未同步更新（`akshare_extras.*` → `html_renderers.*`，`html_writer.*` → `html_renderers.*`），修复 `test_api_status_trading` 缓存断言与 autouse fixture 冲突，修复 3 项 TUI ESC 序列 `side_effect` 不足 StopIteration 崩溃。全量 2956/2956 回归通过。
+- **provider_registry.py 移除旧测试接口**：删除 `get_skip_set_copy()` / `get_skip_time_copy()` 两个标注"兼容旧测试接口"的方法，对应测试改用 `generate_status_report()` 验证熔断状态。
+
+### Changed
+
+- **technical.md 迭代历史痕迹清理**：移除 16 处 A 类（纯迭代记录）和 B 类（版本标记）历史痕迹，恢复为永恒技术设计文档。
+- **how-to-config.md 版本标记清理**：移除 2 处 v0.2.xx 版本标记。
+- **用户文档全局迭代/版本标记清理**：`reports-instruction.md`、`how-to-use-registry.md`、`how-to-config-llm.md` 共 5 处版本后缀/迭代名称（`B 迭代`/`C 迭代后`/`v0.2.15+`/`v0.2.29+`/`v0.2.30+`/`v0.2.85+`）替换或删除，用户文档不再出现具体迭代引用。
+- **technical.md LLM 模块计数同步**：LLM 子模块从 `9` 修正为 `12`，模块职责表新增 `api_base.py` 和 `generators_news.py`。
+- **how-to-use-registry.md 消费方表校正**：`generators.py` → `generators_orchestrator.py`，`market_value.py` → `market_value_sheet.py`，新增 `fund_overlap_sheet.py` 和 `fund_concentration_sheet.py`。新增 LLM 模块步骤增加 `generators_orchestrator.py` 调度注册环节。
+
+### Docs
+
+- **代码库兼容性/死代码审计**：全局扫描 `src/python/` 中 config.json/llm_settings.json/缓存/API 响应的历史兼容代码，结论：代码库干净，仅 4 处微小负担，已处理其中 1 处（`get_skip_*_copy` 旧测试接口）。
+- **配置 + 代码全局一致性检查**：config.json 17 键 / llm_settings.json 53 键 / registry 21 缓存 TTL 项 / 所有 `.py` 文件导入引用 — 无死键、无死文件、无冲突。
+
 ## [0.3.4] - 2026-07-09
 
 ### Added
