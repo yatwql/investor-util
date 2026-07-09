@@ -2,7 +2,7 @@
 
 > **版本**：v0.2.86  
 > **创建日期**：2026-07-05  
-> **关联文档**：`docs-stm/plan/c-iteration-design.md`、`docs-stm/managements/plan.md`（§C-P1b）
+> **关联文档**：`docs-stm/archive/report-section-order-config.md`、`docs-stm/managements/plan.md`（§C-P1b）
 
 ---
 
