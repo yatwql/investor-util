@@ -6,6 +6,23 @@
 
 ---
 
+## [0.3.4] - 2026-07-09
+
+### Fixed
+
+- **R-211 测试隔离补完**：`test_excel_generator_edge.py` 调用 `generate_excel_report` 补传 `output_dir=tmp_path`，消除测试报告对 `reports/` 目录的污染。`logger.py` 新增 `INVEST_RUNNING_TESTS` 环境变量检测 + `"pytest" in sys.modules` 回退，修复 xdist worker 子进程日志误写入 `app.log`。`test_runner.py` 子进程显式设置 `INVEST_RUNNING_TESTS=1` 确保全链路继承。
+
+- **technical.md C12 约束老化引用**：`testplan.md §1.9` → `§1.8`（随 testplan.md 编号修复同步）。
+
+### Docs
+
+- **test-coverage-map.md 归档**：`test-coverage-map.md` + `validate_coverage_map.py` 迁移至 `docs-stm/archive/test-coverage-map/`，缩略条目对应更新。
+- **testplan.md 组织清理**：已归档的旧 §1.8（场景-测试文件覆盖率映射）移除，后续 §1.9→§1.8 重编号；§6.2.8、§8.3.1 老化引用同步更新。
+- **plan.md R-188~R-191 引用更新**：blockquote 标记为已完成，移除"剩余待修复问题"描述。
+- **多批计划文件/设计文档归档**：B1-fund-deep-analysis / C-P1b / A5-test-runtime-optimization / 数据降级复盘文档迁入 `archive/` 子目录归类。
+
+---
+
 ## [0.3.3] - 2026-07-09
 
 ### Added

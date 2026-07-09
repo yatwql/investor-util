@@ -30,6 +30,7 @@
 > v0.3.2 核心模块单元测试补全（96 项新增：generators 21 + prompts 44 + handlers_cache 18 + handlers_report 13），全量 2822 项（2810 passed / 12 skipped for Windows）。
 > v0.3.2e 数据降级重构 Step A~E（45 项新增：provider_registry 37 + phase_timeout 8；原 test_config 单元从 standard 迁移至 unit），全量 2895 项。
 > v0.3.3 测试断言同步修复（R-192/R-193：6 项文案对齐 + 3 项存量 mock/路径修复），全量 2895 项。
+> v0.3.4 测试隔离 + 文档归档清理，全量 2895 项。
 
 ### 功能域对应测试源
 

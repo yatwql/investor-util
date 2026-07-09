@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-09（v0.3.2 — 数据降级重构 Step A~E：DataSourceRegistry 熔断器/会话缓存/策略选择器集中管理 + 文档同步）
+最后更新：2026-07-09（v0.3.4 — 测试隔离 + 文档归档清理）
 
 ---
 
@@ -963,5 +963,5 @@ handlers_*.py → 各模块入口函数编排
 | C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须**在 `llm/skeleton.py` 中注册生成器函数和配置字段，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
 | C10 | **新闻召回策略** | `per_source`（每源原始获取量）与 `top_n`（最终输出量）解耦：各源原始获取量 = `max(500, news_top_count × 2)`，不可写死为固定值。华尔街见闻 API 硬上限 100 条除外 | 配置 `news_top_count` 不生效 | [财经新闻热点与持仓关联分析](#财经新闻热点与持仓关联分析) |
 | C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker（通过 `pytestmark` 模块级变量），新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure`。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动检查标记遗漏并发出 `PytestWarning` | CI 门禁不通过 | `src/test/conftest.py` |
-| C12 | **边缘测试文件隔离** | `@pytest.mark.edge` 测试**必须**放在 `*_edge.py` 文件中，不得与普通测试混搭。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动校验 | 测试收集失败 | `src/test/conftest.py`、`docs-stm/managements/testplan.md §1.9` |
+| C12 | **边缘测试文件隔离** | `@pytest.mark.edge` 测试**必须**放在 `*_edge.py` 文件中，不得与普通测试混搭。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动校验 | 测试收集失败 | `src/test/conftest.py`、`docs-stm/managements/testplan.md §1.8` |
 | C13 | **测试敏感路径隔离** | 运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`conftest.py` 的 `_isolate_sensitive_paths` autouse fixture 自动将 `config.json` 和缓存目录重定向到临时目录 | 用户数据被污染 | `src/test/conftest.py` |
