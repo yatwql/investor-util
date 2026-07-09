@@ -414,7 +414,7 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
             self._make_b_series_mocks(stack)
             write_html_report(self.holdings, include_news=True, output_dir=self._tmp)
 
-        from src.python.report.html_writer import _ENV
+        from src.python.report.html_jinja_env import _ENV
         svis = _ENV.globals.get("section_visible_dict", {})
         self.assertTrue(svis.get("fund_manager"), "基金经理 section 应可见")
         self.assertTrue(svis.get("fund_overlap"), "重合度 section 应可见")

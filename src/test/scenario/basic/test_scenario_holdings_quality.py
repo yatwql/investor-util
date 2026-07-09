@@ -529,7 +529,7 @@ class TestS0dSpecialCharacters(unittest.TestCase):
 
     def test_special_chars_html_filters(self):
         """特殊字符名称 → HTML 模板过滤器不崩溃。"""
-        from src.python.report.html_writer import (
+        from src.python.report.html_jinja_env import (
             _jinja_money, _jinja_shares, _jinja_price, _jinja_pct,
         )
 

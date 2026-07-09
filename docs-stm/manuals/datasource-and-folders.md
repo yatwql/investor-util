@@ -107,6 +107,7 @@ investor-util/
 │       │   │   ├── early_warning.py      # 智能预警页签 — 行业资金流向联动 + 新闻情绪聚合
 │       │   │   ├── llm_content.py        # LLM 增补页签写入 — 各 LLM 模块的 Excel 页签生成
 │       │   │   ├── html_writer.py        # HTML 报告生成编排器 — 调用子渲染函数、模板渲染
+│       │   │   ├── html_jinja_env.py     # Jinja2 环境 — _ENV 实例、8 个过滤器、section_visible 注册（从 html_writer.py 拆分）
 │       │   │   ├── html_save.py          # HTML 报告文件 I/O — 最新版/归档版写入、过期清理（从 html_writer.py 拆分）
 │       │   │   ├── html_builders.py      # HTML 数据构建器 — 持仓分类表/基金业绩数据构建（从 html_writer.py 拆分）
 │       │   │   ├── fund_concentration.py        # 持仓集中度监控 — top3/5/10 占比+环比变化+三级预警

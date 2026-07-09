@@ -7,14 +7,10 @@
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader
-
 from src.python.cache import get_cache_hit_rate
-from src.python.code_utils import is_qdii_extended
 from src.python.constants import APP_VERSION
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
@@ -46,154 +42,28 @@ logger = logging.getLogger("invest")
 #  文件导览
 # ═══════════════════════════════════════════════════════════════
 #
-#   路径 + Jinja2 环境         L46  ~ L52
-#   Jinja2 自定义过滤器         L54  ~ L165
-#     过滤器函数                L57  ~ L134
-#     全局函数                  L136 ~ L150
-#     注册                      L153 ~ L164
-#   辅助函数                    L167 ~ L190
-#   核心生成函数                L192 ~ L351
-#     write_html_report()       L195 ~ L350
-#   子渲染函数                  L353 ~ L919
-#     时间辅助                  L356 ~ L362
-#     市场行情                  L365 ~ L393
-#     账户分组                  L396 ~ L423
-#     分类信息                  L426 ~ L444
-#     市场指数                  L447 ~ L476
-#     持仓分类表                L479 ~ L489
-#     穿透 TOP10                L492 ~ L553
-#     基金业绩                  L556 ~ L571
-#     基金经理变更              L574 ~ L594
-#     持仓重合度矩阵            L597 ~ L640
-#     集中度                    L643 ~ L675
-#     风格分析                  L678 ~ L713
-#     新闻关联                  L716 ~ L753
-#     LLM 内容                  L756 ~ L820
-#     LLM 模块信息              L823 ~ L918
-#   报告保存（已迁出 → html_save.py）
+#   _ENV                          → html_jinja_env.py
+#   8 过滤器 + section_visible    → html_jinja_env.py
+#   _save_html_report             → html_save.py
+#   辅助函数                      L39  ~ L55
+#   核心生成函数                  L57  ~ L217
+#     write_html_report()         L60  ~ L216
+#   子渲染函数                    L220 ~ L785
+#     时间辅助                   L223 ~ L229
+#     市场行情                   L232 ~ L260
+#     账户分组                   L263 ~ L290
+#     市场指数                   L293 ~ L324
+#     分类表 / 穿透 / 基金业绩   L326 ~ L419
+#     B 系列（4 模块）            L421 ~ L579
+#     新闻关联                   L582 ~ L619
+#     LLM 内容                   L622 ~ L686
+#     LLM 模块信息               L689 ~ L785
+#   桥接 import                  L788 ~ L790
 #
 # ═══════════════════════════════════════════════════════════════
 
-# ── 路径 ─────────────────────────────────────────────────────
-
-_TEMPLATE_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "tmpl")
-)
-_ENV = Environment(loader=FileSystemLoader(_TEMPLATE_DIR), autoescape=True)
-
-
-# ── Jinja2 自定义过滤器 ─────────────────────────────────────
-
-
-def _jinja_money(value: Any) -> str:
-    """格式化金额：1,234.56"""
-    try:
-        return f"{float(value):,.2f}"
-    except (ValueError, TypeError):
-        return "--"
-
-
-def _jinja_pct(value: Any) -> str:
-    """格式化比率 (0.15 → +15.00%)"""
-    try:
-        v = float(value)
-        sign = "+" if v >= 0 else ""
-        return f"{sign}{v * 100:.2f}%"
-    except (ValueError, TypeError):
-        return "--"
-
-
-def _jinja_price(value: Any) -> str:
-    """格式化价格：四位小数"""
-    try:
-        return f"{float(value):.4f}"
-    except (ValueError, TypeError):
-        return "--"
-
-
-def _jinja_shares(value: Any) -> str:
-    """格式化份额：两位小数"""
-    try:
-        return f"{float(value):,.2f}"
-    except (ValueError, TypeError):
-        return "--"
-
-
-def _jinja_change(value: Any) -> str:
-    """格式化涨跌幅：百分数"""
-    try:
-        v = float(value)
-        sign = "+" if v >= 0 else ""
-        return f"{sign}{v:.2f}%"
-    except (ValueError, TypeError):
-        return "--"
-
-
-def _jinja_price_type_color(price_type: str, name: str = "") -> str:
-    """取价方式颜色：蓝色代表数据时效性高/可靠。
-
-    着色规则同 Excel 端 _apply_price_type_colors：
-      - "场内收盘价(T)"、"场内午市收盘(T)"、"官方净值(T)" → #0066CC
-      - QDII 基金 "官方净值(T-1)" → #0066CC
-    """
-    if price_type in ("场内收盘价(T)", "场内午市收盘(T)", "官方净值(T)"):
-        return "#0066CC"
-    if price_type == "官方净值(T-1)" and name and is_qdii_extended(name):
-        return "#0066CC"
-    return ""
-
-
-def _jinja_profit_color(value: Any) -> str:
-    """盈亏颜色：盈利红 #CC0000，亏损绿 #009900"""
-    try:
-        v = float(value)
-        if v > 0:
-            return "#CC0000"
-        elif v < 0:
-            return "#009900"
-        return ""
-    except (ValueError, TypeError):
-        return ""
-
-
-def _jinja_thousands(value: Any) -> str:
-    """格式化整数：1,234"""
-    try:
-        return f"{int(value):,}"
-    except (ValueError, TypeError):
-        return str(value)
-
-
-def _jinja_section_visible(key: str) -> bool:
-    """Jinja2 全局函数：判断报告模块是否可见。
-
-    依赖模板上下文中的 section_visible_dict，在渲染前由
-    write_html_report 设置。
-
-    Usage in template:
-        {% if section_visible("fund_manager") %}
-        ...
-        {% endif %}
-    """
-    sv_dict = _ENV.globals.get("section_visible_dict", {})
-    if not isinstance(sv_dict, dict):
-        return False
-    return bool(sv_dict.get(key, False))
-
-
-# 注册过滤器
-_ENV.filters["money"] = _jinja_money
-_ENV.filters["pct"] = _jinja_pct
-_ENV.filters["price"] = _jinja_price
-_ENV.filters["shares"] = _jinja_shares
-_ENV.filters["change"] = _jinja_change
-_ENV.filters["profit_color"] = _jinja_profit_color
-_ENV.filters["price_type_color"] = _jinja_price_type_color
-_ENV.filters["thousands"] = _jinja_thousands
-
-# 注册全局函数
-_ENV.globals["section_visible"] = _jinja_section_visible
-
+# ── 桥接 import：_ENV + 过滤器已在 html_jinja_env.py ────────
+from src.python.report.html_jinja_env import _ENV  # noqa: E402
 
 # ── 辅助函数 ──────────────────────────────────────────────
 

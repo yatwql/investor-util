@@ -130,7 +130,7 @@ def _build_minimal_render_data(
 
 def _render_template(render_data: dict) -> BeautifulSoup:
     """用 html_writer._ENV 渲染模板并返回 BeautifulSoup 对象。"""
-    from src.python.report.html_writer import _ENV
+    from src.python.report.html_jinja_env import _ENV
 
     # 保存/恢复 section_visible_dict 全局
     old_global = _ENV.globals.get("section_visible_dict")

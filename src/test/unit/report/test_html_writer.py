@@ -33,7 +33,7 @@ class TestJinjaFilters(unittest.TestCase):
     """Jinja2 自定义过滤器测试。"""
 
     def setUp(self):
-        from src.python.report.html_writer import _jinja_price_type_color, _jinja_thousands
+        from src.python.report.html_jinja_env import _jinja_price_type_color, _jinja_thousands
         self.fn = _jinja_thousands
         self.price_type_fn = _jinja_price_type_color
 
@@ -755,7 +755,7 @@ class TestSectionOrderTemplateRendering(unittest.TestCase):
 
     def setUp(self):
         from jinja2 import Environment
-        from src.python.report.html_writer import _jinja_section_visible, _ENV
+        from src.python.report.html_jinja_env import _jinja_section_visible, _ENV
         self.env = Environment()
         self._module_env = _ENV
         # 注册 section_visible 全局函数（与 html_writer 中一致）

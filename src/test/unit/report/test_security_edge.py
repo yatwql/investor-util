@@ -84,12 +84,12 @@ class TestXssCacheInjectionY6(unittest.TestCase):
 
     def test_jinja2_autoescape_enabled(self):
         """确认 Jinja2 Environment 已启用 autoescape（防止 XSS 注入）。"""
-        from src.python.report.html_writer import _ENV
+        from src.python.report.html_jinja_env import _ENV
         self.assertTrue(_ENV.autoescape)
 
     def test_template_autoescapes_html_tags(self):
         """Jinja2 模板渲染 → 持仓名 <script> 被转义。"""
-        from src.python.report.html_writer import _ENV
+        from src.python.report.html_jinja_env import _ENV
         template = _ENV.from_string("{{ name }}")
         result = template.render(name='<script>alert("xss")</script>')
         self.assertIn("&lt;script&gt;", result)
@@ -97,7 +97,7 @@ class TestXssCacheInjectionY6(unittest.TestCase):
 
     def test_template_autoescapes_event_handler(self):
         """Jinja2 模板渲染 → onerror 事件处理器被转义。"""
-        from src.python.report.html_writer import _ENV
+        from src.python.report.html_jinja_env import _ENV
         template = _ENV.from_string("{{ name }}")
         result = template.render(name='<img src=x onerror=alert(1)>')
         self.assertIn("&lt;img", result)
@@ -105,14 +105,14 @@ class TestXssCacheInjectionY6(unittest.TestCase):
 
     def test_money_filter_autoescape_safe(self):
         """money 过滤器输出纯文本 → autoescape 不影响数值显示。"""
-        from src.python.report.html_writer import _ENV
+        from src.python.report.html_jinja_env import _ENV
         template = _ENV.from_string("{{ value | money }}")
         result = template.render(value=1234.5)
         self.assertIn("1,234.50", result)
 
     def test_profit_color_filter_autoescape_safe(self):
         """profit_color 过滤器输出颜色值 → autoescape 不影响。"""
-        from src.python.report.html_writer import _ENV
+        from src.python.report.html_jinja_env import _ENV
         template = _ENV.from_string("{{ value | profit_color }}")
         result = template.render(value=100)
         self.assertIn("#CC0000", result)
