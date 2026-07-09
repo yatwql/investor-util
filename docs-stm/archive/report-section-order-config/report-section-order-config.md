@@ -1,6 +1,7 @@
 # C 迭代：报告序号可配置 — 详细设计
 
 > **状态**：✅ 已实现（v0.2.85~v0.2.86）— C-P1a/P1b/P2/P3 全 Phase 上线
+> **注意**：本文档为 C 迭代完整设计，其中 C-P1b 部分（Excel 页签序号跟随用户配置）包含来自同名子设计文档的详细实现方案（已合并）
 > **归档**：设计文档保留供回溯参考。实现详情见 `docs-stm/managements/changelog.md`。
 >
 > 本文档包含 C 迭代的完整设计过程、五轮审查发现、风险分析、技术债务记录和逐 Phase 实施方案。
@@ -209,6 +210,117 @@ def _create_sheets(wb, section_order, enable_b_series=False, include_news=False,
 - ✅ `excel_generator.py` 中无 `wb.move_sheet(ws13` 调用（已删除）
 - ✅ `summary.py` 中无 `wb.move_sheet` 调用（已删除）
 - ✅ 回归测试全部通过（全量 2244 项）
+
+### C-P1b 详细实现方案
+
+#### 问题根因
+
+`set_sheet_title()`（`registry.py:351`）始终只查 `_REPORT_SECTION_DEFAULT` 取 number，不接收 `section_order` 参数。调用链路有三层：
+
+1. `_create_sheets()`（`excel_generator.py:550`）→ `set_sheet_title(ws, sec["key"])` — 应传序号的源头
+2. 11 个独立 sheet 写入器各自调用 `set_sheet_title(ws, "<key>")` — 覆盖了 `_create_sheets` 的设置
+3. `generate_excel_report()` / `generate_html_report()` 内部调 `get_report_section_order()` **不带 config** → 即使序号跟随了自定义顺序，也用的是默认序号
+
+#### 改动范围
+
+| 文件 | 行 | 当前问题 | 修复方式 |
+|:-----|:--:|:---------|:---------|
+| `registry.py` | 351-366 | `set_sheet_title` 只查 `_REPORT_SECTION_DEFAULT` | 增加可选 `section_order` 参数，优先从配置取 number |
+| `excel_generator.py` | 540-552 | `_create_sheets` 不传 `section_order` | 调用 `set_sheet_title` 时传入当前 sec |
+| `excel_generator.py` | 601 | `get_report_section_order()` 不带 config | 通过参数接收 config/section_order |
+| `html_writer.py` | 233 | 同上 | 通过参数接收 config/section_order |
+| `handlers_report.py` | 24-349 | 调用 `generate_excel_report` / `generate_html_report` 时不传 config | 增加 `section_order` 参数传递 |
+| 11 个 sheet 写入器 | 各 1 行 | 各自调用 `set_sheet_title` 覆盖标题 | 移除冗余的 `set_sheet_title` 调用 |
+| `test_registry.py` | 324-349 | 只测默认值 | 新增 config-aware 测试用例 |
+| `test_excel_generator.py` | 全文件 | 未测 sheet 标题 | 新增 `_create_sheets` + 标题断言 |
+| 各 sheet 写入器测试 | 多处 | 断言硬编码默认序号 | 更新为正确序号 or 移除断言 |
+
+#### Phase 拆分
+
+**Phase 1：`set_sheet_title` 核心改造 + `_create_sheets` 传参**
+
+改动：
+1. `registry.py` — `set_sheet_title(ws, key, section_order=None)`
+   - 当 `section_order` 不为 None 时，遍历 `section_order` 匹配 key，取 `sec["number"]`
+   - 当 `section_order` 为 None 时，保持现有行为（查 `_REPORT_SECTION_DEFAULT`）
+2. `excel_generator.py` — `_create_sheets()` 中 `set_sheet_title(ws, sec["key"])` → `set_sheet_title(ws, sec["key"], section_order)`
+
+**Phase 2：移除 11 个写入器的冗余 `set_sheet_title` 调用**
+
+| 文件 | 删除行内容 |
+|:-----|:-----------|
+| `summary.py:254` | `set_sheet_title(ws, "summary")` |
+| `market_value.py:592` | `set_sheet_title(ws, "market_value")` |
+| `category.py:175` | `set_sheet_title(ws, "category")` |
+| `penetration_sheet.py:127` | `set_sheet_title(ws, "penetration")` |
+| `fund_performance.py:362` | `set_sheet_title(ws, "fund_performance")` |
+| `fund_manager_sheet.py:65` | `set_sheet_title(ws, "fund_manager")` |
+| `fund_overlap_sheet.py:77` | `set_sheet_title(ws, "fund_overlap")` |
+| `fund_concentration_sheet.py:85` | `set_sheet_title(ws, "fund_concentration")` |
+| `fund_style_sheet.py:66` | `set_sheet_title(ws, "fund_style")` |
+| `news_correlation.py:509` | `set_sheet_title(ws, "news_correlation")` |
+| `early_warning.py:309` | `set_sheet_title(ws, "early_warning")` |
+
+**Phase 3：Config 接入 — 将 `section_order` 传入报告生成链路**
+
+1. `excel_generator.py:generate_excel_report()` — 新增可选参数 `section_order: list[dict] \| None = None`
+2. `html_writer.py:write_html_report()` — 新增可选参数 `section_order: list[dict] \| None = None`
+3. `handlers_report.py` — 各 `_cmd_*` 函数读取 config，调用 `get_report_section_order(config)` 传入
+
+**Phase 4：新增测试**
+
+| 文件 | 类/方法 | 覆盖内容 |
+|:-----|:--------|:---------|
+| `test_registry.py` | `TestSetSheetTitleWithOrder` | 自定义 section_order → 标题使用正确序号 |
+| `test_registry.py` | 同上 | 部分自定义 → 未配置项使用默认序号 |
+| `test_registry.py` | 同上 | 传入 None（向后兼容）→ 使用默认序号 |
+| `test_excel_generator.py` | `TestCreateSheets` | 按自定义顺序创建 sheet、标题正确 |
+| `test_excel_generator.py` | 同上 | 可见性过滤 + 标题断言 |
+| `test_scenario_section_order.py` | `test_custom_order_excel_titles` | 端到端：Excel 页签标题跟随配置 |
+| `test_scenario_section_order.py` | `test_custom_order_html_titles` | 端到端：HTML 标题正确 |
+
+**Phase 5：文档更新**（plan.md / technical.md / changelog.md / reports-instruction.md）
+
+#### 风险与缓解
+
+| 风险 | 等级 | 缓解 |
+|:-----|:----:|:-----|
+| 移除写入器 `set_sheet_title` 后，某未发现的直接调用路径中断 | 中 | Phase 2 后立即运行全量测试 + 真人验证生成一份完整报告 |
+| Config 在 `handlers_report.py` 中不可达 | 低 | 已有 `get_config_cache()` 模式 |
+| 与用户配置的 `llm_usage` 强制末位冲突 | 低 | `get_report_section_order` 已有处理逻辑 |
+
+#### Phase 依赖关系
+
+```
+Phase 1 (核心函数)
+   │
+   ▼
+Phase 2 (移除冗余调用) ─── 需要 Phase 1 的 set_sheet_title 已就位
+   │
+   ▼
+Phase 3 (Config 接入) ─── 独立于 Phase 2，可先发 PR review
+   │
+   ▼
+Phase 4 (测试) ─── 覆盖 Phase 1-3 的全链路
+   │
+   ▼
+Phase 5 (文档) ─── 最后更新
+```
+
+#### 端到端手动验证步骤
+
+```
+1. 修改 data/config/config.json，添加:
+   "report_section_order": {
+       "fund_performance": 1,
+       "summary": 2,
+       "market_value": 3
+   }
+
+2. 运行 main.py → 菜单 E → 生成 Excel
+3. 打开 .xlsx：第 1 个页签 "1.基金业绩分析"、第 2 个 "2.投资分析汇总"、第 3 个 "3.市值核算明细表"
+4. 恢复 config.json 删除 report_section_order → 重启 → 标题恢复默认 1-16
+```
 
 ---
 
