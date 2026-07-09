@@ -31,7 +31,9 @@ logger = logging.getLogger("invest")
 #   _ENV + 过滤器                  → html_jinja_env.py
 #   14 渲染函数 + LLM 模块信息    → html_renderers.py
 #   _save_html_report              → html_save.py
-#   辅助函数                      _safe_build_data_status, _time_strings
+#   辅助函数                      _safe_build_data_status, _time_strings,
+#                                  _compute_section_visibility,
+#                                  _build_data_status_sections
 #   核心生成函数                  write_html_report()
 #   桥接 import（子渲染器 + 读写器）
 #
@@ -72,6 +74,82 @@ def _time_strings() -> tuple[str, str, str]:
         datetime.now().strftime("%Y-%m-%d"),
         get_last_trading_day(),
     )
+
+
+def _compute_section_visibility(
+    order: list[dict],
+    manager_analysis: dict | None,
+    overlap_matrix: dict | None,
+    concentration_analysis: dict | None,
+    style_analysis: dict | None,
+    include_news: bool,
+    early_warnings: dict | None,
+    llm_enabled_flag: bool,
+) -> tuple[dict[str, int], dict[str, bool], Any]:
+    """计算报告模块序号 + 可见性字典 + 闭包函数。
+
+    根据各模块返回的数据状态决定 section 是否可见，
+    返回的闭包遵守 C14 约束（不写入 _ENV.globals）。
+    """
+    section_numbers = {sec["key"]: sec["number"] for sec in order}
+    raw_data_flags: dict[str, bool] = {
+        "manager_data": manager_analysis is not None,
+        "overlap_data": overlap_matrix is not None,
+        "concentration_data": concentration_analysis is not None,
+        "style_data": style_analysis is not None,
+        "include_news": include_news,
+        "early_warnings": bool(early_warnings),
+        "llm_enabled": llm_enabled_flag,
+    }
+    section_visible_dict: dict[str, bool] = {}
+    for sec in order:
+        flag_name = sec.get("data_flag")
+        if not flag_name:
+            section_visible_dict[sec["key"]] = True
+        else:
+            section_visible_dict[sec["key"]] = raw_data_flags.get(flag_name, False)
+    # 创建渲染期 section_visible 闭包（不写入 _ENV.globals，遵守 C14 约束）
+    _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
+    return section_numbers, section_visible_dict, _sv_fn
+
+
+def _build_data_status_sections(
+    a_indices: dict,
+    us_indices: dict,
+    penetration: dict | None,
+    penetration_profit_ok: bool,
+    penetration_dividend_ok: bool,
+    perf_data: list[dict] | None,
+    perf_profit_ok: bool,
+    holdings: list[Holding],
+    cat_dividend_ok: bool,
+) -> tuple[DataStatus, DataStatus, DataStatus, DataStatus]:
+    """构建 4 个 data_status 摘要字典（指数/穿透/基金业绩/持仓分类）。
+
+    各模块的 data_status 构建互相独立，任一模块失败不影响其他。
+    """
+    data_status_summary: DataStatus = _safe_build_data_status(
+        _build_index_data_status, a_indices, us_indices, label="指数")
+    data_status_penetration: DataStatus = {}
+    if penetration:
+        data_status_penetration = _safe_build_data_status(
+            _build_penetration_data_status, penetration,
+            penetration_profit_ok, penetration_dividend_ok, label="穿透")
+    # 从 perf_data 提取真实 adjusted_ratings（无异常风险，放外面不吞）
+    _adj_ratings: dict[str, str] = {}
+    if perf_data:
+        for _entry in perf_data:
+            _code = _entry.get("code")
+            _tag = _entry.get("rating_tag")
+            if _code and _tag:
+                _adj_ratings[_code] = _tag
+    data_status_perf: DataStatus = _safe_build_data_status(
+        _build_perf_data_status, _adj_ratings,
+        sum(1 for h in holdings if _is_fund(h)),
+        profit_success=perf_profit_ok, label="基金业绩")
+    data_status_category: DataStatus = _safe_build_data_status(
+        _build_category_data_status, cat_dividend_ok, label="持仓分类")
+    return data_status_summary, data_status_penetration, data_status_perf, data_status_category
 
 
 # ── 核心生成函数 ────────────────────────────────────────────
@@ -146,57 +224,18 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
     prog.info("正在渲染 HTML...")
     has_llm_analysis = any(item.get("llm_analysis") for item in (news_data or []))
 
-    # 报告模块序号 & 可见性（优先使用传入的 section_order，避免影子覆盖参数）
+    # ── 10a) 报告模块序号 & 可见性 ──
     order = section_order or get_report_section_order()
-    section_numbers = {sec["key"]: sec["number"] for sec in order}
+    section_numbers, section_visible_dict, _sv_fn = _compute_section_visibility(
+        order, manager_analysis, overlap_matrix, concentration_analysis,
+        style_analysis, include_news, early_warnings, llm_enabled_flag)
 
-    raw_data_flags = {
-        # B 系列：返回非 None = 模块已启用 → section 始终可见（空数据时显示占位）
-        "manager_data": manager_analysis is not None,
-        "overlap_data": overlap_matrix is not None,
-        "concentration_data": concentration_analysis is not None,
-        "style_data": style_analysis is not None,
-        "include_news": include_news,
-        "early_warnings": bool(early_warnings),
-        "llm_enabled": llm_enabled_flag,
-    }
-    section_visible_dict = {}
-    for sec in order:
-        flag_name = sec.get("data_flag")
-        if not flag_name:
-            section_visible_dict[sec["key"]] = True
-        else:
-            section_visible_dict[sec["key"]] = raw_data_flags.get(flag_name, False)
-
-    # 创建渲染期 section_visible 闭包（不写入 _ENV.globals，遵守 C14 约束）
-    _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
-
-    # ── 11) 构建各章节数据源状态摘要 ──
-    data_status_summary: DataStatus = _safe_build_data_status(
-        _build_index_data_status, a_indices, us_indices, label="指数",
-    )
-    data_status_penetration: DataStatus = {}
-    if penetration:
-        data_status_penetration = _safe_build_data_status(
-            _build_penetration_data_status, penetration,
-            penetration_profit_ok, penetration_dividend_ok, label="穿透",
-        )
-    # 从 perf_data 提取真实 adjusted_ratings（无异常风险，放外面不吞）
-    _adj_ratings: dict[str, str] = {}
-    if perf_data:
-        for _entry in perf_data:
-            _code = _entry.get("code")
-            _tag = _entry.get("rating_tag")
-            if _code and _tag:
-                _adj_ratings[_code] = _tag
-    data_status_perf: DataStatus = _safe_build_data_status(
-        _build_perf_data_status, _adj_ratings,
-        sum(1 for h in holdings if _is_fund(h)),
-        profit_success=perf_profit_ok, label="基金业绩",
-    )
-    data_status_category: DataStatus = _safe_build_data_status(
-        _build_category_data_status, cat_dividend_ok, label="持仓分类",
-    )
+    # ── 10b) 数据源状态摘要 ──
+    (data_status_summary, data_status_penetration,
+     data_status_perf, data_status_category) = _build_data_status_sections(
+        a_indices, us_indices, penetration, penetration_profit_ok,
+        penetration_dividend_ok, perf_data, perf_profit_ok, holdings,
+        cat_dividend_ok)
 
     html = _ENV.get_template("report_template.html").render(
         now=now_str, today=today_str, trading_day=trading_day,
