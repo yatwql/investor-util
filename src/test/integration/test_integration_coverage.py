@@ -288,11 +288,11 @@ class TestErrorIsolationSemantics(unittest.TestCase):
                   return_value={}),
             patch("src.python.report.html_writer.compute_penetration_top10",
                   return_value={}),
-            patch("src.python.report.html_writer._build_category_data",
+            patch("src.python.report.html_renderers._build_category_data",
                   return_value=([], False)),
             patch("src.python.report.html_writer.price_update_status",
                   return_value=(1, 1, True)),
-            patch("src.python.report.html_writer._build_perf_data",
+            patch("src.python.report.html_renderers._build_perf_data",
                   return_value={}),
             # 模拟 LLM content 异常（传入错误类型），验证仍生成 HTML
             patch("src.python.report.html_writer._ENV.get_template") as tmpl,

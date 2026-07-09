@@ -52,7 +52,7 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
 
     def test_build_module_info_mixed_states(self):
         """_build_module_info_list：混合状态正确分发。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {
             "penetration_deep": FAIL_REASON_API_ERROR,
@@ -98,7 +98,7 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
 
     def test_mixed_states_count(self):
         """_build_module_info_list：返回 5 个模块条目。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         result = _build_module_info_list({}, {})
         self.assertEqual(len(result), 5)
         keys = [m["key"] for m in result]
@@ -106,7 +106,7 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
 
     def test_render_llm_mixed_integration(self):
         """_render_llm_module_info + 混合状态：状态正确分发。"""
-        from src.python.report.html_writer import _render_llm_module_info
+        from src.python.report.html_renderers import _render_llm_module_info
 
         session_usage = {
             "has_usage": True, "call_count": 1, "per_module": {
@@ -172,7 +172,7 @@ class TestS12AllFailures(unittest.TestCase):
 
     def test_all_five_failure_reasons(self):
         """_build_module_info_list：5 种失败原因正确映射。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {
             "global_macro": FAIL_REASON_NOT_CONFIGURED,
@@ -204,7 +204,7 @@ class TestS12AllFailures(unittest.TestCase):
 
     def test_all_failed_no_per_module(self):
         """全部失败 + 无 per_module → 全部 failed，无成功/缓存覆盖。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {
             "global_macro": FAIL_REASON_API_ERROR,
@@ -249,7 +249,7 @@ class TestS13ThinkingMixed(unittest.TestCase):
 
     def test_thinking_mixed(self):
         """_build_module_info_list：Thinking 标记正确。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         per_module = {
             "global_macro": {
@@ -295,7 +295,7 @@ class TestS13ThinkingMixed(unittest.TestCase):
 
     def test_thinking_true_count(self):
         """Thinking=True 恰好 2 个（global_macro + expert_review）。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         per_module = {
             "global_macro": {
@@ -333,7 +333,7 @@ class TestS14LlmDisabled(unittest.TestCase):
 
     def test_llm_enabled_false_all_unknown(self):
         """_render_llm_module_info(False) → 全部 unknown + 无用量。"""
-        from src.python.report.html_writer import _render_llm_module_info
+        from src.python.report.html_renderers import _render_llm_module_info
 
         with ExitStack() as stack:
             stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE", {}))
@@ -352,7 +352,7 @@ class TestS14LlmDisabled(unittest.TestCase):
 
     def test_llm_enabled_false_no_session_usage(self):
         """llm_enabled=False → llm_session_usage 为 None（即使有 _LLM_MODULE_FAILURE）。"""
-        from src.python.report.html_writer import _render_llm_module_info
+        from src.python.report.html_renderers import _render_llm_module_info
 
         with ExitStack() as stack:
             stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE", {
@@ -380,19 +380,19 @@ class TestS14LlmDisabled(unittest.TestCase):
 
         with ExitStack() as stack:
             mock_details = stack.enter_context(
-                patch("src.python.report.html_writer._generate_details"))
+                patch("src.python.report.html_renderers._generate_details"))
             mock_a_idx = stack.enter_context(
-                patch("src.python.report.html_writer.fetch_indices"))
+                patch("src.python.report.html_renderers.fetch_indices"))
             mock_us_idx = stack.enter_context(
-                patch("src.python.report.html_writer.fetch_us_indices"))
+                patch("src.python.report.html_renderers.fetch_us_indices"))
             mock_pen = stack.enter_context(
-                patch("src.python.report.html_writer.compute_penetration_top10"))
+                patch("src.python.report.html_renderers.compute_penetration_top10"))
             mock_cat = stack.enter_context(
-                patch("src.python.report.html_writer._build_category_data"))
+                patch("src.python.report.html_renderers._build_category_data"))
             mock_status = stack.enter_context(
-                patch("src.python.report.html_writer.price_update_status"))
+                patch("src.python.report.html_renderers.price_update_status"))
             mock_perf = stack.enter_context(
-                patch("src.python.report.html_writer._build_perf_data"))
+                patch("src.python.report.html_renderers._build_perf_data"))
             mock_llm = stack.enter_context(
                 patch("src.python.llm.generate_all_llm"))
             mock_template = stack.enter_context(
@@ -458,7 +458,7 @@ class TestS15DisabledPriority(unittest.TestCase):
 
     def test_disabled_overrides_per_module(self):
         """FAIL_REASON_DISABLED 优先于 per_module 数据。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {
             "health_check": FAIL_REASON_DISABLED,
@@ -488,7 +488,7 @@ class TestS15DisabledPriority(unittest.TestCase):
 
     def test_disabled_overrides_cached(self):
         """禁用优先于缓存状态。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {
             "health_check": FAIL_REASON_DISABLED,
@@ -512,7 +512,7 @@ class TestS15DisabledPriority(unittest.TestCase):
 
     def test_disabled_alone_no_per_module(self):
         """仅禁用无 per_module → 正确显示 disabled。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {"global_macro": FAIL_REASON_DISABLED}
         result = _build_module_info_list(failure, {})
@@ -538,7 +538,7 @@ class TestS16NetworkDown(unittest.TestCase):
 
     def test_all_network_error(self):
         """_build_module_info_list：全部 NETWORK_ERROR。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {
             "global_macro": FAIL_REASON_NETWORK_ERROR,
@@ -561,7 +561,7 @@ class TestS16NetworkDown(unittest.TestCase):
 
     def test_network_error_placeholder_text(self):
         """_render_llm_module_info：断网 -> failed 状态文本正确。"""
-        from src.python.report.html_writer import _render_llm_module_info
+        from src.python.report.html_renderers import _render_llm_module_info
 
         with ExitStack() as stack:
             stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE", {
@@ -590,7 +590,7 @@ class TestS16NetworkDown(unittest.TestCase):
     def test_s16_console_output_format(self):
         """S16 场景下验证 TUI 摘要输出格式中失败模块数正确。"""
         # 验证 _build_module_info_list 返回 5 个失败模块
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {
             "global_macro": FAIL_REASON_NETWORK_ERROR,
@@ -621,7 +621,7 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
 
     def test_partial_cache_hit(self):
         """_build_module_info_list：部分缓存 + 部分成功。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         per_module = {
             "global_macro": {
@@ -710,7 +710,7 @@ class TestS17aFullCache(unittest.TestCase):
 
     def test_all_cache_hit(self):
         """_build_module_info_list：全部缓存命中。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         per_module = {
             "global_macro": {
@@ -890,7 +890,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_and_excel_consistent_disabled(self):
         """disabled 状态在 html 和 excel 中标签一致。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {"health_check": FAIL_REASON_DISABLED}
         html_result = _build_module_info_list(failure, {})
@@ -924,7 +924,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_and_excel_consistent_failure(self):
         """各失败原因在 html 和 excel 中标签一致。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         # 使用已知模块键（_build_module_info_list 只识别 5 个标准 key）
         MODULE_KEY = "health_check"
@@ -948,7 +948,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_and_excel_consistent_success(self):
         """success 状态在 html 和 excel 中标签一致。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         per_module = {
             "expert_review": {
@@ -981,7 +981,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_and_excel_consistent_cached(self):
         """cached 状态在 html 和 excel 中标签一致。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         per_module = {
             "global_macro": {
@@ -1013,7 +1013,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_has_news_correlation(self):
         """HTML module_info 包含 news_correlation 模块。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         result = _build_module_info_list({}, {})
         keys = [m["key"] for m in result]
         self.assertIn("news_correlation", keys)
@@ -1021,7 +1021,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_summary_and_excel_module_order(self):
         """Summary 页签和 Excel 用量页签的模块顺序一致。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         per_module = {
             "global_macro": {
@@ -1077,7 +1077,7 @@ class TestNonTradingDayWithLlm(unittest.TestCase):
 
     def test_llm_module_info_independent_of_market_state(self):
         """_build_module_info_list 不依赖市场状态，非交易日照常调用。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {"penetration_deep": FAIL_REASON_NETWORK_ERROR}
         per_module = {
@@ -1133,7 +1133,7 @@ class TestMultiAccountMultiRoundLlm(unittest.TestCase):
 
     def test_multi_account_does_not_break_build_module_info(self):
         """多账户持仓传入 _build_module_info_list 不崩溃。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         failure = {}
         per_module = {
@@ -1151,7 +1151,7 @@ class TestMultiAccountMultiRoundLlm(unittest.TestCase):
 
     def test_multi_round_per_module_accumulates(self):
         """多轮调用后 per_module 累加所有轮次的 token 数据。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
         per_module_round1 = {
             "global_macro": {

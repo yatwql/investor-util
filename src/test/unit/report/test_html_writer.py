@@ -219,13 +219,13 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            mock_details = stack.enter_context(patch("src.python.report.html_writer._generate_details"))
+            mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
             mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
             mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
             mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
-            mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
             mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
-            mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
             mock_details.return_value = [self.detail]
@@ -259,13 +259,13 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            mock_details = stack.enter_context(patch("src.python.report.html_writer._generate_details"))
+            mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
             mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
             mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
             mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
-            mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
             mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
-            mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
             mock_details.return_value = [self.detail]
@@ -294,13 +294,13 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            mock_details = stack.enter_context(patch("src.python.report.html_writer._generate_details"))
+            mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
             mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
             mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
             mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
-            mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
             mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
-            mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
             mock_details.return_value = [self.detail]
@@ -363,13 +363,13 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
     def _run_with_mocks(self, enable_llm=True):
         """用 ExitStack 统一管理 9 个补丁，调用 write_html_report 并返回 mock_llm。"""
         with ExitStack() as stack:
-            mock_details = stack.enter_context(patch("src.python.report.html_writer._generate_details"))
+            mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
             mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
             mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
             mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
-            mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
             mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
-            mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_llm = stack.enter_context(patch("src.python.llm.generate_all_llm"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
@@ -436,13 +436,13 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
     def _run_with_mocks_and_template(self, enable_llm=True):
         """类似 _run_with_mocks，额外返回 template mock 用于断言模板数据。"""
         with ExitStack() as stack:
-            mock_details = stack.enter_context(patch("src.python.report.html_writer._generate_details"))
+            mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
             mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
             mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
             mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
-            mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
             mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
-            mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_llm = stack.enter_context(patch("src.python.llm.generate_all_llm"))
             mock_template_call = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
@@ -502,7 +502,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
 
     def test_cache_hit(self):
         """per_module 缓存命中 → status='cached', status_label='缓存'。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         per_module = {
             "global_macro": {
                 "model": "deepseek-v4-flash", "cached": True,
@@ -520,7 +520,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
 
     def test_success_call(self):
         """per_module 非缓存 → status='success', status_label='成功'。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         per_module = {
             "expert_review": {
                 "model": "deepseek-v4-flash", "cached": False,
@@ -540,7 +540,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_disabled(self):
         """FAIL_REASON_DISABLED → status='disabled', status_label='已禁用'。"""
         from src.python.llm import FAIL_REASON_DISABLED
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         failure = {"global_macro": FAIL_REASON_DISABLED}
         result = _build_module_info_list(failure, {})
         gm = next(m for m in result if m["key"] == "global_macro")
@@ -552,7 +552,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_failed(self):
         """FAIL_REASON_API_ERROR → status='failed', status_label 含错误描述。"""
         from src.python.llm import FAIL_REASON_API_ERROR
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         failure = {"health_check": FAIL_REASON_API_ERROR}
         result = _build_module_info_list(failure, {})
         hc = next(m for m in result if m["key"] == "health_check")
@@ -565,7 +565,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
             FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
             FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
         )
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         cases = [
             (FAIL_REASON_NOT_CONFIGURED, "LLM 未配置"),
             (FAIL_REASON_API_ERROR, "LLM API 调用失败"),
@@ -584,7 +584,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
 
     def test_unknown(self):
         """无 per_module 且无 failure → status='unknown', status_label=''。"""
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         result = _build_module_info_list({}, {})
         for mk in ["global_macro", "expert_review", "health_check", "penetration_deep"]:
             m = next(entry for entry in result if entry["key"] == mk)
@@ -594,7 +594,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_mixed_states(self):
         """混合状态：禁用、失败、缓存、成功同时存在。"""
         from src.python.llm import FAIL_REASON_DISABLED, FAIL_REASON_TIMEOUT
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
         failure = {
             "global_macro": FAIL_REASON_DISABLED,
             "health_check": FAIL_REASON_TIMEOUT,
@@ -641,7 +641,7 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
                     patch("src.python.llm.get_session_usage", return_value=session_usage))
                 stack.enter_context(
                     patch("src.python.llm.format_session_usage", return_value=session_usage))
-            from src.python.report.html_writer import _render_llm_module_info
+            from src.python.report.html_renderers import _render_llm_module_info
             return _render_llm_module_info(llm_enabled_flag)
 
     def test_not_enabled_returns_unknown(self):
@@ -725,7 +725,7 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
                                       side_effect=TypeError("模拟错误")))
             stack.enter_context(patch("src.python.llm.format_session_usage",
                                       side_effect=TypeError("模拟错误")))
-            from src.python.report.html_writer import _render_llm_module_info
+            from src.python.report.html_renderers import _render_llm_module_info
 
             llm_module_info, llm_endpoint, _, llm_session_usage = \
                 _render_llm_module_info(True)
@@ -939,13 +939,13 @@ class TestAppVersionInTemplate(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            mock_details = stack.enter_context(patch("src.python.report.html_writer._generate_details"))
+            mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
             mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
             mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
             mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
-            mock_cat = stack.enter_context(patch("src.python.report.html_writer._build_category_data"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
             mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
-            mock_perf = stack.enter_context(patch("src.python.report.html_writer._build_perf_data"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
             mock_details.return_value = [self.detail]

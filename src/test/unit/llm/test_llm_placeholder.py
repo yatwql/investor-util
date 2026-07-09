@@ -98,7 +98,7 @@ class TestLlmPlaceholderTextInReport(unittest.TestCase):
     def test_html_writer_placeholder_distinct(self):
         """html_writer 中所有状态占位文本互不相同。"""
         # 验证 html_writer 中 _build_module_info_list 的占位映射
-        from src.python.report.html_writer import _build_module_info_list
+        from src.python.report.html_renderers import _build_module_info_list
 
 
         display_reason = {

@@ -49,7 +49,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
 
     def test_penetration_empty_top10_returns_early(self):
         """pen_result 无 top10 → 直接返回，不加载额外数据。"""
-        from src.python.report.html_writer import _render_penetration_section
+        from src.python.report.html_renderers import _render_penetration_section
 
         with patch("src.python.report.html_writer.compute_penetration_top10",
                    return_value={}):
@@ -58,7 +58,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
 
     def test_penetration_top10_has_eps_and_dividend_defaults(self):
         """API 全失败 → 每个 entry 的 eps_text/dividend_text 为 "--"。"""
-        from src.python.report.html_writer import _render_penetration_section
+        from src.python.report.html_renderers import _render_penetration_section
 
         mock_top10 = {
             "top10": [
@@ -85,7 +85,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
 
     def test_penetration_partial_data(self):
         """部分数据有值 → 仅匹配到的 entry 有 EPS/股息率。"""
-        from src.python.report.html_writer import _render_penetration_section
+        from src.python.report.html_renderers import _render_penetration_section
 
         mock_top10 = {
             "top10": [
@@ -121,7 +121,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
 
     def test_penetration_no_codes_key(self):
         """entry 无 codes 键 → 跳过，eps_text/dividend_text 为 "--"。"""
-        from src.python.report.html_writer import _render_penetration_section
+        from src.python.report.html_renderers import _render_penetration_section
 
         mock_top10 = {
             "top10": [
@@ -181,13 +181,13 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
 
         with ExitStack() as stack:
             # 标准外部依赖 mock
-            stack.enter_context(patch("src.python.report.html_writer._generate_details",
+            stack.enter_context(patch("src.python.report.html_renderers._generate_details",
                                        return_value=[self.detail]))
             stack.enter_context(patch("src.python.report.html_writer.fetch_indices",
                                        return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
             stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
                                        return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
-            stack.enter_context(patch("src.python.report.html_writer._build_category_data",
+            stack.enter_context(patch("src.python.report.html_renderers._build_category_data",
                                        return_value=([], True)))
             stack.enter_context(patch("src.python.report.html_writer.price_update_status",
                                        return_value=(0, 0, True)))
@@ -229,13 +229,13 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.report.html_writer._generate_details",
+            stack.enter_context(patch("src.python.report.html_renderers._generate_details",
                                        return_value=[self.detail]))
             stack.enter_context(patch("src.python.report.html_writer.fetch_indices",
                                        return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
             stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
                                        return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
-            stack.enter_context(patch("src.python.report.html_writer._build_category_data",
+            stack.enter_context(patch("src.python.report.html_renderers._build_category_data",
                                        return_value=([], True)))
             stack.enter_context(patch("src.python.report.html_writer.price_update_status",
                                        return_value=(0, 0, True)))
@@ -274,13 +274,13 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.report.html_writer._generate_details",
+            stack.enter_context(patch("src.python.report.html_renderers._generate_details",
                                        return_value=[self.detail]))
             stack.enter_context(patch("src.python.report.html_writer.fetch_indices",
                                        return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
             stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
                                        return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
-            stack.enter_context(patch("src.python.report.html_writer._build_category_data",
+            stack.enter_context(patch("src.python.report.html_renderers._build_category_data",
                                        return_value=([], True)))
             stack.enter_context(patch("src.python.report.html_writer.price_update_status",
                                        return_value=(0, 0, True)))
@@ -356,13 +356,13 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
 
     def _make_b_series_mocks(self, stack):
         """mock 标准依赖 + 4 个 B 系列 _render_* 返回空数据。"""
-        stack.enter_context(patch("src.python.report.html_writer._generate_details",
+        stack.enter_context(patch("src.python.report.html_renderers._generate_details",
                                    return_value=[self.detail]))
         stack.enter_context(patch("src.python.report.html_writer.fetch_indices",
                                    return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
         stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices",
                                    return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
-        stack.enter_context(patch("src.python.report.html_writer._build_category_data",
+        stack.enter_context(patch("src.python.report.html_renderers._build_category_data",
                                    return_value=([], True)))
         stack.enter_context(patch("src.python.report.html_writer.price_update_status",
                                    return_value=(0, 0, True)))
