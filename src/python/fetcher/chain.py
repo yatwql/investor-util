@@ -15,7 +15,7 @@ from src.python.constants import CACHE_WEEKLY
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.config import get_config
-from src.python.provider_registry import get_registry
+from src.python.provider_registry import get_registry, _TRANSPORT_FAILURE
 
 logger = logging.getLogger("invest")
 
@@ -76,9 +76,8 @@ def is_provider_chain_broken(data_type: str) -> bool:
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
-# 熔断计数器增量标记：_try_provider_fetch 返回此值表示传输级异常
-# （非代码级空结果），应计入熔断计数器。
-_TRANSPORT_FAILURE: object = object()
+# _TRANSPORT_FAILURE sentinel 定义于 provider_registry.py，
+# 跨模块共享用于 _try_provider_fetch 的传输级异常标记。
 
 
 # ── 通用带缓存的 Fallback 调用 ──────────────────────────────
@@ -96,18 +95,19 @@ def _try_provider_fetch(
               | None,
 ) -> dict[str, Any] | None:
     """尝试调用单个 provider 的 fetch 函数，返回转换后的结果或 None。"""
+    _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
     try:
         raw = fetch_fn(**kwargs)
     except Exception as e:
         err_str = str(e)
         if "429" in err_str or "Too Many Requests" in err_str or "rate" in err_str.lower():
-            logger.warning("[%s] %s API 限速(429): %s", data_type, provider_name, err_str)
+            logger.warning("[%s]%s %s API 限速(429): %s", data_type, _code_tag, provider_name, err_str)
         else:
-            logger.warning("[%s] %s 调用异常: %s", data_type, provider_name, err_str)
+            logger.warning("[%s]%s %s 调用异常: %s", data_type, _code_tag, provider_name, err_str)
         return cast("dict[str, Any] | None", _TRANSPORT_FAILURE)  # 传输级异常 → 应计入熔断
 
     if raw is None:
-        logger.info("[%s] %s 返回空，尝试下一链路", data_type, provider_name)
+        logger.info("[%s]%s %s 返回空，尝试下一链路", data_type, _code_tag, provider_name)
         return None
 
     # 数据验证
@@ -134,7 +134,7 @@ def _try_provider_fetch(
         return None
 
     if result is not None:
-        logger.info("[%s] %s 成功", data_type, provider_name)
+        logger.info("[%s]%s %s 成功", data_type, _code_tag, provider_name)
     return result
 
 
@@ -166,20 +166,21 @@ def _fetch_with_fallback(
 
     # 2) 遍历 chain 尝试（熔断委托 registry）
     kwargs = fn_kwargs or {}
+    _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
     reg = get_registry()
     for provider_name in chain:
         # 熔断检查（含自动冷却恢复）
         if reg.is_circuit_broken(provider_name):
-            logger.debug("[%s] %s 已被熔断，跳过", data_type, provider_name)
+            logger.debug("[%s]%s %s 已被熔断，跳过", data_type, _code_tag, provider_name)
             continue
 
         entry = provider_fn_map.get(provider_name)
         if not entry:
-            logger.warning("[%s] 未知 Provider '%s'，跳过", data_type, provider_name)
+            logger.warning("[%s]%s 未知 Provider '%s'，跳过", data_type, _code_tag, provider_name)
             continue
 
         source_label, fetch_fn = entry
-        logger.info("[%s] 尝试 %s (%s)", data_type, source_label, provider_name)
+        logger.info("[%s]%s 尝试 %s (%s)", data_type, _code_tag, source_label, provider_name)
 
         if fetch_fn is None:
             logger.warning("[%s] %s 没有注册的 fetch 函数", data_type, provider_name)

@@ -462,7 +462,7 @@ def _generate_details(holdings: list[Holding], today_str: str) -> list[DetailRow
     # 3. 缓存路径：session cache → file cache（零 HTTP）
     result_map: dict[tuple[str, str], dict | None] = {}
     for h in cache_holdings:
-        mkt = registry._fetch_cached_only(h.code, "price", _price_cache_key)
+        mkt = registry.fetch_cached_only(h.code, "price", _price_cache_key)
         result_map[(h.account.strip(), h.code.strip())] = mkt
 
     # 4. 并行 HTTP 路径

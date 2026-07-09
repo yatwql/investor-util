@@ -14,6 +14,7 @@ import pytest
 from src.python.provider_registry import (
     FetchStrategy,
     _NOT_FOUND,
+    _SESSION_CACHE_MAX_ENTRIES,
     DataSourceRegistry,
     get_registry,
 )
@@ -230,15 +231,89 @@ class TestSessionCache:
         assert r.session_cache_get("industry", "600519") is _NOT_FOUND
 
     def test_eviction_order(self):
-        """超限时淘汰最旧条目（O(1) 近似淘汰）。"""
+        """超限（>2000）时淘汰最旧条目。"""
         r = _fresh_registry()
         domain = "test"
-        for i in range(100):
+        n = _SESSION_CACHE_MAX_ENTRIES + 5  # 2005，确保触发淘汰
+        for i in range(n):
             r.session_cache_set(domain, f"code{i:05d}", i)
-        # 写入超限，至少有一些条目还在
-        count = len(r._session_cache[domain])
-        assert count <= 120  # 100 + 可能少量未淘汰
-        assert count > 0
+        dc = r._session_cache[domain]
+        assert len(dc) == _SESSION_CACHE_MAX_ENTRIES  # 正好 2000
+        # 最早的 5 条应被淘汰
+        for i in range(5):
+            assert f"code{i:05d}" not in dc, f"code{i:05d} 应被淘汰"
+        # 最新的 5 条应存在
+        for i in range(n - 5, n):
+            assert f"code{i:05d}" in dc, f"code{i:05d} 应存在"
+
+
+# ════════════════════════════════════════════════════════════
+# fetch_or_cached / fetch_cached_only
+# ════════════════════════════════════════════════════════════
+
+
+class TestFetchOrCached:
+    def test_fetch_or_cached_live_fetch(self):
+        """LIVE_FETCH 策略 → 调用 fetch_fn 并写 session cache。"""
+        r = _fresh_registry()
+        calls = []
+        def _fetch(code: str) -> dict:
+            calls.append(code)
+            return {"price": 100.0}
+        with mock.patch("src.python.market_hours.is_market_open", return_value=True):
+            result = r.fetch_or_cached("600519", "a_share", _fetch,
+                                       cache_domain="price", chain=[])
+        assert result == {"price": 100.0}
+        assert calls == ["600519"]
+        # session cache 应有值
+        assert r.session_cache_get("price", "600519") == {"price": 100.0}
+
+    def test_fetch_or_cached_cache_only(self):
+        """全链熔断 → CACHE_ONLY → 不调 fetch_fn，仅读缓存。"""
+        r = _fresh_registry()
+        r.register_provider("t1")
+        r.register_provider("t2")
+        with mock.patch("time.time", return_value=1000.0):
+            for p in ("t1", "t2"):
+                for _ in range(3):
+                    r.record_failure(p, "timeout")
+            r.session_cache_set("price", "600519", {"price": 100.0})
+            calls = []
+            def _fetch(code: str) -> dict:
+                calls.append(code)
+                return {"price": 200.0}
+            with mock.patch("src.python.market_hours.is_market_open", return_value=True):
+                result = r.fetch_or_cached("600519", "a_share", _fetch,
+                                           cache_domain="price", chain=["t1", "t2"])
+        # 全链熔断 → CACHE_ONLY → 返回 session cache
+        assert result == {"price": 100.0}
+        assert calls == []
+
+    def test_fetch_or_cached_live_fetch_none_does_not_cache(self):
+        """LIVE_FETCH 但 fetch_fn 返回 None → 不写 session cache。"""
+        r = _fresh_registry()
+        def _fetch(code: str) -> None:
+            return None
+        with mock.patch("src.python.market_hours.is_market_open", return_value=True):
+            result = r.fetch_or_cached("600519", "a_share", _fetch,
+                                       cache_domain="price")
+        assert result is None
+        assert r.session_cache_get("price", "600519") is _NOT_FOUND
+
+
+class TestFetchCachedOnly:
+    def test_fetch_cached_only_session_hit(self):
+        """session cache 命中 → 直接返回。"""
+        r = _fresh_registry()
+        r.session_cache_set("price", "600519", {"price": 100.0})
+        result = r.fetch_cached_only("600519", "price")
+        assert result == {"price": 100.0}
+
+    def test_fetch_cached_only_miss_returns_none(self):
+        """session cache 和 file cache 均无数据 → 返回 None。"""
+        r = _fresh_registry()
+        result = r.fetch_cached_only("600519", "price")
+        assert result is None
 
 
 # ════════════════════════════════════════════════════════════

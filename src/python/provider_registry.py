@@ -392,7 +392,7 @@ class DataSourceRegistry:
         strategy = self.get_effective_strategy(code_type, chain)
 
         if strategy == FetchStrategy.CACHE_ONLY:
-            return self._fetch_cached_only(code, cache_domain, cache_key_fn)
+            return self.fetch_cached_only(code, cache_domain, cache_key_fn)
 
         # LIVE_FETCH：执行实际获取
         result = fetch_fn(code)
@@ -400,7 +400,7 @@ class DataSourceRegistry:
             self.session_cache_set(cache_domain, code, result, source="api")
         return result
 
-    def _fetch_cached_only(
+    def fetch_cached_only(
         self,
         code: str,
         cache_domain: str = "price",

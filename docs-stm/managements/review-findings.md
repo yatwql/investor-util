@@ -36,22 +36,14 @@
 | # | 问题 | 模块 | 备注 |
 |:-:|:-----|:----|:----:|
 | R-187 | **TUI Windows 平台 12 个测试跳过**：`termios`/`tty` 为 Linux 特有模块，Windows 上 `_get_key_linux()` 已加 try/except 保护 | `tui.py` + `test_tui_edge.py` | 功能降级但无错误，可考虑 CI 加 Windows runner |
-| R-189 | **market_value.py 调用 DataSourceRegistry 私有方法 `_fetch_cached_only()`**：前导下划线表明实现细节，非公共 API，模块边界泄漏 | `report/market_value.py` | 建议改为公共方法或改用 `fetch_or_cached` |
-| R-190 | **哨兵 `_TRANSPORT_FAILURE` 重复定义**：`provider_registry.py` 和 `chain.py` 各有一套，后者 unused | `provider_registry.py` + `chain.py` | 应统一至一处 |
-| R-191 | **`test_eviction_order` 未实际触发淘汰**：写入 100 条/阈值 2000，断言永远为真，不能验证淘汰逻辑 | `test_provider_registry.py` | `fetch_or_cached` 和 `_fetch_cached_only` 无单元覆盖 |
-
-### 🟡 中优先级
-
-| # | 问题 | 模块 | 备注 |
-|:-:|:-----|:----|:----:|
-| R-189 | **market_value.py 调用 DataSourceRegistry 私有方法 `_fetch_cached_only()`**：前导下划线表明实现细节，非公共 API，模块边界泄漏 | `report/market_value.py` | 建议改为公共方法或改用 `fetch_or_cached` |
-| R-190 | **哨兵 `_TRANSPORT_FAILURE` 重复定义**：`provider_registry.py` 和 `chain.py` 各有一套，后者 unused | `provider_registry.py` + `chain.py` | 应统一至一处 |
-| R-191 | **`test_eviction_order` 未实际触发淘汰**：写入 100 条/阈值 2000，断言永远为真，不能验证淘汰逻辑 | `test_provider_registry.py` | `fetch_or_cached` 和 `_fetch_cached_only` 无单元覆盖 |
 
 ### ✅ 近期已修复
 
 | # | 问题 | 修复说明 |
 |:-:|:-----|:---------|
+| R-189 | **market_value.py `_fetch_cached_only()` → 公开 `fetch_cached_only()`**：前导下划线改为公共方法名，消除模块边界泄漏；market_value 中改为 `registry.fetch_cached_only(...)` | 2026-07-09 修复 |
+| R-190 | **哨兵 `_TRANSPORT_FAILURE` 统一至 provider_registry.py**：chain.py 删除局部定义，改为 import 共享；添加 `noqa: PLC2701` 注释标记跨模块 sentinel 共享的合理性 | 2026-07-09 修复 |
+| R-191 | **`test_eviction_order` 修复 + 新增覆盖率**：写入 2005 条（>阈值 2000）实际触发淘汰验证；新增 `TestFetchOrCached`（3 项：LIVE_FETCH / CACHE_ONLY / fetch_fn 返回 None）和 `TestFetchCachedOnly`（2 项：session 命中 / 全 miss） | 2026-07-09 修复 |
 | R-188 | **eastmoney_industry.py 局部熔断器迁移至 DataSourceRegistry**：6 个全局熔断变量 + 2 个辅助函数删除，_make_push2_request 统一使用 registry 的 is_circuit_broken/record_failure/record_success API | 2026-07-09 修复 |
 | R-203 | **`register_default_chains()` 未在生产环境调用（P0）**：`DataSourceRegistry.register_default_chains()` 仅在测试中运行，导致 `get_chain()` 始终返回空，CACHE_ONLY 降级失效。修复：`chain.py` 末尾添加模块导入时自动注册 | 2026-07-09 修复 |
 | M-004 | **tencent_style 隐式自注册 → 显式注册**：`record_failure("tencent_style")` 隐式创建 tier=4 最低优先级注册。修复：`fund_style_analysis.py` 模块级新增 `register_provider("tencent_style", tier=4, timeout=15.0)` | 2026-07-09 修复 |

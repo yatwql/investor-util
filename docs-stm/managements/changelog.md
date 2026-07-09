@@ -87,7 +87,15 @@
 
 - **R-203 `register_default_chains()` 未在生产环境调用（P0）**：`DataSourceRegistry.register_default_chains()` 仅在测试中被调用，导致 `get_chain()` 在生产环境始终返回空列表 `[]`，CACHE_ONLY 降级策略失效。修复：`chain.py` 末尾添加 `get_registry().register_default_chains()` 模块导入时执行。
 
-- **R-188 eastmoney_industry 局部熔断器迁移至 DataSourceRegistry（Step C 补遗）**：`eastmoney_industry.py` 删除 6 个局部熔断全局变量 + `_circuit_breaker_record_failure/reset` 辅助函数，`_make_push2_request` 改用 DataSourceRegistry 的 `is_circuit_broken`/`record_failure`/`record_success` API。测试 `setUp()` 补充 `get_registry().reset()` 确保隔离。新增 `test_timeout_triggers_registry_failure` 验证 3 次连续超时后熔断器正确打开。 的隐式创建行为使熔断配置不可见。修复：`fund_style_analysis.py` 模块级新增 `get_registry().register_provider("tencent_style", tier=4, timeout=15.0)`。
+- **R-188 eastmoney_industry 局部熔断器迁移至 DataSourceRegistry（Step C 补遗）**：`eastmoney_industry.py` 删除 6 个局部熔断全局变量 + `_circuit_breaker_record_failure/reset` 辅助函数，`_make_push2_request` 改用 DataSourceRegistry 的 `is_circuit_broken`/`record_failure`/`record_success` API。测试 `setUp()` 补充 `get_registry().reset()` 确保隔离。新增 `test_timeout_triggers_registry_failure` 验证 3 次连续超时后熔断器正确打开。
+
+- **R-189 `_fetch_cached_only()` → 公开 `fetch_cached_only()`**：`market_value.py` 调用 DataSourceRegistry 私有方法 -> 改为公共方法名；market_value 中调用同步更新。模块边界 clean。
+
+- **R-190 `_TRANSPORT_FAILURE` 哨兵去重**：`chain.py` 删除局部 `_TRANSPORT_FAILURE` 定义（原 81-82 行），改为从 `provider_registry.py` import 共享同一 sentinel，消除重复定义。
+
+- **R-191 test_eviction_order 修复 + fetch_or_cached/fetch_cached_only 测试覆盖**：淘汰测试从 100 条坏数据改为 2005 条真实触发 O(1) 淘汰验证（断言最旧 5 条被移除、最新 5 条保留）。新增 `TestFetchOrCached`（3 项：LIVE_FETCH 调用 fetch_fn / CACHE_ONLY 仅读缓存 / fetch_fn 返回 None 不缓存）和 `TestFetchCachedOnly`（2 项：session 命中 / 全 miss）。
+
+- **Provider Chain 日志增加代码上下文**：`chain.py` `_try_provider_fetch` 和 `_fetch_with_fallback` 的日志输出（尝试/返回空/成功/异常/限速）末尾追加 `[{code}]` 标签，用户可直接看到哪个证券代码的请求在 fallback。
 
 ---
 
