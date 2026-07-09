@@ -21,7 +21,6 @@ logger = setup_logger()
 
 def _process_b_module(
     holdings: list,
-    data: dict,
     process_fn: Callable,
     prog: ProgressReporter,
 ) -> tuple[list[str], dict[str, dict]]:
@@ -86,7 +85,7 @@ def write_b_series_sheets(
         overlap_result = None
         fund_names: dict[str, str] = {}
         try:
-            fund_codes, fund_holdings_map = _process_b_module(holdings, data, compute_overlap, prog)
+            fund_codes, fund_holdings_map = _process_b_module(holdings, compute_overlap, prog)
             if len(fund_codes) < 2:
                 logger.info("持仓重合度矩阵：基金数 < 2（%d），跳过", len(fund_codes))
             elif len(fund_holdings_map) >= 2:
@@ -128,7 +127,7 @@ def write_b_series_sheets(
         prog.info("正在计算持仓集中度...")
         conc_data = None
         try:
-            _, conc_fund_holdings = _process_b_module(holdings, data, compute_conc, prog)
+            _, conc_fund_holdings = _process_b_module(holdings, compute_conc, prog)
             if conc_fund_holdings:
                 conc_data = compute_conc(conc_fund_holdings)
                 if conc_data:
@@ -156,7 +155,7 @@ def write_b_series_sheets(
         prog.info("正在分析基金风格漂移...")
         style_result = None
         try:
-            _, style_fund_holdings = _process_b_module(holdings, data, analyze_style, prog)
+            _, style_fund_holdings = _process_b_module(holdings, analyze_style, prog)
             if style_fund_holdings:
                 style_result = analyze_style(style_fund_holdings)
                 if style_result.get("results"):
