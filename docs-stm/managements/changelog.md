@@ -41,6 +41,10 @@
   - **D-4 dev-verify 新增**：`test_runner.py` 新增 `--mode dev-verify`，组合全部 unit 子模块并行 + 基础场景，约 2min 开发者快速验证
   - **C verify 子阶段（`--phased`）**：`test_runner.py` 新增 `--phased` 分阶段标志，verify 模式支持 Phase A（核心单元 unit_core/providers/fetcher ~30s）+ Phase B（场景 ~5min），前序失败跳过后续，减少合入验证的反馈等待时间
 
+- **R-197 market_value.py 拆分**：`market_value.py` 从 711 行拆分为 `market_value.py`（计算层，~450 行）和 `market_value_sheet.py`（Excel 写入层，~230 行）。桥接导入已在 I-8 中完全移除，外部调用者（`excel_generator.py`）分别导入计算和写入模块。测试文件同步拆分为 `test_market_value.py`（128 项 compute 测试）和 `test_market_value_sheet.py`（31 项 write 测试）。
+
+- **R-198 LLM 模块横向拆分（14 步迭代）**：`generators.py`（750 行）拆分为 `generators.py`（190 行，4 单例函数）+ `generators_orchestrator.py`（~340 行，编排/预检/线程池）+ `generators_news.py`（306 行，新闻 LLM 关联）。`api.py`（337 行，原 702 行）拆出 `api_base.py`（基础常量/重试/截断/失败追踪），移除 24 个基础设施 re-export，`__init__.py` 直链新模块。采用 Add→Re-export→Remove 三阶段过渡策略，mock 路径同步更新原则已验证。clean 增量：-949 行（拆分前 ~1452 行 → 拆分后 ~503 行跨 6 文件）。
+
 ### Docs
 
 - **计划文档 v5 终版**：`r200_verify_mode_optimization.md` 同步迭代更新（已完成，归档至 `docs-stm/archive/test-verify-mode-optimization/`）
@@ -118,6 +122,10 @@
 - **R-203 `register_default_chains()` 未在生产环境调用（P0）**：`chain.py` 末尾添加自动注册
 - **Provider Chain 日志增加代码上下文**：日志输出末尾追加 `[{code}]` 标签
 - **test_runner.py verify 模式描述时间修正**：`"并行~1min"` → `"并行~5min"`
+
+- **R-204 html_renderers.py fund_hold 三函数会话缓存**：`_render_overlap_matrix`/`_render_concentration`/`_render_style_analysis` 通过 `DataSourceRegistry.session_cache`（域名 `"fund_hold"`）消除同报告生成内对 `fetch_fund_holdings` 的重复文件缓存读取，~20 只基金从 3×disk 降为 1×disk
+- **R-205 cache.py `_CACHE_DIR` cwd 依赖消除**：`_CACHE_DIR` 从相对路径 `"data/cache"` 改为 `os.path.join(_PROJECT_ROOT, "data/cache")`，以 `cache.py` 文件位置（`src/python/cache.py`）推导项目根目录绝对路径。消除 cwd 依赖后，`DegradationTracker` 的 `.degradation_state.json` 持久化文件始终写入正确目录，跨会话降级记忆恢复生效。同时 `os.path.abspath(_CACHE_DIR)` 对已绝对路径无影响
+- **R-197/R-198 审计修复（5 项技术债）**：代码复盘发现并修复 5 项低/中优先级代码质量问题。MEDIUM：`market_value_sheet.py` 移除重复的 `_FUND_PREMIUM_PLACEHOLDER` 常量定义（已由 `market_value.py` 提供），更新过期注释。LOW：`market_value.py` + `market_value_sheet.py` 新增 `__all__`，明确公共 API 边界。LOW：`generators_news.py` 移除未使用的 `_is_llm_module_enabled` 导入。LOW：`generators_orchestrator.py` 惰性导入（Phase 1+2 临时措施）改为模块级导入，同步修正 3 处 mock 路径。
 
 ### Docs
 

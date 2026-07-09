@@ -79,12 +79,15 @@ investor-util/
 │       │   │   ├── news_correlator.py    # 新闻关联引擎 — 持仓关键词匹配、关联度排序
 │       │   │   └── news_keywords.py      # 关键词提取 — 从持仓+穿透+行业数据生成关键词全集
 │   │   │
-│   │   ├── llm/                      # LLM 客户端（9 个子模块 + __init__.py 导出公共 API）
-│       │   │   ├── __init__.py           # 公共 API 导出，保持向后兼容
-│       │   │   ├── api.py                # API 调用 — Claude/OpenAI/DeepSeek 统一路由、重试、截断检测
+│   │   ├── llm/                      # LLM 客户端（12 个子模块 + __init__.py 导出公共 API）
+│       │   │   ├── __init__.py           # 公共 API 导出，直链 generators_orchestrator/news
+│       │   │   ├── api.py                # Provider 路由 + Claude/OpenAI 调用 + Extended Thinking
+│       │   │   ├── api_base.py           # API 基础设施 — 常量/重试/截断/内容提取/失败追踪（从 api.py 拆分）
 │       │   │   ├── circuit_breaker.py    # 熔断器 — 端点级熔断，防止级联超时
 │       │   │   ├── fingerprint.py        # 缓存指纹 — LLM 输入指纹计算、TTL 管理
-│       │   │   ├── generators.py         # 生成编排 — 5 个 LLM 模块（1 个可选）的入口函数、批量调度
+│       │   │   ├── generators.py         # 4 个单例生成函数（global_macro/expert_review/health_check/penetration）
+│       │   │   ├── generators_news.py    # 财经新闻 LLM 关联分析（从 generators.py 拆分）
+│       │   │   ├── generators_orchestrator.py  # LLM 批量编排、缓存预检、线程池分发（从 generators.py 拆分）
 │       │   │   ├── markdown.py           # Markdown→HTML 渲染
 │       │   │   ├── pricing.py            # 模型定价 — 各模型 Token 单价加载、费用估算
 │       │   │   ├── prompts.py            # 系统提示词 — 内置 System Prompt 常量 + 构建函数
@@ -97,7 +100,8 @@ investor-util/
 │       │   │   ├── excel_writer.py       # Excel 写入 — openpyxl Workbook 创建、页签容器管理
 │       │   │   ├── styles.py             # Excel 样式 — 颜色/字体/边框/对齐/数字格式定义
 │       │   │   ├── summary.py            # 投资分析汇总页签 — 指数行情、账户汇总、LLM 用量
-│       │   │   ├── market_value.py       # 市值核算明细表页签 — 15 列持仓行情、盈亏计算
+│       │   │   ├── market_value.py       # 市值核算计算引擎 — 行情获取、细节行生成、盈亏计算
+│       │   │   ├── market_value_sheet.py # 市值核算 Excel 写入层 — 行值转换、着色、分组写入
 │       │   │   ├── category.py           # 持仓分类表页签 — 按资产属性+投资分类聚合
 │       │   │   ├── data_status.py        # 数据源状态追踪 — DataStatusItem / STATUS_MESSAGES / DegradationTracker
 │       │   │   ├── penetration.py        # 资产穿透 TOP10 — 基金穿透合并、行业分类、板块映射
@@ -124,11 +128,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2895 tests）
+│   └── test/                             # 测试（按标记分组目录，2972 tests）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2589 项，9 个子分组）
+│       ├── unit/                         # 单元测试（2665 项，9 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── conftest.py               # 单元测试级 pytest fixture/配置
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
@@ -150,13 +154,16 @@ investor-util/
 │       │   │   ├── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
 │   │   │   ├── test_fund_manager.py  # 基金经理师数据获取 — HTML 解析、当页面退回档（14 项）
 │       │   │   └── test_api_edge.py      # HTTP Provider 异常场景 — 超时/DNS/SSL/429/503/JSON 异常（23 项 Y1）
-│       │   ├── llm/                      # LLM 相关测试（375 项）
+│       │   ├── llm/                      # LLM 相关测试（480 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_api.py           # LLM API 调用 — 重试/熔断/回退/截断/Provider 路由（44 项）
-│       │   │   ├── test_api_edge.py         # LLM API 异常场景 — 网络错误/HTTP 错误码/超时
+│       │   │   ├── test_api_base.py      # API 基础设施 — _extract_content / _check_truncation / _supports_extended_thinking（~60 项）
+│       │   │   ├── test_api_base_edge.py # API 基础设施异常 — _check_circuit_breaker / _process_success_response / _call_llm_with_retry 异常（13 项，@pytest.mark.edge）
+│       │   │   ├── test_api_edge.py      # LLM API 异常场景 — 网络错误/HTTP 错误码/超时
 │       │   │   ├── test_circuit_breaker_recovery.py  # 熔断器恢复 — 冷却/半开/重开全生命周期（15 项）
 │       │   │   ├── test_circuit_breaker_edge.py    # 熔断器异常场景 — 并发熔断/恢复竞争
 │       │   │   ├── test_fingerprint.py   # 缓存指纹 — _extract_stable_holdings / _build_llm_fingerprint（16 项）
+│       │   │   ├── test_generators.py    # 生成编排 — _apply_llm_news_correlation / _precheck_one_cache / 四函数签名校验（21 项）
 │       │   │   ├── test_llm.py           # LLM 客户端 — _markdown_to_html / generate_all_llm / prompt 构建（50 项）
 │       │   │   ├── test_llm_content.py   # LLM 内容 Excel 写入 — _strip_html / _write_content_sheet / section_order（18 项）
 │       │   │   ├── test_llm_placeholder.py # LLM 占位文本 — 未配置/已禁用/API 失败三种状态（3 项）
@@ -188,6 +195,7 @@ investor-util/
 │       │   │   ├── test_excel_generator.py # Excel 报告编排 — 懒导入/异常隔离/计时（15 项）
 │       │   │   ├── test_summary.py       # 投资分析汇总页签 — 指数行情/账户汇总/LLM 用量（85 项）
 │       │   │   ├── test_market_value.py  # 市值核算明细表 — 15 列持仓盈亏计算（59 项）
+│       │   │   ├── test_market_value_sheet.py # 市值核算 Excel 写入层 — 行值转换/着色/分组（31 项）
 │       │   │   ├── test_penetration.py   # 资产穿透 TOP10 — 基金合并/行业分类（12 项）
 │       │   │   ├── test_penetration_edge.py # 穿透异常场景 — 占比归一化/零总市值/单资产（12 项）
 │       │   │   ├── test_fund_concentration.py # 持仓集中度监控测试（15 项 B4）
@@ -338,7 +346,11 @@ investor-util/
 │   │   │   └── validate_coverage_map.py              # ✅ 已归档 — 覆盖率映射验证脚本
 │   │   ├── refactor-html_writer/                     # 📁 html_writer.py 分拆设计归档
 │   │   │   └── r178_html_writer_split.md             # ✅ 已实现 — R-178：html_writer.py 5 步分拆计划（含 C14 约束引入）
-│   ├── plan/                         # 计划与设计文件（当前空，待填入新迭代计划）
+│   │   ├── refactor-market_value_split_design/       # 📁 market_value.py 分拆设计归档
+│   │   │   └── r197_market_value_split.md            # ✅ 已实现 — R-197：market_value.py 拆分为计算层+写入层
+│   │   └── refactor-llm_split_design/                # 📁 LLM 模块分拆设计归档
+│   │       └── r198_llm_split_design.md              # ✅ 已实现 — R-198：LLM 模块横向拆分
+│   ├── plan/                         # 计划与设计文件（当前空，已全部归档至 archive/）
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
@@ -369,4 +381,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，`technical.md` 中的目录树和测试文件数可能滞后。请以本文档为准。
 >
-> 最后更新：2026-07-09（v0.3.4 — 目录树新增 check-version-consistency.py）
+> 最后更新：2026-07-10（v0.3.5 — LLM 模块横向拆分/市值核算分拆设计归档）

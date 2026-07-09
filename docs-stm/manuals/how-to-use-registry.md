@@ -58,7 +58,7 @@ class DataModuleDef:
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
 | **补充数据（refresh）** | 盈利预测、资金流向、分红 | `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
-| **基金深度分析（refresh）** | 基金经理、持仓重合度 | `fund_manager`, `fund_overlap` | 24h~7d | B 迭代模块，主动刷新触发 |
+| **基金深度分析（refresh）** | 基金经理、持仓重合度 | `fund_manager`, `fund_overlap` | 24h~7d | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
 | **精确键名** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | 固定键名，非前缀匹配 |
 
@@ -136,7 +136,7 @@ from src.python.registry import (
 
 > LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 10 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 12~15 号），在新闻数据就绪时写入。第 16 号的 LLM API 用量页签为程序生成，不依赖 registry。
 >
-> 上表序号为**默认值**，用户可通过 `config.json` 的 `report_section_order` 字段自定义各模块序号和排列顺序。C 迭代后 `_create_sheets()` 按配置顺序创建页签，Excel 物理排序与显示顺序一致（不再有旧版 1-7→13-16→8-11→12 的错位问题）。
+> 上表序号为**默认值**，用户可通过 `config.json` 的 `report_section_order` 字段自定义各模块序号和排列顺序。配置式序号后 `_create_sheets()` 按配置顺序创建页签，Excel 物理排序与显示顺序一致（不再有旧版 1-7→13-16→8-11→12 的错位问题）。
 
 ---
 
@@ -149,7 +149,7 @@ registry 的派生产出被以下模块消费：
 | `src/python/config/_core.py` | `get_cache_ttl_defaults()`, `get_known_llm_settings_keys()` | 配置校验 + TTL 兜底 |
 | `src/python/config/_defaults.py` | `get_cache_ttl_defaults()` | 默认配置模板生成 |
 | `src/python/cache.py` | `get_prefix_type_map()`, `get_exact_type_map()`, `get_cache_ttl_defaults()`, `get_registry()` | 缓存清理 |
-| `src/python/llm/generators.py` | `get_llm_module_names()`, `_MN()` | 模块标签路由、日志 |
+| `src/python/llm/generators_orchestrator.py` | `get_llm_module_name()` | 模块失败标签、调度日志 |
 | `src/python/llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架模块消息映射 |
 | `src/python/main.py` | `get_llm_module_names()` | 菜单显示 |
 | `src/python/tui_menu.py` | `get_llm_module_names()` | LLM 配置状态展示 |
@@ -160,13 +160,15 @@ registry 的派生产出被以下模块消费：
 | `src/python/report/excel_generator.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 错误提示、`_Timer`/`_call_sheet` 标签 |
 | `src/python/report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入、日志 |
 | `src/python/report/summary.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/market_value.py` | `get_report_sheet_name()` | 页签标题 |
+| `src/python/report/market_value_sheet.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/category.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/penetration_sheet.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 穿透 sheet 写入 |
 | `src/python/report/fund_performance.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/early_warning.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/fund_manager_sheet.py` | `get_report_sheet_name()` | 页签标题 |
 | `src/python/report/fund_style_sheet.py` | `get_report_sheet_name()` | 页签标题 |
+| `src/python/report/fund_overlap_sheet.py` | `get_report_sheet_name()` | 页签标题 |
+| `src/python/report/fund_concentration_sheet.py` | `get_report_sheet_name()` | 页签标题 |
 
 ---
 
@@ -204,9 +206,10 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 添加后还需在以下位置补充配套代码：
 
 1. **`llm_settings.json`** — 新增同名配置键组，键名为 `{model|temperature|...}_{my_analysis}`，共 9~10 个键（`news_correlation` 不含 `output_brief`）
-2. **`llm/generators.py`** — 添加 LLM 调用函数，调用 `_call_llm("my_analysis", context)` 并处理返回
-3. **`report/llm_content.py`** — 在 `write_llm_sheets()` 中注册新页签，调用 generators 中的新函数写入对应单元格
-4. **`llm/__init__.py`** — 将新生成函数加入 `__all__` 供外部导入
+2. **`llm/generators.py`** — 添加 LLM 调用函数，如 `generate_new_module()`
+3. **`llm/generators_orchestrator.py`** — 在 `PRECHECK_TASKS` 和 `DISPATCH_TASKS` 中注册新模块的预检和调度条目
+4. **`report/llm_content.py`** — 在 `write_llm_sheets()` 中注册新页签，调用 generators 中的新函数写入对应单元格
+5. **`llm/__init__.py`** — 将新生成函数加入 `__all__` 供外部导入
 
 #### 新增 LLM 模块检查清单
 
@@ -214,11 +217,12 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 |---|------|---------|------|
 | ① | **注册模块定义** | `registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
 | ② | **配置 JSON 键组** | `llm_settings.json` | 新增 9~10 个 `{key}_{suffix}` 配置键 |
-| ③ | **实现生成函数** | `llm/generators.py` | 新增异步生成函数，通过 `_call_llm()` 调用 LLM |
-| ④ | **添加报告页签** | `report/llm_content.py` | 在 `write_llm_sheets()` 中注册新 sheet 并写入结果 |
-| ⑤ | **暴露导出接口** | `llm/__init__.py` | 将新生成函数加入 `__all__` |
-| ⑥ | **运行注册表测试** | 终端 | `pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
-| ⑦ | **验证标记合规** | 终端 | `python scripts/check-test-markers.py` — 确认测试文件标记无遗漏 |
+| ③ | **实现生成函数** | `llm/generators.py` | 新增生成函数，通过 `_call_llm()` 调用 LLM |
+| ④ | **注册调度入口** | `llm/generators_orchestrator.py` | 在 `PRECHECK_TASKS` 和 `DISPATCH_TASKS` 中添加新模块条目 |
+| ⑤ | **添加报告页签** | `report/llm_content.py` | 在 `write_llm_sheets()` 中注册新 sheet 并写入结果 |
+| ⑥ | **暴露导出接口** | `llm/__init__.py` | 将新生成函数加入 `__all__` |
+| ⑦ | **运行注册表测试** | 终端 | `pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
+| ⑧ | **验证标记合规** | 终端 | `python scripts/check-test-markers.py` — 确认测试文件标记无遗漏 |
 
 ### 精确键名缓存（无前缀匹配）
 

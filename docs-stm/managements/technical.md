@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-09（v0.3.4 — 测试隔离 + 文档归档清理）
+最后更新：2026-07-10
 
 ---
 
@@ -26,7 +26,7 @@
 | TUI 入口 | 主循环、流程编排 | `src/python/main.py` |
 | 菜单交互 | 菜单定义、渲染、导航 | `src/python/tui_menu.py` |
 | 菜单通用辅助 | 退出/按任意键继续/LLM用量输出 | `src/python/tui_handlers.py` |
-| 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config/`（v0.3.1 拆为子包） |
+| 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config/`（拆为子包） |
 | 中央注册表 | 数据模块的 name/缓存前缀/TTL/分组/LLM Settings 键名统一注册与查询 | `src/python/registry.py` |
 | 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache.py` |
 | 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher/` |
@@ -52,7 +52,7 @@ investor-util/
 │   │   ├── handlers_config.py    # TUI 配置管理命令
 │   │   ├── handlers_report.py    # TUI 报告生成命令
 │   │   ├── http_client.py        # HTTP 客户端工厂
-│   │   ├── llm/                  # LLM 集成（9 子模块）
+│   │   ├── llm/                  # LLM 集成（12 子模块）
 │   │   ├── logger.py             # 日志模块
 │   │   ├── main.py               # TUI 入口 + 菜单循环
 │   │   ├── market_hours.py       # A 股交易时段判断
@@ -113,9 +113,6 @@ investor-util/
 | `is_money_fund_by_name(name)` | 名称 | 货币基金识别 |
 | `is_fund_holding(name, code, account)` | 复合 | 持仓是否需要基金业绩分析 |
 
-### 迁移状态
-
-v0.2.88 已完成全量迁移，所有 `code.startswith()` 和名称关键词判定已收敛到 code_utils。
 
 ---
 
@@ -277,9 +274,9 @@ Provider Chain 注册表（provider_registry.py:DataSourceRegistry）
 - 全链路失败 → 尝试过期缓存降级 → 仍失败则抛异常由调用方处理
 - **价格缓存收市后新鲜度验证**（`fetcher/price.py:_price_cache_fresh`）：盘后首次请求时校验缓存 `price_date` 是否为当前交易日。若盘中因 Tencent 名称校验降级写入 EastMoney 净值（上一交易日价格），收市后自动清除该残留缓存并强制重走 Provider Chain，确保收盘价更新。
 
-### Provider Chain 三层熔断架构（v0.3.2+ 重构为 DataSourceRegistry）
+### Provider Chain 三层熔断架构
 
-自 v0.3.2 起，Provider Chain 熔断从 `chain.py` 的 4 个全局变量重构为 **DataSourceRegistry 单例**（`src/python/provider_registry.py`），统一管理熔断状态、会话缓存和获取策略：
+Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_registry.py`）统一管理熔断状态、会话缓存和获取策略：
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -321,7 +318,7 @@ Provider Chain 注册表（provider_registry.py:DataSourceRegistry）
 | 维度 | Provider Chain 熔断 | push2 行业/概念熔断 | LLM Circuit Breaker |
 |:-----|:-------------------|:--------------------|:--------------------|
 | 作用域 | 数据 provider（price/industry 等） | push2 行业分类/概念板块 API | LLM API endpoint |
-| 实现位置 | `provider_registry.py` DataSourceRegistry | `provider_registry.py` DataSourceRegistry（已迁移，见 R-188） | `llm/circuit_breaker.py` |
+| 实现位置 | `provider_registry.py` DataSourceRegistry | `provider_registry.py` DataSourceRegistry | `llm/circuit_breaker.py` |
 | 冷却时长 | 300s | 300s | 60s |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
 | 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 |
@@ -358,7 +355,7 @@ handlers_report.py（菜单触发）
    │     └─ report_prepare() 收集所有数据 → info 字典
    │
    ├─ Excel 管线
-   │     excel_generator.py → summary.py / market_value.py / category.py /
+   │     excel_generator.py → summary.py / market_value.py + market_value_sheet.py / category.py /
    │     penetration.py / penetration_sheet.py / fund_performance.py /
    │     news_correlation.py / early_warning.py / llm_content.py /
    │     fund_manager_sheet.py / fund_overlap_sheet.py /
@@ -375,7 +372,7 @@ handlers_report.py（菜单触发）
 - **条件渲染**：B 系列基金分析模块（`enable_b_series` 标志）、智能预警页签（菜单 B/L）、LLM 分析章节（菜单 L）在 `info` 中无对应数据时自动跳过
 - **汇总页（页签 1）** 由 `summary.py` 的 `write_summary_sheet()` 独立写入，采用与其他页签写入器相同的直接调用模式。区别仅在于该函数与 `write_llm_usage_sheet()` 同属于 `summary.py`，且命名上不遵循 `_write_*_sheet` 模式
 
-### 数据降级治理（D 迭代）
+### 数据降级治理
 
 `src/python/report/data_status.py` 提供数据状态追踪基础设施，被 Excel 和 HTML 两端共享：
 
@@ -460,9 +457,9 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 - **独立快照**：`fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
 ---
-### C 迭代：报告序号可配置（v0.2.86+）
+### 报告序号可配置
 
-C 迭代将报告 16 个模块的序号/显示名称从硬编码改为由 `registry.py` 的统一注册表驱动，支持用户通过 `config.json` 自定义序号和排列顺序。
+报告 16 个模块的序号/显示名称由 `registry.py` 注册表驱动，支持用户通过 `config.json` 自定义序号和排列顺序。
 
 #### 设计目标
 
@@ -538,7 +535,6 @@ raw_data_flags = {
 
 **不写入 `_ENV.globals` 作为渲染期通信渠道**（参见约束 C14）。
 
-> 历史：C 迭代原始实现将预计算的 `section_visible_dict` 写入 `_ENV.globals["section_visible_dict"]` 供 `_jinja_section_visible` 读取。该设计违反 C14，已于 R-178 修复为 context 变量传递。
 
 #### HTML 模板重构
 
@@ -557,26 +553,17 @@ raw_data_flags = {
 
 **条件渲染：** 所有模块的最外层可见性条件从分散的 `{% if manager_analysis and ... %}`、`{% if llm_enabled %}` 等形式统一为 `{% if section_visible("fund_manager") %}` 等。
 
-#### 状态迁移
-
-C 迭代共涉及 4 个阶段（Phase），其中 C-P1a（注册表+配置校验）和 C-P2（HTML 全链路）已完成：
-
-| Phase | 范围 | 状态 |
-|:------|:-----|:----:|
-| C-P1a | `registry.py`：注册表 + `get_report_section_order()` / `set_sheet_title()` / `get_report_section_keys()` + 配置校验 + 测试 | ✅ 完成 |
-| C-P1b | `excel_generator.py`：`_create_sheets()` + `set_sheet_title()` 接收 `section_order` 参数 + 11 写入器移除冗余调用；`llm_content.py`：`_get_module_key_map()` 动态构建（移除模块级缓存）；`handlers_report.py`：4 条命令函数传递 `section_order` → Excel 页签标题跟随配置 | ✅ 完成（v0.2.86） |
-| C-P2 | HTML 全链路：`html_writer.py` + `report_template.html` 重构 + `_jinja_section_visible()` + section_visible_dict + CSS order | ✅ 完成 |
-| C-P3 | 文档更新：requirements / technical / how-to-config / config.json / datasource-and-folders / test-coverage / faq | ✅ 已完成 |
-
 ## LLM 客户端技术要点
 
-`src/python/llm/` 包拆分架构（原 `llm_client.py` 解耦为 9 子模块，含 skeleton.py 共享骨架）：
+`src/python/llm/` 包拆分架构（原 `llm_client.py` 解耦为 12 子模块，含 skeleton.py 共享骨架）：
 
 | 模块 | 职责 |
 |------|------|
 | `api.py` | API 调用路由 (Claude/OpenAI)、重试、截断检测、熔断器集成 |
+| `api_base.py` | 共享 API 骨架（`_attempt_api_call`、`_extract_content`、`_process_success_response`、Token 日志） |
 | `prompts.py` | System Prompt 常量与构建函数 |
-| `generators.py` | LLM 生成编排（4+1 模块，线程池并行，并发数由 `llm_max_concurrency` 配置） |
+| `generators_orchestrator.py` | LLM 生成编排（4+1 模块，线程池并行，并发数由 `llm_max_concurrency` 配置） |
+| `generators_news.py` | 新闻关联分析的 LLM 调用逻辑（关键词提取、召回、LLM 二次分析） |
 | `pricing.py` | 模型定价加载、费用估算 |
 | `session.py` | 会话用量累计、追踪 |
 | `circuit_breaker.py` | 端点熔断器 |
@@ -592,7 +579,7 @@ C 迭代共涉及 4 个阶段（Phase），其中 C-P1a（注册表+配置校验
 - **`generate_global_macro()` / `generate_expert_review()`** 仅保留 prompt 构建 + 配置解析，其余委托 `_generate_llm_module()`（`skeleton.py`）
 - **注册表键名派生**（`registry.py`）：每个 LLM 模块的 `settings_suffix` 自动派生出 9 个 `llm_settings.json` 合法键名：`model_`、`temperature_`、`timeout_`、`cache_enabled_`、`max_tokens_`、`system_prompt_`、`thinking_enabled_`、`thinking_budget_`、`reasoning_effort_`。`news_correlation` 外的模块额外增加 `output_brief_`。所有键名由注册表统一校验，新增模块只需在注册表添加一行。
 
-### Extended Thinking（v0.2.22+）
+### Extended Thinking
 
 `_call_claude()` 通过 `llm_config` 参数读取 `thinking_enabled_{模块}` 配置，为 Claude API 注入 `thinking` payload 以实现深度推理。
 
@@ -633,11 +620,11 @@ payload["output_config"] = {"effort": "high"}   # "low" / "medium" / "high" / "m
 
 `llm/circuit_breaker.py` 实现端点级熔断：连续 3 次失败后熔断 60 秒，半开状态允许 1 次探测。通过 `_cb_is_open()` / `_cb_record_failure()` / `_cb_record_success()` 暴露接口，`_call_llm_with_retry()` 在每次请求前检查熔断状态。
 
-### 输出截断自动重试（v0.2.29+）
+### 输出截断自动重试
 
 `_generate_llm_content()`（`skeleton.py`）在收到 LLM 响应后检测输出中是否含 `_TRUNCATION_MARKER`（`【⚠ 输出已被截断`）。若存在，说明输出达到 `max_tokens` 上限被截断不完整，自动以 `max_tokens × 1.5`（`_AUTO_INCREASE_FACTOR`）重试一次，并输出进度提示。二次截断则保留第一次结果并在末尾追加截断警告。
 
-### 内容过滤安抚重试（v0.2.29+）
+### 内容过滤安抚重试
 
 `_call_llm_with_retry()`（`api.py`）在 `_process_success_response()` 返回空内容（`result == ""`，可能被 API 内容过滤机制拦截）时，追加 `_CONTENT_FILTER_RECOVERY` 安抚指令到 system prompt 尾部并重试一次：
 
@@ -676,8 +663,8 @@ _session_usage: dict[str, Any] = {
 |:------|:---------|:-----|
 | `global_macro` | 全球政经局势 | 始终启用 |
 | `expert_review` | 智囊团深度复盘 | 始终启用 |
-| `health_check` | 持仓体检报告 | v0.2.29+ |
-| `penetration_deep` | 穿透深度分析 | v0.2.30+ |
+| `health_check` | 持仓体检报告 | — |
+| `penetration_deep` | 穿透深度分析 | — |
 | `news_correlation` | 新闻 LLM 关联分析 | 仅 `enabled_llm.news_correlation = true` 时启用 |
 
 每个模块条目包含：
@@ -717,10 +704,10 @@ API 调用响应 (usage dict)
     │             └─ per_module[key] ← {model, tokens, cached=True, ...}
     │                                           (调用次数不计入 call_count)
     │
-    ├─► _precheck_one_cache()                 [generators.py]
+    ├─► _precheck_one_cache()                 [generators_orchestrator.py]
     │       └─► _record_per_module()           [session.py]
     │
-    └─► _finalize_news_token_usage()          [generators.py]
+    └─► _finalize_news_token_usage()          [generators_news.py]
             └─► _record_per_module(key="news_correlation")
 ```
 
@@ -728,7 +715,7 @@ API 调用响应 (usage dict)
 - 每次 **成功的 API 调用**（包括重试后的成功响应）均触发 `_track_session_usage()` 和 `_record_per_module()`
 - **缓存命中**（从缓存文件读取 LLM 结果而非调用 API）仅触发 `_record_per_module()`，标记 `cached=True`，不计入 `call_count`
 - **模块失败/禁用**（API Key 未配置、熔断器打开、`enabled_llm.{key}=false`）不产生任何用量数据
-- **新闻 LLM 关联分析**（`news_correlation`）由 `generators.py` 中 `_finalize_news_token_usage()` 单独汇总，以兼容其在新闻处理流程中的独立缓存和批处理逻辑
+- **新闻 LLM 关联分析**（`news_correlation`）由 `generators_news.py` 中 `_finalize_news_token_usage()` 单独汇总，以兼容其在新闻处理流程中的独立缓存和批处理逻辑
 
 #### 用量数据到报告输出
 
@@ -835,7 +822,7 @@ LLM API 用量页签/章节（页签 16 / HTML 底部）**不是独立的 LLM �
 
 默认定价表见 `src/python/constants.py:MODEL_PRICING`，用户可通过 `llm_settings.json` 的 `pricing` 字段覆盖。货币符号通过 `pricing.currency` 配置（默认 `CNY → ¥`）。
 
-#### 系统数据缓存统计（v0.2.85+）
+#### 系统数据缓存统计
 
 LLM 用量页签/章节底部追加"▎数据缓存系统"区域，展示 `cache.py` 统一管理的进程级缓存命中/未命中/总请求数/命中率。统计范围包括价格、指数、基金净值、基金持仓、基金经理等所有缓存类型。
 
@@ -935,7 +922,8 @@ report/excel_generator.py (Excel 编排)
     → report/data_status.py (STATUS_MESSAGES / DataStatusItem)
     → tmpl/report_template.html (Jinja2 模板 + render_data_status 宏)
 
-llm/generators.py (LLM 编排)
+llm/generators_orchestrator.py (LLM 编排)
+  → llm/generators.py (4 单例生成函数)
   → llm/skeleton.py (共享生成骨架)
     → llm/api.py (API 调用+重试+截断+熔断)
     → llm/prompts.py (System Prompt + User Prompt 构建)
@@ -962,11 +950,11 @@ handlers_*.py → 各模块入口函数编排
 | C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用 `DataSourceRegistry.session_cache` 缓存结果，避免重复 HTTP 调用（参考 `provider_registry.py`） | 性能退化、API 限频 | 数据降级重构 |
 | C5 | **HTTP 客户端统一** | 所有 HTTP 请求必须使用 `http_client.py` 的 `make_http_client()` / `make_async_http_client()` 工厂方法，不得直接实例化 `httpx.Client()` / `httpx.AsyncClient()` | SSL 配置不一致、连接池泄漏 | `http_client.py` |
 | C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()` / `batch_fetch_with_fallback()`，不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
-| C7 | **报告序号不可硬编码** | 报告 16 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [C 迭代：报告序号可配置](#c-迭代报告序号可配置-v0286) |
+| C7 | **报告序号不可硬编码** | 报告 16 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [报告序号可配置](#报告序号可配置) |
 | C8 | **日志统一** | 所有模块必须使用 `logger = logging.getLogger("invest")`，不得创建独立的 logger 实例 | 日志碎片化、归档/轮转失效 | `logger.py` |
 | C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须**在 `llm/skeleton.py` 中注册生成器函数和配置字段，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
 | C10 | **新闻召回策略** | `per_source`（每源原始获取量）与 `top_n`（最终输出量）解耦：各源原始获取量 = `max(500, news_top_count × 2)`，不可写死为固定值。华尔街见闻 API 硬上限 100 条除外 | 配置 `news_top_count` 不生效 | [财经新闻热点与持仓关联分析](#财经新闻热点与持仓关联分析) |
 | C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker（通过 `pytestmark` 模块级变量），新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure`。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动检查标记遗漏并发出 `PytestWarning` | CI 门禁不通过 | `src/test/conftest.py` |
 | C12 | **边缘测试文件隔离** | `@pytest.mark.edge` 测试**必须**放在 `*_edge.py` 文件中，不得与普通测试混搭。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动校验 | 测试收集失败 | `src/test/conftest.py`、`docs-stm/managements/testplan.md §1.8` |
 | C13 | **测试敏感路径隔离** | 运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`conftest.py` 的 `_isolate_sensitive_paths` autouse fixture 自动将 `config.json` 和缓存目录重定向到临时目录 | 用户数据被污染 | `src/test/conftest.py` |
-| C14 | **渲染期数据不可写入模块级全局变量** | 任何渲染期数据（section_visible_dict 等）必须通过模板 render context 或函数参数传递，**不得**写入 `_ENV.globals`、模块级 dict 等作为跨函数通信渠道。单次会话中不变的数据（如 _ENV 过滤器注册）不受此限 | 并发不安全、状态污染、跨请求泄漏 | R-178 |
+| C14 | **渲染期数据不可写入模块级全局变量** | 任何渲染期数据（section_visible_dict 等）必须通过模板 render context 或函数参数传递，**不得**写入 `_ENV.globals`、模块级 dict 等作为跨函数通信渠道。单次会话中不变的数据（如 _ENV 过滤器注册）不受此限 | 并发不安全、状态污染、跨请求泄漏 | HTML 渲染架构 |

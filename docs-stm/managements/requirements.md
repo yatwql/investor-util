@@ -721,7 +721,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 |:-------|:---------|
 | **并发策略** | ThreadPoolExecutor：新闻 5 源并发获取、LLM 4+1 模块（4 个 LLM 分析模块 + 可选的新闻关联分析）并发生成（并行数由 `llm_max_concurrency` 配置，默认 3）、取价批量异步 |
 | **基金风格加速** | DataSourceRegistry session_cache（domain="extended"）跨基金复用；Tencent 二级降级基于 registry 熔断器；push2 超时 5s、重试 1 次、熔断阈值 3 |
-| **HTTP 连接池** | LLM 客户端专用 HTTP/2 多路复用 + 连接池上限 20 / 空闲保持 10（`llm/generators.py` `_LLM_CLIENT_SETTINGS`），通用 HTTP 客户端仅 SSL 配置 |
+| **HTTP 连接池** | LLM 客户端专用 HTTP/2 多路复用 + 连接池上限 20 / 空闲保持 10（`llm/generators_orchestrator.py` `_LLM_CLIENT_SETTINGS`），通用 HTTP 客户端仅 SSL 配置 |
 | **缓存原子写入** | `tempfile.mkstemp` + `os.replace` 模式，防断电半写导致文件截断 |
 | **配置原子写入** | 同上，防 config.json 截断导致下次启动丢失全部自定义配置 |
 | **大文件优化** | 缓存超过 100KB 自动 gzip 压缩（`.json.gz`），节省 80-90% 磁盘 |
