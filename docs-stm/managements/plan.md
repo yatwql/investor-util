@@ -28,7 +28,9 @@
 | R-175 | colorama 降级为可选依赖 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
 | R-176 | docstring 误放修复 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
 
-> ✅ **D-10 数据降级重构（Step A~E）已完成**：`DataSourceRegistry` 单例集中管理熔断器/会话缓存/获取策略选择，`chain.py` 全局变量迁移，`_ext_memo` 模块级缓存迁移，R-203/M-004 提交前已修复。剩余待修复问题（R-188~R-191）见 `review-findings.md`。
+> ✅ **D-10 数据降级重构（Step A~E）已完成**：`DataSourceRegistry` 单例集中管理熔断器/会话缓存/获取策略选择，`chain.py` 全局变量迁移，`_ext_memo` 模块级缓存迁移，R-203/M-004 提交前已修复。
+> ✅ **R-188~R-191 已随 v0.3.3 修复**：3 项存量测试断言对齐 + eastmoney_industry 局部熔断器迁移。
+> ✅ **R-211 测试隔离补完已修复**：测试输出目录/日志文件/xdist worker 全链路隔离。
 
 ---
 
