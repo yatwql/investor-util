@@ -96,8 +96,15 @@ investor-util/
 │   │   │
 │   │   ├── report/                   # 报告生成（Excel + HTML）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
-│       │   │   ├── excel_generator.py    # Excel 报告编排 — 调用各页签写入函数、计时、异常隔离
+│       │   │   ├── excel_generator.py    # Excel 报告编排器（12 函数→6 模块拆分后核心编排：~100 行）
 │       │   │   ├── excel_writer.py       # Excel 写入 — openpyxl Workbook 创建、页签容器管理
+│       │   │   ├── excel_module_loader.py # 报告模块加载器 — import + ImportError 降级（从 excel_generator.py 拆分）
+│       │   │   ├── excel_sheet_factory.py # Sheet 工厂 — 页签创建+类型驱动可见性（从 excel_generator.py 拆分）
+│       │   │   ├── excel_market_data.py   # 行情市值+指数数据解析（从 excel_generator.py 拆分）
+│       │   │   ├── excel_content_sheets.py # 核心内容页签写入（汇总/分类/穿透/基金业绩，从 excel_generator.py 拆分）
+│       │   │   ├── excel_news_warning.py  # 新闻+智能预警页签写入（从 excel_generator.py 拆分）
+│       │   │   ├── excel_b_series.py      # B 系列页签写入（基金经理/重合度/集中度/风格，从 excel_generator.py 拆分）
+│       │   │   ├── excel_llm_usage.py     # LLM 分析章节+API 用量页签（从 excel_generator.py 拆分）
 │       │   │   ├── styles.py             # Excel 样式 — 颜色/字体/边框/对齐/数字格式定义
 │       │   │   ├── summary.py            # 投资分析汇总页签 — 指数行情、账户汇总、LLM 用量
 │       │   │   ├── market_value.py       # 市值核算计算引擎 — 行情获取、细节行生成、盈亏计算

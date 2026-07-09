@@ -33,7 +33,7 @@
 | R-187 | **TUI Windows 平台 12 个测试跳过**：`termios`/`tty` 为 Linux 特有模块，Windows 上 `_get_key_linux()` 已加 try/except 保护 | `tui.py` + `test_tui_edge.py` | 功能降级但无错误，可考虑 CI 加 Windows runner |
 | R-199 | **akshare 依赖老化风险**：`requirements.txt` 未锁定 akshare 版本，pytest 收集期已有 `FutureWarning`（DataFrame concat 行为变更），大版本升级可能引入兼容问题 | `requirements.txt` | 建议锁定 `akshare>=1.16,<2.0` 或类似区间 |
 | R-201 | **HTML 打印预览缺少浏览器渲染集成测试**：当前仅 9 项 UT 覆盖 CSS `@media print` 规则，无 Playwright 快照对比确保打印输出视觉正确 | `test_html_template.py` | Playwright 快照测试，但跨系统工具优先级低 |
-| R-206 | **excel_generator.py 文件过大（534 行）**：R-197 market_value 拆分后成为 `src/python/` 最大源文件。12 个函数含多职责，按计划（I-02~I-08）逐步拆出模块加载器/Sheet 工厂/行情数据处理/内容页签/新闻预警/B 系列/LLM 章节 | `report/excel_generator.py` | I-02（模块加载器）✅、I-03（Sheet 工厂）✅、后续 I-04~I-08 进行中 |
+| R-206 | **excel_generator.py 拆分完成（692→98 行）**：按计划拆分出 7 个专业模块（module_loader/sheet_factory/market_data/content_sheets/news_warning/b_series/llm_usage）。_process_b_module 消除 3 份重复模板代码 | `report/excel_generator.py` | I-02~I-08 ✅，692→98 行（-86%） |
 | R-207 | **summary.py 文件过大（617 行）**：20+ 个 `_write_*` 辅助函数混合同一文件，LLM 用量表格部分（`write_llm_usage_sheet`/`_write_llm_summary_section`/`_init_llm_usage_sheet`）已可独立成模块 | `report/summary.py` | 可参照 R-197 模式拆出 summary_llm_usage.py；但 LLM 用量属于变异较快的功能，拆分后仍需考虑后续兼容 |
 
 ### 🟢 低优先级

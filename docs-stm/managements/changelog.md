@@ -15,6 +15,8 @@
 
 ### Changed
 
+- **R-206 excel_generator.py 拆分（692→98 行，-86%）**：按 7 轮迭代拆出 7 个专业模块（excel_module_loader/sheet_factory/market_data/content_sheets/news_warning/b_series/llm_usage）。excel_generator.py 从 12 函数/692 行精简为核心编排器 5 函数/98 行。`_process_b_module` 消除重合度/集中度/风格 3 模块的重复数据准备模板（~90 行→30 行）。更新 5 个测试文件的 import/mock 路径，零行为变更。全量 989 项报告单元测试通过。新增 `docs-stm/manuals/datasource-and-folders.md` 目录树 7 项记录。
+
 - **technical.md 迭代历史痕迹清理**：移除 16 处 A 类（纯迭代记录）和 B 类（版本标记）历史痕迹，恢复为永恒技术设计文档。
 - **how-to-config.md 版本标记清理**：移除 2 处 v0.2.xx 版本标记。
 - **用户文档全局迭代/版本标记清理**：`reports-instruction.md`、`how-to-use-registry.md`、`how-to-config-llm.md` 共 5 处版本后缀/迭代名称（`B 迭代`/`C 迭代后`/`v0.2.15+`/`v0.2.29+`/`v0.2.30+`/`v0.2.85+`）替换或删除，用户文档不再出现具体迭代引用。
