@@ -187,7 +187,7 @@ class TestSanitizeEndpointInLogs(unittest.TestCase):
         with patch("src.python.config.get_llm_key_path", return_value=key_path):
             with patch("src.python.config.get_llm_settings_path",
                        return_value=os.path.join(tmp.name, "llm_settings.json")):
-                with patch("src.python.config.os.path.exists") as mock_exists:
+                with patch("src.python.config._core.os.path.exists") as mock_exists:
                     mock_exists.return_value = True
                     get_llm_config()
 

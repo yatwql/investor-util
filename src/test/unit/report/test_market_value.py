@@ -263,8 +263,10 @@ class TestPriceUpdateStatus(unittest.TestCase):
 
     # ── Tencent（场内）────────────────────────────────────
 
-    def test_tencent_updated(self):
-        """tencent + nav_date == trading_day → 已更新。"""
+    @patch("src.python.report.market_value.is_midday_break", return_value=False)
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_tencent_updated(self, mock_open, mock_midday):
+        """tencent + nav_date == trading_day + 已收市 → 已更新。"""
         d = self._row("tencent", "2026-06-26")
         updated, total, all_ok = mv.price_update_status([d], "2026-06-26")
         self.assertEqual(updated, 1)
@@ -284,6 +286,16 @@ class TestPriceUpdateStatus(unittest.TestCase):
         d = self._row("tencent", "")
         updated, _, _ = mv.price_update_status([d], "2026-06-26")
         self.assertEqual(updated, 0)
+
+    @patch("src.python.report.market_value.is_midday_break", return_value=False)
+    @patch("src.python.report.market_value.is_market_open", return_value=True)
+    def test_tencent_during_market_hours_not_updated(self, mock_open, mock_midday):
+        """tencent + nav_date == trading_day + 交易时段 → 未更新（只有实时价，无收市价）。"""
+        d = self._row("tencent", "2026-06-26")
+        updated, total, all_ok = mv.price_update_status([d], "2026-06-26")
+        self.assertEqual(updated, 0)
+        self.assertEqual(total, 1)
+        self.assertFalse(all_ok)
 
     # ── EastMoney + QDII ────────────────────────────────
 
@@ -334,10 +346,12 @@ class TestPriceUpdateStatus(unittest.TestCase):
 
     # ── 混合场景 ───────────────────────────────────────────
 
-    def test_mixed_status(self):
+    @patch("src.python.report.market_value.is_midday_break", return_value=False)
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_mixed_status(self, mock_open, mock_midday):
         """部分更新 → all_ok 为 False。"""
         details = [
-            self._row("tencent", "2026-06-26"),        # 已更新
+            self._row("tencent", "2026-06-26"),        # 已更新（已收市）
             self._row("tencent", "2026-06-25"),          # 未更新
             self._row("eastmoney", "2026-06-26", name="某基金"),  # 已更新
         ]
@@ -346,7 +360,9 @@ class TestPriceUpdateStatus(unittest.TestCase):
         self.assertEqual(total, 3)
         self.assertFalse(all_ok)
 
-    def test_all_updated(self):
+    @patch("src.python.report.market_value.is_midday_break", return_value=False)
+    @patch("src.python.report.market_value.is_market_open", return_value=False)
+    def test_all_updated(self, mock_open, mock_midday):
         """全部已更新 → all_ok 为 True。"""
         details = [
             self._row("tencent", "2026-06-26"),
@@ -884,9 +900,9 @@ class TestGenerateDetails(unittest.TestCase):
         self.assertEqual(d.price, 0.0)
         self.assertEqual(d.yesterday_close, 0.0)
         self.assertEqual(d.nav_date, "")
-        self.assertEqual(d.source, "--")
+        self.assertEqual(d.source, "无数据")
         self.assertEqual(d.source_api, "")
-        self.assertEqual(d.price_type, "--")
+        self.assertEqual(d.price_type, "暂无行情")
         self.assertEqual(d.today_profit, 0.0)
 
     @patch("src.python.report.market_value.fetch_market_data")

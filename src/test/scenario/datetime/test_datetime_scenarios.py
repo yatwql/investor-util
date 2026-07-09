@@ -1025,6 +1025,10 @@ class TestQdiiDateConsistency(unittest.TestCase):
                   return_value="2026-07-03"),
             patch("src.python.report.market_value.get_prev_trading_day",
                   return_value="2026-07-02"),
+            patch("src.python.report.market_value.is_market_open",
+                  return_value=False),
+            patch("src.python.report.market_value.is_midday_break",
+                  return_value=False),
         ):
             return price_update_status(details, "2026-07-03")
 

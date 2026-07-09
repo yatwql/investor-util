@@ -145,8 +145,9 @@ def price_update_status(details: list[DetailRow], trading_day: str) -> tuple[int
     prev_td = get_prev_trading_day(trading_day)
     for d in details:
         if d.source_api == "tencent":
-            # 场内资产：净值日期等于交易日即视为已更新（收市价）
-            if d.nav_date == trading_day:
+            # 场内资产：需已收市（非交易时段、非午间休市）且净值日期等于交易日
+            # 才视为已更新收市价；盘中/午休只有实时价，不算已更新
+            if not is_market_open() and not is_midday_break() and d.nav_date == trading_day:
                 updated += 1
         elif d.source_api == "eastmoney" and is_qdii_extended(d.name):
             # QDII：净值日期等于交易日(T)或前一个交易日(T-1)即视为已更新

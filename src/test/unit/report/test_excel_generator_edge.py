@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -85,12 +87,16 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
 
         self._mock_external_apis()
 
+        _tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(_tmp.cleanup)
+
         # 不抛出异常即通过
         generate_excel_report(
             self.holdings,
             details=[],
             include_news=True,
             include_llm=False,
+            output_dir=_tmp.name,
             progress=self.progress,
         )
 
@@ -100,11 +106,15 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
 
         self._mock_external_apis()
 
+        _tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(_tmp.cleanup)
+
         generate_excel_report(
             self.holdings,
             details=[],
             include_news=True,
             include_llm=False,
+            output_dir=_tmp.name,
             progress=self.progress,
         )
 

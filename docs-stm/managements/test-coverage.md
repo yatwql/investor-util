@@ -16,12 +16,12 @@
 | `integration` | 306 | ~50s |
 | `edge` | 318 | ~15s |
 | `data` | 65 | ~10s |
-| `all` | 2895 | ~85s |
+| `all` | 2895 | ~6min |
 | `smoke` | 24 | ~2s |
 | `report` 🆕 | ≈958 | ~15s |
 | `all_no_unit` 🆕 | 306 | ~55s |
 
-> 注：`all` 模式收集总数 2889 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2877 passed / 12 skipped。
+> 注：`all` 模式收集总数 2895 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2883 passed / 12 skipped。
 > 🆕 `report` 模式为 A5 新增，标记 `unit_report`（≈958 项），供报告模块开发期快速验证。
 > 🆕 `all_no_unit` 模式标记 `not unit`（306 项），包含 scenario/integration/edge/data/smoke/report 等非单元测试。
 > 说明：单元密集型模式（`unit`/`standard`/`verify`/`all`/`report`）默认启用 `--parallel medium` 自动并行，"典型耗时"即 medium 并行耗时；场景/边缘/冒烟等轻量模式保持单线程（不并行），避免进程调度开销。
@@ -29,7 +29,7 @@
 > v0.3.1 Provider Chain 熔断架构升级（13 项新增：熔断预检 9 项 + 冷却探针 4 项 edge），全量 2726 项（2714 passed / 12 skipped for Windows）。
 > v0.3.2 核心模块单元测试补全（96 项新增：generators 21 + prompts 44 + handlers_cache 18 + handlers_report 13），全量 2822 项（2810 passed / 12 skipped for Windows）。
 > v0.3.2e 数据降级重构 Step A~E（45 项新增：provider_registry 37 + phase_timeout 8；原 test_config 单元从 standard 迁移至 unit），全量 2895 项。
-> v0.3.3 测试断言同步修复（R-192/R-193：6 项测试对齐实现文案），全量 2895 项。
+> v0.3.3 测试断言同步修复（R-192/R-193：6 项文案对齐 + 3 项存量 mock/路径修复），全量 2895 项。
 
 ### 功能域对应测试源
 
@@ -77,7 +77,7 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 9 个子组合计 | **2583** |
+| `unit`（父标记） | 9 个子组合计 | **2589** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 166 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 186 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 440 |

@@ -84,7 +84,7 @@ class TestWriteLlmSettings:
         settings = {"enabled_llm": {"news_correlation": True}}
         path = "/fake/path/llm_settings.json"
         mock_file = MagicMock()
-        mock_file.__enter__.return_value = MagicMock()
+        mock_file.__enter__.return_value.read.return_value = ""
         mock_open.return_value = mock_file
 
         _write_llm_settings(settings, path)

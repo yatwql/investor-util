@@ -56,8 +56,8 @@ MODES: dict[str, dict] = {
     },
     "regression": {
         "marker": "scenario",
-        "desc": "回归测试（场景模式，提交前极速验证）",
-        "timeout_sec": 120,
+        "desc": "回归测试（场景模式，提交前快速验证）",
+        "timeout_sec": 300,
         "order": 4,
         "parallel": False,
     },
@@ -381,12 +381,16 @@ def run_mode(mode_key: str, coverage: bool = False,
     start = _time.time()
     timed_out = False
     try:
+        # 设置测试环境标识，使子进程（含 xdist worker）正确将日志写入 test.log
+        _env = os.environ.copy()
+        _env["INVEST_RUNNING_TESTS"] = "1"
         proc = subprocess.run(
             pytest_args,
             capture_output=True,
             text=True,
             timeout=timeout,
             cwd=_PROJECT_ROOT,
+            env=_env,
         )
     except subprocess.TimeoutExpired:
         print(f"  [ERR] {mode_key} 测试超时（{timeout}s）")

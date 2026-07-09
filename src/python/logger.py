@@ -6,8 +6,17 @@ import sys
 from logging.handlers import RotatingFileHandler
 
 # 日志文件路径：测试期间写入独立文件，避免与运行时日志混淆
-# 检测方式：检查 sys.argv 中是否包含 pytest 调用（在导入阶段即可可靠判断）
-_is_pytest = any("pytest" in arg.lower() for arg in sys.argv[:3])
+# 检测方式（按可靠性降序）：
+#   1. INVEST_RUNNING_TESTS 环境变量（test_runner.py 显式设置，xdist worker 继承）
+#   2. PYTEST_CURRENT_TEST 环境变量（pytest 自身设置）
+#   3. sys.modules 中已加载 pytest（xdist worker 进程，pytest 先于用户代码导入）
+#   4. sys.argv[:3] 包含 "pytest"（直接 python -m pytest）
+_is_pytest = (
+    os.environ.get("INVEST_RUNNING_TESTS") == "1"
+    or bool(os.environ.get("PYTEST_CURRENT_TEST"))
+    or "pytest" in sys.modules
+    or any("pytest" in arg.lower() for arg in sys.argv[:3])
+)
 _LOG_FILE = "logs/test.log" if _is_pytest else "logs/app.log"
 
 # 日志格式

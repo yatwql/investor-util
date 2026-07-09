@@ -121,11 +121,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2889 tests）
+│   └── test/                             # 测试（按标记分组目录，2895 tests）
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2583 项，9 个子分组）
+│       ├── unit/                         # 单元测试（2589 项，9 个子分组）
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── conftest.py               # 单元测试级 pytest fixture/配置
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
@@ -281,16 +281,17 @@ investor-util/
 ├── test-reports/                      # 测试报告输出（自动生成）
 │   ├── latest/                        # 最新测试报告（按 --mode 生成子目录）
 │       │   ├── index.html                 # 汇总页 — 各模式通过/失败总览 + 最近运行时间
-│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2583 项）
-│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，2141 项）
+│       │   ├── unit/report.html           # 单元测试报告（标记 -m "unit"，2589 项）
+│       │   ├── standard/report.html       # 常规单元报告（标记 -m "unit and not (edge or data)"，2204 项）
 │       │   ├── scenario/report.html       # 场景测试报告（标记 -m "scenario"，277 项）
 │       │   ├── regression/report.html     # 回归测试报告（标记 -m "scenario"，模式别名，277 项）
-│       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，1006 项）
+│       │   ├── verify/report.html         # 合入验证报告（标记 -m "scenario or unit_core or unit_providers or unit_fetcher"，1057 项）
 │       │   ├── integration/report.html    # 集成测试报告（标记 -m "scenario or integration"，306 项）
 │       │   ├── smoke/report.html          # 冒烟测试报告（标记 -m "smoke"，24 项）
 │       │   ├── edge/report.html           # 边缘场景报告（标记 -m "edge"，318 项）
 │       │   ├── data/report.html           # 数据正确性报告（标记 -m "data"，65 项）
-│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2889 项）
+│       │   ├── report/report.html         # 仅报告模块测试（标记 -m "unit_report"，≈958 项）
+│       │   ├── all/report.html            # 全量测试报告（无标记筛选，2895 项）
 │       │   ├── all_no_unit/report.html    # 排除单元测试报告（标记 -m "not unit"，306 项）
 │       │   └── coverage/                  # HTML 行覆盖率报告（--coverage 时生成）
 │   └── archives/                      # 历史报告存档

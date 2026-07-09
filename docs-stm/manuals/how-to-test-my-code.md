@@ -59,12 +59,48 @@ python scripts/test_runner.py --coverage
 # 合入验证 — PR 前检查（~49s）
 python scripts/test_runner.py --mode verify
 
-# 全量测试（~80s，--mode all 为默认值，可省略）
+# 全量测试（~6min，--mode all 为默认值，可省略）
 python scripts/test_runner.py --mode all
 
 # 全量测试（排除单元测试，~30s 快速全场景覆盖）
 python scripts/test_runner.py --mode all_no_unit
 ```
+
+## 🔁 只重跑上次失败的测试（`--lf`）
+
+修复代码后验证时，经常只需要重跑**上一次运行失败的那些用例**，而不必等全量通过。pytest 内置的 `--lf`（`--last-failed`）标志专为此场景设计：
+
+```bash
+# 只重跑上次 pytest 运行中失败的测试（跳过已通过的）
+pytest src/test/ --lf
+
+# 先收集匹配 marker 的用例，再从其中只重跑上次失败的
+pytest src/test/ -m "unit_providers" --lf
+
+# 用 test_runner.py 也可以组合 --lf（但注意 --mode 内部也会传 -m，不会冲突）
+python scripts/test_runner.py --mode all -- --lf
+```
+
+**工作原理**：pytest 在每次运行后，将失败用例记录到 `.pytest_cache/lastfailed` 文件；`--lf` 读取该文件，只收集文件中的用例执行。如果上次运行全部通过，`--lf` 会提示 `no tests ran`（因为没有失败记录）。
+
+**典型工作流**：
+
+```
+# 1. 跑全量 → 发现 N 个失败
+pytest src/test/ -m "edge"
+
+# 2. 修复代码
+
+# 3. 仅重跑失败的 N 个（5 秒而非 5 分钟）
+pytest src/test/ -m "edge" --lf
+
+# 4. 全部通过后，再用无 --lf 的全量确认没有回归
+pytest src/test/ -m "edge"
+```
+
+> ⚠ **注意**：`--lf` 依赖 `--lf` 首次运行生成的 `.pytest_cache/lastfailed` 文件。如果清理了 `.pytest_cache/` 或切换了虚拟环境，`--lf` 不会生效。此时只需先正常跑一次目标模式生成失败记录即可。
+>
+> 另一相关标志 `--ff`（`--failed-first`）会**先跑上次失败、再跑全部**，适合修复后确认修复 + 检查回归一步到位。
 
 ## 测试模式详解
 
@@ -77,8 +113,8 @@ python scripts/test_runner.py --mode all_no_unit
 | 级别 | 定义 | 阻断点 | 对应的流水线阶段 |
 |:-----|:-----|:-------|:----------------|
 | **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `regression`（~30s） |
-| **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~49s） |
-| **P2** | 阻塞发布 | 不得 release | ③ `all`（~80s） |
+| **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~5min） |
+| **P2** | 阻塞发布 | 不得 release | ③ `all`（~6min） |
 | **P3** | 建议修复 | 不阻断 | — |
 
 P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
@@ -90,8 +126,8 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 项目推荐的三道质量门禁，按开发阶段逐级收紧：
 
 - **提交前验证（`--mode regression`）** — 每次代码变更后、commit 前必须执行。覆盖全部 `scenario` 业务场景测试（含 S0a-S0d + S1-S28 + S29-S33 + T1-T21），确保端到端用户路径不被破坏。约 30s 即可完成。是编辑-验证循环中的第一道屏障，核心原则是"够快才能频繁跑，频繁跑才能尽早发现问题"。
-- **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。约 49s，适合作为 PR CI 门禁或合入前的手动检查。
-- **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 80s，适合发布前的快速全量回归。
+- **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。约 5min，适合作为 PR CI 门禁或合入前的手动检查。
+- **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 6min，适合发布前的快速全量回归。
 
 > ⚠ 以上项数为撰写时的快照值，实际计数随版本迭代而变化，精确统计见 [`test-coverage.md`](../managements/test-coverage.md)。
 
@@ -100,7 +136,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 **推荐工作流：**
 
 ```
-编码 → --mode regression(30s) → commit → 多次积累 → --mode verify(49s) → merge → release前 → --mode all(~80s)
+编码 → --mode regression(30s) → commit → 多次积累 → --mode verify(~5min) → merge → release前 → --mode all(~6min)
                                   ↑                     ↗
                           此处可反复跑 regression   若改跨模块调用
                                                    先跑 --mode integration(40s)
@@ -109,10 +145,10 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 在一次典型开发周期中：
 1. 修改代码后，运行 `--mode regression`（30s）确认业务场景没有走歪
 2. 如果改了跨模块调用关系（缓存、新闻流水线、TUI 路由等），再跑 `--mode integration`（40s）确认接口契约和全链路正常
-3. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify`（49s）确认整条管道通畅
+3. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify`（~5min）确认整条管道通畅
 4. 通过后 commit，积累多次提交后准备合并到 master
 5. 合并前跑 `--mode verify` 作为合入门禁
-6. 发布版本前跑 `--mode all`（~80s）全量扫一遍
+6. 发布版本前跑 `--mode all`（~6min）全量扫一遍
 
 ### 模式与覆盖范围说明
 
