@@ -61,7 +61,7 @@ class TestS21HkStockConnect(unittest.TestCase):
         row = _compute_detail_row(h, None)
         self.assertEqual(row.market_value, 0.0)
         self.assertEqual(row.price, 0.0)
-        self.assertEqual(row.price_type, "--")
+        self.assertEqual(row.price_type, "暂无行情")
 
 
 # ═══════════════════════════════════════════════════════════════

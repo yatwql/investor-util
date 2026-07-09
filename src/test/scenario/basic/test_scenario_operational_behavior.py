@@ -387,7 +387,7 @@ class TestS33IpoPendingListing(unittest.TestCase):
         self.assertEqual(row.cost, 11250.0)         # 500 × 22.5
         self.assertEqual(row.market_value, 0.0)      # 无行情
         self.assertEqual(row.price, 0.0)
-        self.assertEqual(row.price_type, "--")
+        self.assertEqual(row.price_type, "暂无行情")
         self.assertEqual(row.profit, 0.0)            # 无行情时 profit 硬编码为 0（不显示伪亏损）
 
     def test_ipo_with_market_data_after_listing(self):
@@ -439,7 +439,7 @@ class TestS33IpoPendingListing(unittest.TestCase):
         self.assertEqual(row2.shares, 1000.0)
         self.assertEqual(row2.cost, 10000.0)
         self.assertEqual(row2.market_value, 0.0)
-        self.assertEqual(row2.price_type, "--")
+        self.assertEqual(row2.price_type, "暂无行情")
 
 
 if __name__ == "__main__":

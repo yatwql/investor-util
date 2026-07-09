@@ -379,13 +379,13 @@ class TestCheckNetworkAvailablePrint(unittest.TestCase):
         """全部为 None 时打印网络异常提示。"""
         result, out = self._capture_call([FakeDetail(price=None)])
         self.assertFalse(result)
-        self.assertIn("网络连接异常", out)
+        self.assertIn("所有行情数据均获取失败", out)
 
     def test_all_zero_prints_warning(self):
         """全部为 0 时打印网络异常提示。"""
         result, out = self._capture_call([FakeDetail(price=0)])
         self.assertFalse(result)
-        self.assertIn("网络连接异常", out)
+        self.assertIn("所有行情数据均获取失败", out)
 
     def test_mixed_no_print(self):
         """部分有价时不输出。"""
@@ -402,7 +402,7 @@ class TestCheckNetworkAvailablePrint(unittest.TestCase):
     def test_warning_message_contains_guide(self):
         """网络异常消息包含指引文字。"""
         _, out = self._capture_call([FakeDetail(price=None)])
-        self.assertIn("请检查网络连接", out)
+        self.assertIn("请于交易时段或在网络通畅时重新生成", out)
 
 
 # ═══════════════════════════════════════════════════════════════
