@@ -896,7 +896,7 @@ class TestOutputConsistency(unittest.TestCase):
         html_result = _build_module_info_list(failure, {})
 
         # 模拟 excel_generator 的构建逻辑
-        from src.python.report.excel_generator import _build_llm_usage_sheet as _blus
+        from src.python.report.excel_llm_usage import build_llm_usage_sheet as _blus
         # _blus 内部依赖全局 _LLM_MODULE_FAILURE 和 session_usage
         # 这里直接用内置逻辑构造 excel 等效数据
         DISPLAY_REASON = {

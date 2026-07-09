@@ -440,7 +440,7 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
 
     def _run(self, raw_session: dict, formatted: dict,
              module_failure: dict | None = None) -> MagicMock:
-        """执行 _build_llm_usage_sheet 并返回 write_llm_usage_sheet 的 mock。"""
+        """执行 build_llm_usage_sheet 并返回 write_llm_usage_sheet 的 mock。"""
         if module_failure is None:
             module_failure = {}
         from contextlib import ExitStack
@@ -456,8 +456,8 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
             stack.enter_context(
                 patch("src.python.registry.get_llm_module_names",
                       return_value=self._name_map))
-            from src.python.report.excel_generator import _build_llm_usage_sheet
-            _build_llm_usage_sheet(self.wb, self.prog)
+            from src.python.report.excel_llm_usage import build_llm_usage_sheet
+            build_llm_usage_sheet(self.wb, self.prog)
         return mock_write
 
     def test_cache_hit_all_modules(self):
@@ -598,7 +598,7 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
         """无 per_module 且无失败原因 → excel_module_info 为空，不调用 write_llm_usage_sheet。"""
         formatted = {"has_usage": True, "per_module": {}}
         mock_write = self._run({}, formatted)
-        # 当 excel_module_info 为空时 _build_llm_usage_sheet 直接 return，不调用 write_llm_usage_sheet
+        # 当 excel_module_info 为空时 build_llm_usage_sheet 直接 return，不调用 write_llm_usage_sheet
         mock_write.assert_not_called()
 
     def test_no_usage_returns_early(self):
@@ -612,7 +612,7 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
 
         回归验证：format_session_usage 在 call_count=0 且 per_module 有数据时返回
         has_usage=True（含 per_module），但如果时序/状态导致返回 {"has_usage": False}
-        （不含 per_module），_build_llm_usage_sheet 应通过 raw_session 拿到数据。
+        （不含 per_module），build_llm_usage_sheet 应通过 raw_session 拿到数据。
         """
         raw_session = {
             "per_module": {

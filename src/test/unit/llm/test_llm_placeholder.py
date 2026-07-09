@@ -54,7 +54,7 @@ class TestLlmPlaceholderTextInReport(unittest.TestCase):
     def test_excel_generator_placeholder_distinct(self):
         """excel_generator 中所有状态占位文本互不相同。"""
         # 验证 _build_llm_usage_sheet 中的 DISPLAY_REASON 映射
-        from src.python.report.excel_generator import _build_llm_usage_sheet as _blus
+        from src.python.report.excel_llm_usage import build_llm_usage_sheet as _blus
 
         # 5 种非 disabled 原因 + disabled（单独处理）= 6 种不同状态
         display_reason = {
