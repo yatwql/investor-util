@@ -22,7 +22,8 @@ from src.python.constants import CACHE_DAILY
 from src.python.market_hours import is_market_open as _is_market_open
 from src.python.registry import get_cache_ttl_defaults, get_exact_type_map, get_prefix_type_map, get_registry
 
-_CACHE_DIR = "data/cache"
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CACHE_DIR = os.path.join(_PROJECT_ROOT, "data/cache")
 _GZIP_THRESHOLD = 100 * 1024  # 100KB 以上的缓存自动 gzip
 _GZIP_SUFFIX = ".gz"
 

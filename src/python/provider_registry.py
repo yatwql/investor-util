@@ -475,19 +475,6 @@ class DataSourceRegistry:
         with self._cache_lock:
             self._session_cache.clear()
 
-    def get_skip_set_copy(self) -> set[str]:
-        """兼容旧测试接口：返回熔断中 provider 的集合。"""
-        with self._provider_lock:
-            return {n for n, s in self._providers.items() if s.is_skipped}
-
-    def get_skip_time_copy(self) -> dict[str, float]:
-        """兼容旧测试接口：返回熔断时间戳字典。"""
-        with self._provider_lock:
-            return {
-                n: s.last_failure_time
-                for n, s in self._providers.items()
-                if s.is_skipped
-            }
 
 
 # ── 工厂函数 ────────────────────────────────────────────

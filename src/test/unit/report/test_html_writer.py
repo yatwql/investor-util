@@ -220,11 +220,11 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 
         with ExitStack() as stack:
             mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
-            mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
-            mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
-            mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10"))
             mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
-            mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
+            mock_status = stack.enter_context(patch("src.python.report.html_renderers.price_update_status"))
             mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
@@ -260,11 +260,11 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 
         with ExitStack() as stack:
             mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
-            mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
-            mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
-            mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10"))
             mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
-            mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
+            mock_status = stack.enter_context(patch("src.python.report.html_renderers.price_update_status"))
             mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
@@ -295,11 +295,11 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 
         with ExitStack() as stack:
             mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
-            mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
-            mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
-            mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10"))
             mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
-            mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
+            mock_status = stack.enter_context(patch("src.python.report.html_renderers.price_update_status"))
             mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
@@ -364,11 +364,11 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         """用 ExitStack 统一管理 9 个补丁，调用 write_html_report 并返回 mock_llm。"""
         with ExitStack() as stack:
             mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
-            mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
-            mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
-            mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10"))
             mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
-            mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
+            mock_status = stack.enter_context(patch("src.python.report.html_renderers.price_update_status"))
             mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_llm = stack.enter_context(patch("src.python.llm.generate_all_llm"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
@@ -437,11 +437,11 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         """类似 _run_with_mocks，额外返回 template mock 用于断言模板数据。"""
         with ExitStack() as stack:
             mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
-            mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
-            mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
-            mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10"))
             mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
-            mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
+            mock_status = stack.enter_context(patch("src.python.report.html_renderers.price_update_status"))
             mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_llm = stack.enter_context(patch("src.python.llm.generate_all_llm"))
             mock_template_call = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
@@ -940,11 +940,11 @@ class TestAppVersionInTemplate(unittest.TestCase):
 
         with ExitStack() as stack:
             mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
-            mock_a_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_indices"))
-            mock_us_idx = stack.enter_context(patch("src.python.report.html_writer.fetch_us_indices"))
-            mock_penetration = stack.enter_context(patch("src.python.report.html_writer.compute_penetration_top10"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10"))
             mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
-            mock_status = stack.enter_context(patch("src.python.report.html_writer.price_update_status"))
+            mock_status = stack.enter_context(patch("src.python.report.html_renderers.price_update_status"))
             mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 

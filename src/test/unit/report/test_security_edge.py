@@ -202,7 +202,7 @@ class TestApiKeyLogLeakY6(unittest.TestCase):
         """验证日志配置不输出 api_key（委托已有测试）。"""
         # 已由 test_log_sanitize.py 完整覆盖
         # 此测试为交叉引用，验证导入可用
-        from src.python.llm.api import _sanitize_endpoint
+        from src.python.llm.api_base import _sanitize_endpoint
         result = _sanitize_endpoint("https://api.anthropic.com/v1/messages")
         self.assertIn("api.anthropic.com", result)
         self.assertNotIn("v1/messages", result)

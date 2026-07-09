@@ -770,7 +770,7 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._cfg_patcher = patch("src.python.llm.generators.get_llm_config",
+        cls._cfg_patcher = patch("src.python.llm.generators_orchestrator.get_llm_config",
                                   return_value={"enabled_llm": {
                                       "global_macro": True,
                                       "expert_review": True,
@@ -778,10 +778,10 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
                                       "penetration_deep": True,
                                   }})
         cls._cfg_patcher.start()
-        cls._exec_patcher = patch("src.python.llm.generators.ThreadPoolExecutor",
+        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators.httpx.Client",
+        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client",
                                     new=MagicMock())
         cls._httpx_patcher.start()
 
@@ -791,10 +791,10 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
         cls._exec_patcher.stop()
         cls._cfg_patcher.stop()
 
-    @patch("src.python.llm.generators.generate_penetration_deep_analysis")
-    @patch("src.python.llm.generators.generate_health_check")
-    @patch("src.python.llm.generators.generate_global_macro")
-    @patch("src.python.llm.generators.generate_expert_review")
+    @patch("src.python.llm.generators_orchestrator.generate_penetration_deep_analysis")
+    @patch("src.python.llm.generators_orchestrator.generate_health_check")
+    @patch("src.python.llm.generators_orchestrator.generate_global_macro")
+    @patch("src.python.llm.generators_orchestrator.generate_expert_review")
     def test_empty_holdings_no_crash(
         self, mock_expert, mock_macro, mock_health, mock_penetration,
     ):
@@ -1105,10 +1105,10 @@ class TestNonTradingDayWithLlm(unittest.TestCase):
 
     def test_non_trading_day_no_llm_crash(self):
         """非交易日下 generate_all_llm 不应崩溃。"""
-        from src.python.llm.generators import generate_all_llm
+        from src.python.llm.generators_orchestrator import generate_all_llm
 
         with (
-            patch("src.python.llm.generators._is_llm_module_enabled",
+            patch("src.python.llm.generators_orchestrator._is_llm_module_enabled",
                   return_value=False),
         ):
             result = generate_all_llm({}, {}, 0, 0, 0, 0, 0, {},
@@ -1181,10 +1181,10 @@ class TestMultiAccountMultiRoundLlm(unittest.TestCase):
 
     def test_generate_all_llm_with_multi_account(self):
         """多账户持仓下 generate_all_llm 不崩溃。"""
-        from src.python.llm.generators import generate_all_llm
+        from src.python.llm.generators_orchestrator import generate_all_llm
 
         with (
-            patch("src.python.llm.generators._is_llm_module_enabled",
+            patch("src.python.llm.generators_orchestrator._is_llm_module_enabled",
                   return_value=False),
         ):
             result = generate_all_llm({}, {}, 0, 0, 0, 0, 0, {},

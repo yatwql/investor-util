@@ -477,25 +477,27 @@ class TestReset:
         r.reset()
         assert len(r._chains) == 0
 
-    def test_get_skip_set_copy(self):
-        """兼容旧测试接口。"""
+    def test_circuit_breaker_status_in_report(self):
+        """熔断状态可通过 generate_status_report 查询。"""
         r = _fresh_registry()
         r.register_provider("t1")
         with mock.patch("time.time", return_value=1000.0):
             r.record_failure("t1", "timeout")
             r.record_failure("t1", "timeout")
             r.record_failure("t1", "timeout")
-        skipped = r.get_skip_set_copy()
-        assert "t1" in skipped
+        report = r.generate_status_report()
+        assert "t1" in report
+        assert report["t1"]["circuit_broken"] is True
 
-    def test_get_skip_time_copy(self):
-        """兼容旧测试接口。"""
+    def test_circuit_breaker_failure_details_in_report(self):
+        """熔断详情可通过 generate_status_report 查询。"""
         r = _fresh_registry()
         r.register_provider("t1")
         with mock.patch("time.time", return_value=1000.0):
             r.record_failure("t1", "timeout")
             r.record_failure("t1", "timeout")
             r.record_failure("t1", "timeout")
-        skip_times = r.get_skip_time_copy()
-        assert "t1" in skip_times
-        assert skip_times["t1"] == 1000.0
+        report = r.generate_status_report()
+        assert "t1" in report
+        assert report["t1"]["total_failures"] >= 3
+        assert report["t1"]["last_failure_context"] == "timeout"

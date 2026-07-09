@@ -17,7 +17,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.python.llm.api import _sanitize_endpoint
+from src.python.llm.api_base import _sanitize_endpoint
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
@@ -95,10 +95,10 @@ class TestApiKeyNotInLog(unittest.TestCase):
 
     def test_api_key_not_logged_on_failure(self):
         """API 调用失败日志不包含 api_key。"""
-        from src.python.llm.api import _call_llm_with_retry as _retry
+        from src.python.llm.api_base import _call_llm_with_retry as _retry
 
         secret_key = "sk-another-secret-99999"
-        with patch("src.python.llm.api._attempt_api_call") as mock_attempt:
+        with patch("src.python.llm.api_base._attempt_api_call") as mock_attempt:
             mock_attempt.return_value = ("retryable", 429)
             _retry(
                 label="Claude",

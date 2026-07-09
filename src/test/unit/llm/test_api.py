@@ -17,16 +17,17 @@ import unittest
 from unittest.mock import MagicMock, patch, PropertyMock
 import httpx
 
-from src.python.llm.api import (
-
+from src.python.llm.api_base import (
+    _TRUNCATION_MARKER,
     _call_llm_with_retry,
-    _call_single_provider,
-    _call_llm,
+    _extract_model_from_cached,
     _get_retry_max,
     _sanitize_endpoint,
-    _extract_model_from_cached,
     _truncation_warning,
-    _TRUNCATION_MARKER,
+)
+from src.python.llm.api import (
+    _call_llm,
+    _call_single_provider,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
@@ -177,7 +178,7 @@ class TestCallLlmWithRetryCircuitBreaker(unittest.TestCase):
     """熔断器开启 → 跳过。"""
 
     def test_circuit_open_skips(self) -> None:
-        with patch("src.python.llm.api._cb_is_open", return_value=True):
+        with patch("src.python.llm.api_base._cb_is_open", return_value=True):
             result, usage = _call_llm_with_retry(
                 "Test", MagicMock(), "https://api.test.com/v1",
                 {}, {"model": "test"}, 60, 2, 1000, "max_tokens",
@@ -204,15 +205,15 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
             extract_fn=_default_extract, check_truncation_fn=_no_truncation,
             provider="claude", model_name="test-model",
         )
-        self.cb_patcher = patch("src.python.llm.api._cb_is_open", return_value=False)
+        self.cb_patcher = patch("src.python.llm.api_base._cb_is_open", return_value=False)
         self.cb_patcher.start()
 
     def tearDown(self) -> None:
         self.cb_patcher.stop()
 
-    @patch("src.python.llm.api._cb_record_success")
-    @patch("src.python.llm.api._log_token_usage")
-    @patch("src.python.llm.api._track_session_usage")
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("src.python.llm.api_base._log_token_usage")
+    @patch("src.python.llm.api_base._track_session_usage")
     def test_success_first_try(self, mock_track: MagicMock, mock_log: MagicMock,
                                 mock_success: MagicMock) -> None:
         """首次调用成功。"""
@@ -227,7 +228,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         mock_log.assert_called_once()
         mock_track.assert_called_once()
 
-    @patch("src.python.llm.api._cb_record_success")
+    @patch("src.python.llm.api_base._cb_record_success")
     @patch("time.sleep")
     def test_429_then_success(self, mock_sleep: MagicMock, mock_success: MagicMock) -> None:
         """429 → 重试 → 成功。"""
@@ -238,7 +239,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.assertEqual(self.client.post.call_count, 2)
         mock_success.assert_called_once()
 
-    @patch("src.python.llm.api._cb_record_failure")
+    @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")
     def test_429_all_fail(self, mock_sleep: MagicMock, mock_failure: MagicMock) -> None:
         """429 全部重试失败 → (None, None)。"""
@@ -249,7 +250,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.assertEqual(self.client.post.call_count, 3)
         mock_failure.assert_called_once()
 
-    @patch("src.python.llm.api._cb_record_success")
+    @patch("src.python.llm.api_base._cb_record_success")
     @patch("time.sleep")
     def test_503_then_success(self, mock_sleep: MagicMock, mock_success: MagicMock) -> None:
         """503 → 重试 → 成功。"""
@@ -259,7 +260,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.assertEqual(result, "OK")
         self.assertEqual(self.client.post.call_count, 2)
 
-    @patch("src.python.llm.api._cb_record_success")
+    @patch("src.python.llm.api_base._cb_record_success")
     @patch("time.sleep")
     def test_timeout_then_success(self, mock_sleep: MagicMock, mock_success: MagicMock) -> None:
         """超时 → 重试 → 成功。"""
@@ -269,7 +270,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.assertEqual(result, "OK")
         self.assertEqual(self.client.post.call_count, 2)
 
-    @patch("src.python.llm.api._cb_record_failure")
+    @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")
     def test_timeout_all_fail(self, mock_sleep: MagicMock, mock_failure: MagicMock) -> None:
         """超时全部重试失败 → (None, None)。"""
@@ -280,7 +281,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.assertEqual(self.client.post.call_count, 3)
         mock_failure.assert_called_once()
 
-    @patch("src.python.llm.api._cb_record_success")
+    @patch("src.python.llm.api_base._cb_record_success")
     @patch("time.sleep")
     def test_request_error_then_success(self, mock_sleep: MagicMock, mock_success: MagicMock) -> None:
         """网络错误 → 重试 → 成功。"""
@@ -290,7 +291,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.assertEqual(result, "OK")
         self.assertEqual(self.client.post.call_count, 2)
 
-    @patch("src.python.llm.api._cb_record_failure")
+    @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")
     def test_request_error_all_fail(self, mock_sleep: MagicMock, mock_failure: MagicMock) -> None:
         """网络错误全部重试失败 → (None, None)。"""
@@ -319,13 +320,13 @@ class TestCallLlmWithRetryResponseErrors(unittest.TestCase):
             extract_fn=_default_extract, check_truncation_fn=_no_truncation,
             provider="claude", model_name="",
         )
-        self.cb_patcher = patch("src.python.llm.api._cb_is_open", return_value=False)
+        self.cb_patcher = patch("src.python.llm.api_base._cb_is_open", return_value=False)
         self.cb_patcher.start()
 
     def tearDown(self) -> None:
         self.cb_patcher.stop()
 
-    @patch("src.python.llm.api._cb_record_failure")
+    @patch("src.python.llm.api_base._cb_record_failure")
     def test_json_decode_error(self, mock_failure: MagicMock) -> None:
         """JSON 解析失败 → 立即失败，不重试。"""
         resp = _make_mock_response(200, json_data={"content": [{"type": "text", "text": ""}]})
@@ -336,7 +337,7 @@ class TestCallLlmWithRetryResponseErrors(unittest.TestCase):
         self.assertIsNone(usage)
         self.assertEqual(self.client.post.call_count, 1)
 
-    @patch("src.python.llm.api._cb_record_failure")
+    @patch("src.python.llm.api_base._cb_record_failure")
     def test_extract_returns_none(self, mock_failure: MagicMock) -> None:
         """extract_fn 返回 None → 立即失败。"""
         def _none_extract(data):
@@ -359,7 +360,7 @@ class TestCallLlmWithRetryContentFilter(unittest.TestCase):
 
     def setUp(self) -> None:
         self.client = MagicMock(spec=httpx.Client)
-        self.cb_patcher = patch("src.python.llm.api._cb_is_open", return_value=False)
+        self.cb_patcher = patch("src.python.llm.api_base._cb_is_open", return_value=False)
         self.cb_patcher.start()
 
     def tearDown(self) -> None:
@@ -386,15 +387,15 @@ class TestCallLlmWithRetryTruncation(unittest.TestCase):
 
     def setUp(self) -> None:
         self.client = MagicMock(spec=httpx.Client)
-        self.cb_patcher = patch("src.python.llm.api._cb_is_open", return_value=False)
+        self.cb_patcher = patch("src.python.llm.api_base._cb_is_open", return_value=False)
         self.cb_patcher.start()
 
     def tearDown(self) -> None:
         self.cb_patcher.stop()
 
-    @patch("src.python.llm.api._cb_record_success")
-    @patch("src.python.llm.api._log_token_usage")
-    @patch("src.python.llm.api._track_session_usage")
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("src.python.llm.api_base._log_token_usage")
+    @patch("src.python.llm.api_base._track_session_usage")
     def test_truncation_appends_warning(self, mock_track: MagicMock,
                                          mock_log: MagicMock, mock_success: MagicMock) -> None:
         """截断 → 内容追加截断警告。"""

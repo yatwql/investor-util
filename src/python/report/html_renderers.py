@@ -12,6 +12,7 @@ from src.python.constants import APP_VERSION
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.models import Holding
+from src.python.provider_registry import _NOT_FOUND, get_registry
 from src.python.registry import get_llm_module_name, get_llm_module_names
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
@@ -31,6 +32,21 @@ from src.python.report.progress import ProgressReporter
 from src.python.providers.akshare_extras import get_dividend_data, get_profit_forecast
 
 logger = logging.getLogger("invest")
+
+
+def _fetch_fund_holdings_cached(code: str) -> dict | None:
+    """基金持仓获取（含会话缓存），同一报告生成中同基金只获取一次。
+
+    消除 _render_overlap_matrix / _render_concentration / _render_style_analysis
+    三函数独立调用 fetch_fund_holdings 的冗余文件缓存读取。
+    """
+    registry = get_registry()
+    cached = registry.session_cache_get("fund_hold", code)
+    if cached is not _NOT_FOUND:
+        return cached
+    result = fetch_fund_holdings(code)
+    registry.session_cache_set("fund_hold", code, result, source="api")
+    return result
 
 
 def _render_market_value_section(
@@ -286,7 +302,7 @@ def _render_overlap_matrix(
         fund_holdings: dict[str, list[dict]] = {}
         fund_names: dict[str, str] = {}
         for code in fund_codes:
-            fh = fetch_fund_holdings(code)
+            fh = _fetch_fund_holdings_cached(code)
             if fh and fh.get("holdings"):
                 fund_holdings[code] = fh["holdings"]
                 fund_names[code] = fh.get("name", code)
@@ -327,7 +343,7 @@ def _render_concentration(
         ))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
-            fh = fetch_fund_holdings(code)
+            fh = _fetch_fund_holdings_cached(code)
             if fh and fh.get("holdings"):
                 fund_holdings[code] = {
                     "name": fh.get("name", code),
@@ -362,7 +378,7 @@ def _render_style_analysis(
         ))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
-            fh = fetch_fund_holdings(code)
+            fh = _fetch_fund_holdings_cached(code)
             if fh and fh.get("holdings"):
                 fund_holdings[code] = {
                     "name": fh.get("name", code),

@@ -218,19 +218,19 @@ class TestGetKeyLinux(unittest.TestCase):
 
     def test_escape_up(self) -> None:
         """ESC [ A → KEY_UP。"""
-        self._mock_stdin.read.side_effect = ["\x1b", "[A"]
+        self._mock_stdin.read.side_effect = ["\x1b", "[", "A"]
         self._mock_select.return_value = ([self._mock_stdin], [], [])
         self.assertEqual(_get_key_linux(), KEY_UP)
 
     def test_escape_down(self) -> None:
         """ESC [ B → KEY_DOWN。"""
-        self._mock_stdin.read.side_effect = ["\x1b", "[B"]
+        self._mock_stdin.read.side_effect = ["\x1b", "[", "B"]
         self._mock_select.return_value = ([self._mock_stdin], [], [])
         self.assertEqual(_get_key_linux(), KEY_DOWN)
 
     def test_escape_unknown_seq(self) -> None:
         """ESC [ X → KEY_UNKNOWN。"""
-        self._mock_stdin.read.side_effect = ["\x1b", "[X"]
+        self._mock_stdin.read.side_effect = ["\x1b", "[", "X"]
         self._mock_select.return_value = ([self._mock_stdin], [], [])
         self.assertEqual(_get_key_linux(), KEY_UNKNOWN)
 

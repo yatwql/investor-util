@@ -8,10 +8,6 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any
-
-from openpyxl.styles import Font
-from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python import cache
 from src.python.code_utils import (
@@ -26,30 +22,27 @@ from src.python.market_hours import is_market_open as _mh_is_market_open
 from src.python.provider_registry import FetchStrategy, get_registry
 from src.python.market_hours import is_midday_break as _mh_is_midday_break
 from src.python.models import Holding
-from src.python.registry import get_report_sheet_name
-from src.python.report.excel_writer import (
-    auto_width,
-    freeze_header,
-    write_data_row,
-    write_header_row,
-    write_subtotal_row,
-    write_title_row,
-    write_total_row,
-)
-from src.python.report.styles import BLUE_FONT, FMT_MONEY, FMT_PERCENT, FMT_PRICE, FMT_SHARES, profit_font
 
 logger = logging.getLogger("invest")
 
-# 15 列表头
-_HEADERS = [
-    "账户", "名称", "代码", "最新价", "净值日期", "昨日价",
-    "取价方式", "溢价率", "份额", "市值", "成本",
-    "盈亏", "收益率", "本日盈亏", "取价渠道",
-]
-_NCOLS = len(_HEADERS)
-
 # 占位符 — 非 QDII 或无参考净值时使用
 _FUND_PREMIUM_PLACEHOLDER = "--"
+
+__all__ = [
+    "DetailRow",
+    "_FUND_PREMIUM_PLACEHOLDER",
+    "_compute_premium",
+    "_compute_detail_row",
+    "_count_trading_days_back",
+    "_determine_price_type",
+    "_generate_details",
+    "_get_trading_calendar",
+    "_is_trading_day",
+    "classify_holdings",
+    "get_last_trading_day",
+    "get_prev_trading_day",
+    "price_update_status",
+]
 
 
 def _compute_premium(price: float, nav: float, name: str) -> str:
@@ -450,7 +443,7 @@ def _price_cache_key(code: str) -> str:
     return f"price_{code}"
 
 
-def _generate_details(holdings: list[Holding], today_str: str) -> list[DetailRow]:
+def _generate_details(holdings: list[Holding], today_str: str = "") -> list[DetailRow]:
     """获取所有持仓的行情数据并生成明细行（策略感知：非交易时段/全链熔断时只读缓存）。"""
     details: list[DetailRow] = []
     today_str = today_str or datetime.now().strftime("%Y-%m-%d")
@@ -522,190 +515,3 @@ def _generate_details(holdings: list[Holding], today_str: str) -> list[DetailRow
         logger.info("市场行情获取：全部 %d 条成功", _ok_count)
     logger.info("市值核算明细数据生成完成，共 %d 条", len(details))
     return details
-
-
-def _detail_to_row_values(d: DetailRow) -> list[Any]:
-    """将 DetailRow 转为 Excel 行值列表。"""
-    return [
-        d.account,
-        d.name,
-        d.code,
-        d.price,
-        d.nav_date,
-        d.yesterday_close,
-        d.price_type,
-        d.premium,
-        d.shares,
-        d.market_value,
-        d.cost,
-        d.profit,
-        d.profit_rate,
-        d.today_profit,
-        d.source,
-    ]
-
-
-def _num_formats() -> list[str | None]:
-    """每列的 Excel 数字格式。"""
-    return [
-        "",           # 1  账户
-        "",           # 2  名称
-        "",           # 3  代码
-        FMT_PRICE,    # 4  最新价
-        "",           # 5  净值日期
-        FMT_PRICE,    # 6  昨日价
-        "",           # 7  取价方式
-        "",           # 8  溢价率
-        FMT_SHARES,   # 9  份额
-        FMT_MONEY,    # 10 市值
-        FMT_MONEY,    # 11 成本
-        FMT_MONEY,    # 12 盈亏
-        FMT_PERCENT,  # 13 收益率
-        FMT_MONEY,    # 14 本日盈亏
-        "",           # 15 取价渠道
-    ]
-
-
-def _apply_profit_colors(ws, start_row: int, end_row: int,
-                         profit_col: int, rate_col: int, today_col: int) -> None:
-    """对盈亏列（12）、收益率列（13）、本日盈亏列（14）着色。"""
-    for r in range(start_row, end_row + 1):
-        for col in (profit_col, today_col):
-            cell = ws.cell(row=r, column=col)
-            if isinstance(cell.value, (int, float)):
-                cell.font = profit_font(cell.value)
-        # 收益率特殊处理（字符串含 % 号）
-        rate_cell = ws.cell(row=r, column=rate_col)
-        if isinstance(rate_cell.value, float):
-            rate_cell.font = profit_font(rate_cell.value)
-
-
-_PRICE_TYPE_COL = 7     # 取价方式列
-_NAME_COL = 2           # 名称列（用于识别 QDII）
-
-
-def _apply_price_type_colors(ws, start_row: int, end_row: int) -> None:
-    """对取价方式列（第 7 列）着色：蓝色代表价格来源可靠/时效性高。
-
-    着色规则：
-      - "场内收盘价(T)" → 蓝色（最新场内收盘数据）
-      - "官方净值(T)" → 蓝色（最新官方净值）
-      - QDII 基金的 "官方净值(T-1)" → 蓝色（QDII 因时差延迟一天属正常）
-
-    Args:
-        ws: 目标工作表
-        start_row: 起始行号（含）
-        end_row: 结束行号（含）
-    """
-    for r in range(start_row, end_row + 1):
-        cell = ws.cell(row=r, column=_PRICE_TYPE_COL)
-        val = str(cell.value) if cell.value else ""
-
-        if val in ("场内收盘价(T)", "场内午市收盘(T)", "官方净值(T)"):
-            cell.font = BLUE_FONT
-        elif val == "官方净值(T-1)":
-            name_cell = ws.cell(row=r, column=_NAME_COL)
-            name = str(name_cell.value) if name_cell.value else ""
-            if is_qdii_extended(name):
-                cell.font = BLUE_FONT
-
-
-def _write_account_groupings(
-    ws, details: list[DetailRow], data_start: int,
-) -> tuple[float, float, float, float, int]:
-    """按账户分组写入明细行和小计，返回汇总数据及最终行号。
-
-    Returns:
-        (grand_mv, grand_cost, grand_profit, grand_today, final_row)
-    """
-    accounts: dict[str, list[DetailRow]] = {}
-    for d in details:
-        accounts.setdefault(d.account, []).append(d)
-
-    row = data_start
-    grand_mv = grand_cost = grand_profit = grand_today = 0.0
-
-    for acc_name, acc_details in accounts.items():
-        for d in acc_details:
-            vals = _detail_to_row_values(d)
-            write_data_row(ws, row, vals, _num_formats())
-            row += 1
-
-        acc_mv = sum(d.market_value for d in acc_details)
-        acc_cost = sum(d.cost for d in acc_details)
-        acc_profit = sum(d.profit for d in acc_details)
-        acc_today = sum(d.today_profit for d in acc_details)
-        acc_rate = acc_profit / acc_cost if acc_cost > 0 else 0.0
-
-        subtotal_vals = [
-            f"{acc_name} 小计", "", "", "", "", "", "", "",
-            sum(d.shares for d in acc_details),
-            acc_mv, acc_cost, acc_profit, acc_rate, acc_today, "",
-        ]
-        write_subtotal_row(ws, row, f"{acc_name} 小计",
-                           subtotal_vals[1:], _NCOLS, _num_formats())
-        row += 1
-
-        grand_mv += acc_mv
-        grand_cost += acc_cost
-        grand_profit += acc_profit
-        grand_today += acc_today
-
-    return grand_mv, grand_cost, grand_profit, grand_today, row
-
-
-def write_market_value_sheet(ws: Worksheet, holdings: list[Holding],
-                             today_str: str = "",
-                             details: list[DetailRow] | None = None) -> tuple[float, float, float, float, list[DetailRow]]:
-    """写入市值核算明细表，返回汇总数据供汇总页签使用。
-
-    Args:
-        ws: 目标工作表
-        holdings: 持仓列表
-        today_str: 日期字符串（YYYY-MM-DD），默认当天
-        details: 可选预计算明细行，传入时跳过内部行情获取。
-
-    Returns:
-        (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
-    """
-    if details is None:
-        details = _generate_details(holdings, today_str)
-
-    row = write_title_row(ws, 1, get_report_sheet_name('market_value'), _NCOLS)
-    row = write_header_row(ws, row, _HEADERS)
-    data_start = row
-
-    # 若所有行情数据全零，写一行醒目提示
-    _all_zero = all(d.price == 0 for d in details)
-    if _all_zero and details:
-        _WARN_FONT = Font(size=10, bold=True, color="CC0000")
-        ws.cell(row=row, column=1).font = _WARN_FONT
-        ws.cell(row=row, column=1, value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=15)
-        row += 1
-
-    # 按账户分组写入明细 + 小计
-    grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(ws, details, data_start)
-
-    # 总计
-    grand_rate = grand_profit / grand_cost if grand_cost > 0 else 0.0
-    total_vals = [
-        "总计", "", "", "", "", "", "", "",
-        sum(d.shares for d in details),
-        grand_mv, grand_cost, grand_profit, grand_rate, grand_today, "",
-    ]
-    write_total_row(ws, row, "总计", total_vals[1:], _NCOLS, _num_formats())
-
-    # 对盈亏列着色（数据行 + 小计 + 总计）
-    _apply_profit_colors(ws, data_start, row, profit_col=12, rate_col=13, today_col=14)
-
-    # 对取价方式列着色（蓝色标识最新可靠数据来源）
-    _apply_price_type_colors(ws, data_start, row)
-
-    freeze_header(ws, 2)
-    auto_width(ws)
-
-    logger.info("%s写入完成，共 %d 个账户，%d 条持仓",
-                get_report_sheet_name('market_value'), len(set(d.account for d in details)), len(details))
-
-    return grand_mv, grand_cost, grand_profit, grand_today, details

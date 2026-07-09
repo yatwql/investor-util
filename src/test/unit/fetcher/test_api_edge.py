@@ -251,7 +251,7 @@ class TestLlmApiErrorsY1(unittest.TestCase):
         self.timeout = 30.0
 
     def _call_api(self):
-        from src.python.llm.api import _attempt_api_call
+        from src.python.llm.api_base import _attempt_api_call
         return _attempt_api_call(self.client, self.url, self.headers, self.payload, self.timeout)
 
     def test_http_429_retryable(self):

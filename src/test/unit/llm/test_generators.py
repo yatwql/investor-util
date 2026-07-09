@@ -22,7 +22,7 @@ class TestApplyLlmNewsCorrelation(unittest.TestCase):
     """_apply_llm_news_correlation LLM JSON 响应解析。"""
 
     def _call(self, news_batch: list | None = None, llm_response: str = ""):
-        from src.python.llm.generators import _apply_llm_news_correlation
+        from src.python.llm.generators_news import _apply_llm_news_correlation
         batch = news_batch if news_batch is not None else [
             {"title": "新闻A"}, {"title": "新闻B"},
         ]
@@ -135,7 +135,7 @@ class TestPrecheckOneCache(unittest.TestCase):
 
     def test_cache_disabled(self):
         """can_cache=False → 返回 (None, False)。"""
-        from src.python.llm.generators import _precheck_one_cache
+        from src.python.llm.generators_orchestrator import _precheck_one_cache
         result, cached = _precheck_one_cache(
             {"can_cache": False, "key": "test", "ttl": 3600,
              "thinking_key": "thinking_enabled_test"},
@@ -144,10 +144,10 @@ class TestPrecheckOneCache(unittest.TestCase):
         self.assertIsNone(result)
         self.assertFalse(cached)
 
-    @patch("src.python.llm.generators.cache_get", return_value=None)
+    @patch("src.python.llm.generators_orchestrator.cache_get", return_value=None)
     def test_cache_miss(self, mock_get):
         """缓存未命中 → 返回 (None, False)。"""
-        from src.python.llm.generators import _precheck_one_cache
+        from src.python.llm.generators_orchestrator import _precheck_one_cache
         result, cached = _precheck_one_cache(
             {"can_cache": True, "key": "test", "ttl": 3600,
              "thinking_key": "thinking_enabled_test"},
@@ -171,10 +171,10 @@ class TestPrecheckAllModules(unittest.TestCase):
         _LLM_MODULE_FAILURE.clear()
         _LLM_MODULE_FAILURE.update(self._orig)
 
-    @patch("src.python.llm.generators._is_llm_module_enabled", return_value=False)
+    @patch("src.python.llm.generators_orchestrator._is_llm_module_enabled", return_value=False)
     def test_disabled_module_sets_failure(self, mock_enabled):
         """模块已禁用 → _LLM_MODULE_FAILURE 记录 FAIL_REASON_DISABLED。"""
-        from src.python.llm.generators import _precheck_all_modules
+        from src.python.llm.generators_orchestrator import _precheck_all_modules
         from src.python.llm.prompts import FAIL_REASON_DISABLED, _LLM_MODULE_FAILURE
 
         cache_info = {
@@ -230,7 +230,7 @@ class TestGeneratorFunctions(unittest.TestCase):
 
     def test_llm_client_settings_have_http2(self):
         """默认 LLM 客户端配置包含 HTTP/2。"""
-        from src.python.llm.generators import _LLM_CLIENT_SETTINGS
+        from src.python.llm.generators_orchestrator import _LLM_CLIENT_SETTINGS
         self.assertTrue(_LLM_CLIENT_SETTINGS.get("http2"))
         self.assertIn("limits", _LLM_CLIENT_SETTINGS)
 
@@ -241,7 +241,7 @@ class TestComputeModuleCacheInfo(unittest.TestCase):
 
     def test_contains_all_module_keys(self):
         """包含所有 4 个 LLM 主模块的缓存信息。"""
-        from src.python.llm.generators import _compute_module_cache_info
+        from src.python.llm.generators_orchestrator import _compute_module_cache_info
         info = _compute_module_cache_info(
             {}, {}, {}, 0, 0, 0, 0, 0, {}, None, None, force=False,
         )

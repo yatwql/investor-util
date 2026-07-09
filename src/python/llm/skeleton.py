@@ -11,17 +11,17 @@ import httpx
 from src.python.cache import get as cache_get  # noqa: F401
 from src.python.cache import set as cache_set
 from src.python.config import get_llm_config
-from src.python.llm.api import (
+from src.python.llm.api_base import (
     _AUTO_INCREASE_FACTOR,
     _CACHE_LINE_HTML,
     _LLM_TIMEOUT,
     _TRUNCATION_MARKER,
     _cache_line_model_tpl,
-    _call_llm,
-    _clear_last_llm_failure,
     _extract_model_from_cached,
     _get_last_llm_failure,
 )
+from src.python.llm.api import _call_llm
+from src.python.llm.api_base import _clear_last_llm_failure
 from src.python.llm.fingerprint import _get_cache_ttl_llm
 from src.python.llm.markdown import _markdown_to_html
 from src.python.llm.pricing import _estimate_cost

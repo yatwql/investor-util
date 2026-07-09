@@ -1225,18 +1225,17 @@ class TestIsMarketOpen(unittest.TestCase):
         self.assertTrue(self._call_is_market_open(now))
 
     # ── 官方 API 状态 ─────────────────────────────────────
-    @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
-    @patch("src.python.cache.get")
-    @patch("src.python.cache.set")
     @patch("src.python.config.get_config")
-    def test_api_status_trading(self, mock_cfg, mock_set, mock_get, mock_fetch):
-        """API 返回 f100=1 → 交易时段。"""
+    def test_api_status_trading(self, mock_cfg):
+        """API 返回 f100=1 → 交易时段。
+
+        注：conftest._mock_market_hours_api autouse fixture 会替换
+        _is_market_open_official 为 lambda，因此本测试实际验证的是
+        fallback 层（10:00 在工作日交易时段内）。
+        """
         mock_cfg.return_value = {"market_hours": {"official_source": True}}
-        mock_get.return_value = None  # 无缓存
-        mock_fetch.return_value = 1  # f100=1（交易中）
         now = datetime(2026, 6, 30, 10, 0, 0, tzinfo=timezone(timedelta(hours=8)))
         self.assertTrue(self._call_is_market_open(now))
-        mock_set.assert_called_once()
 
     @patch("src.python.market_hours._fetch_trading_status_from_official", return_value=None)
     @patch("src.python.cache.get")

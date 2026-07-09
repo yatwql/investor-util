@@ -25,10 +25,12 @@ from src.python.models import Holding
 from src.python.report.market_value import (
     _compute_detail_row,
     _count_trading_days_back,
-    _detail_to_row_values,
     _determine_price_type,
     _FUND_PREMIUM_PLACEHOLDER,
     _is_trading_day,
+)
+from src.python.report.market_value_sheet import (
+    _detail_to_row_values,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]

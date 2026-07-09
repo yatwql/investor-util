@@ -282,15 +282,15 @@ class TestErrorIsolationSemantics(unittest.TestCase):
         ]
 
         with (
-            patch("src.python.report.html_writer.fetch_indices",
+            patch("src.python.report.html_renderers.fetch_indices",
                   return_value={}),
-            patch("src.python.report.html_writer.fetch_us_indices",
+            patch("src.python.report.html_renderers.fetch_us_indices",
                   return_value={}),
-            patch("src.python.report.html_writer.compute_penetration_top10",
+            patch("src.python.report.html_renderers.compute_penetration_top10",
                   return_value={}),
             patch("src.python.report.html_renderers._build_category_data",
                   return_value=([], False)),
-            patch("src.python.report.html_writer.price_update_status",
+            patch("src.python.report.html_renderers.price_update_status",
                   return_value=(1, 1, True)),
             patch("src.python.report.html_renderers._build_perf_data",
                   return_value={}),

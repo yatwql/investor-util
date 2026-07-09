@@ -57,22 +57,29 @@ def _import_report_modules(prog: ProgressReporter) -> dict[str, Any]:
             classify_holdings,
             get_last_trading_day,
             price_update_status,
-            write_market_value_sheet,
+            _generate_details,
         )
         modules.update(
             classify_holdings=classify_holdings,
             get_last_trading_day=get_last_trading_day,
             price_update_status=price_update_status,
-            write_market_value_sheet=write_market_value_sheet,
+            _generate_details=_generate_details,
         )
     except ImportError:
         modules.update(
             classify_holdings=lambda _: {},
             get_last_trading_day=lambda: "",
             price_update_status=lambda _a, _b: (0, 0, True),
-            write_market_value_sheet=None,
+            _generate_details=None,
         )
-        prog.add_error("行情市值模块缺失 (market_value)")
+        prog.add_error("行情市值计算模块缺失 (market_value)")
+
+    try:
+        from src.python.report.market_value_sheet import write_market_value_sheet
+        modules["write_market_value_sheet"] = write_market_value_sheet
+    except ImportError:
+        modules["write_market_value_sheet"] = None
+        prog.add_error("行情市值写入模块缺失 (market_value_sheet)")
 
     try:
         from src.python.report.penetration import compute_penetration_top10
@@ -162,7 +169,14 @@ def _resolve_market_data(
     else:
         with _Timer("行情数据获取 (" + get_report_sheet_name("market_value") + ")"):
             prog.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
-            total_mv, total_cost, total_profit, today_profit, details = mvs(ws2, holdings)
+            # 预计算 details（取代 mvs 内部回调，消除跨模块 _generate_details 依赖）
+            gen_details = modules.get("_generate_details")
+            details = gen_details(holdings) if gen_details else []
+            total_mv = sum(d.market_value for d in details)
+            total_cost = sum(d.cost for d in details)
+            total_profit = sum(d.profit for d in details)
+            today_profit = sum(d.today_profit for d in details)
+            mvs(ws2, holdings, details=details)
             data = {
                 "total_mv": total_mv, "total_cost": total_cost,
                 "total_profit": total_profit, "today_profit": today_profit,

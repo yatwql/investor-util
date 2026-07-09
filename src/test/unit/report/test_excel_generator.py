@@ -75,7 +75,7 @@ class _SheetMocks:
             patch("src.python.report.summary.write_summary_sheet", self.write_summary),
             patch("src.python.report.excel_writer.create_workbook"),
             patch("src.python.report.excel_writer.save_workbook", return_value="reports/test.xlsx"),
-            patch("src.python.report.market_value.write_market_value_sheet", self.write_market_value),
+            patch("src.python.report.market_value_sheet.write_market_value_sheet", self.write_market_value),
             patch("src.python.report.market_value.classify_holdings", self.classify_holdings),
             patch("src.python.report.market_value.get_last_trading_day", self.get_last_trading_day),
             patch("src.python.report.market_value.price_update_status", self.price_update_status),
@@ -285,13 +285,13 @@ class TestGenerateExcelReport(unittest.TestCase):
         """行情市值模块缺失 → add_error + 后续模块继续。"""
         from src.python.report.excel_generator import generate_excel_report
 
-        with patch("src.python.report.market_value.write_market_value_sheet", None):
+        with patch("src.python.report.market_value_sheet.write_market_value_sheet", None):
             generate_excel_report(
                 self.holdings, progress=self.progress,
             )
 
         errors = self.progress.get_errors()
-        self.assertTrue(any("market_value" in e.lower() or "行情市值" in e for e in errors),
+        self.assertTrue(any("market_value_sheet" in e.lower() or "行情市值" in e for e in errors),
                         f"预期 market_value 错误，得到: {errors}")
 
     # ── 页签写入异常隔离 ──
