@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-09（R-204 fund_hold 会话缓存 + R-205 cache cwd 持久化均已修复；✅ 近期已修复 20 项清理归档）
+最后更新：2026-07-10（新增 R-206~R-208 三项待修复；✅ 近期已修复 20 项清理归档）
 
 ---
 
@@ -37,11 +37,12 @@
 | R-187 | **TUI Windows 平台 12 个测试跳过**：`termios`/`tty` 为 Linux 特有模块，Windows 上 `_get_key_linux()` 已加 try/except 保护 | `tui.py` + `test_tui_edge.py` | 功能降级但无错误，可考虑 CI 加 Windows runner |
 | R-199 | **akshare 依赖老化风险**：`requirements.txt` 未锁定 akshare 版本，pytest 收集期已有 `FutureWarning`（DataFrame concat 行为变更），大版本升级可能引入兼容问题 | `requirements.txt` | 建议锁定 `akshare>=1.16,<2.0` 或类似区间 |
 | R-201 | **HTML 打印预览缺少浏览器渲染集成测试**：当前仅 9 项 UT 覆盖 CSS `@media print` 规则，无 Playwright 快照对比确保打印输出视觉正确 | `test_html_template.py` | Playwright 快照测试，但跨系统工具优先级低 |
+| R-206 | **excel_generator.py 文件过大（692 行）**：R-197 market_value 拆分（711→450+230）后，成为 `src/python/` 最大源文件。12 个函数含 `_write_content_sheets`/`_write_b_series_sheets`/`_write_llm_section_and_usage` 等多职责，可参照 R-197 模式拆出 Excel sheet 写入层 | `report/excel_generator.py` | 该文件是报告生成核心入口，拆分需同步更新 4+ 测试文件的 mock 路径 |
+| R-207 | **summary.py 文件过大（617 行）**：20+ 个 `_write_*` 辅助函数混合同一文件，LLM 用量表格部分（`write_llm_usage_sheet`/`_write_llm_summary_section`/`_init_llm_usage_sheet`）已可独立成模块 | `report/summary.py` | 可参照 R-197 模式拆出 summary_llm_usage.py；但 LLM 用量属于变异较快的功能，拆分后仍需考虑后续兼容 |
 
 ### 🟢 低优先级
 
-| # | 问题 | 模块 | 备注 |
-|:-:|:-----|:----|:----:|
+（当前无低优先级待修复问题）
 
 ### ✅ 近期已修复（已记录到 changelog.md）
 

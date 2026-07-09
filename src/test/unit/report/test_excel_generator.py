@@ -680,7 +680,7 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
 
 
 class TestCreateSheets(unittest.TestCase):
-    """_create_sheets 页签创建与标题设置测试。"""
+    """create_sheets 页签创建与标题设置测试。"""
 
     _CUSTOM_ORDER = [
         {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
@@ -699,10 +699,10 @@ class TestCreateSheets(unittest.TestCase):
     def test_default_order_uses_default_titles(self):
         """默认 section_order → 标题使用 _REPORT_SECTION_DEFAULT 的序号。"""
         from src.python.registry import _REPORT_SECTION_DEFAULT
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         # always 类型只创建 5 个核心页签
-        sheets = _create_sheets(wb, _REPORT_SECTION_DEFAULT,
+        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_b_series=False, include_news=False, include_llm=False)
         self.assertEqual(len(sheets), 5)
         for sec in _REPORT_SECTION_DEFAULT[:5]:
@@ -712,9 +712,9 @@ class TestCreateSheets(unittest.TestCase):
 
     def test_custom_order_uses_custom_titles(self):
         """自定义 section_order → 标题使用配置序号。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
-        sheets = _create_sheets(wb, self._CUSTOM_ORDER,
+        sheets = create_sheets(wb, self._CUSTOM_ORDER,
                                 enable_b_series=False, include_news=False, include_llm=False)
         self.assertEqual(len(sheets), 3)
         self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析")
@@ -724,10 +724,10 @@ class TestCreateSheets(unittest.TestCase):
     def test_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签。"""
         from src.python.registry import _REPORT_SECTION_DEFAULT
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         # 只启用 news 类型（news_correlation + early_warning）
-        sheets = _create_sheets(wb, _REPORT_SECTION_DEFAULT,
+        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_b_series=False, include_news=True, include_llm=False)
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
         # always(5) + news(2) = 7

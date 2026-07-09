@@ -8,8 +8,9 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from src.python.logger import setup_logger
-from src.python.registry import get_llm_module_name, get_report_section_order, get_report_sheet_name, set_sheet_title
+from src.python.registry import get_llm_module_name, get_report_section_order, get_report_sheet_name
 from src.python.report.excel_module_loader import load_report_modules
+from src.python.report.excel_sheet_factory import create_sheets
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, _Timer
 
 logger = setup_logger()
@@ -456,38 +457,6 @@ def _build_llm_usage_sheet(sheets: dict[str, Any], _prog: ProgressReporter) -> N
         logger.debug("创建 LLM API 用量页签失败（非关键）: %s", e)
 
 
-# ── 类型驱动的页签创建（C-P1b 新增） ──────────────────────────
-
-
-def _should_create_sheet(section: dict, enable_b_series: bool, include_news: bool, include_llm: bool) -> bool:
-    """按 section.type 判断是否创建页签。
-
-    新增模块只需在注册表标 type，无需修改此函数。
-    """
-    type_map = {
-        "always":    True,              # summary, market_value, category, penetration, fund_performance
-        "b_series":  enable_b_series,   # fund_manager, fund_overlap, fund_concentration, fund_style
-        "news":      include_news,      # news_correlation, early_warning
-        "llm":       include_llm,       # global_macro, expert_review, health_check, penetration_deep, llm_usage
-    }
-    return type_map.get(section.get("type", ""), False)
-
-
-def _create_sheets(
-    wb: Any, section_order: list[dict],
-    enable_b_series: bool = False, include_news: bool = False, include_llm: bool = False,
-) -> dict[str, Any]:
-    """按配置顺序创建所有可见页签，返回 {key: ws} 字典。"""
-    sheets: dict[str, Any] = {}
-    for sec in section_order:
-        if not _should_create_sheet(sec, enable_b_series, include_news, include_llm):
-            continue
-        ws = wb.create_sheet()
-        set_sheet_title(ws, sec["key"], section_order)
-        sheets[sec["key"]] = ws
-    return sheets
-
-
 def generate_excel_report(
     holdings: list, include_news: bool = False, output_dir: str = "reports",
     news_top_count: int = 100, include_llm: bool = False,
@@ -537,7 +506,7 @@ def generate_excel_report(
     wb = create_workbook()
     wb.remove(wb.active)
     order = section_order or get_report_section_order()  # 内部名 order，避免影子覆盖参数
-    sheets = _create_sheets(wb, order,
+    sheets = create_sheets(wb, order,
                             enable_b_series=enable_b_series,
                             include_news=include_news,
                             include_llm=include_llm)

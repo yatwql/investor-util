@@ -59,9 +59,9 @@ class TestExcelSheetOrder(unittest.TestCase):
 
     def test_sheet_order_matches_default_section_order(self):
         """默认配置 → 页签顺序与 _REPORT_SECTION_DEFAULT 一致。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
-        sheets = _create_sheets(wb, _REPORT_SECTION_DEFAULT,
+        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_b_series=False, include_news=False, include_llm=False)
         # 只有 always 类型的 5 个页签
         expected_order = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
@@ -71,14 +71,14 @@ class TestExcelSheetOrder(unittest.TestCase):
 
     def test_sheet_order_custom_config(self):
         """自定义配置 → 页签顺序跟随自定义 section_order。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         custom_order = [
             {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
             {"key": "summary",           "name": "投资分析汇总",   "number": 2, "type": "always"},
             {"key": "market_value",      "name": "市值核算明细表", "number": 3, "type": "always"},
         ]
         wb = self._make_wb()
-        sheets = _create_sheets(wb, custom_order,
+        sheets = create_sheets(wb, custom_order,
                                 enable_b_series=False, include_news=False, include_llm=False)
         expected_order = [sec["key"] for sec in custom_order]
         self.assertEqual(list(sheets.keys()), expected_order)
@@ -86,9 +86,9 @@ class TestExcelSheetOrder(unittest.TestCase):
 
     def test_sheet_order_all_types_enabled(self):
         """全部类型启用 → 16 个页签按默认顺序排列。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
-        sheets = _create_sheets(wb, _REPORT_SECTION_DEFAULT,
+        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_b_series=True, include_news=True, include_llm=True)
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys,
@@ -97,10 +97,10 @@ class TestExcelSheetOrder(unittest.TestCase):
 
     def test_sheet_order_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         # 启用 always + b_series
-        sheets = _create_sheets(wb, _REPORT_SECTION_DEFAULT,
+        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_b_series=True, include_news=False, include_llm=False)
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
                          if sec["type"] in ("always", "b_series")]
@@ -124,11 +124,11 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
 
     def test_all_titles_follow_number_name_format(self):
         """所有页签标题符合 {number}.{name} 格式。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         from src.python.registry import get_report_section_order
         wb = self._make_wb()
         order = get_report_section_order()
-        sheets = _create_sheets(wb, order,
+        sheets = create_sheets(wb, order,
                                 enable_b_series=True, include_news=True, include_llm=True)
         for key, ws in sheets.items():
             self.assertRegex(
@@ -145,11 +145,11 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
 
     def test_title_numbers_are_unique(self):
         """所有页签标题的数字序号无重复。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         from src.python.registry import get_report_section_order
         wb = self._make_wb()
         order = get_report_section_order()
-        sheets = _create_sheets(wb, order,
+        sheets = create_sheets(wb, order,
                                 enable_b_series=True, include_news=True, include_llm=True)
         numbers = []
         for ws in sheets.values():
@@ -162,11 +162,11 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
 
     def test_titles_are_unique(self):
         """所有页签标题字符串无重复。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         from src.python.registry import get_report_section_order
         wb = self._make_wb()
         order = get_report_section_order()
-        sheets = _create_sheets(wb, order,
+        sheets = create_sheets(wb, order,
                                 enable_b_series=True, include_news=True, include_llm=True)
         titles = [ws.title for ws in sheets.values()]
         self.assertEqual(len(titles), len(set(titles)),
@@ -174,14 +174,14 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
 
     def test_title_uses_config_number_not_hardcoded(self):
         """自定义 section_order 时标题使用配置序号而非默认。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         custom_order = [
             {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
             {"key": "summary",           "name": "投资分析汇总",   "number": 2, "type": "always"},
             {"key": "market_value",      "name": "市值核算明细表", "number": 3, "type": "always"},
         ]
         wb = self._make_wb()
-        sheets = _create_sheets(wb, custom_order,
+        sheets = create_sheets(wb, custom_order,
                                 enable_b_series=False, include_news=False, include_llm=False)
         self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析",
                          "fund_performance 应使用自定义序号 1")
@@ -192,11 +192,11 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
 
     def test_title_order_tracks_section_order(self):
         """页签标题顺序与 section_order 的 number 值排序一致。"""
-        from src.python.report.excel_generator import _create_sheets
+        from src.python.report.excel_sheet_factory import create_sheets
         from src.python.registry import get_report_section_order
         wb = self._make_wb()
         order = get_report_section_order()
-        sheets = _create_sheets(wb, order,
+        sheets = create_sheets(wb, order,
                                 enable_b_series=True, include_news=True, include_llm=True)
         # 标题应是递增序号
         import re
