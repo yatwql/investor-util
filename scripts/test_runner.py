@@ -79,6 +79,20 @@ MODES: dict[str, dict] = {
         "timeout_sec": 900,
         "order": 6,
         "parallel": True,
+        "phases": [
+            {
+                "marker": "unit_core or unit_providers or unit_fetcher",
+                "desc": "Phase A — 核心单元验证（core / providers / fetcher）",
+                "timeout_sec": 120,
+                "parallel": True,
+            },
+            {
+                "marker": "scenario",
+                "desc": "Phase B — 业务场景验证（S0-S33 + T1-T21）",
+                "timeout_sec": 600,
+                "parallel": False,
+            },
+        ],
     },
     "integration": {
         "marker": "scenario or integration",
@@ -163,6 +177,7 @@ _HELP_TEXT += """\
   --parallel [LVL]  并行级别: high(100%%核数) / medium(50%%,默认) / low(25%%)
   --timeout SEC     覆盖超时时间（秒），所有模式统一使用此值
   --no-timeout      禁用超时，等待测试自然结束
+  --phased          分阶段运行（当前仅 verify 支持：Phase A 核心单元 → Phase B 场景，前序失败跳过后续）
   --help            显示本帮助信息
 
 输出目录结构:
@@ -193,6 +208,8 @@ def parse_args() -> argparse.Namespace:
                         help="覆盖各模式的超时设置（秒），所有模式统一使用此值")
     parser.add_argument("--no-timeout", action="store_true",
                         help="禁用超时，等待测试自然结束")
+    parser.add_argument("--phased", action="store_true",
+                        help="分阶段运行（仅对支持分阶段的模式有效，前序失败则跳过后续）")
     parser.add_argument("--help", action="store_true", help="显示帮助")
     return parser.parse_args()
 
@@ -383,17 +400,24 @@ def _build_pytest_args(mode_cfg: dict, mode_key: str,
 def run_mode(mode_key: str, coverage: bool = False,
              parallel_level: str | None = None,
              timeout_override: int | None = None,
-             no_timeout: bool = False) -> dict:
+             no_timeout: bool = False,
+             phased: bool = False) -> dict:
     """运行指定模式的测试。
 
     Args:
         mode_key: 模式名
         coverage: 是否启用覆盖率
+        phased: 启用分阶段运行（模式支持时有效）
 
     Returns:
         包含测试结果统计的字典
     """
     mode_cfg = MODES.get(mode_key, {})
+
+    # 分阶段模式：若模式定义了 phases 且命令行传入 --phased
+    if phased and "phases" in mode_cfg:
+        return _run_phased(mode_cfg["phases"], mode_key, coverage,
+                           parallel_level, timeout_override, no_timeout)
     html_available = _check_pytest_html()
 
     print(f"\n  {'=' * 54}")
@@ -630,6 +654,110 @@ def _render_index_html(results: list[dict], coverage: bool,
     return html
 
 
+# ── 分阶段执行 ──────────────────────────────────────────────
+
+
+def _run_phased(phases: list[dict], mode_key: str, coverage: bool,
+                parallel_level: str | None = None,
+                timeout_override: int | None = None,
+                no_timeout: bool = False) -> dict:
+    """分阶段运行测试，前序失败则跳过后续阶段。
+
+    每个阶段调用一次 subprocess.run，支持不同 marker/parallel/timeout。
+    """
+    html_available = _check_pytest_html()
+    mode_cfg = MODES.get(mode_key, {})
+
+    combined: dict = {
+        "mode": mode_key,
+        "desc": mode_cfg.get("desc", ""),
+        "passed": 0, "failed": 0, "skipped": 0,
+        "errors": 0, "subtests": 0,
+        "duration": 0.0,
+        "exit_code": 0,
+        "timed_out": False,
+    }
+
+    for i, phase in enumerate(phases):
+        tag = chr(65 + i)  # A, B, C, …
+        print(f"\n    ── [Phase {tag}]: {phase.get('desc', '')} ──")
+
+        phase_cfg = {
+            "marker": phase["marker"],
+            "parallel": phase.get("parallel", False),
+        }
+        pytest_args = _build_pytest_args(
+            phase_cfg, mode_key, html_available, coverage, parallel_level)
+
+        timeout = phase.get("timeout_sec", 300)
+        if no_timeout:
+            timeout = None
+        elif timeout_override is not None:
+            timeout = timeout_override
+
+        start = _time.time()
+        try:
+            _env = os.environ.copy()
+            _env["INVEST_RUNNING_TESTS"] = "1"
+            proc = subprocess.run(
+                pytest_args,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=_PROJECT_ROOT,
+                env=_env,
+            )
+        except subprocess.TimeoutExpired:
+            print(f"    [ERR] [Phase {tag}] 测试超时（{timeout}s）")
+            combined["exit_code"] = -1
+            combined["timed_out"] = True
+            combined["duration"] += (timeout or 0)
+            break
+
+        elapsed = _time.time() - start
+        combined["duration"] += elapsed
+
+        output = (proc.stdout or "") + (proc.stderr or "")
+        stats = _parse_pytest_output(output)
+
+        combined["passed"] += stats["passed"]
+        combined["failed"] += stats["failed"]
+        combined["skipped"] += stats["skipped"]
+        combined["errors"] += stats["errors"]
+        combined["subtests"] += stats["subtests"]
+
+        # 打印 pytest 摘要行
+        for line in output.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if any(kw in stripped for kw in ("passed", "failed", "error",
+                                             "warning", "===", "short test summary")):
+                print(f"      {stripped}")
+
+        ok = proc.returncode == 0
+        tag2 = "OK" if ok else "ERR"
+        parts = [f"{stats['passed']} passed", f"{stats['failed']} failed"]
+        if stats["skipped"]:
+            parts.append(f"{stats['skipped']} skipped")
+        print(f"    [{tag2}] [Phase {tag}] {', '.join(parts)}  ({elapsed:.1f}s)")
+
+        if not ok:
+            combined["exit_code"] = proc.returncode
+            print(f"    [!] [Phase {tag}] 未通过，跳过后续阶段")
+            break
+
+    # 汇总一行
+    ok = combined["exit_code"] == 0
+    tag2 = "OK" if ok else "ERR"
+    parts = [f"{combined['passed']} passed", f"{combined['failed']} failed"]
+    if combined["skipped"]:
+        parts.append(f"{combined['skipped']} skipped")
+    print(f"\n  [{tag2}] {mode_key}（分阶段）: {', '.join(parts)}  ({combined['duration']:.1f}s)")
+
+    return combined
+
+
 # ── 主入口 ────────────────────────────────────────────────────
 
 
@@ -657,6 +785,8 @@ def main() -> None:
         print(f"  [!] 超时: 已禁用（测试可能长时间运行）")
     elif args.timeout:
         print(f"  [..] 超时: 统一设为 {args.timeout}s")
+    if args.phased:
+        print(f"  [..] 分阶段: 已开启（前序阶段失败则跳过后续）")
 
     # 归档现有报告
     archive_path = archive_existing()
@@ -670,7 +800,8 @@ def main() -> None:
         result = run_mode(mode_key, coverage=args.coverage,
                           parallel_level=args.parallel,
                           timeout_override=args.timeout,
-                          no_timeout=args.no_timeout)
+                          no_timeout=args.no_timeout,
+                          phased=args.phased)
         results.append(result)
 
     # 生成汇总页

@@ -39,6 +39,7 @@
   - **B-2b 标记拆分 + 文件搬迁**：S0c（超多持仓）从 `scenario` 拆分为 `scenario_extreme`；`TestS0cLargeHoldings` + `TestScenarioExtreme` 统一迁至 `resilience/test_scenario_extreme.py`。scenario 模式从 21min 降至 321s（74% 降幅），scenario_extreme 8 项 ~56s
   - **B-2a（S0c 优化）降级为低优先级**：S0c 已移出 scenario，不再影响门禁
   - **D-4 dev-verify 新增**：`test_runner.py` 新增 `--mode dev-verify`，组合全部 unit 子模块并行 + 基础场景，约 2min 开发者快速验证
+  - **C verify 子阶段（`--phased`）**：`test_runner.py` 新增 `--phased` 分阶段标志，verify 模式支持 Phase A（核心单元 unit_core/providers/fetcher ~30s）+ Phase B（场景 ~5min），前序失败跳过后续，减少合入验证的反馈等待时间
 
 ### Docs
 
