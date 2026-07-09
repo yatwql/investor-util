@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
 创建日期：2026-06-26
-最后更新：2026-07-09（v0.3.4 — 测试隔离 + 文档归档清理）
+最后更新：2026-07-09（v0.3.4 — 测试隔离 + 文档归档清理 + R-188 push2 熔断引用同步）
 
 ---
 
@@ -704,7 +704,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 持仓文件格式异常 | 跳过异常行，继续解析 | 提示具体行号错误 |
 | 空持仓 | 暂停生成 | 直接返回，不生成报告 |
 | 熔断器触发 | 跳过该端点请求 | 冷却期后自动恢复 |
-| push2 数据源熔断 | 行业分类/概念板块/基金风格分析自动降级为备用数据或代码估算结果 | DataSourceRegistry 熔断器（连续 3 次失败后熔断 push2，冷却 5 分钟后自动放行试探）；eastmoney_industry.py 局部熔断器并行存在（待统一） |
+| push2 数据源熔断 | 行业分类/概念板块/基金风格分析自动降级为备用数据或代码估算结果 | DataSourceRegistry 熔断器（连续 3 次失败后熔断 push2，冷却 5 分钟后自动放行试探）；原 eastmoney_industry.py 局部熔断器已于 R-188 迁移至 DataSourceRegistry |
 | 收市后价格缓存过期（盘中降级残留） | 无感知（透明修复） | `_price_cache_fresh()` 校验缓存 `price_date`，发现非当日时自动清除缓存并重新请求 |
 | T2 增强数据源失败（指数/基金排名） | 列级 `--` + 页脚 ⚠/ℹ 状态摘要 | `_data_status` 字典（DataStatusItem）追踪各源 available/tier/message；Excel 端 `_write_data_status_foot()` 写入灰色页脚；HTML 端 `render_data_status` Jinja2 宏渲染 |
 | T3 数据源失败（行业分类）/ T4 数据源失败（盈利预测、分红） | 列级 `--` + 页脚状态摘要 | 同上 DegradationTracker 双信号降级 |

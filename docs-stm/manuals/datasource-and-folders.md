@@ -253,14 +253,15 @@ investor-util/
 │           ├── basic/                    # 基础业务场景 S0a-S0d + S1-S5 + S21-S33 + C-P1b + P1p（97 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   ├── test_integration.py              # S1-S5：持仓读取/行情获取/市值核算/分类汇总/报告生成
-│           │   ├── test_scenario_holdings_quality.py # S0a-S0d（Z3）：清仓跳过/A-C份额/200+持仓/特殊字符
+│           │   ├── test_scenario_holdings_quality.py # S0a-S0d（Z3）：清仓跳过/A-C份额/特殊字符（S0c 已移至 resilience）
 │           │   ├── test_scenario_special_securities.py # S21-S28（Z1）：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债
 │           │   ├── test_scenario_operational_behavior.py # S29-S33（Z2）：分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市
 │           │   ├── test_scenario_penetration.py  # P1p：穿透深度场景 — 多级基金嵌套/分级合并/行业归属
 │           │   └── test_scenario_section_order.py # C-P1b：报告序号可配置（自定义/部分配置/未知 key 合并场景，6 项）
-│           ├── resilience/               # 异常容错场景 S6-S10（18 项）
+│           ├── resilience/               # 异常容错场景 S6-S10 + 极限场景（24 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
-│           │   └── test_integration_scenarios.py  # S6-S10：纯债分类/网络降级/单行报告/零成本利润/极端份额
+│           │   ├── test_integration_scenarios.py  # S6-S9：纯债分类/网络降级/单行报告/零成本利润
+│           │   └── test_scenario_extreme.py # S0c+S10：超多持仓/极端份额/高精度净值/零成本组合（scenario_extreme 标记，8 项）
 │           ├── llm/                      # LLM 场景 S11-S20（32 项）
 │           │   ├── __init__.py           # 子包标记（空文件）
 │           │   └── test_llm_scenarios.py # S11-S20：混合缓存/全部失败/Thinking/禁用/断网/部分超期/HTML 分支
@@ -305,6 +306,7 @@ investor-util/
 │   ├── launch.sh                     # Linux Bash 启动脚本
 │   ├── test_runner.py                # 测试驱动脚本 — pytest 统一运行 + 结构化 HTML 报告输出
 │   ├── check-test-markers.py         # 标记合规检查 — AST 静态扫描 test_*.py 的 pytest 标记完整性
+│   ├── check-version-consistency.py # 版本号一致性检查 — 以 constants.py 为单一来源校验 9 处版本号
 │
 ├── docs-stm/                         # 项目文档
 │   ├── archive/                       # 历史文件归档
@@ -334,7 +336,9 @@ investor-util/
 │   │   ├── test-coverage-map/                        # 📁 场景-测试文件覆盖率映射归档
 │   │   │   ├── test-coverage-map.md                  # ✅ 已归档 — 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   │   │   └── validate_coverage_map.py              # ✅ 已归档 — 覆盖率映射验证脚本
-│   ├── plan/                         # 计划与设计文件
+│   │   ├── refactor_html_writer/                     # 📁 html_writer.py 分拆设计归档
+│   │   │   └── r178_html_writer_split.md             # ✅ 已实现 — R-178：html_writer.py 5 步分拆计划（含 C14 约束引入）
+│   ├── plan/                         # 计划与设计文件（当前空，待填入新迭代计划）
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
@@ -364,3 +368,5 @@ investor-util/
 ```
 
 > 注意：项目每次版本变更后，`technical.md` 中的目录树和测试文件数可能滞后。请以本文档为准。
+>
+> 最后更新：2026-07-09（v0.3.4 — 目录树新增 check-version-consistency.py）

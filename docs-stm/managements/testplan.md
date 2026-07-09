@@ -69,7 +69,8 @@
 | 测试文件 | 覆盖场景 | 职责范围 |
 |:---------|:---------|:---------|
 | `scenario/basic/test_integration.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
-| `scenario/resilience/test_integration_scenarios.py` | S6-S10 | 异常容错场景：纯债/断网/单账户/零成本/极端值 |
+| `scenario/resilience/test_integration_scenarios.py` | S6-S9 | 异常容错场景：纯债/断网/单账户/零成本 |
+| `scenario/resilience/test_scenario_extreme.py` | S0c+S10 | 极限场景：超多持仓/极端份额/高精度净值/零值组合 |
 | `scenario/llm/test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
 | `scenario/basic/test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
 | `scenario/basic/test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
@@ -84,7 +85,7 @@
 |:-----|:---------|:---------|:-----|:-------|
 | **S0a: 清仓持仓** | — | 持仓含份额=0 的已清仓品种 | 菜单 E | 清仓品种不计入市值、盈亏、总计；分类表跳过空行 |
 | **S0b: 同名多份额** | — | 同一基金分多笔买入（A 类+C 类同一代码） | 菜单 H | 多份额合并计算、穿透不崩溃、分类各计各 |
-| **S0c: 超多持仓** | — | 200 条持仓（覆盖各品种类型） | 菜单 L | 所有账户小计正确、总计正确、无性能问题 |
+| **S0c: 超多持仓** | — | 200 条持仓（覆盖各品种类型） | 菜单 L | 所有账户小计正确、总计正确、无性能问题（标记 `scenario_extreme`，已移至 `scenario/resilience/test_scenario_extreme.py`） |
 | **S0d: 特殊字符** | — | 名称含全角括号/空格/日文/emoji | 菜单 L | 分类正确、穿透正常、Excel/HTML 不崩溃 |
 | **S1: 纯股票组合** | — | 持仓仅含 3 只 A 股，无基金 | 菜单 E → 菜单 H | 穿透 TOP10 等于直接持股；基金业绩显示"无基金"；总计正确 |
 | **S2: 纯基金组合** | — | 持仓仅含 5 只基金（ETF+主动+QDII） | 菜单 L | 穿透计算正确、分类表无"股票"行、LLM 正常生成 |
@@ -108,7 +109,7 @@
 | **S7: 网络中断降级** | — | 持仓缓存存在但网络断开 | 菜单 H | 价格从缓存读取（过期缓存降级）；报告完整不含空白页签 |
 | **S8: 单账户单持仓** | — | 仅一个账户一只持仓 | 菜单 E | 分类表仅一行、穿透 TOP10 仅该持仓、总计 = 该持仓市值 |
 | **S9: 零成本持仓** | — | 持仓成本=0（赠送/未记录买入价） | 菜单 H | 盈亏 = 市值 - 0、收益率不除零崩溃、显示合理占位 |
-| **S10: 极端值** | — | 超大市值/极小份额/极多小数位 | 菜单 E | 正确定标至万元/亿元单位，不溢出、不崩溃 |
+| **S10: 极端值** | — | 超大市值/极小份额/极多小数位 | 菜单 E | 正确定标至万元/亿元单位，不溢出、不崩溃（标记 `scenario_extreme`，已移至 `scenario/resilience/test_scenario_extreme.py`）|
 | **S11: LLM 混合缓存+真实调用** | — | 4 模块（假设 news_correlation 关闭）：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 模块列表正确 |
 | **S12: LLM 全部失败（5 种原因）** | — | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
 | **S13: Extended Thinking 混合** | — | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用模块行，Excel/HTML/Summary 三种输出一致 |
@@ -121,7 +122,7 @@
 | **S20: 三种输出格式一致性** | — | 正常持仓 + 菜单 L | 菜单 L | Excel/HTML/Summary 三种输出对同一 module_info 的状态/颜色/费用一致 |
 
 > 添加新场景时，按复杂度选择文件。LLM 相关的场景统一放在 `test_llm_scenarios.py`。
-> S0a-S0d（持仓质量）统一放在 `test_scenario_holdings_quality.py`。
+> S0a/S0b/S0d（持仓质量，不含 S0c）统一放在 `test_scenario_holdings_quality.py`；S0c（超多持仓）和 S10（极端值）放在 `test_scenario_extreme.py`。
 > S21-S28（特殊品种）统一放在 `test_scenario_special_securities.py`。
 > T 类场景统一放在 `test_datetime_scenarios.py` 并标注 `scenario_datetime`。
 > 新增场景需要同时标注场景子标记（如 `scenario_basic`、`scenario_llm`）和通用 `scenario` 父标记，确保 `-m "scenario"` 能自动涵盖。
@@ -495,7 +496,7 @@ def test_get_ttl_closed(self, mock_open):
 |:---------|:-------|:-----|
 | **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache.py` 追加 `TestCacheEdgeCases` |
 | **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
-| **业务场景测试** | `test_integration.py`（基础链路 S1-S5）或 `test_integration_scenarios.py`（异常容错 S6-S10） | S1 → `test_integration.py` |
+| **业务场景测试** | `test_integration.py`（基础链路 S1-S5）或 `test_integration_scenarios.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_integration.py` |
 | **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
 | **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
 | **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S33 |

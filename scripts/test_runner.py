@@ -61,61 +61,80 @@ MODES: dict[str, dict] = {
         "order": 4,
         "parallel": False,
     },
+    "dev-verify": {
+        "marker": (
+            "(unit_core or unit_providers or unit_fetcher or "
+            "unit_llm or unit_report or unit_config or unit_ui or unit_news) "
+            "and not (edge or data) "
+            "or (scenario_basic)"
+        ),
+        "desc": "开发期快速验证（全部 unit 子模块并行 + 基础场景，~2min）",
+        "timeout_sec": 180,
+        "order": 5,
+        "parallel": True,
+    },
     "verify": {
         "marker": "scenario or unit_core or unit_providers or unit_fetcher",
-        "desc": "合入验证（场景+核心模块，并行~5min）",
+        "desc": "合入验证（场景+核心模块，~6min，unit 可并行但 scenario 为主瓶颈）",
         "timeout_sec": 900,
-        "order": 5,
+        "order": 6,
         "parallel": True,
     },
     "integration": {
         "marker": "scenario or integration",
         "desc": "集成测试（场景+模块契约/缓存/TUI 路由）",
         "timeout_sec": 600,
-        "order": 6,
+        "order": 7,
         "parallel": True,
     },
     "edge": {
         "marker": "edge",
         "desc": "边缘/异常场景测试",
         "timeout_sec": 600,
-        "order": 7,
+        "order": 8,
         "parallel": False,
     },
     "data": {
         "marker": "data",
         "desc": "数据正确性验证测试",
         "timeout_sec": 120,
-        "order": 8,
+        "order": 9,
         "parallel": False,
     },
     "all": {
         "marker": "",
         "desc": "全量测试",
         "timeout_sec": 1200,
-        "order": 9,
+        "order": 10,
         "parallel": True,
     },
     "all_no_unit": {
         "marker": "not unit",
         "desc": "全量测试（排除单元测试）",
         "timeout_sec": 1200,
-        "order": 9,
+        "order": 10,
         "parallel": True,
     },
     "smoke": {
         "marker": "smoke",
         "desc": "冒烟测试（24 项，~15s 快速验证核心通路）",
         "timeout_sec": 60,
-        "order": 10,
+        "order": 11,
         "parallel": False,
     },
     "report": {
         "marker": "unit_report",
         "desc": "仅报告模块测试（开发期快速验证报告变更）",
         "timeout_sec": 300,
-        "order": 11,
+        "order": 12,
         "parallel": True,
+    },
+    "scenario_extreme": {
+        "marker": "scenario_extreme",
+        "desc": "极限场景测试（S0c 超多持仓 + S10 极端值，~1min，手工触发）",
+        "timeout_sec": 600,
+        "order": 13,
+        "parallel": False,
     },
 }
 

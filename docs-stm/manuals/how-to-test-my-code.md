@@ -56,7 +56,10 @@ python scripts/test_runner.py --coverage
 
 # ===== ③ 全量/CI 门禁（耗时较长） =====
 
-# 合入验证 — PR 前检查（~49s）
+# 开发期快速验证（全部 unit 并行 + 基础场景，~2min）
+python scripts/test_runner.py --mode dev-verify
+
+# 合入验证 — PR 前检查（~6min）
 python scripts/test_runner.py --mode verify
 
 # 全量测试（~6min，--mode all 为默认值，可省略）
@@ -123,10 +126,11 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 ### 三级验证流水线
 
-项目推荐的三道质量门禁，按开发阶段逐级收紧：
+项目推荐的四道质量门禁，按开发阶段逐级收紧：
 
-- **提交前验证（`--mode regression`）** — 每次代码变更后、commit 前必须执行。覆盖全部 `scenario` 业务场景测试（含 S0a-S0d + S1-S28 + S29-S33 + T1-T21），确保端到端用户路径不被破坏。约 30s 即可完成。是编辑-验证循环中的第一道屏障，核心原则是"够快才能频繁跑，频繁跑才能尽早发现问题"。
-- **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。约 5min，适合作为 PR CI 门禁或合入前的手动检查。
+- **开发期验证（`--mode dev-verify`）** — 每次代码变更后、commit 前可选的快速验证。组合全部 8 个 unit 子模块（并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 2min。适合编码过程中频繁跑"有没有把房子点了"的快速检查。
+- **提交前验证（`--mode regression`）** — commit 前必须执行。覆盖全部 `scenario` 业务场景测试（含 S0a/S0b/S0d + S1-S28 + S29-S33 + T1-T21），确保端到端用户路径不被破坏。约 5min。是编辑-验证循环中的正式屏障。
+- **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。约 6min（scenario 串行为主瓶颈），适合作为 PR CI 门禁或合入前的手动检查。
 - **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 6min，适合发布前的快速全量回归。
 
 > ⚠ 以上项数为撰写时的快照值，实际计数随版本迭代而变化，精确统计见 [`test-coverage.md`](../managements/test-coverage.md)。
@@ -136,19 +140,20 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 **推荐工作流：**
 
 ```
-编码 → --mode regression(30s) → commit → 多次积累 → --mode verify(~5min) → merge → release前 → --mode all(~6min)
-                                  ↑                     ↗
-                          此处可反复跑 regression   若改跨模块调用
-                                                   先跑 --mode integration(40s)
+编码 → --mode dev-verify(2min) → commit → 多次积累 → --mode verify(6min) → merge → release前 → --mode all(6min)
+          ↑                         ↑                        ↗
+    改完代码随时跑             提交前再跑              若改跨模块调用
+                            --mode regression(5min)  先跑 --mode integration(40s)
 ```
 
 在一次典型开发周期中：
-1. 修改代码后，运行 `--mode regression`（30s）确认业务场景没有走歪
-2. 如果改了跨模块调用关系（缓存、新闻流水线、TUI 路由等），再跑 `--mode integration`（40s）确认接口契约和全链路正常
-3. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify`（~5min）确认整条管道通畅
-4. 通过后 commit，积累多次提交后准备合并到 master
-5. 合并前跑 `--mode verify` 作为合入门禁
-6. 发布版本前跑 `--mode all`（~6min）全量扫一遍
+1. **开发中频繁验证**：修改代码后运行 `--mode dev-verify`（2min）快速确认没有把核心逻辑弄坏
+2. **提交前完整验证**：准备 commit 时运行 `--mode regression`（5min）确保全场景正常
+3. 如果改了跨模块调用关系（缓存、新闻流水线、TUI 路由等），再跑 `--mode integration`（40s）确认接口契约和全链路正常
+4. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify`（6min）确认整条管道通畅
+5. 通过后 commit，积累多次提交后准备合并到 master
+6. 合并前跑 `--mode verify` 作为合入门禁
+7. 发布版本前跑 `--mode all`（6min）全量扫一遍
 
 ### 模式与覆盖范围说明
 
@@ -163,16 +168,18 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 - **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime）。这些测试模拟真实用户操作（如菜单 E/H/B/L 生成报告），组合多个模块进行端到端验证。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 
-  场景测试按职责分为 **4 大类**：
+  场景测试按职责分为 **5 大类**：
 
-  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、超多持仓不崩溃、特殊字符不乱码），以及操作行为场景（S29-S33：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市）。
-  - **`scenario_resilience` — 异常容错场景**：验证系统在非正常输入或环境下的降级能力，包括纯债券基金组合（穿透无股权覆盖）、网络中断（价格从过期缓存读取）、单账户单持仓、零成本持仓（不除零崩溃）、极端值（超大市值正确定标）。
+  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、特殊字符不乱码（超多持仓 S0c 已移至 scenario_extreme）），以及操作行为场景（S29-S33：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市）。
+  - **`scenario_resilience` — 异常容错场景**：验证系统在非正常输入或环境下的降级能力，包括纯债券基金组合（穿透无股权覆盖）、网络中断（价格从过期缓存读取）、单账户单持仓、零成本持仓（不除零崩溃）。
+  - **`scenario_extreme` — 极限场景**：验证极端数据下的正确性，包括超多持仓（S0c，200+ 条批量计算）和极端值（S10，超大/极小份额、高精度净值、零值组合）。标记 `scenario_extreme`，不包含在 `scenario` / `scenario_basic` / `scenario_resilience` 中，需单独运行 `--mode scenario_extreme`。
   - **`scenario_llm` — LLM 场景组合**：验证 LLM 模块在各种状态下的行为，包括缓存/成功/失败混合状态的颜色渲染、五种失败原因独立映射、Extended Thinking 标记、禁用优先原则、断网降级、全缓存无调用、三种输出格式（Excel/HTML/Summary）一致性。
   - **`scenario_datetime` — 日期/时间场景**：验证系统在不同市场时段（盘中/盘前/午休/盘后/非交易日/长假）、产品类型（场外基金/QDII/ETF/股票/混合）、边界条件（时段切换/缝隙/首次启动/断网）以及特殊日历（跨年/季末/汇率故障/调休/港股通假期）下的数据获取正确性和降级表现。
 
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
 - **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
-- **`--mode verify`** 覆盖范围最广的组合模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。这是"快速回查"的上限——确保数据管道整条链路正常，但跳过纯 UI、纯 LLM 等不直接影响数据流的模块。
+- **`--mode dev-verify`** 开发期快速验证模式，组合全部 8 个 unit 子模块（排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 2min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。覆盖项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode verify`** 合入门禁模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部 scenario 场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。约 6min（scenario 268 项串行为主瓶颈）。确保数据管道整条链路正常。
 
 #### 🔷 专项验证系列（`edge` / `data` / `smoke`）
 
@@ -198,7 +205,7 @@ python scripts/test_runner.py --mode scenario,edge
 
 ## 查看报告
 
-每次运行后，测试报告输出到：
+每次运行后，测试报告输出到（每个子目录对应一个 `--mode` 名称）：
 
 ```
 test-reports/latest/
@@ -213,6 +220,8 @@ test-reports/latest/
 │   └── report.html       # 集成测试（场景 + 模块间契约）
 ├── regression/
 │   └── report.html       # 回归测试 / 场景别名
+├── dev-verify/
+│   └── report.html       # 开发期快速验证
 ├── verify/
 │   └── report.html       # 合入验证
 ├── edge/
@@ -223,8 +232,10 @@ test-reports/latest/
 │   └── report.html       # 全量测试
 ├── all_no_unit/
 │   └── report.html       # 全量测试（排除单元测试）
-└── smoke/
-    └── report.html       # 冒烟测试
+├── smoke/
+│   └── report.html       # 冒烟测试
+└── scenario_extreme/
+    └── report.html       # 极限场景测试（mode 输出目录，源文件在 resilience/）
 ```
 
 **打开方式**：直接用浏览器打开 `test-reports/latest/index.html`
@@ -248,12 +259,12 @@ test-reports/latest/
 | ├ `scenario_new_holdings` | S4: 新持仓无缓存 |
 | ├ `scenario_cache_hit` | S5: 缓存全命中 |
 | └ `scenario_special_securities` | S21-S28: 特殊品种 |
-| `scenario_resilience` | 异常容错场景 S6-S10 |
+| `scenario_resilience` | 异常容错场景 S6-S9 |
 | ├ `scenario_bond` | S6: 纯债券基金组合 |
 | ├ `scenario_network_down` | S7: 网络中断降级 |
 | ├ `scenario_single_holding` | S8: 单账户单持仓 |
-| ├ `scenario_zero_cost` | S9: 零成本持仓 |
-| └ `scenario_extreme` | S10: 极端值 |
+| └ `scenario_zero_cost` | S9: 零成本持仓 |
+| `scenario_extreme` | 极限场景 S0c+S10：超多持仓/极端份额/高精度净值/零值组合 |
 | `scenario_llm` | LLM 场景 S11-S20 |
 | `scenario_datetime` | 日期/时间场景 T1-T21 |
 | `scenario_basic or scenario_datetime` | 基础链路 + 日期场景 |

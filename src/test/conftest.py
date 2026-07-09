@@ -125,6 +125,24 @@ def _auto_reset_provider_registry():
     get_registry().reset()
 
 
+@pytest.fixture(autouse=True)
+def _mock_market_hours_api(monkeypatch):
+    """禁用实时东方财富 push2 API 调用，使用内置默认值判断市场时段。
+
+    `is_market_open()` 有 3 层降级（config → push2 API → 内置默认值），
+    本 fixture 跳过第 2 层（push2 HTTP 请求），直接走内置 fallback 判断，
+    避免每测试类首次调用时触发 ~1-3s 的网络请求。
+
+    `_is_market_open_fallback()` 基于北京时区工作日 09:30-11:30+13:00-15:00
+    判断，在测试环境中稳定返回预期值。不影响任何测试断言——测试依赖的是
+    mock 返回的行情数据，而非真实市场状态。
+    """
+    monkeypatch.setattr(
+        "src.python.market_hours._is_market_open_official",
+        lambda _: None,
+    )
+
+
 def pytest_collection_modifyitems(config, items):
     """收集期校验 edge 标记与文件名的匹配约束。
 

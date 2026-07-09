@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
 创建日期：2026-06-26
-最后更新：2026-07-09（D-11 全景复查 + 新增 8 项；R-204 C4 冗余记录；R-205 cwd 依赖问题）
+最后更新：2026-07-09（D-11 全景复查 + 新增 8 项；R-204 C4 冗余记录；R-205 cwd 依赖问题；✅ 近期已修复 16 项清理归档）
 
 ---
 
@@ -30,7 +30,6 @@
 
 | # | 问题 | 模块 | 备注 |
 |:-:|:-----|:----|:----:|
-| R-178 | **`html_writer.py` 996 行严重超重**：导入 25+ 模块，混合 Jinja2 环境/数据准备/内容渲染/LLM 状态/文件 I/O 5 重职责 | `report/html_writer.py` | 分拆计划已制定 → `docs-stm/plan/r178_html_writer_split.md`（5 步 + 前置修复），待执行 |
 | R-197 | **`market_value.py` 711 行持续增长**：第 3 大源文件，混合核心计算（`_compute_detail_row`）与 Excel 写入（`_write_market_value_sheet`）两重职责，随溢价率、空行情、策略选择器等新功能持续膨胀 | `report/market_value.py` | 可拆为 `market_value.py`（计算）+ `market_value_write.py`（写入）|
 
 ### 🟡 中优先级
@@ -40,7 +39,7 @@
 | R-187 | **TUI Windows 平台 12 个测试跳过**：`termios`/`tty` 为 Linux 特有模块，Windows 上 `_get_key_linux()` 已加 try/except 保护 | `tui.py` + `test_tui_edge.py` | 功能降级但无错误，可考虑 CI 加 Windows runner |
 | R-198 | **LLM 模块两巨头膨胀**：`generators.py`（750 行，第 2 大）+ `api.py`（702 行，第 4 大），如新增环比分析等 LLM 模块建议先横向拆分 | `llm/generators.py` + `llm/api.py` | `generators.py` 可拆出 `generators_news.py`；`api.py` 可按 provider 拆为 `api_claude.py`/`api_openai.py` |
 | R-199 | **akshare 依赖老化风险**：`requirements.txt` 未锁定 akshare 版本，pytest 收集期已有 `FutureWarning`（DataFrame concat 行为变更），大版本升级可能引入兼容问题 | `requirements.txt` | 建议锁定 `akshare>=1.16,<2.0` 或类似区间 |
-| R-200 | **verify 模式 ~5min 耗时**：场景/集成测试单线程运行，llm 场景 mock 串行调度可能为瓶颈 | `scripts/test_runner.py` | 可分析瓶颈后对 verify 模式引入增量运行策略 |
+| ~~R-200~~ | ~~verify 模式 ~5min 耗时~~ | ~~`scripts/test_runner.py`~~ | ~~可分析瓶颈后引入增量运行~~ |
 | R-201 | **HTML 打印预览缺少浏览器渲染集成测试**：当前仅 9 项 UT 覆盖 CSS `@media print` 规则，无 Playwright 快照对比确保打印输出视觉正确 | `test_html_template.py` | Playwright 快照测试，但跨系统工具优先级低 |
 | R-205 | **`DegradationTracker` 跨会话持久化因 cwd 依赖从未生效**：`data_status.py` 写 `os.path.join(get_cache_dir(), ".degradation_state.json")`，`get_cache_dir()` = `os.path.abspath("data/cache")` 受运行 cwd 影响。若在 `src/` 下启动程序，路径解析为 `src/data/cache/`，持久化文件被写入错误目录，跨会话降级记忆从未生效。被双层 `try/except` 静默吞掉 | `report/data_status.py` + `cache.py` | 修复：`cache.py` 的 `get_cache_dir()` / `_CACHE_DIR` 改用相对于项目根目录的绝对路径（如 `os.path.dirname(os.path.dirname(__file__))` 推导），消除 cwd 依赖。同时删除已清除的 `src/data/cache/` 残留目录 |
 
@@ -50,23 +49,12 @@
 |:-:|:-----|:----|:----:|
 | R-204 | **B 系列模块文件缓存冗余读取**：`_render_overlap_matrix`/`_render_concentration`/`_render_style_analysis` 各自独立调用 `fetch_fund_holdings(code)`，同基金持仓在一次报告中读取文件缓存 3 次。无额外 API 调用（文件缓存命中），~20 只基金多 ~20ms | `html_writer.py` | 可在 R-178 分拆后用 `DataSourceRegistry.session_cache`（域名 `"fund_hold"`）消除冗余文件读 |
 
-### ✅ 近期已修复
+### ✅ 近期已修复（已记录到 changelog.md）
 
-| # | 问题 | 修复说明 |
-|:-:|:-----|:---------|
-| R-189 | **market_value.py `_fetch_cached_only()` → 公开 `fetch_cached_only()`**：前导下划线改为公共方法名，消除模块边界泄漏；market_value 中改为 `registry.fetch_cached_only(...)` | 2026-07-09 修复 |
-| R-190 | **哨兵 `_TRANSPORT_FAILURE` 统一至 provider_registry.py**：chain.py 删除局部定义，改为 import 共享；添加 `noqa: PLC2701` 注释标记跨模块 sentinel 共享的合理性 | 2026-07-09 修复 |
-| R-191 | **`test_eviction_order` 修复 + 新增覆盖率**：写入 2005 条（>阈值 2000）实际触发淘汰验证；新增 `TestFetchOrCached`（3 项：LIVE_FETCH / CACHE_ONLY / fetch_fn 返回 None）和 `TestFetchCachedOnly`（2 项：session 命中 / 全 miss） | 2026-07-09 修复 |
-| R-188 | **eastmoney_industry.py 局部熔断器迁移至 DataSourceRegistry**：6 个全局熔断变量 + 2 个辅助函数删除，_make_push2_request 统一使用 registry 的 is_circuit_broken/record_failure/record_success API | 2026-07-09 修复 |
-| R-203 | **`register_default_chains()` 未在生产环境调用（P0）**：`DataSourceRegistry.register_default_chains()` 仅在测试中运行，导致 `get_chain()` 始终返回空，CACHE_ONLY 降级失效。修复：`chain.py` 末尾添加模块导入时自动注册 | 2026-07-09 修复 |
-| M-004 | **tencent_style 隐式自注册 → 显式注册**：`record_failure("tencent_style")` 隐式创建 tier=4 最低优先级注册。修复：`fund_style_analysis.py` 模块级新增 `register_provider("tencent_style", tier=4, timeout=15.0)` | 2026-07-09 修复 |
-| R-185 | **预测年份硬编码 → 动态计算**：穿透表列名「预测EPS(XXXXE)」从 `datetime.now().year` 获取当前年份，跨年自动更新 | 2026-07-08 修复 |
-| R-186 | **定价双源消除 — constants.py 为单一来源**：`llm_settings.json` 模板移除型号示例，改为覆盖说明 | 2026-07-08 修复 |
-| R-180 | **`type: ignore` 累计 22 处 → 4 处**：系统性清理 13 个文件，剩余 4 处为 `tui.py` 平台特定，属合理保留 | 2026-07-08 修复 |
-| R-179 | **`config.py` 817 行 → `config/` 子包**：拆为 `_defaults.py` / `_comments.py` / `_core.py`，原文件删除 | 2026-07-08 修复 |
-| R-184 | **`_get_industry_avg_pe()` 空实现 → 完整实现**：接入 push2 API 三级降级（push2→Tencent→代码前缀），10 项测试覆盖 | 2026-07-08 修复 |
-| R-192 | **verify 测试 3 项 price_type 断言未同步**：Step B 将 `_compute_detail_row` 无行情分支的 `price_type` 从 `"--"` 改为 `"暂无行情"`，但 2 个场景测试共 3 处未同步，导致 verify 失败 | 2026-07-09 修复 |
-| R-193 | **unit 测试 3 项 _check_network_available 断言未同步**：`_check_network_available` 文案变更后 TestCheckNetworkAvailablePrint 中 3 项测试未同步，导致 unit 失败 | 2026-07-09 修复 |
-| R-194 | **`technical.md` push2 熔断"待迁移"标记过时**：`eastmoney_industry.py` 实际已于 R-188 迁移至 DataSourceRegistry，但 `technical.md` 的"实现位置"对比表仍标注"模块级全局变量（待迁移）"，与代码实况不符 | 2026-07-09 修复 |
-| R-195 | **版本号一致性检查脚本 + pyproject.toml 修复**：`pyproject.toml` version 自 v0.3.0 后未更新（落后 4 个版本），新增 `scripts/check-version-consistency.py` 以 `constants.py` 为单一事实源自动校验 9 处版本号，`CLAUDE.md` 发布流程同步更新 | 2026-07-09 修复 |
-| R-196 | **溢价率占位符 → 真实计算 + 3 项 🟡→✅**：`market_value.py` 新增 `_compute_premium()` 对 QDII 基金实现 `(现价-参考净值)/参考净值` 计算；`testplan.md` §2 数据正确性表 3 项 🟡 覆盖完成（溢价率/非 T 日本日盈亏/穿透占比归一化），data 标记 65→69 项 | 2026-07-09 修复 |
+> 以下所有项目已完整记录至 [`changelog.md`](./changelog.md)（v0.3.3 ~ v0.3.4），此处仅保留摘要索引，详细修复说明请查阅 changelog。
+>
+> v0.3.3：R-188~R-193、R-203、M-004（eastmoney_industry 熔断器迁移/assert 同步/自动注册等 8 项）
+> v0.3.4：R-194~R-196（technical.md 标记同步/版本一致性检查/溢价率真实计算 3 项）
+> v0.3.4（R-178）：R-178 html_writer.py 5 步分拆（html_save.py/html_jinja_env.py/html_renderers.py 外迁 + Step PF + 编排器精简）
+> **v0.3.5（R-200）：R-200 scenario/regression/verify 三模式耗时优化（Step 0 push2 mock、B-2b 标记拆分+文件搬迁、D-4 dev-verify 新增）**
+> v0.3.3（早期）：R-179~R-180、R-184~R-186（config.py 子包拆分/type:ignore 清理/预测年份动态化/定价单源 5 项）

@@ -15,12 +15,14 @@
 
 ### Fixed
 
+- **R-178 html_writer.py 5 步分拆完成**：`html_writer.py` 从 996 行/5 重职责精简为专注编排。Step 1：`_save_html_report` → `html_save.py`；Step 2：Jinja2 环境 → `html_jinja_env.py`；Step 3：14 个 `_render_*` 函数 → `html_renderers.py`；Step PF：修复 `_ENV.globals` 运行时变异；Step 4：编排器精简。设计文档归档至 `docs-stm/archive/refactor_html_writer/`。
 - **R-211 测试隔离补完**：`test_excel_generator_edge.py` 调用 `generate_excel_report` 补传 `output_dir=tmp_path`，消除测试报告对 `reports/` 目录的污染。`logger.py` 新增 `INVEST_RUNNING_TESTS` 环境变量检测 + `"pytest" in sys.modules` 回退，修复 xdist worker 子进程日志误写入 `app.log`。`test_runner.py` 子进程显式设置 `INVEST_RUNNING_TESTS=1` 确保全链路继承。
 
 - **technical.md C12 约束老化引用**：`testplan.md §1.9` → `§1.8`（随 testplan.md 编号修复同步）。
 
 ### Docs
 
+- **R-194 technical.md push2 熔断标记同步**：`technical.md` 三层熔断对比表的 push2 实现位置从"模块级全局变量（待迁移）"修正为"已迁移，见 R-188"，与代码实况保持一致。
 - **test-coverage-map.md 归档**：`test-coverage-map.md` + `validate_coverage_map.py` 迁移至 `docs-stm/archive/test-coverage-map/`，缩略条目对应更新。
 - **testplan.md 组织清理**：已归档的旧 §1.8（场景-测试文件覆盖率映射）移除，后续 §1.9→§1.8 重编号；§6.2.8、§8.3.1 老化引用同步更新。
 - **plan.md R-188~R-191 引用更新**：blockquote 标记为已完成，移除"剩余待修复问题"描述。
@@ -28,7 +30,21 @@
 
 ---
 
-## [0.3.3] - 2026-07-09
+## [0.3.5] - 2026-07-09
+
+### Changed
+
+- **R-200 scenario/regression/verify 三模式耗时优化**：
+  - **Step 0 push2 API mock**：`conftest.py` 新增 `_mock_market_hours_api` autouse fixture，跳过东方财富 push2 网络请求，直接使用内置 fallback 判断市场时段，消除每测试类首次调用的 1-3s 网络开销
+  - **B-2b 标记拆分 + 文件搬迁**：S0c（超多持仓）从 `scenario` 拆分为 `scenario_extreme`；`TestS0cLargeHoldings` + `TestScenarioExtreme` 统一迁至 `resilience/test_scenario_extreme.py`。scenario 模式从 21min 降至 321s（74% 降幅），scenario_extreme 8 项 ~56s
+  - **B-2a（S0c 优化）降级为低优先级**：S0c 已移出 scenario，不再影响门禁
+  - **D-4 dev-verify 新增**：`test_runner.py` 新增 `--mode dev-verify`，组合全部 unit 子模块并行 + 基础场景，约 2min 开发者快速验证
+
+### Docs
+
+- **计划文档 v5 终版**：`r200_verify_mode_optimization.md` 同步迭代更新
+- **测试模式文档同步**：`how-to-test-my-code.md`、`testplan.md`、`datasource-and-folders.md` 更新 scenario_extreme 文件位置和 dev-verify 模式说明
+- **review-findings.md R-200 → ✅**：已修复转归档
 
 ### Added
 
