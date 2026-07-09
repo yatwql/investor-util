@@ -22,7 +22,6 @@ from src.python.models import Holding
 from src.python.registry import get_llm_module_name, get_llm_module_names, get_report_section_order
 from src.python.report.category import _build_category_data_status
 from src.python.report.data_status import DataStatus
-from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix
@@ -71,8 +70,7 @@ logger = logging.getLogger("invest")
 #     新闻关联                  L716 ~ L753
 #     LLM 内容                  L756 ~ L820
 #     LLM 模块信息              L823 ~ L918
-#   报告保存                    L921 ~ L958
-#     _save_html_report()       L921 ~ L957
+#   报告保存（已迁出 → html_save.py）
 #
 # ═══════════════════════════════════════════════════════════════
 
@@ -954,42 +952,5 @@ def _render_llm_module_info(
     _llm_endpoint = next((mi["endpoint"] for mi in llm_module_info if mi.get("endpoint")), "")
     return llm_module_info, _llm_endpoint, module_disabled, _llm_session_usage
 
-
-def _save_html_report(
-    html: str, output_dir: str,
-    total_mv: float, total_profit: float,
-    prog: ProgressReporter,
-) -> str:
-    """将 HTML 写入文件（最新版 + 归档版）。
-
-    Returns:
-        最新版报告的绝对路径
-    """
-    prog.info("正在保存报告文件...")
-    _ensure_reports_dir(output_dir)
-
-    # 最新版
-    latest_path = os.path.join(output_dir, "个人投资分析报告.html")
-    with open(latest_path, "w", encoding="utf-8") as f:
-        f.write(html)
-    logger.info("最新 HTML 报告已保存: %s", latest_path)
-    prog.ok(f"最新版报告: {latest_path}")
-
-    # 归档版
-    archive_dir = os.path.join(output_dir, datetime.now().strftime("%Y%m%d"))
-    os.makedirs(archive_dir, exist_ok=True)
-    archive_path = os.path.join(
-        archive_dir,
-        f"个人投资分析报告-{datetime.now().strftime('%Y%m%d-%H%M%S')}.html",
-    )
-    with open(archive_path, "w", encoding="utf-8") as f:
-        f.write(html)
-    logger.info("归档 HTML 报告已保存: %s", archive_path)
-    prog.ok(f"归档版报告: {archive_path}")
-
-    # 清理过期归档（非关键），避免目录无限增长
-    _cleanup_old_archives(output_dir)
-
-    prog.ok(f"HTML 报告生成完成！总市值: {total_mv:,.2f}元, 总盈亏: {total_profit:,.2f}元")
-    return os.path.abspath(latest_path)
-
+# ── 桥接 import：Step 1 外迁后保留向后兼容 ──────────────────
+from src.python.report.html_save import _save_html_report  # noqa: E402, F401
