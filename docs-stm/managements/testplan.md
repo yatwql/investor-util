@@ -243,7 +243,7 @@
 
 > edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。
 
-### 1.9 边缘测试文件隔离规范（强制）
+### 1.8 边缘测试文件隔离规范（强制）
 
 所有 `@pytest.mark.edge` 标记的测试**必须**遵守以下文件级约束：
 
@@ -460,7 +460,7 @@ def test_get_ttl_closed(self, mock_open):
 5. **无测试污染**：`pytest --co` 验证无跨文件 patch 残留冲突
 6. **测试数量不降级**：新增功能后 `pytest --collect-only | tail -1` 报告的总测试数 ≥ 变更前（有删除须在 changelog.md 中说明理由）
 7. **测试用例 MUST**：新增功能必有对应测试用例，Bug 修复必有对应回归用例（验证缺陷场景的具体断言，非仅正常路径）
-8. **§1.8 覆盖率映射更新**：新场景（S/Txx）必须映射到对应测试文件，并更新覆盖状态
+8. **`test-coverage.md` 场景表更新**：新场景（S/Txx）必须在场景测试分组表补充条目
 
 ### 6.3 回归检查门禁
 
@@ -521,7 +521,7 @@ def test_qdii_nav_date_delayed_t2(self):
 
 ### 8.3 新增后必须更新的文件
 
-1. **`testplan.md §1.8`** — 如新增 S/T 场景，更新 `test-coverage.md` 场景测试分组表；详细映射已归档，不再强制验证
+1. **`test-coverage.md` 场景测试分组表** — 新增 S/T 场景时补充条目（含测试类参考列）
 2. **`datasource-and-folders.md`** — 新增 test_*.py 文件后更新目录树（test 目录下的测试文件数）
 3. **`changelog.md`** — 记录新增的测试数量和覆盖场景
 4. **`plan.md`** — 如果在迭代中新增的功能，更新对应条目的完成状态
