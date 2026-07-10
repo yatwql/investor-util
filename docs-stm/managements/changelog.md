@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **缓存路径偏移导致"每次都是新增资产"**：`cache.py` 从 `src/cache.py` 重构移动到 `src/python/cache.py` 时，`_PROJECT_ROOT` 的 `dirname` 次数未同步更新（少了一层），导致缓存目录偏移到 `src/data/cache/`，`holdings_tracking.json` 每次都读不到，全部代码被误判为"新增"。修复：在 `constants.py` 用**标记文件查找法**（向上找 `pyproject.toml` / `.git`）替代 `dirname` 深度计数，`cache.py` 统一从此导入。清理了残留的 `src/data/cache/` 目录。
+
 - **`_fetch_from_sina()` 死循环导致 xdist worker OOM crash**：新浪财经翻页后新增跨分类 URL 去重逻辑（`seen_urls`），但当全部条目均被去重命中时，`category_fetched` 永不增长且 `len(items) >= need` 永不触发 break，导致 `while` 死循环 → worker OOM kill。新增 stale-iteration guard：一轮无新增条目时 `break`。修复 2 项测试（`test_fetch_from_sina_returns_list` / `test_fetch_from_sina_dedup_by_url`），全量 2956/2956 通过。
 
 - **新闻源翻页能力不足**：东方财富（单次上限 200）、华尔街见闻（硬编码 `min(num,100)`）、新浪财经（单页 50 条×只取第 1 页）三源实际获取数远低于 `build_news_data` 传入的 `per_source` 值，导致 `news_top_count=300` 时原始候选池不够。改为游标/多页循环翻页，各源现在可达 `per_source` 目标量。
