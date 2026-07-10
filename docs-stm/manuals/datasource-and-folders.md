@@ -27,12 +27,12 @@
 ```
 investor-util/
 │
-├── src/                              # 源代码 — 根包声明（空 `__init__.py`，使 src 可被 Python 导入）
+├── src/                              # 源代码根包，所有业务模块与测试用例的公共父级
 │   ├── __init__.py                   # 包标记（空文件）
 │   │
-│   ├── python/                       # 主程序代码 — 业务子包声明
+│   ├── python/                       # 主程序代码，按职责划分为数据获取、报告生成、LLM 等子模块
 │   │   ├── __init__.py               # 包标记（空文件）
-│   │   ├── cache.py                  # 缓存引擎 — 泛用 JSON 文件缓存、TTL 管理、过期清理、指纹失效
+│   │   ├── cache.py                  # 通用 JSON 文件缓存引擎，提供 TTL 管理、过期清理与指纹失效机制
 │   │   ├── code_utils.py             # 证券代码/名称类型判定中心 — A股/基金/债券/港股通/ETF/QDII 识别原语
 │   │   ├── config/                    # 配置管理子包（_defaults / _comments / _core）— config.json / llm_key / llm_settings 读写、校验
 │   │   ├── constants.py              # 共享常量 + 项目根路径（标记文件查找法）— 版本号、缓存频率、模型定价、PROJECT_ROOT
@@ -51,7 +51,7 @@ investor-util/
 │   │   ├── handlers_config.py        # 配置管理命令 — 菜单 [C]/[F]/[O]/[S]/[R] 的实现：目录/文件/LLM 模块启停
 │   │   ├── handlers_report.py        # 报告生成命令 — 菜单 [E]/[H]/[B]/[L] 的实现：生成各类型报告
 │   │   │
-│   │   ├── fetcher/                  # 数据获取调度（Provider 路由 + 缓存预热）
+│   │   ├── fetcher/                  # 数据获取调度层，负责 Provider 路由分发与缓存预热
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── chain.py              # Provider Chain — 多源路由、fallback 自动切换、过期缓存降级
 │       │   │   ├── fund.py               # 基金数据获取 — 净值/持仓/排名/基准的缓存感知封装
@@ -60,7 +60,7 @@ investor-util/
 │       │   │   ├── fund_manager.py       # 基金经理数据获取 — 主页 HTML 解析 + 档案页回退
 │       │   │   └── price.py              # 价格行情获取 — 场内实时价/收盘价/ETF 溢价
 │   │   │
-│   │   ├── providers/                # 数据源提供商（各 API 的具体实现）
+│   │   ├── providers/                # 数据源提供商，封装各第三方 API 的具体调用逻辑
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── tencent.py            # 腾讯财经 — 场内实时价/收盘价/A 股指数（qt.gtimg.cn）
 │       │   │   ├── sina.py               # 新浪财经 — 美股指数（hq.sinajs.cn，JS 变量解析）
@@ -79,50 +79,50 @@ investor-util/
 │       │   │   ├── news_correlator.py    # 新闻关联引擎 — 持仓关键词匹配、关联度排序
 │       │   │   └── news_keywords.py      # 关键词提取 — 从持仓+穿透+行业数据生成关键词全集
 │   │   │
-│   │   ├── llm/                      # LLM 客户端（12 个子模块 + __init__.py 导出公共 API）
+│   │   ├── llm/                      # LLM 客户端，包含 API 调用、缓存指纹、提示词模板与会话统计等子模块
 │       │   │   ├── __init__.py           # 公共 API 导出，直链 generators_orchestrator/news
 │       │   │   ├── api.py                # Provider 路由 + Claude/OpenAI 调用 + Extended Thinking
-│       │   │   ├── api_base.py           # API 基础设施 — 常量/重试/截断/内容提取/失败追踪（从 api.py 拆分）
+│       │   │   ├── api_base.py           # API 基础设施，提供重试、截断、内容提取与失败追踪等公共逻辑
 │       │   │   ├── circuit_breaker.py    # 熔断器 — 端点级熔断，防止级联超时
 │       │   │   ├── fingerprint.py        # 缓存指纹 — LLM 输入指纹计算、TTL 管理
 │       │   │   ├── generators.py         # 4 个单例生成函数（global_macro/expert_review/health_check/penetration）
-│       │   │   ├── generators_news.py    # 财经新闻 LLM 关联分析（从 generators.py 拆分）
-│       │   │   ├── generators_orchestrator.py  # LLM 批量编排、缓存预检、线程池分发（从 generators.py 拆分）
+│       │   │   ├── generators_news.py    # 财经新闻的 LLM 关联分析逻辑
+│       │   │   ├── generators_orchestrator.py  # LLM 批量任务编排，支持缓存预检与线程池并发分发
 │       │   │   ├── markdown.py           # Markdown→HTML 渲染
 │       │   │   ├── pricing.py            # 模型定价 — 各模型 Token 单价加载、费用估算
 │       │   │   ├── prompts.py            # 系统提示词 — 内置 System Prompt 常量 + 构建函数
 │       │   │   ├── session.py            # 会话统计 — 本次会话的 Token 用量累计、费用汇总
 │       │   │   └── skeleton.py           # 共享骨架 — _generate_llm_content 等核心编排逻辑
 │   │   │
-│   │   ├── report/                   # 报告生成（Excel + HTML）
+│   │   ├── report/                   # 报告生成模块，同时支持 Excel 电子表格与 HTML 网页两种输出格式
 │       │   │   ├── __init__.py           # 子包标记（空文件）
-│       │   │   ├── excel_generator.py    # Excel 报告编排器（12 函数→6 模块拆分后核心编排：~100 行）
+│       │   │   ├── excel_generator.py    # Excel 报告编排器，统筹各子模块完成报告生成
 │       │   │   ├── excel_writer.py       # Excel 写入 — openpyxl Workbook 创建、页签容器管理
-│       │   │   ├── excel_module_loader.py # 报告模块加载器 — import + ImportError 降级（从 excel_generator.py 拆分）
-│       │   │   ├── excel_sheet_factory.py # Sheet 工厂 — 页签创建+类型驱动可见性（从 excel_generator.py 拆分）
-│       │   │   ├── excel_market_data.py   # 行情市值+指数数据解析（从 excel_generator.py 拆分）
-│       │   │   ├── excel_content_sheets.py # 核心内容页签写入（汇总/分类/穿透/基金业绩，从 excel_generator.py 拆分）
-│       │   │   ├── excel_news_warning.py  # 新闻+智能预警页签写入（从 excel_generator.py 拆分）
-│       │   │   ├── excel_b_series.py      # B 系列页签写入（基金经理/重合度/集中度/风格，从 excel_generator.py 拆分）
-│       │   │   ├── excel_llm_usage.py     # LLM 分析章节+API 用量页签（从 excel_generator.py 拆分）
+│       │   │   ├── excel_module_loader.py # 报告模块动态加载器，支持 ImportError 时的优雅降级
+│       │   │   ├── excel_sheet_factory.py # Excel 页签工厂，按数据类型驱动页签创建与可见性控制
+│       │   │   ├── excel_market_data.py   # 行情市值与指数数据的解析逻辑
+│       │   │   ├── excel_content_sheets.py # 核心内容页签写入，涵盖汇总、分类、穿透与基金业绩
+│       │   │   ├── excel_news_warning.py  # 新闻与智能预警页签的写入逻辑
+│       │   │   ├── excel_b_series.py      # B 系列页签写入，包含基金经理、重合度、集中度与风格分析
+│       │   │   ├── excel_llm_usage.py     # LLM 分析章节与 API 用量页签的整合写入
 │       │   │   ├── styles.py             # Excel 样式 — 颜色/字体/边框/对齐/数字格式定义
-│       │   │   ├── summary_llm_usage.py   # LLM API 用量页签（从 summary.py 拆分）
+│       │   │   ├── summary_llm_usage.py   # 投资分析汇总中的 LLM API 用量页签
 │       │   │   ├── summary.py            # 投资分析汇总页签 — 指数行情、账户汇总
 │       │   │   ├── market_value.py       # 市值核算计算引擎 — 行情获取、细节行生成、盈亏计算
 │       │   │   ├── market_value_sheet.py # 市值核算 Excel 写入层 — 行值转换、着色、分组写入
 │       │   │   ├── category.py           # 持仓分类表页签 — 按资产属性+投资分类聚合
 │       │   │   ├── data_status.py        # 数据源状态追踪 — DataStatusItem / STATUS_MESSAGES / DegradationTracker
 │       │   │   ├── penetration.py        # 资产穿透 TOP10 — 基金穿透合并、行业分类、板块映射
-│       │   │   ├── penetration_sheet.py  # 穿透 TOP10 Excel 写入 — 从 penetration.py 拆分的页签写入函数
+│       │   │   ├── penetration_sheet.py  # 穿透 TOP10 的 Excel 页签写入
 │       │   │   ├── fund_performance.py   # 基金业绩分析页签 — 排名/收益率/基准对比/评级
 │       │   │   ├── news_correlation.py   # 新闻关联分析页签 — 财经新闻关键词匹配
 │       │   │   ├── early_warning.py      # 智能预警页签 — 行业资金流向联动 + 新闻情绪聚合
 │       │   │   ├── llm_content.py        # LLM 增补页签写入 — 各 LLM 模块的 Excel 页签生成
 │       │   │   ├── html_writer.py        # HTML 报告生成编排器 — 调用子渲染函数、模板渲染
-│       │   │   ├── html_jinja_env.py     # Jinja2 环境 — _ENV 实例、8 个过滤器、section_visible 注册（从 html_writer.py 拆分）
-│       │   │   ├── html_renderers.py     # HTML 渲染函数 — 14 个 _render_* + _build_module_info_list（从 html_writer.py 拆分）
-│       │   │   ├── html_save.py          # HTML 报告文件 I/O — 最新版/归档版写入、过期清理（从 html_writer.py 拆分）
-│       │   │   ├── html_builders.py      # HTML 数据构建器 — 持仓分类表/基金业绩数据构建（从 html_writer.py 拆分）
+│       │   │   ├── html_jinja_env.py     # Jinja2 模板环境，提供过滤器注册与 section_visible 控制标记
+│       │   │   ├── html_renderers.py     # HTML 报告各章节的渲染函数集合
+│       │   │   ├── html_save.py          # HTML 报告保存，负责覆盖写入最新版、按日期归档并自动清理过期归档
+│       │   │   ├── html_builders.py      # HTML 报告的数据构建器，负责持仓分类与基金业绩数据组装
 │       │   │   ├── fund_concentration.py        # 持仓集中度监控 — top3/5/10 占比+环比变化+三级预警
 │       │   │   ├── fund_concentration_sheet.py  # 持仓集中度监控 Excel 写入 — 10 列输出+变化箭头/标识
 │       │   │   ├── fund_manager_analysis.py     # 基金经理变更分析 — 快照式变更检测（1/3/6 月窗口）
@@ -136,11 +136,11 @@ investor-util/
 │   │   └── tmpl/
 │   │       └── report_template.html  # HTML 报告 Jinja2 模板
 │   │
-│   └── test/                             # 测试（按标记分组目录，2972 tests）
+│   └── test/                             # 测试套件，按 pytest 标记分层组织为 unit / integration / scenario
 │       ├── __init__.py                   # 包标记（空文件）
 │       ├── conftest.py                   # pytest 配置 — 所有标记注册（19 个分层标记）、fixture
 │       ├── helpers.py                    # 测试辅助工具（SynchronousExecutor 异步转同步执行器）
-│       ├── unit/                         # 单元测试（2665 项，9 个子分组）
+│       ├── unit/                         # 单元测试，按被测模块划分子分组
 │       │   ├── __init__.py               # 子包标记（空文件）
 │       │   ├── conftest.py               # 单元测试级 pytest fixture/配置
 │       │   ├── providers/                # 数据源 provider 测试（≈166 项）
@@ -160,7 +160,7 @@ investor-util/
 │       │   │   ├── test_fetcher_index.py # 指数抓取 — 腾讯→新浪 fallback 双链路（13 项）
 │       │   │   ├── test_fetcher_industry.py # 行业抓取 — _industry_transform / fetch_industry_data / 熔断预检 batch（41 项）
 │       │   │   ├── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
-│   │   │   ├── test_fund_manager.py  # 基金经理师数据获取 — HTML 解析、当页面退回档（14 项）
+│   │   │   ├── test_fund_manager.py  # 基金经理数据获取测试，覆盖 HTML 解析与档案页回退
 │       │   │   └── test_api_edge.py      # HTTP Provider 异常场景 — 超时/DNS/SSL/429/503/JSON 异常（23 项 Y1）
 │       │   ├── llm/                      # LLM 相关测试（480 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -213,17 +213,17 @@ investor-util/
 │       │   │   ├── test_classification_utils.py # 分类工具函数 — 资产分类/映射/判定（B 系列辅助）
 │       │   │   ├── test_data_integrity.py # 数据正确性验证 — 分类聚合/行业占比/指数合理性/多币种/多时区
 │       │   │   ├── test_data_quality_edge.py # 数据质量异常场景 — 停牌/负净值/债券违约/FOF 嵌套（22 项 Y2）
-│       │   │   ├── test_data_status.py   # DataStatusItem / DegradationTracker / STATUS_MESSAGES 常量（D 迭代）
+│       │   │   ├── test_data_status.py   # 数据源状态追踪组件 DataStatusItem 与 DegradationTracker 的测试
 │       │   │   ├── test_market_value_edge.py # 行情异常场景 — NAV 空窗期/交易时段切换/溢价率（37 项）
 │       │   │   ├── test_qdii_timezone_edge.py # QDII 多时区 — _is_qdii / 多时区日期转换（26 项）
 │       │   │   ├── test_news_correlation.py # 新闻关联分析页签 — 新闻匹配/关键词写入（49 项）
 │       │   │   ├── test_early_warning.py # 智能预警页签 — 行业资金流出/新闻情绪聚合（25 项）
-│       │   │   ├── test_early_warning_edge.py # D-7b 预警空态占位（5 项）
-│       │   │   ├── test_excel_generator_edge.py # D-8 全局降级冒烟 + 消息一致性（10 项）
-│       │   │   ├── test_fund_bseries_sheet_edge.py # D-8 B 系列空数据占位（6 项）
+│       │   │   ├── test_early_warning_edge.py # 智能预警在空数据状态下的占位行为验证
+│       │   │   ├── test_excel_generator_edge.py # 全局降级场景的冒烟测试与消息一致性验证
+│       │   │   ├── test_fund_bseries_sheet_edge.py # B 系列报告在空数据时的占位展示验证
 │       │   │   ├── test_html_builders.py # HTML 数据构建器 — 持仓分类表/基金业绩数据构建
 │       │   │   ├── test_html_builders_edge.py # HTML 数据构建器异常场景 — 分红 API 降级/盈利预测失败
-│       │   │   ├── test_news_degradation_edge.py # D-7b 新闻全源/部分失败占位（7 项）
+│       │   │   ├── test_news_degradation_edge.py # 新闻源全部或部分失败时的降级展示验证
 │       │   │   ├── test_progress.py      # 进度报告 — ProgressReporter / 错误跟踪/耗时排行（33 项）
 │       │   │   ├── test_fund_style_analysis.py # 基金风格分析 — 市值/PE 加权、网格距离、漂移检测（32 项）
 │       │   │   ├── test_fund_manager_analysis.py # 基金经理变更分析测试（B2）
@@ -285,7 +285,7 @@ investor-util/
 │               ├── __init__.py           # 子包标记（空文件）
 │               └── test_datetime_scenarios.py  # T1-T21：市场状态/产品分类/边界 Edge Case/跨年/调休/汇率故障/港股通假期
 │
-├── data/                             # 运行时数据
+├── data/                             # 运行时数据目录，存放持仓文件、API 缓存与用户配置
 │   ├── holdings/                     # 持仓 xlsx 文件（用户放置）
 │   ├── cache/                        # API 响应缓存（自动生成，JSON/JSON.GZ）
 │   ├── config/                       # 配置文件（手动编辑）
@@ -295,7 +295,7 @@ investor-util/
 │   │
 │   └── ...（其他子目录不存在，仅以上三个）
 │
-├── reports/                          # 生成报告输出（最新版 + 按日期存档，自动生成）
+├── reports/                          # 报告输出目录，保存最新版与按日期归档的历史报告
 ├── logs/                             # 程序日志（app.log，自动生成）
 │
 ├── test-reports/                      # 测试报告输出（自动生成）
@@ -317,14 +317,14 @@ investor-util/
 │   └── archives/                      # 历史报告存档
 │       └── <YYYYMMDD>/                # 按日期归档的子目录（含完整 latest/ 快照）
 │
-├── scripts/                          # 启动脚本 + 测试工具
+├── scripts/                          # 启动脚本与测试工具
 │   ├── launch.ps1                    # Windows PowerShell 启动脚本
 │   ├── launch.sh                     # Linux Bash 启动脚本
 │   ├── test_runner.py                # 测试驱动脚本 — pytest 统一运行 + 结构化 HTML 报告输出
 │   ├── check-test-markers.py         # 标记合规检查 — AST 静态扫描 test_*.py 的 pytest 标记完整性
 │   ├── check-version-consistency.py # 版本号一致性检查 — 以 constants.py 为单一来源校验 9 处版本号
 │
-├── docs-stm/                         # 项目文档
+├── docs-stm/                         # 项目文档目录，包含用户手册、管理文档与历史归档
 │   ├── archive/                       # 历史文件归档
 │   │   ├── archived_changelog.0.1.x.md        # v0.1.x 版本变更日志归档
 │   │   ├── archived_changelog.0.2.x.md        # v0.2.x 版本变更日志归档（v0.2.0 ~ v0.2.91 共 47 个版本）
@@ -352,8 +352,8 @@ investor-util/
 │   │   ├── test-coverage-map/                        # 📁 场景-测试文件覆盖率映射归档
 │   │   │   ├── test-coverage-map.md                  # ✅ 已归档 — 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   │   │   └── validate_coverage_map.py              # ✅ 已归档 — 覆盖率映射验证脚本
-│   │   ├── refactor-excel-generator/              # 📁 excel_generator.py 拆分为 7 模块设计归档
-│   │   │   └── R-206-excel-generator-split-plan.md # ✅ 已实现 — R-206：excel_generator.py 7 模块拆分（692→98 行）
+│   │   ├── refactor-excel-generator/              # Excel 报告编排器，统筹各子模块完成报告生成
+│   │   │   └── R-206-excel-generator-split-plan.md # Excel 报告编排器，统筹各子模块完成报告生成
 │   │   ├── refactor-html_writer/                     # 📁 html_writer.py 分拆设计归档
 │   │   │   └── r178_html_writer_split.md             # ✅ 已实现 — R-178：html_writer.py 5 步分拆计划（含 C14 约束引入）
 │   │   ├── refactor-market_value_split_design/       # 📁 market_value.py 分拆设计归档
@@ -393,4 +393,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，`technical.md` 中的目录树和测试文件数可能滞后。请以本文档为准。
 >
-> 最后更新：2026-07-10（v0.3.5 — 缓存路径偏移修复 + 配置管理子包目录同步）
+> 最后更新：2026-07-11（目录树描述润色，移除历史变更痕迹，统一自然表述）

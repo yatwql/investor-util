@@ -4,8 +4,6 @@
 
 ---
 
----
-
 ## [Unreleased]
 
 ### Fixed
@@ -34,11 +32,13 @@
 
 - **technical.md 迭代历史痕迹清理**：移除 16 处 A 类（纯迭代记录）和 B 类（版本标记）历史痕迹，恢复为永恒技术设计文档。
 - **how-to-config.md 版本标记清理**：移除 2 处 v0.2.xx 版本标记。
-- **用户文档全局迭代/版本标记清理**：`reports-instruction.md`、`how-to-use-registry.md`、`how-to-config-llm.md` 共 5 处版本后缀/迭代名称（`B 迭代`/`C 迭代后`/`v0.2.15+`/`v0.2.29+`/`v0.2.30+`/`v0.2.85+`）替换或删除，用户文档不再出现具体迭代引用。
+- **用户文档全局迭代/版本标记清理**：`reports-instruction.md`、`how-to-use-registry.md`、`how-to-config-llm.md` 共 6 处版本后缀/迭代名称（`B 迭代`/`C 迭代后`/`v0.2.15+`/`v0.2.29+`/`v0.2.30+`/`v0.2.85+`）替换或删除，用户文档不再出现具体迭代引用。
 - **technical.md LLM 模块计数同步**：LLM 子模块从 `9` 修正为 `12`，模块职责表新增 `api_base.py` 和 `generators_news.py`。
 - **how-to-use-registry.md 消费方表校正**：`generators.py` → `generators_orchestrator.py`，`market_value.py` → `market_value_sheet.py`，新增 `fund_overlap_sheet.py` 和 `fund_concentration_sheet.py`。新增 LLM 模块步骤增加 `generators_orchestrator.py` 调度注册环节。
 
 ### Docs
+
+- **datasource-and-folders.md 目录树描述全面润色**：移除所有历史变更痕迹（如"从 xxx.py 拆分"）、迭代标记（D-7b/D-8）和生硬的三段式堆砌，统一改为自然的功能描述语句。涉及约 40 条文件/目录描述更新，涵盖 llm/、report/、test/ 等核心子目录。
 
 - **代码库兼容性/死代码审计**：全局扫描 `src/python/` 中 config.json/llm_settings.json/缓存/API 响应的历史兼容代码，结论：代码库干净，仅 4 处微小负担，已处理其中 1 处（`get_skip_*_copy` 旧测试接口）。
 - **配置 + 代码全局一致性检查**：config.json 17 键 / llm_settings.json 53 键 / registry 21 缓存 TTL 项 / 所有 `.py` 文件导入引用 — 无死键、无死文件、无冲突。
@@ -54,6 +54,7 @@
 - **review-findings.md 全部清空**：24 项自审问题已全部修复/归档，当前无待修复问题。R-187（TUI Windows 12 测试跳过，平台限制已标记 `skipIf`）/R-199（akshare 版本区间锁定）/R-201（HTML 打印预览 Playwright 测试，低优先级暂不修复）已处理归档。
 - **R-206/R-207 设计文档归档**：plan/ 下 2 份迭代设计文件迁至 `docs-stm/archive/refactor-excel-generator/` 和 `docs-stm/archive/refactor-summary-llm-usage/`。
 
+---
 
 ## [0.3.5] - 2026-07-10
 
@@ -185,8 +186,6 @@
 - **多批计划文件/设计文档归档**：B1-fund-deep-analysis / C-P1b / A5-test-runtime-optimization / 数据降级复盘文档迁入 `archive/` 子目录归类。
 
 ---
-
-
 
 ## [0.3.0] - 2026-07-08
 
