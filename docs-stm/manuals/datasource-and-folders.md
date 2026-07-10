@@ -34,8 +34,8 @@ investor-util/
 │   │   ├── __init__.py               # 包标记（空文件）
 │   │   ├── cache.py                  # 缓存引擎 — 泛用 JSON 文件缓存、TTL 管理、过期清理、指纹失效
 │   │   ├── code_utils.py             # 证券代码/名称类型判定中心 — A股/基金/债券/港股通/ETF/QDII 识别原语
-│   │   ├── config.py                 # 配置管理 — config.json / llm_key.json / llm_settings.json 读写、校验
-│   │   ├── constants.py              # 共享常量 — 版本号、缓存频率常量（CACHE_DAILY 等）、模型定价
+│   │   ├── config/                    # 配置管理子包（_defaults / _comments / _core）— config.json / llm_key / llm_settings 读写、校验
+│   │   ├── constants.py              # 共享常量 + 项目根路径（标记文件查找法）— 版本号、缓存频率、模型定价、PROJECT_ROOT
 │   │   ├── http_client.py            # HTTP 客户端工厂 — 统一 httpx.Client 创建、超时/重试配置
 │   │   ├── logger.py                 # 日志模块 — logging 配置、文件+控制台双输出
 │   │   ├── main.py                   # 程序入口 — TUI 主循环、流程编排、菜单路由
@@ -393,4 +393,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，`technical.md` 中的目录树和测试文件数可能滞后。请以本文档为准。
 >
-> 最后更新：2026-07-10（v0.3.5 — LLM 模块横向拆分/市值核算分拆设计/excel_generator 与 summary 页签拆分）
+> 最后更新：2026-07-10（v0.3.5 — 缓存路径偏移修复 + 配置管理子包目录同步）
