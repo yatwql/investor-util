@@ -10,6 +10,12 @@
 
 ### Fixed
 
+- **check-test-markers.py 标记检查脚本 3 项自检缺陷**：
+  1. `EXPECTED_DIR_MARKERS` 中键 `"llm"` 重复，Python dict 后键覆盖前键 → `unit/llm/` 下 3 个文件被误要求有 `scenario` 标记。改用完整二级路径 `"unit/llm"` / `"scenario/llm"` 消除歧义
+  2. `_get_relative_dir()` 取 `parts[1]` 而非完整父路径，`unit/llm` 与 `scenario/llm` 不可区分。改用 `rel.parent` 返回全路径
+  3. `KNOWN_MARKERS` 缺少 `integration_*` 系 6 个子标记；`DEPRECATED_MARKERS` 包含仍在活跃使用的 `integration`。补全标记集，清空废弃集
+- 修复后全量 120 项测试标记合规性检查全部通过，0 违规。
+
 - **缓存路径偏移导致"每次都是新增资产"**：`cache.py` 从 `src/cache.py` 重构移动到 `src/python/cache.py` 时，`_PROJECT_ROOT` 的 `dirname` 次数未同步更新（少了一层），导致缓存目录偏移到 `src/data/cache/`，`holdings_tracking.json` 每次都读不到，全部代码被误判为"新增"。修复：在 `constants.py` 用**标记文件查找法**（向上找 `pyproject.toml` / `.git`）替代 `dirname` 深度计数，`cache.py` 统一从此导入。清理了残留的 `src/data/cache/` 目录。
 
 - **`_fetch_from_sina()` 死循环导致 xdist worker OOM crash**：新浪财经翻页后新增跨分类 URL 去重逻辑（`seen_urls`），但当全部条目均被去重命中时，`category_fetched` 永不增长且 `len(items) >= need` 永不触发 break，导致 `while` 死循环 → worker OOM kill。新增 stale-iteration guard：一轮无新增条目时 `break`。修复 2 项测试（`test_fetch_from_sina_returns_list` / `test_fetch_from_sina_dedup_by_url`），全量 2956/2956 通过。
@@ -36,6 +42,11 @@
 
 - **代码库兼容性/死代码审计**：全局扫描 `src/python/` 中 config.json/llm_settings.json/缓存/API 响应的历史兼容代码，结论：代码库干净，仅 4 处微小负担，已处理其中 1 处（`get_skip_*_copy` 旧测试接口）。
 - **配置 + 代码全局一致性检查**：config.json 17 键 / llm_settings.json 53 键 / registry 21 缓存 TTL 项 / 所有 `.py` 文件导入引用 — 无死键、无死文件、无冲突。
+
+- **technical.md 组织修复**：补充 H2 间缺失 `---` 分隔线（功能模块详解 → LLM 客户端技术要点）；移除功能模块详解内部两处多余 `---` 分组线（B 系列、报告序号可配置前），与全文其他 H2 章节格式统一。
+- **how-to-test-my-code.md 组织修复**：H4 多模式组合补 `🔷` 前缀（与其他 4 个子节一致）；目录树 `scenario_extreme/` 移入场景组（紧接 `scenario/` 后）；快速开始专项验证区新增 `--mode scenario_extreme` 示例。
+- **how-to-test-my-code.md / technical.md 交叉核对**：faq.md 组织正常无需调整；how-to-test-my-code.md 4 项建议中实施 3 项（dev-verify 时序复查后确认正确，撤回）。
+- **test-coverage.md 核对**：all=2972/unit=2665/scenario=269/edge=335，全部吻合无需修改。
 
 - **technical.md 报告管线/依赖树/LLM 用量引用更新**：反映 R-206（7 个 excel_* 中间模块）和 R-207（summary_llm_usage.py）拆分后的新模块结构。Excel 管线从单行描述改为分步编排架构。`build_llm_usage_sheet`/`_write_cache_stats_section` 引用路径从 `summary.py` 更新至 `excel_llm_usage.py`/`summary_llm_usage.py`。
 - **test-coverage.md 报告生成模块列表更新**：补充 R-206/R-207 新增的 8 个模块（excel_module_loader/sheet_factory/market_data/content_sheets/news_warning/b_series/llm_usage/summary_llm_usage）。
