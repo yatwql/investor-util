@@ -35,23 +35,24 @@ TEST_DIR = REPO_ROOT / "src" / "test"
 # unit_* 标记由 conftest.py 运行时强制，此处只做静态扫描辅助
 EXPECTED_DIR_MARKERS: dict[str, set[str]] = {
     # unit 子模块 — 由 pytestmark 模块级列表覆盖
-    "config": {"unit", "unit_config"},
-    "core": {"unit", "unit_core"},
-    "fetcher": {"unit", "unit_fetcher"},
-    "llm": {"unit", "unit_llm", "llm"},
-    "news": {"unit", "unit_news"},
-    "providers": {"unit", "unit_providers"},
-    "report": {"unit", "unit_report"},
-    "ui": {"unit", "unit_ui"},
+    "unit/config": {"unit", "unit_config"},
+    "unit/core": {"unit", "unit_core"},
+    "unit/fetcher": {"unit", "unit_fetcher"},
+    "unit/handlers": {"unit", "unit_core"},
+    "unit/llm": {"unit", "unit_llm", "llm"},
+    "unit/news": {"unit", "unit_news"},
+    "unit/providers": {"unit", "unit_providers"},
+    "unit/report": {"unit", "unit_report"},
+    "unit/ui": {"unit", "unit_ui"},
     # scenario 子模块
-    "basic": {"scenario", "scenario_basic"},
-    "resilience": {"scenario", "scenario_resilience"},
-    "llm": {"scenario", "scenario_llm", "llm"},  # scenario/llm/ 也加入 llm
-    "datetime": {"scenario", "scenario_datetime"},
+    "scenario/basic": {"scenario", "scenario_basic"},
+    "scenario/resilience": {"scenario", "scenario_resilience", "scenario_extreme"},
+    "scenario/llm": {"scenario", "scenario_llm", "llm"},
+    "scenario/datetime": {"scenario", "scenario_datetime"},
 }
 
-# 已移除的标记（不得出现）
-DEPRECATED_MARKERS = {"integration"}
+# 已移除的标记（不得出现）— 当前无已移除标记
+DEPRECATED_MARKERS: set[str] = set()
 
 # 已知的合法标记全集（conftest.py 注册的）
 KNOWN_MARKERS = {
@@ -61,7 +62,9 @@ KNOWN_MARKERS = {
     "scenario_single_holding", "scenario_zero_cost", "scenario_extreme",
     "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news",
     "unit_report", "unit_config", "unit_core", "unit_ui",
-    "edge", "smoke", "data", "llm",
+    "edge", "smoke", "data", "llm", "integration",
+    "integration_contract", "integration_isolation", "integration_news_pipeline",
+    "integration_cache", "integration_tui",
 }
 
 
@@ -101,13 +104,14 @@ def _extract_markers_from_file(filepath: Path) -> set[str]:
 
 
 def _get_relative_dir(filepath: Path) -> str:
-    """获取测试文件相对于 TEST_DIR 的父目录名。"""
+    """获取测试文件相对于 TEST_DIR 的父目录路径（不含文件名）。
+
+    例如 unit/core/test_cache.py → "unit/core"
+    integration/test_integration_coverage.py → "integration"
+    """
     rel = filepath.relative_to(TEST_DIR)
-    # e.g. unit/core/test_cache.py → unit/core → core
-    parts = rel.parts
-    if len(parts) >= 2:
-        return parts[1]
-    return parts[0] if parts else ""
+    parent = rel.parent
+    return str(parent) if parent != Path(".") else ""
 
 
 def check_file(filepath: Path, verbose: bool, ci_mode: bool) -> list[str]:

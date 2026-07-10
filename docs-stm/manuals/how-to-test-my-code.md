@@ -48,6 +48,9 @@ python scripts/test_runner.py --mode standard
 # 仅运行边缘/异常场景测试
 python scripts/test_runner.py --mode edge
 
+# 极限场景（超多持仓/极端值/高精度）
+python scripts/test_runner.py --mode scenario_extreme
+
 # 数据正确性验证（~10s）
 python scripts/test_runner.py --mode data
 
@@ -192,7 +195,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试。包含所有单元测试、场景测试、集成测试、跨类标记测试。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 - **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 
-#### 多模式组合
+#### 🔷 多模式组合
 
 `--mode` 支持逗号分隔同时运行多个模式：
 
@@ -216,6 +219,8 @@ test-reports/latest/
 │   └── report.html       # 常规单元测试
 ├── scenario/
 │   └── report.html       # 业务场景测试
+├── scenario_extreme/
+│   └── report.html       # 极限场景测试
 ├── integration/
 │   └── report.html       # 集成测试（场景 + 模块间契约）
 ├── regression/
@@ -234,8 +239,6 @@ test-reports/latest/
 │   └── report.html       # 全量测试（排除单元测试）
 ├── smoke/
 │   └── report.html       # 冒烟测试
-└── scenario_extreme/
-    └── report.html       # 极限场景测试（mode 输出目录，源文件在 resilience/）
 ```
 
 **打开方式**：直接用浏览器打开 `test-reports/latest/index.html`

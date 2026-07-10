@@ -421,7 +421,6 @@ HTML 端降级机制：
 - 数据清洗：代码自动去除后缀（`.SH`/`.SZ`/`.OF`），份额/成本转为 float，空行跳过
 - 多文件选择：持仓目录下多个 xlsx 时弹出 TUI 选择器（`tui_handlers.py` 中 `_select_holdings_file()`）
 
----
 ### B 系列：基金深度分析模块
 
 B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_style）通过 `enable_b_series` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
@@ -477,7 +476,6 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 - **性能优化**：会话级缓存委托 DataSourceRegistry session_cache（domain="extended"）跨基金复用，同一股票仅首次 HTTP；Tencent 二级降级基于 registry 熔断器（provider="tencent_style"），避免网络不可达时逐只等待超时
 - **独立快照**：`fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
----
 ### 报告序号可配置
 
 报告 16 个模块的序号/显示名称由 `registry.py` 注册表驱动，支持用户通过 `config.json` 自定义序号和排列顺序。
@@ -573,6 +571,8 @@ raw_data_flags = {
 **章节标题：** 硬编码中文序号替换为 `{{ section_numbers['key'] }}、...`。
 
 **条件渲染：** 所有模块的最外层可见性条件从分散的 `{% if manager_analysis and ... %}`、`{% if llm_enabled %}` 等形式统一为 `{% if section_visible("fund_manager") %}` 等。
+
+---
 
 ## LLM 客户端技术要点
 
