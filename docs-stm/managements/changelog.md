@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **`_fetch_from_sina()` 死循环导致 xdist worker OOM crash**：新浪财经翻页后新增跨分类 URL 去重逻辑（`seen_urls`），但当全部条目均被去重命中时，`category_fetched` 永不增长且 `len(items) >= need` 永不触发 break，导致 `while` 死循环 → worker OOM kill。新增 stale-iteration guard：一轮无新增条目时 `break`。修复 2 项测试（`test_fetch_from_sina_returns_list` / `test_fetch_from_sina_dedup_by_url`），全量 2956/2956 通过。
+
 - **新闻源翻页能力不足**：东方财富（单次上限 200）、华尔街见闻（硬编码 `min(num,100)`）、新浪财经（单页 50 条×只取第 1 页）三源实际获取数远低于 `build_news_data` 传入的 `per_source` 值，导致 `news_top_count=300` 时原始候选池不够。改为游标/多页循环翻页，各源现在可达 `per_source` 目标量。
 - **修复 22 项预存测试失败**：R-178 分拆后 18 项 `html_writer` mock 路径未同步更新（`akshare_extras.*` → `html_renderers.*`，`html_writer.*` → `html_renderers.*`），修复 `test_api_status_trading` 缓存断言与 autouse fixture 冲突，修复 3 项 TUI ESC 序列 `side_effect` 不足 StopIteration 崩溃。全量 2956/2956 回归通过。
 - **provider_registry.py 移除旧测试接口**：删除 `get_skip_set_copy()` / `get_skip_time_copy()` 两个标注"兼容旧测试接口"的方法，对应测试改用 `generate_status_report()` 验证熔断状态。
