@@ -18,12 +18,12 @@ import threading
 import time
 from typing import Any
 
-from src.python.constants import CACHE_DAILY
+from src.python.constants import CACHE_DAILY, PROJECT_ROOT
 from src.python.market_hours import is_market_open as _is_market_open
 from src.python.registry import get_cache_ttl_defaults, get_exact_type_map, get_prefix_type_map, get_registry
 
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_CACHE_DIR = os.path.join(_PROJECT_ROOT, "data/cache")
+# 项目根路径从 constants.py 统一导入，避免因重构移动文件导致的路径偏移
+_CACHE_DIR = os.path.join(PROJECT_ROOT, "data/cache")
 _GZIP_THRESHOLD = 100 * 1024  # 100KB 以上的缓存自动 gzip
 _GZIP_SUFFIX = ".gz"
 
@@ -570,6 +570,9 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
       - 更新存储的指纹和代码集合
       - 返回新增的资产代码列表（用于主流程主动取数填充单条缓存）
 
+    注意：份额/成本变动只会改变指纹（触发关联缓存刷新），不会将已有资产
+    误判为"新增"——仅当代码集合中出现了此前未记录的代码时才视为新增。
+
     Args:
         holdings: 当前持仓列表（每项需有 code/account/shares/cost_price）
 
@@ -583,27 +586,45 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
 
     prev_data = _read_holdings_tracking(tracking_key)
 
+    # ── 指纹相同 → 持仓未变 ──────────────────────────────
     if prev_data is not None:
         prev_fp = prev_data.get("fingerprint")
         if prev_fp == current_fp:
-            return []  # 持仓未变，无需刷新
+            return []
 
-    # 指纹不同 → 清除关联缓存
-    prev_codes = builtins.set(prev_data.get("codes", [])) if prev_data else builtins.set()
-    new_codes = current_codes - prev_codes
-
+    # ── 指纹不同 → 清除关联缓存，更新跟踪数据 ────────────
     logger.info("持仓已变更，自动刷新关联缓存...")
     _clear_holdings_related_caches()
 
-    # 存储新跟踪数据（指纹 + 代码集合）
+    # 先提取上一轮的代码集合（用于计算新增资产），再更新存储
+    prev_codes_strs: list[str] = []
+    if prev_data is not None:
+        prev_codes_strs = prev_data.get("codes", [])
+        if not prev_codes_strs:
+            logger.debug("上一轮跟踪数据缺少 codes 字段或为空，所有代码将被视为新增")
+
+    prev_codes = builtins.set(prev_codes_strs)
+    new_codes = current_codes - prev_codes
+
+    # 存储新跟踪数据（指纹 + 代码集合）—— 必须在判断 new_codes 之前完成
     set(tracking_key, {
         "fingerprint": current_fp,
         "codes": sorted(current_codes),
     })
 
     if new_codes:
-        logger.info("检测到新增资产代码: %s", ", ".join(sorted(new_codes)))
+        logger.info(
+            "检测到新增资产代码%s: %s",
+            f"（上一轮共 {len(prev_codes)} 个代码）" if prev_codes else "",
+            ", ".join(sorted(new_codes)),
+        )
         return sorted(new_codes)
+
+    if prev_data is not None and prev_codes:
+        logger.debug(
+            "持仓指纹变更（份额/成本变动），代码集合无变化 (共 %d 个)",
+            len(current_codes),
+        )
     return []
 
 

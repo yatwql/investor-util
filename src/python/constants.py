@@ -4,6 +4,35 @@
 供 cache.py、registry.py、main.py 等模块引用。
 """
 
+import os
+
+
+def _find_project_root() -> str:
+    """从当前文件向上查找标记文件，确定项目根目录。
+
+    查找顺序：pyproject.toml → .git（目录）。两种标记均可，找到即停。
+    不依赖目录树深度，重构移动文件不会导致路径偏移。
+    """
+    current = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(20):  # 安全上限，防止意外死循环
+        if os.path.isfile(os.path.join(current, "pyproject.toml")):
+            return current
+        if os.path.isdir(os.path.join(current, ".git")):
+            return current
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+    # 回退：按当前 src/python/ 深度计算
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+# ── 项目根路径（单一来源，所有模块从此导入） ─────────────
+# 使用标记文件查找法，不依赖目录树深度。
+# cache.py 曾因重构移动文件后忘记更新 dirname 次数导致路径偏移，
+# 集中定义后彻底避免此类问题。
+PROJECT_ROOT = _find_project_root()
+
 # ── 项目版本 ──────────────────────────────────────────────
 
 APP_VERSION = "0.3.5"
