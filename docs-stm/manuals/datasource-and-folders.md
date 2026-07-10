@@ -358,7 +358,7 @@ investor-util/
 │   │   │   └── r178_html_writer_split.md             # ✅ 已实现 — R-178：html_writer.py 5 步分拆计划（含 C14 约束引入）
 │   │   ├── refactor-market_value_split_design/       # 📁 market_value.py 分拆设计归档
 │   │   │   └── r197_market_value_split.md            # ✅ 已实现 — R-197：market_value.py 拆分为计算层+写入层
-│   │   └── refactor-llm_split_design/                # 📁 LLM 模块分拆设计归档
+│   │   ├── refactor-llm_split_design/                # 📁 LLM 模块分拆设计归档
 │   │       └── r198_llm_split_design.md              # ✅ 已实现 — R-198：LLM 模块横向拆分
 │   │   └── refactor-summary-llm-usage/             # 📁 summary.py LLM 用量拆分设计归档
 │   │       └── R-207-summary-llm-usage-split-plan.md # ✅ 已实现 — R-207：summary.py LLM 用量拆分（617→350 行）
@@ -393,4 +393,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，`technical.md` 中的目录树和测试文件数可能滞后。请以本文档为准。
 >
-> 最后更新：2026-07-10（v0.3.5 — LLM 模块横向拆分/市值核算分拆设计归档）
+> 最后更新：2026-07-10（v0.3.5 — LLM 模块横向拆分/市值核算分拆设计/excel_generator 与 summary 页签拆分）
