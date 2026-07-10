@@ -188,7 +188,7 @@
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹 | 说明 |
 |:-----|-----------|:--------:|:----|:-----|
-| `tracking` | `holdings_tracking.json` | 30 天 | — | 持仓跟踪数据（精确键名） |
+| `tracking` | `holdings_tracking.json` | 30 天 | — | 持仓跟踪数据（精确键名，用于指纹比对和新增资产检测） |
 | `calendar` | `trading_calendar.json` | 14 天 | — | A 股交易日历（精确键名） |
 
 > `—` 表示精确键名（无指纹后缀），TTL 到期后刷新。
