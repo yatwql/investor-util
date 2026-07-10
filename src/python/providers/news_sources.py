@@ -54,6 +54,7 @@ def _fetch_from_sina(num: int) -> list[dict[str, Any]]:
             items = sina_fetch(lid=lid, num=need, page=page)
             if not items:
                 break
+            prev_fetched = category_fetched
             for item in items:
                 url = item.get("url", "")
                 if url and url not in seen_urls:
@@ -61,6 +62,9 @@ def _fetch_from_sina(num: int) -> list[dict[str, Any]]:
                     all_items.append(item)
                     category_fetched += 1
             page += 1
+            # 无新增条目（全部被去重命中），避免死循环
+            if category_fetched == prev_fetched:
+                break
             if len(items) < need:
                 break  # 该分类无更多数据
 
