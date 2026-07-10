@@ -30,7 +30,10 @@ def get_source_label(name: str) -> str:
 
 
 def _fetch_from_sina(num: int) -> list[dict[str, Any]]:
-    """从新浪财经获取新闻，均匀覆盖多个分类。"""
+    """从新浪财经获取新闻，均匀覆盖多个分类（支持翻页）。
+
+    各分类通过 page 参数逐页获取，突破单次 50 条上限。
+    """
     try:
         from src.python.providers.sina_news import fetch_news as sina_fetch
     except ImportError:
@@ -39,16 +42,27 @@ def _fetch_from_sina(num: int) -> list[dict[str, Any]]:
 
     lids = ["2516", "2509", "2510"]  # 财经要闻, 国内财经, 国际财经
     per_category = max(1, num // len(lids))
+    per_page = 50  # API 每页上限
 
     all_items: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
     for lid in lids:
-        items = sina_fetch(lid=lid, num=per_category, page=1)
-        for item in items:
-            url = item.get("url", "")
-            if url and url not in seen_urls:
-                seen_urls.add(url)
-                all_items.append(item)
+        page = 1
+        category_fetched = 0
+        while category_fetched < per_category:
+            need = min(per_page, per_category - category_fetched)
+            items = sina_fetch(lid=lid, num=need, page=page)
+            if not items:
+                break
+            for item in items:
+                url = item.get("url", "")
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    all_items.append(item)
+                    category_fetched += 1
+            page += 1
+            if len(items) < need:
+                break  # 该分类无更多数据
 
     logger.info("新浪财经: 获取 %d 条 (去重后)", len(all_items))
     return all_items

@@ -101,50 +101,74 @@ def _parse_news_item(item: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def fetch_news(num: int = 50) -> list[dict[str, Any]]:
-    """从华尔街见闻获取全球财经直播流新闻。
+    """从华尔街见闻获取全球财经直播流新闻（支持翻页）。
+
+    通过 cursor 游标做循环翻页，单页上限 100。
 
     Args:
-        num: 获取条数（最大 100）
+        num: 获取条数
 
     Returns:
         结构化新闻列表，每项包含 title, intro, url, ctime, media_name
         获取失败时返回空列表
     """
-    params: dict[str, Any] = {
-        "channel": "global-channel",
-        "limit": min(num, 100),  # API 限制最大 100
-    }
+    all_items: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    cursor: str | None = None
+    limit_per_page = 100  # API 单页上限
+    max_pages = 10
 
-    logger.debug("WallStreetCN 新闻请求: limit=%d", params["limit"])
+    for _ in range(max_pages):
+        remaining = num - len(all_items)
+        if remaining <= 0:
+            break
 
-    try:
-        with make_http_client(timeout=_TIMEOUT) as client:
-            resp = client.get(_BASE_URL, params=params, headers=_HEADERS)
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.TimeoutException:
-        logger.warning("WallStreetCN 新闻 API 超时")
-        return []
-    except httpx.RequestError as e:
-        logger.warning("WallStreetCN 新闻 API 请求失败: %s", e)
-        return []
-    except ValueError as e:
-        logger.warning("WallStreetCN 新闻 API 响应 JSON 解析失败: %s", e)
-        return []
+        params: dict[str, Any] = {
+            "channel": "global-channel",
+            "limit": min(limit_per_page, remaining),
+        }
+        if cursor:
+            params["cursor"] = cursor
 
-    # 提取 data.items 列表
-    raw_items = data.get("data", {}).get("items")
-    if not isinstance(raw_items, list):
-        logger.debug("WallStreetCN 新闻 API: items 为空或非列表")
-        return []
+        logger.debug("WallStreetCN 新闻请求: limit=%d, cursor=%s",
+                     params["limit"], cursor or "初始")
 
-    parsed: list[dict[str, Any]] = []
-    for item in raw_items:
-        if not isinstance(item, dict):
-            continue
-        parsed_item = _parse_news_item(item)
-        if parsed_item:
-            parsed.append(parsed_item)
+        try:
+            with make_http_client(timeout=_TIMEOUT) as client:
+                resp = client.get(_BASE_URL, params=params, headers=_HEADERS)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.TimeoutException:
+            logger.warning("WallStreetCN 新闻 API 超时")
+            break
+        except httpx.RequestError as e:
+            logger.warning("WallStreetCN 新闻 API 请求失败: %s", e)
+            break
+        except ValueError as e:
+            logger.warning("WallStreetCN 新闻 API 响应 JSON 解析失败: %s", e)
+            break
 
-    logger.info("WallStreetCN 新闻获取成功: 获取 %d 条", len(parsed))
-    return parsed
+        raw_items = data.get("data", {}).get("items")
+        if not isinstance(raw_items, list) or not raw_items:
+            logger.debug("WallStreetCN 新闻翻页结束: 第 %d 页无数据", _ + 1)
+            break
+
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            # 用 id 或 title 去重
+            item_id = str(item.get("id", "")) or item.get("title", "")
+            if item_id in seen_ids:
+                continue
+            seen_ids.add(item_id)
+            parsed = _parse_news_item(item)
+            if parsed:
+                all_items.append(parsed)
+
+        # 获取下一页游标
+        cursor = data.get("data", {}).get("cursor")
+        if not cursor or len(raw_items) < limit_per_page:
+            break
+
+    logger.info("WallStreetCN 新闻获取成功: 获取 %d 条", len(all_items))
+    return all_items
