@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+---
+
+## [0.3.6] - 2026-07-11
+
 ### Fixed
 
 - **check-test-markers.py 标记检查脚本 3 项自检缺陷**：

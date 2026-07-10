@@ -2,7 +2,7 @@
 
 读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.3.5
+> 当前版本：0.3.6
 
 ```bash
 .\scripts\launch.ps1   # Windows
