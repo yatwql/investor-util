@@ -12,6 +12,7 @@
 - **Tencent API 超时/网络错误自动重试**：`fetch_price()` 对 `TimeoutException`/`RequestError` 自动重试一次后再放弃，降低备用链路的偶发超时影响。
 - **日志噪音压缩**：移除 `fetcher/chain.py` 和 `report/market_value.py` 中与 `cache.py` 重复的"缓存命中"DEBUG 日志。
 - **TUI 主循环标题丢失**：`_print_header()` 从主循环前移至循环内调用，确保生成报告/刷新缓存等操作返回后，软件名称和版本号仍然显示在屏幕顶部。
+- **测试文档 `--lf` 错误示例**：`how-to-test-my-code.md` 中原示例 `test_runner.py -- --lf` 实际因 argparse 不支持 `--` 透传而报错。改为直接调 `pytest -m` 复现标记表达式后组合 `--lf`，并补充 `test_runner.py` 与 `--lf` 的分工说明。
 
 ### Changed
 
