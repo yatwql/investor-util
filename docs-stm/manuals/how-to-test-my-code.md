@@ -82,10 +82,26 @@ pytest src/test/ --lf
 
 # 先收集匹配 marker 的用例，再从其中只重跑上次失败的
 pytest src/test/ -m "unit_providers" --lf
-
-# 用 test_runner.py 也可以组合 --lf（但注意 --mode 内部也会传 -m，不会冲突）
-python scripts/test_runner.py --mode all -- --lf
 ```
+
+**与 `test_runner.py` 的配合**：
+
+`test_runner.py` 使用 `argparse` 管理参数，**不支持** `--` 透传（例如 `python scripts/test_runner.py --mode all -- --lf` 会报错）。如需 `--lf`，绕过它直接调 pytest，用 `-m` 参数复现目标模式的标记表达式：
+
+```bash
+# 先找到目标模式对应的 marker 表达式
+# 在 scripts/test_runner.py 的 MODES 字典中查找，例如：
+#   regression → "scenario"
+#   unit       → "unit"
+#   verify     → "scenario or unit_core or unit_providers or unit_fetcher"
+
+# 然后用 pytest -m + --lf 组合运行
+pytest src/test/ -m "scenario" --lf                  # 等价 --mode regression 的失败重跑
+pytest src/test/ -m "unit_providers" --lf            # 等价 --mode unit 下 unit_providers 的失败重跑
+pytest src/test/ -m "scenario or unit_core or unit_providers or unit_fetcher" --lf  # 等价 --mode verify
+```
+
+> 各 `--mode` 对应的 `-m` 表达式见下文「模式与覆盖范围说明」章节，或直接查看 `scripts/test_runner.py` 中 `MODES` 字典的 `marker` 字段。
 
 **工作原理**：pytest 在每次运行后，将失败用例记录到 `.pytest_cache/lastfailed` 文件；`--lf` 读取该文件，只收集文件中的用例执行。如果上次运行全部通过，`--lf` 会提示 `no tests ran`（因为没有失败记录）。
 
@@ -104,9 +120,10 @@ pytest src/test/ -m "edge" --lf
 pytest src/test/ -m "edge"
 ```
 
-> ⚠ **注意**：`--lf` 依赖 `--lf` 首次运行生成的 `.pytest_cache/lastfailed` 文件。如果清理了 `.pytest_cache/` 或切换了虚拟环境，`--lf` 不会生效。此时只需先正常跑一次目标模式生成失败记录即可。
->
-> 另一相关标志 `--ff`（`--failed-first`）会**先跑上次失败、再跑全部**，适合修复后确认修复 + 检查回归一步到位。
+> ⚠ **注意**：
+> - `--lf` 依赖上次运行生成的 `.pytest_cache/lastfailed` 文件。如果清理了 `.pytest_cache/` 或切换了虚拟环境，`--lf` 不会生效。此时只需先正常跑一次目标模式生成失败记录即可。
+> - 另一相关标志 `--ff`（`--failed-first`）会**先跑上次失败、再跑全部**，适合修复后确认修复 + 检查回归一步到位。
+> - `test_runner.py` 不支持 `--lf`，是因为它用 `subprocess.run` 调 pytest 且 argparse 不接收未注册的 `--` 参数。建议日常快速验证时直接使用 `pytest`，门禁检查时再用 `test_runner.py`。
 
 ## 测试模式详解
 
