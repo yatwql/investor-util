@@ -2,7 +2,7 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-10）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-11）测试覆盖规模：
 
 ### 模式对应测试量
 
@@ -23,7 +23,7 @@
 | `all_no_unit` | 307 | ~55s |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：`all` 模式收集总数 2901 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑结果为 2889 passed / 12 skipped。
+> 注：`all` 模式收集总数 2972 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 2960 项。
 
 ### 功能域对应测试源
 
@@ -31,15 +31,15 @@
 
 | 功能域 | 源模块（`src/python/`） | 对应测试文件（`src/test/`） | 覆盖项数 |
 |:-------|:-----------------------|:---------------------------|:--------:|
-| **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 166 |
+| **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 167 |
 | **数据源注册中心** | `provider_registry.py` | `unit/core/test_provider_registry.py` + `test_phase_timeout.py` + `test_market_value_strategy_edge.py` | 53 |
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 186 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
-| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 25 文件含 test_html_writer、test_html_template 等 | ≈945 |
-| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(12 文件) + `scenario/llm/test_llm_scenarios.py` | 440 |
-| **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 342 |
-| **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 75 |
-| **TUI 交互** | `tui*.py`, `handlers.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 165 |
+| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style) | `unit/report/` 共 25 文件含 test_html_writer、test_html_template 等 | 989 |
+| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(12 文件) + `scenario/llm/test_llm_scenarios.py` | 512 |
+| **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 427 |
+| **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 76 |
+| **TUI 交互** | `tui*.py`, `handlers.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 164 |
 | **命令处理器** | `handlers_cache.py`, `handlers_report.py` | `unit/handlers/test_{handlers_cache,handlers_report}.py` | 31 |
 | **端到端业务场景** | 多模块组合（菜单 E/H/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 5 文件, resilience, llm, datetime 共 9 文件) | 240 |
 
@@ -81,12 +81,12 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 9 个子组合计 | **2589** |
+| `unit`（父标记） | 9 个子组合计 | **2665** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 167 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 186 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 480 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
-| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列模块、C/D 迭代降级/占位；含 65 项 data 标记测试） | ≈945 |
+| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列模块、C/D 迭代降级/占位；含 65 项 data 标记测试） | 989 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含 C 迭代 report_section_order 校验） | 76 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含 C/D 迭代注册表测试） | 427 |
 | └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 164 |
@@ -95,7 +95,7 @@
 
 | 标记 | 覆盖范围 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `llm` | 全部 LLM 相关（unit_llm 432 + scenario_llm 32），**全部为 mock 测试，无需真实 API key** | **432** |
+| `llm` | 全部 LLM 相关（unit_llm 480 + scenario_llm 32，其中 432 项标有 llm 标记），**全部为 mock 测试，无需真实 API key** | **432** |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** |
 | `edge` | 异常/边界场景（含熔断冷却探针） | **335** |
 | `data` | 数据正确性验证 | **69** |
