@@ -6,6 +6,17 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **分红 API akshare 1.18.64 签名兼容**：`stock_history_dividend()` 新版不接受参数且返回全量聚合数据（列名从"每股股利"改为"年均股息"），改为一次拉取全量后按代码过滤，移除旧版逐股并发请求逻辑。
+- **Tencent API 超时/网络错误自动重试**：`fetch_price()` 对 `TimeoutException`/`RequestError` 自动重试一次后再放弃，降低备用链路的偶发超时影响。
+- **日志噪音压缩**：移除 `fetcher/chain.py` 和 `report/market_value.py` 中与 `cache.py` 重复的"缓存命中"DEBUG 日志。
+- **TUI 主循环标题丢失**：`_print_header()` 从主循环前移至循环内调用，确保生成报告/刷新缓存等操作返回后，软件名称和版本号仍然显示在屏幕顶部。
+
+### Changed
+
+- **T4 stale_days 配置收紧：14→7 天**：盈利预测/分红/风格等补充数据级不再容忍 2 周旧缓存。`config.json`、`data_status.py` 默认值、`how-to-config.md`、`requirements.md` 同步更新。
+
 ---
 
 ## [0.3.6] - 2026-07-11

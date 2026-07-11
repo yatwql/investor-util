@@ -148,17 +148,24 @@ def fetch_price(code: str) -> dict[str, Any] | None:
 
     logger.debug("Tencent API 请求: %s", full_code)
 
-    try:
-        with make_http_client(timeout=_TIMEOUT) as client:
-            resp = client.get(url)
-            resp.encoding = "gbk"  # qt.gtimg.cn 返回 GBK 编码
-            text = resp.text
-    except httpx.TimeoutException:
-        logger.warning("Tencent API 超时: %s", full_code)
-        return None
-    except httpx.RequestError as e:
-        logger.warning("Tencent API 请求失败: %s", e)
-        return None
+    # 超时/网络错误自动重试一次
+    for attempt in (1, 2):
+        try:
+            with make_http_client(timeout=_TIMEOUT) as client:
+                resp = client.get(url)
+                resp.encoding = "gbk"  # qt.gtimg.cn 返回 GBK 编码
+                text = resp.text
+        except httpx.TimeoutException:
+            logger.warning("Tencent API 超时: %s（第 %d 次）", full_code, attempt)
+            if attempt == 1:
+                continue
+            return None
+        except httpx.RequestError as e:
+            logger.warning("Tencent API 请求失败: %s（第 %d 次）", e, attempt)
+            if attempt == 1:
+                continue
+            return None
+        break  # 成功 → 跳出重试循环
 
     result = _parse_response(text)
     if result is None:

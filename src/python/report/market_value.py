@@ -199,7 +199,6 @@ def _get_trading_calendar() -> set[str]:
     """
     cached = cache.get(_TRADING_CALENDAR_CACHE_KEY, cache.get_ttl("calendar"))
     if cached is not None and isinstance(cached, list):
-        logger.debug("交易日历缓存命中")
         return set(cached)
 
     try:

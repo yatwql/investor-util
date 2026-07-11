@@ -67,7 +67,7 @@
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com` | 行情页 `quotedata` 解析 |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量研报覆盖 | — |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
-| 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — |
+| 股票历史分红 | akshare `stock_history_dividend()`（全量拉取后按代码过滤） | — |
 | 基金经理数据 | 天天基金 `fundf10.eastmoney.com` 经理列表页面 HTML 解析 + 档案页回退 | — |
 
 > **指数双链路说明**：指数数据由 `fetcher/index.py` 直调 Provider，不走 Provider Chain。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存（`stale_cache`）。
@@ -146,7 +146,7 @@
 
 ### 5.4 降级规则
 
-缓存过期但 API 请求失败时使用过期缓存数据。过期天数阈值由 degradation 配置控制（T2=3天、T3=14天、T4=14天，每级 `stale_days`），缓存文件损坏时自动删除并触发重新获取。
+缓存过期但 API 请求失败时使用过期缓存数据。过期天数阈值由 degradation 配置控制（T2=3天、T3=14天、T4=7天，每级 `stale_days`），缓存文件损坏时自动删除并触发重新获取。
 
 ### 5.5 TTL 明细
 
@@ -689,7 +689,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 
 | 场景 | 用户感知 | 内部处理 |
 |:-----|:---------|:---------|
-| 网络断开 | TUI 提示网络异常 | 过期缓存降级使用（由 degradation 配置的 stale_days 控制，T2=3天/T3=14天/T4=14天） |
+| 网络断开 | TUI 提示网络异常 | 过期缓存降级使用（由 degradation 配置的 stale_days 控制，T2=3天/T3=14天/T4=7天） |
 | API 超时 | 单条数据跳过，其余继续 | Provider Chain 自动切换备用链路；连续超时触发 DataSourceRegistry 熔断器（3次失败→熔断300秒→冷却后自动放行） |
 | API 返回异常/空数据 | 显示 `--` 占位 | 日志记录 WARNING |
 | 缓存文件损坏 | 透明修复 | 自动删除并重新获取 |

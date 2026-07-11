@@ -126,8 +126,6 @@ def main() -> None:
     except OSError as e:
         logger.warning("启动时缓存清理失败: %s", e)
 
-    _print_header()
-
     # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/C/F/O/1/2/3/4/S/R
     from src.python.config import get_config
     _default_key = get_config().get("default_menu_key", "L").upper()
@@ -135,6 +133,7 @@ def main() -> None:
     sel: int = _idx if _idx is not None else 0
 
     while True:
+        _print_header()
         _show_config()
         _render_menu(sel)
 

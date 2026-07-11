@@ -161,7 +161,6 @@ def _fetch_with_fallback(
     # 1) 读缓存
     cached = cache_get(cache_key, cache_ttl)
     if cached is not None:
-        logger.debug("缓存命中: %s", cache_key)
         return cached
 
     # 2) 遍历 chain 尝试（熔断委托 registry）

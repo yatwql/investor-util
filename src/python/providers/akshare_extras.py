@@ -3,7 +3,7 @@
 通过 akshare 获取以下数据：
   1. stock_profit_forecast_em — 机构盈利预测（全量股票，含预测 EPS）
   2. stock_sector_fund_flow_rank — 行业资金流向排名（含主力净流入）
-  3. stock_history_dividend — 个股历史分红
+  3. stock_history_dividend — 全量股票历史分红（akshare 1.18.64+ 无参调用，按代码过滤）
 
 各函数独立，使用指数变化/代码列表指纹 + TTL 双因子缓存失效策略。
 """
@@ -318,53 +318,37 @@ def _compute_dividend_fingerprint(codes: list[str]) -> str:
 
 
 def _calc_dividend_summary(df_data) -> dict | None:
-    """从单只股票的分红历史 DataFrame 计算年均分红汇总。
+    """从股票分红汇总 DataFrame 提取年度平均分红。
 
-    提取每年每股股利，计算年均值。
+    akshare 1.18.64+ 的 stock_history_dividend() 返回聚合数据（每只股票一行），
+    列包含：代码、名称、上市日期、累计股息、年均股息、分红次数 等。
 
     Args:
-        df_data: akshare.stock_history_dividend 返回的 DataFrame 或 None
+        df_data: ak.stock_history_dividend 返回的 DataFrame 子集（单只股票的一行）
 
     Returns:
-        {avg_dividend: float, years: int, record_count: int} 或 None
+        {avg_dividend: float, record_count: int} 或 None
     """
     if df_data is None or df_data.empty:
         return None
 
     try:
-        # 定位"除权除息日"列
-        date_col = next((c for c in df_data.columns if "除权除息" in c), None)
-        if not date_col:
-            return None
-
-        # 定位"每股股利(税前)"列，回退到任意"每股股利"列
-        div_col = next((c for c in df_data.columns if "每股股利" in c and "税前" in c), None)
-        if not div_col:
-            div_col = next((c for c in df_data.columns if "每股股利" in c), None)
+        # 定位"年均股息"列
+        div_col = next((c for c in df_data.columns if "年均股息" in c or "每股股息" in c or "每股股利" in c), None)
         if not div_col:
             return None
 
-        yearly: dict[int, float] = {}
-        for _, row in df_data.iterrows():
-            date_str = str(row.get(date_col, "") or "")
-            if len(date_str) < 4:
-                continue
-            try:
-                year = int(date_str[:4])
-                div_val = _safe_float(row.get(div_col))
-                if div_val is not None:
-                    yearly[year] = yearly.get(year, 0.0) + div_val
-            except (ValueError, TypeError):
-                continue
-
-        if not yearly:
+        avg_div = _safe_float(df_data.iloc[0].get(div_col))
+        if avg_div is None or avg_div <= 0:
             return None
 
-        total = sum(yearly.values())
+        # 定位"分红次数"列
+        cnt_col = next((c for c in df_data.columns if "分红次数" in c), None)
+        record_count = int(df_data.iloc[0].get(cnt_col, 0)) if cnt_col else 0
+
         return {
-            "avg_dividend": round(total / len(yearly), 4),
-            "years": len(yearly),
-            "record_count": len(df_data),
+            "avg_dividend": round(avg_div, 4),
+            "record_count": record_count,
         }
     except Exception:
         logger.debug("分红数据解析失败", exc_info=True)
@@ -372,38 +356,40 @@ def _calc_dividend_summary(df_data) -> dict | None:
 
 
 def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
-    """并发请求多只股票的分红数据，返回 {code: summary}。"""
+    """获取多只股票的分红数据，返回 {code: summary}。
+
+    akshare 1.18.64+ 的 stock_history_dividend() 不接受参数，返回全量数据。
+    改为一次拉取后按代码过滤，不再逐股并发请求。
+    """
     result: dict[str, dict] = {}
-    failed = 0
+    code_set = set(a_codes)
 
-    def _fetch_one(code: str) -> tuple[str, dict | None]:
-        try:
-            df = ak.stock_history_dividend(symbol=code, indicator="分红")
-            summary = _calc_dividend_summary(df)
-            if summary:
-                name_col = next((c for c in df.columns if "简称" in c or "名称" in c), None) if df is not None else None
-                name = str(df.iloc[0].get(name_col, "")) if name_col and df is not None and not df.empty else ""
-                summary["name"] = name
-            return (code, summary)
-        except Exception as e:
-            logger.debug("股票 %s 分红获取失败: %s", code, e)
-            return (code, None)
+    try:
+        full_df = ak.stock_history_dividend()
+    except Exception as e:
+        logger.warning("分红全量数据拉取失败: %s", e)
+        return result
 
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        fut_map = {pool.submit(_fetch_one, code): code for code in a_codes}
-        for future in as_completed(fut_map):
-            try:
-                code, summary = future.result(timeout=30)
-            except TimeoutError:
-                code = fut_map[future]
-                logger.warning("分红API超时: %s", code)
-                failed += 1
-                continue
-            if summary:
-                result[code] = summary
-            else:
-                failed += 1
+    if full_df is None or full_df.empty:
+        logger.warning("分红全量数据为空")
+        return result
 
+    # 定位"代码"列（akshare 新版列名）
+    code_col = next((c for c in full_df.columns if "代码" in c or c.lower() in ("code", "symbol")), None)
+    name_col = next((c for c in full_df.columns if "名称" in c or "简称" in c), None)
+    if code_col is None:
+        logger.warning("分红数据缺少代码列，无法过滤")
+        return result
+
+    for code in a_codes:
+        sub = full_df[full_df[code_col] == code]
+        summary = _calc_dividend_summary(sub)
+        if summary and name_col is not None:
+            summary["name"] = str(sub.iloc[0].get(name_col, "")) if not sub.empty else ""
+        if summary:
+            result[code] = summary
+
+    failed = len(a_codes) - len(result)
     logger.info("分红数据加载完成: %d 只成功, %d 只无数据", len(result), failed)
     return result
 
@@ -411,8 +397,8 @@ def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
 def get_dividend_data(codes: list[str]) -> dict[str, dict]:
     """获取股票历史分红数据，计算年均每股分红。
 
-    调用 ak.stock_history_dividend(symbol, indicator="分红") 获取每只股票
-    的历年分红记录，汇总为年均每股股利。
+    调用 ak.stock_history_dividend()（全量拉取，akshare 1.18.64+ 无参数）
+    获取所有股票历年分红记录，按代码过滤后汇总为年均每股股利。
 
     缓存策略：代码列表指纹 + 1 月 TTL 双因子失效。
       持仓/穿透代码变更 → 指纹改变 → 缓存自动失效

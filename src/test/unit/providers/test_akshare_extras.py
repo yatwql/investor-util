@@ -51,73 +51,47 @@ class TestComputeDividendFingerprint(unittest.TestCase):
 
 
 class TestCalcDividendSummary(unittest.TestCase):
-    """测试分红数据汇总计算。"""
+    """测试分红数据汇总计算（akshare 1.18.64 聚合格式）。"""
 
     @staticmethod
-    def _make_df(rows: list[dict]) -> MagicMock:
-        """模拟 akshare 返回的 DataFrame。"""
+    def _make_agg_df(avg: float, cnt: int, code: str = "600519", name: str = "测试") -> MagicMock:
+        """模拟 akshare 1.18.64 stock_history_dividend 返回的聚合行。"""
+        row = {"年均股息": avg, "分红次数": cnt, "代码": code, "名称": name}
+        mock_iloc = MagicMock()
+        mock_iloc.__getitem__.return_value = row
         df = MagicMock()
         df.empty = False
-        df.columns = ["股票代码", "股票简称", "除权除息日", "每股股利(税前)(元)", "每股股利(税后)(元)"]
-        df.__iter__.return_value = iter(df.columns)
-        df.__len__.return_value = len(rows)
-
-        def _iterrows():
-            for r in rows:
-                yield (0, r)
-        df.iterrows = _iterrows
+        df.columns = ["代码", "名称", "年均股息", "分红次数"]
+        df.iloc = mock_iloc
         return df
 
     def test_normal_data(self) -> None:
-        rows = [
-            {"股票代码": "600519", "股票简称": "贵州茅台", "除权除息日": "2025-06-19",
-             "每股股利(税前)(元)": 21.875, "每股股利(税后)(元)": 17.5},
-            {"股票代码": "600519", "股票简称": "贵州茅台", "除权除息日": "2024-06-19",
-             "每股股利(税前)(元)": 19.0, "每股股利(税后)(元)": 15.2},
-            {"股票代码": "600519", "股票简称": "贵州茅台", "除权除息日": "2023-06-20",
-             "每股股利(税前)(元)": 17.5, "每股股利(税后)(元)": 14.0},
-        ]
-        df = self._make_df(rows)
+        df = self._make_agg_df(19.4583, 3)
         result = ae._calc_dividend_summary(df)
         self.assertIsNotNone(result)
-        self.assertAlmostEqual(result["avg_dividend"], (21.875 + 19.0 + 17.5) / 3, places=4)
-        self.assertEqual(result["years"], 3)
+        self.assertAlmostEqual(result["avg_dividend"], 19.4583, places=4)
         self.assertEqual(result["record_count"], 3)
 
     def test_single_year(self) -> None:
-        rows = [
-            {"股票代码": "600519", "股票简称": "贵州茅台", "除权除息日": "2025-06-19",
-             "每股股利(税前)(元)": 21.875, "每股股利(税后)(元)": 17.5},
-        ]
-        df = self._make_df(rows)
+        df = self._make_agg_df(21.875, 1)
         result = ae._calc_dividend_summary(df)
         self.assertIsNotNone(result)
         self.assertAlmostEqual(result["avg_dividend"], 21.875, places=4)
-        self.assertEqual(result["years"], 1)
+        self.assertEqual(result["record_count"], 1)
 
     def test_multiple_dividends_same_year(self) -> None:
-        """同一年多次分红，应累加后按年计算。"""
-        rows = [
-            {"股票代码": "600036", "股票简称": "招商银行", "除权除息日": "2025-07-11",
-             "每股股利(税前)(元)": 1.2, "每股股利(税后)(元)": 0.96},
-            {"股票代码": "600036", "股票简称": "招商银行", "除权除息日": "2025-01-15",
-             "每股股利(税前)(元)": 0.5, "每股股利(税后)(元)": 0.4},
-            {"股票代码": "600036", "股票简称": "招商银行", "除权除息日": "2024-07-12",
-             "每股股利(税前)(元)": 1.1, "每股股利(税后)(元)": 0.88},
-        ]
-        df = self._make_df(rows)
+        """akshare 新版已聚合为年均值，"同一年多次分红"由 akshare 自身处理。"""
+        df = self._make_agg_df(1.4, 2)
         result = ae._calc_dividend_summary(df)
         self.assertIsNotNone(result)
-        # 2025: 1.2 + 0.5 = 1.7, 2024: 1.1 → avg = (1.7 + 1.1) / 2 = 1.4
         self.assertAlmostEqual(result["avg_dividend"], 1.4, places=4)
-        self.assertEqual(result["years"], 2)
+        self.assertEqual(result["record_count"], 2)
 
     def test_no_dividend_column(self) -> None:
-        """无每股股利列 → None。"""
+        """无年均股息列 → None。"""
         df = MagicMock()
         df.empty = False
         df.columns = ["股票代码"]
-        df.iterrows.return_value = iter([])
         result = ae._calc_dividend_summary(df)
         self.assertIsNone(result)
 
@@ -133,40 +107,25 @@ class TestCalcDividendSummary(unittest.TestCase):
 class TestGetDividendData(unittest.TestCase):
     """测试 get_dividend_data 缓存/降级/数据流。"""
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls._akshare_patcher = patch.dict("sys.modules", {"akshare": MagicMock()})
-        cls._akshare_patcher.start()
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        cls._akshare_patcher.stop()
-
     def setUp(self):
         ae._memo_clear()
 
     @patch("src.python.providers.akshare_extras.cache_get", return_value=None)
     @patch("src.python.providers.akshare_extras.cache_set")
     @patch("src.python.providers.akshare_extras._compute_dividend_fingerprint", return_value="testfp")
-    @patch("src.python.providers.akshare_extras.as_completed")
-    @patch("src.python.providers.akshare_extras.ThreadPoolExecutor")
+    @patch("src.python.providers.akshare_extras.ak.stock_history_dividend")
     def test_success_path(
-        self, mock_pool: MagicMock, mock_completed: MagicMock,
+        self, mock_ak: MagicMock,
         mock_fp: MagicMock, mock_set: MagicMock, mock_get: MagicMock,
     ) -> None:
         """正常路径：获取分红数据。"""
-        # 模拟 ThreadPoolExecutor
-        ctx = MagicMock()
-        ctx.__enter__.return_value = ctx
-        mock_pool.return_value = ctx
-
-        # 模拟 future 结果
-        future = MagicMock()
-        future.result.return_value = ("600519", {
-            "avg_dividend": 19.4583, "years": 3, "record_count": 3, "name": "贵州茅台",
-        })
-        ctx.submit.return_value = future
-        mock_completed.return_value = [future]
+        # 模拟 ak.stock_history_dividend() 返回全量聚合数据
+        import pandas as pd
+        full_df = pd.DataFrame([
+            {"代码": "600519", "名称": "贵州茅台", "年均股息": 19.4583, "分红次数": 3},
+            {"代码": "000858", "名称": "五粮液", "年均股息": 3.5, "分红次数": 5},
+        ])
+        mock_ak.return_value = full_df
 
         result = ae.get_dividend_data(["600519", "000858"])
         self.assertIn("600519", result)
@@ -176,7 +135,7 @@ class TestGetDividendData(unittest.TestCase):
     @patch("src.python.providers.akshare_extras.cache_get")
     def test_cache_hit(self, mock_get: MagicMock) -> None:
         """缓存命中时直接返回。"""
-        cached = {"600519": {"avg_dividend": 19.46, "years": 3, "record_count": 3}}
+        cached = {"600519": {"avg_dividend": 19.46, "record_count": 3}}
         mock_get.return_value = cached
         result = ae.get_dividend_data(["600519"])
         self.assertEqual(result, cached)
@@ -196,36 +155,32 @@ class TestGetDividendData(unittest.TestCase):
 
     @patch("src.python.providers.akshare_extras.cache_get", return_value=None)
     @patch("src.python.providers.akshare_extras.cache_set")
-    @patch("src.python.providers.akshare_extras.as_completed")
-    @patch("src.python.providers.akshare_extras.ThreadPoolExecutor")
+    @patch("src.python.providers.akshare_extras._compute_dividend_fingerprint", return_value="testfp")
+    @patch("src.python.providers.akshare_extras.ak.stock_history_dividend")
     def test_dividend_memo_second_call(
-        self, mock_pool: MagicMock, mock_completed: MagicMock,
-        mock_set: MagicMock, mock_get: MagicMock,
+        self, mock_ak: MagicMock,
+        mock_fp: MagicMock, mock_set: MagicMock, mock_get: MagicMock,
     ) -> None:
         """相同代码列表第二次调用应命中 memo，不重复 fetch。"""
-        ctx = MagicMock()
-        ctx.__enter__.return_value = ctx
-        mock_pool.return_value = ctx
-        future = MagicMock()
-        future.result.return_value = ("600519", {
-            "avg_dividend": 19.4583, "years": 3, "record_count": 3, "name": "贵州茅台",
-        })
-        ctx.submit.return_value = future
-        mock_completed.return_value = [future]
+        import pandas as pd
+        full_df = pd.DataFrame([
+            {"代码": "600519", "名称": "贵州茅台", "年均股息": 19.4583, "分红次数": 3},
+        ])
+        mock_ak.return_value = full_df
 
         # 第一次调用 — 走 fetch
         result1 = ae.get_dividend_data(["600519"])
         self.assertIn("600519", result1)
-        self.assertEqual(mock_pool.call_count, 1)
+        self.assertEqual(mock_ak.call_count, 1)
 
         # 重置 mock，准备验证第二次不再调用
-        mock_pool.reset_mock()
+        mock_ak.reset_mock()
         mock_get.reset_mock()
 
         # 第二次调用 — 应命中 memo
         result2 = ae.get_dividend_data(["600519"])
         self.assertEqual(result2, result1)
-        mock_pool.assert_not_called()
+        mock_ak.assert_not_called()
 
 
 class TestCacheKey(unittest.TestCase):

@@ -70,7 +70,7 @@ TIER_PREFIX: dict[str, str] = {"T2": "⚠", "T3": "ℹ", "T4": "ℹ"}
 
 _DEFAULT_UNREACHABLE: dict[str, int] = {"t2": 2, "t3": 2, "t4": 1}
 _DEFAULT_EMPTY: dict[str, int] = {"t2": 3, "t3": 3, "t4": 1}
-_DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 3, "t3": 14, "t4": 14}
+_DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 3, "t3": 14, "t4": 7}
 
 def _default_persist_path() -> str:
     """返回默认持久化文件路径（延迟求值，避免模块导入时的 cwd 依赖）。"""
