@@ -1,10 +1,12 @@
-"""新浪财经 API — 获取全球指数行情（美股指数 + A 股指数备用）。
+"""新浪财经 API — 获取全球指数行情 + A 股/ETF 实时行情。
 
-Endpoint: https://hq.sinajs.cn/list=code1,code2,...
+Endpoint（指数）: https://hq.sinajs.cn/list=code1,code2,...
+Endpoint（个股）: https://hq.sinajs.cn/list=sh600900
 
 支持的指数类型：
   - 美股指数（gb_* 前缀）：主链路
   - A 股指数（s_* 前缀）：作为 A 股指数的备用链路（主链路为 Tencent）
+个股行情作为 Tencent 备用链路。
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from typing import Any
 
 import httpx
 
+from src.python.code_utils import get_exchange_prefix, is_a_share_code, is_exchange_fund_code
 from src.python.http_client import make_http_client
 
 logger = logging.getLogger("invest")
@@ -37,6 +40,112 @@ _A_INDICES_SINA: dict[str, str] = {
     "s_sh000688": "科创板50",
     "s_sz399006": "创业板指",
 }
+
+# ── 个股行情（作为 Tencent 备用链路）───────────────────────
+
+# Sina 标准 A 股行情返回格式（逗号分隔，~46 字段）：
+# var hq_str_sh600900="名称,开盘,昨收,现价,最高,最低,买价,卖价,成交量,成交额,...,日期,时间,00";
+# 关键字段索引：
+#   0=名称, 1=开盘, 2=昨收, 3=现价, 8=成交量(手), 9=成交额(元),
+#   30=日期(YYYY-MM-DD), 31=时间
+
+
+def _add_prefix(code: str) -> str:
+    """根据代码前缀添加交易所标识。"""
+    code = code.strip()
+    if len(code) != 6:
+        return code
+    return get_exchange_prefix(code) + code
+
+
+def _parse_price_response(text: str, code: str) -> dict[str, Any] | None:
+    """解析 Sina 个股行情返回文本为结构化 dict。
+
+    Returns:
+        dict: {name, code, price, yesterday_close, price_date, ...}
+        None: 解析失败
+    """
+    try:
+        start = text.index('"') + 1
+        end = text.rindex('"')
+        body = text[start:end]
+    except ValueError:
+        logger.warning("Sina 行情格式异常: %s", text[:80])
+        return None
+
+    if not body:
+        return None
+
+    parts = body.split(",")
+    if len(parts) < 32:
+        logger.warning("Sina 行情字段不足(%d): %s", len(parts), body[:80])
+        return None
+
+    def _pf(idx: int) -> float:
+        try:
+            return float(parts[idx].strip()) if parts[idx].strip() else 0.0
+        except (ValueError, IndexError):
+            return 0.0
+
+    name = parts[0].strip() if parts[0] else ""
+    price = _pf(3)
+    yclose = _pf(2)
+    raw_date = parts[30].strip() if len(parts) > 30 else ""
+    price_date = raw_date.split(" ")[0] if raw_date else ""
+
+    return {
+        "name": name,
+        "code": code,
+        "price": price,
+        "yesterday_close": yclose,
+        "price_date": price_date,
+        "open": _pf(1),
+        "high": _pf(4),
+        "low": _pf(5),
+        "volume": _pf(8),
+        "turnover": _pf(9),
+        "source": "新浪财经",
+    }
+
+
+def fetch_price(code: str) -> dict[str, Any] | None:
+    """获取单只 A 股/ETF 实时行情（Tencent 备用链路）。
+
+    与 Tencent 相似的代码前缀策略：仅支持 A 股股票和场内基金/ETF。
+
+    Args:
+        code: 6 位证券代码（如 "600900"、"159222"）
+
+    Returns:
+        dict: {name, code, price, yesterday_close, price_date, ...}
+        None: 网络异常/解析失败/不支持的类型
+    """
+    # 仅支持 A 股和场内基金/ETF（与 Tencent 策略一致）
+    if not is_a_share_code(code) and not is_exchange_fund_code(code):
+        logger.debug("Sina 跳过不支持的类型: %s", code)
+        return None
+
+    full_code = _add_prefix(code)
+    url = _BASE_URL + full_code
+
+    logger.debug("Sina 行情请求: %s", full_code)
+
+    try:
+        with make_http_client(timeout=_TIMEOUT) as client:
+            resp = client.get(url, headers={"Referer": "https://finance.sina.com.cn"})
+            resp.encoding = "gb18030"
+            text = resp.text
+    except httpx.TimeoutException:
+        logger.warning("Sina 行情 API 超时: %s", full_code)
+        return None
+    except httpx.RequestError as e:
+        logger.warning("Sina 行情 API 请求失败: %s", e)
+        return None
+
+    return _parse_price_response(text, code)
+
+
+# ── A 股指数行情（Tencent 备用链路）─────────────────────────
 
 
 def _parse_a_index(text: str) -> dict[str, Any] | None:

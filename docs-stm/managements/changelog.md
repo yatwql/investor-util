@@ -4,6 +4,19 @@
 
 ---
 
+## [0.3.8] - 2026-07-12
+
+### Fixed
+
+- **Provider Chain 行情链路优化**：价格获取按代码类型拆分为 `price_stock`（腾讯财经 → 新浪财经备用）和 `price_fund_otc`（东方财富直达），解决腾讯行情中断时股票/ETF 价格全链路不可用的问题。新增新浪财经 A 股/ETF 实时行情获取。
+- **NoneType 格式化崩溃修复**：`DetailRow.profit_rate` 在成本为 0 时为 `None`，导致 LLM 模板和 HTML 报告中的 `format()` 调用崩溃。统一使用 `is not None` 守卫替代 `.get("key", 0)` 默认值模式。
+
+### Changed
+
+- 价格获取架构：按代码类型（`price_stock`/`price_fund_otc`）路由，取代单一 `price` chain。
+
+---
+
 ## [0.3.7] - 2026-07-12
 
 ### Fixed

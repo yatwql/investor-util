@@ -164,10 +164,10 @@ def _build_single_perf_item(
     benchmark = fetch_fund_benchmark(fund.code)
 
     if d:
-        profit_val = d.profit
+        profit_val = d.profit or 0.0
         profit_rate_val = d.profit_rate
         profit_str = f"{profit_val:+,.2f}"
-        profit_rate_str = f"{profit_rate_val * 100:+.2f}%"
+        profit_rate_str = f"{profit_rate_val * 100:+.2f}%" if profit_rate_val is not None else "--"
     else:
         profit_val = 0.0
         profit_rate_val = 0.0

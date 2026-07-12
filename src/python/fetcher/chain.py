@@ -22,6 +22,8 @@ logger = logging.getLogger("invest")
 # ── Provider Chain 定义 ──────────────────────────────────────
 
 _DEFAULT_CHAINS: dict[str, list[str]] = {
+    "price_stock": ["tencent", "sina"],
+    "price_fund_otc": ["eastmoney"],
     "price": ["tencent", "eastmoney"],
     "fund_rank": ["tiantian"],
     "fund_hold": ["tiantian"],

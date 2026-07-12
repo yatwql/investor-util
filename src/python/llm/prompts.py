@@ -165,7 +165,8 @@ def _fmt_holding_line(h: dict, show_cost: bool = False, compact: bool = False) -
     code = h.get("code", "")
     mv = h.get("market_value", 0)
     profit = h.get("profit", 0)
-    rate = h.get("profit_rate", 0)
+    rate = h.get("profit_rate")  # 可能为 None（成本为 0 时）
+    rate_str = f"{rate:+.2f}%" if rate is not None else "--"
     nav_date = h.get("nav_date", "")
     source_api = h.get("source_api", "")
     name = h.get("name", "")
@@ -173,9 +174,9 @@ def _fmt_holding_line(h: dict, show_cost: bool = False, compact: bool = False) -
 
     if show_cost:
         cost = h.get("cost", 0)
-        base = f"{code} 成本{_fmt_wan(cost)} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}({rate:+.2f}%)"
+        base = f"{code} 成本{_fmt_wan(cost)} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}({rate_str})"
     else:
-        base = f"{code} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}({rate:+.2f}%)"
+        base = f"{code} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}({rate_str})"
 
     if source_api != "tencent" and nav_date:
         return f"{base} 净值:{nav_date}{qdii_suffix}"

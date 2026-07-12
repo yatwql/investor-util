@@ -1,6 +1,8 @@
 """市场行情数据获取（场内/场外价格）。
 
-Provider Chain（可配置）：腾讯财经 → 东方财富
+Provider Chain（按代码类型路由）：
+  股票/ETF: 腾讯财经 → 新浪财经
+  场外基金: 东方财富
 """
 
 from __future__ import annotations
@@ -11,8 +13,10 @@ from collections.abc import Callable
 from typing import Any
 
 from src.python.cache import get_ttl
+from src.python.code_utils import is_a_share_code, is_exchange_fund_code
 from src.python.fetcher.chain import _fetch_with_fallback
 from src.python.providers import eastmoney, tencent
+from src.python.providers import sina as sina_provider
 
 logger = logging.getLogger("invest")
 
@@ -50,6 +54,7 @@ _ProviderFunc = Callable[..., dict[str, Any] | None]
 
 _PRICE_PROVIDERS: dict[str, tuple[str, _ProviderFunc]] = {
     "tencent": ("腾讯财经", tencent.fetch_price),
+    "sina": ("新浪财经", sina_provider.fetch_price),
     "eastmoney": ("东方财富", eastmoney.fetch_nav),
 }
 
@@ -63,6 +68,19 @@ def _price_transform_tencent(raw: dict, source: str) -> dict | None:
         "yesterday_close": raw.get("yesterday_close", 0.0),
         "price_date": raw.get("price_date", ""),
         "source_api": "tencent",
+        "source": source,
+    }
+
+
+def _price_transform_sina(raw: dict, source: str) -> dict | None:
+    """新浪财经原始数据 → 统一价格格式。"""
+    return {
+        "name": raw.get("name", ""),
+        "code": raw.get("code", ""),
+        "price": raw.get("price", 0.0),
+        "yesterday_close": raw.get("yesterday_close", 0.0),
+        "price_date": raw.get("price_date", ""),
+        "source_api": "sina",
         "source": source,
     }
 
@@ -85,6 +103,7 @@ def _price_transform_eastmoney(raw: dict, source: str) -> dict | None:
 
 _PRICE_TRANSFORMS: dict[str, Callable] = {
     "tencent": _price_transform_tencent,
+    "sina": _price_transform_sina,
     "eastmoney": _price_transform_eastmoney,
 }
 
@@ -115,7 +134,10 @@ def _price_cache_fresh(data: dict) -> bool:
 
 
 def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | None:
-    """获取一只证券的市场行情（含自动/手动备用链路切换）。
+    """获取一只证券的市场行情（按代码类型自动路由 Provider Chain）。
+
+    股票/ETF → 腾讯财经 → 新浪财经（备用）
+    场外基金 → 东方财富
 
     Args:
         code: 6 位证券代码
@@ -128,18 +150,26 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
     code = code.strip()
     cache_key = _price_cache_key(code)
 
+    # 按代码类型选择专属 Provider Chain
+    # 股票/ETF → tencent → sina（同质 fallback）
+    # 场外基金 → eastmoney（直达，无备用）
+    if is_exchange_fund_code(code) or is_a_share_code(code):
+        data_type = "price_stock"
+    else:
+        data_type = "price_fund_otc"
+
     def _validate(raw: dict, provider_name: str) -> bool:
-        if provider_name == "tencent":
+        if provider_name in ("tencent", "sina"):
             if not raw.get("name"):
                 return False
-            tencent_name = raw.get("name", "").strip()
-            return not (expected_name and tencent_name and not _name_matches(tencent_name, expected_name))
+            pname = raw.get("name", "").strip()
+            return not (expected_name and pname and not _name_matches(pname, expected_name))
         if provider_name == "eastmoney":
             return bool(raw.get("nav") and raw.get("nav", 0.0) > 0)
         return True
 
     result = _fetch_with_fallback(
-        data_type="price",
+        data_type=data_type,
         provider_fn_map=_PRICE_PROVIDERS,
         cache_key=cache_key,
         cache_ttl=get_ttl("price"),
@@ -158,7 +188,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
                      result.get("price_date", "?"), _td)
         _cache_clear(cache_key)
         result = _fetch_with_fallback(
-            data_type="price",
+            data_type=data_type,
             provider_fn_map=_PRICE_PROVIDERS,
             cache_key=cache_key,
             cache_ttl=get_ttl("price"),
