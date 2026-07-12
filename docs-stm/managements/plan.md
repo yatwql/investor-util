@@ -1,16 +1,13 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-12（精简冗余内容：字母迭代清单、验证节、配置架构节、系统影响节改为引用）
+最后更新：2026-07-13
 
 ---
 
 ## 审查问题索引
 
-> **v0.3.x 审查问题记录已归档**：详见 [docs-stm/archive/archived_plan.0.3.x.md](../archive/archived_plan.0.3.x.md)。
-> 涵盖 R-160~R-176（D-8b 全面审查修复）、D-10 数据降级重构、R-188~R-191、R-211 测试隔离补完。
->
-> **v0.2.x 已完成迭代的详细记录已归档**：详见 [docs-stm/archive/archived_plan.0.2.x.md](../archive/archived_plan.0.2.x.md)。
+> 早期审查问题和实现计划已归档：详见 [`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md)。
 
 ---
 
@@ -60,16 +57,7 @@
 
 ## ✅ 已完成迭代
 
-v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel 输出打磨）的详细设计见 [`docs-stm/archive/archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md)。
-
-所有已完成迭代的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md)。
-
-**v0.2.x 已完成迭代的详细记录已归档**：详见 [docs-stm/archive/archived_plan.0.2.x.md](../archive/archived_plan.0.2.x.md)。
-涵盖 B（基金深度分析 4 模块）、C（报告序号可配置）、D（数据降级分层治理）
-及 A/A2/A3/A4/A5/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4 等迭代。
->
-> **v0.3.x 已完成审查修复的详细记录已归档**：详见 [docs-stm/archive/archived_plan.0.3.x.md](../archive/archived_plan.0.3.x.md)。
-> 涵盖 D-8b/D-10/D-11 审查修复（R-160~R-176、R-188~R-191、R-211）。
+所有已完成迭代的详细变更记录见 [`changelog.md`](changelog.md)。早期实现计划和审查记录已归档：[`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md)。
 
 ---
 

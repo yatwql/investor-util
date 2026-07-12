@@ -44,7 +44,7 @@ CACHE_WEEKLY = 604800       # 每周（7d）
 CACHE_TWO_WEEKS = 1209600   # 两周（14d）
 CACHE_MONTHLY = 2592000     # 每月（30d）
 
-# ── F 迭代：组合历史对比分析 ──────────────────────────────
+# ── 组合历史走势 ─────────────────────────────────
 
 # 快照目录（相对于 PROJECT_ROOT）
 HISTORY_SNAPSHOT_DIR = os.path.join(PROJECT_ROOT, "data", "history", "snapshots")

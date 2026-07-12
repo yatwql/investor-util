@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-12（v0.4.0 — 文档双向校验修正 + 设计约束优化）
+最后更新：2026-07-12
 
 ---
 
@@ -156,7 +156,7 @@ investor-util/
 
 ### 策略概览
 
-缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。完整 TTL 表（23 种类型，含 B 系列 4 模块 + F 迭代 2 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
+缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。完整 TTL 表（23 种类型，含基金深度分析 4 模块 + 历史走势 2 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
 
 #### 行业/概念缓存
 
@@ -204,7 +204,7 @@ investor-util/
 - **preload（6 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
 - **refresh（11 模块）**：fund_perf（基金业绩排名）, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, fund_benchmarks（基金业绩基准）, fund_manager（基金经理数据）, fund_overlap（持仓重合度）→ 菜单 `[1]` 触发清除
 - **独立模块**：tracking, calendar, fund_concentration（集中度历史）, fund_style_snapshot（风格快照）→ 无分组保护，不被菜单缓存命令误删
-- **F 迭代独立缓存**：history_stock（历史 K 线，TTL=CACHE_WEEKLY）, history_fund_otc（历史净值，TTL=CACHE_MONTHLY）→ 无分组保护，通过 Provider Chain `_fetch_with_incremental_fallback` 自动管理
+- **历史走势独立缓存**：history_stock（历史 K 线，TTL=CACHE_WEEKLY）, history_fund_otc（历史净值，TTL=CACHE_MONTHLY）→ 无分组保护，通过 Provider Chain `_fetch_with_incremental_fallback` 自动管理
 
 ### 指纹驱动失效机制
 
@@ -369,7 +369,7 @@ handlers_report.py（菜单触发）
    ├─ info 数据准备（并行预热 + 计算）
    │     └─ report_prepare() 收集所有数据 → info 字典
    │
-   ├─ F 迭代数据获取（菜单 L/B）
+   ├─ 历史走势数据获取（菜单 L/B）
    │     ├─ F1 快照对比：SnapshotHoldings → load_latest() → HistoryDiff.compute() → save()
    │     ├─ F2 历史走势：PortfolioHistoryCalculator.get_combined_timeseries()（as-if 模拟）
    │     └─ 数据注入：f_context（diff 摘要）→ Excel；history_data（走势）→ HTML
@@ -552,7 +552,7 @@ raw_data_flags = {
     "include_news":       include_news,
     "early_warnings":     bool(early_warnings),
     "llm_enabled":        llm_enabled_flag,
-    # F 迭代：history 类型 sections 始终可见（数据不可用时显示占位文本）
+    # history 类型 sections 始终可见（数据不可用时显示占位文本）
     "history_data":       history_data is not None,
 }
 ```

@@ -368,7 +368,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
     return results
 
 
-# ── F 迭代：历史 K 线数据（备用链路） ──────────────────────
+# ── 组合历史走势：历史 K 线数据（备用链路） ──────────────────────
 
 
 def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:

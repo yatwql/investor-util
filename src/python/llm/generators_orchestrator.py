@@ -278,7 +278,7 @@ def generate_all_llm(
     每个工作线程创建独立的 httpx.Client，避免全局共享连接池的线程安全问题。
 
     Args:
-        f_context: F 迭代时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
+        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
 
     Returns:
         (global_macro_html, expert_review_html, health_check_html, penetration_deep_html,

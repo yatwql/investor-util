@@ -175,7 +175,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
                   exact_cache_keys=("holdings_tracking",),
                   cache_ttl=CACHE_MONTHLY),  # 无 cache_group，避免被手动清除
 
-    # ── F 迭代：组合历史对比分析（preload 组）──
+    # ── 组合历史走势（preload 组）──
     DataModuleDef("历史股票日线", "history_stock",
                   cache_prefixes=("history_stock_",), cache_ttl=CACHE_WEEKLY,
                   cache_groups=("preload",)),

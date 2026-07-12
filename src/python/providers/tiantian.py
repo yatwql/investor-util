@@ -634,7 +634,7 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     }
 
 
-# ── F 迭代：基金历史净值数据 ──────────────────────────────
+# ── 组合历史走势：基金历史净值数据 ──────────────────────────────
 
 
 def fetch_fund_nav_history(code: str) -> list[dict]:

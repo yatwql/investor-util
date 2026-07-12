@@ -2,7 +2,7 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-12，F 迭代完成）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-12）测试覆盖规模：
 
 ### 模式对应测试量
 
@@ -86,9 +86,9 @@
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 186 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 480 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
-| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列模块、C/D 迭代降级/占位；含 65 项 data 标记测试） | 989 |
-| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含 C 迭代 report_section_order 校验） | 76 |
-| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含 C/D 迭代注册表测试） | 427 |
+| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列基金深度分析模块、数据降级/占位；含 65 项 data 标记测试） | 989 |
+| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 76 |
+| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含注册表测试） | 427 |
 | └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 164 |
 
 ### 跨类标记

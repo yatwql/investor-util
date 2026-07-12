@@ -28,7 +28,7 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "fund_rank": ["tiantian"],
     "fund_hold": ["tiantian"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
-    # F 迭代：历史数据 chains（复用现有 provider name，熔断器共享）
+    # 组合历史走势：历史数据 chains（复用现有 provider name，熔断器共享）
     "history_stock": ["tencent", "sina"],
     "history_fund_otc": ["tiantian"],
 }
@@ -215,7 +215,7 @@ def _fetch_with_fallback(
 
 
 # ═══════════════════════════════════════════════════════════════
-#  F 迭代：增量合并 Fallback 路由
+#  组合历史走势：增量合并 Fallback 路由
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -225,7 +225,7 @@ def _fetch_with_incremental_fallback(
     days: int = 30,
     param_fn: Callable | None = None,
 ) -> list[dict]:
-    """增量合并版 Fallback 路由（F 迭代历史数据用）。
+    """增量合并版 Fallback 路由（历史数据用）。
 
     - chain 层管理缓存读/写/合并
     - Provider 函数只负责纯数据获取（不碰缓存层）

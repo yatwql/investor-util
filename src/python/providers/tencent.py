@@ -209,7 +209,7 @@ def fetch_index_price(code: str) -> dict[str, Any] | None:
     return result
 
 
-# ── F 迭代：历史 K 线数据 ─────────────────────────────────
+# ── 组合历史走势：历史 K 线数据 ─────────────────────────────────
 
 
 def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:

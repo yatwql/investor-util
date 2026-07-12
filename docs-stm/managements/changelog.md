@@ -8,8 +8,8 @@
 
 ### Added
 
-- **F 迭代：F1 快照对比**：每次报告生成时自动创建持仓快照，与上一次快照对比输出环比差异摘要（总市值/盈亏变化、新增/清仓/增持/减持 TOP5），写入 Excel summary 页签底部（`history_snapshot.py` + `history_diff.py`）。
-- **F 迭代：F2 历史走势**：as-if 模拟（当前持仓 × 历史价格/净值），Chart.js 折线图显示组合市值走势 + 回撤面积图，附累计收益率、最大回撤、年化波动率等指标（`portfolio_history.py`、HTML template 模块 17/18）。
+- **F1 快照对比**：每次报告生成时自动创建持仓快照，与上一次快照对比输出环比差异摘要（总市值/盈亏变化、新增/清仓/增持/减持 TOP5），写入 Excel summary 页签底部（`history_snapshot.py` + `history_diff.py`）。
+- **F2 历史走势**：as-if 模拟（当前持仓 × 历史价格/净值），Chart.js 折线图显示组合市值走势 + 回撤面积图，附累计收益率、最大回撤、年化波动率等指标（`portfolio_history.py`、HTML template 模块 17/18）。
 - **新的报告章节 #17 组合历史走势**（`type="history"`，始终可见，数据不可用时占位）。
 - **新的报告章节 #18 回撤分析**（`type="history"`，始终可见，数据不可用时占位）。
 - **`history.analysis` 配置项**：三种模式 `"off"`（默认）/ `"prompt"` / `"auto"`，控制 F2 走势获取行为。
@@ -28,17 +28,20 @@
 ### Docs
 
 - **how-to-test-my-code.md / test-coverage.md**：同步各模式实际运行时间（regression ~6min / verify ~8min / all ~10min），修正多处不一致的耗时描述。scenario 项数修正为 269 项。
-- **config.json**：同步 F 迭代新增配置项（`cache_ttl.history_stock`、`cache_ttl.history_fund_otc`、`history.analysis`）。
-- **requirements.md**：页签对照表扩展至 18 项（新增 #17 组合历史走势、#18 回撤分析），配置表新增 `history.analysis`，计数更新（16→18）。同步修正 cache_ttl 计数（21→23）、独立缓存列表补 history_stock/fund_otc、TTL 子表增加历史走势类、数据源表补历史数据行、F 系列页签脚注、F 迭代降级场景、default_menu_key 描述、F 系列 Excel 占位说明共 8 项。
-- **technical.md**：报告管线增加 F 迭代数据流，fetcher 表增加 `portoflio_history.py`，缓存设计更新（21→23 类型 + 独立缓存说明），注册表增加 `history` 可见性类型，C7 约束更新为 18 模块。修正页签引用编号 6 处（16→18）。
-- **how-to-config.md**：Config JSON 样本增加 F 节 + `history.analysis` 字段，报告模块表扩展至 18 项，新增 §F 历史走势配置章节，无分组模块增加 history 缓存类型。Cache TTL 子表增加历史走势类（history_stock/history_fund_otc）。
+- **config.json**：同步新增配置项（`cache_ttl.history_stock`、`cache_ttl.history_fund_otc`、`history.analysis`）。
+- **requirements.md**：页签对照表扩展至 18 项（新增 #17 组合历史走势、#18 回撤分析），配置表新增 `history.analysis`，计数更新（16→18）。同步修正 cache_ttl 计数（21→23）、独立缓存列表补 history_stock/fund_otc、TTL 子表增加历史走势类、数据源表补历史数据行、历史走势页签脚注、历史走势降级场景、default_menu_key 描述、历史走势 Excel 占位说明共 8 项。
+- **technical.md**：报告管线增加历史走势数据流，fetcher 表增加 `portoflio_history.py`，缓存设计更新（21→23 类型 + 独立缓存说明），注册表增加 `history` 可见性类型，C7 约束更新为 18 模块。修正页签引用编号 6 处（16→18）。
+- **how-to-config.md**：Config JSON 样本增加 `history` 节 + `history.analysis` 字段，报告模块表扩展至 18 项，新增历史走势配置章节，无分组模块增加 history 缓存类型。Cache TTL 子表增加历史走势类（history_stock/history_fund_otc）。
 - **reports-instruction.md**：页签对照表补充 #16 组合历史走势、#17 回撤分析；LLM API 用量章节编号修正 6 处（16→18）、页签名（16→18）、最多模块数（16→18）。
-- **how-to-use-registry.md**：模块计数修正（16→18）；键名对照表补齐全部 18 个模块；分组注册表增加历史走势类条目；补充 F 迭代描述段；编号修正（第 16 号→第 18 号）。
+- **how-to-use-registry.md**：模块计数修正（16→18）；键名对照表补齐全部 18 个模块；分组注册表增加历史走势类条目；补充历史走势描述段；编号修正（第 16 号→第 18 号）。
 - **faq.md**：编号修正 3 处：默认顺序（16 项→18 项）、页签范围（1~16→1~18）、全量（1~16→1~18）。
-- **F 迭代设计文件归档**：`plan/F-portfolio-history-comparison.md` → `archive/`。
-- **plan.md**：F 迭代从待实现方向移除，加入已完成迭代列表。
+- **历史走势设计文件归档**：`plan/F-portfolio-history-comparison.md` → `archive/`。
+- **plan.md**：历史走势从待实现方向移除，加入已完成列表。
 - **how-to-start.md**：菜单 B/L 描述补充 F1 快照对比和 F2 历史走势（视 history.analysis 配置）信息。
 - **how-to-config-llm.md**：LLM API 用量页码编号修正（16→18），与注册表最新编号保持一致。
+- **docs 迭代标签清理（全局）**：所有活跃管理文档和用户文档正文中的历史迭代名称（"B 迭代""C 迭代""D 迭代""F 迭代"）及版本号标记移除或替换为功能描述。源代码注释 18 处"F 迭代"/"组合历史对比分析"统一为"组合历史走势"。
+- **用词统一**：全库 "组合历史对比分析" → "组合历史走势"（how-to-config.md、datasource-and-folders.md 及源代码注释同步）。
+- **归档文件迁移**：`archive/F-portfolio-history-comparison.md` → `archive/portfolio-history-comparison/` 子目录，文件名保持不变。
 
 ## [0.4.0] - 2026-07-12
 

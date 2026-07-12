@@ -179,7 +179,7 @@ from src.python.registry import (
 | 持仓体检报告 | `health_check` | 14. |
 | 穿透深度分析 | `penetration_deep` | 15. |
 
-第 16~17 号为 F 迭代模块（组合历史走势 / 回撤分析），始终显示，数据不可用时显示占位文本。第 18 号为 LLM API 用量页签，程序自动生成，仅菜单 L 时显示。
+第 16~17 号（组合历史走势 / 回撤分析）始终显示，数据不可用时显示占位文本。第 18 号为 LLM API 用量页签，程序自动生成，仅菜单 L 时显示。
 
 > LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 10 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 12~15 号），在新闻数据就绪时写入。第 18 号的 LLM API 用量页签为程序生成，不依赖 registry。
 >

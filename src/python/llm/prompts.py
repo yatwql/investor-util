@@ -12,7 +12,7 @@ logger = logging.getLogger("invest")
 
 
 # ═══════════════════════════════════════════════════════════
-#  F 迭代：差异上下文格式化（R3 F1 快照对比 LLM 注入）
+#  组合历史走势：差异上下文格式化（R3 F1 快照对比 LLM 注入）
 # ═══════════════════════════════════════════════════════════
 
 
@@ -372,7 +372,7 @@ def _build_expert_review_prompt(
     防止 LLM 虚构持仓代码。同时包含穿透 TOP10 供参考。
 
     Args:
-        f_context: F 迭代时间维度上下文（含 diff 差异摘要）。
+        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
@@ -418,7 +418,7 @@ def _build_health_check_prompt(
     要求 LLM 从风险分散度/流动性/收益合理性/成本结构四维度打分。
 
     Args:
-        f_context: F 迭代时间维度上下文（含 diff 差异摘要）。
+        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]

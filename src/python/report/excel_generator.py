@@ -33,7 +33,7 @@ def generate_excel_report(
     include_b_series: bool | None = None,  # renamed from include_fund_deep
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
-    f_context: dict | None = None,  # F 迭代：环比对比数据（drives delta columns）
+    f_context: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -54,7 +54,7 @@ def generate_excel_report(
             None 时跟随 include_news（B/L 含，E/H 不含）。已从 include_fund_deep 重命名。
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
-        f_context: F 迭代环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
+        f_context: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
@@ -89,7 +89,7 @@ def generate_excel_report(
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
     write_llm_section_and_usage(sheets, include_llm, llm_content, prog, section_order=order)
 
-    # ── F 迭代：环比对比摘要（写入 summary 页签底部） ──
+    # ── 组合历史走势：环比对比摘要（写入 summary 页签底部） ──
     if f_context and f_context.get("diff") and "summary" in sheets:
         prog.info("正在写入环比对比摘要...")
         try:

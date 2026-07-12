@@ -240,7 +240,7 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         penetration_dividend_ok, perf_data, perf_profit_ok, holdings,
         cat_dividend_ok)
 
-    # ── 10c) F 迭代：历史走势数据状态 ──
+    # ── 10c) 组合历史走势数据状态 ──
     data_status_history: DataStatus = {}
     if history_data:
         status = history_data.get("status", "unavailable")
@@ -303,7 +303,7 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         data_status_penetration=data_status_penetration,
         data_status_perf=data_status_perf,
         data_status_category=data_status_category,
-        # F 迭代：组合历史走势数据
+        # 组合历史走势数据
         history_data=history_data,
         data_status_history=data_status_history,
         # 报告年份（穿透表预测EPS列使用）

@@ -361,41 +361,42 @@ investor-util/
 │   │   ├── archived_changelog.0.3.x.md        # v0.3.x 版本变更日志归档（v0.3.0 ~ v0.3.10 共 8 个版本）
 │   │   ├── archived_plan.0.3.x.md             # v0.3.x 实现计划归档（D-8b/D-10/D-11 审查修复）
 │   │   ├── archived_review-findings.0.3.x.md  # v0.3.x 自审问题记录归档（D-9/D-10/D-11 等 6 条）
-│   │   ├── archived-data-source-pre-study.md  # ✅ 已归档 — 数据源预研笔记（原位于 plan/notes/）
+│   │   ├── archived-data-source-pre-study.md  # 数据源预研笔记（已归档，原位于 plan/notes/）
 │   │   ├── test-runtime-optimization/         # 📁 测试可扩展性优化设计归档
-│   │   │   └── A5-test-runtime-optimization.md # ✅ 已实现 — A5：测试运行时可扩展性优化设计（pytest-xdist 并行）
+│   │   │   └── A5-test-runtime-optimization.md # 测试运行时可扩展性优化设计（已归档）
 │   │   ├── fund-deep-analysis/                # 📁 基金深度分析设计归档
-│   │   │   └── B1-fund-deep-analysis.md       # ✅ 已实现 — B 迭代基金深度分析 4 模块设计
+│   │   │   └── B1-fund-deep-analysis.md       # 基金深度分析 4 模块设计（已归档）
 │   │   ├── report-section-order-config/                        # 📁 报告序号可配置设计归档
-│   │   │   └── report-section-order-config.md                  # ✅ 已实现 — C 迭代：报告序号可配置设计（含 C-P1b 详细方案）
+│   │   │   └── report-section-order-config.md                  # 报告序号可配置设计（已归档）
 │   │   ├── akshare-integration/                        # 📁 akshare 数据源集成归档
-│   │   │   └── akshare-integration-profit-forecast-sector-flow.md  # ✅ 已归档 — akshare 盈利预测 + 资金流向集成
+│   │   │   └── akshare-integration-profit-forecast-sector-flow.md  # akshare 盈利预测 + 资金流向集成（已归档）
 │   │   ├── report-early-warning/                       # 📁 智能预警 + P1 代码优化归档
-│   │   │   └── early-warning-and-p1-optimization.md    # ✅ 已归档 — 智能预警 + P1 代码优化实施计划
+│   │   │   └── early-warning-and-p1-optimization.md    # 智能预警 + P1 代码优化实施计划（已归档）
 │   │   ├── test-add-config-edge-testcase/               # 📁 配置/环境纵深测试归档
-│   │   │   └── y5-edge-test-config-env.md              # ✅ 已归档 — Y5 配置/环境纵深测试实施计划
+│   │   │   └── y5-edge-test-config-env.md              # 配置/环境纵深测试实施计划（已归档）
 │   │   ├── data-degradation/                                   # 📁 数据降级重构归档
-│   │   │   ├── d-iteration-data-degradation-design.md          # ✅ 已归档 — D 迭代数据降级分层治理完整设计
-│   │   │   ├── d-iteration-data-degradation-iteration-plan.md  # ✅ 已归档 — D 迭代精细化子迭代拆分方案
-│   │   │   └── data-degradation-refactoring.md                 # ✅ 已归档 — 数据降级系统重构精细化子迭代方案（v0.3.2）
+│   │   │   ├── d-iteration-data-degradation-design.md          # 数据降级分层治理完整设计（已归档）
+│   │   │   ├── d-iteration-data-degradation-iteration-plan.md  # 精细化子迭代拆分方案（已归档）
+│   │   │   └── data-degradation-refactoring.md                 # 数据降级系统重构精细化子迭代方案（已归档）
 │   │   ├── test-coverage-map/                        # 📁 场景-测试文件覆盖率映射归档
-│   │   │   ├── test-coverage-map.md                  # ✅ 已归档 — 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
-│   │   │   └── validate_coverage_map.py              # ✅ 已归档 — 覆盖率映射验证脚本
+│   │   │   ├── test-coverage-map.md                  # 场景-测试文件覆盖率映射（已归档）
+│   │   │   └── validate_coverage_map.py              # 覆盖率映射验证脚本（已归档）
 │   │   ├── test-verify-mode-optimization/               # 📁 verify 模式测试优化归档
-│   │   │   └── r200_verify_mode_optimization.md         # ✅ 已实现 — verify 模式测试执行优化
+│   │   │   └── r200_verify_mode_optimization.md         # verify 模式测试执行优化（已归档）
 │   │   ├── refactor-cache-engine/                      # 📁 缓存引擎重构设计归档
-│   │   │   └── cache-refactor-plan.md                  # ✅ 已归档 — 缓存引擎 Strangler Fig 重构计划
+│   │   │   └── cache-refactor-plan.md                  # 缓存引擎 Strangler Fig 重构计划（已归档）
 │   │   ├── refactor-excel-generator/              # Excel 报告编排器，统筹各子模块完成报告生成
 │   │   │   └── R-206-excel-generator-split-plan.md # Excel 报告编排器，统筹各子模块完成报告生成
 │   │   ├── refactor-html_writer/                     # 📁 html_writer.py 分拆设计归档
-│   │   │   └── r178_html_writer_split.md             # ✅ 已实现 — R-178：html_writer.py 5 步分拆计划（含 C14 约束引入）
+│   │   │   └── r178_html_writer_split.md             # html_writer.py 5 步分拆计划（含 C14 约束引入）（已归档）
 │   │   ├── refactor-market_value_split_design/       # 📁 market_value.py 分拆设计归档
-│   │   │   └── r197_market_value_split.md            # ✅ 已实现 — R-197：market_value.py 拆分为计算层+写入层
+│   │   │   └── r197_market_value_split.md            # market_value.py 拆分为计算层+写入层（已归档）
 │   │   ├── refactor-llm_split_design/                # 📁 LLM 模块分拆设计归档
-│   │       └── r198_llm_split_design.md              # ✅ 已实现 — R-198：LLM 模块横向拆分
-│   │   └── refactor-summary-llm-usage/             # 📁 summary.py LLM 用量拆分设计归档
-│   │       └── R-207-summary-llm-usage-split-plan.md # ✅ 已实现 — R-207：summary.py LLM 用量拆分（617→350 行）
-│   ├── F-portfolio-history-comparison.md            # F 迭代：组合历史对比分析 — 快照/差异/历史走势（已归档）
+│   │   │   └── r198_llm_split_design.md              # LLM 模块横向拆分（已归档）
+│   │   ├── refactor-summary-llm-usage/             # 📁 summary.py LLM 用量拆分设计归档
+│   │   │   └── R-207-summary-llm-usage-split-plan.md # summary.py LLM 用量拆分（已归档）
+│   │   └── portfolio-history-comparison/              # 📁 组合历史走势设计归档
+│   │       └── F-portfolio-history-comparison.md     # 组合历史走势计划与技术设计（已归档）
 │   ├── plan/                         # 计划与设计文件
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
@@ -427,4 +428,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，目录树和测试文件数可能滞后。请以代码仓库实际结构为准。
 >
-> 最后更新：2026-07-12（数据源表补历史走势数据；目录树已同步 F 迭代文件）
+> 最后更新：2026-07-12

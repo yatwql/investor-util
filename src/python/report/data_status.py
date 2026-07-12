@@ -60,7 +60,7 @@ STATUS_MESSAGES: dict[str, str] = {
     "news_all_failed":        "新闻数据暂不可用，请检查网络连接",
     "warning_unavailable":    "预警数据暂不可用",
 
-    # F 迭代：组合历史走势
+    # 组合历史走势
     "history_price_unavailable": "个股历史行情获取失败，部分股票走势不可用",
     "history_nav_unavailable":   "基金历史净值获取失败，部分基金走势不可用",
     "history_degraded":          "历史走势部分数据来自降级链路，精度可能降低",
