@@ -127,7 +127,7 @@ investor-util/
 
 | 用途 | 主链路 API | 备用链路 | Provider 文件 |
 |------|-----------|---------|-------------|
-| 场内实时/收盘价 | 腾讯财经 `qt.gtimg.cn` | 东方财富 `push2.eastmoney.com` | `tencent.py` |
+| 场内 A 股/ETF 实时价 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `tencent.py` / `sina.py` |
 | 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 天天基金 `fundf10.eastmoney.com` | `eastmoney.py` |
 | 基金业绩排名 | 天天基金 `pingzhongdata/{code}.js`（JS 变量解析） | — | `tiantian.py` |
 | 基金持仓数据 | 天天基金 `fundf10.eastmoney.com` | — | `tiantian.py` |
@@ -265,16 +265,16 @@ penetration_sector = fetch_industry_data(code).industry  // API优先
 
 ### Provider Chain 路由与 fallback
 
-`src/python/providers/` 下的 Provider 按数据类型的优先级定义在 `fetcher/chain.py:_DEFAULT_CHAINS` 中（`price`→`tencent`,`eastmoney`；`industry`→`eastmoney_industry`,`eastmoney_industry_rest` 等），`fetcher/price.py` 的 `get_price()` 通过 `_fetch_with_fallback()` 遍历 Provider Chain：
+`src/python/providers/` 下的 Provider 按数据类型的优先级定义在 `fetcher/chain.py:_DEFAULT_CHAINS` 中（`price_stock`→`tencent`,`sina`；`price_fund_otc`→`eastmoney`；`industry`→`eastmoney_industry`,`eastmoney_industry_rest` 等），`fetcher/price.py` 的 `fetch_market_data()` 通过 `_fetch_with_fallback()` 遍历 Provider Chain：
 
 ```
 Provider Chain 注册表（provider_registry.py:DataSourceRegistry）
     ↓
-路由此类型首个 Provider（如 price→tencent）
+路由此类型首个 Provider（如 price_stock→tencent）
     ↓ 成功? → 返回并缓存
     ↓ 失败?
     ↓
-递补下一 Provider（如 price→eastmoney）
+递补下一 Provider（如 price_stock→sina）
     ↓ 成功? → 返回并缓存
     ↓ 失败?
     ↓
@@ -284,7 +284,7 @@ Provider Chain 注册表（provider_registry.py:DataSourceRegistry）
 - **默认优先级**硬编码在 `fetcher/chain.py:_DEFAULT_CHAINS` 中，`preferred_provider` 可在 `config.json` 中手动将某类型首选调整到链首
 - 失败检测：空返回、HTTP 错误、JSON 解析异常均视为失败触发递补
 - 全链路失败 → 尝试过期缓存降级 → 仍失败则抛异常由调用方处理
-- **价格缓存收市后新鲜度验证**（`fetcher/price.py:_price_cache_fresh`）：盘后首次请求时校验缓存 `price_date` 是否为当前交易日。若盘中因 Tencent 名称校验降级写入 EastMoney 净值（上一交易日价格），收市后自动清除该残留缓存并强制重走 Provider Chain，确保收盘价更新。
+- **价格缓存收市后新鲜度验证**（`fetcher/price.py:_price_cache_fresh`）：盘后首次请求时校验缓存 `price_date` 是否为当前交易日。若盘中因 Tencent 不可用降级写入 Sina 数据（非收盘价），或盘中缓存残留上一交易日数据，收市后自动清除该残留缓存并强制重走 Provider Chain，确保收盘价更新。
 
 ### Provider Chain 三层熔断架构
 
@@ -345,7 +345,8 @@ Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_re
 
 | 模块 | 功能 | 依赖的 Provider | 缓存类型 |
 |:-----|:-----|:---------------|:---------|
-| `price.py` | 股票/基金最新价 | tencent, eastmoney | `price_*` |
+| `price.py` | 股票/ETF 最新价（腾讯+新浪）| tencent, sina | `price_*` |
+| | 场外基金净值 | eastmoney | `price_*` |
 | `index.py` | A 股/美股指数 | tencent, sina | `index_*` |
 | `fund.py` | 基金排名/持仓/基准 | tiantian | `fund_perf_*`, `fund_hold_*`, `fund_benchmarks` |
 | `fund_manager.py` | 基金经理数据 | tiantian HTML 解析 | `fund_manager_*`, `fund_manager_snapshot` |

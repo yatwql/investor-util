@@ -15,7 +15,7 @@ Excel 写入函数见 :mod:`src.python.report.penetration_sheet`。
   6. 直接持有股票     → 合并计算
 
 输出列：
-  排名 | 名称 | 代码 | 穿透市值 | 占比 | 板块 | 概念 | 预测EPS(当前年E) | 年均股息率 | 来源明细
+  排名 | 名称 | 代码 | 穿透市值 | 占比 | 板块 | 概念 | 预测EPS(当前年E) | 年均股息 | 来源明细
 """
 
 from __future__ import annotations

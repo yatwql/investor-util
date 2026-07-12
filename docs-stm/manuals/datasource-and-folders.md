@@ -2,7 +2,7 @@
 
 | 用途 | 主链路 | 备用链路 |
 |------|--------|----------|
-| 场内实时/收盘价 | 腾讯财经 `qt.gtimg.cn` | 东方财富 `push2.eastmoney.com` |
+| 场内 A 股/ETF 实时价 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` |
 | 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 天天基金 `fundf10.eastmoney.com` |
 | 基金业绩排名 | 天天基金 `pingzhongdata/{code}.js`（JS 变量解析） | — |
 | 基金持仓数据 | 天天基金 `fundf10.eastmoney.com` | — |
@@ -173,6 +173,10 @@ investor-util/
 │       │   │   ├── test_fund.py          # 基金抓取 — 基准三层策略 / HTML 正则解析 / per-code 锁（19 项）
 │   │   │   ├── test_fund_manager.py  # 基金经理数据获取测试，覆盖 HTML 解析与档案页回退
 │       │   │   └── test_api_edge.py      # HTTP Provider 异常场景 — 超时/DNS/SSL/429/503/JSON 异常（23 项 Y1）
+│       │   ├── handlers/                  # 菜单命令处理测试（≈48 项）
+│       │   │   ├── __init__.py            # 子包标记（空文件）
+│       │   │   ├── test_handlers_cache.py  # 缓存管理命令测试 — 刷新/清理/统计（涉及 registry 和 fetcher）
+│       │   │   └── test_handlers_report.py # 报告生成命令测试 — 菜单 E/H/B/L 的场景覆盖
 │       │   ├── llm/                      # LLM 相关测试（480 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_api.py           # LLM API 调用 — 重试/熔断/回退/截断/Provider 路由（44 项）
@@ -183,6 +187,10 @@ investor-util/
 │       │   │   ├── test_circuit_breaker_edge.py    # 熔断器异常场景 — 并发熔断/恢复竞争
 │       │   │   ├── test_fingerprint.py   # 缓存指纹 — _extract_stable_holdings / _build_llm_fingerprint（16 项）
 │       │   │   ├── test_generators.py    # 生成编排 — _apply_llm_news_correlation / _precheck_one_cache / 四函数签名校验（21 项）
+│       │   │   ├── test_generators_news.py # 新闻 LLM 关联分析 — 缓存/批处理/用量汇总测试
+│       │   │   ├── test_generators_news_edge.py # 新闻 LLM 异常场景 — 空输入/网络失败/边际条件测试（edge）
+│       │   │   ├── test_generators_orch.py # LLM 批量编排 — 线程池并发/缓存预检/模块调度测试
+│       │   │   ├── test_generators_orch_edge.py # LLM 编排异常场景 — 并发限制/模块故障隔离（edge）
 │       │   │   ├── test_llm.py           # LLM 客户端 — _markdown_to_html / generate_all_llm / prompt 构建（50 项）
 │       │   │   ├── test_llm_content.py   # LLM 内容 Excel 写入 — _strip_html / _write_content_sheet / section_order（18 项）
 │       │   │   ├── test_llm_placeholder.py # LLM 占位文本 — 未配置/已禁用/API 失败三种状态（3 项）
@@ -363,6 +371,10 @@ investor-util/
 │   │   ├── test-coverage-map/                        # 📁 场景-测试文件覆盖率映射归档
 │   │   │   ├── test-coverage-map.md                  # ✅ 已归档 — 场景-测试文件覆盖率映射（S1-S20 / T1-T16 / 异常场景）
 │   │   │   └── validate_coverage_map.py              # ✅ 已归档 — 覆盖率映射验证脚本
+│   │   ├── test-verify-mode-optimization/               # 📁 verify 模式测试优化归档
+│   │   │   └── r200_verify_mode_optimization.md         # ✅ 已实现 — verify 模式测试执行优化
+│   │   ├── refactor-cache-engine/                      # 📁 缓存引擎重构设计归档
+│   │   │   └── cache-refactor-plan.md                  # ✅ 已归档 — 缓存引擎 Strangler Fig 重构计划
 │   │   ├── refactor-excel-generator/              # Excel 报告编排器，统筹各子模块完成报告生成
 │   │   │   └── R-206-excel-generator-split-plan.md # Excel 报告编排器，统筹各子模块完成报告生成
 │   │   ├── refactor-html_writer/                     # 📁 html_writer.py 分拆设计归档
@@ -402,6 +414,6 @@ investor-util/
 ├── requirements.txt                  # Python 依赖清单（pip install -r 安装）
 ```
 
-> 注意：项目每次版本变更后，`technical.md` 中的目录树和测试文件数可能滞后。请以本文档为准。
+> 注意：项目每次版本变更后，目录树和测试文件数可能滞后。请以代码仓库实际结构为准。
 >
-> 最后更新：2026-07-11（目录树描述润色，移除历史变更痕迹，统一自然表述）
+> 最后更新：2026-07-12（数据源表修正 + 目录树同步：handlers/ 测试组、4 个 LLM 测试文件、2 个归档目录）

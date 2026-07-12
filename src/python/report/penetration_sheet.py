@@ -42,7 +42,7 @@ _NCOLS = 10
 _CURRENT_YEAR = datetime.now().year
 _HEADERS = [
     "排名", "名称", "代码", "穿透市值", "占比", "板块", "概念",
-    f"预测EPS({_CURRENT_YEAR}E)", "年均股息率", "来源明细",
+    f"预测EPS({_CURRENT_YEAR}E)", "年均股息", "来源明细",
 ]
 
 
@@ -60,7 +60,7 @@ def _get_eps_text(forecast: dict, codes: list[str]) -> str:
 
 
 def _get_dividend_text(dividend_data: dict, codes: list[str]) -> str:
-    """根据分红数据和代码列表，查找匹配的年均股息率文本。"""
+    """根据分红数据和代码列表，查找匹配的年均股息文本。"""
     if not dividend_data:
         return "--"
     for code in codes:
@@ -97,7 +97,7 @@ def _load_dividend_data_safe(result: dict) -> tuple[dict, bool]:
         data = get_dividend_data(a_stock_codes) if a_stock_codes else {}
         return data, True
     except Exception:
-        logger.warning("[penetration] 分红数据获取失败（非关键），年均股息率列显示 --", exc_info=True)
+        logger.warning("[penetration] 分红数据获取失败（非关键），年均股息列显示 --", exc_info=True)
         return {}, False
 
 
@@ -273,6 +273,6 @@ def _num_formats() -> list[str | None]:
         "",           # 6  板块
         "",           # 7  概念
         "",           # 8  预测EPS(动态年份)
-        "",           # 9  年均股息率
+        "",           # 9  年均股息
         "",           # 10 来源明细
     ]

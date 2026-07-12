@@ -178,7 +178,7 @@ from src.python.registry import (
 
 > LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 10 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 12~15 号），在新闻数据就绪时写入。第 16 号的 LLM API 用量页签为程序生成，不依赖 registry。
 >
-> 上表序号为**默认值**，用户可通过 `config.json` 的 `report_section_order` 字段自定义各模块序号和排列顺序。配置式序号后 `_create_sheets()` 按配置顺序创建页签，Excel 物理排序与显示顺序一致（不再有旧版 1-7→13-16→8-11→12 的错位问题）。
+> 上表序号为**默认值**，用户可通过 `config.json` 的 `report_section_order` 字段自定义各模块序号和排列顺序。配置式序号后 `_create_sheets()` 按配置顺序创建页签，Excel 物理排序与显示顺序一致。
 
 ---
 

@@ -10,10 +10,18 @@
 
 - **Provider Chain 行情链路优化**：价格获取按代码类型拆分为 `price_stock`（腾讯财经 → 新浪财经备用）和 `price_fund_otc`（东方财富直达），解决腾讯行情中断时股票/ETF 价格全链路不可用的问题。新增新浪财经 A 股/ETF 实时行情获取。
 - **NoneType 格式化崩溃修复**：`DetailRow.profit_rate` 在成本为 0 时为 `None`，导致 LLM 模板和 HTML 报告中的 `format()` 调用崩溃。统一使用 `is not None` 守卫替代 `.get("key", 0)` 默认值模式。
+- **穿透 TOP10 "年均股息率" 列名修正**：该列显示为年均股息金额（元/年）而非比率，栏头 `年均股息率` → `年均股息`，同步更新模板、文档和日志。持仓分类表（实际计算 股息/市值×100%）保留 `年均股息率` 不变。
+- **`technical.md` 价格链路描述陈旧**：6 处仍引用旧版 `price→tencent→eastmoney` 链，同步更新为 `price_stock→tencent,sina` / `price_fund_otc→eastmoney` 拆分架构。
+- **`faq.md` 三处陈旧内容**：价格链路降级描述更新为拆分架构、成本为 0 时收益率显示修正（`+∞%` → `--`）、锚点链接同步到最新格式。
+- **`requirements.md` 备用数据源指代修正**：东方财富 → 新浪财经。
 
 ### Changed
 
 - 价格获取架构：按代码类型（`price_stock`/`price_fund_otc`）路由，取代单一 `price` chain。
+- **`datasource-and-folders.md` 目录树同步**：新增 `handlers/` 测试组、4 个 LLM 测试文件、2 个归档目录，文件计数同步更新。
+- **`how-to-use-registry.md` 消除历史痕迹**：移除"不再有旧版 1-7→13-16→8-11→12 的错位问题"等历史对比描述，仅保留当前状态。
+- **`test-coverage.md` 文件计数刷新**：报告 25→41 文件、LLM 12→20 文件、场景 basic 5→6 文件、场景合计 9→10 文件。
+- **`reports-instruction.md` / `README.md` 股息表述同步**：穿透页签/内容中股息描述区分分类表（率）与穿透（金额）。
 
 ---
 
