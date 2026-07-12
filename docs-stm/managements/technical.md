@@ -975,14 +975,14 @@ handlers_*.py → 各模块入口函数编排
 | C1 | **代码类型判定中心化** | 任何模块不得自行实现资产类型判定（`code.startswith()`、`"QDII" in name.upper()` 等），必须调用 `code_utils` 提供的原语组合 | 代码评审不通过 | [代码类型判定中心化](#代码类型判定中心化) |
 | C2 | **缓存统一管理** | 所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 读写，不得直接操作 `data/cache/` 文件系统 | 缓存不一致、TTL 失效 | [缓存设计](#缓存设计) |
 | C3 | **缓存原子写入** | 缓存和配置文件写入必须使用 `tempfile.mkstemp` + `os.replace` 模式，禁止直接覆写文件 | 断电/崩溃后半写文件损坏 | [原子写入](#原子写入) |
-| C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用 `DataSourceRegistry.session_cache` 缓存结果，避免重复 HTTP 调用（参考 `provider_registry.py`） | 性能退化、API 限频 | 数据降级重构 |
+| C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用 `DataSourceRegistry.session_cache` 缓存结果，避免重复 HTTP 调用（参考 `provider_registry.py`） | 性能退化、API 限频 | [Provider Chain 三层熔断架构](#provider-chain-三层熔断架构) |
 | C5 | **HTTP 客户端统一** | 所有 HTTP 请求必须使用 `http_client.py` 的 `make_http_client()` / `make_async_http_client()` 工厂方法，不得直接实例化 `httpx.Client()` / `httpx.AsyncClient()` | SSL 配置不一致、连接池泄漏 | `http_client.py` |
 | C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()` / `batch_fetch_with_fallback()`，不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
 | C7 | **报告序号不可硬编码** | 报告 16 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [报告序号可配置](#报告序号可配置) |
 | C8 | **日志统一** | 所有模块必须使用 `logger = logging.getLogger("invest")`，不得创建独立的 logger 实例 | 日志碎片化、归档/轮转失效 | `logger.py` |
-| C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须**在 `llm/skeleton.py` 中注册生成器函数和配置字段，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
+| C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须在** `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `_compute_module_cache_info()` 中注册调度入口和缓存信息，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
 | C10 | **新闻召回策略** | `per_source`（每源原始获取量）与 `top_n`（最终输出量）解耦：各源原始获取量 = `max(500, news_top_count × 2)`，不可写死为固定值。华尔街见闻 API 硬上限 100 条除外 | 配置 `news_top_count` 不生效 | [财经新闻热点与持仓关联分析](#财经新闻热点与持仓关联分析) |
 | C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker（通过 `pytestmark` 模块级变量），新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure`。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动检查标记遗漏并发出 `PytestWarning` | CI 门禁不通过 | `src/test/conftest.py` |
-| C12 | **边缘测试文件隔离** | `@pytest.mark.edge` 测试**必须**放在 `*_edge.py` 文件中，不得与普通测试混搭。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动校验 | 测试收集失败 | `src/test/conftest.py`、`docs-stm/managements/testplan.md §1.8` |
+| C12 | **边缘测试文件隔离** | `@pytest.mark.edge` 测试**必须**放在 `*_edge.py` 文件中，不得与普通测试混搭。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动校验 | 测试收集失败 | `src/test/conftest.py` |
 | C13 | **测试敏感路径隔离** | 运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`conftest.py` 的 `_isolate_sensitive_paths` autouse fixture 自动将 `config.json` 和缓存目录重定向到临时目录 | 用户数据被污染 | `src/test/conftest.py` |
-| C14 | **渲染期数据不可写入模块级全局变量** | 任何渲染期数据（section_visible_dict 等）必须通过模板 render context 或函数参数传递，**不得**写入 `_ENV.globals`、模块级 dict 等作为跨函数通信渠道。单次会话中不变的数据（如 _ENV 过滤器注册）不受此限 | 并发不安全、状态污染、跨请求泄漏 | HTML 渲染架构 |
+| C14 | **渲染期数据不可写入模块级全局变量** | 任何渲染期数据（section_visible_dict 等）必须通过模板 render context 或函数参数传递，**不得**写入 `_ENV.globals`、模块级 dict 等作为跨函数通信渠道。单次会话中不变的数据（如 _ENV 过滤器注册）不受此限 | 并发不安全、状态污染、跨请求泄漏 | [报告生成管线](#报告生成管线) |
