@@ -4,6 +4,16 @@
 
 ---
 
+## [0.3.7] - 2026-07-12
+
+### Fixed
+
+- **文档双向校验修正**：`how-to-config.md` 中 `degradation.t4.stale_days` 统一为 14（代码默认值），市场时段缓存 TTL 表格改为按时段描述匹配代码实现。`how-to-use-registry.md` 公共 API 补全 6 个缺失函数、消费者清单修正并补全 10 个遗漏消费者、LLM 新增模块检查清单改为实际代码模式（`_MODULE_FNS` + `_compute_module_cache_info()`）、去除历史变更叙述纯当前状态描述。
+- **`technical.md` 设计约束章节**：C9 注册点修正（`skeleton.py` → `generators_orchestrator.py`）、C12 移除 testplan.md 跨文档引用、C4/C14 参考来源列格式统一为锚点链接。
+- **`technical.md` cache.py 陈旧引用**：Z6 重构后 8 处 `cache.py` → `cache/` 子包、`_read_cache()` → `_read_cache_data()` 同步更新。
+
+---
+
 ## [Unreleased]
 
 ### Fixed

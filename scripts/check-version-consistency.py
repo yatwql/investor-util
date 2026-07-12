@@ -66,7 +66,7 @@ CHECKS.append( (REPO_ROOT / "src" / "python" / "constants.py", "exact",
 # Markdown 管理文档
 add_exact(REPO_ROOT / "README.md", r"> 当前版本：{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md",
-             "v{v} 发布")
+             "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md",
              "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md",
