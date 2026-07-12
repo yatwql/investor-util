@@ -390,7 +390,8 @@ investor-util/
 │   │       └── r198_llm_split_design.md              # ✅ 已实现 — R-198：LLM 模块横向拆分
 │   │   └── refactor-summary-llm-usage/             # 📁 summary.py LLM 用量拆分设计归档
 │   │       └── R-207-summary-llm-usage-split-plan.md # ✅ 已实现 — R-207：summary.py LLM 用量拆分（617→350 行）
-│   ├── plan/                         # 计划与设计文件（当前空，已全部归档至 archive/）
+│   ├── plan/                         # 计划与设计文件
+│   │   └── F-portfolio-history-comparison.md # F 迭代：组合历史对比分析 — 快照/差异/历史走势 14 轮实施方案
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
@@ -421,4 +422,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，目录树和测试文件数可能滞后。请以代码仓库实际结构为准。
 >
-> 最后更新：2026-07-12（目录树核对：新增 test_prompts.py、test_market_value_strategy_edge.py）
+> 最后更新：2026-07-12（目录树核对：新增 test_prompts.py、test_market_value_strategy_edge.py；F 迭代设计文档更名为组合历史对比分析）
