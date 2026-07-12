@@ -23,9 +23,12 @@
 - **`_BOND_FUND_KEYWORDS` 过宽**（HIGH）：原关键词含"易方达""广发""招商""博时"等基金公司名称，导致非债券基金被错误路由到 OTC 净值链路。已将关键词限定为债券品种：纯债、短债、中短债、利率债、信用债、债券。
 - **`id(series)` 作为字典键**（HIGH）：`id()` 返回的内存地址可被回收重用，用作 dict key 会导致数据错乱。已移除整段未使用的 `date_close_map` 死代码。
 - **`_cmd_generate_full()` 不可达代码**（MEDIUM）：`if _diff.is_first_check:` 分支位于外层 `if not _diff.is_first_check:` 块内，条件恒为 False。已移除。
+- **CACHE_ONLY 盘后无缓存时全量丢失行情**（CRITICAL）：非交易时段 `_generate_details()` 对非 QDII 资产使用 CACHE_ONLY 策略，`fetch_cached_only()` 找不到缓存文件直接返回 None，11/15 个资产显示"暂无行情"。已增加缓存未命中检测，自动降级到 LIVE_FETCH 实时获取。
 
 ### Docs
 
+- **how-to-test-my-code.md / test-coverage.md**：同步各模式实际运行时间（regression ~6min / verify ~8min / all ~10min），修正多处不一致的耗时描述。scenario 项数修正为 269 项。
+- **config.json**：同步 F 迭代新增配置项（`cache_ttl.history_stock`、`cache_ttl.history_fund_otc`、`history.analysis`）。
 - **requirements.md**：页签对照表扩展至 18 项（新增 #17 组合历史走势、#18 回撤分析），配置表新增 `history.analysis`，计数更新（16→18）。同步修正 cache_ttl 计数（21→23）、独立缓存列表补 history_stock/fund_otc、TTL 子表增加历史走势类、数据源表补历史数据行、F 系列页签脚注、F 迭代降级场景、default_menu_key 描述、F 系列 Excel 占位说明共 8 项。
 - **technical.md**：报告管线增加 F 迭代数据流，fetcher 表增加 `portoflio_history.py`，缓存设计更新（21→23 类型 + 独立缓存说明），注册表增加 `history` 可见性类型，C7 约束更新为 18 模块。修正页签引用编号 6 处（16→18）。
 - **how-to-config.md**：Config JSON 样本增加 F 节 + `history.analysis` 字段，报告模块表扩展至 18 项，新增 §F 历史走势配置章节，无分组模块增加 history 缓存类型。Cache TTL 子表增加历史走势类（history_stock/history_fund_otc）。

@@ -8,19 +8,19 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2665 | ~22s |
-| `standard` | 2265 | ~22s |
-| `scenario` | **269** | **~5min** |
-| `regression` | **269** | **~5min** |
+| `unit` | 2665 | ~25s |
+| `standard` | 2265 | ~25s |
+| `scenario` | **269** | **~6min** |
+| `regression` | **269** | **~6min** |
 | `dev-verify` | **2389** | **~2min** |
-| `verify` | **1049** | **~6min** |
+| `verify` | **1049** | **~8min** |
 | `integration` | 298 | ~50s |
 | `edge` | 335 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **2972** | **~6min** |
+| `all` | **2972** | **~10min** |
 | `smoke` | 24 | ~2s |
 | `report` | 989 | ~15s |
-| `all_no_unit` | 307 | ~55s |
+| `all_no_unit` | 307 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
 > 注：`all` 模式收集总数 2972 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 2960 项。
