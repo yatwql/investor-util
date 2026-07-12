@@ -195,6 +195,7 @@ investor-util/
 │       │   │   ├── test_llm_content.py   # LLM 内容 Excel 写入 — _strip_html / _write_content_sheet / section_order（18 项）
 │       │   │   ├── test_llm_placeholder.py # LLM 占位文本 — 未配置/已禁用/API 失败三种状态（3 项）
 │       │   │   ├── test_llm_placeholder_distinction_edge.py # LLM 三态互斥 — NOT_CONFIGURED/MODULE_DISABLED/API_ERROR 文本区分（6 项）
+│       │   │   ├── test_prompts.py       # 系统提示词测试 — FAIL_REASON 常量/格式化函数/Prompt 构建函数（45 项）
 │       │   │   ├── test_session.py       # 会话统计 — reset / get / format / _track_session_usage（32 项）
 │       │   │   └── test_skeleton.py      # 共享骨架 — _is_llm_module_enabled / _handle_truncation（9 项）
 │       │   ├── news/                     # 新闻抓取测试（≈176 项）
@@ -223,6 +224,7 @@ investor-util/
 │       │   │   ├── test_summary.py       # 投资分析汇总页签 — 指数行情/账户汇总/LLM 用量（85 项）
 │       │   │   ├── test_market_value.py  # 市值核算明细表 — 15 列持仓盈亏计算（59 项）
 │       │   │   ├── test_market_value_sheet.py # 市值核算 Excel 写入层 — 行值转换/着色/分组（31 项）
+│       │   │   ├── test_market_value_strategy_edge.py # 行情获取策略边缘用例 — 策略选择退化验证（8 项）
 │       │   │   ├── test_penetration.py   # 资产穿透 TOP10 — 基金合并/行业分类（12 项）
 │       │   │   ├── test_penetration_edge.py # 穿透异常场景 — 占比归一化/零总市值/单资产（12 项）
 │       │   │   ├── test_fund_concentration.py # 持仓集中度监控测试（15 项 B4）
@@ -419,4 +421,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，目录树和测试文件数可能滞后。请以代码仓库实际结构为准。
 >
-> 最后更新：2026-07-12（数据源表修正 + 目录树同步：handlers/ 测试组、4 个 LLM 测试文件、2 个归档目录）
+> 最后更新：2026-07-12（目录树核对：新增 test_prompts.py、test_market_value_strategy_edge.py）
