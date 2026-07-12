@@ -84,7 +84,7 @@
 
 | 职责 | 说明 | 关键方法 |
 |:-----|:------|:---------|
-| **Provider 熔断器** | 每个 Provider 独立熔断（连续 3 次失败→熔断 300 秒→自动放行试探）。替代原来分散在 `chain.py`、`fund_style_analysis.py`、`eastmoney_industry.py` 的局部熔断变量 | `record_success()`、`record_failure()`、`is_circuit_broken()`、`get_available_providers()` |
+| **Provider 熔断器** | 每个 Provider 独立熔断（连续 3 次失败→熔断 300 秒→自动放行试探） | `record_success()`、`record_failure()`、`is_circuit_broken()`、`get_available_providers()` |
 | **会话级缓存** | 同一会话内跨模块共享的进程级内存缓存。按 domain 分组（如 `"price"`、`"extended"`），每 domain 上限 2000 条目，超限淘汰最旧 | `session_cache_get/set/contains/clear()` |
 | **策略选择** | 根据代码类型（A 股/港股/QDII）+ 市场时段 + 熔断状态自动选择获取策略：`LIVE_FETCH`（盘中实时）、`CACHE_ONLY`（盘后只读）、`PLACEHOLDER`（预留） | `get_effective_strategy()`、`fetch_or_cached()` |
 
