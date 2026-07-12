@@ -241,7 +241,7 @@ LLM 配置拆分为两个独立文件，分工明确：
 
 具体格式处理函数为 `format_session_usage()`，将原始数据转为可直接展示的字典（含 `call_count`、`model_display`、`cost_display`、`total_tokens` 等格式化字段）。
 
-> 详情参见 [报告文件结构](../manuals/reports-instruction.md#llm-api-用量页签章节说明页签-16--html-第-16-节) 中"LLM API 用量页签/章节说明"章节。
+> 详情参见 [报告文件结构](../manuals/reports-instruction.md#llm-api-用量页签章节说明页签-18--html-第-18-节) 中"LLM API 用量页签/章节说明"章节。
 
 #### 6. 失败降级、占位与截断重试
 
