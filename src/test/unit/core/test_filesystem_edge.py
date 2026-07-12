@@ -261,8 +261,7 @@ class TestCacheTamperingY3(unittest.TestCase):
         """缓存 JSON 损坏 → 自动删除并触发重新获取。"""
         from src.python.cache import get, _cache_path
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("src.python.cache._legacy._CACHE_DIR", tmpdir), \
-             patch("src.python.cache._paths._CACHE_DIR", tmpdir):
+            with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 fpath = _cache_path("test_corrupted")
                 with open(fpath, "w", encoding="utf-8") as f:
                     f.write("{invalid json content")
@@ -274,8 +273,7 @@ class TestCacheTamperingY3(unittest.TestCase):
         """缓存文件含空字节 → 解析失败，自动删除。"""
         from src.python.cache import get, _cache_path
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("src.python.cache._legacy._CACHE_DIR", tmpdir), \
-             patch("src.python.cache._paths._CACHE_DIR", tmpdir):
+            with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 fpath = _cache_path("test_nullbytes")
                 with open(fpath, "wb") as f:
                     f.write(b'{"key": "value"}\x00\x00')
@@ -287,8 +285,7 @@ class TestCacheTamperingY3(unittest.TestCase):
         """0 字节缓存文件 → 解析失败，自动删除。"""
         from src.python.cache import get, _cache_path
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("src.python.cache._legacy._CACHE_DIR", tmpdir), \
-             patch("src.python.cache._paths._CACHE_DIR", tmpdir):
+            with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 fpath = _cache_path("test_empty")
                 with open(fpath, "wb") as f:
                     pass
@@ -300,8 +297,7 @@ class TestCacheTamperingY3(unittest.TestCase):
         """非 UTF-8 编码的缓存文件 → 解析失败，自动删除。"""
         from src.python.cache import get, _cache_path
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("src.python.cache._legacy._CACHE_DIR", tmpdir), \
-             patch("src.python.cache._paths._CACHE_DIR", tmpdir):
+            with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 fpath = _cache_path("test_binary")
                 with open(fpath, "wb") as f:
                     f.write(b'\xff\xfe\x00\x01\x02\x03')

@@ -89,8 +89,8 @@ from src.python.registry import (
 
 **用途：**
 - `get_cache_ttl_defaults()` — `config.py` 用于计算配置 override 后的最终 TTL
-- `get_prefix_type_map()` — `cache.py` 的 `cleanup_expired()` 按文件名前缀推断类型
-- `get_exact_type_map()` — `cache.py` 清理精确键名缓存文件
+- `get_prefix_type_map()` — `cache/_cleanup.py` 的 `cleanup_expired()` 按文件名前缀推断类型
+- `get_exact_type_map()` — `cache/_cleanup.py` 清理精确键名缓存文件
 - `get_registered_data_types()` — 校验/测试用
 
 ### 报表页签名称查找
@@ -148,7 +148,7 @@ registry 的派生产出被以下模块消费：
 |--------|-----------|------|
 | `src/python/config/_core.py` | `get_cache_ttl_defaults()`, `get_known_llm_settings_keys()` | 配置校验 + TTL 兜底 |
 | `src/python/config/_defaults.py` | `get_cache_ttl_defaults()` | 默认配置模板生成 |
-| `src/python/cache.py` | `get_prefix_type_map()`, `get_exact_type_map()`, `get_cache_ttl_defaults()`, `get_registry()` | 缓存清理 |
+| `src/python/cache/` 子包 | `get_prefix_type_map()`, `get_exact_type_map()`, `get_cache_ttl_defaults()`, `get_registry()` | 缓存清理 |
 | `src/python/llm/generators_orchestrator.py` | `get_llm_module_name()` | 模块失败标签、调度日志 |
 | `src/python/llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架模块消息映射 |
 | `src/python/main.py` | `get_llm_module_names()` | 菜单显示 |

@@ -28,11 +28,9 @@ class _CacheTestBase:
 
     def setUp(self):
         self.cache_dir = tempfile.TemporaryDirectory()
-        self._p_legacy = patch("src.python.cache._legacy._CACHE_DIR", self.cache_dir.name)
         self._p_paths = patch("src.python.cache._paths._CACHE_DIR", self.cache_dir.name)
         self._p_cleanup = patch("src.python.cache._cleanup._CACHE_DIR", self.cache_dir.name)
         self._p_groups = patch("src.python.cache._groups._CACHE_DIR", self.cache_dir.name)
-        self._p_legacy.start()
         self._p_paths.start()
         self._p_cleanup.start()
         self._p_groups.start()
@@ -43,7 +41,6 @@ class _CacheTestBase:
         if hasattr(self, '_p_cleanup'):
             self._p_cleanup.stop()
         self._p_paths.stop()
-        self._p_legacy.stop()
         self.cache_dir.cleanup()
 
     def _write_cache(self, key, data, ts=None):

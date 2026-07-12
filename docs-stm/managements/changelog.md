@@ -16,6 +16,7 @@
 
 ### Changed
 
+- **缓存引擎 Strangler Fig 重构完成**：667 行的单体 `cache.py` 拆分为 `cache/` 子包（9 个文件 + services 子包），职责解耦为路径/IO/存取/TTL/统计/清理/组管理/持仓跟踪。过渡文件 `_legacy.py` 已删除。对外 API 保持完全兼容，`from cache import get/set/clear` 等不变。
 - **T4 stale_days 配置收紧：14→7 天**：盈利预测/分红/风格等补充数据级不再容忍 2 周旧缓存。`config.json`、`data_status.py` 默认值、`how-to-config.md`、`requirements.md` 同步更新。
 
 ---

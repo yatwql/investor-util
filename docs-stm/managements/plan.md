@@ -139,4 +139,4 @@ v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel �
 
 对 667 行的 `src/python/cache.py` 进行 Strangler Fig 拆分，解耦为 7 个职责单一的子模块（路径、IO、核心存取、TTL、命中率统计、过期清理、组管理）。持仓跟踪独立为 `services/holdings_tracker.py`（业务层），经 `cache` 包 re-export 保持调用方兼容。保持 `from cache import get` 兼容，I-07 删除过渡文件。
 
-**状态**：迭代计划和技术设计已定稿，7 轮拆分迭代，总计约 147min 工时。详见 [`docs-stm/plan/cache-refactor-plan.md`](../plan/cache-refactor-plan.md)。
+**状态**：✅ **已完成**。667 行单体 `cache.py` 拆分为 `cache/` 子包（7 子模块 + services），迭代计划和技术设计详见 [`docs-stm/archive/refactor-cache-engine/cache-refactor-plan.md`](../archive/refactor-cache-engine/cache-refactor-plan.md)（已归档）。

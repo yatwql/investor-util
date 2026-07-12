@@ -772,8 +772,7 @@ class TestFirstLaunchNonTradingDay(unittest.TestCase):
         """非交易日 + 无缓存 → cache.get 返回 None。"""
         from src.python.cache import get as cache_get
 
-        with patch("src.python.cache._legacy._CACHE_DIR", new="d:/__nonexistent_cache_dir__"), \
-             patch("src.python.cache._paths._CACHE_DIR", new="d:/__nonexistent_cache_dir__"):
+        with patch("src.python.cache._paths._CACHE_DIR", new="d:/__nonexistent_cache_dir__"):
             result = cache_get("nonexistent_key", 9999)
             self.assertIsNone(result)
 

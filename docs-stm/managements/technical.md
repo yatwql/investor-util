@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-11（v0.3.6）
+最后更新：2026-07-12（v0.3.6 — 缓存引擎子包引用同步）
 
 ---
 
@@ -35,7 +35,7 @@
 | 菜单通用辅助 | 退出/按任意键继续/LLM用量输出 | `src/python/tui_handlers.py` |
 | 配置管理 | config.json + llm_key.json（敏感字段）/ llm_settings.json（非敏感参数）读写、mtime 缓存 | `src/python/config/`（拆为子包） |
 | 中央注册表 | 数据模块的 name/缓存前缀/TTL/分组/LLM Settings 键名统一注册与查询 | `src/python/registry.py` |
-| 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache.py` |
+| 缓存引擎 | 泛用 JSON 缓存、TTL、指纹失效、过期清理 | `src/python/cache/`（子包，7 子模块 + services） |
 | 数据获取 | Provider Chain 路由、fallback、缓存预热 | `src/python/fetcher/` |
 | 持仓读取 | xlsx 解析、多工作表、列校验 | `src/python/reader.py` |
 | LLM 客户端 | Claude / OpenAI / DeepSeek API 调用 | `src/python/llm/` |
@@ -50,7 +50,7 @@ investor-util/
 │   ├── __init__.py
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
-│   │   ├── cache.py              # 缓存引擎
+│   │   ├── cache/               # 缓存引擎子包（路径/IO/存取/TTL/统计/清理/组管理 + services）
 │   │   ├── code_utils.py         # 代码类型判定中心化（A 股/基金/QDII 等识别原语）
 │   │   ├── config/               # 配置管理子包（_defaults / _comments / _core）
 │   │   ├── constants.py          # 共享常量 + 项目根路径（标记文件查找法）
@@ -156,7 +156,7 @@ investor-util/
 
 ### 策略概览
 
-缓存统一存放在 `data/cache/` 目录，由 `cache.py` 提供泛用键值对存储接口。完整 TTL 表（21 种类型，含 B 系列 4 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
+缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。完整 TTL 表（21 种类型，含 B 系列 4 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
 
 #### 行业/概念缓存
 

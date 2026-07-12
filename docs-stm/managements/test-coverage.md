@@ -2,7 +2,7 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-11）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-12）测试覆盖规模：
 
 ### 模式对应测试量
 

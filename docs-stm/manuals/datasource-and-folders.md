@@ -32,7 +32,18 @@ investor-util/
 │   │
 │   ├── python/                       # 主程序代码，按职责划分为数据获取、报告生成、LLM 等子模块
 │   │   ├── __init__.py               # 包标记（空文件）
-│   │   ├── cache.py                  # 通用 JSON 文件缓存引擎，提供 TTL 管理、过期清理与指纹失效机制
+│   │   ├── cache/                     # 缓存引擎子包（Strangler Fig 重构后，含路径/IO/存储/TTL/统计/清理/组管理）
+│   │   │   ├── __init__.py            # 包定义 + 公共 API re-export（all: get/set/clear/ttl/stats/cleanup/groups/holdings）
+│   │   │   ├── _paths.py              # 路径/常量子模块 — _CACHE_DIR、gzip 阈值、_cache_path()
+│   │   │   ├── _io.py                 # 文件 IO 子模块 — 原子读写、gzip 透明压缩/解压、损坏自动恢复
+│   │   │   ├── _store.py              # 核心存取子模块 — get/set/clear + _cache_lock
+│   │   │   ├── _ttl.py                # TTL 子模块 — 交易时段感知 TTL 计算、缓存年龄查询
+│   │   │   ├── _stats.py              # 命中率统计子模块 — 缓存击中/未中计数、目录统计
+│   │   │   ├── _cleanup.py            # 过期清理子模块 — 扫描缓存目录、过期删除、dry_run 预览
+│   │   │   ├── _groups.py             # 组管理子模块 — 按前缀/缓存组批量清除
+│   │   │   └── services/              # 业务服务子包
+│   │   │       ├── __init__.py        # 包标记（空文件）
+│   │   │       └── holdings_tracker.py # 持仓跟踪服务 — 指纹计算+变更检测+关联缓存自动刷新
 │   │   ├── code_utils.py             # 证券代码/名称类型判定中心 — A股/基金/债券/港股通/ETF/QDII 识别原语
 │   │   ├── config/                    # 配置管理子包（_defaults / _comments / _core）— config.json / llm_key / llm_settings 读写、校验
 │   │   ├── constants.py              # 共享常量 + 项目根路径（标记文件查找法）— 版本号、缓存频率、模型定价、PROJECT_ROOT
