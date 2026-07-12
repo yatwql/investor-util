@@ -40,7 +40,7 @@ class TestGetTtlMarketAware(unittest.TestCase):
     def setUp(self):
         self._config_patcher = patch("src.python.config.get_config")
         self._mock_get_config = self._config_patcher.start()
-        self._is_open_patcher = patch("src.python.cache._is_market_open")
+        self._is_open_patcher = patch("src.python.cache._ttl._is_market_open")
         self._mock_is_open = self._is_open_patcher.start()
 
     def tearDown(self):
@@ -729,7 +729,7 @@ class TestGetTtlTransition(unittest.TestCase):
         from src.python.cache import get_ttl
 
         with (
-            patch("src.python.cache._is_market_open", return_value=True),
+            patch("src.python.cache._ttl._is_market_open", return_value=True),
             patch("src.python.config.get_config") as mock_cfg,
         ):
             mock_cfg.return_value = {
@@ -741,7 +741,7 @@ class TestGetTtlTransition(unittest.TestCase):
             self.assertEqual(open_ttl, 30)
 
         with (
-            patch("src.python.cache._is_market_open", return_value=False),
+            patch("src.python.cache._ttl._is_market_open", return_value=False),
             patch("src.python.config.get_config") as mock_cfg,
         ):
             mock_cfg.return_value = {
@@ -772,7 +772,8 @@ class TestFirstLaunchNonTradingDay(unittest.TestCase):
         """非交易日 + 无缓存 → cache.get 返回 None。"""
         from src.python.cache import get as cache_get
 
-        with patch("src.python.cache._CACHE_DIR", new="d:/__nonexistent_cache_dir__"):
+        with patch("src.python.cache._legacy._CACHE_DIR", new="d:/__nonexistent_cache_dir__"), \
+             patch("src.python.cache._paths._CACHE_DIR", new="d:/__nonexistent_cache_dir__"):
             result = cache_get("nonexistent_key", 9999)
             self.assertIsNone(result)
 

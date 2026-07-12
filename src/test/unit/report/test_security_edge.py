@@ -267,7 +267,8 @@ class TestTempFileRaceY6(unittest.TestCase):
         from src.python.cache import set, get
         import concurrent.futures
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("src.python.cache._CACHE_DIR", tmpdir):
+            with patch("src.python.cache._legacy._CACHE_DIR", tmpdir), \
+             patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 def write_item(i):
                     try:
                         set(f"concurrent_key", {"value": i})

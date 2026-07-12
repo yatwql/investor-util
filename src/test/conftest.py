@@ -105,6 +105,27 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.config._defaults._CONFIG_FILE",
         str(tmp_path / "data/config/config.json"),
     )
+    # C13: cache 拆分重构后 _CACHE_DIR 存在于 _paths/_legacy/_stats/__init__ 四处
+    monkeypatch.setattr(
+        "src.python.cache._paths._CACHE_DIR",
+        str(tmp_path / "data/cache"),
+    )
+    monkeypatch.setattr(
+        "src.python.cache._legacy._CACHE_DIR",
+        str(tmp_path / "data/cache"),
+    )
+    monkeypatch.setattr(
+        "src.python.cache._stats._CACHE_DIR",
+        str(tmp_path / "data/cache"),
+    )
+    monkeypatch.setattr(
+        "src.python.cache._cleanup._CACHE_DIR",
+        str(tmp_path / "data/cache"),
+    )
+    monkeypatch.setattr(
+        "src.python.cache._groups._CACHE_DIR",
+        str(tmp_path / "data/cache"),
+    )
     monkeypatch.setattr(
         "src.python.cache._CACHE_DIR",
         str(tmp_path / "data/cache"),

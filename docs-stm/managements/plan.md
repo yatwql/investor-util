@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-11（v0.3.6 发布）
+最后更新：2026-07-12（v0.3.6）
 
 ---
 
@@ -132,3 +132,11 @@ v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel �
 
 - ~~**CI/CD 集成**~~ **（已完成 v0.3.0 R-171）**：`.github/workflows/ci.yml`，三档门禁 + 多版本矩阵 + mypy/Ruff
 - **Excel 页签并行写入**：报告生成时每个页签独立写入，可考虑并行加速
+
+---
+
+### [P3] Z6. 缓存引擎拆分重构（中难度 / 中价值）
+
+对 667 行的 `src/python/cache.py` 进行 Strangler Fig 拆分，解耦为 7 个职责单一的子模块（路径、IO、核心存取、TTL、命中率统计、过期清理、组管理）。持仓跟踪独立为 `services/holdings_tracker.py`（业务层），经 `cache` 包 re-export 保持调用方兼容。保持 `from cache import get` 兼容，I-07 删除过渡文件。
+
+**状态**：迭代计划和技术设计已定稿，7 轮拆分迭代，总计约 147min 工时。详见 [`docs-stm/plan/cache-refactor-plan.md`](../plan/cache-refactor-plan.md)。

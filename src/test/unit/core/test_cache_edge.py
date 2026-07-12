@@ -28,11 +28,22 @@ class _CacheTestBase:
 
     def setUp(self):
         self.cache_dir = tempfile.TemporaryDirectory()
-        self._patcher = patch("src.python.cache._CACHE_DIR", self.cache_dir.name)
-        self._patcher.start()
+        self._p_legacy = patch("src.python.cache._legacy._CACHE_DIR", self.cache_dir.name)
+        self._p_paths = patch("src.python.cache._paths._CACHE_DIR", self.cache_dir.name)
+        self._p_cleanup = patch("src.python.cache._cleanup._CACHE_DIR", self.cache_dir.name)
+        self._p_groups = patch("src.python.cache._groups._CACHE_DIR", self.cache_dir.name)
+        self._p_legacy.start()
+        self._p_paths.start()
+        self._p_cleanup.start()
+        self._p_groups.start()
 
     def tearDown(self):
-        self._patcher.stop()
+        if hasattr(self, '_p_groups'):
+            self._p_groups.stop()
+        if hasattr(self, '_p_cleanup'):
+            self._p_cleanup.stop()
+        self._p_paths.stop()
+        self._p_legacy.stop()
         self.cache_dir.cleanup()
 
     def _write_cache(self, key, data, ts=None):
@@ -68,7 +79,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
     def tearDown(self):
         _CacheTestBase.tearDown(self)
 
-    @patch("src.python.cache._is_market_open")
+    @patch("src.python.cache._ttl._is_market_open")
     @patch("src.python.cache.get_ttl")
     def test_market_open_uses_short_ttl(self, mock_ttl, _):
         """开盘时段 → 使用较短 refresh 间隔。"""
@@ -79,7 +90,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
 
     def test_market_open_clamps_min_30(self):
         """刷新 TTL 最小值限制为 30 秒。"""
-        with patch("src.python.cache._is_market_open", return_value=True), \
+        with patch("src.python.cache._ttl._is_market_open", return_value=True), \
              patch("src.python.config.get_config") as mock_cfg:
             mock_cfg.return_value = {
                 "market_hour_aware": ["price"],
@@ -91,7 +102,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
 
     def test_market_open_clamps_max_86400(self):
         """刷新 TTL 最大值限制为 86400 秒。"""
-        with patch("src.python.cache._is_market_open", return_value=True), \
+        with patch("src.python.cache._ttl._is_market_open", return_value=True), \
              patch("src.python.config.get_config") as mock_cfg:
             mock_cfg.return_value = {
                 "market_hour_aware": ["price"],
@@ -101,7 +112,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
             result = get_ttl("price")
             self.assertLessEqual(result, 86400)
 
-    @patch("src.python.cache._is_market_open")
+    @patch("src.python.cache._ttl._is_market_open")
     @patch("src.python.cache.get_ttl")
     def test_non_aware_type_uses_static(self, mock_ttl, _):
         """非市场感知类型 → 使用静态 TTL。"""
@@ -110,7 +121,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         result = get_ttl("some_random_key")
         self.assertEqual(result, 86400)
 
-    @patch("src.python.cache._is_market_open")
+    @patch("src.python.cache._ttl._is_market_open")
     @patch("src.python.cache.get_ttl")
     def test_market_closed_uses_static_ttl(self, mock_ttl, _):
         """收盘后 → 使用静态默认 TTL。"""
@@ -119,7 +130,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         result = get_ttl("price_600900")
         self.assertEqual(result, 86400)
 
-    @patch("src.python.cache._is_market_open")
+    @patch("src.python.cache._ttl._is_market_open")
     @patch("src.python.cache.get_ttl")
     def test_market_closed_no_config_uses_default(self, mock_ttl, _):
         """收盘后无配置 → 使用默认静态 TTL。"""
@@ -130,7 +141,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
 
     def test_market_hour_ttl_missing_fallback_to_30(self):
         """market_hour_ttl 配置缺失 → 默认 30 秒。"""
-        with patch("src.python.cache._is_market_open", return_value=True), \
+        with patch("src.python.cache._ttl._is_market_open", return_value=True), \
              patch("src.python.config.get_config") as mock_cfg:
             mock_cfg.return_value = {
                 "market_hour_aware": ["price"],
@@ -141,7 +152,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
 
     def test_invalid_market_hour_ttl_fallback_to_30(self):
         """market_hour_ttl 配置值非法 → 使用 30 秒默认值。"""
-        with patch("src.python.cache._is_market_open", return_value=True), \
+        with patch("src.python.cache._ttl._is_market_open", return_value=True), \
              patch("src.python.config.get_config") as mock_cfg:
             mock_cfg.return_value = {
                 "market_hour_aware": ["price"],
@@ -151,7 +162,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
             result = get_ttl("price")
             self.assertEqual(result, 30)
 
-    @patch("src.python.cache._is_market_open")
+    @patch("src.python.cache._ttl._is_market_open")
     @patch("src.python.cache.get_ttl")
     def test_midday_break_uses_long_ttl(self, mock_ttl, mock_open):
         """午休时段 → 使用较长 TTL（vs 开盘短 TTL）。"""
@@ -161,7 +172,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         result = get_ttl("price_600900")
         self.assertEqual(result, 86400)
 
-    @patch("src.python.cache._is_market_open")
+    @patch("src.python.cache._ttl._is_market_open")
     @patch("src.python.cache.get_ttl")
     def test_afternoon_closed_uses_long_ttl(self, mock_ttl, mock_open):
         """下午收盘后 → 使用较长 TTL。"""
@@ -184,7 +195,7 @@ class TestGzipCacheEdge(unittest.TestCase, _CacheTestBase):
     def tearDown(self):
         _CacheTestBase.tearDown(self)
 
-    @patch("src.python.cache.time.time")
+    @patch("src.python.cache._store.time.time")
     def test_exact_100kb_boundary_not_gzip(self, mock_time):
         """恰 100KB（未超阈值）→ 不 gzip。"""
         mock_time.return_value = 1000.0
@@ -200,7 +211,7 @@ class TestGzipCacheEdge(unittest.TestCase, _CacheTestBase):
                         "≤100KB 数据应仍为 .json")
         self.assertFalse(os.path.exists(gz_path))
 
-    @patch("src.python.cache.time.time")
+    @patch("src.python.cache._store.time.time")
     def test_gz_corrupted_file_deleted_on_read(self, mock_time):
         """损坏的 .json.gz → 删除并返回 None。"""
         mock_time.return_value = 1000.0
