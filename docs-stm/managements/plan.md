@@ -1,36 +1,16 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-12（v0.3.8）
+最后更新：2026-07-12
 
 ---
 
-## 审查问题索引（R-160 ~ R-176）
+## 审查问题索引
 
-下表汇总 D-8b 审查发现及修复的 17 项问题，便于在新文档中引用时快速定位。
-
-| # | 标题 | 修复版本 | changelog 位置 |
-|:-:|:-----|:--------|:---------------|
-| R-161 | TOCTOU 竞态 — fetcher/chain.py 锁合并 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-162 | `_TRANSPORT_FAILURE` 类型污染 — 纯哨兵替换 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-163 | 废弃 build-backend — setuptools 切换 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-164 | 配置模板一致性防护 — 新增测试 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-165 | Ruff 规则集升级 — SIM/UP/ARG/PERF | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-166 | mypy 严格模式升级 — 77 errors → 0 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-167 | `_ext_memo` 会话级复用缓存推广 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-168 | 配置 mtime+size 双因子缓存 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-169 | 429 API 限速差异化提示 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-170 | 新闻流水线集成测试修复 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-171 | CI/CD 流水线配置 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-172 | HTTP 异步客户端支持 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-173 | ThreadPoolExecutor 集中管理 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-174 | 配置校验去重 — `_section()` 辅助函数 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-175 | colorama 降级为可选依赖 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-| R-176 | docstring 误放修复 | v0.3.3 | [changelog](../managements/changelog.md) / Fixed |
-
-> ✅ **D-10 数据降级重构（Step A~E）已完成**：`DataSourceRegistry` 单例集中管理熔断器/会话缓存/获取策略选择，`chain.py` 全局变量迁移，`_ext_memo` 模块级缓存迁移，R-203/M-004 提交前已修复。
-> ✅ **R-188~R-191 已随 v0.3.3 修复**：3 项存量测试断言对齐 + eastmoney_industry 局部熔断器迁移。
-> ✅ **R-211 测试隔离补完已修复**：测试输出目录/日志文件/xdist worker 全链路隔离。
+> **v0.3.x 审查问题记录已归档**：详见 [docs-stm/archive/archived_plan.0.3.x.md](../archive/archived_plan.0.3.x.md)。
+> 涵盖 R-160~R-176（D-8b 全面审查修复）、D-10 数据降级重构、R-188~R-191、R-211 测试隔离补完。
+>
+> **v0.2.x 已完成迭代的详细记录已归档**：详见 [docs-stm/archive/archived_plan.0.2.x.md](../archive/archived_plan.0.2.x.md)。
 
 ---
 
@@ -106,11 +86,14 @@ LLM 配置拆分为两个独立文件：
 
 v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel 输出打磨）的详细设计见 [`docs-stm/archive/archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md)。
 
-所有已完成迭代（A/A2/A3/A4/A5/B/C/D/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md)。
+所有已完成迭代（A/A2/A3/A4/A5/B/C/D/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4/Z6）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md)。
 
 **v0.2.x 已完成迭代的详细记录已归档**：详见 [docs-stm/archive/archived_plan.0.2.x.md](../archive/archived_plan.0.2.x.md)。
 涵盖 B（基金深度分析 4 模块）、C（报告序号可配置）、D（数据降级分层治理）
 及 A/A2/A3/A4/A5/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4 等迭代。
+>
+> **v0.3.x 已完成审查修复的详细记录已归档**：详见 [docs-stm/archive/archived_plan.0.3.x.md](../archive/archived_plan.0.3.x.md)。
+> 涵盖 D-8b/D-10/D-11 审查修复（R-160~R-176、R-188~R-191、R-211）。
 
 ---
 
@@ -130,13 +113,5 @@ v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel �
 
 ### [P5] O. 工程化增强（低难度 / 低价值）
 
-- ~~**CI/CD 集成**~~ **（已完成 v0.3.0 R-171）**：`.github/workflows/ci.yml`，三档门禁 + 多版本矩阵 + mypy/Ruff
+- ~~**CI/CD 集成**~~ **（已完成）**：`.github/workflows/ci.yml`，三档门禁 + 多版本矩阵 + mypy/Ruff
 - **Excel 页签并行写入**：报告生成时每个页签独立写入，可考虑并行加速
-
----
-
-### [P3] Z6. 缓存引擎拆分重构（中难度 / 中价值）
-
-对 667 行的 `src/python/cache.py` 进行 Strangler Fig 拆分，解耦为 7 个职责单一的子模块（路径、IO、核心存取、TTL、命中率统计、过期清理、组管理）。持仓跟踪独立为 `services/holdings_tracker.py`（业务层），经 `cache` 包 re-export 保持调用方兼容。保持 `from cache import get` 兼容，I-07 删除过渡文件。
-
-**状态**：✅ **已完成**。667 行单体 `cache.py` 拆分为 `cache/` 子包（7 子模块 + services），迭代计划和技术设计详见 [`docs-stm/archive/refactor-cache-engine/cache-refactor-plan.md`](../archive/refactor-cache-engine/cache-refactor-plan.md)（已归档）。
