@@ -40,3 +40,7 @@ D-8b 审查发现的 17 项代码质量问题，全部在 v0.3.3 修复：
 ## R-211 测试隔离补完
 
 测试输出目录/日志文件/xdist worker 全链路隔离。
+
+## Z6 缓存引擎拆分重构（v0.3.5 ~ v0.3.6）
+
+667 行单体 `cache.py` 拆分为 `cache/` 子包（7 子模块 + services：路径、IO、核心存取、TTL、命中率统计、过期清理、组管理）。持仓跟踪独立为 `services/holdings_tracker.py`（业务层），经 `cache` 包 re-export 保持调用方兼容。同步修复缓存路径偏移（`_PROJECT_ROOT` `dirname` 深度未同步导致 `src/data/cache/` 目录偏移）。
