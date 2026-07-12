@@ -89,13 +89,13 @@ class TestProviderChainFallbackY1(unittest.TestCase):
     @patch("src.python.fetcher.chain.cache_set")
     @patch.dict("src.python.fetcher.price._PRICE_PROVIDERS", {
         "tencent": ("腾讯财经", MagicMock(return_value=None)),
-        "eastmoney": ("东方财富", MagicMock(return_value={
-            "name": "长江电力", "code": "600900", "nav": 27.0,
-            "nav_date": "2026-07-03", "source": "东方财富",
+        "sina": ("新浪财经", MagicMock(return_value={
+            "name": "长江电力", "code": "600900", "price": 27.0,
+            "yesterday_close": 26.5, "price_date": "2026-07-03",
         })),
     })
     def test_primary_fails_fallback_succeeds(self, mock_set, mock_get):
-        """腾讯（主）返回 None → 东方财富（备）成功。"""
+        """腾讯（主）返回 None → 新浪（备）成功。"""
         from src.python.fetcher.price import fetch_market_data
         result = fetch_market_data("600900", "长江电力")
         self.assertIsNotNone(result)
@@ -112,7 +112,7 @@ class TestProviderChainFallbackY1(unittest.TestCase):
         from src.python.fetcher.price import _PRICE_PROVIDERS
         with patch.dict(_PRICE_PROVIDERS, {
             "tencent": ("腾讯", MagicMock(return_value=None)),
-            "eastmoney": ("东方财富", MagicMock(return_value=None)),
+            "sina": ("新浪", MagicMock(return_value=None)),
         }):
             from src.python.fetcher.price import fetch_market_data
             result = fetch_market_data("600900", "长江电力")
@@ -126,7 +126,7 @@ class TestProviderChainFallbackY1(unittest.TestCase):
         from src.python.fetcher.price import _PRICE_PROVIDERS
         with patch.dict(_PRICE_PROVIDERS, {
             "tencent": ("腾讯", MagicMock(return_value=None)),
-            "eastmoney": ("东方财富", MagicMock(return_value=None)),
+            "sina": ("新浪", MagicMock(return_value=None)),
         }):
             from src.python.fetcher.price import fetch_market_data
             result = fetch_market_data("600900", "长江电力")
@@ -141,9 +141,9 @@ class TestProviderChainFallbackY1(unittest.TestCase):
         failing = MagicMock(side_effect=RuntimeError("Unexpected crash"))
         with patch.dict(_PRICE_PROVIDERS, {
             "tencent": ("腾讯", failing),
-            "eastmoney": ("东方财富", MagicMock(return_value={
-                "name": "长江电力", "code": "600900", "nav": 27.5,
-                "nav_date": "2026-07-03", "source": "东方财富",
+            "sina": ("新浪", MagicMock(return_value={
+                "name": "长江电力", "code": "600900", "price": 27.5,
+                "yesterday_close": 27.0, "price_date": "2026-07-03",
             })),
         }):
             from src.python.fetcher.price import fetch_market_data

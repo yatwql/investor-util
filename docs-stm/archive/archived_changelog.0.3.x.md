@@ -2,9 +2,17 @@
 
 > 归档时间：2026-07-12
 > 原始文件：docs-stm/managements/changelog.md
-> 涵盖版本：v0.3.0 ~ v0.3.8
+> 涵盖版本：v0.3.0 ~ v0.3.9
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/)。
+
+---
+
+## [0.3.9] - 2026-07-12
+
+### Fixed
+
+- **price_stock 测试 mock 未同步 v0.3.8 链路拆分**：`test_api_edge.py`（3 项）和 `test_fetcher.py`（1 项）仍 mock `eastmoney` 为 fallback provider，但 v0.3.8 已将 `price_stock` 链改为 `tencent→sina`。mock 未命中时实际调用新浪 API 返回实时数据，导致断言失败。统一替换为 `sina` mock，返回字段同步适配 `_price_transform_sina`（`nav`/`nav_date` → `price`/`price_date`）。
 
 ---
 

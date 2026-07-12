@@ -107,10 +107,10 @@ class TestFetchMarketData(unittest.TestCase):
             "price": 15.0, "yesterday_close": 14.5,
             "price_date": "2026-06-26"
         })),
-        "eastmoney": ("东方财富", MagicMock(return_value={
+        "sina": ("新浪财经", MagicMock(return_value={
             "name": "长江电力", "code": "600900",
-            "nav": 16.0, "yesterday_nav": 15.5,
-            "nav_date": "2026-06-26"
+            "price": 16.0, "yesterday_close": 15.5,
+            "price_date": "2026-06-26"
         })),
     }, clear=True)
     def test_name_mismatch_logged(self, mock_cache_get):

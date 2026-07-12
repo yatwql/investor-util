@@ -351,7 +351,7 @@ investor-util/
 │   │   ├── archived_plan.0.2.x.md             # v0.2.x 实现计划归档（B/C/D 等迭代详情）
 │   │   ├── archived_review-findings.0.1.x.md  # v0.1.x 自审问题记录归档
 │   │   ├── archived_review-findings.0.2.x.md  # v0.2.x 自审问题记录归档（R-149~R-159 等 8 条）
-│   │   ├── archived_changelog.0.3.x.md        # v0.3.x 版本变更日志归档（v0.3.0 ~ v0.3.8 共 6 个版本）
+│   │   ├── archived_changelog.0.3.x.md        # v0.3.x 版本变更日志归档（v0.3.0 ~ v0.3.9 共 7 个版本）
 │   │   ├── archived_plan.0.3.x.md             # v0.3.x 实现计划归档（D-8b/D-10/D-11 审查修复）
 │   │   ├── archived_review-findings.0.3.x.md  # v0.3.x 自审问题记录归档（D-9/D-10/D-11 等 6 条）
 │   │   ├── archived-data-source-pre-study.md  # ✅ 已归档 — 数据源预研笔记（原位于 plan/notes/）
@@ -365,7 +365,7 @@ investor-util/
 │   │   │   └── akshare-integration-profit-forecast-sector-flow.md  # ✅ 已归档 — akshare 盈利预测 + 资金流向集成
 │   │   ├── report-early-warning/                       # 📁 智能预警 + P1 代码优化归档
 │   │   │   └── early-warning-and-p1-optimization.md    # ✅ 已归档 — 智能预警 + P1 代码优化实施计划
-│   │   ├── edge-test-coverage/                         # 📁 配置/环境纵深测试归档
+│   │   ├── test-add-config-edge-testcase/               # 📁 配置/环境纵深测试归档
 │   │   │   └── y5-edge-test-config-env.md              # ✅ 已归档 — Y5 配置/环境纵深测试实施计划
 │   │   ├── data-degradation/                                   # 📁 数据降级重构归档
 │   │   │   ├── d-iteration-data-degradation-design.md          # ✅ 已归档 — D 迭代数据降级分层治理完整设计
