@@ -480,6 +480,19 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
         mkt = registry.fetch_cached_only(h.code, "price", _price_cache_key)
         result_map[(h.account.strip(), h.code.strip())] = mkt
 
+    # 3b. 缓存未命中 → 降级到 LIVE_FETCH（CACHE_ONLY 找不到缓存时逐条回退）
+    #     典型场景：非交易时段首次运行/缓存已过期/新资产，CACHE_ONLY 不应让这些资产无数据
+    cache_miss = [
+        h for h in cache_holdings
+        if result_map.get((h.account.strip(), h.code.strip())) is None
+    ]
+    if cache_miss:
+        logger.info(
+            "CACHE_ONLY 未命中 %d 个资产，降级到实时获取（原策略仅命中 %d 个）",
+            len(cache_miss), len(cache_holdings) - len(cache_miss),
+        )
+        live_holdings.extend(cache_miss)
+
     # 4. 并行 HTTP 路径
     if live_holdings:
         with ThreadPoolExecutor(max_workers=8) as executor:

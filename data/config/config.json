@@ -46,6 +46,8 @@
     "fund_style_snapshot": 2592000,
     "benchmark": 2592000,
     "tracking": 2592000,
+    "history_stock": 604800,
+    "history_fund_otc": 2592000,
     "calendar": 1209600
   },
 
@@ -64,5 +66,10 @@
   },
 
   // ── E. 业绩基准 ──
-  "user_fund_benchmarks": {}
+  "user_fund_benchmarks": {},
+
+  // ── F. 组合历史对比分析 ──
+  "history": {
+    "analysis": "off"
+  }
 }
