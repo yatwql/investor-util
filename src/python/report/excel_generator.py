@@ -33,6 +33,7 @@ def generate_excel_report(
     include_b_series: bool | None = None,  # renamed from include_fund_deep
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
+    f_context: dict | None = None,  # F 迭代：环比对比数据（drives delta columns）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -53,6 +54,7 @@ def generate_excel_report(
             None 时跟随 include_news（B/L 含，E/H 不含）。已从 include_fund_deep 重命名。
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
+        f_context: F 迭代环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
@@ -86,6 +88,57 @@ def generate_excel_report(
                                   early_warnings, prog)
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
     write_llm_section_and_usage(sheets, include_llm, llm_content, prog, section_order=order)
+
+    # ── F 迭代：环比对比摘要（写入 summary 页签底部） ──
+    if f_context and f_context.get("diff") and "summary" in sheets:
+        prog.info("正在写入环比对比摘要...")
+        try:
+            _diff = f_context["diff"]
+            _ws_sum = sheets["summary"]
+            # 找到最后一行的行号
+            _last_row = _ws_sum.max_row + 2
+            from openpyxl.styles import Font
+            _section_font = Font(size=12, bold=True, color="2E75B6")
+            _bold_font = Font(bold=True)
+            # 标题行
+            _ws_sum.cell(row=_last_row, column=1, value="【环比对比】").font = _section_font
+            _last_row += 1
+            # 对比数据
+            if _diff.get("days_since_last_report") is not None:
+                _ws_sum.cell(row=_last_row, column=1, value="距上次报告")
+                _ws_sum.cell(row=_last_row, column=2, value=f"{_diff['days_since_last_report']} 天")
+                _last_row += 1
+            if _diff.get("total_value_diff") is not None:
+                _ws_sum.cell(row=_last_row, column=1, value="总市值变化").font = _bold_font
+                _cell = _ws_sum.cell(row=_last_row, column=2, value=_diff["total_value_diff"])
+                _cell.number_format = '#,##0.00'
+                _cell.font = Font(color="CC0000" if _diff["total_value_diff"] >= 0 else "009900")
+                _last_row += 1
+            if _diff.get("total_value_diff_pct") is not None:
+                _ws_sum.cell(row=_last_row, column=1, value="总市值变化率")
+                _cell = _ws_sum.cell(row=_last_row, column=2, value=round(_diff["total_value_diff_pct"] / 100, 4))
+                _cell.number_format = '0.00%'
+                _last_row += 1
+            if _diff.get("total_pnl_diff") is not None:
+                _ws_sum.cell(row=_last_row, column=1, value="总盈亏变化").font = _bold_font
+                _cell = _ws_sum.cell(row=_last_row, column=2, value=_diff["total_pnl_diff"])
+                _cell.number_format = '#,##0.00'
+                _cell.font = Font(color="CC0000" if _diff["total_pnl_diff"] >= 0 else "009900")
+                _last_row += 1
+            # 持仓变动概要
+            for _label, _key in [("新增持仓", "added"), ("清仓标的", "removed"),
+                                  ("增持标的", "increased"), ("减持标的", "decreased")]:
+                _items = _diff.get(_key, [])
+                if _items:
+                    _ws_sum.cell(row=_last_row, column=1, value=_label).font = _bold_font
+                    _names = ", ".join(f"{i.get('name','')}({i.get('code','')})" for i in _items[:5])
+                    if len(_items) > 5:
+                        _names += f" 等{len(_items)}只"
+                    _ws_sum.cell(row=_last_row, column=2, value=_names)
+                    _last_row += 1
+            logger.info("环比对比摘要已写入 summary 页签")
+        except Exception:
+            logger.debug("[F delta] Excel 环比对比摘要写入失败（非关键）", exc_info=True)
 
     # ── 保存 ──
     with _Timer("保存 Excel/HTML 文件"):

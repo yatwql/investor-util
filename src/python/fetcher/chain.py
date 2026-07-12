@@ -11,7 +11,7 @@ import logging
 from collections.abc import Callable
 from typing import Any, cast
 
-from src.python.constants import CACHE_WEEKLY
+from src.python.constants import CACHE_DAILY, CACHE_WEEKLY
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.config import get_config
@@ -28,6 +28,9 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "fund_rank": ["tiantian"],
     "fund_hold": ["tiantian"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
+    # F 迭代：历史数据 chains（复用现有 provider name，熔断器共享）
+    "history_stock": ["tencent", "sina"],
+    "history_fund_otc": ["tiantian"],
 }
 
 
@@ -209,6 +212,181 @@ def _fetch_with_fallback(
         return stale
 
     return None
+
+
+# ═══════════════════════════════════════════════════════════════
+#  F 迭代：增量合并 Fallback 路由
+# ═══════════════════════════════════════════════════════════════
+
+
+def _fetch_with_incremental_fallback(
+    chain_name: str,
+    code: str,
+    days: int = 30,
+    param_fn: Callable | None = None,
+) -> list[dict]:
+    """增量合并版 Fallback 路由（F 迭代历史数据用）。
+
+    - chain 层管理缓存读/写/合并
+    - Provider 函数只负责纯数据获取（不碰缓存层）
+    - 熔断器预检、fallback 遍历与 _fetch_with_fallback() 共享
+
+    Args:
+        chain_name: chain 名称（如 "history_stock"、"history_fund_otc"）
+        code: 证券代码
+        days: 获取天数（默认 30）
+        param_fn: 将 (code, start_from, days) 转换为 provider_fn_kwargs 的函数。
+                  None 时直接使用原始的 (code, days, start_from) 作为 kwargs。
+
+    Returns:
+        list[dict]: 按日期升序排列的数据列表，至少返回 days 条。
+        全链路失败时返回空列表（不使用过期缓存——走势数据降级后显示占位文本）。
+    """
+    cache_key = f"history_{chain_name}_{code}"
+    cached = cache_get(cache_key, CACHE_WEEKLY) or []
+    last_cached_date = cached[-1]["date"] if cached else None
+
+    registry = get_registry()
+    providers = _get_chain(chain_name)
+
+    new_data: list[dict] = []
+    for provider_name in providers:
+        if registry.is_circuit_broken(provider_name):
+            logger.debug("[%s] %s 已被熔断，跳过", chain_name, provider_name)
+            continue
+
+        logger.info("[%s] 尝试 %s（code=%s, days=%d）", chain_name, provider_name, code, days)
+        try:
+            new_data = _call_history_provider(provider_name, chain_name, code, days, last_cached_date)
+            registry.record_success(provider_name)
+            break
+        except Exception:
+            registry.record_failure(provider_name, f"{chain_name}:transport")
+            continue
+
+    # chain 层统一合并 + 缓存写入
+    if new_data:
+        merged = _merge_by_date(cached, new_data)
+        _validate_continuity(cached, new_data, cache_key)
+        cache_set(cache_key, merged)
+        return merged[-days:]
+    elif cached:
+        # 有缓存但无新数据 — 返回已有缓存
+        return cached[-days:]
+
+    return []
+
+
+_HISTORY_PROVIDER_MAP: dict[str, str] = {
+    "tencent": "src.python.providers.tencent",
+    "sina": "src.python.providers.sina",
+    "tiantian": "src.python.providers.tiantian",
+}
+
+
+def _call_history_provider(
+    provider_name: str,
+    chain_name: str,
+    code: str,
+    days: int,
+    start_from: str | None,
+) -> list[dict]:
+    """动态调用对应 provider 的历史数据获取函数。
+
+    通过 _HISTORY_PROVIDER_MAP 实现惰性导入，避免模块加载时的循环依赖。
+
+    Args:
+        provider_name: provider 名称（如 "tencent"、"sina"、"tiantian"）
+        chain_name: chain 名称（决定调用 fetch_kline 还是 fetch_fund_nav_history）
+        code: 证券代码
+        days: 获取天数
+        start_from: 起始日期（YYYY-MM-DD），增量获取参数
+
+    Returns:
+        list[dict] 或 []（失败时）
+    """
+    import importlib
+
+    module_path = _HISTORY_PROVIDER_MAP.get(provider_name)
+    if not module_path:
+        logger.warning("[history] 未知 Provider: %s", provider_name)
+        return []
+
+    try:
+        mod = importlib.import_module(module_path)
+    except ImportError as e:
+        logger.warning("[history] 导入 %s 失败: %s", module_path, e)
+        return []
+
+    if chain_name == "history_fund_otc":
+        fn = getattr(mod, "fetch_fund_nav_history", None)
+        if fn:
+            return fn(code)
+    elif chain_name == "history_stock":
+        fn = getattr(mod, "fetch_kline", None)
+        if fn:
+            return fn(code, days=days, start_from=start_from)
+
+    logger.warning("[history] %s 无 %s 函数", provider_name,
+                   "fetch_kline" if chain_name == "history_stock" else "fetch_fund_nav_history")
+    return []
+
+
+def _merge_by_date(cached: list[dict], new_data: list[dict]) -> list[dict]:
+    """按日期合并去重，new_data 中同天数据覆盖 cached（修正感知）。
+
+    Args:
+        cached: 已有的缓存数据列表（按日期升序）
+        new_data: 新获取的数据列表（按日期升序）
+
+    Returns:
+        合并后的完整数据列表（按日期升序）
+    """
+    seen = {d["date"] for d in cached}
+    merged = list(cached)
+    for d in new_data:
+        if d["date"] in seen:
+            # 覆盖旧数据（处理历史修正）
+            _replace_by_date(merged, d)
+        else:
+            merged.append(d)
+    return sorted(merged, key=lambda x: x["date"])
+
+
+def _replace_by_date(data: list[dict], item: dict) -> None:
+    """在已排序列表中用同日期项替换。"""
+    for i, existing in enumerate(data):
+        if existing["date"] == item["date"]:
+            data[i] = item
+            break
+
+
+def _validate_continuity(cached: list[dict], new_data: list[dict], cache_key: str) -> None:
+    """校验新旧数据连续性，检测历史修正信号。"""
+    if not cached or not new_data:
+        return
+    last_old = cached[-2] if len(cached) >= 2 else cached[-1]
+    first_new = new_data[0]
+
+    # 检测日期重叠：新数据首日 ≤ 旧数据末日，说明有修正
+    if first_new.get("date") <= last_old.get("date"):
+        logger.warning("[%s] 新旧数据重叠——可能是历史修正，建议全量刷新", cache_key)
+        cache_set(f"{cache_key}_correction_flag", True, ttl=CACHE_DAILY)
+    elif _gap_days(last_old.get("date"), first_new.get("date")) > 5:
+        logger.warning("[%s] 数据跳空 >5 交易日——部分历史不可达", cache_key)
+
+
+def _gap_days(date1: str | None, date2: str | None) -> int:
+    """计算两个日期字符串之间的天数差（简单近似）。"""
+    if not date1 or not date2:
+        return 0
+    try:
+        from datetime import datetime
+        d1 = datetime.strptime(date1, "%Y-%m-%d")
+        d2 = datetime.strptime(date2, "%Y-%m-%d")
+        return abs((d2 - d1).days)
+    except (ValueError, TypeError):
+        return 0
 
 
 # 模块加载时自动注册默认 Provider Chain，使 registry.get_chain() 和策略选择器生效

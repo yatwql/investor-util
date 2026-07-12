@@ -156,7 +156,7 @@ investor-util/
 
 ### 策略概览
 
-缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。完整 TTL 表（21 种类型，含 B 系列 4 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
+缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。完整 TTL 表（23 种类型，含 B 系列 4 模块 + F 迭代 2 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
 
 #### 行业/概念缓存
 
@@ -204,6 +204,7 @@ investor-util/
 - **preload（6 模块）**：price, index, llm_global_macro, llm_expert_review, llm_health_check, llm_penetration_deep → 菜单 `[2]` 触发清除
 - **refresh（11 模块）**：fund_perf（基金业绩排名）, fund_hold, industry, news, llm_news_correlation, profit_forecast, sector_flow, dividend, fund_benchmarks（基金业绩基准）, fund_manager（基金经理数据）, fund_overlap（持仓重合度）→ 菜单 `[1]` 触发清除
 - **独立模块**：tracking, calendar, fund_concentration（集中度历史）, fund_style_snapshot（风格快照）→ 无分组保护，不被菜单缓存命令误删
+- **F 迭代独立缓存**：history_stock（历史 K 线，TTL=CACHE_WEEKLY）, history_fund_otc（历史净值，TTL=CACHE_MONTHLY）→ 无分组保护，通过 Provider Chain `_fetch_with_incremental_fallback` 自动管理
 
 ### 指纹驱动失效机制
 
@@ -352,6 +353,7 @@ Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_re
 | `fund_manager.py` | 基金经理数据 | tiantian HTML 解析 | `fund_manager_*`, `fund_manager_snapshot` |
 | `industry.py` | 行业分类+概念板块 | eastmoney_industry, eastmoney_industry_rest | `industry_*` |
 | `chain.py` | Provider 优先链定义 + fallback 路由 | —（纯路由逻辑） | — |
+| `portfolio_history.py` | 组合历史走势计算器（F2） | —（内部路由到 history_stock/history_fund_otc） | `history_stock_*`, `history_fund_otc_*` |
 
 - **并行预热**：`preload_cache()` 对 preload 组使用 `ThreadPoolExecutor` 并行获取，减少串行等待
 - **菜单驱动**：菜单 [1] 和 [2] 分别清除 + 重拉 refresh 和 preload 组，复用 fetcher 模块的预热入口
@@ -366,6 +368,11 @@ handlers_report.py（菜单触发）
    │
    ├─ info 数据准备（并行预热 + 计算）
    │     └─ report_prepare() 收集所有数据 → info 字典
+   │
+   ├─ F 迭代数据获取（菜单 L/B）
+   │     ├─ F1 快照对比：SnapshotHoldings → load_latest() → HistoryDiff.compute() → save()
+   │     ├─ F2 历史走势：PortfolioHistoryCalculator.get_combined_timeseries()（as-if 模拟）
+   │     └─ 数据注入：f_context（diff 摘要）→ Excel；history_data（走势）→ HTML
    │
    ├─ Excel 管线
    │     excel_generator.py（编排器 98 行）
@@ -479,7 +486,7 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 
 ### 报告序号可配置
 
-报告 16 个模块的序号/显示名称由 `registry.py` 注册表驱动，支持用户通过 `config.json` 自定义序号和排列顺序。
+报告 18 个模块的序号/显示名称由 `registry.py` 注册表驱动，支持用户通过 `config.json` 自定义序号和排列顺序。
 
 #### 设计目标
 
@@ -497,7 +504,7 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 | `key` | str | 模块标识，如 `"summary"`、`"fund_manager"` |
 | `name` | str | 显示名称，如 `"投资分析汇总"`、`"基金经理变更监控"` |
 | `number` | int | 默认序号 |
-| `type` | str | 可见性类型：`always` / `b_series` / `news` / `llm` |
+| `type` | str | 可见性类型：`always` / `history` / `b_series` / `news` / `llm` |
 | `data_flag` | str\|None | 运行时数据标志键名，`None` 表示始终可见 |
 
 **可见性类型：**
@@ -505,6 +512,7 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 | 类型 | 数量 | 含义 | data_flag |
 |:-----|:----:|:-----|:----------|
 | `always` | 5 | 始终显示，不依赖任何数据条件 | `None` |
+| `history` | 2 | 始终显示（同 always），数据不可用时显示占位文本 | `history_data` |
 | `b_series` | 4 | 仅当对应基金分析数据可用时显示 | `manager_data` / `overlap_data` / `concentration_data` / `style_data` |
 | `news` | 2 | 仅当启用新闻功能时显示 | `include_news` / `early_warnings` |
 | `llm` | 5 | 仅当 LLM 功能启用时显示 | `llm_enabled` |
@@ -525,7 +533,7 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 
 合并规则（`get_report_section_order(config)`）：
 
-1. 无配置或配置为空 → 返回完整 16 项默认顺序
+1. 无配置或配置为空 → 返回完整 18 项默认顺序
 2. 用户配置的模块使用配置序号，其余保持默认序号
 3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
 4. `llm_usage` 始终固定在最后一位
@@ -544,6 +552,8 @@ raw_data_flags = {
     "include_news":       include_news,
     "early_warnings":     bool(early_warnings),
     "llm_enabled":        llm_enabled_flag,
+    # F 迭代：history 类型 sections 始终可见（数据不可用时显示占位文本）
+    "history_data":       history_data is not None,
 }
 ```
 
@@ -764,7 +774,7 @@ _session_usage (dict)
     │      build_llm_usage_sheet()
     │        → get_session_usage()
     │        → format_session_usage()
-    │        → write_llm_usage_sheet()    写入独立页签 16（LLM API 用量，不追加到汇总页）
+    │        → write_llm_usage_sheet()    写入独立页签 18（LLM API 用量，不追加到汇总页）
     │
     ├─► HTML 报告                           [html_writer.py + template]
     │      _render_llm_module_info()
@@ -780,14 +790,14 @@ _session_usage (dict)
 
 #### 用量展示与 LLM 分析章节的关系
 
-LLM API 用量页签/章节（页签 16 / HTML 底部）**不是独立的 LLM 生成模块**，而是对同一会话中所有 LLM 分析章节调用量的被动统计汇总。
+LLM API 用量页签/章节（页签 18 / HTML 底部）**不是独立的 LLM 生成模块**，而是对同一会话中所有 LLM 分析章节调用量的被动统计汇总。
 
 | 方面 | 设计决策 |
 |:-----|:---------|
 | **触发条件** | 仅菜单 L（全系列完整版报告），与 LLM 分析章节共进退 |
 | **无用量不显示** | 无任何 LLM 调用时（API Key 未配置或所有模块已禁用），该页签/章节整个跳过不渲染 |
 | **全缓存场景** | 所有模块均为缓存命中（无实际 API 调用），汇总区标注"无新增 API 调用，数据全部来自缓存"，模块明细表正常显示 |
-| **与 LLM 章节的物理位置** | Excel 中作为页签 16（最后一位），HTML 中在所有 LLM 分析章节之后渲染 |
+| **与 LLM 章节的物理位置** | Excel 中作为页签 18（最后一位），HTML 中在所有 LLM 分析章节之后渲染 |
 | **新闻 LLM 关联分析** | 当 `enabled_llm.news_correlation = true` 时，其 token 使用量计入 `per_module["news_correlation"]`，与另外 4 个 LLM 主模块在同一明细表中展示 |
 
 #### 展示格式
@@ -852,8 +862,8 @@ LLM 用量页签/章节底部追加"▎数据缓存系统"区域，展示 `cache
 
 | 渠道 | 展示位置 | 实现 |
 |:-----|:---------|:-----|
-| Excel（页签 16） | 状态图例下方，2 列键值表 | `summary_llm_usage.py._write_cache_stats_section()` |
-| HTML（第 16 节） | "各模块明细"表格下方 | `report_template.html` 条件渲染 `{% if cache_stats.total > 0 %}` |
+| Excel（页签 18） | 状态图例下方，2 列键值表 | `summary_llm_usage.py._write_cache_stats_section()` |
+| HTML（第 18 节） | "各模块明细"表格下方 | `report_template.html` 条件渲染 `{% if cache_stats.total > 0 %}` |
 
 #### 会话生命周期
 
@@ -866,7 +876,7 @@ main.py 入口（菜单 L 选中文件后）
   │     ├─ 每个模块调用 → _track + _record（API 调用或缓存命中）
   │     └─ ...
   │
-  ├─ generate_excel_report(...)      // 写入独立页签 16
+  ├─ generate_excel_report(...)      // 写入独立页签 18
   │     └─ build_llm_usage_sheet()
   │
   ├─ write_html_report(...)          // 渲染 HTML 底部
@@ -979,7 +989,7 @@ handlers_*.py → 各模块入口函数编排
 | C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用 `DataSourceRegistry.session_cache` 缓存结果，避免重复 HTTP 调用（参考 `provider_registry.py`） | 性能退化、API 限频 | [Provider Chain 三层熔断架构](#provider-chain-三层熔断架构) |
 | C5 | **HTTP 客户端统一** | 所有 HTTP 请求必须使用 `http_client.py` 的 `make_http_client()` / `make_async_http_client()` 工厂方法，不得直接实例化 `httpx.Client()` / `httpx.AsyncClient()` | SSL 配置不一致、连接池泄漏 | `http_client.py` |
 | C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()` / `batch_fetch_with_fallback()`，不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
-| C7 | **报告序号不可硬编码** | 报告 16 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [报告序号可配置](#报告序号可配置) |
+| C7 | **报告序号不可硬编码** | 报告 18 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [报告序号可配置](#报告序号可配置) |
 | C8 | **日志统一** | 所有模块必须使用 `logger = logging.getLogger("invest")`，不得创建独立的 logger 实例 | 日志碎片化、归档/轮转失效 | `logger.py` |
 | C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须在** `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `_compute_module_cache_info()` 中注册调度入口和缓存信息，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
 | C10 | **新闻召回策略** | `per_source`（每源原始获取量）与 `top_n`（最终输出量）解耦：各源原始获取量 = `max(500, news_top_count × 2)`，不可写死为固定值。华尔街见闻 API 硬上限 100 条除外 | 配置 `news_top_count` 不生效 | [财经新闻热点与持仓关联分析](#财经新闻热点与持仓关联分析) |

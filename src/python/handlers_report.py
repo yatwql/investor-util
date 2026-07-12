@@ -114,6 +114,118 @@ def _cmd_generate_both() -> None:
         _check_network_available(details)
         reporter.ok(f"行情数据获取完成，共 {len(details)} 条")
 
+        # ── F1 快照对比：创建快照 + 计算差异 ─────────────────
+        from src.python.schemas.history import (
+            AccountSnapshot, SnapshotData, SnapshotHolding,
+        )
+        from src.python.fetcher.history_diff import HistoryDiff
+        from src.python.report.history_snapshot import load_latest, save
+
+        f_context: dict | None = None
+        try:
+            _holdings_details = [
+                {
+                    "name": d.name, "code": d.code,
+                    "market_value": d.market_value, "cost": d.cost,
+                    "profit": d.profit,
+                }
+                for d in details
+            ]
+            _snapshot_holdings = [
+                SnapshotHolding(
+                    code=d["code"],
+                    name=d.get("name", ""),
+                    shares=0.0, cost_price=0.0,
+                    market_value=d.get("market_value", 0),
+                    total_pnl=d.get("profit", 0),
+                    cost_total=d.get("cost", 0),
+                )
+                for d in _holdings_details
+            ]
+            # 从原始 holdings 对象补充 shares 和 cost_price
+            for h in _snapshot_holdings:
+                _orig = next((x for x in holdings if x.code == h.code), None)
+                if _orig:
+                    object.__setattr__(h, "shares", _orig.shares)
+                    object.__setattr__(h, "cost_price", _orig.cost_price)
+            _snapshot = SnapshotData(
+                accounts=(AccountSnapshot(account_name="全部",
+                                          holdings=tuple(_snapshot_holdings)),),
+                total_value=sum(d.market_value for d in details),
+                total_cost=sum(d.cost for d in details),
+                total_pnl=sum(d.profit for d in details),
+                timestamp=datetime.now().strftime("%Y%m%dT%H%M%S"),
+            )
+            _old = load_latest()
+            _diff = HistoryDiff.compute(_snapshot, _old)
+            save(_snapshot)
+            if not _diff.is_first_check:
+                f_context = {
+                    "diff": {
+                        "is_first_check": False,
+                        "total_value_diff": _diff.total_value_diff,
+                        "total_value_diff_pct": _diff.total_value_diff_pct,
+                        "total_pnl_diff": _diff.total_pnl_diff,
+                        "days_since_last_report": _diff.days_since_last_report,
+                        "added": [
+                            {"name": a.name, "code": a.code, "action": a.action,
+                             "shares_diff": a.shares_diff, "value_diff": a.value_diff}
+                            for a in _diff.added
+                        ],
+                        "removed": [
+                            {"name": r.name, "code": r.code, "action": r.action,
+                             "shares_diff": r.shares_diff, "value_diff": r.value_diff}
+                            for r in _diff.removed
+                        ],
+                        "increased": [
+                            {"name": i.name, "code": i.code, "action": i.action,
+                             "shares_diff": i.shares_diff, "value_diff": i.value_diff}
+                            for i in _diff.increased
+                        ],
+                        "decreased": [
+                            {"name": d.name, "code": d.code, "action": d.action,
+                             "shares_diff": d.shares_diff, "value_diff": d.value_diff}
+                            for d in _diff.decreased
+                        ],
+                    },
+                    "diff_trimmed": _diff.trimmed,
+                    "days_since_last": _diff.days_since_last_report,
+                }
+            reporter.ok("环比对比数据准备完成")
+        except Exception:
+            logger.info("[F1] 环比数据准备跳过（首次运行或异常）", exc_info=True)
+            # f_context 保持 None
+
+        # ── F2 历史走势：获取组合历史走势数据 ─────────────────
+        history_data: dict | None = None
+        try:
+            _history_cfg = (get_config_cache() or {}).get("history", {})
+            _history_mode = _history_cfg.get("analysis", "off")
+            if _history_mode in ("auto", "prompt"):
+                if _history_mode == "prompt":
+                    try:
+                        _resp = input(
+                            "  [..] 是否获取组合历史走势数据（as-if 模拟）？(y/N): "
+                        ).strip().lower()
+                    except (EOFError, KeyboardInterrupt):
+                        _resp = "n"
+                else:
+                    _resp = "y"
+                if _resp == "y":
+                    reporter.info("正在获取组合历史走势数据（as-if 模拟）...")
+                    from src.python.report.portfolio_history import PortfolioHistoryCalculator
+                    _calc = PortfolioHistoryCalculator()
+                    _holdings_tuples = [(h.code, h.name, h.shares) for h in holdings]
+                    history_data = _calc.get_combined_timeseries(_holdings_tuples)
+                    if history_data and history_data.get("status") != "unavailable":
+                        reporter.ok("组合历史走势数据获取完成")
+                    else:
+                        reporter.warn(
+                            "组合历史走势数据获取失败（部分持仓可能不支持历史数据）")
+        except Exception:
+            logger.info("[F2] 历史走势数据获取跳过", exc_info=True)
+            # history_data 保持 None
+
         from src.python.report.html_writer import write_html_report
         reporter.info("正在生成 HTML 报告（含新闻）...")
         try:
@@ -121,7 +233,7 @@ def _cmd_generate_both() -> None:
                 holdings, output_dir=output_dir,
                 news_top_count=news_top_count, include_news=True,
                 details=details, section_order=sec_order,
-                progress=reporter,
+                history_data=history_data, progress=reporter,
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception:
@@ -135,14 +247,13 @@ def _cmd_generate_both() -> None:
             holdings, include_news=True, output_dir=output_dir,
             news_top_count=news_top_count, details=details,
             section_order=sec_order,
-            progress=reporter,
+            f_context=f_context, progress=reporter,
         )
     except Exception as e:
         reporter.add_error("全系列报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成全系列报告失败")
         _print_error_with_hint(e, "生成失败")
     _finish_report(reporter)
-
 
 def _process_llm_news_futures(
     llm_fut, news_fut, reporter,
@@ -315,6 +426,111 @@ def _cmd_generate_full() -> None:
         prep = _prepare_report_data(holdings, reporter)
         sec_order = get_report_section_order(get_config_cache() or {})
 
+        # ── F1 快照对比：创建快照 + 计算差异 ─────────────────
+        from src.python.schemas.history import (
+            AccountSnapshot, SnapshotData, SnapshotHolding,
+        )
+        from src.python.fetcher.history_diff import HistoryDiff
+        from src.python.report.history_snapshot import load_latest, save
+
+        f_context: dict | None = None
+        try:
+            _snapshot_holdings = [
+                SnapshotHolding(
+                    code=d["code"],
+                    name=d.get("name", ""),
+                    shares=0.0,  # 从 holdings 对象中获取份额
+                    cost_price=0.0,
+                    market_value=d.get("market_value", 0),
+                    total_pnl=d.get("profit", 0),
+                    cost_total=d.get("cost", 0),
+                )
+                for d in prep.get("holdings_details", [])
+            ]
+            # 尝试从原始 holdings 对象补充 shares 和 cost_price
+            for h in _snapshot_holdings:
+                _orig = next((x for x in holdings if x.code == h.code), None)
+                if _orig:
+                    object.__setattr__(h, "shares", _orig.shares)
+                    object.__setattr__(h, "cost_price", _orig.cost_price)
+            _snapshot = SnapshotData(
+                accounts=(AccountSnapshot(account_name="全部", holdings=tuple(_snapshot_holdings)),),
+                total_value=prep.get("total_mv", 0),
+                total_cost=prep.get("total_cost", 0),
+                total_pnl=prep.get("total_profit", 0),
+                timestamp=datetime.now().strftime("%Y%m%dT%H%M%S"),
+            )
+            # 加载上次快照并计算差异
+            _old = load_latest()
+            _diff = HistoryDiff.compute(_snapshot, _old)
+            # 保存本次快照（供下次对比）
+            save(_snapshot)
+            # 构建 f_context（差异未裁剪时直接传递）
+            if not _diff.is_first_check:
+                f_context = {
+                    "diff": {
+                        "is_first_check": False,
+                        "total_value_diff": _diff.total_value_diff,
+                        "total_value_diff_pct": _diff.total_value_diff_pct,
+                        "total_pnl_diff": _diff.total_pnl_diff,
+                        "days_since_last_report": _diff.days_since_last_report,
+                        "added": [
+                            {"name": a.name, "code": a.code, "action": a.action,
+                             "shares_diff": a.shares_diff, "value_diff": a.value_diff}
+                            for a in _diff.added
+                        ],
+                        "removed": [
+                            {"name": r.name, "code": r.code, "action": r.action,
+                             "shares_diff": r.shares_diff, "value_diff": r.value_diff}
+                            for r in _diff.removed
+                        ],
+                        "increased": [
+                            {"name": i.name, "code": i.code, "action": i.action,
+                             "shares_diff": i.shares_diff, "value_diff": i.value_diff}
+                            for i in _diff.increased
+                        ],
+                        "decreased": [
+                            {"name": d.name, "code": d.code, "action": d.action,
+                             "shares_diff": d.shares_diff, "value_diff": d.value_diff}
+                            for d in _diff.decreased
+                        ],
+                    },
+                    "diff_trimmed": _diff.trimmed,
+                    "days_since_last": _diff.days_since_last_report,
+                }
+            reporter.ok("环比对比数据准备完成")
+        except Exception:
+            logger.info("[F1] 环比数据准备跳过（首次运行或异常）", exc_info=True)
+            # f_context 保持 None 值——首次运行或出错时不注入差异
+
+        # ── F2 历史走势：获取组合历史走势数据 ─────────────────
+        history_data: dict | None = None
+        try:
+            _history_cfg = (get_config_cache() or {}).get("history", {})
+            _history_mode = _history_cfg.get("analysis", "off")
+            if _history_mode in ("auto", "prompt"):
+                if _history_mode == "prompt":
+                    try:
+                        _resp = input("  [..] 是否获取组合历史走势数据（as-if 模拟）？(y/N): ").strip().lower()
+                    except (EOFError, KeyboardInterrupt):
+                        _resp = "n"
+                else:
+                    _resp = "y"
+
+                if _resp == "y":
+                    reporter.info("正在获取组合历史走势数据（as-if 模拟）...")
+                    from src.python.report.portfolio_history import PortfolioHistoryCalculator
+                    _calc = PortfolioHistoryCalculator()
+                    _holdings_tuples = [(h.code, h.name, h.shares) for h in holdings]
+                    history_data = _calc.get_combined_timeseries(_holdings_tuples)
+                    if history_data and history_data.get("status") != "unavailable":
+                        reporter.ok("组合历史走势数据获取完成")
+                    else:
+                        reporter.warn("组合历史走势数据获取失败（部分持仓可能不支持历史数据）")
+        except Exception:
+            logger.info("[F2] 历史走势数据获取跳过", exc_info=True)
+            # history_data 保持 None
+
         from src.python.llm import generate_all_llm
         from src.python.providers.akshare_extras import get_sector_fund_flow
         from src.python.report.news_correlation import build_news_data
@@ -337,6 +553,7 @@ def _cmd_generate_full() -> None:
             penetrated_assets=prep["penetrated_assets"],
             holdings_details=prep["holdings_details"],
             sector_flow=_sector_flow, force=_force_llm,
+            f_context=f_context,
         )
         llm_content, news_data, news_llm_meta = _process_llm_news_futures(
             _llm_fut, _news_fut, reporter,
@@ -358,7 +575,7 @@ def _cmd_generate_full() -> None:
                 llm_content=llm_content, details=prep["details"],
                 news_data=news_data, news_llm_meta=news_llm_meta,
                 early_warnings=_early_warnings, section_order=sec_order,
-                progress=reporter,
+                history_data=history_data, progress=reporter,
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception:
@@ -378,6 +595,7 @@ def _cmd_generate_full() -> None:
             news_llm_meta=news_llm_meta,
             section_order=sec_order,
             early_warnings=_early_warnings, progress=reporter,
+            f_context=f_context,
         )
     except Exception as e:
         reporter.add_error("全系列报告生成失败（详情请查看日志文件 logs/app.log）")

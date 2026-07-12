@@ -243,6 +243,11 @@
             .report-header { page-break-after: avoid; }
         }
     </style>
+
+{% if section_visible("portfolio_history") or section_visible("drawdown_analysis") %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>if(typeof Chart==='undefined'){document.write(unescape('%3Cscript src="https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js"%3E%3C/script%3E'))}</script>
+{% endif %}
 </head>
 <body>
 <div class="container">
@@ -1337,6 +1342,215 @@
             </div>
             {% endif %}
         </div>
+    </div>
+    {% endif %}
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    
+    {% if section_visible("portfolio_history") %}
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  MODULE 17: 组合历史走势 (F 迭代)                           -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-portfolio_history" style="order: {{ section_numbers['portfolio_history'] }};">
+        <div class="section-title">
+            {{ section_numbers['portfolio_history'] }}、组合历史走势
+            {% if history_data and history_data.status != "unavailable" %}
+            <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">⚠ as-if 模拟（历史净值 × 当前份额）</span>
+            {% endif %}
+        </div>
+        {% if history_data and history_data.status != "unavailable" %}
+        <div class="section-content">
+            <canvas id="portfolioChart" width="800" height="350" style="width:100%%;height:350px;"></canvas>
+            <div class="summary-grid" style="margin-top:16px;">
+                <div class="summary-card">
+                    <h3>累计收益</h3>
+                    <div class="value" style="color: {{ history_data.total_return_pct | profit_color }};">{{ history_data.total_return_pct | change }}</div>
+                    <div class="meta">{{ history_data.total_return | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>最大回撤</h3>
+                    <div class="value" style="color: #CC0000;">{{ history_data.max_drawdown_pct | change }}</div>
+                    <div class="meta">
+                        {% if history_data.drawdown_start %}始于 {{ history_data.drawdown_start }}{% endif %}
+                        {% if history_data.drawdown_end %} · 终于 {{ history_data.drawdown_end }}{% endif %}
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <h3>年化波动率</h3>
+                    <div class="value">{{ history_data.annualized_volatility | change }}</div>
+                </div>
+            </div>
+            {% if history_data.warnings %}
+            <div class="data-status" style="margin-top:12px;">
+                {% for w in history_data.warnings %}
+                <div class="data-status-info">ℹ {{ w }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <script>
+        (function(){
+            var bars = {{ history_data.bars | tojson }};
+            if(!bars || !bars.length) return;
+            var labels = bars.map(function(b){ return b.date; });
+            var values = bars.map(function(b){ return b.total_value; });
+            var ctx = document.getElementById('portfolioChart');
+            if(!ctx) return;
+            ctx = ctx.getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '组合市值 (as-if)',
+                        data: values,
+                        borderColor: '#2E75B6',
+                        backgroundColor: 'rgba(46,117,182,0.1)',
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0,
+                        borderWidth: 2,
+                        yAxisID: 'y',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx){
+                                    return '市值: ¥' + ctx.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 10, font: { size: 11 } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: {
+                                font: { size: 11 },
+                                callback: function(v){ return '¥' + (v/10000).toFixed(0) + '万'; }
+                            },
+                            grid: { color: 'rgba(0,0,0,0.06)' }
+                        }
+                    }
+                }
+            });
+        })();
+        </script>
+        {% else %}
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>组合历史走势数据暂不可用</strong></p>
+                <p style="margin-top:8px;font-size:13px;color:#888;">
+                    模块说明：基于当前持仓份额假设历史持仓不变（as-if 模拟），使用历史股价/净值
+                    回溯计算组合的模拟走势，包括累计收益率、最大回撤、年化波动率等关键指标。
+                </p>
+                <p style="margin-top:12px;font-size:12px;color:#aaa;">
+                    功能入口：菜单 L（生成全系列完整版报告）将自动获取历史数据 |
+                    可在 config.json 的 history.analysis 中设为 "auto" 自动获取
+                </p>
+            </div>
+        </div>
+        {% endif %}
+        {{ render_data_status(data_status_history) }}
+    </div>
+    {% endif %}
+
+    {% if section_visible("drawdown_analysis") %}
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  MODULE 18: 历史回撤分析 (F 迭代)                           -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-drawdown_analysis" style="order: {{ section_numbers['drawdown_analysis'] }};">
+        <div class="section-title">{{ section_numbers['drawdown_analysis'] }}、历史回撤分析</div>
+        {% if history_data and history_data.status != "unavailable" and history_data.bars %}
+        <div class="section-content">
+            <canvas id="drawdownChart" width="800" height="250" style="width:100%%;height:250px;"></canvas>
+            <div class="summary-grid" style="margin-top:16px;">
+                <div class="summary-card">
+                    <h3>最大回撤幅度</h3>
+                    <div class="value" style="color:#CC0000;">{{ history_data.max_drawdown_pct | change }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>最大回撤金额</h3>
+                    <div class="value" style="color:#CC0000;">{{ history_data.max_drawdown | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>回撤区间</h3>
+                    <div class="meta" style="font-size:16px;">
+                        {{ history_data.drawdown_start or "--" }} → {{ history_data.drawdown_end or "--" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+        (function(){
+            var bars = {{ history_data.bars | tojson }};
+            if(!bars || !bars.length) return;
+            var labels = bars.map(function(b){ return b.date; });
+            var drawdowns = bars.map(function(b){ return b.drawdown_pct; });
+            var ctx = document.getElementById('drawdownChart');
+            if(!ctx) return;
+            ctx = ctx.getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '回撤幅度',
+                        data: drawdowns,
+                        borderColor: '#CC0000',
+                        backgroundColor: 'rgba(204,0,0,0.15)',
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0,
+                        borderWidth: 1.5,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx){
+                                    return '回撤: ' + ctx.parsed.y.toFixed(2) + '%%';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 8, font: { size: 11 } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: {
+                                font: { size: 11 },
+                                callback: function(v){ return v.toFixed(1) + '%%'; }
+                            },
+                            grid: { color: 'rgba(0,0,0,0.06)' }
+                        }
+                    }
+                }
+            });
+        })();
+        </script>
+        {% else %}
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>回撤分析数据暂不可用</strong></p>
+                <p style="margin-top:8px;font-size:13px;color:#888;">生成全系列完整版报告后自动回撤分析数据。</p>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 

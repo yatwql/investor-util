@@ -179,6 +179,7 @@ def _dispatch_llm_workers(
     total_today_profit: float, holdings_count: int, categories: dict,
     penetrated_assets: list[dict] | None, holdings_details: list[dict] | None,
     sector_flow: list[dict] | None,
+    f_context: dict | None = None,
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。"""
     if not any(needs.values()):
@@ -215,12 +216,14 @@ def _dispatch_llm_workers(
             holdings_count, categories, penetrated_assets,
             holdings_details=holdings_details, force=force,
             http_client=c, llm_config=lc,
+            f_context=f_context,
         ),
         "health_check": lambda c, lc: generate_health_check(
             total_mv, total_cost, total_profit, total_today_profit,
             holdings_count, categories, penetrated_assets,
             holdings_details=holdings_details, force=force,
             http_client=c, llm_config=lc,
+            f_context=f_context,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
             total_mv, total_cost, total_profit, total_today_profit,
@@ -262,6 +265,7 @@ def generate_all_llm(
     holdings_details: list[dict] | None = None,
     sector_flow: list[dict] | None = None,
     force: bool = False,
+    f_context: dict | None = None,
 ) -> tuple[str | None, str | None, str | None, str | None, bool, bool, bool, bool]:
     """并行生成全球政经局势 + 智囊团深度复盘 + 持仓体检报告 + 穿透深度分析。
 
@@ -272,6 +276,9 @@ def generate_all_llm(
 
     使用 ThreadPoolExecutor(max_workers=llm_config.llm_max_concurrency, 默认 3) 并发调用四个 LLM 生成任务。
     每个工作线程创建独立的 httpx.Client，避免全局共享连接池的线程安全问题。
+
+    Args:
+        f_context: F 迭代时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
 
     Returns:
         (global_macro_html, expert_review_html, health_check_html, penetration_deep_html,
@@ -298,6 +305,7 @@ def generate_all_llm(
         a_indices, us_indices, total_mv, total_cost, total_profit,
         total_today_profit, holdings_count, categories,
         penetrated_assets, holdings_details, sector_flow,
+        f_context=f_context,
     )
 
     # 合并预检结果 + 工作线程结果

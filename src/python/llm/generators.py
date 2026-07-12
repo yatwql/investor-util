@@ -76,6 +76,7 @@ def generate_expert_review(
     force: bool = False,
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
+    f_context: dict | None = None,
 ) -> tuple[str | None, bool]:
     """生成智囊团深度复盘。"""
     def _fingerprint():
@@ -91,6 +92,7 @@ def generate_expert_review(
             total_mv, total_cost, total_profit, total_today_profit,
             holdings_count, categories, penetrated_assets,
             holdings_details=holdings_details,
+            f_context=f_context,
         )
     return _generate_llm_module(
         llm_config, "expert_review",
@@ -116,6 +118,7 @@ def generate_health_check(
     force: bool = False,
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
+    f_context: dict | None = None,
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。"""
     def _fingerprint():
@@ -131,6 +134,7 @@ def generate_health_check(
             total_mv, total_cost, total_profit, total_today_profit,
             holdings_count, categories, penetrated_assets,
             holdings_details=holdings_details,
+            f_context=f_context,
         )
     return _generate_llm_module(
         llm_config, "health_check",

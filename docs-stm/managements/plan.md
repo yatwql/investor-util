@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-12（v0.4.0）
+最后更新：2026-07-12（精简冗余内容：字母迭代清单、验证节、配置架构节、系统影响节改为引用）
 
 ---
 
@@ -40,23 +40,7 @@
 
 ---
 
-## 当前配置架构
-
-LLM 配置拆分为两个独立文件：
-
-| 文件 | 内容 | 用途 |
-|------|------|------|
-| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段 | API 调用渠道（provider / api_key / model / endpoint / fallback_*） |
-| `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt、thinking 等） |
-
----
-
-## 系统影响
-
-- `data/holdings/`、`data/cache/`、`data/config/` 在首次运行时需保证存在
-- `data/config/config.json` 在程序生命周期外持久保存，含 `output_dir` 字段控制报告输出位置
-- 程序依赖外部中国金融 API，网络不可用时降级运行（使用缓存数据或显示"--"）
-- 持仓目录多 xlsx 文件时，用户通过 TUI 选择
+> 配置架构详见 [`requirements.md §9 配置管理`](requirements.md#9-配置管理)。
 
 ---
 
@@ -72,21 +56,13 @@ LLM 配置拆分为两个独立文件：
 
 ---
 
-## 验证
-
-每次迭代完成后：
-1. 运行 `python src/python/main.py`，确认 TUI 正常导航
-2. 选择对应功能生成报告文件
-3. 打开输出目录下的报告确认内容完整
-4. 模拟异常场景（断网、空目录、格式错误）确认程序不崩溃
-
----
+> 验收标准详见 [`testplan.md §6 验收标准`](testplan.md#6-验收标准)。
 
 ## ✅ 已完成迭代
 
 v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel 输出打磨）的详细设计见 [`docs-stm/archive/archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md)。
 
-所有已完成迭代（A/A2/A3/A4/A5/B/C/D/J/K/L/P/N/Q/R/M/T/S/V/U/W/X/Y1/Y2/Y3/Y4/Y5/Y6/Z1/Z2/Z3/Z4/Z6）的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md)。
+所有已完成迭代的详细变更记录见 [`docs-stm/managements/changelog.md`](changelog.md)。
 
 **v0.2.x 已完成迭代的详细记录已归档**：详见 [docs-stm/archive/archived_plan.0.2.x.md](../archive/archived_plan.0.2.x.md)。
 涵盖 B（基金深度分析 4 模块）、C（报告序号可配置）、D（数据降级分层治理）
@@ -100,15 +76,6 @@ v0.1.x（Iter 1.1~1.5：项目骨架、持仓读取、数据源接入、Excel �
 ### 待实现方向（按风险收益比排序）
 
 > 注：字母编号跳跃出于历史分配——已完成迭代占用了相应字母（详见上方 ✅ 已完成迭代），剩余字母保留给此前已规划但优先级较低的后续迭代。
-
----
-
-### [P2] F. 组合历史对比分析（低难度 / 中价值）
-
-- **环比分析**：对比历史报告摘要，说明组合变化趋势
-- **报告对比**：将本次报告的关键指标（市值/盈亏/仓位）与上次对比，输出变化摘要
-- **回撤监控**：从历史缓存中提取持仓的连续回撤曲线
-- **设计详情**：详见 [`docs-stm/plan/F-portfolio-history-comparison.md`](../plan/F-portfolio-history-comparison.md) — 11 轮实施方案：快照对比 → 历史走势 → 跨报告趋势，含 Provider Chain 集成、T2 同源降级、注册表变更、三阶段目标
 
 ---
 

@@ -207,3 +207,106 @@ def fetch_index_price(code: str) -> dict[str, Any] | None:
         logger.warning("Tencent 指数 API 解析失败: %s", code)
 
     return result
+
+
+# ── F 迭代：历史 K 线数据 ─────────────────────────────────
+
+
+def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:
+    """获取股票/ETF 历史 K 线数据（前复权，纯获取，由 chain 层管理缓存）。
+
+    Endpoint: web.ifzq.gtimg.cn/appstock/app/fqkline/get
+    Tencent K 线 API 返回 JSON 格式，支持前复权（qfq）。
+
+    参数约定（C6 约束）：
+      - Provider 函数保持纯数据获取，不碰缓存层
+      - 缓存合并由 chain 层的 _fetch_with_incremental_fallback() 管理
+      - ✅ C5：所有 HTTP 请求使用 make_http_client()
+
+    Args:
+        code: 6 位证券代码（如 "600900"）
+        days: 获取天数（默认 30，最大 365）
+        start_from: 起始日期（YYYY-MM-DD），用于增量获取。
+                    为 None 时从头获取 days 天数据。
+
+    Returns:
+        list[dict]: [{date, open, close, high, low, volume}, ...]
+        按日期升序排列。API 失败返回空列表。
+    """
+    if not is_a_share_code(code) and not is_exchange_fund_code(code):
+        logger.debug("Tencent K 线跳过不支持的类型: %s", code)
+        return []
+
+    days = min(max(days, 5), 365)
+    full_code = _add_prefix(code)
+    url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+
+    params: dict[str, str | int] = {
+        "param": f"{full_code},day,{start_from or ''},,{days},qfq",
+    }
+
+    logger.debug("Tencent K 线请求: %s, days=%d", full_code, days)
+
+    try:
+        with make_http_client(timeout=30.0) as client:
+            resp = client.get(url, params=params)
+            resp.encoding = "utf-8"
+            data = resp.json()
+    except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
+        logger.warning("Tencent K 线获取失败 %s: %s", full_code, e)
+        return []
+
+    return _parse_kline_response(data, full_code)
+
+
+def _parse_kline_response(data: dict, code: str) -> list[dict]:
+    """解析 Tencent K 线 JSON 响应。
+
+    Tencent 返回格式：
+    {
+      "data": {
+        "code": {
+          "day": [["2026-07-01", "21.50", "22.00", "21.30", "21.80", "12345678"], ...],
+          "qfqday": [["2026-07-01", "21.50", "22.00", "21.30", "21.80", "12345678"], ...],
+        }
+      }
+    }
+
+    优先使用 qfqday（前复权），回退到 day。
+    """
+    bars: list[dict] = []
+    try:
+        inner = data.get("data", {}).get(code, {})
+        # 优先前复权
+        kline = inner.get("qfqday") or inner.get("day", [])
+        if not kline:
+            return []
+
+        for entry in kline:
+            if not isinstance(entry, (list, tuple)) or len(entry) < 6:
+                continue
+            date_str = str(entry[0])
+            values = [_parse_float_field(str(v)) for v in entry[1:6]]
+            if not date_str or values[1] <= 0:
+                continue  # 跳过停牌/无效数据
+            bars.append({
+                "date": date_str,
+                "open": values[0],
+                "close": values[1],
+                "high": values[2],
+                "low": values[3],
+                "volume": values[4],
+            })
+    except (KeyError, TypeError, IndexError) as e:
+        logger.warning("Tencent K 线解析异常: %s", e)
+        return []
+
+    return sorted(bars, key=lambda x: x["date"])
+
+
+def _parse_float_field(s: str) -> float:
+    """安全解析浮点数字段，失败返回 0.0。"""
+    try:
+        return float(s) if s else 0.0
+    except (ValueError, TypeError):
+        return 0.0

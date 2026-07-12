@@ -69,6 +69,8 @@
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
 | 股票历史分红 | akshare `stock_history_dividend()`（全量拉取后按代码过滤） | — |
 | 基金经理数据 | 天天基金 `fundf10.eastmoney.com` 经理列表页面 HTML 解析 + 档案页回退 | — |
+| 个股/ETF 历史 K 线 | 腾讯财经 `qt.gtimg.cn` K 线接口 | 新浪财经 `hq.sinajs.cn` 日线数据 |
+| 场外基金历史净值 | 天天基金 `fundf10.eastmoney.com` 净值页面 | — |
 
 > **指数双链路说明**：指数数据由 `fetcher/index.py` 直调 Provider，不走 Provider Chain。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存（`stale_cache`）。
 >
@@ -113,7 +115,7 @@
 |------|---------|------|
 | **单条缓存**（引擎自动管理） | `{类型前缀}_{键名}.json`，按 TTL 自动过期 | `price_600900.json`、`llm_global_macro_{fingerprint}.json` |
 | **合并缓存**（菜单手动生成 + 自动管理） | 固定文件名，跨会话复用 | `fund_benchmarks.json`（30天） |
-| **特殊独立缓存**（无 cache_group 保护） | 固定文件名，不受菜单 [1][2] 清除 | `holdings_tracking.json`（持仓跟踪）、`trading_calendar.json`（交易日历）、`fund_concentration_snapshot.json`（集中度历史快照）、`fund_style_snapshot.json`（风格快照） |
+| **特殊独立缓存**（无 cache_group 保护） | 固定文件名，不受菜单 [1][2] 清除 | `holdings_tracking.json`（持仓跟踪）、`trading_calendar.json`（交易日历）、`fund_concentration_snapshot.json`（集中度历史快照）、`fund_style_snapshot.json`（风格快照）、`history_stock_*`（历史 K 线）、`history_fund_otc_*`（历史净值） |
 | **进程级内存缓存**（memo） | 同一会话内减少文件 IO，短 TTL | 指数数据 60s、盈利预测 5min、分红 10min |
 
 ### 5.2 指纹驱动失效机制
@@ -142,7 +144,7 @@
 | `[4] 查看缓存统计` | 只读统计 | — |
 
 > **纯股票组合**：无基金时自动跳过基金排名/持仓/基准刷新，仍主动重拉行业分类、分红、盈利预测、资金流向。
-> **无分组保护**：`holdings_tracking.json`、`trading_calendar.json`、`fund_concentration_snapshot.json`、`fund_style_snapshot.json` 不隶属于任何 cache_group，不受菜单 [1][2] 清除命令影响，仅通过菜单 [3] 过期自动清理。
+> **无分组保护**：`holdings_tracking.json`、`trading_calendar.json`、`fund_concentration_snapshot.json`、`fund_style_snapshot.json`、`history_stock_*`、`history_fund_otc_*` 不隶属于任何 cache_group，不受菜单 [1][2] 清除命令影响，仅通过菜单 [3] 过期自动清理。
 
 ### 5.4 降级规则
 
@@ -184,6 +186,13 @@
 | `fund_concentration` | `fund_concentration_snapshot.json` | 30 天 | — | 集中度历史快照（精确键名，无分组） |
 | `fund_style_snapshot` | `fund_style_snapshot.json` | 30 天 | — | 风格快照（精确键名，无分组） |
 
+#### 历史走势类
+
+| 键名 | 文件名模式 | 默认 TTL | 指纹 | 说明 |
+|:-----|-----------|:--------:|:----|:-----|
+| `history_stock` | `history_stock_{code}.json` | 7 天 | — | 个股/ETF 历史 K 线（周级 TTL，无分组保护） |
+| `history_fund_otc` | `history_fund_otc_{code}.json` | 30 天 | — | 场外基金历史净值（月级 TTL，无分组保护） |
+
 #### 系统类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹 | 说明 |
@@ -223,10 +232,19 @@
 | 基金风格分析 | B/L（B 系列） | 市值/PE 加权判定六宫格风格箱 + 三级降级链路 | §8.2.9 |
 | 财经新闻热点与持仓关联分析 | B/L | 5 源并行获取，关键词来源=持仓名称/代码 + 穿透TOP10 + 行业/概念，子串匹配→排序→TOP N（由 `news_top_count` 配置） | §8.2.10 |
 | 智能预警 | B/L | 行业资金联动 + 新闻情绪聚合，对已有计算数据的二次加工 | §8.2.11 |
+| 全球政经局势 | L | 基于市场指数 + 持仓结构生成全球政经局势分析 | §7.1 |
+| 智囊团深度复盘 | L | 三阶段圆桌会议（召集令→辩论→定音锤）模拟，调仓建议和风险预警 | §7.2 |
+| 持仓体检报告 | L | 从风险分散度/流动性/收益合理性/成本结构四维度量化评分 | §7.3 |
+| 穿透深度分析 | L | 行业集中度仪表盘 + 国别/币种暴露分析 | §7.4 |
+| 组合历史走势 | E/H/B/L | as-if 市值曲线、累计收益率、最大回撤、年化波动率（数据不可用时显示占位） | §8.2.12 |
+| 回撤分析 | E/H/B/L | 回撤面积图、最大回撤值/率/区间 | §8.2.13 |
+| LLM API 用量 | L | 当前会话的 LLM API 用量统计汇总（调用次数/token/费用/模块明细） | §7.5 |
 
 > **B 系列**（基金经理/重合度/集中度/风格）需有基金持仓数据才能生成，无数据时显示灰色占位文本。
 >
 > **新闻**模块含可选 LLM 二次关联分析（`enabled_llm.news_correlation=true` 时开启）。各新闻源原始获取量 = `max(500, news_top_count × 2)`，华尔街见闻 API 硬上限 100 条除外。
+>
+> **F 系列**（组合历史走势、回撤分析）在 E/H/B/L 全菜单模式下均可用，数据可用性由 `history.analysis` 配置（`"off"` / `"prompt"` / `"auto"`）控制，详情见 [§8.2.12](#8212-组合历史走势)。
 
 ---
 
@@ -325,7 +343,7 @@ LLM 分析模块是可选增强内容，基于外部持仓摘要数据和市场�
 3. **系统数据缓存统计** — 底部追加当前会话的数据缓存命中/未命中/总请求数/命中率，仅在有缓存请求时显示。
 
 **格式差异：**
-- **Excel**：独立页签 16，汇总区 + 表格，状态列条件颜色填充
+- **Excel**：独立页签 18，汇总区 + 表格，状态列条件颜色填充
 - **HTML**：渲染在所有 LLM 分析章节之后，格式与 Excel 一致
 - **TUI**：完成时终端输出一行摘要（`"本会话 LLM 累计：N 次调用，N tokens，费用 ¥N"`）
 
@@ -349,7 +367,7 @@ LLM 分析模块是可选增强内容，基于外部持仓摘要数据和市场�
 
 ## 8. 页面/页签布局
 
-- Excel 格式：每个模块独立一个页签，页签编号 1~16（可通过 `report_section_order` 配置自定义序号），统一用数字前缀保证排序
+- Excel 格式：每个模块独立一个页签，页签编号 1~18（可通过 `report_section_order` 配置自定义序号），统一用数字前缀保证排序
 - HTML 格式：所有模块在同一页面中按顺序排列，附目录锚点导航，使用 CSS `order` 属性实现视觉排序；各模块的条件渲染通过 `section_visible_dict` 统一控制（根据数据可用性和菜单类型自动判断）
 - **编号惯例**：HTML 序号使用中文数字（随 `report_section_order` 配置动态变化），Excel 页签使用阿拉伯数字前缀
 - **序号配置**：用户可在 `config.json` 中通过 `report_section_order` 字段自定义各模块的序号和排列顺序。`llm_usage` 强制固定在最后一位，不参与排序配置
@@ -367,17 +385,19 @@ LLM 分析模块是可选增强内容，基于外部持仓摘要数据和市场�
 | 7 | 持仓重合度矩阵 | B/L（基金深度） | — | Jaccard+Overlap Ratio 双指标热力图 |
 | 8 | 持仓集中度监控 | B/L（基金深度） | — | top3/5/10 占比 + 环比变化 + 三级预警 |
 | 9 | 基金风格分析 | B/L（基金深度） | — | 市值/PE 加权六宫格 + 网格距离漂移评分 |
-| 10 | 财经新闻热点与持仓关联分析 | B/L | — | 5 源新闻关键词匹配，可选 LLM 二次关联分析；启用时 Token 用量计入页签 16 |
+| 10 | 财经新闻热点与持仓关联分析 | B/L | — | 5 源新闻关键词匹配，可选 LLM 二次关联分析；启用时 Token 用量计入页签 18 |
 | 11 | 智能预警 | B/L | — | 行业资金联动 + 新闻情绪聚合 |
 | 12 | 全球政经局势 | L | ✅ | LLM 基于指数+持仓结构生成 |
 | 13 | 智囊团深度复盘 | L | ✅ | LLM 三阶段圆桌会议 |
 | 14 | 持仓体检报告 | L | ✅ | LLM 四维度评分 |
 | 15 | 穿透深度分析 | L | ✅ | LLM 行业集中度+国别暴露 |
-| 16 | LLM API 用量 | L | — | Token 用量、费用估算、模块明细 |
+| 16 | 组合历史走势 | E/H/B/L | — | as-if 市值曲线、累计收益率、最大回撤、年化波动率 |
+| 17 | 回撤分析 | E/H/B/L | — | 回撤面积图、最大回撤值/率/区间 |
+| 18 | LLM API 用量 | L | — | Token 用量、费用估算、模块明细 |
 
 ### 8.2 各页签字段详情
 
-以下列出页签 1~5（基础报表页签）的字段布局与展示格式。页签 6~11（基金深度分析 + 新闻模块）详见本小节 8.2.6~8.2.11。页签 12~16（LLM 分析章节）详见 [§7](#7-llm-智能分析)。
+以下列出页签 1~5（基础报表页签）的字段布局与展示格式。页签 6~11（基金深度分析 + 新闻模块）详见本小节 8.2.6~8.2.11。页签 12~15（LLM 分析章节）详见 [§7](#7-llm-智能分析)。页签 16~17（组合历史走势 + 回撤分析）详见本小节 8.2.12~8.2.13。
 
 #### 8.2.1 投资分析汇总
 
@@ -605,6 +625,58 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 情绪得分 | -1~1 |
 | 最新要闻 TOP3 | 该品种关联度最高的 3 条新闻标题 |
 
+#### 8.2.12 组合历史走势
+
+以折线图展示组合市值变化轨迹和各关键期指标，基于 **as-if 模拟**（当前持仓份额 × 历史价格/净值），数据由 `portfolio_history.py:PortfolioHistoryCalculator` 计算。
+
+**数据来源：**
+- 场内股票/ETF：腾讯财经 K 线（`qt.gtimg.cn`）或新浪财经（`hq.sinajs.cn`），缓存类型 `history_stock_*`（周级 TTL）
+- 场外基金：天天基金历史净值（`fundf10.eastmoney.com`），缓存类型 `history_fund_otc_*`（月级 TTL）
+
+**返回数据结构（`history_data` 字典）：**
+
+| 字段 | 类型 | 说明 |
+|:-----|:----:|:-----|
+| `bars` | list[dict] | 时间线数组，每项含 `date`、`total_value`、`drawdown`、`drawdown_pct` |
+| `total_return` | float | 累计收益金额（期末市值 - 期初市值） |
+| `total_return_pct` | float | 累计收益率（百分比） |
+| `max_drawdown` | float | 最大回撤金额 |
+| `max_drawdown_pct` | float | 最大回撤幅度（百分比） |
+| `drawdown_start` | str | 最大回撤开始日期 |
+| `drawdown_end` | str | 最大回撤结束日期 |
+| `annualized_volatility` | float | 年化波动率 |
+| `status` | str | `"ok"` / `"degraded"`（部分持仓不可用）/ `"unavailable"` |
+| `warnings` | list[str] | 降级/异常提示信息列表 |
+
+**渲染形式：**
+- **HTML**：Chart.js 折线图（市值曲线）+ 3 个摘要卡片（累计收益/最大回撤/年化波动率）+ 降级提示信息
+- **Excel**：该模块在 Excel 中仅以灰色占位文本呈现（数据不可用提示），完整图表内容仅在 HTML 报告中展示
+
+**触发条件：**
+- 由 `history.analysis` 配置（`"off"`/`"prompt"`/`"auto"`，默认 `"off"`）控制是否获取历史走势（见 §9.1）
+- `"prompt"` 模式：报告生成后询问用户是否需要获取（约耗时 15s）
+- `"auto"` 模式：报告生成时自动获取，不询问
+- `"off"` 模式：不获取数据，报告渲染占位文本
+- 快照对比（F1）不受此配置影响，始终自动执行
+
+#### 8.2.13 回撤分析
+
+以面积图展示组合在整个观测期内的回撤幅度变化，突出最大回撤区间。
+
+**数据来源：** 与组合历史走势共用同一 `history_data` 字典，复用 `bars[i].drawdown_pct` 绘制回撤曲线。
+
+**渲染指标：**
+
+| 指标 | 说明 |
+|:-----|:-----|
+| 最大回撤幅度 | `max_drawdown_pct`，历史最深回撤百分比 |
+| 最大回撤金额 | `max_drawdown`，历史最深回撤金额 |
+| 回撤区间 | `drawdown_start` → `drawdown_end`，最大回撤的起止日期区间 |
+
+**渲染形式：**
+- **HTML**：Chart.js 面积图（回撤曲线，红色填充）+ 3 个摘要卡片（回撤幅度/回撤金额/回撤区间）
+- **Excel**：该模块在 Excel 中仅以灰色占位文本呈现（数据不可用提示），完整图表内容仅在 HTML 报告中展示
+
 ### 8.3 取价方式规范
 
 | 取价方式 | 触发条件 | 蓝色标识 |
@@ -634,13 +706,14 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | `preferred_provider` | dict | `{}` | 手动 | Provider Chain 首选覆写（price/fund_rank/fund_hold/industry） |
 | `user_fund_benchmarks` | dict | `{}` | 手动 | 自定义基金基准 {代码: 基准代码} |
 | `early_warning` | dict | `{sector_alert_threshold_warning:-50000000, sector_alert_threshold_danger:-200000000, sentiment_top_n:10}` | 手动 | 智能预警阈值（单位：元） |
-| `default_menu_key` | str | `"L"` | 手动 | TUI 菜单缺省选项快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R/X） |
-| `report_section_order` | dict | `{}` | 手动 | 报告模块序号配置。键=模块标识，值=序号。已配置模块按序号升序排列在前，未配置模块按默认顺序排后。`llm_usage` 强制末位。示例：`{"fund_manager": 1, ...}`。空对象 `{}` 使用默认 16 项顺序 |
+| `default_menu_key` | str | `"L"` | 手动 | TUI 菜单默认选项快捷键，取值为任一有效菜单键（如 E/H/B/L），启动后光标自动定位 |
+| `report_section_order` | dict | `{}` | 手动 | 报告模块序号配置。键=模块标识，值=序号。已配置模块按序号升序排列在前，未配置模块按默认顺序排后。`llm_usage` 强制末位。示例：`{"fund_manager": 1, ...}`。空对象 `{}` 使用默认 18 项顺序 |
 | `market_hour_aware` | list | `["price", "index"]` | 手动 | 交易时段短 TTL 的数据类型 |
 | `market_hour_ttl` | int | `30` | 手动 | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30", end:"15:00", official_source:true}` | 手动 | 交易时段配置。`official_source=true` 时优先通过东方财富 push2 API 获取实时交易状态，false 时仅依赖内置默认时段 |
 | `degradation` | dict | T2/T3/T4 三级配置 | 手动 | 双信号降级阈值：每层级含 `unreachable_threshold`（连续失败次数）、`empty_data_threshold`（连续空数据次数）、`stale_days`（过期缓存可用天数） |
-| `cache_ttl` | dict | 21 项 | 手动 | 各缓存类型 TTL（秒） |
+| `history.analysis` | str | `"off"` | 手动 | 组合历史走势获取模式：`"off"`=关闭、`"prompt"`=报告后询问用户、`"auto"`=自动获取 |
+| `cache_ttl` | dict | 23 项 | 手动 | 各缓存类型 TTL（秒） |
 | `llm_key_file` | str | `data/config/llm_key.json` | 手动 | LLM 密钥文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | 手动 | LLM 参数文件路径 |
 
@@ -695,7 +768,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 缓存文件损坏 | 透明修复 | 自动删除并重新获取 |
 | 配置值异常 | 启动时输出 WARNING | 使用代码默认值兜底 |
 | LLM API Key 未配置 | 显示占位文本"本节内容待生成 — LLM 未配置（请配置 data/config/llm_key.json）" | 跳过 LLM 模块，不阻塞 |
-| LLM 模块已禁用 | 主分析章节（页签 12~15）完全跳过不渲染，不留空位；LLM API 用量页签（页签 16）中对应模块行显示"已禁用"灰色状态 | `continue` 跳过 / `{# 模块已禁用，完全跳过 #}` |
+| LLM 模块已禁用 | 主分析章节（页签 12~15）完全跳过不渲染，不留空位；LLM API 用量页签（页签 18）中对应模块行显示"已禁用"灰色状态 | `continue` 跳过 / `{# 模块已禁用，完全跳过 #}` |
 | LLM 超时/失败 | 根据 FAIL_REASON_* 类型输出差异化占位（见 llm_content.py _PLACEHOLDER_BY_REASON） | 熔断器自动冷却，支持 fallback_provider 回退 |
 | LLM 输出截断 | 自动增大 max_tokens 1.5× 重试 | 日志 ERROR 提示 |
 | LLM 内容过滤（空返回） | 追加安抚指令重试 | 日志 WARNING |
@@ -712,6 +785,11 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 新闻多源并行获取（5 源全失败/部分失败） | 全源失败 → 模块级占位文本；部分失败 → 页脚列出失败源清单 | `news_aggregator._last_src_results` + `get_last_source_status()` 追踪各源 fetch 结果；`news_correlation._build_news_footer()` 追加失败源列表 |
 | akshare 分红数据获取失败 | 年均股息率列显示 `--`；页脚状态摘要标记分红不可用 | `_build_category_data()` 返回 `(list, bool)`，`dividend_success=False` 时触发 `_build_category_data_status()` 写入状态摘要 |
 | 指数/指数数据双链路均失败 | 指数区域显示 `--`，不影响其余模块 | `fetcher/index.py` 腾讯→新浪→过期缓存三层降级 |
+| F1 快照对比 — 首次运行无历史快照 | 显示"首次运行，暂无环比数据"占位 | `SnapshotHoldings.load_latest()` 返回 None，跳过差异对比 |
+| F1 快照对比 — 快照读取异常/损坏 | 跳过环比对比，不影响报告其余模块 | 日志 WARNING，`f_context` 置为 None |
+| F2 历史走势 — 全部持仓数据不可用 | 页面显示占位文本"组合历史走势数据不可用"；快照对比不受影响 | `history_data.status = "unavailable"`，HTML 模板条件渲染占位块 |
+| F2 历史走势 — 部分持仓数据缺失 | 页面显示降级警告清单（"部分持仓历史走势不可用（3/5）"），观测期压缩但不中断 | `history_data.status = "degraded"`，`warnings` 列表逐条标注；Excel 页脚追加状态提示 |
+| F2 历史走势 — 获取模式为 `"off"` | 报告页面显示占位文本，不报错 | `handlers_report.py` 依据 `history.analysis` 配置跳过获取流程，`f_context` 保持 None |
 
 ---
 

@@ -59,6 +59,13 @@ STATUS_MESSAGES: dict[str, str] = {
     # 新闻 / 预警
     "news_all_failed":        "新闻数据暂不可用，请检查网络连接",
     "warning_unavailable":    "预警数据暂不可用",
+
+    # F 迭代：组合历史走势
+    "history_price_unavailable": "个股历史行情获取失败，部分股票走势不可用",
+    "history_nav_unavailable":   "基金历史净值获取失败，部分基金走势不可用",
+    "history_degraded":          "历史走势部分数据来自降级链路，精度可能降低",
+    "history_correction":        "检测到历史数据修正（重叠覆盖），走势可能已重新计算",
+    "history_zero_value":        "部分交易日存在零收盘价，可能涉及停牌或节假日数据",
 }
 
 # 按层级的前缀符号：T2 → ⚠（橙色警告），T3/T4 → ℹ（蓝色提示）

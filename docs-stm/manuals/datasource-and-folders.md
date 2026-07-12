@@ -17,8 +17,10 @@
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — |
+| 股票/ETF 历史日线 | 腾讯财经 `qt.gtimg.cn`（`f_day` 查询） | 新浪财经 `hq.sinajs.cn`（`hq_f_day` 查询） |
+| 场外基金历史净值 | 天天基金 `fundf10.eastmoney.com` `lsjz` 净值列表 | — |
 
-> **架构说明：** 指数数据由 `fetcher/index.py` 直接调用对应 API（不经过 Provider Chain）。A 股指数：腾讯→新浪备用→过期缓存；美股指数：新浪（2 次重试）→腾讯备用→过期缓存。
+> **架构说明：** 指数数据由 `fetcher/index.py` 直接调用对应 API（不经过 Provider Chain）。A 股指数：腾讯→新浪备用→过期缓存；美股指数：新浪（2 次重试）→腾讯备用→过期缓存。历史走势数据由 `fetcher/portfolio_history.py` 内部路由到对应 Provider 的 history 接口，同样走双链路 fallback。
 
 ---
 
@@ -65,6 +67,7 @@ investor-util/
 │   │   ├── fetcher/                  # 数据获取调度层，负责 Provider 路由分发与缓存预热
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── chain.py              # Provider Chain — 多源路由、fallback 自动切换、过期缓存降级
+│       │   │   ├── history_diff.py       # 持仓快照差异计算 — 环比对比（F1：新增/清仓/增持/减持）
 │       │   │   ├── fund.py               # 基金数据获取 — 净值/持仓/排名/基准的缓存感知封装
 │       │   │   ├── index.py              # 指数行情获取 — A股 + 美股指数、缓存 TTL 管理
 │       │   │   ├── industry.py           # 行业/概念数据获取 — 行业分类、概念板块归属、批量接口
@@ -129,6 +132,8 @@ investor-util/
 │       │   │   ├── news_correlation.py   # 新闻关联分析页签 — 财经新闻关键词匹配
 │       │   │   ├── early_warning.py      # 智能预警页签 — 行业资金流向联动 + 新闻情绪聚合
 │       │   │   ├── llm_content.py        # LLM 增补页签写入 — 各 LLM 模块的 Excel 页签生成
+│       │   │   ├── portfolio_history.py  # 组合历史走势计算 — as-if 市值曲线、回撤/波动率指标（F2）
+│       │   │   ├── history_snapshot.py   # 持仓快照持久化 — 原子写入、最新快照加载、旧快照清理（F1）
 │       │   │   ├── html_writer.py        # HTML 报告生成编排器 — 调用子渲染函数、模板渲染
 │       │   │   ├── html_jinja_env.py     # Jinja2 模板环境，提供过滤器注册与 section_visible 控制标记
 │       │   │   ├── html_renderers.py     # HTML 报告各章节的渲染函数集合
@@ -390,8 +395,8 @@ investor-util/
 │   │       └── r198_llm_split_design.md              # ✅ 已实现 — R-198：LLM 模块横向拆分
 │   │   └── refactor-summary-llm-usage/             # 📁 summary.py LLM 用量拆分设计归档
 │   │       └── R-207-summary-llm-usage-split-plan.md # ✅ 已实现 — R-207：summary.py LLM 用量拆分（617→350 行）
+│   ├── F-portfolio-history-comparison.md            # F 迭代：组合历史对比分析 — 快照/差异/历史走势（已归档）
 │   ├── plan/                         # 计划与设计文件
-│   │   └── F-portfolio-history-comparison.md # F 迭代：组合历史对比分析 — 快照/差异/历史走势 14 轮实施方案
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
@@ -422,4 +427,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，目录树和测试文件数可能滞后。请以代码仓库实际结构为准。
 >
-> 最后更新：2026-07-12（目录树核对：新增 test_prompts.py、test_market_value_strategy_edge.py；F 迭代设计文档更名为组合历史对比分析）
+> 最后更新：2026-07-12（数据源表补历史走势数据；目录树已同步 F 迭代文件）

@@ -97,10 +97,10 @@ class TestHtmlCssStructure(unittest.TestCase):
                           f"section div 缺少 order 样式: {sec_tag}")
 
     def test_section_count(self):
-        """模板应包含 16 个 .section 容器。"""
+        """模板应包含 18 个 .section 容器。"""
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
-        self.assertEqual(len(sections), 16,
-                         f"应有 16 个 .section 容器，实际 {len(sections)}")
+        self.assertEqual(len(sections), 18,
+                         f"应有 18 个 .section 容器，实际 {len(sections)}")
 
     # ── section-title pattern ──────────────────────────────────
 
@@ -115,10 +115,10 @@ class TestHtmlCssStructure(unittest.TestCase):
             self.assertIn("section_numbers['", title_html,
                           f"section-title 缺少 section_numbers 引用: {title_html[:80]}")
 
-    # ── 16 nav <a> in section-nav ──────────────────────────────
+    # ── 18 nav <a> in section-nav ──────────────────────────────
 
     def test_nav_links_count_in_source(self):
-        """模板中 nav 循环应包含 16 个 <a> 标签（不考虑可见性）。"""
+        """模板中 nav 循环应包含 18 个 <a> 标签（不考虑可见性）。"""
         _ = re.findall(
             r'<a\s+href="#sec-[^"]+">',
             self.tmpl,

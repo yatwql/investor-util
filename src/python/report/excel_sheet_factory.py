@@ -18,6 +18,7 @@ def should_create_sheet(section: dict, enable_b_series: bool, include_news: bool
     """
     type_map = {
         "always":    True,              # summary, market_value, category, penetration, fund_performance
+        "history":   True,              # portfolio_history, drawdown_analysis（始终显示，数据不可用时占位）
         "b_series":  enable_b_series,   # fund_manager, fund_overlap, fund_concentration, fund_style
         "news":      include_news,      # news_correlation, early_warning
         "llm":       include_llm,       # global_macro, expert_review, health_check, penetration_deep, llm_usage

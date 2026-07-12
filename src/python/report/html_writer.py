@@ -15,7 +15,7 @@ from src.python.constants import APP_VERSION
 from src.python.models import Holding
 from src.python.registry import get_llm_module_names, get_report_section_order
 from src.python.report.category import _build_category_data_status
-from src.python.report.data_status import DataStatus
+from src.python.report.data_status import DataStatus, DataStatusItem, STATUS_MESSAGES
 from src.python.report.market_value import get_last_trading_day
 from src.python.report.fund_performance import _build_perf_data_status, _is_fund
 from src.python.report.penetration_sheet import _build_penetration_data_status
@@ -155,7 +155,7 @@ def _build_data_status_sections(
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None) -> str:
+def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None, history_data: dict | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     通过各子函数获取分析数据，渲染 Jinja2 模板，
@@ -168,6 +168,9 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         news_data: 可选预获取新闻数据，传入时跳过内部新闻获取。
         news_llm_meta: 与 news_data 对应的 LLM 元数据字典。
         sector_flow: 行业资金流向数据（可选），注入全球政经局势 LLM prompt
+        history_data: 组合历史走势数据（来自 PortfolioHistoryCalculator），
+            包含 bars、max_drawdown、annualized_volatility、total_return、warnings 等。
+            None 时历史章节显示占位文本。
 
     Returns:
         最新版报告的绝对路径
@@ -237,6 +240,34 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         penetration_dividend_ok, perf_data, perf_profit_ok, holdings,
         cat_dividend_ok)
 
+    # ── 10c) F 迭代：历史走势数据状态 ──
+    data_status_history: DataStatus = {}
+    if history_data:
+        status = history_data.get("status", "unavailable")
+        warnings = history_data.get("warnings", [])
+        if status == "unavailable":
+            data_status_history["history_source"] = DataStatusItem(
+                available=False, tier="T3",
+                message=STATUS_MESSAGES.get("history_price_unavailable", "历史走势数据暂不可用"),
+            )
+        else:
+            if status == "degraded":
+                data_status_history["history_degraded"] = DataStatusItem(
+                    available=True, tier="T3",
+                    message=STATUS_MESSAGES.get("history_degraded", "历史走势部分数据来自降级链路"),
+                )
+            for w in warnings:
+                if "收盘价为 0" in w or "零收盘" in w:
+                    key = "history_zero_value"
+                elif "修正" in w or "重叠" in w:
+                    key = "history_correction"
+                else:
+                    continue
+                data_status_history[key] = DataStatusItem(
+                    available=True, tier="T3",
+                    message=STATUS_MESSAGES.get(key, w),
+                )
+
     html = _ENV.get_template("report_template.html").render(
         now=now_str, today=today_str, trading_day=trading_day,
         total_mv=total_mv, total_cost=total_cost,
@@ -272,6 +303,9 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         data_status_penetration=data_status_penetration,
         data_status_perf=data_status_perf,
         data_status_category=data_status_category,
+        # F 迭代：组合历史走势数据
+        history_data=history_data,
+        data_status_history=data_status_history,
         # 报告年份（穿透表预测EPS列使用）
         report_year=datetime.now().year,
         # 数据不可用标记 — 模板用于显示/隐藏 暂无数据 横幅

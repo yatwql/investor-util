@@ -10,6 +10,64 @@ from src.python.code_utils import is_qdii_extended
 
 logger = logging.getLogger("invest")
 
+
+# ═══════════════════════════════════════════════════════════
+#  F 迭代：差异上下文格式化（R3 F1 快照对比 LLM 注入）
+# ═══════════════════════════════════════════════════════════
+
+
+def _build_diff_context_block(f_context: dict | None) -> str:
+    """构建差异上下文文本块（紧凑格式），供 LLM 注入环比分析能力。
+
+    当 f_context 中包含 diff 且非首次运行时，输出"相比上次报告"的差异摘要。
+    首次运行（is_first_check=True）时输出首次报告标记。
+    f_context 为 None 或 diff 为 None 时返回空字符串。
+
+    注意：f_context 中的 diff 由 fetcher/history_diff.HistoryDiff.compute() 生成，
+    以 dict 形式传递避免 prompts.py 对 schemas/history 的强依赖。
+
+    Returns:
+        格式化的差异文本块，首尾不含换行。为空字符串时不做任何注入。
+    """
+    if not f_context:
+        return ""
+    diff = f_context.get("diff")
+    if diff is None or not isinstance(diff, dict):
+        return ""
+    if diff.get("is_first_check"):
+        return "【对比基准】这是首次生成的报告，暂无历史对比数据。"
+
+    lines: list[str] = []
+    days = diff.get("days_since_last_report", 0)
+    lines.append(f"【环比对比】距上次报告 {days} 天")
+
+    tv_diff = diff.get("total_value_diff", 0)
+    tv_pct = diff.get("total_value_diff_pct", 0)
+    lines.append(f"总市值变化: {tv_diff:+,.0f} ({tv_pct:+.2f}%)")
+
+    tp_diff = diff.get("total_pnl_diff", 0)
+    lines.append(f"总盈亏变化: {tp_diff:+,.0f}")
+
+    added = diff.get("added", [])
+    removed = diff.get("removed", [])
+    increased = diff.get("increased", [])
+    decreased = diff.get("decreased", [])
+
+    if added:
+        _a = "、".join(f"{a['name']}({a['code']})" for a in added[:3])
+        lines.append(f"新增持仓: {_a}")
+    if removed:
+        _r = "、".join(f"{r['name']}({r['code']})" for r in removed[:3])
+        lines.append(f"清仓: {_r}")
+    if increased:
+        _i = "、".join(f"{i['name']}+{i['shares_diff']:.0f}份" for i in increased[:3])
+        lines.append(f"加仓: {_i}")
+    if decreased:
+        _d = "、".join(f"{d['name']}{d['shares_diff']:.0f}份" for d in decreased[:3])
+        lines.append(f"减仓: {_d}")
+
+    return "\n".join(lines)
+
 __all__ = [
     "_CACHE_PREFIX_LLM",
     "FAIL_REASON_NOT_CONFIGURED", "FAIL_REASON_API_ERROR", "FAIL_REASON_NETWORK_ERROR",
@@ -306,32 +364,42 @@ def _build_expert_review_prompt(
     categories: dict,
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
+    f_context: dict | None = None,
 ) -> str:
     """构建智囊团深度复盘的用户提示词（紧凑格式）。
 
     必须包含实际持仓明细（名称、代码、市值、成本、盈亏），
     防止 LLM 虚构持仓代码。同时包含穿透 TOP10 供参考。
+
+    Args:
+        f_context: F 迭代时间维度上下文（含 diff 差异摘要）。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
     holdings_text = _format_holdings_block(holdings_details, compact=True)
     pen_text = _format_penetration_block(penetrated_assets)
+    diff_text = _build_diff_context_block(f_context)
 
-    return (
-        f"【当前时间】{now_bj}（北京时间）\n"
+    parts = [
+        f"【当前时间】{now_bj}（北京时间）",
         f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} "
-        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f} 今日{total_today_profit:+,.0f}\n"
-        f"【分布】{' '.join(cat_parts)}{pen_text}\n"
-        f"\n"
-        f"【持仓明细】\n"
-        f"{holdings_text}\n"
-        f"\n"
-        f"请严格基于以上【持仓明细】中的品种进行深度复盘，"
-        f"只引用我实际持有的品种代码（上面列出的），"
-        f"不要虚构任何持仓代码。每个建议必须引用具体品种的名称和代码。"
-        f"给出优化建议和风险预警。"
-    )
+        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f} 今日{total_today_profit:+,.0f}",
+        f"【分布】{' '.join(cat_parts)}{pen_text}",
+    ]
+    if diff_text:
+        parts.append(diff_text)
+    parts += [
+        "",
+        "【持仓明细】",
+        holdings_text,
+        "",
+        "请严格基于以上【持仓明细】中的品种进行深度复盘，"
+        "只引用我实际持有的品种代码（上面列出的），"
+        "不要虚构任何持仓代码。每个建议必须引用具体品种的名称和代码。"
+        "给出优化建议和风险预警。",
+    ]
+    return "\n".join(parts)
 
 
 def _build_health_check_prompt(
@@ -343,33 +411,43 @@ def _build_health_check_prompt(
     categories: dict,
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
+    f_context: dict | None = None,
 ) -> str:
     """构建持仓体检报告的用户提示词。
 
     要求 LLM 从风险分散度/流动性/收益合理性/成本结构四维度打分。
+
+    Args:
+        f_context: F 迭代时间维度上下文（含 diff 差异摘要）。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
     holdings_text = _format_holdings_block(holdings_details, show_cost=True)
     pen_text = _format_penetration_block(penetrated_assets)
+    diff_text = _build_diff_context_block(f_context)
 
-    return (
-        f"【当前时间】{now_bj}（北京时间）\n"
+    parts = [
+        f"【当前时间】{now_bj}（北京时间）",
         f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} "
-        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f} 今日{total_today_profit:+,.0f}\n"
-        f"【分布】{' '.join(cat_parts)}{pen_text}\n"
-        f"\n"
-        f"【持仓明细】\n"
-        f"{holdings_text}\n"
-        f"\n"
-        f"请从以下四个维度对以上投资组合进行全面体检并打分：\n"
-        f"1. 风险分散度 — 行业/品种集中度\n"
-        f"2. 流动性 — 场内场外/停牌/封闭期\n"
-        f"3. 收益合理性 — 盈亏是否与市场匹配\n"
-        f"4. 成本结构 — 成本分布与浮盈浮亏比\n"
-        f"按要求的输出格式给出评分和改进建议。"
-    )
+        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f} 今日{total_today_profit:+,.0f}",
+        f"【分布】{' '.join(cat_parts)}{pen_text}",
+    ]
+    if diff_text:
+        parts.append(diff_text)
+    parts += [
+        "",
+        "【持仓明细】（含成本）",
+        holdings_text,
+        "",
+        "请从以下四个维度对以上投资组合进行全面体检并打分：",
+        "1. 风险分散度 — 行业/品种集中度，结合环比变化趋势评估",
+        "2. 流动性 — 场内场外/停牌/封闭期",
+        "3. 收益合理性 — 盈亏是否与市场匹配，对比上次报告变化",
+        "4. 成本结构 — 成本分布与浮盈浮亏比",
+        "按要求的输出格式给出评分和改进建议。",
+    ]
+    return "\n".join(parts)
 
 
 def _calc_country_exposure(holdings_details: list[dict] | None) -> list[str]:

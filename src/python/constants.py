@@ -44,6 +44,18 @@ CACHE_WEEKLY = 604800       # 每周（7d）
 CACHE_TWO_WEEKS = 1209600   # 两周（14d）
 CACHE_MONTHLY = 2592000     # 每月（30d）
 
+# ── F 迭代：组合历史对比分析 ──────────────────────────────
+
+# 快照目录（相对于 PROJECT_ROOT）
+HISTORY_SNAPSHOT_DIR = os.path.join(PROJECT_ROOT, "data", "history", "snapshots")
+# 最大保留快照数量
+HISTORY_SNAPSHOT_MAX_COUNT = 12
+
+# 历史 K 线缓存 TTL（每周刷新）
+HISTORY_CHAIN_STOCK_TTL = CACHE_WEEKLY
+# 历史净值缓存 TTL（每月刷新）
+HISTORY_CHAIN_FUND_TTL = CACHE_MONTHLY
+
 # ── LLM 模型定价表（每百万 token，CNY）══ 唯一默认源 ══
 
 MODEL_PRICING: dict[str, dict[str, float]] = {

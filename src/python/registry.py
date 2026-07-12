@@ -175,6 +175,14 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
                   exact_cache_keys=("holdings_tracking",),
                   cache_ttl=CACHE_MONTHLY),  # 无 cache_group，避免被手动清除
 
+    # ── F 迭代：组合历史对比分析（preload 组）──
+    DataModuleDef("历史股票日线", "history_stock",
+                  cache_prefixes=("history_stock_",), cache_ttl=CACHE_WEEKLY,
+                  cache_groups=("preload",)),
+    DataModuleDef("历史基金净值", "history_fund_otc",
+                  cache_prefixes=("history_fund_otc_",), cache_ttl=CACHE_MONTHLY,
+                  cache_groups=("preload",)),
+
     # ── 交易日历（akshare 全年数据，极少变动，无 cache_group 避免误删）──
     DataModuleDef("交易日历", "calendar",
                   exact_cache_keys=("trading_calendar",),
@@ -298,6 +306,8 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "fund_overlap": "持仓重合度矩阵",
     "fund_concentration": "持仓集中度监控",
     "fund_style": "基金风格分析",
+    "portfolio_history": "组合历史走势",
+    "drawdown_analysis": "历史回撤分析",
 }
 
 
@@ -335,7 +345,11 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13, "type": "llm",       "data_flag": "llm_enabled"},
     {"key": "health_check",       "name": "持仓体检报告",                     "number": 14, "type": "llm",       "data_flag": "llm_enabled"},
     {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15, "type": "llm",       "data_flag": "llm_enabled"},
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 16, "type": "llm",       "data_flag": "llm_enabled"},
+    # ── history 类型（始终显示，数据不可用时显示占位文本） ──
+    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 16, "type": "history",   "data_flag": None},
+    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 17, "type": "history",   "data_flag": None},
+    # ── llm_usage 强制末位（技术约束） ──
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 18, "type": "llm",       "data_flag": "llm_enabled"},
 ]
 
 
@@ -343,7 +357,7 @@ def get_report_section_keys() -> set[str]:
     """返回所有有效的报告模块标识集合，供 config 校验使用。
 
     Returns:
-        {"summary", "market_value", "category", ..., "llm_usage"}
+        {"summary", "market_value", "category", ..., "drawdown_analysis"}
     """
     return {sec["key"] for sec in _REPORT_SECTION_DEFAULT}
 
@@ -379,7 +393,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 
     处理逻辑：
-      1. 无配置或配置为空 → 返回完整 16 项默认顺序（与当前硬编码一致）
+      1. 无配置或配置为空 → 返回完整 18 项默认顺序（与当前硬编码一致）
       2. 用户配置的模块使用配置序号，其余保持默认序号
       3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
       4. llm_usage 始终固定在最后一位
@@ -389,7 +403,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 16 项
+        [{key, name, number, type, data_flag}, ...] 共 18 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

@@ -702,14 +702,15 @@ class TestCreateSheets(unittest.TestCase):
         from src.python.registry import _REPORT_SECTION_DEFAULT
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
-        # always 类型只创建 5 个核心页签
+        # always + history 类型共创建 7 个核心页签
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_b_series=False, include_news=False, include_llm=False)
-        self.assertEqual(len(sheets), 5)
-        for sec in _REPORT_SECTION_DEFAULT[:5]:
-            ws = sheets[sec["key"]]
-            expected = f"{sec['number']}.{sec['name']}"
-            self.assertEqual(ws.title, expected, f"{sec['key']} title mismatch")
+        self.assertEqual(len(sheets), 7)
+        for sec in _REPORT_SECTION_DEFAULT:
+            if sec["key"] in sheets:
+                ws = sheets[sec["key"]]
+                expected = f"{sec['number']}.{sec['name']}"
+                self.assertEqual(ws.title, expected, f"{sec['key']} title mismatch")
 
     def test_custom_order_uses_custom_titles(self):
         """自定义 section_order → 标题使用配置序号。"""
@@ -731,8 +732,8 @@ class TestCreateSheets(unittest.TestCase):
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_b_series=False, include_news=True, include_llm=False)
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
-        # always(5) + news(2) = 7
-        self.assertEqual(len(sheets), 7)
+        # always(5) + history(2) + news(2) = 9
+        self.assertEqual(len(sheets), 9)
         for key in news_keys:
             self.assertIn(key, sheets)
 

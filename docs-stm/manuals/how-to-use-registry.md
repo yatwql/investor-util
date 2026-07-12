@@ -60,6 +60,7 @@ class DataModuleDef:
 | **补充数据（refresh）** | 盈利预测、资金流向、分红 | `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
 | **基金深度分析（refresh）** | 基金经理、持仓重合度 | `fund_manager`, `fund_overlap` | 24h~7d | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
+| **历史走势类（无分组）** | 历史股票日线、历史基金净值 | `history_stock`, `history_fund_otc` | 1w~1M | 无分组保护，不被菜单缓存命令误删，通过 `portfolio_history.py` 内部路由自动管理 |
 | **精确键名（含 refresh）** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | `benchmark` 归入 `refresh` 组，`tracking`/`calendar` 无分组 |
 
 ---
@@ -132,7 +133,7 @@ from src.python.registry import (
 **用途：**
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
-- `get_report_section_keys()` → 全部 16 个模块键名
+- `get_report_section_keys()` → 全部 18 个模块键名
 - `set_sheet_title(ws, "summary")` → 设置 worksheet 标题为 "投资分析汇总"
 
 ### 报表页签名称查找
@@ -146,7 +147,7 @@ from src.python.registry import (
 **用途：**
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_sheet_name("penetration")` → `"资产穿透TOP10"`
-- 可选键名：`summary`, `market_value`, `category`, `penetration`, `fund_performance`, `early_warning`, `fund_manager`, `fund_overlap`, `fund_concentration`, `fund_style`
+- 可选键名：`summary`, `market_value`, `category`, `penetration`, `fund_performance`, `early_warning`, `fund_manager`, `fund_overlap`, `fund_concentration`, `fund_style`, `portfolio_history`, `drawdown_analysis`
 
 | 键名 | 中文标题 | 默认 Excel 序号 |
 |------|---------|:--------------:|
@@ -161,11 +162,13 @@ from src.python.registry import (
 | `fund_style` | 基金风格分析 | 9. |
 | — | 财经新闻热点与持仓关联分析（通过 `get_llm_module_name("news_correlation")` 获取标题） | 10. |
 | `early_warning` | 智能预警 | 11. |
-| — | 全球政经局势 | 12. |
-| — | 智囊团深度复盘 | 13. |
-| — | 持仓体检报告 | 14. |
-| — | 穿透深度分析 | 15. |
-| — | LLM API 用量 | 16.（注） |
+| — | 全球政经局势（通过 `get_llm_module_name("global_macro")` 获取标题） | 12. |
+| — | 智囊团深度复盘（通过 `get_llm_module_name("expert_review")` 获取标题） | 13. |
+| — | 持仓体检报告（通过 `get_llm_module_name("health_check")` 获取标题） | 14. |
+| — | 穿透深度分析（通过 `get_llm_module_name("penetration_deep")` 获取标题） | 15. |
+| `portfolio_history` | 组合历史走势 | 16. |
+| `drawdown_analysis` | 回撤分析 | 17. |
+| — | LLM API 用量（通过 `get_report_sheet_name("llm_usage")` 获取标题） | 18.（注） |
 
 第 12 至 15 号位置为 LLM 分析模块页签区，共 4 个页签，按注册表 `_REPORT_SECTION_DEFAULT` 顺序排列：
 
@@ -176,7 +179,9 @@ from src.python.registry import (
 | 持仓体检报告 | `health_check` | 14. |
 | 穿透深度分析 | `penetration_deep` | 15. |
 
-> LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 10 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 12~15 号），在新闻数据就绪时写入。第 16 号的 LLM API 用量页签为程序生成，不依赖 registry。
+第 16~17 号为 F 迭代模块（组合历史走势 / 回撤分析），始终显示，数据不可用时显示占位文本。第 18 号为 LLM API 用量页签，程序自动生成，仅菜单 L 时显示。
+
+> LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 10 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 12~15 号），在新闻数据就绪时写入。第 18 号的 LLM API 用量页签为程序生成，不依赖 registry。
 >
 > 上表序号为**默认值**，用户可通过 `config.json` 的 `report_section_order` 字段自定义各模块序号和排列顺序。配置式序号后 `_create_sheets()` 按配置顺序创建页签，Excel 物理排序与显示顺序一致。
 

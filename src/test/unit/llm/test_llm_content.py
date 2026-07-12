@@ -220,8 +220,8 @@ class TestGetModuleKeyMap(unittest.TestCase):
         self.assertIn("global_macro", result.values())
         self.assertNotIn("news_correlation", result.values())
         self.assertNotIn("llm_usage", result.values())
-        # 默认 16 个模块排除 2 个 = 14 个
-        self.assertEqual(len(result), 14)
+        # 默认 18 个模块排除 2 个 = 16 个
+        self.assertEqual(len(result), 16)
 
     def test_empty_list_falls_back_to_default(self):
         """空列表（falsy）→ 回退到默认全局顺序。"""
