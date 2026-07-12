@@ -165,7 +165,7 @@ Endpoint       https://api.anthropic.com/v1/messages
 
 ### 汇总页补充信息
 
-汇总页签（页签 1）不再追加 LLM 用量区块。LLM API 用量信息统一在独立页签 `16.LLM API 用量` 展示（仅菜单 L 时显示）。
+汇总页签（页签 1）不包含 LLM 用量区块。LLM API 用量信息统一在独立页签 `16.LLM API 用量` 展示（仅菜单 L 时显示）。
 
 ## HTML 报告
 

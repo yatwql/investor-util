@@ -204,7 +204,7 @@ A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式�
 }
 ```
 
-空对象 `{}` 或缺失此字段时使用 16 项默认顺序，行为与旧版本一致。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
+空对象 `{}` 或缺失此字段时使用 16 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
 **Q: 如何开启财经新闻热点与持仓关联分析 LLM 关联分析？**
 
