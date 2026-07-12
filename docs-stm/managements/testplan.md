@@ -329,7 +329,7 @@
 | **P1** | Provider 链路手动联通性 | providers / fetcher 变更 | 腾讯/东方财富/天天基金 API 实际可调通 |
 | **P2** | 断网环境下运行（自动降级） | 网络/超时/重试相关变更 | 所有缓存的场景降级正确 |
 | **P2** | 清理缓存后全新运行 | provider / fetcher / cache 变更 | 无缓存路径完整可走通 |
-| **P2** | 旧缓存格式兼容性验证 | cache.py / models.py 变更 | 用 v0.2.48 格式缓存测试新版读取 |
+| **P2** | 旧缓存格式兼容性验证 | cache.py / models.py 变更 | 用旧格式缓存测试当前版本读取 |
 | **P2** | 跨缓存池污染验证 | 缓存 Key/TTL 策略变更 | price TTL 变化不污染 rank/hold TTL |
 | **P3** | 非 UTC+8 时区运行 | 日期/时间/时区相关变更 | `datetime.now(timezone(hours=8))` 一致 |
 | **P3** | 长假期前后跨日运行 | TTL / market_hours 变更 | 长假后首个交易日恢复正常 |
