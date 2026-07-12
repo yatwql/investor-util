@@ -290,14 +290,14 @@ DataModuleDef("我的固定键", "fixed",
 
 ## 无需手动维护的派生产出
 
-以下映射原分散在多个文件中硬编码维护，现已统一由 registry 自动派生，**新增模块时只需在 `_MODULE_REGISTRY` 中添加一行 `DataModuleDef`，无需再手动维护以下任一位置**：
+以下映射由 registry 自动派生，**新增模块时只需在 `_MODULE_REGISTRY` 中添加一行 `DataModuleDef`，即可自动同步到以下所有位置**：
 
-- 缓存 TTL 默认值（原 `constants.CACHE_TTL_DEFAULTS`）→ `get_cache_ttl_defaults()`
-- 缓存前缀/精确键名映射（原 `cache.prefix_type_map` / `exact_map`）→ `get_prefix_type_map()` / `get_exact_type_map()`
-- LLM settings 键名（原 `config._KNOWN_LLM_SETTINGS_KEYS`）→ `get_known_llm_settings_keys()`
-- LLM 模块名称（原 `generators._label_map`、`tui_menu._MODULE_DISPLAY`）→ `get_llm_module_names()`
-- 报表页签标题（原 6 处 `ws.title` + `write_title_row`）→ `set_sheet_title(ws, key)` → `get_report_sheet_name()`
-- Excel 生成器标签（原 12 处 `_Timer`/`_call_sheet` 硬编码）→ `get_report_sheet_name()` / `get_report_section_order()`
+- 缓存 TTL 默认值 → `get_cache_ttl_defaults()`
+- 缓存前缀/精确键名映射 → `get_prefix_type_map()` / `get_exact_type_map()`
+- LLM settings 键名 → `get_known_llm_settings_keys()`
+- LLM 模块名称 → `get_llm_module_names()`
+- 报表页签标题 → `set_sheet_title(ws, key)` → `get_report_sheet_name()`
+- Excel 生成器标签 → `get_report_sheet_name()` / `get_report_section_order()`
 
 ---
 

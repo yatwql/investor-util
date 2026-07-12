@@ -15,7 +15,7 @@
                           │                     │
                     ┌──────▼───────┐      ┌─────▼──────┐
                     │   缓存层      │      │  配置管理层   │
-                    │ (cache.py)   │      │ (config/)   │
+                    │ (cache/)     │      │ (config/)   │
                     └──────────────┘      └────────────┘
                           │                     │
                           └──────────┬──────────┘
@@ -166,7 +166,7 @@ investor-util/
 
 ### 原子写入
 
-`cache.py` 和 `config/` 子包共享 `tempfile.mkstemp` + `os.replace` 模式：
+`cache/` 和 `config/` 子包共享 `tempfile.mkstemp` + `os.replace` 模式：
 - 先通过 `tempfile.mkstemp` 写临时文件，成功后 `os.replace` 原子替换原文件
 - 防止断电/崩溃导致文件截断（半写文件）
 - 缓存文件 PermissionError 时自动降级到直接写入（Windows 兼容）
@@ -174,7 +174,7 @@ investor-util/
 
 ### 文件损坏恢复
 
-- `_read_cache()` 解析失败时自动 `os.remove` 损坏文件
+- `_read_cache_data()` 解析失败时自动 `os.remove` 损坏文件
 - 记录 WARNING 日志，下次调用时重新拉取
 
 ### 并发安全
@@ -196,7 +196,7 @@ investor-util/
 
 - `set()` 中数据 ≥ 100KB 时自动使用 `.json.gz` 压缩
 - 节省约 80-90% 磁盘空间（`profit_forecast` 等全量数据受益最大）
-- 读取时透明解压（`_read_cache()` 根据后缀自动判断）
+- 读取时透明解压（`_read_cache_data()` 根据后缀自动判断）
 
 ### 缓存分组机制
 
@@ -845,9 +845,9 @@ LLM API 用量页签/章节（页签 16 / HTML 底部）**不是独立的 LLM �
 
 #### 系统数据缓存统计
 
-LLM 用量页签/章节底部追加"▎数据缓存系统"区域，展示 `cache.py` 统一管理的进程级缓存命中/未命中/总请求数/命中率。统计范围包括价格、指数、基金净值、基金持仓、基金经理等所有缓存类型。
+LLM 用量页签/章节底部追加"▎数据缓存系统"区域，展示 `cache/` 子包统一管理的进程级缓存命中/未命中/总请求数/命中率。统计范围包括价格、指数、基金净值、基金持仓、基金经理等所有缓存类型。
 
-数据来源：`cache.py.get_cache_hit_rate()`，报告生成时快照采样。仅在会话中有缓存请求记录（`total > 0`）时渲染。
+数据来源：`get_cache_hit_rate()`，报告生成时快照采样。仅在会话中有缓存请求记录（`total > 0`）时渲染。
 
 | 渠道 | 展示位置 | 实现 |
 |:-----|:---------|:-----|
@@ -911,7 +911,7 @@ llm_key.json (敏感密钥)    ──→ 覆盖 llm_settings.json 的同名字�
 **时区安全**：所有 `datetime.now()` 调用均使用 `timezone(timedelta(hours=8))` 北京时区，防止 UTC 服务器上时段判断全错。
 
 **消费方**：
-- `cache.py:get_ttl()` → 交易时段内 `market_hour_aware` 类型自动使用 `market_hour_ttl`（默认 30s）
+- `cache/` 子包 `get_ttl()` → 交易时段内 `market_hour_aware` 类型自动使用 `market_hour_ttl`（默认 30s）
 - `report/market_value.py:is_market_open()` → 取价方式标签判断（委派 market_hours 实现）
 - `report/market_value.py:is_midday_break()` → 午间休市识别
 
@@ -927,7 +927,7 @@ reader.py (持仓解析)
   → fetcher/fund.py (基金数据获取)
   → fetcher/industry.py (行业分类)
   → providers/* (各数据源 API 实现)
-  → cache.py (缓存读写)
+  → cache/ (缓存读写)
     → market_hours.py (交易时段感知 TTL)
     → registry.py (TTL 默认值、缓存分组)
 
@@ -958,7 +958,7 @@ llm/generators_orchestrator.py (LLM 编排)
     → llm/fingerprint.py (缓存指纹)
     → llm/markdown.py (Markdown→HTML)
     → llm/pricing.py, session.py (定价+用量)
-  → cache.py (LLM 结果缓存)
+  → cache/ (LLM 结果缓存)
 
 config/ → registry.py (注册表驱动的 TTL/分组/键名)
 handlers_*.py → 各模块入口函数编排
@@ -973,7 +973,7 @@ handlers_*.py → 各模块入口函数编排
 | # | 约束 | 说明 | 违反后果 | 参考来源 |
 |:---|:-----|:------|:---------|:---------|
 | C1 | **代码类型判定中心化** | 任何模块不得自行实现资产类型判定（`code.startswith()`、`"QDII" in name.upper()` 等），必须调用 `code_utils` 提供的原语组合 | 代码评审不通过 | [代码类型判定中心化](#代码类型判定中心化) |
-| C2 | **缓存统一管理** | 所有持久化缓存必须通过 `cache.py` 的 `get()`/`set()` 读写，不得直接操作 `data/cache/` 文件系统 | 缓存不一致、TTL 失效 | [缓存设计](#缓存设计) |
+| C2 | **缓存统一管理** | 所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 读写，不得直接操作 `data/cache/` 文件系统 | 缓存不一致、TTL 失效 | [缓存设计](#缓存设计) |
 | C3 | **缓存原子写入** | 缓存和配置文件写入必须使用 `tempfile.mkstemp` + `os.replace` 模式，禁止直接覆写文件 | 断电/崩溃后半写文件损坏 | [原子写入](#原子写入) |
 | C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用 `DataSourceRegistry.session_cache` 缓存结果，避免重复 HTTP 调用（参考 `provider_registry.py`） | 性能退化、API 限频 | 数据降级重构 |
 | C5 | **HTTP 客户端统一** | 所有 HTTP 请求必须使用 `http_client.py` 的 `make_http_client()` / `make_async_http_client()` 工厂方法，不得直接实例化 `httpx.Client()` / `httpx.AsyncClient()` | SSL 配置不一致、连接池泄漏 | `http_client.py` |
