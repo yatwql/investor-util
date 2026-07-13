@@ -133,6 +133,8 @@ class PortfolioHistoryCalculator:
         total_holdings = len(holdings)
         success_count = 0
         warnings: list[str] = []
+        failed_holdings: list[str] = []
+        successful_holdings: list[str] = []
 
         _max_workers = min(8, total_holdings) if total_holdings > 1 else 1
         with ThreadPoolExecutor(max_workers=_max_workers) as _pool:
@@ -150,6 +152,9 @@ class PortfolioHistoryCalculator:
                 if series:
                     all_series.append(series)
                     success_count += 1
+                    successful_holdings.append(f"{_name}({_code})")
+                else:
+                    failed_holdings.append(f"{_name}({_code})")
 
         if not all_series:
             return {
@@ -161,6 +166,8 @@ class PortfolioHistoryCalculator:
                 "total_return_pct": 0,
                 "status": "unavailable",
                 "warnings": ["所有持仓均无法获取历史走势数据"],
+                "failed_holdings": failed_holdings,
+                "successful_holdings": [],
             }
 
         status = "ok"
@@ -194,7 +201,7 @@ class PortfolioHistoryCalculator:
             tv = date_map[date]
             if tv > peak:
                 peak = tv
-                current_dd_start = ""
+                current_dd_start = date  # 新高日=潜在回撤起算日
             drawdown = peak - tv
             drawdown_pct = drawdown / peak * 100 if peak > 0 else 0
 
@@ -202,7 +209,10 @@ class PortfolioHistoryCalculator:
                 max_drawdown_val = drawdown
                 max_drawdown_pct = drawdown_pct
                 drawdown_end = date
-                drawdown_start = current_dd_start or date
+                if current_dd_start:
+                    drawdown_start = current_dd_start  # 峰值日
+                else:
+                    drawdown_start = date
 
             bars.append({
                 "date": date,
@@ -239,8 +249,12 @@ class PortfolioHistoryCalculator:
             "annualized_volatility": round(annualized_vol, 4),
             "total_return": round(total_return, 2),
             "total_return_pct": round(total_return_pct, 2),
+            "data_start": sorted_dates[0],
+            "data_end": sorted_dates[-1],
             "status": status,
             "warnings": warnings,
+            "failed_holdings": failed_holdings,
+            "successful_holdings": successful_holdings,
         }
 
     # ── 内部路由 ──────────────────────────────────────────

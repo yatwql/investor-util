@@ -1504,7 +1504,10 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
                 <div class="summary-card">
                     <h3>累计收益</h3>
                     <div class="value" style="color: {{ history_data.total_return_pct | profit_color }};">{{ history_data.total_return_pct | change }}</div>
-                    <div class="meta">{{ history_data.total_return | money }}</div>
+                    <div class="meta">
+                        {{ history_data.total_return | money }} ·
+                        {% if history_data.data_start %} {{ history_data.data_start }} ~ {{ history_data.data_end }} {% else %}全周期{% endif %}
+                    </div>
                 </div>
                 <div class="summary-card">
                     <h3>最大回撤</h3>
@@ -1521,9 +1524,26 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
             </div>
             {% if history_data.warnings %}
             <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">数据加载状态</div>
                 {% for w in history_data.warnings %}
                 <div class="data-status-info">ℹ {{ w }}</div>
                 {% endfor %}
+                {% if history_data.failed_holdings %}
+                <div style="margin-top:8px;font-size:13px;">
+                    <div style="font-weight:600;color:#666;margin-bottom:4px;">⬇ 以下持仓无历史走势数据（不含/不支持/获取失败）：</div>
+                    {% for h in history_data.failed_holdings %}
+                    <div class="data-status-warn" style="border-left-color:#95a5a6;">✗ {{ h }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if history_data.successful_holdings %}
+                <div style="margin-top:8px;font-size:13px;">
+                    <div style="font-weight:600;color:#666;margin-bottom:4px;">⬆ 以下持仓已纳入走势计算：</div>
+                    {% for h in history_data.successful_holdings %}
+                    <div class="data-status-ok">✓ {{ h }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
             {% endif %}
         </div>
@@ -1692,6 +1712,20 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
             setTimeout(function(){ clearInterval(_d_poll); }, 10000);
         })();
         </script>
+        {% if history_data.warnings %}
+        <div class="data-status" style="margin-top:12px;margin-left:20px;margin-right:20px;margin-bottom:4px;">
+            <div class="data-status-title">组合走势数据状态</div>
+            {% for w in history_data.warnings %}
+            <div class="data-status-info">ℹ {{ w }}</div>
+            {% endfor %}
+            {% if history_data.failed_holdings %}
+            <div style="margin-top:6px;font-size:12px;color:#888;">
+                无历史数据的持仓：
+                {% for h in history_data.failed_holdings %}{{ h }}{% if not loop.last %}、{% endif %}{% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
         {% else %}
         <div class="section-content">
             <div class="empty-note placeholder-note">
