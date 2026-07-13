@@ -66,31 +66,36 @@ class PortfolioHistoryCalculator:
         """
         code = holding_code.strip()
         name = (holding_name or "").strip()
+        _tag = f"  [{code} {name}]" if name else f"  [{code}]"
 
         # 路由：按代码类型确定数据源
         if is_a_share_code(code) or is_exchange_fund_code(code):
             bars = self._get_stock_history(code)
             # 降级：00 开头 A 股/OTC 基金重叠区，股票历史全空时尝试基金历史
             if not bars and code.startswith("00") and not is_exchange_fund_code(code):
-                _tag = f"  [{code} {name}]" if name else f"  [{code}]"
                 logger.info("[history]%s K 线链路全部失败（该代码可能为场外基金），降级尝试基金净值链路", _tag)
                 bars = self._get_fund_history(code)
                 if bars:
                     logger.info("[history]%s 降级成功——通过基金净值链路获取到历史数据", _tag)
                 else:
                     logger.warning("[history]%s 降级也失败——基金净值链路亦无数据", _tag)
+            elif not bars:
+                logger.warning("[history]%s K 线链路无数据", _tag)
         elif is_hk_stock_code(code):
-            logger.debug("[history] 港股通暂不支持历史走势: %s", code)
+            logger.info("[history]%s 港股通暂不支持历史走势，跳过", _tag)
             return None
         elif self._is_bond_fund(name):
+            logger.info("[history]%s 债券基金→基金净值链路", _tag)
             bars = self._get_fund_history(code)
         elif len(code) == 6 and code.isdigit():
+            logger.info("[history]%s OTC 基金→基金净值链路", _tag)
             bars = self._get_fund_history(code)
         else:
-            logger.debug("[history] 不支持的类型: %s (%s)", code, name)
+            logger.info("[history]%s 不支持的类型，跳过", _tag)
             return None
 
         if not bars:
+            logger.warning("[history]%s 基金净值链路也无数据", _tag)
             return None
 
         # 转换为 as-if 市值序列
