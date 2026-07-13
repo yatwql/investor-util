@@ -1408,12 +1408,14 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
                     <div class="value">{{ history_data.annualized_volatility | change }}</div>
                 </div>
             </div>
-            {% if history_data.warnings %}
+            {% if history_data.warnings or history_data.failed_holdings or history_data.successful_holdings %}
             <div class="data-status" style="margin-top:12px;">
+                {% if history_data.warnings %}
                 <div class="data-status-title">数据加载状态</div>
                 {% for w in history_data.warnings %}
                 <div class="data-status-info">ℹ {{ w }}</div>
                 {% endfor %}
+                {% endif %}
                 {% if history_data.failed_holdings %}
                 <div style="margin-top:8px;font-size:13px;">
                     <div style="font-weight:600;color:#666;margin-bottom:4px;">⬇ 以下持仓无历史走势数据（不含/不支持/获取失败）：</div>
@@ -1598,20 +1600,29 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
             setTimeout(function(){ clearInterval(_d_poll); }, 10000);
         })();
         </script>
-        {% if history_data.warnings %}
         <div class="data-status" style="margin-top:12px;margin-left:20px;margin-right:20px;margin-bottom:4px;">
-            <div class="data-status-title">组合走势数据状态</div>
-            {% for w in history_data.warnings %}
-            <div class="data-status-info">ℹ {{ w }}</div>
-            {% endfor %}
+            {% if history_data.successful_holdings or history_data.failed_holdings %}
+            <div class="data-status-title">持仓历史数据纳入状态</div>
+            {% if history_data.successful_holdings %}
+            <div style="margin-top:6px;font-size:13px;color:#2e7d32;">
+                <strong>✓</strong> 已纳入回撤计算（{{ history_data.successful_holdings | length }}）：
+                {% for h in history_data.successful_holdings %}{{ h }}{% if not loop.last %}、{% endif %}{% endfor %}
+            </div>
+            {% endif %}
             {% if history_data.failed_holdings %}
-            <div style="margin-top:6px;font-size:12px;color:#888;">
-                无历史数据的持仓：
+            <div style="margin-top:6px;font-size:13px;color:#888;">
+                <strong>✗</strong> 无历史走势数据（{{ history_data.failed_holdings | length }}）：
                 {% for h in history_data.failed_holdings %}{{ h }}{% if not loop.last %}、{% endif %}{% endfor %}
             </div>
             {% endif %}
+            {% endif %}
+            {% if history_data.warnings %}
+            <div class="data-status-title" style="margin-top:8px;">数据质量</div>
+            {% for w in history_data.warnings %}
+            <div class="data-status-info">ℹ {{ w }}</div>
+            {% endfor %}
+            {% endif %}
         </div>
-        {% endif %}
         {% else %}
         <div class="section-content">
             <div class="empty-note placeholder-note">
