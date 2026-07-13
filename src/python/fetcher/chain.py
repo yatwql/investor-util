@@ -261,6 +261,9 @@ def _fetch_with_incremental_fallback(
         logger.info("[%s] 尝试 %s（code=%s, days=%d）", chain_name, provider_name, code, days)
         try:
             new_data = _call_history_provider(provider_name, chain_name, code, days, last_cached_date)
+            if not new_data:
+                logger.info("[%s] %s 返回空数据（无此品种历史数据），尝试下一链路", chain_name, provider_name)
+                continue
             registry.record_success(provider_name)
             break
         except Exception:

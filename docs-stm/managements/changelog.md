@@ -11,6 +11,7 @@
 ### Fixed
 
 - **registry.py**：修复 `history_stock`/`history_fund_otc` 误归入 preload cache_group，导致菜单 [2] 清除历史走势缓存但不重拉的问题。现改为无分组保护，仅按 TTL 过期清理。
+- **chain.py**：修复 `_fetch_with_incremental_fallback()` 中 tiantian 返回空列表 `[]` 时直接 `break` 不到 fallback provider 的问题。现增加 `if not new_data: continue` 空数据检测，使 eastmoney 备用链路在 QDII/债券等基金上能被正确调用。
 
 ### Docs
 
