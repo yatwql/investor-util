@@ -9,6 +9,10 @@
 ### Fixed
 
 - **HTML 章节 18（LLM API 用量）出现在 16/17 之前（HIGH）**：模板源顺序中 llm_usage 的 HTML 代码位于 portfolio_history 和 drawdown_analysis 之前。CSS `order` 在 `overflow-x: auto` + 条件渲染组合下浏览器渲染引擎不总是按 `order` 重排。修复为将 llm_usage 的 HTML 块物理移动到 drawdown_analysis 之后、footer 之前，源顺序与 CSS order 一致。
+- **penetration.py 穿透分类中 00 代码误判为 STOCK（LOW）**：`classify_penetration()` 对 00 前缀 OTC 基金（证券账户中的混合基/货币基）从 `is_a_share_code` 路径改为 `is_otc_fund_by_name()` 优先判定，避免被误归类为直接持股。
+- **excel_b_series.py 三模块重复获取基金持仓（LOW）**：引入 `_fetch_fund_holdings_cached()` 复用 `registry.session_cache_get/set("fund_hold", code)`，消除持仓重合度/集中度/风格分析三模块各自独立调用 `fetch_fund_holdings` 的冗余。
+- **portfolio_history.py 无独立单元测试**：创建 `test_portfolio_history.py`，覆盖代码类型路由、00 代码降级、session_cache、as-if 市值、波动率计算、数据质量校验、债券名称识别共 28 项测试。
+- **test_fetcher_price.py 缺 00 代码降级测试**：新增 3 项测试（降级成功、双链路全失败、股票链路成功不降级），覆盖 price.py 的 00 代码 `price_fund_otc` 降级路径。
 
 ### Added
 

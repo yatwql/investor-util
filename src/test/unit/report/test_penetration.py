@@ -170,6 +170,18 @@ class TestClassifyPenetration(unittest.TestCase):
         h = self._h("某债券ETF", "511880")
         self.assertEqual(pene.classify_penetration(h), pene.BOND_FUND)
 
+    # ── 00 代码 OTC 基金（非场外账户→不应误判为STOCK）────
+
+    def test_otc_fund_00_code_in_securities_account(self):
+        """00 代码混合基金在证券账户 → ACTIVE_EQUITY（非 STOCK）。"""
+        h = self._h("广发多因子混合", "002943", "证券账户")
+        self.assertEqual(pene.classify_penetration(h), pene.ACTIVE_EQUITY)
+
+    def test_otc_fund_00_code_money_market(self):
+        """00 代码货币基金在证券账户 → ACTIVE_EQUITY（非 STOCK）。"""
+        h = self._h("易方达增利货币A", "009123", "证券账户")
+        self.assertEqual(pene.classify_penetration(h), pene.ACTIVE_EQUITY)
+
 
 # ═══════════════════════════════════════════════════════════
 #  辅助函数测试

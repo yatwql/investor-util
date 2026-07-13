@@ -168,3 +168,60 @@ class TestFetchMarketData(unittest.TestCase):
         # _fetch_with_fallback 被调用，validate 从 fn_kwargs 读取
         args, kwargs = mock_fallback.call_args
         self.assertIn("validate", kwargs)
+
+    # ── 00 代码降级 ──────────────────────────────────────
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.fetcher.price._fetch_with_fallback")
+    def test_00_code_degrade_to_eastmoney(
+        self, mock_fallback, mock_fresh,
+    ):
+        """00 代码股票链路全失败 → 降级场外基金净值链路。"""
+        mock_fallback.side_effect = [
+            None,  # 第 1 次：stock 链路返回 None
+            {      # 第 2 次：降级到 fund_otc（eastmoney 转换后格式）
+                "name": "广发多因子",
+                "code": "002943",
+                "price": 1.2345,
+                "yesterday_close": 1.2000,
+                "price_date": "2026-07-13",
+                "source_api": "eastmoney",
+                "source": "东方财富",
+            },
+        ]
+        from src.python.fetcher.price import fetch_market_data
+        result = fetch_market_data("002943", "广发多因子")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["source_api"], "eastmoney")
+        self.assertEqual(result["price"], 1.2345)
+        self.assertEqual(mock_fallback.call_count, 2)
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.fetcher.price._fetch_with_fallback")
+    def test_00_code_degrade_all_fail(
+        self, mock_fallback, mock_fresh,
+    ):
+        """00 代码股票链路 + 降级链路均失败 → None。"""
+        mock_fallback.side_effect = [None, None]
+        from src.python.fetcher.price import fetch_market_data
+        result = fetch_market_data("002943", "广发多因子")
+        self.assertIsNone(result)
+        self.assertEqual(mock_fallback.call_count, 2)
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.fetcher.price._fetch_with_fallback")
+    def test_00_code_stock_success_no_degrade(
+        self, mock_fallback, mock_fresh,
+    ):
+        """00 代码但股票链路成功 → 不回退降级。"""
+        mock_fallback.return_value = {
+            "name": "平安银行",
+            "code": "000001",
+            "price": 12.50,
+            "source_api": "tencent",
+        }
+        from src.python.fetcher.price import fetch_market_data
+        result = fetch_market_data("000001", "平安银行")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["source_api"], "tencent")
+        self.assertEqual(mock_fallback.call_count, 1)

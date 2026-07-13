@@ -30,6 +30,7 @@ from src.python.code_utils import (
     is_etf_by_name,
     is_index_link_by_name,
     is_offsite_fund,
+    is_otc_fund_by_name,
     is_qdii_extended,
 )
 from src.python.fetcher.fund import fetch_fund_holdings
@@ -109,11 +110,15 @@ def classify_penetration(h: Holding) -> str:
     if is_offsite_fund(account):
         return ACTIVE_EQUITY
 
-    # 6) A 股股票
+    # 6) 00 代码场外基金（名称匹配基金特征，与 A 股 00 前缀重叠区）
+    if is_otc_fund_by_name(name, code):
+        return ACTIVE_EQUITY
+
+    # 7) A 股股票
     if is_a_share_code(code):
         return STOCK
 
-    # 7) 其余忽略
+    # 8) 其余忽略
     return IGNORE
 
 
