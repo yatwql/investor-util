@@ -197,12 +197,21 @@ def _classify_stock(
 def _push2_extended(code: str) -> dict[str, Any] | None:
     """从东方财富 push2 API 获取市值+PE 扩展数据。
 
+    结果以全天 TTL 写入文件缓存，同一股票同日内跨进程不重复请求。
+
     Args:
         code: 6 位 A 股代码
 
     Returns:
         {"market_cap": float, "pe": float, "pb": float} 或 None
     """
+    from src.python.cache import get as _cache_get, set as _cache_set
+    from src.python.constants import CACHE_DAILY
+    _key = f"extended_{code}"
+    _cached = _cache_get(_key, CACHE_DAILY)
+    if _cached is not None:
+        return _cached
+
     try:
         from src.python.providers.eastmoney_industry import _make_push2_request
         inner = _make_push2_request(code)
@@ -224,6 +233,8 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
             with contextlib.suppress(ValueError, TypeError):
                 result["pb"] = float(pb)
 
+        if result:
+            _cache_set(_key, result)
         return result if result else None
     except Exception:
         logger.warning("push2 扩展数据获取失败 [%s]", code, exc_info=True)
@@ -233,12 +244,21 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
 def _tencent_extended(code: str) -> dict[str, Any] | None:
     """从腾讯财经 API 获取市值+PE 扩展数据（二级降级）。
 
+    结果以全天 TTL 写入文件缓存，同一股票同日内跨进程不重复请求。
+
     Args:
         code: 6 位 A 股代码
 
     Returns:
         {"market_cap": float, "pe": float} 或 None
     """
+    from src.python.cache import get as _cache_get, set as _cache_set
+    from src.python.constants import CACHE_DAILY
+    _key = f"extended_{code}"
+    _cached = _cache_get(_key, CACHE_DAILY)
+    if _cached is not None:
+        return _cached
+
     from src.python.provider_registry import get_registry
     reg = get_registry()
     try:
@@ -259,6 +279,7 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
 
         if result:
             reg.record_success("tencent_style")
+            _cache_set(_key, result)
             return result
         return None
     except Exception:
