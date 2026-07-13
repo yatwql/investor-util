@@ -53,9 +53,11 @@
   // ── E. 业绩基准 ──
   "user_fund_benchmarks": {},
 
-  // ── F. 组合历史走势 ──
+  // ── F. 组合历史走势 & 持仓快照 ──
   "history": {
-    "analysis": "off"
+    "analysis": "off",
+    "snapshot_retention_days": 60,
+    "snapshot_max_count": 365
   }
 }
 ```
@@ -84,6 +86,8 @@
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `history.analysis` | `"off"` | 组合历史走势获取模式：`"off"`=关闭（默认）、`"prompt"`=报告后询问、`"auto"`=自动获取 | 手动编辑 |
+| `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
+| `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 
 ---
 ### B. 数据源与提供商
@@ -354,7 +358,7 @@
 > 内置基准库实时自动补充，`user_fund_benchmarks` 仅在置信度不足时作为兜底。空对象 `{}` 表示不添加自定义覆盖。
 
 ---
-### F. 组合历史走势
+### F. 组合历史走势（F2）
 
 ## history.analysis 历史走势获取模式
 
@@ -366,7 +370,28 @@
 | `"prompt"` | 报告生成后询问用户是否需要获取历史走势数据（耗时约 15s） |
 | `"auto"` | 自动获取，不询问用户 |
 
-快照对比（F1）不受此配置影响，始终自动执行。
+F1 持仓快照（见 §G）与此配置无关，始终自动执行。
+
+---
+### G. 持仓快照（F1）
+
+快照对比（F1）不受 `history.analysis` 配置影响，在 B/L 菜单生成报告时**始终自动执行**。每次生成报告时自动保存持仓快照到 `data/history/snapshots/`，供下次环比对比。
+
+> **F1 快照自动清理**：保存新快照后自动清理旧文件。清理规则由 `history` 块中的以下字段控制：
+
+| 字段 | 默认值 | 说明 |
+|:-----|:------:|:-----|
+| `snapshot_retention_days` | `60` | 超过此天数的快照自动删除（时间优先） |
+| `snapshot_max_count` | `365` | 安全上限，超过此数量删除最旧的（数量兜底） |
+
+可在 `config.json` 中设置：
+```json
+"history": {
+    "analysis": "off",
+    "snapshot_retention_days": 60,
+    "snapshot_max_count": 365
+}
+```
 
 ---
 ## 缓存分组

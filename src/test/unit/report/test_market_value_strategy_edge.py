@@ -77,16 +77,16 @@ class TestStrategyMarketClosed:
         assert details[0].source_api == "tencent"
 
     @patch("src.python.report.market_value.is_market_open", return_value=False)
-    @patch("src.python.report.market_value.fetch_market_data")
+    @patch("src.python.report.market_value.fetch_market_data", return_value=None)
     def test_cache_only_fallback_to_file_cache(self, mock_fetch, mock_open):
-        """非交易时段，session cache 未命中时回退到 file cache。"""
+        """非交易时段，session cache 未命中时回退到 file cache → 仍无数据。"""
         _setup_registry()
 
         h = Holding("证券账户", "电池ETF", "561910", 1000.0, 1.0)
-        # session cache 为空，file cache 也会 miss → 返回 None
+        # session cache 为空 → 回退 LIVE_FETCH → fetch 返回 None → 标注"无数据"
         details = mv._generate_details([h], "2026-06-26")
 
-        mock_fetch.assert_not_called()
+        mock_fetch.assert_called_once_with("561910", "电池ETF")
         assert len(details) == 1
         # 无缓存数据 → price=0, source="无数据"
         assert details[0].price == 0.0

@@ -90,11 +90,13 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     """自动将 config.json 和缓存目录重定向到临时目录。
 
     防止测试运行意外修改用户的真实配置文件（data/config/config.json）、
-    LLM 密钥文件（data/config/llm_key.json）、缓存文件（data/cache/）等。
+    LLM 密钥文件（data/config/llm_key.json）、缓存文件（data/cache/）、
+    持仓快照（data/history/snapshots/）等。
 
     机制：
     - 替换 _defaults._CONFIG_FILE → tmp_path/data/config/config.json
     - 替换 cache._CACHE_DIR → tmp_path/data/cache
+    - 替换 HISTORY_SNAPSHOT_DIR → tmp_path/data/history/snapshots
     - 清除 config 内存缓存，使 get_config() 从临时路径读取
     （无文件时自动回退到 _DEFAULT_CONFIG 默认值）
 
@@ -125,6 +127,15 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "src.python.cache._CACHE_DIR",
         str(tmp_path / "data/cache"),
+    )
+    # data/history/ 快照目录隔离
+    monkeypatch.setattr(
+        "src.python.constants.HISTORY_SNAPSHOT_DIR",
+        str(tmp_path / "data/history/snapshots"),
+    )
+    monkeypatch.setattr(
+        "src.python.report.history_snapshot.HISTORY_SNAPSHOT_DIR",
+        str(tmp_path / "data/history/snapshots"),
     )
     # 清空配置缓存，使下次 get_config() 使用新路径
     import src.python.config._core as _cfg_core

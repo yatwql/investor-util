@@ -159,6 +159,12 @@ def _cmd_generate_both() -> None:
             _old = load_latest()
             _diff = HistoryDiff.compute(_snapshot, _old)
             save(_snapshot)
+            from src.python.report.history_snapshot import prune as _prune_snapshots
+            _history_cfg = config.get("history", {})
+            _prune_snapshots(
+                retention_days=_history_cfg.get("snapshot_retention_days", 60),
+                max_count=_history_cfg.get("snapshot_max_count", 365),
+            )
             if not _diff.is_first_check:
                 f_context = {
                     "diff": {
@@ -465,6 +471,12 @@ def _cmd_generate_full() -> None:
             _diff = HistoryDiff.compute(_snapshot, _old)
             # 保存本次快照（供下次对比）
             save(_snapshot)
+            from src.python.report.history_snapshot import prune as _prune_snapshots
+            _history_cfg = (get_config_cache() or {}).get("history", {})
+            _prune_snapshots(
+                retention_days=_history_cfg.get("snapshot_retention_days", 60),
+                max_count=_history_cfg.get("snapshot_max_count", 365),
+            )
             # 构建 f_context（差异未裁剪时直接传递）
             if not _diff.is_first_check:
                 f_context = {

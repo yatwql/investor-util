@@ -51,6 +51,12 @@ _DEFAULT_CONFIG = {
     },
     # ── E. 业绩基准 ──
     "user_fund_benchmarks": {},
+    # ── F. 持仓快照 ──
+    "history": {
+        "analysis": "off",
+        "snapshot_retention_days": 60,
+        "snapshot_max_count": 365,
+    },
 }
 
 
@@ -113,6 +119,13 @@ def _get_default_config_template() -> str:
         '  },\n'
         '\n'
         '  // ── E. 业绩基准 ──\n'
-        '  "user_fund_benchmarks": {}\n'
+        '  "user_fund_benchmarks": {},\n'
+        '\n'
+        '  // ── F. 持仓快照 ──\n'
+        '  "history": {\n'
+        '    "analysis": "off",\n'
+        '    "snapshot_retention_days": 60,\n'
+        '    "snapshot_max_count": 365\n'
+        '  }\n'
         '}\n'
     )

@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-13（v0.4.1 + 00代码降级/日志着色）
+最后更新：2026-07-13（v0.4.1 + 00代码降级/日志着色 + 快照清理）
 
 ---
 
@@ -153,6 +153,27 @@ investor-util/
 >
 > 新闻数据的编排/处理层由 `news_aggregator.py`（多源聚合去重）、`news_correlator.py`（持仓关联分析）、`news_keywords.py`（关键词提取）、`news_sources.py`（源元数据定义）4 个模块组成，位于 `providers/` 下，与上述 Provider 分离。
 
+### 行业/概念数据流
+
+```
+持仓列表 + 穿透资产
+    ↓ 提取所有唯一代码
+batch_fetch_industry_data(codes)
+    ↓ API / 缓存
+industry_{code}.json
+    ↓
+build_news_data():
+  1. 行业名/概念名 → 追加到关键词列表 → 提高新闻匹配率
+  2. industry_data → _build_keyword_lookup() → "concept" 类型条目
+  3. _enrich_keywords_for_item() → 显示 "XX[概念]"
+    ↓
+穿透模块:
+  4. batch_fetch_industry_data() → 覆盖 sector 字段 → 板块列显示 API 数据
+
+penetration_sector = fetch_industry_data(code).industry  // API优先
+                  or classify_sector(name, code)         // 关键词回退
+```
+
 [↑ 回到顶部](#技术架构总览)
 
 ---
@@ -163,7 +184,7 @@ investor-util/
 
 缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。完整 TTL 表（23 种类型，含基金深度分析 4 模块 + 历史走势 2 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
 
-#### 行业/概念缓存
+### 行业/概念缓存
 
 | 文件名 | 用途 | 默认 TTL | 清除方式 |
 |--------|------|---------|---------|
@@ -258,27 +279,6 @@ filename = f"{prefix}_{digest}.json"   # 例：profit_forecast_a1b2c3d4e5f6.json
 - LLM 二次关联分析（可选）：`enabled_llm.news_correlation` 配置开启
 - **召回策略**：每个新闻源原始获取量 `per_source = max(500, news_top_count × 2)`，保证去重后候选充足；最终截取 `news_top_count` 条按关联度排序输出
 
-### 行业/概念数据流
-
-```
-持仓列表 + 穿透资产
-    ↓ 提取所有唯一代码
-batch_fetch_industry_data(codes)
-    ↓ API / 缓存
-industry_{code}.json
-    ↓
-build_news_data():
-  1. 行业名/概念名 → 追加到关键词列表 → 提高新闻匹配率
-  2. industry_data → _build_keyword_lookup() → "concept" 类型条目
-  3. _enrich_keywords_for_item() → 显示 "XX[概念]"
-    ↓
-穿透模块:
-  4. batch_fetch_industry_data() → 覆盖 sector 字段 → 板块列显示 API 数据
-
-penetration_sector = fetch_industry_data(code).industry  // API优先
-                  or classify_sector(name, code)         // 关键词回退
-```
-
 ### Provider Chain 路由与 fallback
 
 `src/python/providers/` 下的 Provider 按数据类型的优先级定义在 `fetcher/chain.py:_DEFAULT_CHAINS` 中（`price_stock`→`tencent`,`sina`；`price_fund_otc`→`eastmoney`；`industry`→`eastmoney_industry`,`eastmoney_industry_rest` 等），`fetcher/price.py` 的 `fetch_market_data()` 通过 `_fetch_with_fallback()` 遍历 Provider Chain：
@@ -372,6 +372,7 @@ Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_re
 | `chain.py` | Provider 优先链定义 + fallback 路由 | —（纯路由逻辑） | — |
 | `portfolio_history.py` | 组合历史走势计算器（F2） | —（内部路由到 history_stock/history_fund_otc） | `history_stock_*`, `history_fund_otc_*` |
 | | **00 代码降级**：K 线全空→自动降级基金净值历史 | history_stock → history_fund_otc | — |
+| `history_diff.py` | F1 快照差异计算引擎（纯计算，无 Provider/缓存） | — | — |
 
 - **并行预热**：`preload_cache()` 对 preload 组使用 `ThreadPoolExecutor` 并行获取，减少串行等待
 - **菜单驱动**：菜单 [1] 和 [2] 分别清除 + 重拉 refresh 和 preload 组，复用 fetcher 模块的预热入口
@@ -388,9 +389,10 @@ handlers_report.py（菜单触发）
    │     └─ report_prepare() 收集所有数据 → info 字典
    │
    ├─ 历史走势数据获取（菜单 L/B）
-   │     ├─ F1 快照对比：SnapshotHoldings → load_latest() → HistoryDiff.compute() → save()
+   │     ├─ F1 快照对比：SnapshotHoldings → load_latest() → HistoryDiff.compute() → save() → prune()
    │     ├─ F2 历史走势：PortfolioHistoryCalculator.get_combined_timeseries()（as-if 模拟）
    │     └─ 数据注入：f_context（diff 摘要）→ Excel；history_data（走势）→ HTML
+   │
    │
    ├─ Excel 管线
    │     excel_generator.py（编排器 98 行）
@@ -418,6 +420,13 @@ handlers_report.py（菜单触发）
 - **Excel 页签写入器**：各 `_write_*_sheet()` 函数接收 `info` 字典 + `writer`，独立负责单个页签的内容和样式，互不依赖
 - **条件渲染**：B 系列基金分析模块（`enable_b_series` 标志）、智能预警页签（菜单 B/L）、LLM 分析章节（菜单 L）在 `info` 中无对应数据时自动跳过
 - **汇总页（页签 1）** 由 `summary.py` 的 `write_summary_sheet()` 独立写入。LLM API 用量页签由 `summary_llm_usage.py` 的 `write_llm_usage_sheet()` 写入（从 summary.py 拆分），两者通过 summary.py 的 re-export 保持向后兼容
+
+> **F1 快照存储与清理**（`history_snapshot.py`）：
+> - 存储位置：`data/history/snapshots/snapshot_{timestamp}.json`（独立于缓存系统）
+> - 原子写入：符合 C3 约束，`tempfile.mkstemp` + `os.replace`
+> - 自动清理：`save()` 后自动 `prune()`，两阶段：
+>   ① 时间优先：删除超过 `HISTORY_SNAPSHOT_RETENTION_DAYS`（默认 60d，可通过 `config.json` `history.snapshot_retention_days` 配置）的旧快照
+>   ② 数量兜底：剩余文件超过 `HISTORY_SNAPSHOT_MAX_COUNT`（默认 365，可通过 `config.json` `history.snapshot_max_count` 配置）时删最旧超出部分
 
 ### 数据降级治理
 
@@ -461,7 +470,7 @@ HTML 端降级机制：
 - 数据清洗：代码自动去除后缀（`.SH`/`.SZ`/`.OF`），份额/成本转为 float，空行跳过
 - 多文件选择：持仓目录下多个 xlsx 时弹出 TUI 选择器（`tui_handlers.py` 中 `_select_holdings_file()`）
 
-### B 系列：基金深度分析模块
+### B 系列：基金深度分析模块（B1）
 
 B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_style）通过 `enable_b_series` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
 
@@ -751,7 +760,7 @@ handlers_*.py → 各模块入口函数编排
 | C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()` / `batch_fetch_with_fallback()`，不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
 | C7 | **报告序号不可硬编码** | 报告 18 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [报告序号可配置](#报告序号可配置) |
 | C8 | **日志统一** | 所有模块必须使用 `logger = logging.getLogger("invest")`，不得创建独立的 logger 实例 | 日志碎片化、归档/轮转失效 | `logger.py` |
-| | **控制台日志着色**（v0.4.1+） | `logger.py` 中 `_ColoredFormatter` 使用 `tui_menu.py` 的 ANSI 颜色常量（依赖 colorama Win32 适配）：WARNING 黄色、ERROR/CRITICAL 红色，文件日志保持纯文本。`TuiProgressReporter` 的 UI 进度前缀同步着色：`[..]` 青色、`[OK]` 绿色、`[!]` 黄色、`[ERR]` 红色。NO_COLOR 环境变量或非 TTY 时自动降级 | 告警/错误视觉辨识度提升 | `logger.py`、`report/progress.py` |
+| C15 | **控制台日志着色**（v0.4.1+） | `logger.py` 中 `_ColoredFormatter` 使用 `tui_menu.py` 的 ANSI 颜色常量（依赖 colorama Win32 适配）：WARNING 黄色、ERROR/CRITICAL 红色，文件日志保持纯文本。`TuiProgressReporter` 的 UI 进度前缀同步着色：`[..]` 青色、`[OK]` 绿色、`[!]` 黄色、`[ERR]` 红色。NO_COLOR 环境变量或非 TTY 时自动降级 | 告警/错误视觉辨识度提升 | `logger.py`、`report/progress.py` |
 | C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须在** `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `_compute_module_cache_info()` 中注册调度入口和缓存信息，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
 | C10 | **新闻召回策略** | `per_source`（每源原始获取量）与 `top_n`（最终输出量）解耦：各源原始获取量 = `max(500, news_top_count × 2)`，不可写死为固定值。华尔街见闻 API 硬上限 100 条除外 | 配置 `news_top_count` 不生效 | [财经新闻热点与持仓关联分析](#财经新闻热点与持仓关联分析) |
 | C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker（通过 `pytestmark` 模块级变量），新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure`。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动检查标记遗漏并发出 `PytestWarning` | CI 门禁不通过 | `src/test/conftest.py` |

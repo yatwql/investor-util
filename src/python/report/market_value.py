@@ -57,7 +57,10 @@ def _compute_premium(price: float, nav: float, name: str) -> str:
     Returns:
         格式如 "+1.23%"、"-0.56%"，非 QDII 或无参考净值时返回 "--"。
     """
-    if nav <= 0:
+    try:
+        if nav <= 0:
+            return _FUND_PREMIUM_PLACEHOLDER
+    except TypeError:
         return _FUND_PREMIUM_PLACEHOLDER
     if not is_qdii_extended(name):
         return _FUND_PREMIUM_PLACEHOLDER

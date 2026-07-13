@@ -48,8 +48,11 @@ CACHE_MONTHLY = 2592000     # 每月（30d）
 
 # 快照目录（相对于 PROJECT_ROOT）
 HISTORY_SNAPSHOT_DIR = os.path.join(PROJECT_ROOT, "data", "history", "snapshots")
-# 最大保留快照数量
-HISTORY_SNAPSHOT_MAX_COUNT = 12
+# 快照保留天数（超过此天数的旧快照自动清理）
+HISTORY_SNAPSHOT_RETENTION_DAYS = 60
+# 快照最大保留数量（安全上限，远超 retention 正常生成量，仅在异常堆积时触发）
+# 60天×每日数份 ≈ 200 以内，设为 365 防止误伤正常快照
+HISTORY_SNAPSHOT_MAX_COUNT = 365
 
 # 历史 K 线缓存 TTL（每周刷新）
 HISTORY_CHAIN_STOCK_TTL = CACHE_WEEKLY

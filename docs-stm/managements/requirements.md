@@ -145,6 +145,8 @@
 
 > **纯股票组合**：无基金时自动跳过基金排名/持仓/基准刷新，仍主动重拉行业分类、分红、盈利预测、资金流向。
 > **无分组保护**：`holdings_tracking.json`、`trading_calendar.json`、`fund_concentration_snapshot.json`、`fund_style_snapshot.json`、`history_stock_*`、`history_fund_otc_*` 不隶属于任何 cache_group，不受菜单 [1][2] 清除命令影响，仅通过菜单 [3] 过期自动清理。
+>
+> **持仓快照**：`data/history/snapshots/` 目录存放 F1 环比对比的持仓快照，非缓存系统（详见 [§8.4](#84-持仓快照f1)）。
 
 ### 5.4 降级规则
 
@@ -245,7 +247,7 @@
 >
 > **新闻**模块含可选 LLM 二次关联分析（`enabled_llm.news_correlation=true` 时开启）。各新闻源原始获取量 = `max(500, news_top_count × 2)`，华尔街见闻 API 硬上限 100 条除外。
 >
-> **F 系列**（组合历史走势、回撤分析）在 E/H/B/L 全菜单模式下均可用，数据可用性由 `history.analysis` 配置（`"off"` / `"prompt"` / `"auto"`）控制，详情见 [§8.2.12](#8212-组合历史走势)。
+> **F 系列**（组合历史走势、回撤分析）在 E/H/B/L 全菜单模式下均可用，数据可用性由 `history.analysis` 配置（`"off"` / `"prompt"` / `"auto"`）控制，详情见 [§8.2.12](#8212-组合历史走势)。F1 持仓快照对比不受此配置影响，始终自动执行（详见 [§8.4](#84-持仓快照f1)）。
 
 ---
 
@@ -662,7 +664,6 @@ Jaccard = |A ∩ B| / |A ∪ B|
 - `"prompt"` 模式：报告生成后询问用户是否需要获取（约耗时 15s）
 - `"auto"` 模式：报告生成时自动获取，不询问
 - `"off"` 模式：不获取数据，报告渲染占位文本
-- 快照对比（F1）不受此配置影响，始终自动执行
 
 #### 8.2.13 回撤分析
 
@@ -695,6 +696,19 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 官方净值(T-N) | nav_date 为 2~5 个交易日前 | — |
 | 官方净值(YYYY-MM-DD) | nav_date 为 6 个交易日以上 | — |
 
+### 8.4 持仓快照（F1）
+
+持仓快照用于环比对比（F1），存放在 `data/history/snapshots/` 目录，**独立于缓存系统**。
+
+| 特性 | 说明 |
+|:-----|:------|
+| 存储格式 | `data/history/snapshots/snapshot_{timestamp}.json`（JSON，带时间戳） |
+| 写入时机 | B/L 菜单生成报告时自动创建 |
+| 原子写入 | `tempfile.mkstemp` + `os.replace`，避免半写损坏 |
+| 自动清理 | `save()` 后触发 `prune()`，两阶段：① 超 60 天（`history.snapshot_retention_days`）删除；② 超 365 个（`history.snapshot_max_count`）删最旧 |
+| 对比逻辑 | 加载上次快照 → `HistoryDiff.compute()` → 输出总市值Δ/总盈亏Δ/持仓变动（新增/清仓/增持/减持）TOP5 |
+| 故障降级 | 首次运行无快照 / 快照损坏 → 跳过对比，下次自动建立基线 |
+
 ---
 
 ## 9. 配置文件规格
@@ -717,7 +731,10 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | `market_hour_ttl` | int | `30` | 手动 | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30", end:"15:00", official_source:true}` | 手动 | 交易时段配置。`official_source=true` 时优先通过东方财富 push2 API 获取实时交易状态，false 时仅依赖内置默认时段 |
 | `degradation` | dict | T2/T3/T4 三级配置 | 手动 | 双信号降级阈值：每层级含 `unreachable_threshold`（连续失败次数）、`empty_data_threshold`（连续空数据次数）、`stale_days`（过期缓存可用天数） |
+| **_history 对象** | | | | 以下字段属于顶层 `history` 字典 |
 | `history.analysis` | str | `"off"` | 手动 | 组合历史走势获取模式：`"off"`=关闭、`"prompt"`=报告后询问用户、`"auto"`=自动获取 |
+| `history.snapshot_retention_days` | int | `60` | 手动 | 持仓快照保留天数（超过此天数的旧快照自动删除） |
+| `history.snapshot_max_count` | int | `365` | 手动 | 持仓快照最大保留数（安全上限，超过则删除最旧的） |
 | `cache_ttl` | dict | 23 项 | 手动 | 各缓存类型 TTL（秒） |
 | `llm_key_file` | str | `data/config/llm_key.json` | 手动 | LLM 密钥文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | 手动 | LLM 参数文件路径 |
@@ -795,6 +812,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | **降级日志增强**（v0.4.1+） | 日志输出更清晰 | 所有 Provider Chain 的 fallback 日志追加 `[code]` 标签；00 代码降级日志含资产名称；市场行情失败汇总时列出具体失败资产名称(`基金名(code)`) |
 | F1 快照对比 — 首次运行无历史快照 | 显示"首次运行，暂无环比数据"占位 | `SnapshotHoldings.load_latest()` 返回 None，跳过差异对比 |
 | F1 快照对比 — 快照读取异常/损坏 | 跳过环比对比，不影响报告其余模块 | 日志 WARNING，`f_context` 置为 None |
+| F1 快照自动清理失败（权限/文件锁定） | 日志 WARNING 跳过该文件，快照目录可能膨胀 | `prune()` 日志记录失败路径，保留已有文件继续运行 |
 | F2 历史走势 — 全部持仓数据不可用 | 页面显示占位文本"组合历史走势数据不可用"；快照对比不受影响 | `history_data.status = "unavailable"`，HTML 模板条件渲染占位块 |
 | F2 历史走势 — 部分持仓数据缺失 | 页面显示降级警告清单（"部分持仓历史走势不可用（3/5）"），观测期压缩但不中断 | `history_data.status = "degraded"`，`warnings` 列表逐条标注；Excel 页脚追加状态提示 |
 | F2 历史走势 — 获取模式为 `"off"` | 报告页面显示占位文本，不报错 | `handlers_report.py` 依据 `history.analysis` 配置跳过获取流程，`f_context` 保持 None |

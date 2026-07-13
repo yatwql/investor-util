@@ -129,6 +129,8 @@ python src/python/main.py
 ² 菜单 B 中智能预警仅输出基础页签（Excel 显示空状态提示，HTML 不渲染该章节），实际预警内容需使用菜单 **L** 生成。
 ³ 组合历史走势 + 回撤分析依赖 `history.analysis` 配置（`"prompt"` 或 `"auto"` 时可用，`"off"` 时显示占位文本）。
 
+> **F1 快照自动清理**：B/L 菜单生成报告时自动保存持仓快照（环比对比用），并清理超过 60 天的旧快照（保留天数可通过 `config.json` 的 `history.snapshot_retention_days` 配置），避免 `data/history/snapshots/` 目录无限堆积。
+
 ### 各菜单项说明
 
 | 功能 | 详细说明 |

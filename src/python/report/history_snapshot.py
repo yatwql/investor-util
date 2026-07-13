@@ -21,7 +21,9 @@ import tempfile
 from datetime import datetime
 from typing import Any
 
-from src.python.constants import HISTORY_SNAPSHOT_DIR, HISTORY_SNAPSHOT_MAX_COUNT
+from src.python.constants import (
+    HISTORY_SNAPSHOT_DIR, HISTORY_SNAPSHOT_MAX_COUNT, HISTORY_SNAPSHOT_RETENTION_DAYS,
+)
 from src.python.schemas.history import AccountSnapshot, SnapshotData, SnapshotHolding
 
 logger = logging.getLogger("invest")
@@ -188,38 +190,65 @@ def list_all() -> list[dict[str, Any]]:
     return entries
 
 
-def prune(max_count: int = HISTORY_SNAPSHOT_MAX_COUNT) -> int:
-    """删除超出 max_count 的旧快照文件。
+def prune(
+    retention_days: int = HISTORY_SNAPSHOT_RETENTION_DAYS,
+    max_count: int = HISTORY_SNAPSHOT_MAX_COUNT,
+) -> int:
+    """删除超出保留天数和最大数量的旧快照文件。
 
-    保留最新的 max_count 个文件（按 mtime 排序），其余删除。
+    两阶段清理：
+      1. 删除 mtime 早于 retention_days 天的文件（时间优先）
+      2. 若剩余文件仍超过 max_count，再删除最旧的超出部分（数量兜底）
+
     多进程安全：删除基于逐个文件操作，不会因文件数突变而出错。
 
     Args:
+        retention_days: 保留天数，默认 HISTORY_SNAPSHOT_RETENTION_DAYS (60)
         max_count: 最大保留数，默认 HISTORY_SNAPSHOT_MAX_COUNT (12)
 
     Returns:
         实际删除的文件数量
     """
+    from datetime import datetime, timezone
+
     files = _list_snapshot_files()
-    if len(files) <= max_count:
+    if not files:
         return 0
 
-    # 按 mtime 升序排列（最旧的在前），删除前面的
-    files_sorted = sorted(files, key=lambda p: os.path.getmtime(p))
-    to_delete = files_sorted[:len(files_sorted) - max_count]
-
+    now = datetime.now().astimezone()
     deleted = 0
-    for path in to_delete:
-        try:
-            os.unlink(path)
-            deleted += 1
-        except OSError as e:
-            logger.warning("[history_snapshot] 删除失败 %s: %s",
-                           os.path.basename(path), e)
+    kept: list[str] = []
+
+    # 阶段 1：按保留天数删除
+    for path in sorted(files, key=os.path.getmtime):
+        mtime = datetime.fromtimestamp(os.path.getmtime(path)).astimezone()
+        age_days = (now - mtime).total_seconds() / 86400
+        if age_days > retention_days:
+            try:
+                os.unlink(path)
+                deleted += 1
+            except OSError as e:
+                logger.warning("[history_snapshot] 删除失败 %s: %s",
+                               os.path.basename(path), e)
+        else:
+            kept.append(path)
+
+    # 阶段 2：按最大数量兜底（仅对阶段 1 幸存文件再限制）
+    if max_count > 0 and len(kept) > max_count:
+        # 按 mtime 升序排列，删除最旧的超出部分
+        kept_sorted = sorted(kept, key=os.path.getmtime)
+        to_delete = kept_sorted[:len(kept_sorted) - max_count]
+        for path in to_delete:
+            try:
+                os.unlink(path)
+                deleted += 1
+            except OSError as e:
+                logger.warning("[history_snapshot] 删除失败 %s: %s",
+                               os.path.basename(path), e)
 
     if deleted:
-        logger.info("[history_snapshot] 清理了 %d 个旧快照，保留 %d 个",
-                    deleted, max_count)
+        logger.info("[history_snapshot] 清理了 %d 个旧快照（保留 %d 天内，最多 %d 个）",
+                    deleted, retention_days, max_count)
     return deleted
 
 
