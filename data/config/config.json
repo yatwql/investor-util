@@ -70,6 +70,6 @@
 
   // ── F. 组合历史对比分析 ──
   "history": {
-    "analysis": "off"
+    "analysis": "auto"
   }
 }

@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-13
+
 ### Added
 
 - **F1 快照对比**：每次报告生成时自动创建持仓快照，与上一次快照对比输出环比差异摘要（总市值/盈亏变化、新增/清仓/增持/减持 TOP5），写入 Excel summary 页签底部（`history_snapshot.py` + `history_diff.py`）。
