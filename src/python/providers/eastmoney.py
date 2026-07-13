@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any
 
 import httpx
@@ -165,45 +166,73 @@ def _safe_float(s: str) -> float:
 def fetch_fund_nav_history(code: str) -> list[dict]:
     """获取场外基金历史净值（备用链路）。
 
-    通过东方财富基金历史净值 API 获取全量历史净值数据，
+    通过东方财富基金历史净值 API 分页获取全量历史净值数据，
     与 tiantian.fetch_fund_nav_history() 返回格式兼容。
+
+    API 单页上限为 20 条（实测 pageSize 参数超过 200 返回 null，
+    且无论 pageSize 多大都只返回 20 条）。使用 pageSize=20 逐页
+    遍历，页间延时 0.3s 防限流，最多 10 页（200 条 ≈ 10 个月）。
+    首次获取后缓存积累，后续增量请求只需第一页。
 
     Args:
         code: 6 位基金代码
 
     Returns:
         list[dict]: [{date, nav, acc_nav}, ...]
-        按日期升序排列。API 失败返回空列表。
+        按日期升序排列。API 失败或空数据返回空列表。
     """
-    params: dict[str, Any] = {
-        "callback": "jQuery",
-        "fundCode": code.strip(),
-        "pageIndex": 1,
-        "pageSize": 365,
-    }
+    page_size = 20
+    max_pages = 10
+    all_records: list[dict] = []
+    page_index = 1
 
-    try:
-        with make_http_client(timeout=_TIMEOUT) as client:
-            resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)
-            text = resp.text
-    except httpx.RequestError:
-        logger.warning("[eastmoney] 历史净值 API 请求失败: %s", code)
-        return []
+    while page_index <= max_pages:
+        params: dict[str, Any] = {
+            "callback": "jQuery",
+            "fundCode": code.strip(),
+            "pageIndex": page_index,
+            "pageSize": page_size,
+        }
 
-    json_str = _strip_jsonp(text)
-    try:
-        data = json.loads(json_str)
-    except json.JSONDecodeError:
-        logger.warning("[eastmoney] 历史净值 JSON 解析失败: %s", code)
-        return []
+        try:
+            with make_http_client(timeout=_TIMEOUT) as client:
+                resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)
+                text = resp.text
+        except httpx.RequestError:
+            logger.warning("[eastmoney] 历史净值 API 请求失败（第%d页）: %s", page_index, code)
+            if all_records:
+                break  # 已有数据时容忍单页失败
+            return []
 
-    records = (data.get("Data", {}) or {}).get("LSJZList", [])
-    if not records:
+        json_str = _strip_jsonp(text)
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            logger.warning("[eastmoney] 历史净值 JSON 解析失败（第%d页）: %s", page_index, code)
+            if all_records:
+                break
+            return []
+
+        records = (data.get("Data", {}) or {}).get("LSJZList", [])
+        if not records:
+            break  # 无更多数据
+
+        all_records.extend(records)
+
+        # 检查是否还有更多页
+        total_count = data.get("TotalCount", 0) or 0
+        if page_index * page_size >= total_count:
+            break
+
+        page_index += 1
+        time.sleep(0.3)  # 页间延时防限流
+
+    if not all_records:
         logger.warning("[eastmoney] 无历史净值数据: %s", code)
         return []
 
     result: list[dict] = []
-    for r in records:
+    for r in all_records:
         date_str = (r.get("FSRQ") or "").strip()
         nav = _safe_float(r.get("DWJZ", "0"))
         acc_nav = _safe_float(r.get("LJJZ", "0"))
@@ -217,4 +246,5 @@ def fetch_fund_nav_history(code: str) -> list[dict]:
 
     # API 返回最新在前，按日期升序排列
     result.sort(key=lambda x: x["date"])
+    logger.info("[eastmoney] 基金 %s 历史净值: %d 条（%d 页）", code, len(result), page_index)
     return result

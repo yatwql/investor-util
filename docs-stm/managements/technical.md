@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-13（v0.4.3 + F1/F2对比/缓存分组修正/文档一致性核对）
+最后更新：2026-07-13（v0.4.4 + F2走势三连修复/空数据fallback/分页取净值/收益率起算修正）
 
 ---
 
@@ -302,6 +302,8 @@ Provider Chain 注册表（provider_registry.py:DataSourceRegistry）
 - 全链路失败 → 尝试过期缓存降级 → 仍失败则抛异常由调用方处理
 - **价格缓存收市后新鲜度验证**（`fetcher/price.py:_price_cache_fresh`）：盘后首次请求时校验缓存 `price_date` 是否为当前交易日。若盘中因 Tencent 不可用降级写入 Sina 数据（非收盘价），或盘中缓存残留上一交易日数据，收市后自动清除该残留缓存并强制重走 Provider Chain，确保收盘价更新。
 - **00 代码降级机制**（v0.4.1+）：OTC 基金与 A 股代码前缀重叠（均以 `00` 开头），`is_a_share_code()` 无法区分。`price.py` 和 `portfolio_history.py` 对 `00` 开头代码增加降级路由：主链路（price_stock/history_stock）全失败后，自动降级到 `price_fund_otc`（东方财富净值）或 `history_fund_otc`（天天基金历史净值）。主链路成功时永不触达降级，零误判风险。降级成功/失败均有日志区分（含资产名称）。
+- **走势数据空结果递补**（v0.4.4+）：`_fetch_with_incremental_fallback()` 对返回空列表的首个 provider 视为"需递补"而非"成功"，继续尝试下一链路。修复了 tiantian（QDII/债券基金无 pingzhongdata 变量）返回 `[]` 后永不尝试 eastmoney 的缺陷。
+- **东财历史净值分页**（v0.4.4+）：`eastmoney.fetch_fund_nav_history()` 改用 `pageSize=20` + 分页循环代替单次 `pageSize=365`（超 API 上限返回 null），页间 0.3s 防限流，最多 10 页（约 200 条 ≈10 个月）。
 
 ### Provider Chain 三层熔断架构
 

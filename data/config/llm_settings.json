@@ -9,11 +9,11 @@
   // 模块开关 — 控制各 LLM 分析功能的启用/停用
   // ═══════════════════════════════════════════
   "enabled_llm": {
-    "global_macro": true,
-    "expert_review": true,
-    "health_check": true,
-    "penetration_deep": true,
-    "news_correlation": false
+      "global_macro": true,
+      "expert_review": true,
+      "health_check": true,
+      "penetration_deep": true,
+      "news_correlation": true
   },
 
   // ═══════════════════════════════════════════

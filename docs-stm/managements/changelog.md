@@ -6,12 +6,25 @@
 
 ---
 
+## [0.4.4] - 2026-07-13
+
+### Fixed
+
+- **chain.py**：修复 `_fetch_with_incremental_fallback()` 中 tiantian 返回空列表 `[]` 时直接 `break` 不到 fallback provider 的问题。新增 `if not new_data: continue` 空数据检测，使 eastmoney 备用链路在 QDII/债券等基金上能被正确调用。
+- **eastmoney.py**：修复 `fetch_fund_nav_history()` 中 `pageSize=365` 超东方财富 API 上限（实测 ≥202 即返回 null）导致全部历史净值获取失败的问题。改为 `pageSize=20` + 分页循环（页间 0.3s 防限流），最多 10 页（200 条≈10 个月）。
+- **portfolio_history.py**：修复累计收益率因不同持仓数据起止日期不一致（QDII 基金最早数据仅到 2025-09、债券基金仅到 2026-03）导致 `first_val` 偏小、收益率虚高的问题。改为从 ≥80% 持仓都有数据的日期起算收益率，早期数据仍保留在走势图上但排除出收益率计算。
+
+### Docs
+
+- **requirements.md**：同步 F2 累计收益率起算策略、新增 degradation 场景（全链路空数据 + 部分数据缺失 + 虚高保护）。
+- **technical.md**：同步 Provider Chain 空数据 fallback 策略、eastmoney 分页策略、F2 收益率起算点调整。
+- **how-to-start.md** / **how-to-config.md** / **faq.md**：同步备注说明。
+
 ## [0.4.3] - 2026-07-13
 
 ### Fixed
 
 - **registry.py**：修复 `history_stock`/`history_fund_otc` 误归入 preload cache_group，导致菜单 [2] 清除历史走势缓存但不重拉的问题。现改为无分组保护，仅按 TTL 过期清理。
-- **chain.py**：修复 `_fetch_with_incremental_fallback()` 中 tiantian 返回空列表 `[]` 时直接 `break` 不到 fallback provider 的问题。现增加 `if not new_data: continue` 空数据检测，使 eastmoney 备用链路在 QDII/债券等基金上能被正确调用。
 
 ### Docs
 

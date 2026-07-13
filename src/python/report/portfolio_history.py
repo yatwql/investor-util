@@ -182,16 +182,33 @@ class PortfolioHistoryCalculator:
 
         # 合并为统一时间线
         date_map: dict[str, float] = {}
+        fund_count_on_date: dict[str, int] = {}
         for series in all_series:
             for bar in series:
                 d = bar["date"]
                 date_map[d] = date_map.get(d, 0) + bar["value"]
+                fund_count_on_date[d] = fund_count_on_date.get(d, 0) + 1
 
         sorted_dates = sorted(date_map.keys())
         if not sorted_dates:
             return {"bars": [], "max_drawdown": 0, "max_drawdown_pct": 0,
                     "annualized_volatility": 0, "total_return": 0,
                     "total_return_pct": 0, "status": "unavailable", "warnings": warnings}
+
+        # 找到可用的收益率起算日期：要求该日 ≥80% 的持仓有数据
+        # 不同基金数据起止日期不同（如有的从2025-09、有的从2026-03），
+        # 过早的起算点会因基金不全导致组合市值偏低、收益率虚高
+        total_funds = len(all_series)
+        min_coverage = max(1, int(total_funds * 0.8))
+        valid_start_idx = 0
+        for i, d in enumerate(sorted_dates):
+            funds_with_data = fund_count_on_date.get(d, 0)
+            if funds_with_data >= min_coverage:
+                valid_start_idx = i
+                break
+        if valid_start_idx > 0:
+            logger.info("[history] 收益率起算点调整: %s → %s（此前日期仅覆盖部分持仓）",
+                        sorted_dates[0], sorted_dates[valid_start_idx])
 
         # 构建完整时间线 + 计算指标
         bars: list[dict] = []
@@ -236,14 +253,14 @@ class PortfolioHistoryCalculator:
 
         annualized_vol = self._compute_annualized_volatility(daily_returns)
 
-        # 计算总收益率
-        first_val = bars[0]["total_value"]
+        # 计算总收益率（从 valid_start_idx 起算，避免早期数据覆盖不全导致虚高）
+        first_val = bars[valid_start_idx]["total_value"]
         last_val = bars[-1]["total_value"]
         total_return = last_val - first_val
         total_return_pct = (total_return / first_val * 100) if first_val > 0 else 0
 
-        # 质量校验
-        warnings.extend(_validate_bars(bars))
+        # 质量校验（只校验收益率起算点之后的数据，避免新基金加入导致的跳变误报）
+        warnings.extend(_validate_bars(bars[valid_start_idx:]))
 
         return {
             "bars": bars,
@@ -254,7 +271,7 @@ class PortfolioHistoryCalculator:
             "annualized_volatility": round(annualized_vol, 4),
             "total_return": round(total_return, 2),
             "total_return_pct": round(total_return_pct, 2),
-            "data_start": sorted_dates[0],
+            "data_start": sorted_dates[valid_start_idx],
             "data_end": sorted_dates[-1],
             "status": status,
             "warnings": warnings,
