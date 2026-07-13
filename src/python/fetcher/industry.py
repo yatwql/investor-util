@@ -154,6 +154,6 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
                         with lock:
                             result[code] = data
 
-    logger.info("批量行业数据获取完成: 共 %d 个代码, 成功 %d 个",
-                len(a_codes), len(result))
+    logger.info("批量行业数据就绪: %d/%d 个代码（含缓存命中）",
+                len(result), len(a_codes))
     return result
