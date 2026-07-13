@@ -44,17 +44,14 @@
 - **excel_b_series.py 三模块重复获取基金持仓（LOW）**：引入 `_fetch_fund_holdings_cached()` 复用 `registry.session_cache_get/set("fund_hold", code)`，消除持仓重合度/集中度/风格分析三模块各自独立调用 `fetch_fund_holdings` 的冗余。
 - **portfolio_history.py 无独立单元测试**：创建 `test_portfolio_history.py`，覆盖代码类型路由、00 代码降级、session_cache、as-if 市值、波动率计算、数据质量校验、债券名称识别共 28 项测试。
 - **test_fetcher_price.py 缺 00 代码降级测试**：新增 3 项测试（降级成功、双链路全失败、股票链路成功不降级），覆盖 price.py 的 00 代码 `price_fund_otc` 降级路径。
+- **002943 等 00 代码基金无法获取行情（HIGH）**：`fetch_market_data()` 对 `00` 开头且股票链路全失败的代码自动降级到 `price_fund_otc` 链路通过东方财富获取净值。同时 `market_value.py` 和 `category.py` 在代码分类环节借用 `is_otc_fund_by_name()` 优先判定，消除 00 代码被误路由到 A 股链路的根因。
+- **00 代码基金历史 K 线全空（HIGH）**：`portfolio_history.py` 对 `is_a_share_code()` 和 `is_exchange_fund_code()` 均不匹配的 00 代码，股票历史全空时自动降级尝试基金净值链路，与行情获取的降级策略保持一致。
+- **`except Exception: pass` 空吞异常 2 处（MEDIUM）**：`news_correlation.py` 两处静默吞异常改为 `logger.warning()` 输出详情，避免调试困难。
 
 ### Added
 
 - **`code_utils.is_otc_fund_by_name()` 00 代码重叠区分类辅助**：新增 `_OTC_FUND_NAME_KW` 关键词元组（混合/纯债/短债/货币/联接等），和 `is_otc_fund_by_name(name, code)` 函数，名称+代码双维度判断 00 代码是否为场外基金。
 - **logger.py 控制台彩色日志**：新增 `_ColoredFormatter`，WARNING 黄色/ERROR 红色高亮，文件日志保持纯文本不受影响。
-
-### Fixed
-
-- **002943 等 00 代码基金无法获取行情（HIGH）**：`fetch_market_data()` 对 `00` 开头且股票链路全失败的代码自动降级到 `price_fund_otc` 链路通过东方财富获取净值。同时 `market_value.py` 和 `category.py` 在代码分类环节借用 `is_otc_fund_by_name()` 优先判定，消除 00 代码被误路由到 A 股链路的根因。
-- **00 代码基金历史 K 线全空（HIGH）**：`portfolio_history.py` 对 `is_a_share_code()` 和 `is_exchange_fund_code()` 均不匹配的 00 代码，股票历史全空时自动降级尝试基金净值链路，与行情获取的降级策略保持一致。
-- **`except Exception: pass` 空吞异常 2 处（MEDIUM）**：`news_correlation.py` 两处静默吞异常改为 `logger.warning()` 输出详情，避免调试困难。
 
 ### Performance
 

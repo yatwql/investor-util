@@ -273,7 +273,10 @@ def _fetch_with_incremental_fallback(
     # chain 层统一合并 + 缓存写入
     if new_data:
         merged = _merge_by_date(cached, new_data)
-        _validate_continuity(cached, new_data, cache_key)
+        try:
+            _validate_continuity(cached, new_data, cache_key)
+        except Exception:
+            logger.warning("[%s] 连续性校验异常（不影响合并）", cache_key)
         cache_set(cache_key, merged)
         return merged[-days:]
     elif cached:
@@ -369,16 +372,20 @@ def _replace_by_date(data: list[dict], item: dict) -> None:
 
 
 def _validate_continuity(cached: list[dict], new_data: list[dict], cache_key: str) -> None:
-    """校验新旧数据连续性，检测历史修正信号。"""
+    """校验新旧数据连续性，检测历史修正信号。
+
+    注意：此函数为纯检测/日志用途，异常不影响主流程。
+    调用方应在 try/except 中包装。
+    """
     if not cached or not new_data:
         return
-    last_old = cached[-2] if len(cached) >= 2 else cached[-1]
+    last_old = cached[-1]
     first_new = new_data[0]
 
     # 检测日期重叠：新数据首日 ≤ 旧数据末日，说明有修正
     if first_new.get("date") <= last_old.get("date"):
         logger.warning("[%s] 新旧数据重叠——可能是历史修正，建议全量刷新", cache_key)
-        cache_set(f"{cache_key}_correction_flag", True, ttl=CACHE_DAILY)
+        cache_set(f"{cache_key}_correction_flag", True)
     elif _gap_days(last_old.get("date"), first_new.get("date")) > 5:
         logger.warning("[%s] 数据跳空 >5 交易日——部分历史不可达", cache_key)
 
