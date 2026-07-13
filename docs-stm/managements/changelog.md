@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **HTML 章节 18（LLM API 用量）出现在 16/17 之前（HIGH）**：模板源顺序中 llm_usage 的 HTML 代码位于 portfolio_history 和 drawdown_analysis 之前。CSS `order` 在 `overflow-x: auto` + 条件渲染组合下浏览器渲染引擎不总是按 `order` 重排。修复为将 llm_usage 的 HTML 块物理移动到 drawdown_analysis 之后、footer 之前，源顺序与 CSS order 一致。
+
 ### Added
 
 - **`code_utils.is_otc_fund_by_name()` 00 代码重叠区分类辅助**：新增 `_OTC_FUND_NAME_KW` 关键词元组（混合/纯债/短债/货币/联接等），和 `is_otc_fund_by_name(name, code)` 函数，名称+代码双维度判断 00 代码是否为场外基金。

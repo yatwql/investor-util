@@ -1368,121 +1368,7 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
         {% endif %}
     </div>
 
-    <!--  MODULE 12: LLM API Usage -->
-    <div class="section" id="sec-llm_usage" style="order: {{ section_numbers['llm_usage'] }};">
-        <div class="section-title">{{ section_numbers['llm_usage'] }}、LLM API 用量</div>
-        <div class="section-content">
-            {% if llm_session_usage and llm_session_usage.get("has_usage") %}
-            <table class="kv-table">
-                <tr><td>API 调用次数</td><td>{{ llm_session_usage["call_count"] }} 次</td></tr>
-                <tr><td>模型</td><td>{{ llm_session_usage["model_display"] }}</td></tr>
-                <tr><td>Endpoint</td><td style="word-break: break-all; font-size: 13px;">{{ llm_endpoint or "—" }}</td></tr>
-                <tr><td>输入 token</td><td>{{ llm_session_usage["input_tokens"] | thousands }}</td></tr>
-                <tr><td>输出 token</td><td>{{ llm_session_usage["output_tokens"] | thousands }}</td></tr>
-                <tr><td>总 token</td><td>{{ llm_session_usage["total_tokens"] | thousands }}</td></tr>
-                {% if llm_session_usage["cache_hit_tokens"] %}
-                <tr><td>缓存命中 token</td><td>{{ llm_session_usage["cache_hit_tokens"] | thousands }}</td></tr>
-                {% endif %}
-                <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
-            </table>
-            {% endif %}
-
-            {% if llm_module_info %}
-            <div style="margin-top: 14px; font-size: 13px; color: #555;">
-                <strong>各模块明细：</strong>
-                <table class="kv-table" style="margin-top: 6px;">
-                    <tr style="background: #f5f5f5;">
-                        <th style="padding: 4px 8px; text-align: left;">模块</th>
-                        <th style="padding: 4px 8px; text-align: left;">状态</th>
-                        <th style="padding: 4px 8px; text-align: left;">模型</th>
-                        <th style="padding: 4px 8px; text-align: right;">总 Token 用量</th>
-                        <th style="padding: 4px 8px; text-align: right;">输入 Token</th>
-                        <th style="padding: 4px 8px; text-align: right;">输出 Token</th>
-                        <th style="padding: 4px 8px; text-align: right;">缓存命中 Token</th>
-                        <th style="padding: 4px 8px; text-align: right;">费用</th>
-                        <th style="padding: 4px 8px; text-align: center;">LLM 缓存</th>
-                        <th style="padding: 4px 8px; text-align: center;">Thinking</th>
-                    </tr>
-                    {% for _mi in llm_module_info %}
-                    <tr>
-                        <td style="padding: 4px 8px; font-weight: bold;">{{ _mi.name }}</td>
-                        <td style="padding: 4px 8px;">
-                            {% if _mi.status == "disabled" %}
-                            <span style="color: #9ca3af;">{{ _mi.status_label }}</span>
-                            {% elif _mi.status == "failed" %}
-                            <span style="color: #c0392b;" title="{{ _mi.status_label }}">{{ _mi.status_label }}</span>
-                            {% elif _mi.status == "cached" %}
-                            <span style="color: #2e86c1;">{{ _mi.status_label }}</span>
-                            {% elif _mi.status == "success" %}
-                            <span style="color: #27ae60;">{{ _mi.status_label }}</span>
-                            {% elif _mi.status_label %}
-                            <span style="color: #aaa;">{{ _mi.status_label }}</span>
-                            {% endif %}
-                        </td>
-                        <td style="padding: 4px 8px;">{{ _mi.model or "—" }}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.total_tokens | thousands }}{% endif %}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.input_tokens | thousands }}{% endif %}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.output_tokens | thousands }}{% endif %}</td>
-                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.cache_hit_tokens | thousands }}{% endif %}</td>
-                        <td style="padding: 4px 8px; text-align: right;">
-                            {% if _mi.cost > 0 %}
-                            ¥{{ "%.4f"|format(_mi.cost) }}
-                            {% elif _mi.status == "cached" %}
-                            <span style="color: #999;">已计入原调用</span>
-                            {% else %}
-                            —
-                            {% endif %}
-                        </td>
-                        <td style="padding: 4px 8px; text-align: center;">
-                            {% if _mi.cached %}
-                            <span style="color: #2e86c1;">✓</span>
-                            {% elif _mi.status == "success" %}
-                            <span style="color: #ccc;">—</span>
-                            {% else %}
-                            —
-                            {% endif %}
-                        </td>
-                        <td style="padding: 4px 8px; text-align: center;">
-                            {% if _mi.thinking %}
-                            <span style="color: #8e44ad;">✓</span>
-                            {% elif _mi.status == "success" or _mi.status == "cached" %}
-                            <span style="color: #ccc;">—</span>
-                            {% else %}
-                            —
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-            {% endif %}
-
-            {# 调用次数 vs 模块明细差异注释 #}
-            <div style="margin-top: 8px; font-size: 11px; color: #999;">
-                注：API 调用次数统计实际发起的 API 请求总数（含截断后自动重试等），
-                各模块明细仅列最终结果；两者不一致属正常现象。
-            </div>
-
-            {% if cache_stats and cache_stats.get("total", 0) > 0 %}
-            <div style="margin-top: 16px; font-size: 13px; color: #555;">
-                <strong>系统数据缓存：</strong>
-                <table class="kv-table" style="margin-top: 6px;">
-                    <tr><td>缓存命中</td><td>{{ cache_stats["hits"] }} 次</td></tr>
-                    <tr><td>缓存未命中</td><td>{{ cache_stats["misses"] }} 次</td></tr>
-                    <tr><td>总请求</td><td>{{ cache_stats["total"] }} 次</td></tr>
-                    <tr><td>命中率</td><td>
-                        {%- if cache_stats["rate"] > 0 -%}
-                        {{ "%.1f"|format(cache_stats["rate"] * 100) }}%
-                        {%- else -%}
-                        —
-                        {%- endif -%}
-                    </td></tr>
-                </table>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
+{% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
     
@@ -1738,6 +1624,120 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 12: LLM API Usage -->
+    <div class="section" id="sec-llm_usage" style="order: {{ section_numbers['llm_usage'] }};">
+        <div class="section-title">{{ section_numbers['llm_usage'] }}、LLM API 用量</div>
+        <div class="section-content">
+            {% if llm_session_usage and llm_session_usage.get("has_usage") %}
+            <table class="kv-table">
+                <tr><td>API 调用次数</td><td>{{ llm_session_usage["call_count"] }} 次</td></tr>
+                <tr><td>模型</td><td>{{ llm_session_usage["model_display"] }}</td></tr>
+                <tr><td>Endpoint</td><td style="word-break: break-all; font-size: 13px;">{{ llm_endpoint or "—" }}</td></tr>
+                <tr><td>输入 token</td><td>{{ llm_session_usage["input_tokens"] | thousands }}</td></tr>
+                <tr><td>输出 token</td><td>{{ llm_session_usage["output_tokens"] | thousands }}</td></tr>
+                <tr><td>总 token</td><td>{{ llm_session_usage["total_tokens"] | thousands }}</td></tr>
+                {% if llm_session_usage["cache_hit_tokens"] %}
+                <tr><td>缓存命中 token</td><td>{{ llm_session_usage["cache_hit_tokens"] | thousands }}</td></tr>
+                {% endif %}
+                <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
+            </table>
+            {% endif %}
+
+            {% if llm_module_info %}
+            <div style="margin-top: 14px; font-size: 13px; color: #555;">
+                <strong>各模块明细：</strong>
+                <table class="kv-table" style="margin-top: 6px;">
+                    <tr style="background: #f5f5f5;">
+                        <th style="padding: 4px 8px; text-align: left;">模块</th>
+                        <th style="padding: 4px 8px; text-align: left;">状态</th>
+                        <th style="padding: 4px 8px; text-align: left;">模型</th>
+                        <th style="padding: 4px 8px; text-align: right;">总 Token 用量</th>
+                        <th style="padding: 4px 8px; text-align: right;">输入 Token</th>
+                        <th style="padding: 4px 8px; text-align: right;">输出 Token</th>
+                        <th style="padding: 4px 8px; text-align: right;">缓存命中 Token</th>
+                        <th style="padding: 4px 8px; text-align: right;">费用</th>
+                        <th style="padding: 4px 8px; text-align: center;">LLM 缓存</th>
+                        <th style="padding: 4px 8px; text-align: center;">Thinking</th>
+                    </tr>
+                    {% for _mi in llm_module_info %}
+                    <tr>
+                        <td style="padding: 4px 8px; font-weight: bold;">{{ _mi.name }}</td>
+                        <td style="padding: 4px 8px;">
+                            {% if _mi.status == "disabled" %}
+                            <span style="color: #9ca3af;">{{ _mi.status_label }}</span>
+                            {% elif _mi.status == "failed" %}
+                            <span style="color: #c0392b;" title="{{ _mi.status_label }}">{{ _mi.status_label }}</span>
+                            {% elif _mi.status == "cached" %}
+                            <span style="color: #2e86c1;">{{ _mi.status_label }}</span>
+                            {% elif _mi.status == "success" %}
+                            <span style="color: #27ae60;">{{ _mi.status_label }}</span>
+                            {% elif _mi.status_label %}
+                            <span style="color: #aaa;">{{ _mi.status_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 4px 8px;">{{ _mi.model or "—" }}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.total_tokens | thousands }}{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.input_tokens | thousands }}{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.output_tokens | thousands }}{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">{% if _mi.status == "unknown" %}—{% else %}{{ _mi.cache_hit_tokens | thousands }}{% endif %}</td>
+                        <td style="padding: 4px 8px; text-align: right;">
+                            {% if _mi.cost > 0 %}
+                            ¥{{ "%.4f"|format(_mi.cost) }}
+                            {% elif _mi.status == "cached" %}
+                            <span style="color: #999;">已计入原调用</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td style="padding: 4px 8px; text-align: center;">
+                            {% if _mi.cached %}
+                            <span style="color: #2e86c1;">✓</span>
+                            {% elif _mi.status == "success" %}
+                            <span style="color: #ccc;">—</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td style="padding: 4px 8px; text-align: center;">
+                            {% if _mi.thinking %}
+                            <span style="color: #8e44ad;">✓</span>
+                            {% elif _mi.status == "success" or _mi.status == "cached" %}
+                            <span style="color: #ccc;">—</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endif %}
+
+            {# 调用次数 vs 模块明细差异注释 #}
+            <div style="margin-top: 8px; font-size: 11px; color: #999;">
+                注：API 调用次数统计实际发起的 API 请求总数（含截断后自动重试等），
+                各模块明细仅列最终结果；两者不一致属正常现象。
+            </div>
+
+            {% if cache_stats and cache_stats.get("total", 0) > 0 %}
+            <div style="margin-top: 16px; font-size: 13px; color: #555;">
+                <strong>系统数据缓存：</strong>
+                <table class="kv-table" style="margin-top: 6px;">
+                    <tr><td>缓存命中</td><td>{{ cache_stats["hits"] }} 次</td></tr>
+                    <tr><td>缓存未命中</td><td>{{ cache_stats["misses"] }} 次</td></tr>
+                    <tr><td>总请求</td><td>{{ cache_stats["total"] }} 次</td></tr>
+                    <tr><td>命中率</td><td>
+                        {%- if cache_stats["rate"] > 0 -%}
+                        {{ "%.1f"|format(cache_stats["rate"] * 100) }}%
+                        {%- else -%}
+                        —
+                        {%- endif -%}
+                    </td></tr>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
     <!--  FOOTER                                                -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="report-footer" style="text-align: center; padding: 14px 20px; color: #999; font-size: 12px;">
