@@ -6,7 +6,7 @@
 
 ---
 
-## [0.4.3] - 未发布
+## [0.4.3] - 2026-07-13
 
 ### Fixed
 
@@ -18,6 +18,8 @@
 - **technical.md**：修复 F1 流程图类名（`SnapshotHoldings` → `SnapshotData`）、Fetcher 表 portfolio_history 路径标注、指纹表 3 处函数引用（`index.py`→`akshare_extras.py`、`_compute_code_fingerprint`→`compute_holdings_fingerprint`、`news_keywords.py:news_fingerprint`→`news_aggregator.py:_compute_cache_key`）、C6 约束函数名（`fetch_with_fallback()`→`_fetch_with_fallback()`）、缓存计数（23→24）共 5 处。
 - **how-to-config.md**：修复 `drawdown_analysis` 显示名（`回撤分析` → `历史回撤分析`）。
 - **reports-instruction.md**：新增「F 系列数据机制」章节，含 F1 快照/F2 走势各有详细分述 + 独立对比表。
+- **datasource-and-folders.md**：历史净值备用链路 `—`→`东方财富`；目录树新增 test_portfolio_history.py；更新 9 处子目录测试计数（providers 167/fetcher 189/handlers 31/report 1020/config 76/core 396/ui 164/integration 29/scenario 278）；test-reports 报告计数同步更新。
+- **test-coverage.md**：同步模式对应测试量（unit 2699/scenario 278/all 3006/report 1020）、功能域计数、场景分组计数、单元测试分组计数。
 
 ## [0.4.2] - 2026-07-13
 
