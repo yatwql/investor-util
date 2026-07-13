@@ -30,7 +30,7 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
     # 组合历史走势：历史数据 chains（复用现有 provider name，熔断器共享）
     "history_stock": ["tencent", "sina"],
-    "history_fund_otc": ["tiantian"],
+    "history_fund_otc": ["tiantian", "eastmoney"],
 }
 
 
@@ -284,6 +284,7 @@ _HISTORY_PROVIDER_MAP: dict[str, str] = {
     "tencent": "src.python.providers.tencent",
     "sina": "src.python.providers.sina",
     "tiantian": "src.python.providers.tiantian",
+    "eastmoney": "src.python.providers.eastmoney",
 }
 
 

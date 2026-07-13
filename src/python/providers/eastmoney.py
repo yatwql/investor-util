@@ -160,3 +160,61 @@ def _safe_float(s: str) -> float:
         return float(s)
     except (ValueError, TypeError):
         return 0.0
+
+
+def fetch_fund_nav_history(code: str) -> list[dict]:
+    """获取场外基金历史净值（备用链路）。
+
+    通过东方财富基金历史净值 API 获取全量历史净值数据，
+    与 tiantian.fetch_fund_nav_history() 返回格式兼容。
+
+    Args:
+        code: 6 位基金代码
+
+    Returns:
+        list[dict]: [{date, nav, acc_nav}, ...]
+        按日期升序排列。API 失败返回空列表。
+    """
+    params: dict[str, Any] = {
+        "callback": "jQuery",
+        "fundCode": code.strip(),
+        "pageIndex": 1,
+        "pageSize": 365,
+    }
+
+    try:
+        with make_http_client(timeout=_TIMEOUT) as client:
+            resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)
+            text = resp.text
+    except httpx.RequestError:
+        logger.warning("[eastmoney] 历史净值 API 请求失败: %s", code)
+        return []
+
+    json_str = _strip_jsonp(text)
+    try:
+        data = json.loads(json_str)
+    except json.JSONDecodeError:
+        logger.warning("[eastmoney] 历史净值 JSON 解析失败: %s", code)
+        return []
+
+    records = (data.get("Data", {}) or {}).get("LSJZList", [])
+    if not records:
+        logger.warning("[eastmoney] 无历史净值数据: %s", code)
+        return []
+
+    result: list[dict] = []
+    for r in records:
+        date_str = (r.get("FSRQ") or "").strip()
+        nav = _safe_float(r.get("DWJZ", "0"))
+        acc_nav = _safe_float(r.get("LJJZ", "0"))
+        if not date_str or (nav <= 0 and acc_nav <= 0):
+            continue
+        result.append({
+            "date": date_str,
+            "nav": nav,
+            "acc_nav": acc_nav,
+        })
+
+    # API 返回最新在前，按日期升序排列
+    result.sort(key=lambda x: x["date"])
+    return result
