@@ -24,7 +24,7 @@ LLM 板块（`llm`，#12~15、#18）已通过现有 `enabled_llm` 机制支持�
 - **板块关闭 = 完全跳过**：关闭板块时，对应的数据获取和输出渲染均跳过，不做"缓存预热"例外（见 §2.5）
 - **严格区分配置与运行时**：`enable_news`（配置字段，表示用户意愿）与 `news_data_available`（运行时标志，表示数据获取状态）**不可混淆**——前者是 board 层输入，后者是 data 层输入
 - **两端各自内联 board dict**：Excel 和 HTML 两端都各自构造 `{"always":True, "b_series":..., ...}` 字面量，不提取公共函数。行为一致性由集成测试保证
-- **遵循既有模式**：以 `llm_enabled` 的处理方式为模板（config.json 布尔字段 → handlers 读配置 → sheet_factory/html 双层判断）
+- **遵循既有模式**：以 `enabled_llm`（config 对象）的处理方式为模板（config.json → handlers 读配置 → sheet_factory/html 双层判断）
 - **向后兼容**：旧 config.json 缺少字段时视为 `true`
 - **数据层不变**：不改缓存引擎、Provider Chain、注册表 data_flag 字段
 
@@ -93,7 +93,7 @@ board_flags = {
     "b_series": enable_b_series,
     "news":     enable_news,      # ← 配置驱动的 board 层值，不是运行时 news_data_available
     "history":  enable_history,
-    "llm":      llm_enabled,
+    "llm":      enable_llm,
 }
 ```
 
@@ -115,7 +115,7 @@ board_flags = {
     "b_series": enable_b_series,
     "news":     enable_news,          # ← 配置驱动，非菜单驱动
     "history":  enable_history,
-    "llm":      llm_enabled_flag,
+    "llm":      enable_llm,           # ← board 层，从 enabled_llm 派生
 }
 
 # 数据层标志（不变，仍是各子模块的 data_available）
@@ -126,7 +126,7 @@ data_flags: dict[str, bool] = {
     "style_data":        style_analysis is not None,
     "news_data_available":      news_data_available,          # ← 运行时标志（菜单驱动），表示"数据是否已获取"
     "early_warnings":    bool(early_warnings),
-    "llm_enabled":       llm_enabled_flag,
+    "llm_enabled":       llm_data_available,                 # ← data 层：LLM 内容是否成功生成
 }
 
 # 两层合并
@@ -148,8 +148,8 @@ for sec in order:
 | `news_data_available` | data 层 | 数据获取状态 | 运行时标志——新闻数据是否已获取 |
 | `enable_b_series` | board 层 | config.json | 用户意愿——B 系列板块是否开启 |
 | `enable_history` | board 层 | config.json | 用户意愿——历史走势板块是否开启 |
-| `llm_enabled` | board+data 层 | config + 菜单 | 不变，继续复用 |
-| `llm_data_available` | data 层 | `llm_enabled` | 运行时标志——LLM 数据是否已获取 |
+| `enable_llm` | board 层 | config.json `enabled_llm` | 用户意愿——LLM 板块是否开启 |
+| `llm_data_available` | data 层 | LLM 生成状态 | 运行时标志——LLM 内容是否成功生成 |
 
 ### 2.5 数据流
 
@@ -158,7 +158,7 @@ config.json                          handlers_report.py
   ├─ enable_b_series ─────────────→ _cmd_generate_excel()    [E]
   ├─ enable_news    ─────────────→   │  → core 数据 → Excel 报告
   ├─ enable_history ─────────────→   │    （board 不影响数据获取，仅输出侧隐藏页签）
-  └─ (llm_enabled 已有)               │
+  └─ (enabled_llm config 已有)          │
                                        ├─ _cmd_generate_both()    [B]
                                        │  → core + news + B 系列 + F1/F2
                                        │  → Excel + HTML 报告
@@ -202,7 +202,7 @@ def create_sheets(
     enable_news=True,           # board 层：配置驱动（默认与 config 一致）
     llm_data_available=False,   # data 层：运行时标志
     enable_history=True,        # board 层：配置驱动
-    llm_enabled=True,           # board+data 层（同上）
+    enable_llm=True,            # board 层：配置驱动（从 enabled_llm 派生）
 ) -> dict:
 ```
 
@@ -214,7 +214,7 @@ board_flags = {
     "b_series": enable_b_series,
     "news":     enable_news,         # ← 配置驱动（非 news_data_available！）
     "history":  enable_history,
-    "llm":      llm_enabled,         # ← board 层（llm_data_available 用于 data 层）
+    "llm":      enable_llm,          # ← board 层（llm_data_available 用于 data 层）
 }
 
 for sec in section_order:
@@ -235,11 +235,13 @@ def _compute_section_visibility(
     manager_analysis, overlap_matrix,
     concentration_analysis, style_analysis,
     news_data_available: bool,                    # data 层：数据是否已获取
-    early_warnings, llm_enabled_flag,
+    early_warnings,
+    llm_data_available: bool,            # data 层：LLM 内容是否成功生成
     # ↓↓↓ 新增 board 层参数 ↓↓↓
     enable_news: bool = True,             # board 层：新闻板块是否开启（配置）
     enable_b_series: bool = True,         # board 层：B 系列板块是否开启
     enable_history: bool = True,          # board 层：历史走势板块是否开启
+    enable_llm: bool = True,              # board 层：LLM 板块是否开启（配置）
 ) -> tuple:
 ```
 
@@ -288,6 +290,7 @@ def _compute_section_visibility(
 | **历史数据获取代码重复** | 迭代 5 需改 2 处，可能漏改 | ✅ 提取 F2 历史获取为共享函数 `_fetch_history_data()` |
 | **F1 快照行为未定义**（enable_history=false 时） | F1 快照被误跳过导致环比链断裂 | ✅ §2.7 中明确 F1 不受影响，始终执行 |
 | **两层模型增加理解成本** | 后续开发者可维护性降低 | 代码注释标注两层逻辑；两端内联 board dict 保持代码局部性 |
+| **`news_data_available` 误用配置值**（传入 `enable_news` 而非真实数据状态 `news_available`） | enable_news=True + 数据获取失败 → 空内容页签 | ✅ §2.7/Iter5 中明确区分：`news_available = bool(news_data) if enable_news else False`，data 层传 `news_available` 非 `enable_news` |
 
 ### 2.9 进度汇报与冷启动说明
 
@@ -471,6 +474,9 @@ report_section_order = {"fund_manager": 1, ...}
 - 在 `should_create_sheet()` 之前用内联 board_flags dict 做 board 层预过滤
 - **连续重新编号**（见 §2.10）：不再调用 `set_sheet_title()`，改为在创建每个可见模块时按过滤后的可见顺序分配连续序号。`llm_usage` 强制末位（先创建其他可见页签，最后再创建 llm_usage 并赋予最大号）
 
+**实施前必须先确认所有引用点：**
+- 执行 `grep -rn "include_b_series" src/python/ src/test/` 确认无遗漏，再改类型签名
+
 **B. generator 改造：**
 - `generate_excel_report()` 移除 `include_b_series` 跟随旧 `include_news` 的联动逻辑（`excel_generator.py:62`）
 - 签名新增 `enable_b_series`、`enable_news`、`enable_history` 三个独立参数
@@ -497,7 +503,7 @@ report_section_order = {"fund_manager": 1, ...}
 - [ ] `"enable_b_series": false` 时，#6~9 不在 Excel 中创建
 - [ ] `"enable_news": false` 时，#10~11 不在 Excel 中创建
 - [ ] `"enable_history": false` 时，#16~17 不在 Excel 中创建
-- [ ] B 系列不再跟随 `news_data_available`：`news_data_available=False` + `enable_b_series=True` 时 B 系列页签仍创建
+- [ ] B 系列不再跟随旧 `include_news`：`enable_news=False`（旧 `include_news=False`）→ 不影响 B 系列页签创建，验证 `enable_b_series=True` 时 B 系列仍创建
 - [ ] 旧 `include_b_series` 参数兼容：仍然接受 `bool`，但不接受 `None`
 - [ ] 各字段缺省时默认开启（向后兼容，行为不变）
 - [ ] E 菜单不受 3 个新字段影响（它原本就不含这些板块；H 已取消）
@@ -524,18 +530,20 @@ def _compute_section_visibility(
     order, manager_analysis, overlap_matrix,
     concentration_analysis, style_analysis,
     news_data_available: bool,               # data 层：数据是否已获取
-    early_warnings, llm_enabled_flag,
+    early_warnings,
+    llm_data_available: bool,               # data 层：LLM 内容是否成功生成
     # ↓↓↓ board 层新增参数 ↓↓↓
     enable_news: bool = True,        # board 层：配置驱动（不是 news_data_available！）
     enable_b_series: bool = True,
     enable_history: bool = True,
+    enable_llm: bool = True,         # board 层：配置驱动（从 enabled_llm 派生）
 ):
     board_flags = {
         "always":   True,
         "b_series": enable_b_series,
         "news":     enable_news,            # ← 配置字段
         "history":  enable_history,
-        "llm":      llm_enabled_flag,
+        "llm":      enable_llm,             # ← board 层
     }
     data_flags = {
         "manager_data":       manager_analysis is not None,
@@ -544,7 +552,7 @@ def _compute_section_visibility(
         "style_data":         style_analysis is not None,
         "news_data_available":       news_data_available,  # ← data 层（菜单驱动）
         "early_warnings":     bool(early_warnings),
-        "llm_enabled":        llm_enabled_flag,
+        "llm_enabled":        llm_data_available,         # ← data 层（LLM 生成成功？）
     }
     section_visible_dict = {}
     for sec in order:
@@ -694,11 +702,18 @@ def _cmd_generate_both():
     if enable_news:
         news_data = build_news_data(...)
     else:
+        news_data = None
         logger.info("[板块配置] 新闻板块已关闭，跳过数据获取")
+
+    # 关键：data 层标志反映真实数据状态，而非配置值
+    # enable_news=True 但网络/API 失败时 → news_available=False
+    # 避免新闻板块"显示但空内容"（两层模型正确拦截）
+    news_available = bool(news_data) if enable_news else False
 
     if enable_b_series:
         manager_data = fetch_fund_manager_data(...)
     else:
+        manager_data = None
         logger.info("[板块配置] B 系列已关闭，跳过数据获取")
 
     _history_mode = config.get("history", {}).get("analysis", "off")
@@ -707,18 +722,18 @@ def _cmd_generate_both():
     else:
         logger.info("[板块配置] 历史走势已关闭，跳过数据获取")
 
-    # 输出侧继续传 board_flags（用于页签隐藏）
-    _generate_excel_report(holdings, news_data_available=enable_news,
+    # 输出侧：board 层传 enable_xxx，data 层传真实数据状态
+    _generate_excel_report(holdings, news_data_available=news_available,
                            enable_b_series=enable_b_series,
                            enable_news=enable_news,
                            enable_history=enable_history, ...)
-    write_html_report(holdings, news_data_available=enable_news,
+    write_html_report(holdings, news_data_available=news_available,
                       enable_b_series=enable_b_series,
                       enable_news=enable_news,
                       enable_history=enable_history, ...)
 ```
 
-注意 B 菜单中 `news_data_available` 现在直接使用 `enable_news`（配置值）而非 `True`——因为取消 H 后，`news_data_available` 作为 "data 层是否已获取" 的标志与 board 层 `enable_news` 合并（获取=配置，无需分离）。
+> **关键区分**：`news_data_available`（data 层）传递 `news_available`（真实数据状态），**不是** `enable_news`（配置值）。这确保网络/API 失败时两层模型正确拦截空内容。B 系列和 F2 同理，它们的 data 层标志由内部模块的 `is not None` 判断自行决定。详见 §5 风险表新增项。
 
 **D. TUI 进度汇报联动（见 §2.9）：**
 - 每个条件判断前插入 `progress.update()` 或 `progress.log()`，板块关闭时输出 `[板块配置] %s 已关闭，跳过` 进度提示
@@ -734,6 +749,7 @@ def _cmd_generate_both():
 - E 菜单下即使 board 全开，验证 `build_news_data` **未被调用**（1 项，E 不受 board 影响）
 - 验证 F1 快照在 B/L 菜单下 `enable_history=False` 时仍然执行（mock `SnapshotData.save` 验证）（1 项）
 - 验证 `_capture_snapshot()` 提取后 `_cmd_generate_both()` 和 `_cmd_generate_full()` 中 F1 代码已消除重复（调用同一共享函数）（1 项）
+- mock `enable_news=True` + `build_news_data()` 返回 None → 验证 `news_data_available=False` 传递到输出侧（data 层正确反映真实状态，非配置值）（1 项）
 
 **验收标准：**
 - [x] H 菜单已移除，`_cmd_generate_html()` 函数已删除
@@ -746,7 +762,8 @@ def _cmd_generate_both():
 - [x] 日志可追踪：板块关闭时 log INFO 记录
 - [x] F2 历史获取重复代码已消除（`_cmd_generate_both` 和 `_cmd_generate_full` 中调用 `_fetch_history_data()`）
 - [x] F1 快照重复代码已消除（`_cmd_generate_both` 和 `_cmd_generate_full` 中调用 `_capture_snapshot()`）
-- [x] 测试 ≥9 项，全部通过
+- [x] `news_data_available` 传递真实数据状态（`news_available`）而非配置值（`enable_news`）
+- [x] 测试 ≥10 项，全部通过
 
 **可回退**：纯行为修正，不新增接口。回退只需恢复 `handlers_report.py` 中的条件判断、`_capture_snapshot()`、`_fetch_history_data()` 和 `_cmd_generate_html` 函数。
 
