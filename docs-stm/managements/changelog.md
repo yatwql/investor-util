@@ -24,7 +24,9 @@
 
 ### Changed
 
-- **CDN 链路优化 + 原生 Canvas 即时渲染**：`report_template.html` 重构图表渲染架构——新增 `drawSimpleChart()` 原生 Canvas 2D 函数（无外部依赖、即刻渲染），双图表脚本改为同步原生渲染+后台 Chart.js 升级模式，消除 CDN 白屏等待。CDN 链路首位新增 `bootcdn.net`（国内加速），移除始终超时的 `cdnjs.cloudflare.com`。修复 cssText 覆盖导致画布溢出视口的 Bug（`canvas.style.cssText` → `canvas.clientWidth`）。
+- **CDN 链路优化 + 原生 Canvas 即时渲染**：`report_template.html` 重构图表渲染架构——新增 `drawSimpleChart()` 原生 Canvas 2D 函数（无外部依赖、即刻渲染），双图表脚本改为同步原生渲染+后台 Chart.js 升级模式，消除 CDN 白屏等待。CDN 链路首位新增 `bootcdn.net`（国内加速），移除始终超时的 `cdnjs.cloudflare.com`。
+  - **v1** 修复 cssText 覆盖导致画布溢出的 Bug（`canvas.style.cssText` → `canvas.clientWidth`）
+  - **v2.1** `canvas.clientWidth` 仍可能因父容器被撑宽而溢出 → 追加 `Math.min(..., window.innerWidth - 96)` 硬钳制 + `canvas.style.width = dispW + 'px'` 锁死 CSS 显示宽度 + Chart.js 升级改传 canvas 元素而非 2D 上下文（避免 `ctx.scale(dpr)` 残留）+ `responsive: false` 禁止 Chart.js 篡改尺寸
 - **降级日志增强**：`chain.py` 全部 degrade/fallback 日志附加 `_code_tag`（代码+名称），降级时明确标识受影响资产。`price.py` 新增 00 代码降级/成功两阶段日志。
 - **`max_tokens_global_macro` 1024→2048**：`_core.py` 提高 LLM 全局宏观提示词的最大 token 数，允许生成更长的宏观分析内容。
 - **`progress.py` / `tui_menu.py`**：联动适配，`ProgressReporter` 输出格式微调，`tui_menu` 颜色常量提升为模块级别供 logger.py 引用。

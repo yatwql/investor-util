@@ -41,16 +41,24 @@ https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js
 
 **关键 Bug 修复**（从"翻几页都翻不完"到"一屏可见"）：
 
-原始代码使用了 `canvas.style.cssText = 'width:'+width+'px;height:'+height+'px;'`，这会**覆盖** canvas 内联的 `style="width:100%;height:350px;"`，将显示宽度固定为计算后的像素值（如 1200px），导致画布远超出屏幕视口宽度，用户需要横向滚动多屏才能看全。
+| 版本 | 问题 | 修复 |
+|------|------|------|
+| v1 | `canvas.style.cssText = 'width:'+width+'px'` 用 buffer 宽度覆盖 CSS 显示宽度，画布远超出视口 | 改为读取 `canvas.clientWidth`，不动 CSS |
+| v2.1 | `canvas.clientWidth` 返回的是父容器计算宽度，若父容器被其他内容撑宽，canvas 仍会溢出视口；且 Chart.js `responsive:true` 接管后又可能重设宽度 | 用 `Math.min(canvas.clientWidth, window.innerWidth - 96)` 做硬钳制，然后 `canvas.style.width = dispW + 'px'` 显式锁死 CSS 宽度 + `responsive: false` 禁止 Chart.js 篡改 |
 
-修复后改为读取 `canvas.clientWidth`（CSS 计算后的实际显示宽度），**不动 canvas.style**，让 CSS 规则 `canvas { max-width: 100%; }` 和内联 `style="width:100%"` 正常生效。canvas 缓冲区宽高设为 `dispW * dpr` 保证高清屏清晰度。
+**v2.1 核心逻辑**：
 
-### 改动 3：两个图表渲染脚本 → 即时原生渲染 + 后台 Chart.js 升级
+1. `dispW = Math.min(canvas.clientWidth, window.innerWidth - 96)` —— 以窗口宽度为硬上限
+2. `canvas.style.width = dispW + 'px'` —— 用像素值锁定 CSS 显示尺寸，防止父容器 flex/grid 溢出将其撑宽
+3. Chart.js 升级时 **传 canvas 元素而非 2D 上下文**，避免上下文残留 `ctx.scale(dpr)` 导致 Chart.js 绘图错位
+4. Chart.js 选项 `responsive: false` —— 使用 canvas 已有尺寸（即 drawSimpleChart 锁定的大小），Chart.js 只负责绘制交互层（tooltip），不改尺寸
+
+### 改动 3：两个图表渲染脚本 → 即时原生渲染 + 后台 Chart.js 升级（responsive:false）
 
 **组合走势图**（portfolioChart）和**回撤图**（drawdownChart）的内联渲染脚本：
 - **同步阶段**（页面解析到此 `<script>` 时）：立即调用 `drawSimpleChart()` 渲染，毫秒级
 - **异步阶段**：`setInterval` 每 300ms 轮询 `window.Chart` 是否加载完成
-  - 加载完成 → 创建新的 `Chart` 实例替换 canvas 内容（保持交互 tooltip）
+  - 加载完成 → 传 canvas 元素给 `new Chart(element, {responsive: false, ...})` 在同个 canvas 上叠加交互 tooltip，**不改 canvas CSS 尺寸**
   - 10s 后停止轮询，保持原生静态渲染结果
 - Chart.js 加载异常（CDN 全挂）→ 原生渲染结果保持，不会回退到白屏或错误文本
 
