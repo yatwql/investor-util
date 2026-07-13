@@ -44,6 +44,7 @@
     "fund_overlap": 604800,
     "fund_concentration": 2592000,
     "fund_style_snapshot": 2592000,
+    "extended": 86400,
     "benchmark": 2592000,
     "tracking": 2592000,
     "history_stock": 604800,
@@ -68,8 +69,10 @@
   // ── E. 业绩基准 ──
   "user_fund_benchmarks": {},
 
-  // ── F. 组合历史对比分析 ──
+  // ── F. 组合历史走势（F2） + 持仓快照（F1） ──
   "history": {
-    "analysis": "auto"
+    "analysis": "auto",
+    "snapshot_retention_days": 60,
+    "snapshot_max_count": 365
   }
 }
