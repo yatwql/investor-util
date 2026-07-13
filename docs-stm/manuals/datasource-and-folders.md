@@ -24,7 +24,7 @@
 
 ---
 
-# 目录结构
+## 目录结构
 
 ```
 investor-util/
@@ -324,7 +324,10 @@ investor-util/
 │   │   ├── llm_key.json              # LLM 密钥 — provider / api_key / model / endpoint / fallback
 │   │   └── llm_settings.json         # LLM 参数 — temperature / max_tokens / thinking / system_prompt
 │   │
-│   └── ...（其他子目录不存在，仅以上三个）
+│   ├── history/                      # 历史走势数据（自动生成）
+│   │   └── snapshots/                # 持仓快照（F1，自动生成，保留 60 天）
+│   │
+│   └── ...（其他子目录不存在，仅以上四个）
 │
 ├── reports/                          # 报告输出目录，保存最新版与按日期归档的历史报告
 ├── logs/                             # 程序日志（app.log，自动生成）

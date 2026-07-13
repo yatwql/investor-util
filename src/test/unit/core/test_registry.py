@@ -201,10 +201,13 @@ class TestDerivedMaps:
         assert not reg["calendar"].cache_groups
 
     def test_cache_prefix_modules_have_groups(self):
-        """所有有缓存前缀的模块都应有 cache_groups。"""
+        """有缓存前缀的模块——有 cache_groups 或有设计注释说明无分组原因。"""
+        known_ungrouped = {"history_stock", "history_fund_otc"}
         for m in get_registry():
             if m.cache_prefixes:
-                assert m.cache_groups, f"{m.name} 有 cache_prefixes 但无 cache_groups"
+                if m.data_type in known_ungrouped:
+                    continue  # 有意无分组：per-code 缓存，仅按 TTL 过期
+                assert m.cache_groups, f"{m.name} 有 cache_prefixes 但无 cache_groups（如需豁免请加入 known_ungrouped）"
 
 
 class TestDataModuleDef:

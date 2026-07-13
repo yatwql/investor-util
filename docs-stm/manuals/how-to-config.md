@@ -53,7 +53,7 @@
   // ── E. 业绩基准 ──
   "user_fund_benchmarks": {},
 
-  // ── F. 组合历史走势 & 持仓快照 ──
+  // ── F. 组合历史走势（F2）& G. 持仓快照（F1） ──
   "history": {
     "analysis": "off",
     "snapshot_retention_days": 60,
@@ -90,12 +90,12 @@
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 
 ---
+
 ### B. 数据源与提供商
 
-## news_sources 可调字段
+#### news_sources 可调字段
 
 | 子字段 | 默认 | 说明 |
-|--------|------|------|
 | `sina` | `true` | 新浪财经（财经要闻/国内/国际，正常工作） |
 | `eastmoney` | `true` | 东方财富（np-weblist 快讯接口，req_trace 参数，稳定可用） |
 | `cls` | `false` | 财联社（API 要求签名鉴权，匿名请求不可用） |
@@ -104,7 +104,7 @@
 
 > **用法：** 将值改为 `true` 或 `false` 即可启用/禁用对应新闻源。
 
-## preferred_provider 可调字段
+#### preferred_provider 可调字段
 
 `preferred_provider` 用于手动指定某类数据的首选提供商，将其提到 Provider Chain 第一位。不配置时全部走默认优先级，一个源失败后自动递补备用。
 
@@ -146,7 +146,7 @@
 ---
 ### C. 市场时段与缓存
 
-## market_hours 可调参数
+#### market_hours 可调参数
 
 `market_hours` 控制 A 股交易时段判断，用于盘中实时行情（短 TTL）和盘后收盘价（长 TTL）的自动切换。
 
@@ -166,7 +166,7 @@
 
 > **午餐休市：** 实际交易分为 09:30–11:30（上午）和 13:00–15:00（下午）两段。即使 `start`/`end` 覆盖为 `"09:30"`/`"15:00"`，午餐时段（11:30–13:00）自动视为非交易时段并回落长 TTL。`official_source: true` 时 API 返回 `status=3`（午间休市）也会让系统识别午餐休市。
 
-## cache_ttl 可调参数
+#### cache_ttl 可调参数
 
 > `—` 表示该缓存类型文件名为精确键名（无指纹后缀），不受持仓变化影响，仅在 TTL 到期后刷新。
 
@@ -228,7 +228,7 @@
 ---
 ### D. 行为调优
 
-## early_warning 可调参数
+#### early_warning 可调参数
 
 `early_warning` 控制智能预警模块的行为，用于发现持仓组合的异常信号。
 
@@ -240,7 +240,7 @@
 
 > 阈值均为负值（元），绝对值越大越不容易触发预警。默认值适合 A 股中等市值组合；持仓规模较大时可适当调高（如 warning 调至 -1 亿、danger 调至 -5 亿）。
 
-## degradation 数据降级策略
+#### degradation 数据降级策略
 
 `degradation` 控制数据降级行为，定义各层级数据在连续失败或空数据返回时切换到降级模式的阈值。
 
@@ -270,7 +270,7 @@
 > 
 > T4 阈值最严格（1 次失败即降级）：核心价格/指数数据需要快速切换降级策略。T2/T3 允许更多容错（2~3 次），避免偶发网络波动触发不必要的降级。
 
-## report_section_order 报告序号配置
+#### report_section_order 报告序号配置
 
 `report_section_order` 用于自定义报告 18 个模块的显示序号和排列顺序。
 
@@ -339,7 +339,7 @@
 ---
 ### E. 业绩基准
 
-## user_fund_benchmarks 自定义基准
+#### user_fund_benchmarks 自定义基准
 
 `user_fund_benchmarks` 用于覆盖部分基金的业绩比较基准。代码内置了主流宽基/行业指数（沪深 300、中证 500、纳斯达克 100 等），遇到不在内置库中的基金时，可通过此字段手动指定。
 
@@ -360,7 +360,7 @@
 ---
 ### F. 组合历史走势（F2）
 
-## history.analysis 历史走势获取模式
+#### history.analysis 历史走势获取模式
 
 `history.analysis` 控制组合历史走势（F2）的获取行为：
 
