@@ -281,8 +281,10 @@ def _expand_industry_keywords(
                 if extra_kw:
                     all_kw = list(set(keywords + extra_kw))
                     all_kw.sort(key=lambda x: (-len(x), x))
-                    logger.info("行业/概念关键词扩展: 新增 %d 个 → 共 %d 个",
-                                len(extra_kw), len(all_kw))
+                    # 计算真正新增数（不在原始 keywords 中的行业/概念）
+                    new_count = len(set(extra_kw) - set(keywords))
+                    logger.info("行业/概念关键词扩展: 实增 %d 个 → 共 %d 个",
+                                new_count, len(all_kw))
                     return all_kw, industry_data
     except Exception as e:
         logger.warning("行业/概念数据获取失败（非关键错误，继续）: %s", e)
