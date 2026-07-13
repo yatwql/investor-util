@@ -416,6 +416,7 @@ investor-util/
 │       ├── plan.md                   # 实现计划（关键技术决策 + 下一步迭代计划）
 │       ├── requirements.md           # 需求文档（完整需求规格）
 │       ├── technical.md              # 技术设计文档
+│       ├── llm-technical.md          # LLM 客户端架构与技术细节
 │       ├── testplan.md               # 质量控制与测试标准
 │       ├── changelog.md              # 变更日志 — 当前 [Unreleased] 版本；v0.1.x/v0.2.x 完整记录见 archives/
 │       ├── test-coverage.md          # 测试覆盖统计（mode/功能域/场景分组/单元分组/跨类标记）

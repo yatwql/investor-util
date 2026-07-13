@@ -71,6 +71,7 @@
 | [迭代计划](docs-stm/managements/plan.md) | 迭代计划 |
 | [需求文档](docs-stm/managements/requirements.md) | 完整需求定义 |
 | [技术设计](docs-stm/managements/technical.md) | 技术设计 |
+| [LLM 技术要点](docs-stm/managements/llm-technical.md) | LLM 客户端架构与技术细节 |
 | [质量控制与测试标准](docs-stm/managements/testplan.md) | 质量控制与测试标准 |
 | [测试覆盖情况](docs-stm/managements/test-coverage.md) | 测试覆盖情况 |
 | [自审记录](docs-stm/managements/review-findings.md) | 自我审查问题记录 |

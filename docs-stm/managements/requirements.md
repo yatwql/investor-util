@@ -138,7 +138,7 @@
 
 | 菜单 | 功能 | 清除范围 |
 |---|---|---|
-| `[1] 更新基础类缓存` | 清除 refresh 组缓存（基金业绩/持仓/基准/行业/新闻/新闻LLM/盈利预测/资金流向/分红/基金经理/重合度）后重新拉取 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_item_*`（对应 `llm_news_correlation` 分组）、`profit_forecast_*`、`sector_flow_*`、`dividend_*`、`fund_manager_*`、`fund_overlap_*` |
+| `[1] 更新基础类缓存` | 清除 refresh 组缓存（基金业绩/持仓/基准/行业/新闻/新闻LLM/盈利预测/资金流向/分红/基金经理/重合度/基金风格扩展数据）后重新拉取 | `fund_perf_*`、`fund_hold_*`、`fund_benchmarks.json`、`industry_*`、`news_*`、`llm_news_item_*`（对应 `llm_news_correlation` 分组）、`profit_forecast_*`、`sector_flow_*`、`dividend_*`、`fund_manager_*`、`fund_overlap_*`、`extended_*` |
 | `[2] 更新持仓类缓存` | 清除 preload 组缓存（价格/指数行情，LLM 四大分析模块）后重新拉取 | `price_*`、`index_*`、`llm_global_macro_*`、`llm_expert_review_*`、`llm_health_check_*`、`llm_penetration_deep_*`（`llm_news_correlation` 归菜单 [1]） |
 | `[3] 清理过期缓存` | 按 TTL 扫描删除过期文件 | 全部过期缓存 |
 | `[4] 查看缓存统计` | 只读统计 | — |
@@ -185,6 +185,7 @@
 | `fund_overlap` | 实时计算，无独立缓存（推导自 `fund_hold_{code}.json`） | 7 天 | — | 持仓重合度数据（前缀用于清理注册） |
 | `fund_concentration` | `fund_concentration_snapshot.json` | 30 天 | — | 集中度历史快照（精确键名，无分组） |
 | `fund_style_snapshot` | `fund_style_snapshot.json` | 30 天 | — | 风格快照（精确键名，无分组） |
+| `extended` | `extended_{code}.json` | 24h | — | 基金风格扩展数据（市值/PE），refresh 组 |
 
 #### 历史走势类
 
@@ -642,14 +643,18 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | `total_return_pct` | float | 累计收益率（百分比） |
 | `max_drawdown` | float | 最大回撤金额 |
 | `max_drawdown_pct` | float | 最大回撤幅度（百分比） |
-| `drawdown_start` | str | 最大回撤开始日期 |
+| `drawdown_start` | str | 最大回撤开始日期（始于峰值日） |
 | `drawdown_end` | str | 最大回撤结束日期 |
 | `annualized_volatility` | float | 年化波动率 |
 | `status` | str | `"ok"` / `"degraded"`（部分持仓不可用）/ `"unavailable"` |
 | `warnings` | list[str] | 降级/异常提示信息列表 |
+| `failed_holdings` | list[str] | 获取失败的持仓名称(代码)列表 |
+| `successful_holdings` | list[str] | 获取成功的持仓名称(代码)列表 |
+| `data_start` | str | 数据起始日期（首条 bars 日期） |
+| `data_end` | str | 数据截止日期（末条 bars 日期） |
 
 **渲染形式：**
-- **HTML**：Chart.js 折线图（市值曲线）+ 3 个摘要卡片（累计收益/最大回撤/年化波动率）+ 降级提示信息
+- **HTML**：原生 Canvas 即时渲染（drawSimpleChart 折线图）+ 3 个摘要卡片（累计收益/最大回撤/年化波动率）+ 降级提示信息
 - **Excel**：该模块在 Excel 中仅以灰色占位文本呈现（数据不可用提示），完整图表内容仅在 HTML 报告中展示
 
 **触发条件：**
@@ -671,10 +676,10 @@ Jaccard = |A ∩ B| / |A ∪ B|
 |:-----|:-----|
 | 最大回撤幅度 | `max_drawdown_pct`，历史最深回撤百分比 |
 | 最大回撤金额 | `max_drawdown`，历史最深回撤金额 |
-| 回撤区间 | `drawdown_start` → `drawdown_end`，最大回撤的起止日期区间 |
+| 回撤区间 | `drawdown_start` → `drawdown_end`，最大回撤的起止日期区间（`drawdown_start` 始于峰值日） |
 
 **渲染形式：**
-- **HTML**：Chart.js 面积图（回撤曲线，红色填充）+ 3 个摘要卡片（回撤幅度/回撤金额/回撤区间）
+- **HTML**：原生 Canvas 即时渲染（drawSimpleChart 回撤面积图，红色填充）+ 3 个摘要卡片（回撤幅度/回撤金额/回撤区间）
 - **Excel**：该模块在 Excel 中仅以灰色占位文本呈现（数据不可用提示），完整图表内容仅在 HTML 报告中展示
 
 ### 8.3 取价方式规范

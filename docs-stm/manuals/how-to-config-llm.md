@@ -266,6 +266,16 @@ LLM 配置拆分为两个独立文件，分工明确：
 > 设为 `null` 表示回退使用代码内置提示词，升级代码时可自动获取更新。
 > 查看内置提示词内容：`grep -n "_SYSTEM_" src/python/llm/prompts.py`
 
+**示例** — 让智囊团深度复盘输出英文摘要：
+
+```json
+{
+  "system_prompt_expert_review": "You are an investment expert. Analyze the portfolio data and provide a concise review in English, including risk assessment and rebalancing suggestions. Keep the output within 500 words."
+}
+```
+
+> 注意：覆盖后不会随代码升级自动更新，移除该字段或设为 `null` 即可恢复内置提示词。
+
 ---
 
 ## 配置项总览
@@ -313,7 +323,7 @@ LLM 配置拆分为两个独立文件，分工明确：
 | `thinking_budget_{module}` | int | 4000~16000（模块差异） | **仅 Claude** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足到 `max_tokens` + 4096 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
-> **各模块默认值差异表**：详细推荐值见下方「各模块推荐参数值」章节。
+> **各模块默认值差异表**：温度、max_tokens、timeout、thinking 等默认值因模块而异，详见 [各模块推荐参数值](#各模块推荐参数值)。
 
 <details>
 <summary><b>📄 llm_settings.json 完整参考</b>（点击展开）</summary>
@@ -491,7 +501,8 @@ LLM 配置拆分为两个独立文件，分工明确：
 | `max_tokens_expert_review` | **最终输出文本**的最大 token 数 | 8192 |
 | `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 16000 |
 
-模型先消耗 `thinking_budget` 做内部推理（该部分不可见），再从剩余额度里吐出最终回答（不超过 `max_tokens`）：
+<details>
+<summary>模型先消耗 `thinking_budget` 做内部推理（该部分不可见），再从剩余额度里吐出最终回答（不超过 `max_tokens`）— 点击查看示意图</summary>
 
 ```
 ┌─── thinking_budget_expert_review: 16000 ────────────────┐
@@ -503,6 +514,7 @@ LLM 配置拆分为两个独立文件，分工明确：
 │                   总计 ~11000 tokens（API 按此计价）    │
 └───────────────────────────────────────────────────────┘
 ```
+</details>
 
 **API 硬性约束（仅 Claude）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。默认值已满足：
 

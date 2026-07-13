@@ -116,7 +116,8 @@ LLM API 用量页签/章节被动跟踪以下 5 个子模块（1 个可选）的
 
 ##### 全缓存场景示例
 
-所有 5 个模块均为缓存命中（含已启用 LLM 新闻关联分析），无实际 API 调用：
+<details>
+<summary>点击展开</summary>
 
 ```
 LLM API 用量
@@ -130,10 +131,12 @@ LLM API 用量
 穿透深度分析			缓存	deepseek-v4-flash	3,600		1,000		4,600		1,200			已计入原调用		✓		—
 新闻关联分析(LLM)		缓存	deepseek-v4-flash	1,500		500			2,000		800				已计入原调用		✓		—
 ```
+</details>
 
 ##### 含新闻关联分析的示例
 
-假设某次菜单 L 生成了全部 5 个模块，其中全球政经局势命中缓存，新闻关联分析启用：
+<details>
+<summary>点击展开</summary>
 
 ```
 LLM API 用量
@@ -154,6 +157,7 @@ Endpoint       https://api.anthropic.com/v1/messages
 穿透深度分析			成功	deepseek...	3,600		1,000		4,600	—		¥0.0064	—	—
 新闻关联分析(LLM)		成功	deepseek...	2,345		1,655		4,000	—		¥0.0057	—	—
 ```
+</details>
 
 ### HTML 格式
 
@@ -183,6 +187,8 @@ Endpoint       https://api.anthropic.com/v1/messages
 ---
 
 ## 基金业绩评价标准
+
+一句话：天天基金同类排名 → 类型差异化阈值 → 超额收益修正，三级判定。
 
 基金业绩分析采用 **三层计算逻辑**，数据来源于天天基金 API：
 

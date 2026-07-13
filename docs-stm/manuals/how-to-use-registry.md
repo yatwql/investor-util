@@ -58,7 +58,7 @@ class DataModuleDef:
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
 | **补充数据（refresh）** | 盈利预测、资金流向、分红 | `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
-| **基金深度分析（refresh）** | 基金经理、持仓重合度 | `fund_manager`, `fund_overlap` | 24h~7d | 基金深度分析模块，主动刷新触发 |
+| **基金深度分析（refresh）** | 基金经理、持仓重合度、基金风格扩展数据 | `fund_manager`, `fund_overlap`, `extended` | 24h~7d | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
 | **历史走势类（无分组）** | 历史股票日线、历史基金净值 | `history_stock`, `history_fund_otc` | 1w~1M | 无分组保护，不被菜单缓存命令误删，通过 `portfolio_history.py` 内部路由自动管理 |
 | **精确键名（含 refresh）** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | `benchmark` 归入 `refresh` 组，`tracking`/`calendar` 无分组 |
@@ -149,83 +149,45 @@ from src.python.registry import (
 - `get_report_sheet_name("penetration")` → `"资产穿透TOP10"`
 - 可选键名：`summary`, `market_value`, `category`, `penetration`, `fund_performance`, `early_warning`, `fund_manager`, `fund_overlap`, `fund_concentration`, `fund_style`, `portfolio_history`, `drawdown_analysis`
 
-| 键名 | 中文标题 | 默认 Excel 序号 |
-|------|---------|:--------------:|
-| `summary` | 投资分析汇总 | 1. |
-| `market_value` | 市值核算明细表 | 2. |
-| `category` | 持仓分类表 | 3. |
-| `penetration` | 资产穿透TOP10 | 4. |
-| `fund_performance` | 基金业绩分析 | 5. |
-| `fund_manager` | 基金经理变更监控 | 6. |
-| `fund_overlap` | 持仓重合度矩阵 | 7. |
-| `fund_concentration` | 持仓集中度监控 | 8. |
-| `fund_style` | 基金风格分析 | 9. |
-| — | 财经新闻热点与持仓关联分析（通过 `get_llm_module_name("news_correlation")` 获取标题） | 10. |
-| `early_warning` | 智能预警 | 11. |
-| — | 全球政经局势（通过 `get_llm_module_name("global_macro")` 获取标题） | 12. |
-| — | 智囊团深度复盘（通过 `get_llm_module_name("expert_review")` 获取标题） | 13. |
-| — | 持仓体检报告（通过 `get_llm_module_name("health_check")` 获取标题） | 14. |
-| — | 穿透深度分析（通过 `get_llm_module_name("penetration_deep")` 获取标题） | 15. |
-| `portfolio_history` | 组合历史走势 | 16. |
-| `drawdown_analysis` | 回撤分析 | 17. |
-| — | LLM API 用量（通过 `get_report_sheet_name("llm_usage")` 获取标题） | 18.（注） |
+| 键名 | 中文标题 |
+|------|---------|
+| `summary` | 投资分析汇总 |
+| `market_value` | 市值核算明细表 |
+| `category` | 持仓分类表 |
+| `penetration` | 资产穿透TOP10 |
+| `fund_performance` | 基金业绩分析 |
+| `fund_manager` | 基金经理变更监控 |
+| `fund_overlap` | 持仓重合度矩阵 |
+| `fund_concentration` | 持仓集中度监控 |
+| `fund_style` | 基金风格分析 |
+| `early_warning` | 智能预警 |
+| `portfolio_history` | 组合历史走势 |
+| `drawdown_analysis` | 回撤分析 |
 
-第 12 至 15 号位置为 LLM 分析模块页签区，共 4 个页签，按注册表 `_REPORT_SECTION_DEFAULT` 顺序排列：
+LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取：全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析（第 12~15 号）及财经新闻热点与持仓关联分析（第 10 号）。LLM API 用量页签第 18 号为程序自动生成，不依赖 registry。
 
-| 页签内容 | 对应 `settings_suffix` | 默认 Excel 序号 |
-|---------|----------------------|:--------------:|
-| 全球政经局势 | `global_macro` | 12. |
-| 智囊团深度复盘 | `expert_review` | 13. |
-| 持仓体检报告 | `health_check` | 14. |
-| 穿透深度分析 | `penetration_deep` | 15. |
-
-第 16~17 号（组合历史走势 / 回撤分析）始终显示，数据不可用时显示占位文本。第 18 号为 LLM API 用量页签，程序自动生成，仅菜单 L 时显示。
-
-> LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取，无需在 `get_report_sheet_name()` 中录入。第 10 号的新闻页签虽使用 `get_llm_module_name("news_correlation")` 获取标题，但它独立于 LLM 分析模块区（第 12~15 号），在新闻数据就绪时写入。第 18 号的 LLM API 用量页签为程序生成，不依赖 registry。
->
-> 上表序号为**默认值**，用户可通过 `config.json` 的 `report_section_order` 字段自定义各模块序号和排列顺序。配置式序号后 `_create_sheets()` 按配置顺序创建页签，Excel 物理排序与显示顺序一致。
+完整 18 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
 
 ---
 
-## 消费方清单
-
-registry 的派生产出被以下模块消费：
+## 消费方清单（代表性）
 
 | 消费方 | 调用的 API | 用途 |
 |--------|-----------|------|
-| `src/python/config/_core.py` | `get_known_llm_settings_keys()`, `get_report_section_keys()` | 配置校验 + 报表键名验证 |
-| `src/python/config/_defaults.py` | `get_cache_ttl_defaults()` | 默认配置模板生成 |
-| `src/python/cache/_ttl.py` | `get_cache_ttl_defaults()` | TTL 运行时解析 |
-| `src/python/cache/_cleanup.py` | `get_prefix_type_map()`, `get_exact_type_map()` | 过期缓存清理 |
-| `src/python/cache/_groups.py` | `get_registry()` | 按组批量清除缓存 |
-| `src/python/llm/generators_orchestrator.py` | `get_llm_module_name()`, `get_llm_module_names()` | 模块标签、调度日志 |
-| `src/python/llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架模块消息映射 |
-| `src/python/llm/generators_news.py` | `get_llm_module_name()`, `get_llm_module_names()` | 新闻关联分析生成 |
-| `src/python/main.py` | `get_llm_module_names()` | 菜单显示 |
-| `src/python/tui_menu.py` | `get_llm_module_names()` | LLM 配置状态展示 |
-| `src/python/handlers_report.py` | `get_llm_module_name()`, `get_report_section_order()` | LLM 模块失败标签、报告生成 |
-| `src/python/handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 模块配置展示 |
-| `src/python/report/llm_content.py` | `get_llm_module_name()` | Excel LLM 分析章节生成 |
-| `src/python/report/news_correlation.py` | `get_llm_module_name()` | 新闻页签标题 |
-| `src/python/report/excel_generator.py` | `get_report_section_order()` | 错误提示、`_Timer`/`_call_sheet` 标签 |
-| `src/python/report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入、日志 |
-| `src/python/report/html_renderers.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 渲染模块标签 |
-| `src/python/report/excel_content_sheets.py` | `get_report_sheet_name()` | 内容型页签标题 |
-| `src/python/report/excel_market_data.py` | `get_report_sheet_name()` | 行情数据页签标题 |
-| `src/python/report/excel_news_warning.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 新闻预警页签标题 |
-| `src/python/report/excel_module_loader.py` | `get_llm_module_name()` | 模块调度 |
-| `src/python/report/excel_sheet_factory.py` | `set_sheet_title()` | 统一页签标题设置 |
-| `src/python/report/excel_llm_usage.py` | `get_llm_module_names()` | LLM API 用量统计 |
-| `src/python/report/summary.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/market_value_sheet.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/category.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/penetration_sheet.py` | `get_llm_module_name()`, `get_report_sheet_name()` | 穿透 sheet 写入 |
-| `src/python/report/fund_performance.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/early_warning.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/fund_manager_sheet.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/fund_style_sheet.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/fund_overlap_sheet.py` | `get_report_sheet_name()` | 页签标题 |
-| `src/python/report/fund_concentration_sheet.py` | `get_report_sheet_name()` | 页签标题 |
+| `config/_core.py` | `get_known_llm_settings_keys()`, `get_report_section_keys()` | 配置校验 |
+| `cache/_ttl.py` | `get_cache_ttl_defaults()` | TTL 运行时解析 |
+| `cache/_cleanup.py` | `get_prefix_type_map()`, `get_exact_type_map()` | 过期缓存清理 |
+| `cache/_groups.py` | `get_registry()` | 按组批量清除缓存 |
+| `llm/generators_orchestrator.py` | `get_llm_module_name()`, `get_llm_module_names()` | LLM 调度标签 |
+| `llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架消息映射 |
+| `handlers_report.py` | `get_llm_module_name()`, `get_report_section_order()` | 报告生成编排 |
+| `handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
+| `report/excel_generator.py` | `get_report_section_order()` | Excel 页签排序 |
+| `report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入 |
+| `report/excel_sheet_factory.py` | `set_sheet_title()` | 统一页签标题设置 |
+| `report/excel_llm_usage.py` | `get_llm_module_names()` | LLM API 用量统计 |
+
+> 完整列表：除上表外，各页签写入器（`summary.py`、`market_value_sheet.py`、`category.py` 等）均调用 `get_report_sheet_name()` 获取页签名。新增模块在 `_MODULE_REGISTRY` 注册后自动同步到所有消费方。
 
 ---
 
