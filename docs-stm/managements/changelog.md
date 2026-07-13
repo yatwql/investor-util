@@ -10,15 +10,21 @@
 
 ### Fixed
 
-- **chain.py**：修复 `_fetch_with_incremental_fallback()` 中 tiantian 返回空列表 `[]` 时直接 `break` 不到 fallback provider 的问题。新增 `if not new_data: continue` 空数据检测，使 eastmoney 备用链路在 QDII/债券等基金上能被正确调用。
+- **chain.py**：修复 `_validate_continuity()` 中 `cached[-2]`→`cached[-1]` 逻辑错误及 `cache_set` 不支持 `ttl` 参数导致的 TypeError；调用处包裹 try/except。修复 `_fetch_with_incremental_fallback()` 中 tiantian 返回空列表 `[]` 时直接 `break` 不到 fallback provider 的问题——新增 `if not new_data: continue` 空数据检测，使 eastmoney 备用链路在 QDII/债券等基金上能被正确调用。
 - **eastmoney.py**：修复 `fetch_fund_nav_history()` 中 `pageSize=365` 超东方财富 API 上限（实测 ≥202 即返回 null）导致全部历史净值获取失败的问题。改为 `pageSize=20` + 分页循环（页间 0.3s 防限流），最多 10 页（200 条≈10 个月）。
 - **portfolio_history.py**：修复累计收益率因不同持仓数据起止日期不一致（QDII 基金最早数据仅到 2025-09、债券基金仅到 2026-03）导致 `first_val` 偏小、收益率虚高的问题。改为从 ≥80% 持仓都有数据的日期起算收益率，早期数据仍保留在走势图上但排除出收益率计算。
+- **test_registry.py**：`test_cache_prefix_modules_have_groups` 加入 `history_stock`/`history_fund_otc` 已知无分组豁免名单，消除 registry.py 中有意无分组的 per-code 缓存模块导致的误报。
 
 ### Docs
 
 - **requirements.md**：同步 F2 累计收益率起算策略、新增 degradation 场景（全链路空数据 + 部分数据缺失 + 虚高保护）。
 - **technical.md**：同步 Provider Chain 空数据 fallback 策略、eastmoney 分页策略、F2 收益率起算点调整。
 - **how-to-start.md** / **how-to-config.md** / **faq.md**：同步备注说明。
+- **reports-instruction.md**：新增 18 个页签按 type 分组的 5 组可见性说明表（基础核心/B 系列/新闻与预警/LLM 分析/历史走势）。
+- **plan.md**：新增 [P4] G 报告板块可见性可配置任务项、[P4] H 智能预警模块去留评估任务项；移除低价值任务 O。
+- **test-coverage.md**：同步全量测试项数（3006→3005）、unit 项数（2699→2698）等 8 处计数修正。
+- **datasource-and-folders.md**：修复 dual H1（`# 目录结构` → `## 目录结构`）；新增 `data/history/` 目录节点。
+- **how-to-test-my-code.md**：移除版本号标签。
 
 ## [0.4.3] - 2026-07-13
 

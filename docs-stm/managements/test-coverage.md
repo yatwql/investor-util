@@ -8,22 +8,22 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2699 | ~25s |
-| `standard` | 2265 | ~25s |
-| `scenario` | **278** | **~6min** |
-| `regression` | **278** | **~6min** |
-| `dev-verify` | **2389** | **~2min** |
-| `verify` | **1049** | **~8min** |
+| `unit` | 2698 | ~25s |
+| `standard` | 2298 | ~25s |
+| `scenario` | **269** | **~6min** |
+| `regression` | **269** | **~6min** |
+| `dev-verify` | **2422** | **~2min** |
+| `verify` | **1052** | **~8min** |
 | `integration` | 298 | ~50s |
 | `edge` | 335 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **3006** | **~10min** |
+| `all` | **3005** | **~10min** |
 | `smoke` | 24 | ~2s |
-| `report` | **1020** | ~15s |
+| `report` | **1019** | ~15s |
 | `all_no_unit` | 307 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：`all` 模式收集总数 3006 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 2994 项。
+> 注：`all` 模式收集总数 3005 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 2993 项。
 
 ### 功能域对应测试源
 
@@ -47,7 +47,7 @@
 
 | 标记 | 覆盖场景 | 覆盖项数 | 参考测试类 |
 |:-------|:---------|:--------:|:-----------|
-| `scenario`（父标记） | S0a/S0b/S0d + S1-S33 + T1-T21 全量业务场景（不含 S0c+S10） | **278** | 见下 |
+| `scenario`（父标记） | S0a/S0b/S0d + S1-S33 + T1-T21 全量业务场景（不含 S0c+S10） | **269** | 见下 |
 | ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a/S0b/S0d + S21-S33 + P1p | **124** | |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_integration.py::TestScenarioS1` |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_integration.py::TestScenarioS2` |
@@ -81,12 +81,12 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 9 个子组合计 | **2699** |
+| `unit`（父标记） | 9 个子组合计 | **2698** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 167 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 189 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 480 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
-| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列基金深度分析模块、数据降级/占位；含 65 项 data 标记测试） | 1020 |
+| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列基金深度分析模块、数据降级/占位；含 65 项 data 标记测试） | 1019 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 76 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含注册表测试） | 427 |
 | └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 164 |
