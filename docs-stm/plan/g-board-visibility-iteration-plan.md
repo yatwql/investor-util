@@ -124,7 +124,7 @@ data_flags: dict[str, bool] = {
     "overlap_data":      overlap_matrix is not None,
     "concentration_data": concentration_analysis is not None,
     "style_data":        style_analysis is not None,
-    "news_data_available":      news_data_available,          # ← 运行时标志（菜单驱动），表示"数据是否已获取"
+    "include_news":      news_data_available,          # ← key 匹配 registry data_flag，值用新变量名
     "early_warnings":    bool(early_warnings),
     "llm_enabled":       llm_data_available,                 # ← data 层：LLM 内容是否成功生成
 }
@@ -132,7 +132,7 @@ data_flags: dict[str, bool] = {
 # 两层合并
 for sec in order:
     board_ok = board_flags.get(sec["type"], True)
-    data_ok = data_flags.get(sec["data_flag"], True) if sec["data_flag"] else True
+    data_ok = data_flags.get(sec["data_flag"], False) if sec["data_flag"] else True
     section_visible_dict[sec["key"]] = board_ok and data_ok
 ```
 
@@ -291,6 +291,8 @@ def _compute_section_visibility(
 | **F1 快照行为未定义**（enable_history=false 时） | F1 快照被误跳过导致环比链断裂 | ✅ §2.7 中明确 F1 不受影响，始终执行 |
 | **两层模型增加理解成本** | 后续开发者可维护性降低 | 代码注释标注两层逻辑；两端内联 board dict 保持代码局部性 |
 | **`news_data_available` 误用配置值**（传入 `enable_news` 而非真实数据状态 `news_available`） | enable_news=True + 数据获取失败 → 空内容页签 | ✅ §2.7/Iter5 中明确区分：`news_available = bool(news_data) if enable_news else False`，data 层传 `news_available` 非 `enable_news` |
+| **data_flags dict key 与 registry data_flag 不匹配**（如 key `"news_data_available"` 匹配不到 registry 的 `"include_news"`） | data 层永远命中默认值，两层模型退化为单层 | ✅ 强约束：data_flags 的 key **必须**与 `_REPORT_SECTION_DEFAULT` 的 `data_flag` 字段值完全一致。plan 中已修正为 `"include_news": news_data_available` |
+| **Excel llm_usage 页签因 `continue` 跳过赋值而永不创建** | llm_usage 页签消失 | ✅ §2.10 伪代码已修复：用 `have_llm_usage` 标志位替换直接 `continue` |
 
 ### 2.9 进度汇报与冷启动说明
 
@@ -357,25 +359,29 @@ return display_numbers, section_visible_dict, _sv_fn
 
 ```python
 # 不再调用 set_sheet_title(ws, key, section_order)
-# 改为在创建设工作表时直接设置连续序号
+# 改为在创建页签时直接设置连续序号
 visible_count = 0
+have_llm_usage = False
+llm_usage_name = ""
 for sec in section_order:
     if not board_flags.get(sec.get("type", ""), True):
         continue
     if not should_create_sheet(sec, ...):
         continue
-    visible_count += 1
     if sec["key"] == "llm_usage":
-        continue  # llm_usage 暂不计入，待末位处理
+        have_llm_usage = True        # 标记，稍后末位创建
+        llm_usage_name = sec["name"]
+        continue
+    visible_count += 1
     ws = wb.create_sheet()
     ws.title = f"{visible_count}.{sec['name']}"
     sheets[sec["key"]] = ws
 
-# llm_usage 始终末位
-if "llm_usage" in sheets:
-    ws = sheets.pop("llm_usage")
+# llm_usage 始终末位（先创建其他可见页签，最后再创建 llm_usage）
+if have_llm_usage:
     visible_count += 1
-    ws.title = f"{visible_count}.{sec['name']}"  # 实际是 llm_usage 的名称
+    ws = wb.create_sheet()
+    ws.title = f"{visible_count}.{llm_usage_name}"
     sheets["llm_usage"] = ws
 ```
 
@@ -550,14 +556,14 @@ def _compute_section_visibility(
         "overlap_data":       overlap_matrix is not None,
         "concentration_data": concentration_analysis is not None,
         "style_data":         style_analysis is not None,
-        "news_data_available":       news_data_available,  # ← data 层（菜单驱动）
+        "include_news":       news_data_available,  # ← key 匹配 registry，值用新变量名
         "early_warnings":     bool(early_warnings),
         "llm_enabled":        llm_data_available,         # ← data 层（LLM 生成成功？）
     }
     section_visible_dict = {}
     for sec in order:
         board_ok = board_flags.get(sec["type"], True)
-        data_ok = data_flags.get(sec["data_flag"], True) if sec["data_flag"] else True
+        data_ok = data_flags.get(sec["data_flag"], False) if sec["data_flag"] else True
         section_visible_dict[sec["key"]] = board_ok and data_ok
     ...
 ```
@@ -592,6 +598,7 @@ def _compute_section_visibility(
   - 3 个板块开关各 2 种状态 × 2 层组合（4 象限：开+有数据、开+无数据、关+有数据、关+无数据），多板块分多个 fixture（≥6 项）
   - **关键场景**：菜单 B 模拟 + `enable_news=False` → news 板块不可见（验证 board_flags 使用 `enable_news` 而非 `news_data_available`）（2 项）
   - 验证 `section_visible_dict` 中的 expected 值正确（≥6 项）
+  - **data_flags key 一致性检查**：断言 `_compute_section_visibility` 内部 data_flags dict 的 key 与 `_REPORT_SECTION_DEFAULT` 中各模块的 `data_flag` 字段值完全匹配——新增 key 失配对导致 data 层退化为单层（1 项，**CRITICAL 回归测试**）
   - 重新编号验证：`_compute_section_visibility` 返回的 `visible_numbers` 字典中：
     - 全关场景（仅 always + llm）→ 序号 1~6 连续（1 项）
     - llm_usage 在所有场景下都是最大序号（1 项）
@@ -777,6 +784,7 @@ def _cmd_generate_both():
 
 A. Excel + HTML 整体集成（`test_excel_report_structure.py` / `test_html_report_structure.py` 追加）：
 - 生成完整报告，修改配置开关，验证页签/章节正确创建或隐藏（≥6 项）
+- **data_flags key 集成回归**：mock `build_news_data()` 返回空 → 验证 `news_data_available=False` 传递到 data 层 → 新闻页签不显示（验证 data_flags dict key 与 registry data_flag 匹配，不因 key 失配而绕过）（1 项）
 
 B. 场景测试（`scenario/` 追加，标记 `scenario_basic`）：
 - 新增场景：config.json 中 3 个板块全关 → 验证报告只有 always + llm 页签（1 项）
