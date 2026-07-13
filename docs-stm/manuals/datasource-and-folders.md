@@ -406,6 +406,7 @@ investor-util/
 │   │   └── portfolio-history-comparison/              # 📁 组合历史走势设计归档
 │   │       └── F-portfolio-history-comparison.md     # 组合历史走势计划与技术设计（已归档）
 │   ├── plan/                         # 计划与设计文件
+│   │   └── g-board-visibility-iteration-plan.md  # G. 报告板块可见性可配置 10 轮迭代计划
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
