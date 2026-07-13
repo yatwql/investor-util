@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Any
 
@@ -69,6 +70,15 @@ class PortfolioHistoryCalculator:
         # 路由：按代码类型确定数据源
         if is_a_share_code(code) or is_exchange_fund_code(code):
             bars = self._get_stock_history(code)
+            # 降级：00 开头 A 股/OTC 基金重叠区，股票历史全空时尝试基金历史
+            if not bars and code.startswith("00") and not is_exchange_fund_code(code):
+                _tag = f"  [{code} {name}]" if name else f"  [{code}]"
+                logger.info("[history]%s K 线链路全部失败（该代码可能为场外基金），降级尝试基金净值链路", _tag)
+                bars = self._get_fund_history(code)
+                if bars:
+                    logger.info("[history]%s 降级成功——通过基金净值链路获取到历史数据", _tag)
+                else:
+                    logger.warning("[history]%s 降级也失败——基金净值链路亦无数据", _tag)
         elif is_hk_stock_code(code):
             logger.debug("[history] 港股通暂不支持历史走势: %s", code)
             return None
@@ -118,17 +128,28 @@ class PortfolioHistoryCalculator:
                 "warnings": [str, ...],
             }
         """
-        # 收集每只持仓的走势
+        # 收集每只持仓的走势（并行获取，显著提速）
         all_series: list[list[dict]] = []
         total_holdings = len(holdings)
         success_count = 0
         warnings: list[str] = []
 
-        for code, name, shares in holdings:
-            series = self.calculate_for_holding(code, name, shares)
-            if series:
-                all_series.append(series)
-                success_count += 1
+        _max_workers = min(8, total_holdings) if total_holdings > 1 else 1
+        with ThreadPoolExecutor(max_workers=_max_workers) as _pool:
+            _futures = {
+                _pool.submit(self.calculate_for_holding, code, name, shares):
+                (code, name) for code, name, shares in holdings
+            }
+            for _fut in as_completed(_futures):
+                _code, _name = _futures[_fut]
+                try:
+                    series = _fut.result()
+                except Exception:
+                    logger.warning("[history] %s 历史数据获取异常", _code, exc_info=True)
+                    series = None
+                if series:
+                    all_series.append(series)
+                    success_count += 1
 
         if not all_series:
             return {

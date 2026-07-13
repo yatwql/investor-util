@@ -158,6 +158,10 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
     else:
         data_type = "price_fund_otc"
 
+    # 降级标记：00 开头同时存在 A 股和 OTC 基金，代码前缀无法区分
+    # 若股票链路全失败，降级到场外基金链路尝试
+    _needs_degrade = (data_type == "price_stock" and code.startswith("00"))
+
     def _validate(raw: dict, provider_name: str) -> bool:
         if provider_name in ("tencent", "sina"):
             if not raw.get("name"):
@@ -168,27 +172,10 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
             return bool(raw.get("nav") and raw.get("nav", 0.0) > 0)
         return True
 
-    result = _fetch_with_fallback(
-        data_type=data_type,
-        provider_fn_map=_PRICE_PROVIDERS,
-        cache_key=cache_key,
-        cache_ttl=get_ttl("price"),
-        fn_kwargs={"code": code},
-        transform=_PRICE_TRANSFORMS,
-        validate=_validate,
-    )
-
-    # 收市后验证：缓存 price_date 是否仍是当前交易日
-    # 盘中命中缓存时短 TTL 已保证实时性，收市后长 TTL 可能导致跨日残留
-    if result is not None and not _price_cache_fresh(result):
-        from src.python.cache import clear as _cache_clear
-        from src.python.report.market_value import get_last_trading_day as _gtd
-        _td = _gtd()
-        logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新",
-                     result.get("price_date", "?"), _td)
-        _cache_clear(cache_key)
-        result = _fetch_with_fallback(
-            data_type=data_type,
+    def _fetch_with_cache_refresh(dt: str) -> dict[str, Any] | None:
+        """一次 fetch + 收市后新鲜度校验（跨日残留缓存清仓重试）。"""
+        r = _fetch_with_fallback(
+            data_type=dt,
             provider_fn_map=_PRICE_PROVIDERS,
             cache_key=cache_key,
             cache_ttl=get_ttl("price"),
@@ -196,5 +183,35 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
             transform=_PRICE_TRANSFORMS,
             validate=_validate,
         )
+        if r is not None and not _price_cache_fresh(r):
+            from src.python.cache import clear as _cache_clear
+            from src.python.report.market_value import get_last_trading_day as _gtd
+            _td = _gtd()
+            logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新",
+                         r.get("price_date", "?"), _td)
+            _cache_clear(cache_key)
+            r = _fetch_with_fallback(
+                data_type=dt,
+                provider_fn_map=_PRICE_PROVIDERS,
+                cache_key=cache_key,
+                cache_ttl=get_ttl("price"),
+                fn_kwargs={"code": code},
+                transform=_PRICE_TRANSFORMS,
+                validate=_validate,
+            )
+        return r
+
+    result = _fetch_with_cache_refresh(data_type)
+
+    # ── 降级：00 代码在股票链路全失败 → 尝试场外基金链路 ──
+    if result is None and _needs_degrade:
+        _tag = f"  [{code} {expected_name}]" if expected_name else f"  [{code}]"
+        logger.info("[price]%s 股票链路全部失败（该代码可能为场外基金），降级尝试东方财富净值链路",
+                     _tag)
+        result = _fetch_with_cache_refresh("price_fund_otc")
+        if result is not None:
+            logger.info("[price]%s 降级成功——通过场外基金链路获取到净值", _tag)
+        else:
+            logger.warning("[price]%s 降级也失败——场外基金链路亦无数据", _tag)
 
     return result

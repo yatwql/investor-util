@@ -134,15 +134,24 @@ def _render_category_info(
 
 def _render_index_section(
     prog: ProgressReporter,
+    pre_fetched_a: dict | None = None,
+    pre_fetched_us: dict | None = None,
 ) -> tuple[dict, dict, list[dict[str, Any]], list[dict[str, Any]]]:
     """获取市场指数并转为模板可迭代列表。
+
+    支持传入预获取的指数数据（来自 _prepare_report_data），
+    避免同一流程中重复 HTTP 请求。
 
     Returns:
         (a_indices, us_indices, a_indices_list, us_indices_list)
     """
-    prog.info("正在获取市场指数...")
-    a_indices: dict = fetch_indices()
-    us_indices: dict = fetch_us_indices()
+    if pre_fetched_a is not None and pre_fetched_us is not None:
+        a_indices = pre_fetched_a
+        us_indices = pre_fetched_us
+    else:
+        prog.info("正在获取市场指数...")
+        a_indices = fetch_indices()
+        us_indices = fetch_us_indices()
 
     a_indices_list: list[dict[str, Any]] = []
     for code in ("sh000001", "sz399001", "sh000300", "sh000688", "sz399006"):

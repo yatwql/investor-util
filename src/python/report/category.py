@@ -19,6 +19,7 @@ from src.python.code_utils import (
     is_index_fund_by_name,
     is_money_fund_by_name,
     is_offsite_fund,
+    is_otc_fund_by_name,
     is_qdii_extended,
 )
 from src.python.models import Holding
@@ -94,6 +95,10 @@ def _categorize_holding(h: Holding) -> tuple[str, str]:
     # 5) 场内 ETF（名称含ETF或代码5/1开头）
     if is_etf_by_name_or_code(name, code):
         return ("基金", "指数")
+
+    # 5b) 00 代码场外基金（名称匹配基金特征，与 A 股 00 前缀重叠区）
+    if is_otc_fund_by_name(name, code):
+        return ("基金", "混合")
 
     # 6) 场内股票（A股或港股通）
     if is_a_share_code(code) or is_hk_stock_code(code):

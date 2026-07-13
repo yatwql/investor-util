@@ -155,7 +155,7 @@ def _build_data_status_sections(
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None, history_data: dict | None = None) -> str:
+def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None, history_data: dict | None = None, a_indices: dict | None = None, us_indices: dict | None = None) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     通过各子函数获取分析数据，渲染 Jinja2 模板，
@@ -171,6 +171,8 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         history_data: 组合历史走势数据（来自 PortfolioHistoryCalculator），
             包含 bars、max_drawdown、annualized_volatility、total_return、warnings 等。
             None 时历史章节显示占位文本。
+        a_indices: 可选预获取 A 股指数数据，传入时跳过 HTTP 请求。
+        us_indices: 可选预获取美股指数数据，传入时跳过 HTTP 请求。
 
     Returns:
         最新版报告的绝对路径
@@ -190,7 +192,7 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
     cat_counts, update_status_dict = _render_category_info(holdings, details, trading_day)
 
     # ── 4) 市场指数 ──
-    a_indices, us_indices, a_indices_list, us_indices_list = _render_index_section(prog)
+    a_indices, us_indices, a_indices_list, us_indices_list = _render_index_section(prog, a_indices, us_indices)
 
     # ── 5~7) 分类表 / 穿透 / 基金业绩 ──
     cat_data, cat_dividend_ok = _render_category_table(holdings, details, prog)

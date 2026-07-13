@@ -119,10 +119,10 @@ def _try_provider_fetch(
     if validate:
         try:
             if not validate(raw, provider_name):
-                logger.info("[%s] %s 数据验证未通过，尝试下一链路", data_type, provider_name)
+                logger.info("[%s]%s %s 数据验证未通过，尝试下一链路", data_type, _code_tag, provider_name)
                 return None
         except Exception as e:
-            logger.warning("[%s] %s 数据验证异常: %s", data_type, provider_name, e)
+            logger.warning("[%s]%s %s 数据验证异常: %s", data_type, _code_tag, provider_name, e)
             return None
 
     # 应用数据转换
@@ -201,16 +201,19 @@ def _fetch_with_fallback(
             # 传输级异常（超时/断连/DNS/5xx）→ 累计连续失败计数
             reg.record_failure(provider_name, f"{data_type}:transport")
             if reg.is_circuit_broken(provider_name):
-                logger.warning("[%s] %s 连续失败，本会话后续请求跳过",
-                               data_type, provider_name)
+                logger.warning("[%s]%s %s 连续失败，本会话后续请求跳过",
+                               data_type, _code_tag, provider_name)
         # else: 代码级空结果（API 不识别该代码）→ 不计入熔断计数器
 
     # 3) 降级：全部 Provider 失败时尝试过期缓存
     stale = cache_get(cache_key, CACHE_WEEKLY)
     if stale is not None:
-        logger.info("[%s] 全部 Provider 不可用，降级使用过期缓存", data_type)
+        logger.info("[%s]%s 全部 Provider 不可用，降级使用过期缓存",
+                     data_type, _code_tag)
         return stale
 
+    logger.warning("[%s]%s 全链路失败（无过期缓存可用），数据不可用",
+                   data_type, _code_tag)
     return None
 
 

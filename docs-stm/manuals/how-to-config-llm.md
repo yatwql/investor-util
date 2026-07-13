@@ -57,7 +57,7 @@ LLM 配置拆分为两个独立文件，分工明确：
     "news_correlation": false
   },
   "temperature_global_macro": 0.3,
-  "max_tokens_global_macro": 1024,
+  "max_tokens_global_macro": 2048,
   "temperature_expert_review": 0.8,
   "max_tokens_expert_review": 8192,
   "pricing": {
@@ -345,7 +345,7 @@ LLM 配置拆分为两个独立文件，分工明确：
   "system_prompt_global_macro": null,
   "model_global_macro": null,
   "temperature_global_macro": 0.3,
-  "max_tokens_global_macro": 1024,
+  "max_tokens_global_macro": 2048,
   "timeout_global_macro": 60,
   "cache_enabled_global_macro": true,
   "output_brief_global_macro": false,
@@ -506,7 +506,7 @@ LLM 配置拆分为两个独立文件，分工明确：
 
 **API 硬性约束（仅 Claude）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。默认值已满足：
 
-- `max_tokens_global_macro=1024` → `thinking_budget_global_macro` 至少 2048（默认 4000 ✅）
+- `max_tokens_global_macro=2048` → `thinking_budget_global_macro` 至少 3072（默认 4000 ✅）
 - `max_tokens_expert_review=8192` → `thinking_budget_expert_review` 至少 9216（默认 16000 ✅）
 
 **代码自动保护：**

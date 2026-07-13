@@ -11,6 +11,8 @@ import time as _time_module
 from collections.abc import Callable
 from typing import Any
 
+from src.python.tui_menu import _CYAN, _GREEN, _RED, _RESET, _YELLOW
+
 logger = logging.getLogger("invest")
 
 # ── 模块耗时记录（跨模块共享） ───────────────────────────────
@@ -106,16 +108,16 @@ class TuiProgressReporter(ProgressReporter):
         self._errors: list[str] = []
 
     def info(self, msg: str) -> None:
-        print(f"  [..] {msg}")
+        print(f"  {_CYAN}[..]{_RESET} {msg}")
 
     def ok(self, msg: str) -> None:
-        print(f"  [OK] {msg}")
+        print(f"  {_GREEN}[OK]{_RESET} {msg}")
 
     def warn(self, msg: str) -> None:
-        print(f"  [!] {msg}")
+        print(f"  {_YELLOW}[!]{_RESET} {msg}")
 
     def error(self, msg: str) -> None:
-        print(f"  [ERR] {msg}")
+        print(f"  {_RED}[ERR]{_RESET} {msg}")
 
     def add_error(self, msg: str) -> None:
         self._errors.append(msg)

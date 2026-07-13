@@ -242,11 +242,142 @@
             .summary-grid, .indices-grid { page-break-inside: avoid; }
             .report-header { page-break-after: avoid; }
         }
+        /* --- 图表 canvas --- */
+        canvas { max-width: 100%; }
+        @media print { canvas { max-width: 100%; page-break-inside: avoid; } }
     </style>
 
 {% if section_visible("portfolio_history") or section_visible("drawdown_analysis") %}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script>if(typeof Chart==='undefined'){document.write(unescape('%3Cscript src="https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js"%3E%3C/script%3E'))}</script>
+<script>
+/* --- Native Canvas 2D chart renderer (no external deps, renders instantly) --- */
+window.drawSimpleChart = function(canvasId, labels, values, opts) {
+    opts = opts || {};
+    var canvas = document.getElementById(canvasId);
+    if (!canvas || !labels || !values || labels.length === 0) return;
+
+    /* 读取 CSS 显示尺寸（display size），不动 canvas.style */
+    var dispW = canvas.clientWidth;
+    var dispH = canvas.clientHeight;
+    if (dispW < 50 || dispH < 20) return;
+
+    var dpr = window.devicePixelRatio || 1;
+    /* 设置绘图缓冲区 = 显示尺寸 × dpr（高清屏适配） */
+    canvas.width = dispW * dpr;
+    canvas.height = dispH * dpr;
+
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    var margin = { top: 12, right: 12, bottom: 32, left: 62 };
+    var plotW = dispW - margin.left - margin.right;
+    var plotH = dispH - margin.top - margin.bottom;
+    if (plotW < 50 || plotH < 20) return;
+
+    ctx.clearRect(0, 0, dispW, dispH);
+
+    var minVal = Math.min.apply(null, values);
+    var maxVal = Math.max.apply(null, values);
+    var range = maxVal - minVal;
+    if (range < 1e-10) { range = Math.max(Math.abs(maxVal) * 0.1, 1); minVal = maxVal - range; maxVal += range; }
+    var pad = range * 0.08;
+    var yMin = Math.max(0, minVal - pad);
+    var yMax = maxVal + pad;
+    var yRange = yMax - yMin;
+    if (yRange < 1e-10) yRange = 1;
+
+    function xPos(i) { return margin.left + (values.length <= 1 ? plotW/2 : (i/(values.length-1))*plotW); }
+    function yPos(v) { return margin.top + plotH - ((v - yMin) / yRange) * plotH; }
+
+    ctx.font = '11px -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif';
+    ctx.textBaseline = 'middle';
+
+    var yTickCount = 5;
+    for (var t = 0; t <= yTickCount; t++) {
+        var yv = yMin + (t / yTickCount) * yRange;
+        var y = yPos(yv);
+        ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(dispW - margin.right, y);
+        ctx.stroke();
+        var label;
+        if (opts.yFormat === 'currency') {
+            var wan = yv / 10000;
+            label = wan >= 10000 ? '¥' + (wan/10000).toFixed(1) + '亿' : '¥' + wan.toFixed(0) + '万';
+        } else if (opts.yFormat === 'percent') {
+            label = yv.toFixed(1) + '%';
+        } else {
+            label = yv.toLocaleString();
+        }
+        ctx.fillStyle = '#666';
+        ctx.textAlign = 'right';
+        ctx.fillText(label, margin.left - 6, y);
+    }
+
+    var nLabels = Math.min(10, labels.length);
+    var step = Math.max(1, Math.floor(labels.length / nLabels));
+    var indices = [];
+    for (var i = 0; i < labels.length; i += step) indices.push(i);
+    if (indices[indices.length-1] !== labels.length-1 && labels.length > 1) indices.push(labels.length-1);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#666';
+    for (var k = 0; k < indices.length; k++) {
+        var idx = indices[k];
+        var raw = labels[idx];
+        ctx.fillText(raw && raw.length >= 10 ? raw.substring(5, 10) : raw, xPos(idx), margin.top + plotH + 6);
+    }
+
+    if (opts.fill !== false) {
+        ctx.beginPath();
+        ctx.moveTo(xPos(0), yPos(values[0]));
+        for (var i = 1; i < values.length; i++) ctx.lineTo(xPos(i), yPos(values[i]));
+        ctx.lineTo(xPos(values.length-1), yPos(yMin));
+        ctx.lineTo(xPos(0), yPos(yMin));
+        ctx.closePath();
+        ctx.fillStyle = opts.fillColor || 'rgba(46,117,182,0.1)';
+        ctx.fill();
+    }
+
+    ctx.beginPath();
+    for (var i = 0; i < values.length; i++) {
+        if (i === 0) ctx.moveTo(xPos(i), yPos(values[i]));
+        else ctx.lineTo(xPos(i), yPos(values[i]));
+    }
+    ctx.strokeStyle = opts.lineColor || '#2E75B6';
+    ctx.lineWidth = opts.lineWidth || 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(margin.left, margin.top);
+    ctx.lineTo(margin.left, margin.top + plotH);
+    ctx.stroke();
+};
+
+/* --- Background Chart.js loader (enhancement only, never blocks) --- */
+(function(){
+    var urls = [
+        'https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
+        'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+        'https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js',
+    ];
+    function loadNext(i){
+        if(window.Chart || i>=urls.length) return;
+        var s=document.createElement('script');
+        s.src=urls[i];
+        s.onload=function(){ window.__chartLoaded=true; };
+        s.onerror=function(){ loadNext(i+1); };
+        document.head.appendChild(s);
+    }
+    loadNext(0);
+})();
+</script>
 {% endif %}
 </head>
 <body>
@@ -1394,54 +1525,60 @@
             if(!bars || !bars.length) return;
             var labels = bars.map(function(b){ return b.date; });
             var values = bars.map(function(b){ return b.total_value; });
-            var ctx = document.getElementById('portfolioChart');
-            if(!ctx) return;
-            ctx = ctx.getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '组合市值 (as-if)',
-                        data: values,
-                        borderColor: '#2E75B6',
-                        backgroundColor: 'rgba(46,117,182,0.1)',
-                        fill: true,
-                        tension: 0.1,
-                        pointRadius: 0,
-                        borderWidth: 2,
-                        yAxisID: 'y',
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(ctx){
-                                    return '市值: ¥' + ctx.parsed.y.toLocaleString();
+            /* 即刻使用原生 Canvas 渲染（毫秒级，不依赖 CDN） */
+            window.drawSimpleChart('portfolioChart', labels, values, {
+                lineColor: '#2E75B6',
+                fillColor: 'rgba(46,117,182,0.1)',
+                yFormat: 'currency',
+                fill: true,
+                lineWidth: 2
+            });
+            /* 后台等待 Chart.js，加载后替换为交互式图表 */
+            var _p_poll = setInterval(function(){
+                if(typeof Chart === 'undefined') return;
+                clearInterval(_p_poll);
+                var ctx = document.getElementById('portfolioChart');
+                if(!ctx || ctx.getAttribute('data-chart') === 'chartjs') return;
+                try {
+                    ctx.setAttribute('data-chart', 'chartjs');
+                    ctx = ctx.getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '组合市值 (as-if)',
+                                data: values,
+                                borderColor: '#2E75B6',
+                                backgroundColor: 'rgba(46,117,182,0.1)',
+                                fill: true,
+                                tension: 0.1,
+                                pointRadius: 0,
+                                borderWidth: 2,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(c){ return '市值: ¥' + c.parsed.y.toLocaleString(); }
+                                    }
                                 }
+                            },
+                            scales: {
+                                x: { ticks: { maxTicksLimit: 10, font: { size: 11 } }, grid: { display: false } },
+                                y: { ticks: { font: { size: 11 }, callback: function(v){ return '¥' + (v/10000).toFixed(0) + '万'; } }, grid: { color: 'rgba(0,0,0,0.06)' } }
                             }
                         }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { maxTicksLimit: 10, font: { size: 11 } },
-                            grid: { display: false }
-                        },
-                        y: {
-                            ticks: {
-                                font: { size: 11 },
-                                callback: function(v){ return '¥' + (v/10000).toFixed(0) + '万'; }
-                            },
-                            grid: { color: 'rgba(0,0,0,0.06)' }
-                        }
-                    }
-                }
-            });
+                    });
+                } catch(e) {}
+            }, 300);
+            /* 10 秒后停止等待 */
+            setTimeout(function(){ clearInterval(_p_poll); }, 10000);
         })();
         </script>
         {% else %}
@@ -1495,52 +1632,58 @@
             if(!bars || !bars.length) return;
             var labels = bars.map(function(b){ return b.date; });
             var drawdowns = bars.map(function(b){ return b.drawdown_pct; });
-            var ctx = document.getElementById('drawdownChart');
-            if(!ctx) return;
-            ctx = ctx.getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '回撤幅度',
-                        data: drawdowns,
-                        borderColor: '#CC0000',
-                        backgroundColor: 'rgba(204,0,0,0.15)',
-                        fill: true,
-                        tension: 0.1,
-                        pointRadius: 0,
-                        borderWidth: 1.5,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(ctx){
-                                    return '回撤: ' + ctx.parsed.y.toFixed(2) + '%%';
+            /* 即刻使用原生 Canvas 渲染 */
+            window.drawSimpleChart('drawdownChart', labels, drawdowns, {
+                lineColor: '#CC0000',
+                fillColor: 'rgba(204,0,0,0.15)',
+                yFormat: 'percent',
+                fill: true,
+                lineWidth: 1.5
+            });
+            /* 后台等待 Chart.js，加载后替换为交互式图表 */
+            var _d_poll = setInterval(function(){
+                if(typeof Chart === 'undefined') return;
+                clearInterval(_d_poll);
+                var ctx = document.getElementById('drawdownChart');
+                if(!ctx || ctx.getAttribute('data-chart') === 'chartjs') return;
+                try {
+                    ctx.setAttribute('data-chart', 'chartjs');
+                    ctx = ctx.getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '回撤幅度',
+                                data: drawdowns,
+                                borderColor: '#CC0000',
+                                backgroundColor: 'rgba(204,0,0,0.15)',
+                                fill: true,
+                                tension: 0.1,
+                                pointRadius: 0,
+                                borderWidth: 1.5,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(c){ return '回撤: ' + c.parsed.y.toFixed(2) + '%'; }
+                                    }
                                 }
+                            },
+                            scales: {
+                                x: { ticks: { maxTicksLimit: 8, font: { size: 11 } }, grid: { display: false } },
+                                y: { ticks: { font: { size: 11 }, callback: function(v){ return v.toFixed(1) + '%'; } }, grid: { color: 'rgba(0,0,0,0.06)' } }
                             }
                         }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { maxTicksLimit: 8, font: { size: 11 } },
-                            grid: { display: false }
-                        },
-                        y: {
-                            ticks: {
-                                font: { size: 11 },
-                                callback: function(v){ return v.toFixed(1) + '%%'; }
-                            },
-                            grid: { color: 'rgba(0,0,0,0.06)' }
-                        }
-                    }
-                }
-            });
+                    });
+                } catch(e) {}
+            }, 300);
+            setTimeout(function(){ clearInterval(_d_poll); }, 10000);
         })();
         </script>
         {% else %}

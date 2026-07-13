@@ -435,7 +435,7 @@ def build_news_data(
             from src.python.providers.news_aggregator import get_last_source_status as _glss
             meta["source_status"] = _glss()
         except Exception:
-            pass
+            logger.warning("获取新闻源状态失败（news_aggregator.get_last_source_status），不影响核心新闻数据")
         logger.warning("新闻获取失败")
         return news_items, meta
 
@@ -451,7 +451,7 @@ def build_news_data(
         from src.python.providers.news_aggregator import get_last_source_status as _glss
         meta["source_status"] = _glss()
     except Exception:
-        pass
+        logger.warning("补充新闻源状态失败（news_aggregator.get_last_source_status），不影响新闻匹配结果")
 
     return news_items, meta
 

@@ -23,11 +23,12 @@ except ImportError:
 
 # ANSI 颜色：非 TTY 或设置了 NO_COLOR 环境变量时禁用颜色输出
 if "NO_COLOR" in os.environ or not sys.stdout.isatty():
-    _GREEN = _RED = _YELLOW = _RESET = ""
+    _GREEN = _RED = _YELLOW = _CYAN = _RESET = ""
 else:
     _GREEN = "\033[92m"
     _RED = "\033[91m"
     _YELLOW = "\033[93m"
+    _CYAN = "\033[96m"
     _RESET = "\033[0m"
 
 from src.python.config import get_config, get_llm_config

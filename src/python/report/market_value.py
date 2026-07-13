@@ -15,6 +15,7 @@ from src.python.code_utils import (
     is_etf_by_name,
     is_exchange_fund_code,
     is_offsite_fund,
+    is_otc_fund_by_name,
     is_qdii_extended,
 )
 from src.python.fetcher.price import fetch_market_data
@@ -125,6 +126,9 @@ def classify_holdings(holdings: list[Holding]) -> dict[str, list]:
         # 3) 场内 ETF（名称含 ETF，或代码 5/1 开头的场内品种）
         elif is_etf_by_name(name) or is_exchange_fund_code(code):
             categories["场内ETF"].append(h)
+        # 3b) 00 代码场外基金（名称匹配基金特征，与 A 股 00 前缀重叠区）
+        elif is_otc_fund_by_name(name, code):
+            categories["国内场外"].append(h)
         # 4) A 股股票
         elif is_a_share_code(code):
             categories["场内股票"].append(h)
@@ -518,8 +522,11 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
     _ok_count = sum(1 for d in details if d.price > 0)
     _fail_count = len(details) - _ok_count
     if _fail_count > 0:
+        _fail_names = [f"{h.name}({h.code})"
+                       for h, d in zip(holdings, details) if d.price <= 0]
         logger.warning("市场行情获取：%d 成功，%d 失败（网络/非交易时段/限速），"
-                       "报告部分数据将不可用", _ok_count, _fail_count)
+                       "报告部分数据将不可用；失败资产: %s",
+                       _ok_count, _fail_count, _fail_names)
         if _ok_count == 0:
             logger.warning("所有行情数据均获取失败，报告将显示占位文本 "
                            "'暂无行情' 而非实际数据")

@@ -6,6 +6,36 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`code_utils.is_otc_fund_by_name()` 00 代码重叠区分类辅助**：新增 `_OTC_FUND_NAME_KW` 关键词元组（混合/纯债/短债/货币/联接等），和 `is_otc_fund_by_name(name, code)` 函数，名称+代码双维度判断 00 代码是否为场外基金。
+- **logger.py 控制台彩色日志**：新增 `_ColoredFormatter`，WARNING 黄色/ERROR 红色高亮，文件日志保持纯文本不受影响。
+
+### Fixed
+
+- **002943 等 00 代码基金无法获取行情（HIGH）**：`fetch_market_data()` 对 `00` 开头且股票链路全失败的代码自动降级到 `price_fund_otc` 链路通过东方财富获取净值。同时 `market_value.py` 和 `category.py` 在代码分类环节借用 `is_otc_fund_by_name()` 优先判定，消除 00 代码被误路由到 A 股链路的根因。
+- **00 代码基金历史 K 线全空（HIGH）**：`portfolio_history.py` 对 `is_a_share_code()` 和 `is_exchange_fund_code()` 均不匹配的 00 代码，股票历史全空时自动降级尝试基金净值链路，与行情获取的降级策略保持一致。
+- **`except Exception: pass` 空吞异常 2 处（MEDIUM）**：`news_correlation.py` 两处静默吞异常改为 `logger.warning()` 输出详情，避免调试困难。
+
+### Performance
+
+- **组合历史走势多持仓并行获取**：`portfolio_history.py` 的 `calculate_portfolio_history()` 使用 `ThreadPoolExecutor(max_workers=8)` 并行获取每只持仓的历史数据，串行→并行显著缩短大规模持仓的等待时间（用户报告"速度很慢"的数据获取层根因）。
+- **指数数据去重请求**：`_render_index_section()` 接受 `pre_fetched_a`/`pre_fetched_us` 可选参数，`write_html_report()` 和 `_cmd_generate_full()` 透传 `_prepare_report_data()` 已获取的指数数据，消除同一流程中指数 HTTP 请求重复调用的浪费（降级日志曾出现同一指数数据降级两次）。
+
+### Changed
+
+- **CDN 链路优化 + 原生 Canvas 即时渲染**：`report_template.html` 重构图表渲染架构——新增 `drawSimpleChart()` 原生 Canvas 2D 函数（无外部依赖、即刻渲染），双图表脚本改为同步原生渲染+后台 Chart.js 升级模式，消除 CDN 白屏等待。CDN 链路首位新增 `bootcdn.net`（国内加速），移除始终超时的 `cdnjs.cloudflare.com`。修复 cssText 覆盖导致画布溢出视口的 Bug（`canvas.style.cssText` → `canvas.clientWidth`）。
+- **降级日志增强**：`chain.py` 全部 degrade/fallback 日志附加 `_code_tag`（代码+名称），降级时明确标识受影响资产。`price.py` 新增 00 代码降级/成功两阶段日志。
+- **`max_tokens_global_macro` 1024→2048**：`_core.py` 提高 LLM 全局宏观提示词的最大 token 数，允许生成更长的宏观分析内容。
+- **`progress.py` / `tui_menu.py`**：联动适配，`ProgressReporter` 输出格式微调，`tui_menu` 颜色常量提升为模块级别供 logger.py 引用。
+
+### Docs
+
+- **review-findings.md**：P0(CRITICAL) E1 → 已完成，P1 E2/E3/E4 → 已完成，P2 E5/E6/E7 → 已完成。新增 P3 待处理项（test_fetcher_price 00 degrade 测试、portfolio_history 单元测试、penetration.py 00 分类、excel_b_series session_cache）。
+- **technical.md**：同步设计约束 C1 引用（`code_utils.py` 代码类型分类中心化），补充降级链路描述（00 代码降级流程）。
+- **requirements.md**：同步 00 代码分类需求、并行获取需求、指数去重需求。
+- **datasource-and-folders.md**：目录树补充 `schemas/` 节点。
+
 ## [0.4.1] - 2026-07-13
 
 ### Added

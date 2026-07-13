@@ -22,7 +22,7 @@
   "system_prompt_global_macro": null,
   "model_global_macro": null,
   "temperature_global_macro": 0.3,
-  "max_tokens_global_macro": 1024,
+  "max_tokens_global_macro": 2048,
   "timeout_global_macro": 60,
   "cache_enabled_global_macro": true,
   "output_brief_global_macro": false,

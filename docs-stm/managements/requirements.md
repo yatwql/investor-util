@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
 创建日期：2026-06-26
-最后更新：2026-07-13（v0.4.1）
+最后更新：2026-07-13（v0.4.1 + 降级日志增强/00代码降级/max_tokens调整）
 
 ---
 
@@ -785,6 +785,9 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 新闻多源并行获取（5 源全失败/部分失败） | 全源失败 → 模块级占位文本；部分失败 → 页脚列出失败源清单 | `news_aggregator._last_src_results` + `get_last_source_status()` 追踪各源 fetch 结果；`news_correlation._build_news_footer()` 追加失败源列表 |
 | akshare 分红数据获取失败 | 年均股息率列显示 `--`；页脚状态摘要标记分红不可用 | `_build_category_data()` 返回 `(list, bool)`，`dividend_success=False` 时触发 `_build_category_data_status()` 写入状态摘要 |
 | 指数/指数数据双链路均失败 | 指数区域显示 `--`，不影响其余模块 | `fetcher/index.py` 腾讯→新浪→过期缓存三层降级 |
+| **OTC 基金 00 代码实时行情降级** | 无感知(透明修复) | `price.py` 中 `00` 开头代码（A 股/OTC 基金代码前缀重叠区）的股票链路（腾讯→新浪）全失败后，自动降级到 `price_fund_otc`（东方财富净值）；降级成功/失败均有日志区分 |
+| **OTC 基金 00 代码历史走势降级** | 走势图数据源自动切换 | `portfolio_history.py` 中 `00` 开头代码的 K 线历史全空时，自动降级到 `history_fund_otc`（天天基金历史净值） |
+| **降级日志增强**（v0.4.1+） | 日志输出更清晰 | 所有 Provider Chain 的 fallback 日志追加 `[code]` 标签；00 代码降级日志含资产名称；市场行情失败汇总时列出具体失败资产名称(`基金名(code)`) |
 | F1 快照对比 — 首次运行无历史快照 | 显示"首次运行，暂无环比数据"占位 | `SnapshotHoldings.load_latest()` 返回 None，跳过差异对比 |
 | F1 快照对比 — 快照读取异常/损坏 | 跳过环比对比，不影响报告其余模块 | 日志 WARNING，`f_context` 置为 None |
 | F2 历史走势 — 全部持仓数据不可用 | 页面显示占位文本"组合历史走势数据不可用"；快照对比不受影响 | `history_data.status = "unavailable"`，HTML 模板条件渲染占位块 |

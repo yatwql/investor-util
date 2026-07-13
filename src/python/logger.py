@@ -5,6 +5,8 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
+from src.python.tui_menu import _RED, _RESET, _YELLOW
+
 # 日志文件路径：测试期间写入独立文件，避免与运行时日志混淆
 # 检测方式（按可靠性降序）：
 #   1. INVEST_RUNNING_TESTS 环境变量（test_runner.py 显式设置，xdist worker 继承）
@@ -25,6 +27,29 @@ _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 # 日志轮转配置
 _LOG_MAX_BYTES = 10 * 1024 * 1024  # 单文件最大 10 MB
 _LOG_BACKUP_COUNT = 5               # 保留 5 个备份
+
+# ── 控制台彩色日志格式器 ────────────────────────────────────
+# 仅控制台 handler 应用颜色，文件 handler 保持纯文本
+
+
+class _ColoredFormatter(logging.Formatter):
+    """按日志级别着色消息内容的格式器（仅限控制台）。"""
+
+    _LEVEL_COLORS = {
+        logging.WARNING: _YELLOW,
+        logging.ERROR: _RED,
+        logging.CRITICAL: _RED,
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        color = self._LEVEL_COLORS.get(record.levelno, "")
+        if color:
+            original = record.msg
+            record.msg = f"{color}{record.msg}{_RESET}"
+            result = super().format(record)
+            record.msg = original
+            return result
+        return super().format(record)
 
 
 def setup_logger(name: str = "invest") -> logging.Logger:
@@ -52,10 +77,10 @@ def setup_logger(name: str = "invest") -> logging.Logger:
     # 创建日志格式器
     formatter = logging.Formatter(_LOG_FORMAT)
 
-    # ---- 控制台 Handler ----
+    # ---- 控制台 Handler（彩色输出） ----
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(_ColoredFormatter(_LOG_FORMAT))
     logger.addHandler(console_handler)
 
     # ---- 文件 Handler（自动轮转） ----

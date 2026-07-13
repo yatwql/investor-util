@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-13（v0.4.1）
+最后更新：2026-07-13（v0.4.1 + 00代码降级/日志着色）
 
 ---
 
@@ -286,6 +286,7 @@ Provider Chain 注册表（provider_registry.py:DataSourceRegistry）
 - 失败检测：空返回、HTTP 错误、JSON 解析异常均视为失败触发递补
 - 全链路失败 → 尝试过期缓存降级 → 仍失败则抛异常由调用方处理
 - **价格缓存收市后新鲜度验证**（`fetcher/price.py:_price_cache_fresh`）：盘后首次请求时校验缓存 `price_date` 是否为当前交易日。若盘中因 Tencent 不可用降级写入 Sina 数据（非收盘价），或盘中缓存残留上一交易日数据，收市后自动清除该残留缓存并强制重走 Provider Chain，确保收盘价更新。
+- **00 代码降级机制**（v0.4.1+）：OTC 基金与 A 股代码前缀重叠（均以 `00` 开头），`is_a_share_code()` 无法区分。`price.py` 和 `portfolio_history.py` 对 `00` 开头代码增加降级路由：主链路（price_stock/history_stock）全失败后，自动降级到 `price_fund_otc`（东方财富净值）或 `history_fund_otc`（天天基金历史净值）。主链路成功时永不触达降级，零误判风险。降级成功/失败均有日志区分（含资产名称）。
 
 ### Provider Chain 三层熔断架构
 
@@ -348,12 +349,14 @@ Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_re
 |:-----|:-----|:---------------|:---------|
 | `price.py` | 股票/ETF 最新价（腾讯+新浪）| tencent, sina | `price_*` |
 | | 场外基金净值 | eastmoney | `price_*` |
+| | **00 代码降级**：股票链路全失败→自动降级 eastmoney 净值 | price_stock → price_fund_otc | — |
 | `index.py` | A 股/美股指数 | tencent, sina | `index_*` |
 | `fund.py` | 基金排名/持仓/基准 | tiantian | `fund_perf_*`, `fund_hold_*`, `fund_benchmarks` |
 | `fund_manager.py` | 基金经理数据 | tiantian HTML 解析 | `fund_manager_*`, `fund_manager_snapshot` |
 | `industry.py` | 行业分类+概念板块 | eastmoney_industry, eastmoney_industry_rest | `industry_*` |
 | `chain.py` | Provider 优先链定义 + fallback 路由 | —（纯路由逻辑） | — |
 | `portfolio_history.py` | 组合历史走势计算器（F2） | —（内部路由到 history_stock/history_fund_otc） | `history_stock_*`, `history_fund_otc_*` |
+| | **00 代码降级**：K 线全空→自动降级基金净值历史 | history_stock → history_fund_otc | — |
 
 - **并行预热**：`preload_cache()` 对 preload 组使用 `ThreadPoolExecutor` 并行获取，减少串行等待
 - **菜单驱动**：菜单 [1] 和 [2] 分别清除 + 重拉 refresh 和 preload 组，复用 fetcher 模块的预热入口
@@ -414,6 +417,20 @@ Excel 端降级辅助函数（`category.py`等模块中使用）：
 
 - **`_write_placeholder(ws, message)`**：数据为空时写入灰色占位文本（合并单元格），替代隐藏页签行为
 - **`_write_data_status_foot(ws, status)`**：在页签底部追加数据源状态摘要行，根据 tier 自动匹配前缀
+
+### Fallback/降级日志增强
+
+所有 Provider Chain 的 fallback/降级日志均包含资产 `[code]` 标签，确保用户/开发者能精确定位哪个标的触发了切换：
+
+| 日志类型 | 示例 |
+|:---------|:-----|
+| API 返回空 | `[price_stock] [002943] 新浪财经 返回空，尝试下一链路` |
+| 数据验证未通过 | `[price_stock] [002943] 新浪财经 数据验证未通过，尝试下一链路` |
+| 全链路降级过期缓存 | `[price_stock] [002943] 全部 Provider 不可用，降级使用过期缓存` |
+| 全链路完全失败 | `[price_stock] [002943] 全链路失败（无过期缓存可用），数据不可用` |
+| 00 代码降级 | `[price] [002943 广发多因子灵活配置混合] 股票链路全部失败（该代码可能为场外基金），降级尝试东方财富净值链路` |
+| 降级成功/失败后续 | `[price] [002943 广发多因子灵活配置混合] 降级成功——通过场外基金链路获取到净值` |
+| 汇总失败资产列表 | `市场行情获取：14 成功，1 失败（网络/非交易时段/限速），报告部分数据将不可用；失败资产: ['广发多因子灵活配置混合(002943)']` |
 
 HTML 端降级机制：
 
@@ -991,6 +1008,7 @@ handlers_*.py → 各模块入口函数编排
 | C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()` / `batch_fetch_with_fallback()`，不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
 | C7 | **报告序号不可硬编码** | 报告 18 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [报告序号可配置](#报告序号可配置) |
 | C8 | **日志统一** | 所有模块必须使用 `logger = logging.getLogger("invest")`，不得创建独立的 logger 实例 | 日志碎片化、归档/轮转失效 | `logger.py` |
+| | **控制台日志着色**（v0.4.1+） | `logger.py` 中 `_ColoredFormatter` 使用 `tui_menu.py` 的 ANSI 颜色常量（依赖 colorama Win32 适配）：WARNING 黄色、ERROR/CRITICAL 红色，文件日志保持纯文本。`TuiProgressReporter` 的 UI 进度前缀同步着色：`[..]` 青色、`[OK]` 绿色、`[!]` 黄色、`[ERR]` 红色。NO_COLOR 环境变量或非 TTY 时自动降级 | 告警/错误视觉辨识度提升 | `logger.py`、`report/progress.py` |
 | C9 | **LLM 模块注册** | 新增 LLM 分析模块时，**必须在** `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `_compute_module_cache_info()` 中注册调度入口和缓存信息，在 `registry.py` 中注册模块标识 | 模块不参与并发调度、用量统计遗漏 | [LLM 客户端技术要点](#llm-客户端技术要点) |
 | C10 | **新闻召回策略** | `per_source`（每源原始获取量）与 `top_n`（最终输出量）解耦：各源原始获取量 = `max(500, news_top_count × 2)`，不可写死为固定值。华尔街见闻 API 硬上限 100 条除外 | 配置 `news_top_count` 不生效 | [财经新闻热点与持仓关联分析](#财经新闻热点与持仓关联分析) |
 | C11 | **测试标记强制** | 新增/修改测试用例（测试类或方法）**必须**标注对应的 pytest marker（通过 `pytestmark` 模块级变量），新增 marker 需同步注册到 `conftest.py` 的 `pytest_configure`。`conftest.py` 的 `pytest_collection_modifyitems` 在收集期自动检查标记遗漏并发出 `PytestWarning` | CI 门禁不通过 | `src/test/conftest.py` |

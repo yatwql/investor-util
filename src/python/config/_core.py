@@ -422,7 +422,7 @@ def _get_default_llm_settings_template() -> str:
         '  "system_prompt_global_macro": null,\n'
         '  "model_global_macro": null,\n'
         '  "temperature_global_macro": 0.3,\n'
-        '  "max_tokens_global_macro": 1024,\n'
+        '  "max_tokens_global_macro": 2048,\n'
         '  "timeout_global_macro": 60,\n'
         '  "cache_enabled_global_macro": true,\n'
         '  "output_brief_global_macro": false,\n'

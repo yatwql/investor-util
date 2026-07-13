@@ -576,6 +576,7 @@ def _cmd_generate_full() -> None:
                 news_data=news_data, news_llm_meta=news_llm_meta,
                 early_warnings=_early_warnings, section_order=sec_order,
                 history_data=history_data, progress=reporter,
+                a_indices=prep["a_indices"], us_indices=prep["us_indices"],
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception:

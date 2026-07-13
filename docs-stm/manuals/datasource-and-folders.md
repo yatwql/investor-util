@@ -93,6 +93,10 @@ investor-util/
 │       │   │   ├── news_correlator.py    # 新闻关联引擎 — 持仓关键词匹配、关联度排序
 │       │   │   └── news_keywords.py      # 关键词提取 — 从持仓+穿透+行业数据生成关键词全集
 │   │   │
+│   │   ├── schemas/                 # 数据模型定义
+│       │   │   ├── __init__.py           # 子包标记（空文件）
+│       │   │   └── history.py            # 历史走势数据模型 — 持仓快照、回撤指标等结构化数据
+│   │   │
 │   │   ├── llm/                      # LLM 客户端，包含 API 调用、缓存指纹、提示词模板与会话统计等子模块
 │       │   │   ├── __init__.py           # 公共 API 导出，直链 generators_orchestrator/news
 │       │   │   ├── api.py                # Provider 路由 + Claude/OpenAI 调用 + Extended Thinking

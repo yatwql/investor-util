@@ -266,11 +266,47 @@ def is_index_fund_by_name(name: str) -> bool:
     return any(kw in name for kw in INDEX_KEYWORDS)
 
 
+# 场外基金名称关键词（用于 00 代码重叠区辅助判断）
+_OTC_FUND_NAME_KW = (
+    "混合",      # XX灵活配置混合/偏股混合/偏债混合
+    "纯债",      # 纯债债券
+    "短债",      # 短债债券
+    "中短债",    # 中短债债券
+    "利率债",    # 利率债债券
+    "信用债",    # 信用债债券
+    "货币",      # 货币市场基金
+    "联接",      # ETF联接
+    "增利",      # 增利货币
+)
+
+
+def is_otc_fund_by_name(name: str, code: str) -> bool:
+    """判断 00 代码是否为场外基金（名称 + 代码双维度）。
+
+    OTC 基金代码以 00 开头，与深市主板股票代码区间重叠，
+    单纯靠前缀 `is_a_share_code()` 无法区分。本函数利用
+    名称中的基金特征关键词辅助判定。
+
+    Args:
+        name: 持仓名称
+        code: 6 位证券代码（可为空，仅非 00 开头时提前返回）
+
+    Returns:
+        True 表示确认为场外基金
+    """
+    raw = _strip_prefix(code) if code else ""
+    if not raw or not raw.startswith("00"):
+        return False
+    return any(kw in name for kw in _OTC_FUND_NAME_KW)
+
+
 def is_fund_holding(name: str, code: str, account: str) -> bool:
     """判断持仓是否需要基金业绩分析。
 
     识别逻辑：纯 A 股/港股通（代码前缀匹配且名称不含 ETF）
     且不在场外基金账户中 → 非基金，其余全部视为基金。
+
+    对 00 代码重叠区，优先通过 ``is_otc_fund_by_name()`` 确认。
 
     Args:
         name: 持仓名称
@@ -280,6 +316,8 @@ def is_fund_holding(name: str, code: str, account: str) -> bool:
     Returns:
         True 表示需要基金业绩分析
     """
+    if is_otc_fund_by_name(name, code):
+        return True
     return not ((is_a_share_code(code) or is_hk_stock_code(code)) and "ETF" not in name.upper() and not is_offsite_fund(account))
 
 
