@@ -2,28 +2,28 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-12）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-13）测试覆盖规模：
 
 ### 模式对应测试量
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2665 | ~25s |
+| `unit` | 2699 | ~25s |
 | `standard` | 2265 | ~25s |
-| `scenario` | **269** | **~6min** |
-| `regression` | **269** | **~6min** |
+| `scenario` | **278** | **~6min** |
+| `regression` | **278** | **~6min** |
 | `dev-verify` | **2389** | **~2min** |
 | `verify` | **1049** | **~8min** |
 | `integration` | 298 | ~50s |
 | `edge` | 335 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **2972** | **~10min** |
+| `all` | **3006** | **~10min** |
 | `smoke` | 24 | ~2s |
-| `report` | 989 | ~15s |
+| `report` | **1020** | ~15s |
 | `all_no_unit` | 307 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：`all` 模式收集总数 2972 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 2960 项。
+> 注：`all` 模式收集总数 3006 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 2994 项。
 
 ### 功能域对应测试源
 
@@ -33,9 +33,9 @@
 |:-------|:-----------------------|:---------------------------|:--------:|
 | **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 167 |
 | **数据源注册中心** | `provider_registry.py` | `unit/core/test_provider_registry.py` + `test_phase_timeout.py` + `test_market_value_strategy_edge.py` | 53 |
-| **数据获取调度** | `fetcher/`(price, index, fund, industry, chain, history_diff) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 186 |
+| **数据获取调度** | `fetcher/`(price, index, fund, industry, chain, history_diff) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 189 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
-| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, portfolio_history, history_snapshot) | `unit/report/` 共 40 文件含 test_html_writer、test_html_template 等 | 989 |
+| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, early_warning, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, portfolio_history, history_snapshot) | `unit/report/` 共 41 文件含 test_html_writer、test_html_template 等 | 1020 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(19 文件) + `scenario/llm/test_llm_scenarios.py` | 512 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 427 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 76 |
@@ -47,7 +47,7 @@
 
 | 标记 | 覆盖场景 | 覆盖项数 | 参考测试类 |
 |:-------|:---------|:--------:|:-----------|
-| `scenario`（父标记） | S0a/S0b/S0d + S1-S33 + T1-T21 全量业务场景（不含 S0c+S10） | **269** | 见下 |
+| `scenario`（父标记） | S0a/S0b/S0d + S1-S33 + T1-T21 全量业务场景（不含 S0c+S10） | **278** | 见下 |
 | ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a/S0b/S0d + S21-S33 + P1p | **124** | |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_integration.py::TestScenarioS1` |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_integration.py::TestScenarioS2` |
@@ -81,12 +81,12 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 9 个子组合计 | **2665** |
+| `unit`（父标记） | 9 个子组合计 | **2699** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 167 |
-| ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 186 |
+| ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 189 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 480 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
-| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列基金深度分析模块、数据降级/占位；含 65 项 data 标记测试） | 989 |
+| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列基金深度分析模块、数据降级/占位；含 65 项 data 标记测试） | 1020 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 76 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含注册表测试） | 427 |
 | └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 164 |
