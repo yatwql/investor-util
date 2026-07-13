@@ -70,7 +70,7 @@
 | 股票历史分红 | akshare `stock_history_dividend()`（全量拉取后按代码过滤） | — |
 | 基金经理数据 | 天天基金 `fundf10.eastmoney.com` 经理列表页面 HTML 解析 + 档案页回退 | — |
 | 个股/ETF 历史 K 线 | 腾讯财经 `qt.gtimg.cn` K 线接口 | 新浪财经 `hq.sinajs.cn` 日线数据 |
-| 场外基金历史净值 | 天天基金 `fundf10.eastmoney.com` 净值页面 | — |
+| 场外基金历史净值 | 天天基金 `fundf10.eastmoney.com` 净值页面 | 东方财富 `api.fund.eastmoney.com` 历史净值接口 |
 
 > **指数双链路说明**：指数数据由 `fetcher/index.py` 直调 Provider，不走 Provider Chain。双链路自动 fallback：A 股指数腾讯→新浪，美股指数新浪→腾讯。双链路均失败时降级过期缓存（`stale_cache`）。
 >
@@ -150,7 +150,7 @@
 
 ### 5.4 降级规则
 
-缓存过期但 API 请求失败时使用过期缓存数据。过期天数阈值由 degradation 配置控制（T2=3天、T3=14天、T4=7天，每级 `stale_days`），缓存文件损坏时自动删除并触发重新获取。
+缓存过期但 API 请求失败时使用过期缓存数据。过期天数阈值由 degradation 配置控制（T2=3天、T3=14天、T4=14天，每级 `stale_days`），缓存文件损坏时自动删除并触发重新获取。
 
 ### 5.5 TTL 明细
 
@@ -709,6 +709,22 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | 对比逻辑 | 加载上次快照 → `HistoryDiff.compute()` → 输出总市值Δ/总盈亏Δ/持仓变动（新增/清仓/增持/减持）TOP5 |
 | 故障降级 | 首次运行无快照 / 快照损坏 → 跳过对比，下次自动建立基线 |
 
+### 8.5 F 系列：F1 持仓快照 vs F2 组合历史走势
+
+F1 与 F2 是两套独立的数据机制，共用 F 前缀但无数据依赖，各自独立降级。
+
+| 维度 | F1 持仓快照对比 | F2 组合历史走势 |
+|:-----|:---------------|:---------------|
+| **本质** | 环比对比——本次 vs 上次的快照差异 | 回溯模拟——假设份额不变 × 历史价格 |
+| **数据来源** | 本次报告的持仓市值/盈亏计算结果 | 外部第三方行情/净值 API（腾讯/新浪/天天/东方财富） |
+| **存储位置** | `data/history/snapshots/snapshot_{timestamp}.json` | `data/cache/history_stock_{code}.json` / `history_fund_otc_{code}.json` |
+| **生命周期** | 60 天 + 365 上限自动清理（`prune()`） | 标准缓存系统，按 TTL 过期（周级/月级） |
+| **输出位置** | 嵌入 §8.2.13 回撤分析页脚（快照摘要卡片） | 独立产出 §8.2.12 走势图 + §8.2.13 回撤分析 |
+| **控制开关** | 始终自动执行，不受任何配置影响 | `history.analysis`（`"off"` / `"prompt"` / `"auto"`） |
+| **失败影响** | 跳过对比，下次自动重建基线 | 走势图显示占位文本，回撤指标不可用 |
+| **00 代码降级** | 不涉及 | K 线全空→自动降级基金净值链路 |
+| **代码文件** | `report/history_snapshot.py` + `fetcher/history_diff.py` | `report/portfolio_history.py` + `fetcher/chain.py` |
+
 ---
 
 ## 9. 配置文件规格
@@ -735,7 +751,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | `history.analysis` | str | `"off"` | 手动 | 组合历史走势获取模式：`"off"`=关闭、`"prompt"`=报告后询问用户、`"auto"`=自动获取 |
 | `history.snapshot_retention_days` | int | `60` | 手动 | 持仓快照保留天数（超过此天数的旧快照自动删除） |
 | `history.snapshot_max_count` | int | `365` | 手动 | 持仓快照最大保留数（安全上限，超过则删除最旧的） |
-| `cache_ttl` | dict | 23 项 | 手动 | 各缓存类型 TTL（秒） |
+| `cache_ttl` | dict | 24 项 | 手动 | 各缓存类型 TTL（秒） |
 | `llm_key_file` | str | `data/config/llm_key.json` | 手动 | LLM 密钥文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | 手动 | LLM 参数文件路径 |
 
@@ -784,7 +800,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 
 | 场景 | 用户感知 | 内部处理 |
 |:-----|:---------|:---------|
-| 网络断开 | TUI 提示网络异常 | 过期缓存降级使用（由 degradation 配置的 stale_days 控制，T2=3天/T3=14天/T4=7天） |
+| 网络断开 | TUI 提示网络异常 | 过期缓存降级使用（由 degradation 配置的 stale_days 控制，T2=3天/T3=14天/T4=14天） |
 | API 超时 | 单条数据跳过，其余继续 | Provider Chain 自动切换备用链路；连续超时触发 DataSourceRegistry 熔断器（3次失败→熔断300秒→冷却后自动放行） |
 | API 返回异常/空数据 | 显示 `--` 占位 | 日志记录 WARNING |
 | 缓存文件损坏 | 透明修复 | 自动删除并重新获取 |
@@ -810,7 +826,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 | **OTC 基金 00 代码实时行情降级** | 无感知(透明修复) | `price.py` 中 `00` 开头代码（A 股/OTC 基金代码前缀重叠区）的股票链路（腾讯→新浪）全失败后，自动降级到 `price_fund_otc`（东方财富净值）；降级成功/失败均有日志区分 |
 | **OTC 基金 00 代码历史走势降级** | 走势图数据源自动切换 | `portfolio_history.py` 中 `00` 开头代码的 K 线历史全空时，自动降级到 `history_fund_otc`（天天基金历史净值） |
 | **降级日志增强**（v0.4.1+） | 日志输出更清晰 | 所有 Provider Chain 的 fallback 日志追加 `[code]` 标签；00 代码降级日志含资产名称；市场行情失败汇总时列出具体失败资产名称(`基金名(code)`) |
-| F1 快照对比 — 首次运行无历史快照 | 显示"首次运行，暂无环比数据"占位 | `SnapshotHoldings.load_latest()` 返回 None，跳过差异对比 |
+| F1 快照对比 — 首次运行无历史快照 | 显示"首次运行，暂无环比数据"占位 | `SnapshotData.load_latest()` 返回 None，跳过差异对比 |
 | F1 快照对比 — 快照读取异常/损坏 | 跳过环比对比，不影响报告其余模块 | 日志 WARNING，`f_context` 置为 None |
 | F1 快照自动清理失败（权限/文件锁定） | 日志 WARNING 跳过该文件，快照目录可能膨胀 | `prune()` 日志记录失败路径，保留已有文件继续运行 |
 | F2 历史走势 — 全部持仓数据不可用 | 页面显示占位文本"组合历史走势数据不可用"；快照对比不受影响 | `history_data.status = "unavailable"`，HTML 模板条件渲染占位块 |

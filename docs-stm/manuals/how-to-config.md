@@ -299,7 +299,7 @@
 | 14 | `health_check` | 持仓体检报告 | LLM |
 | 15 | `penetration_deep` | 穿透深度分析 | LLM |
 | 16 | `portfolio_history` | 组合历史走势 | 历史走势（始终显示，数据不可用时占位） |
-| 17 | `drawdown_analysis` | 回撤分析 | 历史走势（始终显示，数据不可用时占位） |
+| 17 | `drawdown_analysis` | 历史回撤分析 | 历史走势（始终显示，数据不可用时占位） |
 | 18 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**

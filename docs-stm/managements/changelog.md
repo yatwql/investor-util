@@ -4,6 +4,21 @@
 
 ---
 
+---
+
+## [0.4.3] - 未发布
+
+### Fixed
+
+- **registry.py**：修复 `history_stock`/`history_fund_otc` 误归入 preload cache_group，导致菜单 [2] 清除历史走势缓存但不重拉的问题。现改为无分组保护，仅按 TTL 过期清理。
+
+### Docs
+
+- **requirements.md**：新增 §8.5 F1 vs F2 对比表；修复 §4 历史净值备用链路（`—` → 东方财富）、§5.3 分组描述确认、§5.4/§10 T4 stale_days（7→14）、§9.1 缓存计数（23→24）、§10 `SnapshotHoldings` → `SnapshotData` 共 6 处不一致。
+- **technical.md**：修复 F1 流程图类名（`SnapshotHoldings` → `SnapshotData`）、Fetcher 表 portfolio_history 路径标注、指纹表 3 处函数引用（`index.py`→`akshare_extras.py`、`_compute_code_fingerprint`→`compute_holdings_fingerprint`、`news_keywords.py:news_fingerprint`→`news_aggregator.py:_compute_cache_key`）、C6 约束函数名（`fetch_with_fallback()`→`_fetch_with_fallback()`）、缓存计数（23→24）共 5 处。
+- **how-to-config.md**：修复 `drawdown_analysis` 显示名（`回撤分析` → `历史回撤分析`）。
+- **reports-instruction.md**：新增「F 系列数据机制」章节，含 F1 快照/F2 走势各有详细分述 + 独立对比表。
+
 ## [0.4.2] - 2026-07-13
 
 ### Fixed

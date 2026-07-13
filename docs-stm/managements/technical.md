@@ -182,7 +182,7 @@ penetration_sector = fetch_industry_data(code).industry  // API优先
 
 ### 策略概览
 
-缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。完整 TTL 表（23 种类型，含基金深度分析 4 模块 + 历史走势 2 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
+缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。完整 TTL 表（24 种类型，含基金深度分析 4 模块 + 历史走势 2 模块）及文件名模式见 [需求文档 §5.5 — TTL 明细](requirements.md#55-ttl-明细)。
 
 ### 行业/概念缓存
 
@@ -246,9 +246,9 @@ filename = f"{prefix}_{digest}.json"   # 例：profit_forecast_a1b2c3d4e5f6.json
 
 | 指纹类型 | 计算位置 | 输入源 | 作用范围 |
 |---------|---------|-------|---------|
-| **指数指纹** | `fetcher/index.py:_compute_index_fingerprint()` | A股 + 美股指数收盘价（列表 → 拼接 → MD5） | `profit_forecast_*`、`sector_flow_*` |
-| **代码列表指纹** | `cache/services/holdings_tracker.py:_compute_code_fingerprint()` | 持仓+穿透 A 股代码（去重排序 → MD5） | `dividend_*` |
-| **输入参数指纹** | `providers/news_keywords.py:news_fingerprint()` | 新闻源参数 + 关键词（拼接 → MD5） | `news_*` |
+| **指数指纹** | `providers/akshare_extras.py:_compute_index_fingerprint()` | A股 + 美股指数收盘价（列表 → 拼接 → MD5） | `profit_forecast_*`、`sector_flow_*` |
+| **代码列表指纹** | `cache/services/holdings_tracker.py:compute_holdings_fingerprint()` | 持仓+穿透 A 股代码（去重排序 → MD5） | `dividend_*` |
+| **输入参数指纹** | `providers/news_aggregator.py:_compute_cache_key()` | 新闻源参数 + 关键词（拼接 → MD5） | `news_*` |
 | **输入数据指纹** | `llm/fingerprint.py:_compute_{module}_fingerprint()` | LLM 模块的依赖数据（持仓汇总/结构序列化 → MD5） | `llm_global_macro_*`、`llm_expert_review_*`、`llm_health_check_*`、`llm_penetration_deep_*`、`llm_news_item_*` |
 
 > **LLM 输入筛选**：expert_review / health_check / penetration_deep 的 `_compute_fingerprint()` 在序列化前排除行情波动字段（`price`、`change_pct`），仅品种/份额/成本变化时指纹改变。
@@ -370,7 +370,7 @@ Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_re
 | `fund_manager.py` | 基金经理数据 | tiantian HTML 解析 | `fund_manager_*`, `fund_manager_snapshot` |
 | `industry.py` | 行业分类+概念板块 | eastmoney_industry, eastmoney_industry_rest | `industry_*` |
 | `chain.py` | Provider 优先链定义 + fallback 路由 | —（纯路由逻辑） | — |
-| `portfolio_history.py` | 组合历史走势计算器（F2） | —（内部路由到 history_stock/history_fund_otc） | `history_stock_*`, `history_fund_otc_*` |
+| `portfolio_history.py` | 组合历史走势计算器（F2，位于 `report/` 包） | —（内部路由到 history_stock/history_fund_otc） | `history_stock_*`, `history_fund_otc_*` |
 | | **00 代码降级**：K 线全空→自动降级基金净值历史 | history_stock → history_fund_otc | — |
 | `history_diff.py` | F1 快照差异计算引擎（纯计算，无 Provider/缓存） | — | — |
 
@@ -389,7 +389,7 @@ handlers_report.py（菜单触发）
    │     └─ report_prepare() 收集所有数据 → info 字典
    │
    ├─ 历史走势数据获取（菜单 L/B）
-   │     ├─ F1 快照对比：SnapshotHoldings → load_latest() → HistoryDiff.compute() → save() → prune()
+   │     ├─ F1 快照对比：SnapshotData → load_latest() → HistoryDiff.compute() → save() → prune()
    │     ├─ F2 历史走势：PortfolioHistoryCalculator.get_combined_timeseries()（as-if 模拟）
    │     └─ 数据注入：f_context（diff 摘要）→ Excel；history_data（走势）→ HTML
    │
@@ -757,7 +757,7 @@ handlers_*.py → 各模块入口函数编排
 | C3 | **缓存原子写入** | 缓存和配置文件写入必须使用 `tempfile.mkstemp` + `os.replace` 模式，禁止直接覆写文件 | 断电/崩溃后半写文件损坏 | [原子写入](#原子写入) |
 | C4 | **会话级 API 复用缓存** | 同次会话内同一外部 API 数据被多处/多次请求时，**必须**使用 `DataSourceRegistry.session_cache` 缓存结果，避免重复 HTTP 调用（参考 `provider_registry.py`） | 性能退化、API 限频 | [Provider Chain 三层熔断架构](#provider-chain-三层熔断架构) |
 | C5 | **HTTP 客户端统一** | 所有 HTTP 请求必须使用 `http_client.py` 的 `make_http_client()` / `make_async_http_client()` 工厂方法，不得直接实例化 `httpx.Client()` / `httpx.AsyncClient()` | SSL 配置不一致、连接池泄漏 | `http_client.py` |
-| C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()` / `batch_fetch_with_fallback()`，不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
+| C6 | **Provider Chain 必经** | 绝大部分数据获取必须通过 `fetcher/chain.py` 的 `_fetch_with_fallback()`（带下划线），不得直接调用 Provider 函数（单元测试 mock 场景、指数数据直调 Provider 除外） | 熔断器失效、fallback 链路断路 | [Provider Chain](#provider-chain) |
 | C7 | **报告序号不可硬编码** | 报告 18 个模块的序号和显示名称必须通过 `registry.py` 注册表驱动，任何模块不得出现硬编码序号或页签标题 | 序号配置失效、排序错位 | [报告序号可配置](#报告序号可配置) |
 | C8 | **日志统一** | 所有模块必须使用 `logger = logging.getLogger("invest")`，不得创建独立的 logger 实例 | 日志碎片化、归档/轮转失效 | `logger.py` |
 | C15 | **控制台日志着色**（v0.4.1+） | `logger.py` 中 `_ColoredFormatter` 使用 `tui_menu.py` 的 ANSI 颜色常量（依赖 colorama Win32 适配）：WARNING 黄色、ERROR/CRITICAL 红色，文件日志保持纯文本。`TuiProgressReporter` 的 UI 进度前缀同步着色：`[..]` 青色、`[OK]` 绿色、`[!]` 黄色、`[ERR]` 红色。NO_COLOR 环境变量或非 TTY 时自动降级 | 告警/错误视觉辨识度提升 | `logger.py`、`report/progress.py` |
