@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
 创建日期：2026-06-26
-最后更新：2026-07-13（v0.4.4 + F2走势历史数据三连修复/备用链路补全/收益率起算修正）
+最后更新：2026-07-13
 
 ---
 
@@ -665,7 +665,7 @@ Jaccard = |A ∩ B| / |A ∪ B|
 - `"auto"` 模式：报告生成时自动获取，不询问
 - `"off"` 模式：不获取数据，报告渲染占位文本
 
-**累计收益率起算点（v0.4.4+）：**
+**累计收益率起算点：**
 - 不同持仓的净值历史起止日期可能不同（QDII 基金可追溯至 2025-09，债券基金仅到 2026-03 等）
 - 收益率从 ≥80% 持仓都有数据的日期起算，避免早期只有部分基金数据时 `first_val` 偏低导致收益率虚高
 - 早期数据（覆盖率不足 80% 的日期）仍保留在走势图上保持视觉完整，但不参与收益率计算
@@ -838,9 +838,9 @@ F1 与 F2 是两套独立的数据机制，共用 F 前缀但无数据依赖，�
 | F2 历史走势 — 全部持仓数据不可用 | 页面显示占位文本"组合历史走势数据不可用"；快照对比不受影响 | `history_data.status = "unavailable"`，HTML 模板条件渲染占位块 |
 | F2 历史走势 — 部分持仓数据缺失 | 页面显示降级警告清单（"部分持仓历史走势不可用（3/5）"），观测期压缩但不中断 | `history_data.status = "degraded"`，`warnings` 列表逐条标注；Excel 页脚追加状态提示 |
 | F2 历史走势 — 获取模式为 `"off"` | 报告页面显示占位文本，不报错 | `handlers_report.py` 依据 `history.analysis` 配置跳过获取流程，`f_context` 保持 None |
-| F2 历史走势 — OTC 基金首链路返回空（v0.4.4+） | 无感知（透明 fallback 到备用链路） | `_fetch_with_incremental_fallback()` 对 `[]` 返回视为需递补而非成功，`if not new_data: continue` 继续尝试下一 provider（如 tiantian→eastmoney） |
-| F2 历史走势 — eastmoney 历史净值 API 分页限制（v0.4.4+） | 获取约 200 条（≈10 个月）历史净值，增量缓存逐步积累更久数据 | `fetch_fund_nav_history()` 使用 `pageSize=20` 分页循环替代单次 `pageSize=365`（超 API 上限返回 null），页间 0.3s 防限流 |
-| F2 累计收益率虚高保护（v0.4.4+） | 收益率从 ≥80% 持仓覆盖的日期起算，早期数据保留在走势图上但排除出收益率计算 | `get_combined_timeseries()` 扫描 `fund_count_on_date`，找到首日 ≥80% 持仓参与计算的日期作为 `valid_start_idx`；`total_return_pct`/`_validate_bars` 均以此日期为基准 |
+| F2 历史走势 — OTC 基金首链路返回空 | 无感知（透明 fallback 到备用链路） | `_fetch_with_incremental_fallback()` 对 `[]` 返回视为需递补而非成功，`if not new_data: continue` 继续尝试下一 provider（如 tiantian→eastmoney） |
+| F2 历史走势 — eastmoney 历史净值 API 分页限制 | 获取约 200 条（≈10 个月）历史净值，增量缓存逐步积累更久数据 | `fetch_fund_nav_history()` 使用 `pageSize=20` 分页循环替代单次 `pageSize=365`（超 API 上限返回 null），页间 0.3s 防限流 |
+| F2 累计收益率虚高保护 | 收益率从 ≥80% 持仓覆盖的日期起算，早期数据保留在走势图上但排除出收益率计算 | `get_combined_timeseries()` 扫描 `fund_count_on_date`，找到首日 ≥80% 持仓参与计算的日期作为 `valid_start_idx`；`total_return_pct`/`_validate_bars` 均以此日期为基准 |
 
 ---
 
