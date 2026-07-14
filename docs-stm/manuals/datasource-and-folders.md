@@ -47,7 +47,12 @@ investor-util/
 │   │   │       ├── __init__.py        # 包标记（空文件）
 │   │   │       └── holdings_tracker.py # 持仓跟踪服务 — 指纹计算+变更检测+关联缓存自动刷新
 │   │   ├── code_utils.py             # 证券代码/名称类型判定中心 — A股/基金/债券/港股通/ETF/QDII 识别原语
-│   │   ├── config/                    # 配置管理子包（_defaults / _comments / _core）— config.json / llm_key / llm_settings 读写、校验
+│   │   ├── config/                    # 配置管理子包 — config.json / llm_key / llm_settings 读写、校验
+│   │   │   ├── __init__.py           # 包标记（空文件）
+│   │   │   ├── _config_defaults.py   # config.json 默认配置 & 模板生成
+│   │   │   ├── _llm_defaults.py      # llm_settings.json 缺省模板
+│   │   │   ├── _comments.py          # JSON 注释剥离
+│   │   │   └── _core.py              # 配置读写/缓存/校验/LLM 配置（核心逻辑）
 │   │   ├── constants.py              # 共享常量 + 项目根路径（标记文件查找法）— 版本号、缓存频率、模型定价、PROJECT_ROOT
 │   │   ├── http_client.py            # HTTP 客户端工厂 — 统一 httpx.Client 创建、超时/重试配置
 │   │   ├── logger.py                 # 日志模块 — logging 配置、文件+控制台双输出
