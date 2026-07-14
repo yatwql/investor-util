@@ -369,6 +369,9 @@ investor-util/
 │   │   ├── archived_changelog.0.3.x.md        # v0.3.x 版本变更日志归档（v0.3.0 ~ v0.3.10 共 8 个版本）
 │   │   ├── archived_plan.0.3.x.md             # v0.3.x 实现计划归档（D-8b/D-10/D-11 审查修复）
 │   │   ├── archived_review-findings.0.3.x.md  # v0.3.x 自审问题记录归档（D-9/D-10/D-11 等 6 条）
+│   │   ├── archived_changelog.0.4.x.md        # v0.4.x 版本变更日志归档（v0.4.0 ~ v0.4.5 共 5 个版本）
+│   │   ├── archived_plan.0.4.x.md             # v0.4.x 实现计划归档（G 板块可见性/F2 历史走势）
+│   │   ├── archived_review-findings.0.4.x.md  # v0.4.x 自审问题记录归档（00 代码/CDN/技术债清理）
 │   │   ├── archived-data-source-pre-study.md  # 数据源预研笔记（已归档，原位于 plan/notes/）
 │   │   ├── report-board-visibility-configable/    # 📁 报告板块可见性可配置设计归档
 │   │   │   └── g-board-visibility-iteration-plan.md  # G. 报告板块可见性可配置 10 轮迭代计划（已归档）
@@ -439,4 +442,4 @@ investor-util/
 
 > 注意：项目每次版本变更后，目录树和测试文件数可能滞后。请以代码仓库实际结构为准。
 >
-> 最后更新：2026-07-13
+> 最后更新：2026-07-14

@@ -46,6 +46,10 @@ from src.python.config._core import (
     _KNOWN_PROVIDER_TYPES,
     _KNOWN_PROVIDER_NAMES,
     _STRING_CONFIG_KEYS,
+    # 板块可见性
+    is_enable_b_series,
+    is_enable_news,
+    is_enable_history,
     # LLM 配置
     get_llm_config,
     get_llm_key_path,
@@ -82,7 +86,11 @@ __all__ = [
     "_KNOWN_PROVIDER_TYPES",
     "_KNOWN_PROVIDER_NAMES",
     "_STRING_CONFIG_KEYS",
-    "get_llm_config",
+    # 板块可见性
+    "is_enable_b_series",
+    "is_enable_news",
+    "is_enable_history",
+    # LLM 配置
     "get_llm_key_path",
     "get_llm_settings_path",
     "_KNOWN_LLM_SETTINGS_KEYS",

@@ -17,7 +17,11 @@ _DEFAULT_CONFIG = {
     "output_dir": "reports",
     "llm_key_file": "data/config/llm_key.json",
     "llm_settings_file": "data/config/llm_settings.json",
-    # ── B. 数据源与提供商 ──
+    # ── B. 板块可见性（关闭后对应页签/章节完全隐藏） ──
+    "enable_b_series": True,    # B 系列基金深度分析（#6~9）
+    "enable_news": True,        # 新闻与预警（#10~11）
+    "enable_history": True,     # 历史走势+回撤分析（#16~17）
+    # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
         "sina": True,
@@ -27,7 +31,7 @@ _DEFAULT_CONFIG = {
         "akshare": True,
     },
     "preferred_provider": {},
-    # ── C. 市场时段与缓存 ──
+    # ── D. 市场时段与缓存 ──
     "market_hour_aware": ["price", "index"],
     "market_hour_ttl": 30,
     "market_hours": {
@@ -36,7 +40,7 @@ _DEFAULT_CONFIG = {
         "official_source": True,
     },
     "cache_ttl": get_cache_ttl_defaults(),
-    # ── D. 行为调优 ──
+    # ── E. 行为调优 ──
     "default_menu_key": "L",
     "report_section_order": {},
     "early_warning": {
@@ -49,9 +53,9 @@ _DEFAULT_CONFIG = {
         "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
         "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14},
     },
-    # ── E. 业绩基准 ──
+    # ── F. 业绩基准 ──
     "user_fund_benchmarks": {},
-    # ── F. 持仓快照 ──
+    # ── G. 持仓快照 ──
     "history": {
         "analysis": "off",
         "snapshot_retention_days": 60,
@@ -83,7 +87,12 @@ def _get_default_config_template() -> str:
         '  "llm_key_file": "data/config/llm_key.json",\n'
         '  "llm_settings_file": "data/config/llm_settings.json",\n'
         '\n'
-        '  // ── B. 数据源与提供商 ──\n'
+        '  // ── B. 板块可见性（关闭后对应页签/章节完全隐藏）──\n'
+        '  "enable_b_series": true,\n'
+        '  "enable_news": true,\n'
+        '  "enable_history": true,\n'
+        '\n'
+        '  // ── C. 数据源与提供商 ──\n'
         '  "news_top_count": 300,\n'
         '  "news_sources": {\n'
         '    "sina": true,\n'
@@ -94,7 +103,7 @@ def _get_default_config_template() -> str:
         '  },\n'
         '  "preferred_provider": {},\n'
         '\n'
-        '  // ── C. 市场时段与缓存 ──\n'
+        '  // ── D. 市场时段与缓存 ──\n'
         '  "market_hour_aware": ["price", "index"],\n'
         '  "market_hour_ttl": 30,\n'
         '  "market_hours": {\n'
@@ -104,7 +113,7 @@ def _get_default_config_template() -> str:
         '  },\n'
         f'  "cache_ttl": {indented_ttl},\n'
         '\n'
-        '  // ── D. 行为调优 ──\n'
+        '  // ── E. 行为调优 ──\n'
         '  "default_menu_key": "L",\n'
         '  "report_section_order": {},\n'
         '  "early_warning": {\n'
@@ -118,10 +127,10 @@ def _get_default_config_template() -> str:
         '    "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}\n'
         '  },\n'
         '\n'
-        '  // ── E. 业绩基准 ──\n'
+        '  // ── F. 业绩基准 ──\n'
         '  "user_fund_benchmarks": {},\n'
         '\n'
-        '  // ── F. 持仓快照 ──\n'
+        '  // ── G. 持仓快照 ──\n'
         '  "history": {\n'
         '    "analysis": "off",\n'
         '    "snapshot_retention_days": 60,\n'

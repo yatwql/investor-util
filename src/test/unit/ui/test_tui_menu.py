@@ -99,7 +99,7 @@ class TestIndexByKey(unittest.TestCase):
         self.assertIsNone(_index_by_key("e"))
 
     def test_find_number(self) -> None:
-        self.assertEqual(_index_by_key("1"), 7)
+        self.assertEqual(_index_by_key("1"), 6)
 
     def test_find_empty(self) -> None:
         self.assertIsNone(_index_by_key(""))

@@ -1,13 +1,13 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
 创建日期：2026-06-26
-最后更新：2026-07-13（v0.4.4）
+最后更新：2026-07-14（v0.5.0）
 
 ---
 
 ## 审查问题索引
 
-> 早期审查问题和实现计划已归档：详见 [`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md)。
+> 早期审查问题和实现计划已归档：详见 [`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md) · [`archived_plan.0.4.x.md`](../archive/archived_plan.0.4.x.md)。
 
 ---
 
@@ -57,7 +57,9 @@
 
 ## ✅ 已完成迭代
 
-所有已完成迭代的详细变更记录见 [`changelog.md`](changelog.md)。早期实现计划和审查记录已归档：[`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md)。
+所有已完成迭代的详细变更记录见 [`changelog.md`](changelog.md)。早期实现计划和审查记录已归档：[`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md) · [`archived_plan.0.4.x.md`](../archive/archived_plan.0.4.x.md)。
+
+- **G. 报告板块可见性可配置** ✅ v0.4.5 完成
 
 ---
 
@@ -66,28 +68,6 @@
 > 注：字母编号跳跃出于历史分配——已完成迭代占用了相应字母（详见上方 ✅ 已完成迭代），剩余字母保留给此前已规划但优先级较低的后续迭代。
 
 ---
-
-### [P4] G. 报告板块可见性可配置（中难度 / 中价值）
-
-为报告各板块（B 系列、新闻与预警、历史走势）增加开/关开关，关闭后对应的全部页签/章节不显示。目前 LLM 板块已有 `llm_enabled` 机制可作为参考实现。
-
-#### 范围
-
-| 板块 | type | 待新增配置 | 对应页签 |
-|:-----|:-----|:-----------|:---------|
-| B 系列 | `b_series` | `b_series_enabled` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析 |
-| 新闻与预警 | `news` | `news_enabled` | #10 财经新闻热点与持仓关联分析、#11 智能预警 |
-| 历史走势 | `history` | `history_enabled` | #16 组合历史走势、#17 历史回撤分析 |
-
-> 注：LLM 板块（`llm`，#12~15、#18）已通过 `llm_enabled` 支持，不在本任务范围内。基础核心板块（`always`，#1~5）始终显示，不可关闭。
-
-#### 验收标准
-
-1. **config.json 配置**：新增 `b_series_enabled`、`news_enabled`、`history_enabled` 三个布尔字段，默认为 `true`
-2. **TUI 菜单**：在菜单 S（配置 LLM 报告分析章节）同级或附近，增加对应板块的开关选项，交互方式与 LLM 模块启停一致
-3. **页签可见性**：关闭某板块后，其所有页签在 Excel 中不创建对应 sheet，在 HTML 中不渲染对应章节
-4. **不影响数据获取**：关闭板块仅控制**输出**，不阻止该板块所需数据的后台获取（避免因开关状态变化导致缓存状态混乱）
-5. **兼容现有配置**：旧 config.json 缺少上述字段时视为 `true`（向后兼容）
 
 ### [P4] H. 智能预警模块去留评估（高难度 / 中价值）
 

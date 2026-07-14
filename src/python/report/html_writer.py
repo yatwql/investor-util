@@ -85,32 +85,64 @@ def _compute_section_visibility(
     include_news: bool,
     early_warnings: dict | None,
     llm_enabled_flag: bool,
+    # ↓↓↓ board 层新增参数 ↓↓↓
+    enable_news: bool = True,        # board 层：新闻板块是否开启（配置驱动，不是 include_news！）
+    enable_b_series: bool = True,    # board 层：B 系列板块是否开启
+    enable_history: bool = True,     # board 层：历史走势板块是否开启
+    enable_llm: bool = True,         # board 层：LLM 板块是否开启
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
 
-    根据各模块返回的数据状态决定 section 是否可见，
+    两层可见性模型：
+      board 层：用户配置的板块开关（enable_xxx）
+      data 层：各子模块返回的数据可用状态
+
     返回的闭包遵守 C14 约束（不写入 _ENV.globals）。
     """
-    section_numbers = {sec["key"]: sec["number"] for sec in order}
-    raw_data_flags: dict[str, bool] = {
-        "manager_data": manager_analysis is not None,
-        "overlap_data": overlap_matrix is not None,
-        "concentration_data": concentration_analysis is not None,
-        "style_data": style_analysis is not None,
-        "include_news": include_news,
-        "early_warnings": bool(early_warnings),
-        "llm_enabled": llm_enabled_flag,
+    # board 层：内联 dict（与 Excel 端结构一致）
+    board_flags: dict[str, bool] = {
+        "always":   True,
+        "b_series": enable_b_series,
+        "news":     enable_news,            # ← 配置字段（不是 include_news/data 层）
+        "history":  enable_history,
+        "llm":      enable_llm,             # ← board 层
     }
+    # data 层：各模块数据就绪状态
+    data_flags: dict[str, bool] = {
+        "manager_data":              manager_analysis is not None,
+        "overlap_data":              overlap_matrix is not None,
+        "concentration_data":        concentration_analysis is not None,
+        "style_data":                style_analysis is not None,
+        "news_data_available":       include_news,         # ← data 层（菜单类型+数据状态）
+        "early_warnings":            bool(early_warnings),
+        "llm_data_available":        llm_enabled_flag,     # ← data 层（LLM 生成成功？）
+    }
+
+    # 两层合并：section_visible = board_ok AND data_ok
     section_visible_dict: dict[str, bool] = {}
     for sec in order:
+        board_ok = board_flags.get(sec.get("type", ""), True)
+        if not board_ok:
+            section_visible_dict[sec["key"]] = False
+            continue
         flag_name = sec.get("data_flag")
         if not flag_name:
             section_visible_dict[sec["key"]] = True
         else:
-            section_visible_dict[sec["key"]] = raw_data_flags.get(flag_name, False)
+            section_visible_dict[sec["key"]] = data_flags.get(flag_name, False)
+
+    # 连续重新编号：基于可见模块分配连续序号，llm_usage 强制末位
+    visible_list = [sec for sec in order
+                    if section_visible_dict.get(sec["key"], False)]
+    llm_sec = [s for s in visible_list if s["key"] == "llm_usage"]
+    other_secs = [s for s in visible_list if s["key"] != "llm_usage"]
+    ordered_visible = other_secs + llm_sec
+    visible_numbers = {sec["key"]: idx for idx, sec in
+                       enumerate(ordered_visible, start=1)}
+
     # 创建渲染期 section_visible 闭包（不写入 _ENV.globals，遵守 C14 约束）
     _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
-    return section_numbers, section_visible_dict, _sv_fn
+    return visible_numbers, section_visible_dict, _sv_fn
 
 
 def _build_data_status_sections(
@@ -155,7 +187,7 @@ def _build_data_status_sections(
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None, history_data: dict | None = None, a_indices: dict | None = None, us_indices: dict | None = None) -> str:
+def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None, history_data: dict | None = None, a_indices: dict | None = None, us_indices: dict | None = None, enable_b_series: bool = True, enable_news: bool = True, enable_history: bool = True) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     通过各子函数获取分析数据，渲染 Jinja2 模板，
@@ -200,7 +232,6 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
     perf_data, perf_profit_ok = _render_fund_performance_section(holdings, details, prog)
 
     # ── 13) 基金经理变更监控（B 系列） ──
-    enable_b_series = include_news  # B/L 菜单含基金深度分析
     manager_analysis = _render_manager_analysis(holdings, enable_b_series, prog)
 
     # ── 14) 持仓重合度矩阵（B 系列） ──
@@ -233,7 +264,12 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
     order = section_order or get_report_section_order()
     section_numbers, section_visible_dict, _sv_fn = _compute_section_visibility(
         order, manager_analysis, overlap_matrix, concentration_analysis,
-        style_analysis, include_news, early_warnings, llm_enabled_flag)
+        style_analysis, include_news, early_warnings, llm_enabled_flag,
+        enable_news=enable_news,
+        enable_b_series=enable_b_series,
+        enable_history=enable_history,
+        enable_llm=enable_llm,  # enable_llm is the board param for LLM
+    )
 
     # ── 10b) 数据源状态摘要 ──
     (data_status_summary, data_status_penetration,

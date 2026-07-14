@@ -1,6 +1,6 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 最后更新：2026-07-13
+> 最后更新：2026-07-14（v0.5.0——归档 v0.4.x 变更记录）
 
 ## 概述
 
@@ -186,7 +186,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
 
-- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime）。这些测试模拟真实用户操作（如菜单 E/H/B/L 生成报告），组合多个模块进行端到端验证。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime）。这些测试模拟真实用户操作（如菜单 E/B/L 生成报告），组合多个模块进行端到端验证。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 
   场景测试按职责分为 **5 大类**：
 

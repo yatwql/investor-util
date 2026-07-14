@@ -260,6 +260,59 @@ def _cmd_config_llm_modules() -> None:
     _press_any_key()
 
 
+def _cmd_config_report_boards() -> None:
+    """配置报告板块可见性（B 系列 / 新闻与预警 / 历史走势）。"""
+    from src.python.config import (
+        is_enable_b_series, is_enable_news, is_enable_history,
+        set_config, get_config,
+    )
+
+    while True:
+        config = get_config()
+        b_series = is_enable_b_series(config)
+        news     = is_enable_news(config)
+        history  = is_enable_history(config)
+
+        print()
+        print("  ┌── 配置报告板块可见性 ────────────────────┐")
+        b_status = f"{_GREEN}启用{_RESET}" if b_series else f"{_RED}禁用{_RESET}"
+        n_status = f"{_GREEN}启用{_RESET}" if news else f"{_RED}禁用{_RESET}"
+        h_status = f"{_GREEN}启用{_RESET}" if history else f"{_RED}禁用{_RESET}"
+        print(f"  │ 1. B 系列基金深度分析（#6~9）  [{b_status}]{' ' * 8}│")
+        print(f"  │ 2. 新闻与预警（#10~11）        [{n_status}]{' ' * 8}│")
+        print(f"  │ 3. 组合历史走势+回撤（#16~17）  [{h_status}]{' ' * 8}│")
+        print(f"  │                                   │")
+        print(f"  │ 4. LLM 板块（#12~15,#18） — 请在菜单 S 配置 │")
+        print(f"  │ 0. 返回主菜单{' ' * 27}│")
+        print(f"  └{'─' * 42}┘")
+        print()
+        try:
+            choice = input("  输入编号切换 (0-4): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        if choice == "0":
+            break
+
+        if choice == "1":
+            set_config("enable_b_series", not b_series)
+            print(f"  {_GREEN}[OK]{_RESET} B 系列已{'禁用' if b_series else '启用'}")
+        elif choice == "2":
+            set_config("enable_news", not news)
+            print(f"  {_GREEN}[OK]{_RESET} 新闻与预警已{'禁用' if news else '启用'}")
+        elif choice == "3":
+            set_config("enable_history", not history)
+            print(f"  {_GREEN}[OK]{_RESET} 组合历史走势已{'禁用' if history else '启用'}")
+        elif choice == "4":
+            print(f"  {_YELLOW}[!]{_RESET} LLM 板块配置请使用菜单 [S]")
+        else:
+            print(f"  {_YELLOW}[!]{_RESET} 无效编号")
+
+    _refresh_config()
+    _press_any_key()
+
+
 def _cmd_refresh_config() -> None:
     """重新加载所有配置（config.json + llm_settings.json + llm_key.json）。"""
     # 破坏内部缓存强制重新读取

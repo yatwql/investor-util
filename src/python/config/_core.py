@@ -257,6 +257,18 @@ def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_enable_boards(config: dict, issues: int) -> int:
+    """验证板块可见性配置（enable_b_series / enable_news / enable_history）。"""
+    for key in ("enable_b_series", "enable_news", "enable_history"):
+        val = config.get(key)
+        if val is None:
+            continue  # 缺失视为 True（向后兼容）
+        if not isinstance(val, bool):
+            logger.warning("config.json %s = %r 不是布尔值，将使用默认值 true", key, val)
+            issues += 1
+    return issues
+
+
 def _validate_early_warning(config: dict, issues: int) -> int:
     ew, issues = _section(config, "early_warning", dict, "智能预警阈值将使用默认值", issues)
     if ew is _MISSING:
@@ -366,12 +378,51 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_news_sources(config, issues)
     issues = _validate_preferred_provider(config, issues)
     issues = _validate_user_fund_benchmarks(config, issues)
+    issues = _validate_enable_boards(config, issues)
     issues = _validate_early_warning(config, issues)
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)
     return issues
+
+
+# ═══════════════════════════════════════════════════════════════
+# 板块可见性读取函数
+# ═══════════════════════════════════════════════════════════════
+
+
+def is_enable_b_series(config: dict | None = None) -> bool:
+    """B 系列基金深度分析（#6~9）是否启用。缺失时返回 True。"""
+    if config is None:
+        config = get_config()
+    val = config.get("enable_b_series")
+    if val is None:
+        logger.debug("config.json 缺少 enable_b_series，使用默认值 true")
+        return True
+    return bool(val)
+
+
+def is_enable_news(config: dict | None = None) -> bool:
+    """新闻与预警（#10~11）是否启用。缺失时返回 True。"""
+    if config is None:
+        config = get_config()
+    val = config.get("enable_news")
+    if val is None:
+        logger.debug("config.json 缺少 enable_news，使用默认值 true")
+        return True
+    return bool(val)
+
+
+def is_enable_history(config: dict | None = None) -> bool:
+    """组合历史走势+回撤分析（#16~17）是否启用。缺失时返回 True。"""
+    if config is None:
+        config = get_config()
+    val = config.get("enable_history")
+    if val is None:
+        logger.debug("config.json 缺少 enable_history，使用默认值 true")
+        return True
+    return bool(val)
 
 
 # ═══════════════════════════════════════════════════════════════

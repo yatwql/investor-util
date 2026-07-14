@@ -84,17 +84,16 @@ def _bind_callbacks() -> None:
         _cmd_config_filename,
         _cmd_config_llm_modules,
         _cmd_config_output_dir,
+        _cmd_config_report_boards,
         _cmd_refresh_config,
     )
     from src.python.handlers_report import (
         _cmd_generate_both,
         _cmd_generate_excel,
         _cmd_generate_full,
-        _cmd_generate_html,
     )
     callbacks: dict[str, Callable] = {
         "E": _cmd_generate_excel,
-        "H": _cmd_generate_html,
         "B": _cmd_generate_both,
         "L": _cmd_generate_full,
         "C": _cmd_config_dir,
@@ -104,6 +103,7 @@ def _bind_callbacks() -> None:
         "2": _cmd_update_position_cache,
         "3": _cmd_cleanup_cache,
         "4": _cmd_show_cache_stats,
+        "P": _cmd_config_report_boards,
         "S": _cmd_config_llm_modules,
         "R": _cmd_refresh_config,
     }

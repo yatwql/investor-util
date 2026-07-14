@@ -53,12 +53,17 @@
   // ── E. 业绩基准 ──
   "user_fund_benchmarks": {},
 
-  // ── F. 组合历史走势（F2）& G. 持仓快照（F1） ──
+  // ── F. 组合历史走势（F2）& 持仓快照（F1） ──
   "history": {
     "analysis": "off",
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365
-  }
+  },
+
+  // ── G. 报告板块可见性 ──
+  "enable_b_series": true,
+  "enable_news": true,
+  "enable_history": true
 }
 ```
 
@@ -80,7 +85,7 @@
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
-| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/H/B/L/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
+| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/P/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
 | `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（18 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
@@ -88,6 +93,9 @@
 | `history.analysis` | `"off"` | 组合历史走势获取模式：`"off"`=关闭（默认）、`"prompt"`=报告后询问、`"auto"`=自动获取 | 手动编辑 |
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
+| `enable_b_series` | `true` | B 系列报告板块可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
+| `enable_news` | `true` | 新闻类报告板块可见性（模块 #10~#11），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制板块在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
+| `enable_history` | `true` | 历史走势报告板块可见性（模块 #16~#17），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
 
 ---
 
@@ -272,7 +280,7 @@
 
 #### report_section_order 报告序号配置
 
-`report_section_order` 用于自定义报告 18 个模块的显示序号和排列顺序。
+`report_section_order` 用于自定义报告各模块的显示序号和排列顺序。
 
 | 子字段 | 格式 | 说明 |
 |--------|:----:|------|
@@ -288,18 +296,18 @@
 | 3 | `category` | 持仓分类表 | 始终显示 |
 | 4 | `penetration` | 资产穿透TOP10 | 始终显示 |
 | 5 | `fund_performance` | 基金业绩分析 | 始终显示 |
-| 6 | `fund_manager` | 基金经理变更监控 | B 系列（有数据才显示） |
-| 7 | `fund_overlap` | 持仓重合度矩阵 | B 系列（有数据才显示） |
-| 8 | `fund_concentration` | 持仓集中度监控 | B 系列（有数据才显示） |
-| 9 | `fund_style` | 基金风格分析 | B 系列（有数据才显示） |
-| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻（需启用） |
-| 11 | `early_warning` | 智能预警 | 新闻（需启用） |
+| 6 | `fund_manager` | 基金经理变更监控 | B 系列（enable_b_series 控制；有数据才显示） |
+| 7 | `fund_overlap` | 持仓重合度矩阵 | B 系列（enable_b_series 控制；有数据才显示） |
+| 8 | `fund_concentration` | 持仓集中度监控 | B 系列（enable_b_series 控制；有数据才显示） |
+| 9 | `fund_style` | 基金风格分析 | B 系列（enable_b_series 控制；有数据才显示） |
+| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻（enable_news 控制） |
+| 11 | `early_warning` | 智能预警 | 新闻（enable_news 控制） |
 | 12 | `global_macro` | 全球政经局势 | LLM |
 | 13 | `expert_review` | 智囊团深度复盘 | LLM |
 | 14 | `health_check` | 持仓体检报告 | LLM |
 | 15 | `penetration_deep` | 穿透深度分析 | LLM |
-| 16 | `portfolio_history` | 组合历史走势 | 历史走势（始终显示，数据不可用时占位） |
-| 17 | `drawdown_analysis` | 历史回撤分析 | 历史走势（始终显示，数据不可用时占位） |
+| 16 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
+| 17 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
 | 18 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
@@ -396,6 +404,21 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
     "snapshot_max_count": 365
 }
 ```
+
+---
+### H. 报告板块可见性 v0.4.5
+
+`enable_b_series`、`enable_news`、`enable_history` 三个配置项控制报告按板块显示或隐藏对应的章节组。关闭某个板块后，该板块涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
+
+通过 TUI 主菜单 `[P]` 配置报告板块可见性进入交互式子菜单，可逐个切换各板块的可见性。
+
+| 字段 | 默认值 | 控制章节 | 说明 |
+|:-----|:------:|:---------|:-----|
+| `enable_b_series` | `true` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析 | B 系列功能板块 |
+| `enable_news` | `true` | #10 财经新闻热点与持仓关联分析、#11 智能预警 | 新闻类功能板块 |
+| `enable_history` | `true` | #16 组合历史走势、#17 历史回撤分析 | 历史走势板块（F1 持仓快照不受影响，始终自动执行） |
+
+> **enable_news 与 news_sources 的区别：** `enable_news` 控制报告板块的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时板块仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时板块完全隐藏。
 
 ---
 ## 缓存分组
