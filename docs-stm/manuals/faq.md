@@ -407,7 +407,7 @@ A: 程序自动识别：6 位数字代码 + 含"ETF"标记的走场内取价（�
 
 A: 默认使用固定顺序（投资分析汇总 → LLM API 用量），但可通过 `config.json` 的 `report_section_order` 字段自定义各模块的序号和排列顺序。HTML 报告同样使用 CSS `order` 属性实现视觉重排。未配置时保持默认行为。详见[配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
-菜单 E/B/L 生成范围不同：E 为基础页签（1~5），B 含 B 系列+新闻模块+历史走势（1~11）¹，L 为全量（1~18）。各模块的条件可见性受 `enable_b_series`/`enable_news`/`enable_history` 配置控制（详见[配置指南](how-to-config.md#h-报告板块可见性-v045)），关闭对应板块后相关章节完全隐藏，剩余章节连续重新编号。
+菜单 E/B/L 生成范围不同：E 为基础页签（1~5），B 含 B 系列+新闻模块+历史走势（1~11）¹，L 为全量（1~18）。各模块的条件可见性受 `enable_b_series`/`enable_news`/`enable_history` 配置控制（详见[配置指南](how-to-config.md#h-报告板块可见性)），关闭对应板块后相关章节完全隐藏，剩余章节连续重新编号。
 
 ¹ B 菜单还条件性包含 #16 组合历史走势和 #17 回撤分析（视 `history.analysis` 配置，`"off"` 时跳过）。
 

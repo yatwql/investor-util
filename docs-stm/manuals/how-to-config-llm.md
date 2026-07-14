@@ -145,6 +145,8 @@ LLM 配置拆分为两个独立文件，分工明确：
 
 > 关闭的模块在报告中自动跳过，不消耗 Token。
 
+> **板块可见性：** 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 报告板块（#12~#15 + LLM API 用量页签）在报告中整体隐藏。仅 `news_correlation` 开启时不影响 LLM 板块可见性。
+
 #### 3. 指纹驱动的缓存自动失效
 
 每个标准模块的缓存键基于**持仓数据指纹**生成，指纹成分因模块而异：

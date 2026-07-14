@@ -6,7 +6,7 @@
   "llm_settings_file": "data/config/llm_settings.json",
   "enable_b_series": false,
   "enable_news": true,
-  "enable_history": true,
+  "enable_history": false,
   "news_top_count": 300,
   "news_sources": {
     "sina": true,

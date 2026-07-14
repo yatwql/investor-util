@@ -224,7 +224,7 @@ def _cmd_generate_both() -> None:
             history_data = _fetch_history_data(_history_mode, holdings, reporter)
         else:
             history_data = None
-            reporter.log("[板块配置] 历史走势已关闭，跳过")
+            reporter.info("[板块配置] 历史走势已关闭，跳过")
 
         from src.python.report.html_writer import write_html_report
         _news_label = "含新闻" if _enable_news else "无新闻"
@@ -238,6 +238,7 @@ def _cmd_generate_both() -> None:
                 enable_b_series=_enable_b_series,
                 enable_news=_enable_news,
                 enable_history=_enable_history,
+                enable_llm=False,           # B 菜单：不含 LLM 分析章节
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception:
@@ -255,6 +256,7 @@ def _cmd_generate_both() -> None:
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,
             enable_history=_enable_history,
+            enable_llm=False,           # B 菜单：不含 LLM 分析章节
         )
     except Exception as e:
         reporter.add_error("全系列报告生成失败（详情请查看日志文件 logs/app.log）")
@@ -431,11 +433,12 @@ def _cmd_generate_full() -> None:
 
     try:
         # ── 读取板块可见性配置 ──
-        from src.python.config import is_enable_b_series, is_enable_news, is_enable_history
+        from src.python.config import is_enable_b_series, is_enable_news, is_enable_history, is_enable_llm
         config = get_config_cache() or {}
         _enable_b_series = is_enable_b_series(config)
         _enable_news     = is_enable_news(config)
         _enable_history  = is_enable_history(config)
+        _enable_llm      = is_enable_llm(config)
 
         prep = _prepare_report_data(holdings, reporter)
         sec_order = get_report_section_order(config)
@@ -449,7 +452,7 @@ def _cmd_generate_full() -> None:
             history_data = _fetch_history_data(_history_mode, holdings, reporter)
         else:
             history_data = None
-            reporter.log("[板块配置] 历史走势已关闭，跳过")
+            reporter.info("[板块配置] 历史走势已关闭，跳过")
 
         from src.python.llm import generate_all_llm
         from src.python.providers.akshare_extras import get_sector_fund_flow
@@ -469,25 +472,36 @@ def _cmd_generate_full() -> None:
             )
         else:
             _news_fut = None
-            reporter.log("[板块配置] 新闻板块已关闭，跳过新闻获取")
-        _llm_fut = _llm_ex.submit(
-            generate_all_llm,
-            prep["a_indices"], prep["us_indices"],
-            prep["total_mv"], prep["total_cost"], prep["total_profit"],
-            prep["total_today_profit"], len(holdings), prep["categories"],
-            penetrated_assets=prep["penetrated_assets"],
-            holdings_details=prep["holdings_details"],
-            sector_flow=_sector_flow, force=_force_llm,
-            f_context=f_context,
-        )
+            reporter.info("[板块配置] 新闻板块已关闭，跳过新闻获取")
 
-        if _news_fut is not None:
+        if _enable_llm:
+            _llm_fut = _llm_ex.submit(
+                generate_all_llm,
+                prep["a_indices"], prep["us_indices"],
+                prep["total_mv"], prep["total_cost"], prep["total_profit"],
+                prep["total_today_profit"], len(holdings), prep["categories"],
+                penetrated_assets=prep["penetrated_assets"],
+                holdings_details=prep["holdings_details"],
+                sector_flow=_sector_flow, force=_force_llm,
+                f_context=f_context,
+            )
+        else:
+            _llm_fut = None
+            reporter.info("[板块配置] LLM 板块已关闭，跳过 LLM 内容生成")
+
+        if _news_fut is not None and _llm_fut is not None:
+            # 新闻 + LLM 均开启：并行等待结果
             llm_content, news_data, news_llm_meta = _process_llm_news_futures(
                 _llm_fut, _news_fut, reporter,
             )
             _news_available = bool(news_data)
-        else:
-            # 板块关闭：只等待 LLM，新闻为空
+        elif _news_fut is not None:
+            # 仅新闻：等待新闻结果，LLM 内容为空
+            news_data, news_llm_meta = _news_fut.result()
+            _news_available = bool(news_data)
+            llm_content = (None, None, None, None)
+        elif _llm_fut is not None:
+            # 仅 LLM：等待 LLM 结果，新闻为空
             news_data = []
             news_llm_meta = {}
             _result = _llm_fut.result()     # 8-tuple from generate_all_llm
@@ -519,6 +533,12 @@ def _cmd_generate_full() -> None:
                 reporter.info("所有 LLM 内容已跳过，未调用 LLM")
             llm_content = (_llm_content[0], _llm_content[1],
                            _llm_content[2], _llm_content[3])
+        else:
+            # 新闻 + LLM 均关闭
+            news_data = []
+            news_llm_meta = {}
+            llm_content = (None, None, None, None)
+            reporter.info("[板块配置] 新闻和 LLM 均未开启，跳过内容生成")
 
         _print_llm_session_usage()
 
@@ -543,6 +563,7 @@ def _cmd_generate_full() -> None:
                 enable_b_series=_enable_b_series,
                 enable_news=_enable_news,
                 enable_history=_enable_history,
+                enable_llm=_enable_llm,         # board 层：LLM 板块是否开启
             )
             reporter.ok(f"HTML 报告已生成: {path}")
         except Exception:
@@ -555,7 +576,7 @@ def _cmd_generate_full() -> None:
         _generate_excel_report(
             holdings, include_news=_news_available,
             output_dir=prep["output_dir"],
-            news_top_count=prep["news_top_count"], include_llm=True,
+            news_top_count=prep["news_top_count"], include_llm=_enable_llm,
             llm_content=llm_content,
             details=prep["details"], a_indices=prep["a_indices"],
             us_indices=prep["us_indices"],
@@ -567,6 +588,7 @@ def _cmd_generate_full() -> None:
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,
             enable_history=_enable_history,
+            enable_llm=_enable_llm,
         )
     except Exception as e:
         reporter.add_error("全系列报告生成失败（详情请查看日志文件 logs/app.log）")

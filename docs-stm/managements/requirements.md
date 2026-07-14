@@ -86,7 +86,7 @@
 
 | 职责 | 说明 | 关键方法 |
 |:-----|:------|:---------|
-| **Provider 熔断器** | 每个 Provider 独立熔断（连续 3 次失败→熔断 300 秒→自动放行试探） | `record_success()`、`record_failure()`、`is_circuit_broken()`、`get_available_providers()` |
+| **Provider 熔断器** | 每个 Provider 独立熔断（默认连续 3 次失败→熔断 300 秒；批量 API 如 eastmoney_industry 为 6 次/120 秒→自动放行试探） | `record_success()`、`record_failure()`、`is_circuit_broken()`、`get_available_providers()` |
 | **会话级缓存** | 同一会话内跨模块共享的进程级内存缓存。按 domain 分组（如 `"price"`、`"extended"`），每 domain 上限 2000 条目，超限淘汰最旧 | `session_cache_get/set/contains/clear()` |
 | **策略选择** | 根据代码类型（A 股/港股/QDII）+ 市场时段 + 熔断状态自动选择获取策略：`LIVE_FETCH`（盘中实时）、`CACHE_ONLY`（盘后只读）、`PLACEHOLDER`（预留） | `get_effective_strategy()`、`fetch_or_cached()` |
 
@@ -813,7 +813,7 @@ F1 与 F2 是两套独立的数据机制，共用 F 前缀但无数据依赖，�
 | 场景 | 用户感知 | 内部处理 |
 |:-----|:---------|:---------|
 | 网络断开 | TUI 提示网络异常 | 过期缓存降级使用（由 degradation 配置的 stale_days 控制，T2=3天/T3=14天/T4=14天） |
-| API 超时 | 单条数据跳过，其余继续 | Provider Chain 自动切换备用链路；连续超时触发 DataSourceRegistry 熔断器（3次失败→熔断300秒→冷却后自动放行） |
+| API 超时 | 单条数据跳过，其余继续 | Provider Chain 自动切换备用链路；连续超时触发 DataSourceRegistry 熔断器（默认 3 次失败→熔断 300 秒；批量 API 如 push2 为 6 次→120 秒→冷却后自动放行） |
 | API 返回异常/空数据 | 显示 `--` 占位 | 日志记录 WARNING |
 | 缓存文件损坏 | 透明修复 | 自动删除并重新获取 |
 | 配置值异常 | 启动时输出 WARNING | 使用代码默认值兜底 |
@@ -827,7 +827,7 @@ F1 与 F2 是两套独立的数据机制，共用 F 前缀但无数据依赖，�
 | 持仓文件格式异常 | 跳过异常行，继续解析 | 提示具体行号错误 |
 | 空持仓 | 暂停生成 | 直接返回，不生成报告 |
 | 熔断器触发 | 跳过该端点请求 | 冷却期后自动恢复 |
-| push2 数据源熔断 | 行业分类/概念板块/基金风格分析自动降级为备用数据或代码估算结果 | DataSourceRegistry 熔断器（连续 3 次失败后熔断 push2，冷却 5 分钟后自动放行试探）；原 eastmoney_industry.py 局部熔断器已于 R-188 迁移至 DataSourceRegistry |
+| push2 数据源熔断 | 行业分类/概念板块/基金风格分析自动降级为备用数据或代码估算结果 | DataSourceRegistry 熔断器（连续 6 次失败后熔断 push2，冷却 120 秒后自动放行试探）。熔断阈值高于单股票 API，因为 push2 在 `batch_fetch_industry_data` 中被 3 线程并发调用，一次连接抖动即可产生多起连续失败计数 |
 | 收市后价格缓存过期（盘中降级残留） | 无感知（透明修复） | `_price_cache_fresh()` 校验缓存 `price_date`，发现非当日时自动清除缓存并重新请求 |
 | T2 增强数据源失败（指数/基金排名） | 列级 `--` + 页脚 ⚠/ℹ 状态摘要 | `_data_status` 字典（DataStatusItem）追踪各源 available/tier/message；Excel 端 `_write_data_status_foot()` 写入灰色页脚；HTML 端 `render_data_status` Jinja2 宏渲染 |
 | T3 数据源失败（行业分类）/ T4 数据源失败（盈利预测、分红） | 列级 `--` + 页脚状态摘要 | 同上 DegradationTracker 双信号降级 |
@@ -855,7 +855,7 @@ F1 与 F2 是两套独立的数据机制，共用 F 前缀但无数据依赖，�
 | 约束项 | 设计决策 |
 |:-------|:---------|
 | **并发策略** | ThreadPoolExecutor：新闻 5 源并发获取、LLM 4+1 模块（4 个 LLM 分析模块 + 可选的新闻关联分析）并发生成（并行数由 `llm_max_concurrency` 配置，默认 3）、取价批量异步 |
-| **基金风格加速** | DataSourceRegistry session_cache（domain="extended"）跨基金复用；Tencent 二级降级基于 registry 熔断器；push2 超时 5s、重试 1 次、熔断阈值 3 |
+| **基金风格加速** | DataSourceRegistry session_cache（domain="extended"）跨基金复用；Tencent 二级降级基于 registry 熔断器；push2 超时 5s、重试 1 次、熔断阈值 6（批量并发场景） |
 | **HTTP 连接池** | LLM 客户端专用 HTTP/2 多路复用 + 连接池上限 20 / 空闲保持 10（`llm/generators_orchestrator.py` `_LLM_CLIENT_SETTINGS`），通用 HTTP 客户端仅 SSL 配置 |
 | **缓存原子写入** | `tempfile.mkstemp` + `os.replace` 模式，防断电半写导致文件截断 |
 | **配置原子写入** | 同上，防 config.json 截断导致下次启动丢失全部自定义配置 |

@@ -425,6 +425,29 @@ def is_enable_history(config: dict | None = None) -> bool:
     return bool(val)
 
 
+# ── LLM 板块可见性（来自 llm_settings.json enabled_llm） ──────
+
+_REPORT_LLM_MODULES = frozenset({
+    "global_macro", "expert_review", "health_check", "penetration_deep",
+})
+
+
+def is_enable_llm(config: dict | None = None) -> bool:
+    """LLM 报告板块是否启用。
+
+    检查 llm_settings.json 中 4 个 LLM 报告模块（global_macro /
+    expert_review / health_check / penetration_deep）是否有任一启用。
+    缺失时返回 True（向后兼容）。
+
+    注意：news_correlation 仅用于新闻关联分析，不影响 LLM 板块整体可见性。
+    """
+    llm_config = get_llm_config()
+    enabled_map = (llm_config or {}).get("enabled_llm", {})
+    if not enabled_map:
+        return True  # 缺失时默认启用
+    return any(enabled_map.get(k, False) for k in _REPORT_LLM_MODULES)
+
+
 # ═══════════════════════════════════════════════════════════════
 # LLM 配置
 # ═══════════════════════════════════════════════════════════════

@@ -317,7 +317,9 @@ Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_re
 │  │  • register_provider(name, tier, fallback)  │    │
 │  │  • record_success / record_failure(provider) │    │
 │  │  • is_circuit_broken / is_chain_broken      │    │
-│  │  • 连续 3 次 → 熔断 300s → 冷却期满自动恢复 │    │
+│  │  • 连续失败达阈值 → 熔断 → 冷却期满自动恢复 │    │
+│  │    默认（单股票 API）：3 次 / 300s          │    │
+│  │    eastmoney_industry（批量）：6 次 / 120s  │    │
 │  └────────────────────────────────────────────┘    │
 │                                                    │
 │  ┌─ 会话级缓存（C4 约束） ─────────────────────┐    │
@@ -342,15 +344,16 @@ Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_re
 
 - **第 1 层 — 熔断预检**：`is_chain_broken(chain)` 检查 chain 中所有 provider 是否全部熔断。`market_value.py` 在批量请求前调用 `get_effective_strategy` 判断是否全链降级到 CACHE_ONLY，避免无效 HTTP 请求。
 - **第 2 层 — Provider 级熔断**：`_fetch_with_fallback` 中每次调用前检查 `is_circuit_broken(provider)`。仅传输级异常（超时/断连/DNS/5xx）触发 `record_failure` 计入熔断计数器；代码级空结果（API 正常返回 None）不计入。
-- **第 3 层 — 冷却试探恢复**：熔断 300s 后 `is_circuit_broken` 自动解除标记并重置 `consecutive_failures=0`，下次调用即为试探。
+- **第 3 层 — 冷却试探恢复**：熔断冷却期后 `is_circuit_broken` 自动解除标记并重置 `consecutive_failures=0`，下次调用即为试探。冷却时长和熔断阈值支持 per-provider 配置（见下方对比表）。
 
 **与 LLM Circuit Breaker 的差异：**
 
-| 维度 | Provider Chain 熔断 | push2 行业/概念熔断 | LLM Circuit Breaker |
-|:-----|:-------------------|:--------------------|:--------------------|
-| 作用域 | 数据 provider（price/industry 等） | push2 行业分类/概念板块 API | LLM API endpoint |
+| 维度 | Provider Chain 熔断（单股票 API） | Provider Chain 熔断（批量 API） | LLM Circuit Breaker |
+|:-----|:-------------------------------|:------------------------------|:--------------------|
+| 作用域 | 数据 provider（price/industry 等） | eastmoney_industry（push2 批量行业分类） | LLM API endpoint |
 | 实现位置 | `provider_registry.py` DataSourceRegistry | `provider_registry.py` DataSourceRegistry | `llm/circuit_breaker.py` |
-| 冷却时长 | 300s | 300s | 60s |
+| 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 N 次 |
+| 冷却时长 | 300s | 120s | 60s |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
 | 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 |
 
@@ -554,17 +557,18 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 }
 ```
 
-读取接口在 `config/_core.py` 中以三个 `is_enable_*()` 函数统一封装：
+读取接口在 `config/_core.py` 中以四个 `is_enable_*()` 函数统一封装：
 
-| 函数 | 配置字段 | 对应 section.type |
-|:-----|:---------|:------------------|
-| `is_enable_b_series(config)` | `enable_b_series` | `b_series` |
-| `is_enable_news(config)` | `enable_news` | `news` |
-| `is_enable_history(config)` | `enable_history` | `history` |
+| 函数 | 配置字段 | 配置来源 | 对应 section.type |
+|:-----|:---------|:---------|:------------------|
+| `is_enable_b_series(config)` | `enable_b_series` | `config.json` | `b_series` |
+| `is_enable_news(config)` | `enable_news` | `config.json` | `news` |
+| `is_enable_history(config)` | `enable_history` | `config.json` | `history` |
+| `is_enable_llm(config)` | `enabled_llm`（4 个报告模块） | `llm_settings.json` | `llm` |
 
 `handlers_report.py` 中 `_cmd_generate_both()` 和 `_cmd_generate_full()` 在报告准备阶段调用上述函数读取配置值后传入 Excel/HTML 管线。配置值验证在 `_validate_enable_boards()` 中统一处理：缺失视为 `true`（兼容无此字段的老版 config.json），非布尔值记录 WARNING。
 
-`always` 和 `llm` 类型的 board 层硬编码为 `True`（always 始终显示，llm 由菜单参数控制，不通过 config.json 开关）。
+`always` 类型始终显示，无配置开关。`llm` 类型由 `is_enable_llm()` 驱动——读取 `llm_settings.json` 的 `enabled_llm` 字典，若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）任一启用则 LLM 板块整体可见。`news_correlation` 仅用于新闻关联分析，不影响板块可见性。
 
 #### Board Flags 内联字典
 
@@ -576,7 +580,7 @@ board_flags = {
     "b_series": enable_b_series,    # config.json → board 层
     "news":     enable_news,        # 配置驱动（非 data 层 include_news）
     "history":  enable_history,     # 配置驱动
-    "llm":      enable_llm,         # 菜单参数驱动
+    "llm":      enable_llm,         # llm_settings.json → board 层
 }
 ```
 

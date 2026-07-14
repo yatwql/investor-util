@@ -87,6 +87,8 @@ class ProviderState:
     is_skipped: bool = False
     total_failures: int = 0
     total_successes: int = 0
+    failure_threshold: int = _PROVIDER_SKIP_THRESHOLD
+    cooldown_secs: float = _PROVIDER_COOLDOWN_SECS
 
 
 @dataclass
@@ -140,11 +142,17 @@ class DataSourceRegistry:
         tier: int = 4,
         fallback: str | None = None,
         timeout: float = 10.0,
+        failure_threshold: int | None = None,
+        cooldown_secs: float | None = None,
     ) -> None:
         """注册一个 Provider（幂等）。
 
         首次注册创建 ProviderState，重复注册只更新 tier/fallback/timeout，
         不影响熔断计数器。
+
+        Args:
+            failure_threshold: 连续失败多少次后熔断；None 表示使用全局默认值（3）
+            cooldown_secs: 熔断后冷却秒数；None 表示使用全局默认值（300）
         """
         with self._provider_lock:
             if name in self._providers:
@@ -152,9 +160,15 @@ class DataSourceRegistry:
                 old.tier = tier
                 old.fallback = fallback
                 old.timeout = timeout
+                if failure_threshold is not None:
+                    old.failure_threshold = failure_threshold
+                if cooldown_secs is not None:
+                    old.cooldown_secs = cooldown_secs
             else:
                 self._providers[name] = ProviderState(
                     name=name, tier=tier, fallback=fallback, timeout=timeout,
+                    failure_threshold=failure_threshold or _PROVIDER_SKIP_THRESHOLD,
+                    cooldown_secs=cooldown_secs or _PROVIDER_COOLDOWN_SECS,
                 )
 
     def register_default_chains(self) -> None:
@@ -168,7 +182,14 @@ class DataSourceRegistry:
             for name in provider_list:
                 tier = 2 if name in ("tencent", "eastmoney") else 3
                 timeout = 10.0 if name in ("tencent", "eastmoney_industry") else 20.0
-                self.register_provider(name, tier, None, timeout)
+                # eastmoney_industry 是批量 API（按股票逐只调用），
+                # 提高熔断阈值避免单次连接抖动导致全链路降级
+                # 6 次：扛得住一两波并发抖动，真挂了也不至于等太久
+                kwargs: dict = {"failure_threshold": None, "cooldown_secs": None}
+                if name == "eastmoney_industry":
+                    kwargs["failure_threshold"] = 6
+                    kwargs["cooldown_secs"] = 120
+                self.register_provider(name, tier, None, timeout, **kwargs)
             self._chains[_data_type] = list(provider_list)
 
     # ── 熔断器（Provider 级） ───────────────────────────
@@ -204,12 +225,12 @@ class DataSourceRegistry:
             state.last_failure_time = now
             state.last_failure_context = context
             state.total_failures += 1
-            if state.consecutive_failures >= _PROVIDER_SKIP_THRESHOLD:
+            if state.consecutive_failures >= state.failure_threshold:
                 state.is_skipped = True
                 logger.warning(
                     "[registry] %s 连续 %d 次失败（最新: %s），熔断 %ds",
                     provider, state.consecutive_failures, context,
-                    _PROVIDER_COOLDOWN_SECS,
+                    state.cooldown_secs,
                 )
 
     def is_circuit_broken(self, provider: str) -> bool:
@@ -222,7 +243,7 @@ class DataSourceRegistry:
             if state is None or not state.is_skipped:
                 return False
             elapsed = time.time() - state.last_failure_time
-            if elapsed >= _PROVIDER_COOLDOWN_SECS:
+            if elapsed >= state.cooldown_secs:
                 state.is_skipped = False
                 state.consecutive_failures = 0
                 logger.info(
@@ -248,7 +269,7 @@ class DataSourceRegistry:
             any_recovered = False
             for p in chain:
                 state = self._providers[p]
-                if now - state.last_failure_time >= _PROVIDER_COOLDOWN_SECS:
+                if now - state.last_failure_time >= state.cooldown_secs:
                     state.is_skipped = False
                     state.consecutive_failures = 0
                     any_recovered = True
