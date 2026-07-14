@@ -31,29 +31,137 @@ investor-util/
 │
 ├── src/                              # 源代码
 │   ├── python/                       # 主程序代码
-│   │   ├── cache/                    #   缓存引擎（TTL/清理/统计/分组）
-│   │   ├── config/                   #   配置管理（config.json / llm_settings / llm_key）
-│   │   ├── fetcher/                  #   数据获取调度（价格/指数/行业/基金/快照）
-│   │   ├── providers/                #   数据源提供商（腾讯/东方财富/天天基金/新浪/akshare/新闻多源）
-│   │   ├── schemas/                  #   数据模型定义
-│   │   ├── llm/                      #   LLM 客户端（API 调用/提示词/缓存指纹/会话统计）
-│   │   ├── report/                   #   报告生成（Excel + HTML，含各页签写入器）
-│   │   ├── tmpl/                     #   HTML 报告模板
-│   │   ├── main.py                   #   程序入口 + TUI 主循环
-│   │   ├── registry.py               #   中央注册表（模块定义/TTL/分组）
-│   │   ├── provider_registry.py      #   数据源注册中心（熔断器/会话缓存）
-│   │   ├── models.py                 #   数据模型
-│   │   ├── reader.py                 #   持仓 xlsx 读取
-│   │   ├── code_utils.py             #   证券代码/类型判定
-│   │   ├── market_hours.py           #   交易时段判断
-│   │   ├── http_client.py            #   HTTP 客户端
-│   │   ├── constants.py              #   全局常量/版本号
-│   │   ├── logger.py                 #   日志模块
-│   │   ├── tui*.py                   #   TUI 交互（菜单/键盘/辅助）
-│   │   └── handlers_*.py             #   菜单命令实现（报告/缓存/配置）
+│   │   ├── cache/                    # 缓存引擎（TTL/清理/统计/分组/IO）
+│   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── _cleanup.py           #   过期缓存清理（按 TTL 分组删除）
+│   │   │   ├── _groups.py            #   缓存分组管理（按前缀路由到不同组）
+│   │   │   ├── _io.py                #   缓存序列化/反序列化（JSON/GZip）
+│   │   │   ├── _paths.py             #   缓存文件路径生成与管理
+│   │   │   ├── _stats.py             #   缓存统计信息（命中率/大小/数量）
+│   │   │   ├── _store.py             #   缓存存取核心（get/set/delete/exists）
+│   │   │   ├── _ttl.py               #   TTL 策略（含盘中/盘后/非交易日区分）
+│   │   │   └── services/             # 缓存上层服务
+│   │   │       ├── __init__.py       #       子包标记
+│   │   │       └── holdings_tracker.py #     持仓快照缓存追踪器
+│   │   │
+│   │   ├── config/                   # 配置管理
+│   │   │   ├── __init__.py           #   子包标记，导出统一配置入口
+│   │   │   ├── _comments.py          #   配置文件注释读写
+│   │   │   ├── _config_defaults.py   #   config.json 默认值定义
+│   │   │   ├── _core.py              #   配置加载/保存/校验核心逻辑
+│   │   │   └── _llm_defaults.py      #   llm_settings.json 默认值定义
+│   │   │
+│   │   ├── fetcher/                  # 数据获取调度
+│   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── chain.py              #   Provider Chain 获取链路（主→备→过期缓存）
+│   │   │   ├── fund.py               #   基金数据获取（净值/业绩排名/持仓）
+│   │   │   ├── fund_manager.py       #   基金经理数据获取
+│   │   │   ├── history_diff.py       #   历史数据差分同步
+│   │   │   ├── index.py              #   指数行情获取（A股/美股，直连 API 不走 Chain）
+│   │   │   ├── industry.py           #   行业分类/概念板块数据获取
+│   │   │   └── price.py              #   行情价格获取（股票/ETF）
+│   │   │
+│   │   ├── providers/                # 数据源提供商实现
+│   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── tencent.py            #   腾讯财经 API（A 股/ETF 实时价）
+│   │   │   ├── sina.py               #   新浪财经 API（备用实时价/美股指数）
+│   │   │   ├── eastmoney.py          #   东方财富 API（场外基金净值/历史净值）
+│   │   │   ├── eastmoney_industry.py #   东方财富行业分类/概念板块
+│   │   │   ├── eastmoney_industry_rest.py # 东方财富行业 REST 接口封装
+│   │   │   ├── tiantian.py           #   天天基金 API（基金业绩排名/评级）
+│   │   │   ├── akshare_extras.py     #   akshare 封装（盈利预测/资金流向/分红）
+│   │   │   ├── akshare_news.py       #   akshare 新闻源（财新网/CCTV）
+│   │   │   ├── sina_news.py          #   新浪财经新闻源
+│   │   │   ├── eastmoney_news.py     #   东方财富新闻源
+│   │   │   ├── cls_news.py           #   财联社新闻源（签名鉴权，默认关闭）
+│   │   │   ├── wallstreetcn_news.py  #   华尔街见闻新闻源
+│   │   │   ├── news_aggregator.py    #   新闻聚合器（多源合并去重）
+│   │   │   ├── news_correlator.py    #   新闻与持仓关联分析
+│   │   │   ├── news_keywords.py      #   新闻关键词提取与匹配
+│   │   │   └── news_sources.py       #   新闻源注册与配置
+│   │   │
+│   │   ├── llm/                      # LLM 智能分析
+│   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
+│   │   │   ├── api_base.py           #   LLM API 基类（请求/重试/流式）
+│   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
+│   │   │   ├── fingerprint.py        #   缓存指纹（请求去重，避免重复调用）
+│   │   │   ├── generators.py         #   提示词生成（全局政经/智囊团复盘）
+│   │   │   ├── generators_news.py    #   新闻分析提示词生成
+│   │   │   ├── generators_orchestrator.py # LLM 多轮对话编排
+│   │   │   ├── markdown.py           #   LLM 输出 Markdown 解析/格式化
+│   │   │   ├── pricing.py            #   Token 计费与用量统计
+│   │   │   ├── prompts.py            #   提示词模板库
+│   │   │   ├── session.py            #   LLM 会话管理（上下文窗口/历史）
+│   │   │   └── skeleton.py           #   LLM 内容骨架生成（结构化输出引导）
+│   │   │
+│   │   ├── schemas/                  # 数据模型定义
+│   │   │   ├── __init__.py           #   子包标记
+│   │   │   └── history.py            #   历史净值/行情数据模型
+│   │   │
+│   │   ├── report/                   # 报告生成引擎
+│   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── excel_generator.py    #   Excel 报告生成总控
+│   │   │   ├── excel_module_loader.py #  Excel 页签模块动态加载
+│   │   │   ├── excel_sheet_factory.py #  Excel 页签工厂（按配置创建页签）
+│   │   │   ├── excel_content_sheets.py #  Excel 内容页签（持仓明细/汇总）
+│   │   │   ├── excel_market_data.py  #   Excel 行情数据页签
+│   │   │   ├── excel_news_warning.py #   Excel 新闻预警页签
+│   │   │   ├── excel_b_series.py     #   Excel B 系列基金深度分析页签
+│   │   │   ├── excel_llm_usage.py    #   Excel LLM 用量统计页签
+│   │   │   ├── excel_writer.py       #   Excel 底层写入器（openpyxl 封装）
+│   │   │   ├── html_writer.py        #   HTML 报告主写入器
+│   │   │   ├── html_builders.py      #   HTML 各区块构建器
+│   │   │   ├── html_renderers.py     #   HTML 渲染管线
+│   │   │   ├── html_jinja_env.py     #   Jinja2 模板环境配置
+│   │   │   ├── html_save.py          #   HTML 保存/导出
+│   │   │   ├── penetration.py        #   穿透持仓分析（嵌套基金）
+│   │   │   ├── penetration_sheet.py  #   穿透分析 Excel 页签
+│   │   │   ├── market_value.py       #   市值计算与盈亏分析
+│   │   │   ├── market_value_sheet.py #   市值分析 Excel 页签
+│   │   │   ├── category.py           #   持仓分类（股票/基金/债券/QDII 等）
+│   │   │   ├── fund_performance.py   #   基金业绩分析（排名/回撤/超额收益）
+│   │   │   ├── fund_concentration.py #   基金持仓集中度分析
+│   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
+│   │   │   ├── fund_manager_analysis.py # 基金经理分析
+│   │   │   ├── fund_manager_sheet.py #   基金经理 Excel 页签
+│   │   │   ├── fund_overlap.py       #   基金持仓重叠分析
+│   │   │   ├── fund_overlap_sheet.py #   重叠分析 Excel 页签
+│   │   │   ├── fund_style_analysis.py #  基金风格分析（大小盘/价值成长）
+│   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
+│   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
+│   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
+│   │   │   ├── early_warning.py      #   持仓异常预警检测
+│   │   │   ├── news_correlation.py   #   新闻与持仓关联分析报告
+│   │   │   ├── summary.py            #   报告摘要生成
+│   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
+│   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
+│   │   │   ├── llm_content.py        #   LLM 分析结果写入报告
+│   │   │   ├── progress.py           #   报告生成进度跟踪
+│   │   │   └── styles.py             #   Excel 样式定义
+│   │   │
+│   │   ├── tmpl/                     # HTML 报告模板
+│   │   │   └── report_template.html  #   Jinja2 HTML 报告主模板
+│   │   │
+│   │   ├── main.py                   # 程序入口 + TUI 主循环
+│   │   ├── tui.py                    # TUI 交互主界面
+│   │   ├── tui_menu.py               # TUI 菜单系统
+│   │   ├── tui_handlers.py           # TUI 键盘/事件处理
+│   │   ├── handlers_report.py        # 报告生成命令处理器
+│   │   ├── handlers_cache.py         # 缓存管理命令处理器
+│   │   ├── handlers_config.py        # 配置管理命令处理器
+│   │   ├── registry.py               # 中央注册表（模块/TTL/分组定义）
+│   │   ├── provider_registry.py      # 数据源注册中心（熔断器/会话缓存）
+│   │   ├── models.py                 # 数据模型（持仓/行情/基金/新闻）
+│   │   ├── reader.py                 # 持仓 xlsx 文件读取
+│   │   ├── code_utils.py             # 证券代码/类型判定工具
+│   │   ├── market_hours.py           # 交易时段判断（A股/港股/QDII）
+│   │   ├── http_client.py            # HTTP 客户端（请求/重试/超时）
+│   │   ├── constants.py              # 全局常量/版本号
+│   │   └── logger.py                 # 日志模块（文件+控制台，自动轮转）
 │   │
 │   └── test/                         # 测试套件
-│       ├── unit/                     #   单元测试（8 个子组：providers/fetcher/llm/news/report/config/core/ui）
+│       ├── unit/                     #   单元测试（8 子组：providers/fetcher/llm/news/report/config/core/ui）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       ├── scenario/                 #   场景测试（basic/resilience/extreme/llm/datetime）
 │       ├── conftest.py               #   pytest 全局配置 + 标记注册
@@ -69,9 +177,10 @@ investor-util/
 ├── logs/                             # 程序日志（app.log，自动轮转）
 ├── test-reports/                     # 测试报告（自动生成，按 mode 分组）
 ├── scripts/                          # 启动脚本 + 测试工具
-│   ├── launch.ps1 / launch.sh        #   Windows / Linux 启动脚本
+│   ├── launch.ps1                    #   Windows PowerShell 启动脚本
+│   ├── launch.sh                     #   Linux/macOS 启动脚本
 │   ├── test_runner.py                #   测试驱动（pytest 模式封装）
-│   ├── check-test-markers.py         #   标记合规检查
+│   ├── check-test-markers.py         #   测试标记合规检查
 │   └── check-version-consistency.py  #   版本号一致性检查
 │
 ├── docs-stm/                         # 项目文档
@@ -88,6 +197,66 @@ investor-util/
 └── .gitignore                        # Git 忽略规则
 ```
 
-> 注意：目录树为主层级结构，具体源文件细节以代码仓库实际结构为准。测试文件数和文件行数随版本迭代变化。
+> 注意：目录树为主层级结构，测试文件数和文件行数随版本迭代变化。
 >
 > 最后更新：2026-07-14
+
+---
+
+## 开发者指引
+
+### 核心数据流
+
+```
+持仓 xlsx  →  reader.py  →  models.py  →  fetcher/  →  report/  →  Excel / HTML
+                                        ↕              ↕
+                                  provider_registry.py   llm/
+                                  (熔断器/会话缓存)          (LLM 分析内容嵌入)
+```
+
+### 入口与主循环
+
+`main.py` 是唯一入口。启动后进入 TUI 主循环（`tui.py` 的 `run_forever`），用户操作通过 `tui_menu.py` 映射到 `handlers_*.py` 的命令，触发不同的业务模块。
+
+### Provider Chain 模式
+
+数据获取遵循"主链路 → 备用链路 → 过期缓存"三级降级策略（`fetcher/chain.py`）：
+
+1. **主链路**（如腾讯财经）→ 成功则更新缓存并返回
+2. 失败 → **备用链路**（如新浪财经）→ 成功则更新缓存
+3. 降级 → 返回**过期缓存**（标记为降级数据）
+
+数据源实现放 `providers/`，调度逻辑放 `fetcher/`，职责清晰分离。详见 `technical.md` 设计约束 C5。
+
+### 缓存架构
+
+`cache/` 是一个按前缀分组的 TTL 缓存系统：
+
+- **TTL 分档**：`_ttl.py` 按数据种类（行情/基金/指数/LLM 等）和交易时段（盘中/盘后/非交易日）自动选择过期时间
+- **分组管理**：`_groups.py` 按缓存 key 前缀路由到不同组（如 `price_*`、`fund_*`、`llm_*`）
+- **IO 层**：`_io.py` 处理 JSON 序列化，大文件自动 GZip 压缩
+- **清理策略**：`_cleanup.py` 按组扫描过期缓存并删除
+
+### 报告生成管线的关键设计选择
+
+- **Excel**：`excel_generator.py` 总控 → `excel_module_loader.py` 自动发现页签模块 → `excel_sheet_factory.py` 按配置创建各页签 → `excel_writer.py` 底层写入
+- **HTML**：`html_writer.py` 主控 → `html_builders.py` 分区块构建 → `html_renderers.py` 渲染 → `report_template.html` Jinja2 模板
+- **模块解耦**：每个报告页签（市值/穿透/基金业绩等）是独立的 `*_sheet.py`，业务逻辑在对应的 `*.py`（如 `market_value.py` 计算，`market_value_sheet.py` 写入），便于单模块测试和扩展
+
+### LLM 集成
+
+- **多 Provider**：支持 Claude（含 DeepSeek Anthropic 兼容端点）和 OpenAI，由 `api.py` 自动路由
+- **熔断器**：`circuit_breaker.py` 连续失败后自动冷却，避免无效重试
+- **缓存指纹**：`fingerprint.py` 基于 prompt+context 生成 hash，相同请求命中缓存，节省 Token
+- **会话管理**：`session.py` 维护上下文窗口，`generators_orchestrator.py` 编排多轮对话
+
+### 测试体系
+
+测试按 `unit` / `integration` / `scenario` 三层组织，通过 pytest marker 灵活选择。详见 `testplan.md` 和 `how-to-test-my-code.md`。
+
+### 新增/修改代码时
+
+1. **同步文档**：新增/重命名文件或目录时，更新本文件的目录树
+2. **同步测试**：新功能必须编写测试用例，并标注对应的 pytest marker
+3. **同步注册表**：新增数据源模块时，在 `registry.py` 注册 TTL 分组和模块定义
+4. **遵循设计约束**：见 `technical.md` 设计约束 C1~C12
