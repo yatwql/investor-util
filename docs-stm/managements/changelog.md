@@ -28,7 +28,9 @@
 - **technical.md**：`is_enable_llm()` 加入 board 层对照表，llm 配置来源说明更新。
 - **how-to-config.md**：H 节新增 LLM 可见性配置行，内容只描述当前状态。
 - **how-to-config-llm.md**：新增板块可见性与 `enabled_llm` 的关联提示。
-- **faq.md**：板块可见性锚点清理。
+- **faq.md**：板块可见性配置项补充 `enabled_llm`，菜单生成范围说明同步。
+- **how-to-start.md**：报告内容对照表 B/L 菜单改用 ☆ 标注配置驱动型可见性，新增脚注 ⁵ 说明。
+- **reports-instruction.md**：可见性规则表重构为两层模型（board+data），LLM 模块触发条件补充 `enabled_llm` 配置控制。
 - **requirements.md**：熔断器/push2/基金风格加速阈值文字同步。
 
 ## [0.5.0] - 2026-07-14

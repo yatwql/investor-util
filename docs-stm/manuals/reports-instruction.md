@@ -94,13 +94,18 @@
 
 ### 可见性规则总览
 
-| type | 显示条件 | 菜单来源 |
-|:-----|:---------|:---------|
-| `always` | 无条件显示 | E / B / L |
-| `b_series` | 有基金持仓数据 | B / L |
-| `news` | 启用新闻功能（`enable_news`） | B / L |
-| `llm` | LLM 功能已配置启用 | L |
-| `history` | 始终显示（数据不可用时占位） | B / L |
+两层可见性模型：
+- **board 层**：用户配置的板块开关（`enable_b_series`/`enable_news`/`enable_history`/`enabled_llm`），关闭则整个类型的章节完全隐藏
+- **data 层**：运行时数据可用性，某模块数据不可用时仅隐藏该模块自身
+- 两层 AND 关系：board 层关闭 → 隐藏全部；board 层开启但 data 层不可用 → 仅隐藏该模块
+
+| type | board 层控制 | data 层条件 | 菜单来源 |
+|:-----|:------------|:------------|:---------|
+| `always` | 无条件 | 无 | E / B / L |
+| `b_series` | `enable_b_series` | 有基金持仓数据 | B / L |
+| `news` | `enable_news` | 新闻获取成功 | B / L |
+| `llm` | `enabled_llm`（任一报告模块启用） | LLM 内容生成成功 | L |
+| `history` | `enable_history` | 历史走势数据可用（不可用时占位） | B / L |
 
 ---
 
@@ -169,10 +174,10 @@
 
 | 条件 | 行为 |
 |:-----|:-----|
-| 菜单 L 执行且至少有一个 LLM 模块触发 API 调用或缓存命中 | ✅ 正常生成页签/章节 |
-| 菜单 L 执行但所有模块均为缓存命中（无实际 API 调用） | ✅ 生成，汇总区标注"无新增 API 调用" |
-| 菜单 L 执行但全部 LLM 模块被禁用 | ❌ 整页不渲染（无用量数据） |
-| LLM API Key 未配置 | ❌ 整页不渲染（无用量数据） |
+| 菜单 L 执行且 `enabled_llm` 中任一报告模块启用，至少一个模块触发 API 调用或缓存命中 | ✅ 正常生成页签/章节 |
+| 菜单 L 执行且 `enabled_llm` 中任一报告模块启用，但全部为缓存命中（无实际 API 调用） | ✅ 生成，汇总区标注"无新增 API 调用" |
+| 菜单 L 执行但 `enabled_llm` 中 4 个报告模块全部关闭 | ❌ 整页不渲染（board 层关闭） |
+| LLM API Key 未配置但 `enabled_llm` 有模块启用 | ❌ 整页不渲染（无用量数据） |
 | 菜单 B / E（不含 LLM） | ❌ 不生成 |
 
 ### 与 LLM 分析章节的关系
@@ -181,10 +186,10 @@ LLM API 用量页签/章节被动跟踪以下 5 个子模块（1 个可选）的
 
 | 模块 | 触发条件 | 说明 |
 |:-----|:---------|:-----|
-| 全球政经局势 | 菜单 L | 始终启用 |
-| 智囊团深度复盘 | 菜单 L | 始终启用 |
-| 持仓体检报告 | 菜单 L | 始终启用 |
-| 穿透深度分析 | 菜单 L | 始终启用 |
+| 全球政经局势 | 菜单 L + `enabled_llm.global_macro = true` | 默认启用 |
+| 智囊团深度复盘 | 菜单 L + `enabled_llm.expert_review = true` | 默认启用 |
+| 持仓体检报告 | 菜单 L + `enabled_llm.health_check = true` | 默认启用 |
+| 穿透深度分析 | 菜单 L + `enabled_llm.penetration_deep = true` | 默认启用 |
 | 财经新闻热点与持仓关联分析（LLM 二次关联部分） | 菜单 L + `enabled_llm.news_correlation = true` | 可选模块，仅在 LLM 新闻关联开启时计入统计 |
 
 > **注意**：财经新闻热点与持仓关联分析的基础新闻匹配（关键词富化）**不消耗 LLM Token**，仅在其 `enabled_llm.news_correlation = true` 时，LLM 二次关联分析产生的 Token 才计入本页签。
