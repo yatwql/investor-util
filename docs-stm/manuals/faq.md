@@ -12,10 +12,12 @@
 - [数据获取](#数据获取)
 - [LLM 相关](#llm-相关)
 - [报告理解](#报告理解)
+- [报告数据解读](#报告数据解读)
 - [缓存相关](#缓存相关)
 - [平台与兼容性](#平台与兼容性)
 - [隐私与安全](#隐私与安全)
-- [实操技巧](#实操技巧)
+- [报告生成技巧](#报告生成技巧)
+- [故障排查](#故障排查)
 
 ---
 
@@ -158,14 +160,6 @@ A: 修改 `config.json` / `llm_key.json` / `llm_settings.json` 时请确保 JSON
 
 A: 删除 `data/config/` 目录下的配置文件后重新启动程序，会自动生成默认配置模板。建议删除前先备份。
 
-**Q: llm_key.json 中的 endpoint 应该填什么？**
-
-A: Claude API 端点：`https://api.anthropic.com/v1/messages`；DeepSeek Anthropic 兼容端点：`https://api.deepseek.com/anthropic/v1/messages`；OpenAI 兼容端点：`https://api.openai.com/v1/chat/completions`。使用中转代理时请替换为对应地址。
-
-**Q: 如何配置多个不同的 LLM 模型？**
-
-A: `llm_settings.json` 中可以为每个模块单独指定模型，通过 `model_{模块键}` 字段设置（如 `"model_global_macro": "claude-sonnet-4-6"`）。不指定时使用 `llm_key.json` 中的默认模型。不同模块可以使用不同模型和参数配置。
-
 **Q: 提示"文件未找到"？**
 
 A: 菜单 `C` 配置正确的持仓目录，或菜单 `F` 选择正确的文件名。
@@ -177,14 +171,6 @@ A: 菜单 `R` 刷新配置可重新加载 `config.json`、`llm_settings.json` �
 **Q: 如何关闭某个不需要的新闻源？**
 
 A: 编辑 `data/config/config.json`，将对应新闻源的值设为 `false` 即可（如 `"cls": false` 关闭财联社）。重启或菜单 `R` 刷新配置后生效。
-
-**Q: 如何切换 LLM provider（如从 Claude 切到 DeepSeek）？**
-
-A: 编辑 `data/config/llm_key.json`，修改 `provider` 字段为 `"claude"` 或 `"openai"`，并配置对应的 `api_key` 和 `endpoint`。菜单 `R` 刷新配置立即生效，无需重启。
-
-**Q: 如何开启/关闭 Extended Thinking？**
-
-A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled_{模块键}` 设为 `true`/`false`（如 `"thinking_enabled_expert_review": true`）。目前仅在 Claude 和 DeepSeek（Anthropic 兼容端点）下生效。推荐仅在智囊团深度复盘模块开启，其他模块收益不大且会增加响应时间。
 
 **Q: 如何使用自定义业绩基准？**
 
@@ -206,13 +192,27 @@ A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式�
 
 空对象 `{}` 或缺失此字段时使用 18 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
-**Q: 如何开启财经新闻热点与持仓关联分析 LLM 关联分析？**
+**Q: 菜单 P（配置报告板块可见性）是做什么的？**
 
-A: 菜单 `S` 可交互切换各 LLM 模块的启停状态（立即生效），或将 `data/config/llm_settings.json` 中的 `enabled_llm.news_correlation` 设为 `true`。开启后菜单 B / L 生成的报告增加"LLM 关联分析"列，每条新闻获得 LLM 判定的关联度（高/中/低/无关）和原因分析。默认关闭以节省费用。
+A: 菜单 P 提供交互式配置界面，可独立控制报告中的三大板块是否显示：
 
-**Q: LLM 分析报告可读性不佳，能否精简输出？**
+- **B 系列基金深度分析**（基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析）—— 对应 `enable_b_series`
+- **新闻与预警**（财经新闻热点与持仓关联分析/智能预警）—— 对应 `enable_news`
+- **历史走势**（组合历史走势/回撤分析）—— 对应 `enable_history`
 
-A: 可以。在 `llm_settings.json` 中设置对应模块的 `output_brief_{模块键}: true`，程序会在 system prompt 中追加精简指令，控制输出篇幅。同时可在 `max_tokens_{模块键}` 中限制最大输出长度。
+关闭的板块在报告中完全隐藏，剩余章节自动连续重新编号，不留空位。配置实时保存到 `data/config/config.json`。
+
+> LLM 板块（全球政经局势/智囊团深度复盘/持仓体检报告/穿透深度分析）的可见性通过菜单 `S` 或 `llm_settings.json` 的 `enabled_llm` 独立控制，不在菜单 P 中。
+
+**Q: 如何备份我的配置和持仓？**
+
+A: 需要备份的文件：
+- `data/config/config.json` — 程序配置
+- `data/config/llm_settings.json` — LLM 模块配置
+- `data/config/llm_key.json` — LLM API Key（注意保密）
+- 持仓 `.xlsx` 文件
+
+缓存文件（`data/cache/`）无需备份，程序会自动重新生成。建议将上述文件定期复制到安全位置。迁移到新电脑时复制整个项目目录即可。
 
 ---
 
@@ -315,9 +315,33 @@ A: 盘中（A 股 9:30-15:00）腾讯接口返回实时成交价，随行情波�
 
 A: 可以。菜单 E / B 全部不依赖 LLM，仅菜单 L 需要 LLM 配置。
 
+**Q: llm_key.json 中的 endpoint 应该填什么？**
+
+A: Claude API 端点：`https://api.anthropic.com/v1/messages`；DeepSeek Anthropic 兼容端点：`https://api.deepseek.com/anthropic/v1/messages`；OpenAI 兼容端点：`https://api.openai.com/v1/chat/completions`。使用中转代理时请替换为对应地址。
+
+**Q: 如何配置多个不同的 LLM 模型？**
+
+A: `llm_settings.json` 中可以为每个模块单独指定模型，通过 `model_{模块键}` 字段设置（如 `"model_global_macro": "claude-sonnet-4-6"`）。不指定时使用 `llm_key.json` 中的默认模型。不同模块可以使用不同模型和参数配置。
+
+**Q: 如何切换 LLM provider（如从 Claude 切到 DeepSeek）？**
+
+A: 编辑 `data/config/llm_key.json`，修改 `provider` 字段为 `"claude"` 或 `"openai"`，并配置对应的 `api_key` 和 `endpoint`。菜单 `R` 刷新配置立即生效，无需重启。
+
+**Q: 如何开启/关闭 Extended Thinking？**
+
+A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled_{模块键}` 设为 `true`/`false`（如 `"thinking_enabled_expert_review": true`）。目前仅在 Claude 和 DeepSeek（Anthropic 兼容端点）下生效。推荐仅在智囊团深度复盘模块开启，其他模块收益不大且会增加响应时间。
+
+**Q: 如何开启财经新闻热点与持仓关联分析？**
+
+A: 菜单 `S` 可交互切换各 LLM 模块的启停状态（立即生效），或将 `data/config/llm_settings.json` 中的 `enabled_llm.news_correlation` 设为 `true`。开启后菜单 B / L 生成的报告增加"LLM 关联分析"列，每条新闻获得 LLM 判定的关联度（高/中/低/无关）和原因分析。默认关闭以节省费用。
+
+**Q: LLM 分析报告可读性不佳，能否精简输出？**
+
+A: 可以。在 `llm_settings.json` 中设置对应模块的 `output_brief_{模块键}: true`，程序会在 system prompt 中追加精简指令，控制输出篇幅。同时可在 `max_tokens_{模块键}` 中限制最大输出长度。
+
 **Q: 调用 LLM 大概需要多少费用？**
 
-A: 以 DeepSeek V4 Flash 为例，一次完整菜单 L（4+1 个模块）约消耗输入 15K～20K Token、输出 5K～8K Token，费用约 ¥0.02～¥0.05。缓存命中不计费。费用估算在报告「LLM API 用量」页签和生成结束时的终端中均有显示。
+A: 以 DeepSeek V4 Flash 为例，一次完整菜单 L（4+1 个模块）约消耗输入 15K～20K Token、输出 5K～8K Token，费用约 ¥0.02～¥0.05。缓存命中不计费。开启 Extended Thinking 后 Token 消耗会显著增加。费用估算在报告「LLM API 用量」页签和生成结束时的终端中均有显示。
 
 **Q: LLM 调用时报错怎么办？**
 
@@ -359,6 +383,35 @@ A: 可以。LLM 缓存文件以 `llm_` 前缀存储在 `data/cache/` 目录下�
 
 A: 默认输出到项目根目录的 `reports/`，菜单 `O` 可修改输出路径。每次生成同时保存一份最新版（`个人投资分析报告.xlsx/html`）和一份按日期命名的归档版（`个人投资分析报告-YYYYMMDD-HHMMSS.xlsx/html`）。
 
+**Q: 报告中"环比摘要"和"快照对比"是什么？**
+
+A: 执行 B 或 L 菜单生成报告时，程序会自动保存一份持仓快照到 `data/history/snapshots/`。下次生成时，程序读取上一份快照与当前持仓对比，在报告中生成环比内容：
+
+- **环比摘要**：账户级别盈亏变化概览（市值增减、盈亏变化）
+- **快照对比**：逐持仓的明细变化（持仓增减、成本变化、盈亏变化）
+
+快照保留天数通过 `config.json` 的 `history.snapshot_retention_days` 配置（默认 60 天），超期自动清理。`reports/` 中的历史归档报告不受影响。
+
+**Q: 报告数据感觉不完整？**
+
+A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最后重试生成报告。
+
+**Q: Excel 报告页签的编号（1.~18.）顺序是固定的吗？**
+
+A: 默认使用固定顺序（投资分析汇总 → LLM API 用量），但可通过 `config.json` 的 `report_section_order` 字段自定义各模块的序号和排列顺序。HTML 报告同样使用 CSS `order` 属性实现视觉重排。未配置时保持默认行为。详见[配置指南](how-to-config.md#report_section_order-报告序号配置)。
+
+菜单 E/B/L 生成范围不同：E 为基础页签（1~5），B 含 B 系列+新闻模块+历史走势（1~11）¹，L 为全量（1~18）。各模块的条件可见性受 `enable_b_series`/`enable_news`/`enable_history`/`enabled_llm`（`llm_settings.json`）配置控制（详见[配置指南](how-to-config.md#h-报告板块可见性)），关闭对应板块后相关章节完全隐藏，剩余章节连续重新编号。
+
+¹ B 菜单还条件性包含 #16 组合历史走势和 #17 回撤分析（视 `history.analysis` 配置，`"off"` 时跳过）。
+
+**Q: 为什么总市值和各账户小计之和有时对不上？**
+
+A: 如果存在跨账户的同一只持仓，各账户小计仅反映该账户内的市值，总计行则合并所有账户的相同代码。此外，部分基金穿透后底层资产与原持仓不重复计算，不影响全局总市值的一致性。
+
+---
+
+## 报告数据解读
+
 **Q: 报告中的"穿透"是什么意思？**
 
 A: "资产穿透"是指将基金等持仓标的逐层拆解到底层资产（如 ETF→成分股、联接基金→底层基金），合并计算后在"资产穿透TOP10"页签展示实际持仓比例最高的前 10 项底层资产，实现对投资组合的真实风险评估。
@@ -370,10 +423,6 @@ A: 基于天天基金同类排名百分位，按 5 级评级（优秀/良好/稳
 **Q: 报告中的盈亏是已实现盈亏还是浮动盈亏？**
 
 A: 浮动盈亏。程序以"最新价 × 持仓份额 − 成本（成本价 × 持仓份额）"计算，未扣除交易佣金和税费。如需精确计算已实现盈亏，需考虑卖出记录（当前程序不保留历史交易流水）。
-
-**Q: 报告数据感觉不完整？**
-
-A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最后重试生成报告。
 
 **Q: 如何判断是盘中数据还是盘后数据？**
 
@@ -402,18 +451,6 @@ A: 调用场外基金持仓 API 后 3 次重试仍失败时会在穿透 TOP10 �
 **Q: 场外基金和 ETF 有什么区别？**
 
 A: 程序自动识别：6 位数字代码 + 含"ETF"标记的走场内取价（腾讯实时价/收盘价），其余走场外基金净值接口（东方财富/天天基金）。两者在报告中取价方式列会标注不同颜色以示区分。
-
-**Q: Excel 报告页签的编号（1.~18.）顺序是固定的吗？**
-
-A: 默认使用固定顺序（投资分析汇总 → LLM API 用量），但可通过 `config.json` 的 `report_section_order` 字段自定义各模块的序号和排列顺序。HTML 报告同样使用 CSS `order` 属性实现视觉重排。未配置时保持默认行为。详见[配置指南](how-to-config.md#report_section_order-报告序号配置)。
-
-菜单 E/B/L 生成范围不同：E 为基础页签（1~5），B 含 B 系列+新闻模块+历史走势（1~11）¹，L 为全量（1~18）。各模块的条件可见性受 `enable_b_series`/`enable_news`/`enable_history`/`enabled_llm`（`llm_settings.json`）配置控制（详见[配置指南](how-to-config.md#h-报告板块可见性)），关闭对应板块后相关章节完全隐藏，剩余章节连续重新编号。
-
-¹ B 菜单还条件性包含 #16 组合历史走势和 #17 回撤分析（视 `history.analysis` 配置，`"off"` 时跳过）。
-
-**Q: 为什么总市值和各账户小计之和有时对不上？**
-
-A: 如果存在跨账户的同一只持仓，各账户小计仅反映该账户内的市值，总计行则合并所有账户的相同代码。此外，部分基金穿透后底层资产与原持仓不重复计算，不影响全局总市值的一致性。
 
 **Q: 组合历史走势的累计收益率看起来异常高？**
 
@@ -483,6 +520,10 @@ A: 可以。在 WSL 中安装 Python 3.10+ 后，使用 `./scripts/launch.sh` �
 
 A: 可以。项目路径包含中文不会影响程序正常运行。唯一需要注意的是 Python 虚拟环境（`.venv/`）路径中的中文可能在某些旧版 Python 上触发编码问题。建议使用 Python 3.12+ 彻底避免此问题。
 
+**Q: 程序支持多个实例同时运行吗？**
+
+A: 不推荐。缓存文件（`data/cache/`）和配置文件（`data/config/`）共享同一份磁盘文件，多实例并发读写可能导致数据竞争或缓存损坏。如确需并行操作，建议复制整个项目目录到不同路径，各自独立运行。
+
 ---
 
 ## 隐私与安全
@@ -505,7 +546,7 @@ A: 默认 INFO 级别下，日志记录模块调用结果和错误信息，不�
 
 ---
 
-## 实操技巧
+## 报告生成技巧
 
 **Q: 能否用一份持仓同时生成多份不同格式的报告？**
 
@@ -519,17 +560,9 @@ A: 程序本身是交互式 TUI，无内置定时任务。但可通过外部计�
 
 A: 每次生成同时保留两份：最新版覆盖写入 `个人投资分析报告.xlsx/html`，同时按当前日期命名生成归档版（`个人投资分析报告-YYYYMMDD-HHMMSS.xlsx/html`）。程序自动清理 180 天前的归档目录，如需长期保留某版本，请移出 `reports/` 目录另行保存。
 
-**Q: HTML 报告打开显示不正常？**
-
-A: 推荐使用 Chrome / Edge 浏览器。单页 HTML 无外部依赖，若内容过长建议等待完全加载后再滚动。报告不含 JavaScript，纯 CSS 渲染。
-
 **Q: 如何自定义 HTML 报告样式？**
 
 A: 直接编辑 `src/python/tmpl/report_template.html`，所有样式在 `<style>` 标签内集中定义。修改后重新生成报告即可生效，无需重启程序。
-
-**Q: 生成报告时 TUI 卡住/无响应怎么办？**
-
-A: 首次运行或清空缓存后首次生成，数据获取阶段需要等待网络请求完成（10-30秒），属正常现象。如果长时间（>60秒）无响应，可按 `Ctrl+C` 中断返回主菜单，检查 `logs/app.log` 中的错误信息，确认网络连通性后再试。
 
 **Q: 为什么版本号还是旧的？**
 
@@ -550,6 +583,26 @@ A: 推荐方法：先后生成两份报告（如上周和本周），对比 Exce
 **Q: 报告输出文件名中的数字（如 个人投资分析报告-20260702-142530）含义？**
 
 A: 格式为 `个人投资分析报告-YYYYMMDD-HHMMSS`，即生成时的本地时间戳：2026 年 07 月 02 日 14 时 25 分 30 秒。在同一日内多次生成不会覆盖归档版，但最新版（`个人投资分析报告.xlsx`）会被覆盖。
+
+---
+
+## 故障排查
+
+**Q: 生成报告中途中断（Ctrl+C/断电）会损坏数据吗？**
+
+A: 不会损坏程序本身或持仓文件。可能的影响：
+- 正在写入的报告文件可能不完整（建议删除后重新生成）
+- 缓存文件最多丢失正在写入的那一条
+- 配置文件通过原子写入（先写临时文件再重命名）保证不会损坏
+直接按 `Ctrl+C` 可安全返回主菜单，重新生成报告即可。
+
+**Q: HTML 报告打开显示不正常？**
+
+A: 推荐使用 Chrome / Edge 浏览器。单页 HTML 无外部依赖，若内容过长建议等待完全加载后再滚动。报告不含 JavaScript，纯 CSS 渲染。
+
+**Q: 生成报告时 TUI 卡住/无响应怎么办？**
+
+A: 首次运行或清空缓存后首次生成，数据获取阶段需要等待网络请求完成（10-30秒），属正常现象。如果长时间（>60秒）无响应，可按 `Ctrl+C` 中断返回主菜单，检查 `logs/app.log` 中的错误信息，确认网络连通性后再试。
 
 **Q: 如何判断程序是否在正常运行（无响应时）？**
 
