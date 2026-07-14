@@ -259,6 +259,10 @@ class PortfolioHistoryCalculator:
         total_return = last_val - first_val
         total_return_pct = (total_return / first_val * 100) if first_val > 0 else 0
 
+        # 诊断：输出起止值明细（用于排查收益率异常）
+        _diagnose_return(bars, sorted_dates, valid_start_idx, fund_count_on_date,
+                         total_return_pct, len(all_series))
+
         # 质量校验（只校验收益率起算点之后的数据，避免新基金加入导致的跳变误报）
         warnings.extend(_validate_bars(bars[valid_start_idx:]))
 
@@ -362,3 +366,48 @@ def _validate_bars(bars: list[dict]) -> list[str]:
                     warnings.append(f"{b['date']}: 单日变化 {change_pct*100:.1f}%（可能异常）")
 
     return warnings
+
+
+def _diagnose_return(
+    bars: list[dict],
+    sorted_dates: list[str],
+    valid_start_idx: int,
+    fund_count_on_date: dict[str, int],
+    total_return_pct: float,
+    total_series: int,
+) -> None:
+    """诊断收益率异常：输出起止日市值、覆盖标的数、每日明细快照。"""
+    if not bars:
+        return
+
+    first_bar = bars[valid_start_idx]
+    last_bar = bars[-1]
+
+    # 取起止日 + 中间等间隔抽 3 个样本
+    step = max(1, (len(bars) - 1) // 4)
+    sample_idxs = [valid_start_idx] + [valid_start_idx + step * i for i in range(1, 4)] + [len(bars) - 1]
+    sample_idxs = sorted(set(i for i in sample_idxs if i < len(bars)))
+
+    lines = [
+        f"[history] ═══ 累计收益率诊断 ═══",
+        f"[history]  起算日: {first_bar['date']}  total_value={first_bar['total_value']:.2f}  "
+        f"覆盖 {fund_count_on_date.get(first_bar['date'], 0)}/{total_series} 只",
+        f"[history]  终止日: {last_bar['date']}  total_value={last_bar['total_value']:.2f}  "
+        f"覆盖 {fund_count_on_date.get(last_bar['date'], 0)}/{total_series} 只",
+        f"[history]  收益率: {total_return_pct:.2f}%",
+        f"[history]  期间: {first_bar['date']} → {last_bar['date']} 共 {len(bars) - valid_start_idx} 个交易日",
+    ]
+
+    # 每日明细快照
+    lines.append(f"[history]  中轴抽样（{len(sample_idxs)} 点）:")
+    for idx in sample_idxs:
+        b = bars[idx]
+        coverage = fund_count_on_date.get(b["date"], 0)
+        lines.append(
+            f"[history]    {b['date']}  tv={b['total_value']:.2f}  "
+            f"dd={b['drawdown']:.2f}  dd%={b['drawdown_pct']:.2f}%  "
+            f"覆盖={coverage}/{total_series}"
+        )
+
+    for line in lines:
+        logger.info(line)
