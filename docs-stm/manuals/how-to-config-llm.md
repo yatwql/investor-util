@@ -68,68 +68,14 @@ LLM 配置拆分为两个独立文件，分工明确：
 
 > **注意**：
 > - `system_prompt_*` 默认值为 `null`，表示使用代码内置提示词。填入字符串可覆盖。
-> - 代码内置提示词定义在 `src/python/llm/prompts.py` 中（`_SYSTEM_GLOBAL_MACRO`、`_SYSTEM_EXPERT_REVIEW` 等变量），更新代码时可自动升级。
-> - `pricing` 段可省略（使用代码内置定价），仅需自定义覆盖时添加，详见下方「完整模型定价表」章节。如需新增或覆盖任意模型的 Token 单价，在 `pricing` 中添加模型条目即可，未覆盖的模型自动使用内置价格。
+> - 代码内置提示词定义在 `src/python/llm/prompts.py` 中，更新代码时可自动升级。
+> - `pricing` 段可省略（使用代码内置定价），仅需自定义覆盖时添加，详见下方「完整模型定价表」章节。
 
 **Step 3**：启动程序，菜单选 **L** 生成包含 LLM 分析的完整版报告。
 
 ---
 
-## LLM 业务模块架构与公共特征
-
-本项目目前有 5 个 LLM 业务模块（1 个可选），共享同一套生成骨架。所有模块在代码层面经过统一封装，以下特征对每个模块都适用。
-
-### 总体架构
-
-```
-每个模块的入口函数（generate_* / enhance_*）
-  → 创建闭包（指纹函数、提示词构建函数）
-  → 委托 _generate_llm_module() 统一骨架
-      ├── 标准模式（4 模块）：_generate_llm_content()
-      │     → 缓存检查 → API 调用 → 截断重试 → Markdown→HTML → 页脚 → 缓存写入
-      └── 批量模式（news_correlation）：_run_batch_mode()
-            → 逐条缓存检查 → 分批(10条/批) → 线程池并行(3并发) → JSON 解析 → 逐条缓存写入
-```
-
-### 两种运行模式
-
-| 模式 | 适用模块 | 输入 | 输出 | 页脚 |
-|------|---------|------|------|------|
-| **标准模式** | global_macro, expert_review, health_check, penetration_deep | 单次提示词 | HTML 文本 | 底部统一格式页脚 |
-| **批量模式** | news_correlation | 多条新闻分批 | JSON 解析后合并回数据 | 无 HTML 页脚，Token 用量汇总到日志 + 会话统计 |
-
-### 公共特征清单
-
-所有 LLM 模块共享以下特征：
-
-#### 1. 统一的配置项命名规则
-
-每个模块在 `llm_settings.json` 中有 **10 个（标准模式）或 9 个（批量模式，无 output_brief）** 配置键，命名格式统一为 `{key}_{module_suffix}`（类型/默认值详见下方「模块级配置」章节）：
-
-| 配置键 | 含义 |
-|--------|------|
-| `system_prompt_{module}` | 系统提示词覆盖 |
-| `model_{module}` | 独立指定模型 |
-| `temperature_{module}` | 温度参数 |
-| `max_tokens_{module}` | 最大输出 token 数 |
-| `timeout_{module}` | API 超时秒数 |
-| `cache_enabled_{module}` | 是否启用缓存 |
-| `output_brief_{module}` | 精简模式（≤200~300 字，**批量模式不支持**） |
-| `thinking_enabled_{module}` | 是否开启 Extended Thinking |
-| `thinking_budget_{module}` | Thinking token 预算（仅 Claude） |
-| `reasoning_effort_{module}` | 推理深度（仅 DeepSeek） |
-
-模块后缀名表：
-
-| 后缀 | 中文名称 |
-|------|---------|
-| `global_macro` | 全球政经局势 |
-| `expert_review` | 智囊团深度复盘 |
-| `health_check` | 持仓体检报告 |
-| `penetration_deep` | 穿透深度分析 |
-| `news_correlation` | 财经新闻热点与持仓关联分析 |
-
-#### 2. 统一的启用/停用机制
+## 模块启用/停用机制
 
 通过 `enabled_llm` 嵌套字典控制每个模块的开关，除 `news_correlation` 默认关闭外，其余默认开启：
 
@@ -143,109 +89,25 @@ LLM 配置拆分为两个独立文件，分工明确：
 }
 ```
 
-> 关闭的模块在报告中自动跳过，不消耗 Token。
+- 关闭的模块在报告中自动跳过，不消耗 Token
+- 可通过菜单 **S** 交互式开关各模块
+- 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 板块在报告中整体隐藏
+- 仅 `news_correlation` 开启时不影响 LLM 板块可见性
 
-> **板块可见性：** 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 报告板块（#12~#15 + LLM API 用量页签）在报告中整体隐藏。仅 `news_correlation` 开启时不影响 LLM 板块可见性。
+---
 
-#### 3. 指纹驱动的缓存自动失效
+## 缓存机制
 
-每个标准模块的缓存键基于**持仓数据指纹**生成，指纹成分因模块而异：
+LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
-| 模块 | 指纹包含 |
-|:-----|:---------|
-| **全球政经局势** | 市场指数 + 总市值 + 总盈亏 + 分类 |
-| **智囊团复盘 / 持仓体检报告** | 总市值/成本/盈亏/本日盈亏 + 每笔持仓明细 + 穿透资产 + 分类 |
-| **穿透深度分析** | 总市值/成本/盈亏/本日盈亏 + 每笔持仓明细 + 穿透资产(含 mv/sector/ratio 字段, `full_penetration=True`) + 分类 |
+- **缓存自动失效** — 持仓数据或指数数据变更时，对应的 LLM 缓存自动失效。无需手动操作
+- **缓存有效期** — 各模块独立配置（`cache_ttl` 中的 `llm_{module}` 条目），默认值见[配置指南](how-to-config.md#cache_ttl-可调参数)
+- **手动清除** — 菜单 **[2]** 更新持仓缓存 → 所有 LLM 缓存自动清除
+- **关闭缓存** — 在 `llm_settings.json` 中将 `cache_enabled_{module}` 设为 `false`，每次生成都重新调用 API
 
-指纹哈希值随数据变化而改变，缓存自动失效：
+---
 
-- **触发缓存的变更**：持仓数据更新、指数数据变更、穿透资产变更
-- **不变更缓存的操作**：菜单 **L** 反复生成（相同指纹下直接命中缓存）
-- **手动清除**：菜单 [2] 更新持仓缓存 → 所有 LLM 缓存自动失效
-- **TTL 自定义**：`data/config/config.json` → `cache_ttl` → `llm_{module}` 条目
-
-批量模式（news_correlation）除持有相同的指纹前缀外，每条新闻独立缓存键 = `标题前80字符` 的指纹与持仓指纹的联合哈希。
-
-#### 4. 统一的 Token 用量页脚（标准模式）
-
-所有标准模式模块生成的 HTML 内容底部自动追加统一格式页脚：
-
-```
-模型：{model} | Token 用量：输入 X / 输出 Y = Z | 估算费用：{cost} | Extended Thinking
-```
-
-其中：
-
-- **模型** — 实际使用的模型名（模块级 `model_{module}` 或默认 model）
-- **Token 用量** — 从 API 响应中提取的输入/输出 token 计数
-- **估算费用** — 根据 `_estimate_cost()` 按模型定价表计算
-- **Extended Thinking** — 仅当模块开启了 Extended Thinking 时追加
-
-> 缓存命中时显示的模型名来自创建缓存时的模型，页脚变为灰字小号提示。
-
-**展示位置**：
-- HTML 报告：在章节内容末尾自动追加（`<p style="color:#888;font-size:12px">`）
-- Excel 报告：在页签底部单元格显示
-- TUI 输出框：在框内最后一行显示
-
-#### 5. 会话级用量统计与报告展示
-
-每次 LLM 调用完成后，Token 用量自动累计到会话级统计字典 `_session_usage`（代码：`src/python/llm/session.py`）。该字典受线程锁保护，支持多模块并发生成时的并发写入。
-
-**数据结构：**
-
-```
-全局累计
-├── input_tokens        — 累计输入 token
-├── output_tokens       — 累计输出 token
-├── cache_hit_tokens    — 累计缓存命中 token
-├── total_cost          — 累计估算费用
-├── call_count          — API 调用次数（缓存命中不计入）
-├── models              — 去重模型列表
-│
-按模块汇总（per_module）
-├── global_macro        — 全球政经局势
-├── expert_review       — 智囊团深度复盘
-├── health_check        — 持仓体检报告
-├── penetration_deep    — 穿透深度分析
-└── news_correlation    — 新闻 LLM 关联分析（可选）
-```
-
-每个 `per_module` 条目包含以下字段（来自 `session.py` 的 `_record_per_module()`）：
-
-| 字段 | 类型 | 含义 |
-|------|------|------|
-| `model` | str | 实际调用的模型名 |
-| `input_tokens` | int | 输入 token 数 |
-| `output_tokens` | int | 输出 token 数 |
-| `cache_hit_tokens` | int | 其中缓存命中的 token 数 |
-| `cost` | float | 估算费用 |
-| `cached` | bool | 是否命中缓存 |
-| `thinking` | bool | 是否开启 Extended Thinking |
-| `endpoint` | str | API 端点 |
-
-**覆盖范围说明：**
-- 会话级统计包含全部 5 个 LLM 子模块（1 个可选），其中 `news_correlation` 仅在 `enabled_llm.news_correlation = true` 时计入
-- 缓存命中：仅记录到 `per_module`（标记 `cached=True`），不计入 `call_count`
-- API 失败：不记录到统计中（失败不计费，也不计入调用次数）
-- 模块已禁用：不产生任何统计记录
-
-**输出链路：**
-
-此统计数据在多个位置展示：
-
-| 输出端 | 展示形式 | 说明 |
-|:-------|:---------|:-----|
-| **Excel 报告** | 独立页签 `18.LLM API 用量`，顶部汇总区 + 下方模块明细表，状态列带条件颜色填充 | 仅菜单 L |
-| **HTML 报告** | 报告第 18 节（底部） | 仅菜单 L |
-| **TUI 终端** | 一行摘要 | 每次菜单 L 完成时输出 |
-| **调试日志** | `logs/app.log` | 每次 API 调用后记录明细 |
-
-具体格式处理函数为 `format_session_usage()`，将原始数据转为可直接展示的字典（含 `call_count`、`model_display`、`cost_display`、`total_tokens` 等格式化字段）。
-
-> 详情参见 [报告文件结构](../manuals/reports-instruction.md#llm-api-用量页签章节说明页签-18--html-第-18-节) 中"LLM API 用量页签/章节说明"章节。
-
-#### 6. 失败降级、占位与截断重试
+## 失败降级与占位
 
 各模块在以下场景下自动降级或重试：
 
@@ -256,17 +118,16 @@ LLM 配置拆分为两个独立文件，分工明确：
 | API 调用失败（网络错误/超时/返回空） | 显示占位："（本节内容生成失败）" | WARNING |
 | 输出被截断（含 `... [TRUNCATED] ...`） | 自动增大 `max_tokens` 1.5× 重试一次，仍截断则记录日志提示用户手动调大 | WARNING |
 
-> 失败原因写入模块级 `_LLM_MODULE_FAILURE` 字典，供写入层（`llm_content.py`、`html_writer.py`）读取后决定占位文本。
+---
 
-#### 7. `system_prompt` 配置覆盖链
+## `system_prompt` 配置覆盖链
 
 系统提示词按以下优先级（高 → 低）解析：
 
 1. `llm_settings.json` → `system_prompt_{module}` 的值（非 null）
-2. 代码内置提示词（`prompts.py` 中 `_SYSTEM_{MODULE}*` 常量）
+2. 代码内置提示词（`prompts.py` 中定义）
 
 > 设为 `null` 表示回退使用代码内置提示词，升级代码时可自动获取更新。
-> 查看内置提示词内容：`grep -n "_SYSTEM_" src/python/llm/prompts.py`
 
 **示例** — 让智囊团深度复盘输出英文摘要：
 
@@ -288,27 +149,8 @@ LLM 配置拆分为两个独立文件，分工明确：
 
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
-- `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关，关闭的模块在报告中自动跳过
+- `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
-
-全局配置段在 `llm_settings.json` 中的实际写法示例：
-
-```json
-{
-  "max_retries": 2,
-  "llm_max_concurrency": 3,
-  "enabled_llm": {
-    "global_macro": true,
-    "expert_review": true,
-    "health_check": true,
-    "penetration_deep": true,
-    "news_correlation": false
-  },
-  "pricing": {
-    "currency": "CNY"
-  }
-}
-```
 
 ### 模块级配置
 
@@ -320,17 +162,17 @@ LLM 配置拆分为两个独立文件，分工明确：
 | `max_tokens_{module}` | int | 1024~8192（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试） |
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
-| `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式不支持** |
+| `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式（news_correlation）不支持** |
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude 或 DeepSeek） |
-| `thinking_budget_{module}` | int | 4000~16000（模块差异） | **仅 Claude** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足到 `max_tokens` + 4096 |
+| `thinking_budget_{module}` | int | 4000~16000（模块差异） | **仅 Claude** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
-> **各模块默认值差异表**：温度、max_tokens、timeout、thinking 等默认值因模块而异，详见 [各模块推荐参数值](#各模块推荐参数值)。
+> 各模块默认值差异详见下方「各模块推荐参数值」表。
 
 <details>
 <summary><b>📄 llm_settings.json 完整参考</b>（点击展开）</summary>
 
-以下为 `llm_settings.json` 的完整配置范例，与实际生成的文件结构一致，含中文注释分组：
+以下为 `llm_settings.json` 的完整配置范例，含中文注释分组：
 
 ```json
 {
@@ -437,7 +279,7 @@ LLM 配置拆分为两个独立文件，分工明确：
 
 ## 各模块推荐参数值
 
-> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`reasoning_effort="high"`。完整参数说明见上方「模块级配置」表。
+> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`reasoning_effort="high"`。
 
 | 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | output_brief_limit |
 |------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:------------------:|
@@ -445,14 +287,12 @@ LLM 配置拆分为两个独立文件，分工明确：
 | **智囊团深度复盘** | null | **0.8**（高温促多元） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
 | **持仓体检报告** | null | **0.5**（居中平衡） | **4096** | **120s** | **true** | 12000 | 300 字 |
 | **穿透深度分析** | null | **0.4**（中低温稳定） | **4096** | **90s** | false | 8000 | 300 字 |
-| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | 不适用（批量模式） |
+| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | 不适用 |
 
 > **temperature 项说明**：
 > - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**>0.5 时全球政经局势可能编造经济指标**。
 > - **中温（0.4~0.6）**：在准确性和判断力之间平衡，适合评分分析。
 > - **高温（≥0.7）**：鼓励多样性和创造性输出，适合辩论式分析。**<0.4 时智囊团专家观点雷同**。
->
-> **Extended Thinking 说明**：批量模式（news_correlation）不支持开启 Thinking——JSON 格式任务不需要深度推理。
 
 ---
 
@@ -492,7 +332,6 @@ LLM 配置拆分为两个独立文件，分工明确：
 | 与 temperature 关系 | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） |
 | 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） |
 | 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` |
-| 降级策略 | 模型不支持时自动跳过，记录 WARNING | 模型不支持时自动跳过，记录 WARNING |
 
 ### `thinking_budget` 与 `max_tokens` 的关系
 
@@ -503,29 +342,7 @@ LLM 配置拆分为两个独立文件，分工明确：
 | `max_tokens_expert_review` | **最终输出文本**的最大 token 数 | 8192 |
 | `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 16000 |
 
-<details>
-<summary>模型先消耗 `thinking_budget` 做内部推理（该部分不可见），再从剩余额度里吐出最终回答（不超过 `max_tokens`）— 点击查看示意图</summary>
-
-```
-┌─── thinking_budget_expert_review: 16000 ────────────────┐
-│  ┌── 模型内部思考 ──┐  ┌── 最终输出 ──────────┐       │
-│  │  ~8000 tokens    │  │  ~3000 tokens (可见)  │       │
-│  │  (不可见，不计入  │  │  ≤ max_tokens=8192   │       │
-│  │   输出 token)     │  │                      │       │
-│  └──────────────────┘  └──────────────────────┘       │
-│                   总计 ~11000 tokens（API 按此计价）    │
-└───────────────────────────────────────────────────────┘
-```
-</details>
-
-**API 硬性约束（仅 Claude）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。默认值已满足：
-
-- `max_tokens_global_macro=2048` → `thinking_budget_global_macro` 至少 3072（默认 4000 ✅）
-- `max_tokens_expert_review=8192` → `thinking_budget_expert_review` 至少 9216（默认 16000 ✅）
-
-**代码自动保护：**
-- 若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。
-- 若配置开启但模型不支持（如 `claude-sonnet-3-5`），自动跳过并记录 WARNING。
+**API 硬性约束（仅 Claude）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
 
 **一句话总结（Claude）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
 **一句话总结（DeepSeek）：** `reasoning_effort` 管"想多深"，`"max"` 对应深度分析的极致模式。
@@ -543,11 +360,10 @@ LLM 配置拆分为两个独立文件，分工明确：
 
 > 仅 `provider: "claude"` 时生效，OpenAI 提供商不适用。
 
-代码在 `_call_claude()` 中自动启用 Anthropic Messages API 的 [Prompt Caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) 功能。system prompt 以数组格式发送并标注 `cache_control: ephemeral`：
+代码在调用 Claude API 时自动启用 Anthropic Messages API 的 [Prompt Caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) 功能。
 
 - **生效条件**：同一 system prompt 在 **5 分钟内**重复使用
 - **场景**：财经新闻热点与持仓关联分析批量处理时最有价值——5 分钟内多次调用共享缓存，**输入 token 扣费减少约 50%**
-- **效果**：费用按 `cache_creation_tokens`（写入缓存）× 1.25 + `cache_read_tokens`（命中缓存）× 0.1 计价，远低于全价输入 token
 - **无感使用**：不需要任何配置项，调用 Claude API 时自动启用
 
 ---
@@ -602,7 +418,6 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
 - 模型：`deepseek-v4-flash`（推荐，**注意全小写**，当前主版本）、`deepseek-chat`（V3 旧版，功能受限）
-- ⚠️ 代码内部使用全小写前缀匹配，推荐统一使用全小写（如 `deepseek-v4-flash`）以保持风格一致；混合大小写亦可正常识别
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
 
@@ -638,7 +453,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 ## Token 消耗参考
 
-以下费用按 **DeepSeek-V4-Flash** 定价（¥1/M 输入、¥2/M 输出）估算，各模型单价详见下方「完整模型定价表」。
+以下费用按 **DeepSeek-V4-Flash** 定价（¥1/M 输入、¥2/M 输出）估算，各模型单价详见「完整模型定价表」。
 
 | 模块 | 输入 token | 输出 token | 单次费用参考 |
 |------|-----------|-----------|-------------|
@@ -651,7 +466,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 - 仅菜单 **L** 触发 LLM 调用，E / B 不会
 - LLM 结果默认缓存，缓存有效期内反复按 L 不会重复扣费
-- 持仓或指数数据变更时，关联的 LLM 缓存自动失效；也可通过菜单 [2] 更新持仓缓存主动清除所有 LLM 缓存
+- 持仓或指数数据变更时，关联的 LLM 缓存自动失效；也可通过菜单 **[2]** 更新持仓缓存主动清除所有 LLM 缓存
 
 ---
 
@@ -685,13 +500,18 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 ---
 
-## 新增 LLM 服务章节规范
+## Token 用量统计
 
-增加新的 LLM 服务章节时，共同的注册/配置/生成/写入步骤见 **[how-to-use-registry.md → 新增 LLM 模块检查清单](how-to-use-registry.md#新增-llm-模块检查清单)**（共 7 步，含注册表测试和标记合规验证）。在 registry 清单基础上，补充以下本领域特有的步骤：
+每次菜单 L 完成后，程序会统计本次会话的 LLM Token 消耗明细，展示在多个位置：
 
-| # | 步骤 | 操作位置 | 产出 |
-|---|------|---------|------|
-| ① | **添加系统提示词** | `llm/prompts.py` | 新增 `_SYSTEM_{MODULE}` 常量和提示词构建函数 |
-| ② | **适配报告模板** | `report/html_writer.py`（HTML）+ `report/llm_content.py`（Excel） | 新章节在两种报告中正确渲染 |
-| ③ | **配置缓存 TTL** | `data/config/config.json` → `cache_ttl` | 添加 `llm_{module}` 条目 |
-| ④ | **更新用户文档** | `data/config/llm_settings.json`（推荐默认值）+ 本文档（模块说明） | 用户可查阅和配置 |
+| 输出端 | 展示形式 | 说明 |
+|:-------|:---------|:-----|
+| **Excel 报告** | 独立页签 `18.LLM API 用量` | 顶部汇总区 + 下方模块明细表，状态列带条件颜色填充 |
+| **HTML 报告** | 报告第 18 节（底部） | 与 Excel 格式一致 |
+| **TUI 终端** | 一行摘要 | 每次菜单 L 完成时输出 |
+| **调试日志** | `logs/app.log` | 每次 API 调用后记录明细 |
+
+主要内容包括：
+- **汇总数据**：API 调用次数、模型名称、输入/输出 Token 总数、缓存命中 Token、累计费用
+- **模块明细**：每个 LLM 子模块的单独统计（状态、模型、Token 数、费用、是否缓存、是否开启 Thinking）
+- **缓存统计**：系统数据缓存命中/未命中/总请求数/命中率

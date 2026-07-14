@@ -252,6 +252,15 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 | ⑦ | **运行注册表测试** | 终端 | `pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
 | ⑧ | **验证标记合规** | 终端 | `python scripts/check-test-markers.py` — 确认测试文件标记无遗漏 |
 
+> **LLM 模块补充步骤**：在上述 registry 清单基础上，新增 LLM 模块还需完成以下领域特定的步骤：
+
+| # | 步骤 | 操作位置 | 产出 |
+|---|------|---------|------|
+| ⑨ | **添加系统提示词** | `llm/prompts.py` | 新增 `_SYSTEM_{MODULE}` 常量和提示词构建函数 |
+| ⑩ | **适配报告模板** | `report/html_writer.py`（HTML）+ `report/llm_content.py`（Excel） | 新章节在两种报告中正确渲染 |
+| ⑪ | **配置缓存 TTL** | `data/config/config.json` → `cache_ttl` | 添加 `llm_{module}` 条目 |
+| ⑫ | **更新用户文档** | `llm_settings.json` 加入推荐默认值 + 更新配置指南 | 用户可查阅和配置 |
+
 ### 精确键名缓存（无前缀匹配）
 
 ```python

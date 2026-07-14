@@ -46,23 +46,26 @@
 
 ---
 
-## 用户文档&使用指南
+## 📖 用户指南
 
-| 文档 | 说明 |
-|------|------|
-| [快速开始 & 菜单操作](docs-stm/manuals/how-to-start.md) | 启动指南、持仓格式、菜单功能 |
-| [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
-| [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL |
-| [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | llm_key.json 字段说明、llm_settings.json 字段说明、LLM 密钥、参数调优、provider 选择 |
-| [报告文件结构 & 基金业绩评价标准](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价模型 |
-| [数据源一览 & 目录结构](docs-stm/manuals/datasource-and-folders.md) | 数据源说明、项目目录结构 |
+建议按以下顺序阅读：
+
+| # | 文档 | 说明 |
+|:-:|:-----|:------|
+| 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
+| 2 | [菜单操作手册](docs-stm/manuals/how-to-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
+| 3 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、板块可见性 |
+| 4 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
+| 5 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
+| 6 | [数据源一览](docs-stm/manuals/datasource-and-folders.md) | 数据源说明、项目目录结构 |
+| 7 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
 
 ## 🔧 开发者参考
 
 | 文档 | 说明 |
-|------|------|
-| [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块流程 |
-| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试报告、新增测试指南 |
+|:-----|:------|
+| [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块（含 LLM）检查清单 |
+| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试模式、新增测试指南 |
 
 ## 管理文档&设计概要
 
