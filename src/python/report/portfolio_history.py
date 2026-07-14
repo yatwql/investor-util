@@ -195,9 +195,10 @@ class PortfolioHistoryCalculator:
                     "annualized_volatility": 0, "total_return": 0,
                     "total_return_pct": 0, "status": "unavailable", "warnings": warnings}
 
-        # 找到可用的收益率起算日期：要求该日 ≥80% 的持仓有数据
+        # 找到可用的收益率起算日期和终止日期：要求该日 ≥80% 的持仓有数据
         # 不同基金数据起止日期不同（如有的从2025-09、有的从2026-03），
-        # 过早的起算点会因基金不全导致组合市值偏低、收益率虚高
+        # 过早的起算点会因基金不全导致组合市值偏低、收益率虚高；
+        # 过晚的终止点同样会因部分基金数据未刷新导致市值骤降
         total_funds = len(all_series)
         min_coverage = max(1, int(total_funds * 0.8))
         valid_start_idx = 0
@@ -206,9 +207,17 @@ class PortfolioHistoryCalculator:
             if funds_with_data >= min_coverage:
                 valid_start_idx = i
                 break
-        if valid_start_idx > 0:
-            logger.info("[history] 收益率起算点调整: %s → %s（此前日期仅覆盖部分持仓）",
-                        sorted_dates[0], sorted_dates[valid_start_idx])
+        valid_end_idx = len(sorted_dates) - 1
+        for i in range(len(sorted_dates) - 1, -1, -1):
+            if fund_count_on_date.get(sorted_dates[i], 0) >= min_coverage:
+                valid_end_idx = i
+                break
+        if valid_end_idx < valid_start_idx:
+            valid_end_idx = valid_start_idx
+        if valid_start_idx > 0 or valid_end_idx < len(sorted_dates) - 1:
+            logger.info("[history] 有效区间截取: %s ~ %s（首尾覆盖不足日期已排除）",
+                        sorted_dates[valid_start_idx], sorted_dates[valid_end_idx])
+        sorted_dates = sorted_dates[valid_start_idx:valid_end_idx + 1]
 
         # 构建完整时间线 + 计算指标
         bars: list[dict] = []
