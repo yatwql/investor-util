@@ -10,9 +10,18 @@
 
 ### Added
 
-- **覆盖阈值可配置**：`config.json` 新增 `history.coverage_threshold`（默认 0.8），控制组合历史走势有效区间起止日的持仓覆盖比例要求。由 `PortfolioHistoryCalculator` 接收，替代硬编码 80%。
-
 ### Fixed
+
+### Changed
+
+### Docs
+
+
+## [0.5.5] - 2026-07-14
+
+### Added
+
+- **覆盖阈值可配置**：`config.json` 新增 `history.coverage_threshold`（默认 0.8），控制组合历史走势有效区间起止日的持仓覆盖比例要求。由 `PortfolioHistoryCalculator` 接收，替代硬编码 80%。
 
 ### Changed
 
@@ -22,8 +31,8 @@
 
 ### Docs
 
-- **test-coverage.md**：同步更新所有测试模式计数——全量 2990 项（-5），单元 2685 项（-5），场景 276 项（+9，含 extreme 归入父标记），report 1013 项（-5），dev-verify 815 项（-1592），verify 1775 项（+732）。其余模式保持不变。
-- **datasource-and-folders.md**：`src/python/` 目录树展开至单文件粒度（~80 个文件/目录），每个文件含用途说明。
+- **test-coverage.md**：同步更新所有测试模式计数——全量 2990 项（-5），单元 2685 项（-5），场景 276 项（+9），report 1013 项（-5），dev-verify 815 项（-1592），verify 1775 项（+732）。其余模式保持不变。
+- **datasource-and-folders.md**：`src/python/` 目录树展开至单文件粒度（~80 个文件/目录），每个文件含用途说明。新增「开发者指引」章节。
 
 - **requirements.md**：系统性重构——由扁平 11 节结构重组为"全局→局部、功能需求→非功能需求"两大部分 12 章。新增统一需求标识体系（R-XXXX-NN），功能/非功能分离，移除原文档中混入的技术设计内容（DataSourceRegistry/Provider Chain/指纹算法等）和版本历史痕迹。
 - **technical.md**：全面重构——从扁平 ~950 行扩充为层次化 ~2050 行文档，新增 12+ ASCII 架构图流程图、5 层系统架构图、核心数据流图，设计约束从平铺表重组为 6 领域分组（含设计目的/违反后果/适用范围）。移除所有用户文档引用和版本历史痕迹。
