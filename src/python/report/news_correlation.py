@@ -281,9 +281,9 @@ def _expand_industry_keywords(
                 if extra_kw:
                     all_kw = list(set(keywords + extra_kw))
                     all_kw.sort(key=lambda x: (-len(x), x))
-                    # 计算真正新增数（不在原始 keywords 中的行业/概念）
+                    # 计算行业/概念来源的关键词数（与持仓关键词不重叠）
                     new_count = len(set(extra_kw) - set(keywords))
-                    logger.info("行业/概念关键词扩展: 实增 %d 个 → 共 %d 个",
+                    logger.info("行业/概念关键词扩展: 行业/概念 %d 个 → 共 %d 个",
                                 new_count, len(all_kw))
                     return all_kw, industry_data
     except Exception as e:

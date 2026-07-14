@@ -14,6 +14,8 @@
 
 - **HTML 报告缺失 LLM 页面**：`write_html_report()` 的 `enable_llm` 参数默认值为 `False`，而 `_cmd_generate_full()`（L 菜单）调用时未传入，导致 HTML 报告中所有 LLM 板块被隐藏且无连续编号。已修复为传递 `is_enable_llm()` 配置值，并同步新增该函数作为统一读取入口。
 
+- **误导日志"实增 N 个"**：`news_correlation.py` 中行业/概念关键词扩展日志使用了"实增"（暗示随时间增长），但实际是持仓关键词（股票名）与行业/概念关键词（行业名、板块名）两个不重叠集合的差值，每次结果相同。已改为"行业/概念 N 个"。
+
 ### Changed
 
 - **`is_enable_llm()` 新增**：在 `config/_core.py` 新增 LLM 板块可见性判断函数，读取 `llm_settings.json` 的 `enabled_llm`，仅检测 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep），不包含 `news_correlation`。缺失时默认启用（向后兼容）。
