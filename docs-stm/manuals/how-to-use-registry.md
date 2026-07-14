@@ -126,7 +126,6 @@ from src.python.registry import (
     get_report_sheet_name,           # sheet_key → 中文标题
     get_report_section_order,        # config → dict[key → 自定义序号]
     get_report_section_keys,         # → list[key]
-    set_sheet_title,                 # (ws, key) → 设置 ws.title
 )
 ```
 
@@ -134,7 +133,6 @@ from src.python.registry import (
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
 - `get_report_section_keys()` → 全部 18 个模块键名
-- `set_sheet_title(ws, "summary")` → 设置 worksheet 标题为 "投资分析汇总"
 
 ### 报表页签名称查找
 
@@ -184,7 +182,7 @@ LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取：全
 | `handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
 | `report/excel_generator.py` | `get_report_section_order()` | Excel 页签排序 |
 | `report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入 |
-| `report/excel_sheet_factory.py` | `set_sheet_title()` | 统一页签标题设置 |
+| `report/excel_sheet_factory.py` | `create_sheets()` 内联连续重新编号 | 页签标题设置 |
 | `report/excel_llm_usage.py` | `get_llm_module_names()` | LLM API 用量统计 |
 
 > 完整列表：除上表外，各页签写入器（`summary.py`、`market_value_sheet.py`、`category.py` 等）均调用 `get_report_sheet_name()` 获取页签名。新增模块在 `_MODULE_REGISTRY` 注册后自动同步到所有消费方。
@@ -263,7 +261,7 @@ DataModuleDef("我的固定键", "fixed",
 - 缓存前缀/精确键名映射 → `get_prefix_type_map()` / `get_exact_type_map()`
 - LLM settings 键名 → `get_known_llm_settings_keys()`
 - LLM 模块名称 → `get_llm_module_names()`
-- 报表页签标题 → `set_sheet_title(ws, key)` → `get_report_sheet_name()`
+- 报表页签标题 → `create_sheets()` 内联连续重新编号, `get_report_sheet_name()`
 - Excel 生成器标签 → `get_report_sheet_name()` / `get_report_section_order()`
 
 ---

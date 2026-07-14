@@ -62,7 +62,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=False, include_news=False, include_llm=False)
+                                enable_b_series=False, enable_news=False, enable_llm=False)
         # 只有 always 类型的 5 个页签
         expected_order = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
                           if sec["type"] == "always"]
@@ -79,7 +79,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         ]
         wb = self._make_wb()
         sheets = create_sheets(wb, custom_order,
-                                enable_b_series=False, include_news=False, include_llm=False)
+                                enable_b_series=False, enable_news=False, enable_llm=False)
         expected_order = [sec["key"] for sec in custom_order]
         self.assertEqual(list(sheets.keys()), expected_order)
         self.assertEqual(wb.sheetnames, [sheets[k].title for k in expected_order])
@@ -89,7 +89,8 @@ class TestExcelSheetOrder(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=True, include_news=True, include_llm=True)
+                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                data_availability={"news_data_available": True, "llm_data_available": True})
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys,
                          "全部启用时页签顺序应与默认注册表一致")
@@ -101,7 +102,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         wb = self._make_wb()
         # 启用 always + b_series
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=True, include_news=False, include_llm=False)
+                                enable_b_series=True, enable_news=False, enable_llm=False)
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
                          if sec["type"] in ("always", "b_series")]
         self.assertEqual(list(sheets.keys()), expected_keys)
@@ -129,7 +130,8 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
-                                enable_b_series=True, include_news=True, include_llm=True)
+                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                data_availability={"news_data_available": True, "llm_data_available": True})
         for key, ws in sheets.items():
             self.assertRegex(
                 ws.title, r"^\d+\.",
@@ -150,7 +152,8 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
-                                enable_b_series=True, include_news=True, include_llm=True)
+                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                data_availability={"news_data_available": True, "llm_data_available": True})
         numbers = []
         for ws in sheets.values():
             import re
@@ -167,7 +170,8 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
-                                enable_b_series=True, include_news=True, include_llm=True)
+                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                data_availability={"news_data_available": True, "llm_data_available": True})
         titles = [ws.title for ws in sheets.values()]
         self.assertEqual(len(titles), len(set(titles)),
                          f"页签标题重复: {set(t for t in titles if titles.count(t) > 1)}")
@@ -182,7 +186,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         ]
         wb = self._make_wb()
         sheets = create_sheets(wb, custom_order,
-                                enable_b_series=False, include_news=False, include_llm=False)
+                                enable_b_series=False, enable_news=False, enable_llm=False)
         self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析",
                          "fund_performance 应使用自定义序号 1")
         self.assertEqual(sheets["summary"].title, "2.投资分析汇总",
@@ -197,7 +201,8 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
-                                enable_b_series=True, include_news=True, include_llm=True)
+                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                data_availability={"news_data_available": True, "llm_data_available": True})
         # 标题应是递增序号
         import re
         numbers = []
@@ -285,21 +290,6 @@ class TestExcelModuleSheets(unittest.TestCase):
         ws.title = "test"
         return ws
 
-    def test_set_sheet_title_consistency(self):
-        """set_sheet_title 对所有 16 个 key 都产生正确标题。"""
-        from src.python.registry import set_sheet_title, _REPORT_SECTION_DEFAULT
-
-        for sec in _REPORT_SECTION_DEFAULT:
-            from openpyxl import Workbook
-            wb = Workbook()
-            ws = wb.active
-            set_sheet_title(ws, sec["key"])
-            expected = f"{sec['number']}.{sec['name']}"
-            self.assertEqual(
-                ws.title, expected,
-                f"{sec['key']}: 期望 '{expected}'，实际 '{ws.title}'",
-            )
-
     def test_generate_excel_report_produces_valid_workbook(self):
         """generate_excel_report 生成有效 xlsx（不崩溃）。"""
         import tempfile
@@ -320,7 +310,7 @@ class TestExcelModuleSheets(unittest.TestCase):
                     news_data=[],
                     news_llm_meta=None,
                     early_warnings=None,
-                    include_b_series=False,
+                    enable_b_series=False,
                 )
                 # 检查输出文件是否存在
                 files = os.listdir(tmpdir)

@@ -339,18 +339,18 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8,  "type": "b_series",  "data_flag": "concentration_data"},
     {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "b_series",  "data_flag": "style_data"},
     # ── news 类型（需启用新闻功能） ──
-    {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10, "type": "news",      "data_flag": "include_news"},
+    {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10, "type": "news",      "data_flag": "news_data_available"},
     {"key": "early_warning",      "name": "智能预警",                         "number": 11, "type": "news",      "data_flag": "early_warnings"},
     # ── llm 类型（需启用 LLM 功能） ──
-    {"key": "global_macro",       "name": "全球政经局势",                     "number": 12, "type": "llm",       "data_flag": "llm_enabled"},
-    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13, "type": "llm",       "data_flag": "llm_enabled"},
-    {"key": "health_check",       "name": "持仓体检报告",                     "number": 14, "type": "llm",       "data_flag": "llm_enabled"},
-    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15, "type": "llm",       "data_flag": "llm_enabled"},
+    {"key": "global_macro",       "name": "全球政经局势",                     "number": 12, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "health_check",       "name": "持仓体检报告",                     "number": 14, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15, "type": "llm",       "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
     {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 16, "type": "history",   "data_flag": None},
     {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 17, "type": "history",   "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 18, "type": "llm",       "data_flag": "llm_enabled"},
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 18, "type": "llm",       "data_flag": "llm_data_available"},
 ]
 
 
@@ -361,33 +361,6 @@ def get_report_section_keys() -> set[str]:
         {"summary", "market_value", "category", ..., "drawdown_analysis"}
     """
     return {sec["key"] for sec in _REPORT_SECTION_DEFAULT}
-
-
-def set_sheet_title(ws, key: str, section_order: list[dict] | None = None) -> None:
-    """设置 Excel 页签标题为 "{number}.{name}"。
-
-    section_order 优先于 _REPORT_SECTION_DEFAULT：
-    - section_order 不为 None 时，遍历 section_order 匹配 key 取 sec["number"]
-    - section_order 为 None 时，使用 _REPORT_SECTION_DEFAULT 默认值
-
-    Args:
-        ws: openpyxl Worksheet 对象
-        key: 模块标识，如 "summary"、"category"
-        section_order: 可选的排序配置，来自 get_report_section_order()
-    """
-    source = section_order or _REPORT_SECTION_DEFAULT
-    for sec in source:
-        if sec["key"] == key:
-            ws.title = f"{sec['number']}.{sec['name']}"
-            return
-    # section_order 中未命中时回退到默认值（防御性编程）
-    if section_order is not None:
-        for sec in _REPORT_SECTION_DEFAULT:
-            if sec["key"] == key:
-                ws.title = f"{sec['number']}.{sec['name']}"
-                return
-    logger.warning("set_sheet_title: 未知的模块标识 %r，使用键名作为标题", key)
-    ws.title = key
 
 
 def get_report_section_order(config: dict | None = None) -> list[dict]:

@@ -38,9 +38,8 @@ MenuItem = tuple[str, str, Callable[[], None] | None, bool]
 
 MENU_ITEMS: list[MenuItem] = [
     ("E", "生成基础版Excel分析报告", None, False),
-    ("H", "生成基础版HTML分析报告", None, False),
-    ("B", "生成全系列包含新闻的报告(Excel+HTML) [含基金深度分析]", None, False),
-    ("L", "生成全系列完整版报告(Excel+HTML) [含基金深度分析]", None, False),
+    ("B", "生成全系列报告(Excel+HTML) [按板块配置]", None, False),
+    ("L", "生成全系列完整版报告(Excel+HTML) [含LLM，按板块配置]", None, False),
     ("C", "配置持仓信息目录", None, False),
     ("F", "配置持仓信息文件名", None, False),
     ("O", "配置报告输出目录", None, False),
@@ -48,6 +47,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("2", "更新持仓类缓存", None, False),
     ("3", "清理过期缓存文件", None, False),
     ("4", "查看缓存统计信息", None, False),
+    ("P", "配置报告板块可见性（B系列/新闻/历史走势）", None, False),
     ("S", "配置支持LLM的报告分析章节", None, False),
     ("R", "刷新配置", None, False),
     ("X", "退出", None, True),

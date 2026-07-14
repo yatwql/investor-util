@@ -4,7 +4,6 @@
   - 默认顺序完整性（18 个模块，summary 开头/llm_usage 结尾）
   - 序号 1~18 连续递增
   - get_report_section_keys 完备性
-  - set_sheet_title 与默认注册表一致性
   - 5 种可见性类型计数正确（always=5, history=2, b_series=4, news=2, llm=5）
   - B 系列 data_flag 各不相同
   - 空配置与无配置行为一致
@@ -33,12 +32,10 @@ class TestScenarioSectionOrder(unittest.TestCase):
             _REPORT_SECTION_DEFAULT,
             get_report_section_order,
             get_report_section_keys,
-            set_sheet_title,
         )
         self._default = _REPORT_SECTION_DEFAULT
         self._get_order = get_report_section_order
         self._get_keys = get_report_section_keys
-        self._set_title = set_sheet_title
 
     def test_default_order_18_items(self):
         """默认顺序包含完整的 18 个模块。"""
@@ -62,20 +59,6 @@ class TestScenarioSectionOrder(unittest.TestCase):
         keys = self._get_keys()
         expected = {s["key"] for s in self._default}
         self.assertEqual(keys, expected)
-
-    def test_set_sheet_title_vs_default(self):
-        """set_sheet_title 对每个默认 key 生成正确的 "{number}.{name}"。"""
-
-        class MockWs:
-            def __init__(self):
-                self.title = ""
-
-        for sec in self._default:
-            ws = MockWs()
-            self._set_title(ws, sec["key"])
-            expected = f"{sec['number']}.{sec['name']}"
-            self.assertEqual(ws.title, expected,
-                             f"{sec['key']}: 预期 {expected!r}，实际 {ws.title!r}")
 
     def test_default_always_type_has_5_sections(self):
         """always 类型模块共 5 个，均无 data_flag。"""
@@ -139,17 +122,14 @@ class TestScenarioSectionOrder(unittest.TestCase):
 class TestScenarioCustomSectionOrder(unittest.TestCase):
     """C 迭代报告序号可配置 — 自定义顺序场景验证。
 
-    验证 `get_report_section_order(config)` 在用户自定义配置下的合并行为，
-    以及 set_sheet_title 在自定义序号下的正确性。
+    验证 `get_report_section_order(config)` 在用户自定义配置下的合并行为。
     """
 
     def setUp(self):
         from src.python.registry import (
             get_report_section_order,
-            set_sheet_title,
         )
         self._get_order = get_report_section_order
-        self._set_title = set_sheet_title
 
     def _partial_config(self) -> dict:
         """部分自定义配置：只覆盖前 3 个模块的序号。"""
@@ -160,12 +140,6 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
                 "market_value": 3,
             }
         }
-
-    def _mock_ws(self):
-        class MockWs:
-            def __init__(self):
-                self.title = ""
-        return MockWs()
 
     def test_partial_custom_preserves_remaining_18_items(self):
         """部分自定义 → 仍返回 18 个模块，未配置项自动续编。"""
@@ -202,16 +176,6 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
         order = self._get_order(self._partial_config())
         keys = [s["key"] for s in order]
         self.assertEqual(len(set(keys)), 18)
-
-    def test_partial_custom_assigns_correct_number_and_name(self):
-        """部分自定义 → set_sheet_title 使用配置的 number。"""
-        order = self._get_order(self._partial_config())
-        for sec in order[:3]:
-            ws = self._mock_ws()
-            self._set_title(ws, sec["key"], order)
-            expected = f"{sec['number']}.{sec['name']}"
-            self.assertEqual(ws.title, expected,
-                             f"{sec['key']}: 预期 {expected!r}，实际 {ws.title!r}")
 
     def test_custom_unknown_key_falls_back_to_default(self):
         """自定义配置中有不再注册表中的 key → 忽略，不影响合并结果。"""

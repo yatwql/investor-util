@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-13
+最后更新：2026-07-14
 
 ---
 
@@ -526,6 +526,109 @@ B 系列 4 个模块（fund_manager / fund_overlap / fund_concentration / fund_s
 - **三级降级**：push2（一级，精确）→ Tencent 扩展字段（二级，可靠，Tencent 数据不标注估算）→ 代码前缀（三级，兜底）：60xxxx→大盘、000/002→中盘、300/688→小盘、4/8→小盘；估值方向统一"混合"+备注"估算风格"
 - **性能优化**：会话级缓存委托 DataSourceRegistry session_cache（domain="extended"）跨基金复用，同一股票仅首次 HTTP；Tencent 二级降级基于 registry 熔断器（provider="tencent_style"），避免网络不可达时逐只等待超时
 - **独立快照**：`fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
+
+### 报告板块可见性
+
+v0.4.5 引入两层可见性模型，将报告模块的显示控制从单一 data_flag 判定拆分为 board 层和 data 层双层逻辑，配套实现连续重新编号，并消除 handlers_report.py 中 ~92 行重复代码。
+
+#### 两层模型
+
+```
+section_visible = board_enabled(section.type) AND data_available(section.data_flag)
+```
+
+| 层级 | 含义 | 来源 | 作用范围 |
+|:-----|:------|:------|:---------|
+| board 层 | 用户配置的板块开关 | `config.json` 的 `enable_b_series` / `enable_news` / `enable_history` | 按 `section.type` 过滤整个类型（如关闭 b_series 后 B2-B5 全部隐藏） |
+| data 层 | 运行时数据可用性 | 各子模块返回的实际数据状态 | 按 `section.data_flag` 过滤单个模块（如 overlap_data 不可用仅隐藏 B3） |
+
+#### Board 层配置
+
+`config.json` 新增三个布尔开关（默认均为 `true`，缺失时向后兼容）：
+
+```json
+{
+  "enable_b_series": true,    // B 系列基金深度分析（fund_manager / overlap / concentration / style）
+  "enable_news": true,        // 新闻与预警（news_correlation / early_warning）
+  "enable_history": true      // 历史走势+回撤分析（portfolio_history / drawdown_analysis）
+}
+```
+
+读取接口在 `config/_core.py` 中以三个 `is_enable_*()` 函数统一封装：
+
+| 函数 | 配置字段 | 对应 section.type |
+|:-----|:---------|:------------------|
+| `is_enable_b_series(config)` | `enable_b_series` | `b_series` |
+| `is_enable_news(config)` | `enable_news` | `news` |
+| `is_enable_history(config)` | `enable_history` | `history` |
+
+`handlers_report.py` 中 `_cmd_generate_both()` 和 `_cmd_generate_full()` 在报告准备阶段调用上述函数读取配置值后传入 Excel/HTML 管线。配置值验证在 `_validate_enable_boards()` 中统一处理：缺失视为 `true`（兼容无此字段的老版 config.json），非布尔值记录 WARNING。
+
+`always` 和 `llm` 类型的 board 层硬编码为 `True`（always 始终显示，llm 由菜单参数控制，不通过 config.json 开关）。
+
+#### Board Flags 内联字典
+
+Excel 端（`excel_sheet_factory.py:create_sheets()`）和 HTML 端（`html_writer.py:_compute_section_visibility()`）各自维护一份结构完全一致的 `board_flags` 字典，保证双端可见性结果一致：
+
+```python
+board_flags = {
+    "always":   True,               # 无配置开关
+    "b_series": enable_b_series,    # config.json → board 层
+    "news":     enable_news,        # 配置驱动（非 data 层 include_news）
+    "history":  enable_history,     # 配置驱动
+    "llm":      enable_llm,         # 菜单参数驱动
+}
+```
+
+两份字典的行为一致性由集成测试保证。
+
+#### 两层合并逻辑
+
+```
+for sec in section_order:
+    board_ok = board_flags.get(sec["type"], True)
+    if not board_ok:
+        → 跳过（board 层关闭，整个类型隐藏，不检查 data 层）
+    flag_name = sec.get("data_flag")
+    if not flag_name:
+        → section 可见（type=always/history 的 data_flag 为 None）
+    else:
+        → section 可见 = data_flags.get(flag_name, False)
+```
+
+HTML 端 `_compute_section_visibility()` 集中实现两层合并，返回 `section_visible_dict` 字典供渲染使用。
+
+Excel 端 `create_sheets()` 分成两步：
+1. board 层预过滤：跳过 board_flags 关闭的 section（直接 `continue`）
+2. data 层判断：调用 `should_create_sheet(sec, data_availability)`，按 `sec["data_flag"]` 在 `data_availability` 中查询数据就绪状态
+
+#### 连续重新编号
+
+可见模块获得连续序号，隐藏模块不留下编号空缺：
+
+1. 从 `section_order` 筛选所有可见模块
+2. 将 `llm_usage` 从可见列表分离并强制追加到末尾
+3. 按新顺序从 1 开始分配连续序号
+
+```python
+visible_list = [sec for sec in order if section_visible_dict.get(sec["key"], False)]
+llm_sec = [s for s in visible_list if s["key"] == "llm_usage"]
+other_secs = [s for s in visible_list if s["key"] != "llm_usage"]
+ordered_visible = other_secs + llm_sec
+visible_numbers = {sec["key"]: idx for idx, sec in enumerate(ordered_visible, start=1)}
+```
+
+Excel 端页签标题采用 `f"{visible_count}.{sec['name']}"` 格式，同样保证 `llm_usage` 页签在最后一位。
+
+#### 共享函数消除
+
+`handlers_report.py` 中提取两个共享函数，消除了 `_cmd_generate_both` 和 `_cmd_generate_full` 间的 ~92 行重复代码：
+
+- **`_capture_snapshot(holdings, details, reporter)`**：F1 持仓快照创建 + 差异计算 + 保存 + 清理的全流程封装。两个菜单命令原各有一份内联实现且逻辑完全相同，现合并为此函数，消除 ~67 行重复。
+- **`_fetch_history_data(history_mode, holdings, reporter)`**：F2 历史走势数据获取的逻辑提取（auto/prompt/off 三种模式、用户交互、异常处理），消除 ~25 行重复。
+- **条件守卫**：F2 调用在两者中均包裹在 `if _enable_history:` 下，board 层关闭时跳过并输出 `[板块配置] 历史走势已关闭，跳过` 日志。
+
+> data_flag 定义、可见性类型表和渲染期传递机制详见 [报告序号可配置](#报告序号可配置)。
 
 ### 报告序号可配置
 

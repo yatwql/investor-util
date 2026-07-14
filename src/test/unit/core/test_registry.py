@@ -15,7 +15,6 @@ from src.python.registry import (
     get_registered_data_types,
     get_report_section_keys,
     get_report_section_order,
-    set_sheet_title,
     _REPORT_SECTION_DEFAULT,
 )
 import pytest
@@ -318,40 +317,6 @@ class TestGetReportSectionKeys:
             assert k in keys, f"缺少 {k}"
 
 
-class MockWorksheet:
-    """模拟 openpyxl Worksheet，用于 set_sheet_title 测试。"""
-    def __init__(self):
-        self.title = ""
-
-
-class TestSetSheetTitle:
-    """set_sheet_title() 单元测试。"""
-
-    def test_sets_title_format(self):
-        """应设置标题为 "{number}.{name}"。"""
-        ws = MockWorksheet()
-        set_sheet_title(ws, "category")
-        assert ws.title == "3.持仓分类表", f"got {ws.title!r}"
-
-    def test_summary_sets_1(self):
-        """summary 页签应为 "1.投资分析汇总"。"""
-        ws = MockWorksheet()
-        set_sheet_title(ws, "summary")
-        assert ws.title == "1.投资分析汇总"
-
-    def test_llm_usage_sets_18(self):
-        """llm_usage 页签应为 "18.LLM API 用量"。"""
-        ws = MockWorksheet()
-        set_sheet_title(ws, "llm_usage")
-        assert ws.title == "18.LLM API 用量"
-
-    def test_unknown_key_fallback(self):
-        """未知 key 使用 key 本身作为标题。"""
-        ws = MockWorksheet()
-        set_sheet_title(ws, "nonexistent")
-        assert ws.title == "nonexistent"
-
-
 class TestGetReportSectionOrder:
     """get_report_section_order() 单元测试。"""
 
@@ -453,31 +418,4 @@ class TestGetReportSectionOrder:
         assert order[0]["key"] == reversed_last
 
 
-class TestSetSheetTitleWithOrder:
-    """set_sheet_title() 传入 section_order 参数的测试。"""
 
-    _CUSTOM_ORDER = [
-        {"key": "fund_performance", "name": "基金业绩分析", "number": 1},
-        {"key": "summary",           "name": "投资分析汇总",   "number": 2},
-        {"key": "market_value",      "name": "市值核算明细表", "number": 3},
-    ]
-
-    def test_custom_order_uses_section_numbers(self):
-        """自定义 section_order → 标题使用配置序号。"""
-        ws = MockWorksheet()
-        set_sheet_title(ws, "fund_performance", self._CUSTOM_ORDER)
-        assert ws.title == "1.基金业绩分析"
-
-    def test_partial_custom_falls_back_to_default(self):
-        """部分自定义 → 未配置项使用默认 _REPORT_SECTION_DEFAULT。"""
-        ws = MockWorksheet()
-        # "fund_performance" 在 CUSTOM_ORDER 中，但 "category" 不在
-        set_sheet_title(ws, "category", self._CUSTOM_ORDER)
-        # category 不在 CUSTOM_ORDER 中 → 从 _REPORT_SECTION_DEFAULT 取
-        assert ws.title == "3.持仓分类表"
-
-    def test_none_order_uses_default(self):
-        """section_order=None → 向后兼容默认行为。"""
-        ws = MockWorksheet()
-        set_sheet_title(ws, "summary")
-        assert ws.title == "1.投资分析汇总"

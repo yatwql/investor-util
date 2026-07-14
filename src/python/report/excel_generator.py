@@ -30,7 +30,10 @@ def generate_excel_report(
     news_data: list | None = None,
     news_llm_meta: dict | None = None,
     early_warnings: dict | None = None,
-    include_b_series: bool | None = None,  # renamed from include_fund_deep
+    enable_b_series: bool = False,      # board 层：B 系列是否开启
+    enable_news: bool = True,           # board 层：新闻板块是否开启（配置值）
+    enable_llm: bool = True,            # board 层：LLM 板块是否开启
+    enable_history: bool = True,        # board 层：历史走势板块是否开启
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     f_context: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
@@ -39,7 +42,7 @@ def generate_excel_report(
 
     Args:
         holdings: 持仓列表
-        include_news: 是否包含新闻页签
+        include_news: 是否包含新闻页签（data 层：菜单类型决定）
         output_dir: 输出目录
         news_top_count: 新闻条数上限
         include_llm: 是否包含 LLM 分析章节
@@ -50,16 +53,15 @@ def generate_excel_report(
         news_data: 预获取的新闻数据
         news_llm_meta: 新闻 LLM 元数据
         early_warnings: 智能预警数据
-        include_b_series: 是否包含 B 系列页签（基金深度分析）。
-            None 时跟随 include_news（B/L 含，E/H 不含）。已从 include_fund_deep 重命名。
+        enable_b_series: board 层 — B 系列基金深度分析是否开启
+        enable_news: board 层 — 新闻板块是否开启（配置值）
+        enable_llm: board 层 — LLM 板块是否开启
+        enable_history: board 层 — 历史走势板块是否开启
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
         f_context: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
     """
     prog = progress if progress is not None else SilentProgressReporter()
-
-    # B 系列跟随 include_news（B/L 菜单含新闻 = 含 B 系列）
-    enable_b_series = include_news if include_b_series is None else include_b_series
 
     modules = load_report_modules(prog)
     if not modules:
@@ -72,10 +74,20 @@ def generate_excel_report(
     wb = create_workbook()
     wb.remove(wb.active)
     order = section_order or get_report_section_order()  # 内部名 order，避免影子覆盖参数
+
+    # 构造 data 层可用性字典
+    data_availability: dict[str, bool] = {}
+    if include_news:
+        data_availability["news_data_available"] = True
+    if include_llm:
+        data_availability["llm_data_available"] = True
+
     sheets = create_sheets(wb, order,
                             enable_b_series=enable_b_series,
-                            include_news=include_news,
-                            include_llm=include_llm)
+                            enable_news=enable_news,
+                            enable_history=enable_history,
+                            enable_llm=enable_llm,
+                            data_availability=data_availability)
 
     # ── 行情市值 + 指数 ──
     data = resolve_market_data(holdings, details, modules, sheets["market_value"], prog)
