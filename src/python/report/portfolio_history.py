@@ -25,6 +25,10 @@ from src.python.code_utils import (
     is_a_share_code,
     is_exchange_fund_code,
     is_hk_stock_code,
+    is_bond_fund_by_name,
+    is_qdii_extended,
+    is_otc_fund_by_name,
+    is_otc_code_overlap,
 )
 from src.python.fetcher.chain import _fetch_with_incremental_fallback
 
@@ -38,12 +42,6 @@ logger = logging.getLogger("invest")
 
 class PortfolioHistoryCalculator:
     """组合历史走势计算器（无状态，每次独立计算）。"""
-
-    # 债券基金名称关键词（用于排除路由到 OTC 净值链路）
-    # 注意：只放真正的债券品种关键词，不放基金公司名——公司名会误伤股票型基金
-    _BOND_FUND_KEYWORDS = (
-        "纯债", "短债", "中短债", "利率债", "信用债", "债券",
-    )
 
     def __init__(self, session_cache: dict[str, Any] | None = None) -> None:
         self._session_cache = session_cache or {}
@@ -68,12 +66,12 @@ class PortfolioHistoryCalculator:
         name = (holding_name or "").strip()
         _tag = f"  [{code} {name}]" if name else f"  [{code}]"
 
-        # 路由：按代码类型确定数据源
-        if is_a_share_code(code) or is_exchange_fund_code(code):
+        # 路由：按代码类型确定数据源（使用 code_utils 统一入口）
+        if is_exchange_fund_code(code) or is_a_share_code(code):
             bars = self._get_stock_history(code)
-            # 降级：00 开头 A 股/OTC 基金重叠区，股票历史全空时尝试基金历史
-            if not bars and code.startswith("00") and not is_exchange_fund_code(code):
-                logger.info("[history]%s K 线链路全部失败（该代码可能为场外基金），降级尝试基金净值链路", _tag)
+            # 降级：A 股/OTC 基金代码重叠区（00 开头），股票历史全空时尝试基金历史
+            if not bars and is_otc_code_overlap(code):
+                logger.info("[history]%s K 线链路全部失败（该代码为场外基金），降级尝试基金净值链路", _tag)
                 bars = self._get_fund_history(code)
                 if bars:
                     logger.info("[history]%s 降级成功——通过基金净值链路获取到历史数据", _tag)
@@ -84,11 +82,18 @@ class PortfolioHistoryCalculator:
         elif is_hk_stock_code(code):
             logger.info("[history]%s 港股通暂不支持历史走势，跳过", _tag)
             return None
-        elif self._is_bond_fund(name):
+        elif is_qdii_extended(name):
+            logger.info("[history]%s QDII 基金→基金净值链路", _tag)
+            bars = self._get_fund_history(code)
+        elif is_bond_fund_by_name(name):
             logger.info("[history]%s 债券基金→基金净值链路", _tag)
             bars = self._get_fund_history(code)
-        elif len(code) == 6 and code.isdigit():
+        elif is_otc_fund_by_name(name, code):
             logger.info("[history]%s OTC 基金→基金净值链路", _tag)
+            bars = self._get_fund_history(code)
+        elif len(code) == 6 and code.isdigit():
+            # 兜底：非 00 前缀的 6 位基金代码（如 011506、161725 等）
+            logger.info("[history]%s 基金→基金净值链路", _tag)
             bars = self._get_fund_history(code)
         else:
             logger.info("[history]%s 不支持的类型，跳过", _tag)
@@ -180,16 +185,24 @@ class PortfolioHistoryCalculator:
             warnings.append(f"部分持仓历史走势不可用（{success_count}/{total_holdings}）")
             status = "degraded"
 
-        # 合并为统一时间线
-        date_map: dict[str, float] = {}
-        fund_count_on_date: dict[str, int] = {}
-        for series in all_series:
-            for bar in series:
-                d = bar["date"]
-                date_map[d] = date_map.get(d, 0) + bar["value"]
-                fund_count_on_date[d] = fund_count_on_date.get(d, 0) + 1
+        # 合并为统一时间线（含 LOCF：净值未更新的标的沿用上次已知值）
+        # 例如 QDII 净值 T-1 滞后、场外基金净值比股票晚更新等，
+        # 若直接略过会导致该日组合市值偏低、收益/回撤异常放大
+        all_dates = sorted({d for series in all_series for b in series for d in [b["date"]]})
+        date_map: dict[str, float] = {d: 0.0 for d in all_dates}
+        fund_count_on_date: dict[str, int] = {d: 0 for d in all_dates}
 
-        sorted_dates = sorted(date_map.keys())
+        for series in all_series:
+            last_val = 0.0
+            series_by_date = {b["date"]: b["value"] for b in series}
+            for d in all_dates:
+                if d in series_by_date:
+                    last_val = series_by_date[d]
+                if last_val > 0:
+                    date_map[d] += last_val
+                    fund_count_on_date[d] += 1
+
+        sorted_dates = all_dates
         if not sorted_dates:
             return {"bars": [], "max_drawdown": 0, "max_drawdown_pct": 0,
                     "annualized_volatility": 0, "total_return": 0,
@@ -263,17 +276,19 @@ class PortfolioHistoryCalculator:
         annualized_vol = self._compute_annualized_volatility(daily_returns)
 
         # 计算总收益率（从 valid_start_idx 起算，避免早期数据覆盖不全导致虚高）
-        first_val = bars[valid_start_idx]["total_value"]
+        # 注意：sorted_dates 已在上面截断为 [valid_start_idx:valid_end_idx+1]，
+        # bars 基于截断后的 sorted_dates 构建，因此索引 0 即起算点
+        first_val = bars[0]["total_value"]
         last_val = bars[-1]["total_value"]
         total_return = last_val - first_val
         total_return_pct = (total_return / first_val * 100) if first_val > 0 else 0
 
         # 诊断：输出起止值明细（用于排查收益率异常）
-        _diagnose_return(bars, sorted_dates, valid_start_idx, fund_count_on_date,
+        _diagnose_return(bars, sorted_dates, 0, fund_count_on_date,
                          total_return_pct, len(all_series))
 
         # 质量校验（只校验收益率起算点之后的数据，避免新基金加入导致的跳变误报）
-        warnings.extend(_validate_bars(bars[valid_start_idx:]))
+        warnings.extend(_validate_bars(bars))
 
         return {
             "bars": bars,
@@ -284,7 +299,7 @@ class PortfolioHistoryCalculator:
             "annualized_volatility": round(annualized_vol, 4),
             "total_return": round(total_return, 2),
             "total_return_pct": round(total_return_pct, 2),
-            "data_start": sorted_dates[valid_start_idx],
+            "data_start": sorted_dates[0],
             "data_end": sorted_dates[-1],
             "status": status,
             "warnings": warnings,
@@ -316,11 +331,6 @@ class PortfolioHistoryCalculator:
         if bars:
             self._session_cache[cache_key] = bars
         return bars
-
-    @classmethod
-    def _is_bond_fund(cls, name: str) -> bool:
-        """根据名称判断是否为债券基金。"""
-        return any(kw in name for kw in cls._BOND_FUND_KEYWORDS)
 
     @staticmethod
     def _compute_annualized_volatility(daily_returns: list[float]) -> float:

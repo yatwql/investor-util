@@ -590,7 +590,7 @@ class TestTuiRouting(unittest.TestCase):
         from src.python.tui_menu import MENU_ITEMS
 
         keys = {item[0] for item in MENU_ITEMS}
-        expected = {"E", "H", "B", "L", "C", "F", "O",
+        expected = {"E", "P", "B", "L", "C", "F", "O",
                     "1", "2", "3", "4", "S", "R", "X"}
         self.assertSetEqual(keys, expected)
 

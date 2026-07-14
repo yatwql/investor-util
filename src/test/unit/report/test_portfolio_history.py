@@ -289,33 +289,3 @@ class TestValidateBars(unittest.TestCase):
             {"date": "2026-07-01", "close": 0.0},
         ])
         self.assertTrue(any("收盘价为 0" in w for w in warnings))
-
-
-class TestIsBondFund(unittest.TestCase):
-    """债券基金名称识别测试。"""
-
-    def _call(self, name: str) -> bool:
-        from src.python.report.portfolio_history import PortfolioHistoryCalculator
-        return PortfolioHistoryCalculator._is_bond_fund(name)
-
-    def test_chunzhai_matches(self):
-        """纯债 → True。"""
-        self.assertTrue(self._call("招商鑫福中短债A"))
-
-    def test_duanzhai_matches(self):
-        """短债 → True。"""
-        self.assertTrue(self._call("博时安盈短债A"))
-
-    def test_bond_in_name_matches(self):
-        """债券 → True。"""
-        self.assertTrue(self._call("某债券基金"))
-
-    def test_non_bond_no_match(self):
-        """非债券名称 → False。"""
-        self.assertFalse(self._call("中欧医疗健康混合"))
-
-    def test_company_name_no_match(self):
-        """基金公司名不匹配 → False（防止误伤）。"""
-        self.assertFalse(self._call("易方达蓝筹精选"))
-        self.assertFalse(self._call("广发多因子"))
-        self.assertFalse(self._call("招商中证白酒"))

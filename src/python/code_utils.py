@@ -300,6 +300,23 @@ def is_otc_fund_by_name(name: str, code: str) -> bool:
     return any(kw in name for kw in _OTC_FUND_NAME_KW)
 
 
+def is_otc_code_overlap(code: str) -> bool:
+    """判断 6 位代码是否处于 A 股/OTC 基金代码重叠区（00 开头）。
+
+    OTC 基金代码以 00 开头，与深市主板（000~004）和中小板（002/003）
+    股票代码区间重叠。本函数仅检测前缀，不验证名称，
+    用于降级路由中判断"是否值得尝试基金净值 API"的快速预筛。
+
+    Args:
+        code: 6 位证券代码
+
+    Returns:
+        True 表示代码处于重叠区间（00 开头）
+    """
+    raw = _strip_prefix(code)
+    return bool(raw and raw.startswith("00"))
+
+
 def is_fund_holding(name: str, code: str, account: str) -> bool:
     """判断持仓是否需要基金业绩分析。
 

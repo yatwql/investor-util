@@ -6,6 +6,23 @@
 
 ---
 
+## [0.5.4] - 2026-07-14
+
+### Fixed
+
+- **截断后索引偏移导致收益率/诊断取值错误**：`portfolio_history.py` 在 `sorted_dates` 截断后，后续仍使用截断前的 `valid_start_idx` 访问已截断的数组（`bars[valid_start_idx]`、`sorted_dates[valid_start_idx]`），导致取值偏移、收益率计算错误。已修复为 `bars[0]` / `sorted_dates[0]`。
+- **`_validate_bars` 双重截断**：`bars[valid_start_idx:]` 在 `bars` 已截断的基础上再次偏移，跳过有效区间头部的数据校验。已修复为直接传入 `bars`。
+
+### Changed
+
+- **C1 合规（代码类型判定中心化）**：`portfolio_history.py` 全面改用 `code_utils` 函数进行资产代码路由：
+  - OTC 基金兜底路由：`len(code)==6 and code.isdigit()` → `is_otc_fund_by_name(name, code)`
+  - 债券基金路由：`self._is_bond_fund(name)` → `is_bond_fund_by_name(name)`
+  - QDII 路由：新增 `is_qdii_extended(name)` 前置判定
+  - 港股路由：新增 `is_hk_stock_code(code)` 跳过港股
+  - 降级路径中移除 `code.startswith("00")`（`is_otc_fund_by_name` 内部已处理）
+- **移除死代码**：`_BOND_FUND_KEYWORDS` 类属性和 `_is_bond_fund()` 方法（路由已通过 `code_utils.is_bond_fund_by_name()` 实现，不再使用）。
+
 ## [0.5.3] - 2026-07-14
 
 ### Fixed
