@@ -1,12 +1,17 @@
 {
+  // ── A. 路径与文件 ──
   "holdings_dir": "data/holdings",
   "holdings_filename": "个人投资持仓信息.xlsx",
   "output_dir": "reports",
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
+
+  // ── B. 板块可见性（关闭后对应页签/章节完全隐藏）──
   "enable_b_series": false,
   "enable_news": true,
   "enable_history": true,
+
+  // ── C. 数据源与提供商 ──
   "news_top_count": 300,
   "news_sources": {
     "sina": true,
@@ -16,10 +21,9 @@
     "akshare": true
   },
   "preferred_provider": {},
-  "market_hour_aware": [
-    "price",
-    "index"
-  ],
+
+  // ── D. 市场时段与缓存 ──
+  "market_hour_aware": ["price", "index"],
   "market_hour_ttl": 30,
   "market_hours": {
     "start": "09:30",
@@ -52,6 +56,8 @@
     "history_fund_otc": 2592000,
     "calendar": 1209600
   },
+
+  // ── E. 行为调优 ──
   "default_menu_key": "L",
   "report_section_order": {},
   "early_warning": {
@@ -60,26 +66,19 @@
     "sentiment_top_n": 10
   },
   "degradation": {
-    "t2": {
-      "unreachable_threshold": 2,
-      "empty_data_threshold": 3,
-      "stale_days": 3
-    },
-    "t3": {
-      "unreachable_threshold": 2,
-      "empty_data_threshold": 3,
-      "stale_days": 14
-    },
-    "t4": {
-      "unreachable_threshold": 1,
-      "empty_data_threshold": 1,
-      "stale_days": 14
-    }
+    "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
+    "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
+    "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}
   },
+
+  // ── F. 业绩基准 ──
   "user_fund_benchmarks": {},
+
+  // ── G. 组合历史走势与持仓快照 ──
   "history": {
     "analysis": "auto",
     "snapshot_retention_days": 60,
-    "snapshot_max_count": 365
+    "snapshot_max_count": 365,
+    "coverage_threshold": 0.8
   }
 }

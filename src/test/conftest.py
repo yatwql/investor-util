@@ -94,7 +94,7 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     持仓快照（data/history/snapshots/）等。
 
     机制：
-    - 替换 _defaults._CONFIG_FILE → tmp_path/data/config/config.json
+    - 替换 _config_defaults._CONFIG_FILE → tmp_path/data/config/config.json
     - 替换 cache._CACHE_DIR → tmp_path/data/cache
     - 替换 HISTORY_SNAPSHOT_DIR → tmp_path/data/history/snapshots
     - 清除 config 内存缓存，使 get_config() 从临时路径读取
@@ -104,7 +104,7 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     测试如需使用真实文件读写，应在测试类中自行 setup 隔离。
     """
     monkeypatch.setattr(
-        "src.python.config._defaults._CONFIG_FILE",
+        "src.python.config._config_defaults._CONFIG_FILE",
         str(tmp_path / "data/config/config.json"),
     )
     # C13: cache 拆分重构后 _CACHE_DIR 存在于 _paths/_stats/_cleanup/_groups/__init__ 等处

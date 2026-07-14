@@ -10,7 +10,8 @@ import threading
 from typing import Any
 
 from src.python.config import _comments
-from src.python.config import _defaults
+from src.python.config import _config_defaults
+from src.python.config._llm_defaults import _get_default_llm_settings_template
 from src.python.registry import get_known_enabled_llm_keys, get_known_llm_settings_keys, get_report_section_keys
 
 logger = logging.getLogger("invest")
@@ -39,10 +40,10 @@ def get_config() -> dict:
     """
     global _config_cache, _config_mtime, _config_size
 
-    config_path = _defaults.get_config_path()
+    config_path = _config_defaults.get_config_path()
     if not os.path.exists(config_path):
         _config_cache = None
-        return dict(_defaults._DEFAULT_CONFIG)
+        return dict(_config_defaults._DEFAULT_CONFIG)
 
     with _config_lock:
         try:
@@ -60,10 +61,10 @@ def get_config() -> dict:
                 raw = f.read()
                 cleaned = _comments._strip_json_comments(raw)
                 config = json.loads(cleaned)
-            merged = dict(_defaults._DEFAULT_CONFIG)
+            merged = dict(_config_defaults._DEFAULT_CONFIG)
             # 过滤 null 值：不允许 config.json 中的 null 覆盖默认值
             for key, val in config.items():
-                if val is None and key in _defaults._DEFAULT_CONFIG:
+                if val is None and key in _config_defaults._DEFAULT_CONFIG:
                     continue
                 merged[key] = val
             _config_cache = merged
@@ -77,7 +78,7 @@ def get_config() -> dict:
         except (OSError, json.JSONDecodeError):
             _config_cache = None
             logger.warning("配置文件 %s 读取失败，已回退到默认配置", config_path)
-            return dict(_defaults._DEFAULT_CONFIG)
+            return dict(_config_defaults._DEFAULT_CONFIG)
 
 
 def set_config(key: str, value: Any) -> None:
@@ -95,7 +96,7 @@ def set_config(key: str, value: Any) -> None:
     config = get_config()
     config[key] = value
 
-    config_path = _defaults.get_config_path()
+    config_path = _config_defaults.get_config_path()
     config_dir = os.path.dirname(config_path)
 
     os.makedirs(config_dir, exist_ok=True)
@@ -124,7 +125,7 @@ def init_config() -> None:
     """
     global _config_cache, _config_mtime, _config_size
 
-    config_path = _defaults.get_config_path()
+    config_path = _config_defaults.get_config_path()
     if os.path.exists(config_path):
         config = get_config()
         validate_config(config)
@@ -132,7 +133,7 @@ def init_config() -> None:
     config_dir = os.path.dirname(config_path)
     os.makedirs(config_dir, exist_ok=True)
     with open(config_path, "w", encoding="utf-8") as f:
-        f.write(_defaults._get_default_config_template())
+        f.write(_config_defaults._get_default_config_template())
     _config_cache = None
     _config_mtime = 0
     _config_size = 0
@@ -497,104 +498,6 @@ def _check_unknown_llm_keys(settings: dict) -> None:
         )
 
 
-def _get_default_llm_settings_template() -> str:
-    return (
-        '{\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 全局设置\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  "max_retries": 2,\n'
-        '  "llm_max_concurrency": 3,\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 模块开关 — 控制各 LLM 分析功能的启用/停用\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  "enabled_llm": {\n'
-        '    "global_macro": true,\n'
-        '    "expert_review": true,\n'
-        '    "health_check": true,\n'
-        '    "penetration_deep": true,\n'
-        '    "news_correlation": false\n'
-        '  },\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 全球政经局势 — global_macro\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  "system_prompt_global_macro": null,\n'
-        '  "model_global_macro": null,\n'
-        '  "temperature_global_macro": 0.3,\n'
-        '  "max_tokens_global_macro": 2048,\n'
-        '  "timeout_global_macro": 60,\n'
-        '  "cache_enabled_global_macro": true,\n'
-        '  "output_brief_global_macro": false,\n'
-        '  "thinking_enabled_global_macro": false,\n'
-        '  "thinking_budget_global_macro": 4000,\n'
-        '  "reasoning_effort_global_macro": "high",\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 智囊团深度复盘 — expert_review\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  "system_prompt_expert_review": null,\n'
-        '  "model_expert_review": null,\n'
-        '  "temperature_expert_review": 0.8,\n'
-        '  "max_tokens_expert_review": 8192,\n'
-        '  "timeout_expert_review": 120,\n'
-        '  "cache_enabled_expert_review": true,\n'
-        '  "output_brief_expert_review": false,\n'
-        '  "thinking_enabled_expert_review": true,\n'
-        '  "thinking_budget_expert_review": 16000,\n'
-        '  "reasoning_effort_expert_review": "high",\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 持仓体检报告 — health_check\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  "system_prompt_health_check": null,\n'
-        '  "model_health_check": null,\n'
-        '  "temperature_health_check": 0.5,\n'
-        '  "max_tokens_health_check": 4096,\n'
-        '  "timeout_health_check": 120,\n'
-        '  "cache_enabled_health_check": true,\n'
-        '  "output_brief_health_check": false,\n'
-        '  "thinking_enabled_health_check": true,\n'
-        '  "thinking_budget_health_check": 12000,\n'
-        '  "reasoning_effort_health_check": "high",\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 穿透深度分析 — penetration_deep\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  "system_prompt_penetration_deep": null,\n'
-        '  "model_penetration_deep": null,\n'
-        '  "temperature_penetration_deep": 0.4,\n'
-        '  "max_tokens_penetration_deep": 4096,\n'
-        '  "timeout_penetration_deep": 90,\n'
-        '  "cache_enabled_penetration_deep": true,\n'
-        '  "output_brief_penetration_deep": false,\n'
-        '  "thinking_enabled_penetration_deep": false,\n'
-        '  "thinking_budget_penetration_deep": 8000,\n'
-        '  "reasoning_effort_penetration_deep": "high",\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 财经新闻热点与持仓关联分析 — news_correlation\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  "system_prompt_news_correlation": null,\n'
-        '  "model_news_correlation": null,\n'
-        '  "temperature_news_correlation": 0.1,\n'
-        '  "max_tokens_news_correlation": 2000,\n'
-        '  "timeout_news_correlation": 60,\n'
-        '  "cache_enabled_news_correlation": true,\n'
-        '  "thinking_enabled_news_correlation": false,\n'
-        '  "thinking_budget_news_correlation": 4000,\n'
-        '  "reasoning_effort_news_correlation": "high",\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 计价配置（可选）— 仅用于覆盖 constants.py 默认定价\n'
-        '  // 单一来源：constants.py MODEL_PRICING 是唯一默认定价表\n'
-        '  // 此段仅在需要临时覆盖某模型价格时取消注释，无需在此维护全量\n'
-        '  // "pricing": {\n'
-        '  //   "currency": "CNY",\n'
-        '  // }\n'
-        '  // ═══════════════════════════════════════════\n'
-        '}\n'
-    )
 
 
 def _ensure_llm_settings_file() -> None:

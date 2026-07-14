@@ -34,7 +34,7 @@ class TestConfigAtomicWrite(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_atomic_write_creates_config(self, mock_get_path):
         """set_config → 目标文件被原子写入。"""
         mock_get_path.return_value = self.config_path
@@ -47,7 +47,7 @@ class TestConfigAtomicWrite(unittest.TestCase):
             payload = json.load(f)
         self.assertEqual(payload["test_key"], "hello")
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_tmp_file_cleaned_after_write(self, mock_get_path):
         """写入完成后临时文件被清理。"""
         mock_get_path.return_value = self.config_path
@@ -58,7 +58,7 @@ class TestConfigAtomicWrite(unittest.TestCase):
         tmp_files = [f for f in os.listdir(self.tmp.name) if f.endswith(".tmp")]
         self.assertEqual(len(tmp_files), 0, "临时文件应在写入后被清理")
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_atomic_write_overwrites_existing(self, mock_get_path):
         """多次写入 → 内容被覆盖更新，config 文件不变。"""
         mock_get_path.return_value = self.config_path
@@ -71,7 +71,7 @@ class TestConfigAtomicWrite(unittest.TestCase):
         self.assertEqual(config.get("key_a"), "first")
         self.assertEqual(config.get("key_b"), "second")
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_atomic_write_preserves_other_keys(self, mock_get_path):
         """set_config 仅更新单个键，其他键不受影响。"""
         mock_get_path.return_value = self.config_path
@@ -82,7 +82,7 @@ class TestConfigAtomicWrite(unittest.TestCase):
         config = get_config()
         self.assertEqual(config.get("keep_me"), "preserved")
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     @patch("src.python.config._core.os.replace")
     def test_windows_permission_error_raises(self, mock_replace, mock_get_path):
         """Windows PermissionError → config.set_config 向上抛（异常由外层处理）。
@@ -119,7 +119,7 @@ class TestConfigAtomicWrite(unittest.TestCase):
             payload = json.load(f)
         self.assertEqual(payload.get("original"), True)
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_set_config_valid_json(self, mock_get_path):
         """写入的 config.json 格式合法（ensure_ascii=False, indent=2）。"""
         mock_get_path.return_value = self.config_path
@@ -151,7 +151,7 @@ class TestConfigAtomicWriteFailure(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     @patch("src.python.config._core.tempfile.mkstemp")
     def test_mkstemp_failure_raised(self, mock_mkstemp, mock_get_path):
         """tempfile.mkstemp 失败 → 异常向外传播。"""
@@ -162,7 +162,7 @@ class TestConfigAtomicWriteFailure(unittest.TestCase):
         with self.assertRaises(OSError):
             set_config("fail_key", "value")
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     @patch("src.python.config._core.tempfile.mkstemp")
     def test_temp_file_cleaned_on_exception(self, mock_mkstemp, mock_get_path):
         """mkstemp 成功但后续写入失败 → 临时文件被清理。"""
@@ -180,7 +180,7 @@ class TestConfigAtomicWriteFailure(unittest.TestCase):
         tmp_files = [f for f in os.listdir(self.tmp.name) if f.endswith(".tmp")]
         self.assertEqual(len(tmp_files), 0, "失败后临时文件应被清理")
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_empty_config_dir_created(self, mock_get_path):
         """config 父目录不存在 → 自动创建。"""
         nested_path = os.path.join(self.tmp.name, "subdir", "nested", "config.json")
@@ -205,7 +205,7 @@ class TestConfigCacheInvalidation(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_get_config_reflects_latest_set(self, mock_get_path):
         """set_config 后 get_config 返回最新值。"""
         mock_get_path.return_value = self.config_path
@@ -217,7 +217,7 @@ class TestConfigCacheInvalidation(unittest.TestCase):
         set_config("key", "updated")
         self.assertEqual(get_config().get("key"), "updated")
 
-    @patch("src.python.config._defaults.get_config_path")
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_config_mtime_change_detected(self, mock_get_path):
         """外部修改 config.json → get_config 重新读取。"""
         mock_get_path.return_value = self.config_path

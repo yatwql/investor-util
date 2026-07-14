@@ -29,12 +29,12 @@ class TestGetConfig(unittest.TestCase):
 
     def setUp(self):
         # 备份原始 _CONFIG_FILE，用临时目录替代
-        self._orig_config = cfg._defaults._CONFIG_FILE
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
         self.tmp = tempfile.TemporaryDirectory()
-        cfg._defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
 
     def tearDown(self):
-        cfg._defaults._CONFIG_FILE = self._orig_config
+        cfg._config_defaults._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
     @pytest.mark.smoke
@@ -51,7 +51,7 @@ class TestGetConfig(unittest.TestCase):
     def test_corrupted_json_returns_defaults(self):
         """配置文件损坏 → 返回默认值。"""
         os.makedirs(self.tmp.name, exist_ok=True)
-        with open(cfg._defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             f.write("{invalid json!!!")
         result = cfg.get_config()
         self.assertEqual(result["holdings_dir"], "data/holdings")
@@ -59,7 +59,7 @@ class TestGetConfig(unittest.TestCase):
     def test_empty_file_returns_defaults(self):
         """配置文件为空 → 返回默认值。"""
         os.makedirs(self.tmp.name, exist_ok=True)
-        with open(cfg._defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             f.write("")
         result = cfg.get_config()
         self.assertEqual(result["holdings_dir"], "data/holdings")
@@ -68,7 +68,7 @@ class TestGetConfig(unittest.TestCase):
         """部分配置 → 未配置项用默认值补齐。"""
         os.makedirs(self.tmp.name, exist_ok=True)
         partial = {"holdings_dir": "/custom/path"}
-        with open(cfg._defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(partial, f)
         result = cfg.get_config()
         self.assertEqual(result["holdings_dir"], "/custom/path")
@@ -87,7 +87,7 @@ class TestGetConfig(unittest.TestCase):
             "cache_ttl": {"price": 3600},
             "preferred_provider": {},
         }
-        with open(cfg._defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f)
         result = cfg.get_config()
         self.assertEqual(result["holdings_dir"], "/a")
@@ -98,20 +98,20 @@ class TestInitConfig(unittest.TestCase):
     """init_config 的边界场景测试。"""
 
     def setUp(self):
-        self._orig_config = cfg._defaults._CONFIG_FILE
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
         self.tmp = tempfile.TemporaryDirectory()
-        cfg._defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
 
     def tearDown(self):
-        cfg._defaults._CONFIG_FILE = self._orig_config
+        cfg._config_defaults._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
     @pytest.mark.smoke
     def test_init_creates_default_config(self):
         """初始化 → 创建包含默认值的配置文件。"""
-        self.assertFalse(os.path.exists(cfg._defaults._CONFIG_FILE))
+        self.assertFalse(os.path.exists(cfg._config_defaults._CONFIG_FILE))
         cfg.init_config()
-        self.assertTrue(os.path.exists(cfg._defaults._CONFIG_FILE))
+        self.assertTrue(os.path.exists(cfg._config_defaults._CONFIG_FILE))
         data = cfg.get_config()
         self.assertEqual(data["holdings_dir"], "data/holdings")
 
@@ -119,31 +119,31 @@ class TestInitConfig(unittest.TestCase):
         """配置文件已存在 → 不覆盖。"""
         os.makedirs(self.tmp.name, exist_ok=True)
         existing = {"holdings_dir": "/manual"}
-        with open(cfg._defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(existing, f)
         cfg.init_config()
-        with open(cfg._defaults._CONFIG_FILE, encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
             data = json.load(f)
         self.assertEqual(data["holdings_dir"], "/manual")
 
     def test_init_nonexistent_dir(self):
         """配置目录不存在 → 创建后写入。"""
         non_exist = os.path.join(self.tmp.name, "sub", "config")
-        cfg._defaults._CONFIG_FILE = os.path.join(non_exist, "config.json")
+        cfg._config_defaults._CONFIG_FILE = os.path.join(non_exist, "config.json")
         cfg.init_config()
-        self.assertTrue(os.path.exists(cfg._defaults._CONFIG_FILE))
+        self.assertTrue(os.path.exists(cfg._config_defaults._CONFIG_FILE))
 
 
 class TestSetConfig(unittest.TestCase):
     """set_config 的异常场景测试。"""
 
     def setUp(self):
-        self._orig_config = cfg._defaults._CONFIG_FILE
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
         self.tmp = tempfile.TemporaryDirectory()
-        cfg._defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
 
     def tearDown(self):
-        cfg._defaults._CONFIG_FILE = self._orig_config
+        cfg._config_defaults._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
     @pytest.mark.smoke
@@ -390,20 +390,20 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
     """
 
     def setUp(self):
-        self._orig_config = cfg._defaults._CONFIG_FILE
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
         self.tmp = tempfile.TemporaryDirectory()
-        cfg._defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
         cfg.init_config()
 
     def tearDown(self):
-        cfg._defaults._CONFIG_FILE = self._orig_config
+        cfg._config_defaults._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
     def test_replace_crash_preserves_original(self):
         """os.replace 抛出异常 → 原配置文件内容不变。"""
         # 先写入一个已知值
         cfg.set_config("holdings_dir", "/original/path")
-        original_content = open(cfg._defaults._CONFIG_FILE, encoding="utf-8").read()
+        original_content = open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8").read()
 
         # 模拟 os.replace 崩溃
         with patch("src.python.config._core.os.replace", side_effect=OSError("disk full")):
@@ -411,13 +411,13 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
                 cfg.set_config("holdings_dir", "/new/path")
 
         # 文件内容应保持原样
-        with open(cfg._defaults._CONFIG_FILE, encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
             self.assertEqual(f.read(), original_content)
 
     def test_replace_crash_tmp_file_cleaned(self):
         """os.replace 崩溃后临时文件被清理。"""
         cfg.set_config("holdings_dir", "/original")
-        config_dir = os.path.dirname(cfg._defaults._CONFIG_FILE)
+        config_dir = os.path.dirname(cfg._config_defaults._CONFIG_FILE)
         tmp_files_before = [f for f in os.listdir(config_dir) if f.endswith(".tmp")]
 
         with patch("src.python.config._core.os.replace", side_effect=OSError("crash")):
@@ -442,7 +442,7 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
                 cfg.set_config("output_dir", "/reports/crashed")
 
         # 直接读取文件内容验证（内存缓存可能已被 crash 污染）
-        with open(cfg._defaults._CONFIG_FILE, encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
             payload = json.load(f)
         self.assertEqual(payload.get("output_dir"), "/reports/original")
 
@@ -451,7 +451,7 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
         cfg.set_config("holdings_dir", "/before/crash")
 
         # 模拟断电：手动创建临时文件但不执行 replace
-        config_dir = os.path.dirname(cfg._defaults._CONFIG_FILE)
+        config_dir = os.path.dirname(cfg._config_defaults._CONFIG_FILE)
         fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"holdings_dir": "/crash/data"}, f)
@@ -482,7 +482,7 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
                 cfg.set_config("holdings_dir", "/unsafe")
 
         # 旧值依然可用（直接读文件避免内存缓存污染）
-        with open(cfg._defaults._CONFIG_FILE, encoding="utf-8") as f:
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
             payload = json.load(f)
         self.assertEqual(payload.get("holdings_dir"), "/safe/value")
 

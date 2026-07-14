@@ -131,7 +131,7 @@ def _get_default_config_template() -> str:
         '  // ── F. 业绩基准 ──\n'
         '  "user_fund_benchmarks": {},\n'
         '\n'
-        '  // ── G. 持仓快照 ──\n'
+        '  // ── G. 组合历史走势与持仓快照 ──\n'
         '  "history": {\n'
         '    "analysis": "off",\n'
         '    "snapshot_retention_days": 60,\n'

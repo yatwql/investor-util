@@ -233,7 +233,7 @@ class TestJsonPrototypePollutionY6(unittest.TestCase):
             config_path = os.path.join(tmpdir, "config.json")
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump({"__proto__": {"admin": True}, "output_dir": "reports"}, f)
-            with patch("src.python.config._defaults._CONFIG_FILE", config_path):
+            with patch("src.python.config._config_defaults._CONFIG_FILE", config_path):
                 config = get_config()
             self.assertIn("__proto__", config)
             self.assertEqual(config["output_dir"], "reports")

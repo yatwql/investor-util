@@ -27,14 +27,14 @@ class TestFirstRunGuidance(unittest.TestCase):
     def tearDown(self):
         if self._orig_config is not None:
             import src.python.config as cfg
-            cfg._defaults._CONFIG_FILE = self._orig_config
+            cfg._config_defaults._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
     def test_missing_config_shows_guidance(self):
         """首次启动配置不存在 → 自动初始化并提示。"""
         import src.python.config as cfg
-        self._orig_config = cfg._defaults._CONFIG_FILE
-        cfg._defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
         cfg._clear_config_cache()
 
         # 配置不存在时 get_config 返回默认值不崩溃
@@ -46,17 +46,17 @@ class TestFirstRunGuidance(unittest.TestCase):
         """配置目录不存在 → init_config 自动创建。"""
         import src.python.config as cfg
         nested = os.path.join(self.tmp.name, "sub", "config")
-        cfg._defaults._CONFIG_FILE = os.path.join(nested, "config.json")
+        cfg._config_defaults._CONFIG_FILE = os.path.join(nested, "config.json")
         self.assertFalse(os.path.exists(nested))
         cfg.init_config()
-        self.assertTrue(os.path.exists(cfg._defaults._CONFIG_FILE))
+        self.assertTrue(os.path.exists(cfg._config_defaults._CONFIG_FILE))
 
     def test_friendly_warning_on_corrupted_config(self):
         """损坏的配置 → 输出警告并用默认值。"""
         import src.python.config as cfg
-        self._orig_config = cfg._defaults._CONFIG_FILE
-        cfg._defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
-        with open(cfg._defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             f.write("{invalid}")
         cfg._clear_config_cache()
         with patch("logging.Logger.warning") as mock_warn:
@@ -72,8 +72,8 @@ class TestFirstRunGuidance(unittest.TestCase):
     def test_first_run_menu_options_available(self):
         """首次运行时菜单 [C]/[F] 配置选项应可用。"""
         import src.python.config as cfg
-        self._orig_config = cfg._defaults._CONFIG_FILE
-        cfg._defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
         cfg._clear_config_cache()
         result = cfg.get_config()
         self.assertIsNotNone(result.get("holdings_dir"))
