@@ -6,6 +6,16 @@
 
 ---
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+### Changed
+
+### Docs
+
 ## [0.5.4] - 2026-07-14
 
 ### Fixed
