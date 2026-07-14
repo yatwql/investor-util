@@ -23,6 +23,10 @@
   - 降级路径中移除 `code.startswith("00")`（`is_otc_fund_by_name` 内部已处理）
 - **移除死代码**：`_BOND_FUND_KEYWORDS` 类属性和 `_is_bond_fund()` 方法（路由已通过 `code_utils.is_bond_fund_by_name()` 实现，不再使用）。
 
+### Docs
+
+- **plan.md**：新增 [P3] I. 组合历史走势与基准指数比对功能提议。
+
 ## [0.5.3] - 2026-07-14
 
 ### Fixed
