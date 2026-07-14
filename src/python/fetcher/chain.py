@@ -298,6 +298,15 @@ def _fetch_with_incremental_fallback(
     new_data = _try_providers(providers, registry, chain_name, code, days, last_cached_date)
 
     if new_data:
+        # 判断 provider 是否实际支持增量获取。
+        # 若新数据起点 ≤ 缓存起点，说明 provider 未按 start_from 过滤
+        #（如 OTC 基金 fetch_fund_nav_history 始终全量返回），
+        # 直接写入新数据，跳过合并与重叠检测。
+        if cached and new_data and new_data[0].get("date", "") <= cached[0].get("date", ""):
+            logger.debug("[%s] %s provider 全量返回，直接使用新数据", chain_name, code)
+            cache_set(cache_key, new_data)
+            return new_data[-days:]
+
         merged = _merge_by_date(cached, new_data)
         needs_refresh = False
         try:
