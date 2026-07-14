@@ -12,8 +12,8 @@
 | `standard` | 2285 | ~25s |
 | `scenario` | **276** | **~6min** |
 | `regression` | **276** | **~6min** |
-| `dev-verify` | **2407** | **~2min** |
-| `verify` | **1043** | **~8min** |
+| `dev-verify` | **815** | **~1min** |
+| `verify` | **1775** | **~8min** |
 | `integration` | 296 | ~50s |
 | `edge` | 335 | ~15s |
 | `data` | 69 | ~10s |
