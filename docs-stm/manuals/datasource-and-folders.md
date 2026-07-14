@@ -62,7 +62,7 @@ investor-util/
 │   │   ├── tui_menu.py               # 菜单交互 — 菜单定义、渲染、导航、快捷键映射
 │   │   ├── handlers_cache.py         # 缓存管理命令 — 菜单 [1]~[4] 的实现：刷新缓存、清理过期、统计
 │   │   ├── handlers_config.py        # 配置管理命令 — 菜单 [C]/[F]/[O]/[S]/[R] 的实现：目录/文件/LLM 模块启停
-│   │   ├── handlers_report.py        # 报告生成命令 — 菜单 [E]/[H]/[B]/[L] 的实现：生成各类型报告
+│   │   ├── handlers_report.py        # 报告生成命令 — 菜单 [E]/[B]/[L] 的实现：生成各类型报告
 │   │   │
 │   │   ├── fetcher/                  # 数据获取调度层，负责 Provider 路由分发与缓存预热
 │       │   │   ├── __init__.py           # 子包标记（空文件）
@@ -185,7 +185,7 @@ investor-util/
 │       │   ├── handlers/                  # 菜单命令处理测试（31 项）
 │       │   │   ├── __init__.py            # 子包标记（空文件）
 │       │   │   ├── test_handlers_cache.py  # 缓存管理命令测试 — 刷新/清理/统计（涉及 registry 和 fetcher）
-│       │   │   └── test_handlers_report.py # 报告生成命令测试 — 菜单 E/H/B/L 的场景覆盖
+│       │   │   └── test_handlers_report.py # 报告生成命令测试 — 菜单 E/B/L 的场景覆盖
 │       │   ├── llm/                      # LLM 相关测试（480 项）
 │       │   │   ├── __init__.py           # 子包标记（空文件）
 │       │   │   ├── test_api.py           # LLM API 调用 — 重试/熔断/回退/截断/Provider 路由（44 项）
@@ -370,6 +370,8 @@ investor-util/
 │   │   ├── archived_plan.0.3.x.md             # v0.3.x 实现计划归档（D-8b/D-10/D-11 审查修复）
 │   │   ├── archived_review-findings.0.3.x.md  # v0.3.x 自审问题记录归档（D-9/D-10/D-11 等 6 条）
 │   │   ├── archived-data-source-pre-study.md  # 数据源预研笔记（已归档，原位于 plan/notes/）
+│   │   ├── report-board-visibility-configable/    # 📁 报告板块可见性可配置设计归档
+│   │   │   └── g-board-visibility-iteration-plan.md  # G. 报告板块可见性可配置 10 轮迭代计划（已归档）
 │   │   ├── test-runtime-optimization/         # 📁 测试可扩展性优化设计归档
 │   │   │   └── A5-test-runtime-optimization.md # 测试运行时可扩展性优化设计（已归档）
 │   │   ├── fund-deep-analysis/                # 📁 基金深度分析设计归档
@@ -405,8 +407,7 @@ investor-util/
 │   │   │   └── R-207-summary-llm-usage-split-plan.md # summary.py LLM 用量拆分（已归档）
 │   │   └── portfolio-history-comparison/              # 📁 组合历史走势设计归档
 │   │       └── F-portfolio-history-comparison.md     # 组合历史走势计划与技术设计（已归档）
-│   ├── plan/                         # 计划与设计文件
-│   │   └── g-board-visibility-iteration-plan.md  # G. 报告板块可见性可配置 10 轮迭代计划
+│   ├── plan/                         # 计划与设计文件（所有计划文件已归档至 archive/）
 │   ├── manuals/                      # 用户文档分册
 │   │   ├── how-to-start.md           # 快速开始 — 启动方式、持仓格式、菜单操作说明
 │   │   ├── how-to-config.md          # 配置指南 — config.json 字段说明 + cache_ttl + 缓存分组
