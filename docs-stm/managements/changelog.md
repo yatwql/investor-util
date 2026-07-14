@@ -6,24 +6,61 @@
 
 ---
 
-## [0.4.4] - 2026-07-13
+## [Unreleased]
+
+### Changed
+
+- **归档目录重组**：`archive/g-board-visibility-iteration-plan.md` 迁入 `archive/report-board-visibility-configable/` 子目录，保持与其它多文件归档一致的目录结构。
+
+### Docs
+
+- **datasource-and-folders.md**：目录树中 `g-board-visibility-iteration-plan.md` 单文件引用更新为 `report-board-visibility-configable/` 目录+子文件层级。
+
+---
+
+## [0.4.5] - 2026-07-14
+
+### Added
+
+- **报告板块可见性可配置（P4 G 任务）**：新增 3 个配置字段 `enable_b_series`/`enable_news`/`enable_history`（默认 `true`），控制 B 系列基金深度分析（#6~9）、新闻与预警（#10~11）、历史走势（#16~17）在报告中的显隐。
+- **TUI 菜单 [P] 配置报告板块可见性**：交互子菜单切换 3 个板块的启停，实时写入 config.json。
+- **两层可见性模型**：板块可见性 = board 层（用户配置）AND data 层（运行时数据可用性），避免"用户开启了但没有数据时页签静默消失"的缺陷。
+- **连续重新编号**：报告对当前可见模块重新编排连续序号，隐藏模块不留下空洞；`llm_usage` 强制末位。
+- **`_capture_snapshot()` / `_fetch_history_data()` 共享函数提取**：消除 `_cmd_generate_both()` 和 `_cmd_generate_full()` 中 ~92 行 F1+F2 重复代码。
+- **数据获取条件跳过**：B/L 菜单下 board 关闭时跳过对应数据获取（省流量/Token/CPU）。
+- **F1 快照始终执行**：`enable_history=false` 时 F1 快照仍自动保存，确保快照链不断裂。
+
+### Changed
+
+- **`create_sheets()` 签名重构**：`include_news`→`enable_news`（board 层）+ `news_data_available`（data 层）；新增 `enable_history`、`enable_llm`；移除 `include_b_series` 与旧 `include_news` 的跟随联动逻辑。
+- **`generate_excel_report()` 签名更新**：移除 `include_b_series: bool | None`；新增 `enable_b_series`/`enable_news_board`/`enable_history` 三个独立 board 层参数。
+- **`_compute_section_visibility()` 实现两层模型**：新增 `enable_news`/`enable_b_series`/`enable_history`/`enable_llm` board 层参数，与 data 层 `data_flags` 合并计算可见性。
+- **H 菜单移除**（原"生成基础版HTML分析报告"）：`_cmd_generate_html()` 函数已删除，B 菜单替代提供 HTML 生成能力。
+- **E 菜单不受 board 影响**：基础版 Excel 获取范围不变（永远不拉 news/B/history）。
 
 ### Fixed
 
+- **`html_writer.py` `_compute_section_visibility()` 调用缺少闭合括号**：添加缺失的 `)`，修复 SyntaxError。
 - **chain.py**：修复 `_validate_continuity()` 中 `cached[-2]`→`cached[-1]` 逻辑错误及 `cache_set` 不支持 `ttl` 参数导致的 TypeError；调用处包裹 try/except。修复 `_fetch_with_incremental_fallback()` 中 tiantian 返回空列表 `[]` 时直接 `break` 不到 fallback provider 的问题——新增 `if not new_data: continue` 空数据检测，使 eastmoney 备用链路在 QDII/债券等基金上能被正确调用。
 - **eastmoney.py**：修复 `fetch_fund_nav_history()` 中 `pageSize=365` 超东方财富 API 上限（实测 ≥202 即返回 null）导致全部历史净值获取失败的问题。改为 `pageSize=20` + 分页循环（页间 0.3s 防限流），最多 10 页（200 条≈10 个月）。
 - **portfolio_history.py**：修复累计收益率因不同持仓数据起止日期不一致（QDII 基金最早数据仅到 2025-09、债券基金仅到 2026-03）导致 `first_val` 偏小、收益率虚高的问题。改为从 ≥80% 持仓都有数据的日期起算收益率，早期数据仍保留在走势图上但排除出收益率计算。
 - **test_registry.py**：`test_cache_prefix_modules_have_groups` 加入 `history_stock`/`history_fund_otc` 已知无分组豁免名单，消除 registry.py 中有意无分组的 per-code 缓存模块导致的误报。
 
+### Removed
+
+- **`_cmd_generate_html()` 函数**：原 H 菜单入口，功能被 B 菜单覆盖。
+- **`include_b_series` 参数**：从 `generate_excel_report()` 签名中移除，由独立 `enable_b_series` 替代。
+
 ### Docs
 
-- **requirements.md**：同步 F2 累计收益率起算策略、新增 degradation 场景（全链路空数据 + 部分数据缺失 + 虚高保护）。
-- **technical.md**：同步 Provider Chain 空数据 fallback 策略、eastmoney 分页策略、F2 收益率起算点调整。
-- **how-to-start.md** / **how-to-config.md** / **faq.md**：同步备注说明。
+- **requirements.md**：移除 H 菜单项；新增 [P] 配置报告板块可见性；新增模块分组说明表（5 组）。同步 F2 累计收益率起算策略、新增 degradation 场景（全链路空数据 + 部分数据缺失 + 虚高保护）。
+- **technical.md**：同步两层可见性模型设计、连续重新编号策略、board/data 层命名规范。同步 Provider Chain 空数据 fallback 策略、eastmoney 分页策略、F2 收益率起算点调整。
+- **how-to-config.md**：新增 3 个 board 配置字段说明、[P] 菜单操作指引、`enable_news` 与 `news_sources` 关系说明。
+- **how-to-start.md** / **faq.md**：同步备注说明。
 - **reports-instruction.md**：新增 18 个页签按 type 分组的 5 组可见性说明表（基础核心/B 系列/新闻与预警/LLM 分析/历史走势）。
-- **plan.md**：新增 [P4] G 报告板块可见性可配置任务项、[P4] H 智能预警模块去留评估任务项；移除低价值任务 O。
-- **test-coverage.md**：同步全量测试项数（3006→3005）、unit 项数（2699→2698）等 8 处计数修正。
-- **datasource-and-folders.md**：修复 dual H1（`# 目录结构` → `## 目录结构`）；新增 `data/history/` 目录节点。
+- **plan.md**：G 任务从"待实现方向"移至"已完成迭代"。新增 [P4] G 报告板块可见性可配置任务项、[P4] H 智能预警模块去留评估任务项；移除低价值任务 O。
+- **test-coverage.md**：同步测试计数。同步全量测试项数（3006→3005）、unit 项数（2699→2698）等 8 处计数修正。
+- **datasource-and-folders.md**：同步文件变更。修复 dual H1（`# 目录结构` → `## 目录结构`）；新增 `data/history/` 目录节点。
 - **how-to-test-my-code.md**：移除版本号标签。
 
 ## [0.4.3] - 2026-07-13
