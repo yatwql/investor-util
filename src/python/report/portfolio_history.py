@@ -239,8 +239,8 @@ class PortfolioHistoryCalculator:
             bars.append({
                 "date": date,
                 "total_value": round(tv, 2),
-                "drawdown": round(drawdown, 2),
-                "drawdown_pct": round(drawdown_pct, 4),
+                "drawdown": round(-drawdown, 2),
+                "drawdown_pct": round(-drawdown_pct, 4),
             })
 
         # 计算年化波动率
@@ -264,8 +264,8 @@ class PortfolioHistoryCalculator:
 
         return {
             "bars": bars,
-            "max_drawdown": round(max_drawdown_val, 2),
-            "max_drawdown_pct": round(max_drawdown_pct, 2),
+            "max_drawdown": round(-max_drawdown_val, 2),
+            "max_drawdown_pct": round(-max_drawdown_pct, 2),
             "drawdown_start": drawdown_start,
             "drawdown_end": drawdown_end,
             "annualized_volatility": round(annualized_vol, 4),

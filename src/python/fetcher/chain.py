@@ -14,6 +14,7 @@ from typing import Any, cast
 from src.python.constants import CACHE_DAILY, CACHE_WEEKLY
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
+from src.python.cache import clear as cache_clear
 from src.python.config import get_config
 from src.python.provider_registry import get_registry, _TRANSPORT_FAILURE
 
@@ -222,6 +223,45 @@ def _fetch_with_fallback(
 # ═══════════════════════════════════════════════════════════════
 
 
+def _try_providers(
+    providers: list[str],
+    registry: Any,
+    chain_name: str,
+    code: str,
+    days: int,
+    start_from: str | None,
+) -> list[dict]:
+    """遍历 providers 获取数据，返回第一个非空结果。
+
+    Args:
+        providers: provider 名称列表（按优先级排序）
+        registry: DataSourceRegistry（熔断检测用）
+        chain_name: chain 名称
+        code: 证券代码
+        days: 获取天数
+        start_from: 起始日期，None 时获取完整 days 条数据
+
+    Returns:
+        list[dict] 或 []（全部链路失败时）
+    """
+    for provider_name in providers:
+        if registry.is_circuit_broken(provider_name):
+            logger.debug("[%s] %s 已被熔断，跳过", chain_name, provider_name)
+            continue
+        logger.info("[%s] 尝试 %s（code=%s, days=%d）", chain_name, provider_name, code, days)
+        try:
+            data = _call_history_provider(provider_name, chain_name, code, days, start_from)
+            if not data:
+                logger.info("[%s] %s 返回空数据（无此品种历史数据），尝试下一链路", chain_name, provider_name)
+                continue
+            registry.record_success(provider_name)
+            return data
+        except Exception:
+            registry.record_failure(provider_name, f"{chain_name}:transport")
+            continue
+    return []
+
+
 def _fetch_with_incremental_fallback(
     chain_name: str,
     code: str,
@@ -229,6 +269,8 @@ def _fetch_with_incremental_fallback(
     param_fn: Callable | None = None,
 ) -> list[dict]:
     """增量合并版 Fallback 路由（历史数据用）。
+
+    当检测到新旧数据重叠时，自动全量刷新缓存，确保历史修正被正确覆盖。
 
     - chain 层管理缓存读/写/合并
     - Provider 函数只负责纯数据获取（不碰缓存层）
@@ -252,31 +294,28 @@ def _fetch_with_incremental_fallback(
     registry = get_registry()
     providers = _get_chain(chain_name)
 
-    new_data: list[dict] = []
-    for provider_name in providers:
-        if registry.is_circuit_broken(provider_name):
-            logger.debug("[%s] %s 已被熔断，跳过", chain_name, provider_name)
-            continue
+    # 第一轮：增量获取（从 last_cached_date 开始）
+    new_data = _try_providers(providers, registry, chain_name, code, days, last_cached_date)
 
-        logger.info("[%s] 尝试 %s（code=%s, days=%d）", chain_name, provider_name, code, days)
-        try:
-            new_data = _call_history_provider(provider_name, chain_name, code, days, last_cached_date)
-            if not new_data:
-                logger.info("[%s] %s 返回空数据（无此品种历史数据），尝试下一链路", chain_name, provider_name)
-                continue
-            registry.record_success(provider_name)
-            break
-        except Exception:
-            registry.record_failure(provider_name, f"{chain_name}:transport")
-            continue
-
-    # chain 层统一合并 + 缓存写入
     if new_data:
         merged = _merge_by_date(cached, new_data)
+        needs_refresh = False
         try:
-            _validate_continuity(cached, new_data, cache_key)
+            needs_refresh = _validate_continuity(cached, new_data, cache_key)
         except Exception:
             logger.warning("[%s] 连续性校验异常（不影响合并）", cache_key)
+
+        if needs_refresh and cached:
+            # 检测到历史修正（如除权除息回溯调整）：旧缓存中非重叠部分已过时
+            # 自动全量刷新：删旧缓存，不带 start_from 重新获取完整历史
+            logger.info("[%s] 检测到历史修正 → 自动全量刷新", chain_name)
+            cache_clear(cache_key)
+            full_data = _try_providers(providers, registry, chain_name, code, days, None)
+            if full_data:
+                cache_set(cache_key, full_data)
+                return full_data[-days:]
+            logger.warning("[%s] 全量刷新失败，使用增量合并数据（仅修正重叠窗口）", chain_name)
+
         cache_set(cache_key, merged)
         return merged[-days:]
     elif cached:
@@ -371,23 +410,29 @@ def _replace_by_date(data: list[dict], item: dict) -> None:
             break
 
 
-def _validate_continuity(cached: list[dict], new_data: list[dict], cache_key: str) -> None:
+def _validate_continuity(cached: list[dict], new_data: list[dict], cache_key: str) -> bool:
     """校验新旧数据连续性，检测历史修正信号。
 
     注意：此函数为纯检测/日志用途，异常不影响主流程。
     调用方应在 try/except 中包装。
+
+    Returns:
+        True 检测到数据重叠（可能为历史修正，调用方可据此触发全量刷新）
+        False 无重叠或数据不足
     """
     if not cached or not new_data:
-        return
+        return False
     last_old = cached[-1]
     first_new = new_data[0]
 
     # 检测日期重叠：新数据首日 ≤ 旧数据末日，说明有修正
     if first_new.get("date") <= last_old.get("date"):
-        logger.warning("[%s] 新旧数据重叠——可能是历史修正，建议全量刷新", cache_key)
+        logger.warning("[%s] 新旧数据重叠——可能是历史修正，自动全量刷新", cache_key)
         cache_set(f"{cache_key}_correction_flag", True)
+        return True
     elif _gap_days(last_old.get("date"), first_new.get("date")) > 5:
         logger.warning("[%s] 数据跳空 >5 交易日——部分历史不可达", cache_key)
+    return False
 
 
 def _gap_days(date1: str | None, date2: str | None) -> int:

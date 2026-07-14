@@ -6,6 +6,20 @@
 
 ---
 
+## [0.5.3] - 2026-07-14
+
+### Fixed
+
+- **最大回撤显示为正数**：`portfolio_history.py` 中 `drawdown_pct` 存储为正值（如 `+59.51%`），但回撤是亏损应显示为负值。已修复为存储负值，Jinja `change` filter 自动显示 `−59.51%`。
+
+### Changed
+
+- **历史数据重叠自动全量刷新**：`_fetch_with_incremental_fallback()` 检测到新旧数据重叠（如分红除权导致的前复权回溯调整）时不再仅记录 WARNING，而是自动清除污染缓存并重新获取完整历史。用户不再需要手动执行菜单 `[2]` 来修正。
+
+### Docs
+
+- **technical.md**：`_fetch_with_incremental_fallback` 描述同步，标注自动全量刷新行为。
+
 ## [0.5.2] - 2026-07-14
 
 ### Added

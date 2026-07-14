@@ -230,7 +230,7 @@ penetration_sector = fetch_industry_data(code).industry  // API优先
 - **preload**：价格/指数行情 + LLM 四大分析模块 → 菜单 `[2]` 触发清除
 - **refresh**：基金数据 + 行业 + 新闻 + 补充数据 + 基金深度分析 → 菜单 `[1]` 触发清除
 - **独立模块**：无分组保护，不被菜单缓存命令误删
-- **历史走势独立缓存**：无分组保护，通过 Provider Chain `_fetch_with_incremental_fallback` 自动管理
+- **历史走势独立缓存**：无分组保护，通过 Provider Chain `_fetch_with_incremental_fallback` 自动管理（含重叠检测→自动全量刷新，应对除权除息等回溯修正）
 
 ### 指纹驱动失效机制
 
