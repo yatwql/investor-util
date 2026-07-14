@@ -10,11 +10,16 @@
 
 ### Added
 
+- **覆盖阈值可配置**：`config.json` 新增 `history.coverage_threshold`（默认 0.8），控制组合历史走势有效区间起止日的持仓覆盖比例要求。由 `PortfolioHistoryCalculator` 接收，替代硬编码 80%。
+
 ### Fixed
 
 ### Changed
 
 ### Docs
+
+- **technical.md**：组合历史走势算法章节补充覆盖阈值可配置说明。
+- **how-to-config.md**：新增 `coverage_threshold` 配置项说明，累计收益率起算文档同步。
 
 ## [0.5.4] - 2026-07-14
 

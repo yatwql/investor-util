@@ -60,6 +60,7 @@ _DEFAULT_CONFIG = {
         "analysis": "off",
         "snapshot_retention_days": 60,
         "snapshot_max_count": 365,
+        "coverage_threshold": 0.8,
     },
 }
 
@@ -134,7 +135,8 @@ def _get_default_config_template() -> str:
         '  "history": {\n'
         '    "analysis": "off",\n'
         '    "snapshot_retention_days": 60,\n'
-        '    "snapshot_max_count": 365\n'
+        '    "snapshot_max_count": 365,\n'
+        '    "coverage_threshold": 0.8\n'
         '  }\n'
         '}\n'
     )

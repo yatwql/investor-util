@@ -379,6 +379,78 @@ Provider Chain 熔断由 **DataSourceRegistry 单例**（`src/python/provider_re
 | | **00 代码降级**：K 线全空→自动降级基金净值历史 | history_stock → history_fund_otc | — |
 | `history_diff.py` | F1 快照差异计算引擎（纯计算，无 Provider/缓存） | — | — |
 
+### 组合历史走势计算算法
+
+`portfolio_history.py` 的 `get_combined_timeseries()` 实现以下算法链：
+
+**① LOCF（Last Observation Carried Forward）合并**
+
+每只持仓的历史数据日期集合不同（股票有完整日 K 线、QDII 净值 T-1 滞后、债券基金更新频率更低）。合并时不再仅对交集日期求和，而是对全部出现过的日期做全并集：
+
+```
+all_dates = sorted(∪ {dates_of_each_holding})
+for each_holding:
+    last_val = 0
+    for d in all_dates:
+        if d in holding_data: last_val = holding[d]
+        if last_val > 0: total_value[d] += last_val
+```
+
+效果：某只基金在某日无新净值时沿用上次已知值，而非计入 0。避免了 QDII 净值滞后、场外基金更新慢导致当日组合市值骤降、收益率虚低的问题。
+
+**② 有效区间双向截断（valid_start_idx + valid_end_idx）**
+
+不同基金的数据起止日期不同（有些从 2025-09 开始、有些从 2026-03 才开始）。在起止边界上只部分基金有数据，若直接用全部日期计算收益率会失真：
+
+- **起算点（valid_start_idx）**：正向遍历，找第一天的 ≥覆盖阈值 覆盖
+- **终止点（valid_end_idx）**：反向遍历，找最后一日的 ≥覆盖阈值 覆盖
+- 截断后锁定的区间才是参与收益率计算的"有效区间"
+- 走势图仍显示完整时间线（含边界数据），但累计收益率和回撤指标只以有效区间为基准
+- **覆盖阈值**：默认 `0.8`（80%），可通过 `config.json` 的 `history.coverage_threshold` 配置（0~1），在 `PortfolioHistoryCalculator.__init__()` 中接收
+
+**③ 回撤算法（Peak-to-Trough）**
+
+```
+peak = 0
+for each date in sorted_dates:
+    tv = total_value[date]
+    if tv > peak:
+        peak = tv                         # 新高 → 更新峰值
+        current_dd_start = date            # 记下潜在回撤起算日
+    drawdown = peak - tv                   # 当前回撤金额
+    drawdown_pct = drawdown / peak * 100   # 回撤百分比
+    if drawdown > max_drawdown_val:        # 追踪最大回撤
+        max_drawdown_val = drawdown
+        max_drawdown_pct = drawdown_pct
+        drawdown_end = date                # 回撤最深日
+        drawdown_start = current_dd_start  # 该段回撤的峰值日
+```
+
+- 有新高时自动重置潜在回撤起算日
+- 每次回撤加深时同步更新最大回撤记录
+- 返回时金额和百分比均取负值（如 `-49626.48`、`-10.22%`）
+
+**④ 累计收益率**
+
+```
+first_val = bars[0]["total_value"]    # 有效区间第一日市值
+last_val  = bars[-1]["total_value"]   # 有效区间最后一日的市值
+total_return_pct = (last_val - first_val) / first_val × 100
+```
+
+注意：`bars[0]` 是截断后的有效区间第一日，而非全部历史数据的首日。收益率 = 有效区间内的总涨跌幅比例。
+
+**⑤ 年化波动率**
+
+```
+daily_returns = [(curr - prev) / prev for adjacent days]
+annualized_vol = std(daily_returns) × √252
+```
+
+使用样本标准差（`ddof=1`），交易日假设 252 天。
+
+---
+
 - **并行预热**：`preload_cache()` 对 preload 组使用 `ThreadPoolExecutor` 并行获取，减少串行等待
 - **菜单驱动**：菜单 [1] 和 [2] 分别清除 + 重拉 refresh 和 preload 组，复用 fetcher 模块的预热入口
 - **指数独立**：`fetcher/index.py` 直调 Provider，不走 Provider Chain（双链路 fallback 硬编码在此）

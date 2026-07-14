@@ -175,7 +175,9 @@ def _fetch_history_data(history_mode: str, holdings: list, reporter: TuiProgress
         return None
     reporter.info("正在获取组合历史走势数据（as-if 模拟）...")
     from src.python.report.portfolio_history import PortfolioHistoryCalculator
-    _calc = PortfolioHistoryCalculator()
+    _history_cfg = (get_config_cache() or {}).get("history", {})
+    _coverage = _history_cfg.get("coverage_threshold", 0.8)
+    _calc = PortfolioHistoryCalculator(coverage_threshold=_coverage)
     _holdings_tuples = [(h.code, h.name, h.shares) for h in holdings]
     try:
         history_data = _calc.get_combined_timeseries(_holdings_tuples)

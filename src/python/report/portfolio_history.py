@@ -43,8 +43,11 @@ logger = logging.getLogger("invest")
 class PortfolioHistoryCalculator:
     """组合历史走势计算器（无状态，每次独立计算）。"""
 
-    def __init__(self, session_cache: dict[str, Any] | None = None) -> None:
+    def __init__(self, session_cache: dict[str, Any] | None = None,
+                 coverage_threshold: float | None = None) -> None:
         self._session_cache = session_cache or {}
+        # 覆盖比例阈值：有效区间起止日要求 ≥此比例×总持仓 有数据
+        self._coverage_threshold = coverage_threshold if coverage_threshold is not None else 0.8
 
     def calculate_for_holding(self, holding_code: str, holding_name: str,
                               shares: float) -> list[dict] | None:
@@ -213,7 +216,7 @@ class PortfolioHistoryCalculator:
         # 过早的起算点会因基金不全导致组合市值偏低、收益率虚高；
         # 过晚的终止点同样会因部分基金数据未刷新导致市值骤降
         total_funds = len(all_series)
-        min_coverage = max(1, int(total_funds * 0.8))
+        min_coverage = max(1, int(total_funds * self._coverage_threshold))
         valid_start_idx = 0
         for i, d in enumerate(sorted_dates):
             funds_with_data = fund_count_on_date.get(d, 0)
