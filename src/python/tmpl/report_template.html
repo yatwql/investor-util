@@ -406,7 +406,7 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
     <nav class="section-nav">
         {% for sec in section_order %}
         {% if section_visible(sec["key"]) %}
-        <a href="#sec-{{ sec['key'] }}">{{ sec["number"] }}、{{ sec["name"] }}</a>
+        <a href="#sec-{{ sec['key'] }}">{{ section_numbers[sec["key"]] }}、{{ sec["name"] }}</a>
         {% endif %}
         {% endfor %}
     </nav>

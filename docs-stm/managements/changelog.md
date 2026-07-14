@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **HTML 报告导航栏序号不连续**：导航栏使用 `sec["number"]`（注册表中的原始编号）而非重新编号后的 `section_numbers`，导致关闭 B 系列/历史走势后导航栏显示原始序号（1,2,3,4,5,10,11...）而章节标题已正确连续编号（1,2,3,4,5,6,7...）。已修复：导航栏改为使用 `section_numbers[sec["key"]]`，与章节标题统一。
+
 - **HTML 报告缺失 LLM 页面**：`write_html_report()` 的 `enable_llm` 参数默认值为 `False`，而 `_cmd_generate_full()`（L 菜单）调用时未传入，导致 HTML 报告中所有 LLM 板块被隐藏且无连续编号。已修复为传递 `is_enable_llm()` 配置值，并同步新增该函数作为统一读取入口。
 
 ### Changed
