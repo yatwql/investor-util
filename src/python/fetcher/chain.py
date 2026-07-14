@@ -434,8 +434,8 @@ def _validate_continuity(cached: list[dict], new_data: list[dict], cache_key: st
     last_old = cached[-1]
     first_new = new_data[0]
 
-    # 检测日期重叠：新数据首日 ≤ 旧数据末日，说明有修正
-    if first_new.get("date") <= last_old.get("date"):
+    # 检测日期重叠：新数据首日早于旧数据末日（非相等，相等=API 包含边界日），说明有修正
+    if first_new.get("date") < last_old.get("date"):
         logger.warning("[%s] 新旧数据重叠——可能是历史修正，自动全量刷新", cache_key)
         cache_set(f"{cache_key}_correction_flag", True)
         return True
