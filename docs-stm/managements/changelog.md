@@ -6,6 +6,18 @@
 
 ---
 
+## [0.5.2] - 2026-07-14
+
+### Added
+
+- **`_validate_enable_llm()` 新增**：在 `config/_core.py` 新增 LLM 板块配置校验函数，启动时检查 `llm_settings.json` 中 `enabled_llm` 字典的子键拼写错误。与 `_validate_enable_boards()` 互补，后者仅处理 `config.json` 的三个板块字段。调用链：`validate_config()` → `_validate_enable_llm()`。
+- **`get_known_enabled_llm_keys()` 新增**：在 `registry.py` 新增启用 LLM 子键查询函数，返回 `enabled_llm` 字典的所有合法子键。
+
+### Docs
+
+- **technical.md**：`_validate_enable_boards()` 验证描述更新为分两路说明（config.json 三字段 + llm_settings.json 子键拼写）。
+- **how-to-use-registry.md**：新增 `enabled_llm` 子键查询章节。
+
 ## [0.5.1] - 2026-07-14
 
 ### Fixed
@@ -32,6 +44,7 @@
 - **how-to-start.md**：报告内容对照表 B/L 菜单改用 ☆ 标注配置驱动型可见性，新增脚注 ⁵ 说明。
 - **reports-instruction.md**：可见性规则表重构为两层模型（board+data），LLM 模块触发条件补充 `enabled_llm` 配置控制。
 - **requirements.md**：熔断器/push2/基金风格加速阈值文字同步。
+- **testplan.md**：熔断器覆盖要求补充 per-instance 阈值说明。
 
 ## [0.5.0] - 2026-07-14
 

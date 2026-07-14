@@ -119,6 +119,17 @@ from src.python.registry import (
 **用途：**
 - 返回 `llm_settings.json` 中所有合法配置键名，用于配置校验
 
+### enabled_llm 子键查询
+
+```python
+from src.python.registry import (
+    get_known_enabled_llm_keys,      # → set[str]
+)
+```
+
+**用途：**
+- 返回 `llm_settings.json` → `enabled_llm` 字典的所有合法子键（即各 LLM 模块的 `settings_suffix`：`global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`），用于 `_validate_enable_llm()` 的子键拼写校验
+
 ### 报表排序与页签名称
 
 ```python

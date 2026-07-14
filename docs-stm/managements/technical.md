@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
 创建日期：2026-06-28
-最后更新：2026-07-14（v0.5.1）
+最后更新：2026-07-14（v0.5.2）
 
 ---
 
@@ -566,7 +566,7 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 | `is_enable_history(config)` | `enable_history` | `config.json` | `history` |
 | `is_enable_llm(config)` | `enabled_llm`（4 个报告模块） | `llm_settings.json` | `llm` |
 
-`handlers_report.py` 中 `_cmd_generate_both()` 和 `_cmd_generate_full()` 在报告准备阶段调用上述函数读取配置值后传入 Excel/HTML 管线。配置值验证在 `_validate_enable_boards()` 中统一处理：缺失视为 `true`（兼容无此字段的老版 config.json），非布尔值记录 WARNING。
+`handlers_report.py` 中 `_cmd_generate_both()` 和 `_cmd_generate_full()` 在报告准备阶段调用上述函数读取配置值后传入 Excel/HTML 管线。配置值验证分两路：`_validate_enable_boards()` 处理 `config.json` 的三个字段（`enable_b_series` / `enable_news` / `enable_history`），`_validate_enable_llm()` 处理 `llm_settings.json` 的 `enabled_llm` 子键拼写校验。缺失均视为 `true`（向后兼容），类型/格式错误记录 WARNING。
 
 `always` 类型始终显示，无配置开关。`llm` 类型由 `is_enable_llm()` 驱动——读取 `llm_settings.json` 的 `enabled_llm` 字典，若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）任一启用则 LLM 板块整体可见。`news_correlation` 仅用于新闻关联分析，不影响板块可见性。
 

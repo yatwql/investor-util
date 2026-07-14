@@ -11,7 +11,7 @@ from typing import Any
 
 from src.python.config import _comments
 from src.python.config import _defaults
-from src.python.registry import get_known_llm_settings_keys, get_report_section_keys
+from src.python.registry import get_known_enabled_llm_keys, get_known_llm_settings_keys, get_report_section_keys
 
 logger = logging.getLogger("invest")
 
@@ -269,6 +269,32 @@ def _validate_enable_boards(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_enable_llm(issues: int) -> int:
+    """验证 llm_settings.json 中 enabled_llm 字典的子键。
+
+    仅检查格式/拼写错误，不判断业务语义（全关正常——可能是用户主动关闭
+    所有 LLM 报告模块但仍需 news_correlation）。缺失视为正常（向后兼容）。
+    """
+    llm_config = get_llm_config()
+    if not llm_config:
+        return issues
+    enabled_map = llm_config.get("enabled_llm")
+    if enabled_map is None:
+        return issues  # 缺失正常
+    if not isinstance(enabled_map, dict):
+        logger.warning("llm_settings.json enabled_llm = %r 不是字典", enabled_map)
+        return issues + 1
+
+    known_keys = get_known_enabled_llm_keys()
+    unknown = [k for k in enabled_map if k not in known_keys]
+    if unknown:
+        logger.warning(
+            "llm_settings.json enabled_llm 中存在未知模块 %s，请检查拼写", unknown
+        )
+        issues += 1
+    return issues
+
+
 def _validate_early_warning(config: dict, issues: int) -> int:
     ew, issues = _section(config, "early_warning", dict, "智能预警阈值将使用默认值", issues)
     if ew is _MISSING:
@@ -382,6 +408,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_early_warning(config, issues)
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
+    issues = _validate_enable_llm(issues)
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)
     return issues

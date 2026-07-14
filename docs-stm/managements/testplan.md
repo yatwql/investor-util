@@ -1,7 +1,7 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
 创建日期：2026-06-26
-最后更新：2026-07-14（v0.5.1）
+最后更新：2026-07-14（v0.5.2）
 
 ---
 
@@ -37,7 +37,7 @@
 | `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、指纹确定性 |
 | `report/*.py` | 正常 + 空数据 + 边界 | 单条持仓、最大 100 条持仓、零成本/零市值、全亏损、全盈利、混合账户 |
 | `market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |
-| `provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断(3次→冷却300s→自动恢复)、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
+| `provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断（默认 3 次→冷却 300s→自动恢复，批量 API 如 eastmoney_industry 为 6 次→120s）、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
 | `handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
 | `tui_menu.py` | 所有 14 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
 

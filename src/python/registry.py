@@ -252,6 +252,15 @@ def get_registered_data_types() -> set[str]:
     return {m.data_type for m in _MODULE_REGISTRY}
 
 
+def get_known_enabled_llm_keys() -> set[str]:
+    """返回 enabled_llm 字典的所有合法子键（即所有 LLM 模块的 settings_suffix）。"""
+    return {
+        m.settings_suffix
+        for m in _MODULE_REGISTRY
+        if m.is_llm and m.settings_suffix is not None
+    }
+
+
 def get_llm_module_name(settings_suffix: str) -> str:
     """根据 settings_suffix 返回 LLM 模块的中文名称。
 
