@@ -249,56 +249,82 @@
 
 {% if section_visible("portfolio_history") or section_visible("drawdown_analysis") %}
 <script>
-/* --- Native Canvas 2D chart renderer (no external deps, renders instantly) --- */
-window.drawSimpleChart = function(canvasId, labels, values, opts) {
-    opts = opts || {};
-    var canvas = document.getElementById(canvasId);
-    if (!canvas || !labels || !values || labels.length === 0) return;
+/* --- Native Canvas 2D chart renderer (multi-dataset, no external deps) --- */
+window.drawSimpleChart = function(canvasId, a, b, c) {
+    /* Backward compat: old (canvasId, labels, values, opts) → new (canvasId, datasets, opts) */
+    var datasets, opts;
+    if (Array.isArray(a) && a.length > 0 && typeof a[0] === 'object' && 'values' in a[0]) {
+        datasets = a;
+        opts = b || {};
+    } else {
+        datasets = [{
+            label: '',
+            values: b,
+            color: (c && c.lineColor) || '#2E75B6',
+            fillColor: (c && c.fillColor) || 'rgba(46,117,182,0.1)',
+            width: (c && c.lineWidth) || 2,
+            dash: (c && c.dash) || [],
+        }];
+        opts = c || {};
+    }
 
-    /* 计算安全显示宽度：canvas.clientWidth 可能被父容器溢出撑宽，
-       因此以窗口宽度为硬上限。container padding(20+20) +
-       section-content padding(20+20) + 安全冗余 ~= 96px */
+    /* 移除无数据或全空 datasets */
+    var validDs = datasets.filter(function(ds){ return ds.values && ds.values.length > 0; });
+    if (validDs.length === 0) return;
+    var nPoints = validDs[0].values.length;
+    var hasMulti = validDs.length > 1;
+
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
     var viewW = window.innerWidth;
     var safeMax = Math.max(300, viewW - 96);
     var dispW = Math.min(canvas.clientWidth, safeMax);
     var dispH = canvas.clientHeight;
     if (dispW < 50 || dispH < 20) return;
-
-    /* 用像素值锁定 CSS 显示尺寸，防止父级 flex/grid 溢出将其撑宽 */
     canvas.style.width = dispW + 'px';
     canvas.style.height = dispH + 'px';
 
     var dpr = window.devicePixelRatio || 1;
-    /* 设置绘图缓冲区 = 显示尺寸 × dpr（高清屏适配） */
     canvas.width = dispW * dpr;
     canvas.height = dispH * dpr;
 
     var ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    var margin = { top: 12, right: 12, bottom: 32, left: 62 };
+    /* 多 dataset 时右侧留出 legend 空间 */
+    var margin = { top: 12, right: hasMulti ? 110 : 12, bottom: 32, left: 62 };
     var plotW = dispW - margin.left - margin.right;
     var plotH = dispH - margin.top - margin.bottom;
     if (plotW < 50 || plotH < 20) return;
 
     ctx.clearRect(0, 0, dispW, dispH);
 
-    var minVal = Math.min.apply(null, values);
-    var maxVal = Math.max.apply(null, values);
-    var range = maxVal - minVal;
-    if (range < 1e-10) { range = Math.max(Math.abs(maxVal) * 0.1, 1); minVal = maxVal - range; maxVal += range; }
+    /* 全局 Y 范围：跨所有 dataset */
+    var globalMin = Infinity, globalMax = -Infinity;
+    for (var di = 0; di < validDs.length; di++) {
+        var vs = validDs[di].values;
+        for (var vi = 0; vi < vs.length; vi++) {
+            if (vs[vi] < globalMin) globalMin = vs[vi];
+            if (vs[vi] > globalMax) globalMax = vs[vi];
+        }
+    }
+    if (globalMin === Infinity) return;
+    var range = globalMax - globalMin;
+    if (range < 1e-10) { range = Math.max(Math.abs(globalMax) * 0.1, 1); globalMin = globalMax - range; globalMax += range; }
     var pad = range * 0.08;
-    var yMin = Math.max(0, minVal - pad);
-    var yMax = maxVal + pad;
+    var yMin = Math.max(0, globalMin - pad);
+    var yMax = globalMax + pad;
     var yRange = yMax - yMin;
     if (yRange < 1e-10) yRange = 1;
 
-    function xPos(i) { return margin.left + (values.length <= 1 ? plotW/2 : (i/(values.length-1))*plotW); }
+    function xPos(i) { return margin.left + (nPoints <= 1 ? plotW/2 : (i/(nPoints-1))*plotW); }
     function yPos(v) { return margin.top + plotH - ((v - yMin) / yRange) * plotH; }
 
     ctx.font = '11px -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif';
     ctx.textBaseline = 'middle';
 
+    /* Y 轴刻度 */
     var yTickCount = 5;
     for (var t = 0; t <= yTickCount; t++) {
         var yv = yMin + (t / yTickCount) * yRange;
@@ -323,68 +349,143 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
         ctx.fillText(label, margin.left - 6, y);
     }
 
-    var nLabels = Math.min(10, labels.length);
-    var step = Math.max(1, Math.floor(labels.length / nLabels));
-    var indices = [];
-    for (var i = 0; i < labels.length; i += step) indices.push(i);
-    if (indices[indices.length-1] !== labels.length-1 && labels.length > 1) indices.push(labels.length-1);
+    /* 图例（多 dataset 时绘制，右上角） */
+    if (hasMulti) {
+        var legX = dispW - margin.right + 8;
+        var legY = margin.top;
+        ctx.textBaseline = 'middle';
+        ctx.font = '12px -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif';
+        for (var li = 0; li < validDs.length; li++) {
+            var ds = validDs[li];
+            var ly = legY + li * 20;
+            ctx.strokeStyle = ds.color || '#2E75B6';
+            ctx.lineWidth = 2;
+            if (ds.dash && ds.dash.length) ctx.setLineDash(ds.dash);
+            else ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(legX, ly);
+            ctx.lineTo(legX + 16, ly);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#444';
+            ctx.textAlign = 'left';
+            ctx.fillText(ds.label || '', legX + 22, ly);
+        }
+    }
 
+    /* X 轴标签 */
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#666';
-    for (var k = 0; k < indices.length; k++) {
-        var idx = indices[k];
-        var raw = labels[idx];
-        ctx.fillText(raw && raw.length >= 10 ? raw.substring(5, 10) : raw, xPos(idx), margin.top + plotH + 6);
+    ctx.font = '11px -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif';
+    var nLabels = Math.min(10, nPoints);
+    var step = Math.max(1, Math.floor(nPoints / nLabels));
+    var xIndices = [];
+    for (var i = 0; i < nPoints; i += step) xIndices.push(i);
+    if (xIndices[xIndices.length-1] !== nPoints-1 && nPoints > 1) xIndices.push(nPoints-1);
+    var dateLabels = opts.labels || [];
+    for (var k = 0; k < xIndices.length; k++) {
+        var idx = xIndices[k];
+        var lbl = dateLabels.length ? (dateLabels[idx] || '') : ('' + idx);
+        ctx.fillText(lbl && lbl.length >= 10 ? lbl.substring(5, 10) : lbl, xPos(idx), margin.top + plotH + 6);
     }
 
-    if (opts.fill !== false) {
+    /* 逐 dataset 绘制 */
+    for (var di = 0; di < validDs.length; di++) {
+        var ds = validDs[di];
+        var vs = ds.values;
+
+        /* 填充 */
+        if (ds.fill !== false) {
+            ctx.beginPath();
+            ctx.moveTo(xPos(0), yPos(vs[0]));
+            for (var i = 1; i < vs.length; i++) ctx.lineTo(xPos(i), yPos(vs[i]));
+            ctx.lineTo(xPos(vs.length-1), yPos(yMin));
+            ctx.lineTo(xPos(0), yPos(yMin));
+            ctx.closePath();
+            ctx.fillStyle = ds.fillColor || 'rgba(46,117,182,0.1)';
+            ctx.fill();
+        }
+
+        /* 折线 */
+        if (ds.dash && ds.dash.length) ctx.setLineDash(ds.dash);
+        else ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.moveTo(xPos(0), yPos(values[0]));
-        for (var i = 1; i < values.length; i++) ctx.lineTo(xPos(i), yPos(values[i]));
-        ctx.lineTo(xPos(values.length-1), yPos(yMin));
-        ctx.lineTo(xPos(0), yPos(yMin));
-        ctx.closePath();
-        ctx.fillStyle = opts.fillColor || 'rgba(46,117,182,0.1)';
-        ctx.fill();
+        for (var i = 0; i < vs.length; i++) {
+            if (i === 0) ctx.moveTo(xPos(i), yPos(vs[i]));
+            else ctx.lineTo(xPos(i), yPos(vs[i]));
+        }
+        ctx.strokeStyle = ds.color || '#2E75B6';
+        ctx.lineWidth = ds.width || 2;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 
-    ctx.beginPath();
-    for (var i = 0; i < values.length; i++) {
-        if (i === 0) ctx.moveTo(xPos(i), yPos(values[i]));
-        else ctx.lineTo(xPos(i), yPos(values[i]));
-    }
-    ctx.strokeStyle = opts.lineColor || '#2E75B6';
-    ctx.lineWidth = opts.lineWidth || 2;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
+    /* Y 轴 */
     ctx.strokeStyle = '#ccc';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(margin.left, margin.top);
     ctx.lineTo(margin.left, margin.top + plotH);
     ctx.stroke();
-};
 
-/* --- Background Chart.js loader (enhancement only, never blocks) --- */
-(function(){
-    var urls = [
-        'https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
-        'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
-        'https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js',
-    ];
-    function loadNext(i){
-        if(window.Chart || i>=urls.length) return;
-        var s=document.createElement('script');
-        s.src=urls[i];
-        s.onload=function(){ window.__chartLoaded=true; };
-        s.onerror=function(){ loadNext(i+1); };
-        document.head.appendChild(s);
+    /* Tooltip（mousemove 显示当前索引所有 dataset 的值） */
+    if (hasMulti) {
+        var tooltipEl = document.getElementById('chart-tooltip-' + canvasId);
+        if (!tooltipEl) {
+            tooltipEl = document.createElement('div');
+            tooltipEl.id = 'chart-tooltip-' + canvasId;
+            tooltipEl.style.cssText = 'position:fixed;display:none;pointer-events:none;' +
+                'background:rgba(40,40,40,0.9);color:#fff;padding:6px 10px;border-radius:4px;' +
+                'font:12px/1.5 -apple-system,"Microsoft YaHei","PingFang SC",sans-serif;' +
+                'z-index:1000;white-space:nowrap;';
+            document.body.appendChild(tooltipEl);
+        }
+
+        canvas.addEventListener('mousemove', function(e){
+            var rect = canvas.getBoundingClientRect();
+            var mx = e.clientX - rect.left;
+            /* 计算 hover 对应的数据索引 */
+            var chartX = mx - margin.left;
+            var ratio = chartX / plotW;
+            var idx = Math.round(ratio * (nPoints - 1));
+            idx = Math.max(0, Math.min(nPoints - 1, idx));
+
+            /* 构建 tooltip 内容 */
+            var html = '<div style="font-weight:600;margin-bottom:3px;">索引 ' + idx + '</div>';
+            for (var ti = 0; ti < validDs.length; ti++) {
+                var tv = validDs[ti].values[idx];
+                var tLabel = validDs[ti].label || '';
+                var tColor = validDs[ti].color || '#2E75B6';
+                var tVal;
+                if (opts.yFormat === 'currency') {
+                    tVal = '¥' + tv.toLocaleString();
+                } else if (opts.yFormat === 'percent') {
+                    tVal = tv.toFixed(2) + '%';
+                } else {
+                    tVal = tv.toLocaleString();
+                }
+                html += '<div><span style="display:inline-block;width:10px;height:10px;' +
+                    'border-radius:50%;background:' + tColor + ';margin-right:6px;"></span>' +
+                    (tLabel ? tLabel + ': ' : '') + '<strong>' + tVal + '</strong></div>';
+            }
+            tooltipEl.innerHTML = html;
+            tooltipEl.style.display = 'block';
+            var ttX = e.clientX + 14;
+            var ttY = e.clientY - 10;
+            if (ttX + tooltipEl.offsetWidth > window.innerWidth) ttX = e.clientX - tooltipEl.offsetWidth - 14;
+            if (ttY < 4) ttY = 4;
+            tooltipEl.style.left = ttX + 'px';
+            tooltipEl.style.top = ttY + 'px';
+        });
+
+        canvas.addEventListener('mouseleave', function(){
+            if (tooltipEl) tooltipEl.style.display = 'none';
+        });
     }
-    loadNext(0);
-})();
+};
 </script>
 {% endif %}
 </head>
@@ -1439,61 +1540,35 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
         (function(){
             var bars = {{ history_data.bars | tojson }};
             if(!bars || !bars.length) return;
-            var labels = bars.map(function(b){ return b.date; });
             var values = bars.map(function(b){ return b.total_value; });
-            /* 即刻使用原生 Canvas 渲染（毫秒级，不依赖 CDN） */
-            window.drawSimpleChart('portfolioChart', labels, values, {
-                lineColor: '#2E75B6',
+            var labels = bars.map(function(b){ return b.date; });
+            /* 归一化组合至 100 基点，与基准指数同量纲比较 */
+            var firstVal = values[0];
+            var normValues = values.map(function(v){ return +(v / firstVal * 100).toFixed(2); });
+            var datasets = [{
+                label: '组合 (as-if)',
+                values: normValues,
+                color: '#2E75B6',
                 fillColor: 'rgba(46,117,182,0.1)',
-                yFormat: 'currency',
-                fill: true,
-                lineWidth: 2
-            });
-            /* 后台等待 Chart.js，加载后创建交互式图表（responsive:false 尊重 canvas 已有尺寸） */
-            var _p_poll = setInterval(function(){
-                if(typeof Chart === 'undefined') return;
-                clearInterval(_p_poll);
-                var ce = document.getElementById('portfolioChart');
-                if(!ce || ce.getAttribute('data-chart') === 'chartjs') return;
-                try {
-                    ce.setAttribute('data-chart', 'chartjs');
-                    new Chart(ce, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: '组合市值 (as-if)',
-                                data: values,
-                                borderColor: '#2E75B6',
-                                backgroundColor: 'rgba(46,117,182,0.1)',
-                                fill: true,
-                                tension: 0.1,
-                                pointRadius: 0,
-                                borderWidth: 2,
-                            }]
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            interaction: { mode: 'index', intersect: false },
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(c){ return '市值: ¥' + c.parsed.y.toLocaleString(); }
-                                    }
-                                }
-                            },
-                            scales: {
-                                x: { ticks: { maxTicksLimit: 10, font: { size: 11 } }, grid: { display: false } },
-                                y: { ticks: { font: { size: 11 }, callback: function(v){ return '¥' + (v/10000).toFixed(0) + '万'; } }, grid: { color: 'rgba(0,0,0,0.06)' } }
-                            }
-                        }
+                width: 2
+            }];
+            /* 叠加基准指数（归一化至 100） */
+            var benchmarks = {{ (history_data.benchmarks or []) | tojson }};
+            var bmColors = ['#CC0000', '#E68A00', '#2E7D32'];
+            if (benchmarks && benchmarks.length) {
+                for (var bi = 0; bi < benchmarks.length; bi++) {
+                    var bm = benchmarks[bi];
+                    if (!bm.bars || !bm.bars.length) continue;
+                    datasets.push({
+                        label: bm.name,
+                        values: bm.bars.map(function(b){ return b.value; }),
+                        color: bmColors[bi % bmColors.length],
+                        width: 1.5,
+                        dash: [5, 3]
                     });
-                } catch(e) {}
-            }, 300);
-            /* 10 秒后停止等待 */
-            setTimeout(function(){ clearInterval(_p_poll); }, 10000);
+                }
+            }
+            window.drawSimpleChart('portfolioChart', datasets, { yFormat: 'index', labels: labels });
         })();
         </script>
         {% else %}
@@ -1545,59 +1620,39 @@ window.drawSimpleChart = function(canvasId, labels, values, opts) {
         (function(){
             var bars = {{ history_data.bars | tojson }};
             if(!bars || !bars.length) return;
-            var labels = bars.map(function(b){ return b.date; });
             var drawdowns = bars.map(function(b){ return b.drawdown_pct; });
-            /* 即刻使用原生 Canvas 渲染 */
-            window.drawSimpleChart('drawdownChart', labels, drawdowns, {
-                lineColor: '#CC0000',
+            var labels = bars.map(function(b){ return b.date; });
+            var datasets = [{
+                label: '组合回撤',
+                values: drawdowns,
+                color: '#CC0000',
                 fillColor: 'rgba(204,0,0,0.15)',
-                yFormat: 'percent',
-                fill: true,
-                lineWidth: 1.5
-            });
-            /* 后台等待 Chart.js，加载后创建交互式图表（responsive:false） */
-            var _d_poll = setInterval(function(){
-                if(typeof Chart === 'undefined') return;
-                clearInterval(_d_poll);
-                var ce = document.getElementById('drawdownChart');
-                if(!ce || ce.getAttribute('data-chart') === 'chartjs') return;
-                try {
-                    ce.setAttribute('data-chart', 'chartjs');
-                    new Chart(ce, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: '回撤幅度',
-                                data: drawdowns,
-                                borderColor: '#CC0000',
-                                backgroundColor: 'rgba(204,0,0,0.15)',
-                                fill: true,
-                                tension: 0.1,
-                                pointRadius: 0,
-                                borderWidth: 1.5,
-                            }]
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(c){ return '回撤: ' + c.parsed.y.toFixed(2) + '%'; }
-                                    }
-                                }
-                            },
-                            scales: {
-                                x: { ticks: { maxTicksLimit: 8, font: { size: 11 } }, grid: { display: false } },
-                                y: { ticks: { font: { size: 11 }, callback: function(v){ return v.toFixed(1) + '%'; } }, grid: { color: 'rgba(0,0,0,0.06)' } }
-                            }
-                        }
+                width: 1.5
+            }];
+            /* 叠加基准指数回撤（从归一化值计算逐日回撤） */
+            var benchmarks = {{ (history_data.benchmarks or []) | tojson }};
+            var bmColors = ['#9CA3AF', '#B0BEC5', '#90A4AE'];
+            if (benchmarks && benchmarks.length) {
+                for (var bi = 0; bi < benchmarks.length; bi++) {
+                    var bm = benchmarks[bi];
+                    if (!bm.bars || !bm.bars.length) continue;
+                    var bmValues = bm.bars.map(function(b){ return b.value; });
+                    var bmDrawdowns = [], bmPeak = bmValues[0];
+                    for (var vi = 0; vi < bmValues.length; vi++) {
+                        if (bmValues[vi] > bmPeak) bmPeak = bmValues[vi];
+                        bmDrawdowns.push(-(bmPeak - bmValues[vi]) / bmPeak * 100);
+                    }
+                    datasets.push({
+                        label: bm.name,
+                        values: bmDrawdowns,
+                        color: bmColors[bi % bmColors.length],
+                        width: 1,
+                        dash: [4, 3],
+                        fill: false
                     });
-                } catch(e) {}
-            }, 300);
-            setTimeout(function(){ clearInterval(_d_poll); }, 10000);
+                }
+            }
+            window.drawSimpleChart('drawdownChart', datasets, { yFormat: 'percent', labels: labels });
         })();
         </script>
         <div class="data-status" style="margin-top:12px;margin-left:20px;margin-right:20px;margin-bottom:4px;">

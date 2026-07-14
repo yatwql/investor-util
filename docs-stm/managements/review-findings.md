@@ -7,7 +7,7 @@
 
 ## 审查记录（摘要）
 
-> 早期审计记录已归档：详见 [`archived_review-findings.0.1.x.md`](../archive/archived_review-findings.0.1.x.md) · [`archived_review-findings.0.2.x.md`](../archive/archived_review-findings.0.2.x.md) · [`archived_review-findings.0.3.x.md`](../archive/archived_review-findings.0.3.x.md) · [`archived_review-findings.0.4.x.md`](../archive/archived_review-findings.0.4.x.md)。
+> 早期审计记录已归档：详见 [`archived_review-findings.0.1.x.md`](../archive/archived_review-findings.0.1.x.md) · [`archived_review-findings.0.2.x.md`](../archive/archived_review-findings.0.2.x.md) · [`archived_review-findings.0.3.x.md`](../archive/archived_review-findings.0.3.x.md) · [`archived_review-findings.0.4.x.md`](../archive/archived_review-findings.0.4.x.md) · [`archived_review-findings.0.5.x.md`](../archive/archived_review-findings.0.5.x.md)。
 
 ---
 
