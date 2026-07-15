@@ -1712,6 +1712,8 @@ industry_{code}.json
 | 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 7 天 | 距上次成功获取的天数超阈值后触发降级 |
 
 可配置于 `config.json` 的 `degradation` 字段。支持跨会话持久化到 `data/state/.degradation_state.json`。
+`data/state/` 目录与 `data/cache/` 同级但独立管理，存放运行时跨会话状态文件而非可清理的缓存数据，
+避免 `cache.cleanup_expired()` 误清理。
 
 **与 DataSourceRegistry 的职责边界**：
 
