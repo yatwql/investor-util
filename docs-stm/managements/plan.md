@@ -48,9 +48,10 @@
 
 ## ✅ 已完成迭代
 
-所有已完成迭代的详细变更记录见 [`changelog.md`](changelog.md)。早期实现计划和审查记录已归档：[`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md) · [`archived_plan.0.4.x.md`](../archive/archived_plan.0.4.x.md) · [`archived_plan.0.5.x.md`](../archive/archived_plan.0.5.x.md)。
+所有已完成迭代的详细变更记录见 [`changelog.md`](changelog.md)。早期实现计划已归档：[`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md) · [`archived_plan.0.4.x.md`](../archive/archived_plan.0.4.x.md) · [`archived_plan.0.5.x.md`](../archive/archived_plan.0.5.x.md)。
 
 - **G. 报告板块可见性可配置** ✅ v0.4.5 完成
+- **I. 组合历史走势与基准指数比对** ✅ v0.6.0 完成
 
 ---
 
@@ -59,31 +60,6 @@
 > 注：字母编号跳跃出于历史分配——已完成迭代占用了相应字母（详见上方 ✅ 已完成迭代），剩余字母保留给此前已规划但优先级较低的后续迭代。
 
 ---
-
-#---
-
-### [P3] I. 组合历史走势与基准指数比对（中难度 / 高价值）
-
-组合历史收益是绝对值，缺乏参照系。叠加基准指数后，用户可以直观判断组合相对表现（跑赢/跑输大盘）。
-
-#### 目标
-
-在组合历史走势和回撤分析中，叠加参照指数线（沪深300、标普500等），让相对收益和相对回撤可量化。
-
-#### 需求点
-
-1. **默认指数选择**：A 股用沪深300（000300）、美股用标普500（SPX），可配置
-2. **历史指数 K 线获取**：当前 `index.py` 只拉当前行情，需要扩展为拉历史日线（已有 `history_stock` chain，但指数代码不同——如 `sh000300`、`sz399001`）
-3. **走势叠加**：
-   - 组合历史走势：在 as-if 净值曲线图上叠加指数归一化曲线（起算日归一化到同一基点）
-   - 历史回撤分析：叠加指数回撤曲线
-4. **HTML 报告兼容**：走势图需要前端改动（ECharts 叠加 series）
-
-#### 约束
-
-- 指数历史数据复用 `history_stock` provider chain（腾讯/新浪），不新增数据源
-- 指数代码前缀可能为 `sh`/`sz`，需 `code_utils.py` 配合处理
-- 归一化起算点与组合有效区间起算日对齐（`valid_start_idx`）
 
 ## [P4] H. 智能预警模块去留评估（高难度 / 中价值）
 
