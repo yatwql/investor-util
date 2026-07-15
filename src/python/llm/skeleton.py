@@ -258,7 +258,7 @@ def _run_standard_mode(
 
     user_prompt = prompt_builder() if prompt_builder else ""
 
-    return _generate_llm_content(
+    return generate_llm_content(
         llm_config, cache_key, get_cache_ttl_llm(module_key),
         system_prompt, user_prompt, cache_enabled, force,
         max_tokens=llm_config.get(f"max_tokens_{module_key}", max_tokens_default),
