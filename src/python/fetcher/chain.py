@@ -33,6 +33,7 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "history_stock": ["tencent", "sina"],
     "history_fund_otc": ["tiantian", "eastmoney"],
     "history_index": ["tencent", "sina"],
+    "history_index_us": ["sina", "tencent"],
 }
 
 

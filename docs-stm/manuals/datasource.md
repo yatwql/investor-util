@@ -20,4 +20,4 @@
 | 股票/ETF 历史日线 | 腾讯财经 `qt.gtimg.cn`（`f_day` 查询） | 新浪财经 `hq.sinajs.cn`（`hq_f_day` 查询） |
 | 场外基金历史净值 | 天天基金 `fundf10.eastmoney.com` `lsjz` 净值列表 | 东方财富 `api.fund.eastmoney.com` 历史净值接口 |
 
-> **架构说明：** 指数数据由 `fetcher/index.py` 直接调用对应 API（不经过 Provider Chain）。A 股指数：腾讯→新浪备用→过期缓存；美股指数：新浪（2 次重试）→腾讯备用→过期缓存。历史走势数据由 `report/portfolio_history.py` 内部路由到对应 Provider 的 history 接口（`_fetch_with_incremental_fallback`），走双链路 fallback。
+> **架构说明：** 指数历史 K 线由 `fetcher/index.py` 通过 Provider Chain 获取（`fetch_with_incremental_fallback`），A 股指数走 `history_index`（腾讯→新浪备用），美股指数走 `history_index_us`（新浪→腾讯备用，因腾讯 K-line API 不支持 `gb_*` 代码）。实时行情由 `report/portfolio_history.py` 内部路由到对应 Provider：A 股指数→腾讯→新浪备用；美股指数→新浪→腾讯备用。

@@ -228,10 +228,12 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     if cached is not NOT_FOUND:
         return cached
 
-    # 通过 history_index chain 获取
+    # 美股指数使用独立 chain（新浪优先，腾讯备用；腾讯 K-line 不支持 gb_* 代码）
+    from src.python.code_utils import is_us_index_code
+    chain_name = "history_index_us" if is_us_index_code(code) else "history_index"
     days = min(max(days, 5), 3650)
     try:
-        result = fetch_with_incremental_fallback("history_index", code, days)
+        result = fetch_with_incremental_fallback(chain_name, code, days)
     except Exception:
         logger.warning("[index] 指数历史日线获取异常: %s", code, exc_info=True)
         result = []

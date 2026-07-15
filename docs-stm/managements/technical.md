@@ -282,6 +282,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
  │  price_fund_otc: 东方财富净值 API (直达，无备用)                   │
  │  history_stock:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_index:  腾讯财经 K 线          →  新浪财经 K 线          │
+ │  history_index_us: 新浪财经 K 线        →  腾讯财经 K 线          │
  │  history_fund_otc: 天天基金 pingzhongdata → 东方财富净值分页       │
  │  industry:       东方财富 push2          →  行情页 quotedata      │
  │  fund_rank:      天天基金 (直达)                                  │
@@ -1435,7 +1436,7 @@ get_combined_timeseries()
 
 **Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值 `'0.00'` 格式），`drawdown_analysis` 页签对比指标矩阵（累计收益率/最大回撤/波动率等）。
 
-**注册表条目**：`history_stock` / `history_fund_otc` / `history_index` 历史走势数据在 registry 中注册为无分组缓存，不受菜单缓存命令影响。
+**注册表条目**：`history_stock` / `history_fund_otc` / `history_index` / `history_index_us` 历史走势数据在 registry 中注册为无分组缓存，不受菜单缓存命令影响。
 
 #### F1 快照存储与清理（history_snapshot.py）
 
@@ -1854,7 +1855,7 @@ class DataModuleDef:
 | 补充数据（refresh） | 4 | profit_forecast、sector_flow、extended、dividend |
 | B 系列基金分析（refresh/无分组） | 4 | fund_manager、fund_overlap、fund_concentration、fund_style_snapshot |
 | 精确键名（refresh/无分组） | 3 | benchmark、tracking、calendar |
-| 历史走势（无分组） | 3 | history_stock、history_fund_otc、history_index |
+| 历史走势（无分组） | 4 | history_stock、history_fund_otc、history_index、history_index_us |
 
 #### 派生产出接口
 
@@ -2171,6 +2172,7 @@ investor-util/
 | `history_stock` | `history_stock_{code}.json` | 7 天 | — | — | 无分组 |
 | `history_fund_otc` | `history_fund_otc_{code}.json` | 30 天 | — | — | 无分组 |
 | `history_index` | `history_index_{code}.json` | 30 天 | — | — | 无分组 |
+| `history_index_us` | `history_index_us_{code}.json` | 30 天 | — | — | 无分组 |
 
 #### 系统类
 

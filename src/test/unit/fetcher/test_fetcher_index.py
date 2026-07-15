@@ -436,4 +436,4 @@ class TestFetchIndexHistory(unittest.TestCase):
         result = fetch_index_history("gb_inx", days=200)
 
         self.assertEqual(len(result), 1)
-        mock_fetch.assert_called_once_with("history_index", "gb_inx", 200)
+        mock_fetch.assert_called_once_with("history_index_us", "gb_inx", 200)
