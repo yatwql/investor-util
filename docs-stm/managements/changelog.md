@@ -23,7 +23,7 @@
 ### Docs
 
 - **requirements.md**：修复 R-CCH-27 编号重复（缓存分组/指纹区段全体顺移）
-- **technical.md**：附录 C TTL 引用路径修正（§5.5 → §9.2）
+- **technical.md**：附录 C 自完备化——移除对需求文档的 TTL 引用，改为直接填充具体数值（price/index 24h/盘中30s、news/sector_flow 15min、LLM 2h/1h/24h 等 22 项）
 - **changelog.md**／**archived_changelog.0.5.x.md**／**review-findings.md**／**archived_review-findings.0.5.x.md**：v0.5.x 变更记录与自审记录归档迁移
 
 
