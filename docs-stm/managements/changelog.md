@@ -25,19 +25,6 @@
 - *（本次无文档变更）*
 
 
-## [0.5.8] - 2026-07-15
-
-**v0.5.8 完整变更记录已归档**：详见 [archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)
-
-## [0.5.7] - 2026-07-15
-
-**v0.5.7 完整变更记录已归档**：详见 [archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)
-
-## [0.5.6] - 2026-07-15
-
-**v0.5.6 完整变更记录已归档**：详见 [archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)
-
-
 > **v0.5.x 版本变更记录已归档**：详见 [docs-stm/archive/v0.5.x/archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)。
 > 涵盖 v0.5.0 ~ v0.5.8（2026-07-14 ~ 2026-07-15）共 9 个版本。
 >
