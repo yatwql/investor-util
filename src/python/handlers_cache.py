@@ -385,58 +385,71 @@ def _cmd_cleanup_cache() -> None:
 def _cmd_show_cache_stats() -> None:
     """查看缓存统计信息。"""
     from src.python.cache import cleanup_expired, get_cache_dir, get_cache_hit_rate, get_cache_stats
+    from src.python.constants import PROJECT_ROOT
     cache_dir = get_cache_dir()
     stats = get_cache_stats()
     hit_rate = get_cache_hit_rate()
-    print(f"  缓存目录: {cache_dir}")
-    print(f"  文件总数: {stats['total_files']}")
-    print(f"  总大小:   {stats['total_size_bytes'] / 1024:.0f} KB")
+
+    # ── 1. data/cache 缓存文件 ──
+    print(f"  ════════════════ data/cache ════════════════")
+    print(f"  目录: {cache_dir}")
+    print(f"  文件: {stats['total_files']} 个 | 大小: {stats['total_size_bytes'] / 1024:.0f} KB")
     if hit_rate["total"] > 0:
         pct = hit_rate["rate"] * 100
         print(f"  命中率:   {pct:.1f}% ({hit_rate['hits']} 命中 / {hit_rate['total']} 次请求)")
-    print("  按前缀分类:")
+    top_size = stats.get("top_by_size", [])
+    if top_size:
+        print(f"  最大文件:")
+        for key, size in top_size[:3]:
+            size_kb = size / 1024
+            disp = f"{size_kb / 1024:.1f} MB" if size_kb >= 1024 else f"{size_kb:.0f} KB"
+            print(f"    {key}.json  ({disp})")
+    print("  前缀分布:")
     for prefix, count in sorted(stats.get("by_prefix", {}).items()):
         print(f"    {prefix}_*: {count} 个文件")
     print()
-    top_size = stats.get("top_by_size", [])
-    if top_size:
-        print(f"  最大文件 TOP {len(top_size)}:")
-        for key, size in top_size:
-            size_kb = size / 1024
-            if size_kb >= 1024:
-                print(f"    {key}.json  ({size_kb / 1024:.1f} MB)")
-            else:
-                print(f"    {key}.json  ({size_kb:.0f} KB)")
-        print()
     print("  [..] 正在检查过期文件...")
     expired = cleanup_expired(dry_run=True)
-    print(f"  过期文件: {expired} 个（可通过菜单 [3] 清理）")
+    print(f"  过期文件: {expired} 个（菜单 [3] 可清理）")
 
-    # ── data/history/snapshots 统计 ──
-    try:
-        from src.python.constants import PROJECT_ROOT
-        _history_dir = os.path.join(PROJECT_ROOT, "data", "history", "snapshots")
-        if os.path.isdir(_history_dir):
-            _h_files = _h_size = 0
-            for _f in os.listdir(_history_dir):
-                _fp = os.path.join(_history_dir, _f)
-                if os.path.isfile(_fp) and _f.endswith(".json"):
-                    _h_files += 1
-                    _h_size += os.path.getsize(_fp)
-            if _h_files > 0:
-                print()
-                print(f"  历史快照目录: {os.path.abspath(_history_dir)}")
-                print(f"  快照文件: {_h_files} 个")
-                print(f"  总大小:   {_h_size / 1024:.0f} KB")
-                _latest = max(
-                    (os.path.getmtime(os.path.join(_history_dir, _f))
-                     for _f in os.listdir(_history_dir) if _f.endswith(".json")),
-                    default=0,
-                )
-                if _latest:
-                    from datetime import datetime
-                    print(f"  最新快照:   {datetime.fromtimestamp(_latest).strftime('%Y-%m-%d %H:%M')}")
-    except (ImportError, OSError):
-        pass
+    # ── 2. data/history/snapshots 快照文件 ──
+    _hist_dir = os.path.join(PROJECT_ROOT, "data", "history", "snapshots")
+    if os.path.isdir(_hist_dir):
+        _h_files = _h_size = 0
+        for _f in os.listdir(_hist_dir):
+            _fp = os.path.join(_hist_dir, _f)
+            if os.path.isfile(_fp) and _f.endswith(".json"):
+                _h_files += 1
+                _h_size += os.path.getsize(_fp)
+        if _h_files > 0:
+            print()
+            print(f"  ════════ data/history/snapshots ════════")
+            print(f"  目录: {os.path.abspath(_hist_dir)}")
+            print(f"  文件: {_h_files} 个 | 大小: {_h_size / 1024:.0f} KB")
+            _latest = max(
+                (os.path.getmtime(os.path.join(_hist_dir, _f))
+                 for _f in os.listdir(_hist_dir) if _f.endswith(".json")),
+                default=0,
+            )
+            if _latest:
+                from datetime import datetime
+                print(f"  最新: {datetime.fromtimestamp(_latest).strftime('%Y-%m-%d %H:%M')}")
+            print(f"  （持仓快照，超期自动删除，不随缓存清理）")
+
+    # ── 3. data/state 运行时状态文件 ──
+    _state_dir = os.path.join(PROJECT_ROOT, "data", "state")
+    if os.path.isdir(_state_dir):
+        _s_files = _s_size = 0
+        for _f in os.listdir(_state_dir):
+            _fp = os.path.join(_state_dir, _f)
+            if os.path.isfile(_fp):
+                _s_files += 1
+                _s_size += os.path.getsize(_fp)
+        if _s_files > 0:
+            print()
+            print(f"  ═══════════════ data/state ═══════════════")
+            print(f"  目录: {os.path.abspath(_state_dir)}")
+            print(f"  文件: {_s_files} 个 | 大小: {_s_size / 1024:.1f} KB")
+            print(f"  （运行时状态，跨会话持久化，不随缓存清理）")
 
     press_any_key()

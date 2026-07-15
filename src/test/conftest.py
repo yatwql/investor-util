@@ -128,6 +128,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.cache._CACHE_DIR",
         str(tmp_path / "data/cache"),
     )
+    # data/state/ 运行时状态目录隔离（从 cache_dir 推导，显式 patch 确保清晰）
+    monkeypatch.setattr(
+        "src.python.report.data_status._default_persist_path",
+        lambda: str(tmp_path / "data/state/.degradation_state.json"),
+    )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(
         "src.python.constants.HISTORY_SNAPSHOT_DIR",

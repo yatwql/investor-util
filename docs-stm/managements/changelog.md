@@ -18,11 +18,14 @@
 
 ### Changed
 
-- *（本次无变更）*
+- **菜单 [4] 缓存统计扩展**：输出从仅 data/cache/ 扩展为三块（data/cache/ 缓存 → data/history/snapshots/ 快照 → data/state/ 运行时状态），每块独立显示文件数与大小
 
 ### Docs
 
-- *（本次无变更）*
+- **requirements.md / how-to-menu.md**：菜单 [4] 说明同步更新为三块统计
+- **how-to-config.md**：degradation 配置项补充持久化位置 data/state/
+- **testplan.md**：测试隔离要求补充 data/state/
+- **faq.md**：新增 data/state/ 说明（用途、不会被清理）
 
 ## [0.5.11] - 2026-07-15
 

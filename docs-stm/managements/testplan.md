@@ -441,7 +441,7 @@ def test_get_ttl_closed(self, mock_open):
 
 ### 5.8 测试隔离要求
 
-- 测试不操作真实 `data/cache/`，所有缓存操作使用 `tempfile.mkdtemp` 临时目录
+- 测试不操作真实 `data/cache/` 和 `data/state/`，所有缓存/状态操作使用 `tempfile.mkdtemp` 临时目录
 - 测试不写磁盘配置，`config.json` 通过 `os.environ` 或 `tempfile` 隔离
 - 网络测试全部 mock，不发起真实 HTTP 请求
 - 测试间互不依赖，每个 `setUp` 清理状态
