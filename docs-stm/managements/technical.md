@@ -2134,51 +2134,51 @@ investor-util/
 
 | 键名 | 文件名模式 | TTL | 指纹 | 分组 |
 |:-----|:----------|:---:|:----|:-----|
-| `price` | `price_{code}.json` | 见需求 §5.5 | — | preload |
-| `index` | `index_{code}.json` | 见需求 §5.5 | — | preload |
-| `news` | `news_{md5}.json` | 见需求 §5.5 | 新闻源参数+关键词 | refresh |
-| `sector_flow` | `sector_flow_{fingerprint}.json` | 见需求 §5.5 | A股+美股指数 | refresh |
-| `rank` | `fund_perf_{code}.json` | 见需求 §5.5 | — | refresh |
-| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 见需求 §5.5 | A股+美股指数 | refresh |
-| `hold` | `fund_hold_{code}.json` | 见需求 §5.5 | — | refresh |
-| `industry` | `industry_{code}.json` | 见需求 §5.5 | — | refresh |
-| `dividend` | `dividend_{fingerprint}.json` | 见需求 §5.5 | 持仓+穿透 A 股代码 | refresh |
-| `benchmark` | `fund_benchmarks.json` | 见需求 §5.5 | — | refresh |
+| `price` | `price_{code}.json` | 见需求 §9.2 | — | preload |
+| `index` | `index_{code}.json` | 见需求 §9.2 | — | preload |
+| `news` | `news_{md5}.json` | 见需求 §9.2 | 新闻源参数+关键词 | refresh |
+| `sector_flow` | `sector_flow_{fingerprint}.json` | 见需求 §9.2 | A股+美股指数 | refresh |
+| `rank` | `fund_perf_{code}.json` | 见需求 §9.2 | — | refresh |
+| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 见需求 §9.2 | A股+美股指数 | refresh |
+| `hold` | `fund_hold_{code}.json` | 见需求 §9.2 | — | refresh |
+| `industry` | `industry_{code}.json` | 见需求 §9.2 | — | refresh |
+| `dividend` | `dividend_{fingerprint}.json` | 见需求 §9.2 | 持仓+穿透 A 股代码 | refresh |
+| `benchmark` | `fund_benchmarks.json` | 见需求 §9.2 | — | refresh |
 
 #### LLM 分析类
 
 | 键名 | 文件名模式 | TTL | 指纹 | 分组 |
 |:-----|:----------|:---:|:----|:-----|
-| `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 见需求 §5.5 | 持仓汇总+分类+穿透+明细 | preload |
-| `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 见需求 §5.5 | 标题前 80 字+持仓指纹 | refresh |
-| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 见需求 §5.5 | A股/美股指数+持仓汇总 | preload |
-| `llm_health_check` | `llm_health_check_{fingerprint}.json` | 见需求 §5.5 | 持仓明细（排除行情波动） | preload |
-| `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 见需求 §5.5 | 持仓明细（排除行情波动） | preload |
+| `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 见需求 §9.2 | 持仓汇总+分类+穿透+明细 | preload |
+| `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 见需求 §9.2 | 标题前 80 字+持仓指纹 | refresh |
+| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 见需求 §9.2 | A股/美股指数+持仓汇总 | preload |
+| `llm_health_check` | `llm_health_check_{fingerprint}.json` | 见需求 §9.2 | 持仓明细（排除行情波动） | preload |
+| `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 见需求 §9.2 | 持仓明细（排除行情波动） | preload |
 
 #### 基金深度分析类
 
 | 键名 | 文件名模式 | TTL | 指纹 | 分组 |
 |:-----|:----------|:---:|:----|:-----|
-| `fund_manager` | `fund_manager_{code}.json` + `fund_manager_snapshot.json` | 见需求 §5.5 | — | refresh |
-| `fund_overlap` | 实时计算（推导自 `fund_hold_{code}.json`） | 见需求 §5.5 | — | refresh |
-| `fund_concentration` | `fund_concentration_snapshot.json` | 见需求 §5.5 | — | 无分组 |
-| `fund_style_snapshot` | `fund_style_snapshot.json` | 见需求 §5.5 | — | 无分组 |
-| `extended` | `extended_{code}.json` | 见需求 §5.5 | — | refresh |
+| `fund_manager` | `fund_manager_{code}.json` + `fund_manager_snapshot.json` | 见需求 §9.2 | — | refresh |
+| `fund_overlap` | 实时计算（推导自 `fund_hold_{code}.json`） | 见需求 §9.2 | — | refresh |
+| `fund_concentration` | `fund_concentration_snapshot.json` | 见需求 §9.2 | — | 无分组 |
+| `fund_style_snapshot` | `fund_style_snapshot.json` | 见需求 §9.2 | — | 无分组 |
+| `extended` | `extended_{code}.json` | 见需求 §9.2 | — | refresh |
 
 #### 历史走势类
 
 | 键名 | 文件名模式 | TTL | 指纹 | 分组 |
 |:-----|:----------|:---:|:----|:-----|
-| `history_stock` | `history_stock_{code}.json` | 见需求 §5.5 | — | 无分组 |
-| `history_fund_otc` | `history_fund_otc_{code}.json` | 见需求 §5.5 | — | 无分组 |
+| `history_stock` | `history_stock_{code}.json` | 见需求 §9.2 | — | 无分组 |
+| `history_fund_otc` | `history_fund_otc_{code}.json` | 见需求 §9.2 | — | 无分组 |
 | `history_index` | `history_index_{code}.json` | 30 天（CACHE_MONTHLY） | — | 无分组 |
 
 #### 系统类
 
 | 键名 | 文件名模式 | TTL | 指纹 | 分组 |
 |:-----|:----------|:---:|:----|:-----|
-| `tracking` | `holdings_tracking.json` | 见需求 §5.5 | — | 无分组 |
-| `calendar` | `trading_calendar.json` | 见需求 §5.5 | — | 无分组 |
+| `tracking` | `holdings_tracking.json` | 见需求 §9.2 | — | 无分组 |
+| `calendar` | `trading_calendar.json` | 见需求 §9.2 | — | 无分组 |
 
 > `—` 表示精确键名（无指纹后缀），TTL 到期后刷新。
 

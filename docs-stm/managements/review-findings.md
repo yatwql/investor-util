@@ -2,17 +2,10 @@
 
 ---
 
-P1 问题（3 项）已全部修复完毕，详见 [`changelog.md`](changelog.md)。
-
-
 ## 当前待处理问题
 
 > 审查方法：并行派出 Architecture Strategist、Maintainability Reviewer、Pattern Recognition Specialist 三个 Agent 对全库（src/python/ + src/test/）进行独立分析后汇总。
 > 审查范围：架构约束遵从（technical.md §2/#9）、死代码、重复代码、命名规范、模块级副作用、测试覆盖缺口。
-
-### P2（中优先级 — 已全部修复）
-
-P2 问题（10 项）已全部修复完毕，详见 [`changelog.md`](changelog.md)。
 
 ### P3（低优先级 — 修复收益有限，建议长期跟踪）
 
