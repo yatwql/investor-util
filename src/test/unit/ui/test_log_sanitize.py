@@ -79,14 +79,14 @@ class TestApiKeyNotInLog(unittest.TestCase):
 
     def test_api_key_not_logged_in_call_llm(self):
         """_call_llm 的日志不包含 api_key 明文。"""
-        from src.python.llm.api import _call_llm
+        from src.python.llm.api import call_llm
 
         secret_key = "sk-test-secret-key-12345"
         config = {"provider": "claude", "api_key": secret_key}
 
         with patch("src.python.llm.api.call_single_provider") as mock_call:
             mock_call.return_value = (None, None)
-            _call_llm("sys", "user", config)
+            call_llm("sys", "user", config)
 
         log_text = self.log_capture.getvalue()
         # api_key 明文不应出现在日志中
@@ -95,7 +95,7 @@ class TestApiKeyNotInLog(unittest.TestCase):
 
     def test_api_key_not_logged_on_failure(self):
         """API 调用失败日志不包含 api_key。"""
-        from src.python.llm.api_base import _call_llm_with_retry as _retry
+        from src.python.llm.api_base import call_llm_with_retry as _retry
 
         secret_key = "sk-another-secret-99999"
         with patch("src.python.llm.api_base._attempt_api_call") as mock_attempt:

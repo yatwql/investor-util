@@ -14,7 +14,16 @@
 
 ### Fixed
 
-- *（本次无修复）*
+- **handlers_cache 缺失 import os**：`_cmd_show_cache_stats` 中使用 `os.path.join` 但模块未导入 `os`（P2-7 拆分解耦遗留）
+- **skeleton.py `_generate_llm_content` 内部调用残留**：`_run_standard_mode` 仍调用旧私有名，导致 penetration_deep 模块 RuntimeError
+- **P1-3f 重命名残留全量清理**（17 测试文件 + 2 源码文件，共 100+ 处）：
+  - `_build_module_info_list` → `build_llm_module_info`（位置迁移至 `llm_module_info.py`）：测试 import/调用 10+ 处
+  - `_generate_llm_content` → `generate_llm_content`：mock 目标 7 处 + `_run_standard_mode` 内部调用 1 处
+  - `_fetch_with_fallback` → `fetch_with_fallback`（`chain.py` 公开函数，`price.py`/`industry.py` 导入）：mock 目标 9 处
+  - `_fetch_with_incremental_fallback` → `fetch_with_incremental_fallback`（`chain.py`）：mock 目标 19 处
+  - `_call_openai` → `call_openai`、`_call_single_provider` → `call_single_provider`：mock 目标 13 处
+  - `_call_llm_with_retry` → `call_llm_with_retry`（移入 `api_base.py`）：mock 目标 1 处
+  - `_press_any_key` / `_refresh_config`（import 自 `tui_menu.py`）：mock 目标 10 处
 
 ### Changed
 

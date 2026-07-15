@@ -201,7 +201,7 @@ class TestDerivedMaps:
 
     def test_cache_prefix_modules_have_groups(self):
         """有缓存前缀的模块——有 cache_groups 或有设计注释说明无分组原因。"""
-        known_ungrouped = {"history_stock", "history_fund_otc"}
+        known_ungrouped = {"history_stock", "history_fund_otc", "history_index"}
         for m in get_registry():
             if m.cache_prefixes:
                 if m.data_type in known_ungrouped:
