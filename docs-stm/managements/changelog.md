@@ -48,6 +48,7 @@
 - 用户文档去历史痕迹：`datasource-and-folders.md` 移除末尾最后更新行
 - `reports-instruction.md` — 补充基准指数叠加对比说明（§16/§17/历史走势分组表/F2 机制）
 - `faq.md` — 补充基准指数对比 FAQ（走势图基准曲线来源说明）
+- **归档目录重组**：`archive/` 根目录扁平文件按版本迁入 `v0.1.x/~v0.5.x/` 子目录，迭代子目录（如 `data-degradation/`）同步归入对应版本目录；`datasource-and-folders.md` 目录树同步更新；`changelog.md`/`plan.md`/`testplan.md` 归档引用路径更新
 
 
 > **v0.5.x 版本变更记录已归档**：详见 [docs-stm/archive/v0.5.x/archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)。
