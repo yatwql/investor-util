@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import atexit
+import os
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any
 
