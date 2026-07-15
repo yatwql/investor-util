@@ -212,6 +212,22 @@ def is_bond_fund_by_name(name: str) -> bool:
     return any(k in name for k in _BOND_KEYWORDS_BROAD)
 
 
+def is_convertible_bond_by_name(name: str) -> bool:
+    """判断名称是否为可转债（含"转债"关键词）。
+
+    可转债虽以 1 开头代码上市交易（与 ETF/LOF 同区间），
+    但其股债混合性质不属于基金/ETF/股票穿透分类，
+    需在 ``classify_penetration`` 的 ETF 判定前单独排除。
+
+    Args:
+        name: 持仓名称
+
+    Returns:
+        True 表示名称匹配可转债特征
+    """
+    return "转债" in name
+
+
 def is_offsite_fund(account: str) -> bool:
     """判断账户是否为场外基金渠道。
 

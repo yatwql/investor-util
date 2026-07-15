@@ -2,11 +2,56 @@
 
 > 归档时间：2026-07-15
 > 原始文件：docs-stm/managements/changelog.md
-> 涵盖版本：v0.5.0 ~ v0.5.11
+> 涵盖版本：v0.5.0 ~ v0.5.12（2026-07-14 ~ 2026-07-15）共 13 个版本
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/)。
 
 ---
+
+## [0.5.12] - 2026-07-15
+
+### Added
+
+- **`code_utils.is_convertible_bond_by_name()`**：新增可转债名称判定函数，集中管理"转债"关键词识别
+
+### Fixed
+
+- **`classify_penetration` 可转债误判为 ETF**：可转债（名称含"转债"）因 `1xxxxx` 代码前缀被 `is_exchange_fund_code` 匹配，在 ETF 判定步骤被拦截返回 `ETF`。在 ETF 判定前新增可转债名称检查，返回 `IGNORE`。相关 3 个测试用例同步修正
+- **`test_html_builders.py` mock 路径错误**：`get_dividend_data` 的 `@patch` 路径指向 `providers.akshare_extras`，但 `html_builders.py` 实际从 `fetcher.akshare` 导入。全量跑时模块加载顺序不同导致 mock 静默失效。修正为 `fetcher.akshare.get_dividend_data`（2 处）
+
+### Changed
+
+- **菜单 [4] 名称与统计扩展**：菜单项改为"查看缓存/状态统计"；输出从仅 data/cache/ 扩展为三块（data/cache/ 缓存 → data/history/snapshots/ 快照 → data/state/ 运行时状态），每块独立显示文件数与大小
+
+### Docs
+
+- **requirements.md**：新增 R-ERR-16 降级状态跨会话持久化目录要求；菜单 [4] 说明同步更新为三块统计
+- **technical.md**：补充 DegradationTracker 节中 data/state/ 目录分离说明
+- **how-to-menu.md**：菜单 [4] 说明同步更新为三块统计
+- **how-to-config.md**：degradation 配置项补充持久化位置 data/state/
+- **testplan.md**：测试隔离要求补充 data/state/
+- **faq.md**：新增 data/state/ Q&A（用途、不会被清理）
+
+## [0.5.11] - 2026-07-15
+
+- **v0.5.11 版本变更记录已归档**
+
+### Fixed
+
+- **回归测试修复**：修复 P1-3f 函数重命名残留在 9 个测试文件中的 7 类共 41 个测试失败
+  - `test_fund_performance.py`：`fp._is_fund()` → `fp.is_fund()`（9 处）
+  - `test_tui_handlers.py`：`_timing_records` → `timing_records`（20+ 处）
+  - `test_log_sanitize.py`：`_call_claude` → `call_claude`（2 处）
+  - `test_news_correlation.py`：mock target 同步至 `llm.run_news_correlation_safe`，同时在 `news_correlation.py._apply_llm_enhancement` 增加 try/except 兜底，防止 LLM 异常穿透
+  - `test_penetration.py`：可转债 `110059` 重分类 `IGNORE` → `ETF`（P2-3 行为变更，更新 2 个测试断言）
+  - `test_html_builders_edge.py`：mock target `providers.akshare_extras.*` → `fetcher.akshare.*`
+  - `test_fund_style_analysis.py`：mock target `providers.eastmoney_industry.fetch_industry` → `fetcher.industry.fetch_industry_data`，返回值由 `str` 调整为 `dict`
+
+### Docs
+
+- **requirements.md**：修复 R-CCH-27 编号重复（缓存分组/指纹区段全体顺移）
+- **technical.md**：附录 C 自完备化——移除对需求文档的 TTL 引用，改为直接填充具体数值（price/index 24h/盘中30s、news/sector_flow 15min、LLM 2h/1h/24h 等 22 项）
+- **changelog.md**／**archived_changelog.0.5.x.md**／**review-findings.md**／**archived_review-findings.0.5.x.md**：v0.5.x 变更记录与自审记录归档迁移
 
 ## [0.5.6] - 2026-07-15
 

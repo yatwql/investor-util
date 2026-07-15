@@ -153,9 +153,9 @@ class TestClassifyPenetration(unittest.TestCase):
         self.assertEqual(pene.classify_penetration(h), pene.ACTIVE_EQUITY)
 
     def test_ignore_convertible_bond(self):
-        """可转债（证券账户中 1 开头代码但无 ETF 名称）→ ETF（P2-3 改判）。"""
+        """可转债（名称含"转债"）→ IGNORE（名称优先级高于代码前缀）。"""
         h = self._h("浦发转债", "110059")
-        self.assertEqual(pene.classify_penetration(h), pene.ETF)
+        self.assertEqual(pene.classify_penetration(h), pene.IGNORE)
 
     def test_ignore_unknown_asset(self):
         """未知类型 → IGNORE。"""
@@ -515,9 +515,9 @@ class TestPenetrationEdgeCases(unittest.TestCase):
         fund_types = [pene.QDII, pene.ETF, pene.INDEX_LINK, pene.BOND_FUND, pene.ACTIVE_EQUITY]
         funds = [h for ft in fund_types for h in classified[ft]]
         stocks = classified[pene.STOCK]
-        self.assertEqual(len(funds), 1)  # 110059 被重分类为 ETF（P2-3）
+        self.assertEqual(len(funds), 0)  # "浦发转债" 回归 IGNORE
         self.assertEqual(len(stocks), 0)
-        self.assertEqual(len(classified[pene.IGNORE]), 1)
+        self.assertEqual(len(classified[pene.IGNORE]), 2)
 
     def test_all_funds_fail_to_fetch(self):
         """所有基金均无法获取穿透数据 → merged 为空。"""

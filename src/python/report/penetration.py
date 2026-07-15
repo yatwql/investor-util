@@ -27,6 +27,7 @@ from typing import Any
 from src.python.code_utils import (
     is_a_share_code,
     is_bond_related_by_name,
+    is_convertible_bond_by_name,
     is_etf_by_name,
     is_exchange_fund_code,
     is_index_link_by_name,
@@ -102,6 +103,10 @@ def classify_penetration(h: Holding) -> str:
     # 3) 场外指数联接
     if is_index_link_by_name(name):
         return INDEX_LINK
+
+    # 3.5) 可转债 → 忽略（转债为场内交易品种，但非基金/ETF/股票）
+    if is_convertible_bond_by_name(name):
+        return IGNORE
 
     # 4) 场内 ETF（名称含 ETF 或代码为场内基金/ETF 代码）
     if is_etf_by_name(name) or is_exchange_fund_code(code):

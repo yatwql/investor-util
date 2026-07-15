@@ -123,7 +123,7 @@ class TestBuildCategoryDataDividend(unittest.TestCase):
         """get_dividend_data 正常 → yield_text 正确计算。"""
         from src.python.report.html_builders import _build_category_data
 
-        with patch("src.python.providers.akshare_extras.get_dividend_data",
+        with patch("src.python.fetcher.akshare.get_dividend_data",
                    return_value={"600900": {"avg_dividend": 0.85},
                                  "601398": {"avg_dividend": 0.30}}):
             result, dividend_success = _build_category_data(self.holdings, list(self.detail_map.values()))
@@ -155,7 +155,7 @@ class TestBuildCategoryDataDividend(unittest.TestCase):
         d.name = "腾讯控股"
         d.code = "00700"
 
-        with patch("src.python.providers.akshare_extras.get_dividend_data") as mock_dd:
+        with patch("src.python.fetcher.akshare.get_dividend_data") as mock_dd:
             result, dividend_success = _build_category_data(non_a_holdings, [d])
             mock_dd.assert_not_called()
             self.assertTrue(dividend_success)

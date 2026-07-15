@@ -6,37 +6,15 @@
 
 ---
 
-## [Unreleased]
+## [0.5.12] - 2026-07-15
 
-### Added
-
-- *（本次无新增功能）*
-
-### Fixed
-
-- *（本次无修复）*
-
-### Changed
-
-- **菜单 [4] 名称与统计扩展**：菜单项改为"查看缓存/状态统计"；输出从仅 data/cache/ 扩展为三块（data/cache/ 缓存 → data/history/snapshots/ 快照 → data/state/ 运行时状态），每块独立显示文件数与大小
-
-### Docs
-
-- **requirements.md**：新增 R-ERR-16 降级状态跨会话持久化目录要求；菜单 [4] 说明同步更新为三块统计
-- **technical.md**：补充 DegradationTracker 节中 data/state/ 目录分离说明
-- **how-to-menu.md**：菜单 [4] 说明同步更新为三块统计
-- **how-to-config.md**：degradation 配置项补充持久化位置 data/state/
-- **testplan.md**：测试隔离要求补充 data/state/
-- **faq.md**：新增 data/state/ Q&A（用途、不会被清理）
-
-## [0.5.11] - 2026-07-15
-
-- **v0.5.11 版本变更记录已归档**：详见 [docs-stm/archive/v0.5.x/archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)。
+- **v0.5.12 版本变更记录已归档**：详见 [docs-stm/archive/v0.5.x/archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)。
 
 
 > **v0.5.x 版本变更记录已归档**：详见 [docs-stm/archive/v0.5.x/archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)。
-> 涵盖 v0.5.0 ~ v0.5.11（2026-07-14 ~ 2026-07-15）共 12 个版本。
->
+> 涵盖 v0.5.0 ~ v0.5.12（2026-07-14 ~ 2026-07-15）共 13 个版本。
+
+
 > **v0.4.x 版本变更记录已归档**：详见 [docs-stm/archive/v0.4.x/archived_changelog.0.4.x.md](../archive/v0.4.x/archived_changelog.0.4.x.md)。
 > 涵盖 v0.4.0 ~ v0.4.5（2026-07-12 ~ 2026-07-14）共 5 个版本。
 >
