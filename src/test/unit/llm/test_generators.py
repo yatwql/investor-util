@@ -162,20 +162,20 @@ class TestPrecheckAllModules(unittest.TestCase):
     """_precheck_all_modules 批量缓存预检。"""
 
     def setUp(self):
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        self._orig = dict(_LLM_MODULE_FAILURE)
-        _LLM_MODULE_FAILURE.clear()
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        self._orig = dict(LLM_MODULE_FAILURE)
+        LLM_MODULE_FAILURE.clear()
 
     def tearDown(self):
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        _LLM_MODULE_FAILURE.clear()
-        _LLM_MODULE_FAILURE.update(self._orig)
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.update(self._orig)
 
     @patch("src.python.llm.generators_orchestrator._is_llm_module_enabled", return_value=False)
     def test_disabled_module_sets_failure(self, mock_enabled):
-        """模块已禁用 → _LLM_MODULE_FAILURE 记录 FAIL_REASON_DISABLED。"""
+        """模块已禁用 → LLM_MODULE_FAILURE 记录 FAIL_REASON_DISABLED。"""
         from src.python.llm.generators_orchestrator import _precheck_all_modules
-        from src.python.llm.prompts import FAIL_REASON_DISABLED, _LLM_MODULE_FAILURE
+        from src.python.llm.prompts import FAIL_REASON_DISABLED, LLM_MODULE_FAILURE
 
         cache_info = {
             "global_macro": {"can_cache": True, "key": "llm_global_macro", "ttl": 86400,
@@ -183,7 +183,7 @@ class TestPrecheckAllModules(unittest.TestCase):
         }
         _precheck_all_modules({}, cache_info, _force=False)
         self.assertEqual(
-            _LLM_MODULE_FAILURE.get("global_macro"),
+            LLM_MODULE_FAILURE.get("global_macro"),
             FAIL_REASON_DISABLED,
         )
 

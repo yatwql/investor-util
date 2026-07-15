@@ -348,17 +348,17 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         self.mock_detail.yesterday_close = 54.0
         self.mock_detail.profit_rate = 1.0
         self._tmp = tempfile.mkdtemp(prefix="test_html_")
-        # 清理前序测试在 _LLM_MODULE_FAILURE 中残留的状态
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        self._saved_llm_failure = dict(_LLM_MODULE_FAILURE)
-        _LLM_MODULE_FAILURE.clear()
+        # 清理前序测试在 LLM_MODULE_FAILURE 中残留的状态
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        self._saved_llm_failure = dict(LLM_MODULE_FAILURE)
+        LLM_MODULE_FAILURE.clear()
 
     def tearDown(self):
         shutil.rmtree(self._tmp, ignore_errors=True)
-        # 恢复 _LLM_MODULE_FAILURE 原始状态
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        _LLM_MODULE_FAILURE.clear()
-        _LLM_MODULE_FAILURE.update(self._saved_llm_failure)
+        # 恢复 LLM_MODULE_FAILURE 原始状态
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.update(self._saved_llm_failure)
 
     def _run_with_mocks(self, enable_llm=True):
         """用 ExitStack 统一管理 9 个补丁，调用 write_html_report 并返回 mock_llm。"""
@@ -634,7 +634,7 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
         """调用 _render_llm_module_info，返回结果四元组。"""
         from contextlib import ExitStack
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE",
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE",
                                       module_failure or {}))
             if session_usage is not None:
                 stack.enter_context(
@@ -718,7 +718,7 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
         """llm_enabled_flag=True 但 format_session_usage 异常 → 返回 unknown + 无 session_usage。"""
         from contextlib import ExitStack
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE", {}))
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {}))
             # 模拟 format_session_usage / get_session_usage 抛出 TypeError
             # （与 _render_llm_module_info 中 except (ImportError, TypeError, AttributeError) 匹配）
             stack.enter_context(patch("src.python.llm.get_session_usage",

@@ -246,14 +246,14 @@ class TestGetPlaceholder(unittest.TestCase):
 
     def test_custom_order_finds_placeholder(self):
         """自定义 section_order → 占位符按配置序号查找。"""
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_NOT_CONFIGURED
-        _LLM_MODULE_FAILURE.clear()
-        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_NOT_CONFIGURED
+        from src.python.llm.prompts import LLM_MODULE_FAILURE, FAIL_REASON_NOT_CONFIGURED
+        LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_NOT_CONFIGURED
         try:
             text = _get_placeholder("1.全球局势", self._CUSTOM_ORDER)
             self.assertIn("LLM 未配置", text)
         finally:
-            _LLM_MODULE_FAILURE.clear()
+            LLM_MODULE_FAILURE.clear()
 
     def test_unknown_title_returns_generic(self):
         """未知标题 → 通用占位符文本。"""
@@ -370,10 +370,10 @@ class TestWriteLlmSheetsDisabled(unittest.TestCase):
 
     def test_disabled_global_macro_skips_sheet(self):
         """global_macro 禁用 → 不写入该页签，其他页签正常。"""
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+        from src.python.llm.prompts import LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
         # 清除可能残留的状态
-        _LLM_MODULE_FAILURE.clear()
-        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
+        LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
         try:
             text7, text8, text9, textA = write_llm_sheets(
                 self.sheets, ("<p>宏观</p>", "<p>复盘</p>", "<p>体检</p>", "<p>穿透</p>"))
@@ -387,14 +387,14 @@ class TestWriteLlmSheetsDisabled(unittest.TestCase):
             self.assertIn("14.持仓体检报告", sheet_titles)
             self.assertIn("15.穿透深度分析", sheet_titles)
         finally:
-            _LLM_MODULE_FAILURE.clear()
+            LLM_MODULE_FAILURE.clear()
 
     def test_all_disabled_no_sheets_created(self):
         """所有 4 个模块都禁用 → sheets 字典中的页签不写入内容（不修改）。"""
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
+        from src.python.llm.prompts import LLM_MODULE_FAILURE, FAIL_REASON_DISABLED
 
-        _LLM_MODULE_FAILURE.clear()
-        _LLM_MODULE_FAILURE.update(
+        LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.update(
             global_macro=FAIL_REASON_DISABLED,
             expert_review=FAIL_REASON_DISABLED,
             health_check=FAIL_REASON_DISABLED,
@@ -413,7 +413,7 @@ class TestWriteLlmSheetsDisabled(unittest.TestCase):
             for title in self._LLM_TITLES:
                 self.assertIn(title, sheet_titles)
         finally:
-            _LLM_MODULE_FAILURE.clear()
+            LLM_MODULE_FAILURE.clear()
 
 
 # ═══════════════════════════════════════════════════════════

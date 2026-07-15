@@ -2,7 +2,7 @@
 
 ---
 
-所有自查问题已修复完毕，详见 [`changelog.md`](changelog.md)。
+P1 问题（3 项）已全部修复完毕，详见 [`changelog.md`](changelog.md)。
 
 > 历史自审记录已归档：
 
@@ -12,14 +12,6 @@
 
 > 审查方法：并行派出 Architecture Strategist、Maintainability Reviewer、Pattern Recognition Specialist 三个 Agent 对全库（src/python/ + src/test/）进行独立分析后汇总。
 > 审查范围：架构约束遵从（technical.md §2/#9）、死代码、重复代码、命名规范、模块级副作用、测试覆盖缺口。
-
-### P1（高优先级 — 建议下一迭代修复）
-
-| # | 分类 | 文件 | 行号 | 问题 | 风险 | 整改收益 |
-|---|------|------|------|------|------|---------|
-| P1-1 | **C5-架构违规** | `llm/generators_orchestrator.py` | 196,202 | 直接 `httpx.Client()` 绕过 `make_http_client()`，LLM 模块的 HTTP 请求缺少统一 SSL 验证策略。`llm/skeleton.py:390` 同款。 | **高**：生产 SSL 管控盲区 | 统一受 `SSL_VERIFY` 环境变量管控；按 `make_http_client(timeout=_LLM_TIMEOUT, **settings)` 替换 |
-| P1-2 | **C6-架构违规** | `report/fund_style_analysis.py` | 216,265,309 | 直接调用 `eastmoney_industry._make_push2_request`（私有函数）、`tencent.fetch_price`、`eastmoney_industry.fetch_industry`，绕过了 Provider Chain。 | **高**：熔断器和回退策略被跳过 | 创建 fetcher 封装层（如 `fetcher/sector.py`），report 模块通过 fetcher → Chain → provider 路径调用 |
-| P1-3 | **私有符号跨包导入** | 全局约 15 处 | 多行 | `_fetch_with_fallback`、`_NOT_FOUND`、`_Timer`、`_make_push2_request`、`_LLM_MODULE_FAILURE` 等下划线开头"私有"符号被其他模块导入使用。`_make_push2_request` 跨越 report ⇄ provider 包边界最严重。 | **高**：API 边界模糊，重构时容易破坏调用方 | 统一改为无下划线公开命名，或通过 `__init__.py` 的 `__all__` 显式导出 |
 
 ### P2（中优先级 — 建议下个版本规划）
 
@@ -42,17 +34,12 @@
 | # | 分类 | 文件 | 行号 | 问题 | 风险 | 整改收益 |
 |---|------|------|------|------|------|---------|
 | P3-1 | **模块级副作用** | `report/fund_style_analysis.py` | 36-37 | 模块加载时执行 `get_registry().register_provider("tencent_style", ...)`，导入即修改全局注册中心。 | **低**：影响测试隔离 | 改为惰性初始化：首次需要时注册 |
-| P3-2 | **模块级副作用** | `llm/pricing.py` | 82 | 模块加载时执行 `_reload_pricing()` 读取配置文件（文件 I/O）。 | **低**：影响启动时间 | 延迟到首次调用 `_estimate_cost()` 时执行 |
-| P3-3 | **模块级副作用** | `provider_registry.py` | 467 | 模块加载时执行 `get_registry().register_default_chains()`，导入时需读取配置。 | **低**：影响模块加载可预测性 | 改为惰性注册或显式初始化入口 |
-| P3-4 | **文件过长** | `providers/tiantian.py` | 745 行 | 基金持仓解析、季度回退、业绩排名、评级计算、历史净值等多项独立职责揉合在一个文件。 | **低**：降低可读性 | 将评级计算、风险分析拆出 |
-| P3-5 | **文件过长** | `report/fund_style_analysis.py` | 634 行 | 快照管理、单股判定、行业 PE 计算、并发批量降级等多种职责。 | **低**：降低可读性 | 考虑拆分子模块 |
-| P3-6 | **文件过长** | `config/_core.py` | 624 行 | 15 个验证函数、配置读写、LLM 配置读取，验证函数模式高度一致。 | **低**：降低可读性 | 验证函数提取到 `_validate.py` |
+| P3-2 | **模块级副作用** | `llm/pricing.py` | 82 | 模块加载时执行 `reload_pricing()` 读取配置文件（文件 I/O）。 | **低**：影响启动时间 | 延迟到首次调用 `estimate_cost()` 时执行 |
+| P3-4 | **文件过长** | `providers/tiantian.py` | 744 行 | 基金持仓解析、季度回退、业绩排名、评级计算、历史净值等多项独立职责揉合在一个文件。 | **低**：降低可读性 | 将评级计算、风险分析拆出 |
+| P3-5 | **文件过长** | `report/fund_style_analysis.py` | 635 行 | 快照管理、单股判定、行业 PE 计算、并发批量降级等多种职责。 | **低**：降低可读性 | 考虑拆分子模块 |
+| P3-6 | **文件过长** | `config/_core.py` | 631 行 | 15 个验证函数、配置读写、LLM 配置读取，验证函数模式高度一致。 | **低**：降低可读性 | 验证函数提取到 `_validate.py` |
 | P3-7 | **抽象依赖倒置** | `report/progress.py` | 14 | 从 `tui_menu.py` 导入颜色常量，report 层抽象模块依赖 UI 层模块。 | **低**：抽象不纯 | 将颜色常量定义移到独立的共享模块 |
-| P3-8 | **遗留 print 语句** | `llm/api_base.py` | 247 | `print(msg)` 直接输出未使用项目标准的 `[..]`/`[OK]` 前缀格式。 | **低**：输出格式不一致 | 改用 logging 或标准 TUI 前缀格式 |
 | P3-9 | **测试覆盖缺口** | `report/fund_style_analysis.py` | 244-288 | `_tencent_extended` / `_push2_extended` 的会话级缓存去重依赖全局单例协作，无集成测试验证跨模块缓存共享。 | **低**：潜在缓存协方差错 | 补充集成测试 |
-| P3-10 | **测试覆盖缺口** | `provider_registry.py` | 256-282 | `is_chain_broken` 的"回调解除+惰性恢复"行为无单元测试覆盖。 | **低**：熔断恢复路径未验证 | 补充 `is_chain_broken` 冷却恢复路径测试 |
-| P3-11 | **配置验证缺失** | `config/_core.py` | 259-263 | `_validate_user_fund_benchmarks` 不做实际验证，仅检查 dict 类型。 | **低**：配置错误不告警 | 增强验证逻辑 |
-| P3-12 | **多空白行** | `config/_core.py` | 526-528 | 连续三行空白，违反 PEP8 两行限制。 | **极低**：编码风格 | 删除多余空白行 |
 
 ---
 

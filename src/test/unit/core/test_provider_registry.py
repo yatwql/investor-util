@@ -13,8 +13,8 @@ import pytest
 
 from src.python.provider_registry import (
     FetchStrategy,
-    _NOT_FOUND,
-    _SESSION_CACHE_MAX_ENTRIES,
+    NOT_FOUND,
+    __SESSION_CACHE_MAX_ENTRIES,
     DataSourceRegistry,
     get_registry,
 )
@@ -196,7 +196,7 @@ class TestSessionCache:
 
     def test_miss(self):
         r = _fresh_registry()
-        assert r.session_cache_get("price", "000001") is _NOT_FOUND
+        assert r.session_cache_get("price", "000001") is NOT_FOUND
 
     def test_contains_existing(self):
         r = _fresh_registry()
@@ -219,16 +219,16 @@ class TestSessionCache:
         r.session_cache_set("price", "600519", {})
         r.session_cache_set("industry", "600519", {})
         r.session_cache_clear("price")
-        assert r.session_cache_get("price", "600519") is _NOT_FOUND
-        assert r.session_cache_get("industry", "600519") is not _NOT_FOUND
+        assert r.session_cache_get("price", "600519") is NOT_FOUND
+        assert r.session_cache_get("industry", "600519") is not NOT_FOUND
 
     def test_clear_all(self):
         r = _fresh_registry()
         r.session_cache_set("price", "600519", {})
         r.session_cache_set("industry", "600519", {})
         r.session_cache_clear()
-        assert r.session_cache_get("price", "600519") is _NOT_FOUND
-        assert r.session_cache_get("industry", "600519") is _NOT_FOUND
+        assert r.session_cache_get("price", "600519") is NOT_FOUND
+        assert r.session_cache_get("industry", "600519") is NOT_FOUND
 
     def test_eviction_order(self):
         """超限（>2000）时淘汰最旧条目。"""
@@ -298,7 +298,7 @@ class TestFetchOrCached:
             result = r.fetch_or_cached("600519", "a_share", _fetch,
                                        cache_domain="price")
         assert result is None
-        assert r.session_cache_get("price", "600519") is _NOT_FOUND
+        assert r.session_cache_get("price", "600519") is NOT_FOUND
 
 
 class TestFetchCachedOnly:
@@ -469,7 +469,7 @@ class TestReset:
         r = _fresh_registry()
         r.session_cache_set("test", "600519", {})
         r.reset()
-        assert r.session_cache_get("test", "600519") is _NOT_FOUND
+        assert r.session_cache_get("test", "600519") is NOT_FOUND
 
     def test_reset_clears_chains(self):
         r = _fresh_registry()

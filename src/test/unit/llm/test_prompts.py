@@ -64,46 +64,46 @@ class TestFailReasonConstants(unittest.TestCase):
 
 @pytest.mark.unit_llm
 class TestModuleFailureDict(unittest.TestCase):
-    """_LLM_MODULE_FAILURE 字典操作。"""
+    """LLM_MODULE_FAILURE 字典操作。"""
 
     def setUp(self):
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        self._orig = dict(_LLM_MODULE_FAILURE)
-        _LLM_MODULE_FAILURE.clear()
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        self._orig = dict(LLM_MODULE_FAILURE)
+        LLM_MODULE_FAILURE.clear()
 
     def tearDown(self):
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        _LLM_MODULE_FAILURE.clear()
-        _LLM_MODULE_FAILURE.update(self._orig)
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.update(self._orig)
 
     def test_set_and_get(self):
         """设置模块失败原因后能正确读取。"""
         from src.python.llm.prompts import (
             FAIL_REASON_DISABLED,
-            _LLM_MODULE_FAILURE,
+            LLM_MODULE_FAILURE,
         )
-        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
-        self.assertEqual(_LLM_MODULE_FAILURE.get("global_macro"), FAIL_REASON_DISABLED)
+        LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
+        self.assertEqual(LLM_MODULE_FAILURE.get("global_macro"), FAIL_REASON_DISABLED)
 
     def test_clear_key(self):
         """清除指定模块的失败原因后返回 None。"""
         from src.python.llm.prompts import (
             FAIL_REASON_API_ERROR,
-            _LLM_MODULE_FAILURE,
+            LLM_MODULE_FAILURE,
         )
-        _LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_API_ERROR
-        _LLM_MODULE_FAILURE.pop("expert_review", None)
-        self.assertIsNone(_LLM_MODULE_FAILURE.get("expert_review"))
+        LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_API_ERROR
+        LLM_MODULE_FAILURE.pop("expert_review", None)
+        self.assertIsNone(LLM_MODULE_FAILURE.get("expert_review"))
 
     def test_unknown_key_returns_none(self):
         """未记录的模块键返回 None。"""
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        self.assertIsNone(_LLM_MODULE_FAILURE.get("nonexistent_module"))
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        self.assertIsNone(LLM_MODULE_FAILURE.get("nonexistent_module"))
 
     def test_direct_import_from_prompts(self):
-        """从 prompts 模块直接导入可访问 _LLM_MODULE_FAILURE。"""
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        self.assertIsInstance(_LLM_MODULE_FAILURE, dict)
+        """从 prompts 模块直接导入可访问 LLM_MODULE_FAILURE。"""
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        self.assertIsInstance(LLM_MODULE_FAILURE, dict)
 
 
 @pytest.mark.unit_llm

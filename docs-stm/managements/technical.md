@@ -425,7 +425,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 │  ┌─ 会话级缓存（C4 约束） ──────────────────────────────────┐   │
 │  │  domain = "industry" / "industry_rest" / "extended" / ...   │   │
 │  │  session_cache_get/set(domain, code)                        │   │
-│  │  _NOT_FOUND sentinel 区分 None vs 未缓存                    │   │
+│  │  NOT_FOUND sentinel 区分 None vs 未缓存                     │   │
 │  │  2000 条/domain O(1) 淘汰                                  │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘

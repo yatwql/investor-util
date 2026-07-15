@@ -24,7 +24,7 @@ from unittest.mock import MagicMock, patch
 
 import src.python.tui_handlers as _th_module
 
-from src.python.report.progress import _timing_records, _Timer
+from src.python.report.progress import timing_records, Timer as _Timer
 
 from src.python.tui_handlers import (
 
