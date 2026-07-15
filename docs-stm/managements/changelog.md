@@ -22,10 +22,12 @@
 
 ### Docs
 
-- **requirements.md / how-to-menu.md**：菜单 [4] 说明同步更新为三块统计
+- **requirements.md**：新增 R-ERR-16 降级状态跨会话持久化目录要求；菜单 [4] 说明同步更新为三块统计
+- **technical.md**：补充 DegradationTracker 节中 data/state/ 目录分离说明
+- **how-to-menu.md**：菜单 [4] 说明同步更新为三块统计
 - **how-to-config.md**：degradation 配置项补充持久化位置 data/state/
 - **testplan.md**：测试隔离要求补充 data/state/
-- **faq.md**：新增 data/state/ 说明（用途、不会被清理）
+- **faq.md**：新增 data/state/ Q&A（用途、不会被清理）
 
 ## [0.5.11] - 2026-07-15
 
