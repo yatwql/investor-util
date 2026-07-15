@@ -44,6 +44,10 @@
 - `testplan.md` — 新增 S34 场景（基准指数对比）
 - `test-coverage.md` — 更新测试项数
 - `datasource-and-folders.md` — 新增 benchmark.py 等文件说明
+- 管理文档去历史痕迹：`requirements.md`、`technical.md`、`testplan.md`、`plan.md`、`review-findings.md` 移除版本号/更新日期/归档链接，内容仅反映最新状态
+- 用户文档去历史痕迹：`datasource-and-folders.md` 移除末尾最后更新行
+- `reports-instruction.md` — 补充基准指数叠加对比说明（§16/§17/历史走势分组表/F2 机制）
+- `faq.md` — 补充基准指数对比 FAQ（走势图基准曲线来源说明）
 
 
 > **v0.5.x 版本变更记录已归档**：详见 [docs-stm/archive/archived_changelog.0.5.x.md](../archive/archived_changelog.0.5.x.md)。
