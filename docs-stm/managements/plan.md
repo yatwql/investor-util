@@ -51,7 +51,7 @@
 所有已完成迭代的详细变更记录见 [`changelog.md`](changelog.md)。早期实现计划已归档：[`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md) · [`archived_plan.0.4.x.md`](../archive/archived_plan.0.4.x.md) · [`archived_plan.0.5.x.md`](../archive/archived_plan.0.5.x.md)。
 
 - **G. 报告板块可见性可配置** ✅ v0.4.5 完成
-- **I. 组合历史走势与基准指数比对** ✅ v0.6.0 完成
+- **I. 组合历史走势与基准指数比对** ✅ v0.5.6 完成
 
 ---
 
