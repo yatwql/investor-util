@@ -27,7 +27,7 @@ class TestCalculateForHolding(unittest.TestCase):
 
     # ── 正常路由 ──────────────────────────────────────────
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_a_share_code_routes_to_stock(self, mock_fetch):
         """6 开头 A 股 → _get_stock_history。"""
         fake_bars = [{"date": "2026-07-01", "close": 26.65}]
@@ -38,7 +38,7 @@ class TestCalculateForHolding(unittest.TestCase):
         self.assertIsNotNone(result)
         mock_fetch.assert_called_once_with("history_stock", "600900")
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_0_code_in_securities_routes_to_stock(self, mock_fetch):
         """0 开头代码且非 OTC 基金 → _get_stock_history。"""
         fake_bars = [{"date": "2026-07-01", "close": 12.50}]
@@ -49,7 +49,7 @@ class TestCalculateForHolding(unittest.TestCase):
         self.assertIsNotNone(result)
         mock_fetch.assert_called_once_with("history_stock", "000001")
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_5_prefix_etf_routes_to_stock(self, mock_fetch):
         """5 开头 ETF → _get_stock_history。"""
         fake_bars = [{"date": "2026-07-01", "close": 1.234}]
@@ -60,7 +60,7 @@ class TestCalculateForHolding(unittest.TestCase):
         self.assertIsNotNone(result)
         mock_fetch.assert_called_once_with("history_stock", "511880")
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_6_digit_code_routes_to_fund(self, mock_fetch):
         """6 位纯数字非 A 股/ETF → _get_fund_history。"""
         fake_bars = [{"date": "2026-07-01", "nav": 1.5}]
@@ -71,7 +71,7 @@ class TestCalculateForHolding(unittest.TestCase):
         self.assertIsNotNone(result)
         mock_fetch.assert_called_once_with("history_fund_otc", "011506")
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_bond_fund_routes_to_fund(self, mock_fetch):
         """债券基金名称 → _get_fund_history。"""
         fake_bars = [{"date": "2026-07-01", "nav": 1.02}]
@@ -96,7 +96,7 @@ class TestCalculateForHolding(unittest.TestCase):
 
     # ── 00 代码降级 ────────────────────────────────────────
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_00_code_degrade_to_fund(self, mock_fetch):
         """00 代码 K 线全空 → 降级至基金净值。"""
         mock_fetch.side_effect = [
@@ -113,7 +113,7 @@ class TestCalculateForHolding(unittest.TestCase):
         # 第 2 次调用必须是 history_fund_otc（降级）
         self.assertEqual(mock_fetch.call_args_list[1][0][0], "history_fund_otc")
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_00_code_stock_success_no_degrade(self, mock_fetch):
         """00 代码但 K 线成功 → 不降级。"""
         mock_fetch.return_value = [{"date": "2026-07-01", "close": 12.50}]
@@ -123,7 +123,7 @@ class TestCalculateForHolding(unittest.TestCase):
         self.assertIsNotNone(result)
         mock_fetch.assert_called_once_with("history_stock", "000001")
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_00_code_degrade_all_fail(self, mock_fetch):
         """00 代码 K 线 + 基金净值均失败 → None。"""
         mock_fetch.side_effect = [None, None]
@@ -135,7 +135,7 @@ class TestCalculateForHolding(unittest.TestCase):
 
     # ── Session Cache ────────────────────────────────────
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_session_cache_stock(self, mock_fetch):
         """_get_stock_history 复用会话缓存。"""
         calc = self._make_calculator({
@@ -146,7 +146,7 @@ class TestCalculateForHolding(unittest.TestCase):
         self.assertEqual(result[0]["close"], 26.65)
         mock_fetch.assert_not_called()
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_session_cache_fund(self, mock_fetch):
         """_get_fund_history 复用会话缓存（00 代码触发降级路径）。"""
         mock_fetch.return_value = None  # stock 路径也 mock 掉
@@ -159,7 +159,7 @@ class TestCalculateForHolding(unittest.TestCase):
 
     # ── as-if 市值计算 ─────────────────────────────────
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_as_if_market_value(self, mock_fetch):
         """as-if 市值 = close × shares。"""
         mock_fetch.return_value = [
@@ -173,7 +173,7 @@ class TestCalculateForHolding(unittest.TestCase):
         self.assertEqual(result[0]["value"], 8000.0)   # 10.0 × 800
         self.assertEqual(result[1]["value"], 8800.0)   # 11.0 × 800
 
-    @patch("src.python.report.portfolio_history._fetch_with_incremental_fallback")
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_as_if_skips_zero_close(self, mock_fetch):
         """close <= 0 的 bar 跳过。"""
         mock_fetch.return_value = [

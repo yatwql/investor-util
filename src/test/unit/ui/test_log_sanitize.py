@@ -84,7 +84,7 @@ class TestApiKeyNotInLog(unittest.TestCase):
         secret_key = "sk-test-secret-key-12345"
         config = {"provider": "claude", "api_key": secret_key}
 
-        with patch("src.python.llm.api._call_single_provider") as mock_call:
+        with patch("src.python.llm.api.call_single_provider") as mock_call:
             mock_call.return_value = (None, None)
             _call_llm("sys", "user", config)
 
@@ -121,7 +121,7 @@ class TestApiKeyNotInLog(unittest.TestCase):
         from src.python.llm.api import _call_claude
 
         secret_key = "sk-header-key-88888"
-        with patch("src.python.llm.api._call_llm_with_retry") as mock_retry:
+        with patch("src.python.llm.api.call_llm_with_retry") as mock_retry:
             mock_retry.return_value = ("result", {"input_tokens": 10})
             _call_claude(
                 system="sys", user="user", api_key=secret_key,

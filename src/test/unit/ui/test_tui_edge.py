@@ -141,7 +141,7 @@ class TestExecuteItemErrorFriendly(unittest.TestCase):
             (0, "test", callback, False),
         ]):
             with patch("sys.stdout", self.capture):
-                with patch("src.python.tui_handlers._press_any_key"):
+                with patch("src.python.tui_handlers.press_any_key"):
                     execute_item(0)
         return self.capture.getvalue()
 

@@ -505,7 +505,7 @@ class TestExecuteItem(unittest.TestCase):
         """KeyboardInterrupt 被捕获并调用 _press_any_key。"""
         callback = MagicMock(side_effect=KeyboardInterrupt)
         mock_menu.__getitem__.return_value = ("T", "Test", callback, False)
-        with patch("src.python.tui_handlers._press_any_key") as mock_pak:
+        with patch("src.python.tui_handlers.press_any_key") as mock_pak:
             execute_item(0)
             mock_pak.assert_called_once()
         self.assertFalse(_th_module._busy)
@@ -530,7 +530,7 @@ class TestExecuteItem(unittest.TestCase):
 class TestSelectHoldingsFile(unittest.TestCase):
     """select_holdings_file 文件选择逻辑测试。"""
 
-    @patch("src.python.tui_handlers._refresh_config")
+    @patch("src.python.tui_handlers.refresh_config")
     @patch("src.python.tui_handlers.get_config_cache")
     @patch("os.path.exists")
     def test_specific_path_exists(
@@ -549,7 +549,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertIn("myfile.xlsx", result)
 
-    @patch("src.python.tui_handlers._refresh_config")
+    @patch("src.python.tui_handlers.refresh_config")
     @patch("src.python.tui_handlers.get_config_cache")
     @patch("os.path.exists")
     @patch("src.python.tui_handlers.list_xlsx_files")
@@ -573,7 +573,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         self.assertIsNone(result)
         self.assertIn("未找到", out.getvalue())
 
-    @patch("src.python.tui_handlers._refresh_config")
+    @patch("src.python.tui_handlers.refresh_config")
     @patch("src.python.tui_handlers.get_config_cache")
     @patch("os.path.exists")
     @patch("src.python.tui_handlers.list_xlsx_files")
@@ -597,7 +597,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         self.assertEqual(result, "dummy_dir/holdings.xlsx")
         self.assertIn("唯一找到", out.getvalue())
 
-    @patch("src.python.tui_handlers._refresh_config")
+    @patch("src.python.tui_handlers.refresh_config")
     @patch("src.python.tui_handlers.get_config_cache")
     @patch("os.path.exists")
     @patch("src.python.tui_handlers.list_xlsx_files")
@@ -630,7 +630,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         result = select_holdings_file()
         self.assertEqual(result, "dummy_dir/b.xlsx")
 
-    @patch("src.python.tui_handlers._refresh_config")
+    @patch("src.python.tui_handlers.refresh_config")
     @patch("src.python.tui_handlers.get_config_cache")
     @patch("os.path.exists")
     @patch("src.python.tui_handlers.list_xlsx_files")
@@ -663,7 +663,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         result = select_holdings_file()
         self.assertIsNone(result)
 
-    @patch("src.python.tui_handlers._refresh_config")
+    @patch("src.python.tui_handlers.refresh_config")
     @patch("src.python.tui_handlers.get_config_cache")
     @patch("os.path.exists")
     @patch("src.python.tui_handlers.list_xlsx_files")

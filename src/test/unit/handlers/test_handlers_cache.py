@@ -156,7 +156,7 @@ class TestCmdCleanupCache(unittest.TestCase):
         with (
             patch("src.python.cache.cleanup_expired", return_value=5),
             patch("src.python.cache.get_cache_dir", return_value="data/cache"),
-            patch("src.python.handlers_cache._press_any_key"),
+            patch("src.python.handlers_cache.press_any_key"),
             patch("sys.stdout", io.StringIO()) as stdout,
         ):
             _cmd_cleanup_cache()
@@ -169,7 +169,7 @@ class TestCmdCleanupCache(unittest.TestCase):
         with (
             patch("src.python.cache.cleanup_expired", return_value=0),
             patch("src.python.cache.get_cache_dir", return_value="data/cache"),
-            patch("src.python.handlers_cache._press_any_key"),
+            patch("src.python.handlers_cache.press_any_key"),
             patch("sys.stdout", io.StringIO()) as stdout,
         ):
             _cmd_cleanup_cache()

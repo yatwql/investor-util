@@ -1802,7 +1802,7 @@ class TestCircuitBreaker(unittest.TestCase):
 class TestProviderFallback(unittest.TestCase):
     """测试 call_llm 在主 provider 失败时回退到 fallback provider。"""
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_main_provider_success_no_fallback(self, mock_call):
         """主 provider 成功 → 不调用 fallback。"""
         mock_call.return_value = ("main result", {"input_tokens": 100})
@@ -1814,7 +1814,7 @@ class TestProviderFallback(unittest.TestCase):
         self.assertEqual(content, "main result")
         self.assertEqual(mock_call.call_count, 1)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_main_failure_fallback_used(self, mock_call):
         """主 provider 返回 None → fallback 被调用。"""
         mock_call.side_effect = [
@@ -1831,7 +1831,7 @@ class TestProviderFallback(unittest.TestCase):
         self.assertEqual(content, "fb result")
         self.assertEqual(mock_call.call_count, 2)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_main_and_fallback_both_fail(self, mock_call):
         """主 + fallback 均失败 → (None, None)。"""
         mock_call.return_value = (None, None)
@@ -1844,7 +1844,7 @@ class TestProviderFallback(unittest.TestCase):
         self.assertIsNone(usage)
         self.assertEqual(mock_call.call_count, 2)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_no_fallback_configured(self, mock_call):
         """未配置 fallback → 不尝试 fallback。"""
         mock_call.return_value = (None, None)
@@ -1853,7 +1853,7 @@ class TestProviderFallback(unittest.TestCase):
         self.assertIsNone(content)
         self.assertEqual(mock_call.call_count, 1)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_fallback_same_as_main_no_loop(self, mock_call):
         """fallback_provider == provider → 不重复调用。"""
         mock_call.return_value = (None, None)
@@ -1966,7 +1966,7 @@ class TestCircuitBreakerRecovery(unittest.TestCase):
 class TestContentFilterRecovery(unittest.TestCase):
     """测试 call_llm 在 API 返回空内容时的安抚重试机制。"""
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_empty_content_triggers_retry(self, mock_call):
         """API 返回空字符串 → 追加安抚指令重试一次。"""
         mock_call.side_effect = [
@@ -1985,7 +1985,7 @@ class TestContentFilterRecovery(unittest.TestCase):
         second_call_system = mock_call.call_args_list[1][0][1]  # system_prompt arg
         self.assertIn("注意：请确保你的回答包含实质性的分析内容", second_call_system)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_empty_content_then_still_empty(self, mock_call):
         """安抚重试后仍为空 → 尝试 fallback provider。"""
         mock_call.side_effect = [
@@ -2001,7 +2001,7 @@ class TestContentFilterRecovery(unittest.TestCase):
         self.assertEqual(content, "fb ok")
         self.assertEqual(mock_call.call_count, 3)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_empty_content_no_fallback_returns_none(self, mock_call):
         """安抚重试仍空且无 fallback → (None, None)。"""
         mock_call.return_value = ("", {"input_tokens": 10})
@@ -2011,7 +2011,7 @@ class TestContentFilterRecovery(unittest.TestCase):
         # 被调用 2 次（原始 + 安抚重试）
         self.assertEqual(mock_call.call_count, 2)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_normal_content_no_retry(self, mock_call):
         """正常返回内容 → 不触发安抚重试。"""
         mock_call.return_value = ("正常内容", {"input_tokens": 100})
@@ -2020,7 +2020,7 @@ class TestContentFilterRecovery(unittest.TestCase):
         self.assertEqual(content, "正常内容")
         self.assertEqual(mock_call.call_count, 1)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_none_from_provider_triggers_fallback_not_retry(self, mock_call):
         """provider 返回 None（格式异常）→ 不触发安抚重试，直接走 fallback。"""
         mock_call.side_effect = [

@@ -435,7 +435,7 @@ class TestCallSingleProvider(unittest.TestCase):
         self.assertEqual(result, "claude result")
         mock_claude.assert_called_once()
 
-    @patch("src.python.llm.api._call_openai")
+    @patch("src.python.llm.api.call_openai")
     def test_openai_routing(self, mock_openai: MagicMock) -> None:
         mock_openai.return_value = ("openai result", {"prompt_tokens": 20})
         result, usage = call_single_provider(

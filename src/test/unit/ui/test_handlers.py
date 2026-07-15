@@ -48,7 +48,7 @@ class TestReadLlmSettings:
         assert "llm_settings.json" in path
 
     @patch("src.python.handlers_config.open", side_effect=FileNotFoundError)
-    @patch("src.python.handlers_config._press_any_key")
+    @patch("src.python.handlers_config.press_any_key")
     def test_file_not_found(self, mock_press, mock_open):
         """文件不存在时返回 None。"""
         from src.python.handlers_config import _read_llm_settings
@@ -58,7 +58,7 @@ class TestReadLlmSettings:
     @patch("src.python.config._strip_json_comments")
     @patch("src.python.handlers_config.open")
     @patch("src.python.handlers_config.json.loads", side_effect=json.JSONDecodeError("x", "", 1))
-    @patch("src.python.handlers_config._press_any_key")
+    @patch("src.python.handlers_config.press_any_key")
     def test_json_decode_error(self, mock_press, mock_json_loads, mock_open, mock_strip):
         """JSON 解析错误时返回 None。"""
         mock_strip.return_value = "bad json"
