@@ -48,19 +48,19 @@
 
 > 验收标准详见 [`testplan.md §6 验收标准`](testplan.md#6-验收标准)。
 
-## ✅ 已完成迭代
+已完成迭代的实现计划已归档：
 
-所有已完成迭代的详细变更记录见 [`changelog.md`](changelog.md)。早期实现计划已归档：[`archived_plan.0.1.x.md`](../archive/v0.1.x/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/v0.2.x/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/v0.3.x/archived_plan.0.3.x.md) · [`archived_plan.0.4.x.md`](../archive/v0.4.x/archived_plan.0.4.x.md) · [`archived_plan.0.5.x.md`](../archive/v0.5.x/archived_plan.0.5.x.md)。
+- [`archived_plan.0.1.x.md`](../archive/v0.1.x/archived_plan.0.1.x.md)
+- [`archived_plan.0.2.x.md`](../archive/v0.2.x/archived_plan.0.2.x.md)
+- [`archived_plan.0.3.x.md`](../archive/v0.3.x/archived_plan.0.3.x.md)
+- [`archived_plan.0.4.x.md`](../archive/v0.4.x/archived_plan.0.4.x.md)
+- [`archived_plan.0.5.x.md`](../archive/v0.5.x/archived_plan.0.5.x.md)
+
+## 待实现方向（按风险收益比排序）
 
 ---
 
-### 待实现方向（按风险收益比排序）
-
-> 注：字母编号跳跃出于历史分配——已完成迭代占用了相应字母（详见上方 ✅ 已完成迭代），剩余字母保留给此前已规划但优先级较低的后续迭代。
-
----
-
-## [P4] H. 智能预警模块去留评估（高难度 / 中价值）
+### [P4] H. 智能预警模块去留评估（高难度 / 中价值）
 
 智能预警（early_warning）页签目前两个数据维度均存在可靠性问题，长期处于空输出状态，需评估去留或重构方案。
 
