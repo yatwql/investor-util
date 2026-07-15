@@ -207,61 +207,65 @@ investor-util/
 │   │   ├── I-comparative-benchmark-design.md   # I 迭代基准对比设计
 │   │   └── I-comparative-benchmark-iteration.md # I 迭代基准对比迭代计划
 │   ├── archive/                      #   历史归档
-│   │   ├── archived-data-source-pre-study.md  # 数据源可行性预研报告
-│   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
-│   │   ├── archived_changelog.0.2.x.md        # 变更日志归档 v0.2.x
-│   │   ├── archived_changelog.0.3.x.md        # 变更日志归档 v0.3.x
-│   │   ├── archived_changelog.0.4.x.md        # 变更日志归档 v0.4.x
-│   │   ├── archived_changelog.0.5.x.md        # 变更日志归档 v0.5.x
-│   │   ├── archived_plan.0.1.x.md             # 实现计划归档 v0.1.x
-│   │   ├── archived_plan.0.2.x.md             # 实现计划归档 v0.2.x
-│   │   ├── archived_plan.0.3.x.md             # 实现计划归档 v0.3.x
-│   │   ├── archived_plan.0.4.x.md             # 实现计划归档 v0.4.x
-│   │   ├── archived_plan.0.5.x.md             # 实现计划归档 v0.5.x
-│   │   ├── archived_review-findings.0.1.x.md  # 自审记录归档 v0.1.x
-│   │   ├── archived_review-findings.0.2.x.md  # 自审记录归档 v0.2.x
-│   │   ├── archived_review-findings.0.3.x.md  # 自审记录归档 v0.3.x
-│   │   ├── archived_review-findings.0.4.x.md  # 自审记录归档 v0.4.x
-│   │   ├── archived_review-findings.0.5.x.md  # 自审记录归档 v0.5.x
-│   │   ├── profit-forecast-sector-flow/          # 盈利预测与资金流向
-│   │   │   └── profit-forecast-sector-flow-akshare-integration.md # 盈利预测+资金流向 akshare 集成
-│   │   ├── data-degradation/                  # 数据降级处理方案
-│   │   │   ├── d-iteration-data-degradation-design.md     # 数据降级设计
-│   │   │   ├── d-iteration-data-degradation-iteration-plan.md # 数据降级迭代计划
-│   │   │   └── data-degradation-refactoring.md            # 数据降级重构
-│   │   ├── fund-deep-analysis/                # 基金深度分析
-│   │   │   └── B1-fund-deep-analysis.md       # 基金持仓深度分析迭代
-│   │   ├── portfolio-history-comparison/      # 组合历史对比
-│   │   │   ├── F-portfolio-history-comparison.md        # F 迭代计划与技术设计
-│   │   │   └── html-report-chart-native-canvas-fallback-plan.md # HTML Canvas 渲染修复
-│   │   ├── refactor-cache-engine/             # 缓存引擎重构
-│   │   │   └── cache-refactor-plan.md         # 缓存引擎重构计划
-│   │   ├── refactor-excel-generator/          # Excel 生成器重构
-│   │   │   └── R-206-excel-generator-split-plan.md # Excel 生成器拆分计划
-│   │   ├── refactor-html_writer/              # HTML 写入器重构
-│   │   │   └── r178_html_writer_split.md      # HTML 写入器拆分
-│   │   ├── refactor-llm_split_design/         # LLM 拆分重构
-│   │   │   └── r198_llm_split_design.md       # LLM 拆分设计
-│   │   ├── refactor-market_value_split_design/ # 市值拆分重构
-│   │   │   └── r197_market_value_split.md     # 市值拆分设计
-│   │   ├── refactor-summary-llm-usage/        # LLM 用量摘要重构
-│   │   │   └── R-207-summary-llm-usage-split-plan.md # LLM 用量摘要拆分计划
-│   │   ├── report-board-visibility-configable/ # 看板可见性配置
-│   │   │   └── g-board-visibility-iteration-plan.md # 看板可见性配置迭代计划
-│   │   ├── report-early-warning/              # 预警优化
-│   │   │   └── early-warning-and-p1-optimization.md # 预警与 P1 优化
-│   │   ├── report-section-order-config/       # 报告章节顺序
-│   │   │   └── report-section-order-config.md # 报告章节顺序配置
-│   │   ├── test-add-config-edge-testcase/     # 边缘测试配置
-│   │   │   └── y5-edge-test-config-env.md     # 边缘测试配置环境
-│   │   ├── test-coverage-map/                 # 测试覆盖地图
-│   │   │   ├── test-coverage-map.md           # 测试覆盖地图文档
-│   │   │   └── validate_coverage_map.py       # 覆盖地图验证脚本
-│   │   ├── test-runtime-optimization/         # 测试运行优化
-│   │   │   └── A5-test-runtime-optimization.md # 测试运行优化
-│   │   └── test-verify-mode-optimization/     # 测试verify 模式运行优化
-│   │       └── r200_verify_mode_optimization.md # 测试verify 模式运行优化
-│   └── tmp/                          #   临时文件（git 忽略，不展开）
+│   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
+│   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
+│   │   │   ├── archived_plan.0.1.x.md             # 实现计划归档 v0.1.x
+│   │   │   └── archived_review-findings.0.1.x.md  # 自审记录归档 v0.1.x
+│   │   ├── v0.2.x/                            # v0.2.x 版本迭代归档
+│   │   │   ├── archived_changelog.0.2.x.md        # 变更日志归档 v0.2.x
+│   │   │   ├── archived_plan.0.2.x.md             # 实现计划归档 v0.2.x
+│   │   │   ├── archived_review-findings.0.2.x.md  # 自审记录归档 v0.2.x
+│   │   │   ├── archived-data-source-pre-study.md  # 数据源可行性预研报告
+│   │   │   ├── data-degradation/                  # 数据降级处理方案
+│   │   │   │   ├── d-iteration-data-degradation-design.md     # 数据降级设计
+│   │   │   │   ├── d-iteration-data-degradation-iteration-plan.md # 数据降级迭代计划
+│   │   │   │   └── data-degradation-refactoring.md            # 数据降级重构
+│   │   │   ├── fund-deep-analysis/                # 基金深度分析
+│   │   │   │   └── B1-fund-deep-analysis.md       # 基金持仓深度分析迭代
+│   │   │   ├── profit-forecast-sector-flow/          # 盈利预测与资金流向
+│   │   │   │   └── profit-forecast-sector-flow-akshare-integration.md # 盈利预测+资金流向 akshare 集成
+│   │   │   ├── report-early-warning/              # 预警优化
+│   │   │   │   └── early-warning-and-p1-optimization.md # 预警与 P1 优化
+│   │   │   ├── report-section-order-config/       # 报告章节顺序
+│   │   │   │   └── report-section-order-config.md # 报告章节顺序配置
+│   │   │   ├── test-coverage-map/                 # 测试覆盖地图
+│   │   │   │   ├── test-coverage-map.md           # 测试覆盖地图文档
+│   │   │   │   └── validate_coverage_map.py       # 覆盖地图验证脚本
+│   │   │   └── test-runtime-optimization/         # 测试运行优化
+│   │   │       └── A5-test-runtime-optimization.md # 测试运行优化
+│   │   ├── v0.3.x/                            # v0.3.x 版本迭代归档
+│   │   │   ├── archived_changelog.0.3.x.md        # 变更日志归档 v0.3.x
+│   │   │   ├── archived_plan.0.3.x.md             # 实现计划归档 v0.3.x
+│   │   │   ├── archived_review-findings.0.3.x.md  # 自审记录归档 v0.3.x
+│   │   │   ├── refactor-cache-engine/             # 缓存引擎重构
+│   │   │   │   └── cache-refactor-plan.md         # 缓存引擎重构计划
+│   │   │   ├── refactor-excel-generator/          # Excel 生成器重构
+│   │   │   │   └── R-206-excel-generator-split-plan.md # Excel 生成器拆分计划
+│   │   │   ├── refactor-html_writer/              # HTML 写入器重构
+│   │   │   │   └── r178_html_writer_split.md      # HTML 写入器拆分
+│   │   │   ├── refactor-llm_split_design/         # LLM 拆分重构
+│   │   │   │   └── r198_llm_split_design.md       # LLM 拆分设计
+│   │   │   ├── refactor-market_value_split_design/ # 市值拆分重构
+│   │   │   │   └── r197_market_value_split.md     # 市值拆分设计
+│   │   │   ├── refactor-summary-llm-usage/        # LLM 用量摘要重构
+│   │   │   │   └── R-207-summary-llm-usage-split-plan.md # LLM 用量摘要拆分计划
+│   │   │   └── test-verify-mode-optimization/     # 测试verify 模式运行优化
+│   │   │       └── r200_verify_mode_optimization.md # 测试verify 模式运行优化
+│   │   ├── v0.4.x/                            # v0.4.x 版本迭代归档
+│   │   │   ├── archived_changelog.0.4.x.md        # 变更日志归档 v0.4.x
+│   │   │   ├── archived_plan.0.4.x.md             # 实现计划归档 v0.4.x
+│   │   │   ├── archived_review-findings.0.4.x.md  # 自审记录归档 v0.4.x
+│   │   │   ├── portfolio-history-comparison/      # 组合历史对比
+│   │   │   │   ├── F-portfolio-history-comparison.md        # F 迭代计划与技术设计
+│   │   │   │   └── html-report-chart-native-canvas-fallback-plan.md # HTML Canvas 渲染修复
+│   │   │   └── test-add-config-edge-testcase/     # 边缘测试配置
+│   │   │       └── y5-edge-test-config-env.md     # 边缘测试配置环境
+│   │   ├── v0.5.x/                            # v0.5.x 版本迭代归档
+│   │   │   ├── archived_changelog.0.5.x.md        # 变更日志归档 v0.5.x
+│   │   │   ├── archived_plan.0.5.x.md             # 实现计划归档 v0.5.x
+│   │   │   ├── archived_review-findings.0.5.x.md  # 自审记录归档 v0.5.x
+│   │   │   └── report-board-visibility-configable/ # 看板可见性配置
+│   │   │       └── g-board-visibility-iteration-plan.md # 看板可见性配置迭代计划└── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口
@@ -271,4 +275,3 @@ investor-util/
 ```
 
 > 注意：目录树为主层级结构，测试文件数和文件行数随版本迭代变化。
-

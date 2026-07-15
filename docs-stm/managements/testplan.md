@@ -122,7 +122,12 @@
 > 添加新场景时，按复杂度选择文件。LLM 相关的场景统一放在 `test_llm_scenarios.py`。
 > S0a/S0b/S0d（持仓质量，不含 S0c）统一放在 `test_scenario_holdings_quality.py`；S0c（超多持仓）和 S10（极端值）放在 `test_scenario_extreme.py`。
 > S21-S28（特殊品种）统一放在 `test_scenario_special_securities.py`。
-> S29-S34（操作行为 + 组合历史走势基准指数对比）统一放在 `test_scenario_operational_behavior.py`。
+> S29-S33（操作行为）统一放在 `test_scenario_operational_behavior.py`。
+> S34（基准指数对比）覆盖在以下单元测试中（scenario 测试环境搭建成本较高，单元级验证已充分）：
+> - `unit/report/test_benchmark.py` — normalize_benchmarks 算法 11 项 + 边缘 7 项
+> - `unit/report/test_portfolio_history.py` — benchmark 集成调用 3 项（提供/空/异常）
+> - `unit/fetcher/test_fetcher_index.py` — fetch_index_history 链路由/缓存/异常 3 项
+> - `unit/fetcher/test_chain.py` — history_index 路由 5 项
 > T 类场景统一放在 `test_datetime_scenarios.py` 并标注 `scenario_datetime`。
 > 新增场景需要同时标注场景子标记（如 `scenario_basic`、`scenario_llm`）和通用 `scenario` 父标记，确保 `-m "scenario"` 能自动涵盖。
 
@@ -238,7 +243,6 @@
 > **pytest marker 对照：** §1.3 场景 → `scenario_basic`/`scenario_resilience`/`scenario_llm`；
 > §1.7 场景 → `scenario_datetime`。全量场景用 `-m "scenario"`。
 > 每场景的测试类参考见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组表。
-> 详细场景-测试文件映射已归档：`docs-stm/archive/test-coverage-map/`。
 
 
 > edge 异常场景测试另有专项覆盖（`_edge.py` 文件），见 [`test-coverage.md`](./test-coverage.md) → 跨类标记。
