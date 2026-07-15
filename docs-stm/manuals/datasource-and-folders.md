@@ -204,8 +204,6 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件
-│   │   ├── I-comparative-benchmark-design.md   # I 迭代基准对比设计
-│   │   └── I-comparative-benchmark-iteration.md # I 迭代基准对比迭代计划
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
@@ -264,8 +262,13 @@ investor-util/
 │   │   │   ├── archived_changelog.0.5.x.md        # 变更日志归档 v0.5.x
 │   │   │   ├── archived_plan.0.5.x.md             # 实现计划归档 v0.5.x
 │   │   │   ├── archived_review-findings.0.5.x.md  # 自审记录归档 v0.5.x
+│   │   │   ├── portfolio-benchmark-comparison/    # I 迭代基准指数对比归档
+│   │   │   │   ├── I-comparative-benchmark-design.md    # I 迭代基准对比设计
+│   │   │   │   ├── I-comparative-benchmark-iteration.md # I 迭代基准对比迭代计划
+│   │   │   │   └── plan-iter-8-excel-benchmark-columns.md # I 迭代 Excel 基准指数列
 │   │   │   └── report-board-visibility-configable/ # 看板可见性配置
-│   │   │       └── g-board-visibility-iteration-plan.md # 看板可见性配置迭代计划└── tmp/                          #   临时文件（git 忽略，不展开）
+│   │   │       └── g-board-visibility-iteration-plan.md # 看板可见性配置迭代计划
+│   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口

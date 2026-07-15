@@ -1,5 +1,7 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
+> 文档版本：v0.5.6
+
 ## 目录
 
 - [1. 总体技术架构](#1-总体技术架构)
@@ -1433,7 +1435,7 @@ get_combined_timeseries()
 
 **Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值 `'0.00'` 格式），`drawdown_analysis` 页签对比指标矩阵（累计收益率/最大回撤/波动率等）。
 
-**注册表条目**：`history_stock` / `history_fund_otc` 历史走势数据在 registry 中注册为无分组缓存，不受菜单缓存命令影响。
+**注册表条目**：`history_stock` / `history_fund_otc` / `history_index` 历史走势数据在 registry 中注册为无分组缓存，不受菜单缓存命令影响。
 
 #### F1 快照存储与清理（history_snapshot.py）
 
@@ -1838,7 +1840,7 @@ class DataModuleDef:
     cache_groups: tuple      # 分组，("preload",) / ("refresh",) 或空
 ```
 
-当前注册 **24 个数据模块**：
+当前注册 **25 个数据模块**：
 
 | 分类 | 数量 | 模块 |
 |:-----|:----:|:-----|
@@ -1850,7 +1852,7 @@ class DataModuleDef:
 | 补充数据（refresh） | 4 | profit_forecast、sector_flow、extended、dividend |
 | B 系列基金分析（refresh/无分组） | 4 | fund_manager、fund_overlap、fund_concentration、fund_style_snapshot |
 | 精确键名（refresh/无分组） | 3 | benchmark、tracking、calendar |
-| 历史走势（无分组） | 2 | history_stock、history_fund_otc |
+| 历史走势（无分组） | 3 | history_stock、history_fund_otc、history_index |
 
 #### 派生产出接口
 
@@ -2074,7 +2076,7 @@ investor-util/
 │   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
 │   │   ├── providers/           # 数据源提供商（14 个文件）
 │   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（24 个数据模块 + 18 个报告模块）
+│   │   ├── registry.py          # 中央注册表（25 个数据模块 + 18 个报告模块）
 │   │   ├── report/              # 报告生成（~30 个文件）
 │   │   ├── tui.py               # 键盘输入封装
 │   │   ├── tui_handlers.py      # 菜单通用辅助
@@ -2169,6 +2171,7 @@ investor-util/
 |:-----|:----------|:---:|:----|:-----|
 | `history_stock` | `history_stock_{code}.json` | 见需求 §5.5 | — | 无分组 |
 | `history_fund_otc` | `history_fund_otc_{code}.json` | 见需求 §5.5 | — | 无分组 |
+| `history_index` | `history_index_{code}.json` | 30 天（CACHE_MONTHLY） | — | 无分组 |
 
 #### 系统类
 

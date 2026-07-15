@@ -1,5 +1,9 @@
 # Iter 8: Excel 基准指数列
 
+> ✅ **已完成**（I 迭代的一部分，v0.5.6 完成）
+>
+> 创建日期：2026-07-14 | 完成日期：2026-07-14
+
 ## Context
 
 组合历史走势和回撤分析的 Excel 页签目前已创建但完全空白——`portfolio_history` 和 `drawdown_analysis` 两个 sheet 只有标题行，无任何数据写入。而 `history_data["benchmarks"]` 在 `portfolio_history.py` 中已完整计算好（归一化至 100 基点的指数走势 + 累计收益率/最大回撤等指标），且已成功注入 HTML 报告的 Canvas 图表。Iter 8 的目标是将这些基准数据写入 Excel 页签。

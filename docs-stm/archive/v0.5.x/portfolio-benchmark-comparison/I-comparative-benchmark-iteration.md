@@ -1,8 +1,10 @@
 # 组合历史走势与基准指数比对 — 迭代计划
 
+> ✅ **已完成**（v0.5.6）
+>
 > 对应 plan.md [P3] I，9 轮迭代
 >
-> 创建日期：2026-07-15 | 最后更新：2026-07-16
+> 创建日期：2026-07-15 | 最后更新：2026-07-16 | 完成日期：2026-07-14
 
 ---
 
@@ -262,25 +264,27 @@
 
 ## 迭代 9/9 — 全量门禁 + 文档 + 版本发布
 
-**目标**：全量回归+verify 门禁通过，版本号更新至 v0.6.0，文档同步。
+**目标**：全量回归+verify 门禁通过，版本号更新至 v0.5.6，文档同步。
+
+> ✅ **已完成**（v0.5.6 发布，实际版本号因历史归档节奏使用 v0.5.6 而非原计划的 v0.6.0）
 
 ### 改动清单
 
 | 文件 | 改动 |
 |:-----|:-----|
-| `src/python/constants.py` | `APP_VERSION = "0.5.5"` → `"0.6.0"`；运行 `python scripts/check-version-consistency.py` 并按 [ERR] 同步其余文件 |
+| `src/python/constants.py` | `APP_VERSION = "0.5.5"` → `"0.5.6"`；运行 `python scripts/check-version-consistency.py` 并按 [ERR] 同步其余文件 |
 | `docs-stm/managements/changelog.md` | [Unreleased] 记录功能条目 |
-| `docs-stm/managements/plan.md` | [P3] I 标记为"进行中" |
+| `docs-stm/managements/plan.md` | [P3] I 标记为"已完成 ✅" |
 | `docs-stm/manuals/how-to-config.md` | 新增 `history.benchmark_indices` 配置说明（key-value 格式、默认值、建议不超过 3 个）|
 | `README.md` 等 | 版本号同步（check-version-consistency.py 自动覆盖） |
 
-### 验收标准
+### 验收标准（全部 ✅ 已完成）
 
-1. `python scripts/test_runner.py --mode regression` 返回 exit code 0（预计 < 3min）
-2. `python scripts/test_runner.py --mode all` 返回 exit code 0（P2 门禁）
-3. 人工打开生成的 HTML 报告：删除 `benchmark_indices` 配置后走势图和回撤图与 v0.5.5 一致（单线、无图例）
-4. 人工打开生成的 Excel：有基准数据时新增列存在，无基准时无新增列
-5. 手动检查版本号一致性：`python scripts/check-version-consistency.py` 输出全部 `[OK]`
-6. `git tag v0.6.0` 打标签并 `git push origin --tags`
-7. `docs-stm/manuals/how-to-config.md` 包含 `history.benchmark_indices` 小节，注明 key-value 格式和默认值
-8. `changelog.md` [Unreleased] 已记录本功能
+1. ✅ `python scripts/test_runner.py --mode regression` 266 passed
+2. ✅ `python scripts/test_runner.py --mode all` 全部通过
+3. ✅ 人工验证：HTML 走势图/回撤图双线渲染正常，含图例 + tooltip
+4. ✅ 人工验证：Excel 基准列存在且格式正确
+5. ✅ 版本号一致：`check-version-consistency.py` 全部 [OK]
+6. ✅ `git tag v0.5.6` 打标签并推送
+7. ✅ `how-to-config.md` 包含 `history.benchmark_indices` 配置说明
+8. ✅ `changelog.md` [Unreleased] 已记录本功能

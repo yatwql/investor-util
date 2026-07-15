@@ -2,25 +2,30 @@
 
 > 归档时间：2026-07-15
 > 原始文件：`docs-stm/managements/plan.md`
-> 涵盖版本：v0.5.0 ~ v0.5.5
+> 涵盖版本：v0.5.0 ~ v0.5.6
 
 ---
 
 ## v0.5.x 变更概要
 
-### [P3] I. 组合历史走势与基准指数比对（v0.5.4 新增）
+### ✅ [P3] I. 组合历史走势与基准指数比对（v0.5.6 已完成）
+
+> 原始设计：`docs-stm/archive/v0.5.x/portfolio-benchmark-comparison/I-comparative-benchmark-design.md`
+> 迭代计划：`docs-stm/archive/v0.5.x/portfolio-benchmark-comparison/I-comparative-benchmark-iteration.md`
 
 在组合历史走势和回撤分析中叠加参照指数线（沪深300、标普500等），让相对收益和相对回撤可量化。
 
 **要点**：
 - 默认指数选择：A 股用沪深300（000300）、美股用标普500（SPX），可配置
 - 走势叠加：组合历史走势图叠加指数归一化曲线（起算日归一化到同一基点）；回撤分析叠加指数回撤曲线
-- HTML 报告需前端改动（Canvas drawSimpleChart 叠加 dataset）
-- 指数历史数据复用 `history_stock` provider chain，不新增数据源
-- 归一化起算点与组合有效区间起算日对齐
+- 归一化算法：三段式对齐（组合起算日 / 指数首日 / 对齐起算日），LOCF 填充 + 起算日对齐
+- `benchmark.py` 并行获取指数历史日线（ThreadPoolExecutor）
+- HTML 原生 Canvas 渲染 drawSimpleChart 多 dataset 版本，移除 Chart.js CDN 外部依赖
+- Excel `portfolio_history` 页签每基准一列（归一化值 0.00 格式），`drawdown_analysis` 页签对比指标矩阵
+- 新增测试：benchmark 集成测试 + normalize_benchmarks 已有 16 项单元 + 7 项边缘场景
 
 **迁移**：
-- [P3] I 从待实现方向新增（0.5.4）
+- [P3] I 从待实现方向移至"已完成迭代"
 
 ### 测试范围修正（v0.5.5）
 
@@ -33,6 +38,19 @@
 - `llm-technical.md`：~159 行 → ~980 行，7 幅架构图/流程图
 - 用户文档分册提取（how-to-start.md → how-to-menu.md 独立成册）
 - 用户文档精简（移除技术实现细节，保留纯配置/操作说明）
+
+### 基准指数对比发布（v0.5.6）
+
+I 迭代 9 轮全部实现完毕，正式发布：
+
+- `code_utils.py` 新增 `is_index_code()` 等判定函数
+- Tencent/Sina 新增 `fetch_index_kline()` 跳过 A 股类型检查
+- `history_index` chain + registry 注册（CACHE_MONTHLY，无分组）
+- `fetch_index_history()` 通过 chain 路由，会话级缓存复用
+- `report/benchmark.py` — `fetch_benchmarks()` 并行获取 + `normalize_benchmarks()` 归一化算法
+- HTML 渲染：`drawSimpleChart()` 多 dataset（组合实线 + 基准虚线），图例 + tooltip
+- Excel 输出：`portfolio_history` 页签每基准一列，`drawdown_analysis` 页签对比指标矩阵
+- 配置 `history.benchmark_indices` 作为 Kill-Switch：缺失或空字典时不产生任何影响
 
 ### v0.5.x 其他重要变更
 
