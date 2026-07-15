@@ -183,6 +183,8 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
                   cache_prefixes=("history_stock_",), cache_ttl=CACHE_WEEKLY),
     DataModuleDef("历史基金净值", "history_fund_otc",
                   cache_prefixes=("history_fund_otc_",), cache_ttl=CACHE_MONTHLY),
+    DataModuleDef("指数历史日线", "history_index",
+                  cache_prefixes=("history_index_",), cache_ttl=CACHE_MONTHLY),
 
     # ── 交易日历（akshare 全年数据，极少变动，无 cache_group 避免误删）──
     DataModuleDef("交易日历", "calendar",

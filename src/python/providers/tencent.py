@@ -11,7 +11,12 @@ from typing import Any
 
 import httpx
 
-from src.python.code_utils import get_exchange_prefix, is_a_share_code, is_exchange_fund_code
+from src.python.code_utils import (
+    get_exchange_prefix,
+    is_a_share_code,
+    is_exchange_fund_code,
+    is_index_code,
+)
 from src.python.http_client import make_http_client
 
 logger = logging.getLogger("invest")
@@ -302,6 +307,50 @@ def _parse_kline_response(data: dict, code: str) -> list[dict]:
         return []
 
     return sorted(bars, key=lambda x: x["date"])
+
+
+def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:
+    """获取指数历史 K 线数据（前复权）。
+
+    与 fetch_kline() 的区别：
+      - 入口通过 code_utils.is_index_code() 校验（C1 约束）
+      - 不检查 is_a_share_code/is_exchange_fund_code
+      - 代码直接透传 API，不调用 _add_prefix（指数代码已含交易所前缀）
+      - 复用 _parse_kline_response() 解析逻辑
+
+    Args:
+        code: 指数代码，如 "sh000300" / "gb_inx"
+        days: 获取天数（默认 30，最大 3650）
+        start_from: 起始日期 YYYY-MM-DD，为 None 时从头获取
+
+    Returns:
+        list[dict]: [{date, open, close, high, low, volume}, ...]
+        按日期升序排列。API 失败返回空列表。
+    """
+    if not is_index_code(code):
+        logger.debug("Tencent 跳过非指数代码: %s", code)
+        return []
+
+    days = min(max(days, 5), 3650)
+    full_code = code.strip()
+    url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+
+    params: dict[str, str | int] = {
+        "param": f"{full_code},day,{start_from or ''},,{days},qfq",
+    }
+
+    logger.debug("Tencent 指数 K 线请求: %s, days=%d", full_code, days)
+
+    try:
+        with make_http_client(timeout=30.0) as client:
+            resp = client.get(url, params=params)
+            resp.encoding = "utf-8"
+            data = resp.json()
+    except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
+        logger.warning("Tencent 指数 K 线获取失败 %s: %s", full_code, e)
+        return []
+
+    return _parse_kline_response(data, full_code)
 
 
 def _parse_float_field(s: str) -> float:

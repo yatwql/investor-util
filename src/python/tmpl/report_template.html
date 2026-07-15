@@ -434,7 +434,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     /* Tooltip（mousemove 显示当前索引所有 dataset 的值） */
     if (hasMulti) {
         var tooltipEl = document.getElementById('chart-tooltip-' + canvasId);
-        if (!tooltipEl) {
+        if (tooltipEl) {
+            /* 重绘时复用已有 tooltip 元素，无需重建 */
+        } else {
             tooltipEl = document.createElement('div');
             tooltipEl.id = 'chart-tooltip-' + canvasId;
             tooltipEl.style.cssText = 'position:fixed;display:none;pointer-events:none;' +
@@ -444,7 +446,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             document.body.appendChild(tooltipEl);
         }
 
-        canvas.addEventListener('mousemove', function(e){
+        /* 防泄漏：移除旧 listener 再添加，避免重绘时重复注册 */
+        if (canvas._chartTooltipHandlers) {
+            canvas.removeEventListener('mousemove', canvas._chartTooltipHandlers.mousemove);
+            canvas.removeEventListener('mouseleave', canvas._chartTooltipHandlers.mouseleave);
+            canvas._chartTooltipHandlers = null;
+        }
+
+        var handlerMove = function(e){
             var rect = canvas.getBoundingClientRect();
             var mx = e.clientX - rect.left;
             /* 计算 hover 对应的数据索引 */
@@ -479,11 +488,15 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             if (ttY < 4) ttY = 4;
             tooltipEl.style.left = ttX + 'px';
             tooltipEl.style.top = ttY + 'px';
-        });
+        };
 
-        canvas.addEventListener('mouseleave', function(){
+        var handlerLeave = function(){
             if (tooltipEl) tooltipEl.style.display = 'none';
-        });
+        };
+
+        canvas._chartTooltipHandlers = { mousemove: handlerMove, mouseleave: handlerLeave };
+        canvas.addEventListener('mousemove', handlerMove);
+        canvas.addEventListener('mouseleave', handlerLeave);
     }
 };
 </script>

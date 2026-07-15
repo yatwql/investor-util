@@ -1,8 +1,5 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
-创建日期：2026-06-26
-最后更新：2026-07-14（v0.5.5）
-
 ---
 
 ## 0. 测试环境要求
@@ -74,12 +71,12 @@
 | `scenario/llm/test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
 | `scenario/basic/test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
 | `scenario/basic/test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
-| `scenario/basic/test_scenario_operational_behavior.py` | S29-S33 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 |
+| `scenario/basic/test_scenario_operational_behavior.py` | S29-S34 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 + 组合历史走势基准指数对比 |
 | `scenario/basic/test_scenario_penetration.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
 | `scenario/basic/test_scenario_section_order.py` | C-P1b | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 
-**业务场景规格（S0a-S0d、S1-S33、T1-T21）：**
+**业务场景规格（S0a-S0d、S1-S34、T1-T21）：**
 
 | 场景 | 前置场景 | 前置条件 | 操作 | 验证点 |
 |:-----|:---------|:---------|:-----|:-------|
@@ -105,6 +102,7 @@
 | **S31: 部分调仓卖出** | — | 持仓含卖出一半/90%/全部清仓 | 菜单 E | 卖出后剩余份额市值盈亏正确；全部清仓不崩溃 |
 | **S32: 跨账户转仓** | — | 同一代码出现在两个账户 | 菜单 E | 各账户独立计算明细、分类各自汇总、总计=账户和 |
 | **S33: 新股中签待上市** | — | 持仓含无行情新股尚未上市 | 菜单 E | 无行情降级 cost 正确显示、上市后正常计算、多只新股不干扰 |
+| **S34: 组合历史走势基准指数对比** | — | 持仓含 A 股+基金，config.json 含 `benchmark_indices: {"sh000300": "沪深300"}` | 菜单 L | 组合走势 + 基准指数走势归一化正确；HTML 走势图显示组合曲线+基准虚线+图例；Excel portfolio_history/drawdown_analysis 页签含基准列；benchmark_indices 为空时走势正常不崩溃 |
 | **S6: 纯债券基金组合** | — | 持仓仅含债券基金（国债ETF + 场外债基） | 菜单 E | 穿透 TOP10 无股权覆盖或极小；债券基金正确分类 |
 | **S7: 网络中断降级** | — | 持仓缓存存在但网络断开 | 菜单 B | 价格从缓存读取（过期缓存降级）；报告完整不含空白页签 |
 | **S8: 单账户单持仓** | — | 仅一个账户一只持仓 | 菜单 E | 分类表仅一行、穿透 TOP10 仅该持仓、总计 = 该持仓市值 |
@@ -124,6 +122,7 @@
 > 添加新场景时，按复杂度选择文件。LLM 相关的场景统一放在 `test_llm_scenarios.py`。
 > S0a/S0b/S0d（持仓质量，不含 S0c）统一放在 `test_scenario_holdings_quality.py`；S0c（超多持仓）和 S10（极端值）放在 `test_scenario_extreme.py`。
 > S21-S28（特殊品种）统一放在 `test_scenario_special_securities.py`。
+> S29-S34（操作行为 + 组合历史走势基准指数对比）统一放在 `test_scenario_operational_behavior.py`。
 > T 类场景统一放在 `test_datetime_scenarios.py` 并标注 `scenario_datetime`。
 > 新增场景需要同时标注场景子标记（如 `scenario_basic`、`scenario_llm`）和通用 `scenario` 父标记，确保 `-m "scenario"` 能自动涵盖。
 
@@ -499,7 +498,7 @@ def test_get_ttl_closed(self, mock_open):
 | **业务场景测试** | `test_integration.py`（基础链路 S1-S5）或 `test_integration_scenarios.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_integration.py` |
 | **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
 | **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
-| **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S33 |
+| **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S34 |
 | **报告序号场景** | `test_scenario_section_order.py` | C-P1b |
 | **LLM 场景测试** | `test_llm_scenarios.py` | S11-S20 |
 | **日期/时间场景** | `test_datetime_scenarios.py` | T1-T21 |

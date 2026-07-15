@@ -32,6 +32,7 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     # 组合历史走势：历史数据 chains（复用现有 provider name，熔断器共享）
     "history_stock": ["tencent", "sina"],
     "history_fund_otc": ["tiantian", "eastmoney"],
+    "history_index": ["tencent", "sina"],
 }
 
 
@@ -380,13 +381,18 @@ def _call_history_provider(
         fn = getattr(mod, "fetch_fund_nav_history", None)
         if fn:
             return fn(code)
+    elif chain_name == "history_index":
+        fn = getattr(mod, "fetch_index_kline", None)
+        if fn:
+            return fn(code, days=days, start_from=start_from)
     elif chain_name == "history_stock":
         fn = getattr(mod, "fetch_kline", None)
         if fn:
             return fn(code, days=days, start_from=start_from)
 
-    logger.warning("[history] %s 无 %s 函数", provider_name,
-                   "fetch_kline" if chain_name == "history_stock" else "fetch_fund_nav_history")
+    fn_name = {"history_stock": "fetch_kline", "history_index": "fetch_index_kline",
+               "history_fund_otc": "fetch_fund_nav_history"}.get(chain_name, "未知函数")
+    logger.warning("[history] %s 无 %s 函数", provider_name, fn_name)
     return []
 
 

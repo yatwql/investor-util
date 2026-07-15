@@ -21,6 +21,159 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter,
 logger = setup_logger()
 
 
+# ── 组合历史走势 + 回撤分析页签写入 ──────────────────────
+
+
+def _write_portfolio_history_sheet(ws, history_data: dict) -> None:
+    """写入组合历史走势页签（含基准指数归一化列）。"""
+    from src.python.report.styles import FMT_MONEY, FMT_PERCENT
+    from src.python.report.excel_writer import (
+        _write_placeholder, auto_width, freeze_header,
+        write_header_row, write_title_row,
+    )
+
+    if history_data is None:
+        _write_placeholder(ws, "组合历史走势数据暂不可用（配置或网络原因）", max_cols=5)
+        auto_width(ws)
+        return
+
+    bars = history_data.get("bars", [])
+    if not bars:
+        _write_placeholder(ws, "组合历史走势数据暂不可用（配置或网络原因）", max_cols=5)
+        auto_width(ws)
+        return
+
+    benchmarks = history_data.get("benchmarks", [])
+    first_value = bars[0]["total_value"] if bars and bars[0].get("total_value") else 0
+    n_bm = len(benchmarks)
+    ncols = 4 + n_bm  # 日期 + 市值 + 收益(%) + 归一化(%) + N 基准
+
+    headers = ["日期", "组合市值", "组合收益(%)", "组合归一化(%)"]
+    for bm in benchmarks:
+        headers.append(bm.get("name", bm.get("code", "基准")))
+
+    row = write_title_row(ws, 1, "组合历史走势", ncols)
+    row = write_header_row(ws, row, headers)
+
+    for i, bar in enumerate(bars):
+        tv = bar.get("total_value", 0)
+        cum_return = (tv - first_value) / first_value if first_value > 0 else 0
+        norm_value = tv / first_value * 100 if first_value > 0 else 0
+
+        values = [bar.get("date", ""), tv, cum_return, round(norm_value, 2)]
+        for bm in benchmarks:
+            bm_bars = bm.get("bars", [])
+            bm_value = bm_bars[i].get("value") if i < len(bm_bars) else None
+            values.append(bm_value)
+
+        fmts: list[str | None] = [None, FMT_MONEY, FMT_PERCENT, "0.00"]
+        for _ in range(n_bm):
+            fmts.append("0.00")
+        row = write_data_row(ws, row, values, formats=fmts)
+
+    # ── 指标汇总区 ──
+    row += 1
+    row = write_title_row(ws, row, "指标汇总", ncols)
+
+    pd = history_data
+    summary_items: list[tuple[str, Any, str | None]] = [
+        ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), FMT_PERCENT),
+        ("累计收益(元)", pd.get("total_return", 0), FMT_MONEY),
+        ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), FMT_PERCENT),
+        ("年化波动率", pd.get("annualized_volatility", 0), FMT_PERCENT),
+        ("起算日", pd.get("data_start", ""), None),
+        ("终止日", pd.get("data_end", ""), None),
+    ]
+    for label, val, fmt in summary_items:
+        cells = [label, val] + [None] * (ncols - 2)
+        fmts_line: list[str | None] = [None, fmt] + [None] * (ncols - 2)
+        row = write_data_row(ws, row, cells, formats=fmts_line)
+
+    freeze_header(ws, row=2)
+    auto_width(ws, min_width=10, max_width=28)
+
+
+def _write_drawdown_analysis_sheet(ws, history_data: dict) -> None:
+    """写入历史回撤分析页签（组合 vs 基准对比矩阵）。"""
+    from src.python.report.styles import FMT_PERCENT
+    from src.python.report.excel_writer import (
+        _write_placeholder, auto_width, freeze_header,
+        write_header_row, write_title_row,
+    )
+
+    if history_data is None:
+        _write_placeholder(ws, "历史回撤分析数据暂不可用（配置或网络原因）", max_cols=5)
+        auto_width(ws)
+        return
+
+    benchmarks = history_data.get("benchmarks", [])
+    n_bm = len(benchmarks)
+    ncols = 2 + n_bm
+
+    headers = ["指标", "组合"]
+    for bm in benchmarks:
+        headers.append(bm.get("name", bm.get("code", "基准")))
+
+    row = write_title_row(ws, 1, "历史回撤分析", ncols)
+    row = write_header_row(ws, row, headers)
+
+    pd = history_data
+    pct_fmt = FMT_PERCENT
+    none_fmt: str | None = None
+
+    metrics: list[tuple[str, Any, str | None, str, str | None]] = [
+        ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), pct_fmt,
+         "total_return_pct", pct_fmt),
+        ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), pct_fmt,
+         "max_drawdown_pct", pct_fmt),
+        ("年化波动率", pd.get("annualized_volatility", 0), pct_fmt,
+         None, None),
+        ("起算日", pd.get("data_start", ""), none_fmt,
+         "data_start", none_fmt),
+        ("终止日", pd.get("data_end", ""), none_fmt,
+         "data_end", none_fmt),
+    ]
+
+    for metric_name, portfolio_val, portfolio_fmt, bm_key, bm_fmt in metrics:
+        values = [metric_name, portfolio_val]
+        for bm in benchmarks:
+            if bm_key and bm.get(bm_key) is not None:
+                raw = bm[bm_key]
+                bm_val = round(raw / 100, 4) if bm_fmt == pct_fmt else raw
+            else:
+                bm_val = None
+            values.append(bm_val)
+
+        flist: list[str | None] = [none_fmt, portfolio_fmt]
+        for _ in range(n_bm):
+            flist.append(bm_fmt if bm_key else none_fmt)
+        row = write_data_row(ws, row, values, formats=flist)
+
+    freeze_header(ws, row=2)
+    auto_width(ws, min_width=10, max_width=28)
+
+
+def _write_history_sheets(
+    sheets: dict[str, Any],
+    history_data: dict | None,
+) -> None:
+    """写入组合历史走势和回撤分析页签（含基准指数列）。"""
+    ws_ph = sheets.get("portfolio_history")
+    ws_dd = sheets.get("drawdown_analysis")
+
+    data_ok = (
+        history_data
+        and history_data.get("status") != "unavailable"
+        and history_data.get("bars")
+    )
+    effective = history_data if data_ok else None
+
+    if ws_ph is not None:
+        _write_portfolio_history_sheet(ws_ph, effective)
+    if ws_dd is not None:
+        _write_drawdown_analysis_sheet(ws_dd, effective)
+
+
 def generate_excel_report(
     holdings: list, include_news: bool = False, output_dir: str = "reports",
     news_top_count: int = 100, include_llm: bool = False,
@@ -37,6 +190,7 @@ def generate_excel_report(
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     f_context: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
+    history_data: dict | None = None,  # 组合历史走势数据（含基准指数）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -60,6 +214,8 @@ def generate_excel_report(
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
         f_context: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
+        history_data: 组合历史走势数据（含基准指数），来自 PortfolioHistoryCalculator。
+                      未提供或 status=unavailable 时页签显示占位文本。
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
@@ -100,6 +256,17 @@ def generate_excel_report(
                                   early_warnings, prog)
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
     write_llm_section_and_usage(sheets, include_llm, llm_content, prog, section_order=order)
+
+    # ── 组合历史走势 + 回撤分析页签（F2 数据） ──
+    if enable_history:
+        ws_ph = sheets.get("portfolio_history")
+        ws_dd = sheets.get("drawdown_analysis")
+        if ws_ph is not None or ws_dd is not None:
+            prog.info("正在写入组合历史走势页签...")
+            try:
+                _write_history_sheets(sheets, history_data)
+            except Exception:
+                logger.debug("[excel] 组合历史走势页签写入失败（非关键）", exc_info=True)
 
     # ── 组合历史走势：环比对比摘要（写入 summary 页签底部） ──
     if f_context and f_context.get("diff") and "summary" in sheets:

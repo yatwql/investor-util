@@ -31,6 +31,7 @@ from src.python.code_utils import (
     is_otc_code_overlap,
 )
 from src.python.fetcher.chain import _fetch_with_incremental_fallback
+from src.python.report.benchmark import fetch_benchmarks, normalize_benchmarks
 
 logger = logging.getLogger("invest")
 
@@ -44,10 +45,24 @@ class PortfolioHistoryCalculator:
     """组合历史走势计算器（无状态，每次独立计算）。"""
 
     def __init__(self, session_cache: dict[str, Any] | None = None,
-                 coverage_threshold: float | None = None) -> None:
+                 coverage_threshold: float | None = None,
+                 benchmark_indices: dict[str, str] | None = None) -> None:
+        """初始化组合历史走势计算器。
+
+        Args:
+            session_cache: 会话级请求缓存（C4 约束），同一次会话内相同请求免 HTTP。
+            coverage_threshold: 有效区间覆盖比例阈值。
+                起止日要求 ≥此比例×总持仓有数据，否则截断。
+                默认 0.8（80%），取值范围 (0, 1]。
+            benchmark_indices: 基准指数配置。
+                {指数代码: 指数名称} 映射，如 {"sh000300": "沪深300", "gb_inx": "标普500"}。
+                空 dict 表示禁用基准指数对比。None 等同于空 dict。
+        """
         self._session_cache = session_cache or {}
         # 覆盖比例阈值：有效区间起止日要求 ≥此比例×总持仓 有数据
         self._coverage_threshold = coverage_threshold if coverage_threshold is not None else 0.8
+        # 基准指数配置：{代码: 名称}，空 dict 表示禁用
+        self._benchmark_indices = benchmark_indices if benchmark_indices is not None else {}
 
     def calculate_for_holding(self, holding_code: str, holding_name: str,
                               shares: float) -> list[dict] | None:
@@ -139,6 +154,8 @@ class PortfolioHistoryCalculator:
                 "total_return_pct": float,
                 "status": "ok" | "degraded" | "unavailable",
                 "warnings": [str, ...],
+                "benchmarks": [{code, name, bars, total_return_pct,
+                                max_drawdown_pct, data_start, data_end, status}, ...],
             }
         """
         # 收集每只持仓的走势（并行获取，显著提速）
@@ -293,6 +310,27 @@ class PortfolioHistoryCalculator:
         # 质量校验（只校验收益率起算点之后的数据，避免新基金加入导致的跳变误报）
         warnings.extend(_validate_bars(bars))
 
+        # ── 基准指数历史走势（Iter 6a: 并行获取；Iter 6b: 归一化对齐） ──
+        benchmarks: list[dict[str, Any]] = []
+        if self._benchmark_indices:
+            logger.info("[history] 开始获取 %d 个基准指数历史走势", len(self._benchmark_indices))
+            try:
+                raw_benchmarks = fetch_benchmarks(self._benchmark_indices, days=days)
+                if raw_benchmarks:
+                    ok_count = len(raw_benchmarks)
+                    logger.info("[history] 基准指数获取完成: %d/%d",
+                                ok_count, len(self._benchmark_indices))
+                    # 归一化对齐
+                    benchmarks = normalize_benchmarks(bars, raw_benchmarks)
+                    if benchmarks:
+                        logger.info("[history] 基准指数归一化完成: %d 条", len(benchmarks))
+                    else:
+                        logger.warning("[history] 基准指数归一化全部失败")
+                else:
+                    logger.warning("[history] 基准指数全部获取失败")
+            except Exception:
+                logger.warning("[history] 基准指数获取异常", exc_info=True)
+
         return {
             "bars": bars,
             "max_drawdown": round(-max_drawdown_val, 2),
@@ -308,6 +346,7 @@ class PortfolioHistoryCalculator:
             "warnings": warnings,
             "failed_holdings": failed_holdings,
             "successful_holdings": successful_holdings,
+            "benchmarks": benchmarks,
         }
 
     # ── 内部路由 ──────────────────────────────────────────

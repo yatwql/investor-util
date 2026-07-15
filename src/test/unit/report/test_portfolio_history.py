@@ -242,6 +242,67 @@ class TestGetCombinedTimeseries(unittest.TestCase):
         self.assertEqual(result["status"], "unavailable")
         self.assertEqual(len(result["bars"]), 0)
 
+    # ── Benchmark integration ──────────────────────────────
+
+    @patch("src.python.report.portfolio_history.normalize_benchmarks")
+    @patch("src.python.report.portfolio_history.fetch_benchmarks")
+    @patch("src.python.report.portfolio_history.PortfolioHistoryCalculator.calculate_for_holding")
+    def test_benchmark_indices_provided_calls_fetch(self, mock_calc, mock_fetch, mock_norm):
+        """传入 benchmark_indices → 调用 fetch_benchmarks + normalize_benchmarks。"""
+        from src.python.report.portfolio_history import PortfolioHistoryCalculator
+        mock_calc.side_effect = [self._bars([10, 11, 12])]
+        mock_fetch.return_value = {"sh000300": {"name": "沪深300", "bars": []}}
+        mock_norm.return_value = [{"code": "sh000300", "name": "沪深300", "bars": [],
+                                    "total_return_pct": 2.0, "max_drawdown_pct": -1.0,
+                                    "data_start": "", "data_end": "", "status": "ok"}]
+
+        calc = PortfolioHistoryCalculator(
+            {},
+            benchmark_indices={"sh000300": "沪深300"},
+        )
+        result = calc.get_combined_timeseries([("600900", "长江电力", 100)], days=30)
+        mock_fetch.assert_called_once_with({"sh000300": "沪深300"}, days=30)
+        mock_norm.assert_called_once()
+        self.assertIn("benchmarks", result)
+        self.assertEqual(len(result["benchmarks"]), 1)
+        self.assertEqual(result["benchmarks"][0]["code"], "sh000300")
+
+    @patch("src.python.report.portfolio_history.normalize_benchmarks")
+    @patch("src.python.report.portfolio_history.fetch_benchmarks")
+    @patch("src.python.report.portfolio_history.PortfolioHistoryCalculator.calculate_for_holding")
+    def test_benchmark_indices_empty_skips_fetch(self, mock_calc, mock_fetch, mock_norm):
+        """benchmark_indices 为空字典 → 不调用 fetch_benchmarks。"""
+        from src.python.report.portfolio_history import PortfolioHistoryCalculator
+        mock_calc.side_effect = [self._bars([10, 11, 12])]
+
+        calc = PortfolioHistoryCalculator(
+            {},
+            benchmark_indices={},
+        )
+        result = calc.get_combined_timeseries([("600900", "长江电力", 100)], days=30)
+        mock_fetch.assert_not_called()
+        mock_norm.assert_not_called()
+        self.assertEqual(result["benchmarks"], [])
+
+    @patch("src.python.report.portfolio_history.normalize_benchmarks")
+    @patch("src.python.report.portfolio_history.fetch_benchmarks")
+    @patch("src.python.report.portfolio_history.PortfolioHistoryCalculator.calculate_for_holding")
+    def test_benchmark_fetch_exception_handled(self, mock_calc, mock_fetch, mock_norm):
+        """fetch_benchmarks 抛出异常 → 不阻塞，返回空列表。"""
+        from src.python.report.portfolio_history import PortfolioHistoryCalculator
+        mock_calc.side_effect = [self._bars([10, 11, 12])]
+        mock_fetch.side_effect = RuntimeError("网络错误")
+
+        calc = PortfolioHistoryCalculator(
+            {},
+            benchmark_indices={"sh000300": "沪深300"},
+        )
+        result = calc.get_combined_timeseries([("600900", "长江电力", 100)], days=30)
+        mock_fetch.assert_called_once()
+        mock_norm.assert_not_called()
+        self.assertEqual(result["benchmarks"], [])
+        self.assertEqual(result["status"], "ok")  # 基准异常不影响组合走势
+
 
 class TestComputeAnnualizedVolatility(unittest.TestCase):
     """年化波动率计算测试。"""

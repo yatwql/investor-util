@@ -2,7 +2,7 @@
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
-按不同的 `--mode` / pytest 标记统计当前（2026-07-14）测试覆盖规模：
+按不同的 `--mode` / pytest 标记统计当前（2026-07-15）测试覆盖规模：
 
 ### 模式对应测试量
 
@@ -47,8 +47,8 @@
 
 | 标记 | 覆盖场景 | 覆盖项数 | 参考测试类 |
 |:-------|:---------|:--------:|:-----------|
-| `scenario`（父标记） | S0a/S0b/S0d + S1-S33 + T1-T21 全量业务场景（含 S0c+S10） | **276** | 见下 |
-| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a/S0b/S0d + S21-S33 + P1p | **122** | |
+| `scenario`（父标记） | S0a/S0b/S0d + S1-S34 + T1-T21 全量业务场景（含 S0c+S10） | **276** | 见下 |
+| ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a/S0b/S0d + S21-S34 + P1p | **122** | |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_integration.py::TestScenarioS1` |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_integration.py::TestScenarioS2` |
 | │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 | `test_integration.py::TestScenarioS3` |
@@ -57,7 +57,7 @@
 | │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 | `test_integration.py`（多类） |
 | │  ├ `scenario_s0_holdings_quality` | S0a/S0b/S0d: 持仓质量（清仓/同名多份额/特殊字符；S0c 已移至 scenario_extreme） | **13** | `test_scenario_holdings_quality.py::TestS0a/TestS0b/TestS0d` |
 | │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 | `test_scenario_section_order.py` |
-| │  └ `—` | S29-S33: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市） | 15 | `test_scenario_operational_behavior.py` |
+| │  └ `—` | S29-S34: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市）+ 组合历史走势基准指数对比 | 15 | `test_scenario_operational_behavior.py` |
 | ├─ `scenario_resilience` | 异常容错场景 S6-S9（S10 已移至 scenario_extreme） | **13** | |
 | │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | `test_integration_scenarios.py::TestScenarioBond` |
 | │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_integration_scenarios.py::TestScenarioNetworkDown` |

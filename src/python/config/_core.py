@@ -63,10 +63,15 @@ def get_config() -> dict:
                 config = json.loads(cleaned)
             merged = dict(_config_defaults._DEFAULT_CONFIG)
             # 过滤 null 值：不允许 config.json 中的 null 覆盖默认值
+            # 嵌套 dict 合并：允许用户只覆盖部分子键（如 history.analysis）而不丢失默认值
             for key, val in config.items():
                 if val is None and key in _config_defaults._DEFAULT_CONFIG:
                     continue
-                merged[key] = val
+                if (key in merged and isinstance(merged[key], dict)
+                        and isinstance(val, dict)):
+                    merged[key] = {**merged[key], **val}
+                else:
+                    merged[key] = val
             _config_cache = merged
             try:
                 _config_mtime = os.path.getmtime(config_path)
@@ -387,6 +392,27 @@ def _validate_report_section_order(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_benchmark_indices(config: dict, issues: int) -> int:
+    """验证 history.benchmark_indices 配置。"""
+    history = config.get("history", {})
+    if not isinstance(history, dict):
+        return issues
+    bm = history.get("benchmark_indices")
+    if bm is None:
+        return issues  # 缺失时使用默认值，正常
+    if not isinstance(bm, dict):
+        logger.warning("config.json history.benchmark_indices = %r 不是对象(dict)，将使用默认值", bm)
+        return issues + 1
+    for key, val in bm.items():
+        if not isinstance(key, str) or len(key) < 3:
+            logger.warning("config.json history.benchmark_indices 中存在无效键 %r，将被忽略", key)
+            issues += 1
+        if not isinstance(val, str):
+            logger.warning("config.json history.benchmark_indices.%s = %r 不是字符串", key, val)
+            issues += 1
+    return issues
+
+
 def validate_config(config: dict | None = None) -> int:
     """校验 config.json 中的常见配置错误，输出 WARNING 日志。
 
@@ -409,6 +435,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_early_warning(config, issues)
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
+    issues = _validate_benchmark_indices(config, issues)
     issues = _validate_enable_llm(issues)
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)

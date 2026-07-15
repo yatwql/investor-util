@@ -5,6 +5,7 @@
   - _parse_float — 安全浮点转换
   - _parse_response — 腾讯 API 文本解析
   - fetch_price — HTTP 请求、错误处理
+  - fetch_index_kline — 指数历史 K 线获取
 
 注意：腾讯 API 返回的字段索引（1-based）依据 _FIELD_MAP：
   name=2, code=3, price=4, yesterday_close=5, price_date=31, high=34, low=35
@@ -19,9 +20,20 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import MagicMock, patch
-import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
+import pytest
+
+from src.python.code_utils import is_index_code
+from src.python.providers.tencent import (
+    _add_prefix,
+    _parse_float,
+    _parse_kline_response,
+    _parse_response,
+    fetch_index_kline,
+    fetch_price,
+)
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
 
 def _make_tx_body(fields: list[str]) -> str:
@@ -34,7 +46,6 @@ class TestAddPrefix(unittest.TestCase):
     """_add_prefix 纯函数测试。"""
 
     def _call(self, code: str) -> str:
-        from src.python.providers.tencent import _add_prefix
         return _add_prefix(code)
 
     def test_sh_5xxxxx(self):
@@ -66,7 +77,6 @@ class TestParseFloat(unittest.TestCase):
     """_parse_float 纯函数测试。"""
 
     def _call(self, s: str) -> float:
-        from src.python.providers.tencent import _parse_float
         return _parse_float(s)
 
     def test_normal(self):
@@ -89,7 +99,6 @@ class TestParseResponse(unittest.TestCase):
     """_parse_response 纯函数测试。"""
 
     def _call(self, text: str):
-        from src.python.providers.tencent import _parse_response
         return _parse_response(text)
 
     def _make_text(self, fields: list[str]) -> str:
@@ -99,19 +108,18 @@ class TestParseResponse(unittest.TestCase):
 
     def test_normal(self):
         """正常数据 → 正确解析所有字段。"""
-        # 至少 35 个字段（依据 _FIELD_MAP 最大索引 35）
         fields = [""] * 35
-        fields[0] = "1"                # 序号(1)
-        fields[1] = "科创材料ETF"       # name(2)
-        fields[2] = "561910"           # code(3)
-        fields[3] = "0.853"            # price(4)
-        fields[4] = "0.901"            # yesterday_close(5)
-        fields[5] = "0.850"            # open(6)
-        fields[6] = "12345"            # volume(7)
-        fields[7] = "67890"            # turnover(8)
-        fields[30] = "20260701103000"  # price_date(31)
-        fields[33] = "0.870"           # high(34)
-        fields[34] = "0.840"           # low(35)
+        fields[0] = "1"
+        fields[1] = "科创材料ETF"
+        fields[2] = "561910"
+        fields[3] = "0.853"
+        fields[4] = "0.901"
+        fields[5] = "0.850"
+        fields[6] = "12345"
+        fields[7] = "67890"
+        fields[30] = "20260701103000"
+        fields[33] = "0.870"
+        fields[34] = "0.840"
 
         result = self._call(self._make_text(fields))
         self.assertIsNotNone(result)
@@ -184,7 +192,6 @@ class TestFetchPrice(unittest.TestCase):
         mock_response.text = text
         mock_client.get.return_value = mock_response
 
-        from src.python.providers.tencent import fetch_price
         result = fetch_price("600900")
         self.assertIsNotNone(result)
         self.assertEqual(result["name"], "长江电力")
@@ -200,7 +207,6 @@ class TestFetchPrice(unittest.TestCase):
         mock_factory.return_value = mock_client
         mock_client.get.side_effect = httpx.TimeoutException("timeout")
 
-        from src.python.providers.tencent import fetch_price
         self.assertIsNone(fetch_price("600900"))
 
     @patch("src.python.providers.tencent.make_http_client")
@@ -212,7 +218,6 @@ class TestFetchPrice(unittest.TestCase):
         mock_factory.return_value = mock_client
         mock_client.get.side_effect = httpx.RequestError("network error")
 
-        from src.python.providers.tencent import fetch_price
         self.assertIsNone(fetch_price("600900"))
 
     @patch("src.python.providers.tencent.make_http_client")
@@ -225,5 +230,116 @@ class TestFetchPrice(unittest.TestCase):
         mock_response.text = "invalid format"
         mock_client.get.return_value = mock_response
 
-        from src.python.providers.tencent import fetch_price
         self.assertIsNone(fetch_price("600900"))
+
+
+class TestFetchIndexKline(unittest.TestCase):
+    """fetch_index_kline 指数历史 K 线获取测试。"""
+
+    def _make_json_response(self, code: str, data_list: list) -> dict:
+        """构造 Tencent K 线 JSON 响应。"""
+        return {
+            "data": {
+                code: {
+                    "qfqday": data_list,
+                }
+            }
+        }
+
+    def _make_kline_entry(self, date: str, open_: float = 3990.0,
+                          close: float = 4000.0, high: float = 4010.0,
+                          low: float = 3980.0, volume: int = 1000000) -> list:
+        """构造 Tencent K 线条目：[date, open, close, high, low, volume]"""
+        return [date, str(open_), str(close), str(high), str(low), str(volume)]
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_normal_a_share_index(self, mock_factory):
+        """sh000300 正常返回 → 正确解析为含标准字段的 dict 列表。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = self._make_json_response(
+            "sh000300",
+            [self._make_kline_entry("2026-07-01", close=4000.0),
+             self._make_kline_entry("2026-07-02", close=4010.0)],
+        )
+        mock_client.get.return_value = mock_resp
+
+        result = fetch_index_kline("sh000300", 30)
+        self.assertEqual(len(result), 2)
+        expected_keys = {"date", "open", "close", "high", "low", "volume"}
+        for bar in result:
+            self.assertEqual(set(bar.keys()), expected_keys)
+            self.assertIsNotNone(bar["close"])
+            self.assertIsNotNone(bar["volume"])
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_us_index(self, mock_factory):
+        """gb_inx 正常返回 → 正确解析。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = self._make_json_response(
+            "gb_inx",
+            [self._make_kline_entry("2026-07-01", close=5500.0)],
+        )
+        mock_client.get.return_value = mock_resp
+
+        result = fetch_index_kline("gb_inx", 30)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["close"], 5500.0)
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_empty_response(self, mock_factory):
+        """远程返回空数据 → 空列表。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"data": {"sh000300": {}}}
+        mock_client.get.return_value = mock_resp
+
+        result = fetch_index_kline("sh000300", 30)
+        self.assertEqual(result, [])
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_timeout_returns_empty(self, mock_factory):
+        """超时 → 空列表。"""
+        import httpx
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_client.get.side_effect = httpx.TimeoutException("timeout")
+
+        result = fetch_index_kline("sh000300", 30)
+        self.assertEqual(result, [])
+
+    def test_non_index_code_returns_empty(self):
+        """非指数代码（600900）→ 空列表。"""
+        result = fetch_index_kline("600900", 30)
+        self.assertEqual(result, [])
+
+    def test_empty_code_returns_empty(self):
+        """空代码 → 空列表。"""
+        result = fetch_index_kline("", 30)
+        self.assertEqual(result, [])
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_is_index_code_called_for_c1(self, mock_factory):
+        """C1 约束：函数通过 code_utils.is_index_code 校验传入代码（mock spy 断言）。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = self._make_json_response(
+            "sh000300",
+            [self._make_kline_entry("2026-07-01")],
+        )
+        mock_client.get.return_value = mock_resp
+
+        with patch("src.python.providers.tencent.is_index_code",
+                   wraps=is_index_code) as spy:
+            fetch_index_kline("sh000300", 30)
+            spy.assert_called_with("sh000300")

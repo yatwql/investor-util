@@ -16,7 +16,12 @@ from typing import Any
 
 import httpx
 
-from src.python.code_utils import get_exchange_prefix, is_a_share_code, is_exchange_fund_code
+from src.python.code_utils import (
+    get_exchange_prefix,
+    is_a_share_code,
+    is_exchange_fund_code,
+    is_index_code,
+)
 from src.python.http_client import make_http_client
 
 logger = logging.getLogger("invest")
@@ -414,6 +419,54 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
             data = resp.json()
     except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
         logger.warning("Sina K 线获取失败 %s: %s", full_code, e)
+        return []
+
+    return _parse_kline_json(data)
+
+
+def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:
+    """获取指数历史 K 线数据（备用链路）。
+
+    与 fetch_kline() 的区别：
+      - 入口通过 code_utils.is_index_code() 校验（C1 约束）
+      - 不检查 is_a_share_code/is_exchange_fund_code
+      - 不调用 _add_prefix（指数代码直接透传）
+      - 复用 _parse_kline_json() 解析逻辑
+
+    Args:
+        code: 指数代码，如 "sh000300" / "gb_inx"
+        days: 获取天数（默认 30，最大 3650）
+        start_from: 起始日期（由 chain 层使用，provider 侧按 days 获取）
+
+    Returns:
+        list[dict]: [{date, open, close, high, low, volume}, ...]
+        API 失败返回空列表。
+    """
+    if not is_index_code(code):
+        logger.debug("Sina 跳过非指数代码: %s", code)
+        return []
+
+    days = min(max(days, 5), 3650)
+    symbol = code.strip()
+    url = "https://money.finance.sina.com.cn/getKLineData"
+
+    params: dict[str, str | int] = {
+        "symbol": symbol,
+        "datalen": days,
+        "scale": 240,
+        "ma": "no",
+    }
+
+    logger.debug("Sina 指数 K 线请求: %s, days=%d", symbol, days)
+
+    try:
+        with make_http_client(timeout=30.0) as client:
+            resp = client.get(url, params=params,
+                              headers={"Referer": "https://finance.sina.com.cn"})
+            resp.encoding = "utf-8"
+            data = resp.json()
+    except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
+        logger.warning("Sina 指数 K 线获取失败 %s: %s", symbol, e)
         return []
 
     return _parse_kline_json(data)

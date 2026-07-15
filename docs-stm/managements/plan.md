@@ -1,14 +1,5 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
-创建日期：2026-06-26
-最后更新：2026-07-14（v0.5.5）
-
----
-
-## 审查问题索引
-
-> 早期审查问题和实现计划已归档：详见 [`archived_plan.0.1.x.md`](../archive/archived_plan.0.1.x.md) · [`archived_plan.0.2.x.md`](../archive/archived_plan.0.2.x.md) · [`archived_plan.0.3.x.md`](../archive/archived_plan.0.3.x.md) · [`archived_plan.0.4.x.md`](../archive/archived_plan.0.4.x.md) · [`archived_plan.0.5.x.md`](../archive/archived_plan.0.5.x.md)。
-
 ---
 
 ## 问题描述

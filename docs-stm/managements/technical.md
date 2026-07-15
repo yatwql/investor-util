@@ -1,7 +1,5 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 最后更新：2026-07-14（v0.5.5）
-
 ## 目录
 
 - [1. 总体技术架构](#1-总体技术架构)
@@ -102,7 +100,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
       penetration_data:{top10, classification, sector, ...}
       news_data:       [{title, source, summary, correlation, ...}]
       llm_data:        {global_macro, expert_review, health_check, ...}
-      history_data:    {timeseries, drawdown, return_pct, ...}
+      history_data:    {timeseries, drawdown, return_pct, benchmarks, ...}
       ...
     }
                       │
@@ -155,6 +153,9 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | | `is_hk_stock_code(code)` | 5 位纯数字 | 港股通标的 |
 | | `is_otc_code_overlap(code)` | 00 开头 | A 股/OTC 基金代码重叠区检测 |
 | | `get_exchange_prefix(code)` | 前缀规则 | sh/sz/bj 交易所前缀 |
+| | `is_index_code(code)` | sh/sz 前缀或 000/399/932 开头或 gb_ 前缀 | 指数代码识别 |
+| | `is_us_index_code(code)` | gb_ 前缀 | 美股指数识别 |
+| | `get_index_exchange_prefix(code)` | sh/sz 前缀 | 指数所属交易所前缀 |
 | | `get_push2_secid(code)` | 前缀规则 | push2 API secid 参数 |
 | 名称关键词 | `is_qdii_by_name(name)` | "QDII" | QDII 标识 |
 | | `is_qdii_extended(name)` | QDII + 隐式关键词 | QDII + 隐式海外基金 |
@@ -278,6 +279,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
  │  price_stock:   腾讯财经 (qt.gtimg.cn)  →  新浪财经 (hq.sinajs.cn)│
  │  price_fund_otc: 东方财富净值 API (直达，无备用)                   │
  │  history_stock:  腾讯财经 K 线          →  新浪财经 K 线          │
+ │  history_index:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_fund_otc: 天天基金 pingzhongdata → 东方财富净值分页       │
  │  industry:       东方财富 push2          →  行情页 quotedata      │
  │  fund_rank:      天天基金 (直达)                                  │
@@ -526,7 +528,7 @@ with phase_timeout(seconds=120, phase_name="data_fetch") as ctx:
 ```
 fetcher/
 ├── price.py            股票/ETF 最新价 + 场外基金净值 + 00 代码降级
-├── index.py            A 股/美股指数（直调 Provider，不走 Chain）
+├── index.py            A 股/美股指数（直调 Provider，不走 Chain）+ fetch_index_history 历史日线（走 Chain，C6 约束）
 ├── fund.py             基金排名/持仓/基准（天天基金数据）
 ├── fund_manager.py     基金经理数据（天天基金 HTML 解析）
 ├── industry.py         行业分类+概念板块（push2 双链路）
@@ -1326,6 +1328,112 @@ new_data = _try_providers(providers, ..., start_from=last_cached_date)
 - **纯检测/日志用途**，异常不影响主流程
 
 **东财历史净值分页**：`eastmoney.fetch_fund_nav_history()` 改用 `pageSize=20` + 分页循环代替单次 `pageSize=365`（超 API 上限返回 null），页间 0.3s 防限流，最多 10 页（约 200 条 ≈10 个月）。
+
+#### 基准指数对比
+
+基准指数历史走势的并行获取与归一化对齐，在 5 步算法链基础上叠加显示。
+
+**配置接口**（`config.json`）：
+```json
+{
+  "history": {
+    "benchmark_indices": {
+      "sh000300": "沪深300",
+      "gb_inx": "标普500"
+    },
+    "analysis": "auto"
+  }
+}
+```
+
+**配置合并保护**：嵌套 dict 合并时使用 `merged[key] = {**merged[key], **val}` 而非直接覆盖，避免 `benchmark_indices` 默认值被 `history.analysis` 配置静默覆盖。
+
+**技术流程**：
+
+```
+get_combined_timeseries()
+    │
+    ▼ (5 步算法链完成后)
+    ┌─────────────────────────────────────┐
+    │ self._benchmark_indices 非空?       │── NO → benchmarks = []
+    └──────────────┬──────────────────────┘
+                   YES
+                   ▼
+    ┌─────────────────────────────────────┐
+    │ fetch_benchmarks(indices, days)     │
+    │ (ThreadPoolExecutor 并行获取，       │
+    │  走 fetch_index_history → chain)     │
+    └──────────────┬──────────────────────┘
+                   ▼
+    ┌─────────────────────────────────────┐
+    │ normalize_benchmarks(bars, raw)     │
+    │ LOCF合并→起算日对齐→归一化至100基点  │
+    └──────────────┬──────────────────────┘
+                   ▼
+             benchmarks 列表
+```
+
+**`fetch_benchmarks()`** — 并行获取多个指数的历史日线：
+- 接收 `{代码: 名称}` 映射，如 `{"sh000300": "沪深300", "gb_inx": "标普500"}`
+- 使用 `ThreadPoolExecutor(max_workers=4)` 并行调用 `fetch_index_history()`
+- 各指数独立处理，失败不影响其他
+- 全部失败时返回空字典，调用方静默降级
+
+**`normalize_benchmarks()`** — 归一化到 100 基点并与组合走势对齐：
+
+```
+输入：组合走势 bars + 各指数原始数据 {code: {name, bars}}
+    │
+    ▼
+① 构建 date→close 映射（过滤无效 close）
+    │
+    ▼
+② 无重叠检测：指数数据完全早于/晚于组合区间 → 跳过
+    │
+    ▼
+③ 确定对齐起算日 align_start = max(组合起算日, 指数首条数据日)
+    │
+    ▼
+④ 起算日 close 获取：在 align_start 当天或之前取最近的 close
+    │
+    ▼
+⑤ LOCF 填充缺失日 + 归一化：
+   value = last_close / close_at_start × 100
+    │
+    ▼
+⑥ 计算区间累计收益率（终值 - 100）
+    │
+    ▼
+⑦ 计算区间最大回撤（Peak-to-Trough，归一化值）
+```
+
+**输出数据字典（每指数）**：
+```python
+{
+    "code": str,              # 指数代码
+    "name": str,              # 指数名称
+    "bars": [                 # 归一化走势，与组合日期一一对应
+        {"date": str, "value": float},
+    ],
+    "total_return_pct": float,  # 区间累计收益率（%）
+    "max_drawdown_pct": float,  # 区间最大回撤（%）
+    "data_start": str,         # 有效起始日
+    "data_end": str,           # 有效结束日
+    "status": str,             # "ok" | "degraded"
+}
+```
+
+**防御性编程**：
+- `bar.get("date")` 防御性检查（防止 KeyError）
+- 每次 index bar 的 close 校验：`isinstance(close, (int, float)) and close > 0`
+- 每个基准完成归一化后输出 `logger.info("[normalize] %s(%s) 归一化完成, %d 条数据")`
+- 异常捕获在 `get_combined_timeseries()` 的 try/except 中，不阻塞主流程
+
+**HTML 渲染**：`drawSimpleChart()` 多 dataset 版本，组合 as-if 曲线（实线）+ 基准指数（虚线，颜色循环），右侧图例显示。回撤图同样叠加基准指数的回撤序列（灰色虚线）。移除了 Chart.js CDN 外部依赖，使用 Canvas 2D API 原生渲染。
+
+**Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值 `'0.00'` 格式），`drawdown_analysis` 页签对比指标矩阵（累计收益率/最大回撤/波动率等）。
+
+**注册表条目**：`history_stock` / `history_fund_otc` 历史走势数据在 registry 中注册为无分组缓存，不受菜单缓存命令影响。
 
 #### F1 快照存储与清理（history_snapshot.py）
 

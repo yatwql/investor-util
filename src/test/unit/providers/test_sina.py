@@ -148,3 +148,117 @@ class TestFetchUsIndices(unittest.TestCase):
         from src.python.providers.sina import fetch_us_indices
 
         self.assertEqual(fetch_us_indices(), {})
+
+
+class TestFetchIndexKline(unittest.TestCase):
+    """fetch_index_kline 指数历史 K 线获取测试。"""
+
+    def _make_kline_json(self, entries: list[list]) -> list[dict]:
+        """构造 Sina K 线 JSON 响应。"""
+        return [
+            {
+                "day": e[0],
+                "open": str(e[1]),
+                "close": str(e[2]),
+                "high": str(e[3]),
+                "low": str(e[4]),
+                "volume": str(e[5]),
+            }
+            for e in entries
+        ]
+
+    @patch("src.python.providers.sina.make_http_client")
+    def test_normal_a_share_index(self, mock_factory):
+        """sh000300 正常返回 → 正确解析。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = self._make_kline_json([
+            ["2026-07-01", 3990.0, 4000.0, 4010.0, 3980.0, 1000000],
+            ["2026-07-02", 4000.0, 4010.0, 4020.0, 3990.0, 1200000],
+        ])
+        mock_client.get.return_value = mock_resp
+
+        from src.python.providers.sina import fetch_index_kline
+        result = fetch_index_kline("sh000300", 30)
+        self.assertEqual(len(result), 2)
+        expected_keys = {"date", "open", "close", "high", "low", "volume"}
+        for bar in result:
+            self.assertEqual(set(bar.keys()), expected_keys)
+            self.assertIsNotNone(bar["close"])
+
+    @patch("src.python.providers.sina.make_http_client")
+    def test_us_index(self, mock_factory):
+        """gb_inx 正常返回 → 正确解析。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = self._make_kline_json([
+            ["2026-07-01", 5490.0, 5500.0, 5510.0, 5480.0, 500000],
+        ])
+        mock_client.get.return_value = mock_resp
+
+        from src.python.providers.sina import fetch_index_kline
+        result = fetch_index_kline("gb_inx", 30)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["close"], 5500.0)
+
+    @patch("src.python.providers.sina.make_http_client")
+    def test_empty_response(self, mock_factory):
+        """远程返回空列表 → 空列表。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = []
+        mock_client.get.return_value = mock_resp
+
+        from src.python.providers.sina import fetch_index_kline
+        result = fetch_index_kline("sh000300", 30)
+        self.assertEqual(result, [])
+
+    @patch("src.python.providers.sina.make_http_client")
+    def test_timeout_returns_empty(self, mock_factory):
+        """超时 → 空列表。"""
+        import httpx
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_client.get.side_effect = httpx.TimeoutException("timeout")
+
+        from src.python.providers.sina import fetch_index_kline
+        result = fetch_index_kline("sh000300", 30)
+        self.assertEqual(result, [])
+
+    def test_non_index_code_returns_empty(self):
+        """非指数代码 → 空列表。"""
+        from src.python.providers.sina import fetch_index_kline
+        result = fetch_index_kline("600900", 30)
+        self.assertEqual(result, [])
+
+    def test_empty_code_returns_empty(self):
+        """空代码 → 空列表。"""
+        from src.python.providers.sina import fetch_index_kline
+        result = fetch_index_kline("", 30)
+        self.assertEqual(result, [])
+
+    @patch("src.python.providers.sina.make_http_client")
+    def test_is_index_code_called_for_c1(self, mock_factory):
+        """C1 约束：函数通过 code_utils.is_index_code 校验传入代码。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = self._make_kline_json([
+            ["2026-07-01", 3990.0, 4000.0, 4010.0, 3980.0, 1000000],
+        ])
+        mock_client.get.return_value = mock_resp
+
+        from src.python.code_utils import is_index_code as _orig_is_index
+        with patch("src.python.providers.sina.is_index_code",
+                   wraps=_orig_is_index) as spy:
+            from src.python.providers.sina import fetch_index_kline
+            fetch_index_kline("sh000300", 30)
+            spy.assert_called_with("sh000300")

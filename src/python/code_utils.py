@@ -46,6 +46,15 @@ _OVERSEA_KW = ("纳斯达克", "标普", "纳指", "道琼斯", "日经")
 # 货币类关键词
 MONEY_KEYWORDS = ("货币", "现金", "增利", "宝")
 
+# ── 指数代码相关常量 ──────────────────────────────────────────
+
+# A 股指数交易所前缀
+_INDEX_EXCHANGE_PREFIXES = ("sh", "sz")
+# 美股指数代码前缀
+_US_INDEX_PREFIX = "gb_"
+# A 股指数原始 6 位码起始数字
+_A_INDEX_RAW_PREFIXES = ("000", "399", "932")
+
 
 # ═══════════════════════════════════════════════════════════════
 #  代码前缀型判定（6 位证券代码，可含 sh/sz/bj 前缀）
@@ -376,6 +385,71 @@ def get_push2_secid(code: str) -> str:
     if raw.startswith(("0", "1", "2", "3")):
         return f"0.{raw}"
     return f"1.{raw}"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  指数代码判定（基准指数比对功能）
+# ═══════════════════════════════════════════════════════════════
+
+
+def is_index_code(code: str) -> bool:
+    """判断代码是否为指数代码（A 股/美股通用）。
+
+    识别依据：
+      - 美股指数：``gb_`` 开头（如 ``gb_inx``）
+      - A 股指数：``sh``/``sz`` 前缀 + 6 位码（以 000/399/932 开头）
+      - 纯 6 位 000/399/932 开头代码（无前缀时也识别）
+
+    Args:
+        code: 指数代码
+
+    Returns:
+        True 表示该代码为指数代码
+    """
+    raw = code.strip()
+    if not raw:
+        return False
+    # 美股指数
+    if raw.startswith(_US_INDEX_PREFIX):
+        return True
+    # 去除交易所前缀
+    stripped = raw
+    for prefix in _INDEX_EXCHANGE_PREFIXES:
+        if raw.startswith(prefix):
+            stripped = raw[len(prefix):]
+            break
+    # A 股指数：6 位数字码以特定前缀开头
+    return len(stripped) == 6 and stripped.isdigit() and stripped.startswith(_A_INDEX_RAW_PREFIXES)
+
+
+def is_us_index_code(code: str) -> bool:
+    """判断是否为美股指数代码（``gb_`` 开头）。
+
+    Args:
+        code: 指数代码
+
+    Returns:
+        True 表示该代码为美股指数
+    """
+    return bool(code and code.strip().startswith(_US_INDEX_PREFIX))
+
+
+def get_index_exchange_prefix(code: str) -> str:
+    """获取 A 股指数代码的交易所前缀。
+
+    如 ``"sh000300"`` → ``"sh"``，非 A 股指数（如 ``"gb_inx"``）返回空字符串。
+
+    Args:
+        code: 指数代码
+
+    Returns:
+        ``"sh"`` | ``"sz"`` | ``""``
+    """
+    raw = code.strip()
+    for prefix in _INDEX_EXCHANGE_PREFIXES:
+        if raw.startswith(prefix):
+            return prefix
+    return ""
 
 
 # ═══════════════════════════════════════════════════════════════

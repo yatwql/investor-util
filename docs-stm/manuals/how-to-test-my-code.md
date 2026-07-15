@@ -1,7 +1,5 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 最后更新：2026-07-14（v0.5.5）
-
 ## 概述
 
 本项目的测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行。使用 `scripts/test_runner.py` 脚本统一驱动，自动输出结构化报告。
@@ -149,7 +147,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 项目推荐的四道质量门禁，按开发阶段逐级收紧：
 
 - **开发期验证（`--mode dev-verify`）** — 每次代码变更后、commit 前可选的快速验证。组合全部 8 个 unit 子模块（并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 2min。适合编码过程中频繁跑"有没有把房子点了"的快速检查。
-- **提交前验证（`--mode regression`）** — commit 前必须执行。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S28 + S29-S33 + T1-T21，共 269 项），确保端到端用户路径不被破坏。约 6min。是编辑-验证循环中的正式屏障。
+- **提交前验证（`--mode regression`）** — commit 前必须执行。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S34 + T1-T21，共 276 项），确保端到端用户路径不被破坏。约 6min。是编辑-验证循环中的正式屏障。
 - **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。分两阶段：Phase A 单元测试并行（~2min）+ Phase B 场景串行（~6min），共约 8min。适合作为 PR CI 门禁或合入前的手动检查。
 - **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 10min，适合发布前的全量回归。
 
@@ -190,7 +188,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
   场景测试按职责分为 **5 大类**：
 
-  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、特殊字符不乱码（超多持仓 S0c 已移至 scenario_extreme）），以及操作行为场景（S29-S33：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市）。
+  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、特殊字符不乱码（超多持仓 S0c 已移至 scenario_extreme）），以及操作行为场景（S29-S34：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市/基准指数走势对比）。
   - **`scenario_resilience` — 异常容错场景**：验证系统在非正常输入或环境下的降级能力，包括纯债券基金组合（穿透无股权覆盖）、网络中断（价格从过期缓存读取）、单账户单持仓、零成本持仓（不除零崩溃）。
   - **`scenario_extreme` — 极限场景**：验证极端数据下的正确性，包括超多持仓（S0c，200+ 条批量计算）和极端值（S10，超大/极小份额、高精度净值、零值组合）。标记 `scenario_extreme`，不包含在 `scenario` / `scenario_basic` / `scenario_resilience` 中，需单独运行 `--mode scenario_extreme`。
   - **`scenario_llm` — LLM 场景组合**：验证 LLM 模块在各种状态下的行为，包括缓存/成功/失败混合状态的颜色渲染、五种失败原因独立映射、Extended Thinking 标记、禁用优先原则、断网降级、全缓存无调用、三种输出格式（Excel/HTML/Summary）一致性。
@@ -199,7 +197,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
 - **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
 - **`--mode dev-verify`** 开发期快速验证模式，组合全部 8 个 unit 子模块（排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 2min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。覆盖项数见 [test-coverage.md](../managements/test-coverage.md)。
-- **`--mode verify`** 合入门禁模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部 scenario 场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。分两阶段执行：Phase A 单元测试并行 + Phase B 场景串行，共约 8min（scenario 269 项串行为主瓶颈）。确保数据管道整条链路正常。
+- **`--mode verify`** 合入门禁模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部 scenario 场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。分两阶段执行：Phase A 单元测试并行 + Phase B 场景串行，共约 8min（scenario 276 项串行为主瓶颈）。确保数据管道整条链路正常。
 
 #### 🔷 专项验证系列（`edge` / `data` / `smoke`）
 
@@ -270,8 +268,8 @@ test-reports/latest/
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
-| `scenario` | 全部业务场景 S0a-S0d + S1-S28 + S29-S33 + T1-T21 |
-| `scenario_basic` | 基础链路 S0a-S0d + S1-S5 + S21-S33 |
+| `scenario` | 全部业务场景 S0a-S0d + S1-S34 + T1-T21 |
+| `scenario_basic` | 基础链路 S0a-S0d + S1-S5 + S21-S34 |
 | ├ `scenario_s0_holdings_quality` | S0a-S0d: 持仓质量 |
 | ├ `scenario_stock` | S1: 纯股票组合 |
 | ├ `scenario_fund` | S2: 纯基金组合 |

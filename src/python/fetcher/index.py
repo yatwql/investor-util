@@ -194,6 +194,53 @@ def _fetch_us_from_tencent(missing: list[str]) -> dict[str, dict[str, Any]]:
     return results
 
 
+def _index_history_cache_key(code: str) -> str:
+    """指数历史日线的文件缓存键。"""
+    return f"history_index_{code}"
+
+
+def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
+    """获取指数历史日线（走 history_index chain，C6 约束）。
+
+    通过 history_index chain 路由，复用 tencent/sina 的 K 线能力，
+    跳过 is_a_share_code 类型检查。
+
+    C4 约束：同次会话同一代码命中 DataSourceRegistry.session_cache。
+
+    Args:
+        code: 指数代码，如 "sh000300" / "gb_inx"
+        days: 获取天数（默认 365，最大 3650）
+
+    Returns:
+        [{"date": "...", "close": float, "open": float,
+          "high": float, "low": float, "volume": int}, ...]
+        按日期升序。全链路失败返回 [].
+    """
+    if not code:
+        return None
+
+    from src.python.fetcher.chain import _fetch_with_incremental_fallback
+
+    # 先查会话缓存（C4 约束）
+    from src.python.provider_registry import _NOT_FOUND, get_registry
+    reg = get_registry()
+    cached = reg.session_cache_get("history_index", code)
+    if cached is not _NOT_FOUND:
+        return cached
+
+    # 通过 history_index chain 获取
+    days = min(max(days, 5), 3650)
+    try:
+        result = _fetch_with_incremental_fallback("history_index", code, days)
+    except Exception:
+        logger.warning("[index] 指数历史日线获取异常: %s", code, exc_info=True)
+        result = []
+
+    # 写入会话缓存（即使为空也缓存，避免重复请求）
+    reg.session_cache_set("history_index", code, result, source="api")
+    return result
+
+
 def fetch_us_indices() -> dict[str, dict[str, Any]]:
     """获取美股三大指数行情（带重试和备用链路）。
 

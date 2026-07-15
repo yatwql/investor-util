@@ -57,7 +57,9 @@
   "history": {
     "analysis": "off",
     "snapshot_retention_days": 60,
-    "snapshot_max_count": 365
+    "snapshot_max_count": 365,
+    "coverage_threshold": 0.8,
+    "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}
   },
 
   // ── G. 报告板块可见性 ──
@@ -94,6 +96,8 @@
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 |  |  | 组合历史走势有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
+| `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（见上） | 手动编辑 |
+| `history.benchmark_indices` | `{"sh000300": "沪深300", "gb_inx": "标普500"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
 | `enable_b_series` | `true` | B 系列报告板块可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
 | `enable_news` | `true` | 新闻类报告板块可见性（模块 #10~#11），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制板块在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
 | `enable_history` | `true` | 历史走势报告板块可见性（模块 #16~#17），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
@@ -229,6 +233,7 @@
 |------|-----------|:--------:|----------|------|
 | `history_stock` | `history_stock_{code}*.json` | 7 天 | — | 股票/ETF 历史 K 线（腾讯/新浪），F2 组合走势计算输入 |
 | `history_fund_otc` | `history_fund_otc_{code}*.json` | 30 天 | — | 场外基金历史净值（天天基金→东方财富备用链路），F2 组合走势计算输入 |
+| `history_index` | `history_index_{code}*.json` | 30 天 | — | 指数历史 K 线（腾讯/新浪），F2 基准指数走势计算输入 |
 
 > **指纹驱动失效：** 文件名中的 `{fingerprint}` 是输入数据的 MD5 哈希。持仓/指数数据变化时指纹自动改变，原缓存失效，无需手动清除。
 > 
@@ -403,9 +408,14 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
     "analysis": "off",
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
-    "coverage_threshold": 0.8
+    "coverage_threshold": 0.8,
+    "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}
 }
 ```
+
+> **基准指数对比**：`benchmark_indices` 配置需要在历史走势图上叠加对比的基准指数。格式为 `{指数代码: 显示名称}`，支持 A 股指数（如 `sh000300`）和美股指数（如 `gb_inx`）。获取方式走 `history_index` chain（腾讯/新浪双链路）。配置为空对象 `{}` 时不获取基准数据。
+
+> **数据获取链路**：基准指数通过 `fetch_index_history()` → `history_index` chain → 腾讯 K 线 / 新浪 K 线（与组合持仓的个股 K 线共享熔断器）。数据写入缓存键 `history_index_{code}.json`。
 
 ---
 ### H. 报告板块可见性

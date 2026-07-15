@@ -14,7 +14,13 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.python.fetcher.chain import _get_chain, _fetch_with_fallback, reset_provider_skip
+from src.python.fetcher.chain import (
+    _call_history_provider,
+    _fetch_with_incremental_fallback,
+    _fetch_with_fallback,
+    _get_chain,
+    reset_provider_skip,
+)
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 
@@ -500,6 +506,77 @@ class TestIsProviderChainBroken(unittest.TestCase):
         reg.record_failure("p1", "test")
         reg.record_failure("p1", "test")
         self.assertTrue(is_provider_chain_broken("test"))
+
+
+class TestHistoryIndexChain(unittest.TestCase):
+    """history_index Provider Chain 路由测试。"""
+
+    def test_chain_defined(self):
+        """_DEFAULT_CHAINS 中包含 history_index 且 provider 顺序正确。"""
+        chain = _get_chain("history_index")
+        self.assertEqual(chain, ["tencent", "sina"])
+
+    def test_history_stock_unaffected(self):
+        """新增 history_index 不影响 history_stock 链。"""
+        chain = _get_chain("history_stock")
+        self.assertEqual(chain, ["tencent", "sina"])
+
+    def test_call_history_provider_dispatches_index(self):
+        """_call_history_provider("tencent", "history_index", ...) 调用 fetch_index_kline。"""
+        mock_mod = MagicMock()
+        mock_mod.fetch_index_kline = MagicMock(return_value=[{"date": "2026-07-01", "close": 4000.0}])
+
+        with patch("importlib.import_module", return_value=mock_mod):
+            result = _call_history_provider("tencent", "history_index", "sh000300", 30, None)
+            self.assertEqual(len(result), 1)
+            mock_mod.fetch_index_kline.assert_called_once_with("sh000300", days=30, start_from=None)
+
+    def test_call_history_provider_stock_unaffected(self):
+        """history_stock 仍调用 fetch_kline，不受历史指数分支影响。"""
+        mock_mod = MagicMock()
+        mock_mod.fetch_kline = MagicMock(return_value=[{"date": "2026-07-01", "close": 25.0}])
+
+        with patch("importlib.import_module", return_value=mock_mod):
+            result = _call_history_provider("tencent", "history_stock", "600900", 30, None)
+            self.assertEqual(len(result), 1)
+            mock_mod.fetch_kline.assert_called_once_with("600900", days=30, start_from=None)
+
+    def test_call_history_provider_fund_unaffected(self):
+        """history_fund_otc 仍调用 fetch_fund_nav_history，不受影响。"""
+        mock_mod = MagicMock()
+        mock_mod.fetch_fund_nav_history = MagicMock(return_value=[{"date": "2026-07-01", "nav": 1.5}])
+
+        with patch("importlib.import_module", return_value=mock_mod):
+            result = _call_history_provider("tiantian", "history_fund_otc", "161725", 30, None)
+            self.assertEqual(len(result), 1)
+            mock_mod.fetch_fund_nav_history.assert_called_once_with("161725")
+
+    def test_call_history_provider_index_unknown_provider(self):
+        """history_index 在未知 provider 上 → 返回空列表（不崩溃）。"""
+        mock_mod = MagicMock()
+        mock_mod.fetch_index_kline = None  # 没有该函数
+
+        with patch("importlib.import_module", return_value=mock_mod):
+            result = _call_history_provider("unknown_provider", "history_index", "sh000300", 30, None)
+            self.assertEqual(result, [])
+
+    def test_double_failure_returns_empty(self):
+        """history_index 全链路失败 → 空列表（不缓存空结果）。"""
+        from src.python.fetcher.chain import _fetch_with_incremental_fallback
+
+        # mock 所有 provider 返回空
+        with patch("src.python.fetcher.chain.cache_get") as mock_cache_get, \
+             patch("src.python.fetcher.chain.cache_set") as mock_cache_set, \
+             patch("src.python.fetcher.chain._try_providers") as mock_try:
+
+            mock_cache_get.return_value = []
+            mock_try.return_value = []  # 全链路失败
+
+            result = _fetch_with_incremental_fallback("history_index", "sh000300", 30)
+
+            self.assertEqual(result, [])
+            # 全链失败时不写缓存（空数据不缓存）
+            mock_cache_set.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -177,7 +177,11 @@ def _fetch_history_data(history_mode: str, holdings: list, reporter: TuiProgress
     from src.python.report.portfolio_history import PortfolioHistoryCalculator
     _history_cfg = (get_config_cache() or {}).get("history", {})
     _coverage = _history_cfg.get("coverage_threshold", 0.8)
-    _calc = PortfolioHistoryCalculator(coverage_threshold=_coverage)
+    _benchmark_indices = _history_cfg.get("benchmark_indices", {})
+    _calc = PortfolioHistoryCalculator(
+        coverage_threshold=_coverage,
+        benchmark_indices=_benchmark_indices,
+    )
     _holdings_tuples = [(h.code, h.name, h.shares) for h in holdings]
     try:
         history_data = _calc.get_combined_timeseries(_holdings_tuples)
@@ -254,7 +258,7 @@ def _cmd_generate_both() -> None:
             holdings, include_news=_enable_news, output_dir=output_dir,
             news_top_count=news_top_count, details=details,
             section_order=sec_order,
-            f_context=f_context, progress=reporter,
+            f_context=f_context, history_data=history_data, progress=reporter,
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,
             enable_history=_enable_history,
@@ -586,7 +590,7 @@ def _cmd_generate_full() -> None:
             news_llm_meta=news_llm_meta,
             section_order=sec_order,
             early_warnings=_early_warnings, progress=reporter,
-            f_context=f_context,
+            f_context=f_context, history_data=history_data,
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,
             enable_history=_enable_history,
