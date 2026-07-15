@@ -14,7 +14,7 @@ import pytest
 from src.python.provider_registry import (
     FetchStrategy,
     NOT_FOUND,
-    __SESSION_CACHE_MAX_ENTRIES,
+    _SESSION_CACHE_MAX_ENTRIES,
     DataSourceRegistry,
     get_registry,
 )
@@ -177,8 +177,8 @@ class TestCircuitBreaker:
 
     def test_is_transport_failure(self):
         """校验 is_transport_failure 正确识别 sentinel。"""
-        from src.python.provider_registry import _TRANSPORT_FAILURE
-        assert DataSourceRegistry.is_transport_failure(_TRANSPORT_FAILURE) is True
+        from src.python.provider_registry import TRANSPORT_FAILURE
+        assert DataSourceRegistry.is_transport_failure(TRANSPORT_FAILURE) is True
         assert DataSourceRegistry.is_transport_failure(None) is False
         assert DataSourceRegistry.is_transport_failure({}) is False
 

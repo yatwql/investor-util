@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 
 from src.python.config import set_config
 from src.python.logger import setup_logger

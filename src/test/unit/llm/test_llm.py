@@ -1,12 +1,12 @@
 """LLM 客户端模块单元测试。
 
 测试目标：
-  - _markdown_to_html — 各类 Markdown → HTML 的正确渲染
-  - _compute_fingerprint — 确定性哈希、不同输入不同指纹
-  - _get_cache_ttl_llm — 全球政经局势 / 智囊团深度复盘 分 TTL
+  - markdown_to_html — 各类 Markdown → HTML 的正确渲染
+  - compute_fingerprint — 确定性哈希、不同输入不同指纹
+  - get_cache_ttl_llm — 全球政经局势 / 智囊团深度复盘 分 TTL
   - _build_global_macro_prompt — 北京时间注入 + 紧凑格式
   - _build_expert_review_prompt — 北京时间注入 + 穿透数据拼接
-  - _call_llm — provider 路由
+  - call_llm — provider 路由
   - generate_all_llm — force 参数透传
 
 运行：
@@ -34,9 +34,9 @@ from src.python.llm.api_base import (
     _supports_extended_thinking,
 )
 from src.python.llm.api import (
-    _call_claude,
-    _call_llm,
-    _call_openai,
+    call_claude,
+    call_llm,
+    call_openai,
 )
 from src.python.llm.circuit_breaker import (
     _CIRCUIT_BREAKER_THRESHOLD,
@@ -47,15 +47,15 @@ from src.python.llm.circuit_breaker import (
     _cb_record_success,
 )
 from src.python.llm.fingerprint import (
-    _compute_fingerprint,
-    _get_cache_ttl_llm,
+    compute_fingerprint,
+    get_cache_ttl_llm,
 )
-from src.python.llm.markdown import _markdown_to_html
+from src.python.llm.markdown import markdown_to_html
 from src.python.llm.pricing import (
-    _CURRENCY_SYMBOLS,
-    _PRICING_MERGED,
-    _estimate_cost,
-    _reload_pricing,
+    CURRENCY_SYMBOLS,
+    PRICING_MERGED,
+    estimate_cost,
+    reload_pricing,
 )
 from src.python.llm.prompts import (
     _SYSTEM_EXPERT_REVIEW,
@@ -64,9 +64,9 @@ from src.python.llm.prompts import (
     _build_global_macro_prompt,
 )
 from src.python.llm.session import (
-    _record_per_module,
+    record_per_module,
     _session_usage,
-    _track_session_usage,
+    track_session_usage,
 )
 
 from src.test.helpers import SynchronousExecutor
@@ -75,7 +75,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 
 # ═══════════════════════════════════════════════════════════
-#  _markdown_to_html
+#  markdown_to_html
 # ═══════════════════════════════════════════════════════════
 
 
@@ -83,50 +83,50 @@ class TestMarkdownToHtml(unittest.TestCase):
     """测试 Markdown → HTML 渲染的各类输入。"""
 
     def test_empty(self) -> None:
-        self.assertEqual(_markdown_to_html(""), "")
-        self.assertEqual(_markdown_to_html(None), "")
+        self.assertEqual(markdown_to_html(""), "")
+        self.assertEqual(markdown_to_html(None), "")
 
     def test_bare_text(self) -> None:
-        r = _markdown_to_html("Hello 你好")
+        r = markdown_to_html("Hello 你好")
         self.assertEqual(r, "<p>Hello 你好</p>")
 
     def test_bold(self) -> None:
-        r = _markdown_to_html("这是 **粗体** 文字")
+        r = markdown_to_html("这是 **粗体** 文字")
         self.assertIn("<strong>粗体</strong>", r)
         self.assertIn("<p>", r)
 
     def test_italic(self) -> None:
-        r = _markdown_to_html("这是 *斜体* 文字")
+        r = markdown_to_html("这是 *斜体* 文字")
         self.assertIn("<em>斜体</em>", r)
 
     def test_heading_h2(self) -> None:
-        r = _markdown_to_html("## 标题二\n\n正文内容")
+        r = markdown_to_html("## 标题二\n\n正文内容")
         self.assertIn("<h2>标题二</h2>", r)
         self.assertIn("<p>正文内容</p>", r)
 
     def test_heading_h3(self) -> None:
-        r = _markdown_to_html("### 标题三\n\n正文")
+        r = markdown_to_html("### 标题三\n\n正文")
         self.assertIn("<h3>", r)
 
     def test_unordered_list(self) -> None:
-        r = _markdown_to_html("- 项目一\n- 项目二\n\n后续段落")
+        r = markdown_to_html("- 项目一\n- 项目二\n\n后续段落")
         self.assertIn("<ul>", r)
         self.assertIn("<li>项目一</li>", r)
         self.assertIn("<li>项目二</li>", r)
         self.assertIn("<p>后续段落</p>", r)
 
     def test_ordered_list(self) -> None:
-        r = _markdown_to_html("1. 第一步\n2. 第二步\n\n结束")
+        r = markdown_to_html("1. 第一步\n2. 第二步\n\n结束")
         self.assertIn("<ol>", r)
         self.assertIn("<li>第一步</li>", r)
         self.assertIn("<li>第二步</li>", r)
 
     def test_inline_code(self) -> None:
-        r = _markdown_to_html("使用 `code` 行内代码")
+        r = markdown_to_html("使用 `code` 行内代码")
         self.assertIn("<code>code</code>", r)
 
     def test_horizontal_rule(self) -> None:
-        r = _markdown_to_html("上面\n---\n下面")
+        r = markdown_to_html("上面\n---\n下面")
         self.assertIn("<hr>", r)
 
     def test_mixed_complex(self) -> None:
@@ -139,7 +139,7 @@ class TestMarkdownToHtml(unittest.TestCase):
 - 增持 600519 至 15%
 
 > 风险提示：注意政策转向"""
-        r = _markdown_to_html(text)
+        r = markdown_to_html(text)
         self.assertIn("<h2>定音锤</h2>", r)
         self.assertIn("<strong>核心建议</strong>", r)
         self.assertIn("<ul>", r)
@@ -147,13 +147,13 @@ class TestMarkdownToHtml(unittest.TestCase):
 
     def test_multi_paragraph(self) -> None:
         text = "第一段\n\n第二段\n\n第三段"
-        r = _markdown_to_html(text)
+        r = markdown_to_html(text)
         self.assertEqual(r.count("<p>"), 3)
         self.assertIn("第一段", r)
 
 
 # ═══════════════════════════════════════════════════════════
-#  _compute_fingerprint
+#  compute_fingerprint
 # ═══════════════════════════════════════════════════════════
 
 
@@ -162,25 +162,25 @@ class TestComputeFingerprint(unittest.TestCase):
 
     def test_deterministic(self) -> None:
         """相同输入 → 相同指纹。"""
-        fp1 = _compute_fingerprint([{"a": 1}], 100.0)
-        fp2 = _compute_fingerprint([{"a": 1}], 100.0)
+        fp1 = compute_fingerprint([{"a": 1}], 100.0)
+        fp2 = compute_fingerprint([{"a": 1}], 100.0)
         self.assertEqual(fp1, fp2)
 
     def test_different_input_differs(self) -> None:
         """不同输入 → 不同指纹。"""
-        fp1 = _compute_fingerprint([{"a": 1}], 100.0)
-        fp2 = _compute_fingerprint([{"a": 2}], 100.0)
+        fp1 = compute_fingerprint([{"a": 1}], 100.0)
+        fp2 = compute_fingerprint([{"a": 2}], 100.0)
         self.assertNotEqual(fp1, fp2)
 
     def test_length(self) -> None:
         """指纹是 12 位十六进制字符串。"""
-        fp = _compute_fingerprint("test")
+        fp = compute_fingerprint("test")
         self.assertEqual(len(fp), 12)
         self.assertTrue(all(c in "0123456789abcdef" for c in fp))
 
 
 # ═══════════════════════════════════════════════════════════
-#  _get_cache_ttl_llm
+#  get_cache_ttl_llm
 # ═══════════════════════════════════════════════════════════
 
 
@@ -188,16 +188,16 @@ class TestGetCacheTtlLlm(unittest.TestCase):
     """测试 LLM TTL 取值。"""
 
     def test_global_macro_default(self) -> None:
-        ttl = _get_cache_ttl_llm("global_macro")
+        ttl = get_cache_ttl_llm("global_macro")
         self.assertGreater(ttl, 0)
         self.assertEqual(ttl, 86400)
 
     def test_expert_review_default(self) -> None:
-        ttl = _get_cache_ttl_llm("expert_review")
+        ttl = get_cache_ttl_llm("expert_review")
         self.assertEqual(ttl, 7200)
 
     def test_news_correlation_default(self) -> None:
-        ttl = _get_cache_ttl_llm("news_correlation")
+        ttl = get_cache_ttl_llm("news_correlation")
         self.assertGreater(ttl, 0)
         self.assertEqual(ttl, 3600)
 
@@ -412,47 +412,47 @@ class TestIsEffortModel(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _call_llm provider routing
+#  call_llm provider routing
 # ═══════════════════════════════════════════════════════════
 
 
 class TestCallLlmProvider(unittest.TestCase):
-    """测试 _call_llm 的 provider 路由。"""
+    """测试 call_llm 的 provider 路由。"""
 
     def test_unsupported_provider(self) -> None:
         config = {"provider": "unknown", "api_key": "test"}
-        content, usage = _call_llm("system", "user", config)
+        content, usage = call_llm("system", "user", config)
         self.assertIsNone(content)
         self.assertIsNone(usage)
 
-    @patch("src.python.llm.api._call_claude")
+    @patch("src.python.llm.api.call_claude")
     def test_claude_routing(self, mock_call: MagicMock) -> None:
         mock_call.return_value = ("claude result", {"input_tokens": 10, "output_tokens": 50})
         config = {"provider": "claude", "api_key": "sk-xxx"}
-        content, usage = _call_llm("system", "user", config)
+        content, usage = call_llm("system", "user", config)
         self.assertEqual(content, "claude result")
         self.assertEqual(usage, {"input_tokens": 10, "output_tokens": 50})
         mock_call.assert_called_once()
 
-    @patch("src.python.llm.api._call_openai")
+    @patch("src.python.llm.api.call_openai")
     def test_openai_routing(self, mock_call: MagicMock) -> None:
         mock_call.return_value = ("openai result", {"prompt_tokens": 20, "completion_tokens": 80})
         config = {"provider": "openai", "api_key": "sk-xxx"}
-        content, usage = _call_llm("system", "user", config)
+        content, usage = call_llm("system", "user", config)
         self.assertEqual(content, "openai result")
         self.assertEqual(usage, {"prompt_tokens": 20, "completion_tokens": 80})
         mock_call.assert_called_once()
 
 
 # ═══════════════════════════════════════════════════════════
-#  _call_claude Extended Thinking 降级
+#  call_claude Extended Thinking 降级
 # ═══════════════════════════════════════════════════════════
 
 
 class TestCallClaudeThinkingDegradation(unittest.TestCase):
-    """测试 _call_claude 中 Extended Thinking 的降级行为。
+    """测试 call_claude 中 Extended Thinking 的降级行为。
 
-    通过 mock _call_llm_with_retry 捕获 payload，验证 thinking 注入逻辑。
+    通过 mock call_llm_with_retry 捕获 payload，验证 thinking 注入逻辑。
     """
 
     def setUp(self) -> None:
@@ -465,10 +465,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
             "thinking_budget_global_macro": 4000,
         }
 
-    @patch("src.python.llm.api._call_llm_with_retry")
+    @patch("src.python.llm.api.call_llm_with_retry")
     def test_thinking_injected_for_supported_model(self, mock_retry: MagicMock) -> None:
         """Sonnet-4 支持 Extended Thinking，应注入 thinking 参数。"""
-        _call_claude(
+        call_claude(
             **self.base_kw, model="claude-sonnet-4-20250514",
             config_field="max_tokens_global_macro", llm_config=self.llm_config,
         )
@@ -478,42 +478,42 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         # temperature 应在 thinking 开启时被移除
         self.assertNotIn("temperature", _payload)
 
-    @patch("src.python.llm.api._call_llm_with_retry")
+    @patch("src.python.llm.api.call_llm_with_retry")
     def test_thinking_skipped_for_unsupported_model(self, mock_retry: MagicMock) -> None:
         """Sonnet-3.5 不支持 Extended Thinking，应降级跳过。"""
-        _call_claude(
+        call_claude(
             **self.base_kw, model="claude-sonnet-3-5-20241022",
             config_field="max_tokens_global_macro", llm_config=self.llm_config,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
 
-    @patch("src.python.llm.api._call_llm_with_retry")
+    @patch("src.python.llm.api.call_llm_with_retry")
     def test_thinking_skipped_when_disabled(self, mock_retry: MagicMock) -> None:
         """thinking_enabled=False 时不应注入 thinking 参数。"""
         cfg = {"thinking_enabled_global_macro": False}
-        _call_claude(
+        call_claude(
             **self.base_kw, model="claude-sonnet-4-20250514",
             config_field="max_tokens_global_macro", llm_config=cfg,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
 
-    @patch("src.python.llm.api._call_llm_with_retry")
+    @patch("src.python.llm.api.call_llm_with_retry")
     def test_thinking_skipped_when_no_llm_config(self, mock_retry: MagicMock) -> None:
         """llm_config=None 时不报错、不注入。"""
-        _call_claude(
+        call_claude(
             **self.base_kw, model="claude-sonnet-4-20250514",
             config_field="max_tokens_global_macro", llm_config=None,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
 
-    @patch("src.python.llm.api._call_llm_with_retry")
+    @patch("src.python.llm.api.call_llm_with_retry")
     def test_budget_auto_padding(self, mock_retry: MagicMock) -> None:
         """budget 小于 max_tokens + 1024 时自动补足到 max_tokens + 4096。"""
         cfg = {"thinking_enabled_global_macro": True, "thinking_budget_global_macro": 100}
-        _call_claude(
+        call_claude(
             **self.base_kw, model="claude-sonnet-4-20250514",
             config_field="max_tokens_global_macro", llm_config=cfg,
         )
@@ -521,14 +521,14 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         # max_tokens=800 → auto_pad=800+4096=4896
         self.assertEqual(_payload["thinking"]["budget_tokens"], 4896)
 
-    @patch("src.python.llm.api._call_llm_with_retry")
+    @patch("src.python.llm.api.call_llm_with_retry")
     def test_deepseek_uses_effort_not_budget(self, mock_retry: MagicMock) -> None:
         """DeepSeek 使用 effort 而非 budget_tokens 控制思考深度。"""
         cfg = {
             "thinking_enabled_global_macro": True,
             "reasoning_effort_global_macro": "high",
         }
-        _call_claude(
+        call_claude(
             **self.base_kw, model="DeepSeek-V4-Flash",
             config_field="max_tokens_global_macro", llm_config=cfg,
         )
@@ -541,25 +541,25 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         # temperature 应被移除
         self.assertNotIn("temperature", _payload)
 
-    @patch("src.python.llm.api._call_llm_with_retry")
+    @patch("src.python.llm.api.call_llm_with_retry")
     def test_deepseek_effort_default_high(self, mock_retry: MagicMock) -> None:
         """DeepSeek 未配置 reasoning_effort 时默认 high。"""
         cfg = {"thinking_enabled_global_macro": True}
-        _call_claude(
+        call_claude(
             **self.base_kw, model="DeepSeek-V4-Flash",
             config_field="max_tokens_global_macro", llm_config=cfg,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertEqual(_payload["output_config"]["effort"], "high")
 
-    @patch("src.python.llm.api._call_llm_with_retry")
+    @patch("src.python.llm.api.call_llm_with_retry")
     def test_deepseek_effort_max(self, mock_retry: MagicMock) -> None:
         """DeepSeek reasoning_effort 可以设为 max。"""
         cfg = {
             "thinking_enabled_global_macro": True,
             "reasoning_effort_global_macro": "max",
         }
-        _call_claude(
+        call_claude(
             **self.base_kw, model="DeepSeek-V4-Flash",
             config_field="max_tokens_global_macro", llm_config=cfg,
         )
@@ -1111,7 +1111,7 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
         self.assertFalse(cached)
         self.assertEqual(usage, {})
 
-    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.call_llm")
     @patch("src.python.llm.skeleton.cache_get")
     def test_cache_hit(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
         """每篇文章独立缓存命中 → 直接返回，不调用 LLM。"""
@@ -1123,7 +1123,7 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
         self.assertTrue(cached)
         mock_call.assert_not_called()
 
-    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.call_llm")
     @patch("src.python.llm.skeleton.cache_get")
     def test_llm_success(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
         """LLM 调用成功 → 返回富化数据。"""
@@ -1140,7 +1140,7 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
         self.assertIn("llm_analysis", result[0])
         self.assertEqual(usage.get("total_tokens"), 150)
 
-    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.call_llm")
     @patch("src.python.llm.skeleton.cache_get")
     def test_llm_failure(self, mock_cache_get: MagicMock, mock_call: MagicMock, mock_cfg: MagicMock) -> None:
         """LLM 调用失败 → 返回原始数据 + 空 token 用量。"""
@@ -1259,7 +1259,7 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
         cls._exec_patcher.stop()
 
     @patch("src.python.llm.skeleton.cache_get", return_value=None)
-    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.call_llm")
     def test_passed_config_used(
         self, mock_call: MagicMock, mock_cache_get: MagicMock,
     ) -> None:
@@ -1276,7 +1276,7 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
             news, holdings, llm_config=llm_config,
         )
         self.assertIn("llm_analysis", result[0])
-        # 验证 _call_llm 接受到 config（首个参数应为 llm_config）
+        # 验证 call_llm 接受到 config（首个参数应为 llm_config）
         self.assertIs(mock_call.call_args[0][2], llm_config)
 
 
@@ -1430,7 +1430,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_penetration.assert_called_once()
 
     @patch("src.python.llm.generators_orchestrator.cache_get")
-    @patch("src.python.llm.generators_orchestrator._record_per_module")
+    @patch("src.python.llm.generators_orchestrator.record_per_module")
     def test_cache_hit_records_per_module(
         self, mock_record: MagicMock, mock_cache_get: MagicMock,
         mock_expert: MagicMock, mock_macro: MagicMock,
@@ -1454,7 +1454,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
             cached = kwargs.get("cached") if "cached" in kwargs else (call[0][2] if len(call[0]) > 2 else False)
             self.assertTrue(cached, f"模块 {call[0][0]} 的 cached 不是 True")
 
-    @patch("src.python.llm.generators_orchestrator._record_per_module")
+    @patch("src.python.llm.generators_orchestrator.record_per_module")
     def test_partial_cache_records_per_module(
         self, mock_record: MagicMock,
         mock_expert: MagicMock, mock_macro: MagicMock,
@@ -1516,7 +1516,7 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
         ]
 
     @patch("src.python.llm.skeleton.cache_get")
-    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.call_llm")
     def test_all_articles_cached(
         self, mock_call: MagicMock, mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
@@ -1533,7 +1533,7 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
             self.assertIn("llm_analysis", item)
 
     @patch("src.python.llm.skeleton.cache_get", return_value=None)
-    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.call_llm")
     def test_no_cache_all_fresh(
         self, mock_call: MagicMock, mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
@@ -1553,7 +1553,7 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
         mock_call.assert_called_once()
 
     @patch("src.python.llm.skeleton.cache_get")
-    @patch("src.python.llm.skeleton._call_llm")
+    @patch("src.python.llm.skeleton.call_llm")
     def test_mixed_cache(
         self, mock_call: MagicMock, mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
@@ -1582,60 +1582,60 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  Pricing — _estimate_cost / _reload_pricing / _PRICING_MERGED
+#  Pricing — estimate_cost / reload_pricing / PRICING_MERGED
 # ═══════════════════════════════════════════════════════════
 
 
 class TestPricing(unittest.TestCase):
     """测试 LLM 费用估算和定价管理。"""
 
-    def test_estimate_cost_known_model(self) -> None:
+    def testestimate_cost_known_model(self) -> None:
         """已知模型应返回正确的费用估算。"""
-        cost = _estimate_cost("deepseek-v4-flash", 3000, 2000)
+        cost = estimate_cost("deepseek-v4-flash", 3000, 2000)
         # (3000/1M)*1 + (2000/1M)*2 = 0.003 + 0.004 = 0.007
         self.assertIn("0.007", cost)
 
-    def test_estimate_cost_cache_hit(self) -> None:
+    def testestimate_cost_cache_hit(self) -> None:
         """缓存命中应降低费用。"""
-        cost = _estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=2000)
-        cost_no = _estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=0)
+        cost = estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=2000)
+        cost_no = estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=0)
         self.assertNotEqual(cost, cost_no)
 
-    def test_estimate_cost_unknown_model(self) -> None:
+    def testestimate_cost_unknown_model(self) -> None:
         """未知模型应返回 -。"""
-        self.assertEqual(_estimate_cost("nonexistent-model", 100, 100), "-")
+        self.assertEqual(estimate_cost("nonexistent-model", 100, 100), "-")
 
-    def test_estimate_cost_zero_tokens(self) -> None:
+    def testestimate_cost_zero_tokens(self) -> None:
         """零 token 应返回 -。"""
-        self.assertEqual(_estimate_cost("deepseek-v4-flash", 0, 0), "-")
+        self.assertEqual(estimate_cost("deepseek-v4-flash", 0, 0), "-")
 
-    def test_estimate_cost_model_prefix_match(self) -> None:
+    def testestimate_cost_model_prefix_match(self) -> None:
         """模型名前缀匹配应选择正确的定价。"""
-        cost = _estimate_cost("claude-sonnet-4-6-20250514", 1000, 500)
+        cost = estimate_cost("claude-sonnet-4-6-20250514", 1000, 500)
         self.assertNotEqual(cost, "-")
 
     def test_pricing_merged_has_defaults(self) -> None:
-        """_PRICING_MERGED 应包含所有内置模型。"""
+        """PRICING_MERGED 应包含所有内置模型。"""
         for model in ("deepseek-v4-flash", "claude-sonnet-4-6", "gpt-4o"):
-            self.assertIn(model, _PRICING_MERGED)
+            self.assertIn(model, PRICING_MERGED)
 
     def test_currency_symbols(self) -> None:
         """货币符号映射应包含主要货币。"""
-        self.assertIn("CNY", _CURRENCY_SYMBOLS)
-        self.assertIn("USD", _CURRENCY_SYMBOLS)
-        self.assertEqual(_CURRENCY_SYMBOLS["CNY"], "¥")
-        self.assertEqual(_CURRENCY_SYMBOLS["USD"], "$")
+        self.assertIn("CNY", CURRENCY_SYMBOLS)
+        self.assertIn("USD", CURRENCY_SYMBOLS)
+        self.assertEqual(CURRENCY_SYMBOLS["CNY"], "¥")
+        self.assertEqual(CURRENCY_SYMBOLS["USD"], "$")
 
-    def test_reload_pricing_merge(self) -> None:
-        """_reload_pricing 应合并不覆盖已有值。"""
-        orig = dict(_PRICING_MERGED)
-        _reload_pricing()
-        self.assertEqual(_PRICING_MERGED.get("deepseek-v4-flash"),
+    def testreload_pricing_merge(self) -> None:
+        """reload_pricing 应合并不覆盖已有值。"""
+        orig = dict(PRICING_MERGED)
+        reload_pricing()
+        self.assertEqual(PRICING_MERGED.get("deepseek-v4-flash"),
                          orig.get("deepseek-v4-flash"))
 
 
 # ═══════════════════════════════════════════════════════════
-#  Session — _track_session_usage / format_session_usage / _record_per_module
+#  Session — track_session_usage / format_session_usage / record_per_module
 # ═══════════════════════════════════════════════════════════
 
 
@@ -1647,7 +1647,7 @@ class TestSession(unittest.TestCase):
 
     def test_reset_clears_all(self) -> None:
         """reset_session_usage 应清零所有累计。"""
-        _track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50}, "claude-sonnet-4-6")
+        track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50}, "claude-sonnet-4-6")
         reset_session_usage()
         usage = get_session_usage()
         self.assertEqual(usage["input_tokens"], 0)
@@ -1656,7 +1656,7 @@ class TestSession(unittest.TestCase):
 
     def test_track_claude_usage(self) -> None:
         """Claude 格式的用量应正确累计。"""
-        _track_session_usage("claude", {"input_tokens": 200, "output_tokens": 100,
+        track_session_usage("claude", {"input_tokens": 200, "output_tokens": 100,
                                         "cache_read_input_tokens": 50}, "claude-sonnet-4-6")
         usage = get_session_usage()
         self.assertEqual(usage["input_tokens"], 200)
@@ -1667,14 +1667,14 @@ class TestSession(unittest.TestCase):
 
     def test_track_openai_usage(self) -> None:
         """OpenAI 格式的用量应正确累计。"""
-        _track_session_usage("openai", {"prompt_tokens": 150, "completion_tokens": 75}, "gpt-4o")
+        track_session_usage("openai", {"prompt_tokens": 150, "completion_tokens": 75}, "gpt-4o")
         usage = get_session_usage()
         self.assertEqual(usage["input_tokens"], 150)
         self.assertEqual(usage["output_tokens"], 75)
 
     def test_track_none_usage_no_op(self) -> None:
         """None 用量不应改变累计值。"""
-        _track_session_usage("claude", None)
+        track_session_usage("claude", None)
         usage = get_session_usage()
         self.assertEqual(usage["call_count"], 0)
 
@@ -1687,26 +1687,26 @@ class TestSession(unittest.TestCase):
     def test_track_multiple_calls_accumulate(self) -> None:
         """多次调用应正确累加。"""
         for _ in range(5):
-            _track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50})
+            track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50})
         usage = get_session_usage()
         self.assertEqual(usage["input_tokens"], 500)
         self.assertEqual(usage["output_tokens"], 250)
         self.assertEqual(usage["call_count"], 5)
 
-    def test_record_per_module(self) -> None:
-        """_record_per_module 应记录模块级用量。"""
-        _record_per_module("global_macro", "deepseek-v4-flash", inp=100, out=50)
-        _record_per_module("expert_review", "deepseek-v4-flash", inp=200, out=100)
+    def testrecord_per_module(self) -> None:
+        """record_per_module 应记录模块级用量。"""
+        record_per_module("global_macro", "deepseek-v4-flash", inp=100, out=50)
+        record_per_module("expert_review", "deepseek-v4-flash", inp=200, out=100)
         usage = get_session_usage()
         self.assertIn("global_macro", usage["per_module"])
         self.assertIn("expert_review", usage["per_module"])
         self.assertEqual(usage["per_module"]["global_macro"]["input_tokens"], 100)
         self.assertEqual(usage["per_module"]["expert_review"]["output_tokens"], 100)
 
-    def test_record_per_module_accumulate(self) -> None:
+    def testrecord_per_module_accumulate(self) -> None:
         """同一模块多次记录应累加 token。"""
-        _record_per_module("global_macro", "deepseek-v4-flash", inp=100, out=50)
-        _record_per_module("global_macro", "deepseek-v4-flash", inp=50, out=25)
+        record_per_module("global_macro", "deepseek-v4-flash", inp=100, out=50)
+        record_per_module("global_macro", "deepseek-v4-flash", inp=50, out=25)
         self.assertEqual(_session_usage["per_module"]["global_macro"]["input_tokens"], 150)
 
     def test_format_session_usage_no_data(self) -> None:
@@ -1718,7 +1718,7 @@ class TestSession(unittest.TestCase):
 
     def test_format_session_usage_with_data(self) -> None:
         """有数据时应正确格式化。"""
-        _track_session_usage("claude", {"input_tokens": 1000, "output_tokens": 500}, "deepseek-v4-flash")
+        track_session_usage("claude", {"input_tokens": 1000, "output_tokens": 500}, "deepseek-v4-flash")
         raw = get_session_usage()
         result = format_session_usage(raw)
         self.assertTrue(result["has_usage"])
@@ -1726,10 +1726,10 @@ class TestSession(unittest.TestCase):
         self.assertEqual(result["total_tokens"], 1500)
         self.assertIn("cost_display", result)
 
-    def test_track_session_usage_models_dedup(self) -> None:
+    def testtrack_session_usage_models_dedup(self) -> None:
         """多次使用同一模型应去重。"""
-        _track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50}, "deepseek-v4-flash")
-        _track_session_usage("claude", {"input_tokens": 200, "output_tokens": 100}, "deepseek-v4-flash")
+        track_session_usage("claude", {"input_tokens": 100, "output_tokens": 50}, "deepseek-v4-flash")
+        track_session_usage("claude", {"input_tokens": 200, "output_tokens": 100}, "deepseek-v4-flash")
         self.assertEqual(len(_session_usage["models"]), 1)
 
 
@@ -1800,7 +1800,7 @@ class TestCircuitBreaker(unittest.TestCase):
 
 
 class TestProviderFallback(unittest.TestCase):
-    """测试 _call_llm 在主 provider 失败时回退到 fallback provider。"""
+    """测试 call_llm 在主 provider 失败时回退到 fallback provider。"""
 
     @patch("src.python.llm.api._call_single_provider")
     def test_main_provider_success_no_fallback(self, mock_call):
@@ -1810,7 +1810,7 @@ class TestProviderFallback(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "openai", "fallback_api_key": "sk-fb",
         }
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertEqual(content, "main result")
         self.assertEqual(mock_call.call_count, 1)
 
@@ -1827,7 +1827,7 @@ class TestProviderFallback(unittest.TestCase):
             "fallback_endpoint": "https://api.openai.com/v1",
             "fallback_model": "gpt-4o",
         }
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertEqual(content, "fb result")
         self.assertEqual(mock_call.call_count, 2)
 
@@ -1839,7 +1839,7 @@ class TestProviderFallback(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "openai", "fallback_api_key": "sk-fb",
         }
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertIsNone(usage)
         self.assertEqual(mock_call.call_count, 2)
@@ -1849,7 +1849,7 @@ class TestProviderFallback(unittest.TestCase):
         """未配置 fallback → 不尝试 fallback。"""
         mock_call.return_value = (None, None)
         config = {"provider": "claude", "api_key": "sk-main"}
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertEqual(mock_call.call_count, 1)
 
@@ -1861,7 +1861,7 @@ class TestProviderFallback(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "claude", "fallback_api_key": "sk-fb",
         }
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertEqual(mock_call.call_count, 1)
 
@@ -1964,7 +1964,7 @@ class TestCircuitBreakerRecovery(unittest.TestCase):
 
 
 class TestContentFilterRecovery(unittest.TestCase):
-    """测试 _call_llm 在 API 返回空内容时的安抚重试机制。"""
+    """测试 call_llm 在 API 返回空内容时的安抚重试机制。"""
 
     @patch("src.python.llm.api._call_single_provider")
     def test_empty_content_triggers_retry(self, mock_call):
@@ -1974,7 +1974,7 @@ class TestContentFilterRecovery(unittest.TestCase):
             ("retry result", {"input_tokens": 200}),  # 第二次：安抚后成功
         ]
         config = {"provider": "claude", "api_key": "sk-test"}
-        content, usage = _call_llm("system prompt", "user content", config)
+        content, usage = call_llm("system prompt", "user content", config)
         # 应返回安抚重试后的结果
         self.assertEqual(content, "retry result")
         self.assertEqual(mock_call.call_count, 2)
@@ -1997,7 +1997,7 @@ class TestContentFilterRecovery(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "openai", "fallback_api_key": "sk-fb",
         }
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertEqual(content, "fb ok")
         self.assertEqual(mock_call.call_count, 3)
 
@@ -2006,7 +2006,7 @@ class TestContentFilterRecovery(unittest.TestCase):
         """安抚重试仍空且无 fallback → (None, None)。"""
         mock_call.return_value = ("", {"input_tokens": 10})
         config = {"provider": "claude", "api_key": "sk-test"}
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertIsNone(content)
         # 被调用 2 次（原始 + 安抚重试）
         self.assertEqual(mock_call.call_count, 2)
@@ -2016,7 +2016,7 @@ class TestContentFilterRecovery(unittest.TestCase):
         """正常返回内容 → 不触发安抚重试。"""
         mock_call.return_value = ("正常内容", {"input_tokens": 100})
         config = {"provider": "claude", "api_key": "sk-test"}
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertEqual(content, "正常内容")
         self.assertEqual(mock_call.call_count, 1)
 
@@ -2031,7 +2031,7 @@ class TestContentFilterRecovery(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "openai", "fallback_api_key": "sk-fb",
         }
-        content, usage = _call_llm("sys", "user", config)
+        content, usage = call_llm("sys", "user", config)
         self.assertEqual(content, "fb result")
         # 只调用了 2 次（主 + fallback），没有安抚重试
         self.assertEqual(mock_call.call_count, 2)

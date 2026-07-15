@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
 
 from src.python.constants import CACHE_DAILY
 from src.python.market_hours import is_market_open as _is_market_open

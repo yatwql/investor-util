@@ -115,7 +115,7 @@ def _load_dividend_data(holdings: list) -> tuple[dict, bool]:
         (dividend_data, success) — success=False 表示 API 调用异常。
     """
     try:
-        from src.python.providers.akshare_extras import get_dividend_data
+        from src.python.fetcher.akshare import get_dividend_data
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         if not stock_codes:
             return {}, True

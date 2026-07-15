@@ -367,9 +367,9 @@ class TestGenerateExcelReport(unittest.TestCase):
     def test_timer_records(self) -> None:
         """模块耗时应有记录（_Timer 上下文管理器）。"""
         from src.python.report.excel_generator import generate_excel_report
-        from src.python.report.progress import _timing_records
+        from src.python.report.progress import timing_records
 
-        _timing_records.clear()
+        timing_records.clear()
         details = [_make_detail()]
 
         generate_excel_report(
@@ -378,7 +378,7 @@ class TestGenerateExcelReport(unittest.TestCase):
             progress=self.progress,
         )
 
-        self.assertGreater(len(_timing_records), 0)
+        self.assertGreater(len(timing_records), 0)
 
 
 # ═══════════════════════════════════════════════════════════

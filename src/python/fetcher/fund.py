@@ -79,6 +79,22 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
     )
 
 
+def fetch_fund_holdings_cached(code: str) -> dict[str, Any] | None:
+    """基金持仓获取（含会话缓存），同一报告生成中同基金只获取一次。
+
+    消除多个模块独立调用 fetch_fund_holdings 的冗余文件缓存读取。
+    """
+    from src.python.provider_registry import NOT_FOUND, get_registry
+
+    registry = get_registry()
+    cached = registry.session_cache_get("fund_hold", code)
+    if cached is not NOT_FOUND:
+        return cached
+    result = fetch_fund_holdings(code)
+    registry.session_cache_set("fund_hold", code, result, source="api")
+    return result
+
+
 # ═══════════════════════════════════════════════════════════
 #  基金业绩比较基准
 # ═══════════════════════════════════════════════════════════

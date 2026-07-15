@@ -16,7 +16,7 @@ import logging
 import math
 import threading as _threading
 import time as _time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Any
 
 from src.python.cache import get as cache_get

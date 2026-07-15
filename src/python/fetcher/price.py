@@ -13,7 +13,7 @@ from collections.abc import Callable
 from typing import Any
 
 from src.python.cache import get_ttl
-from src.python.code_utils import is_a_share_code, is_exchange_fund_code
+from src.python.code_utils import is_a_share_code, is_exchange_fund_code, is_otc_code_overlap
 from src.python.fetcher.chain import fetch_with_fallback
 from src.python.providers import eastmoney, tencent
 from src.python.providers import sina as sina_provider
@@ -166,7 +166,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
 
     # 降级标记：00 开头同时存在 A 股和 OTC 基金，代码前缀无法区分
     # 若股票链路全失败，降级到场外基金链路尝试
-    _needs_degrade = (data_type == "price_stock" and code.startswith("00"))
+    _needs_degrade = (data_type == "price_stock" and is_otc_code_overlap(code))
 
     def _validate(raw: dict, provider_name: str) -> bool:
         if provider_name in ("tencent", "sina"):

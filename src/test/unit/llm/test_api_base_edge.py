@@ -73,7 +73,7 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
     def test_truncation_appends_warning(self) -> None:
         """截断检测 → 内容后追加警告。"""
         from src.python.llm.api_base import (
-            _TRUNCATION_MARKER,
+            TRUNCATION_MARKER,
             _process_success_response,
         )
 
@@ -85,7 +85,7 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
             max_tokens=100, config_field="max_tokens",
             provider="claude", model_name="test", label="Test", url="https://api.test.com",
         )
-        self.assertIn(_TRUNCATION_MARKER, content)
+        self.assertIn(TRUNCATION_MARKER, content)
         self.assertIsNotNone(usage)
 
     def test_usage_missing_does_not_crash(self) -> None:
@@ -108,7 +108,7 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
 
 
 class TestCallLlmWithRetryEdge(unittest.TestCase):
-    """_call_llm_with_retry — 边缘场景。"""
+    """call_llm_with_retry — 边缘场景。"""
 
     @patch("src.python.llm.api_base._cb_is_open", return_value=False)
     @patch("src.python.llm.api_base._attempt_api_call")
@@ -117,7 +117,7 @@ class TestCallLlmWithRetryEdge(unittest.TestCase):
         self, mock_record_success, mock_attempt, mock_cb_open
     ) -> None:
         """内容过滤空返回 → 带空标记。"""
-        from src.python.llm.api_base import _call_llm_with_retry
+        from src.python.llm.api_base import call_llm_with_retry
 
         mock_attempt.return_value = (
             "success",
@@ -125,7 +125,7 @@ class TestCallLlmWithRetryEdge(unittest.TestCase):
         )
 
         mock_client = MagicMock()
-        result, usage = _call_llm_with_retry(
+        result, usage = call_llm_with_retry(
             "Test", mock_client, "https://api.test.com", {}, {},
             30.0, 2, 1000, "max_tokens",
             extract_fn=lambda d: d.get("content"),

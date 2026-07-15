@@ -307,7 +307,7 @@ def generate_llm_module(
             return ({}, False, {}, 0)
         return (None, False)
 
-    if not _is_llm_module_enabled(llm_config, module_key):
+    if not is_llm_module_enabled(llm_config, module_key):
         logger.info("%s LLM 分析已禁用（enabled_llm.%s = false）", _MN(module_key), module_key)
         LLM_MODULE_FAILURE[module_key] = FAIL_REASON_DISABLED
         if batch_preparer:
@@ -316,7 +316,7 @@ def generate_llm_module(
 
     # ── 批量模式分支 ─────────────────────────────────────
     if batch_preparer is not None:
-        return _run_batch_mode(
+        return run_batch_mode(
             llm_config, module_key, force=force,
             batch_preparer=batch_preparer,
             per_item_cache_fn=per_item_cache_fn,

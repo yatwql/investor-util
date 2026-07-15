@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.python.logger import setup_logger
+from src.python.report.llm_module_info import build_llm_module_info
 from src.python.report.progress import ProgressReporter, Timer
 
 logger = setup_logger()
@@ -43,12 +44,10 @@ def build_llm_usage_sheet(sheets: dict[str, Any], _prog: ProgressReporter) -> No
     """构建并写入 LLM API 用量页签。"""
     try:
         from src.python.llm import (
-            FAIL_REASON_DISABLED,
             format_session_usage,
             get_session_usage,
         )
         from src.python.llm.prompts import LLM_MODULE_FAILURE
-        from src.python.registry import get_llm_module_names
         from src.python.report.summary import write_llm_usage_sheet
     except (ImportError, AttributeError) as e:
         logger.debug("LLM 用量页签模块未就绪（非关键）: %s", e)
@@ -64,52 +63,8 @@ def build_llm_usage_sheet(sheets: dict[str, Any], _prog: ProgressReporter) -> No
         logger.debug("LLM 会话数据中 per_module 为空，尝试从 formatted 获取")
         per_module = formatted.get("per_module", {}) or {}
     all_failure = dict(LLM_MODULE_FAILURE)
-    names_map = get_llm_module_names()
 
-    MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]
-    DISPLAY_REASON = {
-        "not_configured": "LLM 未配置",
-        "api_error": "LLM API 调用失败",
-        "network_error": "LLM API 网络连接失败",
-        "timeout": "LLM API 请求超时",
-        "circuit_open": "LLM API 暂时不可用（熔断冷却中）",
-    }
-
-    excel_module_info: list[dict] = []
-    for mk in MODULE_KEYS:
-        entry: dict = {"key": mk, "name": names_map.get(mk, mk)}
-        reason = all_failure.get(mk)
-        pm = per_module.get(mk)
-        if reason == FAIL_REASON_DISABLED:
-            entry.update({"status": "disabled", "status_label": "已禁用",
-                          "model": "", "input_tokens": 0, "output_tokens": 0,
-                          "total_tokens": 0, "cache_hit_tokens": 0,
-                          "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
-        elif reason:
-            reason_text = DISPLAY_REASON.get(str(reason).lower(), str(reason))
-            entry.update({"status": "failed", "status_label": reason_text,
-                          "model": "", "input_tokens": 0, "output_tokens": 0,
-                          "total_tokens": 0, "cache_hit_tokens": 0,
-                          "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""})
-        elif pm:
-            inp = pm.get("input_tokens", 0)
-            out = pm.get("output_tokens", 0)
-            entry.update({
-                "status": "cached" if pm.get("cached") else "success",
-                "status_label": "缓存" if pm.get("cached") else "成功",
-                "model": pm.get("model", ""),
-                "input_tokens": inp, "output_tokens": out,
-                "total_tokens": inp + out,
-                "cache_hit_tokens": pm.get("cache_hit_tokens", 0),
-                "cost": pm.get("cost", 0.0),
-                "cached": pm.get("cached", False),
-                "thinking": pm.get("thinking", False),
-                "endpoint": pm.get("endpoint", ""),
-            })
-        else:
-            continue
-        if entry.get("status_label"):
-            excel_module_info.append(entry)
+    excel_module_info = build_llm_module_info(all_failure, per_module, skip_unknown=True)
 
     if not excel_module_info:
         return

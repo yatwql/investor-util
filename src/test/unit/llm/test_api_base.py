@@ -349,23 +349,23 @@ class TestIsRetryAvailable(unittest.TestCase):
 
 
 class TestCallLlmWithRetry(unittest.TestCase):
-    """_call_llm_with_retry — 通用重试骨架。"""
+    """call_llm_with_retry — 通用重试骨架。"""
 
     def setUp(self) -> None:
         # 清理失败状态
-        from src.python.llm.api_base import _clear_last_llm_failure
-        _clear_last_llm_failure()
+        from src.python.llm.api_base import clear_last_llm_failure
+        clear_last_llm_failure()
 
     @patch("src.python.llm.api_base._cb_is_open", return_value=False)
     @patch("src.python.llm.api_base._cb_record_success")
     @patch("src.python.llm.api_base._log_token_usage")  # avoid formatting magic mock
     def test_success_first_try(self, mock_log_usage, mock_record_success, mock_cb_open) -> None:
         """首次成功 → (content, usage)。"""
-        from src.python.llm.api_base import _call_llm_with_retry
+        from src.python.llm.api_base import call_llm_with_retry
 
         mock_client = MagicMock()
 
-        result, usage = _call_llm_with_retry(
+        result, usage = call_llm_with_retry(
             "Test", mock_client, "https://api.test.com", {}, {},
             30.0, 2, 1000, "max_tokens",
             extract_fn=lambda d: (d or {}).get("content"),
@@ -380,11 +380,11 @@ class TestCallLlmWithRetry(unittest.TestCase):
     def test_circuit_breaker_open(self, mock_record_failure, mock_cb_open) -> None:
         """熔断打开 → (None, None)。"""
         mock_cb_open.return_value = True  # override: circuit breaker open
-        from src.python.llm.api_base import _call_llm_with_retry
+        from src.python.llm.api_base import call_llm_with_retry
 
         mock_client = MagicMock()
 
-        result, usage = _call_llm_with_retry(
+        result, usage = call_llm_with_retry(
             "Test", mock_client, "https://api.test.com", {}, {},
             30.0, 2, 1000, "max_tokens",
             extract_fn=lambda d: "content",
@@ -399,7 +399,7 @@ class TestCallLlmWithRetry(unittest.TestCase):
     @patch("src.python.llm.api_base._cb_record_success")
     def test_retry_then_succeed(self, mock_record_success, mock_attempt, mock_cb_open) -> None:
         """失败重试后成功 → (content, usage)。"""
-        from src.python.llm.api_base import _call_llm_with_retry
+        from src.python.llm.api_base import call_llm_with_retry
         from src.python.llm.api_base import _is_retry_available
 
         # 第一次 retryable, 第二次 success
@@ -412,7 +412,7 @@ class TestCallLlmWithRetry(unittest.TestCase):
         mock_client = MagicMock()
 
         with patch("src.python.llm.api_base._is_retry_available", return_value=True):
-            result, usage = _call_llm_with_retry(
+            result, usage = call_llm_with_retry(
                 "Test", mock_client, "https://api.test.com", {}, {},
                 30.0, 2, 1000, "max_tokens",
                 extract_fn=lambda d: d.get("content"),
@@ -426,7 +426,7 @@ class TestCallLlmWithRetry(unittest.TestCase):
     @patch("src.python.llm.api_base._attempt_api_call")
     def test_all_retries_exhausted(self, mock_attempt, mock_cb_open) -> None:
         """全部重试耗尽 → (None, None)。"""
-        from src.python.llm.api_base import _call_llm_with_retry
+        from src.python.llm.api_base import call_llm_with_retry
 
         # Always retryable
         mock_attempt.return_value = ("retryable", 429)
@@ -436,7 +436,7 @@ class TestCallLlmWithRetry(unittest.TestCase):
         # Make sure max_retries is 0 so only 1 attempt
         from src.python.llm.api_base import _is_retry_available
         with patch("src.python.llm.api_base._is_retry_available", return_value=False):
-            result, usage = _call_llm_with_retry(
+            result, usage = call_llm_with_retry(
                 "Test", mock_client, "https://api.test.com", {}, {},
                 30.0, 0, 1000, "max_tokens",
                 extract_fn=lambda d: None,
@@ -450,12 +450,12 @@ class TestCallLlmWithRetry(unittest.TestCase):
     @patch("src.python.llm.api_base._attempt_api_call")
     def test_response_parse_error(self, mock_attempt, mock_cb_open) -> None:
         """响应解析失败 → (None, None)。"""
-        from src.python.llm.api_base import _call_llm_with_retry
+        from src.python.llm.api_base import call_llm_with_retry
 
         mock_attempt.return_value = ("fatal", "parse error")
 
         mock_client = MagicMock()
-        result, usage = _call_llm_with_retry(
+        result, usage = call_llm_with_retry(
             "Test", mock_client, "https://api.test.com", {}, {},
             30.0, 2, 1000, "max_tokens",
             extract_fn=lambda d: None,
@@ -470,8 +470,8 @@ class TestLastLlmFailureReason(unittest.TestCase):
     """_last_llm_failure_reason — 失败追踪。"""
 
     def setUp(self) -> None:
-        from src.python.llm.api_base import _clear_last_llm_failure
-        _clear_last_llm_failure()
+        from src.python.llm.api_base import clear_last_llm_failure
+        clear_last_llm_failure()
 
     def test_normal_state_is_none(self) -> None:
         """初始状态为 None。"""
@@ -481,22 +481,22 @@ class TestLastLlmFailureReason(unittest.TestCase):
 
     def test_clear_resets_to_none(self) -> None:
         """清除后为 None。"""
-        from src.python.llm.api_base import _clear_last_llm_failure, _get_last_llm_failure
+        from src.python.llm.api_base import clear_last_llm_failure, _get_last_llm_failure
 
-        _clear_last_llm_failure()
+        clear_last_llm_failure()
         self.assertIsNone(_get_last_llm_failure())
 
     def test_get_set_roundtrip(self) -> None:
         """设置后读取正确（通过模块命名空间）。"""
         import src.python.llm.api_base
         from src.python.llm.api_base import (
-            _clear_last_llm_failure,
+            clear_last_llm_failure,
             _get_last_llm_failure,
         )
 
         src.python.llm.api_base._last_llm_failure_reason = "test_reason"
         self.assertEqual(_get_last_llm_failure(), "test_reason")
-        _clear_last_llm_failure()
+        clear_last_llm_failure()
         self.assertIsNone(_get_last_llm_failure())
 
 
@@ -537,10 +537,10 @@ class TestTruncationWarning(unittest.TestCase):
 
     def test_warning_contains_marker(self) -> None:
         """警告含截断标记。"""
-        from src.python.llm.api_base import _TRUNCATION_MARKER, _truncation_warning
+        from src.python.llm.api_base import TRUNCATION_MARKER, _truncation_warning
 
         warning = _truncation_warning("max_tokens")
-        self.assertIn(_TRUNCATION_MARKER, warning)
+        self.assertIn(TRUNCATION_MARKER, warning)
         self.assertIn("max_tokens", warning)
 
 

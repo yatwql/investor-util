@@ -2,7 +2,7 @@
 
 测试目标：
   - _get_chain — 默认顺序、preferred_provider 前置
-  - _fetch_with_fallback — 缓存命中、Provider 遍历、验证、转换、降级
+  - fetch_with_fallback — 缓存命中、Provider 遍历、验证、转换、降级
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -16,8 +16,8 @@ from unittest.mock import MagicMock, patch
 
 from src.python.fetcher.chain import (
     _call_history_provider,
-    _fetch_with_incremental_fallback,
-    _fetch_with_fallback,
+    fetch_with_incremental_fallback,
+    fetch_with_fallback,
     _get_chain,
     reset_provider_skip,
 )
@@ -83,7 +83,7 @@ class TestGetChain(unittest.TestCase):
 
 
 # ============================================================
-#  _fetch_with_fallback
+#  fetch_with_fallback
 # ============================================================
 
 class TestFetchWithFallback(unittest.TestCase):
@@ -102,7 +102,7 @@ class TestFetchWithFallback(unittest.TestCase):
     def test_cache_hit_returns_cached(self, mock_cache_get):
         """缓存命中 → 直接返回缓存数据。"""
         mock_cache_get.return_value = {"cached": True}
-        result = _fetch_with_fallback("price", self.provider_fn_map, "test_key", 3600)
+        result = fetch_with_fallback("price", self.provider_fn_map, "test_key", 3600)
         self.assertEqual(result, {"cached": True})
 
     # ── Provider 成功路径 ────────────────────────────────
@@ -118,7 +118,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "from_p2"})
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "from_p1"})
         fn1.assert_called_once()
@@ -138,7 +138,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "from_p2"})
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "from_p2"})
         fn1.assert_called_once()
@@ -161,7 +161,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn2 = MagicMock(side_effect=Exception("fail"))
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"stale": True})
 
@@ -174,7 +174,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn1 = MagicMock(side_effect=Exception("fail"))
         provider_map = {"p1": ("P1", fn1)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertIsNone(result)
 
@@ -190,7 +190,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "from_p2"})
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "from_p2"})
 
@@ -205,7 +205,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn1 = MagicMock(return_value={"data": "ok"})
         provider_map = {"p1": ("P1", fn1)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "ok"})
 
@@ -220,7 +220,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "from_p2"})
         provider_map = {"p1": ("P1", None), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "from_p2"})
 
@@ -239,7 +239,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def validate(raw, provider):
             return provider == "p2" or raw.get("data") is not None
 
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "ok"})
@@ -257,7 +257,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def validate(raw, provider):
             return True
 
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "good"})
@@ -278,7 +278,7 @@ class TestFetchWithFallback(unittest.TestCase):
                 raise ValueError("validation error")
             return True
 
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "ok"})
@@ -298,7 +298,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def transform(raw, source_label):
             return {"price": float(raw["price"]), "source": source_label}
 
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price", provider_map, "test_key", 3600, transform=transform)
 
         self.assertEqual(result, {"price": 100.0, "source": "P1"})
@@ -319,7 +319,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def t2(raw, label):
             return {"price": int(raw["price"]) * 3, "from": label}
 
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
 
         # p1 成功，使用 t1 转换
@@ -334,7 +334,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn1 = MagicMock(return_value={"data": "raw"})
         provider_map = {"p1": ("P1", fn1)}
 
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price", provider_map, "test_key", 3600, transform={"p_other": lambda r, l: None})
 
         self.assertEqual(result, {"data": "raw"})
@@ -354,7 +354,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def t2(raw, label):
             return {"data": raw["data"], "transformed": True}
 
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
 
         self.assertEqual(result, {"data": "good", "transformed": True})
@@ -370,7 +370,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn1 = MagicMock(return_value={"ok": True})
         provider_map = {"p1": ("P1", fn1)}
 
-        _fetch_with_fallback("price", provider_map, "test_key", 3600, fn_kwargs={"code": "600900"})
+        fetch_with_fallback("price", provider_map, "test_key", 3600, fn_kwargs={"code": "600900"})
 
         fn1.assert_called_once_with(code="600900")
 
@@ -389,7 +389,7 @@ class TestFetchWithFallback(unittest.TestCase):
         # 前 3 次：p1 都失败，p2 兜底
         for i in range(3):
             with self.subTest(fail_count=i + 1):
-                result = _fetch_with_fallback("price", provider_map, f"key_{i}", 3600)
+                result = fetch_with_fallback("price", provider_map, f"key_{i}", 3600)
                 self.assertEqual(result, {"data": "p2_ok"})
                 fn1.assert_called()  # p1 每次都尝试了
 
@@ -397,7 +397,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn2.reset_mock()
 
         # 第 4 次：p1 被熔断跳过，直接走 p2
-        result = _fetch_with_fallback("price", provider_map, "key_4", 3600)
+        result = fetch_with_fallback("price", provider_map, "key_4", 3600)
         self.assertEqual(result, {"data": "p2_ok"})
         fn1.assert_not_called()  # p1 未尝试
 
@@ -419,12 +419,12 @@ class TestFetchWithFallback(unittest.TestCase):
         provider_map = {"p1": ("P1", fn1)}
 
         # 第 1 次：异常
-        self.assertIsNone(_fetch_with_fallback("price", provider_map, "k1", 3600))
+        self.assertIsNone(fetch_with_fallback("price", provider_map, "k1", 3600))
         # 第 2 次：异常
-        self.assertIsNone(_fetch_with_fallback("price", provider_map, "k2", 3600))
+        self.assertIsNone(fetch_with_fallback("price", provider_map, "k2", 3600))
         # 第 3 次：成功（计数器应重置）
         self.assertEqual(
-            _fetch_with_fallback("price", provider_map, "k3", 3600),
+            fetch_with_fallback("price", provider_map, "k3", 3600),
             {"data": "success"},
         )
 
@@ -432,7 +432,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "ok"})
         provider_map2 = {"p1": ("P1", fn2)}
         self.assertEqual(
-            _fetch_with_fallback("price", provider_map2, "k4", 3600),
+            fetch_with_fallback("price", provider_map2, "k4", 3600),
             {"data": "ok"},
         )
         fn2.assert_called_once()
@@ -562,7 +562,7 @@ class TestHistoryIndexChain(unittest.TestCase):
 
     def test_double_failure_returns_empty(self):
         """history_index 全链路失败 → 空列表（不缓存空结果）。"""
-        from src.python.fetcher.chain import _fetch_with_incremental_fallback
+        from src.python.fetcher.chain import fetch_with_incremental_fallback
 
         # mock 所有 provider 返回空
         with patch("src.python.fetcher.chain.cache_get") as mock_cache_get, \
@@ -572,7 +572,7 @@ class TestHistoryIndexChain(unittest.TestCase):
             mock_cache_get.return_value = []
             mock_try.return_value = []  # 全链路失败
 
-            result = _fetch_with_incremental_fallback("history_index", "sh000300", 30)
+            result = fetch_with_incremental_fallback("history_index", "sh000300", 30)
 
             self.assertEqual(result, [])
             # 全链失败时不写缓存（空数据不缓存）

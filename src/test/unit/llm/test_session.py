@@ -4,8 +4,8 @@
   - reset_session_usage — 重置所有累计量
   - get_session_usage — 返回副本不泄漏内部引用
   - format_session_usage — 格式化正确
-  - _track_session_usage — 跨 provider 的 Token 累计
-  - _record_per_module — 模块级用量记录
+  - track_session_usage — 跨 provider 的 Token 累计
+  - record_per_module — 模块级用量记录
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -23,8 +23,8 @@ from src.python.llm.session import (
     get_session_usage,
     reset_session_usage,
     format_session_usage,
-    _track_session_usage,
-    _record_per_module,
+    track_session_usage,
+    record_per_module,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
@@ -203,12 +203,12 @@ class TestTrackSessionUsage(unittest.TestCase):
 
     def test_none_usage_ignored(self):
         """usage 为 None → 不做任何累加。"""
-        _track_session_usage("claude", None)
+        track_session_usage("claude", None)
         self.assertEqual(_session_usage["call_count"], 0)
 
     def test_claude_provider_tokens(self):
         """claude provider 使用 input_tokens / output_tokens。"""
-        _track_session_usage("claude", {
+        track_session_usage("claude", {
             "input_tokens": 10,
             "output_tokens": 20,
             "cache_read_input_tokens": 5,
@@ -220,7 +220,7 @@ class TestTrackSessionUsage(unittest.TestCase):
 
     def test_openai_provider_tokens(self):
         """openai provider 使用 prompt_tokens / completion_tokens。"""
-        _track_session_usage("openai", {
+        track_session_usage("openai", {
             "prompt_tokens": 30,
             "completion_tokens": 40,
         })
@@ -231,19 +231,19 @@ class TestTrackSessionUsage(unittest.TestCase):
     def test_call_count_increments(self):
         """多次调用累加 call_count。"""
         for _ in range(3):
-            _track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1})
+            track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1})
         self.assertEqual(_session_usage["call_count"], 3)
 
     def test_model_name_tracked(self):
         """传入 model_name 累计到 models 列表。"""
-        _track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1},
+        track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1},
                              model_name="claude-sonnet-4-6")
         self.assertIn("claude-sonnet-4-6", _session_usage["models"])
 
     def test_model_name_dedup(self):
         """相同 model_name 不重复添加。"""
         for _ in range(2):
-            _track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1},
+            track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1},
                                  model_name="claude-sonnet-4-6")
         self.assertEqual(len(_session_usage["models"]), 1)
 
@@ -256,7 +256,7 @@ class TestRecordPerModule(unittest.TestCase):
 
     def test_record_creates_entry(self):
         """首次记录创建模块条目。"""
-        _record_per_module("global_macro", "claude-sonnet-4-6",
+        record_per_module("global_macro", "claude-sonnet-4-6",
                            inp=100, out=50, cost=0.01)
         pm = _session_usage["per_module"]
         self.assertIn("global_macro", pm)
@@ -267,9 +267,9 @@ class TestRecordPerModule(unittest.TestCase):
 
     def test_record_accumulates(self):
         """多次记录同一模块累加 Token 和费用。"""
-        _record_per_module("global_macro", "claude-sonnet-4-6",
+        record_per_module("global_macro", "claude-sonnet-4-6",
                            inp=100, out=50, cost=0.01)
-        _record_per_module("global_macro", "claude-sonnet-4-6",
+        record_per_module("global_macro", "claude-sonnet-4-6",
                            inp=200, out=30, cost=0.02)
         entry = _session_usage["per_module"]["global_macro"]
         self.assertEqual(entry["input_tokens"], 300)
@@ -278,17 +278,17 @@ class TestRecordPerModule(unittest.TestCase):
 
     def test_cached_flag_persists(self):
         """cached=True 后保持 True。"""
-        _record_per_module("test_mod", "m", inp=1, out=1, cached=True)
+        record_per_module("test_mod", "m", inp=1, out=1, cached=True)
         self.assertTrue(_session_usage["per_module"]["test_mod"]["cached"])
 
     def test_thinking_flag_persists(self):
         """thinking=True 后保持 True。"""
-        _record_per_module("test_mod", "m", inp=1, out=1, thinking=True)
+        record_per_module("test_mod", "m", inp=1, out=1, thinking=True)
         self.assertTrue(_session_usage["per_module"]["test_mod"]["thinking"])
 
     def test_endpoint_recorded(self):
         """endpoint 被记录。"""
-        _record_per_module("test_mod", "m", inp=1, out=1, endpoint="https://api.test")
+        record_per_module("test_mod", "m", inp=1, out=1, endpoint="https://api.test")
         self.assertEqual(
             _session_usage["per_module"]["test_mod"]["endpoint"],
             "https://api.test",
@@ -296,27 +296,27 @@ class TestRecordPerModule(unittest.TestCase):
 
     def test_cache_hit_tokens_accumulated(self):
         """cache_hit_tokens 累加。"""
-        _record_per_module("test_mod", "m", inp=1, out=1, cache_hit_tokens=50)
-        _record_per_module("test_mod", "m", inp=1, out=1, cache_hit_tokens=30)
+        record_per_module("test_mod", "m", inp=1, out=1, cache_hit_tokens=50)
+        record_per_module("test_mod", "m", inp=1, out=1, cache_hit_tokens=30)
         self.assertEqual(
             _session_usage["per_module"]["test_mod"]["cache_hit_tokens"], 80)
 
     def test_multiple_modules_independent(self):
         """多个模块独立累计。"""
-        _record_per_module("mod_a", "m1", inp=100, out=10)
-        _record_per_module("mod_b", "m2", inp=200, out=20)
+        record_per_module("mod_a", "m1", inp=100, out=10)
+        record_per_module("mod_b", "m2", inp=200, out=20)
         self.assertEqual(_session_usage["per_module"]["mod_a"]["input_tokens"], 100)
         self.assertEqual(_session_usage["per_module"]["mod_b"]["input_tokens"], 200)
 
     def test_model_added_to_models_list(self):
         """传入 model_name 自动添加到全局 models 列表。"""
-        _record_per_module("mod", "claude-opus-4-8", inp=1, out=1)
+        record_per_module("mod", "claude-opus-4-8", inp=1, out=1)
         self.assertIn("claude-opus-4-8", _session_usage["models"])
 
     def test_model_dedup_in_models_list(self):
         """相同模型不重复添加到 models。"""
-        _record_per_module("mod_a", "claude-sonnet-4-6", inp=1, out=1)
-        _record_per_module("mod_b", "claude-sonnet-4-6", inp=1, out=1)
+        record_per_module("mod_a", "claude-sonnet-4-6", inp=1, out=1)
+        record_per_module("mod_b", "claude-sonnet-4-6", inp=1, out=1)
         self.assertEqual(len(_session_usage["models"]), 1)
 
 

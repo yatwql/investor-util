@@ -77,7 +77,7 @@ def _load_profit_forecast_safe() -> tuple[dict, bool]:
         (forecast_dict, success) — success=False 表示 API 调用异常。
     """
     try:
-        from src.python.providers.akshare_extras import get_profit_forecast
+        from src.python.fetcher.akshare import get_profit_forecast
         return get_profit_forecast(), True
     except Exception:
         logger.warning("[penetration] 盈利预测获取失败（非关键），EPS 列显示 --", exc_info=True)
@@ -91,7 +91,7 @@ def _load_dividend_data_safe(result: dict) -> tuple[dict, bool]:
         (dividend_dict, success) — success=False 表示 API 调用异常。
     """
     try:
-        from src.python.providers.akshare_extras import get_dividend_data
+        from src.python.fetcher.akshare import get_dividend_data
         all_top10_codes = list(set().union(*(entry.get("codes", []) for entry in result["top10"])))
         a_stock_codes = [c for c in all_top10_codes if is_a_share_code(c)]
         data = get_dividend_data(a_stock_codes) if a_stock_codes else {}

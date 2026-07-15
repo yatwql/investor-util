@@ -80,8 +80,15 @@ _DEFAULT_EMPTY: dict[str, int] = {"t2": 3, "t3": 3, "t4": 1}
 _DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 3, "t3": 14, "t4": 7}
 
 def _default_persist_path() -> str:
-    """返回默认持久化文件路径（延迟求值，避免模块导入时的 cwd 依赖）。"""
-    return os.path.join(get_cache_dir(), ".degradation_state.json")
+    """返回默认持久化文件路径（延迟求值，避免模块导入时的 cwd 依赖）。
+
+    存放于 data/state/ 目录而非 data/cache/，因为 DegradationTracker
+    的持久化文件是跨会话状态数据而非可清理的缓存数据，
+    避免 cache.cleanup_expired() 误清理。
+    """
+    cache_dir = get_cache_dir()
+    state_dir = os.path.join(os.path.dirname(cache_dir), "state")
+    return os.path.join(state_dir, ".degradation_state.json")
 
 
 # ── 降级阈值控制 ──────────────────────────────

@@ -61,14 +61,9 @@ class FetchStrategy(Enum):
     CACHE_ONLY:
         盘后只读缓存（不发起 HTTP）。
         非交易时段 A 股数据从此策略受益。
-
-    PLACEHOLDER:
-        所有路径都不可用 → 使用占位（暂无行情等）。
-        当前未在 get_effective_strategy 中主动返回，预留。
     """
     LIVE_FETCH = "live"
     CACHE_ONLY = "cache"
-    PLACEHOLDER = "placeholder"
 
 
 # ── 数据类型 ────────────────────────────────────────────

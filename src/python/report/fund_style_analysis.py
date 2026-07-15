@@ -27,14 +27,13 @@ from typing import Any
 
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
-from src.python.code_utils import is_a_share_code
+from src.python.code_utils import estimate_market_cap_by_prefix, is_a_share_code
 
 logger = logging.getLogger("invest")
 
 # 会话级扩展数据缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="extended"）
 # Tencent 二级降级熔断 — 委托 DataSourceRegistry 熔断器（provider="tencent_style"）
-from src.python.provider_registry import get_registry
-get_registry().register_provider("tencent_style", tier=4, timeout=15.0)
+# 注：register_provider("tencent_style") 采用惰性注册（首次 use 时触发，见 _ensure_tencent_provider_registered）
 
 _SNAPSHOT_KEY = "fund_style_snapshot"
 _SNAPSHOT_TTL = 365 * 86400
@@ -65,6 +64,19 @@ _PE_GROWTH_THRESHOLD = 1.3   # PE > 行业均值的 130% → 成长型
 # ═══════════════════════════════════════════════════════════
 #  快照管理
 # ═══════════════════════════════════════════════════════════
+
+
+_tencent_registered: bool = False
+
+
+def _ensure_tencent_provider_registered() -> None:
+    """惰性注册 Tencent 风格数据 Provider（避免模块导入时副作用）。"""
+    global _tencent_registered
+    if _tencent_registered:
+        return
+    from src.python.provider_registry import get_registry
+    get_registry().register_provider("tencent_style", tier=4, timeout=15.0)
+    _tencent_registered = True
 
 
 def _load_snapshot() -> dict[str, Any] | None:
@@ -130,21 +142,8 @@ def _pe_to_style(pe: float, industry_avg_pe: float | None = None) -> str:
 
 
 def _estimate_style_by_code(code: str) -> str:
-    """按代码前缀粗略估算规模（降级方案 C）。
-
-    返回格式："大盘/中盘/小盘"（仅规模维度，估值方向统一为"混合"）
-    """
-    if code.startswith(("60",)):
-        return "大盘"
-    elif code.startswith(("000",)) or code.startswith(("002",)):
-        return "中盘"
-    elif code.startswith(("300",)) or code.startswith(("688",)):
-        return "中小盘"
-    elif code.startswith(("4", "8")):
-        return "小盘"
-    elif code.startswith(("001",)):
-        return "中大盘"
-    return "其他"
+    """按代码前缀粗略估算规模（降级方案 C，委托 code_utils 原语）。"""
+    return estimate_market_cap_by_prefix(code)
 
 
 def _get_size_from_code(code: str) -> str:
@@ -417,6 +416,7 @@ def classify_fund_style(
          "is_estimated": bool,
          "details": [{"name", "code", "size", "style", "ratio", "is_estimated"}, ...]}
     """
+    _ensure_tencent_provider_registered()  # 惰性注册（避免模块级副作用）
     from src.python.provider_registry import get_registry, NOT_FOUND
     reg = get_registry()
 

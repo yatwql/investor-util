@@ -2,46 +2,46 @@
 
 import unittest
 
-from src.python.llm.skeleton import _is_llm_module_enabled
+from src.python.llm.skeleton import is_llm_module_enabled
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 
 
 class TestIsLlmModuleEnabled(unittest.TestCase):
-    """_is_llm_module_enabled — 检查 LLM 模块启用状态。"""
+    """is_llm_module_enabled — 检查 LLM 模块启用状态。"""
 
     def test_none_config_disabled(self):
-        self.assertFalse(_is_llm_module_enabled(None, "global_macro"))
+        self.assertFalse(is_llm_module_enabled(None, "global_macro"))
 
     def test_empty_enabled_map_default_true(self):
         config = {"enabled_llm": {}}
-        self.assertTrue(_is_llm_module_enabled(config, "global_macro"))
+        self.assertTrue(is_llm_module_enabled(config, "global_macro"))
 
     def test_missing_enabled_llm_default_true(self):
         config = {"api_key": "sk-xxx"}
-        self.assertTrue(_is_llm_module_enabled(config, "global_macro"))
+        self.assertTrue(is_llm_module_enabled(config, "global_macro"))
 
     def test_explicitly_enabled(self):
         config = {"enabled_llm": {"global_macro": True}}
-        self.assertTrue(_is_llm_module_enabled(config, "global_macro"))
+        self.assertTrue(is_llm_module_enabled(config, "global_macro"))
 
     def test_explicitly_disabled(self):
         config = {"enabled_llm": {"global_macro": False}}
-        self.assertFalse(_is_llm_module_enabled(config, "global_macro"))
+        self.assertFalse(is_llm_module_enabled(config, "global_macro"))
 
     def test_different_module_not_affected(self):
         config = {"enabled_llm": {"health_check": False}}
-        self.assertTrue(_is_llm_module_enabled(config, "global_macro"))
-        self.assertFalse(_is_llm_module_enabled(config, "health_check"))
+        self.assertTrue(is_llm_module_enabled(config, "global_macro"))
+        self.assertFalse(is_llm_module_enabled(config, "health_check"))
 
     def test_unknown_module_defaults_true(self):
         config = {"enabled_llm": {"global_macro": True}}
-        self.assertTrue(_is_llm_module_enabled(config, "unknown_module"))
+        self.assertTrue(is_llm_module_enabled(config, "unknown_module"))
 
     def test_enabled_map_none(self):
         config = {"enabled_llm": None}
-        self.assertTrue(_is_llm_module_enabled(config, "global_macro"))
+        self.assertTrue(is_llm_module_enabled(config, "global_macro"))
 
 
 class TestHandleTruncation(unittest.TestCase):

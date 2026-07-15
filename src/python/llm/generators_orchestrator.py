@@ -3,10 +3,14 @@
 R-198 从 generators.py 拆分：包含 _compute_module_cache_info、
 _precheck_one_cache、_precheck_all_modules、_dispatch_llm_workers、
 generate_all_llm 和 _LLM_CLIENT_SETTINGS。
+
+``_MODULE_FNS`` 集中管理所有 LLM 模块的生成函数，确保一致的
+缓存预检、线程池分发和失败处理。新增模块需在此注册。
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -32,6 +36,7 @@ from src.python.llm.prompts import (
     CACHE_PREFIX_LLM,
     LLM_MODULE_FAILURE,
     FAIL_REASON_DISABLED,
+    FAIL_REASON_API_ERROR,
 )
 from src.python.llm.session import record_per_module
 from src.python.llm.skeleton import is_llm_module_enabled
@@ -54,7 +59,32 @@ __all__ = [
     "_precheck_all_modules",
     "_dispatch_llm_workers",
     "generate_all_llm",
+    "get_news_correlation_result",
+    "run_news_correlation_safe",
 ]
+
+
+# ── news_correlation 模块级结果缓存 ──────────────────────────
+# news_correlation 的 LLM 分析结果不通过 generate_all_llm 的 8 元组返回
+# （因返回类型与其余 HTML 生成模块不同），通过此模块级变量传递
+# 给 report/news_correlation.py 消费。
+_news_correlation_result: tuple[list[dict], bool, dict] | None = None
+
+
+def get_news_correlation_result() -> tuple[list[dict], bool, dict] | None:
+    """获取预计算的新闻关联 LLM 分析结果。
+
+    若通过 ``generate_all_llm`` 的 news_* 参数集成了 news_correlation，
+    其结果存储于此。report/news_correlation.py 应优先使用此结果，
+    避免重复调用 LLM API。
+    """
+    return _news_correlation_result
+
+
+def _reset_news_correlation_result() -> None:
+    """重置新闻关联结果（测试用）。"""
+    global _news_correlation_result
+    _news_correlation_result = None
 
 
 # ── HTTP 客户端配置 ──────────────────────────────────────────
@@ -181,6 +211,10 @@ def _dispatch_llm_workers(
     penetrated_assets: list[dict] | None, holdings_details: list[dict] | None,
     sector_flow: list[dict] | None,
     f_context: dict | None = None,
+    *,
+    news_data: list[dict] | None = None,
+    holdings_data: list | None = None,
+    penetrated_assets_for_news: list[dict] | None = None,
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。"""
     if not any(needs.values()):
@@ -234,6 +268,12 @@ def _dispatch_llm_workers(
         ),
     }
 
+    # news_correlation 可选集成：仅在提供了新闻和持仓数据时注册
+    if news_data is not None and holdings_data is not None:
+        _MODULE_FNS["news_correlation"] = _make_news_correlation_closure(
+            news_data, holdings_data, penetrated_assets_for_news, force,
+        )
+
     _max_workers = (llm_config or {}).get("llm_max_concurrency", 3)
     with ThreadPoolExecutor(max_workers=_max_workers) as executor:
         _futures: dict[Future, str] = {
@@ -250,7 +290,109 @@ def _dispatch_llm_workers(
             except Exception:  # noqa: PERF203
                 logger.warning("LLM 生成线程异常", exc_info=True)
 
+    # 提取 news_correlation 结果到模块级变量
+    if "news_correlation" in results_dict:
+        global _news_correlation_result
+        nc_result = results_dict["news_correlation"]["result"]
+        if nc_result:
+            try:
+                _news_correlation_result = json.loads(nc_result)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning("news_correlation 结果 JSON 解析失败")
+                _news_correlation_result = ([], False, {})
+        else:
+            _news_correlation_result = None
+
     return results_dict
+
+
+def _make_news_correlation_closure(
+    news_data: list[dict],
+    holdings_data: list,
+    penetrated_assets_for_news: list[dict] | None,
+    force: bool,
+) -> Callable:
+    """创建 news_correlation 的闭包，与 _MODULE_FNS 签名兼容。
+
+    ``enhance_news_correlation`` 返回 ``(list[dict], bool, dict)``，
+    与 _make_runner 期望的 ``(str | None, bool)`` 不兼容。
+    此闭包包装为 ``(json.dumps(result_list), cached)`` 返回，
+    实际结果通过 ``_news_correlation_result`` 模块级变量传递。
+    """
+    def _fn(c: httpx.Client, lc: dict | None) -> tuple[str | None, bool]:
+        try:
+            from src.python.llm.generators_news import enhance_news_correlation
+            result_list, cached, token_usage = enhance_news_correlation(
+                news_data, holdings_data,
+                penetrated_assets=penetrated_assets_for_news,
+                force=force, _http_client=c, llm_config=lc,
+            )
+            LLM_MODULE_FAILURE.pop("news_correlation", None)
+            return json.dumps([result_list, cached, token_usage], ensure_ascii=False), cached
+        except Exception as e:
+            LLM_MODULE_FAILURE["news_correlation"] = FAIL_REASON_API_ERROR
+            logger.warning("%s出错: %s", _MN("news_correlation"), e)
+            return None, False
+    return _fn
+
+
+def run_news_correlation_safe(
+    news_items: list[dict],
+    holdings: list,
+    penetrated_assets: list[dict] | None = None,
+    industry_data: dict[str, dict] | None = None,
+    force: bool = False,
+) -> tuple[list[dict], bool, dict]:
+    """安全执行新闻关联 LLM 分析，提供一致缓存/失败处理/日志。
+
+    与 ``_dispatch_llm_workers`` 中的 ``_make_news_correlation_closure``
+    共享相同的失败处理和日志模式，但可在不经过线程池时直接调用。
+
+    Args:
+        news_items: 关键词匹配后的新闻列表
+        holdings: 持仓列表
+        penetrated_assets: 穿透资产数据（可选）
+        industry_data: 行业/概念数据（可选）
+        force: 跳过缓存强制重新生成
+
+    Returns:
+        (富化后的新闻列表, 是否来自缓存, token 用量字典)
+    """
+    from src.python.config import get_llm_config
+
+    llmc = get_llm_config()
+    if not llmc:
+        return news_items, False, {}
+
+    # 检查是否已通过 orchestrator 预计算
+    if _news_correlation_result is not None:
+        logger.info("%s 使用 orchestrator 预计算结果", _MN("news_correlation"))
+        return _news_correlation_result
+
+    # 检查 LLM 配置
+    enabled_llm = llmc.get("enabled_llm") if llmc else None
+    llm_enabled = enabled_llm.get("news_correlation", False) if isinstance(enabled_llm, dict) else False
+    if not llmc or not llm_enabled:
+        logger.info("%s LLM 分析已禁用（enabled_llm.news_correlation = false）", _MN("news_correlation"))
+        LLM_MODULE_FAILURE["news_correlation"] = FAIL_REASON_DISABLED
+        return news_items, False, {}
+
+    try:
+        from src.python.llm.generators_news import enhance_news_correlation
+        result, cached, token_usage = enhance_news_correlation(
+            news_items, holdings,
+            penetrated_assets=penetrated_assets,
+            industry_data=industry_data,
+            force=force, llm_config=llmc,
+        )
+        LLM_MODULE_FAILURE.pop("news_correlation", None)
+        logger.info("%s生成完成%s", _MN("news_correlation"),
+                    "（缓存）" if cached else "")
+        return result, cached, token_usage
+    except Exception as e:
+        LLM_MODULE_FAILURE["news_correlation"] = FAIL_REASON_API_ERROR
+        logger.warning("%s出错: %s", _MN("news_correlation"), e)
+        return news_items, False, {}
 
 
 def generate_all_llm(

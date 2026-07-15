@@ -1,9 +1,9 @@
 """TUI 错误友好提示测试 — 异常堆栈不暴露给用户。
 
 测试目标：
-  - _print_error_with_hint 对不同异常类型输出对应的中文友好提示
+  - print_error_with_hint 对不同异常类型输出对应的中文友好提示
   - 所有友好提示不包含原始异常类型名
-  - 菜单调度 _execute_item 捕获异常并用友好提示替代
+  - 菜单调度 execute_item 捕获异常并用友好提示替代
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -24,15 +24,15 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_ui, pytest.mark.edge]
 
 @pytest.mark.edge
 class TestPrintErrorWithHint(unittest.TestCase):
-    """_print_error_with_hint 友好提示输出测试。"""
+    """print_error_with_hint 友好提示输出测试。"""
 
     def setUp(self):
         self.capture = io.StringIO()
 
     def _call(self, e: Exception, prefix: str = "操作失败"):
-        from src.python.tui_handlers import _print_error_with_hint
+        from src.python.tui_handlers import print_error_with_hint
         with patch("sys.stdout", self.capture):
-            _print_error_with_hint(e, prefix)
+            print_error_with_hint(e, prefix)
         return self.capture.getvalue()
 
     def assert_friendly(self, text: str, *keywords: str):
@@ -129,20 +129,20 @@ class TestPrintErrorWithHint(unittest.TestCase):
 
 @pytest.mark.edge
 class TestExecuteItemErrorFriendly(unittest.TestCase):
-    """菜单调度 _execute_item 异常捕获友好提示测试。"""
+    """菜单调度 execute_item 异常捕获友好提示测试。"""
 
     def setUp(self):
         self.capture = io.StringIO()
 
     def _execute(self, callback):
-        from src.python.tui_handlers import _execute_item
+        from src.python.tui_handlers import execute_item
         # 修补 MENU_ITEMS 构造一个临时条目
         with patch("src.python.tui_handlers.MENU_ITEMS", [
             (0, "test", callback, False),
         ]):
             with patch("sys.stdout", self.capture):
                 with patch("src.python.tui_handlers._press_any_key"):
-                    _execute_item(0)
+                    execute_item(0)
         return self.capture.getvalue()
 
     def test_callback_raises_generic(self):
@@ -178,21 +178,21 @@ class TestExecuteItemErrorFriendly(unittest.TestCase):
         self.assertIn("权限不足", out)
 
     def test_callback_keyboard_interrupt(self):
-        """Ctrl+C → 不调用 _print_error_with_hint，直接显示取消。"""
+        """Ctrl+C → 不调用 print_error_with_hint，直接显示取消。"""
         def _cancel():
             raise KeyboardInterrupt()
-        with patch("src.python.tui_handlers._print_error_with_hint") as mock_err:
+        with patch("src.python.tui_handlers.print_error_with_hint") as mock_err:
             out = self._execute(_cancel)
         self.assertIn("操作已取消", out)
         mock_err.assert_not_called()
 
     def test_busy_skip(self):
         """_busy=True 时跳过执行。"""
-        from src.python.tui_handlers import _execute_item
+        from src.python.tui_handlers import execute_item
         callback = MagicMock()
         with patch("src.python.tui_handlers.MENU_ITEMS", [
             (0, "test", callback, False),
         ]):
             with patch("src.python.tui_handlers._busy", True):
-                _execute_item(0)
+                execute_item(0)
         callback.assert_not_called()

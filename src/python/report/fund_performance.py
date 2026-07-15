@@ -208,7 +208,7 @@ def _load_profit_forecast() -> tuple[dict[str, Any], bool]:
         (forecast_dict, success) — success=False 表示 API 调用异常。
     """
     try:
-        from src.python.providers.akshare_extras import get_profit_forecast
+        from src.python.fetcher.akshare import get_profit_forecast
         return get_profit_forecast(), True
     except Exception:
         logger.warning("[fund_performance] 盈利预测获取失败（非关键），机构覆盖列显示 --", exc_info=True)
@@ -380,7 +380,7 @@ def build_perf_data_status(
 
     # 盈利预测（T4）
     if not profit_success:
-        from src.python.providers.akshare_extras import get_profit_forecast_cache_key
+        from src.python.fetcher.akshare import get_profit_forecast_cache_key
         pf_key = get_profit_forecast_cache_key()
         pf_cache_age = get_cache_age(pf_key)
         _pf_ttl = get_ttl("profit_forecast")

@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any
 
 from src.python.cache import get_cache_hit_rate
 from src.python.code_utils import is_a_share_code
 from src.python.constants import APP_VERSION
-from src.python.fetcher.fund import fetch_fund_holdings
+from src.python.fetcher.fund import fetch_fund_holdings_cached
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.models import Holding
-from src.python.provider_registry import NOT_FOUND, get_registry
-from src.python.registry import get_llm_module_name, get_llm_module_names
+from src.python.registry import get_llm_module_name
+from src.python.report.llm_module_info import build_llm_module_info
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix
@@ -29,24 +28,9 @@ from src.python.report.market_value import (
 )
 from src.python.report.penetration import compute_penetration_top10
 from src.python.report.progress import ProgressReporter
-from src.python.providers.akshare_extras import get_dividend_data, get_profit_forecast
+from src.python.fetcher.akshare import get_dividend_data, get_profit_forecast
 
 logger = logging.getLogger("invest")
-
-
-def _fetch_fund_holdings_cached(code: str) -> dict | None:
-    """基金持仓获取（含会话缓存），同一报告生成中同基金只获取一次。
-
-    消除 _render_overlap_matrix / _render_concentration / _render_style_analysis
-    三函数独立调用 fetch_fund_holdings 的冗余文件缓存读取。
-    """
-    registry = get_registry()
-    cached = registry.session_cache_get("fund_hold", code)
-    if cached is not NOT_FOUND:
-        return cached
-    result = fetch_fund_holdings(code)
-    registry.session_cache_set("fund_hold", code, result, source="api")
-    return result
 
 
 def _render_market_value_section(
@@ -311,7 +295,7 @@ def _render_overlap_matrix(
         fund_holdings: dict[str, list[dict]] = {}
         fund_names: dict[str, str] = {}
         for code in fund_codes:
-            fh = _fetch_fund_holdings_cached(code)
+            fh = fetch_fund_holdings_cached(code)
             if fh and fh.get("holdings"):
                 fund_holdings[code] = fh["holdings"]
                 fund_names[code] = fh.get("name", code)
@@ -352,7 +336,7 @@ def _render_concentration(
         ))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
-            fh = _fetch_fund_holdings_cached(code)
+            fh = fetch_fund_holdings_cached(code)
             if fh and fh.get("holdings"):
                 fund_holdings[code] = {
                     "name": fh.get("name", code),
@@ -387,7 +371,7 @@ def _render_style_analysis(
         ))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
-            fh = _fetch_fund_holdings_cached(code)
+            fh = fetch_fund_holdings_cached(code)
             if fh and fh.get("holdings"):
                 fund_holdings[code] = {
                     "name": fh.get("name", code),
@@ -489,7 +473,7 @@ def _render_llm_content_section(
                     if d.yesterday_close and abs(d.yesterday_close) > 1e-10 else 0.0),
             } for d in details
         ]
-        from src.python.providers.akshare_extras import get_sector_fund_flow
+        from src.python.fetcher.akshare import get_sector_fund_flow
         _sector_flow = sector_flow if sector_flow is not None else get_sector_fund_flow()
 
         gm, er, hc, pd, _, _, _, _ = generate_all_llm(
@@ -514,66 +498,6 @@ def _render_llm_content_section(
 
 
 # ── LLM 模块状态 ────────────────────────────────────────────
-
-
-def _build_module_info_list(
-    llm_failure: dict,
-    per_module: dict,
-) -> list[dict[str, Any]]:
-    """构建 LLM 模块信息列表（状态、Token 用量、费用等）。"""
-    try:
-        from src.python.llm import (
-            FAIL_REASON_API_ERROR,
-            FAIL_REASON_CIRCUIT_OPEN,
-            FAIL_REASON_DISABLED,
-            FAIL_REASON_NETWORK_ERROR,
-            FAIL_REASON_NOT_CONFIGURED,
-            FAIL_REASON_TIMEOUT,
-        )
-    except ImportError:
-        FAIL_REASON_DISABLED = FAIL_REASON_NOT_CONFIGURED = "disabled"
-        FAIL_REASON_API_ERROR = FAIL_REASON_NETWORK_ERROR = FAIL_REASON_TIMEOUT = FAIL_REASON_CIRCUIT_OPEN = "error"
-
-    _NAMES = get_llm_module_names()
-    _DISPLAY_REASON = {
-        FAIL_REASON_NOT_CONFIGURED: "LLM 未配置",
-        FAIL_REASON_API_ERROR: "LLM API 调用失败",
-        FAIL_REASON_NETWORK_ERROR: "LLM API 网络连接失败",
-        FAIL_REASON_TIMEOUT: "LLM API 请求超时",
-        FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
-    }
-
-    _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]
-    llm_module_info: list[dict[str, Any]] = []
-    for mk in _MODULE_KEYS:
-        entry: dict[str, Any] = {"key": mk, "name": _NAMES.get(mk, mk)}
-        reason = llm_failure.get(mk)
-        pm = per_module.get(mk)
-        if reason == FAIL_REASON_DISABLED:
-            entry.update(status="disabled", status_label="已禁用",
-                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
-        elif reason:
-            entry.update(status="failed", status_label=_DISPLAY_REASON.get(reason, reason),
-                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
-        elif pm:
-            _inp = pm.get("input_tokens", 0)
-            _out = pm.get("output_tokens", 0)
-            entry.update(
-                status="cached" if pm.get("cached") else "success",
-                status_label="缓存" if pm.get("cached") else "成功",
-                model=pm.get("model", ""), input_tokens=_inp, output_tokens=_out,
-                total_tokens=_inp + _out, cache_hit_tokens=pm.get("cache_hit_tokens", 0),
-                cost=pm.get("cost", 0.0), cached=pm.get("cached", False),
-                thinking=pm.get("thinking", False), endpoint=pm.get("endpoint", ""),
-            )
-        else:
-            entry.update(status="unknown", status_label="",
-                         model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                         cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="")
-        llm_module_info.append(entry)
-    return llm_module_info
 
 
 def _render_llm_module_info(
@@ -608,7 +532,7 @@ def _render_llm_module_info(
         mk: _llm_failure.get(mk) == FAIL_REASON_DISABLED
         for mk in ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]}
 
-    llm_module_info = _build_module_info_list(_llm_failure, _per_module)
+    llm_module_info = build_llm_module_info(_llm_failure, _per_module)
 
     _llm_endpoint = next((mi["endpoint"] for mi in llm_module_info if mi.get("endpoint")), "")
     return llm_module_info, _llm_endpoint, module_disabled, _llm_session_usage

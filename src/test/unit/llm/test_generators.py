@@ -171,7 +171,7 @@ class TestPrecheckAllModules(unittest.TestCase):
         LLM_MODULE_FAILURE.clear()
         LLM_MODULE_FAILURE.update(self._orig)
 
-    @patch("src.python.llm.generators_orchestrator._is_llm_module_enabled", return_value=False)
+    @patch("src.python.llm.generators_orchestrator.is_llm_module_enabled", return_value=False)
     def test_disabled_module_sets_failure(self, mock_enabled):
         """模块已禁用 → LLM_MODULE_FAILURE 记录 FAIL_REASON_DISABLED。"""
         from src.python.llm.generators_orchestrator import _precheck_all_modules

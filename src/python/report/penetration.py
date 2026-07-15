@@ -28,6 +28,7 @@ from src.python.code_utils import (
     is_a_share_code,
     is_bond_related_by_name,
     is_etf_by_name,
+    is_exchange_fund_code,
     is_index_link_by_name,
     is_offsite_fund,
     is_otc_fund_by_name,
@@ -102,8 +103,8 @@ def classify_penetration(h: Holding) -> str:
     if is_index_link_by_name(name):
         return INDEX_LINK
 
-    # 4) 场内 ETF（名称含 ETF 或代码 5 开头，不含 1 开头可转债）
-    if is_etf_by_name(name) or code.startswith("5"):
+    # 4) 场内 ETF（名称含 ETF 或代码为场内基金/ETF 代码）
+    if is_etf_by_name(name) or is_exchange_fund_code(code):
         return ETF
 
     # 5) 场外账户中的基金 → 主动权益基金（兜底）

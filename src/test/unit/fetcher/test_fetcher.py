@@ -17,7 +17,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import ANY, MagicMock, patch
 
-from src.python.fetcher.chain import _get_chain, _fetch_with_fallback
+from src.python.fetcher.chain import _get_chain, fetch_with_fallback
 from src.python.fetcher.price import fetch_market_data
 from src.python.fetcher.index import fetch_us_indices
 from src.python.fetcher.fund import fetch_fund_benchmark

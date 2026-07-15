@@ -14,11 +14,21 @@
 
 ### Fixed
 
-- *（本次无缺陷修复）*
+- **P2-1：fund_style_analysis.py 硬编码代码前缀判定** — 在 `code_utils.py` 新增 `estimate_market_cap_by_prefix(code)` 统一规模估算函数，`fund_style_analysis.py` 的 `_estimate_style_by_code()` 改为此函数委派调用
+- **P2-2：price.py 硬编码 code.startswith("00")** — 替换为 `code_utils.is_otc_code_overlap(code)`
+- **P2-3：penetration.py 硬编码 code.startswith("5")** — 替换为 `code_utils.is_exchange_fund_code(code)`，覆盖 1 开头深市 ETF
+- **P2-4：DegradationTracker 状态文件路径** — 从 `data/cache/.degradation_state.json` 移至 `data/state/.degradation_state.json`，避免 cache.cleanup_expired() 误清理
+- **P2-5：news_correlation 注册到 _MODULE_FNS** — `generators_orchestrator.py` 新增 `run_news_correlation_safe()` 安全调用封装，统一缓存/失败处理/日志模式；`_dispatch_llm_workers` 支持可选集成 news_correlation 线程池执行；`news_correlation.py` 改用安全封装
+- **P2-6：重复 _fetch_fund_holdings_cached 函数** — 提取到 `fetcher/fund.py` 的 `fetch_fund_holdings_cached()`，`html_renderers.py` 和 `excel_b_series.py` 改用共享函数
+- **P2-7：重复 LLM 模块信息构建** — 新建 `report/llm_module_info.py`，提供共享 `build_llm_module_info()` 函数，`html_renderers.py` 和 `excel_llm_usage.py` 改用共享函数
+- **P2-8：清理 7 处死导入** — `handlers_config.py`（sys）、`cache/_io.py`（Any）、`cache/_ttl.py`（Any）、`html_renderers.py`（datetime）、`akshare_extras.py`（as_completed）、`schemas/history.py`（field）
+- **P2-9：移除 FetchStrategy.PLACEHOLDER** — 枚举值从未被返回，移除减少概念死分支
+- **P2-10：创建 fetcher/akshare.py 封装层** — 统一封装 `providers/akshare_extras` 的 4 个公开函数，report 层 9 处导入改为 `fetcher.akshare`
+- **P3-1：fund_style_analysis.py 模块级副作用** — 移除模块加载时 `get_registry().register_provider("tencent_style")` 调用，改为 `_ensure_tencent_provider_registered()` 惰性函数，首次调用 `classify_fund_style` 时注册
 
 ### Changed
 
-- *（本次无变更）*
+- **P3-7：颜色常量独立为共享模块** — 创建 `ansi_colors.py`，`report/progress.py` 改为从此导入而非 `tui_menu`，消除 report 层对 UI 层的依赖
 
 ### Docs
 

@@ -50,7 +50,7 @@ def _build_category_data(
     dividend_success = True
     try:
         from src.python.code_utils import is_a_share_code
-        from src.python.providers.akshare_extras import get_dividend_data
+        from src.python.fetcher.akshare import get_dividend_data
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
         if not dividend_data and stock_codes:
@@ -116,7 +116,7 @@ def _build_category_data(
 def _load_profit_forecast() -> dict[str, Any]:
     """加载盈利预测数据（非关键，失败时返回空字典）。"""
     try:
-        from src.python.providers.akshare_extras import get_profit_forecast
+        from src.python.fetcher.akshare import get_profit_forecast
         return get_profit_forecast()
     except Exception:
         logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --", exc_info=True)

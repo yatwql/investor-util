@@ -24,6 +24,8 @@ from src.python.llm.generators_news import (  # noqa: F401
 )
 from src.python.llm.generators_orchestrator import (  # noqa: F401
     generate_all_llm,
+    get_news_correlation_result,
+    run_news_correlation_safe,
 )
 from src.python.llm.prompts import (  # noqa: F401
     FAIL_REASON_API_ERROR,

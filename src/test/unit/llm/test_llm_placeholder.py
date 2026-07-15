@@ -21,7 +21,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_API_ERROR,
     FAIL_REASON_DISABLED,
-    _LLM_MODULE_FAILURE,
+    LLM_MODULE_FAILURE,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
@@ -117,59 +117,59 @@ class TestLlmPlaceholderTextInReport(unittest.TestCase):
 
 
 class TestLlmPlaceholderIntegration(unittest.TestCase):
-    """验证 _LLM_MODULE_FAILURE 与占位文本的正确映射。"""
+    """验证 LLM_MODULE_FAILURE 与占位文本的正确映射。"""
 
     def test_not_configured_placeholder_matches(self):
         """not_configured → 显示 '未配置'。"""
-        _LLM_MODULE_FAILURE["test_mod"] = FAIL_REASON_NOT_CONFIGURED
-        reason = _LLM_MODULE_FAILURE.get("test_mod")
+        LLM_MODULE_FAILURE["test_mod"] = FAIL_REASON_NOT_CONFIGURED
+        reason = LLM_MODULE_FAILURE.get("test_mod")
         self.assertEqual(reason, "not_configured")
-        _LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.clear()
 
     def test_disabled_placeholder_matches(self):
         """disabled → 显示 '已禁用'。"""
-        _LLM_MODULE_FAILURE["test_mod"] = FAIL_REASON_DISABLED
-        reason = _LLM_MODULE_FAILURE.get("test_mod")
+        LLM_MODULE_FAILURE["test_mod"] = FAIL_REASON_DISABLED
+        reason = LLM_MODULE_FAILURE.get("test_mod")
         self.assertEqual(reason, "disabled")
-        _LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.clear()
 
     def test_api_error_placeholder_matches(self):
         """api_error → 显示 'LLM API 调用失败'。"""
-        _LLM_MODULE_FAILURE["test_mod"] = FAIL_REASON_API_ERROR
-        reason = _LLM_MODULE_FAILURE.get("test_mod")
+        LLM_MODULE_FAILURE["test_mod"] = FAIL_REASON_API_ERROR
+        reason = LLM_MODULE_FAILURE.get("test_mod")
         self.assertEqual(reason, "api_error")
-        _LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.clear()
 
     def test_three_states_mutually_exclusive(self):
-        """三种状态在同一 _LLM_MODULE_FAILURE 中互不冲突。"""
-        _LLM_MODULE_FAILURE["mod_a"] = FAIL_REASON_NOT_CONFIGURED
-        _LLM_MODULE_FAILURE["mod_b"] = FAIL_REASON_DISABLED
-        _LLM_MODULE_FAILURE["mod_c"] = FAIL_REASON_API_ERROR
+        """三种状态在同一 LLM_MODULE_FAILURE 中互不冲突。"""
+        LLM_MODULE_FAILURE["mod_a"] = FAIL_REASON_NOT_CONFIGURED
+        LLM_MODULE_FAILURE["mod_b"] = FAIL_REASON_DISABLED
+        LLM_MODULE_FAILURE["mod_c"] = FAIL_REASON_API_ERROR
 
-        self.assertEqual(_LLM_MODULE_FAILURE["mod_a"], "not_configured")
-        self.assertEqual(_LLM_MODULE_FAILURE["mod_b"], "disabled")
-        self.assertEqual(_LLM_MODULE_FAILURE["mod_c"], "api_error")
+        self.assertEqual(LLM_MODULE_FAILURE["mod_a"], "not_configured")
+        self.assertEqual(LLM_MODULE_FAILURE["mod_b"], "disabled")
+        self.assertEqual(LLM_MODULE_FAILURE["mod_c"], "api_error")
 
         # 三个值各不相同
-        values = set(_LLM_MODULE_FAILURE.values())
+        values = set(LLM_MODULE_FAILURE.values())
         self.assertEqual(len(values), 3)
 
-        _LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.clear()
 
     def test_clear_failure_before_regeneration(self):
         """新生成开始时清除对应 key → 旧状态不会残留。"""
-        _LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_API_ERROR
+        LLM_MODULE_FAILURE["expert_review"] = FAIL_REASON_API_ERROR
         # 模拟生成前清除
-        _LLM_MODULE_FAILURE.pop("expert_review", None)
-        self.assertNotIn("expert_review", _LLM_MODULE_FAILURE)
+        LLM_MODULE_FAILURE.pop("expert_review", None)
+        self.assertNotIn("expert_review", LLM_MODULE_FAILURE)
 
     def test_disabled_module_placeholder(self):
         """已禁用的模块不应显示 API 错误占位。"""
-        _LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
-        reason = _LLM_MODULE_FAILURE.get("global_macro")
+        LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
+        reason = LLM_MODULE_FAILURE.get("global_macro")
         self.assertEqual(reason, FAIL_REASON_DISABLED)
         self.assertNotEqual(reason, FAIL_REASON_API_ERROR)
-        _LLM_MODULE_FAILURE.clear()
+        LLM_MODULE_FAILURE.clear()
 
 
 if __name__ == "__main__":

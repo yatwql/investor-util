@@ -170,7 +170,7 @@ class TestScenarioNetworkDown(ScenarioTestBase):
 
     def test_fetch_failure_falls_to_stale_cache(self):
         """Provider 全部失败 → 降级使用过期缓存数据。"""
-        from src.python.fetcher.chain import _fetch_with_fallback
+        from src.python.fetcher.chain import fetch_with_fallback
 
         provider_map = {
             "tencent": ("腾讯财经", MagicMock(side_effect=Exception("网络中断"))),
@@ -184,7 +184,7 @@ class TestScenarioNetworkDown(ScenarioTestBase):
 
             with patch("src.python.fetcher.chain._get_chain",
                        return_value=["tencent", "eastmoney"]):
-                result = _fetch_with_fallback(
+                result = fetch_with_fallback(
                     "price", provider_map, "test_600900", 3600
                 )
 
@@ -193,7 +193,7 @@ class TestScenarioNetworkDown(ScenarioTestBase):
 
     def test_fetch_failure_no_cache_returns_none(self):
         """Provider 全部失败 + 无过期缓存 → 返回 None。"""
-        from src.python.fetcher.chain import _fetch_with_fallback
+        from src.python.fetcher.chain import fetch_with_fallback
 
         provider_map = {
             "tencent": ("腾讯财经", MagicMock(side_effect=Exception("网络中断"))),
@@ -202,7 +202,7 @@ class TestScenarioNetworkDown(ScenarioTestBase):
         with patch("src.python.fetcher.chain.cache_get", return_value=None):
             with patch("src.python.fetcher.chain._get_chain",
                        return_value=["tencent"]):
-                result = _fetch_with_fallback(
+                result = fetch_with_fallback(
                     "price", provider_map, "test_600900", 3600
                 )
 

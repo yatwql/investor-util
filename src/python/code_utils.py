@@ -457,6 +457,31 @@ def get_index_exchange_prefix(code: str) -> str:
 # ═══════════════════════════════════════════════════════════════
 
 
+def estimate_market_cap_by_prefix(code: str) -> str:
+    """按代码前缀粗略估算市值规模。
+
+    Args:
+        code: 6 位证券代码
+
+    Returns:
+        "大盘" | "中盘" | "中小盘" | "小盘" | "中大盘" | "其他"
+    """
+    raw = _strip_prefix(code)
+    if not raw:
+        return "其他"
+    if raw.startswith(("60",)):
+        return "大盘"
+    elif raw.startswith(("000",)) or raw.startswith(("002",)):
+        return "中盘"
+    elif raw.startswith(("300",)) or raw.startswith(("688",)):
+        return "中小盘"
+    elif raw.startswith(("4", "8")):
+        return "小盘"
+    elif raw.startswith(("001",)):
+        return "中大盘"
+    return "其他"
+
+
 def _strip_prefix(code: str) -> str:
     """去除 sh/sz/bj 前缀，返回纯净 6 位数字代码。
 

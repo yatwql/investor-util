@@ -2,13 +2,13 @@
 
 测试目标：
   - _Timer 类上下文管理器
-  - _print_timing_summary / _print_llm_session_usage 输出格式化
-  - _check_network_available 行情数据可用性检测（含 print 输出）
-  - _print_error_with_hint 不同类型异常的友好提示格式
+  - print_timing_summary / print_llm_session_usage 输出格式化
+  - check_network_available 行情数据可用性检测（含 print 输出）
+  - print_error_with_hint 不同类型异常的友好提示格式
   - _add_error / _clear_errors / _print_error_summary 错误累积
   - _call_sheet 安全调用包装
-  - _execute_item 菜单执行调度与防重入
-  - _select_holdings_file 文件选择逻辑
+  - execute_item 菜单执行调度与防重入
+  - select_holdings_file 文件选择逻辑
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -28,12 +28,12 @@ from src.python.report.progress import timing_records, Timer as _Timer
 
 from src.python.tui_handlers import (
 
-    _check_network_available,
-    _execute_item,
-    _print_error_with_hint,
-    _print_llm_session_usage,
-    _print_timing_summary,
-    _select_holdings_file,
+    check_network_available,
+    execute_item,
+    print_error_with_hint,
+    print_llm_session_usage,
+    print_timing_summary,
+    select_holdings_file,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
@@ -51,49 +51,49 @@ class FakeDetail:
 # ═══════════════════════════════════════════════════════════════
 
 class TestCheckNetworkAvailable(unittest.TestCase):
-    """_check_network_available 测试。"""
+    """check_network_available 测试。"""
 
     def test_empty_list(self) -> None:
         """空列表 → False。"""
-        self.assertFalse(_check_network_available([]))
+        self.assertFalse(check_network_available([]))
 
     def test_all_none(self) -> None:
         """所有价格均为 None → False（网络不可用）。"""
         details = [FakeDetail(price=None), FakeDetail(price=None)]
-        self.assertFalse(_check_network_available(details))
+        self.assertFalse(check_network_available(details))
 
     def test_all_zero(self) -> None:
         """所有价格均为 0 → False（网络不可用）。"""
         details = [FakeDetail(price=0), FakeDetail(price=0)]
-        self.assertFalse(_check_network_available(details))
+        self.assertFalse(check_network_available(details))
 
     def test_mixed_available(self) -> None:
         """部分有价 → True。"""
         details = [FakeDetail(price=None), FakeDetail(price=10.5)]
-        self.assertTrue(_check_network_available(details))
+        self.assertTrue(check_network_available(details))
 
     def test_all_available(self) -> None:
         """全部有价 → True。"""
         details = [FakeDetail(price=10.0), FakeDetail(price=20.5)]
-        self.assertTrue(_check_network_available(details))
+        self.assertTrue(check_network_available(details))
 
     def test_single_none(self) -> None:
         """单条 None → False。"""
-        self.assertFalse(_check_network_available([FakeDetail(price=None)]))
+        self.assertFalse(check_network_available([FakeDetail(price=None)]))
 
     def test_single_available(self) -> None:
         """单条有价 → True。"""
-        self.assertTrue(_check_network_available([FakeDetail(price=15.0)]))
+        self.assertTrue(check_network_available([FakeDetail(price=15.0)]))
 
 
 class TestPrintErrorWithHint(unittest.TestCase):
-    """_print_error_with_hint 错误提示格式测试。"""
+    """print_error_with_hint 错误提示格式测试。"""
 
     def _capture(self, e: Exception, prefix: str = "") -> str:
         """捕获 print 输出。"""
         out = io.StringIO()
         with patch("sys.stdout", out):
-            _print_error_with_hint(e, prefix)
+            print_error_with_hint(e, prefix)
         return out.getvalue()
 
     def test_network_error(self) -> None:
@@ -212,11 +212,11 @@ class TestTimer(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — _print_timing_summary
+# 新增测试 — print_timing_summary
 # ═══════════════════════════════════════════════════════════════
 
 class TestPrintTimingSummary(unittest.TestCase):
-    """_print_timing_summary 输出格式化测试。"""
+    """print_timing_summary 输出格式化测试。"""
 
     def setUp(self):
         _timing_records.clear()
@@ -227,7 +227,7 @@ class TestPrintTimingSummary(unittest.TestCase):
     def _capture(self) -> str:
         out = io.StringIO()
         with patch("sys.stdout", out):
-            _print_timing_summary()
+            print_timing_summary()
         return out.getvalue()
 
     def test_no_records_silent(self):
@@ -287,16 +287,16 @@ class TestPrintTimingSummary(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — _print_llm_session_usage
+# 新增测试 — print_llm_session_usage
 # ═══════════════════════════════════════════════════════════════
 
 class TestPrintLlmSessionUsage(unittest.TestCase):
-    """_print_llm_session_usage 输出测试。"""
+    """print_llm_session_usage 输出测试。"""
 
     def _capture(self, usage: dict | None = None) -> str:
         out = io.StringIO()
         with patch("sys.stdout", out):
-            _print_llm_session_usage(usage)
+            print_llm_session_usage(usage)
         return out.getvalue()
 
     def test_empty_dict_silent(self):
@@ -357,16 +357,16 @@ class TestPrintLlmSessionUsage(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — _check_network_available print 输出
+# 新增测试 — check_network_available print 输出
 # ═══════════════════════════════════════════════════════════════
 
 class TestCheckNetworkAvailablePrint(unittest.TestCase):
-    """_check_network_available 的 print 输出测试。"""
+    """check_network_available 的 print 输出测试。"""
 
     def _capture_call(self, details: list) -> tuple[bool, str]:
         out = io.StringIO()
         with patch("sys.stdout", out):
-            result = _check_network_available(details)
+            result = check_network_available(details)
         return result, out.getvalue()
 
     def test_empty_list_no_print(self):
@@ -406,16 +406,16 @@ class TestCheckNetworkAvailablePrint(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — _print_error_with_hint 额外用例
+# 新增测试 — print_error_with_hint 额外用例
 # ═══════════════════════════════════════════════════════════════
 
 class TestPrintErrorWithHintExtended(unittest.TestCase):
-    """_print_error_with_hint 额外关键词及边界测试。"""
+    """print_error_with_hint 额外关键词及边界测试。"""
 
     def _capture(self, e: Exception, prefix: str = "") -> str:
         out = io.StringIO()
         with patch("sys.stdout", out):
-            _print_error_with_hint(e, prefix)
+            print_error_with_hint(e, prefix)
         return out.getvalue()
 
     def test_network_keyword_match(self):
@@ -453,11 +453,11 @@ class TestPrintErrorWithHintExtended(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — _execute_item
+# 新增测试 — execute_item
 # ═══════════════════════════════════════════════════════════════
 
 class TestExecuteItem(unittest.TestCase):
-    """_execute_item 菜单执行调度与防重入测试。"""
+    """execute_item 菜单执行调度与防重入测试。"""
 
     def setUp(self):
         _th_module._busy = False
@@ -472,7 +472,7 @@ class TestExecuteItem(unittest.TestCase):
         mock_menu.__getitem__.return_value = ("X", "Exit", callback, True)
         with patch("src.python.tui_menu._exit_app", side_effect=SystemExit(0)):
             with self.assertRaises(SystemExit):
-                _execute_item(0)
+                execute_item(0)
         callback.assert_not_called()
 
     @patch("src.python.tui_handlers.MENU_ITEMS")
@@ -480,7 +480,7 @@ class TestExecuteItem(unittest.TestCase):
         """普通项调用回调函数。"""
         callback = MagicMock()
         mock_menu.__getitem__.return_value = ("T", "Test", callback, False)
-        _execute_item(0)
+        execute_item(0)
         callback.assert_called_once()
 
     @patch("src.python.tui_handlers.MENU_ITEMS")
@@ -489,7 +489,7 @@ class TestExecuteItem(unittest.TestCase):
         callback = MagicMock()
         mock_menu.__getitem__.return_value = ("T", "Test", callback, False)
         _th_module._busy = True
-        _execute_item(0)
+        execute_item(0)
         callback.assert_not_called()
 
     @patch("src.python.tui_handlers.MENU_ITEMS")
@@ -497,7 +497,7 @@ class TestExecuteItem(unittest.TestCase):
         """执行后 _busy 恢复为 False。"""
         callback = MagicMock()
         mock_menu.__getitem__.return_value = ("T", "Test", callback, False)
-        _execute_item(0)
+        execute_item(0)
         self.assertFalse(_th_module._busy)
 
     @patch("src.python.tui_handlers.MENU_ITEMS")
@@ -506,7 +506,7 @@ class TestExecuteItem(unittest.TestCase):
         callback = MagicMock(side_effect=KeyboardInterrupt)
         mock_menu.__getitem__.return_value = ("T", "Test", callback, False)
         with patch("src.python.tui_handlers._press_any_key") as mock_pak:
-            _execute_item(0)
+            execute_item(0)
             mock_pak.assert_called_once()
         self.assertFalse(_th_module._busy)
 
@@ -514,21 +514,21 @@ class TestExecuteItem(unittest.TestCase):
     def test_none_callback_does_not_set_busy(self, mock_menu):
         """callback 为 None 时不设置 _busy。"""
         mock_menu.__getitem__.return_value = ("T", "Test", None, False)
-        _execute_item(0)
+        execute_item(0)
         self.assertFalse(_th_module._busy)
 
     def test_invalid_index_raises_error(self):
         """无效索引引发 IndexError。"""
         with self.assertRaises(IndexError):
-            _execute_item(999)
+            execute_item(999)
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — _select_holdings_file
+# 新增测试 — select_holdings_file
 # ═══════════════════════════════════════════════════════════════
 
 class TestSelectHoldingsFile(unittest.TestCase):
-    """_select_holdings_file 文件选择逻辑测试。"""
+    """select_holdings_file 文件选择逻辑测试。"""
 
     @patch("src.python.tui_handlers._refresh_config")
     @patch("src.python.tui_handlers.get_config_cache")
@@ -545,7 +545,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
             "holdings_filename": "myfile.xlsx",
         }
         mock_exists.return_value = True
-        result = _select_holdings_file()
+        result = select_holdings_file()
         self.assertIsNotNone(result)
         self.assertIn("myfile.xlsx", result)
 
@@ -569,7 +569,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         mock_list.return_value = []
         out = io.StringIO()
         with patch("sys.stdout", out):
-            result = _select_holdings_file()
+            result = select_holdings_file()
         self.assertIsNone(result)
         self.assertIn("未找到", out.getvalue())
 
@@ -593,7 +593,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         mock_list.return_value = ["dummy_dir/holdings.xlsx"]
         out = io.StringIO()
         with patch("sys.stdout", out):
-            result = _select_holdings_file()
+            result = select_holdings_file()
         self.assertEqual(result, "dummy_dir/holdings.xlsx")
         self.assertIn("唯一找到", out.getvalue())
 
@@ -627,7 +627,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         mock_input.return_value = "2"
         mock_size.return_value = 2048
         mock_mtime.return_value = 1000000.0
-        result = _select_holdings_file()
+        result = select_holdings_file()
         self.assertEqual(result, "dummy_dir/b.xlsx")
 
     @patch("src.python.tui_handlers._refresh_config")
@@ -660,7 +660,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         mock_input.return_value = "abc"
         mock_size.return_value = 2048
         mock_mtime.return_value = 1000000.0
-        result = _select_holdings_file()
+        result = select_holdings_file()
         self.assertIsNone(result)
 
     @patch("src.python.tui_handlers._refresh_config")
@@ -693,7 +693,7 @@ class TestSelectHoldingsFile(unittest.TestCase):
         mock_input.side_effect = EOFError()
         mock_size.return_value = 2048
         mock_mtime.return_value = 1000000.0
-        result = _select_holdings_file()
+        result = select_holdings_file()
         self.assertIsNone(result)
 
 

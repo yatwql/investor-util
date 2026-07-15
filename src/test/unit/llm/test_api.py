@@ -1,9 +1,9 @@
 """LLM API 调用模块单元测试 — 重试骨架、Provider 路由、回退、安抚重试。
 
 测试目标：
-  - _call_llm_with_retry — 熔断/429/503/超时/网络错误/截断/内容过滤
+  - call_llm_with_retry — 熔断/429/503/超时/网络错误/截断/内容过滤
   - _call_llm — 主/回退链式调度 + 空内容安抚重试
-  - _call_single_provider — claude/openai/unknown 路由
+  - call_single_provider — claude/openai/unknown 路由
   - 辅助函数：_get_retry_max/_sanitize_endpoint/_extract_model_from_cached/_truncation_warning
 
 运行：
@@ -18,16 +18,16 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import httpx
 
 from src.python.llm.api_base import (
-    _TRUNCATION_MARKER,
-    _call_llm_with_retry,
+    TRUNCATION_MARKER,
+    call_llm_with_retry,
     _extract_model_from_cached,
     _get_retry_max,
     _sanitize_endpoint,
     _truncation_warning,
 )
 from src.python.llm.api import (
-    _call_llm,
-    _call_single_provider,
+    call_llm,
+    call_single_provider,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
@@ -142,7 +142,7 @@ class TestTruncationWarning(unittest.TestCase):
 
     def test_default_field(self) -> None:
         result = _truncation_warning("max_tokens")
-        self.assertIn(_TRUNCATION_MARKER, result)
+        self.assertIn(TRUNCATION_MARKER, result)
         self.assertIn("max_tokens", result)
 
     def test_custom_field(self) -> None:
@@ -170,7 +170,7 @@ class TestExtractModelFromCached(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _call_llm_with_retry — 熔断器
+#  call_llm_with_retry — 熔断器
 # ═══════════════════════════════════════════════════════════
 
 
@@ -179,7 +179,7 @@ class TestCallLlmWithRetryCircuitBreaker(unittest.TestCase):
 
     def test_circuit_open_skips(self) -> None:
         with patch("src.python.llm.api_base._cb_is_open", return_value=True):
-            result, usage = _call_llm_with_retry(
+            result, usage = call_llm_with_retry(
                 "Test", MagicMock(), "https://api.test.com/v1",
                 {}, {"model": "test"}, 60, 2, 1000, "max_tokens",
                 _default_extract, _no_truncation, "claude", "test-model",
@@ -189,7 +189,7 @@ class TestCallLlmWithRetryCircuitBreaker(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _call_llm_with_retry — HTTP 错误码重试
+#  call_llm_with_retry — HTTP 错误码重试
 # ═══════════════════════════════════════════════════════════
 
 
@@ -213,7 +213,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
 
     @patch("src.python.llm.api_base._cb_record_success")
     @patch("src.python.llm.api_base._log_token_usage")
-    @patch("src.python.llm.api_base._track_session_usage")
+    @patch("src.python.llm.api_base.track_session_usage")
     def test_success_first_try(self, mock_track: MagicMock, mock_log: MagicMock,
                                 mock_success: MagicMock) -> None:
         """首次调用成功。"""
@@ -221,7 +221,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.client.post.return_value = _make_mock_response(
             200, {"content": [{"type": "text", "text": "OK"}]}, usage=usage,
         )
-        result, u = _call_llm_with_retry(**self.base_kw)
+        result, u = call_llm_with_retry(**self.base_kw)
         self.assertEqual(result, "OK")
         self.assertEqual(u["input_tokens"], 10)
         mock_success.assert_called_once()
@@ -234,7 +234,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         """429 → 重试 → 成功。"""
         succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
         self.client.post.side_effect = [_make_mock_response(429), succeed]
-        result, usage = _call_llm_with_retry(**self.base_kw)
+        result, usage = call_llm_with_retry(**self.base_kw)
         self.assertEqual(result, "OK")
         self.assertEqual(self.client.post.call_count, 2)
         mock_success.assert_called_once()
@@ -244,7 +244,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
     def test_429_all_fail(self, mock_sleep: MagicMock, mock_failure: MagicMock) -> None:
         """429 全部重试失败 → (None, None)。"""
         self.client.post.return_value = _make_mock_response(429)
-        result, usage = _call_llm_with_retry(**self.base_kw)
+        result, usage = call_llm_with_retry(**self.base_kw)
         self.assertIsNone(result)
         self.assertIsNone(usage)
         self.assertEqual(self.client.post.call_count, 3)
@@ -256,7 +256,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         """503 → 重试 → 成功。"""
         succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
         self.client.post.side_effect = [_make_mock_response(503), succeed]
-        result, usage = _call_llm_with_retry(**self.base_kw)
+        result, usage = call_llm_with_retry(**self.base_kw)
         self.assertEqual(result, "OK")
         self.assertEqual(self.client.post.call_count, 2)
 
@@ -266,7 +266,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         """超时 → 重试 → 成功。"""
         succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
         self.client.post.side_effect = [httpx.TimeoutException("timeout"), succeed]
-        result, usage = _call_llm_with_retry(**self.base_kw)
+        result, usage = call_llm_with_retry(**self.base_kw)
         self.assertEqual(result, "OK")
         self.assertEqual(self.client.post.call_count, 2)
 
@@ -275,7 +275,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
     def test_timeout_all_fail(self, mock_sleep: MagicMock, mock_failure: MagicMock) -> None:
         """超时全部重试失败 → (None, None)。"""
         self.client.post.side_effect = httpx.TimeoutException("timeout")
-        result, usage = _call_llm_with_retry(**self.base_kw)
+        result, usage = call_llm_with_retry(**self.base_kw)
         self.assertIsNone(result)
         self.assertIsNone(usage)
         self.assertEqual(self.client.post.call_count, 3)
@@ -287,7 +287,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         """网络错误 → 重试 → 成功。"""
         succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
         self.client.post.side_effect = [httpx.RequestError("reset"), succeed]
-        result, usage = _call_llm_with_retry(**self.base_kw)
+        result, usage = call_llm_with_retry(**self.base_kw)
         self.assertEqual(result, "OK")
         self.assertEqual(self.client.post.call_count, 2)
 
@@ -296,7 +296,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
     def test_request_error_all_fail(self, mock_sleep: MagicMock, mock_failure: MagicMock) -> None:
         """网络错误全部重试失败 → (None, None)。"""
         self.client.post.side_effect = httpx.RequestError("reset")
-        result, usage = _call_llm_with_retry(**self.base_kw)
+        result, usage = call_llm_with_retry(**self.base_kw)
         self.assertIsNone(result)
         self.assertIsNone(usage)
         self.assertEqual(self.client.post.call_count, 3)
@@ -304,7 +304,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-#  _call_llm_with_retry — 响应解析错误
+#  call_llm_with_retry — 响应解析错误
 # ═══════════════════════════════════════════════════════════
 
 
@@ -332,7 +332,7 @@ class TestCallLlmWithRetryResponseErrors(unittest.TestCase):
         resp = _make_mock_response(200, json_data={"content": [{"type": "text", "text": ""}]})
         resp.json.side_effect = ValueError("Invalid JSON")
         self.client.post.return_value = resp
-        result, usage = _call_llm_with_retry(**self.base_kw)
+        result, usage = call_llm_with_retry(**self.base_kw)
         self.assertIsNone(result)
         self.assertIsNone(usage)
         self.assertEqual(self.client.post.call_count, 1)
@@ -344,14 +344,14 @@ class TestCallLlmWithRetryResponseErrors(unittest.TestCase):
             return None
         resp = _make_mock_response(200, json_data={"wrong": "format"})
         self.client.post.return_value = resp
-        result, usage = _call_llm_with_retry(**{**self.base_kw, "extract_fn": _none_extract})
+        result, usage = call_llm_with_retry(**{**self.base_kw, "extract_fn": _none_extract})
         self.assertIsNone(result)
         self.assertIsNone(usage)
         self.assertEqual(self.client.post.call_count, 1)
 
 
 # ═══════════════════════════════════════════════════════════
-#  _call_llm_with_retry — 内容过滤 / 截断
+#  call_llm_with_retry — 内容过滤 / 截断
 # ═══════════════════════════════════════════════════════════
 
 
@@ -373,7 +373,7 @@ class TestCallLlmWithRetryContentFilter(unittest.TestCase):
         resp = _make_mock_response(200, json_data=data)
         self.client.post.return_value = resp
 
-        result, u = _call_llm_with_retry(
+        result, u = call_llm_with_retry(
             "Test", self.client, "https://api.test.com/v1",
             {}, {}, 60, 2, 1000, "max_tokens",
             _default_extract, _no_truncation, "claude", "",
@@ -395,7 +395,7 @@ class TestCallLlmWithRetryTruncation(unittest.TestCase):
 
     @patch("src.python.llm.api_base._cb_record_success")
     @patch("src.python.llm.api_base._log_token_usage")
-    @patch("src.python.llm.api_base._track_session_usage")
+    @patch("src.python.llm.api_base.track_session_usage")
     def test_truncation_appends_warning(self, mock_track: MagicMock,
                                          mock_log: MagicMock, mock_success: MagicMock) -> None:
         """截断 → 内容追加截断警告。"""
@@ -406,28 +406,28 @@ class TestCallLlmWithRetryTruncation(unittest.TestCase):
         resp = _make_mock_response(200, json_data=data)
         self.client.post.return_value = resp
 
-        result, usage = _call_llm_with_retry(
+        result, usage = call_llm_with_retry(
             "Test", self.client, "https://api.test.com/v1",
             {}, {}, 60, 2, 800, "max_tokens_expert_review",
             _default_extract, _truncated, "claude", "",
         )
         self.assertIn("max_tokens_expert_review", result)
-        self.assertIn(_TRUNCATION_MARKER, result)
+        self.assertIn(TRUNCATION_MARKER, result)
         self.assertIn("部分内容", result)
 
 
 # ═══════════════════════════════════════════════════════════
-#  _call_single_provider — Provider 路由
+#  call_single_provider — Provider 路由
 # ═══════════════════════════════════════════════════════════
 
 
 class TestCallSingleProvider(unittest.TestCase):
     """测试 provider 分发。"""
 
-    @patch("src.python.llm.api._call_claude")
+    @patch("src.python.llm.api.call_claude")
     def test_claude_routing(self, mock_claude: MagicMock) -> None:
         mock_claude.return_value = ("claude result", {"input_tokens": 10})
-        result, usage = _call_single_provider(
+        result, usage = call_single_provider(
             "claude", "system", "user", "sk-key", "claude-sonnet-4-6",
             "https://api.anthropic.com/v1/messages", 800, 60, 2, None,
             "max_tokens", None, None,
@@ -438,7 +438,7 @@ class TestCallSingleProvider(unittest.TestCase):
     @patch("src.python.llm.api._call_openai")
     def test_openai_routing(self, mock_openai: MagicMock) -> None:
         mock_openai.return_value = ("openai result", {"prompt_tokens": 20})
-        result, usage = _call_single_provider(
+        result, usage = call_single_provider(
             "openai", "system", "user", "sk-key", "gpt-4o",
             "https://api.openai.com/v1/chat/completions", 800, 60, 2, None,
             "max_tokens", None, None,
@@ -447,7 +447,7 @@ class TestCallSingleProvider(unittest.TestCase):
         mock_openai.assert_called_once()
 
     def test_unknown_provider(self) -> None:
-        result, usage = _call_single_provider(
+        result, usage = call_single_provider(
             "unknown", "", "", "", "", "", 0, 0, 0, None, "", None, None,
         )
         self.assertIsNone(result)
@@ -462,7 +462,7 @@ class TestCallSingleProvider(unittest.TestCase):
 class TestCallLlm(unittest.TestCase):
     """_call_llm 主/回退链式调度。"""
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_provider_success(self, mock_single: MagicMock) -> None:
         """主 provider 成功 → 返回结果。"""
         mock_single.return_value = ("成功结果", {"input_tokens": 100})
@@ -471,7 +471,7 @@ class TestCallLlm(unittest.TestCase):
         self.assertEqual(usage["input_tokens"], 100)
         mock_single.assert_called_once()
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_provider_returns_none(self, mock_single: MagicMock) -> None:
         """主 provider 失败 → 无回退 → (None, None)。"""
         mock_single.return_value = (None, None)
@@ -479,7 +479,7 @@ class TestCallLlm(unittest.TestCase):
         self.assertIsNone(result)
         self.assertIsNone(usage)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_content_filter_recovery_success(self, mock_single: MagicMock) -> None:
         """空内容 → 安抚重试成功。"""
         mock_single.side_effect = [
@@ -490,7 +490,7 @@ class TestCallLlm(unittest.TestCase):
         self.assertEqual(result, "安抚后结果")
         self.assertEqual(mock_single.call_count, 2)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_content_filter_recovery_still_empty(self, mock_single: MagicMock) -> None:
         """安抚重试仍为空 → 无回退 → (None, None)。"""
         mock_single.side_effect = [
@@ -501,7 +501,7 @@ class TestCallLlm(unittest.TestCase):
         self.assertIsNone(result)
         self.assertEqual(mock_single.call_count, 2)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_fallback_success(self, mock_single: MagicMock) -> None:
         """主 provider 失败 → 回退成功。"""
         mock_single.side_effect = [
@@ -518,7 +518,7 @@ class TestCallLlm(unittest.TestCase):
         self.assertEqual(result, "回退结果")
         self.assertEqual(mock_single.call_count, 2)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_both_fail(self, mock_single: MagicMock) -> None:
         """主 + 回退都失败 → (None, None)。"""
         mock_single.return_value = (None, None)
@@ -530,7 +530,7 @@ class TestCallLlm(unittest.TestCase):
         self.assertIsNone(result)
         self.assertEqual(mock_single.call_count, 2)
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_fallback_same_as_primary_not_used(self, mock_single: MagicMock) -> None:
         """fallback_provider == provider → 不尝试回退。"""
         mock_single.return_value = (None, None)
@@ -542,7 +542,7 @@ class TestCallLlm(unittest.TestCase):
         self.assertIsNone(result)
         mock_single.assert_called_once()
 
-    @patch("src.python.llm.api._call_single_provider")
+    @patch("src.python.llm.api.call_single_provider")
     def test_content_filter_then_fallback(self, mock_single: MagicMock) -> None:
         """安抚重试仍空 + 有回退 → 尝试回退。"""
         mock_single.side_effect = [

@@ -2,8 +2,8 @@
 
 测试目标：
   - MENU_ITEMS 结构完整性
-  - _index_by_key 快捷键查找
-  - _print_sep / _print_header 不崩溃
+  - index_by_key 快捷键查找
+  - print_sep / print_header 不崩溃
   - _exit_app 退出行为
   - _show_llm_config_status 格式
 
@@ -21,9 +21,9 @@ from unittest.mock import patch
 from src.python.tui_menu import (
 
     MENU_ITEMS,
-    _index_by_key,
-    _print_header,
-    _print_sep,
+    index_by_key,
+    print_header,
+    print_sep,
     _show_llm_config_status,
     get_config_cache,
 )
@@ -83,48 +83,48 @@ class TestMenuItems(unittest.TestCase):
 
 
 class TestIndexByKey(unittest.TestCase):
-    """_index_by_key 快捷键查找测试。"""
+    """index_by_key 快捷键查找测试。"""
 
     def test_find_E(self) -> None:
-        self.assertEqual(_index_by_key("E"), 0)
+        self.assertEqual(index_by_key("E"), 0)
 
     def test_find_X(self) -> None:
-        self.assertEqual(_index_by_key("X"), 13)
+        self.assertEqual(index_by_key("X"), 13)
 
     def test_find_nonexistent(self) -> None:
-        self.assertIsNone(_index_by_key("Z"))
+        self.assertIsNone(index_by_key("Z"))
 
     def test_find_lowercase(self) -> None:
         """小写字母未实现——必须大写。"""
-        self.assertIsNone(_index_by_key("e"))
+        self.assertIsNone(index_by_key("e"))
 
     def test_find_number(self) -> None:
-        self.assertEqual(_index_by_key("1"), 6)
+        self.assertEqual(index_by_key("1"), 6)
 
     def test_find_empty(self) -> None:
-        self.assertIsNone(_index_by_key(""))
+        self.assertIsNone(index_by_key(""))
 
 
 class TestPrintFunctions(unittest.TestCase):
     """打印函数不崩溃测试。"""
 
-    def test_print_sep_default(self) -> None:
+    def testprint_sep_default(self) -> None:
         """默认分隔线。"""
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            _print_sep()
+            print_sep()
             output = mock_out.getvalue()
             self.assertIn("=", output)
 
-    def test_print_sep_custom(self) -> None:
+    def testprint_sep_custom(self) -> None:
         """自定义字符和宽度。"""
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            _print_sep(char="-", width=10)
+            print_sep(char="-", width=10)
             self.assertIn("----------", mock_out.getvalue())
 
-    def test_print_header(self) -> None:
+    def testprint_header(self) -> None:
         """标题头包含系统名称。"""
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            _print_header()
+            print_header()
             self.assertIn("个人投资分析报告生成小助手", mock_out.getvalue())
 
 

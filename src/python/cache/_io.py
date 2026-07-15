@@ -10,7 +10,6 @@ import gzip
 import json
 import logging
 import os
-from typing import Any
 
 from ._paths import _GZIP_SUFFIX
 

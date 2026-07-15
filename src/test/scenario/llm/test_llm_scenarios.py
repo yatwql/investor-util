@@ -52,7 +52,7 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
 
     def test_build_module_info_mixed_states(self):
         """_build_module_info_list：混合状态正确分发。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {
             "penetration_deep": FAIL_REASON_API_ERROR,
@@ -71,7 +71,7 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
             },
         }
 
-        result = _build_module_info_list(failure, per_module)
+        result = build_llm_module_info(failure, per_module)
         by_key = {m["key"]: m for m in result}
 
         # 2 缓存
@@ -98,8 +98,8 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
 
     def test_mixed_states_count(self):
         """_build_module_info_list：返回 5 个模块条目。"""
-        from src.python.report.html_renderers import _build_module_info_list
-        result = _build_module_info_list({}, {})
+        from src.python.report.llm_module_info import build_llm_module_info
+        result = build_llm_module_info({}, {})
         self.assertEqual(len(result), 5)
         keys = [m["key"] for m in result]
         self.assertIn("news_correlation", keys)
@@ -128,7 +128,7 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
         }
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE",
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE",
                                       module_failure))
             stack.enter_context(
                 patch("src.python.llm.get_session_usage", return_value=session_usage))
@@ -172,7 +172,7 @@ class TestS12AllFailures(unittest.TestCase):
 
     def test_all_five_failure_reasons(self):
         """_build_module_info_list：5 种失败原因正确映射。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {
             "global_macro": FAIL_REASON_NOT_CONFIGURED,
@@ -182,7 +182,7 @@ class TestS12AllFailures(unittest.TestCase):
             "news_correlation": FAIL_REASON_CIRCUIT_OPEN,
         }
 
-        result = _build_module_info_list(failure, {})
+        result = build_llm_module_info(failure, {})
         by_key = {m["key"]: m for m in result}
 
         expected = {
@@ -204,7 +204,7 @@ class TestS12AllFailures(unittest.TestCase):
 
     def test_all_failed_no_per_module(self):
         """全部失败 + 无 per_module → 全部 failed，无成功/缓存覆盖。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {
             "global_macro": FAIL_REASON_API_ERROR,
@@ -223,7 +223,7 @@ class TestS12AllFailures(unittest.TestCase):
             },
         }
 
-        result = _build_module_info_list(failure, per_module)
+        result = build_llm_module_info(failure, per_module)
         by_key = {m["key"]: m for m in result}
 
         # 即使 global_macro 在 per_module 中有数据，failure 优先
@@ -249,7 +249,7 @@ class TestS13ThinkingMixed(unittest.TestCase):
 
     def test_thinking_mixed(self):
         """_build_module_info_list：Thinking 标记正确。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         per_module = {
             "global_macro": {
@@ -278,7 +278,7 @@ class TestS13ThinkingMixed(unittest.TestCase):
             },
         }
 
-        result = _build_module_info_list({}, per_module)
+        result = build_llm_module_info({}, per_module)
         by_key = {m["key"]: m for m in result}
 
         # global_macro + Thinking
@@ -295,7 +295,7 @@ class TestS13ThinkingMixed(unittest.TestCase):
 
     def test_thinking_true_count(self):
         """Thinking=True 恰好 2 个（global_macro + expert_review）。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         per_module = {
             "global_macro": {
@@ -312,7 +312,7 @@ class TestS13ThinkingMixed(unittest.TestCase):
             },
         }
 
-        result = _build_module_info_list({}, per_module)
+        result = build_llm_module_info({}, per_module)
         thinking_count = sum(1 for m in result if m["thinking"])
         self.assertEqual(thinking_count, 2)
 
@@ -336,8 +336,8 @@ class TestS14LlmDisabled(unittest.TestCase):
         from src.python.report.html_renderers import _render_llm_module_info
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE", {}))
-            # 即使 _LLM_MODULE_FAILURE 有内容，llm_enabled=False 也应覆盖
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {}))
+            # 即使 LLM_MODULE_FAILURE 有内容，llm_enabled=False 也应覆盖
             llm_module_info, llm_endpoint, module_disabled, llm_session_usage = \
                 _render_llm_module_info(False)
 
@@ -351,11 +351,11 @@ class TestS14LlmDisabled(unittest.TestCase):
         self.assertFalse(any(module_disabled.values()))
 
     def test_llm_enabled_false_no_session_usage(self):
-        """llm_enabled=False → llm_session_usage 为 None（即使有 _LLM_MODULE_FAILURE）。"""
+        """llm_enabled=False → llm_session_usage 为 None（即使有 LLM_MODULE_FAILURE）。"""
         from src.python.report.html_renderers import _render_llm_module_info
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE", {
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {
                 "global_macro": FAIL_REASON_API_ERROR,
                 "expert_review": FAIL_REASON_DISABLED,
             }))
@@ -364,7 +364,7 @@ class TestS14LlmDisabled(unittest.TestCase):
 
         # llm_enabled=False 时 session_usage 总为 None
         self.assertIsNone(llm_session_usage)
-        # _LLM_MODULE_FAILURE 仍被读取（记录了生成时发生的状态）
+        # LLM_MODULE_FAILURE 仍被读取（记录了生成时发生的状态）
         # _render_llm_module_info 不区分 enable 和 failure — failure 来自全局状态
         by_key = {m["key"]: m for m in llm_module_info}
         self.assertEqual(by_key["global_macro"]["status"], "failed")
@@ -458,7 +458,7 @@ class TestS15DisabledPriority(unittest.TestCase):
 
     def test_disabled_overrides_per_module(self):
         """FAIL_REASON_DISABLED 优先于 per_module 数据。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {
             "health_check": FAIL_REASON_DISABLED,
@@ -473,7 +473,7 @@ class TestS15DisabledPriority(unittest.TestCase):
             },
         }
 
-        result = _build_module_info_list(failure, per_module)
+        result = build_llm_module_info(failure, per_module)
         by_key = {m["key"]: m for m in result}
 
         # 禁用优先 → 显示 disabled
@@ -488,7 +488,7 @@ class TestS15DisabledPriority(unittest.TestCase):
 
     def test_disabled_overrides_cached(self):
         """禁用优先于缓存状态。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {
             "health_check": FAIL_REASON_DISABLED,
@@ -502,7 +502,7 @@ class TestS15DisabledPriority(unittest.TestCase):
             },
         }
 
-        result = _build_module_info_list(failure, per_module)
+        result = build_llm_module_info(failure, per_module)
         by_key = {m["key"]: m for m in result}
 
         self.assertEqual(by_key["health_check"]["status"], "disabled")
@@ -512,10 +512,10 @@ class TestS15DisabledPriority(unittest.TestCase):
 
     def test_disabled_alone_no_per_module(self):
         """仅禁用无 per_module → 正确显示 disabled。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {"global_macro": FAIL_REASON_DISABLED}
-        result = _build_module_info_list(failure, {})
+        result = build_llm_module_info(failure, {})
         by_key = {m["key"]: m for m in result}
 
         self.assertEqual(by_key["global_macro"]["status"], "disabled")
@@ -538,7 +538,7 @@ class TestS16NetworkDown(unittest.TestCase):
 
     def test_all_network_error(self):
         """_build_module_info_list：全部 NETWORK_ERROR。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {
             "global_macro": FAIL_REASON_NETWORK_ERROR,
@@ -548,7 +548,7 @@ class TestS16NetworkDown(unittest.TestCase):
             "news_correlation": FAIL_REASON_NETWORK_ERROR,
         }
 
-        result = _build_module_info_list(failure, {})
+        result = build_llm_module_info(failure, {})
         by_key = {m["key"]: m for m in result}
 
         for key in failure:
@@ -564,7 +564,7 @@ class TestS16NetworkDown(unittest.TestCase):
         from src.python.report.html_renderers import _render_llm_module_info
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts._LLM_MODULE_FAILURE", {
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {
                 "global_macro": FAIL_REASON_NETWORK_ERROR,
                 "expert_review": FAIL_REASON_NETWORK_ERROR,
                 "health_check": FAIL_REASON_NETWORK_ERROR,
@@ -590,7 +590,7 @@ class TestS16NetworkDown(unittest.TestCase):
     def test_s16_console_output_format(self):
         """S16 场景下验证 TUI 摘要输出格式中失败模块数正确。"""
         # 验证 _build_module_info_list 返回 5 个失败模块
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {
             "global_macro": FAIL_REASON_NETWORK_ERROR,
@@ -599,7 +599,7 @@ class TestS16NetworkDown(unittest.TestCase):
             "penetration_deep": FAIL_REASON_NETWORK_ERROR,
             "news_correlation": FAIL_REASON_NETWORK_ERROR,
         }
-        result = _build_module_info_list(failure, {})
+        result = build_llm_module_info(failure, {})
 
         failed_count = sum(1 for m in result if m["status"] == "failed")
         self.assertEqual(failed_count, 5, "断网时所有 5 个模块应标记为 failed")
@@ -621,7 +621,7 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
 
     def test_partial_cache_hit(self):
         """_build_module_info_list：部分缓存 + 部分成功。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         per_module = {
             "global_macro": {
@@ -638,7 +638,7 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
             },
         }
 
-        result = _build_module_info_list({}, per_module)
+        result = build_llm_module_info({}, per_module)
         by_key = {m["key"]: m for m in result}
 
         # 缓存
@@ -663,19 +663,19 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
         """阶段性验证：format_session_usage 在混合场景下正确反映 call_count。"""
         from src.python.llm import get_session_usage, format_session_usage
         from src.python.llm.session import reset_session_usage
-        from src.python.llm.session import _track_session_usage, _record_per_module
+        from src.python.llm.session import track_session_usage, record_per_module
 
         reset_session_usage()
 
         # 模拟 S17: 2 模块缓存 + 1 模块成功（过期重新调用）
-        _record_per_module("global_macro", "ds", inp=0, out=0, cached=True,
+        record_per_module("global_macro", "ds", inp=0, out=0, cached=True,
                            cache_hit_tokens=1000)
-        _record_per_module("health_check", "gpt4", inp=0, out=0, cached=True,
+        record_per_module("health_check", "gpt4", inp=0, out=0, cached=True,
                            cache_hit_tokens=500)
-        _track_session_usage("claude",
+        track_session_usage("claude",
                              {"input_tokens": 2000, "output_tokens": 1000},
                              "claude-sonnet-4")
-        _record_per_module("expert_review", "claude-sonnet-4",
+        record_per_module("expert_review", "claude-sonnet-4",
                            inp=2000, out=1000, cached=False)
 
         raw = get_session_usage()
@@ -710,7 +710,7 @@ class TestS17aFullCache(unittest.TestCase):
 
     def test_all_cache_hit(self):
         """_build_module_info_list：全部缓存命中。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         per_module = {
             "global_macro": {
@@ -745,7 +745,7 @@ class TestS17aFullCache(unittest.TestCase):
             },
         }
 
-        result = _build_module_info_list({}, per_module)
+        result = build_llm_module_info({}, per_module)
         by_key = {m["key"]: m for m in result}
 
         for key in per_module:
@@ -825,7 +825,7 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
         from src.python.llm.generators import generate_global_macro
 
         mock_prompt.return_value = "空持仓 prompt"
-        with patch("src.python.llm.generators._generate_llm_module") as mock_gen:
+        with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
             mock_gen.return_value = ("<p>宏观</p>", False)
             try:
                 result, cached = generate_global_macro({}, {}, 0, 0, {},
@@ -890,14 +890,14 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_and_excel_consistent_disabled(self):
         """disabled 状态在 html 和 excel 中标签一致。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {"health_check": FAIL_REASON_DISABLED}
-        html_result = _build_module_info_list(failure, {})
+        html_result = build_llm_module_info(failure, {})
 
         # 模拟 excel_generator 的构建逻辑
         from src.python.report.excel_llm_usage import build_llm_usage_sheet as _blus
-        # _blus 内部依赖全局 _LLM_MODULE_FAILURE 和 session_usage
+        # _blus 内部依赖全局 LLM_MODULE_FAILURE 和 session_usage
         # 这里直接用内置逻辑构造 excel 等效数据
         DISPLAY_REASON = {
             "not_configured": "LLM 未配置",
@@ -924,7 +924,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_and_excel_consistent_failure(self):
         """各失败原因在 html 和 excel 中标签一致。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         # 使用已知模块键（_build_module_info_list 只识别 5 个标准 key）
         MODULE_KEY = "health_check"
@@ -938,7 +938,7 @@ class TestOutputConsistency(unittest.TestCase):
         ]:
             with self.subTest(reason=reason):
                 failure = {MODULE_KEY: reason}
-                html_result = _build_module_info_list(failure, {})
+                html_result = build_llm_module_info(failure, {})
                 test_entry = next(m for m in html_result if m["key"] == MODULE_KEY)
 
                 self.assertEqual(test_entry["status"], "failed")
@@ -948,7 +948,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_and_excel_consistent_success(self):
         """success 状态在 html 和 excel 中标签一致。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         per_module = {
             "expert_review": {
@@ -958,7 +958,7 @@ class TestOutputConsistency(unittest.TestCase):
                 "endpoint": "",
             },
         }
-        html_result = _build_module_info_list({}, per_module)
+        html_result = build_llm_module_info({}, per_module)
         er_html = next(m for m in html_result if m["key"] == "expert_review")
 
         self.assertEqual(er_html["status"], "success")
@@ -981,7 +981,7 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_and_excel_consistent_cached(self):
         """cached 状态在 html 和 excel 中标签一致。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         per_module = {
             "global_macro": {
@@ -991,7 +991,7 @@ class TestOutputConsistency(unittest.TestCase):
                 "endpoint": "",
             },
         }
-        html_result = _build_module_info_list({}, per_module)
+        html_result = build_llm_module_info({}, per_module)
         gm_html = next(m for m in html_result if m["key"] == "global_macro")
 
         self.assertEqual(gm_html["status"], "cached")
@@ -1013,15 +1013,15 @@ class TestOutputConsistency(unittest.TestCase):
 
     def test_html_has_news_correlation(self):
         """HTML module_info 包含 news_correlation 模块。"""
-        from src.python.report.html_renderers import _build_module_info_list
-        result = _build_module_info_list({}, {})
+        from src.python.report.llm_module_info import build_llm_module_info
+        result = build_llm_module_info({}, {})
         keys = [m["key"] for m in result]
         self.assertIn("news_correlation", keys)
         self.assertEqual(len(result), 5)
 
     def test_summary_and_excel_module_order(self):
         """Summary 页签和 Excel 用量页签的模块顺序一致。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         per_module = {
             "global_macro": {
@@ -1049,7 +1049,7 @@ class TestOutputConsistency(unittest.TestCase):
                 "endpoint": "",
             },
         }
-        html_result = _build_module_info_list({}, per_module)
+        html_result = build_llm_module_info({}, per_module)
         html_keys = [m["key"] for m in html_result if m["status"] != "unknown"]
 
         # Excel 模块顺序: global_macro, expert_review, health_check,
@@ -1077,7 +1077,7 @@ class TestNonTradingDayWithLlm(unittest.TestCase):
 
     def test_llm_module_info_independent_of_market_state(self):
         """_build_module_info_list 不依赖市场状态，非交易日照常调用。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {"penetration_deep": FAIL_REASON_NETWORK_ERROR}
         per_module = {
@@ -1094,7 +1094,7 @@ class TestNonTradingDayWithLlm(unittest.TestCase):
                 "endpoint": "",
             },
         }
-        result = _build_module_info_list(failure, per_module)
+        result = build_llm_module_info(failure, per_module)
         by_key = {m["key"]: m for m in result}
 
         self.assertEqual(by_key["global_macro"]["status"], "cached")
@@ -1108,7 +1108,7 @@ class TestNonTradingDayWithLlm(unittest.TestCase):
         from src.python.llm.generators_orchestrator import generate_all_llm
 
         with (
-            patch("src.python.llm.generators_orchestrator._is_llm_module_enabled",
+            patch("src.python.llm.generators_orchestrator.is_llm_module_enabled",
                   return_value=False),
         ):
             result = generate_all_llm({}, {}, 0, 0, 0, 0, 0, {},
@@ -1133,7 +1133,7 @@ class TestMultiAccountMultiRoundLlm(unittest.TestCase):
 
     def test_multi_account_does_not_break_build_module_info(self):
         """多账户持仓传入 _build_module_info_list 不崩溃。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         failure = {}
         per_module = {
@@ -1144,14 +1144,14 @@ class TestMultiAccountMultiRoundLlm(unittest.TestCase):
                 "endpoint": "",
             },
         }
-        result = _build_module_info_list(failure, per_module)
+        result = build_llm_module_info(failure, per_module)
         by_key = {m["key"]: m for m in result}
         self.assertEqual(by_key["global_macro"]["status"], "cached")
         self.assertEqual(len(result), 5)
 
     def test_multi_round_per_module_accumulates(self):
         """多轮调用后 per_module 累加所有轮次的 token 数据。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
 
         per_module_round1 = {
             "global_macro": {
@@ -1171,7 +1171,7 @@ class TestMultiAccountMultiRoundLlm(unittest.TestCase):
         }
         # 模拟多轮合并（生产代码中由调用方合并 per_module 字典）
         merged = {**per_module_round1, **per_module_round2}
-        result = _build_module_info_list({}, merged)
+        result = build_llm_module_info({}, merged)
         by_key = {m["key"]: m for m in result}
 
         self.assertEqual(by_key["global_macro"]["input_tokens"], 1000)
@@ -1184,7 +1184,7 @@ class TestMultiAccountMultiRoundLlm(unittest.TestCase):
         from src.python.llm.generators_orchestrator import generate_all_llm
 
         with (
-            patch("src.python.llm.generators_orchestrator._is_llm_module_enabled",
+            patch("src.python.llm.generators_orchestrator.is_llm_module_enabled",
                   return_value=False),
         ):
             result = generate_all_llm({}, {}, 0, 0, 0, 0, 0, {},

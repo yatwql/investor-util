@@ -36,7 +36,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_timeout_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """Provider 超时 → 回退到下一链路。"""
-        from src.python.fetcher.chain import _fetch_with_fallback, reset_provider_skip
+        from src.python.fetcher.chain import fetch_with_fallback, reset_provider_skip
         import httpx
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
@@ -44,7 +44,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "fallback_ok"})
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "fallback_ok"})
         fn1.assert_called_once()
@@ -55,7 +55,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_429_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """HTTP 429 限流 → 回退到下一链路。"""
-        from src.python.fetcher.chain import _fetch_with_fallback, reset_provider_skip
+        from src.python.fetcher.chain import fetch_with_fallback, reset_provider_skip
         import httpx
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
@@ -65,7 +65,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "fallback_429"})
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "fallback_429"})
 
@@ -74,7 +74,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_503_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """HTTP 503 服务不可用 → 回退到下一链路。"""
-        from src.python.fetcher.chain import _fetch_with_fallback, reset_provider_skip
+        from src.python.fetcher.chain import fetch_with_fallback, reset_provider_skip
         import httpx
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
@@ -84,7 +84,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "fallback_503"})
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "fallback_503"})
 
@@ -93,7 +93,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_all_providers_http_errors_fall_to_stale(self, mock_chain, mock_set, mock_get):
         """全部 Provider 各抛不同 HTTP 错误 → 降级到过期缓存。"""
-        from src.python.fetcher.chain import _fetch_with_fallback, reset_provider_skip
+        from src.python.fetcher.chain import fetch_with_fallback, reset_provider_skip
         import httpx
         mock_chain.return_value = ["p1", "p2"]
         # 第一次 cache_get（新鲜缓存）→ None；第二次（过期降级）→ stale
@@ -104,7 +104,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
         fn2 = MagicMock(side_effect=httpx.TimeoutException("timeout"))
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = _fetch_with_fallback("price", provider_map, "test_key", 3600)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"stale": True, "price": 99.0})
 
@@ -113,7 +113,7 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
 class TestCircuitBreakerCooldownProbe(unittest.TestCase):
     """熔断冷却期满后的试探恢复行为（委托 DataSourceRegistry）。
 
-    熔断逻辑集中在 provider_registry.py，此测试验证 chain.py 的 _fetch_with_fallback
+    熔断逻辑集中在 provider_registry.py，此测试验证 chain.py 的 fetch_with_fallback
     通过 registry 正确响应冷却期状态。
     """
 
@@ -148,8 +148,8 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         self.provider_map["p1"] = ("P1", p1_fn)
 
         with patch("src.python.provider_registry.time.time", return_value=1001.0):
-            from src.python.fetcher.chain import _fetch_with_fallback
-            result = _fetch_with_fallback("price", self.provider_map, "k1", 3600)
+            from src.python.fetcher.chain import fetch_with_fallback
+            result = fetch_with_fallback("price", self.provider_map, "k1", 3600)
 
         self.assertEqual(result, {"data": "probe_ok"})
         p1_fn.assert_called_once()  # 试探请求被放行
@@ -169,10 +169,10 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         self.provider_map["p1"] = ("P1", p1_fn)
 
         with patch("src.python.provider_registry.time.time", return_value=1001.0):
-            from src.python.fetcher.chain import _fetch_with_fallback
+            from src.python.fetcher.chain import fetch_with_fallback
 
             # 第1次：探头失败 → p2 兜底 → p1 计数器 = 1，尚未重新熔断
-            result = _fetch_with_fallback("price", self.provider_map, "k2a", 3600)
+            result = fetch_with_fallback("price", self.provider_map, "k2a", 3600)
             self.assertEqual(result, {"data": "fallback"})
             p1_fn.assert_called_once()
             from src.python.provider_registry import get_registry
@@ -180,13 +180,13 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
 
             # 第2次：p1 计数器 = 2，仍不熔断
             p1_fn.reset_mock()
-            result = _fetch_with_fallback("price", self.provider_map, "k2b", 3600)
+            result = fetch_with_fallback("price", self.provider_map, "k2b", 3600)
             self.assertEqual(result, {"data": "fallback"})
             self.assertFalse(get_registry().is_circuit_broken("p1"))
 
             # 第3次：p1 计数器 = 3，重新熔断
             p1_fn.reset_mock()
-            result = _fetch_with_fallback("price", self.provider_map, "k2c", 3600)
+            result = fetch_with_fallback("price", self.provider_map, "k2c", 3600)
             self.assertEqual(result, {"data": "fallback"})
             self.assertTrue(get_registry().is_circuit_broken("p1"))  # 重新熔断
 
@@ -203,8 +203,8 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         self.provider_map["p1"] = ("P1", p1_fn)
 
         with patch("src.python.provider_registry.time.time", return_value=950.0):
-            from src.python.fetcher.chain import _fetch_with_fallback
-            result = _fetch_with_fallback("price", self.provider_map, "k3", 3600)
+            from src.python.fetcher.chain import fetch_with_fallback
+            result = fetch_with_fallback("price", self.provider_map, "k3", 3600)
 
         self.assertEqual(result, {"data": "fallback"})
         p1_fn.assert_not_called()  # 未放行
@@ -220,8 +220,8 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         p1_fn = MagicMock(return_value={"data": "probe_ok"})
         self.provider_map["p1"] = ("P1", p1_fn)
 
-        from src.python.fetcher.chain import _fetch_with_fallback
-        result = _fetch_with_fallback("price", self.provider_map, "k4", 3600)
+        from src.python.fetcher.chain import fetch_with_fallback
+        result = fetch_with_fallback("price", self.provider_map, "k4", 3600)
 
         self.assertEqual(result, {"data": "probe_ok"})
         p1_fn.assert_called_once()
