@@ -78,7 +78,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
     """build_news_data 开启 LLM 增强时的测试。"""
 
     @patch("src.python.config.get_llm_config")
-    @patch("src.python.llm.generators_orchestrator.run_news_correlation_safe")
+    @patch("src.python.llm.run_news_correlation_safe")
     @patch("src.python.providers.news_aggregator.aggregate_news")
     def test_llm_enabled_calls_enhance(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
@@ -111,7 +111,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
         self.assertIn("llm_analysis", result[0])
 
     @patch("src.python.config.get_llm_config")
-    @patch("src.python.llm.generators_orchestrator.run_news_correlation_safe")
+    @patch("src.python.llm.run_news_correlation_safe")
     @patch("src.python.providers.news_aggregator.aggregate_news")
     def test_llm_cache_hit(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
@@ -139,7 +139,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
         self.assertTrue(meta.get("llm_cached"))
 
     @patch("src.python.config.get_llm_config")
-    @patch("src.python.llm.generators_orchestrator.run_news_correlation_safe")
+    @patch("src.python.llm.run_news_correlation_safe")
     @patch("src.python.providers.news_aggregator.aggregate_news")
     def test_llm_disabled_when_no_api_key(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
@@ -161,7 +161,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
         self.assertNotIn("llm_analysis", result[0])
 
     @patch("src.python.config.get_llm_config")
-    @patch("src.python.llm.generators_orchestrator.run_news_correlation_safe")
+    @patch("src.python.llm.run_news_correlation_safe")
     @patch("src.python.providers.news_aggregator.aggregate_news")
     def test_llm_enhance_failure_falls_back_gracefully(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,

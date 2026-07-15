@@ -342,11 +342,16 @@ def _apply_llm_enhancement(
     meta["llm_enabled"] = True
     from src.python.llm import run_news_correlation_safe
     from src.python.llm.pricing import estimate_cost
-    news_items[:], cached, token_usage = run_news_correlation_safe(
-        news_items, holdings,
-        penetrated_assets=penetrated_assets,
-        industry_data=industry_data,
-    )
+    try:
+        news_items[:], cached, token_usage = run_news_correlation_safe(
+            news_items, holdings,
+            penetrated_assets=penetrated_assets,
+            industry_data=industry_data,
+        )
+    except Exception:
+        logger.warning("LLM 新闻关联分析失败，降级为传统关键词匹配", exc_info=True)
+        cached = False
+        token_usage = {}
     meta["llm_cached"] = cached
     meta["token_usage"] = token_usage
     meta["thinking_enabled"] = llm_config.get("thinking_enabled_news_correlation", False)

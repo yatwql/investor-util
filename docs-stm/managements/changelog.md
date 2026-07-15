@@ -18,7 +18,7 @@
   - `test_fund_performance.py`：`fp._is_fund()` → `fp.is_fund()`（9 处）
   - `test_tui_handlers.py`：`_timing_records` → `timing_records`（20+ 处）
   - `test_log_sanitize.py`：`_call_claude` → `call_claude`（2 处）
-  - `test_news_correlation.py`：mock target `enhance_news_correlation` → `generators_orchestrator.run_news_correlation_safe`
+  - `test_news_correlation.py`：mock target 同步至 `llm.run_news_correlation_safe`，同时在 `news_correlation.py._apply_llm_enhancement` 增加 try/except 兜底，防止 LLM 异常穿透
   - `test_penetration.py`：可转债 `110059` 重分类 `IGNORE` → `ETF`（P2-3 行为变更，更新 2 个测试断言）
   - `test_html_builders_edge.py`：mock target `providers.akshare_extras.*` → `fetcher.akshare.*`
   - `test_fund_style_analysis.py`：mock target `providers.eastmoney_industry.fetch_industry` → `fetcher.industry.fetch_industry_data`，返回值由 `str` 调整为 `dict`

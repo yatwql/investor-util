@@ -289,7 +289,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_session_cache_filled(self, mock_push2, mock_fetch_ind):
         """验证 registry session_cache 被填充，主循环复用"""
-        mock_fetch_ind.side_effect = lambda c: {"600519": "白酒", "000858": "白酒"}.get(c)
+        mock_fetch_ind.side_effect = lambda c: {"600519": {"industry": "白酒"}, "000858": {"industry": "白酒"}}.get(c)
         push2_data = {
             "600519": {"market_cap": 2e12, "pe": 25.0},
             "000858": {"market_cap": 5e11, "pe": 15.0},
@@ -314,7 +314,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_negative_pe_skipped(self, mock_push2, mock_fetch_ind):
         """负 PE / 零 PE 不参与行业平均计算"""
-        mock_fetch_ind.side_effect = lambda c: {"600519": "白酒", "000858": "白酒"}.get(c)
+        mock_fetch_ind.side_effect = lambda c: {"600519": {"industry": "白酒"}, "000858": {"industry": "白酒"}}.get(c)
         mock_push2.side_effect = lambda c: {
             "600519": {"market_cap": 2e12, "pe": 25.0},
             "000858": {"market_cap": 5e11, "pe": -5.0},  # 负 PE，应跳过
