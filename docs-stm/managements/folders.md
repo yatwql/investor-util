@@ -31,6 +31,7 @@ investor-util/
 │   │   │
 │   │   ├── fetcher/                  # 数据获取调度
 │   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── akshare.py            #   akshare 封装层（盈利预测/资金流向/分红）
 │   │   │   ├── chain.py              #   Provider Chain 获取链路（主→备→过期缓存）
 │   │   │   ├── fund.py               #   基金数据获取（净值/业绩排名/持仓）
 │   │   │   ├── fund_manager.py       #   基金经理数据获取
@@ -79,6 +80,7 @@ investor-util/
 │   │   │
 │   │   ├── report/                   # 报告生成引擎
 │   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── benchmark.py          #   业绩基准配置与匹配
 │   │   │   ├── excel_generator.py    #   Excel 报告生成总控
 │   │   │   ├── excel_module_loader.py #  Excel 页签模块动态加载
 │   │   │   ├── excel_sheet_factory.py #  Excel 页签工厂（按配置创建页签）
@@ -115,6 +117,7 @@ investor-util/
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告
+│   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
 │   │   │   └── styles.py             #   Excel 样式定义
 │   │   │
@@ -132,6 +135,7 @@ investor-util/
 │   │   ├── provider_registry.py      # 数据源注册中心（熔断器/会话缓存）
 │   │   ├── models.py                 # 数据模型（持仓/行情/基金/新闻）
 │   │   ├── reader.py                 # 持仓 xlsx 文件读取
+│   │   ├── ansi_colors.py            # ANSI 颜色常量（终端输出着色）
 │   │   ├── code_utils.py             # 证券代码/类型判定工具
 │   │   ├── market_hours.py           # 交易时段判断（A股/港股/QDII）
 │   │   ├── http_client.py            # HTTP 客户端（请求/重试/超时）
@@ -149,6 +153,7 @@ investor-util/
 │   ├── holdings/                     #   持仓 xlsx 文件（用户放置）
 │   ├── cache/                        #   API 响应缓存（自动生成，JSON/GZ）
 │   ├── config/                       #   配置文件（config.json / llm_key.json / llm_settings.json）
+│   ├── state/                        #   运行时状态文件（降级状态等，自动生成）
 │   └── history/snapshots/            #   持仓快照（自动生成，保留 60 天）
 │
 ├── reports/                          # 报告输出（最新版 + 按日期归档）

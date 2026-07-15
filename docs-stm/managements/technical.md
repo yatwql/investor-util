@@ -1711,7 +1711,7 @@ industry_{code}.json
 | 连续失败计数 | T2: 2 次 / T3: 2 次 / T4: 1 次 | 累计失败次数达阈值后触发降级 |
 | 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 7 天 | 距上次成功获取的天数超阈值后触发降级 |
 
-可配置于 `config.json` 的 `degradation` 字段。支持跨会话持久化到 `data/cache/.degradation_state.json`。
+可配置于 `config.json` 的 `degradation` 字段。支持跨会话持久化到 `data/state/.degradation_state.json`。
 
 **与 DataSourceRegistry 的职责边界**：
 
@@ -1778,9 +1778,9 @@ generators_orchestrator（并行调度 4+1 模块）
 |:-----|:------|:------|
 | Extended Thinking | Claude: `thinking.budget_tokens`；DeepSeek: `output_config.effort` | 与 `temperature` 互斥 |
 | Prompt Caching | Anthropic 专属，system prompt 数组 + `cache_control: ephemeral` | 5 分钟内复用免全价 |
-| 截断重试 | 检测 `_TRUNCATION_MARKER` 后自动 1.5× max_tokens 重试一次 | 修复内容被截断的情况 |
+| 截断重试 | 检测 `TRUNCATION_MARKER` 后自动 1.5× max_tokens 重试一次 | 修复内容被截断的情况 |
 | 内容过滤安抚 | 空返回时追加安抚指令重试 | 应对内容审查误杀 |
-| 会话用量追踪 | `session.py` 维护线程安全 `_session_usage` 字典 | 按模块粒度追踪 token/费用/缓存命中 |
+| 会话用量追踪 | `session.py` 维护线程安全 `session_usage` 字典 | 按模块粒度追踪 token/费用/缓存命中 |
 
 **LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名（model / temperature / timeout / cache_enabled / max_tokens / system_prompt / thinking_enabled / thinking_budget / reasoning_effort / output_brief）。
 
@@ -2063,7 +2063,7 @@ investor-util/
 │   │   ├── code_utils.py        # 代码类型判定中心化
 │   │   ├── config/              # 配置管理子包（_defaults / _comments / _core）
 │   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
-│   │   ├── fetcher/             # 数据获取调度（price/index/fund/industry/chain）
+│   │   ├── fetcher/             # 数据获取调度（price/index/fund/industry/chain/akshare）
 │   │   ├── handlers_cache.py    # TUI 缓存管理命令
 │   │   ├── handlers_config.py   # TUI 配置管理命令
 │   │   ├── handlers_report.py   # TUI 报告生成命令
@@ -2112,9 +2112,9 @@ investor-util/
 | 美股指数 | 新浪财经 → 腾讯财经（双链路 fallback） | `sina.py` |
 | 财经新闻 | 5 源并行：新浪/东方财富/财联社/华尔街见闻/akshare | 各 `*_news.py` |
 | 行业分类/概念板块 | 东方财富 push2（主）→ quotedata 回退 | `eastmoney_industry.py` / `eastmoney_industry_rest.py` |
-| 机构盈利预测 | akshare 全量获取（直达） | `akshare_extras.py` |
-| 行业资金流向 | akshare 今日排名（直达） | `akshare_extras.py` |
-| 股票历史分红 | akshare 逐股获取（直达） | `akshare_extras.py` |
+| 机构盈利预测 | akshare 全量获取（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
+| 行业资金流向 | akshare 今日排名（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
+| 股票历史分红 | akshare 逐股获取（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 基金经理数据 | 天天基金 HTML 解析（主）→ 档案页回退 | `fetcher/fund_manager.py` |
 
 > 各数据源具体 API 端点格式见 [需求文档 §5.1 — 数据源总览](requirements.md#51-数据源总览)。
