@@ -14,6 +14,21 @@
 
 ### Fixed
 
+- *（本次无修复）*
+
+### Changed
+
+- *（本次无变更）*
+
+### Docs
+
+- *（本次无文档变更）*
+
+
+## [0.5.10] - 2026-07-15
+
+### Fixed
+
 - **handlers_cache 缺失 import os**：`_cmd_show_cache_stats` 中使用 `os.path.join` 但模块未导入 `os`（P2-7 拆分解耦遗留）
 - **skeleton.py `_generate_llm_content` 内部调用残留**：`_run_standard_mode` 仍调用旧私有名，导致 penetration_deep 模块 RuntimeError
 - **handlers_config.py 函数名错写**：`_cmdrefresh_config` → `_cmd_refresh_config`（少一个 `_`，保持 `_cmd_` 命名一致）
