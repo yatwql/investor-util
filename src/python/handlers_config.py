@@ -312,7 +312,7 @@ def _cmd_config_report_boards() -> None:
     press_any_key()
 
 
-def _cmdrefresh_config() -> None:
+def _cmd_refresh_config() -> None:
     """重新加载所有配置（config.json + llm_settings.json + llm_key.json）。"""
     # 破坏内部缓存强制重新读取
     import src.python.config as _cfg_mod
