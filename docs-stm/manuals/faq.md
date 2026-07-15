@@ -526,7 +526,7 @@ A: 复制整个项目目录（含 `data/cache/` 和 `data/config/`）到新电�
 
 **Q: 日志文件在哪？如何查看详细错误？**
 
-A: 日志文件在 `logs/app.log`，DEBUG 级别的详细信息（如 LLM 发出的完整 prompt）已自动写入该文件，查看即可。如需在终端也显示 DEBUG 输出，可在 `src/python/logger.py` 第 48 行将 `console_handler.setLevel(logging.INFO)` 改为 `logging.DEBUG`。
+A: 日志文件在 `logs/app.log`，DEBUG 级别的详细信息（如 LLM 发出的完整 prompt）已自动写入该文件，查看即可。如需在终端也显示 DEBUG 输出，可在 `src/python/logger.py` 第 82 行将 `console_handler.setLevel(logging.INFO)` 改为 `logging.DEBUG`。
 
 **Q: 程序有没有日志轮转（log rotation）？**
 

@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.5.12
+> 文档版本：v0.6.0
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 
@@ -254,6 +254,8 @@ investor-util/
 │   │   │   │   └── plan-iter-8-excel-benchmark-columns.md # I 迭代 Excel 基准指数列
 │   │   │   └── report-board-visibility-configable/ # 看板可见性配置
 │   │   │       └── g-board-visibility-iteration-plan.md # 看板可见性配置迭代计划
+│   │   ├── v0.6.x/                            # v0.6.x 版本迭代归档
+│   │   │   └── archived_changelog.0.6.x.md        # 变更日志归档 v0.6.x
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
