@@ -1179,7 +1179,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         cls._exec_patcher.stop()
     """测试 generate_* 函数接受外部 llm_config 参数。"""
 
-    @patch("src.python.llm.skeleton._generate_llm_content")
+    @patch("src.python.llm.skeleton.generate_llm_content")
     def test_global_macro_uses_passed_config(
         self, mock_gen: MagicMock,
     ) -> None:
@@ -1195,7 +1195,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         # 验证传递给 _generate_llm_content 的第一个参数是传入的 llm_config
         self.assertIs(mock_gen.call_args[0][0], llm_config)
 
-    @patch("src.python.llm.skeleton._generate_llm_content")
+    @patch("src.python.llm.skeleton.generate_llm_content")
     def test_expert_review_uses_passed_config(
         self, mock_gen: MagicMock,
     ) -> None:
@@ -1210,7 +1210,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         self.assertEqual(result, "<p>复盘</p>")
         self.assertIs(mock_gen.call_args[0][0], llm_config)
 
-    @patch("src.python.llm.skeleton._generate_llm_content")
+    @patch("src.python.llm.skeleton.generate_llm_content")
     def test_health_check_uses_passed_config(
         self, mock_gen: MagicMock,
     ) -> None:
@@ -1225,7 +1225,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         self.assertEqual(result, "<p>体检</p>")
         self.assertIs(mock_gen.call_args[0][0], llm_config)
 
-    @patch("src.python.llm.skeleton._generate_llm_content")
+    @patch("src.python.llm.skeleton.generate_llm_content")
     def test_penetration_uses_passed_config(
         self, mock_gen: MagicMock,
     ) -> None:

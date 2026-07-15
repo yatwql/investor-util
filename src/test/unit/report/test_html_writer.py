@@ -498,11 +498,11 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
 
 
 class TestBuildModuleInfoList(unittest.TestCase):
-    """测试 _build_module_info_list 的状态判定逻辑。"""
+    """测试 build_llm_module_info 的状态判定逻辑。"""
 
     def test_cache_hit(self):
         """per_module 缓存命中 → status='cached', status_label='缓存'。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
         per_module = {
             "global_macro": {
                 "model": "deepseek-v4-flash", "cached": True,
@@ -510,7 +510,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
                 "cost": 0.0, "thinking": False, "endpoint": "",
             },
         }
-        result = _build_module_info_list({}, per_module)
+        result = build_llm_module_info({}, per_module)
         gm = next(m for m in result if m["key"] == "global_macro")
         self.assertEqual(gm["status"], "cached")
         self.assertEqual(gm["status_label"], "缓存")
@@ -520,7 +520,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
 
     def test_success_call(self):
         """per_module 非缓存 → status='success', status_label='成功'。"""
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
         per_module = {
             "expert_review": {
                 "model": "deepseek-v4-flash", "cached": False,
@@ -528,7 +528,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
                 "cache_hit_tokens": 0, "cost": 0.001, "thinking": True, "endpoint": "",
             },
         }
-        result = _build_module_info_list({}, per_module)
+        result = build_llm_module_info({}, per_module)
         er = next(m for m in result if m["key"] == "expert_review")
         self.assertEqual(er["status"], "success")
         self.assertEqual(er["status_label"], "成功")
@@ -540,9 +540,9 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_disabled(self):
         """FAIL_REASON_DISABLED → status='disabled', status_label='已禁用'。"""
         from src.python.llm import FAIL_REASON_DISABLED
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
         failure = {"global_macro": FAIL_REASON_DISABLED}
-        result = _build_module_info_list(failure, {})
+        result = build_llm_module_info(failure, {})
         gm = next(m for m in result if m["key"] == "global_macro")
         self.assertEqual(gm["status"], "disabled")
         self.assertEqual(gm["status_label"], "已禁用")
@@ -552,9 +552,9 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_failed(self):
         """FAIL_REASON_API_ERROR → status='failed', status_label 含错误描述。"""
         from src.python.llm import FAIL_REASON_API_ERROR
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
         failure = {"health_check": FAIL_REASON_API_ERROR}
-        result = _build_module_info_list(failure, {})
+        result = build_llm_module_info(failure, {})
         hc = next(m for m in result if m["key"] == "health_check")
         self.assertEqual(hc["status"], "failed")
         self.assertEqual(hc["status_label"], "LLM API 调用失败")
@@ -565,7 +565,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
             FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
             FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
         )
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
         cases = [
             (FAIL_REASON_NOT_CONFIGURED, "LLM 未配置"),
             (FAIL_REASON_API_ERROR, "LLM API 调用失败"),
@@ -577,15 +577,15 @@ class TestBuildModuleInfoList(unittest.TestCase):
         for idx, (reason, expected) in enumerate(cases):
             with self.subTest(reason=reason):
                 mk = _MODULE_KEYS[idx % len(_MODULE_KEYS)]
-                result = _build_module_info_list({mk: reason}, {})
+                result = build_llm_module_info({mk: reason}, {})
                 entry = next(m for m in result if m["key"] == mk)
                 self.assertEqual(entry["status"], "failed")
                 self.assertEqual(entry["status_label"], expected)
 
     def test_unknown(self):
         """无 per_module 且无 failure → status='unknown', status_label=''。"""
-        from src.python.report.html_renderers import _build_module_info_list
-        result = _build_module_info_list({}, {})
+        from src.python.report.llm_module_info import build_llm_module_info
+        result = build_llm_module_info({}, {})
         for mk in ["global_macro", "expert_review", "health_check", "penetration_deep"]:
             m = next(entry for entry in result if entry["key"] == mk)
             self.assertEqual(m["status"], "unknown", f"{mk} should be unknown")
@@ -594,7 +594,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_mixed_states(self):
         """混合状态：禁用、失败、缓存、成功同时存在。"""
         from src.python.llm import FAIL_REASON_DISABLED, FAIL_REASON_TIMEOUT
-        from src.python.report.html_renderers import _build_module_info_list
+        from src.python.report.llm_module_info import build_llm_module_info
         failure = {
             "global_macro": FAIL_REASON_DISABLED,
             "health_check": FAIL_REASON_TIMEOUT,
@@ -612,7 +612,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
                 "endpoint": "https://api.test.com",
             },
         }
-        result = _build_module_info_list(failure, per_module)
+        result = build_llm_module_info(failure, per_module)
         by_key = {m["key"]: m for m in result}
 
         self.assertEqual(by_key["global_macro"]["status"], "disabled")

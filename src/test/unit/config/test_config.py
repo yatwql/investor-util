@@ -287,7 +287,7 @@ class TestSystemPromptOverride:
         mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
         # _generate_llm_module 位于 skeleton.py，内部调用 skeleton.get_llm_config 和
         # skeleton._generate_llm_content，因此 mock 需指向 skeleton 而非 generators
-        mock_gen = mocker.patch("src.python.llm.skeleton._generate_llm_content",
+        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content",
                                 return_value=(None, False))
 
         _gens.generate_global_macro(
@@ -315,7 +315,7 @@ class TestSystemPromptOverride:
             "model": None,
         }
         mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
-        mock_gen = mocker.patch("src.python.llm.skeleton._generate_llm_content",
+        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content",
                                 return_value=(None, False))
 
         _gens.generate_global_macro(
@@ -341,7 +341,7 @@ class TestSystemPromptOverride:
             "model": None,
         }
         mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
-        mock_gen = mocker.patch("src.python.llm.skeleton._generate_llm_content",
+        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content",
                                 return_value=(None, False))
 
         _gens.generate_global_macro(
