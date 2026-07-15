@@ -27,7 +27,6 @@ P1 问题（3 项）已全部修复完毕，详见 [`changelog.md`](changelog.md
 | P2-8 | **死代码（未使用导入）** | 7 个文件 | 多行 | `handlers_config.py:9` 的 `import sys`；`cache/_io.py:13` 的 `from typing import Any`；`cache/_ttl.py:10` 同款；`html_renderers.py:6` 的 `from datetime import datetime`；`akshare_extras.py:19` 的 `as_completed`；`schemas/history.py:15` 的 `field`。 | **低**：代码冗余 | 删除未使用的 import 语句 |
 | P2-9 | **死代码（枚举值）** | `provider_registry.py` | 67-71 | `FetchStrategy.PLACEHOLDER` 枚举值定义但从未被 `get_effective_strategy()` 返回。 | **低**：概念死分支 | 删除 `PLACEHOLDER` 枚举值及关联文档注释 |
 | P2-10 | **Direct provider 调用** | report 层 9 处 | 多文件 | `html_renderers.py:32`、`news_correlation.py:414`、`category.py:118`、`fund_performance.py:211`、`html_builders.py:53,119`、`penetration_sheet.py:80,94` 直接导入 `akshare_extras` 的函数，无 fetcher 封装层。 | **中**：架构缺口 | 创建 `fetcher/akshare.py` 封装层，统一走 provider → Chain 路径 |
-| P2-11 | **Report 导入私有 fetcher 函数** | `report/portfolio_history.py` | 33 | 导入 `_fetch_with_incremental_fallback`（私有函数）。 | **中**：封装缺口 | 改为公开 API 命名，或通过 `fetcher/__init__.py` 导出 |
 
 ### P3（低优先级 — 修复收益有限，建议长期跟踪）
 
