@@ -35,13 +35,7 @@
 
 ## [0.5.6] - 2026-07-15
 
-### Added
-
-- **组合历史走势 — 基准指数对比（Iter I）**：详见 [v0.5.x 归档](../archive/v0.5.x/archived_changelog.0.5.x.md)
-
-### Docs
-
-- **版本发布**：v0.5.6，完整变更记录已归档至 [archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)
+**v0.5.6 完整变更记录已归档**：详见 [archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)
 
 
 > **v0.5.x 版本变更记录已归档**：详见 [docs-stm/archive/v0.5.x/archived_changelog.0.5.x.md](../archive/v0.5.x/archived_changelog.0.5.x.md)。
