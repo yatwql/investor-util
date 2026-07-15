@@ -172,7 +172,7 @@ class TestFetchWithFallback(unittest.TestCase):
         """空链路 → 返回 None。"""
         mock_cache_get.return_value = None
         mock_get_chain.return_value = []
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price",
             {"tencent": ("腾讯", MagicMock())},
             "test_cache_key",
@@ -186,7 +186,7 @@ class TestFetchWithFallback(unittest.TestCase):
         """链路中某 provider 未注册 → 跳过。"""
         mock_cache_get.return_value = None
         mock_get_chain.return_value = ["nonexistent_provider"]
-        result = _fetch_with_fallback(
+        result = fetch_with_fallback(
             "price",
             {"tencent": ("腾讯", MagicMock())},
             "test_cache_key",

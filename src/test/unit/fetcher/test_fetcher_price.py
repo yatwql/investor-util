@@ -140,7 +140,7 @@ class TestPriceTransformEastmoney(unittest.TestCase):
 class TestFetchMarketData(unittest.TestCase):
     """fetch_market_data 测试（mock chain）。"""
 
-    @patch("src.python.fetcher.price._fetch_with_fallback")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_success(self, mock_fallback):
         """正常返回。"""
         mock_fallback.return_value = {
@@ -151,14 +151,14 @@ class TestFetchMarketData(unittest.TestCase):
         result = fetch_market_data("600900", "长江电力")
         self.assertEqual(result["price"], 26.65)
 
-    @patch("src.python.fetcher.price._fetch_with_fallback")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_all_fail_returns_none(self, mock_fallback):
         """全部失败 → None。"""
         mock_fallback.return_value = None
         from src.python.fetcher.price import fetch_market_data
         self.assertIsNone(fetch_market_data("600900"))
 
-    @patch("src.python.fetcher.price._fetch_with_fallback")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_expected_name_passed(self, mock_fallback):
         """expected_name 正确传递到 validate。"""
         mock_fallback.return_value = None
@@ -172,7 +172,7 @@ class TestFetchMarketData(unittest.TestCase):
     # ── 00 代码降级 ──────────────────────────────────────
 
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
-    @patch("src.python.fetcher.price._fetch_with_fallback")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_00_code_degrade_to_eastmoney(
         self, mock_fallback, mock_fresh,
     ):
@@ -197,7 +197,7 @@ class TestFetchMarketData(unittest.TestCase):
         self.assertEqual(mock_fallback.call_count, 2)
 
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
-    @patch("src.python.fetcher.price._fetch_with_fallback")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_00_code_degrade_all_fail(
         self, mock_fallback, mock_fresh,
     ):
@@ -209,7 +209,7 @@ class TestFetchMarketData(unittest.TestCase):
         self.assertEqual(mock_fallback.call_count, 2)
 
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
-    @patch("src.python.fetcher.price._fetch_with_fallback")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_00_code_stock_success_no_degrade(
         self, mock_fallback, mock_fresh,
     ):

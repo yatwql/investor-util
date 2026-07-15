@@ -119,7 +119,7 @@ class TestIndustryTransform(unittest.TestCase):
 class TestFetchIndustryData(unittest.TestCase):
     """fetch_industry_data 测试。"""
 
-    @patch("src.python.fetcher.industry._fetch_with_fallback")
+    @patch("src.python.fetcher.industry.fetch_with_fallback")
     def test_success(self, mock_fallback):
         """正常返回 → 返回行业数据。"""
         mock_fallback.return_value = {
@@ -130,14 +130,14 @@ class TestFetchIndustryData(unittest.TestCase):
         self.assertEqual(result["industry"], "银行")
         mock_fallback.assert_called_once()
 
-    @patch("src.python.fetcher.industry._fetch_with_fallback")
+    @patch("src.python.fetcher.industry.fetch_with_fallback")
     def test_failure_returns_none(self, mock_fallback):
         """获取失败 → None。"""
         mock_fallback.return_value = None
         from src.python.fetcher.industry import fetch_industry_data
         self.assertIsNone(fetch_industry_data("000001"))
 
-    @patch("src.python.fetcher.industry._fetch_with_fallback")
+    @patch("src.python.fetcher.industry.fetch_with_fallback")
     def test_cache_key_includes_code(self, mock_fallback):
         """缓存键包含代码。"""
         mock_fallback.return_value = {}
