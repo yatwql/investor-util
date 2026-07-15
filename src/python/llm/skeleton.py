@@ -11,28 +11,29 @@ import httpx
 from src.python.cache import get as cache_get  # noqa: F401
 from src.python.cache import set as cache_set
 from src.python.config import get_llm_config
+from src.python.http_client import make_http_client
 from src.python.llm.api_base import (
-    _AUTO_INCREASE_FACTOR,
-    _CACHE_LINE_HTML,
-    _LLM_TIMEOUT,
-    _TRUNCATION_MARKER,
+    AUTO_INCREASE_FACTOR,
+    CACHE_LINE_HTML,
+    LLM_TIMEOUT,
+    TRUNCATION_MARKER,
     _cache_line_model_tpl,
     _extract_model_from_cached,
     _get_last_llm_failure,
 )
-from src.python.llm.api import _call_llm
-from src.python.llm.api_base import _clear_last_llm_failure
-from src.python.llm.fingerprint import _get_cache_ttl_llm
-from src.python.llm.markdown import _markdown_to_html
-from src.python.llm.pricing import _estimate_cost
+from src.python.llm.api import call_llm
+from src.python.llm.api_base import clear_last_llm_failure
+from src.python.llm.fingerprint import get_cache_ttl_llm
+from src.python.llm.markdown import markdown_to_html
+from src.python.llm.pricing import estimate_cost
 from src.python.llm.prompts import (
-    _CACHE_PREFIX_LLM,
-    _LLM_MODULE_FAILURE,
+    CACHE_PREFIX_LLM,
+    LLM_MODULE_FAILURE,
     FAIL_REASON_API_ERROR,
     FAIL_REASON_DISABLED,
     FAIL_REASON_NOT_CONFIGURED,
 )
-from src.python.llm.session import _record_per_module
+from src.python.llm.session import record_per_module
 from src.python.registry import get_llm_module_name
 
 _MN = get_llm_module_name
@@ -40,14 +41,14 @@ _MN = get_llm_module_name
 logger = logging.getLogger("invest")
 
 __all__ = [
-    "_is_llm_module_enabled",
-    "_generate_llm_content",
-    "_generate_llm_module",
-    "_run_batch_mode",
+    "is_llm_module_enabled",
+    "generate_llm_content",
+    "generate_llm_module",
+    "run_batch_mode",
 ]
 
 
-def _is_llm_module_enabled(llm_config: dict | None, module_suffix: str) -> bool:
+def is_llm_module_enabled(llm_config: dict | None, module_suffix: str) -> bool:
     """检查 LLM 模块是否已启用。
 
     读取 enabled_llm 嵌套字典，模块默认启用。
@@ -82,14 +83,14 @@ def _handle_cache_hit(
     logger.info("LLM 缓存命中: %s", cache_key)
     cached_clean = cached
     _orig_model = _extract_model_from_cached(cached)
-    _hint = _cache_line_model_tpl(_orig_model) if _orig_model else _CACHE_LINE_HTML
+    _hint = _cache_line_model_tpl(_orig_model) if _orig_model else CACHE_LINE_HTML
     if thinking_enabled:
         _hint = _hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
     cached_clean += _hint
     if module_key:
         _model_for_record = _orig_model or model or llm_config.get("model", "") or "缓存命中"
         _endpoint_for_record = llm_config.get("endpoint", "") or ""
-        _record_per_module(module_key, _model_for_record, cached=True,
+        record_per_module(module_key, _model_for_record, cached=True,
                            thinking=thinking_enabled, endpoint=_endpoint_for_record)
     return cached_clean
 
@@ -108,11 +109,11 @@ def _finalize_and_cache(
     Returns:
         (HTML 文本, False)
     """
-    html = _markdown_to_html(result)
+    html = markdown_to_html(result)
     if not html.strip():
         logger.warning("LLM 返回内容为空，跳过缓存")
         if module_key:
-            _LLM_MODULE_FAILURE[module_key] = FAIL_REASON_API_ERROR
+            LLM_MODULE_FAILURE[module_key] = FAIL_REASON_API_ERROR
         return (None, False)
 
     _model_name = model or llm_config.get("model", "") or "未指定"
@@ -121,7 +122,7 @@ def _finalize_and_cache(
         out = usage.get("output_tokens", usage.get("completion_tokens", 0))
         cache_hit = usage.get("cache_read_input_tokens", 0)
         _footer = f"模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}"
-        _cost = _estimate_cost(_model_name, inp, out, cache_hit_input_tokens=cache_hit)
+        _cost = estimate_cost(_model_name, inp, out, cache_hit_input_tokens=cache_hit)
         if _cost != "-":
             _footer += f" | 估算费用：{_cost}"
         if cache_hit:
@@ -140,7 +141,7 @@ def _finalize_and_cache(
                     logger.warning("LLM 费用字符串解析失败: %s", _cost)
             _endpoint_for_record = llm_config.get("endpoint", "") or ""
             _cache_hit = usage.get("cache_read_input_tokens", 0)
-            _record_per_module(module_key, _model_name, inp=_inp, out=_out,
+            record_per_module(module_key, _model_name, inp=_inp, out=_out,
                                thinking=thinking_enabled, cost=_cost_val,
                                endpoint=_endpoint_for_record, cache_hit_tokens=_cache_hit)
 
@@ -167,26 +168,26 @@ def _handle_truncation(
     Returns:
         (result, usage) — 重试后的结果与用量，或原结果与用量（未截断时）
     """
-    if not result or _TRUNCATION_MARKER not in result:
+    if not result or TRUNCATION_MARKER not in result:
         return result, usage
 
-    new_max = int(max_tokens * _AUTO_INCREASE_FACTOR)
+    new_max = int(max_tokens * AUTO_INCREASE_FACTOR)
     logger.warning("输出被截断（max_tokens=%d），自动以 %d 重新生成...", max_tokens, new_max)
     print(f"  [..] 输出被截断，自动增大 max_tokens ({max_tokens} → {new_max}) 重新生成...")
-    result2, usage2 = _call_llm(
+    result2, usage2 = call_llm(
         system_prompt, user_prompt, llm_config,
         timeout=timeout, http_client=http_client,
         max_tokens=new_max, config_field=config_field,
         temperature=temperature, model=model,
     )
     if result2:
-        if _TRUNCATION_MARKER in result2:
+        if TRUNCATION_MARKER in result2:
             logger.warning("增大 max_tokens=%d 后仍被截断，请手动增大配置", new_max)
         return result2, usage2
     return result, None
 
 
-def _generate_llm_content(
+def generate_llm_content(
     llm_config: dict,
     cache_key: str,
     cache_ttl: float,
@@ -205,7 +206,7 @@ def _generate_llm_content(
 ) -> tuple[str | None, bool]:
     """通用 LLM 内容生成骨架，带缓存检查与写入。"""
     if module_key:
-        _LLM_MODULE_FAILURE.pop(module_key, None)
+        LLM_MODULE_FAILURE.pop(module_key, None)
 
     # ── 缓存检查 ──
     if cache_enabled and not force:
@@ -214,8 +215,8 @@ def _generate_llm_content(
             return (_handle_cache_hit(cached, cache_key, module_key, model, llm_config, thinking_enabled), True)
 
     # ── LLM 调用 → 截断重试 → 处理结果 ──
-    _clear_last_llm_failure()
-    result, usage = _call_llm(system_prompt, user_prompt, llm_config,
+    clear_last_llm_failure()
+    result, usage = call_llm(system_prompt, user_prompt, llm_config,
                               timeout=timeout, http_client=http_client,
                               max_tokens=max_tokens, config_field=config_field,
                               temperature=temperature, model=model)
@@ -230,7 +231,7 @@ def _generate_llm_content(
     if module_key:
         # 使用 api.py 记录的详细失败原因（区分熔断/超时/网络/API 错误）
         failure_reason = _get_last_llm_failure() or FAIL_REASON_API_ERROR
-        _LLM_MODULE_FAILURE[module_key] = failure_reason
+        LLM_MODULE_FAILURE[module_key] = failure_reason
     return (None, False)
 
 
@@ -249,7 +250,7 @@ def _run_standard_mode(
     """标准 LLM 单篇生成模式：缓存 → 调用 → 处理结果。"""
     cache_enabled = llm_config.get(f"cache_enabled_{module_key}", True)
     fingerprint = fingerprint_fn() if fingerprint_fn else ""
-    cache_key = _CACHE_PREFIX_LLM + f"{module_key}_{fingerprint}"
+    cache_key = CACHE_PREFIX_LLM + f"{module_key}_{fingerprint}"
 
     system_prompt = llm_config.get(f"system_prompt_{module_key}") or system_prompt_default
     if llm_config.get(f"output_brief_{module_key}", False):
@@ -258,7 +259,7 @@ def _run_standard_mode(
     user_prompt = prompt_builder() if prompt_builder else ""
 
     return _generate_llm_content(
-        llm_config, cache_key, _get_cache_ttl_llm(module_key),
+        llm_config, cache_key, get_cache_ttl_llm(module_key),
         system_prompt, user_prompt, cache_enabled, force,
         max_tokens=llm_config.get(f"max_tokens_{module_key}", max_tokens_default),
         timeout=llm_config.get(f"timeout_{module_key}", timeout_default),
@@ -271,7 +272,7 @@ def _run_standard_mode(
     )
 
 
-def _generate_llm_module(
+def generate_llm_module(
     llm_config: dict | None,
     module_key: str,
     *,
@@ -301,14 +302,14 @@ def _generate_llm_module(
         llm_config = get_llm_config()
     if llm_config is None:
         logger.info("LLM 未配置，%s 使用占位文本", _MN(module_key))
-        _LLM_MODULE_FAILURE[module_key] = FAIL_REASON_NOT_CONFIGURED
+        LLM_MODULE_FAILURE[module_key] = FAIL_REASON_NOT_CONFIGURED
         if batch_preparer:
             return ({}, False, {}, 0)
         return (None, False)
 
     if not _is_llm_module_enabled(llm_config, module_key):
         logger.info("%s LLM 分析已禁用（enabled_llm.%s = false）", _MN(module_key), module_key)
-        _LLM_MODULE_FAILURE[module_key] = FAIL_REASON_DISABLED
+        LLM_MODULE_FAILURE[module_key] = FAIL_REASON_DISABLED
         if batch_preparer:
             return ({}, False, {}, 0)
         return (None, False)
@@ -352,7 +353,7 @@ def _check_batch_caches(
         if per_item_cache_fn and cache_enabled and not force:
             ck = per_item_cache_fn(idx, item, context_fp)
             item_cache_keys[idx] = ck
-            cached = cache_get(ck, _get_cache_ttl_llm(module_key))
+            cached = cache_get(ck, get_cache_ttl_llm(module_key))
             if cached is not None:
                 results_map[idx] = cached
                 cached_count += 1
@@ -387,24 +388,24 @@ def _execute_and_merge_batch(
         (input_tokens, output_tokens) 本批的 token 用量
     """
     print(f"  [..] {_MN(module_key)} [{batch_id + 1}/{total_batches}] 批处理中 ({len(batch_indices)} 条)...")
-    batch_client = httpx.Client(timeout=_LLM_TIMEOUT)
+    batch_client = make_http_client(timeout=LLM_TIMEOUT)
     total_in = 0
     total_out = 0
     try:
         batch_items = [items[i] for i in batch_indices]
         user_prompt = batch_prompt_fn(batch_items, context_fp)
-        result, usage = _call_llm(
+        result, usage = call_llm(
             system_prompt, user_prompt, llm_config,
             timeout=timeout, http_client=batch_client,
             max_tokens=max_tokens,
             config_field=f"max_tokens_{module_key}",
             temperature=temperature, model=model,
         )
-        if result and _TRUNCATION_MARKER in result:
-            new_max = int(max_tokens * _AUTO_INCREASE_FACTOR)
+        if result and TRUNCATION_MARKER in result:
+            new_max = int(max_tokens * AUTO_INCREASE_FACTOR)
             logger.warning("%s 输出被截断，自动以 %d 重新生成 [批 %d/%d]",
                            _MN(module_key), new_max, batch_id + 1, total_batches)
-            result2, usage2 = _call_llm(
+            result2, usage2 = call_llm(
                 system_prompt, user_prompt, llm_config,
                 timeout=timeout, http_client=batch_client,
                 max_tokens=new_max, config_field=f"max_tokens_{module_key}",
@@ -432,7 +433,7 @@ def _execute_and_merge_batch(
     return total_in, total_out
 
 
-def _run_batch_mode(
+def run_batch_mode(
     llm_config: dict,
     module_key: str,
     *,

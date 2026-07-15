@@ -10,12 +10,12 @@ from typing import Any
 logger = logging.getLogger("invest")
 
 __all__ = [
-    "_compute_fingerprint", "_extract_stable_holdings", "_extract_stable_penetration",
-    "_build_llm_fingerprint",
-    "_get_cache_ttl_llm",
+    "compute_fingerprint", "extract_stable_holdings", "extract_stable_penetration",
+    "build_llm_fingerprint",
+    "get_cache_ttl_llm",
 ]
 
-def _compute_fingerprint(*args: Any) -> str:
+def compute_fingerprint(*args: Any) -> str:
     """计算输入数据的确定性哈希值（前 12 位），用作缓存键后缀。
 
     当市场行情、持仓数据变化时指纹随之改变，
@@ -25,7 +25,7 @@ def _compute_fingerprint(*args: Any) -> str:
     return hashlib.md5(raw.encode()).hexdigest()[:12]
 
 
-def _extract_stable_holdings(holdings_details: list[dict] | None) -> list[dict]:
+def extract_stable_holdings(holdings_details: list[dict] | None) -> list[dict]:
     """从持仓明细中提取稳定的（无行情波动）字段。"""
     if not holdings_details:
         return []
@@ -35,7 +35,7 @@ def _extract_stable_holdings(holdings_details: list[dict] | None) -> list[dict]:
     ]
 
 
-def _extract_stable_penetration(penetrated_assets: list[dict] | None,
+def extract_stable_penetration(penetrated_assets: list[dict] | None,
                                  full: bool = False) -> list[dict]:
     """从穿透资产中提取稳定的（无行情波动）字段。
 
@@ -58,7 +58,7 @@ def _extract_stable_penetration(penetrated_assets: list[dict] | None,
     return result
 
 
-def _build_llm_fingerprint(
+def build_llm_fingerprint(
     total_mv: float = 0,
     total_cost: float = 0,
     total_profit: float = 0,
@@ -89,15 +89,15 @@ def _build_llm_fingerprint(
     Returns:
         指纹哈希值（前 12 位）
     """
-    _details = _extract_stable_holdings(holdings_details)
-    _pen = _extract_stable_penetration(penetrated_assets, full=full_penetration)
-    return _compute_fingerprint(
+    _details = extract_stable_holdings(holdings_details)
+    _pen = extract_stable_penetration(penetrated_assets, full=full_penetration)
+    return compute_fingerprint(
         total_mv, total_cost, total_profit, total_today_profit,
         categories, _details, _pen,
     )
 
 
-def _get_cache_ttl_llm(subtype: str = "global_macro") -> float:
+def get_cache_ttl_llm(subtype: str = "global_macro") -> float:
     """获取 LLM 缓存 TTL。
 
     TTL 优先级：

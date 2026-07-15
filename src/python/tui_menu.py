@@ -3,10 +3,10 @@
 职责：
   - MenuItem 类型定义
   - MENU_ITEMS 菜单列表
-  - 菜单渲染（_render_menu、_print_header、_print_sep）
-  - 配置显示（_show_config、_show_llm_config_status）
-  - 快捷键查找（_index_by_key）
-  - 通用 UI 辅助（_exit_app、_press_any_key、_refresh_config）
+  - 菜单渲染（render_menu、print_header、print_sep）
+  - 配置显示（show_config、_show_llm_config_status）
+  - 快捷键查找（index_by_key）
+  - 通用 UI 辅助（exit_app、press_any_key、refresh_config）
 """
 
 from __future__ import annotations
@@ -23,13 +23,13 @@ except ImportError:
 
 # ANSI 颜色：非 TTY 或设置了 NO_COLOR 环境变量时禁用颜色输出
 if "NO_COLOR" in os.environ or not sys.stdout.isatty():
-    _GREEN = _RED = _YELLOW = _CYAN = _RESET = ""
+    GREEN = RED = YELLOW = CYAN = RESET = ""
 else:
-    _GREEN = "\033[92m"
-    _RED = "\033[91m"
-    _YELLOW = "\033[93m"
-    _CYAN = "\033[96m"
-    _RESET = "\033[0m"
+    GREEN = "\033[92m"
+    RED = "\033[91m"
+    YELLOW = "\033[93m"
+    CYAN = "\033[96m"
+    RESET = "\033[0m"
 
 from src.python.config import get_config, get_llm_config
 
@@ -56,7 +56,7 @@ MENU_ITEMS: list[MenuItem] = [
 _config_cache: dict | None = None
 
 
-def _refresh_config() -> dict:
+def refresh_config() -> dict:
     """刷新并返回配置缓存。"""
     global _config_cache
     _config_cache = get_config()
@@ -71,19 +71,19 @@ def get_config_cache() -> dict | None:
 # ── 界面输出 ──────────────────────────────────────────────
 
 
-def _print_sep(char: str = "=", width: int = 56) -> None:
+def print_sep(char: str = "=", width: int = 56) -> None:
     print(char * width)
 
 
-def _print_header() -> None:
+def print_header() -> None:
     """打印程序标题头（每次主循环迭代时重绘）。"""
     from src.python.constants import APP_VERSION
-    _print_sep()
+    print_sep()
     print(f"        个人投资分析报告生成小助手  v{APP_VERSION}")
-    _print_sep()
+    print_sep()
 
     # 首次运行引导：检测是否缺少关键资源
-    config = _config_cache if _config_cache is not None else _refresh_config()
+    config = _config_cache if _config_cache is not None else refresh_config()
     holdings = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))
     _first_run_hints = []
     if not os.path.exists(holdings):
@@ -98,7 +98,7 @@ def _print_header() -> None:
         print()
 
 
-def _render_menu(sel: int) -> None:
+def render_menu(sel: int) -> None:
     """打印带选择指示器的菜单。"""
     print()
     for i, (key, label, _cb, is_exit) in enumerate(MENU_ITEMS):
@@ -109,9 +109,9 @@ def _render_menu(sel: int) -> None:
     print()
 
 
-def _show_config() -> None:
+def show_config() -> None:
     """显示当前配置及 LLM 配置状态。"""
-    config = _config_cache if _config_cache is not None else _refresh_config()
+    config = _config_cache if _config_cache is not None else refresh_config()
     holdings_path = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))
     print(f"  持仓目录: {config.get('holdings_dir', '未设置')}")
     print(f"  持仓文件: {config.get('holdings_filename', '未设置')}")
@@ -133,7 +133,7 @@ def _show_llm_config_status() -> None:
         model = llm_config.get("model") or "默认"
         endpoint = llm_config.get("endpoint") or "默认"
         ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
-        print(f"  LLM: {_GREEN}已配置{_RESET}  provider={provider}  model={model}  endpoint={ep_display}")
+        print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
         from src.python.registry import get_llm_module_names
         _route_parts = []
         for _sfx, _name in get_llm_module_names().items():
@@ -141,13 +141,13 @@ def _show_llm_config_status() -> None:
             _route_parts.append(f"{_name}={_mv}")
         print(f"         模型路由: {' / '.join(_route_parts)}")
     else:
-        print(f"  LLM: {_RED}未配置{_RESET}（配置 data/config/llm_key.json 后重启生效）")
+        print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
 
 
 # ── 快捷键查找 ──────────────────────────────────────────────
 
 
-def _index_by_key(key: str) -> int | None:
+def index_by_key(key: str) -> int | None:
     """返回快捷键对应的菜单索引，未找到则返回 None。"""
     for i, (k, _label, _cb, _is_exit) in enumerate(MENU_ITEMS):
         if k == key:
@@ -158,16 +158,16 @@ def _index_by_key(key: str) -> int | None:
 # ── 通用 UI 辅助 ──────────────────────────────────────────────
 
 
-def _press_any_key() -> None:
+def press_any_key() -> None:
     """等待用户按任意键继续。支持 Ctrl+C 退出。"""
     from src.python.tui import KEY_CTRL_C, get_key
     print("  按任意键返回菜单...")
     k = get_key()
     if k == KEY_CTRL_C:
-        _exit_app()
+        exit_app()
 
 
-def _exit_app() -> None:
+def exit_app() -> None:
     """打印退出信息并终止程序。"""
     print()
     print("  感谢使用，再见！")

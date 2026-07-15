@@ -14,7 +14,7 @@ from typing import Any
 
 from src.python.cache import get_ttl
 from src.python.code_utils import is_a_share_code, is_exchange_fund_code
-from src.python.fetcher.chain import _fetch_with_fallback
+from src.python.fetcher.chain import fetch_with_fallback
 from src.python.providers import eastmoney, tencent
 from src.python.providers import sina as sina_provider
 
@@ -69,6 +69,9 @@ def _price_transform_tencent(raw: dict, source: str) -> dict | None:
         "price_date": raw.get("price_date", ""),
         "source_api": "tencent",
         "source": source,
+        # 扩展字段（用于基金风格分析等下游模块）
+        "market_cap": raw.get("market_cap", 0.0),
+        "pe": raw.get("pe", 0.0),
     }
 
 
@@ -82,6 +85,9 @@ def _price_transform_sina(raw: dict, source: str) -> dict | None:
         "price_date": raw.get("price_date", ""),
         "source_api": "sina",
         "source": source,
+        # 新浪数据不含 market_cap/pe，下游使用前需判 None
+        "market_cap": None,
+        "pe": None,
     }
 
 
@@ -174,7 +180,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
 
     def _fetch_with_cache_refresh(dt: str) -> dict[str, Any] | None:
         """一次 fetch + 收市后新鲜度校验（跨日残留缓存清仓重试）。"""
-        r = _fetch_with_fallback(
+        r = fetch_with_fallback(
             data_type=dt,
             provider_fn_map=_PRICE_PROVIDERS,
             cache_key=cache_key,
@@ -190,7 +196,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
             logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新",
                          r.get("price_date", "?"), _td)
             _cache_clear(cache_key)
-            r = _fetch_with_fallback(
+            r = fetch_with_fallback(
                 data_type=dt,
                 provider_fn_map=_PRICE_PROVIDERS,
                 cache_key=cache_key,

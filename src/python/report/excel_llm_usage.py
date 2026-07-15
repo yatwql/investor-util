@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.python.logger import setup_logger
-from src.python.report.progress import ProgressReporter, _Timer
+from src.python.report.progress import ProgressReporter, Timer
 
 logger = setup_logger()
 
@@ -22,7 +22,7 @@ def write_llm_section_and_usage(
     if not include_llm:
         return
 
-    with _Timer("LLM 分析章节"):
+    with Timer("LLM 分析章节"):
         prog.info("正在生成 LLM 分析章节...")
         try:
             from src.python.report.llm_content import write_llm_sheets
@@ -47,7 +47,7 @@ def build_llm_usage_sheet(sheets: dict[str, Any], _prog: ProgressReporter) -> No
             format_session_usage,
             get_session_usage,
         )
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
         from src.python.registry import get_llm_module_names
         from src.python.report.summary import write_llm_usage_sheet
     except (ImportError, AttributeError) as e:
@@ -63,7 +63,7 @@ def build_llm_usage_sheet(sheets: dict[str, Any], _prog: ProgressReporter) -> No
     if not per_module:
         logger.debug("LLM 会话数据中 per_module 为空，尝试从 formatted 获取")
         per_module = formatted.get("per_module", {}) or {}
-    all_failure = dict(_LLM_MODULE_FAILURE)
+    all_failure = dict(LLM_MODULE_FAILURE)
     names_map = get_llm_module_names()
 
     MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]

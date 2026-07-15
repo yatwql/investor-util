@@ -2,7 +2,7 @@
 
 职责：
   1. 遍历持仓 → 按代码类型路由（A 股/ETF → history_stock，OTC 基金 → history_fund_otc）
-  2. 调用 _fetch_with_incremental_fallback() 获取历史数据
+  2. 调用 fetch_with_incremental_fallback() 获取历史数据
   3. 合并为统一的时间序列（as-if 市值）
   4. 计算回撤、波动率、收益率
   5. 数据质量校验（_validate_bars）
@@ -10,7 +10,7 @@
 C1 约束：代码类型判定使用 code_utils 组合逻辑。
 C4 约束：会话内重复请求先查 session_cache。
 C5 约束：HTTP 请求通过 make_http_client()（由 provider 层保证）。
-C6 约束：走 _fetch_with_incremental_fallback，不绕过 chain 层。
+C6 约束：走 fetch_with_incremental_fallback，不绕过 chain 层。
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from src.python.code_utils import (
     is_otc_fund_by_name,
     is_otc_code_overlap,
 )
-from src.python.fetcher.chain import _fetch_with_incremental_fallback
+from src.python.fetcher.chain import fetch_with_incremental_fallback
 from src.python.report.benchmark import fetch_benchmarks, normalize_benchmarks
 
 logger = logging.getLogger("invest")
@@ -358,7 +358,7 @@ class PortfolioHistoryCalculator:
         if cache_key in self._session_cache:
             return self._session_cache[cache_key]
 
-        bars = _fetch_with_incremental_fallback("history_stock", code)
+        bars = fetch_with_incremental_fallback("history_stock", code)
         if bars:
             self._session_cache[cache_key] = bars
         return bars
@@ -369,7 +369,7 @@ class PortfolioHistoryCalculator:
         if cache_key in self._session_cache:
             return self._session_cache[cache_key]
 
-        bars = _fetch_with_incremental_fallback("history_fund_otc", code)
+        bars = fetch_with_incremental_fallback("history_fund_otc", code)
         if bars:
             self._session_cache[cache_key] = bars
         return bars

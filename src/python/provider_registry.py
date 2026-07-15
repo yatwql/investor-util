@@ -40,11 +40,11 @@ _SESSION_CACHE_MAX_ENTRIES = 2000
 
 # ── Sentinel ─────────────────────────────────────────────
 
-_TRANSPORT_FAILURE: object = object()
+TRANSPORT_FAILURE: object = object()
 """传输级异常 sentinel：超时/断连/DNS/SSL/5xx。
    _fetch_with_fallback 通过此 sentinel 区分『网络挂了』和『代码级空结果』。"""
 
-_NOT_FOUND: object = object()
+NOT_FOUND: object = object()
 """会话缓存未命中的返回值 sentinel，区分『缓存存了 None』和『没查过』。"""
 
 
@@ -210,7 +210,7 @@ class DataSourceRegistry:
         调用方应仅在『传输级异常』（超时/断连/DNS/SSL/5xx）时调用此方法。
         代码级空结果（API 正常响应但无匹配数据）不计入熔断。
 
-        未注册的 provider 自动注册（默认 tier=4），兼容 _fetch_with_fallback
+        未注册的 provider 自动注册（默认 tier=4），兼容 fetch_with_fallback
         等不提前注册 provider 的调用方。
         """
         with self._provider_lock:
@@ -288,20 +288,20 @@ class DataSourceRegistry:
     @staticmethod
     def is_transport_failure(result: Any) -> bool:
         """判断结果是否为传输级失败的 sentinel。"""
-        return result is _TRANSPORT_FAILURE
+        return result is TRANSPORT_FAILURE
 
     # ── 会话级缓存 ─────────────────────────────────────
 
     def session_cache_get(self, domain: str, code: str) -> Any:
-        """从会话缓存读取，未命中时返回 _NOT_FOUND sentinel。
+        """从会话缓存读取，未命中时返回 NOT_FOUND sentinel。
 
-        NOTE: 调用方应通过 `is session_cache_get(...) is _NOT_FOUND` 区分
+        NOTE: 调用方应通过 `is session_cache_get(...) is NOT_FOUND` 区分
         『未缓存』和『缓存值为 None』。
         """
         with self._cache_lock:
             entry = self._session_cache.get(domain, {}).get(code)
             if entry is None:
-                return _NOT_FOUND
+                return NOT_FOUND
             return entry.value
 
     def session_cache_set(
@@ -434,7 +434,7 @@ class DataSourceRegistry:
         """
         # 1) session cache
         cached = self.session_cache_get(cache_domain, code)
-        if cached is not _NOT_FOUND:
+        if cached is not NOT_FOUND:
             return cached
 
         # 2) file cache

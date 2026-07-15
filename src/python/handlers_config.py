@@ -11,7 +11,7 @@ import sys
 from src.python.config import set_config
 from src.python.logger import setup_logger
 from src.python.reader import list_xlsx_files
-from src.python.tui_menu import _GREEN, _RED, _YELLOW, _RESET, _press_any_key, _refresh_config, get_config_cache
+from src.python.tui_menu import GREEN, RED, YELLOW, RESET, press_any_key, refresh_config, get_config_cache
 
 logger = setup_logger()
 
@@ -30,8 +30,8 @@ def _read_llm_settings() -> tuple[dict, str] | None:
         settings = json.loads(_strip_json_comments(raw))
         return settings, path
     except (FileNotFoundError, json.JSONDecodeError):
-        print(f"  {_RED}[ERR]{_RESET} 无法读取 llm_settings.json")
-        _press_any_key()
+        print(f"  {RED}[ERR]{RESET} 无法读取 llm_settings.json")
+        press_any_key()
         return None
 
 
@@ -146,7 +146,7 @@ def _replace_dict_block(text: str, key: str, new_val: dict) -> str:
 
 def _cmd_config_dir() -> None:
     """配置持仓目录。"""
-    _refresh_config()
+    refresh_config()
     config = get_config_cache() or {}
     current = config.get("holdings_dir", "")
     print(f"  当前目录: {current}")
@@ -158,15 +158,15 @@ def _cmd_config_dir() -> None:
         return
     if new_dir:
         set_config("holdings_dir", new_dir)
-        _refresh_config()
-        print(f"  {_GREEN}[OK]{_RESET} 目录已更新为: {new_dir}")
+        refresh_config()
+        print(f"  {GREEN}[OK]{RESET} 目录已更新为: {new_dir}")
     else:
         print("  未修改")
 
 
 def _cmd_config_filename() -> None:
     """配置持仓文件名。"""
-    _refresh_config()
+    refresh_config()
     config = get_config_cache() or {}
     current = config.get("holdings_filename", "")
     files = list_xlsx_files(config.get("holdings_dir", ""))
@@ -184,15 +184,15 @@ def _cmd_config_filename() -> None:
         return
     if new_name:
         set_config("holdings_filename", new_name)
-        _refresh_config()
-        print(f"  {_GREEN}[OK]{_RESET} 文件名已更新为: {new_name}")
+        refresh_config()
+        print(f"  {GREEN}[OK]{RESET} 文件名已更新为: {new_name}")
     else:
         print("  未修改")
 
 
 def _cmd_config_output_dir() -> None:
     """配置报告输出目录。"""
-    _refresh_config()
+    refresh_config()
     config = get_config_cache() or {}
     current = config.get("output_dir", "reports")
     print(f"  当前输出目录: {current}")
@@ -204,8 +204,8 @@ def _cmd_config_output_dir() -> None:
         return
     if new_dir:
         set_config("output_dir", new_dir)
-        _refresh_config()
-        print(f"  {_GREEN}[OK]{_RESET} 输出目录已更新为: {new_dir}")
+        refresh_config()
+        print(f"  {GREEN}[OK]{RESET} 输出目录已更新为: {new_dir}")
     else:
         print("  未修改")
 
@@ -228,7 +228,7 @@ def _cmd_config_llm_modules() -> None:
         items = []
         for i, (sfx, name) in enumerate(module_names.items(), 1):
             status = enabled_map.get(sfx, True)
-            status_str = f"{_GREEN}开启{_RESET}" if status else f"{_RED}关闭{_RESET}"
+            status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
             items.append((i, sfx, name, status))
             print(f"  │ {i}. {name:<14s} [{status_str}]{' ' * 4}│")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
@@ -251,13 +251,13 @@ def _cmd_config_llm_modules() -> None:
                 enabled_map[sfx] = not curr
                 settings["enabled_llm"] = enabled_map
                 _write_llm_settings(settings, settings_path)
-                print(f"  {_GREEN}[OK]{_RESET} {name} 已{'开启' if not curr else '关闭'}")
+                print(f"  {GREEN}[OK]{RESET} {name} 已{'开启' if not curr else '关闭'}")
             else:
-                print(f"  {_YELLOW}[!]{_RESET} 无效编号")
+                print(f"  {YELLOW}[!]{RESET} 无效编号")
         except (ValueError, TypeError):
-            print(f"  {_YELLOW}[!]{_RESET} 请输入有效编号")
+            print(f"  {YELLOW}[!]{RESET} 请输入有效编号")
 
-    _press_any_key()
+    press_any_key()
 
 
 def _cmd_config_report_boards() -> None:
@@ -275,9 +275,9 @@ def _cmd_config_report_boards() -> None:
 
         print()
         print("  ┌── 配置报告板块可见性 ────────────────────┐")
-        b_status = f"{_GREEN}启用{_RESET}" if b_series else f"{_RED}禁用{_RESET}"
-        n_status = f"{_GREEN}启用{_RESET}" if news else f"{_RED}禁用{_RESET}"
-        h_status = f"{_GREEN}启用{_RESET}" if history else f"{_RED}禁用{_RESET}"
+        b_status = f"{GREEN}启用{RESET}" if b_series else f"{RED}禁用{RESET}"
+        n_status = f"{GREEN}启用{RESET}" if news else f"{RED}禁用{RESET}"
+        h_status = f"{GREEN}启用{RESET}" if history else f"{RED}禁用{RESET}"
         print(f"  │ 1. B 系列基金深度分析（#6~9）  [{b_status}]{' ' * 8}│")
         print(f"  │ 2. 新闻与预警（#10~11）        [{n_status}]{' ' * 8}│")
         print(f"  │ 3. 组合历史走势+回撤（#16~17）  [{h_status}]{' ' * 8}│")
@@ -297,28 +297,28 @@ def _cmd_config_report_boards() -> None:
 
         if choice == "1":
             set_config("enable_b_series", not b_series)
-            print(f"  {_GREEN}[OK]{_RESET} B 系列已{'禁用' if b_series else '启用'}")
+            print(f"  {GREEN}[OK]{RESET} B 系列已{'禁用' if b_series else '启用'}")
         elif choice == "2":
             set_config("enable_news", not news)
-            print(f"  {_GREEN}[OK]{_RESET} 新闻与预警已{'禁用' if news else '启用'}")
+            print(f"  {GREEN}[OK]{RESET} 新闻与预警已{'禁用' if news else '启用'}")
         elif choice == "3":
             set_config("enable_history", not history)
-            print(f"  {_GREEN}[OK]{_RESET} 组合历史走势已{'禁用' if history else '启用'}")
+            print(f"  {GREEN}[OK]{RESET} 组合历史走势已{'禁用' if history else '启用'}")
         elif choice == "4":
-            print(f"  {_YELLOW}[!]{_RESET} LLM 板块配置请使用菜单 [S]")
+            print(f"  {YELLOW}[!]{RESET} LLM 板块配置请使用菜单 [S]")
         else:
-            print(f"  {_YELLOW}[!]{_RESET} 无效编号")
+            print(f"  {YELLOW}[!]{RESET} 无效编号")
 
-    _refresh_config()
-    _press_any_key()
+    refresh_config()
+    press_any_key()
 
 
-def _cmd_refresh_config() -> None:
+def _cmdrefresh_config() -> None:
     """重新加载所有配置（config.json + llm_settings.json + llm_key.json）。"""
     # 破坏内部缓存强制重新读取
     import src.python.config as _cfg_mod
     from src.python.config import get_config, get_llm_config
-    from src.python.llm.pricing import _reload_pricing
+    from src.python.llm.pricing import reload_pricing
     _cfg_mod._config_cache = None
     _cfg_mod._config_mtime = 0
     _cfg_mod._llm_config_cache = None
@@ -326,15 +326,15 @@ def _cmd_refresh_config() -> None:
 
     config = get_config()
     llm_config = get_llm_config()
-    _reload_pricing()
+    reload_pricing()
 
     # 刷新 tui_menu 配置缓存
-    _refresh_config()
+    refresh_config()
 
     if config:
-        print(f"  {_GREEN}[OK]{_RESET} config.json 已重新加载")
+        print(f"  {GREEN}[OK]{RESET} config.json 已重新加载")
     if llm_config:
-        print(f"  {_GREEN}[OK]{_RESET} llm_settings.json + llm_key.json 已重新加载")
+        print(f"  {GREEN}[OK]{RESET} llm_settings.json + llm_key.json 已重新加载")
     else:
-        print(f"  {_YELLOW}[!]{_RESET} LLM 未配置（llm_key.json 缺失或无效）")
-    _press_any_key()
+        print(f"  {YELLOW}[!]{RESET} LLM 未配置（llm_key.json 缺失或无效）")
+    press_any_key()

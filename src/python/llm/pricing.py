@@ -9,18 +9,18 @@ from src.python.constants import MODEL_PRICING
 logger = logging.getLogger("invest")
 
 __all__ = [
-    "_PRICING_MERGED", "_PRICING_CURRENCY", "_CURRENCY_SYMBOLS",
-    "_reload_pricing", "_estimate_cost",
+    "PRICING_MERGED", "PRICING_CURRENCY", "CURRENCY_SYMBOLS",
+    "reload_pricing", "estimate_cost",
 ]
 
 # ── 运行时合并定价表：硬编码 + llm_settings.json 覆盖
-_PRICING_MERGED: dict[str, dict[str, float]] = dict(MODEL_PRICING)
+PRICING_MERGED: dict[str, dict[str, float]] = dict(MODEL_PRICING)
 
 # 定价货币标识，默认 CNY；可通过 llm_settings.json → pricing.currency 覆盖
-_PRICING_CURRENCY: str = "CNY"
+PRICING_CURRENCY: str = "CNY"
 
 # 货币符号映射
-_CURRENCY_SYMBOLS: dict[str, str] = {
+CURRENCY_SYMBOLS: dict[str, str] = {
     "USD": "$",
     "CNY": "¥",
     "EUR": "€",
@@ -29,14 +29,14 @@ _CURRENCY_SYMBOLS: dict[str, str] = {
 }
 
 
-def _reload_pricing() -> None:
+def reload_pricing() -> None:
     """从 llm_settings.json 重新加载定价配置。
 
     - "currency" 字段（可选，默认 "CNY"）设定货币类型，影响费用显示的符号。
-    - 其余字段按模型名合并到 _PRICING_MERGED（文件配置优先级高于内置默认）。
+    - 其余字段按模型名合并到 PRICING_MERGED（文件配置优先级高于内置默认）。
       文件中的 input_cache_hit 为可选字段，缺失时继承内置默认值（如内置也无则等于 input）。
     """
-    global _PRICING_CURRENCY
+    global PRICING_CURRENCY
     try:
         from src.python.config import get_llm_config
         cfg = get_llm_config()
@@ -45,7 +45,7 @@ def _reload_pricing() -> None:
             if isinstance(file_pricing, dict):
                 # 提取货币标识
                 if "currency" in file_pricing:
-                    _PRICING_CURRENCY = str(file_pricing["currency"]).upper().strip()
+                    PRICING_CURRENCY = str(file_pricing["currency"]).upper().strip()
                 # 合并模型定价（跳过 currency 等非模型字段）
                 for model, prices in file_pricing.items():
                     if model == "currency":
@@ -59,36 +59,36 @@ def _reload_pricing() -> None:
                             entry["input_cache_hit"] = float(prices["input_cache_hit"])
                         else:
                             # 文件未指定缓存命中价时，继承内置默认或等于 input
-                            existing = _PRICING_MERGED.get(model, {})
+                            existing = PRICING_MERGED.get(model, {})
                             entry["input_cache_hit"] = float(
                                 existing.get("input_cache_hit", float(prices["input"]))
                             )
-                        _PRICING_MERGED[model] = entry
+                        PRICING_MERGED[model] = entry
                     elif isinstance(prices, dict):
                         # 部分字段缺失时保持已有值
-                        existing = _PRICING_MERGED.get(model, {"input": 0, "output": 0, "input_cache_hit": 0})
+                        existing = PRICING_MERGED.get(model, {"input": 0, "output": 0, "input_cache_hit": 0})
                         if "input" in prices:
                             existing["input"] = float(prices["input"])
                         if "output" in prices:
                             existing["output"] = float(prices["output"])
                         if "input_cache_hit" in prices:
                             existing["input_cache_hit"] = float(prices["input_cache_hit"])
-                        _PRICING_MERGED[model] = existing
+                        PRICING_MERGED[model] = existing
     except Exception:
         logger.debug("加载定价配置失败，使用默认定价", exc_info=True)
 
 
 # 模块加载时自动合并一次
-_reload_pricing()
+reload_pricing()
 
 
-def _estimate_cost(model: str, input_tokens: int, output_tokens: int,
+def estimate_cost(model: str, input_tokens: int, output_tokens: int,
                    cache_hit_input_tokens: int = 0) -> str:
     """估算 LLM API 调用的费用。
 
     基于已知模型定价（每百万 token 价格）。
     未知模型返回 "-"。
-    货币符号由 _PRICING_CURRENCY 决定（自 llm_settings.json → pricing.currency）。
+    货币符号由 PRICING_CURRENCY 决定（自 llm_settings.json → pricing.currency）。
     若存在缓存命中 token，按 input_cache_hit 费率计算（通常为 input 的 10%）。
 
     Args:
@@ -103,9 +103,9 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int,
     if not input_tokens and not output_tokens:
         return "-"
     model_lower = model.lower().strip()
-    pricing = _PRICING_MERGED.get(model_lower)
+    pricing = PRICING_MERGED.get(model_lower)
     if not pricing:
-        for known, price in _PRICING_MERGED.items():
+        for known, price in PRICING_MERGED.items():
             if model_lower.startswith(known):
                 pricing = price
                 break
@@ -117,7 +117,7 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int,
     if cache_hit_input_tokens > 0:
         cache_rate = pricing.get("input_cache_hit", pricing["input"])
         cost += cache_hit_input_tokens / 1_000_000 * cache_rate
-    symbol = _CURRENCY_SYMBOLS.get(_PRICING_CURRENCY, "$")
+    symbol = CURRENCY_SYMBOLS.get(PRICING_CURRENCY, "$")
     if cost < 0.01:
         return f"{symbol}{cost:.4f}"
     return f"{symbol}{cost:.3f}"

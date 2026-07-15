@@ -10,7 +10,7 @@ from typing import Any
 
 from src.python.logger import setup_logger
 from src.python.registry import get_report_sheet_name
-from src.python.report.progress import ProgressReporter, _Timer
+from src.python.report.progress import ProgressReporter, Timer
 
 logger = setup_logger()
 
@@ -37,10 +37,10 @@ def resolve_market_data(
             "today_profit": sum(d.today_profit for d in details),
             "details": details,
         }
-        with _Timer(get_report_sheet_name("market_value")):
+        with Timer(get_report_sheet_name("market_value")):
             mvs(ws2, holdings, details=details)
     else:
-        with _Timer("行情数据获取 (" + get_report_sheet_name("market_value") + ")"):
+        with Timer("行情数据获取 (" + get_report_sheet_name("market_value") + ")"):
             prog.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
             gen_details = modules.get("_generate_details")
             details = gen_details(holdings) if gen_details else []
@@ -77,7 +77,7 @@ def resolve_indices(
     """获取市场指数（外部传入时复用）。"""
     if a_indices is not None:
         return a_indices, us_indices if us_indices is not None else {}
-    with _Timer("市场指数 (" + get_report_sheet_name("summary") + ")"):
+    with Timer("市场指数 (" + get_report_sheet_name("summary") + ")"):
         prog.info("正在获取市场指数...")
         a_idx = modules.get("fetch_indices", lambda: {})()
         us_idx = modules.get("fetch_us_indices", lambda: {})() if us_indices is None else (us_indices or {})

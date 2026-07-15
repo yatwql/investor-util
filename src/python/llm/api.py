@@ -11,7 +11,7 @@ import logging
 import httpx
 
 from src.python.llm.api_base import (
-    _call_llm_with_retry,
+    call_llm_with_retry,
     _check_claude_truncation,
     _check_openai_truncation,
     _extract_content,
@@ -23,11 +23,11 @@ from src.python.llm.api_base import (
 logger = logging.getLogger("invest")
 
 __all__ = [
-    "_call_llm",
-    "_call_single_provider",
-    "_call_claude",
-    "_call_openai",
-    "_configure_extended_thinking",
+    "call_llm",
+    "call_single_provider",
+    "call_claude",
+    "call_openai",
+    "configure_extended_thinking",
 ]
 
 # ── 内容过滤安抚重试 ────────────────────────────────
@@ -41,7 +41,7 @@ _CONTENT_FILTER_RECOVERY = (
 追加到 system prompt 尾部重新请求。"""
 
 
-def _call_single_provider(
+def call_single_provider(
     provider: str,
     system_prompt: str,
     user_prompt: str,
@@ -58,12 +58,12 @@ def _call_single_provider(
 ) -> tuple[str | None, dict | None]:
     """调用单个 LLM provider。"""
     if provider == "claude":
-        return _call_claude(system_prompt, user_prompt, api_key, resolved_model, endpoint,
+        return call_claude(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                                 max_tokens, timeout, max_retries=max_retries,
                                 http_client=http_client, config_field=config_field,
                                 temperature=temperature, llm_config=llm_config)
     elif provider == "openai":
-        return _call_openai(system_prompt, user_prompt, api_key, resolved_model, endpoint,
+        return call_openai(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                                 max_tokens, timeout, max_retries=max_retries,
                                 http_client=http_client, config_field=config_field,
                                 temperature=temperature)
@@ -72,7 +72,7 @@ def _call_single_provider(
         return (None, None)
 
 
-def _call_llm(
+def call_llm(
     system_prompt: str,
     user_prompt: str,
     llm_config: dict,
@@ -107,7 +107,7 @@ def _call_llm(
     max_retries = _get_retry_max(llm_config)
 
     # ── 主 provider ──
-    result, usage = _call_single_provider(
+    result, usage = call_single_provider(
         provider, system_prompt, user_prompt, api_key, resolved_model, endpoint,
         max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
     )
@@ -118,7 +118,7 @@ def _call_llm(
         logger.warning("%s API 返回空内容，追加安抚指令重试一次", provider)
         print(f"  [..] {provider} API 返回空内容，追加安抚指令重试...")
         calmed_system = system_prompt + _CONTENT_FILTER_RECOVERY
-        result2, usage2 = _call_single_provider(
+        result2, usage2 = call_single_provider(
             provider, calmed_system, user_prompt, api_key, resolved_model, endpoint,
             max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
         )
@@ -135,7 +135,7 @@ def _call_llm(
         fb_model = llm_config.get("fallback_model", resolved_model)
         logger.warning("主 provider (%s) 已失败，回退到 %s", provider, fallback_provider)
         print(f"  [..] LLM 主 provider ({provider}) 失败，正在回退到 {fallback_provider}...")
-        result, usage = _call_single_provider(
+        result, usage = call_single_provider(
             fallback_provider, system_prompt, user_prompt, fb_api_key, fb_model, fb_endpoint,
             max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
         )
@@ -146,7 +146,7 @@ def _call_llm(
     return (None, None)
 
 
-def _configure_extended_thinking(
+def configure_extended_thinking(
     payload: dict,
     llm_config: dict | None,
     config_field: str,
@@ -191,7 +191,7 @@ def _configure_extended_thinking(
         logger.info("Extended Thinking 已开启 [%s]: budget=%d", module_suffix, budget)
 
 
-def _call_claude(
+def call_claude(
     system: str,
     user: str,
     api_key: str,
@@ -238,13 +238,13 @@ def _call_claude(
         "messages": [{"role": "user", "content": user}],
     }
     # ── Extended Thinking（根据模型类型 + 模块配置） ──
-    _configure_extended_thinking(payload, llm_config, config_field, model, max_tokens)
+    configure_extended_thinking(payload, llm_config, config_field, model, max_tokens)
     if temperature is not None and "thinking" not in payload:
         payload["temperature"] = temperature
     client = http_client
     assert client is not None
 
-    return _call_llm_with_retry(
+    return call_llm_with_retry(
         label="Claude", client=client, url=url, headers=headers,
         payload=payload, timeout=timeout, max_retries=max_retries,
         max_tokens=max_tokens, config_field=config_field,
@@ -254,7 +254,7 @@ def _call_claude(
     )
 
 
-def _call_openai(
+def call_openai(
     system: str,
     user: str,
     api_key: str,
@@ -302,7 +302,7 @@ def _call_openai(
         except (KeyError, IndexError, TypeError):
             return None
 
-    return _call_llm_with_retry(
+    return call_llm_with_retry(
         label="OpenAI", client=client, url=url, headers=headers,
         payload=payload, timeout=timeout, max_retries=max_retries,
         max_tokens=max_tokens, config_field=config_field,

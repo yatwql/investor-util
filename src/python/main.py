@@ -15,17 +15,17 @@ if _project_root not in sys.path:
 os.chdir(_project_root)
 
 from src.python.config import init_config
-from src.python.llm.pricing import _CURRENCY_SYMBOLS
+from src.python.llm.pricing import CURRENCY_SYMBOLS
 from src.python.logger import setup_logger
 from src.python.tui import KEY_CTRL_C, KEY_DOWN, KEY_ENTER, KEY_UP, get_key
-from src.python.tui_handlers import _execute_item
+from src.python.tui_handlers import execute_item
 from src.python.tui_menu import (
     MENU_ITEMS,
-    _exit_app,
-    _index_by_key,
-    _print_header,
-    _render_menu,
-    _show_config,
+    exit_app,
+    index_by_key,
+    print_header,
+    render_menu,
+    show_config,
 )
 
 logger = setup_logger()
@@ -44,7 +44,7 @@ def _print_session_usage_on_exit() -> None:
             calls = usage.get("call_count", 0)
             cost = usage.get("total_cost", 0.0)
             currency = usage.get("currency", "CNY")
-            symbol = _CURRENCY_SYMBOLS.get(currency, "¥")
+            symbol = CURRENCY_SYMBOLS.get(currency, "¥")
             model = usage.get("model", "")
             print("\n── LLM 会话统计 ──")
             print(f"  模型: {model}")
@@ -129,13 +129,13 @@ def main() -> None:
     # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/C/F/O/1/2/3/4/S/R/X
     from src.python.config import get_config
     _default_key = get_config().get("default_menu_key", "L").upper()
-    _idx = _index_by_key(_default_key)
+    _idx = index_by_key(_default_key)
     sel: int = _idx if _idx is not None else 0
 
     while True:
-        _print_header()
-        _show_config()
-        _render_menu(sel)
+        print_header()
+        show_config()
+        render_menu(sel)
 
         key = get_key()
 
@@ -144,14 +144,14 @@ def main() -> None:
         elif key == KEY_DOWN:
             sel = (sel + 1) % len(MENU_ITEMS)
         elif key == KEY_ENTER:
-            _execute_item(sel)
+            execute_item(sel)
         elif key == KEY_CTRL_C:
-            _exit_app()
+            exit_app()
         elif len(key) == 1 and ("A" <= key <= "Z" or "a" <= key <= "z" or "0" <= key <= "9"):
-            idx = _index_by_key(key.upper())
+            idx = index_by_key(key.upper())
             if idx is not None:
                 sel = idx
-                _execute_item(idx)
+                execute_item(idx)
 
 
 if __name__ == "__main__":

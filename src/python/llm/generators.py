@@ -13,8 +13,8 @@ from typing import Any
 import httpx
 
 from src.python.llm.fingerprint import (
-    _build_llm_fingerprint,
-    _compute_fingerprint,
+    build_llm_fingerprint,
+    compute_fingerprint,
 )
 from src.python.llm.prompts import (
     _SYSTEM_EXPERT_REVIEW,
@@ -26,7 +26,7 @@ from src.python.llm.prompts import (
     _build_health_check_prompt,
     _build_penetration_deep_prompt,
 )
-from src.python.llm.skeleton import _generate_llm_module
+from src.python.llm.skeleton import generate_llm_module
 
 __all__ = [
     "generate_global_macro",
@@ -49,10 +49,10 @@ def generate_global_macro(
 ) -> tuple[str | None, bool]:
     """生成全球政经局势。"""
     def _fingerprint():
-        return _compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
+        return compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
     def _prompt():
         return _build_global_macro_prompt(a_indices, us_indices, total_mv, total_profit, categories, sector_flow)
-    return _generate_llm_module(
+    return generate_llm_module(
         llm_config, "global_macro",
         force=force, http_client=http_client,
         fingerprint_fn=_fingerprint,
@@ -80,7 +80,7 @@ def generate_expert_review(
 ) -> tuple[str | None, bool]:
     """生成智囊团深度复盘。"""
     def _fingerprint():
-        return _build_llm_fingerprint(
+        return build_llm_fingerprint(
             total_mv=total_mv, total_cost=total_cost,
             total_profit=total_profit, total_today_profit=total_today_profit,
             holdings_details=holdings_details,
@@ -94,7 +94,7 @@ def generate_expert_review(
             holdings_details=holdings_details,
             f_context=f_context,
         )
-    return _generate_llm_module(
+    return generate_llm_module(
         llm_config, "expert_review",
         force=force, http_client=http_client,
         fingerprint_fn=_fingerprint,
@@ -122,7 +122,7 @@ def generate_health_check(
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。"""
     def _fingerprint():
-        return _build_llm_fingerprint(
+        return build_llm_fingerprint(
             total_mv=total_mv, total_cost=total_cost,
             total_profit=total_profit, total_today_profit=total_today_profit,
             holdings_details=holdings_details,
@@ -136,7 +136,7 @@ def generate_health_check(
             holdings_details=holdings_details,
             f_context=f_context,
         )
-    return _generate_llm_module(
+    return generate_llm_module(
         llm_config, "health_check",
         force=force, http_client=http_client,
         fingerprint_fn=_fingerprint,
@@ -163,7 +163,7 @@ def generate_penetration_deep_analysis(
 ) -> tuple[str | None, bool]:
     """生成穿透深度分析。"""
     def _fingerprint():
-        return _build_llm_fingerprint(
+        return build_llm_fingerprint(
             total_mv=total_mv, total_cost=total_cost,
             total_profit=total_profit, total_today_profit=total_today_profit,
             holdings_details=holdings_details,
@@ -177,7 +177,7 @@ def generate_penetration_deep_analysis(
             holdings_count, categories, penetrated_assets,
             holdings_details=holdings_details,
         )
-    return _generate_llm_module(
+    return generate_llm_module(
         llm_config, "penetration_deep",
         force=force, http_client=http_client,
         fingerprint_fn=_fingerprint,

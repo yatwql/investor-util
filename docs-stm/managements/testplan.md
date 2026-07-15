@@ -457,7 +457,7 @@ def test_get_ttl_closed(self, mock_open):
 ### 6.1 功能完整性
 
 1. **功能完成**：当前迭代的所有计划功能已实现（对应 `plan.md` 条目全部标注完成）
-2. **文档同步**：新增/重命名/删除的文件或目录已同步更新 `datasource-and-folders.md` 目录树
+2. **文档同步**：新增/重命名/删除的文件或目录已同步更新 `folders.md` 目录树
 3. **自审记录**：自查问题已写入 `review-findings.md`，修复后已同步到 `changelog.md`
 
 ### 6.2 自动化测试门禁
@@ -528,7 +528,7 @@ def test_qdii_nav_date_delayed_t2(self):
 ### 8.3 新增后必须更新的文件
 
 1. **`test-coverage.md` 场景测试分组表** — 新增 S/T 场景时补充条目（含测试类参考列）
-2. **`datasource-and-folders.md`** — 新增 test_*.py 文件后更新目录树（test 目录下的测试文件数）
+2. **`folders.md`** — 新增 test_*.py 文件后更新目录树
 3. **`changelog.md`** — 记录新增的测试数量和覆盖场景
 4. **`plan.md`** — 如果在迭代中新增的功能，更新对应条目的完成状态
 5. **`unit/conftest.py`** — 新增 `unit/` 下测试文件时确认 `pytestmark` 列表包含正确的 `unit_*` 子标记

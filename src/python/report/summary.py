@@ -250,7 +250,7 @@ def _write_us_indices(ws: Worksheet, row: int, us_indices: dict[str, dict[str, A
     return row
 
 
-def _build_index_data_status(
+def build_index_data_status(
     a_indices: dict[str, dict[str, Any]] | None,
     us_indices: dict[str, dict[str, Any]] | None,
 ) -> DataStatus:
@@ -349,7 +349,7 @@ def write_summary_sheet(
     row = _write_us_indices(ws, row, us_indices)
 
     # 指数数据源状态
-    data_status = _build_index_data_status(a_indices, us_indices)
+    data_status = build_index_data_status(a_indices, us_indices)
     _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
     auto_width(ws)

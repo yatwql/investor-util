@@ -69,10 +69,10 @@ def _build_diff_context_block(f_context: dict | None) -> str:
     return "\n".join(lines)
 
 __all__ = [
-    "_CACHE_PREFIX_LLM",
+    "CACHE_PREFIX_LLM",
     "FAIL_REASON_NOT_CONFIGURED", "FAIL_REASON_API_ERROR", "FAIL_REASON_NETWORK_ERROR",
     "FAIL_REASON_TIMEOUT", "FAIL_REASON_CIRCUIT_OPEN", "FAIL_REASON_DISABLED",
-    "_LLM_MODULE_FAILURE",
+    "LLM_MODULE_FAILURE",
     "_SYSTEM_GLOBAL_MACRO", "_SYSTEM_EXPERT_REVIEW", "_SYSTEM_HEALTH_CHECK",
     "_SYSTEM_PENETRATION_DEEP", "_SYSTEM_NEWS_CORRELATION",
     "_fmt_wan", "_fmt_holding_line",
@@ -83,7 +83,7 @@ __all__ = [
 
 # ── 缓存前缀 ─────────────────────────────────────────────────
 
-_CACHE_PREFIX_LLM = "llm_"
+CACHE_PREFIX_LLM = "llm_"
 
 
 # ── 模块级失败原因记录（供 write_llm_sheets 读取以输出具体提示） ──
@@ -96,7 +96,7 @@ FAIL_REASON_TIMEOUT = "timeout"
 FAIL_REASON_CIRCUIT_OPEN = "circuit_open"
 FAIL_REASON_DISABLED = "disabled"
 
-_LLM_MODULE_FAILURE: dict[str, str] = {}
+LLM_MODULE_FAILURE: dict[str, str] = {}
 """{module_key: reason} 各 LLM 模块最近一次生成的失败原因。
 key 为 "global_macro"/"expert_review"/"health_check"/"penetration_deep"，
 value 为 FAIL_REASON_* 常量。每次新生成开始时清除对应 key。"""

@@ -2,9 +2,9 @@
 
 按职责拆分后，报告生成 → handlers_report.py，缓存管理 → handlers_cache.py，
 配置管理 → handlers_config.py。本文件保留：
-  - 菜单执行调度（_execute_item）
-  - 通用辅助函数（_print_*、_check_*、_prepare_holdings、_select_holdings_file 等）
-  - 持仓变更检测与缓存预热（_check_and_warm_for_new_assets）
+  - 菜单执行调度（execute_item）
+  - 通用辅助函数（_print_*、_check_*、prepare_holdings、select_holdings_file 等）
+  - 持仓变更检测与缓存预热（check_and_warm_for_new_assets）
 """
 
 from __future__ import annotations
@@ -13,11 +13,11 @@ import json
 import os
 from datetime import datetime
 
-from src.python.llm.pricing import _CURRENCY_SYMBOLS
+from src.python.llm.pricing import CURRENCY_SYMBOLS
 from src.python.logger import setup_logger
 from src.python.reader import get_xlsx_info, list_xlsx_files, read_holdings
 from src.python.report.progress import TuiProgressReporter
-from src.python.tui_menu import MENU_ITEMS, _press_any_key, _refresh_config, get_config_cache
+from src.python.tui_menu import MENU_ITEMS, press_any_key, refresh_config, get_config_cache
 
 logger = setup_logger()
 
@@ -27,7 +27,7 @@ _busy: bool = False  # 防连续按键保护
 # ── LLM 用量 / 耗时 / 错误提示 ──────────────────────────────
 
 
-def _print_llm_session_usage(usage: dict | None = None) -> None:
+def print_llm_session_usage(usage: dict | None = None) -> None:
     """输出会话累计 LLM 用量（TUI 终端一行）。"""
     if usage is None:
         try:
@@ -41,16 +41,16 @@ def _print_llm_session_usage(usage: dict | None = None) -> None:
     calls = usage["call_count"]
     total_tok = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
     cost = usage.get("total_cost", 0.0)
-    symbol = _CURRENCY_SYMBOLS.get(usage.get("currency", "CNY"), "¥")
+    symbol = CURRENCY_SYMBOLS.get(usage.get("currency", "CNY"), "¥")
     print(f"  [OK] 本会话 LLM 累计：{calls} 次调用，{total_tok:,} tokens，费用 {symbol}{cost:.4f}")
 
 
-def _print_timing_summary() -> None:
+def print_timing_summary() -> None:
     """输出本次运行时各模块耗时排行（委托至 TuiProgressReporter）。"""
     TuiProgressReporter().print_timing_summary()
 
 
-def _print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
+def print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
     """输出带友好提示的错误信息。"""
     msg = str(e)
     is_network = any(kw in msg.lower() for kw in (
@@ -81,7 +81,7 @@ def _print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
         print(f"  [ERR] {prefix}: 操作异常，详情请查看日志文件 logs/app.log")
 
 
-def _check_network_available(details: list) -> bool:
+def check_network_available(details: list) -> bool:
     """检查行情数据是否全部不可用并在 TUI 上显示友好提示。"""
     if not details:
         return False
@@ -103,10 +103,10 @@ def _check_network_available(details: list) -> bool:
 # ── 持仓准备 / 收尾 ────────────────────────────────────────
 
 
-def _prepare_holdings() -> list | None:
+def prepare_holdings() -> list | None:
     """选择持仓文件并读取持仓记录。失败时返回 None。"""
-    _refresh_config()
-    filepath = _select_holdings_file()
+    refresh_config()
+    filepath = select_holdings_file()
     if not filepath:
         return None
     try:
@@ -116,32 +116,32 @@ def _prepare_holdings() -> list | None:
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
+            press_any_key()
             return None
         print(f"  [OK] 成功读取 {len(holdings)} 条持仓记录")
-        _check_and_warm_for_new_assets(holdings)
+        check_and_warm_for_new_assets(holdings)
         return holdings
     except Exception as e:
-        _print_error_with_hint(e, "读取持仓失败")
-        _press_any_key()
+        print_error_with_hint(e, "读取持仓失败")
+        press_any_key()
         return None
 
 
-def _finish_report(reporter: TuiProgressReporter) -> None:
+def finish_report(reporter: TuiProgressReporter) -> None:
     """报告生成收尾：错误摘要 → 耗时排行 → 按任意键。"""
     reporter.print_error_summary()
     reporter.print_timing_summary()
-    _press_any_key()
+    press_any_key()
 
 
-def _check_and_warm_for_new_assets(holdings: list) -> None:
+def check_and_warm_for_new_assets(holdings: list) -> None:
     """检测持仓是否变化，若有新增资产则主动预热其缓存数据。"""
     try:
         from src.python.cache import check_and_refresh_caches
         from src.python.fetcher.fund import fetch_fund_holdings, fetch_fund_rankings
         from src.python.fetcher.industry import batch_fetch_industry_data
         from src.python.fetcher.price import fetch_market_data
-        from src.python.report.fund_performance import _is_fund
+        from src.python.report.fund_performance import is_fund
 
         new_codes = check_and_refresh_caches(holdings)
         if not new_codes:
@@ -159,7 +159,7 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
                 print(f" {result['price']:.4f}")
             else:
                 print(" 失败")
-            if h and _is_fund(h):
+            if h and is_fund(h):
                 print(f"  [..]   新增基金 {name} ({code}) — 获取业绩排名...", end="")
                 perf = fetch_fund_rankings(code)
                 print(" OK" if perf else " 失败")
@@ -186,9 +186,9 @@ def _check_and_warm_for_new_assets(holdings: list) -> None:
 # ── 文件选择 ──────────────────────────────────────────────
 
 
-def _select_holdings_file() -> str | None:
+def select_holdings_file() -> str | None:
     """让用户选择持仓文件，返回绝对路径；未找到时返回 None。"""
-    _refresh_config()
+    refresh_config()
     config = get_config_cache() or {}
     specific_path = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))
     if os.path.exists(specific_path):
@@ -229,13 +229,13 @@ def _select_holdings_file() -> str | None:
 # ── 菜单执行调度 ────────────────────────────────────────────
 
 
-def _execute_item(sel: int) -> None:
+def execute_item(sel: int) -> None:
     """执行第 sel 项菜单的回调或退出。"""
     global _busy
     _, _label, callback, is_exit = MENU_ITEMS[sel]
     if is_exit:
-        from src.python.tui_menu import _exit_app
-        _exit_app()
+        from src.python.tui_menu import exit_app
+        exit_app()
     if callback is not None:
         if _busy:
             return
@@ -245,10 +245,10 @@ def _execute_item(sel: int) -> None:
         except KeyboardInterrupt:
             print()
             print("  操作已取消")
-            _press_any_key()
+            press_any_key()
         except Exception as e:
             logger.exception("菜单项执行异常")
-            _print_error_with_hint(e, "操作执行异常")
-            _press_any_key()
+            print_error_with_hint(e, "操作执行异常")
+            press_any_key()
         finally:
             _busy = False

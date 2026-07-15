@@ -219,19 +219,19 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     if not code:
         return None
 
-    from src.python.fetcher.chain import _fetch_with_incremental_fallback
+    from src.python.fetcher.chain import fetch_with_incremental_fallback
 
     # 先查会话缓存（C4 约束）
-    from src.python.provider_registry import _NOT_FOUND, get_registry
+    from src.python.provider_registry import NOT_FOUND, get_registry
     reg = get_registry()
     cached = reg.session_cache_get("history_index", code)
-    if cached is not _NOT_FOUND:
+    if cached is not NOT_FOUND:
         return cached
 
     # 通过 history_index chain 获取
     days = min(max(days, 5), 3650)
     try:
-        result = _fetch_with_incremental_fallback("history_index", code, days)
+        result = fetch_with_incremental_fallback("history_index", code, days)
     except Exception:
         logger.warning("[index] 指数历史日线获取异常: %s", code, exc_info=True)
         result = []

@@ -126,7 +126,7 @@ def _load_dividend_data(holdings: list) -> tuple[dict, bool]:
         return {}, False
 
 
-def _build_category_data_status(dividend_success: bool) -> DataStatus:
+def build_category_data_status(dividend_success: bool) -> DataStatus:
     """构建持仓分类表的数据源状态摘要。
 
     Args:
@@ -258,7 +258,7 @@ def write_category_sheet(
     logger.info("%s写入完成，共 %d 个分组，%d 条持仓",
                 get_report_sheet_name('category'), len(sorted_groups), len(holdings))
 
-    data_status = _build_category_data_status(dividend_success)
+    data_status = build_category_data_status(dividend_success)
     _write_data_status_foot(ws, data_status, start_row=row + 1, max_cols=_NCOLS)
 
 

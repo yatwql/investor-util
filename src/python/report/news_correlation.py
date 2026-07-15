@@ -342,7 +342,7 @@ def _apply_llm_enhancement(
     meta["llm_enabled"] = True
     try:
         from src.python.llm import enhance_news_correlation
-        from src.python.llm.pricing import _estimate_cost
+        from src.python.llm.pricing import estimate_cost
         news_items[:], cached, token_usage = enhance_news_correlation(
             news_items, holdings, penetrated_assets=penetrated_assets,
             industry_data=industry_data, llm_config=llm_config,
@@ -351,7 +351,7 @@ def _apply_llm_enhancement(
         meta["token_usage"] = token_usage
         meta["thinking_enabled"] = llm_config.get("thinking_enabled_news_correlation", False)
         if token_usage and token_usage.get("model"):
-            meta["cost_estimation"] = _estimate_cost(
+            meta["cost_estimation"] = estimate_cost(
                 token_usage.get("model", ""),
                 token_usage.get("input_tokens", 0),
                 token_usage.get("output_tokens", 0),

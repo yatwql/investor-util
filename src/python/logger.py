@@ -5,7 +5,7 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-from src.python.tui_menu import _RED, _RESET, _YELLOW
+from src.python.tui_menu import RED, RESET, YELLOW
 
 # 日志文件路径：测试期间写入独立文件，避免与运行时日志混淆
 # 检测方式（按可靠性降序）：
@@ -36,16 +36,16 @@ class _ColoredFormatter(logging.Formatter):
     """按日志级别着色消息内容的格式器（仅限控制台）。"""
 
     _LEVEL_COLORS = {
-        logging.WARNING: _YELLOW,
-        logging.ERROR: _RED,
-        logging.CRITICAL: _RED,
+        logging.WARNING: YELLOW,
+        logging.ERROR: RED,
+        logging.CRITICAL: RED,
     }
 
     def format(self, record: logging.LogRecord) -> str:
         color = self._LEVEL_COLORS.get(record.levelno, "")
         if color:
             original = record.msg
-            record.msg = f"{color}{record.msg}{_RESET}"
+            record.msg = f"{color}{record.msg}{RESET}"
             result = super().format(record)
             record.msg = original
             return result

@@ -12,12 +12,12 @@ from src.python.constants import APP_VERSION
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.models import Holding
-from src.python.provider_registry import _NOT_FOUND, get_registry
+from src.python.provider_registry import NOT_FOUND, get_registry
 from src.python.registry import get_llm_module_name, get_llm_module_names
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix
-from src.python.report.fund_performance import _is_fund
+from src.python.report.fund_performance import is_fund
 from src.python.report.fund_style_analysis import analyze_style_for_all_funds
 from src.python.report.html_builders import _build_category_data, _build_perf_data, _load_profit_forecast
 from src.python.report.market_value import (
@@ -42,7 +42,7 @@ def _fetch_fund_holdings_cached(code: str) -> dict | None:
     """
     registry = get_registry()
     cached = registry.session_cache_get("fund_hold", code)
-    if cached is not _NOT_FOUND:
+    if cached is not NOT_FOUND:
         return cached
     result = fetch_fund_holdings(code)
     registry.session_cache_set("fund_hold", code, result, source="api")
@@ -303,7 +303,7 @@ def _render_overlap_matrix(
     prog.info("正在计算持仓重合度矩阵...")
     try:
         fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if _is_fund(h)
+            h.code for h in holdings if is_fund(h)
         ))
         if len(fund_codes) < 2:
             return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
@@ -348,7 +348,7 @@ def _render_concentration(
     prog.info("正在计算持仓集中度...")
     try:
         fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if _is_fund(h)
+            h.code for h in holdings if is_fund(h)
         ))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
@@ -383,7 +383,7 @@ def _render_style_analysis(
     prog.info("正在分析基金风格漂移...")
     try:
         fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if _is_fund(h)
+            h.code for h in holdings if is_fund(h)
         ))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
@@ -597,8 +597,8 @@ def _render_llm_module_info(
     from src.python.llm import FAIL_REASON_DISABLED as _FAIL_REASON_DISABLED_IMPORT
     FAIL_REASON_DISABLED: str | None = _FAIL_REASON_DISABLED_IMPORT
     try:
-        from src.python.llm.prompts import _LLM_MODULE_FAILURE
-        _llm_failure = dict(_LLM_MODULE_FAILURE)
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        _llm_failure = dict(LLM_MODULE_FAILURE)
     except ImportError:
         logger.info("llm/session 模块未就绪，略过用量统计")
     if _llm_session_usage:

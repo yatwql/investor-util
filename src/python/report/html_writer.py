@@ -14,13 +14,13 @@ from src.python.cache import get_cache_hit_rate
 from src.python.constants import APP_VERSION
 from src.python.models import Holding
 from src.python.registry import get_llm_module_names, get_report_section_order
-from src.python.report.category import _build_category_data_status
+from src.python.report.category import build_category_data_status
 from src.python.report.data_status import DataStatus, DataStatusItem, STATUS_MESSAGES
 from src.python.report.market_value import get_last_trading_day
-from src.python.report.fund_performance import _build_perf_data_status, _is_fund
-from src.python.report.penetration_sheet import _build_penetration_data_status
+from src.python.report.fund_performance import build_perf_data_status, is_fund
+from src.python.report.penetration_sheet import build_penetration_data_status
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
-from src.python.report.summary import _build_index_data_status
+from src.python.report.summary import build_index_data_status
 
 logger = logging.getLogger("invest")
 
@@ -52,7 +52,7 @@ def _safe_build_data_status(builder, *args, label: str = "", **kwargs) -> DataSt
     避免 3 个 try 块重复此模式。
 
     Args:
-        builder: 状态构建函数（如 _build_index_data_status）
+        builder: 状态构建函数（如 build_index_data_status）
         label: 模块名称（用于日志消息），如 "指数"/"穿透"/"基金业绩"
         *args, **kwargs: 透传给 builder 的参数
 
@@ -161,11 +161,11 @@ def _build_data_status_sections(
     各模块的 data_status 构建互相独立，任一模块失败不影响其他。
     """
     data_status_summary: DataStatus = _safe_build_data_status(
-        _build_index_data_status, a_indices, us_indices, label="指数")
+        build_index_data_status, a_indices, us_indices, label="指数")
     data_status_penetration: DataStatus = {}
     if penetration:
         data_status_penetration = _safe_build_data_status(
-            _build_penetration_data_status, penetration,
+            build_penetration_data_status, penetration,
             penetration_profit_ok, penetration_dividend_ok, label="穿透")
     # 从 perf_data 提取真实 adjusted_ratings（无异常风险，放外面不吞）
     _adj_ratings: dict[str, str] = {}
@@ -176,11 +176,11 @@ def _build_data_status_sections(
             if _code and _tag:
                 _adj_ratings[_code] = _tag
     data_status_perf: DataStatus = _safe_build_data_status(
-        _build_perf_data_status, _adj_ratings,
-        sum(1 for h in holdings if _is_fund(h)),
+        build_perf_data_status, _adj_ratings,
+        sum(1 for h in holdings if is_fund(h)),
         profit_success=perf_profit_ok, label="基金业绩")
     data_status_category: DataStatus = _safe_build_data_status(
-        _build_category_data_status, cat_dividend_ok, label="持仓分类")
+        build_category_data_status, cat_dividend_ok, label="持仓分类")
     return data_status_summary, data_status_penetration, data_status_perf, data_status_category
 
 

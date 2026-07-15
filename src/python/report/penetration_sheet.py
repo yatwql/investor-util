@@ -101,7 +101,7 @@ def _load_dividend_data_safe(result: dict) -> tuple[dict, bool]:
         return {}, False
 
 
-def _build_penetration_data_status(
+def build_penetration_data_status(
     result: dict,
     profit_success: bool = True,
     dividend_success: bool = True,
@@ -220,7 +220,7 @@ def write_penetration_sheet(
     if not result["top10"]:
         write_data_row(ws, row, ["暂无穿透数据"])
         # 即使无 TOP10 数据，也检查是否有数据源失败需要展示状态
-        data_status = _build_penetration_data_status(result)
+        data_status = build_penetration_data_status(result)
         _write_data_status_foot(ws, data_status, start_row=row + 1)
         freeze_header(ws, 2)
         auto_width(ws)
@@ -253,7 +253,7 @@ def write_penetration_sheet(
         row += 1
 
     row = _write_penetration_footer(ws, row, summary)
-    data_status = _build_penetration_data_status(result, profit_success, dividend_success)
+    data_status = build_penetration_data_status(result, profit_success, dividend_success)
     _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=40)

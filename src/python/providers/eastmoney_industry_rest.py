@@ -86,10 +86,10 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
             - concept_ids: 空列表
         None: 页面请求失败或未找到行业数据
     """
-    from src.python.provider_registry import get_registry, _NOT_FOUND
+    from src.python.provider_registry import get_registry, NOT_FOUND
     reg = get_registry()
     cached = reg.session_cache_get("industry_rest", code)
-    if cached is not _NOT_FOUND:
+    if cached is not NOT_FOUND:
         return cached
 
     prefix = _quote_prefix(code)

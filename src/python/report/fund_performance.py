@@ -87,7 +87,7 @@ def _fund_display_type(h: Holding) -> str:
     return _FUND_TYPE_LABEL.get(ftype, "--")
 
 
-def _is_fund(h: Holding) -> bool:
+def is_fund(h: Holding) -> bool:
     """判断持仓是否为基金（需要业绩分析），委托 code_utils。"""
     return is_fund_holding(h.name, h.code, h.account)
 
@@ -345,7 +345,7 @@ def _write_rating_distribution(ws: Worksheet, row: int, fund_count: int, adjuste
     return row + 1
 
 
-def _build_perf_data_status(
+def build_perf_data_status(
     adjusted_ratings: dict[str, str],
     total_funds: int,
     profit_success: bool,
@@ -417,7 +417,7 @@ def write_fund_performance_sheet(
     row = write_header_row(ws, row, _HEADERS)
 
     # 识别基金
-    fund_holdings = [h for h in holdings if _is_fund(h)]
+    fund_holdings = [h for h in holdings if is_fund(h)]
     detail_map = {d.code: d for d in details}
 
     if not fund_holdings:
@@ -447,7 +447,7 @@ def write_fund_performance_sheet(
     row = _write_rating_distribution(ws, row, len(fund_holdings_sorted), adjusted_ratings)
 
     # 数据源状态
-    data_status = _build_perf_data_status(adjusted_ratings, len(fund_holdings_sorted), profit_success)
+    data_status = build_perf_data_status(adjusted_ratings, len(fund_holdings_sorted), profit_success)
     _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)

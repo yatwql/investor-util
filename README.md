@@ -57,7 +57,7 @@
 | 3 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、板块可见性 |
 | 4 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
 | 5 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
-| 6 | [数据源一览](docs-stm/manuals/datasource-and-folders.md) | 数据源说明、项目目录结构 |
+| 6 | [数据源一览](docs-stm/manuals/datasource.md) | 数据源说明 |
 | 7 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
 
 ## 🔧 开发者参考
@@ -79,4 +79,5 @@
 | [测试覆盖情况](docs-stm/managements/test-coverage.md) | 测试覆盖情况 |
 | [自审记录](docs-stm/managements/review-findings.md) | 自我审查问题记录 |
 | [变更日志](docs-stm/managements/changelog.md) | 版本更新记录 |
+| [目录结构及文件概览](docs-stm/managements/folders.md) | 目录结构及文件概览 |
 | [CLAUDE.md](CLAUDE.md) | AI 编程助手指引 |

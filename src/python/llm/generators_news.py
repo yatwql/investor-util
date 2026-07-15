@@ -11,23 +11,23 @@ from collections.abc import Callable
 import httpx
 
 from src.python.llm.api_base import (
-    _CACHE_LINE_HTML,
-    _LLM_TIMEOUT,
+    CACHE_LINE_HTML,
+    LLM_TIMEOUT,
     _cache_line_model_tpl,
     _extract_model_from_cached,
     _log_token_usage,
 )
-from src.python.llm.fingerprint import _compute_fingerprint
-from src.python.llm.pricing import _estimate_cost
+from src.python.llm.fingerprint import compute_fingerprint
+from src.python.llm.pricing import estimate_cost
 from src.python.llm.prompts import (
-    _CACHE_PREFIX_LLM,
-    _LLM_MODULE_FAILURE,
+    CACHE_PREFIX_LLM,
+    LLM_MODULE_FAILURE,
     _SYSTEM_NEWS_CORRELATION,
     _build_holdings_summary,
     _build_news_correlation_summary,
 )
-from src.python.llm.session import _record_per_module
-from src.python.llm.skeleton import _generate_llm_module
+from src.python.llm.session import record_per_module
+from src.python.llm.skeleton import generate_llm_module
 from src.python.registry import get_llm_module_name, get_llm_module_names
 
 logger = logging.getLogger("invest")
@@ -147,13 +147,13 @@ def _build_news_hooks(
 
     def _batch_preparer():
         holdings_summary = [{"name": h.name, "code": h.code} for h in holdings[:20]]
-        holdings_fp = _compute_fingerprint(holdings_summary, penetrated_assets)
+        holdings_fp = compute_fingerprint(holdings_summary, penetrated_assets)
         return top_news, holdings_fp
 
     def _per_item_cache(_idx: int, item: dict, context_fp: str) -> str:
         title_prefix = (item.get("title", "") or "")[:80]
-        article_fp = _compute_fingerprint({"title": title_prefix, "holdings_fp": context_fp})
-        return _CACHE_PREFIX_LLM + f"news_item_{article_fp}"
+        article_fp = compute_fingerprint({"title": title_prefix, "holdings_fp": context_fp})
+        return CACHE_PREFIX_LLM + f"news_item_{article_fp}"
 
     def _batch_prompt(batch_items: list[dict], _context_fp: str) -> str:
         holdings_text = _build_holdings_summary(holdings, penetrated_assets, industry_data)
@@ -227,14 +227,14 @@ def _finalize_news_token_usage(
                 model_name=_model,
             )
         _cost_val = 0.0
-        _cost = _estimate_cost(_model, total_in, total_out, cache_hit_input_tokens=0)
+        _cost = estimate_cost(_model, total_in, total_out, cache_hit_input_tokens=0)
         if _cost != "-":
             try:
                 _cost_val = float(_cost.lstrip("$¥€£"))
             except ValueError as e:
                 logger.warning("[llm] 费用估值 JSON 解码失败: %s", e)
         _endpoint = llm_config.get("endpoint", "") or ""
-        _record_per_module(
+        record_per_module(
             "news_correlation", _model, inp=total_in, out=total_out,
             cached=all_cached, cost=_cost_val, endpoint=_endpoint,
         )
@@ -258,7 +258,7 @@ def enhance_news_correlation(
 ) -> tuple[list[dict], bool, dict]:
     """使用 LLM 增强新闻与持仓的关联分析。
 
-    通过 _generate_llm_module 的批量模式 hooks 实现：
+    通过 generate_llm_module 的批量模式 hooks 实现：
     逐条缓存 → 分批并行 → JSON 解析 → 合并回 news_data。
 
     Args:
@@ -283,7 +283,7 @@ def enhance_news_correlation(
         top_news, holdings, penetrated_assets, industry_data, llm_config,
     )
 
-    results_map, all_cached, batch_usage, cached_count = _generate_llm_module(
+    results_map, all_cached, batch_usage, cached_count = generate_llm_module(
         llm_config, "news_correlation",
         force=force,
         system_prompt_default=_SYSTEM_NEWS_CORRELATION,

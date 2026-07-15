@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["_markdown_to_html"]
+__all__ = ["markdown_to_html"]
 
 
 def _md_close_list(
@@ -30,7 +30,7 @@ def _md_inline(text: str) -> str:
     return text
 
 
-def _markdown_to_html(text: str) -> str:
+def markdown_to_html(text: str) -> str:
     """将 Markdown 文本转换为基础 HTML，供 HTML 报告模板渲染。
 
     支持：标题（## / ###）、粗体、斜体、行内代码、

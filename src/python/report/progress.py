@@ -11,28 +11,28 @@ import time as _time_module
 from collections.abc import Callable
 from typing import Any
 
-from src.python.tui_menu import _CYAN, _GREEN, _RED, _RESET, _YELLOW
+from src.python.tui_menu import CYAN, GREEN, RED, RESET, YELLOW
 
 logger = logging.getLogger("invest")
 
 # ── 模块耗时记录（跨模块共享） ───────────────────────────────
-_timing_records: list[tuple[str, float]] = []
+timing_records: list[tuple[str, float]] = []
 
 
-class _Timer:
+class Timer:
     """简单计时器上下文管理器，记录各模块耗时。"""
 
     def __init__(self, label: str) -> None:
         self.label = label
         self.start: float = 0.0
 
-    def __enter__(self) -> _Timer:
+    def __enter__(self) -> Timer:
         self.start = _time_module.time()
         return self
 
     def __exit__(self, *args) -> None:
         elapsed = _time_module.time() - self.start
-        _timing_records.append((self.label, elapsed))
+        timing_records.append((self.label, elapsed))
 
 
 # ── 进度报告接口 ─────────────────────────────────────────────
@@ -82,7 +82,7 @@ class ProgressReporter:
         if fn is None:
             self.add_error(f"{label}模块缺失，跳过")
             return False
-        with _Timer(label):
+        with Timer(label):
             try:
                 fn(*args, **kwargs)
                 return True
@@ -91,9 +91,9 @@ class ProgressReporter:
                 logger.exception("%s写入异常", label)
                 return False
 
-    def timer(self, label: str) -> _Timer:
+    def timer(self, label: str) -> Timer:
         """返回计时器上下文管理器，用于包裹耗时较长的操作。"""
-        return _Timer(label)
+        return Timer(label)
 
 
 class SilentProgressReporter(ProgressReporter):
@@ -108,16 +108,16 @@ class TuiProgressReporter(ProgressReporter):
         self._errors: list[str] = []
 
     def info(self, msg: str) -> None:
-        print(f"  {_CYAN}[..]{_RESET} {msg}")
+        print(f"  {CYAN}[..]{RESET} {msg}")
 
     def ok(self, msg: str) -> None:
-        print(f"  {_GREEN}[OK]{_RESET} {msg}")
+        print(f"  {GREEN}[OK]{RESET} {msg}")
 
     def warn(self, msg: str) -> None:
-        print(f"  {_YELLOW}[!]{_RESET} {msg}")
+        print(f"  {YELLOW}[!]{RESET} {msg}")
 
     def error(self, msg: str) -> None:
-        print(f"  {_RED}[ERR]{_RESET} {msg}")
+        print(f"  {RED}[ERR]{RESET} {msg}")
 
     def add_error(self, msg: str) -> None:
         self._errors.append(msg)
@@ -133,7 +133,7 @@ class TuiProgressReporter(ProgressReporter):
             return False
         self.info(f"正在生成{label}...")
         try:
-            with _Timer(label):
+            with Timer(label):
                 fn(*args, **kwargs)
         except Exception:
             self.add_error(f"{label}生成失败（详情请查看日志）")
@@ -144,11 +144,11 @@ class TuiProgressReporter(ProgressReporter):
 
     def print_timing_summary(self) -> None:
         """输出本次运行时各模块耗时排行。"""
-        if not _timing_records:
+        if not timing_records:
             return
         # 合并同名 label
         merged: dict[str, float] = {}
-        for label, t in _timing_records:
+        for label, t in timing_records:
             merged[label] = merged.get(label, 0.0) + t
         total = sum(merged.values())
         print()
@@ -162,7 +162,7 @@ class TuiProgressReporter(ProgressReporter):
             bar = "█" * bar_len + "░" * (24 - bar_len)
             print(f"  │ {label:<18s} {t:>6.1f}s {pct:>5.1f}% {bar} │")
         print(f"  └{'─' * 48}┘")
-        _timing_records.clear()
+        timing_records.clear()
 
     def print_error_summary(self) -> None:
         """如果存在错误，在终端输出汇总。"""

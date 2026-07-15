@@ -6,14 +6,14 @@ import logging
 import threading
 from typing import Any
 
-from src.python.llm.pricing import _CURRENCY_SYMBOLS, _PRICING_CURRENCY, _estimate_cost
+from src.python.llm.pricing import CURRENCY_SYMBOLS, PRICING_CURRENCY, estimate_cost
 
 logger = logging.getLogger("invest")
 
 __all__ = [
     "_session_usage",
     "reset_session_usage", "get_session_usage", "format_session_usage",
-    "_track_session_usage", "_record_per_module",
+    "track_session_usage", "record_per_module",
 ]
 
 # ── 会话级 Token 用量累计跟踪 ──
@@ -81,7 +81,7 @@ def format_session_usage(raw: dict[str, Any] | None) -> dict[str, Any]:
     cache_hit = raw.get("cache_hit_tokens", 0)
     cost = raw.get("total_cost", 0.0)
     currency = raw.get("currency", "CNY")
-    symbol = _CURRENCY_SYMBOLS.get(currency, "¥")
+    symbol = CURRENCY_SYMBOLS.get(currency, "¥")
     models = raw.get("models", [])
     model_display = " / ".join(models) if models else raw.get("model", "未指定")
     return {
@@ -101,7 +101,7 @@ def format_session_usage(raw: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def _track_session_usage(provider: str, usage: dict | None,
+def track_session_usage(provider: str, usage: dict | None,
                          model_name: str = "") -> None:
     """将一次 LLM 调用的用量累计到会话统计。"""
     global _session_usage
@@ -126,7 +126,7 @@ def _track_session_usage(provider: str, usage: dict | None,
                 _session_usage["models"].append(model_name)
 
         # 累计费用
-        _cost_str = _estimate_cost(model_name, inp, out,
+        _cost_str = estimate_cost(model_name, inp, out,
                                    cache_hit_input_tokens=cache_hit)
         if _cost_str != "-":
             try:
@@ -134,10 +134,10 @@ def _track_session_usage(provider: str, usage: dict | None,
                 _session_usage["total_cost"] += cost_val
             except (ValueError, AttributeError) as _cost_err:
                 logger.warning("解析 LLM 费用字符串失败: %s （原始值: %s）", _cost_err, _cost_str)
-        _session_usage["currency"] = _PRICING_CURRENCY
+        _session_usage["currency"] = PRICING_CURRENCY
 
 
-def _record_per_module(module_key: str, model_name: str,
+def record_per_module(module_key: str, model_name: str,
                        inp: int = 0, out: int = 0,
                        cached: bool = False,
                        thinking: bool = False,

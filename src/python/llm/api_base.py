@@ -19,28 +19,28 @@ from src.python.llm.circuit_breaker import (
     _cb_record_failure,
     _cb_record_success,
 )
-from src.python.llm.pricing import _estimate_cost
+from src.python.llm.pricing import estimate_cost
 from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
     FAIL_REASON_CIRCUIT_OPEN,
     FAIL_REASON_NETWORK_ERROR,
     FAIL_REASON_TIMEOUT,
 )
-from src.python.llm.session import _track_session_usage
+from src.python.llm.session import track_session_usage
 
 logger = logging.getLogger("invest")
 
 __all__ = [
     "_last_llm_failure_reason",
-    "_clear_last_llm_failure", "_get_last_llm_failure",
-    "_LLM_TIMEOUT", "_RETRY_DELAYS", "_TRUNCATION_MARKER", "_AUTO_INCREASE_FACTOR",
-    "_CACHE_LINE_HTML", "_cache_line_model_tpl",
+    "clear_last_llm_failure", "_get_last_llm_failure",
+    "LLM_TIMEOUT", "_RETRY_DELAYS", "TRUNCATION_MARKER", "AUTO_INCREASE_FACTOR",
+    "CACHE_LINE_HTML", "_cache_line_model_tpl",
     "_MODEL_LINE_RE", "_THINKING_SUPPORTED_PREFIXES", "_THINKING_EFFORT_MODEL_PREFIXES",
     "_supports_extended_thinking", "_is_effort_model", "_truncation_warning",
     "_check_claude_truncation", "_check_openai_truncation", "_extract_content",
     "_extract_model_from_cached", "_log_token_usage", "_get_retry_max", "_sanitize_endpoint",
     "_check_circuit_breaker", "_process_success_response", "_attempt_api_call",
-    "_is_retry_available", "_call_llm_with_retry",
+    "_is_retry_available", "call_llm_with_retry",
 ]
 
 # ── 上次失败的详细原因（供调用方区分失败类型，不改变函数签名） ──
@@ -49,7 +49,7 @@ _last_llm_failure_reason: str | None = None
 """最近一次 LLM API 调用失败的详细原因（FAIL_REASON_* 常量），成功调用后为 None。"""
 
 
-def _clear_last_llm_failure() -> None:
+def clear_last_llm_failure() -> None:
     """清除上次失败原因记录。"""
     global _last_llm_failure_reason
     _last_llm_failure_reason = None
@@ -62,7 +62,7 @@ def _get_last_llm_failure() -> str | None:
 
 # ── 默认超时 ─────────────────────────────────────────────────
 
-_LLM_TIMEOUT = 120.0
+LLM_TIMEOUT = 120.0
 
 # ── 重试配置 ─────────────────────────────────────────────────
 
@@ -70,10 +70,10 @@ _RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]  # 指数退避：第 1~5 次依次�
 
 # ── 输出截断自适应重试 ────────────────────────────────
 
-_TRUNCATION_MARKER = "【⚠ 输出已被截断"
+TRUNCATION_MARKER = "【⚠ 输出已被截断"
 """截断警告中的唯一标记，用于检测输出是否被 max_tokens 截断。"""
 
-_AUTO_INCREASE_FACTOR = 1.5
+AUTO_INCREASE_FACTOR = 1.5
 """截断时自动增大的倍数。"""
 
 # _CONTENT_FILTER_RECOVERY（留在 api.py，仅 _call_llm 使用 — 见复盘修正记录）
@@ -81,7 +81,7 @@ _AUTO_INCREASE_FACTOR = 1.5
 
 # ── 缓存行定义 ────────────────────────────────────
 
-_CACHE_LINE_HTML = (
+CACHE_LINE_HTML = (
     '<p style="color:#888;font-size:12px">'
     "本次使用LLM缓存，未直接使用LLM服务能力"
     "</p>"
@@ -123,7 +123,7 @@ def _is_effort_model(model: str) -> bool:
 def _truncation_warning(config_field: str) -> str:
     """生成截断警告，指明 llm_settings.json 中需要增大的具体配置项。"""
     return (
-        f"\n\n{_TRUNCATION_MARKER}！{config_field} 上限不足，内容不完整。"
+        f"\n\n{TRUNCATION_MARKER}！{config_field} 上限不足，内容不完整。"
         f"请在 data/config/llm_settings.json 中增大 {config_field} 后重新生成。】"
     )
 
@@ -241,10 +241,10 @@ def _log_token_usage(provider: str, usage: dict | None, label: str, model_name: 
     if cache_hit:
         msg += f" (缓存命中 {cache_hit:,})"
     if model_name:
-        _cost = _estimate_cost(model_name, inp, out, cache_hit_input_tokens=cache_hit)
+        _cost = estimate_cost(model_name, inp, out, cache_hit_input_tokens=cache_hit)
         if _cost != "-":
             msg += f" | 估算费用: {_cost}"
-    print(msg)
+    logger.info("%s", msg)
 
 
 def _get_retry_max(llm_config: dict) -> int:
@@ -294,7 +294,7 @@ def _process_success_response(
     truncated = check_truncation_fn(data, max_tokens)
     usage = data.get("usage")
     _log_token_usage(provider, usage, label, model_name=model_name)
-    _track_session_usage(provider, usage, model_name=model_name)
+    track_session_usage(provider, usage, model_name=model_name)
 
     content = content.strip()
     if truncated:
@@ -356,7 +356,7 @@ def _is_retry_available(label: str, attempt: int, max_retries: int, detail: str,
     return False
 
 
-def _call_llm_with_retry(
+def call_llm_with_retry(
     label: str,
     client: httpx.Client,
     url: str,
@@ -403,7 +403,7 @@ def _call_llm_with_retry(
         kind, info = _attempt_api_call(client, url, headers, payload, timeout)
 
         if kind == "success":
-            _clear_last_llm_failure()
+            clear_last_llm_failure()
             _cb_record_success(url)
             return _process_success_response(
                 info, extract_fn, check_truncation_fn, max_tokens, config_field,

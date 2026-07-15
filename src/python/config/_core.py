@@ -260,6 +260,14 @@ def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
     ufb, issues = _section(config, "user_fund_benchmarks", dict, "自定义基准将忽略", issues)
     if ufb is _MISSING:
         return issues
+    for code, benchmark in ufb.items():
+        if not isinstance(code, str) or not code.strip():
+            logger.warning("config.json user_fund_benchmarks 中存在非字符串或空字符串的基金代码 %r，该项将被忽略", code)
+            issues += 1
+            continue
+        if not isinstance(benchmark, str) or not benchmark.strip():
+            logger.warning("config.json user_fund_benchmarks.%s = %r 不是有效的基准名称（应为字符串），该项将被忽略", code, benchmark)
+            issues += 1
     return issues
 
 
@@ -523,7 +531,6 @@ def _check_unknown_llm_keys(settings: dict) -> None:
             "请核对后删除，避免混淆。",
             len(unknown), ", ".join(repr(k) for k in sorted(unknown)),
         )
-
 
 
 

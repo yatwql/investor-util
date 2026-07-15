@@ -62,7 +62,7 @@ def _secid(code: str) -> str:
     return get_push2_secid(code)
 
 
-def _make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
+def make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
     """执行 push2 行业/概念 API 请求，返回 data 内层字典或 None。
 
     支持自动重试：对连接断开等瞬态错误，使用指数退避 + 随机抖动重试。
@@ -150,13 +150,13 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     Returns:
         {...} 详见函数内结果字典定义；None: API 异常或解析失败
     """
-    from src.python.provider_registry import get_registry, _NOT_FOUND
+    from src.python.provider_registry import get_registry, NOT_FOUND
     reg = get_registry()
     cached = reg.session_cache_get("industry", code)
-    if cached is not _NOT_FOUND:
+    if cached is not NOT_FOUND:
         return cached
 
-    inner = _make_push2_request(code)
+    inner = make_push2_request(code)
     if inner is None:
         reg.session_cache_set("industry", code, None)
         return None

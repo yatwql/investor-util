@@ -213,8 +213,8 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
         return _cached
 
     try:
-        from src.python.providers.eastmoney_industry import _make_push2_request
-        inner = _make_push2_request(code)
+        from src.python.providers.eastmoney_industry import make_push2_request
+        inner = make_push2_request(code)
         if inner is None:
             return None
 
@@ -262,8 +262,8 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
     from src.python.provider_registry import get_registry
     reg = get_registry()
     try:
-        from src.python.providers.tencent import fetch_price
-        data = fetch_price(code)
+        from src.python.fetcher.price import fetch_market_data
+        data = fetch_market_data(code)
         if data is None:
             return None
 
@@ -306,9 +306,9 @@ def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
         当无可用数据时返回 ``{}``（方案 C 降级走代码段估算）。
     """
     try:
-        from src.python.providers.eastmoney_industry import fetch_industry
+        from src.python.fetcher.industry import fetch_industry_data
     except ImportError:
-        logger.warning("eastmoney_industry 模块不可用，行业平均 PE 功能降级")
+        logger.warning("行业数据 fetcher 模块不可用，行业平均 PE 功能降级")
         return {}
 
     if not codes:
@@ -323,8 +323,9 @@ def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
             if not is_a_share_code(code):
                 continue
 
-            # push2 行业分类（eastmoney_industry 通过 registry session_cache 缓存）
-            industry = fetch_industry(code)
+            # push2 行业分类（通过 fetcher → chain → provider 路径）
+            industry_data = fetch_industry_data(code)
+            industry = industry_data.get("industry", "") if industry_data else ""
             if not industry:
                 continue
 
@@ -416,7 +417,7 @@ def classify_fund_style(
          "is_estimated": bool,
          "details": [{"name", "code", "size", "style", "ratio", "is_estimated"}, ...]}
     """
-    from src.python.provider_registry import get_registry, _NOT_FOUND
+    from src.python.provider_registry import get_registry, NOT_FOUND
     reg = get_registry()
 
     if not holdings:
@@ -467,8 +468,8 @@ def classify_fund_style(
         if ratio <= 0:
             continue
 
-        _cached = reg.session_cache_get("extended", code) if code and is_a_share_code(code) else _NOT_FOUND
-        ext_data = _cached if _cached is not _NOT_FOUND else None
+        _cached = reg.session_cache_get("extended", code) if code and is_a_share_code(code) else NOT_FOUND
+        ext_data = _cached if _cached is not NOT_FOUND else None
         industry_avg_pe = industry_avg_pe_map.get(code)
 
         if ext_data:

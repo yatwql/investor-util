@@ -225,7 +225,7 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
 
     参数约定（C6 约束）：
       - Provider 函数保持纯数据获取，不碰缓存层
-      - 缓存合并由 chain 层的 _fetch_with_incremental_fallback() 管理
+      - 缓存合并由 chain 层的 fetch_with_incremental_fallback() 管理
       - ✅ C5：所有 HTTP 请求使用 make_http_client()
 
     Args:

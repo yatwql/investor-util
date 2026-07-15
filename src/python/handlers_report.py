@@ -9,21 +9,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 from src.python.llm import FAIL_REASON_DISABLED
-from src.python.llm.prompts import _LLM_MODULE_FAILURE
+from src.python.llm.prompts import LLM_MODULE_FAILURE
 from typing import Any
 
 from src.python.logger import setup_logger
 from src.python.registry import get_llm_module_name, get_report_section_order
 from src.python.report.progress import TuiProgressReporter
 from src.python.tui_handlers import (
-    _check_network_available,
-    _finish_report,
-    _prepare_holdings,
-    _print_error_with_hint,
-    _print_llm_session_usage,
+    check_network_available,
+    finish_report,
+    prepare_holdings,
+    print_error_with_hint,
+    print_llm_session_usage,
 )
 from src.python.report.progress import ProgressReporter
-from src.python.tui_menu import _GREEN, _RESET, get_config_cache
+from src.python.tui_menu import GREEN, RESET, get_config_cache
 
 # 共享线程池 — 多处并行任务复用同一实例，避免反复创建/销毁
 _POOL: ThreadPoolExecutor | None = None
@@ -51,7 +51,7 @@ def _cmd_generate_excel() -> None:
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
     sec_order = get_report_section_order(config)
-    holdings = _prepare_holdings()
+    holdings = prepare_holdings()
     if not holdings:
         return
     try:
@@ -62,8 +62,8 @@ def _cmd_generate_excel() -> None:
     except Exception as e:
         reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成 Excel 报告失败")
-        _print_error_with_hint(e, "生成失败")
-    _finish_report(reporter)
+        print_error_with_hint(e, "生成失败")
+    finish_report(reporter)
 
 
 def _capture_snapshot(holdings: list, details: list, reporter: TuiProgressReporter) -> dict | None:
@@ -200,7 +200,7 @@ def _cmd_generate_both() -> None:
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
     sec_order = get_report_section_order(config)
-    holdings = _prepare_holdings()
+    holdings = prepare_holdings()
     if not holdings:
         return
 
@@ -218,7 +218,7 @@ def _cmd_generate_both() -> None:
         from src.python.report.market_value import _generate_details
         reporter.info("正在获取行情数据...")
         details = _generate_details(holdings, today_str)
-        _check_network_available(details)
+        check_network_available(details)
         reporter.ok(f"行情数据获取完成，共 {len(details)} 条")
 
         # ── F1 快照对比：始终执行（不受 enable_history 影响） ──
@@ -267,8 +267,8 @@ def _cmd_generate_both() -> None:
     except Exception as e:
         reporter.add_error("全系列报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成全系列报告失败")
-        _print_error_with_hint(e, "生成失败")
-    _finish_report(reporter)
+        print_error_with_hint(e, "生成失败")
+    finish_report(reporter)
 
 def _process_llm_news_futures(
     llm_fut, news_fut, reporter,
@@ -299,7 +299,7 @@ def _process_llm_news_futures(
                 for mk, r in zip(_MODULE_KEYS, _MODULE_RESULTS):
                     if r is not None:
                         ok_count += 1
-                    elif _LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
+                    elif LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
                         disabled.append(get_llm_module_name(mk))
                     else:
                         failed.append(get_llm_module_name(mk))
@@ -344,7 +344,7 @@ def _prepare_report_data(holdings: list, reporter: TuiProgressReporter) -> dict:
 
     reporter.info("正在获取行情数据...")
     details = _generate_details(holdings, today_str)
-    _check_network_available(details)
+    check_network_available(details)
     total_mv = sum(d.market_value for d in details)
     total_cost = sum(d.cost for d in details)
     total_profit = sum(d.profit for d in details)
@@ -433,7 +433,7 @@ def _compute_early_warnings(
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 分析章节）。"""
     reporter = TuiProgressReporter()
-    holdings = _prepare_holdings()
+    holdings = prepare_holdings()
     if not holdings:
         return
 
@@ -521,7 +521,7 @@ def _cmd_generate_full() -> None:
             for mk, r in zip(_MODULE_KEYS, _llm_content):
                 if r is not None:
                     continue
-                if _LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
+                if LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
                     disabled.append(get_llm_module_name(mk))
                 else:
                     failed.append(get_llm_module_name(mk))
@@ -546,7 +546,7 @@ def _cmd_generate_full() -> None:
             llm_content = (None, None, None, None)
             reporter.info("[板块配置] 新闻和 LLM 均未开启，跳过内容生成")
 
-        _print_llm_session_usage()
+        print_llm_session_usage()
 
         _early_warnings = _compute_early_warnings(
             holdings, prep["penetrated_assets"], _sector_flow,
@@ -599,5 +599,5 @@ def _cmd_generate_full() -> None:
     except Exception as e:
         reporter.add_error("全系列报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成全系列报告失败")
-        _print_error_with_hint(e, "生成失败")
-    _finish_report(reporter)
+        print_error_with_hint(e, "生成失败")
+    finish_report(reporter)

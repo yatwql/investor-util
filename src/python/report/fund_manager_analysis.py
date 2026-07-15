@@ -22,7 +22,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
-from src.python.report.fund_performance import _is_fund
+from src.python.report.fund_performance import is_fund
 
 logger = logging.getLogger("invest")
 
@@ -87,7 +87,7 @@ def detect_manager_changes(holdings: list[Holding]) -> list[dict[str, Any]]:
         仅含基金（非股票/现金），无基金时返回空列表。
     """
     # 筛选基金持仓
-    fund_holdings = [h for h in holdings if _is_fund(h)]
+    fund_holdings = [h for h in holdings if is_fund(h)]
     if not fund_holdings:
         return []
 

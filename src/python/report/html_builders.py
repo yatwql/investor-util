@@ -16,7 +16,7 @@ from src.python.report.fund_performance import (
     _RATING_COMMENT,
     _format_rank,
     _fund_display_type,
-    _is_fund,
+    is_fund,
 )
 from src.python.report.market_value import DetailRow
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
@@ -225,7 +225,7 @@ def _build_perf_data(
         业绩分析数据列表，每项含名称/代码/类型/收益率/排名等字符串值
     """
     prog = progress if progress is not None else SilentProgressReporter()
-    fund_holdings = [h for h in holdings if _is_fund(h)]
+    fund_holdings = [h for h in holdings if is_fund(h)]
     detail_map: dict[str, DetailRow] = {d.code: d for d in details}
 
     fund_holdings_sorted = sorted(

@@ -128,8 +128,8 @@ def _write_module_data_rows(ws: Any, row: int, module_info: list[dict]) -> int:
         _cost = mi.get("cost", 0.0)
         _status_val = mi.get("status", "")
         if _cost > 0:
-            from src.python.llm.pricing import _CURRENCY_SYMBOLS, _PRICING_CURRENCY
-            _sym = _CURRENCY_SYMBOLS.get(_PRICING_CURRENCY, "¥")
+            from src.python.llm.pricing import CURRENCY_SYMBOLS, PRICING_CURRENCY
+            _sym = CURRENCY_SYMBOLS.get(PRICING_CURRENCY, "¥")
             ws.cell(row=row, column=8, value=f"{_sym}{_cost:.4f}").font = _KV_VAL_FONT
             ws.cell(row=row, column=8).alignment = right_align
         elif _status_val == "cached":

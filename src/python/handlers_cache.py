@@ -10,9 +10,9 @@ from typing import Any
 
 from src.python.logger import setup_logger
 from src.python.reader import read_holdings
-from src.python.tui_handlers import _print_error_with_hint, _select_holdings_file
-from src.python.tui_menu import _GREEN, _RED, _YELLOW, _RESET
-from src.python.tui_menu import _press_any_key, _refresh_config
+from src.python.tui_handlers import print_error_with_hint, select_holdings_file
+from src.python.tui_menu import GREEN, RED, YELLOW, RESET
+from src.python.tui_menu import press_any_key, refresh_config
 
 logger = setup_logger()
 
@@ -39,31 +39,31 @@ def _read_holdings_and_clear_cache(group_name: str) -> list | None:
     """
     from src.python.cache import clear_by_group
 
-    _refresh_config()
-    filepath = _select_holdings_file()
+    refresh_config()
+    filepath = select_holdings_file()
     if not filepath:
         return None
 
     try:
         holdings = read_holdings(filepath)
         if not holdings:
-            print(f"  {_RED}[ERR]{_RESET} 未读取到有效的持仓数据")
+            print(f"  {RED}[ERR]{RESET} 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
             print("     需要的列名：名称、代码、持仓份额、每份成本")
-            _press_any_key()
+            press_any_key()
             return None
-        print(f"  {_GREEN}[OK]{_RESET} 共 {len(holdings)} 条持仓记录")
+        print(f"  {GREEN}[OK]{RESET} 共 {len(holdings)} 条持仓记录")
         print("  [..] 清除旧缓存...")
         cleared = clear_by_group(group_name)
         if cleared:
             parts = [f"{name} {count}条" for name, count in cleared.items()]
-            print(f"  {_GREEN}[OK]{_RESET} {' + '.join(parts)} 已清除")
+            print(f"  {GREEN}[OK]{RESET} {' + '.join(parts)} 已清除")
         else:
-            print(f"  {_GREEN}[OK]{_RESET} 无缓存需清除")
+            print(f"  {GREEN}[OK]{RESET} 无缓存需清除")
         return holdings
     except Exception as e:
-        _print_error_with_hint(e, "读取持仓失败")
-        _press_any_key()
+        print_error_with_hint(e, "读取持仓失败")
+        press_any_key()
         return None
 
 
@@ -162,25 +162,25 @@ def _print_cache_refresh_report(
         print(f"  基础缓存更新完成 — 共 {len(funds)} 只基金")
         print()
         if perf_fail == 0:
-            print(f"  {_GREEN}[OK]{_RESET} fund_perf_{{code}}.json  ({perf_ok}/{len(funds)} 全部成功)")
+            print(f"  {GREEN}[OK]{RESET} fund_perf_{{code}}.json  ({perf_ok}/{len(funds)} 全部成功)")
         else:
-            print(f"  {_YELLOW}[!]{_RESET} fund_perf_{{code}}.json  ({perf_ok}/{len(funds)} 成功, {perf_fail} 只失败)")
+            print(f"  {YELLOW}[!]{RESET} fund_perf_{{code}}.json  ({perf_ok}/{len(funds)} 成功, {perf_fail} 只失败)")
         if hold_fail == 0:
-            print(f"  {_GREEN}[OK]{_RESET} fund_hold_{{code}}.json  ({hold_ok}/{len(funds)} 全部成功)")
+            print(f"  {GREEN}[OK]{RESET} fund_hold_{{code}}.json  ({hold_ok}/{len(funds)} 全部成功)")
         else:
-            print(f"  {_YELLOW}[!]{_RESET} fund_hold_{{code}}.json  ({hold_ok}/{len(funds)} 成功, {hold_fail} 只失败)")
+            print(f"  {YELLOW}[!]{RESET} fund_hold_{{code}}.json  ({hold_ok}/{len(funds)} 成功, {hold_fail} 只失败)")
         if bm_fail == 0:
-            print(f"  {_GREEN}[OK]{_RESET} fund_benchmarks.json       ({bm_ok}/{len(funds)} 全部成功)")
+            print(f"  {GREEN}[OK]{RESET} fund_benchmarks.json       ({bm_ok}/{len(funds)} 全部成功)")
         else:
-            print(f"  {_YELLOW}[!]{_RESET} fund_benchmarks.json       ({bm_ok}/{len(funds)} 成功, {bm_fail} 只未找到)")
+            print(f"  {YELLOW}[!]{RESET} fund_benchmarks.json       ({bm_ok}/{len(funds)} 成功, {bm_fail} 只未找到)")
     if pf_ok:
-        print(f"  {_GREEN}[OK]{_RESET} profit_forecast.json           ({pf_ok} 只股票)")
+        print(f"  {GREEN}[OK]{RESET} profit_forecast.json           ({pf_ok} 只股票)")
     elif funds:
-        print(f"  {_YELLOW}[!]{_RESET} profit_forecast.json           获取失败")
+        print(f"  {YELLOW}[!]{RESET} profit_forecast.json           获取失败")
     if sf_ok:
-        print(f"  {_GREEN}[OK]{_RESET} sector_flow.json               ({sf_ok} 个行业)")
+        print(f"  {GREEN}[OK]{RESET} sector_flow.json               ({sf_ok} 个行业)")
     elif funds:
-        print(f"  {_YELLOW}[!]{_RESET} sector_flow.json               {_sector_flow_hint()}")
+        print(f"  {YELLOW}[!]{RESET} sector_flow.json               {_sector_flow_hint()}")
 
 
 def _refresh_common_caches(holdings: list | None = None) -> tuple[int, int, int, int]:
@@ -206,20 +206,20 @@ def _refresh_common_caches(holdings: list | None = None) -> tuple[int, int, int,
             try:
                 if tag == "profit_forecast":
                     _, pf_ok = fut.result()
-                    print(f"  {_GREEN}[OK]{_RESET}   profit_forecast              ({pf_ok} 只股票)" if pf_ok else f"  {_YELLOW}[!]{_RESET}   profit_forecast              获取失败")
+                    print(f"  {GREEN}[OK]{RESET}   profit_forecast              ({pf_ok} 只股票)" if pf_ok else f"  {YELLOW}[!]{RESET}   profit_forecast              获取失败")
                 elif tag == "sector_flow":
                     sf_ok = fut.result()[1]
-                    print(f"  {_GREEN}[OK]{_RESET}   sector_flow                  ({sf_ok} 个行业)" if sf_ok
-                          else f"  {_YELLOW}[!]{_RESET}   sector_flow                  {_sector_flow_hint()}")
+                    print(f"  {GREEN}[OK]{RESET}   sector_flow                  ({sf_ok} 个行业)" if sf_ok
+                          else f"  {YELLOW}[!]{RESET}   sector_flow                  {_sector_flow_hint()}")
                 elif tag == "industry":
                     ind_ok = fut.result()
-                    print(f"  {_GREEN}[OK]{_RESET}   industry                     ({ind_ok} 只证券)" if ind_ok else f"  {_YELLOW}[!]{_RESET}   industry                     获取失败")
+                    print(f"  {GREEN}[OK]{RESET}   industry                     ({ind_ok} 只证券)" if ind_ok else f"  {YELLOW}[!]{RESET}   industry                     获取失败")
                 elif tag == "dividend":
                     div_ok = fut.result()
-                    print(f"  {_GREEN}[OK]{_RESET}   dividend                     ({div_ok} 只股票)" if div_ok else f"  {_YELLOW}[!]{_RESET}   dividend                     获取失败")
+                    print(f"  {GREEN}[OK]{RESET}   dividend                     ({div_ok} 只股票)" if div_ok else f"  {YELLOW}[!]{RESET}   dividend                     获取失败")
             except Exception as e:  # noqa: PERF203
                 logger.debug("%s Future 异常: %s", tag, e)
-                print(f"  {_YELLOW}[!]{_RESET}   {tag:<30}获取失败")
+                print(f"  {YELLOW}[!]{RESET}   {tag:<30}获取失败")
     return pf_ok, sf_ok, ind_ok, div_ok
 
 
@@ -229,8 +229,8 @@ def _cmd_update_basic_cache() -> None:
     if holdings is None:
         return
 
-    from src.python.report.fund_performance import _is_fund
-    funds = [h for h in holdings if _is_fund(h)]
+    from src.python.report.fund_performance import is_fund
+    funds = [h for h in holdings if is_fund(h)]
 
     if not funds:
         print("  [!!] 未检测到基金持仓，跳过基金业绩/持仓/基准缓存")
@@ -238,7 +238,7 @@ def _cmd_update_basic_cache() -> None:
         print()
         print("  [..]   并行获取行业/分红/盈利预测/资金流向...")
         _refresh_common_caches(holdings)
-        _press_any_key()
+        press_any_key()
         return
 
     try:
@@ -270,23 +270,23 @@ def _cmd_update_basic_cache() -> None:
                     else:
                         parts.append("持仓=无数据")
                     parts.append(f"基准={'OK' if b_ok else '未找到'}")
-                    print(f"  {_GREEN}[OK]{_RESET}   {name} ({code}) — {' | '.join(parts)}")
+                    print(f"  {GREEN}[OK]{RESET}   {name} ({code}) — {' | '.join(parts)}")
                 elif result[0] == "profit_forecast":
                     pf_ok = result[1]
-                    print(f"  {_GREEN}[OK]{_RESET}   profit_forecast              ({pf_ok} 只股票)" if pf_ok else f"  {_YELLOW}[!]{_RESET}   profit_forecast              获取失败")
+                    print(f"  {GREEN}[OK]{RESET}   profit_forecast              ({pf_ok} 只股票)" if pf_ok else f"  {YELLOW}[!]{RESET}   profit_forecast              获取失败")
                 elif result[0] == "sector_flow":
                     sf_ok = result[1]
-                    print(f"  {_GREEN}[OK]{_RESET}   sector_flow                  ({sf_ok} 个行业)" if sf_ok
-                          else f"  {_YELLOW}[!]{_RESET}   sector_flow                  {_sector_flow_hint()}")
+                    print(f"  {GREEN}[OK]{RESET}   sector_flow                  ({sf_ok} 个行业)" if sf_ok
+                          else f"  {YELLOW}[!]{RESET}   sector_flow                  {_sector_flow_hint()}")
             except Exception as e:
                 logger.debug("缓存刷新 Future 异常 (%s): %s", tag, e)
-                print(f"  {_YELLOW}[!]{_RESET}   {'基金刷新异常' if tag == 'fund' else '其他缓存刷新异常'}")
+                print(f"  {YELLOW}[!]{RESET}   {'基金刷新异常' if tag == 'fund' else '其他缓存刷新异常'}")
 
         _print_cache_refresh_report(funds, perf_ok, hold_ok, bm_ok, pf_ok, sf_ok)
     except Exception as e:
         logger.exception("更新基础缓存失败")
-        _print_error_with_hint(e, "更新基础缓存")
-    _press_any_key()
+        print_error_with_hint(e, "更新基础缓存")
+    press_any_key()
 
 
 def _fetch_prices_and_indices(holdings: list) -> tuple[int, dict, dict]:
@@ -313,18 +313,18 @@ def _fetch_prices_and_indices(holdings: list) -> tuple[int, dict, dict]:
                 result = future.result()
                 if future is idx_a_fut:
                     a_idx = result or {}
-                    print(f"  {_GREEN}[OK]{_RESET}   A 股指数: {len(a_idx)} 个")
+                    print(f"  {GREEN}[OK]{RESET}   A 股指数: {len(a_idx)} 个")
                 else:
                     us_idx = result or {}
-                    print(f"  {_GREEN}[OK]{_RESET}   美股指数: {len(us_idx)} 个")
+                    print(f"  {GREEN}[OK]{RESET}   美股指数: {len(us_idx)} 个")
             else:
                 h = h_or_none
                 result = future.result()
                 if result and result.get("price", 0) > 0:
                     price_ok += 1
-                    print(f"  {_GREEN}[OK]{_RESET}   {h.name} ({h.code}) → {result['price']:.4f}")
+                    print(f"  {GREEN}[OK]{RESET}   {h.name} ({h.code}) → {result['price']:.4f}")
                 else:
-                    print(f"  {_YELLOW}[!]{_RESET}   {h.name} ({h.code}) → 失败")
+                    print(f"  {YELLOW}[!]{RESET}   {h.name} ({h.code}) → 失败")
         except Exception as e:
             if h_or_none is not None:
                 _msg = str(e)
@@ -334,7 +334,7 @@ def _fetch_prices_and_indices(holdings: list) -> tuple[int, dict, dict]:
                     _hint = "数据解析失败"
                 else:
                     _hint = "获取失败"
-                print(f"  {_RED}[ERR]{_RESET}  {h_or_none.name} ({h_or_none.code}) → {_hint}")
+                print(f"  {RED}[ERR]{RESET}  {h_or_none.name} ({h_or_none.code}) → {_hint}")
 
     return price_ok, a_idx, us_idx
 
@@ -357,15 +357,15 @@ def _cmd_update_position_cache() -> None:
         print(f"  持仓缓存更新完成 — 共 {len(holdings)} 条持仓")
         print()
         if price_fail == 0:
-            print(f"  {_GREEN}[OK]{_RESET} price_{{code}}.json          ({price_ok}/{len(holdings)} 全部成功)")
+            print(f"  {GREEN}[OK]{RESET} price_{{code}}.json          ({price_ok}/{len(holdings)} 全部成功)")
         else:
-            print(f"  {_YELLOW}[!]{_RESET} price_{{code}}.json          ({price_ok}/{len(holdings)} 成功, {price_fail} 条失败)")
-        print(f"  {_GREEN}[OK]{_RESET} index_{{code}}.json           (A股 {len(a_idx)} 个 + 美股 {len(us_idx)} 个 = {total_idx} 个指数)")
-        print(f"  {_GREEN}[OK]{_RESET} LLM 关联缓存已清除（下次菜单 L 自动使用最新数据）")
+            print(f"  {YELLOW}[!]{RESET} price_{{code}}.json          ({price_ok}/{len(holdings)} 成功, {price_fail} 条失败)")
+        print(f"  {GREEN}[OK]{RESET} index_{{code}}.json           (A股 {len(a_idx)} 个 + 美股 {len(us_idx)} 个 = {total_idx} 个指数)")
+        print(f"  {GREEN}[OK]{RESET} LLM 关联缓存已清除（下次菜单 L 自动使用最新数据）")
     except Exception as e:
         logger.exception("更新持仓缓存失败")
-        _print_error_with_hint(e, "更新持仓缓存")
-    _press_any_key()
+        print_error_with_hint(e, "更新持仓缓存")
+    press_any_key()
 
 
 def _cmd_cleanup_cache() -> None:
@@ -375,10 +375,10 @@ def _cmd_cleanup_cache() -> None:
     removed = cleanup_expired(dry_run=False)
     cache_dir = get_cache_dir()
     if removed > 0:
-        print(f"  {_GREEN}[OK]{_RESET} 已删除 {removed} 个过期缓存文件 ({cache_dir})")
+        print(f"  {GREEN}[OK]{RESET} 已删除 {removed} 个过期缓存文件 ({cache_dir})")
     else:
         print(f"  [..] 无需清理 ({cache_dir})")
-    _press_any_key()
+    press_any_key()
 
 
 def _cmd_show_cache_stats() -> None:
@@ -410,4 +410,32 @@ def _cmd_show_cache_stats() -> None:
     print("  [..] 正在检查过期文件...")
     expired = cleanup_expired(dry_run=True)
     print(f"  过期文件: {expired} 个（可通过菜单 [3] 清理）")
-    _press_any_key()
+
+    # ── data/history/snapshots 统计 ──
+    try:
+        from src.python.constants import PROJECT_ROOT
+        _history_dir = os.path.join(PROJECT_ROOT, "data", "history", "snapshots")
+        if os.path.isdir(_history_dir):
+            _h_files = _h_size = 0
+            for _f in os.listdir(_history_dir):
+                _fp = os.path.join(_history_dir, _f)
+                if os.path.isfile(_fp) and _f.endswith(".json"):
+                    _h_files += 1
+                    _h_size += os.path.getsize(_fp)
+            if _h_files > 0:
+                print()
+                print(f"  历史快照目录: {os.path.abspath(_history_dir)}")
+                print(f"  快照文件: {_h_files} 个")
+                print(f"  总大小:   {_h_size / 1024:.0f} KB")
+                _latest = max(
+                    (os.path.getmtime(os.path.join(_history_dir, _f))
+                     for _f in os.listdir(_history_dir) if _f.endswith(".json")),
+                    default=0,
+                )
+                if _latest:
+                    from datetime import datetime
+                    print(f"  最新快照:   {datetime.fromtimestamp(_latest).strftime('%Y-%m-%d %H:%M')}")
+    except (ImportError, OSError):
+        pass
+
+    press_any_key()

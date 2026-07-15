@@ -16,7 +16,7 @@ from src.python.report.excel_llm_usage import write_llm_section_and_usage
 from src.python.report.excel_market_data import resolve_market_data, resolve_indices
 from src.python.report.excel_news_warning import write_news_and_early_warning
 from src.python.report.excel_sheet_factory import create_sheets
-from src.python.report.progress import ProgressReporter, SilentProgressReporter, _Timer
+from src.python.report.progress import ProgressReporter, SilentProgressReporter, Timer
 
 logger = setup_logger()
 
@@ -29,7 +29,7 @@ def _write_portfolio_history_sheet(ws, history_data: dict) -> None:
     from src.python.report.styles import FMT_MONEY, FMT_PERCENT
     from src.python.report.excel_writer import (
         _write_placeholder, auto_width, freeze_header,
-        write_header_row, write_title_row,
+        write_data_row, write_header_row, write_title_row,
     )
 
     if history_data is None:
@@ -98,7 +98,7 @@ def _write_drawdown_analysis_sheet(ws, history_data: dict) -> None:
     from src.python.report.styles import FMT_PERCENT
     from src.python.report.excel_writer import (
         _write_placeholder, auto_width, freeze_header,
-        write_header_row, write_title_row,
+        write_data_row, write_header_row, write_title_row,
     )
 
     if history_data is None:
@@ -320,7 +320,7 @@ def generate_excel_report(
             logger.debug("[F delta] Excel 环比对比摘要写入失败（非关键）", exc_info=True)
 
     # ── 保存 ──
-    with _Timer("保存 Excel/HTML 文件"):
+    with Timer("保存 Excel/HTML 文件"):
         prog.info("正在保存 Excel 报告...")
         path = save_workbook(wb, output_dir=output_dir)
         logger.info("Excel 报告已生成: %s", path)

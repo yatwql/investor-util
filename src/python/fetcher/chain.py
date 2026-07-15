@@ -16,7 +16,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.cache import clear as cache_clear
 from src.python.config import get_config
-from src.python.provider_registry import get_registry, _TRANSPORT_FAILURE
+from src.python.provider_registry import TRANSPORT_FAILURE, get_registry
 
 logger = logging.getLogger("invest")
 
@@ -83,7 +83,7 @@ def is_provider_chain_broken(data_type: str) -> bool:
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
-# _TRANSPORT_FAILURE sentinel 定义于 provider_registry.py，
+# TRANSPORT_FAILURE sentinel 定义于 provider_registry.py，
 # 跨模块共享用于 _try_provider_fetch 的传输级异常标记。
 
 
@@ -111,7 +111,7 @@ def _try_provider_fetch(
             logger.warning("[%s]%s %s API 限速(429): %s", data_type, _code_tag, provider_name, err_str)
         else:
             logger.warning("[%s]%s %s 调用异常: %s", data_type, _code_tag, provider_name, err_str)
-        return cast("dict[str, Any] | None", _TRANSPORT_FAILURE)  # 传输级异常 → 应计入熔断
+        return cast("dict[str, Any] | None", TRANSPORT_FAILURE)  # 传输级异常 → 应计入熔断
 
     if raw is None:
         logger.info("[%s]%s %s 返回空，尝试下一链路", data_type, _code_tag, provider_name)
@@ -145,7 +145,7 @@ def _try_provider_fetch(
     return result
 
 
-def _fetch_with_fallback(
+def fetch_with_fallback(
     data_type: str,
     provider_fn_map: dict[str, tuple[str, _ProviderFunc]],
     cache_key: str,
@@ -193,13 +193,13 @@ def _fetch_with_fallback(
             continue
 
         result = _try_provider_fetch(data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform)
-        if result is not None and result is not _TRANSPORT_FAILURE:
+        if result is not None and result is not TRANSPORT_FAILURE:
             # 成功 → 恢复熔断计数器
             reg.record_success(provider_name)
             cache_set(cache_key, result)
             return result
 
-        if result is _TRANSPORT_FAILURE:
+        if result is TRANSPORT_FAILURE:
             # 传输级异常（超时/断连/DNS/5xx）→ 累计连续失败计数
             reg.record_failure(provider_name, f"{data_type}:transport")
             if reg.is_circuit_broken(provider_name):
@@ -263,7 +263,7 @@ def _try_providers(
     return []
 
 
-def _fetch_with_incremental_fallback(
+def fetch_with_incremental_fallback(
     chain_name: str,
     code: str,
     days: int = 30,
@@ -275,7 +275,7 @@ def _fetch_with_incremental_fallback(
 
     - chain 层管理缓存读/写/合并
     - Provider 函数只负责纯数据获取（不碰缓存层）
-    - 熔断器预检、fallback 遍历与 _fetch_with_fallback() 共享
+    - 熔断器预检、fallback 遍历与 fetch_with_fallback() 共享
 
     Args:
         chain_name: chain 名称（如 "history_stock"、"history_fund_otc"）

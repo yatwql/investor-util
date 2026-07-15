@@ -188,7 +188,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 ### 2.2 Provider Chain 必经（C6）
 
-**决策**：绝大多数数据获取必须通过 `fetcher/chain.py` 的 `_fetch_with_fallback()`（带下划线函数），不得直接调用 Provider 函数。
+**决策**：绝大多数数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()`，不得直接调用 Provider 函数。
 
 **动机**：跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失（故障记录无法集中追踪）。
 
@@ -271,7 +271,7 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 
 ### 3.1 Provider Chain 路由与 fallback
 
-Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个数据类型定义一条优先级链路，`_fetch_with_fallback()` 依次尝试，失败则递补下一 Provider。
+Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个数据类型定义一条优先级链路，`fetch_with_fallback()` 依次尝试，失败则递补下一 Provider。
 
 #### 数据的默认链路
 
@@ -300,7 +300,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 - 超时/断连/DNS 解析失败
 - 数据验证未通过（如名称不匹配、price_date 非当前交易日）
 
-#### _fetch_with_fallback() 完整流程
+#### fetch_with_fallback() 完整流程
 
 ```
 请求 data_type + code
@@ -604,7 +604,7 @@ fetch_market_data(code, expected_name)
 **关键设计保障**：
 - 主链路成功时永不触达降级，零误判风险
 - 降级成功/失败均有日志区分（含资产名称和期望名称）
-- `portfolio_history.py` 中 `_fetch_with_incremental_fallback()` 对返回空列表的首个 provider 同样执行递补，非简单返回
+- `portfolio_history.py` 中 `fetch_with_incremental_fallback()` 对返回空列表的首个 provider 同样执行递补，非简单返回
 
 **`_price_cache_fresh` 收市后新鲜度验证**：
 
@@ -1258,9 +1258,9 @@ annualized_vol = std(daily_returns, ddof=1) × √252
 
 #### 走势数据获取：增量合并 Fallback
 
-`_fetch_with_incremental_fallback()` 与 `_fetch_with_fallback()` 的对比：
+`fetch_with_incremental_fallback()` 与 `fetch_with_fallback()` 的对比：
 
-| 维度 | `_fetch_with_fallback` | `_fetch_with_incremental_fallback` |
+| 维度 | `fetch_with_fallback` | `fetch_with_incremental_fallback` |
 |:-----|:-----------------------|:----------------------------------|
 | 用途 | 单次价类数据（价格/行业） | 时序数据（历史走势） |
 | 缓存策略 | 先读缓存→命中直接返回 | 先读缓存做底座→增量获取新数据→合并 |
@@ -1270,7 +1270,7 @@ annualized_vol = std(daily_returns, ddof=1) × √252
 **增量合并流程**：
 
 ```
-_fetch_with_incremental_fallback(chain_name, code, days)
+fetch_with_incremental_fallback(chain_name, code, days)
     │
     ▼
 cache_key = f"history_{chain_name}_{code}"
@@ -1760,10 +1760,10 @@ llm/
 ```
 generators_orchestrator（并行调度 4+1 模块）
     │
-    └── skeleton._generate_llm_module()
+    └── skeleton.generate_llm_module()
             │ ① 缓存检查（指纹+TTL）→ 命中则直接返回
             │ ② API 调用
-            ├── api._call_llm()
+            ├── api.call_llm()
             │      └── api_base._attempt_api_call()
             │              ├── Claude → anthropic SDK
             │              └── OpenAI/DeepSeek → openai SDK
@@ -1940,7 +1940,7 @@ load_holdings(filepath)
 返回：list[Holding]（每行一个 Holding）
 ```
 
-多文件选择：持仓目录下多个 xlsx 时弹出 TUI 选择器（`tui_handlers.py` 中 `_select_holdings_file()`）。
+多文件选择：持仓目录下多个 xlsx 时弹出 TUI 选择器（`tui_handlers.py` 中 `select_holdings_file()`）。
 
 [↑ 回到顶部](#目录)
 
@@ -2007,7 +2007,7 @@ handlers_*.py → 各模块入口函数编排
 | **C1** | **代码类型判定中心化** — 所有资产代码类型判定必须使用 `code_utils.py` 提供的函数，禁止任何模块自行实现判定逻辑 | 系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落，"魔法判定"遍地，新增资产类型时需全局搜索替换 | 代码评审不通过；新增资产类型时遗漏大量散落判定点 | 所有涉及代码类型判定的模块（fetcher/、report/、llm/ 等） |
 | **C4** | **会话级 API 复用** — 同次会话内同一 API 返回的数据必须通过 `DataSourceRegistry.session_cache` 复用，禁止重复 HTTP 请求 | 避免同一资产在多个模块中重复请求相同 API 数据，降低 API 限频风险，提升性能 | API 调用量膨胀、触发限频、报告生成时间增长 | 所有通过 Provider 获取数据的模块 |
 | **C5** | **HTTP 客户端统一** — 所有 HTTP 请求必须使用 `http_client.py` 工厂方法创建客户端实例 | 统一 SSL 配置、超时策略、连接池管理；防止各模块自行构造 request 导致配置散落、连接池泄漏 | SSL 配置不一致、连接泄漏、重试策略不统一 | 所有发起 HTTP 请求的模块（providers/、llm/） |
-| **C6** | **Provider Chain 必经** — 大多数数据获取必须通过 `_fetch_with_fallback()` 走 Chain 路由，不得直接调用 Provider 函数 | 跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失 | 熔断器失效、fallback 断路、故障记录缺失 | fetcher/ 各模块（例外：index.py 直调 Provider 的双链路 fallback 硬编码，熔断器不适用于指数场景） |
+| **C6** | **Provider Chain 必经** — 大多数数据获取必须通过 `fetch_with_fallback()` 走 Chain 路由，不得直接调用 Provider 函数 | 跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失 | 熔断器失效、fallback 断路、故障记录缺失 | fetcher/ 各模块（例外：index.py 直调 Provider 的双链路 fallback 硬编码，熔断器不适用于指数场景） |
 
 ### 9.2 缓存层约束
 

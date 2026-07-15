@@ -21,7 +21,7 @@ from src.python.llm import (
     FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_TIMEOUT,
 )
-from src.python.llm.prompts import _LLM_MODULE_FAILURE
+from src.python.llm.prompts import LLM_MODULE_FAILURE
 from src.python.registry import get_llm_module_name, get_report_section_order
 from src.python.report.excel_writer import (
     freeze_header,
@@ -127,7 +127,7 @@ def _get_placeholder(title: str, section_order: list[dict] | None = None) -> str
     """根据页签标题查找对应的失败原因占位文本。"""
     mk = _get_module_key_map(section_order).get(title)
     if mk:
-        reason = _LLM_MODULE_FAILURE.get(mk)
+        reason = LLM_MODULE_FAILURE.get(mk)
         if reason in _PLACEHOLDER_BY_REASON:
             return _PLACEHOLDER_BY_REASON[reason]
     return "本节内容待生成 — 请配置 LLM API Key（data/config/llm_key.json）"
@@ -221,7 +221,7 @@ def write_llm_sheets(
 
     _module_keys = ["global_macro", "expert_review", "health_check", "penetration_deep"]
     _disabled = tuple(
-        _LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED
+        LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED
         for mk in _module_keys
     )
 

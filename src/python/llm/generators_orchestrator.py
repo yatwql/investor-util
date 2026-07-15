@@ -16,24 +16,25 @@ import httpx
 
 from src.python.cache import get as cache_get
 from src.python.config import get_llm_config
+from src.python.http_client import make_http_client
 from src.python.llm.api_base import (
-    _CACHE_LINE_HTML,
-    _LLM_TIMEOUT,
+    CACHE_LINE_HTML,
+    LLM_TIMEOUT,
     _cache_line_model_tpl,
     _extract_model_from_cached,
 )
 from src.python.llm.fingerprint import (
-    _build_llm_fingerprint,
-    _compute_fingerprint,
-    _get_cache_ttl_llm,
+    build_llm_fingerprint,
+    compute_fingerprint,
+    get_cache_ttl_llm,
 )
 from src.python.llm.prompts import (
-    _CACHE_PREFIX_LLM,
-    _LLM_MODULE_FAILURE,
+    CACHE_PREFIX_LLM,
+    LLM_MODULE_FAILURE,
     FAIL_REASON_DISABLED,
 )
-from src.python.llm.session import _record_per_module
-from src.python.llm.skeleton import _is_llm_module_enabled
+from src.python.llm.session import record_per_module
+from src.python.llm.skeleton import is_llm_module_enabled
 from src.python.llm.generators import (
     generate_expert_review,
     generate_global_macro,
@@ -75,22 +76,22 @@ def _compute_module_cache_info(
     force: bool,
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。"""
-    fp_global_macro = _compute_fingerprint(
+    fp_global_macro = compute_fingerprint(
         a_indices, us_indices, total_mv, total_profit, categories,
     )
-    fp_expert_review = _build_llm_fingerprint(
+    fp_expert_review = build_llm_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
         holdings_details=holdings_details, penetrated_assets=penetrated_assets,
         categories=categories,
     )
-    fp_health_check = _build_llm_fingerprint(
+    fp_health_check = build_llm_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
         holdings_details=holdings_details, penetrated_assets=penetrated_assets,
         categories=categories,
     )
-    fp_penetration_deep = _build_llm_fingerprint(
+    fp_penetration_deep = build_llm_fingerprint(
         total_mv=total_mv, total_cost=total_cost,
         total_profit=total_profit, total_today_profit=total_today_profit,
         holdings_details=holdings_details, penetrated_assets=penetrated_assets,
@@ -100,26 +101,26 @@ def _compute_module_cache_info(
     force_flag = force
     info: dict[str, dict] = {
         "global_macro": {
-            "key": _CACHE_PREFIX_LLM + f"global_macro_{fp_global_macro}",
-            "ttl": _get_cache_ttl_llm("global_macro"),
+            "key": CACHE_PREFIX_LLM + f"global_macro_{fp_global_macro}",
+            "ttl": get_cache_ttl_llm("global_macro"),
             "can_cache": not force_flag and llm_config.get("cache_enabled_global_macro", True),
             "thinking_key": "thinking_enabled_global_macro",
         },
         "expert_review": {
-            "key": _CACHE_PREFIX_LLM + f"expert_review_{fp_expert_review}",
-            "ttl": _get_cache_ttl_llm("expert_review"),
+            "key": CACHE_PREFIX_LLM + f"expert_review_{fp_expert_review}",
+            "ttl": get_cache_ttl_llm("expert_review"),
             "can_cache": not force_flag and llm_config.get("cache_enabled_expert_review", True),
             "thinking_key": "thinking_enabled_expert_review",
         },
         "health_check": {
-            "key": _CACHE_PREFIX_LLM + f"health_check_{fp_health_check}",
-            "ttl": _get_cache_ttl_llm("health_check"),
+            "key": CACHE_PREFIX_LLM + f"health_check_{fp_health_check}",
+            "ttl": get_cache_ttl_llm("health_check"),
             "can_cache": not force_flag and llm_config.get("cache_enabled_health_check", True),
             "thinking_key": "thinking_enabled_health_check",
         },
         "penetration_deep": {
-            "key": _CACHE_PREFIX_LLM + f"penetration_deep_{fp_penetration_deep}",
-            "ttl": _get_cache_ttl_llm("penetration_deep"),
+            "key": CACHE_PREFIX_LLM + f"penetration_deep_{fp_penetration_deep}",
+            "ttl": get_cache_ttl_llm("penetration_deep"),
             "can_cache": not force_flag and llm_config.get("cache_enabled_penetration_deep", True),
             "thinking_key": "thinking_enabled_penetration_deep",
         },
@@ -142,7 +143,7 @@ def _precheck_one_cache(
         return (None, False)
     clean = cached
     model = _extract_model_from_cached(cached)
-    hint = _cache_line_model_tpl(model) if model else _CACHE_LINE_HTML
+    hint = _cache_line_model_tpl(model) if model else CACHE_LINE_HTML
     thinking_enabled = llm_config.get(cache_info["thinking_key"], False)
     if thinking_enabled:
         hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
@@ -150,7 +151,7 @@ def _precheck_one_cache(
     if module_key:
         _name_for_record = model or llm_config.get("model", "") or "缓存命中"
         _endpoint_for_record = llm_config.get("endpoint", "") or ""
-        _record_per_module(module_key, _name_for_record, cached=True,
+        record_per_module(module_key, _name_for_record, cached=True,
                            thinking=thinking_enabled, endpoint=_endpoint_for_record)
     return (clean + hint, True)
 
@@ -161,10 +162,10 @@ def _precheck_all_modules(
     """检查所有模块的状态（已禁用/缓存命中/缓存未命中）。"""
     results: dict[str, dict] = {}
     for module_key, info in cache_info.items():
-        enabled = _is_llm_module_enabled(llm_config, module_key)
+        enabled = is_llm_module_enabled(llm_config, module_key)
         if not enabled:
             logger.info("%s LLM 分析已禁用（enabled_llm.%s = false）", _MN(module_key), module_key)
-            _LLM_MODULE_FAILURE[module_key] = FAIL_REASON_DISABLED
+            LLM_MODULE_FAILURE[module_key] = FAIL_REASON_DISABLED
             results[module_key] = {"result": None, "cached": False}
             continue
         result, from_cache = _precheck_one_cache(info, llm_config, module_key)
@@ -193,13 +194,13 @@ def _dispatch_llm_workers(
         def _run() -> tuple[str | None, bool]:
             logger.info("正在生成：%s...", _label_map.get(label, label))
             try:
-                c = httpx.Client(timeout=_LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)
+                c = make_http_client(timeout=LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)
             except ImportError:
                 # h2 包未安装时降级到 HTTP/1.1
                 logger.info("h2 包未安装，降级到 HTTP/1.1")
                 _settings = dict(_LLM_CLIENT_SETTINGS)
                 _settings.pop("http2", None)
-                c = httpx.Client(timeout=_LLM_TIMEOUT, **_settings)
+                c = make_http_client(timeout=LLM_TIMEOUT, **_settings)
             try:
                 return fn(c, llm_config)
             finally:
@@ -297,7 +298,7 @@ def generate_all_llm(
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
 
-    needs = {k: (v["result"] is None and _is_llm_module_enabled(llm_config, k))
+    needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k))
              for k, v in precheck_results.items()}
 
     worker_results = _dispatch_llm_workers(

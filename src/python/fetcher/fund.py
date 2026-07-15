@@ -18,7 +18,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.config import get_config
-from src.python.fetcher.chain import _fetch_with_fallback
+from src.python.fetcher.chain import fetch_with_fallback
 from src.python.http_client import make_http_client
 from src.python.providers import tiantian
 
@@ -44,7 +44,7 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     Provider Chain（可配置）：天天基金
     """
     code = code.strip()
-    return _fetch_with_fallback(
+    return fetch_with_fallback(
         "fund_rank",
         _FUND_RANK_PROVIDERS,
         _FUND_PERF_CACHE_PREFIX + code,
@@ -70,7 +70,7 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
     Provider Chain（可配置）：天天基金
     """
     code = code.strip()
-    return _fetch_with_fallback(
+    return fetch_with_fallback(
         "fund_hold",
         _FUND_HOLD_PROVIDERS,
         _FUND_HOLD_CACHE_PREFIX + code,

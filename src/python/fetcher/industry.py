@@ -16,7 +16,7 @@ from typing import Any
 
 from src.python.cache import get_ttl
 from src.python.code_utils import is_a_share_code
-from src.python.fetcher.chain import _fetch_with_fallback, is_provider_chain_broken
+from src.python.fetcher.chain import fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
 
 logger = logging.getLogger("invest")
@@ -60,7 +60,7 @@ def fetch_industry_data(code: str) -> dict | None:
         {code, industry, industry_id, concepts, concept_ids}
         失败返回 None
     """
-    return _fetch_with_fallback(
+    return fetch_with_fallback(
         "industry",
         _INDUSTRY_PROVIDERS,
         _INDUSTRY_CACHE_PREFIX + code.strip(),

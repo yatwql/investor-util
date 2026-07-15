@@ -13,8 +13,8 @@ from typing import Any, Callable
 
 from src.python.fetcher.fund import fetch_fund_holdings
 from src.python.logger import setup_logger
-from src.python.provider_registry import _NOT_FOUND, get_registry
-from src.python.report.fund_performance import _is_fund
+from src.python.provider_registry import NOT_FOUND, get_registry
+from src.python.report.fund_performance import is_fund
 from src.python.report.progress import ProgressReporter
 
 logger = setup_logger()
@@ -24,7 +24,7 @@ def _fetch_fund_holdings_cached(code: str) -> dict | None:
     """基金持仓获取（含会话缓存），同一报告生成中同基金只获取一次。"""
     registry = get_registry()
     cached = registry.session_cache_get("fund_hold", code)
-    if cached is not _NOT_FOUND:
+    if cached is not NOT_FOUND:
         return cached
     result = fetch_fund_holdings(code)
     registry.session_cache_set("fund_hold", code, result, source="api")
@@ -43,7 +43,7 @@ def _process_b_module(
     的键是基金代码，值是 {"name": ..., "holdings": [...]}。
     """
     fund_codes = list(dict.fromkeys(
-        h.code for h in holdings if _is_fund(h)
+        h.code for h in holdings if is_fund(h)
     ))
     fund_holdings_map: dict[str, dict] = {}
     for code in fund_codes:
