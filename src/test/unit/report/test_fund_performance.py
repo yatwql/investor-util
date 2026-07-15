@@ -64,17 +64,17 @@ class TestIsFund(unittest.TestCase):
     def test_stock_sh_6_excluded(self):
         """6 开头上海股票 + 证券账户 -> False"""
         h = self._h("长江电力", "600900")
-        self.assertFalse(fp._is_fund(h))
+        self.assertFalse(fp.is_fund(h))
 
     def test_stock_sz_0_excluded(self):
         """0 开头深圳股票 + 证券账户 -> False"""
         h = self._h("平安银行", "000001")
-        self.assertFalse(fp._is_fund(h))
+        self.assertFalse(fp.is_fund(h))
 
     def test_stock_cyb_3_excluded(self):
         """3 开头创业板股票 + 证券账户 -> False"""
         h = self._h("宁德时代", "300750")
-        self.assertFalse(fp._is_fund(h))
+        self.assertFalse(fp.is_fund(h))
 
     # -- ETF 绕过股票排除 --
 
@@ -83,29 +83,29 @@ class TestIsFund(unittest.TestCase):
         for name in ["半导体ETF", "电池ETF", "消费ETF"]:
             with self.subTest(name=name):
                 h = self._h(name, "512480")
-                self.assertTrue(fp._is_fund(h))
+                self.assertTrue(fp.is_fund(h))
 
     # -- 场外基金账户覆盖 --
 
     def test_fund_in_alipay(self):
         """6 开头代码 + 支付宝 -> True"""
         h = self._h("某混合基金", "600001", "支付宝")
-        self.assertTrue(fp._is_fund(h))
+        self.assertTrue(fp.is_fund(h))
 
     def test_fund_in_wechat(self):
         """0 开头代码 + 微信 -> True"""
         h = self._h("某货币基金", "000001", "微信")
-        self.assertTrue(fp._is_fund(h))
+        self.assertTrue(fp.is_fund(h))
 
     def test_fund_in_bank(self):
         """3 开头代码 + 银行 -> True"""
         h = self._h("某稳健增长", "300001", "银行")
-        self.assertTrue(fp._is_fund(h))
+        self.assertTrue(fp.is_fund(h))
 
     def test_fund_in_fund_account(self):
         """6 开头代码 + 基金账户 -> True"""
         h = self._h("某指数基金", "600001", "基金账户")
-        self.assertTrue(fp._is_fund(h))
+        self.assertTrue(fp.is_fund(h))
 
     # -- 非股票前缀代码始终为基金 --
 
@@ -116,19 +116,19 @@ class TestIsFund(unittest.TestCase):
         for name, code in cases:
             with self.subTest(code=code):
                 h = self._h(name, code)
-                self.assertTrue(fp._is_fund(h))
+                self.assertTrue(fp.is_fund(h))
 
     # -- QDII / 空代码 --
 
     def test_qdii_is_fund(self):
         """QDII 基金 -> True"""
         h = self._h("华夏纳斯达克100ETF(QDII)", "513300")
-        self.assertTrue(fp._is_fund(h))
+        self.assertTrue(fp.is_fund(h))
 
     def test_empty_code_is_fund(self):
         """空代码 -> True（不触发前缀检查）"""
         h = self._h("某基金", "")
-        self.assertTrue(fp._is_fund(h))
+        self.assertTrue(fp.is_fund(h))
 
 
 # ============================================================

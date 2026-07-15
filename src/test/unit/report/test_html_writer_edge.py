@@ -203,7 +203,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
             ))
             # data_status mock — industry 失败
             stack.enter_context(patch(
-                "src.python.report.html_writer._build_penetration_data_status",
+                "src.python.report.html_writer.build_penetration_data_status",
                 return_value={
                     "industry": DataStatusItem(
                         available=False, tier="T3",
@@ -249,7 +249,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
                 return_value=([], False),
             ))
             stack.enter_context(patch(
-                "src.python.report.html_writer._build_perf_data_status",
+                "src.python.report.html_writer.build_perf_data_status",
                 return_value={
                     "rank": DataStatusItem(
                         available=False, tier="T2",
@@ -295,12 +295,12 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
             ))
             # 穿透 data_status 抛异常 → 被辅助函数捕获，结果为 {}
             stack.enter_context(patch(
-                "src.python.report.html_writer._build_penetration_data_status",
+                "src.python.report.html_writer.build_penetration_data_status",
                 side_effect=Exception("模拟穿透状态构建失败"),
             ))
             # 基金业绩 data_status 正常返回
             stack.enter_context(patch(
-                "src.python.report.html_writer._build_perf_data_status",
+                "src.python.report.html_writer.build_perf_data_status",
                 return_value={
                     "benchmark": DataStatusItem(
                         available=False, tier="T3",
@@ -393,11 +393,11 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
             return_value={"results": []},
         ))
         # data_status 构建（标准）
-        stack.enter_context(patch("src.python.report.html_writer._build_index_data_status",
+        stack.enter_context(patch("src.python.report.html_writer.build_index_data_status",
                                    return_value={}))
-        stack.enter_context(patch("src.python.report.html_writer._build_penetration_data_status",
+        stack.enter_context(patch("src.python.report.html_writer.build_penetration_data_status",
                                    return_value={}))
-        stack.enter_context(patch("src.python.report.html_writer._build_perf_data_status",
+        stack.enter_context(patch("src.python.report.html_writer.build_perf_data_status",
                                    return_value={}))
         # 模板
         tmpl = MagicMock()

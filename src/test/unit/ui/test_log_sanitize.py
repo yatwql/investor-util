@@ -118,12 +118,12 @@ class TestApiKeyNotInLog(unittest.TestCase):
     def test_header_api_key_not_in_log(self):
         """HTTP 请求头的 API Key 不写入日志。"""
         from unittest.mock import MagicMock
-        from src.python.llm.api import _call_claude
+        from src.python.llm.api import call_claude
 
         secret_key = "sk-header-key-88888"
         with patch("src.python.llm.api.call_llm_with_retry") as mock_retry:
             mock_retry.return_value = ("result", {"input_tokens": 10})
-            _call_claude(
+            call_claude(
                 system="sys", user="user", api_key=secret_key,
                 model="claude-sonnet-4", endpoint="",
                 max_tokens=100, timeout=30,

@@ -83,7 +83,7 @@ class TestLoadProfitForecast(unittest.TestCase):
     def test_success_returns_dict(self):
         """正常加载 → 返回字典。"""
         from src.python.report.html_builders import _load_profit_forecast
-        with patch("src.python.providers.akshare_extras.get_profit_forecast",
+        with patch("src.python.fetcher.akshare.get_profit_forecast",
                    return_value={"000001": {"reports": 5}}):
             result = _load_profit_forecast()
         self.assertEqual(result, {"000001": {"reports": 5}})
@@ -91,7 +91,7 @@ class TestLoadProfitForecast(unittest.TestCase):
     def test_api_failure_returns_empty(self):
         """API 失败 → 返回空字典。"""
         from src.python.report.html_builders import _load_profit_forecast
-        with patch("src.python.providers.akshare_extras.get_profit_forecast",
+        with patch("src.python.fetcher.akshare.get_profit_forecast",
                    side_effect=Exception("API 失败")):
             result = _load_profit_forecast()
         self.assertEqual(result, {})
@@ -122,7 +122,7 @@ class TestBuildCategoryDataDividendDegradation(unittest.TestCase):
         """get_dividend_data 抛异常 → 所有 yield_text 为 "--"。"""
         from src.python.report.html_builders import _build_category_data
 
-        with patch("src.python.providers.akshare_extras.get_dividend_data",
+        with patch("src.python.fetcher.akshare.get_dividend_data",
                    side_effect=Exception("API 失败")):
             result, dividend_success = _build_category_data(self.holdings, list(self.detail_map.values()))
             self.assertFalse(dividend_success)

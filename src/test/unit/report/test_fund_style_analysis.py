@@ -196,11 +196,11 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         from src.python.provider_registry import get_registry
         get_registry().session_cache_clear("extended")
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_same_industry_median(self, mock_push2, mock_fetch_ind):
         """同行业多只 → 中位数作为行业平均 PE"""
-        mock_fetch_ind.side_effect = lambda c: {"600519": "白酒", "000858": "白酒", "000568": "白酒"}.get(c)
+        mock_fetch_ind.side_effect = lambda c: {"600519": {"industry": "白酒"}, "000858": {"industry": "白酒"}, "000568": {"industry": "白酒"}}.get(c)
         mock_push2.side_effect = lambda c: {
             "600519": {"market_cap": 2e12, "pe": 25.0},
             "000858": {"market_cap": 5e11, "pe": 15.0},
@@ -213,11 +213,11 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         self.assertAlmostEqual(result.get("000858", 0), 25.0, places=4)
         self.assertAlmostEqual(result.get("000568", 0), 25.0, places=4)
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_different_industries(self, mock_push2, mock_fetch_ind):
         """不同行业 → 各自独立计算"""
-        mock_fetch_ind.side_effect = lambda c: {"600519": "白酒", "300750": "电池", "002594": "电池"}.get(c)
+        mock_fetch_ind.side_effect = lambda c: {"600519": {"industry": "白酒"}, "300750": {"industry": "电池"}, "002594": {"industry": "电池"}}.get(c)
         mock_push2.side_effect = lambda c: {
             "600519": {"market_cap": 2e12, "pe": 25.0},
             "300750": {"market_cap": 8e11, "pe": 40.0},
@@ -229,7 +229,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         self.assertAlmostEqual(result.get("300750", 0), 30.0, places=4)  # 电池 median(20,40)=30
         self.assertAlmostEqual(result.get("002594", 0), 30.0, places=4)
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_all_fail(self, mock_push2, mock_fetch_ind):
         """全部失败 → 空字典"""
@@ -239,12 +239,12 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         result = _get_industry_avg_pe(["600519", "000858"])
         self.assertEqual(result, {})
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_partial_failure(self, mock_push2, mock_fetch_ind):
         """部分失败 → 有数据的正常计算"""
         def _industry_side(code):
-            return "白酒" if code == "600519" else "电池" if code == "300750" else None
+            return {"industry": "白酒"} if code == "600519" else {"industry": "电池"} if code == "300750" else None
         mock_fetch_ind.side_effect = _industry_side
         mock_push2.side_effect = lambda c: {
             "600519": {"market_cap": 2e12, "pe": 25.0},
@@ -269,11 +269,11 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         result = _get_industry_avg_pe(["00700", "AAPL", "110011"])
         self.assertEqual(result, {})
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_even_count_median(self, mock_push2, mock_fetch_ind):
         """偶数只股票 → 中位数取中间两数平均值"""
-        mock_fetch_ind.return_value = "白酒"
+        mock_fetch_ind.return_value = {"industry": "白酒"}
         mock_push2.side_effect = lambda c: {
             "600519": {"market_cap": 2e12, "pe": 20.0},
             "000858": {"market_cap": 5e11, "pe": 30.0},
@@ -285,7 +285,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         # 排序 PE: [10, 20, 30, 40] → 中位数 = (20+30)/2 = 25.0
         self.assertAlmostEqual(result.get("600519", 0), 25.0, places=4)
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_session_cache_filled(self, mock_push2, mock_fetch_ind):
         """验证 registry session_cache 被填充，主循环复用"""
@@ -310,7 +310,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         self.assertTrue(get_registry().session_cache_contains("extended", "600519"))
         self.assertTrue(get_registry().session_cache_contains("extended", "000858"))
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_negative_pe_skipped(self, mock_push2, mock_fetch_ind):
         """负 PE / 零 PE 不参与行业平均计算"""
@@ -343,7 +343,7 @@ class TestClassifyFundStyle(unittest.TestCase):
         result = classify_fund_style("110011", [])
         self.assertEqual(result["style"], "--")
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._tencent_extended")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_no_push2_fallback_code(self, mock_push2, mock_tencent, mock_fetch_ind):
@@ -357,7 +357,7 @@ class TestClassifyFundStyle(unittest.TestCase):
         self.assertEqual(result["style"], "大盘混合")
         self.assertTrue(result["is_estimated"])
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._tencent_extended")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_push2_fallback_to_tencent(self, mock_push2, mock_tencent, mock_fetch_ind):
@@ -371,7 +371,7 @@ class TestClassifyFundStyle(unittest.TestCase):
         # Tencent 数据视为精确（非降级）
         self.assertFalse(result["is_estimated"])
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_with_push2_data(self, mock_push2, mock_fetch_ind):
         """push2 可用 → 精确风格"""
@@ -382,13 +382,13 @@ class TestClassifyFundStyle(unittest.TestCase):
         self.assertIn("大盘", result["style"])
         self.assertFalse(result["is_estimated"])
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._tencent_extended")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_industry_avg_affects_style(self, mock_push2, mock_tencent, mock_fetch_ind):
         """行业平均 PE 影响风格判定 — 同一行业不同PE→价值/成长区分"""
         mock_tencent.return_value = None
-        mock_fetch_ind.return_value = "白酒"  # 全部同一行业
+        mock_fetch_ind.return_value = {"industry": "白酒"}  # 全部同一行业
 
         def push2_side(code):
             data = {
@@ -412,7 +412,7 @@ class TestClassifyFundStyle(unittest.TestCase):
         self.assertFalse(details["600519"]["is_estimated"])
         self.assertFalse(details["000858"]["is_estimated"])
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     def test_weighted_style(self, mock_push2, mock_fetch_ind):
         """多只持仓加权 → 按权重最大的 size 和 style 输出"""
@@ -442,7 +442,7 @@ class TestClassifyFundStyle(unittest.TestCase):
 class TestAnalyzeStyleForAllFunds(unittest.TestCase):
     """analyze_style_for_all_funds：全流程集成"""
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._tencent_extended")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     @patch("src.python.report.fund_style_analysis._load_snapshot")
@@ -463,7 +463,7 @@ class TestAnalyzeStyleForAllFunds(unittest.TestCase):
         self.assertTrue(result["results"][0]["is_first_check"])
         self.assertEqual(result["results"][0]["drift_level"], "基准确立中")
 
-    @patch("src.python.providers.eastmoney_industry.fetch_industry")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_analysis._push2_extended")
     @patch("src.python.report.fund_style_analysis._load_snapshot")
     def test_drift_detected(self, mock_load, mock_push2, mock_fetch_ind):

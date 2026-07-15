@@ -14,7 +14,14 @@
 
 ### Fixed
 
-- *（本次无修复）*
+- **回归测试修复**：修复 P1-3f 函数重命名残留在 9 个测试文件中的 7 类共 41 个测试失败
+  - `test_fund_performance.py`：`fp._is_fund()` → `fp.is_fund()`（9 处）
+  - `test_tui_handlers.py`：`_timing_records` → `timing_records`（20+ 处）
+  - `test_log_sanitize.py`：`_call_claude` → `call_claude`（2 处）
+  - `test_news_correlation.py`：mock target `enhance_news_correlation` → `generators_orchestrator.run_news_correlation_safe`
+  - `test_penetration.py`：可转债 `110059` 重分类 `IGNORE` → `ETF`（P2-3 行为变更，更新 2 个测试断言）
+  - `test_html_builders_edge.py`：mock target `providers.akshare_extras.*` → `fetcher.akshare.*`
+  - `test_fund_style_analysis.py`：mock target `providers.eastmoney_industry.fetch_industry` → `fetcher.industry.fetch_industry_data`，返回值由 `str` 调整为 `dict`
 
 ### Changed
 

@@ -452,7 +452,7 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
             stack.enter_context(
                 patch("src.python.llm.format_session_usage", return_value=formatted))
             stack.enter_context(
-                patch("src.python.llm.prompts._LLM_MODULE_FAILURE", module_failure))
+                patch("src.python.llm.prompts.LLM_MODULE_FAILURE", module_failure))
             stack.enter_context(
                 patch("src.python.registry.get_llm_module_names",
                       return_value=self._name_map))
