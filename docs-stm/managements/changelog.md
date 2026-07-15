@@ -18,7 +18,7 @@
 
 ### Changed
 
-- **菜单 [4] 缓存统计扩展**：输出从仅 data/cache/ 扩展为三块（data/cache/ 缓存 → data/history/snapshots/ 快照 → data/state/ 运行时状态），每块独立显示文件数与大小
+- **菜单 [4] 名称与统计扩展**：菜单项改为"查看缓存/状态统计"；输出从仅 data/cache/ 扩展为三块（data/cache/ 缓存 → data/history/snapshots/ 快照 → data/state/ 运行时状态），每块独立显示文件数与大小
 
 ### Docs
 

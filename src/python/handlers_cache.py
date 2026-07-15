@@ -383,7 +383,7 @@ def _cmd_cleanup_cache() -> None:
 
 
 def _cmd_show_cache_stats() -> None:
-    """查看缓存统计信息。"""
+    """查看缓存/状态统计信息。"""
     from src.python.cache import cleanup_expired, get_cache_dir, get_cache_hit_rate, get_cache_stats
     from src.python.constants import PROJECT_ROOT
     cache_dir = get_cache_dir()

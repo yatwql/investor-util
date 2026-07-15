@@ -32,7 +32,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("1", "更新基础类缓存（含基金业绩/持仓/经理/基准等）", None, False),
     ("2", "更新持仓类缓存", None, False),
     ("3", "清理过期缓存文件", None, False),
-    ("4", "查看缓存统计信息", None, False),
+    ("4", "查看缓存/状态统计", None, False),
     ("P", "配置报告板块可见性（B系列/新闻/历史走势）", None, False),
     ("S", "配置支持LLM的报告分析章节", None, False),
     ("R", "刷新配置", None, False),
