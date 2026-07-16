@@ -307,9 +307,40 @@ def generate_report(
     output_dir: str | None = None,
     warm_cache: bool = False,
 ) -> ReportResult:
-    """生成投资分析报告（骨架，后续迭代逐步填充具体路径）。"""
-    # S4 开始填充 basic/both/full 三条路径
+    """生成投资分析报告。
+
+    basic: 仅 Excel（无数据准备/快照/历史）
+    both:  HTML+Excel（不含 LLM） — S5 实现
+    full:  HTML+Excel+LLM — S6 实现
+    """
     result = ReportResult()
+
+    if report_type == "basic":
+        # basic 路径：仅生成 Excel，不调 prepare_report_data / capture_snapshot / fetch_history_data
+        from src.python.report.excel_generator import generate_excel_report
+        from src.python.registry import get_report_section_order
+
+        sec_order = get_report_section_order(config)
+        output = output_dir or config.get("output_dir", "reports")
+
+        try:
+            generate_excel_report(
+                holdings, include_news=False,
+                output_dir=output,
+                section_order=sec_order,
+                progress=reporter,
+            )
+            result.excel_ok = True
+            result.holdings_ok = True
+            result.report_generated = True
+        except Exception:
+            reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
+            logger.exception("生成 Excel 报告失败")
+            result.errors.append("Excel 报告生成失败")
+
+        return result
+
+    # S4 骨架：both/full 路径后续迭代逐步填充
     result.report_generated = True
     reporter.info("generate_report: 骨架模式—报告生成的模块暂未实现（S4 起逐步填充）")
     return result

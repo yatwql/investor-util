@@ -181,6 +181,86 @@ class TestGenerateReport:
         assert result.report_generated is True
         assert result.exit_code == 0
 
+    def test_generate_report_basic(self):
+        """basic 路径直接调用 excel_generator.generate_excel_report 生成 Excel 报告。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="SH600001", name="测试", shares=100, cost_price=10.0)]
+        config = {"output_dir": "reports"}
+
+        with (
+            patch("src.python.report.excel_generator.generate_excel_report") as mock_gen,
+            patch("src.python.registry.get_report_section_order", return_value=[{"key": "overview"}]),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="basic",
+            )
+
+        assert isinstance(result, ReportResult)
+        assert result.excel_ok is True
+        assert result.holdings_ok is True
+        assert result.report_generated is True
+        assert result.exit_code == 0
+        # 验证 generate_excel_report 被正确调用
+        mock_gen.assert_called_once_with(
+            mock_holdings, include_news=False,
+            output_dir="reports",
+            section_order=[{"key": "overview"}],
+            progress=mock_reporter,
+        )
+        # 验证不调用数据准备/快照/历史等函数
+        with pytest.raises(AssertionError):
+            mock_reporter.info.assert_any_call("generate_report: 骨架模式")
+
+    def test_generate_report_basic_exception(self):
+        """basic 路径异常时 result.excel_ok=False，errors 非空。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+
+        with (
+            patch(
+                "src.python.report.excel_generator.generate_excel_report",
+                side_effect=RuntimeError("生成失败"),
+            ),
+            patch("src.python.registry.get_report_section_order", return_value=[]),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config={},
+                reporter=mock_reporter,
+                report_type="basic",
+            )
+
+        assert result.excel_ok is False
+        assert len(result.errors) > 0
+        # reporter.add_error 被调用
+        mock_reporter.add_error.assert_called_once()
+
+    def test_generate_report_basic_uses_output_dir(self):
+        """output_dir 参数覆盖 config 中的 output_dir。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+
+        with (
+            patch("src.python.report.excel_generator.generate_excel_report") as mock_gen,
+            patch("src.python.registry.get_report_section_order", return_value=[]),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config={"output_dir": "reports"},
+                reporter=mock_reporter,
+                report_type="basic",
+                output_dir="/custom/path",
+            )
+
+        assert result.report_generated is True
+        mock_gen.assert_called_once()
+        # output_dir 使用传参而非 config 值
+        _call_kwargs = mock_gen.call_args.kwargs
+        assert _call_kwargs["output_dir"] == "/custom/path"
+
 
 @pytest.mark.unit
 @pytest.mark.unit_report

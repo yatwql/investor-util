@@ -51,15 +51,16 @@ def _cmd_generate_excel() -> None:
     """生成 Excel 分析报告（必选内容）。"""
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
-    sec_order = get_report_section_order(config)
     holdings = prepare_holdings()
     if not holdings:
         return
     try:
-        _generate_excel_report(holdings, include_news=False,
-                               output_dir=config.get("output_dir", "reports"),
-                               section_order=sec_order,
-                               progress=reporter)
+        orchestrator.generate_report(
+            holdings=holdings,
+            config=config,
+            reporter=reporter,
+            report_type="basic",
+        )
     except Exception as e:
         reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("生成 Excel 报告失败")
