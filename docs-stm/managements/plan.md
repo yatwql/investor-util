@@ -88,3 +88,11 @@
 - 行业资金流向连续 30 天成功率 < 30% → 移除该维度
 - 新闻情绪聚合在无行业数据时能否单独产出 ≥ 3 条有价值预警 → 可独立保留
 - 若两维度均不可靠 → 建议完全移除该页签
+
+---
+
+### [P3] I. 命令行模式（CLI）— 支持定时任务驱动报告生成
+
+详见迭代计划 [`cli-mode-iteration-plan.md`](../plan/cli-mode-iteration-plan.md) 和技术设计 [`cli-mode-technical-design.md`](../plan/cli-mode-technical-design.md)。
+
+---

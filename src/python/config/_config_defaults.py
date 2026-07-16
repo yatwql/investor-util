@@ -8,7 +8,6 @@ from src.python.registry import get_cache_ttl_defaults
 # 配置文件路径
 _CONFIG_FILE = "data/config/config.json"
 
-
 # 默认配置（按业务分组排列顺序，与模板 _get_default_config_template() 一致）
 _DEFAULT_CONFIG = {
     # ── A. 路径与文件 ──

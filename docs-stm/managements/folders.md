@@ -190,6 +190,8 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件
+│   │   ├── cli-mode-iteration-plan.md    # CLI 命令行模式迭代计划
+│   │   └── cli-mode-technical-design.md  # CLI 命令行模式技术设计
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
