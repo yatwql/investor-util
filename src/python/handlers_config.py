@@ -8,6 +8,7 @@ import json
 import os
 
 from src.python.config import set_config
+from src.python.constants import PROJECT_ROOT
 from src.python.logger import setup_logger
 from src.python.reader import list_xlsx_files
 from src.python.tui_menu import GREEN, RED, YELLOW, RESET, press_any_key, refresh_config, get_config_cache
@@ -21,13 +22,16 @@ def _read_llm_settings() -> tuple[dict, str] | None:
     Returns:
         (settings_dict, path) 成功时；失败时返回 None（已输出错误提示）
     """
-    from src.python.config import _strip_json_comments
-    path = "data/config/llm_settings.json"
+    from src.python.config import _strip_json_comments, get_config
+    config_path = get_config().get(
+        "llm_settings_file",
+        os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
+    )
     try:
-        with open(path, encoding="utf-8-sig") as f:
+        with open(config_path, encoding="utf-8-sig") as f:
             raw = f.read()
         settings = json.loads(_strip_json_comments(raw))
-        return settings, path
+        return settings, config_path
     except (FileNotFoundError, json.JSONDecodeError):
         print(f"  {RED}[ERR]{RESET} 无法读取 llm_settings.json")
         press_any_key()

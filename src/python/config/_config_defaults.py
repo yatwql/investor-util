@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
 
+from src.python.constants import PROJECT_ROOT
 from src.python.registry import get_cache_ttl_defaults
 
-# 配置文件路径（支持 CLI --config 覆写）
-_CONFIG_FILE = "data/config/config.json"
+# 配置文件路径（支持 CLI --config 覆写），始终以项目根目录为基准
+_CONFIG_FILE = os.path.join(PROJECT_ROOT, "data/config/config.json")
 _CONFIG_PATH_OVERRIDE: str | None = None
 
 

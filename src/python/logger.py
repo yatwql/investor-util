@@ -6,9 +6,11 @@ import socket
 import sys
 from logging.handlers import RotatingFileHandler
 
+from src.python.constants import PROJECT_ROOT
 from src.python.tui_menu import RED, RESET, YELLOW
 
-# 日志文件路径：测试期间写入独立文件，避免与运行时日志混淆
+# 日志文件路径（始终以项目根目录为基准，不受 CWD 影响）
+_LOG_BASE = os.path.join(PROJECT_ROOT, "logs")
 # 检测方式（按可靠性降序）：
 #   1. INVEST_RUNNING_TESTS 环境变量（test_runner.py 显式设置，xdist worker 继承）
 #   2. PYTEST_CURRENT_TEST 环境变量（pytest 自身设置）
@@ -20,7 +22,7 @@ _is_pytest = (
     or "pytest" in sys.modules
     or any("pytest" in arg.lower() for arg in sys.argv[:3])
 )
-_LOG_FILE = "logs/test.log" if _is_pytest else "logs/app.log"
+_LOG_FILE = os.path.join(_LOG_BASE, "test.log") if _is_pytest else os.path.join(_LOG_BASE, "app.log")
 
 # 日志格式
 _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
