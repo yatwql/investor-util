@@ -601,6 +601,15 @@ class TestGenerateReport:
 class TestReportLlmModuleResults:
     """_report_llm_module_results 统一 LLM 结果报告测试。"""
 
+    @pytest.fixture(autouse=True)
+    def _clean_llm_failure_state(self):
+        """清除 LLM_MODULE_FAILURE 全局状态，避免跨测试污染。"""
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+        _saved = dict(LLM_MODULE_FAILURE)
+        LLM_MODULE_FAILURE.clear()
+        yield
+        LLM_MODULE_FAILURE.update(_saved)
+
     def test_all_ok(self):
         """所有 4 个模块均成功。"""
         reporter = MagicMock()
