@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import socket
 import sys
 from logging.handlers import RotatingFileHandler
 
@@ -98,3 +99,27 @@ def setup_logger(name: str = "invest") -> logging.Logger:
     logger.addHandler(file_handler)
 
     return logger
+
+
+def _get_machine_ip() -> str:
+    """获取本机 IP 地址，失败时返回 'unknown'。"""
+    try:
+        return socket.gethostbyname(socket.gethostname())
+    except Exception:
+        return "unknown"
+
+
+def log_app_boundary(event: str, mode: str) -> None:
+    """记录应用启动/关闭事件到日志。
+
+    Args:
+        event: "启动" 或 "关闭"
+        mode: "CLI模式" 或 "TUI模式"
+    """
+    from src.python.constants import APP_VERSION
+
+    ip = _get_machine_ip()
+    logging.getLogger("invest").info(
+        "应用%s | 版本 v%s | %s | 主机 IP: %s",
+        event, APP_VERSION, mode, ip,
+    )

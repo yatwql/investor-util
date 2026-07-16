@@ -52,28 +52,25 @@ def _read_section_flags(config: dict) -> dict:
 
 # ── S1 移入：_prepare_report_data ──
 # 原 handlers_report._prepare_report_data()
-# ★ S6：_get_pool 已替换为内部 ThreadPoolExecutor；仍残留 get_config_cache（S7 移除）
+# ★ config 参数已为必传（P2-C1 清理：移除 S7 残留的 get_config_cache 回退）
 
 
 def prepare_report_data(
     holdings: list,
     reporter: ProgressReporter,
-    config: dict | None = None,
+    config: dict,
 ) -> dict:
     """获取行情、指数、穿透数据，整理持仓明细字典列表。
 
-    S6 新增 config 参数（可选，向后兼容）；使用内部 ThreadPoolExecutor 替代 _get_pool()。
+    使用内部 ThreadPoolExecutor 替代 _get_pool()（S6 完成）。
+    注意：config 参数传入后必须只读使用，不得 mutate。调用方持有的 dict 引用
+    指向相同的配置对象，写入会导致跨模块状态污染（C14 约束）。
     """
     from concurrent.futures import ThreadPoolExecutor
 
     from src.python.fetcher.index import fetch_indices, fetch_us_indices
     from src.python.report.market_value import _generate_details, classify_holdings
     from src.python.report.penetration import compute_penetration_top10
-
-    # ★ 临时依赖：S7 移除
-    if config is None:
-        from src.python.tui_menu import get_config_cache
-        config = get_config_cache() or {}
 
     today_str = datetime.now().strftime("%Y-%m-%d")
 

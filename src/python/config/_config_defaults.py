@@ -5,8 +5,20 @@ import json
 
 from src.python.registry import get_cache_ttl_defaults
 
-# 配置文件路径
+# 配置文件路径（支持 CLI --config 覆写）
 _CONFIG_FILE = "data/config/config.json"
+_CONFIG_PATH_OVERRIDE: str | None = None
+
+
+def set_config_path_override(path: str) -> None:
+    """设置配置文件路径覆写（CLI --config 使用）。"""
+    global _CONFIG_PATH_OVERRIDE
+    _CONFIG_PATH_OVERRIDE = path
+
+
+def get_config_path() -> str:
+    """返回配置文件路径（优先返回覆写路径）。"""
+    return _CONFIG_PATH_OVERRIDE or _CONFIG_FILE
 
 # 默认配置（按业务分组排列顺序，与模板 _get_default_config_template() 一致）
 _DEFAULT_CONFIG = {
@@ -63,11 +75,6 @@ _DEFAULT_CONFIG = {
         "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"},
     },
 }
-
-
-def get_config_path() -> str:
-    """返回配置文件路径。"""
-    return _CONFIG_FILE
 
 
 def _get_default_config_template() -> str:

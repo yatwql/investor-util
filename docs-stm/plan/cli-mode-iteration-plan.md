@@ -1,6 +1,6 @@
 # CLI 命令行模式 — 迭代计划
 
-> 文档版本：v2.5（第 5~10 轮复盘修正版）
+> 文档版本：v2.6（第 11 轮复盘修正版 — P2 优化为 8 轮）
 > 对应版本：v0.7.0（目标）
 > 状态：规划中
 > 关联设计：[cli-mode-technical-design.md](cli-mode-technical-design.md)
@@ -32,11 +32,11 @@ P1 之后:
 | 阶段 | 内容 | 进度要求 |
 |:-----|:------|:---------|
 | **P1：共享层提取**（12 轮） | 从 handlers_*.py 逐函数提取业务逻辑到 `report/orchestrator.py` + `cache/operations.py`；TUI 变薄为仅保留交互的包装器 | **每轮 regression 全绿**，全部完成后才进入 P2 |
-| **P2：CLI 实现**（12 轮） | 用共享层构建 CLI 入口；argparse + CliProgressReporter + 报告/缓存子命令 + 退出码 + 测试 + 文档 | 每轮独立验证 |
+| **P2：CLI 实现**（8 轮） | 用共享层构建 CLI 入口；argparse + CliProgressReporter + 报告/缓存子命令 + 退出码 + 测试 + 文档 | 每轮独立验证 |
 
 ---
 
-## 2. 24 轮迭代总览
+## 2. 20 轮迭代总览
 
 ```
 P1 — 共享层提取（TUI 行为零变更，每轮 regression 全绿 + 模块测试）
@@ -55,17 +55,13 @@ P1 — 共享层提取（TUI 行为零变更，每轮 regression 全绿 + 模块
 
 P2 — CLI 实现（基于共享层，不经过 handlers_*）
   C1  ██░░░░░░░░░░░░   argparse + 路径初始化 + config 覆写
-  C2  ████░░░░░░░░░░   CliProgressReporter
-  C3  ██████░░░░░░░░   CLI 专属持仓读取函数
-  C4  ████████░░░░░░   report --type basic（调 orchestrator）
-  C5  ██████████░░░░   report --type both
-  C6  ████████████░░   report --type full
-  C7  ██████████████   cache 子命令
-  C8  ██████████████   退出码全场景硬化
-  C9  ██████████████   交互审计 + KeyboardInterrupt + config 等值验证
-  C10 ██████████████   单元测试
-  C11 ██████████████   集成测试
-  C12 ████████████████ 文档 + regression 最终验证
+  C2  ████░░░░░░░░░░   CliProgressReporter + 基类 print_timing_summary 补充
+  C3  ██████░░░░░░░░   _cli_read_holdings + cache 子命令（委托 operations）
+  C4  ████████░░░░░░   report --type basic
+  C5  ██████████░░░░   report --type both + --type full（一次覆盖三路径）
+  C6  ████████████░░   退出码硬化 + KeyboardInterrupt + 配置等值验证
+  C7  ██████████████   单元测试 + 集成测试
+  C8  ████████████████ 文档 + regression 最终验证
 ```
 
 ---
@@ -752,7 +748,7 @@ P2 实现时若发现冻结接口需要变更，**不得直接修改**，需按�
 
 ---
 
-## 4. P2：CLI 实现（12 轮）
+## 4. P2：CLI 实现（8 轮）
 
 ---
 
@@ -817,11 +813,11 @@ P2 实现时若发现冻结接口需要变更，**不得直接修改**，需按�
 - 文件位置：`src/python/report/cli_progress.py`
 - 常规模式：输出到 `logging.getLogger("invest")`（**无 `[OK]`/`[!]` 前缀**——`logger.py` 的 `_ColoredFormatter` 已输出 `[%(levelname)s]`）
 - `--verbose` 模式：带前缀的 `[..]`/`[OK]`/`[!]`/`[ERR]` 同步到 stderr；**默认 TTY 自动开启**（`stderr.isatty()`）
-- 着色降级（C15）：本地颜色常量（不导入 `ansi_colors` 模块级常量），`_should_color()` 基于 `stderr.isatty()` + `NO_COLOR` 环境变量
+- 着色降级：本地颜色常量（不导入 `ansi_colors` 模块级常量），`_should_color()` 基于 `stderr.isatty()` + `NO_COLOR` 环境变量
 - `call_sheet()`：始终计时，verbose 模式同步输出执行过程到 stderr
 - `print_timing_summary()`：`logging.INFO` 逐行输出（含 █░ 柱状条），verbose 模式同步到 stderr
 
-#### ★ 基类接口补充（第 4 轮复盘新增）
+#### ★ 基类接口补充
 
 当前 `ProgressReporter` 基类（`report/progress.py:41`）**未定义** `print_timing_summary()` 方法。
 但 orchestrator 的三个报告路径均调用 `reporter.print_timing_summary()`。
@@ -855,9 +851,11 @@ def print_timing_summary(self) -> None:
 
 ---
 
-### C3：CLI 专属持仓读取函数
+### C3：_cli_read_holdings + cache 子命令（委托 operations）
 
-**目标**：为 CLI 实现无交互的持仓文件读取，不经过 TUI 的 `prepare_holdings()`/`select_holdings_file()`。
+**目标**：实现 CLI 专属持仓读取函数，以及 cache 子命令的完整路由委托。
+
+> ★ C3 合并原 C3（`_cli_read_holdings`）和原 C7（cache 子命令）。两者均基于 P1 已冻结的共享层接口，互无依赖，可在同一轮独立验证。
 
 #### 设计要点
 
@@ -885,20 +883,60 @@ def _cli_read_holdings(config: dict) -> list | None:
     return holdings
 ```
 
-- **跳过** `check_and_warm_for_new_assets()`（~30 行 print）。CLI 默认不预热，可选 `--warm` 标志（在 C6 实现时追加）
+**cache 子命令调用链**：
+
+```
+cli.py _handle_cache()
+  → init_config()
+  → config = get_config()
+  → case "--update basic":
+        holdings = _cli_read_holdings(config)
+        result = update_basic_cache(holdings, reporter)    ← operations 共享层
+        → exit result.exit_code
+  → case "--update position":
+        holdings = _cli_read_holdings(config)
+        result = update_position_cache(holdings, reporter) ← operations 共享层
+        → exit result.exit_code
+  → case "--update all":                                    ← ★ 最大努力模式
+        holdings = _cli_read_holdings(config)
+        final_exit = _EXIT_SUCCESS
+        result = update_basic_cache(holdings, reporter)
+        final_exit = max(final_exit, result.exit_code)     ← basic 失败→记录继续
+        result = update_position_cache(holdings, reporter)
+        final_exit = max(final_exit, result.exit_code)     ← position 总被执行
+        → exit final_exit
+  → case "--clean":
+        n = cleanup_cache(reporter)                        ← operations 共享层
+        → exit 0
+  → case "--stats":
+        stats = get_cache_stats(reporter)                  ← operations 共享层
+        → exit 0
+```
+
+**注意事项**：
+- `update_basic_cache()` / `update_position_cache()` 内部已包含 `clear_by_group()` 调用（匹配 TUI 先清再刷语义），CLI 无需额外清除
+- CLI 不经过 `handle_cache.py`，直接调 `operations.*`
+- **不需要 `cli_handlers_cache.py` 中介模块**
 
 #### 涉及文件
 
 | 文件 | 操作 |
 |:-----|:------|
-| `src/python/cli.py` | **修改** — 新增 `_cli_read_holdings()` |
+| `src/python/cli.py` | **修改** — 新增 `_cli_read_holdings()` + `_handle_cache()` 委托 |
 
 #### 验收标准
 
 - [ ] `_cli_read_holdings()` 通过 config 路径读取持仓文件
 - [ ] 文件不存在时返回 None + 日志 ERROR
 - [ ] 多文件时自动选第一个 + 日志 WARNING
-- [ ] 单文件时正常返回
+- [ ] `cache --stats` 调用 `operations.get_cache_stats()`
+- [ ] `cache --clean` 调用 `operations.cleanup_cache()`
+- [ ] `cache --update basic` 调用 `operations.update_basic_cache()`
+- [ ] `cache --update position` 调用 `operations.update_position_cache()`
+- [ ] `cache --update all` 依次调 basic → position，退出码取 `max()`
+- [ ] `cache` 不带操作参数 → exit 2（argparse 互斥组自动行为）
+- [ ] TUI 菜单 [1][2][3][4] 行为不变（regression 验证）
+- [ ] 日志中无 `input()` 调用痕迹
 - [ ] **不满足时不得进入 C4**
 
 ---
@@ -933,196 +971,69 @@ cli.py _handle_report()
 #### 验收标准
 
 - [ ] `report --type basic` 生成 Excel 报告
-- [ ] `--output` 覆盖有效
+- [ ] `--output` 目录覆盖有效
 - [ ] 无持仓文件时 exit 2
 - [ ] `logs/app.log` 记录步骤
 - [ ] 日志中无 `input()` 调用痕迹
-- [ ] TUI 报告行为不变（回归验证）
+- [ ] TUI [E] 菜单行为不变（回归验证）
 - [ ] **不满足时不得进入 C5**
 
 ---
 
-### C5：report --type both
+### C5：report --type both + --type full
 
-**目标**：CLI `report --type both` 调用 orchestrator 生成 HTML + Excel（含新闻）。
+**目标**：CLI `report --type both` 和 `report --type full` 调用 orchestrator 生成完整报告（含 LLM）。
 
-#### 调用链
+> ★ C5 合并原 C5（both）和原 C6（full）。CLI 端的差异仅在于 `report_type=args.type` 的透传，orchestrator 已在 P1 通过 `report_type` 三路分支完整区分。不需要在 CLI 侧编排。
 
-与 C4 相同，仅 `report_type="both"`。历史走势通过 `args.history` 控制：
-- `--history auto` → orchestrator 自动获取
-- `--history off`（默认）→ 跳过
+#### 设计要点
+
+- `report --type both`：生成 HTML + Excel（含新闻，不含 LLM），走 orchestrator `_generate_report_both()`
+- `--history auto` 自动获取历史走势；`--history off`（默认）跳过
+- `report --type full`：生成全量报告（含指数/穿透/LLM+新闻线程池/预警），走 orchestrator `_generate_report_full()`
+- `--force-llm` 传 `force_llm=True` 跳过 LLM 缓存
+- `--warm` 传 `warm_cache=True` 触发缓存预热（`_warm_cache()` 使用 reporter.* 输出）
+- LLM 模块 disabled → exit 0（正常降级）
+- LLM key 缺失 → exit 1（降级生成，报告仍生成）
+- 线程池由 orchestrator 内部管理（P1 已完成）
 
 #### 涉及文件
 
 | 文件 | 操作 |
 |:-----|:------|
-| `src/python/cli.py` | **修改** — report 子命令路由传 `report_type="both"` + `history_mode=args.history` |
+| `src/python/cli.py` | **修改** — `_handle_report()` 中 `report_type=args.type` 改为变量，透传 `history_mode`/`force_llm`/`warm_cache` |
 
 #### 验收标准
 
 - [ ] `report --type both` 生成 HTML + Excel（含新闻板块）
-- [ ] `report --type both --history auto` 自动获取历史走势
+- [ ] `report --type both --history auto` 传 `history_mode="auto"`
 - [ ] `report --type both` 无 LLM 相关调用
-- [ ] TUI 菜单 [B] 行为不变（回归验证）
+- [ ] `report --type full` 生成 HTML + Excel + LLM 分析章节
+- [ ] `report --type full --force-llm` 传 `force_llm=True`
+- [ ] `report --type full --warm` 传 `warm_cache=True`
+- [ ] LLM key 缺失时 exit 1，报告降级生成
+- [ ] LLM disabled 时 exit 0
+- [ ] 日志中无 `input()` 调用痕迹
+- [ ] TUI 菜单 [B][L] 行为不变（回归验证）
 - [ ] **不满足时不得进入 C6**
 
 ---
 
-### C6：report --type full（含 LLM）
+### C6：退出码硬化 + KeyboardInterrupt + 配置等值验证
 
-**目标**：CLI `report --type full` 调用 orchestrator 生成全量报告（含 LLM）。
+**目标**：补齐所有退出码场景映射，实现 Ctrl+C 安全处理，验证 CLI 与 TUI 配置语义一致。
 
-#### 设计要点
-
-- `--force-llm` 标志作为 `force_llm=True` 传入 orchestrator
-- `--warm` 标志（可选）：运行 `check_and_warm_for_new_assets()` 预热缓存
-- LLM 模块 disabled → exit 0
-- LLM key 缺失 → exit 1（降级生成，报告仍生成）
-- 线程池由 orchestrator 内部管理（P1-S5 完成）
-
-#### 涉及文件
-
-| 文件 | 操作 |
-|:-----|:------|
-| `src/python/cli.py` | **修改** — report 子命令路由传 `report_type="full"` + `--warm` 标志 |
-
-#### 验收标准
-
-- [ ] `report --type full` 生成 HTML + Excel（含新闻 + LLM）
-- [ ] `report --type full --force-llm` 跳过 LLM 缓存
-- [ ] `report --type full --warm` 触发缓存预热
-- [ ] LLM key 缺失时 exit 1，报告降级生成
-- [ ] LLM disabled 时 exit 0
-- [ ] TUI 菜单 [L] 行为不变（回归验证）
-- [ ] **不满足时不得进入 C7**
-
----
-
-### C7：cache 子命令
-
-**目标**：CLI `cache --update / --clean / --stats` 调用 operations 共享层。
-
-#### 设计要点
-
-- **★ 第 3 轮发现**：TUI `_cmd_update_basic_cache()` 在刷新前调用 `clear_by_group("refresh")` 清除旧缓存。CLI 的 `cache --update` 应当同样清除旧缓存再刷新，避免已移除的持仓缓存残存。`update_basic_cache()` / `update_position_cache()` 内部需包含 `clear_by_group()` 调用。这与 TUI 的"先清再刷"语义对齐。
-- **★ 第 4 轮复盘修正 — clear_by_group 归属权**：
-  - operations 的 `update_basic_cache()` / `update_position_cache()` **内部统一调用** `clear_by_group()`
-  - TUI 外壳 `_read_holdings_and_clear_cache()` 不再主动清除缓存（避免冗余双重清除）
-  - CLI 路径：`operations.update_basic_cache()` 内部清除 → 天然受益
-  - 变更方案：S8 提取 `_refresh_one_fund_cache()` 时即定义 `update_basic_cache()` 含 `clear_by_group()` 调用；S11 删除 TUI 外壳中的 `clear_by_group()` 调用
-
-#### 调用链
-
-```
-cli.py _handle_cache()
-  → init_config()
-  → config = get_config()
-  → case "--update basic":
-        holdings = _cli_read_holdings(config)
-        result = update_basic_cache(holdings, reporter)
-        → exit result.exit_code
-  → case "--update position":
-        holdings = _cli_read_holdings(config)
-        result = update_position_cache(holdings, reporter)
-        → exit result.exit_code
-  → case "--update all":                                          # ★ v2.5 新增最大努力模式
-        holdings = _cli_read_holdings(config)
-        final_exit = _EXIT_SUCCESS
-        result = update_basic_cache(holdings, reporter)
-        final_exit = max(final_exit, result.exit_code)           # basic 失败→记录继续
-        result = update_position_cache(holdings, reporter)
-        final_exit = max(final_exit, result.exit_code)           # position 总被执行
-        → exit final_exit
-  → case "--clean":
-        n = cleanup_cache(reporter)
-        → exit 0
-  → case "--stats":
-        stats = get_cache_stats(reporter)
-        → exit 0
-```
-
-**★ v2.5 `--update all` 最大努力策略**：
-- `--update all` 不因 basic 部分失败而跳过 position（原设计：basic exit_code≠0 → 直接 return）
-- 使用 `max(final_exit, result.exit_code)` 聚合：`exit_code=2 > exit_code=1 > exit_code=0`
-- basic 严重失败(exit=2) + position 成功(exit=0) → 返回 2（通知调用方有严重错误）
-- basic 部分失败(exit=1) + position 部分失败(exit=1) → 返回 1（部分失败）
-- 两阶段均成功 → 返回 0
-
-- **不需要 `cli_handlers_cache.py`**，CLI 直接调 operations.py
-
-#### 涉及文件
-
-| 文件 | 操作 |
-|:-----|:------|
-| `src/python/cli.py` | **修改** — cache 子命令路由到 `operations.*`；`--update all` 最大努力模式 |
-
-#### 验收标准
-
-- [ ] `cache --update all` 更新所有缓存，无交互询问
-- [ ] **★ v2.5 — `--update all` 最大努力**：basic 部分失败(exit=1)时 position 仍继续执行，最终退出码 = max(basic_exit, position_exit)
-- [ ] `cache --update basic` 仅更新基础类
-- [ ] `cache --update position` 仅更新持仓类
-- [ ] `cache --clean` 清理过期缓存
-- [ ] `cache --stats` 输出统计信息到日志
-- [ ] TUI 菜单 [1][2][3][4] 行为不变（回归验证）
-- [ ] **不满足时不得进入 C8**
-
----
-
-### C8：退出码全场景硬化
-
-**目标**：补齐 `_handle_cache()` 的退出码映射（当前硬编码 `_EXIT_SUCCESS`），覆盖所有 ~12 种场景的实装验证。
+> ★ C6 合并原 C8（退出码全场景硬化）和原 C9（交互审计 + KBI + config 等值验证）。退出码的策略已在 P1 层由 `ReportResult.exit_code` 和 `CacheUpdateResult.exit_code` 实现，CLI 端仅需补全 `_handle_cache()` 的退出码映射。
 
 #### 实装变更
 
 | 变更点 | 当前 | 目标 |
 |:-------|:------|:------|
-| `_handle_cache()` 退出码 | 总是 `_EXIT_SUCCESS` | 使用 `CacheUpdateResult.exit_code` |
+| `_handle_cache()` 退出码 | 总是 `_EXIT_SUCCESS`（C3 暂定） | 使用 `CacheUpdateResult.exit_code` |
 | LLM disabled + --type full | exit 0（正确但无测试） | 新增测试 |
 | config.json 格式错误 | exit 2（`__main__` 兜底） | 新增测试 |
-| KeyboardInterrupt | exit 130 | 已在 C9 覆盖 |
+| KeyboardInterrupt | exit 130 | 实现 |
 | 持仓文件不存在 | exit 2 | 已在 C4 覆盖 |
-
-#### 涉及文件
-
-| 文件 | 操作 |
-|:-----|:------|
-| `src/python/cli.py` | **修改** — `_handle_cache()` 退出码映射 |
-| `src/test/test_cli.py` | **修改** — 退出码 ~12 场景测试 |
-
-#### 验收标准
-
-- [ ] `_handle_cache()` 返回 `CacheUpdateResult.exit_code` 而非硬编码 0
-- [ ] `test_cli_exit_code_success / _partial / _severe / _llm_disabled / _llm_key_missing` 全部通过
-- [ ] config.json 格式错误 → exit 2
-- [ ] **不满足时不得进入 C9**
-
----
-
-### C9：交互审计 + KeyboardInterrupt + config 等值验证
-
-**目标**：全局审计确认 CLI 路径无交互遗漏，实现 Ctrl+C 安全处理，验证 CLI 与 TUI 配置语义一致。
-
-#### 审计命令
-
-```bash
-# 审计 input() 和 get_key() 两种交互方式
-grep -rn "\binput(" src/python/ --include="*.py" | grep -v test | grep -v __pycache__
-grep -rn "\bget_key(" src/python/ --include="*.py" | grep -v test | grep -v __pycache__
-```
-
-#### 交互点对照表
-
-| # | 文件 | 函数 | 交互类型 | CLI 处理方式 |
-|:-:|:-----|:-----|:---------|:------------|
-| 1 | `handlers_report.py` | `_prompt_force_llm()` | `input()` | CLI 不调此函数，`force_llm` 从 `--force-llm` 取 bool |
-| 2 | `tui_handlers.py` | `select_holdings_file()` | `get_key()` | CLI 用 `_cli_read_holdings()` 替代 |
-| 3 | `tui_handlers.py` | `press_any_key()` | `get_key()` | CLI 不调用 |
-| 4 | `tui_handlers.py` | `prepare_holdings()` | `get_key()` | `_cli_read_holdings()` 替代 |
-| 5 | `tui_handlers.py` | `finish_report()` | `get_key()` | CLI 不调用 |
-| 6 | `handlers_cache.py` | `press_any_key()` | `get_key()` | CLI 不调用 |
-
-**结论**：所有交互点全部有替代方案，CLI 永不进入终端原始模式。
 
 #### KeyboardInterrupt 处理
 
@@ -1139,7 +1050,7 @@ if __name__ == "__main__":
         sys.exit(2)
 ```
 
-#### Config 等值验证
+#### 配置等值验证
 
 ```python
 # 验证 CLI 和 TUI 解析同一 config.json 的结果一致
@@ -1147,29 +1058,51 @@ _config = get_config()
 # 在相同 config.json 下，CLI 解析的配置应与 TUI get_config_cache() 一致
 ```
 
+#### 交互审计
+
+执行以下命令确认 CLI 路径无交互遗漏：
+```bash
+grep -rn "\binput(" src/python/ --include="*.py" | grep -v test | grep -v __pycache__
+grep -rn "\bget_key(" src/python/ --include="*.py" | grep -v test | grep -v __pycache__
+```
+
+交互点对照表（所有点已有 CLI 替代方案）：
+
+| # | 文件 | 函数 | 交互类型 | CLI 替代 |
+|:-:|:-----|:-----|:---------|:---------|
+| 1 | `handlers_report.py` | `_prompt_force_llm()` | `input()` | `--force-llm` 标志 |
+| 2 | `tui_handlers.py` | `select_holdings_file()` | `get_key()` | `_cli_read_holdings()` |
+| 3 | `tui_handlers.py` | `press_any_key()` / `prepare_holdings()` / `finish_report()` | `get_key()` | CLI 不调用 |
+
 #### 涉及文件
 
 | 文件 | 操作 |
 |:-----|:------|
-| `src/python/cli.py` | **修改** — 顶层异常兜底 + KeyboardInterrupt 处理 |
+| `src/python/cli.py` | **修改** — 顶层异常兜底 + KeyboardInterrupt 处理 + `_handle_cache()` 退出码映射 |
 
 #### 验收标准
 
+- [ ] `report --type full` LLM disabled 返回 exit 0
+- [ ] `report --type full` LLM key 缺失返回 exit 1
+- [ ] `cache --update basic` 部分失败返回 exit 1
+- [ ] `cache --update all` basic 失败(exit=1) position 仍执行，最终退出码 = max(1, position_exit)
+- [ ] Ctrl+C → exit 130，日志记录中断信息
+- [ ] 未处理异常 → exit 2，日志记录栈
 - [ ] `grep` 审计确认 CLI 路径无 `input()`/`get_key()` 交互遗漏
-- [ ] `KeyboardInterrupt` → exit 130
-- [ ] `KeyboardInterrupt` 时 `logs/app.log` 记录中断日志
-- [ ] Ctrl+C 中断后线程池立即取消（不阻塞 ~30 秒）
-- [ ] 未处理异常 → exit 2 + `logs/app.log` 记录栈
-- [ ] CLI 与 TUI 解析同一 config.json 的结果一致
-- [ ] **不满足时不得进入 C10**
+- [ ] 审计确认 `prepare_report_data()` 的 `get_config_cache()` 回退分支已被删除，CLI 路径无 tui_menu 隐式导入
+- [ ] CLI 与 TUI 解析同一 config.json 结果一致（等值断言）
+- [ ] TUI 行为不变（回归验证）
+- [ ] **不满足时不得进入 C7**
 
 ---
 
-### C10：单元测试
+### C7：单元测试 + 集成测试
 
-**目标**：为 CLI 模块建立完整的单元测试套件。
+**目标**：为 CLI 模块建立完整的单元测试和集成测试套件。
 
-#### 测试注册
+> ★ C7 合并原 C10（单元测试）和原 C11（集成测试）。测试文件结构和用例数不变，仅合并为同一轮。
+
+#### 测试标记注册
 
 ```python
 # conftest.py
@@ -1218,71 +1151,15 @@ test_cli_multi_holdings_auto_select
 test_cli_verbose_ansi_auto_disable
 ```
 
-**`test_orchestrator.py`**（`@pytest.mark.unit`，~15 用例，从 P1 延续补充）：
-
-```
-test_generate_report_basic / both / full
-test_generate_report_thread_pool_safety
-test_generate_report_history_auto / off
-test_generate_report_force_llm
-test_generate_report_llm_disabled
-test_generate_report_llm_key_missing
-test_prepare_report_data
-test_capture_snapshot
-test_compute_early_warnings
-test_fetch_history_data_auto / off
-test_ReportResult_exit_code
-```
-
-**`test_cache_operations.py`**（`@pytest.mark.unit`，~10 用例）：
-
-```
-test_update_basic_cache
-test_update_position_cache
-test_get_cache_stats
-test_cleanup_cache
-test_CacheUpdateResult / PositionCacheResult / CacheStats
-```
-
-#### 涉及文件
-
-| 文件 | 操作 |
-|:-----|:------|
-| `src/test/test_cli.py` | **新建** |
-| `src/test/test_cli_edge.py` | **新建** |
-| `src/test/test_orchestrator.py` | **新建**（P1-S1 已建骨架，P2 完善） |
-| `src/test/test_cache_operations.py` | **新建** |
-| `src/test/conftest.py` | **修改** — 注册 `unit_cli` |
-
-#### 验收标准
-
-- [ ] `pytest src/test/test_cli.py -m unit_cli -v` 全通过
-- [ ] `pytest src/test/test_cli_edge.py -m edge -v` 全通过
-- [ ] `pytest src/test/test_orchestrator.py -v` 全通过
-- [ ] `pytest src/test/test_cache_operations.py -v` 全通过
-- [ ] 单轮测试 < 60s（纯 mock，无网络）
-- [ ] CLI 代码行覆盖率 ≥ 85%
-- [ ] 测试标记符合 C11/C12 要求
-- [ ] **不满足时不得进入 C11**
-
----
-
-### C11：集成测试
-
-**目标**：补齐集成测试场景，验证 CLI 与系统的集成正确性。
-
-#### 测试文件
-
-**`test_cli_integration.py`**（`@pytest.mark.integration` + `@pytest.mark.unit_cli`）：
+**`test_cli_integration.py`**（`@pytest.mark.integration` + `@pytest.mark.unit_cli`，~8 用例）：
 
 | 测试 | 验证点 |
 |:-----|:-------|
-| `test_cli_progress_logger` | C8：CLI 输出全部写入 `logging.getLogger("invest")`，无冗余前缀 |
-| `test_cli_verbose_color_disable` | C15：NO_COLOR / 管道降级 |
-| `test_cli_verbose_auto_enable` | `--verbose` 默认 TTY 自动启用，管道时静默 |
-| `test_cli_report_config_respected` | CLI 使用 `--config` 后配置加载正确 |
-| `test_cli_report_section_order` | C7：报告序号继承 config.json |
-| `test_cli_exit_code_all_scenarios` | 12 种退出码场景全覆盖 |
+| `test_cli_progress_logger` | CLI 输出全部写入 `logging.getLogger("invest")` |
+| `test_cli_verbose_color_disable` | NO_COLOR / 管道降级 |
+| `test_cli_verbose_auto_enable` | `--verbose` 默认 TTY 自动启用 |
+| `test_cli_report_config_respected` | `--config` 后配置加载正确 |
+| `test_cli_exit_code_all_scenarios` | ~12 种退出码场景全覆盖 |
 | `test_cli_init_config_error_handling` | config.json 格式错误 → exit 2 |
 | `test_cli_parallel_pool_isolation` | CLI 线程池与 TUI 隔离 |
 
@@ -1290,20 +1167,26 @@ test_CacheUpdateResult / PositionCacheResult / CacheStats
 
 | 文件 | 操作 |
 |:-----|:------|
+| `src/test/test_cli.py` | **新建** |
+| `src/test/test_cli_edge.py` | **新建** |
 | `src/test/test_cli_integration.py` | **新建** |
+| `src/test/conftest.py` | **修改** — 注册 `unit_cli` marker |
 
 #### 验收标准
 
+- [ ] `pytest src/test/test_cli.py -m unit_cli -v` 全通过
+- [ ] `pytest src/test/test_cli_edge.py -m edge -v` 全通过
 - [ ] `pytest src/test/test_cli_integration.py -m integration -v` 全通过
-- [ ] 集成测试覆盖 C8/C15/C7 验证
-- [ ] 退出码 12 种场景全覆盖
-- [ ] **不满足时不得进入 C12**
+- [ ] 单轮测试 < 60s（纯 mock，无网络）
+- [ ] CLI 代码行覆盖率 ≥ 85%
+- [ ] 测试标记符合 conftest.py 注册要求
+- [ ] **不满足时不得进入 C8**
 
 ---
 
-### C12：文档 + regression 最终验证
+### C8：文档 + regression 最终验证
 
-**目标**：新增定时任务文档 `how-to-schedule.md`，运行 regression 全量通过。
+**目标**：新增定时任务文档，运行全量回归通过，同步管理文档。
 
 #### 新增文档
 
@@ -1362,7 +1245,8 @@ python -m src.python.cli --config /path/to/custom_config.json report --type full
 - [ ] `how-to-schedule.md` 含 Windows 和 Linux 配置
 - [ ] `folders.md` 已同步 CLI + P1 文件
 - [ ] `review-findings.md` 已更新
-- [ ] 全部 24 轮迭代验收标准均已通过
+- [ ] 全部 20 轮迭代验收标准均已通过
+
 
 ---
 
@@ -1378,6 +1262,7 @@ python -m src.python.cli --config /path/to/custom_config.json report --type full
 | **v2.3** | 2026-07-16 | **第 3 轮复盘修正**（CLI 细节深挖）：C1 `--type` 默认改为 `basic`，新增 `--version`；C2 CliProgressReporter 日志前缀策略（无冗余 `[OK]`）、`--verbose` 自动 TTY 检测、`print_timing_summary()` 格式定义、`call_sheet()` verbose 行文；C3 错误消息含列名提示；C8 错误消息含操作指引 |
 | **v2.4** | 2026-07-16 | **第 4 轮复盘修正**（代码对比审计 12 项）：S2 `_capture_snapshot` 规模修正（~15 行 → ~83 行）；S6 新增 `_fetch_llm_and_news()` 统一 LLM 三分支；S5/S6 追加 `check_network_available` TUI 专属说明；C1 追加 `init_config(config_path)` 波及分析；C7 明确 `clear_by_group` 归 operations 统一管理；C2/C10 追加 `print_timing_summary` 基类接口；S9 追加循环内 print→reporter 重构说明；S10 `CacheStats` 扩展覆盖快照/state 目录；S7 追加 `get_config_cache` 审计；基准函数签名使用参数而非 `reporter._output_dir`；新增风险条目（4 项）|
 | **v2.5** | 2026-07-16 | **第 5~10 轮复盘修正**：① S2 测试范围细化（8 用例覆盖 5 子步骤+get_config_cache→config 参数验证）；② S6 4 分支测试覆盖（6 用例：both/llm-only/news-only/disabled/llm 失败降级/线程池清理）；③ S12 后新增 P1→P2 接口冻结合约（签名表+冻结时点+解冻流程）；④ S8 基线+S11 完成双池迁移验证机制；⑤ C7 cache --update all 最大努力退出码模式；⑥ 测试覆盖矩阵新增时间预算（每轮 ≤5~20s，S12 ≤90s）；⑦ 风险矩阵新增 2 项+更新 2 项严重度；⑧ 新增价值静默期分析章节（C4 为价值拐点，建议 S7 后评估 C1 并行化）|
+| **v2.6** | 2026-07-16 | **第 11 轮复盘修正（P2 优化为 8 轮）**：① P2 从 12 轮压缩为 8 轮（C3+C7、C5+C6、C8+C9、C10+C11 合并）；② 价值拐点仍为 C4（第 16 轮），但 P2 总轮数减少 33%；③ 风险矩阵更新为 8 轮引用号；④ 测试覆盖矩阵同步为 C1~C8；⑤ 增量收益表同步为 8 轮；⑥ 静默期分析更新为 20 轮占比；⑦ 技术设计 §9 文件清单同步 8 轮变更 |
 
 ---
 
@@ -1392,14 +1277,15 @@ python -m src.python.cli --config /path/to/custom_config.json report --type full
 | **operations 池 + handlers_cache._POOL 双池共存** | **已降低**（v2.5 追加基线记录+S11 完成验证） | ~16 线程浪费 | S8~S11 | S8 创建 operations 池即标记 handlers_cache._POOL deprecated，S11 删除；**v2.5 新增 S8 基线 grep + S11 对比验证** |
 | **双池迁移期间旧池调用者遗留风险** | 低（v2.5 新增） | S11 删除 _POOL 后仍有未迁移调用者→运行时崩溃 | S8~S11 | S8 记录引用基线；S9/S10 incremental grep 跟踪减少量；S11 最终 grep 清零确认 |
 | CLI 独立持仓读取与 TUI 的文件选择行为不一致 | 低 | CLI 读取了错误的文件 | C3 | CLI 使用 config.json 路径直接读取 |
-| **CLI 冷启动**（不预热缓存） | 中 | 报告生成慢 2-3 倍 | C6 | `--warm` 标志可选预热 |
-| **TUI/CLI 配置语义差异**（get_config_cache vs get_config） | 低 | 配置解析结果不一致 | C9 | S12 等值验证 + C9 追加验证步骤 |
+| **CLI 冷启动**（不预热缓存） | 中 | 报告生成慢 2-3 倍 | C5 | `--warm` 标志可选预热 |
+| **TUI/CLI 配置语义差异**（get_config_cache vs get_config） | 低 | 配置解析结果不一致 | C6 | S12 等值验证 + C6 追加验证步骤 |
 | 共享层接口在 P2 实现时发现缺陷需要回改 P1 | **已降低**（v2.5 接口冻结合约已形式化） | 回退多轮 | C4 起 | P1-S12 后接口冻结（v2.5 新增正式冻结合约：签名表+冻结时点+解冻流程）；冻结合约同步至迭代计划 + 技术设计 |
-| `cache --update all` 执行 ~25 个模块耗时过长被 cron 杀掉 | 中 | 缓存未完全更新 | C7 | 文档建议 cache 与 report 分开调度 |
+| `cache --update all` 执行 ~25 个模块耗时过长被 cron 杀掉 | 中 | 缓存未完全更新 | C3 | 文档建议 cache 与 report 分开调度 |
 | **`_capture_snapshot()` 提取规模低估**（实际 ~83 行 vs 估算 ~15 行） | 中 | S2 提取复杂度和测试范围超预期 | S2 | 扩大 S2 测试用例覆盖 SnapshotHolding/HistoryDiff/save/prune/字典组装 |
 | **`_process_llm_news_futures()` + LLM-only 分支重复代码**未统一封装 | 中 | 维护两份重复的 ok/disabled/failed 判定逻辑 | S6 | S6 的 `_fetch_llm_and_news()` 统一封装全部 4 分支，消除重复 |
 | **TUI `get_config_cache()` 与 orchestrator `config` 参数混用**导致读取不一致 | 低 | orchestrator 读取了过期配置 | S1~S7 | 全局审计 `get_config_cache()` 调用点；orchestrator 统一通过 config 参数读取 |
 | **`init_config(config_path)` 修改波及 TUI 调用方** | 低 | TUI 菜单初始化兼容性 | C1 | 向后兼容：config_path=None 走默认路径，TUI 调用方无需改动 |
+| **`prepare_report_data()` 残留 `get_config_cache()` 死代码** | **已修复（v2.6）** | orchestrator 意外导入 tui_menu | C1~C6 | P2-C1 清理 TD1：删除 3 行死代码；C6 增加审计确认 CLI 路径不触发该回退分支 |
 
 ---
 
@@ -1422,16 +1308,12 @@ S11   regression + 去池验证                  regression        ≤ 15s（含
 S12   regression + dev-verify + scenario    🔒 全绿           ≤ 90s（3 种模式合计）
 C1    argparse 测试                          ⚡ 非法参数路径   ≤ 5s（纯 argparse）
 C2    CliProgressReporter 测试               ⚡ caplog+capsys  ≤ 5s（纯 mock）
-C3    _cli_read_holdings 测试                ⚡ 路径不存在     ≤ 5s
+C3    _cli_read_holdings + cache mock 测试   ⚡ 全绿           ≤ 10s（委托验证）
 C4    report basic mock 测试                 无               ≤ 5s
-C5    report both mock 测试                  无               ≤ 5s
-C6    report full mock 测试                  无               ≤ 5s
-C7    cache mock 测试                        无               ≤ 5s
-C8    退出码全场景测试                       ⚡ ~12 场景全绿   ≤ 10s
-C9    交互审计 + KBI 测试                    ⚡ 全绿           ≤ 5s
-C10   test_cli + orchestrator + operations   ⚡ 全绿           ≤ 30s（~46 用例 mock）
-C11   集成测试                              ⚡ 全绿           ≤ 30s（部分真实 IO）
-C12   regression + dev-verify + edge        🔒 全绿           ≤ 90s（3 种模式合计）
+C5    report both + full mock 测试           无               ≤ 8s（两个 type 分支验证）
+C6    退出码全场景 + KBI 测试                ⚡ ~12 场景全绿  ≤ 10s
+C7    test_cli + edge + integration 全量      ⚡ 全绿           ≤ 30s（~40 用例 mock）
+C8    regression + dev-verify + edge        🔒 全绿           ≤ 90s（3 种模式合计）
 ```
 
 ## 8. 增量收益检查
@@ -1452,30 +1334,28 @@ C12   regression + dev-verify + edge        🔒 全绿           ≤ 90s（3 �
 | S12 | 回归安全垫 + 等值验证 | ✗ | **风险控制** |
 | C1 | CLI --help 骨架 | ✔ 帮助信息 | 基础设施 |
 | C2 | CliProgressReporter | ✗ | 基础设施 |
-| C3 | CLI 独立持仓读取 | ✗ | 基础设施 |
+| C3 | `_cli_read_holdings` + `cache` 子命令 | ✔ 缓存管理 | **功能交付** |
 | C4 | `report --type basic` | ✔ 命令行报告 | **功能交付** |
-| C5 | `report --type both` | ✔ HTML+新闻 | **功能交付** |
-| C6 | `report --type full` | ✔ LLM 全量 + --warm | **功能交付** |
-| C7 | `cache` 子命令 | ✔ 缓存管理 | **功能交付** |
-| C8 | 退出码全场景硬化 | ✔ 定时任务可靠 | **品质提升** |
-| C9 | 中断安全 + config 等值 | ✔ 用户体验 | **品质提升** |
-| C10 | 单元测试 | ✗ | 技术债务 |
-| C11 | 集成测试 | ✗ | 技术债务 |
-| C12 | 文档 + regression | ✔ 可部署 | **交付** |
+| C5 | `report --type both + full` | ✔ HTML+新闻+LLM | **功能交付** |
+| C6 | 退出码硬化 + 中断安全 + 等值验证 | ✔ 定时任务可靠 | **品质提升** |
+| C7 | 单元测试 + 集成测试 | ✗ | 技术债务 |
+| C8 | 文档 + regression | ✔ 可部署 | **交付** |
 
-### ★ v2.5 新增：价值静默期分析与优化建议
+### ★ v2.6 更新：P2 优化为 8 轮后的价值静默期分析
+
+P2 从 12 轮优化为 8 轮后，**价值拐点仍为 C4**（在第 16 轮），但 P2 整体缩短了 4 轮，总耗时减少 ~30%。
 
 #### 静默期统计
 
 | 阶段 | 轮次 | 用户可见产出 | 累计占比 |
 |:-----|:----|:------------|:---------|
-| P1 架构改善 | S1~S12（12 轮） | ✗ 无 | 50%（12/24） |
-| P2 基础设施 | C1~C3（3 轮） | ✔ --help（C1） | 62.5%（15/24） |
+| P1 架构改善 | S1~S12（12 轮） | ✗ 无 | 60%（12/20） |
+| P2 基础设施 | C1~C2（2 轮） | ✔ --help（C1） | 70%（14/20） |
 | **价值拐点** | **C4** | **首次执行 report --type basic 生成报告** | — |
-| P2 功能交付 | C4~C9（6 轮） | ✔ 全部可见 | 87.5%（21/24） |
-| P2 质量加固 | C10~C12（3 轮） | ✔ C12 可部署 | 100%（24/24） |
+| P2 功能交付 | C3~C6（4 轮） | ✔ 全部可见（cache/report/退出码） | 90%（18/20） |
+| P2 质量加固 | C7~C8（2 轮） | ✔ C8 可部署 | 100%（20/20） |
 
-**结论**：C4 为价值拐点（第 16 轮），此时距离开发启动约 8 周（按每轮 2-3 天估算）。
+**结论**：C4 仍为价值拐点（第 16 轮），但 P2 总轮数从 12 降为 8，功能交付阶段（C3~C6）更紧凑。全部 20 轮完成即可达到可部署状态。
 
 #### 并行化建议（可选）
 

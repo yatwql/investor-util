@@ -155,6 +155,7 @@ cli.py
 - **★ v2.4：不调 `check_network_available()`**（TUI 专属，位于 `tui_handlers.py`）
 - **★ v2.4：不调 `print_llm_session_usage()`**（TUI 专属，CLI 通过 logging 间接记录）
 - **★ v2.4：不调 `get_config_cache()`**（或任何 `tui_menu` 符号）；所有配置通过 `config` 参数接收
+- **★ v2.6（P2-C1 清理）**：`prepare_report_data()` 中原残留的 `if config is None: get_config_cache()` 回退分支（S7 引入的临时依赖）已删除，config 签名改为必传 `config: dict`。`prepare_report_data(holdings, reporter, config)` 三个参数现已全为必传。
 
 #### ReportResult
 
@@ -1194,14 +1195,14 @@ P1 完成后以下接口进入冻结状态，P2 实现不得修改其签名。�
 |:-----|:----------|:---------|:------|
 | `src/python/report/orchestrator.py` | P1-S1~S6 | ~200 | 报告编排共享层（**不导入 handlers_report**） |
 | `src/python/cache/operations.py` | P1-S8~S10 | ~200 | 缓存操作共享层（**内部管理池**） |
-| `src/python/cli.py` | P2-C1~C9 | ~170 | argparse + 路由 + 持仓读取 + 退出码（含 `--warm`） |
+| `src/python/cli.py` | P2-C1~C6 | ~170 | argparse + 路由 + 持仓读取 + 退出码（含 `--warm`） |
 | `src/python/report/cli_progress.py` | P2-C2 | ~110 | CliProgressReporter |
-| `src/test/test_cli.py` | P2-C10 | ~350 | CLI 单元测试 |
-| `src/test/test_cli_edge.py` | P2-C10 | ~150 | CLI 边界测试 |
-| `src/test/test_cli_integration.py` | P2-C11 | ~100 | CLI 集成测试 |
-| `src/test/test_orchestrator.py` | P1-S1 | ~150 | orchestrator 单元测试（P1-S1 建骨架，P2-C10 完善） |
-| `src/test/test_cache_operations.py` | P2-C10 | ~100 | operations 单元测试 |
-| `docs-stm/manuals/how-to-schedule.md` | P2-C12 | ~200 | 定时任务文档 |
+| `src/test/test_cli.py` | P2-C7 | ~350 | CLI 单元测试 |
+| `src/test/test_cli_edge.py` | P2-C7 | ~150 | CLI 边界测试 |
+| `src/test/test_cli_integration.py` | P2-C7 | ~100 | CLI 集成测试 |
+| `src/test/test_orchestrator.py` | P1-S1 | ~150 | orchestrator 单元测试（P1-S1 建骨架，P2-C7 完善） |
+| `src/test/test_cache_operations.py` | P2-C7 | ~100 | operations 单元测试 |
+| `docs-stm/manuals/how-to-schedule.md` | P2-C8 | ~200 | 定时任务文档 |
 
 ### 9.2 修改文件
 
@@ -1212,7 +1213,7 @@ P1 完成后以下接口进入冻结状态，P2 实现不得修改其签名。�
 | `src/python/config/__init__.py` | P2-C1 | 导出 `set_config_path_override` |
 | `src/python/handlers_report.py` | P1-S7 | 变薄~60 行（删除 _POOL/_get_pool 等） |
 | `src/python/handlers_cache.py` | P1-S11 | 变薄~80 行（删除 _POOL/_get_pool） |
-| `src/test/conftest.py` | P2-C10 | 注册 `unit_cli` marker |
+| `src/test/conftest.py` | P2-C7 | 注册 `unit_cli` marker |
 
 ### 9.3 与 v2.0 的架构差异（复盘修正）
 
@@ -1269,3 +1270,4 @@ P1 完成后以下接口进入冻结状态，P2 实现不得修改其签名。�
 | **v2.3** | 2026-07-16 | **第 3 轮复盘修正**（CLI 细节深挖）：① `--type` 默认改为 `basic`（cron 安全）；② `--history` 帮助标注仅与 both/full 配合；③ cache 子命令 epilog；④ argparse 设计决策表补充；⑤ CliProgressReporter 日志前缀策略（无冗余 `[OK]`）；⑥ `--verbose` 自动启用规则（TTY 检测）；⑦ `print_timing_summary()` 格式定义；⑧ `call_sheet()` verbose 执行过程定义；⑨ 错误消息文案改进（持仓文件缺列名提示）；⑩ `_warm_cache` 内使用 reporter.* 而非 print() |
 | **v2.4** | 2026-07-16 | **第 4 轮复盘修正**（全量代码对比审计 12 项）：① `capture_snapshot()` 规模修正（~83 行 vs 估算 ~15 行）；② `_fetch_llm_and_news()` 4 分支统一封装（消除 `_process_llm_news_futures` + LLM-only 分支重复）；③ orchestrator 核心原则追加 TUI 专属函数黑名单（check_network_available / print_llm_session_usage / get_config_cache）；④ `prepare_report_data()` 移除 `reporter._output_dir` 私有属性访问；⑤ operations 设计原则追加 `clear_by_group` 归属权统一 + `_refresh_common_caches` 循环重塑；⑥ `ProgressReporter` 基类追加 `print_timing_summary()` 空壳接口；⑦ `init_config(config_path)` 波及分析；⑧ argparse 决策表追加兼容性行；⑨ `CacheStats` 确认已有 snapshot/state 字段（v2.3 已覆盖）；⑩ 文档全线同步 v2.4 |
 | **v2.5** | 2026-07-16 | **第 5~10 轮复盘修正**：① §2.4 C8 _cprint() 边界声明（交互式进度展示≠日志）；② §6 C4 多进程隔离显式验证；③ §2.1 C6 _warm_cache 预热链路合规注释；④ §7.2 S2 capture_snapshot 5 子步骤 mock 策略表；⑤ 新增 §6.1 P1→P2 接口冻结合约（签名表+冻结时点+解冻流程）；⑥ §6.2 config 覆写线程安全性分析+C14 残余风险标注；⑦ §2.3 cache --update all 最大努力退出码模式；⑧ §9.3 追加 v2.5 差异维度表 |
+| **v2.6** | 2026-07-16 | **第 11 轮复盘修正（P2 优化为 8 轮）**：① P2 从 12 轮压缩为 8 轮，§9 文件清单同步为 C1~C8 引用号；② 与迭代计划 v2.6 同步锁定 |

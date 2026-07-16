@@ -16,7 +16,7 @@ os.chdir(_project_root)
 
 from src.python.config import init_config
 from src.python.llm.pricing import CURRENCY_SYMBOLS
-from src.python.logger import setup_logger
+from src.python.logger import setup_logger, log_app_boundary
 from src.python.tui import KEY_CTRL_C, KEY_DOWN, KEY_ENTER, KEY_UP, get_key
 from src.python.tui_handlers import execute_item
 from src.python.tui_menu import (
@@ -29,6 +29,8 @@ from src.python.tui_menu import (
 )
 
 logger = setup_logger()
+log_app_boundary("启动", "TUI模式")
+atexit.register(log_app_boundary, "关闭", "TUI模式")
 
 
 def _print_session_usage_on_exit() -> None:

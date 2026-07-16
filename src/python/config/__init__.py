@@ -25,7 +25,9 @@ from src.python.config._config_defaults import (
     _DEFAULT_CONFIG,
     _get_default_config_template,
     _CONFIG_FILE,
+    _CONFIG_PATH_OVERRIDE,
     get_config_path,
+    set_config_path_override,
 )
 
 # ── 默认模板（llm_settings.json）──
@@ -85,6 +87,7 @@ __all__ = [
     "get_config",
     "set_config",
     "init_config",
+    "set_config_path_override",
     "_clear_config_cache",
     "_config_cache",
     "_config_mtime",

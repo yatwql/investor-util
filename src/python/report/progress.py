@@ -91,6 +91,9 @@ class ProgressReporter:
                 logger.exception("%s写入异常", label)
                 return False
 
+    def print_timing_summary(self) -> None:
+        """输出耗时汇总。默认空实现，子类可覆盖。"""
+
     def timer(self, label: str) -> Timer:
         """返回计时器上下文管理器，用于包裹耗时较长的操作。"""
         return Timer(label)

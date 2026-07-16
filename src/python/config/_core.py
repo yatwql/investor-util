@@ -122,13 +122,20 @@ def set_config(key: str, value: Any) -> None:
     _config_size = 0
 
 
-def init_config() -> None:
+def init_config(config_path: str | None = None) -> None:
     """初始化配置文件。
 
     若 config.json 不存在，则自动用默认配置创建并写入磁盘。
     若文件已存在，不做任何操作。
+
+    Args:
+        config_path: 可选配置文件路径覆写（CLI --config 使用）。
+                     为 None 时使用默认路径 data/config/config.json。
     """
     global _config_cache, _config_mtime, _config_size
+
+    if config_path is not None:
+        _config_defaults.set_config_path_override(config_path)
 
     config_path = _config_defaults.get_config_path()
     if os.path.exists(config_path):
