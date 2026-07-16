@@ -20,6 +20,7 @@ investor-util/
 │   │   │   ├── _stats.py             #   缓存统计信息（命中率/大小/数量）
 │   │   │   ├── _store.py             #   缓存存取核心（get/set/delete/exists）
 │   │   │   ├── _ttl.py               #   TTL 策略（含盘中/盘后/非交易日区分）
+│   │   │   ├──── operations.py          #   缓存操作共享层（S8~S11 从 handlers_cache 提取）
 │   │   │   └── services/             # 缓存上层服务
 │   │   │       ├── __init__.py       #       子包标记
 │   │   │       └── holdings_tracker.py #     持仓快照缓存追踪器

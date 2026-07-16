@@ -520,12 +520,12 @@ operations 返回 `CacheUpdateResult`（结构化数据），TUI 外壳调用 `_
 
 #### 验收标准
 
-- [ ] `update_basic_cache()` 使用 `reporter.*` 替代所有 `print()`
-- [ ] `update_basic_cache()` 无 `press_any_key()`/`input()`
-- [ ] TUI 菜单 [1] 行为不变（格式化输出通过 `_print_cache_refresh_report` 保留）
-- [ ] operations 内部池独立管理，不依赖 `handlers_cache._POOL`
-- [ ] regression 全绿
-- [ ] **不满足时不得进入 S10**
+- [x] `update_basic_cache()` 使用 `reporter.*` 替代所有 `print()`
+- [x] `update_basic_cache()` 无 `press_any_key()`/`input()`
+- [x] TUI 菜单 [1] 行为不变（格式化输出通过 `_print_cache_refresh_report` 保留）
+- [x] operations 内部池独立管理，不依赖 `handlers_cache._POOL`
+- [x] regression 全绿
+- [x] **不满足时不得进入 S10**
 
 ---
 
@@ -567,12 +567,12 @@ def get_cache_stats(reporter: ProgressReporter) -> CacheStats:
 
 #### 验收标准
 
-- [ ] `update_position_cache()` 使用 `reporter.*` 替代 `print()`
-- [ ] `get_cache_stats()` 返回结构化 `CacheStats`，不含 print
-- [ ] `cleanup_cache()` 返回清理数量，不含 print
-- [ ] TUI 菜单 [2][3][4] 行为不变（打印格式通过 TUI 外壳保留）
-- [ ] regression 全绿
-- [ ] **不满足时不得进入 S11**
+- [x] `update_position_cache()` 使用 `reporter.*` 替代 `print()`
+- [x] `get_cache_stats()` 返回结构化 `CacheStats`，不含 print
+- [x] `cleanup_cache()` 返回清理数量，不含 print
+- [x] TUI 菜单 [2][3][4] 行为不变（打印格式通过 TUI 外壳保留）
+- [x] regression 全绿
+- [x] **不满足时不得进入 S11**
 
 ---
 
@@ -644,15 +644,15 @@ def _cmd_show_cache_stats() -> None:
 
 #### 验收标准
 
-- [ ] TUI 菜单 [1][2][3][4] 行为与提取前完全一致（格式化输出相同）
-- [ ] `_read_holdings_and_clear_cache()` 的 TUI 交互选择不变
-- [ ] `press_any_key()` 在每条命令末尾正常工作
-- [ ] `handlers_cache.py` 中无残留业务逻辑
-- [ ] `handlers_cache._POOL` 和 `_get_pool()` 被删除，无残留引用
-- [ ] **★ v2.5 — 池迁移完成验证**：`grep -rn "handlers_cache.*_POOL\|handlers_cache.*_get_pool" src/python/ --include="*.py"` 应仅返回 main.py 的 `from src.python.handlers_cache import _POOL, _get_pool` 两行（供需要保留引用的外部模块）。与 S8 基线对比，引用数已归零（除 main.py）
-- [ ] **跨模块审计**：确认 `handlers_cache._POOL` 和 `_get_pool()` 无外部模块导入（`grep -rn "handlers_cache.*_get_pool\|handlers_cache.*_POOL" src/python/ --include="*.py"` 仅返回 main.py 的正常导入）
-- [ ] regression 全绿
-- [ ] **不满足时不得进入 S12**
+- [x] TUI 菜单 [1][2][3][4] 行为与提取前完全一致（格式化输出相同）
+- [x] `_read_holdings_and_clear_cache()` 的 TUI 交互选择不变
+- [x] `press_any_key()` 在每条命令末尾正常工作
+- [x] `handlers_cache.py` 中无残留业务逻辑
+- [x] `handlers_cache._POOL` 和 `_get_pool()` 被删除，无残留引用
+- [x] **★ v2.5 — 池迁移完成验证**：`grep -rn "handlers_cache.*_POOL\|handlers_cache.*_get_pool" src/python/ --include="*.py"` 应仅返回 main.py 的 `from src.python.handlers_cache import _POOL, _get_pool` 两行（供需要保留引用的外部模块）。与 S8 基线对比，引用数已归零（除 main.py）
+- [x] **跨模块审计**：确认 `handlers_cache._POOL` 和 `_get_pool()` 无外部模块导入（`grep -rn "handlers_cache.*_get_pool\|handlers_cache.*_POOL" src/python/ --include="*.py"` 仅返回 main.py 的正常导入）
+- [x] regression 全绿
+- [x] **不满足时不得进入 S12**
 
 ---
 
@@ -698,16 +698,16 @@ assert _config == _cache_config, "配置语义不一致"
 
 #### 验收标准
 
-- [ ] `regression` 全绿
-- [ ] `dev-verify` 全绿
-- [ ] `scenario` 全绿
-- [ ] TUI 菜单 [E][B][L][1][2][3][4] 冒烟验证通过
-- [ ] `get_config_cache()` 与 `get_config()` 解析同一 config.json 的结果一致
-- [ ] `handlers_report.py` 中无 TUI 编排逻辑残留
-- [ ] `handlers_cache.py` 中无业务逻辑残留
-- [ ] `folders.md` 已同步
-- [ ] **★ v2.5 — P1→P2 接口冻结合约已锁定**（见下方"接口冻结合约"章节）
-- [ ] **不满足时不得进入 P2**
+- [x] `regression` 全绿
+- [x] `dev-verify` 全绿
+- [x] `scenario` 全绿
+- [x] TUI 菜单 [E][B][L][1][2][3][4] 冒烟验证通过
+- [x] `get_config_cache()` 与 `get_config()` 解析同一 config.json 的结果一致
+- [x] `handlers_report.py` 中无 TUI 编排逻辑残留
+- [x] `handlers_cache.py` 中无业务逻辑残留
+- [x] `folders.md` 已同步
+- [x] **★ v2.5 — P1→P2 接口冻结合约已锁定**（见下方"接口冻结合约"章节）
+- [x] **不满足时不得进入 P2**
 
 ---
 

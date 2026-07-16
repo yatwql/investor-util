@@ -1,27 +1,71 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.6.0
+> 文档版本：v0.6.1
 
 ## 目录
 
-- [1. 总体技术架构](#1-总体技术架构)
-- [2. 核心架构原则与设计决策](#2-核心架构原则与设计决策)
-- [3. 数据获取层](#3-数据获取层)
-- [4. 缓存层](#4-缓存层)
-- [5. 报告生成层](#5-报告生成层)
-- [6. LLM 集成层](#6-llm-集成层)
-- [7. 辅助模块设计](#7-辅助模块设计)
-- [8. 模块间依赖关系](#8-模块间依赖关系)
-- [9. 架构设计约束](#9-架构设计约束)
+- [1. 总体技术架构与概要设计](#1-总体技术架构与概要设计)
+  - [1.1 系统分层](#11-系统分层)
+  - [1.2 核心数据流](#12-核心数据流)
+  - [1.3 模块职责总览](#13-模块职责总览)
+  - [1.4 概要设计 — 核心架构决策](#14-概要设计--核心架构决策)
+- [2. 数据获取层详细设计](#2-数据获取层详细设计)
+  - [2.1 Provider Chain 路由与 fallback](#21-provider-chain-路由与-fallback)
+  - [2.2 三层熔断架构](#22-三层熔断架构)
+  - [2.3 Fetcher 调度架构](#23-fetcher-调度架构)
+  - [2.4 关键机制](#24-关键机制)
+- [3. 缓存层详细设计](#3-缓存层详细设计)
+  - [3.1 子模块结构](#31-子模块结构)
+  - [3.2 核心接口与 TTL 分辨率](#32-核心接口与-ttl-分辨率)
+  - [3.3 原子写入与并发安全](#33-原子写入与并发安全)
+  - [3.4 指纹驱动失效机制](#34-指纹驱动失效机制)
+  - [3.5 缓存分组](#35-缓存分组)
+  - [3.6 缓存操作共享层](#36-缓存操作共享层)
+- [4. 报告生成层详细设计](#4-报告生成层详细设计)
+  - [4.1 管线总览](#41-管线总览)
+  - [4.2 报告编排器](#42-报告编排器)
+  - [4.3 Excel 管线](#43-excel-管线)
+  - [4.4 HTML 管线](#44-html-管线)
+  - [4.5 板块可见性两层模型](#45-板块可见性两层模型)
+  - [4.6 报告序号可配置](#46-报告序号可配置)
+  - [4.7 组合历史走势计算算法](#47-组合历史走势计算算法)
+  - [4.8 B 系列基金深度分析](#48-b-系列基金深度分析)
+  - [4.9 资产穿透 TOP10](#49-资产穿透-top10)
+  - [4.10 财经新闻热点与持仓关联分析](#410-财经新闻热点与持仓关联分析)
+  - [4.11 数据降级治理体系](#411-数据降级治理体系)
+- [5. LLM 集成层详细设计](#5-llm-集成层详细设计)
+  - [5.1 架构总览](#51-架构总览)
+  - [5.2 调用链](#52-调用链)
+  - [5.3 关键机制](#53-关键机制)
+- [6. 辅助模块详细设计](#6-辅助模块详细设计)
+  - [6.1 配置管理](#61-配置管理)
+  - [6.2 中央注册表](#62-中央注册表)
+  - [6.3 市场时段判断](#63-市场时段判断)
+  - [6.4 持仓读取与列校验](#64-持仓读取与列校验)
+  - [6.5 代码类型判定中心化](#65-代码类型判定中心化)
+  - [6.6 HTTP 客户端统一](#66-http-客户端统一)
+- [7. 模块间依赖关系](#7-模块间依赖关系)
+- [8. 架构设计约束](#8-架构设计约束)
+  - [8.1 数据获取层约束](#81-数据获取层约束)
+  - [8.2 缓存层约束](#82-缓存层约束)
+  - [8.3 报告层约束](#83-报告层约束)
+  - [8.4 LLM 集成层约束](#84-llm-集成层约束)
+  - [8.5 基础设施约束](#85-基础设施约束)
+  - [8.6 测试约束](#86-测试约束)
 - [附录](#附录)
+  - [附录 A：目录结构](#附录-a目录结构)
+  - [附录 B：数据源一览](#附录-b数据源一览)
+  - [附录 C：缓存 TTL 明细](#附录-c缓存-ttl-明细)
+  - [附录 D：降级层级与阈值定义](#附录-d降级层级与阈值定义)
+  - [附录 E：线程池分布](#附录-e线程池分布)
 
 ---
 
-## 1. 总体技术架构
+## 1. 总体技术架构与概要设计
 
 ### 1.1 系统分层
 
-系统按数据流向分为五层，由贯穿层串联：
+系统按数据流向分为五层，由贯穿层串联。整体架构如下：
 
 ```
   ┌───────────────────────────────────────────────────────────────────┐
@@ -46,16 +90,14 @@
   │                        缓存层 (cache/)                            │
   │        泛用 JSON KV · TTL · 指纹失效 · 分组 · 原子写入           │
   │        大文件 gzip · 路径安全 · 文件损坏自恢复                    │
+  │        缓存操作共享层 (operations.py — TUI/CLI 共用)              │
   └──────────────────────────────────┬────────────────────────────────┘
                                      │
                                      ▼
   ┌───────────────────────────────────────────────────────────────────┐
-  │                      数据处理/计算层                               │
-  │                                                                   │
-  │  资产穿透    市值核算    持仓分类    新闻关联    组合历史走势       │
-  │  B 系列基    LLM 智能   (均在 report/ 或 llm/ 中实现)             │
-  │  金深度分    分析                                                   │
-  │  析模块                                                           │
+  │                      报告编排层 (orchestrator.py)                  │
+  │  数据准备 → 快照 → 历史走势 → LLM+新闻并取 → 智能预警 → 双管线  │
+  │              内部管理 orch_prep / orch_llm_news 线程池           │
   └──────────────────────────────────┬────────────────────────────────┘
                                      │ info 字典
                                      ▼
@@ -69,8 +111,18 @@
   │  └─────────────────────────┘   └───────────────────────────────┘  │
   └───────────────────────────────────────────────────────────────────┘
 
-                 贯穿层：config/ · registry.py · provider_registry.py
+  用户交互层 (TUI)：main.py → tui_menu.py → handlers_*.py
+  贯穿层：config/ · registry.py · provider_registry.py · code_utils.py · market_hours.py
 ```
+
+**用户交互层** (TUI) 位于最上层，通过 `handlers_*.py` 委托编排层（orchestrator）或共享层（operations），自身仅保留交互逻辑。
+
+**关键分层原则**：
+- 每一层只能依赖其下层和贯穿层，禁止反向依赖
+- 数据获取层通过 Provider Chain 解耦数据源，新增数据源无需修改调用方
+- 缓存层作为数据获取层和报告层之间的缓冲，提供 TTL、指纹和分组管理
+- 报告编排层统筹数据准备和双管线生成，消除 TUI 与 CLI 间的逻辑重复
+- 贯穿层提供全局共享的基础设施（配置、注册表、熔断器、代码类型判定）
 
 ### 1.2 核心数据流
 
@@ -93,7 +145,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
     └─────────────────┬──────────────────────┘
                       │
                       ▼
-          报告准备阶段（report_prepare）
+          报告编排层（orchestrator.py）
               合并为 info 字典
     {
       market_data:     {code: {price, yesterday_close, ...}}
@@ -112,103 +164,75 @@ llm/generators_orchestrator.py ──→ cache/（可选）
    .xlsx 报告    .html 报告
 ```
 
+**报告类型与对应路径**：
+
+| 报告类型 | 菜单 | 数据准备深度 | 输出格式 | LLM |
+|:---------|:----|:------------|:---------|:----|
+| `basic` | E | 仅行情（无指数/穿透/分类/新闻） | Excel 单格式 | ❌ |
+| `both` | B | 轻量行情 + 快照 + 历史走势（条件） | HTML + Excel | ❌ |
+| `full` | L | 完整行情 + 穿透 + 快照 + 历史走势 + 资金流向 | HTML + Excel | ✅ |
+
 ### 1.3 模块职责总览
 
 | 层次 | 模块 | 职责 | 文件 |
 |:-----|:-----|:------|:-----|
-| **入口** | TUI 主循环 | 菜单编排、用户交互流 | `main.py` / `tui_menu.py` / `tui_handlers.py` |
+| **用户交互** | TUI 主循环 | 菜单编排、用户交互流 | `main.py` / `tui_menu.py` |
+| **用户交互** | Handler 命令 | TUI 命令 → 委托编排层或共享层 | `handlers_*.py` |
+| **用户交互** | 进度报告 | ProgressReporter 解耦进度输出 | `report/progress.py` |
 | **输入** | 持仓读取 | xlsx 解析、列校验、多账户 | `reader.py` |
-| **配置** | 配置管理层 | config.json / llm_settings.json 读写 | `config/` |
-| **注册** | 中央注册表 | name/缓存前缀/TTL/分组/LLM Settings 键名 | `registry.py` |
-| **数据获取** | 数据源注册中心 | 熔断器、会话缓存、策略选择、审计报告 | `provider_registry.py` |
-| **数据获取** | Fetcher 调度 | Provider Chain 路由、数据获取编排 | `fetcher/price.py` 等 |
+| **配置** | 配置管理层 | 三文件分层配置 | `config/` |
+| **注册** | 中央注册表 | 数据模块 + 报告模块注册 | `registry.py` |
+| **数据获取** | 数据源注册中心 | 熔断器、会话缓存、策略、审计 | `provider_registry.py` |
+| **数据获取** | Fetcher 调度 | Provider Chain 路由、数据获取 | `fetcher/price.py` 等 |
 | **数据获取** | 数据源 Provider | 外部 API 封装（14 个文件） | `providers/*.py` |
-| **缓存** | 缓存引擎 | 泛用 JSON KV、TTL、指纹、分组、清理 | `cache/` |
-| **数据处理** | 代码类型判定 | 资产类型识别原语 | `code_utils.py` |
-| **数据处理** | 交易时段判断 | A 股交易时段、午间休市 | `market_hours.py` |
-| **报告** | 报告编排与写入 | Excel + HTML 双管线生成 | `report/excel_generator.py` / `html_writer.py` |
-| **报告** | 内容模块 | 各页签写入器（~20 个文件） | `report/*.py` |
+| **缓存** | 缓存引擎 | 泛用 JSON KV、TTL、指纹、分组 | `cache/` |
+| **缓存** | 缓存操作共享层 | TUI/CLI 共用的业务级缓存操作 | `cache/operations.py` |
+| **编排** | 报告编排器 | 数据准备 → 管线编排 | `report/orchestrator.py` |
+| **报告** | Excel 管线 | openpyxl 写入 | `report/excel_generator.py` |
+| **报告** | HTML 管线 | Jinja2 模板渲染 | `report/html_writer.py` |
+| **报告** | 内容模块 | 各页签写入器（~20 文件） | `report/*.py` |
 | **LLM** | 智能分析 | Claude/OpenAI 调用、骨架、Prompt Caching | `llm/` |
+| **贯穿** | 代码类型判定 | 资产识别原语 | `code_utils.py` |
+| **贯穿** | 交易时段判断 | A 股时段、午间休市 | `market_hours.py` |
+| **贯穿** | HTTP 客户端 | 统一工厂 | `http_client.py` |
 
-[↑ 回到顶部](#目录)
+### 1.4 概要设计 — 核心架构决策
 
----
+以下五项跨模块架构决策贯穿系统全局，是所有新增/修改代码的设计基础。
 
-## 2. 核心架构原则与设计决策
+#### 1.4.1 代码类型判定中心化
 
-以下五项跨模块设计决策贯穿系统全局，是所有新增/修改代码的架构约束。
+**决策**：所有资产代码类型判定集中到 `src/python/code_utils.py`，禁止任何模块自行实现判定逻辑。
 
-### 2.1 代码类型判定中心化（C1）
+**动机**：系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落、新增资产类型时需全局搜索替换。
 
-**决策**：所有资产代码类型判定集中到 `src/python/code_utils.py`，禁止任何模块自行实现。
+**原语体系**（详见 [§6.5](#65-代码类型判定中心化)）：
 
-**动机**：系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落、"魔法判定"遍地、新增资产类型时全局搜索替换。
+```
+判定维度：
+  代码前缀 → is_a_share_code() / is_exchange_fund_code() / is_hk_stock_code() / ...
+  名称关键词 → is_qdii_by_name() / is_etf_by_name() / is_bond_fund_by_name() / ...
+  复合判定 → is_otc_fund_by_name(name, code) / is_etf_by_name_or_code() / ...
+```
 
-**约定**：`code_utils.py` 只提供纯技术原语（基于前缀/名称关键词），业务层组合使用。任何模块不得出现 `code.startswith(("6", "0", "3"))` 或 `"QDII" in name.upper()` 等判定。
+#### 1.4.2 Provider Chain 必经
 
-#### 原语清单
+**决策**：大多数数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()`，不得直接调用 Provider 函数。
 
-| 维度 | 函数 | 判定依据 | 用途 |
-|:-----|:------|:---------|:------|
-| 代码前缀 | `is_a_share_code(code)` | 60/68/00/30/8 开头 | A 股股票识别 |
-| | `is_exchange_fund_code(code)` | 5/1 开头 | 场内基金/ETF |
-| | `is_hk_stock_code(code)` | 5 位纯数字 | 港股通标的 |
-| | `is_otc_code_overlap(code)` | 00 开头 | A 股/OTC 基金代码重叠区检测 |
-| | `get_exchange_prefix(code)` | 前缀规则 | sh/sz/bj 交易所前缀 |
-| | `is_index_code(code)` | sh/sz 前缀或 000/399/932 开头或 gb_ 前缀 | 指数代码识别 |
-| | `is_us_index_code(code)` | gb_ 前缀 | 美股指数识别 |
-| | `get_index_exchange_prefix(code)` | sh/sz 前缀 | 指数所属交易所前缀 |
-| | `get_push2_secid(code)` | 前缀规则 | push2 API secid 参数 |
-| 名称关键词 | `is_qdii_by_name(name)` | "QDII" | QDII 标识 |
-| | `is_qdii_extended(name)` | QDII + 隐式关键词 | QDII + 隐式海外基金 |
-| | `is_etf_by_name(name)` | "ETF" | ETF 标识 |
-| | `is_bond_related_by_name(name)` | 纯债/短债/利率债等（不含单字"债"） | 债券基金（严格） |
-| | `is_bond_fund_by_name(name)` | 含"债" | 债券基金（宽松，含可转债） |
-| | `is_money_fund_by_name(name)` | 货币/现金/增利/宝 | 货币基金 |
-| | `is_index_fund_by_name(name)` | 指数/ETF联接/中证/沪深300等 | 场外指数基金 |
-| | `is_index_link_by_name(name)` | ETF联接/联接/链接 | 指数联接基金 |
-| 复合 | `is_etf_by_name_or_code(name, code)` | 名称+代码双维度 | ETF 增强识别 |
-| | `is_otc_fund_by_name(name, code)` | 00 代码+名称含基金关键词 | 00 代码重叠区 → 场外基金 |
-| | `is_offsite_fund(account)` | 关键词匹配 | 场外基金账户 |
-| | `is_fund_holding(name, code, account)` | 三者联合 | 持仓是否需要基金业绩分析 |
+**动机**：跳过 Chain 直接调用 Provider 会导致三方面失效：
+1. **熔断器不被激活** — 故障后无冷却恢复
+2. **fallback 链路断路** — Provider 失败时不会自动递补
+3. **日志审计缺失** — 故障记录无法集中追踪
 
-#### 内部工具
+**唯一例外**：`fetcher/index.py` 直调 Provider（双链路 fallback 硬编码在模块内），原因是指数数据不适用熔断器的单股票级粒度。
 
-`_strip_prefix(code)` — 去除 `sh/sz/bj` 前缀，返回纯净 6 位数字代码，非 6 位数字时返回空字符串。所有前缀型判定函数均先调用此函数再匹配。
+#### 1.4.3 缓存统一管理
 
-#### 关键词常量（可供外部导入）
-
-| 常量名 | 值 | 用途 |
-|:-------|:----|:------|
-| `FUND_ACCOUNT_KEYWORDS` | `("基金", "支付宝", "微信", "银行")` | 场外基金账户判定 |
-| `MONEY_KEYWORDS` | `("货币", "现金", "增利", "宝")` | 货币基金识别 |
-| `INDEX_KEYWORDS` | `("指数", "ETF联接", "中证", "沪深300", ...)` | 指数基金判定 |
-
-[↑ 回到顶部](#目录)
-
-### 2.2 Provider Chain 必经（C6）
-
-**决策**：绝大多数数据获取必须通过 `fetcher/chain.py` 的 `fetch_with_fallback()`，不得直接调用 Provider 函数。
-
-**动机**：跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失（故障记录无法集中追踪）。
-
-**例外**：`fetcher/index.py` 直调 Provider（双链路 fallback 硬编码），原因是指数数据不适用熔断器的单股票级粒度。单元测试 mock 场景除外。
-
-详见 [§3.1 Provider Chain 路由与 fallback](#31-provider-chain-路由与-fallback)。
-
-[↑ 回到顶部](#目录)
-
-### 2.3 缓存统一管理（C2 / C3）
-
-**决策**：所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 接口读写（C2），写入必须使用 `tempfile.mkstemp` + `os.replace` 原子写入模式（C3）。
+**决策**：所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 接口读写，写入必须使用 `tempfile.mkstemp` + `os.replace` 原子写入模式。
 
 **动机**：直接操作 `data/cache/` 文件系统导致 TTL 失效、分组清理遗漏、路径穿越等隐患。直接覆写文件在断电/崩溃时产生半写损坏文件。
 
-详见 [§4 缓存层](#4-缓存层)。
-
-[↑ 回到顶部](#目录)
-
-### 2.4 报告配置化（C7 / C14）
+#### 1.4.4 报告配置化
 
 **决策**：报告 18 个模块的序号、显示名称、板块可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
@@ -220,14 +244,10 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 
 | 层级 | 含义 | 来源 |
 |:-----|:------|:------|
-| board 层 | 用户配置的板块开关 | `config.json` (`enable_b_series` / `enable_news` / `enable_history`) |
+| board 层 | 用户配置的板块开关 | `config.json`（`enable_b_series`/`enable_news`/`enable_history`） |
 | data 层 | 运行时数据可用性 | 各子模块返回值非 None 判定 |
 
-详见 [§5.4 板块可见性两层模型](#54-板块可见性两层模型) 和 [§5.5 报告序号可配置](#55-报告序号可配置)。
-
-[↑ 回到顶部](#目录)
-
-### 2.5 数据降级治理体系
+#### 1.4.5 数据降级治理体系
 
 **决策**：数据获取过程中任何环节失败都应静默降级而非中断报告生成，降级状态在报告中可视化呈现。
 
@@ -256,20 +276,20 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
               └──────────┘ └──────────────┘
 ```
 
-**降级状态基础设施**（`report/data_status.py`）：
-- `DataStatusItem` — 单一数据源的可用状态（available / tier / message）
-- `STATUS_MESSAGES` — Excel/HTML 两端的共享常量字典（16 条消息）
-- `DegradationTracker` — 双信号降级阈值控制器（连续失败计数 + 缓存陈旧度），支持跨会话持久化
+**双重降级系统**：
 
-详见 [§5.10 数据降级在报告中的体现](#510-数据降级在报告中的体现)。
+| 系统 | 层级 | 管什么 | 粒度 | 恢复方式 |
+|:-----|:-----|:-------|:-----|:---------|
+| DataSourceRegistry | 熔断层（HTTP 级） | 这个 Provider 能不能调用 | per-provider | 固定 300s 冷却 |
+| DegradationTracker | 降级决策层（数据质量级） | 这批数据能不能信任 | per-source | 跨会话持久化 |
 
 [↑ 回到顶部](#目录)
 
 ---
 
-## 3. 数据获取层
+## 2. 数据获取层详细设计
 
-### 3.1 Provider Chain 路由与 fallback
+### 2.1 Provider Chain 路由与 fallback
 
 Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个数据类型定义一条优先级链路，`fetch_with_fallback()` 依次尝试，失败则递补下一 Provider。
 
@@ -279,14 +299,14 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
                            Provider Chain 结构
  ┌──────────────────────────────────────────────────────────────────┐
  │  price_stock:   腾讯财经 (qt.gtimg.cn)  →  新浪财经 (hq.sinajs.cn)│
- │  price_fund_otc: 东方财富净值 API (直达，无备用)                   │
+ │  price_fund_otc: 东方财富净值 API（直达，无备用）                   │
  │  history_stock:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_index:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_index_us: 新浪财经 K 线        →  腾讯财经 K 线          │
  │  history_fund_otc: 天天基金 pingzhongdata → 东方财富净值分页       │
  │  industry:       东方财富 push2          →  行情页 quotedata      │
- │  fund_rank:      天天基金 (直达)                                  │
- │  fund_hold:      天天基金 (直达)                                  │
+ │  fund_rank:      天天基金（直达）                                   │
+ │  fund_hold:      天天基金（直达）                                   │
  └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -361,11 +381,11 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
                     ▼
            全部 Provider 失败?
            ┌──────┴──────┐
-          YES              NO (回到循环顶)
+          YES              NO（回到循环顶）
             │
             ▼
     ┌─────────────────┐
-    │ 过期缓存降级      │─── cache_get(key, CACHE_WEEKLY=7天)
+    │ 过期缓存降级      │─── cache_get(key, CACHE_WEEKLY=7 天)
     │ (stale fallback) │     命中? → 返回旧数据
     └────────┬────────┘     未命中? → 返回 None
              │
@@ -375,15 +395,9 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
     └─────────────────┘
 ```
 
-**消费方透明设计**：市场行情批量请求时（如 `report/market_value.py`），每个代码独立触发 Chain，失败资产在汇总日志中列出，不影响其他资产获取：
+**消费方透明设计**：市场行情批量请求时（如 `report/market_value.py`），每个代码独立触发 Chain，失败资产在汇总日志中列出，不影响其他资产获取。
 
-```
-市场行情获取：14 成功，1 失败；失败资产: ['广发多因子灵活配置混合(002943)']
-```
-
-[↑ 回到顶部](#目录)
-
-### 3.2 三层熔断架构
+### 2.2 三层熔断架构
 
 由 `DataSourceRegistry` 单例（`src/python/provider_registry.py`）统一管理，采用**双锁设计**（`_provider_lock` + `_cache_lock`）使熔断操作和会话缓存互不阻塞。
 
@@ -415,7 +429,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 │  └─────────────────────────────────────────────────────────────┘   │
 │                                                                   │
 │  ┌─ 第 3 层：冷却试探恢复 ─────────────────────────────────┐   │
-│  │  cooldown_secs 期满后 is_circuit_broken() 自动：          │   │
+│  │  cooldown_secs 期满后 is_circuit_broken() 自动             │   │
 │  │  1. 设置 is_skipped = False                               │   │
 │  │  2. 重置 consecutive_failures = 0                         │   │
 │  │  3. 返回 False（未熔断），下次调用即为试探                  │   │
@@ -427,7 +441,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 │  │  domain = "industry" / "industry_rest" / "extended" / ...   │   │
 │  │  session_cache_get/set(domain, code)                        │   │
 │  │  NOT_FOUND sentinel 区分 None vs 未缓存                     │   │
-│  │  2000 条/domain O(1) 淘汰                                  │   │
+│  │  2000 条/domain O(1) 淘汰                                   │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -493,13 +507,10 @@ get_effective_strategy(code_type, chain)
     │
     └── CACHE_ONLY:
         ① session_cache_get(domain, code) → 命中则返回
-        ② 文件缓存 cache_get(cache_key_fn(code), 7天)
+        ② 文件缓存 cache_get(cache_key_fn(code), 7 天)
            → 设置 _cache_date_mismatch 标记
-           → 写入 session cache
-           → 返回
+           → 写入 session cache → 返回
 ```
-
-CACHE_ONLY 时文件缓存中的 `price_date` 若非当天数据，设置 `_cache_date_mismatch=True` 标记供详情行显示处理。
 
 #### 数据获取全局超时 `phase_timeout()`
 
@@ -522,16 +533,15 @@ with phase_timeout(seconds=120, phase_name="data_fetch") as ctx:
 
 `DataSourceRegistry.generate_status_report()` 输出所有 Provider 的运行时状态（可用性、连续失败次数、熔断状态、冷却剩余时间、总成功/失败次数等），供调试和监控使用。
 
-[↑ 回到顶部](#目录)
-
-### 3.3 Fetcher 调度架构
+### 2.3 Fetcher 调度架构
 
 `src/python/fetcher/` 各模块按数据类型独立封装：
 
 ```
 fetcher/
 ├── price.py            股票/ETF 最新价 + 场外基金净值 + 00 代码降级
-├── index.py            A 股/美股指数（直调 Provider，不走 Chain）+ fetch_index_history 历史日线（走 Chain，C6 约束）
+├── index.py            A 股/美股指数（直调 Provider，不走 Chain）
+│                       + fetch_index_history 历史日线（走 Chain，C6 约束）
 ├── fund.py             基金排名/持仓/基准（天天基金数据）
 ├── fund_manager.py     基金经理数据（天天基金 HTML 解析）
 ├── industry.py         行业分类+概念板块（push2 双链路）
@@ -544,11 +554,9 @@ fetcher/
 
 **菜单驱动**：菜单 [1] 清除 + 重拉 refresh 组，菜单 [2] 清除 + 重拉 preload 组，均复用 fetcher 模块的预热入口。
 
-[↑ 回到顶部](#目录)
+### 2.4 关键机制
 
-### 3.4 关键机制
-
-#### 3.4.1 00 代码降级
+#### 2.4.1 00 代码降级
 
 **问题**：OTC 基金代码与 A 股代码前缀重叠（均以 `00` 开头），`is_a_share_code()` 无法区分。`price.py` 和 `portfolio_history.py` 需要"先股票链路，失败后基金链路"的双阶段降级。
 
@@ -556,12 +564,12 @@ fetcher/
 
 | 函数 | 策略 | 用途 |
 |:-----|:------|:------|
-| `is_otc_code_overlap(code)` | 仅前缀检测（00 开头） | 快速预筛——"是否值得尝试基金净值 API" |
+| `is_otc_code_overlap(code)` | 仅前缀检测（00 开头） | 快速预筛——是否值得尝试基金净值 API |
 | `is_otc_fund_by_name(name, code)` | 名称+代码双维度 | 00 代码+名称含基金关键词→确认为场外基金 |
 
 `_OTC_FUND_NAME_KW = ("混合", "纯债", "短债", "中短债", "利率债", "信用债", "货币", "联接", "增利")`
 
-**price.py 降级流程（流程图）**：
+**price.py 降级流程**：
 
 ```
 fetch_market_data(code, expected_name)
@@ -582,11 +590,11 @@ fetch_market_data(code, expected_name)
     │ price_stock 链路   │──→ 成功? ──→ 返回结果
     │ tencent → sina    │
     └────────┬───────────┘
-        失败(返回None)
+        失败（返回 None）
              │
        ┌─────┴─────┐
        │ 需要降级?  │──→ NO ──→ 返回 None（最终失败）
-       │(00代码?)   │
+       │（00 代码?）│
        └─────┬─────┘
            YES
              │
@@ -595,7 +603,7 @@ fetch_market_data(code, expected_name)
     │ price_fund_otc 链路 │──→ 成功? ──→ 记录"降级成功"  │
     │ eastmoney 净值     │           └──────────────────┘
     └────────┬───────────┘
-        失败(返回None)
+        失败（返回 None）
              │
              ▼
     记录"降级也失败"
@@ -631,9 +639,7 @@ cache_clear(cache_key) → 强制刷新 → 重新走 Provider Chain
   或盘中缓存的上一交易日残留，均在收市后自动清除）
 ```
 
-[↑ 回到顶部](#目录)
-
-#### 3.4.2 指数独立获取
+#### 2.4.2 指数独立获取
 
 指数数据由 `fetcher/index.py` 直调 Provider，**不走 Provider Chain**：
 
@@ -660,7 +666,7 @@ fetch_index_data(code)
 - 双链路 fallback 硬编码在 index.py 内部，双向链路（A 股腾讯→新浪，美股新浪→腾讯）
 - 双链路均失败时降级过期缓存
 
-#### 3.4.3 Fallback 日志增强
+#### 2.4.3 Fallback 日志增强
 
 所有 Provider Chain 的 fallback/降级日志均包含资产 `[code]` 和名称标签：
 
@@ -677,17 +683,15 @@ fetch_index_data(code)
 
 ---
 
-## 4. 缓存层
+## 3. 缓存层详细设计
 
-### 4.1 策略概览
+### 3.1 子模块结构
 
-缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口。
-
-#### 子模块结构
+缓存统一存放在 `data/cache/` 目录，由 `cache/` 子包提供泛用键值对存储接口：
 
 ```
 cache/
-├── __init__.py        公开 API 导出（__all__ 精简为 I-07 最终形态）
+├── __init__.py        公开 API 导出（__all__ 精简形态）
 ├── _store.py          核心存取：get()、set()、clear()
 ├── _ttl.py            TTL 查询：get_ttl()、get_cache_age()
 ├── _io.py             文件 I/O：_read_cache_data()、_write_atomic()
@@ -695,9 +699,12 @@ cache/
 ├── _groups.py         分组清理：clear_by_group()、clear_by_prefix()
 ├── _cleanup.py        过期清理：cleanup_expired()
 ├── _stats.py          统计：缓存命中率、命中/未命中计数
+├── operations.py      缓存操作共享层（TUI/CLI 共用业务逻辑）
 └── services/
     └── holdings_tracker.py  持仓跟踪、指纹比对、增量刷新
 ```
+
+### 3.2 核心接口与 TTL 分辨率
 
 #### 核心接口
 
@@ -754,6 +761,17 @@ get_ttl(data_type)
 
 **`market_hour_aware` 类型列表**：由 `config.json` 的 `market_hour_aware` 数组配置（如 `["price", "index"]`），非硬编码。
 
+### 3.3 原子写入与并发安全
+
+**原子写入模式**（C3 约束，`cache/` 和 `config/` 子包共享）：
+
+```
+tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
+    write(fd, data)
+    close(fd)
+    os.replace(tmp_path, target_path)  ← 原子替换
+```
+
 #### set() 写入细节
 
 ```
@@ -784,42 +802,31 @@ _write_atomic(fd, tmp_path, final_path)
     └── PermissionError → 降级到直接写入（Windows 兼容）
 ```
 
-[↑ 回到顶部](#目录)
+#### 并发安全
 
-### 4.2 原子写入与并发安全
-
-**原子写入模式**（C3 约束，`cache/` 和 `config/` 子包共享）：
-
-```
-tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
-    write(fd, data)
-    close(fd)
-    os.replace(tmp_path, target_path)  ← 原子替换
-```
-
-**并发安全**：
 - `os.replace` 保证读取方不会看到半写文件（文件系统级原子操作）
 - 多线程同时 `get()` 同一 key 可能产生 TOCTOU 空窗（两线程均认为缓存过期，均拉取 API），但通过 `_write_atomic` 保证同时写入时只有一个生效
 - `clear()` 操作使用 `_cache_lock` 互斥
 
-**路径安全**：
+#### 路径安全
+
 - `_cache_path(key)` 对 key 做 `replace("..", "_")` 防目录穿越
 - 缓存目录不存在时 `os.makedirs(dir, exist_ok=True)` 自动创建
 
 **项目根路径查找**（`constants.py:_find_project_root()`）：
+
 ```
 从 src/python/constants.py 所在目录
     → 向上逐层搜索 pyproject.toml 或 .git
     → 找到即停，完全不依赖目录树深度
     → 安全上限 20 层，未找到时按当前文件所在目录兜底
 ```
+
 所有需定位项目根路径的模块统一从 `constants.PROJECT_ROOT` 导入。
 
 **文件损坏恢复**：`_read_cache_data()` 解析失败时自动 `os.remove` 损坏文件，记录 WARNING 日志，下次调用时重新拉取。
 
-[↑ 回到顶部](#目录)
-
-### 4.3 指纹驱动失效机制
+### 3.4 指纹驱动失效机制
 
 **问题**：部分缓存依赖外部输入源（如持仓列表、指数收盘价），输入变化时需重新拉取。但基于名称的缓存键无法感知"数据变了"，只能依赖 TTL 等待过期。
 
@@ -852,10 +859,10 @@ tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
 
 | 指纹类型 | 计算位置 | 输入源 | 作用范围 |
 |:---------|:---------|:-------|:---------|
-| **指数指纹** | `akshare_extras.py:_compute_index_fingerprint()` | A股+美股指数收盘价（列表拼接→MD5） | `profit_forecast_*`、`sector_flow_*` |
+| **指数指纹** | `akshare_extras.py:_compute_index_fingerprint()` | A 股+美股指数收盘价（列表拼接→MD5） | `profit_forecast_*`、`sector_flow_*` |
 | **代码列表指纹** | `holdings_tracker.py:compute_holdings_fingerprint()` | 持仓+穿透 A 股代码（去重排序→MD5） | `dividend_*` |
 | **输入参数指纹** | `news_aggregator.py:_compute_cache_key()` | 新闻源参数+关键词（拼接→MD5） | `news_*` |
-| **输入数据指纹** | `llm/fingerprint.py` | LLM 模块依赖数据（持仓汇总/结构序列化→MD5） | `llm_global_macro_*`、`llm_expert_review_*`、`llm_health_check_*`、`llm_penetration_deep_*`、`llm_news_item_*` |
+| **输入数据指纹** | `llm/fingerprint.py` | LLM 模块依赖数据（持仓汇总/结构序列化→MD5） | `llm_global_macro_*`、`expert_review_*`、`health_check_*`、`penetration_deep_*`、`news_item_*` |
 
 **LLM 指纹筛选**：expert_review / health_check / penetration_deep 的 `_compute_fingerprint()` 在序列化前排除行情波动字段（`price`、`change_pct`），仅品种/份额/成本变化时指纹改变。
 
@@ -863,9 +870,7 @@ tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
 
 **双保险**：指纹机制与 TTL 互补——指纹未变但 TTL 到期同样触发刷新（TTL 优先，指纹为辅助手段）。
 
-[↑ 回到顶部](#目录)
-
-### 4.4 缓存分组
+### 3.5 缓存分组
 
 通过 `registry.py` 的 `cache_groups` 字段定义分组，由 `clear_by_group()` 统一管理：
 
@@ -897,23 +902,89 @@ tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
 - **refresh 组**：可手动刷新的基金/行业/新闻等
 - **无分组**：历史走势（per-code 缓存，不因切换持仓文件而清除）和基金深度分析快照（精确键名，独立管理）
 
+### 3.6 缓存操作共享层
+
+`cache/operations.py` 是 P1（共享层提取）的核心产出，封装了 TUI 和 CLI 共用的缓存操作业务逻辑，消除 `handlers_cache.py` 中的逻辑重复。
+
+#### 数据结构
+
+```python
+@dataclass
+class CacheUpdateResult:
+    total_funds: int = 0
+    perf_ok: int = 0        # 基金业绩数
+    hold_ok: int = 0        # 基金持仓数
+    bm_ok: int = 0          # 基准成功数
+    pf_ok: int = 0          # 盈利预测
+    sf_ok: int = 0          # 资金流向
+    ind_ok: int = 0         # 行业分类数
+    div_ok: int = 0         # 分红数据
+    errors: list[str] = field(default_factory=list)
+    # exit_code: 0=全成功 / 1=部分失败 / 2=全无数据
+
+@dataclass
+class PositionCacheResult:
+    total: int = 0           # 持仓总数
+    price_ok: int = 0        # 价格成功数
+    a_index_count: int = 0
+    us_index_count: int = 0
+    errors: list[str] = field(default_factory=list)
+
+@dataclass
+class CacheStats:
+    total_files: int = 0
+    total_size_bytes: int = 0
+    expired: int = 0
+    hit_rate: float = 0.0
+    # 快照目录 + 运行时状态统计
+    snapshot_files: int = 0
+    state_files: int = 0
+```
+
+#### 对外接口
+
+| 函数 | 说明 |
+|:-----|:------|
+| `update_basic_cache(holdings, reporter) → CacheUpdateResult` | 基金缓存 + 公共缓存（盈利预测/资金流向/行业/分红）并行刷新 |
+| `update_position_cache(holdings, reporter) → PositionCacheResult` | 持仓价格 + 指数并行获取 |
+| `cleanup_cache(reporter) → int` | 扫描清理过期缓存 |
+| `get_cache_stats(reporter) → CacheStats` | 三目录统计（cache + snapshots + state） |
+
+#### 内部线程池
+
+`operations.py` 管理独立的 `cache_ops` 线程池（`max_workers=4`），与 orchestrator 的 `orch_prep`、`orch_llm_news` 池隔离：
+
+```python
+_POOL: ThreadPoolExecutor | None = None
+
+def _get_pool() -> ThreadPoolExecutor:
+    global _POOL
+    if _POOL is None:
+        _POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="cache_ops")
+    return _POOL
+```
+
+**关键设计**：所有与旧 `handlers_cache._POOL` 相关的引用已在 P1 阶段全部迁移至此模块，不残留跨模块引用。
+
 [↑ 回到顶部](#目录)
 
 ---
 
-## 5. 报告生成层
+## 4. 报告生成层详细设计
 
-### 5.1 管线总览
+### 4.1 管线总览
 
-`src/python/report/` 采用**编排器 + 内容模块**架构，Excel 和 HTML 双端共享 `data_status.py` 降级状态基础设施。
+`src/python/report/` 采用**编排器 + 内容模块**架构，Excel 和 HTML 双端共享 `data_status.py` 降级状态基础设施。顶层由 `orchestrator.py` 统一调度，TUI 的 `handlers_report.py` 仅作为"薄壳"委托编排器。
 
 ```
                                          handlers_report.py
                                               │
                                               ▼
-                                     report_prepare()
-                                     并行获取所有数据
-                                     合并为 info 字典
+                                     orchestrator.generate_report()
+                                      │
+                                      ├── basic: 仅 Excel（无数据准备）
+                                      ├── both:  HTML+Excel（无 LLM）
+                                      └── full:  HTML+Excel+LLM
                                               │
                     ┌─────────────────────────┼─────────────────────────┐
                     │                         │                         │
@@ -943,11 +1014,77 @@ tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
                                  styles.py
 ```
 
-**条件渲染**：B 系列基金分析（`enable_b_series`）、智能预警（菜单 B/L）、LLM 分析（菜单 L）在 `info` 中无对应数据时自动跳过，不在报告中生成空白页签/章节。
+### 4.2 报告编排器
 
-[↑ 回到顶部](#目录)
+`report/orchestrator.py`（~740 行）是 TUI 和 CLI 共用的报告编排共享层，负责：
 
-### 5.2 Excel 管线
+1. **数据准备**：行情获取、指数获取、资产穿透 TOP10
+2. **快照创建与差异计算**：F1 持仓快照 + 环比差异
+3. **历史走势计算**：F2 组合 as-if 走势 + 基准指数对比
+4. **行业资金流向获取**
+5. **LLM + 新闻并行获取**（4 分支统一处理）
+6. **智能预警计算**
+7. **双管线生成**：HTML + Excel
+
+#### 三种报告路径
+
+**basic 路径**（菜单 E）：最简路径，仅生成 Excel，不调数据准备层：
+
+```
+generate_report("basic")
+    → 读取板块顺序配置
+    → generate_excel_report()
+    → 返回 ReportResult
+```
+
+**both 路径**（菜单 B）：生成 HTML+Excel，不含 LLM：
+
+```
+_generate_report_both()
+    → _compute_details()           轻量行情获取（无指数/穿透/分类）
+    → capture_snapshot()           F1 快照对比
+    → fetch_history_data()         条件：enable_history=True
+    → write_html_report()          HTML 管线
+    → generate_excel_report()      Excel 管线
+```
+
+**full 路径**（菜单 L）：生成 HTML+Excel+LLM：
+
+```
+_generate_report_full()
+    → prepare_report_data()        完整数据准备（含指数/穿透/分类/明细）
+    → capture_snapshot()           F1 快照
+    → fetch_history_data()         条件：enable_history=True
+    → get_sector_fund_flow()       行业资金流向
+    → _fetch_llm_and_news()        LLM+新闻并行（4 分支：均开/仅 LLM/仅新闻/均关）
+    → compute_early_warnings()     智能预警
+    → write_html_report()
+    → generate_excel_report()
+```
+
+#### 进度报告接口
+
+编排器通过 `ProgressReporter` 接口输出进度消息，不直接依赖 TUI 或 `print()`：
+
+```python
+class ProgressReporter:
+    def info(self, msg: str)       # ℹ️ 进行中
+    def ok(self, msg: str)         # ✅ 成功
+    def warn(self, msg: str)       # ⚠️ 告警
+    def error(self, msg: str)      # ❌ 错误
+    def add_error(self, msg: str)  # 累计错误
+```
+
+TUI 环境使用 `TuiProgressReporter`（输出到终端），CLI 环境可传入静默实现或日志实现。
+
+#### 内部线程池
+
+| 池名称 | 位置 | max_workers | 用途 |
+|:-------|:-----|:-----------|:------|
+| `orch_prep` | `prepare_report_data()` | 2 | 并行获取 A 股/美股指数 |
+| `orch_llm_news` | `_fetch_llm_and_news()` | 2 | 并行获取 LLM + 新闻 |
+
+### 4.3 Excel 管线
 
 **编排器职责**（`excel_generator.py`，~98 行）：
 1. 调用 `create_sheets()` 创建 workbook 和页签
@@ -958,9 +1095,7 @@ tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
 
 **内容模块动态加载**：`excel_module_loader.py` 通过模块注册表发现并加载写入函数，新增模块只需在注册表中添加条目，无需修改编排器。
 
-[↑ 回到顶部](#目录)
-
-### 5.3 HTML 管线
+### 4.4 HTML 管线
 
 | 组件 | 文件 | 职责 |
 |:-----|:-----|:------|
@@ -973,9 +1108,7 @@ tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
 
 **渲染期通信**（C14 约束）：所有渲染期数据（`section_visible_dict` 等）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict 作为跨函数通信渠道。单次会话中不变的数据（如 `_ENV` 过滤器注册）不受此限。
 
-[↑ 回到顶部](#目录)
-
-### 5.4 板块可见性两层模型
+### 4.5 板块可见性两层模型
 
 报告模块按两层模型决定是否在最终报告中显示：
 
@@ -1014,7 +1147,7 @@ tempfile.mkstemp(dir=cache_dir) → fd, tmp_path
 
 #### HTML 端实现
 
-`html_writer.py:_compute_section_visibility()` 集中实现两层合并，返回 `section_visible_dict`：
+`html_writer.py:_compute_section_visibility()` 集中实现两层合并：
 
 ```python
 board_flags = {
@@ -1025,14 +1158,13 @@ board_flags = {
     "llm":      enable_llm,
 }
 
-# 可见性判定循环
 for sec in section_order:
     board_ok = board_flags.get(sec["type"], True)
-    if not board_ok: continue                  # board 层关闭
+    if not board_ok: continue
     flag_name = sec.get("data_flag")
-    if not flag_name:                          # always/history 类型
+    if not flag_name:
         section_visible_dict[sec["key"]] = True
-    else:                                      # b_series/news/llm 类型
+    else:
         section_visible_dict[sec["key"]] = data_flags.get(flag_name, False)
 ```
 
@@ -1051,20 +1183,7 @@ for sec in section_order:
 
 `always` 类型模块（summary / market_value / category / penetration / fund_performance）无 data_flag，始终显示。
 
-#### Board 层配置
-
-| 函数 | 配置字段 | 配置来源 | 对应 section.type |
-|:-----|:---------|:---------|:------------------|
-| `is_enable_b_series(config)` | `enable_b_series` | `config.json` | `b_series` |
-| `is_enable_news(config)` | `enable_news` | `config.json` | `news` |
-| `is_enable_history(config)` | `enable_history` | `config.json` | `history` |
-| `is_enable_llm(config)` | `enabled_llm`（4 个子键任一启用） | `llm_settings.json` | `llm` |
-
-缺失均视为 `true`（向后兼容），类型/格式错误记录 WARNING。
-
-[↑ 回到顶部](#目录)
-
-### 5.5 报告序号可配置
+### 4.6 报告序号可配置
 
 报告 18 个模块的序号/显示名称由 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
@@ -1083,18 +1202,6 @@ for sec in section_order:
 ```
 
 18 个模块分布：`always`×5、`b_series`×4、`news`×2、`llm`×5、`history`×2。
-
-#### 配置接口
-
-```json
-{
-  "report_section_order": {
-    "fund_manager": 1,
-    "summary": 2,
-    "fund_performance": 5
-  }
-}
-```
 
 #### 合并规则流程
 
@@ -1128,21 +1235,15 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 #### 渲染实现
 
 **连续重新编号**：
-
-```
 1. 从 section_order 筛选所有可见模块（board+data 双层过滤）
 2. 将 llm_usage 从可见列表分离，强制追加到末尾
 3. 按新顺序从 1 开始分配连续序号
-4. visible_numbers = {sec["key"]: idx for idx, sec in enumerate(ordered_visible, start=1)}
-```
 
 **HTML 端**：导航栏使用 `section_order` 动态循环（只渲染可见模块），CSS `order` 属性视觉排序，章节标题使用 `{{ section_numbers['key'] }}` 动态显示。
 
 **Excel 端**：页签标题采用 `f"{visible_count}.{sec['name']}"` 格式。
 
-[↑ 回到顶部](#目录)
-
-### 5.6 组合历史走势计算算法
+### 4.7 组合历史走势计算算法
 
 `portfolio_history.py` 的 `get_combined_timeseries()` 实现 5 步算法链。
 
@@ -1170,8 +1271,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 ┌─────────────────────────────────────────────┐
 │ ③ 回撤算法 (Peak-to-Trough)                  │
 │ 遍历日期，新高更新 peak，记录最深回撤            │
-│ 输出：max_drawdown_val, max_drawdown_pct,     │
-│       drawdown_start, drawdown_end           │
+│ 输出：max_drawdown_val, max_drawdown_pct       │
 └─────────────────────┬───────────────────────┘
                       │
                       ▼
@@ -1237,9 +1337,6 @@ for each date in sorted_dates:
         drawdown_start = current_dd_start  # 该段回撤的峰值日
 ```
 
-- 有新高时自动重置潜在回撤起算日
-- 返回时金额和百分比均取负值（如 `-49626.48`、`-10.22%`）
-
 #### ④ 累计收益率
 
 ```
@@ -1268,88 +1365,20 @@ annualized_vol = std(daily_returns, ddof=1) × √252
 | 过期缓存降级 | 全链路失败时降级 7 天内过期缓存 | 全链路失败时返回空列表 `[]`（显示占位文本） |
 | 数据修正感知 | 无感知 | 重叠检测→自动全量刷新（应对除权除息） |
 
-**增量合并流程**：
-
-```
-fetch_with_incremental_fallback(chain_name, code, days)
-    │
-    ▼
-cache_key = f"history_{chain_name}_{code}"
-cached = cache_get(cache_key, CACHE_WEEKLY)  ← 读取已有缓存作为底座
-last_cached_date = cached[-1]["date"] if cached else None
-    │
-    ▼
-providers = _get_chain(chain_name)  ← 获取 Provider Chain
-    │
-    ▼
-new_data = _try_providers(providers, ..., start_from=last_cached_date)
-    │                 (增量获取：只请求 last_cached_date 之后的数据)
-    ▼
-┌──────────────────────────────────────────┐
-│ new_data 非空?                           │
-├────────────┬─────────────────────────────┤
-│  YES       │  NO                         │
-│   │        │     ↓                       │
-│   ▼        │  ┌──────────────────┐       │
-│ 检查是否   │  │ 有缓存?          │       │
-│ 全量返回   │  ├──────┬───────────┤       │
-│ (起点 ≤    │  │ YES  │ NO        │       │
-│  缓存起点) │  │ 返回 │ 返回 []   │       │
-│   │       │  │ 缓存  │           │       │
-│   ▼       │  └──────┘           │       │
-│ 增量合并   │                      │       │
-│ _merge_   │                      │       │
-│ by_date   │                      │       │
-│   │       │                      │       │
-│   ▼       │                      │       │
-│ 连续性     │                      │       │
-│ 校验      │                      │       │
-│ _validate │                      │       │
-│ _continuity│                     │       │
-│   │       │                      │       │
-│   ▼       │                      │       │
-│ 重叠?     │── YES → 全量刷新     │       │
-│ (历史修正) │  cache_clear +       │       │
-│           │  无 start_from 重取  │       │
-└───────────┴──────────────────────┘       │
-                     │
-                     ▼
-              写入 cache_set
-              返回 new_data[-days:]
-```
-
-**Provider 惰性加载**：通过 `_HISTORY_PROVIDER_MAP` 实现动态 `importlib.import_module()`，避免模块加载时的循环依赖。
-
-**合并算法**（`_merge_by_date`）：
-- `seen = {d["date"] for d in cached}` 记录已有日期
-- 新数据同天覆盖（`_replace_by_date`），处理历史修正
-- `sorted(merged, key=lambda x: x["date"])` 升序排列
-
-**连续性校验**（`_validate_continuity`）：
-- 新数据首日 < 旧数据末日 → 重叠 → 触发全量刷新
-- 日期跳空 >5 交易日 → 记录 WARNING（部分历史不可达）
-- **纯检测/日志用途**，异常不影响主流程
-
-**东财历史净值分页**：`eastmoney.fetch_fund_nav_history()` 改用 `pageSize=20` + 分页循环代替单次 `pageSize=365`（超 API 上限返回 null），页间 0.3s 防限流，最多 10 页（约 200 条 ≈10 个月）。
-
 #### 基准指数对比
 
 基准指数历史走势的并行获取与归一化对齐，在 5 步算法链基础上叠加显示。
 
 **配置接口**（`config.json`）：
+
 ```json
 {
   "history": {
-    "benchmark_indices": {
-      "sh000300": "沪深300",
-      "gb_inx": "标普500"
-    },
+    "benchmark_indices": { "sh000300": "沪深300", "gb_inx": "标普500" },
     "analysis": "auto"
   }
 }
 ```
-
-**配置合并保护**：嵌套 dict 合并时使用 `merged[key] = {**merged[key], **val}` 而非直接覆盖，避免 `benchmark_indices` 默认值被 `history.analysis` 配置静默覆盖。
 
 **技术流程**：
 
@@ -1376,67 +1405,15 @@ get_combined_timeseries()
              benchmarks 列表
 ```
 
-**`fetch_benchmarks()`** — 并行获取多个指数的历史日线：
-- 接收 `{代码: 名称}` 映射，如 `{"sh000300": "沪深300", "gb_inx": "标普500"}`
-- 使用 `ThreadPoolExecutor(max_workers=4)` 并行调用 `fetch_index_history()`
-- 各指数独立处理，失败不影响其他
-- 全部失败时返回空字典，调用方静默降级
-
-**`normalize_benchmarks()`** — 归一化到 100 基点并与组合走势对齐：
-
-```
-输入：组合走势 bars + 各指数原始数据 {code: {name, bars}}
-    │
-    ▼
-① 构建 date→close 映射（过滤无效 close）
-    │
-    ▼
-② 无重叠检测：指数数据完全早于/晚于组合区间 → 跳过
-    │
-    ▼
-③ 确定对齐起算日 align_start = max(组合起算日, 指数首条数据日)
-    │
-    ▼
-④ 起算日 close 获取：在 align_start 当天或之前取最近的 close
-    │
-    ▼
-⑤ LOCF 填充缺失日 + 归一化：
-   value = last_close / close_at_start × 100
-    │
-    ▼
-⑥ 计算区间累计收益率（终值 - 100）
-    │
-    ▼
-⑦ 计算区间最大回撤（Peak-to-Trough，归一化值）
-```
-
-**输出数据字典（每指数）**：
-```python
-{
-    "code": str,              # 指数代码
-    "name": str,              # 指数名称
-    "bars": [                 # 归一化走势，与组合日期一一对应
-        {"date": str, "value": float},
-    ],
-    "total_return_pct": float,  # 区间累计收益率（%）
-    "max_drawdown_pct": float,  # 区间最大回撤（%）
-    "data_start": str,         # 有效起始日
-    "data_end": str,           # 有效结束日
-    "status": str,             # "ok" | "degraded"
-}
-```
-
 **防御性编程**：
 - `bar.get("date")` 防御性检查（防止 KeyError）
 - 每次 index bar 的 close 校验：`isinstance(close, (int, float)) and close > 0`
-- 每个基准完成归一化后输出 `logger.info("[normalize] %s(%s) 归一化完成, %d 条数据")`
-- 异常捕获在 `get_combined_timeseries()` 的 try/except 中，不阻塞主流程
+- 每个基准完成归一化后输出 `logger.info(...)` 
+- 异常捕获在 try/except 中，不阻塞主流程
 
-**HTML 渲染**：`drawSimpleChart()` 多 dataset 版本，组合 as-if 曲线（实线）+ 基准指数（虚线，颜色循环），右侧图例显示。回撤图同样叠加基准指数的回撤序列（灰色虚线）。移除了 Chart.js CDN 外部依赖，使用 Canvas 2D API 原生渲染。
+**HTML 渲染**：`drawSimpleChart()` 多 dataset 版本，组合 as-if 曲线（实线）+ 基准指数（虚线，颜色循环），右侧图例显示。使用 Canvas 2D API 原生渲染（无 Chart.js 外部依赖）。
 
-**Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值 `'0.00'` 格式），`drawdown_analysis` 页签对比指标矩阵（累计收益率/最大回撤/波动率等）。
-
-**注册表条目**：`history_stock` / `history_fund_otc` / `history_index` / `history_index_us` 历史走势数据在 registry 中注册为无分组缓存，不受菜单缓存命令影响。
+**Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值），`drawdown_analysis` 页签对比指标矩阵。
 
 #### F1 快照存储与清理（history_snapshot.py）
 
@@ -1453,9 +1430,7 @@ prune()：两阶段自动清理
                  时删最旧超出部分
 ```
 
-[↑ 回到顶部](#目录)
-
-### 5.7 B 系列：基金深度分析模块
+### 4.8 B 系列基金深度分析
 
 B 系列 4 个模块通过 `enable_b_series` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
 
@@ -1511,10 +1486,6 @@ Excel 热力图着色：
     15~30% → 黄底黑字
     >0     → 绿底黑字
     0%     → 无着色
-    │
-    ▼
-配对明细表：按重合度降序排列
-    含共同标的数 + 共同标的名称列表
 ```
 
 触发条件：持仓中基金数量 ≥ 2 只。
@@ -1564,9 +1535,7 @@ Excel 热力图着色：
 - Tencent 二级降级基于 registry 熔断器（provider="tencent_style"），避免网络不可达时逐只等待超时
 - 独立快照 `fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
-[↑ 回到顶部](#目录)
-
-### 5.8 资产穿透 TOP10
+### 4.9 资产穿透 TOP10
 
 `compute_penetration_top10()` 纯计算函数，不依赖 openpyxl。
 
@@ -1597,9 +1566,7 @@ industry_{code}.json
                              → 显示 "XX[概念]"
 ```
 
-[↑ 回到顶部](#目录)
-
-### 5.9 财经新闻热点与持仓关联分析
+### 4.10 财经新闻热点与持仓关联分析
 
 #### 整体流程
 
@@ -1618,7 +1585,6 @@ industry_{code}.json
            news_keywords.py
            关键词提取：持仓名称片段 + 代码 + 穿透资产 + 行业 + 概念
            4 种类型富化：持仓(0) → 穿透(1) → 概念(2) → 行业(3)
-           概念类型来源：东方财富 push2 API 行业分类和概念板块
                   │
                   ▼
            news_correlator.py ←── news_correlation(持仓, 新闻) → 关联度评分
@@ -1656,13 +1622,7 @@ industry_{code}.json
 
 `per_source = max(500, news_top_count × 2)` — 每源原始获取量动态计算，保证去重后候选充足。最终截取 `news_top_count` 条按关联度排序输出。
 
-#### LLM 二次关联分析
-
-可选功能（`enabled_llm.news_correlation` 配置开启），对已排序新闻做 LLM 深度关联评分，用于提升关联准确性。
-
-[↑ 回到顶部](#目录)
-
-### 5.10 数据降级在报告中的体现
+### 4.11 数据降级治理体系
 
 #### 降级状态基础设施（`report/data_status.py`）
 
@@ -1713,8 +1673,6 @@ industry_{code}.json
 | 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 7 天 | 距上次成功获取的天数超阈值后触发降级 |
 
 可配置于 `config.json` 的 `degradation` 字段。支持跨会话持久化到 `data/state/.degradation_state.json`。
-`data/state/` 目录与 `data/cache/` 同级但独立管理，存放运行时跨会话状态文件而非可清理的缓存数据，
-避免 `cache.cleanup_expired()` 误清理。
 
 **与 DataSourceRegistry 的职责边界**：
 
@@ -1736,16 +1694,16 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
 
 ---
 
-## 6. LLM 集成层
+## 5. LLM 集成层详细设计
 
-### 6.1 架构总览
+### 5.1 架构总览
 
 `src/python/llm/` 包为 12 子模块架构：
 
 ```
 llm/
 ├── generators_orchestrator.py  入口：4+1 模块并行编排
-├── skeleton.py                 骨架：缓存检查→API→markdown→HTML（85%公共逻辑）
+├── skeleton.py                 骨架：缓存检查→API→markdown→HTML（85% 公共逻辑）
 ├── api.py                      API 路由 + 重试 + 截断检测 + 熔断器
 ├── api_base.py                 底层 HTTP 调用（_attempt_api_call）
 ├── generators.py              4 个单例生成函数
@@ -1758,7 +1716,9 @@ llm/
 └── models.py                   数据模型
 ```
 
-**调用链**：
+**LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名。
+
+### 5.2 调用链
 
 ```
 generators_orchestrator（并行调度 4+1 模块）
@@ -1775,7 +1735,17 @@ generators_orchestrator（并行调度 4+1 模块）
             └── 返回结果
 ```
 
-### 6.2 关键机制
+**4+1 模块**：
+
+| 模块 | 标识 | 说明 | 分组 |
+|:-----|:-----|:------|:-----|
+| 全球政经局势 | `global_macro` | A 股/美股指数+持仓汇总 → 宏观判断 | preload |
+| 智囊团深度复盘 | `expert_review` | 持仓明细+穿透 → 专业分析师视角 | preload |
+| 组合体检报告 | `health_check` | 持仓明细（排除行情波动）→ 健康度诊断 | preload |
+| 穿透深度分析 | `penetration_deep` | 持仓明细（排除行情波动）→ 穿透标的分析 | preload |
+| 新闻二次关联 | `news_correlation` | 逐条新闻 → LLM 深度关联评分 | refresh |
+
+### 5.3 关键机制
 
 | 机制 | 实现 | 说明 |
 |:-----|:------|:------|
@@ -1784,18 +1754,16 @@ generators_orchestrator（并行调度 4+1 模块）
 | 截断重试 | 检测 `TRUNCATION_MARKER` 后自动 1.5× max_tokens 重试一次 | 修复内容被截断的情况 |
 | 内容过滤安抚 | 空返回时追加安抚指令重试 | 应对内容审查误杀 |
 | 会话用量追踪 | `session.py` 维护线程安全 `session_usage` 字典 | 按模块粒度追踪 token/费用/缓存命中 |
-
-**LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名（model / temperature / timeout / cache_enabled / max_tokens / system_prompt / thinking_enabled / thinking_budget / reasoning_effort / output_brief）。
-
-详细设计见 [LLM 技术要点文档](llm-technical.md)。
+| LLM 熔断 | `llm/circuit_breaker.py` — 连续 N 次失败 → 60s 冷却 → 半开状态试探 | 防止无效调用浪费 token |
+| 指纹缓存 | `fingerprint.py` — 依赖数据指纹过滤（排除行情波动字段） | 仅品种/份额/成本变化时重新调用 |
 
 [↑ 回到顶部](#目录)
 
 ---
 
-## 7. 辅助模块设计
+## 6. 辅助模块详细设计
 
-### 7.1 配置管理
+### 6.1 配置管理
 
 #### 配置分层
 
@@ -1823,9 +1791,7 @@ config/
 
 配置文件（`set_config`）和缓存写入（`_write_atomic`）均使用 `tempfile.mkstemp` + `os.replace` 模式。
 
-[↑ 回到顶部](#目录)
-
-### 7.2 中央注册表（registry.py）
+### 6.2 中央注册表
 
 **设计目标**：消除 `config.py` / `cache.py` / `constants.py` 三处分散维护的遗漏风险，做到"一处注册，全局生效"。
 
@@ -1834,13 +1800,13 @@ config/
 ```python
 @dataclass(frozen=True)
 class DataModuleDef:
-    name: str                # 人类可读名称，"股票价格"、"全球政经局势"
+    name: str                # 人类可读名称
     data_type: str           # 数据类型键，用于 TTL 查找和路由
     cache_prefixes: tuple    # 缓存前缀，如 ("price_",)
-    exact_cache_keys: tuple  # 精确缓存键名，如 ("fund_manager_snapshot",)
+    exact_cache_keys: tuple  # 精确缓存键名
     cache_ttl: float         # 默认缓存过期时间（秒）
     settings_suffix: str|None# LLM settings 键后缀，None=非 LLM 模块
-    cache_groups: tuple      # 分组，("preload",) / ("refresh",) 或空
+    cache_groups: tuple      # 分组
 ```
 
 当前注册 **25 个数据模块**：
@@ -1859,20 +1825,18 @@ class DataModuleDef:
 
 #### 派生产出接口
 
-| 接口 | 用途 | 消除的散落信息 |
-|:-----|:------|:--------------|
-| `get_cache_ttl_defaults()` | data_type → TTL 默认值 | `constants.py` 的 `CACHE_TTL_DEFAULTS` |
-| `get_prefix_type_map()` | 缓存前缀 → data_type | `cache.py` 的 `prefix_type_map` |
-| `get_exact_type_map()` | 精确键名 → data_type | `cache.py` 的 `exact_map` |
-| `get_known_llm_settings_keys()` | `llm_settings.json` 合法键名 | `config.py` 的 `_KNOWN_LLM_SETTINGS_KEYS` |
-| `get_report_section_order()` | 用户配置+默认顺序合并 | `html_writer.py` / `excel_generator.py` 硬编码 |
-| `get_llm_module_names()` | suffix → 中文名称 | 各模块内部 `_label_map` 字典 |
+| 接口 | 用途 |
+|:-----|:------|
+| `get_cache_ttl_defaults()` | data_type → TTL 默认值 |
+| `get_prefix_type_map()` | 缓存前缀 → data_type |
+| `get_exact_type_map()` | 精确键名 → data_type |
+| `get_known_llm_settings_keys()` | `llm_settings.json` 合法键名 |
+| `get_report_section_order()` | 用户配置+默认顺序合并 |
+| `get_llm_module_names()` | suffix → 中文名称 |
 
-[↑ 回到顶部](#目录)
+### 6.3 市场时段判断
 
-### 7.3 市场时段判断（market_hours.py）
-
-**三层 fallback 架构**：
+**三层 fallback 架构**（`market_hours.py`）：
 
 ```
 is_market_open()
@@ -1882,7 +1846,6 @@ is_market_open()
 │ 第 1 层：config.json 手动覆盖                 │
 │ market_hours.start / end                    │
 │ 支持午间不中断模式（连续时段）                  │
-│ market_hours.official_source: false 关闭 API  │
 ├─────────────────────────────────────────────┤
 │ 成功? → 返回 True/False                      │
 │ 未配置? → 进入下一层                          │
@@ -1894,7 +1857,6 @@ is_market_open()
 │ 上证指数 secid=1.000001, f100 字段          │
 │   0=未开盘 / 1=交易中 / 2=收盘 / 3=午间休市   │
 │ 缓存策略：盘中 60s，盘后 7 天                 │
-│ make_http_client(timeout=5.0)               │
 ├─────────────────────────────────────────────┤
 │ 成功? → 返回 True/False                      │
 │ API 不可用? → 进入下一层                      │
@@ -1904,7 +1866,6 @@ is_market_open()
 ┌─────────────────────────────────────────────┐
 │ 第 3 层：内置默认值                           │
 │ 北京时区工作日 09:30-11:30 + 13:00-15:00     │
-│ 自动排除午餐和周末                            │
 ├─────────────────────────────────────────────┤
 │ 固定返回 True/False                          │
 └─────────────────────────────────────────────┘
@@ -1915,13 +1876,11 @@ is_market_open()
 **消费方**：
 - `cache/_ttl.py:get_ttl()` — 交易时段内 `market_hour_aware` 类型自动使用短 TTL（30s）
 - `report/market_value.py:is_market_open()` — 取价方式标签判断
-- `report/market_value.py:is_midday_break()` — 午间休市识别（11:30-13:00，用于区分"午市收盘"和"收盘价"）
+- `report/market_value.py:is_midday_break()` — 午间休市识别（11:30-13:00）
 
-[↑ 回到顶部](#目录)
+### 6.4 持仓读取与列校验
 
-### 7.4 持仓读取与列校验（reader.py）
-
-基于 openpyxl 解析持仓 xlsx：
+基于 openpyxl 解析持仓 xlsx（`reader.py`）：
 
 ```
 load_holdings(filepath)
@@ -1943,13 +1902,63 @@ load_holdings(filepath)
 返回：list[Holding]（每行一个 Holding）
 ```
 
-多文件选择：持仓目录下多个 xlsx 时弹出 TUI 选择器（`tui_handlers.py` 中 `select_holdings_file()`）。
+### 6.5 代码类型判定中心化
+
+所有资产代码类型判定集中到 `src/python/code_utils.py`，以纯技术原语形式提供。
+
+#### 原语清单
+
+| 维度 | 函数 | 判定依据 | 用途 |
+|:-----|:------|:---------|:------|
+| 代码前缀 | `is_a_share_code(code)` | 60/68/00/30/8 开头 | A 股股票识别 |
+| | `is_exchange_fund_code(code)` | 5/1 开头 | 场内基金/ETF |
+| | `is_hk_stock_code(code)` | 5 位纯数字 | 港股通标的 |
+| | `is_otc_code_overlap(code)` | 00 开头 | A 股/OTC 基金代码重叠区检测 |
+| | `get_exchange_prefix(code)` | 前缀规则 | sh/sz/bj 交易所前缀 |
+| | `is_index_code(code)` | sh/sz 前缀或 000/399/932 开头或 gb_ 前缀 | 指数代码识别 |
+| | `is_us_index_code(code)` | gb_ 前缀 | 美股指数识别 |
+| | `get_index_exchange_prefix(code)` | sh/sz 前缀 | 指数所属交易所前缀 |
+| | `get_push2_secid(code)` | 前缀规则 | push2 API secid 参数 |
+| 名称关键词 | `is_qdii_by_name(name)` | "QDII" | QDII 标识 |
+| | `is_qdii_extended(name)` | QDII + 隐式关键词 | QDII + 隐式海外基金 |
+| | `is_etf_by_name(name)` | "ETF" | ETF 标识 |
+| | `is_bond_related_by_name(name)` | 纯债/短债/利率债等（不含单字"债"） | 债券基金（严格） |
+| | `is_bond_fund_by_name(name)` | 含"债" | 债券基金（宽松，含可转债） |
+| | `is_money_fund_by_name(name)` | 货币/现金/增利/宝 | 货币基金 |
+| | `is_index_fund_by_name(name)` | 指数/ETF 联接/中证/沪深 300 等 | 场外指数基金 |
+| | `is_index_link_by_name(name)` | ETF 联接/联接/链接 | 指数联接基金 |
+| 复合 | `is_etf_by_name_or_code(name, code)` | 名称+代码双维度 | ETF 增强识别 |
+| | `is_otc_fund_by_name(name, code)` | 00 代码+名称含基金关键词 | 00 代码重叠区→场外基金 |
+| | `is_offsite_fund(account)` | 关键词匹配 | 场外基金账户 |
+| | `is_fund_holding(name, code, account)` | 三者联合 | 持仓是否需要基金业绩分析 |
+
+#### 内部工具
+
+`_strip_prefix(code)` — 去除 `sh/sz/bj` 前缀，返回纯净 6 位数字代码，非 6 位数字时返回空字符串。所有前缀型判定函数均先调用此函数再匹配。
+
+#### 关键词常量
+
+| 常量名 | 值 | 用途 |
+|:-------|:----|:------|
+| `FUND_ACCOUNT_KEYWORDS` | `("基金", "支付宝", "微信", "银行")` | 场外基金账户判定 |
+| `MONEY_KEYWORDS` | `("货币", "现金", "增利", "宝")` | 货币基金识别 |
+| `INDEX_KEYWORDS` | `("指数", "ETF联接", "中证", "沪深300", ...)` | 指数基金判定 |
+
+### 6.6 HTTP 客户端统一
+
+所有 HTTP 请求必须使用 `http_client.py` 工厂方法创建客户端实例（C5 约束），统一 SSL 配置、超时策略、连接池管理。
+
+```python
+make_http_client(timeout=10.0) → requests.Session
+```
+
+默认超时 10s，支持 per-call 覆盖，所有 provider 模块统一使用此接口。
 
 [↑ 回到顶部](#目录)
 
 ---
 
-## 8. 模块间依赖关系
+## 7. 模块间依赖关系
 
 ```
 reader.py (持仓解析)
@@ -1963,21 +1972,36 @@ reader.py (持仓解析)
     → market_hours.py (交易时段感知 TTL)
     → registry.py (TTL 默认值、缓存分组)
 
+cache/operations.py (缓存操作共享层)
+  → cache/ (缓存引擎核心)
+  → providers/akshare_extras.py (盈利预测/资金流向/分红)
+  → fetcher/industry.py (行业分类)
+  → fetcher/fund_manager.py (基金经理)
+  → fetcher/fund.py (基金业绩)
+  → fetcher/price.py / index.py (持仓缓存)
+
+report/orchestrator.py (报告编排层)
+  → report/market_value.py (行情获取)
+  → fetcher/index.py (指数)
+  → report/penetration.py (资产穿透)
+  → report/history_snapshot.py (F1 快照)
+  → report/portfolio_history.py (F2 历史走势)
+  → report/news_correlation.py (新闻关联)
+  → llm/generators_orchestrator.py (LLM 编排)
+  → report/early_warning.py (智能预警)
+  → report/html_writer.py (HTML 管线)
+  → report/excel_generator.py (Excel 管线)
+  → config/ (开关配置)
+  → registry.py (报告模块注册)
+
 report/excel_generator.py (Excel 编排器)
   → report/excel_module_loader.py (模块动态加载)
   → report/excel_sheet_factory.py (页签创建/可见性)
-  → report/excel_market_data.py / excel_content_sheets.py
-  → report/excel_news_warning.py / excel_b_series.py / excel_llm_usage.py
-    → report/summary.py / summary_llm_usage.py
-    → report/market_value*.py / category.py / penetration*.py
-    → report/fund_performance.py / news_correlation.py
-    → report/llm_content.py / early_warning.py
-    → report/fund_manager_sheet.py / fund_overlap*.py
-    → report/fund_concentration*.py / fund_style*.py
+  → report/*.py (各页签写入器)
   → report/excel_writer.py + styles.py
   → report/data_status.py (降级状态)
 
-report/html_writer.py (HTML 编排)
+report/html_writer.py (HTML 编排器)
   → report/html_builders.py (数据构建器)
   → report/html_renderers.py (Markdown→HTML)
   → report/html_jinja_env.py (Jinja2 环境)
@@ -1985,25 +2009,29 @@ report/html_writer.py (HTML 编排)
   → tmpl/report_template.html (Jinja2 模板)
   → report/data_status.py
 
-llm/generators_orchestrator.py (LLM 编排)
-  → llm/skeleton.py → llm/api.py → llm/prompts.py
-  → llm/fingerprint.py / pricing.py / session.py / markdown.py
+llm/ (LLM 集成)
+  → llm/generators_orchestrator.py → skeleton.py → api.py → api_base.py
+  → llm/prompts.py / fingerprint.py / pricing.py / session.py
   → cache/ (LLM 结果缓存)
 
-config/ → registry.py (注册表驱动的 TTL/分组/键名)
-handlers_*.py → 各模块入口函数编排
+handlers_*.py (TUI 命令)
+  → orchestrator.py 或 cache/operations.py (委托业务逻辑)
+  → report/progress.py (TuiProgressReporter)
+
+config/ → registry.py
+code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 ```
 
 [↑ 回到顶部](#目录)
 
 ---
 
-## 9. 架构设计约束
+## 8. 架构设计约束
 
 本节定义系统架构层面的**设计约束**。所有新增或修改的代码必须遵守，违反即视为架构违规。
 约束按职责域分组，每个约束包含：设计目的（为何存在）、违反后果（不遵守的影响）、适用范围（哪些模块/场景受约束）。
 
-### 9.1 数据获取层约束
+### 8.1 数据获取层约束
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
@@ -2012,35 +2040,35 @@ handlers_*.py → 各模块入口函数编排
 | **C5** | **HTTP 客户端统一** — 所有 HTTP 请求必须使用 `http_client.py` 工厂方法创建客户端实例 | 统一 SSL 配置、超时策略、连接池管理；防止各模块自行构造 request 导致配置散落、连接池泄漏 | SSL 配置不一致、连接泄漏、重试策略不统一 | 所有发起 HTTP 请求的模块（providers/、llm/） |
 | **C6** | **Provider Chain 必经** — 大多数数据获取必须通过 `fetch_with_fallback()` 走 Chain 路由，不得直接调用 Provider 函数 | 跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失 | 熔断器失效、fallback 断路、故障记录缺失 | fetcher/ 各模块（例外：index.py 直调 Provider 的双链路 fallback 硬编码，熔断器不适用于指数场景） |
 
-### 9.2 缓存层约束
+### 8.2 缓存层约束
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
 | **C2** | **缓存统一管理** — 所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 接口读写，禁止直接操作 `data/cache/` 文件系统 | 直接操作文件系统导致 TTL 失效（缓存无法感知过期时间）、分组清理遗漏（菜单命令无法清除对应缓存）、路径穿越隐患 | 缓存不一致、TTL 失效、分组清理遗漏、路径安全风险 | 所有读写 data/cache/ 的模块 |
 | **C3** | **缓存原子写入** — 所有缓存/配置文件写入必须使用 `tempfile.mkstemp` + `os.replace` 原子写入模式 | 直接覆写文件在断电/崩溃时产生半写损坏文件，导致后续读取解析失败 | 半写文件损坏、数据不完整、崩溃后无法自恢复 | cache/ 子包、config/ 子包、history_snapshot.py |
 
-### 9.3 报告层约束
+### 8.3 报告层约束
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
 | **C7** | **报告序号不可硬编码** — 报告 18 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
-| **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | providers/news_aggregator.py |
+| **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 
-### 9.4 LLM 集成层约束
+### 8.4 LLM 集成层约束
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
 | **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `registry.py` 的 `DataModuleDef` 注册表中同时注册 | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失 | llm/ 包 + registry.py |
 
-### 9.5 基础设施约束
+### 8.5 基础设施约束
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
 | **C8** | **日志统一** — 所有模块必须使用 `logging.getLogger("invest")` 获取日志器，禁止直接使用 `print()` 输出运行时诊断信息 | 统一日志名称使日志过滤、级别控制、格式管理集中生效；`print()` 无法控制日志级别，污染 stdout | 日志碎片化、日志级别失控、`print()` 干扰输出流 | 全模块（交互式 print 如进度提示不受此限） |
 | **C15** | **控制台日志着色** — WARNING 级别使用黄色输出、ERROR 级别使用红色输出；当 `NO_COLOR` 环境变量设置或输出非 TTY 时自动降级为无颜色 | 着色提升控制台日志的辨识度，便于快速定位告警和错误；降级保证日志导出、管道重定向时无转义字符污染输出 | 日志可读性降低、非 TTY 环境下转义字符污染 | `logger.py`（_ColoredFormatter） |
 
-### 9.6 测试约束
+### 8.6 测试约束
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
@@ -2062,14 +2090,14 @@ investor-util/
 │   ├── __init__.py
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
-│   │   ├── cache/               # 缓存引擎子包（7 子模块 + services）
+│   │   ├── cache/               # 缓存引擎子包（8 子模块 + operations + services）
 │   │   ├── code_utils.py        # 代码类型判定中心化
 │   │   ├── config/              # 配置管理子包（_defaults / _comments / _core）
 │   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
 │   │   ├── fetcher/             # 数据获取调度（price/index/fund/industry/chain/akshare）
-│   │   ├── handlers_cache.py    # TUI 缓存管理命令
+│   │   ├── handlers_cache.py    # TUI 缓存管理命令（薄壳委托 operations）
 │   │   ├── handlers_config.py   # TUI 配置管理命令
-│   │   ├── handlers_report.py   # TUI 报告生成命令
+│   │   ├── handlers_report.py   # TUI 报告生成命令（薄壳委托 orchestrator）
 │   │   ├── http_client.py       # HTTP 客户端工厂
 │   │   ├── llm/                 # LLM 集成（12 子模块）
 │   │   ├── logger.py            # 日志模块（_ColoredFormatter）
@@ -2080,7 +2108,8 @@ investor-util/
 │   │   ├── providers/           # 数据源提供商（14 个文件）
 │   │   ├── reader.py            # 持仓 Excel 解析
 │   │   ├── registry.py          # 中央注册表（25 个数据模块 + 18 个报告模块）
-│   │   ├── report/              # 报告生成（~30 个文件）
+│   │   ├── report/              # 报告生成（~30 个文件，含 orchestrator/progress）
+│   │   ├── schemas/             # Pydantic 数据模式（快照等）
 │   │   ├── tui.py               # 键盘输入封装
 │   │   ├── tui_handlers.py      # 菜单通用辅助
 │   │   └── tui_menu.py          # 菜单交互
@@ -2090,20 +2119,16 @@ investor-util/
 │       ├── unit/                # 单元测试
 │       ├── integration/         # 集成测试
 │       └── scenario/            # 场景测试
-├── data/                        # 运行时数据（config/holdings/cache）
+├── data/                        # 运行时数据（config/holdings/cache/state/snapshots）
 ├── reports/                     # 生成报告
 ├── logs/                        # 程序日志
-├── docs-stm/                    # 项目管理文档
+├── docs-stm/                    # 项目管理文档（含 managements/、plan/、manuals/、archive/）
 ├── scripts/                     # 启动/测试脚本
 ├── pyproject.toml
 └── CLAUDE.md
 ```
 
-[↑ 回到顶部](#目录)
-
----
-
-### 附录 B：数据源完整一览
+### 附录 B：数据源一览
 
 | 用途 | 链路方案 | Provider 文件 |
 |:-----|:---------|:-------------|
@@ -2120,15 +2145,9 @@ investor-util/
 | 股票历史分红 | akshare 逐股获取（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 基金经理数据 | 天天基金 HTML 解析（主）→ 档案页回退 | `fetcher/fund_manager.py` |
 
-> 各数据源具体 API 端点格式见 [需求文档 §5.1 — 数据源总览](requirements.md#51-数据源总览)。
->
-> 新闻数据处理模块：`news_aggregator.py`（聚合去重）、`news_correlator.py`（关联分析）、`news_keywords.py`（关键词提取）、`news_sources.py`（源元数据定义），位于 `providers/` 下。
+新闻数据处理模块：`news_aggregator.py`（聚合去重）、`news_correlator.py`（关联分析）、`news_keywords.py`（关键词提取）、`news_sources.py`（源元数据定义），均位于 `providers/` 下。
 
-[↑ 回到顶部](#目录)
-
----
-
-### 附录 C：缓存 TTL 明细表
+### 附录 C：缓存 TTL 明细
 
 #### 行情/数据类
 
@@ -2137,9 +2156,9 @@ investor-util/
 | `price` | `price_{code}.json` | 24h | 交易时段 30s | — | preload |
 | `index` | `index_{code}.json` | 24h | 交易时段 30s | — | preload |
 | `news` | `news_{md5}.json` | 15 分钟 | — | 新闻源参数+关键词 | refresh |
-| `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | — | A股+美股指数 | refresh |
+| `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | — | A 股+美股指数 | refresh |
 | `rank` | `fund_perf_{code}.json` | 24h | — | — | refresh |
-| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | — | A股+美股指数 | refresh |
+| `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | — | A 股+美股指数 | refresh |
 | `hold` | `fund_hold_{code}.json` | 7 天 | — | — | refresh |
 | `industry` | `industry_{code}.json` | 14 天 | — | — | refresh |
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | — | 持仓+穿透 A 股代码 | refresh |
@@ -2151,7 +2170,7 @@ investor-util/
 |:-----|:----------|:---:|:--------:|:----|:-----|
 | `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | — | 持仓汇总+分类+穿透+明细 | preload |
 | `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 1h | — | 标题前 80 字+持仓指纹 | refresh |
-| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | — | A股/美股指数+持仓汇总 | preload |
+| `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | — | A 股/美股指数+持仓汇总 | preload |
 | `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | — | 持仓明细（排除行情波动） | preload |
 | `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | — | 持仓明细（排除行情波动） | preload |
 
@@ -2182,5 +2201,25 @@ investor-util/
 | `calendar` | `trading_calendar.json` | 14 天 | — | — | 无分组 |
 
 > `—` 表示精确键名（无指纹后缀），TTL 到期后刷新。
+
+### 附录 D：降级层级与阈值定义
+
+| 层级 | 含义 | 显示前缀 | 连续失败阈值 | 缓存陈旧阈值 |
+|:-----|:------|:---------|:------------|:------------|
+| T2 | 数据不可用 | ⚠ | 2 次 | 3 天 |
+| T3 | 数据部分可用 | ℹ | 2 次 | 14 天 |
+| T4 | 数据临时不可用 | ℹ | 1 次 | 7 天 |
+
+降级配置位于 `config.json` 的 `degradation` 字段，支持 per-source 覆盖。
+
+### 附录 E：线程池分布
+
+| 池名称 | 所在模块 | max_workers | 线程名前缀 | 用途 |
+|:-------|:---------|:-----------|:----------|:------|
+| `orch_prep` | `report/orchestrator.py`（`prepare_report_data`） | 2 | `orch_prep` | 并行获取 A 股/美股指数 |
+| `orch_llm_news` | `report/orchestrator.py`（`_fetch_llm_and_news`） | 2 | `orch_llm_news` | 并行获取 LLM + 新闻 |
+| `cache_ops` | `cache/operations.py` | 4 | `cache_ops` | 并行刷新基金/行业/公共缓存 |
+
+各线程池互不共享，职责隔离。`cache_ops` 池是唯一存在的缓存操作池（P1 已完成从 `handlers_cache` 的迁移）。
 
 [↑ 回到顶部](#目录)

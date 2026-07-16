@@ -1,11 +1,6 @@
 """报告编排共享层 — TUI 和 CLI 共用。
 
 P1 逐步从 handlers_report.py 提取业务逻辑至此模块。
-
-★ S1 临时依赖（S5/S6 消除）：
-  - handlers_report._get_pool()   ← S6 改为内部 ThreadPoolExecutor
-  - tui_menu.get_config_cache()   ← S7 改为 config 参数接收
-  - tui_handlers.check_network_available() ← S5 移除（orchestrator 不调 TUI 函数）
 """
 
 from __future__ import annotations
@@ -57,28 +52,33 @@ def _read_section_flags(config: dict) -> dict:
 
 # ── S1 移入：_prepare_report_data ──
 # 原 handlers_report._prepare_report_data()
-# ★ 临时依赖标注：S5 移除 check_network_available，S6 移除 _get_pool，S7 移除 get_config_cache
+# ★ S6：_get_pool 已替换为内部 ThreadPoolExecutor；仍残留 get_config_cache（S7 移除）
 
 
-def prepare_report_data(holdings: list, reporter: ProgressReporter) -> dict:
-    """获取行情、指数、穿透数据，整理持仓明细字典列表。"""
+def prepare_report_data(
+    holdings: list,
+    reporter: ProgressReporter,
+    config: dict | None = None,
+) -> dict:
+    """获取行情、指数、穿透数据，整理持仓明细字典列表。
+
+    S6 新增 config 参数（可选，向后兼容）；使用内部 ThreadPoolExecutor 替代 _get_pool()。
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
     from src.python.fetcher.index import fetch_indices, fetch_us_indices
     from src.python.report.market_value import _generate_details, classify_holdings
     from src.python.report.penetration import compute_penetration_top10
 
-    # ★ 临时依赖：S7 改从 config 参数接收
-    from src.python.tui_menu import get_config_cache
-    # ★ 临时依赖：S5 移除（TUI 专属）
-    from src.python.tui_handlers import check_network_available  # noqa: F811
-    # ★ 临时依赖：S6 改为内部池
-    from src.python.handlers_report import _get_pool  # noqa: F811
+    # ★ 临时依赖：S7 移除
+    if config is None:
+        from src.python.tui_menu import get_config_cache
+        config = get_config_cache() or {}
 
-    config = get_config_cache() or {}
     today_str = datetime.now().strftime("%Y-%m-%d")
 
     reporter.info("正在获取行情数据...")
     details = _generate_details(holdings, today_str)
-    check_network_available(details)
     total_mv = sum(d.market_value for d in details)
     total_cost = sum(d.cost for d in details)
     total_profit = sum(d.profit for d in details)
@@ -86,11 +86,14 @@ def prepare_report_data(holdings: list, reporter: ProgressReporter) -> dict:
     categories = classify_holdings(holdings)
 
     reporter.info("正在获取指数行情...")
-    _idx_ex = _get_pool()
-    _a_fut = _idx_ex.submit(fetch_indices)
-    _us_fut = _idx_ex.submit(fetch_us_indices)
-    a_indices = _a_fut.result()
-    us_indices = _us_fut.result()
+    pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="orch_prep")
+    try:
+        _a_fut = pool.submit(fetch_indices)
+        _us_fut = pool.submit(fetch_us_indices)
+        a_indices = _a_fut.result()
+        us_indices = _us_fut.result()
+    finally:
+        pool.shutdown(wait=False)
 
     reporter.info("正在计算资产穿透 TOP10...")
     pen_result = compute_penetration_top10(holdings, details)
@@ -340,7 +343,402 @@ def generate_report(
 
         return result
 
-    # S4 骨架：both/full 路径后续迭代逐步填充
+    if report_type == "both":
+        return _generate_report_both(
+            holdings, config, reporter,
+            history_mode=history_mode,
+            output_dir=output_dir,
+        )
+
+    if report_type == "full":
+        return _generate_report_full(
+            holdings, config, reporter,
+            history_mode=history_mode,
+            force_llm=force_llm,
+            output_dir=output_dir,
+        )
+
     result.report_generated = True
-    reporter.info("generate_report: 骨架模式—报告生成的模块暂未实现（S4 起逐步填充）")
+    reporter.info("generate_report: 骨架模式—未知 report_type")
+    return result
+
+
+# ── S5 引入：_compute_details（轻量级行情获取，无指数/穿透/分类）──
+
+
+def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -> list:
+    """轻量级行情获取，供 both 路径使用。
+
+    仅获取行情明细，不获取指数/穿透/分类数据（与 _cmd_generate_both 语义对齐）。
+    """
+    from src.python.report.market_value import _generate_details
+
+    reporter.info("正在获取行情数据...")
+    details = _generate_details(holdings)
+    reporter.ok(f"行情数据获取完成，共 {len(details)} 条")
+    return details
+
+
+# ── S5 引入：_generate_report_both（生成 HTML+Excel，不含 LLM）──
+
+
+def _generate_report_both(
+    holdings: list,
+    config: dict,
+    reporter: ProgressReporter,
+    history_mode: str = "off",
+    output_dir: str | None = None,
+) -> ReportResult:
+    """both 报告路径：生成 HTML + Excel，不含 LLM 分析章节。
+
+    流程：_compute_details() → capture_snapshot() → fetch_history_data()
+          → write_html_report() → generate_excel_report()
+    """
+    from src.python.config import is_enable_b_series, is_enable_news, is_enable_history
+    from src.python.registry import get_report_section_order
+    from src.python.report.html_writer import write_html_report
+    from src.python.report.excel_generator import generate_excel_report
+
+    result = ReportResult()
+    result.holdings_ok = True
+
+    _enable_b_series = is_enable_b_series(config)
+    _enable_news = is_enable_news(config)
+    _enable_history = is_enable_history(config)
+    sec_order = get_report_section_order(config)
+    output = output_dir or config.get("output_dir", "reports")
+    news_top_count = int(config.get("news_top_count", 100))
+
+    # ── 1. 行情获取（轻量级，无指数/穿透/分类） ──
+    details = _compute_details(holdings, config, reporter)
+
+    # ── 2. F1 快照对比（始终执行） ──
+    f_context = capture_snapshot(holdings, details, config, reporter)
+
+    # ── 3. F2 历史走势（条件获取） ──
+    if _enable_history:
+        _resolved_mode = "auto" if history_mode in ("auto",) else "off"
+        history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
+    else:
+        history_data = None
+        reporter.info("[板块配置] 历史走势已关闭，跳过")
+
+    # ── 4. HTML 报告 ──
+    _news_label = "含新闻" if _enable_news else "无新闻"
+    reporter.info(f"正在生成 HTML 报告（{_news_label}）...")
+    try:
+        path = write_html_report(
+            holdings, output_dir=output,
+            news_top_count=news_top_count, include_news=_enable_news,
+            details=details, section_order=sec_order,
+            history_data=history_data, progress=reporter,
+            enable_b_series=_enable_b_series,
+            enable_news=_enable_news,
+            enable_history=_enable_history,
+            enable_llm=False,
+        )
+        reporter.ok(f"HTML 报告已生成: {path}")
+        result.html_ok = True
+    except Exception:
+        reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
+        logger.exception("HTML 报告写入失败")
+        result.errors.append("HTML 报告生成失败")
+
+    # ── 5. Excel 报告 ──
+    reporter.info("正在生成 Excel 报告...")
+    try:
+        generate_excel_report(
+            holdings, include_news=_enable_news, output_dir=output,
+            news_top_count=news_top_count, details=details,
+            section_order=sec_order,
+            f_context=f_context, history_data=history_data, progress=reporter,
+            enable_b_series=_enable_b_series,
+            enable_news=_enable_news,
+            enable_history=_enable_history,
+            enable_llm=False,
+        )
+        reporter.ok("Excel 报告已生成")
+        result.excel_ok = True
+    except Exception:
+        reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
+        logger.exception("Excel 报告生成失败")
+        result.errors.append("Excel 报告生成失败")
+
+    result.report_generated = result.html_ok or result.excel_ok
+    return result
+
+
+# ── S6 引入：_report_llm_module_results（统一的 LLM 模块结果计数/报告）──
+
+
+def _report_llm_module_results(
+    results: tuple,
+    cached_flags: tuple[bool, bool, bool, bool],
+    reporter: ProgressReporter,
+) -> None:
+    """统一的 LLM 模块结果报告逻辑（消除 _process_llm_news_futures 和 LLM-only 分支的重复）。"""
+    from src.python.llm import FAIL_REASON_DISABLED
+    from src.python.llm.prompts import LLM_MODULE_FAILURE
+    from src.python.registry import get_llm_module_name
+
+    _MODULE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep")
+    ok_count = 0
+    disabled: list[str] = []
+    failed: list[str] = []
+
+    for mk, r in zip(_MODULE_KEYS, results):
+        if r is not None:
+            ok_count += 1
+        elif LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
+            disabled.append(get_llm_module_name(mk))
+        else:
+            failed.append(get_llm_module_name(mk))
+
+    for name in disabled:
+        reporter.info(f"{name}：已跳过（菜单 S 可切换）")
+    for name in failed:
+        reporter.add_error(f"{name}：内容生成失败（已降级使用占位文本）")
+        reporter.warn(f"{name}：内容生成失败（已降级使用占位文本）")
+
+    if ok_count > 0 and not failed:
+        tag = "缓存" if all(cached_flags) else "LLM"
+        reporter.ok(f"{tag} 内容生成完成")
+    elif ok_count == 0 and not failed and not disabled:
+        reporter.warn("LLM 均未生成（请检查 LLM 配置）")
+    elif ok_count == 0 and not failed:
+        reporter.info("所有 LLM 内容已跳过，未调用 LLM")
+
+
+# ── S6 引入：_fetch_llm_and_news（统一 4 分支）──
+
+
+def _fetch_llm_and_news(
+    holdings: list,
+    prep_data: dict,
+    sector_flow: list | None,
+    force_llm: bool,
+    f_context: dict | None,
+    enable_news: bool,
+    enable_llm: bool,
+    reporter: ProgressReporter,
+) -> tuple[tuple, list, dict, bool]:
+    """并行获取 LLM 内容 + 新闻数据，统一处理 4 分支。
+
+    内部管理线程池（max_workers=2，S11 已完成全量去池，operations 池唯一存在）。
+    LLM 和新闻的 ok/disabled/failed 计数统一归入此函数。
+
+    Returns:
+        (llm_content, news_data, news_llm_meta, news_ok)
+        llm_content: (global_macro_html, expert_review_html, health_check_html, penetration_deep_html)
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from src.python.llm import generate_all_llm
+    from src.python.report.news_correlation import build_news_data
+
+    llm_content: tuple = (None, None, None, None)
+    news_data: list = []
+    news_llm_meta: dict = {}
+    news_ok: bool = False
+
+    # 分支 ④：均关闭
+    if not enable_llm and not enable_news:
+        reporter.info("[板块配置] 新闻和 LLM 均未开启，跳过内容生成")
+        return llm_content, news_data, news_llm_meta, news_ok
+
+    pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="orch_llm_news")
+    try:
+        _news_fut = None
+        _llm_fut = None
+
+        if enable_news:
+            _news_fut = pool.submit(
+                build_news_data, holdings,
+                prep_data["news_top_count"], prep_data["penetrated_assets"],
+            )
+        else:
+            reporter.info("[板块配置] 新闻板块已关闭，跳过新闻获取")
+
+        if enable_llm:
+            _llm_fut = pool.submit(
+                generate_all_llm,
+                prep_data["a_indices"], prep_data["us_indices"],
+                prep_data["total_mv"], prep_data["total_cost"],
+                prep_data["total_profit"], prep_data["total_today_profit"],
+                len(holdings), prep_data["categories"],
+                penetrated_assets=prep_data["penetrated_assets"],
+                holdings_details=prep_data["holdings_details"],
+                sector_flow=sector_flow,
+                force=force_llm,
+                f_context=f_context,
+            )
+        else:
+            reporter.info("[板块配置] LLM 板块已关闭，跳过 LLM 内容生成")
+
+        if _llm_fut is not None and _news_fut is not None:
+            # 分支 ①：LLM + 新闻均开启（并行等待）
+            for fut in as_completed([_news_fut, _llm_fut]):
+                if fut is _llm_fut:
+                    try:
+                        _result_8 = _llm_fut.result()
+                        llm_content = _result_8[:4]
+                        _cached = _result_8[4:]
+                        _report_llm_module_results(llm_content, _cached, reporter)
+                    except Exception:
+                        reporter.add_error("LLM 内容生成异常（详情请查看日志文件 logs/app.log）")
+                        reporter.error("LLM 内容生成异常（详情请查看日志）")
+                else:
+                    try:
+                        news_data, news_llm_meta = _news_fut.result()
+                        reporter.ok(f"新闻获取完成，共 {len(news_data)} 条")
+                        news_ok = bool(news_data)
+                    except Exception:
+                        reporter.add_error("新闻获取异常（详情请查看日志文件 logs/app.log）")
+                        reporter.warn("新闻获取异常（详情请查看日志）")
+        elif _news_fut is not None:
+            # 分支 ②：仅新闻
+            try:
+                news_data, news_llm_meta = _news_fut.result()
+                news_ok = bool(news_data)
+                reporter.ok(f"新闻获取完成，共 {len(news_data)} 条")
+            except Exception:
+                reporter.add_error("新闻获取异常（详情请查看日志）")
+        elif _llm_fut is not None:
+            # 分支 ③：仅 LLM
+            try:
+                _result_8 = _llm_fut.result()
+                llm_content = _result_8[:4]
+                _cached = _result_8[4:]
+                _report_llm_module_results(llm_content, _cached, reporter)
+            except Exception:
+                reporter.add_error("LLM 内容生成异常（详情请查看日志）")
+                reporter.error("LLM 内容生成异常（详情请查看日志）")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    return llm_content, news_data, news_llm_meta, news_ok
+
+
+# ── S6 引入：_generate_report_full（HTML+Excel+LLM）──
+
+
+def _generate_report_full(
+    holdings: list,
+    config: dict,
+    reporter: ProgressReporter,
+    history_mode: str = "off",
+    force_llm: bool = False,
+    output_dir: str | None = None,
+) -> ReportResult:
+    """full 报告路径：生成 HTML + Excel + LLM 分析章节。
+
+    流程：prepare_report_data() → capture_snapshot() → fetch_history_data()
+          → get_sector_fund_flow() → _fetch_llm_and_news()
+          → compute_early_warnings() → write_html_report() → generate_excel_report()
+    """
+    from src.python.config import is_enable_b_series, is_enable_news, is_enable_history, is_enable_llm
+    from src.python.registry import get_report_section_order
+    from src.python.report.html_writer import write_html_report
+    from src.python.report.excel_generator import generate_excel_report
+    from src.python.providers.akshare_extras import get_sector_fund_flow
+
+    result = ReportResult()
+    result.holdings_ok = True
+
+    _enable_b_series = is_enable_b_series(config)
+    _enable_news = is_enable_news(config)
+    _enable_history = is_enable_history(config)
+    _enable_llm = is_enable_llm(config)
+    sec_order = get_report_section_order(config)
+
+    # ── 1. 完整数据准备（含指数/穿透/分类） ──
+    prep = prepare_report_data(holdings, reporter, config)
+
+    # ── 2. F1 快照对比 ──
+    f_context = capture_snapshot(holdings, prep["details"], config, reporter)
+
+    # ── 3. F2 历史走势（条件获取） ──
+    if _enable_history:
+        _resolved_mode = "auto" if history_mode in ("auto",) else "off"
+        history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
+    else:
+        history_data = None
+        reporter.info("[板块配置] 历史走势已关闭，跳过")
+
+    # ── 4. 行业资金流向 ──
+    reporter.info("正在获取行业资金流向...")
+    try:
+        sector_flow = get_sector_fund_flow()
+        if sector_flow:
+            reporter.ok("行业资金流向获取完成")
+    except Exception:
+        sector_flow = None
+        reporter.warn("行业资金流向获取失败，将继续生成报告")
+
+    # ── 5. 并行获取 LLM + 新闻（4 分支统一处理） ──
+    llm_content, news_data, news_llm_meta, news_ok = _fetch_llm_and_news(
+        holdings, prep, sector_flow, force_llm, f_context,
+        _enable_news, _enable_llm, reporter,
+    )
+
+    # ── 6. 智能预警 ──
+    early_warnings = compute_early_warnings(
+        holdings, prep["penetrated_assets"], sector_flow,
+        news_data, news_llm_meta, reporter,
+    )
+
+    # ── 7. HTML 报告 ──
+    _report_label = "含新闻 + LLM" if news_ok else "仅 LLM"
+    reporter.info(f"正在生成 HTML 报告（{_report_label}分析章节）...")
+    try:
+        path = write_html_report(
+            holdings, output_dir=output_dir or prep["output_dir"],
+            news_top_count=prep["news_top_count"],
+            include_news=news_ok,
+            llm_content=llm_content, details=prep["details"],
+            news_data=news_data, news_llm_meta=news_llm_meta,
+            early_warnings=early_warnings, section_order=sec_order,
+            history_data=history_data, progress=reporter,
+            a_indices=prep["a_indices"], us_indices=prep["us_indices"],
+            enable_b_series=_enable_b_series,
+            enable_news=_enable_news,
+            enable_history=_enable_history,
+            enable_llm=_enable_llm,
+        )
+        reporter.ok(f"HTML 报告已生成: {path}")
+        result.html_ok = True
+    except Exception:
+        reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
+        logger.exception("HTML 报告写入失败")
+        result.errors.append("HTML 报告生成失败")
+
+    # ── 8. Excel 报告 ──
+    reporter.info("正在生成 Excel 报告...")
+    try:
+        generate_excel_report(
+            holdings, include_news=news_ok,
+            output_dir=output_dir or prep["output_dir"],
+            news_top_count=prep["news_top_count"], include_llm=_enable_llm,
+            llm_content=llm_content,
+            details=prep["details"], a_indices=prep["a_indices"],
+            us_indices=prep["us_indices"],
+            news_data=news_data,
+            news_llm_meta=news_llm_meta,
+            section_order=sec_order,
+            early_warnings=early_warnings, progress=reporter,
+            f_context=f_context, history_data=history_data,
+            enable_b_series=_enable_b_series,
+            enable_news=_enable_news,
+            enable_history=_enable_history,
+            enable_llm=_enable_llm,
+        )
+        reporter.ok("Excel 报告已生成")
+        result.excel_ok = True
+    except Exception:
+        reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
+        logger.exception("Excel 报告生成失败")
+        result.errors.append("Excel 报告生成失败")
+
+    result.news_ok = news_ok
+    result.report_generated = result.html_ok or result.excel_ok
     return result

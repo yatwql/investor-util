@@ -17,6 +17,8 @@ from src.python.report.orchestrator import (
     capture_snapshot,
     compute_early_warnings,
     fetch_history_data,
+    _report_llm_module_results,
+    _fetch_llm_and_news,
 )
 
 
@@ -105,24 +107,13 @@ class TestPrepareReportData:
         mock_category = MagicMock()
 
         with (
-            patch("src.python.tui_menu.get_config_cache", return_value={}),
-            patch("src.python.tui_handlers.check_network_available"),
-            patch("src.python.handlers_report._get_pool") as mock_pool,
             patch("src.python.report.market_value._generate_details", return_value=[mock_detail]),
             patch("src.python.report.market_value.classify_holdings", return_value=[mock_category]),
             patch("src.python.fetcher.index.fetch_indices", return_value={"sh000001": 3000}),
             patch("src.python.fetcher.index.fetch_us_indices", return_value={"gb_inx": 5000}),
             patch("src.python.report.penetration.compute_penetration_top10", return_value={"top10": []}),
         ):
-            mock_ex = MagicMock()
-            mock_fut_a = MagicMock()
-            mock_fut_us = MagicMock()
-            mock_fut_a.result.return_value = {"sh000001": 3000}
-            mock_fut_us.result.return_value = {"gb_inx": 5000}
-            mock_ex.submit.side_effect = [mock_fut_a, mock_fut_us]
-            mock_pool.return_value = mock_ex
-
-            result = prepare_report_data(mock_holdings, mock_reporter)
+            result = prepare_report_data(mock_holdings, mock_reporter, config={})
 
         expected_keys = {
             "details", "total_mv", "total_cost", "total_profit",
@@ -142,24 +133,13 @@ class TestPrepareReportData:
         mock_reporter = MagicMock()
 
         with (
-            patch("src.python.tui_menu.get_config_cache", return_value={}),
-            patch("src.python.tui_handlers.check_network_available"),
-            patch("src.python.handlers_report._get_pool") as mock_pool,
             patch("src.python.report.market_value._generate_details", return_value=[]),
             patch("src.python.report.market_value.classify_holdings", return_value=[]),
             patch("src.python.fetcher.index.fetch_indices", return_value={}),
             patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
             patch("src.python.report.penetration.compute_penetration_top10", return_value={"top10": []}),
         ):
-            mock_ex = MagicMock()
-            mock_fut_a = MagicMock()
-            mock_fut_us = MagicMock()
-            mock_fut_a.result.return_value = {}
-            mock_fut_us.result.return_value = {}
-            mock_ex.submit.side_effect = [mock_fut_a, mock_fut_us]
-            mock_pool.return_value = mock_ex
-
-            result = prepare_report_data([], mock_reporter)
+            result = prepare_report_data([], mock_reporter, config={})
 
         assert result["total_mv"] == 0
         assert result["total_cost"] == 0
@@ -260,6 +240,527 @@ class TestGenerateReport:
         # output_dir 使用传参而非 config 值
         _call_kwargs = mock_gen.call_args.kwargs
         assert _call_kwargs["output_dir"] == "/custom/path"
+
+
+    def test_generate_report_both_calls_compute_details(self):
+        """both 路径调用 _compute_details 而非 prepare_report_data，不调用 LLM/线程池。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="SH600001", name="测试", shares=100, cost_price=10.0)]
+        config = {
+            "output_dir": "reports",
+            "news_top_count": 100,
+            "history": {"analysis": "auto"},
+        }
+
+        mock_detail = MagicMock()
+        mock_detail.code = "SH600001"
+        mock_detail.market_value = 1200.0
+        mock_detail.cost = 1000.0
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[mock_detail]),
+            patch("src.python.report.orchestrator.capture_snapshot") as mock_cap,
+            patch("src.python.report.orchestrator.fetch_history_data") as mock_hist,
+            patch("src.python.report.html_writer.write_html_report") as mock_html,
+            patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
+            patch("src.python.registry.get_report_section_order", return_value=[]),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=True),
+        ):
+            mock_cap.return_value = {"diff": {}}
+            mock_hist.return_value = {"dates": [], "status": "available"}
+
+            result = generate_report(
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="both",
+                history_mode="auto",
+            )
+
+        assert isinstance(result, ReportResult)
+        assert result.report_generated is True
+        assert result.html_ok is True
+        assert result.excel_ok is True
+        # 验证 _compute_details （即 _generate_details）被调用
+        # 验证 capture_snapshot 和 fetch_history_data 被调用
+        mock_cap.assert_called_once()
+        mock_hist.assert_called_once()
+        # 验证 write_html_report 和 generate_excel_report 被调用
+        assert mock_html.call_count >= 1
+        assert mock_xls.call_count >= 1
+        # 验证传入 enable_llm=False（both 路径不含 LLM）
+        _html_kwargs = mock_html.call_args.kwargs
+        assert _html_kwargs.get("enable_llm") is False
+        _xls_kwargs = mock_xls.call_args.kwargs
+        assert _xls_kwargs.get("enable_llm") is False
+
+    def test_generate_report_both_history_off(self):
+        """both 路径 history_mode=off 时不调用 fetch_history_data。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+        config = {"output_dir": "reports"}
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
+            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.fetch_history_data") as mock_hist,
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.registry.get_report_section_order"),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=False),
+            patch("src.python.config.is_enable_history", return_value=False),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="both",
+                history_mode="off",
+            )
+
+        assert result.report_generated is True
+        # history 关闭时 fetch_history_data 不应被调用
+        mock_hist.assert_not_called()
+
+    def test_generate_report_both_no_prepare_report_data(self):
+        """both 路径不应调用 prepare_report_data（无指数/穿透/分类）。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+        config = {"output_dir": "reports"}
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
+            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.registry.get_report_section_order"),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=True),
+            # 使用 wrapt 确保 prepare_report_data 不被调用
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="both",
+            )
+
+        assert result.report_generated is True
+
+    def test_generate_report_both_excel_fallback(self):
+        """both 路径 HTML 失败时仍继续生成 Excel。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+        config = {"output_dir": "reports"}
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
+            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch(
+                "src.python.report.html_writer.write_html_report",
+                side_effect=RuntimeError("HTML 失败"),
+            ),
+            patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
+            patch("src.python.registry.get_report_section_order"),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=False),
+            patch("src.python.config.is_enable_history", return_value=False),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="both",
+            )
+
+        assert result.html_ok is False
+        assert result.excel_ok is True
+        assert result.report_generated is True  # Excel 成功，不算失败
+        mock_xls.assert_called_once()
+
+    def test_generate_report_full_calls_prepare_report_data(self):
+        """full 路径调用 prepare_report_data（含指数/穿透/分类）。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="SH600001", name="测试", shares=100, cost_price=10.0)]
+        config = {
+            "output_dir": "reports",
+            "news_top_count": 100,
+            "history": {"analysis": "auto"},
+        }
+
+        with (
+            patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
+            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report.orchestrator._fetch_llm_and_news") as mock_llm_news,
+            patch("src.python.report.orchestrator.compute_early_warnings"),
+            patch("src.python.report.html_writer.write_html_report") as mock_html,
+            patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
+            patch("src.python.registry.get_report_section_order", return_value=[]),
+            patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=[]),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_llm", return_value=True),
+        ):
+            mock_prep.return_value = {
+                "details": [], "total_mv": 0, "total_cost": 0,
+                "total_profit": 0, "total_today_profit": 0,
+                "categories": [], "a_indices": {}, "us_indices": {},
+                "penetrated_assets": [], "holdings_details": [],
+                "today_str": "2026-07-16", "output_dir": "reports",
+                "news_top_count": 100,
+            }
+            mock_llm_news.return_value = (
+                (None, None, None, None), [], {}, False,
+            )
+
+            result = generate_report(
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="full",
+                history_mode="auto",
+                force_llm=False,
+            )
+
+        assert isinstance(result, ReportResult)
+        assert result.report_generated is True
+        # prepare_report_data 被调用且传入了 config
+        mock_prep.assert_called_once_with(mock_holdings, mock_reporter, config)
+        # HTML 和 Excel 报告生成
+        assert mock_html.call_count >= 1
+        assert mock_xls.call_count >= 1
+        # 传入 enable_llm=True（full 路径含 LLM）
+        _html_kwargs = mock_html.call_args.kwargs
+        assert _html_kwargs.get("enable_llm") is True
+
+    def test_generate_report_full_news_only(self):
+        """full 路径仅新闻（LLM 关闭）时正常工作。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+        config = {"output_dir": "reports"}
+
+        with (
+            patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
+            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.registry.get_report_section_order"),
+            patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_llm", return_value=False),
+            patch("src.python.report.news_correlation.build_news_data", return_value=([{"title": "新闻1"}], {})),
+        ):
+            mock_prep.return_value = {
+                "details": [], "total_mv": 0, "total_cost": 0,
+                "total_profit": 0, "total_today_profit": 0,
+                "categories": [], "a_indices": {}, "us_indices": {},
+                "penetrated_assets": [], "holdings_details": [],
+                "today_str": "2026-07-16", "output_dir": "reports",
+                "news_top_count": 100,
+            }
+
+            result = generate_report(
+                holdings=mock_holdings, config=config,
+                reporter=mock_reporter, report_type="full",
+            )
+
+        assert result.report_generated is True
+        assert result.news_ok is True
+
+    def test_generate_report_full_llm_only(self):
+        """full 路径仅 LLM（新闻关闭）时正常工作。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+        config = {"output_dir": "reports"}
+
+        with (
+            patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
+            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report.orchestrator.compute_early_warnings"),
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.registry.get_report_section_order"),
+            patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=False),
+            patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_llm", return_value=True),
+            patch("src.python.llm.generate_all_llm", return_value=(
+                "<p>宏观</p>", None, None, None, False, False, False, False,
+            )),
+        ):
+            mock_prep.return_value = {
+                "details": [], "total_mv": 0, "total_cost": 0,
+                "total_profit": 0, "total_today_profit": 0,
+                "categories": [], "a_indices": {}, "us_indices": {},
+                "penetrated_assets": [], "holdings_details": [],
+                "today_str": "2026-07-16", "output_dir": "reports",
+                "news_top_count": 100,
+            }
+
+            result = generate_report(
+                holdings=mock_holdings, config=config,
+                reporter=mock_reporter, report_type="full",
+            )
+
+        assert result.report_generated is True
+
+    def test_generate_report_full_both_disabled(self):
+        """full 路径 LLM 和新闻均关闭时跳过内容生成，报告仍正常生成。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+        config = {"output_dir": "reports"}
+
+        with (
+            patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
+            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report.orchestrator.compute_early_warnings"),
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.registry.get_report_section_order"),
+            patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=False),
+            patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_llm", return_value=False),
+        ):
+            mock_prep.return_value = {
+                "details": [], "total_mv": 0, "total_cost": 0,
+                "total_profit": 0, "total_today_profit": 0,
+                "categories": [], "a_indices": {}, "us_indices": {},
+                "penetrated_assets": [], "holdings_details": [],
+                "today_str": "2026-07-16", "output_dir": "reports",
+                "news_top_count": 100,
+            }
+
+            result = generate_report(
+                holdings=mock_holdings, config=config,
+                reporter=mock_reporter, report_type="full",
+            )
+
+        assert result.report_generated is True
+
+    def test_generate_report_full_excel_fallback(self):
+        """full 路径 HTML 失败时仍继续生成 Excel 报告。"""
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+        config = {"output_dir": "reports"}
+
+        with (
+            patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
+            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report.orchestrator.compute_early_warnings"),
+            patch(
+                "src.python.report.html_writer.write_html_report",
+                side_effect=RuntimeError("HTML 失败"),
+            ),
+            patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
+            patch("src.python.registry.get_report_section_order"),
+            patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
+            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=False),
+            patch("src.python.config.is_enable_history", return_value=False),
+            patch("src.python.config.is_enable_llm", return_value=False),
+        ):
+            mock_prep.return_value = {
+                "details": [], "total_mv": 0, "total_cost": 0,
+                "total_profit": 0, "total_today_profit": 0,
+                "categories": [], "a_indices": {}, "us_indices": {},
+                "penetrated_assets": [], "holdings_details": [],
+                "today_str": "2026-07-16", "output_dir": "reports",
+                "news_top_count": 100,
+            }
+
+            result = generate_report(
+                holdings=mock_holdings, config=config,
+                reporter=mock_reporter, report_type="full",
+            )
+
+        assert result.html_ok is False
+        assert result.excel_ok is True
+        assert result.report_generated is True
+        mock_xls.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.unit_report
+class TestReportLlmModuleResults:
+    """_report_llm_module_results 统一 LLM 结果报告测试。"""
+
+    def test_all_ok(self):
+        """所有 4 个模块均成功。"""
+        reporter = MagicMock()
+        _report_llm_module_results(
+            ("<p>A</p>", "<p>B</p>", "<p>C</p>", "<p>D</p>"),
+            (False, False, False, False),
+            reporter,
+        )
+        # "LLM 内容生成完成" 被调用
+        ok_calls = [c for c in reporter.ok.call_args_list if "内容生成完成" in str(c)]
+        assert len(ok_calls) == 1
+
+    def test_with_cached(self):
+        """全部缓存命中时 tag="缓存"。"""
+        reporter = MagicMock()
+        _report_llm_module_results(
+            ("<p>A</p>", "<p>B</p>", "<p>C</p>", "<p>D</p>"),
+            (True, True, True, True),
+            reporter,
+        )
+        ok_calls = [c for c in reporter.ok.call_args_list if "缓存" in str(c)]
+        assert len(ok_calls) == 1
+
+    def test_all_none(self):
+        """全部为 None 时不抛异常。"""
+        reporter = MagicMock()
+        _report_llm_module_results(
+            (None, None, None, None),
+            (False, False, False, False),
+            reporter,
+        )
+        reporter.warn.assert_called()
+
+
+@pytest.mark.unit
+@pytest.mark.unit_report
+class TestFetchLlmAndNews:
+    """_fetch_llm_and_news 4 分支测试。"""
+
+    def _make_prep_data(self, **overrides) -> dict:
+        data = {
+            "news_top_count": 100,
+            "penetrated_assets": [],
+            "a_indices": {}, "us_indices": {},
+            "total_mv": 0, "total_cost": 0, "total_profit": 0,
+            "total_today_profit": 0,
+            "categories": [], "holdings_details": [],
+        }
+        data.update(overrides)
+        return data
+
+    def test_both_enabled(self):
+        """分支①：LLM+新闻均开启。"""
+        reporter = MagicMock()
+        holdings = [MagicMock(code="SH600001", shares=100)]
+        prep = self._make_prep_data()
+
+        with (
+            patch("src.python.llm.generate_all_llm", return_value=(
+                "<p>宏观</p>", None, None, None, False, False, False, False,
+            )),
+            patch("src.python.report.news_correlation.build_news_data", return_value=(
+                [{"title": "新闻1"}], {},
+            )),
+        ):
+            result = _fetch_llm_and_news(
+                holdings, prep, sector_flow=[], force_llm=False,
+                f_context=None, enable_news=True, enable_llm=True,
+                reporter=reporter,
+            )
+
+        llm_content, news_data, news_llm_meta, news_ok = result
+        assert llm_content[0] == "<p>宏观</p>"
+        assert len(news_data) == 1
+        assert news_ok is True
+
+    def test_llm_only(self):
+        """分支③：仅 LLM。"""
+        reporter = MagicMock()
+        holdings = [MagicMock(code="SH600001", shares=100)]
+        prep = self._make_prep_data()
+
+        with (
+            patch("src.python.llm.generate_all_llm", return_value=(
+                "<p>宏观</p>", None, None, None, False, False, False, False,
+            )),
+            patch("src.python.report.news_correlation.build_news_data"),
+        ):
+            result = _fetch_llm_and_news(
+                holdings, prep, sector_flow=[], force_llm=False,
+                f_context=None, enable_news=False, enable_llm=True,
+                reporter=reporter,
+            )
+
+        llm_content, news_data, news_llm_meta, news_ok = result
+        assert llm_content[0] == "<p>宏观</p>"
+        assert news_data == []
+        assert news_ok is False
+
+    def test_news_only(self):
+        """分支②：仅新闻。"""
+        reporter = MagicMock()
+        holdings = [MagicMock(code="SH600001", shares=100)]
+        prep = self._make_prep_data()
+
+        with (
+            patch("src.python.llm.generate_all_llm"),
+            patch("src.python.report.news_correlation.build_news_data", return_value=(
+                [{"title": "新闻1"}], {},
+            )),
+        ):
+            result = _fetch_llm_and_news(
+                holdings, prep, sector_flow=[], force_llm=False,
+                f_context=None, enable_news=True, enable_llm=False,
+                reporter=reporter,
+            )
+
+        llm_content, news_data, news_llm_meta, news_ok = result
+        assert llm_content == (None, None, None, None)
+        assert len(news_data) == 1
+        assert news_ok is True
+
+    def test_both_disabled(self):
+        """分支④：均关闭。"""
+        reporter = MagicMock()
+
+        result = _fetch_llm_and_news(
+            [], {}, sector_flow=None, force_llm=False,
+            f_context=None, enable_news=False, enable_llm=False,
+            reporter=reporter,
+        )
+
+        llm_content, news_data, news_llm_meta, news_ok = result
+        assert llm_content == (None, None, None, None)
+        assert news_data == []
+        assert news_ok is False
+        reporter.info.assert_called_once()
+
+    def test_llm_failure_fallback(self):
+        """LLM 失败时新闻仍正常返回。"""
+        reporter = MagicMock()
+        holdings = [MagicMock(code="SH600001", shares=100)]
+        prep = self._make_prep_data()
+
+        with (
+            patch("src.python.llm.generate_all_llm", side_effect=RuntimeError("LLM 异常")),
+            patch("src.python.report.news_correlation.build_news_data", return_value=(
+                [{"title": "新闻1"}], {},
+            )),
+        ):
+            result = _fetch_llm_and_news(
+                holdings, prep, sector_flow=[], force_llm=False,
+                f_context=None, enable_news=True, enable_llm=True,
+                reporter=reporter,
+            )
+
+        llm_content, news_data, news_llm_meta, news_ok = result
+        assert llm_content == (None, None, None, None)
+        assert len(news_data) == 1  # 新闻仍返回
+        assert news_ok is True
 
 
 @pytest.mark.unit
