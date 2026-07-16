@@ -313,7 +313,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     var range = globalMax - globalMin;
     if (range < 1e-10) { range = Math.max(Math.abs(globalMax) * 0.1, 1); globalMin = globalMax - range; globalMax += range; }
     var pad = range * 0.08;
-    var yMin = Math.max(0, globalMin - pad);
+    var yMin = globalMin - pad;
     var yMax = globalMax + pad;
     var yRange = yMax - yMin;
     if (yRange < 1e-10) yRange = 1;
@@ -1672,15 +1672,19 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% if history_data.successful_holdings or history_data.failed_holdings %}
             <div class="data-status-title">持仓历史数据纳入状态</div>
             {% if history_data.successful_holdings %}
-            <div style="margin-top:6px;font-size:13px;color:#2e7d32;">
-                <strong>✓</strong> 已纳入回撤计算（{{ history_data.successful_holdings | length }}）：
-                {% for h in history_data.successful_holdings %}{{ h }}{% if not loop.last %}、{% endif %}{% endfor %}
+            <div style="margin-top:6px;font-size:13px;">
+                <div style="font-weight:600;color:#2e7d32;margin-bottom:4px;">✓ 已纳入回撤计算（{{ history_data.successful_holdings | length }}）：</div>
+                {% for h in history_data.successful_holdings %}
+                <div class="data-status-ok">✓ {{ h }}</div>
+                {% endfor %}
             </div>
             {% endif %}
             {% if history_data.failed_holdings %}
-            <div style="margin-top:6px;font-size:13px;color:#888;">
-                <strong>✗</strong> 无历史走势数据（{{ history_data.failed_holdings | length }}）：
-                {% for h in history_data.failed_holdings %}{{ h }}{% if not loop.last %}、{% endif %}{% endfor %}
+            <div style="margin-top:6px;font-size:13px;">
+                <div style="font-weight:600;color:#888;margin-bottom:4px;">✗ 无历史走势数据（{{ history_data.failed_holdings | length }}）：</div>
+                {% for h in history_data.failed_holdings %}
+                <div class="data-status-warn" style="border-left-color:#95a5a6;">✗ {{ h }}</div>
+                {% endfor %}
             </div>
             {% endif %}
             {% endif %}
