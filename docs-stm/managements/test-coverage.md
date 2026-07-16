@@ -42,6 +42,7 @@
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 438 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 76 |
 | **TUI 交互** | `tui*.py`, `handlers.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 164 |
+| **CLI 命令行模式** | `cli.py`, `report/cli_progress.py` | `test_cli.py` + `test_cli_edge.py` + `test_cli_integration.py` | 48 |
 | **命令处理器** | `handlers_cache.py`, `handlers_report.py` | `unit/handlers/test_{handlers_cache,handlers_report}.py` | 31 |
 | **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic 含 6 文件, resilience, llm, datetime 共 10 文件) | 238 |
 

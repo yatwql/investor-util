@@ -1,6 +1,6 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 文档版本：v0.6.1
+> 文档版本：v0.6.2
 
 ## 概述
 
@@ -181,7 +181,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 单元测试系列（`unit` / `standard`）
 
-- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（8 个子组：providers、fetcher、llm、news、report、config、core、ui），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
+- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（9 个子组：providers、fetcher、llm、news、report、config、core、ui、cli），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
 - **`--mode standard`** 在 `unit` 基础上排除 edge（异常边界）和 data（数据正确性）两个跨类标记，仅保留"常规路径"的单元测试。适用于日常开发中快速验证模块本身逻辑正确，不需要关心边界情况。
 
 #### 🔷 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
@@ -198,7 +198,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
 - **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
-- **`--mode dev-verify`** 开发期快速验证模式，组合全部 8 个 unit 子模块（排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 2min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。覆盖项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode dev-verify`** 开发期快速验证模式，组合全部 9 个 unit 子模块（排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 2min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。覆盖项数见 [test-coverage.md](../managements/test-coverage.md)。
 - **`--mode verify`** 合入门禁模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部 scenario 场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。分两阶段执行：Phase A 单元测试并行 + Phase B 场景串行，共约 8min（scenario 276 项串行为主瓶颈）。确保数据管道整条链路正常。
 
 #### 🔷 专项验证系列（`edge` / `data` / `smoke`）
@@ -305,6 +305,7 @@ test-reports/latest/
 | `unit_config` | 配置管理 |
 | `unit_core` | 核心基础设施（缓存/模型/注册表等） |
 | `unit_ui` | TUI 交互 |
+| `unit_cli` | CLI 命令行模式 |
 | `unit_providers or unit_fetcher` | 数据管道（Provider + 调度） |
 
 ### 横切标记

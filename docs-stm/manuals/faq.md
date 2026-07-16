@@ -578,7 +578,20 @@ A: 可以。完成一次菜单 L 后，可再次执行菜单 E/B 生成指定格
 
 **Q: 能否设置定时自动生成报告？**
 
-A: 程序本身是交互式 TUI，无内置定时任务。但可通过外部计划任务（Windows 任务计划程序 / Linux cron）在虚拟环境下驱动菜单 L 的操作流程：`cd /path/to/project && .venv/bin/python src/python/main.py`。
+A: 可以。项目内置 CLI 命令行模式（`python -m src.python.cli`），专为定时任务与脚本化使用场景设计：
+
+```bash
+# 生成基础 Excel 报告
+python -m src.python.cli report --type basic
+
+# 更新基础缓存 + 生成全量报告（含 LLM）
+python -m src.python.cli cache --update basic
+python -m src.python.cli report --type full --history auto
+```
+
+通过 Windows 任务计划程序 / Linux cron 调用上述命令即可实现无人值守自动生成。CLI 模式生成结果与 TUI 菜单操作一致，缓存可共享。
+
+详细配置步骤见[定时任务配置指南](how-to-schedule.md)。
 
 **Q: 持仓变更后旧报告还有保留吗？**
 

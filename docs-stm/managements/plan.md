@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
-> 文档版本：v0.6.1
+> 文档版本：v0.6.2
 
 ---
 
@@ -91,8 +91,8 @@
 
 ---
 
-### [P3] I. 命令行模式（CLI）— 支持定时任务驱动报告生成
+### [P3 ✓] I. 命令行模式（CLI）— 支持定时任务驱动报告生成
 
-详见迭代计划 [`cli-mode-iteration-plan.md`](../plan/cli-mode-iteration-plan.md) 和技术设计 [`cli-mode-technical-design.md`](../plan/cli-mode-technical-design.md)。
+**已完成（v0.6.1）** — 设计文档已归档至 `docs-stm/archive/v0.6.x/cli-mode/`。
 
 ---

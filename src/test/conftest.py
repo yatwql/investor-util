@@ -67,6 +67,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_report: 报告生成单元测试")
     config.addinivalue_line("markers", "unit_config: 配置管理单元测试")
     config.addinivalue_line("markers", "unit_core: 核心基础设施单元测试")
+    config.addinivalue_line("markers", "unit_cli: CLI 命令行模式单元测试")
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")
     config.addinivalue_line("markers", "llm: LLM 相关测试（全部 mock，无需 API key）")
     config.addinivalue_line("markers", "edge: 边缘/异常场景测试 — 必须放在 *_edge.py 文件中，不得与普通测试混搭")

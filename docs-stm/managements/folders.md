@@ -122,12 +122,14 @@ investor-util/
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
+│   │   │   ├── cli_progress.py         #   CLI 进度报告器（CliProgressReporter）
 │   │   │   └── styles.py             #   Excel 样式定义
 │   │   │
 │   │   ├── tmpl/                     # HTML 报告模板
 │   │   │   └── report_template.html  #   Jinja2 HTML 报告主模板
 │   │   │
 │   │   ├── main.py                   # 程序入口 + TUI 主循环
+│   │   ├── cli.py                    # 程序入口 + CLI 命令行模式（argparse + 共享层路由）
 │   │   ├── tui.py                    # TUI 交互主界面
 │   │   ├── tui_menu.py               # TUI 菜单系统
 │   │   ├── tui_handlers.py           # TUI 键盘/事件处理
@@ -149,7 +151,10 @@ investor-util/
 │       ├── unit/                     #   单元测试（8 子组：providers/fetcher/llm/news/report/config/core/ui）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       ├── scenario/                 #   场景测试（basic/resilience/extreme/llm/datetime）
-│       ├── conftest.py               #   pytest 全局配置 + 标记注册
+│       ├── test_cli.py               #   CLI 命令行模式单元测试（33 用例）
+│   │   ├── test_cli_edge.py          #   CLI 边缘场景测试（7 用例）
+│   │   ├── test_cli_integration.py   #   CLI 集成测试（8 用例）
+│   │   ├── conftest.py               #   pytest 全局配置 + 标记注册
 │       └── helpers.py                #   测试辅助工具
 │
 ├── data/                             # 运行时数据
@@ -177,6 +182,7 @@ investor-util/
 │   │   ├── how-to-config.md          #     配置说明
 │   │   ├── how-to-menu.md            #     菜单操作指南
 │   │   ├── how-to-start.md           #     快速上手
+│   │   ├── how-to-schedule.md       #     定时任务配置指南
 │   │   ├── how-to-test-my-code.md    #     测试编写指南
 │   │   ├── how-to-use-registry.md    #     注册表使用说明
 │   │   └── reports-instruction.md    #     报告使用说明
@@ -191,7 +197,7 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件
-│   │   ├── cli-mode-iteration-plan.md    # CLI 命令行模式迭代计划
+│   │   ├── cli-mode-iteration-plan.md    # CLI 命令行模式迭代计划（已归档 → archive/v0.6.x/cli-mode/）
 │   │   └── cli-mode-technical-design.md  # CLI 命令行模式技术设计
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档

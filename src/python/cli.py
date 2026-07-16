@@ -84,28 +84,145 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# ── 子命令处理器（C1 占位，后续轮次逐步实现）───────────
+# ── 子命令处理器 ───────────────────────────────────────
+
+
+def _cli_read_holdings(config: dict) -> list | None:
+    """CLI 模式读取持仓——跳过文件选择交互，通过 config 配置定位文件。
+
+    Args:
+        config: 配置字典（需含 holdings_dir 和 holdings_filename）
+
+    Returns:
+        持仓列表，文件不存在或格式异常时返回 None
+    """
+    import logging
+    logger = logging.getLogger("invest")
+
+    holdings_dir = config.get("holdings_dir", "data/holdings")
+    holdings_filename = config.get("holdings_filename", "个人投资持仓信息.xlsx")
+    filepath = os.path.join(holdings_dir, holdings_filename)
+
+    if not os.path.exists(filepath):
+        logger.error(
+            "持仓文件不存在（路径: %s）—— 请检查 config.json 中 "
+            "holdings_dir + holdings_filename 配置", filepath,
+        )
+        return None
+
+    from src.python.reader import list_xlsx_files, read_holdings
+
+    # 如果 holdings_filename 实际是一个目录，自动选第一个 xlsx 文件
+    if os.path.isdir(filepath):
+        xlsx_files = list_xlsx_files(filepath)
+        if not xlsx_files:
+            logger.error("持仓目录 %s 中找不到 .xlsx 文件", filepath)
+            return None
+        if len(xlsx_files) > 1:
+            logger.warning("持仓目录 %s 中有多个 .xlsx 文件，自动选择第一个: %s",
+                           filepath, xlsx_files[0])
+        filepath = xlsx_files[0]
+
+    holdings = read_holdings(filepath)
+    if not holdings:
+        logger.error(
+            "持仓文件为空或格式异常: %s —— "
+            "请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列", filepath,
+        )
+        return None
+
+    logger.info("成功读取持仓文件: %s（共 %d 条记录）", filepath, len(holdings))
+    return holdings
 
 
 def _handle_report(args: argparse.Namespace, config: dict) -> int:
-    """处理 report 子命令。"""
-    print(f"[..] report 子命令 — 占位处理（--type={args.type}, "
-          f"--history={args.history}, --force-llm={args.force_llm}, "
-          f"--warm={args.warm}, --output={args.output})")
-    return _EXIT_SUCCESS
+    """处理 report 子命令——委托 orchestrator 共享层。
+
+    支持 --type basic/both/full，通过 generate_report() 统一路由。
+    """
+    from src.python.report.cli_progress import CliProgressReporter
+    from src.python.report.orchestrator import generate_report
+
+    holdings = _cli_read_holdings(config)
+    if holdings is None:
+        return _EXIT_SEVERE
+
+    reporter = CliProgressReporter(verbose=args.verbose)
+
+    result = generate_report(
+        holdings=holdings,
+        config=config,
+        reporter=reporter,
+        report_type=args.type,
+        history_mode=args.history,
+        force_llm=args.force_llm,
+        output_dir=args.output,
+        warm_cache=args.warm,
+    )
+
+    reporter.print_timing_summary()
+    return result.exit_code
 
 
 def _handle_cache(args: argparse.Namespace, config: dict) -> int:
-    """处理 cache 子命令。"""
+    """处理 cache 子命令——委托 operations 共享层。
+
+    各缓存操作通过 CliProgressReporter 输出进度，退出码由 operations 结果决定。
+    """
+    from src.python.cache.operations import (
+        cleanup_cache,
+        get_cache_stats,
+        update_basic_cache,
+        update_position_cache,
+    )
+    from src.python.report.cli_progress import CliProgressReporter
+
+    reporter = CliProgressReporter(verbose=args.verbose)
+
     if args.clean:
-        print("[..] cache --clean 占位处理")
+        cleanup_cache(reporter)
         return _EXIT_SUCCESS
+
     if args.stats:
-        print("[..] cache --stats 占位处理")
+        get_cache_stats(reporter)
         return _EXIT_SUCCESS
+
     if args.update:
-        print(f"[..] cache --update {args.update} 占位处理")
-        return _EXIT_SUCCESS
+        return _handle_cache_update(args.update, config, reporter)
+
+    return _EXIT_SEVERE
+
+
+def _handle_cache_update(update_type: str, config: dict, reporter) -> int:
+    """处理 cache --update 子分支。
+
+    --update basic / position / all 均先读取持仓，然后委托 operations。
+    --update all 采用最大努力模式：basic 失败后仍继续执行 position，
+    最终退出码取两者最大值。
+    """
+    from src.python.cache.operations import (
+        update_basic_cache,
+        update_position_cache,
+    )
+
+    holdings = _cli_read_holdings(config)
+    if holdings is None:
+        return _EXIT_SEVERE
+
+    if update_type == "basic":
+        result = update_basic_cache(holdings, reporter)
+        return result.exit_code
+
+    if update_type == "position":
+        result = update_position_cache(holdings, reporter)
+        return result.exit_code
+
+    if update_type == "all":
+        # 最大努力模式：basic 失败后仍继续执行 position
+        basic_result = update_basic_cache(holdings, reporter)
+        pos_result = update_position_cache(holdings, reporter)
+        return max(basic_result.exit_code, pos_result.exit_code)
+
     return _EXIT_SEVERE
 
 

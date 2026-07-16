@@ -42,9 +42,37 @@ pip install -r requirements.txt
 # （可选）Windows 用户若需终端彩色输出：
 pip install colorama
 
-# 4. 启动
+# 4. 启动 TUI 交互模式
 python src/python/main.py
 ```
+
+## 方式三：CLI 命令行模式
+
+CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本化使用：
+
+```bash
+# 查看帮助
+python -m src.python.cli --help
+
+# 基础 Excel 报告
+python -m src.python.cli report --type basic
+
+# 全量报告（含 LLM）
+python -m src.python.cli report --type full --history auto
+
+# 更新缓存
+python -m src.python.cli cache --update all
+
+# 查看缓存状态
+python -m src.python.cli cache --stats
+
+# 详细模式（终端显示彩色进度前缀）
+python -m src.python.cli --verbose report --type basic
+```
+
+> CLI 模式与 TUI 模式共享同一套缓存和配置文件，两种模式可交替使用。
+
+定时任务配置详见[定时任务配置指南](how-to-schedule.md)。
 
 ---
 

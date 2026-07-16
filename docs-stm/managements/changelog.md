@@ -6,11 +6,22 @@
 
 ---
 
-## [Unreleased]
+## [0.6.2] - 2026-07-17
+
+> CLI 命令行模式（P2）全部 8 轮完成
 
 ### Added
+- **cli.py** — CLI 入口，argparse（report/cache 子命令） + config 覆写 + 退出码硬化的完整实现
+- **report/cli_progress.py** — CliProgressReporter（常规→logging，verbose→stderr 彩色输出）
+- **logger.py** — `log_app_boundary()` 记录启动/关闭事件（含版本号、运行模式、机器 IP）
+- **docs-stm/manuals/how-to-schedule.md** — 定时任务配置指南（Windows schtasks / Linux cron）
 
 ### Changed
+- **report/progress.py** — ProgressReporter 基类新增 `print_timing_summary()` 空壳
+- **plan.md** — P3-I（CLI 模式）移入已完成区
+- **folders.md** — 同步新增 CLI 相关 6 个文件条目
+- **conftest.py** — 注册 `unit_cli` marker
+- **cli-mode-iteration-plan.md / cli-mode-technical-design.md** — 归档至 `docs-stm/archive/v0.6.x/cli-mode/`
 
 ### Removed
 

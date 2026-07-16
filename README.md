@@ -2,12 +2,34 @@
 
 读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.6.1
+> 当前版本：0.6.2
+
+## 启动方式
+
+### TUI 交互模式（菜单操作）
 
 ```bash
 .\scripts\launch.ps1   # Windows
 ./scripts/launch.sh     # Linux
 ```
+
+### CLI 命令行模式（定时任务驱动）
+
+```bash
+# 生成基础 Excel 报告
+python -m src.python.cli report --type basic
+
+# 生成全量报告（含 LLM）
+python -m src.python.cli report --type full --history auto
+
+# 更新缓存
+python -m src.python.cli cache --update all
+
+# 查看缓存状态
+python -m src.python.cli cache --stats
+```
+
+详见[定时任务配置指南](docs-stm/manuals/how-to-schedule.md)。
 
 ---
 
@@ -16,6 +38,7 @@
 ### 基础报告与行情
 
 - **TUI 菜单操作** — 方向键导航 + 字母快捷键，交互友好
+- **CLI 命令行模式** — argparse 参数驱动，支持定时任务自动生成报告（Windows 任务计划程序 / Linux cron）
 - **多账户支持** — Excel 每页工作表为一个独立账户，自动识别
 - **实时行情获取** — 腾讯财经（场内实时价）、东方财富（场外基金净值），多数据源自动 fallback
 - **智能缓存** — API 响应按指定频率缓存，减少网络请求，支持手动刷新和缓存管理
@@ -59,6 +82,7 @@
 | 5 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
 | 6 | [数据源一览](docs-stm/manuals/datasource.md) | 数据源说明 |
 | 7 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
+| 8 | [定时任务配置指南](docs-stm/manuals/how-to-schedule.md) | CLI 命令行模式 & Windows/Linux 定时任务设置 |
 
 ## 🔧 开发者参考
 

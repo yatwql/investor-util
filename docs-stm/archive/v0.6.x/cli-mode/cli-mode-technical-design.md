@@ -1,8 +1,9 @@
 # CLI 命令行模式 — 技术设计
 
 > 文档版本：v2.5（第 5~10 轮复盘修正版）
-> 状态：规划中
+> 状态：v0.6.1 — P2 CLI 模式已完成
 > 关联计划：[cli-mode-iteration-plan.md](cli-mode-iteration-plan.md)
+> 已归档。原始路径：`docs-stm/plan/` → `docs-stm/archive/v0.6.x/cli-mode/`
 
 ---
 

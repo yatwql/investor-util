@@ -1,9 +1,9 @@
 # CLI 命令行模式 — 迭代计划
 
 > 文档版本：v2.6（第 11 轮复盘修正版 — P2 优化为 8 轮）
-> 对应版本：v0.7.0（目标）
-> 状态：规划中
+> 状态：v0.6.1 — P2 CLI 模式已完成
 > 关联设计：[cli-mode-technical-design.md](cli-mode-technical-design.md)
+> 已归档。原始路径：`docs-stm/plan/` → `docs-stm/archive/v0.6.x/cli-mode/`
 
 ---
 
@@ -1209,7 +1209,7 @@ test_cli_verbose_ansi_auto_disable
 
 - `docs-stm/managements/folders.md` — 同步 P1+P2 新增文件
 - `docs-stm/managements/review-findings.md` — P2 修复已记录
-- `plan.md` — P3-I 状态标记"v0.7.0 已完成"
+- `plan.md` — P3-I 状态标记"已完成"
 
 #### 最终用户使用场景
 

@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.6.1
+> 文档版本：v0.6.2
 
 ## 目录
 
@@ -69,14 +69,13 @@
 
 ```
   ┌───────────────────────────────────────────────────────────────────┐
-  │                          输入层                                   │
+  │                        输入层                                      │
   │             持仓 xlsx ──→ reader.py ──→ models.Holding             │
   └──────────────────────────────────┬────────────────────────────────┘
                                      │ holdings
                                      ▼
   ┌───────────────────────────────────────────────────────────────────┐
-  │                       数据获取层 (fetcher/)                       │
-  │                                                                   │
+  │                       数据获取层 (fetcher/)                        │
   │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
   │  │ price.py │ │ index.py │ │ fund.py  │ │industry  │ │ 其他    │ │
   │  │腾讯→新浪  │ │ 指数直调  │ │天天解析  │ │ push2    │ │ ...    │ │
@@ -87,35 +86,50 @@
                                      │
                                      ▼
   ┌───────────────────────────────────────────────────────────────────┐
-  │                        缓存层 (cache/)                            │
-  │        泛用 JSON KV · TTL · 指纹失效 · 分组 · 原子写入           │
-  │        大文件 gzip · 路径安全 · 文件损坏自恢复                    │
-  │        缓存操作共享层 (operations.py — TUI/CLI 共用)              │
+  │                        缓存层 (cache/)                              │
+  │        泛用 JSON KV · TTL · 指纹失效 · 分组 · 原子写入             │
+  │        大文件 gzip · 路径安全 · 文件损坏自恢复                      │
+  │        缓存操作共享层 (operations.py — TUI/CLI 共用)               │
   └──────────────────────────────────┬────────────────────────────────┘
                                      │
                                      ▼
   ┌───────────────────────────────────────────────────────────────────┐
   │                      报告编排层 (orchestrator.py)                  │
   │  数据准备 → 快照 → 历史走势 → LLM+新闻并取 → 智能预警 → 双管线  │
-  │              内部管理 orch_prep / orch_llm_news 线程池           │
+  │              内部管理 orch_prep / orch_llm_news 线程池             │
   └──────────────────────────────────┬────────────────────────────────┘
                                      │ info 字典
                                      ▼
   ┌───────────────────────────────────────────────────────────────────┐
-  │                        报告生成层 (report/)                        │
-  │                                                                   │
+  │                        报告生成层 (report/)                         │
   │  ┌─────────────────────────┐   ┌───────────────────────────────┐  │
   │  │   Excel 管线            │   │   HTML 管线                   │  │
   │  │   openpyxl              │   │   Jinja2 模板                 │  │
   │  │   双端共享 data_status   │   │   CSS order 视觉排序          │  │
   │  └─────────────────────────┘   └───────────────────────────────┘  │
   └───────────────────────────────────────────────────────────────────┘
-
-  用户交互层 (TUI)：main.py → tui_menu.py → handlers_*.py
-  贯穿层：config/ · registry.py · provider_registry.py · code_utils.py · market_hours.py
 ```
 
-**用户交互层** (TUI) 位于最上层，通过 `handlers_*.py` 委托编排层（orchestrator）或共享层（operations），自身仅保留交互逻辑。
+**双入口：TUI 与 CLI**
+
+| 入口 | 通道 | 入口文件 | 用户交互层 | 业务逻辑层 | 进度报告 |
+|:-----|:-----|:---------|:----------|:----------|:---------|
+| TUI | 交互菜单 | `main.py` | `tui_menu.py` + `handlers_*.py` | `report/orchestrator.py` + `cache/operations.py` | `TuiProgressReporter` |
+| CLI | 命令行参数 | `cli.py` | argparse（不经过 handlers_*） | `report/orchestrator.py` + `cache/operations.py` | `CliProgressReporter` |
+
+**共享模块**（TUI/CLI 均直接使用）：
+
+| 共享层 | 位置 | 用途 |
+|:-------|:-----|:------|
+| 报告编排器 | `report/orchestrator.py` | 三路径报告生成（basic/both/full） |
+| 缓存操作 | `cache/operations.py` | 缓存刷新/清理/统计 |
+| 进度接口 | `report/progress.py` | `ProgressReporter` 基类 |
+| 持仓读取 | `reader.py` | xlsx 解析 |
+| 配置管理 | `config/` | 三文件分层配置 |
+
+**分层差异**：TUI 的 `handlers_report.py` / `handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*。保证两次实现共用同一套业务逻辑。
+
+**贯穿层**：`config/` · `registry.py` · `provider_registry.py` · `code_utils.py` · `market_hours.py`
 
 **关键分层原则**：
 - 每一层只能依赖其下层和贯穿层，禁止反向依赖
@@ -177,8 +191,10 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | 层次 | 模块 | 职责 | 文件 |
 |:-----|:-----|:------|:-----|
 | **用户交互** | TUI 主循环 | 菜单编排、用户交互流 | `main.py` / `tui_menu.py` |
+| **用户交互** | CLI 命令行 | argparse 解析、共享层直调、定时任务驱动 | `cli.py` |
 | **用户交互** | Handler 命令 | TUI 命令 → 委托编排层或共享层 | `handlers_*.py` |
 | **用户交互** | 进度报告 | ProgressReporter 解耦进度输出 | `report/progress.py` |
+| **用户交互** | CLI 进度报告 | CliProgressReporter（logging 输出 / verbose stderr） | `report/cli_progress.py` |
 | **输入** | 持仓读取 | xlsx 解析、列校验、多账户 | `reader.py` |
 | **配置** | 配置管理层 | 三文件分层配置 | `config/` |
 | **注册** | 中央注册表 | 数据模块 + 报告模块注册 | `registry.py` |
@@ -1075,7 +1091,16 @@ class ProgressReporter:
     def add_error(self, msg: str)  # 累计错误
 ```
 
-TUI 环境使用 `TuiProgressReporter`（输出到终端），CLI 环境可传入静默实现或日志实现。
+TUI 环境使用 `TuiProgressReporter`（输出到终端），CLI 环境使用 `CliProgressReporter`。
+
+**CliProgressReporter**（`report/cli_progress.py`）行为：
+
+| 模式 | info/ok | warn | error | 输出目标 |
+|:-----|:--------|:-----|:------|:---------|
+| 常规（verbose=False，默认） | `logging.INFO` | `logging.WARNING` | `logging.ERROR` | logs/app.log |
+| verbose（verbose=True） | `logging.INFO` + stderr `[..]/[OK]` | `logging.WARNING` + stderr `[!]` | `logging.ERROR` + stderr `[ERR]` | app.log + stderr |
+
+verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使用本地颜色常量（不依赖 `ansi_colors` 模块级常量，后者基于 `stdout.isatty()`）。
 
 #### 内部线程池
 

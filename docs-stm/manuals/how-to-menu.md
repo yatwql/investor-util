@@ -1,5 +1,8 @@
 # 菜单操作手册
 
+> **CLI 命令行模式**：CLI 模式（`python -m src.python.cli`）使用 `--help` 参数查看等价操作，无需 TUI 界面。
+> 详见[定时任务配置指南](how-to-schedule.md)。
+
 ## 主菜单总览
 
 启动程序后进入 TUI 文本界面主菜单：
