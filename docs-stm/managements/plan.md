@@ -55,4 +55,5 @@
 - [`archived_plan.0.3.x.md`](../archive/v0.3.x/archived_plan.0.3.x.md)
 - [`archived_plan.0.4.x.md`](../archive/v0.4.x/archived_plan.0.4.x.md)
 - [`archived_plan.0.5.x.md`](../archive/v0.5.x/archived_plan.0.5.x.md)
+- [`archived_plan.0.6.x.md`](../archive/v0.6.x/archived_plan.0.6.x.md)
 
