@@ -10,6 +10,7 @@ venv/
 data/
 !data/config/config.json
 !data/config/llm_settings.json
+!data/config/llm_providers.json
 
 # ── 运行时生成 ───────────────────────────────────────
 logs/

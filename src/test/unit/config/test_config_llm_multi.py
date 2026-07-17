@@ -1,0 +1,295 @@
+"""LLM 多 Provider 配置解析单元测试 — R1。
+
+测试目标：
+  - _load_llm_providers()：读取 llm_providers.json，返回 dict 或 None
+  - _parse_providers_list()：校验并补齐 provider 数组
+  - _validate_provider_entry()：单条 provider 字段校验
+
+运行：
+  cd D:/codebase/zoo/investor-util
+  python -m pytest src/test/unit/config/test_config_llm_multi.py -v
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import pytest
+
+from src.python.config._core import (
+    _load_llm_providers,
+    _parse_providers_list,
+    _validate_provider_entry,
+)
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
+
+
+class TestLoadLlmProviders(unittest.TestCase):
+    """_load_llm_providers() — 文件读取层测试。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.providers_path = os.path.join(self.tmp.name, "llm_providers.json")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write_json(self, data: dict):
+        with open(self.providers_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    # ── 标准格式 ──
+
+    def test_standard_format(self):
+        """标准格式解析成功。"""
+        self._write_json({
+            "strategy": "priority",
+            "preferred_providers": {"news": "claude-opus"},
+            "providers": [
+                {
+                    "name": "claude-opus",
+                    "provider": "claude",
+                    "api_key": "sk-test",
+                    "model": "claude-sonnet-4-20250514",
+                }
+            ],
+        })
+        with patch("src.python.config._core._LLM_PROVIDERS_FILE", self.providers_path):
+            result = _load_llm_providers()
+        self.assertIsNotNone(result)
+        self.assertEqual(result["strategy"], "priority")
+        self.assertEqual(len(result["providers"]), 1)
+        self.assertEqual(result["providers"][0]["name"], "claude-opus")
+
+    # ── 文件不存在 ──
+
+    def test_file_not_found(self):
+        """文件不存在返回 None（不抛异常）。"""
+        missing = os.path.join(self.tmp.name, "nonexistent.json")
+        with patch("src.python.config._core._LLM_PROVIDERS_FILE", missing):
+            result = _load_llm_providers()
+        self.assertIsNone(result)
+
+
+class TestParseProvidersList(unittest.TestCase):
+    """_parse_providers_list() 批量解析测试。"""
+
+    # ── 单条 / 多条 ──
+
+    def test_single_provider(self):
+        """单条 provider 正确解析。"""
+        raw = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["name"], "p1")
+
+    def test_multiple_providers(self):
+        """多条 provider 正确解析并保持顺序。"""
+        raw = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p2", "provider": "openai", "api_key": "sk-2", "model": "m2"},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["name"], "p1")
+        self.assertEqual(result[1]["name"], "p2")
+
+    # ── 空/缺 providers ──
+
+    def test_empty_providers_array(self):
+        """空 providers 数组返回 None。"""
+        raw = {"providers": []}
+        result = _parse_providers_list(raw)
+        self.assertIsNone(result)
+
+    def test_missing_providers_field(self):
+        """缺 providers 字段返回 None。"""
+        raw = {"strategy": "priority"}
+        result = _parse_providers_list(raw)
+        self.assertIsNone(result)
+
+    # ── 缺失必填字段 ──
+
+    def test_missing_required_field_skipped(self):
+        """缺必填字段的 entry 被跳过，其余正常保留。"""
+        raw = {
+            "providers": [
+                {"name": "valid", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "bad", "provider": "claude"},  # 缺 api_key 和 model
+                {"name": "also-valid", "provider": "openai", "api_key": "sk-2", "model": "m2"},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["name"], "valid")
+        self.assertEqual(result[1]["name"], "also-valid")
+
+    def test_all_invalid_returns_none(self):
+        """全部 entry 校验不通过返回 None。"""
+        raw = {
+            "providers": [
+                {"name": "", "provider": "unknown", "api_key": "", "model": ""},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNone(result)
+
+    # ── 同名 ──
+
+    def test_duplicate_name(self):
+        """同名 provider → 后者覆盖前者（二者均保留但后者在前者之后）。"""
+        raw = {
+            "providers": [
+                {"name": "dup", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "dup", "provider": "openai", "api_key": "sk-2", "model": "m2"},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 2)
+        names = [p["name"] for p in result]
+        self.assertEqual(names, ["dup", "dup"])
+
+    # ── 默认值补齐 ──
+
+    def test_defaults_applied(self):
+        """缺省字段用默认值补齐（priority=99, weight=1, timeout=60.0, endpoint=None, proxy_preferred=False）。"""
+        raw = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        entry = result[0]
+        self.assertEqual(entry["priority"], 99)
+        self.assertEqual(entry["weight"], 1)
+        self.assertEqual(entry["timeout"], 60.0)
+        self.assertIsNone(entry["endpoint"])
+        self.assertFalse(entry["proxy_preferred"])
+
+    def test_custom_defaults_respected(self):
+        """明确指定的值不被默认值覆盖。"""
+        raw = {
+            "providers": [
+                {
+                    "name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1",
+                    "priority": 5, "weight": 3, "timeout": 120.0,
+                    "endpoint": "https://custom.endpoint", "proxy_preferred": True,
+                },
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        entry = result[0]
+        self.assertEqual(entry["priority"], 5)
+        self.assertEqual(entry["weight"], 3)
+        self.assertEqual(entry["timeout"], 120.0)
+        self.assertEqual(entry["endpoint"], "https://custom.endpoint")
+        self.assertTrue(entry["proxy_preferred"])
+
+    # ── api_key 清理 ──
+
+    def test_api_key_stripped(self):
+        """api_key 两端空格被去除。"""
+        raw = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "  sk-test-key  ", "model": "m1"},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        self.assertEqual(result[0]["api_key"], "sk-test-key")
+
+    # ── 非 dict entry ──
+
+    def test_non_dict_entry_skipped(self):
+        """非 dict 的 providers 元素被跳过。"""
+        raw = {
+            "providers": [
+                {"name": "valid", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                "not_a_dict",
+                {"name": "also-valid", "provider": "openai", "api_key": "sk-2", "model": "m2"},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 2)
+
+
+class TestValidateProviderEntry(unittest.TestCase):
+    """_validate_provider_entry() 单条字段校验测试。"""
+
+    def test_valid_entry_empty_warnings(self):
+        """合法 entry 返回空列表。"""
+        entry = {
+            "name": "test-provider",
+            "provider": "claude",
+            "api_key": "sk-test-key",
+            "model": "claude-sonnet-4-20250514",
+        }
+        warnings = _validate_provider_entry(entry, 0)
+        self.assertEqual(warnings, [])
+
+    def test_valid_with_optional_fields(self):
+        """含 endpoint 的合法 entry 返回空列表。"""
+        entry = {
+            "name": "test-provider",
+            "provider": "openai",
+            "api_key": "sk-test-key",
+            "model": "gpt-4",
+            "endpoint": "https://api.openai.com/v1",
+        }
+        warnings = _validate_provider_entry(entry, 0)
+        self.assertEqual(warnings, [])
+
+    def test_missing_name_errors(self):
+        """缺 name → WARNING。"""
+        entry = {"provider": "claude", "api_key": "sk-key", "model": "m1"}
+        warnings = _validate_provider_entry(entry, 0)
+        self.assertTrue(any("name" in w for w in warnings))
+
+    def test_empty_name_errors(self):
+        """空 name → WARNING。"""
+        entry = {"name": "", "provider": "claude", "api_key": "sk-key", "model": "m1"}
+        warnings = _validate_provider_entry(entry, 0)
+        self.assertTrue(any("name" in w for w in warnings))
+
+    def test_missing_api_key_errors(self):
+        """缺 api_key → WARNING。"""
+        entry = {"name": "test", "provider": "claude", "model": "m1"}
+        warnings = _validate_provider_entry(entry, 0)
+        self.assertTrue(any("api_key" in w for w in warnings))
+
+    def test_missing_model_errors(self):
+        """缺 model → WARNING。"""
+        entry = {"name": "test", "provider": "claude", "api_key": "sk-key"}
+        warnings = _validate_provider_entry(entry, 0)
+        self.assertTrue(any("model" in w for w in warnings))
+
+    def test_null_endpoint_allowed(self):
+        """endpoint 为 None 不警告。"""
+        entry = {
+            "name": "test", "provider": "claude", "api_key": "sk-key",
+            "model": "m1", "endpoint": None,
+        }
+        warnings = _validate_provider_entry(entry, 0)
+        self.assertEqual(warnings, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

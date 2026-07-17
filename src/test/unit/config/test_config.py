@@ -33,7 +33,7 @@ _ABS_LLM_SETTINGS = os.path.join(PROJECT_ROOT, "data/config/llm_settings.json")
 # 模板中的路径型键使用相对路径（用户友好），_DEFAULT_CONFIG 使用绝对路径，
 # 值比较时需跳过这些键
 _PATH_KEYS_IN_TEMPLATE = frozenset({
-    "holdings_dir", "output_dir", "llm_key_file", "llm_settings_file",
+    "holdings_dir", "output_dir", "llm_settings_file",
 })
 
 

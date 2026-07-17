@@ -1,0 +1,19 @@
+{
+  // LLM Provider 多链配置
+  // 按优先级尝试多个 provider，直到第一个成功返回
+  // 有效 provider 类型：claude, openai, gemini
+
+  "strategy": "priority",
+  "preferred_providers": {},
+  "providers": [
+    {
+      "name": "claude-opus",
+      "provider": "claude",
+      "api_key": "sk-your-api-key",
+      "model": "claude-sonnet-4-20250514",
+      "endpoint": null,
+      "priority": 10,
+      "timeout": 120
+    }
+  ]
+}

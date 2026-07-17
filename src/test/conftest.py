@@ -30,7 +30,7 @@ _KNOWN_MARKERS: set[str] = {
     "scenario_zero_cost", "scenario_extreme",
     # unit 分支
     "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news", "unit_report",
-    "unit_config", "unit_core", "unit_ui",
+    "unit_config", "unit_config_edge", "unit_core", "unit_ui",
     # 跨领域标记
     "llm", "edge", "smoke", "data", "integration",
     # integration 分支
@@ -66,6 +66,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_news: 新闻模块单元测试")
     config.addinivalue_line("markers", "unit_report: 报告生成单元测试")
     config.addinivalue_line("markers", "unit_config: 配置管理单元测试")
+    config.addinivalue_line("markers", "unit_config_edge: 配置管理边缘场景单元测试（必须放在 *_edge.py）")
     config.addinivalue_line("markers", "unit_core: 核心基础设施单元测试")
     config.addinivalue_line("markers", "unit_cli: CLI 命令行模式单元测试")
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")

@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.6.4
+> 文档版本：v0.6.7
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 
@@ -175,7 +175,8 @@ investor-util/
 │   ├── launch.sh                     #   Linux/macOS 启动脚本
 │   ├── test_runner.py                #   测试驱动（pytest 模式封装）
 │   ├── check-test-markers.py         #   测试标记合规检查
-│   └── check-version-consistency.py  #   版本号一致性检查
+│   ├── check-version-consistency.py  #   版本号一致性检查
+│   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 │
 ├── docs-stm/                         # 项目文档
 │   ├── manuals/                      #   用户手册分册

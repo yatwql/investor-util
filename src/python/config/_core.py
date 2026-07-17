@@ -584,6 +584,122 @@ def get_llm_settings_path() -> str:
         PROJECT_ROOT, "data/config/llm_settings.json")
 
 
+# ── LLM Provider 多链配置解析 ──────────────────────────────────
+
+_LLM_PROVIDERS_FILE = os.path.join(PROJECT_ROOT, "data/config/llm_providers.json")
+_VALID_LLM_PROVIDER_TYPES = frozenset({"claude", "openai", "gemini"})
+
+
+def _load_llm_providers() -> dict | None:
+    """读取 data/config/llm_providers.json，不存在或格式异常返回 None。
+
+    Returns:
+        dict: 原始 JSON 解析结果，或 None（文件不存在/JSON 解析失败）
+    """
+    if not os.path.exists(_LLM_PROVIDERS_FILE):
+        return None
+    try:
+        with open(_LLM_PROVIDERS_FILE, encoding="utf-8-sig") as f:
+            config = json.loads(_comments._strip_json_comments(f.read()))
+        if not isinstance(config, dict):
+            logger.warning("LLM providers 文件根元素不是 JSON 对象，已忽略")
+            return None
+        return config
+    except (OSError, json.JSONDecodeError) as e:
+        logger.warning("LLM providers 文件读取失败: %s", e)
+        return None
+
+
+def _parse_providers_list(raw_config: dict) -> list[dict] | None:
+    """解析 llm_providers.json 中的 providers 数组，校验并补齐默认值。
+
+    Args:
+        raw_config: _load_llm_providers() 返回的原始 dict
+
+    Returns:
+        校验通过且补齐默认值后的 provider dict 列表，或 None（无有效 provider）
+    """
+    providers = raw_config.get("providers")
+    if not providers or not isinstance(providers, list):
+        logger.warning("LLM providers 配置中 providers 字段缺失或不是数组")
+        return None
+    if len(providers) == 0:
+        logger.warning("LLM providers 配置中 providers 数组为空")
+        return None
+
+    validated: list[dict] = []
+    seen_names: set[str] = set()
+    for i, entry in enumerate(providers):
+        if not isinstance(entry, dict):
+            logger.warning("LLM providers[%d] 不是字典对象，已跳过", i)
+            continue
+        errs = _validate_provider_entry(entry, i)
+        if errs:
+            for e in errs:
+                logger.warning("LLM providers[%d] 校验不通过: %s", i, e)
+            continue
+        name = entry["name"]
+        if name in seen_names:
+            logger.warning("LLM providers 中存在重复 name '%s'，后者覆盖前者", name)
+        seen_names.add(name)
+        validated.append({
+            "name": name,
+            "provider": entry["provider"],
+            "api_key": entry["api_key"].strip(),
+            "model": entry["model"],
+            "endpoint": entry.get("endpoint"),
+            "priority": entry.get("priority", 99),
+            "weight": entry.get("weight", 1),
+            "timeout": float(entry.get("timeout", 60.0)),
+            "proxy_preferred": entry.get("proxy_preferred", False),
+        })
+
+    if not validated:
+        logger.warning("LLM providers 全部校验未通过，无有效 provider")
+        return None
+    return validated
+
+
+def _validate_provider_entry(entry: dict, index: int) -> list[str]:
+    """校验单个 provider 配置条目。
+
+    Args:
+        entry: provider dict
+        index: 在 providers 数组中的索引（用于错误消息）
+
+    Returns:
+        WARNING 消息列表，空列表表示完全通过
+    """
+    warnings: list[str] = []
+
+    # name
+    name = entry.get("name")
+    if not isinstance(name, str) or not name.strip():
+        warnings.append("缺少必填字段 'name' 或格式非法（须为非空字符串）")
+
+    # provider type
+    provider_type = entry.get("provider")
+    if provider_type not in _VALID_LLM_PROVIDER_TYPES:
+        warnings.append(f"provider 类型 '{provider_type}' 无效（有效值: claude/openai/gemini）")
+
+    # api_key
+    api_key = entry.get("api_key")
+    if not isinstance(api_key, str) or not api_key.strip():
+        warnings.append("缺少必填字段 'api_key' 或格式非法（须为非空字符串）")
+
+    # model
+    model = entry.get("model")
+    if not isinstance(model, str) or not model.strip():
+        warnings.append("缺少必填字段 'model' 或格式非法（须为非空字符串）")
+
+    # optional: endpoint
+    endpoint = entry.get("endpoint")
+    if endpoint is not None and not isinstance(endpoint, str):
+        warnings.append("可选字段 'endpoint' 类型非法（须为字符串或 null）")
+
+    return warnings
+
+
 def get_llm_config() -> dict | None:
     """读取 LLM 配置（合并 llm_settings.json + llm_key.json）。"""
     global _llm_config_cache, _llm_config_mtime, _llm_config_size

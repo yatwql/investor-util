@@ -6,7 +6,28 @@
 
 ---
 
-## [0.6.7] - 2026-07-18
+## [0.7.0-dev] - 未发布
+
+> 多 LLM Provider 链式服务（Phase 0 — 数据模型），R1 完成
+
+### Added
+
+- **配置**: `data/config/llm_providers.json` — LLM 多 Provider 配置文件模板
+- **配置解析**: `_load_llm_providers()` / `_parse_providers_list()` / `_validate_provider_entry()` — llm_providers.json 解析与校验（`_core.py`）
+- **测试**: `test_config_llm_multi.py`（20 用例） + `test_config_llm_multi_edge.py`（7 用例）
+
+### Changed
+
+- **`_config_defaults.py`**: 从 `_PATH_KEYS` 和 `_DEFAULT_CONFIG` 中移除 `llm_key_file`
+- **`config.json` 模板**: 不再包含 `llm_key_file` 字段
+- **`_core.py`**: `_load_llm_providers()` 增加根元素类型校验（非 dict 返回 None）
+- **`conftest.py`**: 注册 `unit_config_edge` 标记
+- **`test_config.py`**: 同步清理 `_PATH_KEYS_IN_TEMPLATE` 中的 `llm_key_file`
+- **`folders.md`**: 同步新文件列表和标记描述
+
+---
+
+
 
 > 31 项测试修复 + extract-test-failures 脚本
 
