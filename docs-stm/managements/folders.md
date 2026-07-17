@@ -199,7 +199,7 @@ investor-util/
 │   │   ├── technical.md              #     技术设计文档
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
-│   ├── plan/                         #   中间设计文件（已归档至 archive/v0.6.x/cli-mode/，当前为空）
+│   ├── plan/                         #   中间设计文件
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
