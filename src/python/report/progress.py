@@ -115,6 +115,7 @@ class TuiProgressReporter(ProgressReporter):
     """终端进度报告器 — 将进度消息格式化为 [..]/[OK]/[ERR]/[!] 前缀输出。"""
 
     def __init__(self) -> None:
+        super().__init__()
         self._errors: list[str] = []
 
     def info(self, msg: str) -> None:
