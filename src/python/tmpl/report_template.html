@@ -1209,7 +1209,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         {% if has_llm_analysis %}
                         <td class="text-left" style="font-size: 12px; max-width: 200px;">
                             {% if item.llm_analysis %}
-                            <span class="source-tag">{{ item.llm_analysis }}</span>
+                            <span>{{ item.llm_analysis | sentiment_colorize | safe }}</span>
                             {% else %}
                             <span style="color: #999;">—</span>
                             {% endif %}

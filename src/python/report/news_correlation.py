@@ -16,7 +16,7 @@ import logging
 import re
 from typing import Any
 
-from openpyxl.styles import Alignment
+from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -521,6 +521,24 @@ def _set_news_column_widths(ws: Worksheet, has_llm: bool) -> None:
         ws.column_dimensions[get_column_letter(llm_col)].width = 30
 
 
+# ── LLM 关联分析列着色 ────────────────────────────────────
+
+_BULLISH_RED = "CC0000"
+_BEARISH_GREEN = "009900"
+
+
+def _colorize_llm_cell(ws: Worksheet, row: int, col: int, text: str) -> None:
+    """根据 llm_analysis 文本中的利好/利空标记为单元格字体着色。
+
+    [利好] → 红色 (#CC0000)，[利空] → 绿色 (#009900)。
+    中性或无标记 → 不染色（保持默认黑色）。
+    """
+    if "[利好]" in text:
+        ws.cell(row=row, column=col).font = Font(color=_BULLISH_RED)
+    elif "[利空]" in text:
+        ws.cell(row=row, column=col).font = Font(color=_BEARISH_GREEN)
+
+
 def write_news_sheet(
     ws: Worksheet,
     news_data: list[dict[str, Any]],
@@ -562,15 +580,19 @@ def write_news_sheet(
         return
 
     wrap_left = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    llm_col = _NCOLS + 1 if has_llm else None
     for idx, item in enumerate(news_data, 1):
         enriched = item.get("enriched_keywords", [])
         keywords_str = _format_enriched_keywords(enriched) if enriched else ", ".join(item.get("matched_keywords", []))
         vals = [idx, item.get("title", ""), item.get("intro", ""), item.get("media_name", ""), item.get("ctime", ""), keywords_str]
         if has_llm:
-            vals.append(item.get("llm_analysis", ""))
+            llm_text = item.get("llm_analysis", "")
+            vals.append(llm_text)
         write_data_row(ws, row, vals)
         ws.cell(row=row, column=2).alignment = wrap_left
         ws.cell(row=row, column=3).alignment = wrap_left
+        if has_llm and llm_text:
+            _colorize_llm_cell(ws, row, llm_col, llm_text)
         row += 1
 
     row += 1

@@ -99,6 +99,19 @@ def _jinja_thousands(value: Any) -> str:
         return str(value)
 
 
+def _jinja_sentiment_colorize(text: str) -> str:
+    """将 [利好]/[利空] 标记着色为 HTML 内联样式，其余文本保持原样。
+
+    [利好] → 红色 (#CC0000)，[利空] → 绿色 (#009900)。
+    返回的 HTML 已在过滤器层处理，模板中使用 ``| safe`` 避免二次转义。
+    """
+    if not text:
+        return text
+    text = text.replace("[利好]", '<span style="color:#CC0000;font-weight:bold">[利好]</span>')
+    text = text.replace("[利空]", '<span style="color:#009900;font-weight:bold">[利空]</span>')
+    return text
+
+
 def _jinja_section_visible(key: str) -> bool:
     """Jinja2 全局函数：判断报告模块是否可见。
 
@@ -126,5 +139,6 @@ _ENV.filters["change"] = _jinja_change
 _ENV.filters["profit_color"] = _jinja_profit_color
 _ENV.filters["price_type_color"] = _jinja_price_type_color
 _ENV.filters["thousands"] = _jinja_thousands
+_ENV.filters["sentiment_colorize"] = _jinja_sentiment_colorize
 
 _ENV.globals["section_visible"] = lambda key: False  # fail-closed 默认值，生产环境由 context 变量覆盖
