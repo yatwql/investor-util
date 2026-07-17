@@ -156,7 +156,12 @@ def _normalize_title(title: str) -> str:
 def _dedup_by_title(
     items: list[dict[str, Any]], threshold: float = 0.92,
 ) -> list[dict[str, Any]]:
-    """基于标准化标题模糊去重（同一新闻在不同源标题略有差异）。"""
+    """基于标准化标题模糊去重（同一新闻在不同源标题略有差异）。
+
+    两层判定：
+    1. SequenceMatcher 模糊匹配（≥threshold）
+    2. 子串包含匹配（一条标题是另一条的简写/扩展版本，如快讯→全文、跨源同一事件）
+    """
     from difflib import SequenceMatcher
     if not items:
         return items
@@ -169,9 +174,16 @@ def _dedup_by_title(
             continue
         is_dup = False
         for existing in kept_norms:
+            # ① 模糊匹配（通用）
             if SequenceMatcher(None, norm, existing).ratio() >= threshold:
                 is_dup = True
                 break
+            # ② 子串包含匹配（跨源，10 字以上短标题完全包含于另一条）
+            if not is_dup:
+                short, long = (norm, existing) if len(norm) <= len(existing) else (existing, norm)
+                if len(short) >= 10 and short in long:
+                    is_dup = True
+                    break
         if not is_dup:
             kept_norms.append(norm)
             kept.append(item)
