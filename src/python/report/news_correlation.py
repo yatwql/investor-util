@@ -49,17 +49,11 @@ _SUFFIXES = [
 
 
 def _extract_terms(name: str) -> list[str]:
-    """从名称中提取中文词及双字窗口。"""
+    """从名称中提取中文词（去掉后缀后）。"""
     clean = name
     for suffix in _SUFFIXES:
         clean = clean.replace(suffix, "")
-    terms = re.findall(r"[一-鿿]{2,}", clean)
-    extra: set[str] = set()
-    for t in terms:
-        if len(t) > 2:
-            for i in range(len(t) - 1):
-                extra.add(t[i:i + 2])
-    return list(set(terms) | extra)
+    return re.findall(r"[一-鿿]{2,}", clean)
 
 
 def _index_holdings(lookup: dict, holdings: list[Holding]) -> None:
@@ -248,12 +242,14 @@ def _expand_industry_keywords(
     holdings: list[Holding],
     penetrated_assets: list[dict] | None,
     keywords: list[str],
-) -> tuple[list[str], dict[str, dict]]:
+) -> tuple[list[str], dict[str, dict], set[str]]:
     """扩展关键词：获取行业/概念数据，将行业名和概念名追加为关键词。
 
     Returns:
-        (expanded_keywords, industry_data)
-        行业数据获取失败时返回 (keywords, {})。
+        (expanded_keywords, industry_data, lightweight_kw)
+        lightweight_kw 为扩展中的行业/概念关键词集合（轻量级关键词），
+        用于下游判定是否需要至少 2 个匹配才视为关联。
+        行业数据获取失败时返回 (keywords, {}, set())。
     """
     industry_data: dict[str, dict] = {}
     try:
@@ -281,14 +277,14 @@ def _expand_industry_keywords(
                 if extra_kw:
                     all_kw = list(set(keywords + extra_kw))
                     all_kw.sort(key=lambda x: (-len(x), x))
-                    # 计算行业/概念来源的关键词数（与持仓关键词不重叠）
-                    new_count = len(set(extra_kw) - set(keywords))
+                    lightweight_kw = set(extra_kw) - set(keywords)
+                    new_count = len(lightweight_kw)
                     logger.info("行业/概念关键词扩展: 行业/概念 %d 个 → 共 %d 个",
                                 new_count, len(all_kw))
-                    return all_kw, industry_data
+                    return all_kw, industry_data, lightweight_kw
     except Exception as e:
         logger.warning("行业/概念数据获取失败（非关键错误，继续）: %s", e)
-    return keywords, industry_data
+    return keywords, industry_data, set()
 
 
 def _extract_active_sources(news_items: list[dict]) -> list[str]:
@@ -420,10 +416,12 @@ def build_news_data(
     keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
     logger.info("%s关键词（含穿透）: %s", get_llm_module_name("news_correlation"), keywords)
 
-    keywords, industry_data = _expand_industry_keywords(holdings, penetrated_assets, keywords)
+    keywords, industry_data, lightweight_kw = _expand_industry_keywords(holdings, penetrated_assets, keywords)
     # per_source 取大值保证召回覆盖面，避免去重后候选不足
     per_source = max(500, top_n * 2)
-    news_items = aggregate_news(keywords, top_n=top_n, per_source=per_source, progress_callback=_news_source_cb)
+    news_items = aggregate_news(keywords, top_n=top_n, per_source=per_source,
+                                progress_callback=_news_source_cb,
+                                lightweight_keywords=lightweight_kw)
 
     active_sources = _extract_active_sources(news_items)
     meta: dict = {
@@ -461,7 +459,7 @@ def build_news_data(
     return news_items, meta
 
 
-def _build_news_footer(news_data: list[dict], llm_meta: dict | None, has_llm: bool) -> str:
+def _build_news_footer(news_data: list[dict], llm_meta: dict | None, llm_count: int = 0) -> str:
     """构建新闻页签底部说明文本。"""
     if llm_meta and llm_meta.get("llm_enabled"):
         if llm_meta.get("llm_cached"):
@@ -473,8 +471,8 @@ def _build_news_footer(news_data: list[dict], llm_meta: dict | None, has_llm: bo
                 hint += " | Extended Thinking"
             return hint
         parts = [f"共获取 {len(news_data)} 条关联新闻"]
-        if has_llm:
-            parts.append("（含 LLM 智能关联分析）")
+        if llm_count:
+            parts.append(f"（其中 LLM 关联分析 {llm_count} 条）")
         parts.append("，关键词匹配基于持仓名称和代码")
         return "".join(parts)
     result = (
@@ -539,6 +537,7 @@ def write_news_sheet(
         llm_meta: LLM 元数据，含 token_usage / llm_cached / llm_enabled
     """
     has_llm = any(isinstance(item, dict) and item.get("llm_analysis") for item in news_data)
+    llm_count = sum(1 for n in news_data if n.get("llm_analysis"))
     ncols = _NCOLS + (1 if has_llm else 0)
     headers = _BASE_HEADERS + (["LLM 关联分析"] if has_llm else [])
 
@@ -575,11 +574,11 @@ def write_news_sheet(
         row += 1
 
     row += 1
-    write_data_row(ws, row, [_build_news_footer(news_data, llm_meta, has_llm)])
+    write_data_row(ws, row, [_build_news_footer(news_data, llm_meta, llm_count)])
     row = _write_news_token_footer(ws, row, llm_meta)
 
     freeze_header(ws, 2)
     auto_width(ws)
     _set_news_column_widths(ws, has_llm)
-    llm_info = f"，LLM 分析 {sum(1 for n in news_data if n.get('llm_analysis'))} 条" if has_llm else ""
+    llm_info = f"，其中 LLM 分析 {llm_count} 条" if llm_count else ""
     logger.info("%s写入完成%s，共 %d 条", get_llm_module_name("news_correlation"), llm_info, len(news_data))

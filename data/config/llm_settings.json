@@ -84,7 +84,8 @@
   "cache_enabled_news_correlation": true,
   "thinking_enabled_news_correlation": false,
   "thinking_budget_news_correlation": 4000,
-  "reasoning_effort_news_correlation": "high"
+  "reasoning_effort_news_correlation": "high",
+  "news_correlation_top_n": 30
 
   // ═══════════════════════════════════════════
   // 计价配置（可选，默认使用 constants.py MODEL_PRICING）

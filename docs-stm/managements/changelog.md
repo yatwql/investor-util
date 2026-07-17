@@ -8,6 +8,17 @@
 
 ## [Unreleased]
 
+### Added
+- **新闻关联质量优化（4 项 + 1 项）**：
+  - **关键词精准度** — `_extract_terms()` 去除双字滑动窗口噪声，只保留完整中文词组，大幅减少"嘉实""产业"等通用片段导致的假阳性匹配
+  - **行业/概念阈值** — 行业/概念类轻量级关键词需要至少 2 个命中才计为关联，避免单个泛词（如"电力"）关联不相关新闻
+  - **LLM 分析条数可配置** — 新增 `llm_settings.json` 配置项 `news_correlation_top_n`（默认 30），控制送 LLM 分析的新闻条数
+  - **跨源标题去重** — `_dedup_by_title()` 基于 `difflib.SequenceMatcher` 做标准化标题模糊去重，消除同一新闻在不同源用不同 URL 导致的重复
+  - **底部标注 LLM 条数** — 新闻页签 footer 改为"其中 LLM 关联分析 N 条"，不再仅显示"含 LLM 智能关联分析"
+
+### Changed
+- **news_correlation `_build_news_footer`** — 参数由 `has_llm: bool` 改为 `llm_count: int`，精确显示分析条数
+
 ### Fixed
 - **内部路径隔离** — `_config_defaults.py`、`logger.py`、`handlers_config.py` 统一使用 `PROJECT_ROOT`（`constants.py`）作为基准路径，消除 CWD 依赖。解决从非项目根目录运行时 `src/data/`、`src/logs/` 等目录误创建的问题
 - **回撤图 Y 轴截断** — `drawSimpleChart` 中 `yMin = Math.max(0, globalMin - pad)` 强制下限 ≥0，导致全部负值回撤数据不可见、指数回撤线被裁剪。移除 `Math.max(0, ...)` 修复

@@ -139,8 +139,48 @@ def _log_source_status(src_results: dict[str, tuple[int, str]]) -> None:
     logger.info("新闻源状态: %s", " | ".join(status_parts))
 
 
+def _normalize_title(title: str) -> str:
+    """标准化标题：去标点、去空格、去常见前缀。
+
+    用于跨源标题去重，消除"快讯：""收评"等差异。
+    """
+    import re
+    for prefix in ("快讯", "收评", "收盘", "早评", "午评", "盘中", "盘后"):
+        if title.startswith(prefix):
+            title = title[len(prefix):]
+            break
+    title = re.sub(r'[^\w一-鿿]', '', title)
+    return title.strip().lower()
+
+
+def _dedup_by_title(
+    items: list[dict[str, Any]], threshold: float = 0.92,
+) -> list[dict[str, Any]]:
+    """基于标准化标题模糊去重（同一新闻在不同源标题略有差异）。"""
+    from difflib import SequenceMatcher
+    if not items:
+        return items
+    kept: list[dict[str, Any]] = []
+    kept_norms: list[str] = []
+    for item in items:
+        norm = _normalize_title(item.get("title", ""))
+        if not norm:
+            kept.append(item)
+            continue
+        is_dup = False
+        for existing in kept_norms:
+            if SequenceMatcher(None, norm, existing).ratio() >= threshold:
+                is_dup = True
+                break
+        if not is_dup:
+            kept_norms.append(norm)
+            kept.append(item)
+    return kept
+
+
 def _finalize_news_results(
     all_raw: list[dict[str, Any]], keywords: list[str], top_n: int,
+    lightweight_keywords: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """排序、关联关键词、确保 matched_keywords 字段、截取 TOP N。"""
     if not all_raw:
@@ -149,8 +189,14 @@ def _finalize_news_results(
     # 按时间排序
     all_raw.sort(key=lambda item: item.get("ctime", ""), reverse=True)
 
+    # 标题模糊去重（同一新闻跨源不同 URL）
+    all_raw = _dedup_by_title(all_raw)
+
     # 与关键词关联
-    correlated = correlate_news_with_holdings(all_raw, keywords, top_n=top_n)
+    correlated = correlate_news_with_holdings(
+        all_raw, keywords, top_n=top_n,
+        lightweight_keywords=lightweight_keywords,
+    )
 
     # 确保 matched_keywords 字段
     for item in correlated:
@@ -166,13 +212,14 @@ def aggregate_news(
     sources: list[str] | None = None,
     per_source: int = 100,
     progress_callback: Callable[[str, int, str], None] | None = None,
+    lightweight_keywords: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """从多个新闻源获取新闻，去重后按关键词关联度排序。
 
     流程：
       1. 从各源获取原始新闻（并行）
       2. 按 URL 去重合并
-      3. 按发布时间排序
+      3. 按发布时间排序 + 标题模糊去重
       4. 与关键词关联匹配
       5. 按匹配度降序返回 TOP N
 
@@ -183,6 +230,8 @@ def aggregate_news(
         per_source: 每个源获取的原始新闻条数
         progress_callback: 可选进度回调，签名为 (source_label, count, status)
             每次源获取完成后调用。status 为 "OK" 或 "失败原因"
+        lightweight_keywords: 轻量级关键词集合（行业/概念），
+            匹配此类关键词需要至少 2 个命中才视为关联。
 
     Returns:
         关联后的新闻列表，每项含 matched_keywords 字段
@@ -207,6 +256,7 @@ def aggregate_news(
 
     logger.info("新闻汇总: 去重后共 %d 条 (来自 %d 个源)", len(all_raw), len(sources))
 
-    result = _finalize_news_results(all_raw, keywords, top_n)
+    result = _finalize_news_results(all_raw, keywords, top_n,
+                                    lightweight_keywords=lightweight_keywords)
     _save_news_cache(cache_key, result)
     return result

@@ -342,9 +342,9 @@ class TestBuildKeywordLookup(unittest.TestCase):
         self.assertIn("600900", lookup)
         self.assertEqual(lookup["600900"]["type"], "holding")
         self.assertEqual(lookup["600900"]["name"], "长江电力")
-        # 中文名称片段
-        self.assertIn("长江", lookup)
-        self.assertEqual(lookup["长江"]["type"], "holding")
+        # 中文名称（去掉后缀后）
+        self.assertIn("长江电力", lookup)
+        self.assertEqual(lookup["长江电力"]["type"], "holding")
 
     def test_penetration_asset(self):
         """穿透资产 → lookup 包含穿透资产条目。"""
@@ -355,8 +355,8 @@ class TestBuildKeywordLookup(unittest.TestCase):
         lookup = nc._build_keyword_lookup(holdings, penetrated)
         self.assertIn("00700", lookup)
         self.assertEqual(lookup["00700"]["type"], "penetration")
-        self.assertIn("腾讯", lookup)
-        self.assertEqual(lookup["腾讯"]["type"], "penetration")
+        self.assertIn("腾讯控股", lookup)
+        self.assertEqual(lookup["腾讯控股"]["type"], "penetration")
 
     def test_holding_overrides_penetration(self):
         """同一关键词同时匹配持仓和穿透 → 持仓优先。"""
@@ -411,7 +411,7 @@ class TestEnrichKeywordsForItem(unittest.TestCase):
     def test_holding_match(self):
         """关键词匹配持仓名称 → display = "名称(代码)", type = holding。"""
         result = nc._enrich_keywords_for_item(
-            {"matched_keywords": ["长江"]}, self.lookup,
+            {"matched_keywords": ["长江电力"]}, self.lookup,
         )
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["display"], "长江电力(600900)")
@@ -420,7 +420,7 @@ class TestEnrichKeywordsForItem(unittest.TestCase):
     def test_holding_code_match(self):
         """关键词匹配持仓代码 → 与名称去重后合并。"""
         result = nc._enrich_keywords_for_item(
-            {"matched_keywords": ["600900", "长江"]}, self.lookup,
+            {"matched_keywords": ["600900", "长江电力"]}, self.lookup,
         )
         self.assertEqual(len(result), 1)  # 去重
         self.assertEqual(result[0]["type"], "holding")
@@ -446,7 +446,7 @@ class TestEnrichKeywordsForItem(unittest.TestCase):
     def test_mixed_types_sorted(self):
         """混合关键词 → 排序: holding → penetration → industry。"""
         result = nc._enrich_keywords_for_item(
-            {"matched_keywords": ["长江", "00700", "行业词汇"]}, self.lookup,
+            {"matched_keywords": ["长江电力", "00700", "行业词汇"]}, self.lookup,
         )
         self.assertGreaterEqual(len(result), 3)
         types = [r["type"] for r in result]

@@ -145,12 +145,13 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 > 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation）。
 
-配置分为**全局配置**和**模块级配置**两类。全局配置共有 4 项：
+配置分为**全局配置**和**模块级配置**两类。全局配置共有 5 项：
 
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
+- `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
 
 ### 模块级配置
 
@@ -166,6 +167,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude 或 DeepSeek） |
 | `thinking_budget_{module}` | int | 4000~16000（模块差异） | **仅 Claude** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
+
+### 专用配置项
+
+| 配置键 | 类型 | 默认值 | 说明 |
+|--------|:----:|:------:|------|
+| `news_correlation_top_n` | int | `30` | 送 LLM 分析的新闻条数上限。仅 `news_correlation` 模块有效，按关键词匹配数降序选取前 N 条送 LLM。值越大 Token 消耗越高，设为 `114` 表示全部送分析 |
 
 > 各模块默认值差异详见下方「各模块推荐参数值」表。
 
@@ -262,6 +269,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "thinking_enabled_news_correlation": false,
   "thinking_budget_news_correlation": 4000,
   "reasoning_effort_news_correlation": "high",
+  "news_correlation_top_n": 30,
 
   // ═══════════════════════════════════════════
   // 计价配置
@@ -288,6 +296,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | **持仓体检报告** | null | **0.5**（居中平衡） | **4096** | **120s** | **true** | 12000 | 300 字 |
 | **穿透深度分析** | null | **0.4**（中低温稳定） | **4096** | **90s** | false | 8000 | 300 字 |
 | **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | 不适用 |
+
+> **补充**：财经新闻关联分析还支持 `news_correlation_top_n` 配置项（默认 `30`），控制送 LLM 分析的新闻条数上限，按关键词匹配数降序选取。增大此值会线性增加 Token 消耗，减小则降低 LLM 关联分析的覆盖率。设为 `0` 可完全禁用 LLM 分析（仅保留关键词匹配）。
 
 > **temperature 项说明**：
 > - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**>0.5 时全球政经局势可能编造经济指标**。

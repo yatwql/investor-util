@@ -278,7 +278,8 @@ def enhance_news_correlation(
     if not news_data:
         return (news_data, False, {})
 
-    top_news, top_to_original = _select_top_news(news_data, top_n=30)
+    top_n = (llm_config or {}).get("news_correlation_top_n", 30)
+    top_news, top_to_original = _select_top_news(news_data, top_n=top_n)
     batch_preparer, per_item_cache_fn, batch_prompt_fn, _model = _build_news_hooks(
         top_news, holdings, penetrated_assets, industry_data, llm_config,
     )
