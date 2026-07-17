@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-07-17
+
+> 完全移除智能预警（early_warning）模块 + 全量文档同步清理
+
 ### Added
 - **新闻关联质量优化（4 项 + 1 项）**：
   - **关键词精准度** — `_extract_terms()` 去除双字滑动窗口噪声，只保留完整中文词组，大幅减少"嘉实""产业"等通用片段导致的假阳性匹配
@@ -18,8 +22,10 @@
 
 ### Changed
 - **news_correlation `_build_news_footer`** — 参数由 `has_llm: bool` 改为 `llm_count: int`，精确显示分析条数
-- **plan.md** — 移除已完成的 P3-I（CLI 模式）条目（v0.6.1 已完成）
 - **全量文档同步** — 移除智能预警模块后，核对所有管理文档/用户文档/源码注释的模块数（18→17）、编号（LLM 12→15→11→14，历史 16→17→15→16）、引用描述（新闻与预警→新闻），清除历史痕迹
+
+### Removed
+- **完全移除智能预警（early_warning）模块** — 删除 `report/early_warning.py`、`test_early_warning.py`、`test_early_warning_edge.py`，清理 orchestrator/html_writer/excel_generator/registry/config 中全部引用及所有测试
 
 ### Fixed
 - **内部路径隔离** — `_config_defaults.py`、`logger.py`、`handlers_config.py` 统一使用 `PROJECT_ROOT`（`constants.py`）作为基准路径，消除 CWD 依赖。解决从非项目根目录运行时 `src/data/`、`src/logs/` 等目录误创建的问题
