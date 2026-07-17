@@ -170,7 +170,8 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             f.write(raw)
 
         result = cfg.get_config()
-        self.assertEqual(result["holdings_dir"], "data/holdings")
+        self.assertTrue(os.path.isabs(result["holdings_dir"]),
+                        f"holdings_dir 应为绝对路径: {result['holdings_dir']!r}")
         self.assertEqual(result["holdings_filename"], "test.xlsx")
 
     def test_bom_llm_settings_readable(self):
@@ -341,7 +342,8 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         self.assertTrue(os.path.exists(config_path), "配置文件应被创建")
 
         data = cfg.get_config()
-        self.assertEqual(data.get("holdings_dir"), "data/holdings")
+        self.assertTrue(os.path.isabs(data.get("holdings_dir")),
+                        f"holdings_dir 应为绝对路径: {data.get('holdings_dir')!r}")
 
     # ── 终端无颜色 ──
 

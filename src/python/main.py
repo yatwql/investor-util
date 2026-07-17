@@ -8,11 +8,11 @@ import os
 import sys
 from collections.abc import Callable
 
-# 确保项目根目录在 sys.path 中，并切换工作目录
-_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 确保项目根目录在 sys.path 中（支持直接执行 python src/python/main.py）
+_src_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.dirname(os.path.dirname(_src_dir))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
-os.chdir(_project_root)
 
 from src.python.config import init_config
 from src.python.llm.pricing import CURRENCY_SYMBOLS

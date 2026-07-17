@@ -13,7 +13,11 @@ import unittest
 from unittest.mock import patch
 
 import pytest
+from src.python.constants import PROJECT_ROOT
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config, pytest.mark.edge]
+
+_ABS_HOLDINGS_DIR = os.path.join(PROJECT_ROOT, "data/holdings")
+_ABS_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "reports")
 
 
 @pytest.mark.edge
@@ -39,8 +43,8 @@ class TestFirstRunGuidance(unittest.TestCase):
 
         # 配置不存在时 get_config 返回默认值不崩溃
         result = cfg.get_config()
-        self.assertEqual(result["holdings_dir"], "data/holdings")
-        self.assertEqual(result["output_dir"], "reports")
+        self.assertEqual(result["holdings_dir"], _ABS_HOLDINGS_DIR)
+        self.assertEqual(result["output_dir"], _ABS_OUTPUT_DIR)
 
     def test_missing_config_dir_auto_created(self):
         """配置目录不存在 → init_config 自动创建。"""
@@ -61,7 +65,7 @@ class TestFirstRunGuidance(unittest.TestCase):
         cfg._clear_config_cache()
         with patch("logging.Logger.warning") as mock_warn:
             result = cfg.get_config()
-            self.assertEqual(result["holdings_dir"], "data/holdings")
+            self.assertEqual(result["holdings_dir"], _ABS_HOLDINGS_DIR)
             mock_warn.assert_called()
             warning_text = str(mock_warn.call_args[0][0])
             self.assertTrue(

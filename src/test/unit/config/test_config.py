@@ -19,8 +19,22 @@ import unittest
 from unittest.mock import patch
 
 from src.python import config as cfg
+from src.python.constants import PROJECT_ROOT
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
+
+
+# 路径型配置键的预期绝对路径基准
+_ABS_HOLDINGS_DIR = os.path.join(PROJECT_ROOT, "data/holdings")
+_ABS_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "reports")
+_ABS_LLM_KEY = os.path.join(PROJECT_ROOT, "data/config/llm_key.json")
+_ABS_LLM_SETTINGS = os.path.join(PROJECT_ROOT, "data/config/llm_settings.json")
+
+# 模板中的路径型键使用相对路径（用户友好），_DEFAULT_CONFIG 使用绝对路径，
+# 值比较时需跳过这些键
+_PATH_KEYS_IN_TEMPLATE = frozenset({
+    "holdings_dir", "output_dir", "llm_key_file", "llm_settings_file",
+})
 
 
 
@@ -41,9 +55,9 @@ class TestGetConfig(unittest.TestCase):
     def test_missing_file_returns_defaults(self):
         """配置文件不存在 → 返回默认值。"""
         result = cfg.get_config()
-        self.assertEqual(result["holdings_dir"], "data/holdings")
+        self.assertEqual(result["holdings_dir"], _ABS_HOLDINGS_DIR)
         self.assertEqual(result["holdings_filename"], "个人投资持仓信息.xlsx")
-        self.assertEqual(result.get("output_dir"), "reports")
+        self.assertEqual(result.get("output_dir"), _ABS_OUTPUT_DIR)
         self.assertEqual(result.get("news_top_count"), 300)
         self.assertIn("cache_ttl", result)
         self.assertIn("preferred_provider", result)
@@ -54,7 +68,7 @@ class TestGetConfig(unittest.TestCase):
         with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             f.write("{invalid json!!!")
         result = cfg.get_config()
-        self.assertEqual(result["holdings_dir"], "data/holdings")
+        self.assertEqual(result["holdings_dir"], _ABS_HOLDINGS_DIR)
 
     def test_empty_file_returns_defaults(self):
         """配置文件为空 → 返回默认值。"""
@@ -62,7 +76,7 @@ class TestGetConfig(unittest.TestCase):
         with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             f.write("")
         result = cfg.get_config()
-        self.assertEqual(result["holdings_dir"], "data/holdings")
+        self.assertEqual(result["holdings_dir"], _ABS_HOLDINGS_DIR)
 
     def test_partial_config_merge(self):
         """部分配置 → 未配置项用默认值补齐。"""
@@ -73,7 +87,7 @@ class TestGetConfig(unittest.TestCase):
         result = cfg.get_config()
         self.assertEqual(result["holdings_dir"], "/custom/path")
         self.assertEqual(result["holdings_filename"], "个人投资持仓信息.xlsx")
-        self.assertEqual(result.get("output_dir"), "reports")
+        self.assertEqual(result.get("output_dir"), _ABS_OUTPUT_DIR)
 
     @pytest.mark.smoke
     def test_valid_config_read(self):
@@ -113,7 +127,7 @@ class TestInitConfig(unittest.TestCase):
         cfg.init_config()
         self.assertTrue(os.path.exists(cfg._config_defaults._CONFIG_FILE))
         data = cfg.get_config()
-        self.assertEqual(data["holdings_dir"], "data/holdings")
+        self.assertEqual(data["holdings_dir"], _ABS_HOLDINGS_DIR)
 
     def test_init_does_not_overwrite_existing(self):
         """配置文件已存在 → 不覆盖。"""
@@ -160,7 +174,7 @@ class TestSetConfig(unittest.TestCase):
         cfg.set_config("holdings_dir", "/new/path")
         result = cfg.get_config()
         self.assertEqual(result["holdings_filename"], "个人投资持仓信息.xlsx")
-        self.assertEqual(result.get("output_dir"), "reports")
+        self.assertEqual(result.get("output_dir"), _ABS_OUTPUT_DIR)
 
     def test_set_new_key(self):
         """写入不存在的键 → 新增。"""
@@ -606,6 +620,17 @@ class TestDefaultConfigTemplateConsistency:
                     assert type(parsed["cache_ttl"][k]) == type(cfg._DEFAULT_CONFIG["cache_ttl"][k]), (
                         f"cache_ttl.{k} 类型不匹配: {type(parsed['cache_ttl'][k])} vs {type(cfg._DEFAULT_CONFIG['cache_ttl'][k])}"
                     )
+            if key in _PATH_KEYS_IN_TEMPLATE:
+                # 路径键：模板保留相对路径便于用户编辑，_DEFAULT_CONFIG 使用绝对路径，
+                # 检查模板值是否为相对路径即可，不做值相等性断言
+                assert not os.path.isabs(parsed[key]), (
+                    f"模板中的路径键 {key!r} 应为相对路径，"
+                    f"实际为绝对路径: {parsed[key]!r}"
+                )
+                assert os.path.isabs(cfg._DEFAULT_CONFIG[key]), (
+                    f"_DEFAULT_CONFIG 中的路径键 {key!r} 应为绝对路径，"
+                    f"实际为相对路径: {cfg._DEFAULT_CONFIG[key]!r}"
+                )
             else:
                 assert parsed[key] == cfg._DEFAULT_CONFIG[key], (
                     f"键 {key!r} 值不匹配:\n"

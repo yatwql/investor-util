@@ -12,6 +12,7 @@ from typing import Any
 from src.python.config import _comments
 from src.python.config import _config_defaults
 from src.python.config._llm_defaults import _get_default_llm_settings_template
+from src.python.constants import PROJECT_ROOT
 from src.python.registry import get_known_enabled_llm_keys, get_known_llm_settings_keys, get_report_section_keys
 
 logger = logging.getLogger("invest")
@@ -72,6 +73,8 @@ def get_config() -> dict:
                     merged[key] = {**merged[key], **val}
                 else:
                     merged[key] = val
+            # 绝对化路径键：用户 config.json 中可使用相对路径，运行时统一转为绝对路径
+            _absolutize_paths(merged)
             _config_cache = merged
             try:
                 _config_mtime = os.path.getmtime(config_path)
@@ -179,6 +182,30 @@ _STRING_CONFIG_KEYS: set[str] = {
     "holdings_dir", "holdings_filename", "output_dir",
     "llm_key_file", "llm_settings_file",
 }
+
+# 需要绝对化的路径型配置键（不包含纯文件名 holdings_filename）
+_PATH_CONFIG_KEYS: set[str] = {
+    "holdings_dir", "output_dir",
+    "llm_key_file", "llm_settings_file",
+}
+
+
+def _absolutize_paths(config: dict) -> dict:
+    """将配置中路径型键转为绝对路径（若为相对路径则拼接 PROJECT_ROOT）。
+
+    使用户 config.json 中可继续使用友好的相对路径，运行时所有消费者
+    拿到的均为绝对路径，彻底消除 CWD 依赖。
+    """
+    for key in _PATH_CONFIG_KEYS:
+        val = config.get(key)
+        if isinstance(val, str) and not _is_abs(val):
+            config[key] = os.path.join(PROJECT_ROOT, val)
+    return config
+
+
+def _is_abs(path: str) -> bool:
+    """增强的绝对路径判断，兼容 Windows 下 Unix 风格 /path 的识别。"""
+    return os.path.isabs(path) or (len(path) > 0 and path[0] in ("/", "\\"))
 
 _MISSING = object()
 
@@ -522,7 +549,8 @@ def _check_unknown_llm_keys(settings: dict) -> None:
 def _ensure_llm_settings_file() -> None:
     """若 llm_settings.json 不存在，用默认值自动创建。"""
     config = get_config()
-    settings_path = config.get("llm_settings_file", "data/config/llm_settings.json")
+    settings_path = config.get("llm_settings_file") or os.path.join(
+        PROJECT_ROOT, "data/config/llm_settings.json")
     if os.path.exists(settings_path):
         return
     try:
@@ -545,13 +573,15 @@ def _ensure_llm_settings_file() -> None:
 def get_llm_key_path() -> str:
     """返回 LLM 密钥配置文件路径 (llm_key.json)。"""
     config = get_config()
-    return config.get("llm_key_file", "data/config/llm_key.json")
+    return config.get("llm_key_file") or os.path.join(
+        PROJECT_ROOT, "data/config/llm_key.json")
 
 
 def get_llm_settings_path() -> str:
     """返回 LLM 非敏感配置文件的路径 (llm_settings.json)。"""
     config = get_config()
-    return config.get("llm_settings_file", "data/config/llm_settings.json")
+    return config.get("llm_settings_file") or os.path.join(
+        PROJECT_ROOT, "data/config/llm_settings.json")
 
 
 def get_llm_config() -> dict | None:

@@ -23,13 +23,16 @@ def get_config_path() -> str:
     return _CONFIG_PATH_OVERRIDE or _CONFIG_FILE
 
 # 默认配置（按业务分组排列顺序，与模板 _get_default_config_template() 一致）
+_PATH_KEYS = frozenset({"holdings_dir", "output_dir", "llm_key_file", "llm_settings_file"})
+
 _DEFAULT_CONFIG = {
     # ── A. 路径与文件 ──
-    "holdings_dir": "data/holdings",
+    # 以下路径型键使用绝对路径，使配置不依赖 CWD；holdings_filename 是纯文件名，保持相对
+    "holdings_dir": os.path.join(PROJECT_ROOT, "data/holdings"),
     "holdings_filename": "个人投资持仓信息.xlsx",
-    "output_dir": "reports",
-    "llm_key_file": "data/config/llm_key.json",
-    "llm_settings_file": "data/config/llm_settings.json",
+    "output_dir": os.path.join(PROJECT_ROOT, "reports"),
+    "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
+    "llm_settings_file": os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
     # ── B. 板块可见性（关闭后对应页签/章节完全隐藏） ──
     "enable_b_series": True,    # B 系列基金深度分析（#6~9）
     "enable_news": True,        # 新闻（#10）

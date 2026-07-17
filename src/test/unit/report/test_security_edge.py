@@ -16,6 +16,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+from src.python.constants import PROJECT_ROOT
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
@@ -236,7 +237,8 @@ class TestJsonPrototypePollutionY6(unittest.TestCase):
             with patch("src.python.config._config_defaults._CONFIG_FILE", config_path):
                 config = get_config()
             self.assertIn("__proto__", config)
-            self.assertEqual(config["output_dir"], "reports")
+            self.assertEqual(config["output_dir"],
+                             os.path.join(PROJECT_ROOT, "reports"))
 
 
 # ═══════════════════════════════════════════════════════════
