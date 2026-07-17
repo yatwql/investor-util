@@ -22,6 +22,7 @@
   - **C5 HTTP 客户端统一**（P3-6）：4 个 LLM 模块的 `import httpx` 移至 `TYPE_CHECKING` 块
   - **P3-8 定价懒加载**：`pricing.py` 模块级 `reload_pricing()` 调用改为首次 `estimate_cost()` 时惰性加载，消除启动阶段非必要文件 IO
   - **P3-12 缓存共享测试**：`test_fund_style_analysis.py` 新增 `TestExtendedCacheSharing`，验证 `_push2_extended` 与 `_tencent_extended` 共享 `extended_{code}` 缓存 key
+- **C14 修复补丁**：`TuiProgressReporter.__init__` 遗漏 `super().__init__()` 调用，导致 `_timing_records` 未初始化，`print_timing_summary()` 运行时抛出 AttributeError
 
 ## [0.6.3] - 2026-07-17
 
