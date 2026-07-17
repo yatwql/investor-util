@@ -129,8 +129,8 @@ def prepare_report_data(
     }
 
 
-# ── S2 移入：capture_snapshot + compute_early_warnings ──
-# 原 handlers_report._capture_snapshot() + _compute_early_warnings()
+# ── S2 移入：capture_snapshot ──
+# 原 handlers_report._capture_snapshot()
 # ★ 与 TUI 原版差异：capture_snapshot 使用 config 参数替代 get_config_cache()
 
 
@@ -219,30 +219,6 @@ def capture_snapshot(
     except Exception:
         logger.info("[F1] 环比数据准备跳过（首次运行或异常）", exc_info=True)
     return f_context
-
-
-def compute_early_warnings(
-    holdings: list, penetrated_assets: list, sector_flow: list[dict],
-    news_data: list, news_llm_meta: dict, reporter: ProgressReporter,
-) -> dict | None:
-    """计算智能预警（行业资金流向联动 + 新闻情绪聚合）。"""
-    try:
-        from src.python.report.early_warning import compute_early_warnings as _compute_ew
-        _warnings = _compute_ew(
-            holdings,
-            penetration_top10=penetrated_assets,
-            sector_flow=sector_flow,
-            news_data=news_data,
-            news_llm_meta=news_llm_meta,
-        )
-        if _warnings.get("has_warnings"):
-            _n_sector = len(_warnings.get("sector_alerts", []))
-            _n_sentiment = len(_warnings.get("sentiment_alerts", []))
-            reporter.ok(f"智能预警完成: {_n_sector} 条行业预警, {_n_sentiment} 条新闻情绪")
-        return _warnings
-    except Exception as e:
-        logger.warning("智能预警计算失败: %s", e)
-        return None
 
 
 # ── S3 移入：fetch_history_data ──
@@ -473,7 +449,7 @@ def _report_llm_module_results(
     cached_flags: tuple[bool, bool, bool, bool],
     reporter: ProgressReporter,
 ) -> None:
-    """统一的 LLM 模块结果报告逻辑（消除 _process_llm_news_futures 和 LLM-only 分支的重复）。"""
+    """统一的 LLM 模块结果报告逻辑。"""
     from src.python.llm import FAIL_REASON_DISABLED
     from src.python.llm.prompts import LLM_MODULE_FAILURE
     from src.python.registry import get_llm_module_name
@@ -631,7 +607,7 @@ def _generate_report_full(
 
     流程：prepare_report_data() → capture_snapshot() → fetch_history_data()
           → get_sector_fund_flow() → _fetch_llm_and_news()
-          → compute_early_warnings() → write_html_report() → generate_excel_report()
+          → write_html_report() → generate_excel_report()
     """
     from src.python.config import is_enable_b_series, is_enable_news, is_enable_history, is_enable_llm
     from src.python.registry import get_report_section_order
@@ -678,13 +654,7 @@ def _generate_report_full(
         _enable_news, _enable_llm, reporter,
     )
 
-    # ── 6. 智能预警 ──
-    early_warnings = compute_early_warnings(
-        holdings, prep["penetrated_assets"], sector_flow,
-        news_data, news_llm_meta, reporter,
-    )
-
-    # ── 7. HTML 报告 ──
+    # ── 6. HTML 报告 ──
     _report_label = "含新闻 + LLM" if news_ok else "仅 LLM"
     reporter.info(f"正在生成 HTML 报告（{_report_label}分析章节）...")
     try:
@@ -694,7 +664,7 @@ def _generate_report_full(
             include_news=news_ok,
             llm_content=llm_content, details=prep["details"],
             news_data=news_data, news_llm_meta=news_llm_meta,
-            early_warnings=early_warnings, section_order=sec_order,
+            section_order=sec_order,
             history_data=history_data, progress=reporter,
             a_indices=prep["a_indices"], us_indices=prep["us_indices"],
             enable_b_series=_enable_b_series,
@@ -722,7 +692,7 @@ def _generate_report_full(
             news_data=news_data,
             news_llm_meta=news_llm_meta,
             section_order=sec_order,
-            early_warnings=early_warnings, progress=reporter,
+            progress=reporter,
             f_context=f_context, history_data=history_data,
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,

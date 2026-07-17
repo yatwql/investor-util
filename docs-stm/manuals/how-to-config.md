@@ -39,11 +39,6 @@
   // ── D. 行为调优 ──
   "default_menu_key": "L",
   "report_section_order": {},
-  "early_warning": {
-    "sector_alert_threshold_warning": -50000000,
-    "sector_alert_threshold_danger": -200000000,
-    "sentiment_top_n": 10
-  },
   "degradation": {
     "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
     "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
@@ -88,8 +83,7 @@
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 | `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/P/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
-| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（18 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
-| `early_warning` | `{...}` | 智能预警参数（见 §early_warning 章节） | 手动编辑 |
+| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（17 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `history.analysis` | `"off"` | 组合历史走势获取模式：`"off"`=关闭（默认）、`"prompt"`=报告后询问、`"auto"`=自动获取 | 手动编辑 |
@@ -99,8 +93,8 @@
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（见上） | 手动编辑 |
 | `history.benchmark_indices` | `{"sh000300": "沪深300", "gb_inx": "标普500"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
 | `enable_b_series` | `true` | B 系列报告板块可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
-| `enable_news` | `true` | 新闻类报告板块可见性（模块 #10~#11），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制板块在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
-| `enable_history` | `true` | 历史走势报告板块可见性（模块 #16~#17），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
+| `enable_news` | `true` | 新闻类报告板块可见性（模块 #10），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制板块在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
+| `enable_history` | `true` | 历史走势报告板块可见性（模块 #15~#16），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
 
 ---
 
@@ -242,18 +236,6 @@
 ---
 ### D. 行为调优
 
-#### early_warning 可调参数
-
-`early_warning` 控制智能预警模块的行为，用于发现持仓组合的异常信号。
-
-| 子字段 | 默认值 | 说明 |
-|--------|:------:|------|
-| `sector_alert_threshold_warning` | `-50,000,000` (≈-5000万) | 行业资金净流出预警阈值（负值表示净流出），低于此值标记"⚠注意" |
-| `sector_alert_threshold_danger` | `-200,000,000` (≈-2亿) | 行业资金净流出危险阈值，低于此值标记"🔴危险" |
-| `sentiment_top_n` | `10` | 新闻情绪聚合时取 TOP N 持仓品种（按关联新闻数量排序） |
-
-> 阈值均为负值（元），绝对值越大越不容易触发预警。默认值适合 A 股中等市值组合；持仓规模较大时可适当调高（如 warning 调至 -1 亿、danger 调至 -5 亿）。
-
 #### degradation 数据降级策略
 
 `degradation` 控制数据降级行为，定义各层级数据在连续失败或空数据返回时切换到降级模式的阈值。
@@ -295,7 +277,7 @@
 | 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
 | 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
 
-**18 个模块标识及默认顺序：**
+**17 个模块标识及默认顺序：**
 
 | 默认序号 | 模块标识 | 显示名称 | 类型 |
 |:--------:|:---------|:---------|:-----|
@@ -309,14 +291,13 @@
 | 8 | `fund_concentration` | 持仓集中度监控 | B 系列（enable_b_series 控制；有数据才显示） |
 | 9 | `fund_style` | 基金风格分析 | B 系列（enable_b_series 控制；有数据才显示） |
 | 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻（enable_news 控制） |
-| 11 | `early_warning` | 智能预警 | 新闻（enable_news 控制） |
-| 12 | `global_macro` | 全球政经局势 | LLM |
-| 13 | `expert_review` | 智囊团深度复盘 | LLM |
-| 14 | `health_check` | 持仓体检报告 | LLM |
-| 15 | `penetration_deep` | 穿透深度分析 | LLM |
-| 16 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 17 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 18 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 11 | `global_macro` | 全球政经局势 | LLM |
+| 12 | `expert_review` | 智囊团深度复盘 | LLM |
+| 13 | `health_check` | 持仓体检报告 | LLM |
+| 14 | `penetration_deep` | 穿透深度分析 | LLM |
+| 15 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
+| 16 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
+| 17 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 
@@ -429,9 +410,9 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
 | `enable_b_series` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析 | B 系列功能板块 |
-| `enable_news` | `true` | `config.json` | #10 财经新闻热点与持仓关联分析、#11 智能预警 | 新闻类功能板块 |
-| `enable_history` | `true` | `config.json` | #16 组合历史走势、#17 历史回撤分析 | 历史走势板块（F1 持仓快照不受影响，始终自动执行） |
-| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #12 全球政经局势、#13 智囊团深度复盘、#14 持仓体检报告、#15 穿透深度分析、LLM API 用量 | LLM 板块。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
+| `enable_news` | `true` | `config.json` | #10 财经新闻热点与持仓关联分析 | 新闻类功能板块 |
+| `enable_history` | `true` | `config.json` | #15 组合历史走势、#16 历史回撤分析 | 历史走势板块（F1 持仓快照不受影响，始终自动执行） |
+| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #11 全球政经局势、#12 智囊团深度复盘、#13 持仓体检报告、#14 穿透深度分析、LLM API 用量 | LLM 板块。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告板块的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时板块仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时板块完全隐藏。
 

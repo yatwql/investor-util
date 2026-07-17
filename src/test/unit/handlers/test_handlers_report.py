@@ -1,6 +1,6 @@
 """TUI 报告生成命令处理器单元测试。
 
-测试 _prompt_force_llm、_compute_early_warnings 等可独立辅助函数。
+测试可独立辅助函数。
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -78,56 +78,3 @@ class TestPromptForceLlm(unittest.TestCase):
         with patch("builtins.input", return_value="  y  "):
             result = _prompt_force_llm(reporter)
         self.assertTrue(result)
-
-
-@pytest.mark.unit_core
-class TestComputeEarlyWarnings(unittest.TestCase):
-    """_compute_early_warnings 智能预警计算。"""
-
-    def setUp(self):
-        self.reporter = MagicMock()
-        self.holdings: list = []
-        self.assets = [{"name": "腾讯控股", "codes": ["00700"]}]
-        self.sector_flow = [{"name": "电力"}]
-        self.news_data = [{"title": "test"}]
-        self.news_meta: dict = {}
-
-    def _call(self):
-        from src.python.report.orchestrator import compute_early_warnings
-        return compute_early_warnings(
-            self.holdings, self.assets, self.sector_flow,
-            self.news_data, self.news_meta, self.reporter,
-        )
-
-    @patch("src.python.report.early_warning.compute_early_warnings")
-    def test_has_warnings(self, mock_compute):
-        """有预警时 reporter.ok 被调用。"""
-        mock_compute.return_value = {
-            "has_warnings": True,
-            "sector_alerts": [{"industry": "电力"}],
-            "sentiment_alerts": [{"code": "600900"}],
-        }
-        result = self._call()
-        self.assertIsNotNone(result)
-        self.assertTrue(result["has_warnings"])
-        self.reporter.ok.assert_called_once()
-
-    @patch("src.python.report.early_warning.compute_early_warnings")
-    def test_no_warnings(self, mock_compute):
-        """无预警时 reporter.ok 不被调用。"""
-        mock_compute.return_value = {
-            "has_warnings": False,
-            "sector_alerts": [],
-            "sentiment_alerts": [],
-        }
-        result = self._call()
-        self.assertIsNotNone(result)
-        self.assertFalse(result["has_warnings"])
-        self.reporter.ok.assert_not_called()
-
-    @patch("src.python.report.early_warning.compute_early_warnings",
-           side_effect=ValueError("test error"))
-    def test_exception_returns_none(self, mock_compute):
-        """异常时返回 None 且不传播。"""
-        result = self._call()
-        self.assertIsNone(result)

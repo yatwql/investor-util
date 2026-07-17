@@ -60,11 +60,6 @@
   // ── E. 行为调优 ──
   "default_menu_key": "L",
   "report_section_order": {},
-  "early_warning": {
-    "sector_alert_threshold_warning": -50000000,
-    "sector_alert_threshold_danger": -200000000,
-    "sentiment_top_n": 10
-  },
   "degradation": {
     "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
     "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},

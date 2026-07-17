@@ -316,35 +316,6 @@ def _validate_enable_llm(issues: int) -> int:
     return issues
 
 
-def _validate_early_warning(config: dict, issues: int) -> int:
-    ew, issues = _section(config, "early_warning", dict, "智能预警阈值将使用默认值", issues)
-    if ew is _MISSING:
-        return issues
-    for ew_key in ("sector_alert_threshold_warning", "sector_alert_threshold_danger"):
-        ew_val = ew.get(ew_key)
-        if ew_val is not None:
-            try:
-                fv = float(ew_val)
-                if fv >= 0:
-                    logger.warning("config.json early_warning.%s = %s 应为负值（净流出阈值）", ew_key, ew_val)
-                    issues += 1
-            except (ValueError, TypeError):
-                logger.warning("config.json early_warning.%s = %s 不是有效数字", ew_key, ew_val)
-                issues += 1
-    sentiment_n = ew.get("sentiment_top_n")
-    if sentiment_n is None:
-        return issues
-    try:
-        sn = int(sentiment_n)
-        if sn <= 0:
-            logger.warning("config.json early_warning.sentiment_top_n = %s 不是正数", sentiment_n)
-            issues += 1
-    except (ValueError, TypeError):
-        logger.warning("config.json early_warning.sentiment_top_n = %s 不是有效整数", sentiment_n)
-        issues += 1
-    return issues
-
-
 def _validate_market_hours(config: dict, issues: int) -> int:
     mha = config.get("market_hour_aware")
     if mha is not None and (not isinstance(mha, list) or not all(isinstance(x, str) for x in mha)):
@@ -447,7 +418,6 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_preferred_provider(config, issues)
     issues = _validate_user_fund_benchmarks(config, issues)
     issues = _validate_enable_boards(config, issues)
-    issues = _validate_early_warning(config, issues)
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
     issues = _validate_benchmark_indices(config, issues)
@@ -474,7 +444,7 @@ def is_enable_b_series(config: dict | None = None) -> bool:
 
 
 def is_enable_news(config: dict | None = None) -> bool:
-    """新闻与预警（#10~11）是否启用。缺失时返回 True。"""
+    """新闻（#10）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_news")

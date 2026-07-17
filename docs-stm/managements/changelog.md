@@ -19,9 +19,9 @@
 ### Changed
 - **news_correlation `_build_news_footer`** — 参数由 `has_llm: bool` 改为 `llm_count: int`，精确显示分析条数
 - **plan.md** — 移除已完成的 P3-I（CLI 模式）条目（v0.6.1 已完成）
+- **全量文档同步** — 移除智能预警模块后，核对所有管理文档/用户文档/源码注释的模块数（18→17）、编号（LLM 12→15→11→14，历史 16→17→15→16）、引用描述（新闻与预警→新闻），清除历史痕迹
 
 ### Fixed
-- 智能预警模块 `_collect_relevant_news` 中 `isinstance(analysis, dict)` 类型错误 — 实际 `llm_analysis` 为 `str`（`"[高][利好]..."`），导致新闻情绪聚合维度恒空（见 `generators_news.py:196` vs `early_warning.py:195`）
 - **内部路径隔离** — `_config_defaults.py`、`logger.py`、`handlers_config.py` 统一使用 `PROJECT_ROOT`（`constants.py`）作为基准路径，消除 CWD 依赖。解决从非项目根目录运行时 `src/data/`、`src/logs/` 等目录误创建的问题
 - **回撤图 Y 轴截断** — `drawSimpleChart` 中 `yMin = Math.max(0, globalMin - pad)` 强制下限 ≥0，导致全部负值回撤数据不可见、指数回撤线被裁剪。移除 `Math.max(0, ...)` 修复
 - **回撤区持仓名单分行** — `report_template.html` 中 Section 13 持仓列表由内联拼接改为逐行显示，与 Section 12 保持一致
@@ -44,6 +44,7 @@
 - **cli-mode-iteration-plan.md / cli-mode-technical-design.md** — 归档至 `docs-stm/archive/v0.6.x/cli-mode/`
 
 ### Removed
+- **完全移除智能预警（early_warning）模块** — 经 P4-1 评估确认两个维度均不可靠：行业资金流向 0% 成功率（废弃），新闻情绪聚合因 str/dict 类型 Bug 恒空且 LLM 成本收益比不佳。删除 `report/early_warning.py`、`test_early_warning.py`、`test_early_warning_edge.py`，清理 orchestrator/html_writer/excel_generator/registry/config 中全部引用及所有测试
 
 ## [0.6.1] - 2026-07-16
 

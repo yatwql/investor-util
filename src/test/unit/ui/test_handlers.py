@@ -4,7 +4,7 @@
 - handlers_cache: _print_cache_refresh_report, _refresh_one_fund_cache,
                   _refresh_profit_forecast_cache, _refresh_sector_flow_cache
 - handlers_config: _read_llm_settings, _write_llm_settings
-- handlers_report: _process_llm_news_futures, _compute_early_warnings, _prompt_force_llm
+- handlers_report: _prompt_force_llm
 """
 from __future__ import annotations
 

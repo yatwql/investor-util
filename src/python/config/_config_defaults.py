@@ -32,8 +32,8 @@ _DEFAULT_CONFIG = {
     "llm_settings_file": "data/config/llm_settings.json",
     # ── B. 板块可见性（关闭后对应页签/章节完全隐藏） ──
     "enable_b_series": True,    # B 系列基金深度分析（#6~9）
-    "enable_news": True,        # 新闻与预警（#10~11）
-    "enable_history": True,     # 历史走势+回撤分析（#16~17）
+    "enable_news": True,        # 新闻（#10）
+    "enable_history": True,     # 历史走势+回撤分析（#15~#16）
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -56,11 +56,6 @@ _DEFAULT_CONFIG = {
     # ── E. 行为调优 ──
     "default_menu_key": "L",
     "report_section_order": {},
-    "early_warning": {
-        "sector_alert_threshold_warning": -50_000_000,
-        "sector_alert_threshold_danger": -200_000_000,
-        "sentiment_top_n": 10,
-    },
     "degradation": {
         "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},
         "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
@@ -126,11 +121,6 @@ def _get_default_config_template() -> str:
         '  // ── E. 行为调优 ──\n'
         '  "default_menu_key": "L",\n'
         '  "report_section_order": {},\n'
-        '  "early_warning": {\n'
-        '    "sector_alert_threshold_warning": -50000000,\n'
-        '    "sector_alert_threshold_danger": -200000000,\n'
-        '    "sentiment_top_n": 10\n'
-        '  },\n'
         '  "degradation": {\n'
         '    "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},\n'
         '    "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},\n'

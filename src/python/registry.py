@@ -313,7 +313,6 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "category": "持仓分类表",
     "penetration": "资产穿透TOP10",
     "fund_performance": "基金业绩分析",
-    "early_warning": "智能预警",
     "fund_manager": "基金经理变更监控",
     "fund_overlap": "持仓重合度矩阵",
     "fund_concentration": "持仓集中度监控",
@@ -351,17 +350,16 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "b_series",  "data_flag": "style_data"},
     # ── news 类型（需启用新闻功能） ──
     {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10, "type": "news",      "data_flag": "news_data_available"},
-    {"key": "early_warning",      "name": "智能预警",                         "number": 11, "type": "news",      "data_flag": "early_warnings"},
     # ── llm 类型（需启用 LLM 功能） ──
-    {"key": "global_macro",       "name": "全球政经局势",                     "number": 12, "type": "llm",       "data_flag": "llm_data_available"},
-    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13, "type": "llm",       "data_flag": "llm_data_available"},
-    {"key": "health_check",       "name": "持仓体检报告",                     "number": 14, "type": "llm",       "data_flag": "llm_data_available"},
-    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "global_macro",       "name": "全球政经局势",                     "number": 11, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "health_check",       "name": "持仓体检报告",                     "number": 13, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14, "type": "llm",       "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
-    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 16, "type": "history",   "data_flag": None},
-    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 17, "type": "history",   "data_flag": None},
+    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 15, "type": "history",   "data_flag": None},
+    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 16, "type": "history",   "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 18, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 17, "type": "llm",       "data_flag": "llm_data_available"},
 ]
 
 

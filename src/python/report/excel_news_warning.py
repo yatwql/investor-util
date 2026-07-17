@@ -1,6 +1,6 @@
-"""新闻 + 智能预警页签写入模块。
+"""新闻页签写入模块。
 
-职责：财经新闻页签获取/写入 + 智能预警页签写入。
+职责：财经新闻页签获取/写入。
 提取自 excel_generator.py 的 _write_news_and_early_warning。
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from src.python.logger import setup_logger
-from src.python.registry import get_llm_module_name, get_report_sheet_name
+from src.python.registry import get_llm_module_name
 from src.python.report.progress import ProgressReporter
 
 logger = setup_logger()
@@ -19,10 +19,10 @@ def write_news_and_early_warning(
     sheets: dict[str, Any], holdings: list,
     pen_result: dict, include_news: bool,
     news_data: list | None, news_llm_meta: dict | None,
-    news_top_count: int, early_warnings: dict | None,
+    news_top_count: int,
     prog: ProgressReporter,
 ) -> None:
-    """写入新闻页签和智能预警页签。"""
+    """写入新闻页签。"""
     if not include_news:
         return
     penetrated_assets = pen_result.get("top10", []) if pen_result else []
@@ -57,18 +57,3 @@ def write_news_and_early_warning(
 
     prog.call_sheet(get_llm_module_name("news_correlation"), write_news_sheet,
                     sheets["news_correlation"], news_data, llm_meta=_meta)
-
-    # 智能预警页签
-    if sheets.get("early_warning") is not None:
-        if early_warnings is None:
-            _warnings = {"sector_alerts": [], "sentiment_alerts": [],
-                         "has_warnings": False, "has_sector_data": False, "has_llm_news": False}
-        else:
-            _warnings = early_warnings
-        try:
-            from src.python.report.early_warning import write_early_warning_sheet
-            prog.call_sheet(get_report_sheet_name("early_warning"), write_early_warning_sheet,
-                            sheets["early_warning"], _warnings)
-        except ImportError as _ew_err:
-            logger.warning("智能预警模块缺失: %s", _ew_err)
-            prog.add_error("智能预警模块缺失，跳过")

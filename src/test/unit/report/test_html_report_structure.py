@@ -38,14 +38,14 @@ _ALL_KEYS_DEFAULT = [
     "summary", "market_value", "category", "penetration",
     "fund_performance",
     "fund_manager", "fund_overlap", "fund_concentration", "fund_style",
-    "news_correlation", "early_warning",
+    "news_correlation",
     "global_macro", "expert_review", "health_check", "penetration_deep",
     "llm_usage",
 ]
 
 _ALWAYS_KEYS = {"summary", "market_value", "category", "penetration", "fund_performance"}
 _B_SERIES_KEYS = {"fund_manager", "fund_overlap", "fund_concentration", "fund_style"}
-_NEWS_KEYS = {"news_correlation", "early_warning"}
+_NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
@@ -59,12 +59,11 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8},
     {"key": "fund_style",         "name": "基金风格分析",                     "number": 9},
     {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10},
-    {"key": "early_warning",      "name": "智能预警",                         "number": 11},
-    {"key": "global_macro",       "name": "全球政经局势",                     "number": 12},
-    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13},
-    {"key": "health_check",       "name": "持仓体检报告",                     "number": 14},
-    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15},
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 16},
+    {"key": "global_macro",       "name": "全球政经局势",                     "number": 11},
+    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12},
+    {"key": "health_check",       "name": "持仓体检报告",                     "number": 13},
+    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14},
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 15},
 ]
 
 
@@ -104,7 +103,7 @@ def _build_minimal_render_data(
         "llm_enabled": True,
         "global_macro": None, "expert_review": None,
         "health_check": None, "penetration_deep": None,
-        "llm_session_usage": None, "early_warnings": None,
+        "llm_session_usage": None,
         "module_labels": {}, "module_disabled": {},
         "llm_module_info": [], "llm_endpoint": "",
         "cache_stats": None,
@@ -123,7 +122,6 @@ def _build_minimal_render_data(
     # 新闻模块可见时，news_data 需为非 None list（模板隐式调用 |length）
     if visible_keys & _NEWS_KEYS:
         data["news_data"] = []
-        data["early_warnings"] = None  # 模板内 is None 安全
 
     return data
 
@@ -373,13 +371,12 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "fund_style",         "name": "基金风格分析",                     "number": 9},
             # news 保持默认
             {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10},
-            {"key": "early_warning",      "name": "智能预警",                         "number": 11},
             # llm 保持默认
-            {"key": "global_macro",       "name": "全球政经局势",                     "number": 12},
-            {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13},
-            {"key": "health_check",       "name": "持仓体检报告",                     "number": 14},
-            {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15},
-            {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 16},
+            {"key": "global_macro",       "name": "全球政经局势",                     "number": 11},
+            {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12},
+            {"key": "health_check",       "name": "持仓体检报告",                     "number": 13},
+            {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14},
+            {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 15},
         ]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.custom_order}
         cls.sv_dict = {sec["key"]: True for sec in cls.custom_order}

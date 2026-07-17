@@ -1278,94 +1278,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-        </div>
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════════ -->
-    {% if section_visible("early_warning") %}
-    <!--  MODULE 7: 智能预警 (Early Warning)                     -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-early_warning" style="order: {{ section_numbers['early_warning'] }};">
-        <div class="section-title">{{ section_numbers['early_warning'] }}、智能预警</div>
-        {% if early_warnings and early_warnings.has_warnings %}
-        <div class="section-content">
-            {% if early_warnings.sector_alerts %}
-            <h3 style="margin: 12px 0 8px;">行业资金流向联动预警</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>行业</th>
-                        <th>主力净流入</th>
-                        <th>净占比</th>
-                        <th>涨跌幅</th>
-                        <th>关联持仓</th>
-                        <th>预警等级</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for alert in early_warnings.sector_alerts %}
-                    <tr>
-                        <td>{{ alert.sector_name }}</td>
-                        <td>{{ alert.main_net_inflow | money }}</td>
-                        <td>{{ "%.2f"|format(alert.main_net_inflow_pct) }}%</td>
-                        <td>{{ "%.2f"|format(alert.change_pct) }}%</td>
-                        <td>{{ alert.matched_assets | map(attribute="name") | join(", ") }}</td>
-                        <td>
-                            {% if alert.alert_level == "danger" %}⚠ 危险
-                            {% elif alert.alert_level == "warning" %}▲ 关注
-                            {% else %}● 注意{% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-
-            {% if early_warnings.sentiment_alerts %}
-            <h3 style="margin: 20px 0 8px;">新闻情绪聚合</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>持仓品种</th>
-                        <th>代码</th>
-                        <th>提及次数</th>
-                        <th>利好</th>
-                        <th>利空</th>
-                        <th>中性</th>
-                        <th>情绪</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for entry in early_warnings.sentiment_alerts %}
-                    <tr>
-                        <td>{{ entry.name }}</td>
-                        <td>{{ entry.code }}</td>
-                        <td>{{ entry.total_mentions }}</td>
-                        <td>{{ entry.positive }}</td>
-                        <td>{{ entry.negative }}</td>
-                        <td>{{ entry.neutral }}</td>
-                        <td>{{ entry.sentiment_label }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-        </div>
-        {% else %}
-        {% set _ew_sector = early_warnings.has_sector_data if early_warnings else false %}
-        {% set _ew_llm = early_warnings.has_llm_news if early_warnings else false %}
-        {% if not _ew_sector and not _ew_llm %}
-        <div class="empty-section">📭 预警数据暂不可用（上游行业资金流向和新闻数据均为空）</div>
-        {% elif not _ew_sector %}
-        <div class="empty-section">📭 行业资金流向数据不可用，无法生成行业预警</div>
-        {% elif not _ew_llm %}
-        <div class="empty-section">📭 新闻情绪聚合数据不可用（需启用 LLM 新闻关联分析）</div>
-        {% else %}
-        <div class="section-content">当前无预警信息。</div>
-        {% endif %}
-        {% endif %}
-    </div>
-    {% endif %}
 
     {% if section_visible("global_macro") %}
     <!-- ═══════════════════════════════════════════════════════ -->

@@ -182,7 +182,6 @@ def generate_excel_report(
     us_indices: dict[str, dict[str, Any]] | None = None,
     news_data: list | None = None,
     news_llm_meta: dict | None = None,
-    early_warnings: dict | None = None,
     enable_b_series: bool = False,      # board 层：B 系列是否开启
     enable_news: bool = True,           # board 层：新闻板块是否开启（配置值）
     enable_llm: bool = True,            # board 层：LLM 板块是否开启
@@ -206,7 +205,6 @@ def generate_excel_report(
         us_indices: 美股指数数据
         news_data: 预获取的新闻数据
         news_llm_meta: 新闻 LLM 元数据
-        early_warnings: 智能预警数据
         enable_b_series: board 层 — B 系列基金深度分析是否开启
         enable_news: board 层 — 新闻板块是否开启（配置值）
         enable_llm: board 层 — LLM 板块是否开启
@@ -253,7 +251,7 @@ def generate_excel_report(
     pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
     write_news_and_early_warning(sheets, holdings, pen_result, include_news,
                                   news_data, news_llm_meta, news_top_count,
-                                  early_warnings, prog)
+                                  prog)
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
     write_llm_section_and_usage(sheets, include_llm, llm_content, prog, section_order=order)
 

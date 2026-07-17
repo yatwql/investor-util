@@ -1,7 +1,7 @@
 """orchestrator 共享层单元测试。
 
 S1 骨架：prepare_report_data mock 测试。
-S2 扩展：capture_snapshot + compute_early_warnings。
+S2 扩展：capture_snapshot。
 """
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from src.python.report.orchestrator import (
     generate_report,
     prepare_report_data,
     capture_snapshot,
-    compute_early_warnings,
     fetch_history_data,
     _report_llm_module_results,
     _fetch_llm_and_news,
@@ -399,7 +398,6 @@ class TestGenerateReport:
             patch("src.python.report.orchestrator.capture_snapshot"),
             patch("src.python.report.orchestrator.fetch_history_data"),
             patch("src.python.report.orchestrator._fetch_llm_and_news") as mock_llm_news,
-            patch("src.python.report.orchestrator.compute_early_warnings"),
             patch("src.python.report.html_writer.write_html_report") as mock_html,
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.registry.get_report_section_order", return_value=[]),
@@ -488,7 +486,6 @@ class TestGenerateReport:
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
             patch("src.python.report.orchestrator.capture_snapshot"),
             patch("src.python.report.orchestrator.fetch_history_data"),
-            patch("src.python.report.orchestrator.compute_early_warnings"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.registry.get_report_section_order"),
@@ -527,7 +524,6 @@ class TestGenerateReport:
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
             patch("src.python.report.orchestrator.capture_snapshot"),
             patch("src.python.report.orchestrator.fetch_history_data"),
-            patch("src.python.report.orchestrator.compute_early_warnings"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.registry.get_report_section_order"),
@@ -563,7 +559,6 @@ class TestGenerateReport:
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
             patch("src.python.report.orchestrator.capture_snapshot"),
             patch("src.python.report.orchestrator.fetch_history_data"),
-            patch("src.python.report.orchestrator.compute_early_warnings"),
             patch(
                 "src.python.report.html_writer.write_html_report",
                 side_effect=RuntimeError("HTML 失败"),
@@ -1012,61 +1007,6 @@ class TestCaptureSnapshot:
         ):
             result = capture_snapshot(
                 [self._make_mock_holding()], [detail], config, mock_reporter,
-            )
-
-        assert result is None
-
-
-@pytest.mark.unit
-@pytest.mark.unit_report
-class TestComputeEarlyWarnings:
-    """compute_early_warnings 预警计算测试。"""
-
-    def test_compute_early_warnings_with_data(self):
-        """有预警数据时返回含 sector_alerts + sentiment_alerts 的字典。"""
-        mock_reporter = MagicMock()
-
-        with patch(
-            "src.python.report.early_warning.compute_early_warnings",
-            return_value={
-                "has_warnings": True,
-                "sector_alerts": [{"name": "行业A"}],
-                "sentiment_alerts": [{"name": "情绪B"}],
-            },
-        ):
-            result = compute_early_warnings(
-                [], [], [], [], {}, mock_reporter,
-            )
-
-        assert result is not None
-        assert result["has_warnings"] is True
-        assert len(result["sector_alerts"]) == 1
-
-    def test_compute_early_warnings_no_data(self):
-        """无预警时返回 has_warnings=False。"""
-        mock_reporter = MagicMock()
-
-        with patch(
-            "src.python.report.early_warning.compute_early_warnings",
-            return_value={"has_warnings": False, "sector_alerts": [], "sentiment_alerts": []},
-        ):
-            result = compute_early_warnings(
-                [], [], [], [], {}, mock_reporter,
-            )
-
-        assert result is not None
-        assert result["has_warnings"] is False
-
-    def test_compute_early_warnings_exception(self):
-        """内部异常时返回 None。"""
-        mock_reporter = MagicMock()
-
-        with patch(
-            "src.python.report.early_warning.compute_early_warnings",
-            side_effect=RuntimeError("测试异常"),
-        ):
-            result = compute_early_warnings(
-                [], [], [], [], {}, mock_reporter,
             )
 
         assert result is None

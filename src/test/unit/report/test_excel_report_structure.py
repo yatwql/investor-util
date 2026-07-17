@@ -33,8 +33,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8,  "type": "b_series"},
     {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "b_series"},
     {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10, "type": "news"},
-    {"key": "early_warning",      "name": "智能预警",                         "number": 11, "type": "news"},
-    {"key": "global_macro",       "name": "全球政经局势",                     "number": 12, "type": "llm"},
+    {"key": "global_macro",       "name": "全球政经局势",                     "number": 11, "type": "llm"},
     {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13, "type": "llm"},
     {"key": "health_check",       "name": "持仓体检报告",                     "number": 14, "type": "llm"},
     {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15, "type": "llm"},
@@ -309,7 +308,6 @@ class TestExcelModuleSheets(unittest.TestCase):
                     us_indices={},
                     news_data=[],
                     news_llm_meta=None,
-                    early_warnings=None,
                     enable_b_series=False,
                 )
                 # 检查输出文件是否存在

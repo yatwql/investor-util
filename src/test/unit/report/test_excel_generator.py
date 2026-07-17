@@ -152,17 +152,16 @@ class TestGenerateExcelReport(unittest.TestCase):
     # ── 新闻路径 ──
 
     def test_with_news(self) -> None:
-        """include_news=True → 新闻页签创建 + 预警页签。"""
+        """include_news=True → 新闻页签创建。"""
         from src.python.report.excel_generator import generate_excel_report
 
         with patch("src.python.report.news_correlation.write_news_sheet") as mock_news:
             with patch("src.python.report.news_correlation.build_news_data",
                        return_value=([], {})):
-                with patch("src.python.report.early_warning.write_early_warning_sheet"):
-                    generate_excel_report(
-                        self.holdings, include_news=True,
-                        progress=self.progress,
-                    )
+                generate_excel_report(
+                    self.holdings, include_news=True,
+                    progress=self.progress,
+                )
 
         self.assertEqual(len(self.progress.get_errors()), 0)
 
@@ -173,8 +172,7 @@ class TestGenerateExcelReport(unittest.TestCase):
         news_llm_meta = {"llm_enabled": False}
 
         with patch("src.python.report.news_correlation.write_news_sheet") as mock_news:
-            with patch("src.python.report.early_warning.write_early_warning_sheet"):
-                generate_excel_report(
+            generate_excel_report(
                     self.holdings, include_news=True,
                     news_data=news_data, news_llm_meta=news_llm_meta,
                     progress=self.progress,
@@ -240,31 +238,6 @@ class TestGenerateExcelReport(unittest.TestCase):
                             )
 
         mock_llm.assert_called_once()
-
-    # ── 智能预警 ──
-
-    def test_early_warnings_passthrough(self) -> None:
-        """外部传入 early_warnings → 透传到预警页签。"""
-        from src.python.report.excel_generator import generate_excel_report
-        early_warnings = {
-            "sector_alerts": [{"asset": "茅台", "level": "关注"}],
-            "sentiment_alerts": [],
-            "has_warnings": True, "has_sector_data": True,
-            "has_llm_news": False,
-        }
-
-        with patch("src.python.report.news_correlation.write_news_sheet"):
-            with patch("src.python.report.news_correlation.build_news_data",
-                       return_value=([], {"llm_enabled": False})):
-                with patch("src.python.report.early_warning.write_early_warning_sheet") as mock_ew:
-                    generate_excel_report(
-                        self.holdings, include_news=True,
-                        news_data=[], news_llm_meta={},
-                        early_warnings=early_warnings,
-                        progress=self.progress,
-                    )
-
-        mock_ew.assert_called_once()
 
     # ── 模块缺失降级 ──
 
@@ -740,8 +713,8 @@ class TestCreateSheets(unittest.TestCase):
                                 enable_b_series=False, enable_news=True, enable_llm=False,
                                 data_availability={"news_data_available": True})
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
-        # always(5) + history(2) + news(2) = 9
-        self.assertEqual(len(sheets), 9)
+        # always(5) + history(2) + news(1) = 8
+        self.assertEqual(len(sheets), 8)
         for key in news_keys:
             self.assertIn(key, sheets)
 

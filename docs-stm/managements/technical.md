@@ -95,7 +95,7 @@
                                      ▼
   ┌───────────────────────────────────────────────────────────────────┐
   │                      报告编排层 (orchestrator.py)                  │
-  │  数据准备 → 快照 → 历史走势 → LLM+新闻并取 → 智能预警 → 双管线  │
+  │  数据准备 → 快照 → 历史走势 → LLM+新闻并取 → 双管线  │
   │              内部管理 orch_prep / orch_llm_news 线程池             │
   └──────────────────────────────────┬────────────────────────────────┘
                                      │ info 字典
@@ -250,7 +250,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 18 个模块的序号、显示名称、板块可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 17 个模块的序号、显示名称、板块可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型**：
 
@@ -1024,7 +1024,7 @@ def _get_pool() -> ThreadPoolExecutor:
                                  fund_performance /      共享: data_status.py
                                  news_correlation /       (STATUS_MESSAGES/
                                  llm_content /            TIER_PREFIX/
-                                 early_warning /          DegradationTracker)
+                                                          DegradationTracker)
                                  B 系列 4 个 /
                                  excel_writer.py +
                                  styles.py
@@ -1039,8 +1039,7 @@ def _get_pool() -> ThreadPoolExecutor:
 3. **历史走势计算**：F2 组合 as-if 走势 + 基准指数对比
 4. **行业资金流向获取**
 5. **LLM + 新闻并行获取**（4 分支统一处理）
-6. **智能预警计算**
-7. **双管线生成**：HTML + Excel
+6. **双管线生成**：HTML + Excel
 
 #### 三种报告路径
 
@@ -1073,7 +1072,6 @@ _generate_report_full()
     → fetch_history_data()         条件：enable_history=True
     → get_sector_fund_flow()       行业资金流向
     → _fetch_llm_and_news()        LLM+新闻并行（4 分支：均开/仅 LLM/仅新闻/均关）
-    → compute_early_warnings()     智能预警
     → write_html_report()
     → generate_excel_report()
 ```
@@ -1203,14 +1201,13 @@ for sec in section_order:
 | `concentration_data` | `concentration_analysis is not None` | `b_series` | B4 持仓集中度 |
 | `style_data` | `style_analysis is not None` | `b_series` | B5 基金风格 |
 | `include_news` | `include_news` flag | `news` | 新闻关联分析 |
-| `early_warnings` | `bool(early_warnings)` | `news` | 智能预警 |
 | `llm_enabled` | `llm_enabled_flag` | `llm` | LLM 全部 5 模块 |
 
 `always` 类型模块（summary / market_value / category / penetration / fund_performance）无 data_flag，始终显示。
 
 ### 4.6 报告序号可配置
 
-报告 18 个模块的序号/显示名称由 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 17 个模块的序号/显示名称由 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1226,7 +1223,7 @@ for sec in section_order:
 }
 ```
 
-18 个模块分布：`always`×5、`b_series`×4、`news`×2、`llm`×5、`history`×2。
+17 个模块分布：`always`×5、`b_series`×4、`news`×1、`llm`×5、`history`×2。
 
 #### 合并规则流程
 
@@ -2013,7 +2010,6 @@ report/orchestrator.py (报告编排层)
   → report/portfolio_history.py (F2 历史走势)
   → report/news_correlation.py (新闻关联)
   → llm/generators_orchestrator.py (LLM 编排)
-  → report/early_warning.py (智能预警)
   → report/html_writer.py (HTML 管线)
   → report/excel_generator.py (Excel 管线)
   → config/ (开关配置)
@@ -2076,7 +2072,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号不可硬编码** — 报告 18 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
+| **C7** | **报告序号不可硬编码** — 报告 17 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 
@@ -2132,7 +2128,7 @@ investor-util/
 │   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
 │   │   ├── providers/           # 数据源提供商（14 个文件）
 │   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（25 个数据模块 + 18 个报告模块）
+│   │   ├── registry.py          # 中央注册表（25 个数据模块 + 17 个报告模块）
 │   │   ├── report/              # 报告生成（~30 个文件，含 orchestrator/progress）
 │   │   ├── schemas/             # Pydantic 数据模式（快照等）
 │   │   ├── tui.py               # 键盘输入封装

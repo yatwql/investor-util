@@ -89,7 +89,7 @@ investor-util/
 │   │   │   ├── excel_sheet_factory.py #  Excel 页签工厂（按配置创建页签）
 │   │   │   ├── excel_content_sheets.py #  Excel 内容页签（持仓明细/汇总）
 │   │   │   ├── excel_market_data.py  #   Excel 行情数据页签
-│   │   │   ├── excel_news_warning.py #   Excel 新闻预警页签
+│   │   │   ├── excel_news_warning.py #   Excel 新闻页签
 │   │   │   ├── excel_b_series.py     #   Excel B 系列基金深度分析页签
 │   │   │   ├── excel_llm_usage.py    #   Excel LLM 用量统计页签
 │   │   │   ├── excel_writer.py       #   Excel 底层写入器（openpyxl 封装）
@@ -114,7 +114,6 @@ investor-util/
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
-│   │   │   ├── early_warning.py      #   持仓异常预警检测
 │   │   │   ├── news_correlation.py   #   新闻与持仓关联分析报告
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要

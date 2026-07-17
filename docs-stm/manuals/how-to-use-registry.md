@@ -143,7 +143,7 @@ from src.python.registry import (
 **用途：**
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
-- `get_report_section_keys()` → 全部 18 个模块键名
+- `get_report_section_keys()` → 全部 17 个模块键名
 
 ### 报表页签名称查找
 
@@ -156,7 +156,7 @@ from src.python.registry import (
 **用途：**
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_sheet_name("penetration")` → `"资产穿透TOP10"`
-- 可选键名：`summary`, `market_value`, `category`, `penetration`, `fund_performance`, `early_warning`, `fund_manager`, `fund_overlap`, `fund_concentration`, `fund_style`, `portfolio_history`, `drawdown_analysis`
+- 可选键名：`summary`, `market_value`, `category`, `penetration`, `fund_performance`, `fund_manager`, `fund_overlap`, `fund_concentration`, `fund_style`, `portfolio_history`, `drawdown_analysis`
 
 | 键名 | 中文标题 |
 |------|---------|
@@ -169,7 +169,6 @@ from src.python.registry import (
 | `fund_overlap` | 持仓重合度矩阵 |
 | `fund_concentration` | 持仓集中度监控 |
 | `fund_style` | 基金风格分析 |
-| `early_warning` | 智能预警 |
 | `portfolio_history` | 组合历史走势 |
 | `drawdown_analysis` | 回撤分析 |
 

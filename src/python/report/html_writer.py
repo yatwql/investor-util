@@ -83,7 +83,6 @@ def _compute_section_visibility(
     concentration_analysis: dict | None,
     style_analysis: dict | None,
     include_news: bool,
-    early_warnings: dict | None,
     llm_enabled_flag: bool,
     # ↓↓↓ board 层新增参数 ↓↓↓
     enable_news: bool = True,        # board 层：新闻板块是否开启（配置驱动，不是 include_news！）
@@ -114,7 +113,6 @@ def _compute_section_visibility(
         "concentration_data":        concentration_analysis is not None,
         "style_data":                style_analysis is not None,
         "news_data_available":       include_news,         # ← data 层（菜单类型+数据状态）
-        "early_warnings":            bool(early_warnings),
         "llm_data_available":        llm_enabled_flag,     # ← data 层（LLM 生成成功？）
     }
 
@@ -187,7 +185,7 @@ def _build_data_status_sections(
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
-def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, early_warnings: dict | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None, history_data: dict | None = None, a_indices: dict | None = None, us_indices: dict | None = None, enable_b_series: bool = True, enable_news: bool = True, enable_history: bool = True) -> str:
+def write_html_report(holdings: list[Holding], output_dir: str = "reports", news_top_count: int = 100, enable_llm: bool = False, include_news: bool = True, force_llm: bool = False, llm_content: tuple[str | None, str | None, str | None, str | None] | None = None, details: list | None = None, news_data: list | None = None, news_llm_meta: dict | None = None, sector_flow: list | None = None, progress: ProgressReporter | None = None, section_order: list[dict] | None = None, history_data: dict | None = None, a_indices: dict | None = None, us_indices: dict | None = None, enable_b_series: bool = True, enable_news: bool = True, enable_history: bool = True) -> str:
     """生成 HTML 分析报告并保存到文件。
 
     通过各子函数获取分析数据，渲染 Jinja2 模板，
@@ -264,7 +262,7 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
     order = section_order or get_report_section_order()
     section_numbers, section_visible_dict, _sv_fn = _compute_section_visibility(
         order, manager_analysis, overlap_matrix, concentration_analysis,
-        style_analysis, include_news, early_warnings, llm_enabled_flag,
+        style_analysis, include_news, llm_enabled_flag,
         enable_news=enable_news,
         enable_b_series=enable_b_series,
         enable_history=enable_history,
@@ -326,7 +324,7 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
         llm_enabled=llm_enabled_flag,
         global_macro=global_macro_content, expert_review=expert_review_content,
         health_check=health_check_content, penetration_deep=penetration_deep_content,
-        llm_session_usage=_llm_session_usage, early_warnings=early_warnings,
+        llm_session_usage=_llm_session_usage,
         module_labels=get_llm_module_names(), module_disabled=module_disabled,
         llm_module_info=llm_module_info, llm_endpoint=llm_endpoint,
         cache_stats=get_cache_hit_rate(),
