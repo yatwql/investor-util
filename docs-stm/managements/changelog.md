@@ -13,6 +13,9 @@
 ### Fixed
 - **新闻去重增强** — `_dedup_by_title` 新增子串包含规则：标准化后较短标题（≥10 字）完全包含于另一条即判定重复。覆盖两条场景：同源快讯版 vs 全文版（苹果 iPad mini）、跨源同一事件（中际旭创成交额跨东方财富/华尔街见闻）
 
+### Changed
+- **folders.md 同步** — 补充版本迭代中遗漏的文件：`src/python/__init__.py`、`src/python/report/orchestrator.py`、`src/test/test_orchestrator.py`；`docs-stm/plan/` 目录已空，移除已归档文件条目；`docs-stm/archive/v0.6.x/` 新增 `cli-mode/` 子目录条目
+
 ## [0.6.5] - 2026-07-17
 
 > LLM 关联分析情绪着色 — [利好]红色 / [利空]绿色

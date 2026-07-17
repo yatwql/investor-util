@@ -11,6 +11,7 @@ investor-util/
 │
 ├── src/                              # 源代码
 │   ├── python/                       # 主程序代码
+│   │   ├── __init__.py               #   包标记（空文件）
 │   │   ├── cache/                    # 缓存引擎（TTL/清理/统计/分组/IO）
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── _cleanup.py           #   过期缓存清理（按 TTL 分组删除）
@@ -116,6 +117,7 @@ investor-util/
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
 │   │   │   ├── news_correlation.py   #   新闻与持仓关联分析报告
+│   │   │   ├── orchestrator.py       #   报告编排共享层（TUI/CLI 共用）
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
@@ -154,6 +156,7 @@ investor-util/
 │       ├── test_cli.py               #   CLI 命令行模式单元测试（33 用例）
 │   │   ├── test_cli_edge.py          #   CLI 边缘场景测试（7 用例）
 │   │   ├── test_cli_integration.py   #   CLI 集成测试（8 用例）
+│   │   ├── test_orchestrator.py      #   报告编排器单元测试
 │   │   ├── conftest.py               #   pytest 全局配置 + 标记注册
 │       └── helpers.py                #   测试辅助工具
 │
@@ -196,9 +199,7 @@ investor-util/
 │   │   ├── technical.md              #     技术设计文档
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
-│   ├── plan/                         #   中间设计文件
-│   │   ├── cli-mode-iteration-plan.md    # CLI 命令行模式迭代计划（已归档 → archive/v0.6.x/cli-mode/）
-│   │   └── cli-mode-technical-design.md  # CLI 命令行模式技术设计
+│   ├── plan/                         #   中间设计文件（已归档至 archive/v0.6.x/cli-mode/，当前为空）
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
@@ -264,7 +265,10 @@ investor-util/
 │   │   │   └── report-board-visibility-configable/ # 看板可见性配置
 │   │   │       └── g-board-visibility-iteration-plan.md # 看板可见性配置迭代计划
 │   │   ├── v0.6.x/                            # v0.6.x 版本迭代归档
-│   │   │   └── archived_changelog.0.6.x.md        # 变更日志归档 v0.6.x
+│   │   │   ├── archived_changelog.0.6.x.md        # 变更日志归档 v0.6.x
+│   │   │   └── cli-mode/                          # CLI 命令行模式归档
+│   │   │       ├── cli-mode-iteration-plan.md     # CLI 迭代计划
+│   │   │       └── cli-mode-technical-design.md   # CLI 技术设计
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
