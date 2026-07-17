@@ -14,7 +14,7 @@ from src.python.report.excel_b_series import write_b_series_sheets
 from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_llm_usage import write_llm_section_and_usage
 from src.python.report.excel_market_data import resolve_market_data, resolve_indices
-from src.python.report.excel_news_warning import write_news_and_early_warning
+from src.python.report.excel_news_warning import write_news_sheet
 from src.python.report.excel_sheet_factory import create_sheets
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, Timer
 
@@ -249,7 +249,7 @@ def generate_excel_report(
 
     # ── 各页签写入 ──
     pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
-    write_news_and_early_warning(sheets, holdings, pen_result, include_news,
+    write_news_sheet(sheets, holdings, pen_result, include_news,
                                   news_data, news_llm_meta, news_top_count,
                                   prog)
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)

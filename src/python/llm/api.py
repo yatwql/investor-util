@@ -7,8 +7,10 @@ R-198 拆分后：仅包含 Provider 路由 + Thinking 注入 + 5 个核心函�
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-import httpx
+if TYPE_CHECKING:
+    import httpx
 
 from src.python.llm.api_base import (
     call_llm_with_retry,
@@ -116,14 +118,13 @@ def call_llm(
             return result, usage
         # result == "" → 内容过滤导致空返回，尝试安抚重试
         logger.warning("%s API 返回空内容，追加安抚指令重试一次", provider)
-        print(f"  [..] {provider} API 返回空内容，追加安抚指令重试...")
         calmed_system = system_prompt + _CONTENT_FILTER_RECOVERY
         result2, usage2 = call_single_provider(
             provider, calmed_system, user_prompt, api_key, resolved_model, endpoint,
             max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
         )
         if result2 and result2.strip():
-            print("  [OK] 安抚重试成功")
+            logger.info("安抚重试成功")
             return result2, usage2
         logger.warning("安抚重试后仍返回空内容，继续尝试回退 provider")
 
@@ -134,7 +135,6 @@ def call_llm(
         fb_endpoint = llm_config.get("fallback_endpoint", endpoint)
         fb_model = llm_config.get("fallback_model", resolved_model)
         logger.warning("主 provider (%s) 已失败，回退到 %s", provider, fallback_provider)
-        print(f"  [..] LLM 主 provider ({provider}) 失败，正在回退到 {fallback_provider}...")
         result, usage = call_single_provider(
             fallback_provider, system_prompt, user_prompt, fb_api_key, fb_model, fb_endpoint,
             max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,

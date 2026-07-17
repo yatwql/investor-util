@@ -63,7 +63,7 @@ def get_cache_age_by_data_type(
     """
     # 特殊处理：profit_forecast 使用动态指纹，不走 prefix+identifier 模式
     if data_type == "profit_forecast":
-        from src.python.providers.akshare_extras import get_profit_forecast_cache_key
+        from src.python.fetcher.akshare import get_profit_forecast_cache_key
         return get_cache_age(get_profit_forecast_cache_key())
     # 标准路径：prefix + identifier
     from src.python.registry import get_registry  # 延迟导入避免循环依赖

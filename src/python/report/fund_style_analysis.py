@@ -212,7 +212,7 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
         return _cached
 
     try:
-        from src.python.providers.eastmoney_industry import make_push2_request
+        from src.python.fetcher.industry import make_push2_request
         inner = make_push2_request(code)
         if inner is None:
             return None

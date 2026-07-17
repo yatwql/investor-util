@@ -144,8 +144,16 @@ def init_config(config_path: str | None = None) -> None:
         return
     config_dir = os.path.dirname(config_path)
     os.makedirs(config_dir, exist_ok=True)
-    with open(config_path, "w", encoding="utf-8") as f:
-        f.write(_config_defaults._get_default_config_template())
+    # 原子写入，复用 set_config() 模式
+    fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(_config_defaults._get_default_config_template())
+        os.replace(tmp_path, config_path)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.remove(tmp_path)
+        raise
     _config_cache = None
     _config_mtime = 0
     _config_size = 0
@@ -519,8 +527,16 @@ def _ensure_llm_settings_file() -> None:
         return
     try:
         os.makedirs(os.path.dirname(settings_path), exist_ok=True)
-        with open(settings_path, "w", encoding="utf-8") as f:
-            f.write(_get_default_llm_settings_template())
+        # 原子写入，复用 set_config() 模式
+        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(settings_path), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(_get_default_llm_settings_template())
+            os.replace(tmp_path, settings_path)
+        except Exception:
+            with contextlib.suppress(OSError):
+                os.remove(tmp_path)
+            raise
         logger.info("LLM 设置文件已自动生成: %s", settings_path)
     except OSError as e:
         logger.warning("无法自动创建 LLM 设置文件: %s", e)

@@ -81,12 +81,6 @@ def get_news_correlation_result() -> tuple[list[dict], bool, dict] | None:
     return _news_correlation_result
 
 
-def _reset_news_correlation_result() -> None:
-    """重置新闻关联结果（测试用）。"""
-    global _news_correlation_result
-    _news_correlation_result = None
-
-
 # ── HTTP 客户端配置 ──────────────────────────────────────────
 # 各工作线程共享同一组连接参数，通过 HTTP/2 + keepalive 减少连接建立开销
 _LLM_CLIENT_SETTINGS: dict[str, Any] = {

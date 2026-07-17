@@ -51,12 +51,6 @@ _FIELDS = "f57,f58,f127,f128,f129,f198,f9,f20,f23"
 # 会话级内存缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="industry"）
 
 
-def _ext_memo_clear() -> None:
-    """测试用：清空行业数据会话级缓存。"""
-    from src.python.provider_registry import get_registry
-    get_registry().session_cache_clear("industry")
-
-
 def _secid(code: str) -> str:
     """根据代码生成 secid 参数（委托至 code_utils.get_push2_secid）。"""
     return get_push2_secid(code)

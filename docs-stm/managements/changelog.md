@@ -6,7 +6,22 @@
 
 ---
 
-## [Unreleased]
+## [0.6.4] - 2026-07-17
+
+> 全量架构约束整改（P1+P2+P3 共 27 项）+ 定价模块懒加载 + 缓存共享测试覆盖
+
+### Fixed
+- **全量架构约束整改** — 完成 review-findings.md 中 P1(7项)+P2(11项)+P3(7+2项) 共 27 项修复：
+  - **C6 Provider Chain 必经**（P1-1~P1-3, P2-1~P2-2）：编排器/基金风格分析/新闻关联/缓存层 5 处直调 provider 改为通过 fetcher 层转发，消除绕过熔断器和 fallback 的入口
+  - **C7 报告序号不可硬编码**（P1-4~P1-7）：B 系列 4 个 sheet（基金经理/重合度/集中度/风格）标题序号从硬编码 13-16 改为 `get_report_section_number()` 动态获取
+  - **C3 缓存原子写入**（P2-3~P2-4）：`init_config()` 和 `_ensure_llm_settings_file()` 首次写入改用 `tempfile.mkstemp + os.replace` 原子写入模式
+  - **C8 日志统一**（P2-5~P2-9）：LLM 模块 3 处 + report 2 处 `print()` 替换为 `logger`
+  - **C14 渲染期全局变量**（P2-10）：`timing_records` 从模块级可变列表改为 ProgressReporter 实例级属性
+  - **C1 代码类型判定中心化**（P2-11+P3-7）：`llm/prompts.py` 硬编码国家映射改为 `code_utils` 函数；`news_keywords.py` 手动 ETF/联接判定改为 `is_etf_by_name()`/`is_index_link_by_name()`
+  - **死代码/命名清理**（P3-1~P3-5）：重命名 `write_news_and_early_warning`→`write_news_sheet`；删除 `_reset_news_correlation_result`、2 处 `_ext_memo_clear`；`ws13/14/15/16`→`ws_mgr/ws_overlap/ws_conc/ws_style`
+  - **C5 HTTP 客户端统一**（P3-6）：4 个 LLM 模块的 `import httpx` 移至 `TYPE_CHECKING` 块
+  - **P3-8 定价懒加载**：`pricing.py` 模块级 `reload_pricing()` 调用改为首次 `estimate_cost()` 时惰性加载，消除启动阶段非必要文件 IO
+  - **P3-12 缓存共享测试**：`test_fund_style_analysis.py` 新增 `TestExtendedCacheSharing`，验证 `_push2_extended` 与 `_tencent_extended` 共享 `extended_{code}` 缓存 key
 
 ## [0.6.3] - 2026-07-17
 

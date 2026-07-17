@@ -15,7 +15,7 @@ from src.python.report.progress import ProgressReporter
 logger = setup_logger()
 
 
-def write_news_and_early_warning(
+def write_news_sheet(
     sheets: dict[str, Any], holdings: list,
     pen_result: dict, include_news: bool,
     news_data: list | None, news_llm_meta: dict | None,

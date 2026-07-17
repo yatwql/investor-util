@@ -8,7 +8,7 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
-from src.python.report.progress import ProgressReporter, Timer, timing_records
+from src.python.report.progress import ProgressReporter, Timer
 
 _logger = logging.getLogger("invest")
 
@@ -102,8 +102,7 @@ class CliProgressReporter(ProgressReporter):
         if self._verbose:
             self.info(f"正在生成{label}...")
         try:
-            with Timer(label):
-                fn(*args, **kwargs)
+            with self.timer(label):                fn(*args, **kwargs)
         except Exception:
             self.add_error(f"{label}生成失败（详情请查看日志）")
             _logger.exception("%s写入异常", label)
@@ -119,12 +118,13 @@ class CliProgressReporter(ProgressReporter):
 
         日志输出不含转义序列（纯文本）。verbose 模式 stderr 输出含颜色。
         """
-        if not timing_records:
+        records = self._timing_records
+        if not records:
             return
 
         # 合并同名 label
         merged: dict[str, float] = {}
-        for label, t in timing_records:
+        for label, t in records:
             merged[label] = merged.get(label, 0.0) + t
         total = sum(merged.values())
 
@@ -143,4 +143,4 @@ class CliProgressReporter(ProgressReporter):
             for line in lines:
                 print(line, file=sys.stderr)
 
-        timing_records.clear()
+        records.clear()

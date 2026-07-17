@@ -613,7 +613,7 @@ def _generate_report_full(
     from src.python.registry import get_report_section_order
     from src.python.report.html_writer import write_html_report
     from src.python.report.excel_generator import generate_excel_report
-    from src.python.providers.akshare_extras import get_sector_fund_flow
+    from src.python.fetcher.akshare import get_sector_fund_flow
 
     result = ReportResult()
     result.holdings_ok = True

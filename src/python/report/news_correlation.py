@@ -302,9 +302,9 @@ def _extract_active_sources(news_items: list[dict]) -> list[str]:
 def _news_source_cb(label: str, count: int, status: str) -> None:
     """回调：各新闻源获取完成后在 TUI 输出状态。"""
     if status == "OK":
-        print(f"  [OK] 新闻源 {label}: {count} 条")
+        logger.info("新闻源 %s: %d 条", label, count)
     else:
-        print(f"  [!] 新闻源 {label}: {status}")
+        logger.info("新闻源 %s: %s", label, status)
 
 
 def _apply_llm_enhancement(
@@ -410,8 +410,8 @@ def build_news_data(
         }
         获取失败时 news_data 为 []。
     """
-    from src.python.providers.news_aggregator import aggregate_news
-    from src.python.providers.news_keywords import build_holding_keywords
+    from src.python.fetcher.news import aggregate_news
+    from src.python.fetcher.news import build_holding_keywords
 
     keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
     logger.info("%s关键词（含穿透）: %s", get_llm_module_name("news_correlation"), keywords)
@@ -435,7 +435,7 @@ def build_news_data(
     if not news_items:
         # 即使 news_items 为空，也能从 aggregate_news 获取各源状态
         try:
-            from src.python.providers.news_aggregator import get_last_source_status as _glss
+            from src.python.fetcher.news import get_last_source_status as _glss
             meta["source_status"] = _glss()
         except Exception:
             logger.warning("获取新闻源状态失败（news_aggregator.get_last_source_status），不影响核心新闻数据")

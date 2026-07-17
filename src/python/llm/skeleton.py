@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import httpx
+if TYPE_CHECKING:
+    import httpx
 
 from src.python.cache import get as cache_get  # noqa: F401
 from src.python.cache import set as cache_set
@@ -173,7 +174,6 @@ def _handle_truncation(
 
     new_max = int(max_tokens * AUTO_INCREASE_FACTOR)
     logger.warning("输出被截断（max_tokens=%d），自动以 %d 重新生成...", max_tokens, new_max)
-    print(f"  [..] 输出被截断，自动增大 max_tokens ({max_tokens} → {new_max}) 重新生成...")
     result2, usage2 = call_llm(
         system_prompt, user_prompt, llm_config,
         timeout=timeout, http_client=http_client,
@@ -387,7 +387,8 @@ def _execute_and_merge_batch(
     Returns:
         (input_tokens, output_tokens) 本批的 token 用量
     """
-    print(f"  [..] {_MN(module_key)} [{batch_id + 1}/{total_batches}] 批处理中 ({len(batch_indices)} 条)...")
+    logger.info("%s [%d/%d] 批处理中 (%d 条)...",
+                           _MN(module_key), batch_id + 1, total_batches, len(batch_indices))
     batch_client = make_http_client(timeout=LLM_TIMEOUT)
     total_in = 0
     total_out = 0
@@ -424,7 +425,8 @@ def _execute_and_merge_batch(
             if usage:
                 total_in += usage.get("input_tokens", usage.get("prompt_tokens", 0))
                 total_out += usage.get("output_tokens", usage.get("completion_tokens", 0))
-            print(f"  [OK] {_MN(module_key)} [{batch_id + 1}/{total_batches}] 批完成")
+            logger.info("%s [%d/%d] 批完成",
+                               _MN(module_key), batch_id + 1, total_batches)
         else:
             logger.warning("%s（批 %d/%d）: 分析失败",
                            _MN(module_key), batch_id + 1, total_batches)

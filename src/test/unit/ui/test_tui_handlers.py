@@ -24,7 +24,7 @@ from unittest.mock import MagicMock, patch
 
 import src.python.tui_handlers as _th_module
 
-from src.python.report.progress import timing_records, Timer as _Timer
+from src.python.report.progress import _timing_records, Timer as _Timer
 
 from src.python.tui_handlers import (
 
@@ -144,10 +144,10 @@ class TestTimer(unittest.TestCase):
     """_Timer 上下文管理器测试。"""
 
     def setUp(self):
-        timing_records.clear()
+        _timing_records.clear()
 
     def tearDown(self):
-        timing_records.clear()
+        _timing_records.clear()
 
     def test_enter_sets_start(self):
         """__enter__ 记录开始时间。"""
@@ -160,9 +160,9 @@ class TestTimer(unittest.TestCase):
         with patch.object(_time_module, 'time', side_effect=[1000.0, 1005.5]):
             with _Timer("test"):
                 pass
-        self.assertEqual(len(timing_records), 1)
-        self.assertEqual(timing_records[0][0], "test")
-        self.assertAlmostEqual(timing_records[0][1], 5.5)
+        self.assertEqual(len(_timing_records), 1)
+        self.assertEqual(_timing_records[0][0], "test")
+        self.assertAlmostEqual(_timing_records[0][1], 5.5)
 
     def test_multiple_timers(self):
         """多个计时器各自记录互不干扰。"""
@@ -171,9 +171,9 @@ class TestTimer(unittest.TestCase):
                 pass
             with _Timer("slow"):
                 pass
-        self.assertEqual(len(timing_records), 2)
-        self.assertAlmostEqual(timing_records[0][1], 2.0)
-        self.assertAlmostEqual(timing_records[1][1], 3.0)
+        self.assertEqual(len(_timing_records), 2)
+        self.assertAlmostEqual(_timing_records[0][1], 2.0)
+        self.assertAlmostEqual(_timing_records[1][1], 3.0)
 
     def test_nested_timers(self):
         """嵌套计时器正确工作。"""
@@ -181,24 +181,24 @@ class TestTimer(unittest.TestCase):
             with _Timer("outer"):
                 with _Timer("inner"):
                     pass
-        self.assertEqual(len(timing_records), 2)
-        self.assertEqual(timing_records[0][0], "inner")
-        self.assertAlmostEqual(timing_records[0][1], 0.5)
-        self.assertEqual(timing_records[1][0], "outer")
-        self.assertAlmostEqual(timing_records[1][1], 2.0)
+        self.assertEqual(len(_timing_records), 2)
+        self.assertEqual(_timing_records[0][0], "inner")
+        self.assertAlmostEqual(_timing_records[0][1], 0.5)
+        self.assertEqual(_timing_records[1][0], "outer")
+        self.assertAlmostEqual(_timing_records[1][1], 2.0)
 
     def test_label_preserved(self):
         """标签正确储存在记录中。"""
         with _Timer("模块A"):
             pass
-        self.assertEqual(timing_records[0][0], "模块A")
+        self.assertEqual(_timing_records[0][0], "模块A")
 
     def test_elapsed_is_float(self):
         """耗时记录为浮点数。"""
         with patch.object(_time_module, 'time', side_effect=[0.0, 0.0]):
             with _Timer("test"):
                 pass
-        self.assertIsInstance(timing_records[0][1], float)
+        self.assertIsInstance(_timing_records[0][1], float)
 
     def test_many_timers_append_all(self):
         """大量计时器均被追加到列表中。"""
@@ -208,7 +208,7 @@ class TestTimer(unittest.TestCase):
             for i in range(n):
                 with _Timer(f"t{i}"):
                     pass
-        self.assertEqual(len(timing_records), n)
+        self.assertEqual(len(_timing_records), n)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -219,10 +219,10 @@ class TestPrintTimingSummary(unittest.TestCase):
     """print_timing_summary 输出格式化测试。"""
 
     def setUp(self):
-        timing_records.clear()
+        _timing_records.clear()
 
     def tearDown(self):
-        timing_records.clear()
+        _timing_records.clear()
 
     def _capture(self) -> str:
         out = io.StringIO()
@@ -237,7 +237,7 @@ class TestPrintTimingSummary(unittest.TestCase):
 
     def test_single_record(self):
         """单条记录正确输出。"""
-        timing_records.append(("模块A", 1.5))
+        _timing_records.append(("模块A", 1.5))
         out = self._capture()
         self.assertIn("模块A", out)
         self.assertIn("1.5s", out)
@@ -245,15 +245,15 @@ class TestPrintTimingSummary(unittest.TestCase):
 
     def test_clears_after_print(self):
         """输出后清空记录列表。"""
-        timing_records.append(("test", 0.5))
+        _timing_records.append(("test", 0.5))
         self._capture()
-        self.assertEqual(len(timing_records), 0)
+        self.assertEqual(len(_timing_records), 0)
 
     def test_sorted_by_desc(self):
         """按耗时降序排列。"""
-        timing_records.append(("fast", 0.5))
-        timing_records.append(("slow", 3.0))
-        timing_records.append(("medium", 1.0))
+        _timing_records.append(("fast", 0.5))
+        _timing_records.append(("slow", 3.0))
+        _timing_records.append(("medium", 1.0))
         out = self._capture()
         slow_idx = out.find("slow")
         medium_idx = out.find("medium")
@@ -263,7 +263,7 @@ class TestPrintTimingSummary(unittest.TestCase):
 
     def test_zero_total_handling(self):
         """总耗时为 0 时不会除零错误。"""
-        timing_records.append(("zero", 0.0))
+        _timing_records.append(("zero", 0.0))
         try:
             self._capture()
         except ZeroDivisionError:
@@ -271,15 +271,15 @@ class TestPrintTimingSummary(unittest.TestCase):
 
     def test_multiple_records_percentages(self):
         """多条记录的百分比计算正确。"""
-        timing_records.append(("A", 1.0))
-        timing_records.append(("B", 3.0))
+        _timing_records.append(("A", 1.0))
+        _timing_records.append(("B", 3.0))
         out = self._capture()
         self.assertIn("25.0%", out)
         self.assertIn("75.0%", out)
 
     def test_header_and_footer_lines(self):
         """输出包含正确的表头和表尾。"""
-        timing_records.append(("X", 1.0))
+        _timing_records.append(("X", 1.0))
         out = self._capture()
         self.assertIn("模块耗时排行", out)
         self.assertIn("┌", out)

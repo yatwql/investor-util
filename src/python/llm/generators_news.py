@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-import httpx
+if TYPE_CHECKING:
+    import httpx
 
 from src.python.llm.api_base import (
     CACHE_LINE_HTML,

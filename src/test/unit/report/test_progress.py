@@ -23,7 +23,7 @@ from unittest.mock import patch
 from src.python.report.progress import (
 
     ProgressReporter, SilentProgressReporter, TuiProgressReporter,
-    Timer, timing_records,
+    Timer, _timing_records,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
@@ -87,31 +87,31 @@ class TestProgressReporter(unittest.TestCase):
 
     def test_timer_context(self) -> None:
         """Timer 上下文管理器记录耗时。"""
-        saved = list(timing_records)
-        timing_records.clear()
+        saved = list(_timing_records)
+        _timing_records.clear()
         try:
             with Timer("测试计时"):
                 pass
-            self.assertEqual(len(timing_records), 1)
-            label, elapsed = timing_records[0]
+            self.assertEqual(len(_timing_records), 1)
+            label, elapsed = _timing_records[0]
             self.assertEqual(label, "测试计时")
             self.assertGreaterEqual(elapsed, 0.0)
         finally:
-            timing_records.clear()
-            timing_records.extend(saved)
+            _timing_records.clear()
+            _timing_records.extend(saved)
 
     def test_timer_context_elapsed_time(self) -> None:
         """Timer 记录的实际耗时接近真实耗时。"""
-        saved = list(timing_records)
-        timing_records.clear()
+        saved = list(_timing_records)
+        _timing_records.clear()
         try:
             with Timer("延时"):
                 _time_module.sleep(0.01)
-            _, elapsed = timing_records[0]
+            _, elapsed = _timing_records[0]
             self.assertAlmostEqual(elapsed, 0.01, delta=0.05)
         finally:
-            timing_records.clear()
-            timing_records.extend(saved)
+            _timing_records.clear()
+            _timing_records.extend(saved)
 
 
 class TestSilentProgressReporter(unittest.TestCase):
@@ -282,25 +282,25 @@ class TestTuiProgressReporter(unittest.TestCase):
 
     def test_timer_context_manager(self) -> None:
         """timer() 返回可用的 Timer。"""
-        saved = list(timing_records)
-        timing_records.clear()
+        saved = list(_timing_records)
+        _timing_records.clear()
         try:
             with self.r.timer("模块A"):
                 pass
-            self.assertEqual(len(timing_records), 1)
+            self.assertEqual(len(self.r._timing_records), 1)
         finally:
-            timing_records.clear()
-            timing_records.extend(saved)
+            _timing_records.clear()
+            _timing_records.extend(saved)
 
     # ── 耗时排行 ──
 
     def test_print_timing_summary_output(self) -> None:
         """print_timing_summary 输出耗时排行。"""
-        saved = list(timing_records)
-        timing_records.clear()
+        saved_records = list(self.r._timing_records)
+        self.r._timing_records.clear()
         try:
-            timing_records.append(("模块A", 1.5))
-            timing_records.append(("模块B", 0.5))
+            self.r._timing_records.append(("模块A", 1.5))
+            self.r._timing_records.append(("模块B", 0.5))
             captured = io.StringIO()
             sys.stdout = captured
             try:
@@ -311,13 +311,13 @@ class TestTuiProgressReporter(unittest.TestCase):
             finally:
                 sys.stdout = sys.__stdout__
         finally:
-            timing_records.clear()
-            timing_records.extend(saved)
+            self.r._timing_records.clear()
+            self.r._timing_records.extend(saved_records)
 
     def test_print_timing_summary_empty(self) -> None:
         """无计时记录时 print_timing_summary 不输出。"""
-        saved = list(timing_records)
-        timing_records.clear()
+        saved_records = list(self.r._timing_records)
+        self.r._timing_records.clear()
         try:
             captured = io.StringIO()
             sys.stdout = captured
@@ -327,20 +327,20 @@ class TestTuiProgressReporter(unittest.TestCase):
             finally:
                 sys.stdout = sys.__stdout__
         finally:
-            timing_records.clear()
-            timing_records.extend(saved)
+            self.r._timing_records.clear()
+            self.r._timing_records.extend(saved_records)
 
     def test_print_timing_summary_clears_records(self) -> None:
-        """print_timing_summary 输出后清空 timing_records。"""
-        saved = list(timing_records)
-        timing_records.clear()
+        """print_timing_summary 输出后清空 _timing_records。"""
+        saved_records = list(self.r._timing_records)
+        self.r._timing_records.clear()
         try:
-            timing_records.append(("模块A", 1.0))
+            self.r._timing_records.append(("模块A", 1.0))
             self.r.print_timing_summary()
-            self.assertEqual(len(timing_records), 0)
+            self.assertEqual(len(self.r._timing_records), 0)
         finally:
-            timing_records.clear()
-            timing_records.extend(saved)
+            self.r._timing_records.clear()
+            self.r._timing_records.extend(saved_records)
 
 
 if __name__ == "__main__":

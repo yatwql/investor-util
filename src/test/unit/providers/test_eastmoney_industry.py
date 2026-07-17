@@ -196,9 +196,8 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
     """测试 fetch_industry_and_concepts 主函数。"""
 
     def setUp(self):
-        from src.python.providers.eastmoney_industry import _ext_memo_clear
-        _ext_memo_clear()
         from src.python.provider_registry import get_registry
+        get_registry().session_cache_clear("industry")
         get_registry().reset()
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
@@ -363,8 +362,8 @@ class TestFetchIndustry(unittest.TestCase):
     """测试 fetch_industry 便捷接口。"""
 
     def setUp(self):
-        from src.python.providers.eastmoney_industry import _ext_memo_clear
-        _ext_memo_clear()
+        from src.python.provider_registry import get_registry
+        get_registry().session_cache_clear("industry")
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_industry_found(self, mock_client_cls):
@@ -407,8 +406,8 @@ class TestFetchConcepts(unittest.TestCase):
     """测试 fetch_concepts 便捷接口。"""
 
     def setUp(self):
-        from src.python.providers.eastmoney_industry import _ext_memo_clear
-        _ext_memo_clear()
+        from src.python.provider_registry import get_registry
+        get_registry().session_cache_clear("industry")
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_concepts_found(self, mock_client_cls):

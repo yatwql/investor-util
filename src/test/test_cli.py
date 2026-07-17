@@ -230,8 +230,6 @@ class TestCliProgressReporter:
         from src.python.report.cli_progress import CliProgressReporter
 
         caplog.set_level(10)
-        from src.python.report.progress import timing_records
-        timing_records.clear()
         r = CliProgressReporter()
         r.print_timing_summary()
         # 不应有耗时相关日志
@@ -242,10 +240,8 @@ class TestCliProgressReporter:
         from src.python.report.cli_progress import CliProgressReporter
 
         caplog.set_level(10)
-        from src.python.report.progress import timing_records
-        timing_records.clear()
-        timing_records.append(("测试模块", 1.5))
         r = CliProgressReporter()
+        r._timing_records.append(("测试模块", 1.5))
         r.print_timing_summary()
         assert any("测试模块" in r.message for r in caplog.records)
         assert any("耗时" in r.message for r in caplog.records)

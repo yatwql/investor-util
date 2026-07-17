@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 
+from src.python.code_utils import is_etf_by_name, is_index_link_by_name
 from src.python.models import Holding
 
 logger = logging.getLogger("invest")
@@ -45,11 +46,11 @@ def _extract_keywords_from_holding(h: Holding) -> set[str]:
     clean = _clean_name(name)
     keywords.update(_extract_chinese_terms(clean))
 
-    if "ETF" in name:
+    if is_etf_by_name(name):
         core = name.replace("ETF", "").strip()
         keywords.update(_extract_chinese_terms(core))
 
-    if "联接" in name:
+    if is_index_link_by_name(name):
         parts = re.findall(r"[一-鿿]{2,}", name)
         if len(parts) >= 2:
             if len(parts[0]) >= 2:

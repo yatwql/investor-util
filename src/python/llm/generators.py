@@ -8,9 +8,10 @@ R-198 拆分后职责：
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import httpx
+if TYPE_CHECKING:
+    import httpx
 
 from src.python.llm.fingerprint import (
     build_llm_fingerprint,

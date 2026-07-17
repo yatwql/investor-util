@@ -268,7 +268,6 @@ def _check_circuit_breaker(url: str, label: str) -> bool:
     """检查熔断器状态，若已熔断则记录日志并返回 True。"""
     if _cb_is_open(url):
         logger.warning("%s API 熔断中 (%s)，跳过本次请求", label, _cb_endpoint(url))
-        print(f"  [!] {label} API 暂时不可用（熔断冷却中），跳过请求")
         return True
     return False
 
@@ -349,7 +348,6 @@ def _is_retry_available(label: str, attempt: int, max_retries: int, detail: str,
             "%s API %s (尝试 %d/%d)，%.1fs 后重试...",
             label, detail, attempt + 1, max_retries + 1, delay,
         )
-        print(f"  [..] {label} API {detail} (第{attempt + 1}次重试, {delay:.0f}s后)...")
         time.sleep(delay)
         return True
     logger.warning("%s API %s（已重试 %d 次）", label, detail, max_retries)

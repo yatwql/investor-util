@@ -36,12 +36,6 @@ _HEADERS = {
 # 会话级内存缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="industry_rest"）
 
 
-def _ext_memo_clear() -> None:
-    """测试用：清空行业 REST 缓存。"""
-    from src.python.provider_registry import get_registry
-    get_registry().session_cache_clear("industry_rest")
-
-
 def _quote_prefix(code: str) -> str:
     """生成行情页面所需的交易所前缀（委托至 code_utils.get_exchange_prefix）。"""
     return get_exchange_prefix(code)

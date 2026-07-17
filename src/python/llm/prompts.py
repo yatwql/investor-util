@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from src.python.code_utils import is_qdii_extended
+from src.python.code_utils import is_a_share_code, is_hk_stock_code, is_qdii_extended
 
 logger = logging.getLogger("invest")
 
@@ -452,16 +452,21 @@ def _build_health_check_prompt(
 
 def _calc_country_exposure(holdings_details: list[dict] | None) -> list[str]:
     """从持仓明细计算国别/币种分布，返回格式化行列表。"""
-    _country_map: dict[str, str] = {"hk": "港股", "us": "美股", "sh": "A股", "sz": "A股", "bj": "A股"}
     exposure: dict[str, float] = {}
     if holdings_details:
         for h in holdings_details:
             code = h.get("code", "")
             mv = h.get("market_value", 0)
-            prefix = code.split(".")[0].split("_")[0].split("-")[0].lower() if "." in code else code[:2].lower()
-            country = _country_map.get(prefix, "其他")
-            if prefix.startswith("sh") or prefix.startswith("sz") or prefix.startswith("bj"):
+
+            if is_a_share_code(code):
                 country = "A股"
+            elif is_hk_stock_code(code):
+                country = "港股"
+            elif code.upper().endswith(".US"):
+                country = "美股"
+            else:
+                country = "其他"
+
             exposure[country] = exposure.get(country, 0) + mv
     return [f"{k}: {_fmt_wan(v)}" for k, v in sorted(exposure.items(), key=lambda x: -x[1])]
 

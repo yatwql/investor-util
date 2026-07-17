@@ -131,10 +131,6 @@ def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
         wb.save(latest)
         logger.info("最新报告已保存: %s", latest)
     except PermissionError:
-        print()
-        print("  [ERR] 报告文件被占用，无法保存")
-        print("     请关闭已打开的 Excel 文件后重试")
-        print(f"     文件路径: {os.path.abspath(latest)}")
         logger.error("文件被占用: %s", latest)
         raise
 
@@ -143,7 +139,6 @@ def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
         logger.info("存档报告已保存: %s", archive)
     except (PermissionError, OSError) as e:
         logger.warning("存档报告写入失败: %s", e)
-        print("  [!] 存档报告写入失败（文件可能被占用），最新版已保存")
 
     # 清理过期归档（非关键），避免目录无限增长
     _cleanup_old_archives(output_dir)

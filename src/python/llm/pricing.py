@@ -28,6 +28,9 @@ CURRENCY_SYMBOLS: dict[str, str] = {
     "JPY": "¥",
 }
 
+# 延迟加载标记 — reload_pricing() 首次调用 estimate_cost() 时执行
+_PRICING_LOADED: bool = False
+
 
 def reload_pricing() -> None:
     """从 llm_settings.json 重新加载定价配置。
@@ -78,10 +81,6 @@ def reload_pricing() -> None:
         logger.debug("加载定价配置失败，使用默认定价", exc_info=True)
 
 
-# 模块加载时自动合并一次
-reload_pricing()
-
-
 def estimate_cost(model: str, input_tokens: int, output_tokens: int,
                    cache_hit_input_tokens: int = 0) -> str:
     """估算 LLM API 调用的费用。
@@ -100,6 +99,10 @@ def estimate_cost(model: str, input_tokens: int, output_tokens: int,
     Returns:
         格式化费用字符串，如 "$0.008"、"¥0.06" 或 "-"
     """
+    global _PRICING_LOADED
+    if not _PRICING_LOADED:
+        reload_pricing()
+        _PRICING_LOADED = True
     if not input_tokens and not output_tokens:
         return "-"
     model_lower = model.lower().strip()

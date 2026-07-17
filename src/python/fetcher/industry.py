@@ -18,6 +18,7 @@ from src.python.cache import get_ttl
 from src.python.code_utils import is_a_share_code
 from src.python.fetcher.chain import fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
+from src.python.providers.eastmoney_industry import make_push2_request as _make_push2_request
 
 logger = logging.getLogger("invest")
 
@@ -157,3 +158,18 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
     logger.info("批量行业数据就绪: %d/%d 个代码（含缓存命中）",
                 len(result), len(a_codes))
     return result
+
+
+def make_push2_request(code: str, retries: int = 3) -> dict | None:
+    """执行东方财富 push2 API 请求，返回扩展行情数据。
+
+    委托给 ``providers.eastmoney_industry.make_push2_request``。
+
+    Args:
+        code: 6 位 A 股代码
+        retries: 重试次数
+
+    Returns:
+        {"f20": market_cap, "f9": pe, "f23": pb, ...} 或 None
+    """
+    return _make_push2_request(code, retries=retries)

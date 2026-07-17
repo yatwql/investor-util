@@ -20,7 +20,7 @@ from typing import Any
 from openpyxl.styles import PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.registry import get_report_sheet_name
+from src.python.registry import get_report_section_number, get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -81,7 +81,7 @@ def write_overlap_matrix_sheet(
 
     # ── 标题 ──
     _name = get_report_sheet_name('fund_overlap')
-    write_title_row(ws, 1, f"14. {_name}", ncols=n + 2)
+    write_title_row(ws, 1, f"{get_report_section_number('fund_overlap')}. {_name}", ncols=n + 2)
 
     if n < 2:
         _write_placeholder(ws, STATUS_MESSAGES["overlap_unavailable"], row=3, max_cols=8)

@@ -57,8 +57,8 @@ def write_b_series_sheets(
 
     # ── 基金经理变更监控（独立逻辑，无 fetch_fund_holdings 依赖） ──
     detect = modules.get("detect_manager_changes", lambda _h: [])
-    ws13 = sheets.get("fund_manager")
-    if ws13 is not None:
+    ws_mgr = sheets.get("fund_manager")
+    if ws_mgr is not None:
         prog.info("正在分析基金经理变更...")
         try:
             manager_data = detect(holdings)
@@ -70,17 +70,17 @@ def write_b_series_sheets(
         write_fund_mgr = modules.get("write_fund_manager_sheet")
         if write_fund_mgr:
             try:
-                write_fund_mgr(ws13, manager_data or [])
+                write_fund_mgr(ws_mgr, manager_data or [])
                 prog.ok("基金经理变更监控页签写入完成")
             except Exception as e:
                 logger.warning("基金经理变更监控页签写入失败: %s", e)
                 prog.add_error("基金经理变更监控页签写入失败")
 
-    # ── 14. 持仓重合度矩阵 ──
+    # ── 持仓重合度矩阵 ──
     compute_overlap = modules.get("compute_overlap_matrix")
     write_overlap = modules.get("write_overlap_matrix_sheet")
-    ws14 = sheets.get("fund_overlap")
-    if ws14 is not None and compute_overlap is not None and write_overlap is not None:
+    ws_overlap = sheets.get("fund_overlap")
+    if ws_overlap is not None and compute_overlap is not None and write_overlap is not None:
         prog.info("正在计算持仓重合度矩阵...")
         overlap_result = None
         fund_names: dict[str, str] = {}
@@ -113,17 +113,17 @@ def write_b_series_sheets(
             prog.add_error("持仓重合度矩阵数据获取失败")
 
         try:
-            write_overlap(ws14, overlap_result or {}, fund_names=fund_names)
+            write_overlap(ws_overlap, overlap_result or {}, fund_names=fund_names)
             prog.ok("持仓重合度矩阵页签写入完成")
         except Exception as e:
             logger.warning("持仓重合度矩阵页签写入失败: %s", e)
             prog.add_error("持仓重合度矩阵页签写入失败")
 
-    # ── 15. 持仓集中度监控 ──
+    # ── 持仓集中度监控 ──
     compute_conc = modules.get("compute_concentration")
     write_conc = modules.get("write_concentration_sheet")
-    ws15 = sheets.get("fund_concentration")
-    if ws15 is not None and compute_conc is not None and write_conc is not None:
+    ws_conc = sheets.get("fund_concentration")
+    if ws_conc is not None and compute_conc is not None and write_conc is not None:
         prog.info("正在计算持仓集中度...")
         conc_data = None
         try:
@@ -141,17 +141,17 @@ def write_b_series_sheets(
             prog.add_error("持仓集中度数据获取失败")
 
         try:
-            write_conc(ws15, conc_data or [])
+            write_conc(ws_conc, conc_data or [])
             prog.ok("持仓集中度监控页签写入完成")
         except Exception as e:
             logger.warning("持仓集中度监控页签写入失败: %s", e)
             prog.add_error("持仓集中度监控页签写入失败")
 
-    # ── 16. 基金风格分析 ──
+    # ── 基金风格分析 ──
     analyze_style = modules.get("analyze_style_for_all_funds")
     write_style = modules.get("write_style_sheet")
-    ws16 = sheets.get("fund_style")
-    if ws16 is not None and analyze_style is not None and write_style is not None:
+    ws_style = sheets.get("fund_style")
+    if ws_style is not None and analyze_style is not None and write_style is not None:
         prog.info("正在分析基金风格漂移...")
         style_result = None
         try:
@@ -169,7 +169,7 @@ def write_b_series_sheets(
             prog.add_error("基金风格分析数据获取失败")
 
         try:
-            write_style(ws16, (style_result or {}).get("results", []))
+            write_style(ws_style, (style_result or {}).get("results", []))
             prog.ok("基金风格分析页签写入完成")
         except Exception as e:
             logger.warning("基金风格分析页签写入失败: %s", e)

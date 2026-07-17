@@ -332,8 +332,8 @@ class TestRestFetchIndustryAndConcepts(unittest.TestCase):
     """eastmoney_industry_rest.fetch_industry_and_concepts 测试。"""
 
     def setUp(self):
-        from src.python.providers.eastmoney_industry_rest import _ext_memo_clear
-        _ext_memo_clear()
+        from src.python.provider_registry import get_registry
+        get_registry().session_cache_clear("industry_rest")
 
     @patch("src.python.providers.eastmoney_industry_rest.make_http_client")
     def test_success(self, mock_client_factory):

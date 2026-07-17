@@ -372,6 +372,26 @@ def get_report_section_keys() -> set[str]:
     return {sec["key"] for sec in _REPORT_SECTION_DEFAULT}
 
 
+def get_report_section_number(key: str, config: dict | None = None) -> int:
+    """根据模块键名返回当前配置下的序号。
+
+    优先读取用户配置（config.json 的 report_section_order），
+    未配置时返回默认注册表中的序号。
+
+    Args:
+        key: 模块键名，如 "fund_manager"
+        config: 完整配置字典，为 None 时使用默认注册表序号
+
+    Returns:
+        序号整数，未找到时返回 0
+    """
+    order = get_report_section_order(config)
+    for sec in order:
+        if sec["key"] == key:
+            return sec["number"]
+    return 0
+
+
 def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 

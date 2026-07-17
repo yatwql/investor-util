@@ -15,15 +15,21 @@ from src.python.ansi_colors import CYAN, GREEN, RED, RESET, YELLOW
 
 logger = logging.getLogger("invest")
 
-# ── 模块耗时记录（跨模块共享） ───────────────────────────────
-timing_records: list[tuple[str, float]] = []
+# ── 模块耗时记录（跨模块共享，供直接使用 Timer() 的场景） ──
+_timing_records: list[tuple[str, float]] = []
 
 
 class Timer:
-    """简单计时器上下文管理器，记录各模块耗时。"""
+    """简单计时器上下文管理器，记录各模块耗时。
 
-    def __init__(self, label: str) -> None:
+    默认写入模块级 ``_timing_records``（供直接使用 Timer() 的调用方）。
+    ProgressReporter 子类应通过 ``reporter.timer()`` 获取绑定了实例级
+    记录列表的 Timer，避免跨报告生成的数据串扰。
+    """
+
+    def __init__(self, label: str, records: list | None = None) -> None:
         self.label = label
+        self.records = records if records is not None else _timing_records
         self.start: float = 0.0
 
     def __enter__(self) -> Timer:
@@ -32,7 +38,7 @@ class Timer:
 
     def __exit__(self, *args) -> None:
         elapsed = _time_module.time() - self.start
-        timing_records.append((self.label, elapsed))
+        self.records.append((self.label, elapsed))
 
 
 # ── 进度报告接口 ─────────────────────────────────────────────
@@ -46,6 +52,7 @@ class ProgressReporter:
 
     def __init__(self) -> None:
         self._errors: list[str] = []
+        self._timing_records: list[tuple[str, float]] = []
 
     def info(self, msg: str) -> None:
         """进行中消息（对应 [..] 前缀）。"""
@@ -82,7 +89,7 @@ class ProgressReporter:
         if fn is None:
             self.add_error(f"{label}模块缺失，跳过")
             return False
-        with Timer(label):
+        with self.timer(label):
             try:
                 fn(*args, **kwargs)
                 return True
@@ -95,8 +102,8 @@ class ProgressReporter:
         """输出耗时汇总。默认空实现，子类可覆盖。"""
 
     def timer(self, label: str) -> Timer:
-        """返回计时器上下文管理器，用于包裹耗时较长的操作。"""
-        return Timer(label)
+        """返回绑定了实例级记录的计时器上下文管理器。"""
+        return Timer(label, records=self._timing_records)
 
 
 class SilentProgressReporter(ProgressReporter):
@@ -136,7 +143,7 @@ class TuiProgressReporter(ProgressReporter):
             return False
         self.info(f"正在生成{label}...")
         try:
-            with Timer(label):
+            with self.timer(label):
                 fn(*args, **kwargs)
         except Exception:
             self.add_error(f"{label}生成失败（详情请查看日志）")
@@ -147,11 +154,12 @@ class TuiProgressReporter(ProgressReporter):
 
     def print_timing_summary(self) -> None:
         """输出本次运行时各模块耗时排行。"""
-        if not timing_records:
+        records = self._timing_records
+        if not records:
             return
         # 合并同名 label
         merged: dict[str, float] = {}
-        for label, t in timing_records:
+        for label, t in records:
             merged[label] = merged.get(label, 0.0) + t
         total = sum(merged.values())
         print()
@@ -165,7 +173,7 @@ class TuiProgressReporter(ProgressReporter):
             bar = "█" * bar_len + "░" * (24 - bar_len)
             print(f"  │ {label:<18s} {t:>6.1f}s {pct:>5.1f}% {bar} │")
         print(f"  └{'─' * 48}┘")
-        timing_records.clear()
+        records.clear()
 
     def print_error_summary(self) -> None:
         """如果存在错误，在终端输出汇总。"""

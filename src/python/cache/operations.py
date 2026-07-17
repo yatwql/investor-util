@@ -126,7 +126,7 @@ def _refresh_industry_cache(holdings: list) -> int:
 
 def _refresh_dividend_cache(holdings: list) -> int:
     """刷新股票历史分红缓存。"""
-    from src.python.providers.akshare_extras import get_dividend_data
+    from src.python.fetcher.akshare import get_dividend_data
     codes = [h.code.strip() for h in holdings if h.code and h.code.strip()]
     if not codes:
         return 0
@@ -136,21 +136,21 @@ def _refresh_dividend_cache(holdings: list) -> int:
 
 def _refresh_profit_forecast_cache() -> tuple[str, int]:
     """刷新盈利预测缓存。"""
-    from src.python.providers.akshare_extras import _memo_clear, get_profit_forecast
-    _memo_clear()
+    from src.python.fetcher.akshare import get_profit_forecast
     data = get_profit_forecast()
     return ("profit_forecast", len(data) if data else 0)
 
 
 def _refresh_sector_flow_cache() -> tuple[str, int]:
     """刷新行业资金流向缓存。"""
-    from src.python.providers.akshare_extras import get_sector_fund_flow
+    from src.python.fetcher.akshare import get_sector_fund_flow
     data = get_sector_fund_flow()
     return ("sector_flow", len(data) if data else 0)
 
 
 def _sector_flow_hint() -> str:
     """根据最近一次行业资金流向失败类型返回提示文案。"""
+    from src.python.fetcher.akshare import get_sector_fund_flow  # noqa: F401  # 保持 fetcher 层活跃引用
     from src.python.providers.akshare_extras import _SECTOR_FLOW_FAILURE
     if _SECTOR_FLOW_FAILURE == "connection":
         return "连接失败"

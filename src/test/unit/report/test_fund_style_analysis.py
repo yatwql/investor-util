@@ -9,6 +9,7 @@
   - _grid_distance：网格距离
   - _drift_level：漂移等级
   - analyze_style_for_all_funds：全流程
+  - _push2_extended / _tencent_extended 文件缓存共享
 
 场景覆盖：
   1. 市值阈值（大盘/中盘/小盘）
@@ -19,6 +20,7 @@
   6. 网格距离
   7. 漂移检测
   8. 首检/基线/严重漂移
+  9. push2→tencent 文件缓存共享
 
 运行：
   pytest src/test/ -m "unit_report" -k "fund_style" -v
@@ -491,3 +493,102 @@ class TestAnalyzeStyleForAllFunds(unittest.TestCase):
         """无持仓 → 空结果"""
         result = analyze_style_for_all_funds({})
         self.assertEqual(result["results"], [])
+
+
+# ═══════════════════════════════════════════════════════════════
+#  P3-12: _push2_extended / _tencent_extended 文件缓存共享
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestExtendedCacheSharing(unittest.TestCase):
+    """_push2_extended / _tencent_extended 共享文件缓存（key=extended_{code}）。
+
+    验证：
+      - 一个函数写入缓存后，另一个函数读取缓存而非重复调用 API
+      - 缓存键兼容性
+    """
+
+    def setUp(self):
+        """清除文件缓存中 extended_ 前缀的条目。"""
+        from src.python.cache import delete_by_prefix
+        delete_by_prefix("extended_")
+
+    @patch("src.python.report.fund_style_analysis._tencent_extended")
+    @patch("src.python.fetcher.price.fetch_market_data")
+    @patch("src.python.fetcher.industry.make_push2_request")
+    def test_push2_writes_tencent_reads(
+        self, mock_push2_api, mock_tencent_api, mock_tencent_fn,
+    ):
+        """push2 写入缓存 → tencent 读取缓存（不调用 tencent API）"""
+        # push2 成功返回数据，写入缓存
+        mock_push2_api.return_value = {"market_cap": 1e11, "pe": 25.0}
+        mock_tencent_api.return_value = None  # 不应被调用
+
+        from src.python.report.fund_style_analysis import _push2_extended, _tencent_extended
+
+        # 第一次调用：push2 API 被调用，写入缓存
+        result1 = _push2_extended("600519")
+        self.assertIsNotNone(result1)
+        self.assertAlmostEqual(result1["market_cap"], 1e11)
+        self.assertAlmostEqual(result1["pe"], 25.0)
+
+        # 第二次调用：tencent 应命中同一缓存，不调用 tencent API
+        result2 = _tencent_extended("600519")
+        self.assertIsNotNone(result2)
+        self.assertAlmostEqual(result2["market_cap"], 1e11)
+        self.assertAlmostEqual(result2["pe"], 25.0)
+        # tencent API 在第二次调用中不应被调用（缓存命中）
+        mock_tencent_fn.assert_not_called()
+
+    @patch("src.python.report.fund_style_analysis._push2_extended")
+    @patch("src.python.fetcher.price.fetch_market_data")
+    @patch("src.python.fetcher.industry.make_push2_request")
+    def test_tencent_writes_push2_reads(
+        self, mock_push2_api, mock_tencent_api, mock_push2_fn,
+    ):
+        """tencent 写入缓存 → push2 读取缓存（不调用 push2 API）"""
+        mock_push2_api.return_value = None  # 不应被调用
+        mock_tencent_api.return_value = {"market_cap": 2e11, "pe": 30.0}
+
+        from src.python.report.fund_style_analysis import _push2_extended, _tencent_extended
+
+        # 第一次调用：tencent API 被调用，写入缓存
+        result1 = _tencent_extended("600519")
+        self.assertIsNotNone(result1)
+        self.assertAlmostEqual(result1["market_cap"], 2e11)
+
+        # 第二次调用：push2 应命中同一缓存，不调用 push2 API
+        result2 = _push2_extended("600519")
+        self.assertIsNotNone(result2)
+        self.assertAlmostEqual(result2["market_cap"], 2e11)
+        mock_push2_fn.assert_not_called()
+
+    @patch("src.python.report.fund_style_analysis._tencent_extended")
+    @patch("src.python.fetcher.price.fetch_market_data")
+    @patch("src.python.fetcher.industry.make_push2_request")
+    def test_different_code_no_cache_interference(
+        self, mock_push2_api, mock_tencent_api, mock_tencent_fn,
+    ):
+        """不同代码的缓存互不干扰。"""
+        mock_push2_api.side_effect = lambda c: {
+            "600519": {"market_cap": 1e11, "pe": 25.0},
+            "000858": {"market_cap": 5e10, "pe": 15.0},
+        }.get(c)
+
+        from src.python.report.fund_style_analysis import _push2_extended
+
+        _push2_extended("600519")
+        _push2_extended("000858")
+
+        from src.python.report.fund_style_analysis import _tencent_extended
+
+        r1 = _tencent_extended("600519")
+        self.assertIsNotNone(r1)
+        self.assertAlmostEqual(r1["market_cap"], 1e11)
+
+        r2 = _tencent_extended("000858")
+        self.assertIsNotNone(r2)
+        self.assertAlmostEqual(r2["market_cap"], 5e10)
+
+        # tencent 全程未实际调用（缓存命中）
+        mock_tencent_fn.assert_not_called()
