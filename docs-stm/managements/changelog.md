@@ -18,8 +18,10 @@
 
 ### Changed
 - **news_correlation `_build_news_footer`** — 参数由 `has_llm: bool` 改为 `llm_count: int`，精确显示分析条数
+- **plan.md** — 移除已完成的 P3-I（CLI 模式）条目（v0.6.1 已完成）
 
 ### Fixed
+- 智能预警模块 `_collect_relevant_news` 中 `isinstance(analysis, dict)` 类型错误 — 实际 `llm_analysis` 为 `str`（`"[高][利好]..."`），导致新闻情绪聚合维度恒空（见 `generators_news.py:196` vs `early_warning.py:195`）
 - **内部路径隔离** — `_config_defaults.py`、`logger.py`、`handlers_config.py` 统一使用 `PROJECT_ROOT`（`constants.py`）作为基准路径，消除 CWD 依赖。解决从非项目根目录运行时 `src/data/`、`src/logs/` 等目录误创建的问题
 - **回撤图 Y 轴截断** — `drawSimpleChart` 中 `yMin = Math.max(0, globalMin - pad)` 强制下限 ≥0，导致全部负值回撤数据不可见、指数回撤线被裁剪。移除 `Math.max(0, ...)` 修复
 - **回撤区持仓名单分行** — `report_template.html` 中 Section 13 持仓列表由内联拼接改为逐行显示，与 Section 12 保持一致
