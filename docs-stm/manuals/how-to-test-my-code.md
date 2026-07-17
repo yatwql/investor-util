@@ -1,6 +1,6 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 文档版本：v0.6.6
+> 文档版本：v0.6.7
 
 ## 概述
 
@@ -259,6 +259,42 @@ test-reports/latest/
 ```
 
 **打开方式**：直接用浏览器打开 `test-reports/latest/index.html`
+
+### 🔧 快速定位失败用例 — `scripts/extract-test-failures.py`
+
+运行 `test_runner.py --mode all` 等全量测试后，直接从 HTML 报告中提取失败/错误用例的详细信息，无需手动翻浏览器：
+
+```bash
+# 自动查找 test-reports/latest/ 下的报告
+python scripts/extract-test-failures.py
+
+# 指定报告路径
+python scripts/extract-test-failures.py test-reports/latest/all/report.html
+
+# 仅输出汇总统计（不打印日志）
+python scripts/extract-test-failures.py --summary
+
+# 输出 JSON 格式（便于管道处理）
+python scripts/extract-test-failures.py --json
+```
+
+**典型工作流**：
+
+```
+# 1. 跑全量测试
+python scripts/test_runner.py --mode all
+
+# 2. 快速查看哪些用例失败
+python scripts/extract-test-failures.py --summary
+
+# 3. 查看失败详情（含错误堆栈最后 500 字符）
+python scripts/extract-test-failures.py
+
+# 4. 修复后，只重跑之前失败的用例
+pytest src/test/ -m "<对应标记>" --lf
+```
+
+> 脚本自动定位 `test-reports/latest/all/report.html` 等常用路径，无需每次指定路径。
 
 ## 标记选择运行速查
 

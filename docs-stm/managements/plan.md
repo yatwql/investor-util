@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
-> 文档版本：v0.6.6
+> 文档版本：v0.6.7
 
 ---
 
@@ -42,11 +42,20 @@
 | 持仓 xlsx 格式与预期不一致 | 解析失败或数据错误 | 固定列名解析 + 字段校验 + 友好提示 |
 | 基金穿透计算量大 | 报告生成变慢 | 穿透结果缓存每日更新 |
 | LLM API Key 未配置 / 超时 | 全球政经局势 / 智囊团深度复盘不可用 | 降级输出占位文本，不阻塞报告生成 |
-| LLM Token 费用超预期 | 成本增加 | 缓存 LLM 结果；限制输入上下文；分层缓存 TTL |
+| LLM Token 费用超预期 | 成本增加 | 缓存 LLM 结果；限制输入上下文；分层缓存 TTL；多 provider 成本优先路由 |
 
 ---
 
 > 验收标准详见 [`testplan.md §6 验收标准`](testplan.md#6-验收标准)。
+
+## 待实现方向
+
+### P1-T01：多 LLM Provider 链式服务（规划中）
+
+支持同时配置多个 LLM 服务商（Claude / OpenAI / Gemini / DeepSeek），按优先级/权重/成本策略分发请求。
+
+- **详细设计**：[docs-stm/plan/llm-multi-provider-design.md](../plan/llm-multi-provider-design.md)
+- **迭代计划**：[docs-stm/plan/llm-multi-provider-iteration-plan.md](../plan/llm-multi-provider-iteration-plan.md)
 
 已完成迭代的实现计划已归档：
 

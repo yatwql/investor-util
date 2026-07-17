@@ -21,7 +21,7 @@ import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
-# 标准 16 模块的默认注册表（精简版，仅含结构测试所需字段）
+# 标准注册表（精简版，仅含结构测试所需字段，与 registry.py 对齐）
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary",            "name": "投资分析汇总",                     "number": 1,  "type": "always"},
     {"key": "market_value",       "name": "市值核算明细表",                   "number": 2,  "type": "always"},
@@ -34,10 +34,12 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "b_series"},
     {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10, "type": "news"},
     {"key": "global_macro",       "name": "全球政经局势",                     "number": 11, "type": "llm"},
-    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13, "type": "llm"},
-    {"key": "health_check",       "name": "持仓体检报告",                     "number": 14, "type": "llm"},
-    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15, "type": "llm"},
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 16, "type": "llm"},
+    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12, "type": "llm"},
+    {"key": "health_check",       "name": "持仓体检报告",                     "number": 13, "type": "llm"},
+    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14, "type": "llm"},
+    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 15, "type": "history"},
+    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 16, "type": "history"},
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 17, "type": "llm"},
 ]
 
 
@@ -61,7 +63,8 @@ class TestExcelSheetOrder(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=False, enable_news=False, enable_llm=False)
+                                enable_b_series=False, enable_news=False, enable_llm=False,
+                                enable_history=False)
         # 只有 always 类型的 5 个页签
         expected_order = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
                           if sec["type"] == "always"]
@@ -93,7 +96,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys,
                          "全部启用时页签顺序应与默认注册表一致")
-        self.assertEqual(len(sheets), 16)
+        self.assertEqual(len(sheets), 17)
 
     def test_sheet_order_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
@@ -101,7 +104,8 @@ class TestExcelSheetOrder(unittest.TestCase):
         wb = self._make_wb()
         # 启用 always + b_series
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=True, enable_news=False, enable_llm=False)
+                                enable_b_series=True, enable_news=False, enable_llm=False,
+                                enable_history=False)
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
                          if sec["type"] in ("always", "b_series")]
         self.assertEqual(list(sheets.keys()), expected_keys)

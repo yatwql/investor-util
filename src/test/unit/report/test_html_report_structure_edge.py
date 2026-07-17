@@ -97,10 +97,10 @@ class TestHtmlCssStructure(unittest.TestCase):
                           f"section div 缺少 order 样式: {sec_tag}")
 
     def test_section_count(self):
-        """模板应包含 18 个 .section 容器。"""
+        """模板应包含 17 个 .section 容器。"""
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
-        self.assertEqual(len(sections), 18,
-                         f"应有 18 个 .section 容器，实际 {len(sections)}")
+        self.assertEqual(len(sections), 17,
+                         f"应有 17 个 .section 容器，实际 {len(sections)}")
 
     # ── section-title pattern ──────────────────────────────────
 

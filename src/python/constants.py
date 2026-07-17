@@ -35,7 +35,7 @@ PROJECT_ROOT = _find_project_root()
 
 # ── 项目版本 ──────────────────────────────────────────────
 
-APP_VERSION = "0.6.6"
+APP_VERSION = "0.6.7"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
@@ -85,4 +85,10 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "deepseek-v4-flash": {"input": 1, "output": 2, "input_cache_hit": 0.02},
     "deepseek-v4-pro": {"input": 3, "output": 6, "input_cache_hit": 0.025},
     "deepseek-chat": {"input": 1, "output": 2, "input_cache_hit": 0.02},
+    # Gemini
+    "gemini-2.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
+    "gemini-2.5-pro": {"input": 1.25, "output": 5.0, "input_cache_hit": 0.125},
+    "gemini-2.5-": {"input": 1.25, "output": 5.0, "input_cache_hit": 0.125},
+    "gemini-2.0-flash": {"input": 0.10, "output": 0.40, "input_cache_hit": 0.01},
+    "gemini-2.0-": {"input": 0.10, "output": 0.40, "input_cache_hit": 0.01},
 }

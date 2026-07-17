@@ -33,13 +33,14 @@ _TEMPLATE_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "python", "tmpl", "report_template.html"),
 )
 
-# 16 个模块的期望 key（按默认顺序）
+# 默认注册表 key（按默认顺序，与 registry.py 对齐）
 _ALL_KEYS_DEFAULT = [
     "summary", "market_value", "category", "penetration",
     "fund_performance",
     "fund_manager", "fund_overlap", "fund_concentration", "fund_style",
     "news_correlation",
     "global_macro", "expert_review", "health_check", "penetration_deep",
+    "portfolio_history", "drawdown_analysis",
     "llm_usage",
 ]
 
@@ -47,6 +48,7 @@ _ALWAYS_KEYS = {"summary", "market_value", "category", "penetration", "fund_perf
 _B_SERIES_KEYS = {"fund_manager", "fund_overlap", "fund_concentration", "fund_style"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
+_HISTORY_KEYS = {"portfolio_history", "drawdown_analysis"}
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary",            "name": "投资分析汇总",                     "number": 1},
@@ -63,7 +65,9 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12},
     {"key": "health_check",       "name": "持仓体检报告",                     "number": 13},
     {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14},
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 15},
+    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 15},
+    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 16},
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 17},
 ]
 
 
@@ -171,10 +175,10 @@ class TestHtmlNavStructure(unittest.TestCase):
     # ── Nav links ──────────────────────────────────────────────
 
     def test_nav_link_count(self):
-        """导航链接数量应等于可见模块数（全部可见 = 16）。"""
+        """导航链接数量应等于可见模块数（全部可见 = 17）。"""
         links = self.soup.select("nav.section-nav a")
-        self.assertEqual(len(links), 16,
-                         f"导航应有 16 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 17,
+                         f"导航应有 17 个链接，实际 {len(links)}")
 
     def test_every_nav_link_has_corresponding_section(self):
         """每个导航链接的 href 指向一个存在的 section id。"""
@@ -344,7 +348,7 @@ class TestHtmlSectionVisibility(unittest.TestCase):
         # 无条件渲染的 section 容器
         sections = soup.select("div.section")
         self.assertGreaterEqual(len(sections), 5, "至少 5 个 always 模块应无条件渲染")
-        self.assertLess(len(sections), 16, "不可见模块的 div 不应渲染")
+        self.assertLess(len(sections), 17, "不可见模块的 div 不应渲染")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -376,7 +380,9 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12},
             {"key": "health_check",       "name": "持仓体检报告",                     "number": 13},
             {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14},
-            {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 15},
+            {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 15},
+            {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 16},
+            {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 17},
         ]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.custom_order}
         cls.sv_dict = {sec["key"]: True for sec in cls.custom_order}
@@ -429,9 +435,9 @@ class TestHtmlCustomOrder(unittest.TestCase):
                 orders[sec_id] = int(m.group(1))
 
         self.assertIn("sec-llm_usage", orders)
-        # llm_usage 的 order 应为 16（默认值，未配置时保持）
-        self.assertEqual(orders["sec-llm_usage"], 16,
-                         "llm_usage 的 order 应为 16（末位）")
+        # llm_usage 的 order 应为 17（默认值，未配置时保持）
+        self.assertEqual(orders["sec-llm_usage"], 17,
+                         "llm_usage 的 order 应为 17（末位）")
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -200,6 +200,8 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件
+│   │   ├── llm-multi-provider-design.md              # 多 LLM Provider 链式服务技术设计
+│   │   └── llm-multi-provider-iteration-plan.md      # 多 LLM Provider 链式服务迭代计划
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x

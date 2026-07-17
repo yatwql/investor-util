@@ -37,7 +37,8 @@ __all__ = [
     "CACHE_LINE_HTML", "_cache_line_model_tpl",
     "_MODEL_LINE_RE", "_THINKING_SUPPORTED_PREFIXES", "_THINKING_EFFORT_MODEL_PREFIXES",
     "_supports_extended_thinking", "_is_effort_model", "_truncation_warning",
-    "_check_claude_truncation", "_check_openai_truncation", "_extract_content",
+    "_check_claude_truncation", "_check_openai_truncation", "_check_gemini_truncation",
+    "_extract_content", "_extract_content_from_gemini",
     "_extract_model_from_cached", "_log_token_usage", "_get_retry_max", "_sanitize_endpoint",
     "_check_circuit_breaker", "_process_success_response", "_attempt_api_call",
     "_is_retry_available", "call_llm_with_retry",
@@ -166,6 +167,30 @@ def _check_openai_truncation(data: dict, max_tokens: int, label: str, config_fie
     return False
 
 
+def _check_gemini_truncation(data: dict, max_tokens: int, label: str, config_field: str = "max_tokens") -> bool:
+    """检查 Gemini 响应是否被 max_tokens 截断。
+
+    finishReason 为 "MAX_TOKENS" 表示达到 token 上限被截断。
+    """
+    try:
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return False
+        finish_reason = candidates[0].get("finishReason", "")
+        if finish_reason == "MAX_TOKENS":
+            usage_meta = data.get("usageMetadata", {})
+            out_tokens = usage_meta.get("candidatesTokenCount", 0)
+            logger.error(
+                "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。"
+                "内容不完整，请在 llm_settings.json 中增大 %s",
+                label, config_field, max_tokens, out_tokens, config_field,
+            )
+            return True
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return False
+    return False
+
+
 def _extract_content(data: dict) -> str | None:
     """从 Anthropic Messages API 兼容响应中提取文本内容。
 
@@ -209,6 +234,40 @@ def _extract_content(data: dict) -> str | None:
         return ""  # 空列表也视为空内容而非格式异常
 
     return None
+
+
+def _extract_content_from_gemini(data: dict) -> str | None:
+    """从 Gemini generateContent 响应中提取文本内容。
+
+    Gemini 响应格式：
+    {
+      "candidates": [{
+        "content": {"parts": [{"text": "..."}], "role": "model"},
+        "finishReason": "STOP"
+      }],
+      "usageMetadata": {...}
+    }
+
+    Returns:
+        str: 提取的文本内容
+        None: 响应格式异常
+    """
+    if data and "error" in data:
+        logger.warning("Gemini API 返回错误: %s", data["error"])
+        return None
+
+    try:
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return ""
+        parts = candidates[0].get("content", {}).get("parts", [])
+        texts = [p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text")]
+        if texts:
+            return "\n".join(texts)
+        return "" if candidates else None
+    except (KeyError, IndexError, TypeError, AttributeError) as e:
+        logger.warning("Gemini API 响应格式异常: %s", e)
+        return None
 
 
 def _extract_model_from_cached(html: str) -> str:
@@ -291,7 +350,15 @@ def _process_success_response(
         return ("", data.get("usage"))
 
     truncated = check_truncation_fn(data, max_tokens)
+    # 兼容 Gemini usageMetadata：若 usage 字段不存在但 usageMetadata 存在则转换
     usage = data.get("usage")
+    if usage is None:
+        usage_meta = data.get("usageMetadata")
+        if usage_meta:
+            usage = {
+                "prompt_tokens": usage_meta.get("promptTokenCount", 0),
+                "completion_tokens": usage_meta.get("candidatesTokenCount", 0),
+            }
     _log_token_usage(provider, usage, label, model_name=model_name)
     track_session_usage(provider, usage, model_name=model_name)
 

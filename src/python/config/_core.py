@@ -634,8 +634,8 @@ def get_llm_config() -> dict | None:
 
             provider = key_config.get("provider", "")
             endpoint = key_config.get("endpoint", "")
-            if provider and provider not in ("claude", "openai"):
-                logger.warning("llm_key.json provider = '%s' 不是有效值", provider)
+            if provider and provider not in ("claude", "openai", "gemini"):
+                logger.warning("llm_key.json provider = '%s' 不是有效值（claude/openai/gemini）", provider)
             if endpoint and not endpoint.startswith("http"):
                 logger.warning("llm_key.json endpoint = '%s' 不是有效 URL", endpoint)
 

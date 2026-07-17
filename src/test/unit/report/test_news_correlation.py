@@ -26,7 +26,7 @@ class TestBuildNewsData(unittest.TestCase):
     """build_news_data 异常场景测试（mock 网络层 + LLM 配置）。"""
 
     @patch("src.python.config.get_llm_config")
-    @patch("src.python.providers.news_aggregator.aggregate_news")
+    @patch("src.python.fetcher.news.aggregate_news")
     def test_empty_holdings_returns_empty_list(
         self, mock_aggregate: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
@@ -38,7 +38,7 @@ class TestBuildNewsData(unittest.TestCase):
         self.assertFalse(meta.get("llm_enabled"))
 
     @patch("src.python.config.get_llm_config")
-    @patch("src.python.providers.news_aggregator.aggregate_news")
+    @patch("src.python.fetcher.news.aggregate_news")
     def test_api_failure_returns_empty(
         self, mock_aggregate: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
@@ -54,7 +54,7 @@ class TestBuildNewsData(unittest.TestCase):
         self.assertFalse(meta.get("llm_enabled"))
 
     @patch("src.python.config.get_llm_config")
-    @patch("src.python.providers.news_aggregator.aggregate_news")
+    @patch("src.python.fetcher.news.aggregate_news")
     def test_api_returns_data(
         self, mock_aggregate: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
@@ -79,7 +79,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
 
     @patch("src.python.config.get_llm_config")
     @patch("src.python.llm.run_news_correlation_safe")
-    @patch("src.python.providers.news_aggregator.aggregate_news")
+    @patch("src.python.fetcher.news.aggregate_news")
     def test_llm_enabled_calls_enhance(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
@@ -112,7 +112,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
 
     @patch("src.python.config.get_llm_config")
     @patch("src.python.llm.run_news_correlation_safe")
-    @patch("src.python.providers.news_aggregator.aggregate_news")
+    @patch("src.python.fetcher.news.aggregate_news")
     def test_llm_cache_hit(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
@@ -140,7 +140,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
 
     @patch("src.python.config.get_llm_config")
     @patch("src.python.llm.run_news_correlation_safe")
-    @patch("src.python.providers.news_aggregator.aggregate_news")
+    @patch("src.python.fetcher.news.aggregate_news")
     def test_llm_disabled_when_no_api_key(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
@@ -162,7 +162,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
 
     @patch("src.python.config.get_llm_config")
     @patch("src.python.llm.run_news_correlation_safe")
-    @patch("src.python.providers.news_aggregator.aggregate_news")
+    @patch("src.python.fetcher.news.aggregate_news")
     def test_llm_enhance_failure_falls_back_gracefully(
         self, mock_aggregate: MagicMock, mock_enhance: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:
@@ -187,7 +187,7 @@ class TestBuildNewsDataWithLLM(unittest.TestCase):
         self.assertEqual(meta.get("token_usage", {}), {})
 
     @patch("src.python.config.get_llm_config")
-    @patch("src.python.providers.news_aggregator.aggregate_news")
+    @patch("src.python.fetcher.news.aggregate_news")
     def test_llm_disabled_returns_no_llm_meta(
         self, mock_aggregate: MagicMock, mock_llm_cfg: MagicMock,
     ) -> None:

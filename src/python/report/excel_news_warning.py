@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from src.python.logger import setup_logger
-from src.python.registry import get_llm_module_name
+from src.python.registry import get_llm_module_name, get_report_sheet_name
 from src.python.report.progress import ProgressReporter
 
 logger = setup_logger()

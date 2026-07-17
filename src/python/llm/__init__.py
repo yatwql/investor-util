@@ -8,7 +8,7 @@
   generators.py              — 4 个单例生成函数（global_macro/expert_review/health_check/penetration）
   generators_orchestrator.py — LLM 批量编排、缓存预检、线程池分发
   generators_news.py         — 财经新闻 LLM 关联分析
-  api.py                     — Provider 路由 + Claude/OpenAI 调用
+  api.py                     — Provider 路由 + Claude/OpenAI/Gemini 调用
   api_base.py                — API 基础设施（常量、重试、截断、失败追踪）
   fingerprint.py             — 缓存指纹计算
   pricing.py                 — Token 定价与费用估算

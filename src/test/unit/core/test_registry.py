@@ -74,19 +74,20 @@ class TestRegistryCompleteness:
                 )
 
     def test_llm_settings_keys_count(self):
-        """LLM settings 键名数量应与预期一致（5模块 × 10 - 1个例外 = 49 + 4全局 = 53）。"""
+        """LLM settings 键名数量应与预期一致（5模块 × 10 - 1个例外 = 49 + 5全局 = 54）。"""
         keys = get_known_llm_settings_keys()
         # 确认已知的全局键存在
         assert "max_retries" in keys
         assert "enabled_llm" in keys
         assert "pricing" in keys
+        assert "news_correlation_top_n" in keys
         # 确认 per-module 键生成正确
         assert "temperature_global_macro" in keys
         assert "output_brief_global_macro" in keys
         # news_correlation 不应有 output_brief
         assert "output_brief_news_correlation" not in keys
         # 确认总键数
-        assert len(keys) == 53, f"预期 53 个 LLM settings 键，实际 {len(keys)}"
+        assert len(keys) == 54, f"预期 54 个 LLM settings 键，实际 {len(keys)}"
 
     def test_each_llm_module_has_model_key(self):
         """每个 LLM 模块必须有 model_{suffix} 键。"""
@@ -249,9 +250,9 @@ class TestDataModuleDef:
 class TestReportSectionDefault:
     """_REPORT_SECTION_DEFAULT 完整性验证。"""
 
-    def test_total_18_sections(self):
-        """应有 18 个报告模块。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 18
+    def test_total_17_sections(self):
+        """应有 17 个报告模块（early_warning 已移除）。"""
+        assert len(_REPORT_SECTION_DEFAULT) == 17
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -286,10 +287,10 @@ class TestReportSectionDefault:
                     f"{sec['key']}: {sec['type']} 类型缺少 data_flag"
                 )
 
-    def test_default_numbers_are_1_to_18(self):
-        """默认序号应为 1 到 18。"""
+    def test_default_numbers_are_1_to_17(self):
+        """默认序号应为 1 到 17。"""
         numbers = [sec["number"] for sec in _REPORT_SECTION_DEFAULT]
-        assert numbers == list(range(1, 19)), f"序号不连续: {numbers}"
+        assert numbers == list(range(1, 18)), f"序号不连续: {numbers}"
 
     def test_llm_usage_is_last(self):
         """llm_usage 应在默认列表最后。"""
@@ -305,10 +306,10 @@ class TestReportSectionDefault:
 class TestGetReportSectionKeys:
     """get_report_section_keys() 单元测试。"""
 
-    def test_returns_all_18_keys(self):
-        """应返回 18 个有效 key。"""
+    def test_returns_all_17_keys(self):
+        """应返回 17 个有效 key。"""
         keys = get_report_section_keys()
-        assert len(keys) == 18
+        assert len(keys) == 17
 
     def test_contains_known_keys(self):
         """应包含已知的几个关键 key。"""
@@ -323,7 +324,7 @@ class TestGetReportSectionOrder:
     def test_no_config_returns_defaults(self):
         """config 为 None → 返回 18 项默认值。"""
         order = get_report_section_order()
-        assert len(order) == 18
+        assert len(order) == 17
         assert order[-1]["key"] == "llm_usage"
         # 验证每个条目的 number 与原默认一致
         for sec, default in zip(order, _REPORT_SECTION_DEFAULT):
@@ -339,13 +340,13 @@ class TestGetReportSectionOrder:
     def test_empty_config_returns_defaults(self):
         """report_section_order 为空字典 → 返回默认。"""
         order = get_report_section_order({"report_section_order": {}})
-        assert len(order) == 18
+        assert len(order) == 17
         assert order[0]["key"] == "summary"
 
     def test_non_dict_config_returns_defaults(self):
         """report_section_order 不是 dict → 返回默认。"""
         order = get_report_section_order({"report_section_order": "invalid"})
-        assert len(order) == 18
+        assert len(order) == 17
         assert order[0]["key"] == "summary"
 
     def test_partial_config_items_first(self):
@@ -358,7 +359,7 @@ class TestGetReportSectionOrder:
         assert order[1]["key"] == "summary"
         assert order[1]["number"] == 2
         # 前两项之外应有 16 项（含 llm_usage 在最后）
-        assert len(order) == 18
+        assert len(order) == 17
 
     def test_partial_config_unconfigured_after_configured(self):
         """未配置项排在已配置项之后。"""
@@ -411,7 +412,7 @@ class TestGetReportSectionOrder:
         # 反序配置
         full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}
         order = get_report_section_order({"report_section_order": full_config})
-        assert len(order) == 18
+        assert len(order) == 17
         assert order[-1]["key"] == "llm_usage"
         # 第一个应为反序后的最后一个（即 fund_manager 的反序... 等等）
         reversed_last = list(reversed(all_keys))[0]

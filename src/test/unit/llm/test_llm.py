@@ -1075,13 +1075,9 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
         cls._exec_patcher = patch("src.python.llm.skeleton.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.skeleton.httpx.Client",
-                                    new=MagicMock())
-        cls._httpx_patcher.start()
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls._httpx_patcher.stop()
         cls._exec_patcher.stop()
 
     def setUp(self) -> None:
@@ -1495,13 +1491,9 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
         cls._exec_patcher = patch("src.python.llm.skeleton.ThreadPoolExecutor",
                                    new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.skeleton.httpx.Client",
-                                    new=MagicMock())
-        cls._httpx_patcher.start()
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls._httpx_patcher.stop()
         cls._exec_patcher.stop()
 
     def setUp(self):

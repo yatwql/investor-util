@@ -47,7 +47,11 @@ def print_llm_session_usage(usage: dict | None = None) -> None:
 
 def print_timing_summary() -> None:
     """输出本次运行时各模块耗时排行（委托至 TuiProgressReporter）。"""
-    TuiProgressReporter().print_timing_summary()
+    from src.python.report.progress import _timing_records
+    reporter = TuiProgressReporter()
+    reporter._timing_records.extend(_timing_records)
+    reporter.print_timing_summary()
+    _timing_records.clear()
 
 
 def print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:

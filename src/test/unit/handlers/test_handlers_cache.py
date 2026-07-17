@@ -27,27 +27,23 @@ class TestRefreshProfitForecastCache(unittest.TestCase):
         from src.python.cache.operations import _refresh_profit_forecast_cache
         return _refresh_profit_forecast_cache()
 
-    @patch("src.python.providers.akshare_extras._memo_clear")
-    @patch("src.python.providers.akshare_extras.get_profit_forecast")
-    def test_success(self, mock_get, mock_memo):
+    @patch("src.python.fetcher.akshare.get_profit_forecast")
+    def test_success(self, mock_get):
         """成功获取 → 返回 (profit_forecast, 覆盖数)。"""
         mock_get.return_value = {"600900": {}, "600519": {}}
         name, count = self._call()
         self.assertEqual(name, "profit_forecast")
         self.assertEqual(count, 2)
-        mock_memo.assert_called_once()
 
-    @patch("src.python.providers.akshare_extras._memo_clear")
-    @patch("src.python.providers.akshare_extras.get_profit_forecast")
-    def test_empty_result(self, mock_get, mock_memo):
+    @patch("src.python.fetcher.akshare.get_profit_forecast")
+    def test_empty_result(self, mock_get):
         """空结果 → 返回 0。"""
         mock_get.return_value = {}
         name, count = self._call()
         self.assertEqual(count, 0)
 
-    @patch("src.python.providers.akshare_extras._memo_clear")
-    @patch("src.python.providers.akshare_extras.get_profit_forecast")
-    def test_none_result(self, mock_get, mock_memo):
+    @patch("src.python.fetcher.akshare.get_profit_forecast")
+    def test_none_result(self, mock_get):
         """None 结果 → 返回 0。"""
         mock_get.return_value = None
         name, count = self._call()
@@ -62,7 +58,7 @@ class TestRefreshSectorFlowCache(unittest.TestCase):
         from src.python.cache.operations import _refresh_sector_flow_cache
         return _refresh_sector_flow_cache()
 
-    @patch("src.python.providers.akshare_extras.get_sector_fund_flow")
+    @patch("src.python.fetcher.akshare.get_sector_fund_flow")
     def test_success(self, mock_get):
         """成功获取 → 返回 (sector_flow, 行业数)。"""
         mock_get.return_value = [{"name": "电力"}, {"name": "银行"}]
@@ -70,14 +66,14 @@ class TestRefreshSectorFlowCache(unittest.TestCase):
         self.assertEqual(name, "sector_flow")
         self.assertEqual(count, 2)
 
-    @patch("src.python.providers.akshare_extras.get_sector_fund_flow")
+    @patch("src.python.fetcher.akshare.get_sector_fund_flow")
     def test_empty_result(self, mock_get):
         """空列表 → 返回 0。"""
         mock_get.return_value = []
         name, count = self._call()
         self.assertEqual(count, 0)
 
-    @patch("src.python.providers.akshare_extras.get_sector_fund_flow")
+    @patch("src.python.fetcher.akshare.get_sector_fund_flow")
     def test_none_result(self, mock_get):
         """None 结果 → 返回 0。"""
         mock_get.return_value = None

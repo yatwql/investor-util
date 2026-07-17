@@ -195,9 +195,8 @@ class TestRefreshOneFundCache:
 class TestRefreshProfitForecast:
     """_refresh_profit_forecast_cache: 盈利预测缓存刷新（operations 版）。"""
 
-    @patch("src.python.providers.akshare_extras._memo_clear")
-    @patch("src.python.providers.akshare_extras.get_profit_forecast")
-    def test_success(self, mock_get, mock_clear):
+    @patch("src.python.fetcher.akshare.get_profit_forecast")
+    def test_success(self, mock_get):
         """成功返回覆盖股票数。"""
         mock_get.return_value = {"600519": {}, "000001": {}}
         from src.python.cache.operations import _refresh_profit_forecast_cache
@@ -205,9 +204,8 @@ class TestRefreshProfitForecast:
         count = _refresh_profit_forecast_cache()
         assert count == ("profit_forecast", 2)
 
-    @patch("src.python.providers.akshare_extras._memo_clear")
-    @patch("src.python.providers.akshare_extras.get_profit_forecast", return_value=None)
-    def test_failure(self, mock_get, mock_clear):
+    @patch("src.python.fetcher.akshare.get_profit_forecast", return_value=None)
+    def test_failure(self, mock_get):
         """失败返回 ('profit_forecast', 0)。"""
         from src.python.cache.operations import _refresh_profit_forecast_cache
 
@@ -218,16 +216,16 @@ class TestRefreshProfitForecast:
 class TestRefreshSectorFlow:
     """_refresh_sector_flow_cache: 行业资金流向缓存刷新（operations 版）。"""
 
-    @patch("src.python.providers.akshare_extras.get_sector_fund_flow")
+    @patch("src.python.fetcher.akshare.get_sector_fund_flow")
     def test_success(self, mock_get):
         """成功返回行业数。"""
-        mock_get.return_value = {"银行": {}, "地产": {}}
+        mock_get.return_value = [{"name": "银行"}, {"name": "地产"}]
         from src.python.cache.operations import _refresh_sector_flow_cache
 
         count = _refresh_sector_flow_cache()
         assert count == ("sector_flow", 2)
 
-    @patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None)
+    @patch("src.python.fetcher.akshare.get_sector_fund_flow", return_value=None)
     def test_failure(self, mock_get):
         """失败返回 ('sector_flow', 0)。"""
         from src.python.cache.operations import _refresh_sector_flow_cache

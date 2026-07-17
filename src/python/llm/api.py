@@ -15,8 +15,10 @@ if TYPE_CHECKING:
 from src.python.llm.api_base import (
     call_llm_with_retry,
     _check_claude_truncation,
+    _check_gemini_truncation,
     _check_openai_truncation,
     _extract_content,
+    _extract_content_from_gemini,
     _get_retry_max,
     _is_effort_model,
     _supports_extended_thinking,
@@ -29,6 +31,7 @@ __all__ = [
     "call_single_provider",
     "call_claude",
     "call_openai",
+    "call_gemini",
     "configure_extended_thinking",
 ]
 
@@ -66,6 +69,11 @@ def call_single_provider(
                                 temperature=temperature, llm_config=llm_config)
     elif provider == "openai":
         return call_openai(system_prompt, user_prompt, api_key, resolved_model, endpoint,
+                                max_tokens, timeout, max_retries=max_retries,
+                                http_client=http_client, config_field=config_field,
+                                temperature=temperature)
+    elif provider == "gemini":
+        return call_gemini(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                                 max_tokens, timeout, max_retries=max_retries,
                                 http_client=http_client, config_field=config_field,
                                 temperature=temperature)
@@ -309,4 +317,58 @@ def call_openai(
         extract_fn=_extract_openai,
         check_truncation_fn=lambda d, mt: _check_openai_truncation(d, mt, "OpenAI", config_field),
         provider="openai", model_name=model,
+    )
+
+
+def call_gemini(
+    system: str,
+    user: str,
+    api_key: str,
+    model: str,
+    endpoint: str,
+    max_tokens: int,
+    timeout: float = 60.0,
+    max_retries: int = 2,
+    http_client: httpx.Client | None = None,
+    config_field: str = "max_tokens",
+    temperature: float | None = None,
+) -> tuple[str | None, dict | None]:
+    """调用 Google Gemini API (generateContent)，带重试 + 用量日志。
+
+    Gemini API 使用 x-goog-api-key header 认证，模型名嵌入 URL 路径。
+    支持 system instruction（通过 systemInstruction 字段）和 generationConfig。
+
+    Args:
+        max_retries: 最大重试次数，从 llm_config 读取
+        temperature: 若不为 None，覆盖 generationConfig 中的 temperature 字段
+
+    Returns:
+        (content, usage) — usage 为标准化后的用量字典，失败时均为 None
+    """
+    url = endpoint or f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,
+    }
+    payload = {
+        "contents": [
+            {"role": "user", "parts": [{"text": user}]},
+        ],
+        "systemInstruction": {"parts": [{"text": system}]},
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+        },
+    }
+    if temperature is not None:
+        payload["generationConfig"]["temperature"] = temperature
+    client = http_client
+    assert client is not None
+
+    return call_llm_with_retry(
+        label="Gemini", client=client, url=url, headers=headers,
+        payload=payload, timeout=timeout, max_retries=max_retries,
+        max_tokens=max_tokens, config_field=config_field,
+        extract_fn=_extract_content_from_gemini,
+        check_truncation_fn=lambda d, mt: _check_gemini_truncation(d, mt, "Gemini", config_field),
+        provider="gemini", model_name=model,
     )

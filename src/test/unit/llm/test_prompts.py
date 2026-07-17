@@ -515,9 +515,9 @@ class TestCalcCountryExposure(unittest.TestCase):
         self.assertIn("A股", combined)
 
     def test_no_prefix_code_is_other(self):
-        """无交易所前缀的代码归属为其他。"""
+        """无交易所前缀且非 A 股数字特征的代码归属为其他。"""
         from src.python.llm.prompts import _calc_country_exposure
-        details = [{"code": "600900", "market_value": 50_000}]
+        details = [{"code": "900900", "market_value": 50_000}]
         result = _calc_country_exposure(details)
         combined = " ".join(result)
         self.assertIn("其他", combined)
