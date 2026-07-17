@@ -6,6 +6,11 @@
 
 ---
 
+## [Unreleased]
+
+### Added
+- **LLM 关联分析情绪着色** — Excel 和 HTML 报告对 `[利好]` 标记设为红色（#CC0000）、`[利空]` 标记设为绿色（#009900），中性/无标记保持默认黑色。新增 `_colorize_llm_cell`（Excel）和 `sentiment_colorize` Jinja2 过滤器（HTML）
+
 ## [0.6.4] - 2026-07-17
 
 > 全量架构约束整改（P1+P2+P3 共 27 项）+ 定价模块懒加载 + 缓存共享测试覆盖
