@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.6.0
+> 文档版本：v0.6.4
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 
@@ -20,7 +20,7 @@ investor-util/
 │   │   │   ├── _stats.py             #   缓存统计信息（命中率/大小/数量）
 │   │   │   ├── _store.py             #   缓存存取核心（get/set/delete/exists）
 │   │   │   ├── _ttl.py               #   TTL 策略（含盘中/盘后/非交易日区分）
-│   │   │   ├──── operations.py          #   缓存操作共享层（S8~S11 从 handlers_cache 提取）
+│   │   │   ├── operations.py             #   缓存操作共享层（S8~S11 从 handlers_cache 提取）
 │   │   │   └── services/             # 缓存上层服务
 │   │   │       ├── __init__.py       #       子包标记
 │   │   │       └── holdings_tracker.py #     持仓快照缓存追踪器
@@ -41,6 +41,7 @@ investor-util/
 │   │   │   ├── history_diff.py       #   历史数据差分同步
 │   │   │   ├── index.py              #   指数行情获取（A股/美股，直连 API 不走 Chain）
 │   │   │   ├── industry.py           #   行业分类/概念板块数据获取
+│   │   │   ├── news.py               #   新闻数据获取封装层（聚合器+关键词转发）
 │   │   │   └── price.py              #   行情价格获取（股票/ETF）
 │   │   │
 │   │   ├── providers/                # 数据源提供商实现
