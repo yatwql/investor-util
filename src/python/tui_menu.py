@@ -75,8 +75,8 @@ def print_header() -> None:
     if not os.path.exists(holdings):
         _first_run_hints.append("• 请先通过菜单 [C]/[F] 配置持仓文件路径，或放置文件到默认目录")
     llm_conf = get_llm_config()
-    if llm_conf is None or not llm_conf.get("api_key"):
-        _first_run_hints.append("• 如需 LLM 分析，请配置 data/config/llm_key.json（菜单 [S] 查看状态）")
+    if llm_conf is None or not (llm_conf.get("api_key") or llm_conf.get("_provider_list")):
+        _first_run_hints.append("• 如需 LLM 分析，请配置 data/config/llm_key.json 或 llm_providers.json（菜单 [S] 查看状态）")
     if _first_run_hints:
         print("  📋 首次使用指引：")
         for hint in _first_run_hints:
@@ -114,20 +114,34 @@ def show_config() -> None:
 def _show_llm_config_status() -> None:
     """显示 LLM 配置状态（绿色已配置 / 红色未配置）。"""
     llm_config = get_llm_config()
-    if llm_config and llm_config.get("api_key") and llm_config.get("provider"):
-        provider = llm_config["provider"]
-        model = llm_config.get("model") or "默认"
-        endpoint = llm_config.get("endpoint") or "默认"
-        ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
-        print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
-        from src.python.registry import get_llm_module_names
-        _route_parts = []
-        for _sfx, _name in get_llm_module_names().items():
-            _mv = llm_config.get(f"model_{_sfx}") or model
-            _route_parts.append(f"{_name}={_mv}")
-        print(f"         模型路由: {' / '.join(_route_parts)}")
-    else:
-        print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 后重启生效）")
+    if llm_config is None:
+        print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 或 llm_providers.json 后重启生效）")
+        return
+
+    provider_list = llm_config.get("_provider_list") or []
+
+    # credentials_ref 多链模式（无顶层 api_key，但 _provider_list 有值）
+    if provider_list and not llm_config.get("api_key"):
+        provider_names = " + ".join(p.get("name", "?") for p in provider_list)
+        print(f"  LLM: {GREEN}已配置{RESET}  多链服务: {provider_names}  ({len(provider_list)} provider)")
+        return
+
+    # 传统 flat 模式：单 provider
+    if not llm_config.get("api_key") or not llm_config.get("provider"):
+        print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 或 llm_providers.json 后重启生效）")
+        return
+
+    provider = llm_config["provider"]
+    model = llm_config.get("model") or "默认"
+    endpoint = llm_config.get("endpoint") or "默认"
+    ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
+    print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}")
+    from src.python.registry import get_llm_module_names
+    _route_parts = []
+    for _sfx, _name in get_llm_module_names().items():
+        _mv = llm_config.get(f"model_{_sfx}") or model
+        _route_parts.append(f"{_name}={_mv}")
+    print(f"         模型路由: {' / '.join(_route_parts)}")
 
 
 # ── 快捷键查找 ──────────────────────────────────────────────

@@ -75,31 +75,36 @@ class TestMalformedJson(unittest.TestCase):
         with open(self.providers_path, "w", encoding="utf-8") as f:
             f.write(content)
 
+    def _patch_providers_path(self):
+        """mock _get_llm_providers_path 返回临时路径。"""
+        return patch("src.python.config._core._get_llm_providers_path",
+                     return_value=self.providers_path)
+
     def test_malformed_json_returns_none(self):
         """格式损坏的 JSON → 返回 None（不抛异常）。"""
         self._write_raw("{invalid json content}")
-        with patch("src.python.config._core._LLM_PROVIDERS_FILE", self.providers_path):
+        with self._patch_providers_path():
             result = _load_llm_providers()
         self.assertIsNone(result)
 
     def test_empty_file_returns_none(self):
         """空文件 → 返回 None。"""
         self._write_raw("")
-        with patch("src.python.config._core._LLM_PROVIDERS_FILE", self.providers_path):
+        with self._patch_providers_path():
             result = _load_llm_providers()
         self.assertIsNone(result)
 
     def test_not_a_json_object_returns_none(self):
         """JSON 是数组而非对象 → 返回 None（_load_llm_providers 校验根类型）。"""
         self._write_raw('["a", "b"]')
-        with patch("src.python.config._core._LLM_PROVIDERS_FILE", self.providers_path):
+        with self._patch_providers_path():
             result = _load_llm_providers()
         self.assertIsNone(result)
 
     def test_non_dict_raw_config_handled(self):
         """非 dict JSON → _load_llm_providers 返回 None（不抛异常）。"""
         self._write_raw('"just a string"')
-        with patch("src.python.config._core._LLM_PROVIDERS_FILE", self.providers_path):
+        with self._patch_providers_path():
             result = _load_llm_providers()
         self.assertIsNone(result)
 

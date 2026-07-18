@@ -34,6 +34,7 @@ _ABS_LLM_SETTINGS = os.path.join(PROJECT_ROOT, "data/config/llm_settings.json")
 # 值比较时需跳过这些键
 _PATH_KEYS_IN_TEMPLATE = frozenset({
     "holdings_dir", "output_dir", "llm_settings_file",
+    "llm_key_file", "llm_providers_file",
 })
 
 

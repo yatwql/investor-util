@@ -339,5 +339,5 @@ def _cmd_refresh_config() -> None:
     if llm_config:
         print(f"  {GREEN}[OK]{RESET} llm_settings.json + llm_key.json 已重新加载")
     else:
-        print(f"  {YELLOW}[!]{RESET} LLM 未配置（llm_key.json 缺失或无效）")
+        print(f"  {YELLOW}[!]{RESET} LLM 未配置（llm_key.json 或 llm_providers.json 缺失或无效）")
     press_any_key()

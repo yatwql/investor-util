@@ -153,7 +153,17 @@ def init_config(config_path: str | None = None) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(_config_defaults._get_default_config_template())
-        os.replace(tmp_path, config_path)
+        try:
+            os.replace(tmp_path, config_path)
+        except PermissionError:
+            # Windows 并发场景：另一线程/进程已创建文件，清理自身临时文件后继续
+            with contextlib.suppress(OSError):
+                os.remove(tmp_path)
+            if os.path.exists(config_path):
+                config = get_config()
+                validate_config(config)
+                return
+            raise  # 文件确实不存在，重新抛出
     except Exception:
         with contextlib.suppress(OSError):
             os.remove(tmp_path)
