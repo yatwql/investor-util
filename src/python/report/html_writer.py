@@ -150,7 +150,6 @@ def _build_data_status_sections(
     penetration_profit_ok: bool,
     penetration_dividend_ok: bool,
     perf_data: list[dict] | None,
-    perf_profit_ok: bool,
     holdings: list[Holding],
     cat_dividend_ok: bool,
 ) -> tuple[DataStatus, DataStatus, DataStatus, DataStatus]:
@@ -176,7 +175,7 @@ def _build_data_status_sections(
     data_status_perf: DataStatus = _safe_build_data_status(
         build_perf_data_status, _adj_ratings,
         sum(1 for h in holdings if is_fund(h)),
-        profit_success=perf_profit_ok, label="基金业绩")
+        label="基金业绩")
     data_status_category: DataStatus = _safe_build_data_status(
         build_category_data_status, cat_dividend_ok, label="持仓分类")
     return data_status_summary, data_status_penetration, data_status_perf, data_status_category
@@ -227,7 +226,7 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
     # ── 5~7) 分类表 / 穿透 / 基金业绩 ──
     cat_data, cat_dividend_ok = _render_category_table(holdings, details, prog)
     penetration, penetration_profit_ok, penetration_dividend_ok = _render_penetration_section(holdings, details, prog)
-    perf_data, perf_profit_ok = _render_fund_performance_section(holdings, details, prog)
+    perf_data, _ = _render_fund_performance_section(holdings, details, prog)
 
     # ── 13) 基金经理变更监控（B 系列） ──
     manager_analysis = _render_manager_analysis(holdings, enable_b_series, prog)
@@ -273,7 +272,7 @@ def write_html_report(holdings: list[Holding], output_dir: str = "reports", news
     (data_status_summary, data_status_penetration,
      data_status_perf, data_status_category) = _build_data_status_sections(
         a_indices, us_indices, penetration, penetration_profit_ok,
-        penetration_dividend_ok, perf_data, perf_profit_ok, holdings,
+        penetration_dividend_ok, perf_data, holdings,
         cat_dividend_ok)
 
     # ── 10c) 组合历史走势数据状态 ──
