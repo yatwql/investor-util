@@ -1,6 +1,6 @@
 # 测试覆盖统计
 
-> 文档版本：v0.6.10-dev
+> 文档版本：v0.7.1-dev
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
@@ -10,22 +10,22 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2768 | ~25s |
-| `standard` | 2285 | ~25s |
+| `unit` | 2884 | ~30s |
+| `standard` | 2460 | ~30s |
 | `scenario` | **267** | **~6min** |
 | `regression` | **267** | **~6min** |
-| `dev-verify` | **862** | **~1min** |
-| `verify` | **1832** | **~8min** |
-| `integration` | 296 | ~50s |
+| `dev-verify` | **856** | **~1min** |
+| `verify` | **1907** | **~8min** |
+| `integration` | 304 | ~50s |
 | `edge` | 366 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **3073** | **~10min** |
+| `all` | **3211** | **~10min** |
 | `smoke` | 24 | ~2s |
-| `report` | **1013** | ~15s |
-| `all_no_unit` | 305 | **~7min** |
+| `report` | **1046** | ~15s |
+| `all_no_unit` | 327 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：`all` 模式收集总数 3073 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 3061 项。
+> 注：`all` 模式收集总数 3211 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 3199 项。
 
 ### 功能域对应测试源
 
@@ -37,7 +37,7 @@
 | **数据源注册中心** | `provider_registry.py` | `unit/core/test_provider_registry.py` + `test_phase_timeout.py` + `test_market_value_strategy_edge.py` | 53 |
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain, history_diff) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 204 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
-| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, portfolio_history, history_snapshot) | `unit/report/` 共 41 文件含 test_html_writer、test_html_template 等 | 1008 |
+| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, portfolio_history, history_snapshot) | `unit/report/` 共 41 文件含 test_html_writer、test_html_template 等 | 1046 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(19 文件) + `scenario/llm/test_llm_scenarios.py` | 512 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 438 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 76 |
