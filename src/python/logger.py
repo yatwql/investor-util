@@ -7,7 +7,7 @@ import sys
 from logging.handlers import RotatingFileHandler
 
 from src.python.constants import PROJECT_ROOT
-from src.python.tui_menu import RED, RESET, YELLOW
+from src.python.ansi_colors import RED, RESET, YELLOW
 
 # 日志文件路径（始终以项目根目录为基准，不受 CWD 影响）
 _LOG_BASE = os.path.join(PROJECT_ROOT, "logs")
