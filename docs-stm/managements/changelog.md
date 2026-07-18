@@ -4,10 +4,11 @@
 
 ---
 
-## [0.6.11-dev] - 未发布
+## [0.7.0] - 2026-07-18
 
-### Changed
-- （待定）
+### Added
+- **增强多链 Provider 状态显示（TUI + CLI）**：新增 `get_circuit_status()` 公共函数暴露熔断器状态查询；TUI 菜单 `[4]` / `show_config` 时多链模式展示各 Provider 后端类型、模型名、优先级、熔断状态（带绿✓/红⚠图标）；CLI `cache --stats` 同步输出 LLM Provider 状态详情
+- **文档**: changelog.md v0.6.10 变更记录迁移至归档文件
 
 ---
 

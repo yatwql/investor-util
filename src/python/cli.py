@@ -87,6 +87,81 @@ def _build_parser() -> argparse.ArgumentParser:
 # ── 子命令处理器 ───────────────────────────────────────
 
 
+def _show_llm_config_status_cli() -> None:
+    """CLI 模式显示 LLM 配置状态（含多链详细信息）。"""
+    import logging
+    logger = logging.getLogger("invest")
+
+    from src.python.config import get_llm_config
+    from src.python.llm.circuit_breaker import get_circuit_status
+    from src.python.registry import get_llm_module_names
+
+    llm_config = get_llm_config()
+    if llm_config is None:
+        logger.info("LLM: 未配置（配置 data/config/llm_key.json 或 llm_providers.json 后重启生效）")
+        return
+
+    provider_list = llm_config.get("_provider_list") or []
+
+    logger.info("─" * 40)
+    logger.info("LLM Provider 状态")
+
+    # ── 多链模式 ──
+    if provider_list and not llm_config.get("api_key"):
+        strategy_raw = llm_config.get("_strategy", "priority")
+        strategy_labels = {
+            "priority": "优先级排序", "weighted": "加权随机",
+            "cost_first": "价格最低优先", "fallback_only": "仅 Fallback",
+        }
+        strategy_label = strategy_labels.get(strategy_raw, strategy_raw)
+        logger.info("状态: 已配置 | 策略: %s | 多链服务: %d provider", strategy_label, len(provider_list))
+
+        for i, entry in enumerate(provider_list, 1):
+            name = entry.get("name", "?")
+            backend = entry.get("provider", "?")
+
+            model = entry.get("model", "")
+            endpoint = entry.get("endpoint") or ""
+            creds_ref = entry.get("credentials_ref")
+            if creds_ref and (not model or not endpoint):
+                all_creds = llm_config.get("_llm_credentials", {})
+                ref_creds = all_creds.get(creds_ref, {})
+                if isinstance(ref_creds, dict):
+                    if not model:
+                        model = ref_creds.get("model", "")
+                    if not endpoint:
+                        endpoint = ref_creds.get("endpoint", "") or ""
+
+            model_display = model or "默认"
+            raw_priority = entry.get("priority")
+            priority_display = str(raw_priority) if raw_priority is not None else "50（默认）"
+            cb_status = get_circuit_status(endpoint) if endpoint else "—"
+
+            logger.info("  [%d] %s (%s)", i, name, backend)
+            logger.info("      模型: %s    优先级: %s    熔断: %s", model_display, priority_display, cb_status)
+
+        preferred = llm_config.get("_preferred_providers", {})
+        if preferred:
+            parts = []
+            for mk, pname in preferred.items():
+                display_name = get_llm_module_names().get(mk, mk)
+                parts.append(f"{display_name} → {pname}")
+            logger.info("  ▶ 模块偏好: %s", " / ".join(parts))
+
+    # ── 传统 flat 模式 ──
+    elif llm_config.get("api_key") and llm_config.get("provider"):
+        provider = llm_config["provider"]
+        model = llm_config.get("model") or "默认"
+        endpoint = llm_config.get("endpoint") or "默认"
+        ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
+        cb_status = get_circuit_status(endpoint) if endpoint and endpoint != "默认" else "—"
+        logger.info("状态: 已配置 | provider=%s | model=%s | endpoint=%s | 熔断: %s", provider, model, ep_display, cb_status)
+    else:
+        logger.info("状态: 未配置（配置 data/config/llm_key.json 或 llm_providers.json）")
+
+    logger.info("─" * 40)
+
+
 def _cli_read_holdings(config: dict) -> list | None:
     """CLI 模式读取持仓——跳过文件选择交互，通过 config 配置定位文件。
 
@@ -185,6 +260,7 @@ def _handle_cache(args: argparse.Namespace, config: dict) -> int:
 
     if args.stats:
         get_cache_stats(reporter)
+        _show_llm_config_status_cli()
         return _EXIT_SUCCESS
 
     if args.update:

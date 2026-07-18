@@ -12,6 +12,7 @@ __all__ = [
     "_CIRCUIT_BREAKER_THRESHOLD", "_CIRCUIT_BREAKER_RECOVERY",
     "_circuit_failures", "_circuit_open_until", "_circuit_lock",
     "_cb_endpoint", "_cb_record_failure", "_cb_record_success", "_cb_is_open",
+    "get_circuit_status",
 ]
 
 _CIRCUIT_BREAKER_THRESHOLD = 3   # 连续失败 N 次后开启熔断
@@ -60,3 +61,18 @@ def _cb_is_open(url: str) -> bool:
             del _circuit_open_until[ep]  # 冷却结束 → 半开，允许一次试探
             return False
         return True
+
+
+def get_circuit_status(endpoint: str) -> str:
+    """查询指定端点的熔断状态，返回中文状态描述。
+
+    Args:
+        endpoint: API endpoint URL（如 "https://api.anthropic.com/v1/messages"）
+
+    Returns:
+        "正常" — 熔断器未开启或已冷却
+        "熔断中" — 熔断器开启，正在冷却
+    """
+    if _cb_is_open(endpoint):
+        return "熔断中"
+    return "正常"
