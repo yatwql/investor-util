@@ -1425,7 +1425,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
                 <div class="summary-card">
                     <h3>最大回撤</h3>
-                    <div class="value" style="color: #CC0000;">{{ history_data.max_drawdown_pct | change }}</div>
+                    <div class="value" style="color: #CC0000;">{{ history_data.max_drawdown_pct | abs | change }}</div>
                     <div class="meta">
                         {% if history_data.drawdown_start %}始于 {{ history_data.drawdown_start }}{% endif %}
                         {% if history_data.drawdown_end %} · 终于 {{ history_data.drawdown_end }}{% endif %}
@@ -1529,11 +1529,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="summary-grid" style="margin-top:16px;">
                 <div class="summary-card">
                     <h3>最大回撤幅度</h3>
-                    <div class="value" style="color:#CC0000;">{{ history_data.max_drawdown_pct | change }}</div>
+                    <div class="value" style="color:#CC0000;">{{ history_data.max_drawdown_pct | abs | change }}</div>
                 </div>
                 <div class="summary-card">
                     <h3>最大回撤金额</h3>
-                    <div class="value" style="color:#CC0000;">{{ history_data.max_drawdown | money }}</div>
+                    <div class="value" style="color:#CC0000;">{{ history_data.max_drawdown | abs | money }}</div>
                 </div>
                 <div class="summary-card">
                     <h3>回撤区间</h3>
