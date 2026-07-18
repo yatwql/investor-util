@@ -31,7 +31,8 @@ def _init_llm_usage_sheet(ws: Any) -> int:
     return row
 
 
-def _write_llm_summary_section(ws: Any, row: int, session_usage: dict[str, Any] | None) -> int:
+def _write_llm_summary_section(ws: Any, row: int, session_usage: dict[str, Any] | None,
+                                llm_endpoint: str = "") -> int:
     """写入 LLM 用量汇总数据区，返回下一行号。"""
     if not session_usage or not session_usage.get("has_usage"):
         return row
@@ -50,6 +51,7 @@ def _write_llm_summary_section(ws: Any, row: int, session_usage: dict[str, Any] 
     pairs = [
         ("API 调用次数", f"{session_usage.get('call_count', 0)} 次"),
         ("模型", session_usage.get("model_display", "未指定")),
+        ("Endpoint", llm_endpoint or "—"),
         ("输入 Token", f"{session_usage.get('input_tokens', 0):,}"),
         ("输出 Token", f"{session_usage.get('output_tokens', 0):,}"),
         ("总 Token", f"{session_usage.get('total_tokens', 0):,}"),
@@ -246,13 +248,7 @@ def write_llm_usage_sheet(
     ]
 
     row = _init_llm_usage_sheet(ws)
-    row = _write_llm_summary_section(ws, row, llm_session_usage)
-
-    if llm_endpoint and not (llm_session_usage or {}).get("has_usage"):
-        _KV_KEY_FONT = Font(size=10, bold=True, color="2E75B6")
-        ws.cell(row=row, column=1, value="Endpoint").font = _KV_KEY_FONT
-        ws.cell(row=row, column=2, value=llm_endpoint).font = Font(size=10)
-        row += 2
+    row = _write_llm_summary_section(ws, row, llm_session_usage, llm_endpoint=llm_endpoint)
 
     row = _write_module_table_header(ws, row, _HEADERS)
     row = _write_module_data_rows(ws, row, llm_module_info)

@@ -83,6 +83,7 @@ def format_session_usage(raw: dict[str, Any] | None) -> dict[str, Any]:
     currency = raw.get("currency", "CNY")
     symbol = CURRENCY_SYMBOLS.get(currency, "¥")
     models = raw.get("models", [])
+    models = [m for m in models if m and m != "未指定"]
     model_display = " / ".join(models) if models else raw.get("model", "未指定")
     return {
         "has_usage": True,
