@@ -15,7 +15,7 @@ import os
 import sys
 from collections.abc import Callable
 
-from src.python.ansi_colors import GREEN, RED, RESET
+from src.python.ansi_colors import GREEN, RED, RESET, YELLOW
 from src.python.config import get_config, get_llm_config
 
 # 每个菜单项：(快捷键, 显示标签, 回调函数, 是否退出项)
