@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "investor-util"
-version = "0.6.10-dev"
+version = "0.6.10"
 description = "个人投资者辅助工具：读取持仓 Excel，生成 Excel/HTML 投资分析报告"
 requires-python = ">=3.10"
 dependencies = [
