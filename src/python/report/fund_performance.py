@@ -48,10 +48,10 @@ logger = logging.getLogger("invest")
 # 模块级降级阈值控制器（单会话内共享）
 _tracker = DegradationTracker()
 
-_NCOLS = 12
+_NCOLS = 11
 _HEADERS = [
     "基金", "代码", "类型", "近3月", "近6月", "近12月",
-    "持仓累计盈亏(¥)", "持仓收益率", "业绩基准", "业绩评价", "同类排名", "机构覆盖",
+    "持仓累计盈亏(¥)", "持仓收益率", "业绩基准", "业绩评价", "同类排名",
 ]
 
 # 基础业绩评价 -> 标签 + 描述（P2：5 级评级，新增"较差"）
@@ -201,47 +201,10 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
     return adjusted
 
 
-def _load_profit_forecast() -> tuple[dict[str, Any], bool]:
-    """加载盈利预测数据（非关键，失败时返回空字典）。
-
-    Returns:
-        (forecast_dict, success) — success=False 表示 API 调用异常。
-    """
-    try:
-        from src.python.fetcher.akshare import get_profit_forecast
-        return get_profit_forecast(), True
-    except Exception:
-        logger.warning("[fund_performance] 盈利预测获取失败（非关键），机构覆盖列显示 --", exc_info=True)
-        return {}, False
-
-
-def _coverage_text(code: str, profit_forecast: dict[str, Any]) -> str:
-    """根据基金代码查找机构覆盖信息。
-
-    Args:
-        code: 基金代码
-        profit_forecast: 盈利预测字典
-
-    Returns:
-        机构覆盖文本（如"5家研报 EPS¥1.23"）或 "--"
-    """
-    info = profit_forecast.get(code)
-    if info:
-        reports = info.get("reports", 0)
-        eps = info.get("eps_2026e")
-        if reports and eps is not None:
-            return f"{reports}家研报 EPS¥{eps:.2f}"
-        elif reports:
-            return f"{reports}家研报"
-        elif eps is not None:
-            return f"EPS¥{eps:.2f}"
-    return "--"
-
 
 def _write_one_fund_row(
     ws: Worksheet, row: int, fund: Holding,
     detail_map: dict[str, DetailRow],
-    profit_forecast: dict[str, Any],
 ) -> str | None:
     """获取并写入单只基金的业绩数据行。
 
@@ -250,7 +213,6 @@ def _write_one_fund_row(
         row: 当前行号
         fund: 基金持仓
         detail_map: 估值明细映射 {code: DetailRow}
-        profit_forecast: 盈利预测字典
 
     Returns:
         最终评级（优秀/良好/稳定/偏差/较差），获取失败返回 None
@@ -284,7 +246,6 @@ def _write_one_fund_row(
         profit_rate_val,  # 已为小数（如 0.0523），Excel 0.00% 格式自动处理
         benchmark, comment,
         _format_rank(rankings.get("同类排名", {})),
-        _coverage_text(fund.code, profit_forecast),
     ]
     write_data_row(ws, row, vals, _num_formats())
 
@@ -348,14 +309,12 @@ def _write_rating_distribution(ws: Worksheet, row: int, fund_count: int, adjuste
 def build_perf_data_status(
     adjusted_ratings: dict[str, str],
     total_funds: int,
-    profit_success: bool,
 ) -> DataStatus:
     """根据基金业绩数据获取结果构建数据源状态字典。
 
     Args:
         adjusted_ratings: 成功获取评级的基金 {code: rating}
         total_funds: 需分析的基金总数
-        profit_success: 盈利预测 API 是否成功
 
     Returns:
         数据源状态字典（可能为空 = 全部正常）
@@ -376,23 +335,6 @@ def build_perf_data_status(
             status["rank"] = DataStatusItem(
                 available=False, tier="T2",
                 message=STATUS_MESSAGES["rank_unavailable"],
-            )
-
-    # 盈利预测（T4）
-    if not profit_success:
-        from src.python.fetcher.akshare import get_profit_forecast_cache_key
-        pf_key = get_profit_forecast_cache_key()
-        pf_cache_age = get_cache_age(pf_key)
-        _pf_ttl = get_ttl("profit_forecast")
-        degraded, _, _ = _tracker.record(
-            "perf_profit_forecast", "T4", success=False,
-            cache_age_hours=pf_cache_age / 3600 if pf_cache_age else None,
-            cache_ttl_hours=_pf_ttl / 3600 if _pf_ttl else 24,
-        )
-        if degraded:
-            status["profit_forecast"] = DataStatusItem(
-                available=False, tier="T4",
-                message=STATUS_MESSAGES["profit_forecast_unavailable"],
             )
 
     return status
@@ -434,12 +376,11 @@ def write_fund_performance_sheet(
         reverse=True,
     )
 
-    profit_forecast, profit_success = _load_profit_forecast()
     adjusted_ratings: dict[str, str] = {}
 
     for idx, fund in enumerate(fund_holdings_sorted, 1):
         logger.info("获取基金业绩 [%d/%d]: %s (%s)", idx, len(fund_holdings_sorted), fund.name, fund.code)
-        rating = _write_one_fund_row(ws, row, fund, detail_map, profit_forecast)
+        rating = _write_one_fund_row(ws, row, fund, detail_map)
         if rating:
             adjusted_ratings[fund.code] = rating
         row += 1
@@ -447,7 +388,7 @@ def write_fund_performance_sheet(
     row = _write_rating_distribution(ws, row, len(fund_holdings_sorted), adjusted_ratings)
 
     # 数据源状态
-    data_status = build_perf_data_status(adjusted_ratings, len(fund_holdings_sorted), profit_success)
+    data_status = build_perf_data_status(adjusted_ratings, len(fund_holdings_sorted))
     _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
@@ -471,7 +412,6 @@ def _write_empty_row(ws, row: int, fund: Holding) -> None:
         "--",
         "--",
         "--",
-        "--",
     ]
     write_data_row(ws, row, vals, _num_formats())
 
@@ -491,5 +431,4 @@ def _num_formats() -> list[str | None]:
         None,          # 9  业绩基准（文本）
         None,          # 10 业绩评价（文本）
         None,          # 11 同类排名（文本）
-        None,          # 12 机构覆盖（文本）
     ]

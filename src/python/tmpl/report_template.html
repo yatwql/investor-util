@@ -861,7 +861,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <thead>
                     <tr>
                         <th>基金</th><th>代码</th><th>类型</th><th>近3月</th><th>近6月</th><th>近12月</th>
-                        <th>持仓累计盈亏(¥)</th><th>持仓收益率</th><th>业绩基准</th><th>业绩评价</th><th>同类排名</th><th>机构覆盖</th>
+                        <th>持仓累计盈亏(¥)</th><th>持仓收益率</th><th>业绩基准</th><th>业绩评价</th><th>同类排名</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -878,7 +878,6 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td class="text-left" style="font-size: 12px;">{{ p["benchmark"] }}</td>
                         <td class="text-left" style="font-size: 12px;{{ ' color: #CC0000; font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: #006400; font-weight: 600;' if p['rating_tag'] == '较差' }}{{ ' color: #009900; font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: #0066CC; font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
                         <td>{{ p["rank"] }}</td>
-                        <td style="font-size: 12px;">{{ p.get("coverage", "--") }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
