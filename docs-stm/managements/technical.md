@@ -33,10 +33,12 @@
   - [4.9 资产穿透 TOP10](#49-资产穿透-top10)
   - [4.10 财经新闻热点与持仓关联分析](#410-财经新闻热点与持仓关联分析)
   - [4.11 数据降级治理体系](#411-数据降级治理体系)
-- [5. LLM 集成层详细设计](#5-llm-集成层详细设计)
+- [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
-  - [5.2 调用链](#52-调用链)
-  - [5.3 关键机制](#53-关键机制)
+  - [5.2 调用链概览](#52-调用链概览)
+  - [5.3 模块清单](#53-模块清单)
+  - [5.4 多 Provider 链模式](#54-多-provider-链模式)
+  - [5.5 关键机制](#55-关键机制)
 - [6. 辅助模块详细设计](#6-辅助模块详细设计)
   - [6.1 配置管理](#61-配置管理)
   - [6.2 中央注册表](#62-中央注册表)
@@ -920,7 +922,7 @@ _write_atomic(fd, tmp_path, final_path)
 
 ### 3.6 缓存操作共享层
 
-`cache/operations.py` 是 P1（共享层提取）的核心产出，封装了 TUI 和 CLI 共用的缓存操作业务逻辑，消除 `handlers_cache.py` 中的逻辑重复。
+`cache/operations.py` 封装了 TUI 和 CLI 共用的缓存操作业务逻辑，通过 `ThreadPoolExecutor` 并行执行缓存刷新任务，消除 `handlers_cache.py` 中的逻辑重复。
 
 #### 数据结构
 
@@ -980,7 +982,7 @@ def _get_pool() -> ThreadPoolExecutor:
     return _POOL
 ```
 
-**关键设计**：所有与旧 `handlers_cache._POOL` 相关的引用已在 P1 阶段全部迁移至此模块，不残留跨模块引用。
+**关键设计**：`cache/operations.py` 是 `ThreadPoolExecutor` 的唯一宿主，`handlers_cache.py` 和其他调用方通过调用 `operations.py` 的函数间接使用线程池，不直接持有池引用。
 
 [↑ 回到顶部](#目录)
 
@@ -1716,32 +1718,36 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
 
 ---
 
-## 5. LLM 集成层详细设计
+## 5. LLM 集成层（概要设计）
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包为 13 子模块架构：
+`src/python/llm/` 包按调用层次分为四层，共 13 个子模块：
 
 ```
-llm/
-├── generators_orchestrator.py  入口：4+1 模块并行编排
-├── skeleton.py                 骨架：缓存检查→API→markdown→HTML（85% 公共逻辑）
-├── api.py                      API 路由 + Provider Chain 遍历
-├── api_base.py                 底层 HTTP 调用 + 重试骨架
-├── strategy.py                  多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only）
-├── generators.py              4 个单例生成函数（global_macro/expert_review/health_check/penetration_deep）
-├── generators_news.py          新闻 LLM 二次关联分析（批量模式）
-├── prompts.py                  System Prompt + User Prompt 构建
-├── fingerprint.py              缓存指纹计算
-├── session.py                  会话用量追踪（线程安全）
-├── pricing.py                  费用估算
-├── markdown.py                 Markdown→HTML 转换
-└── circuit_breaker.py          LLM API 熔断器
+入口层         generators_orchestrator.py    4+1 模块并行编排
+                  │
+编排层         skeleton.py                   标准/批量模式共享骨架
+                  │
+API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
+               api_base.py   HTTP 调用 + 重试骨架
+               strategy.py   多 Provider 切换策略引擎
+                  │
+共享层         generators.py         4 个单例生成函数
+               generators_news.py   新闻 LLM 批量关联分析
+               prompts.py           System/User Prompt 构建
+               fingerprint.py       缓存指纹计算
+               session.py           会话用量追踪
+               pricing.py           费用估算
+               markdown.py          Markdown→HTML 转换
+               circuit_breaker.py   LLM API 熔断器
 ```
 
 **LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名。
 
-### 5.2 调用链
+### 5.2 调用链概览
+
+LLM 分析从编排入口到最终 HTML 输出，经过缓存检查 → API 调用 → 内容转换 → 缓存写入的完整链路：
 
 ```
 generators_orchestrator（并行调度 4+1 模块）
@@ -1763,23 +1769,34 @@ generators_orchestrator（并行调度 4+1 模块）
             └── 返回 (result, usage, provider_name) 三元组
 ```
 
-**4+1 模块**：
+### 5.3 模块清单
 
-| 模块 | 标识 | 说明 | 分组 |
-|:-----|:-----|:------|:-----|
-| 全球政经局势 | `global_macro` | A 股/美股指数+持仓汇总 → 宏观判断 | preload |
-| 智囊团深度复盘 | `expert_review` | 持仓明细+穿透 → 专业分析师视角 | preload |
-| 组合体检报告 | `health_check` | 持仓明细（排除行情波动）→ 健康度诊断 | preload |
-| 穿透深度分析 | `penetration_deep` | 持仓明细（排除行情波动）→ 穿透标的分析 | preload |
-| 新闻二次关联 | `news_correlation` | 逐条新闻 → LLM 深度关联评分 | refresh |
+LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_llm` 逐模块独立开关：
 
-### 5.3 关键机制
+| 模块 | 标识 | 功能概要 | 缓存分组 | 默认 TTL |
+|:-----|:-----|:---------|:---------|:--------|
+| 全球政经局势 | `global_macro` | A 股/美股指数+持仓汇总 → 宏观判断 | preload | 24h |
+| 智囊团深度复盘 | `expert_review` | 持仓明细+穿透 → 专业分析师多视角辩论 | preload | 2h |
+| 组合体检报告 | `health_check` | 持仓明细（排除行情波动）→ 4 维健康度评分 | preload | 24h |
+| 穿透深度分析 | `penetration_deep` | 穿透 TOP10 → 行业/品种/国家集中度分析 | preload | 24h |
+| 新闻二次关联 | `news_correlation` | 逐条新闻 → LLM 深度关联评分（批量模式） | refresh | 1h |
+
+每个模块的详细参数（model、temperature、timeout、max_tokens 等）通过 `module_{标识}` 命名约定在 `llm_settings.json` 中配置。
+
+### 5.4 多 Provider 链模式
+
+LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider Chain（§2.1）采用相同设计理念，但策略引擎独立：
+
+- **配置分离**：Provider 路由配置在 `llm_providers.json`，敏感凭据通过 `credentials_ref` 引用 `llm_key.json` 中的凭据块
+- **策略引擎**：`strategy.py` 支持 4 种链切换策略 — priority（优先级排序）、weighted（加权随机）、cost_first（成本优先）、fallback_only（仅递补）
+- **逐链尝试**：`api.call_provider_entry()` 按策略排序后逐链调用，成功即返回，全链失败后降级为占位文本
+- **Provider 感知缓存**：缓存键格式 `llm_{module}_{provider_name}_{fingerprint}`，不同 Provider 的缓存互不冲突
+- **失败追踪**：`LLM_MODULE_FAILURE` 字典记录每个模块的 attempted Provider 列表及 final_status，供报告展示
+
+### 5.5 关键机制
 
 | 机制 | 实现 | 说明 |
 |:-----|:------|:------|
-| Multi-Provider Chain | `strategy.py` + `api.py` — 按策略排序 Provider，逐链尝试至成功 | 5 种策略（priority/weighted/cost_first/fallback_only/proxy_preferred） |
-| credentials_ref | `_resolve_entry_credentials()` — 从 `llm_key.json` 按引用名加载凭据 | 敏感凭据与路由配置分离，支持多凭据块 |
-| Provider 感知缓存 | 缓存键格式 `llm_{module}_{provider_name}_{fingerprint}` | 不同 Provider 的缓存互不冲突 |
 | Extended Thinking | Claude: `thinking.budget_tokens`；DeepSeek: `output_config.effort` | 与 `temperature` 互斥 |
 | Prompt Caching | Anthropic 专属，system prompt 数组 + `cache_control: ephemeral` | 5 分钟内复用免全价 |
 | 截断重试 | 检测 `TRUNCATION_MARKER` 后自动 1.5× max_tokens 重试一次 | 修复内容被截断的情况 |
@@ -1787,7 +1804,7 @@ generators_orchestrator（并行调度 4+1 模块）
 | 会话用量追踪 | `session.py` 维护线程安全 `session_usage` 字典 | 按模块粒度追踪 token/费用/缓存命中 |
 | LLM 熔断 | `llm/circuit_breaker.py` — 连续 N 次失败 → 60s 冷却 → 半开状态试探 | 防止无效调用浪费 token |
 | 指纹缓存 | `fingerprint.py` — 依赖数据指纹过滤（排除行情波动字段） | 仅品种/份额/成本变化时重新调用 |
-| 失败追踪 | `_LLM_MODULE_FAILURE` 字典 — 记录 attempted Provider 列表 + final_status | 报告中展示各 Provider 失败原因 |
+| 乐观缓存预检 | 从 Provider 链中取链首 Provider 优先检查缓存，命中即返回 | 减少链遍历开销 |
 
 [↑ 回到顶部](#目录)
 
@@ -2136,7 +2153,7 @@ investor-util/
 │   │   ├── handlers_config.py   # TUI 配置管理命令
 │   │   ├── handlers_report.py   # TUI 报告生成命令（薄壳委托 orchestrator）
 │   │   ├── http_client.py       # HTTP 客户端工厂
-│   │   ├── llm/                 # LLM 集成（12 子模块）
+│   │   ├── llm/                 # LLM 集成（13 子模块）
 │   │   ├── logger.py            # 日志模块（_ColoredFormatter）
 │   │   ├── main.py              # TUI 入口 + 菜单循环
 │   │   ├── market_hours.py      # A 股交易时段判断
@@ -2257,6 +2274,6 @@ investor-util/
 | `orch_llm_news` | `report/orchestrator.py`（`_fetch_llm_and_news`） | 2 | `orch_llm_news` | 并行获取 LLM + 新闻 |
 | `cache_ops` | `cache/operations.py` | 4 | `cache_ops` | 并行刷新基金/行业/公共缓存 |
 
-各线程池互不共享，职责隔离。`cache_ops` 池是唯一存在的缓存操作池（P1 已完成从 `handlers_cache` 的迁移）。
+各线程池互不共享，职责隔离。
 
 [↑ 回到顶部](#目录)

@@ -482,7 +482,7 @@
 | R-LLM-03 | 支持 Claude / OpenAI / DeepSeek 三种 Provider，可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
 | R-LLM-04 | Provider 不可用时自动按策略递补下一备选 Provider，全链失败时降级占位文本 |
 | R-LLM-05 | 所有 LLM 模块的 API 调用量（Token、费用、模块明细）需在报告中统计展示 |
-| R-LLM-06 | Multi-Provider Chain 支持 5 种切换策略：priority（优先级排序）、weighted（加权随机）、cost_first（价格最低优先）、fallback_only（仅主 provider 失败时切换，等价于 priority）、proxy_preferred（proxy 优先于直连） |
+| R-LLM-06 | Multi-Provider Chain 支持 4 种切换策略：priority（优先级排序）、weighted（加权随机）、cost_first（价格最低优先）、fallback_only（仅主 provider 失败时切换，等价于 priority）。`proxy_preferred` 为 per-provider 后处理标记，不属策略 |
 | R-LLM-07 | 敏感凭据（api_key、model、endpoint）必须与 Provider 路由配置分离存储到 llm_key.json，通过 credentials_ref 引用，Provider 路由配置存于 llm_providers.json |
 | R-LLM-08 | 各 Provider 的失败原因（API 错误 / 超时 / 网络异常等）需追踪记录，在报告中按模块展示失败明细 |
 

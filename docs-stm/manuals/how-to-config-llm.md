@@ -2,15 +2,16 @@
 
 全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、以及可选的财经新闻热点与持仓关联分析均需调用外部 LLM API。
 
-LLM 配置拆分为两个独立文件，分工明确：
+LLM 配置拆分为三个独立文件，分工明确：
 
 | 文件 | 内容 | 用途 |
 |------|------|------|
-| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段 | API 调用渠道（必填：provider / api_key / model / endpoint；可选：fallback_provider / fallback_api_key / fallback_endpoint / fallback_model） |
+| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段，或 `credentials_ref` 多键凭据块 | API 调用渠道（必填：provider / api_key / model / endpoint；可选：fallback_provider / fallback_api_key / fallback_endpoint / fallback_model） |
+| `data/config/llm_providers.json` | Provider 路由配置（多链模式） | 定义多个 Provider 的切换顺序、策略和凭据引用 |
 | `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt 等） |
 
 > **为什么拆分？** `llm_key.json` 包含 API Key，可加入 `.gitignore` 避免误提交；
-> `llm_settings.json` 不含密钥，可安全纳入版本控制，方便团队共享调优参数。
+> `llm_providers.json` 和 `llm_settings.json` 不含密钥，可安全纳入版本控制，方便团队共享调优参数。
 >
 > **不配置会怎样？** `llm_key.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示。不同失败场景的占位文本：
 > 
@@ -75,7 +76,103 @@ LLM 配置拆分为两个独立文件，分工明确：
 
 ---
 
-## 模块启用/停用机制
+## 多 Provider 链式服务（进阶）
+
+当需要同时配置多个 LLM 服务商（如 DeepSeek 为主、Gemini 为辅），按策略自动切换时，可启用多链模式。
+
+### 文件分工
+
+| 文件 | 内容 | 安全等级 |
+|------|------|---------|
+| `llm_providers.json` | Provider 路由配置：名称、类型、切换策略、凭据引用 | ✅ 可提交仓库 |
+| `llm_key.json` | 凭据块：每个 `credentials_ref` 对应一个包含 api_key / model / endpoint 的命名块 | ❌ 含密钥，不提交 |
+
+### 配置步骤
+
+**Step A** — 编辑 `data/config/llm_providers.json`：
+
+```json
+{
+  "strategy": "priority",
+  "preferred_providers": {},
+  "providers": [
+    {
+      "name": "deepseek-main",
+      "provider": "claude",
+      "credentials_ref": "deepseek-main",
+      "priority": 10,
+      "timeout": 120
+    },
+    {
+      "name": "gemini-fallback",
+      "provider": "gemini",
+      "credentials_ref": "gemini-fb",
+      "priority": 20,
+      "timeout": 60,
+      "proxy_preferred": true
+    }
+  ]
+}
+```
+
+**Step B** — 在 `data/config/llm_key.json` 中添加对应凭据块：
+
+```json
+{
+  "deepseek-main": {
+    "api_key": "sk-your-deepseek-key",
+    "model": "DeepSeek-V4-Flash",
+    "endpoint": "https://api.deepseek.com/anthropic"
+  },
+  "gemini-fb": {
+    "api_key": "AIzaSyYourGeminiKey",
+    "model": "gemini-2.0-flash",
+    "endpoint": "https://generativelanguage.googleapis.com/v1beta"
+  }
+}
+```
+
+> **注意**：`llm_key.json` 使用多键格式时，不再使用顶层 `provider` / `api_key` / `model` / `endpoint` 字段，而是为每个 `credentials_ref` 定义独立的命名凭据块。`llm_providers.json` 中的 `credentials_ref` 值必须与 `llm_key.json` 中的键名精确匹配。
+
+### Provider 条目字段
+
+| 字段 | 必填 | 类型 | 说明 |
+|------|:----:|:----:|------|
+| `name` | ✅ | string | Provider 唯一标识名，用于日志和缓存键 |
+| `provider` | ✅ | string | 服务商类型：`claude` / `openai` / `gemini` |
+| `credentials_ref` | ✅ | string | 引用 `llm_key.json` 中的凭据块键名 |
+| `priority` | ❌ | int | 优先级（数值越小越优先），默认 50 |
+| `weight` | ❌ | int | 加权随机权重，仅 `weighted` 策略有效，默认 1 |
+| `timeout` | ❌ | int | 超时秒数，覆盖全局 timeout，默认 60 |
+| `proxy_preferred` | ❌ | bool | `true` 时优先使用代理直连（而非自动路由），默认 `false` |
+
+### 切换策略
+
+`strategy` 字段支持 4 种切换策略：
+
+| 策略 | 值 | 行为 |
+|------|:---:|------|
+| **优先级排序** | `priority` | 按 `priority` 字段升序尝试，第一个成功返回即停止。这是默认策略 |
+| **加权随机** | `weighted` | 按 `weight` 权重随机选取 Provider，失败后重试其他 |
+| **价格最低优先** | `cost_first` | 优先使用单价最低的 Provider，失败后按价格升序递补 |
+| **仅 Fallback** | `fallback_only` | 始终使用第一个 Provider，仅在其全部失败后尝试下一个 |
+
+> `proxy_preferred` 不是策略类型，而是 provider 条目级别的后处理标记。启用时，该条目的请求将优先通过代理发送（若系统配置了代理），而非直连。
+
+### 配置检查
+
+TUI 菜单 **[S]** 查看状态时会显示多链模式详情：
+
+```
+LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
+```
+
+### 兼容性
+
+- 多链模式与旧版 flat 格式（`llm_key.json` 含顶层 `api_key` / `provider`）**并存兼容**。检测到 `llm_key.json` 有顶层 `api_key` 时自动使用 flat 模式，否则按 `credentials_ref` 多链模式解析
+- 不需要多链时，保持旧版 flat 格式即可，`llm_providers.json` 可不配置
+
+---
 
 通过 `enabled_llm` 嵌套字典控制每个模块的开关，除 `news_correlation` 默认关闭外，其余默认开启：
 

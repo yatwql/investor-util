@@ -452,6 +452,7 @@ def _report_llm_module_results(
     """统一的 LLM 模块结果报告逻辑。"""
     from src.python.llm import FAIL_REASON_DISABLED
     from src.python.llm.prompts import LLM_MODULE_FAILURE
+    from src.python.report.llm_module_info import get_llm_module_failure_reason
     from src.python.registry import get_llm_module_name
 
     _MODULE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep")
@@ -462,7 +463,7 @@ def _report_llm_module_results(
     for mk, r in zip(_MODULE_KEYS, results):
         if r is not None:
             ok_count += 1
-        elif LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED:
+        elif get_llm_module_failure_reason(LLM_MODULE_FAILURE, mk) == FAIL_REASON_DISABLED:
             disabled.append(get_llm_module_name(mk))
         else:
             failed.append(get_llm_module_name(mk))

@@ -17,6 +17,7 @@ CLI 入口：`python -m src.python.cli [全局参数] <子命令> [子命令参�
 | 生成全量完整报告 | `python -m src.python.cli report --type full --history auto` |
 | 更新全部缓存 | `python -m src.python.cli cache --update all` |
 | 更新基础类缓存 | `python -m src.python.cli cache --update basic` |
+| 更新持仓类缓存 | `python -m src.python.cli cache --update position` |
 | 清理过期缓存 | `python -m src.python.cli cache --clean` |
 | 查看缓存状态 | `python -m src.python.cli cache --stats` |
 

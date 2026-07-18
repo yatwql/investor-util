@@ -30,7 +30,7 @@ _KNOWN_MARKERS: set[str] = {
     "scenario_zero_cost", "scenario_extreme",
     # unit 分支
     "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news", "unit_report",
-    "unit_config", "unit_config_edge", "unit_core", "unit_ui",
+    "unit_config", "unit_config_edge", "unit_core", "unit_cli", "unit_ui",
     # 跨领域标记
     "llm", "edge", "smoke", "data", "integration",
     # integration 分支

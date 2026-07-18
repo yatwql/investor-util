@@ -27,6 +27,7 @@ from src.python.report.excel_writer import (
     freeze_header,
     write_title_row,
 )
+from src.python.report.llm_module_info import get_llm_module_failure_reason
 from src.python.report.styles import CONTENT_FONT
 
 logger = logging.getLogger("invest")
@@ -127,15 +128,11 @@ def _get_placeholder(title: str, section_order: list[dict] | None = None) -> str
     """根据页签标题查找对应的失败原因占位文本。"""
     mk = _get_module_key_map(section_order).get(title)
     if mk:
-        reason = LLM_MODULE_FAILURE.get(mk)
-        if isinstance(reason, dict):
-            # 多链格式：取 final_status
-            final_status = reason.get("final_status", "")
-            if final_status in _PLACEHOLDER_BY_REASON:
-                return _PLACEHOLDER_BY_REASON[final_status]
-            return "本节内容待生成 — LLM 生成失败"
+        reason = get_llm_module_failure_reason(LLM_MODULE_FAILURE, mk)
         if reason in _PLACEHOLDER_BY_REASON:
             return _PLACEHOLDER_BY_REASON[reason]
+        if reason:
+            return "本节内容待生成 — LLM 生成失败"
     return "本节内容待生成 — 请配置 LLM API Key（data/config/llm_key.json）"
 
 
@@ -227,7 +224,7 @@ def write_llm_sheets(
 
     _module_keys = ["global_macro", "expert_review", "health_check", "penetration_deep"]
     _disabled = tuple(
-        LLM_MODULE_FAILURE.get(mk) == FAIL_REASON_DISABLED
+        get_llm_module_failure_reason(LLM_MODULE_FAILURE, mk) == FAIL_REASON_DISABLED
         for mk in _module_keys
     )
 

@@ -34,6 +34,23 @@ _DISPLAY_REASON: dict[str, str] = {
 }
 
 
+def get_llm_module_failure_reason(module_failure: dict, module_key: str) -> str | None:
+    """从 LLM_MODULE_FAILURE 中提取模块失败原因，统一处理旧格式和多链 dict 格式。
+
+    旧格式：value 为 FAIL_REASON_* 字符串，直接返回。
+    多链格式：value 为 ``{"attempted": [...], "final_status": "success"|FAIL_REASON_*}``，
+    提取 final_status，success 转换为 None（表示成功）。
+
+    Returns:
+        FAIL_REASON_* 字符串，或 None（模块未失败/成功/键不存在）
+    """
+    reason = module_failure.get(module_key)
+    if isinstance(reason, dict):
+        final_status = reason.get("final_status", "")
+        return None if final_status == "success" else final_status
+    return reason
+
+
 def build_llm_module_info(llm_failure: dict, per_module: dict, skip_unknown: bool = False) -> list[dict[str, Any]]:
     """构建 LLM 模块信息列表（状态、Token 用量、费用等）。
 
@@ -49,7 +66,7 @@ def build_llm_module_info(llm_failure: dict, per_module: dict, skip_unknown: boo
     result: list[dict[str, Any]] = []
     for mk in _MODULE_KEYS:
         entry: dict[str, Any] = {"key": mk, "name": names.get(mk, mk)}
-        reason = llm_failure.get(mk)
+        reason = get_llm_module_failure_reason(llm_failure, mk)
         pm = per_module.get(mk)
         if reason == FAIL_REASON_DISABLED:
             entry.update(
