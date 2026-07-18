@@ -14,7 +14,7 @@ import json
 import logging
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -386,11 +386,18 @@ def _request_pingzhong_data(code: str) -> str | None:
     url = f"https://fund.eastmoney.com/pingzhongdata/{code.strip()}.js"
     logger.debug("请求基金业绩数据: %s", url)
     try:
-        with make_http_client(timeout=_TIMEOUT) as client:
+        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
             resp = client.get(url, headers=_HEADERS)
+            resp.raise_for_status()
             resp.encoding = "utf-8"
             return resp.text
-    except (httpx.TimeoutException, httpx.RequestError) as e:
+    except httpx.TimeoutException:
+        logger.warning("基金业绩 API 请求超时: %s", code)
+        return None
+    except httpx.HTTPStatusError as e:
+        logger.warning("基金业绩 API 返回异常状态 %s: %s", code, e.response.status_code)
+        return None
+    except httpx.RequestError as e:
         logger.warning("基金业绩 API 请求失败 %s: %s", code, e)
         return None
 
@@ -696,9 +703,9 @@ def _parse_nav_trend(text: str, var_name: str) -> list[dict]:
     Returns:
         [{date: "YYYY-MM-DD", nav: float}, ...] 按日期升序排列
     """
-    # 匹配 var xxx = [...] 或 var xxx = {...data: [...]}
+    # 匹配 var/let/const/window.xxx = [...] 或 {...data: [...]}
     pattern = re.compile(
-        r'var\s+' + re.escape(var_name) + r'\s*=\s*(.*?);',
+        r'(?:var|let|const|window\.)\s*' + re.escape(var_name) + r'\s*=\s*(.*?);',
         re.DOTALL,
     )
     match = pattern.search(text)
@@ -732,12 +739,19 @@ def _parse_nav_trend(text: str, var_name: str) -> list[dict]:
         val = _safe_float(entry.get("y"))
         if not ts or val <= 0:
             continue
-        # x is int YYYYMMDD
+        # x 可以是 int YYYYMMDD，也可以是毫秒时间戳（13 位）
         date_str = str(ts)
         if len(date_str) == 8:
             date_str = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
         elif len(date_str) == 10 and "-" in date_str:
             pass  # 已经是 YYYY-MM-DD 格式
+        elif len(date_str) >= 13:
+            # 毫秒时间戳 → YYYY-MM-DD
+            try:
+                dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+                date_str = dt.strftime("%Y-%m-%d")
+            except (OSError, ValueError):
+                continue
         else:
             continue
         bars.append({"date": date_str, "nav": val})

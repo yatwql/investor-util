@@ -195,9 +195,15 @@ def fetch_fund_nav_history(code: str) -> list[dict]:
         }
 
         try:
-            with make_http_client(timeout=_TIMEOUT) as client:
+            with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
                 resp = client.get(_FUND_API_URL, params=params, headers=_HEADERS)
+                resp.raise_for_status()
                 text = resp.text
+        except httpx.HTTPStatusError:
+            logger.warning("[eastmoney] 历史净值 API HTTP 错误（第%d页）: %s", page_index, code)
+            if all_records:
+                break
+            return []
         except httpx.RequestError:
             logger.warning("[eastmoney] 历史净值 API 请求失败（第%d页）: %s", page_index, code)
             if all_records:

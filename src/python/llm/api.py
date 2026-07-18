@@ -530,7 +530,7 @@ def call_gemini(
     Returns:
         (content, usage) — usage 为标准化后的用量字典，失败时均为 None
     """
-    url = endpoint or f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = f"{endpoint.rstrip('/')}/models/{model}:generateContent" if endpoint else f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     headers = {
         "Content-Type": "application/json",
         "x-goog-api-key": api_key,
