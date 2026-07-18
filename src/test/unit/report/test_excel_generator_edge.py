@@ -60,8 +60,6 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
             # 基金业绩
             patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None),
             patch("src.python.fetcher.fund.fetch_fund_benchmark", return_value="--"),
-            patch("src.python.report.fund_performance._load_profit_forecast",
-                  return_value=({}, False)),
             # B 系列数据
             patch("src.python.report.fund_manager_analysis.detect_manager_changes",
                   return_value=[]),

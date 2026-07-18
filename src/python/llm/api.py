@@ -86,6 +86,35 @@ def _resolve_entry_credentials(
     return (api_key, model, endpoint)
 
 
+def _resolve_first_provider_model_endpoint(
+    llm_config: dict, module_key: str,
+) -> tuple[str | None, str]:
+    """从多链配置的首个 chain entry 解析 model 和 endpoint。
+
+    仅当存在 _provider_list 且 module_key 非空时生效。
+    非多链模式返回 (None, "")。
+
+    Returns:
+        (model_name, endpoint) — model 为解析后的模型名（含 credentials_ref），
+        endpoint 为解析后的 API 地址
+    """
+    provider_list = llm_config.get("_provider_list")
+    if not provider_list or not module_key:
+        return (None, "")
+    strategy = llm_config.get("_strategy", "priority")
+    preferred = llm_config.get("_preferred_providers", {})
+    try:
+        from src.python.llm.strategy import resolve_provider_chain
+        chain = resolve_provider_chain(provider_list, strategy, module_key, preferred)
+        entry = chain[0] if chain else None
+        if entry:
+            _, model, endpoint = _resolve_entry_credentials(entry, llm_config)
+            return (model, endpoint or "")
+    except Exception:
+        pass
+    return (None, "")
+
+
 def _infer_module_key(config_field: str) -> str:
     """从 config_field 推导 module_key。
 
@@ -183,7 +212,7 @@ def call_single_provider(
         return call_gemini(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                                 max_tokens, timeout, max_retries=max_retries,
                                 http_client=http_client, config_field=config_field,
-                                temperature=temperature)
+                                temperature=temperature, llm_config=llm_config)
     else:
         logger.warning("不支持的 LLM provider: %s", provider)
         return (None, None)
@@ -199,18 +228,19 @@ def call_llm(
     config_field: str = "max_tokens",
     temperature: float | None = None,
     model: str | None = None,
-) -> tuple[str | None, dict | None, str | None]:
+) -> tuple[str | None, dict | None, dict | None]:
     """调用 LLM API 生成文本（多 Provider 链式）。
 
     按 provider 链依次尝试，第一个成功即返回。
     全部失败返回 (None, None, None)。
 
     Args:
-        同前，新增返回值第三元组 provider_name。
+        同前，新增返回值第三元组 provider_info。
 
     Returns:
-        (content, usage, provider_name)
-        — provider_name 为成功 provider 的 entry name，全部失败时为 None
+        (content, usage, provider_info)
+        — provider_info dict: {"name": entry名, "model": 解析后的模型名, "endpoint": 解析后的 endpoint}
+          全部失败时为 None
     """
     provider_list = llm_config.get("_provider_list")
     if not provider_list:
@@ -255,7 +285,7 @@ def call_llm(
                         "attempted": attempted,
                         "final_status": "success",
                     }
-                return (result, usage, name)
+                return (result, usage, {"name": name, "model": entry_model, "endpoint": entry_endpoint or ""})
             else:
                 reason = _get_last_llm_failure() or FAIL_REASON_API_ERROR
                 logger.warning("provider %s 失败（%s），切换下一 provider", _entry_desc, reason)
@@ -293,7 +323,7 @@ def _call_llm_legacy(
     config_field: str = "max_tokens",
     temperature: float | None = None,
     model: str | None = None,
-) -> tuple[str | None, dict | None, str | None]:
+) -> tuple[str | None, dict | None, dict | None]:
     """旧模式兼容（无 _provider_list 配置时回退）。"""
     provider = llm_config.get("provider", "")
     api_key = llm_config.get("api_key", "")
@@ -308,7 +338,7 @@ def _call_llm_legacy(
     )
     if result is not None:
         if result != "":
-            return result, usage, provider or None
+            return result, usage, {"name": provider or None, "model": resolved_model, "endpoint": endpoint or ""}
         # 空内容 → 安抚重试
         logger.warning("%s API 返回空内容，追加安抚指令重试一次", provider)
         calmed_system = system_prompt + _CONTENT_FILTER_RECOVERY
@@ -318,7 +348,7 @@ def _call_llm_legacy(
         )
         if result2 and result2.strip():
             logger.info("安抚重试成功")
-            return result2, usage2, provider or None
+            return result2, usage2, {"name": provider or None, "model": resolved_model, "endpoint": endpoint or ""}
         logger.warning("安抚重试后仍返回空内容")
 
     # 回退 provider（旧 fallback 字段）
@@ -333,7 +363,7 @@ def _call_llm_legacy(
             resolved_max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
         )
         if result is not None:
-            return result, usage, fallback_provider or None
+            return result, usage, {"name": fallback_provider or None, "model": fb_model, "endpoint": fb_endpoint or ""}
         logger.warning("回退 provider (%s) 同样失败", fallback_provider)
 
     return (None, None, None)
@@ -517,6 +547,7 @@ def call_gemini(
     http_client: httpx.Client | None = None,
     config_field: str = "max_tokens",
     temperature: float | None = None,
+    llm_config: dict | None = None,
 ) -> tuple[str | None, dict | None]:
     """调用 Google Gemini API (generateContent)，带重试 + 用量日志。
 
@@ -530,7 +561,7 @@ def call_gemini(
     Returns:
         (content, usage) — usage 为标准化后的用量字典，失败时均为 None
     """
-    url = endpoint or f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = f"{endpoint.rstrip('/')}/models/{model}:generateContent" if endpoint else f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     headers = {
         "Content-Type": "application/json",
         "x-goog-api-key": api_key,
@@ -546,6 +577,25 @@ def call_gemini(
     }
     if temperature is not None:
         payload["generationConfig"]["temperature"] = temperature
+
+    # ── Gemini Extended Thinking（通过 generationConfig.thinkingConfig） ──
+    if llm_config:
+        module_suffix = config_field.replace("max_tokens_", "")
+        if llm_config.get(f"thinking_enabled_{module_suffix}", False):
+            resolved_model = model or "gemini-2.5-flash"
+            if _supports_extended_thinking(resolved_model):
+                budget_key = f"thinking_budget_{module_suffix}"
+                budget = llm_config.get(budget_key)
+                if not budget or budget < max_tokens + 1024:
+                    budget = max_tokens + 4096
+                payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
+                payload["generationConfig"].pop("temperature", None)
+                logger.info("Gemini Extended Thinking 已开启 [%s]: budget=%d",
+                            module_suffix, budget)
+            else:
+                logger.warning("模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]",
+                               resolved_model, module_suffix)
+
     client = http_client
     assert client is not None
 

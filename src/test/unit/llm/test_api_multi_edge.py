@@ -73,7 +73,7 @@ class TestChainNoFallbackFields(unittest.TestCase):
         result, usage, provider_name = call_llm("sys", "user", config)
 
         self.assertEqual(result, "chain ok")
-        self.assertEqual(provider_name, "p2")
+        self.assertEqual(provider_name["name"], "p2")
         self.assertEqual(mock_call.call_count, 2)
 
 

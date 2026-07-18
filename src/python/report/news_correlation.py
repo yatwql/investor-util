@@ -330,10 +330,13 @@ def _apply_llm_enhancement(
     if not llm_config or not llm_enabled:
         return meta
 
-    api_key = (llm_config.get("api_key") or "").strip()
-    if not api_key:
-        logger.warning("enabled_llm.news_correlation 已开启但未配置 api_key，降级为传统关键词匹配分析")
-        return meta
+    # 多链模式：api_key 在 chain 条目内，不在顶级 llm_config
+    provider_list = llm_config.get("_provider_list")
+    if not provider_list:
+        api_key = (llm_config.get("api_key") or "").strip()
+        if not api_key:
+            logger.warning("enabled_llm.news_correlation 已开启但未配置 api_key，降级为传统关键词匹配分析")
+            return meta
 
     meta["llm_enabled"] = True
     from src.python.llm import run_news_correlation_safe

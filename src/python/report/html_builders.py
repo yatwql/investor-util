@@ -113,33 +113,9 @@ def _build_category_data(
     return result, dividend_success
 
 
-def _load_profit_forecast() -> dict[str, Any]:
-    """加载盈利预测数据（非关键，失败时返回空字典）。"""
-    try:
-        from src.python.fetcher.akshare import get_profit_forecast
-        return get_profit_forecast()
-    except Exception:
-        logger.debug("盈利预测加载失败（非关键），机构覆盖列显示 --", exc_info=True)
-        return {}
-
-
-def _coverage_text(code: str, profit_forecast: dict[str, Any]) -> str:
-    """根据基金代码查找机构覆盖信息。"""
-    info = profit_forecast.get(code)
-    if info:
-        reports = info.get("reports", 0)
-        eps = info.get("eps_2026e")
-        if reports and eps is not None:
-            return f"{reports}家研报 EPS¥{eps:.2f}"
-        elif reports:
-            return f"{reports}家研报"
-    return "--"
-
-
 def _build_single_perf_item(
     idx: int, fund: Holding, detail_map: dict,
     prog: ProgressReporter, fund_count: int,
-    profit_forecast: dict | None = None,
 ) -> dict[str, Any]:
     """构建单只基金的业绩分析条目。"""
     logger.info(
@@ -203,7 +179,6 @@ def _build_single_perf_item(
         "rating": rating_comment,
         "rating_tag": rating,
         "rank": rank_str,
-        "coverage": _coverage_text(fund.code, profit_forecast) if profit_forecast else "--",
     }
 
 
@@ -234,10 +209,9 @@ def _build_perf_data(
         reverse=True,
     )
 
-    profit_forecast = _load_profit_forecast()
     result: list[dict[str, Any]] = []
     for idx, fund in enumerate(fund_holdings_sorted, 1):
-        result.append(_build_single_perf_item(idx, fund, detail_map, prog, len(fund_holdings_sorted), profit_forecast))
+        result.append(_build_single_perf_item(idx, fund, detail_map, prog, len(fund_holdings_sorted)))
 
     if result:
         logger.info("基金业绩分析完成，%d 只基金获取成功", len(result))

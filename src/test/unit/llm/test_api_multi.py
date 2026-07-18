@@ -43,7 +43,7 @@ class TestChainEmptyContentRetry(unittest.TestCase):
 
         self.assertEqual(content, "retry success")
         self.assertEqual(usage, {"input_tokens": 200})
-        self.assertEqual(provider_name, "p1")  # 还是在 p1 内完成
+        self.assertEqual(provider_name["name"], "p1")  # 还是在 p1 内完成
         self.assertEqual(mock_call.call_count, 2)
 
     @patch("src.python.llm.api.call_single_provider")
@@ -92,7 +92,7 @@ class TestChainRetryExhaustedFallback(unittest.TestCase):
         content, usage, provider_name = call_llm("sys", "user", config)
 
         self.assertEqual(content, "fb ok")
-        self.assertEqual(provider_name, "p2")  # 来自 p2
+        self.assertEqual(provider_name["name"], "p2")  # 来自 p2
         self.assertEqual(mock_call.call_count, 3)
 
     @patch("src.python.llm.api.call_single_provider")
@@ -141,7 +141,7 @@ class TestChainExceptionSafety(unittest.TestCase):
         content, usage, provider_name = call_llm("sys", "user", config)
 
         self.assertEqual(content, "p2 ok")
-        self.assertEqual(provider_name, "p2")
+        self.assertEqual(provider_name["name"], "p2")
         self.assertEqual(mock_call.call_count, 2)
 
     @patch("src.python.llm.api.call_single_provider")
@@ -187,7 +187,7 @@ class TestChainExceptionSafety(unittest.TestCase):
         content, usage, provider_name = call_llm("sys", "user", config)
 
         self.assertEqual(content, "p2 rescue")
-        self.assertEqual(provider_name, "p2")
+        self.assertEqual(provider_name["name"], "p2")
         self.assertEqual(mock_call.call_count, 3)
 
 
@@ -208,7 +208,7 @@ class TestChainProviderName(unittest.TestCase):
             ],
         }
         _, _, provider_name = call_llm("sys", "user", config)
-        self.assertEqual(provider_name, "my-claude")
+        self.assertEqual(provider_name["name"], "my-claude")
 
     @patch("src.python.llm.api.call_single_provider")
     def test_fallback_provider_success_name(self, mock_call: MagicMock) -> None:
@@ -227,7 +227,7 @@ class TestChainProviderName(unittest.TestCase):
             ],
         }
         _, _, provider_name = call_llm("sys", "user", config)
-        self.assertEqual(provider_name, "secondary")
+        self.assertEqual(provider_name["name"], "secondary")
 
 
 class TestChainFailureTracking(unittest.TestCase):
@@ -346,7 +346,7 @@ class TestModulePreferredRouting(unittest.TestCase):
         )
 
         self.assertEqual(content, "preferred result")
-        self.assertEqual(provider_name, "p2")  # p2 排首位
+        self.assertEqual(provider_name["name"], "p2")  # p2 排首位
         self.assertEqual(mock_call.call_count, 1)  # 只调了一次
 
     @patch("src.python.llm.api.call_single_provider")
@@ -373,7 +373,7 @@ class TestModulePreferredRouting(unittest.TestCase):
             ("should not happen", {}),
         ]
         _, _, pn1 = call_llm("sys", "user", config, config_field="max_tokens_global_macro")
-        self.assertEqual(pn1, "gemini-backup")
+        self.assertEqual(pn1["name"], "gemini-backup")
 
         # 模块 B：expert_review → 偏好 openai
         mock_call.side_effect = [
@@ -381,7 +381,7 @@ class TestModulePreferredRouting(unittest.TestCase):
             ("should not happen", {}),
         ]
         _, _, pn2 = call_llm("sys", "user", config, config_field="max_tokens_expert_review")
-        self.assertEqual(pn2, "openai-fallback")
+        self.assertEqual(pn2["name"], "openai-fallback")
 
 
 if __name__ == "__main__":

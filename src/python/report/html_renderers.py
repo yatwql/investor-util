@@ -18,7 +18,7 @@ from src.python.report.fund_manager_analysis import build_first_check_summary, d
 from src.python.report.fund_overlap import compute_overlap_matrix
 from src.python.report.fund_performance import is_fund
 from src.python.report.fund_style_analysis import analyze_style_for_all_funds
-from src.python.report.html_builders import _build_category_data, _build_perf_data, _load_profit_forecast
+from src.python.report.html_builders import _build_category_data, _build_perf_data
 from src.python.report.market_value import (
     DetailRow,
     _generate_details,
@@ -237,15 +237,11 @@ def _render_fund_performance_section(
     """构建基金业绩分析数据。
 
     Returns:
-        (perf_data, profit_success) — profit_success 表示盈利预测数据是否加载成功
+        (perf_data, True) — 第二项保留供兼容
     """
     prog.info("正在获取基金业绩排名...")
     perf_data = _build_perf_data(holdings, details, progress=prog)
-    try:
-        profit_success = bool(_load_profit_forecast())
-    except Exception:
-        profit_success = False
-    return perf_data, profit_success
+    return perf_data, True
 
 
 def _render_manager_analysis(

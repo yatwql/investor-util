@@ -65,7 +65,7 @@ class TestFetchIndices(unittest.TestCase):
 
     @patch("src.python.fetcher.index.cache_set")
     @patch("src.python.fetcher.index.cache_get", return_value=None)
-    @patch("src.python.fetcher.index.tencent.fetch_price", return_value=None)
+    @patch("src.python.fetcher.index.tencent.fetch_index_price", return_value=None)
     @patch("src.python.fetcher.index.sina.fetch_a_indices")
     def test_tencent_fail_sina_fallback(self, mock_sina, mock_fetch_price,
                                          mock_cache_get, mock_cache_set):
@@ -83,7 +83,7 @@ class TestFetchIndices(unittest.TestCase):
 
     @patch("src.python.fetcher.index.cache_set")
     @patch("src.python.fetcher.index.cache_get", return_value=None)
-    @patch("src.python.fetcher.index.tencent.fetch_price", return_value=None)
+    @patch("src.python.fetcher.index.tencent.fetch_index_price", return_value=None)
     @patch("src.python.fetcher.index.sina.fetch_a_indices", return_value={})
     def test_both_fail_no_stale(self, mock_sina, mock_fetch_price,
                                 mock_cache_get, mock_cache_set):
@@ -106,7 +106,7 @@ class TestFetchIndices(unittest.TestCase):
 
     @patch("src.python.fetcher.index.cache_set")
     @patch("src.python.fetcher.index.cache_get", return_value=None)
-    @patch("src.python.fetcher.index.tencent.fetch_price", return_value=None)
+    @patch("src.python.fetcher.index.tencent.fetch_index_price", return_value=None)
     @patch("src.python.fetcher.index.sina.fetch_a_indices", return_value={})
     def test_both_fail_degrade_to_stale(self, mock_sina, mock_fetch_price,
                                         mock_cache_get, mock_cache_set):

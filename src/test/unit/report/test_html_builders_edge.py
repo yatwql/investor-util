@@ -2,8 +2,6 @@
 
 测试目标：
   - _calc_yield_text：零/负价格、类型异常等边界
-  - _coverage_text：研报数为 0 边界
-  - _load_profit_forecast：API 失败降级
   - _build_category_data：分红数据 API 异常降级
 
 运行：
@@ -62,39 +60,6 @@ class TestCalcYieldTextEdge(unittest.TestCase):
         d.price = 50.0
         result = self.fn("600900", d, {"600900": {"avg_dividend": "invalid"}})
         self.assertEqual(result, "--")
-
-
-class TestCoverageTextEdge(unittest.TestCase):
-    """_coverage_text 边界情况。"""
-
-    def setUp(self):
-        from src.python.report.html_builders import _coverage_text
-        self.fn = _coverage_text
-
-    def test_reports_is_zero(self):
-        """研报数为 0 → "--"。"""
-        result = self.fn("000001", {"000001": {"reports": 0, "eps_2026e": 1.23}})
-        self.assertEqual(result, "--")
-
-
-class TestLoadProfitForecast(unittest.TestCase):
-    """_load_profit_forecast 容错测试。"""
-
-    def test_success_returns_dict(self):
-        """正常加载 → 返回字典。"""
-        from src.python.report.html_builders import _load_profit_forecast
-        with patch("src.python.fetcher.akshare.get_profit_forecast",
-                   return_value={"000001": {"reports": 5}}):
-            result = _load_profit_forecast()
-        self.assertEqual(result, {"000001": {"reports": 5}})
-
-    def test_api_failure_returns_empty(self):
-        """API 失败 → 返回空字典。"""
-        from src.python.report.html_builders import _load_profit_forecast
-        with patch("src.python.fetcher.akshare.get_profit_forecast",
-                   side_effect=Exception("API 失败")):
-            result = _load_profit_forecast()
-        self.assertEqual(result, {})
 
 
 class TestBuildCategoryDataDividendDegradation(unittest.TestCase):

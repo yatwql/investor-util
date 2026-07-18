@@ -444,7 +444,8 @@ _call_llm(system_prompt, user_prompt, llm_config, ...)
     │            │   OpenAI Chat Completions API
     │            │   (也兼容 DeepSeek 等 OpenAI 兼容端点)
     │            └─ "gemini"  → _call_gemini()
-    │                Google Gemini API
+    │                Google Gemini API (generateContent)
+    │                + ThinkingConfig 注入 (generationConfig.thinkingConfig.thinkingBudget)
     │
     │          成功 → 返回 (content, usage, provider_name)
     │          空内容 → 内容过滤安抚重试（追加安抚指令重试一次）
@@ -490,10 +491,11 @@ _configure_extended_thinking(payload, llm_config, config_field, model, max_token
     │      effort 从 reasoning_effort_{module_suffix} 读取
     │      默认 "high"
     │
-    └─ budget_tokens 模型 (Claude Sonnet 4 / Opus 4) →
+    └─ budget_tokens 模型 (Claude Sonnet 4 / Opus 4 / Gemini 2.5) →
            payload["thinking"]["budget_tokens"] = budget
            budget 从 thinking_budget_{module_suffix} 读取
            不足 max_tokens + 1024 时自动兜底到 max_tokens + 4096
+           Gemini 使用 generationConfig.thinkingConfig.thinkingBudget，效果等价
 ```
 
 #### _call_openai() 关键细节
@@ -1097,7 +1099,7 @@ LLM 集成层与系统其他组件的接口：
 | `timeout_{module_key}` | API 超时（秒） | `120` |
 | `thinking_enabled_{module_key}` | 是否启用 Extended Thinking | `true` / `false` |
 | `reasoning_effort_{module_key}` | DeepSeek 推理强度 | `high` / `medium` / `low` |
-| `thinking_budget_{module_key}` | Claude Thinking 预算 token | `10240` |
+| `thinking_budget_{module_key}` | Claude/Gemini Thinking 预算 token | `10240` |
 
 所有参数在 `llm_settings.json` 中配置，`{module_key}` 取值为 `global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`。
 
