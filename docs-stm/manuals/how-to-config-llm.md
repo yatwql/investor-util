@@ -261,8 +261,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
 | `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式（news_correlation）不支持** |
-| `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude 或 DeepSeek） |
-| `thinking_budget_{module}` | int | 4000~16000（模块差异） | **仅 Claude** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
+| `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude / DeepSeek / Gemini 2.5） |
+| `thinking_budget_{module}` | int | 4000~16000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
 ### 专用配置项
@@ -408,6 +408,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 > **Claude**（provider: `"claude"`）：模型 ≥ `claude-sonnet-4` 时生效，用 `thinking.budget_tokens` 控制思考 token 预算。
 >
 > **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"high"` / `"max"`）。
+>
+> **Gemini**（provider: `"gemini"`）：模型 `gemini-2.5-*` 时生效，用 `generationConfig.thinkingConfig.thinkingBudget` 控制思考 token 预算。
 
 **[Extended Thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking)** 让模型在回答前进行深度推理，大幅提升复杂分析的深度和逻辑严谨性。代价是输出 token 大幅增加（约 2~4 倍），费用相应上升。
 
@@ -433,25 +435,25 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 ### 模型差异
 
-| 维度 | Anthropic Claude | DeepSeek V4+ |
-|------|------------------|-------------|
-| 控制参数 | `thinking.budget_tokens`（token 数量预算） | `output_config.effort`（"high"/"max" 定性控制） |
-| 与 temperature 关系 | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） |
-| 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） |
-| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` |
+| 维度 | Anthropic Claude | DeepSeek V4+ | Google Gemini 2.5 |
+|------|------------------|-------------|-------------------|
+| 控制参数 | `thinking.budget_tokens`（token 数量预算） | `output_config.effort`（"high"/"max" 定性控制） | `generationConfig.thinkingConfig.thinkingBudget`（token 数量预算） |
+| 与 temperature 关系 | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） |
+| 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） | `generativelanguage.googleapis.com` |
+| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` | 低成本备选，适合轻量推理
 
 ### `thinking_budget` 与 `max_tokens` 的关系
 
-**仅在使用 Claude 模型时 `thinking_budget_{模块}` 有意义。** DeepSeek 使用 `reasoning_effort`（`"high"` / `"max"`）定性控制思考深度，不涉及 token 预算概念。
+**仅在使用 Claude 或 Gemini 模型时 `thinking_budget_{模块}` 有意义。** DeepSeek 使用 `reasoning_effort`（`"high"` / `"max"`）定性控制思考深度，不涉及 token 预算概念。
 
 | 配置项 | 管什么 | expert 默认值 |
 |--------|--------|:------------:|
 | `max_tokens_expert_review` | **最终输出文本**的最大 token 数 | 8192 |
 | `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 16000 |
 
-**API 硬性约束（仅 Claude）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
+**API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
 
-**一句话总结（Claude）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
+**一句话总结（Claude / Gemini）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
 **一句话总结（DeepSeek）：** `reasoning_effort` 管"想多深"，`"max"` 对应深度分析的极致模式。
 
 ### 效果参考
