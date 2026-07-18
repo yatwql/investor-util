@@ -79,7 +79,7 @@ python -m src.python.cli cache --stats
 | 3 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、板块可见性 |
 | 4 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
 | 5 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
-| 6 | [数据源一览](docs-stm/manuals/datasource.md) | 数据源说明 |
+| 6 | [数据源一览](docs-stm/manuals/datasource.md) | 数据源、缓存前缀、数据质量与常见问题 |
 | 7 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
 | 8 | [定时任务配置指南](docs-stm/manuals/how-to-schedule.md) | CLI 命令行模式 & Windows/Linux 定时任务设置 |
 

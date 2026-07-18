@@ -12,6 +12,8 @@
 
 启动脚本自动完成：Python 检测 → 虚拟环境创建 → 依赖安装 → 目录创建 → 运行主程序。
 
+> **安装验证**：启动脚本执行后首次运行菜单 **E** 生成基础报告。如报告成功生成到 `reports/` 目录，则安装正确。如遇报错，检查 `logs/app.log` 中最近的 ERROR 行。
+
 > **💡 外部虚拟环境管理：** 设置环境变量 `VENV_PATH` 可将 `.venv` 放在项目目录外部，
 > 方便多个项目共享或集中管理虚拟环境：
 > ```bash
@@ -71,6 +73,47 @@ python -m src.python.cli --verbose report --type basic
 ```
 
 > CLI 模式与 TUI 模式共享同一套缓存和配置文件，两种模式可交替使用。
+
+### CLI 命令参考
+
+**全局参数**（位于子命令之前）：
+
+| 参数 | 说明 |
+|:-----|:-----|
+| `--config PATH` | 配置文件路径，默认 `data/config/config.json` |
+| `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir` |
+| `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
+| `--version` | 显示版本号并退出 |
+
+**`report` 子命令**：
+
+| 参数 | 说明 |
+|:-----|:-----|
+| `--type {basic,both,full}` | `basic`=仅 Excel 报告（约 1 分钟，默认）；`both`=Excel+HTML（不含 LLM，约 2 分钟）；`full`=全量含 LLM（约 5 分钟，需 LLM 配置） |
+| `--history {auto,off}` | 是否获取组合历史走势：`auto`=获取（默认），`off`=跳过。仅 `--type both` / `full` 时有效 |
+| `--force-llm` | 强制重新调用 LLM API（忽略缓存），生成最新 LLM 内容 |
+| `--warm` | 报告生成前预热缓存（首次使用或新增持仓时推荐） |
+
+**`cache` 子命令**：
+
+| 参数 | 说明 |
+|:-----|:-----|
+| `--update {basic,position,all}` | `basic`=更新基础类缓存（基金业绩、行业分类、新闻等）；`position`=更新持仓类缓存（价格行情、指数）；`all`=全部更新 |
+| `--clean` | 按 TTL 删除过期缓存文件 |
+| `--stats` | 查看缓存状态统计（文件数、总大小、过期文件预览等） |
+
+**使用示例**：
+
+```bash
+# 生成全量报告，预热缓存，强制重新调用 LLM
+python -m src.python.cli --verbose report --type full --history auto --warm --force-llm
+
+# 基础 Excel 报告，输出到指定目录
+python -m src.python.cli --output D:/my_reports report --type basic
+
+# 使用自定义配置文件
+python -m src.python.cli --config D:/config/my_config.json cache --stats
+```
 
 定时任务配置详见[定时任务配置指南](how-to-schedule.md)。
 

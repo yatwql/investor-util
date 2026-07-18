@@ -6,6 +6,10 @@
 
 本项目的测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行。使用 `scripts/test_runner.py` 脚本统一驱动，自动输出结构化报告。
 
+> **关联文档**：
+> - 需求文档（[requirements.md](../managements/requirements.md)）— 理解业务场景测试（S1~S34）的驱动来源
+> - 技术设计（[technical.md](../managements/technical.md)）— 理解模块间契约和缓存 / Provider Chain 等架构约束的测试覆盖依据
+
 ## 前置条件
 
 ```bash

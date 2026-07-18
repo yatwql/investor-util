@@ -10,6 +10,8 @@ CLI 入口：`python -m src.python.cli [全局参数] <子命令> [子命令参�
 
 ### 常用命令速查
 
+> CLI 完整参数列表见[快速开始](how-to-start.md#cli-命令参考)。以下为定时任务场景的常用命令。
+
 | 用途 | 命令 |
 |:-----|:-----|
 | 生成基础 Excel 报告 | `python -m src.python.cli report --type basic` |
@@ -150,7 +152,24 @@ python -m src.python.cli report --type basic --output ./reports
 python -m src.python.cli report --type full --warm --history auto
 ```
 
-### 4.3 网络退避策略
+### 4.3 报告输出路径
+
+通过 `--output DIR` 全局参数指定报告输出目录，覆盖 `config.json` 中的 `output_dir` 配置。输出目录支持绝对路径和相对路径：
+
+```bash
+# 输出到默认 reports/ 目录（使用 config.json 配置）
+python -m src.python.cli report --type full --history auto
+
+# 输出到指定目录
+python -m src.python.cli --output D:/backup/reports report --type basic
+
+# 输出到网络共享目录（需确保程序有写入权限）
+python -m src.python.cli --output \\NAS\invest\reports report --type basic
+```
+
+> 输出目录不存在时程序会自动创建。定时任务中建议使用绝对路径，避免因工作目录不确定导致的路径问题。
+
+### 4.4 网络退避策略
 
 Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自动降级使用过期缓存。
 

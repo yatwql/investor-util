@@ -576,6 +576,42 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 
 ---
 
+## HTTP 代理配置
+
+程序默认直连 LLM API，如所在网络需要通过 HTTP 代理访问外网（如公司内网、VPN 环境），可通过环境变量配置：
+
+### Linux / macOS
+
+```bash
+# 设置 HTTP 代理
+export HTTP_PROXY="http://127.0.0.1:7890"
+export HTTPS_PROXY="http://127.0.0.1:7890"
+
+# 设置后运行程序即可
+python -m src.python.main
+```
+
+### Windows PowerShell
+
+```powershell
+# 设置 HTTP 代理
+$env:HTTP_PROXY = "http://127.0.0.1:7890"
+$env:HTTPS_PROXY = "http://127.0.0.1:7890"
+
+# 设置后运行程序
+python -m src.python.main
+```
+
+### 注意事项
+
+- 代理配置对所有 LLM Provider（Claude、OpenAI、DeepSeek、Gemini、火山引擎）均生效
+- 代理仅影响 LLM API 调用，不影响数据源行情获取（详情数据源暂不支持代理）
+- 如仅需部分 Provider 走代理，可在 `llm_providers.json` 中为该 Provider 设置 `"proxy_preferred": true`（多链模式下生效）
+- 如代理认证需要用户名密码，使用 `http://user:pass@host:port` 格式
+- 设置后可通过日志确认：`logs/app.log` 中搜索 `proxy` 或 `httpx.Proxy` 关键字
+
+---
+
 ## Token 消耗参考
 
 以下费用按 **DeepSeek-V4-Flash** 定价（¥1/M 输入、¥2/M 输出）估算，各模型单价详见「完整模型定价表」。
