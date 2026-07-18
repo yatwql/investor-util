@@ -127,23 +127,39 @@ def _cache_key(prefix: str, fingerprint: str) -> str:
     return f"{prefix}nofp"
 
 
-def _run_with_timeout(fn, timeout: float = _TIMEOUT):
-    """在线程中执行函数，超时或异常时返回 None。"""
-    pool = ThreadPoolExecutor(max_workers=1)
-    try:
-        fut = pool.submit(fn)
+def _run_with_timeout(fn, timeout: float = _TIMEOUT, retries: int = 1):
+    """在线程中执行函数，超时或异常时重试，全部失败返回 None。
+
+    Args:
+        fn: 要执行的函数
+        timeout: 每次调用的超时秒数
+        retries: 失败后的重试次数（默认 1 次）
+    """
+    for attempt in range(1 + retries):
+        pool = ThreadPoolExecutor(max_workers=1)
         try:
-            return fut.result(timeout=timeout)
-        except TimeoutError:
-            logger.warning("akshare 调用超时 (%.1fs)", timeout)
-            fut.cancel()
-            return None
-        except Exception as e:
-            logger.warning("akshare 调用异常: %s", e)
-            fut.cancel()
-            return None
-    finally:
-        pool.shutdown(wait=False)
+            fut = pool.submit(fn)
+            try:
+                return fut.result(timeout=timeout)
+            except TimeoutError:
+                logger.warning("akshare 调用超时 (%.1fs, 第 %d/%d 次)",
+                               timeout, attempt + 1, 1 + retries)
+                fut.cancel()
+                if attempt < retries:
+                    import time as _time
+                    _time.sleep(1)
+                continue
+            except Exception as e:
+                logger.warning("akshare 调用异常 (第 %d/%d 次): %s",
+                               attempt + 1, 1 + retries, e)
+                fut.cancel()
+                if attempt < retries:
+                    import time as _time
+                    _time.sleep(1)
+                continue
+        finally:
+            pool.shutdown(wait=False)
+    return None
 
 
 def get_profit_forecast() -> dict[str, dict]:
@@ -181,7 +197,7 @@ def get_profit_forecast() -> dict[str, dict]:
     def _fetch():
         return ak.stock_profit_forecast_em()
 
-    df = _run_with_timeout(_fetch)
+    df = _run_with_timeout(_fetch, timeout=30.0)
     if df is None:
         logger.warning("盈利预测获取失败（超时或网络错误）")
         return {}
@@ -441,7 +457,11 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
         return {}
 
     logger.info("正在获取 %d 只股票的分红历史...", len(a_codes))
-    result = _fetch_all_dividends(a_codes)
+
+    def _fetch_div():
+        return _fetch_all_dividends(a_codes)
+
+    result = _run_with_timeout(_fetch_div, timeout=60.0) or {}
     if result:
         cache_set(_key, result)
     _memo_set(_memo_key_str, result)

@@ -52,7 +52,7 @@ def _fetch_indices_from_tencent(uncached: list[str]) -> dict[str, dict[str, Any]
 
     def _fetch_one(index_code: str) -> tuple[str, dict] | None:
         index_name = _A_INDICES[index_code]
-        result = tencent.fetch_price(index_code)
+        result = tencent.fetch_index_price(index_code)
         if result and result.get("price", 0) > 0:
             price = result.get("price", 0.0)
             yclose = result.get("yesterday_close", 0.0)

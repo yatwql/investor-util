@@ -105,7 +105,7 @@ _MODEL_LINE_RE = re.compile(r'模型[：:]\s*([^|<\s][^|]*)')
 
 # ── Extended Thinking 模型兼容性名单 ──
 
-_THINKING_SUPPORTED_PREFIXES = ("claude-sonnet-4", "claude-opus-4", "claude-fable-5", "deepseek-v4-", "deepseek-chat")
+_THINKING_SUPPORTED_PREFIXES = ("claude-sonnet-4", "claude-opus-4", "claude-fable-5", "deepseek-v4-", "deepseek-chat", "gemini-2-5-")
 
 # 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
 _THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-v4-", "deepseek-chat")

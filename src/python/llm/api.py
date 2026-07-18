@@ -183,7 +183,7 @@ def call_single_provider(
         return call_gemini(system_prompt, user_prompt, api_key, resolved_model, endpoint,
                                 max_tokens, timeout, max_retries=max_retries,
                                 http_client=http_client, config_field=config_field,
-                                temperature=temperature)
+                                temperature=temperature, llm_config=llm_config)
     else:
         logger.warning("不支持的 LLM provider: %s", provider)
         return (None, None)
@@ -517,6 +517,7 @@ def call_gemini(
     http_client: httpx.Client | None = None,
     config_field: str = "max_tokens",
     temperature: float | None = None,
+    llm_config: dict | None = None,
 ) -> tuple[str | None, dict | None]:
     """调用 Google Gemini API (generateContent)，带重试 + 用量日志。
 
@@ -546,6 +547,25 @@ def call_gemini(
     }
     if temperature is not None:
         payload["generationConfig"]["temperature"] = temperature
+
+    # ── Gemini Extended Thinking（通过 generationConfig.thinkingConfig） ──
+    if llm_config:
+        module_suffix = config_field.replace("max_tokens_", "")
+        if llm_config.get(f"thinking_enabled_{module_suffix}", False):
+            resolved_model = model or "gemini-2.5-flash"
+            if _supports_extended_thinking(resolved_model):
+                budget_key = f"thinking_budget_{module_suffix}"
+                budget = llm_config.get(budget_key)
+                if not budget or budget < max_tokens + 1024:
+                    budget = max_tokens + 4096
+                payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
+                payload["generationConfig"].pop("temperature", None)
+                logger.info("Gemini Extended Thinking 已开启 [%s]: budget=%d",
+                            module_suffix, budget)
+            else:
+                logger.warning("模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]",
+                               resolved_model, module_suffix)
+
     client = http_client
     assert client is not None
 
