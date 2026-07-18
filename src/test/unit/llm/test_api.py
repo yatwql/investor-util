@@ -466,7 +466,7 @@ class TestCallLlm(unittest.TestCase):
     def test_provider_success(self, mock_single: MagicMock) -> None:
         """主 provider 成功 → 返回结果。"""
         mock_single.return_value = ("成功结果", {"input_tokens": 100})
-        result, usage = call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
+        result, usage, _ = call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
         self.assertEqual(result, "成功结果")
         self.assertEqual(usage["input_tokens"], 100)
         mock_single.assert_called_once()
@@ -475,7 +475,7 @@ class TestCallLlm(unittest.TestCase):
     def test_provider_returns_none(self, mock_single: MagicMock) -> None:
         """主 provider 失败 → 无回退 → (None, None)。"""
         mock_single.return_value = (None, None)
-        result, usage = call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
+        result, usage, _ = call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
         self.assertIsNone(result)
         self.assertIsNone(usage)
 
@@ -486,7 +486,7 @@ class TestCallLlm(unittest.TestCase):
             ("", {"input_tokens": 10}),
             ("安抚后结果", {"input_tokens": 20}),
         ]
-        result, usage = call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
+        result, usage, _ = call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
         self.assertEqual(result, "安抚后结果")
         self.assertEqual(mock_single.call_count, 2)
 
@@ -497,7 +497,7 @@ class TestCallLlm(unittest.TestCase):
             ("", {"input_tokens": 10}),
             ("", {"input_tokens": 20}),
         ]
-        result, usage = call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
+        result, usage, _ = call_llm("system", "user", {"provider": "claude", "api_key": "sk-x"})
         self.assertIsNone(result)
         self.assertEqual(mock_single.call_count, 2)
 
@@ -514,7 +514,7 @@ class TestCallLlm(unittest.TestCase):
             "fallback_endpoint": "https://api.openai.com/v1",
             "fallback_model": "gpt-4o",
         }
-        result, usage = call_llm("system", "user", config)
+        result, usage, _ = call_llm("system", "user", config)
         self.assertEqual(result, "回退结果")
         self.assertEqual(mock_single.call_count, 2)
 
@@ -526,7 +526,7 @@ class TestCallLlm(unittest.TestCase):
             "provider": "claude", "api_key": "sk-claude",
             "fallback_provider": "openai", "fallback_api_key": "sk-openai",
         }
-        result, usage = call_llm("system", "user", config)
+        result, usage, _ = call_llm("system", "user", config)
         self.assertIsNone(result)
         self.assertEqual(mock_single.call_count, 2)
 
@@ -538,7 +538,7 @@ class TestCallLlm(unittest.TestCase):
             "provider": "claude", "api_key": "sk-claude",
             "fallback_provider": "claude",
         }
-        result, usage = call_llm("system", "user", config)
+        result, usage, _ = call_llm("system", "user", config)
         self.assertIsNone(result)
         mock_single.assert_called_once()
 
@@ -554,7 +554,7 @@ class TestCallLlm(unittest.TestCase):
             "provider": "claude", "api_key": "sk-claude",
             "fallback_provider": "openai", "fallback_api_key": "sk-openai",
         }
-        result, usage = call_llm("system", "user", config)
+        result, usage, _ = call_llm("system", "user", config)
         self.assertEqual(result, "回退结果")
         self.assertEqual(mock_single.call_count, 3)
 

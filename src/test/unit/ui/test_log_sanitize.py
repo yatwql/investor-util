@@ -184,7 +184,7 @@ class TestSanitizeEndpointInLogs(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"provider": "claude", "api_key": secret}, f)
 
-        with patch("src.python.config.get_llm_key_path", return_value=key_path):
+        with patch("src.python.config._core._LLM_KEY_FILE", key_path):
             with patch("src.python.config.get_llm_settings_path",
                        return_value=os.path.join(tmp.name, "llm_settings.json")):
                 with patch("src.python.config._core.os.path.exists") as mock_exists:

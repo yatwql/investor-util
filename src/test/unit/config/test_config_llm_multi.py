@@ -21,6 +21,7 @@ from unittest.mock import patch
 import pytest
 
 from src.python.config._core import (
+    _inject_provider_chain_data,
     _load_llm_providers,
     _parse_providers_list,
     _validate_provider_entry,
@@ -59,7 +60,7 @@ class TestLoadLlmProviders(unittest.TestCase):
                 }
             ],
         })
-        with patch("src.python.config._core._LLM_PROVIDERS_FILE", self.providers_path):
+        with patch("src.python.config._core._get_llm_providers_path", return_value=self.providers_path):
             result = _load_llm_providers()
         self.assertIsNotNone(result)
         self.assertEqual(result["strategy"], "priority")
@@ -71,7 +72,7 @@ class TestLoadLlmProviders(unittest.TestCase):
     def test_file_not_found(self):
         """文件不存在返回 None（不抛异常）。"""
         missing = os.path.join(self.tmp.name, "nonexistent.json")
-        with patch("src.python.config._core._LLM_PROVIDERS_FILE", missing):
+        with patch("src.python.config._core._get_llm_providers_path", return_value=missing):
             result = _load_llm_providers()
         self.assertIsNone(result)
 
@@ -289,6 +290,163 @@ class TestValidateProviderEntry(unittest.TestCase):
         }
         warnings = _validate_provider_entry(entry, 0)
         self.assertEqual(warnings, [])
+
+
+# ── R2: _inject_provider_chain_data 测试 ─────────────────────
+
+
+class TestInjectProviderChainData(unittest.TestCase):
+    """_inject_provider_chain_data() — get_llm_config() 注入逻辑测试。"""
+
+    def setUp(self):
+        self.base_config = {
+            "provider": "claude",
+            "api_key": "sk-test",
+            "model": "claude-sonnet-4-20250514",
+        }
+
+    # ── _provider_list ──
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_has_provider_list(self, mock_load):
+        """_inject_provider_chain_data → merged dict 含 _provider_list。"""
+        mock_load.return_value = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertIn("_provider_list", result)
+        self.assertIsNotNone(result["_provider_list"])
+        self.assertEqual(len(result["_provider_list"]), 1)
+        self.assertEqual(result["_provider_list"][0]["name"], "p1")
+
+    # ── strategy ──
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_strategy_default_priority(self, mock_load):
+        """未指定 strategy → 默认 "priority"。"""
+        mock_load.return_value = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertEqual(result["_strategy"], "priority")
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_strategy_explicit_priority(self, mock_load):
+        """指定 strategy="weighted" → 保留用户设置。"""
+        mock_load.return_value = {
+            "strategy": "weighted",
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertEqual(result["_strategy"], "weighted")
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_strategy_invalid_fallback(self, mock_load):
+        """非法策略值回退 priority + WARNING。"""
+        mock_load.return_value = {
+            "strategy": "random",
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        with self.assertLogs("invest", level="WARNING") as logs:
+            result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertEqual(result["_strategy"], "priority")
+        self.assertTrue(any("random" in msg for msg in logs.output))
+
+    # ── preferred_providers ──
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_preferred_default_empty(self, mock_load):
+        """未指定 preferred_providers → 默认 {}。"""
+        mock_load.return_value = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertEqual(result["_preferred_providers"], {})
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_preferred_valid_name(self, mock_load):
+        """preferred_providers 中 name 存在 → 保留。"""
+        mock_load.return_value = {
+            "preferred_providers": {"news": "p1"},
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertEqual(result["_preferred_providers"], {"news": "p1"})
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_preferred_invalid_name(self, mock_load):
+        """不存在的偏好 name → WARNING + 忽略。"""
+        mock_load.return_value = {
+            "preferred_providers": {"news": "nonexistent"},
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        with self.assertLogs("invest", level="WARNING") as logs:
+            result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertEqual(result["_preferred_providers"], {})
+        self.assertTrue(any("nonexistent" in msg for msg in logs.output))
+
+    # ── 原有字段保留 ──
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_first_provider_reference(self, mock_load):
+        """原有 provider/api_key/model/endpoint 字段在注入后保留。"""
+        mock_load.return_value = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        original = {
+            "provider": "original_provider",
+            "api_key": "original_key",
+            "model": "original_model",
+            "endpoint": "https://original.endpoint",
+        }
+        result = _inject_provider_chain_data(original)
+        self.assertEqual(result["provider"], "original_provider")
+        self.assertEqual(result["api_key"], "original_key")
+        self.assertEqual(result["model"], "original_model")
+        self.assertEqual(result["endpoint"], "https://original.endpoint")
+
+    # ── 无 llm_providers.json ──
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_no_providers_file(self, mock_load):
+        """llm_providers.json 不存在 → _provider_list=None, _strategy=priority, _preferred={}。"""
+        mock_load.return_value = None
+        result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertIsNone(result["_provider_list"])
+        self.assertEqual(result["_strategy"], "priority")
+        self.assertEqual(result["_preferred_providers"], {})
+
+    # ── preferred_providers 非 dict ──
+
+    @patch("src.python.config._core._load_llm_providers")
+    def test_preferred_not_dict(self, mock_load):
+        """preferred_providers 不是 dict → WARNING + 空 dict。"""
+        mock_load.return_value = {
+            "preferred_providers": "not_a_dict",
+            "providers": [
+                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+            ]
+        }
+        with self.assertLogs("invest", level="WARNING") as logs:
+            result = _inject_provider_chain_data(dict(self.base_config))
+        self.assertEqual(result["_preferred_providers"], {})
+        self.assertTrue(any("not a dict" in msg.lower() or "dict" in msg.lower() for msg in logs.output))
 
 
 if __name__ == "__main__":

@@ -190,7 +190,7 @@ A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式�
 }
 ```
 
-空对象 `{}` 或缺失此字段时使用 18 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
+空对象 `{}` 或缺失此字段时使用 17 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
 **Q: 菜单 P（配置报告板块可见性）是做什么的？**
 
@@ -363,9 +363,19 @@ A: 菜单 `L` 会先检查缓存，缓存过期（默认全球政经局势/持�
 
 A: 程序内置自动增大 `max_tokens` 1.5 倍重试机制。如果仍被截断，可在 `llm_settings.json` 中手动调大对应模块的 `max_tokens_{模块键}` 值（默认为 4096，可设为 8192 或更高）。调整后菜单 `R` 刷新配置，再重新生成即可。
 
+**Q: 如何配置多个 LLM Provider 做链式服务？**
+
+A: 通过 `data/config/llm_providers.json` 配置多个 LLM Provider，支持按优先级/权重/成本分发请求。示例配置已含主用 DeepSeek（claude 兼容端点）+ 备用 Gemini，程序自动按策略切换，无需手动干预。详细配置见 [LLM 配置指引](how-to-config-llm.md)。
+
 **Q: 支持多个 LLM Key 做负载均衡吗？**
 
-A: 不支持多 Key 负载均衡。但可通过 `llm_key.json` 的 `fallback_provider` 配置一个备用 LLM 端点：当主 provider 连续失败时自动切换到 fallback。切换过程有日志记录，终端也会提示。适用于主 provider 限流或故障时的降级场景。
+A: 支持。通过 `llm_providers.json` 的 `strategy` 字段切换分发策略：
+- `priority`（默认）— 按 `priority` 值顺序尝试，值越小优先级越高
+- `weighted` — 按 `weight` 值加权随机分发
+- `cost_first` — 按每次调用费用排序，优先使用低成本 Provider
+- `fallback_only` — 仅当首选 Provider 失败时使用后续 Provider
+
+任一 Provider 失败均自动递补下一可用 Provider，无需手动切换。详见 [LLM 配置指引](how-to-config-llm.md)。
 
 **Q: LLM API 返回 429（请求过多）怎么办？**
 
@@ -400,11 +410,11 @@ A: 执行 B 或 L 菜单生成报告时，程序会自动保存一份持仓快�
 
 A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最后重试生成报告。各菜单生成的范围差异见[菜单操作手册](how-to-menu.md#报告内容对照)。
 
-**Q: Excel 报告页签的编号（1.~18.）顺序是固定的吗？**
+**Q: Excel 报告页签的编号（1.~17.）顺序是固定的吗？**
 
 A: 默认使用固定顺序（投资分析汇总 → LLM API 用量），但可通过 `config.json` 的 `report_section_order` 字段自定义各模块的序号和排列顺序。未配置时保持默认行为。详见[配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
-菜单 E/B/L 生成范围不同：E 为基础页签（1~5），B 含 B 系列+新闻模块+历史走势（1~11）¹，L 为全量（1~18）。各菜单对应的页签范围详见[菜单操作手册](how-to-menu.md#报告内容对照)。
+菜单 E/B/L 生成范围不同：E 为基础页签（1~5），B 含 B 系列+新闻模块+历史走势（不含 LLM 分析模块），L 为全量（1~17）。各菜单对应的页签范围详见[菜单操作手册](how-to-menu.md#报告内容对照)。
 
 **Q: 为什么总市值和各账户小计之和有时对不上？**
 

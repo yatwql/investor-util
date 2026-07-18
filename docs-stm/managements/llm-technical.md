@@ -134,8 +134,9 @@ skeleton.py:_generate_llm_content()
 | `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep） | 各 `generate_*()` |
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
 | `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑） | `_generate_llm_module()` |
-| `api.py` | API 层 | Provider 路由（Claude/OpenAI）、Extended Thinking 注入 | `_call_llm()` |
+| `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、Gemini API 调用 | `_call_llm()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `_call_llm_with_retry()` |
+| `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
 | `prompts.py` | 工具 | System/User Prompt 模板、持仓明细格式化、差异上下文 | 各 `_build_*_prompt()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `_compute_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `reset_session_usage()` |
@@ -410,32 +411,43 @@ if not any(needs.values()):
 
 ## 5. API 调用层
 
-### 5.1 Provider 路由
+### 5.1 Provider 路由与多链调用
 
 ```
 _call_llm(system_prompt, user_prompt, llm_config, ...)
     │
-    ├─ 读取 provider / api_key / model / endpoint / max_tokens
+    ├─ ① 读取 Provider 列表和策略
+    │   strategy.resolve_provider_chain(provider_list, strategy, module_key, preferred)
+    │   按策略排序（priority/weighted/cost_first/fallback_only）
+    │   → _apply_module_preferred() 模块偏好前置
+    │   → _apply_proxy_preferred() 有代理时 proxy_preferred 条目前置
     │
-    ├─ _call_single_provider(provider, ...)
-    │      ├─ "claude" → _call_claude(system, user, ...)
-    │      │                Anthropic Messages API
-    │      │                + Extended Thinking 注入
-    │      │                + Prompt Caching (cache_control)
-    │      └─ "openai" → _call_openai(system, user, ...)
-    │                       OpenAI Chat Completions API
-    │                       (也兼容 DeepSeek 等 OpenAI 兼容端点)
+    ├─ ② 乐观缓存预检
+    │   以链首 Provider 的缓存键做预检查 → 命中则直接返回
     │
-    ├─ 主 provider 成功 → 返回 (content, usage)
+    ├─ ③ 遍历 Provider Chain（逐条尝试至成功）
+    │      for entry in chain:
+    │          _resolve_entry_credentials(entry, llm_config)
+    │            ├─ credentials_ref 查表 → api_key/model/endpoint
+    │            ├─ entry 级叠加覆盖
+    │            └─ 无 ref → 内联字段回退
     │
-    ├─ 主 provider 返回空内容 → 内容过滤安抚重试
-    │      system_prompt += _CONTENT_FILTER_RECOVERY
-    │      重试一次 → 成功则返回，失败则继续
+    │          _call_provider_entry(entry, ...)
+    │            ├─ "claude"  → _call_claude()
+    │            │   Anthropic Messages API
+    │            │   + Extended Thinking 注入
+    │            │   + Prompt Caching (cache_control)
+    │            ├─ "openai"  → _call_openai()
+    │            │   OpenAI Chat Completions API
+    │            │   (也兼容 DeepSeek 等 OpenAI 兼容端点)
+    │            └─ "gemini"  → _call_gemini()
+    │                Google Gemini API
     │
-    └─ 主 provider 失败 → 尝试回退 provider
-           fallback_provider / fallback_api_key /
-           fallback_endpoint / fallback_model
-           均失败 → 返回 (None, None)
+    │          成功 → 返回 (content, usage, provider_name)
+    │          空内容 → 内容过滤安抚重试（追加安抚指令重试一次）
+    │          失败 → 记录失败原因，继续下一 entry
+    │
+    └─ ④ 全链失败 → 返回 (None, {}, None)
 ```
 
 #### _call_claude() 关键细节
@@ -863,13 +875,14 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 
 | 配置项 | 所在文件 | 字段示例 |
 |:-------|:---------|:---------|
-| Provider/API Key/Endpoint | `llm_settings.json` | `provider`, `api_key`, `endpoint`, `model` |
+| Provider/API Key/Endpoint | `llm_key.json`（多凭据块） | `{"deepseek-main": {"api_key": "...", "model": "...", "endpoint": "..."}}` |
+| Provider 链与策略 | `llm_providers.json` | `{"strategy": "priority", "providers": [{"name": "p1", "credentials_ref": "deepseek-main", ...}]}` |
 | Per-module 参数 | `llm_settings.json` | `max_tokens_expert_review`, `timeout_global_macro` |
 | 模块启用开关 | `llm_settings.json` | `enabled_llm.global_macro` |
 | Thinking 配置 | `llm_settings.json` | `thinking_enabled_expert_review`, `thinking_budget_expert_review` |
 | 简化模式 | `llm_settings.json` | `output_brief_expert_review` |
-| 敏感密钥覆盖 | `llm_key.json` | 同名覆盖 `llm_settings.json` |
 | 缓存 TTL | `config.json` | `cache_ttl.llm_global_macro` |
+| Provider 文件路径 | `config.json` | `llm_providers_file`, `llm_key_file`, `llm_settings_file` |
 | 模型定价 | `llm_settings.json` → `pricing` | `pricing.currency`, `pricing.claude-sonnet-4-20250514.input` |
 
 ### 12.2 注册表键名派生
@@ -900,7 +913,23 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 
 ### 12.3 LLM 模块配置合并（get_llm_config）
 
-`llm_settings.json` 和 `llm_key.json` 合并读取（`llm_key.json` 的敏感字段覆盖 `llm_settings.json` 的同名字段），按 mtime 自动检查更新。
+`llm_settings.json`、`llm_key.json` 和 `llm_providers.json` 三层合并：
+
+```
+get_llm_config()
+    │
+    ├── ① 读取 llm_settings.json（非敏感参数）
+    ├── ② 读取 llm_key.json（敏感凭据，覆盖同名字段）
+    │      旧格式 {"api_key": "...", "model": "..."} → 自动包裹为 {"_default": {...}}
+    │      新格式 {"deepseek-main": {...}, "gemini-fb": {...}} → 多凭据块
+    ├── ③ 读取 llm_providers.json（若存在）
+    │      _inject_provider_chain_data() 注入：
+    │        _provider_list — 解析并校验后的 Provider 数组
+    │        _strategy — 切换策略
+    │        _preferred_providers — 模块级首选 Provider
+    │        _llm_credentials — 解析后的凭据字典
+    └── ④ 按 mtime 联合检查更新，返回合并配置
+```
 
 [↑ 回到顶部](#目录)
 
@@ -978,5 +1007,186 @@ LLM 集成层与系统其他组件的接口：
 | 4 模块之一生成失败（API 错误） | 对应模块跳过，其他不受影响 | 显示失败原因提示（熔断/超时/网络错误/API 错误） |
 | `news_correlation` 生成失败 | 新闻关联降级到关键词匹配结果 | LLM 增强的关联度/情感分析不可用 |
 | 所有 5 模块均失败/skip | LLM 页签整体跳过 | LLM 模块在 board 层检测到数据全空时自动隐藏 |
+
+[↑ 回到顶部](#目录)
+
+---
+
+## 14. Multi-Provider Chain
+
+### 14.1 设计目标
+
+在单 Provider 不可用时自动递补备选 Provider，避免单点故障导致 LLM 分析完全不可用。支持多种切换策略以适配不同的成本/性能偏好。
+
+### 14.2 整体流程
+
+```
+call_llm(system_prompt, user_prompt, llm_config, ...)
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ strategy.resolve_provider_chain()   │
+│ 输入: _provider_list, _strategy     │
+│ 输出: 排序后的 provider entry 列表   │
+│   priority:    按 priority 升序     │
+│   weighted:    按 weight 加权随机    │
+│   cost_first:  查询定价表按费用升序  │
+│   fallback_only: 同 priority        │
+│                                   │
+│ 后置处理:                          │
+│   _apply_module_preferred()        │
+│   _apply_proxy_preferred()         │
+│   (有代理时 proxy_preferred 条目前置)│
+└──────────────┬──────────────────────┘
+               │
+               ▼
+    ┌── 遍历每个 entry ──┐
+    │                    │
+    ▼                    │
+┌────────────────────┐   │
+│ _resolve_entry_    │   │
+│ credentials(entry, │   │
+│   llm_config)      │   │
+│                    │   │
+│ ← creds_ref →      │   │
+│   _llm_credentials │   │
+│   查表 → api_key/  │   │
+│   model/endpoint   │   │
+│   + entry 级覆盖   │   │
+│ ← 无 ref → 回退    │   │
+│   entry 内联字段   │   │
+└────────┬───────────┘   │
+         │               │
+         ▼               │
+┌────────────────────┐   │
+│ _call_provider_    │   │
+│ entry(entry, ...)  │   │
+│                    │   │
+│ 成功 → 返回        │   │
+│ (result, usage)    │   │
+│                    │   │
+│ 失败 → 记录失败    │   │
+│ 原因, 继续下一    │──┘
+│ entry              │
+│                    │
+│ 空内容 → 安抚重试  │
+│ （追加安抚提示     │
+│   重试一次）       │
+└────────────────────┘
+         │
+         ▼
+┌────────────────────┐
+│ 全链失败?           │
+├────────┬───────────┤
+│ YES    │ NO        │
+│ 返回   │ 返回       │
+│(None,  │ (result,  │
+│ {},    │ usage,    │
+│ None)  │ provider_ │
+│        │ name)     │
+└────────┴───────────┘
+```
+
+### 14.3 4 种策略详解
+
+| 策略 | 引擎函数 | 排序逻辑 | 适用场景 |
+|:-----|:---------|:---------|:---------|
+| `priority`（默认） | `_resolve_priority_chain()` | 按 `priority` 字段升序（数值越小越优先） | 显式指定首选的成本/质量平衡 |
+| `weighted` | `_resolve_weighted_chain()` | 按 `weight` 字段加权随机打乱，权重越高被选到链首的概率越大 | 负载均衡、A/B 测试 |
+| `cost_first` | `_resolve_cost_first_chain()` | 查询 `pricing.py` 定价表，按每千 token 费用升序排列；未知模型排末尾 | 成本敏感场景 |
+| `fallback_only` | 同 `priority` | 等价于 `priority`，语义为"主 Provider + N 个备用" | 明确主备关系的场景 |
+
+**后置处理**：无论何种策略，`resolve_provider_chain()` 返回前会依次执行：
+- `_apply_module_preferred()` — 模块偏好 Provider 移至列表首位
+- `_apply_proxy_preferred()` — 检测到代理环境变量时，`proxy_preferred=true` 的 Provider 条目前置
+
+**coalesce 合并**：无论何种策略，最终返回的列表会移除 `provider` 重复项（保留首个出现的版本），避免同一 provider 类型重复尝试。
+
+### 14.4 credentials_ref 凭据引用
+
+**设计目的**：将敏感凭据（api_key、model、endpoint）与 Provider 路由配置分离，降低凭据泄露风险，支持凭据复用。
+
+#### 文件结构
+
+```
+llm_key.json（敏感凭据，纳入 .gitignore）
+  {"deepseek-main": {"api_key": "sk-...", "model": "...", "endpoint": "..."},
+   "gemini-fb":     {"api_key": "sk-...", "model": "...", "endpoint": "..."}}
+
+llm_providers.json（路由配置）
+  {"providers": [
+     {"name": "deepseek-main", "provider": "claude", "credentials_ref": "deepseek-main", ...},
+     {"name": "gemini-fallback", "provider": "gemini", "credentials_ref": "gemini-fb", ...}
+  ]}
+```
+
+#### 解析优先级
+
+`_resolve_entry_credentials()` 按以下顺序解析每个 entry 的凭据：
+
+1. **`credentials_ref` 查表**：从 `llm_config["_llm_credentials"]` 中查找对应键名的凭据块
+2. **entry 级叠加覆盖**：若 entry 本身也包含 `api_key`/`model`/`endpoint`，则覆盖凭据块中的同名字段
+3. **无 ref 回退**：无 `credentials_ref` 时，直接使用 entry 内联字段（兼容旧格式）
+
+#### 向后兼容
+
+- **单键旧格式**：`llm_key.json` 为 `{"api_key": "...", "model": "..."}` 时，`_load_llm_key_credentials()` 自动包裹为 `{"_default": {...}}`
+- **内联凭据**：`llm_providers.json` 的 entry 可直接含 `api_key`/`model`（无需 `credentials_ref`），与旧文件格式兼容
+
+### 14.5 Provider 感知缓存
+
+#### 问题
+
+不同 Provider 对同一模块的生成内容不同，但旧缓存键 `llm_{module}_{fingerprint}` 无法区分 Provider。切换 Provider 后可能返回旧 Provider 的缓存结果。
+
+#### 方案
+
+缓存键格式：`llm_{module}_{provider_name}_{fingerprint}`
+
+```python
+def _build_provider_cache_key(module_key: str, provider_name: str, fingerprint: str) -> str:
+    return f"llm_{module_key}_{provider_name}_{fingerprint}"
+```
+
+#### 乐观预检
+
+`generate_llm_content()` 在遍历链之前，先以**链首 Provider** 的缓存键做一次缓存检查：
+
+```
+optimistic_key = _build_provider_cache_key(module_key, chain[0]["name"], fingerprint)
+cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
+                                → 未命中 → 走完整链
+```
+
+设计目的：绝大多数情况下链首 Provider 最常使用，提前检查避免不必要的链遍历。链首变更时缓存键自然失效。
+
+#### 缓存写入
+
+API 调用成功后，以**实际返回的 provider_name** 写入缓存（而非链首），确保缓存键与实际 Provider 一致。
+
+### 14.6 失败追踪
+
+`LLM_MODULE_FAILURE` 字典记录每个模块的 Provider 链调用情况：
+
+```python
+LLM_MODULE_FAILURE: dict[str, dict] = {
+    module_key: {
+        "attempted": [
+            "deepseek-main: api_error",        # 格式 "provider_name: failure_reason"
+            "gemini-fallback: SUCCESS",       # 成功条目标注 SUCCESS
+        ],
+        "final_status": "success",            # "success" 或 "failed"
+    }
+}
+```
+
+报告模块通过 `_get_placeholder()` 读取此字典，按失败原因输出差异化占位文本：
+
+| `final_status` | 报告行为 |
+|:---------------|:---------|
+| `"success"` | 正常渲染，不显示失败信息 |
+| `"failed"` | 显示失败原因占位文本（如"LLM API 调用失败：api_error"） |
+
+[↑ 回到顶部](#目录)
 
 [↑ 回到顶部](#目录)

@@ -421,7 +421,7 @@ class TestCallLlmProvider(unittest.TestCase):
 
     def test_unsupported_provider(self) -> None:
         config = {"provider": "unknown", "api_key": "test"}
-        content, usage = call_llm("system", "user", config)
+        content, usage, _ = call_llm("system", "user", config)
         self.assertIsNone(content)
         self.assertIsNone(usage)
 
@@ -429,7 +429,7 @@ class TestCallLlmProvider(unittest.TestCase):
     def test_claude_routing(self, mock_call: MagicMock) -> None:
         mock_call.return_value = ("claude result", {"input_tokens": 10, "output_tokens": 50})
         config = {"provider": "claude", "api_key": "sk-xxx"}
-        content, usage = call_llm("system", "user", config)
+        content, usage, _ = call_llm("system", "user", config)
         self.assertEqual(content, "claude result")
         self.assertEqual(usage, {"input_tokens": 10, "output_tokens": 50})
         mock_call.assert_called_once()
@@ -438,7 +438,7 @@ class TestCallLlmProvider(unittest.TestCase):
     def test_openai_routing(self, mock_call: MagicMock) -> None:
         mock_call.return_value = ("openai result", {"prompt_tokens": 20, "completion_tokens": 80})
         config = {"provider": "openai", "api_key": "sk-xxx"}
-        content, usage = call_llm("system", "user", config)
+        content, usage, _ = call_llm("system", "user", config)
         self.assertEqual(content, "openai result")
         self.assertEqual(usage, {"prompt_tokens": 20, "completion_tokens": 80})
         mock_call.assert_called_once()
@@ -1130,6 +1130,7 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
             '[{"idx": 0, "relevance": "高", "analysis": "直接相关"}, '
             '{"idx": 1, "relevance": "中", "analysis": "间接影响"}]',
             {"input_tokens": 100, "output_tokens": 50},
+            None,
         )
         result, cached, usage = enhance_news_correlation(self.news, self.holdings)
         self.assertFalse(cached)
@@ -1143,7 +1144,7 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
         from src.python.llm import enhance_news_correlation
         mock_cfg.return_value = {"provider": "claude", "api_key": "sk-x"}
         mock_cache_get.return_value = None  # 缓存未命中
-        mock_call.return_value = (None, None)  # 调用失败
+        mock_call.return_value = (None, None, None)  # 调用失败
         result, cached, usage = enhance_news_correlation(self.news, self.holdings)
         self.assertFalse(cached)
         self.assertEqual(usage, {})
@@ -1266,6 +1267,7 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
         mock_call.return_value = (
             '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "好"}]',
             {"input_tokens": 10, "output_tokens": 5},
+            None,
         )
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_news_correlation": False}
         result, cached, usage = enhance_news_correlation(
@@ -1538,6 +1540,7 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
             '{"idx": 1, "relevance": "中", "sentiment": "中性", "analysis": "B"},'
             '{"idx": 2, "relevance": "低", "sentiment": "利空", "analysis": "C"}]',
             {"input_tokens": 200, "output_tokens": 100},
+            None,
         )
         result, cached, usage = enhance_news_correlation(self.news, self.holdings)
         self.assertFalse(cached)
@@ -1567,6 +1570,7 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
         mock_call.return_value = (
             '[{"idx": 0, "relevance": "中", "sentiment": "中性", "analysis": "新鲜"}]',
             {"input_tokens": 50, "output_tokens": 25},
+            None,
         )
         result, cached, usage = enhance_news_correlation(self.news, self.holdings)
         self.assertFalse(cached)  # 部分未缓存 → 整体 cached=False
@@ -1802,7 +1806,7 @@ class TestProviderFallback(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "openai", "fallback_api_key": "sk-fb",
         }
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "main result")
         self.assertEqual(mock_call.call_count, 1)
 
@@ -1819,7 +1823,7 @@ class TestProviderFallback(unittest.TestCase):
             "fallback_endpoint": "https://api.openai.com/v1",
             "fallback_model": "gpt-4o",
         }
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "fb result")
         self.assertEqual(mock_call.call_count, 2)
 
@@ -1831,7 +1835,7 @@ class TestProviderFallback(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "openai", "fallback_api_key": "sk-fb",
         }
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertIsNone(usage)
         self.assertEqual(mock_call.call_count, 2)
@@ -1841,7 +1845,7 @@ class TestProviderFallback(unittest.TestCase):
         """未配置 fallback → 不尝试 fallback。"""
         mock_call.return_value = (None, None)
         config = {"provider": "claude", "api_key": "sk-main"}
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertEqual(mock_call.call_count, 1)
 
@@ -1853,7 +1857,7 @@ class TestProviderFallback(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "claude", "fallback_api_key": "sk-fb",
         }
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertEqual(mock_call.call_count, 1)
 
@@ -1966,7 +1970,7 @@ class TestContentFilterRecovery(unittest.TestCase):
             ("retry result", {"input_tokens": 200}),  # 第二次：安抚后成功
         ]
         config = {"provider": "claude", "api_key": "sk-test"}
-        content, usage = call_llm("system prompt", "user content", config)
+        content, usage, _ = call_llm("system prompt", "user content", config)
         # 应返回安抚重试后的结果
         self.assertEqual(content, "retry result")
         self.assertEqual(mock_call.call_count, 2)
@@ -1989,7 +1993,7 @@ class TestContentFilterRecovery(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "openai", "fallback_api_key": "sk-fb",
         }
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "fb ok")
         self.assertEqual(mock_call.call_count, 3)
 
@@ -1998,7 +2002,7 @@ class TestContentFilterRecovery(unittest.TestCase):
         """安抚重试仍空且无 fallback → (None, None)。"""
         mock_call.return_value = ("", {"input_tokens": 10})
         config = {"provider": "claude", "api_key": "sk-test"}
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
         # 被调用 2 次（原始 + 安抚重试）
         self.assertEqual(mock_call.call_count, 2)
@@ -2008,7 +2012,7 @@ class TestContentFilterRecovery(unittest.TestCase):
         """正常返回内容 → 不触发安抚重试。"""
         mock_call.return_value = ("正常内容", {"input_tokens": 100})
         config = {"provider": "claude", "api_key": "sk-test"}
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "正常内容")
         self.assertEqual(mock_call.call_count, 1)
 
@@ -2023,7 +2027,7 @@ class TestContentFilterRecovery(unittest.TestCase):
             "provider": "claude", "api_key": "sk-main",
             "fallback_provider": "openai", "fallback_api_key": "sk-fb",
         }
-        content, usage = call_llm("sys", "user", config)
+        content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "fb result")
         # 只调用了 2 次（主 + fallback），没有安抚重试
         self.assertEqual(mock_call.call_count, 2)

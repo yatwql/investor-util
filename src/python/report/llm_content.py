@@ -128,6 +128,12 @@ def _get_placeholder(title: str, section_order: list[dict] | None = None) -> str
     mk = _get_module_key_map(section_order).get(title)
     if mk:
         reason = LLM_MODULE_FAILURE.get(mk)
+        if isinstance(reason, dict):
+            # 多链格式：取 final_status
+            final_status = reason.get("final_status", "")
+            if final_status in _PLACEHOLDER_BY_REASON:
+                return _PLACEHOLDER_BY_REASON[final_status]
+            return "本节内容待生成 — LLM 生成失败"
         if reason in _PLACEHOLDER_BY_REASON:
             return _PLACEHOLDER_BY_REASON[reason]
     return "本节内容待生成 — 请配置 LLM API Key（data/config/llm_key.json）"

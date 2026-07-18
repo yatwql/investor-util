@@ -459,6 +459,24 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 获取方式：火山引擎方舟控制台 → 推理接入点 → 创建接入点。
 </details>
 
+<details>
+<summary><b>Gemini（Google）</b></summary>
+
+```json
+{
+  "provider": "gemini",
+  "api_key": "AIzaSyYourGeminiKey",
+  "model": "gemini-2.5-flash",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+}
+```
+
+- API Key 使用 Google AI Studio 生成的 Gemini API Key
+- 可用模型：`gemini-2.5-flash`（推荐，高性价比）、`gemini-2.5-pro`（强推理）
+- 认证方式为 `x-goog-api-key` header，非 Bearer token
+- 适用于多 Provider 链式服务中作为低成本备选
+</details>
+
 ---
 
 ## Token 消耗参考

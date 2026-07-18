@@ -1,7 +1,7 @@
 # 多 LLM Provider 链式服务 — 迭代计划
 
 > 文档版本：v4.2
-> 状态：待实现
+> 状态：已完成（v0.7.0-dev R1-R12 全部实现）
 > 关联设计：[llm-multi-provider-design.md](llm-multi-provider-design.md)
 > 目标版本：v0.7.0
 

@@ -174,7 +174,7 @@ def _handle_truncation(
 
     new_max = int(max_tokens * AUTO_INCREASE_FACTOR)
     logger.warning("输出被截断（max_tokens=%d），自动以 %d 重新生成...", max_tokens, new_max)
-    result2, usage2 = call_llm(
+    result2, usage2, _ = call_llm(
         system_prompt, user_prompt, llm_config,
         timeout=timeout, http_client=http_client,
         max_tokens=new_max, config_field=config_field,
@@ -185,6 +185,42 @@ def _handle_truncation(
             logger.warning("增大 max_tokens=%d 后仍被截断，请手动增大配置", new_max)
         return result2, usage2
     return result, None
+
+
+def _build_provider_cache_key(
+    cache_key: str,
+    llm_config: dict,
+    module_key: str,
+    resolved_first_name: str | None = None,
+) -> str:
+    """在 chain 模式下为 cache_key 附加 provider name 后缀。
+
+    Args:
+        cache_key: 原始缓存 key（格式：llm_{module_key}_{fingerprint}）
+        llm_config: LLM 配置（含 _provider_list 等）
+        module_key: 当前模块键
+        resolved_first_name: 可选，已解析的首位 provider name
+
+    Returns:
+        chain 模式返回 "{cache_key}_{provider_name}"，否则返回原 cache_key
+    """
+    provider_list = llm_config.get("_provider_list")
+    if not provider_list or not module_key:
+        return cache_key
+    if resolved_first_name:
+        name = resolved_first_name
+    elif module_key:
+        strategy = llm_config.get("_strategy", "priority")
+        preferred = llm_config.get("_preferred_providers", {})
+        try:
+            from src.python.llm.strategy import resolve_provider_chain
+            chain = resolve_provider_chain(provider_list, strategy, module_key, preferred)
+            name = chain[0]["name"] if chain else "unknown"
+        except Exception:
+            name = "unknown"
+    else:
+        name = "unknown"
+    return f"{cache_key}_{name}"
 
 
 def generate_llm_content(
@@ -208,30 +244,51 @@ def generate_llm_content(
     if module_key:
         LLM_MODULE_FAILURE.pop(module_key, None)
 
+    # ── 多链：乐观预检 chain 首位 provider ──
+    provider_list = llm_config.get("_provider_list")
+    first_name: str | None = None
+    if provider_list and module_key:
+        strategy = llm_config.get("_strategy", "priority")
+        preferred = llm_config.get("_preferred_providers", {})
+        try:
+            from src.python.llm.strategy import resolve_provider_chain
+            chain = resolve_provider_chain(provider_list, strategy, module_key, preferred)
+            first_name = chain[0]["name"] if chain else None
+        except Exception:
+            pass
+
+    precheck_key = _build_provider_cache_key(cache_key, llm_config, module_key, first_name)
+
     # ── 缓存检查 ──
     if cache_enabled and not force:
-        cached = cache_get(cache_key, cache_ttl)
+        cached = cache_get(precheck_key, cache_ttl)
         if cached:
-            return (_handle_cache_hit(cached, cache_key, module_key, model, llm_config, thinking_enabled), True)
+            return (_handle_cache_hit(cached, precheck_key, module_key, model, llm_config, thinking_enabled), True)
 
     # ── LLM 调用 → 截断重试 → 处理结果 ──
     clear_last_llm_failure()
-    result, usage = call_llm(system_prompt, user_prompt, llm_config,
-                              timeout=timeout, http_client=http_client,
-                              max_tokens=max_tokens, config_field=config_field,
-                              temperature=temperature, model=model)
+    result, usage, provider_name = call_llm(system_prompt, user_prompt, llm_config,
+                                            timeout=timeout, http_client=http_client,
+                                            max_tokens=max_tokens, config_field=config_field,
+                                            temperature=temperature, model=model)
     result, usage = _handle_truncation(result, usage, max_tokens, system_prompt, user_prompt,
                                        llm_config, timeout, http_client, config_field,
                                        temperature, model)
 
     if result:
-        return _finalize_and_cache(result, usage, cache_key, module_key, model, llm_config, thinking_enabled)
+        # 按实际 provider_name 落盘（可能与乐观预检不同——回退场景）
+        write_key = cache_key
+        if provider_list and provider_name:
+            write_key = f"{cache_key}_{provider_name}"
+        return _finalize_and_cache(result, usage, write_key, module_key, model, llm_config, thinking_enabled)
 
     logger.warning("LLM 内容生成失败: %s", cache_key)
     if module_key:
-        # 使用 api.py 记录的详细失败原因（区分熔断/超时/网络/API 错误）
-        failure_reason = _get_last_llm_failure() or FAIL_REASON_API_ERROR
-        LLM_MODULE_FAILURE[module_key] = failure_reason
+        # 多链模式已在 api.py 中设置了结构化 dict，不覆盖
+        existing = LLM_MODULE_FAILURE.get(module_key)
+        if not isinstance(existing, dict):
+            failure_reason = _get_last_llm_failure() or FAIL_REASON_API_ERROR
+            LLM_MODULE_FAILURE[module_key] = failure_reason
     return (None, False)
 
 
@@ -395,7 +452,7 @@ def _execute_and_merge_batch(
     try:
         batch_items = [items[i] for i in batch_indices]
         user_prompt = batch_prompt_fn(batch_items, context_fp)
-        result, usage = call_llm(
+        result, usage, _ = call_llm(
             system_prompt, user_prompt, llm_config,
             timeout=timeout, http_client=batch_client,
             max_tokens=max_tokens,
@@ -406,7 +463,7 @@ def _execute_and_merge_batch(
             new_max = int(max_tokens * AUTO_INCREASE_FACTOR)
             logger.warning("%s 输出被截断，自动以 %d 重新生成 [批 %d/%d]",
                            _MN(module_key), new_max, batch_id + 1, total_batches)
-            result2, usage2 = call_llm(
+            result2, usage2, _ = call_llm(
                 system_prompt, user_prompt, llm_config,
                 timeout=timeout, http_client=batch_client,
                 max_tokens=new_max, config_field=f"max_tokens_{module_key}",

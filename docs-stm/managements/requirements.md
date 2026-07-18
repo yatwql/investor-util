@@ -479,9 +479,12 @@
 |:---------|:---------|
 | R-LLM-01 | LLM 分析是可选增强内容，仅在菜单 L 中触发 |
 | R-LLM-02 | 每个 LLM 模块可通过配置独立启停（enabled_llm.x） |
-| R-LLM-03 | 支持 Claude / OpenAI / DeepSeek 三种 Provider |
-| R-LLM-04 | Provider 不可用时应支持自动回退到备用 Provider |
+| R-LLM-03 | 支持 Claude / OpenAI / DeepSeek 三种 Provider，可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
+| R-LLM-04 | Provider 不可用时自动按策略递补下一备选 Provider，全链失败时降级占位文本 |
 | R-LLM-05 | 所有 LLM 模块的 API 调用量（Token、费用、模块明细）需在报告中统计展示 |
+| R-LLM-06 | Multi-Provider Chain 支持 5 种切换策略：priority（优先级排序）、weighted（加权随机）、cost_first（价格最低优先）、fallback_only（仅主 provider 失败时切换，等价于 priority）、proxy_preferred（proxy 优先于直连） |
+| R-LLM-07 | 敏感凭据（api_key、model、endpoint）必须与 Provider 路由配置分离存储到 llm_key.json，通过 credentials_ref 引用，Provider 路由配置存于 llm_providers.json |
+| R-LLM-08 | 各 Provider 的失败原因（API 错误 / 超时 / 网络异常等）需追踪记录，在报告中按模块展示失败明细 |
 
 ### 7.2 全球政经局势
 
@@ -683,21 +686,23 @@
 | `history.coverage_threshold` | float | 0.8 | — | 有效区间覆盖阈值 |
 | `history.benchmark_indices` | dict | {"sh000300":"沪深300","gb_inx":"标普500"} | — | 基准指数配置，组合历史走势对比 |
 | `cache_ttl` | dict | 默认 TTL | — | 各缓存类型 TTL 覆盖 |
-| `llm_key_file` | str | `data/config/llm_key.json` | — | LLM 密钥文件路径 |
+| `llm_key_file` | str | `data/config/llm_key.json` | — | LLM 密钥文件路径（敏感凭据，纳入 .gitignore） |
+| `llm_providers_file` | str | `data/config/llm_providers.json` | — | LLM Provider 多链配置文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | — | LLM 参数文件路径 |
 
-### 11.2 llm_key.json（敏感参数，建议纳入 .gitignore）
+### 11.2 llm_key.json（敏感凭据文件，建议纳入 .gitignore）
 
-| 字段 | 必填 | 说明 |
-|:-----|:----:|:-----|
-| `provider` | ✅ | 主 Provider：`"claude"` 或 `"openai"` |
-| `api_key` | ✅ | API 密钥 |
-| `model` | ✅ | 默认模型名 |
-| `endpoint` | ✅ | API 端点 URL |
-| `fallback_provider` | — | 回退 Provider |
-| `fallback_api_key` | — | 回退 Provider 的 API 密钥 |
-| `fallback_endpoint` | — | 回退 Provider 的端点 URL |
-| `fallback_model` | — | 回退 Provider 的默认模型 |
+多键凭据字典，支持按 `credentials_ref` 名称引用。
+
+| 键 | 类型 | 必填 | 说明 |
+|:---|:----:|:----:|:-----|
+| `{ref_name}` | dict | ✅ | 凭据块，任意合法键名（如 `deepseek-main`） |
+| `{ref_name}.api_key` | str | ✅ | API 密钥 |
+| `{ref_name}.model` | str | ✅ | 模型名 |
+| `{ref_name}.endpoint` | str | ✅ | API 端点 URL |
+| `{ref_name}.provider` | str | — | Provider 类型（`claude` / `openai` / `gemini`），仅在覆盖 `llm_providers.json` 时使用 |
+
+**简化格式**（无需 `credentials_ref` 的传统使用）：若文件顶层仅含 `{"api_key": "...", "model": "..."}` 等单键凭据字段，自动包裹为 `{"_default": {...}}` 兼容处理。
 
 ### 11.3 llm_settings.json（非敏感参数）
 
@@ -724,6 +729,43 @@
 | `thinking_enabled_{key}` | bool | Extended Thinking 开关 |
 | `thinking_budget_{key}` | int | Claude Thinking 预算 |
 | `reasoning_effort_{key}` | str | DeepSeek 推理深度 |
+
+### 11.4 llm_providers.json（Provider 多链配置）
+
+定义 LLM Provider 的切换策略和备选 Provider 列表，不包含敏感凭据（通过 credentials_ref 引用 llm_key.json）。
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|:-----|:----:|:----:|:------:|:-----|
+| `strategy` | str | — | `"priority"` | 切换策略：priority / weighted / cost_first / fallback_only。每条 Provider 可额外设置 `proxy_preferred: true`，有代理环境时自动前置 |
+| `preferred_providers` | dict | — | `{}` | 模块级首选：`{"news": "provider_name"}`，指定模块强制路由到特定 Provider |
+| `providers` | list[dict] | ✅ | — | Provider 条目数组（按优先级顺序，至少 1 条） |
+
+**Provider 条目字段**：
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|:-----|:----:|:----:|:------:|:-----|
+| `name` | str | ✅ | — | 唯一标识名称，用于引用和日志 |
+| `provider` | str | ✅ | — | Provider 类型：`claude` / `openai` / `gemini` |
+| `credentials_ref` | str | ✅* | — | 引用 `llm_key.json` 中的凭据块名（*与内联 api_key/model 二选一） |
+| `api_key` | str | △ | — | 内联 API 密钥（仅当 credentials_ref 未指定时必填；与 credentials_ref 互斥） |
+| `model` | str | △ | — | 内联模型名（同上） |
+| `endpoint` | str | — | 各 Provider 默认值 | 端点 URL 覆盖 |
+| `priority` | int | — | 99 | 优先级（数值越小优先级越高），priority 策略使用 |
+| `weight` | int | — | 1 | 权重值，weighted 策略使用 |
+| `timeout` | float | — | 60.0 | API 超时秒数 |
+| `proxy_preferred` | bool | — | false | 是否优先使用 proxy（proxy_preferred 策略使用） |
+
+**示例**：
+```json
+{
+  "strategy": "priority",
+  "preferred_providers": {"news": "deepseek-main"},
+  "providers": [
+    {"name": "deepseek-main", "provider": "claude", "credentials_ref": "deepseek-main", "priority": 10, "timeout": 120},
+    {"name": "gemini-fallback", "provider": "gemini", "credentials_ref": "gemini-fb", "priority": 20, "timeout": 60}
+  ]
+}
+```
 
 ---
 

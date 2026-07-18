@@ -62,7 +62,6 @@ from src.python.config._core import (
     is_enable_llm,
     # LLM 配置
     get_llm_config,
-    get_llm_key_path,
     get_llm_settings_path,
     _KNOWN_LLM_SETTINGS_KEYS,
     _llm_config_cache,
@@ -104,7 +103,6 @@ __all__ = [
     "is_enable_history",
     "is_enable_llm",
     # LLM 配置
-    "get_llm_key_path",
     "get_llm_settings_path",
     "_KNOWN_LLM_SETTINGS_KEYS",
     "_llm_config_cache",

@@ -96,10 +96,11 @@ FAIL_REASON_TIMEOUT = "timeout"
 FAIL_REASON_CIRCUIT_OPEN = "circuit_open"
 FAIL_REASON_DISABLED = "disabled"
 
-LLM_MODULE_FAILURE: dict[str, str] = {}
-"""{module_key: reason} 各 LLM 模块最近一次生成的失败原因。
+LLM_MODULE_FAILURE: dict[str, str | dict] = {}
+"""{module_key: reason|dict} 各 LLM 模块最近一次生成的失败原因。
 key 为 "global_macro"/"expert_review"/"health_check"/"penetration_deep"，
-value 为 FAIL_REASON_* 常量。每次新生成开始时清除对应 key。"""
+value 为 FAIL_REASON_* 常量（旧格式），或 {"attempted": [...], "final_status": "success"|reason}（多链格式）。
+每次新生成开始时清除对应 key。"""
 
 
 # ═══════════════════════════════════════════════════════════

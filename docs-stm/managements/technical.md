@@ -207,7 +207,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **报告** | Excel 管线 | openpyxl 写入 | `report/excel_generator.py` |
 | **报告** | HTML 管线 | Jinja2 模板渲染 | `report/html_writer.py` |
 | **报告** | 内容模块 | 各页签写入器（~20 文件） | `report/*.py` |
-| **LLM** | 智能分析 | Claude/OpenAI 调用、骨架、Prompt Caching | `llm/` |
+| **LLM** | 智能分析 | Claude/OpenAI/Gemini 调用、Provider Chain 策略路由、Multi-Provider 多链切换、fingerprint 指纹缓存、Extended Thinking、骨架流程、并行编排、费用估算 | `llm/` |
 | **贯穿** | 代码类型判定 | 资产识别原语 | `code_utils.py` |
 | **贯穿** | 交易时段判断 | A 股时段、午间休市 | `market_hours.py` |
 | **贯穿** | HTTP 客户端 | 统一工厂 | `http_client.py` |
@@ -1720,22 +1720,23 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包为 12 子模块架构：
+`src/python/llm/` 包为 13 子模块架构：
 
 ```
 llm/
 ├── generators_orchestrator.py  入口：4+1 模块并行编排
 ├── skeleton.py                 骨架：缓存检查→API→markdown→HTML（85% 公共逻辑）
-├── api.py                      API 路由 + 重试 + 截断检测 + 熔断器
-├── api_base.py                 底层 HTTP 调用（_attempt_api_call）
-├── generators.py              4 个单例生成函数
+├── api.py                      API 路由 + Provider Chain 遍历
+├── api_base.py                 底层 HTTP 调用 + 重试骨架
+├── strategy.py                  多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only）
+├── generators.py              4 个单例生成函数（global_macro/expert_review/health_check/penetration_deep）
+├── generators_news.py          新闻 LLM 二次关联分析（批量模式）
 ├── prompts.py                  System Prompt + User Prompt 构建
 ├── fingerprint.py              缓存指纹计算
 ├── session.py                  会话用量追踪（线程安全）
 ├── pricing.py                  费用估算
 ├── markdown.py                 Markdown→HTML 转换
-├── circuit_breaker.py          LLM API 熔断器
-└── models.py                   数据模型
+└── circuit_breaker.py          LLM API 熔断器
 ```
 
 **LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名。
@@ -1747,14 +1748,19 @@ generators_orchestrator（并行调度 4+1 模块）
     │
     └── skeleton.generate_llm_module()
             │ ① 缓存检查（指纹+TTL）→ 命中则直接返回
-            │ ② API 调用
+            │ ② 乐观预检链首 Provider 缓存键
+            │ ③ API 调用（走 Provider Chain）
             ├── api.call_llm()
+            │      ├── strategy.resolve_provider_chain() → 策略排序
+            │      ├── api.call_provider_entry() × N（逐链尝试）
+            │      │      └── _resolve_entry_credentials()（credentials_ref 解析）
             │      └── api_base._attempt_api_call()
             │              ├── Claude → anthropic SDK
             │              └── OpenAI/DeepSeek → openai SDK
-            │ ③ Markdown→HTML（markdown.py）
-            │ ④ 写入缓存
-            └── 返回结果
+            │ ④ 内容过滤安抚重试（空返回时追加安抚提示）
+            │ ⑤ Markdown→HTML（markdown.py）
+            │ ⑥ 写入缓存（Provider 感知键名，记录实际 Provider 名）
+            └── 返回 (result, usage, provider_name) 三元组
 ```
 
 **4+1 模块**：
@@ -1771,6 +1777,9 @@ generators_orchestrator（并行调度 4+1 模块）
 
 | 机制 | 实现 | 说明 |
 |:-----|:------|:------|
+| Multi-Provider Chain | `strategy.py` + `api.py` — 按策略排序 Provider，逐链尝试至成功 | 5 种策略（priority/weighted/cost_first/fallback_only/proxy_preferred） |
+| credentials_ref | `_resolve_entry_credentials()` — 从 `llm_key.json` 按引用名加载凭据 | 敏感凭据与路由配置分离，支持多凭据块 |
+| Provider 感知缓存 | 缓存键格式 `llm_{module}_{provider_name}_{fingerprint}` | 不同 Provider 的缓存互不冲突 |
 | Extended Thinking | Claude: `thinking.budget_tokens`；DeepSeek: `output_config.effort` | 与 `temperature` 互斥 |
 | Prompt Caching | Anthropic 专属，system prompt 数组 + `cache_control: ephemeral` | 5 分钟内复用免全价 |
 | 截断重试 | 检测 `TRUNCATION_MARKER` 后自动 1.5× max_tokens 重试一次 | 修复内容被截断的情况 |
@@ -1778,6 +1787,7 @@ generators_orchestrator（并行调度 4+1 模块）
 | 会话用量追踪 | `session.py` 维护线程安全 `session_usage` 字典 | 按模块粒度追踪 token/费用/缓存命中 |
 | LLM 熔断 | `llm/circuit_breaker.py` — 连续 N 次失败 → 60s 冷却 → 半开状态试探 | 防止无效调用浪费 token |
 | 指纹缓存 | `fingerprint.py` — 依赖数据指纹过滤（排除行情波动字段） | 仅品种/份额/成本变化时重新调用 |
+| 失败追踪 | `_LLM_MODULE_FAILURE` 字典 — 记录 attempted Provider 列表 + final_status | 报告中展示各 Provider 失败原因 |
 
 [↑ 回到顶部](#目录)
 
@@ -1792,17 +1802,20 @@ generators_orchestrator（并行调度 4+1 模块）
 ```
 config.json (基础配置)       → get_config() 内存缓存，按 mtime 自动失效
 llm_settings.json (非敏感)    → get_llm_config() 合并读取，联合 mtime 失效
-llm_key.json (敏感密钥)       → 覆盖 llm_settings.json 的同名字段
+llm_key.json (敏感凭据)       → 覆盖 llm_settings.json 的同名字段；多凭据块供 credentials_ref 引用
+llm_providers.json (链配置)   → _load_llm_providers() 读取，$inject_provider_chain_data 注入
 ```
 
 `config/` 子包结构：
 
 ```
 config/
-├── __init__.py        # 公开 API 导出
-├── _core.py           # 核心读写：get_config()、set_config()、is_enable_*()
-├── _defaults.py       # 默认配置值定义
-└── _comments.py       # JSON 注释剥离（_strip_json_comments）
+├── __init__.py                   # 公开 API 导出
+├── _comments.py                  # JSON 注释剥离（_strip_json_comments）
+├── _config_defaults.py           # config.json 默认值定义 + 模板生成
+├── _core.py                      # 核心读写：get_config()、set_config()、init_config()
+├── _llm_defaults.py              # llm_settings.json 默认模板生成
+└── _llm_providers_defaults.py    # llm_providers.json 默认模板生成
 ```
 
 #### JSON 注释支持
@@ -2081,6 +2094,8 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
 | **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `registry.py` 的 `DataModuleDef` 注册表中同时注册 | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失 | llm/ 包 + registry.py |
+| **C17** | **Multi-LLM Provider Chain** — 所有 LLM API 调用必须通过 Provider Chain（`strategy.py` + `api.py`）路由，`call_llm()` 返回 `(result, usage, provider_name)` 三元组，provider_name 记录实际使用的 Provider 条目名 | 手动切换 Provider 导致配置散落、失败无法递补、Provider 名称不可追踪 | API 调用不经过 Chain → 无法自动递补、Provider 名称缺失 → 缓存键冲突、用量统计不准确 | llm/api.py、llm/skeleton.py、llm/strategy.py |
+| **C18** | **credentials_ref 凭据分离** — API 凭据（api_key/model/endpoint）必须通过 `llm_key.json` 的 `credentials_ref` 引用，禁止在 `llm_providers.json` 中直接存储敏感凭据 | 凭据与路由配置混存导致凭据泄露风险；凭据变更时需同时修改两份配置 | 凭据泄露风险、凭据变更需多处修改、凭据复用困难 | data/config/llm_providers.json、data/config/llm_key.json、config/_core.py、llm/api.py |
 
 ### 8.5 基础设施约束
 
@@ -2088,7 +2103,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 |:---|:-----|:---------|:---------|:---------|
 | **C8** | **日志统一** — 所有模块必须使用 `logging.getLogger("invest")` 获取日志器，禁止直接使用 `print()` 输出运行时诊断信息 | 统一日志名称使日志过滤、级别控制、格式管理集中生效；`print()` 无法控制日志级别，污染 stdout | 日志碎片化、日志级别失控、`print()` 干扰输出流 | 全模块（交互式 print 如进度提示不受此限） |
 | **C15** | **控制台日志着色** — WARNING 级别使用黄色输出、ERROR 级别使用红色输出；当 `NO_COLOR` 环境变量设置或输出非 TTY 时自动降级为无颜色 | 着色提升控制台日志的辨识度，便于快速定位告警和错误；降级保证日志导出、管道重定向时无转义字符污染输出 | 日志可读性降低、非 TTY 环境下转义字符污染 | `logger.py`（_ColoredFormatter） |
-| **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `main.py`/`cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
+| **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_providers_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `main.py`/`cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
 
 ### 8.6 测试约束
 
@@ -2114,7 +2129,7 @@ investor-util/
 │   │   ├── __init__.py
 │   │   ├── cache/               # 缓存引擎子包（8 子模块 + operations + services）
 │   │   ├── code_utils.py        # 代码类型判定中心化
-│   │   ├── config/              # 配置管理子包（_defaults / _comments / _core）
+│   │   ├── config/              # 配置管理子包（_config_defaults / _comments / _core）
 │   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
 │   │   ├── fetcher/             # 数据获取调度（price/index/fund/industry/chain/akshare）
 │   │   ├── handlers_cache.py    # TUI 缓存管理命令（薄壳委托 operations）

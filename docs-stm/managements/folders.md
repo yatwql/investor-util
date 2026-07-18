@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.6.7
+> 文档版本：v0.6.8-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 
@@ -31,7 +31,8 @@ investor-util/
 │   │   │   ├── _comments.py          #   配置文件注释读写
 │   │   │   ├── _config_defaults.py   #   config.json 默认值定义
 │   │   │   ├── _core.py              #   配置加载/保存/校验核心逻辑
-│   │   │   └── _llm_defaults.py      #   llm_settings.json 默认值定义
+│   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
+│   │   │   └── _llm_providers_defaults.py # llm_providers.json 默认值定义
 │   │   │
 │   │   ├── fetcher/                  # 数据获取调度
 │   │   │   ├── __init__.py           #   子包标记
@@ -77,7 +78,8 @@ investor-util/
 │   │   │   ├── pricing.py            #   Token 计费与用量统计
 │   │   │   ├── prompts.py            #   提示词模板库
 │   │   │   ├── session.py            #   LLM 会话管理（上下文窗口/历史）
-│   │   │   └── skeleton.py           #   LLM 内容骨架生成（结构化输出引导）
+│   │   │   ├── skeleton.py           #   LLM 内容骨架生成（结构化输出引导）
+│   │   │   └── strategy.py           #   Provider 多链切换策略引擎
 │   │   │
 │   │   ├── schemas/                  # 数据模型定义
 │   │   │   ├── __init__.py           #   子包标记
@@ -200,9 +202,8 @@ investor-util/
 │   │   ├── technical.md              #     技术设计文档
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
-│   ├── plan/                         #   中间设计文件
-│   │   ├── llm-multi-provider-design.md              # 多 LLM Provider 链式服务技术设计
-│   │   └── llm-multi-provider-iteration-plan.md      # 多 LLM Provider 链式服务迭代计划
+│   ├── plan/                         #   中间设计文件（当前迭代中）
+
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
@@ -269,6 +270,11 @@ investor-util/
 │   │   │       └── g-board-visibility-iteration-plan.md # 看板可见性配置迭代计划
 │   │   ├── v0.6.x/                            # v0.6.x 版本迭代归档
 │   │   │   ├── archived_changelog.0.6.x.md        # 变更日志归档 v0.6.x
+│   │   │   ├── archived_plan.0.6.x.md             # 实现计划归档 v0.6.x
+│   │   │   ├── archived_review-findings.0.6.x.md  # 自审记录归档 v0.6.x
+│   │   │   ├── llm-multi-provider/                # 多 LLM Provider 链式服务归档
+│   │   │   │   ├── llm-multi-provider-design.md       # 多 LLM Provider 链式服务技术设计
+│   │   │   │   └── llm-multi-provider-iteration-plan.md # 多 LLM Provider 链式服务迭代计划
 │   │   │   └── cli-mode/                          # CLI 命令行模式归档
 │   │   │       ├── cli-mode-iteration-plan.md     # CLI 迭代计划
 │   │   │       └── cli-mode-technical-design.md   # CLI 技术设计

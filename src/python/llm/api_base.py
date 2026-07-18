@@ -297,6 +297,8 @@ def _log_token_usage(provider: str, usage: dict | None, label: str, model_name: 
         cache_hit = 0
     total = inp + out
     msg = f"  [LLM] {label}: 输入 {inp:,} + 输出 {out:,} = {total:,} tokens"
+    if model_name:
+        msg += f" | 模型: {model_name}"
     if cache_hit:
         msg += f" (缓存命中 {cache_hit:,})"
     if model_name:

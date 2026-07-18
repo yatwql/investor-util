@@ -92,3 +92,41 @@ Excel 和 HTML 报告对 `[利好]` 标记红色、`[利空]` 标记绿色着色
 
 - `_dedup_by_title` 新增子串包含规则：跨源、同源快讯版 vs 全文版去重
 - folders.md 同步：补充遗漏文件 + 归档路径 cleanup
+
+---
+
+### ✅ v0.6.7：文档审计 + 多 Provider 初版 + proxy_preferred
+
+### ✅ P1-T01：多 LLM Provider 链式服务（Phase 0 数据模型完成）
+
+支持同时配置多个 LLM 服务商（Claude / OpenAI / Gemini / DeepSeek），按优先级/权重/成本策略分发请求。
+
+**实现组件**：
+- `llm/strategy.py` — 4 种切换策略引擎（priority/weighted/cost_first/fallback_only）
+- `llm/api.py` — Provider Chain 遍历 + credentials_ref 凭据解析
+- `config/_llm_providers_defaults.py` — llm_providers.json 缺省模板生成
+- C17（Multi-LLM Provider Chain）、C18（credentials_ref 凭据分离）纳入架构约束
+
+**设计文档**：`docs-stm/archive/v0.6.x/llm-multi-provider/`（已归档）
+
+**遗留项**：R2 起后续轮次（Phase 1~4 — 策略引擎、高级特性、集成交付）推至 v0.7.0。
+
+---
+
+### ✅ 管理文档审计（2026-07-18）
+
+- `folders.md`：补充缺失 `_llm_providers_defaults.py`，修正 llm/ 子模块列表
+- `technical.md` §1.3/§5.1/§6.1：模块描述与实际代码对齐
+- `llm-technical.md` §2.1/§5.1/§14.2/§14.3：proxy_preferred 从"5 种策略"修正为"后处理步骤"
+- `requirements.md` §11.4：strategy 字段移除 proxy_preferred，改为 per-provider 标记
+- `plan.md`：P1-T01 状态从"规划中"改为"已完成"
+
+### ✅ 用户文档审计（2026-07-18）
+
+- `how-to-config.md` / `faq.md`：report_section_order 默认 18→17 项，页签编号修正
+- `how-to-use-registry.md`：`_defaults.py`→`_config_defaults.py`
+- `how-to-config-llm.md`：新增 Gemini provider 配置示例
+- `faq.md`：补充多 Provider 链式服务问答，替换过时"不支持多 Key"内容
+- `review-findings.md`：移除已清零的约束汇总表
+- `plan.md`：移除已完成的 P1-T01 条目
+- 设计文件归档至 `docs-stm/archive/v0.6.x/llm-multi-provider/`

@@ -89,7 +89,7 @@ from src.python.registry import (
 ```
 
 **用途：**
-- `get_cache_ttl_defaults()` — `config/_defaults.py` 用于默认配置模板生成
+- `get_cache_ttl_defaults()` — `config/_config_defaults.py` 用于默认配置模板生成
 - `get_prefix_type_map()` — `cache/_cleanup.py` 的 `cleanup_expired()` 按文件名前缀推断类型
 - `get_exact_type_map()` — `cache/_cleanup.py` 清理精确键名缓存文件
 - `get_registered_data_types()` — 校验/测试用

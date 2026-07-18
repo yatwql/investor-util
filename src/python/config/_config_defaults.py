@@ -23,7 +23,7 @@ def get_config_path() -> str:
     return _CONFIG_PATH_OVERRIDE or _CONFIG_FILE
 
 # 默认配置（按业务分组排列顺序，与模板 _get_default_config_template() 一致）
-_PATH_KEYS = frozenset({"holdings_dir", "output_dir", "llm_settings_file"})
+_PATH_KEYS = frozenset({"holdings_dir", "output_dir", "llm_settings_file", "llm_key_file", "llm_providers_file"})
 
 _DEFAULT_CONFIG = {
     # ── A. 路径与文件 ──
@@ -32,6 +32,8 @@ _DEFAULT_CONFIG = {
     "holdings_filename": "个人投资持仓信息.xlsx",
     "output_dir": os.path.join(PROJECT_ROOT, "reports"),
     "llm_settings_file": os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
+    "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
+    "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
     # ── B. 板块可见性（关闭后对应页签/章节完全隐藏） ──
     "enable_b_series": True,    # B 系列基金深度分析（#6~9）
     "enable_news": True,        # 新闻（#10）
@@ -92,6 +94,8 @@ def _get_default_config_template() -> str:
         '  "holdings_filename": "个人投资持仓信息.xlsx",\n'
         '  "output_dir": "reports",\n'
         '  "llm_settings_file": "data/config/llm_settings.json",\n'
+        '  "llm_key_file": "data/config/llm_key.json",\n'
+        '  "llm_providers_file": "data/config/llm_providers.json",\n'
         '\n'
         '  // ── B. 板块可见性（关闭后对应页签/章节完全隐藏）──\n'
         '  "enable_b_series": true,\n'

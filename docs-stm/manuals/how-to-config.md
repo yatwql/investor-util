@@ -10,6 +10,7 @@
   "output_dir": "reports",
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
+  "llm_providers_file": "data/config/llm_providers.json",
 
   // ── B. 数据源与提供商 ──
   "news_top_count": 300,
@@ -75,6 +76,7 @@
 | `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `O` |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
+| `llm_providers_file` | `data/config/llm_providers.json` | LLM 多 Provider 链式服务配置文件路径，参见 [LLM 配置指引](how-to-config-llm.md) | 手动编辑 |
 | `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量 = max(500, news_top_count × 2)，华尔街见闻硬上限 100 条除外） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
@@ -317,7 +319,7 @@
 
 > 效果：基金经理/重合度/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
-> 空对象 `{}` 或缺失此字段时使用上述 18 项默认顺序。
+> 空对象 `{}` 或缺失此字段时使用上述 17 项默认顺序。
 
 **实用示例** — 将组合历史走势提到前面，关注回撤风险：
 
