@@ -4,7 +4,13 @@
 
 ---
 
-## [0.7.2-dev] - 未发布
+## [0.7.2] - 2026-07-19
+
+### Added
+- **新闻去重阈值锚点采集 + 校准脚本**：`news_aggregator.py` 自动记录去重边界案例到 `data/cache/dedup_anchors.jsonl`（append-only，零运行时感知）；新增 `scripts/calibrate-dedup-threshold.py` 分析工具，积累 100 条后即可评估阈值是否合理
+
+### Changed
+- **CI 门禁精简**：移除 mypy 类型检查（从未全绿，形同虚设）；移除 ruff check 代码风格 lint（与 ruff format 重叠）。CI 仅保留三档测试门禁（P0/P1/P2）+ ruff format --check。CLAUDE.md 同步更新 CI 辅助检查说明
 
 ### Fixed
 - **新闻标题去重算法重构**：基于 37 条真实新闻 47 对标注校准，替换单一 0.92 阈值为三层策略——同源（共享中文实体 bigram ≥ 4）、跨源（SequenceMatcher ≥ 0.50 直接合并 / 0.30~0.50 需共享 bigram ≥ 3）、子串包含兜底（6 字以上短标题包含于另一条）。消除同源/跨源同一事件多次出现问题，同时避免不同事件误合并（如"建行审查"vs"建行罚款"、"苹果反垄断"vs"苹果市值登顶"）

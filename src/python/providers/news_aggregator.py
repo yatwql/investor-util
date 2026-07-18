@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -19,6 +20,18 @@ from src.python.providers.news_sources import (
 )
 
 logger = logging.getLogger("invest")
+
+# ── 锚点采集（阈值校准用） ──────────────────────────────────────
+# 每次 _dedup_by_title 运行后，边界案例收集到此列表，
+# aggregate_news() 结束时追写至 data/cache/dedup_anchors.jsonl。
+# 一条记录为一个 JSON 行，append-only。格式：
+#   {"ts","title_a","title_b","source_a","source_b",
+#    "ratio","bigram_overlap","decision","rule"}
+_ANCHOR_RECORDS: list[dict[str, Any]] = []
+_ANCHOR_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "cache", "dedup_anchors.jsonl",
+)
 
 
 def get_enabled_sources() -> list[str]:
@@ -158,6 +171,48 @@ def _normalize_title(title: str) -> str:
     return title.strip().lower()
 
 
+def _make_anchor(
+    item_a: dict[str, Any],
+    item_b: dict[str, Any],
+    ratio: float,
+    bigram_overlap: int,
+    merged: bool,
+    rule: str,
+) -> dict[str, Any]:
+    """构建一条锚点记录（边界案例），用于后续阈值校准。"""
+    return {
+        "ts": item_a.get("ctime", "") or item_b.get("ctime", ""),
+        "title_a": item_a.get("title", ""),
+        "title_b": item_b.get("title", ""),
+        "source_a": item_a.get("_source", ""),
+        "source_b": item_b.get("_source", ""),
+        "ratio": round(ratio, 3),
+        "bigram_overlap": bigram_overlap,
+        "merged": merged,
+        "rule": rule,
+    }
+
+
+def _flush_anchors() -> None:
+    """将内存中的锚点记录追写到 JSONL 文件，然后清空列表。
+
+    一次运行产生数十条记录（~200 字节/条），文件写入发生在去重完成后，
+    不影响新闻获取和报告生成的主流程。
+    """
+    global _ANCHOR_RECORDS
+    if not _ANCHOR_RECORDS:
+        return
+    records = _ANCHOR_RECORDS
+    _ANCHOR_RECORDS = []  # 先清空再写，防止递归写入
+    try:
+        os.makedirs(os.path.dirname(_ANCHOR_PATH), exist_ok=True)
+        with open(_ANCHOR_PATH, "a", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    except OSError:
+        pass  # best effort，不影响主流程
+
+
 def _dedup_by_title(
     items: list[dict[str, Any]],
     cross_threshold: float = 0.30,
@@ -214,36 +269,43 @@ def _dedup_by_title(
         source = item.get("_source", "") or ""
         for idx, existing in enumerate(kept_norms):
             existing_src = kept_sources[idx]
+            existing_item = kept[idx]
             same_source = bool(source) and bool(existing_src) and source == existing_src
 
             # ① 同源：共享实体 bigram ≥ 4 即合并
-            #    4 可过滤"建设银行"类不同事件仅共享 3 个公司名 bigram，
-            #    同一事件额外共享事件实体 bigram，总 ≥ 4。
-            #    同源不会同时发出方向对立报道，不需要 SequenceMatcher 兜底。
             if same_source:
                 bg1 = _extract_entity_bigrams(norm)
                 bg2 = _extract_entity_bigrams(existing)
-                if len(bg1 & bg2) >= 4:
+                overlap = len(bg1 & bg2)
+                if overlap >= 4:
                     is_dup = True
                     break
+                # 锚点：同源 bigram 接近阈值
+                if 2 <= overlap <= 5:
+                    _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, 0.0, overlap, False, "same_src"))
 
             # ② 跨源安全区：ratio ≥ 0.50 直接合并
             ratio = SequenceMatcher(None, norm, existing).ratio()
             if ratio >= 0.50:
                 is_dup = True
+                # 锚点：跨源安全区擦边
+                if ratio < 0.60:
+                    _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, 0, True, "cross_safe"))
                 break
 
             # ③ 跨源候选区：0.30 ≤ ratio < 0.50，需共享 ≥ 3 实体 bigram
-            #    3 可过滤"苹果"+"果上"=2 的假阳性，
-            #    反垄断/汇丰/微软AI 等真实重复共享 ≥ 4。
             if not same_source and ratio >= cross_threshold:
                 bg1 = _extract_entity_bigrams(norm)
                 bg2 = _extract_entity_bigrams(existing)
-                if len(bg1 & bg2) >= 3:
+                overlap = len(bg1 & bg2)
+                if overlap >= 3:
                     is_dup = True
+                    _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
                     break
+                # 锚点：跨源候选区但 bigram 不足
+                _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, overlap, False, "cross_skip"))
 
-            # ④ 子串包含（短标题 6 字以上完全包含于另一条）
+            # ④ 子串包含
             if not is_dup:
                 short, long = (norm, existing) if len(norm) <= len(existing) else (existing, norm)
                 if len(short) >= 6 and short in long:
@@ -341,4 +403,5 @@ def aggregate_news(
 
     result = _finalize_news_results(all_raw, keywords, top_n, lightweight_keywords=lightweight_keywords)
     _save_news_cache(cache_key, result)
+    _flush_anchors()
     return result
