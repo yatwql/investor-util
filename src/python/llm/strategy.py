@@ -16,7 +16,6 @@ from __future__ import annotations
 import logging
 import os
 import random
-from typing import Any
 
 logger = logging.getLogger("invest")
 
@@ -96,8 +95,7 @@ def _apply_module_preferred(
 
 def _detect_proxy() -> bool:
     """检测系统代理环境变量，任一非空即返回 True。"""
-    return any(os.environ.get(v, "") for v in
-               ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY"])
+    return any(os.environ.get(v, "") for v in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY"])
 
 
 def _apply_proxy_preferred(chain: list[dict]) -> list[dict]:
@@ -161,6 +159,7 @@ def _apply_cost_first(provider_list: list[dict]) -> list[dict]:
     """
     try:
         from src.python.llm.pricing import PRICING_MERGED, reload_pricing
+
         if not PRICING_MERGED:
             reload_pricing()
     except ImportError:
@@ -170,6 +169,7 @@ def _apply_cost_first(provider_list: list[dict]) -> list[dict]:
         model = p.get("model", "")
         try:
             from src.python.llm.pricing import PRICING_MERGED
+
             pricing = PRICING_MERGED.get(model)
             if pricing:
                 return pricing.get("input_price", 0) + pricing.get("output_price", 0)

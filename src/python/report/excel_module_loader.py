@@ -20,10 +20,13 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
     try:
         from src.python.fetcher.index import fetch_indices, fetch_us_indices
     except ImportError:
+
         def fetch_indices() -> dict[str, dict[str, Any]]:
             return {}
+
         def fetch_us_indices() -> dict[str, dict[str, Any]]:
             return {}
+
         prog.add_error("市场指数模块缺失 (fetcher)")
 
     try:
@@ -41,6 +44,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
 
     try:
         from src.python.report.summary import write_summary_sheet
+
         modules["write_summary_sheet"] = write_summary_sheet
     except ImportError:
         modules["write_summary_sheet"] = None
@@ -48,6 +52,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
 
     try:
         from src.python.report.category import write_category_sheet
+
         modules["write_category_sheet"] = write_category_sheet
     except ImportError:
         modules["write_category_sheet"] = None
@@ -55,11 +60,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
 
     try:
         from src.python.report.market_value import (
+            _generate_details,
             classify_holdings,
             get_last_trading_day,
             price_update_status,
-            _generate_details,
         )
+
         modules.update(
             classify_holdings=classify_holdings,
             get_last_trading_day=get_last_trading_day,
@@ -77,6 +83,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
 
     try:
         from src.python.report.market_value_sheet import write_market_value_sheet
+
         modules["write_market_value_sheet"] = write_market_value_sheet
     except ImportError:
         modules["write_market_value_sheet"] = None
@@ -85,6 +92,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
     try:
         from src.python.report.penetration import compute_penetration_top10
         from src.python.report.penetration_sheet import write_penetration_sheet
+
         modules["write_penetration_sheet"] = write_penetration_sheet
         modules["compute_penetration_top10"] = compute_penetration_top10
     except ImportError:
@@ -94,6 +102,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
 
     try:
         from src.python.report.fund_performance import write_fund_performance_sheet
+
         modules["write_fund_performance_sheet"] = write_fund_performance_sheet
     except ImportError:
         modules["write_fund_performance_sheet"] = None
@@ -102,6 +111,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
     try:
         from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
         from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+
         modules["detect_manager_changes"] = detect_manager_changes
         modules["write_fund_manager_sheet"] = write_fund_manager_sheet
         modules["build_first_check_summary"] = build_first_check_summary
@@ -113,6 +123,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
     try:
         from src.python.report.fund_overlap import compute_overlap_matrix
         from src.python.report.fund_overlap_sheet import write_overlap_matrix_sheet
+
         modules["compute_overlap_matrix"] = compute_overlap_matrix
         modules["write_overlap_matrix_sheet"] = write_overlap_matrix_sheet
     except ImportError:
@@ -123,6 +134,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
     try:
         from src.python.report.fund_concentration import compute_concentration
         from src.python.report.fund_concentration_sheet import write_concentration_sheet
+
         modules["compute_concentration"] = compute_concentration
         modules["write_concentration_sheet"] = write_concentration_sheet
     except ImportError:
@@ -133,6 +145,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
     try:
         from src.python.report.fund_style_analysis import analyze_style_for_all_funds
         from src.python.report.fund_style_sheet import write_style_sheet
+
         modules["analyze_style_for_all_funds"] = analyze_style_for_all_funds
         modules["write_style_sheet"] = write_style_sheet
     except ImportError:

@@ -1,4 +1,5 @@
 """默认配置与模板 — _DEFAULT_CONFIG、模板生成、路径常量。"""
+
 from __future__ import annotations
 
 import json
@@ -22,6 +23,7 @@ def get_config_path() -> str:
     """返回配置文件路径（优先返回覆写路径）。"""
     return _CONFIG_PATH_OVERRIDE or _CONFIG_FILE
 
+
 # 默认配置（按业务分组排列顺序，与模板 _get_default_config_template() 一致）
 _PATH_KEYS = frozenset({"holdings_dir", "output_dir", "llm_settings_file", "llm_key_file", "llm_providers_file"})
 
@@ -35,9 +37,9 @@ _DEFAULT_CONFIG = {
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
     # ── B. 板块可见性（关闭后对应页签/章节完全隐藏） ──
-    "enable_b_series": True,    # B 系列基金深度分析（#6~9）
-    "enable_news": True,        # 新闻（#10）
-    "enable_history": True,     # 历史走势+回撤分析（#15~#16）
+    "enable_b_series": True,  # B 系列基金深度分析（#6~9）
+    "enable_news": True,  # 新闻（#10）
+    "enable_history": True,  # 历史走势+回撤分析（#15~#16）
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -88,21 +90,21 @@ def _get_default_config_template() -> str:
     lines = ttl_json.split("\n")
     indented_ttl = "\n".join([lines[0]] + ["  " + line for line in lines[1:]])
     return (
-        '{\n'
-        '  // ── A. 路径与文件 ──\n'
+        "{\n"
+        "  // ── A. 路径与文件 ──\n"
         '  "holdings_dir": "data/holdings",\n'
         '  "holdings_filename": "个人投资持仓信息.xlsx",\n'
         '  "output_dir": "reports",\n'
         '  "llm_settings_file": "data/config/llm_settings.json",\n'
         '  "llm_key_file": "data/config/llm_key.json",\n'
         '  "llm_providers_file": "data/config/llm_providers.json",\n'
-        '\n'
-        '  // ── B. 板块可见性（关闭后对应页签/章节完全隐藏）──\n'
+        "\n"
+        "  // ── B. 板块可见性（关闭后对应页签/章节完全隐藏）──\n"
         '  "enable_b_series": true,\n'
         '  "enable_news": true,\n'
         '  "enable_history": true,\n'
-        '\n'
-        '  // ── C. 数据源与提供商 ──\n'
+        "\n"
+        "  // ── C. 数据源与提供商 ──\n"
         '  "news_top_count": 300,\n'
         '  "news_sources": {\n'
         '    "sina": true,\n'
@@ -110,38 +112,38 @@ def _get_default_config_template() -> str:
         '    "cls": false,\n'
         '    "wallstreetcn": true,\n'
         '    "akshare": true\n'
-        '  },\n'
+        "  },\n"
         '  "preferred_provider": {},\n'
-        '\n'
-        '  // ── D. 市场时段与缓存 ──\n'
+        "\n"
+        "  // ── D. 市场时段与缓存 ──\n"
         '  "market_hour_aware": ["price", "index"],\n'
         '  "market_hour_ttl": 30,\n'
         '  "market_hours": {\n'
         '    "start": "09:30",\n'
         '    "end": "15:00",\n'
         '    "official_source": true\n'
-        '  },\n'
+        "  },\n"
         f'  "cache_ttl": {indented_ttl},\n'
-        '\n'
-        '  // ── E. 行为调优 ──\n'
+        "\n"
+        "  // ── E. 行为调优 ──\n"
         '  "default_menu_key": "L",\n'
         '  "report_section_order": {},\n'
         '  "degradation": {\n'
         '    "t2": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 3},\n'
         '    "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},\n'
         '    "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}\n'
-        '  },\n'
-        '\n'
-        '  // ── F. 业绩基准 ──\n'
+        "  },\n"
+        "\n"
+        "  // ── F. 业绩基准 ──\n"
         '  "user_fund_benchmarks": {},\n'
-        '\n'
-        '  // ── G. 组合历史走势与持仓快照 ──\n'
+        "\n"
+        "  // ── G. 组合历史走势与持仓快照 ──\n"
         '  "history": {\n'
         '    "analysis": "off",\n'
         '    "snapshot_retention_days": 60,\n'
         '    "snapshot_max_count": 365,\n'
         '    "coverage_threshold": 0.8,\n'
         '    "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}\n'
-        '  }\n'
-        '}\n'
+        "  }\n"
+        "}\n"
     )

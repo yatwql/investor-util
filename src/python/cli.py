@@ -3,6 +3,7 @@
 
 支持 report 和 cache 子命令，共享 P1 已提取的业务编排层。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,7 +17,6 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from src.python.constants import APP_VERSION
-
 
 # ── 退出码 ───────────────────────────────────────────────
 
@@ -37,42 +37,39 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     # 全局参数
-    parser.add_argument("--config", metavar="PATH",
-                        help="备用配置文件路径（默认: data/config/config.json）")
-    parser.add_argument("--output", metavar="DIR",
-                        help="报告输出目录（覆盖 config.json 的 output_dir）")
-    parser.add_argument("--verbose", action="store_true",
-                        help="将进度消息同步到 stderr（默认仅写入 logs/app.log）")
-    parser.add_argument("--version", action="version",
-                        version=f"%(prog)s v{APP_VERSION}")
+    parser.add_argument("--config", metavar="PATH", help="备用配置文件路径（默认: data/config/config.json）")
+    parser.add_argument("--output", metavar="DIR", help="报告输出目录（覆盖 config.json 的 output_dir）")
+    parser.add_argument("--verbose", action="store_true", help="将进度消息同步到 stderr（默认仅写入 logs/app.log）")
+    parser.add_argument("--version", action="version", version=f"%(prog)s v{APP_VERSION}")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
     # ── report 子命令 ──
     report_p = sub.add_parser("report", help="生成投资分析报告")
     report_p.add_argument(
-        "--type", choices=["basic", "both", "full"], default="basic",
+        "--type",
+        choices=["basic", "both", "full"],
+        default="basic",
         help="报告类型: basic=仅Excel(≈1min, 默认), both=HTML+Excel(不含LLM,≈2min), "
-             "full=全量含LLM(≈5min, 定时任务按需开启)",
+        "full=全量含LLM(≈5min, 定时任务按需开启)",
     )
     report_p.add_argument(
-        "--history", choices=["auto", "off"], default="off",
+        "--history",
+        choices=["auto", "off"],
+        default="off",
         help="获取组合历史走势数据: auto=获取, off=跳过（默认; 仅 --type both/full 时有效）",
     )
-    report_p.add_argument("--force-llm", action="store_true",
-                          help="强制重新生成 LLM 内容（跳过缓存）")
-    report_p.add_argument("--warm", action="store_true",
-                          help="预热新资产缓存（冷启动时使用）")
+    report_p.add_argument("--force-llm", action="store_true", help="强制重新生成 LLM 内容（跳过缓存）")
+    report_p.add_argument("--warm", action="store_true", help="预热新资产缓存（冷启动时使用）")
 
     # ── cache 子命令 ──
     cache_p = sub.add_parser("cache", help="缓存管理")
     cache_action = cache_p.add_mutually_exclusive_group(required=True)
-    cache_action.add_argument("--update", choices=["basic", "position", "all"],
-                              help="更新缓存: basic=基础类, position=持仓类, all=全部")
-    cache_action.add_argument("--clean", action="store_true",
-                              help="清理过期缓存文件")
-    cache_action.add_argument("--stats", action="store_true",
-                              help="查看缓存文件统计/状态")
+    cache_action.add_argument(
+        "--update", choices=["basic", "position", "all"], help="更新缓存: basic=基础类, position=持仓类, all=全部"
+    )
+    cache_action.add_argument("--clean", action="store_true", help="清理过期缓存文件")
+    cache_action.add_argument("--stats", action="store_true", help="查看缓存文件统计/状态")
     cache_p.epilog = (
         "示例:\n"
         "  cache --update all             更新全部缓存\n"
@@ -90,6 +87,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _show_llm_config_status_cli() -> None:
     """CLI 模式显示 LLM 配置状态（含多链详细信息）。"""
     import logging
+
     logger = logging.getLogger("invest")
 
     from src.python.config import get_llm_config
@@ -110,8 +108,10 @@ def _show_llm_config_status_cli() -> None:
     if provider_list and not llm_config.get("api_key"):
         strategy_raw = llm_config.get("_strategy", "priority")
         strategy_labels = {
-            "priority": "优先级排序", "weighted": "加权随机",
-            "cost_first": "价格最低优先", "fallback_only": "仅 Fallback",
+            "priority": "优先级排序",
+            "weighted": "加权随机",
+            "cost_first": "价格最低优先",
+            "fallback_only": "仅 Fallback",
         }
         strategy_label = strategy_labels.get(strategy_raw, strategy_raw)
         logger.info("状态: 已配置 | 策略: %s | 多链服务: %d provider", strategy_label, len(provider_list))
@@ -153,9 +153,13 @@ def _show_llm_config_status_cli() -> None:
         provider = llm_config["provider"]
         model = llm_config.get("model") or "默认"
         endpoint = llm_config.get("endpoint") or "默认"
-        ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
+        ep_display = (
+            endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
+        )
         cb_status = get_circuit_status(endpoint) if endpoint and endpoint != "默认" else "—"
-        logger.info("状态: 已配置 | provider=%s | model=%s | endpoint=%s | 熔断: %s", provider, model, ep_display, cb_status)
+        logger.info(
+            "状态: 已配置 | provider=%s | model=%s | endpoint=%s | 熔断: %s", provider, model, ep_display, cb_status
+        )
     else:
         logger.info("状态: 未配置（配置 data/config/llm_key.json 或 llm_providers.json）")
 
@@ -172,6 +176,7 @@ def _cli_read_holdings(config: dict) -> list | None:
         持仓列表，文件不存在或格式异常时返回 None
     """
     import logging
+
     logger = logging.getLogger("invest")
 
     holdings_dir = config.get("holdings_dir", "data/holdings")
@@ -180,8 +185,8 @@ def _cli_read_holdings(config: dict) -> list | None:
 
     if not os.path.exists(filepath):
         logger.error(
-            "持仓文件不存在（路径: %s）—— 请检查 config.json 中 "
-            "holdings_dir + holdings_filename 配置", filepath,
+            "持仓文件不存在（路径: %s）—— 请检查 config.json 中 holdings_dir + holdings_filename 配置",
+            filepath,
         )
         return None
 
@@ -194,15 +199,14 @@ def _cli_read_holdings(config: dict) -> list | None:
             logger.error("持仓目录 %s 中找不到 .xlsx 文件", filepath)
             return None
         if len(xlsx_files) > 1:
-            logger.warning("持仓目录 %s 中有多个 .xlsx 文件，自动选择第一个: %s",
-                           filepath, xlsx_files[0])
+            logger.warning("持仓目录 %s 中有多个 .xlsx 文件，自动选择第一个: %s", filepath, xlsx_files[0])
         filepath = xlsx_files[0]
 
     holdings = read_holdings(filepath)
     if not holdings:
         logger.error(
-            "持仓文件为空或格式异常: %s —— "
-            "请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列", filepath,
+            "持仓文件为空或格式异常: %s —— 请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列",
+            filepath,
         )
         return None
 
@@ -247,8 +251,6 @@ def _handle_cache(args: argparse.Namespace, config: dict) -> int:
     from src.python.cache.operations import (
         cleanup_cache,
         get_cache_stats,
-        update_basic_cache,
-        update_position_cache,
     )
     from src.python.report.cli_progress import CliProgressReporter
 
@@ -311,14 +313,16 @@ def main() -> int:
     Returns:
         int 退出码（0=成功, 1=部分失败, 2=严重错误）
     """
-    from src.python.logger import setup_logger, log_app_boundary
+    from src.python.logger import log_app_boundary, setup_logger
+
     setup_logger()
     log_app_boundary("启动", "CLI模式")
 
     parser = _build_parser()
     args = parser.parse_args()
 
-    from src.python.config import init_config, get_config
+    from src.python.config import get_config, init_config
+
     init_config(config_path=args.config)
     config = get_config()
 
@@ -331,6 +335,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     from src.python.logger import log_app_boundary
+
     try:
         sys.exit(main())
     except SystemExit:
@@ -339,11 +344,13 @@ if __name__ == "__main__":
         raise
     except KeyboardInterrupt:
         import logging
+
         logging.getLogger("invest").info("CLI 操作被用户中断")
         log_app_boundary("关闭", "CLI模式")
         sys.exit(130)
     except Exception:
         import logging
+
         logging.getLogger("invest").exception("CLI 未处理异常")
         log_app_boundary("关闭", "CLI模式")
         sys.exit(2)

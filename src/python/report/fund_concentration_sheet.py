@@ -35,9 +35,16 @@ logger = logging.getLogger("invest")
 
 _NCOLS = 10
 _HEADERS = [
-    "基金名称", "基金代码", "基金类型",
-    "前3占比%", "前5占比%", "前10占比%",
-    "上期前10占比%", "环比变化", "预警级别", "标识",
+    "基金名称",
+    "基金代码",
+    "基金类型",
+    "前3占比%",
+    "前5占比%",
+    "前10占比%",
+    "上期前10占比%",
+    "环比变化",
+    "预警级别",
+    "标识",
 ]
 
 # ── 预警字体 ────────────────────────────────────────────────
@@ -83,7 +90,7 @@ def write_concentration_sheet(
         ws: openpyxl Worksheet 对象
         concentration_data: compute_concentration() 的返回结果
     """
-    _name = get_report_sheet_name('fund_concentration')
+    _name = get_report_sheet_name("fund_concentration")
     write_title_row(ws, 1, f"{get_report_section_number('fund_concentration')}. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 

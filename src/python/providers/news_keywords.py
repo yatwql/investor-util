@@ -17,8 +17,18 @@ logger = logging.getLogger("invest")
 
 # 常见需要过滤的基金/ETF 后缀
 _KEYWORD_FILTER_SUFFIXES = [
-    "ETF", "联接", "A", "C", "(QDII)", "基金", "混合",
-    "指数", "开放", "式", "发起", "LOF",
+    "ETF",
+    "联接",
+    "A",
+    "C",
+    "(QDII)",
+    "基金",
+    "混合",
+    "指数",
+    "开放",
+    "式",
+    "发起",
+    "LOF",
 ]
 
 

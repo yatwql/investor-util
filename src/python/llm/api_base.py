@@ -32,16 +32,34 @@ logger = logging.getLogger("invest")
 
 __all__ = [
     "_last_llm_failure_reason",
-    "clear_last_llm_failure", "_get_last_llm_failure",
-    "LLM_TIMEOUT", "_RETRY_DELAYS", "TRUNCATION_MARKER", "AUTO_INCREASE_FACTOR",
-    "CACHE_LINE_HTML", "_cache_line_model_tpl",
-    "_MODEL_LINE_RE", "_THINKING_SUPPORTED_PREFIXES", "_THINKING_EFFORT_MODEL_PREFIXES",
-    "_supports_extended_thinking", "_is_effort_model", "_truncation_warning",
-    "_check_claude_truncation", "_check_openai_truncation", "_check_gemini_truncation",
-    "_extract_content", "_extract_content_from_gemini",
-    "_extract_model_from_cached", "_log_token_usage", "_get_retry_max", "_sanitize_endpoint",
-    "_check_circuit_breaker", "_process_success_response", "_attempt_api_call",
-    "_is_retry_available", "call_llm_with_retry",
+    "clear_last_llm_failure",
+    "_get_last_llm_failure",
+    "LLM_TIMEOUT",
+    "_RETRY_DELAYS",
+    "TRUNCATION_MARKER",
+    "AUTO_INCREASE_FACTOR",
+    "CACHE_LINE_HTML",
+    "_cache_line_model_tpl",
+    "_MODEL_LINE_RE",
+    "_THINKING_SUPPORTED_PREFIXES",
+    "_THINKING_EFFORT_MODEL_PREFIXES",
+    "_supports_extended_thinking",
+    "_is_effort_model",
+    "_truncation_warning",
+    "_check_claude_truncation",
+    "_check_openai_truncation",
+    "_check_gemini_truncation",
+    "_extract_content",
+    "_extract_content_from_gemini",
+    "_extract_model_from_cached",
+    "_log_token_usage",
+    "_get_retry_max",
+    "_sanitize_endpoint",
+    "_check_circuit_breaker",
+    "_process_success_response",
+    "_attempt_api_call",
+    "_is_retry_available",
+    "call_llm_with_retry",
 ]
 
 # ── 上次失败的详细原因（供调用方区分失败类型，不改变函数签名） ──
@@ -82,30 +100,31 @@ AUTO_INCREASE_FACTOR = 1.5
 
 # ── 缓存行定义 ────────────────────────────────────
 
-CACHE_LINE_HTML = (
-    '<p style="color:#888;font-size:12px">'
-    "本次使用LLM缓存，未直接使用LLM服务能力"
-    "</p>"
-)
+CACHE_LINE_HTML = '<p style="color:#888;font-size:12px">本次使用LLM缓存，未直接使用LLM服务能力</p>'
 """缓存命中的 HTML 提示行。"""
 
 
 def _cache_line_model_tpl(model: str) -> str:
     """生成缓存命中提示行（含模型名）。"""
-    return (
-        '<p style="color:#888;font-size:12px">'
-        f"本次使用LLM缓存（原始模型：{model}）"
-        "</p>"
-    )
+    return f'<p style="color:#888;font-size:12px">本次使用LLM缓存（原始模型：{model}）</p>'
+
+
 # 含原始模型名称的缓存提示行模板。
 
-_MODEL_LINE_RE = re.compile(r'模型[：:]\s*([^|<\s][^|]*)')
+_MODEL_LINE_RE = re.compile(r"模型[：:]\s*([^|<\s][^|]*)")
 """从 token 行中提取模型名称的正则。"""
 
 
 # ── Extended Thinking 模型兼容性名单 ──
 
-_THINKING_SUPPORTED_PREFIXES = ("claude-sonnet-4", "claude-opus-4", "claude-fable-5", "deepseek-v4-", "deepseek-chat", "gemini-2-5-")
+_THINKING_SUPPORTED_PREFIXES = (
+    "claude-sonnet-4",
+    "claude-opus-4",
+    "claude-fable-5",
+    "deepseek-v4-",
+    "deepseek-chat",
+    "gemini-2-5-",
+)
 
 # 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
 _THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-v4-", "deepseek-chat")
@@ -139,9 +158,12 @@ def _check_claude_truncation(data: dict, max_tokens: int, label: str, config_fie
     if stop_reason == "max_tokens":
         out_tokens = (data.get("usage") or {}).get("output_tokens", 0)
         logger.error(
-            "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。"
-            "内容不完整，请在 llm_settings.json 中增大 %s",
-            label, config_field, max_tokens, out_tokens, config_field,
+            "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。内容不完整，请在 llm_settings.json 中增大 %s",
+            label,
+            config_field,
+            max_tokens,
+            out_tokens,
+            config_field,
         )
         return True
     return False
@@ -159,9 +181,12 @@ def _check_openai_truncation(data: dict, max_tokens: int, label: str, config_fie
     if finish_reason == "length":
         out_tokens = (data.get("usage") or {}).get("completion_tokens", 0)
         logger.error(
-            "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。"
-            "内容不完整，请在 llm_settings.json 中增大 %s",
-            label, config_field, max_tokens, out_tokens, config_field,
+            "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。内容不完整，请在 llm_settings.json 中增大 %s",
+            label,
+            config_field,
+            max_tokens,
+            out_tokens,
+            config_field,
         )
         return True
     return False
@@ -181,9 +206,12 @@ def _check_gemini_truncation(data: dict, max_tokens: int, label: str, config_fie
             usage_meta = data.get("usageMetadata", {})
             out_tokens = usage_meta.get("candidatesTokenCount", 0)
             logger.error(
-                "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。"
-                "内容不完整，请在 llm_settings.json 中增大 %s",
-                label, config_field, max_tokens, out_tokens, config_field,
+                "LLM 输出被截断 [%s]: %s=%d, 实际输出=%d tokens。内容不完整，请在 llm_settings.json 中增大 %s",
+                label,
+                config_field,
+                max_tokens,
+                out_tokens,
+                config_field,
             )
             return True
     except (KeyError, IndexError, TypeError, AttributeError):
@@ -337,8 +365,11 @@ def _process_success_response(
     data: dict,
     extract_fn: Callable[[dict], str | None],
     check_truncation_fn: Callable[[dict, int], bool],
-    max_tokens: int, config_field: str,
-    provider: str, model_name: str, label: str,
+    max_tokens: int,
+    config_field: str,
+    provider: str,
+    model_name: str,
+    label: str,
     url: str,
 ) -> tuple[str | None, dict | None]:
     """处理成功响应：内容提取、截断检测、Token 日志。"""
@@ -390,8 +421,7 @@ def _attempt_api_call(
         if resp.status_code in (429, 503):
             if resp.status_code == 429:
                 logger.warning(
-                    "%s API 返回 429 Too Many Requests（API 限速），"
-                    "建议调低 llm_max_concurrency（当前并发数可能过高）",
+                    "%s API 返回 429 Too Many Requests（API 限速），建议调低 llm_max_concurrency（当前并发数可能过高）",
                     _sanitize_endpoint(url),
                 )
             return ("retryable", resp.status_code)
@@ -415,7 +445,11 @@ def _is_retry_available(label: str, attempt: int, max_retries: int, detail: str,
         delay = _RETRY_DELAYS[attempt]
         logger.warning(
             "%s API %s (尝试 %d/%d)，%.1fs 后重试...",
-            label, detail, attempt + 1, max_retries + 1, delay,
+            label,
+            detail,
+            attempt + 1,
+            max_retries + 1,
+            delay,
         )
         time.sleep(delay)
         return True
@@ -473,8 +507,15 @@ def call_llm_with_retry(
             clear_last_llm_failure()
             _cb_record_success(url)
             return _process_success_response(
-                info, extract_fn, check_truncation_fn, max_tokens, config_field,
-                provider, model_name, label, url,
+                info,
+                extract_fn,
+                check_truncation_fn,
+                max_tokens,
+                config_field,
+                provider,
+                model_name,
+                label,
+                url,
             )
 
         if kind == "retryable":

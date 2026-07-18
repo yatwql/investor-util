@@ -51,47 +51,37 @@ CHECKS: list[tuple[Path, str, tuple[str, ...]]] = []
 
 
 def add_exact(path: Path, pattern: str):
-    CHECKS.append( (REPO_ROOT / path, "exact", (pattern,)) )
+    CHECKS.append((REPO_ROOT / path, "exact", (pattern,)))
 
 
 def add_contains(path: Path, *patterns: str):
-    CHECKS.append( (REPO_ROOT / path, "contains", patterns) )
+    CHECKS.append((REPO_ROOT / path, "contains", patterns))
 
 
 # 代码文件
-CHECKS.append( (REPO_ROOT / "pyproject.toml", "pyproject_version", ()) )
-CHECKS.append( (REPO_ROOT / "src" / "python" / "constants.py", "exact",
-                 (r'^APP_VERSION\s*=\s*"[^"]*"$',)) )
+CHECKS.append((REPO_ROOT / "pyproject.toml", "pyproject_version", ()))
+CHECKS.append((REPO_ROOT / "src" / "python" / "constants.py", "exact", (r'^APP_VERSION\s*=\s*"[^"]*"$',)))
 
 # Markdown 管理文档
 add_exact(REPO_ROOT / "README.md", r"> 当前版本：{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md",
-             "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md",
-             "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md",
-             "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md",
-             "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md",
-             "[{v}]")
-add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md",
-             "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
+add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md", "v{v}")
 
 
 # ── 校验逻辑 ────────────────────────────────────────────────
+
 
 def _check_exact(text: str, pattern_template: str, version: str) -> bool:
     pattern = pattern_template.replace("{v}", re.escape(version))
     return bool(re.search(pattern, text, re.MULTILINE))
 
 
-def _check_contains(text: str, patterns_template: tuple[str, ...],
-                    version: str) -> bool:
-    return any(
-        p.replace("{v}", version) in text
-        for p in patterns_template
-    )
+def _check_contains(text: str, patterns_template: tuple[str, ...], version: str) -> bool:
+    return any(p.replace("{v}", version) in text for p in patterns_template)
 
 
 def _check_pyproject_version(text: str, version: str) -> bool:
@@ -108,7 +98,9 @@ def _auto_fix_pyproject(path: Path, version: str) -> bool:
     new_text, count = re.subn(
         r'^(version\s*=\s*)"[^"]*"',
         lambda m: f'{m.group(1)}"{version}"',
-        text, count=1, flags=re.MULTILINE,
+        text,
+        count=1,
+        flags=re.MULTILINE,
     )
     if count > 0 and new_text != text:
         path.write_text(new_text, encoding="utf-8")
@@ -120,8 +112,7 @@ def main() -> None:
     version = _get_app_version()
     do_fix = "--fix" in sys.argv
 
-    print(f"[..] 校验版本号一致性 — APP_VERSION = {version}\n"
-          f"     来源：{CONSTANTS_FILE.relative_to(REPO_ROOT)}\n")
+    print(f"[..] 校验版本号一致性 — APP_VERSION = {version}\n     来源：{CONSTANTS_FILE.relative_to(REPO_ROOT)}\n")
 
     all_ok = True
     checked = 0
@@ -164,11 +155,10 @@ def main() -> None:
         return
 
     if do_fix and fixed > 0:
-        print(f"[!] 已自动修正 {fixed} 项（pyproject.toml）。"
-              "其他文件需手动更新。")
+        print(f"[!] 已自动修正 {fixed} 项（pyproject.toml）。其他文件需手动更新。")
         sys.exit(0)
 
-    print(f"[ERR] 版本号不一致 — 请先手动更新后重试。")
+    print("[ERR] 版本号不一致 — 请先手动更新后重试。")
     print("      发布流程：")
     print("        1. 修改 src/python/constants.py APP_VERSION")
     print("        2. 运行 python scripts/check-version-consistency.py")

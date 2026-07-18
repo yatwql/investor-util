@@ -10,10 +10,13 @@ from typing import Any
 logger = logging.getLogger("invest")
 
 __all__ = [
-    "compute_fingerprint", "extract_stable_holdings", "extract_stable_penetration",
+    "compute_fingerprint",
+    "extract_stable_holdings",
+    "extract_stable_penetration",
     "build_llm_fingerprint",
     "get_cache_ttl_llm",
 ]
+
 
 def compute_fingerprint(*args: Any) -> str:
     """计算输入数据的确定性哈希值（前 12 位），用作缓存键后缀。
@@ -29,14 +32,10 @@ def extract_stable_holdings(holdings_details: list[dict] | None) -> list[dict]:
     """从持仓明细中提取稳定的（无行情波动）字段。"""
     if not holdings_details:
         return []
-    return [
-        {"name": d.get("name", ""), "code": d.get("code", ""), "cost": d.get("cost", 0)}
-        for d in holdings_details
-    ]
+    return [{"name": d.get("name", ""), "code": d.get("code", ""), "cost": d.get("cost", 0)} for d in holdings_details]
 
 
-def extract_stable_penetration(penetrated_assets: list[dict] | None,
-                                 full: bool = False) -> list[dict]:
+def extract_stable_penetration(penetrated_assets: list[dict] | None, full: bool = False) -> list[dict]:
     """从穿透资产中提取稳定的（无行情波动）字段。
 
     Args:
@@ -92,8 +91,13 @@ def build_llm_fingerprint(
     _details = extract_stable_holdings(holdings_details)
     _pen = extract_stable_penetration(penetrated_assets, full=full_penetration)
     return compute_fingerprint(
-        total_mv, total_cost, total_profit, total_today_profit,
-        categories, _details, _pen,
+        total_mv,
+        total_cost,
+        total_profit,
+        total_today_profit,
+        categories,
+        _details,
+        _pen,
     )
 
 
@@ -121,8 +125,15 @@ def get_cache_ttl_llm(subtype: str = "global_macro") -> float:
     data_type = _key_map.get(subtype, "llm_global_macro")
     try:
         from src.python.cache import get_ttl
+
         return get_ttl(data_type)
     except (ImportError, TypeError, AttributeError):
         logger.debug("_get_llm_ttl: 获取 TTL 失败，使用 LLM 默认值")
-        defaults: dict[str, float] = {"global_macro": 86400, "expert_review": 7200, "news_correlation": 3600, "health_check": 86400, "penetration_deep": 86400}
+        defaults: dict[str, float] = {
+            "global_macro": 86400,
+            "expert_review": 7200,
+            "news_correlation": 3600,
+            "health_check": 86400,
+            "penetration_deep": 86400,
+        }
         return defaults.get(subtype, 3600)

@@ -2,6 +2,7 @@
 
 S7 已变薄：仅保留 TUI 专属交互外壳，业务编排逻辑全部委托 orchestrator。
 """
+
 from __future__ import annotations
 
 from src.python.logger import setup_logger
@@ -21,6 +22,7 @@ logger = setup_logger()
 def _prompt_history(reporter: TuiProgressReporter) -> str:
     """TUI 专属：询问用户是否获取历史走势数据。"""
     from src.python.config import is_enable_history
+
     config = get_config_cache() or {}
     if not is_enable_history(config):
         return "off"
@@ -55,7 +57,9 @@ def _cmd_generate_excel() -> None:
         return
     try:
         orchestrator.generate_report(
-            holdings=holdings, config=config, reporter=reporter,
+            holdings=holdings,
+            config=config,
+            reporter=reporter,
             report_type="basic",
         )
     except Exception as e:
@@ -73,8 +77,11 @@ def _cmd_generate_both() -> None:
         return
     try:
         orchestrator.generate_report(
-            holdings=holdings, config=config, reporter=reporter,
-            report_type="both", history_mode=_prompt_history(reporter),
+            holdings=holdings,
+            config=config,
+            reporter=reporter,
+            report_type="both",
+            history_mode=_prompt_history(reporter),
         )
     except Exception as e:
         logger.exception("生成全系列报告失败")
@@ -91,7 +98,9 @@ def _cmd_generate_full() -> None:
         return
     try:
         orchestrator.generate_report(
-            holdings=holdings, config=config, reporter=reporter,
+            holdings=holdings,
+            config=config,
+            reporter=reporter,
             report_type="full",
             history_mode=_prompt_history(reporter),
             force_llm=_prompt_force_llm(reporter),

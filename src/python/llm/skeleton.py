@@ -13,6 +13,7 @@ from src.python.cache import get as cache_get  # noqa: F401
 from src.python.cache import set as cache_set
 from src.python.config import get_llm_config
 from src.python.http_client import make_http_client
+from src.python.llm.api import call_llm
 from src.python.llm.api_base import (
     AUTO_INCREASE_FACTOR,
     CACHE_LINE_HTML,
@@ -21,18 +22,17 @@ from src.python.llm.api_base import (
     _cache_line_model_tpl,
     _extract_model_from_cached,
     _get_last_llm_failure,
+    clear_last_llm_failure,
 )
-from src.python.llm.api import call_llm
-from src.python.llm.api_base import clear_last_llm_failure
 from src.python.llm.fingerprint import get_cache_ttl_llm
 from src.python.llm.markdown import markdown_to_html
 from src.python.llm.pricing import estimate_cost
 from src.python.llm.prompts import (
     CACHE_PREFIX_LLM,
-    LLM_MODULE_FAILURE,
     FAIL_REASON_API_ERROR,
     FAIL_REASON_DISABLED,
     FAIL_REASON_NOT_CONFIGURED,
+    LLM_MODULE_FAILURE,
 )
 from src.python.llm.session import record_per_module
 from src.python.registry import get_llm_module_name
@@ -92,11 +92,10 @@ def _handle_cache_hit(
     if module_key:
         _model_for_record = _orig_model or model or llm_config.get("model", "") or "缓存命中"
         _endpoint_for_record = endpoint or llm_config.get("endpoint", "") or ""
-        record_per_module(module_key, _model_for_record, cached=True,
-                           thinking=thinking_enabled, endpoint=_endpoint_for_record)
+        record_per_module(
+            module_key, _model_for_record, cached=True, thinking=thinking_enabled, endpoint=_endpoint_for_record
+        )
     return cached_clean
-
-
 
 
 def _finalize_and_cache(
@@ -146,9 +145,16 @@ def _finalize_and_cache(
                     logger.warning("LLM 费用字符串解析失败: %s", _cost)
             _endpoint_for_record = endpoint or llm_config.get("endpoint", "") or ""
             _cache_hit = usage.get("cache_read_input_tokens", 0)
-            record_per_module(module_key, _model_name, inp=_inp, out=_out,
-                               thinking=thinking_enabled, cost=_cost_val,
-                               endpoint=_endpoint_for_record, cache_hit_tokens=_cache_hit)
+            record_per_module(
+                module_key,
+                _model_name,
+                inp=_inp,
+                out=_out,
+                thinking=thinking_enabled,
+                cost=_cost_val,
+                endpoint=_endpoint_for_record,
+                cache_hit_tokens=_cache_hit,
+            )
 
     cache_set(cache_key, html)
     logger.info("LLM 内容生成完成: %s", cache_key)
@@ -179,10 +185,15 @@ def _handle_truncation(
     new_max = int(max_tokens * AUTO_INCREASE_FACTOR)
     logger.warning("输出被截断（max_tokens=%d），自动以 %d 重新生成...", max_tokens, new_max)
     result2, usage2, _ = call_llm(
-        system_prompt, user_prompt, llm_config,
-        timeout=timeout, http_client=http_client,
-        max_tokens=new_max, config_field=config_field,
-        temperature=temperature, model=model,
+        system_prompt,
+        user_prompt,
+        llm_config,
+        timeout=timeout,
+        http_client=http_client,
+        max_tokens=new_max,
+        config_field=config_field,
+        temperature=temperature,
+        model=model,
     )
     if result2:
         if TRUNCATION_MARKER in result2:
@@ -218,6 +229,7 @@ def _build_provider_cache_key(
         preferred = llm_config.get("_preferred_providers", {})
         try:
             from src.python.llm.strategy import resolve_provider_chain
+
             chain = resolve_provider_chain(provider_list, strategy, module_key, preferred)
             name = chain[0]["name"] if chain else "unknown"
         except Exception:
@@ -258,11 +270,13 @@ def generate_llm_content(
         preferred = llm_config.get("_preferred_providers", {})
         try:
             from src.python.llm.strategy import resolve_provider_chain
+
             chain = resolve_provider_chain(provider_list, strategy, module_key, preferred)
             first_entry = chain[0] if chain else None
             first_name = first_entry["name"] if first_entry else None
             if first_entry:
                 from src.python.llm.api import _resolve_entry_credentials
+
                 _, first_model, first_endpoint = _resolve_entry_credentials(first_entry, llm_config)
         except Exception:
             pass
@@ -273,17 +287,45 @@ def generate_llm_content(
     if cache_enabled and not force:
         cached = cache_get(precheck_key, cache_ttl)
         if cached:
-            return (_handle_cache_hit(cached, precheck_key, module_key, first_model or model, llm_config, thinking_enabled, endpoint=first_endpoint), True)
+            return (
+                _handle_cache_hit(
+                    cached,
+                    precheck_key,
+                    module_key,
+                    first_model or model,
+                    llm_config,
+                    thinking_enabled,
+                    endpoint=first_endpoint,
+                ),
+                True,
+            )
 
     # ── LLM 调用 → 截断重试 → 处理结果 ──
     clear_last_llm_failure()
-    result, usage, provider_info = call_llm(system_prompt, user_prompt, llm_config,
-                                            timeout=timeout, http_client=http_client,
-                                            max_tokens=max_tokens, config_field=config_field,
-                                            temperature=temperature, model=model)
-    result, usage = _handle_truncation(result, usage, max_tokens, system_prompt, user_prompt,
-                                       llm_config, timeout, http_client, config_field,
-                                       temperature, model)
+    result, usage, provider_info = call_llm(
+        system_prompt,
+        user_prompt,
+        llm_config,
+        timeout=timeout,
+        http_client=http_client,
+        max_tokens=max_tokens,
+        config_field=config_field,
+        temperature=temperature,
+        model=model,
+    )
+    result, usage = _handle_truncation(
+        result,
+        usage,
+        max_tokens,
+        system_prompt,
+        user_prompt,
+        llm_config,
+        timeout,
+        http_client,
+        config_field,
+        temperature,
+        model,
+    )
 
     if result:
         provider_name = provider_info.get("name") if provider_info else None
@@ -293,7 +335,16 @@ def generate_llm_content(
         write_key = cache_key
         if provider_list and provider_name:
             write_key = f"{cache_key}_{provider_name}"
-        return _finalize_and_cache(result, usage, write_key, module_key, resolved_model, llm_config, thinking_enabled, endpoint=resolved_endpoint)
+        return _finalize_and_cache(
+            result,
+            usage,
+            write_key,
+            module_key,
+            resolved_model,
+            llm_config,
+            thinking_enabled,
+            endpoint=resolved_endpoint,
+        )
 
     logger.warning("LLM 内容生成失败: %s", cache_key)
     if module_key:
@@ -329,8 +380,13 @@ def _run_standard_mode(
     user_prompt = prompt_builder() if prompt_builder else ""
 
     return generate_llm_content(
-        llm_config, cache_key, get_cache_ttl_llm(module_key),
-        system_prompt, user_prompt, cache_enabled, force,
+        llm_config,
+        cache_key,
+        get_cache_ttl_llm(module_key),
+        system_prompt,
+        user_prompt,
+        cache_enabled,
+        force,
         max_tokens=llm_config.get(f"max_tokens_{module_key}", max_tokens_default),
         timeout=llm_config.get(f"timeout_{module_key}", timeout_default),
         temperature=llm_config.get(f"temperature_{module_key}"),
@@ -355,10 +411,10 @@ def generate_llm_module(
     timeout_default: float = 120.0,
     output_brief_limit: int = 300,
     # ── 批量模式 hooks（用于 news_correlation 类模块） ──
-    batch_preparer: Any = None,       # fn() → (items, context) or None（None=标准模式）
-    per_item_cache_fn: Any = None,    # fn(index, item, context_fp) → cache_key or None
-    batch_prompt_fn: Any = None,      # fn(batch_items, context) → user_prompt 字符串
-    response_parser: Any = None,      # fn(batch_items, llm_response) → [parsed 列表]
+    batch_preparer: Any = None,  # fn() → (items, context) or None（None=标准模式）
+    per_item_cache_fn: Any = None,  # fn(index, item, context_fp) → cache_key or None
+    batch_prompt_fn: Any = None,  # fn(batch_items, context) → user_prompt 字符串
+    response_parser: Any = None,  # fn(batch_items, llm_response) → [parsed 列表]
 ) -> Any:
     """通用 LLM 模块生成骨架。
 
@@ -387,7 +443,9 @@ def generate_llm_module(
     # ── 批量模式分支 ─────────────────────────────────────
     if batch_preparer is not None:
         return run_batch_mode(
-            llm_config, module_key, force=force,
+            llm_config,
+            module_key,
+            force=force,
             batch_preparer=batch_preparer,
             per_item_cache_fn=per_item_cache_fn,
             batch_prompt_fn=batch_prompt_fn,
@@ -399,9 +457,16 @@ def generate_llm_module(
 
     # ── 标准模式（原有的 4 个分析模块） ──────────────────
     return _run_standard_mode(
-        llm_config, module_key, force, http_client,
-        fingerprint_fn, system_prompt_default, prompt_builder,
-        max_tokens_default, timeout_default, output_brief_limit,
+        llm_config,
+        module_key,
+        force,
+        http_client,
+        fingerprint_fn,
+        system_prompt_default,
+        prompt_builder,
+        max_tokens_default,
+        timeout_default,
+        output_brief_limit,
     )
 
 
@@ -457,8 +522,7 @@ def _execute_and_merge_batch(
     Returns:
         (input_tokens, output_tokens) 本批的 token 用量
     """
-    logger.info("%s [%d/%d] 批处理中 (%d 条)...",
-                           _MN(module_key), batch_id + 1, total_batches, len(batch_indices))
+    logger.info("%s [%d/%d] 批处理中 (%d 条)...", _MN(module_key), batch_id + 1, total_batches, len(batch_indices))
     batch_client = make_http_client(timeout=LLM_TIMEOUT)
     total_in = 0
     total_out = 0
@@ -466,21 +530,31 @@ def _execute_and_merge_batch(
         batch_items = [items[i] for i in batch_indices]
         user_prompt = batch_prompt_fn(batch_items, context_fp)
         result, usage, _ = call_llm(
-            system_prompt, user_prompt, llm_config,
-            timeout=timeout, http_client=batch_client,
+            system_prompt,
+            user_prompt,
+            llm_config,
+            timeout=timeout,
+            http_client=batch_client,
             max_tokens=max_tokens,
             config_field=f"max_tokens_{module_key}",
-            temperature=temperature, model=model,
+            temperature=temperature,
+            model=model,
         )
         if result and TRUNCATION_MARKER in result:
             new_max = int(max_tokens * AUTO_INCREASE_FACTOR)
-            logger.warning("%s 输出被截断，自动以 %d 重新生成 [批 %d/%d]",
-                           _MN(module_key), new_max, batch_id + 1, total_batches)
+            logger.warning(
+                "%s 输出被截断，自动以 %d 重新生成 [批 %d/%d]", _MN(module_key), new_max, batch_id + 1, total_batches
+            )
             result2, usage2, _ = call_llm(
-                system_prompt, user_prompt, llm_config,
-                timeout=timeout, http_client=batch_client,
-                max_tokens=new_max, config_field=f"max_tokens_{module_key}",
-                temperature=temperature, model=model,
+                system_prompt,
+                user_prompt,
+                llm_config,
+                timeout=timeout,
+                http_client=batch_client,
+                max_tokens=new_max,
+                config_field=f"max_tokens_{module_key}",
+                temperature=temperature,
+                model=model,
             )
             if result2:
                 result, usage = result2, usage2
@@ -495,11 +569,9 @@ def _execute_and_merge_batch(
             if usage:
                 total_in += usage.get("input_tokens", usage.get("prompt_tokens", 0))
                 total_out += usage.get("output_tokens", usage.get("completion_tokens", 0))
-            logger.info("%s [%d/%d] 批完成",
-                               _MN(module_key), batch_id + 1, total_batches)
+            logger.info("%s [%d/%d] 批完成", _MN(module_key), batch_id + 1, total_batches)
         else:
-            logger.warning("%s（批 %d/%d）: 分析失败",
-                           _MN(module_key), batch_id + 1, total_batches)
+            logger.warning("%s（批 %d/%d）: 分析失败", _MN(module_key), batch_id + 1, total_batches)
     finally:
         batch_client.close()
     return total_in, total_out
@@ -532,7 +604,12 @@ def run_batch_mode(
 
     items, context_fp = batch_preparer()
     results_map, item_cache_keys, uncached_indices, cached_count, all_cached = _check_batch_caches(
-        items, per_item_cache_fn, cache_enabled, force, module_key, context_fp,
+        items,
+        per_item_cache_fn,
+        cache_enabled,
+        force,
+        module_key,
+        context_fp,
     )
 
     total_in = 0
@@ -540,17 +617,31 @@ def run_batch_mode(
 
     if uncached_indices and batch_prompt_fn and response_parser:
         BATCH_SIZE = 10
-        batches = [uncached_indices[i:i + BATCH_SIZE]
-                   for i in range(0, len(uncached_indices), BATCH_SIZE)]
-        logger.info("正在调用 %s（%d 批未缓存，每批最多 %d 条）...",
-                    _MN(module_key), len(batches), BATCH_SIZE)
+        batches = [uncached_indices[i : i + BATCH_SIZE] for i in range(0, len(uncached_indices), BATCH_SIZE)]
+        logger.info("正在调用 %s（%d 批未缓存，每批最多 %d 条）...", _MN(module_key), len(batches), BATCH_SIZE)
 
         with ThreadPoolExecutor(max_workers=min(3, len(batches), 6)) as ex:
             _fut_map = {
-                ex.submit(_execute_and_merge_batch, i, indices, items, context_fp,
-                          system_prompt, llm_config, module_key, max_tokens,
-                          _timeout, _temp, _model, batch_prompt_fn, response_parser,
-                          results_map, item_cache_keys, per_item_cache_fn, len(batches)): i
+                ex.submit(
+                    _execute_and_merge_batch,
+                    i,
+                    indices,
+                    items,
+                    context_fp,
+                    system_prompt,
+                    llm_config,
+                    module_key,
+                    max_tokens,
+                    _timeout,
+                    _temp,
+                    _model,
+                    batch_prompt_fn,
+                    response_parser,
+                    results_map,
+                    item_cache_keys,
+                    per_item_cache_fn,
+                    len(batches),
+                ): i
                 for i, indices in enumerate(batches)
             }
             for future in as_completed(_fut_map):

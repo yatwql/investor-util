@@ -69,35 +69,37 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
     # 表格结构：<div class="infoOfFund">...<td>基金经理</td><td>...<a>经理名</a>...</td>...
     info_match = re.search(
         r'<div[^>]*class="infoOfFund"[^>]*>(.*?)</div>',
-        html, re.DOTALL | re.IGNORECASE,
+        html,
+        re.DOTALL | re.IGNORECASE,
     )
     if info_match:
         info_html = info_match.group(1)
         # 旧格式：基金经理 独立 td → 下一个 td 含名字
         manager_row = re.search(
-            r'基金经理\s*</td>\s*<td[^>]*>(.*?)</td>',
-            info_html, re.DOTALL | re.IGNORECASE,
+            r"基金经理\s*</td>\s*<td[^>]*>(.*?)</td>",
+            info_html,
+            re.DOTALL | re.IGNORECASE,
         )
         if manager_row:
             cell_html = manager_row.group(1)
             # 提取所有 <a> 标签内的名字（多位经理以链接形式并列）
-            names = re.findall(r'<a[^>]*>(.*?)</a>', cell_html)
+            names = re.findall(r"<a[^>]*>(.*?)</a>", cell_html)
             if names:
                 manager_name = "/".join(n.strip() for n in names if n.strip())
             else:
                 # 回退：提取纯文本
-                text = re.sub(r'<[^>]+>', '', cell_html).strip()
+                text = re.sub(r"<[^>]+>", "", cell_html).strip()
                 if text:
                     manager_name = text.split("（")[0].split("(")[0].strip()
 
             # 提取任职起始日（旧格式中在与经理名同一 cell）
             date_match = re.search(
-                r'任职起始日[：:]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})',
+                r"任职起始日[：:]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})",
                 cell_html,
             )
             if not date_match:
                 date_match = re.search(
-                    r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})\s*至今',
+                    r"(\d{4}[-/]\d{1,2}[-/]\d{1,2})\s*至今",
                     cell_html,
                 )
             if date_match:
@@ -105,7 +107,7 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
         else:
             # 新格式：同一 td 内 "基金经理：<a>name</a>"
             new_match = re.search(
-                r'基金经理[：:]\s*<a[^>]*>(.*?)</a>',
+                r"基金经理[：:]\s*<a[^>]*>(.*?)</a>",
                 info_html,
             )
             if new_match:
@@ -116,7 +118,7 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
     if not manager_name:
         # 在全文搜索 "基金经理：" 或 "基金经理 "</td>
         full_match = re.search(
-            r'基金经理[：:]\s*([^<>\n]{2,20})',
+            r"基金经理[：:]\s*([^<>\n]{2,20})",
             html,
         )
         if full_match:
@@ -125,8 +127,9 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
         if not manager_name:
             # 搜索 "基金经理</span>" 模式（移动端或简化版页面）
             mobile_match = re.search(
-                r'基金经理</span>\s*<span[^>]*>\s*<a[^>]*>(.*?)</a>',
-                html, re.DOTALL,
+                r"基金经理</span>\s*<span[^>]*>\s*<a[^>]*>(.*?)</a>",
+                html,
+                re.DOTALL,
             )
             if mobile_match:
                 manager_name = mobile_match.group(1).strip()
@@ -147,21 +150,24 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
     # ── 提取历任经理简要列表（页面中可能含"历任基金经理"） ──
     history: list[dict] = []
     history_section = re.search(
-        r'历任基金经理\s*</td>\s*<td[^>]*>(.*?)</td>',
-        html, re.DOTALL | re.IGNORECASE,
+        r"历任基金经理\s*</td>\s*<td[^>]*>(.*?)</td>",
+        html,
+        re.DOTALL | re.IGNORECASE,
     )
     if history_section:
         history_html = history_section.group(1)
         # 每个经理可能是 <a> 或纯文本
         hist_items = re.findall(
-            r'<a[^>]*>(.*?)</a>\s*[（(](\d{4}[-/]\d{1,2}[-/]\d{1,2})',
+            r"<a[^>]*>(.*?)</a>\s*[（(](\d{4}[-/]\d{1,2}[-/]\d{1,2})",
             history_html,
         )
         for name, date in hist_items:
-            history.append({
-                "name": name.strip(),
-                "start_date": date.replace("/", "-"),
-            })
+            history.append(
+                {
+                    "name": name.strip(),
+                    "start_date": date.replace("/", "-"),
+                }
+            )
 
     result: dict[str, Any] = {
         "manager_name": manager_name,
@@ -169,8 +175,7 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
         "tenure_days": tenure_days,
         "history": history,
     }
-    logger.debug("基金经理解析完成: %s（任职起始 %s, %d 天）",
-                 manager_name, start_date or "未知", tenure_days)
+    logger.debug("基金经理解析完成: %s（任职起始 %s, %d 天）", manager_name, start_date or "未知", tenure_days)
     return result
 
 
@@ -223,27 +228,29 @@ def _parse_manager_from_archive_page(code: str) -> dict[str, Any] | None:
     #   <thead><th>起始期</th>...<th>基金经理</th>...
     #   <tbody><tr><td>date</td><td>至今</td><td><a>name</a></td>...
     table_match = re.search(
-        r'<table[^>]*>(.*?起始期.*?基金经理.*?</thead>.*?<tbody>(.*?)</tbody>)',
-        html, re.DOTALL | re.IGNORECASE,
+        r"<table[^>]*>(.*?起始期.*?基金经理.*?</thead>.*?<tbody>(.*?)</tbody>)",
+        html,
+        re.DOTALL | re.IGNORECASE,
     )
 
     if table_match:
         tbody_html = table_match.group(2)
         # 解析 tbody 中的行
-        row_htmls = re.findall(r'<tr[^>]*>(.*?)</tr>', tbody_html, re.DOTALL)
+        row_htmls = re.findall(r"<tr[^>]*>(.*?)</tr>", tbody_html, re.DOTALL)
     else:
         # 旧格式（回退）：<tr><td><a>name</a></td><td>date</td></tr>
         logger.debug("基金经理档案页未匹配新格式，尝试旧格式行解析: %s", code)
         all_cells = re.findall(
-            r'<tr[^>]*>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>',
-            html, re.DOTALL,
+            r"<tr[^>]*>.*?<td[^>]*>(.*?)</td>.*?<td[^>]*>(.*?)</td>",
+            html,
+            re.DOTALL,
         )
         row_htmls = []
         for name_html, date_html in all_cells:
-            re.sub(r'<[^>]+>', '', name_html).strip()
-            date_text = re.sub(r'<[^>]+>', '', date_html).strip()
+            re.sub(r"<[^>]+>", "", name_html).strip()
+            date_text = re.sub(r"<[^>]+>", "", date_html).strip()
             # 经理行特征：第二列是日期（不含中文导航文字），第一列是人名
-            if re.search(r'\d{4}', date_text) and not re.search(r'[一-鿿]{4,}', date_text):
+            if re.search(r"\d{4}", date_text) and not re.search(r"[一-鿿]{4,}", date_text):
                 row_htmls.append(f"<td>{date_text}</td><td></td><td>{name_html}</td>")
 
     if not row_htmls:
@@ -253,18 +260,18 @@ def _parse_manager_from_archive_page(code: str) -> dict[str, Any] | None:
     # 取每行的 td
     def _parse_row(row_html: str) -> tuple[str, str]:
         """从经理行提取（起始日期, 经理名）。"""
-        tds = re.findall(r'<td[^>]*>(.*?)</td>', row_html, re.DOTALL)
+        tds = re.findall(r"<td[^>]*>(.*?)</td>", row_html, re.DOTALL)
         if len(tds) < 3:
             return ("", "")
-        start_td = re.sub(r'<[^>]+>', '', tds[0]).strip()
-        name_td = re.sub(r'<[^>]+>', '', tds[2]).strip()
+        start_td = re.sub(r"<[^>]+>", "", tds[0]).strip()
+        name_td = re.sub(r"<[^>]+>", "", tds[2]).strip()
         return (start_td, name_td)
 
     # 第一行 = 当前经理
     first_start, first_name = _parse_row(row_htmls[0])
 
     # 提取日期
-    date_match = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})', first_start)
+    date_match = re.search(r"(\d{4}[-/]\d{1,2}[-/]\d{1,2})", first_start)
     start_date = date_match.group(1).replace("/", "-") if date_match else ""
 
     tenure_days = 0
@@ -279,12 +286,14 @@ def _parse_manager_from_archive_page(code: str) -> dict[str, Any] | None:
     history: list[dict] = []
     for row in row_htmls[1:]:
         h_start, h_name = _parse_row(row)
-        h_date_match = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})', h_start)
+        h_date_match = re.search(r"(\d{4}[-/]\d{1,2}[-/]\d{1,2})", h_start)
         if h_name and h_date_match:
-            history.append({
-                "name": h_name,
-                "start_date": h_date_match.group(1).replace("/", "-"),
-            })
+            history.append(
+                {
+                    "name": h_name,
+                    "start_date": h_date_match.group(1).replace("/", "-"),
+                }
+            )
 
     result: dict[str, Any] = {
         "manager_name": first_name,

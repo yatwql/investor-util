@@ -23,12 +23,12 @@ from typing import Any
 
 from src.python.code_utils import (
     is_a_share_code,
+    is_bond_fund_by_name,
     is_exchange_fund_code,
     is_hk_stock_code,
-    is_bond_fund_by_name,
-    is_qdii_extended,
-    is_otc_fund_by_name,
     is_otc_code_overlap,
+    is_otc_fund_by_name,
+    is_qdii_extended,
 )
 from src.python.fetcher.chain import fetch_with_incremental_fallback
 from src.python.report.benchmark import fetch_benchmarks, normalize_benchmarks
@@ -44,9 +44,12 @@ logger = logging.getLogger("invest")
 class PortfolioHistoryCalculator:
     """组合历史走势计算器（无状态，每次独立计算）。"""
 
-    def __init__(self, session_cache: dict[str, Any] | None = None,
-                 coverage_threshold: float | None = None,
-                 benchmark_indices: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        session_cache: dict[str, Any] | None = None,
+        coverage_threshold: float | None = None,
+        benchmark_indices: dict[str, str] | None = None,
+    ) -> None:
         """初始化组合历史走势计算器。
 
         Args:
@@ -64,8 +67,7 @@ class PortfolioHistoryCalculator:
         # 基准指数配置：{代码: 名称}，空 dict 表示禁用
         self._benchmark_indices = benchmark_indices if benchmark_indices is not None else {}
 
-    def calculate_for_holding(self, holding_code: str, holding_name: str,
-                              shares: float) -> list[dict] | None:
+    def calculate_for_holding(self, holding_code: str, holding_name: str, shares: float) -> list[dict] | None:
         """计算单只持仓的 as-if 历史市值序列。
 
         as-if 语义：假设当前持仓份额在过去 N 天不变，用历史价格 × 当前份额。
@@ -127,16 +129,20 @@ class PortfolioHistoryCalculator:
             close = bar.get("close") or bar.get("nav", 0)
             if close <= 0:
                 continue
-            result.append({
-                "date": bar["date"],
-                "close": close,
-                "value": round(close * shares, 2),
-            })
+            result.append(
+                {
+                    "date": bar["date"],
+                    "close": close,
+                    "value": round(close * shares, 2),
+                }
+            )
 
         return result if result else None
 
     def get_combined_timeseries(
-        self, holdings: list[tuple[str, str, float]], days: int = 30,
+        self,
+        holdings: list[tuple[str, str, float]],
+        days: int = 30,
     ) -> dict[str, Any]:
         """计算组合全部持仓的综合走势。
 
@@ -169,8 +175,8 @@ class PortfolioHistoryCalculator:
         _max_workers = min(8, total_holdings) if total_holdings > 1 else 1
         with ThreadPoolExecutor(max_workers=_max_workers) as _pool:
             _futures = {
-                _pool.submit(self.calculate_for_holding, code, name, shares):
-                (code, name) for code, name, shares in holdings
+                _pool.submit(self.calculate_for_holding, code, name, shares): (code, name)
+                for code, name, shares in holdings
             }
             for _fut in as_completed(_futures):
                 _code, _name = _futures[_fut]
@@ -224,9 +230,16 @@ class PortfolioHistoryCalculator:
 
         sorted_dates = all_dates
         if not sorted_dates:
-            return {"bars": [], "max_drawdown": 0, "max_drawdown_pct": 0,
-                    "annualized_volatility": 0, "total_return": 0,
-                    "total_return_pct": 0, "status": "unavailable", "warnings": warnings}
+            return {
+                "bars": [],
+                "max_drawdown": 0,
+                "max_drawdown_pct": 0,
+                "annualized_volatility": 0,
+                "total_return": 0,
+                "total_return_pct": 0,
+                "status": "unavailable",
+                "warnings": warnings,
+            }
 
         # 找到可用的收益率起算日期和终止日期：要求该日 ≥80% 的持仓有数据
         # 不同基金数据起止日期不同（如有的从2025-09、有的从2026-03），
@@ -248,9 +261,12 @@ class PortfolioHistoryCalculator:
         if valid_end_idx < valid_start_idx:
             valid_end_idx = valid_start_idx
         if valid_start_idx > 0 or valid_end_idx < len(sorted_dates) - 1:
-            logger.info("[history] 有效区间截取: %s ~ %s（首尾覆盖不足日期已排除）",
-                        sorted_dates[valid_start_idx], sorted_dates[valid_end_idx])
-        sorted_dates = sorted_dates[valid_start_idx:valid_end_idx + 1]
+            logger.info(
+                "[history] 有效区间截取: %s ~ %s（首尾覆盖不足日期已排除）",
+                sorted_dates[valid_start_idx],
+                sorted_dates[valid_end_idx],
+            )
+        sorted_dates = sorted_dates[valid_start_idx : valid_end_idx + 1]
 
         # 构建完整时间线 + 计算指标
         bars: list[dict] = []
@@ -278,12 +294,14 @@ class PortfolioHistoryCalculator:
                 else:
                     drawdown_start = date
 
-            bars.append({
-                "date": date,
-                "total_value": round(tv, 2),
-                "drawdown": round(-drawdown, 2),
-                "drawdown_pct": round(-drawdown_pct, 4),
-            })
+            bars.append(
+                {
+                    "date": date,
+                    "total_value": round(tv, 2),
+                    "drawdown": round(-drawdown, 2),
+                    "drawdown_pct": round(-drawdown_pct, 4),
+                }
+            )
 
         # 计算年化波动率
         daily_returns = []
@@ -304,8 +322,7 @@ class PortfolioHistoryCalculator:
         total_return_pct = (total_return / first_val * 100) if first_val > 0 else 0
 
         # 诊断：输出起止值明细（用于排查收益率异常）
-        _diagnose_return(bars, sorted_dates, 0, fund_count_on_date,
-                         total_return_pct, len(all_series))
+        _diagnose_return(bars, sorted_dates, 0, fund_count_on_date, total_return_pct, len(all_series))
 
         # 质量校验（只校验收益率起算点之后的数据，避免新基金加入导致的跳变误报）
         warnings.extend(_validate_bars(bars))
@@ -318,8 +335,7 @@ class PortfolioHistoryCalculator:
                 raw_benchmarks = fetch_benchmarks(self._benchmark_indices, days=days)
                 if raw_benchmarks:
                     ok_count = len(raw_benchmarks)
-                    logger.info("[history] 基准指数获取完成: %d/%d",
-                                ok_count, len(self._benchmark_indices))
+                    logger.info("[history] 基准指数获取完成: %d/%d", ok_count, len(self._benchmark_indices))
                     # 归一化对齐
                     benchmarks = normalize_benchmarks(bars, raw_benchmarks)
                     if benchmarks:
@@ -424,7 +440,7 @@ def _validate_bars(bars: list[dict]) -> list[str]:
             if prev > 0 and close > 0:
                 change_pct = abs(close - prev) / prev
                 if change_pct > 0.5:
-                    warnings.append(f"{b['date']}: 单日变化 {change_pct*100:.1f}%（可能异常）")
+                    warnings.append(f"{b['date']}: 单日变化 {change_pct * 100:.1f}%（可能异常）")
 
     return warnings
 
@@ -450,7 +466,7 @@ def _diagnose_return(
     sample_idxs = sorted(set(i for i in sample_idxs if i < len(bars)))
 
     lines = [
-        f"[history] ═══ 累计收益率诊断 ═══",
+        "[history] ═══ 累计收益率诊断 ═══",
         f"[history]  起算日: {first_bar['date']}  total_value={first_bar['total_value']:.2f}  "
         f"覆盖 {fund_count_on_date.get(first_bar['date'], 0)}/{total_series} 只",
         f"[history]  终止日: {last_bar['date']}  total_value={last_bar['total_value']:.2f}  "

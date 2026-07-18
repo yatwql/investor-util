@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
 
 from src.python.report.progress import ProgressReporter
 
@@ -41,7 +40,8 @@ class ReportResult:
 
 def _read_section_flags(config: dict) -> dict:
     """从 config 读取板块可见性开关，返回统一字典。"""
-    from src.python.config import is_enable_b_series, is_enable_news, is_enable_history, is_enable_llm
+    from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
+
     return {
         "b_series": is_enable_b_series(config),
         "news": is_enable_news(config),
@@ -98,9 +98,12 @@ def prepare_report_data(
 
     holdings_details = [
         {
-            "name": d.name, "code": d.code,
-            "market_value": d.market_value, "cost": d.cost,
-            "profit": d.profit, "profit_rate": d.profit_rate,
+            "name": d.name,
+            "code": d.code,
+            "market_value": d.market_value,
+            "cost": d.cost,
+            "profit": d.profit,
+            "profit_rate": d.profit_rate,
             "change_pct": (
                 (d.price - d.yesterday_close) / d.yesterday_close * 100
                 if d.yesterday_close and abs(d.yesterday_close) > 1e-10
@@ -135,8 +138,10 @@ def prepare_report_data(
 
 
 def capture_snapshot(
-    holdings: list, details: list,
-    config: dict | None, reporter: ProgressReporter,
+    holdings: list,
+    details: list,
+    config: dict | None,
+    reporter: ProgressReporter,
 ) -> dict | None:
     """F1 持仓快照创建 + 差异计算 + 保存 + 清理。
 
@@ -145,19 +150,25 @@ def capture_snapshot(
     Returns:
         f_context 字典（含 diff），首次运行或异常时返回 None。
     """
-    from src.python.schemas.history import (
-        AccountSnapshot, SnapshotData, SnapshotHolding,
-    )
     from src.python.fetcher.history_diff import HistoryDiff
     from src.python.report.history_snapshot import load_latest, save
+    from src.python.schemas.history import (
+        AccountSnapshot,
+        SnapshotData,
+        SnapshotHolding,
+    )
 
     f_context: dict | None = None
     try:
         _snapshot_holdings = [
             SnapshotHolding(
-                code=d.code, name=getattr(d, "name", ""),
-                shares=0.0, cost_price=0.0,
-                market_value=d.market_value, total_pnl=d.profit, cost_total=d.cost,
+                code=d.code,
+                name=getattr(d, "name", ""),
+                shares=0.0,
+                cost_price=0.0,
+                market_value=d.market_value,
+                total_pnl=d.profit,
+                cost_total=d.cost,
             )
             for d in details
         ]
@@ -167,8 +178,7 @@ def capture_snapshot(
                 object.__setattr__(h, "shares", _orig.shares)
                 object.__setattr__(h, "cost_price", _orig.cost_price)
         _snapshot = SnapshotData(
-            accounts=(AccountSnapshot(account_name="全部",
-                                      holdings=tuple(_snapshot_holdings)),),
+            accounts=(AccountSnapshot(account_name="全部", holdings=tuple(_snapshot_holdings)),),
             total_value=sum(d.market_value for d in details),
             total_cost=sum(d.cost for d in details),
             total_pnl=sum(d.profit for d in details),
@@ -178,6 +188,7 @@ def capture_snapshot(
         _diff = HistoryDiff.compute(_snapshot, _old)
         save(_snapshot)
         from src.python.report.history_snapshot import prune as _prune_snapshots
+
         _history_cfg = (config or {}).get("history", {})
         _prune_snapshots(
             retention_days=_history_cfg.get("snapshot_retention_days", 60),
@@ -192,23 +203,43 @@ def capture_snapshot(
                     "total_pnl_diff": _diff.total_pnl_diff,
                     "days_since_last_report": _diff.days_since_last_report,
                     "added": [
-                        {"name": a.name, "code": a.code, "action": a.action,
-                         "shares_diff": a.shares_diff, "value_diff": a.value_diff}
+                        {
+                            "name": a.name,
+                            "code": a.code,
+                            "action": a.action,
+                            "shares_diff": a.shares_diff,
+                            "value_diff": a.value_diff,
+                        }
                         for a in _diff.added
                     ],
                     "removed": [
-                        {"name": r.name, "code": r.code, "action": r.action,
-                         "shares_diff": r.shares_diff, "value_diff": r.value_diff}
+                        {
+                            "name": r.name,
+                            "code": r.code,
+                            "action": r.action,
+                            "shares_diff": r.shares_diff,
+                            "value_diff": r.value_diff,
+                        }
                         for r in _diff.removed
                     ],
                     "increased": [
-                        {"name": i.name, "code": i.code, "action": i.action,
-                         "shares_diff": i.shares_diff, "value_diff": i.value_diff}
+                        {
+                            "name": i.name,
+                            "code": i.code,
+                            "action": i.action,
+                            "shares_diff": i.shares_diff,
+                            "value_diff": i.value_diff,
+                        }
                         for i in _diff.increased
                     ],
                     "decreased": [
-                        {"name": d.name, "code": d.code, "action": d.action,
-                         "shares_diff": d.shares_diff, "value_diff": d.value_diff}
+                        {
+                            "name": d.name,
+                            "code": d.code,
+                            "action": d.action,
+                            "shares_diff": d.shares_diff,
+                            "value_diff": d.value_diff,
+                        }
                         for d in _diff.decreased
                     ],
                 },
@@ -293,15 +324,16 @@ def generate_report(
 
     if report_type == "basic":
         # basic 路径：仅生成 Excel，不调 prepare_report_data / capture_snapshot / fetch_history_data
-        from src.python.report.excel_generator import generate_excel_report
         from src.python.registry import get_report_section_order
+        from src.python.report.excel_generator import generate_excel_report
 
         sec_order = get_report_section_order(config)
         output = output_dir or config.get("output_dir", "reports")
 
         try:
             generate_excel_report(
-                holdings, include_news=False,
+                holdings,
+                include_news=False,
                 output_dir=output,
                 section_order=sec_order,
                 progress=reporter,
@@ -318,14 +350,18 @@ def generate_report(
 
     if report_type == "both":
         return _generate_report_both(
-            holdings, config, reporter,
+            holdings,
+            config,
+            reporter,
             history_mode=history_mode,
             output_dir=output_dir,
         )
 
     if report_type == "full":
         return _generate_report_full(
-            holdings, config, reporter,
+            holdings,
+            config,
+            reporter,
             history_mode=history_mode,
             force_llm=force_llm,
             output_dir=output_dir,
@@ -367,10 +403,10 @@ def _generate_report_both(
     流程：_compute_details() → capture_snapshot() → fetch_history_data()
           → write_html_report() → generate_excel_report()
     """
-    from src.python.config import is_enable_b_series, is_enable_news, is_enable_history
+    from src.python.config import is_enable_b_series, is_enable_history, is_enable_news
     from src.python.registry import get_report_section_order
-    from src.python.report.html_writer import write_html_report
     from src.python.report.excel_generator import generate_excel_report
+    from src.python.report.html_writer import write_html_report
 
     result = ReportResult()
     result.holdings_ok = True
@@ -401,10 +437,14 @@ def _generate_report_both(
     reporter.info(f"正在生成 HTML 报告（{_news_label}）...")
     try:
         path = write_html_report(
-            holdings, output_dir=output,
-            news_top_count=news_top_count, include_news=_enable_news,
-            details=details, section_order=sec_order,
-            history_data=history_data, progress=reporter,
+            holdings,
+            output_dir=output,
+            news_top_count=news_top_count,
+            include_news=_enable_news,
+            details=details,
+            section_order=sec_order,
+            history_data=history_data,
+            progress=reporter,
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,
             enable_history=_enable_history,
@@ -421,10 +461,15 @@ def _generate_report_both(
     reporter.info("正在生成 Excel 报告...")
     try:
         generate_excel_report(
-            holdings, include_news=_enable_news, output_dir=output,
-            news_top_count=news_top_count, details=details,
+            holdings,
+            include_news=_enable_news,
+            output_dir=output,
+            news_top_count=news_top_count,
+            details=details,
             section_order=sec_order,
-            f_context=f_context, history_data=history_data, progress=reporter,
+            f_context=f_context,
+            history_data=history_data,
+            progress=reporter,
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,
             enable_history=_enable_history,
@@ -452,8 +497,8 @@ def _report_llm_module_results(
     """统一的 LLM 模块结果报告逻辑。"""
     from src.python.llm import FAIL_REASON_DISABLED
     from src.python.llm.prompts import LLM_MODULE_FAILURE
-    from src.python.report.llm_module_info import get_llm_module_failure_reason
     from src.python.registry import get_llm_module_name
+    from src.python.report.llm_module_info import get_llm_module_failure_reason
 
     _MODULE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep")
     ok_count = 0
@@ -527,8 +572,10 @@ def _fetch_llm_and_news(
 
         if enable_news:
             _news_fut = pool.submit(
-                build_news_data, holdings,
-                prep_data["news_top_count"], prep_data["penetrated_assets"],
+                build_news_data,
+                holdings,
+                prep_data["news_top_count"],
+                prep_data["penetrated_assets"],
             )
         else:
             reporter.info("[板块配置] 新闻板块已关闭，跳过新闻获取")
@@ -536,10 +583,14 @@ def _fetch_llm_and_news(
         if enable_llm:
             _llm_fut = pool.submit(
                 generate_all_llm,
-                prep_data["a_indices"], prep_data["us_indices"],
-                prep_data["total_mv"], prep_data["total_cost"],
-                prep_data["total_profit"], prep_data["total_today_profit"],
-                len(holdings), prep_data["categories"],
+                prep_data["a_indices"],
+                prep_data["us_indices"],
+                prep_data["total_mv"],
+                prep_data["total_cost"],
+                prep_data["total_profit"],
+                prep_data["total_today_profit"],
+                len(holdings),
+                prep_data["categories"],
                 penetrated_assets=prep_data["penetrated_assets"],
                 holdings_details=prep_data["holdings_details"],
                 sector_flow=sector_flow,
@@ -610,11 +661,11 @@ def _generate_report_full(
           → get_sector_fund_flow() → _fetch_llm_and_news()
           → write_html_report() → generate_excel_report()
     """
-    from src.python.config import is_enable_b_series, is_enable_news, is_enable_history, is_enable_llm
-    from src.python.registry import get_report_section_order
-    from src.python.report.html_writer import write_html_report
-    from src.python.report.excel_generator import generate_excel_report
+    from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
     from src.python.fetcher.akshare import get_sector_fund_flow
+    from src.python.registry import get_report_section_order
+    from src.python.report.excel_generator import generate_excel_report
+    from src.python.report.html_writer import write_html_report
 
     result = ReportResult()
     result.holdings_ok = True
@@ -651,8 +702,14 @@ def _generate_report_full(
 
     # ── 5. 并行获取 LLM + 新闻（4 分支统一处理） ──
     llm_content, news_data, news_llm_meta, news_ok = _fetch_llm_and_news(
-        holdings, prep, sector_flow, force_llm, f_context,
-        _enable_news, _enable_llm, reporter,
+        holdings,
+        prep,
+        sector_flow,
+        force_llm,
+        f_context,
+        _enable_news,
+        _enable_llm,
+        reporter,
     )
 
     # ── 6. HTML 报告 ──
@@ -660,14 +717,19 @@ def _generate_report_full(
     reporter.info(f"正在生成 HTML 报告（{_report_label}分析章节）...")
     try:
         path = write_html_report(
-            holdings, output_dir=output_dir or prep["output_dir"],
+            holdings,
+            output_dir=output_dir or prep["output_dir"],
             news_top_count=prep["news_top_count"],
             include_news=news_ok,
-            llm_content=llm_content, details=prep["details"],
-            news_data=news_data, news_llm_meta=news_llm_meta,
+            llm_content=llm_content,
+            details=prep["details"],
+            news_data=news_data,
+            news_llm_meta=news_llm_meta,
             section_order=sec_order,
-            history_data=history_data, progress=reporter,
-            a_indices=prep["a_indices"], us_indices=prep["us_indices"],
+            history_data=history_data,
+            progress=reporter,
+            a_indices=prep["a_indices"],
+            us_indices=prep["us_indices"],
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,
             enable_history=_enable_history,
@@ -684,17 +746,21 @@ def _generate_report_full(
     reporter.info("正在生成 Excel 报告...")
     try:
         generate_excel_report(
-            holdings, include_news=news_ok,
+            holdings,
+            include_news=news_ok,
             output_dir=output_dir or prep["output_dir"],
-            news_top_count=prep["news_top_count"], include_llm=_enable_llm,
+            news_top_count=prep["news_top_count"],
+            include_llm=_enable_llm,
             llm_content=llm_content,
-            details=prep["details"], a_indices=prep["a_indices"],
+            details=prep["details"],
+            a_indices=prep["a_indices"],
             us_indices=prep["us_indices"],
             news_data=news_data,
             news_llm_meta=news_llm_meta,
             section_order=sec_order,
             progress=reporter,
-            f_context=f_context, history_data=history_data,
+            f_context=f_context,
+            history_data=history_data,
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,
             enable_history=_enable_history,

@@ -41,8 +41,16 @@ _tracker = DegradationTracker()
 _NCOLS = 10
 _CURRENT_YEAR = datetime.now().year
 _HEADERS = [
-    "排名", "名称", "代码", "穿透市值", "占比", "板块", "概念",
-    f"预测EPS({_CURRENT_YEAR}E)", "年均股息", "来源明细",
+    "排名",
+    "名称",
+    "代码",
+    "穿透市值",
+    "占比",
+    "板块",
+    "概念",
+    f"预测EPS({_CURRENT_YEAR}E)",
+    "年均股息",
+    "来源明细",
 ]
 
 
@@ -78,6 +86,7 @@ def _load_profit_forecast_safe() -> tuple[dict, bool]:
     """
     try:
         from src.python.fetcher.akshare import get_profit_forecast
+
         return get_profit_forecast(), True
     except Exception:
         logger.warning("[penetration] 盈利预测获取失败（非关键），EPS 列显示 --", exc_info=True)
@@ -92,6 +101,7 @@ def _load_dividend_data_safe(result: dict) -> tuple[dict, bool]:
     """
     try:
         from src.python.fetcher.akshare import get_dividend_data
+
         all_top10_codes = list(set().union(*(entry.get("codes", []) for entry in result["top10"])))
         a_stock_codes = [c for c in all_top10_codes if is_a_share_code(c)]
         data = get_dividend_data(a_stock_codes) if a_stock_codes else {}
@@ -131,36 +141,45 @@ def build_penetration_data_status(
         cache_age = get_cache_age_by_data_type("industry", _first_code) if _first_code else None
         _ind_ttl = get_ttl("industry")
         degraded, _, _ = _tracker.record(
-            "penetration_industry", "T3", success=False,
+            "penetration_industry",
+            "T3",
+            success=False,
             failure_type="unreachable",
             cache_age_hours=cache_age / 3600 if cache_age else None,
             cache_ttl_hours=_ind_ttl / 3600 if _ind_ttl else 24,
         )
         if degraded:
             status["industry"] = DataStatusItem(
-                available=False, tier="T3",
+                available=False,
+                tier="T3",
                 message=STATUS_MESSAGES["industry_unavailable"],
             )
 
     # 盈利预测（T4，akshare）
     if not profit_success:
         degraded, _, _ = _tracker.record(
-            "penetration_profit_forecast", "T4", success=False,
+            "penetration_profit_forecast",
+            "T4",
+            success=False,
         )
         if degraded:
             status["profit_forecast"] = DataStatusItem(
-                available=False, tier="T4",
+                available=False,
+                tier="T4",
                 message=STATUS_MESSAGES["profit_forecast_unavailable"],
             )
 
     # 分红数据（T4，akshare）
     if not dividend_success:
         degraded, _, _ = _tracker.record(
-            "penetration_dividend", "T4", success=False,
+            "penetration_dividend",
+            "T4",
+            success=False,
         )
         if degraded:
             status["dividend"] = DataStatusItem(
-                available=False, tier="T4",
+                available=False,
+                tier="T4",
                 message=STATUS_MESSAGES["dividend_unavailable"],
             )
 
@@ -171,17 +190,20 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
     """写入穿透页签底部备注和统计信息。返回写入后的行号。"""
     row += 1
     if summary["unknown_mv"] > 0:
-        write_data_row(ws, row,
-                       [f"* {summary['total_funds']} 只基金中，有 "
-                        f"{summary['failed_funds']} 只无法获取穿透数据，"
-                        f"合计市值 {summary['unknown_mv']:,.2f} 元未计入穿透 TOP10"],
-                       [])
+        write_data_row(
+            ws,
+            row,
+            [
+                f"* {summary['total_funds']} 只基金中，有 "
+                f"{summary['failed_funds']} 只无法获取穿透数据，"
+                f"合计市值 {summary['unknown_mv']:,.2f} 元未计入穿透 TOP10"
+            ],
+            [],
+        )
         row += 1
         failed_details = summary.get("failed_fund_details", [])
         if failed_details:
-            failed_names = "；".join(
-                f"{f['name']}({f['code']})" for f in failed_details
-            )
+            failed_names = "；".join(f"{f['name']}({f['code']})" for f in failed_details)
             write_data_row(ws, row, [f"  无法获取穿透的基金：{failed_names}"])
             row += 1
 
@@ -212,7 +234,7 @@ def write_penetration_sheet(
         penetration_data: 预计算穿透数据。为 None 时自动计算，提供时跳过
                           内部重复计算，用于调用方已算过一轮的场景
     """
-    row = write_title_row(ws, 1, get_report_sheet_name('penetration'), _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name("penetration"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
     result = penetration_data if penetration_data is not None else compute_penetration_top10(holdings, details)
@@ -258,21 +280,20 @@ def write_penetration_sheet(
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=40)
 
-    logger.info("%s写入完成，合并 %d 个标的",
-                get_report_sheet_name('penetration'), summary["merged_count"])
+    logger.info("%s写入完成，合并 %d 个标的", get_report_sheet_name("penetration"), summary["merged_count"])
 
 
 def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
     return [
-        "",           # 1  排名
-        "",           # 2  名称
-        "",           # 3  代码
-        FMT_MONEY,    # 4  穿透市值
+        "",  # 1  排名
+        "",  # 2  名称
+        "",  # 3  代码
+        FMT_MONEY,  # 4  穿透市值
         FMT_PERCENT,  # 5  占比
-        "",           # 6  板块
-        "",           # 7  概念
-        "",           # 8  预测EPS(动态年份)
-        "",           # 9  年均股息
-        "",           # 10 来源明细
+        "",  # 6  板块
+        "",  # 7  概念
+        "",  # 8  预测EPS(动态年份)
+        "",  # 9  年均股息
+        "",  # 10 来源明细
     ]

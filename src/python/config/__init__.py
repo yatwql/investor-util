@@ -15,61 +15,61 @@
 """
 
 # 保留子模块引用，供测试和外部直接访问
-from src.python.config import _config_defaults as _config_defaults
-from src.python.config import _llm_defaults as _llm_defaults
 from src.python.config import _comments as _comments
+from src.python.config import _config_defaults as _config_defaults
 from src.python.config import _core as _core
+from src.python.config import _llm_defaults as _llm_defaults
+
+# ── JSON 注释剥离 ──
+from src.python.config._comments import _strip_json_comments
 
 # ── 默认配置（config.json）──
 from src.python.config._config_defaults import (
-    _DEFAULT_CONFIG,
-    _get_default_config_template,
     _CONFIG_FILE,
     _CONFIG_PATH_OVERRIDE,
+    _DEFAULT_CONFIG,
+    _get_default_config_template,
     get_config_path,
     set_config_path_override,
+)
+
+# ── 核心逻辑 ──
+from src.python.config._core import (
+    _KNOWN_LLM_SETTINGS_KEYS,
+    _KNOWN_NEWS_SOURCES,
+    _KNOWN_PROVIDER_NAMES,
+    _KNOWN_PROVIDER_TYPES,
+    _STRING_CONFIG_KEYS,
+    _check_unknown_llm_keys,
+    _clear_config_cache,
+    _config_cache,
+    _config_lock,
+    _config_mtime,
+    _config_size,
+    _ensure_llm_settings_file,
+    _llm_config_cache,
+    _llm_config_lock,
+    _llm_config_mtime,
+    _llm_config_size,
+    # 配置缓存 & 读写
+    get_config,
+    # LLM 配置
+    get_llm_config,
+    get_llm_settings_path,
+    init_config,
+    # 板块可见性
+    is_enable_b_series,
+    is_enable_history,
+    is_enable_llm,
+    is_enable_news,
+    set_config,
+    # 配置校验
+    validate_config,
 )
 
 # ── 默认模板（llm_settings.json）──
 from src.python.config._llm_defaults import (
     _get_default_llm_settings_template,
-)
-
-# ── JSON 注释剥离 ──
-from src.python.config._comments import _strip_json_comments
-
-# ── 核心逻辑 ──
-from src.python.config._core import (
-    # 配置缓存 & 读写
-    get_config,
-    set_config,
-    init_config,
-    _clear_config_cache,
-    _config_cache,
-    _config_mtime,
-    _config_size,
-    _config_lock,
-    # 配置校验
-    validate_config,
-    _KNOWN_NEWS_SOURCES,
-    _KNOWN_PROVIDER_TYPES,
-    _KNOWN_PROVIDER_NAMES,
-    _STRING_CONFIG_KEYS,
-    # 板块可见性
-    is_enable_b_series,
-    is_enable_news,
-    is_enable_history,
-    is_enable_llm,
-    # LLM 配置
-    get_llm_config,
-    get_llm_settings_path,
-    _KNOWN_LLM_SETTINGS_KEYS,
-    _llm_config_cache,
-    _llm_config_mtime,
-    _llm_config_size,
-    _llm_config_lock,
-    _ensure_llm_settings_file,
-    _check_unknown_llm_keys,
 )
 
 __all__ = [

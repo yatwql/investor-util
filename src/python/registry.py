@@ -91,105 +91,127 @@ class DataModuleDef:
 
 _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     # ── 基础行情（preload 组：换持仓后重取）──
-    DataModuleDef("股票价格", "price",
-                  cache_prefixes=("price_",), cache_ttl=CACHE_DAILY,
-                  cache_groups=("preload",)),
-    DataModuleDef("市场指数", "index",
-                  cache_prefixes=("index_",), cache_ttl=CACHE_DAILY,
-                  cache_groups=("preload",)),
-
+    DataModuleDef("股票价格", "price", cache_prefixes=("price_",), cache_ttl=CACHE_DAILY, cache_groups=("preload",)),
+    DataModuleDef("市场指数", "index", cache_prefixes=("index_",), cache_ttl=CACHE_DAILY, cache_groups=("preload",)),
     # ── 基金数据（refresh 组：主动刷新缓存）──
-    DataModuleDef("基金业绩排名", "rank",
-                  cache_prefixes=("fund_perf_",), cache_ttl=CACHE_DAILY,
-                  cache_groups=("refresh",)),
-    DataModuleDef("基金持仓", "hold",
-                  cache_prefixes=("fund_hold_",), cache_ttl=CACHE_WEEKLY,
-                  cache_groups=("refresh",)),
-
+    DataModuleDef(
+        "基金业绩排名", "rank", cache_prefixes=("fund_perf_",), cache_ttl=CACHE_DAILY, cache_groups=("refresh",)
+    ),
+    DataModuleDef(
+        "基金持仓", "hold", cache_prefixes=("fund_hold_",), cache_ttl=CACHE_WEEKLY, cache_groups=("refresh",)
+    ),
     # ── 行业分类（refresh 组）──
-    DataModuleDef("行业分类", "industry",
-                  cache_prefixes=("industry_",), cache_ttl=CACHE_TWO_WEEKS,
-                  cache_groups=("refresh",)),
-
+    DataModuleDef(
+        "行业分类", "industry", cache_prefixes=("industry_",), cache_ttl=CACHE_TWO_WEEKS, cache_groups=("refresh",)
+    ),
     # ── 新闻（refresh 组）──
-    DataModuleDef("新闻聚合", "news",
-                  cache_prefixes=("news_",), cache_ttl=900,
-                  cache_groups=("refresh",)),
-
+    DataModuleDef("新闻聚合", "news", cache_prefixes=("news_",), cache_ttl=900, cache_groups=("refresh",)),
     # ── LLM 智能分析模块 ──
-    DataModuleDef("全球政经局势", "llm_global_macro",
-                  cache_prefixes=("llm_global_macro_",),
-                  cache_ttl=86400, settings_suffix="global_macro",
-                  cache_groups=("preload",)),
-    DataModuleDef("智囊团深度复盘", "llm_expert_review",
-                  cache_prefixes=("llm_expert_review_",),
-                  cache_ttl=7200, settings_suffix="expert_review",
-                  cache_groups=("preload",)),
-    DataModuleDef("财经新闻热点与持仓关联分析", "llm_news_correlation",
-                  cache_prefixes=("llm_news_item_",),
-                  cache_ttl=3600, settings_suffix="news_correlation",
-                  cache_groups=("refresh",)),
-    DataModuleDef("持仓体检报告", "llm_health_check",
-                  cache_prefixes=("llm_health_check_",),
-                  cache_ttl=86400, settings_suffix="health_check",
-                  cache_groups=("preload",)),
-    DataModuleDef("穿透深度分析", "llm_penetration_deep",
-                  cache_prefixes=("llm_penetration_deep_",),
-                  cache_ttl=86400, settings_suffix="penetration_deep",
-                  cache_groups=("preload",)),
-
+    DataModuleDef(
+        "全球政经局势",
+        "llm_global_macro",
+        cache_prefixes=("llm_global_macro_",),
+        cache_ttl=86400,
+        settings_suffix="global_macro",
+        cache_groups=("preload",),
+    ),
+    DataModuleDef(
+        "智囊团深度复盘",
+        "llm_expert_review",
+        cache_prefixes=("llm_expert_review_",),
+        cache_ttl=7200,
+        settings_suffix="expert_review",
+        cache_groups=("preload",),
+    ),
+    DataModuleDef(
+        "财经新闻热点与持仓关联分析",
+        "llm_news_correlation",
+        cache_prefixes=("llm_news_item_",),
+        cache_ttl=3600,
+        settings_suffix="news_correlation",
+        cache_groups=("refresh",),
+    ),
+    DataModuleDef(
+        "持仓体检报告",
+        "llm_health_check",
+        cache_prefixes=("llm_health_check_",),
+        cache_ttl=86400,
+        settings_suffix="health_check",
+        cache_groups=("preload",),
+    ),
+    DataModuleDef(
+        "穿透深度分析",
+        "llm_penetration_deep",
+        cache_prefixes=("llm_penetration_deep_",),
+        cache_ttl=86400,
+        settings_suffix="penetration_deep",
+        cache_groups=("preload",),
+    ),
     # ── 补充数据（refresh 组）──
-    DataModuleDef("机构盈利预测", "profit_forecast",
-                  cache_prefixes=("profit_forecast_",), cache_ttl=CACHE_DAILY,
-                  cache_groups=("refresh",)),
-    DataModuleDef("行业资金流向", "sector_flow",
-                  cache_prefixes=("sector_flow_",), cache_ttl=900,
-                  cache_groups=("refresh",)),
-    DataModuleDef("基金风格扩展数据（市值/PE）", "extended",
-                  cache_prefixes=("extended_",), cache_ttl=CACHE_DAILY,
-                  cache_groups=("refresh",)),
-    DataModuleDef("股票历史分红", "dividend",
-                  cache_prefixes=("dividend_",), cache_ttl=CACHE_MONTHLY,
-                  cache_groups=("refresh",)),
-
+    DataModuleDef(
+        "机构盈利预测",
+        "profit_forecast",
+        cache_prefixes=("profit_forecast_",),
+        cache_ttl=CACHE_DAILY,
+        cache_groups=("refresh",),
+    ),
+    DataModuleDef(
+        "行业资金流向", "sector_flow", cache_prefixes=("sector_flow_",), cache_ttl=900, cache_groups=("refresh",)
+    ),
+    DataModuleDef(
+        "基金风格扩展数据（市值/PE）",
+        "extended",
+        cache_prefixes=("extended_",),
+        cache_ttl=CACHE_DAILY,
+        cache_groups=("refresh",),
+    ),
+    DataModuleDef(
+        "股票历史分红", "dividend", cache_prefixes=("dividend_",), cache_ttl=CACHE_MONTHLY, cache_groups=("refresh",)
+    ),
     # ── B 系列：基金深度分析模块 ──
-    DataModuleDef("基金经理", "fund_manager",
-                  cache_prefixes=("fund_manager_",),
-                  exact_cache_keys=("fund_manager_snapshot",),
-                  cache_ttl=CACHE_DAILY,
-                  cache_groups=("refresh",)),
-    DataModuleDef("持仓重合度", "fund_overlap",
-                  cache_prefixes=("fund_overlap_",),
-                  cache_ttl=CACHE_WEEKLY,
-                  cache_groups=("refresh",)),
-    DataModuleDef("基金集中度历史", "fund_concentration",
-                  exact_cache_keys=("fund_concentration_snapshot",),
-                  cache_ttl=CACHE_MONTHLY),
-    DataModuleDef("基金风格快照", "fund_style_snapshot",
-                  exact_cache_keys=("fund_style_snapshot",),
-                  cache_ttl=CACHE_MONTHLY),
-
+    DataModuleDef(
+        "基金经理",
+        "fund_manager",
+        cache_prefixes=("fund_manager_",),
+        exact_cache_keys=("fund_manager_snapshot",),
+        cache_ttl=CACHE_DAILY,
+        cache_groups=("refresh",),
+    ),
+    DataModuleDef(
+        "持仓重合度",
+        "fund_overlap",
+        cache_prefixes=("fund_overlap_",),
+        cache_ttl=CACHE_WEEKLY,
+        cache_groups=("refresh",),
+    ),
+    DataModuleDef(
+        "基金集中度历史",
+        "fund_concentration",
+        exact_cache_keys=("fund_concentration_snapshot",),
+        cache_ttl=CACHE_MONTHLY,
+    ),
+    DataModuleDef(
+        "基金风格快照", "fund_style_snapshot", exact_cache_keys=("fund_style_snapshot",), cache_ttl=CACHE_MONTHLY
+    ),
     # ── 精确键名缓存（基准数据/持仓跟踪/交易日历）──
-    DataModuleDef("基金业绩基准", "benchmark",
-                  exact_cache_keys=("fund_benchmarks",),
-                  cache_ttl=CACHE_MONTHLY,
-                  cache_groups=("refresh",)),
-    DataModuleDef("持仓跟踪", "tracking",
-                  exact_cache_keys=("holdings_tracking",),
-                  cache_ttl=CACHE_MONTHLY),  # 无 cache_group，避免被手动清除
-
+    DataModuleDef(
+        "基金业绩基准",
+        "benchmark",
+        exact_cache_keys=("fund_benchmarks",),
+        cache_ttl=CACHE_MONTHLY,
+        cache_groups=("refresh",),
+    ),
+    DataModuleDef(
+        "持仓跟踪", "tracking", exact_cache_keys=("holdings_tracking",), cache_ttl=CACHE_MONTHLY
+    ),  # 无 cache_group，避免被手动清除
     # ── 组合历史走势（无 cache_group — per-code 缓存，不因切换持仓文件而清除）──
-    DataModuleDef("历史股票日线", "history_stock",
-                  cache_prefixes=("history_stock_",), cache_ttl=CACHE_WEEKLY),
-    DataModuleDef("历史基金净值", "history_fund_otc",
-                  cache_prefixes=("history_fund_otc_",), cache_ttl=CACHE_MONTHLY),
-    DataModuleDef("指数历史日线", "history_index",
-                  cache_prefixes=("history_index_",), cache_ttl=CACHE_MONTHLY),
-
+    DataModuleDef("历史股票日线", "history_stock", cache_prefixes=("history_stock_",), cache_ttl=CACHE_WEEKLY),
+    DataModuleDef("历史基金净值", "history_fund_otc", cache_prefixes=("history_fund_otc_",), cache_ttl=CACHE_MONTHLY),
+    DataModuleDef("指数历史日线", "history_index", cache_prefixes=("history_index_",), cache_ttl=CACHE_MONTHLY),
     # ── 交易日历（akshare 全年数据，极少变动，无 cache_group 避免误删）──
-    DataModuleDef("交易日历", "calendar",
-                  exact_cache_keys=("trading_calendar",),
-                  cache_ttl=CACHE_WEEKLY * 2),  # 两周（cleanup 周期 + 读缓存均从此取值）
+    DataModuleDef(
+        "交易日历", "calendar", exact_cache_keys=("trading_calendar",), cache_ttl=CACHE_WEEKLY * 2
+    ),  # 两周（cleanup 周期 + 读缓存均从此取值）
 )
 
 
@@ -256,11 +278,7 @@ def get_registered_data_types() -> set[str]:
 
 def get_known_enabled_llm_keys() -> set[str]:
     """返回 enabled_llm 字典的所有合法子键（即所有 LLM 模块的 settings_suffix）。"""
-    return {
-        m.settings_suffix
-        for m in _MODULE_REGISTRY
-        if m.is_llm and m.settings_suffix is not None
-    }
+    return {m.settings_suffix for m in _MODULE_REGISTRY if m.is_llm and m.settings_suffix is not None}
 
 
 def get_llm_module_name(settings_suffix: str) -> str:
@@ -295,11 +313,7 @@ def get_llm_module_names() -> dict[str, str]:
         >>> names["global_macro"]
         '全球政经局势'
     """
-    return {
-        m.settings_suffix: m.name
-        for m in _MODULE_REGISTRY
-        if m.is_llm and m.settings_suffix is not None
-    }
+    return {m.settings_suffix: m.name for m in _MODULE_REGISTRY if m.is_llm and m.settings_suffix is not None}
 
 
 # ── 非 LLM 报表页签名称 ──────────────────────────────────
@@ -338,28 +352,40 @@ def get_report_sheet_name(sheet_key: str) -> str:
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── always 类型（始终显示，无 data_flag 依赖） ──
-    {"key": "summary",            "name": "投资分析汇总",                     "number": 1,  "type": "always",    "data_flag": None},
-    {"key": "market_value",       "name": "市值核算明细表",                   "number": 2,  "type": "always",    "data_flag": None},
-    {"key": "category",           "name": "持仓分类表",                       "number": 3,  "type": "always",    "data_flag": None},
-    {"key": "penetration",        "name": "资产穿透TOP10",                    "number": 4,  "type": "always",    "data_flag": None},
-    {"key": "fund_performance",   "name": "基金业绩分析",                     "number": 5,  "type": "always",    "data_flag": None},
+    {"key": "summary", "name": "投资分析汇总", "number": 1, "type": "always", "data_flag": None},
+    {"key": "market_value", "name": "市值核算明细表", "number": 2, "type": "always", "data_flag": None},
+    {"key": "category", "name": "持仓分类表", "number": 3, "type": "always", "data_flag": None},
+    {"key": "penetration", "name": "资产穿透TOP10", "number": 4, "type": "always", "data_flag": None},
+    {"key": "fund_performance", "name": "基金业绩分析", "number": 5, "type": "always", "data_flag": None},
     # ── b_series 类型（有数据才显示） ──
-    {"key": "fund_manager",       "name": "基金经理变更监控",                 "number": 6,  "type": "b_series",  "data_flag": "manager_data"},
-    {"key": "fund_overlap",       "name": "持仓重合度矩阵",                   "number": 7,  "type": "b_series",  "data_flag": "overlap_data"},
-    {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8,  "type": "b_series",  "data_flag": "concentration_data"},
-    {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "b_series",  "data_flag": "style_data"},
+    {"key": "fund_manager", "name": "基金经理变更监控", "number": 6, "type": "b_series", "data_flag": "manager_data"},
+    {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7, "type": "b_series", "data_flag": "overlap_data"},
+    {
+        "key": "fund_concentration",
+        "name": "持仓集中度监控",
+        "number": 8,
+        "type": "b_series",
+        "data_flag": "concentration_data",
+    },
+    {"key": "fund_style", "name": "基金风格分析", "number": 9, "type": "b_series", "data_flag": "style_data"},
     # ── news 类型（需启用新闻功能） ──
-    {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10, "type": "news",      "data_flag": "news_data_available"},
+    {
+        "key": "news_correlation",
+        "name": "财经新闻热点与持仓关联分析",
+        "number": 10,
+        "type": "news",
+        "data_flag": "news_data_available",
+    },
     # ── llm 类型（需启用 LLM 功能） ──
-    {"key": "global_macro",       "name": "全球政经局势",                     "number": 11, "type": "llm",       "data_flag": "llm_data_available"},
-    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12, "type": "llm",       "data_flag": "llm_data_available"},
-    {"key": "health_check",       "name": "持仓体检报告",                     "number": 13, "type": "llm",       "data_flag": "llm_data_available"},
-    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "global_macro", "name": "全球政经局势", "number": 11, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "health_check", "name": "持仓体检报告", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
-    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 15, "type": "history",   "data_flag": None},
-    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 16, "type": "history",   "data_flag": None},
+    {"key": "portfolio_history", "name": "组合历史走势", "number": 15, "type": "history", "data_flag": None},
+    {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16, "type": "history", "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 17, "type": "llm",       "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 17, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 

@@ -84,17 +84,14 @@ def _extract_log_from_html(html: str, test_id: str) -> str:
     """
     # 尝试匹配 <div class="log">...</div> 在包含 test_id 的区域附近
     escaped = re.escape(test_id)
-    m = re.search(
-        r'<div\s+class="log"[^>]*>.*?' + escaped + r'.*?</pre>\s*</div>',
-        html, re.DOTALL
-    )
+    m = re.search(r'<div\s+class="log"[^>]*>.*?' + escaped + r".*?</pre>\s*</div>", html, re.DOTALL)
     if m:
         # 提取 <pre> 中的内容
-        pre = re.search(r'<pre[^>]*>(.*?)</pre>', m.group(0), re.DOTALL)
+        pre = re.search(r"<pre[^>]*>(.*?)</pre>", m.group(0), re.DOTALL)
         if pre:
             text = pre.group(1)
             text = text.replace("&#34;", '"').replace("&gt;", ">").replace("&lt;", "<").replace("&amp;", "&")
-            text = re.sub(r'<[^>]+>', '', text)
+            text = re.sub(r"<[^>]+>", "", text)
             return text.strip()
     return ""
 
@@ -108,7 +105,7 @@ def parse_report(report_path: str) -> dict[str, Any]:
             "failures": [{"test_id": str, "result": str, "log": str, "duration": str}, ...]
         }
     """
-    with open(report_path, "r", encoding="utf-8") as f:
+    with open(report_path, encoding="utf-8") as f:
         html = f.read()
 
     raw_json = _find_json_blob(html)
@@ -172,7 +169,7 @@ def print_report(result: dict[str, Any], detail: bool = True) -> None:
     ne = s["errors"]
     sk = s["skipped"]
 
-    print(f"=== 测试报告汇总 ===")
+    print("=== 测试报告汇总 ===")
     print(f"  总计: {total}  |  通过: {ok}  |  失败: {nf}  |  错误: {ne}  |  跳过: {sk}")
     print()
 
@@ -225,12 +222,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="从 pytest-html 报告中提取失败/错误测试用例",
     )
-    parser.add_argument("path", nargs="?", default=None,
-                        help="report.html 路径（默认自动查找 test-reports/latest/）")
-    parser.add_argument("--summary", action="store_true",
-                        help="仅输出汇总统计")
-    parser.add_argument("--json", action="store_true",
-                        help="输出 JSON 格式")
+    parser.add_argument("path", nargs="?", default=None, help="report.html 路径（默认自动查找 test-reports/latest/）")
+    parser.add_argument("--summary", action="store_true", help="仅输出汇总统计")
+    parser.add_argument("--json", action="store_true", help="输出 JSON 格式")
     args = parser.parse_args()
 
     report_path = resolve_report_path(args.path)

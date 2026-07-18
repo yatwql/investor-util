@@ -70,16 +70,31 @@ def build_llm_module_info(llm_failure: dict, per_module: dict, skip_unknown: boo
         pm = per_module.get(mk)
         if reason == FAIL_REASON_DISABLED:
             entry.update(
-                status="disabled", status_label="已禁用",
-                model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="",
+                status="disabled",
+                status_label="已禁用",
+                model="",
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                cache_hit_tokens=0,
+                cost=0.0,
+                cached=False,
+                thinking=False,
+                endpoint="",
             )
         elif reason:
             entry.update(
                 status="failed",
                 status_label=_DISPLAY_REASON.get(reason, str(reason)),
-                model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="",
+                model="",
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                cache_hit_tokens=0,
+                cost=0.0,
+                cached=False,
+                thinking=False,
+                endpoint="",
             )
         elif pm:
             inp = pm.get("input_tokens", 0)
@@ -87,18 +102,31 @@ def build_llm_module_info(llm_failure: dict, per_module: dict, skip_unknown: boo
             entry.update(
                 status="cached" if pm.get("cached") else "success",
                 status_label="缓存" if pm.get("cached") else "成功",
-                model=pm.get("model", ""), input_tokens=inp, output_tokens=out,
-                total_tokens=inp + out, cache_hit_tokens=pm.get("cache_hit_tokens", 0),
-                cost=pm.get("cost", 0.0), cached=pm.get("cached", False),
-                thinking=pm.get("thinking", False), endpoint=pm.get("endpoint", ""),
+                model=pm.get("model", ""),
+                input_tokens=inp,
+                output_tokens=out,
+                total_tokens=inp + out,
+                cache_hit_tokens=pm.get("cache_hit_tokens", 0),
+                cost=pm.get("cost", 0.0),
+                cached=pm.get("cached", False),
+                thinking=pm.get("thinking", False),
+                endpoint=pm.get("endpoint", ""),
             )
         elif skip_unknown:
             continue
         else:
             entry.update(
-                status="unknown", status_label="",
-                model="", input_tokens=0, output_tokens=0, total_tokens=0,
-                cache_hit_tokens=0, cost=0.0, cached=False, thinking=False, endpoint="",
+                status="unknown",
+                status_label="",
+                model="",
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                cache_hit_tokens=0,
+                cost=0.0,
+                cached=False,
+                thinking=False,
+                endpoint="",
             )
         result.append(entry)
     return result

@@ -104,8 +104,7 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
 
     # 熔断预检：全链已熔断时跳过批量请求，避免逐条冗余调用
     if is_provider_chain_broken("industry"):
-        logger.warning("[industry] 行业数据 API 全链不可用（熔断），跳过 %d 个代码的批量获取",
-                       len(a_codes))
+        logger.warning("[industry] 行业数据 API 全链不可用（熔断），跳过 %d 个代码的批量获取", len(a_codes))
         return {}
 
     result: dict[str, dict] = {}
@@ -135,8 +134,7 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
     if failed:
         # 重试预检：如熔断未恢复则跳过重试，避免无效等待
         if is_provider_chain_broken("industry"):
-            logger.info("[industry] 行业数据全链熔断未恢复，跳过 %d 个失败代码重试",
-                        len(failed))
+            logger.info("[industry] 行业数据全链熔断未恢复，跳过 %d 个失败代码重试", len(failed))
         else:
             delay = _BATCH_RETRY_DELAY + random.uniform(0, _BATCH_RETRY_JITTER)
             logger.info("批量行业数据重试 %d 个失败代码（%.1fs 后）", len(failed), delay)
@@ -155,8 +153,7 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
                         with lock:
                             result[code] = data
 
-    logger.info("批量行业数据就绪: %d/%d 个代码（含缓存命中）",
-                len(result), len(a_codes))
+    logger.info("批量行业数据就绪: %d/%d 个代码（含缓存命中）", len(result), len(a_codes))
     return result
 
 

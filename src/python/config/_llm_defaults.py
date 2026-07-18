@@ -13,27 +13,27 @@ def _get_default_llm_settings_template() -> str:
     支持 // 注释风格，由 _strip_json_comments() 剥离后解析。
     """
     return (
-        '{\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 全局设置\n'
-        '  // ═══════════════════════════════════════════\n'
+        "{\n"
+        "  // ═══════════════════════════════════════════\n"
+        "  // 全局设置\n"
+        "  // ═══════════════════════════════════════════\n"
         '  "max_retries": 2,\n'
         '  "llm_max_concurrency": 3,\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 模块开关 — 控制各 LLM 分析功能的启用/停用\n'
-        '  // ═══════════════════════════════════════════\n'
+        "\n"
+        "  // ═══════════════════════════════════════════\n"
+        "  // 模块开关 — 控制各 LLM 分析功能的启用/停用\n"
+        "  // ═══════════════════════════════════════════\n"
         '  "enabled_llm": {\n'
         '    "global_macro": true,\n'
         '    "expert_review": true,\n'
         '    "health_check": true,\n'
         '    "penetration_deep": true,\n'
         '    "news_correlation": false\n'
-        '  },\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 全球政经局势 — global_macro\n'
-        '  // ═══════════════════════════════════════════\n'
+        "  },\n"
+        "\n"
+        "  // ═══════════════════════════════════════════\n"
+        "  // 全球政经局势 — global_macro\n"
+        "  // ═══════════════════════════════════════════\n"
         '  "system_prompt_global_macro": null,\n'
         '  "model_global_macro": null,\n'
         '  "temperature_global_macro": 0.3,\n'
@@ -44,10 +44,10 @@ def _get_default_llm_settings_template() -> str:
         '  "thinking_enabled_global_macro": false,\n'
         '  "thinking_budget_global_macro": 4000,\n'
         '  "reasoning_effort_global_macro": "high",\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 智囊团深度复盘 — expert_review\n'
-        '  // ═══════════════════════════════════════════\n'
+        "\n"
+        "  // ═══════════════════════════════════════════\n"
+        "  // 智囊团深度复盘 — expert_review\n"
+        "  // ═══════════════════════════════════════════\n"
         '  "system_prompt_expert_review": null,\n'
         '  "model_expert_review": null,\n'
         '  "temperature_expert_review": 0.8,\n'
@@ -58,10 +58,10 @@ def _get_default_llm_settings_template() -> str:
         '  "thinking_enabled_expert_review": true,\n'
         '  "thinking_budget_expert_review": 16000,\n'
         '  "reasoning_effort_expert_review": "high",\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 持仓体检报告 — health_check\n'
-        '  // ═══════════════════════════════════════════\n'
+        "\n"
+        "  // ═══════════════════════════════════════════\n"
+        "  // 持仓体检报告 — health_check\n"
+        "  // ═══════════════════════════════════════════\n"
         '  "system_prompt_health_check": null,\n'
         '  "model_health_check": null,\n'
         '  "temperature_health_check": 0.5,\n'
@@ -72,10 +72,10 @@ def _get_default_llm_settings_template() -> str:
         '  "thinking_enabled_health_check": true,\n'
         '  "thinking_budget_health_check": 12000,\n'
         '  "reasoning_effort_health_check": "high",\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 穿透深度分析 — penetration_deep\n'
-        '  // ═══════════════════════════════════════════\n'
+        "\n"
+        "  // ═══════════════════════════════════════════\n"
+        "  // 穿透深度分析 — penetration_deep\n"
+        "  // ═══════════════════════════════════════════\n"
         '  "system_prompt_penetration_deep": null,\n'
         '  "model_penetration_deep": null,\n'
         '  "temperature_penetration_deep": 0.4,\n'
@@ -86,11 +86,11 @@ def _get_default_llm_settings_template() -> str:
         '  "thinking_enabled_penetration_deep": false,\n'
         '  "thinking_budget_penetration_deep": 8000,\n'
         '  "reasoning_effort_penetration_deep": "high",\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 财经新闻热点与持仓关联分析 — news_correlation\n'
-        '  // （注：news_correlation 不支持 output_brief 模式）\n'
-        '  // ═══════════════════════════════════════════\n'
+        "\n"
+        "  // ═══════════════════════════════════════════\n"
+        "  // 财经新闻热点与持仓关联分析 — news_correlation\n"
+        "  // （注：news_correlation 不支持 output_brief 模式）\n"
+        "  // ═══════════════════════════════════════════\n"
         '  "system_prompt_news_correlation": null,\n'
         '  "model_news_correlation": null,\n'
         '  "temperature_news_correlation": 0.1,\n'
@@ -101,13 +101,13 @@ def _get_default_llm_settings_template() -> str:
         '  "thinking_budget_news_correlation": 4000,\n'
         '  "reasoning_effort_news_correlation": "high",\n'
         '  "news_correlation_top_n": 30,\n'
-        '\n'
-        '  // ═══════════════════════════════════════════\n'
-        '  // 计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）\n'
-        '  // ═══════════════════════════════════════════\n'
+        "\n"
+        "  // ═══════════════════════════════════════════\n"
+        "  // 计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）\n"
+        "  // ═══════════════════════════════════════════\n"
         '  "pricing": {\n'
         '    "currency": "CNY",\n'
         '    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.3}\n'
-        '  }\n'
-        '}\n'
+        "  }\n"
+        "}\n"
     )

@@ -11,9 +11,7 @@ from src.python.code_utils import is_qdii_extended
 
 # ── 路径 & Jinja2 环境 ─────────────────────────────────────
 
-_TEMPLATE_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "tmpl")
-)
+_TEMPLATE_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "tmpl"))
 _ENV = Environment(loader=FileSystemLoader(_TEMPLATE_DIR), autoescape=True)
 
 

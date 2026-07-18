@@ -33,15 +33,13 @@ from src.python.report.styles import CONTENT_FONT
 logger = logging.getLogger("invest")
 
 _CONTENT_NCOLS = 2
-_COL_WIDTH = 80          # 固定列宽（字符宽度）
-_CHARS_PER_LINE = 40     # 每行约 40 中文字符
-_ROW_HEIGHT_MIN = 30     # 最小行高 (pt)
+_COL_WIDTH = 80  # 固定列宽（字符宽度）
+_CHARS_PER_LINE = 40  # 每行约 40 中文字符
+_ROW_HEIGHT_MIN = 30  # 最小行高 (pt)
 _ROW_HEIGHT_PER_LINE = 15  # 每行增加高度 (pt)
 
 # 匹配 LLM 生成的底部标识行：<p style="color:#888;font-size:12px">...</p>
-_FOOTER_RE = re.compile(
-    r'<p style="color:#888;font-size:12px">([^<]*)</p>'
-)
+_FOOTER_RE = re.compile(r'<p style="color:#888;font-size:12px">([^<]*)</p>')
 
 
 def _extract_footer_text(html: str) -> str:
@@ -114,6 +112,7 @@ def _get_module_key_map(section_order: list[dict] | None = None) -> dict[str, st
             title = f"{sec['number']}.{sec['name']}"
             result[title] = mk
     return result
+
 
 _PLACEHOLDER_BY_REASON: dict[str, str] = {
     FAIL_REASON_NOT_CONFIGURED: "本节内容待生成 — LLM 未配置（请配置 data/config/llm_providers.json 或 llm_key.json）",
@@ -224,8 +223,7 @@ def write_llm_sheets(
 
     _module_keys = ["global_macro", "expert_review", "health_check", "penetration_deep"]
     _disabled = tuple(
-        get_llm_module_failure_reason(LLM_MODULE_FAILURE, mk) == FAIL_REASON_DISABLED
-        for mk in _module_keys
+        get_llm_module_failure_reason(LLM_MODULE_FAILURE, mk) == FAIL_REASON_DISABLED for mk in _module_keys
     )
 
     content7, content8, content9, contentA = llm_content

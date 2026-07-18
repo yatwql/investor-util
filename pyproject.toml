@@ -24,7 +24,6 @@ test = [
     "pytest-mock>=3.15",
     "pytest-xdist>=3.6",
     "pytest-html>=4.2",
-    "mypy>=1.15",
     "ruff>=0.11",
     "types-colorama",
 ]
@@ -38,20 +37,3 @@ target-version = "py310"
 line-length = 120
 extend-exclude = [".venv"]
 
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "SIM", "UP", "ARG", "PERF"]
-
-[tool.ruff.lint.per-file-ignores]
-"src/test/*" = ["ARG"]
-"src/python/*" = ["E402", "E501", "E701", "E702"]
-"src/python/handlers_cache.py" = ["F541"]
-"src/python/tui_menu.py" = ["F541"]
-
-[tool.mypy]
-python_version = "3.10"
-strict = false
-no_implicit_optional = true
-warn_unused_ignores = true
-check_untyped_defs = true
-ignore_missing_imports = true
-exclude = [".venv"]

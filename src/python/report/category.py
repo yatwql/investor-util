@@ -42,8 +42,16 @@ logger = logging.getLogger("invest")
 
 _NCOLS = 10
 _HEADERS = [
-    "资产属性", "投资分类", "名称", "代码",
-    "市值", "成本", "盈亏", "收益率", "本日盈亏", "年均股息率",
+    "资产属性",
+    "投资分类",
+    "名称",
+    "代码",
+    "市值",
+    "成本",
+    "盈亏",
+    "收益率",
+    "本日盈亏",
+    "年均股息率",
 ]
 
 # ── 分类映射规则 ──────────────────────────────────────────
@@ -116,6 +124,7 @@ def _load_dividend_data(holdings: list) -> tuple[dict, bool]:
     """
     try:
         from src.python.fetcher.akshare import get_dividend_data
+
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         if not stock_codes:
             return {}, True
@@ -167,16 +176,30 @@ def calc_yield_text(code: str, d, dividend_data: dict) -> str:
 
 
 def _write_category_group(
-    ws: Worksheet, row: int, group: list[Holding], prop: str, sub: str,
-    detail_map: dict, dividend_data: dict,
+    ws: Worksheet,
+    row: int,
+    group: list[Holding],
+    prop: str,
+    sub: str,
+    detail_map: dict,
+    dividend_data: dict,
 ) -> tuple[int, float, float, float, float]:
     """写入一个分类分组的明细行和小计，返回 (next_row, mv, cost, profit, today)。"""
     for h in group:
         d = detail_map.get(h.code)
         if d:
-            vals = [prop, sub, h.name, h.code,
-                    d.market_value, d.cost, d.profit, d.profit_rate,
-                    d.today_profit, calc_yield_text(h.code, d, dividend_data)]
+            vals = [
+                prop,
+                sub,
+                h.name,
+                h.code,
+                d.market_value,
+                d.cost,
+                d.profit,
+                d.profit_rate,
+                d.today_profit,
+                calc_yield_text(h.code, d, dividend_data),
+            ]
         else:
             vals = [prop, sub, h.name, h.code, 0.0, 0.0, 0.0, 0.0, 0.0, "--"]
         write_data_row(ws, row, vals, _num_formats())
@@ -217,22 +240,20 @@ def write_category_sheet(
         cat_groups.setdefault((prop, sub), []).append(h)
 
     _PROP_ORDER = {"股票": 0, "基金": 1, "债券": 2, "现金": 3, "其他": 4}
-    _SUB_ORDER = {"A股": 0, "QDII": 1, "主动": 2, "被动": 3, "指数": 4,
-                  "混合": 5, "纯债": 6, "货币": 7, "其他": 8}
+    _SUB_ORDER = {"A股": 0, "QDII": 1, "主动": 2, "被动": 3, "指数": 4, "混合": 5, "纯债": 6, "货币": 7, "其他": 8}
     sorted_groups = sorted(
         cat_groups.items(),
         key=lambda x: (_PROP_ORDER.get(x[0][0], 99), _SUB_ORDER.get(x[0][1], 99)),
     )
 
-    row = write_title_row(ws, 1, get_report_sheet_name('category'), _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name("category"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
     # 若所有行情数据全零，写一行醒目提示
     _all_zero = all(d.market_value == 0 for d in details)
     if _all_zero and details:
-        cell = ws.cell(row=row, column=1,
-                       value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
+        cell = ws.cell(row=row, column=1, value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
         cell.font = Font(size=10, bold=True, color="CC0000")
         row += 1
 
@@ -241,7 +262,13 @@ def write_category_sheet(
 
     for (prop, sub), group in sorted_groups:
         row, smv, scost, sprofit, stoday = _write_category_group(
-            ws, row, group, prop, sub, detail_map, dividend_data,
+            ws,
+            row,
+            group,
+            prop,
+            sub,
+            detail_map,
+            dividend_data,
         )
         grand_mv += smv
         grand_cost += scost
@@ -255,8 +282,9 @@ def write_category_sheet(
     _apply_profit_colors(ws, data_start, row)
     freeze_header(ws, 2)
     auto_width(ws)
-    logger.info("%s写入完成，共 %d 个分组，%d 条持仓",
-                get_report_sheet_name('category'), len(sorted_groups), len(holdings))
+    logger.info(
+        "%s写入完成，共 %d 个分组，%d 条持仓", get_report_sheet_name("category"), len(sorted_groups), len(holdings)
+    )
 
     data_status = build_category_data_status(dividend_success)
     _write_data_status_foot(ws, data_status, start_row=row + 1, max_cols=_NCOLS)
@@ -265,16 +293,16 @@ def write_category_sheet(
 def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
     return [
-        "",           # 1  资产属性
-        "",           # 2  投资分类
-        "",           # 3  名称
-        "",           # 4  代码
-        FMT_MONEY,    # 5  市值
-        FMT_MONEY,    # 6  成本
-        FMT_MONEY,    # 7  盈亏
+        "",  # 1  资产属性
+        "",  # 2  投资分类
+        "",  # 3  名称
+        "",  # 4  代码
+        FMT_MONEY,  # 5  市值
+        FMT_MONEY,  # 6  成本
+        FMT_MONEY,  # 7  盈亏
         FMT_PERCENT,  # 8  收益率
-        FMT_MONEY,    # 9  本日盈亏
-        "",           # 10 年均股息率（字符串格式）
+        FMT_MONEY,  # 9  本日盈亏
+        "",  # 10 年均股息率（字符串格式）
     ]
 
 

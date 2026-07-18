@@ -103,7 +103,7 @@ def _parse_holdings_rows(table_html: str) -> list[dict[str, Any]]:
         if len(cells) < 2:
             continue
         cell0 = cells[0]
-        name_match = re.search(r'<a[^>]*>(.*?)</a>', cell0)
+        name_match = re.search(r"<a[^>]*>(.*?)</a>", cell0)
         if not name_match:
             continue
         stock_name = re.sub(r"<[^>]+>", "", name_match.group(1)).strip()
@@ -254,9 +254,7 @@ def _parse_quarterly_holdings(html_content: str) -> list[dict[str, Any]]:
     """从季报 API 返回的 HTML 内容中解析持仓行。"""
     holdings: list[dict[str, Any]] = []
 
-    table_match = re.search(
-        r"<table[^>]*>(.*?)</table>", html_content, re.DOTALL | re.IGNORECASE
-    )
+    table_match = re.search(r"<table[^>]*>(.*?)</table>", html_content, re.DOTALL | re.IGNORECASE)
     if not table_match:
         return holdings
 
@@ -268,17 +266,11 @@ def _parse_quarterly_holdings(html_content: str) -> list[dict[str, Any]]:
 
         code_cell = cells[1]
         code_a = re.search(r"<a[^>]*>(.*?)</a>", code_cell)
-        stock_code = (
-            code_a.group(1).strip()
-            if code_a else re.sub(r"<[^>]+>", "", code_cell).strip()
-        )
+        stock_code = code_a.group(1).strip() if code_a else re.sub(r"<[^>]+>", "", code_cell).strip()
 
         name_cell = cells[2]
         name_a = re.search(r"<a[^>]*>(.*?)</a>", name_cell)
-        stock_name = (
-            name_a.group(1).strip()
-            if name_a else re.sub(r"<[^>]+>", "", name_cell).strip()
-        )
+        stock_name = name_a.group(1).strip() if name_a else re.sub(r"<[^>]+>", "", name_cell).strip()
 
         if not stock_name or not stock_code:
             continue
@@ -373,8 +365,14 @@ def _fetch_single_quarter(code: str, year: int | None = None, month: int | None 
         return None
 
     label = f"{year}-{month:02d}" if year is not None else "默认"
-    logger.info("基金持仓 API %s（%s）: %d 条持仓, 报告期 %s（%s）",
-                fund_name or code, code, len(all_holdings), report_date or "未知", label)
+    logger.info(
+        "基金持仓 API %s（%s）: %d 条持仓, 报告期 %s（%s）",
+        fund_name or code,
+        code,
+        len(all_holdings),
+        report_date or "未知",
+        label,
+    )
     return {"code": code.strip(), "name": fund_name, "date": report_date, "holdings": all_holdings}
 
 
@@ -409,9 +407,12 @@ def _parse_syl_returns(text: str) -> dict[str, dict[str, Any]]:
     P0 改进：长周期 + `--` 占位符防御。
     """
     period_map = {
-        "近1月": "syl_1y", "近3月": "syl_3y",
-        "近6月": "syl_6y", "近1年": "syl_1n",
-        "近2年": "syl_2n", "近3年": "syl_3n",
+        "近1月": "syl_1y",
+        "近3月": "syl_3y",
+        "近6月": "syl_6y",
+        "近1年": "syl_1n",
+        "近2年": "syl_2n",
+        "近3年": "syl_3n",
         "近5年": "syl_5n",
     }
     rankings: dict[str, dict[str, Any]] = {}
@@ -454,10 +455,10 @@ def _parse_rank_entry(text: str) -> dict[str, Any]:
 # ── 评级计算（P2 改进：5 级 + 类型差异化阈值） ────────
 
 _RATING_THRESHOLDS: dict[str, list[float]] = {
-    "default":      [0.10, 0.30, 0.50, 0.75],
-    "bond":         [0.15, 0.35, 0.55, 0.80],
-    "index":        [0.10, 0.25, 0.45, 0.70],
-    "qdii":         [0.15, 0.35, 0.55, 0.80],
+    "default": [0.10, 0.30, 0.50, 0.75],
+    "bond": [0.15, 0.35, 0.55, 0.80],
+    "index": [0.10, 0.25, 0.45, 0.70],
+    "qdii": [0.15, 0.35, 0.55, 0.80],
 }
 
 _KNOWN_RATING_TYPES = list(_RATING_THRESHOLDS.keys())
@@ -477,15 +478,18 @@ def _pct_to_rating(pct: float, thresholds: list[float] | None = None) -> str:
     if pct < 0 or pct > 1:
         return ""
     t = thresholds or _RATING_THRESHOLDS["default"]
-    if pct <= t[0]: return "优秀"
-    if pct <= t[1]: return "良好"
-    if pct <= t[2]: return "稳定"
-    if pct <= t[3]: return "偏差"
+    if pct <= t[0]:
+        return "优秀"
+    if pct <= t[1]:
+        return "良好"
+    if pct <= t[2]:
+        return "稳定"
+    if pct <= t[3]:
+        return "偏差"
     return "较差"
 
 
-def _calc_rating_from_entry(rank_entry: dict[str, Any],
-                            fund_type_hint: str = "") -> str:
+def _calc_rating_from_entry(rank_entry: dict[str, Any], fund_type_hint: str = "") -> str:
     """根据排名/总数（优先）或百分位计算评级。
 
     P2 改进：支持类型差异化阈值 + 5 级输出。
@@ -497,6 +501,7 @@ def _calc_rating_from_entry(rank_entry: dict[str, Any],
     Returns:
         评级字符串（优秀/良好/稳定/偏差/较差）或空串
     """
+
     def _pct_to_rating_with_type(pct: float) -> str:
         return _pct_to_rating(pct, _get_rating_thresholds(fund_type_hint))
 
@@ -520,18 +525,20 @@ def _calc_rating_from_entry(rank_entry: dict[str, Any],
 
     # 两者矛盾 → 以排名/总数为准
     if pct_rating and rank_rating and pct_rating != rank_rating:
-        logger.info("百分位评级(%s)与排名评级(%s)不一致，以排名/总数(%s/%s)为准",
-                    pct_rating, rank_rating,
-                    rank_entry.get("rank", "?"), rank_entry.get("total", "?"))
+        logger.info(
+            "百分位评级(%s)与排名评级(%s)不一致，以排名/总数(%s/%s)为准",
+            pct_rating,
+            rank_rating,
+            rank_entry.get("rank", "?"),
+            rank_entry.get("total", "?"),
+        )
 
     return rank_rating or pct_rating or ""
 
 
 def _parse_perf_evaluation(text: str) -> dict[str, Any] | None:
     """解析业绩评价数据（Data_performanceEvaluation JS 变量）。"""
-    pe_match = re.search(
-        r'var Data_performanceEvaluation\s*=\s*(\{[^;]+\});', text, re.DOTALL
-    )
+    pe_match = re.search(r"var Data_performanceEvaluation\s*=\s*(\{[^;]+\});", text, re.DOTALL)
     if not pe_match:
         return None
     try:
@@ -556,13 +563,9 @@ def _parse_risk_analysis(text: str) -> dict[str, Any] | None:
     Returns:
         风险指标字典 或 None
     """
-    ra_match = re.search(
-        r'var Data_riskAnalysis\s*=\s*(\[[\s\S]*?\]);', text, re.DOTALL
-    )
+    ra_match = re.search(r"var Data_riskAnalysis\s*=\s*(\[[\s\S]*?\]);", text, re.DOTALL)
     if not ra_match:
-        ra_match = re.search(
-            r'var Data_riskAnalysis\s*=\s*(\{[\s\S]*?\});', text, re.DOTALL
-        )
+        ra_match = re.search(r"var Data_riskAnalysis\s*=\s*(\{[\s\S]*?\});", text, re.DOTALL)
     if not ra_match:
         return None
 
@@ -578,8 +581,7 @@ def _parse_risk_analysis(text: str) -> dict[str, Any] | None:
         cats = parsed.get("categories") or []
         data = parsed.get("data") or []
         if cats and data and len(cats) == len(data):
-            return {str(c): float(d) for c, d in zip(cats, data)
-                    if c is not None and d is not None}
+            return {str(c): float(d) for c, d in zip(cats, data) if c is not None and d is not None}
 
     # 格式2: [["名称", 值], ...]
     if isinstance(parsed, list) and parsed:
@@ -626,9 +628,14 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     perf_eval = _parse_perf_evaluation(text)
     risk_data = _parse_risk_analysis(text)
 
-    logger.info("基金 %s（%s）: 排名 %s/%s, 评级 %s",
-                name, code, rank_entry.get("rank", "?"), rank_entry.get("total", "?"),
-                rating or "未知")
+    logger.info(
+        "基金 %s（%s）: 排名 %s/%s, 评级 %s",
+        name,
+        code,
+        rank_entry.get("rank", "?"),
+        rank_entry.get("total", "?"),
+        rating or "未知",
+    )
 
     return {
         "code": code.strip(),
@@ -683,11 +690,13 @@ def fetch_fund_nav_history(code: str) -> list[dict]:
         acc_nav = acc_map.get(date, 0.0)
         if nav <= 0 and acc_nav <= 0:
             continue
-        result.append({
-            "date": date,
-            "nav": nav,
-            "acc_nav": acc_nav,
-        })
+        result.append(
+            {
+                "date": date,
+                "nav": nav,
+                "acc_nav": acc_nav,
+            }
+        )
 
     logger.info("基金 %s 历史净值: %d 条", code, len(result))
     return result
@@ -705,7 +714,7 @@ def _parse_nav_trend(text: str, var_name: str) -> list[dict]:
     """
     # 匹配 var/let/const/window.xxx = [...] 或 {...data: [...]}
     pattern = re.compile(
-        r'(?:var|let|const|window\.)\s*' + re.escape(var_name) + r'\s*=\s*(.*?);',
+        r"(?:var|let|const|window\.)\s*" + re.escape(var_name) + r"\s*=\s*(.*?);",
         re.DOTALL,
     )
     match = pattern.search(text)

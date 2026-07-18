@@ -39,10 +39,10 @@ APP_VERSION = "0.7.2-dev"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
-CACHE_DAILY = 86400         # 每日（24h）
-CACHE_WEEKLY = 604800       # 每周（7d）
-CACHE_TWO_WEEKS = 1209600   # 两周（14d）
-CACHE_MONTHLY = 2592000     # 每月（30d）
+CACHE_DAILY = 86400  # 每日（24h）
+CACHE_WEEKLY = 604800  # 每周（7d）
+CACHE_TWO_WEEKS = 1209600  # 两周（14d）
+CACHE_MONTHLY = 2592000  # 每月（30d）
 
 # ── 组合历史走势 ─────────────────────────────────
 

@@ -21,7 +21,6 @@ import sys
 import time as _time
 from datetime import datetime
 
-
 # ── 路径常量 ─────────────────────────────────────────────────
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -62,11 +61,7 @@ MODES: dict[str, dict] = {
         "parallel": False,
     },
     "dev-verify": {
-        "marker": (
-            "(unit_core or unit_providers or unit_fetcher) "
-            "and not (edge or data) "
-            "or (scenario_basic)"
-        ),
+        "marker": ("(unit_core or unit_providers or unit_fetcher) and not (edge or data) or (scenario_basic)"),
         "desc": "开发期快速验证（core/providers/fetcher 单元 + 基础场景，~2min）",
         "timeout_sec": 180,
         "order": 5,
@@ -153,7 +148,7 @@ MODES: dict[str, dict] = {
 
 # ── 帮助文本 ─────────────────────────────────────────────────
 
-_HELP_TEXT = f"""测试驱动脚本 — 统一运行 pytest 并输出结构化 HTML 报告。
+_HELP_TEXT = """测试驱动脚本 — 统一运行 pytest 并输出结构化 HTML 报告。
 
 用法:
   python scripts/test_runner.py                          # 全量测试
@@ -196,19 +191,25 @@ _HELP_TEXT += """\
 def parse_args() -> argparse.Namespace:
     """解析命令行参数。"""
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--mode", default="all",
-                        help="运行模式 (unit/scenario/integration/regression/edge/all)，逗号分隔")
-    parser.add_argument("--coverage", action="store_true",
-                        help="同时生成 HTML 行覆盖率报告")
-    parser.add_argument("--parallel", nargs="?", const="medium", default=None,
-                        choices=["high", "medium", "low"],
-                        help="并行级别（high=100%核数, medium=50%核数, low=25%核数，缺省 medium）")
-    parser.add_argument("--timeout", type=int, default=None, metavar="SEC",
-                        help="覆盖各模式的超时设置（秒），所有模式统一使用此值")
-    parser.add_argument("--no-timeout", action="store_true",
-                        help="禁用超时，等待测试自然结束")
-    parser.add_argument("--phased", action="store_true",
-                        help="分阶段运行（仅对支持分阶段的模式有效，前序失败则跳过后续）")
+    parser.add_argument(
+        "--mode", default="all", help="运行模式 (unit/scenario/integration/regression/edge/all)，逗号分隔"
+    )
+    parser.add_argument("--coverage", action="store_true", help="同时生成 HTML 行覆盖率报告")
+    parser.add_argument(
+        "--parallel",
+        nargs="?",
+        const="medium",
+        default=None,
+        choices=["high", "medium", "low"],
+        help="并行级别（high=100%核数, medium=50%核数, low=25%核数，缺省 medium）",
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=None, metavar="SEC", help="覆盖各模式的超时设置（秒），所有模式统一使用此值"
+    )
+    parser.add_argument("--no-timeout", action="store_true", help="禁用超时，等待测试自然结束")
+    parser.add_argument(
+        "--phased", action="store_true", help="分阶段运行（仅对支持分阶段的模式有效，前序失败则跳过后续）"
+    )
     parser.add_argument("--help", action="store_true", help="显示帮助")
     return parser.parse_args()
 
@@ -264,6 +265,7 @@ def _check_pytest_html() -> bool:
     """检查 pytest-html 是否已安装。"""
     try:
         import pytest_html  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -273,6 +275,7 @@ def _check_pytest_cov() -> bool:
     """检查 pytest-cov 是否已安装。"""
     try:
         import pytest_cov  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -290,8 +293,7 @@ def _parse_pytest_output(output: str) -> dict:
     Returns:
         {passed, failed, skipped, errors, subtests, duration}
     """
-    result: dict = {"passed": 0, "failed": 0, "skipped": 0,
-                    "errors": 0, "subtests": 0, "duration": 0.0}
+    result: dict = {"passed": 0, "failed": 0, "skipped": 0, "errors": 0, "subtests": 0, "duration": 0.0}
 
     lines = output.strip().splitlines()
     summary_line = ""
@@ -321,6 +323,7 @@ def _check_xdist() -> bool:
     """检查 pytest-xdist 是否已安装。"""
     try:
         import xdist  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -353,12 +356,14 @@ def _calc_parallel_workers(level: str | bool) -> str:
     return str(workers)
 
 
-def _build_pytest_args(mode_cfg: dict, mode_key: str,
-                       html_available: bool, coverage: bool,
-                       parallel_level: str | None = None) -> list[str]:
+def _build_pytest_args(
+    mode_cfg: dict, mode_key: str, html_available: bool, coverage: bool, parallel_level: str | None = None
+) -> list[str]:
     """构建 pytest 命令参数列表。"""
     args = [
-        sys.executable, "-m", "pytest",
+        sys.executable,
+        "-m",
+        "pytest",
         _SRC_DIR,
         "-q",
         "--tb=short",
@@ -376,7 +381,7 @@ def _build_pytest_args(mode_cfg: dict, mode_key: str,
         args.extend(["-n", workers])
         print(f"      [..] 并行 worker={workers}（级别: {level}）")
     elif parallel_enabled:
-        print(f"      [!] pytest-xdist 未安装，降级单线程执行")
+        print("      [!] pytest-xdist 未安装，降级单线程执行")
 
     if html_available:
         report_path = os.path.join(_LATEST_DIR, mode_key, "report.html")
@@ -385,22 +390,27 @@ def _build_pytest_args(mode_cfg: dict, mode_key: str,
     if coverage:
         if _check_pytest_cov():
             cov_report_dir = os.path.join(_LATEST_DIR, "coverage")
-            args.extend([
-                "--cov=" + os.path.join(_PROJECT_ROOT, "src", "python"),
-                "--cov-report=html:" + cov_report_dir,
-                "--cov-report=term-missing:skip-covered",
-            ])
+            args.extend(
+                [
+                    "--cov=" + os.path.join(_PROJECT_ROOT, "src", "python"),
+                    "--cov-report=html:" + cov_report_dir,
+                    "--cov-report=term-missing:skip-covered",
+                ]
+            )
         else:
-            print(f"  [!] pytest-cov 未安装，跳过覆盖率收集")
+            print("  [!] pytest-cov 未安装，跳过覆盖率收集")
 
     return args
 
 
-def run_mode(mode_key: str, coverage: bool = False,
-             parallel_level: str | None = None,
-             timeout_override: int | None = None,
-             no_timeout: bool = False,
-             phased: bool = False) -> dict:
+def run_mode(
+    mode_key: str,
+    coverage: bool = False,
+    parallel_level: str | None = None,
+    timeout_override: int | None = None,
+    no_timeout: bool = False,
+    phased: bool = False,
+) -> dict:
     """运行指定模式的测试。
 
     Args:
@@ -415,14 +425,13 @@ def run_mode(mode_key: str, coverage: bool = False,
 
     # 分阶段模式：若模式定义了 phases 且命令行传入 --phased
     if phased and "phases" in mode_cfg:
-        return _run_phased(mode_cfg["phases"], mode_key, coverage,
-                           parallel_level, timeout_override, no_timeout)
+        return _run_phased(mode_cfg["phases"], mode_key, coverage, parallel_level, timeout_override, no_timeout)
     html_available = _check_pytest_html()
 
     print(f"\n  {'=' * 54}")
     print(f"  [..] 正在运行 [{mode_key}] — {mode_cfg.get('desc', '')}")
     if not html_available:
-        print(f"  [!] pytest-html 未安装，将使用默认文本输出")
+        print("  [!] pytest-html 未安装，将使用默认文本输出")
     print()
 
     pytest_args = _build_pytest_args(mode_cfg, mode_key, html_available, coverage, parallel_level)
@@ -453,8 +462,11 @@ def run_mode(mode_key: str, coverage: bool = False,
         stats: dict = {
             "mode": mode_key,
             "desc": mode_cfg.get("desc", ""),
-            "passed": 0, "failed": 0, "skipped": 0,
-            "errors": 0, "subtests": 0,
+            "passed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "errors": 0,
+            "subtests": 0,
             "duration": float(timeout),
             "exit_code": -1,
         }
@@ -476,8 +488,7 @@ def run_mode(mode_key: str, coverage: bool = False,
         stripped = line.strip()
         if not stripped:
             continue
-        if any(kw in stripped for kw in ("passed", "failed", "error",
-                                         "warning", "===", "short test summary")):
+        if any(kw in stripped for kw in ("passed", "failed", "error", "warning", "===", "short test summary")):
             print(f"    {stripped}")
 
     # 结果概览
@@ -507,8 +518,7 @@ def _overall_status(results: list[dict]) -> tuple[str, str]:
     return "PARTIAL", f"{ok_count}/{len(results)} 模式通过"
 
 
-def _render_index_html(results: list[dict], coverage: bool,
-                       archive_path: str | None) -> str:
+def _render_index_html(results: list[dict], coverage: bool, archive_path: str | None) -> str:
     """生成汇总页 HTML。"""
     total_passed = sum(r.get("passed", 0) for r in results)
     total_failed = sum(r.get("failed", 0) for r in results)
@@ -557,20 +567,14 @@ def _render_index_html(results: list[dict], coverage: bool,
     archive_note = ""
     if archive_path:
         rel_archive = os.path.relpath(archive_path, _REPORTS_DIR)
-        archive_note = (
-            f'<div class="note archive-note">'
-            f'📦 历史报告已归档: <code>{rel_archive}/</code>'
-            f'</div>')
+        archive_note = f'<div class="note archive-note">📦 历史报告已归档: <code>{rel_archive}/</code></div>'
 
     # 覆盖率备注
     cov_note = ""
     if coverage:
         cov_index = os.path.join(_LATEST_DIR, "coverage", "index.html")
         if os.path.isfile(cov_index):
-            cov_note = (
-                f'<div class="note cov-note">'
-                f'📊 <a href="coverage/index.html">查看行覆盖率报告</a>'
-                f'</div>')
+            cov_note = '<div class="note cov-note">📊 <a href="coverage/index.html">查看行覆盖率报告</a></div>'
 
     html = f"""\
 <!DOCTYPE html>
@@ -656,10 +660,14 @@ def _render_index_html(results: list[dict], coverage: bool,
 # ── 分阶段执行 ──────────────────────────────────────────────
 
 
-def _run_phased(phases: list[dict], mode_key: str, coverage: bool,
-                parallel_level: str | None = None,
-                timeout_override: int | None = None,
-                no_timeout: bool = False) -> dict:
+def _run_phased(
+    phases: list[dict],
+    mode_key: str,
+    coverage: bool,
+    parallel_level: str | None = None,
+    timeout_override: int | None = None,
+    no_timeout: bool = False,
+) -> dict:
     """分阶段运行测试，前序失败则跳过后续阶段。
 
     每个阶段调用一次 subprocess.run，支持不同 marker/parallel/timeout。
@@ -670,8 +678,11 @@ def _run_phased(phases: list[dict], mode_key: str, coverage: bool,
     combined: dict = {
         "mode": mode_key,
         "desc": mode_cfg.get("desc", ""),
-        "passed": 0, "failed": 0, "skipped": 0,
-        "errors": 0, "subtests": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0,
+        "subtests": 0,
         "duration": 0.0,
         "exit_code": 0,
         "timed_out": False,
@@ -685,8 +696,7 @@ def _run_phased(phases: list[dict], mode_key: str, coverage: bool,
             "marker": phase["marker"],
             "parallel": phase.get("parallel", False),
         }
-        pytest_args = _build_pytest_args(
-            phase_cfg, mode_key, html_available, coverage, parallel_level)
+        pytest_args = _build_pytest_args(phase_cfg, mode_key, html_available, coverage, parallel_level)
 
         timeout = phase.get("timeout_sec", 300)
         if no_timeout:
@@ -710,7 +720,7 @@ def _run_phased(phases: list[dict], mode_key: str, coverage: bool,
             print(f"    [ERR] [Phase {tag}] 测试超时（{timeout}s）")
             combined["exit_code"] = -1
             combined["timed_out"] = True
-            combined["duration"] += (timeout or 0)
+            combined["duration"] += timeout or 0
             break
 
         elapsed = _time.time() - start
@@ -730,8 +740,7 @@ def _run_phased(phases: list[dict], mode_key: str, coverage: bool,
             stripped = line.strip()
             if not stripped:
                 continue
-            if any(kw in stripped for kw in ("passed", "failed", "error",
-                                             "warning", "===", "short test summary")):
+            if any(kw in stripped for kw in ("passed", "failed", "error", "warning", "===", "short test summary")):
                 print(f"      {stripped}")
 
         ok = proc.returncode == 0
@@ -776,16 +785,16 @@ def main() -> None:
         print(f"       有效模式: {', '.join(MODES.keys())}")
         sys.exit(1)
 
-    print(f"  [..] 测试报告系统 v1.0")
+    print("  [..] 测试报告系统 v1.0")
     print(f"  [..] 计划运行模式: {', '.join(modes_to_run)}")
     if args.coverage:
-        print(f"  [..] 覆盖率报告: 已开启")
+        print("  [..] 覆盖率报告: 已开启")
     if args.no_timeout:
-        print(f"  [!] 超时: 已禁用（测试可能长时间运行）")
+        print("  [!] 超时: 已禁用（测试可能长时间运行）")
     elif args.timeout:
         print(f"  [..] 超时: 统一设为 {args.timeout}s")
     if args.phased:
-        print(f"  [..] 分阶段: 已开启（前序阶段失败则跳过后续）")
+        print("  [..] 分阶段: 已开启（前序阶段失败则跳过后续）")
 
     # 归档现有报告
     archive_path = archive_existing()
@@ -796,11 +805,14 @@ def main() -> None:
     # 运行各模式
     results: list[dict] = []
     for mode_key in modes_to_run:
-        result = run_mode(mode_key, coverage=args.coverage,
-                          parallel_level=args.parallel,
-                          timeout_override=args.timeout,
-                          no_timeout=args.no_timeout,
-                          phased=args.phased)
+        result = run_mode(
+            mode_key,
+            coverage=args.coverage,
+            parallel_level=args.parallel,
+            timeout_override=args.timeout,
+            no_timeout=args.no_timeout,
+            phased=args.phased,
+        )
         results.append(result)
 
     # 生成汇总页
@@ -809,7 +821,7 @@ def main() -> None:
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_html)
 
-    print(f"\n  [OK] 汇总页已生成: test-reports/latest/index.html")
+    print("\n  [OK] 汇总页已生成: test-reports/latest/index.html")
 
     # 总体结果
     exit_codes = [r.get("exit_code", -1) for r in results]
@@ -820,11 +832,13 @@ def main() -> None:
     print()
     print(f"  {'=' * 54}")
     if overall == 0:
-        print(f"  [OK] 全部完成 — {total_passed} 通过, {total_failed} 失败"
-              f"  (总耗时 {sum(r.get('duration', 0) for r in results):.1f}s)")
+        print(
+            f"  [OK] 全部完成 — {total_passed} 通过, {total_failed} 失败"
+            f"  (总耗时 {sum(r.get('duration', 0) for r in results):.1f}s)"
+        )
     else:
         print(f"  [ERR] 存在失败的测试 — {total_passed} 通过, {total_failed} 失败")
-        print(f"        请检查 test-reports/latest/ 中的详细报告")
+        print("        请检查 test-reports/latest/ 中的详细报告")
     print()
 
     sys.exit(overall)

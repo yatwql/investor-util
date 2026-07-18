@@ -17,7 +17,7 @@ from src.python.llm.pricing import CURRENCY_SYMBOLS
 from src.python.logger import setup_logger
 from src.python.reader import get_xlsx_info, list_xlsx_files, read_holdings
 from src.python.report.progress import TuiProgressReporter
-from src.python.tui_menu import MENU_ITEMS, press_any_key, refresh_config, get_config_cache
+from src.python.tui_menu import MENU_ITEMS, get_config_cache, press_any_key, refresh_config
 
 logger = setup_logger()
 
@@ -32,6 +32,7 @@ def print_llm_session_usage(usage: dict | None = None) -> None:
     if usage is None:
         try:
             from src.python.llm import get_session_usage
+
             usage = get_session_usage()
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键）")
@@ -48,6 +49,7 @@ def print_llm_session_usage(usage: dict | None = None) -> None:
 def print_timing_summary() -> None:
     """输出本次运行时各模块耗时排行（委托至 TuiProgressReporter）。"""
     from src.python.report.progress import _timing_records
+
     reporter = TuiProgressReporter()
     reporter._timing_records.extend(_timing_records)
     reporter.print_timing_summary()
@@ -57,10 +59,20 @@ def print_timing_summary() -> None:
 def print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
     """输出带友好提示的错误信息。"""
     msg = str(e)
-    is_network = any(kw in msg.lower() for kw in (
-        "connect", "timeout", "dns", "resolve", "network",
-        "connection", "read timed out", "eof", "reset",
-    ))
+    is_network = any(
+        kw in msg.lower()
+        for kw in (
+            "connect",
+            "timeout",
+            "dns",
+            "resolve",
+            "network",
+            "connection",
+            "read timed out",
+            "eof",
+            "reset",
+        )
+    )
     if is_network:
         print(f"  [ERR] {prefix}: 网络连接异常，请检查网络后重试")
         print(f"        详情: {msg}")
@@ -89,10 +101,7 @@ def check_network_available(details: list) -> bool:
     """检查行情数据是否全部不可用并在 TUI 上显示友好提示。"""
     if not details:
         return False
-    all_unavailable = all(
-        getattr(d, 'price', 0) is None or getattr(d, 'price', 0) == 0
-        for d in details
-    )
+    all_unavailable = all(getattr(d, "price", 0) is None or getattr(d, "price", 0) == 0 for d in details)
     if all_unavailable:
         print("  " + "=" * 54)
         print("  [!] 所有行情数据均获取失败")
@@ -239,6 +248,7 @@ def execute_item(sel: int) -> None:
     _, _label, callback, is_exit = MENU_ITEMS[sel]
     if is_exit:
         from src.python.tui_menu import exit_app
+
         exit_app()
     if callback is not None:
         if _busy:

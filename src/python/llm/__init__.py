@@ -36,10 +36,10 @@ from src.python.llm.prompts import (  # noqa: F401
     FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_TIMEOUT,
 )
-from src.python.llm.strategy import (  # noqa: F401
-    resolve_provider_chain,
-)
 from src.python.llm.session import (  # noqa: F401
     format_session_usage,
     get_session_usage,
+)
+from src.python.llm.strategy import (  # noqa: F401
+    resolve_provider_chain,
 )

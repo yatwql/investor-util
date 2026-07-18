@@ -68,16 +68,29 @@ def _build_diff_context_block(f_context: dict | None) -> str:
 
     return "\n".join(lines)
 
+
 __all__ = [
     "CACHE_PREFIX_LLM",
-    "FAIL_REASON_NOT_CONFIGURED", "FAIL_REASON_API_ERROR", "FAIL_REASON_NETWORK_ERROR",
-    "FAIL_REASON_TIMEOUT", "FAIL_REASON_CIRCUIT_OPEN", "FAIL_REASON_DISABLED",
+    "FAIL_REASON_NOT_CONFIGURED",
+    "FAIL_REASON_API_ERROR",
+    "FAIL_REASON_NETWORK_ERROR",
+    "FAIL_REASON_TIMEOUT",
+    "FAIL_REASON_CIRCUIT_OPEN",
+    "FAIL_REASON_DISABLED",
     "LLM_MODULE_FAILURE",
-    "_SYSTEM_GLOBAL_MACRO", "_SYSTEM_EXPERT_REVIEW", "_SYSTEM_HEALTH_CHECK",
-    "_SYSTEM_PENETRATION_DEEP", "_SYSTEM_NEWS_CORRELATION",
-    "_fmt_wan", "_fmt_holding_line",
-    "_build_global_macro_prompt", "_build_expert_review_prompt", "_build_health_check_prompt",
-    "_build_penetration_deep_prompt", "_build_holdings_summary", "_build_news_correlation_summary",
+    "_SYSTEM_GLOBAL_MACRO",
+    "_SYSTEM_EXPERT_REVIEW",
+    "_SYSTEM_HEALTH_CHECK",
+    "_SYSTEM_PENETRATION_DEEP",
+    "_SYSTEM_NEWS_CORRELATION",
+    "_fmt_wan",
+    "_fmt_holding_line",
+    "_build_global_macro_prompt",
+    "_build_expert_review_prompt",
+    "_build_health_check_prompt",
+    "_build_penetration_deep_prompt",
+    "_build_holdings_summary",
+    "_build_news_correlation_summary",
 ]
 
 
@@ -204,9 +217,9 @@ sentiment 字段判断该新闻对持仓的利好/利空影响（结合行业和
 def _fmt_wan(num: float) -> str:
     """将数值格式化为中文单位（万/亿），减少 token 消耗。"""
     if abs(num) >= 100_000_000:
-        return f"{num/100_000_000:.2f}亿"
+        return f"{num / 100_000_000:.2f}亿"
     if abs(num) >= 10_000:
-        return f"{num/10_000:.1f}万"
+        return f"{num / 10_000:.1f}万"
     return f"{num:,.0f}"
 
 
@@ -314,7 +327,9 @@ def _build_global_macro_prompt(
     )
 
 
-def _format_holdings_block(holdings_details: list[dict] | None, show_cost: bool = False, compact: bool = False, limit: int = 30) -> str:
+def _format_holdings_block(
+    holdings_details: list[dict] | None, show_cost: bool = False, compact: bool = False, limit: int = 30
+) -> str:
     """将持仓明细格式化为紧凑文本块（共享函数，消除 3 模块重复循环）。
 
     Args:
@@ -328,10 +343,7 @@ def _format_holdings_block(holdings_details: list[dict] | None, show_cost: bool 
     """
     if not holdings_details:
         return ""
-    return "\n".join(
-        _fmt_holding_line(h, show_cost=show_cost, compact=compact)
-        for h in holdings_details[:limit]
-    )
+    return "\n".join(_fmt_holding_line(h, show_cost=show_cost, compact=compact) for h in holdings_details[:limit])
 
 
 def _format_penetration_block(penetrated_assets: list[dict] | None, limit: int = 10) -> str:
@@ -573,7 +585,7 @@ def _build_holdings_summary(
             line = f"    [穿透] {name} ({codes})"
             if industry_data:
                 tags = []
-                for ac in (a.get("codes") or []):
+                for ac in a.get("codes") or []:
                     ac = ac.strip()
                     if ac in industry_data:
                         idata = industry_data[ac]
@@ -601,9 +613,5 @@ def _build_news_correlation_summary(news_data: list[dict]) -> str:
         title = (item.get("title") or "")[:120]
         intro = (item.get("intro") or "")[:150]
         keywords = ", ".join(item.get("matched_keywords", []))
-        parts.append(
-            f"[{i}] 标题: {title}\n"
-            f"    摘要: {intro}\n"
-            f"    关键词: {keywords or '--'}"
-        )
+        parts.append(f"[{i}] 标题: {title}\n    摘要: {intro}\n    关键词: {keywords or '--'}")
     return "\n".join(parts)

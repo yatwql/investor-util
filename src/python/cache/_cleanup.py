@@ -58,8 +58,7 @@ def _process_cache_file(
             os.remove(fpath)
         except OSError:
             return 0
-    logger.info("缓存清理: %s %s (age=%.1fh > ttl=%.1fh)",
-                "预览" if dry_run else "删除", fname, age / 3600, ttl / 3600)
+    logger.info("缓存清理: %s %s (age=%.1fh > ttl=%.1fh)", "预览" if dry_run else "删除", fname, age / 3600, ttl / 3600)
     return 1
 
 
@@ -88,6 +87,5 @@ def cleanup_expired(dry_run: bool = False) -> int:
         for fname in sorted(os.listdir(_CACHE_DIR)):
             removed += _process_cache_file(fname, dry_run, prefix_type_map, exact_map)
 
-        logger.info("缓存清理%s: 共 %d 个文件",
-                    "预览" if dry_run else "完成", removed)
+        logger.info("缓存清理%s: 共 %d 个文件", "预览" if dry_run else "完成", removed)
         return removed

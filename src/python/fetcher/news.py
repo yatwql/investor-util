@@ -14,14 +14,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
+from src.python.models import Holding
 from src.python.providers.news_aggregator import (
     aggregate_news as _aggregate_news,
+)
+from src.python.providers.news_aggregator import (
     get_last_source_status as _get_last_source_status,
 )
 from src.python.providers.news_keywords import build_holding_keywords as _build_holding_keywords
-from src.python.models import Holding
 
 __all__ = [
     "aggregate_news",

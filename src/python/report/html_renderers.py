@@ -5,30 +5,27 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.python.cache import get_cache_hit_rate
 from src.python.code_utils import is_a_share_code
-from src.python.constants import APP_VERSION
+from src.python.fetcher.akshare import get_dividend_data, get_profit_forecast
 from src.python.fetcher.fund import fetch_fund_holdings_cached
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.models import Holding
 from src.python.registry import get_llm_module_name
-from src.python.report.llm_module_info import build_llm_module_info
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix
 from src.python.report.fund_performance import is_fund
 from src.python.report.fund_style_analysis import analyze_style_for_all_funds
 from src.python.report.html_builders import _build_category_data, _build_perf_data
+from src.python.report.llm_module_info import build_llm_module_info
 from src.python.report.market_value import (
     DetailRow,
     _generate_details,
     classify_holdings,
-    get_last_trading_day,
     price_update_status,
 )
 from src.python.report.penetration import compute_penetration_top10
 from src.python.report.progress import ProgressReporter
-from src.python.fetcher.akshare import get_dividend_data, get_profit_forecast
 
 logger = logging.getLogger("invest")
 
@@ -61,8 +58,7 @@ def _render_market_value_section(
     total_profit_rate = total_profit / total_cost if total_cost > 0 else 0.0
     today_denom = total_cost + total_profit - total_today_profit
     today_profit_rate = total_today_profit / today_denom if today_denom > 0 else 0.0
-    return details, (total_mv, total_cost, total_profit, total_today_profit,
-                     total_profit_rate, today_profit_rate)
+    return details, (total_mv, total_cost, total_profit, total_today_profit, total_profit_rate, today_profit_rate)
 
 
 def _render_account_grouping(
@@ -88,8 +84,10 @@ def _render_account_grouping(
         acc_today = sum(d.today_profit for d in acc_details)
         acc_rate = acc_profit / acc_cost if acc_cost > 0 else 0.0
         account_totals[acc_name] = {
-            "market_value": acc_mv, "cost": acc_cost,
-            "profit": acc_profit, "profit_rate": acc_rate,
+            "market_value": acc_mv,
+            "cost": acc_cost,
+            "profit": acc_profit,
+            "profit_rate": acc_rate,
             "today_profit": acc_today,
         }
     return accounts, account_totals
@@ -141,24 +139,34 @@ def _render_index_section(
     for code in ("sh000001", "sz399001", "sh000300", "sh000688", "sz399006"):
         idx = a_indices.get(code)
         if idx:
-            a_indices_list.append({
-                "name": idx.get("name", ""), "price": idx.get("price", 0),
-                "change": idx.get("change", 0), "change_pct": idx.get("change_pct", 0),
-            })
+            a_indices_list.append(
+                {
+                    "name": idx.get("name", ""),
+                    "price": idx.get("price", 0),
+                    "change": idx.get("change", 0),
+                    "change_pct": idx.get("change_pct", 0),
+                }
+            )
 
     us_indices_list: list[dict[str, Any]] = []
     for code in ("gb_dji", "gb_ixic", "gb_inx"):
         idx = us_indices.get(code)
         if idx:
-            us_indices_list.append({
-                "name": idx.get("name", ""), "price": idx.get("price", 0),
-                "change": idx.get("change", 0), "change_pct": idx.get("change_pct", 0),
-            })
+            us_indices_list.append(
+                {
+                    "name": idx.get("name", ""),
+                    "price": idx.get("price", 0),
+                    "change": idx.get("change", 0),
+                    "change_pct": idx.get("change_pct", 0),
+                }
+            )
     return a_indices, us_indices, a_indices_list, us_indices_list
 
 
 def _render_category_table(
-    holdings: list[Holding], details: list, prog: ProgressReporter,
+    holdings: list[Holding],
+    details: list,
+    prog: ProgressReporter,
 ) -> tuple[list[dict[str, Any]], bool]:
     """构建持仓分类表数据。
 
@@ -171,7 +179,9 @@ def _render_category_table(
 
 
 def _render_penetration_section(
-    holdings: list[Holding], details: list, prog: ProgressReporter,
+    holdings: list[Holding],
+    details: list,
+    prog: ProgressReporter,
 ) -> tuple[dict | None, bool, bool]:
     """计算资产穿透TOP10，附加盈利预测和股息率。
 
@@ -232,7 +242,9 @@ def _render_penetration_section(
 
 
 def _render_fund_performance_section(
-    holdings: list[Holding], details: list, prog: ProgressReporter,
+    holdings: list[Holding],
+    details: list,
+    prog: ProgressReporter,
 ) -> tuple[list[dict[str, Any]], bool]:
     """构建基金业绩分析数据。
 
@@ -245,7 +257,9 @@ def _render_fund_performance_section(
 
 
 def _render_manager_analysis(
-    holdings: list[Holding], enable_b_series: bool, prog: ProgressReporter,
+    holdings: list[Holding],
+    enable_b_series: bool,
+    prog: ProgressReporter,
 ) -> dict | None:
     """构建基金经理变更监控数据。
 
@@ -282,9 +296,7 @@ def _render_overlap_matrix(
         return None
     prog.info("正在计算持仓重合度矩阵...")
     try:
-        fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if is_fund(h)
-        ))
+        fund_codes = list(dict.fromkeys(h.code for h in holdings if is_fund(h)))
         if len(fund_codes) < 2:
             return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
 
@@ -327,9 +339,7 @@ def _render_concentration(
         return None
     prog.info("正在计算持仓集中度...")
     try:
-        fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if is_fund(h)
-        ))
+        fund_codes = list(dict.fromkeys(h.code for h in holdings if is_fund(h)))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
             fh = fetch_fund_holdings_cached(code)
@@ -362,9 +372,7 @@ def _render_style_analysis(
         return None
     prog.info("正在分析基金风格漂移...")
     try:
-        fund_codes = list(dict.fromkeys(
-            h.code for h in holdings if is_fund(h)
-        ))
+        fund_codes = list(dict.fromkeys(h.code for h in holdings if is_fund(h)))
         fund_holdings: dict[str, dict] = {}
         for code in fund_codes:
             fh = fetch_fund_holdings_cached(code)
@@ -400,8 +408,13 @@ def _render_news_section(
     Returns:
         (news_data, news_llm_meta)
     """
-    _default_meta = {"llm_enabled": False, "llm_cached": False, "token_usage": {},
-                     "cost_estimation": "-", "thinking_enabled": False}
+    _default_meta = {
+        "llm_enabled": False,
+        "llm_cached": False,
+        "token_usage": {},
+        "cost_estimation": "-",
+        "thinking_enabled": False,
+    }
     if not include_news:
         return [], _default_meta
 
@@ -413,8 +426,8 @@ def _render_news_section(
     try:
         penetrated_assets = penetration.get("top10", []) if penetration else []
         from src.python.report.news_correlation import build_news_data
-        news_data, _news_llm_meta = build_news_data(
-            holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
+
+        news_data, _news_llm_meta = build_news_data(holdings, top_n=news_top_count, penetrated_assets=penetrated_assets)
         if not news_data:
             news_data = []
             logger.info("财经新闻热点与持仓关联分析：无数据")
@@ -458,35 +471,55 @@ def _render_llm_content_section(
     prog.info("正在调用 LLM 生成智能分析...")
     try:
         from src.python.llm import generate_all_llm
+
         pen_top10 = penetration.get("top10", []) if penetration else []
         _holdings_details = [
             {
-                "name": d.name, "code": d.code,
-                "market_value": d.market_value, "cost": d.cost,
-                "profit": d.profit, "profit_rate": d.profit_rate,
+                "name": d.name,
+                "code": d.code,
+                "market_value": d.market_value,
+                "cost": d.cost,
+                "profit": d.profit,
+                "profit_rate": d.profit_rate,
                 "change_pct": (
                     (d.price - d.yesterday_close) / d.yesterday_close * 100
-                    if d.yesterday_close and abs(d.yesterday_close) > 1e-10 else 0.0),
-            } for d in details
+                    if d.yesterday_close and abs(d.yesterday_close) > 1e-10
+                    else 0.0
+                ),
+            }
+            for d in details
         ]
         from src.python.fetcher.akshare import get_sector_fund_flow
+
         _sector_flow = sector_flow if sector_flow is not None else get_sector_fund_flow()
 
         gm, er, hc, pd, _, _, _, _ = generate_all_llm(
-            a_indices, us_indices, total_mv, total_cost, total_profit,
-            total_today_profit, len(holdings), cat_counts,
-            penetrated_assets=pen_top10, holdings_details=_holdings_details,
-            sector_flow=_sector_flow, force=force_llm,
+            a_indices,
+            us_indices,
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            len(holdings),
+            cat_counts,
+            penetrated_assets=pen_top10,
+            holdings_details=_holdings_details,
+            sector_flow=_sector_flow,
+            force=force_llm,
         )
         enabled = False
         if gm:
-            enabled = True; logger.info("%s LLM 生成完成", get_llm_module_name("global_macro"))
+            enabled = True
+            logger.info("%s LLM 生成完成", get_llm_module_name("global_macro"))
         if er:
-            enabled = True; logger.info("%s LLM 生成完成", get_llm_module_name("expert_review"))
+            enabled = True
+            logger.info("%s LLM 生成完成", get_llm_module_name("expert_review"))
         if hc:
-            enabled = True; logger.info("%s LLM 生成完成", get_llm_module_name("health_check"))
+            enabled = True
+            logger.info("%s LLM 生成完成", get_llm_module_name("health_check"))
         if pd:
-            enabled = True; logger.info("%s LLM 生成完成", get_llm_module_name("penetration_deep"))
+            enabled = True
+            logger.info("%s LLM 生成完成", get_llm_module_name("penetration_deep"))
         return enabled, gm, er, hc, pd
     except Exception as e:
         logger.warning("LLM 生成失败: %s", e)
@@ -508,6 +541,7 @@ def _render_llm_module_info(
     if llm_enabled_flag:
         try:
             from src.python.llm import format_session_usage, get_session_usage
+
             _llm_session_usage = format_session_usage(get_session_usage())
         except (ImportError, TypeError, AttributeError):
             logger.debug("获取 LLM 会话用量失败（非关键）")
@@ -515,9 +549,11 @@ def _render_llm_module_info(
     _llm_failure = {}
     _per_module: dict[str, Any] = {}
     from src.python.llm import FAIL_REASON_DISABLED as _FAIL_REASON_DISABLED_IMPORT
+
     FAIL_REASON_DISABLED: str | None = _FAIL_REASON_DISABLED_IMPORT
     try:
         from src.python.llm.prompts import LLM_MODULE_FAILURE
+
         _llm_failure = dict(LLM_MODULE_FAILURE)
     except ImportError:
         logger.info("llm/session 模块未就绪，略过用量统计")
@@ -526,7 +562,8 @@ def _render_llm_module_info(
 
     module_disabled = {
         mk: _llm_failure.get(mk) == FAIL_REASON_DISABLED
-        for mk in ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]}
+        for mk in ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]
+    }
 
     llm_module_info = build_llm_module_info(_llm_failure, _per_module)
 

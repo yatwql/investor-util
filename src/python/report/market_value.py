@@ -20,9 +20,9 @@ from src.python.code_utils import (
 )
 from src.python.fetcher.price import fetch_market_data
 from src.python.market_hours import is_market_open as _mh_is_market_open
-from src.python.provider_registry import FetchStrategy, get_registry
 from src.python.market_hours import is_midday_break as _mh_is_midday_break
 from src.python.models import Holding
+from src.python.provider_registry import FetchStrategy, get_registry
 
 logger = logging.getLogger("invest")
 
@@ -71,6 +71,7 @@ def _compute_premium(price: float, nav: float, name: str) -> str:
 @dataclass
 class DetailRow:
     """单条持仓估值明细（15 列对应字段）。"""
+
     account: str = ""
     name: str = ""
     code: str = ""
@@ -402,12 +403,21 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     if mkt is None:
         logger.warning("无法获取行情数据: %s (%s)", h.name, h.code)
         return DetailRow(
-            account=h.account.strip(), name=h.name, code=h.code,
-            price=0.0, nav_date="", yesterday_close=0.0,
-            price_type="暂无行情", shares=h.shares,
-            market_value=0.0, cost=round(h.cost_price * h.shares, 2),
-            profit=0.0, profit_rate=None, today_profit=0.0,
-            source="无数据", source_api="",
+            account=h.account.strip(),
+            name=h.name,
+            code=h.code,
+            price=0.0,
+            nav_date="",
+            yesterday_close=0.0,
+            price_type="暂无行情",
+            shares=h.shares,
+            market_value=0.0,
+            cost=round(h.cost_price * h.shares, 2),
+            profit=0.0,
+            profit_rate=None,
+            today_profit=0.0,
+            source="无数据",
+            source_api="",
         )
 
     price = mkt.get("price", 0.0) or 0.0
@@ -422,7 +432,7 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     profit = round(mv - cost, 2)
     profit_rate = profit / cost if cost > 0 else None
 
-        # 本日盈亏
+    # 本日盈亏
     if source_api == "tencent":
         today_profit = round((price - yclose) * h.shares, 2)
     elif nav_date:
@@ -435,12 +445,22 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     premium = _compute_premium(price, yclose, mkt.get("name", ""))
 
     return DetailRow(
-        account=h.account.strip(), name=h.name, code=h.code,
-        price=price, nav_date=nav_date, yesterday_close=yclose,
-        price_type=price_type, premium=premium,
-        shares=h.shares, market_value=mv, cost=cost,
-        profit=profit, profit_rate=profit_rate, today_profit=today_profit,
-        source=source, source_api=source_api,
+        account=h.account.strip(),
+        name=h.name,
+        code=h.code,
+        price=price,
+        nav_date=nav_date,
+        yesterday_close=yclose,
+        price_type=price_type,
+        premium=premium,
+        shares=h.shares,
+        market_value=mv,
+        cost=cost,
+        profit=profit,
+        profit_rate=profit_rate,
+        today_profit=today_profit,
+        source=source,
+        source_api=source_api,
     )
 
 
@@ -489,14 +509,12 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
 
     # 3b. 缓存未命中 → 降级到 LIVE_FETCH（CACHE_ONLY 找不到缓存时逐条回退）
     #     典型场景：非交易时段首次运行/缓存已过期/新资产，CACHE_ONLY 不应让这些资产无数据
-    cache_miss = [
-        h for h in cache_holdings
-        if result_map.get((h.account.strip(), h.code.strip())) is None
-    ]
+    cache_miss = [h for h in cache_holdings if result_map.get((h.account.strip(), h.code.strip())) is None]
     if cache_miss:
         logger.info(
             "CACHE_ONLY 未命中 %d 个资产，降级到实时获取（原策略仅命中 %d 个）",
-            len(cache_miss), len(cache_holdings) - len(cache_miss),
+            len(cache_miss),
+            len(cache_holdings) - len(cache_miss),
         )
         live_holdings.extend(cache_miss)
 
@@ -525,14 +543,15 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
     _ok_count = sum(1 for d in details if d.price > 0)
     _fail_count = len(details) - _ok_count
     if _fail_count > 0:
-        _fail_names = [f"{h.name}({h.code})"
-                       for h, d in zip(holdings, details) if d.price <= 0]
-        logger.warning("市场行情获取：%d 成功，%d 失败（网络/非交易时段/限速），"
-                       "报告部分数据将不可用；失败资产: %s",
-                       _ok_count, _fail_count, _fail_names)
+        _fail_names = [f"{h.name}({h.code})" for h, d in zip(holdings, details) if d.price <= 0]
+        logger.warning(
+            "市场行情获取：%d 成功，%d 失败（网络/非交易时段/限速），报告部分数据将不可用；失败资产: %s",
+            _ok_count,
+            _fail_count,
+            _fail_names,
+        )
         if _ok_count == 0:
-            logger.warning("所有行情数据均获取失败，报告将显示占位文本 "
-                           "'暂无行情' 而非实际数据")
+            logger.warning("所有行情数据均获取失败，报告将显示占位文本 '暂无行情' 而非实际数据")
     else:
         logger.info("市场行情获取：全部 %d 条成功", _ok_count)
     logger.info("市值核算明细数据生成完成，共 %d 条", len(details))

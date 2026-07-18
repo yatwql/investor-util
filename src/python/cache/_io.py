@@ -53,8 +53,13 @@ def _read_cache_data(fpath: str, key: str, dry_run: bool = False) -> dict | None
 
 
 def _write_atomic(
-    fd: int, tmp_path: str, final_path: str,
-    path: str, json_str: str, raw_bytes: bytes, use_gzip: bool,
+    fd: int,
+    tmp_path: str,
+    final_path: str,
+    path: str,
+    json_str: str,
+    raw_bytes: bytes,
+    use_gzip: bool,
 ) -> None:
     """原子写入：写临时文件 → os.replace 替换 → 清理旧格式。
 

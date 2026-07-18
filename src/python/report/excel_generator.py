@@ -9,11 +9,11 @@ from typing import Any
 
 from src.python.logger import setup_logger
 from src.python.registry import get_report_section_order
-from src.python.report.excel_module_loader import load_report_modules
 from src.python.report.excel_b_series import write_b_series_sheets
 from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_llm_usage import write_llm_section_and_usage
-from src.python.report.excel_market_data import resolve_market_data, resolve_indices
+from src.python.report.excel_market_data import resolve_indices, resolve_market_data
+from src.python.report.excel_module_loader import load_report_modules
 from src.python.report.excel_news_warning import write_news_sheet
 from src.python.report.excel_sheet_factory import create_sheets
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, Timer
@@ -26,11 +26,15 @@ logger = setup_logger()
 
 def _write_portfolio_history_sheet(ws, history_data: dict) -> None:
     """写入组合历史走势页签（含基准指数归一化列）。"""
-    from src.python.report.styles import FMT_MONEY, FMT_PERCENT
     from src.python.report.excel_writer import (
-        _write_placeholder, auto_width, freeze_header,
-        write_data_row, write_header_row, write_title_row,
+        _write_placeholder,
+        auto_width,
+        freeze_header,
+        write_data_row,
+        write_header_row,
+        write_title_row,
     )
+    from src.python.report.styles import FMT_MONEY, FMT_PERCENT
 
     if history_data is None:
         _write_placeholder(ws, "组合历史走势数据暂不可用（配置或网络原因）", max_cols=5)
@@ -95,11 +99,15 @@ def _write_portfolio_history_sheet(ws, history_data: dict) -> None:
 
 def _write_drawdown_analysis_sheet(ws, history_data: dict) -> None:
     """写入历史回撤分析页签（组合 vs 基准对比矩阵）。"""
-    from src.python.report.styles import FMT_PERCENT
     from src.python.report.excel_writer import (
-        _write_placeholder, auto_width, freeze_header,
-        write_data_row, write_header_row, write_title_row,
+        _write_placeholder,
+        auto_width,
+        freeze_header,
+        write_data_row,
+        write_header_row,
+        write_title_row,
     )
+    from src.python.report.styles import FMT_PERCENT
 
     if history_data is None:
         _write_placeholder(ws, "历史回撤分析数据暂不可用（配置或网络原因）", max_cols=5)
@@ -122,16 +130,11 @@ def _write_drawdown_analysis_sheet(ws, history_data: dict) -> None:
     none_fmt: str | None = None
 
     metrics: list[tuple[str, Any, str | None, str, str | None]] = [
-        ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), pct_fmt,
-         "total_return_pct", pct_fmt),
-        ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), pct_fmt,
-         "max_drawdown_pct", pct_fmt),
-        ("年化波动率", pd.get("annualized_volatility", 0), pct_fmt,
-         None, None),
-        ("起算日", pd.get("data_start", ""), none_fmt,
-         "data_start", none_fmt),
-        ("终止日", pd.get("data_end", ""), none_fmt,
-         "data_end", none_fmt),
+        ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), pct_fmt, "total_return_pct", pct_fmt),
+        ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), pct_fmt, "max_drawdown_pct", pct_fmt),
+        ("年化波动率", pd.get("annualized_volatility", 0), pct_fmt, None, None),
+        ("起算日", pd.get("data_start", ""), none_fmt, "data_start", none_fmt),
+        ("终止日", pd.get("data_end", ""), none_fmt, "data_end", none_fmt),
     ]
 
     for metric_name, portfolio_val, portfolio_fmt, bm_key, bm_fmt in metrics:
@@ -161,11 +164,7 @@ def _write_history_sheets(
     ws_ph = sheets.get("portfolio_history")
     ws_dd = sheets.get("drawdown_analysis")
 
-    data_ok = (
-        history_data
-        and history_data.get("status") != "unavailable"
-        and history_data.get("bars")
-    )
+    data_ok = history_data and history_data.get("status") != "unavailable" and history_data.get("bars")
     effective = history_data if data_ok else None
 
     if ws_ph is not None:
@@ -175,17 +174,21 @@ def _write_history_sheets(
 
 
 def generate_excel_report(
-    holdings: list, include_news: bool = False, output_dir: str = "reports",
-    news_top_count: int = 100, include_llm: bool = False,
+    holdings: list,
+    include_news: bool = False,
+    output_dir: str = "reports",
+    news_top_count: int = 100,
+    include_llm: bool = False,
     llm_content: tuple[str | None, str | None, str | None, str | None] | None = None,
-    details: list | None = None, a_indices: dict[str, dict[str, Any]] | None = None,
+    details: list | None = None,
+    a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
     news_data: list | None = None,
     news_llm_meta: dict | None = None,
-    enable_b_series: bool = False,      # board 层：B 系列是否开启
-    enable_news: bool = True,           # board 层：新闻板块是否开启（配置值）
-    enable_llm: bool = True,            # board 层：LLM 板块是否开启
-    enable_history: bool = True,        # board 层：历史走势板块是否开启
+    enable_b_series: bool = False,  # board 层：B 系列是否开启
+    enable_news: bool = True,  # board 层：新闻板块是否开启（配置值）
+    enable_llm: bool = True,  # board 层：LLM 板块是否开启
+    enable_history: bool = True,  # board 层：历史走势板块是否开启
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     f_context: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
@@ -236,12 +239,15 @@ def generate_excel_report(
     if include_llm:
         data_availability["llm_data_available"] = True
 
-    sheets = create_sheets(wb, order,
-                            enable_b_series=enable_b_series,
-                            enable_news=enable_news,
-                            enable_history=enable_history,
-                            enable_llm=enable_llm,
-                            data_availability=data_availability)
+    sheets = create_sheets(
+        wb,
+        order,
+        enable_b_series=enable_b_series,
+        enable_news=enable_news,
+        enable_history=enable_history,
+        enable_llm=enable_llm,
+        data_availability=data_availability,
+    )
 
     # ── 行情市值 + 指数 ──
     data = resolve_market_data(holdings, details, modules, sheets["market_value"], prog)
@@ -249,9 +255,7 @@ def generate_excel_report(
 
     # ── 各页签写入 ──
     pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
-    write_news_sheet(sheets, holdings, pen_result, include_news,
-                                  news_data, news_llm_meta, news_top_count,
-                                  prog)
+    write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
     write_llm_section_and_usage(sheets, include_llm, llm_content, prog, section_order=order)
 
@@ -275,6 +279,7 @@ def generate_excel_report(
             # 找到最后一行的行号
             _last_row = _ws_sum.max_row + 2
             from openpyxl.styles import Font
+
             _section_font = Font(size=12, bold=True, color="2E75B6")
             _bold_font = Font(bold=True)
             # 标题行
@@ -288,27 +293,31 @@ def generate_excel_report(
             if _diff.get("total_value_diff") is not None:
                 _ws_sum.cell(row=_last_row, column=1, value="总市值变化").font = _bold_font
                 _cell = _ws_sum.cell(row=_last_row, column=2, value=_diff["total_value_diff"])
-                _cell.number_format = '#,##0.00'
+                _cell.number_format = "#,##0.00"
                 _cell.font = Font(color="CC0000" if _diff["total_value_diff"] >= 0 else "009900")
                 _last_row += 1
             if _diff.get("total_value_diff_pct") is not None:
                 _ws_sum.cell(row=_last_row, column=1, value="总市值变化率")
                 _cell = _ws_sum.cell(row=_last_row, column=2, value=round(_diff["total_value_diff_pct"] / 100, 4))
-                _cell.number_format = '0.00%'
+                _cell.number_format = "0.00%"
                 _last_row += 1
             if _diff.get("total_pnl_diff") is not None:
                 _ws_sum.cell(row=_last_row, column=1, value="总盈亏变化").font = _bold_font
                 _cell = _ws_sum.cell(row=_last_row, column=2, value=_diff["total_pnl_diff"])
-                _cell.number_format = '#,##0.00'
+                _cell.number_format = "#,##0.00"
                 _cell.font = Font(color="CC0000" if _diff["total_pnl_diff"] >= 0 else "009900")
                 _last_row += 1
             # 持仓变动概要
-            for _label, _key in [("新增持仓", "added"), ("清仓标的", "removed"),
-                                  ("增持标的", "increased"), ("减持标的", "decreased")]:
+            for _label, _key in [
+                ("新增持仓", "added"),
+                ("清仓标的", "removed"),
+                ("增持标的", "increased"),
+                ("减持标的", "decreased"),
+            ]:
                 _items = _diff.get(_key, [])
                 if _items:
                     _ws_sum.cell(row=_last_row, column=1, value=_label).font = _bold_font
-                    _names = ", ".join(f"{i.get('name','')}({i.get('code','')})" for i in _items[:5])
+                    _names = ", ".join(f"{i.get('name', '')}({i.get('code', '')})" for i in _items[:5])
                     if len(_items) > 5:
                         _names += f" 等{len(_items)}只"
                     _ws_sum.cell(row=_last_row, column=2, value=_names)
@@ -322,7 +331,11 @@ def generate_excel_report(
         prog.info("正在保存 Excel 报告...")
         path = save_workbook(wb, output_dir=output_dir)
         logger.info("Excel 报告已生成: %s", path)
-        logger.info("总市值: %.2f元, 总成本: %.2f元, 总盈亏: %.2f元, 本日盈亏: %.2f元",
-                    data["total_mv"], data["total_cost"],
-                    data["total_profit"], data["today_profit"])
+        logger.info(
+            "总市值: %.2f元, 总成本: %.2f元, 总盈亏: %.2f元, 本日盈亏: %.2f元",
+            data["total_mv"],
+            data["total_cost"],
+            data["total_profit"],
+            data["today_profit"],
+        )
         prog.ok(f"Excel 报告已保存: {path}")

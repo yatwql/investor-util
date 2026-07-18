@@ -80,12 +80,22 @@ def normalize_benchmarks(
 
         # 检查数据是否有重叠
         if sorted_bar_dates[0] > portfolio_dates[-1]:
-            logger.warning("[normalize] %s(%s) 数据起始日 %s 晚于组合结束日 %s，跳过",
-                           name, code, sorted_bar_dates[0], portfolio_dates[-1])
+            logger.warning(
+                "[normalize] %s(%s) 数据起始日 %s 晚于组合结束日 %s，跳过",
+                name,
+                code,
+                sorted_bar_dates[0],
+                portfolio_dates[-1],
+            )
             continue
         if sorted_bar_dates[-1] < portfolio_dates[0]:
-            logger.warning("[normalize] %s(%s) 数据结束日 %s 早于组合起算日 %s，跳过",
-                           name, code, sorted_bar_dates[-1], portfolio_dates[0])
+            logger.warning(
+                "[normalize] %s(%s) 数据结束日 %s 早于组合起算日 %s，跳过",
+                name,
+                code,
+                sorted_bar_dates[-1],
+                portfolio_dates[0],
+            )
             continue
 
         # 确定对齐起算日 = max(组合起算日, 指数首条数据日)
@@ -125,8 +135,7 @@ def normalize_benchmarks(
         if not normalized:
             continue
 
-        logger.info("[normalize] %s(%s) 归一化完成, %d 条数据",
-                     name, code, len(normalized))
+        logger.info("[normalize] %s(%s) 归一化完成, %d 条数据", name, code, len(normalized))
 
         # 计算区间累计收益率 = (归一化终值 / 100 - 1) * 100 = 终值 - 100
         total_return_pct = round(normalized[-1]["value"] - 100, 2)
@@ -142,16 +151,18 @@ def normalize_benchmarks(
             if dd_pct > max_dd_pct:
                 max_dd_pct = dd_pct
 
-        results.append({
-            "code": code,
-            "name": name,
-            "bars": normalized,
-            "total_return_pct": total_return_pct,
-            "max_drawdown_pct": round(-max_dd_pct, 2),
-            "data_start": normalized[0]["date"],
-            "data_end": normalized[-1]["date"],
-            "status": "ok",
-        })
+        results.append(
+            {
+                "code": code,
+                "name": name,
+                "bars": normalized,
+                "total_return_pct": total_return_pct,
+                "max_drawdown_pct": round(-max_dd_pct, 2),
+                "data_start": normalized[0]["date"],
+                "data_end": normalized[-1]["date"],
+                "status": "ok",
+            }
+        )
 
     return results
 
@@ -179,10 +190,7 @@ def fetch_benchmarks(
 
     _max_workers = min(4, len(codes)) if len(codes) > 1 else 1
     with ThreadPoolExecutor(max_workers=_max_workers) as pool:
-        futures = {
-            pool.submit(fetch_index_history, code, days): code
-            for code in codes
-        }
+        futures = {pool.submit(fetch_index_history, code, days): code for code in codes}
         for fut in as_completed(futures):
             code = futures[fut]
             name = benchmark_indices[code]

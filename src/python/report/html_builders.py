@@ -24,8 +24,6 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter
 logger = logging.getLogger("invest")
 
 
-
-
 def _build_category_data(
     holdings: list[Holding],
     details: list[DetailRow],
@@ -51,6 +49,7 @@ def _build_category_data(
     try:
         from src.python.code_utils import is_a_share_code
         from src.python.fetcher.akshare import get_dividend_data
+
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
         if not dividend_data and stock_codes:
@@ -66,8 +65,15 @@ def _build_category_data(
 
     _PROP_ORDER = {"股票": 0, "基金": 1, "债券": 2, "现金": 3, "其他": 4}
     _SUB_ORDER = {
-        "A股": 0, "QDII": 1, "主动": 2, "被动": 3,
-        "指数": 4, "混合": 5, "纯债": 6, "货币": 7, "其他": 8,
+        "A股": 0,
+        "QDII": 1,
+        "主动": 2,
+        "被动": 3,
+        "指数": 4,
+        "混合": 5,
+        "纯债": 6,
+        "货币": 7,
+        "其他": 8,
     }
     sorted_groups = sorted(
         cat_groups.items(),
@@ -82,16 +88,18 @@ def _build_category_data(
         items: list[dict[str, Any]] = []
         for h in group:
             d = detail_map.get(h.code)
-            items.append({
-                "name": h.name,
-                "code": h.code,
-                "market_value": d.market_value if d else 0.0,
-                "cost": d.cost if d else 0.0,
-                "profit": d.profit if d else 0.0,
-                "profit_rate": d.profit_rate if d else 0.0,
-                "today_profit": d.today_profit if d else 0.0,
-                "yield_text": calc_yield_text(h.code, d, dividend_data),
-            })
+            items.append(
+                {
+                    "name": h.name,
+                    "code": h.code,
+                    "market_value": d.market_value if d else 0.0,
+                    "cost": d.cost if d else 0.0,
+                    "profit": d.profit if d else 0.0,
+                    "profit_rate": d.profit_rate if d else 0.0,
+                    "today_profit": d.today_profit if d else 0.0,
+                    "yield_text": calc_yield_text(h.code, d, dividend_data),
+                }
+            )
 
         sub_mv = sum(i["market_value"] for i in items)
         sub_cost = sum(i["cost"] for i in items)
@@ -99,28 +107,36 @@ def _build_category_data(
         sub_today = sum(i["today_profit"] for i in items)
         sub_rate = sub_profit / sub_cost if sub_cost > 0 else 0.0
 
-        result.append({
-            "property": prop,
-            "sub_category": sub,
-            "items": items,
-            "sub_mv": sub_mv,
-            "sub_cost": sub_cost,
-            "sub_profit": sub_profit,
-            "sub_rate": sub_rate,
-            "sub_today": sub_today,
-        })
+        result.append(
+            {
+                "property": prop,
+                "sub_category": sub,
+                "items": items,
+                "sub_mv": sub_mv,
+                "sub_cost": sub_cost,
+                "sub_profit": sub_profit,
+                "sub_rate": sub_rate,
+                "sub_today": sub_today,
+            }
+        )
 
     return result, dividend_success
 
 
 def _build_single_perf_item(
-    idx: int, fund: Holding, detail_map: dict,
-    prog: ProgressReporter, fund_count: int,
+    idx: int,
+    fund: Holding,
+    detail_map: dict,
+    prog: ProgressReporter,
+    fund_count: int,
 ) -> dict[str, Any]:
     """构建单只基金的业绩分析条目。"""
     logger.info(
         "获取基金业绩 [%d/%d]: %s (%s)",
-        idx, fund_count, fund.name, fund.code,
+        idx,
+        fund_count,
+        fund.name,
+        fund.code,
     )
     prog.info(f"基金业绩 [{idx}/{fund_count}]: {fund.name}")
 

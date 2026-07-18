@@ -20,10 +20,11 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger("invest")
 
@@ -62,6 +63,7 @@ class FetchStrategy(Enum):
         盘后只读缓存（不发起 HTTP）。
         非交易时段 A 股数据从此策略受益。
     """
+
     LIVE_FETCH = "live"
     CACHE_ONLY = "cache"
 
@@ -72,6 +74,7 @@ class FetchStrategy(Enum):
 @dataclass
 class ProviderState:
     """Provider 运行时状态（熔断器数据）。"""
+
     name: str
     tier: int
     fallback: str | None
@@ -89,6 +92,7 @@ class ProviderState:
 @dataclass
 class SessionCacheEntry:
     """会话缓存条目。"""
+
     value: Any
     fetched_at: float
     source: str
@@ -161,7 +165,10 @@ class DataSourceRegistry:
                     old.cooldown_secs = cooldown_secs
             else:
                 self._providers[name] = ProviderState(
-                    name=name, tier=tier, fallback=fallback, timeout=timeout,
+                    name=name,
+                    tier=tier,
+                    fallback=fallback,
+                    timeout=timeout,
                     failure_threshold=failure_threshold or _PROVIDER_SKIP_THRESHOLD,
                     cooldown_secs=cooldown_secs or _PROVIDER_COOLDOWN_SECS,
                 )
@@ -212,7 +219,10 @@ class DataSourceRegistry:
             state = self._providers.get(provider)
             if state is None:
                 state = ProviderState(
-                    name=provider, tier=4, fallback=None, timeout=10.0,
+                    name=provider,
+                    tier=4,
+                    fallback=None,
+                    timeout=10.0,
                 )
                 self._providers[provider] = state
             now = time.time()
@@ -224,7 +234,9 @@ class DataSourceRegistry:
                 state.is_skipped = True
                 logger.warning(
                     "[registry] %s 连续 %d 次失败（最新: %s），熔断 %ds",
-                    provider, state.consecutive_failures, context,
+                    provider,
+                    state.consecutive_failures,
+                    context,
                     state.cooldown_secs,
                 )
 
@@ -243,7 +255,8 @@ class DataSourceRegistry:
                 state.consecutive_failures = 0
                 logger.info(
                     "[registry] %s 冷却期满（%.0fs），解除熔断",
-                    provider, elapsed,
+                    provider,
+                    elapsed,
                 )
                 return False
             return True
@@ -270,7 +283,8 @@ class DataSourceRegistry:
                     any_recovered = True
                     logger.info(
                         "[registry] %s 冷却期满（链式检查，%.0fs），解除熔断",
-                        p, now - state.last_failure_time,
+                        p,
+                        now - state.last_failure_time,
                     )
             if any_recovered:
                 return False
@@ -314,7 +328,9 @@ class DataSourceRegistry:
             if len(dc) >= _SESSION_CACHE_MAX_ENTRIES:
                 self._evict_one(dc)
             dc[code] = SessionCacheEntry(
-                value=value, fetched_at=time.time(), source=source,
+                value=value,
+                fetched_at=time.time(),
+                source=source,
             )
 
     def session_cache_contains(self, domain: str, code: str) -> bool:
@@ -363,6 +379,7 @@ class DataSourceRegistry:
         # 检测交易时段
         if market_open is None:
             from src.python.market_hours import is_market_open
+
             try:
                 market_open = is_market_open()
             except Exception:
@@ -492,7 +509,6 @@ class DataSourceRegistry:
             self._session_cache.clear()
 
 
-
 # ── 工厂函数 ────────────────────────────────────────────
 
 
@@ -529,10 +545,7 @@ def phase_timeout(seconds: float, phase_name: str = "data_fetch"):
     global _phase_timer, _phase_expired, _phase_timer_name
 
     if _phase_timer is not None:
-        raise RuntimeError(
-            f"phase_timeout 不支持嵌套：已有 '{_phase_timer_name}' 在运行，"
-            f"不能开启 '{phase_name}'"
-        )
+        raise RuntimeError(f"phase_timeout 不支持嵌套：已有 '{_phase_timer_name}' 在运行，不能开启 '{phase_name}'")
 
     start = time.time()
     _phase_expired = False
@@ -544,7 +557,8 @@ def phase_timeout(seconds: float, phase_name: str = "data_fetch"):
             _phase_expired = True
         logger.warning(
             "[phase_timeout] %s 超时（%.0fs），继续使用已获取数据",
-            phase_name, seconds,
+            phase_name,
+            seconds,
         )
 
     timer = threading.Timer(seconds, _expire)

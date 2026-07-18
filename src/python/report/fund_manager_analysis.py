@@ -158,18 +158,20 @@ def detect_manager_changes(holdings: list[Holding]) -> list[dict[str, Any]]:
         if is_first_run:
             alert_level = "首检"
 
-        results.append({
-            "code": h.code,
-            "name": h.name,
-            "current_manager": current_manager or "--",
-            "start_date": start_date or "--",
-            "tenure_days": tenure_days,
-            "changed_1m": changed_1m,
-            "changed_3m": changed_3m,
-            "changed_6m": changed_6m,
-            "alert_level": alert_level,
-            "is_first_check": is_first_run,
-        })
+        results.append(
+            {
+                "code": h.code,
+                "name": h.name,
+                "current_manager": current_manager or "--",
+                "start_date": start_date or "--",
+                "tenure_days": tenure_days,
+                "changed_1m": changed_1m,
+                "changed_3m": changed_3m,
+                "changed_6m": changed_6m,
+                "alert_level": alert_level,
+                "is_first_check": is_first_run,
+            }
+        )
 
         # ── 更新快照（只要有经理数据就更新）──
         if current_manager:
@@ -196,7 +198,4 @@ def build_first_check_summary(results: list[dict]) -> str:
     """
     total = len(results)
     managed = sum(1 for r in results if r.get("current_manager") and r["current_manager"] != "--")
-    return (
-        f"此为首次运行，基金经理变更自下次报告起跟踪。"
-        f"当前监控 {total} 只基金，其中 {managed} 只由当前经理管理。"
-    )
+    return f"此为首次运行，基金经理变更自下次报告起跟踪。当前监控 {total} 只基金，其中 {managed} 只由当前经理管理。"

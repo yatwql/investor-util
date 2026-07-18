@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import os
 import sys
 from pathlib import Path
 
@@ -56,15 +55,40 @@ DEPRECATED_MARKERS: set[str] = set()
 
 # 已知的合法标记全集（conftest.py 注册的）
 KNOWN_MARKERS = {
-    "scenario", "scenario_basic", "scenario_resilience", "scenario_llm",
-    "scenario_datetime", "scenario_stock", "scenario_fund", "scenario_mixed_accounts",
-    "scenario_new_holdings", "scenario_cache_hit", "scenario_bond", "scenario_network_down",
-    "scenario_single_holding", "scenario_zero_cost", "scenario_extreme",
-    "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news",
-    "unit_report", "unit_config", "unit_core", "unit_ui",
-    "edge", "smoke", "data", "llm", "integration",
-    "integration_contract", "integration_isolation", "integration_news_pipeline",
-    "integration_cache", "integration_tui",
+    "scenario",
+    "scenario_basic",
+    "scenario_resilience",
+    "scenario_llm",
+    "scenario_datetime",
+    "scenario_stock",
+    "scenario_fund",
+    "scenario_mixed_accounts",
+    "scenario_new_holdings",
+    "scenario_cache_hit",
+    "scenario_bond",
+    "scenario_network_down",
+    "scenario_single_holding",
+    "scenario_zero_cost",
+    "scenario_extreme",
+    "unit",
+    "unit_providers",
+    "unit_fetcher",
+    "unit_llm",
+    "unit_news",
+    "unit_report",
+    "unit_config",
+    "unit_core",
+    "unit_ui",
+    "edge",
+    "smoke",
+    "data",
+    "llm",
+    "integration",
+    "integration_contract",
+    "integration_isolation",
+    "integration_news_pipeline",
+    "integration_cache",
+    "integration_tui",
 }
 
 
@@ -84,20 +108,24 @@ def _extract_markers_from_file(filepath: Path) -> set[str]:
                 if isinstance(target, ast.Name) and target.id == "pytestmark":
                     if isinstance(node.value, ast.List):
                         for elt in node.value.elts:
-                            if (isinstance(elt, ast.Attribute)
-                                    and isinstance(elt.value, ast.Attribute)
-                                    and elt.value.attr == "mark"
-                                    and isinstance(elt.value.value, ast.Name)
-                                    and elt.value.value.id == "pytest"):
+                            if (
+                                isinstance(elt, ast.Attribute)
+                                and isinstance(elt.value, ast.Attribute)
+                                and elt.value.attr == "mark"
+                                and isinstance(elt.value.value, ast.Name)
+                                and elt.value.value.id == "pytest"
+                            ):
                                 markers.add(elt.attr)
         # 提取 @pytest.mark.xxx 装饰器（类级或方法级）
         if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
             for decorator in node.decorator_list:
-                if (isinstance(decorator, ast.Attribute)
-                        and isinstance(decorator.value, ast.Attribute)
-                        and decorator.value.attr == "mark"
-                        and isinstance(decorator.value.value, ast.Name)
-                        and decorator.value.value.id == "pytest"):
+                if (
+                    isinstance(decorator, ast.Attribute)
+                    and isinstance(decorator.value, ast.Attribute)
+                    and decorator.value.attr == "mark"
+                    and isinstance(decorator.value.value, ast.Name)
+                    and decorator.value.value.id == "pytest"
+                ):
                     markers.add(decorator.attr)
 
     return markers
@@ -141,9 +169,7 @@ def check_file(filepath: Path, verbose: bool, ci_mode: bool) -> list[str]:
         # 提取该文件实际含有的、属于预期集的标记
         found_expected = markers & expected
         if not found_expected:
-            violations.append(
-                f"{rel_path}: 缺少期望标记 {expected}（当前: {markers or '空'}）"
-            )
+            violations.append(f"{rel_path}: 缺少期望标记 {expected}（当前: {markers or '空'}）")
 
     if verbose and not violations:
         print(f"  [OK] {rel_path} — markers: {sorted(markers)}")
@@ -156,7 +182,8 @@ def main() -> int:
         description="测试标记合规性检查",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="详细输出（含通过的检查）",
     )
@@ -184,12 +211,12 @@ def main() -> int:
 
     # 输出汇总
     if not args.ci:
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"检查完成: {passed} 通过, {failed} 违规")
 
     if all_violations:
         if not args.ci:
-            print(f"\n违规详情:")
+            print("\n违规详情:")
         for v in all_violations:
             print(f"  [ERR] {v}")
         return 1

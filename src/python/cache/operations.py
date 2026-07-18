@@ -5,6 +5,7 @@ P1-S8~S11 逐步从 handlers_cache.py 提取业务逻辑至此模块。
 S9：公共缓存函数（盈利预测/行业资金流向/行业/分红）+ print→reporter 替换
 S10：持仓缓存（价格+指数）+ 清理 + 统计
 """
+
 from __future__ import annotations
 
 import os
@@ -64,6 +65,7 @@ class PositionCacheResult:
 @dataclass
 class CacheStats:
     """缓存统计信息。"""
+
     total_files: int = 0
     total_size_bytes: int = 0
     expired: int = 0
@@ -99,6 +101,7 @@ def _get_pool() -> ThreadPoolExecutor:
 def _refresh_one_fund_cache(fund) -> tuple:
     """刷新单只基金的排名、持仓和基准缓存。"""
     from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_holdings, fetch_fund_rankings
+
     perf_result = fetch_fund_rankings(fund.code)
     perf_ok = bool(perf_result)
     hold_data = fetch_fund_holdings(fund.code)
@@ -117,6 +120,7 @@ def _refresh_one_fund_cache(fund) -> tuple:
 def _refresh_industry_cache(holdings: list) -> int:
     """刷新行业分类缓存。"""
     from src.python.fetcher.industry import batch_fetch_industry_data
+
     codes = [h.code.strip() for h in holdings if h.code and h.code.strip()]
     if not codes:
         return 0
@@ -127,6 +131,7 @@ def _refresh_industry_cache(holdings: list) -> int:
 def _refresh_dividend_cache(holdings: list) -> int:
     """刷新股票历史分红缓存。"""
     from src.python.fetcher.akshare import get_dividend_data
+
     codes = [h.code.strip() for h in holdings if h.code and h.code.strip()]
     if not codes:
         return 0
@@ -137,6 +142,7 @@ def _refresh_dividend_cache(holdings: list) -> int:
 def _refresh_profit_forecast_cache() -> tuple[str, int]:
     """刷新盈利预测缓存。"""
     from src.python.fetcher.akshare import get_profit_forecast
+
     data = get_profit_forecast()
     return ("profit_forecast", len(data) if data else 0)
 
@@ -144,6 +150,7 @@ def _refresh_profit_forecast_cache() -> tuple[str, int]:
 def _refresh_sector_flow_cache() -> tuple[str, int]:
     """刷新行业资金流向缓存。"""
     from src.python.fetcher.akshare import get_sector_fund_flow
+
     data = get_sector_fund_flow()
     return ("sector_flow", len(data) if data else 0)
 
@@ -152,6 +159,7 @@ def _sector_flow_hint() -> str:
     """根据最近一次行业资金流向失败类型返回提示文案。"""
     from src.python.fetcher.akshare import get_sector_fund_flow  # noqa: F401  # 保持 fetcher 层活跃引用
     from src.python.providers.akshare_extras import _SECTOR_FLOW_FAILURE
+
     if _SECTOR_FLOW_FAILURE == "connection":
         return "连接失败"
     if _SECTOR_FLOW_FAILURE == "empty":
@@ -189,10 +197,12 @@ def _refresh_common_caches(
     if holdings:
         f3 = pool.submit(_refresh_industry_cache, holdings)
         f4 = pool.submit(_refresh_dividend_cache, holdings)
-        futs.extend([
-            (f3, "industry", "行业分类"),
-            (f4, "dividend", "分红数据"),
-        ])
+        futs.extend(
+            [
+                (f3, "industry", "行业分类"),
+                (f4, "dividend", "分红数据"),
+            ]
+        )
 
     for fut, tag, label in futs:
         try:
@@ -253,6 +263,7 @@ def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
     clear_by_group("refresh")
 
     from src.python.report.fund_performance import is_fund
+
     funds = [h for h in holdings if is_fund(h)]
     result.total_funds = len(funds)
 
@@ -260,8 +271,7 @@ def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
 
     if not funds:
         # 无基金：仅刷新公共缓存
-        result.pf_ok, result.sf_ok, result.ind_ok, result.div_ok = \
-            _refresh_common_caches(holdings, reporter)
+        result.pf_ok, result.sf_ok, result.ind_ok, result.div_ok = _refresh_common_caches(holdings, reporter)
         return result
 
     # 有基金：所有任务并行提交
@@ -284,8 +294,10 @@ def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
                     result.hold_ok += 1
                 if b_ok:
                     result.bm_ok += 1
-                reporter.ok(f"{name} ({code}) — 业绩={'OK' if p_ok else '失败'} | "
-                            f"持仓={h_cnt}条 | 基准={'OK' if b_ok else '未找到'}")
+                reporter.ok(
+                    f"{name} ({code}) — 业绩={'OK' if p_ok else '失败'} | "
+                    f"持仓={h_cnt}条 | 基准={'OK' if b_ok else '未找到'}"
+                )
             elif res[0] == "profit_forecast":
                 result.pf_ok = res[1]
                 if result.pf_ok:
@@ -408,6 +420,8 @@ def get_cache_stats(reporter) -> CacheStats:
         cleanup_expired,
         get_cache_dir,
         get_cache_hit_rate,
+    )
+    from src.python.cache import (
         get_cache_stats as _get_cache_stats,
     )
     from src.python.constants import PROJECT_ROOT

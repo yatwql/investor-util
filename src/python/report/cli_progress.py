@@ -8,7 +8,7 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
-from src.python.report.progress import ProgressReporter, Timer
+from src.python.report.progress import ProgressReporter
 
 _logger = logging.getLogger("invest")
 
@@ -102,7 +102,8 @@ class CliProgressReporter(ProgressReporter):
         if self._verbose:
             self.info(f"正在生成{label}...")
         try:
-            with self.timer(label):                fn(*args, **kwargs)
+            with self.timer(label):
+                fn(*args, **kwargs)
         except Exception:
             self.add_error(f"{label}生成失败（详情请查看日志）")
             _logger.exception("%s写入异常", label)

@@ -16,8 +16,11 @@ logger = setup_logger()
 
 
 def write_llm_section_and_usage(
-    sheets: dict[str, Any], include_llm: bool, llm_content: tuple[str | None, str | None, str | None, str | None] | None,
-    prog: ProgressReporter, section_order: list[dict] | None = None,
+    sheets: dict[str, Any],
+    include_llm: bool,
+    llm_content: tuple[str | None, str | None, str | None, str | None] | None,
+    prog: ProgressReporter,
+    section_order: list[dict] | None = None,
 ) -> None:
     """写入 LLM 分析章节页签和 LLM API 用量页签。"""
     if not include_llm:
@@ -27,6 +30,7 @@ def write_llm_section_and_usage(
         prog.info("正在生成 LLM 分析章节...")
         try:
             from src.python.report.llm_content import write_llm_sheets
+
             write_llm_sheets(sheets, llm_content=llm_content or (None, None, None, None), section_order=section_order)
             logger.info("LLM 分析章节已生成")
             prog.ok("LLM 分析章节生成完成")

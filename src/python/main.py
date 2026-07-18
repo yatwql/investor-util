@@ -16,7 +16,7 @@ if _project_root not in sys.path:
 
 from src.python.config import init_config
 from src.python.llm.pricing import CURRENCY_SYMBOLS
-from src.python.logger import setup_logger, log_app_boundary
+from src.python.logger import log_app_boundary, setup_logger
 from src.python.tui import KEY_CTRL_C, KEY_DOWN, KEY_ENTER, KEY_UP, get_key
 from src.python.tui_handlers import execute_item
 from src.python.tui_menu import (
@@ -37,6 +37,7 @@ def _print_session_usage_on_exit() -> None:
     """程序退出时打印 LLM 会话累计用量。"""
     try:
         from src.python.llm import get_session_usage
+
         usage = get_session_usage()
         if usage.get("call_count", 0) > 0:
             inp = usage.get("input_tokens", 0)
@@ -53,6 +54,7 @@ def _print_session_usage_on_exit() -> None:
             per_module = usage.get("per_module", {})
             if per_module:
                 from src.python.registry import get_llm_module_names
+
                 _MODULE_DISPLAY = get_llm_module_names()
                 for key, display_name in _MODULE_DISPLAY.items():
                     if key in per_module:
@@ -94,6 +96,7 @@ def _bind_callbacks() -> None:
         _cmd_generate_excel,
         _cmd_generate_full,
     )
+
     callbacks: dict[str, Callable] = {
         "E": _cmd_generate_excel,
         "B": _cmd_generate_both,
@@ -122,6 +125,7 @@ def main() -> None:
     # 启动时自动清理过期缓存（静默后台执行，仅日志记录）
     try:
         from src.python.cache import cleanup_expired
+
         removed = cleanup_expired(dry_run=False)
         if removed > 0:
             logger.info("启动时自动清理了 %d 个过期缓存文件", removed)
@@ -130,6 +134,7 @@ def main() -> None:
 
     # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/C/F/O/1/2/3/4/S/R/X
     from src.python.config import get_config
+
     _default_key = get_config().get("default_menu_key", "L").upper()
     _idx = index_by_key(_default_key)
     sel: int = _idx if _idx is not None else 0

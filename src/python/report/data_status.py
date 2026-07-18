@@ -31,8 +31,8 @@ logger = logging.getLogger("invest")
 
 class DataStatusItem(TypedDict):
     available: bool
-    tier: str       # "T2" / "T3" / "T4"
-    message: str    # 最终展示文本，直接渲染不拼接
+    tier: str  # "T2" / "T3" / "T4"
+    message: str  # 最终展示文本，直接渲染不拼接
 
 
 DataStatus = dict[str, DataStatusItem]
@@ -42,30 +42,27 @@ DataStatus = dict[str, DataStatusItem]
 # Excel 和 HTML 两端共享引用，保证消息一致
 
 STATUS_MESSAGES: dict[str, str] = {
-    "rank_unavailable":       "基金业绩排名数据不可用，排名列显示 --",
-    "benchmark_unavailable":  "业绩基准数据不可用",
-    "industry_unavailable":   "行业分类数据暂不可用（数据源 push2 不稳定）",
-    "holdings_unavailable":   "穿透持仓数据暂不可用",
+    "rank_unavailable": "基金业绩排名数据不可用，排名列显示 --",
+    "benchmark_unavailable": "业绩基准数据不可用",
+    "industry_unavailable": "行业分类数据暂不可用（数据源 push2 不稳定）",
+    "holdings_unavailable": "穿透持仓数据暂不可用",
     "profit_forecast_unavailable": "盈利预测数据不可用，EPS 列显示 --",
-    "dividend_unavailable":   "分红数据暂不可用",
-    "index_degraded":         "指数数据来自降级链路",
-
+    "dividend_unavailable": "分红数据暂不可用",
+    "index_degraded": "指数数据来自降级链路",
     # B 系列占位文本
-    "manager_unavailable":    "基金经理数据暂不可用",
-    "overlap_unavailable":    "持仓数据不足，无法计算重合度",
+    "manager_unavailable": "基金经理数据暂不可用",
+    "overlap_unavailable": "持仓数据不足，无法计算重合度",
     "concentration_unavailable": "持仓集中度数据暂不可用",
-    "style_unavailable":      "基金风格数据暂不可用",
-
+    "style_unavailable": "基金风格数据暂不可用",
     # 新闻 / 预警
-    "news_all_failed":        "新闻数据暂不可用，请检查网络连接",
-    "warning_unavailable":    "预警数据暂不可用",
-
+    "news_all_failed": "新闻数据暂不可用，请检查网络连接",
+    "warning_unavailable": "预警数据暂不可用",
     # 组合历史走势
     "history_price_unavailable": "个股历史行情获取失败，部分股票走势不可用",
-    "history_nav_unavailable":   "基金历史净值获取失败，部分基金走势不可用",
-    "history_degraded":          "历史走势部分数据来自降级链路，精度可能降低",
-    "history_correction":        "检测到历史数据修正（重叠覆盖），走势可能已重新计算",
-    "history_zero_value":        "部分交易日存在零收盘价，可能涉及停牌或节假日数据",
+    "history_nav_unavailable": "基金历史净值获取失败，部分基金走势不可用",
+    "history_degraded": "历史走势部分数据来自降级链路，精度可能降低",
+    "history_correction": "检测到历史数据修正（重叠覆盖），走势可能已重新计算",
+    "history_zero_value": "部分交易日存在零收盘价，可能涉及停牌或节假日数据",
 }
 
 # 按层级的前缀符号：T2 → ⚠（橙色警告），T3/T4 → ℹ（蓝色提示）
@@ -78,6 +75,7 @@ TIER_PREFIX: dict[str, str] = {"T2": "⚠", "T3": "ℹ", "T4": "ℹ"}
 _DEFAULT_UNREACHABLE: dict[str, int] = {"t2": 2, "t3": 2, "t4": 1}
 _DEFAULT_EMPTY: dict[str, int] = {"t2": 3, "t3": 3, "t4": 1}
 _DEFAULT_STALE_DAYS: dict[str, int] = {"t2": 3, "t3": 14, "t4": 7}
+
 
 def _default_persist_path() -> str:
     """返回默认持久化文件路径（延迟求值，避免模块导入时的 cwd 依赖）。
@@ -207,8 +205,12 @@ class DegradationTracker:
             raise ValueError(f"无效的 tier 参数: {tier!r}，必须为 T2/T3/T4")
         with self._lock:
             return self._record_unsafe(
-                source_key, tier, success, failure_type,
-                cache_age_hours, cache_ttl_hours,
+                source_key,
+                tier,
+                success,
+                failure_type,
+                cache_age_hours,
+                cache_ttl_hours,
             )
 
     def reset(self, source_key: str) -> None:
@@ -258,10 +260,7 @@ class DegradationTracker:
         empty_eff = self._adjust(base_empty, cache_age_hours, cache_ttl_hours)
 
         # 信号1：任一失败类型超过其有效阈值
-        signal1 = (
-            counts["unreachable"] >= unreachable_eff
-            or counts["empty"] >= empty_eff
-        )
+        signal1 = counts["unreachable"] >= unreachable_eff or counts["empty"] >= empty_eff
 
         # 信号2：缓存陈旧度 or 持久化跨会话陈旧度
         signal2 = self._check_stale(tier, cfg, cache_age_hours, source_key)
