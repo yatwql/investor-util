@@ -30,9 +30,7 @@ def compute_holdings_fingerprint(holdings: list) -> str:
     Returns:
         MD5 十六进制字符串
     """
-    items = sorted(
-        (h.code, h.account, h.shares, h.cost_price) for h in holdings
-    )
+    items = sorted((h.code, h.account, h.shares, h.cost_price) for h in holdings)
     raw = json.dumps(items, ensure_ascii=False, sort_keys=True)
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
@@ -133,10 +131,13 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
     new_codes = current_codes - prev_codes
 
     # 存储新跟踪数据（指纹 + 代码集合）—— 必须在判断 new_codes 之前完成
-    set(tracking_key, {
-        "fingerprint": current_fp,
-        "codes": sorted(current_codes),
-    })
+    set(
+        tracking_key,
+        {
+            "fingerprint": current_fp,
+            "codes": sorted(current_codes),
+        },
+    )
 
     if new_codes:
         logger.info(

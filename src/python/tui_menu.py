@@ -15,8 +15,7 @@ import os
 import sys
 from collections.abc import Callable
 
-from src.python.ansi_colors import CYAN, GREEN, RED, RESET, YELLOW
-
+from src.python.ansi_colors import GREEN, RED, RESET
 from src.python.config import get_config, get_llm_config
 
 # 每个菜单项：(快捷键, 显示标签, 回调函数, 是否退出项)
@@ -64,6 +63,7 @@ def print_sep(char: str = "=", width: int = 56) -> None:
 def print_header() -> None:
     """打印程序标题头（每次主循环迭代时重绘）。"""
     from src.python.constants import APP_VERSION
+
     print_sep()
     print(f"        个人投资分析报告生成小助手  v{APP_VERSION}")
     print_sep()
@@ -76,7 +76,9 @@ def print_header() -> None:
         _first_run_hints.append("• 请先通过菜单 [C]/[F] 配置持仓文件路径，或放置文件到默认目录")
     llm_conf = get_llm_config()
     if llm_conf is None or not (llm_conf.get("api_key") or llm_conf.get("_provider_list")):
-        _first_run_hints.append("• 如需 LLM 分析，请配置 data/config/llm_key.json 或 llm_providers.json（菜单 [S] 查看状态）")
+        _first_run_hints.append(
+            "• 如需 LLM 分析，请配置 data/config/llm_key.json 或 llm_providers.json（菜单 [S] 查看状态）"
+        )
     if _first_run_hints:
         print("  📋 首次使用指引：")
         for hint in _first_run_hints:
@@ -136,7 +138,9 @@ def _show_llm_config_status() -> None:
     provider = llm_config["provider"]
     model = llm_config.get("model") or "默认"
     endpoint = llm_config.get("endpoint") or "默认"
-    ep_display = endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
+    ep_display = (
+        endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
+    )
 
     # 单 provider 熔断状态
     cb_status = get_circuit_status(endpoint) if endpoint and endpoint != "默认" else "—"
@@ -230,6 +234,7 @@ def index_by_key(key: str) -> int | None:
 def press_any_key() -> None:
     """等待用户按任意键继续。支持 Ctrl+C 退出。"""
     from src.python.tui import KEY_CTRL_C, get_key
+
     print("  按任意键返回菜单...")
     k = get_key()
     if k == KEY_CTRL_C:

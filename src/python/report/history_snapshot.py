@@ -22,7 +22,9 @@ from datetime import datetime
 from typing import Any
 
 from src.python.constants import (
-    HISTORY_SNAPSHOT_DIR, HISTORY_SNAPSHOT_MAX_COUNT, HISTORY_SNAPSHOT_RETENTION_DAYS,
+    HISTORY_SNAPSHOT_DIR,
+    HISTORY_SNAPSHOT_MAX_COUNT,
+    HISTORY_SNAPSHOT_RETENTION_DAYS,
 )
 from src.python.schemas.history import AccountSnapshot, SnapshotData, SnapshotHolding
 
@@ -142,8 +144,7 @@ def save(snapshot: SnapshotData) -> str:
             pass
         raise
 
-    logger.info("[history_snapshot] 快照已保存: %s (%d KB)",
-                filename, len(content) // 1024)
+    logger.info("[history_snapshot] 快照已保存: %s (%d KB)", filename, len(content) // 1024)
     return final_path
 
 
@@ -179,14 +180,16 @@ def list_all() -> list[dict[str, Any]]:
         size = os.path.getsize(path)
         # 从文件名解析时间戳：snapshot_{ts}.json
         ts = basename.replace("snapshot_", "").replace(".json", "")
-        entries.append({
-            "filename": basename,
-            "path": path,
-            "mtime": mtime,
-            "mtime_str": datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S"),
-            "timestamp": ts,
-            "size": size,
-        })
+        entries.append(
+            {
+                "filename": basename,
+                "path": path,
+                "mtime": mtime,
+                "mtime_str": datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                "timestamp": ts,
+                "size": size,
+            }
+        )
     return entries
 
 
@@ -209,7 +212,7 @@ def prune(
     Returns:
         实际删除的文件数量
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     files = _list_snapshot_files()
     if not files:
@@ -228,8 +231,7 @@ def prune(
                 os.unlink(path)
                 deleted += 1
             except OSError as e:
-                logger.warning("[history_snapshot] 删除失败 %s: %s",
-                               os.path.basename(path), e)
+                logger.warning("[history_snapshot] 删除失败 %s: %s", os.path.basename(path), e)
         else:
             kept.append(path)
 
@@ -237,18 +239,18 @@ def prune(
     if max_count > 0 and len(kept) > max_count:
         # 按 mtime 升序排列，删除最旧的超出部分
         kept_sorted = sorted(kept, key=os.path.getmtime)
-        to_delete = kept_sorted[:len(kept_sorted) - max_count]
+        to_delete = kept_sorted[: len(kept_sorted) - max_count]
         for path in to_delete:
             try:
                 os.unlink(path)
                 deleted += 1
             except OSError as e:
-                logger.warning("[history_snapshot] 删除失败 %s: %s",
-                               os.path.basename(path), e)
+                logger.warning("[history_snapshot] 删除失败 %s: %s", os.path.basename(path), e)
 
     if deleted:
-        logger.info("[history_snapshot] 清理了 %d 个旧快照（保留 %d 天内，最多 %d 个）",
-                    deleted, retention_days, max_count)
+        logger.info(
+            "[history_snapshot] 清理了 %d 个旧快照（保留 %d 天内，最多 %d 个）", deleted, retention_days, max_count
+        )
     return deleted
 
 
@@ -289,6 +291,5 @@ def _load_file(path: str) -> SnapshotData | None:
             data = json.load(f)
         return _snapshot_from_dict(data)
     except (json.JSONDecodeError, OSError, KeyError) as e:
-        logger.warning("[history_snapshot] 文件损坏 %s: %s",
-                       os.path.basename(path), e)
+        logger.warning("[history_snapshot] 文件损坏 %s: %s", os.path.basename(path), e)
         return None

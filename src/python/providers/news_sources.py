@@ -24,6 +24,7 @@ _SOURCE_LABELS: dict[str, str] = {
     "akshare": "财新网 / CCTV",
 }
 
+
 def get_source_label(name: str) -> str:
     """返回新闻源的中文标签。"""
     return _SOURCE_LABELS.get(name, name)

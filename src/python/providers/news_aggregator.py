@@ -27,16 +27,17 @@ def get_enabled_sources() -> list[str]:
     启停状态从 config.json 的 news_sources 字段读取。
     """
     from src.python.config import get_config
+
     config = get_config()
     enabled_map: dict[str, bool] = config.get("news_sources") or {}
-    return [
-        name for name in _SOURCE_LABELS
-        if enabled_map.get(name, False)
-    ]
+    return [name for name in _SOURCE_LABELS if enabled_map.get(name, False)]
 
 
 def _compute_cache_key(
-    keywords: list[str], top_n: int, sources: list[str], per_source: int,
+    keywords: list[str],
+    top_n: int,
+    sources: list[str],
+    per_source: int,
 ) -> str:
     """计算新闻缓存键。"""
     raw = json.dumps([keywords, top_n, sources, per_source], sort_keys=True, ensure_ascii=False)
@@ -47,6 +48,7 @@ def _check_news_cache(cache_key: str, sources: list[str]) -> list[dict] | None:
     """检查新闻缓存，命中则直接返回缓存结果。"""
     from src.python.cache import get as _nget
     from src.python.cache import get_ttl as _get_news_ttl
+
     cached = _nget(cache_key, _get_news_ttl("news"))
     if cached is not None:
         logger.info("新闻缓存命中，跳过 %d 个源获取", len(sources))
@@ -56,6 +58,7 @@ def _check_news_cache(cache_key: str, sources: list[str]) -> list[dict] | None:
 def _save_news_cache(cache_key: str, result: list[dict]) -> None:
     """保存新闻结果到缓存。"""
     from src.python.cache import set as _nset
+
     _nset(cache_key, result)
 
 
@@ -84,7 +87,8 @@ def get_last_source_status() -> dict[str, dict]:
 
 
 def _fetch_from_all_sources(
-    sources: list[str], per_source: int,
+    sources: list[str],
+    per_source: int,
     progress_callback: Callable[[str, int, str], None] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, tuple[int, str]]]:
     """从多个新闻源并行获取，去重合并。返回 (all_raw, src_results)。"""
@@ -145,16 +149,18 @@ def _normalize_title(title: str) -> str:
     用于跨源标题去重，消除"快讯：""收评"等差异。
     """
     import re
+
     for prefix in ("快讯", "收评", "收盘", "早评", "午评", "盘中", "盘后"):
         if title.startswith(prefix):
-            title = title[len(prefix):]
+            title = title[len(prefix) :]
             break
-    title = re.sub(r'[^\w一-鿿]', '', title)
+    title = re.sub(r"[^\w一-鿿]", "", title)
     return title.strip().lower()
 
 
 def _dedup_by_title(
-    items: list[dict[str, Any]], threshold: float = 0.92,
+    items: list[dict[str, Any]],
+    threshold: float = 0.92,
 ) -> list[dict[str, Any]]:
     """基于标准化标题模糊去重（同一新闻在不同源标题略有差异）。
 
@@ -163,6 +169,7 @@ def _dedup_by_title(
     2. 子串包含匹配（一条标题是另一条的简写/扩展版本，如快讯→全文、跨源同一事件）
     """
     from difflib import SequenceMatcher
+
     if not items:
         return items
     kept: list[dict[str, Any]] = []
@@ -191,7 +198,9 @@ def _dedup_by_title(
 
 
 def _finalize_news_results(
-    all_raw: list[dict[str, Any]], keywords: list[str], top_n: int,
+    all_raw: list[dict[str, Any]],
+    keywords: list[str],
+    top_n: int,
     lightweight_keywords: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """排序、关联关键词、确保 matched_keywords 字段、截取 TOP N。"""
@@ -206,7 +215,9 @@ def _finalize_news_results(
 
     # 与关键词关联
     correlated = correlate_news_with_holdings(
-        all_raw, keywords, top_n=top_n,
+        all_raw,
+        keywords,
+        top_n=top_n,
         lightweight_keywords=lightweight_keywords,
     )
 
@@ -268,7 +279,6 @@ def aggregate_news(
 
     logger.info("新闻汇总: 去重后共 %d 条 (来自 %d 个源)", len(all_raw), len(sources))
 
-    result = _finalize_news_results(all_raw, keywords, top_n,
-                                    lightweight_keywords=lightweight_keywords)
+    result = _finalize_news_results(all_raw, keywords, top_n, lightweight_keywords=lightweight_keywords)
     _save_news_cache(cache_key, result)
     return result

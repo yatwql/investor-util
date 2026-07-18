@@ -2,6 +2,7 @@
 
 按职责从 tui_handlers.py 拆分而来，负责所有配置管理相关的命令函数。
 """
+
 from __future__ import annotations
 
 import json
@@ -11,7 +12,7 @@ from src.python.config import set_config
 from src.python.constants import PROJECT_ROOT
 from src.python.logger import setup_logger
 from src.python.reader import list_xlsx_files
-from src.python.tui_menu import GREEN, RED, YELLOW, RESET, press_any_key, refresh_config, get_config_cache
+from src.python.tui_menu import GREEN, RED, RESET, YELLOW, get_config_cache, press_any_key, refresh_config
 
 logger = setup_logger()
 
@@ -23,6 +24,7 @@ def _read_llm_settings() -> tuple[dict, str] | None:
         (settings_dict, path) 成功时；失败时返回 None（已输出错误提示）
     """
     from src.python.config import _strip_json_comments, get_config
+
     config_path = get_config().get(
         "llm_settings_file",
         os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
@@ -44,13 +46,14 @@ def _write_llm_settings(settings: dict, path: str) -> None:
     仅更新 settings 中发生变化的字段对应的文本区块，注释和其他字段原样保留。
     """
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             raw = f.read()
     except FileNotFoundError:
         raw = ""
 
     if raw.strip():
         from src.python.config import _strip_json_comments
+
         current = json.loads(_strip_json_comments(raw))
         updated_raw = _update_json_raw_text(raw, current, settings)
         with open(path, "w", encoding="utf-8") as f:
@@ -60,6 +63,7 @@ def _write_llm_settings(settings: dict, path: str) -> None:
             json.dump(settings, f, ensure_ascii=False, indent=2)
 
     from src.python.config import get_llm_config
+
     get_llm_config()
 
 
@@ -91,7 +95,7 @@ def _update_json_raw_text(raw: str, current: dict, new: dict) -> str:
             old_json = json.dumps(old_val, ensure_ascii=False, indent=2) if old_val is not None else "null"
             new_json = json.dumps(new_val, ensure_ascii=False, indent=2) if new_val is not None else "null"
             result = re.sub(
-                re.escape(f'"{key}":') + r'\s*' + re.escape(old_json),
+                re.escape(f'"{key}":') + r"\s*" + re.escape(old_json),
                 f'"{key}": {new_json}',
                 result,
                 count=1,
@@ -105,10 +109,10 @@ def _replace_dict_block(text: str, key: str, new_val: dict) -> str:
     使用 brace 平衡算法确保正确匹配嵌套大括号，自动检测周围缩进层级，
     使替换后的 JSON 与文件缩进风格一致。
     """
-    import re
     import json as _json
+    import re
 
-    match = re.search(re.escape(f'"{key}":') + r'\s*\{', text)
+    match = re.search(re.escape(f'"{key}":') + r"\s*\{", text)
     if not match:
         return text
 
@@ -142,7 +146,7 @@ def _replace_dict_block(text: str, key: str, new_val: dict) -> str:
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                return text[:match.start()] + f'"{key}": {block_text}' + text[pos + 1:]
+                return text[: match.start()] + f'"{key}": {block_text}' + text[pos + 1 :]
         pos += 1
     return text  # brace 不平衡，放弃替换
 
@@ -266,15 +270,18 @@ def _cmd_config_llm_modules() -> None:
 def _cmd_config_report_boards() -> None:
     """配置报告板块可见性（B 系列 / 新闻 / 历史走势）。"""
     from src.python.config import (
-        is_enable_b_series, is_enable_news, is_enable_history,
-        set_config, get_config,
+        get_config,
+        is_enable_b_series,
+        is_enable_history,
+        is_enable_news,
+        set_config,
     )
 
     while True:
         config = get_config()
         b_series = is_enable_b_series(config)
-        news     = is_enable_news(config)
-        history  = is_enable_history(config)
+        news = is_enable_news(config)
+        history = is_enable_history(config)
 
         print()
         print("  ┌── 配置报告板块可见性 ────────────────────┐")
@@ -284,8 +291,8 @@ def _cmd_config_report_boards() -> None:
         print(f"  │ 1. B 系列基金深度分析（#6~9）  [{b_status}]{' ' * 8}│")
         print(f"  │ 2. 新闻（#10）               [{n_status}]{' ' * 8}│")
         print(f"  │ 3. 组合历史走势+回撤（#16~17）  [{h_status}]{' ' * 8}│")
-        print(f"  │                                   │")
-        print(f"  │ 4. LLM 板块（#12~15,#18） — 请在菜单 S 配置 │")
+        print("  │                                   │")
+        print("  │ 4. LLM 板块（#12~15,#18） — 请在菜单 S 配置 │")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
         print()
@@ -322,6 +329,7 @@ def _cmd_refresh_config() -> None:
     import src.python.config as _cfg_mod
     from src.python.config import get_config, get_llm_config
     from src.python.llm.pricing import reload_pricing
+
     _cfg_mod._config_cache = None
     _cfg_mod._config_mtime = 0
     _cfg_mod._llm_config_cache = None

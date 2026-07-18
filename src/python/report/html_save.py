@@ -13,8 +13,10 @@ logger = logging.getLogger("invest")
 
 
 def _save_html_report(
-    html: str, output_dir: str,
-    total_mv: float, total_profit: float,
+    html: str,
+    output_dir: str,
+    total_mv: float,
+    total_profit: float,
     prog: ProgressReporter,
 ) -> str:
     """将 HTML 写入文件（最新版 + 归档版）。

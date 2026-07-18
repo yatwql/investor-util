@@ -13,24 +13,19 @@ if TYPE_CHECKING:
     import httpx
 
 from src.python.llm.api_base import (
-    CACHE_LINE_HTML,
-    LLM_TIMEOUT,
-    _cache_line_model_tpl,
-    _extract_model_from_cached,
     _log_token_usage,
 )
 from src.python.llm.fingerprint import compute_fingerprint
 from src.python.llm.pricing import estimate_cost
 from src.python.llm.prompts import (
-    CACHE_PREFIX_LLM,
-    LLM_MODULE_FAILURE,
     _SYSTEM_NEWS_CORRELATION,
+    CACHE_PREFIX_LLM,
     _build_holdings_summary,
     _build_news_correlation_summary,
 )
 from src.python.llm.session import record_per_module
 from src.python.llm.skeleton import generate_llm_module
-from src.python.registry import get_llm_module_name, get_llm_module_names
+from src.python.registry import get_llm_module_name
 
 logger = logging.getLogger("invest")
 _MN = get_llm_module_name
@@ -114,7 +109,8 @@ def _apply_llm_news_correlation(
 
 
 def _select_top_news(
-    news_data: list[dict], top_n: int = 30,
+    news_data: list[dict],
+    top_n: int = 30,
 ) -> tuple[list[dict], dict[int, int]]:
     """按关键词匹配数排序，选取 TOP N 条送 LLM 分析。
 
@@ -133,8 +129,11 @@ def _select_top_news(
 
 
 def _build_news_hooks(
-    top_news: list[dict], holdings: list, penetrated_assets: list | None,
-    industry_data: dict[str, dict] | None, llm_config: dict | None,
+    top_news: list[dict],
+    holdings: list,
+    penetrated_assets: list | None,
+    industry_data: dict[str, dict] | None,
+    llm_config: dict | None,
 ) -> tuple[Callable, Callable, Callable, str]:
     """构建批量处理 hooks。
 
@@ -148,6 +147,7 @@ def _build_news_hooks(
     if not _model and llm_config:
         # 多链模式：从首位 chain entry 解析模型名
         from src.python.llm.api import _resolve_first_provider_model_endpoint
+
         _model, _ = _resolve_first_provider_model_endpoint(llm_config, "news_correlation")
     if not _model:
         _model = (llm_config or {}).get("model", "") or "未指定" if llm_config else "未指定"
@@ -175,7 +175,8 @@ def _build_news_hooks(
 
 
 def _map_llm_results(
-    results_map: dict[int, tuple], top_to_original: dict[int, int],
+    results_map: dict[int, tuple],
+    top_to_original: dict[int, int],
 ) -> dict[int, tuple]:
     """将 LLM results_map（top_news idx→parsed）映射到原始 news_data idx。"""
     analysis_by_orig_idx: dict[int, tuple] = {}
@@ -187,7 +188,8 @@ def _map_llm_results(
 
 
 def _merge_llm_analysis(
-    news_data: list[dict], analysis_by_orig_idx: dict[int, tuple],
+    news_data: list[dict],
+    analysis_by_orig_idx: dict[int, tuple],
 ) -> tuple[list[dict], int]:
     """将 LLM 分析结果合并回 news_data，返回 (enriched, analysis_count)。"""
     enriched: list[dict] = []
@@ -200,17 +202,20 @@ def _merge_llm_analysis(
                 prefix = f"[{relevance}]"
                 if sentiment in ("利好", "利空"):
                     prefix += f"[{sentiment}]"
-                item_copy["llm_analysis"] = (
-                    f"{prefix} {analysis_text}" if analysis_text else prefix
-                )
+                item_copy["llm_analysis"] = f"{prefix} {analysis_text}" if analysis_text else prefix
                 analysis_count += 1
         enriched.append(item_copy)
     return enriched, analysis_count
 
 
 def _finalize_news_token_usage(
-    batch_usage: dict, llm_config: dict | None, _model: str,
-    top_news: list, cached_count: int, news_data: list, analysis_count: int,
+    batch_usage: dict,
+    llm_config: dict | None,
+    _model: str,
+    top_news: list,
+    cached_count: int,
+    news_data: list,
+    analysis_count: int,
     all_cached: bool = False,
 ) -> dict:
     """计算 Token 用量并记录日志。返回 token_usage dict。"""
@@ -243,16 +248,26 @@ def _finalize_news_token_usage(
         _endpoint = llm_config.get("endpoint", "") or ""
         if not _endpoint and llm_config.get("_provider_list"):
             from src.python.llm.api import _resolve_first_provider_model_endpoint
+
             _, _endpoint = _resolve_first_provider_model_endpoint(llm_config, "news_correlation")
         record_per_module(
-            "news_correlation", _model, inp=total_in, out=total_out,
-            cached=all_cached, cost=_cost_val, endpoint=_endpoint,
+            "news_correlation",
+            _model,
+            inp=total_in,
+            out=total_out,
+            cached=all_cached,
+            cost=_cost_val,
+            endpoint=_endpoint,
         )
 
     fresh_count = len(top_news) - cached_count
     logger.info(
         "%s完成: %d 条 → %d 条含 LLM 分析（缓存 %d 条 + 新处理 %d 条）",
-        _MN("news_correlation"), len(news_data), analysis_count, cached_count, fresh_count,
+        _MN("news_correlation"),
+        len(news_data),
+        analysis_count,
+        cached_count,
+        fresh_count,
     )
     return token_usage
 
@@ -291,11 +306,16 @@ def enhance_news_correlation(
     top_n = (llm_config or {}).get("news_correlation_top_n", 30)
     top_news, top_to_original = _select_top_news(news_data, top_n=top_n)
     batch_preparer, per_item_cache_fn, batch_prompt_fn, _model = _build_news_hooks(
-        top_news, holdings, penetrated_assets, industry_data, llm_config,
+        top_news,
+        holdings,
+        penetrated_assets,
+        industry_data,
+        llm_config,
     )
 
     results_map, all_cached, batch_usage, cached_count = generate_llm_module(
-        llm_config, "news_correlation",
+        llm_config,
+        "news_correlation",
         force=force,
         system_prompt_default=_SYSTEM_NEWS_CORRELATION,
         max_tokens_default=2000,
@@ -309,7 +329,13 @@ def enhance_news_correlation(
     analysis_by_orig_idx = _map_llm_results(results_map, top_to_original)
     enriched, analysis_count = _merge_llm_analysis(news_data, analysis_by_orig_idx)
     token_usage = _finalize_news_token_usage(
-        batch_usage, llm_config, _model, top_news, cached_count, news_data, analysis_count,
+        batch_usage,
+        llm_config,
+        _model,
+        top_news,
+        cached_count,
+        news_data,
+        analysis_count,
         all_cached=all_cached,
     )
 

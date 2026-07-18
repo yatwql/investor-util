@@ -244,11 +244,13 @@ def fetch_fund_nav_history(code: str) -> list[dict]:
         acc_nav = _safe_float(r.get("LJJZ", "0"))
         if not date_str or (nav <= 0 and acc_nav <= 0):
             continue
-        result.append({
-            "date": date_str,
-            "nav": nav,
-            "acc_nav": acc_nav,
-        })
+        result.append(
+            {
+                "date": date_str,
+                "nav": nav,
+                "acc_nav": acc_nav,
+            }
+        )
 
     # API 返回最新在前，按日期升序排列
     result.sort(key=lambda x: x["date"])

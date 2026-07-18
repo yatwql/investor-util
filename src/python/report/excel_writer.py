@@ -27,6 +27,7 @@ from src.python.report.styles import (
 
 logger = logging.getLogger("invest")
 
+
 def _ensure_reports_dir(output_dir: str) -> None:
     """创建 output_dir/YYYYMMDD/ 目录。
 
@@ -43,18 +44,14 @@ def _ensure_reports_dir(output_dir: str) -> None:
         open(test_file, "a").close()
         os.remove(test_file)
     except (PermissionError, OSError) as e:
-        raise PermissionError(
-            f"输出目录 '{output_dir}' 无写入权限"
-        ) from e
+        raise PermissionError(f"输出目录 '{output_dir}' 无写入权限") from e
     # 验证存档子目录可写
     archive_test_file = os.path.join(date_dir, ".write_test")
     try:
         open(archive_test_file, "a").close()
         os.remove(archive_test_file)
     except (PermissionError, OSError) as e:
-        raise PermissionError(
-            f"存档子目录 '{date_dir}' 无写入权限"
-        ) from e
+        raise PermissionError(f"存档子目录 '{date_dir}' 无写入权限") from e
 
 
 def _latest_path(output_dir: str) -> str:
@@ -223,8 +220,9 @@ def write_data_row(ws, row: int, values: list[Any], formats: list[str | None] | 
     return row + 1
 
 
-def write_subtotal_row(ws, row: int, label: str, values: list[Any], ncols: int,
-                       formats: list[str | None] | None = None) -> int:
+def write_subtotal_row(
+    ws, row: int, label: str, values: list[Any], ncols: int, formats: list[str | None] | None = None
+) -> int:
     """写小计行（首列标签，后续各列居中对齐，黄底）。
 
     Args:
@@ -258,8 +256,9 @@ def write_subtotal_row(ws, row: int, label: str, values: list[Any], ncols: int,
     return row + 1
 
 
-def write_total_row(ws, row: int, label: str, values: list[Any], ncols: int,
-                    formats: list[str | None] | None = None) -> int:
+def write_total_row(
+    ws, row: int, label: str, values: list[Any], ncols: int, formats: list[str | None] | None = None
+) -> int:
     """写总计行（绿底加粗，与上方的分隔线）。"""
     cell = ws.cell(row=row, column=1, value=label)
     cell.font = BOLD_FONT
@@ -335,8 +334,7 @@ def _write_data_status_foot(
         return start_row or ws.max_row + 1
 
     # 筛选失败项
-    failed = {k: v for k, v in data_status.items()
-              if isinstance(v, dict) and not v.get("available", True)}
+    failed = {k: v for k, v in data_status.items() if isinstance(v, dict) and not v.get("available", True)}
 
     if not failed:
         return start_row or ws.max_row + 1
@@ -389,5 +387,3 @@ def _write_status_title(ws, row: int, ncols: int) -> None:
     cell = ws.cell(row=row, column=1, value="数据加载状态")
     cell.font = Font(size=10, bold=True, color="666666")
     cell.alignment = Alignment(horizontal="left", vertical="center")
-
-

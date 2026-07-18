@@ -43,8 +43,18 @@ _BASE_HEADERS = ["序号", "新闻标题", "摘要", "来源", "发布时间", "
 # ── 关键词构建辅助函数 ──────────────────────────────────────────
 
 _SUFFIXES = [
-    "ETF", "联接", "A", "C", "(QDII)", "基金", "混合",
-    "指数", "开放", "式", "发起", "LOF",
+    "ETF",
+    "联接",
+    "A",
+    "C",
+    "(QDII)",
+    "基金",
+    "混合",
+    "指数",
+    "开放",
+    "式",
+    "发起",
+    "LOF",
 ]
 
 
@@ -77,7 +87,7 @@ def _index_penetrated_assets(lookup: dict, penetrated_assets: list[dict]) -> Non
     """将穿透资产名称/代码加入关键词查找表。"""
     for asset in penetrated_assets:
         asset_name = (asset.get("name") or "").strip()
-        for ac in (asset.get("codes") or []):
+        for ac in asset.get("codes") or []:
             ac_stripped = ac.strip()
             if ac_stripped and ac_stripped not in lookup:
                 lookup[ac_stripped] = {"type": "penetration", "name": asset_name, "code": ac_stripped}
@@ -93,15 +103,19 @@ def _index_industry_concepts(lookup: dict, industry_data: dict[str, dict]) -> No
         industry_name = (idata.get("industry") or "").strip()
         if industry_name and industry_name not in lookup:
             lookup[industry_name] = {
-                "type": "concept", "name": industry_name,
-                "code": code, "source": "industry",
+                "type": "concept",
+                "name": industry_name,
+                "code": code,
+                "source": "industry",
             }
-        for cname in (idata.get("concepts", [])):
+        for cname in idata.get("concepts", []):
             cname = cname.strip()
             if cname and cname not in lookup:
                 lookup[cname] = {
-                    "type": "concept", "name": cname,
-                    "code": code, "source": "concept",
+                    "type": "concept",
+                    "name": cname,
+                    "code": code,
+                    "source": "concept",
                 }
 
 
@@ -192,35 +206,41 @@ def _enrich_keywords_for_item(
             dedup_key = entry["code"]
             if ("holding", dedup_key) not in seen:
                 seen.add(("holding", dedup_key))
-                enriched.append({
-                    "display": f"{entry['name']}({entry['code']})"
-                               f"{_format_industry_tags(entry)}",
-                    "type": "holding",
-                })
+                enriched.append(
+                    {
+                        "display": f"{entry['name']}({entry['code']}){_format_industry_tags(entry)}",
+                        "type": "holding",
+                    }
+                )
         elif entry and entry["type"] == "penetration":
             dedup_key = entry.get("code", entry["name"])
             if ("penetration", dedup_key) not in seen:
                 seen.add(("penetration", dedup_key))
-                enriched.append({
-                    "display": f"{entry['name']}[穿透]"
-                               f"{_format_industry_tags(entry)}",
-                    "type": "penetration",
-                })
+                enriched.append(
+                    {
+                        "display": f"{entry['name']}[穿透]{_format_industry_tags(entry)}",
+                        "type": "penetration",
+                    }
+                )
         elif entry and entry["type"] == "concept":
             dedup_key = entry.get("name", kw)
             if ("concept", dedup_key) not in seen:
                 seen.add(("concept", dedup_key))
-                enriched.append({
-                    "display": f"{entry['name']}[概念]",
-                    "type": "concept",
-                })
+                enriched.append(
+                    {
+                        "display": f"{entry['name']}[概念]",
+                        "type": "concept",
+                    }
+                )
         else:
             if ("industry", kw) not in seen:
                 seen.add(("industry", kw))
-                enriched.append({
-                    "display": kw,
-                    "type": "industry",
-                })
+                enriched.append(
+                    {
+                        "display": kw,
+                        "type": "industry",
+                    }
+                )
 
     type_order = {"holding": 0, "penetration": 1, "concept": 2, "industry": 3}
     enriched.sort(key=lambda x: type_order.get(x["type"], 99))
@@ -259,28 +279,26 @@ def _expand_industry_keywords(
                 all_codes.add(h.code.strip())
         if penetrated_assets:
             for asset in penetrated_assets:
-                for ac in (asset.get("codes") or []):
+                for ac in asset.get("codes") or []:
                     if ac and ac.strip():
                         all_codes.add(ac.strip())
 
         if all_codes:
             from src.python.fetcher.industry import batch_fetch_industry_data as _batch_industry
+
             industry_data = _batch_industry(list(all_codes))
             if industry_data:
                 extra_kw: list[str] = []
                 for idata in industry_data.values():
                     if idata.get("industry"):
                         extra_kw.append(idata["industry"])
-                    extra_kw.extend(
-                        cname.strip() for cname in idata.get("concepts", []) if cname.strip()
-                    )
+                    extra_kw.extend(cname.strip() for cname in idata.get("concepts", []) if cname.strip())
                 if extra_kw:
                     all_kw = list(set(keywords + extra_kw))
                     all_kw.sort(key=lambda x: (-len(x), x))
                     lightweight_kw = set(extra_kw) - set(keywords)
                     new_count = len(lightweight_kw)
-                    logger.info("行业/概念关键词扩展: 行业/概念 %d 个 → 共 %d 个",
-                                new_count, len(all_kw))
+                    logger.info("行业/概念关键词扩展: 行业/概念 %d 个 → 共 %d 个", new_count, len(all_kw))
                     return all_kw, industry_data, lightweight_kw
     except Exception as e:
         logger.warning("行业/概念数据获取失败（非关键错误，继续）: %s", e)
@@ -323,6 +341,7 @@ def _apply_llm_enhancement(
         更新后的 meta 字典
     """
     from src.python.config import get_llm_config
+
     llm_config = get_llm_config()
     enabled_llm = llm_config.get("enabled_llm") if llm_config else None
     llm_enabled = enabled_llm.get("news_correlation", False) if isinstance(enabled_llm, dict) else False
@@ -341,9 +360,11 @@ def _apply_llm_enhancement(
     meta["llm_enabled"] = True
     from src.python.llm import run_news_correlation_safe
     from src.python.llm.pricing import estimate_cost
+
     try:
         news_items[:], cached, token_usage = run_news_correlation_safe(
-            news_items, holdings,
+            news_items,
+            holdings,
             penetrated_assets=penetrated_assets,
             industry_data=industry_data,
         )
@@ -363,9 +384,11 @@ def _apply_llm_enhancement(
     else:
         meta["cost_estimation"] = "-"
     if cached:
-        logger.info("%s（缓存）: 富化 %d 条",
-                    get_llm_module_name("news_correlation"),
-                    sum(1 for n in news_items if n.get("llm_analysis")))
+        logger.info(
+            "%s（缓存）: 富化 %d 条",
+            get_llm_module_name("news_correlation"),
+            sum(1 for n in news_items if n.get("llm_analysis")),
+        )
     return meta
 
 
@@ -413,8 +436,7 @@ def build_news_data(
         }
         获取失败时 news_data 为 []。
     """
-    from src.python.fetcher.news import aggregate_news
-    from src.python.fetcher.news import build_holding_keywords
+    from src.python.fetcher.news import aggregate_news, build_holding_keywords
 
     keywords = build_holding_keywords(holdings, penetrated_assets=penetrated_assets)
     logger.info("%s关键词（含穿透）: %s", get_llm_module_name("news_correlation"), keywords)
@@ -422,9 +444,13 @@ def build_news_data(
     keywords, industry_data, lightweight_kw = _expand_industry_keywords(holdings, penetrated_assets, keywords)
     # per_source 取大值保证召回覆盖面，避免去重后候选不足
     per_source = max(500, top_n * 2)
-    news_items = aggregate_news(keywords, top_n=top_n, per_source=per_source,
-                                progress_callback=_news_source_cb,
-                                lightweight_keywords=lightweight_kw)
+    news_items = aggregate_news(
+        keywords,
+        top_n=top_n,
+        per_source=per_source,
+        progress_callback=_news_source_cb,
+        lightweight_keywords=lightweight_kw,
+    )
 
     active_sources = _extract_active_sources(news_items)
     meta: dict = {
@@ -439,15 +465,19 @@ def build_news_data(
         # 即使 news_items 为空，也能从 aggregate_news 获取各源状态
         try:
             from src.python.fetcher.news import get_last_source_status as _glss
+
             meta["source_status"] = _glss()
         except Exception:
             logger.warning("获取新闻源状态失败（news_aggregator.get_last_source_status），不影响核心新闻数据")
         logger.warning("新闻获取失败")
         return news_items, meta
 
-    logger.info("%s完成: 获取 %d 条, 匹配 %d 条",
-                get_llm_module_name("news_correlation"),
-                len(news_items), sum(1 for n in news_items if n.get("matched_keywords")))
+    logger.info(
+        "%s完成: 获取 %d 条, 匹配 %d 条",
+        get_llm_module_name("news_correlation"),
+        len(news_items),
+        sum(1 for n in news_items if n.get("matched_keywords")),
+    )
 
     meta = _apply_llm_enhancement(news_items, holdings, penetrated_assets, industry_data, meta)
     _enrich_news_keywords(news_items, holdings, penetrated_assets, industry_data)
@@ -455,6 +485,7 @@ def build_news_data(
     # 补充各源状态（在 aggregate_news 之后获取）
     try:
         from src.python.providers.news_aggregator import get_last_source_status as _glss
+
         meta["source_status"] = _glss()
     except Exception:
         logger.warning("补充新闻源状态失败（news_aggregator.get_last_source_status），不影响新闻匹配结果")
@@ -466,10 +497,7 @@ def _build_news_footer(news_data: list[dict], llm_meta: dict | None, llm_count: 
     """构建新闻页签底部说明文本。"""
     if llm_meta and llm_meta.get("llm_enabled"):
         if llm_meta.get("llm_cached"):
-            hint = (
-                f"共获取 {len(news_data)} 条关联新闻。"
-                "本次使用LLM缓存，未直接使用LLM服务能力"
-            )
+            hint = f"共获取 {len(news_data)} 条关联新闻。本次使用LLM缓存，未直接使用LLM服务能力"
             if llm_meta.get("thinking_enabled", False):
                 hint += " | Extended Thinking"
             return hint
@@ -485,10 +513,7 @@ def _build_news_footer(news_data: list[dict], llm_meta: dict | None, llm_count: 
     )
     # 追加部分源失败信息
     _source_status = (llm_meta or {}).get("source_status", {})
-    _failed_sources = [
-        s["label"] for s in _source_status.values()
-        if not s["success"]
-    ]
+    _failed_sources = [s["label"] for s in _source_status.values() if not s["success"]]
     if _failed_sources:
         result += f" 以下新闻源不可用：{'、'.join(_failed_sources)}"
     return result
@@ -562,19 +587,16 @@ def write_news_sheet(
     ncols = _NCOLS + (1 if has_llm else 0)
     headers = _BASE_HEADERS + (["LLM 关联分析"] if has_llm else [])
 
-    row = write_title_row(ws, 1, get_llm_module_name('news_correlation'), ncols)
+    row = write_title_row(ws, 1, get_llm_module_name("news_correlation"), ncols)
     row = write_header_row(ws, row, headers)
 
     if not news_data:
         # 全源失败 → 写占位
         _source_status = (llm_meta or {}).get("source_status", {})
-        _all_failed = _source_status and all(
-            not s["success"] for s in _source_status.values()
-        )
+        _all_failed = _source_status and all(not s["success"] for s in _source_status.values())
         if _all_failed:
             _write_placeholder(ws, STATUS_MESSAGES["news_all_failed"], row=row, max_cols=ncols)
-            logger.warning("%s：所有新闻源均获取失败，写入占位",
-                          get_llm_module_name("news_correlation"))
+            logger.warning("%s：所有新闻源均获取失败，写入占位", get_llm_module_name("news_correlation"))
         else:
             write_data_row(ws, row, ["暂无关联新闻"])
             logger.info("%s：无数据", get_llm_module_name("news_correlation"))
@@ -587,7 +609,14 @@ def write_news_sheet(
     for idx, item in enumerate(news_data, 1):
         enriched = item.get("enriched_keywords", [])
         keywords_str = _format_enriched_keywords(enriched) if enriched else ", ".join(item.get("matched_keywords", []))
-        vals = [idx, item.get("title", ""), item.get("intro", ""), item.get("media_name", ""), item.get("ctime", ""), keywords_str]
+        vals = [
+            idx,
+            item.get("title", ""),
+            item.get("intro", ""),
+            item.get("media_name", ""),
+            item.get("ctime", ""),
+            keywords_str,
+        ]
         if has_llm:
             llm_text = item.get("llm_analysis", "")
             vals.append(llm_text)

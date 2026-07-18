@@ -11,11 +11,11 @@ import logging
 from collections.abc import Callable
 from typing import Any, cast
 
-from src.python.constants import CACHE_DAILY, CACHE_WEEKLY
+from src.python.cache import clear as cache_clear
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
-from src.python.cache import clear as cache_clear
 from src.python.config import get_config
+from src.python.constants import CACHE_WEEKLY
 from src.python.provider_registry import TRANSPORT_FAILURE, get_registry
 
 logger = logging.getLogger("invest")
@@ -82,6 +82,7 @@ def is_provider_chain_broken(data_type: str) -> bool:
         return True
     return get_registry().is_chain_broken(chain)
 
+
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
 # TRANSPORT_FAILURE sentinel 定义于 provider_registry.py，
@@ -99,8 +100,8 @@ def _try_provider_fetch(
     kwargs: dict,
     validate: Callable[[dict[str, Any], str], bool] | None,
     transform: Callable[[dict[str, Any], str], dict[str, Any] | None]
-              | dict[str, Callable[[dict[str, Any], str], dict[str, Any] | None]]
-              | None,
+    | dict[str, Callable[[dict[str, Any], str], dict[str, Any] | None]]
+    | None,
 ) -> dict[str, Any] | None:
     """尝试调用单个 provider 的 fetch 函数，返回转换后的结果或 None。"""
     _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
@@ -153,8 +154,8 @@ def fetch_with_fallback(
     cache_ttl: float,
     fn_kwargs: dict[str, Any] | None = None,
     transform: Callable[[dict[str, Any], str], dict[str, Any] | None]
-              | dict[str, Callable[[dict[str, Any], str], dict[str, Any] | None]]
-              | None = None,
+    | dict[str, Callable[[dict[str, Any], str], dict[str, Any] | None]]
+    | None = None,
     validate: Callable[[dict[str, Any], str], bool] | None = None,
 ) -> dict[str, Any] | None:
     """通用 Fallback 获取器。
@@ -204,19 +205,16 @@ def fetch_with_fallback(
             # 传输级异常（超时/断连/DNS/5xx）→ 累计连续失败计数
             reg.record_failure(provider_name, f"{data_type}:transport")
             if reg.is_circuit_broken(provider_name):
-                logger.warning("[%s]%s %s 连续失败，本会话后续请求跳过",
-                               data_type, _code_tag, provider_name)
+                logger.warning("[%s]%s %s 连续失败，本会话后续请求跳过", data_type, _code_tag, provider_name)
         # else: 代码级空结果（API 不识别该代码）→ 不计入熔断计数器
 
     # 3) 降级：全部 Provider 失败时尝试过期缓存
     stale = cache_get(cache_key, CACHE_WEEKLY)
     if stale is not None:
-        logger.info("[%s]%s 全部 Provider 不可用，降级使用过期缓存",
-                     data_type, _code_tag)
+        logger.info("[%s]%s 全部 Provider 不可用，降级使用过期缓存", data_type, _code_tag)
         return stale
 
-    logger.warning("[%s]%s 全链路失败（无过期缓存可用），数据不可用",
-                   data_type, _code_tag)
+    logger.warning("[%s]%s 全链路失败（无过期缓存可用），数据不可用", data_type, _code_tag)
     return None
 
 
@@ -302,7 +300,7 @@ def fetch_with_incremental_fallback(
     if new_data:
         # 判断 provider 是否实际支持增量获取。
         # 若新数据起点 ≤ 缓存起点，说明 provider 未按 start_from 过滤
-        #（如 OTC 基金 fetch_fund_nav_history 始终全量返回），
+        # （如 OTC 基金 fetch_fund_nav_history 始终全量返回），
         # 直接写入新数据，跳过合并与重叠检测。
         if cached and new_data and new_data[0].get("date", "") <= cached[0].get("date", ""):
             logger.debug("[%s] %s provider 全量返回，直接使用新数据", chain_name, code)
@@ -391,8 +389,11 @@ def _call_history_provider(
         if fn:
             return fn(code, days=days, start_from=start_from)
 
-    fn_name = {"history_stock": "fetch_kline", "history_index": "fetch_index_kline",
-               "history_fund_otc": "fetch_fund_nav_history"}.get(chain_name, "未知函数")
+    fn_name = {
+        "history_stock": "fetch_kline",
+        "history_index": "fetch_index_kline",
+        "history_fund_otc": "fetch_fund_nav_history",
+    }.get(chain_name, "未知函数")
     logger.warning("[history] %s 无 %s 函数", provider_name, fn_name)
     return []
 
@@ -457,6 +458,7 @@ def _gap_days(date1: str | None, date2: str | None) -> int:
         return 0
     try:
         from datetime import datetime
+
         d1 = datetime.strptime(date1, "%Y-%m-%d")
         d2 = datetime.strptime(date2, "%Y-%m-%d")
         return abs((d2 - d1).days)

@@ -37,8 +37,7 @@ _BOND_KEYWORDS_BROAD = ("债", "纯债", "短债", "中短债", "利率债", "�
 FUND_ACCOUNT_KEYWORDS = ("基金", "支付宝", "微信", "银行")
 
 # 指数类关键词（用于场外被动基金判定）
-INDEX_KEYWORDS = ("指数", "ETF联接", "ETF 联接", "中证", "沪深300",
-                  "中证500", "中证1000", "科创50", "创业板", "上证")
+INDEX_KEYWORDS = ("指数", "ETF联接", "ETF 联接", "中证", "沪深300", "中证500", "中证1000", "科创50", "创业板", "上证")
 
 # 隐式 QDII 关键词
 _OVERSEA_KW = ("纳斯达克", "标普", "纳指", "道琼斯", "日经")
@@ -293,15 +292,15 @@ def is_index_fund_by_name(name: str) -> bool:
 
 # 场外基金名称关键词（用于 00 代码重叠区辅助判断）
 _OTC_FUND_NAME_KW = (
-    "混合",      # XX灵活配置混合/偏股混合/偏债混合
-    "纯债",      # 纯债债券
-    "短债",      # 短债债券
-    "中短债",    # 中短债债券
-    "利率债",    # 利率债债券
-    "信用债",    # 信用债债券
-    "货币",      # 货币市场基金
-    "联接",      # ETF联接
-    "增利",      # 增利货币
+    "混合",  # XX灵活配置混合/偏股混合/偏债混合
+    "纯债",  # 纯债债券
+    "短债",  # 短债债券
+    "中短债",  # 中短债债券
+    "利率债",  # 利率债债券
+    "信用债",  # 信用债债券
+    "货币",  # 货币市场基金
+    "联接",  # ETF联接
+    "增利",  # 增利货币
 )
 
 
@@ -360,7 +359,9 @@ def is_fund_holding(name: str, code: str, account: str) -> bool:
     """
     if is_otc_fund_by_name(name, code):
         return True
-    return not ((is_a_share_code(code) or is_hk_stock_code(code)) and "ETF" not in name.upper() and not is_offsite_fund(account))
+    return not (
+        (is_a_share_code(code) or is_hk_stock_code(code)) and "ETF" not in name.upper() and not is_offsite_fund(account)
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -432,7 +433,7 @@ def is_index_code(code: str) -> bool:
     stripped = raw
     for prefix in _INDEX_EXCHANGE_PREFIXES:
         if raw.startswith(prefix):
-            stripped = raw[len(prefix):]
+            stripped = raw[len(prefix) :]
             break
     # A 股指数：6 位数字码以特定前缀开头
     return len(stripped) == 6 and stripped.isdigit() and stripped.startswith(_A_INDEX_RAW_PREFIXES)
@@ -512,7 +513,7 @@ def _strip_prefix(code: str) -> str:
         return ""
     for prefix in ("sh", "sz", "bj"):
         if raw.startswith(prefix):
-            raw = raw[len(prefix):]
+            raw = raw[len(prefix) :]
             break
     if len(raw) == 6 and raw.isdigit():
         return raw

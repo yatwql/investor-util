@@ -15,7 +15,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-
 # ═══════════════════════════════════════════════════════════════
 #  F1：快照模型（R0+R1 基础设施）
 # ═══════════════════════════════════════════════════════════════
@@ -35,10 +34,10 @@ class SnapshotHolding:
     name: str
     shares: float
     cost_price: float
-    market_value: float          # 当前市值
-    daily_pnl: float = 0.0      # 当日盈亏
-    total_pnl: float = 0.0      # 总盈亏（累计）
-    cost_total: float = 0.0     # 总成本
+    market_value: float  # 当前市值
+    daily_pnl: float = 0.0  # 当日盈亏
+    total_pnl: float = 0.0  # 总盈亏（累计）
+    cost_total: float = 0.0  # 总成本
 
 
 @dataclass(frozen=True)
@@ -124,20 +123,20 @@ class DiffSummary:
     """
 
     # ── 组合级 ──
-    total_value_diff: float = 0.0          # 总市值变化
-    total_value_diff_pct: float = 0.0      # 总市值变化率
-    total_pnl_diff: float = 0.0            # 总盈亏变化
-    days_since_last_report: int = 0        # 距上次报告天数
+    total_value_diff: float = 0.0  # 总市值变化
+    total_value_diff_pct: float = 0.0  # 总市值变化率
+    total_pnl_diff: float = 0.0  # 总盈亏变化
+    days_since_last_report: int = 0  # 距上次报告天数
 
     # ── 持仓级 ──
-    added: tuple[HoldingDiff, ...] = ()        # 新增持仓
-    removed: tuple[HoldingDiff, ...] = ()      # 清仓持仓
-    increased: tuple[HoldingDiff, ...] = ()    # 加仓
-    decreased: tuple[HoldingDiff, ...] = ()    # 减仓
+    added: tuple[HoldingDiff, ...] = ()  # 新增持仓
+    removed: tuple[HoldingDiff, ...] = ()  # 清仓持仓
+    increased: tuple[HoldingDiff, ...] = ()  # 加仓
+    decreased: tuple[HoldingDiff, ...] = ()  # 减仓
 
     # ── 元数据 ──
-    is_first_check: bool = False               # 首次运行（无对比基准）
-    trimmed: bool = False                      # 是否已被裁剪
+    is_first_check: bool = False  # 首次运行（无对比基准）
+    trimmed: bool = False  # 是否已被裁剪
 
     def trim(self, top_n: int = 5) -> DiffSummary:
         """返回裁剪后的差异摘要（仅保留前 top_n 条变化）。

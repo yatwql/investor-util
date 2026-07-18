@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from openpyxl.styles import Font
@@ -29,7 +30,6 @@ from src.python.report.excel_writer import (
 from src.python.report.market_value import DetailRow
 from src.python.report.styles import BLUE_FONT, FMT_MONEY, FMT_PERCENT, FMT_PRICE, FMT_SHARES, profit_font
 
-import logging
 logger = logging.getLogger("invest")
 
 __all__ = [
@@ -41,9 +41,21 @@ __all__ = [
 
 # 15 列表头（R-197 拆分后归 sheet 层维护）
 _HEADERS = [
-    "账户", "名称", "代码", "最新价", "净值日期", "昨日价",
-    "取价方式", "溢价率", "份额", "市值", "成本",
-    "盈亏", "收益率", "本日盈亏", "取价渠道",
+    "账户",
+    "名称",
+    "代码",
+    "最新价",
+    "净值日期",
+    "昨日价",
+    "取价方式",
+    "溢价率",
+    "份额",
+    "市值",
+    "成本",
+    "盈亏",
+    "收益率",
+    "本日盈亏",
+    "取价渠道",
 ]
 _NCOLS = len(_HEADERS)
 
@@ -54,36 +66,46 @@ _NAME_COL = 2
 def _detail_to_row_values(d: DetailRow) -> list[Any]:
     """将 DetailRow 转为 Excel 行值列表。"""
     return [
-        d.account, d.name, d.code, d.price, d.nav_date,
-        d.yesterday_close, d.price_type, d.premium,
-        d.shares, d.market_value, d.cost, d.profit,
-        d.profit_rate, d.today_profit, d.source,
+        d.account,
+        d.name,
+        d.code,
+        d.price,
+        d.nav_date,
+        d.yesterday_close,
+        d.price_type,
+        d.premium,
+        d.shares,
+        d.market_value,
+        d.cost,
+        d.profit,
+        d.profit_rate,
+        d.today_profit,
+        d.source,
     ]
 
 
 def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
     return [
-        "",           # 1  账户
-        "",           # 2  名称
-        "",           # 3  代码
-        FMT_PRICE,    # 4  最新价
-        "",           # 5  净值日期
-        FMT_PRICE,    # 6  昨日价
-        "",           # 7  取价方式
-        "",           # 8  溢价率
-        FMT_SHARES,   # 9  份额
-        FMT_MONEY,    # 10 市值
-        FMT_MONEY,    # 11 成本
-        FMT_MONEY,    # 12 盈亏
+        "",  # 1  账户
+        "",  # 2  名称
+        "",  # 3  代码
+        FMT_PRICE,  # 4  最新价
+        "",  # 5  净值日期
+        FMT_PRICE,  # 6  昨日价
+        "",  # 7  取价方式
+        "",  # 8  溢价率
+        FMT_SHARES,  # 9  份额
+        FMT_MONEY,  # 10 市值
+        FMT_MONEY,  # 11 成本
+        FMT_MONEY,  # 12 盈亏
         FMT_PERCENT,  # 13 收益率
-        FMT_MONEY,    # 14 本日盈亏
-        "",           # 15 取价渠道
+        FMT_MONEY,  # 14 本日盈亏
+        "",  # 15 取价渠道
     ]
 
 
-def _apply_profit_colors(ws, start_row: int, end_row: int,
-                         profit_col: int, rate_col: int, today_col: int) -> None:
+def _apply_profit_colors(ws, start_row: int, end_row: int, profit_col: int, rate_col: int, today_col: int) -> None:
     """对盈亏列（12）、收益率列（13）、本日盈亏列（14）着色。"""
     for r in range(start_row, end_row + 1):
         for col in (profit_col, today_col):
@@ -110,7 +132,9 @@ def _apply_price_type_colors(ws, start_row: int, end_row: int) -> None:
 
 
 def _write_account_groupings(
-    ws, details: list[DetailRow], data_start: int,
+    ws,
+    details: list[DetailRow],
+    data_start: int,
 ) -> tuple[float, float, float, float, int]:
     """按账户分组写入明细行和小计，返回汇总数据及最终行号。
 
@@ -137,12 +161,23 @@ def _write_account_groupings(
         acc_rate = acc_profit / acc_cost if acc_cost > 0 else 0.0
 
         subtotal_vals = [
-            f"{acc_name} 小计", "", "", "", "", "", "", "",
+            f"{acc_name} 小计",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
             sum(d.shares for d in acc_details),
-            acc_mv, acc_cost, acc_profit, acc_rate, acc_today, "",
+            acc_mv,
+            acc_cost,
+            acc_profit,
+            acc_rate,
+            acc_today,
+            "",
         ]
-        write_subtotal_row(ws, row, f"{acc_name} 小计",
-                           subtotal_vals[1:], _NCOLS, _num_formats())
+        write_subtotal_row(ws, row, f"{acc_name} 小计", subtotal_vals[1:], _NCOLS, _num_formats())
         row += 1
 
         grand_mv += acc_mv
@@ -153,9 +188,9 @@ def _write_account_groupings(
     return grand_mv, grand_cost, grand_profit, grand_today, row
 
 
-def write_market_value_sheet(ws: Worksheet, holdings: list,
-                             today_str: str = "",
-                             details: list[DetailRow] | None = None) -> tuple[float, float, float, float, list[DetailRow]]:
+def write_market_value_sheet(
+    ws: Worksheet, holdings: list, today_str: str = "", details: list[DetailRow] | None = None
+) -> tuple[float, float, float, float, list[DetailRow]]:
     """写入市值核算明细表，返回汇总数据供汇总页签使用。
 
     Args:
@@ -167,7 +202,7 @@ def write_market_value_sheet(ws: Worksheet, holdings: list,
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
     """
-    row = write_title_row(ws, 1, get_report_sheet_name('market_value'), _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name("market_value"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
     data_start = row
 
@@ -181,15 +216,26 @@ def write_market_value_sheet(ws: Worksheet, holdings: list,
         row += 1
 
     # 按账户分组写入明细 + 小计
-    grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(
-        ws, details or [], data_start)
+    grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(ws, details or [], data_start)
 
     # 总计
     grand_rate = grand_profit / grand_cost if grand_cost > 0 else 0.0
     total_vals = [
-        "总计", "", "", "", "", "", "", "",
+        "总计",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
         sum(d.shares for d in details) if details else 0,
-        grand_mv, grand_cost, grand_profit, grand_rate, grand_today, "",
+        grand_mv,
+        grand_cost,
+        grand_profit,
+        grand_rate,
+        grand_today,
+        "",
     ]
     write_total_row(ws, row, "总计", total_vals[1:], _NCOLS, _num_formats())
 
@@ -202,9 +248,12 @@ def write_market_value_sheet(ws: Worksheet, holdings: list,
     freeze_header(ws, 2)
     auto_width(ws)
 
-    logger.info("%s写入完成，共 %d 个账户，%d 条持仓",
-                get_report_sheet_name('market_value'),
-                len(set(d.account for d in (details or []))), len(details or []))
+    logger.info(
+        "%s写入完成，共 %d 个账户，%d 条持仓",
+        get_report_sheet_name("market_value"),
+        len(set(d.account for d in (details or []))),
+        len(details or []),
+    )
 
     _details = details or []
     return grand_mv, grand_cost, grand_profit, grand_today, _details

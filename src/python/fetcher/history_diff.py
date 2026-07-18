@@ -23,7 +23,6 @@ import logging
 from datetime import datetime
 
 from src.python.schemas.history import (
-    AccountSnapshot,
     DiffSummary,
     HoldingDiff,
     SnapshotData,
@@ -55,11 +54,7 @@ class HistoryDiff:
 
         # 1) 组合级 Δ
         total_value_diff = new.total_value - old.total_value
-        total_value_diff_pct = (
-            (total_value_diff / old.total_value * 100)
-            if old.total_value != 0
-            else 0.0
-        )
+        total_value_diff_pct = (total_value_diff / old.total_value * 100) if old.total_value != 0 else 0.0
         total_pnl_diff = new.total_pnl - old.total_pnl
 
         # 2) 基准日对齐
@@ -81,23 +76,27 @@ class HistoryDiff:
             old_h = old_holdings.get(code)
 
             if new_h and not old_h:
-                added.append(HoldingDiff(
-                    code=code,
-                    name=new_h.name,
-                    action="新增",
-                    shares_diff=new_h.shares,
-                    value_diff=new_h.market_value,
-                    pnl_diff=new_h.total_pnl,
-                ))
+                added.append(
+                    HoldingDiff(
+                        code=code,
+                        name=new_h.name,
+                        action="新增",
+                        shares_diff=new_h.shares,
+                        value_diff=new_h.market_value,
+                        pnl_diff=new_h.total_pnl,
+                    )
+                )
             elif old_h and not new_h:
-                removed.append(HoldingDiff(
-                    code=code,
-                    name=old_h.name,
-                    action="清仓",
-                    shares_diff=-old_h.shares,
-                    value_diff=-old_h.market_value,
-                    pnl_diff=-old_h.total_pnl,
-                ))
+                removed.append(
+                    HoldingDiff(
+                        code=code,
+                        name=old_h.name,
+                        action="清仓",
+                        shares_diff=-old_h.shares,
+                        value_diff=-old_h.market_value,
+                        pnl_diff=-old_h.total_pnl,
+                    )
+                )
             elif new_h and old_h:
                 shares_diff = new_h.shares - old_h.shares
                 value_diff = new_h.market_value - old_h.market_value

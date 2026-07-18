@@ -128,13 +128,16 @@ def compute_overlap_matrix(
             if common_count == 0:
                 matrix[i][j] = 0.0
                 matrix[j][i] = 0.0
-                pairs.append({
-                    "fund_a": code_i, "fund_b": code_j,
-                    "common_count": 0,
-                    "jaccard": 0.0,
-                    "overlap_mv_pct": None,
-                    "common_stocks": [],
-                })
+                pairs.append(
+                    {
+                        "fund_a": code_i,
+                        "fund_b": code_j,
+                        "common_count": 0,
+                        "jaccard": 0.0,
+                        "overlap_mv_pct": None,
+                        "common_stocks": [],
+                    }
+                )
                 continue
 
             jaccard = _jaccard_similarity(set_i, set_j)
@@ -152,10 +155,12 @@ def compute_overlap_matrix(
             for sk in sorted(common_stock_keys):
                 di = details_i.get(sk, {})
                 dj = details_j.get(sk, {})
-                common_stocks.append({
-                    "name": (di.get("name") or dj.get("name") or sk),
-                    "code": (di.get("code") or dj.get("code") or ""),
-                })
+                common_stocks.append(
+                    {
+                        "name": (di.get("name") or dj.get("name") or sk),
+                        "code": (di.get("code") or dj.get("code") or ""),
+                    }
+                )
 
             # overlap_mv_pct：共同标的穿透市值占比
             overlap_mv_pct = None
@@ -171,13 +176,16 @@ def compute_overlap_matrix(
                         common_mv += mv_i * (di_ratio / 100.0) + mv_j * (dj_ratio / 100.0)
                     overlap_mv_pct = round(common_mv / total_mv * 100, 2)
 
-            pairs.append({
-                "fund_a": code_i, "fund_b": code_j,
-                "common_count": common_count,
-                "jaccard": jaccard,
-                "overlap_mv_pct": overlap_mv_pct,
-                "common_stocks": common_stocks,
-            })
+            pairs.append(
+                {
+                    "fund_a": code_i,
+                    "fund_b": code_j,
+                    "common_count": common_count,
+                    "jaccard": jaccard,
+                    "overlap_mv_pct": overlap_mv_pct,
+                    "common_stocks": common_stocks,
+                }
+            )
 
     # 按重合度（max Jaccard/overlap_ratio）降序排列
     pairs.sort(key=lambda p: overlap_map.get((p["fund_a"], p["fund_b"]), 0.0), reverse=True)

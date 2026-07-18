@@ -9,17 +9,23 @@ import time
 logger = logging.getLogger("invest")
 
 __all__ = [
-    "_CIRCUIT_BREAKER_THRESHOLD", "_CIRCUIT_BREAKER_RECOVERY",
-    "_circuit_failures", "_circuit_open_until", "_circuit_lock",
-    "_cb_endpoint", "_cb_record_failure", "_cb_record_success", "_cb_is_open",
+    "_CIRCUIT_BREAKER_THRESHOLD",
+    "_CIRCUIT_BREAKER_RECOVERY",
+    "_circuit_failures",
+    "_circuit_open_until",
+    "_circuit_lock",
+    "_cb_endpoint",
+    "_cb_record_failure",
+    "_cb_record_success",
+    "_cb_is_open",
     "get_circuit_status",
 ]
 
-_CIRCUIT_BREAKER_THRESHOLD = 3   # 连续失败 N 次后开启熔断
+_CIRCUIT_BREAKER_THRESHOLD = 3  # 连续失败 N 次后开启熔断
 _CIRCUIT_BREAKER_RECOVERY = 60  # 冷却时间（秒）
 
-_circuit_failures: dict[str, int] = {}        # endpoint → 连续失败次数
-_circuit_open_until: dict[str, float] = {}     # endpoint → 冷却到期时间
+_circuit_failures: dict[str, int] = {}  # endpoint → 连续失败次数
+_circuit_open_until: dict[str, float] = {}  # endpoint → 冷却到期时间
 _circuit_lock = _threading.Lock()
 
 
@@ -39,8 +45,9 @@ def _cb_record_failure(url: str) -> None:
         if _circuit_failures[ep] >= _CIRCUIT_BREAKER_THRESHOLD:
             expiry = time.time() + _CIRCUIT_BREAKER_RECOVERY
             _circuit_open_until[ep] = expiry
-            logger.warning("熔断器已开启: %s (连续失败 %d 次, 冷却 %.0fs)",
-                          ep, _circuit_failures[ep], _CIRCUIT_BREAKER_RECOVERY)
+            logger.warning(
+                "熔断器已开启: %s (连续失败 %d 次, 冷却 %.0fs)", ep, _circuit_failures[ep], _CIRCUIT_BREAKER_RECOVERY
+            )
 
 
 def _cb_record_success(url: str) -> None:

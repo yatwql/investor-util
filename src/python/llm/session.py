@@ -12,8 +12,11 @@ logger = logging.getLogger("invest")
 
 __all__ = [
     "_session_usage",
-    "reset_session_usage", "get_session_usage", "format_session_usage",
-    "track_session_usage", "record_per_module",
+    "reset_session_usage",
+    "get_session_usage",
+    "format_session_usage",
+    "track_session_usage",
+    "record_per_module",
 ]
 
 # ── 会话级 Token 用量累计跟踪 ──
@@ -102,8 +105,7 @@ def format_session_usage(raw: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
-def track_session_usage(provider: str, usage: dict | None,
-                         model_name: str = "") -> None:
+def track_session_usage(provider: str, usage: dict | None, model_name: str = "") -> None:
     """将一次 LLM 调用的用量累计到会话统计。"""
     global _session_usage
     if not usage:
@@ -127,8 +129,7 @@ def track_session_usage(provider: str, usage: dict | None,
                 _session_usage["models"].append(model_name)
 
         # 累计费用
-        _cost_str = estimate_cost(model_name, inp, out,
-                                   cache_hit_input_tokens=cache_hit)
+        _cost_str = estimate_cost(model_name, inp, out, cache_hit_input_tokens=cache_hit)
         if _cost_str != "-":
             try:
                 cost_val = float(_cost_str.lstrip("$¥€£"))
@@ -138,21 +139,30 @@ def track_session_usage(provider: str, usage: dict | None,
         _session_usage["currency"] = PRICING_CURRENCY
 
 
-def record_per_module(module_key: str, model_name: str,
-                       inp: int = 0, out: int = 0,
-                       cached: bool = False,
-                       thinking: bool = False,
-                       cost: float = 0.0,
-                       endpoint: str = "",
-                       cache_hit_tokens: int = 0) -> None:
+def record_per_module(
+    module_key: str,
+    model_name: str,
+    inp: int = 0,
+    out: int = 0,
+    cached: bool = False,
+    thinking: bool = False,
+    cost: float = 0.0,
+    endpoint: str = "",
+    cache_hit_tokens: int = 0,
+) -> None:
     """按模块记录本次 LLM 调用的模型、Token 用量、缓存/Thinking/费用/Endpoint。"""
     with _session_lock:
         pm = _session_usage.setdefault("per_module", {})
         if module_key not in pm:
             pm[module_key] = {
-                "model": model_name, "input_tokens": 0, "output_tokens": 0,
-                "cached": cached, "thinking": thinking, "cost": 0.0,
-                "endpoint": endpoint, "cache_hit_tokens": 0,
+                "model": model_name,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cached": cached,
+                "thinking": thinking,
+                "cost": 0.0,
+                "endpoint": endpoint,
+                "cache_hit_tokens": 0,
             }
         entry = pm[module_key]
         entry["input_tokens"] += inp

@@ -75,6 +75,7 @@ def _parse_news_item(item: dict[str, Any]) -> dict[str, Any] | None:
     content_text = (item.get("content_text") or "").strip()
     # 去除 HTML 标签（如有）
     import re
+
     intro = re.sub(r"<[^>]+>", "", content_text).strip()
     # 限制摘要长度
     if len(intro) > 300:
@@ -85,7 +86,6 @@ def _parse_news_item(item: dict[str, Any]) -> dict[str, Any] | None:
         ctime_str = _ts_to_str(int(float(raw_ctime))) if raw_ctime is not None else ""
     except (TypeError, ValueError):
         ctime_str = ""
-
 
     # uri 可能是相对路径 "/live/xxxxx"，拼接完整 URL
     uri = (item.get("uri") or "").strip()
@@ -130,8 +130,7 @@ def fetch_news(num: int = 50) -> list[dict[str, Any]]:
         if cursor:
             params["cursor"] = cursor
 
-        logger.debug("WallStreetCN 新闻请求: limit=%d, cursor=%s",
-                     params["limit"], cursor or "初始")
+        logger.debug("WallStreetCN 新闻请求: limit=%d, cursor=%s", params["limit"], cursor or "初始")
 
         try:
             with make_http_client(timeout=_TIMEOUT) as client:

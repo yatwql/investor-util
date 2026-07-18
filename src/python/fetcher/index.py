@@ -11,10 +11,10 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from src.python.constants import CACHE_WEEKLY
-from src.python.cache import get_ttl
 from src.python.cache import get as cache_get
+from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
+from src.python.constants import CACHE_WEEKLY
 from src.python.providers import sina, tencent
 
 logger = logging.getLogger("invest")
@@ -88,8 +88,7 @@ def _fetch_indices_from_sina(uncached: list[str]) -> dict[str, dict[str, Any]]:
     results: dict[str, dict[str, Any]] = {}
 
     # 将需要获取的内部代码转为 Sina 代码
-    sina_codes = [_A_INTERNAL_TO_SINA[code] for code in uncached
-                  if code in _A_INTERNAL_TO_SINA]
+    sina_codes = [_A_INTERNAL_TO_SINA[code] for code in uncached if code in _A_INTERNAL_TO_SINA]
     if not sina_codes:
         return results
 
@@ -135,8 +134,11 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
     # 检查哪些还没获取到，尝试备用链路
     still_missing = [c for c in uncached_codes if c not in indices]
     if still_missing:
-        logger.warning("[index] A 股指数腾讯链路失败（未获取 %d 个指数），降级至新浪备用链路: %s",
-                        len(still_missing), still_missing)
+        logger.warning(
+            "[index] A 股指数腾讯链路失败（未获取 %d 个指数），降级至新浪备用链路: %s",
+            len(still_missing),
+            still_missing,
+        )
         sina_results = _fetch_indices_from_sina(still_missing)
         indices.update(sina_results)
 
@@ -223,6 +225,7 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
 
     # 先查会话缓存（C4 约束）
     from src.python.provider_registry import NOT_FOUND, get_registry
+
     reg = get_registry()
     cached = reg.session_cache_get("history_index", code)
     if cached is not NOT_FOUND:
@@ -230,6 +233,7 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
 
     # 美股指数使用独立 chain（新浪优先，腾讯备用；腾讯 K-line 不支持 gb_* 代码）
     from src.python.code_utils import is_us_index_code
+
     chain_name = "history_index_us" if is_us_index_code(code) else "history_index"
     days = min(max(days, 5), 3650)
     try:
@@ -267,6 +271,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
 
     # 主链路：新浪财经（带 2 次重试）
     import time as _time
+
     for attempt in range(2):
         try:
             sina_data = sina.fetch_us_indices()

@@ -32,20 +32,20 @@ from src.python.llm.fingerprint import (
     compute_fingerprint,
     get_cache_ttl_llm,
 )
-from src.python.llm.prompts import (
-    CACHE_PREFIX_LLM,
-    LLM_MODULE_FAILURE,
-    FAIL_REASON_DISABLED,
-    FAIL_REASON_API_ERROR,
-)
-from src.python.llm.session import record_per_module
-from src.python.llm.skeleton import is_llm_module_enabled
 from src.python.llm.generators import (
     generate_expert_review,
     generate_global_macro,
     generate_health_check,
     generate_penetration_deep_analysis,
 )
+from src.python.llm.prompts import (
+    CACHE_PREFIX_LLM,
+    FAIL_REASON_API_ERROR,
+    FAIL_REASON_DISABLED,
+    LLM_MODULE_FAILURE,
+)
+from src.python.llm.session import record_per_module
+from src.python.llm.skeleton import is_llm_module_enabled
 from src.python.registry import get_llm_module_name, get_llm_module_names
 
 logger = logging.getLogger("invest")
@@ -84,42 +84,63 @@ def get_news_correlation_result() -> tuple[list[dict], bool, dict] | None:
 # ── HTTP 客户端配置 ──────────────────────────────────────────
 # 各工作线程共享同一组连接参数，通过 HTTP/2 + keepalive 减少连接建立开销
 _LLM_CLIENT_SETTINGS: dict[str, Any] = {
-    "http2": True,                               # HTTP/2 多路复用
+    "http2": True,  # HTTP/2 多路复用
     "limits": httpx.Limits(
-        max_connections=20,                      # 总连接池上限
-        max_keepalive_connections=10,            # 空闲保持连接数
+        max_connections=20,  # 总连接池上限
+        max_keepalive_connections=10,  # 空闲保持连接数
     ),
 }
 
 
 def _compute_module_cache_info(
-    llm_config: dict, a_indices, us_indices,
-    total_mv: float, total_cost: float, total_profit: float,
-    total_today_profit: float, _holdings_count: int, categories: dict,
-    penetrated_assets: list[dict] | None, holdings_details: list[dict] | None,
+    llm_config: dict,
+    a_indices,
+    us_indices,
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    total_today_profit: float,
+    _holdings_count: int,
+    categories: dict,
+    penetrated_assets: list[dict] | None,
+    holdings_details: list[dict] | None,
     force: bool,
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。"""
     fp_global_macro = compute_fingerprint(
-        a_indices, us_indices, total_mv, total_profit, categories,
+        a_indices,
+        us_indices,
+        total_mv,
+        total_profit,
+        categories,
     )
     fp_expert_review = build_llm_fingerprint(
-        total_mv=total_mv, total_cost=total_cost,
-        total_profit=total_profit, total_today_profit=total_today_profit,
-        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
         categories=categories,
     )
     fp_health_check = build_llm_fingerprint(
-        total_mv=total_mv, total_cost=total_cost,
-        total_profit=total_profit, total_today_profit=total_today_profit,
-        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
         categories=categories,
     )
     fp_penetration_deep = build_llm_fingerprint(
-        total_mv=total_mv, total_cost=total_cost,
-        total_profit=total_profit, total_today_profit=total_today_profit,
-        holdings_details=holdings_details, penetrated_assets=penetrated_assets,
-        categories=categories, full_penetration=True,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
+        categories=categories,
+        full_penetration=True,
     )
 
     force_flag = force
@@ -153,7 +174,9 @@ def _compute_module_cache_info(
 
 
 def _precheck_one_cache(
-    cache_info: dict, llm_config: dict, module_key: str = "",
+    cache_info: dict,
+    llm_config: dict,
+    module_key: str = "",
 ) -> tuple[str | None, bool]:
     """预检单个模块的缓存，返回 (result, from_cached)。
 
@@ -177,14 +200,18 @@ def _precheck_one_cache(
         _endpoint_for_record = llm_config.get("endpoint", "") or ""
         if not _endpoint_for_record and llm_config.get("_provider_list") and module_key:
             from src.python.llm.api import _resolve_first_provider_model_endpoint
+
             _, _endpoint_for_record = _resolve_first_provider_model_endpoint(llm_config, module_key)
-        record_per_module(module_key, _name_for_record, cached=True,
-                           thinking=thinking_enabled, endpoint=_endpoint_for_record)
+        record_per_module(
+            module_key, _name_for_record, cached=True, thinking=thinking_enabled, endpoint=_endpoint_for_record
+        )
     return (clean + hint, True)
 
 
 def _precheck_all_modules(
-    llm_config: dict, cache_info: dict[str, dict], _force: bool,
+    llm_config: dict,
+    cache_info: dict[str, dict],
+    _force: bool,
 ) -> dict[str, dict]:
     """检查所有模块的状态（已禁用/缓存命中/缓存未命中）。"""
     results: dict[str, dict] = {}
@@ -201,11 +228,19 @@ def _precheck_all_modules(
 
 
 def _dispatch_llm_workers(
-    needs: dict[str, bool], llm_config: dict | None, force: bool,
-    a_indices, us_indices,
-    total_mv: float, total_cost: float, total_profit: float,
-    total_today_profit: float, holdings_count: int, categories: dict,
-    penetrated_assets: list[dict] | None, holdings_details: list[dict] | None,
+    needs: dict[str, bool],
+    llm_config: dict | None,
+    force: bool,
+    a_indices,
+    us_indices,
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    total_today_profit: float,
+    holdings_count: int,
+    categories: dict,
+    penetrated_assets: list[dict] | None,
+    holdings_details: list[dict] | None,
     sector_flow: list[dict] | None,
     f_context: dict | None = None,
     *,
@@ -222,6 +257,7 @@ def _dispatch_llm_workers(
 
     def _make_runner(label: str, fn: Callable) -> Callable:
         """创建闭包：持 httpx.Client（HTTP/2 + 连接池）运行 fn(c, llm_config)。"""
+
         def _run() -> tuple[str | None, bool]:
             logger.info("正在生成：%s...", _label_map.get(label, label))
             try:
@@ -236,46 +272,77 @@ def _dispatch_llm_workers(
                 return fn(c, llm_config)
             finally:
                 c.close()
+
         return _run
 
     _MODULE_FNS: dict[str, Callable] = {
         "global_macro": lambda c, lc: generate_global_macro(
-            a_indices, us_indices, total_mv, total_profit, categories,
-            sector_flow=sector_flow, force=force, http_client=c, llm_config=lc,
+            a_indices,
+            us_indices,
+            total_mv,
+            total_profit,
+            categories,
+            sector_flow=sector_flow,
+            force=force,
+            http_client=c,
+            llm_config=lc,
         ),
         "expert_review": lambda c, lc: generate_expert_review(
-            total_mv, total_cost, total_profit, total_today_profit,
-            holdings_count, categories, penetrated_assets,
-            holdings_details=holdings_details, force=force,
-            http_client=c, llm_config=lc,
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
             f_context=f_context,
         ),
         "health_check": lambda c, lc: generate_health_check(
-            total_mv, total_cost, total_profit, total_today_profit,
-            holdings_count, categories, penetrated_assets,
-            holdings_details=holdings_details, force=force,
-            http_client=c, llm_config=lc,
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
             f_context=f_context,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
-            total_mv, total_cost, total_profit, total_today_profit,
-            holdings_count, categories, penetrated_assets,
-            holdings_details=holdings_details, force=force,
-            http_client=c, llm_config=lc,
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
         ),
     }
 
     # news_correlation 可选集成：仅在提供了新闻和持仓数据时注册
     if news_data is not None and holdings_data is not None:
         _MODULE_FNS["news_correlation"] = _make_news_correlation_closure(
-            news_data, holdings_data, penetrated_assets_for_news, force,
+            news_data,
+            holdings_data,
+            penetrated_assets_for_news,
+            force,
         )
 
     _max_workers = (llm_config or {}).get("llm_max_concurrency", 3)
     with ThreadPoolExecutor(max_workers=_max_workers) as executor:
         _futures: dict[Future, str] = {
-            executor.submit(_make_runner(k, fn)): k
-            for k, fn in _MODULE_FNS.items() if needs.get(k)
+            executor.submit(_make_runner(k, fn)): k for k, fn in _MODULE_FNS.items() if needs.get(k)
         }
 
         for future in as_completed(_futures):
@@ -316,13 +383,18 @@ def _make_news_correlation_closure(
     此闭包包装为 ``(json.dumps(result_list), cached)`` 返回，
     实际结果通过 ``_news_correlation_result`` 模块级变量传递。
     """
+
     def _fn(c: httpx.Client, lc: dict | None) -> tuple[str | None, bool]:
         try:
             from src.python.llm.generators_news import enhance_news_correlation
+
             result_list, cached, token_usage = enhance_news_correlation(
-                news_data, holdings_data,
+                news_data,
+                holdings_data,
                 penetrated_assets=penetrated_assets_for_news,
-                force=force, _http_client=c, llm_config=lc,
+                force=force,
+                _http_client=c,
+                llm_config=lc,
             )
             LLM_MODULE_FAILURE.pop("news_correlation", None)
             return json.dumps([result_list, cached, token_usage], ensure_ascii=False), cached
@@ -330,6 +402,7 @@ def _make_news_correlation_closure(
             LLM_MODULE_FAILURE["news_correlation"] = FAIL_REASON_API_ERROR
             logger.warning("%s出错: %s", _MN("news_correlation"), e)
             return None, False
+
     return _fn
 
 
@@ -376,15 +449,17 @@ def run_news_correlation_safe(
 
     try:
         from src.python.llm.generators_news import enhance_news_correlation
+
         result, cached, token_usage = enhance_news_correlation(
-            news_items, holdings,
+            news_items,
+            holdings,
             penetrated_assets=penetrated_assets,
             industry_data=industry_data,
-            force=force, llm_config=llmc,
+            force=force,
+            llm_config=llmc,
         )
         LLM_MODULE_FAILURE.pop("news_correlation", None)
-        logger.info("%s生成完成%s", _MN("news_correlation"),
-                    "（缓存）" if cached else "")
+        logger.info("%s生成完成%s", _MN("news_correlation"), "（缓存）" if cached else "")
         return result, cached, token_usage
     except Exception as e:
         LLM_MODULE_FAILURE["news_correlation"] = FAIL_REASON_API_ERROR
@@ -429,22 +504,39 @@ def generate_all_llm(
         return (None, None, None, None, False, False, False, False)
 
     cache_info = _compute_module_cache_info(
-        llm_config, a_indices, us_indices,
-        total_mv, total_cost, total_profit, total_today_profit,
-        holdings_count, categories, penetrated_assets, holdings_details,
+        llm_config,
+        a_indices,
+        us_indices,
+        total_mv,
+        total_cost,
+        total_profit,
+        total_today_profit,
+        holdings_count,
+        categories,
+        penetrated_assets,
+        holdings_details,
         force,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
 
-    needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k))
-             for k, v in precheck_results.items()}
+    needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k)) for k, v in precheck_results.items()}
 
     worker_results = _dispatch_llm_workers(
-        needs, llm_config, force,
-        a_indices, us_indices, total_mv, total_cost, total_profit,
-        total_today_profit, holdings_count, categories,
-        penetrated_assets, holdings_details, sector_flow,
+        needs,
+        llm_config,
+        force,
+        a_indices,
+        us_indices,
+        total_mv,
+        total_cost,
+        total_profit,
+        total_today_profit,
+        holdings_count,
+        categories,
+        penetrated_assets,
+        holdings_details,
+        sector_flow,
         f_context=f_context,
     )
 
@@ -463,9 +555,15 @@ def generate_all_llm(
     hc_r, hc_c = _get("health_check")
     pd_r, pd_c = _get("penetration_deep")
 
-    logger.info("LLM 生成完成: %s=%s, %s=%s, %s=%s, %s=%s",
-                _MN("global_macro"), "OK" if gm_r else "跳过",
-                _MN("expert_review"), "OK" if er_r else "跳过",
-                _MN("health_check"), "OK" if hc_r else "跳过",
-                _MN("penetration_deep"), "OK" if pd_r else "跳过")
+    logger.info(
+        "LLM 生成完成: %s=%s, %s=%s, %s=%s, %s=%s",
+        _MN("global_macro"),
+        "OK" if gm_r else "跳过",
+        _MN("expert_review"),
+        "OK" if er_r else "跳过",
+        _MN("health_check"),
+        "OK" if hc_r else "跳过",
+        _MN("penetration_deep"),
+        "OK" if pd_r else "跳过",
+    )
     return (gm_r, er_r, hc_r, pd_r, gm_c, er_c, hc_c, pd_c)

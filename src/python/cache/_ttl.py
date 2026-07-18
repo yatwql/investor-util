@@ -42,7 +42,8 @@ def get_cache_age(key: str) -> float | None:
 
 
 def get_cache_age_by_data_type(
-    data_type: str, identifier: str | None = None,
+    data_type: str,
+    identifier: str | None = None,
 ) -> float | None:
     """按 registry 数据类型获取缓存年龄，替换硬编码 get_cache_age() 调用。
 
@@ -64,9 +65,11 @@ def get_cache_age_by_data_type(
     # 特殊处理：profit_forecast 使用动态指纹，不走 prefix+identifier 模式
     if data_type == "profit_forecast":
         from src.python.fetcher.akshare import get_profit_forecast_cache_key
+
         return get_cache_age(get_profit_forecast_cache_key())
     # 标准路径：prefix + identifier
     from src.python.registry import get_registry  # 延迟导入避免循环依赖
+
     for module in get_registry():
         if module.data_type == data_type and identifier is not None and module.cache_prefixes:
             key = f"{module.cache_prefixes[0]}{identifier}"
@@ -88,6 +91,7 @@ def get_ttl(data_type: str) -> float:
     """
     try:
         from src.python.config import get_config  # lazy import
+
         config = get_config()
         # ── 交易时段内：配置声明的数据类型用短 TTL 确保实时性 ──
         market_hour_aware: list = config.get("market_hour_aware") or []

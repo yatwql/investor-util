@@ -413,8 +413,7 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
 
     try:
         with make_http_client(timeout=30.0) as client:
-            resp = client.get(url, params=params,
-                              headers={"Referer": "https://finance.sina.com.cn"})
+            resp = client.get(url, params=params, headers={"Referer": "https://finance.sina.com.cn"})
             resp.encoding = "utf-8"
             data = resp.json()
     except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
@@ -461,8 +460,7 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
 
     try:
         with make_http_client(timeout=30.0) as client:
-            resp = client.get(url, params=params,
-                              headers={"Referer": "https://finance.sina.com.cn"})
+            resp = client.get(url, params=params, headers={"Referer": "https://finance.sina.com.cn"})
             resp.encoding = "utf-8"
             data = resp.json()
     except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
@@ -494,14 +492,16 @@ def _parse_kline_json(data: list | dict | None) -> list[dict]:
         close_val = _parse_sina_kline_float(entry.get("close"))
         if not date_str or close_val <= 0:
             continue
-        bars.append({
-            "date": date_str,
-            "open": _parse_sina_kline_float(entry.get("open")),
-            "close": close_val,
-            "high": _parse_sina_kline_float(entry.get("high")),
-            "low": _parse_sina_kline_float(entry.get("low")),
-            "volume": _parse_sina_kline_float(entry.get("volume")),
-        })
+        bars.append(
+            {
+                "date": date_str,
+                "open": _parse_sina_kline_float(entry.get("open")),
+                "close": close_val,
+                "high": _parse_sina_kline_float(entry.get("high")),
+                "low": _parse_sina_kline_float(entry.get("low")),
+                "volume": _parse_sina_kline_float(entry.get("volume")),
+            }
+        )
 
     return sorted(bars, key=lambda x: x["date"])
 

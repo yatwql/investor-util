@@ -15,7 +15,7 @@ import time
 from typing import Any
 
 from ._io import _read_cache_data, _write_atomic
-from ._paths import _GZIP_THRESHOLD, _GZIP_SUFFIX, _cache_path
+from ._paths import _GZIP_SUFFIX, _GZIP_THRESHOLD, _cache_path
 from ._stats import _record_cache_hit, _record_cache_miss
 
 logger = logging.getLogger("invest")

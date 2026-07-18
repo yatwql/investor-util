@@ -20,7 +20,7 @@ from typing import Any
 
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.cache import get_cache_age, get_ttl
+from src.python.cache import get_ttl
 from src.python.code_utils import is_fund_holding
 from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
 from src.python.models import Holding
@@ -50,8 +50,17 @@ _tracker = DegradationTracker()
 
 _NCOLS = 11
 _HEADERS = [
-    "基金", "代码", "类型", "近3月", "近6月", "近12月",
-    "持仓累计盈亏(¥)", "持仓收益率", "业绩基准", "业绩评价", "同类排名",
+    "基金",
+    "代码",
+    "类型",
+    "近3月",
+    "近6月",
+    "近12月",
+    "持仓累计盈亏(¥)",
+    "持仓收益率",
+    "业绩基准",
+    "业绩评价",
+    "同类排名",
 ]
 
 # 基础业绩评价 -> 标签 + 描述（P2：5 级评级，新增"较差"）
@@ -77,7 +86,7 @@ _FUND_TYPE_LABEL = {
 _RATING_ORDER = ["较差", "偏差", "稳定", "良好", "优秀"]
 
 # 超额收益评分阈值（用于评级修正）
-_EXCESS_THRESHOLD_UP = 80    # 超额收益 ≥ 80 → 评级上调一级
+_EXCESS_THRESHOLD_UP = 80  # 超额收益 ≥ 80 → 评级上调一级
 _EXCESS_THRESHOLD_DOWN = 40  # 超额收益 < 40 → 评级下调一级
 
 
@@ -196,14 +205,14 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
 
     adjusted = _RATING_ORDER[new_idx]
     if adjusted != peer_rating:
-        logger.debug("评级调整: %s → %s（超额收益评分 %.0f）",
-                     peer_rating, adjusted, excess_score)
+        logger.debug("评级调整: %s → %s（超额收益评分 %.0f）", peer_rating, adjusted, excess_score)
     return adjusted
 
 
-
 def _write_one_fund_row(
-    ws: Worksheet, row: int, fund: Holding,
+    ws: Worksheet,
+    row: int,
+    fund: Holding,
     detail_map: dict[str, DetailRow],
 ) -> str | None:
     """获取并写入单只基金的业绩数据行。
@@ -238,13 +247,16 @@ def _write_one_fund_row(
     profit_rate_val = d.profit_rate if d else 0.0
 
     vals = [
-        fund.name, fund.code, fund_type,
+        fund.name,
+        fund.code,
+        fund_type,
         _format_return(rankings.get("近3月", {}).get("return")),
         _format_return(rankings.get("近6月", {}).get("return")),
         _format_return(rankings.get("近1年", {}).get("return")),
         profit_val,
         profit_rate_val,  # 已为小数（如 0.0523），Excel 0.00% 格式自动处理
-        benchmark, comment,
+        benchmark,
+        comment,
         _format_rank(rankings.get("同类排名", {})),
     ]
     write_data_row(ws, row, vals, _num_formats())
@@ -289,7 +301,8 @@ def _write_rating_distribution(ws: Worksheet, row: int, fund_count: int, adjuste
 
     if rating_counts:
         summary = " | ".join(
-            f"{k}: {v}只" for k, v in sorted(
+            f"{k}: {v}只"
+            for k, v in sorted(
                 rating_counts.items(),
                 key=lambda x: _RATING_ORDER.index(x[0]) if x[0] in _RATING_ORDER else 99,
                 reverse=True,
@@ -299,10 +312,14 @@ def _write_rating_distribution(ws: Worksheet, row: int, fund_count: int, adjuste
         row += 1
 
     row += 1
-    write_data_row(ws, row, [
-        "业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿) | "
-        "超额收益评分≥80上调一级、<40下调一级"
-    ])
+    write_data_row(
+        ws,
+        row,
+        [
+            "业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿) | "
+            "超额收益评分≥80上调一级、<40下调一级"
+        ],
+    )
     return row + 1
 
 
@@ -326,14 +343,17 @@ def build_perf_data_status(
         # 所有基金均未获取到排名数据（无代表性缓存年龄可查）
         ttl = get_ttl("fund_rank")
         degraded, _, _ = _tracker.record(
-            "perf_rank", "T2", success=False,
+            "perf_rank",
+            "T2",
+            success=False,
             failure_type="empty",
             cache_age_hours=None,
             cache_ttl_hours=ttl / 3600 if ttl else 24,
         )
         if degraded:
             status["rank"] = DataStatusItem(
-                available=False, tier="T2",
+                available=False,
+                tier="T2",
                 message=STATUS_MESSAGES["rank_unavailable"],
             )
 
@@ -355,7 +375,7 @@ def write_fund_performance_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
     """
-    row = write_title_row(ws, 1, get_report_sheet_name('fund_performance'), _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name("fund_performance"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
     # 识别基金
@@ -396,9 +416,12 @@ def write_fund_performance_sheet(
     if not adjusted_ratings:
         logger.warning("[fund_performance] 天天基金排名接口均返回空数据，排名列显示 --")
     else:
-        logger.info("%s写入完成，%d/%d 只基金获取成功",
-                    get_report_sheet_name('fund_performance'),
-                    len(adjusted_ratings), len(fund_holdings_sorted))
+        logger.info(
+            "%s写入完成，%d/%d 只基金获取成功",
+            get_report_sheet_name("fund_performance"),
+            len(adjusted_ratings),
+            len(fund_holdings_sorted),
+        )
 
 
 def _write_empty_row(ws, row: int, fund: Holding) -> None:
@@ -407,8 +430,11 @@ def _write_empty_row(ws, row: int, fund: Holding) -> None:
         fund.name,
         fund.code,
         _fund_display_type(fund),
-        "--", "--", "--",
-        "--", "--",
+        "--",
+        "--",
+        "--",
+        "--",
+        "--",
         "--",
         "--",
         "--",
@@ -419,16 +445,17 @@ def _write_empty_row(ws, row: int, fund: Holding) -> None:
 def _num_formats() -> list[str | None]:
     """每列的 Excel 数字格式。"""
     from src.python.report.styles import FMT_MONEY, FMT_PERCENT
+
     return [
-        None,          # 1  基金（文本）
-        None,          # 2  代码（文本）
-        None,          # 3  类型（文本）
-        FMT_PERCENT,   # 4  近3月
-        FMT_PERCENT,   # 5  近6月
-        FMT_PERCENT,   # 6  近12月
-        FMT_MONEY,     # 7  持仓累计盈亏(¥)
-        FMT_PERCENT,   # 8  持仓收益率
-        None,          # 9  业绩基准（文本）
-        None,          # 10 业绩评价（文本）
-        None,          # 11 同类排名（文本）
+        None,  # 1  基金（文本）
+        None,  # 2  代码（文本）
+        None,  # 3  类型（文本）
+        FMT_PERCENT,  # 4  近3月
+        FMT_PERCENT,  # 5  近6月
+        FMT_PERCENT,  # 6  近12月
+        FMT_MONEY,  # 7  持仓累计盈亏(¥)
+        FMT_PERCENT,  # 8  持仓收益率
+        None,  # 9  业绩基准（文本）
+        None,  # 10 业绩评价（文本）
+        None,  # 11 同类排名（文本）
     ]

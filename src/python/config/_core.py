@@ -1,4 +1,5 @@
 """核心配置逻辑 — 配置读写缓存 / 校验 / LLM 配置合并。"""
+
 from __future__ import annotations
 
 import contextlib
@@ -9,8 +10,7 @@ import tempfile
 import threading
 from typing import Any
 
-from src.python.config import _comments
-from src.python.config import _config_defaults
+from src.python.config import _comments, _config_defaults
 from src.python.config._llm_defaults import _get_default_llm_settings_template
 from src.python.config._llm_providers_defaults import _get_default_llm_providers_template
 from src.python.constants import PROJECT_ROOT
@@ -51,9 +51,7 @@ def get_config() -> dict:
         try:
             current_mtime = os.path.getmtime(config_path)
             current_size = os.path.getsize(config_path)
-            if (_config_cache is not None
-                    and current_mtime <= _config_mtime
-                    and current_size == _config_size):
+            if _config_cache is not None and current_mtime <= _config_mtime and current_size == _config_size:
                 return _config_cache
         except OSError:
             pass
@@ -69,8 +67,7 @@ def get_config() -> dict:
             for key, val in config.items():
                 if val is None and key in _config_defaults._DEFAULT_CONFIG:
                     continue
-                if (key in merged and isinstance(merged[key], dict)
-                        and isinstance(val, dict)):
+                if key in merged and isinstance(merged[key], dict) and isinstance(val, dict):
                     merged[key] = {**merged[key], **val}
                 else:
                     merged[key] = val
@@ -186,19 +183,28 @@ _KNOWN_NEWS_SOURCES: set[str] = {"sina", "eastmoney", "cls", "wallstreetcn", "ak
 _KNOWN_PROVIDER_TYPES: set[str] = {"price", "fund_rank", "fund_hold", "industry"}
 
 _KNOWN_PROVIDER_NAMES: set[str] = {
-    "tencent", "eastmoney", "sina", "tiantian",
-    "eastmoney_industry", "eastmoney_industry_rest",
+    "tencent",
+    "eastmoney",
+    "sina",
+    "tiantian",
+    "eastmoney_industry",
+    "eastmoney_industry_rest",
 }
 
 _STRING_CONFIG_KEYS: set[str] = {
-    "holdings_dir", "holdings_filename", "output_dir",
-    "llm_key_file", "llm_settings_file",
+    "holdings_dir",
+    "holdings_filename",
+    "output_dir",
+    "llm_key_file",
+    "llm_settings_file",
 }
 
 # 需要绝对化的路径型配置键（不包含纯文件名 holdings_filename）
 _PATH_CONFIG_KEYS: set[str] = {
-    "holdings_dir", "output_dir",
-    "llm_key_file", "llm_settings_file",
+    "holdings_dir",
+    "output_dir",
+    "llm_key_file",
+    "llm_settings_file",
 }
 
 
@@ -219,11 +225,11 @@ def _is_abs(path: str) -> bool:
     """增强的绝对路径判断，兼容 Windows 下 Unix 风格 /path 的识别。"""
     return os.path.isabs(path) or (len(path) > 0 and path[0] in ("/", "\\"))
 
+
 _MISSING = object()
 
 
-def _section(config: dict, key: str, expected_type: type, warn_msg: str,
-             issues: int = 0) -> tuple[Any, int]:
+def _section(config: dict, key: str, expected_type: type, warn_msg: str, issues: int = 0) -> tuple[Any, int]:
     """读取配置段，校验类型。"""
     val = config.get(key)
     if val is None:
@@ -287,8 +293,7 @@ def _validate_news_sources(config: dict, issues: int) -> int:
             logger.warning("config.json news_sources 中存在未知的源 %r，将被忽略", key)
             issues += 1
         if not isinstance(val, bool):
-            logger.warning("config.json news_sources.%s = %r 不是布尔值，"
-                           "非空字符串/数字会被当作 True 处理", key, val)
+            logger.warning("config.json news_sources.%s = %r 不是布尔值，非空字符串/数字会被当作 True 处理", key, val)
             issues += 1
     return issues
 
@@ -299,13 +304,19 @@ def _validate_preferred_provider(config: dict, issues: int) -> int:
         return issues
     for data_type, provider in pref.items():
         if data_type not in _KNOWN_PROVIDER_TYPES:
-            logger.warning("config.json preferred_provider 中存在未知的数据类型 %r，"
-                           "有效值: %s", data_type, ", ".join(sorted(_KNOWN_PROVIDER_TYPES)))
+            logger.warning(
+                "config.json preferred_provider 中存在未知的数据类型 %r，有效值: %s",
+                data_type,
+                ", ".join(sorted(_KNOWN_PROVIDER_TYPES)),
+            )
             issues += 1
         if provider not in _KNOWN_PROVIDER_NAMES:
-            logger.warning("config.json preferred_provider.%s = %r 不是已知的 provider，"
-                           "有效值: %s", data_type, provider,
-                           ", ".join(sorted(_KNOWN_PROVIDER_NAMES)))
+            logger.warning(
+                "config.json preferred_provider.%s = %r 不是已知的 provider，有效值: %s",
+                data_type,
+                provider,
+                ", ".join(sorted(_KNOWN_PROVIDER_NAMES)),
+            )
             issues += 1
     return issues
 
@@ -320,7 +331,11 @@ def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
             issues += 1
             continue
         if not isinstance(benchmark, str) or not benchmark.strip():
-            logger.warning("config.json user_fund_benchmarks.%s = %r 不是有效的基准名称（应为字符串），该项将被忽略", code, benchmark)
+            logger.warning(
+                "config.json user_fund_benchmarks.%s = %r 不是有效的基准名称（应为字符串），该项将被忽略",
+                code,
+                benchmark,
+            )
             issues += 1
     return issues
 
@@ -356,9 +371,7 @@ def _validate_enable_llm(issues: int) -> int:
     known_keys = get_known_enabled_llm_keys()
     unknown = [k for k in enabled_map if k not in known_keys]
     if unknown:
-        logger.warning(
-            "llm_settings.json enabled_llm 中存在未知模块 %s，请检查拼写", unknown
-        )
+        logger.warning("llm_settings.json enabled_llm 中存在未知模块 %s，请检查拼写", unknown)
         issues += 1
     return issues
 
@@ -514,9 +527,14 @@ def is_enable_history(config: dict | None = None) -> bool:
 
 # ── LLM 板块可见性（来自 llm_settings.json enabled_llm） ──────
 
-_REPORT_LLM_MODULES = frozenset({
-    "global_macro", "expert_review", "health_check", "penetration_deep",
-})
+_REPORT_LLM_MODULES = frozenset(
+    {
+        "global_macro",
+        "expert_review",
+        "health_check",
+        "penetration_deep",
+    }
+)
 
 
 def is_enable_llm(config: dict | None = None) -> bool:
@@ -551,18 +569,16 @@ def _check_unknown_llm_keys(settings: dict) -> None:
     unknown = [key for key in settings if key not in _KNOWN_LLM_SETTINGS_KEYS]
     if unknown:
         logger.warning(
-            "llm_settings.json 中检测到 %d 个未知配置项，可能是拼写错误或已废弃的配置: %s。"
-            "请核对后删除，避免混淆。",
-            len(unknown), ", ".join(repr(k) for k in sorted(unknown)),
+            "llm_settings.json 中检测到 %d 个未知配置项，可能是拼写错误或已废弃的配置: %s。请核对后删除，避免混淆。",
+            len(unknown),
+            ", ".join(repr(k) for k in sorted(unknown)),
         )
-
 
 
 def _ensure_llm_settings_file() -> None:
     """若 llm_settings.json 不存在，用默认值自动创建。"""
     config = get_config()
-    settings_path = config.get("llm_settings_file") or os.path.join(
-        PROJECT_ROOT, "data/config/llm_settings.json")
+    settings_path = config.get("llm_settings_file") or os.path.join(PROJECT_ROOT, "data/config/llm_settings.json")
     if os.path.exists(settings_path):
         return
     try:
@@ -606,8 +622,7 @@ def _ensure_llm_providers_file() -> None:
 def get_llm_settings_path() -> str:
     """返回 LLM 非敏感配置文件的路径 (llm_settings.json)。"""
     config = get_config()
-    return config.get("llm_settings_file") or os.path.join(
-        PROJECT_ROOT, "data/config/llm_settings.json")
+    return config.get("llm_settings_file") or os.path.join(PROJECT_ROOT, "data/config/llm_settings.json")
 
 
 # ── LLM Provider 多链配置解析 ──────────────────────────────────
@@ -620,6 +635,7 @@ def _get_llm_providers_path() -> str:
     """返回 llm_providers.json 路径（优先读取 config.json 配置）。"""
     try:
         from src.python.config import get_config
+
         config = get_config()
         return config.get("llm_providers_file") or _LLM_PROVIDERS_FILE_DEFAULT
     except Exception:
@@ -630,10 +646,13 @@ def _get_llm_key_path() -> str:
     """返回 llm_key.json 路径（优先读取 config.json 配置）。"""
     try:
         from src.python.config import get_config
+
         config = get_config()
         return config.get("llm_key_file") or _LLM_KEY_FILE_DEFAULT
     except Exception:
         return _LLM_KEY_FILE_DEFAULT
+
+
 _VALID_LLM_PROVIDER_TYPES = frozenset({"claude", "openai", "gemini"})
 _VALID_STRATEGIES = frozenset({"priority", "weighted", "cost_first", "fallback_only"})
 
@@ -818,8 +837,11 @@ def _inject_provider_chain_data(config: dict) -> dict:
     # strategy
     strategy = raw_providers.get("strategy", "priority")
     if strategy not in _VALID_STRATEGIES:
-        logger.warning("LLM providers strategy '%s' 无效，回退到 'priority'（有效值: %s）",
-                       strategy, "/".join(sorted(_VALID_STRATEGIES)))
+        logger.warning(
+            "LLM providers strategy '%s' 无效，回退到 'priority'（有效值: %s）",
+            strategy,
+            "/".join(sorted(_VALID_STRATEGIES)),
+        )
         strategy = "priority"
     config["_strategy"] = strategy
 
@@ -832,8 +854,9 @@ def _inject_provider_chain_data(config: dict) -> dict:
         valid_names = {p["name"] for p in provider_list}
         for module_key, name in list(preferred.items()):
             if name not in valid_names:
-                logger.warning("LLM providers preferred_providers['%s']='%s' 不在 provider 列表中，已忽略",
-                               module_key, name)
+                logger.warning(
+                    "LLM providers preferred_providers['%s']='%s' 不在 provider 列表中，已忽略", module_key, name
+                )
                 preferred.pop(module_key, None)
     config["_preferred_providers"] = preferred
 
@@ -849,7 +872,8 @@ def _inject_provider_chain_data(config: dict) -> dict:
                 if ref and ref not in credentials:
                     logger.warning(
                         "provider '%s' 引用凭据 '%s' 在 llm_key.json 中不存在",
-                        entry["name"], ref,
+                        entry["name"],
+                        ref,
                     )
 
     return config
@@ -900,9 +924,11 @@ def get_llm_config() -> dict | None:
             combined_mtime = max(key_mtime, settings_mtime)
             combined_size = key_size + settings_size
 
-            if (_llm_config_cache is not None
-                    and combined_mtime <= _llm_config_mtime
-                    and combined_size == _llm_config_size):
+            if (
+                _llm_config_cache is not None
+                and combined_mtime <= _llm_config_mtime
+                and combined_size == _llm_config_size
+            ):
                 return _llm_config_cache
 
             with open(_get_llm_key_path(), encoding="utf-8-sig") as f:

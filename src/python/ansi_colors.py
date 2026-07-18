@@ -17,6 +17,7 @@ import sys
 
 try:
     import colorama
+
     colorama.init()  # 包装 stdout，ANSI → Win32 API，不依赖终端原生 ANSI 支持
 except ImportError:
     pass  # 无 colorama 时 Windows 控制台可能无法正确显示颜色，但功能不受影响

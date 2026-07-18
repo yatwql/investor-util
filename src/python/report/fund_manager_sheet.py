@@ -28,16 +28,22 @@ logger = logging.getLogger("invest")
 
 _NCOLS = 8
 _HEADERS = [
-    "基金名称", "基金代码", "当前基金经理", "任职天数",
-    "1月内变更", "3月内变更", "6月内变更", "预警级别",
+    "基金名称",
+    "基金代码",
+    "当前基金经理",
+    "任职天数",
+    "1月内变更",
+    "3月内变更",
+    "6月内变更",
+    "预警级别",
 ]
 
 # ── 预警级别字体 ─────────────────────────────────────────────
 
 _ALERT_FONTS: dict[str, Font] = {
-    "紧急": Font(color="CC0000"),       # 红色
-    "关注": Font(color="FF8C00"),       # 暗橙色
-    "首检": Font(color="808080"),       # 灰色
+    "紧急": Font(color="CC0000"),  # 红色
+    "关注": Font(color="FF8C00"),  # 暗橙色
+    "首检": Font(color="808080"),  # 灰色
 }
 
 
@@ -63,7 +69,7 @@ def write_fund_manager_sheet(
         ws: openpyxl Worksheet 对象
         manager_data: detect_manager_changes() 的返回结果
     """
-    _name = get_report_sheet_name('fund_manager')
+    _name = get_report_sheet_name("fund_manager")
     write_title_row(ws, 1, f"{get_report_section_number('fund_manager')}. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 

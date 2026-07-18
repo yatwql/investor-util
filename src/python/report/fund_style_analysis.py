@@ -44,21 +44,17 @@ _SIZE_ORDER = ["大盘", "中盘", "小盘"]
 _STYLE_ORDER = ["价值", "混合", "成长"]
 
 # 所有有效风格组合
-_STYLE_BOXES: set[str] = {
-    f"{size}{style}"
-    for size in _SIZE_ORDER
-    for style in _STYLE_ORDER
-}
+_STYLE_BOXES: set[str] = {f"{size}{style}" for size in _SIZE_ORDER for style in _STYLE_ORDER}
 
 
 # ── 市值 / PE 阈值 ────────────────────────────────────────
 
 _MARKET_CAP_LARGE = 500e8  # 500 亿
-_MARKET_CAP_MID = 100e8    # 100 亿
+_MARKET_CAP_MID = 100e8  # 100 亿
 
 # PE 相对行业平均的乘数阈值
-_PE_VALUE_THRESHOLD = 0.7    # PE < 行业均值的 70% → 价值型
-_PE_GROWTH_THRESHOLD = 1.3   # PE > 行业均值的 130% → 成长型
+_PE_VALUE_THRESHOLD = 0.7  # PE < 行业均值的 70% → 价值型
+_PE_GROWTH_THRESHOLD = 1.3  # PE > 行业均值的 130% → 成长型
 
 
 # ═══════════════════════════════════════════════════════════
@@ -75,6 +71,7 @@ def _ensure_tencent_provider_registered() -> None:
     if _tencent_registered:
         return
     from src.python.provider_registry import get_registry
+
     get_registry().register_provider("tencent_style", tier=4, timeout=15.0)
     _tencent_registered = True
 
@@ -204,8 +201,10 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
     Returns:
         {"market_cap": float, "pe": float, "pb": float} 或 None
     """
-    from src.python.cache import get as _cache_get, set as _cache_set
+    from src.python.cache import get as _cache_get
+    from src.python.cache import set as _cache_set
     from src.python.constants import CACHE_DAILY
+
     _key = f"extended_{code}"
     _cached = _cache_get(_key, CACHE_DAILY)
     if _cached is not None:
@@ -213,6 +212,7 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
 
     try:
         from src.python.fetcher.industry import make_push2_request
+
         inner = make_push2_request(code)
         if inner is None:
             return None
@@ -251,17 +251,21 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
     Returns:
         {"market_cap": float, "pe": float} 或 None
     """
-    from src.python.cache import get as _cache_get, set as _cache_set
+    from src.python.cache import get as _cache_get
+    from src.python.cache import set as _cache_set
     from src.python.constants import CACHE_DAILY
+
     _key = f"extended_{code}"
     _cached = _cache_get(_key, CACHE_DAILY)
     if _cached is not None:
         return _cached
 
     from src.python.provider_registry import get_registry
+
     reg = get_registry()
     try:
         from src.python.fetcher.price import fetch_market_data
+
         data = fetch_market_data(code)
         if data is None:
             return None
@@ -357,8 +361,7 @@ def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
                 industry_avg[ind] = (sorted_pe[n // 2 - 1] + sorted_pe[n // 2]) / 2.0
 
         # ── 第三遍：代码 → 行业平均 PE 映射 ─────────────────────
-        return {code: industry_avg[ind] for code, ind in code_industry.items()
-                if ind in industry_avg}
+        return {code: industry_avg[ind] for code, ind in code_industry.items() if ind in industry_avg}
     except Exception:
         logger.warning("行业平均 PE 获取异常", exc_info=True)
         return {}
@@ -394,6 +397,7 @@ def _batch_tencent_extended(codes: list[str]) -> dict[str, dict[str, Any]]:
     # 同步写入 registry session_cache（主循环不会重复请求）
     if results:
         from src.python.provider_registry import get_registry
+
         reg = get_registry()
         for c, d in results.items():
             reg.session_cache_set("extended", c, d)
@@ -417,7 +421,8 @@ def classify_fund_style(
          "details": [{"name", "code", "size", "style", "ratio", "is_estimated"}, ...]}
     """
     _ensure_tencent_provider_registered()  # 惰性注册（避免模块级副作用）
-    from src.python.provider_registry import get_registry, NOT_FOUND
+    from src.python.provider_registry import NOT_FOUND, get_registry
+
     reg = get_registry()
 
     if not holdings:
@@ -433,10 +438,7 @@ def classify_fund_style(
     # ── 预取阶段：并行填充 registry session_cache ──────────────────
     # 三级降级：push2（精确）→ Tencent 批量并发（可靠）→ 代码段估算（兜底）
     # 非 A 股（美股/港股/基金等）跳过 API 调用，直接估算
-    _codes_to_fetch = [
-        c for h in holdings if (c := (h.get("code") or "").strip())
-        and c and is_a_share_code(c)
-    ]
+    _codes_to_fetch = [c for h in holdings if (c := (h.get("code") or "").strip()) and c and is_a_share_code(c)]
     # 去重：同一股票跨基金不重复请求
     _seen: set[str] = set()
     _unique_codes = [c for c in _codes_to_fetch if not (c in _seen or _seen.add(c))]
@@ -486,11 +488,16 @@ def classify_fund_style(
         size = result.get("size", "--")
         style = result.get("style", "混合")
 
-        stock_styles.append({
-            "name": name, "code": code, "ratio": ratio,
-            "size": size, "style": style,
-            "is_estimated": result.get("is_estimated", False),
-        })
+        stock_styles.append(
+            {
+                "name": name,
+                "code": code,
+                "ratio": ratio,
+                "size": size,
+                "style": style,
+                "is_estimated": result.get("is_estimated", False),
+            }
+        )
 
         if size in size_weights:
             size_weights[size] += ratio
@@ -539,8 +546,16 @@ def _grid_distance(style_a: str, style_b: str) -> int:
     style_type_a = style_a[2:] if len(style_a) > 2 else ""
     style_type_b = style_b[2:] if len(style_b) > 2 else ""
 
-    size_dist = abs(_SIZE_ORDER.index(size_a) - _SIZE_ORDER.index(size_b)) if size_a in _SIZE_ORDER and size_b in _SIZE_ORDER else 0
-    style_dist = abs(_STYLE_ORDER.index(style_type_a) - _STYLE_ORDER.index(style_type_b)) if style_type_a in _STYLE_ORDER and style_type_b in _STYLE_ORDER else 0
+    size_dist = (
+        abs(_SIZE_ORDER.index(size_a) - _SIZE_ORDER.index(size_b))
+        if size_a in _SIZE_ORDER and size_b in _SIZE_ORDER
+        else 0
+    )
+    style_dist = (
+        abs(_STYLE_ORDER.index(style_type_a) - _STYLE_ORDER.index(style_type_b))
+        if style_type_a in _STYLE_ORDER and style_type_b in _STYLE_ORDER
+        else 0
+    )
 
     return size_dist + style_dist
 
@@ -609,18 +624,20 @@ def analyze_style_for_all_funds(
             drift_level = _drift_level(distance)
             drift_score = distance
 
-        results.append({
-            "code": code,
-            "name": name,
-            "current_style": current_style,
-            "prev_style": prev_style or "--",
-            "drift_level": drift_level,
-            "drift_score": drift_score,
-            "is_estimated": is_estimated,
-            "is_first_check": is_first_check,
-            "remark": remark,
-            "details": style_result.get("details", []),
-        })
+        results.append(
+            {
+                "code": code,
+                "name": name,
+                "current_style": current_style,
+                "prev_style": prev_style or "--",
+                "drift_level": drift_level,
+                "drift_score": drift_score,
+                "is_estimated": is_estimated,
+                "is_first_check": is_first_check,
+                "remark": remark,
+                "details": style_result.get("details", []),
+            }
+        )
 
         if current_style != "--":
             new_snapshot[code] = {

@@ -80,13 +80,15 @@ def _fetch_from_caixin(num: int = 100) -> list[dict[str, Any]]:
         # 财新 API 不返回发布时间，用当前日期
         ctime = f"{today_str} 00:00"
 
-        parsed.append({
-            "title": title,
-            "intro": intro,
-            "url": url,
-            "ctime": ctime,
-            "media_name": "财新网",
-        })
+        parsed.append(
+            {
+                "title": title,
+                "intro": intro,
+                "url": url,
+                "ctime": ctime,
+                "media_name": "财新网",
+            }
+        )
 
         if len(parsed) >= num:
             break
@@ -144,13 +146,15 @@ def _fetch_cctv_news(date_str: str | None = None) -> list[dict[str, Any]]:
         now_bj = datetime.now(bj_tz)
         ctime = now_bj.strftime("%Y-%m-%d %H:%M")
 
-        parsed.append({
-            "title": title,
-            "intro": intro,
-            "url": "",
-            "ctime": ctime,
-            "media_name": "央视新闻",
-        })
+        parsed.append(
+            {
+                "title": title,
+                "intro": intro,
+                "url": "",
+                "ctime": ctime,
+                "media_name": "央视新闻",
+            }
+        )
 
     logger.info("CCTV 新闻 (akshare): 获取 %d 条", len(parsed))
     return parsed
@@ -186,8 +190,7 @@ def fetch_news(num: int = 100) -> list[dict[str, Any]]:
             seen_urls.add(title)
             all_items.append(item)
 
-    logger.info("akshare 新闻汇总: 财新 %d 条 + CCTV %d 条 = %d 条",
-                len(caixin_items), len(cctv_items), len(all_items))
+    logger.info("akshare 新闻汇总: 财新 %d 条 + CCTV %d 条 = %d 条", len(caixin_items), len(cctv_items), len(all_items))
 
     # 按 ctime 降序排列
     all_items.sort(key=lambda x: x.get("ctime", ""), reverse=True)

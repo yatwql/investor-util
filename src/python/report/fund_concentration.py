@@ -139,18 +139,20 @@ def compute_concentration(
         # 预警级别
         alert_level = "正常" if is_first_run else _calc_alert_level(top10, change_pct)  # 首次运行显示"基线已记录"
 
-        results.append({
-            "code": code,
-            "name": name,
-            "top3_pct": top3,
-            "top5_pct": top5,
-            "top10_pct": top10,
-            "holding_count": holding_count,
-            "prev_top10_pct": prev_top10,
-            "change_pct": change_pct,
-            "alert_level": alert_level,
-            "is_first_check": is_first_run,
-        })
+        results.append(
+            {
+                "code": code,
+                "name": name,
+                "top3_pct": top3,
+                "top5_pct": top5,
+                "top10_pct": top10,
+                "holding_count": holding_count,
+                "prev_top10_pct": prev_top10,
+                "change_pct": change_pct,
+                "alert_level": alert_level,
+                "is_first_check": is_first_run,
+            }
+        )
 
     # 写入快照
     if results:

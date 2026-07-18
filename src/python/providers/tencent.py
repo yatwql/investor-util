@@ -31,18 +31,18 @@ _TIMEOUT = 15.0
 # split("~") 后：parts[0]="1"(序号), parts[1]="科创材料ETF", parts[2]="561910", ...
 # _get(idx) 读取 parts[idx-1]，所以 name=2 → parts[1] ✓
 _FIELD_MAP: dict[str, int] = {
-    "name": 2,          # 名称
-    "code": 3,          # 代码
-    "price": 4,         # 当前价格
+    "name": 2,  # 名称
+    "code": 3,  # 代码
+    "price": 4,  # 当前价格
     "yesterday_close": 5,  # 昨收
-    "open": 6,          # 今开
-    "volume": 7,        # 成交量（手）
-    "turnover": 8,      # 成交额
-    "price_date": 31,   # 日期时间 YYYYMMDDHHMMSS
-    "high": 34,         # 最高价
-    "low": 35,          # 最低价
-    "market_cap": 46,   # 总市值（API 返回亿，内部保持原始值，下游按需转换）
-    "pe": 40,           # 动态市盈率
+    "open": 6,  # 今开
+    "volume": 7,  # 成交量（手）
+    "turnover": 8,  # 成交额
+    "price_date": 31,  # 日期时间 YYYYMMDDHHMMSS
+    "high": 34,  # 最高价
+    "low": 35,  # 最低价
+    "market_cap": 46,  # 总市值（API 返回亿，内部保持原始值，下游按需转换）
+    "pe": 40,  # 动态市盈率
 }
 
 
@@ -294,14 +294,16 @@ def _parse_kline_response(data: dict, code: str) -> list[dict]:
             values = [_parse_float_field(str(v)) for v in entry[1:6]]
             if not date_str or values[1] <= 0:
                 continue  # 跳过停牌/无效数据
-            bars.append({
-                "date": date_str,
-                "open": values[0],
-                "close": values[1],
-                "high": values[2],
-                "low": values[3],
-                "volume": values[4],
-            })
+            bars.append(
+                {
+                    "date": date_str,
+                    "open": values[0],
+                    "close": values[1],
+                    "high": values[2],
+                    "low": values[3],
+                    "volume": values[4],
+                }
+            )
     except (KeyError, TypeError, IndexError) as e:
         logger.warning("Tencent K 线解析异常: %s", e)
         return []

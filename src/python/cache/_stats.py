@@ -67,8 +67,10 @@ def get_cache_stats() -> dict:
          top_by_size: [(key, size_bytes), ...]}
     """
     stats: dict[str, Any] = {
-        "total_files": 0, "total_size_bytes": 0,
-        "by_prefix": {}, "top_by_size": [],
+        "total_files": 0,
+        "total_size_bytes": 0,
+        "by_prefix": {},
+        "top_by_size": [],
     }
     if not os.path.isdir(_CACHE_DIR):
         return stats

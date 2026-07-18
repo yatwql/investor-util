@@ -33,7 +33,7 @@ from src.python.report.styles import profit_font
 logger = logging.getLogger("invest")
 
 # 指数涨跌颜色
-_INDEX_UP_FONT = Font(size=10, bold=True, color="CC0000")    # 涨→红
+_INDEX_UP_FONT = Font(size=10, bold=True, color="CC0000")  # 涨→红
 _INDEX_DOWN_FONT = Font(size=10, bold=True, color="009900")  # 跌→绿
 
 # 单元格对齐
@@ -47,8 +47,8 @@ _HEADERS = ["指标", "数值"]
 
 # 样式
 _SECTION_FONT = Font(size=11, bold=True, color="2E75B6")  # 章节标题：深蓝
-_BLUE_FONT = Font(size=10, bold=True, color="2E75B6")      # 更新完成：蓝色
-_RED_FONT = Font(size=10, bold=True, color="CC0000")        # 未完成：红色
+_BLUE_FONT = Font(size=10, bold=True, color="2E75B6")  # 更新完成：蓝色
+_RED_FONT = Font(size=10, bold=True, color="CC0000")  # 未完成：红色
 _NORMAL_FONT = Font(size=10)
 
 
@@ -67,8 +67,7 @@ def _write_kv_row(ws, row: int, key: str, value: Any) -> int:
     return row + 1
 
 
-def _write_kv_row_colored(ws, row: int, key: str, value: Any,
-                           font: Font) -> int:
+def _write_kv_row_colored(ws, row: int, key: str, value: Any, font: Font) -> int:
     """写入带颜色的指标行。"""
     write_data_row(ws, row, [key, value])
     for col in (1, 2):
@@ -119,7 +118,8 @@ def _write_basic_info(ws: Worksheet, row: int, now: datetime | None = None) -> i
 
 
 def _write_holdings_overview(
-    ws: Worksheet, row: int,
+    ws: Worksheet,
+    row: int,
     categories: dict[str, list] | None,
     update_status: tuple[int, int, bool] | None,
 ) -> int:
@@ -151,8 +151,12 @@ def _write_holdings_overview(
 
 
 def _write_profit_summary(
-    ws: Worksheet, row: int,
-    total_mv: float, total_cost: float, total_profit: float, today_profit: float,
+    ws: Worksheet,
+    row: int,
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    today_profit: float,
 ) -> int:
     """写入盈亏汇总（数值以原始小数/金额写入，由 Excel 数字格式控制显示）。"""
     # 检测行情数据是否全部不可用 — 有持仓成本但市值全零
@@ -161,9 +165,11 @@ def _write_profit_summary(
         _WARN_FILL = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
         _WARN_FONT = Font(size=10, bold=True, color="CC0000")
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=_NCOLS)
-        cell = ws.cell(row=row, column=1,
-                       value="⚠ 行情数据全部不可用（非交易时段/网络异常/API限速），以下市值为 0，"
-                             "请于交易时段重新生成")
+        cell = ws.cell(
+            row=row,
+            column=1,
+            value="⚠ 行情数据全部不可用（非交易时段/网络异常/API限速），以下市值为 0，请于交易时段重新生成",
+        )
         cell.font = _WARN_FONT
         cell.fill = _WARN_FILL
         row += 1
@@ -174,6 +180,7 @@ def _write_profit_summary(
     today_rate = (today_profit / denominator) if denominator > 0 else 0.0  # 小数，0.00% 格式
 
     from src.python.report.styles import FMT_MONEY, FMT_PERCENT
+
     row = _write_section(ws, row, "【盈亏汇总】")
     summary_data: list[tuple[str, float, str]] = [
         ("总市值 (元)", total_mv, FMT_MONEY),
@@ -201,8 +208,10 @@ def _write_a_share_indices(ws: Worksheet, row: int, a_indices: dict[str, dict[st
 
     row = _write_kv_row(ws, row, "── A股指数（本日）──", "")
     a_list = [
-        ("sh000001", "上证指数"), ("sz399001", "深证成指"),
-        ("sh000300", "沪深300"), ("sh000688", "科创板50"),
+        ("sh000001", "上证指数"),
+        ("sz399001", "深证成指"),
+        ("sh000300", "沪深300"),
+        ("sh000688", "科创板50"),
         ("sz399006", "创业板指"),
     ]
     for code, cname in a_list:
@@ -230,7 +239,9 @@ def _write_us_indices(ws: Worksheet, row: int, us_indices: dict[str, dict[str, A
 
     row = _write_kv_row(ws, row, "── 美股指数（最新）──", "")
     us_list = [
-        ("gb_dji", "道琼斯"), ("gb_ixic", "纳斯达克"), ("gb_inx", "标普500"),
+        ("gb_dji", "道琼斯"),
+        ("gb_ixic", "纳斯达克"),
+        ("gb_inx", "标普500"),
     ]
     for code, cname in us_list:
         idx = us_indices.get(code)
@@ -267,43 +278,43 @@ def build_index_data_status(
 
     # A 股指数（T2）
     if a_indices:
-        has_degraded = any(
-            idx.get("_source") in ("sina", "stale_cache")
-            for idx in a_indices.values()
-        )
+        has_degraded = any(idx.get("_source") in ("sina", "stale_cache") for idx in a_indices.values())
         if has_degraded:
             cache_age = get_cache_age_by_data_type("index", "sh000001")
             ttl = get_ttl("index")
             degraded, _, _ = _tracker.record(
-                "index_a", "T2", success=False,
+                "index_a",
+                "T2",
+                success=False,
                 failure_type="unreachable",
                 cache_age_hours=cache_age / 3600 if cache_age else None,
                 cache_ttl_hours=ttl / 3600 if ttl else 24,
             )
             if degraded:
                 status["index_a"] = DataStatusItem(
-                    available=False, tier="T2",
+                    available=False,
+                    tier="T2",
                     message=STATUS_MESSAGES["index_degraded"],
                 )
 
     # 美股指数（T2）
     if us_indices:
-        has_degraded = any(
-            idx.get("_source") in ("tencent", "stale_cache")
-            for idx in us_indices.values()
-        )
+        has_degraded = any(idx.get("_source") in ("tencent", "stale_cache") for idx in us_indices.values())
         if has_degraded:
             cache_age = get_cache_age_by_data_type("index", "gb_dji")
             ttl = get_ttl("index")
             degraded, _, _ = _tracker.record(
-                "index_us", "T2", success=False,
+                "index_us",
+                "T2",
+                success=False,
                 failure_type="unreachable",
                 cache_age_hours=cache_age / 3600 if cache_age else None,
                 cache_ttl_hours=ttl / 3600 if ttl else 24,
             )
             if degraded:
                 status["index_us"] = DataStatusItem(
-                    available=False, tier="T2",
+                    available=False,
+                    tier="T2",
                     message=STATUS_MESSAGES["index_degraded"],
                 )
 
@@ -334,7 +345,7 @@ def write_summary_sheet(
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
     """
-    row = write_title_row(ws, 1, get_report_sheet_name('summary'), _NCOLS)
+    row = write_title_row(ws, 1, get_report_sheet_name("summary"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
     row = _write_basic_info(ws, row)

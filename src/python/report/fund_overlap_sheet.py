@@ -80,7 +80,7 @@ def write_overlap_matrix_sheet(
     n = len(funds)
 
     # ── 标题 ──
-    _name = get_report_sheet_name('fund_overlap')
+    _name = get_report_sheet_name("fund_overlap")
     write_title_row(ws, 1, f"{get_report_section_number('fund_overlap')}. {_name}", ncols=n + 2)
 
     if n < 2:
@@ -125,9 +125,11 @@ def write_overlap_matrix_sheet(
     for idx, pair in enumerate(pairs, 1):
         a_name = fund_names.get(pair["fund_a"], pair["fund_a"]) if fund_names else pair["fund_a"]
         b_name = fund_names.get(pair["fund_b"], pair["fund_b"]) if fund_names else pair["fund_b"]
-        common_stocks_str = "、".join(
-            s.get("name", s.get("code", "")) for s in pair.get("common_stocks", [])
-        ) if pair.get("common_stocks") else "—"
+        common_stocks_str = (
+            "、".join(s.get("name", s.get("code", "")) for s in pair.get("common_stocks", []))
+            if pair.get("common_stocks")
+            else "—"
+        )
 
         overlap_pct = max(pair["jaccard"], 0.01 if pair["common_count"] > 0 else 0)
 

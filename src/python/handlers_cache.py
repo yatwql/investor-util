@@ -8,6 +8,7 @@ P1-S9~S11 将业务逻辑迁移至 cache/operations.py，本模块仅保留 TUI 
   - TUI 结果格式化（_print_cache_refresh_report, _print_position_result）
   - TUI 命令入口（_cmd_*），委托至 cache/operations.py
 """
+
 from __future__ import annotations
 
 import os
@@ -15,8 +16,7 @@ import os
 from src.python.logger import setup_logger
 from src.python.reader import read_holdings
 from src.python.tui_handlers import print_error_with_hint, select_holdings_file
-from src.python.tui_menu import GREEN, RED, YELLOW, RESET
-from src.python.tui_menu import press_any_key, refresh_config
+from src.python.tui_menu import GREEN, RED, RESET, YELLOW, press_any_key, refresh_config
 
 logger = setup_logger()
 
@@ -69,6 +69,7 @@ def _read_holdings_and_clear_cache(group_name: str) -> list | None:
 def _print_cache_refresh_report(result) -> None:
     """TUI 格式化输出缓存刷新结果（CacheUpdateResult → 终端颜色）。"""
     from src.python.cache.operations import _sector_flow_hint
+
     funds_count = result.total_funds
     perf_ok = result.perf_ok
     hold_ok = result.hold_ok
@@ -117,8 +118,12 @@ def _print_position_result(result) -> None:
     if price_fail == 0:
         print(f"  {GREEN}[OK]{RESET} price_{{code}}.json          ({result.price_ok}/{result.total} 全部成功)")
     else:
-        print(f"  {YELLOW}[!]{RESET} price_{{code}}.json          ({result.price_ok}/{result.total} 成功, {price_fail} 条失败)")
-    print(f"  {GREEN}[OK]{RESET} index_{{code}}.json           (A股 {result.a_index_count} 个 + 美股 {result.us_index_count} 个 = {total_idx} 个指数)")
+        print(
+            f"  {YELLOW}[!]{RESET} price_{{code}}.json          ({result.price_ok}/{result.total} 成功, {price_fail} 条失败)"
+        )
+    print(
+        f"  {GREEN}[OK]{RESET} index_{{code}}.json           (A股 {result.a_index_count} 个 + 美股 {result.us_index_count} 个 = {total_idx} 个指数)"
+    )
     print(f"  {GREEN}[OK]{RESET} LLM 关联缓存已清除（下次菜单 L 自动使用最新数据）")
 
 
@@ -183,9 +188,10 @@ def _cmd_show_cache_stats() -> None:
     reporter = TuiProgressReporter()
     stats = get_cache_stats(reporter)
 
+    from datetime import datetime
+
     from src.python.cache import get_cache_dir
     from src.python.constants import PROJECT_ROOT
-    from datetime import datetime
 
     cache_dir = get_cache_dir()
 
@@ -215,8 +221,7 @@ def _cmd_show_cache_stats() -> None:
         print(f"  目录: {os.path.abspath(_hist_dir)}")
         print(f"  文件: {stats.snapshot_files} 个 | 大小: {stats.snapshot_size_bytes / 1024:.0f} KB")
         _latest = max(
-            (os.path.getmtime(os.path.join(_hist_dir, _f))
-             for _f in os.listdir(_hist_dir) if _f.endswith(".json")),
+            (os.path.getmtime(os.path.join(_hist_dir, _f)) for _f in os.listdir(_hist_dir) if _f.endswith(".json")),
             default=0,
         )
         if _latest:

@@ -24,15 +24,15 @@ def _init_llm_usage_sheet(ws: Any) -> int:
     row = write_title_row(ws, 1, title, 10)
     row += 1
     _SUB_FONT = Font(size=9, color="666666")
-    ws.cell(row=row, column=1,
-            value="以下展示本次 LLM 全量生成的 API 调用统计和模块明细，帮助了解 Token 消耗和费用构成。")
+    ws.cell(
+        row=row, column=1, value="以下展示本次 LLM 全量生成的 API 调用统计和模块明细，帮助了解 Token 消耗和费用构成。"
+    )
     ws.cell(row=row, column=1).font = _SUB_FONT
     row += 2
     return row
 
 
-def _write_llm_summary_section(ws: Any, row: int, session_usage: dict[str, Any] | None,
-                                llm_endpoint: str = "") -> int:
+def _write_llm_summary_section(ws: Any, row: int, session_usage: dict[str, Any] | None, llm_endpoint: str = "") -> int:
     """写入 LLM 用量汇总数据区，返回下一行号。"""
     if not session_usage or not session_usage.get("has_usage"):
         return row
@@ -97,8 +97,10 @@ def _write_module_data_rows(ws: Any, row: int, module_info: list[dict]) -> int:
     """写入各模块明细行，返回下一行号。"""
     _KV_VAL_FONT = Font(size=10)
     _STATUS_COLORS = {
-        "disabled": "9ca3af", "failed": "c0392b",
-        "cached": "2e86c1", "success": "27ae60",
+        "disabled": "9ca3af",
+        "failed": "c0392b",
+        "cached": "2e86c1",
+        "success": "27ae60",
     }
     _THIN_BORDER = Border(bottom=Side(style="thin", color="d0d0d0"))
     ncols = 10
@@ -131,6 +133,7 @@ def _write_module_data_rows(ws: Any, row: int, module_info: list[dict]) -> int:
         _status_val = mi.get("status", "")
         if _cost > 0:
             from src.python.llm.pricing import CURRENCY_SYMBOLS, PRICING_CURRENCY
+
             _sym = CURRENCY_SYMBOLS.get(PRICING_CURRENCY, "¥")
             ws.cell(row=row, column=8, value=f"{_sym}{_cost:.4f}").font = _KV_VAL_FONT
             ws.cell(row=row, column=8).alignment = right_align
@@ -177,9 +180,12 @@ def _write_legend(ws: Any, row: int) -> None:
         ws.cell(row=row, column=2, value=desc).font = Font(size=8, color="999999")
         row += 1
     row += 1
-    ws.cell(row=row, column=1,
-            value="注：API 调用次数统计实际发起的 API 请求总数（含截断后自动重试等），"
-                  "各模块明细仅列最终结果；两者不一致属正常现象。").font = Font(size=8, color="999999")
+    ws.cell(
+        row=row,
+        column=1,
+        value="注：API 调用次数统计实际发起的 API 请求总数（含截断后自动重试等），"
+        "各模块明细仅列最终结果；两者不一致属正常现象。",
+    ).font = Font(size=8, color="999999")
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=10)
 
 
@@ -242,9 +248,16 @@ def write_llm_usage_sheet(
         return
 
     _HEADERS = [
-        "模块", "状态", "模型",
-        "总 Token 用量", "输入 Token", "输出 Token",
-        "缓存命中 Token", "费用", "LLM 缓存", "Thinking",
+        "模块",
+        "状态",
+        "模型",
+        "总 Token 用量",
+        "输入 Token",
+        "输出 Token",
+        "缓存命中 Token",
+        "费用",
+        "LLM 缓存",
+        "Thinking",
     ]
 
     row = _init_llm_usage_sheet(ws)

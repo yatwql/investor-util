@@ -23,10 +23,10 @@ logger = logging.getLogger("invest")
 # ── A 股交易时段（内置默认值，用于 fallback） ───────────
 # 早盘 09:30 (570min) – 11:30 (690min)
 # 午盘 13:00 (780min) – 15:00 (900min)
-_MORNING_START = 570   # 09:30
-_MORNING_END = 690     # 11:30
+_MORNING_START = 570  # 09:30
+_MORNING_END = 690  # 11:30
 _AFTERNOON_START = 780  # 13:00
-_AFTERNOON_END = 900    # 15:00
+_AFTERNOON_END = 900  # 15:00
 _DEFAULT_START = "09:30"
 _DEFAULT_END = "15:00"
 
@@ -68,7 +68,6 @@ def _fetch_trading_status_from_official() -> int | None:
         交易状态码（0-3），API 失败返回 None
     """
     from src.python.http_client import make_http_client
-
 
     params = {"secid": "1.000001", "fields": "f100,f169"}
     try:

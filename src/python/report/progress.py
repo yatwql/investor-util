@@ -108,6 +108,7 @@ class ProgressReporter:
 
 class SilentProgressReporter(ProgressReporter):
     """静默进度报告器 — 所有消息不输出（默认），适合库调用场景。"""
+
     pass
 
 

@@ -50,7 +50,7 @@ def _extract_quotedata(html: str) -> dict | None:
     Returns:
         解析后的 quotedata 字典；未找到或解析失败返回 None
     """
-    m = re.search(r'var\s+quotedata\s*=\s*({.*?})\s*;', html)
+    m = re.search(r"var\s+quotedata\s*=\s*({.*?})\s*;", html)
     if not m:
         return None
     try:
@@ -80,7 +80,8 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
             - concept_ids: 空列表
         None: 页面请求失败或未找到行业数据
     """
-    from src.python.provider_registry import get_registry, NOT_FOUND
+    from src.python.provider_registry import NOT_FOUND, get_registry
+
     reg = get_registry()
     cached = reg.session_cache_get("industry_rest", code)
     if cached is not NOT_FOUND:

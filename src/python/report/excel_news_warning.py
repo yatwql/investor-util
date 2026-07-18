@@ -6,19 +6,23 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from src.python.logger import setup_logger
-from src.python.registry import get_llm_module_name, get_report_sheet_name
+from src.python.registry import get_llm_module_name
 from src.python.report.progress import ProgressReporter
 
 logger = setup_logger()
 
 
 def write_news_sheet(
-    sheets: dict[str, Any], holdings: list,
-    pen_result: dict, include_news: bool,
-    news_data: list | None, news_llm_meta: dict | None,
+    sheets: dict[str, Any],
+    holdings: list,
+    pen_result: dict,
+    include_news: bool,
+    news_data: list | None,
+    news_llm_meta: dict | None,
     news_top_count: int,
     prog: ProgressReporter,
 ) -> None:
@@ -55,5 +59,6 @@ def write_news_sheet(
             prog.add_error(f"{get_llm_module_name('news_correlation')}数据模块缺失")
             news_data, _meta = [], {}
 
-    prog.call_sheet(get_llm_module_name("news_correlation"), write_news_sheet,
-                    sheets["news_correlation"], news_data, llm_meta=_meta)
+    prog.call_sheet(
+        get_llm_module_name("news_correlation"), write_news_sheet, sheets["news_correlation"], news_data, llm_meta=_meta
+    )

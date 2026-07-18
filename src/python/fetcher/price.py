@@ -127,6 +127,7 @@ def _price_cache_fresh(data: dict) -> bool:
     try:
         from src.python.market_hours import is_market_open as _mh_open
         from src.python.report.market_value import get_last_trading_day as _gtd
+
         if _mh_open():
             return True
         pd = data.get("price_date", "")
@@ -166,7 +167,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
 
     # 降级标记：00 开头同时存在 A 股和 OTC 基金，代码前缀无法区分
     # 若股票链路全失败，降级到场外基金链路尝试
-    _needs_degrade = (data_type == "price_stock" and is_otc_code_overlap(code))
+    _needs_degrade = data_type == "price_stock" and is_otc_code_overlap(code)
 
     def _validate(raw: dict, provider_name: str) -> bool:
         if provider_name in ("tencent", "sina"):
@@ -192,9 +193,9 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
         if r is not None and not _price_cache_fresh(r):
             from src.python.cache import clear as _cache_clear
             from src.python.report.market_value import get_last_trading_day as _gtd
+
             _td = _gtd()
-            logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新",
-                         r.get("price_date", "?"), _td)
+            logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新", r.get("price_date", "?"), _td)
             _cache_clear(cache_key)
             r = fetch_with_fallback(
                 data_type=dt,
@@ -212,8 +213,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
     # ── 降级：00 代码在股票链路全失败 → 尝试场外基金链路 ──
     if result is None and _needs_degrade:
         _tag = f"  [{code} {expected_name}]" if expected_name else f"  [{code}]"
-        logger.info("[price]%s 股票链路全部失败（该代码可能为场外基金），降级尝试东方财富净值链路",
-                     _tag)
+        logger.info("[price]%s 股票链路全部失败（该代码可能为场外基金），降级尝试东方财富净值链路", _tag)
         result = _fetch_with_cache_refresh("price_fund_otc")
         if result is not None:
             logger.info("[price]%s 降级成功——通过场外基金链路获取到净值", _tag)

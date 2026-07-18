@@ -29,8 +29,14 @@ logger = logging.getLogger("invest")
 
 _NCOLS = 8
 _HEADERS = [
-    "基金名称", "基金代码", "当前风格", "上期风格",
-    "漂移等级", "漂移评分", "备注", "标识",
+    "基金名称",
+    "基金代码",
+    "当前风格",
+    "上期风格",
+    "漂移等级",
+    "漂移评分",
+    "备注",
+    "标识",
 ]
 
 _DRIFT_FONTS: dict[str, Font] = {
@@ -64,7 +70,7 @@ def write_style_sheet(
         ws: openpyxl Worksheet 对象
         style_data: analyze_style_for_all_funds 的结果中的 results 列表
     """
-    _name = get_report_sheet_name('fund_style')
+    _name = get_report_sheet_name("fund_style")
     write_title_row(ws, 1, f"{get_report_section_number('fund_style')}. {_name}", ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 

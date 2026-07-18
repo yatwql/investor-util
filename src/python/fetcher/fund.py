@@ -112,6 +112,7 @@ def _fetch_benchmark_from_api(code: str) -> str | None:
         "Referer": "https://fund.eastmoney.com/",
     }
     import httpx as _httpx_loc
+
     urls = [
         f"https://fund.eastmoney.com/{code}.html",
         f"https://fundf10.eastmoney.com/jbgk_{code}.html",

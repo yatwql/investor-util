@@ -9,8 +9,11 @@ from src.python.constants import MODEL_PRICING
 logger = logging.getLogger("invest")
 
 __all__ = [
-    "PRICING_MERGED", "PRICING_CURRENCY", "CURRENCY_SYMBOLS",
-    "reload_pricing", "estimate_cost",
+    "PRICING_MERGED",
+    "PRICING_CURRENCY",
+    "CURRENCY_SYMBOLS",
+    "reload_pricing",
+    "estimate_cost",
 ]
 
 # ── 运行时合并定价表：硬编码 + llm_settings.json 覆盖
@@ -42,6 +45,7 @@ def reload_pricing() -> None:
     global PRICING_CURRENCY
     try:
         from src.python.config import get_llm_config
+
         cfg = get_llm_config()
         if cfg and "pricing" in cfg:
             file_pricing = cfg["pricing"]
@@ -63,9 +67,7 @@ def reload_pricing() -> None:
                         else:
                             # 文件未指定缓存命中价时，继承内置默认或等于 input
                             existing = PRICING_MERGED.get(model, {})
-                            entry["input_cache_hit"] = float(
-                                existing.get("input_cache_hit", float(prices["input"]))
-                            )
+                            entry["input_cache_hit"] = float(existing.get("input_cache_hit", float(prices["input"])))
                         PRICING_MERGED[model] = entry
                     elif isinstance(prices, dict):
                         # 部分字段缺失时保持已有值
@@ -81,8 +83,7 @@ def reload_pricing() -> None:
         logger.debug("加载定价配置失败，使用默认定价", exc_info=True)
 
 
-def estimate_cost(model: str, input_tokens: int, output_tokens: int,
-                   cache_hit_input_tokens: int = 0) -> str:
+def estimate_cost(model: str, input_tokens: int, output_tokens: int, cache_hit_input_tokens: int = 0) -> str:
     """估算 LLM API 调用的费用。
 
     基于已知模型定价（每百万 token 价格）。
@@ -115,8 +116,7 @@ def estimate_cost(model: str, input_tokens: int, output_tokens: int,
     if not pricing:
         return "-"
     cache_miss = input_tokens - cache_hit_input_tokens
-    cost = (cache_miss / 1_000_000 * pricing["input"] +
-            output_tokens / 1_000_000 * pricing["output"])
+    cost = cache_miss / 1_000_000 * pricing["input"] + output_tokens / 1_000_000 * pricing["output"]
     if cache_hit_input_tokens > 0:
         cache_rate = pricing.get("input_cache_hit", pricing["input"])
         cost += cache_hit_input_tokens / 1_000_000 * cache_rate

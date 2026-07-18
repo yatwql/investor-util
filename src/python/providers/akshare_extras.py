@@ -37,9 +37,9 @@ _MEMO_CACHE: dict[str, tuple[Any, float]] = {}
 _MEMO_LOCK = _threading.Lock()
 _MEMO_MAX = 100
 _MEMO_TTL: dict[str, float] = {
-    "profit_forecast": 300,   # 5 min — 指纹驱动，短期 memo 足够
-    "sector_flow": 60,        # 1 min — 行业资金流向变化快
-    "dividend": 600,          # 10 min — 分红数据会话内极少变化
+    "profit_forecast": 300,  # 5 min — 指纹驱动，短期 memo 足够
+    "sector_flow": 60,  # 1 min — 行业资金流向变化快
+    "dividend": 600,  # 10 min — 分红数据会话内极少变化
 }
 
 
@@ -84,10 +84,10 @@ _INDEX_MEMO_LOCK = _threading.Lock()
 _CACHE_PROFIT_PREFIX = "profit_forecast_"
 _CACHE_FLOW_PREFIX = "sector_flow_"
 _CACHE_DIVIDEND_PREFIX = "dividend_"
-_TTL = 86400               # 盈利预测：1天
-_SECTOR_FLOW_TTL = 900     # 行业资金流向：15分钟
-_DIVIDEND_TTL = 2592000    # 分红：1个月
-_TIMEOUT = 15.0            # akshare 调用超时（秒）
+_TTL = 86400  # 盈利预测：1天
+_SECTOR_FLOW_TTL = 900  # 行业资金流向：15分钟
+_DIVIDEND_TTL = 2592000  # 分红：1个月
+_TIMEOUT = 15.0  # akshare 调用超时（秒）
 
 
 def _compute_index_fingerprint() -> str:
@@ -142,19 +142,19 @@ def _run_with_timeout(fn, timeout: float = _TIMEOUT, retries: int = 1):
             try:
                 return fut.result(timeout=timeout)
             except TimeoutError:
-                logger.warning("akshare 调用超时 (%.1fs, 第 %d/%d 次)",
-                               timeout, attempt + 1, 1 + retries)
+                logger.warning("akshare 调用超时 (%.1fs, 第 %d/%d 次)", timeout, attempt + 1, 1 + retries)
                 fut.cancel()
                 if attempt < retries:
                     import time as _time
+
                     _time.sleep(1)
                 continue
             except Exception as e:
-                logger.warning("akshare 调用异常 (第 %d/%d 次): %s",
-                               attempt + 1, 1 + retries, e)
+                logger.warning("akshare 调用异常 (第 %d/%d 次): %s", attempt + 1, 1 + retries, e)
                 fut.cancel()
                 if attempt < retries:
                     import time as _time
+
                     _time.sleep(1)
                 continue
         finally:
@@ -281,7 +281,8 @@ def get_sector_fund_flow() -> list[dict[str, Any]]:
 
     def _fetch():
         return ak.stock_sector_fund_flow_rank(
-            indicator="今日", sector_type="行业资金流",
+            indicator="今日",
+            sector_type="行业资金流",
         )
 
     df = _run_with_timeout(_fetch)
@@ -298,13 +299,15 @@ def get_sector_fund_flow() -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for _, row in df.iterrows():
         try:
-            result.append({
-                "name": str(row.get("名称", "") or "").strip(),
-                "change_pct": _safe_float(row.get("今日涨跌幅")),
-                "main_net_inflow": _safe_float(row.get("今日主力净流入-净额")),
-                "main_net_inflow_pct": _safe_float(row.get("今日主力净流入-净占比")),
-                "top_stock": str(row.get("今日主力净流入最大股", "") or "").strip(),
-            })
+            result.append(
+                {
+                    "name": str(row.get("名称", "") or "").strip(),
+                    "change_pct": _safe_float(row.get("今日涨跌幅")),
+                    "main_net_inflow": _safe_float(row.get("今日主力净流入-净额")),
+                    "main_net_inflow_pct": _safe_float(row.get("今日主力净流入-净占比")),
+                    "top_stock": str(row.get("今日主力净流入最大股", "") or "").strip(),
+                }
+            )
         except (ValueError, TypeError):  # noqa: PERF203
             continue
 

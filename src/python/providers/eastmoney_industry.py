@@ -70,6 +70,7 @@ def make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
         data 内层字典；全部失败返回 None
     """
     from src.python.provider_registry import get_registry
+
     reg = get_registry()
     if reg.is_circuit_broken("eastmoney_industry"):
         logger.debug("东方财富 push2 已被 DataSourceRegistry 熔断，跳过 [%s]", code)
@@ -88,9 +89,8 @@ def make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
                 text = resp.text
         except (httpx.TimeoutException, httpx.RequestError) as e:
             if attempt < retries:
-                delay = (0.5 * (2 ** attempt)) + random.uniform(0, 0.3)
-                logger.debug("东方财富 push2 请求失败 [%s]（第 %d 次重试，%.1fs 后）: %s",
-                             code, attempt + 1, delay, e)
+                delay = (0.5 * (2**attempt)) + random.uniform(0, 0.3)
+                logger.debug("东方财富 push2 请求失败 [%s]（第 %d 次重试，%.1fs 后）: %s", code, attempt + 1, delay, e)
                 time.sleep(delay)
                 continue
             logger.warning("东方财富 push2 请求失败 [%s]: %s", code, e)
@@ -144,7 +144,8 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     Returns:
         {...} 详见函数内结果字典定义；None: API 异常或解析失败
     """
-    from src.python.provider_registry import get_registry, NOT_FOUND
+    from src.python.provider_registry import NOT_FOUND, get_registry
+
     reg = get_registry()
     cached = reg.session_cache_get("industry", code)
     if cached is not NOT_FOUND:
@@ -163,8 +164,9 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
         "concept_ids": [],
     }
 
-    logger.debug("东方财富行业/概念 [%s]: 行业=%s, 概念=%d个",
-                 code, result["industry"] or "无", len(result["concepts"]))
+    logger.debug(
+        "东方财富行业/概念 [%s]: 行业=%s, 概念=%d个", code, result["industry"] or "无", len(result["concepts"])
+    )
     reg.session_cache_set("industry", code, result)
     return result
 

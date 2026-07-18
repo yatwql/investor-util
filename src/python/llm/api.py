@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     import httpx
 
 from src.python.llm.api_base import (
-    call_llm_with_retry,
     _check_claude_truncation,
     _check_gemini_truncation,
     _check_openai_truncation,
@@ -23,6 +22,7 @@ from src.python.llm.api_base import (
     _get_retry_max,
     _is_effort_model,
     _supports_extended_thinking,
+    call_llm_with_retry,
 )
 from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
@@ -87,7 +87,8 @@ def _resolve_entry_credentials(
 
 
 def _resolve_first_provider_model_endpoint(
-    llm_config: dict, module_key: str,
+    llm_config: dict,
+    module_key: str,
 ) -> tuple[str | None, str]:
     """从多链配置的首个 chain entry 解析 model 和 endpoint。
 
@@ -105,6 +106,7 @@ def _resolve_first_provider_model_endpoint(
     preferred = llm_config.get("_preferred_providers", {})
     try:
         from src.python.llm.strategy import resolve_provider_chain
+
         chain = resolve_provider_chain(provider_list, strategy, module_key, preferred)
         entry = chain[0] if chain else None
         if entry:
@@ -124,7 +126,7 @@ def _infer_module_key(config_field: str) -> str:
     """
     if not config_field or not config_field.startswith("max_tokens_"):
         return ""
-    return config_field[len("max_tokens_"):]
+    return config_field[len("max_tokens_") :]
 
 
 def _call_provider_entry(
@@ -199,20 +201,49 @@ def call_single_provider(
 ) -> tuple[str | None, dict | None]:
     """调用单个 LLM provider。"""
     if provider == "claude":
-        return call_claude(system_prompt, user_prompt, api_key, resolved_model, endpoint,
-                                max_tokens, timeout, max_retries=max_retries,
-                                http_client=http_client, config_field=config_field,
-                                temperature=temperature, llm_config=llm_config)
+        return call_claude(
+            system_prompt,
+            user_prompt,
+            api_key,
+            resolved_model,
+            endpoint,
+            max_tokens,
+            timeout,
+            max_retries=max_retries,
+            http_client=http_client,
+            config_field=config_field,
+            temperature=temperature,
+            llm_config=llm_config,
+        )
     elif provider == "openai":
-        return call_openai(system_prompt, user_prompt, api_key, resolved_model, endpoint,
-                                max_tokens, timeout, max_retries=max_retries,
-                                http_client=http_client, config_field=config_field,
-                                temperature=temperature)
+        return call_openai(
+            system_prompt,
+            user_prompt,
+            api_key,
+            resolved_model,
+            endpoint,
+            max_tokens,
+            timeout,
+            max_retries=max_retries,
+            http_client=http_client,
+            config_field=config_field,
+            temperature=temperature,
+        )
     elif provider == "gemini":
-        return call_gemini(system_prompt, user_prompt, api_key, resolved_model, endpoint,
-                                max_tokens, timeout, max_retries=max_retries,
-                                http_client=http_client, config_field=config_field,
-                                temperature=temperature, llm_config=llm_config)
+        return call_gemini(
+            system_prompt,
+            user_prompt,
+            api_key,
+            resolved_model,
+            endpoint,
+            max_tokens,
+            timeout,
+            max_retries=max_retries,
+            http_client=http_client,
+            config_field=config_field,
+            temperature=temperature,
+            llm_config=llm_config,
+        )
     else:
         logger.warning("不支持的 LLM provider: %s", provider)
         return (None, None)
@@ -245,9 +276,9 @@ def call_llm(
     provider_list = llm_config.get("_provider_list")
     if not provider_list:
         # 无多链配置，回退旧模式（兼容过渡期）
-        return _call_llm_legacy(system_prompt, user_prompt, llm_config,
-                                timeout, http_client, max_tokens, config_field,
-                                temperature, model)
+        return _call_llm_legacy(
+            system_prompt, user_prompt, llm_config, timeout, http_client, max_tokens, config_field, temperature, model
+        )
 
     # 多链模式
     strategy = llm_config.get("_strategy", "priority")
@@ -274,8 +305,16 @@ def call_llm(
         logger.info("尝试 provider: %s", _entry_desc)
         try:
             result, usage = _call_provider_entry(
-                entry, system_prompt, user_prompt, resolved_max_tokens,
-                timeout, max_retries, http_client, config_field, temperature, llm_config,
+                entry,
+                system_prompt,
+                user_prompt,
+                resolved_max_tokens,
+                timeout,
+                max_retries,
+                http_client,
+                config_field,
+                temperature,
+                llm_config,
             )
             if result is not None:
                 logger.info("provider 成功: %s", _entry_desc)
@@ -301,8 +340,10 @@ def call_llm(
         if attempted:
             last_reason = attempted[-1].split(": ", 1)[-1]
             _known_reasons = {
-                FAIL_REASON_TIMEOUT, FAIL_REASON_NETWORK_ERROR,
-                FAIL_REASON_API_ERROR, FAIL_REASON_CIRCUIT_OPEN,
+                FAIL_REASON_TIMEOUT,
+                FAIL_REASON_NETWORK_ERROR,
+                FAIL_REASON_API_ERROR,
+                FAIL_REASON_CIRCUIT_OPEN,
             }
             if last_reason in _known_reasons:
                 final_status = last_reason
@@ -333,8 +374,19 @@ def _call_llm_legacy(
     max_retries = _get_retry_max(llm_config)
 
     result, usage = call_single_provider(
-        provider, system_prompt, user_prompt, api_key, resolved_model, endpoint,
-        resolved_max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
+        provider,
+        system_prompt,
+        user_prompt,
+        api_key,
+        resolved_model,
+        endpoint,
+        resolved_max_tokens,
+        timeout,
+        max_retries,
+        http_client,
+        config_field,
+        temperature,
+        llm_config,
     )
     if result is not None:
         if result != "":
@@ -343,8 +395,19 @@ def _call_llm_legacy(
         logger.warning("%s API 返回空内容，追加安抚指令重试一次", provider)
         calmed_system = system_prompt + _CONTENT_FILTER_RECOVERY
         result2, usage2 = call_single_provider(
-            provider, calmed_system, user_prompt, api_key, resolved_model, endpoint,
-            resolved_max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
+            provider,
+            calmed_system,
+            user_prompt,
+            api_key,
+            resolved_model,
+            endpoint,
+            resolved_max_tokens,
+            timeout,
+            max_retries,
+            http_client,
+            config_field,
+            temperature,
+            llm_config,
         )
         if result2 and result2.strip():
             logger.info("安抚重试成功")
@@ -359,8 +422,19 @@ def _call_llm_legacy(
         fb_model = llm_config.get("fallback_model", resolved_model)
         logger.warning("主 provider (%s) 已失败，回退到 %s", provider, fallback_provider)
         result, usage = call_single_provider(
-            fallback_provider, system_prompt, user_prompt, fb_api_key, fb_model, fb_endpoint,
-            resolved_max_tokens, timeout, max_retries, http_client, config_field, temperature, llm_config,
+            fallback_provider,
+            system_prompt,
+            user_prompt,
+            fb_api_key,
+            fb_model,
+            fb_endpoint,
+            resolved_max_tokens,
+            timeout,
+            max_retries,
+            http_client,
+            config_field,
+            temperature,
+            llm_config,
         )
         if result is not None:
             return result, usage, {"name": fallback_provider or None, "model": fb_model, "endpoint": fb_endpoint or ""}
@@ -393,7 +467,8 @@ def configure_extended_thinking(
     if not _supports_extended_thinking(resolved_model):
         logger.warning(
             "模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]",
-            resolved_model, module_suffix,
+            resolved_model,
+            module_suffix,
         )
         return
 
@@ -468,12 +543,19 @@ def call_claude(
     assert client is not None
 
     return call_llm_with_retry(
-        label="Claude", client=client, url=url, headers=headers,
-        payload=payload, timeout=timeout, max_retries=max_retries,
-        max_tokens=max_tokens, config_field=config_field,
+        label="Claude",
+        client=client,
+        url=url,
+        headers=headers,
+        payload=payload,
+        timeout=timeout,
+        max_retries=max_retries,
+        max_tokens=max_tokens,
+        config_field=config_field,
         extract_fn=_extract_content,
         check_truncation_fn=lambda d, mt: _check_claude_truncation(d, mt, "Claude", config_field),
-        provider="claude", model_name=model,
+        provider="claude",
+        model_name=model,
     )
 
 
@@ -526,12 +608,19 @@ def call_openai(
             return None
 
     return call_llm_with_retry(
-        label="OpenAI", client=client, url=url, headers=headers,
-        payload=payload, timeout=timeout, max_retries=max_retries,
-        max_tokens=max_tokens, config_field=config_field,
+        label="OpenAI",
+        client=client,
+        url=url,
+        headers=headers,
+        payload=payload,
+        timeout=timeout,
+        max_retries=max_retries,
+        max_tokens=max_tokens,
+        config_field=config_field,
         extract_fn=_extract_openai,
         check_truncation_fn=lambda d, mt: _check_openai_truncation(d, mt, "OpenAI", config_field),
-        provider="openai", model_name=model,
+        provider="openai",
+        model_name=model,
     )
 
 
@@ -561,7 +650,11 @@ def call_gemini(
     Returns:
         (content, usage) — usage 为标准化后的用量字典，失败时均为 None
     """
-    url = f"{endpoint.rstrip('/')}/models/{model}:generateContent" if endpoint else f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = (
+        f"{endpoint.rstrip('/')}/models/{model}:generateContent"
+        if endpoint
+        else f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    )
     headers = {
         "Content-Type": "application/json",
         "x-goog-api-key": api_key,
@@ -590,20 +683,25 @@ def call_gemini(
                     budget = max_tokens + 4096
                 payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
                 payload["generationConfig"].pop("temperature", None)
-                logger.info("Gemini Extended Thinking 已开启 [%s]: budget=%d",
-                            module_suffix, budget)
+                logger.info("Gemini Extended Thinking 已开启 [%s]: budget=%d", module_suffix, budget)
             else:
-                logger.warning("模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]",
-                               resolved_model, module_suffix)
+                logger.warning("模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]", resolved_model, module_suffix)
 
     client = http_client
     assert client is not None
 
     return call_llm_with_retry(
-        label="Gemini", client=client, url=url, headers=headers,
-        payload=payload, timeout=timeout, max_retries=max_retries,
-        max_tokens=max_tokens, config_field=config_field,
+        label="Gemini",
+        client=client,
+        url=url,
+        headers=headers,
+        payload=payload,
+        timeout=timeout,
+        max_retries=max_retries,
+        max_tokens=max_tokens,
+        config_field=config_field,
         extract_fn=_extract_content_from_gemini,
         check_truncation_fn=lambda d, mt: _check_gemini_truncation(d, mt, "Gemini", config_field),
-        provider="gemini", model_name=model,
+        provider="gemini",
+        model_name=model,
     )

@@ -29,7 +29,7 @@ _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 
 # 日志轮转配置
 _LOG_MAX_BYTES = 10 * 1024 * 1024  # 单文件最大 10 MB
-_LOG_BACKUP_COUNT = 5               # 保留 5 个备份
+_LOG_BACKUP_COUNT = 5  # 保留 5 个备份
 
 # ── 控制台彩色日志格式器 ────────────────────────────────────
 # 仅控制台 handler 应用颜色，文件 handler 保持纯文本
@@ -123,5 +123,8 @@ def log_app_boundary(event: str, mode: str) -> None:
     ip = _get_machine_ip()
     logging.getLogger("invest").info(
         "应用%s | 版本 v%s | %s | 主机 IP: %s",
-        event, APP_VERSION, mode, ip,
+        event,
+        APP_VERSION,
+        mode,
+        ip,
     )
