@@ -35,6 +35,7 @@
 - **注意**：`EnterPlanMode` 等工具自动写入 `.claude/plans/` 的行为不可控，使用后**必须手动迁移**到 `docs-stm/plan/`
 - **版本号一致**：发布版本时，先修改 `src/python/constants.py`（`APP_VERSION`），然后运行 `python scripts/check-version-consistency.py`，按 [ERR] 提示逐个同步其余文件，直到全部 [OK] 再提交。受检文件：`README.md`、`pyproject.toml`、4 份管理文档头部、`how-to-test-my-code.md`、`changelog.md`。任何版本号变更均应全局覆盖，避免遗漏。
 - **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
+- **开发版本切换**：发布版本并打 tag 后，**立即**将 `APP_VERSION` 和所有管理文档版本头改为**下一个版本的 `-dev`**（如发布 v0.6.8 后即改为 v0.6.9-dev），运行 `check-version-consistency.py` 验证全链 [OK] 后提交，然后继续开发。开发期间版本号始终标识为下一个预期发布版本的 `-dev`。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功，绿色）、`[!]`（部分失败/告警，黄色）、`[ERR]`（错误，红色）。终端不支持颜色时自动降级。
 - **架构遵从**：所有模块必须遵守 `docs-stm/managements/technical.md` 中「#1.4-概要设计--核心架构决策」（代码类型判定中心化 C1、Provider Chain 必经 C6、缓存统一管理 C2/C3、报告配置化 C7/C14、数据降级治理体系）和「#8-架构设计约束」（C1~C15 含会话级复用缓存 C4、测试标记强制 C11、边缘测试文件隔离 C12 等），新增/修改代码不得违反。
 
