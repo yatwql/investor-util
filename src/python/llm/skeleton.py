@@ -75,6 +75,7 @@ def _handle_cache_hit(
     model: str | None,
     llm_config: dict,
     thinking_enabled: bool,
+    endpoint: str = "",
 ) -> str:
     """处理 LLM 缓存命中：格式化缓存 HTML 并记录模块用量。
 
@@ -90,10 +91,12 @@ def _handle_cache_hit(
     cached_clean += _hint
     if module_key:
         _model_for_record = _orig_model or model or llm_config.get("model", "") or "缓存命中"
-        _endpoint_for_record = llm_config.get("endpoint", "") or ""
+        _endpoint_for_record = endpoint or llm_config.get("endpoint", "") or ""
         record_per_module(module_key, _model_for_record, cached=True,
                            thinking=thinking_enabled, endpoint=_endpoint_for_record)
     return cached_clean
+
+
 
 
 def _finalize_and_cache(
@@ -104,6 +107,7 @@ def _finalize_and_cache(
     model: str | None,
     llm_config: dict,
     thinking_enabled: bool,
+    endpoint: str = "",
 ) -> tuple[str | None, bool]:
     """处理 LLM 返回结果：Markdown→HTML → 拼接页脚 → 缓存 → 记录。
 
@@ -140,7 +144,7 @@ def _finalize_and_cache(
                     _cost_val = float(_cost.lstrip("$¥€£"))
                 except ValueError:
                     logger.warning("LLM 费用字符串解析失败: %s", _cost)
-            _endpoint_for_record = llm_config.get("endpoint", "") or ""
+            _endpoint_for_record = endpoint or llm_config.get("endpoint", "") or ""
             _cache_hit = usage.get("cache_read_input_tokens", 0)
             record_per_module(module_key, _model_name, inp=_inp, out=_out,
                                thinking=thinking_enabled, cost=_cost_val,
@@ -247,13 +251,19 @@ def generate_llm_content(
     # ── 多链：乐观预检 chain 首位 provider ──
     provider_list = llm_config.get("_provider_list")
     first_name: str | None = None
+    first_model: str | None = None
+    first_endpoint: str = ""
     if provider_list and module_key:
         strategy = llm_config.get("_strategy", "priority")
         preferred = llm_config.get("_preferred_providers", {})
         try:
             from src.python.llm.strategy import resolve_provider_chain
             chain = resolve_provider_chain(provider_list, strategy, module_key, preferred)
-            first_name = chain[0]["name"] if chain else None
+            first_entry = chain[0] if chain else None
+            first_name = first_entry["name"] if first_entry else None
+            if first_entry:
+                from src.python.llm.api import _resolve_entry_credentials
+                _, first_model, first_endpoint = _resolve_entry_credentials(first_entry, llm_config)
         except Exception:
             pass
 
@@ -263,11 +273,11 @@ def generate_llm_content(
     if cache_enabled and not force:
         cached = cache_get(precheck_key, cache_ttl)
         if cached:
-            return (_handle_cache_hit(cached, precheck_key, module_key, model, llm_config, thinking_enabled), True)
+            return (_handle_cache_hit(cached, precheck_key, module_key, first_model or model, llm_config, thinking_enabled, endpoint=first_endpoint), True)
 
     # ── LLM 调用 → 截断重试 → 处理结果 ──
     clear_last_llm_failure()
-    result, usage, provider_name = call_llm(system_prompt, user_prompt, llm_config,
+    result, usage, provider_info = call_llm(system_prompt, user_prompt, llm_config,
                                             timeout=timeout, http_client=http_client,
                                             max_tokens=max_tokens, config_field=config_field,
                                             temperature=temperature, model=model)
@@ -276,11 +286,14 @@ def generate_llm_content(
                                        temperature, model)
 
     if result:
+        provider_name = provider_info.get("name") if provider_info else None
+        resolved_model = provider_info.get("model") if provider_info else model
+        resolved_endpoint = provider_info.get("endpoint", "") if provider_info else ""
         # 按实际 provider_name 落盘（可能与乐观预检不同——回退场景）
         write_key = cache_key
         if provider_list and provider_name:
             write_key = f"{cache_key}_{provider_name}"
-        return _finalize_and_cache(result, usage, write_key, module_key, model, llm_config, thinking_enabled)
+        return _finalize_and_cache(result, usage, write_key, module_key, resolved_model, llm_config, thinking_enabled, endpoint=resolved_endpoint)
 
     logger.warning("LLM 内容生成失败: %s", cache_key)
     if module_key:

@@ -175,6 +175,9 @@ def _precheck_one_cache(
     if module_key:
         _name_for_record = model or llm_config.get("model", "") or "缓存命中"
         _endpoint_for_record = llm_config.get("endpoint", "") or ""
+        if not _endpoint_for_record and llm_config.get("_provider_list") and module_key:
+            from src.python.llm.api import _resolve_first_provider_model_endpoint
+            _, _endpoint_for_record = _resolve_first_provider_model_endpoint(llm_config, module_key)
         record_per_module(module_key, _name_for_record, cached=True,
                            thinking=thinking_enabled, endpoint=_endpoint_for_record)
     return (clean + hint, True)

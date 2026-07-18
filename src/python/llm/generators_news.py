@@ -144,8 +144,13 @@ def _build_news_hooks(
     Returns:
         (batch_preparer, per_item_cache_fn, batch_prompt_fn, model_name)
     """
-    _model = (llm_config.get("model_news_correlation") or
-              (llm_config or {}).get("model", "") or "未指定") if llm_config else "未指定"
+    _model = llm_config.get("model_news_correlation") if llm_config else None
+    if not _model and llm_config:
+        # 多链模式：从首位 chain entry 解析模型名
+        from src.python.llm.api import _resolve_first_provider_model_endpoint
+        _model, _ = _resolve_first_provider_model_endpoint(llm_config, "news_correlation")
+    if not _model:
+        _model = (llm_config or {}).get("model", "") or "未指定" if llm_config else "未指定"
 
     def _batch_preparer():
         holdings_summary = [{"name": h.name, "code": h.code} for h in holdings[:20]]
@@ -236,6 +241,9 @@ def _finalize_news_token_usage(
             except ValueError as e:
                 logger.warning("[llm] 费用估值 JSON 解码失败: %s", e)
         _endpoint = llm_config.get("endpoint", "") or ""
+        if not _endpoint and llm_config.get("_provider_list"):
+            from src.python.llm.api import _resolve_first_provider_model_endpoint
+            _, _endpoint = _resolve_first_provider_model_endpoint(llm_config, "news_correlation")
         record_per_module(
             "news_correlation", _model, inp=total_in, out=total_out,
             cached=all_cached, cost=_cost_val, endpoint=_endpoint,

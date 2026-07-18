@@ -112,7 +112,7 @@ class TestCachePrecheckAndWrite(unittest.TestCase):
         from src.python.llm.skeleton import generate_llm_content
 
         mock_cache_get.return_value = None  # 未命中
-        mock_call.return_value = ("生成的内容", {"input_tokens": 10}, "p2")
+        mock_call.return_value = ("生成的内容", {"input_tokens": 10}, {"name": "p2", "model": "", "endpoint": ""})
 
         config = {
             "_provider_list": [

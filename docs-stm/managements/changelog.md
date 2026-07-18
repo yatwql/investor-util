@@ -4,7 +4,7 @@
 
 ---
 
-## [0.7.1-dev] - 未发布
+## [0.7.1] - 2026-07-18
 
 ### Added
 - **Gemini Extended Thinking 支持**：`call_gemini()` 新增 `llm_config` 参数，根据 `thinking_enabled_{模块}`/`thinking_budget_{模块}` 配置向 `generationConfig.thinkingConfig.thinkingBudget` 注入推理预算。`api_base.py` 模型兼容列表新增 `gemini-2-5-` 前缀（仅 Gemini 2.5 系列支持）
@@ -23,6 +23,10 @@
 - **A 股指数腾讯链路失败**：`_fetch_indices_from_tencent()` 使用 `tencent.fetch_price()` 获取指数行情，但该函数的前置类型守卫（`is_a_share_code`/`is_exchange_fund_code`）将 `sz399001`（深证成指）和 `sz399006`（创业板指）过滤为"不支持的类型"。改用 `tencent.fetch_index_price()` 修复，此函数无类型限制，专为指数设计
 - **akshare 超时无重试**：`_run_with_timeout()` 新增自动重试机制（网络错误时 1 次重试 + 1s 间隔）；`get_profit_forecast()` 超时从 15s 放宽至 30s（全量数据获取）；`_fetch_all_dividends()` 新增超时保护（60s，此前完全无保护可能永久阻塞）
 - **移除"机构覆盖"列遗留的引用**：`html_renderers.py` 仍从 `html_builders` 导入已删除的 `_load_profit_forecast`，导致 `ImportError` 报告生成崩溃；同步清理 `html_writer.py` 中向 `build_perf_data_status` 传 `profit_success` 的死参数，移除测试文件中对应 `patch` 和用例
+- **多链模式 LLM Footer 模型名显示"未指定"（P0）**：`call_llm()` 在链模式下解析 `_resolve_entry_credentials()` 获取真实模型名，但仅返回 `provider_name`（entry 名），不返回 `model`/`endpoint`。`_finalize_and_cache()` 通过 `model or llm_config.get("model", "")` 兜底，在 multi-chain 模式下均为空 → "未指定"。修复：`call_llm()` 返回类型从 `(str | None)` 改为 `(dict | None)`，包含 `name`/`model`/`endpoint`；`_finalize_and_cache()` 和 `_handle_cache_hit()` 新增 `endpoint` 参数传播解析后的值
+- **多链模式 LLM 用量页 Endpoint/费用/模型缺失**：`record_per_module()` 调用方传递 `llm_config.get("endpoint", "")`，多链模式下顶级 endpoint 为空 → 显示 "—"。`estimate_cost("未指定", ...)` 返回 "-" → 费用不显示。根因同上，修复后信息从实际 provider entry 传播
+- **多链模式 news_correlation api_key 误报"未配置"**：`news_correlation.py` 检查 `llm_config.get("api_key")`，多链模式下 api_key 在 chain 条目中不在顶级 → 降级为传统关键词匹配。修复：检测非多链模式时才检查 api_key
+- **多链模式全局审计**：审计所有 `llm_config.get("model"/"endpoint"/"api_key"/"provider")` 访问点，修复 `generators_news.py:_build_news_hooks()` 模型名解析、`_finalize_news_token_usage()` endpoint 记录、`generators_orchestrator.py:_precheck_one_cache()` endpoint 记录共 3 处类似问题。新增 `api._resolve_first_provider_model_endpoint()` 辅助函数统一多链首位 provider 信息解析
 
 ### Docs
 - **项目统计信息**：`folders.md` 新增统计表（项目概览：源代码 128 文件 31,570 行，测试代码 155 文件 49,674 行/3,211 用例，文档 67 文件 31,523 行）；`test-coverage.md` 测试项数同步更新至 v0.7.1-dev 最新数据（`all` 模式 3211 项）
