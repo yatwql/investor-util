@@ -300,6 +300,39 @@ pytest src/test/ -m "<对应标记>" --lf
 
 > 脚本自动定位 `test-reports/latest/all/report.html` 等常用路径，无需每次指定路径。
 
+### 📐 新闻去重阈值校准 — `scripts/calibrate-dedup-threshold.py`
+
+新闻标题去重（`news_aggregator.py:_dedup_by_title`）使用同源/跨源两档阈值 + 中文实体 bigram 辅助判定。去重逻辑在每次报告运行时自动记录"边界案例"（ratio 或 bigram 接近阈值的比较对）到 `data/cache/dedup_anchors.jsonl`（append-only，约 200 字节/条）。
+
+积累足够锚点后，可用此脚本分析当前阈值是否合理：
+
+```bash
+# 分析全部锚点，输出建议
+python scripts/calibrate-dedup-threshold.py
+
+# 仅看汇总统计（不展开详细列表）
+python scripts/calibrate-dedup-threshold.py --summary
+
+# 指定锚点文件
+python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.jsonl
+```
+
+**校准时机**：建议锚点文件积累 **100 条以上**（约 5~10 次报告运行）后校准一次。脚本只分析不自动修改阈值，是否需要调整以及调多少由开发者判断。
+
+**输出示例**：
+
+```
+=== cross_skip（跨源 ≥0.30 但 bigram<3 被跳过 — 潜在漏判）===
+  数量: 12
+  ratio 范围: 0.300 ~ 0.450
+  bigram 范围: 0 ~ 2
+
+=== 校准建议 ===
+[!] cross_threshold=0.30: 5 条 ratio≥0.35 被跳过
+    建议审查这些案例是否应为重复
+[OK] 跨源 bigram=3: 无边界样本
+```
+
 ## 标记选择运行速查
 
 以 `pytest -m "<表达式>"` 形式快速选取特定标记组合，适合开发调试中定向验证。
