@@ -2,7 +2,7 @@
 
 > 归档时间：2026-07-18
 > 原始文件：docs-stm/managements/changelog.md
-> 涵盖版本：v0.6.0 ~ v0.6.7（2026-07-15 ~ 2026-07-18）共 8 个版本
+> 涵盖版本：v0.6.0 ~ v0.6.8（2026-07-15 ~ 2026-07-18）共 9 个版本
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/)。
 
@@ -170,3 +170,32 @@
   - `how-to-config.md` / `faq.md`: 补充 `llm_providers.json` 多 Provider 配置说明
 - **设计文件归档**: `docs-stm/plan/` → `docs-stm/archive/v0.6.x/llm-multi-provider/` — 已完成的多 LLM Provider 链式服务设计文件更新状态后归档
 - **版本计划/审查记录归档**: `plan.md` 和 `review-findings.md` 的 v0.6.x 内容迁移合并至归档文件，重置为 v0.7.0-dev
+
+---
+
+## [0.6.8] - 2026-07-18
+
+> 多 LLM Provider 链式服务（Phase 0 — 数据模型），R1 完成
+
+### Added
+
+- **配置**: `data/config/llm_providers.json` — LLM 多 Provider 配置文件模板
+- **配置解析**: `_load_llm_providers()` / `_parse_providers_list()` / `_validate_provider_entry()` — llm_providers.json 解析与校验（`_core.py`）
+- **测试**: `test_config_llm_multi.py`（20 用例） + `test_config_llm_multi_edge.py`（7 用例）
+
+### Changed
+
+- **`_config_defaults.py`**: 从 `_PATH_KEYS` 和 `_DEFAULT_CONFIG` 中移除 `llm_key_file`
+- **`config.json` 模板**: 不再包含 `llm_key_file` 字段
+- **`_core.py`**: `_load_llm_providers()` 增加根元素类型校验（非 dict 返回 None）
+- **`conftest.py`**: 注册 `unit_config_edge` 标记
+- **`test_config.py`**: 同步清理 `_PATH_KEYS_IN_TEMPLATE` 中的 `llm_key_file`
+- **`folders.md`**: 同步新文件列表和标记描述
+
+### Docs
+
+- **管理/用户文档审计**: `folders.md`、`technical.md`、`llm-technical.md`、`requirements.md`、`how-to-config.md`、`faq.md`、`how-to-config-llm.md`、`how-to-use-registry.md` 同步最新架构状态（proxy_preferred 后处理修正、模块列表对齐、Gemini 示例、多 Provider 配置说明等）
+- **审查记录清理**: `review-findings.md` 移除已清零的约束汇总表，重置为 v0.6.8-dev
+- **计划文档清理**: `plan.md` 移除已完成的 P1-T01，重置为 v0.6.8-dev
+- **版本归档**: `plan.md`、`review-findings.md`、`changelog.md` 的 v0.6.x 内容迁移至 `archive/v0.6.x/` 对应归档文件；已完成的设计文件从 `docs-stm/plan/` 移入 `archive/v0.6.x/llm-multi-provider/`
+
