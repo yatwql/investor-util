@@ -160,39 +160,99 @@ def _normalize_title(title: str) -> str:
 
 def _dedup_by_title(
     items: list[dict[str, Any]],
-    threshold: float = 0.92,
+    cross_threshold: float = 0.30,
 ) -> list[dict[str, Any]]:
-    """基于标准化标题模糊去重（同一新闻在不同源标题略有差异）。
+    """基于标准化标题模糊去重 + 中文实体 bigram 辅助判定。
 
-    两层判定：
-    1. SequenceMatcher 模糊匹配（≥threshold）
-    2. 子串包含匹配（一条标题是另一条的简写/扩展版本，如快讯→全文、跨源同一事件）
+    两档阈值策略（基于 37 条真实新闻 24 对重复 + 23 对非重复校准）：
+      - 同源：共享实体 bigram ≥ 2 即合并。
+        同源不会同时出现方向对立报道（如"突破3万亿"vs"跌破3万亿"），
+        所以不依赖 SequenceMatcher 阈值，只检查实体重叠。
+      - 跨源：分成两段——
+        ① ratio ≥ 0.50 安全区，直接合并
+        ② cross_threshold ≤ ratio < 0.50，需共享 ≥ 2 个实体 bigram 防误杀
+
+    实体 bigram：
+      - 提取中文 2-gram，过滤常见财经动词（上调/下跌/超越等）
+      - 目的是确保双方有实质性公司/产品/概念实体重叠
     """
     from difflib import SequenceMatcher
+    import re
 
     if not items:
         return items
+
+    # 中文财经常用动词/形容词 — 不作为实体判定依据
+    _STOP_BIGRAMS: set[str] = {
+        "上调", "下跌", "上涨", "超越", "低于", "高于",
+        "首次", "今日", "昨日", "本周", "上周", "本月", "上月",
+        "盘中", "盘后", "早盘", "午盘", "收盘", "开盘",
+        "不会", "将会", "成为", "宣布", "公布", "发布",
+        "推动", "发力", "实现", "加大", "降低", "回升",
+        "有望", "再度", "时隔",
+    }
+
+    def _extract_entity_bigrams(text: str) -> set[str]:
+        """提取标题中的中文实体 bigram，去掉动词/形容词 STOP。"""
+        chinese_only = re.sub(r"[^一-鿿]", "", text)
+        bigrams: set[str] = set()
+        for i in range(len(chinese_only) - 1):
+            bg = chinese_only[i : i + 2]
+            if bg not in _STOP_BIGRAMS:
+                bigrams.add(bg)
+        return bigrams
+
     kept: list[dict[str, Any]] = []
     kept_norms: list[str] = []
+    kept_sources: list[str] = []
     for item in items:
         norm = _normalize_title(item.get("title", ""))
         if not norm:
             kept.append(item)
             continue
         is_dup = False
-        for existing in kept_norms:
-            # ① 模糊匹配（通用）
-            if SequenceMatcher(None, norm, existing).ratio() >= threshold:
-                is_dup = True
-                break
-            # ② 子串包含匹配（跨源，10 字以上短标题完全包含于另一条）
-            if not is_dup:
-                short, long = (norm, existing) if len(norm) <= len(existing) else (existing, norm)
-                if len(short) >= 10 and short in long:
+        source = item.get("_source", "") or ""
+        for idx, existing in enumerate(kept_norms):
+            existing_src = kept_sources[idx]
+            same_source = bool(source) and bool(existing_src) and source == existing_src
+
+            # ① 同源：共享实体 bigram ≥ 4 即合并
+            #    4 可过滤"建设银行"类不同事件仅共享 3 个公司名 bigram，
+            #    同一事件额外共享事件实体 bigram，总 ≥ 4。
+            #    同源不会同时发出方向对立报道，不需要 SequenceMatcher 兜底。
+            if same_source:
+                bg1 = _extract_entity_bigrams(norm)
+                bg2 = _extract_entity_bigrams(existing)
+                if len(bg1 & bg2) >= 4:
                     is_dup = True
                     break
+
+            # ② 跨源安全区：ratio ≥ 0.50 直接合并
+            ratio = SequenceMatcher(None, norm, existing).ratio()
+            if ratio >= 0.50:
+                is_dup = True
+                break
+
+            # ③ 跨源候选区：0.30 ≤ ratio < 0.50，需共享 ≥ 3 实体 bigram
+            #    3 可过滤"苹果"+"果上"=2 的假阳性，
+            #    反垄断/汇丰/微软AI 等真实重复共享 ≥ 4。
+            if not same_source and ratio >= cross_threshold:
+                bg1 = _extract_entity_bigrams(norm)
+                bg2 = _extract_entity_bigrams(existing)
+                if len(bg1 & bg2) >= 3:
+                    is_dup = True
+                    break
+
+            # ④ 子串包含（短标题 6 字以上完全包含于另一条）
+            if not is_dup:
+                short, long = (norm, existing) if len(norm) <= len(existing) else (existing, norm)
+                if len(short) >= 6 and short in long:
+                    is_dup = True
+                    break
+
         if not is_dup:
             kept_norms.append(norm)
+            kept_sources.append(source)
             kept.append(item)
     return kept
 
