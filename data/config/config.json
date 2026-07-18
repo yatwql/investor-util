@@ -4,6 +4,7 @@
   "holdings_filename": "个人投资持仓信息.xlsx",
   "output_dir": "reports",
   "llm_key_file": "data/config/llm_key.json",
+  "llm_providers_file": "data/config/llm_providers.json",
   "llm_settings_file": "data/config/llm_settings.json",
 
   // ── B. 板块可见性（关闭后对应页签/章节完全隐藏）──

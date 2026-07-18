@@ -1,19 +1,24 @@
 {
   // LLM Provider 多链配置
-  // 按优先级尝试多个 provider，直到第一个成功返回
-  // 有效 provider 类型：claude, openai, gemini
+  // 主：DeepSeek（通过 claude 兼容端点）/ 辅：Gemini
 
   "strategy": "priority",
   "preferred_providers": {},
   "providers": [
     {
-      "name": "claude-opus",
+      "name": "deepseek-main",
       "provider": "claude",
-      "api_key": "sk-your-api-key",
-      "model": "claude-sonnet-4-20250514",
-      "endpoint": null,
+      "credentials_ref": "deepseek-main",
       "priority": 10,
       "timeout": 120
+    },
+    {
+      "name": "gemini-fallback",
+      "provider": "gemini",
+      "credentials_ref": "gemini-fb",
+      "priority": 20,
+      "timeout": 60,
+      "proxy_preferred": true
     }
   ]
 }
