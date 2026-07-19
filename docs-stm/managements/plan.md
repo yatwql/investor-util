@@ -36,8 +36,8 @@
 
 | 序号 | 任务 | 依赖 | 估时 | 说明 |
 |:----:|------|:----:|:----:|------|
-| 1 | **T0-01-A: DegradationTracker get_log() 接口封装 + record() 注入** | — | **4h** | 审计 4 文件 6 降级点注入 record() + 封装 get_log() 接口 |
-| 2 | **T0-01-B: f_context Pre-Schema 文档** | — | 2h | 定义 ~12 个已有管线键 Schema + 初始类型断言 checkpoint |
+| 1 | **T0-01-A: DegradationTracker get_log() 接口封装 + record() 注入 + 单例工厂** | — | **5h** | 审计 4 文件 6 降级点注入 record() + 封装 get_log() 接口 + 三重实例统一为 get_tracker() 单例工厂 |
+| 2 | **T0-01-B: f_context Pre-Schema 文档 + 死键清理** | — | 2h | 定义 ~12 个已有管线键 Schema + 初始类型断言 checkpoint + 删除 f_context 中 2 个死键（diff_trimmed/days_since_last） |
 | 3 | **T0-01: DegradationTracker→LLM 接线** | ←①+② | 4h | 注入 f_context["data_degradation"] |
 | 4 | **T0-02: 数据质量告警注入 LLM** | ←③ | 4h | 健康检查 3 类→5 类（缓存在 Phase 4 实现） |
 | 5 | **MVP-01: 收益归因计算与注入** | — | 4h | profit 贡献排序注入 LLM |
@@ -46,7 +46,7 @@
 | 8 | **MVP-04: 竞争语境极简版** | — | 8h | 组合 vs 沪深300 收益对比 |
 | 9 | **MVP-05: LLM Prompt 整合串联** | ←⑤⑥⑦⑧ | 4h | 5 个段落集中整合到 prompts.py |
 | 10 | **MVP-06: 条件推理场景块** | ←⑨ | 4h | 上涨/下跌 20% 分情景建议 |
-| | **合计** | | **44h** | 较调整前 -6h（MVP-03 从 16h 降至 6h）+ 2h（T0-01-A 从 2h 升至 4h）= 净减 4h |
+| | **合计** | | **45h** | T0-01-A 从 4h→5h（增单例工厂），T0-01-B 增死键清理（+0h）
 
 ### P4 — 基础设施改善
 

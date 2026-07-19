@@ -70,20 +70,23 @@
 
 ## T0 — Tier 0 基础设施（超优先，~12h）
 
-### T0-01-A: DegradationTracker get_log() 查询接口封装（前置）
-- **估时**: 4h（修正：2h→4h，需逐一审计 4 个调用文件共 6 个降级点）
-- **文件**: `src/python/report/data_status.py`（扩展 DegradationTracker）
+### T0-01-A: DegradationTracker get_log() 查询接口封装 + record() 注入 + 单例工厂（前置）
+- **估时**: 5h（修正：2h→5h，含 fetcher 层 6 处注入 + 三实例统一为单例 + 测试）
+- **文件**: `src/python/report/data_status.py`（扩展 DegradationTracker + 新增 `get_tracker()`）、`src/python/report/fund_performance.py`、`src/python/report/penetration_sheet.py`、`src/python/report/summary.py`（各改 1 行 import）
 - **阻塞**: 否
 - **依赖**: 无
 - **已知降级调用点（需注入 record()）**: `src/python/fetcher/price.py`(L184, L200 — 2处), `src/python/fetcher/fund.py`(L47, L73 — 2处), `src/python/fetcher/industry.py`(L64 — 1处), `src/python/fetcher/index.py`(L240 — `fetch_with_incremental_fallback`, 1处)。共 6 处 fetcher 层降级点。
-- **描述**: 当前 DegradationTracker 在 fund_performance.py/penetration_sheet.py/summary.py 中已实例化且 **report/ 层已有 6 处 record() 调用**（`fund_performance.py:345` 的 perf_rank、`penetration_sheet.py:143/160/174` 的 industry/profit_forecast/dividend、`summary.py:285/306` 的 index_a/index_us）——但这些全是数据状态构建阶段的消费侧记录。**fetcher/ 层的 6 处降级点（price.py×2、fund.py×2、industry.py×1、index.py×1）仍然缺失 record()**，导致真正触发降级时的原始错误（全链路不可用/fallback 降级）未被捕获。这是一个架构性缺陷——fetcher 层降级事件丢失，data_degradation 内容不完整。需完成：(1) 在 DegradationTracker 上封装 get_log() → list[dict] 方法，汇总当日所有降级记录；(2) 在以上 6 处 `fetch_with_fallback()` / `fetch_with_incremental_fallback()` 调用点注入 DegradationTracker.record() 调用，区分"全链路不可用"和"fallback 降级"两种场景；(3) 确保 orchestrator.py 的 data_degradation 键仅在记录非空时聚合并注入，空列表时注入空列表而非 None。注：此任务为 T0-01 的前置，发现记录为零时不应阻塞报告生成，降级段落显示"今日无降级记录"。
+- **描述**: 当前 DegradationTracker 在 fund_performance.py/penetration_sheet.py/summary.py 中已实例化且 **report/ 层已有 6 处 record() 调用**（`fund_performance.py:345` 的 perf_rank、`penetration_sheet.py:143/160/174` 的 industry/profit_forecast/dividend、`summary.py:285/306` 的 index_a/index_us）——但这些全是数据状态构建阶段的消费侧记录。**fetcher/ 层的 6 处降级点（price.py×2、fund.py×2、industry.py×1、index.py×1）仍然缺失 record()**，导致真正触发降级时的原始错误（全链路不可用/fallback 降级）未被捕获。这是一个架构性缺陷——fetcher 层降级事件丢失，data_degradation 内容不完整。需完成：(1) 在 DegradationTracker 上封装 get_log() → list[dict] 方法，汇总当日所有降级记录；(2) 在以上 6 处 `fetch_with_fallback()` / `fetch_with_incremental_fallback()` 调用点注入 DegradationTracker.record() 调用，区分"全链路不可用"和"fallback 降级"两种场景；(3) 在 `data_status.py` 中新增模块级单例工厂 `get_tracker()`，将 `fund_performance.py`/`penetration_sheet.py`/`summary.py` 三个文件级独立实例统一为单例（各改 1 行 `_tracker = DegradationTracker()` → `_tracker = get_tracker()`），消除降级状态碎片化，统一持久化路径；(4) 确保 orchestrator.py 的 data_degradation 键仅在记录非空时聚合并注入，空列表时注入空列表而非 None。注：此任务为 T0-01 的前置，发现记录为零时不应阻塞报告生成，降级段落显示"今日无降级记录"。
+- **测试隔离要求**: 新增 `get_tracker()` 单例后，**必须**在 `src/test/conftest.py` 中增加一个 `autouse` fixture 在每次测试前重置此单例（参考 `_auto_reset_provider_registry` 模式——调用 `get_tracker().reset()` 或新增 `_reset_tracker()` 函数），否则模块级单例状态会在测试间泄漏。受影响测试包括本任务的 record() 注入测试和 T0-01 的接线测试。
 
-### T0-01-B: f_context Pre-Schema 文档（现有管线键定义 + 类型断言，前置）
+### T0-01-B: f_context Pre-Schema 文档 + 死键清理（现有管线键定义 + 类型断言，前置）
 - **估时**: 2h
-- **文件**: `docs-stm/plan/better-investment-advice/f_context-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言）
+- **文件**: `docs-stm/plan/better-investment-advice/f_context-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言 + 清理 f_context 死键）
 - **阻塞**: 否
 - **依赖**: 无
-- **描述**: 在 T0-01（DegradationTracker 接线）和 P1-06-A（f_context_builder 预重构）之前，先定义当前生产管线已有数据键的 Schema（Pre-Schema）。**注意：当前架构中"管线数据"分为两个独立通道——(A) `capture_snapshot()` 返回的 `f_context` 字典仅含 3 个键（`diff`、`diff_trimmed`、`days_since_last`），其中 `diff` 含 9 个子键（is_first_check、total_value_diff、total_value_diff_pct、total_pnl_diff、days_since_last_report、added/removed/increased/decreased）用于快照对比——这是 LLM 直接消费的唯一 f_context； (B) `prepare_report_data()` 返回的 `prep` 字典含 13 个键（details、total_mv、total_cost、total_profit、total_today_profit、categories、a_indices、us_indices、penetrated_assets、holdings_details、today_str、output_dir、news_top_count），以独立参数形式传入 `generate_all_llm()` 而非通过 f_context。Pre-Schema 文档必须同时覆盖两个通道的键定义，避免后续混淆。** 每个键标注：类型、所属通道（f_context / prep）、必选/可选标记、写入模块、消费模块、写入管线阶段。同时在 orchestrator.py 各管线阶段之间插入初始类型断言 checkpoint（assert isinstance / .get() 类型守卫），开发期捕获类型不匹配。⚠ **生产环境运行时**：断言仅在 `__debug__` 模式下生效，但类型不匹配在生产中可能静默通过直到下游报错。措施：断言失败时额外通过 `logger.warning()` 记录结构化的类型不匹配日志（键名、期望类型、实际类型），确保即使生产环境无崩溃也可追踪到类型漂移。**时序要求**：必须在 T0-01 之前完成，使 T0-01 注入 data_degradation 键时已有类型校验框架。P1-21 的 Full Schema（Phase 1 新增键定义 + 全量校验扩展）在 Phase 1 补充。
+- **描述**: 在 T0-01（DegradationTracker 接线）和 P1-06-A（f_context_builder 预重构）之前，先定义当前生产管线已有数据键的 Schema（Pre-Schema），**并清理 f_context 中的死键**。**注意：当前架构中"管线数据"分为两个独立通道——(A) `capture_snapshot()` 返回的 `f_context` 字典仅含 3 个键（`diff`、`diff_trimmed`、`days_since_last`），其中 `diff` 含 9 个子键（is_first_check、total_value_diff、total_value_diff_pct、total_pnl_diff、days_since_last_report、added/removed/increased/decreased）用于快照对比——这是 LLM 直接消费的唯一 f_context； (B) `prepare_report_data()` 返回的 `prep` 字典含 13 个键（details、total_mv、total_cost、total_profit、total_today_profit、categories、a_indices、us_indices、penetrated_assets、holdings_details、today_str、output_dir、news_top_count），以独立参数形式传入 `generate_all_llm()` 而非通过 f_context。Pre-Schema 文档必须同时覆盖两个通道的键定义，避免后续混淆。** 每个键标注：类型、所属通道（f_context / prep）、必选/可选标记、写入模块、消费模块、写入管线阶段。
+- **死键清理（追加）**: 代码审计确认 `f_context["diff_trimmed"]`（L246, bool 值）和 `f_context["days_since_last"]`（L247, 与 `diff.days_since_last_report` 完全重复）在 f_context 注入后**没有任何下游 LLM generator 或 prompt 消费**，属于纯代码噪音。在 Pre-Schema 实施时直接删除这两个死键，保持 f_context 最小化。删除后 f_context 顶层仅保留 `"diff"` 一个键，与 Pre-Schema 文档的键定义一致，无向后兼容问题（下游 0 引用）。
+- **类型断言（扩展）**: 同时在 orchestrator.py 各管线阶段之间插入初始类型断言 checkpoint（assert isinstance / .get() 类型守卫），开发期捕获类型不匹配。⚠ **生产环境运行时**：断言仅在 `__debug__` 模式下生效，但类型不匹配在生产中可能静默通过直到下游报错。措施：断言失败时额外通过 `logger.warning()` 记录结构化的类型不匹配日志（键名、期望类型、实际类型），确保即使生产环境无崩溃也可追踪到类型漂移。**时序要求**：必须在 T0-01 之前完成，使 T0-01 注入 data_degradation 键时已有类型校验框架。P1-21 的 Full Schema（Phase 1 新增键定义 + 全量校验扩展）在 Phase 1 补充。
 
 ### T0-01: DegradationTracker→LLM 接线
 - **估时**: 4h
@@ -262,6 +265,7 @@
 - **阻塞**: 否
 - **依赖**: P1-11（feature_flags 系统已就绪）
 - **描述**: 为每个风险指标计算函数包裹断路逻辑（指标级断路器，非网络请求级）。包装器行为：(1) 单指标连续失败 3 次 → 该指标静默 24h（返回 None）；(2) 失败计数存文件（`data/cache/metrics_breaker.json`），跨会话持久；(3) 成功调用重置计数；(4) 结合 Feature Flag：如果 `feature_flags.metrics_sharpe == false`，直接返回 None 不走计算；(5) 所有断路事件记录到 `DegradationTracker`。
+- **测试隔离要求**: `metrics_breaker.json` 持久化路径必须设计为可注入（通过构造函数参数或 config），以便测试时通过 `monkeypatch.setattr` 重定向到 `tmp_path`。《=无需新增 conftest.py 的 autouse，但在编写测试时必须手动确保使用了临时路径。
 - **C20 约束（Feature Flag ↔ Circuit Breaker 交互）**：在 P1-12 实施时强制增加以下联动逻辑——(a) **Feature Flag 关闭期间不计断路失败次数**：`metrics_sharpe = false` 时该指标不参与熔断计数，避免"开关关闭期间指标未运行"被误计入失败；(b) **Feature Flag 打开时自动重置断路器状态**：当 `metrics_sharpe` 从 false 切为 true 时，清空该指标的历史失败计数和冷却剩余时间，以"干净状态"重新开始计算——防止旧失败记录导致新开关打开后指标立即进入冷却期；(c) **Feature Flag 变更事件记录到 DegradationTracker**：每次 Feature Flag 发生状态变更时（无论 open→close 或 close→open）记录变更日志，方便运维排查"为何某指标突然可算/不可算"。三条规则统一封装在 `is_feature_enabled()` 函数中，由该函数触发断路检查和状态重置，调用方透明。
 
 ### P1-13: 持仓匿名化最小版
@@ -291,6 +295,7 @@
 - **阻塞**: 否
 - **依赖**: P1-06、P1-07、P1-08、P1-09（所有阻断点已修复）
 - **描述**: 新增冒烟测试覆盖 4 个阻断点：(1) `prepare_report_data` 返回字典含 `risk_metrics` 键；(2) `capture_snapshot` f_context 含风险字段且 `.get()` 安全；(3) `generate_all_llm` 不因缺失 `history_data` 崩溃；(4) `_fingerprint` 哈希输入含风险摘要且旧版本无此字段时不报错。使用最小持仓 fixture（2-3 品种），快速执行（<30s）。运行 `--mode regression` 确认通过。标注 `@pytest.mark.scenario_basic`。
+- **测试隔离要求**: (a) **输出目录隔离**——必须将 `reports/` 输出目录重定向到 `tmp_path`（使用 `monkeypatch.setattr` 或 fixture），避免测试报告残留在生产 `reports/` 目录；(b) **LLM 调用 mock**——`generate_all_llm` 的测试必须 mock LLM API 调用（`unittest.mock.patch`），防止真实调用产生费用和 API 依赖；(c) **输入数据隔离**——持仓数据必须使用 fixture 构造（2-3 品种的简单持仓），不得依赖 `data/holdings/` 的真实文件；(d) **单例重置**——测试涉及 DegradationTracker 的，需调用 `get_tracker().reset()` 清理状态。
 
 ### P1-17: 熔断器改进——指数退避
 - **估时**: 4h
@@ -305,6 +310,7 @@
 - **阻塞**: 否
 - **依赖**: P1-17（指数退避已实现）
 - **描述**: 当前 `circuit_breaker.py` 熔断状态在内存（L27-28 `_breakers: dict`），程序重启后丢失。新增：(1) 状态持久化到 `data/cache/circuit_breaker.json`；(2) 启动时反序列化恢复；(3) 每次状态变更（熔断/半开/关闭）写回；(4) TTL 清理：超过 24h 的熔断记录视为过期移除。保证读写安全（文件锁或原子写入）。
+- **测试隔离要求**: `circuit_breaker.json` 持久化路径必须作为 `CircuitBreaker` 的可选构造参数（默认值 `data/cache/circuit_breaker.json`，测试时注入 `tmp_path` 路径），或在 `_isolate_sensitive_paths` 中通过 `monkeypatch.setattr` 重定向。必须编写测试验证：持久化写入后可恢复、TTL 过期后恢复为空、并发写入不损坏文件。
 
 ### P1-19: 双熔断器统一网关
 - **估时**: 4h
@@ -445,6 +451,7 @@
 - **阻塞**: 否
 - **依赖**: P2-14（LLM 注入就绪）、P1-08（history_data 管线就绪）、P2-08（metrics.py compute_all_metrics 就绪）
 - **描述**: 模拟完整管线执行，验证 Phase 2 指标数据在 Phase 1 管线中正确流转：(1) 创建最小持仓 fixture（3 品种 + 模拟日收益率序列）；(2) 执行完整管线：`prepare_report_data` → `capture_snapshot` → `compute_all_metrics` → `build_system_prompt`（含指标表）；(3) 断言 `compute_all_metrics()` 返回值中的每个指标（sharpe_ratio、calmar_ratio、hhi、win_rate、turnover_rate、risk_contributions、beta）在 `f_context["risk_metrics"]` 中存在且类型正确；(4) 断言指标表出现在 LLM prompt 输出字符串中（验证 inject 成功）；(5) 验证空数据场景——当 `daily_returns` 不足 20 天时，相关指标返回 None 且 prompt 显示"--"而非崩溃。标注 `@pytest.mark.scenario_basic`。
+- **测试隔离要求**: (a) **输出目录隔离**——`reports/` 输出目录必须重定向到 `tmp_path`；(b) **LLM 调用 mock**——`build_system_prompt` 的测试只验证 prompt 字符串输出，不调用 `call_llm()`；若测试触发完整 LLM 管线，必须 mock `call_llm()`；(c) **输入数据隔离**——持仓 fixture 构造 3 品种简单数据，不依赖 `data/holdings/` 真实文件；(d) **Rf 依赖 mock**——若使用 `bond_yield` 获取 Rf 计算夏普，需 mock `bond_zh_us_rate()` 返回已知值，避免外部 API 依赖。
 
 ### P2-15: LLM Prompt 注入——数据质量段落
 - **估时**: 4h
@@ -501,7 +508,9 @@
 - **文件**: `src/python/analysis/rebalance.py`
 - **阻塞**: 否
 - **依赖**: P3-02（阈值系统已就绪）
+- **测试**: unit（`pytest src/test/unit/test_rebalance.py -x -q`）
 - **描述**: 引入静默期机制：同一品种触发再平衡信号后，N 天内不再重复告警（默认 30 天，可配）。静默期状态持久化到 `data/cache/rebalance_silence.json`。LLM 输出时注明："上次建议减持 XX 在 30 天静默期内，本次不再重复。"
+- **测试隔离要求**: `rebalance_silence.json` 路径必须可注入（构造参数或 config），测试时通过 `monkeypatch.setattr` 或 fixture 注入 `tmp_path` 下路径。测试应验证：写入后可恢复读取、静默期内不重复告警、静默期过期后重新告警。
 
 ### P3-04: 再平衡完整版——信号置信度
 - **估时**: 8h
