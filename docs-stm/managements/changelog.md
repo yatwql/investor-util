@@ -52,6 +52,11 @@
   - **P3-05**: 误报防护——3 类：分红拆股（shares 检查）、新买入<20 日过滤、可转债到期标注
   - **P3-06**: 权益/固收偏离——`equity_fixed_income_deviation()` 将 7 类资产汇总为权益/固收超大类，对照目标配置计算偏离
   - 79 项单元测试全部通过，含 16 项权益/固收偏离专项测试
+- **P3-07: 竞争语境完整版——自定义基金池**：
+  - `index.py`/`sina.py` 新增中证500(`sh000905`)和中证全债(`sh000012`)指数映射
+  - `comparison_indices` 配置项（默认沪深300+中证500+中证全债），含配置校验
+  - `_build_competitive_context_block()` 支持多指数对比行
+  - TUI 新增 `[I]` 管理对比指数池菜单
 
 ### Changed
 - **代码注释历史痕迹清理**：移除所有 P1-XX/P2-XX 任务标签（metrics.py、drawdown_warning.py、fingerprint.py、generators_orchestrator.py、prompts_action.py、prompts_core.py、prompts_tables.py、circuit_breaker.py、bond_yield.py、registry.py、orchestrator.py 等共 ~60 处），保持代码当前状态描述

@@ -258,6 +258,7 @@ def _dispatch_llm_workers(
     penetrated_assets_for_news: list[dict] | None = None,
     metrics: dict | None = None,
     degradation_events: list[dict] | None = None,
+    comparison_indices: dict[str, str] | None = None,
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。"""
     if not any(needs.values()):
@@ -266,6 +267,7 @@ def _dispatch_llm_workers(
     # ── 预计算竞争语境文本块 ──
     _competitive_context = _build_competitive_context_block(
         a_indices, total_mv, total_today_profit,
+        comparison_indices=comparison_indices,
     )
     # 量化指标 + 降级事件传递
     _metrics = metrics
@@ -507,6 +509,7 @@ def generate_all_llm(
     history_data: dict | None = None,
     metrics: dict | None = None,
     degradation_events: list[dict] | None = None,
+    comparison_indices: dict[str, str] | None = None,
 ) -> tuple[str | None, str | None, str | None, str | None, bool, bool, bool, bool]:
     """并行生成全球政经局势 + 智囊团深度复盘 + 持仓体检报告 + 穿透深度分析。
 
@@ -523,6 +526,7 @@ def generate_all_llm(
         history_data: 组合历史走势数据字典（含风险指标）。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
         degradation_events: DegradationTracker.get_log() 输出。
+        comparison_indices: {代码: 名称} 对比指数池，用于竞争语境多指数对比。
 
     Returns:
         (global_macro_html, expert_review_html, health_check_html, penetration_deep_html,
@@ -570,6 +574,7 @@ def generate_all_llm(
         f_context=f_context,
         metrics=metrics,
         degradation_events=degradation_events,
+        comparison_indices=comparison_indices,
     )
 
     # 合并预检结果 + 工作线程结果

@@ -267,6 +267,116 @@ def _cmd_config_llm_modules() -> None:
     press_any_key()
 
 
+def _cmd_config_comparison_indices() -> None:
+    """管理对比指数池（竞争语境中使用的多指数对比）。"""
+    from src.python.config._config_defaults import _DEFAULT_CONFIG
+
+    while True:
+        refresh_config()
+        config = get_config_cache() or {}
+        indices = config.get("comparison_indices", _DEFAULT_CONFIG.get("comparison_indices", {}))
+        print()
+        print("  ┌── 管理对比指数池 ──────────────────────┐")
+        print(f"  │ 当前指数 ({len(indices)} 个):{' ' * 21}│")
+        if indices:
+            for i, (code, name) in enumerate(indices.items(), 1):
+                label = f"{code} ({name})"
+                padding = " " * max(1, 35 - len(label))
+                print(f"  │   {i}. {label}{padding}│")
+        else:
+            print("  │   空池（仅显示沪深300） {' ' * 20}│")
+        print(f"  │{'─' * 42}│")
+        print("  │ A. 添加指数 {' ' * 30}│")
+        print("  │ D. 删除指数 {' ' * 30}│")
+        print("  │ R. 重置为默认预设{' ' * 27}│")
+        print("  │ 0. 返回主菜单{' ' * 27}│")
+        print(f"  └{'─' * 42}┘")
+        print()
+        try:
+            choice = input("  请选择 (A/D/R/0): ").strip().upper()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        if choice == "0":
+            break
+        elif choice == "A":
+            _add_comparison_index(config, indices)
+        elif choice == "D":
+            _remove_comparison_index(config, indices)
+        elif choice == "R":
+            default_pool = _DEFAULT_CONFIG.get("comparison_indices", {})
+            set_config("comparison_indices", dict(default_pool))
+            print(f"  {GREEN}[OK]{RESET} 对比指数池已重置为默认预设")
+        elif choice in ("A", "D", "R"):
+            continue
+        else:
+            print(f"  {YELLOW}[!]{RESET} 无效选择，请重试")
+
+    press_any_key()
+
+
+def _add_comparison_index(config: dict, indices: dict[str, str]) -> None:
+    """添加指数到对比池。"""
+    print("  请输入指数代码（如 sh000905）:")
+    try:
+        code = input("  > ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+    if not code:
+        print(f"  {YELLOW}[!]{RESET} 代码不能为空")
+        return
+    if code in indices:
+        print(f"  {YELLOW}[!]{RESET} 指数 {code} 已在对比池中")
+        return
+    print("  请输入指数名称（如 中证500）:")
+    try:
+        name = input("  > ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+    if not name:
+        print(f"  {YELLOW}[!]{RESET} 名称不能为空")
+        return
+    new_indices = dict(indices)
+    new_indices[code] = name
+    set_config("comparison_indices", new_indices)
+    print(f"  {GREEN}[OK]{RESET} 已添加 {code} ({name})")
+
+
+def _remove_comparison_index(config: dict, indices: dict[str, str]) -> None:
+    """从对比池中删除指数。"""
+    if not indices:
+        print(f"  {YELLOW}[!]{RESET} 对比池为空，无指数可删除")
+        return
+    items = list(indices.items())
+    print("  选择要删除的指数编号:")
+    for i, (code, name) in enumerate(items, 1):
+        print(f"    [{i}] {code} ({name})")
+    print("    [0] 取消")
+    try:
+        choice = input("  > ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+    try:
+        idx = int(choice)
+    except (ValueError, TypeError):
+        print(f"  {YELLOW}[!]{RESET} 无效编号")
+        return
+    if idx == 0:
+        return
+    if 1 <= idx <= len(items):
+        code, name = items[idx - 1]
+        new_indices = dict(indices)
+        del new_indices[code]
+        set_config("comparison_indices", new_indices)
+        print(f"  {GREEN}[OK]{RESET} 已删除 {code} ({name})")
+    else:
+        print(f"  {YELLOW}[!]{RESET} 编号超出范围")
+
+
 def _cmd_config_report_boards() -> None:
     """配置报告板块可见性（B 系列 / 新闻 / 历史走势）。"""
     from src.python.config import (

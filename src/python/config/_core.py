@@ -459,6 +459,21 @@ def _validate_benchmark_indices(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_comparison_indices(config: dict, issues: int) -> int:
+    """验证 comparison_indices 配置。"""
+    ci, issues = _section(config, "comparison_indices", dict, "对比指数池将使用默认值", issues)
+    if ci is _MISSING:
+        return issues
+    for key, val in ci.items():
+        if not isinstance(key, str) or len(key) < 3:
+            logger.warning("config.json comparison_indices 中存在无效键 %r，将被忽略", key)
+            issues += 1
+        if not isinstance(val, str):
+            logger.warning("config.json comparison_indices.%s = %r 不是字符串", key, val)
+            issues += 1
+    return issues
+
+
 def _validate_rebalance_config(config: dict, issues: int) -> int:
     """验证 rebalance 配置段。"""
     rb, issues = _section(config, "rebalance", dict, "再平衡配置无效，将使用默认值", issues)
@@ -560,6 +575,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
     issues = _validate_benchmark_indices(config, issues)
+    issues = _validate_comparison_indices(config, issues)
     issues = _validate_rebalance_config(config, issues)
     issues = _validate_enable_llm(issues)
     if issues:

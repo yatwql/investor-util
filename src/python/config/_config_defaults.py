@@ -70,6 +70,8 @@ _DEFAULT_CONFIG = {
     # ── F. 业绩基准与无风险利率 ──
     "risk_free_rate": None,  # Rf 手动配置（None=自动获取，填小数如0.0174或百分比如1.74）
     "user_fund_benchmarks": {},
+    # 竞争语境对比指数池（默认沪深300+中证500+中证全债）
+    "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
     # ── G. 持仓快照 ──
     "history": {
         "analysis": "off",
@@ -147,6 +149,7 @@ def _get_default_config_template() -> str:
         "  // ── F. 业绩基准 ──\n"
         '  "risk_free_rate": null,\n'
         '  "user_fund_benchmarks": {},\n'
+        '  "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},\n'
         "\n"
         "  // ── G. 组合历史走势与持仓快照 ──\n"
         '  "history": {\n'

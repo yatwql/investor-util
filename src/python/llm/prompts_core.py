@@ -270,7 +270,7 @@ def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
 def _build_concept_sector_block(penetrated_assets: list[dict] | None) -> str:
     """构建概念板块占比段落（穿透 TOP10 的概念汇总）。"""
     if not penetrated_assets:
-        return "暂无概念板块数据（穿透数据不可用）"
+        return "暂无概念板块数据"
 
     concept_mv: dict[str, float] = {}
     for asset in penetrated_assets:
@@ -281,7 +281,7 @@ def _build_concept_sector_block(penetrated_assets: list[dict] | None) -> str:
                 concept_mv[c.strip()] = concept_mv.get(c.strip(), 0) + mv
 
     if not concept_mv:
-        return "部分品种无概念分类（非 A 股穿透资产天然无概念数据）"
+        return "部分品种无概念分类"
 
     total_mv = sum(concept_mv.values())
     sorted_concepts = sorted(concept_mv.items(), key=lambda x: -x[1])
@@ -333,20 +333,46 @@ def _build_competitive_context_block(
     total_mv: float,
     total_today_profit: float,
     history_data: dict | None = None,
+    comparison_indices: dict[str, str] | None = None,
 ) -> str:
-    """构建竞争语境段落（组合 vs 沪深300 收益对比）。"""
+    """构建竞争语境段落（组合 vs 多指数收益对比）。
+
+    Args:
+        a_indices: A 股指数行情字典（由 fetch_indices() 返回）。
+        total_mv: 组合总市值。
+        total_today_profit: 组合当日盈亏。
+        history_data: 历史数据（含 benchmark_returns, portfolio_returns）。
+        comparison_indices: {代码: 名称} 对比指数池配置，
+            默认 {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}。
+    """
     lines: list[str] = []
 
-    if a_indices and total_mv > 0:
-        csi300 = a_indices.get("sh000300")
-        if csi300:
-            idx_chg = csi300.get("change_pct")
-            portfolio_chg = total_today_profit / total_mv * 100
-            lines.append(f"【今日对比】组合 {portfolio_chg:+.2f}% vs 沪深300 {idx_chg:+.2f}%")
-            if idx_chg is not None:
-                diff = portfolio_chg - idx_chg
-                lines.append(f"相对沪深300 {'跑赢' if diff >= 0 else '跑输'} {abs(diff):.2f}%")
+    if comparison_indices is None:
+        comparison_indices = {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}
 
+    # ── 今日对比：组合 vs 各指数 ──
+    if a_indices and total_mv > 0:
+        portfolio_chg = total_today_profit / total_mv * 100
+        today_lines: list[str] = []
+        for code, name in comparison_indices.items():
+            idx_data = a_indices.get(code)
+            if not idx_data:
+                continue
+            idx_chg = idx_data.get("change_pct")
+            if idx_chg is None:
+                continue
+            today_lines.append(f"组合 {portfolio_chg:+.2f}% vs {name} {idx_chg:+.2f}%")
+
+        if today_lines:
+            lines.append("【今日对比】" + " | ".join(today_lines))
+
+        # 相对沪深300 跑赢/跑输（沪深300 始终作为主要对比基准）
+        csi300 = a_indices.get("sh000300")
+        if csi300 and csi300.get("change_pct") is not None:
+            diff = portfolio_chg - csi300["change_pct"]
+            lines.append(f"相对沪深300 {'跑赢' if diff >= 0 else '跑输'} {abs(diff):.2f}%")
+
+    # ── 区间对比 ──
     if history_data and isinstance(history_data, dict):
         benchmark_returns = history_data.get("benchmark_returns")
         portfolio_returns = history_data.get("portfolio_returns")
@@ -356,7 +382,7 @@ def _build_competitive_context_block(
             if p_return is not None and b_return is not None:
                 lines.append(f"【区间对比】组合累计 {p_return:+.2f}% vs 沪深300 {b_return:+.2f}%")
 
-    if not lines:
+    if len(lines) <= 1:  # 只有免责说明，无实际对比数据
         return "暂无足够历史数据进行竞争语境对比"
 
     return "\n".join(lines)

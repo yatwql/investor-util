@@ -556,7 +556,9 @@ def _fetch_llm_and_news(
     enable_news: bool,
     enable_llm: bool,
     reporter: ProgressReporter,
+    *,
     history_data: dict | None = None,
+    comparison_indices: dict[str, str] | None = None,
 ) -> tuple[tuple, list, dict, bool]:
     """并行获取 LLM 内容 + 新闻数据，统一处理 4 分支。
 
@@ -565,6 +567,7 @@ def _fetch_llm_and_news(
 
     Args:
         history_data: 组合历史走势数据，传递给 generate_all_llm。
+        comparison_indices: {代码: 名称} 对比指数池，传递给 generate_all_llm。
 
     Returns:
         (llm_content, news_data, news_llm_meta, news_ok)
@@ -617,6 +620,7 @@ def _fetch_llm_and_news(
                 force=force_llm,
                 f_context=f_context,
                 history_data=history_data,
+                comparison_indices=comparison_indices,
             )
         else:
             reporter.info("[板块配置] LLM 板块已关闭，跳过 LLM 内容生成")
@@ -754,6 +758,8 @@ def _generate_report_full(
         reporter.warn("行业资金流向获取失败，将继续生成报告")
 
     # ── 5. 并行获取 LLM + 新闻（4 分支统一处理） ──
+    # 读取对比指数池配置（默认预设池在 _config_defaults.py 中定义）
+    _comparison_indices = config.get("comparison_indices", None)
     llm_content, news_data, news_llm_meta, news_ok = _fetch_llm_and_news(
         holdings,
         prep,
@@ -764,6 +770,7 @@ def _generate_report_full(
         _enable_llm,
         reporter,
         history_data=history_data,
+        comparison_indices=_comparison_indices,
     )
 
     # LLM 全部失败时自动降级使用占位文本
