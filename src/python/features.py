@@ -49,6 +49,14 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "news_cls": False,
     "news_wallstreetcn": True,
     "news_akshare": True,
+    # ── 量化指标（7 项） ──
+    "metrics_sharpe": True,
+    "metrics_calmar": True,
+    "metrics_hhi": True,
+    "metrics_winrate": True,
+    "metrics_turnover": True,
+    "metrics_risk_contribution": True,
+    "metrics_beta": True,
     # ── 历史数据与回撤（2 项） ──
     "history_portfolio": True,
     "history_benchmark": True,

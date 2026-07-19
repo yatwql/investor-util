@@ -1,6 +1,6 @@
 """Registry 报告序号可配置 edge 场景专项测试。
 
-从 test_registry.py 提取的 edge 场景：
+edge 场景：
   - get_report_section_order 异常值处理（None/缺失/浮点数/布尔值/大数值）
   - 配置中存在未知 key
   - 所有模块使用同序号时的稳定排序行为

@@ -5,16 +5,54 @@
 保持与报告层的完全解耦。
 
 已实现：
-  - simple_rebalance: 极简再平衡信号计算
-正在迁移：
-  - 证券代码/分类判定 → 全部收敛至 code_utils.py（已完成）
-  - 币种判定 → 待迁移
+  - rebalance: 再平衡信号计算（单品超限 + 目标偏离 + 权益/固收偏离）
+  - metrics: 量化指标计算（夏普/卡玛/HHI/胜率/换手率/风险贡献/波动率/Beta）
+  - circuit_breaker_wrapper: 指标级断路包装器
+  - drawdown_warning: 回撤历史分位预警（滚动窗口 + 全历史）
 """
 
 from __future__ import annotations
 
 from src.python.analysis.simple_rebalance import compute_rebalance_signals  # noqa: F401
+from src.python.analysis.metrics import (  # noqa: F401
+    sharpe_ratio,
+    calmar_ratio,
+    hhi,
+    win_rate,
+    turnover_rate,
+    risk_contribution,
+    get_dividend_yield,
+    compute_all_metrics,
+    sanitize_metric,
+    individual_volatility,
+    portfolio_beta,
+    truncate_extreme_values,
+    check_data_sufficiency,
+    get_confidence_level,
+)
+from src.python.analysis.drawdown_warning import (  # noqa: F401
+    compute_drawdown_warning,
+    rolling_max_drawdown,
+    current_drawdown_percentile,
+)
 
 __all__ = [
     "compute_rebalance_signals",
+    "sharpe_ratio",
+    "calmar_ratio",
+    "hhi",
+    "win_rate",
+    "turnover_rate",
+    "risk_contribution",
+    "get_dividend_yield",
+    "compute_all_metrics",
+    "sanitize_metric",
+    "individual_volatility",
+    "portfolio_beta",
+    "truncate_extreme_values",
+    "check_data_sufficiency",
+    "get_confidence_level",
+    "compute_drawdown_warning",
+    "rolling_max_drawdown",
+    "current_drawdown_percentile",
 ]

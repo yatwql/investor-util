@@ -12,8 +12,8 @@
 > | HTML 报告模板 | HTML | 1 | 1,750 | `src/python/tmpl/report_template.html` |
 > | 辅助脚本 | Python/Shell | 6 | 1,739 | `scripts/`（启动脚本、测试驱动、工具检查） |
 > | **源代码合计** | — | **128** | **31,570** | 主程序 + 模板 + 脚本 |
-> | **测试代码** | Python | **155** | **49,674** | `src/test/` 所有 `.py` 文件 |
-> | **测试用例** | — | — | **3,211 个** | `pytest --collect-only` 统计 |
+> | **测试代码** | Python | **158** | **50,346** | `src/test/` 所有 `.py` 文件 |
+> | **测试用例** | — | — | **3,253 个** | `pytest --collect-only` 统计 |
 > | **用户文档** | Markdown | **67** | **31,523** | `docs-stm/`（65 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
@@ -167,12 +167,12 @@ investor-util/
 │       ├── unit/                     #   单元测试（8 子组：providers/fetcher/llm/news/report/config/core/ui）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       ├── scenario/                 #   场景测试（basic/resilience/extreme/llm/datetime）
-│       ├── test_cli.py               #   CLI 命令行模式单元测试（33 用例）
-│   │   ├── test_cli_edge.py          #   CLI 边缘场景测试（7 用例）
-│   │   ├── test_cli_integration.py   #   CLI 集成测试（8 用例）
-│   │   ├── test_orchestrator.py      #   报告编排器单元测试
-│   │   ├── conftest.py               #   pytest 全局配置 + 标记注册
-│       └── helpers.py                #   测试辅助工具
+│       ├── conftest.py               #   pytest 全局配置 + 标记注册
+│       ├── helpers.py                #   测试辅助工具
+│       ├── test_cli.py               #   CLI 命令行模式单元测试
+│       ├── test_cli_edge.py          #   CLI 边缘场景测试
+│       ├── test_cli_integration.py   #   CLI 集成测试
+│       └── test_orchestrator.py      #   报告编排器单元测试
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     #   持仓 xlsx 文件（用户放置）

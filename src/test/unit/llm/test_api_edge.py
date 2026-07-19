@@ -1,6 +1,6 @@
 """LLM API edge 场景专项测试。
 
-从 test_api.py 提取的 edge 场景：
+edge 场景：
   - content_filter 安抚重试后 usage 传播正确性
   - content_filter 安抚重试仍空 + 无回退
 

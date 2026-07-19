@@ -424,7 +424,7 @@ class TestGetReportSectionOrder:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Test Computation Registry (P1-10)
+#  Test Computation Registry
 # ═══════════════════════════════════════════════════════════════
 
 

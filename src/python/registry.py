@@ -358,15 +358,15 @@ def get_report_sheet_name(sheet_key: str) -> str:
 
 # ── 计算模块注册表（_COMPUTATION_REGISTRY） ──────────────────
 # 计算模块不能反向导入 report/，此注册表确保分析模块与报表层的
-# 单向依赖关系（P1-22 隔离约束）得以维持。
+# 单向依赖关系（analysis 层隔离约束）得以维持。
 
 
 @dataclass(frozen=True)
 class ComputModuleDef:
     """计算模块注册表条目。
 
-    P1-10 新增：记录所有计算/分析模块的元信息，
-    用于运行时发现、依赖管理和指标级断路（P1-12）的注册基础。
+    记录所有计算/分析模块的元信息，
+    用于运行时发现、依赖管理和指标级断路的注册基础。
 
     Attributes:
         name: 模块中文名称。
@@ -392,7 +392,7 @@ _COMPUTATION_REGISTRY: tuple[ComputModuleDef, ...] = (
         label="指标",
         dependencies=("bond_yield", "history"),
         description="夏普比率、卡玛比率、HHI 集中度、组合 Beta、持仓胜率、换手率、波动率、最大回撤等指标",
-        status="planned",
+        status="implemented",
     ),
     ComputModuleDef(
         name="流动性分析",

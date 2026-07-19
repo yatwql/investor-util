@@ -33,6 +33,7 @@ _KNOWN_MARKERS: set[str] = {
     "unit_config", "unit_config_edge", "unit_core", "unit_cli", "unit_ui",
     # 跨领域标记
     "llm", "edge", "smoke", "data", "integration",
+    "unit_rebalance",
     # integration 分支
     "integration_contract", "integration_isolation", "integration_news_pipeline",
     "integration_cache", "integration_tui",
@@ -70,6 +71,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_core: 核心基础设施单元测试")
     config.addinivalue_line("markers", "unit_cli: CLI 命令行模式单元测试")
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")
+    config.addinivalue_line("markers", "unit_rebalance: 再平衡信号计算单元测试")
     config.addinivalue_line("markers", "llm: LLM 相关测试（全部 mock，无需 API key）")
     config.addinivalue_line("markers", "edge: 边缘/异常场景测试 — 必须放在 *_edge.py 文件中，不得与普通测试混搭")
     config.addinivalue_line("markers", "smoke: 冒烟测试（快速验证核心功能）")
@@ -134,6 +136,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "src.python.report.data_status._default_persist_path",
         lambda: str(tmp_path / "data/state/.degradation_state.json"),
+    )
+    # rebalance 静默期文件隔离
+    monkeypatch.setattr(
+        "src.python.analysis.rebalance._SILENCE_FILE",
+        str(tmp_path / "data/cache/rebalance_silence.json"),
     )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(

@@ -1,9 +1,7 @@
 """统一的断路器网关层 — 聚合 Provider 和 LLM 熔断状态查询。
 
-P1-19 设计目标：
-  - 提供统一的熔断状态查询入口，UI/CLI 模块只需调用此模块
-  - Provider 熔断和 LLM 熔断的状态共享同一持久化文件
-  - llm/circuit_breaker.py 的公共 API 保持向后兼容
+提供统一的熔断状态查询入口，UI/CLI 模块只需调用此模块；
+Provider 熔断和 LLM 熔断的状态共享同一持久化文件。
 """
 
 from __future__ import annotations

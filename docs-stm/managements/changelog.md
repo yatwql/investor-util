@@ -4,6 +4,68 @@
 
 ---
 
+## [Unreleased]
+
+### Added
+- **P1 基建 20 项全部完成（v0.7.4）**：
+  - **P1-03**: Rf 获取——`bond_zh_us_rate` + 手动兜底，`bond_yield.py` 新建，C6 chain 路由合规
+  - **P1-04**: 个股日收益率管线暴露，`portfolio_history.py` daily_returns 从局部变量→返回值
+  - **P1-05**: 组合日收益率暴露，`get_combined_timeseries` 新增 `daily_returns_portfolio` 字段
+  - **P1-06-A**: f_context 组装逻辑抽取，orchestrator.py→`f_context_builder.py`
+  - **P1-06**: 阻断点 1——`prepare_report_data` 加 risk_metrics 空字典占位
+  - **P1-07**: 阻断点 2——`capture_snapshot` 加 risk_metrics/portfolio_daily_returns 透传
+  - **P1-08**: 阻断点 3——`generate_all_llm` 暴露 history_data 到 prompt
+  - **P1-08-B**: prompts.py 拆为三文件（prompts_core.py / prompts_tables.py / prompts_action.py）
+  - **P1-09**: 阻断点 4——fingerprint 含风险信号 Hash（risk_metrics 摘要）
+  - **P1-10**: 数据模块注册 + `_COMPUTATION_REGISTRY`（bond_yield 注册 + 预留 6 计算模块）
+  - **P1-11**: 功能开关注册 JSON Schema（18 开关），Feature Flag 体系 `is_feature_enabled()`
+  - **P1-13**: 持仓匿名化最小版，`anonymizer.py` 名称替换/数量模糊/关闭三种模式
+  - **P1-14**: 缓存文件权限保护，`cache.py` 写缓存设 0o600
+  - **P1-15**: Rf fetcher 测试用例，mock 正常/异常/手动配置/缓存命中 8 场景
+  - **P1-17**: 熔断器改进——指数退避（60s→300s→900s→3600s）
+  - **P1-18**: 熔断器改进——持久化（`circuit_breaker.json`）
+  - **P1-19**: 双熔断器统一网关（`circuit_breaker.py` + `provider_registry.py`）
+  - **P1-20**: LLM 失败自动降级模板，全失败时占位文本
+  - **P1-21**: f_context Schema Full Schema 补充+校验检查点
+  - **P1-22**: analysis/ 层定位 + category.py→code_utils.py，消除逆向依赖
+  - 合计 ~112h，53 tests passed（原 44→53，新增 registry/bond_yield 测试）
+- **P1-12: 指标级断路包装器**：`circuit_breaker_wrapper.py`，per-indicator 熔断（连续 3 次→静默 24h），C20 FF↔CB 联动，持久化到 `metrics_breaker.json`
+- **P2-01~P2-11a: 量化指标算法体系 11 个**：`analysis/metrics.py`（sharpe_ratio/calmar_ratio/hhi/win_rate/turnover_rate/risk_contribution/get_dividend_yield/individual_volatility/portfolio_beta/compute_all_metrics/sanitize_metric/truncate_extreme_values/check_data_sufficiency/get_confidence_level），~670 行纯函数
+- **P2-12/P2-13: 回撤历史分位预警**：`analysis/drawdown_warning.py`，3 时间窗口（1 年/3 年/全历史），分位预警（80%/95% 阈值）
+- **P2-14~P2-17: LLM Prompt 注入 4 项**：
+  - `_build_metrics_table_block()` — 夏普/卡玛/HHI/Beta 等指标格式化
+  - `_build_data_quality_detail_block()` — 降级详情报表
+  - confidence guidance 注入 _SYSTEM_EXPERT_REVIEW
+  - action template 表格注入 expert_review prompt
+- **P1-16/P2-14-B/P2-18: 测试任务 3 项**：
+  - **P1-16**: 管线集成冒烟测试（test_pipeline_smoke.py，4 阻断点，4 tests）
+  - **P2-14-B**: 管线指标注入测试（test_pipeline_metrics_injection.py，14 tests）
+  - **P2-18**: 指标集成测试（test_metrics.py，8 指标正+边界，24 tests）
+  - 合计 42 tests，全部通过
+
+### Added
+- **P3-01~P3-06: 再平衡六项任务全部完成**：
+  - **P3-01**: 目标配置 Schema——`rebalance.py` 支持大类+品种级目标配置，`compute_target_deviation()` 输出偏离度信号
+  - **P3-02**: 阈值可配——三套预设集（保守 10%/3%、稳健 15%/5%、进取 25%/8%），`resolve_rebalance_config()` 解析，config 独立覆盖
+  - **P3-03**: 静默期——同品种 N 天不重复告警（默认 30d，可配），JSON 持久化到 `rebalance_silence.json`
+  - **P3-04**: 信号置信度——`_compute_confidence()` 输出 high/medium/low，单品种超限 2×threshold→high
+  - **P3-05**: 误报防护——3 类：分红拆股（shares 检查）、新买入<20 日过滤、可转债到期标注
+  - **P3-06**: 权益/固收偏离——`equity_fixed_income_deviation()` 将 7 类资产汇总为权益/固收超大类，对照目标配置计算偏离
+  - 79 项单元测试全部通过，含 16 项权益/固收偏离专项测试
+
+### Changed
+- **代码注释历史痕迹清理**：移除所有 P1-XX/P2-XX 任务标签（metrics.py、drawdown_warning.py、fingerprint.py、generators_orchestrator.py、prompts_action.py、prompts_core.py、prompts_tables.py、circuit_breaker.py、bond_yield.py、registry.py、orchestrator.py 等共 ~60 处），保持代码当前状态描述
+- **registry.py analytics_metrics 状态**: "planned" → "implemented"
+- **Phase 2 全部 19 项任务（P2-01~P2-18）提升至 P1 优先级**：所有任务从 `better-investment-task.md` 的 Phase 2 移至 `plan.md` 的 P1 待办区
+- **Phase 3 全部 18 项任务（P3-01~P3-17）和 Phase 4 全部 17 项任务（P2-11b、P4-01~P4-16）提升至 P2 优先级**：所有任务从 `better-investment-task.md` 的 Phase 3/4 移至 `plan.md` 的 P2 待办区
+
+### Docs
+- `plan.md`: P1 阶段 39 项任务全部标记完成并从待办表移除，仅保留完成摘要
+- `better-investment-task.md`: Phase 2/3/4 头部添加迁移告示；Phase 2 已实现任务标记完成
+- `changelog.md`: 本次变更记录
+
+---
+
 ## [0.7.3] - 2026-07-20
 
 ### Added

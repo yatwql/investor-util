@@ -140,6 +140,7 @@
 | 行业资金流向 | akshare | — |
 | 股票历史分红 | akshare | — |
 | 基金经理数据 | 天天基金 | 档案页回退 |
+| 无风险利率（Rf） | akshare `bond_zh_us_rate`（Sina 国债收益率） | 手动配置兜底（config.json risk_free_rate） |
 | 个股/ETF 历史 K 线 | 腾讯财经 | 新浪财经 |
 | 场外基金历史净值 | 天天基金 | 东方财富 |
 | 指数历史 K 线（A 股指数） | 腾讯财经 | 新浪财经 |
@@ -156,7 +157,7 @@
 | R-DATA-05 | 收盘后需验证缓存中 price_date 是否为当日数据，避免盘中降级残留数据滞留 |
 | R-DATA-06 | 00 开头的代码同时可能是 A 股或场外基金，需通过名称关键词辅助判断，股票链路全失败时自动尝试基金净值链路 |
 
-### 5.3 熔断需求
+### 5.3 熔断与降级需求
 
 | 需求标识 | 需求描述 |
 |:---------|:---------|
@@ -165,6 +166,9 @@
 | R-BRK-03 | API 正常返回空数据（非传输级异常）不计入熔断计数器 |
 | R-BRK-04 | LLM API 端点应有独立的熔断器（连续 3 次失败熔断 60 秒） |
 | R-BRK-05 | 同一次会话中跨模块的同一 API 调用结果应共享会话级内存缓存（上限 2000 条/domain） |
+| R-BRK-06 | 熔断冷却时间应采用指数退避策略（60s→300s→900s→3600s），每次失败翻倍递增，成功恢复后重置 |
+| R-BRK-07 | 熔断器状态应跨会话持久化到 `data/state/circuit_breaker.json`，与缓存文件隔离，确保会话重启后熔断记忆恢复 |
+| R-BRK-08 | Provider 级熔断器和数据模块级熔断器应通过统一的网关（`circuit_breaker.py` + `provider_registry.py`）管理，消除双熔断器状态不一致
 
 ### 5.4 新闻获取需求
 
@@ -672,6 +676,7 @@
 | `news_sources` | dict | 全开启 | — | 各新闻源启停 |
 | `preferred_provider` | dict | 空 | — | 各数据类型的首选 Provider |
 | `user_fund_benchmarks` | dict | 空 | — | 自定义基金业绩基准 |
+| `risk_free_rate` | float/null | null | — | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74） |
 | `report_section_order` | dict | 空 | — | 报告模块序号自定义 |
 | `enable_b_series` | bool | true | ✅ P | B 系列基金深度分析启停 |
 | `enable_news` | bool | true | ✅ P | 新闻板块启停 |
@@ -764,6 +769,27 @@
     {"name": "deepseek-main", "provider": "claude", "credentials_ref": "deepseek-main", "priority": 10, "timeout": 120},
     {"name": "gemini-fallback", "provider": "gemini", "credentials_ref": "gemini-fb", "priority": 20, "timeout": 60}
   ]
+}
+```
+
+### 11.5 features.json（功能开关注册表）
+
+独立配置文件，提供 18 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
+
+| 开关名 | 类型 | 默认值 | 说明 |
+|:-------|:----:|:------:|:-----|
+| `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` | bool | true（news_correlation 默认关闭） | LLM 各模块独立启停开关 |
+| `b_series_fund_manager` / `b_series_fund_overlap` / `b_series_fund_concentration` / `b_series_fund_style` | bool | true | B 系列基金深度分析模块启停 |
+| `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
+| `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |
+| `anonymizer` | bool | false | 持仓匿名化开关（名称替换/数量模糊） |
+| `cache_daily_cleanup` | bool | true | 启动时自动清理过期缓存 |
+
+用法：在 `features.json` 中仅列出需覆写的开关，未列出的保持默认值。
+```json
+{
+  "anonymizer": true,
+  "news_cls": false
 }
 ```
 

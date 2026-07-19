@@ -111,7 +111,7 @@ def _compute_module_cache_info(
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
 
-    P1-09: 新增 history_data 参数，风险信号 Hash 加入专家/体检/穿透指纹。
+    history_data 风险信号 Hash 加入专家/体检/穿透指纹。
     """
     fp_global_macro = compute_fingerprint(
         a_indices,
@@ -256,15 +256,20 @@ def _dispatch_llm_workers(
     news_data: list[dict] | None = None,
     holdings_data: list | None = None,
     penetrated_assets_for_news: list[dict] | None = None,
+    metrics: dict | None = None,
+    degradation_events: list[dict] | None = None,
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。"""
     if not any(needs.values()):
         return {}
 
-    # ── MVP-04/MVP-05: 预计算竞争语境文本块 ──
+    # ── 预计算竞争语境文本块 ──
     _competitive_context = _build_competitive_context_block(
         a_indices, total_mv, total_today_profit,
     )
+    # 量化指标 + 降级事件传递
+    _metrics = metrics
+    _degradation_events = degradation_events
 
     results_dict: dict[str, dict] = {}
     _label_map: dict[str, str] = get_llm_module_names()
@@ -316,6 +321,7 @@ def _dispatch_llm_workers(
             llm_config=lc,
             f_context=f_context,
             competitive_context=_competitive_context,
+            metrics=_metrics,
         ),
         "health_check": lambda c, lc: generate_health_check(
             total_mv,
@@ -330,6 +336,7 @@ def _dispatch_llm_workers(
             http_client=c,
             llm_config=lc,
             f_context=f_context,
+            degradation_events=_degradation_events,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
             total_mv,
@@ -498,6 +505,8 @@ def generate_all_llm(
     force: bool = False,
     f_context: dict | None = None,
     history_data: dict | None = None,
+    metrics: dict | None = None,
+    degradation_events: list[dict] | None = None,
 ) -> tuple[str | None, str | None, str | None, str | None, bool, bool, bool, bool]:
     """并行生成全球政经局势 + 智囊团深度复盘 + 持仓体检报告 + 穿透深度分析。
 
@@ -511,7 +520,9 @@ def generate_all_llm(
 
     Args:
         f_context: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
-        history_data: 组合历史走势数据字典（含风险指标），P1-08 新增。
+        history_data: 组合历史走势数据字典（含风险指标）。
+        metrics: 量化指标字典，compute_all_metrics() 的输出。
+        degradation_events: DegradationTracker.get_log() 输出。
 
     Returns:
         (global_macro_html, expert_review_html, health_check_html, penetration_deep_html,
@@ -557,6 +568,8 @@ def generate_all_llm(
         holdings_details,
         sector_flow,
         f_context=f_context,
+        metrics=metrics,
+        degradation_events=degradation_events,
     )
 
     # 合并预检结果 + 工作线程结果

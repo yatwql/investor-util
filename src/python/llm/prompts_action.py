@@ -1,6 +1,6 @@
 """LLM 提示词动作模块 — 各模块 Prompt 构建函数。
 
-P1-08-B 从 prompts.py 拆分，包含：
+从 prompts.py 拆分，包含：
   - _build_global_macro_prompt — 全球政经局势
   - _build_expert_review_prompt — 智囊团深度复盘
   - _build_health_check_prompt — 持仓体检报告
@@ -25,6 +25,8 @@ from src.python.llm.prompts_tables import (
     _calc_country_exposure,
     _format_holdings_block,
     _format_penetration_block,
+    _build_metrics_table_block,
+    _build_data_quality_detail_block,
 )
 
 logger = logging.getLogger("invest")
@@ -110,6 +112,7 @@ def _build_expert_review_prompt(
     holdings_details: list[dict] | None = None,
     f_context: dict | None = None,
     competitive_context: str | None = None,
+    metrics: dict | None = None,
 ) -> str:
     """构建智囊团深度复盘的用户提示词（紧凑格式）。
 
@@ -120,6 +123,7 @@ def _build_expert_review_prompt(
         f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），
             可选，由呼叫方构建并传入。
+        metrics: 量化指标字典，compute_all_metrics() 的输出。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
@@ -150,6 +154,20 @@ def _build_expert_review_prompt(
         parts.append(rebalance_text)
     if competitive_context:
         parts.append(competitive_context)
+    # 量化指标表格
+    metrics_text = _build_metrics_table_block(metrics)
+    if metrics_text:
+        parts.append(metrics_text)
+    # 行动建议模板
+    parts.append(
+        "\n【行动建议】\n"
+        "请在回复末尾增加 **'### 操作建议'** 表格，按优先级排列：\n\n"
+        "| 优先级 | 品种 | 建议操作 | 理由 |\n"
+        "|:------:|------|:--------:|------|\n"
+        "| 🔴 高 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
+        "| 🟡 中 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
+        "| 🟢 低 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
+    )
     parts += [
         "",
         "【持仓明细】",
@@ -173,6 +191,7 @@ def _build_health_check_prompt(
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
     f_context: dict | None = None,
+    degradation_events: list[dict] | None = None,
 ) -> str:
     """构建持仓体检报告的用户提示词。
 
@@ -180,6 +199,7 @@ def _build_health_check_prompt(
 
     Args:
         f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
+        degradation_events: DegradationTracker.get_log() 输出。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
@@ -188,6 +208,8 @@ def _build_health_check_prompt(
     pen_text = _format_penetration_block(penetrated_assets)
     diff_text = _build_diff_context_block(f_context)
     degradation_text = _build_data_degradation_block(f_context)
+    # 数据质量详情
+    dq_detail = _build_data_quality_detail_block(degradation_events)
     attribution_text = _build_profit_attribution_block(holdings_details)
 
     parts = [
@@ -200,6 +222,8 @@ def _build_health_check_prompt(
         parts.append(diff_text)
     if degradation_text:
         parts.append(degradation_text)
+    if dq_detail:
+        parts.append(dq_detail)
     if attribution_text:
         parts.append(attribution_text)
     parts += [

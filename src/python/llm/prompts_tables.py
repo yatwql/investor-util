@@ -1,6 +1,6 @@
 """LLM 提示词表格模块 — 格式化和摘要构建函数。
 
-P1-08-B 从 prompts.py 拆分，包含：
+从 prompts.py 拆分，包含：
   - _format_holdings_block — 持仓明细格式化
   - _format_penetration_block — 穿透 TOP10 格式化
   - _calc_country_exposure — 国别/币种暴露计算
@@ -80,6 +80,118 @@ def _calc_country_exposure(holdings_details: list[dict] | None) -> list[str]:
 
             exposure[country] = exposure.get(country, 0) + mv
     return [f"{k}: {_fmt_wan(v)}" for k, v in sorted(exposure.items(), key=lambda x: -x[1])]
+
+
+def _build_metrics_table_block(metrics: dict | None) -> str:
+    """构建量化指标表格文本块，供 expert_review prompt 使用。
+
+    Args:
+        metrics: compute_all_metrics() 的输出字典
+
+    Returns:
+        格式化的指标表格文本块。metrics 为空或全 None 时返回空字符串。
+    """
+    if not metrics:
+        return ""
+
+    lines = ["【量化指标】"]
+
+    # 夏普比率
+    sharpe = metrics.get("sharpe_ratio")
+    if sharpe is not None:
+        sharpe_conf = metrics.get("sharpe_confidence", "low")
+        lines.append(f"夏普比率: {sharpe:.2f}（置信度: {sharpe_conf}）")
+    else:
+        lines.append("夏普比率: --（数据不足）")
+
+    # 卡玛比率
+    calmar = metrics.get("calmar_ratio")
+    if calmar is not None:
+        lines.append(f"卡玛比率: {calmar:.2f}")
+    else:
+        lines.append("卡玛比率: --")
+
+    # HHI
+    hhi_val = metrics.get("hhi")
+    hhi_eq = metrics.get("hhi_equivalent")
+    if hhi_val is not None and hhi_val > 0:
+        conc_level = "低" if hhi_val < 0.1 else "中" if hhi_val < 0.2 else "高"
+        if hhi_eq:
+            lines.append(f"集中度(HHI): {hhi_val:.4f}（等效{hhi_eq:.0f}只品种, {conc_level}）")
+        else:
+            lines.append(f"集中度(HHI): {hhi_val:.4f}（{conc_level}）")
+    else:
+        lines.append("集中度(HHI): --")
+
+    # 胜率
+    wr = metrics.get("win_rate", {})
+    if isinstance(wr, dict):
+        wr_val = wr.get("win_rate", 0)
+        winning = wr.get("winning", [])
+        losing = wr.get("losing", [])
+        lines.append(f"持仓胜率: {wr_val * 100:.1f}%（盈利{len(winning)}只, 亏损{len(losing)}只）")
+
+    # 换手率
+    turnover = metrics.get("turnover_rate")
+    if turnover is not None:
+        lines.append(f"区间换手率: {turnover * 100:.1f}%")
+
+    # Beta
+    beta = metrics.get("portfolio_beta")
+    beta_conf = metrics.get("beta_confidence", "insufficient")
+    if beta is not None:
+        beta_desc = "偏高" if beta > 1.2 else "偏低" if beta < 0.8 else "适中"
+        lines.append(f"组合Beta: {beta:.2f}（{beta_desc}, 置信度: {beta_conf}）")
+    else:
+        lines.append("组合Beta: --（数据不足）")
+
+    return "\n".join(lines)
+
+
+def _build_data_quality_detail_block(degradation_events: list[dict] | None) -> str:
+    """构建数据质量详细信息块，供 health_check prompt 使用。
+
+    从 DegradationTracker 的 events 日志中提取结构化数据质量信息，
+    比 _build_data_degradation_block 更详细，包含降级频次和时间。
+
+    Args:
+        degradation_events: DegradationTracker.get_log() 的输出
+
+    Returns:
+        格式化的数据质量详细文本块
+    """
+    if not degradation_events:
+        return "【数据质量】今日无降级记录，所有数据源正常。"
+
+    lines = ["【数据质量详细状态】"]
+    unreachable: dict[str, int] = {}
+    empty: dict[str, int] = {}
+    degraded_events: list[dict] = []
+
+    for e in degradation_events:
+        sk = e.get("source_key", "?")
+        ft = e.get("failure_type", "?")
+        degraded = e.get("degraded", False)
+        if degraded:
+            degraded_events.append(e)
+        if ft == "unreachable":
+            unreachable[sk] = unreachable.get(sk, 0) + 1
+        elif ft == "empty":
+            empty[sk] = empty.get(sk, 0) + 1
+
+    if unreachable:
+        parts = [f"{k}({v}次)" for k, v in sorted(unreachable.items(), key=lambda x: -x[1])]
+        lines.append(f"连接失败: {'、'.join(parts)}")
+    if empty:
+        parts = [f"{k}({v}次)" for k, v in sorted(empty.items(), key=lambda x: -x[1])]
+        lines.append(f"数据为空: {'、'.join(parts)}")
+    if degraded_events:
+        lines.append(f"触发降级: {len(degraded_events)} 次")
+
+    if not unreachable and not empty and not degraded_events:
+        lines.append("今日无降级事件")
+
+    return "\n".join(lines)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -164,4 +276,6 @@ __all__ = [
     "_calc_country_exposure",
     "_build_holdings_summary",
     "_build_news_correlation_summary",
+    "_build_metrics_table_block",
+    "_build_data_quality_detail_block",
 ]

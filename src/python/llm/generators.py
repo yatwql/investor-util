@@ -93,11 +93,13 @@ def generate_expert_review(
     llm_config: dict | None = None,
     f_context: dict | None = None,
     competitive_context: str | None = None,
+    metrics: dict | None = None,
 ) -> tuple[str | None, bool]:
     """生成智囊团深度复盘。
 
     Args:
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），可选。
+        metrics: 量化指标字典，compute_all_metrics() 的输出。
     """
 
     def _fingerprint():
@@ -123,6 +125,7 @@ def generate_expert_review(
             holdings_details=holdings_details,
             f_context=f_context,
             competitive_context=competitive_context,
+            metrics=metrics,
         )
 
     return generate_llm_module(
@@ -152,6 +155,7 @@ def generate_health_check(
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
     f_context: dict | None = None,
+    degradation_events: list[dict] | None = None,
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。"""
 
@@ -177,6 +181,7 @@ def generate_health_check(
             penetrated_assets,
             holdings_details=holdings_details,
             f_context=f_context,
+            degradation_events=degradation_events,
         )
 
     return generate_llm_module(

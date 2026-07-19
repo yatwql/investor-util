@@ -77,11 +77,12 @@
                      ├──────────── 共享工具层 ────────────┐
                      │                                    │
                      ▼                                    ▼
-              ┌──────────────┐              ┌────────────────────┐
-              │ prompts.py   │              │ fingerprint.py     │
-              │ System/User  │              │ 缓存指纹计算       │
-              │ Prompt 模板  │              │ 稳定性字段提取      │
-              └──────────────┘              └────────────────────┘
+              ┌──────────────────┐          ┌────────────────────┐
+              │ prompts_core.py  │          │ fingerprint.py     │
+              │ prompts_tables.py│          │ 缓存指纹计算       │
+              │ prompts_action.py│          │ 稳定性字段提取      │
+              │ （原 prompts.py） │          │ 风险信号摘要        │
+              └──────────────────┘          └────────────────────┘
               ┌──────────────┐              ┌────────────────────┐
               │ session.py   │              │ pricing.py         │
               │ 会话用量累计  │              │ 模型定价/费用估算  │
@@ -140,7 +141,9 @@ skeleton.py:_generate_llm_content()
 | `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、Gemini API 调用 | `_call_llm()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `_call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
-| `prompts.py` | 工具 | System/User Prompt 模板、持仓明细格式化、差异上下文 | 各 `_build_*_prompt()` |
+| `prompts_core.py` | 工具 | System/User Prompt 构建（拆分自 prompts.py，与 tables/action 为同级文件） | `_build_system_prompt()` / `_build_user_prompt()` |
+| `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown（拆分自 prompts.py） | `_build_metrics_table()` / `_build_performance_table()` |
+| `prompts_action.py` | 工具 | 行动建议表格/诊断结论格式化（拆分自 prompts.py） | `_build_action_table()` / `_build_diagnosis_block()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `_compute_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `reset_session_usage()` |
 | `pricing.py` | 工具 | 模型定价合并、费用估算 | `_estimate_cost()` |
@@ -402,9 +405,11 @@ if not any(needs.values()):
     return {}
 ```
 
-### 4.4 f_context 注入
+### 4.4 f_context 注入与 history_data 暴露
 
 `f_context`（组合历史走势时间维度上下文，含 F1→F2 diff 差异摘要）可选传递给 `expert_review` 和 `health_check`，使 LLM 能感知持仓环比变化（新增/清仓/加仓/减仓品种、总市值/总盈亏变化百分比）。
+
+**history_data 暴露**：`generate_all_llm()` 接收 `history_data` 参数，包含组合历史日收益率序列、基准指数日收益率序列等时间序列数据。该数据在 prompt 中以紧凑图表形式注入，使 LLM 能感知组合的历史波动特征和相对大盘表现，增强智囊团深度复盘和持仓体检报告中的趋势分析能力。
 
 首次运行（`is_first_check=True`）时输出"暂无历史对比数据"标记。
 
@@ -663,6 +668,8 @@ penetrated_assets ──→ _extract_stable_penetration()
 ```
 
 **设计目的**：`expert_review` / `health_check` / `penetration_deep` 的 `_compute_fingerprint()` 在序列化前排除行情波动字段（`price`、`change_pct`），仅品种/份额/成本变化时指纹改变。防止日内股价波动导致 TTL 期内缓存频繁失效。
+
+**风险信号摘要**：`risk_metrics` 摘要（夏普/卡玛/HHI 等计算指标的 MD5 摘要）已加入指纹哈希因子。风险信号变化时缓存自动失效，确保 LLM 提示词中包含的量化指标与最新计算结果一致。
 
 ### 7.2 缓存键模式
 

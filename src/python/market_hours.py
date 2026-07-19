@@ -1,6 +1,6 @@
 """A 股交易时段判断模块。
 
-从 cache.py 提取，提供多层判断机制（config → API → fallback）来确定
+提供多层判断机制（config → API → fallback）来确定
 A 股市场当前是否在交易时段。
 
 用法::

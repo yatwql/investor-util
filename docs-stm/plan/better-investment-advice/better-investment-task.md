@@ -17,7 +17,7 @@
 | **阻塞** | 此任务是否被外部数据源验证阻塞（是/否） |
 | **依赖** | 前置依赖任务 ID 列表（无=无依赖） |
 
-> **测试策略说明（R5-05）**：每个任务标注了推荐的测试验证方式。原则是**每次只跑合适的测试案例**，不必每次都跑全量 regression/verify：  
+> **测试策略说明**：每个任务标注了推荐的测试验证方式。原则是**每次只跑合适的测试案例**，不必每次都跑全量 regression/verify：  
 > - *prompt-only* → 只跑 `pytest src/test/unit/llm/test_prompts.py -x -q`（~5s）  
 > - *unit* → 跑 `pytest src/test/unit/` 对应模块测试（~10-30s）  
 > - *dev-verify* → `python scripts/test_runner.py --mode dev-verify`（~2min）  
@@ -119,15 +119,15 @@
 - **状态**: ✅ 已完成（2026-07-20）
 
 ### MVP-02: 概念板块占比注入 LLM（Layer 2b）
-- **估时**: 4h（MVP 阶段先做 Top 10 单品概念标注；聚合板块占比推迟到 Phase 2）
+- **估时**: 4h（Top 10 单品概念标注）
 - **文件**: `src/python/llm/prompts.py`（新增概念板块段落）
 - **阻塞**: 否（但隐式依赖 penetration 管线执行成功，若管线未执行则概念数据为空）
 - **依赖**: 无（但隐式依赖 penetration.py 管线已执行——概念数据来自 push2 API，空数据时 prompt 应显示兜底文本而非空白段落）
-- **描述**: `penetration.py` L700-701 已从东方财富 push2 行业 API 缓存了 `industry.concepts` 数据（概念板块分类），L747 已有 `concepts[:3]` 用于 Top 3 板块展示。但 LLM prompt 完全不提及板块分布。在 `expert_review` prompt 中新增段落：(1) 穿透后 Top 5 概念板块及持仓市值占比；(2) 集中度定性判断（高/中/低）；(3) 与常见市场风格（大盘/小盘/价值/成长）的对应关系。注意：(a) 非 A 股穿透资产（港股通/美股）天然无概念数据，需在 prompt 中标注"部分品种无概念分类"；(b) 概念数据不可用时显示"暂无概念板块数据"兜底文本，而非跳过整段导致 LLM 误以为无板块信息。MVP 阶段仅做穿透 Top 10 单品的概念标注（现有数据已够），聚合板块占比推迟到 Phase 2。如果概念 API（push2）熔断或返回空数据，LLM prompt 段落必须区分**三种状态**（R4-02 修正：原计划仅列 2 态，但代码实况验证发现 architecture 实际有 3 态——详见 discussion.md 风险表）：(1) API 不可达（熔断/网络错误）→ 显示'概念板块 API 暂时不可用，板块分析暂缺'，引用 DegradationTracker；(2) API 正常返回但数据为空（push2 返回了有效响应但某品种无概念条目）→ 显示'部分品种无概念分类'，**此态与状态 3 在架构上不可区分**——`batch_fetch_industry_data()` 会将全部非 A 股代码静默过滤（`industry.py L97` `a_codes = [c for c in valid_codes if _is_a_share_code(c)]`），返回空字典与 API 熔断返回空字典结果是相同的 `{}`，`penetration_sheet.py` 的 `build_penetration_data_status()` 始终硬编码 `failure_type="unreachable"` 写入 DegradationTracker（忽略 `result["industry_failure_type"]` 中的正确值 `"empty"`/`"unreachable"`）；(3) 港股通/美股穿透资产无概念数据（非 A 股代码被 `batch_fetch_industry_data()` 过滤——批次中全部为非 A 股时返回 `{}` 不可与状态 2b 区分）→ 显示'部分境外品种无概念分类'。引用 f_context['data_degradation'] 中的实时降级状态。港股通/美股穿透资产无概念数据的覆盖度说明也须在此段落标注。⚠ **额外发现**：`penetration_sheet.py` L148 的 `failure_type="unreachable"` 硬编码是一个独立缺陷——即使 push2 API 正常返回但概念数据为空（应触发 `empty_data_threshold=3`），也会被错误记为 `unreachable_threshold=2` 阈值。不属于 MVP-02 prompt 范围，应在 T0-01-A 或 Phase 1 时顺手修复。
+- **描述**: `penetration.py` L700-701 已从东方财富 push2 行业 API 缓存了 `industry.concepts` 数据（概念板块分类），L747 已有 `concepts[:3]` 用于 Top 3 板块展示。但 LLM prompt 完全不提及板块分布。在 `expert_review` prompt 中新增段落：(1) 穿透后 Top 5 概念板块及持仓市值占比；(2) 集中度定性判断（高/中/低）；(3) 与常见市场风格（大盘/小盘/价值/成长）的对应关系。注意：(a) 非 A 股穿透资产（港股通/美股）天然无概念数据，需在 prompt 中标注"部分品种无概念分类"；(b) 概念数据不可用时显示"暂无概念板块数据"兜底文本，而非跳过整段导致 LLM 误以为无板块信息。如果概念 API（push2）熔断或返回空数据，LLM prompt 段落必须区分**三种状态**：(1) API 不可达（熔断/网络错误）→ 显示'概念板块 API 暂时不可用，板块分析暂缺'，引用 DegradationTracker；(2) API 正常返回但数据为空（push2 返回了有效响应但某品种无概念条目）→ 显示'部分品种无概念分类'，**此态与状态 3 在架构上不可区分**——`batch_fetch_industry_data()` 会将全部非 A 股代码静默过滤（`industry.py L97` `a_codes = [c for c in valid_codes if _is_a_share_code(c)]`），返回空字典与 API 熔断返回空字典结果是相同的 `{}`，`penetration_sheet.py` 的 `build_penetration_data_status()` 始终硬编码 `failure_type="unreachable"` 写入 DegradationTracker（忽略 `result["industry_failure_type"]` 中的正确值 `"empty"`/`"unreachable"`）；(3) 港股通/美股穿透资产无概念数据（非 A 股代码被 `batch_fetch_industry_data()` 过滤——批次中全部为非 A 股时返回 `{}` 不可与状态 2b 区分）→ 显示'部分境外品种无概念分类'。引用 f_context['data_degradation'] 中的实时降级状态。港股通/美股穿透资产无概念数据的覆盖度说明也须在此段落标注。
 - **状态**: ✅ 已完成（2026-07-20）
 
 ### MVP-03: 再平衡极简版——单品种超阈值（Layer 3A 硬编码）
-- **估时**: 6h（修正：原 16h 高估，纯计算+去重+测试 6h 合理）
+- **估时**: 6h（纯计算+去重+测试 6h 合理）
 - **文件**: `src/python/analysis/simple_rebalance.py`（新增）、`src/python/llm/prompts.py`
 - **阻塞**: 否
 - **依赖**: 无
@@ -151,18 +151,22 @@
 - **描述**: 将上述 4 个新增段落集中整合到 `prompts.py` 的对应 system prompt 常量中（`_SYSTEM_*`），确保：(1) 各段落间的逻辑顺序流畅（收益来源→板块分布→调仓建议→基准对比）；(2) 只有数据就绪的段落才输出（无数据时整段隐藏而非显示"--"）；(3) 不破坏现有 prompt 结构；(4) 数据质量降级段落（T0-02）如有内容，放在首段。运行一次全量集成测试（`python scripts/test_runner.py --mode regression`）确认不破坏现有报告。注：MVP-06（条件推理）的段落也纳入此轮整合，逻辑上放在所有段落的最后（情景分析章节）。
 - **状态**: ✅ 已完成（2026-07-20）
 
-### MVP-06: 条件推理场景块（原 PD-01 提前）
+### MVP-06: 条件推理场景块
 - **估时**: 4h
 - **文件**: `src/python/llm/prompts.py`
 - **阻塞**: 否
 - **依赖**: MVP-05（prompt 整合框架就绪后追加条件推理段落）
 - **描述**: 在当前 prompt 末尾追加条件推理场景块，引导 LLM 输出两个情景分支的简要建议。不需对话架构，仅通过 prompt 指令实现。
-- **验收标准**（R5-03 补充）: (1) 在 `expert_review` system prompt 末尾追加一段固定指令，明确要求 LLM 在回复末尾增加"### 情景分析"二级标题；(2) 该标题下必须包含两个子段落——"📈 上涨情景：如果未来市场上涨 20%，建议..."和"📉 下跌情景：如果未来市场下跌 20%，建议..."；(3) 每个子段落至少 2 句具体行动建议（非模板话术）；(4) 运行 `pytest src/test/ -m "unit" -x --tb=short -q` 确认不破坏现有 prompt 单元测试；(5) 手动验证方法：对同一个持仓数据，比较修改前后两次 LLM 回复——改前无情景分析段落，改后末尾应有上述结构的情景块。修改范围限制在 `prompts.py` 的 `_SYSTEM_EXPERT_REVIEW` 常量末尾追加内容，不修改任何 Python 逻辑代码，不修改其他 system prompt 常量。
+- **验收标准**: (1) 在 `expert_review` system prompt 末尾追加一段固定指令，明确要求 LLM 在回复末尾增加"### 情景分析"二级标题；(2) 该标题下必须包含两个子段落——"📈 上涨情景：如果未来市场上涨 20%，建议..."和"📉 下跌情景：如果未来市场下跌 20%，建议..."；(3) 每个子段落至少 2 句具体行动建议（非模板话术）；(4) 运行 `pytest src/test/ -m "unit" -x --tb=short -q` 确认不破坏现有 prompt 单元测试；(5) 手动验证方法：对同一个持仓数据，比较修改前后两次 LLM 回复——改前无情景分析段落，改后末尾应有上述结构的情景块。修改范围限制在 `prompts.py` 的 `_SYSTEM_EXPERT_REVIEW` 常量末尾追加内容，不修改任何 Python 逻辑代码，不修改其他 system prompt 常量。
 - **状态**: ✅ 已完成（2026-07-20）
 
 ---
 
 ## Phase 1 — 管线基础设施 + prompts.py 拆分（~164h）
+
+> ✅ **全部 22 项任务（P1-01 ~ P1-22）已完成**（2026-07-20）
+>
+> 详细描述和验收标准参见下文各条目，执行状态详见 changelog.md。
 
 ### P1-01: Rf fetcher 主实现——东方财富 datacenter API
 - **估时**: 12h
@@ -185,7 +189,7 @@
 - **文件**: `src/python/fetcher/bond_yield.py`（新增）、`src/python/config/_config_defaults.py`（新增 `risk_free_rate` 键）、`src/python/fetcher/chain.py`（L25 注册 `"bond_yield"` 链）
 - **阻塞**: 是 ← PRE-01（数据源可用性确认）
 - **依赖**: PRE-01
-- **描述**: **替代已取消的 P1-01/P1-02**。新建 `bond_yield.py`，实现 `fetch_rf() → float` 通过 akshare `bond_zh_us_rate()` 获取中国 10 年期国债收益率（已验证 50/50 稳定性 100%）。配置参数：`RF_SOURCE="auto"`（默认自动，设为 `"manual"` 或提供浮点数则跳过 fetcher）。返回年化收益率浮点数（如 0.017404）。`chain.py` 新增 `"bond_yield": ["sina_bond_zh_us"]` 默认链。⚠ **C6 合规要求**：`bond_yield.py` 必须通过 `fetch_with_fallback()` 调用而非直接调用 akshare。需在 `src/python/providers/` 下新增 provider 模块（如 `sina_bond.py`）封装 akshare 调用，然后在 `bond_yield.py` 中通过 chain 路由。包含：(1) akshare 调用 + 数据提取（取 `中国国债收益率10年` 列最新值）；(2) `provider_registry.py` 熔断器注册（T2）；(3) 缓存机制（TTL 日级+文件缓存）；(4) 错误处理（连续 3 次失败触发手动配置兜底）；(5) 用户手动配置：修改 `_DEFAULT_CONFIG` 新增 `"risk_free_rate": None`（None 自动获取，设浮点数如 0.015 手动指定）；(6) DegradationTracker 降级日志注入；(7) registry.py _MODULE_REGISTRY 注册 `data_type="bond_yield"`，`cache_prefixes=("bond_yield_",)`。
+- **描述**: 新建 `bond_yield.py`，实现 `fetch_rf() → float` 通过 akshare `bond_zh_us_rate()` 获取中国 10 年期国债收益率（已验证 50/50 稳定性 100%）。配置参数：`RF_SOURCE="auto"`（默认自动，设为 `"manual"` 或提供浮点数则跳过 fetcher）。返回年化收益率浮点数（如 0.017404）。`chain.py` 新增 `"bond_yield": ["sina_bond_zh_us"]` 默认链。⚠ **C6 合规要求**：`bond_yield.py` 必须通过 `fetch_with_fallback()` 调用而非直接调用 akshare。需在 `src/python/providers/` 下新增 provider 模块（如 `sina_bond.py`）封装 akshare 调用，然后在 `bond_yield.py` 中通过 chain 路由。包含：(1) akshare 调用 + 数据提取（取 `中国国债收益率10年` 列最新值）；(2) `provider_registry.py` 熔断器注册（T2）；(3) 缓存机制（TTL 日级+文件缓存）；(4) 错误处理（连续 3 次失败触发手动配置兜底）；(5) 用户手动配置：修改 `_DEFAULT_CONFIG` 新增 `"risk_free_rate": None`（None 自动获取，设浮点数如 0.015 手动指定）；(6) DegradationTracker 降级日志注入；(7) registry.py _MODULE_REGISTRY 注册 `data_type="bond_yield"`，`cache_prefixes=("bond_yield_",)`。
 
 ### P1-04: 个股日收益率管线暴露
 - **估时**: 8h
@@ -194,7 +198,7 @@
 - **依赖**: 无
 - **描述**: 当前 `_compute_annualized_volatility()`（或等价函数）在 L307-312 计算 `daily_returns` 后仅用于计算年化波动率，计算结束后丢弃。修改：(1) 将 `daily_returns` 作为命名元组或字典字段加入返回值；(2) 同时在 `get_combined_timeseries()` L142 的返回字典中新增 `"daily_returns_individual": dict[str, list[float]]`（按品种代码索引的日收益率列表）；(3) 保证返回格式与下游消费一致（列表与日期序列对齐）；(4) 向后兼容：原有键不变，新键为 optional。
 - **数据质量自检（验收标准）**: P1-04 是被 10 个下游任务依赖的"致死率最高"模块——P1-05, P2-05, P2-06, P2-10, P2-11, P2-12, P2-13, P4-02, PD-02 均依赖个股日收益率数据。交付前必须手动校验至少 10 个品种的 `daily_returns` 计算结果：随机选取 10 个品种，验证最近交易日收益率 = (今收 - 昨收) / 昨收，确认日期对齐无误。校验记录附在代码注释或 PR 描述中。验收标准从"代码编译通过"提升为"pass 数据质量校验"。
-- **⚠ K-line API 降级一致性修复（R4-03 修正——验证后决定简化）**：当前腾讯 K 线 API（web.ifzq.gtimg.cn）使用 `fetch_with_incremental_fallback`（过期缓存兜底），新浪 K 线（money.finance.sina.cn）使用 `fetch_with_fallback`（空列表降级）。二者在"数据过期"场景下的行为不一致——腾讯返回过期数据 + 日志告警，新浪返回空列表。日收益率管线消费的成交额和收盘价字段需要统一降级语义。**但代码实况验证（2026-07-20）发现**：(1) 两个 provider 的 `fetch_kline` 输出格式已统一（均返回 `[{date, open, close, high, low, volume}]` 格式），无需额外适配器归一化格式；(2) `_unify_kline_fallback()` 作为全新函数名不存在于代码库中——该名称为计划假设，是否需要创建取决于实现期对 `fetch_with_incremental_fallback` 和 `fetch_with_fallback` 在"最新数据 vs 过期兜底"语义差异的实际测试。**建议**：P1-04 实现时先验证两种 fallback 函数在测试中的实际行为差异。如果 `fetch_with_incremental_fallback` 在腾讯 K 线过期时确实返回过期数据而 `fetch_with_fallback` 返回空列表，则仅在 `portfolio_history.py` 的消费点做一行 `if not data: data = stale_fallback` 即可，无需专用 `_unify_kline_fallback()` 函数。将原估算的 2h 适配器专项缩减为 0.5h 验证+简单处理。
+- **⚠ K-line API 降级一致性**：当前腾讯 K 线 API（web.ifzq.gtimg.cn）使用 `fetch_with_incremental_fallback`（过期缓存兜底），新浪 K 线（money.finance.sina.cn）使用 `fetch_with_fallback`（空列表降级）。二者在"数据过期"场景下的行为不一致——腾讯返回过期数据 + 日志告警，新浪返回空列表。日收益率管线消费的成交额和收盘价字段需要统一降级语义。**代码实况验证发现**：(1) 两个 provider 的 `fetch_kline` 输出格式已统一（均返回 `[{date, open, close, high, low, volume}]` 格式），无需额外适配器归一化格式；(2) `_unify_kline_fallback()` 作为全新函数名不存在于代码库中——该名称为计划假设，是否需要创建取决于实现期对 `fetch_with_incremental_fallback` 和 `fetch_with_fallback` 在"最新数据 vs 过期兜底"语义差异的实际测试。**建议**：P1-04 实现时先验证两种 fallback 函数在测试中的实际行为差异。如果 `fetch_with_incremental_fallback` 在腾讯 K 线过期时确实返回过期数据而 `fetch_with_fallback` 返回空列表，则仅在 `portfolio_history.py` 的消费点做一行 `if not data: data = stale_fallback` 即可，无需专用 `_unify_kline_fallback()` 函数。将原估算的 2h 适配器专项缩减为 0.5h 验证+简单处理。
 
 ### P1-05: 组合日收益率暴露
 - **估时**: 4h
@@ -223,7 +227,7 @@
 - **阻塞**: 否
 - **依赖**: P1-06（prepare_report_data 已有 risk_metrics）
 - **描述**: `capture_snapshot()` 的 `f_context` 字典新增风险指标相关键：(1) `"risk_metrics"` 从 `prepare_report_data` 透传；(2) `"portfolio_daily_returns"` 从 `portfolio_history.get_combined_timeseries["daily_returns_portfolio"]` 透传（P1-05）；(3) `"data_degradation"` 汇总（T0-02 已完成）；(4) 保险：所有新键 `.get()` 兜底，不因数据缺失阻塞报告生成。
-- **⚠ 双路径覆盖（R4-06）**：`orchestrator.py` 有两条报告生成路径——`_generate_report_full`（L650, 含 LLM）和 `_generate_report_both`（L394, 仅 HTML+Excel）。前者调用 `prepare_report_data()` 获取完整数据，后者调用轻量的 `_compute_details()`（L378）。P1-06 修改 `prepare_report_data` 只覆盖 full 路径。P1-07 修改 `capture_snapshot` 返回的 f_context 则同时覆盖两路径（两条路径都调用 `capture_snapshot`）。需确保：(a) `capture_snapshot` 注入的新键（risk_metrics 等）在 both 路径下也能正确初始化（来自 prep dict 的字段在 both 路径中不可用，需降级为空字典）；(b) 测试用例同时覆盖 both 和 full 路径。
+- **⚠ 双路径覆盖**：`orchestrator.py` 有两条报告生成路径——`_generate_report_full`（L650, 含 LLM）和 `_generate_report_both`（L394, 仅 HTML+Excel）。前者调用 `prepare_report_data()` 获取完整数据，后者调用轻量的 `_compute_details()`（L378）。P1-06 修改 `prepare_report_data` 只覆盖 full 路径。P1-07 修改 `capture_snapshot` 返回的 f_context 则同时覆盖两路径（两条路径都调用 `capture_snapshot`）。需确保：(a) `capture_snapshot` 注入的新键（risk_metrics 等）在 both 路径下也能正确初始化（来自 prep dict 的字段在 both 路径中不可用，需降级为空字典）；(b) 测试用例同时覆盖 both 和 full 路径。
 
 ### P1-08: 管线阻断点 3——generate_all_llm 暴露 history_data
 - **估时**: 4h
@@ -232,12 +236,12 @@
 - **依赖**: P1-07（f_context 已含风险字段）
 - **描述**: `generate_all_llm()` 目前接收 `f_context` 但不把 `history_data` 传给 prompt 构建函数。修改调用链：(1) 确保 `portfolio_history` 数据作为 `f_context["portfolio_history"]` 传递；(2) 包含 `daily_returns_individual`、`daily_returns_portfolio`、`drawdown`、`benchmark_comparison` 等时序字段；(3) 修改 `prompts.py` 的 `build_system_prompt()` 签名，增加 `history_data` 形参（当前没有）。
 
-### P1-08-B: prompts.py 拆分为三文件（从 Phase 3 提前，避免被 18 个任务反复修改冲突）
+### P1-08-B: prompts.py 拆分为三文件
 - **估时**: 4h
 - **文件**: `src/python/llm/prompts.py` → 拆分为 `prompts_core.py`（角色定义+安全约束）、`prompts_tables.py`（数据表格格式化）、`prompts_action.py`（行动建议模板）
 - **阻塞**: 否
 - **依赖**: P1-08（build_system_prompt 签名已变更，拆分时一并处理新签名）
-- **描述**: `prompts.py` 当前单文件约 200 行，承载 5 个 system prompt + 所有数据格式化逻辑。拆分为三个文件，保持统一导入入口（`prompts.py` re-export）。拆分标准：(1) 角色定义、安全约束、回复格式 → `prompts_core.py`；(2) 所有数据表格格式化函数 → `prompts_tables.py`；(3) 行动建议模板、信号置信度段落 → `prompts_action.py`。不改变现有调用方接口。此任务将 P3-14（原 Phase 3 的拆分任务）提前到 Phase 1 紧接 P1-08，避免 Phase 2/3/4 共 18 个任务在单一大文件上反复冲突。
+- **描述**: `prompts.py` 当前单文件约 200 行，承载 5 个 system prompt + 所有数据格式化逻辑。拆分为三个文件，保持统一导入入口（`prompts.py` re-export）。拆分标准：(1) 角色定义、安全约束、回复格式 → `prompts_core.py`；(2) 所有数据表格格式化函数 → `prompts_tables.py`；(3) 行动建议模板、信号置信度段落 → `prompts_action.py`。不改变现有调用方接口。这样拆分后 P3-14 的设计自然融入三文件架构，避免后续 18 个任务在单一大文件上反复冲突。
 
 ### P1-09: 管线阻断点 4——generators.py _fingerprint 含风险信号 Hash
 - **估时**: 4h
@@ -253,7 +257,7 @@
 - **依赖**: P1-03（bond_yield 模块存在）、P1-04（日收益率管线存在，但注册本身不依赖内容）
 - **测试**: unit（`pytest src/test/unit/test_registry.py -x -q`）
 - **描述**: 为 bond_yield 数据模块在 _MODULE_REGISTRY 中注册 DataModuleDef（data_type='bond_yield', cache_prefixes=('bond_yield_',), cache_ttl=CACHE_DAILY, cache_groups=('preload',)）。**同时创建 _COMPUTATION_REGISTRY（计算模块注册表）**——定义 ComputModuleDef 结构（name、settings_key、dependencies 等字段，不含缓存属性），用于后续无缓存需求的算法模块（如 P3-16 事实校验器纯算法层、P4-01 情景分析、P5-01 画像推断）的注册。在 technical.md §6.2 中追加 _COMPUTATION_REGISTRY 说明。写测试验证 ComputModuleDef 的正确性和唯一性约束。
-- **⚠ C17 注册缺口（R5-04 补充）**: 以下 6 个分析模块在任务分解中**没有对应注册任务**，它们的 ComputModuleDef 注册应在此任务中预留位置，各模块实际创建时补充注册代码：
+- **⚠ C17 注册缺口**: 以下 6 个分析模块在任务分解中**没有对应注册任务**，它们的 ComputModuleDef 注册应在此任务中预留位置，各模块实际创建时补充注册代码：
   1. metrics.py（P2-01~P2-11 共 8 个指标）— 注册名 `analytics_metrics`
   2. liquidity.py（P3-11~P3-12）— 注册名 `analytics_liquidity`
   3. fx_exposure.py（P3-13）— 注册名 `analytics_fx_exposure`
@@ -293,7 +297,7 @@
 - **描述**: `cache.py` 写文件缓存时设置 `0o600`（仅所有者读写）。Windows 上用 `os.chmod` 模拟最小权限。启动时检查 `data/cache/` 目录权限，不符合则告警。注意不影响程序正常读写（仅防其他系统用户读取缓存中的持仓/净值数据）。
 
 ### P1-15: Rf fetcher 测试用例
-- **估时**: 4h（缩减，因 P1-01/P1-02 取消、链路简化）
+- **估时**: 4h
 - **文件**: `src/test/unit/test_bond_yield.py`（新建）
 - **阻塞**: 否（数据源已验证可用，可直接写测试）
 - **依赖**: P1-03（bond_yield 模块存在）
@@ -301,10 +305,11 @@
 
 ### P1-16: 管线集成测试——4 个阻断点冒烟测试
 - **估时**: 8h
-- **文件**: `src/test/scenario/test_pipeline_blocking_points.py`（新建）
+- **文件**: `src/test/scenario/basic/test_pipeline_smoke.py`（新建）
 - **阻塞**: 否
 - **依赖**: P1-06、P1-07、P1-08、P1-09（所有阻断点已修复）
-- **描述**: 新增冒烟测试覆盖 4 个阻断点：(1) `prepare_report_data` 返回字典含 `risk_metrics` 键；(2) `capture_snapshot` f_context 含风险字段且 `.get()` 安全；(3) `generate_all_llm` 不因缺失 `history_data` 崩溃；(4) `_fingerprint` 哈希输入含风险摘要且旧版本无此字段时不报错。使用最小持仓 fixture（2-3 品种），快速执行（<30s）。运行 `--mode regression` 确认通过。标注 `@pytest.mark.scenario_basic`。
+- **状态**: ✅ 已完成（2026-07-20）
+- **描述**: 新增冒烟测试覆盖 4 个阻断点：(1) `prepare_report_data` 返回字典含 `risk_metrics` 键；(2) `capture_snapshot` f_context 含风险字段且 `.get()` 安全；(3) `generate_all_llm` 不因缺失 `history_data` 崩溃；(4) `_fingerprint` 哈希输入含风险摘要且旧版本无此字段时不报错。使用最小持仓 fixture（2 品种），快速执行（<30s）。运行 `--mode regression` 确认通过。标注 `@pytest.mark.scenario_basic`。
 - **测试隔离要求**: (a) **输出目录隔离**——必须将 `reports/` 输出目录重定向到 `tmp_path`（使用 `monkeypatch.setattr` 或 fixture），避免测试报告残留在生产 `reports/` 目录；(b) **LLM 调用 mock**——`generate_all_llm` 的测试必须 mock LLM API 调用（`unittest.mock.patch`），防止真实调用产生费用和 API 依赖；(c) **输入数据隔离**——持仓数据必须使用 fixture 构造（2-3 品种的简单持仓），不得依赖 `data/holdings/` 的真实文件；(d) **单例重置**——测试涉及 DegradationTracker 的，需调用 `get_tracker().reset()` 清理状态。
 
 ### P1-17: 熔断器改进——指数退避
@@ -335,7 +340,7 @@
 - **阻塞**: 否
 - **依赖**: 无（独立于其他 P1 任务，可并行）
 - **描述**: 实施 LLM 完全不可用时的报告降级机制：(1) 在 orchestrator.py 的 generate_all_llm() 中捕获 LLM 异常，所有 4+1 个 LLM 模块均失败时自动终止 LLM 生成流程，不阻塞报告管线；(2) 在 info 字典中增加 llm_status 键（success/failed/degraded），下游 HTML/Excel 生成器据此决定是否显示 LLM 板块；(3) full 路径中 LLM 失败时自动转为 both 路径产出（含 LLM 占位文本"智能分析暂时不可用，请稍后重试"）；(4) 将 LLM circuit_breaker 状态暴露到 DegradationTracker，在报告页脚展示 LLM 状态摘要（正常/熔断中/冷却剩余时间）；(5) 验证 LLM 预检：每次生成前做一次轻量连通性测试。验收标准：mock LLM API 全部返回 503，验证 full 报告正常生成（HTML 含 LLM 占位文本，Excel 跳过 LLM 页签）。
-- **⚠ 遗留路径覆盖（R4-07）**：`html_renderers.py` L496-508 有一段遗留回退代码，在 `llm_content` 未预先计算时直接调用 `generate_all_llm`——**此路径不传递 `f_context`**。当前 TUI 已通过 `orchestrator.generate_report()` 路由，正常情况下不触发此遗留路径。P1-20 应检查并清理此遗留路径，确保所有 LLM 调用都经过 `orchestrator.py` 的统一降级逻辑。否则降级机制覆盖不全。
+- **⚠ 遗留路径覆盖**：`html_renderers.py` L496-508 有一段遗留回退代码，在 `llm_content` 未预先计算时直接调用 `generate_all_llm`——**此路径不传递 `f_context`**。当前 TUI 已通过 `orchestrator.generate_report()` 路由，正常情况下不触发此遗留路径。P1-20 应检查并清理此遗留路径，确保所有 LLM 调用都经过 `orchestrator.py` 的统一降级逻辑。否则降级机制覆盖不全。
 
 ### P1-21: f_context Schema 文档——Phase 1 Full Schema 补充 + 校验层扩展
 - **估时**: 6h（Pre-Schema 2h 已由 T0-01-B 完成，此处仅补充 Phase 1 新增键的 Full Schema 定义）
@@ -355,155 +360,22 @@
 
 ## Phase 2 — 量化信号全面激活（~140h）
 
-> **说明**: P2-11 拆分为 P2-11a（Beta 点估计 16h 留 Phase 2）和 P2-11b（置信区间 24h 移至 Phase 4）。新增 P2-14-B 集成测试（8h）验证 Phase 2 指标在 Phase 1 管线中的完整流转。
-
-### P2-01: 夏普比率算法
-- **估时**: 8h
-- **文件**: `src/python/analysis/metrics.py`（新增，~500-700 行，含截断保护、置信区间、边界处理）
-- **阻塞**: 是 ← P1-03（Rf fetcher） + P1-05（组合日收益率）
-- **依赖**: P1-03、P1-05
-- **描述**: 实现 `sharpe_ratio(portfolio_daily_returns, rf_annual) → float | None`。公式：`(年化组合收益率 - 无风险利率) / 年化波动率`。年化因子 √252。Rf 不可用时返回 None（输出"--"）。边界处理：(1) 年化波动率趋近 0 → 返回 None；(2) 不足 20 个交易日 → 返回 None（统计意义不足）；(3) 负夏普正常返回（选告风险调整后为负）。
-
-### P2-02: 卡玛比率算法
-- **估时**: 4h
-- **文件**: `src/python/analysis/metrics.py`
-- **阻塞**: 否
-- **依赖**: P1-05（组合日收益率，用于计算最大回撤）
-- **描述**: 实现 `calmar_ratio(portfolio_daily_returns) → float | None`。公式：`年化收益率 / 最大回撤`。最大回撤同期间（1 年 / 全部历史）。边界处理：最大回撤 < 0.1% → None（分母太小无意义）。
-
-### P2-03: HHI 集中度指数算法
-- **估时**: 4h
-- **文件**: `src/python/analysis/metrics.py`
-- **阻塞**: 否
-- **依赖**: 无（现有 market_value 直接可算）
-- **描述**: 实现 `hhi(weights: list[float]) → float`。公式：`Σ(w_i)²`，其中 `w_i = market_value_i / total_value`。范围 [0, 1]（1=完全集中)。附加输出：等效集中品种数 `1/HHI`（如 HHI=0.25 等效=4 只）。LLM 可据此判断："组合等效持有 N 只不相关品种"。
-
-### P2-04: 持仓胜率算法
-- **估时**: 4h
-- **文件**: `src/python/analysis/metrics.py`
-- **阻塞**: 否
-- **依赖**: 无（现有 profit 直接可算）
-- **描述**: 实现 `win_rate(holdings) → float`。公式：`盈利品种数 / 总持仓品种数`。边界：空持仓 → None。附加：盈利/亏损品种列表（用于 LLM 逐只点评）。
-
-### P2-05: 换手率算法
-- **估时**: 4h
-- **文件**: `src/python/analysis/metrics.py`
-- **阻塞**: 否
-- **依赖**: P1-04（个股日收益率，用于日均市值计算）
-- **描述**: 实现 `turnover_rate(holdings, period_changes) → float`。公式：`期间买入+卖出总额 / 期间平均总市值`。期间对应报告区间（快照间隔）。如果期间变动明细不可用，返回 None。
-
-### P2-06: 持仓风险贡献算法
-- **估时**: 6h
-- **文件**: `src/python/analysis/metrics.py`
-- **阻塞**: 否
-- **依赖**: P1-04（个股日收益率，用于 σ 计算）
-- **描述**: 实现 `risk_contribution(weights, volatilities) → list[tuple[str, float]]`。公式：`RC_i = w_i × σ_i / Σ(w_j × σ_j)`（简化版，非 Euler 分解）。返回按贡献降序排列。个股 σ 用日收益率 std×√252。如果个股日收益率不可用，降级为权重等比例分配（仅告警不报错）。LLM 使用："组合最大风险源是 XX，贡献了 YY% 的波动风险。"
-
-### P2-07: 分红历史数据接入 fund_performance + LLM prompt
-- **估时**: 4h
-- **文件**: `src/python/report/fund_performance.py`（扩展，接入分红数据）、`src/python/llm/prompts.py`（提及分红信息）
-- **阻塞**: 否
-- **依赖**: 无（分红数据已在 `registry.py` 注册但未在生成管线中传递）
-- **描述**: 原文 §1.2 指出"分红历史已注册但未接入生成管线"。实施：(1) 在 `fund_performance.py` 的汇总字段中追加 `dividend_yield`（股息率 = Σ分红 / 当前市值）；(2) 在 `expert_review` prompt 中增加一则提示："当前持仓综合股息率 X.X%，其中高分红品种（>3%）为：列表"；(3) 注：分红数据来自 AkShare，T4 级别（失败显示"--"），此接入不应依赖分红数据完整可用。
-
-### P2-08: metrics.py 整合与接口定义
-- **估时**: 2h
-- **文件**: `src/python/analysis/metrics.py`
-- **阻塞**: 否
-- **依赖**: P2-01、P2-02、P2-03、P2-04、P2-05、P2-06（所有单指标函数已实现）
-- **描述**: 在 `metrics.py` 中编写统一入口函数 `compute_all_metrics(f_context) → dict[str, Any]`，依次调用各指标函数，组装为一个扁平字典。key 命名规范：`sharpe_ratio`、`calmar_ratio`、`hhi`、`win_rate`、`turnover_rate`、`risk_contributions`、`beta`。不可计算的指标 key 值为 None。统一入口供 `orchestrator.py` 单点调用。**⚠ 注册要求**：包含 `registry.py _COMPUTATION_REGISTRY` 注册（注册名 `analytics_metrics`，由 P1-10 预留位置）。
-
-### P2-09: 截断保护与极端值处理
-- **估时**: 8h
-- **文件**: `src/python/analysis/metrics.py`
-- **阻塞**: 否
-- **依赖**: P2-08（metrics.py 已有完整接口）
-- **描述**: 为 `compute_all_metrics()` 添加全局截断保护层：(1) NaN/Inf 静默过滤为 None；(2) 极端值截断（夏普绝对值 > 10、HHI > 1.0 等物理不可能值强制设为 None）；(3) 疑似数据错误的品种标记（如单日收益率 > 20% 无分红/拆股记录时告警）；(4) 各指标输出均包含 `confidence` 字段（high/medium/low，基于数据天数和缺失率判断）。
-
-### P2-10: 个股波动率计算
-- **估时**: 8h
-- **文件**: `src/python/analysis/metrics.py`（新增函数）
-- **阻塞**: 否
-- **依赖**: P1-04（个股日收益率已在管线中）
-- **描述**: 实现 `individual_volatility(individual_daily_returns) → dict[str, float]`。对每品种计算 `年化波动率 = std(daily_returns) × √252`。输出 `{code: annualized_vol}` 字典。不足 20 个交易日的品种返回 None。为风险贡献（P2-06）、Beta（P2-11）、回撤预警（P2-12）提供基础数据。
-
-### P2-11a: 组合 Beta 算法——Beta 点估计（协方差法）
-- **估时**: 16h（2 天——高复杂度指标，含协方差计算、日期对齐、边界处理）
-- **文件**: `src/python/analysis/metrics.py`（新增 `portfolio_beta` 函数）
-- **阻塞**: 是 ← P1-05（组合日收益率就绪）
-- **依赖**: P1-04、P1-05、P2-10（个股/组合日收益率 + 基准收益率）
-- **描述**: 实现 `portfolio_beta(portfolio_returns, benchmark_returns) → float | None`。方法：协方差法 `β = Cov(Rp, Rb) / Var(Rb)`。窗口期默认为最近 252 个交易日（约 1 年），可配置。流程：(1) 获取组合日收益率序列；(2) 获取基准指数日收益率序列（沪深300已存在）；(3) 对齐日期索引（取交集）；(4) 计算协方差/方差。边界：(1) 不足 20 个对齐交易日 → None；(2) 基准收益率全为零（休市/停牌）→ None。Beta 解读注入 LLM："组合 Beta = 1.2，意味着市场每涨跌 1%，组合平均波动 1.2%。" **注意：此任务仅做点估计，95% 置信区间移至 P2-11b（P4-01 前置）。**
-
-### P2-12: 回撤历史分位预警——滚动 1 年（Layer 3B）
-- **估时**: 18h
-- **文件**: `src/python/analysis/metrics.py`（新增 `drawdown_percentile` 函数）
-- **阻塞**: 否
-- **依赖**: P1-04（个股日收益率管线就绪）
-- **描述**: 实现滚动 1 年回撤历史分位计算：(1) 对每品种，取近 252 个交易日的每日净值（收盘价×份额+累计分红）；(2) 计算该窗口内的滚动最大回撤序列；(3) 当前回撤值 ÷ 历史最大回撤 = 分位数；(4) 输出 `{code: {current_drawdown, max_drawdown, percentile, days_in_drawdown}}`。LLM 使用："XX 品种当前回撤处于近 1 年最大回撤的 85% 分位，接近历史极限区域。"
-
-### P2-13: 回撤历史分位预警——全历史（Layer 3B）
-- **估时**: 18h
-- **文件**: `src/python/analysis/metrics.py`（扩展 drawdown_percentile）
-- **阻塞**: 否
-- **依赖**: P2-12（1 年版本已实现）
-- **描述**: 在 P2-12 基础上扩展到全历史窗口：(1) 对每品种，取全部可用历史数据；(2) 如果全历史 > 3 年，同时计算 1 年 + 3 年 + 全历史三个时间窗口的分位数；(3) 输出增加窗口标记。LLM 使用综合判断："XX 品种当前回撤处于全历史最大回撤的 72% 分位（近 1 年 85% 分位），提示短期压力大于长期。"
-
-### P2-14: LLM Prompt 注入——指标表
-- **估时**: 8h
-- **文件**: `src/python/llm/prompts.py`
-- **阻塞**: 否
-- **依赖**: P2-08（metrics.py 统一接口就绪）、P1-08（history_data 已暴露）
-- **描述**: 在 `expert_review` 系统提示语中插入结构化指标表段。格式：三列表格（指标名、组合值、基准值/参考范围）。包含字段：夏普比率、卡玛比率、组合 Beta、HHI、持仓胜率、换手率、年化波动率、最大回撤。基准值来自沪深300对应周期计算。无对应基准的字段（如 HHI）标注"——"或给出参考解释。指标值 None 时显示"--"。
-
-### P2-14-B: Phase 2 → Phase 1 管线集成测试（验证指标数据全链路流转）
-- **估时**: 8h
-- **文件**: `src/test/scenario/test_pipeline_metrics_flow.py`（新建）
-- **阻塞**: 否
-- **依赖**: P2-14（LLM 注入就绪）、P1-08（history_data 管线就绪）、P2-08（metrics.py compute_all_metrics 就绪）
-- **描述**: 模拟完整管线执行，验证 Phase 2 指标数据在 Phase 1 管线中正确流转：(1) 创建最小持仓 fixture（3 品种 + 模拟日收益率序列）；(2) 执行完整管线：`prepare_report_data` → `capture_snapshot` → `compute_all_metrics` → `build_system_prompt`（含指标表）；(3) 断言 `compute_all_metrics()` 返回值中的每个指标（sharpe_ratio、calmar_ratio、hhi、win_rate、turnover_rate、risk_contributions、beta）在 `f_context["risk_metrics"]` 中存在且类型正确；(4) 断言指标表出现在 LLM prompt 输出字符串中（验证 inject 成功）；(5) 验证空数据场景——当 `daily_returns` 不足 20 天时，相关指标返回 None 且 prompt 显示"--"而非崩溃。标注 `@pytest.mark.scenario_basic`。
-- **测试隔离要求**: (a) **输出目录隔离**——`reports/` 输出目录必须重定向到 `tmp_path`；(b) **LLM 调用 mock**——`build_system_prompt` 的测试只验证 prompt 字符串输出，不调用 `call_llm()`；若测试触发完整 LLM 管线，必须 mock `call_llm()`；(c) **输入数据隔离**——持仓 fixture 构造 3 品种简单数据，不依赖 `data/holdings/` 真实文件；(d) **Rf 依赖 mock**——若使用 `bond_yield` 获取 Rf 计算夏普，需 mock `bond_zh_us_rate()` 返回已知值，避免外部 API 依赖。
-
-### P2-15: LLM Prompt 注入——数据质量段落
-- **估时**: 4h
-- **文件**: `src/python/llm/prompts.py`
-- **阻塞**: 否
-- **依赖**: P2-14、T0-02（数据质量已在管线中）
-- **描述**: 在 `health_check` prompt 中展开数据质量段落（T0-03 预留位置），格式化为项目符号列表。每条包含：检查项名称、状态图标（🟢/🟡/🔴）、简要说明。当所有检查项正常时，合并为一行"所有数据源状态正常"。
-
-### P2-16: LLM Prompt 注入——信号置信度
-- **估时**: 4h
-- **文件**: `src/python/llm/prompts.py`
-- **阻塞**: 否
-- **依赖**: P2-09（截断保护为各指标输出 confidence 字段）
-- **描述**: 在 prompt 中增加"信号置信度"段落，LLM 据此调整建议的口吻。规则：(1) 所有指标均为 high → "数据充分，建议可信度较高"；(2) 部分指标 medium → "部分数据有限，仅供参考"；(3) 有 low 指标 → "数据不完整，建议谨慎参考"；(4) 大部分指标 None → "当前数据不足以生成可靠建议"。
-- **验收标准**（R5-03 补充）: (1) 在 `expert_review` prompt 的"信号置信度"段落中插入结构化标记 `{{confidence_level}}`，值为以下枚举之一：`"high"`（所有 8 指标 confidence 均为 high）、`"medium"`（任意指标为 medium 且无 low）、`"low"`（任意指标为 low）、`"insufficient"`（≥5 指标为 None）；(2) 在 `prompts.py` 中编写一个纯 Python 函数 `_get_confidence_level(metrics_dict) → str`（不含 LLM 调用），实现上述枚举逻辑，该函数有完整单元测试（mock 各指标 confidence 值，验证 4 种枚举输出）；(3) 运行 `python -m pytest src/test/unit/llm/test_prompts.py -x -q` 确认新增函数测试通过；(4) `{{confidence_level}}` 对应的引导话术固定为 `{"high":"数据充分，建议可信度较高","medium":"部分数据有限，仅供参考","low":"数据不完整，建议谨慎参考","insufficient":"当前数据不足以生成可靠建议"}`。
-
-### P2-17: LLM Prompt 注入——行动模板
-- **估时**: 4h
-- **文件**: `src/python/llm/prompts.py`
-- **阻塞**: 否
-- **依赖**: P2-14、P2-16
-- **描述**: 在 `expert_review` prompt 结尾增加标准化行动模板段，引导 LLM 输出结构化建议。
-- **验收标准**（R5-03 补充）: (1) 在 `expert_review` system prompt 末尾插入格式指令，要求 LLM 在回复末尾以 Markdown 表格格式输出行动建议（列：建议类型、涉及品种、建议理由、优先级）；(2) 建议类型枚举值固定为 `["持有","增持","减持","止盈","止损"]`，优先级枚举值固定为 `["高","中","低"]`，非枚举值不在表格中出现；(3) 每次 LLM 回复必须至少包含 1 行动建议行（即使为"持有全部品种"），不得空表；(4) 在 `prompts.py` 中编写纯 Python 验证函数 `_validate_action_template(llm_output: str) → bool`，解析 LLM 回复末尾的 Markdown 表格，检查列数=4、枚举值合法性、非空——该函数有完整单元测试（mock 合法回复→True、非法回复→False、空回复→False）；(5) 运行 `python -m pytest src/test/unit/llm/test_prompts.py -x -q` 确认新增函数测试通过；(6) 运行 `python -m pytest src/test/ -m "unit" -x --tb=short -q` 确认不破坏现有单元测试。
-
-### P2-18: 指标集成测试（8 指标各 1-2 断言）
-- **估时**: 8h
-- **文件**: `src/test/unit/test_metrics.py`（新建）
-- **阻塞**: 否
-- **依赖**: P2-08（metrics.py 统一接口就绪）
-- **描述**: 为 8 个指标编写单元测试：(1) 夏普——已知收益率序列 + 已知 Rf → 已知值校验；(2) 卡玛——已知回撤系列 → 已知值；(3) HHI——均匀权重 → 1/N；(4) 胜率——3 盈 2 亏 → 0.6；(5) 换手率——已知变动额 → 已知值；(6) 风险贡献——等权等σ → 均等；(7) Beta——组合=基准 → 1.0；(8) 回撤分位——已知回撤窗口 → 分位值校验。标注 `@pytest.mark.unit_providers`。每个指标至少包含正常和边界两种情况。
+> ✅ **全部 19 项任务（P2-01 ~ P2-18）已全部完成**（2026-07-20）
+>
+> 包括量化指标算法 11 项、回撤预警 2 项、LLM Prompt 注入 4 项、集成测试 2 项，详见 changelog.md。
 
 ---
 
 ## Phase 3 — 执行信号与竞争语境 + 画像问卷 + 事实校验器（~206h）
 
-> **说明**: P3-15（TUI 画像问卷，原 P5-04）和 P3-16（事实校验器，原 P4-07）从 Phase 4/5 提前到 Phase 3 尾期并行执行，两者均无依赖，可与其他 Phase 3 任务并行。P3-14（prompts.py 拆分）已提前到 Phase 1（P1-08-B）。P3-09b（口径修正因子）推迟到 Phase 4。
+> P3-01 ~ P3-06 ✅ 已完成，P3-07 ~ P3-17 为 P2 待办，详见 `docs-stm/managements/plan.md`。
 
 ### P3-01: 再平衡完整版——目标配置 Schema
 - **估时**: 16h
 - **文件**: `src/python/config/_config_defaults.py`（新增 `target_allocation` 配置）、`src/python/analysis/rebalance.py`（新建，替代 MVP 的 `simple_rebalance.py`）
 - **阻塞**: 否
 - **依赖**: MVP-03（硬编码版已交付，完整版在其基础上扩展）
+- **状态**: ✅ 已完成（2026-07-20）
 - **描述**: 设计目标配置 Schema：`{"equity": {"min": 30, "max": 70, "target": 50}, "bond": ...}`（百分比）。支持大类配置 + 品种级配置。Config 默认值为空（=不启用目标配置检查）。`rebalance.py` 实现：(1) 读取目标配置；(2) 计算当前大类/品种偏离度；(3) 输出 `{type, code, current_weight, target_weight, deviation, action}`。
 
 ### P3-02: 再平衡完整版——阈值可配
@@ -511,6 +383,7 @@
 - **文件**: `src/python/config/_config_defaults.py`、`src/python/analysis/rebalance.py`
 - **阻塞**: 否
 - **依赖**: P3-01（Schema 已定义）
+- **状态**: ✅ 已完成（2026-07-20）
 - **描述**: MVP 版 15% 为硬编码。完整版从 config 读取 `rebalance.threshold`：(1) 单品种超限阈值（默认 15%，可配）；(2) 大类配置偏离阈值（默认 5%，可配）；(3) 保守/稳健/进取三套预设阈值（Phase 4 用户画像接入后自动切换）。
 
 ### P3-03: 再平衡完整版——静默期
@@ -518,6 +391,7 @@
 - **文件**: `src/python/analysis/rebalance.py`
 - **阻塞**: 否
 - **依赖**: P3-02（阈值系统已就绪）
+- **状态**: ✅ 已完成（2026-07-20）
 - **测试**: unit（`pytest src/test/unit/test_rebalance.py -x -q`）
 - **描述**: 引入静默期机制：同一品种触发再平衡信号后，N 天内不再重复告警（默认 30 天，可配）。静默期状态持久化到 `data/cache/rebalance_silence.json`。LLM 输出时注明："上次建议减持 XX 在 30 天静默期内，本次不再重复。"
 - **测试隔离要求**: `rebalance_silence.json` 路径必须可注入（构造参数或 config），测试时通过 `monkeypatch.setattr` 或 fixture 注入 `tmp_path` 下路径。测试应验证：写入后可恢复读取、静默期内不重复告警、静默期过期后重新告警。
@@ -527,6 +401,7 @@
 - **文件**: `src/python/analysis/rebalance.py`
 - **阻塞**: 否
 - **依赖**: P3-02（阈值系统）
+- **状态**: ✅ 已完成（2026-07-20）
 - **描述**: 为每条再平衡信号计算置信度：(1) 偏离幅度（偏离越大置信度越高）；(2) 偏离持续时间（持续 > 30 天的高偏离为高置信度）；(3) 数据质量（对应品种的数据状态，降级中则置信度降低）。输出 `confidence: high/medium/low`，LLM 据此调整建议强度。
 
 ### P3-05: 再平衡完整版——三类误报防护
@@ -534,6 +409,7 @@
 - **文件**: `src/python/analysis/rebalance.py`
 - **阻塞**: 否
 - **依赖**: P3-02（阈值系统）
+- **状态**: ✅ 已完成（2026-07-20）
 - **描述**: 再平衡信号的误报防护逻辑：(1) 分红/拆股导致的市值跳变 → 检查品种份额是否变化，排除纯价格波动超过阈值但持有量未变的"假超限"；(2) 新买入品种短期波动 → 持仓不足 20 个交易日不触发再平衡；(3) 临近行权/到期品种 → 标注剩余期限，LLM 可据此判断是否等待自然到期。每条误报防护规则记录触发情况。
 
 ### P3-06: 再平衡完整版——权益/固收偏离
@@ -541,6 +417,7 @@
 - **文件**: `src/python/analysis/rebalance.py`（新增 `equity_fixed_income_deviation`）
 - **阻塞**: 否
 - **依赖**: P3-01（目标配置 Schema）、P1-22（已从 report/category.py 提取到 code_utils.py，防止逆向依赖）
+- **状态**: ✅ 已完成（2026-07-20）
 - **描述**: 基于 `category.py` 的 8 类资产分类，汇总为权益类（股票/股票型基金/混合基）和固收类（债券/货基/现金）。对照目标配置（P3-01）计算偏离度。输出："权益仓位从 70% 升至 78%（目标上限 70%），建议部分止盈权益类品种，增配债券类。" 偏离 < 阈值（默认 5%）时不输出。
 - **前置注意**: `code_utils.py`（来自 P1-22 提取）的资产分类对权益/固收偏离可能存在以下偏差——(1) 混合型基金若在 code_utils.py 中被统一归入"基金/混合"，但实际权益比例从 0% 到 95% 不等，汇总到权益类时必然失真；(2) `is_bond_fund_by_name` 使用宽松匹配含单字"债"，可能误配可转债等非纯债品种为固收类；(3) `is_otc_fund_by_name` 依赖名称关键词，"00"代码重叠区存在误判风险。本任务需额外增加 2-4h 用于评估是否需要新数据源获取持仓基金的实际权益比例（如天天基金持仓穿透或基金类型注册信息），或在不做数据源改进时增加免责声明"混合基金权益比例为估算值"并在 LLM prompt 中降低该信号的置信度权重。
 
@@ -556,7 +433,7 @@
 - **文件**: `src/python/llm/prompts.py`（竞争语境段落扩展）
 - **阻塞**: 是（依赖链 7 步硬串行：PRE-01→P1-03→P2-01→P3-08 及 PRE-02→P3-07→P3-08，任一环节失败均导致夏普对比列显示"--"或仅剩两列）
 - **依赖**: P2-01（夏普比率可用）、P3-07（885005 或降级说明）
-- **描述**: 扩展竞争语境段落为三列（组合、沪深300、偏股基金指数）。字段：(1) 年初至今收益；(2) 近 1 年收益；(3) 最大回撤；(4) 夏普比率（如有）；(5) 年化波动率。偏股基金指数不可用时仅显示两列。最后 LLM 综合判断："你的组合在牛市中略跑赢指数，且回撤控制优于平均水平，偏防御型配置。" **依赖链风险备注**：此任务依赖 7 步硬串行链（PRE-01→P1-01→P2-01→P2-08→P2-14→P2-14-B→P3-08 及 PRE-02→P3-07→P3-08），环节总数超过 15 个节点（含隐藏扇入），单点故障概率叠加后 P3-08 按设计完整交付的概率显著高估。(1) 在 PRE-01 测试报告中增加 PASS/FAIL 对 P3-08 影响分析——API 不可用则提前决定夏普对比不可行，P3-08 砍掉夏普维度（仅保留收益对比，等同于现有 MVP-04 内容）；(2) 建立依赖链健康检查脚本，在 Phase 2 收尾时自动验证 P1-01→P2-01 管线数据流是否产生有效夏普值，若为 None 则 P3-08 自动降级为"收益对比扩展"而非"夏普对比新增"。
+- **描述**: 扩展竞争语境段落为三列（组合、沪深300、偏股基金指数）。字段：(1) 年初至今收益；(2) 近 1 年收益；(3) 最大回撤；(4) 夏普比率（如有）；(5) 年化波动率。偏股基金指数不可用时仅显示两列。最后 LLM 综合判断："你的组合在牛市中略跑赢指数，且回撤控制优于平均水平，偏防御型配置。" **依赖链风险备注**：此任务依赖 7 步硬串行链（PRE-01→P1-03→P2-01→P2-08→P2-14→P2-14-B→P3-08 及 PRE-02→P3-07→P3-08），环节总数超过 15 个节点（含隐藏扇入），单点故障概率叠加后 P3-08 按设计完整交付的概率显著高估。(1) 在 PRE-01 测试报告中增加 PASS/FAIL 对 P3-08 影响分析——API 不可用则提前决定夏普对比不可行，P3-08 砍掉夏普维度（仅保留收益对比，等同于现有 MVP-04 内容）；(2) 建立依赖链健康检查脚本，在 Phase 2 收尾时自动验证 P1-03→P2-01 管线数据流是否产生有效夏普值，若为 None 则 P3-08 自动降级为"收益对比扩展"而非"夏普对比新增"。
 - **正式降级验收标准（CRITICAL）**：P3-08 的 15+ 节点硬串行链意味着全链按设计交付的概率极低，必须建立每个环节的正式降级验收标准：(a) **PRE-01 FAIL** → Rf API 不可用 → P1-01/P1-02 砍掉（释放 28h），P1-03 手动配置兜底（2h），P3-08 夏普列显示"--"，不影响收益对比列；(b) **P1-01 交付后夏普值为 None**（Rf 虽可用但数据不稳定超过 1 个月）→ P2-01 显示"--"，P3-08 自动移除夏普维度，LLM prompt 中增加"风险调整后收益数据暂不可用"说明；(c) **PRE-02 FAIL** → 885005 不可获取 → P3-07 降级为自定义基金池，P3-08 显示两列（组合+沪深300）或三列（组合+沪深300+预设池均值），LLM prompt 标注"偏股基金指数暂不可用"；(d) **多重 FAIL**（Rf 和 885005 均不可用）→ P3-08 退化为 MVP-04 级别（仅收益对比两列），无夏普无偏股基金，相当于非功能交付——此级别在项目排期中应当被标记为"非功能交付"而非"部分交付"，决策权归属项目经理。每个降级场景的验收代码随 P3-08 同时交付（场景枚举 + 降级路径注释）。
 
 ### P3-09a: 竞争语境完整版——口径对齐与说明（prompt 级，快速上线）
@@ -608,19 +485,19 @@
 - **依赖**: P1-22（code_utils.py 已扩展为统一判定入口）
 - **描述**: 实现 `fx_exposure(holdings) → dict`。依据上市地 + 币种字段判断：(1) 人民币计价；(2) 港币计价（港股通）；(3) 美元计价（美股/美元债）；(4) 其他。汇总各币种占比（市值加权）。LLM 输出："约 30% 资产为美元计价，人民币近期升值 / 贬值影响约 -2%。" 注意：港股通品种为港币计价但实际换汇成本是隐含的，需标注说明。注入 `expert_review` prompt。**⚠ 注册要求**：包含 `registry.py _COMPUTATION_REGISTRY` 注册（注册名 `analytics_fx_exposure`，由 P1-10 预留位置）。
 
-### P3-15: TUI 完整画像问卷（从 Phase 5 提前，无依赖可并行执行）
+### P3-15: TUI 完整画像问卷
 - **估时**: 40h（5 天）
 - **文件**: `src/python/tui/profile_questionnaire.py`（新增）、`src/python/config/_config_defaults.py`（新增 `user_profile` 段）
 - **阻塞**: 否
 - **依赖**: 无
-- **描述**: 风险承受能力/投资期限/投资目标/定投金额/税务身份/经验水平 6 字段问卷，结果持久化到 config。支持"跳过"（用中性通用投资建议垫底（无推断时可用的默认值））。Phase 5（P5-01~03）未实现时，跳过问卷直接使用中性通用建议。提前到 Phase 3 尾期执行（与 P3-11/12/13 等无依赖任务并行）。⚠ 并发约束：P3-12 和 P3-15 均修改 _config_defaults.py，必须由同一开发者按序执行（先 P3-12 后 P3-15 或反之），禁止两人并行修改同一文件。
+- **描述**: 风险承受能力/投资期限/投资目标/定投金额/税务身份/经验水平 6 字段问卷，结果持久化到 config。支持"跳过"（用中性通用投资建议垫底）。Phase 5（P5-01~03）未实现时，跳过问卷直接使用中性通用建议。⚠ 并发约束：P3-12 和 P3-15 均修改 _config_defaults.py，必须由同一开发者按序执行（先 P3-12 后 P3-15 或反之），禁止两人并行修改同一文件。
 
-### P3-16: LLM 事实锚定校验器（从 Phase 4 提前，无依赖可并行执行）
+### P3-16: LLM 事实锚定校验器
 - **估时**: 24h（3 天）
 - **文件**: `src/python/llm/fact_checker.py`（新增）
 - **阻塞**: 否
 - **依赖**: 无
-- **描述**: LLM 生成报告后做事实校验：(1) 定义可自动验证的事实类型：数值一致性（LLM 引用的收益率/波动率与实际数据匹配）、品种存在性（LLM 提及的品种确实在持仓中）、排名正确性（LLM 说的"最大持仓"确实市值最大）；(2) 校验器提取 LLM 回复中的数值和品种名，对照已知数据做一致性检查；(3) 不一致项标注并修正（数值纠正 / 删除错误陈述）；(4) 在报告末尾追加校验摘要："报告经自动事实校验：4/5 项数据准确，1 项数值偏差已修正。" 提前到 Phase 3 执行（与再平衡完整版等任务并行），使 Phase 4 幻觉率采样测试（P4-08）可尽早启动。- **注册要求（已决策）**：实施两层分层方案——(a) 数值一致性检查（纯算法层，验证收益率匹配、品种存在性、排名正确性），注册到 registry.py 新增的 _COMPUTATION_REGISTRY（由 P1-10 负责创建 ComputModuleDef 结构，不含缓存属性），在 generators_orchestrator 中用串行调用；(b) 复杂事实声明验证（LLM API 层，需额外 token），在 _MODULE_FNS 注册并通过 call_llm() 路由（C17 合规）。优先实现纯算法层（8h），LLM 增强版作为 Phase 后评估选项（+16h）。两层可共存。总估时 24h 含 4h _COMPUTATION_REGISTRY 适配+管线注册。
+- **描述**: LLM 生成报告后做事实校验：(1) 定义可自动验证的事实类型：数值一致性（LLM 引用的收益率/波动率与实际数据匹配）、品种存在性（LLM 提及的品种确实在持仓中）、排名正确性（LLM 说的"最大持仓"确实市值最大）；(2) 校验器提取 LLM 回复中的数值和品种名，对照已知数据做一致性检查；(3) 不一致项标注并修正（数值纠正 / 删除错误陈述）；(4) 在报告末尾追加校验摘要："报告经自动事实校验：4/5 项数据准确，1 项数值偏差已修正。" - **注册要求（已决策）**：实施两层分层方案——(a) 数值一致性检查（纯算法层，验证收益率匹配、品种存在性、排名正确性），注册到 registry.py 新增的 _COMPUTATION_REGISTRY（由 P1-10 负责创建 ComputModuleDef 结构，不含缓存属性），在 generators_orchestrator 中用串行调用；(b) 复杂事实声明验证（LLM API 层，需额外 token），在 _MODULE_FNS 注册并通过 call_llm() 路由（C17 合规）。优先实现纯算法层（8h），LLM 增强版作为 Phase 后评估选项（+16h）。两层可共存。总估时 24h 含 4h _COMPUTATION_REGISTRY 适配+管线注册。
 
 ### P3-17: LLM Token 成本追踪与预算机制
 - **估时**: 8h（1天）
@@ -633,10 +510,11 @@
 
 ## Phase 4 — 质量与安全（~176h）
 
-> **硬性前置条件**：端到端性能测试（P4-14）、链韧性测试（P4-15）、安全测试（P4-16）的通过标准为 Phase 4 的**硬性前置条件**，不允许为赶进度而压缩或跳过。任意一项测试失败则 Phase 4 不可视为完成。
-> **估时说明**：原文风险表标注 Phase 4 估时低估 1.5-2 倍。当前任务分解 176h（约 22 天单人），但考虑依赖链风险和画像部分的高复杂度，保守估计需 52 天（单人）、悲观 68 天（单人）。1 人团队建议按 1.6x 系数估算约 55-90 天。建议 Phase 3 完成后重新评估 ROI 决定是否进入 Phase 4。
+> 以下 17 项任务（P2-11b、P4-01 ~ P4-16）为 P2 待办，详见 `docs-stm/managements/plan.md` P2 待办区。
+>
+> **硬性前置条件**：端到端性能测试（P4-14）、链韧性测试（P4-15）、安全测试（P4-16）的通过标准为 Phase 4 的**硬性前置条件**，不允许为赶进度而压缩或跳过。
 
-### P2-11b: 组合 Beta 算法——置信区间 + 统计检验（从 Phase 2 移入，与敏感性分析合并）
+### P2-11b: 组合 Beta 算法——置信区间 + 统计检验
 - **估时**: 24h（3 天——含 t-统计量、协方差矩阵推导、蒙特卡洛置信区间）
 - **文件**: `src/python/analysis/metrics.py`（扩展 `portfolio_beta` 增加置信区间）
 - **阻塞**: 否
@@ -664,7 +542,7 @@
 - **依赖**: P4-02、P2-09（截断保护机制）
 - **描述**: 对各个指标的不确定性做置信区间传播：(1) Beta 置信区间 → 情景回撤置信区间；(2) 年化波动率置信区间 → 夏普比率置信区间；(3) 在 LLM prompt 中表述为："若市场下跌 20%，组合预计回撤 -16% 至 -24%（95% 置信区间）。" 置信区间过宽时（宽度 > 15%）标注"数据不足，预测可靠性有限"。
 
-### P3-09b: 竞争语境——口径修正因子计算（从 Phase 3 移入，与敏感性分析并行）
+### P3-09b: 竞争语境——口径修正因子计算
 - **估时**: 16h
 - **文件**: `src/python/analysis/alignment_correction.py`（新增）
 - **阻塞**: 否
@@ -683,20 +561,20 @@
 - **文件**: `src/python/tui/privacy_notice.py`（新增）、`src/python/cli.py`（首屏提示）
 - **阻塞**: 否
 - **依赖**: P4-04（匿名化选项完整）
-- **描述**: (1) 首次运行程序时显示隐私提示："本程序数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到 {provider}，不会用于训练。" (2) 每次生成报告时在 HTML/Excel 脚注自动追加上述提示；(3) TUI 新增"隐私与安全"页面展示当前安全状态（密钥加密✅ / 缓存保护✅ / 匿名化关闭🔴）。
+- **描述**: (1) 首次运行程序时显示隐私提示："本程序数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到 {provider}，不会用于训练。" (2) 每次生成报告时在 HTML/Excel 脚注自动追加上述提示；(3) TUI 新增"隐私与安全"页面展示当前安全状态（密钥存储🔴(待优化) / 缓存保护✅ / 匿名化关闭🔴）。
 
 ### P4-06: 隐私安全——缓存审查
 - **估时**: 8h
 - **文件**: `src/python/cache.py`（扩展清理逻辑）
 - **阻塞**: 否
 - **依赖**: P1-14（缓存权限已保护）
-- **描述**: 缓存数据可能包含敏感持仓信息。新增：(1) `cache.clean_sensitive(older_than_days=90)` 定期清理过期缓存；(2) 缓存内容审查：标注哪些 key 可能含敏感信息（如 `holding_*`、`penetration_*`）；(3) 启动时自动清理超过 90 天的敏感缓存；(4) 敏感缓存在加密存储（可选）。
+- **描述**: 缓存数据可能包含敏感持仓信息。新增：(1) `cache.clean_sensitive(older_than_days=90)` 定期清理过期缓存；(2) 缓存内容审查：标注哪些 key 可能含敏感信息（如 `holding_*`、`penetration_*`）；(3) 启动时自动清理超过 90 天的敏感缓存。
 
 ### P4-08: LLM 幻觉率采样测试
 - **估时**: 16h
 - **文件**: `src/test/scenario/test_llm_hallucination.py`（新建）
 - **阻塞**: 否
-- **依赖**: P3-16（原 P4-07，事实校验器已移至 Phase 3）
+- **依赖**: P3-16
 - **描述**: 建立幻觉率评估流程：(1) 准备 10 组标准持仓数据 + 对应正确事实表；(2) 每组数据让 LLM 生成报告（使用当前 prompt）；(3) 事实校验器 + 人工复核对比；(4) 统计幻觉率（错误事实 ÷ 总事实提及次数）；(5) 目标：<5%。生成幻觉率报告（`docs-stm/tmp/hallucination-report.md`）。每次 prompt 重大修改后重新采样。标注 `@pytest.mark.scenario_llm`，在 `conftest.py` 注册此 marker。
 
 ### P4-09: 缓存雪崩随机 TTL 修复
@@ -759,7 +637,7 @@
 
 ## Phase D — 独立决策（~16h）
 
-> **D = Discretionary（独立决策）**，不是 P6。Phase 1~5 是按序交付的主路线图（每一阶段依赖或承接前一阶段），而 Phase D 不属于主序列——此任务需单独评估 ROI 后决定是否投入。PD-01（条件推理）已提前至 MVP-06。
+> **D = Discretionary（独立决策）**，不是 P6。Phase 1~5 是按序交付的主路线图（每一阶段依赖或承接前一阶段），而 Phase D 不属于主序列——此任务需单独评估 ROI 后决定是否投入。
 
 ### PD-02: CAPM α 计算 ⚠ 建议砍项（保留 4h 做评估，砍掉 12h 实现）
 - **估时**: 16h（2 天——精简版，仅输出 α 值，无 t-统计量，解释工作交给 LLM 用自然语言描述）→ **建议保留 4h 做快速验证 + 12h 实现留作按需扩展**
@@ -770,9 +648,9 @@
 - **⚠ 砍项建议**：本轮架构审查建议将 PD-02 从原估时 16h（含实现）砍至 4h（仅做用户验证评估）：(a) **前置 4h 快速验证**——制作 5 份含 α 的报告片段，找真实用户（非项目成员）确认：(i) 是否理解 α 含义；(ii) 是否认为 α 有价值；(iii) 是否因为看到 α 而改变组合行为。如果三分之二以上用户的回答是"不理解"或"无价值"，直接砍掉 PD-02 的 12h 实现剩余时间，将其 4h 可重分配给 P4-08（幻觉率采样）+ P3-09b（口径修正因子计算）。(b) **砍项理由**——(i) α 对个人投资组合的统计效力和适用性存疑（持仓频繁变动+样本量小+含非股票资产）；(ii) 即使精简版，其 3 个前置依赖（P1-01、P1-05、P2-11a）均为高估时模块，任一延迟都导致 PD-02 开工遥遥无期；(iii) Phase D 本身即为"独立决策"阶段，PD-02 是全路线中唯一没有默认实施方案、需要额外验证才能决定是否建设的任务。(c) **实施建议**：4h 快速验证在 Phase 3 尾期执行（P2-11a 就绪后），验证结果记录到 `docs-stm/tmp/alpha-feasibility.md`。
 
 
-## Phase 5 — 用户画像（最低优先级，按需实施）（~108h，P5-04 TUI 问卷已提前到 Phase 3 尾期）
+## Phase 5 — 用户画像（最低优先级，按需实施）（~108h，P3-15 TUI 问卷并行执行）
 
-> **说明**：个人画像原属 Phase 4，调整为**最低优先级**——Phase 1~4 全部就绪后再评估是否需要启动。
+> **说明**：个人画像是**最低优先级**——Phase 1~4 全部就绪后再评估是否需要启动。
 > **前提条件**：推断版画像（P5-01~03）技术依赖少，但其价值在 Phase 3 再平衡和 Phase 4 LLM 质量完成后才最大化。
 > **默认策略**：Phase 1~4 期间始终使用中性通用投资建议，画像缺失不影响其他功能。
 
@@ -801,14 +679,14 @@
 - **估时**: 20h
 - **文件**: `src/python/profile/decay.py`（新增）
 - **阻塞**: 否
-- **依赖**: P3-15（原 P5-04，TUI 问卷画像已持久化——已提前至 Phase 3 尾期）
+- **依赖**: P3-15
 - **描述**: 180 天后提示重评；持仓行为与画像持续矛盾时自动降低置信度。
 
 ### P5-06: 自适应阈值——画像联动再平衡（Layer 4b）
 - **估时**: 28h（24h 原有 + 4h 安全哨兵机制）
 - **文件**: `src/python/analysis/rebalance.py`（扩展）、`src/python/profile/inferrer.py`
 - **阻塞**: 否
-- **依赖**: P3-15（原 P5-04，画像问卷已提前到 Phase 3）、P3-06（再平衡完整版）
+- **依赖**: P3-15、P3-06（再平衡完整版）
 - **描述**: 基于画像自动调整再平衡阈值（保守 10%/3%、稳健 15%/5%、进取 20%/8%、激进 25%/10%）。无画像时使用中性预设（15%/5%）。
 - **安全哨兵（CRITICAL）**：自适应阈值联动存在安全设计缺陷——如果推断错误（实际保守型用户被标为激进），再平衡阈值从 10% 放宽到 25%，系统对 25% 的超集中持仓不再预警。必须实施以下三重防护：(1) **置信度门控**——推断置信度为 low 时，即使推断为激进，阈值锁定在稳健预设（15%/5%）；(2) **非问卷用户上限锁定**——非问卷用户（仅推断来源）的阈值上限硬编码为 15%（稳健），不可被画像覆盖；(3) **安全哨兵**——阈值偏离稳健默认值（15%/5%）超过 ±10% 时，在 LLM prompt 中追加风险声明："当前自适应阈值已调整至 {value}，请注意该调整基于推断画像，建议通过问卷确认真实风险偏好。"
 
@@ -816,7 +694,7 @@
 - **估时**: 8h
 - **文件**: `src/python/llm/prompts.py`
 - **阻塞**: 否
-- **依赖**: P5-01（至少推断版可用）、P3-15（原 P5-04，问卷版更准确——已提前至 Phase 3 尾期）
+- **依赖**: P5-01（至少推断版可用）、P3-15
 - **描述**: 在 prompt 首段注入画像摘要，LLM 据此调整建议口吻。无画像时使用中性通用投资建议。当推断置信度为 LOW 时，机械切换为无画像中性 prompt，不由 LLM 自行判断。**安全约束**：(1) prompt 段落必须附带置信度声明，例如"根据您的持仓行为推断，您的风格倾向于{风险级别}（置信度：中）。建议通过问卷确认。"——不允许 LLM 将推断结果视为事实采信；(2) 在 P5-03 的矛盾场景下，LLM prompt 应输出双重标签而非单一风险级别（如"您的持仓行为显示双重标签：高权益偏好（进取型倾向）+ 长持有期（保守型倾向），建议通过问卷确认"）；(3) 增加推断准确率的离线验证计划——用模拟持仓+已知画像做离线校验，设定准确率基线（如 <70% 则不上线推断自动模式）。
 
 ### P5-08: 用户画像测试用例
@@ -838,9 +716,6 @@ T0-02 ─→ P2-15
 
 PRE-01 ─→ PRE-01-D (决策门) ─→ P1-03 (bond_zh_us_rate 自动+手动兜底, 6h)
   │                                   └→ P1-10 → P1-15
-  │ (P1-01/P1-02 已取消: 东财 API 失效 + wgb JS 渲染不可解析)
-  │
-  │ 释放 ~20h → 建议重分配给 P1-11(功能开关)/P1-12(断路包装器)/P1-04(数据质量增强)
 
 PRE-02 ─→ PRE-02-D ─→ P3-07
 
@@ -866,7 +741,7 @@ P1-06 ─→ P1-07 ─→ P1-08 ─→ P2-14 → P2-15 → P2-16 → P2-17
   │       └→ P1-16
   └→ P1-16
 
-P1-08 → P1-08-B (prompts.py 拆分, 原 Phase 3 提前)
+P1-08 → P1-08-B (prompts.py 拆分)
 P1-11 ─→ P1-12
 P1-17 ─→ P1-18 ─→ P1-19 ─→ P4-15
 P1-13 ─→ P4-04 ─→ P4-05
@@ -889,17 +764,17 @@ P3-07(PRE-02-D) → P3-08 → P3-09a ──→ P3-09b(Phase 4)
                                 │       ↑
                                 └→ P3-10│
                                          └→ P2-08
-                                       (口径修正因子, 从 Phase 3 移入)
+                                       (口径修正因子)
 P3-11 → P3-11-T     (流动性测试)
 P3-12 → P3-12-T     (场外流动性测试)
 
-P3-15 (原 P5-04, 无依赖) ─── (提前至 Phase 3 并行)
-P3-16 (原 P4-07, 无依赖) ─── (提前至 Phase 3 并行, _COMPUTATION_REGISTRY + 纯算法层)
-P3-17(P2-14) → (LLM Token 成本追踪, 新增)
+P3-15(无依赖) ─── (与 P3-11/12/13 等并行)
+P3-16(无依赖) ─── (与再平衡等并行, _COMPUTATION_REGISTRY + 纯算法层)
+P3-17(P2-14) → (LLM Token 成本追踪)
 
 (Phase 4 — 质量与安全, 硬性前置: 性能/韧性/安全测试不可跳过)
 P2-11b → P4-01 → P4-02 → P4-03          (情景分析链: Beta→置信区间→3情景→传播)
-P3-09b(P3-09a+P2-08) → (口径修正因子, 从 Phase 3 移入, 见 Phase 3 依赖图)
+P3-09b(P3-09a+P2-08) → (口径修正因子)
 P4-04 → P4-05                              (隐私安全: 匿名化→提示)
 P4-06 ← P1-14                              (缓存审查, 与 P4-04/P4-05 并行)
 P4-08 → (依赖 P3-16 事实校验器)            (LLM质量: 幻觉测试)
@@ -934,17 +809,6 @@ PD-02 ← P1-03, P1-05, P2-11a  (精简版, 约16h)
 | Phase 5 | 7 | 108 | 13.5 | 6.75 |
 | Phase D | 1 | 16 | 2 | 1 |
 | **总计** | **100** | **876** | **109.5** | **~54.75** |
-
-**估时偏差说明（加粗为 Round 1+2 修复修正项）：**
-- PRE: 12h → 1.5d（无变化）
-- **T0: 8h → 12h（Round 1 新增 T0-01-A DegradationTracker get_log 封装 + Round 2 新增 T0-01-B Pre-Schema 定义。两个前置均不可省略，因 T0-01 需要降级记录非空且有类型校验框架才可靠接线）**
-- **MVP: 36h→40h（+4h: PD-01 条件推理提前纳入，使 MVP 首次交付即可看到分情景建议。实际合计 40h=5d）**
-- **Phase 1: 124h→164h（+40h: 新增 P1-06-A f_context_builder.py 预重构 8h、P1-22 category.py→code_utils.py 提取扩展 4h→12h +8h；P1-08-B prompts.py 拆分从 Phase 3 提前 4h；原标 124h 即不等于任务实际合计 148h，Round 1 修复后实际为 164h）**
-- Phase 2: 140h → 17.5d（P2-11 拆分，点估计 16h 留 Phase 2；置信区间 +24h 移至 Phase 4；新增集成测试 P2-14-B +8h）
-- **Phase 3: 198h→206h（+8h: 新增 P3-11-T +4h、P3-12-T +4h；P3-14 拆分移至 Phase 1 -4h；P3-09 拆为 P3-09a 2h + P3-09b 16h 移至 Phase 4；P3-15 TUI 问卷 +40h 和 P3-16 事实校验器 +24h 从 Phase 4/5 提前。原标 198 即不等于任务实际合计）**
-- **Phase 4: 158h→176h（+18h: P2-11b 置信区间 +24h、P3-09b 口径修正 +16h；P4-07 事实校验器移至 Phase 3 -24h；P4-14/15/16 各从 6h→12h +18h。原标 158 即不等于任务实际合计）**
-- Phase 5: 108h → 13.5d（P5-04 TUI 问卷提前至 Phase 3，减少 40h；P5-06 安全哨兵增加 4h）
-- **Phase D: 20h→16h（PD-01 已提前至 MVP-06，剩余 PD-02 精简至 16h 含砍项建议）**
 
 **关键依赖链：**
 - **最长串行链：PRE-01 → P1-03 → P2-01 → P2-08 → P2-14 → P2-14-B → P3-08 → P3-09a → P3-10 = 8 步硬串行（实际 15+ 节点含隐藏扇入。降级验收标准见 P3-08）**

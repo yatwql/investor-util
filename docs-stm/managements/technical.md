@@ -470,9 +470,16 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 |:-----|:----------|:-----------------------------|:----------|
 | 实现位置 | `provider_registry.py` | `provider_registry.py` | `llm/circuit_breaker.py` |
 | 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 N 次 |
-| 冷却时长 | 300s | 120s | 60s |
+| 冷却时长 | 指数退避 60s→300s→900s→3600s | 120s | 60s |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
 | 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 |
+| 持久化 | `data/state/circuit_breaker.json` | `data/state/circuit_breaker.json` | 会话级（无持久化） |
+
+**指数退避**：单股票 API 熔断器冷却时间采用指数退避策略（60s→300s→900s→3600s），每次连续失败冷却时长翻倍递增，成功恢复后重置为基础值。
+
+**跨会话持久化**：熔断器状态持久化到 `data/state/circuit_breaker.json`，与 `data/cache/` 隔离，避免缓存清理误删。会话重启后恢复熔断记忆。
+
+**双熔断器统一网关**：`provider_registry.py` 和 `circuit_breaker.py` 通过统一的熔断网关管理。Provider 级熔断（HTTP 传输层）管"某个数据源能不能调用"；数据模块级熔断（业务层）管"某类数据是否跳过"。两熔断器状态同步。
 
 #### Chain 自动注册
 
@@ -1042,6 +1049,12 @@ def _get_pool() -> ThreadPoolExecutor:
 4. **行业资金流向获取**
 5. **LLM + 新闻并行获取**（4 分支统一处理）
 6. **双管线生成**：HTML + Excel
+
+#### f_context 数据上下文
+
+`report/f_context_builder.py` 集中组装传递给 LLM 的数据上下文 `f_context`。原本内联在 `orchestrator.py` 的组装逻辑被抽取到此独立模块，包含 `_build_basic_context()`、`_build_risk_context()`、`_build_llm_context()` 等分段构造器，职责清晰可测。
+
+`f_context` 遵循 C19 Schema 契约：所有键必须在 `docs-stm/plan/better-investment-advice/f_context-schema.md` 中预定义类型、版本号和写入/消费模块后，才能在代码中使用该键。
 
 #### 三种报告路径
 
@@ -1861,7 +1874,7 @@ class DataModuleDef:
     cache_groups: tuple      # 分组
 ```
 
-当前注册 **25 个数据模块**：
+当前注册 **26 个数据模块**：
 
 | 分类 | 数量 | 模块 |
 |:-----|:----:|:-----|
@@ -1872,8 +1885,25 @@ class DataModuleDef:
 | LLM 分析（preload/refresh） | 5 | global_macro、expert_review、news_correlation、health_check、penetration_deep |
 | 补充数据（refresh） | 4 | profit_forecast、sector_flow、extended、dividend |
 | B 系列基金分析（refresh/无分组） | 4 | fund_manager、fund_overlap、fund_concentration、fund_style_snapshot |
-| 精确键名（refresh/无分组） | 3 | benchmark、tracking、calendar |
+| 精确键名（refresh/无分组） | 4 | benchmark、tracking、calendar、**bond_yield** |
 | 历史走势（无分组） | 4 | history_stock、history_fund_otc、history_index、history_index_us |
+
+#### 计算模块注册表（`_COMPUTATION_REGISTRY`）
+
+除数据模块注册外，系统维护独立的计算模块注册表 `_COMPUTATION_REGISTRY`，记录所有分析/指标计算模块的元信息。
+
+```python
+@dataclass(frozen=True)
+class ComputModuleDef:
+    name: str           # 中文名称
+    module_key: str     # 键名（如 "analytics_metrics"）
+    label: str          # 短标签
+    dependencies: tuple # 前置数据依赖
+    description: str    # 功能说明
+    status: str         # planned / implemented
+```
+
+当前注册 6 个计算模块（analytics_metrics、analytics_liquidity、analytics_rebalance、analytics_fx、analytics_scenario、analytics_beta），支持依赖管理和指标级断路。计算模块与报表层保持单向依赖，禁止反向导入 report/。
 
 #### 派生产出接口
 
@@ -2145,16 +2175,19 @@ investor-util/
 │   ├── __init__.py
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
+│   │   ├── analysis/            # 业务分析计算层（再平衡、量化指标）
+│   │   ├── anonymizer.py        # 持仓匿名化（名称替换/数量模糊/关闭三模式）
 │   │   ├── cache/               # 缓存引擎子包（8 子模块 + operations + services）
 │   │   ├── code_utils.py        # 代码类型判定中心化
 │   │   ├── config/              # 配置管理子包（_config_defaults / _comments / _core）
 │   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
-│   │   ├── fetcher/             # 数据获取调度（price/index/fund/industry/chain/akshare）
+│   │   ├── features.py          # 功能开关注册表（18 项 Feature Flag）
+│   │   ├── fetcher/             # 数据获取调度（price/index/fund/industry/chain/akshare/bond_yield）
 │   │   ├── handlers_cache.py    # TUI 缓存管理命令（薄壳委托 operations）
 │   │   ├── handlers_config.py   # TUI 配置管理命令
 │   │   ├── handlers_report.py   # TUI 报告生成命令（薄壳委托 orchestrator）
 │   │   ├── http_client.py       # HTTP 客户端工厂
-│   │   ├── llm/                 # LLM 集成（13 子模块）
+│   │   ├── llm/                 # LLM 集成（14 子模块，prompts.py 拆分为 core/tables/action）
 │   │   ├── logger.py            # 日志模块（_ColoredFormatter）
 │   │   ├── main.py              # TUI 入口 + 菜单循环
 │   │   ├── market_hours.py      # A 股交易时段判断
@@ -2162,8 +2195,8 @@ investor-util/
 │   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
 │   │   ├── providers/           # 数据源提供商（14 个文件）
 │   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（25 个数据模块 + 17 个报告模块）
-│   │   ├── report/              # 报告生成（~30 个文件，含 orchestrator/progress）
+│   │   ├── registry.py          # 中央注册表（26 个数据模块 + 17 个报告模块 + 6 个计算模块）
+│   │   ├── report/              # 报告生成（~30 个文件，含 orchestrator/progress/f_context_builder）
 │   │   ├── schemas/             # Pydantic 数据模式（快照等）
 │   │   ├── tui.py               # 键盘输入封装
 │   │   ├── tui_handlers.py      # 菜单通用辅助
@@ -2199,6 +2232,7 @@ investor-util/
 | 行业资金流向 | akshare 今日排名（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 股票历史分红 | akshare 逐股获取（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 基金经理数据 | 天天基金 HTML 解析（主）→ 档案页回退 | `fetcher/fund_manager.py` |
+| 无风险利率（Rf） | akshare `bond_zh_us_rate`（Sina 国债收益率）→ 手动配置兜底 | `fetcher/bond_yield.py` |
 
 新闻数据处理模块：`news_aggregator.py`（聚合去重）、`news_correlator.py`（关联分析）、`news_keywords.py`（关键词提取）、`news_sources.py`（源元数据定义），均位于 `providers/` 下。
 
@@ -2254,6 +2288,7 @@ investor-util/
 |:-----|:----------|:---:|:--------:|:----|:-----|
 | `tracking` | `holdings_tracking.json` | 30 天 | — | — | 无分组 |
 | `calendar` | `trading_calendar.json` | 14 天 | — | — | 无分组 |
+| `bond_yield` | `bond_yield_rf`（精确键名） | 1 天 | — | — | 精确键名 |
 
 > `—` 表示精确键名（无指纹后缀），TTL 到期后刷新。
 
@@ -2277,19 +2312,19 @@ investor-util/
 
 各线程池互不共享，职责隔离。
 
-### 附录 F：Phase 2 指标降级依赖矩阵
+### 附录 F：指标降级依赖矩阵
 
 | 指标 | 依赖数据 | K 线完全不可用 | K 线部分缺失 | 说明 |
 |:-----|:---------|:--------------|:-----------|:------|
-| 夏普比率 | Rf + 组合日收益率 + 波动率 | None（显示 --） | 置信度降为 low | P2-01 |
-| 卡玛比率 | 组合日收益率 + 最大回撤 | None（显示 --） | 置信度降为 low | P2-02 |
-| HHI | 持仓权重（不依赖行情） | 正常计算 | 正常计算 | P2-03 |
-| 胜率 | 盈亏品种数（不依赖行情） | 正常计算 | 正常计算 | P2-04 |
-| 换手率 | 期间变动金额 + 均值市值（不依赖 K 线） | 正常计算 | 正常计算 | P2-05 |
-| 风险贡献 | 品种波动率 + 权重 | 仅权重等比例分配 | 部分品种用等比例替代 | P2-06 |
-| Beta | 组合日收益率 + 基准日收益率 | None（显示 --） | 置信度降为 low | P2-11a |
-| 回撤分位(1年) | 组合日收益率（约 250 交易日） | None（显示 --） | 数据不足 60 日则不计算 | P2-12 |
-| 回撤分位(全历史) | 组合日收益率 | None（显示 --） | 数据不足 60 日则不计算 | P2-13 |
+| 夏普比率 | Rf + 组合日收益率 + 波动率 | None（显示 --） | 置信度降为 low | 依赖 Rf 获取器 |
+| 卡玛比率 | 组合日收益率 + 最大回撤 | None（显示 --） | 置信度降为 low | — |
+| HHI | 持仓权重（不依赖行情） | 正常计算 | 正常计算 | 仅需权重数据 |
+| 胜率 | 盈亏品种数（不依赖行情） | 正常计算 | 正常计算 | 仅需盈亏数据 |
+| 换手率 | 期间变动金额 + 均值市值（不依赖 K 线） | 正常计算 | 正常计算 | 期间变动数据仅快照支持 |
+| 风险贡献 | 品种波动率 + 权重 | 仅权重等比例分配 | 部分品种用等比例替代 | 简化版非 Euler 分解 |
+| Beta | 组合日收益率 + 基准日收益率 | None（显示 --） | 置信度降为 low | 252 日窗口 |
+| 回撤分位(1年) | 组合日收益率（约 250 交易日） | None（显示 --） | 数据不足 60 日则不计算 | — |
+| 回撤分位(全历史) | 组合日收益率 | None（显示 --） | 数据不足 60 日则不计算 | 1 年/3 年/全历史三档 |
 
 > K 线数据通过腾讯/新浪 API 获取，两者均为已知不可靠来源。熔断时降级行为由 DegradationTracker 记录并传递至 f_context['data_degradation']，LLM prompt 据此展示"部分指标因行情数据不全暂时无法计算"。
 
@@ -2312,21 +2347,21 @@ investor-util/
 > 完整定义和维护责任见 docs-stm/plan/better-investment-advice/f_context-schema.md。
 > 此处仅列出当前阶段已确认的键名和类型。
 
-| 键名 | 类型 | Optional | Phase | 写入阶段 |
+| 键名 | 类型 | Optional | 状态 | 写入阶段 |
 |:-----|:----|:---------|:------|:--------|
-| market_data | dict | 否 | 当前 | prepare_report_data |
-| index_data | dict | 是 | 当前 | prepare_report_data |
-| fund_data | dict | 是 | 当前 | prepare_report_data |
-| penetration_data | dict | 是 | 当前 | prepare_report_data |
-| news_data | list | 是 | 当前 | fetch_news |
-| llm_data | dict | 是 | 当前 | generate_all_llm |
-| history_data | dict | 是 | 当前 | fetch_history_data |
-| risk_metrics | dict | 是 | Phase 1 (P1-06) | prepare_report_data |
-| data_degradation | list[dict] | 是 | Tier 0 (T0-02) | capture_snapshot |
-| llm_status | str | 是 | Phase 1 (P1-20) | generate_all_llm |
-| rebalance_signals | list[dict] | 是 | MVP-03 / Phase 3 | prepare_report_data |
-| liquidity_warnings | list[dict] | 是 | Phase 3 | capture_snapshot |
-| fx_exposure | dict | 是 | Phase 3 | capture_snapshot |
-| scenario_analysis | dict | 是 | Phase 4 | prepare_report_data |
+| market_data | dict | 否 | 已实现 | prepare_report_data |
+| index_data | dict | 是 | 已实现 | prepare_report_data |
+| fund_data | dict | 是 | 已实现 | prepare_report_data |
+| penetration_data | dict | 是 | 已实现 | prepare_report_data |
+| news_data | list | 是 | 已实现 | fetch_news |
+| llm_data | dict | 是 | 已实现 | generate_all_llm |
+| history_data | dict | 是 | 已实现 | fetch_history_data |
+| risk_metrics | dict | 是 | 已实现 | prepare_report_data |
+| data_degradation | list[dict] | 是 | 已实现 | capture_snapshot |
+| llm_status | str | 是 | 已实现 | generate_all_llm |
+| rebalance_signals | list[dict] | 是 | 已实现 | prepare_report_data |
+| liquidity_warnings | list[dict] | 是 | 计划中 | capture_snapshot |
+| fx_exposure | dict | 是 | 计划中 | capture_snapshot |
+| scenario_analysis | dict | 是 | 计划中 | prepare_report_data |
 
 [↑ 回到顶部](#目录)

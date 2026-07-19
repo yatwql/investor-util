@@ -78,6 +78,15 @@ _DEFAULT_CONFIG = {
         "coverage_threshold": 0.8,
         "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"},
     },
+    # ── H. 再平衡配置 ──
+    "rebalance": {
+        "threshold": 0.15,  # 单品种权重超限阈值（默认 15%）
+        "deviation_threshold": 0.05,  # 大类/品种配置偏离阈值（默认 5%）
+        "profile": "moderate",  # 预设阈值集: conservative / moderate / aggressive / custom
+        "silence_days": 30,  # 再平衡信号静默期天数（默认 30 天）
+        "target_allocation": {},  # 目标配置 Schema（空=不启用目标配置检查）
+        "equity_fixed_income": {},  # 权益/固收超大类目标配置（空=不启用）
+    },
 }
 
 
@@ -146,6 +155,16 @@ def _get_default_config_template() -> str:
         '    "snapshot_max_count": 365,\n'
         '    "coverage_threshold": 0.8,\n'
         '    "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}\n'
+        "  },\n"
+        "\n"
+        "  // ── H. 再平衡配置 ──\n"
+        '  "rebalance": {\n'
+        '    "threshold": 0.15,\n'
+        '    "deviation_threshold": 0.05,\n'
+        '    "profile": "moderate",\n'
+        '    "silence_days": 30,\n'
+        '    "target_allocation": {},\n'
+        '    "equity_fixed_income": {}\n'
         "  }\n"
         "}\n"
     )

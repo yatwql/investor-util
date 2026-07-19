@@ -76,7 +76,7 @@ def build_llm_fingerprint(
     穿透资产默认仅取 (name, codes)，full_penetration=True 时额外包含
     mv/sector/ratio（穿透深度分析需要穿透数据更新触发缓存失效）。
 
-    P1-09: 新增 history_data 参数，提取 key 风险信号摘要加入指纹，
+    history_data 参数提取 key 风险信号摘要加入指纹，
     使风险指标变化时自动失效 LLM 缓存。
 
     Args:
@@ -88,7 +88,7 @@ def build_llm_fingerprint(
         penetrated_assets: 穿透资产列表
         categories: 分类汇总
         full_penetration: 为 True 时穿透资产包含 mv/sector/ratio（用于穿透深度分析）
-        history_data: 组合历史走势数据（P1-09 新增），仅提取 key 风险信号摘要
+        history_data: 组合历史走势数据，仅提取 key 风险信号摘要
 
     Returns:
         指纹哈希值（前 12 位）
@@ -96,7 +96,7 @@ def build_llm_fingerprint(
     _details = extract_stable_holdings(holdings_details)
     _pen = extract_stable_penetration(penetrated_assets, full=full_penetration)
 
-    # P1-09: 从 history_data 提取 key 风险信号摘要
+    # 从 history_data 提取 key 风险信号摘要
     _risk_signals: dict[str, float | str] = {}
     if history_data and isinstance(history_data, dict):
         for _key in ("max_drawdown_pct", "annualized_volatility", "total_return_pct", "status"):

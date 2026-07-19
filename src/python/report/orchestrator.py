@@ -1,7 +1,4 @@
-"""报告编排共享层 — TUI 和 CLI 共用。
-
-P1 逐步从 handlers_report.py 提取业务逻辑至此模块。
-"""
+"""报告编排共享层 — TUI 和 CLI 共用。"""
 
 from __future__ import annotations
 
@@ -129,7 +126,7 @@ def prepare_report_data(
         "today_str": today_str,
         "output_dir": config.get("output_dir", "reports"),
         "news_top_count": int(config.get("news_top_count", 100)),
-        # P1-06 占位：组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
+        # 组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
         "risk_metrics": {},
     }
 
@@ -256,7 +253,7 @@ def capture_snapshot(
                 },
                 "data_degradation": _get_degradation_tracker().get_log(),
             }
-            # P1-07: 透传额外扩展字段（risk_metrics / portfolio_daily_returns）
+            # 透传额外扩展字段（risk_metrics / portfolio_daily_returns）
             if extra:
                 f_context.update(extra)
         reporter.ok("环比对比数据准备完成")
@@ -567,7 +564,7 @@ def _fetch_llm_and_news(
     LLM 和新闻的 ok/disabled/failed 计数统一归入此函数。
 
     Args:
-        history_data: 组合历史走势数据（P1-08 新增），传递给 generate_all_llm。
+        history_data: 组合历史走势数据，传递给 generate_all_llm。
 
     Returns:
         (llm_content, news_data, news_llm_meta, news_ok)
@@ -725,7 +722,7 @@ def _generate_report_full(
     if _enable_history:
         _resolved_mode = "auto" if history_mode in ("auto",) else "off"
         history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
-        # P1-07: 从 history_data 提取风险指标，注入 prep 和 f_context
+        # 从 history_data 提取风险指标，注入 prep 和 f_context
         if history_data and history_data.get("status") not in ("unavailable",):
             _risk = {
                 "annualized_volatility": history_data.get("annualized_volatility", 0),
@@ -769,7 +766,7 @@ def _generate_report_full(
         history_data=history_data,
     )
 
-    # P1-20: LLM 全部失败时自动降级使用占位文本
+    # LLM 全部失败时自动降级使用占位文本
     if _enable_llm:
         from src.python.llm.fallback import build_fallback_llm_content
 
