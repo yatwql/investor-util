@@ -198,7 +198,7 @@ LLM 据此输出："你的组合在牛市中略跑赢指数，且回撤控制优
 | **Phase D** | 2 天 | ★★★ 可选 | 0 | Phase 1(Rf+日收益率) |
 | **全量总计** | **~109.5 天(+buffer ~126-131d)** | — | 最多2个 | — |
 
-**核心结论**：全量路线共 **~109.5 天纯开发**（含 buffer 约 126-131 天），约 **22-27 周**（5-6 个月，2 人团队）。组织方式按用户可感知价值分批次交付——**MVP 仅 4.5 天**即可交付用户可见改进（零新数据源），**Phase 1+2 共 38 天**完成全部量化信号建设。Phase 4+5（质量+画像）合计估时修正为 35.5-39.5 天。关键修正：Rf fetcher 实测东方财富 API 已不可用（替代源 bond_zh_us_rate 已验证 50/50 100%），DegradationTracker 已实例化但 record() 从未被调用（T0-01-A 需审计 4 文件 6 降级点逐一注入）。Phase 1 估时从 124h 修正为 164h（实际任务合计，原头部低估 32%）。不含约 20% 协调 buffer。
+**核心结论**：全量路线共 **~109.5 天纯开发**（含 buffer 约 126-131 天），约 **22-27 周**（5-6 个月，2 人团队）。组织方式按用户可感知价值分批次交付——**MVP 仅 4.5 天**即可交付用户可见改进（零新数据源），**Phase 1+2 共 38 天**完成全部量化信号建设。Phase 4+5（质量+画像）合计估时修正为 35.5-39.5 天。关键修正：Rf fetcher 实测东方财富 API 已不可用（替代源 bond_zh_us_rate 已验证 50/50 100%），DegradationTracker 的 report/ 层已有 6 处 record() 调用（perf_rank/industry/profit_forecast/dividend/index_a/index_us）但 **fetcher 层 6 处降级点（price/fund/industry/index）仍然缺失 record()**——T0-01-A 需在 4 文件 6 处逐一注入。Phase 1 估时从 124h 修正为 164h（实际任务合计，原头部低估 32%）。不含约 20% 协调 buffer。
 
 #### 最终风险评级
 
@@ -219,8 +219,13 @@ LLM 据此输出："你的组合在牛市中略跑赢指数，且回撤控制优
 | LLM 输出质量 | **中** | 无事实校验，幻觉检测需额外投入 | 当前建议不动，Phase 4 再做事实锚定校验器；前期让用户理解"LLM 输出仅供参考" |
 | 双熔断器隔离 | **低** | circuit_breaker.py (60s) 和 provider_registry.py (300s) 各独立 | Phase 1 尾期合并统一网关(1.5d) |
 | AkShare 分红数据源 | **低** | 爬虫库，T4 降级，失败显示 "--" | 无需应对 |
+| 既有 fetcher 模块未通过 C6 链（基线债务） | **低** | `fund_manager.py`、`akshare.py`、`news.py` 三个 fetcher 模块直接调用 provider 函数或发起 HTTP 请求，绕过了 `chain.py` 的 `fetch_with_fallback()`。`fund.py` 的 `_fetch_benchmark_from_api()` 同样直连 HTTP。当前运行稳定但属于架构基线债务，新增模块不得效仿。 | 新增 fetcher（如 P1-03 bond_yield.py）必须通过 chain.py 注册 + `fetch_with_fallback()` 调用。既有模块暂不修复，但 registry.py 注册时标注 `c6_compliant=false` 字段以便追踪。 |
 | LLM 服务不可用 | **高** | full 路径以 LLM 为交付核心，LLM 完全不可用时无降级模板，报告生成断裂 | orchestrator.py 增加 LLM 失败自动降级：full 路径转为 both 路径（含 LLM 占位文本），circuit_breaker 状态暴露到 DegradationTracker 和报告页脚。P0 优先级，Phase 1 必须完成 |
-| DegradationTracker record() 零写入（T0 隐患） | **高** | DegradationTracker 实例存在于 3 个模块但 `record()` 从未被调用。data_degradation 永远为空列表。MVP-02 的概念 API 降级状态检测依赖这组数据。T0-01-A 完成后才能解锁 data_degradation。 | T0-01-A 首次明确注入点：price.py(2处)/fund.py(2处)/industry.py(1处)/index.py(1处)共 6 个降级点。完成前 T0-01/T0-02/MVP-02 均不可交付。 |
+| DegradationTracker record() 在 fetcher 层零写入（T0 隐患） | **高** | DegradationTracker 实例存在于 3 个 report/ 模块但 **fetcher/ 层 record() 从未被调用**（注意：report/ 层已有 6 处 record() 调用——fund_performance.py perf_rank、penetration_sheet.py industry/profit_forecast/dividend、summary.py index_a/index_us——但这些都是消费侧的数据状态构建记录）。真正触发降级时的原始错误（全链路不可用/fallback 降级）在 fetcher/ 层（price/fund/industry/index）未被捕获。data_degradation 永远缺少 fetcher 层的关键降级事件。MVP-02 的概念 API 降级状态检测依赖这组数据。 | T0-01-A 首次明确 fetcher 层注入点：price.py(2处)/fund.py(2处)/industry.py(1处)/index.py(1处)共 6 处降级点。完成前 T0-01/T0-02/MVP-02 均不可完整交付。 |
+| C17 _COMPUTATION_REGISTRY 注册缺口（6 模块缺失） | **中** | P1-10 计划创建 _COMPUTATION_REGISTRY（计算模块注册表），但以下 6 个分析模块在任务分解中**没有对应的注册任务**：(1) metrics.py（P2-01~P2-11 共 8 个指标），(2) liquidity.py（P3-11~P3-12），(3) fx_exposure.py（P3-13），(4) scenario.py（P4-01~P4-03），(5) alignment_correction.py（P3-09b），(6) inferrer.py（P5-01）。这些模块的 ComputModuleDef 注册缺失将导致 registry 无法统一管理计算模块的依赖关系和 SettingsKey 映射。 | P1-10 实施时同步为 6 模块预留 ComputModuleDef 注册位置，各模块创建时补充注册代码和测试。给这些模块立项时在任务描述中显式标注"包含 registry.py _COMPUTATION_REGISTRY 注册"。 |
+| news_top_count 默认值不一致（orchestrator.py=100 vs _config_defaults.py=300） | **低** | `orchestrator.py` L533 硬编码 `news_top_count=100`，但 `_config_defaults.py` 的 `_DEFAULT_CONFIG` 默认值为 `"news_top_count": 300`。两处默认值相差 3 倍，但用户若未显式配置会导致行为不确定——orchestrator 优先用自己参数而非 config。不影响功能正确性（新闻仍可正常获取），仅影响 Top-N 截断量。 | 统一默认值。建议将 orchestrator.py 的默认值改为从 config 读取：`news_top_count = config.get("news_top_count", 300)`，消除硬编码。 |
+| f_context 死键（diff_trimmed、days_since_last 从未被消费） | **低** | `orchestrator.py` `capture_snapshot()` 返回 f_context 包含 3 个键，其中 `diff_trimmed` 和 `days_since_last` 在 f_context 注入后**从未被任何一个 LLM generator 或 prompt 消费**。`diff_trimmed` 是 `diff` 的裁剪版（保留 Top N 品种），`days_since_last` 是距离上次报告的天数。二者 TUI/full 路径均无消费点。无功能影响，仅代码维护噪音。 | 在 P2-14（指标表注入）时评估是否启用 diff_trimmed；如不启用则在 P1-08-B（prompts.py 拆分）时清理死键。 |
+| DegradationTracker 三重实例（隔离隐患） | **低** | `fund_performance.py`、`penetration_sheet.py`、`summary.py` 各在文件级实例化了一个 DegradationTracker 实例（`degradation = DegradationTracker(...)`），**三者各自独立记录日志**。`orchestrator.py` 的 `data_degradation` 注入点应聚合三者日志——但当前没有统一收集机制。若三个实例的生产报告阶段不同（fund_performance 在 Stage A、penetration_sheet 在 Stage B），日志聚合点在时间上可能不完整。当前运行稳定（三个阶段按序执行，聚合时均已完成），但架构上存在隐患：若未来某日 parallelism 改变导致部分阶段未执行，降级状态可能被遗漏。 | P1-06-A（f_context_builder 预重构）时评估：改为 orchestrator 级单例 + 各模块通过参数注入同一实例，消除文件级实例化分散。 |
 
 ### 3.1 外部数据源稳定性全景图与专项测试建议
 
@@ -308,6 +313,26 @@ Rf 数据源一致性策略（简化）：`bond_zh_us_rate` 单源获取，每�
 | **Phase D** | Rf(同上) | 同 Phase 1 | α 不可计算 |
 
 **核心结论**：**真正需要在 Phase 1 开工前专项测试的只有 1 项——Rf 的东方财富 datacenter API。** 其余的要么是生产验证过的，要么有成熟的降级方案，要么在 Phase 1 不依赖它。
+
+> **架构基础设施备注——C4 会话级缓存缺口**：当前缓存引擎（`src/python/cache/`）为纯文件系统实现，每次 `get()` 都涉及磁盘 I/O + JSON 反序列化，没有内存级（进程内/会话级）缓存层。当同一个缓存数据在同一报告生成过程中被多次访问（如 `price_` 前缀的行情数据被 market_value、penetration、summary 等多个模块读取），每次访问都产生冗余的磁盘读取。这在当前阶段不构成阻塞问题（单次报告约 30-50 次缓存读取，延迟可接受），但 P1-04 日收益率管线和 Phase 2 指标算法上线后将显著增加缓存访问频率。建议在 P1-06-A（f_context_builder 预重构）时评估是否在 `cache.py` 中增加一个可选的 `functools.lru_cache` 装饰层（TTL 秒级，单次报告生命周期内有效），消除同一文件在同一进程内的重复反序列化。此优化非阻塞，可推迟到 Phase 4 缓存优化批次合并实施。
+
+> **测试策略优化备注（R5-05）**：当前 `scripts/test_runner.py` 中 `--mode regression` 与 `--mode scenario` 实际配置完全一致（同一 marker 集合、同一 timeout、同一并行度），存在**功能冗余**——`regression` 和 `scenario` 两个 mode 名指向完全相同的测试集合。建议在门禁体系建设时合并或重新定义 mode 语义。
+>
+> 各任务推荐的测试选择策略（避免每次都跑全量测试）：
+> - **单任务纯逻辑改动**（如 P2-17 prompts.py 模板改动）：跑 `python -m pytest src/test/unit/llm/test_prompts.py -x -q`（~5s）即可，无需走 test_runner
+> - **单模块新功能**（如 metrics.py）：跑 `python -m pytest src/test/unit/test_metrics.py -x -q`（~10s）或 `python -m pytest src/test/ -m "unit" -x --tb=short -q`
+> - **跨模块改动**（如 orchestrator.py + fetcher）：跑 `python scripts/test_runner.py --mode dev-verify`（~2min，核心场景+单元）
+> - **门禁 P0 提交前**：`python scripts/test_runner.py --mode regression`（~10min，场景验证，现在 == scenario）
+> - **门禁 P1 合并前**：`python scripts/test_runner.py --mode verify`（~8min，场景+核心模块）
+> - **门禁 P2 发布前**：`python scripts/test_runner.py --mode all`（全量，~30min+）
+> 
+> 具体到各 Phase 任务：
+> - **纯 prompt 改动**（MVP-05/06, P2-14/15/16/17）：`pytest src/test/unit/llm/test_prompts.py` 即可，除非同时修改了 Python 逻辑代码
+> - **纯数据计算**（MVP-01/03, P2-01~06）：`pytest src/test/unit/` 对应模块测试
+> - **fetcher 改动**（P1-03/15）：`python -m pytest src/test/unit/test_bond_yield.py -x -q` + 手动验证一次 Rf 值
+> - **管线改动**（P1-04~09, T0-01）：必须跑 `python scripts/test_runner.py --mode dev-verify`
+> - **配置改动**（P1-11, P3-02）：`python -m pytest src/test/unit/test_config.py -x -q`
+> - **TUI 改动**（P3-15, P3-07 基金池菜单）：手动验证 UI + `pytest src/test/unit/tui/`
 
 ## 4. 最终版综合建议
 
