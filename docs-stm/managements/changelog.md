@@ -61,6 +61,10 @@
   - 量化指标（夏普/卡玛/年化波动率/最大回撤）注入竞争语境【指标对比】段落
   - metrics 数据流在 `_generate_report_full()` 中计算，经 `_fetch_llm_and_news()` → `generate_all_llm()` → `_dispatch_llm_workers()` → `_build_competitive_context_block()` 全链路贯通
   - 8 项单元测试覆盖正常/空/部分键/None 值/NaN 等指标展示场景
+- **P3-09a: 竞争语境——口径对齐与说明**：
+  - 竞争语境段落末尾自动追加口径说明脚注（费后净收益 vs 价格指数、含现金 vs 不含、期间持仓变动）
+  - `_SYSTEM_EXPERT_REVIEW` 新增竞争语境约束段落，限制 LLM 使用数据陈述替代主观结论
+  - 3 项新增测试验证脚注和 LLM 约束内容
 
 ### Changed
 - **代码注释历史痕迹清理**：移除所有 P1-XX/P2-XX 任务标签（metrics.py、drawdown_warning.py、fingerprint.py、generators_orchestrator.py、prompts_action.py、prompts_core.py、prompts_tables.py、circuit_breaker.py、bond_yield.py、registry.py、orchestrator.py 等共 ~60 处），保持代码当前状态描述

@@ -222,6 +222,13 @@ class TestSystemPrompts(unittest.TestCase):
         self.assertIsInstance(_SYSTEM_EXPERT_REVIEW, str)
         self.assertIn("Phase 1", _SYSTEM_EXPERT_REVIEW)
 
+    def test_system_expert_review_competitive_context_constraint(self):
+        """专家复盘 prompt 包含竞争语境约束。"""
+        from src.python.llm.prompts import _SYSTEM_EXPERT_REVIEW
+        self.assertIn("竞争语境约束", _SYSTEM_EXPERT_REVIEW)
+        self.assertIn("不得使用", _SYSTEM_EXPERT_REVIEW)
+        self.assertIn("口径差异", _SYSTEM_EXPERT_REVIEW)
+
     def test_system_health_check(self):
         from src.python.llm.prompts import _SYSTEM_HEALTH_CHECK
         self.assertIsInstance(_SYSTEM_HEALTH_CHECK, str)
@@ -640,3 +647,23 @@ class TestBuildCompetitiveContextBlock(unittest.TestCase):
         )
         self.assertIn("中证全债", result)
         self.assertNotIn("中证500", result)
+
+    def test_footnote_appended_when_comparison_present(self):
+        """有对比数据时脚注自动追加。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(
+            {"sh000300": {"name": "沪深300", "change_pct": 0.5}},
+            1_000_000, 10_000,
+        )
+        self.assertIn("口径说明", result)
+        self.assertIn("费后净收益", result)
+        self.assertIn("价格指数", result)
+        self.assertIn("现金管理品种", result)
+        self.assertIn("非静态组合", result)
+
+    def test_footnote_not_appended_when_no_data(self):
+        """无对比数据时无脚注。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(None, 0, 0)
+        self.assertEqual(result, "暂无足够历史数据进行竞争语境对比")
+        self.assertNotIn("口径说明", result)
