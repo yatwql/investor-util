@@ -61,7 +61,11 @@ def fetch_industry_data(code: str) -> dict | None:
         {code, industry, industry_id, concepts, concept_ids}
         失败返回 None
     """
-    return fetch_with_fallback(
+    from src.python.report.data_status import get_tracker
+
+    _t = get_tracker()
+    _src_key = f"industry_{code.strip()}"
+    result = fetch_with_fallback(
         "industry",
         _INDUSTRY_PROVIDERS,
         _INDUSTRY_CACHE_PREFIX + code.strip(),
@@ -69,6 +73,11 @@ def fetch_industry_data(code: str) -> dict | None:
         fn_kwargs={"code": code.strip()},
         transform=_industry_transform,
     )
+    if result is not None:
+        _t.record(_src_key, "T3", success=True)
+    else:
+        _t.record(_src_key, "T3", success=False, failure_type="unreachable")
+    return result
 
 
 def _is_a_share_code(code: str) -> bool:

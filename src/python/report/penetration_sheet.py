@@ -19,7 +19,7 @@ from src.python.report.data_status import (
     STATUS_MESSAGES,
     DataStatus,
     DataStatusItem,
-    DegradationTracker,
+    get_tracker,
 )
 from src.python.report.excel_writer import (
     _write_data_status_foot,
@@ -35,8 +35,8 @@ from src.python.report.styles import FMT_MONEY, FMT_PERCENT
 
 logger = logging.getLogger("invest")
 
-# 模块级降级阈值控制器（单会话内共享）
-_tracker = DegradationTracker()
+# 模块级降级阈值控制器（单例工厂共享，T0-01-A 统一管理）
+_tracker = get_tracker()
 
 _NCOLS = 10
 _CURRENT_YEAR = datetime.now().year

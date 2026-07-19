@@ -69,6 +69,232 @@ def _build_diff_context_block(f_context: dict | None) -> str:
     return "\n".join(lines)
 
 
+# ═══════════════════════════════════════════════════════════
+#  数据质量降级上下文（T0-01：DegradationTracker→LLM 接线）
+# ═══════════════════════════════════════════════════════════
+
+
+def _build_data_degradation_block(f_context: dict | None) -> str:
+    """构建数据质量降级上下文文本块，供 LLM 感知数据降级状态。
+
+    从 f_context["data_degradation"] 读取由 DegradationTracker.get_log()
+    汇总的会话内所有降级事件，格式化为紧凑文本。
+
+    Returns:
+        格式化的降级状态文本块。无降级记录时返回空字符串。
+    """
+    if not f_context:
+        return ""
+    events = f_context.get("data_degradation")
+    if not events or not isinstance(events, list):
+        return ""
+
+    degraded = [e for e in events if e.get("degraded")]
+    if not degraded:
+        return ""
+
+    lines = ["【数据质量降级】"]
+    for e in degraded:
+        _sk = e.get("source_key", "?")
+        _tier = e.get("tier", "?")
+        _ft = e.get("failure_type", "?")
+        _cnt = e.get("count", 0)
+        lines.append(f"- {_sk}: {_tier} 降级 ({_ft}, 累计{_cnt}次)")
+    lines.append("（以上数据源部分或完全不可用，分析建议时请考虑数据缺失的影响）")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════
+#  MVP-01: 收益归因计算与注入
+# ═══════════════════════════════════════════════════════════
+
+
+def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
+    """构建收益归因段落（TOP 5 品种按贡献排序）。
+
+    计算 profit_contribution = profit_i / Σ|profit_j|，
+    正负贡献分别列出。Σ|profit_j| = 0 时返回空字符串。
+
+    Args:
+        holdings_details: 持仓明细列表（含 profit / name / code）
+
+    Returns:
+        格式化的收益归因文本块，数据不可用时返回空字符串。
+    """
+    if not holdings_details:
+        return ""
+    profits = [(h.get("name", ""), h.get("code", ""), h.get("profit", 0) or 0)
+               for h in holdings_details]
+    total_abs = sum(abs(p[2]) for p in profits)
+    if total_abs == 0:
+        return ""
+
+    # 按贡献降序
+    profits_sorted = sorted(profits, key=lambda x: abs(x[2]), reverse=True)
+
+    lines = ["【收益归因】"]
+    top5 = profits_sorted[:5]
+    pos = [(n, c, p) for n, c, p in top5 if p > 0]
+    neg = [(n, c, p) for n, c, p in top5 if p < 0]
+
+    if pos:
+        pos_parts = [f"{n}(+{p / total_abs * 100:.1f}%)" for n, c, p in pos]
+        lines.append(f"主要盈利来源: {'、'.join(pos_parts)}")
+    if neg:
+        neg_parts = [f"{n}({p / total_abs * 100:.1f}%)" for n, c, p in neg]
+        lines.append(f"主要亏损来源: {'、'.join(neg_parts)}")
+
+    pos_total = sum(p for _, _, p in profits if p > 0)
+    neg_total = sum(p for _, _, p in profits if p < 0)
+    if pos_total > 0 and neg_total < 0:
+        lines.append(f"盈利品种合计 +{_fmt_wan(pos_total)}，亏损品种合计 {_fmt_wan(neg_total)}（净{_fmt_wan(pos_total + neg_total)}）")
+    elif pos_total > 0:
+        lines.append(f"全部品种盈利，合计 +{_fmt_wan(pos_total)}")
+    elif neg_total < 0:
+        lines.append(f"全部品种亏损，合计 {_fmt_wan(neg_total)}")
+
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════
+#  MVP-02: 概念板块占比注入 LLM
+# ═══════════════════════════════════════════════════════════
+
+
+def _build_concept_sector_block(penetrated_assets: list[dict] | None) -> str:
+    """构建概念板块占比段落（穿透 TOP10 的概念汇总）。
+
+    从穿透资产的 concepts 字段按市值汇总，TOP 5 概念板块 + 集中度判断。
+    概念数据不可用或全部为空时返回兜底文本。
+
+    Args:
+        penetrated_assets: 穿透 TOP10 资产列表（含 concepts / mv）
+
+    Returns:
+        格式化的概念板块文本块。
+    """
+    if not penetrated_assets:
+        return "暂无概念板块数据（穿透数据不可用）"
+
+    # 收集各概念板块的市值
+    concept_mv: dict[str, float] = {}
+    for asset in penetrated_assets:
+        mv = asset.get("mv", 0) or 0
+        concepts = asset.get("concepts") or []
+        for c in concepts:
+            if isinstance(c, str) and c.strip():
+                concept_mv[c.strip()] = concept_mv.get(c.strip(), 0) + mv
+
+    if not concept_mv:
+        return "部分品种无概念分类（非 A 股穿透资产天然无概念数据）"
+
+    total_mv = sum(concept_mv.values())
+    sorted_concepts = sorted(concept_mv.items(), key=lambda x: -x[1])
+    top5 = sorted_concepts[:5]
+
+    lines = ["【概念板块分布】"]
+    for name, mv in top5:
+        pct = mv / total_mv * 100 if total_mv > 0 else 0
+        lines.append(f"- {name}: {_fmt_wan(mv)} ({pct:.1f}%)")
+
+    # 集中度判断
+    if top5:
+        top1_pct = top5[0][1] / total_mv * 100 if total_mv > 0 else 0
+        top3_pct = sum(v for _, v in top5[:3]) / total_mv * 100 if total_mv > 0 else 0
+        if top1_pct > 40 or top3_pct > 70:
+            lines.append("集中度判断: 高")
+        elif top1_pct > 20 or top3_pct > 50:
+            lines.append("集中度判断: 中")
+        else:
+            lines.append("集中度判断: 低")
+
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════
+#  MVP-03: 再平衡建议段落（委托 simple_rebalance 计算）
+# ═══════════════════════════════════════════════════════════
+
+
+def _build_rebalance_block(holdings_details: list[dict] | None, total_mv: float) -> str:
+    """构建再平衡建议段落。
+
+    委托 src.python.analysis.simple_rebalance.compute_rebalance_signals
+    计算信号，格式化为易读文本。
+
+    Returns:
+        格式化的再平衡建议文本块，无信号时返回空字符串。
+    """
+    from src.python.analysis.simple_rebalance import compute_rebalance_signals
+
+    signals = compute_rebalance_signals(holdings_details, total_mv)
+    if not signals:
+        return ""
+
+    lines = ["【再平衡建议】"]
+    for s in signals:
+        if s.get("summary"):
+            lines.append(f"⚠ {s['message']}")
+        else:
+            weight_pct = s["weight"] * 100
+            threshold_pct = s["threshold"] * 100
+            lines.append(
+                f"- {s['name']}({s['code']}) 持仓占比 {weight_pct:.1f}%，"
+                f"超出建议上限 {threshold_pct:.0f}%，{s['action']}"
+            )
+
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════
+#  MVP-04: 竞争语境极简版 — 组合 vs 沪深300
+# ═══════════════════════════════════════════════════════════
+
+
+def _build_competitive_context_block(
+    a_indices: dict | None,
+    total_mv: float,
+    total_today_profit: float,
+    history_data: dict | None = None,
+) -> str:
+    """构建竞争语境段落（组合 vs 沪深300 收益对比）。
+
+    今日对比使用 a_indices 中的 sh000300（沪深300）行情数据。
+    上市以来对比需要 history_data（portfolio_history 输出）。
+    基准数据不可用时返回兜底文本。
+
+    Returns:
+        格式化的竞争语境文本块。
+    """
+    lines: list[str] = []
+
+    # ── 今日对比 ──
+    if a_indices and total_mv > 0:
+        csi300 = a_indices.get("sh000300")
+        if csi300:
+            idx_chg = csi300.get("change_pct")
+            portfolio_chg = total_today_profit / total_mv * 100
+            lines.append(f"【今日对比】组合 {portfolio_chg:+.2f}% vs 沪深300 {idx_chg:+.2f}%")
+            if idx_chg is not None:
+                diff = portfolio_chg - idx_chg
+                lines.append(f"相对沪深300 {'跑赢' if diff >= 0 else '跑输'} {abs(diff):.2f}%")
+
+    # ── 区间对比（依赖 history_data） ──
+    if history_data and isinstance(history_data, dict):
+        benchmark_returns = history_data.get("benchmark_returns")
+        portfolio_returns = history_data.get("portfolio_returns")
+        if benchmark_returns is not None and portfolio_returns is not None:
+            p_return = portfolio_returns[-1] * 100 if isinstance(portfolio_returns, list) and portfolio_returns else None
+            b_return = benchmark_returns[-1] * 100 if isinstance(benchmark_returns, list) and benchmark_returns else None
+            if p_return is not None and b_return is not None:
+                lines.append(f"【区间对比】组合累计 {p_return:+.2f}% vs 沪深300 {b_return:+.2f}%")
+
+    if not lines:
+        return "暂无足够历史数据进行竞争语境对比"
+
+    return "\n".join(lines)
+
+
 __all__ = [
     "CACHE_PREFIX_LLM",
     "FAIL_REASON_NOT_CONFIGURED",
@@ -91,6 +317,11 @@ __all__ = [
     "_build_penetration_deep_prompt",
     "_build_holdings_summary",
     "_build_news_correlation_summary",
+    "_build_data_degradation_block",
+    "_build_profit_attribution_block",
+    "_build_concept_sector_block",
+    "_build_rebalance_block",
+    "_build_competitive_context_block",
 ]
 
 
@@ -133,9 +364,23 @@ Phase 3（定音锤）指挥官融合辩论给出量化调仓方案和风险提�
 
 约束：数据来自输入不虚构；每个论点引用品种代码和收益率；全 Markdown 输出；引用北京时间。
 标注了"净值:YYYY-MM-DD"的品种其涨跌幅数据截止该日期，并非今日涨跌幅，不得在简报和辩论中提及本日盈亏。
-标注了"(QDII滞后1日)"的 QDII 基金净值天然滞后一个交易日，即使净值日期显示为今日，其底层资产定价也截止上一交易日，同样不得讨论本日盈亏。"""
+标注了"(QDII滞后1日)"的 QDII 基金净值天然滞后一个交易日，即使净值日期显示为今日，其底层资产定价也截止上一交易日，同样不得讨论本日盈亏。
 
-_SYSTEM_HEALTH_CHECK = """你是专业投资组合体检分析师。基于用户持仓数据，从四个维度打分：
+## 情景分析
+
+请在回复末尾增加 **"### 情景分析"** 二级标题，标题下包含两个子段落：
+
+📈 **上涨情景：如果未来市场上涨 20%…**
+- 至少 2 句具体行动建议（如：哪些品种建议止盈、哪些可继续持有、是否加仓等）
+- 结合当前持仓结构和盈亏状态给出差异化建议
+
+📉 **下跌情景：如果未来市场下跌 20%…**
+- 至少 2 句具体行动建议（如：哪些品种可逢低补仓、是否需要设止损、现金管理建议等）
+- 结合品种的当前回撤位置和基本面判断
+
+注意：两个情景必须给出方向性判断和具体品种建议，避免"视情况而定"这类模棱两可的表述。"""
+
+_SYSTEM_HEALTH_CHECK = """你是专业投资组合体检分析师。基于用户持仓数据，从五个维度打分：
 
 ## 评分标准（每项满分100）
 
@@ -143,6 +388,12 @@ _SYSTEM_HEALTH_CHECK = """你是专业投资组合体检分析师。基于用户
 2. **流动性**：评估场内/场外比例、停牌风险、基金封闭期
 3. **收益合理性**：评估盈亏是否合理、与大盘/同类对比
 4. **成本结构**：评估成本分布、浮盈浮亏比
+5. **数据质量**：评估输入数据的完整性和可靠性，结合输入中的【数据质量降级】段落：
+   - 收盘价异常断点（停牌/零值）
+   - T2/T3 降级发生频次（数据源不可用的严重程度）
+   - 基金净值更新延迟（净值日期距当前日期）
+   - 分红数据状态（是否可获取）
+   - 个别品种数据缺失时长（连续缺失交易日数）
 
 ## 输出格式（Markdown）
 
@@ -164,6 +415,10 @@ _SYSTEM_HEALTH_CHECK = """你是专业投资组合体检分析师。基于用户
 ## 四、成本结构（XX/100）
 评分依据：…
 优化建议：…
+
+## 五、数据质量（XX/100）
+评分依据（引用【数据质量降级】中的具体降级事件）：
+影响说明：…
 
 ## 改进建议
 按优先级列出3-5条具体可操作建议。
@@ -270,6 +525,7 @@ def _build_global_macro_prompt(
     total_profit: float,
     categories: dict,
     sector_flow: list[dict[str, Any]] | None = None,
+    competitive_context: str | None = None,
 ) -> str:
     """构建全球政经局势的用户提示词（紧凑格式）。
 
@@ -280,6 +536,7 @@ def _build_global_macro_prompt(
         total_profit: 持仓总盈亏
         categories: 品种分类计数
         sector_flow: 行业资金流向数据（可选），含主力净流入排名
+        competitive_context: 竞争语境文本（可选），由呼叫方构建
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     idx_text = "A股:"
@@ -317,12 +574,14 @@ def _build_global_macro_prompt(
             flow_lines.append("  ".join(parts))
         flow_text = "\n【行业资金流向】\n" + "\n".join(flow_lines)
 
+    comp_text = f"\n{competitive_context}" if competitive_context else ""
     return (
         f"【当前时间】{now_bj}（北京时间）\n"
         f"【指数】{idx_text}\n"
         f"【持仓】总市值{total_mv:,.0f} 总盈亏{total_profit:+,.0f}\n"
         f"【分布】{' '.join(cat_parts)}\n"
         f"{flow_text}"
+        f"{comp_text}"
         f"请基于以上数据，分析当前全球政经局势对持仓的潜在影响。"
     )
 
@@ -378,6 +637,7 @@ def _build_expert_review_prompt(
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
     f_context: dict | None = None,
+    competitive_context: str | None = None,
 ) -> str:
     """构建智囊团深度复盘的用户提示词（紧凑格式）。
 
@@ -386,6 +646,8 @@ def _build_expert_review_prompt(
 
     Args:
         f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
+        competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），
+            可选，由呼叫方构建并传入。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
@@ -393,6 +655,10 @@ def _build_expert_review_prompt(
     holdings_text = _format_holdings_block(holdings_details, compact=True)
     pen_text = _format_penetration_block(penetrated_assets)
     diff_text = _build_diff_context_block(f_context)
+    degradation_text = _build_data_degradation_block(f_context)
+    attribution_text = _build_profit_attribution_block(holdings_details)
+    concept_text = _build_concept_sector_block(penetrated_assets)
+    rebalance_text = _build_rebalance_block(holdings_details, total_mv)
 
     parts = [
         f"【当前时间】{now_bj}（北京时间）",
@@ -402,6 +668,16 @@ def _build_expert_review_prompt(
     ]
     if diff_text:
         parts.append(diff_text)
+    if degradation_text:
+        parts.append(degradation_text)
+    if attribution_text:
+        parts.append(attribution_text)
+    if concept_text:
+        parts.append(concept_text)
+    if rebalance_text:
+        parts.append(rebalance_text)
+    if competitive_context:
+        parts.append(competitive_context)
     parts += [
         "",
         "【持仓明细】",
@@ -439,6 +715,8 @@ def _build_health_check_prompt(
     holdings_text = _format_holdings_block(holdings_details, show_cost=True)
     pen_text = _format_penetration_block(penetrated_assets)
     diff_text = _build_diff_context_block(f_context)
+    degradation_text = _build_data_degradation_block(f_context)
+    attribution_text = _build_profit_attribution_block(holdings_details)
 
     parts = [
         f"【当前时间】{now_bj}（北京时间）",
@@ -448,16 +726,21 @@ def _build_health_check_prompt(
     ]
     if diff_text:
         parts.append(diff_text)
+    if degradation_text:
+        parts.append(degradation_text)
+    if attribution_text:
+        parts.append(attribution_text)
     parts += [
         "",
         "【持仓明细】（含成本）",
         holdings_text,
         "",
-        "请从以下四个维度对以上投资组合进行全面体检并打分：",
+        "请从以下五个维度对以上投资组合进行全面体检并打分：",
         "1. 风险分散度 — 行业/品种集中度，结合环比变化趋势评估",
         "2. 流动性 — 场内场外/停牌/封闭期",
         "3. 收益合理性 — 盈亏是否与市场匹配，对比上次报告变化",
         "4. 成本结构 — 成本分布与浮盈浮亏比",
+        "5. 数据质量 — 结合【数据质量降级】段落评估数据完整性",
         "按要求的输出格式给出评分和改进建议。",
     ]
     return "\n".join(parts)

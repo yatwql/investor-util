@@ -218,6 +218,7 @@ investor-util/
 │   │   ├── better-investment-advice/            #   投资建议改进分析讨论
 │   │   │   ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
 │   │   │   ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
+│   │   │   ├── f_context-schema.md              # f_context Pre-Schema 文档（管线键定义+类型断言）
 │   │   │   └── rf-and-885005-test-report.md              # Rf & 885005 数据源稳定性专项测试报告
 
 │   ├── archive/                      #   历史归档

@@ -161,6 +161,17 @@ def _auto_reset_provider_registry():
 
 
 @pytest.fixture(autouse=True)
+def _reset_degradation_tracker():
+    """自动重置 DegradationTracker 单例，防止测试间状态污染。
+
+    每次测试执行前清空计数器和事件日志。
+    依赖 reset_tracker() 销毁当前实例，下次 get_tracker() 重新创建。
+    """
+    from src.python.report.data_status import reset_tracker
+    reset_tracker()
+
+
+@pytest.fixture(autouse=True)
 def _mock_market_hours_api(monkeypatch):
     """禁用实时东方财富 push2 API 调用，使用内置默认值判断市场时段。
 

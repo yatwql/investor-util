@@ -43,6 +43,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
     FAIL_REASON_DISABLED,
     LLM_MODULE_FAILURE,
+    _build_competitive_context_block,
 )
 from src.python.llm.session import record_per_module
 from src.python.llm.skeleton import is_llm_module_enabled
@@ -252,6 +253,11 @@ def _dispatch_llm_workers(
     if not any(needs.values()):
         return {}
 
+    # ── MVP-04/MVP-05: 预计算竞争语境文本块 ──
+    _competitive_context = _build_competitive_context_block(
+        a_indices, total_mv, total_today_profit,
+    )
+
     results_dict: dict[str, dict] = {}
     _label_map: dict[str, str] = get_llm_module_names()
 
@@ -286,6 +292,7 @@ def _dispatch_llm_workers(
             force=force,
             http_client=c,
             llm_config=lc,
+            competitive_context=_competitive_context,
         ),
         "expert_review": lambda c, lc: generate_expert_review(
             total_mv,
@@ -300,6 +307,7 @@ def _dispatch_llm_workers(
             http_client=c,
             llm_config=lc,
             f_context=f_context,
+            competitive_context=_competitive_context,
         ),
         "health_check": lambda c, lc: generate_health_check(
             total_mv,

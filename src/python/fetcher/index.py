@@ -242,6 +242,15 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
         logger.warning("[index] 指数历史日线获取异常: %s", code, exc_info=True)
         result = []
 
+    # 记录降级事件
+    from src.python.report.data_status import get_tracker
+    _t = get_tracker()
+    _src_key = f"index_history_{chain_name}_{code}"
+    if result:
+        _t.record(_src_key, "T2", success=True)
+    else:
+        _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+
     # 写入会话缓存（即使为空也缓存，避免重复请求）
     reg.session_cache_set("history_index", code, result, source="api")
     return result

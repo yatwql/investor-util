@@ -4,9 +4,21 @@
 
 ---
 
-## [0.7.3-dev] - 开发中
+## [0.7.3] - 2026-07-20
 
 ### Added
+- **P2 全部 10 项任务完成（Tier 0 + MVP）**：
+  - **T0-01-A**: DegradationTracker get_log() + 6 处 fetcher 层 record() + get_tracker() 单例工厂，消除三重实例碎片化
+  - **T0-01-B**: f_context Pre-Schema 文档（`f_context-schema.md`）+ 删除 2 个死键 + 类型断言 checkpoint
+  - **T0-01**: DegradationTracker→LLM 接线，注入 f_context["data_degradation"]
+  - **T0-02**: 健康检查 3 类→5 类（新增数据质量维度评分标准）
+  - **MVP-01**: `_build_profit_attribution_block()` TOP 5 收益归因（正负分别列出，Σ|profit|=0 保护）
+  - **MVP-02**: `_build_concept_sector_block()` TOP 5 概念板块 + 集中度判断（3 态兜底：无数据/部分无分类/正常）
+  - **MVP-03**: `src/python/analysis/simple_rebalance.py` 硬编码 15% 再平衡阈值 + 去重聚合（>3 条→汇总）
+  - **MVP-04**: `_build_competitive_context_block()` 组合 vs 沪深300 今日/区间对比
+  - **MVP-05**: 5 个段落整合串联到 prompts.py + generators.py/orch 竞争语境接线
+  - **MVP-06**: `_SYSTEM_EXPERT_REVIEW` 追加情景分析（上涨/下跌 20% 分情景建议）
+  - 合计 45h，regression 266 passed, 0 failed
 - **PRE-01/PRE-02 专项测试**：完成 Rf 国债收益率数据源和偏股基金指数 885005 的全面测试
   - 东方财富 datacenter API（RPTBOND_*）**确认不可用**（30+ report name 全部返回"参数配置不对"）
   - `bond_zh_us_rate`（akshare/Sina）通过 50/50 稳定性测试（100% 成功率，平均 2.734s，中国 10Y=1.7404%）

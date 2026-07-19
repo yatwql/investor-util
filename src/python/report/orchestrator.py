@@ -151,6 +151,7 @@ def capture_snapshot(
         f_context 字典（含 diff），首次运行或异常时返回 None。
     """
     from src.python.fetcher.history_diff import HistoryDiff
+    from src.python.report.data_status import get_tracker as _get_degradation_tracker
     from src.python.report.history_snapshot import load_latest, save
     from src.python.schemas.history import (
         AccountSnapshot,
@@ -243,8 +244,7 @@ def capture_snapshot(
                         for d in _diff.decreased
                     ],
                 },
-                "diff_trimmed": _diff.trimmed,
-                "days_since_last": _diff.days_since_last_report,
+                "data_degradation": _get_degradation_tracker().get_log(),
             }
         reporter.ok("环比对比数据准备完成")
     except Exception:
@@ -423,6 +423,12 @@ def _generate_report_both(
 
     # ── 2. F1 快照对比（始终执行） ──
     f_context = capture_snapshot(holdings, details, config, reporter)
+    # [checkpoint] f_context 类型断言
+    if f_context is not None:
+        assert isinstance(f_context, dict), "capture_snapshot(both) f_context 类型异常"
+        _diff = f_context.get("diff")
+        if _diff is not None and not isinstance(_diff, dict):
+            logger.warning("[checkpoint] f_context.diff 类型异常(both): %s", type(_diff).__name__)
 
     # ── 3. F2 历史走势（条件获取） ──
     if _enable_history:
@@ -678,9 +684,24 @@ def _generate_report_full(
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
     prep = prepare_report_data(holdings, reporter, config)
+    # [checkpoint] prep 类型断言
+    assert isinstance(prep, dict), "prepare_report_data 返回类型异常"
+    for _ck in ("total_mv", "total_cost", "total_profit", "total_today_profit", "categories",
+                 "a_indices", "holdings_details", "today_str", "output_dir", "news_top_count"):
+        if _ck not in prep:
+            logger.warning("[checkpoint] prep 缺失必选键: %s", _ck)
+        elif not isinstance(prep.get(_ck), (int, float, dict, list, str, type(None))):
+            logger.warning("[checkpoint] prep.%s 类型异常: %s", _ck, type(prep.get(_ck)).__name__)
 
     # ── 2. F1 快照对比 ──
     f_context = capture_snapshot(holdings, prep["details"], config, reporter)
+    # [checkpoint] f_context 类型断言
+    if f_context is not None:
+        assert isinstance(f_context, dict), "capture_snapshot f_context 类型异常"
+        _diff = f_context.get("diff")
+        if _diff is not None:
+            if not isinstance(_diff, dict):
+                logger.warning("[checkpoint] f_context.diff 类型异常: %s", type(_diff).__name__)
 
     # ── 3. F2 历史走势（条件获取） ──
     if _enable_history:

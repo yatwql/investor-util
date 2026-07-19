@@ -19,6 +19,7 @@ import logging
 import os
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from src.python.cache import get_cache_dir
@@ -36,6 +37,26 @@ class DataStatusItem(TypedDict):
 
 
 DataStatus = dict[str, DataStatusItem]
+
+
+# ── 降级事件类型（get_log() 返回值结构）───
+
+
+@dataclass
+class DegradationEvent:
+    """单次降级记录事件。
+
+    每次 record() 调用产生一个事件，供 get_log() 汇总为 LLM 可消费的结构化列表。
+    """
+
+    source_key: str
+    tier: str
+    success: bool
+    failure_type: str
+    degraded: bool
+    count: int
+    effective_threshold: int
+    timestamp: float
 
 
 # ── 消息常量 ──────────────────────────────────
@@ -89,6 +110,43 @@ def _default_persist_path() -> str:
     return os.path.join(state_dir, ".degradation_state.json")
 
 
+# ── 单例工厂 ──────────────────────────────────
+
+_tracker_instance: DegradationTracker | None = None
+_tracker_instance_lock = threading.Lock()
+
+
+def get_tracker(persist_path: str | None = None) -> DegradationTracker:
+    """获取 DegradationTracker 单例。
+
+    模块级懒加载单例工厂，消除 fund_performance.py / penetration_sheet.py /
+    summary.py 的独立实例碎片化，统一降级状态管理与持久化路径。
+
+    Args:
+        persist_path: 持久化文件路径，None 使用默认路径
+
+    Returns:
+        DegradationTracker 单例
+    """
+    global _tracker_instance
+    if _tracker_instance is None:
+        with _tracker_instance_lock:
+            if _tracker_instance is None:
+                _tracker_instance = DegradationTracker(persist_path=persist_path)
+    return _tracker_instance
+
+
+def reset_tracker() -> None:
+    """重置 DegradationTracker 单例（测试用）。
+
+    清空所有计数器和事件日志，销毁当前实例。
+    下次 get_tracker() 调用时重新创建。
+    """
+    global _tracker_instance
+    with _tracker_instance_lock:
+        _tracker_instance = None
+
+
 # ── 降级阈值控制 ──────────────────────────────
 
 
@@ -132,6 +190,9 @@ class DegradationTracker:
         # 持久化写节流
         self._last_persist_ts: float = 0.0
         self._persist_dirty: bool = False
+
+        # 事件日志（get_log() 数据源）
+        self._events: list[DegradationEvent] = []
 
     # ── 持久化 ─────────────────────────────────
 
@@ -225,6 +286,34 @@ class DegradationTracker:
         with self._lock:
             return dict(self._counts.get(source_key, {}))
 
+    def get_log(self) -> list[dict]:
+        """返回会话内所有降级记录事件（线程安全）。
+
+        Returns:
+            事件字典列表，每条含 source_key / tier / success / failure_type /
+            degraded / count / effective_threshold / timestamp。
+            按 record() 调用顺序排列。
+        """
+        with self._lock:
+            return [
+                {
+                    "source_key": e.source_key,
+                    "tier": e.tier,
+                    "success": e.success,
+                    "failure_type": e.failure_type,
+                    "degraded": e.degraded,
+                    "count": e.count,
+                    "effective_threshold": e.effective_threshold,
+                    "timestamp": e.timestamp,
+                }
+                for e in self._events
+            ]
+
+    def clear_log(self) -> None:
+        """清空事件日志（测试用）。"""
+        with self._lock:
+            self._events.clear()
+
     # ── 内部实现 ──────────────────────────────
 
     def _record_unsafe(
@@ -242,6 +331,16 @@ class DegradationTracker:
             self._last_success[source_key] = time.time()
             self._persist_dirty = True
             self._persist_state()
+            self._events.append(DegradationEvent(
+                source_key=source_key,
+                tier=tier,
+                success=True,
+                failure_type=failure_type,
+                degraded=False,
+                count=0,
+                effective_threshold=0,
+                timestamp=time.time(),
+            ))
             return False, 0, 0
 
         # 读取层级配置
@@ -265,7 +364,21 @@ class DegradationTracker:
         # 信号2：缓存陈旧度 or 持久化跨会话陈旧度
         signal2 = self._check_stale(tier, cfg, cache_age_hours, source_key)
 
-        return signal1 or signal2, max(counts.values()), min(unreachable_eff, empty_eff)
+        degraded = signal1 or signal2
+        max_count = max(counts.values())
+        min_eff = min(unreachable_eff, empty_eff)
+
+        self._events.append(DegradationEvent(
+            source_key=source_key,
+            tier=tier,
+            success=False,
+            failure_type=failure_type,
+            degraded=degraded,
+            count=max_count,
+            effective_threshold=min_eff,
+            timestamp=time.time(),
+        ))
+        return degraded, max_count, min_eff
 
     @staticmethod
     def _adjust(base: int, cache_age_hours: float | None, cache_ttl_hours: float | None) -> int:
