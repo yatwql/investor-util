@@ -65,6 +65,9 @@
   - 竞争语境段落末尾自动追加口径说明脚注（费后净收益 vs 价格指数、含现金 vs 不含、期间持仓变动）
   - `_SYSTEM_EXPERT_REVIEW` 新增竞争语境约束段落，限制 LLM 使用数据陈述替代主观结论
   - 3 项新增测试验证脚注和 LLM 约束内容
+- **P3-10: 竞争语境——幸存者偏差说明**：
+  - 竞争语境脚注追加幸存者偏差提示（指数成分股/成分基金定期调整效应）
+  - 2 项新增测试验证提示存在/不存在
 
 ### Changed
 - **代码注释历史痕迹清理**：移除所有 P1-XX/P2-XX 任务标签（metrics.py、drawdown_warning.py、fingerprint.py、generators_orchestrator.py、prompts_action.py、prompts_core.py、prompts_tables.py、circuit_breaker.py、bond_yield.py、registry.py、orchestrator.py 等共 ~60 处），保持代码当前状态描述

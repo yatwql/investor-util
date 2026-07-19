@@ -667,3 +667,19 @@ class TestBuildCompetitiveContextBlock(unittest.TestCase):
         result = _build_competitive_context_block(None, 0, 0)
         self.assertEqual(result, "暂无足够历史数据进行竞争语境对比")
         self.assertNotIn("口径说明", result)
+
+    def test_survivor_bias_note_appended_when_comparison_present(self):
+        """有对比数据时幸存者偏差提示自动追加。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(
+            {"sh000300": {"name": "沪深300", "change_pct": 0.5}},
+            1_000_000, 10_000,
+        )
+        self.assertIn("幸存者偏差", result)
+        self.assertIn("成分股", result)
+
+    def test_survivor_bias_note_not_appended_when_no_data(self):
+        """无对比数据时无幸存者偏差提示。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(None, 0, 0)
+        self.assertNotIn("幸存者偏差", result)
