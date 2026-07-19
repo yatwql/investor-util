@@ -172,6 +172,10 @@ investor-util/
 │   │
 │   └── test/                         # 测试套件
 │       ├── unit/                     #   单元测试（8 子组：providers/fetcher/llm/news/report/config/core/ui）
+│       │   ├── test_liquidity.py          #   流动性分析：场内品种变现天数（10 tests）
+│       │   ├── test_liquidity_edge.py     #   流动性分析：边缘场景（极端大持仓/低流动性/空K线）
+│       │   ├── test_liquidity_otc.py      #   流动性分析：场外赎回天数（配置上限/未配置/零上限，8 tests）
+│       │   └── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景（巨额赎回/混合配置）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       ├── scenario/                 #   场景测试（basic/resilience/extreme/llm/datetime）
 │       ├── conftest.py               #   pytest 全局配置 + 标记注册

@@ -4,10 +4,11 @@
 
     from src.python.analysis.liquidity import check_liquidity
 
-    signals = check_liquidity(holdings_details, total_mv)
+    signals = check_liquidity(holdings_details, total_mv, redemption_limits=limits)
 
 场内品种（股票/ETF）基于近 20 日 K 线成交量和收盘价估算日成交额，
-计算全额变现所需天数。场外品种标记为 OTC 类型（由 P3-12 处理）。
+计算全额变现所需天数。场外品种标记为 OTC 类型，可通过 redemption_limits
+参数配置单日赎回上限计算赎回天数（未配置则标记"需手动确认赎回上限"）。
 
 降级方案：成交额数据失败时默认假设流动性充足，不告警。
 """
@@ -95,16 +96,20 @@ def _compute_avg_daily_turnover(code: str) -> float | None:
 def check_liquidity(
     holdings_details: list[dict[str, Any]] | None,
     total_mv: float,
+    redemption_limits: dict[str, float] | None = None,
 ) -> list[dict[str, Any]]:
     """检查持仓流动性风险。
 
     对每个场内品种，基于近 20 日日均成交额计算全额变现天数。
-    场外品种标记 type="otc"，不计算变现天数。
+    场外品种标记 type="otc"，若提供 redemption_limits 则计算赎回天数，
+    未配置赎回上限的品种标记"需手动确认赎回上限"。
     数据获取失败的场内品种默认假设流动性充足（标记 type="assumed_liquid"）。
 
     Args:
         holdings_details: 持仓明细列表，每项含 code/name/market_value。
         total_mv: 组合总市值（用于权重计算，当前暂未使用）。
+        redemption_limits: 场外基金单日赎回上限映射（code → 金额 CNY）。
+            为 None 或空 dict 时不计算 OTC 赎回天数。
 
     Returns:
         流动性分析结果列表，每项含：
@@ -113,11 +118,15 @@ def check_liquidity(
         - market_value: 持仓市值
         - type: "stock"（场内可计算）/ "otc"（场外）/ "assumed_liquid"（数据缺失，默认充足）
         - avg_daily_turnover: 日均成交额（CNY，仅 type="stock"）
-        - liquidation_days: 全额变现天数（仅 type="stock"）
-        - tag: "当日可卖出" / "需约 N 日卖出" / "场外基金" / "流动性充足（数据缺失）"
+        - liquidation_days: 全额变现天数（type="stock" 或已配 OTC）
+        - daily_redemption_limit: 单日赎回上限（CNY，仅 type="otc" 且已配置）
+        - tag: "当日可卖出" / "需约 N 日卖出" / "场外基金" / "需手动确认赎回上限" /
+               "流动性充足（数据缺失）"
     """
     if not holdings_details:
         return []
+
+    limits = redemption_limits or {}
 
     results: list[dict[str, Any]] = []
     for h in holdings_details:
@@ -128,17 +137,33 @@ def check_liquidity(
         if mv <= 0:
             continue
 
-        # 场外基金 → 标记 OTC，交 P3-12
+        # 场外基金 → 标记 OTC，检查赎回上限配置
         if _is_otc_fund(name, code):
-            results.append({
-                "code": code,
-                "name": name,
-                "market_value": mv,
-                "type": "otc",
-                "avg_daily_turnover": None,
-                "liquidation_days": None,
-                "tag": "场外基金",
-            })
+            daily_limit = limits.get(code)
+            if daily_limit is not None and daily_limit > 0:
+                otc_days = mv / daily_limit
+                tag = "当日可赎回" if otc_days < 1.0 else f"需约{otc_days:.1f}日赎回"
+                results.append({
+                    "code": code,
+                    "name": name,
+                    "market_value": mv,
+                    "type": "otc",
+                    "avg_daily_turnover": None,
+                    "liquidation_days": round(otc_days, 2),
+                    "daily_redemption_limit": daily_limit,
+                    "tag": tag,
+                })
+            else:
+                results.append({
+                    "code": code,
+                    "name": name,
+                    "market_value": mv,
+                    "type": "otc",
+                    "avg_daily_turnover": None,
+                    "liquidation_days": None,
+                    "daily_redemption_limit": None,
+                    "tag": "需手动确认赎回上限",
+                })
             continue
 
         # 场内品种 → 计算变现天数

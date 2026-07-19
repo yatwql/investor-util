@@ -76,6 +76,13 @@
 - **P3-11-T: 流动性风险测试（场内）**：
   - `test_liquidity.py` 10 项正常场景（空输入/OTC/Stock/Mixed）+ `test_liquidity_edge.py` 5 项 edge 场景
   - mock 路径使用 `_MOCK_TARGET = "src.python.fetcher.chain.fetch_with_incremental_fallback"`（lazy import），C12 edge 文件隔离合规
+- **P3-12: 流动性风险——场外品种手动配置入口**：
+  - `_DEFAULT_CONFIG` 新增 `redemption_limits` 字典键（I 组配置，code → 单日赎回上限金额）
+  - `check_liquidity()` 新增 `redemption_limits` 可选参数，已配置品种计算赎回天数（"需约 N 日赎回"/"当日可赎回"），未配置品种标记"需手动确认赎回上限"
+  - 零上限（0 或 None）视同未配置，不影响未配置品种的逻辑
+- **P3-12-T: 流动性风险测试（场外）**：
+  - `test_liquidity_otc.py` 8 项正常场景（配置限额/未配置/高限额当日/空字典/无OTC/零上限）
+  - `test_liquidity_otc_edge.py` 3 项 edge 场景（巨额赎回/混合配置/零市值跳过），C12 edge 文件隔离合规
 
 ### Changed
 - **代码注释历史痕迹清理**：移除所有 P1-XX/P2-XX 任务标签（metrics.py、drawdown_warning.py、fingerprint.py、generators_orchestrator.py、prompts_action.py、prompts_core.py、prompts_tables.py、circuit_breaker.py、bond_yield.py、registry.py、orchestrator.py 等共 ~60 处），保持代码当前状态描述

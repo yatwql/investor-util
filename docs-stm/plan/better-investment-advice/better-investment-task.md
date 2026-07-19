@@ -368,7 +368,7 @@
 
 ## Phase 3 — 执行信号与竞争语境 + 画像问卷 + 事实校验器（~206h）
 
-> P3-01 ~ P3-11 ✅ 已完成，P3-12 ~ P3-17 为 P2 待办，详见 `docs-stm/managements/plan.md`。
+> P3-01 ~ P3-12 ✅ 已完成，P3-13 ~ P3-17 为 P2 待办，详见 `docs-stm/managements/plan.md`。
 
 ### P3-01: 再平衡完整版——目标配置 Schema
 - **估时**: 16h
@@ -475,6 +475,7 @@
 - **文件**: `src/python/config/_config_defaults.py`（新增 `redemption_limits`）、`src/python/analysis/liquidity.py`（扩展）
 - **阻塞**: 否
 - **依赖**: P3-11（流动性分析框架已就绪）
+- **状态**: ✅ 已完成（2026-07-20）——`_DEFAULT_CONFIG` 新增 `redemption_limits` 字典；`check_liquidity()` 新增 `redemption_limits` 参数，已配置品种计算赎回天数（"需约 N 日赎回"/"当日可赎回"），未配置品种标记"需手动确认赎回上限"
 - **描述**: 场外基金实际赎回上限（如"单日上限 10 万"）无法自动获取，需用户配置。在 `_DEFAULT_CONFIG` 中新增 `redemption_limits: dict[str, float]`（code → 单日赎回上限金额）。`liquidity.py` 读取该配置，计算场外品种全量赎回所需天数。未配置的品种显示"需手动确认赎回上限"。⚠ 并发约束：P3-12 和 P3-15 均修改 _config_defaults.py，必须由同一开发者按序执行（先 P3-12 后 P3-15 或反之），禁止两人并行修改同一文件。
 
 ### P3-12-T: 流动性风险测试（场外）
@@ -482,6 +483,7 @@
 - **文件**: `src/test/unit/test_liquidity_otc.py`（新建）、`src/test/unit/test_liquidity_otc_edge.py`（新增——极端场景隔离）
 - **阻塞**: 否
 - **依赖**: P3-12
+- **状态**: ✅ 已完成（2026-07-20）——8 项正常场景测试 + 3 项 edge 测试，覆盖配置上限/未配置/零上限/无 OTC/巨额赎回/混合配置，C12 edge 文件隔离合规
 - **描述**: 为场外赎回天数计算编写测试用例：(1) 配置赎回上限——给定持仓市值+单日上限，验证天数正确；(2) 未配置品种——返回"需手动确认"标记；(3) 无 OTC 品种——返回空列表；(4) **巨额赎回（放入 test_liquidity_otc_edge.py）**——市值远超单日上限，验证天数为合理值。标注 `@pytest.mark.unit_providers`（普通测试）、`@pytest.mark.edge`（极端场景放入 `test_liquidity_otc_edge.py`）。**C12 合规**：极端场景必须与普通测试文件分离。
 
 ### P3-13: 汇率敞口——货币分类修复（Layer 3C）

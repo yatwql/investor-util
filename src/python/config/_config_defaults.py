@@ -89,6 +89,8 @@ _DEFAULT_CONFIG = {
         "target_allocation": {},  # 目标配置 Schema（空=不启用目标配置检查）
         "equity_fixed_income": {},  # 权益/固收超大类目标配置（空=不启用）
     },
+    # ── I. 流动性配置 ──
+    "redemption_limits": {},  # 场外基金单日赎回上限（code → 金额，空=未配置）
 }
 
 
@@ -168,6 +170,9 @@ def _get_default_config_template() -> str:
         '    "silence_days": 30,\n'
         '    "target_allocation": {},\n'
         '    "equity_fixed_income": {}\n'
-        "  }\n"
+        "  },\n"
+        "\n"
+        "  // ── I. 流动性配置 ──\n"
+        '  "redemption_limits": {}\n'
         "}\n"
     )
