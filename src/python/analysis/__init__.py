@@ -9,6 +9,7 @@
   - metrics: 量化指标计算（夏普/卡玛/HHI/胜率/换手率/风险贡献/波动率/Beta）
   - circuit_breaker_wrapper: 指标级断路包装器
   - drawdown_warning: 回撤历史分位预警（滚动窗口 + 全历史）
+  - liquidity: 流动性风险评估（场内品种变现天数计算）
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from src.python.analysis.drawdown_warning import (  # noqa: F401
     rolling_max_drawdown,
     current_drawdown_percentile,
 )
+from src.python.analysis.liquidity import check_liquidity  # noqa: F401
 
 __all__ = [
     "compute_rebalance_signals",
@@ -55,4 +57,5 @@ __all__ = [
     "compute_drawdown_warning",
     "rolling_max_drawdown",
     "current_drawdown_percentile",
+    "check_liquidity",
 ]

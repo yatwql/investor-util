@@ -77,8 +77,15 @@ investor-util/
 │   │   │   ├── news_keywords.py      #   新闻关键词提取与匹配
 │   │   │   └── news_sources.py       #   新闻源注册与配置
 │   │   │
+│   │   ├── analysis/                 # 业务计算层（独立无依赖，不导入 report/）
+│   │   │   ├── __init__.py           #   包标记；导出 check_liquidity 等
+│   │   │   ├── metrics.py            #   量化指标计算（夏普/卡玛/HHI/Beta 等）
+│   │   │   ├── simple_rebalance.py   #   极简再平衡（单品种超15%警戒线）
+│   │   │   ├── circuit_breaker_wrapper.py # 指标级断路包装器
+│   │   │   ├── drawdown_warning.py   #   回撤历史分位预警
+│   │   │   └── liquidity.py          #   流动性风险评估（场内品种变现天数计算）
+│   │   │
 │   │   ├── llm/                      # LLM 智能分析
-│   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
 │   │   │   ├── api_base.py           #   LLM API 基类（请求/重试/流式）
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）

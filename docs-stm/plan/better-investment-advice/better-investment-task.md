@@ -368,7 +368,7 @@
 
 ## Phase 3 — 执行信号与竞争语境 + 画像问卷 + 事实校验器（~206h）
 
-> P3-01 ~ P3-10 ✅ 已完成，P3-11 ~ P3-17 为 P2 待办，详见 `docs-stm/managements/plan.md`。
+> P3-01 ~ P3-11 ✅ 已完成，P3-12 ~ P3-17 为 P2 待办，详见 `docs-stm/managements/plan.md`。
 
 ### P3-01: 再平衡完整版——目标配置 Schema
 - **估时**: 16h
@@ -459,6 +459,7 @@
 - **文件**: `src/python/analysis/liquidity.py`（新增）
 - **阻塞**: 否
 - **依赖**: 腾讯/新浪 K 线 API（个股/ETF 的日均成交额数据已有，但依赖该 API 正常返回成交量字段；历史上空数据返回记录——若 API 降级或格式变更，流动性计算完全失效）
+- **状态**: ✅ 已完成（2026-07-20）——`check_liquidity(holdings)` 基于市值/日均成交额计算变现天数，OTC 品种标记为 otc，K 线缺失时降级为 assumed_liquid；13 项单元测试（含 5 edge）全部通过
 - **描述**: 实现 `check_liquidity(holdings) → list[dict]`。场内品种（股票/ETF）：`市值 / 近 20 日日均成交额`，计算变现天数。输出：(1) 各品种变现天数；(2) 累计变现总天数（若需全部卖出）；(3) 标记"当日可卖出" vs "需多日卖出"。场外基金标记为 OTC 类型交由 P3-12。注入 LLM prompt："XX 品种持仓 500 万，日均成交额 1000 万，约 0.5 日可完成变现。" **降级方案**：成交额数据失败时默认假设流动性充足，不告警。**⚠ 注册要求**：包含 `registry.py _COMPUTATION_REGISTRY` 注册（注册名 `analytics_liquidity`，由 P1-10 预留位置）。
 
 ### P3-11-T: 流动性风险测试（场内）
@@ -466,6 +467,7 @@
 - **文件**: `src/test/unit/test_liquidity.py`（新建）、`src/test/unit/test_liquidity_edge.py`（新增——极端场景隔离）
 - **阻塞**: 否
 - **依赖**: P3-11
+- **状态**: ✅ 已完成（2026-07-20）——10 项正常场景测试 + 5 项 edge 测试全部通过，mock 路径使用 `_MOCK_TARGET = "src.python.fetcher.chain.fetch_with_incremental_fallback"`，边缘测试文件隔离合规（C12）
 - **描述**: 为场内流动性计算编写测试用例：(1) 正常计算——给定市值+成交额，验证变现天数正确；(2) **极端大持仓（放入 test_liquidity_edge.py）**——市值远超日均成交额，验证变现天数为合理值；(3) 所有品种均为 OTC——返回空列表；(4) 空成交额——成交额列表为空时返回 None 而非崩溃。标注 `@pytest.mark.unit_providers`（普通测试）、`@pytest.mark.edge`（极端场景放入 `test_liquidity_edge.py`）。**C12 合规**：极端场景必须与普通测试文件分离。
 
 ### P3-12: 流动性风险——场外品种手动配置入口（Layer 3B）

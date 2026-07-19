@@ -400,7 +400,7 @@ _COMPUTATION_REGISTRY: tuple[ComputModuleDef, ...] = (
         label="流动性",
         dependencies=(),
         description="场内/场外比例、停牌风险、基金封闭期分析",
-        status="planned",
+        status="implemented",
     ),
     ComputModuleDef(
         name="外汇敞口分析",

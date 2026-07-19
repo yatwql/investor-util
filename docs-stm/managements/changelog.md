@@ -68,6 +68,14 @@
 - **P3-10: 竞争语境——幸存者偏差说明**：
   - 竞争语境脚注追加幸存者偏差提示（指数成分股/成分基金定期调整效应）
   - 2 项新增测试验证提示存在/不存在
+- **P3-11: 流动性风险——场内品种自动计算**：
+  - `src/python/analysis/liquidity.py` 新增 `check_liquidity()` 函数，基于市值/20日日均成交额计算场内品种变现天数
+  - OTC 基金正确识别并标记 type="otc"（交 P3-12），K 线数据缺失时降级为 assumed_liquid
+  - 检查顺序：先场外（债券基/货基/代码重叠区 OTC）→ 后场内（A 股/场内基金）→ 港股等默认充足
+  - `__init__.py` 导出 `check_liquidity`，registry.py `analytics_liquidity` 已注册（P1-10 预留）
+- **P3-11-T: 流动性风险测试（场内）**：
+  - `test_liquidity.py` 10 项正常场景（空输入/OTC/Stock/Mixed）+ `test_liquidity_edge.py` 5 项 edge 场景
+  - mock 路径使用 `_MOCK_TARGET = "src.python.fetcher.chain.fetch_with_incremental_fallback"`（lazy import），C12 edge 文件隔离合规
 
 ### Changed
 - **代码注释历史痕迹清理**：移除所有 P1-XX/P2-XX 任务标签（metrics.py、drawdown_warning.py、fingerprint.py、generators_orchestrator.py、prompts_action.py、prompts_core.py、prompts_tables.py、circuit_breaker.py、bond_yield.py、registry.py、orchestrator.py 等共 ~60 处），保持代码当前状态描述
