@@ -27,7 +27,7 @@
 - **阻塞**: 否（独立）
 - **依赖**: 无
 - **状态**: ✅ 已完成（2026-07-20）
-- **描述**: 验证 Rf（无风险利率）数据源的可用性。测试 3 个候选源：(1) 东方财富 `datacenter-web` API（原规划主源，**已失效**——所有 `RPTBOND_*` report name 均返回"参数配置不对"）；(2) `worldgovernmentbonds.com`（JS 渲染，不可直接抓取）；(3) **`bond_zh_us_rate`（akshare 封装的 Sina 财经数据）——已验证稳定可用**（详见测试报告）。详见 `docs-stm/tmp/rf-test-report.md`。⚠ **决策影响**：原规划 P1-01（东方财富 API fetcher, 12h）和 P1-02（备用源, 8h）取消，P1-03（手动配置, 2h）改为 `bond_zh_us_rate` 自动源 + 手动兜底双模式。
+- **描述**: 验证 Rf（无风险利率）数据源的可用性。测试 3 个候选源：(1) 东方财富 `datacenter-web` API（原规划主源，**已失效**——所有 `RPTBOND_*` report name 均返回"参数配置不对"）；(2) `worldgovernmentbonds.com`（JS 渲染，不可直接抓取）；(3) **`bond_zh_us_rate`（akshare 封装的 Sina 财经数据）——已验证稳定可用**（详见测试报告 `rf-and-885005-test-report.md`）。⚠ **决策影响**：原规划 P1-01（东方财富 API fetcher, 12h）和 P1-02（备用源, 8h）取消，P1-03（手动配置, 2h）改为 `bond_zh_us_rate` 自动源 + 手动兜底双模式。
 
 ### PRE-01-D: PRE-01 决策门（0h）
 - **估时**: 0h
@@ -35,7 +35,7 @@
 - **阻塞**: 否
 - **依赖**: PRE-01
 - **状态**: ✅ 已决策（2026-07-20）
-- **描述**: **PRE-01 测试结论：东方财富 datacenter API 已不可用，`bond_zh_us_rate`（akshare/Sina）为可行替代。** 决策：(1) P1-01（东方财富 API fetcher, 12h）和 P1-02（备用源 fetcher, 8h）**取消**；(2) P1-03（手动配置, 2h）**保留**，但扩展为双模式——`bond_zh_us_rate` 自动获取（主）+ 用户手动配置（兜底）；(3) P1-15（Rf 测试, 8h）缩减为 `bond_zh_us_rate` 集成测试（4h）；(4) 合计释放 **~20h** 重新分配给 P1-11（功能开关）、P1-12（断路包装器）、P1-04（数据质量增强）。详见 `docs-stm/tmp/rf-test-report.md`。
+- **描述**: **PRE-01 测试结论：东方财富 datacenter API 已不可用，`bond_zh_us_rate`（akshare/Sina）为可行替代。** 决策：(1) P1-01（东方财富 API fetcher, 12h）和 P1-02（备用源 fetcher, 8h）**取消**；(2) P1-03（手动配置, 2h）**保留**，但扩展为双模式——`bond_zh_us_rate` 自动获取（主）+ 用户手动配置（兜底）；(3) P1-15（Rf 测试, 8h）缩减为 `bond_zh_us_rate` 集成测试（4h）；(4) 合计释放 **~20h** 重新分配给 P1-11（功能开关）、P1-12（断路包装器）、P1-04（数据质量增强）。详见测试报告 `rf-and-885005-test-report.md`。
 
 ### PRE-02: 偏股基金指数 885005 可用性测试
 - **估时**: 4h（含 akshare+东方财富+新浪/腾讯 多源测试）
@@ -43,7 +43,7 @@
 - **阻塞**: 否
 - **依赖**: 无
 - **状态**: ✅ 已完成（2026-07-20）
-- **描述**: 测试 885005（中证偏股基金指数）的可用性。测试覆盖 akshare（`index_zh_a_hist`/`stock_zh_index_daily`/`fund_info_index_em`）、东方财富（push2his/push2 全部市场码 0~19、基金 index API/performance API）、新浪、腾讯、CSI 中证指数官网。**结论：885005 是 Wind（万得）专属代码，所有免费公开 API 均不可获取。** CSI 替代代码（930950/932055/931255）同样不可用。详见 `docs-stm/tmp/rf-test-report.md`。**P3-07 强制降级为沪深300+自定义基金池**。
+- **描述**: 测试 885005（中证偏股基金指数）的可用性。测试覆盖 akshare（`index_zh_a_hist`/`stock_zh_index_daily`/`fund_info_index_em`）、东方财富（push2his/push2 全部市场码 0~19、基金 index API/performance API）、新浪、腾讯、CSI 中证指数官网。**结论：885005 是 Wind（万得）专属代码，所有免费公开 API 均不可获取。** CSI 替代代码（930950/932055/931255）同样不可用。详见测试报告 `rf-and-885005-test-report.md`。**P3-07 强制降级为沪深300+自定义基金池**。
 
 ### PRE-02-D: PRE-02 决策与 prompt 分支实现（2h）
 - **估时**: 2h

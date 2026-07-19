@@ -216,8 +216,9 @@ investor-util/
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
 │   │   ├── better-investment-advice/            #   投资建议改进分析讨论
-│   │   │   ├── discussion-better-investment-advice.md  # 可行性调研：6 层改进方向与实施路径
-│   │   │   └── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
+│   │   │   ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
+│   │   │   ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
+│   │   │   └── rf-and-885005-test-report.md              # Rf & 885005 数据源稳定性专项测试报告
 
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
