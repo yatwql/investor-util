@@ -129,6 +129,8 @@ def prepare_report_data(
         "today_str": today_str,
         "output_dir": config.get("output_dir", "reports"),
         "news_top_count": int(config.get("news_top_count", 100)),
+        # P1-06 占位：组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
+        "risk_metrics": {},
     }
 
 
@@ -142,10 +144,18 @@ def capture_snapshot(
     details: list,
     config: dict | None,
     reporter: ProgressReporter,
+    **extra: Any,
 ) -> dict | None:
     """F1 持仓快照创建 + 差异计算 + 保存 + 清理。
 
     接受 config 参数而非调用 get_config_cache()（★ 与 TUI 原版的核心差异）。
+
+    Args:
+        holdings: 持仓列表
+        details: 行情明细
+        config: 配置字典
+        reporter: 进度报告接口
+        extra: 额外扩展字段（如 risk_metrics，供 Phase 1 在 f_context 中透传）
 
     Returns:
         f_context 字典（含 diff），首次运行或异常时返回 None。
@@ -246,6 +256,9 @@ def capture_snapshot(
                 },
                 "data_degradation": _get_degradation_tracker().get_log(),
             }
+            # P1-07: 透传额外扩展字段（risk_metrics / portfolio_daily_returns）
+            if extra:
+                f_context.update(extra)
         reporter.ok("环比对比数据准备完成")
     except Exception:
         logger.info("[F1] 环比数据准备跳过（首次运行或异常）", exc_info=True)
@@ -546,11 +559,15 @@ def _fetch_llm_and_news(
     enable_news: bool,
     enable_llm: bool,
     reporter: ProgressReporter,
+    history_data: dict | None = None,
 ) -> tuple[tuple, list, dict, bool]:
     """并行获取 LLM 内容 + 新闻数据，统一处理 4 分支。
 
     内部管理线程池（max_workers=2，S11 已完成全量去池，operations 池唯一存在）。
     LLM 和新闻的 ok/disabled/failed 计数统一归入此函数。
+
+    Args:
+        history_data: 组合历史走势数据（P1-08 新增），传递给 generate_all_llm。
 
     Returns:
         (llm_content, news_data, news_llm_meta, news_ok)
@@ -602,6 +619,7 @@ def _fetch_llm_and_news(
                 sector_flow=sector_flow,
                 force=force_llm,
                 f_context=f_context,
+                history_data=history_data,
             )
         else:
             reporter.info("[板块配置] LLM 板块已关闭，跳过 LLM 内容生成")
@@ -687,7 +705,7 @@ def _generate_report_full(
     # [checkpoint] prep 类型断言
     assert isinstance(prep, dict), "prepare_report_data 返回类型异常"
     for _ck in ("total_mv", "total_cost", "total_profit", "total_today_profit", "categories",
-                 "a_indices", "holdings_details", "today_str", "output_dir", "news_top_count"):
+                 "a_indices", "holdings_details", "today_str", "output_dir", "news_top_count", "risk_metrics"):
         if _ck not in prep:
             logger.warning("[checkpoint] prep 缺失必选键: %s", _ck)
         elif not isinstance(prep.get(_ck), (int, float, dict, list, str, type(None))):
@@ -707,6 +725,23 @@ def _generate_report_full(
     if _enable_history:
         _resolved_mode = "auto" if history_mode in ("auto",) else "off"
         history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
+        # P1-07: 从 history_data 提取风险指标，注入 prep 和 f_context
+        if history_data and history_data.get("status") not in ("unavailable",):
+            _risk = {
+                "annualized_volatility": history_data.get("annualized_volatility", 0),
+                "max_drawdown_pct": history_data.get("max_drawdown_pct", 0),
+                "total_return_pct": history_data.get("total_return_pct", 0),
+                "data_start": history_data.get("data_start", ""),
+                "data_end": history_data.get("data_end", ""),
+            }
+            prep["risk_metrics"] = _risk
+            if f_context is not None:
+                f_context["risk_metrics"] = _risk
+                f_context["portfolio_daily_returns"] = history_data.get("daily_returns_portfolio", [])
+        # [checkpoint] risk_metrics 完整性校验
+        _injected = prep.get("risk_metrics", {})
+        if not _injected.get("annualized_volatility") and _injected.get("annualized_volatility") != 0:
+            logger.warning("[checkpoint] prep.risk_metrics 缺 annualized_volatility")
     else:
         history_data = None
         reporter.info("[板块配置] 历史走势已关闭，跳过")
@@ -731,7 +766,16 @@ def _generate_report_full(
         _enable_news,
         _enable_llm,
         reporter,
+        history_data=history_data,
     )
+
+    # P1-20: LLM 全部失败时自动降级使用占位文本
+    if _enable_llm:
+        from src.python.llm.fallback import build_fallback_llm_content
+
+        llm_content = build_fallback_llm_content(llm_content)
+        if all(c is not None for c in llm_content[:4]):
+            result.llm_ok = True
 
     # ── 6. HTML 报告 ──
     _report_label = "含新闻 + LLM" if news_ok else "仅 LLM"

@@ -43,6 +43,13 @@
 |------|------|-----------|------|
 | `data_degradation` | `list[dict]` | 必选 | DegradationTracker.get_log() 返回的会话内降级事件列表。空列表 = 今日无降级 |
 
+### Phase 1 新增键（P1-07）
+
+| 键名 | 类型 | 必选/可选 | 说明 |
+|------|------|-----------|------|
+| `risk_metrics` | `dict` | 可选 | 组合风险指标（同 B 通道 `prep.risk_metrics` 子键定义），由 F2 阶段通过 `extra` 参数注入 |
+| `portfolio_daily_returns` | `list[float]` | 可选 | 组合日收益率序列（小数，如 0.01 = +1%） |
+
 ---
 
 ## B 通道：prep（`prepare_report_data()` 返回值）
@@ -68,6 +75,18 @@
 | `today_str` | `str` | 必选 | 当前日期 `YYYY-MM-DD` |
 | `output_dir` | `str` | 必选 | 报告输出目录路径 |
 | `news_top_count` | `int` | 必选 | 新闻最大返回条数 |
+| `risk_metrics` | `dict` | 必选（P1-06） | 组合风险指标容器，初始为空 `{}` ，由 F2 阶段填充 |
+
+### risk_metrics 子键（F2 填充后）
+
+| 键名 | 类型 | 必选/可选 | 说明 |
+|------|------|-----------|------|
+| `max_drawdown_pct` | `float` | 可选 | 最大回撤百分比（正数，如 5.2 = -5.2%） |
+| `annualized_volatility` | `float` | 可选 | 年化波动率 |
+| `total_return_pct` | `float` | 可选 | 组合累计收益率（百分比） |
+| `data_start` | `str` | 可选 | 数据起始日期 YYYY-MM-DD |
+| `data_end` | `str` | 可选 | 数据截止日期 YYYY-MM-DD |
+
 
 ---
 
@@ -89,6 +108,23 @@
 | `holdings_details` | `prep["holdings_details"]` | 所有 prompt（可选） |
 | `sector_flow` | `get_sector_fund_flow()` | `_build_global_macro_prompt`（可选） |
 | `f_context` | `capture_snapshot()` 返回值 | `_build_expert_review_prompt`, `_build_health_check_prompt`（可选） |
+| `history_data` | `fetch_history_data()` 返回值（P1-08 新增） | `_build_competitive_context_block`（仅使用 risk 摘要），`build_llm_fingerprint` 风险信号（P1-09） |
+
+### history_data 键定义
+
+| 键名 | 类型 | 必选/可选 | 说明 |
+|------|------|-----------|------|
+| `bars` | `list[dict]` | 必选 | 统一时间线上各日期的组合总市值序列 |
+| `max_drawdown` | `float` | 必选 | 最大回撤金额 |
+| `max_drawdown_pct` | `float` | 必选 | 最大回撤百分比（正数） |
+| `annualized_volatility` | `float` | 必选 | 年化波动率 |
+| `total_return` | `float` | 必选 | 累计收益金额 |
+| `total_return_pct` | `float` | 必选 | 累计收益率（小数，如 0.15 = +15%） |
+| `daily_returns` | `list[float]` | 必选 | 组合日收益率序列 |
+| `daily_returns_portfolio` | `list[float]` | 必选 | 同上（别名，与 `daily_returns` 同值） |
+| `benchmarks` | `dict` | 可选 | 基准指数日收益率 `{code: [float, ...]}` |
+| `status` | `str` | 必选 | 状态：`ok` / `degraded` / `unavailable` |
+| `warnings` | `list[str]` | 可选 | 数据质量告警列表 |
 
 ---
 
@@ -103,9 +139,26 @@ if f_context is not None:
     _diff = f_context.get("diff")
     if _diff is not None:
         assert isinstance(_diff, dict), "f_context.diff 类型异常"
+    # Phase 1（P1-07）：风险字段类型检查
+    _rm = f_context.get("risk_metrics")
+    if _rm is not None:
+        assert isinstance(_rm, dict), "f_context.risk_metrics 类型异常"
+    _pdr = f_context.get("portfolio_daily_returns")
+    if _pdr is not None:
+        assert isinstance(_pdr, list), "f_context.portfolio_daily_returns 类型异常"
 
 # checkpoint: prepare_report_data 返回后
 assert isinstance(prep, dict), "prep 类型异常"
 for _k in ("total_mv", "total_cost", "total_profit", "total_today_profit"):
     assert isinstance(prep.get(_k), (int, float)), f"prep.{_k} 类型异常"
+# Phase 1（P1-06）：risk_metrics 键存在性检查
+assert "risk_metrics" in prep, "prep 缺少 risk_metrics 键"
+assert isinstance(prep["risk_metrics"], dict), "prep.risk_metrics 类型异常"
+
+# checkpoint: fetch_history_data 返回后
+if history_data is not None:
+    assert isinstance(history_data, dict), "history_data 类型异常"
+    for _hk in ("max_drawdown_pct", "annualized_volatility", "total_return_pct", "status"):
+        if _hk in history_data:
+            logger.debug("history_data.%s = %s", _hk, history_data[_hk])
 ```

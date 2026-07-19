@@ -67,7 +67,8 @@ _DEFAULT_CONFIG = {
         "t3": {"unreachable_threshold": 2, "empty_data_threshold": 3, "stale_days": 14},
         "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14},
     },
-    # ── F. 业绩基准 ──
+    # ── F. 业绩基准与无风险利率 ──
+    "risk_free_rate": None,  # Rf 手动配置（None=自动获取，填小数如0.0174或百分比如1.74）
     "user_fund_benchmarks": {},
     # ── G. 持仓快照 ──
     "history": {
@@ -135,6 +136,7 @@ def _get_default_config_template() -> str:
         "  },\n"
         "\n"
         "  // ── F. 业绩基准 ──\n"
+        '  "risk_free_rate": null,\n'
         '  "user_fund_benchmarks": {},\n'
         "\n"
         "  // ── G. 组合历史走势与持仓快照 ──\n"

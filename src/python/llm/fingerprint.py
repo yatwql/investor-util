@@ -66,6 +66,7 @@ def build_llm_fingerprint(
     penetrated_assets: list[dict] | None = None,
     categories: dict | None = None,
     full_penetration: bool = False,
+    history_data: dict | None = None,
 ) -> str:
     """构建 LLM 模块的缓存指纹，统一剔除行情波动字段。
 
@@ -74,6 +75,9 @@ def build_llm_fingerprint(
     使用 _extract_stable_holdings 剔除行情波动；
     穿透资产默认仅取 (name, codes)，full_penetration=True 时额外包含
     mv/sector/ratio（穿透深度分析需要穿透数据更新触发缓存失效）。
+
+    P1-09: 新增 history_data 参数，提取 key 风险信号摘要加入指纹，
+    使风险指标变化时自动失效 LLM 缓存。
 
     Args:
         total_mv: 总市值
@@ -84,12 +88,21 @@ def build_llm_fingerprint(
         penetrated_assets: 穿透资产列表
         categories: 分类汇总
         full_penetration: 为 True 时穿透资产包含 mv/sector/ratio（用于穿透深度分析）
+        history_data: 组合历史走势数据（P1-09 新增），仅提取 key 风险信号摘要
 
     Returns:
         指纹哈希值（前 12 位）
     """
     _details = extract_stable_holdings(holdings_details)
     _pen = extract_stable_penetration(penetrated_assets, full=full_penetration)
+
+    # P1-09: 从 history_data 提取 key 风险信号摘要
+    _risk_signals: dict[str, float | str] = {}
+    if history_data and isinstance(history_data, dict):
+        for _key in ("max_drawdown_pct", "annualized_volatility", "total_return_pct", "status"):
+            if _key in history_data:
+                _risk_signals[_key] = history_data[_key]
+
     return compute_fingerprint(
         total_mv,
         total_cost,
@@ -98,6 +111,7 @@ def build_llm_fingerprint(
         categories,
         _details,
         _pen,
+        _risk_signals,
     )
 
 

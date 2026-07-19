@@ -106,8 +106,13 @@ def _compute_module_cache_info(
     penetrated_assets: list[dict] | None,
     holdings_details: list[dict] | None,
     force: bool,
+    *,
+    history_data: dict | None = None,
 ) -> dict[str, dict]:
-    """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。"""
+    """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
+
+    P1-09: 新增 history_data 参数，风险信号 Hash 加入专家/体检/穿透指纹。
+    """
     fp_global_macro = compute_fingerprint(
         a_indices,
         us_indices,
@@ -123,6 +128,7 @@ def _compute_module_cache_info(
         holdings_details=holdings_details,
         penetrated_assets=penetrated_assets,
         categories=categories,
+        history_data=history_data,
     )
     fp_health_check = build_llm_fingerprint(
         total_mv=total_mv,
@@ -132,6 +138,7 @@ def _compute_module_cache_info(
         holdings_details=holdings_details,
         penetrated_assets=penetrated_assets,
         categories=categories,
+        history_data=history_data,
     )
     fp_penetration_deep = build_llm_fingerprint(
         total_mv=total_mv,
@@ -142,6 +149,7 @@ def _compute_module_cache_info(
         penetrated_assets=penetrated_assets,
         categories=categories,
         full_penetration=True,
+        history_data=history_data,
     )
 
     force_flag = force
@@ -489,6 +497,7 @@ def generate_all_llm(
     sector_flow: list[dict] | None = None,
     force: bool = False,
     f_context: dict | None = None,
+    history_data: dict | None = None,
 ) -> tuple[str | None, str | None, str | None, str | None, bool, bool, bool, bool]:
     """并行生成全球政经局势 + 智囊团深度复盘 + 持仓体检报告 + 穿透深度分析。
 
@@ -502,6 +511,7 @@ def generate_all_llm(
 
     Args:
         f_context: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
+        history_data: 组合历史走势数据字典（含风险指标），P1-08 新增。
 
     Returns:
         (global_macro_html, expert_review_html, health_check_html, penetration_deep_html,
@@ -524,6 +534,7 @@ def generate_all_llm(
         penetrated_assets,
         holdings_details,
         force,
+        history_data=history_data,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
