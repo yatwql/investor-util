@@ -19,6 +19,7 @@
 - **测试标记强制**：所有新增/修改的测试用例（测试类或测试方法）**必须**标注对应的 pytest marker（如 `@pytest.mark.unit_providers`、`@pytest.mark.scenario_basic` 等），marker 定义见 `src/test/conftest.py` 的 `pytest_configure`。新增 marker 需同步注册到 `conftest.py` 和维护文档。
 - **边缘测试文件隔离**：edge 场景测试（`@pytest.mark.edge`）**必须**放置在 `*_edge.py` 文件中，不得与普通测试混搭在同一文件。`conftest.py` 的 `pytest_collection_modifyitems` 会在收集期自动校验此约束。
 - **测试隔离**：运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`src/test/conftest.py` 中的 `_isolate_sensitive_paths` autouse fixture 会自动将 `config.json` 和缓存目录重定向到临时目录。测试用例应使用 mock 或临时文件隔离，避免污染真实数据。
+- **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md）

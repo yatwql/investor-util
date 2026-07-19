@@ -2105,6 +2105,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 | **C7** | **报告序号不可硬编码** — 报告 17 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
+| **C19** | **f_context Schema 契约** — 所有 f_context 键必须先在 docs-stm/plan/better-investment-advice/f_context-schema.md 中定义类型、版本号、写入/消费模块后，才能在代码中新增该键的使用 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 f_context 注入数据的模块 |
 
 ### 8.4 LLM 集成层约束
 
@@ -2275,5 +2276,57 @@ investor-util/
 | `cache_ops` | `cache/operations.py` | 4 | `cache_ops` | 并行刷新基金/行业/公共缓存 |
 
 各线程池互不共享，职责隔离。
+
+### 附录 F：Phase 2 指标降级依赖矩阵
+
+| 指标 | 依赖数据 | K 线完全不可用 | K 线部分缺失 | 说明 |
+|:-----|:---------|:--------------|:-----------|:------|
+| 夏普比率 | Rf + 组合日收益率 + 波动率 | None（显示 --） | 置信度降为 low | P2-01 |
+| 卡玛比率 | 组合日收益率 + 最大回撤 | None（显示 --） | 置信度降为 low | P2-02 |
+| HHI | 持仓权重（不依赖行情） | 正常计算 | 正常计算 | P2-03 |
+| 胜率 | 盈亏品种数（不依赖行情） | 正常计算 | 正常计算 | P2-04 |
+| 换手率 | 期间变动金额 + 均值市值（不依赖 K 线） | 正常计算 | 正常计算 | P2-05 |
+| 风险贡献 | 品种波动率 + 权重 | 仅权重等比例分配 | 部分品种用等比例替代 | P2-06 |
+| Beta | 组合日收益率 + 基准日收益率 | None（显示 --） | 置信度降为 low | P2-11a |
+| 回撤分位(1年) | 组合日收益率（约 250 交易日） | None（显示 --） | 数据不足 60 日则不计算 | P2-12 |
+| 回撤分位(全历史) | 组合日收益率 | None（显示 --） | 数据不足 60 日则不计算 | P2-13 |
+
+> K 线数据通过腾讯/新浪 API 获取，两者均为已知不可靠来源。熔断时降级行为由 DegradationTracker 记录并传递至 f_context['data_degradation']，LLM prompt 据此展示"部分指标因行情数据不全暂时无法计算"。
+
+### 附录 G：报告生成降级路径矩阵
+
+| 故障场景 | basic 路径 | both 路径 | full 路径 | LLM 板块 |
+|:---------|:----------|:---------|:---------|:---------|
+| 行情数据全熔断 | 显示 -- | 生成但注明行情缺失 | 生成但注明行情缺失 | LLM 跳过行情相关部分 |
+| 概念数据熔断 | N/A | N/A | 概念板块段落显示占位文本 | 引用 DegradationTracker |
+| Rf 数据不可用 | N/A | N/A | 夏普等 Rf 依赖指标显示 -- | 注明'无风险利率数据不可用' |
+| LLM API 全部不可用 | 正常 | 正常（无 LLM） | 自动降级为 both 路径 | 显示'智能分析暂时不可用' |
+| 单一 LLM 模块失败 | 正常 | 正常 | 仅该模块显示占位文本 | 其余 LLM 模块正常 |
+| 多源并发故障 | 正常 | 生成但注明大面积降级 | 生成但注明大面积降级 | 所有不可用数据源标注降级 |
+| 文件系统写失败 | 报告生成失败 | 报告生成失败 | 报告生成失败 | — |
+
+> 基本原则：任何数据获取失败均不得阻止报告生成（文件系统写失败除外）。降级状态下生成的报告必须在页脚注明降级摘要。
+
+### 附录 H：f_context Schema 定义（当前已实现 + 计划中）
+
+> 完整定义和维护责任见 docs-stm/plan/better-investment-advice/f_context-schema.md。
+> 此处仅列出当前阶段已确认的键名和类型。
+
+| 键名 | 类型 | Optional | Phase | 写入阶段 |
+|:-----|:----|:---------|:------|:--------|
+| market_data | dict | 否 | 当前 | prepare_report_data |
+| index_data | dict | 是 | 当前 | prepare_report_data |
+| fund_data | dict | 是 | 当前 | prepare_report_data |
+| penetration_data | dict | 是 | 当前 | prepare_report_data |
+| news_data | list | 是 | 当前 | fetch_news |
+| llm_data | dict | 是 | 当前 | generate_all_llm |
+| history_data | dict | 是 | 当前 | fetch_history_data |
+| risk_metrics | dict | 是 | Phase 1 (P1-06) | prepare_report_data |
+| data_degradation | list[dict] | 是 | Tier 0 (T0-02) | capture_snapshot |
+| llm_status | str | 是 | Phase 1 (P1-20) | generate_all_llm |
+| rebalance_signals | list[dict] | 是 | MVP-03 / Phase 3 | prepare_report_data |
+| liquidity_warnings | list[dict] | 是 | Phase 3 | capture_snapshot |
+| fx_exposure | dict | 是 | Phase 3 | capture_snapshot |
+| scenario_analysis | dict | 是 | Phase 4 | prepare_report_data |
 
 [↑ 回到顶部](#目录)
