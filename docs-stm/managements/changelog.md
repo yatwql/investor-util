@@ -6,7 +6,26 @@
 
 ## [0.7.3-dev] - 开发中
 
-### TBD
+### Added
+- **PRE-01/PRE-02 专项测试**：完成 Rf 国债收益率数据源和偏股基金指数 885005 的全面测试
+  - 东方财富 datacenter API（RPTBOND_*）**确认不可用**（30+ report name 全部返回"参数配置不对"）
+  - `bond_zh_us_rate`（akshare/Sina）通过 50/50 稳定性测试（100% 成功率，平均 2.734s，中国 10Y=1.7404%）
+  - worldgovernmentbonds.com 确认 JS 渲染不可直接抓取
+  - 885005 确认为 Wind（万得）专属代码，12 个公开数据源均不可获取
+  - CSI 替代指数（930950/932055/931255）同样不可用
+- **测试报告归档**：`docs-stm/plan/better-investment-advice/rf-and-885005-test-report.md`
+
+### Changed
+- **设计文档全面更新**：plan.md、better-investment-task.md、discussion-better-investment-advice.md 同步 PRE 测试结论
+- **P1-01/P1-02 取消**（东财 API 失效、worldgovernmentbonds JS 不可解析），释放 ~20h
+- **P1-03 重设计**：从纯手动配置（4h）扩展为 `bond_zh_us_rate` 自动获取 + 手动配置兜底双模式（6h）
+- **P1-15 缩减**：Rf 测试从 8h 缩减为 `bond_zh_us_rate` 集成测试（4h）
+- **P3-07 降级路径确认**：885005 不可获取 → 强制降级为沪深300+自定义基金池
+- **PRE-02-D prompt 分支**：决策已落地，代码实现归入 P3-07
+
+### Docs
+- `folders.md` 新增测试报告文件条目
+- 全部 4 个 P1 PRE 任务完成，从 plan.md 当前迭代待办移除
 
 ---
 
