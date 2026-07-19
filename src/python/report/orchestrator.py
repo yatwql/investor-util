@@ -559,6 +559,7 @@ def _fetch_llm_and_news(
     *,
     history_data: dict | None = None,
     comparison_indices: dict[str, str] | None = None,
+    metrics: dict | None = None,
 ) -> tuple[tuple, list, dict, bool]:
     """并行获取 LLM 内容 + 新闻数据，统一处理 4 分支。
 
@@ -621,6 +622,7 @@ def _fetch_llm_and_news(
                 f_context=f_context,
                 history_data=history_data,
                 comparison_indices=comparison_indices,
+                metrics=metrics,
             )
         else:
             reporter.info("[板块配置] LLM 板块已关闭，跳过 LLM 内容生成")
@@ -743,7 +745,25 @@ def _generate_report_full(
         _injected = prep.get("risk_metrics", {})
         if not _injected.get("annualized_volatility") and _injected.get("annualized_volatility") != 0:
             logger.warning("[checkpoint] prep.risk_metrics 缺 annualized_volatility")
+
+        # ── 计算量化指标（夏普/卡玛）用于竞争语境 ──
+        _daily_returns = history_data.get("daily_returns_portfolio", [])
+        if _daily_returns:
+            from src.python.analysis.metrics import calmar_ratio, sharpe_ratio
+
+            _sharpe = sharpe_ratio(_daily_returns)
+            _calmar = calmar_ratio(_daily_returns)
+            _mdd_pct = history_data.get("max_drawdown_pct", 0)
+            _metrics = {
+                "sharpe_ratio": _sharpe,
+                "calmar_ratio": _calmar,
+                "annualized_volatility": history_data.get("annualized_volatility"),
+                "max_drawdown": -(_mdd_pct / 100) if _mdd_pct else None,
+            }
+        else:
+            _metrics = None
     else:
+        _metrics = None
         history_data = None
         reporter.info("[板块配置] 历史走势已关闭，跳过")
 
@@ -771,6 +791,7 @@ def _generate_report_full(
         reporter,
         history_data=history_data,
         comparison_indices=_comparison_indices,
+        metrics=_metrics,
     )
 
     # LLM 全部失败时自动降级使用占位文本

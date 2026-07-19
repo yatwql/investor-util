@@ -334,8 +334,9 @@ def _build_competitive_context_block(
     total_today_profit: float,
     history_data: dict | None = None,
     comparison_indices: dict[str, str] | None = None,
+    metrics: dict | None = None,
 ) -> str:
-    """构建竞争语境段落（组合 vs 多指数收益对比）。
+    """构建竞争语境段落（组合 vs 多指数收益对比，含指标对比）。
 
     Args:
         a_indices: A 股指数行情字典（由 fetch_indices() 返回）。
@@ -344,6 +345,7 @@ def _build_competitive_context_block(
         history_data: 历史数据（含 benchmark_returns, portfolio_returns）。
         comparison_indices: {代码: 名称} 对比指数池配置，
             默认 {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}。
+        metrics: 量化指标字典（含 sharpe_ratio、annualized_volatility 等）。
     """
     lines: list[str] = []
 
@@ -382,10 +384,38 @@ def _build_competitive_context_block(
             if p_return is not None and b_return is not None:
                 lines.append(f"【区间对比】组合累计 {p_return:+.2f}% vs 沪深300 {b_return:+.2f}%")
 
-    if len(lines) <= 1:  # 只有免责说明，无实际对比数据
+    # ── 指标对比（组合级） ──
+    if metrics and isinstance(metrics, dict):
+        metric_parts: list[str] = []
+        sharpe = metrics.get("sharpe_ratio")
+        if sharpe is not None and _is_valid_number(sharpe):
+            metric_parts.append(f"夏普 {sharpe:.2f}")
+        vol = metrics.get("annualized_volatility")
+        if vol is not None and _is_valid_number(vol):
+            metric_parts.append(f"年化波动率 {vol:.1%}" if abs(vol) < 1 else f"年化波动率 {vol:.2f}%")
+        mdd = metrics.get("max_drawdown")
+        if mdd is not None and _is_valid_number(mdd):
+            metric_parts.append(f"最大回撤 {mdd:.1%}" if abs(mdd) < 1 else f"最大回撤 {mdd:.2f}%")
+        calmar = metrics.get("calmar_ratio")
+        if calmar is not None and _is_valid_number(calmar):
+            metric_parts.append(f"卡玛 {calmar:.2f}")
+        if metric_parts:
+            lines.append("【指标对比】" + " | ".join(metric_parts))
+
+    if not lines:
         return "暂无足够历史数据进行竞争语境对比"
 
     return "\n".join(lines)
+
+
+def _is_valid_number(val: object) -> bool:
+    """检查值是否为有效有限数值（排除 None/NaN/Inf）。"""
+    import math
+    if val is None:
+        return False
+    if isinstance(val, (int, float)):
+        return math.isfinite(val)
+    return False
 
 
 # ── 共用格式化函数 ──────────────────────────────────────────

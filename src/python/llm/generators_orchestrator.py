@@ -259,6 +259,7 @@ def _dispatch_llm_workers(
     metrics: dict | None = None,
     degradation_events: list[dict] | None = None,
     comparison_indices: dict[str, str] | None = None,
+    history_data: dict | None = None,
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。"""
     if not any(needs.values()):
@@ -268,6 +269,8 @@ def _dispatch_llm_workers(
     _competitive_context = _build_competitive_context_block(
         a_indices, total_mv, total_today_profit,
         comparison_indices=comparison_indices,
+        history_data=history_data,
+        metrics=metrics,
     )
     # 量化指标 + 降级事件传递
     _metrics = metrics
@@ -575,6 +578,7 @@ def generate_all_llm(
         metrics=metrics,
         degradation_events=degradation_events,
         comparison_indices=comparison_indices,
+        history_data=history_data,
     )
 
     # 合并预检结果 + 工作线程结果
