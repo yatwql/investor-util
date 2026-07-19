@@ -63,18 +63,19 @@
 ## T0 — Tier 0 基础设施（超优先，~12h）
 
 ### T0-01-A: DegradationTracker get_log() 查询接口封装（前置）
-- **估时**: 2h
+- **估时**: 4h（修正：2h→4h，需逐一审计 4 个调用文件共 6 个降级点）
 - **文件**: `src/python/report/data_status.py`（扩展 DegradationTracker）
 - **阻塞**: 否
 - **依赖**: 无
-- **描述**: 当前 DegradationTracker 在 fund_performance.py/penetration_sheet.py/summary.py 中已实例化但 record() 从未被调用，也缺少聚合查询接口。新增：(1) 在 DegradationTracker 上封装 get_log() → list[dict] 方法，汇总当日所有降级记录；(2) 在 Fetcher Chain 的每个降级点（现存的 fetch_with_fallback 失败点）注入 DegradationTracker.record() 调用；(3) 确保 orchestrator.py 的 data_degradation 键仅在记录非空时聚合并注入，空列表时注入空列表而非 None（避免 LLM prompt 中的 if-empty 检查）。注：此任务为 T0-01 的前置，发现记录为零时不应阻塞报告生成，降级段落显示"今日无降级记录"。
+- **已知降级调用点（需注入 record()）**: `src/python/fetcher/price.py`(L184, L200 — 2处), `src/python/fetcher/fund.py`(L47, L73 — 2处), `src/python/fetcher/industry.py`(L64 — 1处), `src/python/fetcher/index.py`(L240 — `fetch_with_incremental_fallback`, 1处)。共 6 处降级点。
+- **描述**: 当前 DegradationTracker 在 fund_performance.py/penetration_sheet.py/summary.py 中已实例化但 `record()` **从未被调用**（当前仅有 `_write_data_status_foot` 调用，即降级状态信息在报告中显示的底层实现，而非 record()），且缺少聚合查询接口。这是一个架构性缺陷——DegradationTracker 实例存在但无数据写入，导致 data_degradation 永远为空。需完成：(1) 在 DegradationTracker 上封装 get_log() → list[dict] 方法，汇总当日所有降级记录；(2) 在以上 6 处 `fetch_with_fallback()` / `fetch_with_incremental_fallback()` 调用点注入 DegradationTracker.record() 调用，区分"全链路不可用"和"fallback 降级"两种场景；(3) 确保 orchestrator.py 的 data_degradation 键仅在记录非空时聚合并注入，空列表时注入空列表而非 None。注：此任务为 T0-01 的前置，发现记录为零时不应阻塞报告生成，降级段落显示"今日无降级记录"。
 
 ### T0-01-B: f_context Pre-Schema 文档（现有管线键定义 + 类型断言，前置）
 - **估时**: 2h
 - **文件**: `docs-stm/plan/better-investment-advice/f_context-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言）
 - **阻塞**: 否
 - **依赖**: 无
-- **描述**: 在 T0-01（DegradationTracker 接线）和 P1-06-A（f_context_builder 预重构）之前，先定义当前生产管线已有 f_context 键的 Schema（Pre-Schema）。覆盖约 12 个已有键（market_data、fund_data、summary、penetration、holdings_info、portfolio_history、base_currency 等），每个键标注：类型、必选/可选标记、写入模块、消费模块、写入管线阶段。同时在 orchestrator.py 各管线阶段之间插入初始类型断言 checkpoint（assert isinstance / .get() 类型守卫），开发期捕获类型不匹配。断言仅在 `__debug__` 模式下生效，生产环境零开销。**时序要求**：必须在 T0-01 之前完成，使 T0-01 注入 data_degradation 键时已有类型校验框架。P1-21 的 Full Schema（Phase 1 新增键定义 + 全量校验扩展）在 Phase 1 补充。
+- **描述**: 在 T0-01（DegradationTracker 接线）和 P1-06-A（f_context_builder 预重构）之前，先定义当前生产管线已有 f_context 键的 Schema（Pre-Schema）。覆盖约 12 个已有键（market_data、fund_data、summary、penetration、holdings_info、portfolio_history、base_currency 等），每个键标注：类型、必选/可选标记、写入模块、消费模块、写入管线阶段。同时在 orchestrator.py 各管线阶段之间插入初始类型断言 checkpoint（assert isinstance / .get() 类型守卫），开发期捕获类型不匹配。⚠ **生产环境运行时**：断言仅在 `__debug__` 模式下生效，但类型不匹配在生产中可能静默通过直到下游报错。措施：断言失败时额外通过 `logger.warning()` 记录结构化的类型不匹配日志（键名、期望类型、实际类型），确保即使生产环境无崩溃也可追踪到类型漂移。**时序要求**：必须在 T0-01 之前完成，使 T0-01 注入 data_degradation 键时已有类型校验框架。P1-21 的 Full Schema（Phase 1 新增键定义 + 全量校验扩展）在 Phase 1 补充。
 
 ### T0-01: DegradationTracker→LLM 接线
 - **估时**: 4h
@@ -83,12 +84,12 @@
 - **依赖**: T0-01-A（get_log 接口已就绪）、T0-01-B（Pre-Schema 已定义，f_context 键类型校验框架就绪）
 - **描述**: `data_status.py` 的 `DegradationTracker` 已在 `fund_performance.py`/`penetration_sheet.py`/`summary.py` 中实例化并写入降级日志，但 `orchestrator.py` 的 `capture_snapshot()` 返回的 `f_context` 字典中**没有降级状态键**。新增 `f_context["data_degradation"]`，将当天所有 `DegradationTracker.log()` 记录汇总为结构化列表（数据源、降级级别、降级时间、原始错误摘要），使 LLM prompt 可以引用。
 
-### T0-02: 数据质量告警注入 LLM（扩展校验项 3→6）
+### T0-02: 数据质量告警注入 LLM（扩展校验项 3→5，移除缓存遍历项）
 - **估时**: 4h
-- **文件**: `src/python/llm/prompts.py`（数据质量段落）
+- **文件**: `src/python/llm/prompts.py`（数据质量段落）`、`src/python/report/orchestrator.py`（数据质量统计字段）
 - **阻塞**: 否
 - **依赖**: T0-01（降级状态数据已进入 f_context）
-- **描述**: 当前 LLM "健康检查" prompt 中只有 3 类数据质量提示（数据缺失、收益率异常、基准不一致）。扩展为 6 类：(1) 收盘价异常断点，(2) 缓存过期时间接近阈值，(3) T2/T3 降级发生频次，(4) 基金净值更新延迟，(5) 分红数据状态，(6) 个别品种数据缺失时长。每类附带当前状态摘要（正常/警告/异常）。格式化为易读的一段，注入 health_check 系统提示语。同时修改 `src/python/report/orchestrator.py` 中的 `prepare_report_data()` 确保数据质量统计字段在管线中传递。
+- **描述**: 当前 LLM "健康检查" prompt 中只有 3 类数据质量提示（数据缺失、收益率异常、基准不一致）。扩展为 5 类（移除"缓存过期时间接近阈值"，因其需要遍历数百缓存文件解析 `_ts`，复杂度远超 prompt 修改范围，推迟至 Phase 4 缓存雪崩修复合并实现）：(1) 收盘价异常断点，(2) T2/T3 降级发生频次，(3) 基金净值更新延迟，(4) 分红数据状态，(5) 个别品种数据缺失时长。每类附带当前状态摘要（正常/警告/异常）。格式化为易读的一段，注入 health_check 系统提示语。同时修改 `orchestrator.py` 中的 `prepare_report_data()` 确保数据质量统计字段在管线中传递。
 
 ---
 
@@ -99,7 +100,7 @@
 - **文件**: `src/python/llm/prompts.py`（新增收益归因段落）
 - **阻塞**: 否
 - **依赖**: 无
-- **描述**: 已有每品种 `profit`（盈亏金额），直接计算 `profit_contribution_i = profit_i / Σ|profit_j|`。按贡献降序排列，TOP 5 品种+占比格式化一段文本。注入 `expert_review` 和 `health_check` 两个 LLM prompt 的"收益来源"小节。格式示例："收益主要由 3 只品种贡献：贵州茅台(+32.5%)、腾讯控股(+18.2%)、招商银行(+12.1%)，合计占总收益 62.8%。" 注意正负号处理（亏损品种独立列出）。
+- **描述**: 已有每品种 `profit`（盈亏金额），直接计算 `profit_contribution_i = profit_i / Σ|profit_j|`。按贡献降序排列，TOP 5 品种+占比格式化一段文本。注入 `expert_review` 和 `health_check` 两个 LLM prompt 的"收益来源"小节。格式示例："收益主要由 3 只品种贡献：贵州茅台(+32.5%)、腾讯控股(+18.2%)、招商银行(+12.1%)，合计占总收益 62.8%。" 注意正负号处理（亏损品种独立列出）。⚠ **边界处理**：当 Σ|profit_j| = 0（所有品种盈亏均为零）时返回空段落，LLM 显示"暂无收益归因数据"而非 ZeroDivisionError。
 
 ### MVP-02: 概念板块占比注入 LLM（Layer 2b）
 - **估时**: 4h（MVP 阶段先做 Top 10 单品概念标注；聚合板块占比推迟到 Phase 2）
@@ -109,10 +110,11 @@
 - **描述**: `penetration.py` L700-701 已从东方财富 push2 行业 API 缓存了 `industry.concepts` 数据（概念板块分类），L747 已有 `concepts[:3]` 用于 Top 3 板块展示。但 LLM prompt 完全不提及板块分布。在 `expert_review` prompt 中新增段落：(1) 穿透后 Top 5 概念板块及持仓市值占比；(2) 集中度定性判断（高/中/低）；(3) 与常见市场风格（大盘/小盘/价值/成长）的对应关系。注意：(a) 非 A 股穿透资产（港股通/美股）天然无概念数据，需在 prompt 中标注"部分品种无概念分类"；(b) 概念数据不可用时显示"暂无概念板块数据"兜底文本，而非跳过整段导致 LLM 误以为无板块信息。MVP 阶段仅做穿透 Top 10 单品的概念标注（现有数据已够），聚合板块占比推迟到 Phase 2。如果概念 API（push2）熔断或返回空数据，LLM prompt 段落必须区分两种状态：(1) 有降级记录 → 显示'概念板块 API 暂时不可用，板块分析暂缺'；(2) 无降级记录 → 显示'部分持仓品种无概念分类'。引用 f_context['data_degradation'] 中的实时降级状态。港股通/美股穿透资产无概念数据的覆盖度说明也须在此段落标注。
 
 ### MVP-03: 再平衡极简版——单品种超阈值（Layer 3A 硬编码）
-- **估时**: 16h（2 天）
+- **估时**: 6h（修正：原 16h 高估，纯计算+去重+测试 6h 合理）
 - **文件**: `src/python/analysis/simple_rebalance.py`（新增）、`src/python/llm/prompts.py`
 - **阻塞**: 否
 - **依赖**: 无
+- **架构约束**: ⚠️ `simple_rebalance.py` 禁止导入 `report/` 包下的任何模块（仅消费 f_context 传入的数据），遵守 P1-22 的 `analysis/` 层定位——业务计算层只消费数据、不依赖报告层。新增模块必须 `from src.python.code_utils import ...` 而非 `from src.python.report.category import ...`。
 - **描述**: 实现一个极简再平衡信号计算模块。规则：对每品种 `weight = market_value / total_value`，如果 `weight > 0.15`（硬编码阈值），输出建议："XX 持仓占比 23%，超出建议上限 15%，建议部分止盈至 10-15% 区间。" 无需配置系统、无需 Schema、无需用户画像。输出格式化为结构化列表 `[{code, name, weight, threshold, action}]`。注入 `expert_review` prompt 的"调仓建议"小节。包含三项低成本防护（不改 15% 硬编码阈值）：(1) 建议去重聚合——当超过 3 个品种同时触发时，输出一条汇总"您的组合集中度较高，有 N 个品种超过 15% 警戒线，建议整体考虑适度分散"，而非逐条列出；(2) 优先排序——按偏离幅度从大到小排序，仅输出 Top 3；(3) 单元测试包含基础断言（正常品种不触发、超阈值触发、极端情况）**以及"5 个品种均超过 15% 时只输出 1 条汇总建议"的断言**。测试用例标注 `@pytest.mark.unit_providers`，在 `conftest.py` 的 `pytest_configure` 中注册此 marker。
 
 ### MVP-04: 竞争语境极简版——组合 vs 沪深 300 收益对比（Layer 5 极简）
