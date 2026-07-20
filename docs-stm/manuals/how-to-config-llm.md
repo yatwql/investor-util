@@ -159,6 +159,37 @@ LLM 配置拆分为三个独立文件，分工明确：
 
 > `proxy_preferred` 不是策略类型，而是 provider 条目级别的后处理标记。启用时，该条目的请求将优先通过代理发送（若系统配置了代理），而非直连。
 
+### 模块级 Provider 偏好
+
+当特定 LLM 模块（如智囊团深度复盘）需要使用指定的 provider，而其他模块沿用默认排序时，可通过 `preferred_providers` 字段配置模块级偏好：
+
+```json
+{
+  "strategy": "priority",
+  "preferred_providers": {
+    "expert_review": "gemini-fallback",
+    "health_check": "gemini-fallback"
+  },
+  "providers": [
+    { "name": "deepseek-main", "provider": "claude", "credentials_ref": "deepseek-main", "priority": 10, "timeout": 120 },
+    { "name": "gemini-fallback", "provider": "gemini", "credentials_ref": "gemini-fb", "priority": 20, "timeout": 60 }
+  ]
+}
+```
+
+上述配置的效果：
+
+| 模块 | module_key | Chain 排序 | 优先尝试 |
+|------|-----------|-----------|---------|
+| 智囊团深度复盘 | `expert_review` | `[gemini-fallback, deepseek-main]` | Gemini |
+| 持仓体检报告 | `health_check` | `[gemini-fallback, deepseek-main]` | Gemini |
+| 全球政经局势 | `global_macro`（未配置） | `[deepseek-main, gemini-fallback]` | DeepSeek |
+| 穿透深度分析 | `penetration_deep`（未配置） | `[deepseek-main, gemini-fallback]` | DeepSeek |
+
+> **module_key 规则**：对应 `llm_settings.json` 中 `max_tokens_{module_key}` 的 `{module_key}` 部分。有效值：`global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`。
+>
+> `preferred_providers` 中的 provider 名称必须与 `providers[].name` 精确匹配，否则该条配置会被忽略并记录警告日志。
+
 ### 配置检查
 
 TUI 菜单 **[S]** 查看状态时会显示多链模式详情：

@@ -317,11 +317,16 @@ investor-util/
 │   │   │   ├── archived_plan.0.7.x.md             # 实现计划归档 v0.7.x
 │   │   │   ├── archived_review-findings.0.7.x.md  # 自审记录归档 v0.7.x
 │   │   │   └── better-investment-advice/           # 投资建议改进分析讨论（已归档）
-│   │   │       ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
-│   │   │       ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
-│   │   │       ├── data-channels-schema.md            # 数据通道 Schema 文档（管线键定义+类型断言）
-│   │   │       ├── data-source-stability-test-report.md       # 数据源稳定性专项测试报告
-│   │   │       └── better-investment-performance-test-report.md # 端到端性能基准测试报告
+│   │   │       ├── discussion-better-investment-advice.md             # 可行性调研：6 层改进方向与实施路径
+│   │   │       ├── better-investment-task.md                          # 最小粒度工作任务分解（86 任务）
+│   │   │       ├── data-channels-schema.md                            # 数据通道 Schema 文档
+│   │   │       ├── data-source-stability-test-report.md               # 数据源稳定性专项测试报告
+│   │   │       ├── better-investment-performance-test-report.md        # 端到端性能基准测试报告
+│   │   │       ├── r1-insert-feasibility-audit-into-discussion.py      # R1 数据源可行性审查插入脚本（最终版）
+│   │   │       ├── debug-find-insert-anchor_r1.py                     # R1 锚点定位合并调试脚本
+│   │   │       ├── llm-hallucination-report_expert-review.md           # LLM 幻觉率采样报告（expert_review 模块）
+│   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
+│   │   │       └── llm-hallucination-sample-output_expert-review.txt   # 幻觉采样 LLM 原始输出样本
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

@@ -123,7 +123,7 @@ _THINKING_SUPPORTED_PREFIXES = (
     "claude-fable-5",
     "deepseek-v4-",
     "deepseek-chat",
-    "gemini-2-5-",
+    "gemini-2.5-",
 )
 
 # 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
