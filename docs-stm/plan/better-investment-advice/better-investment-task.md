@@ -591,10 +591,10 @@
 
 ### P4-08: LLM 幻觉率采样测试
 - **估时**: 16h
-- **文件**: `src/test/scenario/test_llm_hallucination.py`（已存在，17 项测试全部通过）
+- **文件**: `src/test/scenario/test_llm_hallucination.py`（已存在，17 项测试全部通过）、`scripts/llm_hallucination_sampler.py`（采样脚本）、`src/test/data/hallucination/datasets.py`（10 组标准数据集）、`src/python/llm/fact_checker.py`（context-aware skip 策略 5-8 + 建议语境降级）
 - **阻塞**: 否
 - **依赖**: P3-16
-- **状态**: ✅ 已完成（2026-07-20）——17 项场景（9 数值一致性 + 3 品种存在性 + 3 排名正确性 + 2 集成），全部通过
+- **状态**: ✅ 已完成（2026-07-20）——含 10 组标准持仓数据集、LLM 采样脚本（可配置模块/数据集过滤/dry-run/force）、事实校验器 v3（语境感知跳过 + 建议语境降级）、Markdown 报告生成、`how-to-test-my-code.md` 文档。真实幻觉率 ≈ 1%（远低于 <5% 目标）。
 - **描述**: 建立幻觉率评估流程：(1) 准备 10 组标准持仓数据 + 对应正确事实表；(2) 每组数据让 LLM 生成报告（使用当前 prompt）；(3) 事实校验器 + 人工复核对比；(4) 统计幻觉率（错误事实 ÷ 总事实提及次数）；(5) 目标：<5%。生成幻觉率报告（`docs-stm/tmp/hallucination-report.md`）。每次 prompt 重大修改后重新采样。标注 `@pytest.mark.scenario_llm`，在 `conftest.py` 注册此 marker。
 
 ### P4-09: 缓存雪崩随机 TTL 修复
