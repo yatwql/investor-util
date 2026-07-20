@@ -328,6 +328,15 @@ def generate_excel_report(
 
     # ── 保存 ──
     with Timer("保存 Excel/HTML 文件"):
+        # 在每个页签底部写入隐私声明脚注
+        for _ws_name, _ws in sheets.items():
+            if _ws is not None:
+                try:
+                    from src.python.report.excel_writer import write_privacy_footer
+
+                    write_privacy_footer(_ws, ncols=5)
+                except Exception:
+                    logger.debug("[privacy] 页签 %s 写入隐私脚注失败（非关键）", _ws_name, exc_info=True)
         prog.info("正在保存 Excel 报告...")
         path = save_workbook(wb, output_dir=output_dir)
         logger.info("Excel 报告已生成: %s", path)

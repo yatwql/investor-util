@@ -155,31 +155,34 @@ class TestCheckSymbolExistence:
 
     def test_empty_text(self):
         """空文本 → 无检查项。"""
-        issues, checked, passed = check_symbol_existence("", None)
+        issues, checked, passed, suggestions = check_symbol_existence("", None)
         assert issues == []
         assert checked == 0
         assert passed == 0
+        assert suggestions == []
 
     def test_no_codes_mentioned(self, sample_holdings):
         """无代码提及 → 无检查项。"""
         text = "本季度组合以消费和金融板块为主。"
-        issues, checked, passed = check_symbol_existence(text, sample_holdings)
+        issues, checked, passed, suggestions = check_symbol_existence(text, sample_holdings)
         assert issues == []
         assert checked == 0
         assert passed == 0
+        assert suggestions == []
 
     def test_all_codes_in_holdings(self, sample_holdings):
         """提及的代码全部在持仓中 → 全部通过。"""
         text = "贵州茅台（600519）本季度表现突出。招商银行（600036）保持稳定。"
-        issues, checked, passed = check_symbol_existence(text, sample_holdings)
+        issues, checked, passed, suggestions = check_symbol_existence(text, sample_holdings)
         assert checked == 2
         assert passed == 2
         assert issues == []
+        assert suggestions == []
 
     def test_index_code_skipped(self, sample_holdings):
         """常见指数代码（沪深300:000300）跳过大盘指数。"""
         text = "组合收益在本季度跑赢沪深300（000300）指数。"
-        issues, checked, passed = check_symbol_existence(text, sample_holdings)
+        issues, checked, passed, suggestions = check_symbol_existence(text, sample_holdings)
         assert checked == 1
         assert passed == 1
         assert issues == []
@@ -187,35 +190,58 @@ class TestCheckSymbolExistence:
     def test_code_not_in_holdings(self, sample_holdings):
         """提及的代码不在持仓中 → 告警。"""
         text = "中国平安（601318）作为金融龙头值得关注。"
-        issues, checked, passed = check_symbol_existence(text, sample_holdings)
+        issues, checked, passed, suggestions = check_symbol_existence(text, sample_holdings)
         assert checked == 1
         assert passed == 0
         assert len(issues) == 1
         assert "601318" in issues[0]
         assert "不在当前持仓" in issues[0]
+        assert suggestions == []
+
+    def test_suggestion_context_does_not_alert(self, sample_holdings):
+        """建议语境提及的非持仓代码 → 归入 suggestion 而非 issues。"""
+        text = "建议关注511010国债ETF作为配置补充"
+        issues, checked, passed, suggestions = check_symbol_existence(text, sample_holdings)
+        assert checked == 1
+        assert passed == 0
+        assert issues == [], "建议语境不应进入幻觉告警"
+        assert len(suggestions) == 1
+        assert "511010" in suggestions[0]
+
+    def test_suggestion_keywords_disabled(self, sample_holdings):
+        """suggestion_keywords=None 时建议语境也告警。"""
+        text = "建议关注511010国债ETF"
+        issues, checked, passed, suggestions = check_symbol_existence(
+            text, sample_holdings, suggestion_keywords=None,
+        )
+        assert len(issues) == 1, "关闭建议检测后应正常告警"
+        assert suggestions == []
 
     def test_mixed_valid_and_invalid(self, sample_holdings):
         """混合持仓中和非持仓代码。"""
         text = "贵州茅台（600519）和宁德时代（300750）表现良好。恒瑞医药（600276）需关注。"
-        issues, checked, passed = check_symbol_existence(text, sample_holdings)
+        issues, checked, passed, suggestions = check_symbol_existence(text, sample_holdings)
         assert checked == 3
         assert passed == 2
         assert len(issues) == 1
         assert "600276" in issues[0]
+        assert suggestions == []
 
     def test_holdings_none(self):
         """holdings_details 为 None → 直接返回。"""
-        issues, checked, passed = check_symbol_existence("代码 600519 表现良好", None)
+        issues, checked, passed, suggestions = check_symbol_existence("代码 600519 表现良好", None)
         assert issues == []
         assert checked == 0
         assert passed == 0
+        assert suggestions == []
 
     def test_holdings_empty_list(self):
         """holdings_details 为空列表 → 直接返回。"""
-        issues, checked, passed = check_symbol_existence("代码 600519 表现良好", [])
+        issues, checked, passed, suggestions = check_symbol_existence("代码 600519 表现良好", [])
         assert issues == []
         assert checked == 0
         assert passed == 0
+        assert suggestions == []
 
 
 # ── check_ranking_correctness ────────────────────────────────

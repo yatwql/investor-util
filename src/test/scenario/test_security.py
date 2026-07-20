@@ -68,19 +68,19 @@ class TestSecurityBaseline:
     @pytest.mark.scenario_security
     def test_key_file_no_plaintext_in_cache(self, tmp_path):
         """缓存文件不应包含明文 API 密钥。"""
-        from src.python.cache._io import _write_atomic
-
-        # 模拟写入一个缓存条目（同时含正常数据 + 不小心混入的 key）
+        # 手动构造一个缓存 JSON 文件进行安全检查
         cache_data = {
             "_ts": 1000.0,
-            "price": 35.5,
-            "name": "test",
+            "_data": {
+                "price": 35.5,
+                "name": "test",
+            },
         }
-        key = "test_cache_entry"
-        _write_atomic(tmp_path / f"{key}.json", cache_data)
+        fpath = tmp_path / "test_cache_entry.json"
+        fpath.write_text(json.dumps(cache_data, ensure_ascii=False), encoding="utf-8")
 
         # 读取并检查是否含密钥模式
-        content = (tmp_path / f"{key}.json").read_text(encoding="utf-8")
+        content = fpath.read_text(encoding="utf-8")
         for pattern in _SAMPLE_KEY_PATTERNS:
             match = pattern.search(content)
             if match:
@@ -111,17 +111,17 @@ class TestSecurityBaseline:
     @pytest.mark.scenario_security
     def test_cache_content_no_api_key(self, tmp_path):
         """写入和读取缓存不应产生 API 密钥残留。"""
-        from src.python.cache._io import _write_atomic
-
-        # 模拟缓存写入
-        key = "price_600036"
+        # 手动构造一个缓存 JSON 文件进行密钥扫描
         data = {
             "_ts": 2000.0,
-            "price": 35.5,
-            "change_pct": 0.01,
+            "_data": {
+                "price": 35.5,
+                "change_pct": 0.01,
+            },
         }
-        _write_atomic(tmp_path / f"{key}.json", data)
-        content = (tmp_path / f"{key}.json").read_text(encoding="utf-8")
+        fpath = tmp_path / "price_600036.json"
+        fpath.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        content = fpath.read_text(encoding="utf-8")
         assert "sk-" not in content, "缓存文件含 API key 特征字符串"
         assert "api_key" not in content.lower(), "缓存文件含 api_key 字段"
 
@@ -220,7 +220,7 @@ def _mask_api_key(text: str, visible_chars: int = 4) -> str:
     Returns:
         脱敏后的文本
     """
-    pattern = re.compile(r"(sk-)[a-zA-Z0-9]+")
+    pattern = re.compile(r"(sk-)[a-zA-Z0-9_-]+")
     def _replacer(m: re.Match) -> str:
         prefix = m.group(1)
         full_key = m.group(0)

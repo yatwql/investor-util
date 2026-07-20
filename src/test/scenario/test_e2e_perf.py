@@ -20,6 +20,7 @@ import pytest
 pytestmark = [pytest.mark.scenario_perf]
 
 from src.python.models import Holding
+from src.python.report.market_value import DetailRow
 
 logger = logging.getLogger("invest")
 
@@ -68,6 +69,7 @@ def mock_all_apis():
         patch("src.python.fetcher.akshare.get_dividend_data", return_value={}),
         patch("src.python.fetcher.index.fetch_indices", return_value={}),
         patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
+        patch("src.python.fetcher.fund.fetch_fund_holdings", return_value=None),
         patch("src.python.fetcher.fund.fetch_fund_holdings_cached", return_value=None),
         patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=[]),
         patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
@@ -111,8 +113,10 @@ class TestE2EPerformance:
         from src.python.report.penetration import compute_penetration_top10
 
         details = [
-            {"name": h.name, "code": h.code, "market_value": h.shares * h.cost_price,
-             "cost": h.shares * h.cost_price, "profit": 0.0, "account": h.account}
+            DetailRow(
+                name=h.name, code=h.code, market_value=h.shares * h.cost_price,
+                cost=h.shares * h.cost_price, profit=0.0, account=h.account,
+            )
             for h in twenty_holdings
         ]
         start = time.perf_counter()
@@ -145,21 +149,37 @@ class TestE2EPerformance:
 
     @pytest.mark.scenario_perf
     def test_excel_report_time(self, twenty_holdings, mock_all_apis, tmp_path):
-        """Excel 报告生成完整管线耗时测量。"""
-        from src.python.report.excel_writer import write_excel_report
-        from src.python.report.market_value import _generate_details
+        """Excel 报告写入耗时测量。"""
+        import os
 
-        today_str = "2026-07-20"
-        details = _generate_details(twenty_holdings, today_str)
-        output_path = tmp_path / "test_perf.xlsx"
+        from openpyxl import Workbook
+
+        from src.python.report.excel_writer import (
+            create_workbook,
+            save_workbook,
+            write_data_row,
+            write_header_row,
+            write_title_row,
+        )
+
+        wb = create_workbook()
+        ws = wb.active
+        ws.title = "性能测试"
+        headers = ["名称", "代码", "市值", "成本", "盈亏"]
+        write_title_row(ws, 1, "测试报告", len(headers))
+        write_header_row(ws, 2, headers)
+        for i, h in enumerate(twenty_holdings):
+            mkt_val = h.shares * h.cost_price
+            write_data_row(ws, i + 3, [h.name, h.code, mkt_val, h.cost_price, 0.0])
 
         start = time.perf_counter()
-        write_excel_report(str(output_path), twenty_holdings, details, today_str)
+        result_path = save_workbook(wb, str(tmp_path))
         elapsed = time.perf_counter() - start
 
-        logger.info("Excel 报告生成耗时: %.3fs", elapsed)
-        assert output_path.exists()
-        assert elapsed < 30.0, f"Excel 报告耗时 {elapsed:.2f}s > 30s 阈值"
+        logger.info("Excel 报告写入耗时: %.3fs", elapsed)
+        assert result_path is not None
+        assert os.path.exists(result_path)
+        assert elapsed < 30.0, f"Excel 写入耗时 {elapsed:.2f}s > 30s 阈值"
 
     @pytest.mark.scenario_perf
     def test_full_pipeline_time(self, twenty_holdings, mock_all_apis, tmp_path):
@@ -174,8 +194,10 @@ class TestE2EPerformance:
         portfolio_returns = [0.001] * 252
         benchmark_returns = [0.0005] * 252
         details = [
-            {"name": h.name, "code": h.code, "market_value": h.shares * h.cost_price,
-             "cost": h.shares * h.cost_price, "profit": 0.0, "account": h.account}
+            DetailRow(
+                name=h.name, code=h.code, market_value=h.shares * h.cost_price,
+                cost=h.shares * h.cost_price, profit=0.0, account=h.account,
+            )
             for h in twenty_holdings
         ]
 

@@ -1,6 +1,6 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 文档版本：v0.7.5-dev
+> 文档版本：v0.7.6-dev
 
 ## 概述
 
@@ -332,6 +332,50 @@ python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.json
     建议审查这些案例是否应为重复
 [OK] 跨源 bigram=3: 无边界样本
 ```
+
+### 🤖 LLM 幻觉率采样测试 — `scripts/llm_hallucination_sampler.py`
+
+LLM 生成的投资分析报告可能包含幻觉（与持仓数据不符的事实性错误）。此脚本对 **10 组标准化持仓数据** 调用当前 prompt，经事实校验器验证后统计幻觉率。
+
+```bash
+# 完整采样（调用 LLM API 对 10 组数据生成分析）
+python scripts/llm_hallucination_sampler.py
+
+# 仅测试特定模块（默认 expert_review）
+python scripts/llm_hallucination_sampler.py --module health_check
+
+# 仅测试特定数据集（1-indexed）
+python scripts/llm_hallucination_sampler.py --dataset 1,3,5
+
+# 跳过 API 调用，只构建 prompt 验证结构
+python scripts/llm_hallucination_sampler.py --dry-run
+
+# 跳过缓存强制重新生成
+python scripts/llm_hallucination_sampler.py --force
+```
+
+**输出**：
+- 报告文件：`docs-stm/tmp/hallucination-report.md`
+- Dry-run prompt 转储：`docs-stm/tmp/hallucination-prompts-{module}.md`
+
+**数据集简介**（共 10 组）：
+
+| # | 名称 | 品种数 | 测试重点 |
+|---|------|:------:|----------|
+| 1 | 基本 A 股组合 | 3 | 标准正收益场景 |
+| 2 | 混合基金组合 | 5 | 股+基混合，部分亏损 |
+| 3 | 含较大亏损组合 | 4 | 亏损品种描述准确性 |
+| 4 | 权重集中组合 | 3 | 集中度风险描述 |
+| 5 | 分散组合 | 8 | 多品种小额分散 |
+| 6 | 多账户组合 | 6 | 三账户场内外混合 |
+| 7 | 偏防守组合 | 4 | 高股息防守型 |
+| 8 | 全基金组合 | 3 | 穿透逻辑幻觉 |
+| 9 | 零成本特殊场景 | 3 | 继承/赠予零成本 |
+| 10 | 极简组合 | 2 | 最小规模边界 |
+
+**幻觉率标准**：目标 **< 5%**。每次 prompt 重大修改后应重新采样。
+
+**注意**：数值一致性检查可能产生误报——仓位占比百分比（如 "52.4%"）和情景假设百分比会被事实校验器标记为收益率偏差。建议人工复核后确认实际幻觉率。
 
 ## 标记选择运行速查
 

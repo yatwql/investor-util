@@ -31,7 +31,8 @@ logger = logging.getLogger("invest")
 # ── 常量 ──────────────────────────────────────────────────────
 
 # 6 位数字代码（A 股/基金/指数）
-_CODE_PATTERN = re.compile(r'\b[0-9]{6}\b')
+# 使用 re.ASCII 确保 \b 在中文和非 ASCII 字符旁也正常匹配边界
+_CODE_PATTERN = re.compile(r'\b[0-9]{6}\b', re.ASCII)
 
 # 排名声称模式
 _RANK_MAX_PATTERN = re.compile(r'(?:第[一二三四五六七八九十\d]+大|最大|最重|首要|主要|第一重仓|第一权重)')
@@ -49,7 +50,36 @@ _PROFIT_KEYWORDS = frozenset([
 # 收益归因段落特征词（数值为贡献度占比，不可与收益率直接比较）
 _CONTRIBUTION_KEYWORDS = frozenset([
     '盈利来源', '亏损来源', '收益归因',
+    '贡献占比', '盈利贡献', '贡献度', '归因于',
 ])
+
+# 仓位/占比上下文——数值为权重而非收益率
+_POSITION_WEIGHT_KEYWORDS = frozenset([
+    '占比', '仓位', '集中度',
+])
+
+# 调仓目标上下文——数值为目标而非实际收益率
+_REBALANCE_TARGET_KEYWORDS = frozenset([
+    '降至', '升至', '调至', '减仓至', '加仓至',
+])
+
+# 假设/情景上下文——数值为假设场景而非实际收益率
+_HYPOTHETICAL_KEYWORDS = frozenset([
+    '如果', '假设', '若', '情景', '假如',
+])
+
+# 币种/敞口上下文
+_EXPOSURE_KEYWORDS = frozenset([
+    '币种', '敞口', '人民币', '美元', '港币', '港元',
+])
+
+# 建议语境关键词 — 品种代码属于投资建议而非声称持有
+# 注意：避免"关注"（会匹配"值得关注"）、"参考"（会匹配"参考品种"）等宽泛词
+_SUGGESTION_KEYWORDS: tuple[str, ...] = (
+    '建议', '可考虑', '推荐', '买入',
+    '可以考虑', '适合', '可买入',
+    '建议关注', '可关注', '值得配置',
+)
 
 # 常见指数代码（校验品种存在性时跳过）
 _INDEX_CODES: frozenset[str] = frozenset({
@@ -137,7 +167,32 @@ def _is_contribution_sentence(sentence: str) -> bool:
     return any(kw in sentence for kw in _CONTRIBUTION_KEYWORDS)
 
 
-# ── 检查器 1：数值一致性（v2 — 感知增强）───────────────────────
+def _is_position_weight_context(sentence: str) -> bool:
+    """判断是否为仓位/占比语境，数值为权重而非收益率。"""
+    return any(kw in sentence for kw in _POSITION_WEIGHT_KEYWORDS)
+
+
+def _is_hypothetical_context(sentence: str) -> bool:
+    """判断是否为假设/情景语境，数值为假设而非实际收益率。"""
+    return any(kw in sentence for kw in _HYPOTHETICAL_KEYWORDS)
+
+
+def _is_suggestion_context(code: str, full_text: str) -> bool:
+    """判断代码在全文上下文中是否属于建议/推荐语境而非声称持有。
+
+    通过检查代码前后约 60 字符的上下文窗口是否含建议关键词来判定。
+    用于将建议提及从"品种不存在"告警中降级为非幻觉。
+    """
+    idx = full_text.find(code)
+    if idx == -1:
+        return False
+    start = max(0, idx - 60)
+    end = min(len(full_text), idx + 60)
+    context = full_text[start:end]
+    return any(kw in context for kw in _SUGGESTION_KEYWORDS)
+
+
+# ── 检查器 1：数值一致性（v3 — 带语境感知）───────────────────────
 
 
 def check_numerical_consistency(
@@ -189,13 +244,13 @@ def check_numerical_consistency(
             seen_values.add(value_str)
             value = float(value_str)
 
-            # 数值上下文必须有收益相关关键词才进入校验
+            total_checked += 1
+
+            # 无收益关键词 → 不是收益/回报类百分比 → 无法校验，默认为通过
             is_profit_context = any(kw in sentence for kw in _PROFIT_KEYWORDS)
             if not is_profit_context or profit_rate < 0.01:
                 passed += 1
                 continue
-
-            total_checked += 1
 
             # 构建参考收益率列表：个股收益率 + 组合总收益率
             # 对每个数值，找最接近的参考值进行匹配
@@ -230,13 +285,39 @@ def check_numerical_consistency(
                 passed += 1
                 continue
 
+            # 策略 5：仓位/占比语境 → 跳过（如"茅台占比52.4%"）
+            if _is_position_weight_context(sentence):
+                passed += 1
+                continue
+
+            # 策略 6：假设/情景语境 → 跳过（如"若下跌20%"）
+            if _is_hypothetical_context(sentence):
+                passed += 1
+                continue
+
+            # 策略 7：调仓目标语境 → 跳过（如"从52%降至15%"）
+            if any(kw in sentence for kw in _REBALANCE_TARGET_KEYWORDS):
+                passed += 1
+                continue
+
+            # 策略 8：币种/敞口语境 → 跳过（如"人民币 100%"）
+            if any(kw in sentence for kw in _EXPOSURE_KEYWORDS):
+                passed += 1
+                continue
+
             # 全部策略均未通过 → 标记为不一致
-            # 优先使用句中持仓代码生成消息（更准确），否则使用最近参考值
-            if holding_codes_in_sentence:
-                code = holding_codes_in_sentence[0]
-                stock_rate = stock_rates_abs.get(code, 0)
+            # 优先匹配句中持仓代码中与数值最接近的品种（而非仅取第一个代码）
+            if len(holding_codes_in_sentence) > 1:
+                best_code = min(holding_codes_in_sentence,
+                                key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
+            elif holding_codes_in_sentence:
+                best_code = holding_codes_in_sentence[0]
+            else:
+                best_code = None
+            if best_code:
+                stock_rate = stock_rates_abs.get(best_code, 0)
                 issues.append(
-                    f"收益相关数值 {value}% 与 {code} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
+                    f"收益相关数值 {value}% 与 {best_code} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
                 )
             elif closest_ref != "_portfolio":
                 stock_rate = stock_rates_abs.get(closest_ref, 0)
@@ -258,23 +339,32 @@ def check_symbol_existence(
     text: str,
     holdings_details: list[dict] | None,
     extra_valid_codes: set[str] | None = None,
-) -> tuple[list[str], int, int]:
+    suggestion_keywords: tuple[str, ...] | None = _SUGGESTION_KEYWORDS,
+) -> tuple[list[str], int, int, list[str]]:
     """检查 LLM 输出的品种代码是否确实存在于持仓中。
 
     跳过常见指数代码（如沪深300:000300），仅校验疑似持仓代码。
     支持传入 extra_valid_codes 扩展有效代码集（如穿透分析的股票代码）。
 
+    从 v2 起返回 4 元组，第 4 项是建议语境提及的列表（不计入幻觉率）。
+    建议提及是指 LLM 在建议/推荐语境中引用非持仓代码（如"建议关注511010"），
+    而非声称持有该品种。
+
     Args:
         text: 去 HTML 标签后的纯文本。
         holdings_details: 持仓明细列表。
         extra_valid_codes: 额外有效代码集合（如穿透 TOP10 中的股票代码）。
+        suggestion_keywords: 建议语境关键词元组，设为 None 可关闭此检测。
 
     Returns:
-        (issues, total_checked, passed_count)
+        (issues, total_checked, passed_count, suggestion_issues)
+        — suggestion_issues 是 issues 的子集，已从 issues 中移除，
+          不计入幻觉率。
     """
     issues: list[str] = []
+    suggestions: list[str] = []
     if not text or not holdings_details:
-        return issues, 0, 0
+        return issues, 0, 0, suggestions
 
     valid_codes = _extract_holding_map(holdings_details)
     codes_found = set(_CODE_PATTERN.findall(text))
@@ -290,9 +380,13 @@ def check_symbol_existence(
         if code in all_valid:
             passed += 1
         else:
-            issues.append(f"品种代码 {code} 不在当前持仓中")
+            # 判断是否建议语境（如"建议关注511010"）
+            if suggestion_keywords is not None and _is_suggestion_context(code, text):
+                suggestions.append(f"品种代码 {code} 不在当前持仓中（建议提及）")
+            else:
+                issues.append(f"品种代码 {code} 不在当前持仓中")
 
-    return issues, total_checked, passed
+    return issues, total_checked, passed, suggestions
 
 
 # ── 检查器 3：排名正确性 ──────────────────────────────────────
@@ -424,7 +518,9 @@ def run_fact_check(
     total_passed += num_passed
 
     # 检查 2：品种存在性（支持穿透分析的额外有效代码）
-    sym_issues, sym_checked, sym_passed = check_symbol_existence(text, holdings_details, extra_valid_codes)
+    sym_issues, sym_checked, sym_passed, sym_suggestions = check_symbol_existence(
+        text, holdings_details, extra_valid_codes,
+    )
     all_issues.extend(sym_issues)
     total_checks += sym_checked
     total_passed += sym_passed
@@ -440,10 +536,19 @@ def run_fact_check(
 
     tag = f"[{module_label}] " if module_label else ""
 
+    # 构建建议提及行（灰色，不计入告警）
+    suggestion_lines = ""
+    if sym_suggestions:
+        sug_detail = "; ".join(sym_suggestions)
+        suggestion_lines = f'\n<span style="color:#999;font-size:11px">ℹ {tag}建议提及（不计入校验）: {sug_detail}</span>'
+
     if not all_issues:
-        # 全部通过 — 绿色摘要
+        # 全部通过 — 绿色摘要（含建议提及则灰色追加）
         summary = f"{tag}✓ 事实校验通过：{total_passed}/{total_checks} 项检查全部通过"
-        return f'<p style="color:#4a4;font-size:12px">{summary}</p>'
+        result = f'<p style="color:#4a4;font-size:12px">{summary}</p>'
+        if suggestion_lines:
+            result += suggestion_lines
+        return result
 
     # 存在不一致 — 黄色告警摘要
     detail_lines = "\n".join(f"⚠ {tag}{issue}" for issue in all_issues)
@@ -451,4 +556,4 @@ def run_fact_check(
         f"{tag}事实校验：{total_passed}/{total_checks} 项通过，{len(all_issues)} 项提示\n"
         f"{detail_lines}"
     )
-    return f'<p style="color:#a40;font-size:12px">{summary}</p>'
+    return f'<p style="color:#a40;font-size:12px">{summary}</p>{suggestion_lines}'

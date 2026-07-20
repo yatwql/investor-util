@@ -347,6 +347,10 @@ A: 菜单 `S` 可交互切换各 LLM 模块的启停状态（立即生效），�
 
 A: 可以。在 `llm_settings.json` 中设置对应模块的 `output_brief_{模块键}: true`，程序会在 system prompt 中追加精简指令，控制输出篇幅。同时可在 `max_tokens_{模块键}` 中限制最大输出长度。
 
+**Q: 如何评估 LLM 输出的准确性，防止幻觉？**
+
+A: 使用 `scripts/llm_hallucination_sampler.py` 对 10 组标准化持仓数据进行采样测试。脚本调用当前 prompt 配置生成 LLM 分析，通过事实校验器自动验证数值一致性、品种存在性和排名正确性，生成幻觉率报告到 `docs-stm/tmp/hallucination-report.md`。目标幻觉率 < 5%，每次 prompt 重大修改后应重新采样。详见 [`how-to-test-my-code.md`](how-to-test-my-code.md#-llm-幻觉率采样测试)。
+
 **Q: 调用 LLM 大概需要多少费用？**
 
 A: 以 DeepSeek V4 Flash 为例，一次完整菜单 L（4+1 个模块）约消耗输入 15K～20K Token、输出 5K～8K Token，费用约 ¥0.02～¥0.05。缓存命中不计费。开启 Extended Thinking 后 Token 消耗会显著增加。费用估算在报告「LLM API 用量」页签和生成结束时的终端中均有显示。

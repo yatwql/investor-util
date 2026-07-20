@@ -79,8 +79,8 @@ class TestChainResilience:
             registry.record_failure("eastmoney")
         assert registry.is_circuit_broken("eastmoney"), "熔断应已触发"
 
-        # 模拟冷却期结束：将 _circuit_open_until 设到过去
-        registry._circuit_open_until["eastmoney"] = time.time() - 1
+        # 模拟冷却期结束：将 last_failure_time 设到过去
+        registry._providers["eastmoney"].last_failure_time = time.time() - 3600
 
         # 试探请求（记录成功）
         registry.record_success("eastmoney")
@@ -96,9 +96,9 @@ class TestChainResilience:
         for _ in range(2):
             registry.record_failure("eastmoney")
 
-        # 模拟保存：状态已写入 _circuit_breaker_state 和持久化文件
-        state = registry._circuit_breaker_state.get("eastmoney", {})
-        failures = state.get("consecutive_failures", 0)
+        # 验证状态已记录在熔断器内部
+        state = registry._providers.get("eastmoney")
+        failures = state.consecutive_failures if state else 0
         assert failures >= 2, f"持久化前应有 >=2 次失败，实际 {failures}"
 
     @pytest.mark.scenario_resilience
@@ -134,20 +134,20 @@ class TestChainResilience:
 
         from src.python.llm.circuit_breaker import (
             _CIRCUIT_BREAKER_THRESHOLD,
-            _circuit_failures,
+            _cb_record_failure,
             _circuit_open_until,
-            record_failure,
         )
 
         endpoint = "https://api.example.com/v1"
+        domain = "api.example.com"  # _cb_endpoint 从 URL 提取的域名
         for _ in range(_CIRCUIT_BREAKER_THRESHOLD):
-            record_failure(endpoint)
+            _cb_record_failure(endpoint)
 
-        assert endpoint in _circuit_open_until, "LLM 端点应已进入冷却期"
-        cooldown = _circuit_open_until[endpoint] - time.time()
+        assert domain in _circuit_open_until, "LLM 端点应已进入冷却期"
+        cooldown = _circuit_open_until[domain] - time.time()
         assert cooldown > 0, "冷却剩余时间应 > 0"
 
         # 验证统一网关也能读取 LLM 熔断状态
         llm_status = gateway.get("llm")
-        assert endpoint in llm_status, "gateway 应能报告 LLM 端点状态"
-        assert llm_status[endpoint]["circuit_broken"], "gateway 应标记为已熔断"
+        assert domain in llm_status, "gateway 应能报告 LLM 端点状态"
+        assert llm_status[domain]["circuit_broken"], "gateway 应标记为已熔断"

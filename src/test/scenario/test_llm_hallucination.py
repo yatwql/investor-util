@@ -132,14 +132,14 @@ class TestHallucinationDetection:
     def test_missing_code(self):
         """LLM 引用了一个不在持仓中的代码（000001 是指数，用非指数代码）。"""
         text = "参考品种 002837（英维克）的走势"
-        issues, total, passed = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, _ = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) >= 1, "应检测到不存在的品种代码"
 
     @pytest.mark.scenario_llm
     def test_valid_code(self):
         """LLM 引用的持仓代码都在持仓中，应通过。"""
         text = "招商银行(600036)和贵州茅台(600519)表现较好"
-        issues, total, passed = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, _ = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) == 0, "存在代码不应告警"
 
     @pytest.mark.scenario_llm
@@ -147,10 +147,10 @@ class TestHallucinationDetection:
         """穿透代码集传入 extra_valid_codes 后不应告警。"""
         text = "穿透分析显示 300750（宁德时代）权重最大"
         # 不传 extra 时 → 告警
-        issues, _, _ = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
+        issues, _, _, _ = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) >= 1, "不传 extra 时应告警"
         # 传 extra 时 → 通过
-        issues, total, passed = check_symbol_existence(
+        issues, total, passed, _ = check_symbol_existence(
             text, _STD_HOLDINGS_DETAILS, extra_valid_codes={"300750", "002837"}
         )
         assert len(issues) == 0, "传入 extra_valid_codes 后不应告警"
@@ -194,7 +194,7 @@ class TestHallucinationDetection:
             "最大持仓是贵州茅台(600519)。"
         )
         i1, _, p1 = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
-        i2, _, p2 = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
+        i2, _, p2, _ = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
         i3, _, p3 = check_ranking_correctness(text, _STD_HOLDINGS_DETAILS)
         fails = len(i1) + len(i2) + len(i3)
         assert fails == 0, f"正确输出不应有检出错误，发现 {fails} 项"

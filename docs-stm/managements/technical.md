@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.7.5-dev
+> 文档版本：v0.7.6-dev
 
 ## 目录
 
@@ -2376,6 +2376,6 @@ investor-util/
 | rebalance_signals | list[dict] | 是 | 已实现 | prepare_report_data |
 | liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
 | fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
-| scenario_analysis | dict | 是 | 计划中 | prepare_report_data |
+| scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
 
 [↑ 回到顶部](#目录)

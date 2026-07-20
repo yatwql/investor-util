@@ -111,7 +111,26 @@ def show_config() -> None:
         print("  状态: [OK] 文件就绪")
     else:
         print("  状态: [!!] 文件未找到")
+    _show_privacy_and_security_status()
     _show_llm_config_status()
+    print()
+
+
+def _show_privacy_and_security_status() -> None:
+    """显示隐私提示和匿名化安全状态。"""
+    from src.python.config import get_config as _get_cfg
+
+    _cfg = _get_cfg()
+    _anon_mode = _cfg.get("features", {}).get("anonymization", {}).get("mode", "off")
+    _anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
+    _anon_display = _anon_labels.get(_anon_mode, _anon_mode)
+
+    # 检查隐私提示是否已显示过
+    _privacy_shown = _cfg.get("_privacy_notice_shown", False)
+    _privacy_icon = f"{GREEN}✓{RESET}" if _privacy_shown else f"{YELLOW}首次运行将显示{RESET}"
+
+    print(f"  匿名化模式: {_anon_display}")
+    print(f"  隐私声明: {_privacy_icon}")
     print()
 
 
