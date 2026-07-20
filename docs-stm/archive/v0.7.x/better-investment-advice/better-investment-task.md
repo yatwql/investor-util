@@ -82,7 +82,7 @@
 
 ### T0-01-B: pipeline_data Pre-Schema 文档 + 死键清理（现有管线键定义 + 类型断言，前置）
 - **估时**: 2h
-- **文件**: `docs-stm/plan/better-investment-advice/data-channels-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言 + 清理 pipeline_data 死键）
+- **文件**: `data-channels-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言 + 清理 pipeline_data 死键）
 - **阻塞**: 否
 - **依赖**: 无
 - **描述**: 在 T0-01（DegradationTracker 接线）和 P1-06-A（pipeline_data_builder 预重构）之前，先定义当前生产管线已有数据键的 Schema（Pre-Schema），**并清理 pipeline_data 中的死键**。**注意：当前架构中"管线数据"分为两个独立通道——(A) `capture_snapshot()` 返回的 `pipeline_data` 字典仅含 3 个键（`diff`、`diff_trimmed`、`days_since_last`），其中 `diff` 含 9 个子键（is_first_check、total_value_diff、total_value_diff_pct、total_pnl_diff、days_since_last_report、added/removed/increased/decreased）用于快照对比——这是 LLM 直接消费的唯一 pipeline_data； (B) `prepare_report_data()` 返回的 `prep` 字典含 13 个键（details、total_mv、total_cost、total_profit、total_today_profit、categories、a_indices、us_indices、penetrated_assets、holdings_details、today_str、output_dir、news_top_count），以独立参数形式传入 `generate_all_llm()` 而非通过 pipeline_data。Pre-Schema 文档必须同时覆盖两个通道的键定义，避免后续混淆。** 每个键标注：类型、所属通道（pipeline_data / prep）、必选/可选标记、写入模块、消费模块、写入管线阶段。
@@ -344,7 +344,7 @@
 
 ### P1-21: pipeline_data Schema 文档——Phase 1 Full Schema 补充 + 校验层扩展
 - **估时**: 6h（Pre-Schema 2h 已由 T0-01-B 完成，此处仅补充 Phase 1 新增键的 Full Schema 定义）
-- **文件**: `docs-stm/plan/better-investment-advice/data-channels-schema.md`（扩展 Full Schema 章节）、`src/python/report/orchestrator.py`（校验层扩展）
+- **文件**: `data-channels-schema.md`（扩展 Full Schema 章节）、`src/python/report/orchestrator.py`（校验层扩展）
 - **阻塞**: 否
 - **依赖**: P1-06, P1-07, P1-08
 - **描述**: T0-01-B 已完成 Pre-Schema（现有管线键的定义 + 初始类型断言）。本任务在 Pre-Schema 基础上补充 Full Schema：(1) 在 data-channels-schema.md 中追加 Phase 1 新增键的定义（risk_metrics、portfolio_daily_returns、data_degradation、feature_flags 等约 8 个键），与 Pre-Schema 合并在同一文档中，用"Phase"列区分归属；(2) 扩展 orchestrator 中的类型断言 checkpoint 覆盖这些新键；(3) data-channels-schema.md 纳入项目文档，每次新增 pipeline_data 键时必须同步更新。
@@ -643,7 +643,7 @@
 - **阻塞**: 否
 - **依赖**: P2-08（metrics 完备）、P3-06（再平衡完备）、P4-03（情景分析完备）
 - **状态**: ✅ 已完成（2026-07-20）
-- **描述**: 模拟 20 品种 + 3 年历史的完整持仓，运行全量报告生成（Excel + HTML + LLM），计时并记录：(1) 总耗时（目标 < 60s）；(2) 各阶段耗时分布；(3) 缓存命中率；(4) LLM Token 消耗（计数）。失败条件：总耗时 > 120s。结果输出到 `docs-stm/plan/better-investment-advice/better-investment-performance-test-report.md`。
+- **描述**: 模拟 20 品种 + 3 年历史的完整持仓，运行全量报告生成（Excel + HTML + LLM），计时并记录：(1) 总耗时（目标 < 60s）；(2) 各阶段耗时分布；(3) 缓存命中率；(4) LLM Token 消耗（计数）。失败条件：总耗时 > 120s。结果输出到 `better-investment-performance-test-report.md`。
 
 ### P4-15: 链韧性测试
 - **估时**: 12h（含 6h 级联故障/长时间恢复/持久化恢复三种测试场景 + 4h 跨会话熔断恢复验证 + 2h 报告生成）

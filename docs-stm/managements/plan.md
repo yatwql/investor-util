@@ -34,5 +34,5 @@
 
 | # | 类别 | 实验功能项 | 状态 | 估时 | 阻塞 | 说明 |
 |:-:|:-----|----------|:----:|:----:|:----:|------|
-| 91 | **LLM策略** | **增强 LLM 策略——从"解读数据"到"模拟辩论"** | 🆕 | 24h | ←LLM管线 | 实验功能（缺省关闭）。3 种改进模式注入 config 控制的 prompt 模板：(1) 多人辩论——白脸/黑脸双 prompt 分轮生成后 LLM 综合；(2) 条件推理——分情景（涨/跌/震荡）给出建议；(3) 反问引导——识别高集中度品种反问用户是否值得。开关位于 `features.json`，缺省 `false`。配置文件见 `discussion-better-investment-advice.md` 第 6 层 |
+| 91 | **LLM策略** | **增强 LLM 策略——从"解读数据"到"模拟辩论"** | 🆕 | 24h | ←LLM管线 | 实验功能（缺省关闭）。3 种改进模式注入 config 控制的 prompt 模板：(1) 多人辩论——白脸/黑脸双 prompt 分轮生成后 LLM 综合；(2) 条件推理——分情景（涨/跌/震荡）给出建议；(3) 反问引导——识别高集中度品种反问用户是否值得。开关位于 `features.json`，缺省 `false`。配置文件见 [`docs-stm/archive/v0.7.x/better-investment-advice/discussion-better-investment-advice.md`](../archive/v0.7.x/better-investment-advice/discussion-better-investment-advice.md) 第 6 层 |
 

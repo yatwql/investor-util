@@ -237,13 +237,6 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
-│   │   ├── better-investment-advice/            #   投资建议改进分析讨论
-│   │   │   ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
-│   │   │   ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
-│   │   │   ├── data-channels-schema.md            # 数据通道 Schema 文档（管线键定义+类型断言）
-│   │   │   ├── data-source-stability-test-report.md       # 数据源稳定性专项测试报告
-│   │   │   └── better-investment-performance-test-report.md # 端到端性能基准测试报告
-
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
@@ -319,6 +312,16 @@ investor-util/
 │   │   │   └── cli-mode/                          # CLI 命令行模式归档
 │   │   │       ├── cli-mode-iteration-plan.md     # CLI 迭代计划
 │   │   │       └── cli-mode-technical-design.md   # CLI 技术设计
+│   │   ├── v0.7.x/                            # v0.7.x 版本迭代归档
+│   │   │   ├── archived_changelog.0.7.x.md        # 变更日志归档 v0.7.x
+│   │   │   ├── archived_plan.0.7.x.md             # 实现计划归档 v0.7.x
+│   │   │   ├── archived_review-findings.0.7.x.md  # 自审记录归档 v0.7.x
+│   │   │   └── better-investment-advice/           # 投资建议改进分析讨论（已归档）
+│   │   │       ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
+│   │   │       ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
+│   │   │       ├── data-channels-schema.md            # 数据通道 Schema 文档（管线键定义+类型断言）
+│   │   │       ├── data-source-stability-test-report.md       # 数据源稳定性专项测试报告
+│   │   │       └── better-investment-performance-test-report.md # 端到端性能基准测试报告
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

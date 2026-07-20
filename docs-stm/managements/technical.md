@@ -1054,7 +1054,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 `report/pipeline_data_builder.py` 集中组装传递给 LLM 的数据上下文 `pipeline_data`。原本内联在 `orchestrator.py` 的组装逻辑被抽取到此独立模块，包含 `_build_basic_context()`、`_build_risk_context()`、`_build_llm_context()` 等分段构造器，职责清晰可测。
 
-`pipeline_data` 遵循 C19 Schema 契约：所有键必须在 `docs-stm/plan/better-investment-advice/data-channels-schema.md` 中预定义类型、版本号和写入/消费模块后，才能在代码中使用该键。
+`pipeline_data` 遵循 C19 Schema 契约：所有键必须在 `docs-stm/archive/v0.7.x/better-investment-advice/data-channels-schema.md` 中预定义类型、版本号和写入/消费模块后，才能在代码中使用该键。
 
 #### 三种报告路径
 
@@ -2244,7 +2244,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 | **C7** | **报告序号不可硬编码** — 报告 17 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
-| **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 docs-stm/plan/better-investment-advice/data-channels-schema.md 中定义类型、版本号、写入/消费模块后，才能在代码中新增该键的使用 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
+| **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 docs-stm/archive/v0.7.x/better-investment-advice/data-channels-schema.md 中定义类型、版本号、写入/消费模块后，才能在代码中新增该键的使用 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
 
 ### 8.4 LLM 集成层约束
 
@@ -2453,7 +2453,7 @@ investor-util/
 
 ### 附录 H：pipeline_data Schema 定义（当前已实现 + 计划中）
 
-> 完整定义和维护责任见 docs-stm/plan/better-investment-advice/data-channels-schema.md。
+> 完整定义和维护责任见 docs-stm/archive/v0.7.x/better-investment-advice/data-channels-schema.md。
 > 此处仅列出当前阶段已确认的键名和类型。
 
 | 键名 | 类型 | Optional | 状态 | 写入阶段 |
