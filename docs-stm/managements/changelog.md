@@ -27,6 +27,7 @@
 - **plan.md**: 移除已完成的 P2 质量与安全（4 项：隐私提示/端到端性能测试/链韧性测试/安全测试）和 P3 技术债清算（4 项：性能/韧性/安全/匿名化扩展）全部整节。当前待办仅保留 P4-91（增强 LLM 策略实验功能）。详见 `better-investment-task.md` 保管的完整任务分解记录
 - **8 份管理/用户文档全域清理历史痕迹**：源码注释移除 `"R-198 从 xxx 拆分"`、`"向后兼容"`、`"旧版"`、`"提取自 xxx"`、`"拆分而来"` 等 30+ 处历史迭代描述/版本对比/重构标记语言，正文只反映当前最新状态
 - **测试补丁**：`test_excel_generator.py` 中 `excel_news_warning.get_report_sheet_name` mock 补 `create=True`，适配历史清理后模块不再暴露该属性
+- **删除已移除功能的测试**：`test_html_builders.py` 的 `TestCoverageText` 类（`_coverage_text` 函数已于 `0de1fbd` 随"机构覆盖"列一并删除，测试未同步导致 6 个持续失败）
 
 ### Docs
 - **requirements.md**: 全文档事实核对——A1 菜单项 15→16（新增 [I] 和 [A] 说明行）；A2 报告模块范围 E/B/L→B/L（组合历史走势和回撤分析仅 B/L 路径有）；A3 删除虚假的"机构覆盖"第 12 列（基金业绩实际只有 11 列）；A4 R-HLD-05 代码清洗描述从 ".SH/.SZ 后缀"改为 "sh/sz/bj 前缀"；B1 取价渠道描述从 "腾讯财经/天天基金网"扩展为 "腾讯财经/东方财富/天天基金网等"；B2 行业分类备用链路从 "quotedata 回退"改为 "东方财富 REST 行情页回退"
@@ -35,7 +36,7 @@
 - **testplan.md**: §6.3 补充回归项序号 9/10/11；P1/P2 对齐为 `--mode verify` 和 `--mode all`；§1.3 补充 scenario 文件表条目
 - **how-to-config-llm.md**: 补全 enabled_llm JSON 块前缺失的 "## 模块启停" 章节标题；删除重复的 "专用配置项" 表格；`model_{module}` 说明补充多链模式下的配置来源
 - **how-to-use-registry.md**: 合并重复报表章节，展开完整 17 模块键名表；补充 `llm_module_info.py` 消费方；补充 `get_report_section_number()`
-- **faq.md**: 删除重复问题
+- **faq.md**: 删除重复问题；补充日志级别配置修改表格（控制台/文件/全局三级）
 - **reports-instruction.md**: §16/§17 修正为 §15/§16；HTML LLM API 用量定位修复
 
 ---
