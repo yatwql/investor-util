@@ -126,7 +126,7 @@ LLM 配置拆分为三个独立文件，分工明确：
   },
   "gemini-fb": {
     "api_key": "AIzaSyYourGeminiKey",
-    "model": "gemini-2.0-flash",
+    "model": "gemini-3.5-flash",
     "endpoint": "https://generativelanguage.googleapis.com/v1beta"
   }
 }

@@ -123,6 +123,7 @@ _THINKING_SUPPORTED_PREFIXES = (
     "claude-fable-5",
     "deepseek-v4-",
     "deepseek-chat",
+    "gemini-3.5-",
     "gemini-2.5-",
 )
 

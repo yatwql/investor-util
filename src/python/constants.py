@@ -86,6 +86,8 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "deepseek-v4-pro": {"input": 3, "output": 6, "input_cache_hit": 0.025},
     "deepseek-chat": {"input": 1, "output": 2, "input_cache_hit": 0.02},
     # Gemini
+    "gemini-3.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
+    "gemini-3.5-": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
     "gemini-2.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
     "gemini-2.5-pro": {"input": 1.25, "output": 5.0, "input_cache_hit": 0.125},
     "gemini-2.5-": {"input": 1.25, "output": 5.0, "input_cache_hit": 0.125},
