@@ -1,0 +1,163 @@
+# 实现计划归档 — v0.7.x
+
+> 归档时间：2026-07-20
+> 原始文件：`docs-stm/managements/plan.md`
+> 涵盖版本：v0.7.0 ~ v0.7.6
+
+---
+
+## v0.7.x 计划历史
+
+### ✅ v0.7.0 — P2「Tier 0 + MVP」全量任务详情（2026-07-09）
+
+> 原始提交：`e42e231` — docs: T0+MVP全量任务详情迁入plan.md P2区
+> 版本头：v0.7.3-dev
+
+P2 阶段包含 10 项串行任务（45h 估时），分为：
+- **串行链 1**：T0-01-A + T0-01-B → T0-01 → T0-02
+- **串行链 2**：MVP-01~04（可并行） → MVP-05 → MVP-06
+- **交叉依赖**：MVP-02 ← T0-01（概念降级感知依赖 data_degradation）
+
+#### 摘要表
+
+| 序号 | 任务 | 依赖 | 估时 | 说明 |
+|:----:|------|:----:|:----:|------|
+| 1 | **T0-01-A: DegradationTracker get_log() + record() + 单例工厂** | — | **5h** | 审计 4 文件 6 降级点注入 record() + 封装 get_log() + 三重实例统一为 get_tracker() 单例工厂 |
+| 2 | **T0-01-B: f_context Pre-Schema 文档 + 死键清理** | — | 2h | 定义 ~12 个已有管线键 Schema + 初始类型断言 checkpoint + 删除 f_context 中 2 个死键 |
+| 3 | **T0-01: DegradationTracker→LLM 接线** | ←①+② | 4h | 注入 f_context["data_degradation"] |
+| 4 | **T0-02: 数据质量告警注入 LLM** | ←③ | 4h | 健康检查 3 类→5 类 |
+| 5 | **MVP-01: 收益归因计算与注入** | — | 4h | profit 贡献排序注入 LLM |
+| 6 | **MVP-02: 概念板块占比注入 LLM** | ←③ | 4h | Top 10 单品概念标注，依赖 data_degradation 做降级兜底 |
+| 7 | **MVP-03: 再平衡极简版（硬编码）** | — | **6h** | 单品种超 15% 阈值告警+去重聚合 ⚠️ 禁止导入 report/ 包 |
+| 8 | **MVP-04: 竞争语境极简版** | — | 8h | 组合 vs 沪深300 收益对比 |
+| 9 | **MVP-05: LLM Prompt 整合串联** | ←⑤⑥⑦⑧ | 4h | 5 个段落集中整合到 prompts.py |
+| 10 | **MVP-06: 条件推理场景块** | ←⑨ | 4h | 上涨/下跌 20% 分情景建议 |
+| | **合计** | | **45h** | T0-01-A 含单例工厂（+1h） |
+
+#### 各任务详细描述
+
+##### T0-01-A: DegradationTracker get_log() 查询接口封装 + record() 注入 + 单例工厂（前置）
+- **估时**: 5h
+- **文件**: `src/python/report/data_status.py`（扩展 DegradationTracker + 新增 `get_tracker()`）、`src/python/report/fund_performance.py`、`src/python/report/penetration_sheet.py`、`src/python/report/summary.py`（各改 1 行 import）
+- **描述**: 当前 DegradationTracker 在 report/ 层已有 6 处 record() 调用（fund_performance.py:345 perf_rank、penetration_sheet.py:143/160/174 industry/profit_forecast/dividend、summary.py:285/306 index_a/index_us）——但这些全是消费侧记录。fetcher/ 层的 6 处降级点仍然缺失 record()。需完成：(1) 封装 get_log() → list[dict] 方法；(2) 在 6 处 `fetch_with_fallback()` / `fetch_with_incremental_fallback()` 注入 record()；(3) 在 `data_status.py` 中新增模块级单例工厂 `get_tracker()`，将三个文件级实例统一为单例；(4) 确保 orchestrator.py 的 data_degradation 键在记录非空时聚合并注入。
+
+##### T0-01-B: f_context Pre-Schema 文档 + 死键清理（前置）
+- **估时**: 2h
+- **文件**: `docs-stm/plan/better-investment-advice/f_context-schema.md`（新建）、`src/python/report/orchestrator.py`（初始断言 + 清理 f_context 死键）
+- **描述**: 定义当前生产管线已有数据键的 Schema。注意架构中"管线数据"分为两个独立通道——(A) `capture_snapshot()` 返回的 `f_context` 字典（`diff` 含 9 子键）；(B) `prepare_report_data()` 返回的 `prep` 字典含 13 个键。死键清理：删除 `f_context["diff_trimmed"]` 和 `f_context["days_since_last"]`。
+
+##### T0-01: DegradationTracker→LLM 接线
+- **估时**: 4h
+- **描述**: `data_status.py` 的 `DegradationTracker` 已在 report/ 模块中实例化并写入降级日志，但 `capture_snapshot()` 返回的 `f_context` 字典中**没有降级状态键**。新增 `f_context["data_degradation"]`，将当天所有降级记录汇总为结构化列表。
+
+##### T0-02: 数据质量告警注入 LLM
+- **估时**: 4h
+- **描述**: 当前 LLM "健康检查" prompt 中只有 3 类数据质量提示。扩展为 5 类：(1) 收盘价异常断点；(2) T2/T3 降级发生频次；(3) 基金净值更新延迟；(4) 分红数据状态；(5) 个别品种数据缺失时长。
+
+##### MVP-01: 收益归因计算与注入（Layer 2a）
+- **估时**: 4h
+- **描述**: 已有每品种 `profit`，直接计算 `profit_contribution_i = profit_i / Σ|profit_j|`。按贡献降序排列，TOP 5 品种+占比格式化一段文本。⚠ **边界处理**：当 Σ|profit_j| = 0 时返回空段落，显示"暂无收益归因数据"而非 ZeroDivisionError。
+
+##### MVP-02: 概念板块占比注入 LLM（Layer 2b）
+- **估时**: 4h
+- **描述**: 利用已有 `industry.concepts` 数据（概念板块分类），在 `expert_review` prompt 中新增段落：(1) 穿透后 Top 5 概念板块及持仓市值占比；(2) 集中度定性判断；(3) 与大盘/小盘/价值/成长风格对应关系。必须区分三种状态：(a) API 不可达 → 显示降级文本；(b) API 返回空数据 → 显示"部分品种无概念分类"；(c) 港股通/美股穿透资产无概念 → 显示"部分境外品种无概念分类"。
+
+##### MVP-03: 再平衡极简版——单品种超阈值（Layer 3A 硬编码）
+- **估时**: 6h
+- **架构约束**: ⚠️ 禁止导入 `report/` 包下的任何模块（仅消费 f_context 传入的数据）。
+- **描述**: 对每品种 `weight = market_value / total_value`，超 15% 硬编码阈值则输出建议。包含：(1) 建议去重聚合——超 3 品种同时触发时输出 1 条汇总；(2) 按偏离幅度排序 Top 3；(3) 单元测试包含"5 品种超阈值只输出 1 条汇总"断言。
+
+##### MVP-04: 竞争语境极简版——组合 vs 沪深 300 收益对比（Layer 5 极简）
+- **估时**: 8h
+- **描述**: 利用已有基准指数对比数据，在 `summary` prompt 中新增收益对比段落。格式化为两列对比表。零新数据源。
+
+##### MVP-05: LLM Prompt 整合串联
+- **估时**: 4h
+- **描述**: 将上述 4 个新增段落集中整合到 `prompts.py` 的 `_SYSTEM_*` 常量中，确保逻辑顺序流畅（收益来源→板块分布→调仓建议→基准对比），无数据时整段隐藏。
+
+##### MVP-06: 条件推理场景块（原 PD-01 提前）
+- **估时**: 4h
+- **描述**: 在 prompt 末尾追加条件推理场景块，引导 LLM 输出两个情景分支的简要建议。
+- **验收标准**: (1) 在 `expert_review` system prompt 末尾追加固定指令，要求回复末尾增加"### 情景分析"二级标题；(2) 含"📈 上涨情景"和"📉 下跌情景"两个子段落；(3) 不破坏现有 prompt 测试。
+
+#### P4 — 基础设施改善（v0.7.0）
+
+| 序号 | 任务 | 状态 | 估时 | 说明 |
+|:----:|------|:----:|:----:|------|
+| 1 | **加密 API 密钥存储** | 待处理 | 4 小时 | 当前 `llm_key.json` 明文存储 API 密钥。改用对称加密（`cryptography.fernet`），运行时解密进内存。KEK 从环境变量 `INVESTOR_UTIL_KEY` 读取。 |
+
+---
+
+### ✅ v0.7.3 — P2 精简为摘要表，全量详情迁出（2026-07-10）
+
+> 原始提交：`cc3fce5` — docs: plan.md 精简为摘要表，全量任务详情回归task.md
+> 版本头：v0.7.3-dev → v0.7.3（release `575c2de`）
+
+P2 阶段全部完成并标注 ✅，摘要表保留仅作引用，详细任务描述移至 `docs-stm/plan/better-investment-advice/better-investment-task.md`。
+
+> ✅ **全部完成（2026-07-20）**。10 项 P2 任务均已完成并测试验证通过（regression 266 passed, 0 failed）。
+
+---
+
+### ✅ v0.7.4 — Phase 3 + Phase 4 任务计划（2026-07-15）
+
+> 原始提交：`4fecab4` — release: v0.7.4
+> 版本头：v0.7.4
+
+#### Phase 3 执行信号与竞争语境（✅ 全部完成）
+
+| 序号 | 任务 | 状态 | 估时 | 说明 |
+|:----:|------|:----:|:----:|------|
+| 56 | **P3-16: LLM 事实锚定校验器** | ✅ 纯算法层完成 | 24h | 纯算法层（数值一致/品种存在性/排名正确）已实现并集成到 orchestrator，报告末尾追加校验摘要；LLM 增强层待评估 |
+
+#### Phase 4 质量与安全（17 项，~176h）
+
+| 序号 | 任务 | 状态 | 估时 | 阻塞 | 说明 |
+|:----:|------|:----:|:----:|:----:|------|
+| 60 | **P2-11b: 组合 Beta 置信区间 + 统计检验** | 🆕 | 24h | ←P2-11a | 95% CI、t-统计量、p 值 |
+| 61 | **P4-01: 敏感性分析——Beta 推导** | 🆕 | 12h | ←P2-11a,P2-11b | 6 种涨跌情景下组合预期回撤/收益 |
+| 62 | **P4-02: 敏感性分析——3 情景表** | 🆕 | 8h | ←P4-01 | 扩展市场/行业/汇率三张情景表 |
+| 63 | **P4-03: 敏感性分析——置信区间传播** | 🆕 | 12h | ←P4-02,P2-09 | Beta CI→情景回撤 CI，年化波动 CI→夏普 CI |
+| 64 | **P3-09b: 竞争语境——口径修正因子计算** | 🆕 | 16h | ←P3-09a,P2-08 | 综合费率估算/现金剥离/TWR 计算 |
+| 65 | **P4-04: 隐私安全——匿名化 4 模式** | 🆕 | 12h | ←P1-13 | 关闭/代码显示/完全匿名/汇总模式 |
+| 66 | **P4-05: 隐私安全——隐私提示** | 🆕 | 4h | ←P4-04 | 首次运行隐私提示 + HTML/Excel 脚注 + TUI 安全状态页 |
+| 67 | **P4-06: 隐私安全——缓存审查** | 🆕 | 8h | ←P1-14 | `cache.clean_sensitive(90d)` + 敏感 key 标注 |
+| 68 | **P4-08: LLM 幻觉率采样测试** | 🆕 | 16h | ←P3-16 | 10 组标准数据→LLM 生成→校验器+人工复核 |
+| 69 | **P4-09: 缓存雪崩随机 TTL 修复** | 🆕 | 4h | — | 同类缓存 TTL 增加 ±15% 随机偏移 |
+| 70 | **P4-10: metrics 测试用例（edge 场景）** | 🆕 | 8h | ←P2-18,P2-09 | 全 None/空列表/极端值 |
+| 71 | **P4-11: bond_yield 测试用例（edge 场景）** | 🆕 | 4h | ←P1-15 | 负数收益率/字符串 NaN/双源差异 |
+| 72 | **P4-12: 再平衡测试用例完善** | 🆕 | 8h | ←P3-06 | 无超限/单品种超限/权益偏离 |
+| 73 | **P4-13: 测试标记注册与集成门禁** | 🆕 | 4h | ←P4-10,P4-11,P4-12 | 注册新 marker + edge 校验 |
+| 74 | **P4-14: 端到端性能测试** | 🆕 | 12h | ←P2-08,P3-06,P4-03 | 20 品种+3 年历史，全量报告生成 |
+| 75 | **P4-15: 链韧性测试** | 🆕 | 12h | ←P1-19 | 多数据源故障/长时间恢复/熔断持久化恢复 |
+| 76 | **P4-16: 安全测试** | 🆕 | 12h | ←P4-06 | 密钥/缓存/匿名化/API 日志/HTML 路径 5 项安全基线验证 |
+| | **Phase 4 合计** | | **~176h** | | 共 17 项任务 |
+
+---
+
+### ✅ v0.7.5 — 版本切换（2026-07-18）
+
+> 原始提交：`ae2b0e9` — chore: 发布后版本切换至 v0.7.5-dev
+
+Phase 4 任务内容与 v0.7.4 一致，仅版本头从 `v0.7.4` 更新为 `v0.7.5-dev`。期间有多项 Phase 4 任务批量完成（P4-01~P4-16 含端到端性能、链韧性、安全测试等，详见 changelog.md）。
+
+---
+
+### ✅ v0.7.6 — P2/P3 已完成整节清理，仅保留 P4 实验功能（2026-07-19）
+
+> 原始提交：`9c20f8e` — chore: plan.md 清理已完成 P2/P3 整节，移至 changelog.md
+> 版本头：v0.7.6-dev
+
+P2 和 P3 整节（含 Phase 3 和 Phase 4 任务表）全部移除，仅保留 P4-91「增强 LLM 策略——从"解读数据"到"模拟辩论"」实验功能项。
+
+| # | 类别 | 实验功能项 | 状态 | 估时 | 阻塞 | 说明 |
+|:-:|:-----|----------|:----:|:----:|:----:|------|
+| 91 | **LLM策略** | **增强 LLM 策略——从"解读数据"到"模拟辩论"** | 🆕 | 24h | ←LLM管线 | 3 种改进模式：(1) 多人辩论——白脸/黑脸双 prompt；(2) 条件推理——分情景给出建议；(3) 反问引导——识别高集中度品种。缺省关闭。 |
+
+---
+
+## 归档引用
+
+- `plan.md`（当前）→ `docs-stm/managements/plan.md`
+- 详细任务描述 → `docs-stm/plan/better-investment-advice/better-investment-task.md`
+- 原始 git 提交历史 → `e42e231` ~ `9c20f8e`

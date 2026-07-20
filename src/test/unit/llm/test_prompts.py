@@ -252,7 +252,7 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
     def test_returns_string(self):
         """空数据时返回合理提示词。"""
         from src.python.llm.prompts import _build_global_macro_prompt
-        result = _build_global_macro_prompt({}, {}, 0, 0, {})
+        result = _build_global_macro_prompt({}, {}, 0, 0, 0, {})
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 20)
         self.assertIn("总市值", result)
@@ -266,7 +266,7 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
         us_indices = {
             "dji": {"name": "道琼斯", "price": 40000, "change_pct": -0.2},
         }
-        result = _build_global_macro_prompt(a_indices, us_indices, 1_000_000, 50_000, {})
+        result = _build_global_macro_prompt(a_indices, us_indices, 1_000_000, 50_000, 0, {})
         self.assertIn("上证指数", result)
         self.assertIn("道琼斯", result)
         self.assertIn("1,000,000", result)
@@ -277,7 +277,7 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
         sector_flow = [
             {"name": "电力", "change_pct": 1.5, "main_net_inflow": 500_000_000, "main_net_inflow_pct": 0.12},
         ]
-        result = _build_global_macro_prompt({}, {}, 500_000, 10_000, {}, sector_flow)
+        result = _build_global_macro_prompt({}, {}, 500_000, 10_000, 0, {}, sector_flow)
         self.assertIn("行业资金流向", result)
         self.assertIn("电力", result)
 
@@ -285,7 +285,7 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
         """品种分类信息嵌入。"""
         from src.python.llm.prompts import _build_global_macro_prompt
         categories = {"股票": 3, "基金": 2}
-        result = _build_global_macro_prompt({}, {}, 0, 0, categories)
+        result = _build_global_macro_prompt({}, {}, 0, 0, 0, categories)
         self.assertIn("股票3只", result)
         self.assertIn("基金2只", result)
 

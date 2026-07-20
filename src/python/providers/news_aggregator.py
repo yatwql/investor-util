@@ -13,6 +13,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
+from src.python.constants import PROJECT_ROOT
 from src.python.providers.news_correlator import correlate_news_with_holdings
 from src.python.providers.news_sources import (
     _FETCH_MAP,
@@ -29,8 +30,7 @@ logger = logging.getLogger("invest")
 #    "ratio","bigram_overlap","decision","rule"}
 _ANCHOR_RECORDS: list[dict[str, Any]] = []
 _ANCHOR_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "data", "cache", "dedup_anchors.jsonl",
+    PROJECT_ROOT, "data", "cache", "dedup_anchors.jsonl",
 )
 
 

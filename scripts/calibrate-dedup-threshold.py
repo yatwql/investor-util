@@ -136,12 +136,13 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
     print()
 
     # ── 校准建议 ──
-    _print_calibration_advice(by_rule, summary_only)
+    _print_calibration_advice(by_rule, summary_only, dry_run)
 
 
 def _print_calibration_advice(
     by_rule: dict[str, list[dict[str, Any]]],
     summary_only: bool,
+    dry_run: bool,
 ) -> None:
     """基于锚点数据生成阈值调整建议。"""
     print("=" * 60)

@@ -1,6 +1,6 @@
 # 测试覆盖统计
 
-> 文档版本：v0.7.5-dev
+> 文档版本：v0.7.7-dev
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
@@ -10,22 +10,22 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 2884 | ~30s |
-| `standard` | 2460 | ~30s |
-| `scenario` | **267** | **~6min** |
-| `regression` | **267** | **~6min** |
-| `dev-verify` | **856** | **~1min** |
-| `verify` | **1907** | **~8min** |
-| `integration` | 304 | ~50s |
-| `edge` | 366 | ~15s |
+| `unit` | 3227 | ~30s |
+| `standard` | 2707 | ~30s |
+| `scenario` | **285** | **~6min** |
+| `regression` | **285** | **~6min** |
+| `dev-verify` | **2847** | **~1min** |
+| `verify` | **2180** | **~8min** |
+| `integration` | 322 | ~50s |
+| `edge` | 469 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **3449** | **~10min** |
+| `all` | **3616** | **~10min** |
 | `smoke` | 24 | ~2s |
-| `report` | **1046** | ~15s |
-| `all_no_unit` | 327 | **~7min** |
+| `report` | **1045** | ~15s |
+| `all_no_unit` | 389 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：`all` 模式收集总数 3211 项，但因 12 项为 Linux 专用键盘测试（`test_tui.py::TestGetKeyLinux`），在 Windows 上实跑约为 3199 项。
+> 注：统计为 `pytest --collect-only` 收集数。`all` 模式全量 3616 项（2026-07-20 快照）。
 
 ### 功能域对应测试源
 
@@ -84,23 +84,23 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 9 子组合计 | **2806** |
-| ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 191 |
+| `unit`（父标记） | 9 子组合计 | **3227** |
+| ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 259 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 204 |
-| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 518 |
+| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 584 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
-| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列基金深度分析模块、数据降级/占位；含 65 项 data 标记测试） | 1008 |
-| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 76 |
-| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含注册表测试） | 438 |
-| └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 164 |
+| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列基金深度分析模块、数据降级/占位） | 1045 |
+| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 113 |
+| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含注册表测试） | 559 |
+| └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 158 |
 
 ### 跨类标记
 
 | 标记 | 覆盖范围 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `llm` | 全部 LLM 相关（unit_llm 480 + scenario_llm 32，其中 432 项标有 llm 标记），**全部为 mock 测试，无需真实 API key** | **432** |
+| `llm` | 全部 LLM 相关（unit_llm 584 + scenario_llm 32，其中 432 项标有 llm 标记），**全部为 mock 测试，无需真实 API key** | **432** |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** |
-| `edge` | 异常/边界场景（含熔断冷却探针） | **366** |
+| `edge` | 异常/边界场景（含熔断冷却探针） | **469** |
 | `data` | 数据正确性验证 | **69** |
 
 详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。

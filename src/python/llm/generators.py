@@ -43,6 +43,7 @@ def generate_global_macro(
     us_indices: dict[str, dict[str, Any]],
     total_mv: float,
     total_profit: float,
+    total_cost: float,
     categories: dict,
     sector_flow: list[dict[str, Any]] | None = None,
     force: bool = False,
@@ -61,7 +62,7 @@ def generate_global_macro(
 
     def _prompt():
         return _build_global_macro_prompt(
-            a_indices, us_indices, total_mv, total_profit, categories,
+            a_indices, us_indices, total_mv, total_profit, total_cost, categories,
             sector_flow, competitive_context=competitive_context,
         )
 

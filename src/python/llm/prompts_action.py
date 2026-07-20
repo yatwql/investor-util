@@ -38,6 +38,7 @@ def _build_global_macro_prompt(
     us_indices: dict[str, dict[str, Any]],
     total_mv: float,
     total_profit: float,
+    total_cost: float,
     categories: dict,
     sector_flow: list[dict[str, Any]] | None = None,
     competitive_context: str | None = None,
@@ -49,6 +50,7 @@ def _build_global_macro_prompt(
         us_indices: 美股指数行情
         total_mv: 持仓总市值
         total_profit: 持仓总盈亏
+        total_cost: 持仓总成本
         categories: 品种分类计数
         sector_flow: 行业资金流向数据（可选），含主力净流入排名
         competitive_context: 竞争语境文本（可选），由呼叫方构建
@@ -89,11 +91,12 @@ def _build_global_macro_prompt(
             flow_lines.append("  ".join(parts))
         flow_text = "\n【行业资金流向】\n" + "\n".join(flow_lines)
 
+    total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
     comp_text = f"\n{competitive_context}" if competitive_context else ""
     return (
         f"【当前时间】{now_bj}（北京时间）\n"
         f"【指数】{idx_text}\n"
-        f"【持仓】总市值{total_mv:,.0f} 总盈亏{total_profit:+,.0f}\n"
+        f"【持仓】总市值{total_mv:,.0f} 总盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）\n"
         f"【分布】{' '.join(cat_parts)}\n"
         f"{flow_text}"
         f"{comp_text}"
@@ -136,11 +139,12 @@ def _build_expert_review_prompt(
     concept_text = _build_concept_sector_block(penetrated_assets)
     rebalance_text = _build_rebalance_block(holdings_details, total_mv)
     fx_text = _build_fx_exposure_block(holdings_details)
+    total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
 
     parts = [
         f"【当前时间】{now_bj}（北京时间）",
         f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} "
-        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f} 今日{total_today_profit:+,.0f}",
+        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）今日{total_today_profit:+,.0f}",
         f"【分布】{' '.join(cat_parts)}{pen_text}",
     ]
     if diff_text:
@@ -223,11 +227,12 @@ def _build_health_check_prompt(
     # 数据质量详情
     dq_detail = _build_data_quality_detail_block(degradation_events)
     attribution_text = _build_profit_attribution_block(holdings_details)
+    total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
 
     parts = [
         f"【当前时间】{now_bj}（北京时间）",
         f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} "
-        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f} 今日{total_today_profit:+,.0f}",
+        f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）今日{total_today_profit:+,.0f}",
         f"【分布】{' '.join(cat_parts)}{pen_text}",
     ]
     if diff_text:
