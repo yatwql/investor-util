@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 
@@ -16,6 +17,27 @@ from ._io import _read_cache_data
 from ._paths import _GZIP_SUFFIX, _cache_path
 
 logger = logging.getLogger("invest")
+
+# 缓存雪崩防护：TTL 随机偏移范围 (±15%)
+_TTL_JITTER_RANGE = 0.15
+_TTL_JITTER_RESOLUTION = 301  # 步数，使偏移值在 [0.85, 1.15] 范围内有 301 个可能值
+
+
+def _ttl_jitter_factor(key: str) -> float:
+    """基于 key 哈希的确定性 TTL 偏移因子 [0.85, 1.15]。
+
+    相同 key 始终返回相同因子（跨进程稳定），确保缓存过期时间分散，
+    防止大量同类缓存同时过期导致缓存雪崩。
+
+    Args:
+        key: 缓存键名
+
+    Returns:
+        [0.85, 1.15] 范围内的偏移因子
+    """
+    h = int(hashlib.md5(key.encode()).hexdigest()[:4], 16)
+    offset = h % _TTL_JITTER_RESOLUTION  # 0 .. 300
+    return 1.0 + _TTL_JITTER_RANGE * (offset - _TTL_JITTER_RESOLUTION // 2) / (_TTL_JITTER_RESOLUTION // 2)
 
 
 def get_cache_age(key: str) -> float | None:
@@ -77,14 +99,18 @@ def get_cache_age_by_data_type(
     return None
 
 
-def get_ttl(data_type: str) -> float:
+def get_ttl(data_type: str, key: str | None = None) -> float:
     """获取指定数据类型的缓存过期时间（秒）。
 
     交易时段内，对 market_hour_aware 声明过的数据类型使用短 TTL（默认 30s）
     确保实时性，优先于静态 cache_ttl 配置。
 
+    当传入 key 参数时，对 TTL 增加 ±15% 的确定性随机偏移（基于 key 哈希），
+    用于防止大量同类缓存同时过期导致的缓存雪崩。
+
     Args:
         data_type: 数据类型键名，如 "price"、"rank"、"hold"
+        key: 缓存键名，传入时启用 TTL 随机偏移（缓存雪崩防护）
 
     Returns:
         过期时间（秒）
@@ -99,15 +125,25 @@ def get_ttl(data_type: str) -> float:
             market_ttl = config.get("market_hour_ttl", 30)
             try:
                 market_ttl_val = float(market_ttl)
-                return max(30, min(86400, market_ttl_val))
+                ttl = max(30, min(86400, market_ttl_val))
             except (ValueError, TypeError):
-                return 30
-        # ── 非交易时段或非感知类型：用静态配置或默认值 ──
-        ttl_config = config.get("cache_ttl") or {}
-        if data_type in ttl_config:
-            val = float(ttl_config[data_type])
-            if val > 0:
-                return val
+                ttl = 30
+        else:
+            # ── 非交易时段或非感知类型：用静态配置或默认值 ──
+            ttl_config = config.get("cache_ttl") or {}
+            if data_type in ttl_config:
+                val = float(ttl_config[data_type])
+                if val > 0:
+                    ttl = val
+                else:
+                    ttl = get_cache_ttl_defaults().get(data_type, CACHE_DAILY)
+            else:
+                ttl = get_cache_ttl_defaults().get(data_type, CACHE_DAILY)
     except (ImportError, TypeError, ValueError, KeyError, AttributeError, RuntimeError):
         logger.debug("get_ttl: 配置读取失败，使用默认值")
-    return get_cache_ttl_defaults().get(data_type, CACHE_DAILY)
+        ttl = get_cache_ttl_defaults().get(data_type, CACHE_DAILY)
+
+    # 缓存雪崩防护：基于 key 哈希的确定性 TTL 偏移
+    if key is not None:
+        ttl *= _ttl_jitter_factor(key)
+    return ttl

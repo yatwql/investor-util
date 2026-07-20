@@ -415,8 +415,8 @@ _COMPUTATION_REGISTRY: tuple[ComputModuleDef, ...] = (
         module_key="analytics_scenario",
         label="情景",
         dependencies=("history",),
-        description="市场上涨/下跌 20% 的情景模拟与影响评估",
-        status="planned",
+        description="市场上涨/下跌的情景模拟与影响评估（±10%/±20%/±30% 六情景，含置信区间传播）",
+        status="implemented",
     ),
     ComputModuleDef(
         name="组合校准分析",

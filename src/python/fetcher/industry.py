@@ -65,11 +65,12 @@ def fetch_industry_data(code: str) -> dict | None:
 
     _t = get_tracker()
     _src_key = f"industry_{code.strip()}"
+    industry_cache_key = _INDUSTRY_CACHE_PREFIX + code.strip()
     result = fetch_with_fallback(
         "industry",
         _INDUSTRY_PROVIDERS,
-        _INDUSTRY_CACHE_PREFIX + code.strip(),
-        get_ttl("industry"),
+        industry_cache_key,
+        get_ttl("industry", industry_cache_key),
         fn_kwargs={"code": code.strip()},
         transform=_industry_transform,
     )
