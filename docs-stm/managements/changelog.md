@@ -6,9 +6,17 @@
 
 ## [0.7.8-dev] - 未发布
 
-### 待定
+### Changed
+- **changelog.md**: v0.7.0~v0.7.7 详细变更记录归档至 `archive/v0.7.x/archived_changelog.0.7.x.md`，主文件仅保留当前版本 + 归档索引
+- **better-investment-advice 完整归档**：目录从 `docs-stm/plan/` 移至 `docs-stm/archive/v0.7.x/`，所有外部引用（technical.md 3 处、plan.md 1 处、folders.md 1 处）同步更新
+- **管理文档版本头同步**：llm-technical.md、test-coverage.md、folders.md 版本头更新至 v0.7.8-dev
+- **reports-instruction.md**: 补充投资分析与风控/基金评价功能-报告位置对照表
 
-（下一版本待办项）
+### Docs
+- **discussion-better-investment-advice.md**: Phase 3 状态（LLM 事实校验器从待办改为 ✅）、Phase 4 状态（从"11 项已交付+4 项待办"改为"全部 15 项 ✅"），版本头（v0.7.7 → v0.7.8-dev），顶部状态摘要同步
+- **Phase 5（用户画像）+ Phase D（CAPM α）已关闭**：better-investment-task.md 全部 8 项标记 ❌ 已关闭，汇总表同步；discussion-better-investment-advice.md 总览表、风险表、依赖关系图、全量估时描述同步更新
+- **plan.md**: 恢复概述节与归档索引（v0.1.x ~ v0.7.x）
+- **review-findings.md**: 恢复历史审查记录链接 + 历史归档节
 
 ---
 
