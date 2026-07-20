@@ -211,13 +211,13 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
     """测试全球政经局势用户提示词。"""
 
     def test_has_timestamp(self) -> None:
-        r = _build_global_macro_prompt({}, {}, 100.0, 10.0, {"股票": 3})
+        r = _build_global_macro_prompt({}, {}, 100.0, 10.0, 0, {"股票": 3})
         self.assertIn("北京时间", r)
         self.assertIn("当前时间", r)
 
     def test_compact_format(self) -> None:
         a_idx = {"sh000001": {"name": "上证指数", "price": 3120, "change_pct": 1.2}}
-        r = _build_global_macro_prompt(a_idx, {}, 100000, 5000, {"股票": 3, "基金": 2})
+        r = _build_global_macro_prompt(a_idx, {}, 100000, 5000, 0, {"股票": 3, "基金": 2})
         self.assertIn("上证指数", r)
         self.assertIn("3120", r)
         self.assertIn("+1.20%", r)
@@ -227,11 +227,11 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
     def test_single_line_indices(self) -> None:
         """指数应为紧凑单行格式。"""
         a_idx = {"sh000001": {"name": "上证", "price": 3000, "change_pct": -0.5}}
-        r = _build_global_macro_prompt(a_idx, {}, 0, 0, {})
+        r = _build_global_macro_prompt(a_idx, {}, 0, 0, 0, {})
         self.assertIn("上证3000(-0.50%)", r)
 
     def test_no_categories(self) -> None:
-        r = _build_global_macro_prompt({}, {}, 0, 0, {})
+        r = _build_global_macro_prompt({}, {}, 0, 0, 0, {})
         self.assertIn("当前时间", r)
         # 不应该有 AssertionError
 
@@ -241,7 +241,7 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
             {"name": "半导体", "change_pct": 2.5, "main_net_inflow": 1500000000, "main_net_inflow_pct": 3.2},
             {"name": "银行", "change_pct": -0.8, "main_net_inflow": -500000000, "main_net_inflow_pct": -1.1},
         ]
-        r = _build_global_macro_prompt({}, {}, 100000, 5000, {"股票": 3}, sector_flow=sector_flow)
+        r = _build_global_macro_prompt({}, {}, 100000, 5000, 0, {"股票": 3}, sector_flow=sector_flow)
         self.assertIn("行业资金流向", r)
         self.assertIn("半导体", r)
         self.assertIn("+2.50%", r)
@@ -251,7 +251,7 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
 
     def test_sector_flow_none(self) -> None:
         """sector_flow=None 时不应包含资金流向内容。"""
-        r = _build_global_macro_prompt({}, {}, 0, 0, {})
+        r = _build_global_macro_prompt({}, {}, 0, 0, 0, {})
         self.assertNotIn("行业资金流向", r)
 
 
@@ -1185,7 +1185,7 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
         mock_gen.return_value = ("<p>结果</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_global_macro": False}
         result, cached = generate_global_macro(
-            a_indices={}, us_indices={}, total_mv=0, total_profit=0,
+            a_indices={}, us_indices={}, total_mv=0, total_profit=0, total_cost=0,
             categories={}, llm_config=llm_config,
         )
         self.assertEqual(result, "<p>结果</p>")

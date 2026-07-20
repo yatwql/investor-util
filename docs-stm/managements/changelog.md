@@ -8,6 +8,8 @@
 
 ### Fixed
 - **news_aggregator.py `_ANCHOR_PATH` 路径错误**：手动 `dirname` 计算比 `constants.PROJECT_ROOT` 多 1 级，锚点文件写入 `src/data/cache/` 而非 `data/cache/`，导致 `calibrate-dedup-threshold.py` 找不到锚点文件。改用 `from src.python.constants import PROJECT_ROOT`，消除 dirname 层数依赖
+- **LLM prompt 缺失总收益率**：`_build_global_macro_prompt` / `_build_expert_review_prompt` / `_build_health_check_prompt` 持仓概况行缺少 `总收益率` 字段，LLM 自行计算盈亏/成本时虚构收益率（如 18.1% vs 实际 28.7%）。现直接传入 `total_rate` 并在提示词中标明 `（收益率+XX.XX%）`，消除 fact_checker 误报
+- **calibrate-dedup-threshold.py `dry_run` 未定义**：`_print_calibration_advice` 函数缺 `dry_run` 参数签名，运行时报 `NameError`
 
 ### Changed
 - **test-coverage.md**: 全量测试统计更新（all: 3449→3616，edge: 366→469，llm: 518→584 等）

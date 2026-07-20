@@ -304,6 +304,7 @@ def _dispatch_llm_workers(
             us_indices,
             total_mv,
             total_profit,
+            total_cost,
             categories,
             sector_flow=sector_flow,
             force=force,
