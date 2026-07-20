@@ -540,7 +540,6 @@ def test_qdii_nav_date_delayed_t2(self):
 pytest src/test/                                   # 全量通过
 pytest --co                                         # 无 patch 残留污染
 pytest src/test/unit/core/test_registry.py --co -v      # 新文件隔离（示例）
-# 已归档 — 映射验证移至 test-coverage.md 场景表
 python scripts/check-test-markers.py                # 标记合规性检查（AST 静态扫描）
 ```
 
