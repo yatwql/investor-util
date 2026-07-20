@@ -32,7 +32,7 @@
 > ✅ **全部完成（2026-07-20）**。4 项 PRE 任务均已完成测试与决策：
 > - PRE-01/PRE-01-D：东财 API 不可用 → `bond_zh_us_rate` 替代，P1-01/P1-02 取消
 > - PRE-02/PRE-02-D：885005 不可获取 → 沪深300+自定义基金池降级
-> - 详见测试报告 `rf-and-885005-test-report.md`
+> - 详见测试报告 `data-source-stability-test-report.md`
 
 ### PRE-01: Rf 国债收益率数据源可用性测试
 - **估时**: 8h（1 天）
@@ -40,7 +40,7 @@
 - **阻塞**: 否（独立）
 - **依赖**: 无
 - **状态**: ✅ 已完成（2026-07-20）
-- **描述**: 验证 Rf（无风险利率）数据源的可用性。测试 3 个候选源：(1) 东方财富 `datacenter-web` API（原规划主源，**已失效**——所有 `RPTBOND_*` report name 均返回"参数配置不对"）；(2) `worldgovernmentbonds.com`（JS 渲染，不可直接抓取）；(3) **`bond_zh_us_rate`（akshare 封装的 Sina 财经数据）——已验证稳定可用**（详见测试报告 `rf-and-885005-test-report.md`）。⚠ **决策影响**：原规划 P1-01（东方财富 API fetcher, 12h）和 P1-02（备用源, 8h）取消，P1-03（手动配置, 2h）改为 `bond_zh_us_rate` 自动源 + 手动兜底双模式。
+- **描述**: 验证 Rf（无风险利率）数据源的可用性。测试 3 个候选源：(1) 东方财富 `datacenter-web` API（原规划主源，**已失效**——所有 `RPTBOND_*` report name 均返回"参数配置不对"）；(2) `worldgovernmentbonds.com`（JS 渲染，不可直接抓取）；(3) **`bond_zh_us_rate`（akshare 封装的 Sina 财经数据）——已验证稳定可用**（详见测试报告 `data-source-stability-test-report.md`）。⚠ **决策影响**：原规划 P1-01（东方财富 API fetcher, 12h）和 P1-02（备用源, 8h）取消，P1-03（手动配置, 2h）改为 `bond_zh_us_rate` 自动源 + 手动兜底双模式。
 
 ### PRE-01-D: PRE-01 决策门（0h）
 - **估时**: 0h
@@ -48,7 +48,7 @@
 - **阻塞**: 否
 - **依赖**: PRE-01
 - **状态**: ✅ 已决策（2026-07-20）
-- **描述**: **PRE-01 测试结论：东方财富 datacenter API 已不可用，`bond_zh_us_rate`（akshare/Sina）为可行替代。** 决策：(1) P1-01（东方财富 API fetcher, 12h）和 P1-02（备用源 fetcher, 8h）**取消**；(2) P1-03（手动配置, 2h）**保留**，但扩展为双模式——`bond_zh_us_rate` 自动获取（主）+ 用户手动配置（兜底）；(3) P1-15（Rf 测试, 8h）缩减为 `bond_zh_us_rate` 集成测试（4h）；(4) 合计释放 **~20h** 重新分配给 P1-11（功能开关）、P1-12（断路包装器）、P1-04（数据质量增强）。详见测试报告 `rf-and-885005-test-report.md`。
+- **描述**: **PRE-01 测试结论：东方财富 datacenter API 已不可用，`bond_zh_us_rate`（akshare/Sina）为可行替代。** 决策：(1) P1-01（东方财富 API fetcher, 12h）和 P1-02（备用源 fetcher, 8h）**取消**；(2) P1-03（手动配置, 2h）**保留**，但扩展为双模式——`bond_zh_us_rate` 自动获取（主）+ 用户手动配置（兜底）；(3) P1-15（Rf 测试, 8h）缩减为 `bond_zh_us_rate` 集成测试（4h）；(4) 合计释放 **~20h** 重新分配给 P1-11（功能开关）、P1-12（断路包装器）、P1-04（数据质量增强）。详见测试报告 `data-source-stability-test-report.md`。
 
 ### PRE-02: 偏股基金指数 885005 可用性测试
 - **估时**: 4h（含 akshare+东方财富+新浪/腾讯 多源测试）
@@ -56,7 +56,7 @@
 - **阻塞**: 否
 - **依赖**: 无
 - **状态**: ✅ 已完成（2026-07-20）
-- **描述**: 测试 885005（中证偏股基金指数）的可用性。测试覆盖 akshare（`index_zh_a_hist`/`stock_zh_index_daily`/`fund_info_index_em`）、东方财富（push2his/push2 全部市场码 0~19、基金 index API/performance API）、新浪、腾讯、CSI 中证指数官网。**结论：885005 是 Wind（万得）专属代码，所有免费公开 API 均不可获取。** CSI 替代代码（930950/932055/931255）同样不可用。详见测试报告 `rf-and-885005-test-report.md`。**P3-07 强制降级为沪深300+自定义基金池**。
+- **描述**: 测试 885005（中证偏股基金指数）的可用性。测试覆盖 akshare（`index_zh_a_hist`/`stock_zh_index_daily`/`fund_info_index_em`）、东方财富（push2his/push2 全部市场码 0~19、基金 index API/performance API）、新浪、腾讯、CSI 中证指数官网。**结论：885005 是 Wind（万得）专属代码，所有免费公开 API 均不可获取。** CSI 替代代码（930950/932055/931255）同样不可用。详见测试报告 `data-source-stability-test-report.md`。**P3-07 强制降级为沪深300+自定义基金池**。
 
 ### PRE-02-D: PRE-02 决策门（0h，决策已落地 → 实现归入 P3-07）
 - **估时**: 2h（决策 0h + P3-07 内实现 2h）
@@ -82,7 +82,7 @@
 
 ### T0-01-B: f_context Pre-Schema 文档 + 死键清理（现有管线键定义 + 类型断言，前置）
 - **估时**: 2h
-- **文件**: `docs-stm/plan/better-investment-advice/f_context-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言 + 清理 f_context 死键）
+- **文件**: `docs-stm/plan/better-investment-advice/data-channels-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言 + 清理 f_context 死键）
 - **阻塞**: 否
 - **依赖**: 无
 - **描述**: 在 T0-01（DegradationTracker 接线）和 P1-06-A（f_context_builder 预重构）之前，先定义当前生产管线已有数据键的 Schema（Pre-Schema），**并清理 f_context 中的死键**。**注意：当前架构中"管线数据"分为两个独立通道——(A) `capture_snapshot()` 返回的 `f_context` 字典仅含 3 个键（`diff`、`diff_trimmed`、`days_since_last`），其中 `diff` 含 9 个子键（is_first_check、total_value_diff、total_value_diff_pct、total_pnl_diff、days_since_last_report、added/removed/increased/decreased）用于快照对比——这是 LLM 直接消费的唯一 f_context； (B) `prepare_report_data()` 返回的 `prep` 字典含 13 个键（details、total_mv、total_cost、total_profit、total_today_profit、categories、a_indices、us_indices、penetrated_assets、holdings_details、today_str、output_dir、news_top_count），以独立参数形式传入 `generate_all_llm()` 而非通过 f_context。Pre-Schema 文档必须同时覆盖两个通道的键定义，避免后续混淆。** 每个键标注：类型、所属通道（f_context / prep）、必选/可选标记、写入模块、消费模块、写入管线阶段。
@@ -344,10 +344,10 @@
 
 ### P1-21: f_context Schema 文档——Phase 1 Full Schema 补充 + 校验层扩展
 - **估时**: 6h（Pre-Schema 2h 已由 T0-01-B 完成，此处仅补充 Phase 1 新增键的 Full Schema 定义）
-- **文件**: `docs-stm/plan/better-investment-advice/f_context-schema.md`（扩展 Full Schema 章节）、`src/python/report/orchestrator.py`（校验层扩展）
+- **文件**: `docs-stm/plan/better-investment-advice/data-channels-schema.md`（扩展 Full Schema 章节）、`src/python/report/orchestrator.py`（校验层扩展）
 - **阻塞**: 否
 - **依赖**: P1-06, P1-07, P1-08
-- **描述**: T0-01-B 已完成 Pre-Schema（现有管线键的定义 + 初始类型断言）。本任务在 Pre-Schema 基础上补充 Full Schema：(1) 在 f_context-schema.md 中追加 Phase 1 新增键的定义（risk_metrics、portfolio_daily_returns、data_degradation、feature_flags 等约 8 个键），与 Pre-Schema 合并在同一文档中，用"Phase"列区分归属；(2) 扩展 orchestrator 中的类型断言 checkpoint 覆盖这些新键；(3) f_context-schema.md 纳入项目文档，每次新增 f_context 键时必须同步更新。
+- **描述**: T0-01-B 已完成 Pre-Schema（现有管线键的定义 + 初始类型断言）。本任务在 Pre-Schema 基础上补充 Full Schema：(1) 在 data-channels-schema.md 中追加 Phase 1 新增键的定义（risk_metrics、portfolio_daily_returns、data_degradation、feature_flags 等约 8 个键），与 Pre-Schema 合并在同一文档中，用"Phase"列区分归属；(2) 扩展 orchestrator 中的类型断言 checkpoint 覆盖这些新键；(3) data-channels-schema.md 纳入项目文档，每次新增 f_context 键时必须同步更新。
 
 ### P1-22: analysis/ 层定位与模块依赖规范
 - **估时**: 12h（含 8h category.py 提取到 code_utils.py + 2h technical.md/folders.md 更新 + 2h 验证所有消费点导入路径变更）
@@ -629,7 +629,7 @@
 - **文件**: `src/test/scenario/test_e2e_perf.py`（新建）
 - **阻塞**: 否
 - **依赖**: P2-08（metrics 完备）、P3-06（再平衡完备）、P4-03（情景分析完备）
-- **描述**: 模拟 20 品种 + 3 年历史的完整持仓，运行全量报告生成（Excel + HTML + LLM），计时并记录：(1) 总耗时（目标 < 60s）；(2) 各阶段耗时分布；(3) 缓存命中率；(4) LLM Token 消耗（计数）。失败条件：总耗时 > 120s。结果输出到 `docs-stm/tmp/perf-report.md`。
+- **描述**: 模拟 20 品种 + 3 年历史的完整持仓，运行全量报告生成（Excel + HTML + LLM），计时并记录：(1) 总耗时（目标 < 60s）；(2) 各阶段耗时分布；(3) 缓存命中率；(4) LLM Token 消耗（计数）。失败条件：总耗时 > 120s。结果输出到 `docs-stm/plan/better-investment-advice/better-investment-performance-test-report.md`。
 
 ### P4-15: 链韧性测试
 - **估时**: 12h（含 6h 级联故障/长时间恢复/持久化恢复三种测试场景 + 4h 跨会话熔断恢复验证 + 2h 报告生成）

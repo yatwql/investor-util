@@ -12,7 +12,7 @@ A 通道（f_context）流向：
 B 通道（prep）流向：
   prepare_report_data() → f_context_builder.build_prep() → LLM / Excel
 
-C19 约束：所有键必须先在 f_context-schema.md 中注册。
+C19 约束：所有键必须先在 data-channels-schema.md 中注册。
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ def _validate_keys(data: dict, known_keys: set[str], label: str) -> None:
     """
     for k in data:
         if k not in known_keys:
-            logger.warning("[f_context] %s 包含未知键 '%s'，请先在 f_context-schema.md 注册", label, k)
+            logger.warning("[f_context] %s 包含未知键 '%s'，请先在 data-channels-schema.md 注册", label, k)
 
 
 def _assert_type(value: Any, expected: type | tuple[type, ...], key: str) -> None:

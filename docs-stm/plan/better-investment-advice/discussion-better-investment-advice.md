@@ -281,7 +281,7 @@ LLM 据此输出："你的组合在牛市中略跑赢指数，且回撤控制优
    - **替代源（已验证可用）**：`bond_zh_us_rate`（akshare/Sina 财经）→ **50/50 稳定性 100%**，中国 10Y 国债收益率最新值 **1.7404%**，覆盖 2002-2026 共 6129 条日线
    - 备用源 `worldgovernmentbonds.com` → **JS 渲染不可直接解析**
    - 解耦：`bond_zh_us_rate` 自动获取（主）+ 用户手动配置 Rf 值（兜底）
-   - 详见测试报告 `rf-and-885005-test-report.md`
+   - 详见测试报告 `data-source-stability-test-report.md`
 
 Rf 数据源一致性策略（简化）：`bond_zh_us_rate` 单源获取，每次请求自动校验数据结构完整性（13 列字段名不变）。若连续 3 次请求失败，激活手动配置兜底。
 

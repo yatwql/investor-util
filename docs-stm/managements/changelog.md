@@ -129,7 +129,7 @@
 ### Added
 - **P2 全部 10 项任务完成（Tier 0 + MVP）**：
   - **T0-01-A**: DegradationTracker get_log() + 6 处 fetcher 层 record() + get_tracker() 单例工厂，消除三重实例碎片化
-  - **T0-01-B**: f_context Pre-Schema 文档（`f_context-schema.md`）+ 删除 2 个死键 + 类型断言 checkpoint
+  - **T0-01-B**: f_context Pre-Schema 文档（`data-channels-schema.md`）+ 删除 2 个死键 + 类型断言 checkpoint
   - **T0-01**: DegradationTracker→LLM 接线，注入 f_context["data_degradation"]
   - **T0-02**: 健康检查 3 类→5 类（新增数据质量维度评分标准）
   - **MVP-01**: `_build_profit_attribution_block()` TOP 5 收益归因（正负分别列出，Σ|profit|=0 保护）
@@ -145,7 +145,7 @@
   - worldgovernmentbonds.com 确认 JS 渲染不可直接抓取
   - 885005 确认为 Wind（万得）专属代码，12 个公开数据源均不可获取
   - CSI 替代指数（930950/932055/931255）同样不可用
-- **测试报告归档**：`docs-stm/plan/better-investment-advice/rf-and-885005-test-report.md`
+- **测试报告归档**：`docs-stm/plan/better-investment-advice/data-source-stability-test-report.md`
 
 ### Changed
 - **设计文档全面更新**：plan.md、better-investment-task.md、discussion-better-investment-advice.md 同步 PRE 测试结论

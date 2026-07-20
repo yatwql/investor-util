@@ -8,13 +8,13 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-> | 主程序代码 | Python | 123 | 28,170 | `src/python/` 下所有 `.py`（不含测试） |
-> | HTML 报告模板 | HTML | 1 | 1,750 | `src/python/tmpl/report_template.html` |
-> | 辅助脚本 | Python/Shell | 6 | 1,739 | `scripts/`（启动脚本、测试驱动、工具检查） |
-> | **源代码合计** | — | **129** | **31,659** | 主程序 + 模板 + 脚本 |
-> | **测试代码** | Python | **159** | **50,650** | `src/test/` 所有 `.py` 文件 |
-> | **测试用例** | — | — | **3,449 个** | `pytest --collect-only` 统计 |
-> | **用户文档** | Markdown | **67** | **31,523** | `docs-stm/`（65 文件）+ `README.md` + `CLAUDE.md` |
+| 主程序代码 | Python | 141 | 35,949 | `src/python/` 下所有 `.py`（不含测试） |
+| HTML 报告模板 | HTML | 1 | 1,749 | `src/python/tmpl/report_template.html` |
+| 辅助脚本 | Python/Shell | 8 | 2,364 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试） |
+| **源代码合计** | — | **150** | **40,062** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **168** | **53,155** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,484 个** | `pytest --collect-only` 统计 |
+| **用户文档** | Markdown | **71** | **34,145** | `docs-stm/`（69 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
 
@@ -202,6 +202,8 @@ investor-util/
 │   ├── test_runner.py                #   测试驱动（pytest 模式封装）
 │   ├── check-test-markers.py         #   测试标记合规检查
 │   ├── check-version-consistency.py  #   版本号一致性检查
+│   ├── calibrate-dedup-threshold.py  #   新闻去重阈值校准
+│   ├── perf_report.py               #   端到端性能基准测试
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 │
 ├── docs-stm/                         # 项目文档
@@ -230,8 +232,8 @@ investor-util/
 │   │   ├── better-investment-advice/            #   投资建议改进分析讨论
 │   │   │   ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
 │   │   │   ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
-│   │   │   ├── f_context-schema.md              # f_context Pre-Schema 文档（管线键定义+类型断言）
-│   │   │   └── rf-and-885005-test-report.md              # Rf & 885005 数据源稳定性专项测试报告
+│   │   │   ├── data-channels-schema.md            # 数据通道 Schema 文档（管线键定义+类型断言）
+│   │   │   └── data-source-stability-test-report.md       # 数据源稳定性专项测试报告
 
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档

@@ -55,7 +55,7 @@
 | 71 | **bond_yield 测试用例（edge 场景）** | 🆕 | 4h | ←收益率 | 负数收益率/字符串 NaN/双源差异>0.5%/连续 10 次失败→熔断，`@pytest.mark.edge` |
 | 72 | **再平衡测试用例完善** | 🆕 | 8h | ←再平衡 | 无超限/单品种超限/权益偏离/误报防护/静默期/阈值可配，含 edge 文件隔离 |
 | 73 | **测试标记注册与集成门禁** | 🆕 | 4h | ←edge 测试 | 注册新 marker + `pytest_collection_modifyitems` edge 校验 + `testplan.md` 更新 |
-| 74 | **端到端性能测试** | 🆕 | 12h | ←指标+再平衡+CI | 20 品种+3 年历史，全量报告生成，目标 <60s，`docs-stm/tmp/perf-report.md` |
+| 74 | **端到端性能测试** | 🆕 | 12h | ←指标+再平衡+CI | 20 品种+3 年历史，全量报告生成，目标 <60s，`docs-stm/plan/better-investment-advice/better-investment-performance-test-report.md` |
 | 75 | **链韧性测试** | 🆕 | 12h | ←故障注入 | 多数据源故障/长时间恢复/熔断持久化恢复，三种场景各至少一个断言 |
 | 76 | **安全测试** | 🆕 | 12h | ←缓存审查 | 密钥/缓存/匿名化/API 日志/HTML 路径 5 项安全基线验证 |
 

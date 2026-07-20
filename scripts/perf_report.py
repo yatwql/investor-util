@@ -8,7 +8,7 @@
   python scripts/perf_report.py
 
 输出：
-  docs-stm/plan/better-investment-advice/perf-report.md
+  docs-stm/tmp/better-investment-performance-test-report.md
 
 目标：
   - basic 模式总耗时 < 60s
@@ -38,10 +38,9 @@ _20_HOLDINGS_COUNT = 20
 _REPORT_OUTPUT_DIR = os.path.join(
     _PROJECT_ROOT,
     "docs-stm",
-    "plan",
-    "better-investment-advice",
+    "tmp",
 )
-_PERF_REPORT_PATH = os.path.join(_REPORT_OUTPUT_DIR, "perf-report.md")
+_PERF_REPORT_PATH = os.path.join(_REPORT_OUTPUT_DIR, "better-investment-performance-test-report.md")
 
 
 # ── 持仓生成 ─────────────────────────────────────
