@@ -4,7 +4,7 @@
 
 ---
 
-## [Unreleased]
+## [0.7.4] - 2026-07-20
 
 ### Added
 - **P1 基建 20 项全部完成（v0.7.4）**：
@@ -83,6 +83,19 @@
 - **P3-12-T: 流动性风险测试（场外）**：
   - `test_liquidity_otc.py` 8 项正常场景（配置限额/未配置/高限额当日/空字典/无OTC/零上限）
   - `test_liquidity_otc_edge.py` 3 项 edge 场景（巨额赎回/混合配置/零市值跳过），C12 edge 文件隔离合规
+- **P3-13: 汇率敞口——货币分类修复**：
+  - `src/python/analysis/fx_exposure.py` 新增 `fx_exposure(holdings) → dict`，基于 `code_utils.get_currency_by_code()` 按币种（CNY/HKD/USD）汇总市值占比
+  - `prompts_tables.py` 新增 `_build_fx_exposure_block()` 格式化块，注入 `expert_review` prompt
+  - `_calc_country_exposure()` 改为使用 `get_currency_by_code()` 统一判定逻辑
+  - `registry.py analytics_fx_exposure` 状态 "planned" → "implemented"，去除 `bond_yield` 依赖
+  - `analysis/__init__.py` 导出 `fx_exposure`
+  - 12 项单元测试全部通过（正常/edge/prompt 构建）
+- **P3-17: LLM Token 成本追踪与预算**：
+  - `src/python/llm/cost_tracker.py` 新增：报告级 8K Token 预算（`reset_budget()`/`check_input_budget()`）、成本摘要格式化（`get_cost_summary()`）
+  - `session.py` `record_per_module()` 增加 `duration` 字段，记录 API 调用耗时
+  - `skeleton.py` `generate_llm_content()` 增加 `time.monotonic()` 计时，`_finalize_and_cache()` 页脚显示耗时
+  - 9 项单元测试全部通过（预算管理/摘要格式化/耗时记录）
+- **P3-16: LLM 事实锚定校验器（纯算法层）**：`llm/fact_checker.py` 新增三个校验函数——数值一致性（提取百分比与持仓实际收益率对比）、品种存在性（校验引用的证券代码是否在持仓中）、排名正确性（验证"最大持仓"等排序断言）。报告末尾追加校验摘要（绿色通过/黄色告警）。注册到 `_COMPUTATION_REGISTRY` 为 `analytics_fact_checker`。38 项单元测试覆盖正常/异常/边缘场景
 
 ### Changed
 - **代码注释历史痕迹清理**：移除所有 P1-XX/P2-XX 任务标签（metrics.py、drawdown_warning.py、fingerprint.py、generators_orchestrator.py、prompts_action.py、prompts_core.py、prompts_tables.py、circuit_breaker.py、bond_yield.py、registry.py、orchestrator.py 等共 ~60 处），保持代码当前状态描述
@@ -91,8 +104,12 @@
 - **Phase 3 全部 18 项任务（P3-01~P3-17）和 Phase 4 全部 17 项任务（P2-11b、P4-01~P4-16）提升至 P2 优先级**：所有任务从 `better-investment-task.md` 的 Phase 3/4 移至 `plan.md` 的 P2 待办区
 
 ### Docs
-- `plan.md`: P1 阶段 39 项任务全部标记完成并从待办表移除，仅保留完成摘要
+- `plan.md`: P1 阶段 39 项任务全部标记完成并从待办表移除（2 处：P1 整节删除 + Phase 3 已完成 14 项移除）；Phase 3 合计估时从 ~206h 更新为 ~84h
 - `better-investment-task.md`: Phase 2/3/4 头部添加迁移告示；Phase 2 已实现任务标记完成
+- `changelog.md`: 本次变更记录
+- `plan.md`: P3-13/P3-17 标记完成并从 Phase 3 待办表移除；P3-15 取消；Phase 3 待办仅剩 P3-16（24h）；P2 合计从 ~220h 更新为 ~200h
+- `better-investment-task.md`: P3-13/P3-17 标记完成；P3-15 标记取消；Phase 5 依赖关系更新
+- `discussion-better-investment-advice.md`: Phase 3 待办状态更新（P3-01~P3-13 + P3-17 ✅，P3-15 ❌，P3-16 ⏳）
 - `changelog.md`: 本次变更记录
 
 ---

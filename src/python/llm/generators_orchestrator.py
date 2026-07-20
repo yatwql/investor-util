@@ -32,6 +32,7 @@ from src.python.llm.fingerprint import (
     compute_fingerprint,
     get_cache_ttl_llm,
 )
+from src.python.llm.fact_checker import run_fact_check
 from src.python.llm.generators import (
     generate_expert_review,
     generate_global_macro,
@@ -595,6 +596,26 @@ def generate_all_llm(
     er_r, er_c = _get("expert_review")
     hc_r, hc_c = _get("health_check")
     pd_r, pd_c = _get("penetration_deep")
+
+    # ── 事实锚定校验 ──────────────────────────────────────
+    # 对已生成的 LLM 内容运行纯算法层事实校验，追加校验摘要到 HTML 底部。
+    # 仅检查非缓存且非空的模块（缓存命中说明内容未变化，无需重复校验）。
+    _module_labels = {"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘",
+                      "health_check": "持仓体检报告", "penetration_deep": "穿透深度分析"}
+    if holdings_details and any(r is not None for r in (gm_r, er_r, hc_r, pd_r)):
+        for _mk, _result in [("global_macro", gm_r), ("expert_review", er_r),
+                             ("health_check", hc_r), ("penetration_deep", pd_r)]:
+            if _result:
+                _summary = run_fact_check(_result, holdings_details, _module_labels.get(_mk, _mk))
+                if _summary and _summary not in _result:
+                    if _mk == "global_macro":
+                        gm_r = _result + "\n" + _summary
+                    elif _mk == "expert_review":
+                        er_r = _result + "\n" + _summary
+                    elif _mk == "health_check":
+                        hc_r = _result + "\n" + _summary
+                    elif _mk == "penetration_deep":
+                        pd_r = _result + "\n" + _summary
 
     logger.info(
         "LLM 生成完成: %s=%s, %s=%s, %s=%s, %s=%s",

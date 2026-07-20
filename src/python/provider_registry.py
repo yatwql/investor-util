@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -138,8 +139,9 @@ class DataSourceRegistry:
         if getattr(self, "_initialized", False):
             return
         # 双锁：熔断操作和缓存操作不互相阻塞
-        self._provider_lock = threading.Lock()
-        self._cache_lock = threading.Lock()
+        # 用 RLock 因为 record_failure()/record_success() 在持锁中调用 _save_state()
+        self._provider_lock = threading.RLock()
+        self._cache_lock = threading.RLock()
         self._providers: dict[str, ProviderState] = {}
         self._session_cache: dict[str, dict[str, SessionCacheEntry]] = {}
         self._chains: dict[str, list[str]] = {}

@@ -521,13 +521,13 @@ class TestCalcCountryExposure(unittest.TestCase):
         combined = " ".join(result)
         self.assertIn("A股", combined)
 
-    def test_no_prefix_code_is_other(self):
-        """无交易所前缀且非 A 股数字特征的代码归属为其他。"""
+    def test_no_prefix_code_is_cny_by_default(self):
+        """无交易所前缀代码默认按 CNY 归属为 A 股。"""
         from src.python.llm.prompts import _calc_country_exposure
         details = [{"code": "900900", "market_value": 50_000}]
         result = _calc_country_exposure(details)
         combined = " ".join(result)
-        self.assertIn("其他", combined)
+        self.assertIn("A股", combined)
 
 
 @pytest.mark.unit_llm

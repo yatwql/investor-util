@@ -37,6 +37,7 @@ from src.python.analysis.drawdown_warning import (  # noqa: F401
     current_drawdown_percentile,
 )
 from src.python.analysis.liquidity import check_liquidity  # noqa: F401
+from src.python.analysis.fx_exposure import fx_exposure  # noqa: F401
 
 __all__ = [
     "compute_rebalance_signals",
@@ -58,4 +59,5 @@ __all__ = [
     "rolling_max_drawdown",
     "current_drawdown_percentile",
     "check_liquidity",
+    "fx_exposure",
 ]

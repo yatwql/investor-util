@@ -149,8 +149,9 @@ def record_per_module(
     cost: float = 0.0,
     endpoint: str = "",
     cache_hit_tokens: int = 0,
+    duration: float = 0.0,
 ) -> None:
-    """按模块记录本次 LLM 调用的模型、Token 用量、缓存/Thinking/费用/Endpoint。"""
+    """按模块记录本次 LLM 调用的模型、Token 用量、耗时、缓存/Thinking/费用/Endpoint。"""
     with _session_lock:
         pm = _session_usage.setdefault("per_module", {})
         if module_key not in pm:
@@ -163,12 +164,14 @@ def record_per_module(
                 "cost": 0.0,
                 "endpoint": endpoint,
                 "cache_hit_tokens": 0,
+                "duration": 0.0,
             }
         entry = pm[module_key]
         entry["input_tokens"] += inp
         entry["output_tokens"] += out
         entry["cost"] += cost
         entry["cache_hit_tokens"] += cache_hit_tokens
+        entry["duration"] += duration
         if model_name:
             entry["model"] = model_name
         if endpoint:

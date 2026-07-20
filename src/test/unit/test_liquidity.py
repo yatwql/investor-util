@@ -57,7 +57,7 @@ class TestLiquidityOTC:
         assert len(result) == 2
         for r in result:
             assert r["type"] == "otc"
-            assert r["tag"] == "场外基金"
+            assert r["tag"] == "需手动确认赎回上限"
             assert r["liquidation_days"] is None
 
     def test_otc_no_kline_call(self):

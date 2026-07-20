@@ -23,6 +23,7 @@ from src.python.llm.prompts_core import (
 )
 from src.python.llm.prompts_tables import (
     _calc_country_exposure,
+    _build_fx_exposure_block,
     _format_holdings_block,
     _format_penetration_block,
     _build_metrics_table_block,
@@ -135,6 +136,7 @@ def _build_expert_review_prompt(
     attribution_text = _build_profit_attribution_block(holdings_details)
     concept_text = _build_concept_sector_block(penetrated_assets)
     rebalance_text = _build_rebalance_block(holdings_details, total_mv)
+    fx_text = _build_fx_exposure_block(holdings_details)
 
     parts = [
         f"【当前时间】{now_bj}（北京时间）",
@@ -152,6 +154,8 @@ def _build_expert_review_prompt(
         parts.append(concept_text)
     if rebalance_text:
         parts.append(rebalance_text)
+    if fx_text:
+        parts.append(fx_text)
     if competitive_context:
         parts.append(competitive_context)
     # 量化指标表格

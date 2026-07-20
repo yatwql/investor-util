@@ -431,10 +431,10 @@ class TestGetReportSectionOrder:
 class TestComputationRegistry:
     """计算模块注册表测试。"""
 
-    def test_registry_has_6_modules(self):
-        """_COMPUTATION_REGISTRY 有 6 个预留模块。"""
+    def test_registry_has_7_modules(self):
+        """_COMPUTATION_REGISTRY 当前有 7 个注册模块。"""
         reg = get_computation_registry()
-        assert len(reg) == 6
+        assert len(reg) == 7
 
     def test_all_modules_have_module_key(self):
         """每个模块必须有 module_key。"""
@@ -471,10 +471,10 @@ class TestComputationRegistry:
         assert "bond_yield" in m.dependencies
         assert "history" in m.dependencies
 
-    def test_all_modules_status_planned(self):
-        """所有模块初始状态为 planned。"""
+    def test_all_modules_status_valid(self):
+        """所有模块状态为 planned 或 implemented。"""
         for m in get_computation_registry():
-            assert m.status == "planned", f"{m.module_key} 状态应为 planned，实际 {m.status}"
+            assert m.status in ("planned", "implemented"), f"{m.module_key} 状态 {m.status} 不合法"
 
     def test_comput_module_def_is_frozen(self):
         """ComputModuleDef 应为不可变。"""

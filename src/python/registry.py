@@ -406,9 +406,9 @@ _COMPUTATION_REGISTRY: tuple[ComputModuleDef, ...] = (
         name="外汇敞口分析",
         module_key="analytics_fx_exposure",
         label="外汇",
-        dependencies=("bond_yield",),
+        dependencies=(),
         description="A股/港股/美股 国别分布与外汇风险敞口判断",
-        status="planned",
+        status="implemented",
     ),
     ComputModuleDef(
         name="情景分析",
@@ -433,6 +433,14 @@ _COMPUTATION_REGISTRY: tuple[ComputModuleDef, ...] = (
         dependencies=(),
         description="从持仓结构推断用户风险偏好与投资风格",
         status="planned",
+    ),
+    ComputModuleDef(
+        name="事实锚定校验器",
+        module_key="analytics_fact_checker",
+        label="事实校验",
+        dependencies=(),
+        description="LLM 输出的事实锚定校验：数值一致性、品种存在性、排名正确性（纯算法层）",
+        status="implemented",
     ),
 )
 

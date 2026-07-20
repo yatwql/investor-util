@@ -1,6 +1,6 @@
 # LLM 集成层技术设计
 
-> 文档版本：v0.6.10-dev
+> 文档版本：v0.7.4
 
 ## 目录
 
@@ -83,14 +83,19 @@
               │ prompts_action.py│          │ 稳定性字段提取      │
               │ （原 prompts.py） │          │ 风险信号摘要        │
               └──────────────────┘          └────────────────────┘
-              ┌──────────────┐              ┌────────────────────┐
-              │ session.py   │              │ pricing.py         │
-              │ 会话用量累计  │              │ 模型定价/费用估算  │
-              └──────────────┘              └────────────────────┘
-              ┌──────────────┐              ┌────────────────────┐
-              │ markdown.py  │              │ circuit_breaker.py │
-              │ MD→HTML 转换 │              │ LLM 端点熔断器      │
-              └──────────────┘              └────────────────────┘
+              ┌──────────────────┐              ┌────────────────────┐
+              │ session.py       │              │ pricing.py         │
+              │ 会话用量累计      │              │ 模型定价/费用估算  │
+              └──────────────────┘              └────────────────────┘
+              ┌──────────────────┐          ┌────────────────────┐
+              │ cost_tracker.py  │          │ markdown.py        │
+              │ Token预算/摘要   │          │ MD→HTML 转换       │
+              └──────────────────┘          └────────────────────┘
+              ┌──────────────────┐
+              │ circuit_breaker  │
+              │ .py              │
+              │ LLM 端点熔断器    │
+              └──────────────────┘
 ```
 
 **调用链（API 调用流程）**：
@@ -146,6 +151,7 @@ skeleton.py:_generate_llm_content()
 | `prompts_action.py` | 工具 | 行动建议表格/诊断结论格式化（拆分自 prompts.py） | `_build_action_table()` / `_build_diagnosis_block()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `_compute_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `reset_session_usage()` |
+| `cost_tracker.py` | 工具 | Token 预算管理、输入检查、成本摘要格式化（compact/verbose） | `reset_budget()` / `get_cost_summary()` |
 | `pricing.py` | 工具 | 模型定价合并、费用估算 | `_estimate_cost()` |
 | `circuit_breaker.py` | 工具 | LLM 端点熔断器（3 次/60s） | `_cb_is_open()` |
 | `markdown.py` | 工具 | Markdown→HTML 转换 | `_markdown_to_html()` |
@@ -814,9 +820,24 @@ _session_usage = {
     "model": "未指定",           # 最后使用的模型
     "models": [],               # 去重模型列表
     "call_count": 0,            # API 调用次数（缓存命中不计入）
-    "per_module": {},           # 按模块细分
+    "per_module": {},           # 按模块细分（含 duration 字段）
 }
 ```
+
+`llm/cost_tracker.py` 在前者之上提供 Token 预算管理：
+
+| 函数 | 职责 |
+|:-----|:------|
+| `reset_budget(input_budget)` | 每份报告开始时重置预算状态 |
+| `check_input_budget(module, input_tokens)` | 调用前检查是否超预算 |
+| `get_budget_status()` | 查询当前预算使用情况 |
+| `get_cost_summary(for_report=True)` | 生成成本摘要文本（compact/verbose 模式） |
+
+### 9.1a duration 字段
+
+`record_per_module()` 新增 `duration: float = 0.0` 参数，记录每个模块的 API 调用耗时（秒）。`skeleton.py` 中 `generate_llm_content()` 通过 `time.monotonic()` 计时，调用 `call_llm()` 前后计算耗时，传入 `_finalize_and_cache()` 后写入 `per_module` 的 `"duration"` 键。多条缓存路径（首次生成 + 截断重试）的耗时通过 `duration` 字段累计。
+
+HTML 报告页脚自动显示每个模块的耗时（`耗时: X.Xs`），便于识别慢模块。
 
 ### 9.2 数据收集来源
 
@@ -825,8 +846,11 @@ _precheck_one_cache() -> 缓存命中
     → _record_per_module(key, model, cached=True, ...)
 
 _generate_llm_content() -> API 调用成功
+    → time.monotonic() 计时开始
     → _track_session_usage(provider, usage, model_name)
     → _record_per_module(key, model, inp, out, cost, ...)
+    → duration = time.monotonic() - start
+    → _finalize_and_cache(..., duration=duration) ← 页脚显示耗时
 
 enhance_news_correlation() -> 新闻关联完成
     → _finalize_news_token_usage()
@@ -861,7 +885,10 @@ _session_usage ──→ format_session_usage()
                      │
                      ├──→ Excel 报告 (excel_llm_usage.py)
                      ├──→ HTML 报告 (html_writer.py + template)
-                     └──→ TUI 终端 (tui_handlers.py)
+                     │     页脚附加每个模块的 duration（耗时）
+                     ├──→ TUI 终端 (tui_handlers.py)
+                     └──→ cost_tracker.get_cost_summary(for_report=True)
+                            compact 模式一行摘要 / verbose 模式模块级明细
 ```
 
 [↑ 回到顶部](#目录)

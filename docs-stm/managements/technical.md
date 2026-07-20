@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.7.4-dev
+> 文档版本：v0.7.4
 
 ## 目录
 
@@ -202,7 +202,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **注册** | 中央注册表 | 数据模块 + 报告模块注册 | `registry.py` |
 | **数据获取** | 数据源注册中心 | 熔断器、会话缓存、策略、审计 | `provider_registry.py` |
 | **数据获取** | Fetcher 调度 | Provider Chain 路由、数据获取 | `fetcher/price.py` 等 |
-| **数据获取** | 数据源 Provider | 外部 API 封装（14 个文件） | `providers/*.py` |
+| **数据获取** | 数据源 Provider | 外部 API 封装（16 个文件） | `providers/*.py` |
 | **缓存** | 缓存引擎 | 泛用 JSON KV、TTL、指纹、分组 | `cache/` |
 | **缓存** | 缓存操作共享层 | TUI/CLI 共用的业务级缓存操作 | `cache/operations.py` |
 | **编排** | 报告编排器 | 数据准备 → 管线编排 | `report/orchestrator.py` |
@@ -1248,7 +1248,7 @@ get_report_section_order(config)
     ▼
 ┌────────────────────────┐
 │ config 中有             │
-│ report_section_order?  │── NO ──→ 返回完整 18 项默认顺序
+│ report_section_order?  │── NO ──→ 返回完整 17 项默认顺序
 └───────────┬────────────┘
            YES
             │
@@ -1266,7 +1266,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（18 项，key/number/type/data_flag）
+返回 result（17 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -1814,7 +1814,9 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 | Prompt Caching | Anthropic 专属，system prompt 数组 + `cache_control: ephemeral` | 5 分钟内复用免全价 |
 | 截断重试 | 检测 `TRUNCATION_MARKER` 后自动 1.5× max_tokens 重试一次 | 修复内容被截断的情况 |
 | 内容过滤安抚 | 空返回时追加安抚指令重试 | 应对内容审查误杀 |
-| 会话用量追踪 | `session.py` 维护线程安全 `session_usage` 字典 | 按模块粒度追踪 token/费用/缓存命中 |
+| 会话用量追踪 | `session.py` 维护线程安全 `session_usage` 字典 + `cost_tracker.py` 报告级预算管理 | 按模块粒度追踪 token/费用/缓存命中/耗时 |
+| Token 预算告警 | `cost_tracker.check_input_budget()` — 累计输入 Token 超 8K 时日志告警（不截断） | 为模型分层提供基线数据 |
+| 调用耗时记录 | `skeleton.py` `time.monotonic()` 计时 → `record_per_module(duration=)` → HTML 页脚展示 | 每次 call_llm() 记录实际耗时 |
 | LLM 熔断 | `llm/circuit_breaker.py` — 连续 N 次失败 → 60s 冷却 → 半开状态试探 | 防止无效调用浪费 token |
 | 指纹缓存 | `fingerprint.py` — 依赖数据指纹过滤（排除行情波动字段） | 仅品种/份额/成本变化时重新调用 |
 | 乐观缓存预检 | 从 Provider 链中取链首 Provider 优先检查缓存，命中即返回 | 减少链遍历开销 |
@@ -1903,7 +1905,19 @@ class ComputModuleDef:
     status: str         # planned / implemented
 ```
 
-当前注册 6 个计算模块（analytics_metrics、analytics_liquidity、analytics_rebalance、analytics_fx、analytics_scenario、analytics_beta），支持依赖管理和指标级断路。计算模块与报表层保持单向依赖，禁止反向导入 report/。
+当前注册 7 个计算模块：
+
+| module_key | name | 状态 | 说明 |
+|:-----------|:-----|:----:|:-----|
+| `analytics_metrics` | 量化指标计算 | ✅ | 夏普比率、卡玛比率、HHI 集中度、组合 Beta、持仓胜率、换手率、波动率、最大回撤 |
+| `analytics_liquidity` | 流动性分析 | ✅ | 场内/场外比例、停牌风险、基金封闭期分析 |
+| `analytics_fx_exposure` | 外汇敞口分析 | ✅ | A股/港股/美股 国别分布与外汇风险敞口判断 |
+| `analytics_fact_checker` | 事实锚定校验器 | ✅ | LLM 输出的事实校验：数值一致性、品种存在性、排名正确性（纯算法层） |
+| `analytics_scenario` | 情景分析 | ⏳ | 市场涨跌 20% 情景模拟 |
+| `analytics_alignment` | 组合校准分析 | ⏳ | 持仓与目标偏差分析 |
+| `analytics_inferrer` | 用户画像推断 | ⏳ | 持仓结构→风险偏好推断 |
+
+计算模块与报表层保持单向依赖，禁止反向导入 report/。
 
 #### 派生产出接口
 
@@ -2181,7 +2195,7 @@ investor-util/
 │   │   ├── code_utils.py        # 代码类型判定中心化
 │   │   ├── config/              # 配置管理子包（_config_defaults / _comments / _core）
 │   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
-│   │   ├── features.py          # 功能开关注册表（18 项 Feature Flag）
+│   │   ├── features.py          # 功能开关注册表（25 项 Feature Flag）
 │   │   ├── fetcher/             # 数据获取调度（price/index/fund/industry/chain/akshare/bond_yield）
 │   │   ├── handlers_cache.py    # TUI 缓存管理命令（薄壳委托 operations）
 │   │   ├── handlers_config.py   # TUI 配置管理命令
@@ -2361,7 +2375,7 @@ investor-util/
 | llm_status | str | 是 | 已实现 | generate_all_llm |
 | rebalance_signals | list[dict] | 是 | 已实现 | prepare_report_data |
 | liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
-| fx_exposure | dict | 是 | 计划中 | capture_snapshot |
+| fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
 | scenario_analysis | dict | 是 | 计划中 | prepare_report_data |
 
 [↑ 回到顶部](#目录)

@@ -2,8 +2,7 @@
 
 主源：akshare bond_zh_us_rate() → 中国 10Y 国债收益率；
 手动兜底：config.json risk_free_rate 字段（非 None 时跳过 fetcher）。
-"""
-  - 缓存：成功结果缓存 1 天，避免重复 akshare 调用
+缓存：成功结果缓存 1 天，避免重复 akshare 调用。
 
 返回值为小数（如 0.017404 代表 1.7404%），可直接用于夏普比率等计算。
 返回值可能为 None（数据源不可用且无手动配置）。

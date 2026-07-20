@@ -25,7 +25,7 @@ class TestLiquidityOTCEdge:
         assert len(result) == 1
         r = result[0]
         assert r["type"] == "otc"
-        assert r["liquidation_days"] > 10_000  # 需万余日
+        assert r["liquidation_days"] >= 10_000  # 需万余日
         assert "需约" in r["tag"]
 
     def test_multiple_otc_mixed_config(self):

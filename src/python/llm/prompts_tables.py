@@ -13,7 +13,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.python.code_utils import is_a_share_code, is_hk_stock_code
+from src.python.analysis.fx_exposure import fx_exposure as _fx_exposure
+from src.python.code_utils import get_currency_by_code, is_a_share_code, is_hk_stock_code
 from src.python.llm.prompts_core import _fmt_holding_line, _fmt_wan
 
 logger = logging.getLogger("invest")
@@ -62,18 +63,24 @@ def _format_penetration_block(penetrated_assets: list[dict] | None, limit: int =
 
 
 def _calc_country_exposure(holdings_details: list[dict] | None) -> list[str]:
-    """从持仓明细计算国别/币种分布，返回格式化行列表。"""
+    """从持仓明细计算国别/币种分布，返回格式化行列表。
+
+    使用 code_utils.get_currency_by_code() 统一判定逻辑，
+    确保与 fx_exposure.py 的判定结果一致。
+    """
     exposure: dict[str, float] = {}
     if holdings_details:
         for h in holdings_details:
+            name = h.get("name", "")
             code = h.get("code", "")
             mv = h.get("market_value", 0)
 
-            if is_a_share_code(code):
+            currency = get_currency_by_code(name, code)
+            if currency == "CNY":
                 country = "A股"
-            elif is_hk_stock_code(code):
+            elif currency == "HKD":
                 country = "港股"
-            elif code.upper().endswith(".US"):
+            elif currency == "USD":
                 country = "美股"
             else:
                 country = "其他"
@@ -194,6 +201,32 @@ def _build_data_quality_detail_block(degradation_events: list[dict] | None) -> s
     return "\n".join(lines)
 
 
+def _build_fx_exposure_block(holdings_details: list[dict] | None) -> str:
+    """构建汇率敞口文本块，供 expert_review prompt 注入。
+
+    调用 fx_exposure() 计算币种分布后格式化为易读文本，
+    包含人民币/港币/美元占比摘要。
+    """
+    result = _fx_exposure(holdings_details)
+    if not result or not result.get("exposures"):
+        return ""
+
+    lines = ["【币种敞口分布】"]
+    for e in result["exposures"]:
+        mv_str = _fmt_wan(e["total_mv"])
+        lines.append(f"{e['label']}: {e['pct']:.1f}%（市值{mv_str}）")
+
+    if result["hkd_suffix"]:
+        lines.append(f"*{result['hkd_suffix']}")
+
+    # 非人民币资产占比
+    foreign_pct = sum(e["pct"] for e in result["exposures"] if e["currency"] != "CNY")
+    if foreign_pct > 0:
+        lines.append(f"非人民币资产合计占比 {foreign_pct:.1f}%，存在汇率波动风险。")
+
+    return "\n".join(lines)
+
+
 # ═══════════════════════════════════════════════════════════
 #  新闻关联分析
 # ═══════════════════════════════════════════════════════════
@@ -274,6 +307,7 @@ __all__ = [
     "_format_holdings_block",
     "_format_penetration_block",
     "_calc_country_exposure",
+    "_build_fx_exposure_block",
     "_build_holdings_summary",
     "_build_news_correlation_summary",
     "_build_metrics_table_block",
