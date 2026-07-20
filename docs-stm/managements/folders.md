@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.7.6-dev
+> 文档版本：v0.7.7-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -10,7 +10,7 @@
 > |---|---|---|---|---|
 | 主程序代码 | Python | 141 | 35,949 | `src/python/` 下所有 `.py`（不含测试） |
 | HTML 报告模板 | HTML | 1 | 1,749 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python/Shell | 8 | 2,364 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试） |
+| 辅助脚本 | Python/Shell | 9 | 2,364 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
 | **源代码合计** | — | **150** | **40,062** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **168** | **53,155** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **3,484 个** | `pytest --collect-only` 统计 |
@@ -210,6 +210,7 @@ investor-util/
 │   ├── check-test-markers.py         #   测试标记合规检查
 │   ├── check-version-consistency.py  #   版本号一致性检查
 │   ├── calibrate-dedup-threshold.py  #   新闻去重阈值校准
+│   ├── llm_hallucination_sampler.py   #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 │
