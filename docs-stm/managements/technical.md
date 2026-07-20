@@ -2360,7 +2360,7 @@ investor-util/
 | data_degradation | list[dict] | 是 | 已实现 | capture_snapshot |
 | llm_status | str | 是 | 已实现 | generate_all_llm |
 | rebalance_signals | list[dict] | 是 | 已实现 | prepare_report_data |
-| liquidity_warnings | list[dict] | 是 | 计划中 | capture_snapshot |
+| liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
 | fx_exposure | dict | 是 | 计划中 | capture_snapshot |
 | scenario_analysis | dict | 是 | 计划中 | prepare_report_data |
 

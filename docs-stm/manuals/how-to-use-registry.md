@@ -274,6 +274,35 @@ DataModuleDef("我的固定键", "fixed",
 
 ---
 
+## 计算模块注册表（_COMPUTATION_REGISTRY）
+
+除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表。
+
+```python
+@dataclass(frozen=True)
+class ComputModuleDef:
+    name: str               # 中文名称
+    module_key: str          # 唯一键，如 "analytics_liquidity"
+    label: str               # 短标签（日志/提示）
+    dependencies: tuple      # 前置数据模块键名
+    description: str         # 功能说明
+```
+
+当前已注册的计算模块：
+
+| module_key | 名称 | 依赖 | 状态 |
+|:-----------|:-----|:-----|:----:|
+| `analytics_metrics` | 量化指标 | — | ✅ implemented |
+| `analytics_liquidity` | 流动性分析 | — | ✅ implemented |
+| `analytics_rebalance` | 再平衡 | — | ✅ implemented |
+| `analytics_fx` | 汇率敞口 | — | ⏳ planned |
+| `analytics_scenario` | 情景分析 | — | ⏳ planned |
+| `analytics_beta` | Beta 置信区间 | — | ⏳ planned |
+
+新增计算模块只需在 `_COMPUTATION_REGISTRY` 中添加一行 `ComputModuleDef`，纯算法模块无需缓存注册。
+
+---
+
 ## 无需手动维护的派生产出
 
 以下映射由 registry 自动派生，**新增模块时只需在 `_MODULE_REGISTRY` 中添加一行 `DataModuleDef`，即可自动同步到以下所有位置**：
