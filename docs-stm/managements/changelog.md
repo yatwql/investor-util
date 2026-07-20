@@ -4,7 +4,7 @@
 
 ---
 
-## [0.7.7-dev] - 未发布
+## [0.7.7] - 2026-07-20
 
 ### Fixed
 - **news_aggregator.py `_ANCHOR_PATH` 路径错误**：手动 `dirname` 计算比 `constants.PROJECT_ROOT` 多 1 级，锚点文件写入 `src/data/cache/` 而非 `data/cache/`，导致 `calibrate-dedup-threshold.py` 找不到锚点文件。改用 `from src.python.constants import PROJECT_ROOT`，消除 dirname 层数依赖
