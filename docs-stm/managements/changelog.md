@@ -4,6 +4,90 @@
 
 ---
 
+## [0.7.6] - 2026-07-20
+
+### Added
+- **P4-14 (端到端性能测试)**：全流程报告管线性能测试，覆盖 E/B/L 三种菜单从读取持仓到报告输出的完整链路
+- **P4-15 (链韧性测试)**：`test_chain_resilience.py` 全链路熔断降级场景测试，验证 Provider Chain 在多级失败下的逐级降级行为
+- **P4-16 (安全测试)**：覆盖缓存目录穿越、配置注入、LLM 凭据泄露、路径遍历等安全场景
+- **P4-05 (隐私提示)**：Excel 报告页脚添加匿名化状态说明行 + TUI 菜单 [A] 新增安全状态页，展示当前匿名化模式、加密状态等隐私概要
+- **P4-08 (LLM 幻觉率采样测试)**：`scripts/llm_hallucination_sampler.py` — 10 组标准化持仓数据集，事实校验器自动验证数值/品种/排名正确性，输出报告到 `docs-stm/tmp/hallucination-report.md`
+- **培训数据集**：`scripts/data/hallucination_datasets/` 10 组 JSON 数据集 + `ground_truth.json` 正确事实表
+
+### Fixed
+- **fact_checker 建议语境下沉**：`check_symbol_existence()` 新增 `suggestion_contexts` 参数，将"建议关注 XXX"类品种代码识别为建议语境，不计入幻觉。`_POSITION_WEIGHT_KEYWORDS` / `_HYPOTHETICAL_KEYWORDS` 跳过仓位占比和情景假设百分比误报
+- **fact_checker 数值一致性增强**：按句子粒度分析，优先匹配句中持仓代码对应个股收益率；收益归因段落自动跳过；指数基准代码数值跳过；金融宏观指标跳过
+- **fact_checker 排名检查**：穿透模块跳过排名校验（穿透底层代码非持仓品种，不应要求排名正确性）；传入穿透层股票代码集避免误告警
+- **expert_review prompt 数值精度约束**：要求直接引用持仓明细中的 profit_rate 数据，不虚构收益率；贡献度标注为"贡献占比"；不确定时用定性描述
+- **修复 3 个 P2 测试文件 API 漂移**：`test_chain_resilience.py` / `test_liquidity_edge.py` / `test_liquidity_otc_edge.py` 中 API 端点/参数因外部数据源变更导致的过期断言更新
+- **修复 main.py tab 缩进**：`menu_items` 第 118 行混合 tab/space 缩进导致的 `TabError`
+- **修复去重 sampler 逻辑**：`llm_hallucination_sampler.py` 中的缓存回退路径错误
+
+### Changed
+- **plan.md**: 移除已完成的 P2 质量与安全（4 项：隐私提示/端到端性能测试/链韧性测试/安全测试）和 P3 技术债清算（4 项：性能/韧性/安全/匿名化扩展）全部整节。当前待办仅保留 P4-91（增强 LLM 策略实验功能）。详见 `better-investment-task.md` 保管的完整任务分解记录
+- **8 份管理/用户文档全域清理历史痕迹**：源码注释移除 `"R-198 从 xxx 拆分"`、`"向后兼容"`、`"旧版"`、`"提取自 xxx"`、`"拆分而来"` 等 30+ 处历史迭代描述/版本对比/重构标记语言，正文只反映当前最新状态
+- **测试补丁**：`test_excel_generator.py` 中 `excel_news_warning.get_report_sheet_name` mock 补 `create=True`，适配历史清理后模块不再暴露该属性
+- **删除已移除功能的测试**：`test_html_builders.py` 的 `TestCoverageText` 类（`_coverage_text` 函数已于 `0de1fbd` 随"机构覆盖"列一并删除，测试未同步导致 6 个持续失败）
+
+### Docs
+- **requirements.md**: 全文档事实核对——A1 菜单项 15→16（新增 [I] 和 [A] 说明行）；A2 报告模块范围 E/B/L→B/L（组合历史走势和回撤分析仅 B/L 路径有）；A3 删除虚假的"机构覆盖"第 12 列（基金业绩实际只有 11 列）；A4 R-HLD-05 代码清洗描述从 ".SH/.SZ 后缀"改为 "sh/sz/bj 前缀"；B1 取价渠道描述从 "腾讯财经/天天基金网"扩展为 "腾讯财经/东方财富/天天基金网等"；B2 行业分类备用链路从 "quotedata 回退"改为 "东方财富 REST 行情页回退"
+- **how-to-start.md**: 菜单速览新增 [I] 管理对比指数池 和 [A] 配置匿名化模式 两行
+- **how-to-test-my-code.md**: 结构调整——将 calibrate-dedup-threshold.py 和 llm_hallucination_sampler.py 从 "查看报告" 移入新增的 "辅助脚本" 节
+- **testplan.md**: §6.3 补充回归项序号 9/10/11；P1/P2 对齐为 `--mode verify` 和 `--mode all`；§1.3 补充 scenario 文件表条目
+- **how-to-config-llm.md**: 补全 enabled_llm JSON 块前缺失的 "## 模块启停" 章节标题；删除重复的 "专用配置项" 表格；`model_{module}` 说明补充多链模式下的配置来源
+- **how-to-use-registry.md**: 合并重复报表章节，展开完整 17 模块键名表；补充 `llm_module_info.py` 消费方；补充 `get_report_section_number()`
+- **faq.md**: 删除重复问题；补充日志级别配置修改表格（控制台/文件/全局三级）
+- **reports-instruction.md**: §16/§17 修正为 §15/§16；HTML LLM API 用量定位修复
+
+---
+
+## [0.7.5] - 2026-07-20
+
+### Added
+- **P2-11b (Beta 置信区间+统计检验)**：`metrics.py` 新增 95% 置信区间、t-统计量、p 值，置信区间过宽时标注"数据不足，Beta 估计可靠性有限"
+- **P4-01 (情景分析——Beta 推导)**：`scenario.py` 新增 `scenario_analysis()`，6 种涨跌情景下组合预期回撤/收益，含 ±1σ/±2σ 置信区间，注入 LLM prompt "情景模拟"段落
+- **P4-02 (情景分析——3 情景表)**：`scenario.py` 扩展市场/行业/汇率三张情景表
+- **P4-03 (情景分析——置信区间传播)**：`scenario.py` 实现 Beta CI→情景回撤 CI、年化波动 CI→夏普 CI 传播，过宽时标注"预测可靠性有限"
+- **P3-09b (口径修正因子计算)**：`alignment_correction.py` 529 行，综合费率估算/现金剥离/TWR 计算，数据不足时回退纯说明版本
+- **P4-04 (匿名化 4 模式)**：`anonymizer.py` 扩展为 4 模式（off/code_display/full_anonymous/summary），TUI 菜单 `[A]` 设置，持久化到 config `anonymization.mode`
+- **P4-06 (缓存审查)**：`cache.py` 新增 `clean_sensitive(older_than_days=90)`，敏感 key 标注（`holding_*`、`penetration_*`），启动时自动清理过期敏感缓存
+- **P3-81 (双熔断器统一网关)**：`circuit_breaker.py` 扩展完整 `CircuitBreakerGateway` 类，支持 `gateway.summary()` 统一状态输出
+- **P3-82 (清理遗留 LLM 回退路径)**：`html_renderers.py` 绕过 orchestrator 直接调用 `generate_all_llm()` 的死代码已清理
+- **P3-83 (概念板块 API 降级状态区分)**：`"no_a_share"` / `"empty"` / `"unreachable"` 三种状态已区分，LLM prompt 段落据此显示不同兜底文本
+- **P4-10**: metrics edge 测试用例（`test_metrics_edge.py`，59 项，覆盖 None/NaN/Inf/空列表/长度不匹配 等全异常路径）
+- **P4-11**: bond_yield edge 测试用例（`test_bond_yield_edge.py`，16 项，覆盖 config 异常/缓存异常/akshare 异常/DataFrame 异常）
+- **P4-12**: rebalance 测试用例完善（`test_rebalance_edge.py`，24 项，覆盖 config/profile 边界/分类降级/回填保护/静默期异常/置信度边界）
+
+### Fixed
+- **P4-13**: 测试标记注册 & 静态扫描合规
+  - `check-test-markers.py` KNOWN_MARKERS 新增 `unit_rebalance`
+  - 修复 `test_config_llm_multi_edge.py` 笔误 `unit_config_edge` → `unit_config`
+  - 验证结果：151 文件通过，0 违规
+
+### Changed
+- **事实校验器 v2（感知增强）**：`llm/fact_checker.py` 数值一致性全面重写——按句子粒度分析，优先匹配句中持仓代码对应个股收益率，未识别到个股时回退组合总收益率；收益归因段落自动跳过；指数基准代码数值跳过；金融宏观指标（国债利率/GDP/CPI）跳过。品种存在性新增 extra_valid_codes 参数，穿透分析自动传入穿透层股票代码。排名检查新增 is_penetration_module 参数，穿透模块跳过排名校验
+- **LLM Prompt 数值精度约束**：prompts_action.py 智囊团深度复盘 prompt 新增"数值精度约束"段落——要求 LLM 直接引用持仓明细中的 profit_rate 数据，不虚构收益率；贡献度标注为"贡献占比"；不确定时用定性描述。
+
+### Fixed
+- **事实校验器误报消除**：三类系统性误报——个股收益率不再错误对比组合总收益；穿透底层股票代码（如 002837/300750）不再误告警；全球政经宏观指标自动跳过。scenario_llm/scenario_perf/scenario_security 标记注册到 conftest.py
+
+### Tests
+- **test_llm_hallucination.py 重写**：17 项场景测试，覆盖个股/组合级数值一致性、归因段落跳过、指数基准跳过、穿透代码集、穿透排名跳过
+- **`f_context` → `pipeline_data` 全局重命名**：文件 `f_context_builder.py` → `pipeline_data_builder.py`，所有源码变量名/函数名/参数名/注释及 8 份文档统一替换为 `pipeline_data`；归档文档（`docs-stm/archive/`）保留历史原名不变
+- **`plan.md`**：移除已完成任务项——P2 表移除 #60~#65、#67、#68 共 9 项；P3 表移除 #81~#84、#88、#89 共 6 项；质量与安全计数从 12 项/~148h 更新为 4 项/~40h；P3 技术债从 10 项/~120h 更新为 4 项/~52h
+- **文件重命名**（去除代码内部变量名和缩写）：
+  - `perf-report.md` → `better-investment-performance-test-report.md`
+  - `f_context-schema.md` → `data-channels-schema.md`
+  - `rf-and-885005-test-report.md` → `data-source-stability-test-report.md`
+- **引用同步**：同步更新 plan.md/changelog.md/technical.md/folders.md/better-investment-task.md/discussion-better-investment-advice.md/pipeline_data_builder.py/perf_report.py 共 8 处引用路径
+- **`scripts/perf_report.py`**：输出路径从 `docs-stm/plan/better-investment-advice/` 改为 `docs-stm/tmp/`（运行时临时产物），基线报告保留在 plan 目录
+- **`plan.md`**：追加 P3 技术债清算区（10 项），覆盖架构/测试/安全三类债务
+
+### Docs
+- **`plan.md`**：补充 P3 技术债清单，详见 `docs-stm/managements/plan.md` → P3 技术债清算
+
+---
+
 ## [0.7.4] - 2026-07-20
 
 ### Added
@@ -11,7 +95,7 @@
   - **P1-03**: Rf 获取——`bond_zh_us_rate` + 手动兜底，`bond_yield.py` 新建，C6 chain 路由合规
   - **P1-04**: 个股日收益率管线暴露，`portfolio_history.py` daily_returns 从局部变量→返回值
   - **P1-05**: 组合日收益率暴露，`get_combined_timeseries` 新增 `daily_returns_portfolio` 字段
-  - **P1-06-A**: f_context 组装逻辑抽取，orchestrator.py→`f_context_builder.py`
+  - **P1-06-A**: pipeline_data 组装逻辑抽取，orchestrator.py→`pipeline_data_builder.py`
   - **P1-06**: 阻断点 1——`prepare_report_data` 加 risk_metrics 空字典占位
   - **P1-07**: 阻断点 2——`capture_snapshot` 加 risk_metrics/portfolio_daily_returns 透传
   - **P1-08**: 阻断点 3——`generate_all_llm` 暴露 history_data 到 prompt
@@ -26,7 +110,7 @@
   - **P1-18**: 熔断器改进——持久化（`circuit_breaker.json`）
   - **P1-19**: 双熔断器统一网关（`circuit_breaker.py` + `provider_registry.py`）
   - **P1-20**: LLM 失败自动降级模板，全失败时占位文本
-  - **P1-21**: f_context Schema Full Schema 补充+校验检查点
+  - **P1-21**: pipeline_data Schema Full Schema 补充+校验检查点
   - **P1-22**: analysis/ 层定位 + category.py→code_utils.py，消除逆向依赖
   - 合计 ~112h，53 tests passed（原 44→53，新增 registry/bond_yield 测试）
 - **P1-12: 指标级断路包装器**：`circuit_breaker_wrapper.py`，per-indicator 熔断（连续 3 次→静默 24h），C20 FF↔CB 联动，持久化到 `metrics_breaker.json`
@@ -119,8 +203,8 @@
 ### Added
 - **P2 全部 10 项任务完成（Tier 0 + MVP）**：
   - **T0-01-A**: DegradationTracker get_log() + 6 处 fetcher 层 record() + get_tracker() 单例工厂，消除三重实例碎片化
-  - **T0-01-B**: f_context Pre-Schema 文档（`f_context-schema.md`）+ 删除 2 个死键 + 类型断言 checkpoint
-  - **T0-01**: DegradationTracker→LLM 接线，注入 f_context["data_degradation"]
+  - **T0-01-B**: pipeline_data Pre-Schema 文档（`data-channels-schema.md`）+ 删除 2 个死键 + 类型断言 checkpoint
+  - **T0-01**: DegradationTracker→LLM 接线，注入 pipeline_data["data_degradation"]
   - **T0-02**: 健康检查 3 类→5 类（新增数据质量维度评分标准）
   - **MVP-01**: `_build_profit_attribution_block()` TOP 5 收益归因（正负分别列出，Σ|profit|=0 保护）
   - **MVP-02**: `_build_concept_sector_block()` TOP 5 概念板块 + 集中度判断（3 态兜底：无数据/部分无分类/正常）
@@ -135,7 +219,7 @@
   - worldgovernmentbonds.com 确认 JS 渲染不可直接抓取
   - 885005 确认为 Wind（万得）专属代码，12 个公开数据源均不可获取
   - CSI 替代指数（930950/932055/931255）同样不可用
-- **测试报告归档**：`docs-stm/plan/better-investment-advice/rf-and-885005-test-report.md`
+- **测试报告归档**：`docs-stm/plan/better-investment-advice/data-source-stability-test-report.md`
 
 ### Changed
 - **设计文档全面更新**：plan.md、better-investment-task.md、discussion-better-investment-advice.md 同步 PRE 测试结论

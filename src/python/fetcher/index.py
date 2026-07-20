@@ -121,7 +121,7 @@ def fetch_indices() -> dict[str, dict[str, Any]]:
     uncached_codes: list[str] = []
     for index_code in _A_INDICES:
         cache_key = _index_cache_key(index_code)
-        cached = cache_get(cache_key, get_ttl("index"))
+        cached = cache_get(cache_key, get_ttl("index", cache_key))
         if cached is not None:
             cached["_source"] = "cache"
             indices[index_code] = cached
@@ -270,7 +270,7 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
 
     for code in _US_INDEX_CODES:
         cache_key = _index_cache_key(code)
-        cached = cache_get(cache_key, get_ttl("index"))
+        cached = cache_get(cache_key, get_ttl("index", cache_key))
         if cached is not None:
             cached["_source"] = "cache"
             indices[code] = cached

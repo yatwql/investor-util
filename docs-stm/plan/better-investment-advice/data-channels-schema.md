@@ -1,12 +1,12 @@
-# f_context Pre-Schema
+# pipeline_data Pre-Schema
 
 > **状态**：Pre-Schema（Phase 1 Full Schema 的前置工作）  
 > **目的**：清晰定义当前管线中所有数据键的定义，消除通道混淆，为 Full Schema 和类型校验提供基础。  
-> **通道说明**：当前架构中"管线数据"分为两个独立通道——`capture_snapshot()` 返回的 `f_context` 和 `prepare_report_data()` 返回的 `prep` 字典。两者通过不同路径到达 LLM 消费方。
+> **通道说明**：当前架构中"管线数据"分为两个独立通道——`capture_snapshot()` 返回的 `pipeline_data` 和 `prepare_report_data()` 返回的 `prep` 字典。两者通过不同路径到达 LLM 消费方。
 
 ---
 
-## A 通道：f_context（`capture_snapshot()` 返回值）
+## A 通道：pipeline_data（`capture_snapshot()` 返回值）
 
 写入模块：`src/python/report/orchestrator.py` L198-248  
 消费模块：`src/python/llm/generators_orchestrator.py`、`src/python/llm/prompts.py`  
@@ -107,7 +107,7 @@
 | `penetrated_assets` | `prep["penetrated_assets"]` | 所有 prompt（可选） |
 | `holdings_details` | `prep["holdings_details"]` | 所有 prompt（可选） |
 | `sector_flow` | `get_sector_fund_flow()` | `_build_global_macro_prompt`（可选） |
-| `f_context` | `capture_snapshot()` 返回值 | `_build_expert_review_prompt`, `_build_health_check_prompt`（可选） |
+| `pipeline_data` | `capture_snapshot()` 返回值 | `_build_expert_review_prompt`, `_build_health_check_prompt`（可选） |
 | `history_data` | `fetch_history_data()` 返回值（P1-08 新增） | `_build_competitive_context_block`（仅使用 risk 摘要），`build_llm_fingerprint` 风险信号（P1-09） |
 
 ### history_data 键定义
@@ -134,18 +134,18 @@
 
 ```python
 # checkpoint: capture_snapshot 返回后
-if f_context is not None:
-    assert isinstance(f_context, dict), "f_context 类型异常"
-    _diff = f_context.get("diff")
+if pipeline_data is not None:
+    assert isinstance(pipeline_data, dict), "pipeline_data 类型异常"
+    _diff = pipeline_data.get("diff")
     if _diff is not None:
-        assert isinstance(_diff, dict), "f_context.diff 类型异常"
+        assert isinstance(_diff, dict), "pipeline_data.diff 类型异常"
     # Phase 1（P1-07）：风险字段类型检查
-    _rm = f_context.get("risk_metrics")
+    _rm = pipeline_data.get("risk_metrics")
     if _rm is not None:
-        assert isinstance(_rm, dict), "f_context.risk_metrics 类型异常"
-    _pdr = f_context.get("portfolio_daily_returns")
+        assert isinstance(_rm, dict), "pipeline_data.risk_metrics 类型异常"
+    _pdr = pipeline_data.get("portfolio_daily_returns")
     if _pdr is not None:
-        assert isinstance(_pdr, list), "f_context.portfolio_daily_returns 类型异常"
+        assert isinstance(_pdr, list), "pipeline_data.portfolio_daily_returns 类型异常"
 
 # checkpoint: prepare_report_data 返回后
 assert isinstance(prep, dict), "prep 类型异常"

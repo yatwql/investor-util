@@ -1,7 +1,6 @@
 """Sheet 工厂 — 页签创建 + 可见性判定。
 
 职责：根据注册表配置和运行时标志创建可见页签。
-提取自 excel_generator.py 的 _should_create_sheet + _create_sheets。
 """
 
 from __future__ import annotations

@@ -78,6 +78,7 @@ KNOWN_MARKERS = {
     "unit_report",
     "unit_config",
     "unit_core",
+    "unit_rebalance",
     "unit_ui",
     "edge",
     "smoke",

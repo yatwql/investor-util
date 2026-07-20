@@ -9,6 +9,7 @@
   6. risk_contribution — 正常贡献度 / 空列表返回 []
   7. individual_volatility — 正常波动率 / 不足样本 None
   8. portfolio_beta — 正常 Beta / 不足样本 None
+  9. portfolio_beta_analysis — 置信区间 / 统计检验 / 噪声 CI 宽度
 """
 
 from __future__ import annotations
@@ -205,6 +206,112 @@ class TestPortfolioBeta:
         from src.python.analysis.metrics import portfolio_beta
 
         assert portfolio_beta([0.001] * 10, [0.002] * 10) is None
+
+
+class TestPortfolioBetaAnalysis:
+    """组合 Beta 置信区间与统计检验。"""
+
+    def test_analysis_returns_all_keys(self):
+        """正常数据返回完整字典。"""
+        from src.python.analysis.metrics import portfolio_beta_analysis
+
+        base = _make_positive_returns(252, 0.001, 0.01)
+        portfolio = [b for b in base]  # 同序列 → Beta=1
+        result = portfolio_beta_analysis(portfolio, base)
+        assert result is not None
+        expected_keys = {"beta", "ci_lower", "ci_upper", "t_stat", "p_value", "reliable", "df"}
+        assert set(result.keys()) == expected_keys, f"缺失键：{expected_keys - set(result.keys())}"
+
+    def test_beta_one_analysis(self):
+        """Beta=1 时 CI 紧密，p 值显著。"""
+        from src.python.analysis.metrics import portfolio_beta_analysis
+
+        base = _make_positive_returns(252, 0.001, 0.01)
+        result = portfolio_beta_analysis(base, base)  # 完全相同 → Beta=1
+        assert result is not None
+        assert abs(result["beta"] - 1.0) < 0.5
+        assert result["ci_lower"] is not None and result["ci_lower"] <= result["beta"]
+        assert result["ci_upper"] is not None and result["ci_upper"] >= result["beta"]
+        assert result["p_value"] == 0.0  # 完美相关 → 零不确定性
+        assert result["reliable"] is True
+        assert result["df"] > 0
+
+    def test_unrelated_returns_beta_near_zero(self):
+        """不相关序列 → Beta≈0，p 值不显著。"""
+        from src.python.analysis.metrics import portfolio_beta_analysis
+        import random
+
+        random.seed(123)
+        n = 252
+        base = [random.gauss(0.001, 0.015) for _ in range(n)]
+        unrelated = [random.gauss(0.001, 0.02) for _ in range(n)]
+        result = portfolio_beta_analysis(unrelated, base)
+        assert result is not None
+        assert abs(result["beta"]) < 0.5
+        assert result["p_value"] > 0.05  # 不显著
+
+    def test_high_beta_ci(self):
+        """Beta>1 时 CI 包含 Beta 值。"""
+        from src.python.analysis.metrics import portfolio_beta_analysis
+        import random
+
+        random.seed(42)
+        base = [random.gauss(0.001, 0.015) for _ in range(252)]
+        portfolio = [b * 1.5 + random.gauss(0.0, 0.005) for b in base]
+        result = portfolio_beta_analysis(portfolio, base)
+        assert result is not None
+        assert result["beta"] > 1.0
+        assert result["ci_lower"] <= result["beta"]
+        assert result["ci_upper"] >= result["beta"]
+        assert result["df"] > 0
+
+    def test_insufficient_data_returns_none(self):
+        """不足 20 日 → None。"""
+        from src.python.analysis.metrics import portfolio_beta_analysis
+
+        assert portfolio_beta_analysis([0.001] * 10, [0.002] * 10) is None
+
+    def test_flat_returns_none(self):
+        """无波动基准 → None。"""
+        from src.python.analysis.metrics import portfolio_beta_analysis
+
+        assert portfolio_beta_analysis([0.001] * 252, [0.0] * 252) is None
+
+    def test_high_noise_ci_wider(self):
+        """高噪声 → CI 更宽。"""
+        from src.python.analysis.metrics import portfolio_beta_analysis
+        import random
+
+        random.seed(42)
+        n = 252
+        base = [random.gauss(0.0, 0.015) for _ in range(n)]
+        # 低噪声 → 窄 CI
+        low_noise = [b * 1.0 + random.gauss(0.0, 0.005) for b in base]
+        # 高噪声 → 宽 CI
+        high_noise = [b * 1.0 + random.gauss(0.0, 0.05) for b in base]
+
+        r1 = portfolio_beta_analysis(low_noise, base)
+        r2 = portfolio_beta_analysis(high_noise, base)
+        assert r1 is not None and r2 is not None
+
+        ci_w1 = r1["ci_upper"] - r1["ci_lower"]
+        ci_w2 = r2["ci_upper"] - r2["ci_lower"]
+        assert ci_w2 > ci_w1, "高噪声应产生更宽的置信区间"
+
+    def test_compute_all_metrics_includes_analysis(self):
+        """compute_all_metrics 包含 beta_analysis 键。"""
+        from src.python.analysis.metrics import compute_all_metrics
+
+        base = _make_positive_returns(252, 0.001, 0.01)
+        portfolio = [b for b in base]
+        result = compute_all_metrics(portfolio,
+                                      benchmark_daily_returns=base,
+                                      rf_annual=0.02,
+                                      portfolio_weights=[1.0],
+                                      individual_vols={"A": 0.2})
+        assert "beta_analysis" in result
+        assert result["beta_analysis"] is not None
+        assert isinstance(result["beta_analysis"], dict)
 
 
 # ── 数值清理函数测试 ──────────────────────────────────────

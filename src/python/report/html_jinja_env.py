@@ -114,7 +114,7 @@ def _jinja_section_visible(key: str) -> bool:
     """Jinja2 全局函数：判断报告模块是否可见。
 
     依赖模板上下文中的 section_visible_dict，在渲染前由
-    write_html_report 设置。（Step PF 将改为 context 变量传递）
+    write_html_report 设置。
 
     Usage in template:
         {% if section_visible("fund_manager") %}

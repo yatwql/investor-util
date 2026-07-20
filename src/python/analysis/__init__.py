@@ -27,6 +27,7 @@ from src.python.analysis.metrics import (  # noqa: F401
     sanitize_metric,
     individual_volatility,
     portfolio_beta,
+    portfolio_beta_analysis,
     truncate_extreme_values,
     check_data_sufficiency,
     get_confidence_level,
@@ -38,6 +39,18 @@ from src.python.analysis.drawdown_warning import (  # noqa: F401
 )
 from src.python.analysis.liquidity import check_liquidity  # noqa: F401
 from src.python.analysis.fx_exposure import fx_exposure  # noqa: F401
+from src.python.analysis.scenario import (  # noqa: F401
+    scenario_analysis,
+    industry_concentration_analysis,
+    fx_scenario_analysis,
+    sharpe_ci_propagation,
+)
+from src.python.analysis.alignment_correction import (  # noqa: F401
+    portfolio_fee_estimation,
+    cash_stripping,
+    twr_calculation,
+    compute_alignment_factors,
+)
 
 __all__ = [
     "compute_rebalance_signals",
@@ -52,6 +65,7 @@ __all__ = [
     "sanitize_metric",
     "individual_volatility",
     "portfolio_beta",
+    "portfolio_beta_analysis",
     "truncate_extreme_values",
     "check_data_sufficiency",
     "get_confidence_level",
@@ -60,4 +74,12 @@ __all__ = [
     "current_drawdown_percentile",
     "check_liquidity",
     "fx_exposure",
+    "scenario_analysis",
+    "industry_concentration_analysis",
+    "fx_scenario_analysis",
+    "sharpe_ci_propagation",
+    "portfolio_fee_estimation",
+    "cash_stripping",
+    "twr_calculation",
+    "compute_alignment_factors",
 ]

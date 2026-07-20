@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
-> 文档版本：v0.7.4
+> 文档版本：v0.7.6-dev
 
 ---
 
@@ -77,6 +77,7 @@
 | `scenario/basic/test_scenario_penetration.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
 | `scenario/basic/test_scenario_section_order.py` | C-P1b | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
+| `scenario/test_llm_hallucination.py` | P4‑08 | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
 
 **业务场景规格（S0a-S0d、S1-S34、T1-T21）：**
 
@@ -472,9 +473,9 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-- **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
-- **P1 全通** — 不可合并 master：手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
-- **P2 已执行** — 可合入但不可发布：断网降级/旧缓存兼容/跨池污染
+9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + 手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
+11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode all` + 断网降级/旧缓存兼容/跨池污染确认
 
 ### 6.4 人工验证
 

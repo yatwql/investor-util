@@ -1,18 +1,12 @@
-"""LLM 提示词模块 — 重新导出门户。
+"""LLM 提示词模块 — 统一导出入口。
 
-本文件为向后兼容的重新导出门户。
-具体实现已拆分到以下子模块：
-
-  - prompts_core.py  — System Prompt 常量、基础设施、上下文构建块
-  - prompts_tables.py — 格式化和摘要构建函数
-  - prompts_action.py — 各模块 Prompt 构建函数
-
-所有外部代码保持 from src.python.llm.prompts import ... 不变。
+导出 prompts_core / prompts_tables / prompts_action 的公开符号。
+外部代码使用 from src.python.llm.prompts import ... 导入。
 """
 
 from __future__ import annotations
 
-# ── 从 prompts_core 重新导出 ──────────────────────────────────
+# ── 从 prompts_core 导出 ──────────────────────────────────
 from src.python.llm.prompts_core import (
     CACHE_PREFIX_LLM,
     FAIL_REASON_API_ERROR,
@@ -30,14 +24,14 @@ from src.python.llm.prompts_core import (
     _build_competitive_context_block,
     _build_concept_sector_block,
     _build_data_degradation_block,
-    _build_diff_context_block,
+    _build_difpipeline_data_block,
     _build_profit_attribution_block,
     _build_rebalance_block,
     _fmt_holding_line,
     _fmt_wan,
 )
 
-# ── 从 prompts_tables 重新导出 ────────────────────────────────
+# ── 从 prompts_tables 导出 ────────────────────────────────
 from src.python.llm.prompts_tables import (
     _build_holdings_summary,
     _build_news_correlation_summary,
@@ -46,7 +40,7 @@ from src.python.llm.prompts_tables import (
     _format_penetration_block,
 )
 
-# ── 从 prompts_action 重新导出 ────────────────────────────────
+# ── 从 prompts_action 导出 ────────────────────────────────
 from src.python.llm.prompts_action import (
     _build_expert_review_prompt,
     _build_global_macro_prompt,
@@ -77,7 +71,7 @@ __all__ = [
     "_format_penetration_block",
     "_calc_country_exposure",
     # 上下文构建块
-    "_build_diff_context_block",
+    "_build_difpipeline_data_block",
     "_build_data_degradation_block",
     "_build_profit_attribution_block",
     "_build_concept_sector_block",

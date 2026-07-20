@@ -1,6 +1,6 @@
 """LLM API 基础模块 — 共享的常量、检测函数、失败追踪与重试骨架。
 
-R-198 从 api.py 拆分：基础设施层（被 api.py / skeleton.py / generators 系列共用）。
+基础设施层（被 api.py / skeleton.py / generators 系列共用）。
 """
 
 from __future__ import annotations

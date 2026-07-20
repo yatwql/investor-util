@@ -91,6 +91,8 @@ _DEFAULT_CONFIG = {
     },
     # ── I. 流动性配置 ──
     "redemption_limits": {},  # 场外基金单日赎回上限（code → 金额，空=未配置）
+    # ── J. 匿名化配置 ──
+    "anonymization": {"mode": "off"},  # 匿名化模式：off/code_display/full_anonymous/summary
 }
 
 
@@ -173,6 +175,11 @@ def _get_default_config_template() -> str:
         "  },\n"
         "\n"
         "  // ── I. 流动性配置 ──\n"
-        '  "redemption_limits": {}\n'
+        '  "redemption_limits": {},\n'
+        "\n"
+        "  // ── J. 匿名化配置 ──\n"
+        '  "anonymization": {\n'
+        '    "mode": "off"\n'
+        "  }\n"
         "}\n"
     )

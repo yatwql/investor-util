@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from src.python.report.styles import (
@@ -180,14 +180,11 @@ def write_header_row(ws, row: int, headers: list[str]) -> int:
     Returns:
         下一行起始行号
 
-    Note:
-        API 历史：旧签名为 (ws, headers, ncols)，当前为 (ws, row, headers)。
-        若传入旧式调用将引发 TypeError，切勿混用。
     """
     if not isinstance(row, int):
         raise TypeError(
             f"write_header_row: 'row' 应为 int，收到 {type(row).__name__}。"
-            " 旧式 API (ws, headers, ncols) 已被弃用，请使用 (ws, row, headers)。"
+            " 调用签名应为 (ws, row, headers)。"
         )
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=row, column=col, value=h)
@@ -387,3 +384,22 @@ def _write_status_title(ws, row: int, ncols: int) -> None:
     cell = ws.cell(row=row, column=1, value="数据加载状态")
     cell.font = Font(size=10, bold=True, color="666666")
     cell.alignment = Alignment(horizontal="left", vertical="center")
+
+
+def write_privacy_footer(ws, ncols: int = 5) -> None:
+    """在指定工作表底部写入隐私声明脚注。
+
+    灰色小字，合并列居中显示。适用于所有页签的页脚。
+
+    Args:
+        ws: 工作表
+        ncols: 列数，默认 5
+    """
+    from src.python.report.privacy_notice import get_privacy_notice
+
+    row = (ws.max_row or 1) + 2
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+    cell = ws.cell(row=row, column=1, value=get_privacy_notice())
+    cell.font = Font(size=9, color="999999")
+    cell.alignment = Alignment(horizontal="center", vertical="center")
+    cell.fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")

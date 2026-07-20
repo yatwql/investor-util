@@ -378,7 +378,7 @@ def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
     """获取多只股票的分红数据，返回 {code: summary}。
 
     akshare 1.18.64+ 的 stock_history_dividend() 不接受参数，返回全量数据。
-    改为一次拉取后按代码过滤，不再逐股并发请求。
+    一次拉取后按代码过滤。
     """
     result: dict[str, dict] = {}
     code_set = set(a_codes)

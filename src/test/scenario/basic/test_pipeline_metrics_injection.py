@@ -175,7 +175,7 @@ class TestHealthCheckDegradationInjection:
             holdings_count=2,
             categories={"股票": 2},
         )
-        # 即使无 degradation_events，f_context 中的 degradation 块仍可存在
+        # 即使无 degradation_events，pipeline_data 中的 degradation 块仍可存在
         assert "【持仓明细】" in prompt
 
 

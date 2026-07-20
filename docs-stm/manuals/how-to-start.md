@@ -167,6 +167,7 @@ python -m src.python.cli --config D:/config/my_config.json cache --stats
     [L] 生成全系列完整版报告(Excel+HTML)
     [C] 配置持仓信息目录    [F] 配置持仓信息文件名
     [O] 配置报告输出目录
+    [I] 管理对比指数池        [A] 配置匿名化模式
     [1] 更新基础类缓存        [2] 更新持仓类缓存
     [3] 清理过期缓存文件     [4] 查看缓存/状态统计
     [P] 配置报告板块可见性    [S] 配置支持LLM的章节

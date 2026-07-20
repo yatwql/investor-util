@@ -91,7 +91,7 @@ def generate_expert_review(
     force: bool = False,
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     competitive_context: str | None = None,
     metrics: dict | None = None,
 ) -> tuple[str | None, bool]:
@@ -123,7 +123,7 @@ def generate_expert_review(
             categories,
             penetrated_assets,
             holdings_details=holdings_details,
-            f_context=f_context,
+            pipeline_data=pipeline_data,
             competitive_context=competitive_context,
             metrics=metrics,
         )
@@ -154,7 +154,7 @@ def generate_health_check(
     force: bool = False,
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     degradation_events: list[dict] | None = None,
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。"""
@@ -180,7 +180,7 @@ def generate_health_check(
             categories,
             penetrated_assets,
             holdings_details=holdings_details,
-            f_context=f_context,
+            pipeline_data=pipeline_data,
             degradation_events=degradation_events,
         )
 

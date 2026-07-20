@@ -48,11 +48,12 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     code = code.strip()
     _t = get_tracker()
     _src_key = f"fund_rank_{code}"
+    rank_cache_key = _FUND_PERF_CACHE_PREFIX + code
     result = fetch_with_fallback(
         "fund_rank",
         _FUND_RANK_PROVIDERS,
-        _FUND_PERF_CACHE_PREFIX + code,
-        get_ttl("rank"),
+        rank_cache_key,
+        get_ttl("rank", rank_cache_key),
         fn_kwargs={"code": code},
     )
     if result is not None:
@@ -83,11 +84,12 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
     code = code.strip()
     _t = get_tracker()
     _src_key = f"fund_hold_{code}"
+    hold_cache_key = _FUND_HOLD_CACHE_PREFIX + code
     result = fetch_with_fallback(
         "fund_hold",
         _FUND_HOLD_PROVIDERS,
-        _FUND_HOLD_CACHE_PREFIX + code,
-        get_ttl("hold"),
+        hold_cache_key,
+        get_ttl("hold", hold_cache_key),
         fn_kwargs={"code": code},
     )
     if result is not None:
@@ -231,13 +233,13 @@ def fetch_fund_benchmark(code: str) -> str:
     """
     code = code.strip()
     cache_key = _BENCHMARK_TABLE_KEY
-    cached = cache_get(cache_key, get_ttl("benchmark"))
+    cached = cache_get(cache_key, get_ttl("benchmark", cache_key))
     if cached is not None and isinstance(cached, dict):
         return cached.get(code, "--")
 
     lock = _get_benchmark_lock(code)
     with lock:
-        cached = cache_get(cache_key, get_ttl("benchmark"))
+        cached = cache_get(cache_key, get_ttl("benchmark", cache_key))
         if cached is not None and isinstance(cached, dict):
             return cached.get(code, "--")
 

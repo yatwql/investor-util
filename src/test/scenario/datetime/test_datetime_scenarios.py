@@ -807,16 +807,16 @@ class TestFetchMarketDataMarketAware(unittest.TestCase):
     @patch("src.python.fetcher.price.fetch_with_fallback")
     @patch("src.python.fetcher.price.get_ttl")
     def test_fetch_price_calls_get_ttl(self, mock_get_ttl, mock_fetch, _mock_fresh):
-        """fetch_market_data 调用 get_ttl("price")。"""
+        """fetch_market_data 调用 get_ttl("price", cache_key)。"""
         mock_get_ttl.return_value = 30
         mock_fetch.return_value = {"price": 10.0, "name": "test"}
 
         from src.python.fetcher.price import fetch_market_data
         fetch_market_data("600900", "长江电力")
 
-        # v0.2.89 新增价格缓存新鲜度校验，两次调用：首次获取 + 跨日刷新
+        # 两次调用：首次获取 + 跨日刷新
         self.assertEqual(mock_get_ttl.call_count, 2)
-        mock_get_ttl.assert_any_call("price")
+        mock_get_ttl.assert_any_call("price", "price_600900")
         # _fetch_with_fallback 第二次（刷新）调用时 cache_ttl 参数为 30
         call_kwargs = mock_fetch.call_args[1]
         self.assertEqual(call_kwargs["cache_ttl"], 30)
@@ -825,16 +825,16 @@ class TestFetchMarketDataMarketAware(unittest.TestCase):
     @patch("src.python.fetcher.price.fetch_with_fallback")
     @patch("src.python.fetcher.price.get_ttl")
     def test_get_ttl_called_with_price(self, mock_get_ttl, mock_fetch, _mock_fresh):
-        """验证 get_ttl 的参数为 'price'。"""
+        """验证 get_ttl 的参数为 'price' + cache_key。"""
         mock_get_ttl.return_value = 86400
         mock_fetch.return_value = {"price": 10.0}
 
         from src.python.fetcher.price import fetch_market_data
         fetch_market_data("003095")
 
-        # v0.2.89 新增价格缓存新鲜度校验，两次调用
+        # 两次调用：首次获取 + 跨日刷新
         self.assertEqual(mock_get_ttl.call_count, 2)
-        mock_get_ttl.assert_any_call("price")
+        mock_get_ttl.assert_any_call("price", "price_003095")
 
 
 # ═══════════════════════════════════════════════════════════

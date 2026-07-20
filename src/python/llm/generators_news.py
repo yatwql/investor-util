@@ -1,6 +1,6 @@
 """LLM 新闻关联分析模块 — LLM 增强的新闻与持仓关联分析。
 
-R-198 从 generators.py 拆分：包含 _apply_llm_news_correlation ~ enhance_news_correlation 全部 7 个函数。
+包含 _apply_llm_news_correlation ~ enhance_news_correlation 全部 7 个函数。
 """
 
 from __future__ import annotations

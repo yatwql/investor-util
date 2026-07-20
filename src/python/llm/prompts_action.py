@@ -1,12 +1,11 @@
 """LLM 提示词动作模块 — 各模块 Prompt 构建函数。
 
-从 prompts.py 拆分，包含：
+包含：
   - _build_global_macro_prompt — 全球政经局势
   - _build_expert_review_prompt — 智囊团深度复盘
   - _build_health_check_prompt — 持仓体检报告
   - _build_penetration_deep_prompt — 穿透深度分析
 """
-
 from __future__ import annotations
 
 import logging
@@ -16,7 +15,7 @@ from typing import Any
 from src.python.llm.prompts_core import (
     _build_concept_sector_block,
     _build_data_degradation_block,
-    _build_diff_context_block,
+    _build_difpipeline_data_block,
     _build_profit_attribution_block,
     _build_rebalance_block,
     _fmt_wan,
@@ -111,7 +110,7 @@ def _build_expert_review_prompt(
     categories: dict,
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     competitive_context: str | None = None,
     metrics: dict | None = None,
 ) -> str:
@@ -121,7 +120,7 @@ def _build_expert_review_prompt(
     防止 LLM 虚构持仓代码。同时包含穿透 TOP10 供参考。
 
     Args:
-        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
+        pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要）。
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），
             可选，由呼叫方构建并传入。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
@@ -131,8 +130,8 @@ def _build_expert_review_prompt(
 
     holdings_text = _format_holdings_block(holdings_details, compact=True)
     pen_text = _format_penetration_block(penetrated_assets)
-    diff_text = _build_diff_context_block(f_context)
-    degradation_text = _build_data_degradation_block(f_context)
+    diff_text = _build_difpipeline_data_block(pipeline_data)
+    degradation_text = _build_data_degradation_block(pipeline_data)
     attribution_text = _build_profit_attribution_block(holdings_details)
     concept_text = _build_concept_sector_block(penetrated_assets)
     rebalance_text = _build_rebalance_block(holdings_details, total_mv)
@@ -179,7 +178,16 @@ def _build_expert_review_prompt(
         "",
         "请严格基于以上【持仓明细】中的品种进行深度复盘，"
         "只引用我实际持有的品种代码（上面列出的），"
-        "不要虚构任何持仓代码。每个建议必须引用具体品种的名称和代码。"
+        "不要虚构任何持仓代码。每个建议必须引用具体品种的名称和代码。\n"
+        "【数值精度约束】\n"
+        "1. 持仓明细中每只品种已经标注了盈亏比例（如 +6.00% 或 -3.50%），"
+        "请直接引用这些数据，不要自行计算或虚构收益率、涨幅等百分比数值。\n"
+        "2. 如果需要引用收益归因数据，请参考【收益归因】段落中的占比数据，"
+        '并明确标注为「贡献占比」而非收益率。\n'
+        "3. 如果对某个数值不确定，请使用定性描述（如「表现较好」、「有盈利」、「亏损」等）"
+        "而非虚构具体百分比。\n"
+        "4. 提及指数基准时（如沪深300涨跌幅），请保持数值大致合理，"
+        "避免与基准指数的实际表现严重偏离。\n"
         "给出优化建议和风险预警。",
     ]
     return "\n".join(parts)
@@ -194,7 +202,7 @@ def _build_health_check_prompt(
     categories: dict,
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     degradation_events: list[dict] | None = None,
 ) -> str:
     """构建持仓体检报告的用户提示词。
@@ -202,7 +210,7 @@ def _build_health_check_prompt(
     要求 LLM 从风险分散度/流动性/收益合理性/成本结构四维度打分。
 
     Args:
-        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
+        pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要）。
         degradation_events: DegradationTracker.get_log() 输出。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
@@ -210,8 +218,8 @@ def _build_health_check_prompt(
 
     holdings_text = _format_holdings_block(holdings_details, show_cost=True)
     pen_text = _format_penetration_block(penetrated_assets)
-    diff_text = _build_diff_context_block(f_context)
-    degradation_text = _build_data_degradation_block(f_context)
+    diff_text = _build_difpipeline_data_block(pipeline_data)
+    degradation_text = _build_data_degradation_block(pipeline_data)
     # 数据质量详情
     dq_detail = _build_data_quality_detail_block(degradation_events)
     attribution_text = _build_profit_attribution_block(holdings_details)

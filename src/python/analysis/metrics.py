@@ -46,6 +46,7 @@ __all__ = [
     "sanitize_metric",
     "individual_volatility",
     "portfolio_beta",
+    "portfolio_beta_analysis",
     # 清理辅助函数
     "truncate_extreme_values",
     "check_data_sufficiency",
@@ -525,6 +526,194 @@ def individual_volatility(
     return result
 
 
+# ── t 分布辅助函数（纯 math，无 scipy 依赖） ──────
+
+
+def _log_beta(a: float, b: float) -> float:
+    """Beta 函数的自然对数：ln(B(a,b)) = ln(Γ(a)) + ln(Γ(b)) - ln(Γ(a+b))
+
+    Args:
+        a: 形状参数 > 0
+        b: 形状参数 > 0
+
+    Returns:
+        ln(B(a,b))
+    """
+    return math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+
+
+def _incomplete_beta_series(a: float, b: float, x: float) -> float:
+    """使用幂级数展开计算正则化不完全 Beta 函数 I_x(a,b)。
+
+    对 x 较小（x < (a+1)/(a+b+2)）时稳定收敛。
+    级数：I_x(a,b) = x^a(1-x)^b / (a·B(a,b)) · Σ(d_k · x^k/(a+k))
+    其中 d_0=1, d_k = d_{k-1}·(a+b+k-1)/(a+k)
+
+    Args:
+        a: 形状参数 > 0
+        b: 形状参数 > 0
+        x: [0, 1] 区间
+
+    Returns:
+        I_x(a, b) 值
+    """
+    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+    front = math.exp(a * math.log(x) + b * math.log1p(-x) - lbeta) / a
+
+    # 幂级数求和
+    total = 1.0
+    term = 1.0
+    for k in range(1, 501):
+        term *= (a + b + k - 1.0) * x / (a + k)
+        total += term
+        if abs(term) < 1e-14 * abs(total):
+            break
+
+    return front * total
+
+
+def _incomplete_beta_cf(a: float, b: float, x: float) -> float:
+    """正则化不完全 Beta 函数 I_x(a,b) — 混合算法。
+
+    当 x 较小（级数收敛快）时使用幂级数展开，
+    当 x 较大时使用对称性 I_x(a,b) = 1 - I_(1-x)(b,a)。
+
+    这避免了 Lentz 连分数法在 a < 1 时的不收敛问题。
+
+    Args:
+        a: 形状参数 > 0
+        b: 形状参数 > 0
+        x: [0, 1] 区间
+
+    Returns:
+        I_x(a, b) 值
+    """
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+
+    # 对称性：确保级数中使用的 x 较小
+    if x > (a + 1.0) / (a + b + 2.0):
+        return 1.0 - _incomplete_beta_series(b, a, 1.0 - x)
+    return _incomplete_beta_series(a, b, x)
+
+
+def _t_cdf(t: float, df: int) -> float:
+    """t 分布的累积分布函数。
+
+    P(T ≤ t) = 1 - 0.5 * I(df/(df+t²), df/2, 0.5)   for t >= 0
+
+    Args:
+        t: t 统计量
+        df: 自由度
+
+    Returns:
+        累积概率 [0, 1]
+    """
+    if df <= 0:
+        return 0.5
+
+    x = df / (df + t * t)
+    if x <= 0:
+        return 1.0
+    if x >= 1:
+        return 0.0
+
+    p = _incomplete_beta_cf(df / 2, 0.5, x)
+    if t >= 0:
+        return 1.0 - 0.5 * p
+    else:
+        return 0.5 * p
+
+
+def _t_critical_95(df: int) -> float:
+    """95% 置信水平的 t 临界值（双尾）。
+
+    对常见自由度使用预计算表，对非常见值做线性插值。
+
+    Args:
+        df: 自由度
+
+    Returns:
+        双尾 95% 临界 t 值
+    """
+    # 预计算临界值表（双尾 α=0.05）
+    _T95_TABLE: dict[int, float] = {
+        1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571,
+        6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
+        11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131,
+        16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
+        21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060,
+        26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042,
+        35: 2.030, 40: 2.021, 45: 2.014, 50: 2.009, 60: 2.000,
+        70: 1.994, 80: 1.990, 90: 1.987, 100: 1.984, 120: 1.980,
+    }
+
+    if df in _T95_TABLE:
+        return _T95_TABLE[df]
+
+    keys = sorted(_T95_TABLE.keys())
+    if df < keys[0]:
+        return _T95_TABLE[keys[0]]
+    if df > keys[-1]:
+        # 大样本近似标准正态临界值 1.96
+        return 1.96
+
+    # 线性插值
+    for i in range(len(keys) - 1):
+        if keys[i] < df < keys[i + 1]:
+            x0, x1 = float(keys[i]), float(keys[i + 1])
+            y0, y1 = _T95_TABLE[keys[i]], _T95_TABLE[keys[i + 1]]
+            return y0 + (y1 - y0) * (df - x0) / (x1 - x0)
+
+    return 1.96
+
+
+def _beta_se(
+    portfolio_returns: list[float],
+    benchmark_returns: list[float],
+    beta: float,
+) -> tuple[float, int] | None:
+    """计算 Beta 的标准误。
+
+    基于 OLS 回归：SE(β̂) = sqrt(MSE / Σ(x_i - x̄)²)
+
+    Args:
+        portfolio_returns: 组合日收益率序列
+        benchmark_returns: 基准日收益率序列
+        beta: Beta 点估计值
+
+    Returns:
+        (标准误, 自由度) 元组，数据不足时返回 None
+    """
+    n = min(len(portfolio_returns), len(benchmark_returns))
+    pr = portfolio_returns[-n:]
+    br = benchmark_returns[-n:]
+
+    if n < _MIN_SAMPLE_DAYS + 2:
+        return None
+
+    mean_pr = sum(pr) / n
+    mean_br = sum(br) / n
+
+    # OLS: alpha = mean_pr - beta * mean_br
+    alpha = mean_pr - beta * mean_br
+
+    # MSE = Σ(y_i - ŷ_i)² / (n - 2)
+    sse = sum((pr[i] - (alpha + beta * br[i])) ** 2 for i in range(n))
+    mse = sse / (n - 2)
+
+    # Σ(x_i - x̄)²
+    ssx = sum((br[i] - mean_br) ** 2 for i in range(n))
+
+    if ssx == 0 or mse < 0:
+        return None
+
+    se = math.sqrt(mse / ssx)
+    return (se, n - 2)
+
+
 # ── 组合 Beta（协方差法） ───────────────────────
 
 
@@ -569,6 +758,69 @@ def portfolio_beta(
 
     beta = cov / var_br
     return sanitize_metric(beta)
+
+
+# ── 组合 Beta 置信区间与统计检验 ──────────────
+
+
+def portfolio_beta_analysis(
+    portfolio_returns: list[float],
+    benchmark_returns: list[float],
+) -> dict | None:
+    """组合 Beta 置信区间 + 统计检验。
+
+    在 portfolio_beta 的点估计基础上增加：
+      - 95% 置信区间（基于 OLS 标准误 + t 分布）
+      - t 统计量 + p 值（判断 Beta 是否显著 ≠ 0）
+      - 置信区间过宽（> 1.5）时标记为不可靠
+
+    Args:
+        portfolio_returns: 组合日收益率序列
+        benchmark_returns: 基准日收益率序列
+
+    Returns:
+        {beta, ci_lower, ci_upper, t_stat, p_value, reliable, df}
+        数据不足时返回 None
+    """
+    beta = portfolio_beta(portfolio_returns, benchmark_returns)
+    if beta is None:
+        return None
+
+    se_result = _beta_se(portfolio_returns, benchmark_returns, beta)
+    if se_result is None:
+        return {"beta": beta, "ci_lower": None, "ci_upper": None,
+                "t_stat": None, "p_value": None, "reliable": False, "df": 0}
+
+    se, df = se_result
+    if se <= 0:
+        if beta is not None and se == 0.0:
+            # 完美预测：t 统计量无穷大，CI 为零宽度
+            return {"beta": sanitize_metric(beta), "ci_lower": sanitize_metric(beta),
+                    "ci_upper": sanitize_metric(beta), "t_stat": None,
+                    "p_value": 0.0, "reliable": True, "df": df}
+        return {"beta": beta, "ci_lower": None, "ci_upper": None,
+                "t_stat": None, "p_value": None, "reliable": False, "df": df}
+
+    t_stat = beta / se if se > 0 else None
+    p_value = _t_cdf(-abs(t_stat), df) * 2 if t_stat is not None else None
+
+    t_crit = _t_critical_95(df)
+    ci_half = t_crit * se
+    ci_lower = sanitize_metric(beta - ci_half)
+    ci_upper = sanitize_metric(beta + ci_half)
+
+    ci_width = (ci_upper or 0) - (ci_lower or 0)
+    reliable = ci_width <= 1.5 and beta is not None
+
+    return {
+        "beta": sanitize_metric(beta),
+        "ci_lower": ci_lower,
+        "ci_upper": ci_upper,
+        "t_stat": sanitize_metric(t_stat),
+        "p_value": sanitize_metric(p_value),
+        "reliable": reliable,
+        "df": df,
+    }
 
 
 # ── 全量指标聚合 ────────────────────────────────
@@ -650,9 +902,11 @@ def compute_all_metrics(
     #11a 组合 Beta
     beta_val = None
     beta_conf = "insufficient"
+    beta_analysis = None
     if benchmark_daily_returns is not None and data_sufficient:
         beta_val = portfolio_beta(portfolio_daily_returns, benchmark_daily_returns)
         beta_conf = get_confidence_level(portfolio_daily_returns)
+        beta_analysis = portfolio_beta_analysis(portfolio_daily_returns, benchmark_daily_returns)
 
     #06 风险贡献
     rc_result: list[dict] = []
@@ -677,4 +931,6 @@ def compute_all_metrics(
         "portfolio_beta": sanitize_metric(beta_val),
         "beta_confidence": beta_conf,
         "risk_contributions": rc_result,
+        # Beta 统计检验
+        "beta_analysis": beta_analysis,
     }

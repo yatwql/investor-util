@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.7.4
+> 文档版本：v0.7.6-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,19 +8,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-> | 主程序代码 | Python | 123 | 28,170 | `src/python/` 下所有 `.py`（不含测试） |
-> | HTML 报告模板 | HTML | 1 | 1,750 | `src/python/tmpl/report_template.html` |
-> | 辅助脚本 | Python/Shell | 6 | 1,739 | `scripts/`（启动脚本、测试驱动、工具检查） |
-> | **源代码合计** | — | **129** | **31,659** | 主程序 + 模板 + 脚本 |
-> | **测试代码** | Python | **159** | **50,650** | `src/test/` 所有 `.py` 文件 |
-> | **测试用例** | — | — | **3,449 个** | `pytest --collect-only` 统计 |
-> | **用户文档** | Markdown | **67** | **31,523** | `docs-stm/`（65 文件）+ `README.md` + `CLAUDE.md` |
+| 主程序代码 | Python | 141 | 35,949 | `src/python/` 下所有 `.py`（不含测试） |
+| HTML 报告模板 | HTML | 1 | 1,749 | `src/python/tmpl/report_template.html` |
+| 辅助脚本 | Python/Shell | 8 | 2,364 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试） |
+| **源代码合计** | — | **150** | **40,062** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **168** | **53,155** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,484 个** | `pytest --collect-only` 统计 |
+| **用户文档** | Markdown | **71** | **34,145** | `docs-stm/`（69 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
 
 ```
 investor-util/
-│
 ├── src/                              # 源代码
 │   ├── python/                       # 主程序代码
 │   │   ├── __init__.py               #   包标记（空文件）
@@ -78,12 +77,16 @@ investor-util/
 │   │   │   └── news_sources.py       #   新闻源注册与配置
 │   │   │
 │   │   ├── analysis/                 # 业务计算层（独立无依赖，不导入 report/）
-│   │   │   ├── __init__.py           #   包标记；导出 check_liquidity 等
-│   │   │   ├── metrics.py            #   量化指标计算（夏普/卡玛/HHI/Beta 等）
-│   │   │   ├── simple_rebalance.py   #   极简再平衡（单品种超15%警戒线）
-│   │   │   ├── circuit_breaker_wrapper.py # 指标级断路包装器
-│   │   │   ├── drawdown_warning.py   #   回撤历史分位预警
-│   │   │   └── liquidity.py          #   流动性风险评估（场内品种变现天数计算）
+│   │   │   ├── __init__.py                    #   包标记；导出 check_liquidity 等
+│   │   │   ├── alignment_correction.py        #   口径修正因子计算（估值偏差校准）
+│   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
+│   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
+│   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
+│   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
+│   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
+│   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
+│   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
+│   │   │   └── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
 │   │   │
 │   │   ├── llm/                      # LLM 智能分析
 │   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
@@ -124,6 +127,7 @@ investor-util/
 │   │   │   ├── html_save.py          #   HTML 保存/导出
 │   │   │   ├── penetration.py        #   穿透持仓分析（嵌套基金）
 │   │   │   ├── penetration_sheet.py  #   穿透分析 Excel 页签
+│   │   │   ├── pipeline_data_builder.py # 管线数据上下文组装（capture_snapshot → pipeline_data 字典，P1-06-A 从 orchestrator 拆分）
 │   │   │   ├── market_value.py       #   市值计算与盈亏分析
 │   │   │   ├── market_value_sheet.py #   市值分析 Excel 页签
 │   │   │   ├── category.py           #   持仓分类（股票/基金/债券/QDII 等）
@@ -140,6 +144,7 @@ investor-util/
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
 │   │   │   ├── news_correlation.py   #   新闻与持仓关联分析报告
 │   │   │   ├── orchestrator.py       #   报告编排共享层（TUI/CLI 共用）
+│   │   │   ├── privacy_notice.py     #   隐私提示模块（首次运行提示 + 报告脚注）
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
@@ -167,6 +172,8 @@ investor-util/
 │   │   ├── ansi_colors.py            # ANSI 颜色常量（终端输出着色）
 │   │   ├── code_utils.py             # 证券代码/类型判定工具
 │   │   ├── market_hours.py           # 交易时段判断（A股/港股/QDII）
+│   │   ├── anonymizer.py              # 匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
+│   │   ├── circuit_breaker.py         # 统一断路器网关（Provider + LLM 熔断状态查询）
 │   │   ├── http_client.py            # HTTP 客户端（请求/重试/超时）
 │   │   ├── constants.py              # 全局常量/版本号
 │   │   └── logger.py                 # 日志模块（文件+控制台，自动轮转）
@@ -202,6 +209,8 @@ investor-util/
 │   ├── test_runner.py                #   测试驱动（pytest 模式封装）
 │   ├── check-test-markers.py         #   测试标记合规检查
 │   ├── check-version-consistency.py  #   版本号一致性检查
+│   ├── calibrate-dedup-threshold.py  #   新闻去重阈值校准
+│   ├── perf_report.py               #   端到端性能基准测试
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 │
 ├── docs-stm/                         # 项目文档
@@ -230,8 +239,9 @@ investor-util/
 │   │   ├── better-investment-advice/            #   投资建议改进分析讨论
 │   │   │   ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
 │   │   │   ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
-│   │   │   ├── f_context-schema.md              # f_context Pre-Schema 文档（管线键定义+类型断言）
-│   │   │   └── rf-and-885005-test-report.md              # Rf & 885005 数据源稳定性专项测试报告
+│   │   │   ├── data-channels-schema.md            # 数据通道 Schema 文档（管线键定义+类型断言）
+│   │   │   ├── data-source-stability-test-report.md       # 数据源稳定性专项测试报告
+│   │   │   └── better-investment-performance-test-report.md # 端到端性能基准测试报告
 
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档

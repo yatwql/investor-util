@@ -1,13 +1,11 @@
 """LLM 批量编排模块 — 缓存预检查、线程池分发与 LLM 全量生成。
 
-R-198 从 generators.py 拆分：包含 _compute_module_cache_info、
-_precheck_one_cache、_precheck_all_modules、_dispatch_llm_workers、
-generate_all_llm 和 _LLM_CLIENT_SETTINGS。
+包含 _compute_module_cache_info、_precheck_one_cache、_precheck_all_modules、
+_dispatch_llm_workers、generate_all_llm 和 _LLM_CLIENT_SETTINGS。
 
 ``_MODULE_FNS`` 集中管理所有 LLM 模块的生成函数，确保一致的
 缓存预检、线程池分发和失败处理。新增模块需在此注册。
 """
-
 from __future__ import annotations
 
 import json
@@ -252,7 +250,7 @@ def _dispatch_llm_workers(
     penetrated_assets: list[dict] | None,
     holdings_details: list[dict] | None,
     sector_flow: list[dict] | None,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     *,
     news_data: list[dict] | None = None,
     holdings_data: list | None = None,
@@ -325,7 +323,7 @@ def _dispatch_llm_workers(
             force=force,
             http_client=c,
             llm_config=lc,
-            f_context=f_context,
+            pipeline_data=pipeline_data,
             competitive_context=_competitive_context,
             metrics=_metrics,
         ),
@@ -341,7 +339,7 @@ def _dispatch_llm_workers(
             force=force,
             http_client=c,
             llm_config=lc,
-            f_context=f_context,
+            pipeline_data=pipeline_data,
             degradation_events=_degradation_events,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
@@ -509,7 +507,7 @@ def generate_all_llm(
     holdings_details: list[dict] | None = None,
     sector_flow: list[dict] | None = None,
     force: bool = False,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     history_data: dict | None = None,
     metrics: dict | None = None,
     degradation_events: list[dict] | None = None,
@@ -526,7 +524,7 @@ def generate_all_llm(
     每个工作线程创建独立的 httpx.Client，避免全局共享连接池的线程安全问题。
 
     Args:
-        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
+        pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
         history_data: 组合历史走势数据字典（含风险指标）。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
         degradation_events: DegradationTracker.get_log() 输出。
@@ -575,7 +573,7 @@ def generate_all_llm(
         penetrated_assets,
         holdings_details,
         sector_flow,
-        f_context=f_context,
+        pipeline_data=pipeline_data,
         metrics=metrics,
         degradation_events=degradation_events,
         comparison_indices=comparison_indices,
@@ -602,11 +600,24 @@ def generate_all_llm(
     # 仅检查非缓存且非空的模块（缓存命中说明内容未变化，无需重复校验）。
     _module_labels = {"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘",
                       "health_check": "持仓体检报告", "penetration_deep": "穿透深度分析"}
+
+    # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
+    _penetrated_codes: set[str] = set()
+    if penetrated_assets:
+        for _asset in penetrated_assets:
+            _codes = _asset.get("codes") or []
+            _penetrated_codes.update(_codes)
+
     if holdings_details and any(r is not None for r in (gm_r, er_r, hc_r, pd_r)):
         for _mk, _result in [("global_macro", gm_r), ("expert_review", er_r),
                              ("health_check", hc_r), ("penetration_deep", pd_r)]:
             if _result:
-                _summary = run_fact_check(_result, holdings_details, _module_labels.get(_mk, _mk))
+                _summary = run_fact_check(
+                    _result, holdings_details,
+                    module_label=_module_labels.get(_mk, _mk),
+                    extra_valid_codes=_penetrated_codes if _mk == "penetration_deep" else None,
+                    is_penetration_module=_mk == "penetration_deep",
+                )
                 if _summary and _summary not in _result:
                     if _mk == "global_macro":
                         gm_r = _result + "\n" + _summary

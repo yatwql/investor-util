@@ -672,7 +672,7 @@ class TestFetchLlmAndNews:
         ):
             result = _fetch_llm_and_news(
                 holdings, prep, sector_flow=[], force_llm=False,
-                f_context=None, enable_news=True, enable_llm=True,
+                pipeline_data=None, enable_news=True, enable_llm=True,
                 reporter=reporter,
             )
 
@@ -695,7 +695,7 @@ class TestFetchLlmAndNews:
         ):
             result = _fetch_llm_and_news(
                 holdings, prep, sector_flow=[], force_llm=False,
-                f_context=None, enable_news=False, enable_llm=True,
+                pipeline_data=None, enable_news=False, enable_llm=True,
                 reporter=reporter,
             )
 
@@ -718,7 +718,7 @@ class TestFetchLlmAndNews:
         ):
             result = _fetch_llm_and_news(
                 holdings, prep, sector_flow=[], force_llm=False,
-                f_context=None, enable_news=True, enable_llm=False,
+                pipeline_data=None, enable_news=True, enable_llm=False,
                 reporter=reporter,
             )
 
@@ -733,7 +733,7 @@ class TestFetchLlmAndNews:
 
         result = _fetch_llm_and_news(
             [], {}, sector_flow=None, force_llm=False,
-            f_context=None, enable_news=False, enable_llm=False,
+            pipeline_data=None, enable_news=False, enable_llm=False,
             reporter=reporter,
         )
 
@@ -757,7 +757,7 @@ class TestFetchLlmAndNews:
         ):
             result = _fetch_llm_and_news(
                 holdings, prep, sector_flow=[], force_llm=False,
-                f_context=None, enable_news=True, enable_llm=True,
+                pipeline_data=None, enable_news=True, enable_llm=True,
                 reporter=reporter,
             )
 
@@ -935,8 +935,8 @@ class TestCaptureSnapshot:
         # 验证 prune 参数来自 config 而非 get_config_cache()
         mock_prune.assert_called_once_with(retention_days=99, max_count=200)
 
-    def test_capture_snapshot_f_context(self):
-        """f_context 含 diff/diff_trimmed/days_since_last 三个顶层 key。"""
+    def test_capture_snapshot_pipeline_data(self):
+        """pipeline_data 含 diff/diff_trimmed/days_since_last 三个顶层 key。"""
         mock_reporter = MagicMock()
         detail = self._make_mock_detail()
         config = {"history": {"snapshot_retention_days": 60, "snapshot_max_count": 365}}

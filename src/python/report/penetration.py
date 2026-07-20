@@ -677,18 +677,23 @@ def _enrich_with_industry_api(merged: dict[str, Any]) -> tuple[bool, str]:
 
     Returns:
         (success, failure_type)
-        - success=True 表示 API 获取成功（可能有部分数据）
-        - success=False 时 failure_type 为 ``"unreachable"``（连接失败）或 ``"empty"``（无可用代码/空响应）
+        - success=True 表示 API 获取成功（可能有部分数据），或无需调用 API（全为非 A 股）
+        - success=False 时 failure_type 为 ``"unreachable"``（连接失败）、
+          ``"empty"``（A 股代码存在但 API 返回空数据）
     """
     try:
         all_codes: list[str] = []
         for info in merged.values():
             all_codes.extend(info.get("codes") or [])
         if not all_codes:
-            return False, "empty"
+            return True, "no_a_share"
+        # 穿透资产中无 A 股代码（如全为 QDII/港股通）→ 无需调用行业 API
+        a_share_codes = [c for c in set(all_codes) if is_a_share_code(c)]
+        if not a_share_codes:
+            return True, "no_a_share"
         from src.python.fetcher.industry import batch_fetch_industry_data as batch_ind
 
-        ind_data = batch_ind(list(set(all_codes)))
+        ind_data = batch_ind(a_share_codes)
         if ind_data:
             for info in merged.values():
                 for code in info.get("codes") or []:

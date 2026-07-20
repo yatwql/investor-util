@@ -1,13 +1,12 @@
 """LLM 提示词表格模块 — 格式化和摘要构建函数。
 
-从 prompts.py 拆分，包含：
+包含：
   - _format_holdings_block — 持仓明细格式化
   - _format_penetration_block — 穿透 TOP10 格式化
   - _calc_country_exposure — 国别/币种暴露计算
   - _build_holdings_summary — 持仓摘要构建（新闻关联分析用）
   - _build_news_correlation_summary — 新闻摘要构建
 """
-
 from __future__ import annotations
 
 import logging

@@ -1,7 +1,6 @@
 """核心内容页签写入模块。
 
 职责：写入汇总 / 分类 / 穿透 / 基金业绩 4 个核心页签。
-提取自 excel_generator.py 的 _write_content_sheets。
 """
 
 from __future__ import annotations

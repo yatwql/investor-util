@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.7.4
+> 文档版本：v0.7.6-dev
 
 ## 目录
 
@@ -1050,11 +1050,11 @@ def _get_pool() -> ThreadPoolExecutor:
 5. **LLM + 新闻并行获取**（4 分支统一处理）
 6. **双管线生成**：HTML + Excel
 
-#### f_context 数据上下文
+#### pipeline_data 数据上下文
 
-`report/f_context_builder.py` 集中组装传递给 LLM 的数据上下文 `f_context`。原本内联在 `orchestrator.py` 的组装逻辑被抽取到此独立模块，包含 `_build_basic_context()`、`_build_risk_context()`、`_build_llm_context()` 等分段构造器，职责清晰可测。
+`report/pipeline_data_builder.py` 集中组装传递给 LLM 的数据上下文 `pipeline_data`。原本内联在 `orchestrator.py` 的组装逻辑被抽取到此独立模块，包含 `_build_basic_context()`、`_build_risk_context()`、`_build_llm_context()` 等分段构造器，职责清晰可测。
 
-`f_context` 遵循 C19 Schema 契约：所有键必须在 `docs-stm/plan/better-investment-advice/f_context-schema.md` 中预定义类型、版本号和写入/消费模块后，才能在代码中使用该键。
+`pipeline_data` 遵循 C19 Schema 契约：所有键必须在 `docs-stm/plan/better-investment-advice/data-channels-schema.md` 中预定义类型、版本号和写入/消费模块后，才能在代码中使用该键。
 
 #### 三种报告路径
 
@@ -1913,8 +1913,8 @@ class ComputModuleDef:
 | `analytics_liquidity` | 流动性分析 | ✅ | 场内/场外比例、停牌风险、基金封闭期分析 |
 | `analytics_fx_exposure` | 外汇敞口分析 | ✅ | A股/港股/美股 国别分布与外汇风险敞口判断 |
 | `analytics_fact_checker` | 事实锚定校验器 | ✅ | LLM 输出的事实校验：数值一致性、品种存在性、排名正确性（纯算法层） |
-| `analytics_scenario` | 情景分析 | ⏳ | 市场涨跌 20% 情景模拟 |
-| `analytics_alignment` | 组合校准分析 | ⏳ | 持仓与目标偏差分析 |
+| `analytics_scenario` | 情景分析 | ✅ | 市场涨跌情景模拟、3 情景表、置信区间传播 |
+| `analytics_alignment` | 组合校准分析 | ✅ | 费率估算/现金剥离/TWR 计算 |
 | `analytics_inferrer` | 用户画像推断 | ⏳ | 持仓结构→风险偏好推断 |
 
 计算模块与报表层保持单向依赖，禁止反向导入 report/。
@@ -2149,7 +2149,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 | **C7** | **报告序号不可硬编码** — 报告 17 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
-| **C19** | **f_context Schema 契约** — 所有 f_context 键必须先在 docs-stm/plan/better-investment-advice/f_context-schema.md 中定义类型、版本号、写入/消费模块后，才能在代码中新增该键的使用 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 f_context 注入数据的模块 |
+| **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 docs-stm/plan/better-investment-advice/data-channels-schema.md 中定义类型、版本号、写入/消费模块后，才能在代码中新增该键的使用 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
 
 ### 8.4 LLM 集成层约束
 
@@ -2210,7 +2210,7 @@ investor-util/
 │   │   ├── providers/           # 数据源提供商（14 个文件）
 │   │   ├── reader.py            # 持仓 Excel 解析
 │   │   ├── registry.py          # 中央注册表（26 个数据模块 + 17 个报告模块 + 6 个计算模块）
-│   │   ├── report/              # 报告生成（~30 个文件，含 orchestrator/progress/f_context_builder）
+│   │   ├── report/              # 报告生成（~30 个文件，含 orchestrator/progress/pipeline_data_builder）
 │   │   ├── schemas/             # Pydantic 数据模式（快照等）
 │   │   ├── tui.py               # 键盘输入封装
 │   │   ├── tui_handlers.py      # 菜单通用辅助
@@ -2340,7 +2340,7 @@ investor-util/
 | 回撤分位(1年) | 组合日收益率（约 250 交易日） | None（显示 --） | 数据不足 60 日则不计算 | — |
 | 回撤分位(全历史) | 组合日收益率 | None（显示 --） | 数据不足 60 日则不计算 | 1 年/3 年/全历史三档 |
 
-> K 线数据通过腾讯/新浪 API 获取，两者均为已知不可靠来源。熔断时降级行为由 DegradationTracker 记录并传递至 f_context['data_degradation']，LLM prompt 据此展示"部分指标因行情数据不全暂时无法计算"。
+> K 线数据通过腾讯/新浪 API 获取，两者均为已知不可靠来源。熔断时降级行为由 DegradationTracker 记录并传递至 pipeline_data['data_degradation']，LLM prompt 据此展示"部分指标因行情数据不全暂时无法计算"。
 
 ### 附录 G：报告生成降级路径矩阵
 
@@ -2356,9 +2356,9 @@ investor-util/
 
 > 基本原则：任何数据获取失败均不得阻止报告生成（文件系统写失败除外）。降级状态下生成的报告必须在页脚注明降级摘要。
 
-### 附录 H：f_context Schema 定义（当前已实现 + 计划中）
+### 附录 H：pipeline_data Schema 定义（当前已实现 + 计划中）
 
-> 完整定义和维护责任见 docs-stm/plan/better-investment-advice/f_context-schema.md。
+> 完整定义和维护责任见 docs-stm/plan/better-investment-advice/data-channels-schema.md。
 > 此处仅列出当前阶段已确认的键名和类型。
 
 | 键名 | 类型 | Optional | 状态 | 写入阶段 |
@@ -2376,6 +2376,6 @@ investor-util/
 | rebalance_signals | list[dict] | 是 | 已实现 | prepare_report_data |
 | liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
 | fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
-| scenario_analysis | dict | 是 | 计划中 | prepare_report_data |
+| scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
 
 [↑ 回到顶部](#目录)

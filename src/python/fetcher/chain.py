@@ -165,7 +165,7 @@ def fetch_with_fallback(
     对于指定数据类型，依次尝试 chain 中的每个 provider，
     第一个成功的返回结果，全部失败返回 None。
 
-    熔断逻辑委托 DataSourceRegistry，取代旧版 _PROVIDER_SKIP 等全局变量。
+    熔断逻辑委托 DataSourceRegistry 统一管理。
     """
     chain = _get_chain(data_type)
 

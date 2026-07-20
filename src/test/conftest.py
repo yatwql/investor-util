@@ -27,7 +27,7 @@ _KNOWN_MARKERS: set[str] = {
     "scenario", "scenario_basic", "scenario_resilience", "scenario_llm", "scenario_datetime",
     "scenario_stock", "scenario_fund", "scenario_mixed_accounts", "scenario_new_holdings",
     "scenario_cache_hit", "scenario_bond", "scenario_network_down", "scenario_single_holding",
-    "scenario_zero_cost", "scenario_extreme",
+    "scenario_zero_cost", "scenario_extreme", "scenario_perf", "scenario_security",
     # unit 分支
     "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news", "unit_report",
     "unit_config", "unit_config_edge", "unit_core", "unit_cli", "unit_ui",
@@ -49,6 +49,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "scenario_basic: 基础业务链路（S1-S5 + S0a-S0d + S21-S28 + S29-S33）")
     config.addinivalue_line("markers", "scenario_resilience: 异常容错场景（S6-S10）")
     config.addinivalue_line("markers", "scenario_llm: LLM 场景组合（S11-S20）")
+    config.addinivalue_line("markers", "scenario_perf: 性能基准测试（P4-14）")
+    config.addinivalue_line("markers", "scenario_security: 安全基线测试（P4-16）")
     config.addinivalue_line("markers", "scenario_datetime: 日期/时间场景（T1-T21）")
     config.addinivalue_line("markers", "scenario_stock: 场景 S1 — 纯股票组合")
     config.addinivalue_line("markers", "scenario_fund: 场景 S2 — 纯基金组合")
@@ -111,7 +113,7 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.config._config_defaults._CONFIG_FILE",
         str(tmp_path / "data/config/config.json"),
     )
-    # C13: cache 拆分重构后 _CACHE_DIR 存在于 _paths/_stats/_cleanup/_groups/__init__ 等处
+    # C13: _CACHE_DIR 存在于 cache/ 子包中
     monkeypatch.setattr(
         "src.python.cache._paths._CACHE_DIR",
         str(tmp_path / "data/cache"),

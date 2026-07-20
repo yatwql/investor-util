@@ -38,9 +38,8 @@ _HEADERS = {
 _MAX_RETRIES = 1
 
 # ── 熔断器 ─────────────────────────────────────────────────
-# 熔断逻辑已统一委托 DataSourceRegistry（provider_registry.py）。
+# 熔断逻辑委托 DataSourceRegistry（provider_registry.py）。
 # 连续 3 次传输级失败 → 熔断 300s → 冷却期满自动放行试探。
-# 不再使用独立的局部熔断全局变量。
 
 # 查询字段（行业分类 + 扩展行情，供 fund_style 等模块使用）
 #   f9=动态市盈率(PE), f20=总市值, f23=市净率(PB)

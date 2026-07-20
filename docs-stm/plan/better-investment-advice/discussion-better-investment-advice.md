@@ -1,6 +1,6 @@
 # 产品思考：从"数据呈现"到"切实投资建议"的鸿沟与路径
 
-> **状态**：Tier 0 / MVP / Phase 1（20 项）/ Phase 2（19 项）/ Phase 3（P3-01~P3-13 + P3-17）已交付，P3-15 已取消，合计 73 项任务完成  
+> **状态**：Tier 0 / MVP / Phase 1（20 项）/ Phase 2（19 项）/ Phase 3（全部 16 项 + 3 项技术债清理）/ Phase 4（全部 15 项）已交付，P3-15 已取消，合计 91 项任务完成  
 > **日期**：2026-07-20  
 > **场景**：当前产品已有报表数据 + LLM 大模型提示语，如何让投资建议更"切实可执行"
 
@@ -192,8 +192,8 @@ LLM 据此输出："你的组合在牛市中略跑赢指数，且回撤控制优
 | **MVP** | 4.5 天 | ★★★★★ 最强 | **0** | ✅ 已完成 |
 | **Phase 1** | 20.5 天 | ★★★ 管线基础 | 1个(Rf) | ✅ 已完成 |
 | **Phase 2** | 17.5 天 | ★★★★ 高 | 0 | ✅ 已完成 |
-| **Phase 3** | 25.75 天 | ★★★★★ 最强 | 0个（885005降级） | P3-01~P3-13 + P3-17 ✅，P3-15 ❌ 取消，P3-16 待办 |
-| **Phase 4** | 22-26 天 | ★★★★ 积累 | 0 | P2 待办 |
+| **Phase 3** | 25.75 天 | ★★★★★ 最强 | 0个（885005降级） | P3-01~P3-13 + P3-16 + P3-17 ✅，P3-15 ❌ 取消 |
+| **Phase 4** | 22-26 天 | ★★★★ 积累 | 0 | 全部 15 项 ✅ 已交付 |
 | **Phase 5** | 13.5 天 | ★★★★ 按需 | 0 | 按需评估 |
 | **Phase D** | 2 天 | ★★★ 可选 | 0 | 独立决策 |
 | **全量总计** | **~109.5 天(+buffer ~126-131d)** | — | 最多2个 | — |
@@ -224,7 +224,7 @@ LLM 据此输出："你的组合在牛市中略跑赢指数，且回撤控制优
 | DegradationTracker record() 在 fetcher 层零写入（T0 隐患） | **高** | DegradationTracker 实例存在于 3 个 report/ 模块但 **fetcher/ 层 record() 从未被调用**（注意：report/ 层已有 6 处 record() 调用——fund_performance.py perf_rank、penetration_sheet.py industry/profit_forecast/dividend、summary.py index_a/index_us——但这些都是消费侧的数据状态构建记录）。真正触发降级时的原始错误（全链路不可用/fallback 降级）在 fetcher/ 层（price/fund/industry/index）未被捕获。data_degradation 永远缺少 fetcher 层的关键降级事件。MVP-02 的概念 API 降级状态检测依赖这组数据。 | T0-01-A 首次明确 fetcher 层注入点：price.py(2处)/fund.py(2处)/industry.py(1处)/index.py(1处)共 6 处降级点。完成前 T0-01/T0-02/MVP-02 均不可完整交付。 |
 | C17 _COMPUTATION_REGISTRY 注册缺口（6 模块缺失） | **中** | P1-10 计划创建 _COMPUTATION_REGISTRY（计算模块注册表），但以下 6 个分析模块在任务分解中**没有对应的注册任务**：(1) metrics.py（P2-01~P2-11 共 8 个指标），(2) liquidity.py（P3-11~P3-12），(3) fx_exposure.py（P3-13），(4) scenario.py（P4-01~P4-03），(5) alignment_correction.py（P3-09b），(6) inferrer.py（P5-01）。这些模块的 ComputModuleDef 注册缺失将导致 registry 无法统一管理计算模块的依赖关系和 SettingsKey 映射。 | P1-10 实施时同步为 6 模块预留 ComputModuleDef 注册位置，各模块创建时补充注册代码和测试。给这些模块立项时在任务描述中显式标注"包含 registry.py _COMPUTATION_REGISTRY 注册"。 |
 | news_top_count 默认值不一致（orchestrator.py=100 vs _config_defaults.py=300） | **低** | `orchestrator.py` L533 硬编码 `news_top_count=100`，但 `_config_defaults.py` 的 `_DEFAULT_CONFIG` 默认值为 `"news_top_count": 300`。两处默认值相差 3 倍，但用户若未显式配置会导致行为不确定——orchestrator 优先用自己参数而非 config。不影响功能正确性（新闻仍可正常获取），仅影响 Top-N 截断量。 | 统一默认值。建议将 orchestrator.py 的默认值改为从 config 读取：`news_top_count = config.get("news_top_count", 300)`，消除硬编码。 |
-| f_context 死键（diff_trimmed、days_since_last 从未被消费） | **低** | `orchestrator.py` `capture_snapshot()` 返回 f_context 包含 3 个键，其中 `diff_trimmed`（L246，`_diff.trimmed` 布尔值——永远是 False，因为下游从未调过 `_diff.trim()`）和 `days_since_last`（L247，与 `diff.days_since_last_report` 完全重复）在 f_context 注入后**从未被任何一个 LLM generator 或 prompt 消费**。二者合计 2 行死代码。无功能影响。 | **推荐方案 B：T0-01-B 时直接删除**。理由：`diff_trimmed` 是 bool False 非裁剪数据（被命名误导），`days_since_last` 是 `diff` 里已有数据的冗余副本。删除后 f_context 顶层仅留 `"diff"` 一个键，与 Pre-Schema 文档一致，无需做后续死键复活决策。删除操作简单（删 2 行），覆盖 T0-01-B 的 Pre-Schema 定义时段，无向后兼容风险。P2-14 指标表注入如需要裁剪版，应在 LLM prompt 消费侧从 `diff` 做 `trim()`，而非恢复 f_context 中的冗余字段。 |
+| pipeline_data 死键（diff_trimmed、days_since_last 从未被消费） | **低** | `orchestrator.py` `capture_snapshot()` 返回 pipeline_data 包含 3 个键，其中 `diff_trimmed`（L246，`_diff.trimmed` 布尔值——永远是 False，因为下游从未调过 `_diff.trim()`）和 `days_since_last`（L247，与 `diff.days_since_last_report` 完全重复）在 pipeline_data 注入后**从未被任何一个 LLM generator 或 prompt 消费**。二者合计 2 行死代码。无功能影响。 | **推荐方案 B：T0-01-B 时直接删除**。理由：`diff_trimmed` 是 bool False 非裁剪数据（被命名误导），`days_since_last` 是 `diff` 里已有数据的冗余副本。删除后 pipeline_data 顶层仅留 `"diff"` 一个键，与 Pre-Schema 文档一致，无需做后续死键复活决策。删除操作简单（删 2 行），覆盖 T0-01-B 的 Pre-Schema 定义时段，无向后兼容风险。P2-14 指标表注入如需要裁剪版，应在 LLM prompt 消费侧从 `diff` 做 `trim()`，而非恢复 pipeline_data 中的冗余字段。 |
 | DegradationTracker 三重实例（隔离隐患） | **低** | `fund_performance.py`、`penetration_sheet.py`、`summary.py` 各在文件级实例化了一个 DegradationTracker 实例（`degradation = DegradationTracker(...)`），**三者各自独立记录日志**。`orchestrator.py` 的 `data_degradation` 注入点应聚合三者日志——但当前没有统一收集机制。若三个实例的生产报告阶段不同（fund_performance 在 Stage A、penetration_sheet 在 Stage B），日志聚合点在时间上可能不完整。当前运行稳定（三个阶段按序执行，聚合时均已完成），但架构上存在隐患：若未来某日 parallelism 改变导致部分阶段未执行，降级状态可能被遗漏。 | **T0-01-A 时改为单例工厂**：在 `data_status.py` 中新增模块级 `get_tracker()` 函数（`global _instance` + 延迟初始化 + 持久化路径统一），三个消费者各改 1 行（`DegradationTracker()` → `get_tracker()`）。收益：(1) 三模块共享同一 _counts → 降级状态自动聚合；(2) 统一 persist_path → 跨会话持久化生效；(3) orchestrator 只需一次 get_log() 即可获取全量；(4) 未来并行化时线程安全已有保证。改动量：3 文件各改 1 行 import + data_status.py 加 ~8 行工厂函数。 |
 
 ### 3.1 外部数据源稳定性全景图与专项测试建议
@@ -281,7 +281,7 @@ LLM 据此输出："你的组合在牛市中略跑赢指数，且回撤控制优
    - **替代源（已验证可用）**：`bond_zh_us_rate`（akshare/Sina 财经）→ **50/50 稳定性 100%**，中国 10Y 国债收益率最新值 **1.7404%**，覆盖 2002-2026 共 6129 条日线
    - 备用源 `worldgovernmentbonds.com` → **JS 渲染不可直接解析**
    - 解耦：`bond_zh_us_rate` 自动获取（主）+ 用户手动配置 Rf 值（兜底）
-   - 详见测试报告 `rf-and-885005-test-report.md`
+   - 详见测试报告 `data-source-stability-test-report.md`
 
 Rf 数据源一致性策略（简化）：`bond_zh_us_rate` 单源获取，每次请求自动校验数据结构完整性（13 列字段名不变）。若连续 3 次请求失败，激活手动配置兜底。
 
@@ -314,7 +314,7 @@ Rf 数据源一致性策略（简化）：`bond_zh_us_rate` 单源获取，每�
 
 **核心结论**：**真正需要在 Phase 1 开工前专项测试的只有 1 项——Rf 的东方财富 datacenter API。** 其余的要么是生产验证过的，要么有成熟的降级方案，要么在 Phase 1 不依赖它。
 
-> **架构基础设施备注——C4 会话级缓存缺口**：当前缓存引擎（`src/python/cache/`）为纯文件系统实现，每次 `get()` 都涉及磁盘 I/O + JSON 反序列化，没有内存级（进程内/会话级）缓存层。当同一个缓存数据在同一报告生成过程中被多次访问（如 `price_` 前缀的行情数据被 market_value、penetration、summary 等多个模块读取），每次访问都产生冗余的磁盘读取。这在当前阶段不构成阻塞问题（单次报告约 30-50 次缓存读取，延迟可接受），但 P1-04 日收益率管线和 Phase 2 指标算法上线后将显著增加缓存访问频率。建议在 P1-06-A（f_context_builder 预重构）时评估是否在 `cache.py` 中增加一个可选的 `functools.lru_cache` 装饰层（TTL 秒级，单次报告生命周期内有效），消除同一文件在同一进程内的重复反序列化。此优化非阻塞，可推迟到 Phase 4 缓存优化批次合并实施。
+> **架构基础设施备注——C4 会话级缓存缺口**：当前缓存引擎（`src/python/cache/`）为纯文件系统实现，每次 `get()` 都涉及磁盘 I/O + JSON 反序列化，没有内存级（进程内/会话级）缓存层。当同一个缓存数据在同一报告生成过程中被多次访问（如 `price_` 前缀的行情数据被 market_value、penetration、summary 等多个模块读取），每次访问都产生冗余的磁盘读取。这在当前阶段不构成阻塞问题（单次报告约 30-50 次缓存读取，延迟可接受），但 P1-04 日收益率管线和 Phase 2 指标算法上线后将显著增加缓存访问频率。建议在 P1-06-A（pipeline_data_builder 预重构）时评估是否在 `cache.py` 中增加一个可选的 `functools.lru_cache` 装饰层（TTL 秒级，单次报告生命周期内有效），消除同一文件在同一进程内的重复反序列化。此优化非阻塞，可推迟到 Phase 4 缓存优化批次合并实施。
 
 > **测试策略优化备注**：当前 `scripts/test_runner.py` 中 `--mode regression` 与 `--mode scenario` 实际配置完全一致（同一 marker 集合、同一 timeout、同一并行度），存在**功能冗余**——`regression` 和 `scenario` 两个 mode 名指向完全相同的测试集合。建议在门禁体系建设时合并或重新定义 mode 语义。
 >
@@ -345,7 +345,7 @@ Tier 0（超优先，在当前迭代中先行交付，1.25天）
   ├── DegradationTracker get_log() 查询接口封装 + record() 注入     ← 0.25天
   │   （先补 record() 调用，确保降级记录不为空；再封装聚合查询接口）
   ├── DegradationTracker→LLM 接线（data_status.py 已实例化
-  │    但未接入 LLM 管线，在 f_context 中注入降级状态）           ← 0.5天
+  │    但未接入 LLM 管线，在 pipeline_data 中注入降级状态）           ← 0.5天
   └── 数据质量警告注入 LLM（扩展校验项从3→6）                     ← 0.5天
   用户感知：★☆☆ 无感（基础设施，但解锁所有后续层的数据质量感知）
 
@@ -386,16 +386,16 @@ Phase 1 管线基础设施（3-4 周，为所有量化指标铺路）── 20.5
   ├── 个股日收益率管线暴露（portfolio_history.py L307 局部变量→返回）← 2天
   │     依赖：无（重构现有代码）
   ├── 组合日收益率暴露（get_combined_timeseries 新增 daily_returns 字段）← 0.5天
-  ├── f_context_builder 预重构（从 orchestrator 拆分 f_context 组装）  ← 1天
+  ├── pipeline_data_builder 预重构（从 orchestrator 拆分 pipeline_data 组装）  ← 1天
   ├── 管线隔离修复（orchestrator.py 4 个阻断点）                     ← 2天
   │     prepare_report_data 加 risk_metrics 键
-  │     capture_snapshot f_context 加风险字段
+  │     capture_snapshot pipeline_data 加风险字段
   │     generate_all_llm 暴露 history_data
   │     generators.py _fingerprint 含风险信号
   ├── 数据模块注册（registry.py 注册 + _COMPUTATION_REGISTRY 创建）   ← 1天
   ├── 基础设施（功能开关注册 18 开关 + 指标级断路包装器 + C20联动） ← 3天
   ├── 持仓匿名化最小版 + 缓存文件权限保护                            ← 1.5天
-  ├── f_context Schema 文档（T0 Pre-Schema + Phase 1 Full Schema）    ← 1天
+  ├── pipeline_data Schema 文档（T0 Pre-Schema + Phase 1 Full Schema）    ← 1天
   ├── category.py→code_utils.py 提取（消除 analysis→report 逆向依赖）← 1.5天
   ├── 管线集成测试 + Rf fetcher 测试用例                             ← 2天
   ├── 熔断器改进（指数退避+持久化+双熔断器统一网关）                ← 1.5天
@@ -426,7 +426,7 @@ Phase 2 量化信号全面激活（3-4 周，8 个指标上线）── 17.5 天
   │     （P2-14 至 P2-17 为硬串行依赖链）
   ├── 指标集成测试（8 指标各 1-2 断言）                              ← 1天
   └── 管线集成测试（模拟完整管线执行，验证 compute_all_metrics()
-       返回值最终出现在 f_context 和 LLM prompt 输出中）              ← 1天
+       返回值最终出现在 pipeline_data 和 LLM prompt 输出中）              ← 1天
       小计：~17.5 天
       小计：~14.5 天
       交付：报告首次出现夏普/卡玛/Beta/HHI 等量化指标，LLM 可引用
@@ -566,14 +566,14 @@ Phase 5（按需，最低优先级，不阻塞其他阶段）──────�
 
 - **Tier 0 (1.25d)**：DegradationTracker get_log() 封装 + DegradationTracker→LLM 接线 + 数据质量警告注入。必须先做，解锁所有后续层的 LLM 数据质量感知。
 - **MVP (5d)**：收益归因 + 概念板块 + 再平衡硬编码 + 竞争语境收益对比 + **条件推理**。**零新数据源、零新基础设施**，直接在现有 prompts.py 中加段落。这是最快的用户感知交付——用户第一次看到"建议减仓"+"收益来源"+"分情景建议"。建议 **第 1 周交付**。
-- **Phase 1 (20.5d)**：Rf fetcher（已验证东方财富 API 不可用，改用 Sina bond_zh_us_rate）+ 日收益率管线 + f_context_builder 预重构 + 管线隔离修复 + 基础设施 + code_utils 提取。后端改造为主，用户看到夏普比率开始有数值。**✅ 已完成**。
+- **Phase 1 (20.5d)**：Rf fetcher（已验证东方财富 API 不可用，改用 Sina bond_zh_us_rate）+ 日收益率管线 + pipeline_data_builder 预重构 + 管线隔离修复 + 基础设施 + code_utils 提取。后端改造为主，用户看到夏普比率开始有数值。**✅ 已完成**。
 - **Phase 2 (17.5d)**：全量 8 个指标算法 + 组合 Beta + 回撤预警 + 指标 prompt 注入 + 管线集成测试。报告首次出现夏普/卡玛/HHI/Beta/胜率/换手率/风险贡献。**✅ 已完成**。
 - **Phase 3 (25.75d)**：完整再平衡（阈值可配+权益固收偏离 ✅）+ 竞争语境完整版（自定义基金池 ✅）+ 流动性风险（场内自动计算+场外手动配置 ✅）+ 汇率敞口 ✅ + LLM Token 成本追踪 ✅ + LLM 事实校验器（待办 24h）。TUI 问卷前端（P3-15）**已取消**（用户画像降最低优先级）。这是**用户感知最强的批次**——可执行建议覆盖配置、风险、流动性、币种敞口全维度。
-- **Phase 4 (22-26d)**：敏感性分析 + Beta 置信区间 + 口径修正因子 + LLM 质量 + 测试框架 + 隐私安全实施 + 性能/韧性/安全测试门禁。质量门禁 + 安全基线 + 情景分析。建议 **Phase 3 完成后重新评估 ROI 决定是否进入**。
+- **Phase 4 (22-26d)**：敏感性分析 + Beta 置信区间 + 口径修正因子 + LLM 质量 + 测试框架 + 隐私安全实施 + 性能/韧性/安全测试门禁。✅ 11 项已交付（情境分析链、口径修正、匿名化 4 模式、缓存审查、LLM 幻觉测试、测试标记注册），🆕 4 项待办（隐私提示 P4-05、性能/韧性/安全测试 P4-14~P4-16）。
 - **Phase 5 (13.5d，按需)**：用户画像（持仓推断 + 置信度门控 + 安全哨兵 + 自适应阈值 + 对比基金池管理。TUI 问卷前端 P3-15 已取消）。**Phase 4 全部就绪后评估是否启动**。若 1 人团队按 1.6x 系数量化约 21.6 天。在此之前默认使用中性通用投资建议，不受画像缺失影响。
 - **Phase D (2d)**：CAPM α 独立决策。建议在 Phase 1 Rf+日收益率就绪后先花 4h 做用户验证，确认理解度和需求度后再决定是否投入 12h 实现。
 
-**f_context 管线改造 + DegradationTracker 接线是第一个交付里程碑（Tier 0）——改动小、影响大、解锁所有后续层的 LLM 能力。**
+**pipeline_data 管线改造 + DegradationTracker 接线是第一个交付里程碑（Tier 0）——改动小、影响大、解锁所有后续层的 LLM 能力。**
 
 ## 5. 附录：一张图看变化
 

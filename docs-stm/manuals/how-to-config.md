@@ -102,6 +102,7 @@
 | `rebalance.target_allocation` | `{}` | 目标配置 Schema（空=不启用）。格式 `{"equity":{"min":30,"max":70,"target":50}, "bond":{...}}` | 手动编辑 |
 | `rebalance.equity_fixed_income` | `{}` | 权益/固收超大类目标配置（空=不启用）。格式 `{"equity":{"min":30,"max":70}}` | 手动编辑 |
 | `redemption_limits` | `{}` | 场外基金单日赎回上限，格式 `{基金代码: 金额}`。配置后程序可计算场外品种全量赎回所需天数。未配置品种标记"需手动确认赎回上限" | 手动编辑 |
+| `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）/ `code_display`（名称→"品种X"，保留代码和盈亏）/ `full_anonymous`（名称→"品种X"，代码→"000XXX"，盈亏→±XX%）/ `summary`（仅大类汇总） | 菜单 `A` |
 | `enable_b_series` | `true` | B 系列报告板块可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
 | `enable_news` | `true` | 新闻类报告板块可见性（模块 #10），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制板块在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
 | `enable_history` | `true` | 历史走势报告板块可见性（模块 #15~#16），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
@@ -433,7 +434,7 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 
 ```json
 {
-  "anonymizer": true,
+  "anonymization": {"mode": "code_display"},
   "news_cls": true
 }
 ```
@@ -445,7 +446,7 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 | `llm_*`（5 项） | true（news_correlation 默认 false） | LLM 各模块独立启停 |
 | `b_series_*`（4 项） | true | B 系列基金深度分析模块 |
 | `news_*`（5 项） | true（cls 默认 false） | 新闻源启停 |
-| `anonymizer` | false | 持仓匿名化开关。开启后生成报告时名称替换为"持仓A/B/C…"，可选数量模糊模式 |
+| `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）、`code_display`（名称→"品种X"，保留代码）、`full_anonymous`（名称→"品种X"，代码→"000XXX"）、`summary`（仅大类汇总）。TUI 菜单 `[A]` 设置 |
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
 
 > 该文件不包含敏感信息，可安全纳入版本控制。

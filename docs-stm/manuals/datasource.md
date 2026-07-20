@@ -15,7 +15,7 @@
 | 财经新闻（akshare 封装） | akshare：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — | `news_akshare_` | 新闻 |
 | A 股指数 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn`（s_* 前缀） | `index_` / `query_` | 价格 |
 | 美股指数 | 新浪财经 `hq.sinajs.cn`（gb_* 前缀 JS 变量解析） | 腾讯财经 `qt.gtimg.cn` | `index_us_` / `query_` | 价格 |
-| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 行情页 `quotedata` 解析（仅行业，无概念） | `industry_` | 基础 |
+| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 东方财富 REST 行情页回退（仅行业，无概念） | `industry_` | 基础 |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `forecast_` | 基础 |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `sector_flow_` | 基础 |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `dividend_` | 基础 |

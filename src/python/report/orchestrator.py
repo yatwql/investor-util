@@ -132,8 +132,6 @@ def prepare_report_data(
 
 
 # ── S2 移入：capture_snapshot ──
-# 原 handlers_report._capture_snapshot()
-# ★ 与 TUI 原版差异：capture_snapshot 使用 config 参数替代 get_config_cache()
 
 
 def capture_snapshot(
@@ -145,17 +143,15 @@ def capture_snapshot(
 ) -> dict | None:
     """F1 持仓快照创建 + 差异计算 + 保存 + 清理。
 
-    接受 config 参数而非调用 get_config_cache()（★ 与 TUI 原版的核心差异）。
-
     Args:
         holdings: 持仓列表
         details: 行情明细
         config: 配置字典
         reporter: 进度报告接口
-        extra: 额外扩展字段（如 risk_metrics，供 Phase 1 在 f_context 中透传）
+        extra: 额外扩展字段（如 risk_metrics，供 Phase 1 在 pipeline_data 中透传）
 
     Returns:
-        f_context 字典（含 diff），首次运行或异常时返回 None。
+        pipeline_data 字典（含 diff），首次运行或异常时返回 None。
     """
     from src.python.fetcher.history_diff import HistoryDiff
     from src.python.report.data_status import get_tracker as _get_degradation_tracker
@@ -166,7 +162,7 @@ def capture_snapshot(
         SnapshotHolding,
     )
 
-    f_context: dict | None = None
+    pipeline_data: dict | None = None
     try:
         _snapshot_holdings = [
             SnapshotHolding(
@@ -203,7 +199,7 @@ def capture_snapshot(
             max_count=_history_cfg.get("snapshot_max_count", 365),
         )
         if not _diff.is_first_check:
-            f_context = {
+            pipeline_data = {
                 "diff": {
                     "is_first_check": False,
                     "total_value_diff": _diff.total_value_diff,
@@ -255,16 +251,14 @@ def capture_snapshot(
             }
             # 透传额外扩展字段（risk_metrics / portfolio_daily_returns）
             if extra:
-                f_context.update(extra)
+                pipeline_data.update(extra)
         reporter.ok("环比对比数据准备完成")
     except Exception:
         logger.info("[F1] 环比数据准备跳过（首次运行或异常）", exc_info=True)
-    return f_context
+    return pipeline_data
 
 
 # ── S3 移入：fetch_history_data ──
-# 原 handlers_report._fetch_history_data() 业务逻辑
-# ★ 与 TUI 原版差异：接受 config 参数替代 get_config_cache()；不接受 "prompt" 模式
 
 
 def fetch_history_data(
@@ -432,13 +426,13 @@ def _generate_report_both(
     details = _compute_details(holdings, config, reporter)
 
     # ── 2. F1 快照对比（始终执行） ──
-    f_context = capture_snapshot(holdings, details, config, reporter)
-    # [checkpoint] f_context 类型断言
-    if f_context is not None:
-        assert isinstance(f_context, dict), "capture_snapshot(both) f_context 类型异常"
-        _diff = f_context.get("diff")
+    pipeline_data = capture_snapshot(holdings, details, config, reporter)
+    # [checkpoint] pipeline_data 类型断言
+    if pipeline_data is not None:
+        assert isinstance(pipeline_data, dict), "capture_snapshot(both) pipeline_data 类型异常"
+        _diff = pipeline_data.get("diff")
         if _diff is not None and not isinstance(_diff, dict):
-            logger.warning("[checkpoint] f_context.diff 类型异常(both): %s", type(_diff).__name__)
+            logger.warning("[checkpoint] pipeline_data.diff 类型异常(both): %s", type(_diff).__name__)
 
     # ── 3. F2 历史走势（条件获取） ──
     if _enable_history:
@@ -483,7 +477,7 @@ def _generate_report_both(
             news_top_count=news_top_count,
             details=details,
             section_order=sec_order,
-            f_context=f_context,
+            pipeline_data=pipeline_data,
             history_data=history_data,
             progress=reporter,
             enable_b_series=_enable_b_series,
@@ -552,7 +546,7 @@ def _fetch_llm_and_news(
     prep_data: dict,
     sector_flow: list | None,
     force_llm: bool,
-    f_context: dict | None,
+    pipeline_data: dict | None,
     enable_news: bool,
     enable_llm: bool,
     reporter: ProgressReporter,
@@ -619,7 +613,7 @@ def _fetch_llm_and_news(
                 holdings_details=prep_data["holdings_details"],
                 sector_flow=sector_flow,
                 force=force_llm,
-                f_context=f_context,
+                pipeline_data=pipeline_data,
                 history_data=history_data,
                 comparison_indices=comparison_indices,
                 metrics=metrics,
@@ -715,20 +709,20 @@ def _generate_report_full(
             logger.warning("[checkpoint] prep.%s 类型异常: %s", _ck, type(prep.get(_ck)).__name__)
 
     # ── 2. F1 快照对比 ──
-    f_context = capture_snapshot(holdings, prep["details"], config, reporter)
-    # [checkpoint] f_context 类型断言
-    if f_context is not None:
-        assert isinstance(f_context, dict), "capture_snapshot f_context 类型异常"
-        _diff = f_context.get("diff")
+    pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
+    # [checkpoint] pipeline_data 类型断言
+    if pipeline_data is not None:
+        assert isinstance(pipeline_data, dict), "capture_snapshot pipeline_data 类型异常"
+        _diff = pipeline_data.get("diff")
         if _diff is not None:
             if not isinstance(_diff, dict):
-                logger.warning("[checkpoint] f_context.diff 类型异常: %s", type(_diff).__name__)
+                logger.warning("[checkpoint] pipeline_data.diff 类型异常: %s", type(_diff).__name__)
 
     # ── 3. F2 历史走势（条件获取） ──
     if _enable_history:
         _resolved_mode = "auto" if history_mode in ("auto",) else "off"
         history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
-        # 从 history_data 提取风险指标，注入 prep 和 f_context
+        # 从 history_data 提取风险指标，注入 prep 和 pipeline_data
         if history_data and history_data.get("status") not in ("unavailable",):
             _risk = {
                 "annualized_volatility": history_data.get("annualized_volatility", 0),
@@ -738,9 +732,9 @@ def _generate_report_full(
                 "data_end": history_data.get("data_end", ""),
             }
             prep["risk_metrics"] = _risk
-            if f_context is not None:
-                f_context["risk_metrics"] = _risk
-                f_context["portfolio_daily_returns"] = history_data.get("daily_returns_portfolio", [])
+            if pipeline_data is not None:
+                pipeline_data["risk_metrics"] = _risk
+                pipeline_data["portfolio_daily_returns"] = history_data.get("daily_returns_portfolio", [])
         # [checkpoint] risk_metrics 完整性校验
         _injected = prep.get("risk_metrics", {})
         if not _injected.get("annualized_volatility") and _injected.get("annualized_volatility") != 0:
@@ -785,7 +779,7 @@ def _generate_report_full(
         prep,
         sector_flow,
         force_llm,
-        f_context,
+        pipeline_data,
         _enable_news,
         _enable_llm,
         reporter,
@@ -849,7 +843,7 @@ def _generate_report_full(
             news_llm_meta=news_llm_meta,
             section_order=sec_order,
             progress=reporter,
-            f_context=f_context,
+            pipeline_data=pipeline_data,
             history_data=history_data,
             enable_b_series=_enable_b_series,
             enable_news=_enable_news,

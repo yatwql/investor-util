@@ -1,7 +1,6 @@
 """LLM API 用量页签写入模块。
 
 职责：LLM 用量汇总/模块明细/状态着色/缓存统计/列宽设置。
-提取自 summary.py 的 write_llm_usage_sheet 及其 7 个辅助函数。
 """
 
 from __future__ import annotations

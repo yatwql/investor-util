@@ -1,6 +1,6 @@
 """LLM 提示词核心模块 — System Prompt 常量与基础设施。
 
-从 prompts.py 拆分，包含：
+包含：
   - System Prompt 常量（_SYSTEM_*）
   - 失败原因常量（FAIL_REASON_*）
   - 缓存前缀（CACHE_PREFIX_LLM）
@@ -164,15 +164,15 @@ sentiment 字段判断该新闻对持仓的利好/利空影响（结合行业和
 # ── 上下文构建块 ──────────────────────────────────────────
 
 
-def _build_diff_context_block(f_context: dict | None) -> str:
+def _build_difpipeline_data_block(pipeline_data: dict | None) -> str:
     """构建差异上下文文本块（紧凑格式），供 LLM 注入环比分析能力。
 
     Returns:
         格式化的差异文本块，为空时不做任何注入。
     """
-    if not f_context:
+    if not pipeline_data:
         return ""
-    diff = f_context.get("diff")
+    diff = pipeline_data.get("diff")
     if diff is None or not isinstance(diff, dict):
         return ""
     if diff.get("is_first_check"):
@@ -210,15 +210,15 @@ def _build_diff_context_block(f_context: dict | None) -> str:
     return "\n".join(lines)
 
 
-def _build_data_degradation_block(f_context: dict | None) -> str:
+def _build_data_degradation_block(pipeline_data: dict | None) -> str:
     """构建数据质量降级上下文文本块。
 
     Returns:
         格式化的降级状态文本块。无降级记录时返回空字符串。
     """
-    if not f_context:
+    if not pipeline_data:
         return ""
-    events = f_context.get("data_degradation")
+    events = pipeline_data.get("data_degradation")
     if not events or not isinstance(events, list):
         return ""
 
@@ -488,7 +488,7 @@ __all__ = [
     "_SYSTEM_NEWS_CORRELATION",
     "_fmt_wan",
     "_fmt_holding_line",
-    "_build_diff_context_block",
+    "_build_difpipeline_data_block",
     "_build_data_degradation_block",
     "_build_profit_attribution_block",
     "_build_concept_sector_block",

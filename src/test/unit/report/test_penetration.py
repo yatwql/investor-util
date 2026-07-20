@@ -339,7 +339,7 @@ class TestPenetrationMerge(unittest.TestCase):
         mock_fetch.side_effect = side_effect
 
         # 调用写穿透的下层逻辑：直接调用 write_penetration_sheet 太重量级（需要 openpyxl）
-        # 改为测试 merge 阶段的逻辑 —— 用内联方式测试
+        # 用内联方式测试 merge 阶段的逻辑
         detail_map = {d.code: d for d in self.details}
         merged: dict[str, dict[str, Any]] = {}
 

@@ -1,7 +1,6 @@
 """报告模块加载器 — 模块发现 + ImportError 兜底。
 
 职责：统一管理报告各模块的 import，提供 ImportError 降级/占位函数。
-提取自 excel_generator.py 的 _import_report_modules()。
 """
 
 from __future__ import annotations
