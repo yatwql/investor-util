@@ -119,7 +119,7 @@ class TestCircuitBreaker:
             r.record_failure("t1", "timeout")
             r.record_failure("t1", "dns")
             r.record_failure("t1", "5xx")
-        with mock.patch("time.time", return_value=1299.0):
+        with mock.patch("time.time", return_value=1030.0):
             assert r.is_circuit_broken("t1") is True
 
     def test_is_chain_broken_all(self):

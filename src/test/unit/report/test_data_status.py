@@ -389,3 +389,102 @@ class TestConstants:
         for tier in ("T2", "T3", "T4"):
             assert tier in TIER_PREFIX
             assert TIER_PREFIX[tier] in ("⚠", "ℹ"), f"{tier} 前缀异常"
+
+
+# ═══════════════════════════════════════════════════════════
+#  get_tracker() 单例工厂 + get_log() + reset_tracker()
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGetTracker:
+    """get_tracker() 单例工厂 + get_log() + reset_tracker()."""
+
+    def test_get_tracker_returns_same_instance(self):
+        """连续两次调用 get_tracker() 返回同一实例。"""
+        from src.python.report.data_status import get_tracker, reset_tracker
+        reset_tracker()
+        t1 = get_tracker()
+        t2 = get_tracker()
+        assert t1 is t2
+
+    def test_get_log_after_record(self):
+        """record() 成功调用后 get_log() 应包含对应事件。"""
+        from src.python.report.data_status import get_tracker, reset_tracker
+        reset_tracker()
+        t = get_tracker()
+        t.record("test_source", "T2", success=True)
+        log = t.get_log()
+        assert len(log) == 1
+        assert log[0]["source_key"] == "test_source"
+        assert log[0]["success"] is True
+        assert log[0]["degraded"] is False
+
+    def test_get_log_failure_event(self):
+        """record(success=False) 后 get_log() 应包含失败事件。"""
+        from src.python.report.data_status import get_tracker, reset_tracker
+        reset_tracker()
+        t = get_tracker()
+        t.record("src_fail", "T4", success=False, failure_type="unreachable")
+        log = t.get_log()
+        assert len(log) == 1
+        assert log[0]["source_key"] == "src_fail"
+        assert log[0]["success"] is False
+        assert log[0]["failure_type"] == "unreachable"
+
+    def test_get_log_multiple_events_in_order(self):
+        """多次 record() 调用按顺序记录在日志中。"""
+        from src.python.report.data_status import get_tracker, reset_tracker
+        reset_tracker()
+        t = get_tracker()
+        t.record("src_a", "T2", success=True)
+        t.record("src_b", "T3", success=False, failure_type="empty")
+        t.record("src_c", "T2", success=True)
+        log = t.get_log()
+        assert len(log) == 3
+        assert log[0]["source_key"] == "src_a"
+        assert log[1]["source_key"] == "src_b"
+        assert log[1]["success"] is False
+        assert log[2]["source_key"] == "src_c"
+
+    def test_clear_log(self):
+        """clear_log() 后 get_log() 应返回空列表。"""
+        from src.python.report.data_status import get_tracker, reset_tracker
+        reset_tracker()
+        t = get_tracker()
+        t.record("src_a", "T2", success=True)
+        assert len(t.get_log()) == 1
+        t.clear_log()
+        assert len(t.get_log()) == 0
+
+    def test_reset_tracker_creates_new_instance(self):
+        """reset_tracker() 后 get_tracker() 返回新实例，旧日志清除。"""
+        from src.python.report.data_status import get_tracker, reset_tracker
+        reset_tracker()
+        t1 = get_tracker()
+        t1.record("src_a", "T2", success=True)
+        assert len(t1.get_log()) == 1
+        reset_tracker()
+        t2 = get_tracker()
+        assert t1 is not t2
+        assert len(t2.get_log()) == 0
+
+    def test_get_log_contains_timestamp(self):
+        """get_log() 条目应含有效的时间戳。"""
+        from src.python.report.data_status import get_tracker, reset_tracker
+        reset_tracker()
+        t = get_tracker()
+        t.record("src_ts", "T2", success=True)
+        log = t.get_log()
+        assert isinstance(log[0]["timestamp"], float)
+        assert log[0]["timestamp"] > 0
+
+    def test_get_log_failure_contains_degraded(self):
+        """失败事件的 degraded 字段反映是否触发降级。"""
+        from src.python.report.data_status import get_tracker, reset_tracker
+        reset_tracker()
+        t = get_tracker()
+        # T4 单次失败即降级
+        t.record("src_degrade", "T4", success=False, failure_type="unreachable")
+        log = t.get_log()
+        assert log[0]["degraded"] is True
+        assert log[0]["count"] >= 1

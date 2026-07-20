@@ -212,6 +212,14 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     DataModuleDef(
         "交易日历", "calendar", exact_cache_keys=("trading_calendar",), cache_ttl=CACHE_WEEKLY * 2
     ),  # 两周（cleanup 周期 + 读缓存均从此取值）
+    # ── 无风险利率（bond_zh_us_rate + 手动兜底）──
+    DataModuleDef(
+        "无风险利率",
+        "bond_yield",
+        exact_cache_keys=("bond_yield_rf",),
+        cache_ttl=CACHE_DAILY,
+        cache_groups=("refresh",),
+    ),
 )
 
 
@@ -346,6 +354,115 @@ def get_report_sheet_name(sheet_key: str) -> str:
         中文标题；未找到时返回 sheet_key 本身
     """
     return _REPORT_SHEET_NAMES.get(sheet_key, sheet_key)
+
+
+# ── 计算模块注册表（_COMPUTATION_REGISTRY） ──────────────────
+# 计算模块不能反向导入 report/，此注册表确保分析模块与报表层的
+# 单向依赖关系（analysis 层隔离约束）得以维持。
+
+
+@dataclass(frozen=True)
+class ComputModuleDef:
+    """计算模块注册表条目。
+
+    记录所有计算/分析模块的元信息，
+    用于运行时发现、依赖管理和指标级断路的注册基础。
+
+    Attributes:
+        name: 模块中文名称。
+        module_key: 模块键名，如 "analytics_metrics"、"analytics_liquidity"。
+        label: 短标签（用于日志/提示）。
+        dependencies: 前置数据模块键名列表（如 "bond_yield"、"history"）。
+        description: 模块功能说明，用于文档生成。
+        status: 实现状态（planned / implemented）。
+    """
+
+    name: str
+    module_key: str
+    label: str = ""
+    dependencies: tuple[str, ...] = ()
+    description: str = ""
+    status: str = "planned"
+
+
+_COMPUTATION_REGISTRY: tuple[ComputModuleDef, ...] = (
+    ComputModuleDef(
+        name="量化指标计算",
+        module_key="analytics_metrics",
+        label="指标",
+        dependencies=("bond_yield", "history"),
+        description="夏普比率、卡玛比率、HHI 集中度、组合 Beta、持仓胜率、换手率、波动率、最大回撤等指标",
+        status="implemented",
+    ),
+    ComputModuleDef(
+        name="流动性分析",
+        module_key="analytics_liquidity",
+        label="流动性",
+        dependencies=(),
+        description="场内/场外比例、停牌风险、基金封闭期分析",
+        status="implemented",
+    ),
+    ComputModuleDef(
+        name="外汇敞口分析",
+        module_key="analytics_fx_exposure",
+        label="外汇",
+        dependencies=(),
+        description="A股/港股/美股 国别分布与外汇风险敞口判断",
+        status="implemented",
+    ),
+    ComputModuleDef(
+        name="情景分析",
+        module_key="analytics_scenario",
+        label="情景",
+        dependencies=("history",),
+        description="市场上涨/下跌 20% 的情景模拟与影响评估",
+        status="planned",
+    ),
+    ComputModuleDef(
+        name="组合校准分析",
+        module_key="analytics_alignment",
+        label="校准",
+        dependencies=(),
+        description="持仓与目标的偏差分析，再平衡建议的量化基础",
+        status="planned",
+    ),
+    ComputModuleDef(
+        name="用户画像推断",
+        module_key="analytics_inferrer",
+        label="画像",
+        dependencies=(),
+        description="从持仓结构推断用户风险偏好与投资风格",
+        status="planned",
+    ),
+    ComputModuleDef(
+        name="事实锚定校验器",
+        module_key="analytics_fact_checker",
+        label="事实校验",
+        dependencies=(),
+        description="LLM 输出的事实锚定校验：数值一致性、品种存在性、排名正确性（纯算法层）",
+        status="implemented",
+    ),
+)
+
+
+def get_computation_registry() -> tuple[ComputModuleDef, ...]:
+    """返回完整的计算模块注册表副本。"""
+    return _COMPUTATION_REGISTRY
+
+
+def get_computation_module(module_key: str) -> ComputModuleDef | None:
+    """根据 module_key 查找计算模块定义。
+
+    Args:
+        module_key: 模块键名，如 "analytics_metrics"
+
+    Returns:
+        ComputModuleDef 或 None（未找到）
+    """
+    for m in _COMPUTATION_REGISTRY:
+        if m.module_key == module_key:
+            return m
+    return None
 
 
 # ── 报告模块注册表（C 迭代：序号可配置） ──────────────────────

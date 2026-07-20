@@ -1,6 +1,6 @@
 """Config 原子写入并发与断电恢复测试 — edge 专项。
 
-从 test_config_atomic.py 提取的 edge 场景：
+edge 场景：
   - 多线程并发写入文件完整性
   - os.replace 断电模拟
   - 部分写入后恢复旧文件

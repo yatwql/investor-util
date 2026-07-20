@@ -4,9 +4,150 @@
 
 ---
 
-## [0.7.3-dev] - 开发中
+## [0.7.4] - 2026-07-20
 
-### TBD
+### Added
+- **P1 基建 20 项全部完成（v0.7.4）**：
+  - **P1-03**: Rf 获取——`bond_zh_us_rate` + 手动兜底，`bond_yield.py` 新建，C6 chain 路由合规
+  - **P1-04**: 个股日收益率管线暴露，`portfolio_history.py` daily_returns 从局部变量→返回值
+  - **P1-05**: 组合日收益率暴露，`get_combined_timeseries` 新增 `daily_returns_portfolio` 字段
+  - **P1-06-A**: f_context 组装逻辑抽取，orchestrator.py→`f_context_builder.py`
+  - **P1-06**: 阻断点 1——`prepare_report_data` 加 risk_metrics 空字典占位
+  - **P1-07**: 阻断点 2——`capture_snapshot` 加 risk_metrics/portfolio_daily_returns 透传
+  - **P1-08**: 阻断点 3——`generate_all_llm` 暴露 history_data 到 prompt
+  - **P1-08-B**: prompts.py 拆为三文件（prompts_core.py / prompts_tables.py / prompts_action.py）
+  - **P1-09**: 阻断点 4——fingerprint 含风险信号 Hash（risk_metrics 摘要）
+  - **P1-10**: 数据模块注册 + `_COMPUTATION_REGISTRY`（bond_yield 注册 + 预留 6 计算模块）
+  - **P1-11**: 功能开关注册 JSON Schema（18 开关），Feature Flag 体系 `is_feature_enabled()`
+  - **P1-13**: 持仓匿名化最小版，`anonymizer.py` 名称替换/数量模糊/关闭三种模式
+  - **P1-14**: 缓存文件权限保护，`cache.py` 写缓存设 0o600
+  - **P1-15**: Rf fetcher 测试用例，mock 正常/异常/手动配置/缓存命中 8 场景
+  - **P1-17**: 熔断器改进——指数退避（60s→300s→900s→3600s）
+  - **P1-18**: 熔断器改进——持久化（`circuit_breaker.json`）
+  - **P1-19**: 双熔断器统一网关（`circuit_breaker.py` + `provider_registry.py`）
+  - **P1-20**: LLM 失败自动降级模板，全失败时占位文本
+  - **P1-21**: f_context Schema Full Schema 补充+校验检查点
+  - **P1-22**: analysis/ 层定位 + category.py→code_utils.py，消除逆向依赖
+  - 合计 ~112h，53 tests passed（原 44→53，新增 registry/bond_yield 测试）
+- **P1-12: 指标级断路包装器**：`circuit_breaker_wrapper.py`，per-indicator 熔断（连续 3 次→静默 24h），C20 FF↔CB 联动，持久化到 `metrics_breaker.json`
+- **P2-01~P2-11a: 量化指标算法体系 11 个**：`analysis/metrics.py`（sharpe_ratio/calmar_ratio/hhi/win_rate/turnover_rate/risk_contribution/get_dividend_yield/individual_volatility/portfolio_beta/compute_all_metrics/sanitize_metric/truncate_extreme_values/check_data_sufficiency/get_confidence_level），~670 行纯函数
+- **P2-12/P2-13: 回撤历史分位预警**：`analysis/drawdown_warning.py`，3 时间窗口（1 年/3 年/全历史），分位预警（80%/95% 阈值）
+- **P2-14~P2-17: LLM Prompt 注入 4 项**：
+  - `_build_metrics_table_block()` — 夏普/卡玛/HHI/Beta 等指标格式化
+  - `_build_data_quality_detail_block()` — 降级详情报表
+  - confidence guidance 注入 _SYSTEM_EXPERT_REVIEW
+  - action template 表格注入 expert_review prompt
+- **P1-16/P2-14-B/P2-18: 测试任务 3 项**：
+  - **P1-16**: 管线集成冒烟测试（test_pipeline_smoke.py，4 阻断点，4 tests）
+  - **P2-14-B**: 管线指标注入测试（test_pipeline_metrics_injection.py，14 tests）
+  - **P2-18**: 指标集成测试（test_metrics.py，8 指标正+边界，24 tests）
+  - 合计 42 tests，全部通过
+
+### Added
+- **P3-01~P3-06: 再平衡六项任务全部完成**：
+  - **P3-01**: 目标配置 Schema——`rebalance.py` 支持大类+品种级目标配置，`compute_target_deviation()` 输出偏离度信号
+  - **P3-02**: 阈值可配——三套预设集（保守 10%/3%、稳健 15%/5%、进取 25%/8%），`resolve_rebalance_config()` 解析，config 独立覆盖
+  - **P3-03**: 静默期——同品种 N 天不重复告警（默认 30d，可配），JSON 持久化到 `rebalance_silence.json`
+  - **P3-04**: 信号置信度——`_compute_confidence()` 输出 high/medium/low，单品种超限 2×threshold→high
+  - **P3-05**: 误报防护——3 类：分红拆股（shares 检查）、新买入<20 日过滤、可转债到期标注
+  - **P3-06**: 权益/固收偏离——`equity_fixed_income_deviation()` 将 7 类资产汇总为权益/固收超大类，对照目标配置计算偏离
+  - 79 项单元测试全部通过，含 16 项权益/固收偏离专项测试
+- **P3-07: 竞争语境完整版——自定义基金池**：
+  - `index.py`/`sina.py` 新增中证500(`sh000905`)和中证全债(`sh000012`)指数映射
+  - `comparison_indices` 配置项（默认沪深300+中证500+中证全债），含配置校验
+  - `_build_competitive_context_block()` 支持多指数对比行
+  - TUI 新增 `[I]` 管理对比指数池菜单
+- **P3-08: 竞争语境完整版——夏普对比**：
+  - 量化指标（夏普/卡玛/年化波动率/最大回撤）注入竞争语境【指标对比】段落
+  - metrics 数据流在 `_generate_report_full()` 中计算，经 `_fetch_llm_and_news()` → `generate_all_llm()` → `_dispatch_llm_workers()` → `_build_competitive_context_block()` 全链路贯通
+  - 8 项单元测试覆盖正常/空/部分键/None 值/NaN 等指标展示场景
+- **P3-09a: 竞争语境——口径对齐与说明**：
+  - 竞争语境段落末尾自动追加口径说明脚注（费后净收益 vs 价格指数、含现金 vs 不含、期间持仓变动）
+  - `_SYSTEM_EXPERT_REVIEW` 新增竞争语境约束段落，限制 LLM 使用数据陈述替代主观结论
+  - 3 项新增测试验证脚注和 LLM 约束内容
+- **P3-10: 竞争语境——幸存者偏差说明**：
+  - 竞争语境脚注追加幸存者偏差提示（指数成分股/成分基金定期调整效应）
+  - 2 项新增测试验证提示存在/不存在
+- **P3-11: 流动性风险——场内品种自动计算**：
+  - `src/python/analysis/liquidity.py` 新增 `check_liquidity()` 函数，基于市值/20日日均成交额计算场内品种变现天数
+  - OTC 基金正确识别并标记 type="otc"（交 P3-12），K 线数据缺失时降级为 assumed_liquid
+  - 检查顺序：先场外（债券基/货基/代码重叠区 OTC）→ 后场内（A 股/场内基金）→ 港股等默认充足
+  - `__init__.py` 导出 `check_liquidity`，registry.py `analytics_liquidity` 已注册（P1-10 预留）
+- **P3-11-T: 流动性风险测试（场内）**：
+  - `test_liquidity.py` 10 项正常场景（空输入/OTC/Stock/Mixed）+ `test_liquidity_edge.py` 5 项 edge 场景
+  - mock 路径使用 `_MOCK_TARGET = "src.python.fetcher.chain.fetch_with_incremental_fallback"`（lazy import），C12 edge 文件隔离合规
+- **P3-12: 流动性风险——场外品种手动配置入口**：
+  - `_DEFAULT_CONFIG` 新增 `redemption_limits` 字典键（I 组配置，code → 单日赎回上限金额）
+  - `check_liquidity()` 新增 `redemption_limits` 可选参数，已配置品种计算赎回天数（"需约 N 日赎回"/"当日可赎回"），未配置品种标记"需手动确认赎回上限"
+  - 零上限（0 或 None）视同未配置，不影响未配置品种的逻辑
+- **P3-12-T: 流动性风险测试（场外）**：
+  - `test_liquidity_otc.py` 8 项正常场景（配置限额/未配置/高限额当日/空字典/无OTC/零上限）
+  - `test_liquidity_otc_edge.py` 3 项 edge 场景（巨额赎回/混合配置/零市值跳过），C12 edge 文件隔离合规
+- **P3-13: 汇率敞口——货币分类修复**：
+  - `src/python/analysis/fx_exposure.py` 新增 `fx_exposure(holdings) → dict`，基于 `code_utils.get_currency_by_code()` 按币种（CNY/HKD/USD）汇总市值占比
+  - `prompts_tables.py` 新增 `_build_fx_exposure_block()` 格式化块，注入 `expert_review` prompt
+  - `_calc_country_exposure()` 改为使用 `get_currency_by_code()` 统一判定逻辑
+  - `registry.py analytics_fx_exposure` 状态 "planned" → "implemented"，去除 `bond_yield` 依赖
+  - `analysis/__init__.py` 导出 `fx_exposure`
+  - 12 项单元测试全部通过（正常/edge/prompt 构建）
+- **P3-17: LLM Token 成本追踪与预算**：
+  - `src/python/llm/cost_tracker.py` 新增：报告级 8K Token 预算（`reset_budget()`/`check_input_budget()`）、成本摘要格式化（`get_cost_summary()`）
+  - `session.py` `record_per_module()` 增加 `duration` 字段，记录 API 调用耗时
+  - `skeleton.py` `generate_llm_content()` 增加 `time.monotonic()` 计时，`_finalize_and_cache()` 页脚显示耗时
+  - 9 项单元测试全部通过（预算管理/摘要格式化/耗时记录）
+- **P3-16: LLM 事实锚定校验器（纯算法层）**：`llm/fact_checker.py` 新增三个校验函数——数值一致性（提取百分比与持仓实际收益率对比）、品种存在性（校验引用的证券代码是否在持仓中）、排名正确性（验证"最大持仓"等排序断言）。报告末尾追加校验摘要（绿色通过/黄色告警）。注册到 `_COMPUTATION_REGISTRY` 为 `analytics_fact_checker`。38 项单元测试覆盖正常/异常/边缘场景
+
+### Changed
+- **代码注释历史痕迹清理**：移除所有 P1-XX/P2-XX 任务标签（metrics.py、drawdown_warning.py、fingerprint.py、generators_orchestrator.py、prompts_action.py、prompts_core.py、prompts_tables.py、circuit_breaker.py、bond_yield.py、registry.py、orchestrator.py 等共 ~60 处），保持代码当前状态描述
+- **registry.py analytics_metrics 状态**: "planned" → "implemented"
+- **Phase 2 全部 19 项任务（P2-01~P2-18）提升至 P1 优先级**：所有任务从 `better-investment-task.md` 的 Phase 2 移至 `plan.md` 的 P1 待办区
+- **Phase 3 全部 18 项任务（P3-01~P3-17）和 Phase 4 全部 17 项任务（P2-11b、P4-01~P4-16）提升至 P2 优先级**：所有任务从 `better-investment-task.md` 的 Phase 3/4 移至 `plan.md` 的 P2 待办区
+
+### Docs
+- `plan.md`: P1 阶段 39 项任务全部标记完成并从待办表移除（2 处：P1 整节删除 + Phase 3 已完成 14 项移除）；Phase 3 合计估时从 ~206h 更新为 ~84h
+- `better-investment-task.md`: Phase 2/3/4 头部添加迁移告示；Phase 2 已实现任务标记完成
+- `changelog.md`: 本次变更记录
+- `plan.md`: P3-13/P3-17 标记完成并从 Phase 3 待办表移除；P3-15 取消；Phase 3 待办仅剩 P3-16（24h）；P2 合计从 ~220h 更新为 ~200h
+- `better-investment-task.md`: P3-13/P3-17 标记完成；P3-15 标记取消；Phase 5 依赖关系更新
+- `discussion-better-investment-advice.md`: Phase 3 待办状态更新（P3-01~P3-13 + P3-17 ✅，P3-15 ❌，P3-16 ⏳）
+- `changelog.md`: 本次变更记录
+
+---
+
+## [0.7.3] - 2026-07-20
+
+### Added
+- **P2 全部 10 项任务完成（Tier 0 + MVP）**：
+  - **T0-01-A**: DegradationTracker get_log() + 6 处 fetcher 层 record() + get_tracker() 单例工厂，消除三重实例碎片化
+  - **T0-01-B**: f_context Pre-Schema 文档（`f_context-schema.md`）+ 删除 2 个死键 + 类型断言 checkpoint
+  - **T0-01**: DegradationTracker→LLM 接线，注入 f_context["data_degradation"]
+  - **T0-02**: 健康检查 3 类→5 类（新增数据质量维度评分标准）
+  - **MVP-01**: `_build_profit_attribution_block()` TOP 5 收益归因（正负分别列出，Σ|profit|=0 保护）
+  - **MVP-02**: `_build_concept_sector_block()` TOP 5 概念板块 + 集中度判断（3 态兜底：无数据/部分无分类/正常）
+  - **MVP-03**: `src/python/analysis/simple_rebalance.py` 硬编码 15% 再平衡阈值 + 去重聚合（>3 条→汇总）
+  - **MVP-04**: `_build_competitive_context_block()` 组合 vs 沪深300 今日/区间对比
+  - **MVP-05**: 5 个段落整合串联到 prompts.py + generators.py/orch 竞争语境接线
+  - **MVP-06**: `_SYSTEM_EXPERT_REVIEW` 追加情景分析（上涨/下跌 20% 分情景建议）
+  - 合计 45h，regression 266 passed, 0 failed
+- **PRE-01/PRE-02 专项测试**：完成 Rf 国债收益率数据源和偏股基金指数 885005 的全面测试
+  - 东方财富 datacenter API（RPTBOND_*）**确认不可用**（30+ report name 全部返回"参数配置不对"）
+  - `bond_zh_us_rate`（akshare/Sina）通过 50/50 稳定性测试（100% 成功率，平均 2.734s，中国 10Y=1.7404%）
+  - worldgovernmentbonds.com 确认 JS 渲染不可直接抓取
+  - 885005 确认为 Wind（万得）专属代码，12 个公开数据源均不可获取
+  - CSI 替代指数（930950/932055/931255）同样不可用
+- **测试报告归档**：`docs-stm/plan/better-investment-advice/rf-and-885005-test-report.md`
+
+### Changed
+- **设计文档全面更新**：plan.md、better-investment-task.md、discussion-better-investment-advice.md 同步 PRE 测试结论
+- **P1-01/P1-02 取消**（东财 API 失效、worldgovernmentbonds JS 不可解析），释放 ~20h
+- **P1-03 重设计**：从纯手动配置（4h）扩展为 `bond_zh_us_rate` 自动获取 + 手动配置兜底双模式（6h）
+- **P1-15 缩减**：Rf 测试从 8h 缩减为 `bond_zh_us_rate` 集成测试（4h）
+- **P3-07 降级路径确认**：885005 不可获取 → 强制降级为沪深300+自定义基金池
+- **PRE-02-D prompt 分支**：决策已落地，代码实现归入 P3-07
+
+### Docs
+- `folders.md` 新增测试报告文件条目
+- 全部 4 个 P1 PRE 任务完成，从 plan.md 当前迭代待办移除
 
 ---
 

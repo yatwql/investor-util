@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
-> 文档版本：v0.7.3-dev
+> 文档版本：v0.7.4
 
 ---
 
@@ -73,7 +73,7 @@
 | 需求标识 | 需求描述 |
 |:---------|:---------|
 | R-TUI-01 | 启动后显示标题"个人投资分析报告生成小助手" |
-| R-TUI-02 | 主菜单提供以下 14 个交互选项 |
+| R-TUI-02 | 主菜单提供以下 15 个交互选项 |
 
 ### 3.2 菜单选项
 
@@ -140,6 +140,7 @@
 | 行业资金流向 | akshare | — |
 | 股票历史分红 | akshare | — |
 | 基金经理数据 | 天天基金 | 档案页回退 |
+| 无风险利率（Rf） | akshare `bond_zh_us_rate`（Sina 国债收益率） | 手动配置兜底（config.json risk_free_rate） |
 | 个股/ETF 历史 K 线 | 腾讯财经 | 新浪财经 |
 | 场外基金历史净值 | 天天基金 | 东方财富 |
 | 指数历史 K 线（A 股指数） | 腾讯财经 | 新浪财经 |
@@ -156,15 +157,18 @@
 | R-DATA-05 | 收盘后需验证缓存中 price_date 是否为当日数据，避免盘中降级残留数据滞留 |
 | R-DATA-06 | 00 开头的代码同时可能是 A 股或场外基金，需通过名称关键词辅助判断，股票链路全失败时自动尝试基金净值链路 |
 
-### 5.3 熔断需求
+### 5.3 熔断与降级需求
 
 | 需求标识 | 需求描述 |
 |:---------|:---------|
-| R-BRK-01 | 单股票级 API 连续 3 次传输级失败后应熔断 300 秒，冷却期满后自动试探恢复 |
+| R-BRK-01 | 单股票级 API 连续 3 次传输级失败后应熔断，冷却期满后自动试探恢复 |
 | R-BRK-02 | 批量 API（如行业分类）连续 6 次传输级失败后应熔断 120 秒 |
 | R-BRK-03 | API 正常返回空数据（非传输级异常）不计入熔断计数器 |
 | R-BRK-04 | LLM API 端点应有独立的熔断器（连续 3 次失败熔断 60 秒） |
 | R-BRK-05 | 同一次会话中跨模块的同一 API 调用结果应共享会话级内存缓存（上限 2000 条/domain） |
+| R-BRK-06 | 熔断冷却时间应采用指数退避策略（60s→300s→900s→3600s），每次失败翻倍递增，成功恢复后重置 |
+| R-BRK-07 | 熔断器状态应跨会话持久化到 `data/state/circuit_breaker.json`，与缓存文件隔离，确保会话重启后熔断记忆恢复 |
+| R-BRK-08 | Provider 级熔断器和数据模块级熔断器应通过统一的网关（`circuit_breaker.py` + `provider_registry.py`）管理，消除双熔断器状态不一致
 
 ### 5.4 新闻获取需求
 
@@ -214,7 +218,7 @@
 
 | 需求标识 | 需求描述 |
 |:---------|:---------|
-| R-OUT-05 | Excel 格式：每个模块独立一个页签，页签编号 1~18，数字前缀保证排序 |
+| R-OUT-05 | Excel 格式：每个模块独立一个页签，页签编号 1~17，数字前缀保证排序 |
 | R-OUT-06 | HTML 格式：所有模块在同一页面中顺序排列，附目录锚点导航 |
 | R-OUT-07 | Excel 页签编号和 HTML 章节序号支持通过配置自定义 |
 | R-OUT-08 | LLM API 用量页签强制固定在最后一位，不受排序配置影响 |
@@ -469,6 +473,54 @@
 | R-SNP-05 | 快照对比输出：总市值变化、总盈亏变化、新增/清仓/增持/减持品种 TOP5 |
 | R-SNP-06 | 首次运行无历史快照时跳过对比，下次自动建立基线 |
 
+### 6.7 流动性风险分析
+
+| 需求标识 | 需求描述 |
+|:---------|:---------|
+| R-LIQ-01 | 系统应计算场内品种（股票/ETF）的变现天数，计算公式：市值 / 近 20 日日均成交额 |
+| R-LIQ-02 | 场外基金应支持用户配置单日赎回上限（`redemption_limits`），计算全量赎回所需天数 |
+| R-LIQ-03 | 未配置赎回上限的场外品种应标记"需手动确认赎回上限"，不阻塞报告生成 |
+| R-LIQ-04 | 成交额数据不可用（K 线缺失/API 降级）时默认假设流动性充足，不告警 |
+| R-LIQ-05 | 流动性分析结果应注入智囊团深度复盘（`expert_review`）LLM prompt 的流动性小节 |
+| R-LIQ-06 | 场内品种按变现天数分级：当日可卖出（<1日）/需多日卖出（≥1日） |
+| R-LIQ-07 | OTC 品种（债券/货币基金）标记为 otc 类型，不进行场内流动性计算 |
+| R-LIQ-08 | 香港/美股等非 A 股品种标记为 assumed_liquid，不进行场内流动性计算 |
+
+### 6.8 再平衡信号
+
+| 需求标识 | 需求描述 |
+|:---------|:---------|
+| R-RBL-01 | 系统应计算各品种权重 = 市值 / 总市值，超限阈值默认 15% 可配置（`rebalance.threshold`） |
+| R-RBL-02 | 系统应支持大类配置（权益/固收）偏离度计算，偏离阈值默认 5% 可配置（`rebalance.deviation_threshold`） |
+| R-RBL-03 | 系统应提供三套预设阈值（conservative 10%/3%、moderate 15%/5%、aggressive 25%/8%），通过 `rebalance.profile` 切换 |
+| R-RBL-04 | 同一品种触发再平衡信号后应有静默期（默认 30 天可配），静默期内不重复告警 |
+| R-RBL-05 | 静默期状态应跨会话持久化到 `data/cache/rebalance_silence.json` |
+| R-RBL-06 | 再平衡信号应附带置信度评估（high / medium / low），基于偏离幅度、持续时间和数据质量决定 |
+| R-RBL-07 | 系统应提供三类误报防护：(1) 分红/拆股跳变排除，(2) 新买入品种不足 20 日不触发，(3) 临近到期品种标注剩余期限 |
+| R-RBL-08 | 再平衡结果应注入智囊团深度复盘 LLM prompt 的调仓建议小节 |
+
+### 6.9 竞争语境（基准对比）
+
+| 需求标识 | 需求描述 |
+|:---------|:---------|
+| R-CTX-01 | 系统应支持多指数对比，通过 `comparison_indices` 配置基准指数池（默认：沪深300+中证500+中证全债） |
+| R-CTX-02 | 竞争语境应展示组合与各基准的收益对比（年初至今收益、近 1 年收益） |
+| R-CTX-03 | 竞争语境应展示组合与各基准的风险指标对比（夏普比率、年化波动率、最大回撤） |
+| R-CTX-04 | 竞争语境段落应附口径说明脚注：费后净收益 vs 价格指数、含现金管理品种 vs 不含、持仓变动非静态组合 |
+| R-CTX-05 | 竞争语境段落应附加幸存者偏差提示，说明对比指数成分股定期调整效应 |
+| R-CTX-06 | LLM 仅做数据陈述（"组合收益 X%，指数收益 Y%，差异 Z 个百分点"），不做"跑赢/跑输"的明确结论性判断 |
+| R-CTX-07 | 自定义基金池可通过 TUI 菜单（选项 I）管理，预设默认池无需用户手动维护 |
+
+### 6.10 汇率敞口分析
+
+| 需求标识 | 需求描述 |
+|:---------|:---------|
+| R-FX-01 | 根据持仓品种的代码（港股通 5 位纯数字）和名称关键词（QDII/海外基金）自动判定交易币种：CNY（人民币）/ HKD（港币）/ USD（美元） |
+| R-FX-02 | 以持仓市值为权重汇总各币种占比（百分比 + 金额），支持多币种混合持仓 |
+| R-FX-03 | 港股通品种标注"港币计价，实际换汇成本隐含在汇率中"说明，避免误解为人民币直接交易 |
+| R-FX-04 | 非人民币资产合计占比 > 0% 时附加汇率波动风险提示 |
+| R-FX-05 | 汇率敞口分析结果应注入智囊团深度复盘（`expert_review`）LLM prompt 的【币种敞口分布】段落 |
+
 ---
 
 ## 7. LLM 智能分析
@@ -543,6 +595,8 @@
 | R-LLM-US-03 | 缓存命中计入统计但标注"缓存"来源，不计入 API 调用次数 |
 | R-LLM-US-04 | 无任何用量数据时整块不渲染 |
 | R-LLM-US-05 | 费用按模型定价表实时估算，支持用户自定义定价 |
+| R-LLM-US-06 | 每份报告设输入 Token 预算上限（默认 8K），超出时告警而非截断，为后续模型分层提供基线数据 |
+| R-LLM-US-07 | 每次 API 调用记录耗时（秒），模块明细展示各模块累计调用耗时 |
 
 ---
 
@@ -672,6 +726,7 @@
 | `news_sources` | dict | 全开启 | — | 各新闻源启停 |
 | `preferred_provider` | dict | 空 | — | 各数据类型的首选 Provider |
 | `user_fund_benchmarks` | dict | 空 | — | 自定义基金业绩基准 |
+| `risk_free_rate` | float/null | null | — | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74） |
 | `report_section_order` | dict | 空 | — | 报告模块序号自定义 |
 | `enable_b_series` | bool | true | ✅ P | B 系列基金深度分析启停 |
 | `enable_news` | bool | true | ✅ P | 新闻板块启停 |
@@ -685,6 +740,14 @@
 | `history.snapshot_max_count` | int | 365 | — | 快照最大数量 |
 | `history.coverage_threshold` | float | 0.8 | — | 有效区间覆盖阈值 |
 | `history.benchmark_indices` | dict | {"sh000300":"沪深300","gb_inx":"标普500"} | — | 基准指数配置，组合历史走势对比 |
+| `comparison_indices` | dict | {"sh000300":"沪深300","sh000905":"中证500","sh000012":"中证全债"} | — | 竞争语境对比指数池，支持多指数对比 |
+| `rebalance.threshold` | float | 0.15 | — | 单品种权重超限阈值（15%），超限触发再平衡建议 |
+| `rebalance.deviation_threshold` | float | 0.05 | — | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 |
+| `rebalance.profile` | str | "moderate" | — | 预设阈值集：conservative（保守 10%/3%）/ moderate（稳健 15%/5%）/ aggressive（进取 25%/8%）/ custom（自定义） |
+| `rebalance.silence_days` | int | 30 | — | 再平衡信号静默期天数，同品种触发 N 天内不重复告警 |
+| `rebalance.target_allocation` | dict | {} | — | 目标配置 Schema（空=不启用），格式 `{"equity":{"min":30,"max":70,"target":50},"bond":{...}}` |
+| `rebalance.equity_fixed_income` | dict | {} | — | 权益/固收超大类目标配置（空=不启用），格式 `{"equity":{"min":30,"max":70}}` |
+| `redemption_limits` | dict | {} | — | 场外基金单日赎回上限，格式 `{基金代码: 金额}`。配置后计算场外品种全量赎回所需天数 |
 | `cache_ttl` | dict | 默认 TTL | — | 各缓存类型 TTL 覆盖 |
 | `llm_key_file` | str | `data/config/llm_key.json` | — | LLM 密钥文件路径（敏感凭据，纳入 .gitignore） |
 | `llm_providers_file` | str | `data/config/llm_providers.json` | — | LLM Provider 多链配置文件路径 |
@@ -764,6 +827,27 @@
     {"name": "deepseek-main", "provider": "claude", "credentials_ref": "deepseek-main", "priority": 10, "timeout": 120},
     {"name": "gemini-fallback", "provider": "gemini", "credentials_ref": "gemini-fb", "priority": 20, "timeout": 60}
   ]
+}
+```
+
+### 11.5 features.json（功能开关注册表）
+
+独立配置文件，提供 25 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
+
+| 开关名 | 类型 | 默认值 | 说明 |
+|:-------|:----:|:------:|:-----|
+| `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` | bool | true（news_correlation 默认关闭） | LLM 各模块独立启停开关 |
+| `b_series_fund_manager` / `b_series_fund_overlap` / `b_series_fund_concentration` / `b_series_fund_style` | bool | true | B 系列基金深度分析模块启停 |
+| `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
+| `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |
+| `anonymizer` | bool | false | 持仓匿名化开关（名称替换/数量模糊） |
+| `cache_daily_cleanup` | bool | true | 启动时自动清理过期缓存 |
+
+用法：在 `features.json` 中仅列出需覆写的开关，未列出的保持默认值。
+```json
+{
+  "anonymizer": true,
+  "news_cls": false
 }
 ```
 

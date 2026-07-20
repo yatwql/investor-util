@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -34,7 +35,17 @@ _PROVIDER_SKIP_THRESHOLD = 3
 """单个 Provider 连续失败多少次后熔断。"""
 
 _PROVIDER_COOLDOWN_SECS = 300
-"""熔断后多少秒自动放行一次试探。"""
+"""熔断后默认冷却秒数（首次熔断使用，后续由指数退避覆盖）。"""
+
+_BACKOFF_LEVELS = (60, 300, 900, 3600)
+"""指数退避级别（秒）：1min → 5min → 15min → 1h。
+成功重置后回到 60s，连续多次熔断逐步延长冷却时间。"""
+
+_CIRCUIT_BREAKER_STATE_FILE = "circuit_breaker.json"
+"""熔断状态持久化文件名（存储在缓存目录下，由 _get_breaker_state_path() 解析绝对路径）。"""
+
+_CIRCUIT_BREAKER_TTL = 86400  # 24h
+"""熔断状态持久化记录的超时 TTL（秒），超过此时间的条目在加载时自动清理。"""
 
 _SESSION_CACHE_MAX_ENTRIES = 2000
 """每 domain 最多缓存条目数，超限时淘汰最旧条目。"""
@@ -87,6 +98,8 @@ class ProviderState:
     total_successes: int = 0
     failure_threshold: int = _PROVIDER_SKIP_THRESHOLD
     cooldown_secs: float = _PROVIDER_COOLDOWN_SECS
+    backoff_level: int = 0
+    """当前指数退避级别索引（0=60s, 1=300s, 2=900s, 3=3600s）。成功时重置。"""
 
 
 @dataclass
@@ -126,12 +139,18 @@ class DataSourceRegistry:
         if getattr(self, "_initialized", False):
             return
         # 双锁：熔断操作和缓存操作不互相阻塞
-        self._provider_lock = threading.Lock()
-        self._cache_lock = threading.Lock()
+        # 用 RLock 因为 record_failure()/record_success() 在持锁中调用 _save_state()
+        self._provider_lock = threading.RLock()
+        self._cache_lock = threading.RLock()
         self._providers: dict[str, ProviderState] = {}
         self._session_cache: dict[str, dict[str, SessionCacheEntry]] = {}
         self._chains: dict[str, list[str]] = {}
         self._initialized = True
+        # 启动时加载持久化熔断状态
+        try:
+            self._load_state()
+        except Exception:
+            logger.debug("[registry] 熔断状态加载跳过（首次运行或异常）")
 
     # ── Provider 注册 ─────────────────────────────────
 
@@ -194,10 +213,80 @@ class DataSourceRegistry:
                 self.register_provider(name, tier, None, timeout, **kwargs)
             self._chains[_data_type] = list(provider_list)
 
-    # ── 熔断器（Provider 级） ───────────────────────────
+    # ── 熔断状态持久化 ───────────────────────────────
+
+    @staticmethod
+    def _get_breaker_state_path() -> str:
+        """返回熔断状态持久化文件路径。"""
+        from src.python.cache._paths import _CACHE_DIR
+
+        return os.path.join(_CACHE_DIR, _CIRCUIT_BREAKER_STATE_FILE)
+
+    def _save_state(self) -> None:
+        """持久化当前熔断状态到 JSON 文件。"""
+        import json
+
+        path = self._get_breaker_state_path()
+        now = time.time()
+        state: dict[str, dict] = {}
+        with self._provider_lock:
+            for name, ps in self._providers.items():
+                if ps.is_skipped or ps.consecutive_failures > 0:
+                    state[name] = {
+                        "consecutive_failures": ps.consecutive_failures,
+                        "is_skipped": ps.is_skipped,
+                        "last_failure_time": ps.last_failure_time,
+                        "last_failure_context": ps.last_failure_context,
+                        "backoff_level": ps.backoff_level,
+                        "cooldown_secs": ps.cooldown_secs,
+                        "_saved_at": now,
+                    }
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            logger.warning("[registry] 熔断状态持久化失败: %s", e)
+
+    def _load_state(self) -> None:
+        """从 JSON 文件加载熔断状态，超过 TTL 的条目自动清理。"""
+        import json
+
+        path = self._get_breaker_state_path()
+        if not os.path.exists(path):
+            return
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            logger.debug("[registry] 熔断状态文件损坏，跳过加载")
+            return
+
+        now = time.time()
+        loaded = 0
+        expired = 0
+        with self._provider_lock:
+            for name, ps_data in data.items():
+                saved_at = ps_data.get("_saved_at", 0)
+                if now - saved_at > _CIRCUIT_BREAKER_TTL:
+                    expired += 1
+                    continue
+                state = self._providers.get(name)
+                if state is None:
+                    continue
+                state.consecutive_failures = ps_data.get("consecutive_failures", 0)
+                state.is_skipped = ps_data.get("is_skipped", False)
+                state.last_failure_time = ps_data.get("last_failure_time", 0)
+                state.last_failure_context = ps_data.get("last_failure_context", "")
+                state.backoff_level = ps_data.get("backoff_level", 0)
+                state.cooldown_secs = ps_data.get("cooldown_secs", _PROVIDER_COOLDOWN_SECS)
+                loaded += 1
+        if loaded:
+            logger.info("[registry] 已加载 %d 个 Provider 熔断状态（%d 条已过期）", loaded, expired)
 
     def record_success(self, provider: str) -> None:
-        """记录一次 Provider 调用成功，重置熔断计数。"""
+        """记录一次 Provider 调用成功，重置熔断计数和退避级别。"""
+        changed = False
         with self._provider_lock:
             state = self._providers.get(provider)
             if state is None:
@@ -205,6 +294,15 @@ class DataSourceRegistry:
             state.consecutive_failures = 0
             state.is_skipped = False
             state.total_successes += 1
+            if state.backoff_level > 0:
+                logger.info("[registry] %s 调用成功，重置退避级别(%d→0)", provider, state.backoff_level)
+                state.backoff_level = 0
+                state.cooldown_secs = _PROVIDER_COOLDOWN_SECS
+                changed = True
+            elif state.total_successes == 1:
+                changed = True
+        if changed:
+            self._save_state()
 
     def record_failure(self, provider: str, context: str = "") -> None:
         """记录一次 Provider 传输级失败，达到阈值时触发熔断。
@@ -232,13 +330,21 @@ class DataSourceRegistry:
             state.total_failures += 1
             if state.consecutive_failures >= state.failure_threshold:
                 state.is_skipped = True
+                # 指数退避：每次熔断递增退避级别，上限 _BACKOFF_LEVELS[-1]
+                level = min(state.backoff_level, len(_BACKOFF_LEVELS) - 1)
+                backoff = _BACKOFF_LEVELS[level]
+                state.cooldown_secs = backoff
+                state.backoff_level += 1
                 logger.warning(
-                    "[registry] %s 连续 %d 次失败（最新: %s），熔断 %ds",
+                    "[registry] %s 连续 %d 次失败（最新: %s），熔断 %ds（退避级别 %d）",
                     provider,
                     state.consecutive_failures,
                     context,
-                    state.cooldown_secs,
+                    backoff,
+                    state.backoff_level - 1,
                 )
+                # 熔断状态变化→持久化
+                self._save_state()
 
     def is_circuit_broken(self, provider: str) -> bool:
         """检查 Provider 是否在熔断中。

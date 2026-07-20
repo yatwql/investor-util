@@ -88,12 +88,20 @@
 | `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（17 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
+| `risk_free_rate` | `null` | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74）。程序默认通过 akshare `bond_zh_us_rate` 获取中国 10Y 国债收益率 | 手动编辑 |
 | `history.analysis` | `"off"` | 组合历史走势获取模式：`"off"`=关闭（默认）、`"prompt"`=报告后询问、`"auto"`=自动获取 | 手动编辑 |
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 |  |  | 组合历史走势有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（见上） | 手动编辑 |
 | `history.benchmark_indices` | `{"sh000300": "沪深300", "gb_inx": "标普500"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
+| `rebalance.threshold` | `0.15` | 单品种权重超限阈值（15%），超限触发再平衡建议 | 手动编辑 |
+| `rebalance.deviation_threshold` | `0.05` | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 | 手动编辑 |
+| `rebalance.profile` | `"moderate"` | 预设阈值集：conservative（保守 10%/3%）/ moderate（稳健 15%/5%）/ aggressive（进取 25%/8%）/ custom（自定义） | 手动编辑 |
+| `rebalance.silence_days` | `30` | 再平衡信号静默期天数。同一品种触发再平衡后 N 天内不再重复 | 手动编辑 |
+| `rebalance.target_allocation` | `{}` | 目标配置 Schema（空=不启用）。格式 `{"equity":{"min":30,"max":70,"target":50}, "bond":{...}}` | 手动编辑 |
+| `rebalance.equity_fixed_income` | `{}` | 权益/固收超大类目标配置（空=不启用）。格式 `{"equity":{"min":30,"max":70}}` | 手动编辑 |
+| `redemption_limits` | `{}` | 场外基金单日赎回上限，格式 `{基金代码: 金额}`。配置后程序可计算场外品种全量赎回所需天数。未配置品种标记"需手动确认赎回上限" | 手动编辑 |
 | `enable_b_series` | `true` | B 系列报告板块可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
 | `enable_news` | `true` | 新闻类报告板块可见性（模块 #10），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制板块在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
 | `enable_history` | `true` | 历史走势报告板块可见性（模块 #15~#16），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
@@ -417,6 +425,30 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 | `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #11 全球政经局势、#12 智囊团深度复盘、#13 持仓体检报告、#14 穿透深度分析、LLM API 用量 | LLM 板块。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告板块的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时板块仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时板块完全隐藏。
+
+---
+### I. 功能开关（features.json）
+
+`data/config/features.json` 提供 25 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
+
+```json
+{
+  "anonymizer": true,
+  "news_cls": true
+}
+```
+
+主要开关：
+
+| 开关名 | 默认值 | 说明 |
+|:-------|:------:|:-----|
+| `llm_*`（5 项） | true（news_correlation 默认 false） | LLM 各模块独立启停 |
+| `b_series_*`（4 项） | true | B 系列基金深度分析模块 |
+| `news_*`（5 项） | true（cls 默认 false） | 新闻源启停 |
+| `anonymizer` | false | 持仓匿名化开关。开启后生成报告时名称替换为"持仓A/B/C…"，可选数量模糊模式 |
+| `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
+
+> 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---
 ## 缓存分组

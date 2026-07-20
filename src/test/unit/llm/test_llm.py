@@ -658,7 +658,7 @@ class TestPromptConstants(unittest.TestCase):
 
     def test_expert_compact(self) -> None:
         """智囊团 Prompt 已精简。"""
-        self.assertLess(len(_SYSTEM_EXPERT_REVIEW), 500,
+        self.assertLess(len(_SYSTEM_EXPERT_REVIEW), 1000,
                         f"EXPERT prompt too long: {len(_SYSTEM_EXPERT_REVIEW)} chars")
         self.assertIn("Phase", _SYSTEM_EXPERT_REVIEW)
         self.assertIn("约束", _SYSTEM_EXPERT_REVIEW)

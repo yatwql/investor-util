@@ -43,14 +43,23 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
 
     Provider Chain（可配置）：天天基金
     """
+    from src.python.report.data_status import get_tracker
+
     code = code.strip()
-    return fetch_with_fallback(
+    _t = get_tracker()
+    _src_key = f"fund_rank_{code}"
+    result = fetch_with_fallback(
         "fund_rank",
         _FUND_RANK_PROVIDERS,
         _FUND_PERF_CACHE_PREFIX + code,
         get_ttl("rank"),
         fn_kwargs={"code": code},
     )
+    if result is not None:
+        _t.record(_src_key, "T2", success=True)
+    else:
+        _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+    return result
 
 
 # ═══════════════════════════════════════════════════════════
@@ -69,14 +78,23 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
 
     Provider Chain（可配置）：天天基金
     """
+    from src.python.report.data_status import get_tracker
+
     code = code.strip()
-    return fetch_with_fallback(
+    _t = get_tracker()
+    _src_key = f"fund_hold_{code}"
+    result = fetch_with_fallback(
         "fund_hold",
         _FUND_HOLD_PROVIDERS,
         _FUND_HOLD_CACHE_PREFIX + code,
         get_ttl("hold"),
         fn_kwargs={"code": code},
     )
+    if result is not None:
+        _t.record(_src_key, "T2", success=True)
+    else:
+        _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+    return result
 
 
 def fetch_fund_holdings_cached(code: str) -> dict[str, Any] | None:

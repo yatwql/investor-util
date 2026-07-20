@@ -121,7 +121,29 @@ class TestFinalizeNewsResults(unittest.TestCase):
            side_effect=lambda items, *a, **kw: items)
     def test_truncate_top_n(self, mock_corr):
         """超过 top_n 条 → 截断。"""
-        items = [{"ctime": f"2026-07-01 {i:02d}:00", "title": f"n{i}"}
+        titles = [
+            "A股三大指数集体收涨",
+            "港股科技板块持续走强",
+            "央行MLF操作利率维持不变",
+            "北向资金今日净买入超百亿",
+            "新能源赛道迎来布局窗口",
+            "医药板块估值处于历史低位",
+            "消费复苏带动食品饮料板块",
+            "半导体产业链国产化加速",
+            "房地产政策松绑效果显现",
+            "国际油价大幅波动影响能源股",
+            "券商板块受益于市场活跃度提升",
+            "光伏行业景气度持续超预期",
+            "电池龙头企业发布新一代产品",
+            "汽车销量数据超市场预期",
+            "AI应用落地带动算力需求激增",
+            "军工板块受政策利好推动",
+            "银行股分红率吸引长期资金",
+            "有色金属价格大幅上涨",
+            "大消费板块业绩有望改善",
+            "通信行业5G建设持续推进",
+        ]
+        items = [{"ctime": f"2026-07-01 {i:02d}:00", "title": titles[i]}
                  for i in range(20)]
         result = self._call(items, [], 5)
         self.assertEqual(len(result), 5)

@@ -69,7 +69,7 @@ LLM 配置拆分为三个独立文件，分工明确：
 
 > **注意**：
 > - `system_prompt_*` 默认值为 `null`，表示使用代码内置提示词。填入字符串可覆盖。
-> - 代码内置提示词定义在 `src/python/llm/prompts.py` 中，更新代码时可自动升级。
+> - 代码内置提示词定义在 `src/python/llm/prompts_core.py`（主 prompt）、`prompts_tables.py`（数据表格）、`prompts_action.py`（行动建议）中，更新代码时可自动升级。
 > - `pricing` 段可省略（使用代码内置定价），仅需自定义覆盖时添加，详见下方「完整模型定价表」章节。
 
 **Step 3**：启动程序，菜单选 **L** 生成包含 LLM 分析的完整版报告。
@@ -222,7 +222,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 系统提示词按以下优先级（高 → 低）解析：
 
 1. `llm_settings.json` → `system_prompt_{module}` 的值（非 null）
-2. 代码内置提示词（`prompts.py` 中定义）
+2. 代码内置提示词（`prompts_core.py` / `prompts_tables.py` / `prompts_action.py` 中定义）
 
 > 设为 `null` 表示回退使用代码内置提示词，升级代码时可自动获取更新。
 
@@ -669,8 +669,8 @@ python -m src.python.main
 
 | 输出端 | 展示形式 | 说明 |
 |:-------|:---------|:-----|
-| **Excel 报告** | 独立页签 `18.LLM API 用量` | 顶部汇总区 + 下方模块明细表，状态列带条件颜色填充 |
-| **HTML 报告** | 报告第 18 节（底部） | 与 Excel 格式一致 |
+| **Excel 报告** | 独立页签 `17.LLM API 用量` | 顶部汇总区 + 下方模块明细表，状态列带条件颜色填充 |
+| **HTML 报告** | 报告第 17 节（底部） | 与 Excel 格式一致 |
 | **TUI 终端** | 一行摘要 | 每次菜单 L 完成时输出 |
 | **调试日志** | `logs/app.log` | 每次 API 调用后记录明细 |
 

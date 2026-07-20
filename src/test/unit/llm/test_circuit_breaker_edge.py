@@ -1,6 +1,6 @@
 """熔断器冷却计时边界 + 多端点状态 edge 专项测试。
 
-从 test_circuit_breaker_recovery.py 提取的 edge 场景：
+edge 场景：
   - 冷却期满 60s 整 → 半开
   - 冷却期 59s（未满 60s）→ 仍然熔断
   - 多个 endpoint 处于不同熔断状态

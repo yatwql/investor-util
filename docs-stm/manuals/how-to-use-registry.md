@@ -174,9 +174,9 @@ from src.python.registry import (
 | `portfolio_history` | 组合历史走势 |
 | `drawdown_analysis` | 回撤分析 |
 
-LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取：全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析（第 12~15 号）及财经新闻热点与持仓关联分析（第 10 号）。LLM API 用量页签第 18 号为程序自动生成，不依赖 registry。
+LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取：全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析（第 11~14 号）及财经新闻热点与持仓关联分析（第 10 号）。LLM API 用量页签第 17 号为程序自动生成，不依赖 registry。
 
-完整 18 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
+完整 17 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
 
 ---
 
@@ -271,6 +271,36 @@ DataModuleDef("我的固定键", "fixed",
 ```
 
 精确键名不会被前缀通配误匹配，适合固定文件名的缓存。
+
+---
+
+## 计算模块注册表（_COMPUTATION_REGISTRY）
+
+除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表。
+
+```python
+@dataclass(frozen=True)
+class ComputModuleDef:
+    name: str               # 中文名称
+    module_key: str          # 唯一键，如 "analytics_liquidity"
+    label: str               # 短标签（日志/提示）
+    dependencies: tuple      # 前置数据模块键名
+    description: str         # 功能说明
+```
+
+当前已注册的计算模块：
+
+| module_key | 名称 | 依赖 | 状态 |
+|:-----------|:-----|:-----|:----:|
+| `analytics_metrics` | 量化指标 | bond_yield, history | ✅ implemented |
+| `analytics_liquidity` | 流动性分析 | — | ✅ implemented |
+| `analytics_fx_exposure` | 外汇敞口分析 | — | ✅ implemented |
+| `analytics_fact_checker` | 事实锚定校验器 | — | ✅ implemented |
+| `analytics_scenario` | 情景分析 | history | ⏳ planned |
+| `analytics_alignment` | 组合校准分析 | — | ⏳ planned |
+| `analytics_inferrer` | 用户画像推断 | — | ⏳ planned |
+
+新增计算模块只需在 `_COMPUTATION_REGISTRY` 中添加一行 `ComputModuleDef`，纯算法模块无需缓存注册。
 
 ---
 

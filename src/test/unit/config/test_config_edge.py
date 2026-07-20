@@ -1,6 +1,6 @@
 """Config report_section_order edge 场景专项测试。
 
-从 test_config.py 提取的 edge 场景：
+edge 场景：
   - 浮点值作为序号（int() 隐式转换）
   - 布尔值 True/False 作为序号（bool 是 int 子类）
   - 极大序号

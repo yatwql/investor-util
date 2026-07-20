@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.7.1-dev
+> 文档版本：v0.7.4
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,12 +8,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-> | 主程序代码 | Python | 121 | 28,081 | `src/python/` 下所有 `.py`（不含测试） |
+> | 主程序代码 | Python | 123 | 28,170 | `src/python/` 下所有 `.py`（不含测试） |
 > | HTML 报告模板 | HTML | 1 | 1,750 | `src/python/tmpl/report_template.html` |
 > | 辅助脚本 | Python/Shell | 6 | 1,739 | `scripts/`（启动脚本、测试驱动、工具检查） |
-> | **源代码合计** | — | **128** | **31,570** | 主程序 + 模板 + 脚本 |
-> | **测试代码** | Python | **155** | **49,674** | `src/test/` 所有 `.py` 文件 |
-> | **测试用例** | — | — | **3,211 个** | `pytest --collect-only` 统计 |
+> | **源代码合计** | — | **129** | **31,659** | 主程序 + 模板 + 脚本 |
+> | **测试代码** | Python | **159** | **50,650** | `src/test/` 所有 `.py` 文件 |
+> | **测试用例** | — | — | **3,449 个** | `pytest --collect-only` 统计 |
 > | **用户文档** | Markdown | **67** | **31,523** | `docs-stm/`（65 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
@@ -77,11 +77,19 @@ investor-util/
 │   │   │   ├── news_keywords.py      #   新闻关键词提取与匹配
 │   │   │   └── news_sources.py       #   新闻源注册与配置
 │   │   │
+│   │   ├── analysis/                 # 业务计算层（独立无依赖，不导入 report/）
+│   │   │   ├── __init__.py           #   包标记；导出 check_liquidity 等
+│   │   │   ├── metrics.py            #   量化指标计算（夏普/卡玛/HHI/Beta 等）
+│   │   │   ├── simple_rebalance.py   #   极简再平衡（单品种超15%警戒线）
+│   │   │   ├── circuit_breaker_wrapper.py # 指标级断路包装器
+│   │   │   ├── drawdown_warning.py   #   回撤历史分位预警
+│   │   │   └── liquidity.py          #   流动性风险评估（场内品种变现天数计算）
+│   │   │
 │   │   ├── llm/                      # LLM 智能分析
-│   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
 │   │   │   ├── api_base.py           #   LLM API 基类（请求/重试/流式）
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
+│   │   │   ├── fact_checker.py       #   LLM 事实锚定校验器（数值/品种/排名一致性校验）
 │   │   │   ├── fingerprint.py        #   缓存指纹（请求去重，避免重复调用）
 │   │   │   ├── generators.py         #   提示词生成（全局政经/智囊团复盘）
 │   │   │   ├── generators_news.py    #   新闻分析提示词生成
@@ -165,14 +173,18 @@ investor-util/
 │   │
 │   └── test/                         # 测试套件
 │       ├── unit/                     #   单元测试（8 子组：providers/fetcher/llm/news/report/config/core/ui）
+│       │   ├── test_liquidity.py          #   流动性分析：场内品种变现天数（10 tests）
+│       │   ├── test_liquidity_edge.py     #   流动性分析：边缘场景（极端大持仓/低流动性/空K线）
+│       │   ├── test_liquidity_otc.py      #   流动性分析：场外赎回天数（配置上限/未配置/零上限，8 tests）
+│       │   └── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景（巨额赎回/混合配置）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       ├── scenario/                 #   场景测试（basic/resilience/extreme/llm/datetime）
-│       ├── test_cli.py               #   CLI 命令行模式单元测试（33 用例）
-│   │   ├── test_cli_edge.py          #   CLI 边缘场景测试（7 用例）
-│   │   ├── test_cli_integration.py   #   CLI 集成测试（8 用例）
-│   │   ├── test_orchestrator.py      #   报告编排器单元测试
-│   │   ├── conftest.py               #   pytest 全局配置 + 标记注册
-│       └── helpers.py                #   测试辅助工具
+│       ├── conftest.py               #   pytest 全局配置 + 标记注册
+│       ├── helpers.py                #   测试辅助工具
+│       ├── test_cli.py               #   CLI 命令行模式单元测试
+│       ├── test_cli_edge.py          #   CLI 边缘场景测试
+│       ├── test_cli_integration.py   #   CLI 集成测试
+│       └── test_orchestrator.py      #   报告编排器单元测试
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     #   持仓 xlsx 文件（用户放置）
@@ -215,6 +227,11 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
+│   │   ├── better-investment-advice/            #   投资建议改进分析讨论
+│   │   │   ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
+│   │   │   ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
+│   │   │   ├── f_context-schema.md              # f_context Pre-Schema 文档（管线键定义+类型断言）
+│   │   │   └── rf-and-885005-test-report.md              # Rf & 885005 数据源稳定性专项测试报告
 
 │   ├── archive/                      #   历史归档
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档

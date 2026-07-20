@@ -474,6 +474,27 @@ def get_index_exchange_prefix(code: str) -> str:
 # ═══════════════════════════════════════════════════════════════
 
 
+def get_currency_by_code(name: str, code: str) -> str:
+    """根据证券名称和代码判定交易币种。
+
+    港股通（5 位纯数字代码）→ HKD，
+    QDII/海外基金/美股指数 → USD，
+    其余 A 股/基金 → CNY。
+
+    Args:
+        name: 证券名称
+        code: 证券代码
+
+    Returns:
+        "CNY" | "HKD" | "USD"
+    """
+    if is_hk_stock_code(code):
+        return "HKD"
+    if is_qdii_extended(name):
+        return "USD"
+    return "CNY"
+
+
 def estimate_market_cap_by_prefix(code: str) -> str:
     """按代码前缀粗略估算市值规模。
 

@@ -1,6 +1,6 @@
 """Provider Chain HTTP 错误回退 edge 专项测试。
 
-从 test_chain.py 提取的 edge 场景：
+edge 场景：
   - HTTP 超时 → 回退
   - HTTP 429 限流 → 回退
   - HTTP 503 不可用 → 回退

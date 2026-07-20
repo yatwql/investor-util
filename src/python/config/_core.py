@@ -459,6 +459,100 @@ def _validate_benchmark_indices(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_comparison_indices(config: dict, issues: int) -> int:
+    """验证 comparison_indices 配置。"""
+    ci, issues = _section(config, "comparison_indices", dict, "对比指数池将使用默认值", issues)
+    if ci is _MISSING:
+        return issues
+    for key, val in ci.items():
+        if not isinstance(key, str) or len(key) < 3:
+            logger.warning("config.json comparison_indices 中存在无效键 %r，将被忽略", key)
+            issues += 1
+        if not isinstance(val, str):
+            logger.warning("config.json comparison_indices.%s = %r 不是字符串", key, val)
+            issues += 1
+    return issues
+
+
+def _validate_rebalance_config(config: dict, issues: int) -> int:
+    """验证 rebalance 配置段。"""
+    rb, issues = _section(config, "rebalance", dict, "再平衡配置无效，将使用默认值", issues)
+    if rb is _MISSING:
+        return issues
+    threshold = rb.get("threshold")
+    if threshold is not None:
+        try:
+            t = float(threshold)
+            if t <= 0 or t >= 1:
+                logger.warning("config.json rebalance.threshold = %s 应在 0~1 之间，将使用默认值 0.15", t)
+                issues += 1
+        except (ValueError, TypeError):
+            logger.warning("config.json rebalance.threshold = %r 不是有效数字，将使用默认值 0.15", threshold)
+            issues += 1
+    deviation = rb.get("deviation_threshold")
+    if deviation is not None:
+        try:
+            d = float(deviation)
+            if d <= 0 or d >= 1:
+                logger.warning("config.json rebalance.deviation_threshold = %s 应在 0~1 之间，将使用默认值 0.05", d)
+                issues += 1
+        except (ValueError, TypeError):
+            logger.warning("config.json rebalance.deviation_threshold = %r 不是有效数字，将使用默认值 0.05", deviation)
+            issues += 1
+    profile = rb.get("profile")
+    if profile is not None:
+        valid_profiles = ("conservative", "moderate", "aggressive", "custom")
+        if profile not in valid_profiles:
+            logger.warning("config.json rebalance.profile = %r 无效，有效值: %s，将使用 moderate", profile, valid_profiles)
+            issues += 1
+    silence = rb.get("silence_days")
+    if silence is not None:
+        try:
+            s = int(silence)
+            if s < 0:
+                logger.warning("config.json rebalance.silence_days = %s 不能为负数，将使用默认值 30", s)
+                issues += 1
+        except (ValueError, TypeError):
+            logger.warning("config.json rebalance.silence_days = %r 不是有效整数，将使用默认值 30", silence)
+            issues += 1
+    target = rb.get("target_allocation")
+    if target is not None:
+        if not isinstance(target, dict):
+            logger.warning("config.json rebalance.target_allocation = %r 不是对象(dict)，将忽略", target)
+            issues += 1
+        else:
+            for key, val in target.items():
+                if not isinstance(val, dict):
+                    logger.warning("config.json rebalance.target_allocation.%s 不是对象，将忽略该项", key)
+                    issues += 1
+                    continue
+                for f in ("min", "max", "target"):
+                    fv = val.get(f)
+                    if fv is not None and not isinstance(fv, (int, float)):
+                        logger.warning("config.json rebalance.target_allocation.%s.%s = %r 不是数字", key, f, fv)
+                        issues += 1
+    efi = rb.get("equity_fixed_income")
+    if efi is not None:
+        if not isinstance(efi, dict):
+            logger.warning("config.json rebalance.equity_fixed_income = %r 不是对象(dict)，将忽略", efi)
+            issues += 1
+        else:
+            for key, val in efi.items():
+                if key not in ("equity", "fixed_income"):
+                    logger.warning("config.json rebalance.equity_fixed_income.%s 未知，有效键: equity, fixed_income", key)
+                    issues += 1
+                if not isinstance(val, dict):
+                    logger.warning("config.json rebalance.equity_fixed_income.%s 不是对象，将忽略该项", key)
+                    issues += 1
+                    continue
+                for f in ("min", "max", "target"):
+                    fv = val.get(f)
+                    if fv is not None and not isinstance(fv, (int, float)):
+                        logger.warning("config.json rebalance.equity_fixed_income.%s.%s = %r 不是数字", key, f, fv)
+                        issues += 1
+    return issues
+
+
 def validate_config(config: dict | None = None) -> int:
     """校验 config.json 中的常见配置错误，输出 WARNING 日志。
 
@@ -481,6 +575,8 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
     issues = _validate_benchmark_indices(config, issues)
+    issues = _validate_comparison_indices(config, issues)
+    issues = _validate_rebalance_config(config, issues)
     issues = _validate_enable_llm(issues)
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)

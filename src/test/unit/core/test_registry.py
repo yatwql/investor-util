@@ -6,7 +6,10 @@ from __future__ import annotations
 
 from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
 from src.python.registry import (
+    ComputModuleDef,
     DataModuleDef,
+    get_computation_module,
+    get_computation_registry,
     get_registry,
     get_cache_ttl_defaults,
     get_prefix_type_map,
@@ -159,12 +162,13 @@ class TestDerivedMaps:
         assert etm["fund_manager_snapshot"] == "fund_manager"
         assert etm["fund_concentration_snapshot"] == "fund_concentration"
         assert etm["fund_style_snapshot"] == "fund_style_snapshot"
+        assert etm["bond_yield_rf"] == "bond_yield"
 
     def test_exact_type_map_no_extra_keys(self):
         """exact_map 不包含多余键名。"""
         etm = get_exact_type_map()
-        # 3 个已有（benchmark/tracking/calendar）+ 3 个 B 系列（manager/concentration/style）
-        assert len(etm) == 6, f"预期 6 个精确键名，实际 {len(etm)}"
+        # 3 个已有（benchmark/tracking/calendar）+ 3 个 B 系列（manager/concentration/style）+ 1 bond_yield_rf
+        assert len(etm) == 7, f"预期 7 个精确键名，实际 {len(etm)}"
 
     def test_registered_data_types(self):
         """get_registered_data_types 返回所有 data_type。"""
@@ -419,4 +423,61 @@ class TestGetReportSectionOrder:
         assert order[0]["key"] == reversed_last
 
 
+# ═══════════════════════════════════════════════════════════════
+#  Test Computation Registry
+# ═══════════════════════════════════════════════════════════════
 
+
+class TestComputationRegistry:
+    """计算模块注册表测试。"""
+
+    def test_registry_has_7_modules(self):
+        """_COMPUTATION_REGISTRY 当前有 7 个注册模块。"""
+        reg = get_computation_registry()
+        assert len(reg) == 7
+
+    def test_all_modules_have_module_key(self):
+        """每个模块必须有 module_key。"""
+        for m in get_computation_registry():
+            assert m.module_key, f"模块 {m.name} 缺少 module_key"
+            assert m.module_key.startswith("analytics_"), f"module_key {m.module_key} 应以 analytics_ 开头"
+
+    def test_all_modules_have_name(self):
+        """每个模块必须有中文名称。"""
+        for m in get_computation_registry():
+            assert m.name, f"模块 {m.module_key} 缺少 name"
+
+    def test_no_duplicate_module_keys(self):
+        """module_key 不得重复。"""
+        keys = [m.module_key for m in get_computation_registry()]
+        duplicates = {k for k in keys if keys.count(k) > 1}
+        assert not duplicates, f"重复的 module_key: {duplicates}"
+
+    def test_get_computation_module_found(self):
+        """按 module_key 查找已注册模块。"""
+        m = get_computation_module("analytics_metrics")
+        assert m is not None
+        assert m.name == "量化指标计算"
+
+    def test_get_computation_module_not_found(self):
+        """查找不存在的 module_key 返回 None。"""
+        m = get_computation_module("analytics_nonexistent")
+        assert m is None
+
+    def test_metrics_module_dependencies(self):
+        """量化指标模块依赖 bond_yield 和 history。"""
+        m = get_computation_module("analytics_metrics")
+        assert m is not None
+        assert "bond_yield" in m.dependencies
+        assert "history" in m.dependencies
+
+    def test_all_modules_status_valid(self):
+        """所有模块状态为 planned 或 implemented。"""
+        for m in get_computation_registry():
+            assert m.status in ("planned", "implemented"), f"{m.module_key} 状态 {m.status} 不合法"
+
+    def test_comput_module_def_is_frozen(self):
+        """ComputModuleDef 应为不可变。"""
+        m = ComputModuleDef(name="测试", module_key="analytics_test", label="test")
+        with pytest.raises(AttributeError):
+            m.module_key = "changed"  # type: ignore[misc]

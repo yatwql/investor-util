@@ -8,7 +8,7 @@ from src.python.constants import CACHE_DAILY
 from ._cleanup import _process_cache_file, cleanup_expired
 from ._groups import clear_by_group, clear_by_prefix
 from ._io import _read_cache_data, _write_atomic
-from ._paths import _CACHE_DIR, _GZIP_SUFFIX, _GZIP_THRESHOLD, _cache_path, get_cache_dir
+from ._paths import _CACHE_DIR, _GZIP_SUFFIX, _GZIP_THRESHOLD, _cache_path, check_cache_dir_permissions, get_cache_dir
 from ._stats import (
     _record_cache_hit,
     _record_cache_miss,
@@ -43,6 +43,7 @@ __all__ = [
     "compute_holdings_fingerprint",
     "compute_holdings_codes",
     "get_cache_dir",
+    "check_cache_dir_permissions",
     # ── 公共常量（test_cache.py 有 3 处 from cache import CACHE_DAILY）──
     "CACHE_DAILY",
     # ── 内部接口（_cache_lock 被市场时段等模块使用）──

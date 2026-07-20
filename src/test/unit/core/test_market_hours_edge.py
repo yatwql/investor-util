@@ -1,6 +1,6 @@
 """交易时段判断时区一致性 edge 专项测试。
 
-从 test_market_hours.py 提取的 edge 场景：
+edge 场景：
   - 系统时区为 JST（UTC+9）— 与北京同时区方向
   - 系统时区为 Pacific（UTC-8）— 深度负偏移
   - 午休判断时区一致性（UTC/EST/任意）

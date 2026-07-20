@@ -1,6 +1,6 @@
 # 测试覆盖统计
 
-> 文档版本：v0.7.1-dev
+> 文档版本：v0.7.4
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
@@ -19,7 +19,7 @@
 | `integration` | 304 | ~50s |
 | `edge` | 366 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **3211** | **~10min** |
+| `all` | **3449** | **~10min** |
 | `smoke` | 24 | ~2s |
 | `report` | **1046** | ~15s |
 | `all_no_unit` | 327 | **~7min** |
@@ -38,7 +38,7 @@
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain, history_diff) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 204 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
 | **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, portfolio_history, history_snapshot) | `unit/report/` 共 41 文件含 test_html_writer、test_html_template 等 | 1046 |
-| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(19 文件) + `scenario/llm/test_llm_scenarios.py` | 512 |
+| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(19 文件) + `scenario/llm/test_llm_scenarios.py` | 518 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 438 |
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 76 |
 | **TUI 交互** | `tui*.py`, `handlers.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 164 |
@@ -58,10 +58,10 @@
 | │  ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 | `test_integration.py::TestScenarioS4` |
 | │  ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 | `test_integration.py::TestScenarioS5` |
 | │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 | `test_integration.py`（多类） |
-| │  ├ `scenario_s0_holdings_quality` | S0a/S0b/S0d: 持仓质量（清仓/同名多份额/特殊字符；S0c 已移至 scenario_extreme） | **13** | `test_scenario_holdings_quality.py::TestS0a/TestS0b/TestS0d` |
+| │  ├ `scenario_s0_holdings_quality` | S0a/S0b/S0d: 持仓质量（清仓/同名多份额/特殊字符） | **13** | `test_scenario_holdings_quality.py::TestS0a/TestS0b/TestS0d` |
 | │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 | `test_scenario_section_order.py` |
 | │  └ `—` | S29-S34: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市）+ 组合历史走势基准指数对比 | 15 | `test_scenario_operational_behavior.py` |
-| ├─ `scenario_resilience` | 异常容错场景 S6-S9（S10 已移至 scenario_extreme） | **13** | |
+| ├─ `scenario_resilience` | 异常容错场景 S6-S9 | **13** | |
 | │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | `test_integration_scenarios.py::TestScenarioBond` |
 | │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_integration_scenarios.py::TestScenarioNetworkDown` |
 | │  ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 | `test_integration_scenarios.py::TestScenarioSingleHolding` |
@@ -84,10 +84,10 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 9 子组合计 | **2768** |
+| `unit`（父标记） | 9 子组合计 | **2806** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 191 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 204 |
-| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 480 |
+| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 518 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
 | ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、B 系列基金深度分析模块、数据降级/占位；含 65 项 data 标记测试） | 1008 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 76 |

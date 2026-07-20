@@ -222,6 +222,13 @@ class TestSystemPrompts(unittest.TestCase):
         self.assertIsInstance(_SYSTEM_EXPERT_REVIEW, str)
         self.assertIn("Phase 1", _SYSTEM_EXPERT_REVIEW)
 
+    def test_system_expert_review_competitive_context_constraint(self):
+        """专家复盘 prompt 包含竞争语境约束。"""
+        from src.python.llm.prompts import _SYSTEM_EXPERT_REVIEW
+        self.assertIn("竞争语境约束", _SYSTEM_EXPERT_REVIEW)
+        self.assertIn("不得使用", _SYSTEM_EXPERT_REVIEW)
+        self.assertIn("口径差异", _SYSTEM_EXPERT_REVIEW)
+
     def test_system_health_check(self):
         from src.python.llm.prompts import _SYSTEM_HEALTH_CHECK
         self.assertIsInstance(_SYSTEM_HEALTH_CHECK, str)
@@ -514,10 +521,165 @@ class TestCalcCountryExposure(unittest.TestCase):
         combined = " ".join(result)
         self.assertIn("A股", combined)
 
-    def test_no_prefix_code_is_other(self):
-        """无交易所前缀且非 A 股数字特征的代码归属为其他。"""
+    def test_no_prefix_code_is_cny_by_default(self):
+        """无交易所前缀代码默认按 CNY 归属为 A 股。"""
         from src.python.llm.prompts import _calc_country_exposure
         details = [{"code": "900900", "market_value": 50_000}]
         result = _calc_country_exposure(details)
         combined = " ".join(result)
-        self.assertIn("其他", combined)
+        self.assertIn("A股", combined)
+
+
+@pytest.mark.unit_llm
+class TestBuildCompetitiveContextBlock(unittest.TestCase):
+    """_build_competitive_context_block 竞争语境段落构建。"""
+
+    def _no_data(self) -> str:
+        from src.python.llm.prompts import _build_competitive_context_block
+        return _build_competitive_context_block(None, 0, 0)
+
+    def test_no_data_returns_fallback(self):
+        """无数据时返回兜底文本。"""
+        result = self._no_data()
+        self.assertEqual(result, "暂无足够历史数据进行竞争语境对比")
+
+    def test_with_index_data_shows_today_compare(self):
+        """指数数据正确显示今日对比段落。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        a_indices = {
+            "sh000300": {"name": "沪深300", "change_pct": 0.5},
+            "sh000905": {"name": "中证500", "change_pct": 1.2},
+        }
+        result = _build_competitive_context_block(a_indices, 1_000_000, 10_000)
+        self.assertIn("【今日对比】", result)
+        self.assertIn("沪深300", result)
+        self.assertIn("中证500", result)
+        self.assertIn("相对沪深300", result)
+
+    def test_with_history_data_shows_interval_compare(self):
+        """历史数据包含区间对比。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        history_data = {
+            "portfolio_returns": [0.01, 0.02, 0.05],
+            "benchmark_returns": [0.005, 0.01, 0.03],
+        }
+        result = _build_competitive_context_block(
+            {"sh000300": {"change_pct": 0.5}}, 1_000_000, 10_000,
+            history_data=history_data,
+        )
+        self.assertIn("【区间对比】", result)
+
+    def test_with_metrics_shows_indicator_compare(self):
+        """量化指标正确嵌入指标对比段落。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        metrics = {
+            "sharpe_ratio": 0.85,
+            "annualized_volatility": 0.1234,
+            "max_drawdown": -0.15,
+            "calmar_ratio": 1.2,
+        }
+        result = _build_competitive_context_block(
+            {"sh000300": {"change_pct": 0.5}}, 1_000_000, 10_000,
+            metrics=metrics,
+        )
+        self.assertIn("【指标对比】", result)
+        self.assertIn("夏普 0.85", result)
+        self.assertIn("年化波动率 12.3%", result)
+        self.assertIn("最大回撤 -15.0%", result)
+        self.assertIn("卡玛 1.20", result)
+
+    def test_metrics_partial_keys_shows_available_only(self):
+        """指标字典部分键时仅显示存在的指标。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        metrics = {
+            "sharpe_ratio": 0.85,
+            "annualized_volatility": 0.12,
+        }
+        result = _build_competitive_context_block(
+            {"sh000300": {"change_pct": 0.5}}, 1_000_000, 10_000,
+            metrics=metrics,
+        )
+        self.assertIn("【指标对比】", result)
+        self.assertIn("夏普 0.85", result)
+        self.assertIn("年化波动率", result)
+        self.assertNotIn("最大回撤", result)
+        self.assertNotIn("卡玛", result)
+
+    def test_metrics_with_none_values_ignored(self):
+        """指标值为 None 时跳过。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        metrics = {
+            "sharpe_ratio": None,
+            "annualized_volatility": 0.12,
+            "max_drawdown": None,
+            "calmar_ratio": None,
+        }
+        result = _build_competitive_context_block(
+            {"sh000300": {"change_pct": 0.5}}, 1_000_000, 10_000,
+            metrics=metrics,
+        )
+        self.assertIn("【指标对比】", result)
+        self.assertIn("年化波动率", result)
+        self.assertNotIn("夏普", result)
+        self.assertNotIn("最大回撤", result)
+        self.assertNotIn("卡玛", result)
+
+    def test_metrics_empty_dict_no_indicator_section(self):
+        """空指标字典时无指标对比段落。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(
+            {"sh000300": {"change_pct": 0.5}}, 1_000_000, 10_000,
+            metrics={},
+        )
+        self.assertNotIn("【指标对比】", result)
+        self.assertIn("【今日对比】", result)
+
+    def test_custom_comparison_indices(self):
+        """自定义对比指数池生效。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        a_indices = {
+            "sh000300": {"name": "沪深300", "change_pct": 0.5},
+            "sh000012": {"name": "中证全债", "change_pct": 0.05},
+        }
+        result = _build_competitive_context_block(
+            a_indices, 1_000_000, 10_000,
+            comparison_indices={"sh000012": "中证全债"},
+        )
+        self.assertIn("中证全债", result)
+        self.assertNotIn("中证500", result)
+
+    def test_footnote_appended_when_comparison_present(self):
+        """有对比数据时脚注自动追加。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(
+            {"sh000300": {"name": "沪深300", "change_pct": 0.5}},
+            1_000_000, 10_000,
+        )
+        self.assertIn("口径说明", result)
+        self.assertIn("费后净收益", result)
+        self.assertIn("价格指数", result)
+        self.assertIn("现金管理品种", result)
+        self.assertIn("非静态组合", result)
+
+    def test_footnote_not_appended_when_no_data(self):
+        """无对比数据时无脚注。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(None, 0, 0)
+        self.assertEqual(result, "暂无足够历史数据进行竞争语境对比")
+        self.assertNotIn("口径说明", result)
+
+    def test_survivor_bias_note_appended_when_comparison_present(self):
+        """有对比数据时幸存者偏差提示自动追加。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(
+            {"sh000300": {"name": "沪深300", "change_pct": 0.5}},
+            1_000_000, 10_000,
+        )
+        self.assertIn("幸存者偏差", result)
+        self.assertIn("成分股", result)
+
+    def test_survivor_bias_note_not_appended_when_no_data(self):
+        """无对比数据时无幸存者偏差提示。"""
+        from src.python.llm.prompts import _build_competitive_context_block
+        result = _build_competitive_context_block(None, 0, 0)
+        self.assertNotIn("幸存者偏差", result)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
@@ -107,8 +108,12 @@ def _finalize_and_cache(
     llm_config: dict,
     thinking_enabled: bool,
     endpoint: str = "",
+    duration: float = 0.0,
 ) -> tuple[str | None, bool]:
     """处理 LLM 返回结果：Markdown→HTML → 拼接页脚 → 缓存 → 记录。
+
+    Args:
+        duration: API 调用耗时（秒），由调用方计时传入。
 
     Returns:
         (HTML 文本, False)
@@ -126,6 +131,8 @@ def _finalize_and_cache(
         out = usage.get("output_tokens", usage.get("completion_tokens", 0))
         cache_hit = usage.get("cache_read_input_tokens", 0)
         _footer = f"模型：{_model_name} | Token 用量：输入 {inp:,} / 输出 {out:,} = {inp + out:,}"
+        if duration > 0:
+            _footer += f" | 耗时: {duration:.1f}s"
         _cost = estimate_cost(_model_name, inp, out, cache_hit_input_tokens=cache_hit)
         if _cost != "-":
             _footer += f" | 估算费用：{_cost}"
@@ -154,6 +161,7 @@ def _finalize_and_cache(
                 cost=_cost_val,
                 endpoint=_endpoint_for_record,
                 cache_hit_tokens=_cache_hit,
+                duration=duration,
             )
 
     cache_set(cache_key, html)
@@ -302,6 +310,7 @@ def generate_llm_content(
 
     # ── LLM 调用 → 截断重试 → 处理结果 ──
     clear_last_llm_failure()
+    _t0 = time.monotonic()
     result, usage, provider_info = call_llm(
         system_prompt,
         user_prompt,
@@ -313,6 +322,7 @@ def generate_llm_content(
         temperature=temperature,
         model=model,
     )
+    _duration = time.monotonic() - _t0
     result, usage = _handle_truncation(
         result,
         usage,
@@ -344,6 +354,7 @@ def generate_llm_content(
             llm_config,
             thinking_enabled,
             endpoint=resolved_endpoint,
+            duration=_duration,
         )
 
     logger.warning("LLM 内容生成失败: %s", cache_key)

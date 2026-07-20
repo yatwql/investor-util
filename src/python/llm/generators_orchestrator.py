@@ -32,6 +32,7 @@ from src.python.llm.fingerprint import (
     compute_fingerprint,
     get_cache_ttl_llm,
 )
+from src.python.llm.fact_checker import run_fact_check
 from src.python.llm.generators import (
     generate_expert_review,
     generate_global_macro,
@@ -43,6 +44,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
     FAIL_REASON_DISABLED,
     LLM_MODULE_FAILURE,
+    _build_competitive_context_block,
 )
 from src.python.llm.session import record_per_module
 from src.python.llm.skeleton import is_llm_module_enabled
@@ -105,8 +107,13 @@ def _compute_module_cache_info(
     penetrated_assets: list[dict] | None,
     holdings_details: list[dict] | None,
     force: bool,
+    *,
+    history_data: dict | None = None,
 ) -> dict[str, dict]:
-    """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。"""
+    """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
+
+    history_data 风险信号 Hash 加入专家/体检/穿透指纹。
+    """
     fp_global_macro = compute_fingerprint(
         a_indices,
         us_indices,
@@ -122,6 +129,7 @@ def _compute_module_cache_info(
         holdings_details=holdings_details,
         penetrated_assets=penetrated_assets,
         categories=categories,
+        history_data=history_data,
     )
     fp_health_check = build_llm_fingerprint(
         total_mv=total_mv,
@@ -131,6 +139,7 @@ def _compute_module_cache_info(
         holdings_details=holdings_details,
         penetrated_assets=penetrated_assets,
         categories=categories,
+        history_data=history_data,
     )
     fp_penetration_deep = build_llm_fingerprint(
         total_mv=total_mv,
@@ -141,6 +150,7 @@ def _compute_module_cache_info(
         penetrated_assets=penetrated_assets,
         categories=categories,
         full_penetration=True,
+        history_data=history_data,
     )
 
     force_flag = force
@@ -247,10 +257,25 @@ def _dispatch_llm_workers(
     news_data: list[dict] | None = None,
     holdings_data: list | None = None,
     penetrated_assets_for_news: list[dict] | None = None,
+    metrics: dict | None = None,
+    degradation_events: list[dict] | None = None,
+    comparison_indices: dict[str, str] | None = None,
+    history_data: dict | None = None,
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。"""
     if not any(needs.values()):
         return {}
+
+    # ── 预计算竞争语境文本块 ──
+    _competitive_context = _build_competitive_context_block(
+        a_indices, total_mv, total_today_profit,
+        comparison_indices=comparison_indices,
+        history_data=history_data,
+        metrics=metrics,
+    )
+    # 量化指标 + 降级事件传递
+    _metrics = metrics
+    _degradation_events = degradation_events
 
     results_dict: dict[str, dict] = {}
     _label_map: dict[str, str] = get_llm_module_names()
@@ -286,6 +311,7 @@ def _dispatch_llm_workers(
             force=force,
             http_client=c,
             llm_config=lc,
+            competitive_context=_competitive_context,
         ),
         "expert_review": lambda c, lc: generate_expert_review(
             total_mv,
@@ -300,6 +326,8 @@ def _dispatch_llm_workers(
             http_client=c,
             llm_config=lc,
             f_context=f_context,
+            competitive_context=_competitive_context,
+            metrics=_metrics,
         ),
         "health_check": lambda c, lc: generate_health_check(
             total_mv,
@@ -314,6 +342,7 @@ def _dispatch_llm_workers(
             http_client=c,
             llm_config=lc,
             f_context=f_context,
+            degradation_events=_degradation_events,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
             total_mv,
@@ -481,6 +510,10 @@ def generate_all_llm(
     sector_flow: list[dict] | None = None,
     force: bool = False,
     f_context: dict | None = None,
+    history_data: dict | None = None,
+    metrics: dict | None = None,
+    degradation_events: list[dict] | None = None,
+    comparison_indices: dict[str, str] | None = None,
 ) -> tuple[str | None, str | None, str | None, str | None, bool, bool, bool, bool]:
     """并行生成全球政经局势 + 智囊团深度复盘 + 持仓体检报告 + 穿透深度分析。
 
@@ -494,6 +527,10 @@ def generate_all_llm(
 
     Args:
         f_context: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
+        history_data: 组合历史走势数据字典（含风险指标）。
+        metrics: 量化指标字典，compute_all_metrics() 的输出。
+        degradation_events: DegradationTracker.get_log() 输出。
+        comparison_indices: {代码: 名称} 对比指数池，用于竞争语境多指数对比。
 
     Returns:
         (global_macro_html, expert_review_html, health_check_html, penetration_deep_html,
@@ -516,6 +553,7 @@ def generate_all_llm(
         penetrated_assets,
         holdings_details,
         force,
+        history_data=history_data,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
@@ -538,6 +576,10 @@ def generate_all_llm(
         holdings_details,
         sector_flow,
         f_context=f_context,
+        metrics=metrics,
+        degradation_events=degradation_events,
+        comparison_indices=comparison_indices,
+        history_data=history_data,
     )
 
     # 合并预检结果 + 工作线程结果
@@ -554,6 +596,26 @@ def generate_all_llm(
     er_r, er_c = _get("expert_review")
     hc_r, hc_c = _get("health_check")
     pd_r, pd_c = _get("penetration_deep")
+
+    # ── 事实锚定校验 ──────────────────────────────────────
+    # 对已生成的 LLM 内容运行纯算法层事实校验，追加校验摘要到 HTML 底部。
+    # 仅检查非缓存且非空的模块（缓存命中说明内容未变化，无需重复校验）。
+    _module_labels = {"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘",
+                      "health_check": "持仓体检报告", "penetration_deep": "穿透深度分析"}
+    if holdings_details and any(r is not None for r in (gm_r, er_r, hc_r, pd_r)):
+        for _mk, _result in [("global_macro", gm_r), ("expert_review", er_r),
+                             ("health_check", hc_r), ("penetration_deep", pd_r)]:
+            if _result:
+                _summary = run_fact_check(_result, holdings_details, _module_labels.get(_mk, _mk))
+                if _summary and _summary not in _result:
+                    if _mk == "global_macro":
+                        gm_r = _result + "\n" + _summary
+                    elif _mk == "expert_review":
+                        er_r = _result + "\n" + _summary
+                    elif _mk == "health_check":
+                        hc_r = _result + "\n" + _summary
+                    elif _mk == "penetration_deep":
+                        pd_r = _result + "\n" + _summary
 
     logger.info(
         "LLM 生成完成: %s=%s, %s=%s, %s=%s, %s=%s",

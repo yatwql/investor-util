@@ -496,7 +496,7 @@ class TestAnalyzeStyleForAllFunds(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  P3-12: _push2_extended / _tencent_extended 文件缓存共享
+#  _push2_extended / _tencent_extended 文件缓存共享
 # ═══════════════════════════════════════════════════════════════
 
 

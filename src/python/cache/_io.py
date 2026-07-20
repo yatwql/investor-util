@@ -91,6 +91,12 @@ def _write_atomic(
             os.remove(final_path)
         os.rename(tmp_path, final_path)
 
+    # 设置文件权限为 0o600（仅所有者可读写，保护敏感数据）
+    try:
+        os.chmod(final_path, 0o600)
+    except OSError:
+        pass  # Windows 可能不支持完整 chmod，忽略
+
     # 清理旧格式文件（防止 .json 和 .json.gz 同时存在）
     other_path = path if use_gzip else (path + _GZIP_SUFFIX)
     if os.path.exists(other_path):

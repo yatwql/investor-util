@@ -1,6 +1,6 @@
 """缓存 edge 场景专项测试。
 
-从 test_cache.py 提取的 edge 场景：
+edge 场景：
   - TestGetTTLMarketHourAware: 市场交易时段感知的 TTL 计算
   - TestGzipCacheEdge: gzip 压缩边界（100KB 阈值）+ 损坏文件恢复
 

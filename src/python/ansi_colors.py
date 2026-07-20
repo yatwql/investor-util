@@ -1,8 +1,5 @@
 """ANSI 终端颜色常量 — 共享模块，避免 report 层依赖 UI 层。
 
-将颜色常量定义从 tui_menu.py 剥离到此共享模块，消除 report/progress.py
-对 tui_menu.py 的导入依赖。
-
 使用方：
   - tui_menu.py（UI 层）
   - report/progress.py（报告层）

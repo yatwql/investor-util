@@ -181,6 +181,11 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
 
     def _fetch_with_cache_refresh(dt: str) -> dict[str, Any] | None:
         """一次 fetch + 收市后新鲜度校验（跨日残留缓存清仓重试）。"""
+        from src.python.report.data_status import get_tracker
+
+        _t = get_tracker()
+        _src_key = f"price_{dt}_{code}"
+
         r = fetch_with_fallback(
             data_type=dt,
             provider_fn_map=_PRICE_PROVIDERS,
@@ -190,6 +195,11 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
             transform=_PRICE_TRANSFORMS,
             validate=_validate,
         )
+        if r is not None:
+            _t.record(_src_key, "T2", success=True)
+        else:
+            _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+
         if r is not None and not _price_cache_fresh(r):
             from src.python.cache import clear as _cache_clear
             from src.python.report.market_value import get_last_trading_day as _gtd
@@ -206,6 +216,10 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
                 transform=_PRICE_TRANSFORMS,
                 validate=_validate,
             )
+            if r is not None:
+                _t.record(f"{_src_key}_refresh", "T2", success=True)
+            else:
+                _t.record(f"{_src_key}_refresh", "T2", success=False, failure_type="unreachable")
         return r
 
     result = _fetch_with_cache_refresh(data_type)

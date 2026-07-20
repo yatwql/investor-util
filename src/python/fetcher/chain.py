@@ -34,6 +34,8 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "history_fund_otc": ["tiantian", "eastmoney"],
     "history_index": ["tencent", "sina"],
     "history_index_us": ["sina", "tencent"],
+    # 无风险利率：首选 akshare（bond_zh_us_rate），配置兜底
+    "bond_yield": ["akshare"],
 }
 
 
