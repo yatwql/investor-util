@@ -296,8 +296,8 @@ class ComputModuleDef:
 | `analytics_liquidity` | 流动性分析 | — | ✅ implemented |
 | `analytics_fx_exposure` | 外汇敞口分析 | — | ✅ implemented |
 | `analytics_fact_checker` | 事实锚定校验器 | — | ✅ implemented |
-| `analytics_scenario` | 情景分析 | history | ⏳ planned |
-| `analytics_alignment` | 组合校准分析 | — | ⏳ planned |
+| `analytics_scenario` | 情景分析 | history | ✅ implemented |
+| `analytics_alignment` | 组合校准分析 | — | ✅ implemented |
 | `analytics_inferrer` | 用户画像推断 | — | ⏳ planned |
 
 新增计算模块只需在 `_COMPUTATION_REGISTRY` 中添加一行 `ComputModuleDef`，纯算法模块无需缓存注册。

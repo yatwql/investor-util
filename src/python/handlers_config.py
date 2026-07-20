@@ -459,3 +459,54 @@ def _cmd_refresh_config() -> None:
     else:
         print(f"  {YELLOW}[!]{RESET} LLM 未配置（llm_key.json 或 llm_providers.json 缺失或无效）")
     press_any_key()
+
+
+def _cmd_config_anonymization_mode() -> None:
+    """配置匿名化模式（关闭/代码显示/完全匿名/汇总）。"""
+    from src.python.anonymizer import (
+        ANONYMIZATION_MODE_DESCRIPTIONS,
+        get_anonymization_mode,
+        set_anonymization_mode,
+    )
+
+    # 定义显示顺序
+    _ORDERED_KEYS = ["off", "code_display", "full_anonymous", "summary"]
+
+    while True:
+        current = get_anonymization_mode()
+        print()
+        print("  ┌── 配置匿名化模式 ──────────────────────────┐")
+        print(f"  │ 当前模式: {current}{' ' * (32 - len(current))}│")
+        print(f"  │{'─' * 48}│")
+        for idx, mode_key in enumerate(_ORDERED_KEYS, 1):
+            desc = ANONYMIZATION_MODE_DESCRIPTIONS.get(mode_key, mode_key)
+            marker = "►" if mode_key == current else " "
+            print(f"  │ {marker} {idx}. {desc}{' ' * max(1, 42 - len(desc))}│")
+        print(f"  │{'─' * 48}│")
+        print("  │ 0. 返回主菜单                              │")
+        print(f"  └{'─' * 48}┘")
+        print()
+        try:
+            choice = input("  请选择 (0-4): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        if choice == "0":
+            break
+
+        try:
+            idx = int(choice)
+            if 1 <= idx <= len(_ORDERED_KEYS):
+                new_mode = _ORDERED_KEYS[idx - 1]
+                if new_mode == current:
+                    print(f"  {YELLOW}[!]{RESET} 已是当前模式")
+                else:
+                    set_anonymization_mode(new_mode)
+                    print(f"  {GREEN}[OK]{RESET} 匿名化模式已切换为: {new_mode}")
+            else:
+                print(f"  {YELLOW}[!]{RESET} 无效编号")
+        except (ValueError, TypeError):
+            print(f"  {YELLOW}[!]{RESET} 请输入有效编号")
+
+    press_any_key()

@@ -10,7 +10,6 @@ from src.python.fetcher.akshare import get_dividend_data, get_profit_forecast
 from src.python.fetcher.fund import fetch_fund_holdings_cached
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.models import Holding
-from src.python.registry import get_llm_module_name
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix
@@ -468,62 +467,14 @@ def _render_llm_content_section(
     if not enable_llm:
         return False, None, None, None, None
 
-    prog.info("正在调用 LLM 生成智能分析...")
-    try:
-        from src.python.llm import generate_all_llm
-
-        pen_top10 = penetration.get("top10", []) if penetration else []
-        _holdings_details = [
-            {
-                "name": d.name,
-                "code": d.code,
-                "market_value": d.market_value,
-                "cost": d.cost,
-                "profit": d.profit,
-                "profit_rate": d.profit_rate,
-                "change_pct": (
-                    (d.price - d.yesterday_close) / d.yesterday_close * 100
-                    if d.yesterday_close and abs(d.yesterday_close) > 1e-10
-                    else 0.0
-                ),
-            }
-            for d in details
-        ]
-        from src.python.fetcher.akshare import get_sector_fund_flow
-
-        _sector_flow = sector_flow if sector_flow is not None else get_sector_fund_flow()
-
-        gm, er, hc, pd, _, _, _, _ = generate_all_llm(
-            a_indices,
-            us_indices,
-            total_mv,
-            total_cost,
-            total_profit,
-            total_today_profit,
-            len(holdings),
-            cat_counts,
-            penetrated_assets=pen_top10,
-            holdings_details=_holdings_details,
-            sector_flow=_sector_flow,
-            force=force_llm,
-        )
-        enabled = False
-        if gm:
-            enabled = True
-            logger.info("%s LLM 生成完成", get_llm_module_name("global_macro"))
-        if er:
-            enabled = True
-            logger.info("%s LLM 生成完成", get_llm_module_name("expert_review"))
-        if hc:
-            enabled = True
-            logger.info("%s LLM 生成完成", get_llm_module_name("health_check"))
-        if pd:
-            enabled = True
-            logger.info("%s LLM 生成完成", get_llm_module_name("penetration_deep"))
-        return enabled, gm, er, hc, pd
-    except Exception as e:
-        logger.warning("LLM 生成失败: %s", e)
-        return False, None, None, None, None
+    # 注意：此路径不应在正常情况下触发——orchestrator 始终预生成 llm_content
+    # 后传入 write_html_report()，enable_llm=True 时 llm_content 不应为 None。
+    # 保留此函数签名仅用于兼容，直接返回空值并记录告警。
+    logger.warning(
+        "_render_llm_content_section: llm_content 未预生成（enable_llm=True），"
+        "LLM 内容应通过 orchestrator 预生成后传入"
+    )
+    return False, None, None, None, None
 
 
 # ── LLM 模块状态 ────────────────────────────────────────────

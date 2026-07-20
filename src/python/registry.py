@@ -423,8 +423,8 @@ _COMPUTATION_REGISTRY: tuple[ComputModuleDef, ...] = (
         module_key="analytics_alignment",
         label="校准",
         dependencies=(),
-        description="持仓与目标的偏差分析，再平衡建议的量化基础",
-        status="planned",
+        description="组合校准修正因子：费率估算、现金剥离、时间加权收益率（TWR）",
+        status="implemented",
     ),
     ComputModuleDef(
         name="用户画像推断",

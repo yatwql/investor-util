@@ -45,6 +45,12 @@ from src.python.analysis.scenario import (  # noqa: F401
     fx_scenario_analysis,
     sharpe_ci_propagation,
 )
+from src.python.analysis.alignment_correction import (  # noqa: F401
+    portfolio_fee_estimation,
+    cash_stripping,
+    twr_calculation,
+    compute_alignment_factors,
+)
 
 __all__ = [
     "compute_rebalance_signals",
@@ -72,4 +78,8 @@ __all__ = [
     "industry_concentration_analysis",
     "fx_scenario_analysis",
     "sharpe_ci_propagation",
+    "portfolio_fee_estimation",
+    "cash_stripping",
+    "twr_calculation",
+    "compute_alignment_factors",
 ]

@@ -840,13 +840,13 @@
 | `b_series_fund_manager` / `b_series_fund_overlap` / `b_series_fund_concentration` / `b_series_fund_style` | bool | true | B 系列基金深度分析模块启停 |
 | `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
 | `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |
-| `anonymizer` | bool | false | 持仓匿名化开关（名称替换/数量模糊） |
+| `anonymization.mode` | str | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）、`code_display`（名称→"品种X"，保留代码）、`full_anonymous`（名称→"品种X"，代码→"000XXX"，盈亏→±XX%）、`summary`（仅大类汇总） |
 | `cache_daily_cleanup` | bool | true | 启动时自动清理过期缓存 |
 
 用法：在 `features.json` 中仅列出需覆写的开关，未列出的保持默认值。
 ```json
 {
-  "anonymizer": true,
+  "anonymization": {"mode": "code_display"},
   "news_cls": false
 }
 ```

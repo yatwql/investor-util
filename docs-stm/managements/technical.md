@@ -1913,8 +1913,8 @@ class ComputModuleDef:
 | `analytics_liquidity` | 流动性分析 | ✅ | 场内/场外比例、停牌风险、基金封闭期分析 |
 | `analytics_fx_exposure` | 外汇敞口分析 | ✅ | A股/港股/美股 国别分布与外汇风险敞口判断 |
 | `analytics_fact_checker` | 事实锚定校验器 | ✅ | LLM 输出的事实校验：数值一致性、品种存在性、排名正确性（纯算法层） |
-| `analytics_scenario` | 情景分析 | ⏳ | 市场涨跌 20% 情景模拟 |
-| `analytics_alignment` | 组合校准分析 | ⏳ | 持仓与目标偏差分析 |
+| `analytics_scenario` | 情景分析 | ✅ | 市场涨跌情景模拟、3 情景表、置信区间传播 |
+| `analytics_alignment` | 组合校准分析 | ✅ | 费率估算/现金剥离/TWR 计算 |
 | `analytics_inferrer` | 用户画像推断 | ⏳ | 持仓结构→风险偏好推断 |
 
 计算模块与报表层保持单向依赖，禁止反向导入 report/。

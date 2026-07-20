@@ -602,11 +602,24 @@ def generate_all_llm(
     # 仅检查非缓存且非空的模块（缓存命中说明内容未变化，无需重复校验）。
     _module_labels = {"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘",
                       "health_check": "持仓体检报告", "penetration_deep": "穿透深度分析"}
+
+    # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
+    _penetrated_codes: set[str] = set()
+    if penetrated_assets:
+        for _asset in penetrated_assets:
+            _codes = _asset.get("codes") or []
+            _penetrated_codes.update(_codes)
+
     if holdings_details and any(r is not None for r in (gm_r, er_r, hc_r, pd_r)):
         for _mk, _result in [("global_macro", gm_r), ("expert_review", er_r),
                              ("health_check", hc_r), ("penetration_deep", pd_r)]:
             if _result:
-                _summary = run_fact_check(_result, holdings_details, _module_labels.get(_mk, _mk))
+                _summary = run_fact_check(
+                    _result, holdings_details,
+                    module_label=_module_labels.get(_mk, _mk),
+                    extra_valid_codes=_penetrated_codes if _mk == "penetration_deep" else None,
+                    is_penetration_module=_mk == "penetration_deep",
+                )
                 if _summary and _summary not in _result:
                     if _mk == "global_macro":
                         gm_r = _result + "\n" + _summary

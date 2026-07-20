@@ -7,7 +7,16 @@
 ## [0.7.5] - Unreleased
 
 ### Added
-- **P4-09**: 缓存雪崩随机 TTL 修复（`cache/_ttl.py` `_ttl_jitter_factor()`，基于 key 哈希的 ±15% 确定性偏移，同类缓存 TTL 分散以降低雪崩概率）
+- **P2-11b (Beta 置信区间+统计检验)**：`metrics.py` 新增 95% 置信区间、t-统计量、p 值，置信区间过宽时标注"数据不足，Beta 估计可靠性有限"
+- **P4-01 (情景分析——Beta 推导)**：`scenario.py` 新增 `scenario_analysis()`，6 种涨跌情景下组合预期回撤/收益，含 ±1σ/±2σ 置信区间，注入 LLM prompt "情景模拟"段落
+- **P4-02 (情景分析——3 情景表)**：`scenario.py` 扩展市场/行业/汇率三张情景表
+- **P4-03 (情景分析——置信区间传播)**：`scenario.py` 实现 Beta CI→情景回撤 CI、年化波动 CI→夏普 CI 传播，过宽时标注"预测可靠性有限"
+- **P3-09b (口径修正因子计算)**：`alignment_correction.py` 529 行，综合费率估算/现金剥离/TWR 计算，数据不足时回退纯说明版本
+- **P4-04 (匿名化 4 模式)**：`anonymizer.py` 扩展为 4 模式（off/code_display/full_anonymous/summary），TUI 菜单 `[A]` 设置，持久化到 config `anonymization.mode`
+- **P4-06 (缓存审查)**：`cache.py` 新增 `clean_sensitive(older_than_days=90)`，敏感 key 标注（`holding_*`、`penetration_*`），启动时自动清理过期敏感缓存
+- **P3-81 (双熔断器统一网关)**：`circuit_breaker.py` 扩展完整 `CircuitBreakerGateway` 类，支持 `gateway.summary()` 统一状态输出
+- **P3-82 (清理遗留 LLM 回退路径)**：`html_renderers.py` 绕过 orchestrator 直接调用 `generate_all_llm()` 的死代码已清理
+- **P3-83 (概念板块 API 降级状态区分)**：`"no_a_share"` / `"empty"` / `"unreachable"` 三种状态已区分，LLM prompt 段落据此显示不同兜底文本
 - **P4-10**: metrics edge 测试用例（`test_metrics_edge.py`，59 项，覆盖 None/NaN/Inf/空列表/长度不匹配 等全异常路径）
 - **P4-11**: bond_yield edge 测试用例（`test_bond_yield_edge.py`，16 项，覆盖 config 异常/缓存异常/akshare 异常/DataFrame 异常）
 - **P4-12**: rebalance 测试用例完善（`test_rebalance_edge.py`，24 项，覆盖 config/profile 边界/分类降级/回填保护/静默期异常/置信度边界）
@@ -19,8 +28,16 @@
   - 验证结果：151 文件通过，0 违规
 
 ### Changed
+- **事实校验器 v2（感知增强）**：`llm/fact_checker.py` 数值一致性全面重写——按句子粒度分析，优先匹配句中持仓代码对应个股收益率，未识别到个股时回退组合总收益率；收益归因段落自动跳过；指数基准代码数值跳过；金融宏观指标（国债利率/GDP/CPI）跳过。品种存在性新增 extra_valid_codes 参数，穿透分析自动传入穿透层股票代码。排名检查新增 is_penetration_module 参数，穿透模块跳过排名校验
+- **LLM Prompt 数值精度约束**：prompts_action.py 智囊团深度复盘 prompt 新增"数值精度约束"段落——要求 LLM 直接引用持仓明细中的 profit_rate 数据，不虚构收益率；贡献度标注为"贡献占比"；不确定时用定性描述。
+
+### Fixed
+- **事实校验器误报消除**：三类系统性误报——个股收益率不再错误对比组合总收益；穿透底层股票代码（如 002837/300750）不再误告警；全球政经宏观指标自动跳过。scenario_llm/scenario_perf/scenario_security 标记注册到 conftest.py
+
+### Tests
+- **test_llm_hallucination.py 重写**：17 项场景测试，覆盖个股/组合级数值一致性、归因段落跳过、指数基准跳过、穿透代码集、穿透排名跳过
 - **`f_context` → `pipeline_data` 全局重命名**：文件 `f_context_builder.py` → `pipeline_data_builder.py`，所有源码变量名/函数名/参数名/注释及 8 份文档统一替换为 `pipeline_data`；归档文档（`docs-stm/archive/`）保留历史原名不变
-- **`plan.md`**：移除已完成任务项——"执行信号与竞争语境"整节（含事实校验器 #56）和 P4-09~P4-13 共 6 项从待办表删除；质量与安全计数从 17 项/~176h 更新为 12 项/~148h；P2 标题移除"执行信号与竞争语境"前缀
+- **`plan.md`**：移除已完成任务项——P2 表移除 #60~#65、#67、#68 共 9 项；P3 表移除 #81~#84、#88、#89 共 6 项；质量与安全计数从 12 项/~148h 更新为 4 项/~40h；P3 技术债从 10 项/~120h 更新为 4 项/~52h
 - **文件重命名**（去除代码内部变量名和缩写）：
   - `perf-report.md` → `better-investment-performance-test-report.md`
   - `f_context-schema.md` → `data-channels-schema.md`

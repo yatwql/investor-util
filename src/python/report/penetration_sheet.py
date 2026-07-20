@@ -133,27 +133,33 @@ def build_penetration_data_status(
 
     # 行业分类（T3，push2）
     if not result.get("industry_success", True):
-        # 行业缓存按股票代码存储，取第一个可用代码检查缓存新鲜度
-        _first_code = next(
-            (_code for _entry in result.get("top10", []) for _code in (_entry.get("codes") or [])),
-            None,
-        )
-        cache_age = get_cache_age_by_data_type("industry", _first_code) if _first_code else None
-        _ind_ttl = get_ttl("industry")
-        degraded, _, _ = _tracker.record(
-            "penetration_industry",
-            "T3",
-            success=False,
-            failure_type="unreachable",
-            cache_age_hours=cache_age / 3600 if cache_age else None,
-            cache_ttl_hours=_ind_ttl / 3600 if _ind_ttl else 24,
-        )
-        if degraded:
-            status["industry"] = DataStatusItem(
-                available=False,
-                tier="T3",
-                message=STATUS_MESSAGES["industry_unavailable"],
+        # 读取实际的失败类型，避免将"无A股代码"误记为不可用
+        industry_failure_type = result.get("industry_failure_type", "unreachable")
+        # "no_a_share" 是预期行为（全为非 A 股穿透资产），不视为降级
+        if industry_failure_type == "no_a_share":
+            pass
+        else:
+            # 行业缓存按股票代码存储，取第一个可用代码检查缓存新鲜度
+            _first_code = next(
+                (_code for _entry in result.get("top10", []) for _code in (_entry.get("codes") or [])),
+                None,
             )
+            cache_age = get_cache_age_by_data_type("industry", _first_code) if _first_code else None
+            _ind_ttl = get_ttl("industry")
+            degraded, _, _ = _tracker.record(
+                "penetration_industry",
+                "T3",
+                success=False,
+                failure_type=industry_failure_type,
+                cache_age_hours=cache_age / 3600 if cache_age else None,
+                cache_ttl_hours=_ind_ttl / 3600 if _ind_ttl else 24,
+            )
+            if degraded:
+                status["industry"] = DataStatusItem(
+                    available=False,
+                    tier="T3",
+                    message=STATUS_MESSAGES["industry_unavailable"],
+                )
 
     # 盈利预测（T4，akshare）
     if not profit_success:

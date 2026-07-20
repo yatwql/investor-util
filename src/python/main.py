@@ -84,6 +84,7 @@ def _bind_callbacks() -> None:
         _cmd_update_position_cache,
     )
     from src.python.handlers_config import (
+        _cmd_config_anonymization_mode,
         _cmd_config_comparison_indices,
         _cmd_config_dir,
         _cmd_config_filename,
@@ -110,6 +111,7 @@ def _bind_callbacks() -> None:
         "3": _cmd_cleanup_cache,
         "4": _cmd_show_cache_stats,
         "I": _cmd_config_comparison_indices,
+        "A": _cmd_config_anonymization_mode,
         "P": _cmd_config_report_boards,
         "S": _cmd_config_llm_modules,
         "R": _cmd_refresh_config,
@@ -124,15 +126,23 @@ def main() -> None:
     _bind_callbacks()
     atexit.register(_print_session_usage_on_exit)
 
-    # 启动时自动清理过期缓存（静默后台执行，仅日志记录）
-    try:
-        from src.python.cache import cleanup_expired
+	# 启动时自动清理过期缓存（静默后台执行，仅日志记录）
+	try:
+		from src.python.cache import cleanup_expired
 
-        removed = cleanup_expired(dry_run=False)
-        if removed > 0:
-            logger.info("启动时自动清理了 %d 个过期缓存文件", removed)
-    except OSError as e:
-        logger.warning("启动时缓存清理失败: %s", e)
+		removed = cleanup_expired(dry_run=False)
+		if removed > 0:
+			logger.info("启动时自动清理了 %d 个过期缓存文件", removed)
+	except OSError as e:
+		logger.warning("启动时缓存清理失败: %s", e)
+
+	# 首次运行隐私提示
+	try:
+		from src.python.report.privacy_notice import show_privacy_notice_if_needed
+
+		show_privacy_notice_if_needed()
+	except Exception:
+		logger.debug("隐私提示显示失败（非关键）", exc_info=True)
 
     # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/C/F/O/1/2/3/4/S/R/X
     from src.python.config import get_config
