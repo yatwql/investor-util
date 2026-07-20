@@ -8,13 +8,13 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 141 | 35,949 | `src/python/` 下所有 `.py`（不含测试） |
-| HTML 报告模板 | HTML | 1 | 1,749 | `src/python/tmpl/report_template.html` |
+| 主程序代码 | Python | 143 | 37,271 | `src/python/` 下所有 `.py`（不含测试） |
+| HTML 报告模板 | HTML | 1 | 1,750 | `src/python/tmpl/report_template.html` |
 | 辅助脚本 | Python/Shell | 9 | 2,364 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **150** | **40,062** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **168** | **53,155** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,484 个** | `pytest --collect-only` 统计 |
-| **用户文档** | Markdown | **71** | **34,145** | `docs-stm/`（69 文件）+ `README.md` + `CLAUDE.md` |
+| **源代码合计** | — | **153** | **41,385** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **177** | **55,827** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,616 个** | `pytest --collect-only` 统计 |
+| **用户文档** | Markdown | **73** | **35,436** | `docs-stm/`（71 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
 
@@ -245,6 +245,7 @@ investor-util/
 │   │   │   └── better-investment-performance-test-report.md # 端到端性能基准测试报告
 
 │   ├── archive/                      #   历史归档
+│   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
 │   │   │   ├── archived_plan.0.1.x.md             # 实现计划归档 v0.1.x

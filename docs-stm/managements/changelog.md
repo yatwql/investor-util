@@ -6,8 +6,18 @@
 
 ## [0.7.7-dev] - 未发布
 
-### Added
-- (待添加)
+### Fixed
+- **news_aggregator.py `_ANCHOR_PATH` 路径错误**：手动 `dirname` 计算比 `constants.PROJECT_ROOT` 多 1 级，锚点文件写入 `src/data/cache/` 而非 `data/cache/`，导致 `calibrate-dedup-threshold.py` 找不到锚点文件。改用 `from src.python.constants import PROJECT_ROOT`，消除 dirname 层数依赖
+
+### Changed
+- **test-coverage.md**: 全量测试统计更新（all: 3449→3616，edge: 366→469，llm: 518→584 等）
+- **folders.md**: 统计表刷新（主程序 141→143 文件，测试 168→177 文件，测试用例 3484→3616）；补 `llm_hallucination_sampler.py` 至 scripts 目录树、`porting-to-rust-vs-java-analysis.md` 至 archive 根
+
+### Docs
+- **how-to-config.md**: 补全 `comparison_indices` 字段说明；合并 `coverage_threshold` 溢出行
+- **README.md + reports-instruction.md**: 补充 LLM 报告实际输出描述（情景分析、再平衡、竞争语境对比、穿透国别/币种暴露）
+- **faq.md**: 新增日志级别配置表（控制台/文件/全局），附 logger.py 行号
+- **folders.md / llm-technical.md / test-coverage.md**: 版本头同步至 v0.7.7-dev
 
 ---
 
