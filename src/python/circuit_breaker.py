@@ -16,9 +16,9 @@ LLM 熔断（llm/circuit_breaker.py 模块级）共享同一查询入口。
     # 查询 LLM 熔断端点状态
     llm_status = gateway.get("llm")
 
-向后兼容:
+兼容包装函数:
     get_all_breaker_status() / get_provider_breaker_status() / get_llm_endpoint_status()
-    仍然可用，委派给网关。
+    委派给网关。
 """
 
 from __future__ import annotations
@@ -191,14 +191,14 @@ gateway = CircuitBreakerGateway()
 
 
 # ═══════════════════════════════════════════════════════════════
-# 向后兼容的模块级函数
+# 模块级包装函数（委派给 gateway）
 # ═══════════════════════════════════════════════════════════════
 
 
 def get_provider_breaker_status() -> dict[str, dict[str, Any]]:
     """返回所有 Provider 的熔断状态报告。
 
-    向后兼容包装器，委派给 gateway._get_provider_status()。
+    委派给 gateway._get_provider_status()。
 
     Returns:
         {provider_name: {available, tier, consecutive_failures, ...}, ...}
@@ -209,7 +209,7 @@ def get_provider_breaker_status() -> dict[str, dict[str, Any]]:
 def get_llm_endpoint_status() -> dict[str, dict[str, Any]]:
     """返回所有 LLM 端点的熔断状态报告。
 
-    向后兼容包装器，委派给 gateway._get_llm_status()。
+    委派给 gateway._get_llm_status()。
 
     Returns:
         {endpoint_domain: {circuit_broken, consecutive_failures, ...}, ...}
@@ -220,7 +220,7 @@ def get_llm_endpoint_status() -> dict[str, dict[str, Any]]:
 def get_all_breaker_status() -> dict[str, dict[str, Any]]:
     """返回所有断路器状态（Provider + LLM）。
 
-    向后兼容包装器，委派给 gateway.summary()。
+    委派给 gateway.summary()。
 
     Returns:
         {"provider": {...}, "llm": {...}}

@@ -113,7 +113,7 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.config._config_defaults._CONFIG_FILE",
         str(tmp_path / "data/config/config.json"),
     )
-    # C13: cache 拆分重构后 _CACHE_DIR 存在于 _paths/_stats/_cleanup/_groups/__init__ 等处
+    # C13: _CACHE_DIR 存在于 cache/ 子包中
     monkeypatch.setattr(
         "src.python.cache._paths._CACHE_DIR",
         str(tmp_path / "data/cache"),

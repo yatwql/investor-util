@@ -1,7 +1,6 @@
 """行情市值与指数数据解析模块。
 
 职责：市场行情数据获取/复用 + 指数数据获取/复用。
-提取自 excel_generator.py 的 _resolve_market_data + _resolve_indices。
 """
 
 from __future__ import annotations

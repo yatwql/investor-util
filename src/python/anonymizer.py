@@ -4,8 +4,8 @@
 
 4 模式：
   - "off":             不处理，原样返回
-  - "code_display":    名称 → "品种X"，保留代码和盈亏（原 name_replace）
-  - "full_anonymous":  名称 → "品种X"，代码 → "000XXX"，盈亏模糊化（原 quantity_blur）
+  - "code_display":    名称 → "品种X"，保留代码和盈亏
+  - "full_anonymous":  名称 → "品种X"，代码 → "000XXX"，盈亏模糊化
   - "summary":         仅显示大类汇总，不展示单条持仓
 
 使用方式：
@@ -35,15 +35,15 @@ logger = logging.getLogger("invest")
 
 _ANONYMIZATION_MODES = frozenset({"off", "code_display", "full_anonymous", "summary"})
 
-# 向后兼容映射：旧模式 → 新模式（不含 off，off 无变化）
+# 模式名别名映射（兼容历史配置值）
 _DEPRECATED_MODE_MAP: dict[str, str] = {
     "name_replace": "code_display",
     "quantity_blur": "full_anonymous",
 }
 
-# 弃用消息模板
+# 别名提示消息模板
 _DEPRECATION_WARNING_TPL = (
-    "匿名化模式 '%s' 已废弃，请使用 '%s'（向后兼容处理中，将在未来版本移除）"
+    "匿名化模式 '%s' 已重命名为 '%s'，请更新配置"
 )
 
 __all__ = [

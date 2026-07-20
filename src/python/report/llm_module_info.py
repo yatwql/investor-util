@@ -35,10 +35,10 @@ _DISPLAY_REASON: dict[str, str] = {
 
 
 def get_llm_module_failure_reason(module_failure: dict, module_key: str) -> str | None:
-    """从 LLM_MODULE_FAILURE 中提取模块失败原因，统一处理旧格式和多链 dict 格式。
+    """从 LLM_MODULE_FAILURE 中提取模块失败原因，支持字符串和多链 dict 两种格式。
 
-    旧格式：value 为 FAIL_REASON_* 字符串，直接返回。
-    多链格式：value 为 ``{"attempted": [...], "final_status": "success"|FAIL_REASON_*}``，
+    字符串：value 为 FAIL_REASON_*，直接返回。
+    多链 dict：value 为 ``{"attempted": [...], "final_status": "success"|FAIL_REASON_*}``，
     提取 final_status，success 转换为 None（表示成功）。
 
     Returns:

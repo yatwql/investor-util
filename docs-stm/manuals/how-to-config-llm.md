@@ -174,6 +174,8 @@ LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
 
 ---
 
+## 模块启停
+
 通过 `enabled_llm` 嵌套字典控制每个模块的开关，除 `news_correlation` 默认关闭外，其余默认开启：
 
 ```json
@@ -255,7 +257,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | 配置键 | 类型 | 默认值（各模块不同） | 说明 |
 |--------|:----:|:--------------------:|------|
 | `system_prompt_{module}` | string / null | `null` | 系统提示词覆盖，`null`=使用代码内置 prompt |
-| `model_{module}` | string / null | `null` | 独立指定本模块使用的模型，`null`=使用 `llm_key.json` 的默认 model |
+| `model_{module}` | string / null | `null` | 独立指定本模块使用的模型，`null`=使用 Provider 的默认模型（flat 模式取 `llm_key.json`，多链模式取 `llm_providers.json` 中该 Provider 凭据块的 model） |
 | `temperature_{module}` | float | 0.1~0.8（模块差异） | 采样温度，0=确定性最高，1=最大多样性 |
 | `max_tokens_{module}` | int | 1024~8192（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试） |
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
@@ -264,12 +266,6 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude / DeepSeek / Gemini 2.5） |
 | `thinking_budget_{module}` | int | 4000~16000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
-
-### 专用配置项
-
-| 配置键 | 类型 | 默认值 | 说明 |
-|--------|:----:|:------:|------|
-| `news_correlation_top_n` | int | `30` | 送 LLM 分析的新闻条数上限。仅 `news_correlation` 模块有效，按关键词匹配数降序选取前 N 条送 LLM。值越大 Token 消耗越高，设为 `114` 表示全部送分析 |
 
 > 各模块默认值差异详见下方「各模块推荐参数值」表。
 

@@ -1,6 +1,6 @@
 """LLM 提示词核心模块 — System Prompt 常量与基础设施。
 
-从 prompts.py 拆分，包含：
+包含：
   - System Prompt 常量（_SYSTEM_*）
   - 失败原因常量（FAIL_REASON_*）
   - 缓存前缀（CACHE_PREFIX_LLM）

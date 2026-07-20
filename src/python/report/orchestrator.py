@@ -132,8 +132,6 @@ def prepare_report_data(
 
 
 # ── S2 移入：capture_snapshot ──
-# 原 handlers_report._capture_snapshot()
-# ★ 与 TUI 原版差异：capture_snapshot 使用 config 参数替代 get_config_cache()
 
 
 def capture_snapshot(
@@ -144,8 +142,6 @@ def capture_snapshot(
     **extra: Any,
 ) -> dict | None:
     """F1 持仓快照创建 + 差异计算 + 保存 + 清理。
-
-    接受 config 参数而非调用 get_config_cache()（★ 与 TUI 原版的核心差异）。
 
     Args:
         holdings: 持仓列表
@@ -263,8 +259,6 @@ def capture_snapshot(
 
 
 # ── S3 移入：fetch_history_data ──
-# 原 handlers_report._fetch_history_data() 业务逻辑
-# ★ 与 TUI 原版差异：接受 config 参数替代 get_config_cache()；不接受 "prompt" 模式
 
 
 def fetch_history_data(

@@ -255,7 +255,7 @@ class TestReportSectionDefault:
     """_REPORT_SECTION_DEFAULT 完整性验证。"""
 
     def test_total_17_sections(self):
-        """应有 17 个报告模块（early_warning 已移除）。"""
+        """应有 17 个报告模块。"""
         assert len(_REPORT_SECTION_DEFAULT) == 17
 
     def test_every_entry_has_required_fields(self):

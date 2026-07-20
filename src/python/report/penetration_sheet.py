@@ -1,4 +1,4 @@
-"""穿透 TOP10 Excel 写入模块 — 从 penetration.py 拆分而来。
+"""穿透 TOP10 Excel 写入模块。
 
 包含 write_penetration_sheet 及辅助函数，依赖 penetration.py 的
 compute_penetration_top10 进行计算。

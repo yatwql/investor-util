@@ -1,7 +1,6 @@
 """新闻页签写入模块。
 
 职责：财经新闻页签获取/写入。
-提取自 excel_generator.py 的 _write_news_and_early_warning。
 """
 
 from __future__ import annotations

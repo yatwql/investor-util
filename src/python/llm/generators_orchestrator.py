@@ -1,13 +1,11 @@
 """LLM 批量编排模块 — 缓存预检查、线程池分发与 LLM 全量生成。
 
-R-198 从 generators.py 拆分：包含 _compute_module_cache_info、
-_precheck_one_cache、_precheck_all_modules、_dispatch_llm_workers、
-generate_all_llm 和 _LLM_CLIENT_SETTINGS。
+包含 _compute_module_cache_info、_precheck_one_cache、_precheck_all_modules、
+_dispatch_llm_workers、generate_all_llm 和 _LLM_CLIENT_SETTINGS。
 
 ``_MODULE_FNS`` 集中管理所有 LLM 模块的生成函数，确保一致的
 缓存预检、线程池分发和失败处理。新增模块需在此注册。
 """
-
 from __future__ import annotations
 
 import json

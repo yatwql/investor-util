@@ -138,6 +138,7 @@ from src.python.registry import (
 from src.python.registry import (
     get_report_sheet_name,           # sheet_key → 中文标题
     get_report_section_order,        # config → dict[key → 自定义序号]
+    get_report_section_number,       # key → 当前配置下的序号
     get_report_section_keys,         # → list[key]
 )
 ```
@@ -145,36 +146,32 @@ from src.python.registry import (
 **用途：**
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
-- `get_report_section_keys()` → 全部 17 个模块键名
+- `get_report_section_number("fund_manager")` → 当前配置下该模块的序号（被 B 系列各页签写入器调用）
+- `get_report_section_keys()` → 全部 17 个模块键名（见下表）
 
-### 报表页签名称查找
+全部键名及对应中文标题：
 
-```python
-from src.python.registry import (
-    get_report_sheet_name,             # sheet_key → 中文标题
-)
-```
+| 键名 | 中文标题 | 说明 |
+|------|---------|:----:|
+| `summary` | 投资分析汇总 | 始终显示 |
+| `market_value` | 市值核算明细表 | 始终显示 |
+| `category` | 持仓分类表 | 始终显示 |
+| `penetration` | 资产穿透TOP10 | 始终显示 |
+| `fund_performance` | 基金业绩分析 | 始终显示 |
+| `fund_manager` | 基金经理变更监控 | B 系列 |
+| `fund_overlap` | 持仓重合度矩阵 | B 系列 |
+| `fund_concentration` | 持仓集中度监控 | B 系列 |
+| `fund_style` | 基金风格分析 | B 系列 |
+| `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻 |
+| `global_macro` | 全球政经局势 | LLM |
+| `expert_review` | 智囊团深度复盘 | LLM |
+| `health_check` | 持仓体检报告 | LLM |
+| `penetration_deep` | 穿透深度分析 | LLM |
+| `portfolio_history` | 组合历史走势 | 历史走势 |
+| `drawdown_analysis` | 回撤分析 | 历史走势 |
+| `llm_usage` | LLM API 用量 | LLM（强制末位） |
 
-**用途：**
-- `get_report_sheet_name("summary")` → `"投资分析汇总"`
-- `get_report_sheet_name("penetration")` → `"资产穿透TOP10"`
-- 可选键名：`summary`, `market_value`, `category`, `penetration`, `fund_performance`, `fund_manager`, `fund_overlap`, `fund_concentration`, `fund_style`, `portfolio_history`, `drawdown_analysis`
-
-| 键名 | 中文标题 |
-|------|---------|
-| `summary` | 投资分析汇总 |
-| `market_value` | 市值核算明细表 |
-| `category` | 持仓分类表 |
-| `penetration` | 资产穿透TOP10 |
-| `fund_performance` | 基金业绩分析 |
-| `fund_manager` | 基金经理变更监控 |
-| `fund_overlap` | 持仓重合度矩阵 |
-| `fund_concentration` | 持仓集中度监控 |
-| `fund_style` | 基金风格分析 |
-| `portfolio_history` | 组合历史走势 |
-| `drawdown_analysis` | 回撤分析 |
-
-LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取：全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析（第 11~14 号）及财经新闻热点与持仓关联分析（第 10 号）。LLM API 用量页签第 17 号为程序自动生成，不依赖 registry。
+> LLM 模块（`global_macro`/`expert_review`/`health_check`/`penetration_deep`/`news_correlation`）的页签标题统一通过 `get_llm_module_name(settings_suffix)` 获取；`llm_usage` 的序号和名称也在 registry 中注册，内容（Token/费用数据）由程序动态计算。
 
 完整 17 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
 
@@ -194,8 +191,8 @@ LLM 模块页签标题通过 `get_llm_module_name(settings_suffix)` 获取：全
 | `handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
 | `report/excel_generator.py` | `get_report_section_order()` | Excel 页签排序 |
 | `report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入 |
-| `report/excel_sheet_factory.py` | `create_sheets()` 内联连续重新编号 | 页签标题设置 |
-| `report/excel_llm_usage.py` | `get_llm_module_names()` | LLM API 用量统计 |
+| `report/llm_module_info.py` | `get_llm_module_names()` | 构建模块状态/Token用量/费用信息 |
+| `report/excel_llm_usage.py` | `build_llm_module_info()`（→ `llm_module_info.py` 间接调用） | LLM API 用量页签写入 |
 
 > 完整列表：除上表外，各页签写入器（`summary.py`、`market_value_sheet.py`、`category.py` 等）均调用 `get_report_sheet_name()` 获取页签名。新增模块在 `_MODULE_REGISTRY` 注册后自动同步到所有消费方。
 

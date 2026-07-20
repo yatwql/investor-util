@@ -1,6 +1,6 @@
 """TUI 配置管理命令处理器。
 
-按职责从 tui_handlers.py 拆分而来，负责所有配置管理相关的命令函数。
+所有配置管理相关的 TUI 命令处理函数（菜单 C/F/O/P/S/R/A/I）。
 """
 
 from __future__ import annotations

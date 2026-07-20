@@ -143,7 +143,7 @@
 | **数据来源** | A 股/ETF → 腾讯或新浪 K 线接口；场外基金 → 天天基金（主）+ 东方财富历史净值 API（备用）；基准指数 → 腾讯→新浪 K 线（走 `history_index` chain） |
 | **数据获取链路** | 场外基金：tiantian(`pingzhongdata/{code}.js`) → 空数据时自动 fallback 到 eastmoney(`api.fund.eastmoney.com/f10/lsjz` 分页获取，单页 20 条，最多 10 页)；基准指数通过 `fetch_index_history()` → `history_index` chain 并行获取 |
 | **存储位置** | `data/cache/history_stock_{code}.json` / `history_fund_otc_{code}.json` / `history_index_{code}.json`（标准缓存系统） |
-| **输出内容** | §16 走势折线图（含基准指数叠加对比，累计收益/最大回撤/年化波动率三卡片）+ §17 回撤面积图（含基准指数回撤对比） |
+| **输出内容** | §15 走势折线图（含基准指数叠加对比，累计收益/最大回撤/年化波动率三卡片）+ §16 回撤面积图（含基准指数回撤对比） |
 | **触发方式** | 由 `config.json` 的 `history.analysis` 控制： |
 | | `"off"` — 关闭，走势图显示占位文本 |
 | | `"prompt"` — 报告生成后询问是否获取 |
@@ -309,7 +309,7 @@ Endpoint       https://api.anthropic.com/v1/messages
 
 ### HTML 格式
 
-自动渲染在报告第 17 节（回撤分析之后），格式与 Excel 一致，分汇总区和模块明细表两部分。底部追加系统数据缓存统计区域：
+当 LLM 启用时，自动渲染在报告各 LLM 分析章节之后（末位），格式与 Excel 一致，分汇总区和模块明细表两部分。底部追加系统数据缓存统计区域：
 
 | 区块 | HTML 渲染方式 |
 |:-----|:-------------|

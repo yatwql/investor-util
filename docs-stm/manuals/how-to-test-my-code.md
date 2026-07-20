@@ -300,6 +300,8 @@ pytest src/test/ -m "<对应标记>" --lf
 
 > 脚本自动定位 `test-reports/latest/all/report.html` 等常用路径，无需每次指定路径。
 
+## 辅助脚本
+
 ### 📐 新闻去重阈值校准 — `scripts/calibrate-dedup-threshold.py`
 
 新闻标题去重（`news_aggregator.py:_dedup_by_title`）使用同源/跨源两档阈值 + 中文实体 bigram 辅助判定。去重逻辑在每次报告运行时自动记录"边界案例"（ratio 或 bigram 接近阈值的比较对）到 `data/cache/dedup_anchors.jsonl`（append-only，约 200 字节/条）。
@@ -375,7 +377,7 @@ python scripts/llm_hallucination_sampler.py --force
 
 **幻觉率标准**：目标 **< 5%**。每次 prompt 重大修改后应重新采样。
 
-**注意**：数值一致性检查可能产生误报——仓位占比百分比（如 "52.4%"）和情景假设百分比会被事实校验器标记为收益率偏差。建议人工复核后确认实际幻觉率。
+**注意**：事实校验器对仓位占比百分比和情景假设百分比设跳过策略（`_POSITION_WEIGHT_KEYWORDS` / `_HYPOTHETICAL_KEYWORDS`），避免将百分比陈述误报为幻觉。最终幻觉率以 `docs-stm/tmp/hallucination-report.md` 为准。
 
 ## 标记选择运行速查
 

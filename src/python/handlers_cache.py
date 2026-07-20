@@ -1,7 +1,7 @@
 """TUI 缓存管理命令处理器。
 
-按职责从 tui_handlers.py 拆分而来，负责所有缓存刷新/管理相关的命令函数。
-P1-S9~S11 将业务逻辑迁移至 cache/operations.py，本模块仅保留 TUI 外壳。
+所有缓存刷新/管理相关的 TUI 命令处理函数（菜单 [1][2][3][4]）。
+业务逻辑委托至 cache/operations.py，本模块仅保留 TUI 外壳。
 
 本模块包含：
   - TUI 文件选择 + 持仓读取（_read_holdings_and_clear_cache）

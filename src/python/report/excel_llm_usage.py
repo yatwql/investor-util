@@ -1,7 +1,6 @@
 """LLM 分析章节 + API 用量页签写入模块。
 
 职责：LLM 分析章节编排 + LLM API 用量构建/写入。
-提取自 excel_generator.py 的 _write_llm_section_and_usage + _build_llm_usage_sheet。
 """
 
 from __future__ import annotations

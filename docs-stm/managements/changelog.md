@@ -4,16 +4,39 @@
 
 ---
 
-## [0.7.6-dev] - Unreleased
+## [0.7.6] - 2026-07-20
 
 ### Added
-- （待添加）
-
-### Changed
-- **plan.md**: 移除已完成的 P2 质量与安全（4 项：隐私提示/端到端性能测试/链韧性测试/安全测试）和 P3 技术债清算（4 项：性能/韧性/安全/匿名化扩展）全部整节。当前待办仅保留 P4-91（增强 LLM 策略实验功能）。详见 `better-investment-task.md` 保管的完整任务分解记录。
+- **P4-14 (端到端性能测试)**：全流程报告管线性能测试，覆盖 E/B/L 三种菜单从读取持仓到报告输出的完整链路
+- **P4-15 (链韧性测试)**：`test_chain_resilience.py` 全链路熔断降级场景测试，验证 Provider Chain 在多级失败下的逐级降级行为
+- **P4-16 (安全测试)**：覆盖缓存目录穿越、配置注入、LLM 凭据泄露、路径遍历等安全场景
+- **P4-05 (隐私提示)**：Excel 报告页脚添加匿名化状态说明行 + TUI 菜单 [A] 新增安全状态页，展示当前匿名化模式、加密状态等隐私概要
+- **P4-08 (LLM 幻觉率采样测试)**：`scripts/llm_hallucination_sampler.py` — 10 组标准化持仓数据集，事实校验器自动验证数值/品种/排名正确性，输出报告到 `docs-stm/tmp/hallucination-report.md`
+- **培训数据集**：`scripts/data/hallucination_datasets/` 10 组 JSON 数据集 + `ground_truth.json` 正确事实表
 
 ### Fixed
-- （待添加）
+- **fact_checker 建议语境下沉**：`check_symbol_existence()` 新增 `suggestion_contexts` 参数，将"建议关注 XXX"类品种代码识别为建议语境，不计入幻觉。`_POSITION_WEIGHT_KEYWORDS` / `_HYPOTHETICAL_KEYWORDS` 跳过仓位占比和情景假设百分比误报
+- **fact_checker 数值一致性增强**：按句子粒度分析，优先匹配句中持仓代码对应个股收益率；收益归因段落自动跳过；指数基准代码数值跳过；金融宏观指标跳过
+- **fact_checker 排名检查**：穿透模块跳过排名校验（穿透底层代码非持仓品种，不应要求排名正确性）；传入穿透层股票代码集避免误告警
+- **expert_review prompt 数值精度约束**：要求直接引用持仓明细中的 profit_rate 数据，不虚构收益率；贡献度标注为"贡献占比"；不确定时用定性描述
+- **修复 3 个 P2 测试文件 API 漂移**：`test_chain_resilience.py` / `test_liquidity_edge.py` / `test_liquidity_otc_edge.py` 中 API 端点/参数因外部数据源变更导致的过期断言更新
+- **修复 main.py tab 缩进**：`menu_items` 第 118 行混合 tab/space 缩进导致的 `TabError`
+- **修复去重 sampler 逻辑**：`llm_hallucination_sampler.py` 中的缓存回退路径错误
+
+### Changed
+- **plan.md**: 移除已完成的 P2 质量与安全（4 项：隐私提示/端到端性能测试/链韧性测试/安全测试）和 P3 技术债清算（4 项：性能/韧性/安全/匿名化扩展）全部整节。当前待办仅保留 P4-91（增强 LLM 策略实验功能）。详见 `better-investment-task.md` 保管的完整任务分解记录
+- **8 份管理/用户文档全域清理历史痕迹**：源码注释移除 `"R-198 从 xxx 拆分"`、`"向后兼容"`、`"旧版"`、`"提取自 xxx"`、`"拆分而来"` 等 30+ 处历史迭代描述/版本对比/重构标记语言，正文只反映当前最新状态
+- **测试补丁**：`test_excel_generator.py` 中 `excel_news_warning.get_report_sheet_name` mock 补 `create=True`，适配历史清理后模块不再暴露该属性
+
+### Docs
+- **requirements.md**: 全文档事实核对——A1 菜单项 15→16（新增 [I] 和 [A] 说明行）；A2 报告模块范围 E/B/L→B/L（组合历史走势和回撤分析仅 B/L 路径有）；A3 删除虚假的"机构覆盖"第 12 列（基金业绩实际只有 11 列）；A4 R-HLD-05 代码清洗描述从 ".SH/.SZ 后缀"改为 "sh/sz/bj 前缀"；B1 取价渠道描述从 "腾讯财经/天天基金网"扩展为 "腾讯财经/东方财富/天天基金网等"；B2 行业分类备用链路从 "quotedata 回退"改为 "东方财富 REST 行情页回退"
+- **how-to-start.md**: 菜单速览新增 [I] 管理对比指数池 和 [A] 配置匿名化模式 两行
+- **how-to-test-my-code.md**: 结构调整——将 calibrate-dedup-threshold.py 和 llm_hallucination_sampler.py 从 "查看报告" 移入新增的 "辅助脚本" 节
+- **testplan.md**: §6.3 补充回归项序号 9/10/11；P1/P2 对齐为 `--mode verify` 和 `--mode all`；§1.3 补充 scenario 文件表条目
+- **how-to-config-llm.md**: 补全 enabled_llm JSON 块前缺失的 "## 模块启停" 章节标题；删除重复的 "专用配置项" 表格；`model_{module}` 说明补充多链模式下的配置来源
+- **how-to-use-registry.md**: 合并重复报表章节，展开完整 17 模块键名表；补充 `llm_module_info.py` 消费方；补充 `get_report_section_number()`
+- **faq.md**: 删除重复问题
+- **reports-instruction.md**: §16/§17 修正为 §15/§16；HTML LLM API 用量定位修复
 
 ---
 

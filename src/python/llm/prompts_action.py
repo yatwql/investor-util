@@ -1,12 +1,11 @@
 """LLM 提示词动作模块 — 各模块 Prompt 构建函数。
 
-从 prompts.py 拆分，包含：
+包含：
   - _build_global_macro_prompt — 全球政经局势
   - _build_expert_review_prompt — 智囊团深度复盘
   - _build_health_check_prompt — 持仓体检报告
   - _build_penetration_deep_prompt — 穿透深度分析
 """
-
 from __future__ import annotations
 
 import logging
