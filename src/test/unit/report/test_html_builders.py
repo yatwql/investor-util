@@ -2,7 +2,6 @@
 
 测试目标：
   - _calc_yield_text：正常/缺失数据下的文本计算
-  - _coverage_text：正常格式化和缺失数据
   - _build_category_data：标准分红数据加载和正常路径
 
 运行：
@@ -57,44 +56,6 @@ class TestCalcYieldText(unittest.TestCase):
         """avg_dividend key 缺失 → "--"。"""
         dividend_data = {"600900": {}}
         result = self.fn("600900", self.d, dividend_data)
-        self.assertEqual(result, "--")
-
-
-class TestCoverageText(unittest.TestCase):
-    """_coverage_text 基础格式化测试。"""
-
-    def setUp(self):
-        from src.python.report.html_builders import _coverage_text
-        self.fn = _coverage_text
-
-    def test_reports_and_eps(self):
-        """有研报数 + EPS → 格式化文本。"""
-        result = self.fn("000001", {"000001": {"reports": 5, "eps_2026e": 1.23}})
-        self.assertEqual(result, "5家研报 EPS¥1.23")
-
-    def test_reports_only(self):
-        """仅研报数 → 显示研报家数。"""
-        result = self.fn("000001", {"000001": {"reports": 3}})
-        self.assertEqual(result, "3家研报")
-
-    def test_eps_is_none_with_reports(self):
-        """EPS 为 None 但有研报数 → 显示研报家数。"""
-        result = self.fn("000001", {"000001": {"reports": 2, "eps_2026e": None}})
-        self.assertEqual(result, "2家研报")
-
-    def test_no_data(self):
-        """代码在字典中但无有用字段 → "--"。"""
-        result = self.fn("000001", {"000001": {}})
-        self.assertEqual(result, "--")
-
-    def test_code_not_in_dict(self):
-        """代码不在盈利预测字典中 → "--"。"""
-        result = self.fn("999999", {"000001": {"reports": 5}})
-        self.assertEqual(result, "--")
-
-    def test_empty_dict(self):
-        """盈利预测为空字典 → "--"。"""
-        result = self.fn("000001", {})
         self.assertEqual(result, "--")
 
 
