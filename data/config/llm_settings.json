@@ -3,17 +3,17 @@
   // 全局设置
   // ═══════════════════════════════════════════
   "max_retries": 2,
-  "llm_max_concurrency": 1,
+  "llm_max_concurrency": 3,
 
   // ═══════════════════════════════════════════
   // 模块开关 — 控制各 LLM 分析功能的启用/停用
   // ═══════════════════════════════════════════
   "enabled_llm": {
-      "global_macro": true,
-      "expert_review": true,
-      "health_check": true,
-      "penetration_deep": true,
-      "news_correlation": true
+    "global_macro": true,
+    "expert_review": true,
+    "health_check": true,
+    "penetration_deep": true,
+    "news_correlation": false
   },
 
   // ═══════════════════════════════════════════
@@ -85,14 +85,13 @@
   "thinking_enabled_news_correlation": false,
   "thinking_budget_news_correlation": 4000,
   "reasoning_effort_news_correlation": "high",
-  "news_correlation_top_n": 30
+  "news_correlation_top_n": 30,
 
   // ═══════════════════════════════════════════
-  // 计价配置（可选，默认使用 constants.py MODEL_PRICING）
-  // 如需覆盖某模型定价，取消注释并按需调整：
+  // 计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）
   // ═══════════════════════════════════════════
-  // "pricing": {
-  //   "currency": "CNY",
-  //   "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.3}
-  // }
+  "pricing": {
+    "currency": "CNY",
+    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.3}
+  }
 }
