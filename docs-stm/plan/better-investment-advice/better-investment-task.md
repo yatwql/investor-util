@@ -80,29 +80,29 @@
 - **测试隔离要求**: 新增 `get_tracker()` 单例后，**必须**在 `src/test/conftest.py` 中增加一个 `autouse` fixture 在每次测试前重置此单例（参考 `_auto_reset_provider_registry` 模式——调用 `get_tracker().reset()` 或新增 `_reset_tracker()` 函数），否则模块级单例状态会在测试间泄漏。受影响测试包括本任务的 record() 注入测试和 T0-01 的接线测试。
 - **状态**: ✅ 已完成（2026-07-20）
 
-### T0-01-B: f_context Pre-Schema 文档 + 死键清理（现有管线键定义 + 类型断言，前置）
+### T0-01-B: pipeline_data Pre-Schema 文档 + 死键清理（现有管线键定义 + 类型断言，前置）
 - **估时**: 2h
-- **文件**: `docs-stm/plan/better-investment-advice/data-channels-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言 + 清理 f_context 死键）
+- **文件**: `docs-stm/plan/better-investment-advice/data-channels-schema.md`（新建，Pre-Schema 部分）、`src/python/report/orchestrator.py`（初始断言 + 清理 pipeline_data 死键）
 - **阻塞**: 否
 - **依赖**: 无
-- **描述**: 在 T0-01（DegradationTracker 接线）和 P1-06-A（f_context_builder 预重构）之前，先定义当前生产管线已有数据键的 Schema（Pre-Schema），**并清理 f_context 中的死键**。**注意：当前架构中"管线数据"分为两个独立通道——(A) `capture_snapshot()` 返回的 `f_context` 字典仅含 3 个键（`diff`、`diff_trimmed`、`days_since_last`），其中 `diff` 含 9 个子键（is_first_check、total_value_diff、total_value_diff_pct、total_pnl_diff、days_since_last_report、added/removed/increased/decreased）用于快照对比——这是 LLM 直接消费的唯一 f_context； (B) `prepare_report_data()` 返回的 `prep` 字典含 13 个键（details、total_mv、total_cost、total_profit、total_today_profit、categories、a_indices、us_indices、penetrated_assets、holdings_details、today_str、output_dir、news_top_count），以独立参数形式传入 `generate_all_llm()` 而非通过 f_context。Pre-Schema 文档必须同时覆盖两个通道的键定义，避免后续混淆。** 每个键标注：类型、所属通道（f_context / prep）、必选/可选标记、写入模块、消费模块、写入管线阶段。
-- **死键清理（追加）**: 代码审计确认 `f_context["diff_trimmed"]`（L246, bool 值）和 `f_context["days_since_last"]`（L247, 与 `diff.days_since_last_report` 完全重复）在 f_context 注入后**没有任何下游 LLM generator 或 prompt 消费**，属于纯代码噪音。在 Pre-Schema 实施时直接删除这两个死键，保持 f_context 最小化。删除后 f_context 顶层仅保留 `"diff"` 一个键，与 Pre-Schema 文档的键定义一致，无向后兼容问题（下游 0 引用）。
+- **描述**: 在 T0-01（DegradationTracker 接线）和 P1-06-A（pipeline_data_builder 预重构）之前，先定义当前生产管线已有数据键的 Schema（Pre-Schema），**并清理 pipeline_data 中的死键**。**注意：当前架构中"管线数据"分为两个独立通道——(A) `capture_snapshot()` 返回的 `pipeline_data` 字典仅含 3 个键（`diff`、`diff_trimmed`、`days_since_last`），其中 `diff` 含 9 个子键（is_first_check、total_value_diff、total_value_diff_pct、total_pnl_diff、days_since_last_report、added/removed/increased/decreased）用于快照对比——这是 LLM 直接消费的唯一 pipeline_data； (B) `prepare_report_data()` 返回的 `prep` 字典含 13 个键（details、total_mv、total_cost、total_profit、total_today_profit、categories、a_indices、us_indices、penetrated_assets、holdings_details、today_str、output_dir、news_top_count），以独立参数形式传入 `generate_all_llm()` 而非通过 pipeline_data。Pre-Schema 文档必须同时覆盖两个通道的键定义，避免后续混淆。** 每个键标注：类型、所属通道（pipeline_data / prep）、必选/可选标记、写入模块、消费模块、写入管线阶段。
+- **死键清理（追加）**: 代码审计确认 `pipeline_data["diff_trimmed"]`（L246, bool 值）和 `pipeline_data["days_since_last"]`（L247, 与 `diff.days_since_last_report` 完全重复）在 pipeline_data 注入后**没有任何下游 LLM generator 或 prompt 消费**，属于纯代码噪音。在 Pre-Schema 实施时直接删除这两个死键，保持 pipeline_data 最小化。删除后 pipeline_data 顶层仅保留 `"diff"` 一个键，与 Pre-Schema 文档的键定义一致，无向后兼容问题（下游 0 引用）。
 - **类型断言（扩展）**: 同时在 orchestrator.py 各管线阶段之间插入初始类型断言 checkpoint（assert isinstance / .get() 类型守卫），开发期捕获类型不匹配。⚠ **生产环境运行时**：断言仅在 `__debug__` 模式下生效，但类型不匹配在生产中可能静默通过直到下游报错。措施：断言失败时额外通过 `logger.warning()` 记录结构化的类型不匹配日志（键名、期望类型、实际类型），确保即使生产环境无崩溃也可追踪到类型漂移。**时序要求**：必须在 T0-01 之前完成，使 T0-01 注入 data_degradation 键时已有类型校验框架。P1-21 的 Full Schema（Phase 1 新增键定义 + 全量校验扩展）在 Phase 1 补充。
 - **状态**: ✅ 已完成（2026-07-20）
 
 ### T0-01: DegradationTracker→LLM 接线
 - **估时**: 4h
-- **文件**: `src/python/report/orchestrator.py`（L198-248 `capture_snapshot` 构建 f_context 处注入）、`src/python/report/data_status.py`（L95 已实例化但未接）
+- **文件**: `src/python/report/orchestrator.py`（L198-248 `capture_snapshot` 构建 pipeline_data 处注入）、`src/python/report/data_status.py`（L95 已实例化但未接）
 - **阻塞**: 否
-- **依赖**: T0-01-A（get_log 接口已就绪）、T0-01-B（Pre-Schema 已定义，f_context 键类型校验框架就绪）
-- **描述**: `data_status.py` 的 `DegradationTracker` 已在 `fund_performance.py`/`penetration_sheet.py`/`summary.py` 中实例化并写入降级日志，但 `orchestrator.py` 的 `capture_snapshot()` 返回的 `f_context` 字典中**没有降级状态键**。新增 `f_context["data_degradation"]`，将当天所有 `DegradationTracker.log()` 记录汇总为结构化列表（数据源、降级级别、降级时间、原始错误摘要），使 LLM prompt 可以引用。
+- **依赖**: T0-01-A（get_log 接口已就绪）、T0-01-B（Pre-Schema 已定义，pipeline_data 键类型校验框架就绪）
+- **描述**: `data_status.py` 的 `DegradationTracker` 已在 `fund_performance.py`/`penetration_sheet.py`/`summary.py` 中实例化并写入降级日志，但 `orchestrator.py` 的 `capture_snapshot()` 返回的 `pipeline_data` 字典中**没有降级状态键**。新增 `pipeline_data["data_degradation"]`，将当天所有 `DegradationTracker.log()` 记录汇总为结构化列表（数据源、降级级别、降级时间、原始错误摘要），使 LLM prompt 可以引用。
 - **状态**: ✅ 已完成（2026-07-20）
 
 ### T0-02: 数据质量告警注入 LLM（扩展校验项 3→5，移除缓存遍历项）
 - **估时**: 4h
 - **文件**: `src/python/llm/prompts.py`（数据质量段落）`、`src/python/report/orchestrator.py`（数据质量统计字段）
 - **阻塞**: 否
-- **依赖**: T0-01（降级状态数据已进入 f_context）
+- **依赖**: T0-01（降级状态数据已进入 pipeline_data）
 - **描述**: 当前 LLM "健康检查" prompt 中只有 3 类数据质量提示（数据缺失、收益率异常、基准不一致）。扩展为 5 类（移除"缓存过期时间接近阈值"，因其需要遍历数百缓存文件解析 `_ts`，复杂度远超 prompt 修改范围，推迟至 Phase 4 缓存雪崩修复合并实现）：(1) 收盘价异常断点，(2) T2/T3 降级发生频次，(3) 基金净值更新延迟，(4) 分红数据状态，(5) 个别品种数据缺失时长。每类附带当前状态摘要（正常/警告/异常）。格式化为易读的一段，注入 health_check 系统提示语。同时修改 `orchestrator.py` 中的 `prepare_report_data()` 确保数据质量统计字段在管线中传递。
 - **状态**: ✅ 已完成（2026-07-20）
 
@@ -123,7 +123,7 @@
 - **文件**: `src/python/llm/prompts.py`（新增概念板块段落）
 - **阻塞**: 否（但隐式依赖 penetration 管线执行成功，若管线未执行则概念数据为空）
 - **依赖**: 无（但隐式依赖 penetration.py 管线已执行——概念数据来自 push2 API，空数据时 prompt 应显示兜底文本而非空白段落）
-- **描述**: `penetration.py` L700-701 已从东方财富 push2 行业 API 缓存了 `industry.concepts` 数据（概念板块分类），L747 已有 `concepts[:3]` 用于 Top 3 板块展示。但 LLM prompt 完全不提及板块分布。在 `expert_review` prompt 中新增段落：(1) 穿透后 Top 5 概念板块及持仓市值占比；(2) 集中度定性判断（高/中/低）；(3) 与常见市场风格（大盘/小盘/价值/成长）的对应关系。注意：(a) 非 A 股穿透资产（港股通/美股）天然无概念数据，需在 prompt 中标注"部分品种无概念分类"；(b) 概念数据不可用时显示"暂无概念板块数据"兜底文本，而非跳过整段导致 LLM 误以为无板块信息。如果概念 API（push2）熔断或返回空数据，LLM prompt 段落必须区分**三种状态**：(1) API 不可达（熔断/网络错误）→ 显示'概念板块 API 暂时不可用，板块分析暂缺'，引用 DegradationTracker；(2) API 正常返回但数据为空（push2 返回了有效响应但某品种无概念条目）→ 显示'部分品种无概念分类'，**此态与状态 3 在架构上不可区分**——`batch_fetch_industry_data()` 会将全部非 A 股代码静默过滤（`industry.py L97` `a_codes = [c for c in valid_codes if _is_a_share_code(c)]`），返回空字典与 API 熔断返回空字典结果是相同的 `{}`，`penetration_sheet.py` 的 `build_penetration_data_status()` 始终硬编码 `failure_type="unreachable"` 写入 DegradationTracker（忽略 `result["industry_failure_type"]` 中的正确值 `"empty"`/`"unreachable"`）；(3) 港股通/美股穿透资产无概念数据（非 A 股代码被 `batch_fetch_industry_data()` 过滤——批次中全部为非 A 股时返回 `{}` 不可与状态 2b 区分）→ 显示'部分境外品种无概念分类'。引用 f_context['data_degradation'] 中的实时降级状态。港股通/美股穿透资产无概念数据的覆盖度说明也须在此段落标注。
+- **描述**: `penetration.py` L700-701 已从东方财富 push2 行业 API 缓存了 `industry.concepts` 数据（概念板块分类），L747 已有 `concepts[:3]` 用于 Top 3 板块展示。但 LLM prompt 完全不提及板块分布。在 `expert_review` prompt 中新增段落：(1) 穿透后 Top 5 概念板块及持仓市值占比；(2) 集中度定性判断（高/中/低）；(3) 与常见市场风格（大盘/小盘/价值/成长）的对应关系。注意：(a) 非 A 股穿透资产（港股通/美股）天然无概念数据，需在 prompt 中标注"部分品种无概念分类"；(b) 概念数据不可用时显示"暂无概念板块数据"兜底文本，而非跳过整段导致 LLM 误以为无板块信息。如果概念 API（push2）熔断或返回空数据，LLM prompt 段落必须区分**三种状态**：(1) API 不可达（熔断/网络错误）→ 显示'概念板块 API 暂时不可用，板块分析暂缺'，引用 DegradationTracker；(2) API 正常返回但数据为空（push2 返回了有效响应但某品种无概念条目）→ 显示'部分品种无概念分类'，**此态与状态 3 在架构上不可区分**——`batch_fetch_industry_data()` 会将全部非 A 股代码静默过滤（`industry.py L97` `a_codes = [c for c in valid_codes if _is_a_share_code(c)]`），返回空字典与 API 熔断返回空字典结果是相同的 `{}`，`penetration_sheet.py` 的 `build_penetration_data_status()` 始终硬编码 `failure_type="unreachable"` 写入 DegradationTracker（忽略 `result["industry_failure_type"]` 中的正确值 `"empty"`/`"unreachable"`）；(3) 港股通/美股穿透资产无概念数据（非 A 股代码被 `batch_fetch_industry_data()` 过滤——批次中全部为非 A 股时返回 `{}` 不可与状态 2b 区分）→ 显示'部分境外品种无概念分类'。引用 pipeline_data['data_degradation'] 中的实时降级状态。港股通/美股穿透资产无概念数据的覆盖度说明也须在此段落标注。
 - **状态**: ✅ 已完成（2026-07-20）
 
 ### MVP-03: 再平衡极简版——单品种超阈值（Layer 3A 硬编码）
@@ -131,7 +131,7 @@
 - **文件**: `src/python/analysis/simple_rebalance.py`（新增）、`src/python/llm/prompts.py`
 - **阻塞**: 否
 - **依赖**: 无
-- **架构约束**: ⚠️ `simple_rebalance.py` 禁止导入 `report/` 包下的任何模块（仅消费 f_context 传入的数据），遵守 P1-22 的 `analysis/` 层定位——业务计算层只消费数据、不依赖报告层。新增模块必须 `from src.python.code_utils import ...` 而非 `from src.python.report.category import ...`。
+- **架构约束**: ⚠️ `simple_rebalance.py` 禁止导入 `report/` 包下的任何模块（仅消费 pipeline_data 传入的数据），遵守 P1-22 的 `analysis/` 层定位——业务计算层只消费数据、不依赖报告层。新增模块必须 `from src.python.code_utils import ...` 而非 `from src.python.report.category import ...`。
 - **描述**: 实现一个极简再平衡信号计算模块。规则：对每品种 `weight = market_value / total_value`，如果 `weight > 0.15`（硬编码阈值），输出建议："XX 持仓占比 23%，超出建议上限 15%，建议部分止盈至 10-15% 区间。" 无需配置系统、无需 Schema、无需用户画像。输出格式化为结构化列表 `[{code, name, weight, threshold, action}]`。注入 `expert_review` prompt 的"调仓建议"小节。包含三项低成本防护（不改 15% 硬编码阈值）：(1) 建议去重聚合——当超过 3 个品种同时触发时，输出一条汇总"您的组合集中度较高，有 N 个品种超过 15% 警戒线，建议整体考虑适度分散"，而非逐条列出；(2) 优先排序——按偏离幅度从大到小排序，仅输出 Top 3；(3) 单元测试包含基础断言（正常品种不触发、超阈值触发、极端情况）**以及"5 个品种均超过 15% 时只输出 1 条汇总建议"的断言**。测试用例标注 `@pytest.mark.unit_providers`，在 `conftest.py` 的 `pytest_configure` 中注册此 marker。
 - **状态**: ✅ 已完成（2026-07-20）
 
@@ -207,34 +207,34 @@
 - **依赖**: P1-04（个股日收益率已暴露，组合日收益率 = 市值加权平均）
 - **描述**: 在 `get_combined_timeseries()` 返回字典中新增 `"daily_returns_portfolio": list[float]`（组合每日收益率序列）。计算方式：(1) 每交易日各品种日收益率 × 前日市值权重 → 加权和；(2) 注意无数据日（停牌、休市）用前值填充或标记 NaN；(3) 与 `"daily_returns_individual"` 共享相同日期对齐索引。
 
-### P1-06-A: orchestrator.py f_context 组装逻辑抽取（预重构）
+### P1-06-A: orchestrator.py pipeline_data 组装逻辑抽取（预重构）
 - **估时**: 8h
-- **文件**: `src/python/report/orchestrator.py`（拆分）、`src/python/report/f_context_builder.py`（新增）
+- **文件**: `src/python/report/orchestrator.py`（拆分）、`src/python/report/pipeline_data_builder.py`（新增）
 - **阻塞**: 否
 - **依赖**: 无
-- **描述**: orchestrator.py 当前 ~778 行，P1-06~P1-09 四个阻断点修复将使其超过 900 行。新增的 f_context 键（risk_metrics、portfolio_daily_returns、data_degradation 等）同时被多个消费方使用，需要统一的数据合并点和类型断言。实施：(1) 将 f_context 字段组装逻辑从 orchestrator.py 抽取到独立的 f_context_builder.py 模块，定义 `build_f_context(...) → dict` 和 `_merge_f_context(...) → dict` 函数作为所有管线数据的统一注入点；(2) 在每个管线阶段之间增加类型断言 checkpoint（assert isinstance），开发期捕获类型不匹配；(3) 断言失败时记录结构化日志而非直接崩溃（携带期望类型、实际类型、键名），方便调试。此任务完成后，orchestrator.py 仅保留管线调度（调用顺序编排），不再直接处理数据组装。
+- **描述**: orchestrator.py 当前 ~778 行，P1-06~P1-09 四个阻断点修复将使其超过 900 行。新增的 pipeline_data 键（risk_metrics、portfolio_daily_returns、data_degradation 等）同时被多个消费方使用，需要统一的数据合并点和类型断言。实施：(1) 将 pipeline_data 字段组装逻辑从 orchestrator.py 抽取到独立的 pipeline_data_builder.py 模块，定义 `build_pipeline_data(...) → dict` 和 `_merge_pipeline_data(...) → dict` 函数作为所有管线数据的统一注入点；(2) 在每个管线阶段之间增加类型断言 checkpoint（assert isinstance），开发期捕获类型不匹配；(3) 断言失败时记录结构化日志而非直接崩溃（携带期望类型、实际类型、键名），方便调试。此任务完成后，orchestrator.py 仅保留管线调度（调用顺序编排），不再直接处理数据组装。
 
 ### P1-06: 管线阻断点 1——prepare_report_data 加 risk_metrics 键
 - **估时**: 4h
-- **文件**: `src/python/report/f_context_builder.py`（P1-06-A 已拆分至此）
+- **文件**: `src/python/report/pipeline_data_builder.py`（P1-06-A 已拆分至此）
 - **阻塞**: 否
-- **依赖**: P1-06-A（f_context_builder 已存在）
+- **依赖**: P1-06-A（pipeline_data_builder 已存在）
 - **描述**: `prepare_report_data()` 当前返回 12 个字段（含 market_data、fund_data、summary 等），但没有 `risk_metrics` 键。新增 `"risk_metrics": {}` 空字典占位，供 Phase 2 的 `metrics.py` 填充。此步骤只保证键存在、管线不报 KeyError，值为空字典。同时修改下游消费方（`capture_snapshot`、Excel writer、HTML writer），在读取 `risk_metrics` 时用 `.get("risk_metrics", {})` 确保兼容。
 
-### P1-07: 管线阻断点 2——capture_snapshot f_context 加风险字段
+### P1-07: 管线阻断点 2——capture_snapshot pipeline_data 加风险字段
 - **估时**: 4h
-- **文件**: `src/python/report/orchestrator.py`（L140 `capture_snapshot` 构建 f_context）
+- **文件**: `src/python/report/orchestrator.py`（L140 `capture_snapshot` 构建 pipeline_data）
 - **阻塞**: 否
 - **依赖**: P1-06（prepare_report_data 已有 risk_metrics）
-- **描述**: `capture_snapshot()` 的 `f_context` 字典新增风险指标相关键：(1) `"risk_metrics"` 从 `prepare_report_data` 透传；(2) `"portfolio_daily_returns"` 从 `portfolio_history.get_combined_timeseries["daily_returns_portfolio"]` 透传（P1-05）；(3) `"data_degradation"` 汇总（T0-02 已完成）；(4) 保险：所有新键 `.get()` 兜底，不因数据缺失阻塞报告生成。
-- **⚠ 双路径覆盖**：`orchestrator.py` 有两条报告生成路径——`_generate_report_full`（L650, 含 LLM）和 `_generate_report_both`（L394, 仅 HTML+Excel）。前者调用 `prepare_report_data()` 获取完整数据，后者调用轻量的 `_compute_details()`（L378）。P1-06 修改 `prepare_report_data` 只覆盖 full 路径。P1-07 修改 `capture_snapshot` 返回的 f_context 则同时覆盖两路径（两条路径都调用 `capture_snapshot`）。需确保：(a) `capture_snapshot` 注入的新键（risk_metrics 等）在 both 路径下也能正确初始化（来自 prep dict 的字段在 both 路径中不可用，需降级为空字典）；(b) 测试用例同时覆盖 both 和 full 路径。
+- **描述**: `capture_snapshot()` 的 `pipeline_data` 字典新增风险指标相关键：(1) `"risk_metrics"` 从 `prepare_report_data` 透传；(2) `"portfolio_daily_returns"` 从 `portfolio_history.get_combined_timeseries["daily_returns_portfolio"]` 透传（P1-05）；(3) `"data_degradation"` 汇总（T0-02 已完成）；(4) 保险：所有新键 `.get()` 兜底，不因数据缺失阻塞报告生成。
+- **⚠ 双路径覆盖**：`orchestrator.py` 有两条报告生成路径——`_generate_report_full`（L650, 含 LLM）和 `_generate_report_both`（L394, 仅 HTML+Excel）。前者调用 `prepare_report_data()` 获取完整数据，后者调用轻量的 `_compute_details()`（L378）。P1-06 修改 `prepare_report_data` 只覆盖 full 路径。P1-07 修改 `capture_snapshot` 返回的 pipeline_data 则同时覆盖两路径（两条路径都调用 `capture_snapshot`）。需确保：(a) `capture_snapshot` 注入的新键（risk_metrics 等）在 both 路径下也能正确初始化（来自 prep dict 的字段在 both 路径中不可用，需降级为空字典）；(b) 测试用例同时覆盖 both 和 full 路径。
 
 ### P1-08: 管线阻断点 3——generate_all_llm 暴露 history_data
 - **估时**: 4h
 - **文件**: `src/python/llm/generators_orchestrator.py`（L470 `generate_all_llm`）
 - **阻塞**: 否
-- **依赖**: P1-07（f_context 已含风险字段）
-- **描述**: `generate_all_llm()` 目前接收 `f_context` 但不把 `history_data` 传给 prompt 构建函数。修改调用链：(1) 确保 `portfolio_history` 数据作为 `f_context["portfolio_history"]` 传递；(2) 包含 `daily_returns_individual`、`daily_returns_portfolio`、`drawdown`、`benchmark_comparison` 等时序字段；(3) 修改 `prompts.py` 的 `build_system_prompt()` 签名，增加 `history_data` 形参（当前没有）。
+- **依赖**: P1-07（pipeline_data 已含风险字段）
+- **描述**: `generate_all_llm()` 目前接收 `pipeline_data` 但不把 `history_data` 传给 prompt 构建函数。修改调用链：(1) 确保 `portfolio_history` 数据作为 `pipeline_data["portfolio_history"]` 传递；(2) 包含 `daily_returns_individual`、`daily_returns_portfolio`、`drawdown`、`benchmark_comparison` 等时序字段；(3) 修改 `prompts.py` 的 `build_system_prompt()` 签名，增加 `history_data` 形参（当前没有）。
 
 ### P1-08-B: prompts.py 拆分为三文件
 - **估时**: 4h
@@ -248,7 +248,7 @@
 - **文件**: `src/python/llm/generators.py`（L53/89/143/196 四个 `_fingerprint` 方法）
 - **阻塞**: 否
 - **依赖**: P1-06（risk_metrics 键存在）
-- **描述**: LLM 请求去重依赖 `_fingerprint()` 哈希。当前 fingerprint 只覆盖基础数据字段，不等同数据变更时不会触发重新生成。在各 `_fingerprint()` 的哈希输入中增加：(1) `risk_metrics` 的 JSON 摘要；(2) `data_degradation` 状态摘要；(3) `portfolio_daily_returns[-1]`（最近一日收益率，轻量级变更检测）。字段不存在时静默跳过（向后兼容）。⚠ **额外发现（R3-04）**：当前 expert_review 和 health_check 的 `_fingerprint()` 不包含 `f_context["diff"]`——持仓快照对比数据变化（added/removed/increased/decreased）不会触发重新生成，新一期报告的 LLM 回复可能仍引用旧的持仓变动数据。本任务也应将 `f_context["diff"]` 的 JSON 摘要纳入 expert_review 和 health_check 的 fingerprint 哈希输入。
+- **描述**: LLM 请求去重依赖 `_fingerprint()` 哈希。当前 fingerprint 只覆盖基础数据字段，不等同数据变更时不会触发重新生成。在各 `_fingerprint()` 的哈希输入中增加：(1) `risk_metrics` 的 JSON 摘要；(2) `data_degradation` 状态摘要；(3) `portfolio_daily_returns[-1]`（最近一日收益率，轻量级变更检测）。字段不存在时静默跳过（向后兼容）。⚠ **额外发现（R3-04）**：当前 expert_review 和 health_check 的 `_fingerprint()` 不包含 `pipeline_data["diff"]`——持仓快照对比数据变化（added/removed/increased/decreased）不会触发重新生成，新一期报告的 LLM 回复可能仍引用旧的持仓变动数据。本任务也应将 `pipeline_data["diff"]` 的 JSON 摘要纳入 expert_review 和 health_check 的 fingerprint 哈希输入。
 
 ### P1-10: 数据模块注册——registry.py 注册新模块 + _COMPUTATION_REGISTRY 创建
 - **估时**: 8h
@@ -309,7 +309,7 @@
 - **阻塞**: 否
 - **依赖**: P1-06、P1-07、P1-08、P1-09（所有阻断点已修复）
 - **状态**: ✅ 已完成（2026-07-20）
-- **描述**: 新增冒烟测试覆盖 4 个阻断点：(1) `prepare_report_data` 返回字典含 `risk_metrics` 键；(2) `capture_snapshot` f_context 含风险字段且 `.get()` 安全；(3) `generate_all_llm` 不因缺失 `history_data` 崩溃；(4) `_fingerprint` 哈希输入含风险摘要且旧版本无此字段时不报错。使用最小持仓 fixture（2 品种），快速执行（<30s）。运行 `--mode regression` 确认通过。标注 `@pytest.mark.scenario_basic`。
+- **描述**: 新增冒烟测试覆盖 4 个阻断点：(1) `prepare_report_data` 返回字典含 `risk_metrics` 键；(2) `capture_snapshot` pipeline_data 含风险字段且 `.get()` 安全；(3) `generate_all_llm` 不因缺失 `history_data` 崩溃；(4) `_fingerprint` 哈希输入含风险摘要且旧版本无此字段时不报错。使用最小持仓 fixture（2 品种），快速执行（<30s）。运行 `--mode regression` 确认通过。标注 `@pytest.mark.scenario_basic`。
 - **测试隔离要求**: (a) **输出目录隔离**——必须将 `reports/` 输出目录重定向到 `tmp_path`（使用 `monkeypatch.setattr` 或 fixture），避免测试报告残留在生产 `reports/` 目录；(b) **LLM 调用 mock**——`generate_all_llm` 的测试必须 mock LLM API 调用（`unittest.mock.patch`），防止真实调用产生费用和 API 依赖；(c) **输入数据隔离**——持仓数据必须使用 fixture 构造（2-3 品种的简单持仓），不得依赖 `data/holdings/` 的真实文件；(d) **单例重置**——测试涉及 DegradationTracker 的，需调用 `get_tracker().reset()` 清理状态。
 
 ### P1-17: 熔断器改进——指数退避
@@ -340,14 +340,14 @@
 - **阻塞**: 否
 - **依赖**: 无（独立于其他 P1 任务，可并行）
 - **描述**: 实施 LLM 完全不可用时的报告降级机制：(1) 在 orchestrator.py 的 generate_all_llm() 中捕获 LLM 异常，所有 4+1 个 LLM 模块均失败时自动终止 LLM 生成流程，不阻塞报告管线；(2) 在 info 字典中增加 llm_status 键（success/failed/degraded），下游 HTML/Excel 生成器据此决定是否显示 LLM 板块；(3) full 路径中 LLM 失败时自动转为 both 路径产出（含 LLM 占位文本"智能分析暂时不可用，请稍后重试"）；(4) 将 LLM circuit_breaker 状态暴露到 DegradationTracker，在报告页脚展示 LLM 状态摘要（正常/熔断中/冷却剩余时间）；(5) 验证 LLM 预检：每次生成前做一次轻量连通性测试。验收标准：mock LLM API 全部返回 503，验证 full 报告正常生成（HTML 含 LLM 占位文本，Excel 跳过 LLM 页签）。
-- **⚠ 遗留路径覆盖**：`html_renderers.py` L496-508 有一段遗留回退代码，在 `llm_content` 未预先计算时直接调用 `generate_all_llm`——**此路径不传递 `f_context`**。当前 TUI 已通过 `orchestrator.generate_report()` 路由，正常情况下不触发此遗留路径。P1-20 应检查并清理此遗留路径，确保所有 LLM 调用都经过 `orchestrator.py` 的统一降级逻辑。否则降级机制覆盖不全。
+- **⚠ 遗留路径覆盖**：`html_renderers.py` L496-508 有一段遗留回退代码，在 `llm_content` 未预先计算时直接调用 `generate_all_llm`——**此路径不传递 `pipeline_data`**。当前 TUI 已通过 `orchestrator.generate_report()` 路由，正常情况下不触发此遗留路径。P1-20 应检查并清理此遗留路径，确保所有 LLM 调用都经过 `orchestrator.py` 的统一降级逻辑。否则降级机制覆盖不全。
 
-### P1-21: f_context Schema 文档——Phase 1 Full Schema 补充 + 校验层扩展
+### P1-21: pipeline_data Schema 文档——Phase 1 Full Schema 补充 + 校验层扩展
 - **估时**: 6h（Pre-Schema 2h 已由 T0-01-B 完成，此处仅补充 Phase 1 新增键的 Full Schema 定义）
 - **文件**: `docs-stm/plan/better-investment-advice/data-channels-schema.md`（扩展 Full Schema 章节）、`src/python/report/orchestrator.py`（校验层扩展）
 - **阻塞**: 否
 - **依赖**: P1-06, P1-07, P1-08
-- **描述**: T0-01-B 已完成 Pre-Schema（现有管线键的定义 + 初始类型断言）。本任务在 Pre-Schema 基础上补充 Full Schema：(1) 在 data-channels-schema.md 中追加 Phase 1 新增键的定义（risk_metrics、portfolio_daily_returns、data_degradation、feature_flags 等约 8 个键），与 Pre-Schema 合并在同一文档中，用"Phase"列区分归属；(2) 扩展 orchestrator 中的类型断言 checkpoint 覆盖这些新键；(3) data-channels-schema.md 纳入项目文档，每次新增 f_context 键时必须同步更新。
+- **描述**: T0-01-B 已完成 Pre-Schema（现有管线键的定义 + 初始类型断言）。本任务在 Pre-Schema 基础上补充 Full Schema：(1) 在 data-channels-schema.md 中追加 Phase 1 新增键的定义（risk_metrics、portfolio_daily_returns、data_degradation、feature_flags 等约 8 个键），与 Pre-Schema 合并在同一文档中，用"Phase"列区分归属；(2) 扩展 orchestrator 中的类型断言 checkpoint 覆盖这些新键；(3) data-channels-schema.md 纳入项目文档，每次新增 pipeline_data 键时必须同步更新。
 
 ### P1-22: analysis/ 层定位与模块依赖规范
 - **估时**: 12h（含 8h category.py 提取到 code_utils.py + 2h technical.md/folders.md 更新 + 2h 验证所有消费点导入路径变更）

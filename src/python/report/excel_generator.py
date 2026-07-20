@@ -191,7 +191,7 @@ def generate_excel_report(
     enable_history: bool = True,  # board 层：历史走势板块是否开启
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
-    f_context: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
+    pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
     history_data: dict | None = None,  # 组合历史走势数据（含基准指数）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
@@ -214,7 +214,7 @@ def generate_excel_report(
         enable_history: board 层 — 历史走势板块是否开启
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
-        f_context: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
+        pipeline_data: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
         history_data: 组合历史走势数据（含基准指数），来自 PortfolioHistoryCalculator。
                       未提供或 status=unavailable 时页签显示占位文本。
     """
@@ -271,10 +271,10 @@ def generate_excel_report(
                 logger.debug("[excel] 组合历史走势页签写入失败（非关键）", exc_info=True)
 
     # ── 组合历史走势：环比对比摘要（写入 summary 页签底部） ──
-    if f_context and f_context.get("diff") and "summary" in sheets:
+    if pipeline_data and pipeline_data.get("diff") and "summary" in sheets:
         prog.info("正在写入环比对比摘要...")
         try:
-            _diff = f_context["diff"]
+            _diff = pipeline_data["diff"]
             _ws_sum = sheets["summary"]
             # 找到最后一行的行号
             _last_row = _ws_sum.max_row + 2

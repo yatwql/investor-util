@@ -30,7 +30,7 @@ from src.python.llm.prompts_core import (
     _build_competitive_context_block,
     _build_concept_sector_block,
     _build_data_degradation_block,
-    _build_diff_context_block,
+    _build_difpipeline_data_block,
     _build_profit_attribution_block,
     _build_rebalance_block,
     _fmt_holding_line,
@@ -77,7 +77,7 @@ __all__ = [
     "_format_penetration_block",
     "_calc_country_exposure",
     # 上下文构建块
-    "_build_diff_context_block",
+    "_build_difpipeline_data_block",
     "_build_data_degradation_block",
     "_build_profit_attribution_block",
     "_build_concept_sector_block",

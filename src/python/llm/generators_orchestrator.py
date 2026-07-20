@@ -252,7 +252,7 @@ def _dispatch_llm_workers(
     penetrated_assets: list[dict] | None,
     holdings_details: list[dict] | None,
     sector_flow: list[dict] | None,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     *,
     news_data: list[dict] | None = None,
     holdings_data: list | None = None,
@@ -325,7 +325,7 @@ def _dispatch_llm_workers(
             force=force,
             http_client=c,
             llm_config=lc,
-            f_context=f_context,
+            pipeline_data=pipeline_data,
             competitive_context=_competitive_context,
             metrics=_metrics,
         ),
@@ -341,7 +341,7 @@ def _dispatch_llm_workers(
             force=force,
             http_client=c,
             llm_config=lc,
-            f_context=f_context,
+            pipeline_data=pipeline_data,
             degradation_events=_degradation_events,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
@@ -509,7 +509,7 @@ def generate_all_llm(
     holdings_details: list[dict] | None = None,
     sector_flow: list[dict] | None = None,
     force: bool = False,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     history_data: dict | None = None,
     metrics: dict | None = None,
     degradation_events: list[dict] | None = None,
@@ -526,7 +526,7 @@ def generate_all_llm(
     每个工作线程创建独立的 httpx.Client，避免全局共享连接池的线程安全问题。
 
     Args:
-        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
+        pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
         history_data: 组合历史走势数据字典（含风险指标）。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
         degradation_events: DegradationTracker.get_log() 输出。
@@ -575,7 +575,7 @@ def generate_all_llm(
         penetrated_assets,
         holdings_details,
         sector_flow,
-        f_context=f_context,
+        pipeline_data=pipeline_data,
         metrics=metrics,
         degradation_events=degradation_events,
         comparison_indices=comparison_indices,

@@ -16,7 +16,7 @@ from typing import Any
 from src.python.llm.prompts_core import (
     _build_concept_sector_block,
     _build_data_degradation_block,
-    _build_diff_context_block,
+    _build_difpipeline_data_block,
     _build_profit_attribution_block,
     _build_rebalance_block,
     _fmt_wan,
@@ -111,7 +111,7 @@ def _build_expert_review_prompt(
     categories: dict,
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     competitive_context: str | None = None,
     metrics: dict | None = None,
 ) -> str:
@@ -121,7 +121,7 @@ def _build_expert_review_prompt(
     防止 LLM 虚构持仓代码。同时包含穿透 TOP10 供参考。
 
     Args:
-        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
+        pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要）。
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），
             可选，由呼叫方构建并传入。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
@@ -131,8 +131,8 @@ def _build_expert_review_prompt(
 
     holdings_text = _format_holdings_block(holdings_details, compact=True)
     pen_text = _format_penetration_block(penetrated_assets)
-    diff_text = _build_diff_context_block(f_context)
-    degradation_text = _build_data_degradation_block(f_context)
+    diff_text = _build_difpipeline_data_block(pipeline_data)
+    degradation_text = _build_data_degradation_block(pipeline_data)
     attribution_text = _build_profit_attribution_block(holdings_details)
     concept_text = _build_concept_sector_block(penetrated_assets)
     rebalance_text = _build_rebalance_block(holdings_details, total_mv)
@@ -194,7 +194,7 @@ def _build_health_check_prompt(
     categories: dict,
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
-    f_context: dict | None = None,
+    pipeline_data: dict | None = None,
     degradation_events: list[dict] | None = None,
 ) -> str:
     """构建持仓体检报告的用户提示词。
@@ -202,7 +202,7 @@ def _build_health_check_prompt(
     要求 LLM 从风险分散度/流动性/收益合理性/成本结构四维度打分。
 
     Args:
-        f_context: 组合历史走势时间维度上下文（含 diff 差异摘要）。
+        pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要）。
         degradation_events: DegradationTracker.get_log() 输出。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
@@ -210,8 +210,8 @@ def _build_health_check_prompt(
 
     holdings_text = _format_holdings_block(holdings_details, show_cost=True)
     pen_text = _format_penetration_block(penetrated_assets)
-    diff_text = _build_diff_context_block(f_context)
-    degradation_text = _build_data_degradation_block(f_context)
+    diff_text = _build_difpipeline_data_block(pipeline_data)
+    degradation_text = _build_data_degradation_block(pipeline_data)
     # 数据质量详情
     dq_detail = _build_data_quality_detail_block(degradation_events)
     attribution_text = _build_profit_attribution_block(holdings_details)

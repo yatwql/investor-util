@@ -1,16 +1,16 @@
-"""f_context 组装构建器 — 统一数据合并点 + 类型断言。
+"""pipeline_data 组装构建器 — 统一数据合并点 + 类型断言。
 
 职责：
   1. 接收来自各数据准备阶段的结构化数据
-  2. 合并到统一的 f_context 字典
+  2. 合并到统一的 pipeline_data 字典
   3. 执行类型断言（C19 契约）
   4. 为下游（LLM prompt / Excel 摘要）提供稳定的入口
 
-A 通道（f_context）流向：
-  capture_snapshot() → f_context_builder.build() → Excel / LLM
+A 通道（pipeline_data）流向：
+  capture_snapshot() → pipeline_data_builder.build() → Excel / LLM
 
 B 通道（prep）流向：
-  prepare_report_data() → f_context_builder.build_prep() → LLM / Excel
+  prepare_report_data() → pipeline_data_builder.build_prep() → LLM / Excel
 
 C19 约束：所有键必须先在 data-channels-schema.md 中注册。
 """
@@ -23,9 +23,9 @@ from typing import Any
 
 logger = logging.getLogger("invest")
 
-# ── 已知 f_context 顶层键（用于 build() 类型校验） ──
+# ── 已知 pipeline_data 顶层键（用于 build() 类型校验） ──
 
-_F_CONTEXT_KNOWN_KEYS: set[str] = {
+_PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "diff",
     "data_degradation",
 }
@@ -50,7 +50,7 @@ _PREP_KNOWN_KEYS: set[str] = {
 
 # ── 类型映射（用于自动类型断言） ──
 
-_F_CONTEXT_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
+_PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "diff": (dict, type(None)),
     "data_degradation": list,
 }
@@ -83,11 +83,11 @@ def _validate_keys(data: dict, known_keys: set[str], label: str) -> None:
     Args:
         data: 待校验字典
         known_keys: 已知合法键集合
-        label: 日志标签（如 "f_context" / "prep"）
+        label: 日志标签（如 "pipeline_data" / "prep"）
     """
     for k in data:
         if k not in known_keys:
-            logger.warning("[f_context] %s 包含未知键 '%s'，请先在 data-channels-schema.md 注册", label, k)
+            logger.warning("[pipeline_data] %s 包含未知键 '%s'，请先在 data-channels-schema.md 注册", label, k)
 
 
 def _assert_type(value: Any, expected: type | tuple[type, ...], key: str) -> None:
@@ -96,7 +96,7 @@ def _assert_type(value: Any, expected: type | tuple[type, ...], key: str) -> Non
         actual = type(value).__name__
         expected_name = getattr(expected, "__name__", str(expected))
         logger.warning(
-            "[checkpoint] f_context.%s 类型异常: 期望 %s, 实际 %s",
+            "[checkpoint] pipeline_data.%s 类型异常: 期望 %s, 实际 %s",
             key,
             expected_name,
             actual,
@@ -108,7 +108,7 @@ def build(
     data_degradation: list | None = None,
     **extra: Any,
 ) -> dict[str, Any]:
-    """构建 A 通道 f_context 字典。
+    """构建 A 通道 pipeline_data 字典。
 
     从各数据准备阶段接收结构化数据，合并并校验类型后返回。
 
@@ -118,7 +118,7 @@ def build(
         extra: 额外键值对（供 Phase 1 扩展用）
 
     Returns:
-        统一的 f_context 字典，始终包含所有已知键（值可能为 None/空列表）
+        统一的 pipeline_data 字典，始终包含所有已知键（值可能为 None/空列表）
     """
     result: dict[str, Any] = {
         "diff": diff,
@@ -128,14 +128,14 @@ def build(
     # 合并额外键
     for k, v in extra.items():
         result[k] = v
-        _F_CONTEXT_KNOWN_KEYS.add(k)
+        _PIPELINE_DATA_KNOWN_KEYS.add(k)
 
     # 类型校验
-    for key, expected in _F_CONTEXT_TYPE_MAP.items():
+    for key, expected in _PIPELINE_DATA_TYPE_MAP.items():
         _assert_type(result.get(key), expected, key)
 
     # 校验已知键范围
-    _validate_keys(result, _F_CONTEXT_KNOWN_KEYS, "f_context")
+    _validate_keys(result, _PIPELINE_DATA_KNOWN_KEYS, "pipeline_data")
 
     # diff 子键深层校验
     if diff is not None and isinstance(diff, dict):
@@ -235,34 +235,34 @@ def _validate_diff(diff: dict) -> None:
 # ── orchestrator.py 兼容入口（合并 capture_snapshot 返回值 + 可选扩展）──
 
 
-def merge_f_context(
-    base_f_context: dict | None,
+def merge_pipeline_data(
+    base_pipeline_data: dict | None,
     **extra: Any,
 ) -> dict | None:
-    """合并基础 f_context 与扩展字段。
+    """合并基础 pipeline_data 与扩展字段。
 
-    用于在 capture_snapshot 返回后向 f_context 追加 Phase 1 新增字段。
+    用于在 capture_snapshot 返回后向 pipeline_data 追加 Phase 1 新增字段。
 
     Args:
-        base_f_context: capture_snapshot 返回的原始 f_context（可能为 None）
-        extra: 需合并到 f_context 的扩展字段
+        base_pipeline_data: capture_snapshot 返回的原始 pipeline_data（可能为 None）
+        extra: 需合并到 pipeline_data 的扩展字段
 
     Returns:
-        合并后的 f_context，或 None（base_f_context 为 None 且 extra 为空时）
+        合并后的 pipeline_data，或 None（base_pipeline_data 为 None 且 extra 为空时）
     """
-    if base_f_context is None and not extra:
+    if base_pipeline_data is None and not extra:
         return None
-    if base_f_context is None:
-        # 首次运行无基础 f_context，以 extra 构建
+    if base_pipeline_data is None:
+        # 首次运行无基础 pipeline_data，以 extra 构建
         return build(**extra)
     if not extra:
-        return base_f_context
+        return base_pipeline_data
 
-    # 合并 extra 到已有 f_context
-    merged = dict(base_f_context)
+    # 合并 extra 到已有 pipeline_data
+    merged = dict(base_pipeline_data)
     for k, v in extra.items():
         if k in merged:
-            logger.debug("[f_context] 覆盖已有键 '%s'", k)
+            logger.debug("[pipeline_data] 覆盖已有键 '%s'", k)
         merged[k] = v
-        _F_CONTEXT_KNOWN_KEYS.add(k)
+        _PIPELINE_DATA_KNOWN_KEYS.add(k)
     return merged

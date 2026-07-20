@@ -7,10 +7,30 @@
 ## [0.7.5] - Unreleased
 
 ### Added
-- (开发中)
+- **P4-09**: 缓存雪崩随机 TTL 修复（`cache/_ttl.py` `_ttl_jitter_factor()`，基于 key 哈希的 ±15% 确定性偏移，同类缓存 TTL 分散以降低雪崩概率）
+- **P4-10**: metrics edge 测试用例（`test_metrics_edge.py`，59 项，覆盖 None/NaN/Inf/空列表/长度不匹配 等全异常路径）
+- **P4-11**: bond_yield edge 测试用例（`test_bond_yield_edge.py`，16 项，覆盖 config 异常/缓存异常/akshare 异常/DataFrame 异常）
+- **P4-12**: rebalance 测试用例完善（`test_rebalance_edge.py`，24 项，覆盖 config/profile 边界/分类降级/回填保护/静默期异常/置信度边界）
+
+### Fixed
+- **P4-13**: 测试标记注册 & 静态扫描合规
+  - `check-test-markers.py` KNOWN_MARKERS 新增 `unit_rebalance`
+  - 修复 `test_config_llm_multi_edge.py` 笔误 `unit_config_edge` → `unit_config`
+  - 验证结果：151 文件通过，0 违规
 
 ### Changed
-- (开发中)
+- **`f_context` → `pipeline_data` 全局重命名**：文件 `f_context_builder.py` → `pipeline_data_builder.py`，所有源码变量名/函数名/参数名/注释及 8 份文档统一替换为 `pipeline_data`；归档文档（`docs-stm/archive/`）保留历史原名不变
+- **`plan.md`**：移除已完成任务项——"执行信号与竞争语境"整节（含事实校验器 #56）和 P4-09~P4-13 共 6 项从待办表删除；质量与安全计数从 17 项/~176h 更新为 12 项/~148h；P2 标题移除"执行信号与竞争语境"前缀
+- **文件重命名**（去除代码内部变量名和缩写）：
+  - `perf-report.md` → `better-investment-performance-test-report.md`
+  - `f_context-schema.md` → `data-channels-schema.md`
+  - `rf-and-885005-test-report.md` → `data-source-stability-test-report.md`
+- **引用同步**：同步更新 plan.md/changelog.md/technical.md/folders.md/better-investment-task.md/discussion-better-investment-advice.md/pipeline_data_builder.py/perf_report.py 共 8 处引用路径
+- **`scripts/perf_report.py`**：输出路径从 `docs-stm/plan/better-investment-advice/` 改为 `docs-stm/tmp/`（运行时临时产物），基线报告保留在 plan 目录
+- **`plan.md`**：追加 P3 技术债清算区（10 项），覆盖架构/测试/安全三类债务
+
+### Docs
+- **`plan.md`**：补充 P3 技术债清单，详见 `docs-stm/managements/plan.md` → P3 技术债清算
 
 ---
 
@@ -21,7 +41,7 @@
   - **P1-03**: Rf 获取——`bond_zh_us_rate` + 手动兜底，`bond_yield.py` 新建，C6 chain 路由合规
   - **P1-04**: 个股日收益率管线暴露，`portfolio_history.py` daily_returns 从局部变量→返回值
   - **P1-05**: 组合日收益率暴露，`get_combined_timeseries` 新增 `daily_returns_portfolio` 字段
-  - **P1-06-A**: f_context 组装逻辑抽取，orchestrator.py→`f_context_builder.py`
+  - **P1-06-A**: pipeline_data 组装逻辑抽取，orchestrator.py→`pipeline_data_builder.py`
   - **P1-06**: 阻断点 1——`prepare_report_data` 加 risk_metrics 空字典占位
   - **P1-07**: 阻断点 2——`capture_snapshot` 加 risk_metrics/portfolio_daily_returns 透传
   - **P1-08**: 阻断点 3——`generate_all_llm` 暴露 history_data 到 prompt
@@ -36,7 +56,7 @@
   - **P1-18**: 熔断器改进——持久化（`circuit_breaker.json`）
   - **P1-19**: 双熔断器统一网关（`circuit_breaker.py` + `provider_registry.py`）
   - **P1-20**: LLM 失败自动降级模板，全失败时占位文本
-  - **P1-21**: f_context Schema Full Schema 补充+校验检查点
+  - **P1-21**: pipeline_data Schema Full Schema 补充+校验检查点
   - **P1-22**: analysis/ 层定位 + category.py→code_utils.py，消除逆向依赖
   - 合计 ~112h，53 tests passed（原 44→53，新增 registry/bond_yield 测试）
 - **P1-12: 指标级断路包装器**：`circuit_breaker_wrapper.py`，per-indicator 熔断（连续 3 次→静默 24h），C20 FF↔CB 联动，持久化到 `metrics_breaker.json`
@@ -129,8 +149,8 @@
 ### Added
 - **P2 全部 10 项任务完成（Tier 0 + MVP）**：
   - **T0-01-A**: DegradationTracker get_log() + 6 处 fetcher 层 record() + get_tracker() 单例工厂，消除三重实例碎片化
-  - **T0-01-B**: f_context Pre-Schema 文档（`data-channels-schema.md`）+ 删除 2 个死键 + 类型断言 checkpoint
-  - **T0-01**: DegradationTracker→LLM 接线，注入 f_context["data_degradation"]
+  - **T0-01-B**: pipeline_data Pre-Schema 文档（`data-channels-schema.md`）+ 删除 2 个死键 + 类型断言 checkpoint
+  - **T0-01**: DegradationTracker→LLM 接线，注入 pipeline_data["data_degradation"]
   - **T0-02**: 健康检查 3 类→5 类（新增数据质量维度评分标准）
   - **MVP-01**: `_build_profit_attribution_block()` TOP 5 收益归因（正负分别列出，Σ|profit|=0 保护）
   - **MVP-02**: `_build_concept_sector_block()` TOP 5 概念板块 + 集中度判断（3 态兜底：无数据/部分无分类/正常）

@@ -25,7 +25,7 @@ from src.python.config._core import (
     _validate_provider_entry,
 )
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_config_edge, pytest.mark.edge]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_config, pytest.mark.edge]
 
 
 class TestInvalidProviderType(unittest.TestCase):

@@ -124,6 +124,7 @@ investor-util/
 │   │   │   ├── html_save.py          #   HTML 保存/导出
 │   │   │   ├── penetration.py        #   穿透持仓分析（嵌套基金）
 │   │   │   ├── penetration_sheet.py  #   穿透分析 Excel 页签
+│   │   │   ├── pipeline_data_builder.py # 管线数据上下文组装（capture_snapshot → pipeline_data 字典，P1-06-A 从 orchestrator 拆分）
 │   │   │   ├── market_value.py       #   市值计算与盈亏分析
 │   │   │   ├── market_value_sheet.py #   市值分析 Excel 页签
 │   │   │   ├── category.py           #   持仓分类（股票/基金/债券/QDII 等）

@@ -411,9 +411,9 @@ if not any(needs.values()):
     return {}
 ```
 
-### 4.4 f_context 注入与 history_data 暴露
+### 4.4 pipeline_data 注入与 history_data 暴露
 
-`f_context`（组合历史走势时间维度上下文，含 F1→F2 diff 差异摘要）可选传递给 `expert_review` 和 `health_check`，使 LLM 能感知持仓环比变化（新增/清仓/加仓/减仓品种、总市值/总盈亏变化百分比）。
+`pipeline_data`（组合历史走势时间维度上下文，含 F1→F2 diff 差异摘要）可选传递给 `expert_review` 和 `health_check`，使 LLM 能感知持仓环比变化（新增/清仓/加仓/减仓品种、总市值/总盈亏变化百分比）。
 
 **history_data 暴露**：`generate_all_llm()` 接收 `history_data` 参数，包含组合历史日收益率序列、基准指数日收益率序列等时间序列数据。该数据在 prompt 中以紧凑图表形式注入，使 LLM 能感知组合的历史波动特征和相对大盘表现，增强智囊团深度复盘和持仓体检报告中的趋势分析能力。
 
@@ -796,7 +796,7 @@ _build_global_macro_prompt()
 - 紧凑模式：省略今日涨跌幅（智囊团使用，减少 token + 缓存更稳定）
 - 含成本模式：增加成本字段（体检报告使用）
 
-**差异上下文注入**（`_build_diff_context_block`）：仅 `expert_review` / `health_check` 使用，从 `f_context.diff` 提取环比变化（新增/清仓/加仓/减仓/市值变化/盈亏变化），以紧凑格式注入提示词。首次运行输出"暂无历史对比数据"。
+**差异上下文注入**（`_build_difpipeline_data_block`）：仅 `expert_review` / `health_check` 使用，从 `pipeline_data.diff` 提取环比变化（新增/清仓/加仓/减仓/市值变化/盈亏变化），以紧凑格式注入提示词。首次运行输出"暂无历史对比数据"。
 
 **国别/币种分布**（`_calc_country_exposure`）：从持仓明细代码前缀推断（sh/sz/bj→A股，hk→港股，us→美股），并计算各国家/地区的市值合计。
 
@@ -1101,7 +1101,7 @@ LLM 集成层与系统其他组件的接口：
 | LLM 模块 | 依赖数据源 | 缓存指纹依赖 |
 |:---------|:----------|:------------|
 | `global_macro` | A股指数 + 美股指数 + 总市值+总盈亏 + 分类 + (可选)行业资金流向 | 指数收盘价 + 持仓汇总 |
-| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + (可选)f_context | 持仓品种/份额/成本（剔除行情波动） |
+| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动） |
 | `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动） |
 | `penetration_deep` | 同 expert_review + 穿透 TOP10（含行业/板块） | 同上 + 穿透 mv/ratio/sector（full_penetration=True） |
 | `news_correlation` | 过滤后的新闻列表 + 持仓摘要 + 穿透资产 + 行业/概念数据 | 标题前 80 字 + 持仓指纹 |
