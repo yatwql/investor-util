@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from typing import TYPE_CHECKING, Any
@@ -16,9 +17,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import httpx
 
+from src.python.cache import get as cache_get
+from src.python.cache import set as cache_set
 from src.python.llm.fingerprint import (
     build_llm_fingerprint,
     compute_fingerprint,
+    get_cache_ttl_llm,
 )
 from src.python.llm.prompts import (
     _SYSTEM_DEBATE_CON,
@@ -398,8 +402,12 @@ def generate_debate_procon(
                 _valid_codes.add(str(_code))
 
     # ── Step 1: 白脸（Pro） ────────────────────────────
+    _pro_cache_key = f"llm_debate_pro_{_fingerprint}"
     _session_pro_key = f"debate_pro_{_fingerprint}"
     pro_text = _check_session_cache(_session_pro_key)
+
+    if pro_text is None and not force:
+        pro_text = cache_get(_pro_cache_key, get_cache_ttl_llm("debate_pro"))
 
     if pro_text is None:
         pro_result = generate_llm_module(
@@ -418,6 +426,7 @@ def generate_debate_procon(
         pro_text = pro_result[0] if pro_result and isinstance(pro_result, tuple) else None
         if pro_text:
             pro_text = _filter_hallucinated_codes(pro_text, _valid_codes)
+            cache_set(_pro_cache_key, pro_text)
             _set_session_cache(_session_pro_key, pro_text)
 
     if not pro_text:
@@ -425,8 +434,12 @@ def generate_debate_procon(
         return (None, None, None)
 
     # ── Step 2: 黑脸（Con） ────────────────────────────
+    _con_cache_key = f"llm_debate_con_{_fingerprint}"
     _session_con_key = f"debate_con_{_fingerprint}"
     con_text = _check_session_cache(_session_con_key)
+
+    if con_text is None and not force:
+        con_text = cache_get(_con_cache_key, get_cache_ttl_llm("debate_con"))
 
     if con_text is None:
         con_result = generate_llm_module(
@@ -445,6 +458,7 @@ def generate_debate_procon(
         con_text = con_result[0] if con_result and isinstance(con_result, tuple) else None
         if con_text:
             con_text = _filter_hallucinated_codes(con_text, _valid_codes)
+            cache_set(_con_cache_key, con_text)
             _set_session_cache(_session_con_key, con_text)
 
     if not con_text:
@@ -453,9 +467,15 @@ def generate_debate_procon(
 
     # ── Step 3: 综合（Synthesis） ──────────────────────
     _synthesis_user = _build_debate_synthesis_prompt(pro_text, con_text)
-    _synthesis_fingerprint = f"{_fingerprint}_{abs(hash(pro_text[:200]))}_{abs(hash(con_text[:200]))}"
-    _session_syn_key = f"debate_syn_{_synthesis_fingerprint}"
+    _pro_digest = hashlib.sha256(pro_text[:200].encode()).hexdigest()[:8]
+    _con_digest = hashlib.sha256(con_text[:200].encode()).hexdigest()[:8]
+    _syn_fingerprint = f"{_fingerprint}_{_pro_digest}_{_con_digest}"
+    _syn_cache_key = f"llm_debate_synthesis_{_syn_fingerprint}"
+    _session_syn_key = f"debate_syn_{_syn_fingerprint}"
     synthesis_text = _check_session_cache(_session_syn_key)
+
+    if synthesis_text is None and not force:
+        synthesis_text = cache_get(_syn_cache_key, get_cache_ttl_llm("debate_synthesis"))
 
     if synthesis_text is None:
         synthesis_result = generate_llm_module(
@@ -474,6 +494,7 @@ def generate_debate_procon(
         synthesis_text = synthesis_result[0] if synthesis_result and isinstance(synthesis_result, tuple) else None
         if synthesis_text:
             synthesis_text = _filter_hallucinated_codes(synthesis_text, _valid_codes)
+            cache_set(_syn_cache_key, synthesis_text)
             _set_session_cache(_session_syn_key, synthesis_text)
 
     if not synthesis_text:

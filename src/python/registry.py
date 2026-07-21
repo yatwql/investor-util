@@ -147,6 +147,28 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         settings_suffix="penetration_deep",
         cache_groups=("preload",),
     ),
+    # ── 辩论模式（preload 组，P4 实验功能）──
+    DataModuleDef(
+        "辩论白脸",
+        "llm_debate_pro",
+        cache_prefixes=("llm_debate_pro_",),
+        cache_ttl=86400,
+        cache_groups=("preload",),
+    ),
+    DataModuleDef(
+        "辩论黑脸",
+        "llm_debate_con",
+        cache_prefixes=("llm_debate_con_",),
+        cache_ttl=86400,
+        cache_groups=("preload",),
+    ),
+    DataModuleDef(
+        "辩论综合",
+        "llm_debate_synthesis",
+        cache_prefixes=("llm_debate_synthesis_",),
+        cache_ttl=86400,
+        cache_groups=("preload",),
+    ),
     # ── 补充数据（refresh 组）──
     DataModuleDef(
         "机构盈利预测",
