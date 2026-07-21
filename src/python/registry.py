@@ -181,13 +181,6 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         "行业资金流向", "sector_flow", cache_prefixes=("sector_flow_",), cache_ttl=900, cache_groups=("refresh",)
     ),
     DataModuleDef(
-        "基金风格扩展数据（市值/PE）",
-        "extended",
-        cache_prefixes=("extended_",),
-        cache_ttl=CACHE_DAILY,
-        cache_groups=("refresh",),
-    ),
-    DataModuleDef(
         "股票历史分红", "dividend", cache_prefixes=("dividend_",), cache_ttl=CACHE_MONTHLY, cache_groups=("refresh",)
     ),
     # ── B 系列：基金深度分析模块 ──
@@ -214,6 +207,13 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     ),
     DataModuleDef(
         "基金风格快照", "fund_style_snapshot", exact_cache_keys=("fund_style_snapshot",), cache_ttl=CACHE_MONTHLY
+    ),
+    DataModuleDef(
+        "基金风格扩展数据（市值/PE）",
+        "extended",
+        cache_prefixes=("extended_",),
+        cache_ttl=CACHE_DAILY,
+        cache_groups=("refresh",),
     ),
     # ── 精确键名缓存（基准数据/持仓跟踪/交易日历）──
     DataModuleDef(

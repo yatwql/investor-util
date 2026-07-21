@@ -28,7 +28,7 @@ from src.python.report.excel_writer import (
     write_title_row,
 )
 from src.python.report.llm_module_info import get_llm_module_failure_reason
-from src.python.report.styles import CONTENT_FONT
+from src.python.report.styles import CONTENT_FONT, GREEN_FONT
 
 logger = logging.getLogger("invest")
 
@@ -95,6 +95,14 @@ _THINKING_FONT = Font(
     size=9,
     italic=True,
 )
+
+# 匹配事实校验摘要行（run_fact_check 追加到内容尾部）
+_FACT_CHECK_PASS_RE = re.compile(r'✓.*事实校验')  # 通过：✓ 事实校验通过
+_FACT_CHECK_FAIL_RE = re.compile(r'事实校验：.*提示|^⚠ ')  # 告警：事实校验：N/M 项通过，K 项提示 / ⚠ 品种代码
+
+# 事实校验字体（与 HTML 报告的 #4a4 / #a40 对应）
+_FACT_CHECK_PASS_FONT = GREEN_FONT
+_FACT_CHECK_WARN_FONT = Font(color="CC6600", size=11)  # 琥珀色
 
 
 def _get_module_key_map(section_order: list[dict] | None = None) -> dict[str, str]:
@@ -184,7 +192,13 @@ def _write_content_sheet(
 
         for para in paragraphs:
             cell = ws.cell(row=row, column=1, value=para)
-            cell.font = CONTENT_FONT
+            # 事实校验摘要行使用特殊字体（绿/琥珀色）以便视觉区分
+            if _FACT_CHECK_PASS_RE.search(para):
+                cell.font = _FACT_CHECK_PASS_FONT
+            elif _FACT_CHECK_FAIL_RE.search(para):
+                cell.font = _FACT_CHECK_WARN_FONT
+            else:
+                cell.font = CONTENT_FONT
             cell.alignment = _CONTENT_ALIGN
             ws.row_dimensions[row].height = _calc_row_height(para)
             row += 1
