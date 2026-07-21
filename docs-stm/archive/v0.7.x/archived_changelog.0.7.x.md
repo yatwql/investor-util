@@ -2,7 +2,7 @@
 
 > 归档时间：2026-07-21
 > 原始文件：`docs-stm/managements/changelog.md`
-> 涵盖版本：v0.7.0 ~ v0.7.8
+> 涵盖版本：v0.7.0 ~ v0.7.9
 
 ---
 
@@ -382,3 +382,13 @@
   - I-06 数据流描述扩展：debate_info 全链路数据流（a-f 六步），明确 `_fetch_llm_and_news()` 改 5 元组
   - `_fetch_llm_and_news()` 第 630 行增加元组长度检测提取 debate_info
   - fingerprint 数据依赖合规确认：generate_debate_procon() 使用与 expert_review 相同的输入参数，不新增依赖
+
+---
+
+## [0.7.9] - 2026-07-21
+
+### Changed
+- **task91-enhanced-llm-strategy.md**：从 `docs-stm/plan/` 迁移至 `docs-stm/archive/v0.7.x/better-investment-advice/`，状态更新为"已交付"
+- **review-findings.md/plan.md**：v0.7.x 已完成的审查记录和计划记录迁移合并至对应归档文件
+- **changelog.md**: v0.7.8 变更记录归档至 `archived_changelog.0.7.x.md`
+- **归档文件清理**：`archived_changelog.0.7.x.md` / `archived_plan.0.7.x.md` / `archived_review-findings.0.7.x.md` 移除元信息，仅保留变更记录本身
