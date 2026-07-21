@@ -237,7 +237,7 @@ def _dedup_by_title(
     if not items:
         return items
 
-    # 中文财经常用动词/形容词 — 不作为实体判定依据
+    # 高频财经常见动词/形容词/副垫 — 不作为实体判定依据
     _STOP_BIGRAMS: set[str] = {
         "上调", "下跌", "上涨", "超越", "低于", "高于",
         "首次", "今日", "昨日", "本周", "上周", "本月", "上月",
@@ -245,17 +245,28 @@ def _dedup_by_title(
         "不会", "将会", "成为", "宣布", "公布", "发布",
         "推动", "发力", "实现", "加大", "降低", "回升",
         "有望", "再度", "时隔",
+        # 高频噪声：常见数理/报道用词
+        "同比", "环比", "预计", "累计", "显示", "预期",
+        "影响", "明显", "相关", "报告", "数据", "来源",
+        "表示", "认为", "其中", "分别", "总额", "规定",
     }
 
     def _extract_entity_bigrams(text: str) -> set[str]:
-        """提取标题中的中文实体 bigram，去掉动词/形容词 STOP。"""
+        """提取标题中的实体特征：中文 bigram + 英数 token。
+
+        中文实体判定依赖 2-gram 重叠；英数 token 补全"AI""AMD"等被中文
+        正则过滤的专名。
+        """
+        # 英数 token：长度 ≥ 2 避免单字符噪声
+        tokens = re.findall(r"[a-zA-Z]+|[0-9]+", text)
+        result: set[str] = set(t.lower() for t in tokens if len(t) >= 2)
+        # 中文 bigram
         chinese_only = re.sub(r"[^一-鿿]", "", text)
-        bigrams: set[str] = set()
         for i in range(len(chinese_only) - 1):
             bg = chinese_only[i : i + 2]
             if bg not in _STOP_BIGRAMS:
-                bigrams.add(bg)
-        return bigrams
+                result.add(bg)
+        return result
 
     kept: list[dict[str, Any]] = []
     kept_norms: list[str] = []

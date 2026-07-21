@@ -130,5 +130,111 @@ class TestFetchFunctionBehavior(unittest.TestCase):
         mock_fetch.assert_called_once_with(num=5)
 
 
+class TestDedupByTitle(unittest.TestCase):
+    """_dedup_by_title 标题模糊去重测试。"""
+
+    def _make_item(self, title: str, source: str = "东方财富") -> dict:
+        return {"title": title, "_source": source, "url": "http://x.com/" + title[:10]}
+
+    def test_cross_source_english_entity_matched(self) -> None:
+        """跨源：含英数实体的同一新闻应合并（如微软+AMD+Helios）。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("微软Azure采用大规模集群AMD Helios以推动AI创新", "东方财富"),
+            self._make_item("AMD与微软AI合作推出Azure上Helios系统", "财联社"),
+        ]
+        result = _dedup_by_title(items)
+        # 改进算法下 bigram=5（微软 + azure + amd + helios + ai）≥3 → 合并为1条
+        self.assertEqual(len(result), 1)
+
+    def test_cross_source_different_news_kept(self) -> None:
+        """跨源：不同新闻即使高 SequenceMatcher ratio 但实体不重叠，不应合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("2026年7月票房破25亿", "东方财富"),
+            self._make_item("量化观察：预测2026年7月经营质量、动量等因子表现更优", "财联社"),
+        ]
+        result = _dedup_by_title(items)
+        # 共享 bigram 主要为日期数字/量化术语，无实质实体重叠 → 保留2条
+        self.assertEqual(len(result), 2)
+
+    def test_cross_source_ratio_over_50_merged(self) -> None:
+        """跨源：ratio ≥ 0.50 安全区直接合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("茅台股价突破2000元大关", "东方财富"),
+            self._make_item("茅台股价突破2000元关口", "新浪财经"),
+        ]
+        result = _dedup_by_title(items)
+        self.assertEqual(len(result), 1)
+
+    def test_same_source_high_overlap_merged(self) -> None:
+        """同源：共享实体 bigram ≥ 4 合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("英伟达发布新一代AI芯片Blackwell性能提升30%", "东方财富"),
+            self._make_item("英伟达Blackwell AI芯片正式发布性能跃升30%", "东方财富"),
+        ]
+        result = _dedup_by_title(items)
+        # 共享：英伟达、Blackwell、AI、芯片、发布、性能 → bigram≥4
+        self.assertEqual(len(result), 1)
+
+    def test_same_source_low_overlap_kept(self) -> None:
+        """同源：bigram < 4 的不同新闻应保留（阈值防范误杀）。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("广发证券上调融资融券业务总规模上限至净资本2.5倍", "东方财富"),
+            self._make_item("康希诺生物新冠疫苗获得世卫组织紧急使用授权", "东方财富"),
+        ]
+        result = _dedup_by_title(items)
+        self.assertEqual(len(result), 2)
+
+    def test_substring_dedup(self) -> None:
+        """子串包含去重：短标题(≥6字)完全出现在长标题中则合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("锂电池板块集体走强宁德时代涨超5%", "东方财富"),
+            self._make_item("锂电池板块集体走强", "东方财富"),
+        ]
+        result = _dedup_by_title(items)
+        self.assertEqual(len(result), 1)
+
+    def test_empty_input(self) -> None:
+        """空输入应返回空列表。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        self.assertEqual(_dedup_by_title([]), [])
+
+    def test_no_title_item_kept(self) -> None:
+        """无标题项应直接保留。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [{"url": "http://no-title", "_source": "test"}]
+        result = _dedup_by_title(items)
+        self.assertEqual(len(result), 1)
+
+    def test_cross_source_english_token_only_overlap(self) -> None:
+        """跨源：仅英数 token 重叠就达到阈值的同一新闻应合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("CPI同比增长2.5%PPI同比下降0.8%", "东方财富"),
+            self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
+        ]
+        result = _dedup_by_title(items)
+        # 改进算法共享：cpi(2)、2.5(2，但"2."长度不够，不)
+
+        # 实际上 "cpi" "ppi" 是英数token，长度≥2
+        # 中文bigram共享：同比、数据... 但"同比"在STOP里，不算
+        # 关键重叠: cpi, ppi (2个英数token) + 可能有"统计"等中文
+        self.assertEqual(len(result), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

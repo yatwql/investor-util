@@ -21,9 +21,11 @@ from typing import Any
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "cache", "dedup_anchors.jsonl")
 # 当前代码中的阈值常量（与 news_aggregator.py 保持一致）
-_CROSS_THRESHOLD = 0.30  # cross_threshold
-_SAME_SRC_BIGRAM = 4     # 同源 bigram 阈值
-_CROSS_BIGRAM = 3        # 跨源 bigram 阈值
+# 算法同时使用中文 bigram + 英数 token 匹配，
+# 三个阈值经数据分析确认均维持不变。
+_CROSS_THRESHOLD = 0.30  # cross_threshold（英数加入后 cross_skip 自然减少）
+_SAME_SRC_BIGRAM = 4     # 同源 bigram 阈值（抽样验证 bigram=2~3 确为不同新闻）
+_CROSS_BIGRAM = 3        # 跨源 bigram 阈值（边界案例 ratio<0.40 者风险评估过高）
 
 
 def load_anchors(path: str = _ANCHOR_PATH) -> list[dict[str, Any]]:

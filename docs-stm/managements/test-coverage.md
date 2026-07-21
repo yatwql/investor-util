@@ -1,6 +1,6 @@
 # 测试覆盖统计
 
-> 文档版本：v0.7.8-dev
+> 文档版本：v0.8.2-dev
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
@@ -10,7 +10,7 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | 3227 | ~30s |
+| `unit` | 3236 | ~30s |
 | `standard` | 2707 | ~30s |
 | `scenario` | **285** | **~6min** |
 | `regression` | **285** | **~6min** |
@@ -19,13 +19,13 @@
 | `integration` | 322 | ~50s |
 | `edge` | 469 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **3616** | **~10min** |
+| `all` | **3625** | **~10min** |
 | `smoke` | 24 | ~2s |
 | `report` | **1045** | ~15s |
 | `all_no_unit` | 389 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：统计为 `pytest --collect-only` 收集数。`all` 模式全量 3616 项（2026-07-20 快照）。
+> 注：统计为 `pytest --collect-only` 收集数。`all` 模式全量 3625 项（2026-07-22 快照）。
 
 ### 功能域对应测试源
 
@@ -36,7 +36,7 @@
 | **数据源 Provider** | `providers/`(tencent, eastmoney, sina, tiantian, akshare_extras) | `unit/providers/test_{tencent,eastmoney,sina,tiantian,akshare_extras}.py` + `test_eastmoney_industry.py` | 191 |
 | **数据源注册中心** | `provider_registry.py` | `unit/core/test_provider_registry.py` + `test_phase_timeout.py` + `test_market_value_strategy_edge.py` | 53 |
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain, history_diff) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_api_edge.py` | 204 |
-| **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 176 |
+| **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 185 |
 | **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, portfolio_history, history_snapshot) | `unit/report/` 共 41 文件含 test_html_writer、test_html_template 等 | 1046 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content) | `unit/llm/`(19 文件) + `scenario/llm/test_llm_scenarios.py` | 518 |
 | **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 438 |
@@ -88,7 +88,7 @@
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 259 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 204 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入） | 584 |
-| ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 176 |
+| ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 185 |
 | ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、基金深度分析模块、数据降级/占位） | 1045 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 113 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含注册表测试） | 559 |
