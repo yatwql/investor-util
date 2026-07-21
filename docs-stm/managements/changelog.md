@@ -8,6 +8,7 @@
 
 ### Changed
 - 版本号更新至 v0.7.9-dev
+- **task91-enhanced-llm-strategy.md**：从 `docs-stm/plan/` 迁移至 `docs-stm/archive/v0.7.x/better-investment-advice/`，状态更新为"已交付"
 
 ---
 
