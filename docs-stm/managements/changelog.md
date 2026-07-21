@@ -4,6 +4,12 @@
 
 ---
 
+## [0.8.1-dev] - 未发布
+
+### Changed
+- 版本号更新至 v0.8.1-dev
+- **check-version-consistency.py**: review-findings.md、llm-technical.md 加入版本号一致性检查清单（11 项）
+
 ## [0.8.0] - 2026-07-21
 
 ### Changed
