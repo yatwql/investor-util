@@ -11,7 +11,8 @@
   _config_defaults.py  — config.json 默认配置 & 模板生成
   _llm_defaults.py     — llm_settings.json 缺省模板
   _comments.py         — JSON 注释剥离
-  _core.py             — 配置读写/缓存/校验/LLM 配置（核心逻辑）
+  _validation.py       — config.json 配置校验函数集
+  _core.py             — 配置读写/缓存/LLM 配置（核心逻辑）
 """
 
 # 保留子模块引用，供测试和外部直接访问
@@ -19,6 +20,7 @@ from src.python.config import _comments as _comments
 from src.python.config import _config_defaults as _config_defaults
 from src.python.config import _core as _core
 from src.python.config import _llm_defaults as _llm_defaults
+from src.python.config import _validation as _validation
 
 # ── JSON 注释剥离 ──
 from src.python.config._comments import _strip_json_comments
@@ -33,13 +35,18 @@ from src.python.config._config_defaults import (
     set_config_path_override,
 )
 
-# ── 核心逻辑 ──
-from src.python.config._core import (
-    _KNOWN_LLM_SETTINGS_KEYS,
+# ── 配置校验 ──
+from src.python.config._validation import (
     _KNOWN_NEWS_SOURCES,
     _KNOWN_PROVIDER_NAMES,
     _KNOWN_PROVIDER_TYPES,
     _STRING_CONFIG_KEYS,
+    validate_config,
+)
+
+# ── 核心逻辑 ──
+from src.python.config._core import (
+    _KNOWN_LLM_SETTINGS_KEYS,
     _check_unknown_llm_keys,
     _clear_config_cache,
     _config_cache,
@@ -63,8 +70,6 @@ from src.python.config._core import (
     is_enable_llm,
     is_enable_news,
     set_config,
-    # 配置校验
-    validate_config,
 )
 
 # ── 默认模板（llm_settings.json）──

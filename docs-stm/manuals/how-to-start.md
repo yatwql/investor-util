@@ -167,7 +167,7 @@ python -m src.python.cli --config D:/config/my_config.json cache --stats
     [I] 管理对比指数池        [A] 配置匿名化模式
     [1] 更新基础类缓存        [2] 更新持仓类缓存
     [3] 清理过期缓存文件     [4] 查看缓存/状态统计
-    [P] 配置报告板块可见性    [S] 配置支持LLM的章节
+    [P] 配置报告板块可见性    [S] 配置LLM分析章节
     [R] 刷新配置               [X] 退出
 ```
 

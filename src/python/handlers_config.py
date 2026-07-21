@@ -253,19 +253,21 @@ def _cmd_config_llm_modules() -> None:
             items.append((i, sfx, name, status, "llm"))
             print(f"  │ {i}. {name:<14s} [{status_str}]{' ' * 4}│")
 
-        # 分隔线
+        # 分隔线 + 实验功能标记
         print(f"  │{'─' * 42}│")
+        print(f"  │ ⚗ 实验性功能（默认关闭）{' ' * 22}│")
 
         # ② 辩论模式开关（6-8）
         for j, (flag, label, _desc) in enumerate(DEBATE_FLAGS, len(module_names) + 1):
             status = is_feature_enabled(flag)
             status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
             items.append((j, flag, label, status, "debate"))
-            print(f"  │ {j}. {label:<14s} [{status_str}]{' ' * 4}│")
+            print(f"  │ {j}. ⚗{label:<14s} [{status_str}]{' ' * 3}│")
 
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
-        print("  ⚡ 辩论模式默认关闭，开启后智囊团复盘输出含辩论内容")
+        print("  ⚗ 实验性辩论模式默认关闭，开启后智囊团复盘输出含辩论内容")
+        print("     ⚠ 当前为实验阶段，输出质量可能不稳定")
         print()
         try:
             total = len(items)
