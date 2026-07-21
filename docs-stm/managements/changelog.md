@@ -9,6 +9,8 @@
 ### Changed
 - 版本号更新至 v0.7.9-dev
 - **task91-enhanced-llm-strategy.md**：从 `docs-stm/plan/` 迁移至 `docs-stm/archive/v0.7.x/better-investment-advice/`，状态更新为"已交付"
+- **review-findings.md**：v0.7.x 全部审查记录（D16/D17/P3）迁移合并至 `archived_review-findings.0.7.x.md`，主文件仅保留归档引用
+- **plan.md**：v0.7.x 全部计划记录（含 Task91 已完成项）迁移合并至 `archived_plan.0.7.x.md`，主文件 P4 区清空待排期
 
 ---
 

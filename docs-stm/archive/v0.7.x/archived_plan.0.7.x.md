@@ -1,8 +1,8 @@
 # 实现计划归档 — v0.7.x
 
-> 归档时间：2026-07-20
+> 归档时间：2026-07-21
 > 原始文件：`docs-stm/managements/plan.md`
-> 涵盖版本：v0.7.0 ~ v0.7.6
+> 涵盖版本：v0.7.0 ~ v0.7.8
 
 ---
 
@@ -158,8 +158,25 @@ P2 和 P3 整节（含 Phase 3 和 Phase 4 任务表）全部移除，仅保留 
 
 ---
 
+---
+
+### ✅ v0.7.7 ~ v0.7.8 — Task91 辩论模式交付 + D16/D17 修复（2026-07-20 ~ 2026-07-21）
+
+> 原始提交：`5e8a648` ~ `6f5be5c`
+> 版本头：v0.7.8-dev → v0.7.8
+
+Task91「增强 LLM 策略——辩论模式」全部 12 轮迭代完成并交付，含 D16 终轮一致性扫描和 D17 pipeline_data Schema 合规审计。
+
+| # | 类别 | 实验功能项 | 状态 | 估时 | 说明 |
+|:-:|:-----|----------|:----:|:----:|------|
+| 91 | **LLM策略** | **增强 LLM 策略——从"解读数据"到"模拟辩论"** | ✅ | 32h | M1 白脸/黑脸/综合辩论 + M2 条件推理 + M3 集中度问答，62 项单元测试 + 3 项集成测试，缺省关闭 |
+
+同步完成：
+- D16 终轮一致性扫描（10 项修复：目录编号偏移、闭包变量捕获、依赖图修正等）
+- D17 pipeline_data Schema 合规审计（4 项确认：不新增 pipeline_data 键，debate_info 独立通道传递）
+
 ## 归档引用
 
 - `plan.md`（当前）→ `docs-stm/managements/plan.md`
-- 详细任务描述 → `docs-stm/plan/better-investment-advice/better-investment-task.md`
-- 原始 git 提交历史 → `e42e231` ~ `9c20f8e`
+- 详细任务描述 → `docs-stm/archive/v0.7.x/better-investment-advice/task91-enhanced-llm-strategy.md`
+- 原始 git 提交历史 → `e42e231` ~ `6f5be5c`
