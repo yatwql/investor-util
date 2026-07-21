@@ -34,6 +34,7 @@
 | `cache/` 子包 | 过期判断、读写、清理 | 原子写入、损坏恢复、TTL 边界（0s/1s/过期1s）、前缀匹配、并发 access、gzip 透明解压 |
 | `providers/*.py` | mock HTTP + 异常 | 200 正常 / 空数据 / 超时 / 429 / 503 / JSON 格式错误 / HTML 而非 JSON / 空响应 / 字段缺失 / 编码异常 |
 | `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、指纹确定性 |
+| `llm/` — 辩论模式 | 6 文件专项覆盖 | `test_debate_generators.py`（三段生成流程 pro→con→synthesis 控制）、`test_debate_prompts.py`（提示词模板/合成提示/集中度问答块）、`test_debate_token_budget.py`（Token 预算守卫 1×/2× 阈值）、`test_debate_edge.py`（C12 合规边缘场景 11 项）、`test_debate_conditional.py`（条件推理 M2 场景注入）、`test_debate_qa.py`（集中度问答 M3 阈值触发） |
 | `report/*.py` | 正常 + 空数据 + 边界 | 单条持仓、最大 100 条持仓、零成本/零市值、全亏损、全盈利、混合账户 |
 | `market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |
 | `provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断（默认 3 次→冷却 300s→自动恢复，批量 API 如 eastmoney_industry 为 6 次→120s）、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
@@ -121,6 +122,9 @@
 | **S18: 全缓存无 API 调用** | — | 连续两次菜单 L（间隔 < TTL，全部模块命中缓存） | 菜单 L → 菜单 L | 第二次 LLM API 用量汇总"无新增 API 调用，数据全部来自缓存"，call_count=0 |
 | **S19: 空持仓 LLM 降级** | — | 无持仓数据但按 L | 菜单 L（空目录） | LLM 调用跳过，输出空占位，报告不崩溃 |
 | **S20: 三种输出格式一致性** | — | 正常持仓 + 菜单 L | 菜单 L | Excel/HTML/Summary 三种输出对同一 module_info 的状态/颜色/费用一致 |
+| **D1: 辩论模式 M1 三段正常生成** | — | 含多品种持仓，Feature Flag `llm_debate_procon=true` | 菜单 L | pro（白脸）→ con（黑脸）→ synthesis（综合）三段完整生成；HTML 显示三色块+实验模式标签；Excel 显示"🧪 辩论模式"灰字注记；LLM 用量表正确归入"实验模式"行 |
+| **D2: 辩论降级回退普通模式** | — | M1 启用但 pro 或 con 返回 None | 菜单 L（模拟 LLM pro 失败） | 自动回退普通 expert_review；返回 8 元组（无 debate_info）；HTML 不显示辩论块，显示普通结果 |
+| **D3: Token 预算触发生成截断** | — | 配置极低 `max_total_tokens_per_report`，持仓数据量大使 pro+con 超 1× 预算 | 菜单 L（模拟长篇输出） | 超过 1× 预算跳过 synthesis，返回 pro+con 拼接；超过 2× 跳过全部 debate 回退普通模式；日志输出 budget 告警 |
 
 > 添加新场景时，按复杂度选择文件。LLM 相关的场景统一放在 `test_llm_scenarios.py`。
 > S0a/S0b/S0d（持仓质量，不含 S0c）统一放在 `test_scenario_holdings_quality.py`；S0c（超多持仓）和 S10（极端值）放在 `test_scenario_extreme.py`。
@@ -133,6 +137,7 @@
 > - `unit/fetcher/test_chain.py` — history_index 路由 5 项
 > T 类场景统一放在 `test_datetime_scenarios.py` 并标注 `scenario_datetime`。
 > 新增场景需要同时标注场景子标记（如 `scenario_basic`、`scenario_llm`）和通用 `scenario` 父标记，确保 `-m "scenario"` 能自动涵盖。
+> D1-D3（辩论模式）统一放在 `test_llm_scenarios.py`，归属 LLM 大场景组。
 
 ### 1.4 单元测试标记分组（Unit Test Markers）
 
@@ -165,6 +170,7 @@
 | **新闻流水线集成**：fetch_all → aggregate → deduplicate → correlate_with_holdings → write_to_report | ✅ | `test_news_pipeline_edge.py` |
 | **多模块缓存一致性**：price 刷新后，market_value / fund_performance 使用同一缓存源 | ✅ | `test_integration_coverage.py` (integration_cache) |
 | **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ✅ | `test_integration_coverage.py` (integration_tui) |
+| **辩论管线集成**：orchestrator 辩论路由 _debate_wrapper → _debate_info_container → 8/9 元组返回 → HTML/Excel 渲染 | ✅ | `test_debate_pipeline.py` |
 | **API 联通性验证**：手动运行确认腾讯/东方财富/天天基金 API 实际可调通 | ✅ | 每次迭代人工执行 |
 
 ### 1.6 异常场景全覆盖
@@ -195,6 +201,12 @@
 | 熔断器冷却恢复 | 熔断后 60s 半开探测 | ✅ `test_circuit_breaker_edge.py`（60s 边界/59s 仍开/多端点） |
 | 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | ✅ `test_cache_edge.py`（gzip 边界 100KB/损坏删除） |
 | LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | ✅ `test_api_edge.py`（恢复重试/仍空不回退） |
+| **辩论虚构代码过滤** | 行级检测 LLM 输出的含字母虚构代码，移出该整行 | ✅ `test_debate_edge.py` `test_filter_removes_hallucinated` |
+| **辩论 Provider 全不可用** | pro 失败返回 (None, None, None)，回退普通模式 | ✅ `test_debate_edge.py` `test_pro_failure_returns_none` |
+| **辩论 synthesis 超时** | pro+con 成功但 synthesis 失败 → 返回 pro+con 拼接 | ✅ `test_debate_edge.py` `test_synthesis_timeout_returns_pro_con` |
+| **辩论配置段缺失** | llm_settings.json 无 debate 段 → 使用全缺省配置 | ✅ `test_debate_edge.py` `test_missing_config_section` |
+| **辩论 Token 预算 1× 超限** | pro+con 总和超过 1× 预算 → 跳过 synthesis | ✅ `test_debate_token_budget.py` `test_budget_exceeded_skips_synthesis` |
+| **辩论 Token 预算 2× 超限** | pro 单独超过 2× 预算 → 跳过全部 debate | ✅ `test_debate_token_budget.py` `test_budget_2x_skips_all` |
 
 ### 1.7 日期/时间数据获取场景测试（T1-T21）
 
@@ -494,60 +506,4 @@ def test_get_ttl_closed(self, mock_open):
 
 ## 8. 新增测试指南
 
-新增测试用例时，按以下流程操作：
-
-### 8.1 确定测试类型和文件位置
-
-| 测试类型 | 放哪里 | 示例 |
-|:---------|:-------|:-----|
-| **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache.py` 追加 `TestCacheEdgeCases` |
-| **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
-| **业务场景测试** | `test_integration.py`（基础链路 S1-S5）或 `test_integration_scenarios.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_integration.py` |
-| **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
-| **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
-| **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S34 |
-| **报告序号场景** | `test_scenario_section_order.py` | C-P1b |
-| **LLM 场景测试** | `test_llm_scenarios.py` | S11-S20 |
-| **日期/时间场景** | `test_datetime_scenarios.py` | T1-T21 |
-| **缺陷回归测试** | 对应模块的 `test_*.py` 或 `test_regression.py` | Bug fix 的断言 |
-| **边缘/异常场景测试** | 对应模块的 `test_<module>_edge.py` | 使用 `@pytest.mark.edge` 标记，放置于模块目录下 |
-
-### 8.2 命名规范
-
-```python
-# 测试类名 — 模块/场景名 + 测试维度
-class TestCacheEdgeCases:          # 模块 + 测试类型
-class TestGetTtlMarketAware:       # 函数名 + 场景
-class TestScenarioS21:             # 新业务场景递增
-
-# 测试方法名 — test_ + 场景 + 预期结果
-def test_empty_holdings_returns_zero(self):
-def test_ttl_during_trading_hours_returns_30s(self):
-def test_qdii_nav_date_delayed_t2(self):
-```
-
-### 8.3 新增后必须更新的文件
-
-1. **`test-coverage.md` 场景测试分组表** — 新增 S/T 场景时补充条目（含测试类参考列）
-2. **`folders.md`** — 新增 test_*.py 文件后更新目录树
-3. **`changelog.md`** — 记录新增的测试数量和覆盖场景
-4. **`plan.md`** — 如果在迭代中新增的功能，更新对应条目的完成状态
-5. **`unit/conftest.py`** — 新增 `unit/` 下测试文件时确认 `pytestmark` 列表包含正确的 `unit_*` 子标记
-
-### 8.4 新增后必须执行的验证
-
-```bash
-pytest src/test/                                   # 全量通过
-pytest --co                                         # 无 patch 残留污染
-pytest src/test/unit/core/test_registry.py --co -v      # 新文件隔离（示例）
-python scripts/check-test-markers.py                # 标记合规性检查（AST 静态扫描）
-```
-
-### 8.5 文件膨胀阈值
-
-| 指标 | 警告线 | 红线 | 措施 |
-|:-----|:------:|:----:|:-----|
-| 单文件测试数 | > 80 项 | > 120 项 | 拆分到子文件 `test_xxx_part1.py` / `test_xxx_part2.py` |
-| 单文件行数 | > 800 行 | > 1200 行 | 考虑按被测函数 / 场景类型拆分 |
-| 单类方法数 | > 15 项 | > 25 项 | 拆为多个 Test 类或拆分文件 |
-| 单方法 mock 数 | > 5 个 patch | > 8 个 patch | 重构被测函数以降低耦合 |
+> 新增测试用例的操作流程（确定文件位置 / 命名规范 / 必须更新的文件 / 验证步骤 / 膨胀阈值）详见 [`how-to-test-my-code.md` → 新增测试指南](../manuals/how-to-test-my-code.md#新增测试指南)。

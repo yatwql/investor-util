@@ -90,7 +90,7 @@ class TestRegistryCompleteness:
         # news_correlation 不应有 output_brief
         assert "output_brief_news_correlation" not in keys
         # 确认总键数
-        assert len(keys) == 54, f"预期 54 个 LLM settings 键，实际 {len(keys)}"
+        assert len(keys) == 55, f"预期 55 个 LLM settings 键，实际 {len(keys)}"
 
     def test_each_llm_module_has_model_key(self):
         """每个 LLM 模块必须有 model_{suffix} 键。"""

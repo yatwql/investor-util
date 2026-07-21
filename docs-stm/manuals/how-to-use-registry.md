@@ -59,10 +59,11 @@ class DataModuleDef:
 | **行业分类（refresh）** | 行业分类 | `industry` | 14天 | 主动刷新触发 |
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
-| **补充数据（refresh）** | 盈利预测、资金流向、分红 | `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
+| **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | P4 实验功能，三段独立缓存（复用 expert_review 指纹） |
+| **补充数据（refresh）** | 盈利预测、资金流向、分红、无风险利率 | `profit_forecast`, `sector_flow`, `dividend`, `bond_yield` | 15min~30d | 主动刷新触发；`bond_yield` 为精确键名 `bond_yield_rf` |
 | **基金深度分析（refresh）** | 基金经理、持仓重合度、基金风格扩展数据 | `fund_manager`, `fund_overlap`, `extended` | 24h~7d | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
-| **历史走势类（无分组）** | 历史股票日线、历史基金净值 | `history_stock`, `history_fund_otc` | 1w~1M | 无分组保护，不被菜单缓存命令误删，通过 `portfolio_history.py` 内部路由自动管理 |
+| **历史走势类（无分组）** | 历史股票日线、历史基金净值、指数历史日线 | `history_stock`, `history_fund_otc`, `history_index` | 1w~1M | 无分组保护，不被菜单缓存命令误删，通过 `portfolio_history.py` 内部路由自动管理 |
 | **精确键名（含 refresh）** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | `benchmark` 归入 `refresh` 组，`tracking`/`calendar` 无分组 |
 
 ---
@@ -292,10 +293,10 @@ class ComputModuleDef:
 | `analytics_metrics` | 量化指标 | bond_yield, history | ✅ implemented |
 | `analytics_liquidity` | 流动性分析 | — | ✅ implemented |
 | `analytics_fx_exposure` | 外汇敞口分析 | — | ✅ implemented |
-| `analytics_fact_checker` | 事实锚定校验器 | — | ✅ implemented |
 | `analytics_scenario` | 情景分析 | history | ✅ implemented |
 | `analytics_alignment` | 组合校准分析 | — | ✅ implemented |
 | `analytics_inferrer` | 用户画像推断 | — | ⏳ planned |
+| `analytics_fact_checker` | 事实锚定校验器 | — | ✅ implemented |
 
 新增计算模块只需在 `_COMPUTATION_REGISTRY` 中添加一行 `ComputModuleDef`，纯算法模块无需缓存注册。
 

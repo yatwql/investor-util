@@ -60,6 +60,9 @@
   - [附录 C：缓存 TTL 明细](#附录-c缓存-ttl-明细)
   - [附录 D：降级层级与阈值定义](#附录-d降级层级与阈值定义)
   - [附录 E：线程池分布](#附录-e线程池分布)
+  - [附录 F：指标降级依赖矩阵](#附录-f指标降级依赖矩阵)
+  - [附录 G：报告生成降级路径矩阵](#附录-g报告生成降级路径矩阵)
+  - [附录 H：pipeline_data Schema 定义](#附录-hpipeline_data-schema-定义)
 
 ---
 
@@ -208,7 +211,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **编排** | 报告编排器 | 数据准备 → 管线编排 | `report/orchestrator.py` |
 | **报告** | Excel 管线 | openpyxl 写入 | `report/excel_generator.py` |
 | **报告** | HTML 管线 | Jinja2 模板渲染 | `report/html_writer.py` |
-| **报告** | 内容模块 | 各页签写入器（~20 文件） | `report/*.py` |
+| **报告** | 内容模块 | 各页签写入器（43 文件） | `report/*.py` |
 | **LLM** | 智能分析 | Claude/OpenAI/Gemini 调用、Provider Chain 策略路由、Multi-Provider 多链切换、fingerprint 指纹缓存、Extended Thinking、骨架流程、并行编排、费用估算 | `llm/` |
 | **贯穿** | 代码类型判定 | 资产识别原语 | `code_utils.py` |
 | **贯穿** | 交易时段判断 | A 股时段、午间休市 | `market_hours.py` |
@@ -571,6 +574,9 @@ fetcher/
 ├── fund_manager.py     基金经理数据（天天基金 HTML 解析）
 ├── industry.py         行业分类+概念板块（push2 双链路）
 ├── chain.py            Provider 优先链定义 + fallback 路由 + 增量合并
+├── akshare.py          AKShare 数据获取（备用数据源）
+├── bond_yield.py       债券收益率数据
+├── news.py             新闻数据获取
 ├── portfolio_history.py 组合历史走势计算（位于 report/ 包）
 └── history_diff.py     F1 快照差异计算（纯计算，无 I/O）
 ```
@@ -1041,7 +1047,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 ### 4.2 报告编排器
 
-`report/orchestrator.py`（~740 行）是 TUI 和 CLI 共用的报告编排共享层，负责：
+`report/orchestrator.py`（~867 行）是 TUI 和 CLI 共用的报告编排共享层，负责：
 
 1. **数据准备**：行情获取、指数获取、资产穿透 TOP10
 2. **快照创建与差异计算**：F1 持仓快照 + 环比差异
@@ -1052,7 +1058,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 #### pipeline_data 数据上下文
 
-`report/pipeline_data_builder.py` 集中组装传递给 LLM 的数据上下文 `pipeline_data`。原本内联在 `orchestrator.py` 的组装逻辑被抽取到此独立模块，包含 `_build_basic_context()`、`_build_risk_context()`、`_build_llm_context()` 等分段构造器，职责清晰可测。
+`report/pipeline_data_builder.py` 集中组装传递给 LLM 的数据上下文 `pipeline_data`。包含 `_build_basic_context()`、`_build_risk_context()`、`_build_llm_context()` 等分段构造器，职责清晰可测。
 
 `pipeline_data` 遵循 C19 Schema 契约：所有键必须在 `docs-stm/archive/v0.7.x/better-investment-advice/data-channels-schema.md` 中预定义类型、版本号和写入/消费模块后，才能在代码中使用该键。
 
@@ -1830,7 +1836,7 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 13 个子模块：
+`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker.py / fallback.py；`prompts.py` 拆分为 core/tables/action 3 文件，逻辑上仍视作一个 Prompt 构建层）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
@@ -1846,12 +1852,17 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
                prompts.py           System/User Prompt 构建
                fingerprint.py       缓存指纹计算
                session.py           会话用量追踪
+               cost_tracker.py      Token 预算管理
                pricing.py           费用估算
                markdown.py          Markdown→HTML 转换
                circuit_breaker.py   LLM API 熔断器
+               fact_checker.py      LLM 输出伪代码/幻觉过滤
+               fallback.py          全失败降级占位模板
 ```
 
 **LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名。
+
+**辩论模式（实验性路由）**：当 Feature Flag `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` 任一启用时，`generators_orchestrator.py` 中的 `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`。辩论模式与标准模式互斥（辩论优先），路由后 `skeleton.generate_llm_module()` 走辩论三段缓存（`llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_`）而非标准 expert_review 缓存。三段独立的 `DataModuleDef` 注册在 `registry.py` 中（preload 组，24h TTL）。
 
 ### 5.2 调用链概览
 
@@ -1891,6 +1902,8 @@ LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_
 
 每个模块的详细参数（model、temperature、timeout、max_tokens 等）通过 `module_{标识}` 命名约定在 `llm_settings.json` 中配置。
 
+**辩论模式路由**：当 Feature Flag 开启时，expert_review 模块的生成入口被 `_debate_wrapper` 接管，输出路径变为 debate 三段式（详见 §7.8 辩论模式需求）。辩论模式使用独立的缓存键（`llm_debate_pro_`/`llm_debate_con_`/`llm_debate_synthesis_`）和 Token 预算守卫，三段缓存共用 expert_review 的持仓指纹（排除行情波动），默认 TTL 24h。辩论模式启用时报告页签标题尾部附加"(实验)"标签。
+
 ### 5.4 多 Provider 链模式
 
 LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider Chain（§2.1）采用相同设计理念，但策略引擎独立：
@@ -1915,6 +1928,9 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 | LLM 熔断 | `llm/circuit_breaker.py` — 连续 N 次失败 → 60s 冷却 → 半开状态试探 | 防止无效调用浪费 token |
 | 指纹缓存 | `fingerprint.py` — 依赖数据指纹过滤（排除行情波动字段） | 仅品种/份额/成本变化时重新调用 |
 | 乐观缓存预检 | 从 Provider 链中取链首 Provider 优先检查缓存，命中即返回 | 减少链遍历开销 |
+| 辩论路由 | `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`，Feature Flag 控制启停（默认关闭） | 辩论模式与标准模式互斥，辩论优先 |
+| Token 预算守卫 | 每阶段输出字符数 > `int(max_tokens × 0.65)` 时触发保护：1× 超限→跳过 synthesis 阶段并拼接 pro+con；2× 超限→回退标准模式 | 防止辩论模式过度消耗 token |
+| 虚构代码过滤 | `_filter_hallucinated_codes()` 基于正则的行级过滤，使用 `(?:^\|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]\|$)` 适配中文环境 | 消除 LLM 产生的虚构证券代码 |
 
 [↑ 回到顶部](#目录)
 
@@ -1971,7 +1987,7 @@ class DataModuleDef:
     cache_groups: tuple      # 分组
 ```
 
-当前注册 **26 个数据模块**：
+当前注册 **29 个数据模块**：
 
 | 分类 | 数量 | 模块 |
 |:-----|:----:|:-----|
@@ -1980,10 +1996,11 @@ class DataModuleDef:
 | 行业 | 1 | industry |
 | 新闻（refresh） | 1 | news |
 | LLM 分析（preload/refresh） | 5 | global_macro、expert_review、news_correlation、health_check、penetration_deep |
+| 辩论缓存（preload，实验） | 3 | llm_debate_pro、llm_debate_con、llm_debate_synthesis |
 | 补充数据（refresh） | 4 | profit_forecast、sector_flow、extended、dividend |
 | B 系列基金分析（refresh/无分组） | 4 | fund_manager、fund_overlap、fund_concentration、fund_style_snapshot |
 | 精确键名（refresh/无分组） | 4 | benchmark、tracking、calendar、**bond_yield** |
-| 历史走势（无分组） | 4 | history_stock、history_fund_otc、history_index、history_index_us |
+| 历史走势（无分组） | 3 | history_stock、history_fund_otc、history_index |
 
 #### 计算模块注册表（`_COMPUTATION_REGISTRY`）
 
@@ -2290,22 +2307,22 @@ investor-util/
 │   │   ├── code_utils.py        # 代码类型判定中心化
 │   │   ├── config/              # 配置管理子包（_config_defaults / _comments / _core）
 │   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
-│   │   ├── features.py          # 功能开关注册表（25 项 Feature Flag）
-│   │   ├── fetcher/             # 数据获取调度（price/index/fund/industry/chain/akshare/bond_yield）
+│   │   ├── features.py          # 功能开关注册表（28 项 Feature Flag）
+│   │   ├── fetcher/             # 数据获取调度（price/index/fund/fund_manager/industry/chain/akshare/bond_yield/news/history_diff）
 │   │   ├── handlers_cache.py    # TUI 缓存管理命令（薄壳委托 operations）
 │   │   ├── handlers_config.py   # TUI 配置管理命令
 │   │   ├── handlers_report.py   # TUI 报告生成命令（薄壳委托 orchestrator）
 │   │   ├── http_client.py       # HTTP 客户端工厂
-│   │   ├── llm/                 # LLM 集成（14 子模块，prompts.py 拆分为 core/tables/action）
+│   │   ├── llm/                 # LLM 集成（16 子模块，含 fact_checker/fallback，prompts.py 拆分为 core/tables/action）
 │   │   ├── logger.py            # 日志模块（_ColoredFormatter）
 │   │   ├── main.py              # TUI 入口 + 菜单循环
 │   │   ├── market_hours.py      # A 股交易时段判断
 │   │   ├── models.py            # 数据模型
 │   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
-│   │   ├── providers/           # 数据源提供商（14 个文件）
+│   │   ├── providers/           # 数据源提供商（16 个文件）
 │   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（26 个数据模块 + 17 个报告模块 + 6 个计算模块）
-│   │   ├── report/              # 报告生成（~30 个文件，含 orchestrator/progress/pipeline_data_builder）
+│   │   ├── registry.py          # 中央注册表（29 个数据模块 + 17 个报告模块 + 7 个计算模块）
+│   │   ├── report/              # 报告生成（43 个文件，含 orchestrator/progress/pipeline_data_builder）
 │   │   ├── schemas/             # Pydantic 数据模式（快照等）
 │   │   ├── tui.py               # 键盘输入封装
 │   │   ├── tui_handlers.py      # 菜单通用辅助
@@ -2367,6 +2384,9 @@ investor-util/
 | 键名 | 文件名模式 | TTL | 盘中特殊 | 指纹 | 分组 |
 |:-----|:----------|:---:|:--------:|:----|:-----|
 | `llm_expert_review` | `llm_expert_review_{fingerprint}.json` | 2h | — | 持仓汇总+分类+穿透+明细 | preload |
+| `llm_debate_pro` | `llm_debate_pro_{fingerprint}.json` | 24h | — | 复用 expert_review 持仓指纹（排除行情波动） | preload |
+| `llm_debate_con` | `llm_debate_con_{fingerprint}.json` | 24h | — | 复用 expert_review 持仓指纹（排除行情波动） | preload |
+| `llm_debate_synthesis` | `llm_debate_synthesis_{fingerprint}.json` | 24h | — | 复用 expert_review 持仓指纹（排除行情波动） | preload |
 | `llm_news_correlation` | `llm_news_item_{hash}.json`（逐条） | 1h | — | 标题前 80 字+持仓指纹 | refresh |
 | `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | — | A 股/美股指数+持仓汇总 | preload |
 | `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | — | 持仓明细（排除行情波动） | preload |
@@ -2389,7 +2409,6 @@ investor-util/
 | `history_stock` | `history_stock_{code}.json` | 7 天 | — | — | 无分组 |
 | `history_fund_otc` | `history_fund_otc_{code}.json` | 30 天 | — | — | 无分组 |
 | `history_index` | `history_index_{code}.json` | 30 天 | — | — | 无分组 |
-| `history_index_us` | `history_index_us_{code}.json` | 30 天 | — | — | 无分组 |
 
 #### 系统类
 

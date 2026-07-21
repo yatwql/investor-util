@@ -582,7 +582,7 @@ def _fetch_llm_and_news(
     # 分支 ④：均关闭
     if not enable_llm and not enable_news:
         reporter.info("[板块配置] 新闻和 LLM 均未开启，跳过内容生成")
-        return llm_content, news_data, news_llm_meta, news_ok
+        return llm_content, news_data, news_llm_meta, news_ok, debate_info
 
     pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="orch_llm_news")
     try:

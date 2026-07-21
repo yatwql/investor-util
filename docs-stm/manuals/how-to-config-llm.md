@@ -132,7 +132,7 @@ LLM 配置拆分为三个独立文件，分工明确：
 }
 ```
 
-> **注意**：`llm_key.json` 使用多键格式时，不再使用顶层 `provider` / `api_key` / `model` / `endpoint` 字段，而是为每个 `credentials_ref` 定义独立的命名凭据块。`llm_providers.json` 中的 `credentials_ref` 值必须与 `llm_key.json` 中的键名精确匹配。
+> **注意**：`llm_key.json` 使用多键格式时，顶层 `provider` / `api_key` / `model` / `endpoint` 字段无效，需要为每个 `credentials_ref` 定义独立的命名凭据块。`llm_providers.json` 中的 `credentials_ref` 值必须与 `llm_key.json` 中的键名精确匹配。
 
 ### Provider 条目字段
 
@@ -200,8 +200,8 @@ LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
 
 ### 兼容性
 
-- 多链模式与旧版 flat 格式（`llm_key.json` 含顶层 `api_key` / `provider`）**并存兼容**。检测到 `llm_key.json` 有顶层 `api_key` 时自动使用 flat 模式，否则按 `credentials_ref` 多链模式解析
-- 不需要多链时，保持旧版 flat 格式即可，`llm_providers.json` 可不配置
+- 多链模式与 flat 格式（`llm_key.json` 含顶层 `api_key` / `provider`）**并存兼容**。检测到 `llm_key.json` 有顶层 `api_key` 时自动使用 flat 模式，否则按 `credentials_ref` 多链模式解析
+- 不需要多链时，保持 flat 格式即可，`llm_providers.json` 可不配置
 
 ---
 
@@ -553,7 +553,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 ```
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
-- 模型：`deepseek-v4-flash`（推荐，**注意全小写**，当前主版本）、`deepseek-chat`（V3 旧版，功能受限）
+- 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-chat`（V3，功能受限）
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
 
@@ -676,7 +676,7 @@ python -m src.python.main
 | `gpt-4o-mini` | 0.15 | 0.60 | 0.15 | OpenAI 轻量（缓存无折扣） |
 | `deepseek-v4-flash` | 1.00 | 2.00 | 0.02 | ⭐ 高性价比推荐，默认模型 |
 | `deepseek-v4-pro` | 3.00 | 6.00 | 0.025 | DeepSeek 增强推理 |
-| `deepseek-chat` | 1.00 | 2.00 | 0.02 | DeepSeek V3 旧版 |
+| `deepseek-chat` | 1.00 | 2.00 | 0.02 | DeepSeek V3 |
 
 > **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash：输入 3000 tokens × ¥1 + 输出 2000 tokens × ¥2 = ¥0.007/次。缓存命中时输入部分按 `input_cache_hit` 计费。
 >

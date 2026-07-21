@@ -43,9 +43,9 @@ class TestNewsPipelineIntegration(unittest.TestCase):
         from src.python.providers.news_aggregator import aggregate_news
 
         mock_news = [
-            self._mock_news_item("新闻A", "新浪"),
-            self._mock_news_item("新闻B", "东方财富"),
-            self._mock_news_item("新闻C", "财联社"),
+            self._mock_news_item("茅台股价突破2000元", "新浪"),
+            self._mock_news_item("腾讯发布财报", "东方财富"),
+            self._mock_news_item("美联储加息预期升温", "财联社"),
         ]
 
         with (

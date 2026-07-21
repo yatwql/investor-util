@@ -109,6 +109,12 @@
 
 ---
 
+### A. 路径与文件
+
+路径/文件相关字段（`holdings_dir`、`holdings_filename`、`output_dir`、`llm_key_file`、`llm_settings_file`、`llm_providers_file`）见上方字段总表。
+
+---
+
 ### B. 数据源与提供商
 
 #### news_sources 可调字段
@@ -190,7 +196,7 @@
 
 快速定位：— [行情/数据类](#行情数据类) — [LLM 分析类](#llm-分析类) — [基金深度分析类](#基金深度分析类) — [系统类](#系统类) — [历史走势类](#历史走势类)
 
-### 行情/数据类
+#### 行情/数据类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -205,7 +211,7 @@
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
 | `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
 
-### LLM 分析类
+#### LLM 分析类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -215,7 +221,7 @@
 | `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 |
 | `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 |
 
-### 基金深度分析类
+#### 基金深度分析类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -225,14 +231,14 @@
 | `fund_style_snapshot` | `fund_style_snapshot.json` | 30 天 | — | 风格快照（精确键名，无分组） |
 | `extended` | `extended_{code}.json` | 24h | — | 基金风格扩展数据（市值/PE），refresh 组 |
 
-### 系统类
+#### 系统类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
 | `tracking` | `holdings_tracking.json` | 30 天 | — | 持仓跟踪数据（精确键名，无指纹） |
 | `calendar` | `trading_calendar.json` | 14 天 | — | A 股交易日历（精确键名，无指纹） |
 
-### 历史走势类
+#### 历史走势类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -430,7 +436,7 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 ---
 ### I. 功能开关（features.json）
 
-`data/config/features.json` 提供 25 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
+`data/config/features.json` 提供 28 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
 ```json
 {
@@ -439,16 +445,22 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 }
 ```
 
+> **文件不必须存在** — 全部使用代码默认值时无需此文件。首次在菜单 **[S]** 切换辩论模式或手动创建后自动生效。
+
 主要开关：
 
 | 开关名 | 默认值 | 说明 |
 |:-------|:------:|:-----|
 | `llm_*`（5 项） | true（news_correlation 默认 false） | LLM 各模块独立启停 |
+| `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | **false**（全部默认关闭） | 辩论模式三增强通路：M1 正反辩论/M2 条件推理/M3 集中度问答。菜单 **[S]** 可交互开关 |
 | `b_series_*`（4 项） | true | B 系列基金深度分析模块 |
 | `news_*`（5 项） | true（cls 默认 false） | 新闻源启停 |
+| `history_portfolio` / `history_benchmark` | true | 历史走势与基准指数开关 |
+| `metrics_*`（7 项） | true | 量化指标（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
 | `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）、`code_display`（名称→"品种X"，保留代码）、`full_anonymous`（名称→"品种X"，代码→"000XXX"）、`summary`（仅大类汇总）。TUI 菜单 `[A]` 设置 |
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
 
+> 完整开关清单及说明见 [需求文档 §11.5](../managements/requirements.md#115-featuresjson功能开关注册表)。
 > 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---

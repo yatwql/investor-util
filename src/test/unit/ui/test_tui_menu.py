@@ -42,8 +42,8 @@ class TestMenuItems(unittest.TestCase):
             _tm.MENU_ITEMS[i] = (key, label, None, is_exit)
 
     def test_item_count(self) -> None:
-        """菜单项应为 14 个。"""
-        self.assertEqual(len(MENU_ITEMS), 14)
+        """菜单项应为 16 个。"""
+        self.assertEqual(len(MENU_ITEMS), 16)
 
     def test_first_item_excel(self) -> None:
         """第一项快捷键 E。"""
@@ -55,7 +55,7 @@ class TestMenuItems(unittest.TestCase):
 
     def test_last_item_exit(self) -> None:
         """最后一项快捷键 X，is_exit=True。"""
-        key, label, cb, is_exit = MENU_ITEMS[13]
+        key, label, cb, is_exit = MENU_ITEMS[15]
         self.assertEqual(key, "X")
         self.assertIn("退出", label)
         self.assertIsNone(cb)
@@ -89,7 +89,7 @@ class TestIndexByKey(unittest.TestCase):
         self.assertEqual(index_by_key("E"), 0)
 
     def test_find_X(self) -> None:
-        self.assertEqual(index_by_key("X"), 13)
+        self.assertEqual(index_by_key("X"), 15)
 
     def test_find_nonexistent(self) -> None:
         self.assertIsNone(index_by_key("Z"))

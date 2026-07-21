@@ -212,6 +212,7 @@ investor-util/
 │   ├── calibrate-dedup-threshold.py  #   新闻去重阈值校准
 │   ├── llm_hallucination_sampler.py   #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试
+│   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 │
 ├── docs-stm/                         # 项目文档
@@ -224,6 +225,7 @@ investor-util/
 │   │   ├── how-to-start.md           #     快速上手
 │   │   ├── how-to-schedule.md       #     定时任务配置指南
 │   │   ├── how-to-test-my-code.md    #     测试编写指南
+│   │   ├── scripts-reference.md      #     辅助脚本参考（全）
 │   │   ├── how-to-use-registry.md    #     注册表使用说明
 │   │   └── reports-instruction.md    #     报告使用说明
 │   ├── managements/                  #   管理文档

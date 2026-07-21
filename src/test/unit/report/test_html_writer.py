@@ -403,21 +403,12 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         return mock_llm
 
     def test_generate_all_llm_receives_dict_indices(self):
-        """LLM 内部调用路径：generate_all_llm 收到 dict 类型指数数据。"""
+        """LLM 内容由 orchestrator 预生成后传入 html_writer，html_writer 自身不再调用 generate_all_llm。"""
         mock_llm = self._run_with_mocks()
 
-        mock_llm.assert_called_once()
-        args, kwargs = mock_llm.call_args
-        a_indices, us_indices = args[0], args[1]
-
-        self.assertIsInstance(a_indices, dict,
-                              "a_indices 应为 dict 类型（非 list）")
-        self.assertIsInstance(us_indices, dict,
-                              "us_indices 应为 dict 类型（非 list）")
-
-        # 验证 .values() 安全运行
-        self.assertIsNotNone(list(a_indices.values()))
-        self.assertIsNotNone(list(us_indices.values()))
+        # generate_all_llm 已上移至 orchestrator._fetch_llm_and_news，
+        # html_writer 不再直接调用
+        mock_llm.assert_not_called()
 
     def test_llm_path_no_crash_on_dict_values(self):
         """LLM 路径不会因 dict/list 类型不匹配崩溃。"""

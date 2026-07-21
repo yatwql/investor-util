@@ -104,24 +104,31 @@ def _get_default_llm_settings_template() -> str:
         "\n"
         "  // ═══════════════════════════════════════════\n"
         "  // 辩论模式（实验功能，缺省关闭）\n"
+        "  // 通过 Feature Flag 控制启停，菜单 [S] 可交互开关\n"
         "  // ═══════════════════════════════════════════\n"
         '  "debate": {\n'
+        "    // M1 正反辩论 — 三段式(白脸→黑脸→综合)\n"
         '    "mode_1_procon": {\n'
         '      "per_call_max_tokens": null,\n'
         '      "synthesis_model": null,\n'
         '      "synthesis_temperature": 0.5\n'
         "    },\n"
+        "    // M2 条件推理 — 情景化分析\n"
         '    "mode_2_conditional": {\n'
+        "      // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)\n"
         '      "scenarios": [\n'
         '        {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},\n'
         '        {"name": "下跌", "change": -0.20, "desc": "如果未来市场下跌 20%"},\n'
         '        {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"}\n'
         "      ]\n"
         "    },\n"
+        "    // M3 集中度问答 — 集中度风险问答块\n"
         '    "mode_3_qa_concentration": {\n'
         '      "threshold": 0.20\n'
         "    },\n"
+        "    // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）\n"
         '    "max_total_tokens_per_report": 16000,\n'
+        "    // 辩论模式单次 API 调用超时覆盖（秒）\n"
         '    "per_call_timeout_override": 90\n'
         "  },\n"
         "\n"

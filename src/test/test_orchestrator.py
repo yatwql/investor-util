@@ -117,7 +117,7 @@ class TestPrepareReportData:
             "details", "total_mv", "total_cost", "total_profit",
             "total_today_profit", "categories", "a_indices", "us_indices",
             "penetrated_assets", "holdings_details", "today_str",
-            "output_dir", "news_top_count",
+            "output_dir", "news_top_count", "risk_metrics",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 
@@ -302,7 +302,7 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
-            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
             patch("src.python.report.orchestrator.fetch_history_data") as mock_hist,
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
@@ -331,7 +331,7 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
-            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
             patch("src.python.report.orchestrator.fetch_history_data"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
@@ -358,7 +358,7 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
-            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
             patch("src.python.report.orchestrator.fetch_history_data"),
             patch(
                 "src.python.report.html_writer.write_html_report",
@@ -394,7 +394,7 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
             patch("src.python.report.orchestrator.fetch_history_data"),
             patch("src.python.report.orchestrator._fetch_llm_and_news") as mock_llm_news,
             patch("src.python.report.html_writer.write_html_report") as mock_html,
@@ -415,7 +415,7 @@ class TestGenerateReport:
                 "news_top_count": 100,
             }
             mock_llm_news.return_value = (
-                (None, None, None, None), [], {}, False,
+                (None, None, None, None), [], {}, False, None,
             )
 
             result = generate_report(
@@ -446,7 +446,7 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.capture_snapshot", return_value=None),
             patch("src.python.report.orchestrator.fetch_history_data"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
@@ -483,7 +483,7 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.capture_snapshot", return_value=None),
             patch("src.python.report.orchestrator.fetch_history_data"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
@@ -521,7 +521,7 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.capture_snapshot", return_value=None),
             patch("src.python.report.orchestrator.fetch_history_data"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
@@ -556,7 +556,7 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot"),
+            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
             patch("src.python.report.orchestrator.fetch_history_data"),
             patch(
                 "src.python.report.html_writer.write_html_report",
@@ -675,7 +675,7 @@ class TestFetchLlmAndNews:
                 reporter=reporter,
             )
 
-        llm_content, news_data, news_llm_meta, news_ok = result
+        llm_content, news_data, news_llm_meta, news_ok, _debate_info = result
         assert llm_content[0] == "<p>宏观</p>"
         assert len(news_data) == 1
         assert news_ok is True
@@ -698,7 +698,7 @@ class TestFetchLlmAndNews:
                 reporter=reporter,
             )
 
-        llm_content, news_data, news_llm_meta, news_ok = result
+        llm_content, news_data, news_llm_meta, news_ok, _debate_info = result
         assert llm_content[0] == "<p>宏观</p>"
         assert news_data == []
         assert news_ok is False
@@ -721,7 +721,7 @@ class TestFetchLlmAndNews:
                 reporter=reporter,
             )
 
-        llm_content, news_data, news_llm_meta, news_ok = result
+        llm_content, news_data, news_llm_meta, news_ok, _debate_info = result
         assert llm_content == (None, None, None, None)
         assert len(news_data) == 1
         assert news_ok is True
@@ -736,7 +736,7 @@ class TestFetchLlmAndNews:
             reporter=reporter,
         )
 
-        llm_content, news_data, news_llm_meta, news_ok = result
+        llm_content, news_data, news_llm_meta, news_ok, _debate_info = result
         assert llm_content == (None, None, None, None)
         assert news_data == []
         assert news_ok is False
@@ -760,7 +760,7 @@ class TestFetchLlmAndNews:
                 reporter=reporter,
             )
 
-        llm_content, news_data, news_llm_meta, news_ok = result
+        llm_content, news_data, news_llm_meta, news_ok, _debate_info = result
         assert llm_content == (None, None, None, None)
         assert len(news_data) == 1  # 新闻仍返回
         assert news_ok is True
@@ -966,9 +966,7 @@ class TestCaptureSnapshot:
 
         assert result is not None
         assert "diff" in result
-        assert "diff_trimmed" in result
-        assert "days_since_last" in result
-        assert result["days_since_last"] == 5
+        assert result["diff"]["days_since_last_report"] == 5
 
     def test_capture_snapshot_first_run(self):
         """首次运行（无旧快照）时返回 None。"""

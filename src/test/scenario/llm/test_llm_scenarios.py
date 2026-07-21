@@ -828,7 +828,7 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
         with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
             mock_gen.return_value = ("<p>宏观</p>", False)
             try:
-                result, cached = generate_global_macro({}, {}, 0, 0, {},
+                result, cached = generate_global_macro({}, {}, 0, 0, 0, {},
                                                         force=True)
             except Exception as e:
                 self.fail(f"空持仓下 generate_global_macro 不应崩溃: {e}")

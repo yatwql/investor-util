@@ -386,8 +386,8 @@ class TestNewsPipeline(unittest.TestCase):
 
         # _fetch_from_all_sources 在 mock 层面模拟去重后的结果
         mock_news = [
-            self._mock_news_item("新闻A", url="http://test.com/a"),
-            self._mock_news_item("新闻B", url="http://test.com/b"),
+            self._mock_news_item("茅台股价突破2000元", url="http://test.com/a"),
+            self._mock_news_item("腾讯发布财报", url="http://test.com/b"),
         ]
 
         with (
@@ -590,7 +590,7 @@ class TestTuiRouting(unittest.TestCase):
         from src.python.tui_menu import MENU_ITEMS
 
         keys = {item[0] for item in MENU_ITEMS}
-        expected = {"E", "P", "B", "L", "C", "F", "O",
+        expected = {"E", "P", "B", "L", "C", "F", "O", "I", "A",
                     "1", "2", "3", "4", "S", "R", "X"}
         self.assertSetEqual(keys, expected)
 

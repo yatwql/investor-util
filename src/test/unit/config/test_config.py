@@ -307,7 +307,7 @@ class TestSystemPromptOverride:
 
         _gens.generate_global_macro(
             a_indices={}, us_indices={}, total_mv=100000,
-            total_profit=5000, categories={},
+            total_profit=5000, total_cost=0, categories={},
         )
 
         # 验证 _generate_llm_content 被调用，且第 4 个 positional 参数（system_prompt）等于自定义值
@@ -335,7 +335,7 @@ class TestSystemPromptOverride:
 
         _gens.generate_global_macro(
             a_indices={}, us_indices={}, total_mv=100000,
-            total_profit=5000, categories={},
+            total_profit=5000, total_cost=0, categories={},
         )
 
         call_args = mock_gen.call_args[0]
@@ -361,7 +361,7 @@ class TestSystemPromptOverride:
 
         _gens.generate_global_macro(
             a_indices={}, us_indices={}, total_mv=100000,
-            total_profit=5000, categories={},
+            total_profit=5000, total_cost=0, categories={},
         )
 
         call_args = mock_gen.call_args[0]
