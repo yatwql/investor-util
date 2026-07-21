@@ -323,11 +323,11 @@
 | 3 | `category` | 持仓分类表 | 始终显示 |
 | 4 | `penetration` | 资产穿透TOP10 | 始终显示 |
 | 5 | `fund_performance` | 基金业绩分析 | 始终显示 |
-| 6 | `fund_manager` | 基金经理变更监控 | B 系列（enable_b_series 控制；有数据才显示） |
-| 7 | `fund_overlap` | 持仓重合度矩阵 | B 系列（enable_b_series 控制；有数据才显示） |
-| 8 | `fund_concentration` | 持仓集中度监控 | B 系列（enable_b_series 控制；有数据才显示） |
-| 9 | `fund_style` | 基金风格分析 | B 系列（enable_b_series 控制；有数据才显示） |
-| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻（enable_news 控制） |
+| 6 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_b_series 控制；有数据才显示） |
+| 7 | `fund_overlap` | 持仓重合度矩阵 | 基金深度分析（enable_b_series 控制；有数据才显示） |
+| 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_b_series 控制；有数据才显示） |
+| 9 | `fund_style` | 基金风格分析 | 基金深度分析（enable_b_series 控制；有数据才显示） |
+| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
 | 11 | `global_macro` | 全球政经局势 | LLM |
 | 12 | `expert_review` | 智囊团深度复盘 | LLM |
 | 13 | `health_check` | 持仓体检报告 | LLM |
@@ -473,7 +473,7 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 |:-------|:------:|:-----|
 | `llm_*`（5 项） | true（features.py 全部默认 true；news_correlation 实际启停通过 llm_settings.json 的 `enabled_llm` 控制，默认 false） | LLM 各模块独立启停 |
 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | **false**（全部默认关闭） | 辩论模式三增强通路：M1 正反辩论/M2 条件推理/M3 集中度问答。菜单 **[S]** 可交互开关 |
-| `b_series_*`（4 项） | true | B 系列基金深度分析模块 |
+| `b_series_*`（4 项） | true | 基金深度分析模块 |
 | `news_*`（5 项） | true（cls 默认 false） | 新闻源启停 |
 | `history_portfolio` / `history_benchmark` | true | 历史走势与基准指数开关 |
 | `metrics_*`（7 项） | true | 量化指标（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
