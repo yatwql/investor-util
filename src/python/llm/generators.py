@@ -1,7 +1,8 @@
-"""LLM 生成模块 — 全局政经/智囊团/体检/穿透四大单例函数。
+"""LLM 生成模块 — 全局政经/智囊团/体检/穿透四大单例函数 + 辩论模式生成。
 
-R-198 拆分后职责：
+职责：
   - 4 个单例生成函数（generate_global_macro 等）
+  - 辩论模式白脸/黑脸/综合生成（generate_debate_procon）
   - 批量编排 → generators_orchestrator.py
   - 新闻关联 → generators_news.py
 """
@@ -325,7 +326,7 @@ def generate_debate_procon(
     *,  # 以下为关键字参数
     session_cache: dict | None = None,
 ) -> tuple[str | None, str | None, str | None]:
-    """生成白脸/黑脸辩论 + 综合结果（Mode 1）。
+    """生成白脸/黑脸辩论 + 综合结果。
 
     pro 或 con 失败时返回 (None, None, None) — 由调用方决定是否回退普通模式。
     synthesis 失败时返回 (pro_text, con_text, None) — 调用方可使用拼接结果。

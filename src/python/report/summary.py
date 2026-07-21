@@ -367,5 +367,5 @@ def write_summary_sheet(
     logger.info("投资分析汇总写入完成，共 %d 行", row)
 
 
-# ── re-export: write_llm_usage_sheet 已迁移至 summary_llm_usage ──
+# ── re-export: write_llm_usage_sheet ──
 from src.python.report.summary_llm_usage import write_llm_usage_sheet  # noqa: F401, E402

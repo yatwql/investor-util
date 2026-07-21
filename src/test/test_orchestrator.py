@@ -1,7 +1,6 @@
 """orchestrator 共享层单元测试。
 
-S1 骨架：prepare_report_data mock 测试。
-S2 扩展：capture_snapshot。
+prepare_report_data mock 测试 + capture_snapshot。
 """
 from __future__ import annotations
 

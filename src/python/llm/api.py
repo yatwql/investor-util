@@ -1,6 +1,6 @@
 """LLM API 调用模块 — Provider 路由、Extended Thinking、调用实现。
 
-R-198 拆分后：仅包含 Provider 路由 + Thinking 注入 + 5 个核心函数。
+仅包含 Provider 路由 + Thinking 注入 + 5 个核心调用函数。
 基础设施（常量/重试/截断/内容提取/失败追踪）位于 api_base.py。
 """
 

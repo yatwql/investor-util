@@ -394,13 +394,13 @@ def write_html_report(
         llm_endpoint=llm_endpoint,
         cache_stats=get_cache_hit_rate(),
         app_version=APP_VERSION,
-        # C 迭代：序号 & 可见性（模板使用 section_numbers/section_visible_dict）
+        # 序号 & 可见性（模板使用 section_numbers/section_visible_dict）
         section_order=order,
         section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,
         # PF 修复：section_visible 函数由 context 变量传入，不写入 _ENV.globals
         section_visible=_sv_fn,
-        # D 迭代：数据源状态摘要
+        # 数据源状态摘要
         data_status_summary=data_status_summary,
         data_status_penetration=data_status_penetration,
         data_status_perf=data_status_perf,

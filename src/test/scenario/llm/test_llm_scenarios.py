@@ -703,7 +703,7 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
 @pytest.mark.scenario_llm
 @pytest.mark.scenario
 class TestS17aFullCache(unittest.TestCase):
-    """S17 扩展：全部模块缓存命中，无 API 调用。
+    """S17：全部模块缓存命中，无 API 调用。
 
     预期：module_info 全部 cached，无失败/成功条目。
     """

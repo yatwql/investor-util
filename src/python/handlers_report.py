@@ -1,6 +1,6 @@
 """TUI 报告生成命令处理器。
 
-S7 已变薄：仅保留 TUI 专属交互外壳，业务编排逻辑全部委托 orchestrator。
+仅保留 TUI 专属交互外壳，业务编排逻辑全部委托 orchestrator。
 """
 
 from __future__ import annotations

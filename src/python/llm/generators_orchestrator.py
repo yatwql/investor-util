@@ -365,7 +365,7 @@ def _dispatch_llm_workers(
         ),
     }
 
-    # ── Mode 1 辩论模式路由：替换 expert_review 条目 ──────────
+    # ── 辩论模式路由：替换 expert_review 条目 ─────────────────
     from src.python.features import is_feature_enabled
 
     if is_feature_enabled("llm_debate_procon") and needs.get("expert_review"):
@@ -409,7 +409,7 @@ def _dispatch_llm_workers(
                 return _original_expert(c, lc)
 
         _MODULE_FNS["expert_review"] = _debate_wrapper
-        logger.info("[debate] Mode 1 辩论模式已启用，expert_review 路由已替换")
+        logger.info("[debate] 辩论模式已启用，expert_review 路由已替换")
 
     # news_correlation 可选集成：仅在提供了新闻和持仓数据时注册
     if news_data is not None and holdings_data is not None:

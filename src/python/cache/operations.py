@@ -92,7 +92,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 
 # ═══════════════════════════════════════════════════════════════
-# S8 移入：基金刷新
+# 基金刷新
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -111,7 +111,7 @@ def _refresh_one_fund_cache(fund) -> tuple:
 
 
 # ═══════════════════════════════════════════════════════════════
-# S9 移入：公共缓存函数
+# 公共缓存函数
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -166,7 +166,7 @@ def _sector_flow_hint() -> str:
 
 
 # ═══════════════════════════════════════════════════════════════
-# S9 移入：公共缓存并行刷新（print→reporter 替换）
+# 公共缓存并行刷新（print→reporter 替换）
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -236,15 +236,15 @@ def _refresh_common_caches(
 
 
 # ═══════════════════════════════════════════════════════════════
-# S9 完整实现：update_basic_cache（基金 + 公共缓存）
+# update_basic_cache（基金 + 公共缓存）
 # ═══════════════════════════════════════════════════════════════
 
 
 def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
     """更新基础类缓存（基金业绩+持仓+基准 + 公共缓存）。
 
-    内部管理线程池（S11 完成去池，operations 池唯一存在）。
-    S9 完整实现：基金刷新 + 公共缓存并行获取。
+    内部管理线程池，operations 池唯一存在。
+    基金刷新 + 公共缓存并行获取。
 
     Args:
         holdings: 持仓列表
@@ -317,14 +317,14 @@ def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
 
 
 # ═══════════════════════════════════════════════════════════════
-# S10 移入：持仓缓存（价格+指数）
+# 持仓缓存（价格+指数）
 # ═══════════════════════════════════════════════════════════════
 
 
 def _fetch_prices_and_indices(holdings: list, reporter) -> PositionCacheResult:
     """并行获取持仓价格 + 市场指数，通过 reporter.* 输出进度。
 
-    内部管理线程池（S11 完成去池，operations 池唯一存在）。
+    内部管理线程池，operations 池唯一存在。
     """
     from src.python.fetcher.index import fetch_indices, fetch_us_indices
     from src.python.fetcher.price import fetch_market_data
@@ -387,7 +387,7 @@ def update_position_cache(holdings: list, reporter) -> PositionCacheResult:
 
 
 # ═══════════════════════════════════════════════════════════════
-# S10 移入：缓存清理 + 统计
+# 缓存清理 + 统计
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -412,7 +412,7 @@ def cleanup_cache(reporter) -> int:
 def get_cache_stats(reporter) -> CacheStats:
     """返回缓存统计信息，无 print 格式化。
 
-    S10 完整实现：扫描 data/cache、data/history/snapshots、data/state 三个目录。
+    扫描 data/cache、data/history/snapshots、data/state 三个目录。
     """
     from src.python.cache import (
         cleanup_expired,

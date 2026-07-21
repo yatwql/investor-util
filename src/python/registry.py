@@ -465,7 +465,7 @@ def get_computation_module(module_key: str) -> ComputModuleDef | None:
     return None
 
 
-# ── 报告模块注册表（C 迭代：序号可配置） ──────────────────────
+# ── 报告模块注册表（序号可配置） ──────────────────────────────
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── always 类型（始终显示，无 data_flag 依赖） ──

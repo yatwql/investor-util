@@ -47,9 +47,8 @@ def _read_section_flags(config: dict) -> dict:
     }
 
 
-# ── S1 移入：_prepare_report_data ──
-# 原 handlers_report._prepare_report_data()
-# ★ config 参数已为必传（P2-C1 清理：移除 S7 残留的 get_config_cache 回退）
+# ── prepare_report_data ──
+# ★ config 参数已为必传
 
 
 def prepare_report_data(
@@ -59,7 +58,7 @@ def prepare_report_data(
 ) -> dict:
     """获取行情、指数、穿透数据，整理持仓明细字典列表。
 
-    使用内部 ThreadPoolExecutor 替代 _get_pool()（S6 完成）。
+    使用内部 ThreadPoolExecutor。
     注意：config 参数传入后必须只读使用，不得 mutate。调用方持有的 dict 引用
     指向相同的配置对象，写入会导致跨模块状态污染（C14 约束）。
     """
@@ -131,7 +130,7 @@ def prepare_report_data(
     }
 
 
-# ── S2 移入：capture_snapshot ──
+# ── capture_snapshot ──
 
 
 def capture_snapshot(
@@ -258,7 +257,7 @@ def capture_snapshot(
     return pipeline_data
 
 
-# ── S3 移入：fetch_history_data ──
+# ── fetch_history_data ──
 
 
 def fetch_history_data(
@@ -305,7 +304,7 @@ def fetch_history_data(
         return None
 
 
-# ── S1 骨架：generate_report（S4 开始逐步填充）──
+# ── generate_report ──
 
 
 def generate_report(
@@ -321,8 +320,8 @@ def generate_report(
     """生成投资分析报告。
 
     basic: 仅 Excel（无数据准备/快照/历史）
-    both:  HTML+Excel（不含 LLM） — S5 实现
-    full:  HTML+Excel+LLM — S6 实现
+    both:  HTML+Excel（不含 LLM）
+    full:  HTML+Excel+LLM
     """
     result = ReportResult()
 
@@ -376,7 +375,7 @@ def generate_report(
     return result
 
 
-# ── S5 引入：_compute_details（轻量级行情获取，无指数/穿透/分类）──
+# ── _compute_details（轻量级行情获取，无指数/穿透/分类）──
 
 
 def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -> list:
@@ -392,7 +391,7 @@ def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -
     return details
 
 
-# ── S5 引入：_generate_report_both（生成 HTML+Excel，不含 LLM）──
+# ── _generate_report_both（生成 HTML+Excel，不含 LLM）──
 
 
 def _generate_report_both(
@@ -496,7 +495,7 @@ def _generate_report_both(
     return result
 
 
-# ── S6 引入：_report_llm_module_results（统一的 LLM 模块结果计数/报告）──
+# ── _report_llm_module_results（统一的 LLM 模块结果计数/报告）──
 
 
 def _report_llm_module_results(
@@ -538,7 +537,7 @@ def _report_llm_module_results(
         reporter.info("所有 LLM 内容已跳过，未调用 LLM")
 
 
-# ── S6 引入：_fetch_llm_and_news（统一 4 分支）──
+# ── _fetch_llm_and_news（统一 4 分支）──
 
 
 def _fetch_llm_and_news(
@@ -557,7 +556,7 @@ def _fetch_llm_and_news(
 ) -> tuple[tuple, list, dict, bool]:
     """并行获取 LLM 内容 + 新闻数据，统一处理 4 分支。
 
-    内部管理线程池（max_workers=2，S11 已完成全量去池，operations 池唯一存在）。
+    内部管理线程池（max_workers=2，operations 池唯一存在）。
     LLM 和新闻的 ok/disabled/failed 计数统一归入此函数。
 
     Args:
@@ -669,7 +668,7 @@ def _fetch_llm_and_news(
     return llm_content, news_data, news_llm_meta, news_ok, debate_info
 
 
-# ── S6 引入：_generate_report_full（HTML+Excel+LLM）──
+# ── _generate_report_full（HTML+Excel+LLM）──
 
 
 def _generate_report_full(

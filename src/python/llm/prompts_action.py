@@ -106,7 +106,7 @@ def _build_global_macro_prompt(
     )
 
 
-# ── Mode 3：集中度反问引导 ──────────────────────────────────
+# ── 集中度反问引导 ──────────────────────────────────────────
 
 
 def _build_qa_concentration_block(
@@ -115,7 +115,7 @@ def _build_qa_concentration_block(
     threshold: float = 0.20,
     industry_concentration: dict[str, float] | None = None,
 ) -> str:
-    """构建集中度反问段落（Mode 3）。
+    """构建集中度反问段落。
 
     检查持仓集中度，命中任一阈值即追加反问段落。
     纯计算函数，不涉及 LLM 调用。
@@ -178,8 +178,8 @@ def _build_qa_concentration_block(
     return "".join(lines)
 
 
-# ── Mode 2：条件推理 + Mode 3：反问引导 ───────────────────
-# 两个模式通过 _build_expert_review_prompt 的 enable_mode_2/enable_mode_3 参数控制
+# ── 条件推理 + 反问引导 ─────────────────────────────────────
+# 通过 _build_expert_review_prompt 的 enable_mode_2/enable_mode_3 参数控制
 
 
 def _build_expert_review_prompt(
@@ -277,7 +277,7 @@ def _build_expert_review_prompt(
         "给出优化建议和风险预警。",
     ]
 
-    # ── Mode 2: 条件推理情景追加 ────────────────────────
+    # ── 条件推理情景追加 ────────────────────────────────
     if enable_mode_2:
         try:
             from src.python.config._core import get_llm_config
@@ -295,9 +295,9 @@ def _build_expert_review_prompt(
                     )
                 parts.append("\n".join(scenario_lines))
         except Exception:
-            logger.warning("[debate] Mode 2 情景追加失败，已跳过")
+            logger.warning("[debate] 条件推理情景追加失败，已跳过")
 
-    # ── Mode 3: 集中度反问引导 ──────────────────────────
+    # ── 集中度反问引导 ──────────────────────────────────
     if enable_mode_3:
         _qa_block = _build_qa_concentration_block(
             holdings_details, total_mv,
