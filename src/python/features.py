@@ -42,7 +42,7 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "llm_debate_procon": False,
     "llm_debate_conditional": False,
     "llm_debate_qa_concentration": False,
-    # ── B 系列基金深度分析（4 项） ──
+    # ── 基金深度分析模块（4 项） ──
     "b_series_fund_manager": True,
     "b_series_fund_overlap": True,
     "b_series_fund_concentration": True,

@@ -106,7 +106,7 @@ def show_config() -> None:
     print(f"  持仓目录: {config.get('holdings_dir', '未设置')}")
     print(f"  持仓文件: {config.get('holdings_filename', '未设置')}")
     print(f"  输出目录: {config.get('output_dir', 'reports')}")
-    print(f"  新闻 TOP: {config.get('news_top_count', '100')} 条")
+    print(f"  新闻抓取上限: {config.get('news_top_count', '100')} 条")
     if os.path.exists(holdings_path):
         print("  状态: [OK] 文件就绪")
     else:
@@ -127,9 +127,9 @@ def _show_privacy_and_security_status() -> None:
 
     # 检查隐私提示是否已显示过
     _privacy_shown = _cfg.get("_privacy_notice_shown", False)
-    _privacy_icon = f"{GREEN}✓{RESET}" if _privacy_shown else f"{YELLOW}首次运行将显示{RESET}"
+    _privacy_icon = f"{GREEN}✓{RESET}" if _privacy_shown else f"{YELLOW}待首次报告生成时显示{RESET}"
 
-    print(f"  匿名化模式: {_anon_display}")
+    print(f"  持仓匿名化: {_anon_display}")
     print(f"  隐私声明: {_privacy_icon}")
     print()
 

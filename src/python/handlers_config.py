@@ -313,6 +313,7 @@ def _cmd_config_comparison_indices() -> None:
         indices = config.get("comparison_indices", _DEFAULT_CONFIG.get("comparison_indices", {}))
         print()
         print("  ┌── 管理对比指数池 ──────────────────────┐")
+        print("  │ 自定义基准指数，用于报告中组合 vs 多指数对比  │")
         print(f"  │ 当前指数 ({len(indices)} 个):{' ' * 21}│")
         if indices:
             for i, (code, name) in enumerate(indices.items(), 1):
@@ -438,7 +439,7 @@ def _cmd_config_report_boards() -> None:
         print(f"  │ 2. 市场新闻（#10）              [{n_status}]{' ' * 8}│")
         print(f"  │ 3. 组合历史走势+回撤（#16~17）  [{h_status}]{' ' * 8}│")
         print("  │                                   │")
-        print("  │ 4. LLM 分析章节（#12~15,#18） — 请在菜单 S 配置 │")
+        print("  │ 4. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
         print()
@@ -498,7 +499,7 @@ def _cmd_refresh_config() -> None:
 
 
 def _cmd_config_anonymization_mode() -> None:
-    """配置匿名化模式（关闭/代码显示/完全匿名/汇总）。"""
+    """配置持仓匿名化（关闭/代码显示/完全匿名/汇总）。"""
     from src.python.anonymizer import (
         ANONYMIZATION_MODE_DESCRIPTIONS,
         get_anonymization_mode,
@@ -511,7 +512,7 @@ def _cmd_config_anonymization_mode() -> None:
     while True:
         current = get_anonymization_mode()
         print()
-        print("  ┌── 配置匿名化模式 ──────────────────────────┐")
+        print(f"  ┌── 配置持仓匿名化 {'─' * 36}┐")
         print(f"  │ 当前模式: {current}{' ' * (32 - len(current))}│")
         print(f"  │{'─' * 48}│")
         for idx, mode_key in enumerate(_ORDERED_KEYS, 1):
@@ -539,7 +540,7 @@ def _cmd_config_anonymization_mode() -> None:
                     print(f"  {YELLOW}[!]{RESET} 已是当前模式")
                 else:
                     set_anonymization_mode(new_mode)
-                    print(f"  {GREEN}[OK]{RESET} 匿名化模式已切换为: {new_mode}")
+                    print(f"  {GREEN}[OK]{RESET} 持仓匿名化已切换为: {new_mode}")
             else:
                 print(f"  {YELLOW}[!]{RESET} 无效编号")
         except (ValueError, TypeError):

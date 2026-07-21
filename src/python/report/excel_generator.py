@@ -185,10 +185,10 @@ def generate_excel_report(
     us_indices: dict[str, dict[str, Any]] | None = None,
     news_data: list | None = None,
     news_llm_meta: dict | None = None,
-    enable_b_series: bool = False,  # board 层：B 系列是否开启
-    enable_news: bool = True,  # board 层：新闻板块是否开启（配置值）
-    enable_llm: bool = True,  # board 层：LLM 板块是否开启
-    enable_history: bool = True,  # board 层：历史走势板块是否开启
+    enable_b_series: bool = False,  # board 层：基金深度分析是否开启
+    enable_news: bool = True,  # board 层：市场新闻是否开启（配置值）
+    enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
+    enable_history: bool = True,  # board 层：历史走势章节是否开启
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
@@ -209,10 +209,10 @@ def generate_excel_report(
         us_indices: 美股指数数据
         news_data: 预获取的新闻数据
         news_llm_meta: 新闻 LLM 元数据
-        enable_b_series: board 层 — B 系列基金深度分析是否开启
-        enable_news: board 层 — 新闻板块是否开启（配置值）
-        enable_llm: board 层 — LLM 板块是否开启
-        enable_history: board 层 — 历史走势板块是否开启
+        enable_b_series: board 层 — 基金深度分析是否开启
+        enable_news: board 层 — 市场新闻是否开启（配置值）
+        enable_llm: board 层 — LLM 分析章节是否开启
+        enable_history: board 层 — 历史走势章节是否开启
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
         pipeline_data: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要

@@ -191,7 +191,7 @@ def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
 
 
 def _validate_enable_boards(config: dict, issues: int) -> int:
-    """验证板块可见性配置（enable_b_series / enable_news / enable_history）。"""
+    """验证章节可见性配置（enable_b_series / enable_news / enable_history）。"""
     for key in ("enable_b_series", "enable_news", "enable_history"):
         val = config.get(key)
         if val is None:

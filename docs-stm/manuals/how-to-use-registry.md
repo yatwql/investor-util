@@ -147,7 +147,7 @@ from src.python.registry import (
 **用途：**
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
-- `get_report_section_number("fund_manager")` → 当前配置下该模块的序号（被 B 系列各页签写入器调用）
+- `get_report_section_number("fund_manager")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
 - `get_report_section_keys()` → 全部 17 个模块键名（见下表）
 
 全部键名及对应中文标题：
@@ -159,10 +159,10 @@ from src.python.registry import (
 | `category` | 持仓分类表 | 始终显示 |
 | `penetration` | 资产穿透TOP10 | 始终显示 |
 | `fund_performance` | 基金业绩分析 | 始终显示 |
-| `fund_manager` | 基金经理变更监控 | B 系列 |
-| `fund_overlap` | 持仓重合度矩阵 | B 系列 |
-| `fund_concentration` | 持仓集中度监控 | B 系列 |
-| `fund_style` | 基金风格分析 | B 系列 |
+| `fund_manager` | 基金经理变更监控 | 基金深度分析 |
+| `fund_overlap` | 持仓重合度矩阵 | 基金深度分析 |
+| `fund_concentration` | 持仓集中度监控 | 基金深度分析 |
+| `fund_style` | 基金风格分析 | 基金深度分析 |
 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻 |
 | `global_macro` | 全球政经局势 | LLM |
 | `expert_review` | 智囊团深度复盘 | LLM |

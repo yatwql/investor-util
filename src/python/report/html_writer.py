@@ -85,15 +85,15 @@ def _compute_section_visibility(
     include_news: bool,
     llm_enabled_flag: bool,
     # ↓↓↓ board 层新增参数 ↓↓↓
-    enable_news: bool = True,  # board 层：新闻板块是否开启（配置驱动，不是 include_news！）
-    enable_b_series: bool = True,  # board 层：B 系列板块是否开启
-    enable_history: bool = True,  # board 层：历史走势板块是否开启
-    enable_llm: bool = True,  # board 层：LLM 板块是否开启
+    enable_news: bool = True,  # board 层：市场新闻是否开启（配置驱动，不是 include_news！）
+    enable_b_series: bool = True,  # board 层：基金深度分析是否开启
+    enable_history: bool = True,  # board 层：历史走势章节是否开启
+    enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
 
     两层可见性模型：
-      board 层：用户配置的板块开关（enable_xxx）
+      board 层：用户配置的章节开关（enable_xxx）
       data 层：各子模块返回的数据可用状态
 
     返回的闭包遵守 C14 约束（不写入 _ENV.globals）。
@@ -248,16 +248,16 @@ def write_html_report(
     penetration, penetration_profit_ok, penetration_dividend_ok = _render_penetration_section(holdings, details, prog)
     perf_data, _ = _render_fund_performance_section(holdings, details, prog)
 
-    # ── 13) 基金经理变更监控（B 系列） ──
+    # ── 13) 基金经理变更监控 ──
     manager_analysis = _render_manager_analysis(holdings, enable_b_series, prog)
 
-    # ── 14) 持仓重合度矩阵（B 系列） ──
+    # ── 14) 持仓重合度矩阵 ──
     overlap_matrix = _render_overlap_matrix(holdings, details, enable_b_series, prog)
 
-    # ── 15) 持仓集中度监控（B 系列） ──
+    # ── 15) 持仓集中度监控 ──
     concentration_analysis = _render_concentration(holdings, enable_b_series, prog)
 
-    # ── 16) 基金风格分析（B 系列） ──
+    # ── 16) 基金风格分析 ──
     style_analysis = _render_style_analysis(holdings, enable_b_series, prog)
 
     # ── 8) 财经新闻 ──

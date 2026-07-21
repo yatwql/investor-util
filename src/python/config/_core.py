@@ -178,12 +178,12 @@ def init_config(config_path: str | None = None) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 板块可见性读取函数
+# 章节可见性读取函数
 # ═══════════════════════════════════════════════════════════════
 
 
 def is_enable_b_series(config: dict | None = None) -> bool:
-    """B 系列基金深度分析（#6~9）是否启用。缺失时返回 True。"""
+    """基金深度分析章节（#6~9）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_b_series")
@@ -194,7 +194,7 @@ def is_enable_b_series(config: dict | None = None) -> bool:
 
 
 def is_enable_news(config: dict | None = None) -> bool:
-    """新闻（#10）是否启用。缺失时返回 True。"""
+    """市场新闻（#10）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_news")
@@ -215,7 +215,7 @@ def is_enable_history(config: dict | None = None) -> bool:
     return bool(val)
 
 
-# ── LLM 板块可见性（来自 llm_settings.json enabled_llm） ──────
+# ── LLM 分析章节可见性（来自 llm_settings.json enabled_llm） ────
 
 _REPORT_LLM_MODULES = frozenset(
     {
@@ -228,13 +228,13 @@ _REPORT_LLM_MODULES = frozenset(
 
 
 def is_enable_llm(config: dict | None = None) -> bool:
-    """LLM 报告板块是否启用。
+    """LLM 分析章节是否启用。
 
     检查 llm_settings.json 中 4 个 LLM 报告模块（global_macro /
     expert_review / health_check / penetration_deep）是否有任一启用。
     缺失时返回 True（向后兼容）。
 
-    注意：news_correlation 仅用于新闻关联分析，不影响 LLM 板块整体可见性。
+    注意：news_correlation 仅用于新闻关联分析，不影响 LLM 分析章节整体可见性。
     """
     llm_config = get_llm_config()
     enabled_map = (llm_config or {}).get("enabled_llm", {})

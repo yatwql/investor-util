@@ -900,7 +900,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 13: 基金经理变更监控 (B 系列)                     -->
+    <!--  MODULE 13: 基金经理变更监控                             -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_manager") %}
     <div class="section" id="sec-fund_manager" style="order: {{ section_numbers['fund_manager'] }};">
@@ -953,7 +953,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 14: 持仓重合度矩阵 (B 系列)                      -->
+    <!--  MODULE 14: 持仓重合度矩阵                              -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_overlap") %}
     {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
@@ -1060,7 +1060,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 15: 持仓集中度监控 (B 系列)                       -->
+    <!--  MODULE 15: 持仓集中度监控                               -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_concentration") %}
     {% set conc_results = concentration_analysis["results"] %}
@@ -1124,7 +1124,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 16: 基金风格分析 (B 系列)                         -->
+    <!--  MODULE 16: 基金风格分析                                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_style") %}
     {% set style_results = style_analysis["results"] %}

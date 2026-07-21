@@ -12,7 +12,7 @@
   "llm_settings_file": "data/config/llm_settings.json",
   "llm_providers_file": "data/config/llm_providers.json",
 
-  // ── B. 板块可见性（关闭后对应页签/章节完全隐藏） ──
+  // ── B. 章节可见性（关闭后对应页签/章节完全隐藏） ──
   "enable_b_series": true,
   "enable_news": true,
   "enable_history": true,
@@ -123,9 +123,9 @@
 | `rebalance.equity_fixed_income` | `{}` | 权益/固收超大类目标配置（空=不启用）。格式 `{"equity":{"min":30,"max":70}}` | 手动编辑 |
 | `redemption_limits` | `{}` | 场外基金单日赎回上限，格式 `{基金代码: 金额}`。配置后程序可计算场外品种全量赎回所需天数。未配置品种标记"需手动确认赎回上限" | 手动编辑 |
 | `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）/ `code_display`（名称→"品种X"，保留代码和盈亏）/ `full_anonymous`（名称→"品种X"，代码→"000XXX"，盈亏→±XX%）/ `summary`（仅大类汇总） | 菜单 `A` |
-| `enable_b_series` | `true` | B 系列报告板块可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
-| `enable_news` | `true` | 新闻类报告板块可见性（模块 #10），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制板块在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
-| `enable_history` | `true` | 历史走势报告板块可见性（模块 #15~#16），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
+| `enable_b_series` | `true` | 基金深度分析章节可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
+| `enable_news` | `true` | 市场新闻章节可见性（模块 #10），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
+| `enable_history` | `true` | 历史走势章节可见性（模块 #15~#16），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
 
 ---
 
@@ -438,20 +438,20 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 > **数据获取链路**：基准指数通过 `fetch_index_history()` → `history_index` chain → 腾讯 K 线 / 新浪 K 线（与组合持仓的个股 K 线共享熔断器）。数据写入缓存键 `history_index_{code}.json`。
 
 ---
-### H. 报告板块可见性
+### H. 报告章节可见性
 
-`enable_b_series`、`enable_news`、`enable_history` 三个配置项控制报告按板块显示或隐藏对应的章节组。LLM 板块的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个板块后，该板块涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
+`enable_b_series`、`enable_news`、`enable_history` 三个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
 
-通过 TUI 主菜单 `[P]` 配置报告板块可见性进入交互式子菜单，可逐个切换各板块的可见性。
+通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换各章节组的可见性。
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
-| `enable_b_series` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析 | B 系列功能板块 |
-| `enable_news` | `true` | `config.json` | #10 财经新闻热点与持仓关联分析 | 新闻类功能板块 |
-| `enable_history` | `true` | `config.json` | #15 组合历史走势、#16 历史回撤分析 | 历史走势板块（F1 持仓快照不受影响，始终自动执行） |
-| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #11 全球政经局势、#12 智囊团深度复盘、#13 持仓体检报告、#14 穿透深度分析、LLM API 用量 | LLM 板块。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
+| `enable_b_series` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析 | 基金深度分析章节组 |
+| `enable_news` | `true` | `config.json` | #10 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
+| `enable_history` | `true` | `config.json` | #15 组合历史走势、#16 历史回撤分析 | 历史走势章节组（F1 持仓快照不受影响，始终自动执行） |
+| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #11 全球政经局势、#12 智囊团深度复盘、#13 持仓体检报告、#14 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
-> **enable_news 与 news_sources 的区别：** `enable_news` 控制报告板块的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时板块仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时板块完全隐藏。
+> **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
 
 ---
 ### I. 功能开关（features.json）

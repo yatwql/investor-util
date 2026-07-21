@@ -1,4 +1,4 @@
-"""B 系列基金深度分析页签写入模块。
+"""基金深度分析页签写入模块。
 
 职责：基金经理变更监控、持仓重合度矩阵、持仓集中度监控、基金风格漂移分析。
 
@@ -23,7 +23,7 @@ def _process_b_module(
     process_fn: Callable,
     prog: ProgressReporter,
 ) -> tuple[list[str], dict[str, dict]]:
-    """B 系列模块通用数据准备模板。
+    """基金深度分析模块通用数据准备模板。
 
     每个调用方自行封装 try/except，此函数不捕获异常。
     返回 (fund_codes, fund_holdings_map)，其中 fund_holdings_map
@@ -50,7 +50,7 @@ def write_b_series_sheets(
     modules: dict[str, Any],
     prog: ProgressReporter,
 ) -> None:
-    """写入基金深度分析页签（B 系列）。"""
+    """写入基金深度分析页签。"""
     if not enable_b_series:
         return
 
