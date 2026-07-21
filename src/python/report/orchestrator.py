@@ -565,8 +565,9 @@ def _fetch_llm_and_news(
         comparison_indices: {代码: 名称} 对比指数池，传递给 generate_all_llm。
 
     Returns:
-        (llm_content, news_data, news_llm_meta, news_ok)
+        (llm_content, news_data, news_llm_meta, news_ok, debate_info)
         llm_content: (global_macro_html, expert_review_html, health_check_html, penetration_deep_html)
+        debate_info: dict | None — 辩论模式启用时包含 pro_text/con_text/mode_label
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -577,6 +578,7 @@ def _fetch_llm_and_news(
     news_data: list = []
     news_llm_meta: dict = {}
     news_ok: bool = False
+    debate_info: dict | None = None
 
     # 分支 ④：均关闭
     if not enable_llm and not enable_news:
@@ -626,10 +628,11 @@ def _fetch_llm_and_news(
             for fut in as_completed([_news_fut, _llm_fut]):
                 if fut is _llm_fut:
                     try:
-                        _result_8 = _llm_fut.result()
-                        llm_content = _result_8[:4]
-                        _cached = _result_8[4:]
+                        _result = _llm_fut.result()
+                        llm_content = _result[:4]
+                        _cached = _result[4:8]
                         _report_llm_module_results(llm_content, _cached, reporter)
+                        debate_info = _result[8] if len(_result) > 8 else None
                     except Exception:
                         reporter.add_error("LLM 内容生成异常（详情请查看日志文件 logs/app.log）")
                         reporter.error("LLM 内容生成异常（详情请查看日志）")
@@ -652,17 +655,18 @@ def _fetch_llm_and_news(
         elif _llm_fut is not None:
             # 分支 ③：仅 LLM
             try:
-                _result_8 = _llm_fut.result()
-                llm_content = _result_8[:4]
-                _cached = _result_8[4:]
+                _result = _llm_fut.result()
+                llm_content = _result[:4]
+                _cached = _result[4:8]
                 _report_llm_module_results(llm_content, _cached, reporter)
+                debate_info = _result[8] if len(_result) > 8 else None
             except Exception:
                 reporter.add_error("LLM 内容生成异常（详情请查看日志）")
                 reporter.error("LLM 内容生成异常（详情请查看日志）")
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
-    return llm_content, news_data, news_llm_meta, news_ok
+    return llm_content, news_data, news_llm_meta, news_ok, debate_info
 
 
 # ── S6 引入：_generate_report_full（HTML+Excel+LLM）──
@@ -774,7 +778,7 @@ def _generate_report_full(
     # ── 5. 并行获取 LLM + 新闻（4 分支统一处理） ──
     # 读取对比指数池配置（默认预设池在 _config_defaults.py 中定义）
     _comparison_indices = config.get("comparison_indices", None)
-    llm_content, news_data, news_llm_meta, news_ok = _fetch_llm_and_news(
+    llm_content, news_data, news_llm_meta, news_ok, debate_info = _fetch_llm_and_news(
         holdings,
         prep,
         sector_flow,
@@ -818,6 +822,7 @@ def _generate_report_full(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=_enable_llm,
+            debate_info=debate_info,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -849,6 +854,7 @@ def _generate_report_full(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=_enable_llm,
+            debate_info=debate_info,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True

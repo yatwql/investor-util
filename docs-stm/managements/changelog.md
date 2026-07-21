@@ -18,6 +18,18 @@
 - **plan.md**: 恢复概述节与归档索引（v0.1.x ~ v0.7.x）
 - **review-findings.md**: 恢复历史审查记录链接 + 历史归档节
 
+### Plan
+- **task91-enhanced-llm-strategy.md D16 终轮一致性扫描修复**：
+  - 修复目录编号偏移（§6/§7/§8 锚点与实际标题对齐）
+  - I-09 cost_tracker.py 误引用→改为 `generate_debate_procon()` 内建 output token 守卫（D9 发现落地）
+  - I-06 闭包变量捕获→改为 list-container 模式（D14 发现落地）
+  - R6 第三层防线"综合阶段交叉校验"不存在→降为 2 层防线描述，添加注释（D16 发现）
+  - R2 交叉引用错误（I-12→I-03）修复
+  - I-03 session_cache 添加 threading.Lock 线程安全要求
+  - §4.4 新增/修改文件清单补全遗漏文件（html_writer.py、orchestrator.py、llm_content.py 等）
+  - 依赖图 I-12 连接分支修正（从 I-04/I-05 块移至独立节点）
+  - I-06 文件变更补全 orchestrator.py
+
 ---
 
 > v0.7.x 版本变更记录已归档：

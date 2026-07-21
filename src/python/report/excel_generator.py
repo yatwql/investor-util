@@ -193,6 +193,7 @@ def generate_excel_report(
     section_order: list[dict] | None = None,
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
     history_data: dict | None = None,  # 组合历史走势数据（含基准指数）
+    debate_info: dict | None = None,
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 

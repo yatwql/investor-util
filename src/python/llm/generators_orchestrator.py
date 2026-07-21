@@ -32,6 +32,7 @@ from src.python.llm.fingerprint import (
 )
 from src.python.llm.fact_checker import run_fact_check
 from src.python.llm.generators import (
+    generate_debate_procon,
     generate_expert_review,
     generate_global_macro,
     generate_health_check,
@@ -259,8 +260,14 @@ def _dispatch_llm_workers(
     degradation_events: list[dict] | None = None,
     comparison_indices: dict[str, str] | None = None,
     history_data: dict | None = None,
+    _debate_info_container: list | None = None,
 ) -> dict[str, dict]:
-    """对缓存未命中的模块提交线程池任务，返回结果字典。"""
+    """对缓存未命中的模块提交线程池任务，返回结果字典。
+
+    Args:
+        _debate_info_container: 辩论模式信息捕获容器（list[dict|None]），
+            启用辩论模式时闭包写入 debate_info dict，调用方事后读取。
+    """
     if not any(needs.values()):
         return {}
 
@@ -357,6 +364,52 @@ def _dispatch_llm_workers(
             llm_config=lc,
         ),
     }
+
+    # ── Mode 1 辩论模式路由：替换 expert_review 条目 ──────────
+    from src.python.features import is_feature_enabled
+
+    if is_feature_enabled("llm_debate_procon") and needs.get("expert_review"):
+        _original_expert = _MODULE_FNS["expert_review"]
+
+        def _debate_wrapper(c, lc) -> tuple[str | None, bool]:
+            """辩论包装闭包：pro→con→synthesis，两级 fallback。"""
+            try:
+                _result = generate_debate_procon(
+                    total_mv, total_cost, total_profit, total_today_profit,
+                    holdings_count, categories, penetrated_assets,
+                    holdings_details=holdings_details,
+                    force=force, http_client=c, llm_config=lc,
+                    pipeline_data=pipeline_data,
+                    competitive_context=_competitive_context,
+                    metrics=_metrics,
+                )
+                pro, con, synthesis = _result
+                if pro and con:
+                    # 记录 debate_info
+                    if _debate_info_container is not None:
+                        _debate_info_container[0] = {
+                            "pro_text": pro,
+                            "con_text": con,
+                            "mode_label": "🧪 辩论模式",
+                        }
+                    if synthesis:
+                        return (synthesis, True)
+                    # synthesis 失败 → 返回 pro+con 拼接
+                    logger.warning("[debate] 综合失败，返回 pro+con 拼接")
+                    return (f"【白脸观点】\n{pro}\n\n【黑脸观点】\n{con}", True)
+                # pro 或 con 失败 → 回退普通 expert_review
+                logger.warning("[debate] pro/con 失败，回退普通 expert_review")
+                if _debate_info_container is not None:
+                    _debate_info_container[0] = None
+                return _original_expert(c, lc)
+            except Exception:
+                logger.warning("[debate] 异常，回退普通 expert_review", exc_info=True)
+                if _debate_info_container is not None:
+                    _debate_info_container[0] = None
+                return _original_expert(c, lc)
+
+        _MODULE_FNS["expert_review"] = _debate_wrapper
+        logger.info("[debate] Mode 1 辩论模式已启用，expert_review 路由已替换")
 
     # news_correlation 可选集成：仅在提供了新闻和持仓数据时注册
     if news_data is not None and holdings_data is not None:
@@ -557,7 +610,13 @@ def generate_all_llm(
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
 
+    from src.python.features import is_feature_enabled
+
     needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k)) for k, v in precheck_results.items()}
+
+    # ── 辩论模式容器（用于闭包捕获 debate_info） ────────
+    _debate_info_container: list[dict | None] = [None]
+    _has_debate = is_feature_enabled("llm_debate_procon")
 
     worker_results = _dispatch_llm_workers(
         needs,
@@ -579,6 +638,7 @@ def generate_all_llm(
         degradation_events=degradation_events,
         comparison_indices=comparison_indices,
         history_data=history_data,
+        _debate_info_container=_debate_info_container,
     )
 
     # 合并预检结果 + 工作线程结果
@@ -640,4 +700,7 @@ def generate_all_llm(
         _MN("penetration_deep"),
         "OK" if pd_r else "跳过",
     )
+    _raw_debate_info = _debate_info_container[0] if _has_debate else None
+    if _has_debate:
+        return (gm_r, er_r, hc_r, pd_r, gm_c, er_c, hc_c, pd_c, _raw_debate_info)
     return (gm_r, er_r, hc_r, pd_r, gm_c, er_c, hc_c, pd_c)

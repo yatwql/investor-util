@@ -16,6 +16,9 @@ from src.python.llm.prompts_core import (
     FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_TIMEOUT,
     LLM_MODULE_FAILURE,
+    _SYSTEM_DEBATE_CON,
+    _SYSTEM_DEBATE_PRO,
+    _SYSTEM_DEBATE_SYNTHESIS,
     _SYSTEM_EXPERT_REVIEW,
     _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_HEALTH_CHECK,
@@ -42,10 +45,12 @@ from src.python.llm.prompts_tables import (
 
 # ── 从 prompts_action 导出 ────────────────────────────────
 from src.python.llm.prompts_action import (
+    _build_debate_synthesis_prompt,
     _build_expert_review_prompt,
     _build_global_macro_prompt,
     _build_health_check_prompt,
     _build_penetration_deep_prompt,
+    _build_qa_concentration_block,
 )
 
 __all__ = [
@@ -64,6 +69,9 @@ __all__ = [
     "_SYSTEM_HEALTH_CHECK",
     "_SYSTEM_PENETRATION_DEEP",
     "_SYSTEM_NEWS_CORRELATION",
+    "_SYSTEM_DEBATE_PRO",
+    "_SYSTEM_DEBATE_CON",
+    "_SYSTEM_DEBATE_SYNTHESIS",
     # 格式化函数
     "_fmt_wan",
     "_fmt_holding_line",
@@ -82,6 +90,7 @@ __all__ = [
     "_build_expert_review_prompt",
     "_build_health_check_prompt",
     "_build_penetration_deep_prompt",
+    "_build_debate_synthesis_prompt",
     # 新闻关联分析
     "_build_holdings_summary",
     "_build_news_correlation_summary",

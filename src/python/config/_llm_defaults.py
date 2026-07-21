@@ -103,6 +103,29 @@ def _get_default_llm_settings_template() -> str:
         '  "news_correlation_top_n": 30,\n'
         "\n"
         "  // ═══════════════════════════════════════════\n"
+        "  // 辩论模式（P4 实验功能，缺省关闭）\n"
+        "  // ═══════════════════════════════════════════\n"
+        '  "debate": {\n'
+        '    "mode_1_procon": {\n'
+        '      "per_call_max_tokens": null,\n'
+        '      "synthesis_model": null,\n'
+        '      "synthesis_temperature": 0.5\n'
+        "    },\n"
+        '    "mode_2_conditional": {\n'
+        '      "scenarios": [\n'
+        '        {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},\n'
+        '        {"name": "下跌", "change": -0.20, "desc": "如果未来市场下跌 20%"},\n'
+        '        {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"}\n'
+        "      ]\n"
+        "    },\n"
+        '    "mode_3_qa_concentration": {\n'
+        '      "threshold": 0.20\n'
+        "    },\n"
+        '    "max_total_tokens_per_report": 16000,\n'
+        '    "per_call_timeout_override": 90\n'
+        "  },\n"
+        "\n"
+        "  // ═══════════════════════════════════════════\n"
         "  // 计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）\n"
         "  // ═══════════════════════════════════════════\n"
         '  "pricing": {\n'

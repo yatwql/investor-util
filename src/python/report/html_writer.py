@@ -203,6 +203,7 @@ def write_html_report(
     enable_b_series: bool = True,
     enable_news: bool = True,
     enable_history: bool = True,
+    debate_info: dict | None = None,
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 

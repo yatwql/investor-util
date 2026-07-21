@@ -378,24 +378,38 @@ def _run_standard_mode(
     max_tokens_default: int,
     timeout_default: float,
     output_brief_limit: int,
+    system_prompt: str | None = None,
+    user_prompt: str | None = None,
 ) -> tuple[str | None, bool]:
-    """标准 LLM 单篇生成模式：缓存 → 调用 → 处理结果。"""
+    """标准 LLM 单篇生成模式：缓存 → 调用 → 处理结果。
+
+    Args:
+        system_prompt: 不为 None 时覆盖 system prompt（不走 llm_config 配置）。
+        user_prompt: 不为 None 时跳过 prompt_builder，直接使用此值。
+    """
     cache_enabled = llm_config.get(f"cache_enabled_{module_key}", True)
+
+    if system_prompt is not None:
+        _system = system_prompt
+    else:
+        _system = llm_config.get(f"system_prompt_{module_key}") or system_prompt_default
+        if llm_config.get(f"output_brief_{module_key}", False):
+            _system += f"\n（精简模式，输出 {output_brief_limit} 字以内。）"
+
+    if user_prompt is not None:
+        _user = user_prompt
+    else:
+        _user = prompt_builder() if prompt_builder else ""
+
     fingerprint = fingerprint_fn() if fingerprint_fn else ""
     cache_key = CACHE_PREFIX_LLM + f"{module_key}_{fingerprint}"
-
-    system_prompt = llm_config.get(f"system_prompt_{module_key}") or system_prompt_default
-    if llm_config.get(f"output_brief_{module_key}", False):
-        system_prompt += f"\n（精简模式，输出 {output_brief_limit} 字以内。）"
-
-    user_prompt = prompt_builder() if prompt_builder else ""
 
     return generate_llm_content(
         llm_config,
         cache_key,
         get_cache_ttl_llm(module_key),
-        system_prompt,
-        user_prompt,
+        _system,
+        _user,
         cache_enabled,
         force,
         max_tokens=llm_config.get(f"max_tokens_{module_key}", max_tokens_default),
@@ -421,6 +435,9 @@ def generate_llm_module(
     max_tokens_default: int = 4096,
     timeout_default: float = 120.0,
     output_brief_limit: int = 300,
+    # ── 辩论模式覆盖参数（None 时使用默认行为） ──
+    system_prompt: str | None = None,
+    user_prompt: str | None = None,
     # ── 批量模式 hooks（用于 news_correlation 类模块） ──
     batch_preparer: Any = None,  # fn() → (items, context) or None（None=标准模式）
     per_item_cache_fn: Any = None,  # fn(index, item, context_fp) → cache_key or None
@@ -478,6 +495,8 @@ def generate_llm_module(
         max_tokens_default,
         timeout_default,
         output_brief_limit,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
     )
 
 
