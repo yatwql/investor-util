@@ -205,13 +205,13 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **注册** | 中央注册表 | 数据模块 + 报告模块注册 | `registry.py` |
 | **数据获取** | 数据源注册中心 | 熔断器、会话缓存、策略、审计 | `provider_registry.py` |
 | **数据获取** | Fetcher 调度 | Provider Chain 路由、数据获取 | `fetcher/price.py` 等 |
-| **数据获取** | 数据源 Provider | 外部 API 封装（16 个文件） | `providers/*.py` |
+| **数据获取** | 数据源 Provider | 外部 API 封装 | `providers/*.py` |
 | **缓存** | 缓存引擎 | 泛用 JSON KV、TTL、指纹、分组 | `cache/` |
 | **缓存** | 缓存操作共享层 | TUI/CLI 共用的业务级缓存操作 | `cache/operations.py` |
 | **编排** | 报告编排器 | 数据准备 → 管线编排 | `report/orchestrator.py` |
 | **报告** | Excel 管线 | openpyxl 写入 | `report/excel_generator.py` |
 | **报告** | HTML 管线 | Jinja2 模板渲染 | `report/html_writer.py` |
-| **报告** | 内容模块 | 各页签写入器（43 文件） | `report/*.py` |
+| **报告** | 内容模块 | 各页签写入器 | `report/*.py` |
 | **LLM** | 智能分析 | Claude/OpenAI/Gemini 调用、Provider Chain 策略路由、Multi-Provider 多链切换、fingerprint 指纹缓存、Extended Thinking、骨架流程、并行编排、费用估算 | `llm/` |
 | **贯穿** | 代码类型判定 | 资产识别原语 | `code_utils.py` |
 | **贯穿** | 交易时段判断 | A 股时段、午间休市 | `market_hours.py` |
@@ -1047,7 +1047,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 ### 4.2 报告编排器
 
-`report/orchestrator.py`（~867 行）是 TUI 和 CLI 共用的报告编排共享层，负责：
+`report/orchestrator.py` 是 TUI 和 CLI 共用的报告编排共享层，负责：
 
 1. **数据准备**：行情获取、指数获取、资产穿透 TOP10
 2. **快照创建与差异计算**：F1 持仓快照 + 环比差异
@@ -1058,7 +1058,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 #### pipeline_data 数据上下文
 
-`report/pipeline_data_builder.py` 集中组装传递给 LLM 的数据上下文 `pipeline_data`。包含 `_build_basic_context()`、`_build_risk_context()`、`_build_llm_context()` 等分段构造器，职责清晰可测。
+`report/pipeline_data_builder.py` 集中组装传递给 LLM 的数据上下文 `pipeline_data`。包含 `build()`（A 通道：快照环比差异组装）和 `build_prep()`（B 通道：行情/持仓/指标数据组装）两个构造器，入口统一做类型断言（C19 约束）。
 
 `pipeline_data` 遵循 C19 Schema 契约：所有键必须在 `docs-stm/archive/v0.7.x/better-investment-advice/data-channels-schema.md` 中预定义类型、版本号和写入/消费模块后，才能在代码中使用该键。
 
@@ -1130,7 +1130,7 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 
 ### 4.3 Excel 管线
 
-**编排器职责**（`excel_generator.py`，~98 行）：
+**编排器职责**（`excel_generator.py`）：
 1. 调用 `create_sheets()` 创建 workbook 和页签
 2. 迭代 `excel_module_loader.py` 动态加载的内容模块
 3. 每个模块接收 `(ws, info, writer)` → 独立写入页签内容和样式
@@ -1987,7 +1987,7 @@ class DataModuleDef:
     cache_groups: tuple      # 分组
 ```
 
-当前注册 **29 个数据模块**：
+当前注册 **30 个数据模块**：
 
 | 分类 | 数量 | 模块 |
 |:-----|:----:|:-----|
@@ -1997,9 +1997,10 @@ class DataModuleDef:
 | 新闻（refresh） | 1 | news |
 | LLM 分析（preload/refresh） | 5 | global_macro、expert_review、news_correlation、health_check、penetration_deep |
 | 辩论缓存（preload，实验） | 3 | llm_debate_pro、llm_debate_con、llm_debate_synthesis |
-| 补充数据（refresh） | 4 | profit_forecast、sector_flow、extended、dividend |
-| B 系列基金分析（refresh/无分组） | 4 | fund_manager、fund_overlap、fund_concentration、fund_style_snapshot |
-| 精确键名（refresh/无分组） | 4 | benchmark、tracking、calendar、**bond_yield** |
+| 补充数据（refresh） | 3 | profit_forecast、sector_flow、dividend |
+| B 系列基金分析（refresh/无分组） | 5 | fund_manager、fund_overlap、fund_concentration、fund_style_snapshot、**extended** |
+| 无风险利率（refresh） | 1 | **bond_yield** |
+| 精确键名（refresh/无分组） | 3 | benchmark、tracking、calendar |
 | 历史走势（无分组） | 3 | history_stock、history_fund_otc、history_index |
 
 #### 计算模块注册表（`_COMPUTATION_REGISTRY`）
@@ -2313,16 +2314,16 @@ investor-util/
 │   │   ├── handlers_config.py   # TUI 配置管理命令
 │   │   ├── handlers_report.py   # TUI 报告生成命令（薄壳委托 orchestrator）
 │   │   ├── http_client.py       # HTTP 客户端工厂
-│   │   ├── llm/                 # LLM 集成（16 子模块，含 fact_checker/fallback，prompts.py 拆分为 core/tables/action）
+│   │   ├── llm/                 # LLM 集成（编排/骨架/API 路由/提示词/指纹/熔断器等）
 │   │   ├── logger.py            # 日志模块（_ColoredFormatter）
 │   │   ├── main.py              # TUI 入口 + 菜单循环
 │   │   ├── market_hours.py      # A 股交易时段判断
 │   │   ├── models.py            # 数据模型
 │   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
-│   │   ├── providers/           # 数据源提供商（16 个文件）
+│   │   ├── providers/           # 数据源提供商（各 API 封装）
 │   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（29 个数据模块 + 17 个报告模块 + 7 个计算模块）
-│   │   ├── report/              # 报告生成（43 个文件，含 orchestrator/progress/pipeline_data_builder）
+│   │   ├── registry.py          # 中央注册表（30 个数据模块 + 17 个报告模块 + 7 个计算模块）
+│   │   ├── report/              # 报告生成（编排器/进度/管线/数据构建器/页签写入器）
 │   │   ├── schemas/             # Pydantic 数据模式（快照等）
 │   │   ├── tui.py               # 键盘输入封装
 │   │   ├── tui_handlers.py      # 菜单通用辅助
@@ -2416,7 +2417,7 @@ investor-util/
 |:-----|:----------|:---:|:--------:|:----|:-----|
 | `tracking` | `holdings_tracking.json` | 30 天 | — | — | 无分组 |
 | `calendar` | `trading_calendar.json` | 14 天 | — | — | 无分组 |
-| `bond_yield` | `bond_yield_rf`（精确键名） | 1 天 | — | — | 精确键名 |
+| `bond_yield` | `bond_yield_rf`（精确键名） | 1 天 | — | — | refresh |
 
 > `—` 表示精确键名（无指纹后缀），TTL 到期后刷新。
 

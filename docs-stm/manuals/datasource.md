@@ -4,26 +4,38 @@
 
 | 用途 | 主链路 | 备用链路 | 缓存前缀 | 分组 |
 |:-----|:-------|:---------|:---------|:-----|
-| 场内 A 股/ETF 实时价 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `price_` | 价格 |
-| 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 天天基金 `fundf10.eastmoney.com` | `fund_nav_` | 价格 |
-| 基金业绩排名 | 天天基金 `pingzhongdata/{code}.js`（JS 变量解析） | — | `fund_perf_` | 基础 |
-| 基金持仓数据 | 天天基金 `fundf10.eastmoney.com` | — | `fund_holding_` | 基础 |
-| 财经新闻（新浪） | 新浪财经 `feed.mix.sina.com.cn` | — | `news_sina_` | 新闻 |
-| 财经新闻（东方财富） | 东方财富 `np-weblist.eastmoney.com/comm/web/getFastNewsList` | — | `news_eastmoney_` | 新闻 |
-| 财经新闻（财联社） | 财联社 `www.cls.cn/v1/roll/get_roll_list` | —（需签名鉴权，默认关闭） | `news_cls_` | 新闻 |
-| 财经新闻（华尔街见闻） | 华尔街见闻 `api-one.wallstcn.com/apiv1/content/lives` | — | `news_wallstreetcn_` | 新闻 |
-| 财经新闻（akshare 封装） | akshare：财新网 `stock_news_main_cx()` + CCTV `news_cctv()` | — | `news_akshare_` | 新闻 |
-| A 股指数 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn`（s_* 前缀） | `index_` / `query_` | 价格 |
-| 美股指数 | 新浪财经 `hq.sinajs.cn`（gb_* 前缀 JS 变量解析） | 腾讯财经 `qt.gtimg.cn` | `index_us_` / `query_` | 价格 |
-| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 东方财富 REST 行情页回退（仅行业，无概念） | `industry_` | 基础 |
-| 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `forecast_` | 基础 |
-| 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `sector_flow_` | 基础 |
-| 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `dividend_` | 基础 |
-| 股票/ETF 历史日线 | 腾讯财经 `qt.gtimg.cn`（`f_day` 查询） | 新浪财经 `hq.sinajs.cn`（`hq_f_day`） | `history_` | 历史走势 |
-| 场外基金历史净值 | 天天基金 `fundf10.eastmoney.com` `lsjz` 净值列表 | 东方财富 `api.fund.eastmoney.com` 历史净值 | `fund_nav_history_` | 历史走势 |
+| 场内 A 股/ETF 实时价 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `price_` | 持仓类 |
+| 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 天天基金 `fundf10.eastmoney.com` | `price_` | 持仓类 |
+| A 股指数行情 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `index_` | 持仓类 |
+| 美股指数行情 | 新浪财经 `hq.sinajs.cn`（gb_* 前缀） | 腾讯财经 `qt.gtimg.cn` | `index_` | 持仓类 |
+| 基金业绩排名 | 天天基金 `fund.eastmoney.com`（`pingzhongdata/{code}.js` JS 变量解析） | — | `fund_perf_` | 基础类 |
+| 基金持仓数据 | 天天基金 `fundf10.eastmoney.com`（HTML 解析） | — | `fund_hold_` | 基础类 |
+| 基金经理数据 | 东方财富 `fund.eastmoney.com/{code}.html`（HTML 解析） | 天天基金 `fundf10.eastmoney.com/jjjl_{code}.html` | `fund_manager_` | 基础类 |
+| 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 东方财富 REST 行情页（仅行业，无概念） | `industry_` | 基础类 |
+| 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `profit_forecast_` | 基础类 |
+| 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `sector_flow_` | 基础类 |
+| 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `dividend_` | 基础类 |
+| 无风险利率（Rf） | akshare `bond_zh_us_rate`（国债收益率） | config.json 手动配置兜底 | `bond_yield_rf` | 基础类 |
+| 财经新闻（5 源聚合） | 新浪 + 东方财富 + 财联社 + 华尔街见闻 + akshare 并行获取，统一聚合去重 | — | `news_` | 基础类 |
+| 股票/ETF 历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 | `history_stock_` | 历史走势 |
+| 场外基金历史净值 | 天天基金 `pingzhongdata/{code}.js` | 东方财富 `api.fund.eastmoney.com/f10/lsjz`（分页获取） | `history_fund_otc_` | 历史走势 |
+| 指数历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 | `history_index_` | 历史走势 |
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。
-> **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。
+> **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。历史走势类不受菜单缓存命令影响，仅按 TTL 过期。
+
+### LLM 模块缓存
+
+LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请求链路：
+
+| 模块 | 缓存前缀 | 默认 TTL | 分组 |
+|:-----|:---------|:--------:|:-----|
+| 全球政经局势 | `llm_global_macro_` | 24h | 持仓类 |
+| 智囊团深度复盘 | `llm_expert_review_` | 2h | 持仓类 |
+| 持仓体检报告 | `llm_health_check_` | 24h | 持仓类 |
+| 穿透深度分析 | `llm_penetration_deep_` | 24h | 持仓类 |
+| 财经新闻热点与持仓关联分析（LLM 二次关联） | `llm_news_item_` | 1h | 基础类 |
+| 辩论模式三段缓存（pro/con/synthesis，实验功能） | `llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_` | 24h | 持仓类 |
 
 ---
 
@@ -53,10 +65,12 @@
 | 场外基金净值 | 每日 1 次（通常 19:00~22:00 更新） | 基金公司发布后同步至东方财富/天天基金 |
 | 基金业绩排名 | 每日更新 | 基于前一日净值计算，百分位排名含 1/3/6/12 月多周期 |
 | 基金持仓数据 | 季报更新（每年 4/8/10 月末） | 非实时，为最新披露的季报持仓（含前 10 大重仓 + 全部持仓明细） |
+| 基金经理数据 | 不定期更新 | 基于基金公司公告，变更时同步至天天基金 |
 | 财经新闻 | 实时推送 | 5 源聚合去重，部分源可能有 1~5 分钟延迟 |
 | 行业分类 | 季度更新 | 东方财富三级行业分类，含概念板块归属 |
 | 机构盈利预测 | 不定期更新 | 基于券商研报汇总，时效性取决于研报发布时间 |
 | 行业资金流向 | 交易日实时 | akshare 今日排名，非交易日或盘前为空 |
+| 无风险利率 | 每日更新 | akshare 获取中国 10Y 国债收益率，config 可手动覆盖 |
 | 股票/ETF 历史日线 | 交易日更新 | 包含前复权数据，含涨跌幅、成交量、换手率 |
 
 ---

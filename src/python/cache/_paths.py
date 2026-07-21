@@ -13,7 +13,7 @@ from src.python.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
 
-# 项目根路径从 constants.py 统一导入，避免因重构移动文件导致的路径偏移
+# 项目根路径从 constants.py 统一导入，确保路径来源唯一
 _CACHE_DIR = os.path.join(PROJECT_ROOT, "data/cache")
 _GZIP_THRESHOLD = 100 * 1024  # 100KB 以上的缓存自动 gzip
 _GZIP_SUFFIX = ".gz"

@@ -42,7 +42,7 @@ def _make_dispatch_mock(debate_info: dict | None = None):
 
 
 class TestDebatePipelineBackwardCompat(unittest.TestCase):
-    """向后兼容测试：所有 Flag 关闭时输出应与修改前一致。"""
+    """向后兼容测试：所有 Flag 关闭时输出 8 元组（不含 debate_info）。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
     @patch("src.python.features.is_feature_enabled")

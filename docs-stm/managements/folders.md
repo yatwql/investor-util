@@ -8,10 +8,10 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 143 | 37,271 | `src/python/` 下所有 `.py`（不含测试） |
+| 主程序代码 | Python | 143 | 38,272 | `src/python/` 下所有 `.py`（不含测试） |
 | HTML 报告模板 | HTML | 1 | 1,750 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python/Shell | 9 | 2,364 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **153** | **41,385** | 主程序 + 模板 + 脚本 |
+| 辅助脚本 | Python/Shell | 10 | 3,072 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **154** | **43,094** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **177** | **55,827** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **3,616 个** | `pytest --collect-only` 统计 |
 | **用户文档** | Markdown | **73** | **35,436** | `docs-stm/`（71 文件）+ `README.md` + `CLAUDE.md` |
@@ -48,6 +48,7 @@ investor-util/
 │   │   ├── fetcher/                  # 数据获取调度
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── akshare.py            #   akshare 封装层（盈利预测/资金流向/分红）
+│   │   │   ├── bond_yield.py         #   无风险利率获取（akshare 国债收益率 + config 手动兜底）
 │   │   │   ├── chain.py              #   Provider Chain 获取链路（主→备→过期缓存）
 │   │   │   ├── fund.py               #   基金数据获取（净值/业绩排名/持仓）
 │   │   │   ├── fund_manager.py       #   基金经理数据获取
@@ -92,7 +93,9 @@ investor-util/
 │   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
 │   │   │   ├── api_base.py           #   LLM API 基类（请求/重试/流式）
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
+│   │   │   ├── cost_tracker.py       #   Token 成本跟踪与预算管理（会话级 Token 守卫）
 │   │   │   ├── fact_checker.py       #   LLM 事实锚定校验器（数值/品种/排名一致性校验）
+│   │   │   ├── fallback.py           #   LLM 故障降级模板（所有模块失败时提供占位内容，防止报告空白）
 │   │   │   ├── fingerprint.py        #   缓存指纹（请求去重，避免重复调用）
 │   │   │   ├── generators.py         #   提示词生成（全局政经/智囊团复盘）
 │   │   │   ├── generators_news.py    #   新闻分析提示词生成
@@ -100,6 +103,9 @@ investor-util/
 │   │   │   ├── markdown.py           #   LLM 输出 Markdown 解析/格式化
 │   │   │   ├── pricing.py            #   Token 计费与用量统计
 │   │   │   ├── prompts.py            #   提示词模板库
+│   │   │   ├── prompts_action.py     #   LLM 分析模块提示词构造（全局政经/智囊团复盘/体检/穿透）
+│   │   │   ├── prompts_core.py       #   核心提示词模块（系统提示常量/缓存前缀/通用格式化）
+│   │   │   ├── prompts_tables.py     #   提示词表格模块（持仓/穿透/场景分析格式化与摘要构造）
 │   │   │   ├── session.py            #   LLM 会话管理（上下文窗口/历史）
 │   │   │   ├── skeleton.py           #   LLM 内容骨架生成（结构化输出引导）
 │   │   │   └── strategy.py           #   Provider 多链切换策略引擎
@@ -167,6 +173,7 @@ investor-util/
 │   │   ├── handlers_config.py        # 配置管理命令处理器
 │   │   ├── registry.py               # 中央注册表（模块/TTL/分组定义）
 │   │   ├── provider_registry.py      # 数据源注册中心（熔断器/会话缓存）
+│   │   ├── features.py               # Feature Flag 注册中心（开关集中管理，含默认值与运行时控制）
 │   │   ├── models.py                 # 数据模型（持仓/行情/基金/新闻）
 │   │   ├── reader.py                 # 持仓 xlsx 文件读取
 │   │   ├── ansi_colors.py            # ANSI 颜色常量（终端输出着色）

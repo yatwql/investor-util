@@ -4,7 +4,7 @@
 
 ---
 
-## [0.7.8-dev] - 未发布
+## [0.7.8] - 2026-07-21
 
 ### Changed
 - **changelog.md**: v0.7.0~v0.7.7 详细变更记录归档至 `archive/v0.7.x/archived_changelog.0.7.x.md`，主文件仅保留当前版本 + 归档索引
@@ -53,8 +53,16 @@
 - **how-to-start.md** — CLI 参数表 `--history` 默认值 `auto`→`off`（对齐 `cli.py` 实际默认值）；移除已过时的 `# (可选) colorama` 注释（已在 requirements.txt 硬依赖）
 - **全域文档清理历史痕迹**：technical.md 移除"原本内联在 orchestrator.py"等历史重组描述；how-to-config-llm.md 移除 4 处"旧版"/"不再使用"历史标签；review-findings.md 归档索引移除版本范围描述，"v0.6.x 历史审查记录"改为通用"审查记录归档"；plan.md 归档索引移除版本范围描述
 
+### Docs
+- **datasource.md**: 全面更新数据源表以对齐实际注册表——修正 7 个过时缓存前缀（`fund_nav_`→`price_`、`fund_holding_`→`fund_hold_`、`forecast_`→`profit_forecast_`、移除 `query_`/`index_us_`、`history_`→`history_stock_`、`fund_nav_history_`→`history_fund_otc_`，新闻合并为单 `news_` 前缀），新增 5 个缺失数据源行（A股指数行情、基金经理数据、无风险利率、指数历史日线），新增 LLM 模块独立缓存表（13 段前缀），移除过时/合并的路由说明
+- **folders.md**: 目录树补全 7 个缺失文件（`features.py`、`fetcher/bond_yield.py`、`llm/cost_tracker.py`、`llm/fallback.py`、`llm/prompts_action.py`、`llm/prompts_core.py`、`llm/prompts_tables.py`），同步更新统计数据
+- **review-findings.md**: D16/D17 摘要行展开为详细修复表格，每项对应具体修复内容而非笼统计数
+- **archived_review-findings.0.7.x.md**: v0.7.5 摘要补充 Phase 4 批量交付详情（13 项任务清单）
+- **archived_plan.0.7.x.md**: v0.7.5 摘要补充 Phase 4 具体交付项（P4-01~P4-16 清单）
+
 ### Fixed
 - **test_orchestrator.py** — `capture_snapshot` mock 缺少 `return_value` 导致 MagicMock 无法通过 `isinstance(x, dict)` 断言：`test_generate_report_full_news_only`、`test_generate_report_full_llm_only`、`test_generate_report_full_both_disabled` 3 个测试补上 `return_value=None`
+- **代码注释历史痕迹清理**：`cache/_paths.py:16`、`constants.py:32-33`、`test/integration/test_debate_pipeline.py:45` 共 3 处含历史重构/变更描述的注释修改为纯当前状态描述
 
 ### Plan
 - **task91-enhanced-llm-strategy.md D16 终轮一致性扫描修复**：
@@ -67,6 +75,11 @@
   - §4.4 新增/修改文件清单补全遗漏文件（html_writer.py、orchestrator.py、llm_content.py 等）
   - 依赖图 I-12 连接分支修正（从 I-04/I-05 块移至独立节点）
   - I-06 文件变更补全 orchestrator.py
+- **pipeline_data Schema 合规审计（D17 修复）**：
+  - C19 pipeline_data Schema 合规确认：不新增 pipeline_data 键，debate_info 通过独立返回通道传递
+  - I-06 数据流描述扩展：debate_info 全链路数据流（a-f 六步），明确 `_fetch_llm_and_news()` 改 5 元组
+  - `_fetch_llm_and_news()` 第 630 行增加元组长度检测提取 debate_info
+  - fingerprint 数据依赖合规确认：generate_debate_procon() 使用与 expert_review 相同的输入参数，不新增依赖
 
 ---
 

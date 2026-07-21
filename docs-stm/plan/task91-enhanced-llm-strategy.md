@@ -1,10 +1,10 @@
 # 任务 #91 分解：增强 LLM 策略——从"解读数据"到"模拟辩论"
 
-> **文档版本**: v0.7.8-dev  
-> **状态**: 设计阶段（12 轮迭代）  
+> **文档版本**: v0.7.8  
+> **状态**: 已交付 ✅  
 > **标签**: P4 实验功能 · LLM 策略 · 辩论模式 · 条件推理 · 反问引导  
-> **估时**: 32h（12 轮迭代）  
-> **阻塞**: ← LLM 管线（generators_orchestrator + prompts 体系就绪即可跑）  
+> **估时**: 32h（12 轮迭代，实际已全部完成）  
+> **阻塞**: 无（已集成到管线）  
 > **关联文档**: `discussion-better-investment-advice.md`（第 6 层）、`technical.md`（§5 LLM 集成层 + §8 架构约束）、`plan.md`（任务 #91）、`llm-hallucination-prompts_expert-review.md`（现有 prompt 结构）
 
 ---
