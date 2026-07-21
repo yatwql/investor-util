@@ -325,6 +325,11 @@ def generate_report(
     """
     result = ReportResult()
 
+    # 实验性功能状态日志（红色高亮）
+    from src.python.features import log_experimental_features
+
+    log_experimental_features()
+
     if report_type == "basic":
         # basic 路径：仅生成 Excel，不调 prepare_report_data / capture_snapshot / fetch_history_data
         from src.python.registry import get_report_section_order

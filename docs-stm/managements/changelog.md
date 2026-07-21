@@ -4,7 +4,11 @@
 
 ---
 
-## [0.8.1-dev] - 未发布
+## [0.8.2-dev] - 未发布
+
+### Changed
+
+## [0.8.1] - 2026-07-22
 
 ### Fixed
 - **P3-13**: `llm/generators.py` `_filter_hallucinated_codes` — 英文词误杀修复：全小写启发式 + `_HALLU_SAFE_WORDS` 白名单豁免 HTML/CSS 标签（`style`、`flash`、`color` 等）和金融术语（`QDII`、`ETF`），正则 `[A-Za-z0-9]{4,6}` 不再误判全小写词，真正虚构代码仍被过滤
@@ -13,7 +17,8 @@
 - **P2-12**: `config/_core.py` 验证函数提取至 `config/_validation.py`（`_core.py` 1146→739 行，-407 行；`_validation.py` 新建 442 行）
 
 ### Changed
-- 版本号更新至 v0.8.1-dev
+- **features.py** + **orchestrator.py**: 实验性功能开启时，生成报告日志中以 `[ERROR]`（红色）高亮显示具体开启了哪些实验性功能
+- 版本号更新至 v0.8.1
 - **check-version-consistency.py**: review-findings.md、llm-technical.md 加入版本号一致性检查清单（11 项）
 - **tui_menu.py**: 菜单 [S] 描述改为"配置 LLM 分析章节"，更简洁准确
 - **handlers_config.py**: 辩论模式区域标注 ⚗ 实验性功能标识，底部增加实验阶段提示
