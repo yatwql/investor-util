@@ -26,6 +26,8 @@ from src.python.llm.prompts_tables import (
     _format_holdings_block,
     _format_penetration_block,
     _build_metrics_table_block,
+    _build_scenario_block,
+    _build_alignment_block,
     _build_data_quality_detail_block,
 )
 
@@ -247,6 +249,14 @@ def _build_expert_review_prompt(
     metrics_text = _build_metrics_table_block(metrics)
     if metrics_text:
         parts.append(metrics_text)
+    # 情景分析（Beta CI 传播）
+    scenario_text = _build_scenario_block(metrics.get("scenario_analysis") if metrics else None)
+    if scenario_text:
+        parts.append(scenario_text)
+    # 口径修正因子（费率/现金剥离/TWR）
+    alignment_text = _build_alignment_block(metrics.get("alignment_summary") if metrics else None)
+    if alignment_text:
+        parts.append(alignment_text)
     # 行动建议模板
     parts.append(
         "\n【行动建议】\n"

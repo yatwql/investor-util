@@ -743,20 +743,60 @@ def _generate_report_full(
         if not _injected.get("annualized_volatility") and _injected.get("annualized_volatility") != 0:
             logger.warning("[checkpoint] prep.risk_metrics 缺 annualized_volatility")
 
-        # ── 计算量化指标（夏普/卡玛）用于竞争语境 ──
+        # ── 全量量化指标 + 情景分析 + 口径修正 ──
         _daily_returns = history_data.get("daily_returns_portfolio", [])
         if _daily_returns:
-            from src.python.analysis.metrics import calmar_ratio, sharpe_ratio
+            from src.python.analysis.metrics import compute_all_metrics
+            from src.python.analysis.alignment_correction import compute_alignment_factors
 
-            _sharpe = sharpe_ratio(_daily_returns)
-            _calmar = calmar_ratio(_daily_returns)
+            _holdings_details = prep.get("holdings_details", [])
+            _total_mv = prep.get("total_mv", 0)
+
+            # 组合市值权重
+            _portfolio_weights = (
+                [h["market_value"] / _total_mv for h in _holdings_details
+                 if _total_mv > 0 and h.get("market_value", 0) > 0]
+                or None
+            )
+
+            # 全量量化指标（14 项：夏普/卡玛/HHI/胜率/换手率/Beta CI/风险贡献）
+            _metrics = compute_all_metrics(
+                portfolio_daily_returns=_daily_returns,
+                portfolio_weights=_portfolio_weights,
+                benchmark_daily_returns=None,  # 暂无可对齐的基准日收益率序列
+                holdings_details=_holdings_details,
+                rf_annual=0.02,
+            )
+            # 补充竞争语境需要但 compute_all_metrics 不产的字段
             _mdd_pct = history_data.get("max_drawdown_pct", 0)
-            _metrics = {
-                "sharpe_ratio": _sharpe,
-                "calmar_ratio": _calmar,
-                "annualized_volatility": history_data.get("annualized_volatility"),
-                "max_drawdown": -(_mdd_pct / 100) if _mdd_pct else None,
-            }
+            _metrics["annualized_volatility"] = history_data.get("annualized_volatility")
+            _metrics["max_drawdown"] = -(_mdd_pct / 100) if _mdd_pct else None
+
+            # 口径修正因子（费率估算 + 现金剥离 + TWR）
+            _alignment = compute_alignment_factors(
+                holdings_details=_holdings_details,
+                total_mv=_total_mv,
+                portfolio_daily_returns=_daily_returns,
+            )
+            if _alignment.get("has_any_data"):
+                _metrics["alignment_summary"] = _alignment.get("summary_text", "")
+
+            # 情景分析（基于 Beta 置信区间传播）
+            _beta_analysis = _metrics.get("beta_analysis")
+            _beta_val = _metrics.get("portfolio_beta")
+            if isinstance(_beta_analysis, dict) and _beta_val is not None:
+                from src.python.analysis.scenario import scenario_analysis
+
+                _scenario = scenario_analysis(
+                    portfolio_value=_total_mv,
+                    beta=_beta_val,
+                    beta_ci_lower=_beta_analysis.get("ci_lower"),
+                    beta_ci_upper=_beta_analysis.get("ci_upper"),
+                    beta_se=_beta_analysis.get("std_error"),
+                    portfolio_volatility=history_data.get("annualized_volatility"),
+                )
+                if _scenario.get("has_data") and _scenario.get("scenarios"):
+                    _metrics["scenario_analysis"] = _scenario
         else:
             _metrics = None
     else:
