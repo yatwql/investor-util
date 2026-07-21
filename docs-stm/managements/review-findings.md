@@ -1,16 +1,17 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
-> 文档版本：v0.7.7
+> 文档版本：v0.8.1-dev
 
 ---
 
 ## 当前待处理问题
 
-> 审查方法：全库代码扫描（src/python/ + src/test/），按 technical.md §1.4（核心架构决策）和 §8（架构设计约束）逐条核对。
->
-> 已修复清单见 changelog.md。
->
-> v0.6.x 历史审查记录 → [`docs-stm/archive/v0.6.x/archived_review-findings.0.6.x.md`](../archive/v0.6.x/archived_review-findings.0.6.x.md)
+### P2 — 已排期（前置依赖未就绪，待后续迭代切入）
+
+| # | 分类 | 文件 | 说明 | 阻塞依赖 | 估时 |
+|---|------|------|------|:--------:|:----:|
+| P2-11b | **统计检验** | `src/python/report/metrics.py` | 组合 Beta 置信区间 + t-统计量/p 值，当前仅有点估计无区间范围，无法判断 Beta 可靠性 | ←P2-11a | 24h |
+| P3-09b | **竞争语境** | `src/python/report/` | 口径修正因子（综合费率估算/现金剥离/TWR 计算），组合 vs 基准对比口径不一致导致失真 | ←P3-09a,P2-08 | 16h |
 
 ### P3（低优先级 — 修复收益有限，建议长期跟踪）
 
@@ -20,13 +21,17 @@
 | P3-10 | **文件过长** | `report/fund_style_analysis.py` | 635 行 | 快照管理、单股判定、行业 PE 计算、并发批量降级等多种职责。 | **低**：同上 | 考虑拆分子模块 |
 | P3-11 | **文件过长** | `config/_core.py` | 631 行 | 15 个验证函数、配置读写、LLM 配置读取，验证函数模式高度一致。 | **低**：同上 | 验证函数提取到 `_validate.py` |
 
+v0.7.x 已修复项的审查记录已归档，详见下方归档链接。
+
 ---
 
-## 历史归档
+## 归档
 
-- [`archived_review-findings.0.6.x.md`](../archive/v0.6.x/archived_review-findings.0.6.x.md) — v0.6.0 ~ v0.6.9
-- [`archived_review-findings.0.5.x.md`](../archive/v0.5.x/archived_review-findings.0.5.x.md) — v0.5.0 ~ v0.5.12
-- [`archived_review-findings.0.4.x.md`](../archive/v0.4.x/archived_review-findings.0.4.x.md) — v0.4.0 ~ v0.4.5
-- [`archived_review-findings.0.3.x.md`](../archive/v0.3.x/archived_review-findings.0.3.x.md) — v0.3.0 ~ v0.3.10
-- [`archived_review-findings.0.2.x.md`](../archive/v0.2.x/archived_review-findings.0.2.x.md) — v0.2.0 ~ v0.2.91
-- [`archived_review-findings.0.1.x.md`](../archive/v0.1.x/archived_review-findings.0.1.x.md) — 早期版本
+- [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) — v0.7.x 全部审查记录（含 D16 扫描、D17 Schema 审计、P3 长期跟踪项）
+- [`archived_review-findings.0.6.x.md`](../archive/v0.6.x/archived_review-findings.0.6.x.md)
+- [`archived_review-findings.0.5.x.md`](../archive/v0.5.x/archived_review-findings.0.5.x.md)
+- [`archived_review-findings.0.4.x.md`](../archive/v0.4.x/archived_review-findings.0.4.x.md)
+- [`archived_review-findings.0.3.x.md`](../archive/v0.3.x/archived_review-findings.0.3.x.md)
+- [`archived_review-findings.0.2.x.md`](../archive/v0.2.x/archived_review-findings.0.2.x.md)
+- [`archived_review-findings.0.1.x.md`](../archive/v0.1.x/archived_review-findings.0.1.x.md)
+

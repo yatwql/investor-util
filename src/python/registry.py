@@ -147,6 +147,28 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         settings_suffix="penetration_deep",
         cache_groups=("preload",),
     ),
+    # ── 辩论模式（preload 组，P4 实验功能）──
+    DataModuleDef(
+        "辩论白脸",
+        "llm_debate_pro",
+        cache_prefixes=("llm_debate_pro_",),
+        cache_ttl=86400,
+        cache_groups=("preload",),
+    ),
+    DataModuleDef(
+        "辩论黑脸",
+        "llm_debate_con",
+        cache_prefixes=("llm_debate_con_",),
+        cache_ttl=86400,
+        cache_groups=("preload",),
+    ),
+    DataModuleDef(
+        "辩论综合",
+        "llm_debate_synthesis",
+        cache_prefixes=("llm_debate_synthesis_",),
+        cache_ttl=86400,
+        cache_groups=("preload",),
+    ),
     # ── 补充数据（refresh 组）──
     DataModuleDef(
         "机构盈利预测",
@@ -157,13 +179,6 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     ),
     DataModuleDef(
         "行业资金流向", "sector_flow", cache_prefixes=("sector_flow_",), cache_ttl=900, cache_groups=("refresh",)
-    ),
-    DataModuleDef(
-        "基金风格扩展数据（市值/PE）",
-        "extended",
-        cache_prefixes=("extended_",),
-        cache_ttl=CACHE_DAILY,
-        cache_groups=("refresh",),
     ),
     DataModuleDef(
         "股票历史分红", "dividend", cache_prefixes=("dividend_",), cache_ttl=CACHE_MONTHLY, cache_groups=("refresh",)
@@ -192,6 +207,13 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     ),
     DataModuleDef(
         "基金风格快照", "fund_style_snapshot", exact_cache_keys=("fund_style_snapshot",), cache_ttl=CACHE_MONTHLY
+    ),
+    DataModuleDef(
+        "基金风格扩展数据（市值/PE）",
+        "extended",
+        cache_prefixes=("extended_",),
+        cache_ttl=CACHE_DAILY,
+        cache_groups=("refresh",),
     ),
     # ── 精确键名缓存（基准数据/持仓跟踪/交易日历）──
     DataModuleDef(
@@ -275,7 +297,7 @@ def get_known_llm_settings_keys() -> set[str]:
         if m.is_llm:
             keys |= m.llm_settings_keys()
     # 全局键名
-    keys |= {"max_retries", "enabled_llm", "pricing", "llm_max_concurrency", "news_correlation_top_n"}
+    keys |= {"max_retries", "enabled_llm", "pricing", "llm_max_concurrency", "news_correlation_top_n", "debate"}
     return keys
 
 
@@ -465,7 +487,7 @@ def get_computation_module(module_key: str) -> ComputModuleDef | None:
     return None
 
 
-# ── 报告模块注册表（C 迭代：序号可配置） ──────────────────────
+# ── 报告模块注册表（序号可配置） ──────────────────────────────
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── always 类型（始终显示，无 data_flag 依赖） ──

@@ -135,6 +135,9 @@ def get_cache_ttl_llm(subtype: str = "global_macro") -> float:
         "news_correlation": "llm_news_correlation",
         "health_check": "llm_health_check",
         "penetration_deep": "llm_penetration_deep",
+        "debate_pro": "llm_debate_pro",
+        "debate_con": "llm_debate_con",
+        "debate_synthesis": "llm_debate_synthesis",
     }
     data_type = _key_map.get(subtype, "llm_global_macro")
     try:
@@ -149,5 +152,8 @@ def get_cache_ttl_llm(subtype: str = "global_macro") -> float:
             "news_correlation": 3600,
             "health_check": 86400,
             "penetration_deep": 86400,
+            "debate_pro": 86400,
+            "debate_con": 86400,
+            "debate_synthesis": 86400,
         }
         return defaults.get(subtype, 3600)

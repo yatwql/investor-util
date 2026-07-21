@@ -15,6 +15,13 @@
 
         .section { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
         .section-title { background: #2E75B6; color: #fff; padding: 12px 20px; font-size: 16px; font-weight: 600; }
+        .experimental-badge { background: #fff3e0; color: #e65100; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: normal; margin-left: 10px; vertical-align: middle; }
+        .debate-block { margin: 12px 0; padding: 14px 16px; border-radius: 6px; }
+        .debate-block .debate-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+        .debate-block .debate-content { font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+        .debate-pro { background: #f0faf0; border-left: 4px solid #4caf50; }
+        .debate-con { background: #fef0f0; border-left: 4px solid #f44336; }
+        .debate-synthesis { background: #fffdf0; border-left: 4px solid #ff9800; }
         .section-content { padding: 16px 20px; }
         .report-footer { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
 
@@ -1315,10 +1322,30 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!--  MODULE 9: 智囊团深度复盘 (Expert Review, LLM augment)  -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-expert_review" style="order: {{ section_numbers['expert_review'] }};">
-        <div class="section-title">{{ section_numbers['expert_review'] }}、智囊团深度复盘</div>
+        <div class="section-title">{{ section_numbers['expert_review'] }}、智囊团深度复盘
+            {%- if debate_mode_label %}
+            <span class="experimental-badge">{{ debate_mode_label }}</span>
+            {%- endif %}
+        </div>
         {% if llm_enabled and expert_review %}
         <div class="section-content">
+            {% if debate_info and debate_info.get("pro_text") and debate_info.get("con_text") %}
+            {# 辩论模式：显示白脸/黑脸/综合三段 #}
+            <div class="debate-block debate-pro">
+                <div class="debate-label">👍 白脸观点（持有理由）</div>
+                <div class="debate-content">{{ debate_info.pro_text }}</div>
+            </div>
+            <div class="debate-block debate-con">
+                <div class="debate-label">👎 黑脸观点（卖出理由）</div>
+                <div class="debate-content">{{ debate_info.con_text }}</div>
+            </div>
+            <div class="debate-block debate-synthesis">
+                <div class="debate-label">⚖️ 综合权衡</div>
+                <div class="debate-content">{{ expert_review | safe }}</div>
+            </div>
+            {% else %}
             {{ expert_review | safe }}
+            {% endif %}
         </div>
         {% elif module_disabled.get("expert_review") %}
         {# 模块已禁用，完全跳过 #}
@@ -1637,6 +1664,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <tr><td>缓存命中 token</td><td>{{ llm_session_usage["cache_hit_tokens"] | thousands }}</td></tr>
                 {% endif %}
                 <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
+                {% if debate_mode_label %}
+                <tr><td>实验模式</td><td>{{ debate_mode_label }}</td></tr>
+                {% endif %}
             </table>
             {% endif %}
 

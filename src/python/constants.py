@@ -28,14 +28,12 @@ def _find_project_root() -> str:
 
 
 # ── 项目根路径（单一来源，所有模块从此导入） ─────────────
-# 使用标记文件查找法，不依赖目录树深度。
-# cache.py 曾因重构移动文件后忘记更新 dirname 次数导致路径偏移，
-# 集中定义后彻底避免此类问题。
+# 使用标记文件查找法（pyproject.toml / .git），不依赖目录树深度。
 PROJECT_ROOT = _find_project_root()
 
 # ── 项目版本 ──────────────────────────────────────────────
 
-APP_VERSION = "0.7.7"
+APP_VERSION = "0.8.1-dev"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
@@ -86,6 +84,8 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "deepseek-v4-pro": {"input": 3, "output": 6, "input_cache_hit": 0.025},
     "deepseek-chat": {"input": 1, "output": 2, "input_cache_hit": 0.02},
     # Gemini
+    "gemini-3.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
+    "gemini-3.5-": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
     "gemini-2.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
     "gemini-2.5-pro": {"input": 1.25, "output": 5.0, "input_cache_hit": 0.125},
     "gemini-2.5-": {"input": 1.25, "output": 5.0, "input_cache_hit": 0.125},

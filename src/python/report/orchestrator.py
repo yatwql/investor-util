@@ -47,9 +47,8 @@ def _read_section_flags(config: dict) -> dict:
     }
 
 
-# ── S1 移入：_prepare_report_data ──
-# 原 handlers_report._prepare_report_data()
-# ★ config 参数已为必传（P2-C1 清理：移除 S7 残留的 get_config_cache 回退）
+# ── prepare_report_data ──
+# ★ config 参数已为必传
 
 
 def prepare_report_data(
@@ -59,7 +58,7 @@ def prepare_report_data(
 ) -> dict:
     """获取行情、指数、穿透数据，整理持仓明细字典列表。
 
-    使用内部 ThreadPoolExecutor 替代 _get_pool()（S6 完成）。
+    使用内部 ThreadPoolExecutor。
     注意：config 参数传入后必须只读使用，不得 mutate。调用方持有的 dict 引用
     指向相同的配置对象，写入会导致跨模块状态污染（C14 约束）。
     """
@@ -131,7 +130,7 @@ def prepare_report_data(
     }
 
 
-# ── S2 移入：capture_snapshot ──
+# ── capture_snapshot ──
 
 
 def capture_snapshot(
@@ -148,7 +147,7 @@ def capture_snapshot(
         details: 行情明细
         config: 配置字典
         reporter: 进度报告接口
-        extra: 额外扩展字段（如 risk_metrics，供 Phase 1 在 pipeline_data 中透传）
+        extra: 额外扩展字段（如 risk_metrics），透传到 pipeline_data
 
     Returns:
         pipeline_data 字典（含 diff），首次运行或异常时返回 None。
@@ -258,7 +257,7 @@ def capture_snapshot(
     return pipeline_data
 
 
-# ── S3 移入：fetch_history_data ──
+# ── fetch_history_data ──
 
 
 def fetch_history_data(
@@ -305,7 +304,7 @@ def fetch_history_data(
         return None
 
 
-# ── S1 骨架：generate_report（S4 开始逐步填充）──
+# ── generate_report ──
 
 
 def generate_report(
@@ -321,8 +320,8 @@ def generate_report(
     """生成投资分析报告。
 
     basic: 仅 Excel（无数据准备/快照/历史）
-    both:  HTML+Excel（不含 LLM） — S5 实现
-    full:  HTML+Excel+LLM — S6 实现
+    both:  HTML+Excel（不含 LLM）
+    full:  HTML+Excel+LLM
     """
     result = ReportResult()
 
@@ -376,7 +375,7 @@ def generate_report(
     return result
 
 
-# ── S5 引入：_compute_details（轻量级行情获取，无指数/穿透/分类）──
+# ── _compute_details（轻量级行情获取，无指数/穿透/分类）──
 
 
 def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -> list:
@@ -392,7 +391,7 @@ def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -
     return details
 
 
-# ── S5 引入：_generate_report_both（生成 HTML+Excel，不含 LLM）──
+# ── _generate_report_both（生成 HTML+Excel，不含 LLM）──
 
 
 def _generate_report_both(
@@ -496,7 +495,7 @@ def _generate_report_both(
     return result
 
 
-# ── S6 引入：_report_llm_module_results（统一的 LLM 模块结果计数/报告）──
+# ── _report_llm_module_results（统一的 LLM 模块结果计数/报告）──
 
 
 def _report_llm_module_results(
@@ -538,7 +537,7 @@ def _report_llm_module_results(
         reporter.info("所有 LLM 内容已跳过，未调用 LLM")
 
 
-# ── S6 引入：_fetch_llm_and_news（统一 4 分支）──
+# ── _fetch_llm_and_news（统一 4 分支）──
 
 
 def _fetch_llm_and_news(
@@ -557,7 +556,7 @@ def _fetch_llm_and_news(
 ) -> tuple[tuple, list, dict, bool]:
     """并行获取 LLM 内容 + 新闻数据，统一处理 4 分支。
 
-    内部管理线程池（max_workers=2，S11 已完成全量去池，operations 池唯一存在）。
+    内部管理线程池（max_workers=2，operations 池唯一存在）。
     LLM 和新闻的 ok/disabled/failed 计数统一归入此函数。
 
     Args:
@@ -565,8 +564,9 @@ def _fetch_llm_and_news(
         comparison_indices: {代码: 名称} 对比指数池，传递给 generate_all_llm。
 
     Returns:
-        (llm_content, news_data, news_llm_meta, news_ok)
+        (llm_content, news_data, news_llm_meta, news_ok, debate_info)
         llm_content: (global_macro_html, expert_review_html, health_check_html, penetration_deep_html)
+        debate_info: dict | None — 辩论模式启用时包含 pro_text/con_text/mode_label
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -577,11 +577,12 @@ def _fetch_llm_and_news(
     news_data: list = []
     news_llm_meta: dict = {}
     news_ok: bool = False
+    debate_info: dict | None = None
 
     # 分支 ④：均关闭
     if not enable_llm and not enable_news:
         reporter.info("[板块配置] 新闻和 LLM 均未开启，跳过内容生成")
-        return llm_content, news_data, news_llm_meta, news_ok
+        return llm_content, news_data, news_llm_meta, news_ok, debate_info
 
     pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="orch_llm_news")
     try:
@@ -626,10 +627,11 @@ def _fetch_llm_and_news(
             for fut in as_completed([_news_fut, _llm_fut]):
                 if fut is _llm_fut:
                     try:
-                        _result_8 = _llm_fut.result()
-                        llm_content = _result_8[:4]
-                        _cached = _result_8[4:]
+                        _result = _llm_fut.result()
+                        llm_content = _result[:4]
+                        _cached = _result[4:8]
                         _report_llm_module_results(llm_content, _cached, reporter)
+                        debate_info = _result[8] if len(_result) > 8 else None
                     except Exception:
                         reporter.add_error("LLM 内容生成异常（详情请查看日志文件 logs/app.log）")
                         reporter.error("LLM 内容生成异常（详情请查看日志）")
@@ -652,20 +654,21 @@ def _fetch_llm_and_news(
         elif _llm_fut is not None:
             # 分支 ③：仅 LLM
             try:
-                _result_8 = _llm_fut.result()
-                llm_content = _result_8[:4]
-                _cached = _result_8[4:]
+                _result = _llm_fut.result()
+                llm_content = _result[:4]
+                _cached = _result[4:8]
                 _report_llm_module_results(llm_content, _cached, reporter)
+                debate_info = _result[8] if len(_result) > 8 else None
             except Exception:
                 reporter.add_error("LLM 内容生成异常（详情请查看日志）")
                 reporter.error("LLM 内容生成异常（详情请查看日志）")
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
-    return llm_content, news_data, news_llm_meta, news_ok
+    return llm_content, news_data, news_llm_meta, news_ok, debate_info
 
 
-# ── S6 引入：_generate_report_full（HTML+Excel+LLM）──
+# ── _generate_report_full（HTML+Excel+LLM）──
 
 
 def _generate_report_full(
@@ -740,20 +743,60 @@ def _generate_report_full(
         if not _injected.get("annualized_volatility") and _injected.get("annualized_volatility") != 0:
             logger.warning("[checkpoint] prep.risk_metrics 缺 annualized_volatility")
 
-        # ── 计算量化指标（夏普/卡玛）用于竞争语境 ──
+        # ── 全量量化指标 + 情景分析 + 口径修正 ──
         _daily_returns = history_data.get("daily_returns_portfolio", [])
         if _daily_returns:
-            from src.python.analysis.metrics import calmar_ratio, sharpe_ratio
+            from src.python.analysis.metrics import compute_all_metrics
+            from src.python.analysis.alignment_correction import compute_alignment_factors
 
-            _sharpe = sharpe_ratio(_daily_returns)
-            _calmar = calmar_ratio(_daily_returns)
+            _holdings_details = prep.get("holdings_details", [])
+            _total_mv = prep.get("total_mv", 0)
+
+            # 组合市值权重
+            _portfolio_weights = (
+                [h["market_value"] / _total_mv for h in _holdings_details
+                 if _total_mv > 0 and h.get("market_value", 0) > 0]
+                or None
+            )
+
+            # 全量量化指标（14 项：夏普/卡玛/HHI/胜率/换手率/Beta CI/风险贡献）
+            _metrics = compute_all_metrics(
+                portfolio_daily_returns=_daily_returns,
+                portfolio_weights=_portfolio_weights,
+                benchmark_daily_returns=None,  # 暂无可对齐的基准日收益率序列
+                holdings_details=_holdings_details,
+                rf_annual=0.02,
+            )
+            # 补充竞争语境需要但 compute_all_metrics 不产的字段
             _mdd_pct = history_data.get("max_drawdown_pct", 0)
-            _metrics = {
-                "sharpe_ratio": _sharpe,
-                "calmar_ratio": _calmar,
-                "annualized_volatility": history_data.get("annualized_volatility"),
-                "max_drawdown": -(_mdd_pct / 100) if _mdd_pct else None,
-            }
+            _metrics["annualized_volatility"] = history_data.get("annualized_volatility")
+            _metrics["max_drawdown"] = -(_mdd_pct / 100) if _mdd_pct else None
+
+            # 口径修正因子（费率估算 + 现金剥离 + TWR）
+            _alignment = compute_alignment_factors(
+                holdings_details=_holdings_details,
+                total_mv=_total_mv,
+                portfolio_daily_returns=_daily_returns,
+            )
+            if _alignment.get("has_any_data"):
+                _metrics["alignment_summary"] = _alignment.get("summary_text", "")
+
+            # 情景分析（基于 Beta 置信区间传播）
+            _beta_analysis = _metrics.get("beta_analysis")
+            _beta_val = _metrics.get("portfolio_beta")
+            if isinstance(_beta_analysis, dict) and _beta_val is not None:
+                from src.python.analysis.scenario import scenario_analysis
+
+                _scenario = scenario_analysis(
+                    portfolio_value=_total_mv,
+                    beta=_beta_val,
+                    beta_ci_lower=_beta_analysis.get("ci_lower"),
+                    beta_ci_upper=_beta_analysis.get("ci_upper"),
+                    beta_se=_beta_analysis.get("std_error"),
+                    portfolio_volatility=history_data.get("annualized_volatility"),
+                )
+                if _scenario.get("has_data") and _scenario.get("scenarios"):
+                    _metrics["scenario_analysis"] = _scenario
         else:
             _metrics = None
     else:
@@ -774,7 +817,7 @@ def _generate_report_full(
     # ── 5. 并行获取 LLM + 新闻（4 分支统一处理） ──
     # 读取对比指数池配置（默认预设池在 _config_defaults.py 中定义）
     _comparison_indices = config.get("comparison_indices", None)
-    llm_content, news_data, news_llm_meta, news_ok = _fetch_llm_and_news(
+    llm_content, news_data, news_llm_meta, news_ok, debate_info = _fetch_llm_and_news(
         holdings,
         prep,
         sector_flow,
@@ -818,6 +861,7 @@ def _generate_report_full(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=_enable_llm,
+            debate_info=debate_info,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -849,6 +893,7 @@ def _generate_report_full(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=_enable_llm,
+            debate_info=debate_info,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True

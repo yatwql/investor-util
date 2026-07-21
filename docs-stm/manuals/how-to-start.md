@@ -41,9 +41,6 @@ source .venv/bin/activate
 # 3. 安装依赖
 pip install -r requirements.txt
 
-# （可选）Windows 用户若需终端彩色输出：
-pip install colorama
-
 # 4. 启动 TUI 交互模式
 python src/python/main.py
 ```
@@ -90,7 +87,7 @@ python -m src.python.cli --verbose report --type basic
 | 参数 | 说明 |
 |:-----|:-----|
 | `--type {basic,both,full}` | `basic`=仅 Excel 报告（约 1 分钟，默认）；`both`=Excel+HTML（不含 LLM，约 2 分钟）；`full`=全量含 LLM（约 5 分钟，需 LLM 配置） |
-| `--history {auto,off}` | 是否获取组合历史走势：`auto`=获取（默认），`off`=跳过。仅 `--type both` / `full` 时有效 |
+| `--history {auto,off}` | 是否获取组合历史走势：`auto`=获取，`off`=跳过（默认）。仅 `--type both` / `full` 时有效 |
 | `--force-llm` | 强制重新调用 LLM API（忽略缓存），生成最新 LLM 内容 |
 | `--warm` | 报告生成前预热缓存（首次使用或新增持仓时推荐） |
 

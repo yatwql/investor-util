@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.7.7-dev
+> 文档版本：v0.7.8-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,10 +8,10 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 143 | 37,271 | `src/python/` 下所有 `.py`（不含测试） |
+| 主程序代码 | Python | 143 | 38,272 | `src/python/` 下所有 `.py`（不含测试） |
 | HTML 报告模板 | HTML | 1 | 1,750 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python/Shell | 9 | 2,364 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **153** | **41,385** | 主程序 + 模板 + 脚本 |
+| 辅助脚本 | Python/Shell | 10 | 3,072 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **154** | **43,094** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **177** | **55,827** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **3,616 个** | `pytest --collect-only` 统计 |
 | **用户文档** | Markdown | **73** | **35,436** | `docs-stm/`（71 文件）+ `README.md` + `CLAUDE.md` |
@@ -48,6 +48,7 @@ investor-util/
 │   │   ├── fetcher/                  # 数据获取调度
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── akshare.py            #   akshare 封装层（盈利预测/资金流向/分红）
+│   │   │   ├── bond_yield.py         #   无风险利率获取（akshare 国债收益率 + config 手动兜底）
 │   │   │   ├── chain.py              #   Provider Chain 获取链路（主→备→过期缓存）
 │   │   │   ├── fund.py               #   基金数据获取（净值/业绩排名/持仓）
 │   │   │   ├── fund_manager.py       #   基金经理数据获取
@@ -92,7 +93,9 @@ investor-util/
 │   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
 │   │   │   ├── api_base.py           #   LLM API 基类（请求/重试/流式）
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
+│   │   │   ├── cost_tracker.py       #   Token 成本跟踪与预算管理（会话级 Token 守卫）
 │   │   │   ├── fact_checker.py       #   LLM 事实锚定校验器（数值/品种/排名一致性校验）
+│   │   │   ├── fallback.py           #   LLM 故障降级模板（所有模块失败时提供占位内容，防止报告空白）
 │   │   │   ├── fingerprint.py        #   缓存指纹（请求去重，避免重复调用）
 │   │   │   ├── generators.py         #   提示词生成（全局政经/智囊团复盘）
 │   │   │   ├── generators_news.py    #   新闻分析提示词生成
@@ -100,6 +103,9 @@ investor-util/
 │   │   │   ├── markdown.py           #   LLM 输出 Markdown 解析/格式化
 │   │   │   ├── pricing.py            #   Token 计费与用量统计
 │   │   │   ├── prompts.py            #   提示词模板库
+│   │   │   ├── prompts_action.py     #   LLM 分析模块提示词构造（全局政经/智囊团复盘/体检/穿透）
+│   │   │   ├── prompts_core.py       #   核心提示词模块（系统提示常量/缓存前缀/通用格式化）
+│   │   │   ├── prompts_tables.py     #   提示词表格模块（持仓/穿透/场景分析格式化与摘要构造）
 │   │   │   ├── session.py            #   LLM 会话管理（上下文窗口/历史）
 │   │   │   ├── skeleton.py           #   LLM 内容骨架生成（结构化输出引导）
 │   │   │   └── strategy.py           #   Provider 多链切换策略引擎
@@ -167,6 +173,7 @@ investor-util/
 │   │   ├── handlers_config.py        # 配置管理命令处理器
 │   │   ├── registry.py               # 中央注册表（模块/TTL/分组定义）
 │   │   ├── provider_registry.py      # 数据源注册中心（熔断器/会话缓存）
+│   │   ├── features.py               # Feature Flag 注册中心（开关集中管理，含默认值与运行时控制）
 │   │   ├── models.py                 # 数据模型（持仓/行情/基金/新闻）
 │   │   ├── reader.py                 # 持仓 xlsx 文件读取
 │   │   ├── ansi_colors.py            # ANSI 颜色常量（终端输出着色）
@@ -212,6 +219,7 @@ investor-util/
 │   ├── calibrate-dedup-threshold.py  #   新闻去重阈值校准
 │   ├── llm_hallucination_sampler.py   #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试
+│   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 │
 ├── docs-stm/                         # 项目文档
@@ -224,6 +232,7 @@ investor-util/
 │   │   ├── how-to-start.md           #     快速上手
 │   │   ├── how-to-schedule.md       #     定时任务配置指南
 │   │   ├── how-to-test-my-code.md    #     测试编写指南
+│   │   ├── scripts-reference.md      #     辅助脚本参考（全）
 │   │   ├── how-to-use-registry.md    #     注册表使用说明
 │   │   └── reports-instruction.md    #     报告使用说明
 │   ├── managements/                  #   管理文档
@@ -237,13 +246,6 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
-│   │   ├── better-investment-advice/            #   投资建议改进分析讨论
-│   │   │   ├── discussion-better-investment-advice.md    # 可行性调研：6 层改进方向与实施路径
-│   │   │   ├── better-investment-task.md                 # 最小粒度工作任务分解（86 任务）
-│   │   │   ├── data-channels-schema.md            # 数据通道 Schema 文档（管线键定义+类型断言）
-│   │   │   ├── data-source-stability-test-report.md       # 数据源稳定性专项测试报告
-│   │   │   └── better-investment-performance-test-report.md # 端到端性能基准测试报告
-
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
@@ -319,6 +321,21 @@ investor-util/
 │   │   │   └── cli-mode/                          # CLI 命令行模式归档
 │   │   │       ├── cli-mode-iteration-plan.md     # CLI 迭代计划
 │   │   │       └── cli-mode-technical-design.md   # CLI 技术设计
+│   │   ├── v0.7.x/                            # v0.7.x 版本迭代归档
+│   │   │   ├── archived_changelog.0.7.x.md        # 变更日志归档 v0.7.x
+│   │   │   ├── archived_plan.0.7.x.md             # 实现计划归档 v0.7.x
+│   │   │   ├── archived_review-findings.0.7.x.md  # 自审记录归档 v0.7.x
+│   │   │   └── better-investment-advice/           # 投资建议改进分析讨论（已归档）
+│   │   │       ├── discussion-better-investment-advice.md             # 可行性调研：6 层改进方向与实施路径
+│   │   │       ├── better-investment-task.md                          # 最小粒度工作任务分解（86 任务）
+│   │   │       ├── data-channels-schema.md                            # 数据通道 Schema 文档
+│   │   │       ├── data-source-stability-test-report.md               # 数据源稳定性专项测试报告
+│   │   │       ├── better-investment-performance-test-report.md        # 端到端性能基准测试报告
+│   │   │       ├── r1-insert-feasibility-audit-into-discussion.py      # R1 数据源可行性审查插入脚本（最终版）
+│   │   │       ├── debug-find-insert-anchor_r1.py                     # R1 锚点定位合并调试脚本
+│   │   │       ├── llm-hallucination-report_expert-review.md           # LLM 幻觉率采样报告（expert_review 模块）
+│   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
+│   │   │       └── llm-hallucination-sample-output_expert-review.txt   # 幻觉采样 LLM 原始输出样本
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

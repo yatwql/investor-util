@@ -193,6 +193,7 @@ def generate_excel_report(
     section_order: list[dict] | None = None,
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
     history_data: dict | None = None,  # 组合历史走势数据（含基准指数）
+    debate_info: dict | None = None,
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -257,7 +258,20 @@ def generate_excel_report(
     pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
-    write_llm_section_and_usage(sheets, include_llm, llm_content, prog, section_order=order)
+    # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
+    _debate_mode_label: str | None = None
+    if debate_info and isinstance(debate_info, dict):
+        _debate_mode_label = debate_info.get("mode_label")
+    if not _debate_mode_label:
+        from src.python.features import is_feature_enabled
+
+        if is_feature_enabled("llm_debate_procon"):
+            _debate_mode_label = "🧪 辩论模式"
+        elif is_feature_enabled("llm_debate_conditional") or is_feature_enabled("llm_debate_qa_concentration"):
+            _debate_mode_label = "🧪 实验模式"
+    write_llm_section_and_usage(
+        sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
+    )
 
     # ── 组合历史走势 + 回撤分析页签（F2 数据） ──
     if enable_history:

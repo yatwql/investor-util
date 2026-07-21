@@ -6,7 +6,7 @@
   S0a: 含已清仓记录 — shares=0 的持仓自动跳过，不计入报告各项合计
   S0b: 同名基金多份额 — A/C 类份额同时持有时的穿透合并行为
   S0d: 持仓名称含特殊字符 — ®/™/♥/全角括号/繁体中文/英文混排不破坏输出
-  （S0c 超多持仓已移至 scenario/scenario_extreme/test_scenario_extreme.py）
+  S0c: 超多持仓 -> scenario/scenario_extreme/test_scenario_extreme.py
 
 运行：
   cd D:/codebase/zoo/investor-util

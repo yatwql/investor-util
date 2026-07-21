@@ -1,8 +1,5 @@
 """TUI 缓存管理命令处理器单元测试。
 
-P1-S9~S10：公共缓存 + 持仓缓存函数已迁移至 cache/operations.py，
-测试对应更新导入路径。
-
 运行：
   cd D:/codebase/zoo/investor-util
   pytest src/test/unit/handlers/test_handlers_cache.py -v

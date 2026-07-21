@@ -1,4 +1,4 @@
-"""C 迭代报告序号可配置 — 业务场景验证。
+"""报告序号可配置 — 业务场景验证。
 
 验证目标：
   - 默认顺序完整性（17 个模块，summary 开头/llm_usage 结尾）
@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
 
 class TestScenarioSectionOrder(unittest.TestCase):
-    """C 迭代报告序号可配置 — 业务场景验证。
+    """报告序号可配置 — 业务场景验证。
 
     验证默认顺序完整性、序号连续性、注册表与 Excel 命名一致性。
     """
@@ -119,7 +119,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
 
 
 class TestScenarioCustomSectionOrder(unittest.TestCase):
-    """C 迭代报告序号可配置 — 自定义顺序场景验证。
+    """报告序号可配置 — 自定义顺序场景验证。
 
     验证 `get_report_section_order(config)` 在用户自定义配置下的合并行为。
     """

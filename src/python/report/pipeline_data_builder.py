@@ -115,7 +115,7 @@ def build(
     Args:
         diff: HistoryDiff 计算的环比差异字典
         data_degradation: DegradationTracker.get_log() 降级事件列表
-        extra: 额外键值对（供 Phase 1 扩展用）
+        extra: 额外扩展键值对
 
     Returns:
         统一的 pipeline_data 字典，始终包含所有已知键（值可能为 None/空列表）
@@ -178,7 +178,7 @@ def build_prep(
         today_str: 当前日期 YYYY-MM-DD
         output_dir: 报告输出目录
         news_top_count: 新闻最大返回条数
-        extra: 额外键值对（供 Phase 1 扩展用）
+        extra: 额外扩展键值对
 
     Returns:
         合并后的 prep 字典
@@ -241,7 +241,7 @@ def merge_pipeline_data(
 ) -> dict | None:
     """合并基础 pipeline_data 与扩展字段。
 
-    用于在 capture_snapshot 返回后向 pipeline_data 追加 Phase 1 新增字段。
+    用于在 capture_snapshot 返回后向 pipeline_data 追加扩展字段。
 
     Args:
         base_pipeline_data: capture_snapshot 返回的原始 pipeline_data（可能为 None）

@@ -59,10 +59,11 @@ class DataModuleDef:
 | **行业分类（refresh）** | 行业分类 | `industry` | 14天 | 主动刷新触发 |
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
-| **补充数据（refresh）** | 盈利预测、资金流向、分红 | `profit_forecast`, `sector_flow`, `dividend` | 15min~1M | 主动刷新触发 |
+| **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | P4 实验功能，三段独立缓存（复用 expert_review 指纹） |
+| **补充数据（refresh）** | 盈利预测、资金流向、分红、无风险利率 | `profit_forecast`, `sector_flow`, `dividend`, `bond_yield` | 15min~30d | 主动刷新触发；`bond_yield` 为精确键名 `bond_yield_rf` |
 | **基金深度分析（refresh）** | 基金经理、持仓重合度、基金风格扩展数据 | `fund_manager`, `fund_overlap`, `extended` | 24h~7d | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
-| **历史走势类（无分组）** | 历史股票日线、历史基金净值 | `history_stock`, `history_fund_otc` | 1w~1M | 无分组保护，不被菜单缓存命令误删，通过 `portfolio_history.py` 内部路由自动管理 |
+| **历史走势类（无分组）** | 历史股票日线、历史基金净值、指数历史日线 | `history_stock`, `history_fund_otc`, `history_index` | 1w~1M | 无分组保护，不被菜单缓存命令误删，通过 `portfolio_history.py` 内部路由自动管理 |
 | **精确键名（含 refresh）** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | `benchmark` 归入 `refresh` 组，`tracking`/`calendar` 无分组 |
 
 ---
@@ -137,7 +138,7 @@ from src.python.registry import (
 ```python
 from src.python.registry import (
     get_report_sheet_name,           # sheet_key → 中文标题
-    get_report_section_order,        # config → dict[key → 自定义序号]
+    get_report_section_order,        # config → list[dict]（含 key/number/type/data_flag 的完整排序列表）
     get_report_section_number,       # key → 当前配置下的序号
     get_report_section_keys,         # → list[key]
 )
@@ -175,6 +176,21 @@ from src.python.registry import (
 
 完整 17 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
 
+### 计算模块查询
+
+```python
+from src.python.registry import (
+    get_computation_registry,        # → tuple[ComputModuleDef, ...]
+    get_computation_module,          # module_key → ComputModuleDef | None
+)
+```
+
+**用途：**
+- `get_computation_registry()` — 遍历所有计算/分析模块（量化指标、流动性分析、外汇敞口、情景分析、组合校准、用户画像、事实校验器），用于运行时发现和文档生成
+- `get_computation_module("analytics_metrics")` → 按 module_key 查找单个计算模块定义
+
+当前注册的计算模块见 §计算模块注册表。
+
 ---
 
 ## 消费方清单（代表性）
@@ -187,7 +203,7 @@ from src.python.registry import (
 | `cache/_groups.py` | `get_registry()` | 按组批量清除缓存 |
 | `llm/generators_orchestrator.py` | `get_llm_module_name()`, `get_llm_module_names()` | LLM 调度标签 |
 | `llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架消息映射 |
-| `handlers_report.py` | `get_llm_module_name()`, `get_report_section_order()` | 报告生成编排 |
+| `report/orchestrator.py` | `get_llm_module_name()`, `get_report_section_order()` | 报告生成编排（LLM 模块标签 + 页签排序） |
 | `handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
 | `report/excel_generator.py` | `get_report_section_order()` | Excel 页签排序 |
 | `report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入 |
@@ -292,10 +308,10 @@ class ComputModuleDef:
 | `analytics_metrics` | 量化指标 | bond_yield, history | ✅ implemented |
 | `analytics_liquidity` | 流动性分析 | — | ✅ implemented |
 | `analytics_fx_exposure` | 外汇敞口分析 | — | ✅ implemented |
-| `analytics_fact_checker` | 事实锚定校验器 | — | ✅ implemented |
 | `analytics_scenario` | 情景分析 | history | ✅ implemented |
 | `analytics_alignment` | 组合校准分析 | — | ✅ implemented |
 | `analytics_inferrer` | 用户画像推断 | — | ⏳ planned |
+| `analytics_fact_checker` | 事实锚定校验器 | — | ✅ implemented |
 
 新增计算模块只需在 `_COMPUTATION_REGISTRY` 中添加一行 `ComputModuleDef`，纯算法模块无需缓存注册。
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import copy
 import json
 import logging
 import os
@@ -671,6 +672,94 @@ def _check_unknown_llm_keys(settings: dict) -> None:
         )
 
 
+_DEBATE_CONFIG_DEFAULTS: dict[str, Any] = {
+    "mode_1_procon": {
+        "per_call_max_tokens": None,
+        "synthesis_model": None,
+        "synthesis_temperature": 0.5,
+    },
+    "mode_2_conditional": {
+        "scenarios": [
+            {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
+            {"name": "下跌", "change": -0.20, "desc": "如果未来市场下跌 20%"},
+            {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"},
+        ],
+    },
+    "mode_3_qa_concentration": {
+        "threshold": 0.20,
+    },
+    "max_total_tokens_per_report": 16000,
+    "per_call_timeout_override": 90,
+}
+
+
+def _load_debate_config(settings: dict) -> dict:
+    """解析 debate 配置段，Schema 校验失败时回退默认值。
+
+    Args:
+        settings: 从 llm_settings.json 解析的原始配置字典。
+
+    Returns:
+        合并用户值与缺省值的完整 debate 配置字典。
+    """
+    raw_debate = settings.get("debate")
+    if not isinstance(raw_debate, dict):
+        return copy.deepcopy(_DEBATE_CONFIG_DEFAULTS)
+
+    merged = copy.deepcopy(_DEBATE_CONFIG_DEFAULTS)
+
+    # mode_1_procon
+    raw_m1 = raw_debate.get("mode_1_procon")
+    if isinstance(raw_m1, dict):
+        if isinstance(raw_m1.get("per_call_max_tokens"), (int, float)) and raw_m1["per_call_max_tokens"] > 0:
+            merged["mode_1_procon"]["per_call_max_tokens"] = raw_m1["per_call_max_tokens"]
+        elif raw_m1.get("per_call_max_tokens") is not None:
+            logger.warning("[debate] mode_1_procon.per_call_max_tokens 应为正数或 null，使用默认值 None")
+        if isinstance(raw_m1.get("synthesis_model"), str) and raw_m1["synthesis_model"].strip():
+            merged["mode_1_procon"]["synthesis_model"] = raw_m1["synthesis_model"].strip()
+        if isinstance(raw_m1.get("synthesis_temperature"), (int, float)):
+            if 0.0 <= raw_m1["synthesis_temperature"] <= 2.0:
+                merged["mode_1_procon"]["synthesis_temperature"] = raw_m1["synthesis_temperature"]
+            else:
+                logger.warning("[debate] mode_1_procon.synthesis_temperature 应在 [0.0, 2.0] 范围，使用默认值 0.5")
+
+    # mode_2_conditional
+    raw_m2 = raw_debate.get("mode_2_conditional")
+    if isinstance(raw_m2, dict):
+        raw_scenarios = raw_m2.get("scenarios")
+        if isinstance(raw_scenarios, list) and raw_scenarios:
+            validated: list[dict] = []
+            for idx, s in enumerate(raw_scenarios):
+                if isinstance(s, dict) and "name" in s and "desc" in s:
+                    validated.append({"name": str(s["name"]), "change": s.get("change", 0.0), "desc": str(s["desc"])})
+                else:
+                    logger.warning("[debate] mode_2_conditional.scenarios[%d] 格式无效，已跳过", idx)
+            if validated:
+                merged["mode_2_conditional"]["scenarios"] = validated
+            else:
+                logger.warning("[debate] mode_2_conditional.scenarios 全部无效，使用默认情景")
+
+    # mode_3_qa_concentration
+    raw_m3 = raw_debate.get("mode_3_qa_concentration")
+    if isinstance(raw_m3, dict):
+        raw_threshold = raw_m3.get("threshold")
+        if isinstance(raw_threshold, (int, float)) and 0.0 < raw_threshold < 1.0:
+            merged["mode_3_qa_concentration"]["threshold"] = raw_threshold
+        elif raw_threshold is not None:
+            logger.warning("[debate] mode_3_qa_concentration.threshold 应在 (0, 1) 范围，使用默认值 0.20")
+
+    # 顶层标量
+    raw_total = raw_debate.get("max_total_tokens_per_report")
+    if isinstance(raw_total, (int, float)) and raw_total > 0:
+        merged["max_total_tokens_per_report"] = int(raw_total)
+
+    raw_timeout = raw_debate.get("per_call_timeout_override")
+    if isinstance(raw_timeout, (int, float)) and raw_timeout > 0:
+        merged["per_call_timeout_override"] = int(raw_timeout)
+
+    return merged
+
+
 def _ensure_llm_settings_file() -> None:
     """若 llm_settings.json 不存在，用默认值自动创建。"""
     config = get_config()
@@ -999,6 +1088,7 @@ def get_llm_config() -> dict | None:
             logger.warning("LLM 密钥文件不存在: %s", _get_llm_key_path())
             if base_settings.get("api_key"):
                 base_settings["api_key"] = base_settings["api_key"].strip()
+                base_settings["debate"] = _load_debate_config(base_settings)
                 _llm_config_cache = _inject_provider_chain_data(base_settings)
                 _llm_config_mtime = 0
                 _llm_config_size = 0
@@ -1006,6 +1096,7 @@ def get_llm_config() -> dict | None:
             # 检查 llm_providers.json 是否有 provider（链模式可不依赖 llm_key.json）
             raw_providers = _load_llm_providers()
             if raw_providers and raw_providers.get("providers"):
+                base_settings["debate"] = _load_debate_config(base_settings)
                 _llm_config_cache = _inject_provider_chain_data(base_settings)
                 _llm_config_mtime = 0
                 _llm_config_size = 0
@@ -1040,6 +1131,7 @@ def get_llm_config() -> dict | None:
 
             merged = dict(base_settings)
             merged.update(key_config)
+            merged["debate"] = _load_debate_config(merged)
             if merged.get("api_key"):
                 merged["api_key"] = merged["api_key"].strip()
 

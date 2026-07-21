@@ -126,13 +126,13 @@ LLM 配置拆分为三个独立文件，分工明确：
   },
   "gemini-fb": {
     "api_key": "AIzaSyYourGeminiKey",
-    "model": "gemini-2.0-flash",
+    "model": "gemini-3.5-flash",
     "endpoint": "https://generativelanguage.googleapis.com/v1beta"
   }
 }
 ```
 
-> **注意**：`llm_key.json` 使用多键格式时，不再使用顶层 `provider` / `api_key` / `model` / `endpoint` 字段，而是为每个 `credentials_ref` 定义独立的命名凭据块。`llm_providers.json` 中的 `credentials_ref` 值必须与 `llm_key.json` 中的键名精确匹配。
+> **注意**：`llm_key.json` 使用多键格式时，顶层 `provider` / `api_key` / `model` / `endpoint` 字段无效，需要为每个 `credentials_ref` 定义独立的命名凭据块。`llm_providers.json` 中的 `credentials_ref` 值必须与 `llm_key.json` 中的键名精确匹配。
 
 ### Provider 条目字段
 
@@ -159,6 +159,37 @@ LLM 配置拆分为三个独立文件，分工明确：
 
 > `proxy_preferred` 不是策略类型，而是 provider 条目级别的后处理标记。启用时，该条目的请求将优先通过代理发送（若系统配置了代理），而非直连。
 
+### 模块级 Provider 偏好
+
+当特定 LLM 模块（如智囊团深度复盘）需要使用指定的 provider，而其他模块沿用默认排序时，可通过 `preferred_providers` 字段配置模块级偏好：
+
+```json
+{
+  "strategy": "priority",
+  "preferred_providers": {
+    "expert_review": "gemini-fallback",
+    "health_check": "gemini-fallback"
+  },
+  "providers": [
+    { "name": "deepseek-main", "provider": "claude", "credentials_ref": "deepseek-main", "priority": 10, "timeout": 120 },
+    { "name": "gemini-fallback", "provider": "gemini", "credentials_ref": "gemini-fb", "priority": 20, "timeout": 60 }
+  ]
+}
+```
+
+上述配置的效果：
+
+| 模块 | module_key | Chain 排序 | 优先尝试 |
+|------|-----------|-----------|---------|
+| 智囊团深度复盘 | `expert_review` | `[gemini-fallback, deepseek-main]` | Gemini |
+| 持仓体检报告 | `health_check` | `[gemini-fallback, deepseek-main]` | Gemini |
+| 全球政经局势 | `global_macro`（未配置） | `[deepseek-main, gemini-fallback]` | DeepSeek |
+| 穿透深度分析 | `penetration_deep`（未配置） | `[deepseek-main, gemini-fallback]` | DeepSeek |
+
+> **module_key 规则**：对应 `llm_settings.json` 中 `max_tokens_{module_key}` 的 `{module_key}` 部分。有效值：`global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`。
+>
+> `preferred_providers` 中的 provider 名称必须与 `providers[].name` 精确匹配，否则该条配置会被忽略并记录警告日志。
+
 ### 配置检查
 
 TUI 菜单 **[S]** 查看状态时会显示多链模式详情：
@@ -169,8 +200,8 @@ LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
 
 ### 兼容性
 
-- 多链模式与旧版 flat 格式（`llm_key.json` 含顶层 `api_key` / `provider`）**并存兼容**。检测到 `llm_key.json` 有顶层 `api_key` 时自动使用 flat 模式，否则按 `credentials_ref` 多链模式解析
-- 不需要多链时，保持旧版 flat 格式即可，`llm_providers.json` 可不配置
+- 多链模式与 flat 格式（`llm_key.json` 含顶层 `api_key` / `provider`）**并存兼容**。检测到 `llm_key.json` 有顶层 `api_key` 时自动使用 flat 模式，否则按 `credentials_ref` 多链模式解析
+- 不需要多链时，保持 flat 格式即可，`llm_providers.json` 可不配置
 
 ---
 
@@ -244,20 +275,21 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 > 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation）。
 
-配置分为**全局配置**和**模块级配置**两类。全局配置共有 5 项：
+配置分为**全局配置**和**模块级配置**两类。全局配置共有 6 项：
 
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
+- `debate`（dict，可选实验功能）：辩论模式配置。含 mode_1_procon（三段式正反辩论）、mode_2_conditional（条件情景推理）、mode_3_qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
 
 ### 模块级配置
 
 | 配置键 | 类型 | 默认值（各模块不同） | 说明 |
 |--------|:----:|:--------------------:|------|
 | `system_prompt_{module}` | string / null | `null` | 系统提示词覆盖，`null`=使用代码内置 prompt |
-| `model_{module}` | string / null | `null` | 独立指定本模块使用的模型，`null`=使用 Provider 的默认模型（flat 模式取 `llm_key.json`，多链模式取 `llm_providers.json` 中该 Provider 凭据块的 model） |
+| `model_{module}` | string / null | `null` | 独立指定本模块使用的模型，`null`=使用 Provider 默认模型。**仅 flat 模式生效；多链模式优先使用 `llm_providers.json` 中凭据块定义的模型** |
 | `temperature_{module}` | float | 0.1~0.8（模块差异） | 采样温度，0=确定性最高，1=最大多样性 |
 | `max_tokens_{module}` | int | 1024~8192（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试） |
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
@@ -365,6 +397,36 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "news_correlation_top_n": 30,
 
   // ═══════════════════════════════════════════
+  // 辩论模式（实验功能，缺省关闭）
+  // 通过 Feature Flag 控制启停，菜单 [S] 可交互开关
+  // ═══════════════════════════════════════════
+  "debate": {
+    // M1 正反辩论 — 三段式(白脸→黑脸→综合)
+    "mode_1_procon": {
+      "per_call_max_tokens": null,
+      "synthesis_model": null,
+      "synthesis_temperature": 0.5
+    },
+    // M2 条件推理 — 情景化分析
+    "mode_2_conditional": {
+      // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)
+      "scenarios": [
+        {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
+        {"name": "下跌", "change": -0.20, "desc": "如果未来市场下跌 20%"},
+        {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"}
+      ]
+    },
+    // M3 集中度问答 — 集中度风险问答块
+    "mode_3_qa_concentration": {
+      "threshold": 0.20
+    },
+    // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
+    "max_total_tokens_per_report": 16000,
+    // 辩论模式单次 API 调用超时覆盖（秒）
+    "per_call_timeout_override": 90
+  },
+
+  // ═══════════════════════════════════════════
   // 计价配置
   // ═══════════════════════════════════════════
   "pricing": {
@@ -384,7 +446,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 | 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | output_brief_limit |
 |------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:------------------:|
-| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **1024** | **60s** | false | 4000 | **200 字** |
+| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | **200 字** |
 | **智囊团深度复盘** | null | **0.8**（高温促多元） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
 | **持仓体检报告** | null | **0.5**（居中平衡） | **4096** | **120s** | **true** | 12000 | 300 字 |
 | **穿透深度分析** | null | **0.4**（中低温稳定） | **4096** | **90s** | false | 8000 | 300 字 |
@@ -522,7 +584,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 ```
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
-- 模型：`deepseek-v4-flash`（推荐，**注意全小写**，当前主版本）、`deepseek-chat`（V3 旧版，功能受限）
+- 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-chat`（V3，功能受限）
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
 
@@ -645,7 +707,7 @@ python -m src.python.main
 | `gpt-4o-mini` | 0.15 | 0.60 | 0.15 | OpenAI 轻量（缓存无折扣） |
 | `deepseek-v4-flash` | 1.00 | 2.00 | 0.02 | ⭐ 高性价比推荐，默认模型 |
 | `deepseek-v4-pro` | 3.00 | 6.00 | 0.025 | DeepSeek 增强推理 |
-| `deepseek-chat` | 1.00 | 2.00 | 0.02 | DeepSeek V3 旧版 |
+| `deepseek-chat` | 1.00 | 2.00 | 0.02 | DeepSeek V3 |
 
 > **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash：输入 3000 tokens × ¥1 + 输出 2000 tokens × ¥2 = ¥0.007/次。缓存命中时输入部分按 `input_cache_hit` 计费。
 >

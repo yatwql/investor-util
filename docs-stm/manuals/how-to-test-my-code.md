@@ -1,6 +1,6 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 文档版本：v0.7.7-dev
+> 文档版本：v0.8.1-dev
 
 ## 概述
 
@@ -302,63 +302,7 @@ pytest src/test/ -m "<对应标记>" --lf
 
 ## 辅助脚本
 
-### 📐 新闻去重阈值校准 — `scripts/calibrate-dedup-threshold.py`
-
-新闻标题去重（`news_aggregator.py:_dedup_by_title`）使用同源/跨源两档阈值 + 中文实体 bigram 辅助判定。去重逻辑在每次报告运行时自动记录"边界案例"（ratio 或 bigram 接近阈值的比较对）到 `data/cache/dedup_anchors.jsonl`（append-only，约 200 字节/条）。
-
-积累足够锚点后，可用此脚本分析当前阈值是否合理：
-
-```bash
-# 分析全部锚点，输出建议
-python scripts/calibrate-dedup-threshold.py
-
-# 仅看汇总统计（不展开详细列表）
-python scripts/calibrate-dedup-threshold.py --summary
-
-# 指定锚点文件
-python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.jsonl
-```
-
-**校准时机**：建议锚点文件积累 **100 条以上**（约 5~10 次报告运行）后校准一次。脚本只分析不自动修改阈值，是否需要调整以及调多少由开发者判断。
-
-**输出示例**：
-
-```
-=== cross_skip（跨源 ≥0.30 但 bigram<3 被跳过 — 潜在漏判）===
-  数量: 12
-  ratio 范围: 0.300 ~ 0.450
-  bigram 范围: 0 ~ 2
-
-=== 校准建议 ===
-[!] cross_threshold=0.30: 5 条 ratio≥0.35 被跳过
-    建议审查这些案例是否应为重复
-[OK] 跨源 bigram=3: 无边界样本
-```
-
-### 🤖 LLM 幻觉率采样测试 — `scripts/llm_hallucination_sampler.py`
-
-LLM 生成的投资分析报告可能包含幻觉（与持仓数据不符的事实性错误）。此脚本对 **10 组标准化持仓数据** 调用当前 prompt，经事实校验器验证后统计幻觉率。
-
-```bash
-# 完整采样（调用 LLM API 对 10 组数据生成分析）
-python scripts/llm_hallucination_sampler.py
-
-# 仅测试特定模块（默认 expert_review）
-python scripts/llm_hallucination_sampler.py --module health_check
-
-# 仅测试特定数据集（1-indexed）
-python scripts/llm_hallucination_sampler.py --dataset 1,3,5
-
-# 跳过 API 调用，只构建 prompt 验证结构
-python scripts/llm_hallucination_sampler.py --dry-run
-
-# 跳过缓存强制重新生成
-python scripts/llm_hallucination_sampler.py --force
-```
-
-**输出**：
-- 报告文件：`docs-stm/tmp/hallucination-report.md`
-- Dry-run prompt 转储：`docs-stm/tmp/hallucination-prompts-{module}.md`
+> 所有辅助脚本的完整参考（含测试驱动/失败提取/标记检查/幻觉率采样/去重校准/版本一致性检查/性能基准/Gemini 诊断）详见 [`scripts-reference.md`](./scripts-reference.md)。
 
 **数据集简介**（共 10 组）：
 
@@ -494,15 +438,67 @@ pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 - **标记规则**：单元测试用 `pytestmark` 模块级列表（`[pytest.mark.unit, pytest.mark.<子组>]`），场景测试用类级 `@pytest.mark.scenario + @pytest.mark.<子组>`，edge 测试在 `pytestmark` 中追加 `pytest.mark.edge`
 - 新增文件后运行 `python scripts/check-test-markers.py` 验证标记合规性
 
-## 新增测试文件流程
+## 新增测试指南
 
-为新增模块添加测试时，按以下步骤操作：
+新增测试用例时，按以下流程操作：
 
-1. **创建测试文件**：按功能域放入对应 `src/test/` 子目录，命名 `test_<模块>.py`
-2. **编写测试**：继承 `unittest.TestCase`，方法命名 `test_<场景>`
-3. **添加标记**：按上方"测试文件规范"中的标记规则标注
-4. **验证标记合规**：`python scripts/check-test-markers.py`，无报错继续
-5. **本地确认**：`pytest src/test/<子目录>/test_<模块>.py -v` 全部通过
+### 确定测试类型和文件位置
+
+| 测试类型 | 放哪里 | 示例 |
+|:---------|:-------|:-----|
+| **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache.py` 追加 `TestCacheEdgeCases` |
+| **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
+| **业务场景测试** | `test_integration.py`（基础链路 S1-S5）或 `test_integration_scenarios.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_integration.py` |
+| **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
+| **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
+| **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S34 |
+| **报告序号场景** | `test_scenario_section_order.py` | C-P1b |
+| **LLM 场景测试** | `test_llm_scenarios.py` | S11-S20 |
+| **日期/时间场景** | `test_datetime_scenarios.py` | T1-T21 |
+| **辩论模式场景** | `test_llm_scenarios.py`（归属 LLM 大场景组） | D1-D3 |
+| **辩论模式单元测试** | `unit/llm/test_debate_*.py` | generators/prompts/edge/token_budget/conditional/qa |
+| **缺陷回归测试** | 对应模块的 `test_*.py` 或 `test_regression.py` | Bug fix 的断言 |
+| **边缘/异常场景测试** | 对应模块的 `test_<module>_edge.py` | 使用 `@pytest.mark.edge` 标记，放置于模块目录下 |
+
+### 命名规范
+
+```python
+# 测试类名 — 模块/场景名 + 测试维度
+class TestCacheEdgeCases:          # 模块 + 测试类型
+class TestGetTtlMarketAware:       # 函数名 + 场景
+class TestScenarioS21:             # 新业务场景递增
+
+# 测试方法名 — test_ + 场景 + 预期结果
+def test_empty_holdings_returns_zero(self):
+def test_ttl_during_trading_hours_returns_30s(self):
+def test_qdii_nav_date_delayed_t2(self):
+```
+
+### 新增后必须更新的文件
+
+1. **`test-coverage.md` 场景测试分组表** — 新增 S/T/D 场景时补充条目（含测试类参考列）
+2. **`folders.md`** — 新增 test_*.py 文件后更新目录树
+3. **`changelog.md`** — 记录新增的测试数量和覆盖场景
+4. **`plan.md`** — 如果在迭代中新增的功能，更新对应条目的完成状态
+5. **`unit/conftest.py`** — 新增 `unit/` 下测试文件时确认 `pytestmark` 列表包含正确的 `unit_*` 子标记
+
+### 新增后必须执行的验证
+
+```bash
+pytest src/test/                                   # 全量通过
+pytest --co                                         # 无 patch 残留污染
+pytest src/test/unit/core/test_registry.py --co -v      # 新文件隔离（示例）
+python scripts/check-test-markers.py                # 标记合规性检查（AST 静态扫描）
+```
+
+### 文件膨胀阈值
+
+| 指标 | 警告线 | 红线 | 措施 |
+|:-----|:------:|:----:|:-----|
+| 单文件测试数 | > 80 项 | > 120 项 | 拆分到子文件 `test_xxx_part1.py` / `test_xxx_part2.py` |
+| 单文件行数 | > 800 行 | > 1200 行 | 考虑按被测函数 / 场景类型拆分 |
+| 单类方法数 | > 15 项 | > 25 项 | 拆为多个 Test 类或拆分文件 |
+| 单方法 mock 数 | > 5 个 patch | > 8 个 patch | 重构被测函数以降低耦合 |
 
 ## 常见问题
 

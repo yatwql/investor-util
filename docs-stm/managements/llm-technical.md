@@ -1,6 +1,6 @@
 # LLM 集成层技术设计
 
-> 文档版本：v0.7.7-dev
+> 文档版本：v0.8.1-dev
 
 ## 目录
 
@@ -91,10 +91,14 @@
               │ cost_tracker.py  │          │ markdown.py        │
               │ Token预算/摘要   │          │ MD→HTML 转换       │
               └──────────────────┘          └────────────────────┘
+              ┌──────────────────┐          ┌────────────────────┐
+              │ circuit_breaker  │          │ fact_checker.py    │
+              │ .py              │          │ 伪代码/幻觉过滤    │
+              │ LLM 端点熔断器    │          └────────────────────┘
+              └──────────────────┘
               ┌──────────────────┐
-              │ circuit_breaker  │
-              │ .py              │
-              │ LLM 端点熔断器    │
+              │ fallback.py      │
+              │ 降级占位模板      │
               └──────────────────┘
 ```
 
@@ -135,7 +139,9 @@ skeleton.py:_generate_llm_content()
 
 ## 2. 模块清单
 
-### 2.1 13 子模块总览
+### 2.1 16 子模块总览
+
+说明：`prompts.py` 逻辑上已拆分为 `prompts_core.py` / `prompts_tables.py` / `prompts_action.py` 3 文件，`prompts.py` 仍保留为 re-export 入口供外部模块兼容导入。
 
 | 模块 | 分类 | 职责 | 入口函数 |
 |:-----|:-----|:------|:---------|
@@ -146,7 +152,9 @@ skeleton.py:_generate_llm_content()
 | `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、Gemini API 调用 | `_call_llm()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `_call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
-| `prompts_core.py` | 工具 | System/User Prompt 构建（拆分自 prompts.py，与 tables/action 为同级文件） | `_build_system_prompt()` / `_build_user_prompt()` |
+| `fact_checker.py` | 基础设施 | LLM 输出伪代码/虚假信息过滤，正则级行级幻觉检测 | `run_fact_check()` |
+| `fallback.py` | 基础设施 | 全模块失败时的降级占位模板 | `get_fallback_content()` |
+| `prompts_core.py` | 工具 | System/User Prompt 构建（拆分自 prompts.py） | `_build_system_prompt()` / `_build_user_prompt()` |
 | `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown（拆分自 prompts.py） | `_build_metrics_table()` / `_build_performance_table()` |
 | `prompts_action.py` | 工具 | 行动建议表格/诊断结论格式化（拆分自 prompts.py） | `_build_action_table()` / `_build_diagnosis_block()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `_compute_fingerprint()` |
@@ -747,7 +755,7 @@ cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
 
 ## 8. 提示词管理
 
-### 8.1 四个 System Prompt
+### 8.1 五个 System Prompt
 
 **全球政经局势** (`_SYSTEM_GLOBAL_MACRO`)：资深宏观经济学家角色，500 字内，3-4 段评估主要经济体政策走向+地缘风险+对持仓潜在影响。纯文本输出，无 HTML。
 
@@ -767,6 +775,8 @@ cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
 - 成本结构（分布与浮盈浮亏比）
 
 **穿透深度分析** (`_SYSTEM_PENETRATION_DEEP`)：三节分析（行业集中度、品种集中度、国别/币种暴露）+ 综合建议。
+
+**新闻关联分析** (`_SYSTEM_NEWS_CORRELATION`)：批量分析模式下使用的 System Prompt，要求 LLM 按 JSON 数组格式输出每条新闻与持仓组合的关联度评分、影响方向（正面/负面/中性）及简要理由。每批最多 10 条新闻，分析时需引用品种代码，禁止虚构数据。
 
 ### 8.2 User Prompt 构建
 
@@ -831,7 +841,7 @@ _session_usage = {
 | `reset_budget(input_budget)` | 每份报告开始时重置预算状态 |
 | `check_input_budget(module, input_tokens)` | 调用前检查是否超预算 |
 | `get_budget_status()` | 查询当前预算使用情况 |
-| `get_cost_summary(for_report=True)` | 生成成本摘要文本（compact/verbose 模式） |
+| `get_cost_summary(for_report=True)` | 生成成本摘要文本（`for_report=True` 对应 verbose 模式） |
 
 ### 9.1a duration 字段
 
@@ -1143,10 +1153,19 @@ LLM 集成层与系统其他组件的接口：
 
 | 模型 | 输入 | 输出 | 缓存命中 |
 |:-----|:----:|:----:|:--------:|
+| claude-fable-5 | 3.00 | 15.00 | 0.30 |
+| claude-haiku-4-5 | 0.25 | 1.25 | 0.025 |
 | claude-opus-4-8 | 15.00 | 75.00 | 1.50 |
 | claude-sonnet-4-6 | 3.00 | 15.00 | 0.30 |
-| deepseek-chat | 0.50 | 2.00 | 0.08 |
-| gemini-2.5-flash | 0.15 | 0.60 | 0.03 |
+| deepseek-chat | 1.00 | 2.00 | 0.02 |
+| deepseek-v4-flash | 1.00 | 2.00 | 0.02 |
+| deepseek-v4-pro | 3.00 | 6.00 | 0.025 |
+| gemini-2.0-flash | 0.10 | 0.40 | 0.01 |
+| gemini-2.5-flash | 0.15 | 0.60 | 0.015 |
+| gemini-2.5-pro | 1.25 | 5.00 | 0.125 |
+| gemini-3.5-flash | 0.15 | 0.60 | 0.015 |
+| gpt-4o | 2.50 | 10.00 | 2.50 |
+| gpt-4o-mini | 0.15 | 0.60 | 0.15 |
 
 费用按 `(input_tokens × 输入单价 + output_tokens × 输出单价 + cache_hit_tokens × 缓存命中单价) / 1_000_000` 计算。
 

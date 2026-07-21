@@ -218,7 +218,12 @@ def _cmd_config_output_dir() -> None:
 
 
 def _cmd_config_llm_modules() -> None:
-    """配置各 LLM 报告的启用/停用（编辑 llm_settings.json 的 enabled_llm）。"""
+    """配置各 LLM 报告的启用/停用（llm_settings.json + features.json 辩论开关）。
+
+    标准 LLM 模块（1-5）通过 enabled_llm 控制，存储在 llm_settings.json。
+    辩论模式增强（6-8）通过 Feature Flag 控制，存储在 features.json。
+    """
+    from src.python.features import is_feature_enabled, save_feature_overrides, set_feature_enabled
     from src.python.registry import get_llm_module_names
 
     result = _read_llm_settings()
@@ -229,20 +234,42 @@ def _cmd_config_llm_modules() -> None:
     enabled_map = settings.get("enabled_llm", {})
     module_names = get_llm_module_names()
 
+    # 辩论模式开关定义：(flag_key, 显示名, 说明)
+    DEBATE_FLAGS: list[tuple[str, str, str]] = [
+        ("llm_debate_procon", "辩论-M1 正反辩论", "三段式(白脸→黑脸→综合)"),
+        ("llm_debate_conditional", "辩论-M2 条件推理", "情景化分析(涨/跌/震荡)"),
+        ("llm_debate_qa_concentration", "辩论-M3 集中度问答", "集中度风险问答"),
+    ]
+
     while True:
         print()
         print("  ┌── 配置支持LLM的报告分析章节 ──────────────┐")
-        items = []
+        items: list[tuple[int, str, str, bool, str]] = []
+
+        # ① 标准 LLM 模块（1-5）
         for i, (sfx, name) in enumerate(module_names.items(), 1):
             status = enabled_map.get(sfx, True)
             status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
-            items.append((i, sfx, name, status))
+            items.append((i, sfx, name, status, "llm"))
             print(f"  │ {i}. {name:<14s} [{status_str}]{' ' * 4}│")
+
+        # 分隔线
+        print(f"  │{'─' * 42}│")
+
+        # ② 辩论模式开关（6-8）
+        for j, (flag, label, _desc) in enumerate(DEBATE_FLAGS, len(module_names) + 1):
+            status = is_feature_enabled(flag)
+            status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
+            items.append((j, flag, label, status, "debate"))
+            print(f"  │ {j}. {label:<14s} [{status_str}]{' ' * 4}│")
+
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
+        print("  ⚡ 辩论模式默认关闭，开启后智囊团复盘输出含辩论内容")
         print()
         try:
-            choice = input("  输入编号切换 (0-5): ").strip()
+            total = len(items)
+            choice = input(f"  输入编号切换 (0-{total}): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -254,11 +281,18 @@ def _cmd_config_llm_modules() -> None:
             idx = int(choice)
             matched = [it for it in items if it[0] == idx]
             if matched:
-                _, sfx, name, curr = matched[0]
-                enabled_map[sfx] = not curr
-                settings["enabled_llm"] = enabled_map
-                _write_llm_settings(settings, settings_path)
-                print(f"  {GREEN}[OK]{RESET} {name} 已{'开启' if not curr else '关闭'}")
+                _, key, name, curr, kind = matched[0]
+                new_val = not curr
+                if kind == "llm":
+                    enabled_map[key] = new_val
+                    settings["enabled_llm"] = enabled_map
+                    _write_llm_settings(settings, settings_path)
+                else:
+                    set_feature_enabled(key, new_val)
+                    save_feature_overrides({key: new_val})
+                print(f"  {GREEN}[OK]{RESET} {name} 已{'开启' if new_val else '关闭'}")
+                # 刷新配置缓存
+                refresh_config()
             else:
                 print(f"  {YELLOW}[!]{RESET} 无效编号")
         except (ValueError, TypeError):

@@ -26,8 +26,12 @@ from src.python.llm.prompts_tables import (
     _format_holdings_block,
     _format_penetration_block,
     _build_metrics_table_block,
+    _build_scenario_block,
+    _build_alignment_block,
     _build_data_quality_detail_block,
 )
+
+logger = logging.getLogger("invest")
 
 logger = logging.getLogger("invest")
 
@@ -104,6 +108,82 @@ def _build_global_macro_prompt(
     )
 
 
+# ── 集中度反问引导 ──────────────────────────────────────────
+
+
+def _build_qa_concentration_block(
+    holdings_details: list[dict] | None,
+    total_mv: float,
+    threshold: float = 0.20,
+    industry_concentration: dict[str, float] | None = None,
+) -> str:
+    """构建集中度反问段落。
+
+    检查持仓集中度，命中任一阈值即追加反问段落。
+    纯计算函数，不涉及 LLM 调用。
+
+    Args:
+        holdings_details: 持仓明细列表，每项含 name/code/mv 等字段。
+        total_mv: 持仓总市值。
+        threshold: 单品种占比警戒阈值（默认 20%）。
+        industry_concentration: 可选行业集中度字典 {行业名: 占比}。
+
+    Returns:
+        反问段落字符串（无触发时返回空字符串）。
+    """
+    if not holdings_details or total_mv <= 0:
+        return ""
+
+    questions: list[str] = []
+
+    # 触发器①：单品种占比 > threshold
+    for h in holdings_details:
+        mv = h.get("mv", 0) or 0
+        ratio = mv / total_mv if total_mv > 0 else 0
+        if ratio > threshold:
+            name = h.get("name", h.get("code", "未知"))
+            questions.append(
+                f"1. **{name} 占比 {ratio:.1%}**，远超 {threshold:.0%} 警戒线。"
+                "若该品种出现极端行情，可能对组合整体造成显著冲击。"
+            )
+            break  # 只需提示最突出的一个
+
+    # 触发器②：前 3 品种合计 > 60%
+    sorted_by_mv = sorted(holdings_details, key=lambda x: x.get("mv", 0) or 0, reverse=True)
+    top3_ratio = sum((h.get("mv", 0) or 0) for h in sorted_by_mv[:3]) / total_mv
+    if top3_ratio > 0.60:
+        questions.append(
+            f"2. **前 3 大品种合计 {top3_ratio:.1%}**，集中度偏高。"
+            "您是否评估过前 3 品种同时回调对组合的影响？"
+        )
+
+    # 触发器③：行业穿透集中度
+    if industry_concentration:
+        risky_industries = {k: v for k, v in industry_concentration.items() if v > 0.40}
+        for ind_name, ind_ratio in sorted(risky_industries.items(), key=lambda x: -x[1]):
+            questions.append(
+                f"3. **{ind_name}行业穿透后占比 {ind_ratio:.1%}**，"
+                "超过 40% 行业集中度预警线。该行业若出现政策或周期风险，"
+                "将对穿透层资产产生系统性影响。"
+            )
+            break  # 只需提示最突出的一个行业
+
+    if not questions:
+        return ""
+
+    lines = [
+        "\n\n### 思考\n",
+        "您是否考虑过以下问题？\n",
+    ]
+    lines.extend(questions)
+    lines.append("\n（以上问题旨在引发思考，无需在本次报告中回答。）")
+    return "".join(lines)
+
+
+# ── 条件推理 + 反问引导 ─────────────────────────────────────
+# 通过 _build_expert_review_prompt 的 enable_mode_2/enable_mode_3 参数控制
+
+
 def _build_expert_review_prompt(
     total_mv: float,
     total_cost: float,
@@ -116,6 +196,10 @@ def _build_expert_review_prompt(
     pipeline_data: dict | None = None,
     competitive_context: str | None = None,
     metrics: dict | None = None,
+    *,  # 以下为实验模式参数
+    enable_mode_2: bool = False,
+    enable_mode_3: bool = False,
+    industry_concentration: dict[str, float] | None = None,
 ) -> str:
     """构建智囊团深度复盘的用户提示词（紧凑格式）。
 
@@ -165,6 +249,14 @@ def _build_expert_review_prompt(
     metrics_text = _build_metrics_table_block(metrics)
     if metrics_text:
         parts.append(metrics_text)
+    # 情景分析（Beta CI 传播）
+    scenario_text = _build_scenario_block(metrics.get("scenario_analysis") if metrics else None)
+    if scenario_text:
+        parts.append(scenario_text)
+    # 口径修正因子（费率/现金剥离/TWR）
+    alignment_text = _build_alignment_block(metrics.get("alignment_summary") if metrics else None)
+    if alignment_text:
+        parts.append(alignment_text)
     # 行动建议模板
     parts.append(
         "\n【行动建议】\n"
@@ -194,6 +286,37 @@ def _build_expert_review_prompt(
         "避免与基准指数的实际表现严重偏离。\n"
         "给出优化建议和风险预警。",
     ]
+
+    # ── 条件推理情景追加 ────────────────────────────────
+    if enable_mode_2:
+        try:
+            from src.python.config._core import get_llm_config
+            _cfg = get_llm_config()
+            _scenarios = (_cfg or {}).get("debate", {}).get("mode_2_conditional", {}).get("scenarios", [])
+            if _scenarios:
+                scenario_lines = ["\n\n### 情景分析"]
+                for _s in _scenarios:
+                    _name = _s.get("name", "未知")
+                    _desc = _s.get("desc", "")
+                    _change = _s.get("change", 0)
+                    scenario_lines.append(
+                        f"📈 **{_name}情景（{_desc}）**：至少 2 句具体行动建议，"
+                        f"分析在 {_desc} 情境下应如何调整持仓。"
+                    )
+                parts.append("\n".join(scenario_lines))
+        except Exception:
+            logger.warning("[debate] 条件推理情景追加失败，已跳过")
+
+    # ── 集中度反问引导 ──────────────────────────────────
+    if enable_mode_3:
+        _qa_block = _build_qa_concentration_block(
+            holdings_details, total_mv,
+            threshold=0.20,  # 默认值，可由调用方传入
+            industry_concentration=industry_concentration,
+        )
+        if _qa_block:
+            parts.append(_qa_block)
+
     return "\n".join(parts)
 
 
@@ -316,9 +439,30 @@ def _build_penetration_deep_prompt(
     )
 
 
+# ── 辩论模式：综合 prompt 构建 ──────────────────────────────
+
+
+def _build_debate_synthesis_prompt(pro_text: str, con_text: str) -> str:
+    """构建综合阶段的用户 prompt，包含白脸和黑脸的原始分析全文。
+
+    Args:
+        pro_text: 白脸分析的完整文本。
+        con_text: 黑脸分析的完整文本。
+
+    Returns:
+        格式化的综合 prompt 字符串。
+    """
+    return (
+        f"白脸原始分析：\n\n```markdown\n{pro_text}\n```\n\n"
+        f"黑脸原始分析：\n\n```markdown\n{con_text}\n```"
+    )
+
+
 __all__ = [
     "_build_global_macro_prompt",
     "_build_expert_review_prompt",
     "_build_health_check_prompt",
     "_build_penetration_deep_prompt",
+    "_build_debate_synthesis_prompt",
+    "_build_qa_concentration_block",
 ]

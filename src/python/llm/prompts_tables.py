@@ -6,6 +6,9 @@
   - _calc_country_exposure — 国别/币种暴露计算
   - _build_holdings_summary — 持仓摘要构建（新闻关联分析用）
   - _build_news_correlation_summary — 新闻摘要构建
+  - _build_metrics_table_block — 量化指标表格
+  - _build_scenario_block — 情景分析文本块
+  - _build_alignment_block — 口径修正文本块
 """
 from __future__ import annotations
 
@@ -152,6 +155,55 @@ def _build_metrics_table_block(metrics: dict | None) -> str:
         lines.append("组合Beta: --（数据不足）")
 
     return "\n".join(lines)
+
+
+def _build_scenario_block(scenario: dict | None) -> str:
+    """构建情景分析文本块。
+
+    基于 scenario_analysis() 的 6 种市场情景输出 Beta CI 传播结果。
+
+    Args:
+        scenario: scenario_analysis() 的输出字典
+
+    Returns:
+        格式化的情景分析文本块。无数据时返回空字符串。
+    """
+    if not scenario or not scenario.get("has_data"):
+        return ""
+
+    lines = ["【情景分析（Beta 置信区间传播）】"]
+    beta = scenario.get("beta")
+    if beta is not None:
+        lines.append(f"组合 Beta: {beta:.2f}")
+    else:
+        lines.append("组合 Beta: --")
+
+    scenarios = scenario.get("scenarios", [])
+    for s in scenarios:
+        mkt = s.get("market_change")
+        exp_pct = s.get("expected_change_pct")
+        if mkt is None:
+            continue
+        if exp_pct is not None:
+            lines.append(f"  市场 {mkt * 100:+.0f}% → 组合预期 {exp_pct * 100:+.2f}%")
+        else:
+            lines.append(f"  市场 {mkt * 100:+.0f}% → 组合预期: --")
+
+    return "\n".join(lines)
+
+
+def _build_alignment_block(alignment_summary: str | None) -> str:
+    """构建口径修正文本块。
+
+    Args:
+        alignment_summary: compute_alignment_factors() 输出的 summary_text
+
+    Returns:
+        口径修正文本块。无数据时返回空字符串。
+    """
+    if not alignment_summary:
+        return ""
+    return "\n" + alignment_summary
 
 
 def _build_data_quality_detail_block(degradation_events: list[dict] | None) -> str:

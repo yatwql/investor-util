@@ -203,6 +203,7 @@ def write_html_report(
     enable_b_series: bool = True,
     enable_news: bool = True,
     enable_history: bool = True,
+    debate_info: dict | None = None,
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -287,6 +288,25 @@ def write_html_report(
 
     # ── LLM 模块状态收集 ──
     llm_module_info, llm_endpoint, module_disabled, _llm_session_usage = _render_llm_module_info(llm_enabled_flag)
+
+    # ── 辩论模式标签 ──
+    _debate_mode_label: str | None = None
+    if debate_info and isinstance(debate_info, dict):
+        _debate_mode_label = debate_info.get("mode_label")
+    if not _debate_mode_label:
+        # M2/M3 仅启用时从 feature flag 检测
+        from src.python.features import is_feature_enabled
+
+        if is_feature_enabled("llm_debate_procon"):
+            _debate_mode_label = "🧪 辩论模式"
+        elif is_feature_enabled("llm_debate_conditional") or is_feature_enabled("llm_debate_qa_concentration"):
+            _debate_mode_label = "🧪 实验模式"
+
+    # 辩论模式启用时覆盖 llm_module_info 中 expert_review 的状态标签
+    if _debate_mode_label:
+        for _mi in llm_module_info:
+            if _mi.get("key") == "expert_review" and _mi.get("status") in ("success", "cached"):
+                _mi["status_label"] = _debate_mode_label
 
     # ── 10) 渲染模板 ──
     prog.info("正在渲染 HTML...")
@@ -393,13 +413,16 @@ def write_html_report(
         llm_endpoint=llm_endpoint,
         cache_stats=get_cache_hit_rate(),
         app_version=APP_VERSION,
-        # C 迭代：序号 & 可见性（模板使用 section_numbers/section_visible_dict）
+        # 辩论模式（模板使用 debate_mode_label + debate_info）
+        debate_mode_label=_debate_mode_label,
+        debate_info=debate_info,
+        # 序号 & 可见性（模板使用 section_numbers/section_visible_dict）
         section_order=order,
         section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,
         # PF 修复：section_visible 函数由 context 变量传入，不写入 _ENV.globals
         section_visible=_sv_fn,
-        # D 迭代：数据源状态摘要
+        # 数据源状态摘要
         data_status_summary=data_status_summary,
         data_status_penetration=data_status_penetration,
         data_status_perf=data_status_perf,

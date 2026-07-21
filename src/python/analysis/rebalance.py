@@ -215,7 +215,7 @@ def _compute_confidence(
 # ── 静默期管理 ──────────────────────────────────────────────────
 
 # 静默期持久化路径（可通过 monkeypatch.setattr 注入测试路径）
-_SILENCE_FILE = os.path.join(PROJECT_ROOT, "data/cache/rebalance_silence.json")
+_SILENCE_FILE = os.path.join(PROJECT_ROOT, "data/state/rebalance_silence.json")
 
 
 def _load_silence_state(silence_file: str | None = None) -> dict[str, str]:

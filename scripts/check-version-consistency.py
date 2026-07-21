@@ -5,7 +5,8 @@
 
   - pyproject.toml          version = "X.Y.Z"
   - README.md               > 当前版本：X.Y.Z
-  - docs-stm/managements/plan.md, technical.md, requirements.md, testplan.md
+  - docs-stm/managements/plan.md, technical.md, requirements.md,
+    testplan.md, review-findings.md, llm-technical.md
                             最后更新：...（vX.Y.Z ...）
   - docs-stm/manuals/how-to-test-my-code.md
                             最后更新：...（vX.Y.Z）
@@ -68,6 +69,8 @@ add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md", "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md", "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md", "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md", "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
 add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md", "v{v}")
 
