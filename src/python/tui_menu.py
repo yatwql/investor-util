@@ -23,18 +23,18 @@ MenuItem = tuple[str, str, Callable[[], None] | None, bool]
 
 MENU_ITEMS: list[MenuItem] = [
     ("E", "生成基础版Excel分析报告", None, False),
-    ("B", "生成全系列报告(Excel+HTML) [按板块配置]", None, False),
-    ("L", "生成全系列完整版报告(Excel+HTML) [含LLM，按板块配置]", None, False),
+    ("B", "生成标准报告(Excel+HTML) [按章节配置]", None, False),
+    ("L", "生成完整报告(Excel+HTML) [含LLM，按章节配置]", None, False),
     ("C", "配置持仓信息目录", None, False),
     ("F", "配置持仓信息文件名", None, False),
     ("O", "配置报告输出目录", None, False),
     ("1", "更新基础类缓存（含基金业绩/持仓/经理/基准等）", None, False),
-    ("2", "更新持仓类缓存", None, False),
+    ("2", "更新行情类缓存（含价格/指数等）", None, False),
     ("3", "清理过期缓存文件", None, False),
     ("4", "查看缓存/状态统计", None, False),
-    ("P", "配置报告板块可见性（B系列/新闻/历史走势）", None, False),
-    ("I", "管理对比指数池（竞争语境基准）", None, False),
-    ("A", "配置匿名化模式", None, False),
+    ("P", "配置报告可选章节（基金分析/市场新闻/历史走势）", None, False),
+    ("I", "管理对比指数池（自定义基准指数）", None, False),
+    ("A", "配置持仓匿名化（代码/名称脱敏）", None, False),
     ("S", "配置LLM分析章节", None, False),
     ("R", "刷新配置", None, False),
     ("X", "退出", None, True),
@@ -106,7 +106,7 @@ def show_config() -> None:
     print(f"  持仓目录: {config.get('holdings_dir', '未设置')}")
     print(f"  持仓文件: {config.get('holdings_filename', '未设置')}")
     print(f"  输出目录: {config.get('output_dir', 'reports')}")
-    print(f"  新闻 TOP: {config.get('news_top_count', '100')} 条")
+    print(f"  新闻抓取上限: {config.get('news_top_count', '100')} 条")
     if os.path.exists(holdings_path):
         print("  状态: [OK] 文件就绪")
     else:
@@ -127,9 +127,9 @@ def _show_privacy_and_security_status() -> None:
 
     # 检查隐私提示是否已显示过
     _privacy_shown = _cfg.get("_privacy_notice_shown", False)
-    _privacy_icon = f"{GREEN}✓{RESET}" if _privacy_shown else f"{YELLOW}首次运行将显示{RESET}"
+    _privacy_icon = f"{GREEN}✓{RESET}" if _privacy_shown else f"{YELLOW}待首次报告生成时显示{RESET}"
 
-    print(f"  匿名化模式: {_anon_display}")
+    print(f"  持仓匿名化: {_anon_display}")
     print(f"  隐私声明: {_privacy_icon}")
     print()
 

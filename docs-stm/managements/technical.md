@@ -26,10 +26,10 @@
   - [4.2 报告编排器](#42-报告编排器)
   - [4.3 Excel 管线](#43-excel-管线)
   - [4.4 HTML 管线](#44-html-管线)
-  - [4.5 板块可见性两层模型](#45-板块可见性两层模型)
+  - [4.5 章节可见性两层模型](#45-章节可见性两层模型)
   - [4.6 报告序号可配置](#46-报告序号可配置)
   - [4.7 组合历史走势计算算法](#47-组合历史走势计算算法)
-  - [4.8 B 系列基金深度分析](#48-b-系列基金深度分析)
+  - [4.8 基金深度分析](#48-基金深度分析)
   - [4.9 资产穿透 TOP10](#49-资产穿透-top10)
   - [4.10 财经新闻热点与持仓关联分析](#410-财经新闻热点与持仓关联分析)
   - [4.11 数据降级治理体系](#411-数据降级治理体系)
@@ -255,7 +255,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 17 个模块的序号、显示名称、板块可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 17 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型**：
 
@@ -265,7 +265,7 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 
 | 层级 | 含义 | 来源 |
 |:-----|:------|:------|
-| board 层 | 用户配置的板块开关 | `config.json`（`enable_b_series`/`enable_news`/`enable_history`） |
+| board 层 | 用户配置的章节开关 | `config.json`（`enable_b_series`/`enable_news`/`enable_history`） |
 | data 层 | 运行时数据可用性 | 各子模块返回值非 None 判定 |
 
 #### 1.4.5 数据降级治理体系
@@ -1040,7 +1040,7 @@ def _get_pool() -> ThreadPoolExecutor:
                                  news_correlation /       (STATUS_MESSAGES/
                                  llm_content /            TIER_PREFIX/
                                                           DegradationTracker)
-                                 B 系列 4 个 /
+                                 基金深度分析 4 个 /
                                  excel_writer.py +
                                  styles.py
 ```
@@ -1068,7 +1068,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 ```
 generate_report("basic")
-    → 读取板块顺序配置
+    → 读取章节顺序配置
     → generate_excel_report()
     → 返回 ReportResult
 ```
@@ -1152,7 +1152,7 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 
 **渲染期通信**（C14 约束）：所有渲染期数据（`section_visible_dict` 等）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict 作为跨函数通信渠道。单次会话中不变的数据（如 `_ENV` 过滤器注册）不受此限。
 
-### 4.5 板块可见性两层模型
+### 4.5 章节可见性两层模型
 
 报告模块按两层模型决定是否在最终报告中显示：
 
@@ -1473,12 +1473,12 @@ prune()：两阶段自动清理
                  时删最旧超出部分
 ```
 
-### 4.8 B 系列基金深度分析
+### 4.8 基金深度分析
 
-B 系列 4 个模块通过 `enable_b_series` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
+基金深度分析 4 个模块通过 `enable_b_series` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
 
 ```
-                    B 系列模块架构
+                    基金深度分析模块架构
                          │
            enable_b_series = True?
                          │
@@ -1778,7 +1778,7 @@ _dedup_by_title(items)
 │  news_all_failed:        "新闻数据暂不可用，请检查网络连接"   │
 │  history_correction:     "检测到历史数据修正，走势可能已重算" │
 │  ...（共 16 条，覆盖价格/排名/行业/穿透/盈利/分红/指数/      │
-│        B系列/新闻/预警/历史走势）                            │
+│        基金深度分析/新闻/预警/历史走势）                            │
 │                                                             │
 │  TIER_PREFIX = {"T2": "⚠", "T3": "ℹ", "T4": "ℹ"}           │
 └─────────────────────────────────────────────────────────────┘
@@ -1999,7 +1999,7 @@ class DataModuleDef:
 | LLM 分析（preload/refresh） | 5 | global_macro、expert_review、news_correlation、health_check、penetration_deep |
 | 辩论缓存（preload，实验） | 3 | llm_debate_pro、llm_debate_con、llm_debate_synthesis |
 | 补充数据（refresh） | 3 | profit_forecast、sector_flow、dividend |
-| B 系列基金分析（refresh/无分组） | 5 | fund_manager、fund_overlap、fund_concentration、fund_style_snapshot、**extended** |
+| 基金深度分析（refresh/无分组） | 5 | fund_manager、fund_overlap、fund_concentration、fund_style_snapshot、**extended** |
 | 无风险利率（refresh） | 1 | **bond_yield** |
 | 精确键名（refresh/无分组） | 3 | benchmark、tracking、calendar |
 | 历史走势（无分组） | 3 | history_stock、history_fund_otc、history_index |
@@ -2460,7 +2460,7 @@ investor-util/
 
 ### 附录 G：报告生成降级路径矩阵
 
-| 故障场景 | basic 路径 | both 路径 | full 路径 | LLM 板块 |
+| 故障场景 | basic 路径 | both 路径 | full 路径 | LLM 分析章节 |
 |:---------|:----------|:---------|:---------|:---------|
 | 行情数据全熔断 | 显示 -- | 生成但注明行情缺失 | 生成但注明行情缺失 | LLM 跳过行情相关部分 |
 | 概念数据熔断 | N/A | N/A | 概念板块段落显示占位文本 | 引用 DegradationTracker |

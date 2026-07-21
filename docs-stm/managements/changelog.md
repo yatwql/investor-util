@@ -7,6 +7,14 @@
 ## [0.8.2-dev] - 未发布
 
 ### Changed
+- **术语统一（报告内容+注释+文档）**：全项目范围将内部架构术语替换为用户友好术语
+  - `板块可见性` → `章节可见性`（config 注释、日志、管理文档）
+  - `B 系列` / `B 系列基金深度分析` → `基金深度分析`（Excel 页签、HTML 注释、模块 docstring、文档）
+  - `新闻板块` → `市场新闻`（config 注释、文档）
+  - `LLM 板块` → `LLM 分析章节` / `LLM 分析章节组`（config 注释、文档）
+  - `板块开关` → `章节开关`（technical.md）
+  - `板块配置` → `章节配置`（日志输出，此前已改）
+  - 覆盖文件：`config/_config_defaults.py`、`config/_core.py`、`features.py`、`registry.py`、`report/excel_b_series.py`、`report/data_status.py`、`report/orchestrator.py`、`report/html_writer.py`、`report/excel_generator.py`、`report/excel_sheet_factory.py`、`report/tmpl/report_template.html`、`README.md`、5 份用户文档、3 份管理文档
 
 ## [0.8.1] - 2026-07-22
 

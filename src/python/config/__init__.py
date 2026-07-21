@@ -64,7 +64,7 @@ from src.python.config._core import (
     get_llm_config,
     get_llm_settings_path,
     init_config,
-    # 板块可见性
+    # 章节可见性
     is_enable_b_series,
     is_enable_history,
     is_enable_llm,
@@ -102,7 +102,7 @@ __all__ = [
     "_KNOWN_PROVIDER_TYPES",
     "_KNOWN_PROVIDER_NAMES",
     "_STRING_CONFIG_KEYS",
-    # 板块可见性
+    # 章节可见性
     "is_enable_b_series",
     "is_enable_news",
     "is_enable_history",

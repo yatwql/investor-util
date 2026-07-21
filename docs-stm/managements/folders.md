@@ -123,7 +123,7 @@ investor-util/
 │   │   │   ├── excel_content_sheets.py #  Excel 内容页签（持仓明细/汇总）
 │   │   │   ├── excel_market_data.py  #   Excel 行情数据页签
 │   │   │   ├── excel_news_warning.py #   Excel 新闻页签
-│   │   │   ├── excel_b_series.py     #   Excel B 系列基金深度分析页签
+│   │   │   ├── excel_b_series.py     #   Excel 基金深度分析页签
 │   │   │   ├── excel_llm_usage.py    #   Excel LLM 用量统计页签
 │   │   │   ├── excel_writer.py       #   Excel 底层写入器（openpyxl 封装）
 │   │   │   ├── html_writer.py        #   HTML 报告主写入器

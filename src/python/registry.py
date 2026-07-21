@@ -183,7 +183,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     DataModuleDef(
         "股票历史分红", "dividend", cache_prefixes=("dividend_",), cache_ttl=CACHE_MONTHLY, cache_groups=("refresh",)
     ),
-    # ── B 系列：基金深度分析模块 ──
+    # ── 基金深度分析模块 ──
     DataModuleDef(
         "基金经理",
         "fund_manager",

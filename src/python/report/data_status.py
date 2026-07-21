@@ -70,7 +70,7 @@ STATUS_MESSAGES: dict[str, str] = {
     "profit_forecast_unavailable": "盈利预测数据不可用，EPS 列显示 --",
     "dividend_unavailable": "分红数据暂不可用",
     "index_degraded": "指数数据来自降级链路",
-    # B 系列占位文本
+    # 基金深度分析占位文本
     "manager_unavailable": "基金经理数据暂不可用",
     "overlap_unavailable": "持仓数据不足，无法计算重合度",
     "concentration_unavailable": "持仓集中度数据暂不可用",

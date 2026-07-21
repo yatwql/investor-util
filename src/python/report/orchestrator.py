@@ -36,7 +36,7 @@ class ReportResult:
 
 
 def _read_section_flags(config: dict) -> dict:
-    """从 config 读取板块可见性开关，返回统一字典。"""
+    """从 config 读取章节可见性开关，返回统一字典。"""
     from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
 
     return {
@@ -444,7 +444,7 @@ def _generate_report_both(
         history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
     else:
         history_data = None
-        reporter.info("[板块配置] 历史走势已关闭，跳过")
+        reporter.info("[章节配置] 历史走势已关闭，跳过")
 
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
@@ -586,7 +586,7 @@ def _fetch_llm_and_news(
 
     # 分支 ④：均关闭
     if not enable_llm and not enable_news:
-        reporter.info("[板块配置] 新闻和 LLM 均未开启，跳过内容生成")
+        reporter.info("[章节配置] 新闻和 LLM 均未开启，跳过内容生成")
         return llm_content, news_data, news_llm_meta, news_ok, debate_info
 
     pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="orch_llm_news")
@@ -602,7 +602,7 @@ def _fetch_llm_and_news(
                 prep_data["penetrated_assets"],
             )
         else:
-            reporter.info("[板块配置] 新闻板块已关闭，跳过新闻获取")
+            reporter.info("[章节配置] 市场新闻已关闭，跳过新闻获取")
 
         if enable_llm:
             _llm_fut = pool.submit(
@@ -625,7 +625,7 @@ def _fetch_llm_and_news(
                 metrics=metrics,
             )
         else:
-            reporter.info("[板块配置] LLM 板块已关闭，跳过 LLM 内容生成")
+            reporter.info("[章节配置] LLM 分析章节已关闭，跳过 LLM 内容生成")
 
         if _llm_fut is not None and _news_fut is not None:
             # 分支 ①：LLM + 新闻均开启（并行等待）
@@ -807,7 +807,7 @@ def _generate_report_full(
     else:
         _metrics = None
         history_data = None
-        reporter.info("[板块配置] 历史走势已关闭，跳过")
+        reporter.info("[章节配置] 历史走势已关闭，跳过")
 
     # ── 4. 行业资金流向 ──
     reporter.info("正在获取行业资金流向...")

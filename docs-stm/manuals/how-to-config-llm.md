@@ -221,8 +221,8 @@ LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
-- 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 板块在报告中整体隐藏
-- 仅 `news_correlation` 开启时不影响 LLM 板块可见性
+- 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
+- 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 
 ---
 

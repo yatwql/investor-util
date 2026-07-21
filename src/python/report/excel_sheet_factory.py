@@ -34,16 +34,16 @@ def create_sheets(
     """按配置顺序创建所有可见页签，返回 {key: ws} 字典。
 
     两层可见性模型：
-      board 层：用户配置的板块开关（enable_xxx）
+      board 层：用户配置的章节开关（enable_xxx）
       data 层：运行时数据可用性标志（data_availability dict）
 
     Args:
         wb: openpyxl Workbook
         section_order: 注册表模块顺序列表
-        enable_b_series: board 层 — B 系列是否开启（配置驱动）
-        enable_news: board 层 — 新闻板块是否开启（配置驱动）
-        enable_history: board 层 — 历史走势板块是否开启
-        enable_llm: board 层 — LLM 板块是否开启
+        enable_b_series: board 层 — 基金深度分析是否开启（配置驱动）
+        enable_news: board 层 — 市场新闻是否开启（配置驱动）
+        enable_history: board 层 — 历史走势章节是否开启
+        enable_llm: board 层 — LLM 分析章节是否开启
         data_availability: data 层 — 各模块 data_flag 的就绪状态
     """
     # 内联 board_flags dict（与 HTML 端结构一致，行为一致性由集成测试保证）

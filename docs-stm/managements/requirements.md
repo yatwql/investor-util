@@ -50,7 +50,7 @@
 报告生成（Excel + HTML 双管线）
      │
      ├── 基础报告（E 菜单）：汇总、市值、分类、穿透、基金业绩
-     ├── 完整报告（B 菜单）：基础 + 新闻 + B 系列基金深度分析 + 历史走势
+     ├── 完整报告（B 菜单）：基础 + 新闻 + 基金深度分析 + 历史走势
      └── LLM 增强报告（L 菜单）：完整报告 + 全球政经/智囊团/体检/穿透分析
 ```
 
@@ -80,16 +80,16 @@
 | 选项 | 功能 | 说明 |
 |:----:|:-----|:------|
 | **报告生成** | | |
-| E | 生成基础版 Excel 分析报告 | 投资分析汇总、市值核算明细表、持仓分类表、资产穿透TOP10、基金业绩分析（始终显示的5个核心模块，不含B系列基金深度分析/新闻/历史走势） |
-| B | 生成全系列报告（Excel+HTML）按板块配置 | 同时生成 HTML + Excel，含新闻（如有）、B 系列基金深度分析（如有）、历史走势（如有），不含 LLM 增补。各板块按 [P] 菜单配置决定是否包含 |
-| L | 生成全系列完整版报告（Excel+HTML）含 LLM，按板块配置 | 同时生成 HTML + Excel，含新闻、B 系列、历史走势、LLM 增补。各板块按配置决定是否包含 |
+| E | 生成基础版 Excel 分析报告 | 投资分析汇总、市值核算明细表、持仓分类表、资产穿透TOP10、基金业绩分析（始终显示的5个核心模块，不含基金深度分析/新闻/历史走势） |
+| B | 生成标准报告（Excel+HTML）按章节配置 | 同时生成 HTML + Excel，含新闻（如有）、基金深度分析（如有）、历史走势（如有），不含 LLM 增补。各章节按 [P] 菜单配置决定是否包含 |
+| L | 生成完整报告（Excel+HTML）含 LLM，按章节配置 | 同时生成 HTML + Excel，含新闻、基金深度分析、历史走势、LLM 增补。各章节按配置决定是否包含 |
 | **配置管理** | | |
 | C | 配置持仓信息目录 | 设置持仓 xlsx 文件的存放目录 |
 | F | 配置持仓信息文件名 | 设置持仓 xlsx 的文件名 |
 | O | 配置报告输出目录 | 设置报告输出目录（默认 `reports/`） |
-| I | 管理对比指数池（竞争语境基准） | 交互添加/删除对比基准指数 |
-| A | 配置匿名化模式 | 交互式切换匿名化模式（关闭/代码显示/完全匿名/汇总） |
-| P | 配置报告板块可见性 | 交互切换 B 系列/新闻/历史走势 3 个板块的启用/停用 |
+| I | 管理对比指数池（自定义基准指数） | 交互添加/删除对比基准指数 |
+| A | 配置持仓匿名化（代码/名称脱敏） | 交互式切换匿名化模式（关闭/代码显示/完全匿名/汇总） |
+| P | 配置报告可选章节 | 交互切换基金分析/市场新闻/历史走势 3 个章节的启用/停用 |
 | S | 配置 LLM 分析章节 | 交互切换各 LLM 报告的启用/停用，含实验性辩论模式（⚗ 标识） |
 | R | 刷新配置 | 重新加载 config.json / llm_settings.json / llm_key.json |
 | **缓存管理** | | |
@@ -235,10 +235,10 @@
 | 3 | 持仓分类表 | E/B/L | 基础报表 | 按资产属性+投资分类分组聚合 |
 | 4 | 资产穿透TOP10 | E/B/L | 基础报表 | 基金底层标的拆解合并排序 |
 | 5 | 基金业绩分析 | E/B/L | 基础报表 | 同类排名、收益率、基准对比 |
-| 6 | 基金经理变更监控 | B/L | B 系列 | 快照式变更检测（1/3/6月窗口），三级预警 |
-| 7 | 持仓重合度矩阵 | B/L | B 系列 | Jaccard+重叠率双指标热力图 |
-| 8 | 持仓集中度监控 | B/L | B 系列 | top3/5/10 占比+环比变化+三级预警 |
-| 9 | 基金风格分析 | B/L | B 系列 | 市值/PE 加权六宫格+漂移评分 |
+| 6 | 基金经理变更监控 | B/L | 基金深度分析 | 快照式变更检测（1/3/6月窗口），三级预警 |
+| 7 | 持仓重合度矩阵 | B/L | 基金深度分析 | Jaccard+重叠率双指标热力图 |
+| 8 | 持仓集中度监控 | B/L | 基金深度分析 | top3/5/10 占比+环比变化+三级预警 |
+| 9 | 基金风格分析 | B/L | 基金深度分析 | 市值/PE 加权六宫格+漂移评分 |
 | 10 | 财经新闻热点与持仓关联分析 | B/L | 新闻 | 5 源新闻关键词匹配，可选 LLM 增强 |
 | 11 | 全球政经局势 | L | LLM | 基于指数+持仓结构生成 |
 | 12 | 智囊团深度复盘 | L | LLM | 三阶段圆桌会议；Feature Flag 开启辩论模式（M1/M2/M3）时输出含辩论内容并标注"(实验)"标签 |
@@ -677,7 +677,7 @@
 | R-ERR-07 | LLM 未配置时不阻塞报告生成，对应章节显示"LLM 未配置" |
 | R-ERR-08 | LLM 模块已禁用时完全跳过渲染，不留空位 |
 | R-ERR-09 | LLM API 失败时根据失败原因输出差异化占位文本 |
-| R-ERR-10 | B 系列模块数据不可用时显示模块级灰色占位文本，不隐藏页签 |
+| R-ERR-10 | 基金深度分析模块数据不可用时显示模块级灰色占位文本，不隐藏页签 |
 | R-ERR-11 | 新闻 5 源部分失败时在页脚列出失败源清单 |
 
 ### 8.3 走势数据降级
@@ -788,8 +788,8 @@
 | `user_fund_benchmarks` | dict | 空 | — | 自定义基金业绩基准 |
 | `risk_free_rate` | float/null | null | — | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74） |
 | `report_section_order` | dict | 空 | — | 报告模块序号自定义 |
-| `enable_b_series` | bool | true | ✅ P | B 系列基金深度分析启停 |
-| `enable_news` | bool | true | ✅ P | 新闻板块启停 |
+| `enable_b_series` | bool | true | ✅ P | 基金深度分析启停 |
+| `enable_news` | bool | true | ✅ P | 市场新闻启停 |
 | `enable_history` | bool | true | ✅ P | 历史走势启停 |
 | `market_hour_aware` | list | `["price","index"]` | — | 交易时段短 TTL 的数据类型 |
 | `market_hour_ttl` | int | 30 | — | 交易时段缓存有效期（秒） |
@@ -910,7 +910,7 @@
 |:-------|:----:|:------:|:-----|
 | `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` | bool | true（llm_news_correlation 为保留字段） | LLM 各模块独立启停开关（llm_news_correlation 的实际启停由 llm_settings.json 的 enabled_llm.news_correlation 控制，默认 false） |
 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | bool | false（全部默认关闭） | 辩论模式三增强通路独立启停：M1 正反辩论/M2 条件推理/M3 集中度问答 |
-| `b_series_fund_manager` / `b_series_fund_overlap` / `b_series_fund_concentration` / `b_series_fund_style` | bool | true | B 系列基金深度分析模块启停 |
+| `b_series_fund_manager` / `b_series_fund_overlap` / `b_series_fund_concentration` / `b_series_fund_style` | bool | true | 基金深度分析模块启停 |
 | `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
 | `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |
 | `metrics_sharpe` / `metrics_calmar` / `metrics_hhi` / `metrics_winrate` / `metrics_turnover` / `metrics_risk_contribution` / `metrics_beta` | bool | true | 量化指标独立启停（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
