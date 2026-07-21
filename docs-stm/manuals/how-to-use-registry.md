@@ -138,7 +138,7 @@ from src.python.registry import (
 ```python
 from src.python.registry import (
     get_report_sheet_name,           # sheet_key → 中文标题
-    get_report_section_order,        # config → dict[key → 自定义序号]
+    get_report_section_order,        # config → list[dict]（含 key/number/type/data_flag 的完整排序列表）
     get_report_section_number,       # key → 当前配置下的序号
     get_report_section_keys,         # → list[key]
 )
@@ -176,6 +176,21 @@ from src.python.registry import (
 
 完整 17 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
 
+### 计算模块查询
+
+```python
+from src.python.registry import (
+    get_computation_registry,        # → tuple[ComputModuleDef, ...]
+    get_computation_module,          # module_key → ComputModuleDef | None
+)
+```
+
+**用途：**
+- `get_computation_registry()` — 遍历所有计算/分析模块（量化指标、流动性分析、外汇敞口、情景分析、组合校准、用户画像、事实校验器），用于运行时发现和文档生成
+- `get_computation_module("analytics_metrics")` → 按 module_key 查找单个计算模块定义
+
+当前注册的计算模块见 §计算模块注册表。
+
 ---
 
 ## 消费方清单（代表性）
@@ -188,7 +203,7 @@ from src.python.registry import (
 | `cache/_groups.py` | `get_registry()` | 按组批量清除缓存 |
 | `llm/generators_orchestrator.py` | `get_llm_module_name()`, `get_llm_module_names()` | LLM 调度标签 |
 | `llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架消息映射 |
-| `handlers_report.py` | `get_llm_module_name()`, `get_report_section_order()` | 报告生成编排 |
+| `report/orchestrator.py` | `get_llm_module_name()`, `get_report_section_order()` | 报告生成编排（LLM 模块标签 + 页签排序） |
 | `handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
 | `report/excel_generator.py` | `get_report_section_order()` | Excel 页签排序 |
 | `report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入 |
