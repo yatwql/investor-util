@@ -608,7 +608,7 @@ class TestGenerateAllLlm(unittest.TestCase):
         mock_health.return_value = ("<p>体检</p>", False)
         mock_penetration.return_value = ("<p>穿透</p>", False)
 
-        macro, expert, health, penetration, mc, ec, hc, pc = generate_all_llm([], [], 0, 0, 0, 0, 0, {}, force=True)
+        macro, expert, health, penetration, mc, ec, hc, pc, *_ = generate_all_llm([], [], 0, 0, 0, 0, 0, {}, force=True)
 
         self.assertEqual(macro, "<p>宏</p>")
         self.assertEqual(expert, "<p>策略</p>")
@@ -630,7 +630,7 @@ class TestGenerateAllLlm(unittest.TestCase):
         mock_health.return_value = ("<p>h</p>", False)
         mock_penetration.return_value = ("<p>p</p>", False)
 
-        macro, expert, health, penetration, mc, ec, hc, pc = generate_all_llm([], [], 0, 0, 0, 0, 0, {})
+        macro, expert, health, penetration, mc, ec, hc, pc, *_ = generate_all_llm([], [], 0, 0, 0, 0, 0, {})
 
         self.assertIsNotNone(macro)
         self.assertIsNotNone(expert)
@@ -1323,7 +1323,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
     ) -> None:
         """全部缓存命中 → 不调用 generate_* 函数。"""
         mock_cache_get.return_value = self.CACHED_CONTENT
-        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+        macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
             {}, {}, 0, 0, 0, 0, 0, {},
             holdings_details=[], penetrated_assets=[],
         )
@@ -1353,7 +1353,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_health.return_value = ("<p>体检</p>", False)
         mock_penetration.return_value = ("<p>穿透</p>", False)
 
-        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+        macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
             {}, {}, 0, 0, 0, 0, 0, {},
             holdings_details=[], penetrated_assets=[],
         )
@@ -1379,7 +1379,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_health.return_value = ("<p>体检</p>", False)
         mock_penetration.return_value = ("<p>穿透</p>", False)
 
-        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+        macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
             {}, {}, 0, 0, 0, 0, 0, {},
             holdings_details=[], penetrated_assets=[],
             force=True,
@@ -1410,7 +1410,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_health.return_value = ("<p>体检</p>", False)
         mock_penetration.return_value = ("<p>穿透</p>", False)
 
-        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+        macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
             {}, {}, 0, 0, 0, 0, 0, {},
             holdings_details=[], penetrated_assets=[],
         )
@@ -1437,7 +1437,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         """全部缓存命中 → 为每个模块记录 per_module 用量（cached=True）。"""
         mock_cache_get.return_value = self.CACHED_CONTENT
 
-        macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+        macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
             {}, {}, 0, 0, 0, 0, 0, {},
             holdings_details=[], penetrated_assets=[],
         )

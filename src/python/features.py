@@ -69,10 +69,50 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "cache_daily_cleanup": True,
 }
 
+# ── 实验性功能定义 ──────────────────────────────────────────
+# 格式: {flag_name: ("显示名", "说明")}
+# 此处列出的功能默认关闭，用户在 features.json 中手动开启后，
+# 启动时会在日志中以红色高亮提示。
+EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
+    "llm_debate_procon": ("辩论-M1 正反辩论", "三段式(白脸→黑脸→综合)"),
+    "llm_debate_conditional": ("辩论-M2 条件推理", "情景化分析(涨/跌/震荡)"),
+    "llm_debate_qa_concentration": ("辩论-M3 集中度问答", "集中度风险问答"),
+}
+
+
+def log_experimental_features() -> None:
+    """如果已启用实验性功能，在日志中以红色高亮显示具体开启了什么功能。
+
+    在 main() 中调用（TUI/CLI 均在 ``init_config()`` 之后调用此函数）。
+    通过 ``logger.error()`` 输出以触发 ``_ColoredFormatter`` 的红色着色。
+    """
+    enabled = [
+        (name, desc)
+        for flag, (name, desc) in EXPERIMENTAL_FEATURES.items()
+        if is_feature_enabled(flag)
+    ]
+    if not enabled:
+        return
+
+    import logging
+
+    logger = logging.getLogger("invest")
+    sep = "=" * 48
+
+    logger.error(sep)
+    logger.error("  ⚗ 实验性功能已开启！")
+    logger.error(sep)
+    for name, desc in enabled:
+        logger.error("  ⚗ %s — %s", name, desc)
+    logger.error(sep)
+
+
 __all__ = [
+    "EXPERIMENTAL_FEATURES",
     "FEATURE_FLAGS",
     "get_feature_defaults",
     "is_feature_enabled",
+    "log_experimental_features",
     "set_feature_enabled",
     "load_feature_overrides",
     "save_feature_overrides",

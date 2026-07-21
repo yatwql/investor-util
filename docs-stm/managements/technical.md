@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.8.1-dev
+> 文档版本：v0.8.2-dev
 
 ## 目录
 
@@ -1957,6 +1957,7 @@ config/
 ├── _comments.py                  # JSON 注释剥离（_strip_json_comments）
 ├── _config_defaults.py           # config.json 默认值定义 + 模板生成
 ├── _core.py                      # 核心读写：get_config()、set_config()、init_config()
+├── _validation.py                # 配置校验：validate_config()、_absolutize_paths()
 ├── _llm_defaults.py              # llm_settings.json 默认模板生成
 └── _llm_providers_defaults.py    # llm_providers.json 默认模板生成
 ```

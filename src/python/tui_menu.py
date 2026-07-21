@@ -35,7 +35,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("P", "配置报告板块可见性（B系列/新闻/历史走势）", None, False),
     ("I", "管理对比指数池（竞争语境基准）", None, False),
     ("A", "配置匿名化模式", None, False),
-    ("S", "配置支持LLM的报告分析章节", None, False),
+    ("S", "配置LLM分析章节", None, False),
     ("R", "刷新配置", None, False),
     ("X", "退出", None, True),
 ]
