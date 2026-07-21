@@ -39,7 +39,7 @@ __all__ = [
     "_apply_price_type_colors",
 ]
 
-# 15 列表头（R-197 拆分后归 sheet 层维护）
+# 15 列表头（由 sheet 层维护）
 _HEADERS = [
     "账户",
     "名称",

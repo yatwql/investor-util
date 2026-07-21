@@ -147,7 +147,7 @@ def capture_snapshot(
         details: 行情明细
         config: 配置字典
         reporter: 进度报告接口
-        extra: 额外扩展字段（如 risk_metrics，供 Phase 1 在 pipeline_data 中透传）
+        extra: 额外扩展字段（如 risk_metrics），透传到 pipeline_data
 
     Returns:
         pipeline_data 字典（含 diff），首次运行或异常时返回 None。

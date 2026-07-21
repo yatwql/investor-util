@@ -1,7 +1,7 @@
 """缓存操作共享层 — TUI 和 CLI 共用。
 
-S9：公共缓存函数（盈利预测/行业资金流向/行业/分红）+ print→reporter 替换
-S10：持仓缓存（价格+指数）+ 清理 + 统计
+公共缓存函数（盈利预测/行业资金流向/行业/分红）+ print→reporter 替换
+持仓缓存（价格+指数）+ 清理 + 统计
 """
 
 from __future__ import annotations
