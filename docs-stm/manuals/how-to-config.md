@@ -12,7 +12,12 @@
   "llm_settings_file": "data/config/llm_settings.json",
   "llm_providers_file": "data/config/llm_providers.json",
 
-  // ── B. 数据源与提供商 ──
+  // ── B. 板块可见性（关闭后对应页签/章节完全隐藏） ──
+  "enable_b_series": true,
+  "enable_news": true,
+  "enable_history": true,
+
+  // ── C. 数据源与提供商 ──
   "news_top_count": 300,
   "news_sources": {
     "sina": true,
@@ -23,7 +28,7 @@
   },
   "preferred_provider": {},
 
-  // ── C. 市场时段与缓存 ──
+  // ── D. 市场时段与缓存 ──
   "market_hour_aware": ["price", "index"],
   "market_hour_ttl": 30,
   "market_hours": {
@@ -33,11 +38,11 @@
   },
   "cache_ttl": {
     "price": 86400,
-    "index": 86400,
+    "index": 86400
     // ...（完整列表见下方 cache_ttl 章节）
   },
 
-  // ── D. 行为调优 ──
+  // ── E. 行为调优 ──
   "default_menu_key": "L",
   "report_section_order": {},
   "degradation": {
@@ -46,10 +51,12 @@
     "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}
   },
 
-  // ── E. 业绩基准 ──
+  // ── F. 业绩基准与无风险利率 ──
+  "risk_free_rate": null,
   "user_fund_benchmarks": {},
+  "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
 
-  // ── F. 组合历史走势（F2）& 持仓快照（F1） ──
+  // ── G. 组合历史走势与持仓快照 ──
   "history": {
     "analysis": "off",
     "snapshot_retention_days": 60,
@@ -58,10 +65,23 @@
     "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}
   },
 
-  // ── G. 报告板块可见性 ──
-  "enable_b_series": true,
-  "enable_news": true,
-  "enable_history": true
+  // ── H. 再平衡配置 ──
+  "rebalance": {
+    "threshold": 0.15,
+    "deviation_threshold": 0.05,
+    "profile": "moderate",
+    "silence_days": 30,
+    "target_allocation": {},
+    "equity_fixed_income": {}
+  },
+
+  // ── I. 流动性配置 ──
+  "redemption_limits": {},
+
+  // ── J. 匿名化配置 ──
+  "anonymization": {
+    "mode": "off"
+  }
 }
 ```
 
@@ -451,13 +471,13 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 
 | 开关名 | 默认值 | 说明 |
 |:-------|:------:|:-----|
-| `llm_*`（5 项） | true（news_correlation 默认 false） | LLM 各模块独立启停 |
+| `llm_*`（5 项） | true（features.py 全部默认 true；news_correlation 实际启停通过 llm_settings.json 的 `enabled_llm` 控制，默认 false） | LLM 各模块独立启停 |
 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | **false**（全部默认关闭） | 辩论模式三增强通路：M1 正反辩论/M2 条件推理/M3 集中度问答。菜单 **[S]** 可交互开关 |
 | `b_series_*`（4 项） | true | B 系列基金深度分析模块 |
 | `news_*`（5 项） | true（cls 默认 false） | 新闻源启停 |
 | `history_portfolio` / `history_benchmark` | true | 历史走势与基准指数开关 |
 | `metrics_*`（7 项） | true | 量化指标（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
-| `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）、`code_display`（名称→"品种X"，保留代码）、`full_anonymous`（名称→"品种X"，代码→"000XXX"）、`summary`（仅大类汇总）。TUI 菜单 `[A]` 设置 |
+| `anonymizer` | false | 匿名化功能总开关（关闭后强制 off）；具体模式通过 config.json 的 anonymization.mode 设置 |
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
 
 > 完整开关清单及说明见 [需求文档 §11.5](../managements/requirements.md#115-featuresjson功能开关注册表)。
