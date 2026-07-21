@@ -295,3 +295,91 @@ class TestFilterHallucinatedCodes(unittest.TestCase):
             args, _ = mock_warn.call_args
             self.assertIn("虚构", args[0])
 
+
+@pytest.mark.unit_llm
+class TestFilterHallucinatedCodesEnglishWords(unittest.TestCase):
+    """常见英文词汇不会被误判为虚构代码（正则误杀修复）。
+
+    修复后必须同时满足：
+      1. HTML/CSS 标签、金融术语、英文高频词不被误杀
+      2. 真正的虚构代码（格式类似代码的字母组合）仍被过滤
+    """
+
+    def _call(self, text: str, valid: set[str] | None = None):
+        from src.python.llm.generators import _filter_hallucinated_codes
+        return _filter_hallucinated_codes(text, valid or set())
+
+    def test_english_words_not_filtered(self):
+        """HTML/CSS 标签和英文高频词不被误杀。"""
+        text = (
+            "当前指数处于 strong 趋势，板块风格 style 为成长，"
+            "注意 flash 下跌风险，font size 12px color red 标注警示。"
+        )
+        result = self._call(text, {"600519"})
+        self.assertIn("strong", result)
+        self.assertIn("style", result)
+        self.assertIn("flash", result)
+        self.assertIn("font", result)
+        self.assertIn("size", result)
+        self.assertIn("color", result)
+        self.assertIn("12px", result)
+
+    def test_qdii_and_token_not_filtered(self):
+        """QDII / Token / 100ETF 等行业术语不被误杀。"""
+        text = "QDII 额度紧张，Token 资产波动大，100ETF 净流入"
+        result = self._call(text, {"600519"})
+        self.assertIn("QDII", result)
+        self.assertIn("Token", result)
+        self.assertIn("100ETF", result)
+
+    def test_mixed_case_safe_words_not_filtered(self):
+        """大小写混合的英文词汇同样豁免（大写 COLOR / Style / TOKEN）。"""
+        text = "大写 COLOR 标注危险，Style 标签说明，TOKEN 代币概念"
+        result = self._call(text, {"600519"})
+        self.assertIn("COLOR", result)
+        self.assertIn("Style", result)
+        self.assertIn("TOKEN", result)
+
+    def test_lowercase_code_never_filtered(self):
+        """全小写字母串绝不视为虚构代码（实盘无全小写代码）。"""
+        text = "lowercase 测试 abcdef ghijkl mnopqr"
+        result = self._call(text, {"600519"})
+        self.assertEqual(result, text)
+
+    def test_real_hallucinations_still_caught(self):
+        """真正的虚构代码仍被过滤。"""
+        text = "建议关注600519\n虚构代码X1234需警惕\n虚构港股HK5678"
+        result = self._call(text, {"600519"})
+        self.assertIn("600519", result)
+        self.assertNotIn("X1234", result)
+        self.assertNotIn("HK5678", result)
+
+    def test_mixed_safe_and_hallucinated(self):
+        """安全英文词与真正虚构代码共存时，仅虚构代码行被移除。"""
+        text = (
+            "市场风格 style 偏向成长\n"
+            "虚构代码X1234需警惕\n"
+            "注意 strong 趋势信号"
+        )
+        result = self._call(text, {"600519"})
+        self.assertIn("style", result)
+        self.assertIn("strong", result)
+        self.assertNotIn("X1234", result)
+
+    def test_mixed_english_and_chinese_scenario(self):
+        """混合英文词与持仓代码的长文本 → 不被全量清空。"""
+        text = (
+            "【市场风格分析】当前市场风格偏向大盘成长 style，"
+            "需注意 flash 下跌风险，QDII 额度阶段性收紧。\n"
+            "【持仓建议】建议关注600519贵州茅台、00700腾讯控股。\n"
+            "虚构品种ZZZZZ需警惕集中度风险。"
+        )
+        result = self._call(text, {"600519", "00700"})
+        self.assertIn("style", result)
+        self.assertIn("flash", result)
+        self.assertIn("QDII", result)
+        self.assertIn("600519", result)
+        self.assertIn("00700", result)
+        self.assertNotIn("ZZZZZ", result)
+        self.assertGreater(len(result), 0, "误杀导致全空，修复后应有内容")
+
