@@ -42,7 +42,7 @@ _BACKOFF_LEVELS = (60, 300, 900, 3600)
 成功重置后回到 60s，连续多次熔断逐步延长冷却时间。"""
 
 _CIRCUIT_BREAKER_STATE_FILE = "circuit_breaker.json"
-"""熔断状态持久化文件名（存储在缓存目录下，由 _get_breaker_state_path() 解析绝对路径）。"""
+"""熔断状态持久化文件名（存储在 data/state 目录下，由 _get_breaker_state_path() 解析绝对路径）。"""
 
 _CIRCUIT_BREAKER_TTL = 86400  # 24h
 """熔断状态持久化记录的超时 TTL（秒），超过此时间的条目在加载时自动清理。"""
@@ -220,7 +220,7 @@ class DataSourceRegistry:
         """返回熔断状态持久化文件路径。"""
         from src.python.cache._paths import _CACHE_DIR
 
-        return os.path.join(_CACHE_DIR, _CIRCUIT_BREAKER_STATE_FILE)
+        return os.path.join(os.path.dirname(_CACHE_DIR), "state", _CIRCUIT_BREAKER_STATE_FILE)
 
     def _save_state(self) -> None:
         """持久化当前熔断状态到 JSON 文件。"""

@@ -142,7 +142,7 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     # rebalance 静默期文件隔离
     monkeypatch.setattr(
         "src.python.analysis.rebalance._SILENCE_FILE",
-        str(tmp_path / "data/cache/rebalance_silence.json"),
+        str(tmp_path / "data/state/rebalance_silence.json"),
     )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(
