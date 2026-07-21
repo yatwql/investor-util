@@ -20,8 +20,13 @@ def write_llm_section_and_usage(
     llm_content: tuple[str | None, str | None, str | None, str | None] | None,
     prog: ProgressReporter,
     section_order: list[dict] | None = None,
+    debate_mode_label: str | None = None,
 ) -> None:
-    """写入 LLM 分析章节页签和 LLM API 用量页签。"""
+    """写入 LLM 分析章节页签和 LLM API 用量页签。
+
+    Args:
+        debate_mode_label: 辩论模式标签，非 None 时在 expert_review 页签和用量页展示实验模式标识
+    """
     if not include_llm:
         return
 
@@ -30,7 +35,12 @@ def write_llm_section_and_usage(
         try:
             from src.python.report.llm_content import write_llm_sheets
 
-            write_llm_sheets(sheets, llm_content=llm_content or (None, None, None, None), section_order=section_order)
+            write_llm_sheets(
+                sheets,
+                llm_content=llm_content or (None, None, None, None),
+                section_order=section_order,
+                debate_mode_label=debate_mode_label,
+            )
             logger.info("LLM 分析章节已生成")
             prog.ok("LLM 分析章节生成完成")
         except ImportError:
@@ -40,11 +50,19 @@ def write_llm_section_and_usage(
             logger.exception("生成 LLM 分析章节失败")
             prog.add_error("LLM 分析章节生成失败（详情请查看日志）")
 
-    build_llm_usage_sheet(sheets, prog)
+    build_llm_usage_sheet(sheets, prog, debate_mode_label=debate_mode_label)
 
 
-def build_llm_usage_sheet(sheets: dict[str, Any], _prog: ProgressReporter) -> None:
-    """构建并写入 LLM API 用量页签。"""
+def build_llm_usage_sheet(
+    sheets: dict[str, Any],
+    _prog: ProgressReporter,
+    debate_mode_label: str | None = None,
+) -> None:
+    """构建并写入 LLM API 用量页签。
+
+    Args:
+        debate_mode_label: 辩论模式标签，非 None 时在模块状态列和汇总区显示实验模式标识
+    """
     try:
         from src.python.llm import (
             format_session_usage,
@@ -67,7 +85,14 @@ def build_llm_usage_sheet(sheets: dict[str, Any], _prog: ProgressReporter) -> No
         per_module = formatted.get("per_module", {}) or {}
     all_failure = dict(LLM_MODULE_FAILURE)
 
-    excel_module_info = build_llm_module_info(all_failure, per_module, skip_unknown=True)
+    # 辩论模式启用时，标记 expert_review 为实验模式
+    _debate_modules: set[str] | None = None
+    if debate_mode_label:
+        _debate_modules = {"expert_review"}
+
+    excel_module_info = build_llm_module_info(
+        all_failure, per_module, skip_unknown=True, debate_enabled_modules=_debate_modules
+    )
 
     if not excel_module_info:
         return

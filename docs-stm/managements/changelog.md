@@ -18,6 +18,20 @@
 - **plan.md**: 恢复概述节与归档索引（v0.1.x ~ v0.7.x）
 - **review-findings.md**: 恢复历史审查记录链接 + 历史归档节
 
+### Added
+- **Task91 增强 LLM 策略（辩论模式 I-01~I-12）**：
+  - **辩论模式 M1（白脸/黑脸/综合）**：`generate_debate_procon()` 三段式辩论（pro→con→synthesis），两级 fallback（pro/con 失败→回退普通模式、synthesis 失败→返回 pro+con 拼接）
+  - **条件推理 M2**：场景注入用户提示词（自定义市场场景 → 条件化的 expert_review 分析）
+  - **集中度问答 M3**：阈值触发的持仓集中度问答块生成（单品种≥5%/前三≥60%/行业≥40%）
+  - **Token 预算守卫**：基于 char 计量的 token 预算控制（超过 1× 预算跳过 synthesis、超过 2× 预算跳过全部 debate）
+  - **虚构代码过滤**：`_filter_hallucinated_codes()` 基于正则的 LLM 输出行级幻觉过滤（兼容中文环境的 `\b` 替代方案）
+  - **缓存体系**：三段独立缓存（pro/con/synthesis），session 级线程安全缓存，指纹驱动的缓存键
+  - **HTML/Excel 渲染**：辩论实验模式标签、pro(绿)/con(红)/synthesis(金) 三色块渲染、棒棒糖式展开设计
+  - **配置文件**：`llm_settings.json` 新增 `debate` 配置段（per_call_max_tokens/synthesis_temperature/max_total_tokens_per_report 等）
+  - **Feature Flag**：`features.py` 新增 `llm_debate_procon`/`llm_debate_conditional`/`llm_debate_qa_concentration` 三开关
+  - **测试套件**：62 项单元测试 + 3 项集成测试覆盖（含边缘场景/Token 预算/管线集成/prompts/generators 等）
+  - **监视脚本**：`scripts/check_debate_architecture.py` 架构一致性巡检
+
 ### Plan
 - **task91-enhanced-llm-strategy.md D16 终轮一致性扫描修复**：
   - 修复目录编号偏移（§6/§7/§8 锚点与实际标题对齐）

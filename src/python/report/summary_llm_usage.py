@@ -31,7 +31,9 @@ def _init_llm_usage_sheet(ws: Any) -> int:
     return row
 
 
-def _write_llm_summary_section(ws: Any, row: int, session_usage: dict[str, Any] | None, llm_endpoint: str = "") -> int:
+def _write_llm_summary_section(
+    ws: Any, row: int, session_usage: dict[str, Any] | None, llm_endpoint: str = "", debate_mode_label: str | None = None
+) -> int:
     """写入 LLM 用量汇总数据区，返回下一行号。"""
     if not session_usage or not session_usage.get("has_usage"):
         return row
@@ -63,6 +65,10 @@ def _write_llm_summary_section(ws: Any, row: int, session_usage: dict[str, Any] 
     for key, val in pairs:
         ws.cell(row=row, column=1, value=key).font = _KV_KEY_FONT
         ws.cell(row=row, column=2, value=val).font = _KV_VAL_FONT
+        row += 1
+    if debate_mode_label:
+        ws.cell(row=row, column=1, value="实验模式").font = _KV_KEY_FONT
+        ws.cell(row=row, column=2, value=debate_mode_label).font = _KV_VAL_FONT
         row += 1
     return row + 1
 
@@ -234,6 +240,7 @@ def write_llm_usage_sheet(
     llm_session_usage: dict[str, Any] | None,
     llm_module_info: list[dict[str, Any]] | None,
     llm_endpoint: str = "",
+    debate_mode_label: str | None = None,
 ) -> None:
     """写入 'LLM API 用量' 页签内容。
 
@@ -242,6 +249,7 @@ def write_llm_usage_sheet(
         llm_session_usage: format_session_usage() 返回值
         llm_module_info: 合并后的模块明细列表
         llm_endpoint: 全局 LLM endpoint
+        debate_mode_label: 辩论模式标签，非 None 时在汇总区显示实验模式行
     """
     if not llm_module_info:
         return
@@ -260,7 +268,7 @@ def write_llm_usage_sheet(
     ]
 
     row = _init_llm_usage_sheet(ws)
-    row = _write_llm_summary_section(ws, row, llm_session_usage, llm_endpoint=llm_endpoint)
+    row = _write_llm_summary_section(ws, row, llm_session_usage, llm_endpoint=llm_endpoint, debate_mode_label=debate_mode_label)
 
     row = _write_module_table_header(ws, row, _HEADERS)
     row = _write_module_data_rows(ws, row, llm_module_info)

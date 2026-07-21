@@ -51,13 +51,19 @@ def get_llm_module_failure_reason(module_failure: dict, module_key: str) -> str 
     return reason
 
 
-def build_llm_module_info(llm_failure: dict, per_module: dict, skip_unknown: bool = False) -> list[dict[str, Any]]:
+def build_llm_module_info(
+    llm_failure: dict,
+    per_module: dict,
+    skip_unknown: bool = False,
+    debate_enabled_modules: set[str] | None = None,
+) -> list[dict[str, Any]]:
     """构建 LLM 模块信息列表（状态、Token 用量、费用等）。
 
     Args:
         llm_failure: LLM 模块失败原因字典（LLM_MODULE_FAILURE）
         per_module: 每个模块的用量统计
         skip_unknown: 是否跳过状态为 unknown 的模块
+        debate_enabled_modules: 启用辩论模式的模块 key 集合，命中时 status_label 覆盖为实验模式标签
 
     Returns:
         模块信息列表，每项含 key/name/status/status_label/model/tokens/cost 等字段
@@ -68,6 +74,12 @@ def build_llm_module_info(llm_failure: dict, per_module: dict, skip_unknown: boo
         entry: dict[str, Any] = {"key": mk, "name": names.get(mk, mk)}
         reason = get_llm_module_failure_reason(llm_failure, mk)
         pm = per_module.get(mk)
+
+        # 辩论模式标签映射（模块级覆盖）
+        _DEBATE_LABELS: dict[str, str] = {
+            "llm_debate_procon": "🧪 辩论模式",
+        }
+
         if reason == FAIL_REASON_DISABLED:
             entry.update(
                 status="disabled",
@@ -99,9 +111,16 @@ def build_llm_module_info(llm_failure: dict, per_module: dict, skip_unknown: boo
         elif pm:
             inp = pm.get("input_tokens", 0)
             out = pm.get("output_tokens", 0)
+            # 辩论模式覆盖状态标签
+            _label_override = None
+            if debate_enabled_modules and mk in debate_enabled_modules:
+                for _flag, _lbl in _DEBATE_LABELS.items():
+                    if _flag in debate_enabled_modules:
+                        _label_override = _lbl
+                        break
             entry.update(
                 status="cached" if pm.get("cached") else "success",
-                status_label="缓存" if pm.get("cached") else "成功",
+                status_label=_label_override or ("缓存" if pm.get("cached") else "成功"),
                 model=pm.get("model", ""),
                 input_tokens=inp,
                 output_tokens=out,

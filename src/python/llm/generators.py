@@ -288,7 +288,9 @@ def _filter_hallucinated_codes(
     if not text:
         return text
 
-    found_codes = set(re.findall(r'\b[A-Za-z0-9]{4,6}\b', text))
+    # 使用左边界(^|[^A-Za-z0-9])和右边界([^A-Za-z0-9]|$)替代\b
+    # 避免中文环境下\b失效（Python re 视中文字符为\w）
+    found_codes = set(re.findall(r'(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]|$)', text))
     invalid = {c for c in found_codes if c not in valid_codes and not c.isdigit()}
 
     if not invalid:
@@ -299,7 +301,7 @@ def _filter_hallucinated_codes(
     filtered = []
     removed_count = 0
     for line in lines:
-        line_codes = set(re.findall(r'\b[A-Za-z0-9]{4,6}\b', line))
+        line_codes = set(re.findall(r'(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]|$)', line))
         if line_codes & invalid:
             removed_count += 1
             continue
@@ -393,6 +395,12 @@ def generate_debate_procon(
     _max_tokens = _per_call_max_tokens if _per_call_max_tokens is not None else 8192
     _timeout = debate_cfg.get("per_call_timeout_override", 90)
 
+    # ── Token 预算守卫 ─────────────────────────────────
+    _max_total_tokens_budget = debate_cfg.get("max_total_tokens_per_report", 16000)
+    # 按 1 中文字符 ≈ 1.5 token 估算，转为字符级阈值（保守偏宽松）
+    _budget_char_threshold = int(_max_total_tokens_budget * 0.65)
+    _cumulative_chars: int = 0
+
     # ── 构建有效持仓代码集合（幻觉过滤用） ────────────
     _valid_codes: set[str] = set()
     if holdings_details:
@@ -433,6 +441,19 @@ def generate_debate_procon(
         logger.warning("[debate] 白脸生成失败，回退普通模式")
         return (None, None, None)
 
+    # 追踪白脸 token 消耗
+    _cumulative_chars += len(pro_text)
+    logger.info("[debate] Token budget: 已用 %d chars（阈值 %d）", _cumulative_chars, _budget_char_threshold)
+
+    # 超过 2× 预算：跳过所有 debate 调用，回退普通模式
+    if _cumulative_chars > _budget_char_threshold * 2:
+        logger.warning(
+            "[debate] 超过 2× Token 预算（%d chars > %d），跳过所有 debate 调用",
+            _cumulative_chars,
+            _budget_char_threshold * 2,
+        )
+        return (None, None, None)
+
     # ── Step 2: 黑脸（Con） ────────────────────────────
     _con_cache_key = f"llm_debate_con_{_fingerprint}"
     _session_con_key = f"debate_con_{_fingerprint}"
@@ -464,6 +485,19 @@ def generate_debate_procon(
     if not con_text:
         logger.warning("[debate] 黑脸生成失败，回退普通模式")
         return (None, None, None)
+
+    # 追踪黑脸 token 消耗
+    _cumulative_chars += len(con_text)
+    logger.info("[debate] Token budget: 已用 %d chars（阈值 %d）", _cumulative_chars, _budget_char_threshold)
+
+    # 超过预算：跳过 synthesis，返回 pro+con 拼接
+    if _cumulative_chars > _budget_char_threshold:
+        logger.warning(
+            "[debate] 超过 Token 预算（%d chars > %d），跳过 synthesis，返回 pro+con 拼接",
+            _cumulative_chars,
+            _budget_char_threshold,
+        )
+        return (pro_text, con_text, None)
 
     # ── Step 3: 综合（Synthesis） ──────────────────────
     _synthesis_user = _build_debate_synthesis_prompt(pro_text, con_text)

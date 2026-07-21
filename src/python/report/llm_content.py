@@ -140,6 +140,7 @@ def _write_content_sheet(
     title: str,
     content: str | None,
     section_order: list[dict] | None = None,
+    debate_mode_label: str | None = None,
 ) -> None:
     """写入一个 LLM 分析章节。
 
@@ -159,6 +160,15 @@ def _write_content_sheet(
 
     # 固定列宽
     ws.column_dimensions["A"].width = _COL_WIDTH
+
+    # 辩论模式标注（灰色小字注释）
+    if debate_mode_label:
+        row += 1
+        _note_cell = ws.cell(row=row, column=1, value=f"本报告为实验模式输出（{debate_mode_label}），结果仅供参考")
+        _note_cell.font = Font(size=9, color="999999")
+        _note_cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[row].height = 20
+        row += 1
 
     if content:
         # 先提取底部 LLM footer（在剥离 HTML 前进行）
@@ -204,6 +214,7 @@ def write_llm_sheets(
     sheets: dict[str, Any],
     llm_content: tuple[str | None, str | None, str | None, str | None],
     section_order: list[dict] | None = None,
+    debate_mode_label: str | None = None,
 ) -> tuple[str, str, str, str]:
     """写入 LLM 分析章节（全球政经局势 & 智囊团深度复盘 & 持仓体检报告 & 穿透深度分析）。
 
@@ -215,6 +226,7 @@ def write_llm_sheets(
         sheets: {key: ws} 字典，页签已由 _create_sheets 按序预创建
         llm_content: (global_macro_html, expert_review_html, health_check_html, penetration_deep_html) 预生成内容
         section_order: 可选，用于 LLM 内部标题行序号跟随用户配置
+        debate_mode_label: 辩论模式标签，非 None 时在 expert_review 页签追加实验模式注释
 
     Returns:
         (global_macro_text, expert_review_text, health_check_text, penetration_deep_text) 纯文本四元组，供 TUI 展示
@@ -242,7 +254,13 @@ def write_llm_sheets(
         if ws is None:
             logger.warning("LLM 分析章节页签 %s 未由 _create_sheets 创建，跳过", mk)
             continue
-        _write_content_sheet(ws, _reverse.get(mk, get_llm_module_name(mk)), content, section_order)
+        _write_content_sheet(
+            ws,
+            _reverse.get(mk, get_llm_module_name(mk)),
+            content,
+            section_order,
+            debate_mode_label=(debate_mode_label if mk == "expert_review" else None),
+        )
 
     logger.info("LLM 分析章节写入完成（含%s）", get_llm_module_name("penetration_deep"))
 
