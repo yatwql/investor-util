@@ -160,6 +160,18 @@ class TestDedupByTitle(unittest.TestCase):
         # 共享 bigram 主要为日期数字/量化术语，无实质实体重叠 → 保留2条
         self.assertEqual(len(result), 2)
 
+    def test_cross_source_date_pattern_ratio_not_inflated(self) -> None:
+        """跨源：仅共享日期格式的不同新闻，剥离日期后 ratio 应 <0.30，不进候选区。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("2026年7月票房破25亿", "东方财富"),
+            self._make_item("2026年7月全国居民消费价格指数发布同比微涨", "财联社"),
+        ]
+        result = _dedup_by_title(items)
+        # 去日期后实体 bigram 无重叠 → 保留2条
+        self.assertEqual(len(result), 2)
+
     def test_cross_source_ratio_over_50_merged(self) -> None:
         """跨源：ratio ≥ 0.50 安全区直接合并。"""
         from src.python.providers.news_aggregator import _dedup_by_title
