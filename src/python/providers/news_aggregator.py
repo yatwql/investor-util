@@ -225,7 +225,7 @@ def _dedup_by_title(
         所以不依赖 SequenceMatcher 阈值，只检查实体重叠。
       - 跨源：分成两段——
         ① ratio ≥ 0.50 安全区，直接合并
-        ② cross_threshold ≤ ratio < 0.50，需共享 ≥ 2 个实体 bigram 防误杀
+        ② cross_threshold ≤ ratio < 0.50，需共享 ≥ 3 个实体 bigram 防误杀
 
     实体 bigram：
       - 提取中文 2-gram，过滤常见财经动词（上调/下跌/超越等）
@@ -268,6 +268,12 @@ def _dedup_by_title(
                 result.add(bg)
         return result
 
+    # 用于 SequenceMatcher 的归一化——剥离通用日期模式，避免
+    # "2026年7月票房破25亿" 与 "2026年7月经营质量因子" 等完全不同的
+    # 新闻因共享日期格式而获得虚高 ratio，进入不必要的候选区。
+    # ⚠ 仅用于 ratio 计算，不影响 kept_norms（后者用于 bigram 提取）。
+    _RATIO_CLEAN = re.compile(r"\d{4}年|\d+月|\d+日")
+
     kept: list[dict[str, Any]] = []
     kept_norms: list[str] = []
     kept_sources: list[str] = []
@@ -296,7 +302,10 @@ def _dedup_by_title(
                     _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, 0.0, overlap, False, "same_src"))
 
             # ② 跨源安全区：ratio ≥ 0.50 直接合并
-            ratio = SequenceMatcher(None, norm, existing).ratio()
+            #    剥离通用日期模式后比较，避免不同新闻因共享"2026年7月"等虚高
+            _norm_clean = _RATIO_CLEAN.sub("", norm)
+            _exist_clean = _RATIO_CLEAN.sub("", existing)
+            ratio = SequenceMatcher(None, _norm_clean, _exist_clean).ratio()
             if ratio >= 0.50:
                 is_dup = True
                 # 锚点：跨源安全区擦边
