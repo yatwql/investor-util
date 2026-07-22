@@ -4,7 +4,17 @@
 
 ---
 
-## [0.8.4-dev] - 未发布
+## [0.8.5-dev] - 未发布
+
+### Fixed
+- 待补充
+
+### Changed
+- 待补充
+
+---
+
+## [0.8.4] - 2026-07-22
 
 ### Fixed
 - **`metrics.py` 零方差浮点精度（Linux CI）**：`sharpe_ratio()` 和 `individual_volatility()` 使用 `variance == 0` 精确比较，但 Linux 上 `[0.001]*252` 的方差计算因浮点精度返回 `~6.8e-41` 而非 0，导致夏普返回天文数字而非 None、波动率返回 `1e-17` 而非 0.0 — 改为 `< 1e-15` epsilon 容差
