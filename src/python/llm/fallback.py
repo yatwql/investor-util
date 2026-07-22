@@ -29,7 +29,7 @@ _PLACEHOLDER_TEXT: dict[str, str] = {
     ),
     "expert_review": (
         "<h3>🧠 智囊团深度复盘</h3>"
-        "<p>⚠️ 当前无法生智囊团深度复盘内容。</p>"
+        "<p>⚠️ 当前无法生成智囊团深度复盘内容。</p>"
         "<p>可能原因：LLM API 服务暂时不可用、网络连接异常或 API Key 配置错误。</p>"
         "<p>建议稍后重试，或检查 <code>data/config/llm_settings.json</code> 中 API 配置是否正确。</p>"
         "<hr/><p><em>数据获取时间：{timestamp}</em></p>"

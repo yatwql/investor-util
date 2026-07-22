@@ -660,8 +660,7 @@ def generate_all_llm(
     # ── 事实锚定校验 ──────────────────────────────────────
     # 对已生成的 LLM 内容运行纯算法层事实校验，追加校验摘要到 HTML 底部。
     # 仅检查非缓存且非空的模块（缓存命中说明内容未变化，无需重复校验）。
-    _module_labels = {"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘",
-                      "health_check": "持仓体检报告", "penetration_deep": "穿透深度分析"}
+    _module_labels = get_llm_module_names()
 
     # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
     _penetrated_codes: set[str] = set()

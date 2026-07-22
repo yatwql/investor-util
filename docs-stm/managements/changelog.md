@@ -6,6 +6,14 @@
 
 ## [0.8.4-dev] - 未发布
 
+### Fixed
+- **`fallback.py` 占位文本缺字**：智囊团深度复盘降级占位文本缺少"成"字（"无法生"→"无法生成"），已补回
+- **`handlers_config.py` 辩论模式说明缺字**：辩论模式启用说明中"智囊团复盘"缺少"深度"二字，正文为"智囊团深度复盘"
+- **`news_correlation.py` 日志使用缩写**：LLM 新闻关联失败日志"LLM 新闻关联分析"改为完整模块名"财经新闻热点与持仓关联分析（LLM）"
+
+### Changed
+- **`generators_orchestrator.py` 消除硬编码模块标签**：事实校验阶段 `_module_labels` 字典从硬编码改为调用 `get_llm_module_names()`，与注册表自动同步
+
 ## [0.8.3] - 2026-07-22
 
 ### Fixed
