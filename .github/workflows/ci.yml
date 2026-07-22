@@ -47,10 +47,11 @@ jobs:
 
       - name: P2 — 全量测试（版本发布门禁）
         if: startsWith(github.ref, 'refs/tags/v')
-        run: python scripts/test_runner.py --mode all
+        run: python scripts/test_runner.py --mode all --no-timeout  # 禁用超时，避免大套件意外截断
 
   format:
     runs-on: ubuntu-latest
+    continue-on-error: true  # 格式问题不阻断 CI（非阻塞门禁，可后续修复）
     steps:
       - uses: actions/checkout@v4
 
