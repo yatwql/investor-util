@@ -170,6 +170,18 @@ def _auto_reset_provider_registry():
 
 
 @pytest.fixture(autouse=True)
+def _auto_reset_feature_flags():
+    """自动重置 FEATURE_FLAGS 为默认值，防止测试间 feature 状态泄漏。
+
+    每个测试执行前通过 reset_feature_flags() 恢复出厂默认值。
+    需要特定 feature 状态的测试应自行 mock is_feature_enabled()
+    或在测试体内调用 set_feature_enabled()，reset fixture 保证不污染下游。
+    """
+    from src.python.features import reset_feature_flags
+    reset_feature_flags()
+
+
+@pytest.fixture(autouse=True)
 def _reset_degradation_tracker():
     """自动重置 DegradationTracker 单例，防止测试间状态污染。
 

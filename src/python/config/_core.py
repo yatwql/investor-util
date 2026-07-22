@@ -458,10 +458,10 @@ def _load_llm_providers() -> dict | None:
 def _load_llm_key_credentials() -> dict[str, dict] | None:
     """读取 llm_key.json 为多键凭据字典。
 
-    新格式（多键）：
+    多凭据格式：
       {"claude-main": {"api_key": "sk-...", "model": "..."}, "openai-fb": {"api_key": "..."}}
 
-    旧格式（单键）：
+    单凭据格式（自动升级）：
       {"api_key": "sk-...", "model": "claude-sonnet-4-..."}
       → 自动包裹为 {"_default": {"api_key": "...", "model": "..."}}
 
@@ -476,10 +476,10 @@ def _load_llm_key_credentials() -> dict[str, dict] | None:
         if not isinstance(raw, dict):
             logger.warning("llm_key.json 根元素不是 JSON 对象，已忽略")
             return None
-        # 格式检测：顶层有 "api_key" 字符串键 → 旧格式
+        # 格式检测：顶层有 "api_key" 字符串键 → 单凭据格式
         if isinstance(raw.get("api_key"), str):
             return {"_default": raw}
-        # 新格式：校验每项是 dict
+        # 多凭据格式：校验每项是 dict
         for ref_name, creds in raw.items():
             if not isinstance(creds, dict):
                 logger.warning("llm_key.json 中 '%s' 的值不是 JSON 对象，已忽略", ref_name)

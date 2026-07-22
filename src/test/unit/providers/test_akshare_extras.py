@@ -51,11 +51,11 @@ class TestComputeDividendFingerprint(unittest.TestCase):
 
 
 class TestCalcDividendSummary(unittest.TestCase):
-    """测试分红数据汇总计算（akshare 1.18.64 聚合格式）。"""
+    """测试分红数据汇总计算（akshare 新版聚合格式）。"""
 
     @staticmethod
     def _make_agg_df(avg: float, cnt: int, code: str = "600519", name: str = "测试") -> MagicMock:
-        """模拟 akshare 1.18.64 stock_history_dividend 返回的聚合行。"""
+        """模拟 akshare 新版 stock_history_dividend 返回的聚合行。"""
         row = {"年均股息": avg, "分红次数": cnt, "代码": code, "名称": name}
         mock_iloc = MagicMock()
         mock_iloc.__getitem__.return_value = row

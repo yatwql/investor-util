@@ -147,7 +147,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         settings_suffix="penetration_deep",
         cache_groups=("preload",),
     ),
-    # ── 辩论模式（preload 组，P4 实验功能）──
+    # ── 辩论模式（preload 组，实验功能）──
     DataModuleDef(
         "辩论白脸",
         "llm_debate_pro",

@@ -275,7 +275,7 @@ def call_llm(
     """
     provider_list = llm_config.get("_provider_list")
     if not provider_list:
-        # 无多链配置，回退旧模式（兼容过渡期）
+        # 无多链配置，回退单 Provider 模式
         return _call_llm_legacy(
             system_prompt, user_prompt, llm_config, timeout, http_client, max_tokens, config_field, temperature, model
         )
@@ -365,7 +365,7 @@ def _call_llm_legacy(
     temperature: float | None = None,
     model: str | None = None,
 ) -> tuple[str | None, dict | None, dict | None]:
-    """旧模式兼容（无 _provider_list 配置时回退）。"""
+    """无 _provider_list 配置时的单 Provider 模式。"""
     provider = llm_config.get("provider", "")
     api_key = llm_config.get("api_key", "")
     resolved_model = model or llm_config.get("model", "")

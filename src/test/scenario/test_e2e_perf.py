@@ -73,6 +73,7 @@ def mock_all_apis():
         patch("src.python.fetcher.fund.fetch_fund_holdings_cached", return_value=None),
         patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=[]),
         patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        patch("src.python.report.penetration.fetch_fund_holdings", return_value=None),
     ]
     for p in patches:
         p.start()
