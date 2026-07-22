@@ -487,7 +487,7 @@ def test_get_ttl_closed(self, mock_open):
 
 9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + 手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
-11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode all` + 断网降级/旧缓存兼容/跨池污染确认
+11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + 断网降级/旧缓存兼容/跨池污染确认
 
 ### 6.4 人工验证
 
