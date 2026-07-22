@@ -740,8 +740,29 @@ def _run_phased(
             stripped = line.strip()
             if not stripped:
                 continue
-            if any(kw in stripped for kw in ("passed", "failed", "error", "warning", "===", "short test summary")):
+            if any(kw in stripped for kw in ("passed", "failed", "error", "warning", "===", "short test summary", "ERROR")):
                 print(f"      {stripped}")
+
+        # 阶段失败时打印更多输出（前 30 行 + 后 80 行，捕获 import/traceback）
+        if proc.returncode != 0:
+            lines = output.splitlines()
+            # 找第一个错误行
+            first_err = None
+            for j, ln in enumerate(lines):
+                if any(kw in ln for kw in ("Error", "Traceback", "ImportError", "ModuleNotFoundError", "SyntaxError")):
+                    first_err = j - 3
+                    break
+            if first_err is not None and first_err < 0:
+                first_err = 0
+            if first_err is not None:
+                end = min(first_err + 40, len(lines))
+                print(f"      [Phase {tag}] --- 错误详情（行 {first_err+1}-{end}）---")
+                for ln in lines[first_err:end]:
+                    print(f"      |{ln}")
+            # 末尾 20 行（pytest short summary）
+            print(f"      [Phase {tag}] --- 末尾输出 ---")
+            for ln in lines[-min(30, len(lines)):]:
+                print(f"      |{ln}")
 
         ok = proc.returncode == 0
         tag2 = "OK" if ok else "ERR"
@@ -752,7 +773,8 @@ def _run_phased(
 
         if not ok:
             combined["exit_code"] = proc.returncode
-            print(f"    [!] [Phase {tag}] 未通过，跳过后续阶段")
+            # 打印完整 pytest 短摘要（自动包含末尾）
+            print(f"    [!] [Phase {tag}] 未通过（exit={proc.returncode}），跳过后续阶段")
             break
 
     # 汇总一行
