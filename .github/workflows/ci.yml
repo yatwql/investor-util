@@ -43,7 +43,11 @@ jobs:
 
       - name: P1 — 合入验证（master 门禁）
         if: github.ref_name == 'master' || github.event_name == 'pull_request'
-        run: python scripts/test_runner.py --mode verify --phased
+        run: |
+          echo "=== Phase A: unit_core | unit_providers | unit_fetcher ==="
+          python -m pytest src/test/ -m "unit_core or unit_providers or unit_fetcher" -v --tb=long --no-header 2>&1
+          echo "=== Phase B: scenario ==="
+          python -m pytest src/test/ -m "scenario" -v --tb=long --no-header 2>&1
 
       - name: 上传测试报告（含调试日志）
         if: always() && github.ref_name == 'master'
