@@ -4,7 +4,9 @@
 
 ---
 
-## [0.8.2-dev] - 未发布
+## [0.8.3-dev] - 未发布
+
+## [0.8.2] - 2026-07-22
 
 ### Fixed
 - **新闻去重算法优化**：`_extract_entity_bigrams()` 加入英数 token 提取（原仅中文 bigram，丢失"AI""AMD"等英文专名），实测减少 14.5% 跨源漏判；扩展 `_STOP_BIGRAMS` 过滤同比/环比等高频噪声；阈值经 80396 条锚点数据分析确认不变
@@ -21,6 +23,10 @@
   - `板块开关` → `章节开关`（technical.md）
   - `板块配置` → `章节配置`（日志输出，此前已改）
   - 覆盖文件：`config/_config_defaults.py`、`config/_core.py`、`features.py`、`registry.py`、`report/excel_b_series.py`、`report/data_status.py`、`report/orchestrator.py`、`report/html_writer.py`、`report/excel_generator.py`、`report/excel_sheet_factory.py`、`report/tmpl/report_template.html`、`README.md`、5 份用户文档、3 份管理文档
+- **同步 technical.md 与 llm-technical.md 交叉引用**：§5（LLM 集成层）各子节末指向 llm-technical.md 对应章节；§8（架构设计约束）C9/C17/C18 补充 llm-technical.md 参考；llm-technical.md 首部补充引言说明其与 technical.md 的定位关系
+- **清理版本历史术语**：源码注释中移除历版本号引用（`akshare 1.18.64` → `新版`，`旧/新模式` → `单/多凭据格式`）；CLAUDE.md 架构遵从指引改为引用 §架构设计约束表
+- **测试隔离增强**：conftest.py 新增 `_auto_reset_feature_flags` fixture 防止 feature 状态跨测试泄漏；LLM 空持仓场景兼容 8/9 元组返回值；e2e_perf 补充缺失 mock
+- **用户文档违规引用清理**：how-to-config.md 移除 requirements.md 引用；faq.md 移除 changelog.md 引用；how-to-test-my-code.md 13→1 处管理文档引用合并；README.md 内部文档区标题优化
 
 ## [0.8.1] - 2026-07-22
 
