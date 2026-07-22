@@ -4,16 +4,23 @@
 
 ---
 
-## [0.8.3-dev] - 未发布
+## [0.8.4-dev] - 未发布
+
+## [0.8.3] - 2026-07-22
 
 ### Fixed
 - **P3-12 CI 测试持续失败**：三个原因修复：① `pyproject.toml` 中 `required_plugins` 将 `pytest-mock` 死锁在 `==3.15.1`，但 deps 声明 `>=3.15`，导致 pip 安装的版本不满足硬校验，pytest 拒绝启动 — 统一改为 `>=3.15`；② `format` job 的 Ruff 检查无 `continue-on-error: true`，非阻塞门禁却阻断 CI — 已添加；③ `all` 模式无 `--no-timeout`，大套件易超时截断 — 已添加
 - **辩论模式 HTML 报告编码错误**：`report_template.html` 中辩论白脸（pro_text）和黑脸（con_text）的 Jinja2 模板变量缺少 `| safe` 过滤器，导致 LLM 返回的 HTML 内容被转义为文本源码显示。综合权衡段（`expert_review`）已有 `| safe`，不受影响
 - **`_normalize_title()` 数字模式过滤**：加入百分比 `\d+(?:\.?\d+)?%` 和金额 `\d+(?:\.?\d+)?[万亿]` 正则过滤，减少跨源去重时不同新闻因共享数字模式（如"20%""25亿"）导致的 SequenceMatcher 比率虚高。同步更新 `test_cross_source_english_token_only_overlap` 测试用例（去百分比后实体 bigram 由 4 降为 2，正确保持 2 条独立新闻）
+- **全球政经局势 LLM 虚构最大持仓**：`_build_global_macro_prompt()` 未传入持仓排名数据，LLM 猜测"561910 为最大持仓"但实际最大为 011506。修复：prompt 中新增【持仓TOP3】区块（按市值排序的名称/代码/市值/占比/收益率），并在 system prompt 追加"请勿虚构持仓排名"约束。涉及 `prompts_action.py`、`generators.py`、`generators_orchestrator.py`
+- **`_normalize_title()` 扩展前缀/数字模式降去重噪声**：校准锚点分析发现 257 条 bg≤1/ratio≥0.40 噪声。修复：新增 7 个编辑栏目前缀（数据图解、CCI快报、市场动态等）、剔除事件年份数字（`WAIC 2026`→`WAIC`）、剔除排名标记（前N），降低未来校准分析的 false high 比例
+- **`_normalize_title()` 再增 4 个高频率栏目前缀**：`量化观察`、`刷屏`、`尾盘`、`华尔街见闻早餐`，基于 3650 条 cross_skip 锚点数据分析补充
 
 ### Changed
 - **辩论模式防幻觉增强**：pro/con 系统提示词新增严格约束——"数据来自输入，不得虚构任何数值、百分比或排名"；health_check 提示词补充"不得编造未提供的数值"
 - **事实校验器防误报**：新增 `_PROPORTION_KEYWORDS` 策略，跳过"XX%的品种""XX%的持仓"等品种计数比例语境，不再将其误判为收益率与累计收益率比较
+- **config.json 中文注释分组对齐 TUI 菜单**：B 组注释 `章节可见性` → `报告可选章节`，补充行内注释（`enable_b_series: 基金深度分析（#6~9）` 等），`enable_history` 章节编号修正 `#15~#16` → `#16~17`（与 TUI 菜单描述一致）；默认值和模板同步更新。涉及 `config.json`、`_config_defaults.py`
+- **历史走势基准指数移除标普500(gb_inx)**：默认 `benchmark_indices` 移除 `gb_inx: "标普500"`（Sina/Tencent K-line 均不可用，走势始终空白）。同步更新：`_config_defaults.py`（默认值 + 模板）、`config.json`、`benchmark.py` docstring、`how-to-config.md`（示例/字段表/描述 4 处）、`requirements.md`（配置表 1 处）。美股日行情数据源不受影响
 
 ## [0.8.2] - 2026-07-22
 

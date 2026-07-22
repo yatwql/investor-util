@@ -65,11 +65,13 @@ def generate_global_macro(
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
     competitive_context: str | None = None,
+    holdings_details: list[dict] | None = None,
 ) -> tuple[str | None, bool]:
     """生成全球政经局势。
 
     Args:
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），可选。
+        holdings_details: 持仓明细（可选），用于提供 TOP3 排名，防止 LLM 虚构最大持仓。
     """
 
     def _fingerprint():
@@ -79,6 +81,7 @@ def generate_global_macro(
         return _build_global_macro_prompt(
             a_indices, us_indices, total_mv, total_profit, total_cost, categories,
             sector_flow, competitive_context=competitive_context,
+            holdings_details=holdings_details,
         )
 
     return generate_llm_module(

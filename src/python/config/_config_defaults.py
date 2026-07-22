@@ -36,10 +36,10 @@ _DEFAULT_CONFIG = {
     "llm_settings_file": os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
-    # ── B. 章节可见性（关闭后对应页签/章节完全隐藏） ──
-    "enable_b_series": True,  # 基金深度分析章节（#6~9）
+    # ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──
+    "enable_b_series": True,  # 基金深度分析（#6~9）
     "enable_news": True,  # 市场新闻（#10）
-    "enable_history": True,  # 历史走势+回撤分析（#15~#16）
+    "enable_history": True,  # 组合历史走势+回撤（#16~17）
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -78,7 +78,7 @@ _DEFAULT_CONFIG = {
         "snapshot_retention_days": 60,
         "snapshot_max_count": 365,
         "coverage_threshold": 0.8,
-        "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"},
+        "benchmark_indices": {"sh000300": "沪深300"},
     },
     # ── H. 再平衡配置 ──
     "rebalance": {
@@ -115,10 +115,10 @@ def _get_default_config_template() -> str:
         '  "llm_key_file": "data/config/llm_key.json",\n'
         '  "llm_providers_file": "data/config/llm_providers.json",\n'
         "\n"
-        "  // ── B. 章节可见性（关闭后对应页签/章节完全隐藏）──\n"
-        '  "enable_b_series": true,\n'
-        '  "enable_news": true,\n'
-        '  "enable_history": true,\n'
+        "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──\n"
+        '  "enable_b_series": true,  // 基金深度分析（#6~9）\n'
+        '  "enable_news": true,  // 市场新闻（#10）\n'
+        '  "enable_history": true,  // 组合历史走势+回撤（#16~17）\n'
         "\n"
         "  // ── C. 数据源与提供商 ──\n"
         '  "news_top_count": 300,\n'
@@ -161,7 +161,7 @@ def _get_default_config_template() -> str:
         '    "snapshot_retention_days": 60,\n'
         '    "snapshot_max_count": 365,\n'
         '    "coverage_threshold": 0.8,\n'
-        '    "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}\n'
+        '    "benchmark_indices": {"sh000300": "沪深300"}\n'
         "  },\n"
         "\n"
         "  // ── H. 再平衡配置 ──\n"

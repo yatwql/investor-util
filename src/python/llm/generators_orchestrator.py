@@ -318,6 +318,7 @@ def _dispatch_llm_workers(
             http_client=c,
             llm_config=lc,
             competitive_context=_competitive_context,
+            holdings_details=holdings_details,
         ),
         "expert_review": lambda c, lc: generate_expert_review(
             total_mv,
