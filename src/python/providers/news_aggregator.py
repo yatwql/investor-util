@@ -173,13 +173,15 @@ def _normalize_title(title: str) -> str:
 
     for prefix in ("快讯", "收评", "收盘", "早评", "午评", "盘中", "盘后",
                    "数据图解", "CCI快报", "市场动态", "市场洞察", "行业深度",
-                   "周刊提前读", "公司观察"):
+                   "周刊提前读", "公司观察",
+                   "量化观察", "刷屏", "尾盘", "华尔街见闻早餐"):
         if title.startswith(prefix):
             title = title[len(prefix) :]
             break
     # 过滤通用数字模式，避免跨源去重时不同新闻因共享
     # "20%""25亿"等数字模式而获得虚高 SequenceMatcher 比率。
-    # 日期模式（2026年/7月/8日）已在 _dedup_by_title 的 _RATIO_CLEAN 中处理。
+    # 日期模式（2026年/7月/8日）已在 _dedup_by_title 的 _RATIO_CLEAN 中处理，
+    # 但前导日期（如 "7月18日美股成交额前20"）在 bigram 提取前剥离。
     title = re.sub(r"\d+(?:\.?\d+)?%", "", title)       # 20%、2.5%
     title = re.sub(r"\d+(?:\.?\d+)?[万亿]", "", title)   # 25亿、1.2万亿
     # 孤立 4 位年份数字（如 "WAIC 2026" → "WAIC"），避免不同年报道因共享英文
