@@ -54,7 +54,7 @@ def scenario_analysis(
 ) -> dict[str, Any]:
     """基于 Beta 计算六种市场情景下的组合预期变动。
 
-    Layer 1 版本：线性推导 E(Rp) = β × Rm。
+    线性推导 E(Rp) = β × Rm。
     含置信区间（Beta CI → 预期变动 CI）和 ±1σ/±2σ 波动率区间（当 portfolio_volatility 可用时）。
 
     Args:

@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.8.2-dev
+> 文档版本：v0.8.3-dev
 
 ## 目录
 
@@ -1060,7 +1060,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 `report/pipeline_data_builder.py` 集中组装传递给 LLM 的数据上下文 `pipeline_data`。包含 `build()`（A 通道：快照环比差异组装）和 `build_prep()`（B 通道：行情/持仓/指标数据组装）两个构造器，入口统一做类型断言（C19 约束）。
 
-`pipeline_data` 遵循 C19 Schema 契约：所有键必须在 `docs-stm/archive/v0.7.x/better-investment-advice/data-channels-schema.md` 中预定义类型、版本号和写入/消费模块后，才能在代码中使用该键。
+`pipeline_data` 遵循 C19 Schema 契约：所有键必须在 pipeline_data Schema 定义集中存放处预定义类型、版本号和写入/消费模块后，才能在代码中使用该键（详见附录 H）。
 
 #### 三种报告路径
 
@@ -1667,7 +1667,7 @@ industry_{code}.json
 
 #### 新闻去重算法
 
-`_dedup_by_title()` 采用**两阶段模糊去重 + 中文实体 bigram 辅助判定**策略，基于 37 条真实新闻（24 对重复 + 23 对非重复）校准。
+`_dedup_by_title()` 采用**两阶段模糊去重 + 实体 bigram + 英数 token 辅助判定**策略。
 
 ##### 整体流程
 
@@ -1682,11 +1682,13 @@ _dedup_by_title(items)
     │       （同源不会出现方向对立报道，不依赖比率阈值）
     │
     ├── ② 跨源安全区（ratio ≥ 0.50）
-    │       直接合并，无需 bigram 校验
+    │       SequenceMatcher 前剥离 "2026年/7月/15日" 等日期模式，
+    │       避免不同新闻因共享日期格式虚高 ratio
+    │       ratio ≥ 0.50 直接合并，无需 bigram 校验
     │       擦边案例（0.50~0.60）写入锚点
     │
     ├── ③ 跨源候选区（0.30 ≤ ratio < 0.50）
-    │       需额外共享 ≥ 3 个实体 bigram 防误杀
+    │       需额外共享 ≥ 3 个实体 bigram（含英数 token）防误杀
     │       → bigram ≥ 3：合并，写入 cross_merge 锚点
     │       → bigram < 3：跳过，写入 cross_skip 锚点
     │
@@ -1703,14 +1705,14 @@ _dedup_by_title(items)
 | **安全区** | ratio ≥ 0.50，直接合并，不依赖 bigram | ≥0.50 |
 | **候选区** | 0.30 ≤ ratio < 0.50，需额外 bigram 校验防误杀 | [0.30, 0.50) |
 | **bigram（字符二元组）** | 中文标题的连续 2 字切片，用于提取实体身份 | — |
-| **实体 bigram** | 过滤掉财经动词/形容词后的 bigram 集合 | STOP 集含 24 个词 |
+| **实体 bigram** | 过滤掉财经动词/形容词后的 bigram 集合（含英数 token） | STOP 集含 44 个词 |
 | **bigram_overlap** | 两标题实体 bigram 交集大小 | 同源≥4/跨源≥3 判定重复 |
 | **同源（same_source）** | 两新闻来自同一源头（如新浪 vs 新浪） | 仅依赖 bigram，不依赖 ratio |
 | **跨源（cross_source）** | 两新闻来自不同源头 | 依赖 ratio + bigram 双重判定 |
 
 ##### SequenceMatcher 比率
 
-`difflib.SequenceMatcher.ratio()` 计算两个标准化标题的相似度（0.0~1.0），值越高表示字符级匹配越强。经过 `_normalize_title()` 预处理（去除标点/空白/特殊字符）后：
+`difflib.SequenceMatcher.ratio()` 计算两个标准化标题的相似度（0.0~1.0），值越高表示字符级匹配越强。经过 `_normalize_title()` 预处理（去除标点/空白/特殊字符）后，再剥离 `\d{4}年|\d+月|\d+日` 通用日期模式（防止不同新闻因共享日期格式虚高 ratio）：
 
 - **0.50 以上**：大概率同一事件（如"XX 突破 3 万亿" vs "XX突破3万亿元"）
 - **0.30~0.50**：可能同一事件，但用词差异较大（如"XX 创历史新高" vs "XX 再次刷新纪录"）
@@ -1718,18 +1720,18 @@ _dedup_by_title(items)
 
 ##### 实体 bigram 提取
 
-`_extract_entity_bigrams()` 提取标题中的中文实体二元组：
+`_extract_entity_bigrams()` 提取标题中的实体特征（中文 bigram + 英数 token）：
 
 ```python
 步骤：
-  ① 正则去除非中文字符（保留 一~鿿）
-  ② 滑动窗口取连续 2 字
-  ③ 过滤 _STOP_BIGRAMS（财经动词/形容词）
+  ① 英数 token：提取 [a-zA-Z]+ 和 [0-9]+，长度 ≥ 2 过滤单字符噪声
+  ② 中文 bigram：正则去除非中文字符 → 滑动窗口取连续 2 字
+  ③ 过滤 _STOP_BIGRAMS（财经动词/形容词/噪声）
 ```
 
-**STOP 词列表**（24 个，不参与实体判定）：上调、下跌、上涨、超越、低于、高于、首次、今日、昨日、本周、上周、本月、上月、盘中、盘后、早盘、午盘、收盘、开盘、不会、将会、成为、宣布、公布、发布、推动、发力、实现、加大、降低、回升、有望、再度、时隔。
+**STOP 词列表**（44 个，不参与实体判定）：上调、下跌、上涨、超越、低于、高于、首次、今日、昨日、本周、上周、本月、上月、盘中、盘后、早盘、午盘、收盘、开盘、不会、将会、成为、宣布、公布、发布、推动、发力、实现、加大、降低、回升、有望、再度、时隔、同比、环比、预计、累计、显示、预期、影响、明显、相关、报告、数据、来源、表示、认为、其中、分别、总额、规定。
 
-**示例**：标题"腾讯突破 3 万亿市值" → 提取中文部分"腾讯突破万亿市值" → bigram：腾讯、讯突、突破、破万、万亿、值市 → 过滤掉"突破"后 → **实体 bigram：腾讯、讯突、破万、万亿、值市**
+**示例**：标题"英伟达Blackwell AI芯片发布" → 英数 token：`{"blackwell", "ai"}`；中文 bigram：英伟、伟达、达、芯片、片发、发布 → 过滤掉"发布"后 → **实体集合：`{"blackwell", "ai", "英伟", "伟达", "芯片", "片发"}`**
 
 ##### 两档阈值策略
 
@@ -1756,9 +1758,9 @@ _dedup_by_title(items)
 `python scripts/calibrate-dedup-threshold.py` 分析 `data/cache/dedup_anchors.jsonl`，输出：
 
 - 各规则覆盖统计（cross_skip / cross_merge / cross_safe / same_src）
-- 跨源 ratio 和 bigram 分布
-- 边界样本明细（前 10 条）
-- 阈值调整建议（cross_threshold 升降、bigram 门槛评估）
+- 跨源 ratio 和 bigram 分布，按 bigram 分档（bg=0 无实体重叠 / bg=1 几乎无重叠 / bg≥2 需审查）
+- 边界样本明细（前 5~10 条）
+- 阈值评估建议（区分"实体重叠漏判"与"日期/财经关键词虚高"）
 
 ### 4.11 数据降级治理体系
 
@@ -1864,6 +1866,8 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
 
 **辩论模式（实验性路由）**：当 Feature Flag `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` 任一启用时，`generators_orchestrator.py` 中的 `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`。辩论模式与标准模式互斥（辩论优先），路由后 `skeleton.generate_llm_module()` 走辩论三段缓存（`llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_`）而非标准 expert_review 缓存。三段独立的 `DataModuleDef` 注册在 `registry.py` 中（preload 组，24h TTL）。
 
+各子模块的详细设计见 `llm-technical.md` §1~§4（架构总览、模块清单、骨架流程、并行编排）。
+
 ### 5.2 调用链概览
 
 LLM 分析从编排入口到最终 HTML 输出，经过缓存检查 → API 调用 → 内容转换 → 缓存写入的完整链路：
@@ -1888,6 +1892,8 @@ generators_orchestrator（并行调度 4+1 模块）
             └── 返回 (result, usage, provider_name) 三元组
 ```
 
+完整调用链含重试、熔断、截断重试、缓存写入的各分支流程，详见 `llm-technical.md` §3（骨架流程）和 §6（重试与容错）。
+
 ### 5.3 模块清单
 
 LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_llm` 逐模块独立开关：
@@ -1902,7 +1908,9 @@ LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_
 
 每个模块的详细参数（model、temperature、timeout、max_tokens 等）通过 `module_{标识}` 命名约定在 `llm_settings.json` 中配置。
 
-**辩论模式路由**：当 Feature Flag 开启时，expert_review 模块的生成入口被 `_debate_wrapper` 接管，输出路径变为 debate 三段式（详见 §7.8 辩论模式需求）。辩论模式使用独立的缓存键（`llm_debate_pro_`/`llm_debate_con_`/`llm_debate_synthesis_`）和 Token 预算守卫，三段缓存共用 expert_review 的持仓指纹（排除行情波动），默认 TTL 24h。辩论模式启用时报告页签标题尾部附加"(实验)"标签。
+**辩论模式路由**：当 Feature Flag 开启时，expert_review 模块的生成入口被 `_debate_wrapper` 接管，输出路径变为 debate 三段式。辩论模式使用独立的缓存键（`llm_debate_pro_`/`llm_debate_con_`/`llm_debate_synthesis_`）和 Token 预算守卫，三段缓存共用 expert_review 的持仓指纹（排除行情波动），默认 TTL 24h。辩论模式启用时报告页签标题尾部附加"(实验)"标签。
+
+各模块的详细配置参数、System Prompt 设计、User Prompt 构建逻辑见 `llm-technical.md` §8（提示词管理）。辩论模式详见 `llm-technical.md` §4.1 和 §5.5。
 
 ### 5.4 多 Provider 链模式
 
@@ -1913,6 +1921,8 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 - **逐链尝试**：`api.call_provider_entry()` 按策略排序后逐链调用，成功即返回，全链失败后降级为占位文本
 - **Provider 感知缓存**：缓存键格式 `llm_{module}_{provider_name}_{fingerprint}`，不同 Provider 的缓存互不冲突
 - **失败追踪**：`LLM_MODULE_FAILURE` 字典记录每个模块的 attempted Provider 列表及 final_status，供报告展示
+
+4 种策略的详细排序逻辑和 credentials_ref 解析流程见 `llm-technical.md` §5（API 调用层）。
 
 ### 5.5 关键机制
 
@@ -1931,6 +1941,8 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 | 辩论路由 | `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`，Feature Flag 控制启停（默认关闭） | 辩论模式与标准模式互斥，辩论优先 |
 | Token 预算守卫 | 每阶段输出字符数 > `int(max_tokens × 0.65)` 时触发保护：1× 超限→跳过 synthesis 阶段并拼接 pro+con；2× 超限→回退标准模式 | 防止辩论模式过度消耗 token |
 | 虚构代码过滤 | `_filter_hallucinated_codes()` 基于正则的行级过滤，使用 `(?:^\|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]\|$)` 适配中文环境 | 消除 LLM 产生的虚构证券代码 |
+
+各项机制的详细实现见 `llm-technical.md` §5~§11（API 调用层、重试与容错、缓存与指纹失效、提示词管理、会话级 Token 追踪、模型定价、熔断器）。
 
 [↑ 回到顶部](#目录)
 
@@ -2263,15 +2275,15 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 | **C7** | **报告序号不可硬编码** — 报告 17 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
-| **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 docs-stm/archive/v0.7.x/better-investment-advice/data-channels-schema.md 中定义类型、版本号、写入/消费模块后，才能在代码中新增该键的使用 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
+| **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 pipeline_data Schema 定义文档中预定义类型、版本号、写入/消费模块后，才能在代码中使用该键（详见附录 H） | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
 
 ### 8.4 LLM 集成层约束
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `registry.py` 的 `DataModuleDef` 注册表中同时注册 | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失 | llm/ 包 + registry.py |
-| **C17** | **Multi-LLM Provider Chain** — 所有 LLM API 调用必须通过 Provider Chain（`strategy.py` + `api.py`）路由，`call_llm()` 返回 `(result, usage, provider_name)` 三元组，provider_name 记录实际使用的 Provider 条目名 | 手动切换 Provider 导致配置散落、失败无法递补、Provider 名称不可追踪 | API 调用不经过 Chain → 无法自动递补、Provider 名称缺失 → 缓存键冲突、用量统计不准确 | llm/api.py、llm/skeleton.py、llm/strategy.py |
-| **C18** | **credentials_ref 凭据分离** — API 凭据（api_key/model/endpoint）必须通过 `llm_key.json` 的 `credentials_ref` 引用，禁止在 `llm_providers.json` 中直接存储敏感凭据 | 凭据与路由配置混存导致凭据泄露风险；凭据变更时需同时修改两份配置 | 凭据泄露风险、凭据变更需多处修改、凭据复用困难 | data/config/llm_providers.json、data/config/llm_key.json、config/_core.py、llm/api.py |
+| **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `registry.py` 的 `DataModuleDef` 注册表中同时注册（详见 `llm-technical.md` §12） | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失 | llm/ 包 + registry.py |
+| **C17** | **Multi-LLM Provider Chain** — 所有 LLM API 调用必须通过 Provider Chain（`strategy.py` + `api.py`）路由，`call_llm()` 返回 `(result, usage, provider_name)` 三元组，provider_name 记录实际使用的 Provider 条目名（详见 `llm-technical.md` §5.2） | 手动切换 Provider 导致配置散落、失败无法递补、Provider 名称不可追踪 | API 调用不经过 Chain → 无法自动递补、Provider 名称缺失 → 缓存键冲突、用量统计不准确 | llm/api.py、llm/skeleton.py、llm/strategy.py |
+| **C18** | **credentials_ref 凭据分离** — API 凭据（api_key/model/endpoint）必须通过 `llm_key.json` 的 `credentials_ref` 引用，禁止在 `llm_providers.json` 中直接存储敏感凭据（详见 `llm-technical.md` §5.3） | 凭据与路由配置混存导致凭据泄露风险；凭据变更时需同时修改两份配置 | 凭据泄露风险、凭据变更需多处修改、凭据复用困难 | data/config/llm_providers.json、data/config/llm_key.json、config/_core.py、llm/api.py |
 
 ### 8.5 基础设施约束
 
@@ -2338,7 +2350,7 @@ investor-util/
 ├── data/                        # 运行时数据（config/holdings/cache/state/snapshots）
 ├── reports/                     # 生成报告
 ├── logs/                        # 程序日志
-├── docs-stm/                    # 项目管理文档（含 managements/、plan/、manuals/、archive/）
+├── docs-stm/                    # 项目管理文档（含 managements/、plan/、manuals/）
 ├── scripts/                     # 启动/测试脚本
 ├── pyproject.toml
 └── CLAUDE.md
@@ -2474,7 +2486,7 @@ investor-util/
 
 ### 附录 H：pipeline_data Schema 定义（当前已实现 + 计划中）
 
-> 完整定义和维护责任见 docs-stm/archive/v0.7.x/better-investment-advice/data-channels-schema.md。
+> 完整定义和维护责任见 pipeline_data Schema 定义文档。
 > 此处仅列出当前阶段已确认的键名和类型。
 
 | 键名 | 类型 | Optional | 状态 | 写入阶段 |

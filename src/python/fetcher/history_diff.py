@@ -7,14 +7,7 @@
   持仓级 — 新增/清仓/加仓/减仓/不变
   基准日 — days_since_last_report（距上次报告天数）
 
-用例覆盖（验收标准 —— 7 用例）：
-  1. 首次运行（无旧快照）→ is_first_check=True
-  2. 无变化 → 全空 diff
-  3. 新增持仓
-  4. 清仓持仓
-  5. 加仓
-  6. 减仓
-  7. 基准日对齐
+首次运行时 is_first_check=True，无旧快照可比较。
 """
 
 from __future__ import annotations

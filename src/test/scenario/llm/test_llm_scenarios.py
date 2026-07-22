@@ -807,13 +807,18 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
         mock_penetration.return_value = ("<p>空穿透</p>", False)
 
         try:
-            macro, expert, health, pen, mc, ec, hc, pc = generate_all_llm(
+            result = generate_all_llm(
                 {}, {}, 0, 0, 0, 0, 0, {},
                 holdings_details=[], penetrated_assets=[],
             )
         except Exception as e:
             self.fail(f"generate_all_llm 在空持仓下不应崩溃: {e}")
 
+        # 兼容 8 元组（无辩论模式）和 9 元组（辩论模式开启）
+        macro = result[0]
+        expert = result[1]
+        health = result[2]
+        pen = result[3]
         self.assertIsNotNone(macro)
         self.assertIsNotNone(expert)
         self.assertIsNotNone(health)

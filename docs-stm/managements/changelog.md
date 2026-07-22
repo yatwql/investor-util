@@ -4,17 +4,29 @@
 
 ---
 
-## [0.8.2-dev] - 未发布
+## [0.8.3-dev] - 未发布
+
+## [0.8.2] - 2026-07-22
+
+### Fixed
+- **新闻去重算法优化**：`_extract_entity_bigrams()` 加入英数 token 提取（原仅中文 bigram，丢失"AI""AMD"等英文专名），实测减少 14.5% 跨源漏判；扩展 `_STOP_BIGRAMS` 过滤同比/环比等高频噪声；阈值经 80396 条锚点数据分析确认不变
+- **校准工具错误建议修正**：`calibrate-dedup-threshold.py` — 按 bigram 重叠度分档分析 cross_skip，不再对 bg≤1（无实体重叠）的 pair 误判"降低阈值"，正确归因于公共日期/财经关键词虚高；移除 ⚠ 字符修复 Windows GBK 编码崩溃
+- **SequenceMatcher 剥离日期模式降虚高**：`_dedup_by_title()` 中 comparison 前先剥离 `\d{4}年|\d+月|\d+日` 通用日期格式，防止完全不相关的新闻（如"2026年7月票房" vs "2026年7月经营质量"）因共享日期 ratio 虚高进入候选区
 
 ### Changed
+- **同步 technical.md 去重算法描述至最新代码**：算法概述去掉校准数据细节；流程图新增日期剥离步骤；核心概念表 STOP 集 24→44 词并含英数 token；实体 bigram 提取补充英数 token 步骤和 STOP 全列表；校准工具输出描述同步为三档分仓分类
 - **术语统一（报告内容+注释+文档）**：全项目范围将内部架构术语替换为用户友好术语
   - `板块可见性` → `章节可见性`（config 注释、日志、管理文档）
-  - `B 系列` / `B 系列基金深度分析` → `基金深度分析`（Excel 页签、HTML 注释、模块 docstring、文档）
+  - `B 系列` / `B 系列基金深度分析` → `基金深度分析`（模块 docstring、代码注释、HTML 模板注释、文档）
   - `新闻板块` → `市场新闻`（config 注释、文档）
   - `LLM 板块` → `LLM 分析章节` / `LLM 分析章节组`（config 注释、文档）
   - `板块开关` → `章节开关`（technical.md）
   - `板块配置` → `章节配置`（日志输出，此前已改）
   - 覆盖文件：`config/_config_defaults.py`、`config/_core.py`、`features.py`、`registry.py`、`report/excel_b_series.py`、`report/data_status.py`、`report/orchestrator.py`、`report/html_writer.py`、`report/excel_generator.py`、`report/excel_sheet_factory.py`、`report/tmpl/report_template.html`、`README.md`、5 份用户文档、3 份管理文档
+- **同步 technical.md 与 llm-technical.md 交叉引用**：§5（LLM 集成层）各子节末指向 llm-technical.md 对应章节；§8（架构设计约束）C9/C17/C18 补充 llm-technical.md 参考；llm-technical.md 首部补充引言说明其与 technical.md 的定位关系
+- **清理版本历史术语**：源码注释中移除历版本号引用（`akshare 1.18.64` → `新版`，`旧/新模式` → `单/多凭据格式`）；CLAUDE.md 架构遵从指引改为引用 §架构设计约束表
+- **测试隔离增强**：conftest.py 新增 `_auto_reset_feature_flags` fixture 防止 feature 状态跨测试泄漏；LLM 空持仓场景兼容 8/9 元组返回值；e2e_perf 补充缺失 mock
+- **用户文档违规引用清理**：how-to-config.md 移除 requirements.md 引用；faq.md 移除 changelog.md 引用；how-to-test-my-code.md 13→1 处管理文档引用合并；README.md 内部文档区标题优化
 
 ## [0.8.1] - 2026-07-22
 

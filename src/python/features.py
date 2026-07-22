@@ -26,7 +26,7 @@ logger = logging.getLogger("invest")
 
 _FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
 
-# ── 全部功能开关默认值（28 项） ──────────────────────────
+# ── 全部功能开关默认值 ──────────────────────────────────────
 # 格式：{flag_name: default_enabled}
 # False = 功能默认关闭，需要用户手动启用
 # True  = 功能默认开启，可在 features.json 中关闭
@@ -38,7 +38,7 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "llm_health_check": True,
     "llm_penetration_deep": True,
     "llm_news_correlation": True,
-    # ── 辩论模式（3 项，P4 实验功能，默认关闭） ──
+    # ── 辩论模式（实验功能，默认关闭） ──
     "llm_debate_procon": False,
     "llm_debate_conditional": False,
     "llm_debate_qa_concentration": False,

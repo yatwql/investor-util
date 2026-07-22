@@ -19,7 +19,7 @@
 - **测试标记强制**：所有新增/修改的测试用例（测试类或测试方法）**必须**标注对应的 pytest marker（如 `@pytest.mark.unit_providers`、`@pytest.mark.scenario_basic` 等），marker 定义见 `src/test/conftest.py` 的 `pytest_configure`。新增 marker 需同步注册到 `conftest.py` 和维护文档。
 - **边缘测试文件隔离**：edge 场景测试（`@pytest.mark.edge`）**必须**放置在 `*_edge.py` 文件中，不得与普通测试混搭在同一文件。`conftest.py` 的 `pytest_collection_modifyitems` 会在收集期自动校验此约束。
 - **测试隔离**：运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`src/test/conftest.py` 中的 `_isolate_sensitive_paths` autouse fixture 会自动将 `config.json` 和缓存目录重定向到临时目录。测试用例应使用 mock 或临时文件隔离，避免污染真实数据。
-- **新增测试隔离要求（迭代 better-investment-advice）**：
+- **新增测试隔离要求**：
   - **单例状态重置**：新增模块级单例（如 `get_tracker()`）时，**必须**在 conftest.py 中增加 `autouse` fixture 重置该单例（参考 `_auto_reset_provider_registry` 模式），避免测试间状态污染
   - **持久化文件隔离**：新增任何持久化状态文件（`circuit_breaker.json`、`metrics_breaker.json`、`rebalance_silence.json` 等）时，**必须**在 `_isolate_sensitive_paths` fixture 中增加 `monkeypatch.setattr` 将该文件路径重定向到 `tmp_path`，不得依赖测试自行清理
   - **输出目录隔离**：集成测试（如 P1-16、P2-14-B 等触发报告生成管线的测试）**必须**将 `output_dir`/`reports/` 重定向到临时目录，避免测试产物残留在真实报告目录
@@ -46,7 +46,7 @@
 - **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
 - **开发版本切换**：发布版本并打 tag 后，**立即**将 `APP_VERSION` 和所有管理文档版本头改为**下一个版本的 `-dev`**（如发布 v0.6.8 后即改为 v0.6.9-dev），运行 `check-version-consistency.py` 验证全链 [OK] 后提交，然后继续开发。开发期间版本号始终标识为下一个预期发布版本的 `-dev`。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功，绿色）、`[!]`（部分失败/告警，黄色）、`[ERR]`（错误，红色）。终端不支持颜色时自动降级。
-- **架构遵从**：所有模块必须遵守 `docs-stm/managements/technical.md` 中「#1.4-概要设计--核心架构决策」（代码类型判定中心化 C1、Provider Chain 必经 C6、缓存统一管理 C2/C3、报告配置化 C7/C14、数据降级治理体系）和「#8-架构设计约束」（C1~C15 含会话级复用缓存 C4、测试标记强制 C11、边缘测试文件隔离 C12 等），新增/修改代码不得违反。
+- **架构遵从**：所有模块必须遵守 `docs-stm/managements/technical.md` 中 **`## 架构设计约束`**（第 2240 行起，表格清晰含 C1~C19 的设计目的/违反后果/适用范围）和 **`## 概要设计--核心架构决策`**（第 220 行起，含数据降级治理体系等补充说明）。**优先对照 `## 架构设计约束` 的表格逐条自检**——表格更完整（19 条约束 vs. 概要设计仅 5 项），且每项附带"违反后果"便于判断违规与否。当涉及数据降级/熔断相关逻辑时，需额外参考 `## 概要设计--核心架构决策` 的 1.4.5 节理解双重降级治理体系设计意图。新增/修改代码不得违反。
 
 ## 持仓文件格式
 

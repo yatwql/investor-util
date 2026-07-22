@@ -2,7 +2,7 @@
 
 读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.8.2-dev
+> 当前版本：0.8.3-dev
 
 ## 启动方式
 
@@ -126,7 +126,9 @@ python -m src.python.cli cache --stats
 | [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试模式、新增测试指南 |
 | [辅助脚本参考](docs-stm/manuals/scripts-reference.md) | scripts/ 目录全部工具脚本用法速查 |
 
-## 管理文档&设计概要
+## 📋 项目内部文档
+
+以下为项目管理和技术设计文档，供项目维护者和开发者参考，普通用户无需阅读：
 
 | 文档 | 说明 |
 |------|------|

@@ -225,7 +225,7 @@ def _dedup_by_title(
         所以不依赖 SequenceMatcher 阈值，只检查实体重叠。
       - 跨源：分成两段——
         ① ratio ≥ 0.50 安全区，直接合并
-        ② cross_threshold ≤ ratio < 0.50，需共享 ≥ 2 个实体 bigram 防误杀
+        ② cross_threshold ≤ ratio < 0.50，需共享 ≥ 3 个实体 bigram 防误杀
 
     实体 bigram：
       - 提取中文 2-gram，过滤常见财经动词（上调/下跌/超越等）
@@ -237,7 +237,7 @@ def _dedup_by_title(
     if not items:
         return items
 
-    # 中文财经常用动词/形容词 — 不作为实体判定依据
+    # 高频财经常见动词/形容词/副垫 — 不作为实体判定依据
     _STOP_BIGRAMS: set[str] = {
         "上调", "下跌", "上涨", "超越", "低于", "高于",
         "首次", "今日", "昨日", "本周", "上周", "本月", "上月",
@@ -245,17 +245,34 @@ def _dedup_by_title(
         "不会", "将会", "成为", "宣布", "公布", "发布",
         "推动", "发力", "实现", "加大", "降低", "回升",
         "有望", "再度", "时隔",
+        # 高频噪声：常见数理/报道用词
+        "同比", "环比", "预计", "累计", "显示", "预期",
+        "影响", "明显", "相关", "报告", "数据", "来源",
+        "表示", "认为", "其中", "分别", "总额", "规定",
     }
 
     def _extract_entity_bigrams(text: str) -> set[str]:
-        """提取标题中的中文实体 bigram，去掉动词/形容词 STOP。"""
+        """提取标题中的实体特征：中文 bigram + 英数 token。
+
+        中文实体判定依赖 2-gram 重叠；英数 token 补全"AI""AMD"等被中文
+        正则过滤的专名。
+        """
+        # 英数 token：长度 ≥ 2 避免单字符噪声
+        tokens = re.findall(r"[a-zA-Z]+|[0-9]+", text)
+        result: set[str] = set(t.lower() for t in tokens if len(t) >= 2)
+        # 中文 bigram
         chinese_only = re.sub(r"[^一-鿿]", "", text)
-        bigrams: set[str] = set()
         for i in range(len(chinese_only) - 1):
             bg = chinese_only[i : i + 2]
             if bg not in _STOP_BIGRAMS:
-                bigrams.add(bg)
-        return bigrams
+                result.add(bg)
+        return result
+
+    # 用于 SequenceMatcher 的归一化——剥离通用日期模式，避免
+    # "2026年7月票房破25亿" 与 "2026年7月经营质量因子" 等完全不同的
+    # 新闻因共享日期格式而获得虚高 ratio，进入不必要的候选区。
+    # ⚠ 仅用于 ratio 计算，不影响 kept_norms（后者用于 bigram 提取）。
+    _RATIO_CLEAN = re.compile(r"\d{4}年|\d+月|\d+日")
 
     kept: list[dict[str, Any]] = []
     kept_norms: list[str] = []
@@ -285,7 +302,10 @@ def _dedup_by_title(
                     _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, 0.0, overlap, False, "same_src"))
 
             # ② 跨源安全区：ratio ≥ 0.50 直接合并
-            ratio = SequenceMatcher(None, norm, existing).ratio()
+            #    剥离通用日期模式后比较，避免不同新闻因共享"2026年7月"等虚高
+            _norm_clean = _RATIO_CLEAN.sub("", norm)
+            _exist_clean = _RATIO_CLEAN.sub("", existing)
+            ratio = SequenceMatcher(None, _norm_clean, _exist_clean).ratio()
             if ratio >= 0.50:
                 is_dup = True
                 # 锚点：跨源安全区擦边

@@ -21,9 +21,11 @@ from typing import Any
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "cache", "dedup_anchors.jsonl")
 # 当前代码中的阈值常量（与 news_aggregator.py 保持一致）
-_CROSS_THRESHOLD = 0.30  # cross_threshold
-_SAME_SRC_BIGRAM = 4     # 同源 bigram 阈值
-_CROSS_BIGRAM = 3        # 跨源 bigram 阈值
+# 算法同时使用中文 bigram + 英数 token 匹配，
+# 三个阈值经数据分析确认均维持不变。
+_CROSS_THRESHOLD = 0.30  # cross_threshold（英数加入后 cross_skip 自然减少）
+_SAME_SRC_BIGRAM = 4     # 同源 bigram 阈值（抽样验证 bigram=2~3 确为不同新闻）
+_CROSS_BIGRAM = 3        # 跨源 bigram 阈值（边界案例 ratio<0.40 者风险评估过高）
 
 
 def load_anchors(path: str = _ANCHOR_PATH) -> list[dict[str, Any]]:
@@ -100,7 +102,7 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
         # 检查 bigram=3 的边界样本
         edge = [r for r in merge_records if r["bigram_overlap"] == 3]
         if edge:
-            print(f"  ⚠ bigram=3 边界样本: {len(edge)} 条（降低阈值风险较大）")
+            print(f"  [!!] bigram=3 边界样本: {len(edge)} 条（降低阈值风险较大）")
             if not summary_only:
                 for r in edge[:5]:
                     print(f"    [{r['source_a']}] {r['title_a'][:30]}")
@@ -159,25 +161,44 @@ def _print_calibration_advice(
 
     # 1. cross_threshold (0.30)
     if skip:
-        # 检查被跳过的案例中，有没有 ratio 很高的
-        high_skip = [r for r in skip if r["ratio"] >= 0.35]
-        if high_skip:
+        # ── 按 bigram 重叠度分档分析 ──
+        skip_bg0 = [r for r in skip if r["bigram_overlap"] == 0]
+        skip_bg1 = [r for r in skip if r["bigram_overlap"] == 1]
+        skip_bg2 = [r for r in skip if r["bigram_overlap"] >= 2]
+        print()
+        print(f"  cross_skip 按 bigram 分档:")
+        print(f"    bg=0: {len(skip_bg0)} 条（无实体重叠，财经虚高，安全跳过）")
+        print(f"    bg=1: {len(skip_bg1)} 条（几乎无实体重叠，安全跳过）")
+        print(f"    bg>=2: {len(skip_bg2)} 条（有实体重叠但未达阈值，需审查）")
+
+        # bg≥2 且有较高 ratio → 可能漏判
+        high_skip_entity = [r for r in skip_bg2 if r["ratio"] >= 0.35]
+        if high_skip_entity:
             print()
-            print(f"[!] cross_threshold=0.30: {len(high_skip)} 条 ratio≥0.35 被跳过")
-            print(f"    建议审查这些案例是否应为重复，考虑将 cross_threshold 降至 0.25")
+            print(f"[!] bg≥2 且 ratio≥0.35 被跳过: {len(high_skip_entity)} 条")
+            print(f"    这些案例有实体重叠且 ratio 较高，建议审查是否应为重复")
             if not summary_only:
-                for r in high_skip[:5]:
+                for r in high_skip_entity[:5]:
                     print(f"      ratio={r['ratio']:.3f} bg={r['bigram_overlap']} "
                           f"[{r['source_a']}] {r['title_a'][:30]}")
                     print(f"      → [{r['source_b']}] {r['title_b'][:30]}")
 
-        low_skip = [r for r in skip if r["ratio"] < 0.25]
-        if len(low_skip) > len(skip) * 0.5:
-            print(f"[+] cross_threshold=0.30 偏紧: {len(low_skip)}/{len(skip)} 条 ratio<0.25")
-            print(f"    建议考虑将 cross_threshold 提升至 0.32~0.35 减少无效比较")
+        # bg=0,1 但 ratio 很高 → 说明归一化不够，不是阈值问题
+        high_skip_noise = [r for r in skip if r["bigram_overlap"] <= 1 and r["ratio"] >= 0.40]
+        if high_skip_noise:
+            print()
+            print(f"[+] bg≤1 但 ratio≥0.40: {len(high_skip_noise)} 条")
+            print(f"    这些不是重复，是共享日期/财经关键词导致 SequenceMatcher 比率虚高")
+            print(f"    不必调整阈值，应考虑增强 _normalize_title() 过滤通用日期/数字模式")
+            if not summary_only:
+                for r in high_skip_noise[:3]:
+                    print(f"      ratio={r['ratio']:.3f} bg={r['bigram_overlap']} "
+                          f"[{r['source_a']}] {r['title_a'][:30]}")
+                    print(f"      → [{r['source_b']}] {r['title_b'][:30]}")
 
-        if not high_skip and not low_skip:
-            print(f"[OK] cross_threshold=0.30 当前合适")
+        # 绝大多数 skip 都在边界内 → 阈值合适
+        if not high_skip_entity:
+            print(f"[OK] cross_threshold=0.30 当前合适（无非重复漏判）")
     else:
         print(f"[OK] cross_threshold=0.30: 无 skips，阈值安全")
 
@@ -188,15 +209,15 @@ def _print_calibration_advice(
             ratio_ok = sum(1 for r in edge_merge if r["ratio"] >= 0.40)
             print()
             print(f"[!] 跨源 bigram=3: {len(edge_merge)} 条在边界上")
-            print(f"    其中 {ratio_ok}/{len(edge_merge)} 条 ratio≥0.40")
+            print(f"    其中 {ratio_ok}/{len(edge_merge)} 条 ratio>=0.40")
             if ratio_ok == len(edge_merge):
-                print(f"    建议考虑将跨源 bigram 阈值降至 2（ratio≥0.40 时安全）")
+                print(f"    建议考虑将跨源 bigram 阈值降至 2（ratio>=0.40 时安全）")
             else:
-                print(f"    建议保留 bigram≥3，降低此阈值风险较高")
+                print(f"    建议保留 bigram>=3，降低此阈值风险较高")
 
         bigram_4plus = [r for r in merge if r["bigram_overlap"] >= 4]
         if bigram_4plus:
-            print(f"[OK] 跨源 bigram≥4: {len(bigram_4plus)} 条已合并，阈值安全")
+            print(f"[OK] 跨源 bigram>=4: {len(bigram_4plus)} 条已合并，阈值安全")
     else:
         print(f"[OK] 跨源 bigram=3: 无边界样本")
 

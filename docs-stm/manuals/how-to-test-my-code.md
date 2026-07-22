@@ -1,14 +1,12 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 文档版本：v0.8.2-dev
+> 文档版本：v0.8.3-dev
 
 ## 概述
 
 本项目的测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行。使用 `scripts/test_runner.py` 脚本统一驱动，自动输出结构化报告。
 
-> **关联文档**：
-> - 需求文档（[requirements.md](../managements/requirements.md)）— 理解业务场景测试（S1~S34）的驱动来源
-> - 技术设计（[technical.md](../managements/technical.md)）— 理解模块间契约和缓存 / Provider Chain 等架构约束的测试覆盖依据
+> **关联参考**：各 `--mode` 的精确测试项数统计见 **[test-coverage.md](../managements/test-coverage.md)**（以下标注为撰写时快照值，随版本迭代变化）。
 
 ## 前置条件
 
@@ -157,9 +155,9 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。在 regression 的业务场景基础上，增加 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）三个关键单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。分两阶段：Phase A 单元测试并行（~2min）+ Phase B 场景串行（~6min），共约 8min。适合作为 PR CI 门禁或合入前的手动检查。
 - **发布验证（`--mode all`）** — 发布版本（打 tag/release）前必须执行。全量测试全部过一遍，包括所有单元测试和场景测试、LLM 模块测试、UI 测试等。确保任何改动不会在新版本中遗漏。约 10min，适合发布前的全量回归。
 
-> ⚠ 以上项数为撰写时的快照值，实际计数随版本迭代而变化，精确统计见 [`test-coverage.md`](../managements/test-coverage.md)。
+> ⚠ 以上项数为撰写时的快照值，实际计数随版本迭代而变化。
 
-> `regression` 与 `scenario` 底层使用相同的标记表达式（`-m "scenario"`），测试项数一致（精确计数见 [`test-coverage.md`](../managements/test-coverage.md)）。前者是语义别名——强调"提交前快速回归"的用途定位；后者是分类名——强调"业务场景测试"的数据性质。两者可互相替代，但建议按使用场合选用对应名称以增强代码意图可读性。
+> `regression` 与 `scenario` 底层使用相同的标记表达式（`-m "scenario"`），测试项数一致。前者是语义别名——强调"提交前快速回归"的用途定位；后者是分类名——强调"业务场景测试"的数据性质。两者可互相替代，但建议按使用场合选用对应名称以增强代码意图可读性。
 
 **推荐工作流：**
 
@@ -190,7 +188,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
 
-- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime）。这些测试模拟真实用户操作（如菜单 E/B/L 生成报告），组合多个模块进行端到端验证。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime）。这些测试模拟真实用户操作（如菜单 E/B/L 生成报告），组合多个模块进行端到端验证。
 
   场景测试按职责分为 **5 大类**：
 
@@ -201,20 +199,20 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
   - **`scenario_datetime` — 日期/时间场景**：验证系统在不同市场时段（盘中/盘前/午休/盘后/非交易日/长假）、产品类型（场外基金/QDII/ETF/股票/混合）、边界条件（时段切换/缝隙/首次启动/断网）以及特殊日历（跨年/季末/汇率故障/调休/港股通假期）下的数据获取正确性和降级表现。
 
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
-- **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
-- **`--mode dev-verify`** 开发期快速验证模式，组合全部 9 个 unit 子模块（排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 2min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。覆盖项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。
+- **`--mode dev-verify`** 开发期快速验证模式，组合全部 9 个 unit 子模块（排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 2min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。
 - **`--mode verify`** 合入门禁模式（`scenario or unit_core or unit_providers or unit_fetcher`），包含了全部 scenario 场景测试 + 核心基础设施 + 数据源 Provider + 数据获取调度。分两阶段执行：Phase A 单元测试并行 + Phase B 场景串行，共约 8min（scenario 276 项串行为主瓶颈）。确保数据管道整条链路正常。
 
 #### 🔷 专项验证系列（`edge` / `data` / `smoke`）
 
-- **`--mode edge`** 仅运行标记为 `edge` 的测试，覆盖各种异常和边界情况：零值、空数据集、并发竞态、Unicode、时区安全、文件系统边界、API 网络异常等。适用于修改了函数内部错误处理逻辑后的针对性验证。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode edge`** 仅运行标记为 `edge` 的测试，覆盖各种异常和边界情况：零值、空数据集、并发竞态、Unicode、时区安全、文件系统边界、API 网络异常等。适用于修改了函数内部错误处理逻辑后的针对性验证。
 - **`--mode data`** 仅运行标记为 `data` 的测试，覆盖数据精确性：市值=价格×份额、盈亏=市值-成本、收益率=盈亏÷成本（成本>0）、穿透 TOP10 占比归一化等。适用于修改了数值计算逻辑后的回归。
-- **`--mode smoke`** 仅运行标记为 `smoke` 的测试，从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s，合计 ~2s。适用于部署后冒烟或极速"通不通"检查。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode smoke`** 仅运行标记为 `smoke` 的测试，从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s，合计 ~2s。适用于部署后冒烟或极速"通不通"检查。
 
 #### 🔷 全量（`all`）
 
-- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试。包含所有单元测试、场景测试、集成测试、跨类标记测试。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
-- **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。具体项数见 [test-coverage.md](../managements/test-coverage.md)。
+- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试。包含所有单元测试、场景测试、集成测试、跨类标记测试。
+- **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
 
 #### 🔷 多模式组合
 
@@ -225,7 +223,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 python scripts/test_runner.py --mode scenario,edge
 ```
 
-脚本按 MODES 字典定义的 order 顺序依次执行各模式，结果汇总到同一份 HTML 报告中。适用于 CI 流水线中按阶段逐步收紧的场景。各模式的详细测试项数统计见 **[test-coverage.md](../managements/test-coverage.md)**，精确实时计数请运行 `pytest src/test/ --collect-only -q`。
+脚本按 MODES 字典定义的 order 顺序依次执行各模式，结果汇总到同一份 HTML 报告中。适用于 CI 流水线中按阶段逐步收紧的场景。精确实时计数请运行 `pytest src/test/ --collect-only -q`。
 
 ## 查看报告
 
@@ -329,8 +327,6 @@ pytest src/test/ -m "<对应标记>" --lf
 
 ### 场景标记
 
-项数见 [`test-coverage.md`](../managements/test-coverage.md) → 场景测试分组。
-
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
 | `scenario` | 全部业务场景 S0a-S0d + S1-S34 + T1-T21 |
@@ -355,7 +351,7 @@ pytest src/test/ -m "<对应标记>" --lf
 
 ### 单元子模块标记
 
-以 `pytest -m "<表达式>"` 快速选取单元子模块。项数见 [`test-coverage.md`](../managements/test-coverage.md) → 单元测试分组。
+以 `pytest -m "<表达式>"` 快速选取单元子模块。
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
@@ -373,7 +369,7 @@ pytest src/test/ -m "<对应标记>" --lf
 
 ### 横切标记
 
-以 `pytest -m "<表达式>"` 快速选取横切标记。项数见 [`test-coverage.md`](../managements/test-coverage.md) → 跨类标记。
+以 `pytest -m "<表达式>"` 快速选取横切标记。
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
