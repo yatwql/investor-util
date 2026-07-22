@@ -12,10 +12,10 @@
   "llm_settings_file": "data/config/llm_settings.json",
   "llm_providers_file": "data/config/llm_providers.json",
 
-  // ── B. 章节可见性（关闭后对应页签/章节完全隐藏） ──
-  "enable_b_series": true,
-  "enable_news": true,
-  "enable_history": true,
+  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──
+  "enable_b_series": true,  // 基金深度分析（#6~9）
+  "enable_news": true,      // 市场新闻（#10）
+  "enable_history": true,   // 组合历史走势+回撤（#16~17）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -62,7 +62,7 @@
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
-    "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}
+    "benchmark_indices": {"sh000300": "沪深300"}
   },
 
   // ── H. 再平衡配置 ──
@@ -114,7 +114,7 @@
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
-| `history.benchmark_indices` | `{"sh000300": "沪深300", "gb_inx": "标普500"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
+| `history.benchmark_indices` | `{"sh000300": "沪深300"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
 | `rebalance.threshold` | `0.15` | 单品种权重超限阈值（15%），超限触发再平衡建议 | 手动编辑 |
 | `rebalance.deviation_threshold` | `0.05` | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 | 手动编辑 |
 | `rebalance.profile` | `"moderate"` | 预设阈值集：conservative（保守 10%/3%）/ moderate（稳健 15%/5%）/ aggressive（进取 25%/8%）/ custom（自定义） | 手动编辑 |
@@ -429,11 +429,11 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
-    "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}
+    "benchmark_indices": {"sh000300": "沪深300"}
 }
 ```
 
-> **基准指数对比**：`benchmark_indices` 配置需要在历史走势图上叠加对比的基准指数。格式为 `{指数代码: 显示名称}`，支持 A 股指数（如 `sh000300`）和美股指数（如 `gb_inx`）。获取方式走 `history_index` chain（腾讯/新浪双链路）。配置为空对象 `{}` 时不获取基准数据。
+> **基准指数对比**：`benchmark_indices` 配置需要在历史走势图上叠加对比的基准指数。格式为 `{指数代码: 显示名称}`，支持 A 股指数（如 `sh000300`）。获取方式走 `history_index` chain（腾讯/新浪双链路）。配置为空对象 `{}` 时不获取基准数据。
 
 > **数据获取链路**：基准指数通过 `fetch_index_history()` → `history_index` chain → 腾讯 K 线 / 新浪 K 线（与组合持仓的个股 K 线共享熔断器）。数据写入缓存键 `history_index_{code}.json`。
 

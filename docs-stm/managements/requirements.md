@@ -799,7 +799,7 @@
 | `history.snapshot_retention_days` | int | 60 | — | 快照保留天数 |
 | `history.snapshot_max_count` | int | 365 | — | 快照最大数量 |
 | `history.coverage_threshold` | float | 0.8 | — | 有效区间覆盖阈值 |
-| `history.benchmark_indices` | dict | {"sh000300":"沪深300","gb_inx":"标普500"} | — | 基准指数配置，组合历史走势对比 |
+| `history.benchmark_indices` | dict | {"sh000300":"沪深300"} | — | 基准指数配置，组合历史走势对比 |
 | `comparison_indices` | dict | {"sh000300":"沪深300","sh000905":"中证500","sh000012":"中证全债"} | — | 竞争语境对比指数池，支持多指数对比 |
 | `rebalance.threshold` | float | 0.15 | — | 单品种权重超限阈值（15%），超限触发再平衡建议 |
 | `rebalance.deviation_threshold` | float | 0.05 | — | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 |
