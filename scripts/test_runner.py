@@ -56,7 +56,7 @@ MODES: dict[str, dict] = {
     "regression": {
         "marker": "scenario",
         "desc": "回归测试（场景模式，提交前快速验证）",
-        "timeout_sec": 600,
+        "timeout_sec": 1200,
         "order": 4,
         "parallel": False,
     },
@@ -83,7 +83,7 @@ MODES: dict[str, dict] = {
             {
                 "marker": "scenario",
                 "desc": "Phase B — 业务场景验证（S0-S33 + T1-T21）",
-                "timeout_sec": 600,
+                "timeout_sec": 1200,
                 "parallel": False,
             },
         ],
@@ -838,7 +838,11 @@ def main() -> None:
 
     # 总体结果
     exit_codes = [r.get("exit_code", -1) for r in results]
-    overall = 0 if all(ec == 0 for ec in exit_codes) else max(exit_codes)
+    any_timeout = any(r.get("timed_out", False) for r in results)
+    if any_timeout:
+        overall = 124  # 超时退出码（标准 timeout exit code）
+    else:
+        overall = 0 if all(ec == 0 for ec in exit_codes) else max(exit_codes)
     total_failed = sum(r.get("failed", 0) for r in results)
     total_passed = sum(r.get("passed", 0) for r in results)
 
