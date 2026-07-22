@@ -97,12 +97,12 @@ python scripts/extract-test-failures.py --json
 **典型工作流**：
 
 ```bash
-python scripts/test_runner.py --mode all                    # ① 跑全量
+python scripts/test_runner.py --mode verify,regression     # ① 跑全量验证
 python scripts/extract-test-failures.py --summary           # ② 看哪些失败
 python scripts/extract-test-failures.py                     # ③ 看详细错误
 # 修复代码后只重跑失败用例：
 python -m pytest <test_file>::<test_name> -v --tb=short     # ④ 单用例验证
-python scripts/test_runner.py --mode all                    # ⑤ 全量确认
+python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
 ```
 
 ---
