@@ -7,12 +7,16 @@
 ## [0.8.4-dev] - 未发布
 
 ### Fixed
+- **`llm_hallucination_sampler.py` 中文引号语法错误**：第 324 行中文引号误用 ASCII 双引号，导致 Python 3.10 下 SyntaxError（ruff 强于本地版本检测到），CI 回归测试失败 — 改用单引号包裹字符串
 - **`fallback.py` 占位文本缺字**：智囊团深度复盘降级占位文本缺少"成"字（"无法生"→"无法生成"），已补回
 - **`handlers_config.py` 辩论模式说明缺字**：辩论模式启用说明中"智囊团复盘"缺少"深度"二字，正文为"智囊团深度复盘"
 - **`news_correlation.py` 日志使用缩写**：LLM 新闻关联失败日志"LLM 新闻关联分析"改为完整模块名"财经新闻热点与持仓关联分析（LLM）"
 
 ### Changed
 - **`generators_orchestrator.py` 消除硬编码模块标签**：事实校验阶段 `_module_labels` 字典从硬编码改为调用 `get_llm_module_names()`，与注册表自动同步
+
+### Chore
+- **ruff format 全量对齐**：33 个源码文件 `ruff format` 格式化，CI 格式检查不再报错（非阻塞门禁，但保持全绿）
 
 ## [0.8.3] - 2026-07-22
 
