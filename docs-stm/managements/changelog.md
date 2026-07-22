@@ -4,7 +4,9 @@
 
 ---
 
-## [0.8.3-dev] - 未发布
+## [0.8.4-dev] - 未发布
+
+## [0.8.3] - 2026-07-22
 
 ### Fixed
 - **P3-12 CI 测试持续失败**：三个原因修复：① `pyproject.toml` 中 `required_plugins` 将 `pytest-mock` 死锁在 `==3.15.1`，但 deps 声明 `>=3.15`，导致 pip 安装的版本不满足硬校验，pytest 拒绝启动 — 统一改为 `>=3.15`；② `format` job 的 Ruff 检查无 `continue-on-error: true`，非阻塞门禁却阻断 CI — 已添加；③ `all` 模式无 `--no-timeout`，大套件易超时截断 — 已添加
