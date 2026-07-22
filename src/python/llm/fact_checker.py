@@ -58,6 +58,11 @@ _POSITION_WEIGHT_KEYWORDS = frozenset([
     '占比', '仓位', '集中度',
 ])
 
+# 品种计数/比例上下文——数值为品种计数比例而非收益率（如"80%的品种处于盈利"）
+_PROPORTION_KEYWORDS: tuple[str, ...] = (
+    '的品种', '的持仓', '的标的', '的资产',
+)
+
 # 调仓目标上下文——数值为目标而非实际收益率
 _REBALANCE_TARGET_KEYWORDS = frozenset([
     '降至', '升至', '调至', '减仓至', '加仓至',
@@ -245,6 +250,11 @@ def check_numerical_consistency(
             value = float(value_str)
 
             total_checked += 1
+
+            # 品种计数/比例语境（如"80%的品种处于盈利"）→ 数值为品种比例而非收益率，跳过
+            if any(kw in sentence for kw in _PROPORTION_KEYWORDS):
+                passed += 1
+                continue
 
             # 无收益关键词 → 不是收益/回报类百分比 → 无法校验，默认为通过
             is_profit_context = any(kw in sentence for kw in _PROFIT_KEYWORDS)

@@ -157,7 +157,11 @@ def _log_source_status(src_results: dict[str, tuple[int, str]]) -> None:
 
 
 def _normalize_title(title: str) -> str:
-    """标准化标题：去标点、去空格、去常见前缀。
+    """标准化标题：去标点、去空格、去常见前缀，过滤通用数字模式降虚高。
+
+    数字模式（百分比、金额）在不同新闻中可能无意共享，导致
+    SequenceMatcher 比率虚高和实体 bigram 中数字 token 的虚假重叠。
+    过滤后同时降低 bigram 提取噪声和比率比较的误判。
 
     用于跨源标题去重，消除"快讯：""收评"等差异。
     """
@@ -167,6 +171,11 @@ def _normalize_title(title: str) -> str:
         if title.startswith(prefix):
             title = title[len(prefix) :]
             break
+    # 过滤通用数字模式，避免跨源去重时不同新闻因共享
+    # "20%""25亿"等数字模式而获得虚高 SequenceMatcher 比率。
+    # 日期模式（2026年/7月/8日）已在 _dedup_by_title 的 _RATIO_CLEAN 中处理。
+    title = re.sub(r"\d+(?:\.?\d+)?%", "", title)       # 20%、2.5%
+    title = re.sub(r"\d+(?:\.?\d+)?[万亿]", "", title)   # 25亿、1.2万亿
     title = re.sub(r"[^\w一-鿿]", "", title)
     return title.strip().lower()
 

@@ -232,7 +232,11 @@ class TestDedupByTitle(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
     def test_cross_source_english_token_only_overlap(self) -> None:
-        """跨源：仅英数 token 重叠就达到阈值的同一新闻应合并。"""
+        """跨源：仅英数 token 重叠但无实质实体重叠，不合并。
+
+        数值 token（2.5%、0.8%）被 _normalize_title 过滤后，仅剩
+        {cpi, ppi} 2 个 token，达不到跨源 ≥3 实体 bigram 的合并门槛。
+        """
         from src.python.providers.news_aggregator import _dedup_by_title
 
         items = [
@@ -240,12 +244,9 @@ class TestDedupByTitle(unittest.TestCase):
             self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
         ]
         result = _dedup_by_title(items)
-        # 改进算法共享：cpi(2)、2.5(2，但"2."长度不够，不)
-
-        # 实际上 "cpi" "ppi" 是英数token，长度≥2
-        # 中文bigram共享：同比、数据... 但"同比"在STOP里，不算
-        # 关键重叠: cpi, ppi (2个英数token) + 可能有"统计"等中文
-        self.assertEqual(len(result), 1)
+        # _normalize_title 过滤百分比后 entity overlap={cpi, ppi}=2 < 3
+        # ratio≈0.33 在候选区但 bigram 不足 → 保留2条
+        self.assertEqual(len(result), 2)
 
 
 if __name__ == "__main__":
