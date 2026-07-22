@@ -78,7 +78,7 @@ _DEFAULT_CONFIG = {
         "snapshot_retention_days": 60,
         "snapshot_max_count": 365,
         "coverage_threshold": 0.8,
-        "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"},
+        "benchmark_indices": {"sh000300": "沪深300"},
     },
     # ── H. 再平衡配置 ──
     "rebalance": {
@@ -161,7 +161,7 @@ def _get_default_config_template() -> str:
         '    "snapshot_retention_days": 60,\n'
         '    "snapshot_max_count": 365,\n'
         '    "coverage_threshold": 0.8,\n'
-        '    "benchmark_indices": {"sh000300": "沪深300", "gb_inx": "标普500"}\n'
+        '    "benchmark_indices": {"sh000300": "沪深300"}\n'
         "  },\n"
         "\n"
         "  // ── H. 再平衡配置 ──\n"

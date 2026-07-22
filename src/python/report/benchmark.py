@@ -174,7 +174,7 @@ def fetch_benchmarks(
     """并行获取多个基准指数的历史日线数据。
 
     Args:
-        benchmark_indices: {代码: 名称} 映射，如 {"sh000300": "沪深300", "gb_inx": "标普500"}
+        benchmark_indices: {代码: 名称} 映射，如 {"sh000300": "沪深300"}
         days: 获取天数（默认 365，透传给 fetch_index_history）
 
     Returns:
