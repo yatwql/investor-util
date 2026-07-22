@@ -37,7 +37,7 @@ python scripts/test_runner.py --mode regression
 python scripts/test_runner.py --mode verify
 
 # 发布门禁（P2）
-python scripts/test_runner.py --mode all
+python scripts/test_runner.py --mode verify,regression
 
 # 常用快捷模式
 python scripts/test_runner.py --mode unit         # 全量单元测试
@@ -78,7 +78,7 @@ python scripts/test_runner.py --mode unit --coverage
 
 ### `extract-test-failures.py` — 失败用例提取
 
-运行 `test_runner.py --mode all` 等全量测试后，直接从 HTML 报告中提取失败/错误用例信息。
+运行 `test_runner.py --mode verify,regression` 等全量测试后，直接从 HTML 报告中提取失败/错误用例信息。
 
 ```bash
 # 自动查找 test-reports/latest/ 下最新报告
