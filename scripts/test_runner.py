@@ -68,25 +68,11 @@ MODES: dict[str, dict] = {
         "parallel": True,
     },
     "verify": {
-        "marker": "scenario or unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm",
-        "desc": "合入验证（全量场景 + 核心/配置/新闻/LLM 模块，~8min）",
-        "timeout_sec": 900,
+        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm",
+        "desc": "合入验证（核心/配置/新闻/LLM 模块单元测试，不含场景——场景由 P0+P2 覆盖）",
+        "timeout_sec": 300,
         "order": 6,
         "parallel": True,
-        "phases": [
-            {
-                "marker": "unit_core or unit_providers or unit_fetcher",
-                "desc": "Phase A — 核心单元验证（core / providers / fetcher）",
-                "timeout_sec": 120,
-                "parallel": True,
-            },
-            {
-                "marker": "scenario",
-                "desc": "Phase B — 业务场景验证（S0-S33 + T1-T21）",
-                "timeout_sec": 1200,
-                "parallel": False,
-            },
-        ],
     },
     "integration": {
         "marker": "scenario or integration",

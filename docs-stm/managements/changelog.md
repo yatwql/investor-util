@@ -10,7 +10,7 @@
 - **CI 超时 & 退出码混乱**：`regression` 和 `verify` Phase B 的 600s 超时在 CI 慢速 runner 上频繁截断场景测试；超时退出码 `-1` 经 `sys.exit()` 转为 255，难以区分与真实崩溃 — 增加默认超时到 1200s，CI 全部加 `--no-timeout` 禁用超时，超时退出码改为标准 124
 
 ### Changed
-- 待补充
+- **verify 模式瘦身**：移除 Phase B 场景测试（重复 P0 regression），仅保留单元测试（~50s 而非 ~5min）—— 场景测试由 P0（dev 提交）和 P2（版本发布）覆盖
 
 ---
 
