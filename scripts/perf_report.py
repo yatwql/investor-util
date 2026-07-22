@@ -92,22 +92,26 @@ def _generate_holdings(count: int = _20_HOLDINGS_COUNT) -> list[Any]:
     random.seed(42)
 
     for name, code in _STOCKS[:count]:
-        holdings.append(Holding(
-            account="证券账户",
-            name=name,
-            code=code,
-            shares=round(random.uniform(100, 5000), 2),
-            cost_price=round(random.uniform(5, 500), 2),
-        ))
+        holdings.append(
+            Holding(
+                account="证券账户",
+                name=name,
+                code=code,
+                shares=round(random.uniform(100, 5000), 2),
+                cost_price=round(random.uniform(5, 500), 2),
+            )
+        )
 
     for name, code in _FUNDS:
-        holdings.append(Holding(
-            account="基金账户",
-            name=name,
-            code=code,
-            shares=round(random.uniform(500, 20000), 2),
-            cost_price=round(random.uniform(0.5, 5), 2),
-        ))
+        holdings.append(
+            Holding(
+                account="基金账户",
+                name=name,
+                code=code,
+                shares=round(random.uniform(500, 20000), 2),
+                cost_price=round(random.uniform(0.5, 5), 2),
+            )
+        )
 
     return holdings
 
@@ -131,18 +135,20 @@ def _generate_details(holdings: list[Any]) -> list[Any]:
         profit_rate = round(profit / cost, 4) if cost else 0.0
         today_profit = round(profit * random.uniform(-0.02, 0.03), 2)
 
-        details.append(DetailRow(
-            account=h.account,
-            name=h.name,
-            code=h.code,
-            price=price,
-            market_value=market_value,
-            cost=cost,
-            profit=profit,
-            profit_rate=profit_rate,
-            today_profit=today_profit,
-            shares=h.shares,
-        ))
+        details.append(
+            DetailRow(
+                account=h.account,
+                name=h.name,
+                code=h.code,
+                price=price,
+                market_value=market_value,
+                cost=cost,
+                profit=profit,
+                profit_rate=profit_rate,
+                today_profit=today_profit,
+                shares=h.shares,
+            )
+        )
     return details
 
 
@@ -179,12 +185,13 @@ def run_perf_test() -> dict[str, float]:
 
     # ── Phase 1: basic 报告生成（Excel only） ──
     print("\n[..] Phase 1: basic 模式报告生成 (Excel)...")
-    with patch("src.python.fetcher.index.fetch_indices", return_value={}), \
-         patch("src.python.fetcher.index.fetch_us_indices", return_value={}), \
-         patch("src.python.report.fund_performance.write_fund_performance_sheet"), \
-         patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}), \
-         patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None):
-
+    with (
+        patch("src.python.fetcher.index.fetch_indices", return_value={}),
+        patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
+        patch("src.python.report.fund_performance.write_fund_performance_sheet"),
+        patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None),
+    ):
         t_start = time.perf_counter()
         generate_excel_report(
             holdings,
@@ -202,15 +209,17 @@ def run_perf_test() -> dict[str, float]:
 
     # ── Phase 2: both 模式（Excel + HTML，不含LLM） ──
     print("\n[..] Phase 2: both 模式报告生成 (Excel+HTML)...")
-    with patch("src.python.fetcher.index.fetch_indices", return_value={}), \
-         patch("src.python.fetcher.index.fetch_us_indices", return_value={}), \
-         patch("src.python.report.fund_performance.write_fund_performance_sheet"), \
-         patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}), \
-         patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None), \
-         patch("src.python.llm.generators_orchestrator.generate_all_llm",
-               return_value=("<p>因测试模式跳过 LLM 分析</p>", "<p>LLM 内容测试占位</p>",
-                             None, None, None, None)):
-
+    with (
+        patch("src.python.fetcher.index.fetch_indices", return_value={}),
+        patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
+        patch("src.python.report.fund_performance.write_fund_performance_sheet"),
+        patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None),
+        patch(
+            "src.python.llm.generators_orchestrator.generate_all_llm",
+            return_value=("<p>因测试模式跳过 LLM 分析</p>", "<p>LLM 内容测试占位</p>", None, None, None, None),
+        ),
+    ):
         from src.python.report.orchestrator import _generate_report_both
 
         t_start = time.perf_counter()
@@ -233,12 +242,13 @@ def run_perf_test() -> dict[str, float]:
     large_details = _generate_details(large_holdings)
     print(f"  {len(large_holdings)} 品种")
 
-    with patch("src.python.fetcher.index.fetch_indices", return_value={}), \
-         patch("src.python.fetcher.index.fetch_us_indices", return_value={}), \
-         patch("src.python.report.fund_performance.write_fund_performance_sheet"), \
-         patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}), \
-         patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None):
-
+    with (
+        patch("src.python.fetcher.index.fetch_indices", return_value={}),
+        patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
+        patch("src.python.report.fund_performance.write_fund_performance_sheet"),
+        patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None),
+    ):
         t_start = time.perf_counter()
         generate_excel_report(
             large_holdings,

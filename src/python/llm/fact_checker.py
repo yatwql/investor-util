@@ -32,71 +32,127 @@ logger = logging.getLogger("invest")
 
 # 6 位数字代码（A 股/基金/指数）
 # 使用 re.ASCII 确保 \b 在中文和非 ASCII 字符旁也正常匹配边界
-_CODE_PATTERN = re.compile(r'\b[0-9]{6}\b', re.ASCII)
+_CODE_PATTERN = re.compile(r"\b[0-9]{6}\b", re.ASCII)
 
 # 排名声称模式
-_RANK_MAX_PATTERN = re.compile(r'(?:第[一二三四五六七八九十\d]+大|最大|最重|首要|主要|第一重仓|第一权重)')
-_RANK_TOP_N_PATTERN = re.compile(r'(?:前[一二三四五六七八九十\d]+|头[一二三四五六七八九十\d]+)')
+_RANK_MAX_PATTERN = re.compile(r"(?:第[一二三四五六七八九十\d]+大|最大|最重|首要|主要|第一重仓|第一权重)")
+_RANK_TOP_N_PATTERN = re.compile(r"(?:前[一二三四五六七八九十\d]+|头[一二三四五六七八九十\d]+)")
 
 # 百分比数值
-_PERCENT_PATTERN = re.compile(r'(\d+\.?\d*)\s*%')
+_PERCENT_PATTERN = re.compile(r"(\d+\.?\d*)\s*%")
 
 # 收益/回报相关关键词（用于数值上下文判断）
-_PROFIT_KEYWORDS = frozenset([
-    '收益', '盈利', '回报', '涨幅', '利润', '收益率', '回报率',
-    '累计', '浮盈', '浮亏', '亏损', '增长', '下跌', '上涨',
-])
+_PROFIT_KEYWORDS = frozenset(
+    [
+        "收益",
+        "盈利",
+        "回报",
+        "涨幅",
+        "利润",
+        "收益率",
+        "回报率",
+        "累计",
+        "浮盈",
+        "浮亏",
+        "亏损",
+        "增长",
+        "下跌",
+        "上涨",
+    ]
+)
 
 # 收益归因段落特征词（数值为贡献度占比，不可与收益率直接比较）
-_CONTRIBUTION_KEYWORDS = frozenset([
-    '盈利来源', '亏损来源', '收益归因',
-    '贡献占比', '盈利贡献', '贡献度', '归因于',
-])
+_CONTRIBUTION_KEYWORDS = frozenset(
+    [
+        "盈利来源",
+        "亏损来源",
+        "收益归因",
+        "贡献占比",
+        "盈利贡献",
+        "贡献度",
+        "归因于",
+    ]
+)
 
 # 仓位/占比上下文——数值为权重而非收益率
-_POSITION_WEIGHT_KEYWORDS = frozenset([
-    '占比', '仓位', '集中度',
-])
+_POSITION_WEIGHT_KEYWORDS = frozenset(
+    [
+        "占比",
+        "仓位",
+        "集中度",
+    ]
+)
 
 # 品种计数/比例上下文——数值为品种计数比例而非收益率（如"80%的品种处于盈利"）
 _PROPORTION_KEYWORDS: tuple[str, ...] = (
-    '的品种', '的持仓', '的标的', '的资产',
+    "的品种",
+    "的持仓",
+    "的标的",
+    "的资产",
 )
 
 # 调仓目标上下文——数值为目标而非实际收益率
-_REBALANCE_TARGET_KEYWORDS = frozenset([
-    '降至', '升至', '调至', '减仓至', '加仓至',
-])
+_REBALANCE_TARGET_KEYWORDS = frozenset(
+    [
+        "降至",
+        "升至",
+        "调至",
+        "减仓至",
+        "加仓至",
+    ]
+)
 
 # 假设/情景上下文——数值为假设场景而非实际收益率
-_HYPOTHETICAL_KEYWORDS = frozenset([
-    '如果', '假设', '若', '情景', '假如',
-])
+_HYPOTHETICAL_KEYWORDS = frozenset(
+    [
+        "如果",
+        "假设",
+        "若",
+        "情景",
+        "假如",
+    ]
+)
 
 # 币种/敞口上下文
-_EXPOSURE_KEYWORDS = frozenset([
-    '币种', '敞口', '人民币', '美元', '港币', '港元',
-])
+_EXPOSURE_KEYWORDS = frozenset(
+    [
+        "币种",
+        "敞口",
+        "人民币",
+        "美元",
+        "港币",
+        "港元",
+    ]
+)
 
 # 建议语境关键词 — 品种代码属于投资建议而非声称持有
 # 注意：避免"关注"（会匹配"值得关注"）、"参考"（会匹配"参考品种"）等宽泛词
 _SUGGESTION_KEYWORDS: tuple[str, ...] = (
-    '建议', '可考虑', '推荐', '买入',
-    '可以考虑', '适合', '可买入',
-    '建议关注', '可关注', '值得配置',
+    "建议",
+    "可考虑",
+    "推荐",
+    "买入",
+    "可以考虑",
+    "适合",
+    "可买入",
+    "建议关注",
+    "可关注",
+    "值得配置",
 )
 
 # 常见指数代码（校验品种存在性时跳过）
-_INDEX_CODES: frozenset[str] = frozenset({
-    '000300',  # 沪深300
-    '000001',  # 上证指数
-    '399001',  # 深证成指
-    '399006',  # 创业板指
-    '000688',  # 科创50
-    '000016',  # 上证50
-    '000905',  # 中证500
-    '399300',  # 沪深300（深圳）
-})
+_INDEX_CODES: frozenset[str] = frozenset(
+    {
+        "000300",  # 沪深300
+        "000001",  # 上证指数
+        "399001",  # 深证成指
+        "399006",  # 创业板指
+        "000688",  # 科创50
+        "000016",  # 上证50
+        "000905",  # 中证500
+        "399300",  # 沪深300（深圳）
+    }
+)
 
 # 默认容差（百分点）
 _DEFAULT_TOLERANCE_PCT = 1.0
@@ -106,15 +162,15 @@ def _strip_html(html: str) -> str:
     """去除 HTML 标签，返回纯文本。"""
     if not html:
         return ""
-    text = re.sub(r'<[^>]+>', '', html)
-    text = text.replace('&nbsp;', ' ').replace('&amp;', '&')
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r"<[^>]+>", "", html)
+    text = text.replace("&nbsp;", " ").replace("&amp;", "&")
+    text = re.sub(r"\s+", " ", text).strip()
     return text
 
 
 def _split_sentences(text: str) -> list[str]:
     """按中英文句号、感叹号、问号、换行拆分句子。"""
-    sentences = re.split(r'[。！？\n!?]', text)
+    sentences = re.split(r"[。！？\n!?]", text)
     return [s.strip() for s in sentences if s.strip()]
 
 
@@ -122,8 +178,8 @@ def _extract_holding_map(holdings_details: list[dict] | None) -> dict[str, str]:
     """从持仓明细构建 {code: name} 映射。"""
     result: dict[str, str] = {}
     for d in holdings_details or []:
-        code = d.get('code', '') or ''
-        name = d.get('name', '') or ''
+        code = d.get("code", "") or ""
+        name = d.get("name", "") or ""
         if code:
             result[code] = name
     return result
@@ -135,8 +191,8 @@ def _calc_portfolio_values(holdings_details: list[dict] | None) -> dict[str, flo
     Returns:
         {"total_mv": float, "total_cost": float, "total_profit": float, "total_profit_rate": float}
     """
-    total_mv = sum(d.get('market_value', 0) or 0 for d in holdings_details or [])
-    total_cost = sum(d.get('cost', 0) or 0 for d in holdings_details or [])
+    total_mv = sum(d.get("market_value", 0) or 0 for d in holdings_details or [])
+    total_cost = sum(d.get("cost", 0) or 0 for d in holdings_details or [])
     total_profit = total_mv - total_cost
     total_profit_rate = 0.0
     if total_cost and abs(total_cost) > 1e-10:
@@ -160,8 +216,8 @@ def _build_stock_rate_map(holdings_details: list[dict] | None) -> dict[str, floa
     """
     result: dict[str, float] = {}
     for d in holdings_details or []:
-        code = d.get('code', '') or ''
-        rate = d.get('profit_rate')
+        code = d.get("code", "") or ""
+        rate = d.get("profit_rate")
         if code and rate is not None:
             result[code] = float(rate)
     return result
@@ -286,12 +342,12 @@ def check_numerical_consistency(
                 continue
 
             # 策略 3：句中含贡献类关键词 → 跳过不可验证
-            if any(kw in sentence for kw in ('贡献', '贡献度', '归因', '主要来源')):
+            if any(kw in sentence for kw in ("贡献", "贡献度", "归因", "主要来源")):
                 passed += 1
                 continue
 
             # 策略 4：句中含金融基准类关键词（利率/通胀/国债等外部指标）→ 跳过
-            if any(kw in sentence for kw in ('国债', '利率', '通胀', 'GDP', 'CPI', 'PMI')):
+            if any(kw in sentence for kw in ("国债", "利率", "通胀", "GDP", "CPI", "PMI")):
                 passed += 1
                 continue
 
@@ -318,8 +374,7 @@ def check_numerical_consistency(
             # 全部策略均未通过 → 标记为不一致
             # 优先匹配句中持仓代码中与数值最接近的品种（而非仅取第一个代码）
             if len(holding_codes_in_sentence) > 1:
-                best_code = min(holding_codes_in_sentence,
-                                key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
+                best_code = min(holding_codes_in_sentence, key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
             elif holding_codes_in_sentence:
                 best_code = holding_codes_in_sentence[0]
             else:
@@ -335,9 +390,7 @@ def check_numerical_consistency(
                     f"收益相关数值 {value}% 与 {closest_ref} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
                 )
             else:
-                issues.append(
-                    f"收益相关数值 {value}% 与实际累计收益率 {profit_rate:.1f}%（{profit_sign}）偏差超过容差"
-                )
+                issues.append(f"收益相关数值 {value}% 与实际累计收益率 {profit_rate:.1f}%（{profit_sign}）偏差超过容差")
 
     return issues, total_checked, passed
 
@@ -433,8 +486,8 @@ def check_ranking_correctness(
 
     # 按市值降序排列
     sorted_holdings = sorted(
-        [d for d in holdings_details if (d.get('market_value', 0) or 0) > 0],
-        key=lambda d: d.get('market_value', 0) or 0,
+        [d for d in holdings_details if (d.get("market_value", 0) or 0) > 0],
+        key=lambda d: d.get("market_value", 0) or 0,
         reverse=True,
     )
     if not sorted_holdings:
@@ -443,7 +496,7 @@ def check_ranking_correctness(
     # {code: rank_index} 映射
     rank_map: dict[str, int] = {}
     for i, d in enumerate(sorted_holdings):
-        code = d.get('code', '')
+        code = d.get("code", "")
         if code:
             rank_map[code] = i
 
@@ -469,12 +522,9 @@ def check_ranking_correctness(
         # 检查 "最大/最重/第一" 声称
         if rank != 0:
             actual_top = sorted_holdings[0]
-            actual_name = actual_top.get('name', '') or ''
-            actual_code = actual_top.get('code', '') or ''
-            issues.append(
-                f"声称 {mentioned_code} 为最大持仓，"
-                f"但实际最大持仓为 {actual_code}（{actual_name}）"
-            )
+            actual_name = actual_top.get("name", "") or ""
+            actual_code = actual_top.get("code", "") or ""
+            issues.append(f"声称 {mentioned_code} 为最大持仓，但实际最大持仓为 {actual_code}（{actual_name}）")
         else:
             passed += 1
 
@@ -529,7 +579,9 @@ def run_fact_check(
 
     # 检查 2：品种存在性（支持穿透分析的额外有效代码）
     sym_issues, sym_checked, sym_passed, sym_suggestions = check_symbol_existence(
-        text, holdings_details, extra_valid_codes,
+        text,
+        holdings_details,
+        extra_valid_codes,
     )
     all_issues.extend(sym_issues)
     total_checks += sym_checked
@@ -550,7 +602,9 @@ def run_fact_check(
     suggestion_lines = ""
     if sym_suggestions:
         sug_detail = "; ".join(sym_suggestions)
-        suggestion_lines = f'\n<span style="color:#999;font-size:11px">ℹ {tag}建议提及（不计入校验）: {sug_detail}</span>'
+        suggestion_lines = (
+            f'\n<span style="color:#999;font-size:11px">ℹ {tag}建议提及（不计入校验）: {sug_detail}</span>'
+        )
 
     if not all_issues:
         # 全部通过 — 绿色摘要（含建议提及则灰色追加）
@@ -562,8 +616,5 @@ def run_fact_check(
 
     # 存在不一致 — 黄色告警摘要
     detail_lines = "\n".join(f"⚠ {tag}{issue}" for issue in all_issues)
-    summary = (
-        f"{tag}事实校验：{total_passed}/{total_checks} 项通过，{len(all_issues)} 项提示\n"
-        f"{detail_lines}"
-    )
+    summary = f"{tag}事实校验：{total_passed}/{total_checks} 项通过，{len(all_issues)} 项提示\n{detail_lines}"
     return f'<p style="color:#a40;font-size:12px">{summary}</p>{suggestion_lines}'

@@ -42,9 +42,7 @@ _DEPRECATED_MODE_MAP: dict[str, str] = {
 }
 
 # 别名提示消息模板
-_DEPRECATION_WARNING_TPL = (
-    "匿名化模式 '%s' 已重命名为 '%s'，请更新配置"
-)
+_DEPRECATION_WARNING_TPL = "匿名化模式 '%s' 已重命名为 '%s'，请更新配置"
 
 __all__ = [
     "anonymize_holdings",

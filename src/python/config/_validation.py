@@ -355,7 +355,9 @@ def _validate_rebalance_config(config: dict, issues: int) -> int:
     if profile is not None:
         valid_profiles = ("conservative", "moderate", "aggressive", "custom")
         if profile not in valid_profiles:
-            logger.warning("config.json rebalance.profile = %r 无效，有效值: %s，将使用 moderate", profile, valid_profiles)
+            logger.warning(
+                "config.json rebalance.profile = %r 无效，有效值: %s，将使用 moderate", profile, valid_profiles
+            )
             issues += 1
     silence = rb.get("silence_days")
     if silence is not None:
@@ -391,7 +393,9 @@ def _validate_rebalance_config(config: dict, issues: int) -> int:
         else:
             for key, val in efi.items():
                 if key not in ("equity", "fixed_income"):
-                    logger.warning("config.json rebalance.equity_fixed_income.%s 未知，有效键: equity, fixed_income", key)
+                    logger.warning(
+                        "config.json rebalance.equity_fixed_income.%s 未知，有效键: equity, fixed_income", key
+                    )
                     issues += 1
                 if not isinstance(val, dict):
                     logger.warning("config.json rebalance.equity_fixed_income.%s 不是对象，将忽略该项", key)

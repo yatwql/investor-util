@@ -29,7 +29,7 @@ _PLACEHOLDER_TEXT: dict[str, str] = {
     ),
     "expert_review": (
         "<h3>🧠 智囊团深度复盘</h3>"
-        "<p>⚠️ 当前无法生智囊团深度复盘内容。</p>"
+        "<p>⚠️ 当前无法生成智囊团深度复盘内容。</p>"
         "<p>可能原因：LLM API 服务暂时不可用、网络连接异常或 API Key 配置错误。</p>"
         "<p>建议稍后重试，或检查 <code>data/config/llm_settings.json</code> 中 API 配置是否正确。</p>"
         "<hr/><p><em>数据获取时间：{timestamp}</em></p>"
@@ -72,9 +72,7 @@ def get_placeholder_text(module_key: str, timestamp: str | None = None) -> str:
     ts = timestamp or datetime.now().strftime("%Y-%m-%d %H:%M")
     template = _PLACEHOLDER_TEXT.get(module_key, "")
     if not template:
-        return (
-            f"<p>⚠️ {module_key} 内容暂不可用（数据获取时间：{ts}）</p>"
-        )
+        return f"<p>⚠️ {module_key} 内容暂不可用（数据获取时间：{ts}）</p>"
     return template.format(timestamp=ts)
 
 
@@ -119,8 +117,6 @@ def build_fallback_llm_content(
     if force or is_all_llm_failed(llm_content):
         # 全部失败 → 全部使用占位文本
         ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-        return tuple(
-            get_placeholder_text(key, timestamp=ts) for key in _MODULE_KEYS
-        )
+        return tuple(get_placeholder_text(key, timestamp=ts) for key in _MODULE_KEYS)
 
     return llm_content

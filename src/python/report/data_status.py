@@ -331,16 +331,18 @@ class DegradationTracker:
             self._last_success[source_key] = time.time()
             self._persist_dirty = True
             self._persist_state()
-            self._events.append(DegradationEvent(
-                source_key=source_key,
-                tier=tier,
-                success=True,
-                failure_type=failure_type,
-                degraded=False,
-                count=0,
-                effective_threshold=0,
-                timestamp=time.time(),
-            ))
+            self._events.append(
+                DegradationEvent(
+                    source_key=source_key,
+                    tier=tier,
+                    success=True,
+                    failure_type=failure_type,
+                    degraded=False,
+                    count=0,
+                    effective_threshold=0,
+                    timestamp=time.time(),
+                )
+            )
             return False, 0, 0
 
         # 读取层级配置
@@ -368,16 +370,18 @@ class DegradationTracker:
         max_count = max(counts.values())
         min_eff = min(unreachable_eff, empty_eff)
 
-        self._events.append(DegradationEvent(
-            source_key=source_key,
-            tier=tier,
-            success=False,
-            failure_type=failure_type,
-            degraded=degraded,
-            count=max_count,
-            effective_threshold=min_eff,
-            timestamp=time.time(),
-        ))
+        self._events.append(
+            DegradationEvent(
+                source_key=source_key,
+                tier=tier,
+                success=False,
+                failure_type=failure_type,
+                degraded=degraded,
+                count=max_count,
+                effective_threshold=min_eff,
+                timestamp=time.time(),
+            )
+        )
         return degraded, max_count, min_eff
 
     @staticmethod

@@ -6,6 +6,7 @@
   - _build_health_check_prompt — 持仓体检报告
   - _build_penetration_deep_prompt — 穿透深度分析
 """
+
 from __future__ import annotations
 
 import logging
@@ -34,7 +35,6 @@ from src.python.llm.prompts_tables import (
 logger = logging.getLogger("invest")
 
 logger = logging.getLogger("invest")
-
 
 
 def _build_global_macro_prompt(
@@ -177,8 +177,7 @@ def _build_qa_concentration_block(
     top3_ratio = sum((h.get("mv", 0) or 0) for h in sorted_by_mv[:3]) / total_mv
     if top3_ratio > 0.60:
         questions.append(
-            f"2. **前 3 大品种合计 {top3_ratio:.1%}**，集中度偏高。"
-            "您是否评估过前 3 品种同时回调对组合的影响？"
+            f"2. **前 3 大品种合计 {top3_ratio:.1%}**，集中度偏高。您是否评估过前 3 品种同时回调对组合的影响？"
         )
 
     # 触发器③：行业穿透集中度
@@ -303,7 +302,7 @@ def _build_expert_review_prompt(
         "1. 持仓明细中每只品种已经标注了盈亏比例（如 +6.00% 或 -3.50%），"
         "请直接引用这些数据，不要自行计算或虚构收益率、涨幅等百分比数值。\n"
         "2. 如果需要引用收益归因数据，请参考【收益归因】段落中的占比数据，"
-        '并明确标注为「贡献占比」而非收益率。\n'
+        "并明确标注为「贡献占比」而非收益率。\n"
         "3. 如果对某个数值不确定，请使用定性描述（如「表现较好」、「有盈利」、「亏损」等）"
         "而非虚构具体百分比。\n"
         "4. 提及指数基准时（如沪深300涨跌幅），请保持数值大致合理，"
@@ -315,6 +314,7 @@ def _build_expert_review_prompt(
     if enable_mode_2:
         try:
             from src.python.config._core import get_llm_config
+
             _cfg = get_llm_config()
             _scenarios = (_cfg or {}).get("debate", {}).get("mode_2_conditional", {}).get("scenarios", [])
             if _scenarios:
@@ -324,8 +324,7 @@ def _build_expert_review_prompt(
                     _desc = _s.get("desc", "")
                     _change = _s.get("change", 0)
                     scenario_lines.append(
-                        f"📈 **{_name}情景（{_desc}）**：至少 2 句具体行动建议，"
-                        f"分析在 {_desc} 情境下应如何调整持仓。"
+                        f"📈 **{_name}情景（{_desc}）**：至少 2 句具体行动建议，分析在 {_desc} 情境下应如何调整持仓。"
                     )
                 parts.append("\n".join(scenario_lines))
         except Exception:
@@ -334,7 +333,8 @@ def _build_expert_review_prompt(
     # ── 集中度反问引导 ──────────────────────────────────
     if enable_mode_3:
         _qa_block = _build_qa_concentration_block(
-            holdings_details, total_mv,
+            holdings_details,
+            total_mv,
             threshold=0.20,  # 默认值，可由调用方传入
             industry_concentration=industry_concentration,
         )
@@ -476,10 +476,7 @@ def _build_debate_synthesis_prompt(pro_text: str, con_text: str) -> str:
     Returns:
         格式化的综合 prompt 字符串。
     """
-    return (
-        f"白脸原始分析：\n\n```markdown\n{pro_text}\n```\n\n"
-        f"黑脸原始分析：\n\n```markdown\n{con_text}\n```"
-    )
+    return f"白脸原始分析：\n\n```markdown\n{pro_text}\n```\n\n黑脸原始分析：\n\n```markdown\n{con_text}\n```"
 
 
 __all__ = [

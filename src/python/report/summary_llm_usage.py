@@ -32,7 +32,11 @@ def _init_llm_usage_sheet(ws: Any) -> int:
 
 
 def _write_llm_summary_section(
-    ws: Any, row: int, session_usage: dict[str, Any] | None, llm_endpoint: str = "", debate_mode_label: str | None = None
+    ws: Any,
+    row: int,
+    session_usage: dict[str, Any] | None,
+    llm_endpoint: str = "",
+    debate_mode_label: str | None = None,
 ) -> int:
     """写入 LLM 用量汇总数据区，返回下一行号。"""
     if not session_usage or not session_usage.get("has_usage"):
@@ -268,7 +272,9 @@ def write_llm_usage_sheet(
     ]
 
     row = _init_llm_usage_sheet(ws)
-    row = _write_llm_summary_section(ws, row, llm_session_usage, llm_endpoint=llm_endpoint, debate_mode_label=debate_mode_label)
+    row = _write_llm_summary_section(
+        ws, row, llm_session_usage, llm_endpoint=llm_endpoint, debate_mode_label=debate_mode_label
+    )
 
     row = _write_module_table_header(ws, row, _HEADERS)
     row = _write_module_data_rows(ws, row, llm_module_info)

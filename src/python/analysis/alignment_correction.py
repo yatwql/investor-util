@@ -16,10 +16,10 @@ from typing import Any
 
 # ── 费率估算经验值 ──────────────────────────────
 # 各类别年化费率（管理费 + 托管费，粗略估算）
-_STOCK_FEE_RATE = 0.001      # 股票 ~0.1%
+_STOCK_FEE_RATE = 0.001  # 股票 ~0.1%
 _BOND_FUND_FEE_RATE = 0.007  # 债券基金 ~0.7%
 _MONEY_MARKET_FEE_RATE = 0.003  # 货币基金 ~0.3%
-_EQUITY_FUND_FEE_RATE = 0.015   # 偏股基金 ~1.5%
+_EQUITY_FUND_FEE_RATE = 0.015  # 偏股基金 ~1.5%
 
 # 基金类型关键词规则（用于 match_fund_type）
 _FUND_TYPE_RULES: list[tuple[tuple[str, ...], str, float]] = [
@@ -148,12 +148,14 @@ def portfolio_fee_estimation(
         contribution = weight * fee_rate
         total_weighted_fee += contribution
 
-        fee_breakdown.append({
-            "品种名称": name or code,
-            "fee_rate": fee_rate,
-            "weight": round(weight, 6),
-            "contribution": round(contribution, 6),
-        })
+        fee_breakdown.append(
+            {
+                "品种名称": name or code,
+                "fee_rate": fee_rate,
+                "weight": round(weight, 6),
+                "contribution": round(contribution, 6),
+            }
+        )
 
     if not fee_breakdown or total_mv <= 0:
         return {
@@ -168,14 +170,11 @@ def portfolio_fee_estimation(
     annual_fee = total_mv * fee_rate
 
     # 检查是否有较多未知类型品种
-    unknown_count = sum(
-        1 for fd in fee_breakdown
-        if fd.get("fee_rate") == _DEFAULT_FEE_RATE
-    )
+    unknown_count = sum(1 for fd in fee_breakdown if fd.get("fee_rate") == _DEFAULT_FEE_RATE)
     warning = None
     if unknown_count > 0:
         warning = (
-            f"有 {unknown_count} 个品种未能识别具体类型，使用默认费率 {_DEFAULT_FEE_RATE*100:.1f}%，"
+            f"有 {unknown_count} 个品种未能识别具体类型，使用默认费率 {_DEFAULT_FEE_RATE * 100:.1f}%，"
             "估算结果可能偏差较大"
         )
 
@@ -266,11 +265,13 @@ def cash_stripping(
 
         if is_cash:
             cash_mv += mv
-            cash_holdings.append({
-                "name": name or code,
-                "code": code,
-                "market_value": round(mv, 2),
-            })
+            cash_holdings.append(
+                {
+                    "name": name or code,
+                    "code": code,
+                    "market_value": round(mv, 2),
+                }
+            )
         else:
             equity_mv += mv
 
@@ -288,26 +289,23 @@ def cash_stripping(
             # 为防止除零，先计算累计组合收益率
             cum_portfolio_return = 1.0
             for r in portfolio_daily_returns:
-                cum_portfolio_return *= (1.0 + r)
+                cum_portfolio_return *= 1.0 + r
             total_return_pct = cum_portfolio_return - 1.0
             stripped_return_pct = total_return_pct / equity_allocation_pct if equity_allocation_pct > 0 else None
         elif equity_allocation_pct == 1.0:
             # 无现金品种，直接使用组合收益率
             cum_return = 1.0
             for r in portfolio_daily_returns:
-                cum_return *= (1.0 + r)
+                cum_return *= 1.0 + r
             stripped_return_pct = cum_return - 1.0
 
     warning = None
     if cash_allocation_pct == 0:
         warning = "未识别出现金管理品种，无需现金剥离"
     elif cash_allocation_pct < 0.05:
-        warning = f"现金管理品种占比仅 {cash_allocation_pct*100:.1f}%，剥离影响有限"
+        warning = f"现金管理品种占比仅 {cash_allocation_pct * 100:.1f}%，剥离影响有限"
     if portfolio_daily_returns is None or len(portfolio_daily_returns) == 0:
-        warning = (
-            (warning + "；" if warning else "")
-            + "无日收益率数据，无法计算剥离后收益率"
-        )
+        warning = (warning + "；" if warning else "") + "无日收益率数据，无法计算剥离后收益率"
         stripped_return_pct = None
 
     return {
@@ -383,7 +381,7 @@ def twr_calculation(
 
         # 子期间收益率 = (期末市值 - 现金流) / 期初市值 - 1
         sub_period_return = (curr_value - cash_flow) / prev_value - 1.0
-        twr_product *= (1.0 + sub_period_return)
+        twr_product *= 1.0 + sub_period_return
         valid_periods += 1
 
     if valid_periods == 0:
@@ -406,10 +404,7 @@ def twr_calculation(
     if valid_periods < 2:
         warning = "有效期间数过少，TWR 可能不稳定"
     elif valid_periods < _TRADING_DAYS_PER_YEAR:
-        warning = (
-            f"数据覆盖 {valid_periods} 个交易日（不足一年），"
-            "未计算年化 TWR"
-        )
+        warning = f"数据覆盖 {valid_periods} 个交易日（不足一年），未计算年化 TWR"
 
     return {
         "has_data": True,
@@ -462,7 +457,9 @@ def compute_alignment_factors(
             "warning": "未提供快照数据，未计算 TWR",
         }
 
-    has_any_data = fee_result.get("has_data", False) or cash_result.get("has_data", False) or twr_result.get("has_data", False)
+    has_any_data = (
+        fee_result.get("has_data", False) or cash_result.get("has_data", False) or twr_result.get("has_data", False)
+    )
 
     # 构建摘要文本
     parts: list[str] = []
@@ -472,10 +469,7 @@ def compute_alignment_factors(
     if fee_result.get("has_data"):
         fee_rate = fee_result["fee_rate"]
         annual_fee = fee_result["annual_fee"]
-        parts.append(
-            f"综合费率估算：加权平均费率 {fee_rate*100:.2f}%，"
-            f"年化费用约 {annual_fee:.2f} 元"
-        )
+        parts.append(f"综合费率估算：加权平均费率 {fee_rate * 100:.2f}%，年化费用约 {annual_fee:.2f} 元")
     else:
         fee_warn = fee_result.get("warning", "数据不足")
         parts.append(f"费率估算：{fee_warn}")
@@ -485,12 +479,9 @@ def compute_alignment_factors(
         cash_pct = cash_result.get("cash_allocation_pct", 0.0) * 100
         equity_pct = cash_result.get("equity_allocation_pct", 0.0) * 100
         stripped_ret = cash_result.get("stripped_return_pct")
-        parts.append(
-            f"现金剥离：现金管理品种占比 {cash_pct:.2f}%，"
-            f"权益部分占比 {equity_pct:.2f}%"
-        )
+        parts.append(f"现金剥离：现金管理品种占比 {cash_pct:.2f}%，权益部分占比 {equity_pct:.2f}%")
         if stripped_ret is not None:
-            parts.append(f"剥离后权益收益率：{stripped_ret*100:.2f}%")
+            parts.append(f"剥离后权益收益率：{stripped_ret * 100:.2f}%")
     else:
         cash_warn = cash_result.get("warning", "数据不足")
         parts.append(f"现金剥离：{cash_warn}")
@@ -500,11 +491,9 @@ def compute_alignment_factors(
         twr = twr_result.get("twr", 0.0)
         n_periods = twr_result.get("n_periods", 0)
         annualized = twr_result.get("annualized_twr")
-        parts.append(
-            f"时间加权收益率（TWR）：{twr*100:.2f}%（{n_periods} 个期间）"
-        )
+        parts.append(f"时间加权收益率（TWR）：{twr * 100:.2f}%（{n_periods} 个期间）")
         if annualized is not None:
-            parts.append(f"年化 TWR：{annualized*100:.2f}%")
+            parts.append(f"年化 TWR：{annualized * 100:.2f}%")
     else:
         twr_warn = twr_result.get("warning", "未计算")
         parts.append(f"时间加权收益率：{twr_warn}")

@@ -369,7 +369,7 @@ def _apply_llm_enhancement(
             industry_data=industry_data,
         )
     except Exception:
-        logger.warning("LLM 新闻关联分析失败，降级为传统关键词匹配", exc_info=True)
+        logger.warning("财经新闻热点与持仓关联分析（LLM）失败，降级为传统关键词匹配", exc_info=True)
         cached = False
         token_usage = {}
     meta["llm_cached"] = cached

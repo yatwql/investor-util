@@ -241,8 +241,7 @@ def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
     """构建收益归因段落（TOP 5 品种按贡献排序）。"""
     if not holdings_details:
         return ""
-    profits = [(h.get("name", ""), h.get("code", ""), h.get("profit", 0) or 0)
-               for h in holdings_details]
+    profits = [(h.get("name", ""), h.get("code", ""), h.get("profit", 0) or 0) for h in holdings_details]
     total_abs = sum(abs(p[2]) for p in profits)
     if total_abs == 0:
         return ""
@@ -263,7 +262,9 @@ def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
     pos_total = sum(p for _, _, p in profits if p > 0)
     neg_total = sum(p for _, _, p in profits if p < 0)
     if pos_total > 0 and neg_total < 0:
-        lines.append(f"盈利品种合计 +{_fmt_wan(pos_total)}，亏损品种合计 {_fmt_wan(neg_total)}（净{_fmt_wan(pos_total + neg_total)}）")
+        lines.append(
+            f"盈利品种合计 +{_fmt_wan(pos_total)}，亏损品种合计 {_fmt_wan(neg_total)}（净{_fmt_wan(pos_total + neg_total)}）"
+        )
     elif pos_total > 0:
         lines.append(f"全部品种盈利，合计 +{_fmt_wan(pos_total)}")
     elif neg_total < 0:
@@ -384,8 +385,12 @@ def _build_competitive_context_block(
         benchmark_returns = history_data.get("benchmark_returns")
         portfolio_returns = history_data.get("portfolio_returns")
         if benchmark_returns is not None and portfolio_returns is not None:
-            p_return = portfolio_returns[-1] * 100 if isinstance(portfolio_returns, list) and portfolio_returns else None
-            b_return = benchmark_returns[-1] * 100 if isinstance(benchmark_returns, list) and benchmark_returns else None
+            p_return = (
+                portfolio_returns[-1] * 100 if isinstance(portfolio_returns, list) and portfolio_returns else None
+            )
+            b_return = (
+                benchmark_returns[-1] * 100 if isinstance(benchmark_returns, list) and benchmark_returns else None
+            )
             if p_return is not None and b_return is not None:
                 lines.append(f"【区间对比】组合累计 {p_return:+.2f}% vs 沪深300 {b_return:+.2f}%")
 
@@ -412,14 +417,18 @@ def _build_competitive_context_block(
 
     # ── 口径说明（脚注） ──
     lines.append("")
-    lines.append("⚠ 口径说明：组合收益为费后净收益，指数为价格指数（非全收益）；"
-                 "组合含现金管理品种，指数不含；对比期间可能存在持仓变动（非静态组合）。"
-                 "以上差异可能导致对比结果偏移，仅供大致参考。")
+    lines.append(
+        "⚠ 口径说明：组合收益为费后净收益，指数为价格指数（非全收益）；"
+        "组合含现金管理品种，指数不含；对比期间可能存在持仓变动（非静态组合）。"
+        "以上差异可能导致对比结果偏移，仅供大致参考。"
+    )
 
     # ── 幸存者偏差提示 ──
-    lines.append("⚠ 幸存者偏差提示：对比指数的成分股/成分基金会定期调整，"
-                 "表现差的成分可能被剔除，因此指数本身存在幸存者偏差。"
-                 "你的组合对比结果可能略显保守。")
+    lines.append(
+        "⚠ 幸存者偏差提示：对比指数的成分股/成分基金会定期调整，"
+        "表现差的成分可能被剔除，因此指数本身存在幸存者偏差。"
+        "你的组合对比结果可能略显保守。"
+    )
 
     return "\n".join(lines)
 
@@ -427,6 +436,7 @@ def _build_competitive_context_block(
 def _is_valid_number(val: object) -> bool:
     """检查值是否为有效有限数值（排除 None/NaN/Inf）。"""
     import math
+
     if val is None:
         return False
     if isinstance(val, (int, float)):

@@ -53,27 +53,31 @@ def compute_rebalance_signals(
         mv = h.get("market_value", 0) or 0
         weight = mv / total_mv
         if weight > _THRESHOLD:
-            signals.append({
-                "code": h.get("code", ""),
-                "name": h.get("name", ""),
-                "weight": round(weight, 4),
-                "threshold": _THRESHOLD,
-                "action": "建议部分止盈至10-15%区间",
-            })
+            signals.append(
+                {
+                    "code": h.get("code", ""),
+                    "name": h.get("name", ""),
+                    "weight": round(weight, 4),
+                    "threshold": _THRESHOLD,
+                    "action": "建议部分止盈至10-15%区间",
+                }
+            )
 
     if not signals:
         return []
 
     # 去重聚合：超过 _MAX_DETAILED 个触发时汇总
     if len(signals) > _MAX_DETAILED:
-        return [{
-            "summary": True,
-            "count": len(signals),
-            "message": (
-                f"您的组合集中度较高，有 {len(signals)} 个品种超过 "
-                f"{_THRESHOLD * 100:.0f}% 警戒线，建议整体考虑适度分散"
-            ),
-        }]
+        return [
+            {
+                "summary": True,
+                "count": len(signals),
+                "message": (
+                    f"您的组合集中度较高，有 {len(signals)} 个品种超过 "
+                    f"{_THRESHOLD * 100:.0f}% 警戒线，建议整体考虑适度分散"
+                ),
+            }
+        ]
 
     # 按权重降序
     signals.sort(key=lambda x: -x["weight"])
