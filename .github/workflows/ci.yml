@@ -43,7 +43,7 @@ jobs:
 
       - name: P1 — 合入验证（master 门禁）
         if: github.ref_name == 'master' || github.event_name == 'pull_request'
-        run: python scripts/test_runner.py --mode verify --phased --no-timeout
+        run: python scripts/test_runner.py --mode verify --no-timeout
 
       - name: P2 — 全量测试（版本发布门禁）
         if: startsWith(github.ref, 'refs/tags/v')
