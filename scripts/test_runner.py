@@ -157,7 +157,7 @@ _HELP_TEXT += """\
   --parallel [LVL]  并行级别: high(100%%核数) / medium(50%%,默认) / low(25%%)
   --timeout SEC     覆盖超时时间（秒），所有模式统一使用此值
   --no-timeout      禁用超时，等待测试自然结束
-  --phased          分阶段运行（当前仅 verify 支持：Phase A 核心单元 → Phase B 场景，前序失败跳过后续）
+  --phased          分阶段运行（对配置了 phases 的模式有效，前序失败跳过后续阶段）
   --help            显示本帮助信息
 
 输出目录结构:
