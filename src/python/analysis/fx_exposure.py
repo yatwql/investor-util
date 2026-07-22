@@ -80,23 +80,27 @@ def fx_exposure(holdings_details: list[dict[str, Any]] | None) -> dict[str, Any]
         mv = currency_mv.get(currency, 0)
         pct = (mv / total_mv) * 100 if total_mv > 0 else 0.0
         if mv > 0:
-            exposures.append({
-                "currency": currency,
-                "label": _CURRENCY_LABELS.get(currency, currency),
-                "total_mv": round(mv, 2),
-                "pct": round(pct, 1),
-            })
+            exposures.append(
+                {
+                    "currency": currency,
+                    "label": _CURRENCY_LABELS.get(currency, currency),
+                    "total_mv": round(mv, 2),
+                    "pct": round(pct, 1),
+                }
+            )
 
     # 处理其他币种（按货币代码排序展示）
     other_mv = sum(mv for c, mv in currency_mv.items() if c not in (CURRENCY_CNY, CURRENCY_HKD, CURRENCY_USD))
     if other_mv > 0:
         other_pct = (other_mv / total_mv) * 100
-        exposures.append({
-            "currency": CURRENCY_OTHER,
-            "label": _CURRENCY_OTHER,
-            "total_mv": round(other_mv, 2),
-            "pct": round(other_pct, 1),
-        })
+        exposures.append(
+            {
+                "currency": CURRENCY_OTHER,
+                "label": _CURRENCY_OTHER,
+                "total_mv": round(other_mv, 2),
+                "pct": round(other_pct, 1),
+            }
+        )
 
     # 摘要文本
     summary_parts = [f"{e['label']} {e['pct']:.1f}%" for e in exposures]

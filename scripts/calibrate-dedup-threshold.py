@@ -24,8 +24,8 @@ _ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "cache", "dedup_anchors.jsonl
 # 算法同时使用中文 bigram + 英数 token 匹配，
 # 三个阈值经数据分析确认均维持不变。
 _CROSS_THRESHOLD = 0.30  # cross_threshold（英数加入后 cross_skip 自然减少）
-_SAME_SRC_BIGRAM = 4     # 同源 bigram 阈值（抽样验证 bigram=2~3 确为不同新闻）
-_CROSS_BIGRAM = 3        # 跨源 bigram 阈值（边界案例 ratio<0.40 者风险评估过高）
+_SAME_SRC_BIGRAM = 4  # 同源 bigram 阈值（抽样验证 bigram=2~3 确为不同新闻）
+_CROSS_BIGRAM = 3  # 跨源 bigram 阈值（边界案例 ratio<0.40 者风险评估过高）
 
 
 def load_anchors(path: str = _ANCHOR_PATH) -> list[dict[str, Any]]:
@@ -81,8 +81,7 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
         if not summary_only:
             print(f"  {'详细列表（前10条）':-^60}")
             for r in skip_records[:10]:
-                print(f"  ratio={r['ratio']:.3f} bg={r['bigram_overlap']} "
-                      f"[{r['source_a']}] {r['title_a'][:35]}")
+                print(f"  ratio={r['ratio']:.3f} bg={r['bigram_overlap']} [{r['source_a']}] {r['title_a'][:35]}")
                 print(f"  {'':>15s}     [{r['source_b']}] {r['title_b'][:35]}")
                 print()
     else:
@@ -179,8 +178,9 @@ def _print_calibration_advice(
             print(f"    这些案例有实体重叠且 ratio 较高，建议审查是否应为重复")
             if not summary_only:
                 for r in high_skip_entity[:5]:
-                    print(f"      ratio={r['ratio']:.3f} bg={r['bigram_overlap']} "
-                          f"[{r['source_a']}] {r['title_a'][:30]}")
+                    print(
+                        f"      ratio={r['ratio']:.3f} bg={r['bigram_overlap']} [{r['source_a']}] {r['title_a'][:30]}"
+                    )
                     print(f"      → [{r['source_b']}] {r['title_b'][:30]}")
 
         # bg=0,1 但 ratio 很高 → 说明归一化不够，不是阈值问题
@@ -192,8 +192,9 @@ def _print_calibration_advice(
             print(f"    不必调整阈值，应考虑增强 _normalize_title() 过滤通用日期/数字模式")
             if not summary_only:
                 for r in high_skip_noise[:3]:
-                    print(f"      ratio={r['ratio']:.3f} bg={r['bigram_overlap']} "
-                          f"[{r['source_a']}] {r['title_a'][:30]}")
+                    print(
+                        f"      ratio={r['ratio']:.3f} bg={r['bigram_overlap']} [{r['source_a']}] {r['title_a'][:30]}"
+                    )
                     print(f"      → [{r['source_b']}] {r['title_b'][:30]}")
 
         # 绝大多数 skip 都在边界内 → 阈值合适

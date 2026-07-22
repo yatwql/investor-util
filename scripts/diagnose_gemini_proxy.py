@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """诊断 Gemini API 代理连通性。"""
+
 import os, sys, json
 import httpx
 
@@ -51,11 +52,13 @@ def _find_gemini_model() -> str:
                     return v.get("model", "gemini-2.5-flash")
     return "gemini-2.5-flash"
 
+
 GEMINI_MODEL = _find_gemini_model()
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}"
 
 PASS = "  [OK]"
 FAIL = "  [ERR]"
+
 
 def test(name: str, fn):
     print(f"\n▶ {name}")
@@ -65,17 +68,20 @@ def test(name: str, fn):
     except Exception as e:
         print(f"{FAIL} {e}")
 
+
 # ── 1. 不通过代理，直连 Google ──
 def test_direct():
     r = httpx.get(GEMINI_URL, timeout=5)
     print(f"   状态码: {r.status_code}")
     print(f"   响应: {r.text[:200]}")
 
+
 # ── 2. 通过代理连接 Google ──
 def test_via_proxy():
     r = httpx.get(GEMINI_URL, timeout=10, proxy=PROXY)
     print(f"   状态码: {r.status_code}")
     print(f"   响应: {r.text[:200]}")
+
 
 # ── 3. 通过代理+API Key 调用 Gemini ──
 def test_auth_via_proxy():

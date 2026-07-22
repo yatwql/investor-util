@@ -43,6 +43,7 @@ def _get_http_client():
     global _HTTP_CLIENT
     if _HTTP_CLIENT is None:
         from src.python.http_client import make_http_client
+
         _HTTP_CLIENT = make_http_client(timeout=120.0, http2=False)
     return _HTTP_CLIENT
 
@@ -71,6 +72,7 @@ def _compute_categories(holdings_details: list[dict]) -> dict[str, int]:
 def _compute_portfolio_values(holdings_details: list[dict]) -> dict[str, float]:
     """计算组合核心数值，委托给 fact_checker 保持一致。"""
     from src.python.llm.fact_checker import _calc_portfolio_values
+
     vals = _calc_portfolio_values(holdings_details)
     vals["total_today_profit"] = 0.0
     return vals
@@ -146,30 +148,50 @@ def _call_llm_module(
         # 仅构建 prompt 不调用 API
         if module_name == "expert_review":
             from src.python.llm.prompts import _build_expert_review_prompt, _SYSTEM_EXPERT_REVIEW
+
             prompt = _build_expert_review_prompt(
-                total_mv, total_cost, total_profit, total_today_profit,
-                holdings_count, categories,
+                total_mv,
+                total_cost,
+                total_profit,
+                total_today_profit,
+                holdings_count,
+                categories,
                 holdings_details=holdings_details,
             )
             return f"[SYSTEM]\n{_SYSTEM_EXPERT_REVIEW}\n\n[USER]\n{prompt}", {"dry_run": True}
         elif module_name == "global_macro":
             from src.python.llm.prompts import _build_global_macro_prompt, _SYSTEM_GLOBAL_MACRO
+
             prompt = _build_global_macro_prompt(
-                {}, {}, total_mv, total_profit, categories,
+                {},
+                {},
+                total_mv,
+                total_profit,
+                categories,
             )
             return f"[SYSTEM]\n{_SYSTEM_GLOBAL_MACRO}\n\n[USER]\n{prompt}", {"dry_run": True}
         elif module_name == "health_check":
             from src.python.llm.prompts import _build_health_check_prompt, _SYSTEM_HEALTH_CHECK
+
             prompt = _build_health_check_prompt(
-                total_mv, total_cost, total_profit, total_today_profit,
-                holdings_count, categories,
+                total_mv,
+                total_cost,
+                total_profit,
+                total_today_profit,
+                holdings_count,
+                categories,
                 holdings_details=holdings_details,
             )
             return f"[SYSTEM]\n{_SYSTEM_HEALTH_CHECK}\n\n[USER]\n{prompt}", {"dry_run": True}
         elif module_name == "penetration_deep":
             from src.python.llm.prompts import _build_penetration_deep_prompt, _SYSTEM_PENETRATION_DEEP
+
             prompt = _build_penetration_deep_prompt(
-                total_mv, total_cost, total_profit, holdings_count, categories,
+                total_mv,
+                total_cost,
+                total_profit,
+                holdings_count,
+                categories,
                 holdings_details=holdings_details,
             )
             return f"[SYSTEM]\n{_SYSTEM_PENETRATION_DEEP}\n\n[USER]\n{prompt}", {"dry_run": True}
@@ -180,31 +202,55 @@ def _call_llm_module(
     try:
         if module_name == "expert_review":
             content, cached = generate_expert_review(
-                total_mv, total_cost, total_profit, total_today_profit,
-                holdings_count, categories,
+                total_mv,
+                total_cost,
+                total_profit,
+                total_today_profit,
+                holdings_count,
+                categories,
                 holdings_details=holdings_details,
-                force=force, http_client=http_client, llm_config=llm_config,
+                force=force,
+                http_client=http_client,
+                llm_config=llm_config,
             )
         elif module_name == "global_macro":
             a_indices = {}
             us_indices = {}
             content, cached = generate_global_macro(
-                a_indices, us_indices, total_mv, total_profit, categories,
-                force=force, http_client=http_client, llm_config=llm_config,
+                a_indices,
+                us_indices,
+                total_mv,
+                total_profit,
+                categories,
+                force=force,
+                http_client=http_client,
+                llm_config=llm_config,
             )
         elif module_name == "health_check":
             content, cached = generate_health_check(
-                total_mv, total_cost, total_profit, total_today_profit,
-                holdings_count, categories,
+                total_mv,
+                total_cost,
+                total_profit,
+                total_today_profit,
+                holdings_count,
+                categories,
                 holdings_details=holdings_details,
-                force=force, http_client=http_client, llm_config=llm_config,
+                force=force,
+                http_client=http_client,
+                llm_config=llm_config,
             )
         elif module_name == "penetration_deep":
             content, cached = generate_penetration_deep_analysis(
-                total_mv, total_cost, total_profit, total_today_profit,
-                holdings_count, categories,
+                total_mv,
+                total_cost,
+                total_profit,
+                total_today_profit,
+                holdings_count,
+                categories,
                 holdings_details=holdings_details,
-                force=force, http_client=http_client, llm_config=llm_config,
+                force=force,
+                http_client=http_client,
+                llm_config=llm_config,
             )
         else:
             content = None
@@ -247,12 +293,16 @@ def _run_fact_check(
 
     # 检查器 2：品种存在性（建议语境已在内部处理）
     sym_issues, sym_checked, sym_passed, sym_suggestions = check_symbol_existence(
-        text, holdings_details, extra_valid_codes,
+        text,
+        holdings_details,
+        extra_valid_codes,
     )
 
     # 检查器 3：排名正确性
     rank_issues, rank_checked, rank_passed = check_ranking_correctness(
-        text, holdings_details, is_penetration_module,
+        text,
+        holdings_details,
+        is_penetration_module,
     )
 
     total_checks = num_checked + sym_checked + rank_checked
@@ -321,7 +371,7 @@ def _generate_report(
     lines.append(f"")
 
     lines.append("> **说明**：")
-    lines.append("> - 品种存在性告警分为"声称持有"（幻觉）和"建议提及"（非幻觉），")
+    lines.append('> - 品种存在性告警分为"声称持有"（幻觉）和"建议提及"（非幻觉），')
     lines.append(">   建议提及不计入幻觉率（如 LLM 推荐买入的品种不在持仓中）。")
     lines.append("> - 数值一致性告警可能包含误报——仓位占比（如 52.4%）、")
     lines.append(">   情景假设百分比等非收益率数值会被标记为偏差。")
@@ -368,8 +418,11 @@ def _generate_report(
             if has_any_issue:
                 lines.append(f"#### 告警详情")
                 lines.append(f"")
-                for cat, cat_label in [("numerical", "数值一致性"), ("symbol", "品种存在性（幻觉）"),
-                                        ("rank", "排名正确性")]:
+                for cat, cat_label in [
+                    ("numerical", "数值一致性"),
+                    ("symbol", "品种存在性（幻觉）"),
+                    ("rank", "排名正确性"),
+                ]:
                     if fc["issues"][cat]:
                         lines.append(f"**{cat_label}**：")
                         for issue in fc["issues"][cat]:
@@ -396,17 +449,15 @@ def _generate_report(
 
 def main():
     parser = argparse.ArgumentParser(description="LLM 幻觉率采样测试")
-    parser.add_argument("--module", default="expert_review",
-                        choices=list(_MODULE_FNS.keys()),
-                        help="LLM 模块（默认 expert_review）")
-    parser.add_argument("--dataset", type=str, default=None,
-                        help="仅测试指定数据集，逗号分隔（如 1,3,5）")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="不调用 LLM，只构建 prompt 验证结构")
-    parser.add_argument("--force", action="store_true",
-                        help="跳过缓存强制重新生成")
-    parser.add_argument("--output", type=str, default=None,
-                        help="报告输出路径（默认 docs-stm/tmp/hallucination-report.md）")
+    parser.add_argument(
+        "--module", default="expert_review", choices=list(_MODULE_FNS.keys()), help="LLM 模块（默认 expert_review）"
+    )
+    parser.add_argument("--dataset", type=str, default=None, help="仅测试指定数据集，逗号分隔（如 1,3,5）")
+    parser.add_argument("--dry-run", action="store_true", help="不调用 LLM，只构建 prompt 验证结构")
+    parser.add_argument("--force", action="store_true", help="跳过缓存强制重新生成")
+    parser.add_argument(
+        "--output", type=str, default=None, help="报告输出路径（默认 docs-stm/tmp/hallucination-report.md）"
+    )
     args = parser.parse_args()
 
     module_name = args.module
@@ -456,14 +507,17 @@ def main():
         values = _compute_portfolio_values(holdings)
         categories = _compute_categories(holdings)
 
-        logger.info("[%d/%d] %s (%d 品种, 市值 %.0f)",
-                     idx, len(datasets), name, len(holdings), values["total_mv"])
+        logger.info("[%d/%d] %s (%d 品种, 市值 %.0f)", idx, len(datasets), name, len(holdings), values["total_mv"])
 
         # ── 2a. 调用 LLM ──
         start_ts = time.time()
         llm_output, usage = _call_llm_module(
-            module_name, holdings, values, categories,
-            dry_run=dry_run, force=force,
+            module_name,
+            holdings,
+            values,
+            categories,
+            dry_run=dry_run,
+            force=force,
         )
         elapsed = time.time() - start_ts
 
@@ -482,21 +536,23 @@ def main():
 
         if not llm_output and not dry_run:
             logger.warning("  [%d/%d] %s → LLM 返回空（跳过事实校验）", idx, len(datasets), name)
-            all_results.append({
-                "dataset": ds,
-                "llm_output": None,
-                "usage": usage,
-                "fact_check": {
-                    "issues": {"numerical": [], "symbol": [], "rank": [], "symbol_suggestion": []},
-                    "total_checks": 0,
-                    "num_checked": 0,
-                    "sym_checked": 0,
-                    "rank_checked": 0,
-                    "sym_suggestion_count": 0,
-                    "hallucination_rate": 0.0,
-                },
-                "elapsed": elapsed,
-            })
+            all_results.append(
+                {
+                    "dataset": ds,
+                    "llm_output": None,
+                    "usage": usage,
+                    "fact_check": {
+                        "issues": {"numerical": [], "symbol": [], "rank": [], "symbol_suggestion": []},
+                        "total_checks": 0,
+                        "num_checked": 0,
+                        "sym_checked": 0,
+                        "rank_checked": 0,
+                        "sym_suggestion_count": 0,
+                        "hallucination_rate": 0.0,
+                    },
+                    "elapsed": elapsed,
+                }
+            )
             continue
 
         # ── 2b. 事实校验 ──
@@ -518,19 +574,26 @@ def main():
         )
 
         rate_str = f"{fact_check_result['hallucination_rate']:.2%}"
-        logger.info("  [%d/%d] %s → 校验 %d 项 / 告警 %d / 幻觉率 %s (%.1fs)",
-                     idx, len(datasets), name,
-                     fact_check_result["total_checks"],
-                     sum(len(v) for v in fact_check_result["issues"].values()),
-                     rate_str, elapsed)
+        logger.info(
+            "  [%d/%d] %s → 校验 %d 项 / 告警 %d / 幻觉率 %s (%.1fs)",
+            idx,
+            len(datasets),
+            name,
+            fact_check_result["total_checks"],
+            sum(len(v) for v in fact_check_result["issues"].values()),
+            rate_str,
+            elapsed,
+        )
 
-        all_results.append({
-            "dataset": ds,
-            "llm_output": llm_output,
-            "usage": usage,
-            "fact_check": fact_check_result,
-            "elapsed": elapsed,
-        })
+        all_results.append(
+            {
+                "dataset": ds,
+                "llm_output": llm_output,
+                "usage": usage,
+                "fact_check": fact_check_result,
+                "elapsed": elapsed,
+            }
+        )
 
     # ── Dry-Run 保存 Prompt ──
     if dry_run:
@@ -548,9 +611,9 @@ def main():
     # ── 汇总输出 ──
     total_checks = sum(r["fact_check"]["total_checks"] for r in all_results)
     total_issues = sum(
-        len(r["fact_check"]["issues"].get("numerical", [])) +
-        len(r["fact_check"]["issues"].get("symbol", [])) +
-        len(r["fact_check"]["issues"].get("rank", []))
+        len(r["fact_check"]["issues"].get("numerical", []))
+        + len(r["fact_check"]["issues"].get("symbol", []))
+        + len(r["fact_check"]["issues"].get("rank", []))
         for r in all_results
     )
     overall_rate = total_issues / total_checks if total_checks > 0 else 0.0
@@ -558,9 +621,14 @@ def main():
     logger.info("")
     logger.info("=" * 60)
     logger.info("采样完成！")
-    logger.info("总校验项: %d | 告警: %d | 幻觉率: %.2f%% | 达标数据集: %d/%d",
-                 total_checks, total_issues, overall_rate * 100,
-                 passed_datasets, len(all_results))
+    logger.info(
+        "总校验项: %d | 告警: %d | 幻觉率: %.2f%% | 达标数据集: %d/%d",
+        total_checks,
+        total_issues,
+        overall_rate * 100,
+        passed_datasets,
+        len(all_results),
+    )
     logger.info("目标 < 5%%: %s", "✅ 达标" if overall_rate < 0.05 else "❌ 未达标")
     logger.info("=" * 60)
 

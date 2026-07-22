@@ -345,6 +345,7 @@ def _update_silence_state(
     if updated:
         _save_silence_state(state, silence_file)
 
+
 # ── 资产分类 —──────────────────────────────────────────────────
 
 
@@ -559,34 +560,33 @@ def compute_target_deviation(
             # 生成建议文本
             if current > t_max:
                 action = (
-                    f"权益占比 {current}%，超过目标上限 {t_max}%，"
-                    f"超配 {deviation:.1f}%，建议适当止盈权益类，增配固收类"
+                    f"权益占比 {current}%，超过目标上限 {t_max}%，超配 {deviation:.1f}%，建议适当止盈权益类，增配固收类"
                 )
             elif current < t_min:
-                action = (
-                    f"权益占比 {current}%，低于目标下限 {t_min}%，"
-                    f"低配 {-deviation:.1f}%，建议适当增配权益类"
-                )
+                action = f"权益占比 {current}%，低于目标下限 {t_min}%，低配 {-deviation:.1f}%，建议适当增配权益类"
             else:
                 action = f"权益占比 {current}%，在目标范围 {t_min}%-{t_max}% 内，无需调整"
 
             label = _CATEGORY_LABELS.get(key, key)
             confidence = _compute_confidence(
-                "category", deviation=deviation,
+                "category",
+                deviation=deviation,
                 deviation_threshold_pct=deviation_threshold * 100,
             )
-            signals.append({
-                "type": "category",
-                "category": key,
-                "category_label": label,
-                "current_weight": current,
-                "target_weight": t_target or (t_min + t_max) / 2,
-                "min": t_min,
-                "max": t_max,
-                "deviation": deviation,
-                "confidence": confidence,
-                "action": action,
-            })
+            signals.append(
+                {
+                    "type": "category",
+                    "category": key,
+                    "category_label": label,
+                    "current_weight": current,
+                    "target_weight": t_target or (t_min + t_max) / 2,
+                    "min": t_min,
+                    "max": t_max,
+                    "deviation": deviation,
+                    "confidence": confidence,
+                    "action": action,
+                }
+            )
 
     # 2. 品种级配置检查
     for key, target in target_allocation.items():
@@ -614,19 +614,22 @@ def compute_target_deviation(
                 else:
                     act = f"持有 {current_w}%，在目标范围 {t_min}%-{t_max}% 内"
                 sec_confidence = _compute_confidence(
-                    "security", deviation=deviation,
+                    "security",
+                    deviation=deviation,
                     deviation_threshold_pct=deviation_threshold * 100,
                 )
-                signals.append({
-                    "type": "security",
-                    "code": key,
-                    "name": h.get("name", ""),
-                    "current_weight": current_w,
-                    "target_weight": t_target or (t_min + t_max) / 2,
-                    "deviation": deviation,
-                    "confidence": sec_confidence,
-                    "action": act,
-                })
+                signals.append(
+                    {
+                        "type": "security",
+                        "code": key,
+                        "name": h.get("name", ""),
+                        "current_weight": current_w,
+                        "target_weight": t_target or (t_min + t_max) / 2,
+                        "deviation": deviation,
+                        "confidence": sec_confidence,
+                        "action": act,
+                    }
+                )
                 break
 
     return signals
@@ -729,28 +732,28 @@ def equity_fixed_income_deviation(
                 f"低配 {-deviation:.1f}%，建议适当增加{group_label}配置"
             )
         else:
-            action = (
-                f"{group_label}仓位 {current}%，在目标范围 {t_min}%-{t_max}% 内，"
-                "无需调整"
-            )
+            action = f"{group_label}仓位 {current}%，在目标范围 {t_min}%-{t_max}% 内，无需调整"
 
         confidence = _compute_confidence(
-            "category", deviation=deviation,
+            "category",
+            deviation=deviation,
             deviation_threshold_pct=deviation_threshold * 100,
         )
 
-        signals.append({
-            "type": "equity_fixed_income",
-            "group": group_key,
-            "group_label": group_label,
-            "current_weight": current,
-            "target_weight": t_target or (t_min + t_max) / 2,
-            "min": t_min,
-            "max": t_max,
-            "deviation": deviation,
-            "confidence": confidence,
-            "action": action,
-        })
+        signals.append(
+            {
+                "type": "equity_fixed_income",
+                "group": group_key,
+                "group_label": group_label,
+                "current_weight": current,
+                "target_weight": t_target or (t_min + t_max) / 2,
+                "min": t_min,
+                "max": t_max,
+                "deviation": deviation,
+                "confidence": confidence,
+                "action": action,
+            }
+        )
 
     return signals
 
@@ -808,28 +811,32 @@ def compute_rebalance_signals(
                 deviation=weight_pct,
                 threshold=threshold,
             )
-            single_signals.append({
-                "type": "single_overflow",
-                "code": h.get("code", ""),
-                "name": h.get("name", ""),
-                "weight": weight_pct,
-                "threshold": threshold * 100,
-                "confidence": confidence,
-                "action": f"持仓 {weight*100:.1f}%，超出建议上限 {threshold*100:.0f}%，建议部分止盈至 {threshold*50:.0f}-{threshold*100:.0f}% 区间",
-            })
+            single_signals.append(
+                {
+                    "type": "single_overflow",
+                    "code": h.get("code", ""),
+                    "name": h.get("name", ""),
+                    "weight": weight_pct,
+                    "threshold": threshold * 100,
+                    "confidence": confidence,
+                    "action": f"持仓 {weight * 100:.1f}%，超出建议上限 {threshold * 100:.0f}%，建议部分止盈至 {threshold * 50:.0f}-{threshold * 100:.0f}% 区间",
+                }
+            )
 
     # 去重聚合：超过 3 个时汇总
     _MAX_DETAILED = 3
     if len(single_signals) > _MAX_DETAILED:
-        signals.append({
-            "type": "summary",
-            "summary": True,
-            "count": len(single_signals),
-            "message": (
-                f"您的组合集中度较高，有 {len(single_signals)} 个品种超过 "
-                f"{threshold*100:.0f}% 警戒线，建议整体考虑适度分散"
-            ),
-        })
+        signals.append(
+            {
+                "type": "summary",
+                "summary": True,
+                "count": len(single_signals),
+                "message": (
+                    f"您的组合集中度较高，有 {len(single_signals)} 个品种超过 "
+                    f"{threshold * 100:.0f}% 警戒线，建议整体考虑适度分散"
+                ),
+            }
+        )
     else:
         single_signals.sort(key=lambda x: -x["weight"])
         signals.extend(single_signals[:_MAX_DETAILED])
@@ -837,7 +844,10 @@ def compute_rebalance_signals(
     # 2. 目标配置偏离信号
     if target_allocation:
         dev_signals = compute_target_deviation(
-            holdings_details, total_mv, target_allocation, deviation_threshold,
+            holdings_details,
+            total_mv,
+            target_allocation,
+            deviation_threshold,
         )
         signals.extend(dev_signals)
 
@@ -845,7 +855,10 @@ def compute_rebalance_signals(
     equity_fi_target = resolved.get("equity_fixed_income", {})
     if equity_fi_target:
         ef_signals = equity_fixed_income_deviation(
-            holdings_details, total_mv, equity_fi_target, deviation_threshold,
+            holdings_details,
+            total_mv,
+            equity_fi_target,
+            deviation_threshold,
         )
         signals.extend(ef_signals)
 

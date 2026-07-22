@@ -183,8 +183,7 @@ def write_header_row(ws, row: int, headers: list[str]) -> int:
     """
     if not isinstance(row, int):
         raise TypeError(
-            f"write_header_row: 'row' 应为 int，收到 {type(row).__name__}。"
-            " 调用签名应为 (ws, row, headers)。"
+            f"write_header_row: 'row' 应为 int，收到 {type(row).__name__}。 调用签名应为 (ws, row, headers)。"
         )
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=row, column=col, value=h)

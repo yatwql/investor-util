@@ -79,8 +79,14 @@ def generate_global_macro(
 
     def _prompt():
         return _build_global_macro_prompt(
-            a_indices, us_indices, total_mv, total_profit, total_cost, categories,
-            sector_flow, competitive_context=competitive_context,
+            a_indices,
+            us_indices,
+            total_mv,
+            total_profit,
+            total_cost,
+            categories,
+            sector_flow,
+            competitive_context=competitive_context,
             holdings_details=holdings_details,
         )
 
@@ -276,26 +282,112 @@ def generate_penetration_deep_analysis(
 # 出现场景：LLM 在分析报告中插入 HTML/CSS 标签、金融术语、英文词汇
 _HALLU_SAFE_WORDS: set[str] = {
     # 已报告误杀（HTML/CSS 标签、英文词汇）
-    "style", "flash", "strong", "font", "size", "color", "token",
-    "qdii", "12px", "100etf",
+    "style",
+    "flash",
+    "strong",
+    "font",
+    "size",
+    "color",
+    "token",
+    "qdii",
+    "12px",
+    "100etf",
     # HTML/CSS 常见属性
-    "width", "height", "align", "border", "margin", "padding",
-    "inline", "solid", "dashed", "dotted", "double", "groove",
-    "ridge", "inset", "outset", "hidden", "visible", "scroll",
+    "width",
+    "height",
+    "align",
+    "border",
+    "margin",
+    "padding",
+    "inline",
+    "solid",
+    "dashed",
+    "dotted",
+    "double",
+    "groove",
+    "ridge",
+    "inset",
+    "outset",
+    "hidden",
+    "visible",
+    "scroll",
     # 金融/经济分析高频词汇
-    "value", "price", "yield", "total", "index", "month", "year",
-    "daily", "weekly", "growth", "level", "range", "trend",
-    "large", "small", "short", "long", "cover", "limit", "order",
-    "trade", "share", "stock", "bond", "fund", "cash", "risk",
-    "rate", "asset", "debt", "equity", "fixed", "float", "clear",
-    "cycle", "light", "dark", "block", "track", "focus",
-    "upper", "lower", "major", "minor", "prime", "core",
-    "delta", "gamma", "theta", "alpha", "beta", "sigma",
-    "rally", "crash", "bulls", "bears", "spike", "split",
+    "value",
+    "price",
+    "yield",
+    "total",
+    "index",
+    "month",
+    "year",
+    "daily",
+    "weekly",
+    "growth",
+    "level",
+    "range",
+    "trend",
+    "large",
+    "small",
+    "short",
+    "long",
+    "cover",
+    "limit",
+    "order",
+    "trade",
+    "share",
+    "stock",
+    "bond",
+    "fund",
+    "cash",
+    "risk",
+    "rate",
+    "asset",
+    "debt",
+    "equity",
+    "fixed",
+    "float",
+    "clear",
+    "cycle",
+    "light",
+    "dark",
+    "block",
+    "track",
+    "focus",
+    "upper",
+    "lower",
+    "major",
+    "minor",
+    "prime",
+    "core",
+    "delta",
+    "gamma",
+    "theta",
+    "alpha",
+    "beta",
+    "sigma",
+    "rally",
+    "crash",
+    "bulls",
+    "bears",
+    "spike",
+    "split",
     # 报告写作常见词
-    "title", "table", "label", "point", "issue", "topic",
-    "chart", "graph", "phase", "stage", "state", "event",
-    "cause", "effect", "basis", "shift", "swing",
+    "title",
+    "table",
+    "label",
+    "point",
+    "issue",
+    "topic",
+    "chart",
+    "graph",
+    "phase",
+    "stage",
+    "state",
+    "event",
+    "cause",
+    "effect",
+    "basis",
+    "shift",
+    "swing",
 }
 
 
@@ -340,13 +432,8 @@ def _filter_hallucinated_codes(
 
     # 使用左边界(^|[^A-Za-z0-9])和右边界([^A-Za-z0-9]|$)替代\b
     # 避免中文环境下\b失效（Python re 视中文字符为\w）
-    found_codes = set(re.findall(r'(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]|$)', text))
-    invalid = {
-        c for c in found_codes
-        if c not in valid_codes
-        and not c.isdigit()
-        and not _is_safe_word(c)
-    }
+    found_codes = set(re.findall(r"(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]|$)", text))
+    invalid = {c for c in found_codes if c not in valid_codes and not c.isdigit() and not _is_safe_word(c)}
 
     if not invalid:
         return text
@@ -356,7 +443,7 @@ def _filter_hallucinated_codes(
     filtered = []
     removed_count = 0
     for line in lines:
-        line_codes = set(re.findall(r'(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]|$)', line))
+        line_codes = set(re.findall(r"(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]|$)", line))
         if line_codes & invalid:
             removed_count += 1
             continue
@@ -364,7 +451,9 @@ def _filter_hallucinated_codes(
 
     logger.info(
         "[debate-hallu] 过滤前 %d 字符，过滤后 %d 字符，移除了 %d 个虚构品种所在行",
-        len(text), len("\n".join(filtered)), removed_count,
+        len(text),
+        len("\n".join(filtered)),
+        removed_count,
     )
     return "\n".join(filtered)
 

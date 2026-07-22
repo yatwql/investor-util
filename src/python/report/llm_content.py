@@ -97,8 +97,8 @@ _THINKING_FONT = Font(
 )
 
 # 匹配事实校验摘要行（run_fact_check 追加到内容尾部）
-_FACT_CHECK_PASS_RE = re.compile(r'✓.*事实校验')  # 通过：✓ 事实校验通过
-_FACT_CHECK_FAIL_RE = re.compile(r'事实校验：.*提示|^⚠ ')  # 告警：事实校验：N/M 项通过，K 项提示 / ⚠ 品种代码
+_FACT_CHECK_PASS_RE = re.compile(r"✓.*事实校验")  # 通过：✓ 事实校验通过
+_FACT_CHECK_FAIL_RE = re.compile(r"事实校验：.*提示|^⚠ ")  # 告警：事实校验：N/M 项通过，K 项提示 / ⚠ 品种代码
 
 # 事实校验字体（与 HTML 报告的 #4a4 / #a40 对应）
 _FACT_CHECK_PASS_FONT = GREEN_FONT

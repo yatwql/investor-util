@@ -143,27 +143,31 @@ def check_liquidity(
             if daily_limit is not None and daily_limit > 0:
                 otc_days = mv / daily_limit
                 tag = "当日可赎回" if otc_days < 1.0 else f"需约{otc_days:.1f}日赎回"
-                results.append({
-                    "code": code,
-                    "name": name,
-                    "market_value": mv,
-                    "type": "otc",
-                    "avg_daily_turnover": None,
-                    "liquidation_days": round(otc_days, 2),
-                    "daily_redemption_limit": daily_limit,
-                    "tag": tag,
-                })
+                results.append(
+                    {
+                        "code": code,
+                        "name": name,
+                        "market_value": mv,
+                        "type": "otc",
+                        "avg_daily_turnover": None,
+                        "liquidation_days": round(otc_days, 2),
+                        "daily_redemption_limit": daily_limit,
+                        "tag": tag,
+                    }
+                )
             else:
-                results.append({
-                    "code": code,
-                    "name": name,
-                    "market_value": mv,
-                    "type": "otc",
-                    "avg_daily_turnover": None,
-                    "liquidation_days": None,
-                    "daily_redemption_limit": None,
-                    "tag": "需手动确认赎回上限",
-                })
+                results.append(
+                    {
+                        "code": code,
+                        "name": name,
+                        "market_value": mv,
+                        "type": "otc",
+                        "avg_daily_turnover": None,
+                        "liquidation_days": None,
+                        "daily_redemption_limit": None,
+                        "tag": "需手动确认赎回上限",
+                    }
+                )
             continue
 
         # 场内品种 → 计算变现天数
@@ -172,19 +176,35 @@ def check_liquidity(
             if avg_turnover is not None and avg_turnover > 0:
                 liq_days = mv / avg_turnover
                 tag = "当日可卖出" if liq_days < _SAME_DAY_THRESHOLD else f"需约{liq_days:.1f}日卖出"
-                results.append({
-                    "code": code,
-                    "name": name,
-                    "market_value": mv,
-                    "type": "stock",
-                    "avg_daily_turnover": round(avg_turnover, 2),
-                    "liquidation_days": round(liq_days, 2),
-                    "tag": tag,
-                })
+                results.append(
+                    {
+                        "code": code,
+                        "name": name,
+                        "market_value": mv,
+                        "type": "stock",
+                        "avg_daily_turnover": round(avg_turnover, 2),
+                        "liquidation_days": round(liq_days, 2),
+                        "tag": tag,
+                    }
+                )
             else:
                 # 数据获取失败 → 默认充足
                 logger.info("[liquidity] %s(%s) 成交额数据缺失，默认流动性充足", name, code)
-                results.append({
+                results.append(
+                    {
+                        "code": code,
+                        "name": name,
+                        "market_value": mv,
+                        "type": "assumed_liquid",
+                        "avg_daily_turnover": None,
+                        "liquidation_days": None,
+                        "tag": "流动性充足（数据缺失）",
+                    }
+                )
+        else:
+            # 港股等其他类型 → 标记为 assumed_liquid
+            results.append(
+                {
                     "code": code,
                     "name": name,
                     "market_value": mv,
@@ -192,17 +212,7 @@ def check_liquidity(
                     "avg_daily_turnover": None,
                     "liquidation_days": None,
                     "tag": "流动性充足（数据缺失）",
-                })
-        else:
-            # 港股等其他类型 → 标记为 assumed_liquid
-            results.append({
-                "code": code,
-                "name": name,
-                "market_value": mv,
-                "type": "assumed_liquid",
-                "avg_daily_turnover": None,
-                "liquidation_days": None,
-                "tag": "流动性充足（数据缺失）",
-            })
+                }
+            )
 
     return results

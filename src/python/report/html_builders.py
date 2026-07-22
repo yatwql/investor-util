@@ -17,7 +17,10 @@ from src.python.report.fund_performance import (
 )
 from src.python.report.market_value import DetailRow
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
+
 logger = logging.getLogger("invest")
+
+
 def _build_category_data(
     holdings: list[Holding],
     details: list[DetailRow],
@@ -39,6 +42,7 @@ def _build_category_data(
     try:
         from src.python.code_utils import is_a_share_code
         from src.python.fetcher.akshare import get_dividend_data
+
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
         dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
         if not dividend_data and stock_codes:
@@ -104,6 +108,8 @@ def _build_category_data(
             }
         )
     return result, dividend_success
+
+
 def _build_single_perf_item(
     idx: int,
     fund: Holding,
@@ -168,6 +174,8 @@ def _build_single_perf_item(
         "rating_tag": rating,
         "rank": rank_str,
     }
+
+
 def _build_perf_data(
     holdings: list[Holding],
     details: list[DetailRow],
@@ -198,6 +206,8 @@ def _build_perf_data(
     else:
         logger.info("基金业绩分析：无基金持仓")
     return result
+
+
 def _parse_return_raw(val: Any) -> float | None:
     """解析收益率原始数值，用于着色判断。
     Args:
@@ -211,6 +221,8 @@ def _parse_return_raw(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
 def _format_return_pct(val: Any) -> str:
     """格式化收益率为百分比字符串（供 HTML 报告使用）。
     天天基金 API 返回的收益率已是百分数（如 5.23 表示 5.23%），

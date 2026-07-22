@@ -10,6 +10,7 @@
   - _build_scenario_block — 情景分析文本块
   - _build_alignment_block — 口径修正文本块
 """
+
 from __future__ import annotations
 
 import logging
@@ -20,7 +21,6 @@ from src.python.code_utils import get_currency_by_code, is_a_share_code, is_hk_s
 from src.python.llm.prompts_core import _fmt_holding_line, _fmt_wan
 
 logger = logging.getLogger("invest")
-
 
 
 def _format_holdings_block(

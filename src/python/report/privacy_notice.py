@@ -12,8 +12,7 @@ logger = logging.getLogger("invest")
 
 # 隐私声明文本
 PRIVACY_NOTICE = (
-    "本报告数据仅供本地处理，所有数据保存在当前设备。"
-    "LLM 请求经由 API 发送到配置的 provider，不会用于训练。"
+    "本报告数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到配置的 provider，不会用于训练。"
 )
 
 # 首次运行标记的配置键

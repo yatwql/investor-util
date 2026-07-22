@@ -6,6 +6,7 @@ _dispatch_llm_workers、generate_all_llm 和 _LLM_CLIENT_SETTINGS。
 ``_MODULE_FNS`` 集中管理所有 LLM 模块的生成函数，确保一致的
 缓存预检、线程池分发和失败处理。新增模块需在此注册。
 """
+
 from __future__ import annotations
 
 import json
@@ -273,7 +274,9 @@ def _dispatch_llm_workers(
 
     # ── 预计算竞争语境文本块 ──
     _competitive_context = _build_competitive_context_block(
-        a_indices, total_mv, total_today_profit,
+        a_indices,
+        total_mv,
+        total_today_profit,
         comparison_indices=comparison_indices,
         history_data=history_data,
         metrics=metrics,
@@ -376,10 +379,17 @@ def _dispatch_llm_workers(
             """辩论包装闭包：pro→con→synthesis，两级 fallback。"""
             try:
                 _result = generate_debate_procon(
-                    total_mv, total_cost, total_profit, total_today_profit,
-                    holdings_count, categories, penetrated_assets,
+                    total_mv,
+                    total_cost,
+                    total_profit,
+                    total_today_profit,
+                    holdings_count,
+                    categories,
+                    penetrated_assets,
                     holdings_details=holdings_details,
-                    force=force, http_client=c, llm_config=lc,
+                    force=force,
+                    http_client=c,
+                    llm_config=lc,
                     pipeline_data=pipeline_data,
                     competitive_context=_competitive_context,
                     metrics=_metrics,
@@ -670,11 +680,16 @@ def generate_all_llm(
             _penetrated_codes.update(_codes)
 
     if holdings_details and any(r is not None for r in (gm_r, er_r, hc_r, pd_r)):
-        for _mk, _result in [("global_macro", gm_r), ("expert_review", er_r),
-                             ("health_check", hc_r), ("penetration_deep", pd_r)]:
+        for _mk, _result in [
+            ("global_macro", gm_r),
+            ("expert_review", er_r),
+            ("health_check", hc_r),
+            ("penetration_deep", pd_r),
+        ]:
             if _result:
                 _summary = run_fact_check(
-                    _result, holdings_details,
+                    _result,
+                    holdings_details,
                     module_label=_module_labels.get(_mk, _mk),
                     extra_valid_codes=_penetrated_codes if _mk == "penetration_deep" else None,
                     is_penetration_module=_mk == "penetration_deep",

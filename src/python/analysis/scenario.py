@@ -97,19 +97,21 @@ def scenario_analysis(
 
     for market_chg in _MARKET_SCENARIOS:
         if not has_data or beta is None:
-            scenarios.append({
-                "market_change": market_chg,
-                "expected_change_pct": None,
-                "expected_change_amt": None,
-                "ci_lower_pct": None,
-                "ci_upper_pct": None,
-                "ci_lower_amt": None,
-                "ci_upper_amt": None,
-                "vol_1sigma_pct": None,
-                "vol_1sigma_upper_pct": None,
-                "vol_2sigma_pct": None,
-                "vol_2sigma_upper_pct": None,
-            })
+            scenarios.append(
+                {
+                    "market_change": market_chg,
+                    "expected_change_pct": None,
+                    "expected_change_amt": None,
+                    "ci_lower_pct": None,
+                    "ci_upper_pct": None,
+                    "ci_lower_amt": None,
+                    "ci_upper_amt": None,
+                    "vol_1sigma_pct": None,
+                    "vol_1sigma_upper_pct": None,
+                    "vol_2sigma_pct": None,
+                    "vol_2sigma_upper_pct": None,
+                }
+            )
             continue
 
         expected_pct = beta * market_chg
@@ -144,19 +146,21 @@ def scenario_analysis(
             vol_2sigma_pct = expected_pct - 2.0 * se_pct
             vol_2sigma_upper_pct = expected_pct + 2.0 * se_pct
 
-        scenarios.append({
-            "market_change": market_chg,
-            "expected_change_pct": round(expected_pct, 4),
-            "expected_change_amt": round(expected_amt, 2),
-            "ci_lower_pct": round(ci_lower_pct, 4) if ci_lower_pct is not None else None,
-            "ci_upper_pct": round(ci_upper_pct, 4) if ci_upper_pct is not None else None,
-            "ci_lower_amt": round(ci_lower_amt, 2) if ci_lower_amt is not None else None,
-            "ci_upper_amt": round(ci_upper_amt, 2) if ci_upper_amt is not None else None,
-            "vol_1sigma_pct": round(vol_1sigma_pct, 4) if vol_1sigma_pct is not None else None,
-            "vol_1sigma_upper_pct": round(vol_1sigma_upper_pct, 4) if vol_1sigma_upper_pct is not None else None,
-            "vol_2sigma_pct": round(vol_2sigma_pct, 4) if vol_2sigma_pct is not None else None,
-            "vol_2sigma_upper_pct": round(vol_2sigma_upper_pct, 4) if vol_2sigma_upper_pct is not None else None,
-        })
+        scenarios.append(
+            {
+                "market_change": market_chg,
+                "expected_change_pct": round(expected_pct, 4),
+                "expected_change_amt": round(expected_amt, 2),
+                "ci_lower_pct": round(ci_lower_pct, 4) if ci_lower_pct is not None else None,
+                "ci_upper_pct": round(ci_upper_pct, 4) if ci_upper_pct is not None else None,
+                "ci_lower_amt": round(ci_lower_amt, 2) if ci_lower_amt is not None else None,
+                "ci_upper_amt": round(ci_upper_amt, 2) if ci_upper_amt is not None else None,
+                "vol_1sigma_pct": round(vol_1sigma_pct, 4) if vol_1sigma_pct is not None else None,
+                "vol_1sigma_upper_pct": round(vol_1sigma_upper_pct, 4) if vol_1sigma_upper_pct is not None else None,
+                "vol_2sigma_pct": round(vol_2sigma_pct, 4) if vol_2sigma_pct is not None else None,
+                "vol_2sigma_upper_pct": round(vol_2sigma_upper_pct, 4) if vol_2sigma_upper_pct is not None else None,
+            }
+        )
 
     return {
         "has_data": has_data,
@@ -268,8 +272,12 @@ def fx_scenario_analysis(
             "has_data": False,
             "foreign_exposure_pct": None,
             "scenarios": [
-                {"fx_change": fx, "label": "人民币升值" if fx < 0 else "人民币贬值",
-                 "impact_pct": None, "impact_amt": None}
+                {
+                    "fx_change": fx,
+                    "label": "人民币升值" if fx < 0 else "人民币贬值",
+                    "impact_pct": None,
+                    "impact_amt": None,
+                }
                 for fx in _FX_SCENARIOS
             ],
             "warning": "外汇敞口数据不足，无法评估汇率变动影响",
@@ -281,12 +289,14 @@ def fx_scenario_analysis(
         label = "人民币升值" if fx_chg < 0 else "人民币贬值"
         impact_pct = foreign_exposure_pct * fx_chg
         impact_amt = total_mv * impact_pct
-        scenarios.append({
-            "fx_change": fx_chg,
-            "label": label,
-            "impact_pct": round(impact_pct, 4),
-            "impact_amt": round(impact_amt, 2),
-        })
+        scenarios.append(
+            {
+                "fx_change": fx_chg,
+                "label": label,
+                "impact_pct": round(impact_pct, 4),
+                "impact_amt": round(impact_amt, 2),
+            }
+        )
 
     warning = None
     if foreign_exposure_pct < 0.05:
@@ -343,7 +353,7 @@ def sharpe_ci_propagation(
         }
 
     # 标准误近似：Lo (2002) 方法
-    se = math.sqrt((1.0 + 0.5 * sharpe_ratio ** 2) / n_observations) if n_observations > 0 else 1.0
+    se = math.sqrt((1.0 + 0.5 * sharpe_ratio**2) / n_observations) if n_observations > 0 else 1.0
     ci_half = 1.96 * se  # 95% CI
     ci_lower = sharpe_ratio - ci_half
     ci_upper = sharpe_ratio + ci_half

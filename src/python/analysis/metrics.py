@@ -178,9 +178,7 @@ def sharpe_ratio(
     # 计算日收益率标准差
     if len(portfolio_daily_returns) < 2:
         return None
-    variance = sum((r - mean_daily_return) ** 2 for r in portfolio_daily_returns) / (
-        len(portfolio_daily_returns) - 1
-    )
+    variance = sum((r - mean_daily_return) ** 2 for r in portfolio_daily_returns) / (len(portfolio_daily_returns) - 1)
     if variance == 0:
         return None  # 波动率为零 → 夏普无意义
     daily_vol = math.sqrt(variance)
@@ -640,14 +638,46 @@ def _t_critical_95(df: int) -> float:
     """
     # 预计算临界值表（双尾 α=0.05）
     _T95_TABLE: dict[int, float] = {
-        1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571,
-        6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
-        11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131,
-        16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
-        21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060,
-        26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042,
-        35: 2.030, 40: 2.021, 45: 2.014, 50: 2.009, 60: 2.000,
-        70: 1.994, 80: 1.990, 90: 1.987, 100: 1.984, 120: 1.980,
+        1: 12.706,
+        2: 4.303,
+        3: 3.182,
+        4: 2.776,
+        5: 2.571,
+        6: 2.447,
+        7: 2.365,
+        8: 2.306,
+        9: 2.262,
+        10: 2.228,
+        11: 2.201,
+        12: 2.179,
+        13: 2.160,
+        14: 2.145,
+        15: 2.131,
+        16: 2.120,
+        17: 2.110,
+        18: 2.101,
+        19: 2.093,
+        20: 2.086,
+        21: 2.080,
+        22: 2.074,
+        23: 2.069,
+        24: 2.064,
+        25: 2.060,
+        26: 2.056,
+        27: 2.052,
+        28: 2.048,
+        29: 2.045,
+        30: 2.042,
+        35: 2.030,
+        40: 2.021,
+        45: 2.014,
+        50: 2.009,
+        60: 2.000,
+        70: 1.994,
+        80: 1.990,
+        90: 1.987,
+        100: 1.984,
+        120: 1.980,
     }
 
     if df in _T95_TABLE:
@@ -788,18 +818,38 @@ def portfolio_beta_analysis(
 
     se_result = _beta_se(portfolio_returns, benchmark_returns, beta)
     if se_result is None:
-        return {"beta": beta, "ci_lower": None, "ci_upper": None,
-                "t_stat": None, "p_value": None, "reliable": False, "df": 0}
+        return {
+            "beta": beta,
+            "ci_lower": None,
+            "ci_upper": None,
+            "t_stat": None,
+            "p_value": None,
+            "reliable": False,
+            "df": 0,
+        }
 
     se, df = se_result
     if se <= 0:
         if beta is not None and se == 0.0:
             # 完美预测：t 统计量无穷大，CI 为零宽度
-            return {"beta": sanitize_metric(beta), "ci_lower": sanitize_metric(beta),
-                    "ci_upper": sanitize_metric(beta), "t_stat": None,
-                    "p_value": 0.0, "reliable": True, "df": df}
-        return {"beta": beta, "ci_lower": None, "ci_upper": None,
-                "t_stat": None, "p_value": None, "reliable": False, "df": df}
+            return {
+                "beta": sanitize_metric(beta),
+                "ci_lower": sanitize_metric(beta),
+                "ci_upper": sanitize_metric(beta),
+                "t_stat": None,
+                "p_value": 0.0,
+                "reliable": True,
+                "df": df,
+            }
+        return {
+            "beta": beta,
+            "ci_lower": None,
+            "ci_upper": None,
+            "t_stat": None,
+            "p_value": None,
+            "reliable": False,
+            "df": df,
+        }
 
     t_stat = beta / se if se > 0 else None
     p_value = _t_cdf(-abs(t_stat), df) * 2 if t_stat is not None else None
@@ -870,17 +920,17 @@ def compute_all_metrics(
     confidence = get_confidence_level(portfolio_daily_returns)
     data_sufficient = confidence != "insufficient"
 
-    #01 夏普比率
+    # 01 夏普比率
     sharpe_val = None
     if data_sufficient:
         sharpe_val = sharpe_ratio(portfolio_daily_returns, rf_annual)
 
-    #02 卡玛比率
+    # 02 卡玛比率
     calmar_val = None
     if data_sufficient:
         calmar_val = calmar_ratio(portfolio_daily_returns)
 
-    #03 HHI
+    # 03 HHI
     hhi_val = None
     hhi_equiv = None
     if portfolio_weights:
@@ -888,18 +938,18 @@ def compute_all_metrics(
         if hhi_val and hhi_val > 0:
             hhi_equiv = round(1.0 / hhi_val, 1)
 
-    #04 胜率
+    # 04 胜率
     wr_result = win_rate(holdings_details or [])
 
-    #05 换手率
+    # 05 换手率
     turnover_val = None
     if holdings_before is not None and holdings_after is not None:
         turnover_val = turnover_rate(holdings_before, holdings_after)
 
-    #10 个股波动率
+    # 10 个股波动率
     ind_vol = individual_vols or None
 
-    #11a 组合 Beta
+    # 11a 组合 Beta
     beta_val = None
     beta_conf = "insufficient"
     beta_analysis = None
@@ -908,7 +958,7 @@ def compute_all_metrics(
         beta_conf = get_confidence_level(portfolio_daily_returns)
         beta_analysis = portfolio_beta_analysis(portfolio_daily_returns, benchmark_daily_returns)
 
-    #06 风险贡献
+    # 06 风险贡献
     rc_result: list[dict] = []
     if portfolio_weights and individual_vols:
         vol_list: list[float] = []

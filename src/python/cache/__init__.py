@@ -1,5 +1,4 @@
-"""缓存引擎子包 — 提供 get/set/clear 及 TTL 管理等统一接口。
-"""
+"""缓存引擎子包 — 提供 get/set/clear 及 TTL 管理等统一接口。"""
 
 import logging
 

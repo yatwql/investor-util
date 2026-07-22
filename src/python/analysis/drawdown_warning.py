@@ -151,10 +151,7 @@ def compute_drawdown_warning(
             "alert_level": str,            # "normal" / "warning" / "critical"
         }
     """
-    drawdown_series = [
-        b.get("drawdown_pct", 0) or 0
-        for b in bars
-    ]
+    drawdown_series = [b.get("drawdown_pct", 0) or 0 for b in bars]
     if not drawdown_series:
         return {
             "name": name,

@@ -86,11 +86,7 @@ def log_experimental_features() -> None:
     在 main() 中调用（TUI/CLI 均在 ``init_config()`` 之后调用此函数）。
     通过 ``logger.error()`` 输出以触发 ``_ColoredFormatter`` 的红色着色。
     """
-    enabled = [
-        (name, desc)
-        for flag, (name, desc) in EXPERIMENTAL_FEATURES.items()
-        if is_feature_enabled(flag)
-    ]
+    enabled = [(name, desc) for flag, (name, desc) in EXPERIMENTAL_FEATURES.items() if is_feature_enabled(flag)]
     if not enabled:
         return
 

@@ -471,8 +471,7 @@ def _render_llm_content_section(
     # 后传入 write_html_report()，enable_llm=True 时 llm_content 不应为 None。
     # 保留此函数签名仅用于兼容，直接返回空值并记录告警。
     logger.warning(
-        "_render_llm_content_section: llm_content 未预生成（enable_llm=True），"
-        "LLM 内容应通过 orchestrator 预生成后传入"
+        "_render_llm_content_section: llm_content 未预生成（enable_llm=True），LLM 内容应通过 orchestrator 预生成后传入"
     )
     return False, None, None, None, None
 

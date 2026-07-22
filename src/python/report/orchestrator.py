@@ -709,8 +709,19 @@ def _generate_report_full(
     prep = prepare_report_data(holdings, reporter, config)
     # [checkpoint] prep 类型断言
     assert isinstance(prep, dict), "prepare_report_data 返回类型异常"
-    for _ck in ("total_mv", "total_cost", "total_profit", "total_today_profit", "categories",
-                 "a_indices", "holdings_details", "today_str", "output_dir", "news_top_count", "risk_metrics"):
+    for _ck in (
+        "total_mv",
+        "total_cost",
+        "total_profit",
+        "total_today_profit",
+        "categories",
+        "a_indices",
+        "holdings_details",
+        "today_str",
+        "output_dir",
+        "news_top_count",
+        "risk_metrics",
+    ):
         if _ck not in prep:
             logger.warning("[checkpoint] prep 缺失必选键: %s", _ck)
         elif not isinstance(prep.get(_ck), (int, float, dict, list, str, type(None))):
@@ -758,11 +769,11 @@ def _generate_report_full(
             _total_mv = prep.get("total_mv", 0)
 
             # 组合市值权重
-            _portfolio_weights = (
-                [h["market_value"] / _total_mv for h in _holdings_details
-                 if _total_mv > 0 and h.get("market_value", 0) > 0]
-                or None
-            )
+            _portfolio_weights = [
+                h["market_value"] / _total_mv
+                for h in _holdings_details
+                if _total_mv > 0 and h.get("market_value", 0) > 0
+            ] or None
 
             # 全量量化指标（14 项：夏普/卡玛/HHI/胜率/换手率/Beta CI/风险贡献）
             _metrics = compute_all_metrics(

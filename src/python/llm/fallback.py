@@ -72,9 +72,7 @@ def get_placeholder_text(module_key: str, timestamp: str | None = None) -> str:
     ts = timestamp or datetime.now().strftime("%Y-%m-%d %H:%M")
     template = _PLACEHOLDER_TEXT.get(module_key, "")
     if not template:
-        return (
-            f"<p>⚠️ {module_key} 内容暂不可用（数据获取时间：{ts}）</p>"
-        )
+        return f"<p>⚠️ {module_key} 内容暂不可用（数据获取时间：{ts}）</p>"
     return template.format(timestamp=ts)
 
 
@@ -119,8 +117,6 @@ def build_fallback_llm_content(
     if force or is_all_llm_failed(llm_content):
         # 全部失败 → 全部使用占位文本
         ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-        return tuple(
-            get_placeholder_text(key, timestamp=ts) for key in _MODULE_KEYS
-        )
+        return tuple(get_placeholder_text(key, timestamp=ts) for key in _MODULE_KEYS)
 
     return llm_content
