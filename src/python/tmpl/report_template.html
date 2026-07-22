@@ -1333,11 +1333,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {# 辩论模式：显示白脸/黑脸/综合三段 #}
             <div class="debate-block debate-pro">
                 <div class="debate-label">👍 白脸观点（持有理由）</div>
-                <div class="debate-content">{{ debate_info.pro_text }}</div>
+                <div class="debate-content">{{ debate_info.pro_text | safe }}</div>
             </div>
             <div class="debate-block debate-con">
                 <div class="debate-label">👎 黑脸观点（卖出理由）</div>
-                <div class="debate-content">{{ debate_info.con_text }}</div>
+                <div class="debate-content">{{ debate_info.con_text | safe }}</div>
             </div>
             <div class="debate-block debate-synthesis">
                 <div class="debate-label">⚖️ 综合权衡</div>

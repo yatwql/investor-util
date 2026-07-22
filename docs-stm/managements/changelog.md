@@ -6,6 +6,9 @@
 
 ## [0.8.3-dev] - 未发布
 
+### Fixed
+- **辩论模式 HTML 报告编码错误**：`report_template.html` 中辩论白脸（pro_text）和黑脸（con_text）的 Jinja2 模板变量缺少 `| safe` 过滤器，导致 LLM 返回的 HTML 内容被转义为文本源码显示。综合权衡段（`expert_review`）已有 `| safe`，不受影响
+
 ## [0.8.2] - 2026-07-22
 
 ### Fixed
