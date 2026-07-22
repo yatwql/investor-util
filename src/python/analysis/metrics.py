@@ -179,7 +179,9 @@ def sharpe_ratio(
     if len(portfolio_daily_returns) < 2:
         return None
     variance = sum((r - mean_daily_return) ** 2 for r in portfolio_daily_returns) / (len(portfolio_daily_returns) - 1)
-    if variance == 0:
+    # 使用 epsilon 容差避免 Linux/Windows 浮点精度差异
+    _VARIANCE_EPSILON = 1e-15
+    if variance < _VARIANCE_EPSILON:
         return None  # 波动率为零 → 夏普无意义
     daily_vol = math.sqrt(variance)
 
@@ -511,7 +513,9 @@ def individual_volatility(
 
         mean_r = sum(returns) / len(returns)
         variance = sum((r - mean_r) ** 2 for r in returns) / (len(returns) - 1)
-        if variance == 0:
+        # 使用 epsilon 容差避免 Linux/Windows 浮点精度差异
+        _VAR_EPS = 1e-15
+        if variance < _VAR_EPS:
             result[code] = 0.0
             continue
 

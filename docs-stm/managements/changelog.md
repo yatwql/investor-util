@@ -7,6 +7,8 @@
 ## [0.8.4-dev] - 未发布
 
 ### Fixed
+- **`metrics.py` 零方差浮点精度（Linux CI）**：`sharpe_ratio()` 和 `individual_volatility()` 使用 `variance == 0` 精确比较，但 Linux 上 `[0.001]*252` 的方差计算因浮点精度返回 `~6.8e-41` 而非 0，导致夏普返回天文数字而非 None、波动率返回 `1e-17` 而非 0.0 — 改为 `< 1e-15` epsilon 容差
+- **`test_fund.py` threading.Lock 类型检查兼容**：Python 3.10 某些平台上 `threading.Lock` 在 `isinstance()` 中非 type 类型 — 改用 `type(threading.Lock())` 动态获取实际类型
 - **`llm_hallucination_sampler.py` 中文引号语法错误**：第 324 行中文引号误用 ASCII 双引号，导致 Python 3.10 下 SyntaxError（ruff 强于本地版本检测到），CI 回归测试失败 — 改用单引号包裹字符串
 - **`fallback.py` 占位文本缺字**：智囊团深度复盘降级占位文本缺少"成"字（"无法生"→"无法生成"），已补回
 - **`handlers_config.py` 辩论模式说明缺字**：辩论模式启用说明中"智囊团复盘"缺少"深度"二字，正文为"智囊团深度复盘"

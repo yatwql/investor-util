@@ -75,7 +75,8 @@ class TestGetBenchmarkLock(unittest.TestCase):
     def test_creates_lock_on_first_access(self):
         """首次访问创建新锁。"""
         lock = _get_benchmark_lock("123456")
-        self.assertIsInstance(lock, threading.Lock)
+        # 跨 Python 版本兼容检查：type(threading.Lock()) 而非 threading.Lock（3.10 平台差异）
+        self.assertIsInstance(lock, type(threading.Lock()))
 
     def test_reuses_existing_lock(self):
         """同一 code 返回同一锁对象。"""
