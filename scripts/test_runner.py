@@ -745,11 +745,15 @@ def _run_phased(
             ):
                 print(f"      {stripped}")
 
-        # 阶段失败时打印全部输出到 stderr（GitHub Actions 日志可捕获）
+        # 阶段失败时保存完整输到调试文件（可在 CI artifact 中查看）
         if proc.returncode != 0:
-            print(f"      [Phase {tag}] --- 完整输出（{len(output.splitlines())} 行）---", file=sys.stderr)
-            for ln in output.splitlines():
-                print(f"      |{ln}", file=sys.stderr)
+            debug_path = os.path.join(_LATEST_DIR, mode_key, f"phase_{tag}_debug.log")
+            try:
+                with open(debug_path, "w", encoding="utf-8") as df:
+                    df.write(output)
+                print(f"      [Phase {tag}] 详细日志已保存: {debug_path}")
+            except Exception:
+                pass
 
         ok = proc.returncode == 0
         tag2 = "OK" if ok else "ERR"

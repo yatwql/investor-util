@@ -45,6 +45,14 @@ jobs:
         if: github.ref_name == 'master' || github.event_name == 'pull_request'
         run: python scripts/test_runner.py --mode verify --phased
 
+      - name: 上传测试报告（含调试日志）
+        if: always() && github.ref_name == 'master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.python-version }}
+          path: test-reports/latest/
+          retention-days: 3
+
       - name: P2 — 全量测试（版本发布门禁）
         if: startsWith(github.ref, 'refs/tags/v')
         run: python scripts/test_runner.py --mode all --no-timeout  # 禁用超时，避免大套件意外截断
