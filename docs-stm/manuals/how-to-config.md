@@ -480,7 +480,7 @@ F1 持仓快照（见 §G）与此配置无关，始终自动执行。
 | `anonymizer` | false | 匿名化功能总开关（关闭后强制 off）；具体模式通过 config.json 的 anonymization.mode 设置 |
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
 
-> 完整开关清单及说明见 [需求文档 §11.5](../managements/requirements.md#115-featuresjson功能开关注册表)。
+> 以上为主要功能开关速查。完整清单（含所有子开关名、默认值及说明）以 `data/config/features.json` 文件中的注释为准，可直接查看该文件。
 > 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---
