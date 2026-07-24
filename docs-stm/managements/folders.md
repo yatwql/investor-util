@@ -362,12 +362,8 @@ investor-util/
 │       │   ├── test_debate_pipeline.py    #   辩论多轮对话管线集成测试
 │       │   ├── test_integration_coverage.py # 集成测试覆盖率校验
 │       │   └── test_news_pipeline_edge.py   # 新闻管线边缘场景集成测试
-│       ├── scenario/                 #   场景测试（basic/resilience/llm/datetime 四子组）
+│       ├── scenario/                 #   场景测试（basic/datetime/llm/perf/resilience/security 六子组）
 │       │   ├── __init__.py           #   子包标记
-│       │   ├── test_chain_resilience.py   #   数据链弹性场景测试
-│       │   ├── test_e2e_perf.py           #   端到端性能场景测试
-│       │   ├── test_llm_hallucination.py  #   LLM 幻觉率采样场景测试
-│       │   ├── test_security.py           #   安全场景测试
 │       │   ├── basic/               #   基本面场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_integration.py             #   集成场景测试
@@ -383,11 +379,19 @@ investor-util/
 │       │   │   └── test_datetime_scenarios.py #   日期时间场景测试
 │       │   ├── llm/                 #   LLM 场景测试
 │       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_llm_hallucination.py  #   LLM 幻觉率采样场景测试
 │       │   │   └── test_llm_scenarios.py #   LLM 场景测试
-│       │   └── resilience/          #   弹性场景测试
+│       │   ├── perf/                #   性能场景测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   └── test_e2e_perf.py #   端到端性能场景测试
+│       │   ├── resilience/          #   弹性场景测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_chain_resilience.py   #   数据链弹性场景测试
+│       │   │   ├── test_integration_scenarios.py #   集成弹性场景测试
+│       │   │   └── test_scenario_extreme.py      #   极端场景测试
+│       │   └── security/            #   安全场景测试
 │       │       ├── __init__.py      #       子包标记
-│       │       ├── test_integration_scenarios.py #   集成弹性场景测试
-│       │       └── test_scenario_extreme.py      #   极端场景测试
+│       │       └── test_security.py #   安全场景测试
 │       ├── test_cli.py               #   CLI 命令行模式单元测试
 │       ├── test_cli_edge.py          #   CLI 边缘场景测试
 │       ├── test_cli_integration.py   #   CLI 集成测试
