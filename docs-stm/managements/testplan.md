@@ -78,7 +78,7 @@
 | `scenario/basic/test_scenario_penetration.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
 | `scenario/basic/test_scenario_section_order.py` | C-P1b | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
-| `scenario/test_llm_hallucination.py` | P4‑08 | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
+| `scenario/llm/test_llm_hallucination.py` | P4‑08 | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
 
 **业务场景规格（S0a-S0d、S1-S34、T1-T21）：**
 
