@@ -11,7 +11,7 @@
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：`src/test/test_*.py`，执行 `pytest src/test/`
-  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode regression`（业务场景快速验证），否则不得 commit
+  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode dev-verify`（核心单元+基础场景快速验证），否则不得 commit
   - **合入门禁（P1）**：合并到 master 前必须通过 `python scripts/test_runner.py --mode verify`（核心模块单元测试），否则不得 merge
   - **发布门禁（P2）**：发布版本前必须通过 `python scripts/test_runner.py --mode verify,regression`（单元+场景验证），否则不得 release
 - **CI 辅助检查**：`ruff format --check`（代码格式一致性），非阻塞门禁——格式问题可通过 `ruff format` 自动修复，不阻止合并/发布
@@ -22,9 +22,9 @@
 - **新增测试隔离要求**：
   - **单例状态重置**：新增模块级单例（如 `get_tracker()`）时，**必须**在 conftest.py 中增加 `autouse` fixture 重置该单例（参考 `_auto_reset_provider_registry` 模式），避免测试间状态污染
   - **持久化文件隔离**：新增任何持久化状态文件（`circuit_breaker.json`、`metrics_breaker.json`、`rebalance_silence.json` 等）时，**必须**在 `_isolate_sensitive_paths` fixture 中增加 `monkeypatch.setattr` 将该文件路径重定向到 `tmp_path`，不得依赖测试自行清理
-  - **输出目录隔离**：集成测试（如 P1-16、P2-14-B 等触发报告生成管线的测试）**必须**将 `output_dir`/`reports/` 重定向到临时目录，避免测试产物残留在真实报告目录
+  - **输出目录隔离**：管线集成测试（如 `test_pipeline_smoke.py`、`test_pipeline_metrics_injection.py` 等触发报告生成管线的测试）**必须**将 `output_dir`/`reports/` 重定向到临时目录，避免测试产物残留在真实报告目录
   - **LLM 调用 mock 强制**：任何触发 `generate_all_llm()` 或 `call_llm()` 的测试**必须** mock LLM API 调用（使用 `unittest.mock.patch` 或 `monkeypatch`），禁止真实调用（防费用、防 API 依赖、防测试不稳定）
-  - **输入数据隔离**：管线集成测试（P1-16、P2-14-B）**不得**依赖真实持仓文件，必须使用 fixture 构造最小持仓（2-5 品种）或 mock 持仓数据。`data/holdings/` 的真实文件在测试中应视为只读
+  - **输入数据隔离**：管线集成测试（同上——`test_pipeline_smoke.py`、`test_pipeline_metrics_injection.py` 等）**不得**依赖真实持仓文件，必须使用 fixture 构造最小持仓（2-5 品种）或 mock 持仓数据。`data/holdings/` 的真实文件在测试中应视为只读
   - **C12 边缘文件隔离**：极端值/异常场景测试（如 `test_liquidity_edge.py`、`test_liquidity_otc_edge.py`）**必须**使用 `@pytest.mark.edge` 标记并放入 `*_edge.py` 文件，conftest.py 的 `pytest_collection_modifyitems` 会自动校验
 - **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
@@ -46,7 +46,7 @@
 - **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
 - **开发版本切换**：发布版本并打 tag 后，**立即**将 `APP_VERSION` 和所有管理文档版本头改为**下一个版本的 `-dev`**（如发布 v0.6.8 后即改为 v0.6.9-dev），运行 `check-version-consistency.py` 验证全链 [OK] 后提交，然后继续开发。开发期间版本号始终标识为下一个预期发布版本的 `-dev`。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功，绿色）、`[!]`（部分失败/告警，黄色）、`[ERR]`（错误，红色）。终端不支持颜色时自动降级。
-- **架构遵从**：所有模块必须遵守 `docs-stm/managements/technical.md` 中 **`## 架构设计约束`**（第 2240 行起，表格清晰含 C1~C19 的设计目的/违反后果/适用范围）和 **`## 概要设计--核心架构决策`**（第 220 行起，含数据降级治理体系等补充说明）。**优先对照 `## 架构设计约束` 的表格逐条自检**——表格更完整（19 条约束 vs. 概要设计仅 5 项），且每项附带"违反后果"便于判断违规与否。当涉及数据降级/熔断相关逻辑时，需额外参考 `## 概要设计--核心架构决策` 的 1.4.5 节理解双重降级治理体系设计意图。新增/修改代码不得违反。
+- **架构遵从**：所有模块必须遵守 `docs-stm/managements/technical.md` 中 `## 架构设计约束`（表格含 C1~C19 的设计目的/违反后果/适用范围）和 `## 概要设计--核心架构决策`（含数据降级治理体系补充说明）。**优先对照架构设计约束的表格逐条自检**——表格更完整（19 条约束 vs. 概要设计仅 5 项），且每项附带违反后果便于判断违规与否。当涉及数据降级/熔断相关逻辑时，需额外参考概要设计 1.4.5 节理解双重降级治理体系设计意图。新增/修改代码不得违反。
 
 ## 持仓文件格式
 

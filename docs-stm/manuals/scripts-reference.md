@@ -31,7 +31,7 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 python scripts/test_runner.py --help
 
 # 日常提交前门禁（P0）
-python scripts/test_runner.py --mode regression
+python scripts/test_runner.py --mode dev-verify
 
 # 合入门禁（P1）
 python scripts/test_runner.py --mode verify
