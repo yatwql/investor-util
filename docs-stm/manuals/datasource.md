@@ -15,13 +15,17 @@
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `profit_forecast_` | 基础类 |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `sector_flow_` | 基础类 |
 | 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `dividend_` | 基础类 |
-| 无风险利率（Rf） | akshare `bond_zh_us_rate`（国债收益率） | config.json 手动配置兜底 | `bond_yield_rf` | 基础类 |
+| 无风险利率（Rf） | akshare `bond_zh_us_rate`（国债收益率） | config.json 手动配置兜底 | `bond_yield_rf`¹ | 基础类 |
 | 财经新闻（5 源聚合） | 新浪 + 东方财富 + 财联社 + 华尔街见闻 + akshare 并行获取，统一聚合去重 | — | `news_` | 基础类 |
 | 股票/ETF 历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 | `history_stock_` | 历史走势 |
 | 场外基金历史净值 | 天天基金 `pingzhongdata/{code}.js` | 东方财富 `api.fund.eastmoney.com/f10/lsjz`（分页获取） | `history_fund_otc_` | 历史走势 |
 | 指数历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 | `history_index_` | 历史走势 |
+| 持仓重合度 | 在线计算（基于持仓基金前 10 大重仓股的 Jaccard 相似度） | — | `fund_overlap_` | 基础类 |
+| 基金风格扩展数据（市值/PE） | 东方财富 + 天天基金（基金持仓市值风格 + 市盈率/市净率数据） | — | `extended_` | 基础类 |
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。
+> ¹ `bond_yield_rf` 为精确缓存键名（`exact_cache_keys`），非前缀匹配，单独管理。
+> 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数纯 `exact_cache_keys` 模块（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`），无缓存前缀，不受常规缓存清理影响。
 > **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。历史走势类不受菜单缓存命令影响，仅按 TTL 过期。
 
 ### LLM 模块缓存

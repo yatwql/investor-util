@@ -15,6 +15,8 @@
 
 ### Docs
 - **门禁文档同步**：CLAUDE.md、how-to-test-my-code.md（10 处）、testplan.md、test-coverage.md（verify 项数 2180→~1022）、scripts-reference.md（4 处）– 与 verify 瘦身/P2 优化对齐
+- **目录树全量同步**：`folders.md` — 更新统计（源码 143→144、测试 177→185、用例 3616→3760、文档 73→81）；展开测试子组完整目录树（unit 含 9 子组、integration、scenario 含 4 子组、data/hallucination 数据集）；补充 `_validation.py`、`__init__.py`、`.github/workflows/ci.yml`、`pytest.ini`、`reason.bat` 等新文件；清理冗余版本描述
+- **数据源文档补充**：`datasource.md` — 新增"持仓重合度"(`fund_overlap_`)和"基金风格扩展数据"(`extended_`)两条数据源；`bond_yield_rf` 标注精确缓存键脚注；补充 exact_cache_keys 仅模块说明
 
 ---
 
