@@ -43,7 +43,7 @@
 | **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 177 |
 | **分析计算** | `analysis/`(liquidity, rebalance, fx_exposure, bond_yield) | `unit/analysis/test_{liquidity,rebalance,bond_yield,fx_exposure}*.py` | 162 |
 | **TUI 交互** | `tui*.py`, `handlers.py`, `main.py` | `unit/ui/test_{handlers,tui,tui_handlers,tui_menu,log_sanitize}.py` | 164 |
-| **CLI 命令行模式** | `cli.py`, `report/cli_progress.py` | `test_cli.py` + `test_cli_edge.py` + `test_cli_integration.py` | 48 |
+| **CLI 命令行模式** | `cli.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py` + `integration/test_cli_integration.py` | 48 |
 | **命令处理器** | `handlers_cache.py`, `handlers_report.py` | `unit/handlers/test_{handlers_cache,handlers_report}.py` | 31 |
 | **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组 12 文件) | 238 |
 
@@ -85,7 +85,7 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 10 子组合计 | **3375** |
+| `unit`（父标记） | 11 子组合计 | **3375** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 191 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 204 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪） | 660 |
@@ -94,6 +94,7 @@
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 177 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/缓存命令处理器/报告命令处理器；含注册表测试） | 559 |
 | ├─ `unit_analysis` | 分析计算（流动性/再平衡/汇率/无风险利率） | 162 |
+| ├─ `unit_cli` | CLI 命令行模式（参数解析/路由/退出码/日志） | 40 |
 | └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 158 |
 
 ### 跨类标记

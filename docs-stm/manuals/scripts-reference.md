@@ -67,8 +67,8 @@ python scripts/test_runner.py --mode unit --coverage
 | `data` | `data` | ~10s |
 | `scenario` | `scenario` | ~6min |
 | `integration` | `integration` | ~50s |
-| `verify` | `scenario or unit_core or unit_providers or unit_fetcher` | ~8min |
-| `dev-verify` | `unit or smoke` | ~1min |
+| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis` | ~1min |
+| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)` | ~1min |
 | `all` | （无过滤，全量） | ~10min |
 | `all_no_unit` | `not unit` | ~7min |
 | `report` | `unit_report` | ~15s |

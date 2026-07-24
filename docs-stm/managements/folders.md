@@ -398,10 +398,6 @@ investor-util/
 │       │   └── security/            #   安全场景测试
 │       │       ├── __init__.py      #       子包标记
 │       │       └── test_security.py #   安全场景测试
-│       ├── test_cli.py               #   CLI 命令行模式单元测试
-│       ├── test_cli_edge.py          #   CLI 边缘场景测试
-│       ├── test_cli_integration.py   #   CLI 集成测试
-│       └── test_orchestrator.py      #   报告编排器单元测试
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     #   持仓 xlsx 文件（用户放置）
