@@ -488,6 +488,7 @@ def test_get_ttl_closed(self, mock_open):
 9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + 手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
 11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + 断网降级/旧缓存兼容/跨池污染确认
+    > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 人工验证
 
