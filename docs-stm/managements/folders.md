@@ -195,19 +195,20 @@ investor-util/
 │       │   └── hallucination/        #   幻觉测试数据集
 │       │       ├── __init__.py       #       子包标记
 │       │       └── datasets.py       #       幻觉评估标准持仓数据
-│       ├── unit/                     #   单元测试（9 子组）
+│       ├── unit/                     #   单元测试（10 子组）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── conftest.py           #   单元测试 conftest
-│       │   ├── test_bond_yield.py         #   无风险利率获取
-│       │   ├── test_bond_yield_edge.py    #   无风险利率边缘场景
-│       │   ├── test_cost_tracker.py       #   Token 成本跟踪
-│       │   ├── test_fx_exposure.py        #   外汇敞口分析
-│       │   ├── test_liquidity.py          #   流动性分析：场内品种变现天数
-│       │   ├── test_liquidity_edge.py     #   流动性分析：边缘场景
-│       │   ├── test_liquidity_otc.py      #   流动性分析：场外赎回天数
-│       │   ├── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景
-│       │   ├── test_rebalance.py          #   再平衡信号计算
-│       │   ├── test_rebalance_edge.py     #   再平衡边缘场景
+│       │   ├── analysis/             #   分析计算单元测试
+│       │   │   ├── __init__.py       #       子包标记
+│       │   │   ├── test_bond_yield.py         #   无风险利率获取
+│       │   │   ├── test_bond_yield_edge.py    #   无风险利率边缘场景
+│       │   │   ├── test_fx_exposure.py        #   外汇敞口分析
+│       │   │   ├── test_liquidity.py          #   流动性分析：场内品种变现天数
+│       │   │   ├── test_liquidity_edge.py     #   流动性分析：边缘场景
+│       │   │   ├── test_liquidity_otc.py      #   流动性分析：场外赎回天数
+│       │   │   ├── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景
+│       │   │   ├── test_rebalance.py          #   再平衡信号计算
+│       │   │   └── test_rebalance_edge.py     #   再平衡边缘场景
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_config.py            #   配置管理核心测试

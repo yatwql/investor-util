@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_llm]
 
 
 class TestBudgetManagement:

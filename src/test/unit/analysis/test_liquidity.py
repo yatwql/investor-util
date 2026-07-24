@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 _MOCK_DAILY_BARS = [
     {"date": f"2026-07-{d:02d}", "open": 10.0, "close": 10.5, "high": 10.8, "low": 9.9, "volume": 1_000_000}

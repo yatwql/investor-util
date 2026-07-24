@@ -26,7 +26,7 @@
   - **输出目录隔离**：管线集成测试（如 `test_pipeline_smoke.py`、`test_pipeline_metrics_injection.py` 等触发报告生成管线的测试）**必须**将 `output_dir`/`reports/` 重定向到临时目录，避免测试产物残留在真实报告目录
   - **LLM 调用 mock 强制**：任何触发 `generate_all_llm()` 或 `call_llm()` 的测试**必须** mock LLM API 调用（使用 `unittest.mock.patch` 或 `monkeypatch`），禁止真实调用（防费用、防 API 依赖、防测试不稳定）
   - **输入数据隔离**：管线集成测试（同上——`test_pipeline_smoke.py`、`test_pipeline_metrics_injection.py` 等）**不得**依赖真实持仓文件，必须使用 fixture 构造最小持仓（2-5 品种）或 mock 持仓数据。`data/holdings/` 的真实文件在测试中应视为只读
-  - **C12 边缘文件隔离**：极端值/异常场景测试（如 `test_liquidity_edge.py`、`test_liquidity_otc_edge.py`）**必须**使用 `@pytest.mark.edge` 标记并放入 `*_edge.py` 文件，conftest.py 的 `pytest_collection_modifyitems` 会自动校验
+  - **C12 边缘文件隔离**：极端值/异常场景测试（如 `unit/analysis/test_liquidity_edge.py`、`unit/analysis/test_liquidity_otc_edge.py`）**必须**使用 `@pytest.mark.edge` 标记并放入 `*_edge.py` 文件，conftest.py 的 `pytest_collection_modifyitems` 会自动校验
 - **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。
