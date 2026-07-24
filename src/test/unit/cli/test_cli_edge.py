@@ -4,10 +4,12 @@
 """
 from __future__ import annotations
 
+import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_cli, pytest.mark.edge]
+
 import os
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from src.python.cli import _EXIT_SEVERE, _EXIT_SUCCESS, _cli_read_holdings
 

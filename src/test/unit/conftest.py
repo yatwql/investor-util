@@ -5,7 +5,8 @@
 
 在 conftest.py 的标记注册列表中可见所有 unit_* 标记名：
   - unit_providers / unit_fetcher / unit_llm / unit_news
-  - unit_report / unit_config / unit_core / unit_ui
+  - unit_report / unit_config / unit_core / unit_analysis
+	  - unit_ui / unit_cli
 
 用法：
   pytest src/test/unit/ -m "unit_core"    # 仅 core 子模块
@@ -23,9 +24,12 @@ _UNIT_ROOT = Path(__file__).resolve().parent
 
 # 子目录名 → unit_* 标记名
 _DIR_TO_MARKER: dict[str, str] = {
+    "analysis": "unit_analysis",
+    "cli": "unit_cli",
     "config": "unit_config",
     "core": "unit_core",
     "fetcher": "unit_fetcher",
+    "handlers": "unit_core",
     "llm": "unit_llm",
     "news": "unit_news",
     "providers": "unit_providers",

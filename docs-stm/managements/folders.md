@@ -348,7 +348,12 @@ investor-util/
 │       │   │   ├── test_progress.py               #   进度跟踪测试
 │       │   │   ├── test_qdii_timezone_edge.py     #   QDII 时区边缘场景
 │       │   │   ├── test_security_edge.py          #   证券边缘场景
+│       │   │   ├── test_orchestrator.py           #   报告编排器单元测试
 │       │   │   └── test_summary.py                #   摘要生成测试
+│       │   ├── cli/                 #   CLI 命令行模式单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_cli.py               #   CLI 命令行模式单元测试
+│       │   │   └── test_cli_edge.py          #   CLI 边缘场景测试
 │       │   ├── ui/                  #   UI 单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_handlers.py         #   事件处理测试
@@ -360,6 +365,7 @@ investor-util/
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── test_debate_pipeline.py    #   辩论多轮对话管线集成测试
+│       │   ├── test_cli_integration.py    #   CLI 命令行模式集成测试
 │       │   ├── test_integration_coverage.py # 集成测试覆盖率校验
 │       │   └── test_news_pipeline_edge.py   # 新闻管线边缘场景集成测试
 │       ├── scenario/                 #   场景测试（basic/datetime/llm/perf/resilience/security 六子组）

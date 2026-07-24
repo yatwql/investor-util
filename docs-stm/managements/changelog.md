@@ -10,12 +10,24 @@
 - **CI 超时 & 退出码混乱**：`regression` 和 `verify` Phase B 的 600s 超时在 CI 慢速 runner 上频繁截断场景测试；超时退出码 `-1` 经 `sys.exit()` 转为 255，难以区分与真实崩溃 — 增加默认超时到 1200s，CI 全部加 `--no-timeout` 禁用超时，超时退出码改为标准 124
 
 ### Changed
+- **P0 提交门禁优化**：`regression`（~6min 全场景）改 `dev-verify`（~1min 核心单元+基础场景）—— 最频繁的编辑-验证循环从 6 分钟降为 1 分钟，释放开发效率
 - **verify 模式瘦身**：移除 Phase B 场景测试（重复 P0 regression），仅保留单元测试（~50s 而非 ~5min）—— 场景测试由 P0（dev 提交）和 P2（版本发布）覆盖
 - **P2 发布门禁优化**：`all`（3741 测试，~6.5min）改 `verify,regression`（单元+场景，1306 测试，~3min）—— 减少 65% 测试量，仍覆盖核心通路
+- **`src/test/` 目录结构全面重组**：
+  - `unit/` 新增 `analysis/` 子目录：9 个分析计算测试文件从根目录移入（流动性/再平衡/汇率/债券收益率），标记 `unit_providers` → `unit_analysis`
+  - `unit/` 新增 `cli/` 子目录：`test_cli.py` / `test_cli_edge.py` 从根目录移入
+  - `unit/` `test_cost_tracker.py` 移入 `llm/`，标记 `unit_providers` → `unit_llm`
+  - `unit/` `test_orchestrator.py` 从根目录移入 `report/`
+  - `scenario/` 新增 `perf/` 和 `security/` 子目录：`test_e2e_perf.py` / `test_security.py` 从根目录移入；`test_chain_resilience.py` 移入 `resilience/`；`test_llm_hallucination.py` 移入 `llm/`
+  - `integration/`：`test_cli_integration.py` 从根目录移入
+  - `unit/conftest.py` `_DIR_TO_MARKER` 补齐 `analysis`/`cli`/`handlers` 映射，新增标记校验兜底
+  - 清理空目录 `unit/report/template/`
+  - 根目录 4 个"流浪"测试文件全部归位，`src/test/` 根目录不再有除 `conftest.py`/`helpers.py`/`__init__.py` 外的测试文件
 
 ### Docs
 - **门禁文档同步**：CLAUDE.md、how-to-test-my-code.md（10 处）、testplan.md、test-coverage.md（verify 项数 2180→~1022）、scripts-reference.md（4 处）– 与 verify 瘦身/P2 优化对齐
-- **目录树全量同步**：`folders.md` — 更新统计（源码 143→144、测试 177→185、用例 3616→3760、文档 73→81）；展开测试子组完整目录树（unit 含 9 子组、integration、scenario 含 4 子组、data/hallucination 数据集）；补充 `_validation.py`、`__init__.py`、`.github/workflows/ci.yml`、`pytest.ini`、`reason.bat` 等新文件；清理冗余版本描述
+- **目录树全量同步**：`folders.md` — 更新统计（源码 143→144、测试 177→185、用例 3616→3760、文档 73→81）；展开测试子组完整目录树（unit 含 11 子组含 analysis/cli、integration 含 test_cli_integration、scenario 含 6 子组含 perf/security、data/hallucination 数据集）；补充 `_validation.py`、`__init__.py`、`.github/workflows/ci.yml`、`pytest.ini`、`reason.bat` 等新文件；清理冗余版本描述
+- **测试重组同步**：CLAUDE.md C12 示例路径加 `unit/analysis/` 前缀；testplan.md P0 引用 `regression` → `dev-verify` + hallucination 路径更新；test-coverage.md 新增 analysis 行、功能域表同步、场景测试源统计更新；how-to-test-my-code.md Quick Start/P0 门禁/工作流图/unit 子组数对齐
 - **数据源文档补充**：`datasource.md` — 新增"持仓重合度"(`fund_overlap_`)和"基金风格扩展数据"(`extended_`)两条数据源；`bond_yield_rf` 标注精确缓存键脚注；补充 exact_cache_keys 仅模块说明
 
 ---
