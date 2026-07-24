@@ -6,7 +6,8 @@
 
 ## [0.8.6-dev] - 未发布
 
-### Docs
+### Fixed
+- **`orchestrator.py` 历史走势获取失败时 NoneType 崩溃**：`fetch_history_data()` 可返回 `None`（数据源不可用/异常），但行 763 无条件调用 `.get()` 导致 `AttributeError` — 增加 `if history_data:` 保护，为 None 时跳过全量量化指标计算
 
 
 ## [0.8.5] - 2026-07-24

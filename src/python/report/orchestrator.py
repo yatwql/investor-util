@@ -760,7 +760,10 @@ def _generate_report_full(
             logger.warning("[checkpoint] prep.risk_metrics 缺 annualized_volatility")
 
         # ── 全量量化指标 + 情景分析 + 口径修正 ──
-        _daily_returns = history_data.get("daily_returns_portfolio", [])
+        if history_data:
+            _daily_returns = history_data.get("daily_returns_portfolio", [])
+        else:
+            _daily_returns = None
         if _daily_returns:
             from src.python.analysis.metrics import compute_all_metrics
             from src.python.analysis.alignment_correction import compute_alignment_factors
