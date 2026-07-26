@@ -373,6 +373,11 @@ def write_html_report(
                     message=STATUS_MESSAGES.get(key, w),
                 )
 
+    # ── 10d) 数据源可用性矩阵 ──
+    from src.python.report.data_source_matrix import build_data_source_matrix
+
+    data_source_matrix = build_data_source_matrix()
+
     html = _ENV.get_template("report_template.html").render(
         now=now_str,
         today=today_str,
@@ -430,6 +435,8 @@ def write_html_report(
         # 组合历史走势数据
         history_data=history_data,
         data_status_history=data_status_history,
+        # 数据源可用性矩阵
+        data_source_matrix=data_source_matrix,
         # 报告年份（穿透表预测EPS列使用）
         report_year=datetime.now().year,
         # 数据不可用标记 — 模板用于显示/隐藏 暂无数据 横幅

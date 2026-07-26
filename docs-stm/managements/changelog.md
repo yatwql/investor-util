@@ -6,6 +6,9 @@
 
 ## [0.8.6-dev] - 未发布
 
+### Added
+- **数据源可用性矩阵**：新增第 18 号报告章节，在 Excel/HTML 报告末尾统一展示所有数据源运行状态（正常/降级/失败），聚合 DegradationTracker 会话事件按类别（行情/基金排名/行业分类/指数等）归总；Excel 页签含颜色标注和失败明细，HTML 表格含状态图标和详情列
+
 ### Fixed
 - **`orchestrator.py` 历史走势获取失败时 NoneType 崩溃**：`fetch_history_data()` 可返回 `None`（数据源不可用/异常），但行 763 无条件调用 `.get()` 导致 `AttributeError` — 增加 `if history_data:` 保护，为 None 时跳过全量量化指标计算
 
