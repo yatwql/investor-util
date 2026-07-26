@@ -156,6 +156,7 @@ investor-util/
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
+│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #18）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
