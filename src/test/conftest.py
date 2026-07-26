@@ -193,15 +193,22 @@ def _reset_degradation_tracker():
 
 @pytest.fixture(autouse=True)
 def _auto_reset_cost_tracker():
-    """自动重置 cost_tracker 全局状态，防止测试间预算状态污染。
+    """自动重置 cost_tracker 全局状态 + session 用量，防止测试间状态污染。
 
-    其他测试可能调用 set_input_budget() 修改 _input_budget，若不重置，
-    后续 BudgetManagement 测试断言 `budget == DEFAULT_INPUT_BUDGET (8000)`
-    将因残留的自定义预算值而失败。
-    依赖 reset_budget() 恢复为默认值。
+    问题场景（xdist 并发）：
+      测试 A 通过 patch('src.python.llm.session.get_session_usage') 使用 MagicMock，
+      同一 worker 上后续的 BudgetManagement 测试调用 get_budget_status() 时，
+      get_session_usage() 返回 MagicMock，导致 usage.get('input_tokens', 0) 返回
+      MagicMock → max(0, _input_budget - MagicMock) 抛出 TypeError。
+
+    修复策略：
+      1. 重置 session 用量，确保 get_session_usage() 返回干净数据
+      2. 重置 budget 为默认值，消除自定义预算残留
     """
     from src.python.llm.cost_tracker import DEFAULT_INPUT_BUDGET, reset_budget
+    from src.python.llm.session import reset_session_usage
 
+    reset_session_usage()
     reset_budget(DEFAULT_INPUT_BUDGET)
 
 

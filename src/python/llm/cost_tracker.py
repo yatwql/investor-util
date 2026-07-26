@@ -123,6 +123,9 @@ def get_budget_status() -> dict[str, Any]:
     """
     usage = get_session_usage()
     used = usage.get("input_tokens", 0)
+    # 防御性处理：xdist 场景下其他测试的 MagicMock patch 可能误伤 session 模块
+    if not isinstance(used, (int, float)):
+        used = 0
     return {
         "budget": _input_budget,
         "used": used,
