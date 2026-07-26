@@ -248,6 +248,44 @@ class TestDedupByTitle(unittest.TestCase):
         # ratio≈0.33 在候选区但 bigram 不足 → 保留2条
         self.assertEqual(len(result), 2)
 
+    def test_cross_source_bg2_high_ratio_merged(self) -> None:
+        """跨源：bg=2 但 ratio≥0.38 时梯度合并（新增梯度规则）。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        # 同一事件（微软+AMD+Helios）不同表述，bg≈2（amd、helios）+ ratio≈0.49
+        items = [
+            self._make_item("微软Azure采用大规模集群AMD Helios以推动AI创新", "东方财富"),
+            self._make_item("AMD与微软AI合作推出Azure上Helios系统", "新浪财经"),
+        ]
+        result = _dedup_by_title(items)
+        # 梯度规则：overlap=2（amd+helios）且 ratio≈0.49 ≥ 0.38 → 合并为1条
+        self.assertEqual(len(result), 1)
+
+    def test_cross_source_bg2_low_ratio_kept(self) -> None:
+        """跨源：bg=2 但 ratio<0.38 时不合并，梯度规则不误杀。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        # 共享 CPI+PPI 2 个英数 token 但 ratio≈0.33，低于 0.38 门槛
+        items = [
+            self._make_item("CPI同比增长2.5%PPI同比下降0.8%", "东方财富"),
+            self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
+        ]
+        result = _dedup_by_title(items)
+        # overlap=2 但 ratio≈0.33 < 0.38 → 保留2条
+        self.assertEqual(len(result), 2)
+
+    def test_cross_source_year_digit_not_inflated(self) -> None:
+        """跨源：仅共享独立年份数字的完全无关新闻，归一化后不进候选区。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("2026年炒股赚200万", "东方财富"),
+            self._make_item("丝路视觉2026年全年业绩预期", "新浪财经"),
+        ]
+        result = _dedup_by_title(items)
+        # normalize 剥离"2026"后仅剩炒股赚/丝路视觉全年业绩预期，ratio 极低 → 保留2条
+        self.assertEqual(len(result), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

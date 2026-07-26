@@ -22,10 +22,14 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "cache", "dedup_anchors.jsonl")
 # 当前代码中的阈值常量（与 news_aggregator.py 保持一致）
 # 算法同时使用中文 bigram + 英数 token 匹配，
-# 三个阈值经数据分析确认均维持不变。
-_CROSS_THRESHOLD = 0.30  # cross_threshold（英数加入后 cross_skip 自然减少）
-_SAME_SRC_BIGRAM = 4  # 同源 bigram 阈值（抽样验证 bigram=2~3 确为不同新闻）
-_CROSS_BIGRAM = 3  # 跨源 bigram 阈值（边界案例 ratio<0.40 者风险评估过高）
+# 跨源采用梯度阈值：
+#   - bg≥3: ratio≥0.30 合并（已有规则）
+#   - bg=2: ratio≥0.40 合并（补充梯度规则）
+#   - bg≤1: 不合并（即使 ratio 较高也是虚假重叠）
+_CROSS_THRESHOLD = 0.30  # cross_threshold
+_SAME_SRC_BIGRAM = 4  # 同源 bigram 阈值
+_CROSS_BIGRAM = 3  # 跨源 bigram 阈值
+_BG2_RATIO = 0.40  # 梯度阈值：bg=2 时需 ratio≥0.40 才合并
 
 
 def load_anchors(path: str = _ANCHOR_PATH) -> list[dict[str, Any]]:
@@ -110,6 +114,26 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
         print("=== cross_merge: 无记录 ===")
     print()
 
+    # cross_merge_bg2: 跨源 ratio ≥ 0.38 且 bigram = 2 被合并（梯度规则）
+    merge_bg2 = by_rule.get("cross_merge_bg2", [])
+    if merge_bg2:
+        ratios = [r["ratio"] for r in merge_bg2]
+        overlaps = [r["bigram_overlap"] for r in merge_bg2]
+        print(f"=== cross_merge_bg2（跨源 bg=2 且 ratio≥0.38 梯度合并 — 新增规则）===")
+        print(f"  数量: {len(merge_bg2)}")
+        print(f"  ratio 范围: {min(ratios):.3f} ~ {max(ratios):.3f}")
+        # 检查 ratio=0.38 附近的边界
+        edge = [r for r in merge_bg2 if r["ratio"] < 0.42]
+        if edge:
+            print(f"  ratio<0.42 边界: {len(edge)} 条")
+            if not summary_only:
+                for r in edge[:5]:
+                    print(f"    ratio={r['ratio']:.3f} bg={r['bigram_overlap']} [{r['source_a']}] {r['title_a'][:30]}")
+                    print(f"    → [{r['source_b']}] {r['title_b'][:30]}")
+    else:
+        print("=== cross_merge_bg2: 无记录 ===")
+    print()
+
     # cross_safe: 跨源 ratio ≥ 0.50 直接合并
     safe_records = by_rule.get("cross_safe", [])
     if safe_records:
@@ -152,11 +176,12 @@ def _print_calibration_advice(
 
     skip = by_rule.get("cross_skip", [])
     merge = by_rule.get("cross_merge", [])
+    merge_bg2 = by_rule.get("cross_merge_bg2", [])
     same = by_rule.get("same_src", [])
     safe = by_rule.get("cross_safe", [])
 
     # 跨源 candidate 总数
-    cross_candidates = len(skip) + len(merge) + len(safe)
+    cross_candidates = len(skip) + len(merge) + len(merge_bg2) + len(safe)
 
     # 1. cross_threshold (0.30)
     if skip:
@@ -170,26 +195,34 @@ def _print_calibration_advice(
         print(f"    bg=1: {len(skip_bg1)} 条（几乎无实体重叠，安全跳过）")
         print(f"    bg>=2: {len(skip_bg2)} 条（有实体重叠但未达阈值，需审查）")
 
-        # bg≥2 且有较高 ratio → 可能漏判
-        high_skip_entity = [r for r in skip_bg2 if r["ratio"] >= 0.35]
+        # bg≥2 且有较高 ratio → 被梯度规则覆盖
+        high_skip_entity = [r for r in skip_bg2 if r["ratio"] >= _BG2_RATIO]
         if high_skip_entity:
             print()
-            print(f"[!] bg≥2 且 ratio≥0.35 被跳过: {len(high_skip_entity)} 条")
-            print(f"    这些案例有实体重叠且 ratio 较高，建议审查是否应为重复")
+            print(f"[!] bg≥2 且 ratio≥{_BG2_RATIO} 被跳过: {len(high_skip_entity)} 条")
+            print(f"    这些应被梯度规则 cross_merge_bg2 捕获，如仍有记录说明需排查。")
             if not summary_only:
                 for r in high_skip_entity[:5]:
                     print(
                         f"      ratio={r['ratio']:.3f} bg={r['bigram_overlap']} [{r['source_a']}] {r['title_a'][:30]}"
                     )
                     print(f"      → [{r['source_b']}] {r['title_b'][:30]}")
+        # bg≥2 但 ratio 介于 0.35~0.38 之间
+        mid_skip_entity = [r for r in skip_bg2 if _BG2_RATIO > r["ratio"] >= 0.35]
+        if mid_skip_entity:
+            print()
+            print(f"[?] bg≥2 且 0.35≤ratio<{_BG2_RATIO} 被跳过: {len(mid_skip_entity)} 条")
+            print(f"    这些案例有实体重叠但 ratio 未达梯度阈值 {_BG2_RATIO}，")
+            print(f"    建议审查是否应为重复，以便决定是否进一步降低阈值。")
 
         # bg=0,1 但 ratio 很高 → 说明归一化不够，不是阈值问题
         high_skip_noise = [r for r in skip if r["bigram_overlap"] <= 1 and r["ratio"] >= 0.40]
         if high_skip_noise:
             print()
             print(f"[+] bg≤1 但 ratio≥0.40: {len(high_skip_noise)} 条")
-            print(f"    这些不是重复，是共享日期/财经关键词导致 SequenceMatcher 比率虚高")
-            print(f"    不必调整阈值，应考虑增强 _normalize_title() 过滤通用日期/数字模式")
+            print(f"    这些不是重复，是共享日期/事件名/财经关键词导致 SequenceMatcher 比率虚高")
+            print(f"    _normalize_title 用 \\\\b(?:19|20)\\\\d{2}\\\\b 剥离孤立年份数字")
+            print(f'    可过滤共享"2026""2025"等年份导致的 ratio 虚高（如"2026年炒股"vs"2026年展会"）')
             if not summary_only:
                 for r in high_skip_noise[:3]:
                     print(
@@ -203,18 +236,16 @@ def _print_calibration_advice(
     else:
         print(f"[OK] cross_threshold=0.30: 无 skips，阈值安全")
 
-    # 2. 跨源 bigram 阈值 (3)
-    if merge:
+    # 2. 跨源 bigram 阈值 (3) 与梯度阈值 (bg=2 + ratio≥0.40)
+    if merge or merge_bg2:
         edge_merge = [r for r in merge if r["bigram_overlap"] == 3]
         if edge_merge:
             ratio_ok = sum(1 for r in edge_merge if r["ratio"] >= 0.40)
             print()
             print(f"[!] 跨源 bigram=3: {len(edge_merge)} 条在边界上")
             print(f"    其中 {ratio_ok}/{len(edge_merge)} 条 ratio>=0.40")
-            if ratio_ok == len(edge_merge):
-                print(f"    建议考虑将跨源 bigram 阈值降至 2（ratio>=0.40 时安全）")
-            else:
-                print(f"    建议保留 bigram>=3，降低此阈值风险较高")
+            print(f"    已有梯度规则（bg=2 + ratio≥{_BG2_RATIO}）作为降级补充路径，")
+            print(f"    降低 bigram=3 阈值的需求不大。")
 
         bigram_4plus = [r for r in merge if r["bigram_overlap"] >= 4]
         if bigram_4plus:
@@ -238,6 +269,16 @@ def _print_calibration_advice(
     print()
     print(f"有效跨源样本: {cross_candidates} 条（建议 ≥100 条后校准一次）")
     print(f"有效同源样本: {len(same)} 条（建议 ≥50 条后校准一次）")
+
+    # 5. 当前阈值规则摘要
+    print()
+    print("─" * 60)
+    print("当前阈值规则")
+    print("─" * 60)
+    print(f"  跨源梯度阈值：bg≥3 + ratio≥0.30 || bg=2 + ratio≥{_BG2_RATIO} → 合并")
+    print(f"  跨源安全区：ratio≥0.50 → 直接合并")
+    print(f"  同源：bigram≥4 → 合并")
+    print(f"  _normalize_title 过滤模式：%、万亿、前N、\\\\b(?:19|20)\\\\d{{2}}\\\\b、字母后缀年份")
 
     if not dry_run:
         print()
