@@ -1,10 +1,10 @@
 """报告序号可配置 — 业务场景验证。
 
 验证目标：
-  - 默认顺序完整性（17 个模块，summary 开头/llm_usage 结尾）
-  - 序号 1~17 连续递增
+  - 默认顺序完整性（len(_REPORT_SECTION_DEFAULT) 个模块，summary 开头/llm_usage 结尾）
+  - 序号 1~N 连续递增
   - get_report_section_keys 完备性
-  - 5 种可见性类型计数正确（always=5, history=2, b_series=4, news=1, llm=5）
+  - 5 种可见性类型计数正确（always=6, history=2, b_series=4, news=1, llm=5）
   - B 系列 data_flag 各不相同
   - 空配置与无配置行为一致
 
@@ -16,7 +16,10 @@
 from __future__ import annotations
 
 import unittest
+
 import pytest
+
+from src.python.registry import _REPORT_SECTION_DEFAULT
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -38,9 +41,9 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self._get_keys = get_report_section_keys
 
     def test_default_order_17_items(self):
-        """默认顺序包含完整的 17 个模块。"""
+        """默认顺序包含完整的 N 个模块。"""
         order = self._get_order()
-        self.assertEqual(len(order), 17)
+        self.assertEqual(len(order), len(self._default))
 
     def test_default_order_correct_start_end(self):
         """默认顺序以 summary 开头，以 llm_usage 结尾。"""
@@ -48,11 +51,11 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(order[0]["key"], "summary")
         self.assertEqual(order[-1]["key"], "llm_usage")
 
-    def test_default_numbers_1_to_17(self):
-        """默认序号为 1~17 连续递增。"""
+    def test_default_numbers_1_to_18(self):
+        """默认序号为 1~N 连续递增。"""
         order = self._get_order()
         numbers = [s["number"] for s in order]
-        self.assertEqual(numbers, list(range(1, 18)))
+        self.assertEqual(numbers, list(range(1, len(self._default) + 1)))
 
     def test_all_keys_valid(self):
         """get_report_section_keys 包含全部有效 key。"""
@@ -60,12 +63,14 @@ class TestScenarioSectionOrder(unittest.TestCase):
         expected = {s["key"] for s in self._default}
         self.assertEqual(keys, expected)
 
-    def test_default_always_type_has_5_sections(self):
-        """always 类型模块共 5 个，均无 data_flag。"""
+    def test_default_always_type_has_6_sections(self):
+        """always 类型模块共 6 个（含数据源可用性矩阵），均无 data_flag。"""
         always = [s for s in self._default if s["type"] == "always"]
-        self.assertEqual(len(always), 5)
+        self.assertEqual(len(always), 6)
         for sec in always:
             self.assertIsNone(sec["data_flag"])
+        keys = {s["key"] for s in always}
+        self.assertIn("data_source_status", keys)
 
     def test_default_b_series_type_has_4_sections(self):
         """b_series 类型模块共 4 个（基金深度分析）。"""
@@ -105,13 +110,13 @@ class TestScenarioSectionOrder(unittest.TestCase):
             self.assertEqual(s1["key"], s2["key"])
             self.assertEqual(s1["number"], s2["number"])
 
-    def test_4_visibility_types(self):
+    def test_5_visibility_types(self):
         """5 种 type 都有对应模块。"""
         type_counts: dict[str, int] = {}
         for sec in self._default:
             type_counts[sec["type"]] = type_counts.get(sec["type"], 0) + 1
         self.assertEqual(set(type_counts.keys()), {"always", "history", "b_series", "news", "llm"})
-        self.assertEqual(type_counts["always"], 5)
+        self.assertEqual(type_counts["always"], 6)
         self.assertEqual(type_counts["history"], 2)
         self.assertEqual(type_counts["b_series"], 4)
         self.assertEqual(type_counts["news"], 1)
@@ -140,10 +145,10 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
             }
         }
 
-    def test_partial_custom_preserves_remaining_17_items(self):
-        """部分自定义 → 仍返回 17 个模块，未配置项自动续编。"""
+    def test_partial_custom_preserves_remaining_items(self):
+        """部分自定义 → 仍返回 N 个模块，未配置项自动续编。"""
         order = self._get_order(self._partial_config())
-        self.assertEqual(len(order), 17)
+        self.assertEqual(len(order), len(_REPORT_SECTION_DEFAULT))
 
     def test_partial_custom_reorders_modules(self):
         """部分自定义 → fund_performance 排第 1，summary 排第 2，market_value 排第 3。"""
@@ -161,9 +166,9 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
         # 已配置项出现在前 3 位
         configured = {s["key"] for s in order[:3]}
         self.assertEqual(configured, {"fund_performance", "summary", "market_value"})
-        # 未配置项 key 个数 = 14（总 17 - 3 已配置）
+        # 未配置项 key 个数 = total - 3 已配置
         remaining = order[3:]
-        self.assertEqual(len(remaining), 14)
+        self.assertEqual(len(remaining), len(_REPORT_SECTION_DEFAULT) - 3)
         # number 列应单调递增（可包含重复因部分配置和默认序号冲突）
         numbers = [s["number"] for s in remaining]
         for i in range(1, len(numbers)):
@@ -171,10 +176,10 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
                                     f"剩余项序号不单调递增: {numbers}")
 
     def test_partial_custom_all_keys_present(self):
-        """部分自定义 → 所有 17 个 key 都出现且不重复。"""
+        """部分自定义 → 所有 N 个 key 都出现且不重复。"""
         order = self._get_order(self._partial_config())
         keys = [s["key"] for s in order]
-        self.assertEqual(len(set(keys)), 17)
+        self.assertEqual(len(set(keys)), len(_REPORT_SECTION_DEFAULT))
 
     def test_custom_unknown_key_falls_back_to_default(self):
         """自定义配置中有不再注册表中的 key → 忽略，不影响合并结果。"""
@@ -185,6 +190,6 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
             }
         }
         order = self._get_order(config)
-        self.assertEqual(len(order), 17)
+        self.assertEqual(len(order), len(_REPORT_SECTION_DEFAULT))
         keys = [s["key"] for s in order]
         self.assertNotIn("nonexistent_key", keys)

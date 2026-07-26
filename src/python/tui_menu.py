@@ -254,7 +254,7 @@ def index_by_key(key: str) -> int | None:
 
 def press_any_key() -> None:
     """等待用户按任意键继续。支持 Ctrl+C 退出。"""
-    from src.python.tui import KEY_CTRL_C, get_key
+    from src.python.tui_keys import KEY_CTRL_C, get_key
 
     print("  按任意键返回菜单...")
     k = get_key()

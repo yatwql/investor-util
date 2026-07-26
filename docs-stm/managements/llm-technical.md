@@ -147,7 +147,7 @@ skeleton.py:_generate_llm_content()
 
 ## 2. 模块清单
 
-### 2.1 16 子模块总览
+### 2.1 子模块总览
 
 说明：`prompts.py` 逻辑上已拆分为 `prompts_core.py` / `prompts_tables.py` / `prompts_action.py` 3 文件，`prompts.py` 仍保留为 re-export 入口供外部模块兼容导入。
 
@@ -543,6 +543,49 @@ _configure_extended_thinking(payload, llm_config, config_field, model, max_token
 
 **temperature 处理**：标准模式通过 `skeleton.py` 传递 `llm_config.get("temperature_{module_key}")`；仅当 `thinking` 未启用时注入 payload。
 
+#### _call_gemini() 关键细节
+
+**URL**: `{endpoint}/models/{model}:generateContent`
+
+默认 `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`（模型名嵌入 URL 路径）。
+
+**认证方式**：通过 `x-goog-api-key` 请求头传递 API Key，凭据在 `llm_key.json` 中配置。
+
+**Payload 结构**：
+```python
+{
+    "contents": [
+        {"role": "user", "parts": [{"text": user_prompt}]},
+    ],
+    "systemInstruction": {"parts": [{"text": system_prompt}]},
+    "generationConfig": {
+        "maxOutputTokens": max_tokens,
+    },
+}
+```
+
+`system_prompt` 通过 `systemInstruction` 字段传递（非 messages 数组内），`user_prompt` 通过 `contents[0].parts[0].text` 传递。
+
+**Extended Thinking 注入**（通过 `generationConfig.thinkingConfig`）：
+
+```
+call_gemini() Extended Thinking 注入
+    │
+    ├─ 读取 thinking_enabled_{module_suffix}
+    │      False → 无操作返回
+    │
+    ├─ 验证模型兼容性 (_supports_extended_thinking)
+    │      不兼容 → 自动降级跳过，记录 WARNING
+    │
+    └─ 启用 Thinking →
+           payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
+           budget 从 thinking_budget_{module_suffix} 读取
+           不足 max_tokens + 1024 时自动兜底到 max_tokens + 4096
+           payload["generationConfig"].pop("temperature", None)  ← 与 temperature 互斥
+```
+
+与 Claude 的区别：Gemini 的 Thinking 配置位于 `generationConfig.thinkingConfig`（而非顶层 `thinking` 字段），且仅支持 `budget_tokens` 模式（通过 `thinkingBudget` 参数），不支持 `effort` 模式。
+
 ### 5.2 Multi-Provider Chain
 
 #### 设计目标
@@ -851,7 +894,7 @@ _session_usage = {
 | `get_budget_status()` | 查询当前预算使用情况 |
 | `get_cost_summary(for_report=True)` | 生成成本摘要文本（`for_report=True` 对应 verbose 模式） |
 
-### 9.1a duration 字段
+### 9.1.1 duration 字段
 
 `record_per_module()` 新增 `duration: float = 0.0` 参数，记录每个模块的 API 调用耗时（秒）。`skeleton.py` 中 `generate_llm_content()` 通过 `time.monotonic()` 计时，调用 `call_llm()` 前后计算耗时，传入 `_finalize_and_cache()` 后写入 `per_module` 的 `"duration"` 键。多条缓存路径（首次生成 + 截断重试）的耗时通过 `duration` 字段累计。
 
@@ -878,7 +921,7 @@ enhance_news_correlation() -> 新闻关联完成
 ### 9.3 生命周期
 
 ```
-main.py 菜单 L/B 入口
+tui.py 菜单 L/B 入口
     │
     ├─ reset_session_usage()          ← 会话开始，清空累计
     ├─ generate_all_llm()              ← 4 模块并行生成

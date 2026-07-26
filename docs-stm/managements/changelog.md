@@ -4,12 +4,14 @@
 
 ---
 
-## [0.8.6-dev] - 未发布
+## [0.8.6] - 2026-07-27
 
 ### Added
-- **数据源可用性矩阵**：新增第 18 号报告章节，在 Excel/HTML 报告末尾统一展示所有数据源运行状态（正常/降级/失败），聚合 DegradationTracker 会话事件按类别（行情/基金排名/行业分类/指数等）归总；Excel 页签含颜色标注和失败明细，HTML 表格含状态图标和详情列
+- **数据源可用性矩阵**：新增报告章节 #17（always 类型），在 Excel/HTML 报告末尾统一展示所有数据源运行状态（正常/降级/失败），聚合 DegradationTracker 会话事件按类别（行情/基金排名/行业分类/指数等）归总；Excel 页签含颜色标注和失败明细，HTML 表格含状态图标和详情列
 
 ### Fixed
+- **cost_tracker 全局预算 xdist 竞态**：`_input_budget` 和 `_budget_warned` 为模块级全局变量，xdist 并行测试时其他测试调用 `set_input_budget()` 修改后残留自定义值，导致下游 BudgetManagement 测试断言 `budget == DEFAULT_INPUT_BUDGET (8000)` 失败 — 新增 `_auto_reset_cost_tracker` autouse fixture 在每次测试前调用 `reset_budget(DEFAULT_INPUT_BUDGET)`，同类测试新增隔离模式详见 CLAUDE.md 新增项；修复 4 个失败用例（`test_cost_tracker.py`）
+- **穿透测试 HTTP 请求遗漏 mock**：`_prefetch_manager_data()` 在 `compute_penetration_top10()` 中遍历基金调用 `fetch_fund_manager(code)`（每只基金一次 HTTP 请求），`mock_all_apis` 未 mock 该函数导致穿透性能测试实际发出 10 次网络请求耗时 17s — 在 `test_e2e_perf.py::mock_all_apis` 中补回 `patch("src.python.report.penetration.fetch_fund_manager", return_value=None)`
 - **`orchestrator.py` 历史走势获取失败时 NoneType 崩溃**：`fetch_history_data()` 可返回 `None`（数据源不可用/异常），但行 763 无条件调用 `.get()` 导致 `AttributeError` — 增加 `if history_data:` 保护，为 None 时跳过全量量化指标计算
 
 ### Changed
@@ -17,6 +19,13 @@
 - **新闻去重跨源梯度阈值**：bg=2 且 ratio≥0.40 时合并（cross_merge_bg2），覆盖 bg=2 实体重叠少但 ratio 较高的重复案例（如"微软Azure Helios" vs "AMD+微软Azure Helios"），对应 616 条遗漏中 ~301 条被捕获
 - **`_normalize_title()` 增加孤立年份剥离**：`\b(?:19|20)\d{2}\b` 正则过滤独立 4 位年份数字（1900-2099），减少共享"2026""2025"等年份导致的 SequenceMatcher 虚高
 - **`calibrate-dedup-threshold.py` 适配新规则**：新增 cross_merge_bg2 分组统计、梯度阈值边界分析、0.35~0.40 灰色带审查提示
+
+### Docs
+- **内部文档序号/组织校对**：全量审核 6 份文档并修复不一致——llm-technical.md（§2.1 去硬编码计数、§9.1 合并子节、§5.1 新增 `_call_gemini()` 图文）、how-to-start.md（示例数据段并入提示）、how-to-config.md（章节 A→J 重新排序 + 新增 risk_free_rate/rebalance/anonymization 等）、reports-instruction.md（#17/#18 序号对齐 6 处）、how-to-use-registry.md（绘图分析→历史回撤分析）、faq.md（E 菜单范围修正）
+- **config JSON/章节标题三向对齐**：`_config_defaults.py` 注释标签、config.json JSON 标签、how-to-config.md 描述三方同步为 `B. 报告章节可见性` / `F. 业绩基准与无风险利率`
+- **统计数据全量刷新**：folders.md（源码 146/39,294、测试 189/57,960、用例 3765、文档 87）、test-coverage.md（all 3765，11 子组项数同步）
+- **plan.md 与 review-findings.md 同步**：6 份 plan 子文档纳入 plan.md 分层管理（P2 ~22d / P3）；plan-engineering.md 内容登记至 review-findings.md（P3-11 HTTP 同步 / P3-13 性能基准）
+- **已实现功能状态标注**：plan-documentation.md §1（数据源可靠性文档 ✅）、plan-web-ui.md §4（数据源可用性矩阵 ✅）
 
 
 ## [0.8.5] - 2026-07-24

@@ -648,7 +648,7 @@ export HTTP_PROXY="http://127.0.0.1:7890"
 export HTTPS_PROXY="http://127.0.0.1:7890"
 
 # 设置后运行程序即可
-python -m src.python.main
+python -m src.python.tui
 ```
 
 ### Windows PowerShell
@@ -659,7 +659,7 @@ $env:HTTP_PROXY = "http://127.0.0.1:7890"
 $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 
 # 设置后运行程序
-python -m src.python.main
+python -m src.python.tui
 ```
 
 ### 注意事项

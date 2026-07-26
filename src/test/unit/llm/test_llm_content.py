@@ -215,13 +215,14 @@ class TestGetModuleKeyMap(unittest.TestCase):
         self.assertNotIn("6.LLM 用量", result)
 
     def test_none_falls_back_to_default(self):
-        """section_order=None → 使用默认全局顺序（14 个模块，排除 news_correlation/llm_usage）。"""
+        """section_order=None → 使用默认全局顺序（排除 news_correlation/llm_usage）。"""
         result = _get_module_key_map(None)
         self.assertIn("global_macro", result.values())
         self.assertNotIn("news_correlation", result.values())
         self.assertNotIn("llm_usage", result.values())
-        # 默认 17 个模块排除 2 个 = 15 个
-        self.assertEqual(len(result), 15)
+        # 默认模块排除 2 个 = total - 2
+        from src.python.registry import _REPORT_SECTION_DEFAULT
+        self.assertEqual(len(result), len(_REPORT_SECTION_DEFAULT) - 2)
 
     def test_empty_list_falls_back_to_default(self):
         """空列表（falsy）→ 回退到默认全局顺序。"""

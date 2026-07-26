@@ -9,6 +9,10 @@
 
 ## 1. 数据源可靠性文档
 
+> **状态：✅ 已完成**（2026-07-27）
+> - 文档：`docs-stm/manuals/datasource-reliability.md`
+> - 健康检查命令：`python -m src.python.cli check-sources`
+
 ### 概述
 
 当前 `datasource.md` 记录了缓存键和数据路径，但缺少运维视角的信息：每个数据源的可靠性如何、挂了之后降级到哪里、更新频率、是否有 API 访问限制。
@@ -56,7 +60,7 @@
 
 ### 额外产出
 
-一个轻量健康检查命令 `python main.py --check-sources`，运行后输出：
+一个轻量健康检查命令 `python -m src.python.cli check-sources`，运行后输出：
 
 ```
 数据源健康检查结果 (2026-07-26 18:00)

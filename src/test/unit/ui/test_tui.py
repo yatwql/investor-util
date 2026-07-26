@@ -17,7 +17,7 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.python.tui import (
+from src.python.tui_keys import (
 
     KEY_CTRL_C,
     KEY_DOWN,
@@ -58,28 +58,28 @@ class TestGetKeyDispatch(unittest.TestCase):
     不依赖实际平台模块，可跨平台运行。
     """
 
-    @patch("src.python.tui._get_key_windows")
-    @patch("src.python.tui._get_key_linux")
+    @patch("src.python.tui_keys._get_key_windows")
+    @patch("src.python.tui_keys._get_key_linux")
     def test_windows_dispatch(
         self,
         mock_linux: MagicMock,
         mock_windows: MagicMock,
     ) -> None:
         """os.name == 'nt' 时走 Windows 分支。"""
-        with patch("src.python.tui.os.name", "nt"):
+        with patch("src.python.tui_keys.os.name", "nt"):
             get_key()
         mock_windows.assert_called_once()
         mock_linux.assert_not_called()
 
-    @patch("src.python.tui._get_key_windows")
-    @patch("src.python.tui._get_key_linux")
+    @patch("src.python.tui_keys._get_key_windows")
+    @patch("src.python.tui_keys._get_key_linux")
     def test_linux_dispatch(
         self,
         mock_linux: MagicMock,
         mock_windows: MagicMock,
     ) -> None:
         """os.name != 'nt' 时走 Linux 分支。"""
-        with patch("src.python.tui.os.name", "posix"):
+        with patch("src.python.tui_keys.os.name", "posix"):
             get_key()
         mock_linux.assert_called_once()
         mock_windows.assert_not_called()
@@ -172,7 +172,7 @@ class TestGetKeyLinux(unittest.TestCase):
 
 
         self._termios_error = termios.error
-        self._stdin_patcher = patch("src.python.tui.sys.stdin")
+        self._stdin_patcher = patch("src.python.tui_keys.sys.stdin")
         self._mock_stdin = self._stdin_patcher.start()
         self._mock_stdin.fileno.return_value = 99
 

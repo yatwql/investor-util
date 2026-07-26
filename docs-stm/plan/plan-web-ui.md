@@ -108,12 +108,17 @@
 ### 实现思路
 
 两种入口：
-- **CLI 模式**：`python main.py --view-logs` → 终端内折叠式日志查看（类似 `journalctl -n 50 -f`）
+- **TUI 模式**：`python tui.py --view-logs` → 终端内折叠式日志查看（类似 `journalctl -n 50 -f`）
 - **数据源矩阵**：在报告末尾加一页"本次运行数据源状态"表，绿色=成功/黄色=降级/红色=失败
 
 ---
 
 ## 4. 错误友好提示
+
+> **状态：✅ 已完成**（2026-07-27）
+> - 核心实现：`src/python/report/data_source_matrix.py`（从 DegradationTracker 聚合各数据源状态）
+> - 状态追踪：`src/python/report/data_status.py`（DegradationTracker 单例）
+> - 渲染输出：报告章节 #17 数据源可用性矩阵（Excel + HTML 双格式）
 
 ### 概述
 

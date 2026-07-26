@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.8.2-dev
+> 文档版本：v0.8.6-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,13 +8,13 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 144 | 38,823 | `src/python/` 下所有 `.py`（不含测试） |
-| HTML 报告模板 | HTML | 1 | 1,780 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python/Shell | 10 | 3,084 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **155** | **43,687** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **185** | **57,864** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,760 个** | `pytest --collect-only` 统计 |
-| **用户文档** | Markdown | **81** | — | `docs-stm/`（79 文件）+ `README.md` + `CLAUDE.md` |
+| 主程序代码 | Python | 146 | 39,294 | `src/python/` 下所有 `.py`（不含测试） |
+| HTML 报告模板 | HTML | 1 | 1,844 | `src/python/tmpl/report_template.html` |
+| 辅助脚本 | Python/Shell | 10 | 3,227 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **157** | **44,365** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **189** | **57,960** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,765 个** | `pytest --collect-only` 统计 |
+| **用户文档** | Markdown | **87** | — | `docs-stm/`（85 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
 
@@ -166,13 +166,14 @@ investor-util/
 │   │   ├── tmpl/                     # HTML 报告模板
 │   │   │   └── report_template.html  #   Jinja2 HTML 报告主模板
 │   │   │
-│   │   ├── main.py                   # 程序入口 + TUI 主循环
+│   │   ├── tui.py                    # 程序入口 + TUI 主循环
 │   │   ├── cli.py                    # 程序入口 + CLI 命令行模式（argparse + 共享层路由）
-│   │   ├── tui.py                    # TUI 交互主界面
+│   │   ├── tui_keys.py               # 终端键盘输入封装
 │   │   ├── tui_menu.py               # TUI 菜单系统
 │   │   ├── tui_handlers.py           # TUI 键盘/事件处理
 │   │   ├── handlers_report.py        # 报告生成命令处理器
 │   │   ├── handlers_cache.py         # 缓存管理命令处理器
+│   │   ├── handlers_check_sources.py #     数据源健康检查命令处理器
 │   │   ├── handlers_config.py        # 配置管理命令处理器
 │   │   ├── registry.py               # 中央注册表（模块/TTL/分组定义）
 │   │   ├── provider_registry.py      # 数据源注册中心（熔断器/会话缓存）
@@ -252,6 +253,7 @@ investor-util/
 │       │   ├── handlers/            #   命令处理器单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_handlers_cache.py  #   缓存管理命令处理测试
+│   │   ├── handlers_check_sources.py #     数据源健康检查命令处理器
 │       │   │   └── test_handlers_report.py #   报告生成命令处理测试
 │       │   ├── llm/                 #   LLM 单元测试
 │       │   │   ├── __init__.py      #       子包标记
@@ -429,6 +431,7 @@ investor-util/
 ├── docs-stm/                         # 项目文档
 │   ├── manuals/                      #   用户手册分册
 │   │   ├── datasource.md             #     数据源一览
+│   │   ├── datasource-reliability.md #     数据源可靠性文档（运维视角）
 │   │   ├── faq.md                    #     常见问题解答
 │   │   ├── how-to-config-llm.md      #     LLM 配置指南
 │   │   ├── how-to-config.md          #     配置说明

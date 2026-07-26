@@ -42,7 +42,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 4. 启动 TUI 交互模式
-python src/python/main.py
+python src/python/tui.py
 ```
 
 ## 方式三：CLI 命令行模式
@@ -112,6 +112,13 @@ python -m src.python.cli --output D:/my_reports report --type basic
 python -m src.python.cli --config D:/config/my_config.json cache --stats
 ```
 
+**数据源健康检查**（直接通过主程序运行，无需 TUI 界面）：
+
+```bash
+# 测试各数据源联通性并报告延迟
+python -m src.python.cli check-sources
+```
+
 定时任务配置详见[定时任务配置指南](how-to-schedule.md)。
 
 ---
@@ -146,13 +153,7 @@ python -m src.python.cli --config D:/config/my_config.json cache --stats
 
 当持仓文件新增了代码（如新买了一只股票），程序会自动触发该代码的行情预热缓存（首次使用时自动获取并缓存行情数据），后续操作即复用缓存。
 
-> 提示：如果需要同时维护多份不同的持仓方案，可在 `holdings_dir` 目录下放置多个 `.xlsx` 文件，程序会列出所有文件供选择。
-
-### 示例数据
-- **证券账户** — 场内股票/ETF
-- **支付宝-基金投资账户** — 场外基金
-- **微信-基金投资账户** — 债券基金
-- **银行-基金投资账户** — QDII 基金
+> 提示：如果需要同时维护多份不同的持仓方案，可在 `holdings_dir` 目录下放置多个 `.xlsx` 文件，程序会列出所有文件供选择。典型的方案包含以下账户示例：**证券账户**（场内股票/ETF）、**支付宝-基金投资账户**（场外基金）、**微信-基金投资账户**（债券基金）、**银行-基金投资账户**（QDII 基金）。
 
 ---
 
@@ -164,10 +165,10 @@ python -m src.python.cli --config D:/config/my_config.json cache --stats
     [L] 生成完整报告(Excel+HTML) [含LLM，按章节配置]
     [C] 配置持仓信息目录    [F] 配置持仓信息文件名
     [O] 配置报告输出目录
-    [I] 管理对比指数池        [A] 配置持仓匿名化
     [1] 更新基础类缓存        [2] 更新行情类缓存
     [3] 清理过期缓存文件     [4] 查看缓存/状态统计
-    [P] 配置报告可选章节    [S] 配置LLM分析章节
+    [P] 配置报告可选章节    [I] 管理对比指数池
+    [A] 配置持仓匿名化        [S] 配置LLM分析章节
     [R] 刷新配置               [X] 退出
 ```
 
@@ -175,7 +176,7 @@ python -m src.python.cli --config D:/config/my_config.json cache --stats
 
 | 内容 | E | B | L |
 |:-----|:-:|:-:|:-:|
-| 核心报告（投资分析汇总/市值/分类/穿透/基金业绩） | ✅ | ✅ | ✅ |
+| 核心报告（投资分析汇总/市值/分类/穿透/基金业绩/数据源可用性矩阵） | ✅ | ✅ | ✅ |
 | 财经新闻与关联分析 | — | ✅ | ✅ |
 | 基金深度分析 | — | ☆ | ☆ |
 | 组合历史走势 + 回撤分析 | — | ☆ | ☆ |

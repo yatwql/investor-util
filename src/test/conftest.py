@@ -192,6 +192,20 @@ def _reset_degradation_tracker():
 
 
 @pytest.fixture(autouse=True)
+def _auto_reset_cost_tracker():
+    """自动重置 cost_tracker 全局状态，防止测试间预算状态污染。
+
+    其他测试可能调用 set_input_budget() 修改 _input_budget，若不重置，
+    后续 BudgetManagement 测试断言 `budget == DEFAULT_INPUT_BUDGET (8000)`
+    将因残留的自定义预算值而失败。
+    依赖 reset_budget() 恢复为默认值。
+    """
+    from src.python.llm.cost_tracker import DEFAULT_INPUT_BUDGET, reset_budget
+
+    reset_budget(DEFAULT_INPUT_BUDGET)
+
+
+@pytest.fixture(autouse=True)
 def _mock_market_hours_api(monkeypatch):
     """禁用实时东方财富 push2 API 调用，使用内置默认值判断市场时段。
 
