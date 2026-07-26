@@ -10,7 +10,7 @@
 - **`orchestrator.py` 历史走势获取失败时 NoneType 崩溃**：`fetch_history_data()` 可返回 `None`（数据源不可用/异常），但行 763 无条件调用 `.get()` 导致 `AttributeError` — 增加 `if history_data:` 保护，为 None 时跳过全量量化指标计算
 
 ### Changed
-- **`_extract_entity_bigrams()` 英数专名加权**：长度 ≥4 的英文 token 额外插入 `_tk:` 前缀虚拟 bigram，提升共享专名（Anthropic/Meta/Helios 等）在实体重叠计数中的权重，使 ratio 不足 0.40 但共享英文专名的案例通过 bg≥3 候选区合并
+- **`_extract_entity_bigrams()` 英数专名 `_tk:` 加权**：长度 ≥4 的英文专名（Anthropic/Meta/Helios 等）在实体 bigram 中额外插入 `_tk:` 前缀虚拟 bigram，使 `Anthropic+Meta` 等英数专名重叠的跨源标题即使 ratio<0.40 也能通过 bg≥3 候选区合并，无需降低 ratio 阈值；新规则下 cross_skip 从 3956 降至 10（单次运行）
 - **新闻去重跨源梯度阈值**：bg=2 且 ratio≥0.40 时合并（cross_merge_bg2），覆盖 bg=2 实体重叠少但 ratio 较高的重复案例（如"微软Azure Helios" vs "AMD+微软Azure Helios"），对应 616 条遗漏中 ~301 条被捕获
 - **`_normalize_title()` 增加孤立年份剥离**：`\b(?:19|20)\d{2}\b` 正则过滤独立 4 位年份数字（1900-2099），减少共享"2026""2025"等年份导致的 SequenceMatcher 虚高
 - **`calibrate-dedup-threshold.py` 适配新规则**：新增 cross_merge_bg2 分组统计、梯度阈值边界分析、0.35~0.40 灰色带审查提示
