@@ -338,14 +338,25 @@ def _dedup_by_title(
     }
 
     def _extract_entity_bigrams(text: str) -> set[str]:
-        """提取标题中的实体特征：中文 bigram + 英数 token。
+        """提取标题中的实体特征：中文 bigram + 英数 token + 长英文专名加权。
 
         中文实体判定依赖 2-gram 重叠；英数 token 补全"AI""AMD"等被中文
-        正则过滤的专名。
+        正则过滤的专名；长度 ≥ 4 的英文专名（Anthropic/Meta/Helios 等）
+        额外插入 _tk: 前缀虚拟 bigram，使共享专名在 bigram 计数中获得
+        权重加成，避免因英文专名占比高但 token 条数少而漏过候选区。
         """
         # 英数 token：长度 ≥ 2 避免单字符噪声
         tokens = re.findall(r"[a-zA-Z]+|[0-9]+", text)
-        result: set[str] = set(t.lower() for t in tokens if len(t) >= 2)
+        result: set[str] = set()
+        for t in tokens:
+            t_lower = t.lower()
+            if len(t_lower) >= 2:
+                result.add(t_lower)
+                # 长英文专名（≥4 字符）额外插入虚拟 bigram 占用位，
+                # 提升共享专名在实体重叠计数中的权重（如 Anthropic+Meta
+                # 在 bg 计数中额外贡献 2 点，使 bg=2+2=4 进入合并区）。
+                if t_lower.isalpha() and len(t_lower) >= 4:
+                    result.add(f"_tk:{t_lower}")
         # 中文 bigram
         chinese_only = re.sub(r"[^一-鿿]", "", text)
         for i in range(len(chinese_only) - 1):

@@ -258,20 +258,20 @@ class TestDedupByTitle(unittest.TestCase):
             self._make_item("AMD与微软AI合作推出Azure上Helios系统", "新浪财经"),
         ]
         result = _dedup_by_title(items)
-        # 梯度规则：overlap=2（amd+helios）且 ratio≈0.49 ≥ 0.38 → 合并为1条
+        # 梯度规则：overlap=2（amd+helios）且 ratio≈0.49 ≥ 0.40 → 合并为1条
         self.assertEqual(len(result), 1)
 
     def test_cross_source_bg2_low_ratio_kept(self) -> None:
-        """跨源：bg=2 但 ratio<0.38 时不合并，梯度规则不误杀。"""
+        """跨源：bg=2 但 ratio<0.40 时不合并，梯度规则不误杀。"""
         from src.python.providers.news_aggregator import _dedup_by_title
 
-        # 共享 CPI+PPI 2 个英数 token 但 ratio≈0.33，低于 0.38 门槛
+        # 共享 CPI+PPI 2 个英数 token 但 ratio≈0.389，低于 0.40 门槛
         items = [
             self._make_item("CPI同比增长2.5%PPI同比下降0.8%", "东方财富"),
             self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
         ]
         result = _dedup_by_title(items)
-        # overlap=2 但 ratio≈0.33 < 0.38 → 保留2条
+        # overlap=2 但 ratio≈0.389 < 0.40 → 保留2条
         self.assertEqual(len(result), 2)
 
     def test_cross_source_year_digit_not_inflated(self) -> None:
@@ -285,6 +285,21 @@ class TestDedupByTitle(unittest.TestCase):
         result = _dedup_by_title(items)
         # normalize 剥离"2026"后仅剩炒股赚/丝路视觉全年业绩预期，ratio 极低 → 保留2条
         self.assertEqual(len(result), 2)
+
+    def test_cross_source_long_english_token_weighted(self) -> None:
+        """跨源：长英文专名（Anthropic/Meta/Helios≥4字符）在实体 bigram 中获得
+        _tk: 前缀加权，使 bg 计数提升跨过 3 阈值，弥补 ratio 不足。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        # Anthropic(6)+Meta(4) → 两个长专名给双方各贡献 2 个 _tk: 虚拟 bigram
+        # 中文 bigram 重叠 2 个（洽谈+算力）+ 2 个 _tk: 虚拟 = bg=4 ≥ 3 → 合并
+        items = [
+            self._make_item("Anthropic正与Meta开展初期洽谈，计划租赁后者算力", "新浪财经"),
+            self._make_item("Meta据悉洽谈向Anthropic出租AI算力 拟进军云计算", "东方财富"),
+        ]
+        result = _dedup_by_title(items)
+        # ratio≈0.381 < 0.40 走不了梯度规则，但 _tk: 加权后 bg≥3 通过候选区
+        self.assertEqual(len(result), 1)
 
 
 if __name__ == "__main__":
