@@ -102,14 +102,14 @@ plan-1 是 plan-3（最大回撤+净值曲线 Chart.js 双轴图增强）和 pla
 |:-:|:-----|:----|:----:|:----:|:---------|:---------|
 | R1 | **HTML 文件体积膨胀** | 中 | 高 | 中 | 6 张图表原始数据内联到 JS → 模板体积 280KB → 预估 ~1MB | ① 服务端预聚合降低数据粒度（如净值曲线按周聚合）② 热力图数据压缩（仅下三角）③ Feature Flag 关闭时回退 Canvas |
 | R2 | **国产浏览器兼容性** | 低 | 中 | 低 | 微信内置浏览器/老旧 Chrome 对 ES6+ 或 Chart.js v4 支持不完整 | ① 锁定 Chart.js 版本（不 auto-load latest）② `@babel/standalone` 转译（可选）③ Canvas 回退兜底 |
-| R3 | **CDN 可用性风险** | 中 | 低 | 高 | CDN 宕机/被墙导致 Chart.js 无法加载 → 全部交互图表白屏 | ① CDN ↔ 本地 bundle 双策略（features.json 配置 `chart_js_source: "cdn" \| "local"`）② 加载失败自动回退到 Canvas 2D ③ CDN SRI 完整性校验（防劫持） |
+| R3 | **CDN 可用性风险** | 中 | 低 | 高 | CDN 宕机/被墙导致 Chart.js 无法加载 → 全部交互图表白屏 | ① CDN SRI 完整性校验（防篡改，hash 硬编码）② 加载失败 `onerror` 自动回退到 Canvas 2D ③ 本地 bundle 作为 P2 未来增强预留 |
 | R4 | **Chart.js 热力图插件不成熟** | 中 | 中 | 中 | `chartjs-chart-matrix` 社区插件与 Chart.js v4 版本兼容性未知 | ① 技术选型阶段做 POC 验证 ② 不通过则回退到自制 Canvas 热力图（当前纯文本格子） |
 | R5 | **打印降级时序问题** | 中 | 中 | 中 | `chart.toBase64Image()` 异步调用，`window.print()` 触发时快照尚未就绪，打印输出空白或模糊图 | ① `beforeprint` 事件提前预渲染所有 chart 快照到 `<img>` fallback ② `afterprint` 清理临时 img（见 §6.5.4 方案） |
 | R6 | **C14 违规风险** | 低 | 低 | **高** | 开发过程中不慎将 chart_data 或 chart_config 写入 `_ENV.globals` | 代码审查重点标注 + 自动化 grep `_ENV.globals\[` 不得出现在非 `html_jinja_env.py` 的文件中 |
 | R7 | **JavaScript 调试困难** | 中 | 中 | 中 | Chart.js 数据集配置复杂（特别是热力图 + 雷达图 + 双轴图复合），浏览器调试 vs Python 调试模式切换 | ① 建立 JS 调试辅助页（独立 test HTML）② 模板内 `console.log` 兜底 ③ Python 端预处理器（§8.2.2）减少 JS 复杂度 |
 | R8 | **历史走势数据粒度与图表性能** | 中 | 中 | 中 | 净值曲线若含每日数据（~250 点/年 × 品种），Chart.js 渲染性能下降 | ① 服务端下采样（按周/月聚合）② Chart.js `decimation` 插件（内置）③ 数据阈值告警 |
 | R9 | **数据隐私泄露** | **中** | 高 | 中 | `tojson` 将全量持仓明细（代码/份额/成本/每日市值）嵌入 HTML 文件内联 `<script>`，分享 HTML 报告 = 分享全量持仓数据。Chart.js 的结构化 JSON 键名规律使批量提取更容易 | ① 在报告中标注"本文件含全量持仓数据，分享前请谨慎" ② `anonymizer` Feature Flag（`features.py` 已存在）开启时对 Chart.js 数据做模糊处理 ③ Chart.js 数据最小化（只传递日期+市值，不含份额/成本） |
-| R10 | **CDN 供应链攻击** | 低 | 极低 | **高** | CDN 被投毒或劫持时，恶意 JS 可访问报告中所有数据 | ① 使用 SRI（Subresource Integrity）`integrity="sha384-{{ hash }}" crossorigin="anonymous"` 锁定文件内容 ② 构建步骤生成 hash ③ `onerror` Canvas 回退兜底 |
+| R10 | **CDN 供应链攻击** | 低 | 极低 | **高** | CDN 被投毒或劫持时，恶意 JS 可访问报告中所有数据 | ① 使用 SRI（Subresource Integrity）`integrity="sha384-{{硬编码 hash}}" crossorigin="anonymous"` 锁定文件内容 ② hash 硬编码在模板中，非构建步骤 ③ `onerror` Canvas 回退兜底 |
 
 ### 3.2 风险最高项：CDN 可用性（R3）+ 热力图插件（R4）
 
@@ -118,18 +118,18 @@ plan-1 是 plan-3（最大回撤+净值曲线 Chart.js 双轴图增强）和 pla
 | 方案 | 实现成本 | 用户感知 | 维护成本 |
 |:-----|:--------|:---------|:--------|
 | **纯 CDN**（cdn.jsdelivr.net/npm/chart.js@4） | 低：1 行 `<script>` | 依赖 CDN 可用 | 低 |
-| CDN + 本地 bundle 备选 | 中：feature flag 切换 `chart_js_source` + 本地 chart.min.js | CDN 失败自动降级 | 中：需跟踪 CVE |
-| **CDN + SRI + script onerror Canvas 回退**（推荐） | 低：`<script integrity="sha384-..." onerror="fallback()">` | CDN 失败/篡改时所有图变 Canvas | 中：需构建步骤生成 hash |
-| 纯本地 bundle | 中：~80KB gzip 嵌入 repo | 无 CDN 依赖 | 中：需手动升级 |
+| **CDN + SRI + script onerror Canvas 回退**（推荐） | 低：`<script integrity="sha384-..." onerror="fallback()">` | CDN 失败/篡改时所有图变 Canvas | 低：hash 硬编码，仅在 Chart.js 版本升级时手动更新 |
 
-**推荐组合**：CDN + SRI 完整性校验 + `onerror` Canvas 回退（工作量最低，安全有保障）。可选本地 bundle Feature Flag（为离线场景预留）。
+**推荐组合**：CDN + SRI 完整性校验 + `onerror` Canvas 回退。SRI hash 硬编码在模板中（非模板变量，不经过 Python context），仅在 Chart.js 版本升级时手动计算一次：
 
-SRI hash 生成方式（构建步骤）：
 ```bash
+# 非日常构建步骤——仅在升级 Chart.js 版本时执行
 curl -sL https://cdn.jsdelivr.net/npm/chart.js@4.x/dist/chart.umd.min.js \
   | openssl dgst -sha384 -binary | base64
-# 输出填入 <script integrity="sha384-{{ output }}">
+# 输出直接填入 <script integrity="sha384-输出">，不作为模板变量
 ```
+
+> **本地 bundle 方案**已降级为 P2 未来增强（用户反馈 CDN 不可达时再实施）。Iter 1 不涉及该方案，无需 Feature Flag `chart_js_source` 或 `chart.min.js` 文件。
 
 #### R4 缓解方案
 
@@ -213,7 +213,7 @@ graph LR
 |:-----|:-----|:------|
 | **C8** 日志统一 | ✅ 无关 | Chart.js 是客户端侧，不经过 Python 日志 |
 | **C15** 控制台日志着色 | ✅ 无关 | |
-| **C16** 路径绝对化 | ⚠ 注意 | 若采用本地 bundle 方案，Chart.js 文件路径必须通过 `PROJECT_ROOT` 推导，不能硬编码或依赖 CWD |
+| **C16** 路径绝对化 | ⚠ 注意 | 本地 bundle 已降级为 P2 未来增强，Iter 1 采用 CDN 路径不涉及本地文件路由 |
 
 ### 5.5 合规总评
 
@@ -263,8 +263,8 @@ C19 ✅
 4. 模板中条件切换（配合 JS 外部化方案 §8.2.1）：
    ```jinja2
    {% if enable_interactive_charts %}
-     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.x"
-             integrity="sha384-{{ chart_js_hash }}"
+     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+             integrity="sha384-ABC123..."  {# 硬编码 hash #}
              crossorigin="anonymous"
              onerror="window.__CHART_CDN_FAILED=true"></script>
      <script src="chart-init.js"></script>
@@ -309,6 +309,8 @@ C19 ✅
 ```
 
 所有降级标记复用现有 `data_status_history` 结构，不新增降级类型。`"degraded"` 状态下 Chart.js 渲染数据不变，仅数据集添加 `borderDash: [5, 5]` 样式。
+
+**DegradationTracker 兼容性确认**：Chart.js 三级降级（ok/degraded/unavailable）基于 `history_data.status`（`portfolio_history.py` 产出），与 `DegradationTracker` 的 T1~T4 数据源降级系统（`report/data_status.py`，追踪各数据源可用性）是正交设计。两者并行运作：DegradationTracker 构建 `data_status_history` 表格展示于报告尾部，Chart.js 读 `history_data.status` 控制图表视觉。无冲突亦无重复（R7 确认）。
 
 ### 6.6 §1.4.4 Feature Flag 与 metrics Flag 的交互
 
@@ -404,23 +406,19 @@ const chartTheme = {
 
 ### 8.2 CDN vs 本地 Bundle + SRI
 
-**推荐策略**：CDN + SRI 完整性校验 + `onerror` 自动回退 Canvas 2D + Feature Flag 切换本地 bundle
+**推荐策略**：CDN + SRI 完整性校验 + `onerror` 自动回退 Canvas 2D（零构建步骤，SRI hash 硬编码）
 
 ```
-1. 默认: <script src="https://cdn.jsdelivr.net/npm/chart.js@4.x"
-            integrity="sha384-{{ chart_js_hash }}"
+1. 默认: <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+            integrity="sha384-ABC123..."  {# 硬编码，非模板变量 #}
             crossorigin="anonymous"
             onerror="window.__CHART_CDN_FAILED=true">
    加载失败或完整性校验不通过 → 所有图表回退到 drawSimpleChart() + 表格
 
-2. Feature Flag chart_js_source: "local" 时:
-   <script src="{{ static_url }}/chart.min.js">
-
-3. 本地 bundle 来自: data/bundle/chart.min.js + chartjs-plugin-matrix.min.js
-   （手动下载，不通过 npm，保持与项目一致的版本控制）
+2. 本地 bundle 方案已降级为 P2 未来增强（用户反馈 CDN 不可达时再实施），
+   不纳入 Iter 1 范围，不新增 Feature Flag `chart_js_source`，
+   不新增 `chart.min.js` 文件。
 ```
-
-SRI hash 由构建步骤生成，chart.js 版本升级时同步更新。
 
 ### 8.2.1 设计优化：JS 外部化
 
@@ -644,8 +642,7 @@ def load_feature_overrides() -> None:
 |:-------|:---------|:---------|
 | plan-1 完成后首次提交 | `features.py` 注册 flag + 回退路径测试 | plan-1 实施时 |
 | plan-1 稳定 2 版本后 | 移除 `drawSimpleChart()` + Canvas 回退路径 + Feature Flag 条件分支 | 发布 2 个版本后（如 v0.9.0） |
-| 本地 bundle 首次启用 | `data/bundle/` 目录 + chart.min.js 下载 + `static_url` 路由 | 用户反馈 CDN 不可达时 |
-| 每次 Chart.js 安全更新 | 刷新 CDN 版本号 + 本地 bundle 版本 | CVE 公告 |
+| 每次 Chart.js 安全更新 | 刷新 CDN 版本号 | CVE 公告 |
 
 ---
 
@@ -675,6 +672,81 @@ def load_feature_overrides() -> None:
 
 ---
 
+## 附录 F：第 2 轮架构深度审计（与 technical.md 逐条对照）
+
+### 审计结果
+
+| 约束 | 状态 | 详细说明 |
+|:-----|:----|:---------|
+| **C1** 代码类型判定 | ✅ 无关 | Chart.js 图表不涉及代码类型判定 |
+| **C2** 缓存统一 | ✅ 无关 | 无新增缓存类型 |
+| **C3** 缓存原子写入 | ✅ 无关 | HTML 写入仍走 `html_save.py` |
+| **C4** 会话级 API 复用 | ✅ 无关 | `chart_data_builder.py` 是纯计算函数，无 HTTP 请求 |
+| **C5** HTTP 客户端统一 | ✅ 无关 | Chart.js CDN 加载走浏览器 `<script>` |
+| **C6** Provider Chain 必经 | ✅ 无关 | 图表所需数据已在编排器阶段获取 |
+| **C7** 报告序号可配置 | ✅ 安全 | 不改 `_REPORT_SECTION_DEFAULT`，不新增模块 |
+| **C8** 日志统一 | ✅ 无关 | 客户端 JS 不经过 Python 日志 |
+| **C10** 新闻召回可配置 | ✅ 无关 | 不涉及新闻系统 |
+| **C14** 渲染期数据不可写 `_ENV.globals` | ✅ 深度合规 | 见下方 §F.2 |
+| **C15** 日志着色 | ✅ 无关 | |
+| **C16** 路径绝对化 | ✅ 无影响 | 本地 bundle 已降级为 P2 未来增强，Iter 1 采用 CDN |
+| **C19** pipeline_data Schema | ✅ 安全 | `chart_datasets` 不经过 pipeline_data，仅 template context |
+| **C11** 测试标记 | ⚠ 需要关注 | 见下方 §F.3 |
+| **C12** 边缘文件隔离 | ⚠ 需要关注 | 见下方 §F.3 |
+| **C13** 测试敏感路径隔离 | ✅ 无关 | 纯函数测试不操作文件系统 |
+
+### F.2 C14 深度分析：`section_visible` globals 模式
+
+当前 `_ENV.globals["section_visible"]` 仅作为 fail-closed 默认值（`lambda key: False`），渲染期被 context 传递的 `_sv_fn` 闭包覆盖。
+
+**`section_visible_dict` 传递路径**（v0.8.7-dev 已验证）：
+
+```
+html_writer.py: _compute_section_visibility()
+    → section_visible_dict (dict)
+    → _sv_fn = lambda key, _d=section_visible_dict: bool(...)
+    → render(context={
+          section_visible_dict=section_visible_dict,  # 模板备用
+          section_visible=_sv_fn,                      # 实际使用（覆盖 globals）
+      })
+```
+
+**重要发现**：`html_jinja_env.py` 的 `_jinja_section_visible()` 函数（第 113-127 行）定义了但**从未注册**到 `_ENV.globals`——它是死代码。实际的 globals 条目只有第 142 行的 `lambda key: False`。这说明 C14 已经严格执行多年，plan-1 沿用此模式即可。
+
+**对 plan-1 的要求**：
+- `chart_datasets` → 通过 render() context 传递（与 `section_visible_dict` 同级）
+- `enable_interactive_charts` → 通过 render() context 传递
+- 不在 `_ENV.globals` 增加任何新条目
+- code review grep 规则：`grep '_ENV\.globals\[' | grep -v html_jinja_env.py` → 0 结果
+
+### F.3 C11/C12 测试标记与边缘文件隔离
+
+| 测试文件 | 内容 | 标记 | 边缘隔离 |
+|:---------|:-----|:-----|:---------|
+| `test_chart_data_builder.py` | 预处理器单元测试（正常输入） | `unit` + `unit_report` | 不隔离 |
+| `test_chart_data_builder_edge.py` | 边缘场景（空/全降级/全N/A） | `unit` + `unit_report` + **`edge`** | **必须 `*_edge.py`** |
+| `test_feature_interactive.py` | Feature Flag 开关测试 | `unit` + `unit_config` | 不隔离 |
+| `test_pipeline_smoke.py`（增强） | 全流程集成测试 | `scenario_basic` | 不隔离 |
+
+**关键约束**：带 `@pytest.mark.edge` 的测试文件必须命名为 `*_edge.py`，反之 `*_edge.py` 中的测试必须带 edge 标记。conftest.py 的 `pytest_collection_modifyitems` 会在收集期校验。
+
+### F.4 隐藏问题清单
+
+| # | 问题 | 等级 | 说明 |
+|:-:|:-----|:----|:------|
+| H1 | `features.py` 分类注释计数不同步 | 低 | `# ── 功能特性（2 项）──` → 注册后应为 **3 项** |
+| H2 | `data_unavailable` 与 chart 的交互未覆盖 | 低 | `data_unavailable=True` 时（持仓有成本但总市值=0），Chart.js 应显示"暂无数据"横幅而非尝试渲染空图。**已修复** — Iter 3（§5 验收标准 4）和 Iter 6（§5 验收标准 6）均已添加 `data_unavailable` 交叉验证 |
+| H3 | 模板 context 膨胀未评估 | 低 | 当前 render() 已传递约 **40 个 context 变量**。`chart_datasets` 是多个 JSON 数据集构成的嵌套 dict，加入后 context 序列化/传递性能需验证（预估 <5ms 增量） |
+| H4 | 量化指标雷达图数据来源核查已确认 | 中 | `prep["risk_metrics"]` 仅含 5 个基本字段（volatility/max_drawdown/return 等）。全量 14 项指标（sharpe/calmar/HHI/beta 等）由 `compute_all_metrics()` 计算后存于局部变量 `_metrics`，**仅传入 LLM（第 948 行），从未传入 `write_html_report()`**。Iter 1 需在编排器中将 `_metrics` 合并到 `chart_datasets` 或在 `build_chart_datasets()` 新增参数 `all_metrics` 接收 |
+| H5 | Feature Flag 读取位置选择 | 低 | `enable_interactive_charts` 是在 `html_writer.py` 内部读（如 debate flag），还是由 caller（orchestrator）传参？当前 debate flag 在内部读，建议一致。**已修复** — 经代码审查确认：`enable_b_series/enable_news/enable_history/enable_llm` 全部从 config 读取后以参数形式传入 `write_html_report()`，debate flag 的 `html_writer` 内读是特例（late-binding 需求）。统一采用参数传递模式：orchestrator 读 `is_feature_enabled("enable_interactive_charts")` → 传入 `write_html_report()`（R7 确认） |
+| H6 | Both 路径雷达图数据源缺口 | 低 | both 路径不计算 `prep["risk_metrics"]`（中段代码无 `_risk` 注入），也不计算 `_metrics`。雷达图若无兜底将完全为空。**已修复** — `_build_radar_dataset()` 新增第三级降级：当 `all_metrics=None` 且 `risk_metrics=None` 时，从 `history_data` 提取 `annualized_volatility`/`max_drawdown_pct`/`total_return_pct` 3 个基本轴。`history_data` 双路径均有，此降级确保 both 路径也能显示基础雷达图（R7 确认） |
+
+
 > **文档版本记录**
 > - 2026-07-27 v1：初版，基于 v0.8.7-dev 代码审查完成
 > - 2026-07-27 v2：自审补充 — 新增 R9(隐私)/R10(SRI)/TD6~TD8(债务)、§6.5 三级降级、§6.6(metrics Flag 交互)、§6.7(暗色模式预留)、§8.2.1(JS 外部化)、§8.2.2(Python 预处理器)、§8.5(设计优先级)、附录 E(数据依赖矩阵)；工作量 4d→5.25d
+> - 2026-07-27 v3：**第 2 轮架构深度审计** — 逐条对照 technical.md 全部 19 条约束 + 5 项核心决策；发现 5 项隐藏问题（H1~H5）；新增测试标记与边缘隔离规范（§F.3）；C14 深度分析确认 `section_visible` globals 模式安全可复用（§F.2）
+> - 2026-07-27 v4（R4+R5）：CDN 策略简化 — SRI hash 硬编码（非构建步骤）、本地 bundle 降级 P2、§F.3 命名修复、两文档 CDN 策略描述全局同步
+>   - H4 确认升级：`_metrics`（14 项全量）从未传入 `write_html_report()`，Iter 1 需新增 `all_metrics` 预处理器参数
+> - 2026-07-27 v5（R6）：实施细节补全 — JS 文件交付机制（`shutil.copy2`）、chart-init.js CDN 失败守卫 + canvas 存在检测、`Chart.instances.forEach` 修正（非标准 API）、Both 路径雷达图差异标记
+> - 2026-07-27 v6（R7）：Feature Flag 读取位置确认（orchestrator 参数传递模式 ↑ 与 enable_* 系列一致）、DegradationTracker 兼容性确认（正交无冲突）、H5/H6 修复、Both 路径雷达图 `history_data` 三级降级兜底
