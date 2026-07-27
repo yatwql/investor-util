@@ -30,10 +30,9 @@ _KNOWN_MARKERS: set[str] = {
     "scenario_zero_cost", "scenario_extreme", "scenario_perf", "scenario_security",
     # unit 分支
     "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news", "unit_report",
-    "unit_config", "unit_config_edge", "unit_core", "unit_cli", "unit_ui",
+    "unit_config", "unit_config_edge", "unit_core", "unit_cli", "unit_ui", "unit_analysis",
     # 跨领域标记
     "llm", "edge", "smoke", "data", "integration",
-    "unit_rebalance",
     # integration 分支
     "integration_contract", "integration_isolation", "integration_news_pipeline",
     "integration_cache", "integration_tui",
@@ -49,8 +48,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "scenario_basic: 基础业务链路（S1-S5 + S0a-S0d + S21-S28 + S29-S33）")
     config.addinivalue_line("markers", "scenario_resilience: 异常容错场景（S6-S10）")
     config.addinivalue_line("markers", "scenario_llm: LLM 场景组合（S11-S20）")
-    config.addinivalue_line("markers", "scenario_perf: 性能基准测试（P4-14）")
-    config.addinivalue_line("markers", "scenario_security: 安全基线测试（P4-16）")
+    config.addinivalue_line("markers", "scenario_perf: 性能基准测试")
+    config.addinivalue_line("markers", "scenario_security: 安全基线测试")
     config.addinivalue_line("markers", "scenario_datetime: 日期/时间场景（T1-T21）")
     config.addinivalue_line("markers", "scenario_stock: 场景 S1 — 纯股票组合")
     config.addinivalue_line("markers", "scenario_fund: 场景 S2 — 纯基金组合")
@@ -73,7 +72,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_core: 核心基础设施单元测试")
     config.addinivalue_line("markers", "unit_cli: CLI 命令行模式单元测试")
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")
-    config.addinivalue_line("markers", "unit_rebalance: 再平衡信号计算单元测试")
+    config.addinivalue_line("markers", "unit_analysis: 分析计算模块单元测试（流动性/再平衡/汇率/无风险利率）")
     config.addinivalue_line("markers", "llm: LLM 相关测试（全部 mock，无需 API key）")
     config.addinivalue_line("markers", "edge: 边缘/异常场景测试 — 必须放在 *_edge.py 文件中，不得与普通测试混搭")
     config.addinivalue_line("markers", "smoke: 冒烟测试（快速验证核心功能）")
@@ -144,6 +143,16 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.analysis.rebalance._SILENCE_FILE",
         str(tmp_path / "data/state/rebalance_silence.json"),
     )
+    # perf_history.jsonl 性能历史文件隔离
+    monkeypatch.setattr(
+        "src.python.perf._PERF_HISTORY_FILE",
+        str(tmp_path / "data/state/perf_history.jsonl"),
+    )
+    # datasource_health.jsonl 数据源健康检查历史文件隔离
+    monkeypatch.setattr(
+        "src.python.perf._HEALTH_CHECK_FILE",
+        str(tmp_path / "data/state/datasource_health.jsonl"),
+    )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(
         "src.python.constants.HISTORY_SNAPSHOT_DIR",
@@ -190,6 +199,27 @@ def _reset_degradation_tracker():
     """
     from src.python.report.data_status import reset_tracker
     reset_tracker()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_cost_tracker():
+    """自动重置 cost_tracker 全局状态 + session 用量，防止测试间状态污染。
+
+    问题场景（xdist 并发）：
+      测试 A 通过 patch('src.python.llm.session.get_session_usage') 使用 MagicMock，
+      同一 worker 上后续的 BudgetManagement 测试调用 get_budget_status() 时，
+      get_session_usage() 返回 MagicMock，导致 usage.get('input_tokens', 0) 返回
+      MagicMock → max(0, _input_budget - MagicMock) 抛出 TypeError。
+
+    修复策略：
+      1. 重置 session 用量，确保 get_session_usage() 返回干净数据
+      2. 重置 budget 为默认值，消除自定义预算残留
+    """
+    from src.python.llm.cost_tracker import DEFAULT_INPUT_BUDGET, reset_budget
+    from src.python.llm.session import reset_session_usage
+
+    reset_session_usage()
+    reset_budget(DEFAULT_INPUT_BUDGET)
 
 
 @pytest.fixture(autouse=True)

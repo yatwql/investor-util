@@ -28,7 +28,7 @@ A: 请使用支持 UTF-8 的终端（Windows Terminal 或 VS Code 终端），�
 
 **Q: 程序启动时 PowerShell 报"无法加载文件，因为在此系统上禁止运行脚本"？**
 
-A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，再运行 `.\scripts\launch.ps1`。或使用手动方式：`.venv\Scripts\activate` + `python src/python/main.py`。
+A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，再运行 `.\scripts\launch.ps1`。或使用手动方式：`.venv\Scripts\activate` + `python src/python/tui.py`。
 
 **Q: 需要什么 Python 版本？**
 
@@ -113,11 +113,11 @@ echo 'export VENV_PATH=/data/shared/venvs/investor-util' >> ~/.bashrc && source 
 ```bash
 # Linux（Docker / Jenkins / GitHub Actions）
 /data/shared/venvs/investor-util/bin/python scripts/test_runner.py --mode regression
-/data/shared/venvs/investor-util/bin/python src/python/main.py
+/data/shared/venvs/investor-util/bin/python src/python/tui.py
 
 # Windows（部署脚本）
 & "D:\shared\venvs\investor-util\Scripts\python.exe" scripts\test_runner.py --mode regression
-& "D:\shared\venvs\investor-util\Scripts\python.exe" src\python\main.py
+& "D:\shared\venvs\investor-util\Scripts\python.exe" src\python\tui.py
 ```
 
 原理：**PEP 405** 规定 Python 解释器启动时会自动读取同级目录下的 `pyvenv.cfg`，知道自己在虚拟环境中。使用 `.venv/bin/python` 直接执行等效于先 `activate` 再运行——自动使用 venv 内的 site-packages，无需任何环境变量。pip 安装也同理：
@@ -206,7 +206,7 @@ A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式�
 }
 ```
 
-空对象 `{}` 或缺失此字段时使用 17 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
+空对象 `{}` 或缺失此字段时使用 18 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
 **Q: 菜单 P（配置报告可选章节）是做什么的？**
 
@@ -459,11 +459,11 @@ A: 执行 B 或 L 菜单生成报告时，程序会自动保存一份持仓快�
 
 A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最后重试生成报告。各菜单生成的范围差异见[菜单操作手册](how-to-menu.md#报告内容对照)。
 
-**Q: Excel 报告页签的编号（1.~17.）顺序是固定的吗？**
+**Q: Excel 报告页签的编号（1.~18.）顺序是固定的吗？**
 
 A: 默认使用固定顺序（投资分析汇总 → LLM API 用量），但可通过 `config.json` 的 `report_section_order` 字段自定义各模块的序号和排列顺序。未配置时保持默认行为。详见[配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
-菜单 E/B/L 生成范围不同：E 为基础页签（1~5，仅始终显示的 5 个核心模块，不含基金深度分析、不含新闻、不含历史走势），B 含基金深度分析+新闻模块+历史走势（不含 LLM 分析模块），L 为全量（1~17）。各菜单对应的页签范围详见[菜单操作手册](how-to-menu.md#报告内容对照)。
+菜单 E/B/L 生成范围不同：E 为基础页签（1~5、17，仅始终显示的 6 个核心模块，不含基金深度分析、不含新闻、不含历史走势），B 含基金深度分析+新闻模块+历史走势（不含 LLM 分析模块），L 为全量（1~18）。各菜单对应的页签范围详见[菜单操作手册](how-to-menu.md#报告内容对照)。
 
 **Q: 为什么总市值和各账户小计之和有时对不上？**
 
@@ -623,7 +623,22 @@ A: 缓存文件默认存储在 `data/cache/`，主要是行情 JSON（单文件�
 
 **Q: data/state/ 目录是做什么的？会被菜单 [3] 清理吗？**
 
-A: `data/state/` 存放跨会话持久化的运行时状态文件，目前主要为降级状态（`.degradation_state.json`），记录各数据源上次成功获取的时间戳。该目录与 `data/cache/` 隔离，**不会被菜单 `[3]`（清理过期缓存）删除**，也不会被 `cleanup_expired()` 扫描。菜单 `[4]`（查看缓存统计）会单独列出该目录的文件数量和大小。如手动删除该目录，程序会自动重建，但降级记忆会丢失——下次会话启动时降级判定将从零开始，需重新积累连续失败计数。
+A: `data/state/` 存放跨会话持久化的运行时状态文件，目前包含：
+- `.degradation_state.json` — 降级状态（各数据源上次成功获取的时间戳）
+- `circuit_breaker.json` — 熔断器状态（Provider 级熔断记忆，跨会话恢复）
+- `rebalance_silence.json` — 再平衡告警静默期
+- `perf_history.jsonl` — **每次报告生成的阶段耗时记录**（供 `scripts/perf_view.py` 做跨版本趋势分析）
+- `datasource_health.jsonl` — **每次报告生成时自动执行的数据源健康检查结果**（HTTP 连通性+延迟）
+
+该目录与 `data/cache/` 隔离，**不会被菜单 `[3]`（清理过期缓存）删除**，也不会被 `cleanup_expired()` 扫描。菜单 `[4]`（查看缓存统计）会单独列出该目录的文件数量和大小。如手动删除该目录，程序会自动重建，但会丢失降级记忆（熔断从零开始）和性能历史数据。
+
+**Q: data/state/perf_history.jsonl 有何用途？如何查看？**
+
+A: 每次通过菜单 E/B/L 或 CLI 生成报告时，程序自动记录各阶段耗时（行情获取、数据准备、快照对比、历史走势、LLM+新闻、Excel 生成、HTML 生成等）到该文件。运行 `python scripts/perf_view.py` 即可查看按版本和报告类型分组的耗时趋势对比表格。可用于发现版本间性能退化。
+
+**Q: data/state/datasource_health.jsonl 有何用途？**
+
+A: 每次生成报告时，程序在后台并行对所有数据源（腾讯财经、新浪财经、东方财富、天天基金等）执行 HTTP 连通性检查和延迟测量，结果自动记录到该文件，同时注入 DegradationTracker。报告中的数据源可用性矩阵章节（#17）会据此实时展示各数据源状态。该检查与报告生成并行，不阻塞主流程。
 
 **Q: 缓存文件可以手动编辑吗？**
 

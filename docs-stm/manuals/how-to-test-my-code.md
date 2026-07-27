@@ -1,6 +1,6 @@
 # 如何驱动测试 — 测试组合运行指南
 
-> 文档版本：v0.8.5-dev
+> 文档版本：v0.8.8-dev
 
 ## 概述
 
@@ -27,8 +27,8 @@ python scripts/test_runner.py --help
 
 # ===== ① 日常常用（快速反馈，提交前验证） =====
 
-# 快速回归 — 提交前验证（~6min）
-python scripts/test_runner.py --mode regression
+# 提交前快速验证（~1min，P0 门禁）
+python scripts/test_runner.py --mode dev-verify
 
 # 冒烟测试（~2s 快速验证核心通路）
 python scripts/test_runner.py --mode smoke
@@ -95,12 +95,12 @@ pytest src/test/ -m "unit_providers" --lf
 # 在 scripts/test_runner.py 的 MODES 字典中查找，例如：
 #   regression → "scenario"
 #   unit       → "unit"
-#   verify     → "scenario or unit_core or unit_providers or unit_fetcher"
+#   verify     → "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis"
 
 # 然后用 pytest -m + --lf 组合运行
 pytest src/test/ -m "scenario" --lf                  # 等价 --mode regression 的失败重跑
 pytest src/test/ -m "unit_providers" --lf            # 等价 --mode unit 下 unit_providers 的失败重跑
-pytest src/test/ -m "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm" --lf  # 等价 --mode verify
+pytest src/test/ -m "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis" --lf  # 等价 --mode verify
 ```
 
 > 各 `--mode` 对应的 `-m` 表达式见下文「模式与覆盖范围说明」章节，或直接查看 `scripts/test_runner.py` 中 `MODES` 字典的 `marker` 字段。
@@ -137,9 +137,9 @@ pytest src/test/ -m "edge"
 
 | 级别 | 定义 | 阻断点 | 对应的流水线阶段 |
 |:-----|:-----|:-------|:----------------|
-| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `regression`（~6min） |
+| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `dev-verify`（~1min） |
 | **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~8min） |
-| **P2** | 阻塞发布 | 不得 release | ③ `all`（~10min） |
+| **P2** | 阻塞发布 | 不得 release | ③ `verify,regression`（~7min） |
 | **P3** | 建议修复 | 不阻断 | — |
 
 P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
@@ -150,10 +150,11 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 项目推荐的四道质量门禁，按开发阶段逐级收紧：
 
-- **开发期验证（`--mode dev-verify`）** — 每次代码变更后、commit 前可选的快速验证。组合全部 8 个 unit 子模块（并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 2min。适合编码过程中频繁跑"有没有把房子点了"的快速检查。
-- **提交前验证（`--mode regression`）** — commit 前必须执行。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S34 + T1-T21，共 276 项），确保端到端用户路径不被破坏。约 6min。是编辑-验证循环中的正式屏障。
-- **合入验证（`--mode verify`）** — 准备合并到 master 前必须执行。覆盖 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）、`unit_config`（配置管理）、`unit_news`（新闻聚合）、`unit_llm`（LLM 模块）六个单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。并行执行，约 1min。场景测试已在 P0 regression（dev 提交）中覆盖，P1 不再重复。
+- **提交前门禁（`--mode dev-verify` / P0）** — commit 前必须执行。组合全部 11 个 unit 子模块（并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 1min。是编辑-验证循环中的正式屏障。
+- **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S34 + T1-T21，共 276 项），确保端到端用户路径不被破坏。约 6min。推荐在改动了跨模块路径或数据流后补充运行。
+- **合入验证（`--mode verify` / P1）** — 准备合并到 master 前必须执行。覆盖 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）、`unit_config`（配置管理）、`unit_news`（新闻聚合）、`unit_llm`（LLM 模块）六个单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。并行执行，约 1min。场景测试已在 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）中覆盖，P1 不重复。
 - **发布验证（`--mode verify,regression`）** — 发布版本（打 tag/release）前必须执行。组合单元测试 + 场景测试，覆盖全部核心通路。约 3min，比原来的 `--mode all`（~10min）减少 65% 测试量。
+  > 注：若走常规 `dev → merge → tag master` 流程，P1 已保证 `verify` 通过，P2 的 `verify` 属冗余验证。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。如确定流程中有严格 merge 屏障且不直接发布 dev，P2 可优化为仅 `--mode regression`（~6min）。详见 [`testplan.md`](../managements/testplan.md) → §6.3 脚注。
 
 > ⚠ 以上项数为撰写时的快照值，实际计数随版本迭代而变化。
 
@@ -162,15 +163,15 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 **推荐工作流：**
 
 ```
-编码 → --mode dev-verify(2min) → commit → 多次积累 → P0 --mode regression(5min) → merge → P1 --mode verify(1min) → release前 → P2 --mode verify,regression(3min)
-          ↑                         ↑                        ↗
-    改完代码随时跑             提交前再跑              若改跨模块调用
-                            --mode regression(6min)  先跑 --mode integration(50s)
+编码 → --mode dev-verify(1min) → commit → 多次积累 → merge → P1 --mode verify(1min) → release前 → P2 --mode verify,regression(3min)
+          ↑                                    ↗
+    改完代码随时跑                      若改跨模块调用
+      提交前必过P0门禁                  先跑 --mode integration(50s)
 ```
 
 在一次典型开发周期中：
-1. **开发中频繁验证**：修改代码后运行 `--mode dev-verify`（2min）快速确认没有把核心逻辑弄坏
-2. **提交前完整验证**：准备 commit 时运行 `--mode regression`（6min）确保全场景正常
+1. **提交前门禁验证**：修改代码后运行 `--mode dev-verify`（1min）确认核心单元+基础场景通过（P0 强制）
+2. **全场景补充验证**：若改动了跨模块路径/数据流，再跑 `--mode regression`（6min）确保全场景正常
 3. 如果改了跨模块调用关系（缓存、新闻流水线、TUI 路由等），再跑 `--mode integration`（50s）确认接口契约和全链路正常
 4. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify`（1min）确认整条管道通畅
 5. 通过后 commit，积累多次提交后准备合并到 master
@@ -183,14 +184,14 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 单元测试系列（`unit` / `standard`）
 
-- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（9 个子组：providers、fetcher、llm、news、report、config、core、ui、cli），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
+- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（11 个子组：providers、fetcher、llm、news、report、config、core、analysis、ui、cli），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
 - **`--mode standard`** 在 `unit` 基础上排除 edge（异常边界）和 data（数据正确性）两个跨类标记，仅保留"常规路径"的单元测试。适用于日常开发中快速验证模块本身逻辑正确，不需要关心边界情况。
 
 #### 🔷 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
 
-- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（4 个子组：basic、resilience、llm、datetime）。这些测试模拟真实用户操作（如菜单 E/B/L 生成报告），组合多个模块进行端到端验证。
+- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（6 个子组：basic、resilience、llm、datetime、perf、security）。这些测试模拟真实用户操作（如菜单 E/B/L 生成报告），组合多个模块进行端到端验证。
 
-  场景测试按职责分为 **5 大类**：
+  场景测试按职责分为 **7 大类**：
 
   - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、特殊字符不乱码（超多持仓 S0c 在 scenario_extreme）），以及操作行为场景（S29-S34：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市/基准指数走势对比）。
   - **`scenario_resilience` — 异常容错场景**：验证系统在非正常输入或环境下的降级能力，包括纯债券基金组合（穿透无股权覆盖）、网络中断（价格从过期缓存读取）、单账户单持仓、零成本持仓（不除零崩溃）。
@@ -200,8 +201,8 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
 - **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。
-- **`--mode dev-verify`** 开发期快速验证模式，组合全部 9 个 unit 子模块（排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 2min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。
-- **`--mode verify`** 合入门禁模式（`unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm`），包含核心基础设施 + 数据源 Provider + 数据获取调度 + 配置管理 + 新闻聚合 + LLM 模块的单元测试，共约 1min（并行执行）。场景测试由 P0 regression（dev 提交）和 P2 verify,regression（发布验证）覆盖。
+- **`--mode dev-verify`** 提交前门禁模式（P0），组合全部 11 个 unit 子模块（排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 1min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。
+- **`--mode verify`** 合入门禁模式（`unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis`），包含核心基础设施 + 数据源 Provider + 数据获取调度 + 配置管理 + 新闻聚合 + LLM 模块 + 分析计算的单元测试，共约 1min（并行执行）。场景测试由 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）覆盖。
 
 #### 🔷 专项验证系列（`edge` / `data` / `smoke`）
 
@@ -211,7 +212,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 全量（`all`）
 
-- **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 3min，替代原先的 `--mode all`（~10min）作为发布门禁。
+- **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 3min，作为发布门禁。
 - **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试（3741+ 项，~6.5min）。需要全覆盖时手动调用。
 - **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
 

@@ -15,7 +15,7 @@ import json
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_rebalance, pytest.mark.edge]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
 from src.python.analysis.rebalance import (
     _calc_category_weights,

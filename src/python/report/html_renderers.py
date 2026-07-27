@@ -14,7 +14,7 @@ from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix
 from src.python.report.fund_performance import is_fund
-from src.python.report.fund_style_analysis import analyze_style_for_all_funds
+from src.python.report.fund_style_report import analyze_style_for_all_funds
 from src.python.report.html_builders import _build_category_data, _build_perf_data
 from src.python.report.llm_module_info import build_llm_module_info
 from src.python.report.market_value import (
@@ -248,7 +248,7 @@ def _render_fund_performance_section(
     """构建基金业绩分析数据。
 
     Returns:
-        (perf_data, True) — 第二项保留供兼容
+        (perf_data, True) — 第二项为固定值
     """
     prog.info("正在获取基金业绩排名...")
     perf_data = _build_perf_data(holdings, details, progress=prog)
@@ -469,7 +469,7 @@ def _render_llm_content_section(
 
     # 注意：此路径不应在正常情况下触发——orchestrator 始终预生成 llm_content
     # 后传入 write_html_report()，enable_llm=True 时 llm_content 不应为 None。
-    # 保留此函数签名仅用于兼容，直接返回空值并记录告警。
+    # 兜底路径：orchestrator 未预生成 llm_content 时返回空值并记录告警。
     logger.warning(
         "_render_llm_content_section: llm_content 未预生成（enable_llm=True），LLM 内容应通过 orchestrator 预生成后传入"
     )

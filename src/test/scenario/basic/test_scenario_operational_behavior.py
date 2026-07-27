@@ -313,7 +313,7 @@ class TestS32CrossAccount(unittest.TestCase):
         self.assertEqual(row2.code, "600900")
         self.assertEqual(row1.shares, 100.0)
         self.assertEqual(row2.shares, 50.0)
-        # 市值分别计算，不再合并
+        # 市值分别计算，不合并
         self.assertEqual(row1.market_value, 2500.0)  # 100 × 25
         self.assertEqual(row2.market_value, 1250.0)  # 50 × 25
         # 合计（分类汇总应由 summary 模块处理合并）

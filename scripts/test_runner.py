@@ -61,14 +61,14 @@ MODES: dict[str, dict] = {
         "parallel": False,
     },
     "dev-verify": {
-        "marker": ("(unit_core or unit_providers or unit_fetcher) and not (edge or data) or (scenario_basic)"),
-        "desc": "开发期快速验证（core/providers/fetcher 单元 + 基础场景，~2min）",
+        "marker": ("(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)"),
+        "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景，~1min）",
         "timeout_sec": 180,
         "order": 5,
         "parallel": True,
     },
     "verify": {
-        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm",
+        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis",
         "desc": "合入验证（核心/配置/新闻/LLM 模块单元测试，不含场景——场景由 P0+P2 覆盖）",
         "timeout_sec": 300,
         "order": 6,

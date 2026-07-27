@@ -403,11 +403,11 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         return mock_llm
 
     def test_generate_all_llm_receives_dict_indices(self):
-        """LLM 内容由 orchestrator 预生成后传入 html_writer，html_writer 自身不再调用 generate_all_llm。"""
+        """LLM 内容由 orchestrator 预生成后传入 html_writer，html_writer 自身不调用 generate_all_llm。"""
         mock_llm = self._run_with_mocks()
 
-        # generate_all_llm 已上移至 orchestrator._fetch_llm_and_news，
-        # html_writer 不再直接调用
+        # generate_all_llm 位于 orchestrator._fetch_llm_and_news，
+        # html_writer 不直接调用
         mock_llm.assert_not_called()
 
     def test_llm_path_no_crash_on_dict_values(self):

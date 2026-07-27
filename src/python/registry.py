@@ -523,8 +523,10 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
     {"key": "portfolio_history", "name": "组合历史走势", "number": 15, "type": "history", "data_flag": None},
     {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16, "type": "history", "data_flag": None},
+    # ── always 类型（始终显示） ──
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 17, "type": "always", "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 17, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 18, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 
@@ -561,7 +563,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 
     处理逻辑：
-      1. 无配置或配置为空 → 返回完整 17 项默认顺序（与当前硬编码一致）
+      1. 无配置或配置为空 → 返回完整 18 项默认顺序（与当前硬编码一致）
       2. 用户配置的模块使用配置序号，其余保持默认序号
       3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
       4. llm_usage 始终固定在最后一位
@@ -571,7 +573,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 17 项
+        [{key, name, number, type, data_flag}, ...] 共 18 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

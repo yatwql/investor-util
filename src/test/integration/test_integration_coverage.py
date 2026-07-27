@@ -1,4 +1,4 @@
-"""集成测试覆盖增补 — P0 U 五类集成验证。
+"""集成测试覆盖增补 — 五类集成验证。
 
 覆盖项：
   1. 模块间接口契约验证     — reader → market_value → penetration 类型链
@@ -571,7 +571,7 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_all_menu_keys_have_callbacks(self):
         """所有非退出菜单项的 callback 不为 None。"""
-        from src.python.main import _bind_callbacks
+        from src.python.tui import _bind_callbacks
         from src.python.tui_menu import MENU_ITEMS
 
         _bind_callbacks()
@@ -614,7 +614,7 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_bind_callbacks_fills_all_slots(self):
         """_bind_callbacks 后所有菜单项 callback 非 None。"""
-        from src.python.main import _bind_callbacks
+        from src.python.tui import _bind_callbacks
 
         _bind_callbacks()
 
@@ -641,7 +641,7 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_keyboard_shortcut_routing(self):
         """字母键直达路由：E → handler_report._cmd_generate_excel。"""
-        from src.python.main import _bind_callbacks
+        from src.python.tui import _bind_callbacks
 
         _bind_callbacks()
 
@@ -655,7 +655,7 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_llm_key_routes_to_full_generation(self):
         """L 键路由到 _cmd_generate_full。"""
-        from src.python.main import _bind_callbacks
+        from src.python.tui import _bind_callbacks
 
         _bind_callbacks()
 

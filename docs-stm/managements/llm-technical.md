@@ -1,6 +1,6 @@
 # LLM 集成层技术设计
 
-> 文档版本：v0.8.5-dev
+> 文档版本：v0.8.8-dev
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -147,9 +147,9 @@ skeleton.py:_generate_llm_content()
 
 ## 2. 模块清单
 
-### 2.1 16 子模块总览
+### 2.1 子模块总览
 
-说明：`prompts.py` 逻辑上已拆分为 `prompts_core.py` / `prompts_tables.py` / `prompts_action.py` 3 文件，`prompts.py` 仍保留为 re-export 入口供外部模块兼容导入。
+说明：`prompts.py` 为统一导出入口，将 `prompts_core.py` / `prompts_tables.py` / `prompts_action.py` 的公开符号汇总导出。
 
 | 模块 | 分类 | 职责 | 入口函数 |
 |:-----|:-----|:------|:---------|
@@ -162,9 +162,9 @@ skeleton.py:_generate_llm_content()
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
 | `fact_checker.py` | 基础设施 | LLM 输出伪代码/虚假信息过滤，正则级行级幻觉检测 | `run_fact_check()` |
 | `fallback.py` | 基础设施 | 全模块失败时的降级占位模板 | `get_fallback_content()` |
-| `prompts_core.py` | 工具 | System/User Prompt 构建（拆分自 prompts.py） | `_build_system_prompt()` / `_build_user_prompt()` |
-| `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown（拆分自 prompts.py） | `_build_metrics_table()` / `_build_performance_table()` |
-| `prompts_action.py` | 工具 | 行动建议表格/诊断结论格式化（拆分自 prompts.py） | `_build_action_table()` / `_build_diagnosis_block()` |
+| `prompts_core.py` | 工具 | System / User Prompt 构建 | `_build_system_prompt()` / `_build_user_prompt()` |
+| `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown | `_build_metrics_table()` / `_build_performance_table()` |
+| `prompts_action.py` | 工具 | 行动建议表格/诊断结论格式化 | `_build_action_table()` / `_build_diagnosis_block()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `_compute_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `reset_session_usage()` |
 | `cost_tracker.py` | 工具 | Token 预算管理、输入检查、成本摘要格式化（compact/verbose） | `reset_budget()` / `get_cost_summary()` |
@@ -543,6 +543,49 @@ _configure_extended_thinking(payload, llm_config, config_field, model, max_token
 
 **temperature 处理**：标准模式通过 `skeleton.py` 传递 `llm_config.get("temperature_{module_key}")`；仅当 `thinking` 未启用时注入 payload。
 
+#### _call_gemini() 关键细节
+
+**URL**: `{endpoint}/models/{model}:generateContent`
+
+默认 `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`（模型名嵌入 URL 路径）。
+
+**认证方式**：通过 `x-goog-api-key` 请求头传递 API Key，凭据在 `llm_key.json` 中配置。
+
+**Payload 结构**：
+```python
+{
+    "contents": [
+        {"role": "user", "parts": [{"text": user_prompt}]},
+    ],
+    "systemInstruction": {"parts": [{"text": system_prompt}]},
+    "generationConfig": {
+        "maxOutputTokens": max_tokens,
+    },
+}
+```
+
+`system_prompt` 通过 `systemInstruction` 字段传递（非 messages 数组内），`user_prompt` 通过 `contents[0].parts[0].text` 传递。
+
+**Extended Thinking 注入**（通过 `generationConfig.thinkingConfig`）：
+
+```
+call_gemini() Extended Thinking 注入
+    │
+    ├─ 读取 thinking_enabled_{module_suffix}
+    │      False → 无操作返回
+    │
+    ├─ 验证模型兼容性 (_supports_extended_thinking)
+    │      不兼容 → 自动降级跳过，记录 WARNING
+    │
+    └─ 启用 Thinking →
+           payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
+           budget 从 thinking_budget_{module_suffix} 读取
+           不足 max_tokens + 1024 时自动兜底到 max_tokens + 4096
+           payload["generationConfig"].pop("temperature", None)  ← 与 temperature 互斥
+```
+
+与 Claude 的区别：Gemini 的 Thinking 配置位于 `generationConfig.thinkingConfig`（而非顶层 `thinking` 字段），且仅支持 `budget_tokens` 模式（通过 `thinkingBudget` 参数），不支持 `effort` 模式。
+
 ### 5.2 Multi-Provider Chain
 
 #### 设计目标
@@ -851,9 +894,9 @@ _session_usage = {
 | `get_budget_status()` | 查询当前预算使用情况 |
 | `get_cost_summary(for_report=True)` | 生成成本摘要文本（`for_report=True` 对应 verbose 模式） |
 
-### 9.1a duration 字段
+### 9.1.1 duration 字段
 
-`record_per_module()` 新增 `duration: float = 0.0` 参数，记录每个模块的 API 调用耗时（秒）。`skeleton.py` 中 `generate_llm_content()` 通过 `time.monotonic()` 计时，调用 `call_llm()` 前后计算耗时，传入 `_finalize_and_cache()` 后写入 `per_module` 的 `"duration"` 键。多条缓存路径（首次生成 + 截断重试）的耗时通过 `duration` 字段累计。
+`record_per_module()` 接受 `duration: float = 0.0` 参数，记录每个模块的 API 调用耗时（秒）。`skeleton.py` 中 `generate_llm_content()` 通过 `time.monotonic()` 计时，调用 `call_llm()` 前后计算耗时，传入 `_finalize_and_cache()` 后写入 `per_module` 的 `"duration"` 键。多条缓存路径（首次生成 + 截断重试）的耗时通过 `duration` 字段累计。
 
 HTML 报告页脚自动显示每个模块的耗时（`耗时: X.Xs`），便于识别慢模块。
 
@@ -878,7 +921,7 @@ enhance_news_correlation() -> 新闻关联完成
 ### 9.3 生命周期
 
 ```
-main.py 菜单 L/B 入口
+tui.py 菜单 L/B 入口
     │
     ├─ reset_session_usage()          ← 会话开始，清空累计
     ├─ generate_all_llm()              ← 4 模块并行生成

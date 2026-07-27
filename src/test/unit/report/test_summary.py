@@ -217,7 +217,7 @@ class TestWriteSummarySheet(unittest.TestCase):
 
     def setUp(self):
         self.ws = MagicMock()
-        self.ws.title = "fixture_title"  # 写入器不再修改标题，仅做 fixture 预设
+        self.ws.title = "fixture_title"  # 写入器不修改标题，仅做 fixture 预设
         self.cell = MagicMock()
         self.ws.cell.return_value = self.cell
 
@@ -427,7 +427,7 @@ class TestWriteSummarySheet(unittest.TestCase):
         mocks["mock_profit_font"].assert_any_call(-3000.0)
 
     def test_profit_font_rate_positive(self):
-        """收益率正数时 profit_font 传入原始浮点数值（不再经字符串格式化舍入）。"""
+        """收益率正数时 profit_font 传入原始浮点数值（不经字符串格式化舍入）。"""
         mocks = self._call_summary_sheet(
             self.ws, self.mv, self.cost, self.profit, self.today,
             categories=self.categories,
@@ -438,7 +438,7 @@ class TestWriteSummarySheet(unittest.TestCase):
         mocks["mock_profit_font"].assert_any_call(5000.0 / 145000.0)
 
     def test_profit_font_rate_negative(self):
-        """收益率负值时 profit_font 传入原始浮点数值（不再经字符串格式化舍入）。"""
+        """收益率负值时 profit_font 传入原始浮点数值（不经字符串格式化舍入）。"""
         mocks = self._call_summary_sheet(
             self.ws, 90000.0, 100000.0, -10000.0, -2000.0,
             categories=self.categories,

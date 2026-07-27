@@ -1,7 +1,7 @@
 # CI/CD 流水线 — GitHub Actions
 #
 # 门禁等级（与 CLAUDE.md 一致）：
-#   P0（提交前）→ regression 模式 — dev 分支每次推送
+#   P0（提交前）→ dev-verify 模式 — dev 分支每次推送
 #   P1（合入前）→ verify 模式   — master 分支 PR/推送
 #   P2（发布前）→ all 模式       — 版本标签推送
 
@@ -37,9 +37,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[test]"
 
-      - name: P0 — 回归测试（dev 提交门禁）
+      - name: P0 — 快速验证（dev 提交门禁）
         if: github.ref_name == 'dev' && github.event_name == 'push'
-        run: python scripts/test_runner.py --mode regression --no-timeout
+        run: python scripts/test_runner.py --mode dev-verify --no-timeout
 
       - name: P1 — 合入验证（master 门禁）
         if: github.ref_name == 'master' || github.event_name == 'pull_request'

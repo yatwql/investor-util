@@ -941,7 +941,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
         self.assertEqual(result[3], ("低", "中性", ""))  # 缺失项默认值
 
     def test_irrelevant_not_filtered(self) -> None:
-        """"无关"不再被过滤——元组中直接返回原始数据，由调用方决定是否跳过。"""
+        """"无关"不被过滤——元组中直接返回原始数据，由调用方决定是否跳过。"""
         from src.python.llm.generators_news import _apply_llm_news_correlation
         llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "中性", "analysis": "利好"}, {"idx": 1, "relevance": "无关", "sentiment": "中性", "analysis": "无关内容"}]'
         result = _apply_llm_news_correlation(self.news, llm_resp)

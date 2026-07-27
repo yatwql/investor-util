@@ -14,9 +14,11 @@
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
-| `perf_report.py` | 诊断 | 端到端报告生成管线性能基准 |
+| `perf_report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
+| `perf_view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
 | `diagnose_gemini_proxy.py` | 诊断 | Gemini API 代理连通性诊断 |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本 |
+| `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
 
 ---
 
@@ -31,7 +33,7 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 python scripts/test_runner.py --help
 
 # 日常提交前门禁（P0）
-python scripts/test_runner.py --mode regression
+python scripts/test_runner.py --mode dev-verify
 
 # 合入门禁（P1）
 python scripts/test_runner.py --mode verify
@@ -67,8 +69,8 @@ python scripts/test_runner.py --mode unit --coverage
 | `data` | `data` | ~10s |
 | `scenario` | `scenario` | ~6min |
 | `integration` | `integration` | ~50s |
-| `verify` | `scenario or unit_core or unit_providers or unit_fetcher` | ~8min |
-| `dev-verify` | `unit or smoke` | ~1min |
+| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis` | ~1min |
+| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)` | ~1min |
 | `all` | （无过滤，全量） | ~10min |
 | `all_no_unit` | `not unit` | ~7min |
 | `report` | `unit_report` | ~15s |
@@ -229,6 +231,37 @@ python scripts/perf_report.py
 
 ---
 
+### `perf_view.py` — 性能历史趋势查看
+
+读取 `data/state/perf_history.jsonl`（由 `PerfCollector` 在每次报告生成时自动追加），按版本和报告类型分组统计，输出版本间性能趋势对比。
+
+```bash
+# 输出全部历史趋势到 stdout
+python scripts/perf_view.py
+
+# 仅看 full 类型报告的性能趋势
+python scripts/perf_view.py --report-type full
+
+# 仅看最近 30 条记录
+python scripts/perf_view.py --last 30
+
+# 同时写入 docs-stm/tmp/perf_trend.md
+python scripts/perf_view.py --save
+```
+
+**输出列说明**：
+
+| 列 | 含义 |
+|:---|:------|
+| 阶段 | 报告生成管线阶段名称（行情获取/快照对比/历史走势/HTML 生成/Excel 生成 等） |
+| 平均耗时 | 该阶段历史平均耗时 |
+| 最短/最长 | 该阶段历史最小/最大耗时 |
+| 次数 | 该阶段出现次数（条件阶段如历史走势仅在启用时出现） |
+
+**数据来源**：每次 `generate_report()` 调用时自动记录到 `data/state/perf_history.jsonl`，无需手动触发。
+
+---
+
 ### `diagnose_gemini_proxy.py` — Gemini API 代理诊断
 
 当 Gemini API 代理（如 `http://10.22.207.29:10037`）出现连通性问题时，逐项检测网络层、代理层和 API 层的健康状况。
@@ -264,3 +297,31 @@ python scripts/diagnose_gemini_proxy.py
 ```
 
 两者均负责：激活虚拟环境（如存在）、设置 `PYTHONPATH`、启动主程序 TUI。
+
+---
+
+## CLI 模式
+
+### `--check-sources` — 数据源健康检查
+
+跳过 TUI 交互界面，直接测试各数据源联通性并报告延迟。
+
+```bash
+# 运行数据源健康检查
+python -m src.python.cli check-sources
+```
+
+**输出示例**：
+
+```
+数据源健康检查结果 (2026-07-26)
+──────────────────────────────────────────────────────────
+  ✅  腾讯财经      行情           45ms  正常
+  ✅  新浪财经      行情           82ms  正常
+  ⚠️  天天基金      持仓/排名     2.3s  响应慢
+  ❌  akshare       资金           timeout  连接超时
+```
+
+**检查覆盖范围**：腾讯财经行情、新浪财经行情、东方财富净值、天天基金持仓/排名、东方财富行业分类、新浪财经新闻、东方财富新闻、华尔街见闻、财联社、腾讯 K 线——共 **10 个端点**。
+
+**退出码**：0=全部正常，1=有告警（部分源慢），2=有失败。

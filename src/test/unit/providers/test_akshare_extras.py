@@ -173,7 +173,7 @@ class TestGetDividendData(unittest.TestCase):
         self.assertIn("600519", result1)
         self.assertEqual(mock_ak.call_count, 1)
 
-        # 重置 mock，准备验证第二次不再调用
+        # 重置 mock，准备验证第二次不调用
         mock_ak.reset_mock()
         mock_get.reset_mock()
 

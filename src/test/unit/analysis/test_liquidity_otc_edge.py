@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.edge, pytest.mark.unit_providers]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
 
 class TestLiquidityOTCEdge:

@@ -36,7 +36,7 @@ _DEFAULT_CONFIG = {
     "llm_settings_file": os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
-    # ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──
+    # ── B. 报告章节可见性 ──
     "enable_b_series": True,  # 基金深度分析（#6~9）
     "enable_news": True,  # 市场新闻（#10）
     "enable_history": True,  # 组合历史走势+回撤（#16~17）
@@ -150,7 +150,7 @@ def _get_default_config_template() -> str:
         '    "t4": {"unreachable_threshold": 1, "empty_data_threshold": 1, "stale_days": 14}\n'
         "  },\n"
         "\n"
-        "  // ── F. 业绩基准 ──\n"
+        "  // ── F. 业绩基准与无风险利率 ──\n"
         '  "risk_free_rate": null,\n'
         '  "user_fund_benchmarks": {},\n'
         '  "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},\n'

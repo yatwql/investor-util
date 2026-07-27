@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 
 class TestBondYieldFetcher:

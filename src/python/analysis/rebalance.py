@@ -650,7 +650,7 @@ def equity_fixed_income_deviation(
       - 权益类（equity）：equity + fund_equity + qdii
       - 固收类（fixed_income）：fixed_income + money_market + alternative
 
-    对照目标配置（P3-01）计算偏离度，偏离低于阈值时不输出。
+    对照目标配置计算偏离度，偏离低于阈值时不输出。
     输出示例："权益类仓位 78%，超过目标上限 70%（超配 8%），建议适当止盈权益类品种，增配固收类"
 
     Args:

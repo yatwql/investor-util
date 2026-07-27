@@ -94,6 +94,11 @@
         .data-status-warn { border-left: 3px solid #e67e22; padding-left: 8px; margin: 3px 0; color: #e67e22; }
         .data-status-info { border-left: 3px solid #95a5a6; padding-left: 8px; margin: 3px 0; color: #666; }
         .data-status-ok { border-left: 3px solid #27ae60; padding-left: 8px; margin: 3px 0; color: #27ae60; }
+        /* ── 数据源可用性矩阵 ──────────────── */
+        .src-matrix-ok { color: #27ae60; font-weight: 600; }
+        .src-matrix-degraded { color: #e67e22; font-weight: 600; }
+        .src-matrix-failed { color: #cc0000; font-weight: 600; }
+        .src-matrix-detail { font-size: 12px; color: #888; }
 
 {% macro render_data_status(data_status_dict) %}
 {% if data_status_dict %}
@@ -1644,6 +1649,65 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+    </div>
+    {% endif %}
+
+    {% if section_visible("data_source_status") %}
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 18: 数据源可用性矩阵                           -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-data_source_status" style="order: {{ section_numbers['data_source_status'] }};">
+        <div class="section-title">{{ section_numbers['data_source_status'] }}、数据源可用性矩阵</div>
+        <div class="section-content">
+            {% if data_source_matrix %}
+            <table>
+                <tr>
+                    <th>数据源</th>
+                    <th>状态</th>
+                    <th>详情</th>
+                    <th>正常</th>
+                    <th>降级/失败</th>
+                </tr>
+                {% for m in data_source_matrix %}
+                <tr>
+                    <td style="text-align:left;font-weight:600;">{{ m.name }}</td>
+                    <td>
+                        {% if m.status == "ok" %}
+                        <span class="src-matrix-ok">&#10003; 正常</span>
+                        {% elif m.status == "degraded" %}
+                        <span class="src-matrix-degraded">&#9888; 降级</span>
+                        {% else %}
+                        <span class="src-matrix-failed">&#10007; 失败</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:left;" class="src-matrix-detail">{{ m.detail }}</td>
+                    <td>{{ m.ok }}</td>
+                    <td>{{ m.degraded }}/{{ m.failed }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% set _has_failures = namespace(value=false) %}
+            {% for m in data_source_matrix %}
+            {% if m.sample_failures %}
+            {% set _has_failures.value = true %}
+            {% endif %}
+            {% endfor %}
+            {% if _has_failures.value %}
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">失败明细</div>
+                {% for m in data_source_matrix %}
+                {% for sf in m.sample_failures %}
+                <div class="data-status-info">&#8505; [{{ m.name }}] {{ sf }}</div>
+                {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="data-status" style="margin-top:0;">
+                <div class="data-status-ok" style="border-left-color:#27ae60;padding-left:8px;">所有数据源运行正常</div>
+            </div>
+            {% endif %}
+        </div>
     </div>
     {% endif %}
 

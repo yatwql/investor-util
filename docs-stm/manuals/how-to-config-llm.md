@@ -2,7 +2,7 @@
 
 全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、以及可选的财经新闻热点与持仓关联分析均需调用外部 LLM API。
 
-LLM 配置拆分为三个独立文件，分工明确：
+LLM 配置由三个独立文件管理：
 
 | 文件 | 内容 | 用途 |
 |------|------|------|
@@ -10,7 +10,7 @@ LLM 配置拆分为三个独立文件，分工明确：
 | `data/config/llm_providers.json` | Provider 路由配置（多链模式） | 定义多个 Provider 的切换顺序、策略和凭据引用 |
 | `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt 等） |
 
-> **为什么拆分？** `llm_key.json` 包含 API Key，可加入 `.gitignore` 避免误提交；
+> **为什么用三个文件？** `llm_key.json` 包含 API Key，可加入 `.gitignore` 避免误提交；
 > `llm_providers.json` 和 `llm_settings.json` 不含密钥，可安全纳入版本控制，方便团队共享调优参数。
 >
 > **不配置会怎样？** `llm_key.json` 缺失或 key 为空时，程序不崩溃，其他功能正常。对应报告页签显示占位提示。不同失败场景的占位文本：
@@ -648,7 +648,7 @@ export HTTP_PROXY="http://127.0.0.1:7890"
 export HTTPS_PROXY="http://127.0.0.1:7890"
 
 # 设置后运行程序即可
-python -m src.python.main
+python -m src.python.tui
 ```
 
 ### Windows PowerShell
@@ -659,7 +659,7 @@ $env:HTTP_PROXY = "http://127.0.0.1:7890"
 $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 
 # 设置后运行程序
-python -m src.python.main
+python -m src.python.tui
 ```
 
 ### 注意事项

@@ -162,15 +162,11 @@ def _log_source_status(src_results: dict[str, tuple[int, str]]) -> None:
 def _normalize_title(title: str) -> str:
     """标准化标题：去标点、去空格、去常见前缀，过滤通用数字模式降虚高。
 
-    数字模式（百分比、金额）在不同新闻中可能无意共享，导致
+    数字模式（百分比、金额、年份、排名标记）在不同新闻中可能无意共享，导致
     SequenceMatcher 比率虚高和实体 bigram 中数字 token 的虚假重叠。
     过滤后同时降低 bigram 提取噪声和比率比较的误判。
 
     用于跨源标题去重，消除"快讯：""收评"等差异。
-
-    2026-07-22 扩展：增加更多编辑/栏目前缀（数据图解、CCI快报等），
-    过滤孤立 4 位年份数字和排名列表标记（前N），降低校准锚点中
-    bg≤1 但 ratio≥0.40 的噪声比例。
     """
     import re
 
@@ -208,6 +204,9 @@ def _normalize_title(title: str) -> str:
     title = re.sub(r"(?<=[a-zA-Z])\s*\d{4}\b", "", title)
     # 排名/列表标记（"前20""前10"），可安全移除的修饰语
     title = re.sub(r"前\d+", "", title)
+    # 孤立 4 位年份数字（1900-2099），避免不同新闻因共享"2026"等年份数字
+    # 在实体 bigram 提取和 SequenceMatcher 中产生虚假重叠。
+    title = re.sub(r"\b(?:19|20)\d{2}\b", "", title)
     title = re.sub(r"[^\w一-鿿]", "", title)
     return title.strip().lower()
 
@@ -260,13 +259,16 @@ def _dedup_by_title(
 ) -> list[dict[str, Any]]:
     """基于标准化标题模糊去重 + 中文实体 bigram 辅助判定。
 
-    两档阈值策略（基于 37 条真实新闻 24 对重复 + 23 对非重复校准）：
+    三档阈值策略（基于 10.6 万条锚点校准，2026-07-26 更新）：
       - 同源：共享实体 bigram ≥ 2 即合并。
         同源不会同时出现方向对立报道（如"突破3万亿"vs"跌破3万亿"），
         所以不依赖 SequenceMatcher 阈值，只检查实体重叠。
-      - 跨源：分成两段——
+      - 跨源：采用梯度阈值——
         ① ratio ≥ 0.50 安全区，直接合并
-        ② cross_threshold ≤ ratio < 0.50，需共享 ≥ 3 个实体 bigram 防误杀
+        ② cross_threshold ≤ ratio < 0.50，阶梯判定：
+           - 共享 ≥ 3 个实体 bigram → 合并（高实体重叠，低 ratio 门槛）
+           - 共享 ≥ 2 个实体 bigram 且 ratio ≥ 0.38 → 合并（梯度补偿）
+           - 否则跳过（实体重叠不足或 ratio 太低）
 
     实体 bigram：
       - 提取中文 2-gram，过滤常见财经动词（上调/下跌/超越等）
@@ -336,14 +338,25 @@ def _dedup_by_title(
     }
 
     def _extract_entity_bigrams(text: str) -> set[str]:
-        """提取标题中的实体特征：中文 bigram + 英数 token。
+        """提取标题中的实体特征：中文 bigram + 英数 token + 长英文专名加权。
 
         中文实体判定依赖 2-gram 重叠；英数 token 补全"AI""AMD"等被中文
-        正则过滤的专名。
+        正则过滤的专名；长度 ≥ 4 的英文专名（Anthropic/Meta/Helios 等）
+        额外插入 _tk: 前缀虚拟 bigram，使共享专名在 bigram 计数中获得
+        权重加成，避免因英文专名占比高但 token 条数少而漏过候选区。
         """
         # 英数 token：长度 ≥ 2 避免单字符噪声
         tokens = re.findall(r"[a-zA-Z]+|[0-9]+", text)
-        result: set[str] = set(t.lower() for t in tokens if len(t) >= 2)
+        result: set[str] = set()
+        for t in tokens:
+            t_lower = t.lower()
+            if len(t_lower) >= 2:
+                result.add(t_lower)
+                # 长英文专名（≥4 字符）额外插入虚拟 bigram 占用位，
+                # 提升共享专名在实体重叠计数中的权重（如 Anthropic+Meta
+                # 在 bg 计数中额外贡献 2 点，使 bg=2+2=4 进入合并区）。
+                if t_lower.isalpha() and len(t_lower) >= 4:
+                    result.add(f"_tk:{t_lower}")
         # 中文 bigram
         chinese_only = re.sub(r"[^一-鿿]", "", text)
         for i in range(len(chinese_only) - 1):

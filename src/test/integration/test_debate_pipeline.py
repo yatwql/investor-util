@@ -42,7 +42,7 @@ def _make_dispatch_mock(debate_info: dict | None = None):
 
 
 class TestDebatePipelineBackwardCompat(unittest.TestCase):
-    """向后兼容测试：所有 Flag 关闭时输出 8 元组（不含 debate_info）。"""
+    """所有 Flag 关闭时输出 8 元组（不含 debate_info）。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
     @patch("src.python.features.is_feature_enabled")
@@ -53,7 +53,7 @@ class TestDebatePipelineBackwardCompat(unittest.TestCase):
         mock_feature,
         mock_config,
     ):
-        """所有 Feature Flag 为 False → 返回 8 元组（向后兼容）。"""
+        """所有 Feature Flag 为 False → 返回 8 元组。"""
         mock_config.return_value = {"cache_enabled_expert_review": True,
                                     "enabled_llm": {"global_macro": True,
                                                     "expert_review": True,

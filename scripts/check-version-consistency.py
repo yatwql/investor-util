@@ -71,6 +71,8 @@ add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md", "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md", "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md", "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "folders.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md", "v{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
 add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md", "v{v}")
 

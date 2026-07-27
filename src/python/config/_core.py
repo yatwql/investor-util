@@ -231,7 +231,7 @@ def is_enable_llm(config: dict | None = None) -> bool:
 
     检查 llm_settings.json 中 4 个 LLM 报告模块（global_macro /
     expert_review / health_check / penetration_deep）是否有任一启用。
-    缺失时返回 True（向后兼容）。
+    缺失时返回 True（默认启用）。
 
     注意：news_correlation 仅用于新闻关联分析，不影响 LLM 分析章节整体可见性。
     """
@@ -258,7 +258,7 @@ def _check_unknown_llm_keys(settings: dict) -> None:
     unknown = [key for key in settings if key not in _KNOWN_LLM_SETTINGS_KEYS]
     if unknown:
         logger.warning(
-            "llm_settings.json 中检测到 %d 个未知配置项，可能是拼写错误或已废弃的配置: %s。请核对后删除，避免混淆。",
+            "llm_settings.json 中检测到 %d 个未知配置项，可能是拼写错误或无法识别的配置项: %s。请核对后删除，避免混淆。",
             len(unknown),
             ", ".join(repr(k) for k in sorted(unknown)),
         )

@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_rebalance]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 from src.python.analysis.rebalance import (
     _categorize_holdings,

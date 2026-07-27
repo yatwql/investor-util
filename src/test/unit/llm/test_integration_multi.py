@@ -82,7 +82,7 @@ class TestConfigNoLlmKeyFile(unittest.TestCase):
 
     @patch("src.python.config._core.os.path.exists")
     def test_llm_key_path_not_exported(self, mock_exists: MagicMock) -> None:
-        """验证 get_llm_key_path 不再从 config 模块导出。"""
+        """验证 get_llm_key_path 未从 config 模块导出。"""
         import src.python.config as cfg
         self.assertFalse(hasattr(cfg, "get_llm_key_path"),
                          "get_llm_key_path 应从 config 模块移除")

@@ -4,14 +4,79 @@
 
 ---
 
-## [0.8.5-dev] - 未发布
+## [0.8.8-dev] - 未发布
+
+### Fixed
+-（待补充）
+
+## [0.8.7] - 2026-07-27
+
+### Added
+- **三层性能基准体系（P3-13）**：① `perf.py` PerfCollector 在 `generate_report()` 三路径（basic/both/full）嵌入轻量计时埋点，每次运行自动记录各阶段耗时到 `data/state/perf_history.jsonl` ② `scripts/perf_report.py` 保留独立基准脚本（mock 外部源）用于精准回归检测 ③ `scripts/perf_view.py` 趋势查看工具读取历史文件输出版本间耗时对比 Markdown 表格。遵循 C3（原子写入）、C8（统一日志）、C14（局部实例非单例）、C16（路径绝对化）约束
+- **数据源健康检查自动收集**：每次客户端生成报告时，后台并行运行全量数据源健康检查（HTTP 连通性+延迟），结果存入 `data/state/datasource_health.jsonl` 并注入 DegradationTracker，供数据源可用性矩阵章节（#17）实时展示。`handlers_check_sources.py` 提取 `run_health_checks()` 返回结构化数据，CLI `check-sources` 命令保持不变
+
+### Fixed
+- **excel_b_series.py `NameError: _fetch_fund_holdings_cached`**：P2-6（提交 `259e4b4`）将本地私有函数 `_fetch_fund_holdings_cached` 提取到 `fetcher/fund.py` 为公开函数 `fetch_fund_holdings_cached`，删除了本地定义并更新了导入名，但调用点（`_process_b_module` 第 36 行）仍使用旧私有名 `_fetch_fund_holdings_cached`，导致 `enable_b_series=True` 且持有基金时触发 `NameError`，持仓重合度/集中度/风格分析三个模块均回退为占位。修复：导入 `fetch_fund_holdings_cached` 并修正调用名
+- **新闻去重 cross_merge_bg2 梯度规则 78% 误判**：v0.8.6 引入的 bg=2 + ratio≥0.40 梯度规则实际仅 2/9 pair 正确合并，其余 7/9 为高频金融 bigram（"指数""涨""成交""额"）导致的虚假重叠（如"N长鑫成交额1300亿"误合并为"沪深总成交额20766亿"、"港股开盘"误合并为"日经225收盘"）。移除该规则，恢复纯 bg≥3 合并条件。涉及 `news_aggregator.py`、`calibrate-dedup-threshold.py`、`test_news_sources.py`
+
+### Changed
+- **代码/测试注释历史迭代痕迹清理（6 轮）**：全面清除源码注释、测试注释/描述、管理文档正文（changelog.md/plan.md/review-findings.md 除外）、用户文档中的所有历史变更痕迹。覆盖模式包括「不再」「向后兼容」「保留供兼容」「已废弃」「原有的」「此前」「曾」「已迁」「已拆分」「已改为」等，累计修复 50+ 处。涉及 8 个源码文件、5 个测试文件、3 份管理文档、3 份用户文档。豁免文件按约定保留历史记录
+- **P3-11 问题描述修正**：`review-findings.md` P3-11 从错误描述的"async 异步化"修正为 ThreadPoolExecutor 批量并行方案，对齐 C5/C6/C2/C3/§1.4.5 架构约束
+- **迭代计划文件同步**：`plan-engineering.md` 大文件拆分/性能基准段标记为已完成，异步化段重写为 TPE 并行方案并补齐架构约束分析；`plan-documentation.md` ADR 段标记为搁置并记录原因；`perf-three-layer-plan.md` 归档至 `archive/0.8.x/perf_report/`
+
+### Docs
+- `review-findings.md` P3-11 补充架构耦合约束脚注（C5/C6/C2/C3/1.4.2/1.4.5）
+
+
+## [0.8.6] - 2026-07-27
+
+### Added
+- **数据源可用性矩阵**：新增报告章节 #17（always 类型），在 Excel/HTML 报告末尾统一展示所有数据源运行状态（正常/降级/失败），聚合 DegradationTracker 会话事件按类别（行情/基金排名/行业分类/指数等）归总；Excel 页签含颜色标注和失败明细，HTML 表格含状态图标和详情列
+
+### Fixed
+- **cost_tracker 全局预算 xdist 竞态**：`_input_budget` 和 `_budget_warned` 为模块级全局变量，xdist 并行时其他测试通过 `patch("src.python.llm.session.get_session_usage")` 污染 worker，导致 `get_budget_status()` 中 `usage.get("input_tokens", 0)` 返回 MagicMock 而非 int，`max(0, input_budget - MagicMock)` 抛出 TypeError。修复：`_auto_reset_cost_tracker` autouse fixture 增加 `reset_session_usage()` 调用，每次测试前同时重置 session 用量 + budget，确保 `get_budget_status()` 读取到干净的 int 数据；修复 4 个失败用例（`test_cost_tracker.py::TestBudgetManagement`）
+- **穿透测试 HTTP 请求遗漏 mock**：`_prefetch_manager_data()` 在 `compute_penetration_top10()` 中遍历基金调用 `fetch_fund_manager(code)`（每只基金一次 HTTP 请求），`mock_all_apis` 未 mock 该函数导致穿透性能测试实际发出 10 次网络请求耗时 17s — 在 `test_e2e_perf.py::mock_all_apis` 中补回 `patch("src.python.report.penetration.fetch_fund_manager", return_value=None)`
+- **`orchestrator.py` 历史走势获取失败时 NoneType 崩溃**：`fetch_history_data()` 可返回 `None`（数据源不可用/异常），但行 763 无条件调用 `.get()` 导致 `AttributeError` — 增加 `if history_data:` 保护，为 None 时跳过全量量化指标计算
+
+### Changed
+- **`_extract_entity_bigrams()` 英数专名 `_tk:` 加权**：长度 ≥4 的英文专名（Anthropic/Meta/Helios 等）在实体 bigram 中额外插入 `_tk:` 前缀虚拟 bigram，使 `Anthropic+Meta` 等英数专名重叠的跨源标题即使 ratio<0.40 也能通过 bg≥3 候选区合并，无需降低 ratio 阈值；新规则下 cross_skip 从 3956 降至 10（单次运行）
+- **新闻去重跨源梯度阈值**：bg=2 且 ratio≥0.40 时合并（cross_merge_bg2），覆盖 bg=2 实体重叠少但 ratio 较高的重复案例（如"微软Azure Helios" vs "AMD+微软Azure Helios"），对应 616 条遗漏中 ~301 条被捕获
+- **`_normalize_title()` 增加孤立年份剥离**：`\b(?:19|20)\d{2}\b` 正则过滤独立 4 位年份数字（1900-2099），减少共享"2026""2025"等年份导致的 SequenceMatcher 虚高
+- **`calibrate-dedup-threshold.py` 适配新规则**：新增 cross_merge_bg2 分组统计、梯度阈值边界分析、0.35~0.40 灰色带审查提示
+
+### Docs
+- **内部文档序号/组织校对**：全量审核 6 份文档并修复不一致——llm-technical.md（§2.1 去硬编码计数、§9.1 合并子节、§5.1 新增 `_call_gemini()` 图文）、how-to-start.md（示例数据段并入提示）、how-to-config.md（章节 A→J 重新排序 + 新增 risk_free_rate/rebalance/anonymization 等）、reports-instruction.md（#17/#18 序号对齐 6 处）、how-to-use-registry.md（绘图分析→历史回撤分析）、faq.md（E 菜单范围修正）
+- **config JSON/章节标题三向对齐**：`_config_defaults.py` 注释标签、config.json JSON 标签、how-to-config.md 描述三方同步为 `B. 报告章节可见性` / `F. 业绩基准与无风险利率`
+- **统计数据全量刷新**：folders.md（源码 146/39,294、测试 189/57,960、用例 3765、文档 87）、test-coverage.md（all 3765，11 子组项数同步）
+- **plan.md 与 review-findings.md 同步**：6 份 plan 子文档纳入 plan.md 分层管理（P2 ~22d / P3）；plan-engineering.md 内容登记至 review-findings.md（P3-11 HTTP 同步 / P3-13 性能基准）
+- **已实现功能状态标注**：plan-documentation.md §1（数据源可靠性文档 ✅）、plan-web-ui.md §4（数据源可用性矩阵 ✅）
+
+
+## [0.8.5] - 2026-07-24
 
 ### Fixed
 - **CI 超时 & 退出码混乱**：`regression` 和 `verify` Phase B 的 600s 超时在 CI 慢速 runner 上频繁截断场景测试；超时退出码 `-1` 经 `sys.exit()` 转为 255，难以区分与真实崩溃 — 增加默认超时到 1200s，CI 全部加 `--no-timeout` 禁用超时，超时退出码改为标准 124
 
 ### Changed
+- **P0 提交门禁优化**：`regression`（~6min 全场景）改 `dev-verify`（~1min 核心单元+基础场景）—— 最频繁的编辑-验证循环从 6 分钟降为 1 分钟，释放开发效率
 - **verify 模式瘦身**：移除 Phase B 场景测试（重复 P0 regression），仅保留单元测试（~50s 而非 ~5min）—— 场景测试由 P0（dev 提交）和 P2（版本发布）覆盖
 - **P2 发布门禁优化**：`all`（3741 测试，~6.5min）改 `verify,regression`（单元+场景，1306 测试，~3min）—— 减少 65% 测试量，仍覆盖核心通路
+- **`src/test/` 目录结构全面重组**：
+  - `unit/` 新增 `analysis/` 子目录：9 个分析计算测试文件从根目录移入（流动性/再平衡/汇率/债券收益率），标记 `unit_providers` → `unit_analysis`
+  - `unit/` 新增 `cli/` 子目录：`test_cli.py` / `test_cli_edge.py` 从根目录移入
+  - `unit/` `test_cost_tracker.py` 移入 `llm/`，标记 `unit_providers` → `unit_llm`
+  - `unit/` `test_orchestrator.py` 从根目录移入 `report/`
+  - `scenario/` 新增 `perf/` 和 `security/` 子目录：`test_e2e_perf.py` / `test_security.py` 从根目录移入；`test_chain_resilience.py` 移入 `resilience/`；`test_llm_hallucination.py` 移入 `llm/`
+  - `integration/`：`test_cli_integration.py` 从根目录移入
+  - `unit/conftest.py` `_DIR_TO_MARKER` 补齐 `analysis`/`cli`/`handlers` 映射，新增标记校验兜底
+  - 清理空目录 `unit/report/template/`
+  - 根目录 4 个"流浪"测试文件全部归位，`src/test/` 根目录不再有除 `conftest.py`/`helpers.py`/`__init__.py` 外的测试文件
+
+### Docs
+- **门禁文档同步**：CLAUDE.md、how-to-test-my-code.md（10 处）、testplan.md、test-coverage.md（verify 项数 2180→~1022）、scripts-reference.md（4 处）– 与 verify 瘦身/P2 优化对齐
+- **目录树全量同步**：`folders.md` — 更新统计（源码 143→144、测试 177→185、用例 3616→3760、文档 73→81）；展开测试子组完整目录树（unit 含 11 子组含 analysis/cli、integration 含 test_cli_integration、scenario 含 6 子组含 perf/security、data/hallucination 数据集）；补充 `_validation.py`、`__init__.py`、`.github/workflows/ci.yml`、`pytest.ini`、`reason.bat` 等新文件；清理冗余版本描述
+- **测试重组同步**：CLAUDE.md C12 示例路径加 `unit/analysis/` 前缀；testplan.md P0 引用 `regression` → `dev-verify` + hallucination 路径更新；test-coverage.md 新增 analysis 行、功能域表同步、场景测试源统计更新；how-to-test-my-code.md Quick Start/P0 门禁/工作流图/unit 子组数对齐
+- **数据源文档补充**：`datasource.md` — 新增"持仓重合度"(`fund_overlap_`)和"基金风格扩展数据"(`extended_`)两条数据源；`bond_yield_rf` 标注精确缓存键脚注；补充 exact_cache_keys 仅模块说明
 
 ---
 

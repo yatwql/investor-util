@@ -4,12 +4,13 @@
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
 import pytest
 
+pytestmark = [pytest.mark.integration]
 
-@pytest.mark.integration
+from unittest.mock import MagicMock, patch
+
+
 class TestCliIntegration:
     """CLI 集成测试。"""
 

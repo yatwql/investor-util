@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：v0.8.2-dev
+> 文档版本：v0.8.8-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,13 +8,13 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 143 | 38,272 | `src/python/` 下所有 `.py`（不含测试） |
-| HTML 报告模板 | HTML | 1 | 1,750 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python/Shell | 10 | 3,072 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **154** | **43,094** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **177** | **55,827** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,616 个** | `pytest --collect-only` 统计 |
-| **用户文档** | Markdown | **73** | **35,436** | `docs-stm/`（71 文件）+ `README.md` + `CLAUDE.md` |
+| 主程序代码 | Python | 152 | 39,801 | `src/python/` 下所有 `.py`（不含测试） |
+| HTML 报告模板 | HTML | 1 | 1,844 | `src/python/tmpl/report_template.html` |
+| 辅助脚本 | Python | 9 | 3,153 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **162** | **44,798** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **189** | **57,982** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,765 个** | `pytest --collect-only` 统计 |
+| **用户文档** | Markdown | **88** | — | `docs-stm/`（86 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
 
@@ -32,7 +32,7 @@ investor-util/
 │   │   │   ├── _stats.py             #   缓存统计信息（命中率/大小/数量）
 │   │   │   ├── _store.py             #   缓存存取核心（get/set/delete/exists）
 │   │   │   ├── _ttl.py               #   TTL 策略（含盘中/盘后/非交易日区分）
-│   │   │   ├── operations.py             #   缓存操作共享层（S8~S11 从 handlers_cache 提取）
+│   │   │   ├── operations.py             #   缓存操作共享层
 │   │   │   └── services/             # 缓存上层服务
 │   │   │       ├── __init__.py       #       子包标记
 │   │   │       └── holdings_tracker.py #     持仓快照缓存追踪器
@@ -43,7 +43,8 @@ investor-util/
 │   │   │   ├── _config_defaults.py   #   config.json 默认值定义
 │   │   │   ├── _core.py              #   配置加载/保存/校验核心逻辑
 │   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
-│   │   │   └── _llm_providers_defaults.py # llm_providers.json 默认值定义
+│   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义
+│   │   │   └── _validation.py        #   配置校验函数集
 │   │   │
 │   │   ├── fetcher/                  # 数据获取调度
 │   │   │   ├── __init__.py           #   子包标记
@@ -65,7 +66,10 @@ investor-util/
 │   │   │   ├── eastmoney.py          #   东方财富 API（场外基金净值/历史净值）
 │   │   │   ├── eastmoney_industry.py #   东方财富行业分类/概念板块
 │   │   │   ├── eastmoney_industry_rest.py # 东方财富行业 REST 接口封装
-│   │   │   ├── tiantian.py           #   天天基金 API（基金业绩排名/评级）
+│   │   │   ├── tiantian_base.py        #   天天基金 API — 公共 HTTP 请求解析
+│   │   │   ├── tiantian_holdings.py    #   天天基金 API — 基金持仓数据
+│   │   │   ├── tiantian_nav.py         #   天天基金 API — 历史净值数据
+│   │   │   ├── tiantian_ranking.py     #   天天基金 API — 业绩排名/评级/风险分析
 │   │   │   ├── akshare_extras.py     #   akshare 封装（盈利预测/资金流向/分红）
 │   │   │   ├── akshare_news.py       #   akshare 新闻源（财新网/CCTV）
 │   │   │   ├── sina_news.py          #   新浪财经新闻源
@@ -90,6 +94,7 @@ investor-util/
 │   │   │   └── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
 │   │   │
 │   │   ├── llm/                      # LLM 智能分析
+│   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
 │   │   │   ├── api_base.py           #   LLM API 基类（请求/重试/流式）
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
@@ -133,7 +138,7 @@ investor-util/
 │   │   │   ├── html_save.py          #   HTML 保存/导出
 │   │   │   ├── penetration.py        #   穿透持仓分析（嵌套基金）
 │   │   │   ├── penetration_sheet.py  #   穿透分析 Excel 页签
-│   │   │   ├── pipeline_data_builder.py # 管线数据上下文组装（capture_snapshot → pipeline_data 字典，P1-06-A 从 orchestrator 拆分）
+│   │   │   ├── pipeline_data_builder.py # 管线数据上下文组装
 │   │   │   ├── market_value.py       #   市值计算与盈亏分析
 │   │   │   ├── market_value_sheet.py #   市值分析 Excel 页签
 │   │   │   ├── category.py           #   持仓分类（股票/基金/债券/QDII 等）
@@ -144,7 +149,9 @@ investor-util/
 │   │   │   ├── fund_manager_sheet.py #   基金经理 Excel 页签
 │   │   │   ├── fund_overlap.py       #   基金持仓重叠分析
 │   │   │   ├── fund_overlap_sheet.py #   重叠分析 Excel 页签
-│   │   │   ├── fund_style_analysis.py #  基金风格分析（大小盘/价值成长）
+│   │   │   ├── fund_style_base.py       #   基金风格基础（常量/快照/PECity阈值）
+│   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
+│   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
@@ -154,6 +161,7 @@ investor-util/
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
+│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #18）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
@@ -163,22 +171,24 @@ investor-util/
 │   │   ├── tmpl/                     # HTML 报告模板
 │   │   │   └── report_template.html  #   Jinja2 HTML 报告主模板
 │   │   │
-│   │   ├── main.py                   # 程序入口 + TUI 主循环
+│   │   ├── tui.py                    # 程序入口 + TUI 主循环
 │   │   ├── cli.py                    # 程序入口 + CLI 命令行模式（argparse + 共享层路由）
-│   │   ├── tui.py                    # TUI 交互主界面
+│   │   ├── tui_keys.py               # 终端键盘输入封装
 │   │   ├── tui_menu.py               # TUI 菜单系统
 │   │   ├── tui_handlers.py           # TUI 键盘/事件处理
 │   │   ├── handlers_report.py        # 报告生成命令处理器
 │   │   ├── handlers_cache.py         # 缓存管理命令处理器
+│   │   ├── handlers_check_sources.py #     数据源健康检查命令处理器
 │   │   ├── handlers_config.py        # 配置管理命令处理器
 │   │   ├── registry.py               # 中央注册表（模块/TTL/分组定义）
 │   │   ├── provider_registry.py      # 数据源注册中心（熔断器/会话缓存）
-│   │   ├── features.py               # Feature Flag 注册中心（开关集中管理，含默认值与运行时控制）
+│   │   ├── features.py               # Feature Flag 注册中心（开关集中管理，含默认值与运行时控制，持久化到 data/config/features.json）
 │   │   ├── models.py                 # 数据模型（持仓/行情/基金/新闻）
 │   │   ├── reader.py                 # 持仓 xlsx 文件读取
 │   │   ├── ansi_colors.py            # ANSI 颜色常量（终端输出着色）
 │   │   ├── code_utils.py             # 证券代码/类型判定工具
 │   │   ├── market_hours.py           # 交易时段判断（A股/港股/QDII）
+│   │   ├── perf.py                   # 性能收集（PerfCollector 计时 + 数据源健康检查持久化）
 │   │   ├── anonymizer.py              # 匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
 │   │   ├── circuit_breaker.py         # 统一断路器网关（Provider + LLM 熔断状态查询）
 │   │   ├── http_client.py            # HTTP 客户端（请求/重试/超时）
@@ -186,45 +196,249 @@ investor-util/
 │   │   └── logger.py                 # 日志模块（文件+控制台，自动轮转）
 │   │
 │   └── test/                         # 测试套件
-│       ├── unit/                     #   单元测试（8 子组：providers/fetcher/llm/news/report/config/core/ui）
-│       │   ├── test_liquidity.py          #   流动性分析：场内品种变现天数（10 tests）
-│       │   ├── test_liquidity_edge.py     #   流动性分析：边缘场景（极端大持仓/低流动性/空K线）
-│       │   ├── test_liquidity_otc.py      #   流动性分析：场外赎回天数（配置上限/未配置/零上限，8 tests）
-│       │   └── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景（巨额赎回/混合配置）
-│       ├── integration/              #   集成测试（契约/隔离/流水线）
-│       ├── scenario/                 #   场景测试（basic/resilience/extreme/llm/datetime）
+│       ├── __init__.py               #   包标记（空文件）
 │       ├── conftest.py               #   pytest 全局配置 + 标记注册
 │       ├── helpers.py                #   测试辅助工具
-│       ├── test_cli.py               #   CLI 命令行模式单元测试
-│       ├── test_cli_edge.py          #   CLI 边缘场景测试
-│       ├── test_cli_integration.py   #   CLI 集成测试
-│       └── test_orchestrator.py      #   报告编排器单元测试
+│       ├── data/                     #   测试数据集
+│       │   └── hallucination/        #   幻觉测试数据集
+│       │       ├── __init__.py       #       子包标记
+│       │       └── datasets.py       #       幻觉评估标准持仓数据
+│       ├── unit/                     #   单元测试（10 子组）
+│       │   ├── __init__.py           #   子包标记
+│       │   ├── conftest.py           #   单元测试 conftest
+│       │   ├── analysis/             #   分析计算单元测试
+│       │   │   ├── __init__.py       #       子包标记
+│       │   │   ├── test_bond_yield.py         #   无风险利率获取
+│       │   │   ├── test_bond_yield_edge.py    #   无风险利率边缘场景
+│       │   │   ├── test_fx_exposure.py        #   外汇敞口分析
+│       │   │   ├── test_liquidity.py          #   流动性分析：场内品种变现天数
+│       │   │   ├── test_liquidity_edge.py     #   流动性分析：边缘场景
+│       │   │   ├── test_liquidity_otc.py      #   流动性分析：场外赎回天数
+│       │   │   ├── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景
+│       │   │   ├── test_rebalance.py          #   再平衡信号计算
+│       │   │   └── test_rebalance_edge.py     #   再平衡边缘场景
+│       │   ├── config/              #   配置单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_config.py            #   配置管理核心测试
+│       │   │   ├── test_config_atomic.py     #   配置原子操作测试
+│       │   │   ├── test_config_atomic_edge.py #   配置原子操作边缘场景
+│       │   │   ├── test_config_edge.py       #   配置管理边缘场景
+│       │   │   ├── test_config_firstrun_edge.py #   首次运行配置边缘场景
+│       │   │   ├── test_config_llm_multi.py      #   LLM 多配置测试
+│       │   │   ├── test_config_llm_multi_edge.py #   LLM 多配置边缘场景
+│       │   │   └── test_config_validation.py     #   配置校验函数测试
+│       │   ├── core/                #   核心模块单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_cache.py            #   缓存引擎测试
+│       │   │   ├── test_cache_edge.py       #   缓存引擎边缘场景
+│       │   │   ├── test_code_utils.py       #   证券代码工具测试
+│       │   │   ├── test_filesystem_edge.py  #   文件系统边缘场景
+│       │   │   ├── test_http_client.py      #   HTTP 客户端测试
+│       │   │   ├── test_market_hours.py     #   交易时段判断测试
+│       │   │   ├── test_market_hours_edge.py #   交易时段边缘场景
+│       │   │   ├── test_metrics.py          #   量化指标计算测试
+│       │   │   ├── test_metrics_edge.py     #   量化指标边缘场景
+│       │   │   ├── test_models.py           #   数据模型测试
+│       │   │   ├── test_phase_timeout.py    #   阶段超时测试
+│       │   │   ├── test_provider_registry.py #   数据源注册中心测试
+│       │   │   ├── test_reader.py           #   持仓文件读取测试
+│       │   │   ├── test_registry.py         #   中央注册表测试
+│       │   │   ├── test_registry_edge.py    #   注册表边缘场景
+│       │   │   └── test_scenario.py         #   情景分析测试
+│       │   ├── fetcher/             #   数据获取单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_api_edge.py         #   API 获取边缘场景
+│       │   │   ├── test_chain.py            #   数据链主链路测试
+│       │   │   ├── test_chain_edge.py       #   数据链边缘场景
+│       │   │   ├── test_fetcher.py          #   获取调度核心测试
+│       │   │   ├── test_fetcher_index.py    #   指数行情获取测试
+│       │   │   ├── test_fetcher_industry.py #   行业分类获取测试
+│       │   │   ├── test_fetcher_price.py    #   行情价格获取测试
+│       │   │   ├── test_fund.py             #   基金数据获取测试
+│       │   │   └── test_fund_manager.py     #   基金经理数据测试
+│       │   ├── handlers/            #   命令处理器单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_handlers_cache.py  #   缓存管理命令处理测试
+│   │   ├── handlers_check_sources.py #     数据源健康检查命令处理器
+│       │   │   └── test_handlers_report.py #   报告生成命令处理测试
+│       │   ├── llm/                 #   LLM 单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_api.py                #   LLM API 主入口测试
+│       │   │   ├── test_api_base.py           #   LLM API 基类测试
+│       │   │   ├── test_api_base_edge.py      #   API 基类边缘场景
+│       │   │   ├── test_api_edge.py           #   API 边缘场景
+│       │   │   ├── test_api_multi.py          #   多 Provider API 测试
+│       │   │   ├── test_api_multi_edge.py     #   多 Provider 边缘场景
+│       │   │   ├── test_cache_multi.py        #   多 Provider 缓存测试
+│       │   │   ├── test_circuit_breaker_edge.py  #   LLM 熔断器边缘场景
+│       │   │   ├── test_circuit_breaker_recovery.py # 熔断恢复测试
+│       │   │   ├── test_debate_conditional.py #   辩论条件触发测试
+│       │   │   ├── test_debate_edge.py        #   辩论边缘场景
+│       │   │   ├── test_debate_generators.py  #   辩论提示词生成测试
+│       │   │   ├── test_debate_prompts.py     #   辩论提示词模板测试
+│       │   │   ├── test_debate_qa.py          #   辩论 Q&A 测试
+│       │   │   ├── test_debate_token_budget.py #   辩论 Token 预算测试
+│       │   │   ├── test_fact_checker.py       #   事实校验器测试
+│       │   │   ├── test_fingerprint.py        #   缓存指纹测试
+│       │   │   ├── test_generators.py         #   全局提示词生成测试
+│       │   │   ├── test_generators_news.py    #   新闻提示词生成测试
+│       │   │   ├── test_generators_news_edge.py #   新闻提示词边缘场景
+│       │   │   ├── test_generators_orch.py    #   多轮对话编排测试
+│       │   │   ├── test_generators_orch_edge.py #   编排边缘场景
+│       │   │   ├── test_integration_multi.py  #   多 Provider 集成测试
+│       │   │   ├── test_llm.py                #   LLM 模块通用测试
+│       │   │   ├── test_llm_content.py        #   LLM 内容写入测试
+│       │   │   ├── test_llm_placeholder.py    #   LLM 占位内容测试
+│       │   │   ├── test_llm_placeholder_distinction_edge.py # 占位区分边缘场景
+│       │   │   ├── test_prompts.py            #   提示词库测试
+│       │   │   ├── test_session.py            #   会话管理测试
+│       │   │   ├── test_skeleton.py           #   内容骨架生成测试
+│       │   │   └── test_strategy.py           #   策略引擎测试
+│       │   ├── news/                #   新闻单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_akshare_news.py       #   akshare 新闻源测试
+│       │   │   ├── test_cls_news.py           #   财联社新闻源测试
+│       │   │   ├── test_eastmoney_news.py     #   东方财富新闻源测试
+│       │   │   ├── test_news_aggregator.py    #   新闻聚合器测试
+│       │   │   ├── test_news_correlator.py    #   新闻关联分析测试
+│       │   │   ├── test_news_keywords.py      #   新闻关键词测试
+│       │   │   ├── test_news_sources.py       #   新闻源注册测试
+│       │   │   ├── test_sina_news.py          #   新浪新闻源测试
+│       │   │   └── test_wallstreetcn_news.py  #   华尔街见闻新闻源测试
+│       │   ├── providers/           #   数据源提供商单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_akshare_extras.py     #   akshare 封装测试
+│       │   │   ├── test_eastmoney.py          #   东方财富 API 测试
+│       │   │   ├── test_eastmoney_industry.py #   东方财富行业分类测试
+│       │   │   ├── test_sina.py               #   新浪财经 API 测试
+│       │   │   ├── test_sina_edge.py          #   新浪财经边缘场景
+│       │   │   ├── test_tencent.py            #   腾讯财经 API 测试
+│       │   │   ├── test_tencent_edge.py       #   腾讯财经边缘场景
+│       │   │   └── test_tiantian.py           #   天天基金 API 测试
+│       │   ├── report/              #   报告单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_benchmark.py              #   业绩基准测试
+│       │   │   ├── test_benchmark_edge.py         #   基准边缘场景
+│       │   │   ├── test_category.py               #   持仓分类测试
+│       │   │   ├── test_category_edge.py          #   分类边缘场景
+│       │   │   ├── test_classification_utils.py   #   分类工具测试
+│       │   │   ├── test_data_integrity.py         #   数据完整性测试
+│       │   │   ├── test_data_quality_edge.py      #   数据质量边缘场景
+│       │   │   ├── test_data_status.py            #   数据状态测试
+│       │   │   ├── test_excel_format_edge.py      #   Excel 格式边缘场景
+│       │   │   ├── test_excel_generator.py        #   Excel 生成测试
+│       │   │   ├── test_excel_generator_edge.py   #   Excel 生成边缘场景
+│       │   │   ├── test_excel_report_structure.py #   Excel 报告结构测试
+│       │   │   ├── test_excel_roundtrip.py        #   Excel 写入读取回环测试
+│       │   │   ├── test_excel_writer.py           #   Excel 写入器测试
+│       │   │   ├── test_fund_bseries_sheet_edge.py # 基金深度分析页签边缘场景
+│       │   │   ├── test_fund_concentration.py     #   基金集中度测试
+│       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试
+│       │   │   ├── test_fund_manager_sheet.py     #   基金经理页签测试
+│       │   │   ├── test_fund_overlap.py           #   基金重叠分析测试
+│       │   │   ├── test_fund_performance.py       #   基金业绩测试
+│       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
+│       │   │   ├── test_html_builders.py          #   HTML 构建器测试
+│       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
+│       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试
+│       │   │   ├── test_html_report_structure_edge.py # HTML 结构边缘场景
+│       │   │   ├── test_html_template.py          #   HTML 模板测试
+│       │   │   ├── test_html_writer.py            #   HTML 写入器测试
+│       │   │   ├── test_html_writer_edge.py       #   HTML 写入器边缘场景
+│       │   │   ├── test_market_value.py           #   市值计算测试
+│       │   │   ├── test_market_value_edge.py      #   市值边缘场景
+│       │   │   ├── test_market_value_sheet.py     #   市值页签测试
+│       │   │   ├── test_market_value_strategy_edge.py # 市值策略边缘场景
+│       │   │   ├── test_news_correlation.py       #   新闻关联报告测试
+│       │   │   ├── test_news_degradation_edge.py  #   新闻降级边缘场景
+│       │   │   ├── test_penetration.py            #   穿透分析测试
+│       │   │   ├── test_penetration_edge.py       #   穿透分析边缘场景
+│       │   │   ├── test_portfolio_history.py      #   组合历史走势测试
+│       │   │   ├── test_progress.py               #   进度跟踪测试
+│       │   │   ├── test_qdii_timezone_edge.py     #   QDII 时区边缘场景
+│       │   │   ├── test_security_edge.py          #   证券边缘场景
+│       │   │   ├── test_orchestrator.py           #   报告编排器单元测试
+│       │   │   └── test_summary.py                #   摘要生成测试
+│       │   ├── cli/                 #   CLI 命令行模式单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_cli.py               #   CLI 命令行模式单元测试
+│       │   │   └── test_cli_edge.py          #   CLI 边缘场景测试
+│       │   ├── ui/                  #   UI 单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_handlers.py         #   事件处理测试
+│       │   │   ├── test_log_sanitize.py     #   日志清洗测试
+│       │   │   ├── test_tui.py              #   TUI 交互测试
+│       │   │   ├── test_tui_edge.py         #   TUI 边缘场景
+│       │   │   ├── test_tui_handlers.py     #   TUI 事件处理测试
+│       │   │   └── test_tui_menu.py         #   TUI 菜单测试
+│       ├── integration/              #   集成测试（契约/隔离/流水线）
+│       │   ├── __init__.py           #   子包标记
+│       │   ├── test_debate_pipeline.py    #   辩论多轮对话管线集成测试
+│       │   ├── test_cli_integration.py    #   CLI 命令行模式集成测试
+│       │   ├── test_integration_coverage.py # 集成测试覆盖率校验
+│       │   └── test_news_pipeline_edge.py   # 新闻管线边缘场景集成测试
+│       ├── scenario/                 #   场景测试（basic/datetime/llm/perf/resilience/security 六子组）
+│       │   ├── __init__.py           #   子包标记
+│       │   ├── basic/               #   基本面场景测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_integration.py             #   集成场景测试
+│       │   │   ├── test_pipeline_metrics_injection.py # 管线指标注入测试
+│       │   │   ├── test_pipeline_smoke.py          #   管线冒烟测试
+│       │   │   ├── test_scenario_holdings_quality.py # 持仓质量场景测试
+│       │   │   ├── test_scenario_operational_behavior.py # 操作行为场景测试
+│       │   │   ├── test_scenario_section_order.py  #   报告章节顺序场景测试
+│       │   │   ├── test_scenario_penetration.py    #   穿透分析场景测试
+│       │   │   └── test_scenario_special_securities.py # 特殊证券场景测试
+│       │   ├── datetime/            #   日期时间场景测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   └── test_datetime_scenarios.py #   日期时间场景测试
+│       │   ├── llm/                 #   LLM 场景测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_llm_hallucination.py  #   LLM 幻觉率采样场景测试
+│       │   │   └── test_llm_scenarios.py #   LLM 场景测试
+│       │   ├── perf/                #   性能场景测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   └── test_e2e_perf.py #   端到端性能场景测试
+│       │   ├── resilience/          #   弹性场景测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_chain_resilience.py   #   数据链弹性场景测试
+│       │   │   ├── test_integration_scenarios.py #   集成弹性场景测试
+│       │   │   └── test_scenario_extreme.py      #   极端场景测试
+│       │   └── security/            #   安全场景测试
+│       │       ├── __init__.py      #       子包标记
+│       │       └── test_security.py #   安全场景测试
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     #   持仓 xlsx 文件（用户放置）
 │   ├── cache/                        #   API 响应缓存（自动生成，JSON/GZ）
-│   ├── config/                       #   配置文件（config.json / llm_key.json / llm_settings.json）
-│   ├── state/                        #   运行时状态文件（降级状态等，自动生成）
+│   ├── config/                       #   配置文件（config.json / features.json / llm_key.json / llm_settings.json / llm_providers.json）
+│   ├── state/                        #   运行时状态文件（.degradation_state.json / circuit_breaker.json，自动生成）
 │   └── history/snapshots/            #   持仓快照（自动生成，保留 60 天）
 │
 ├── reports/                          # 报告输出（最新版 + 按日期归档）
 ├── logs/                             # 程序日志（app.log，自动轮转）
 ├── test-reports/                     # 测试报告（自动生成，按 mode 分组）
+├── .github/                         # GitHub 配置
+│   └── workflows/
+│       └── ci.yml                   #   CI/CD 流水线（P0/P1/P2 三级门禁）
+├── pytest.ini                       # pytest 全局配置
+├── reason.bat                       # Reasonix AI code editor 启动（`reasonix code`）
 ├── scripts/                          # 启动脚本 + 测试工具
-│   ├── launch.ps1                    #   Windows PowerShell 启动脚本
-│   ├── launch.sh                     #   Linux/macOS 启动脚本
-│   ├── test_runner.py                #   测试驱动（pytest 模式封装）
-│   ├── check-test-markers.py         #   测试标记合规检查
-│   ├── check-version-consistency.py  #   版本号一致性检查
-│   ├── calibrate-dedup-threshold.py  #   新闻去重阈值校准
-│   ├── llm_hallucination_sampler.py   #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
-│   ├── perf_report.py               #   端到端性能基准测试
+│   ├── launch.ps1                   #   Windows PowerShell 启动脚本
+│   ├── launch.sh                    #   Linux/macOS 启动脚本
+│   ├── test_runner.py               #   测试驱动（pytest 模式封装）
+│   ├── check-test-markers.py        #   测试标记合规检查
+│   ├── check-version-consistency.py #   版本号一致性检查
+│   ├── calibrate-dedup-threshold.py #   新闻去重阈值校准
+│   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
+│   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
+│   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
 │   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
-│
 ├── docs-stm/                         # 项目文档
 │   ├── manuals/                      #   用户手册分册
 │   │   ├── datasource.md             #     数据源一览
+│   │   ├── datasource-reliability.md #     数据源可靠性文档（运维视角）
 │   │   ├── faq.md                    #     常见问题解答
 │   │   ├── how-to-config-llm.md      #     LLM 配置指南
 │   │   ├── how-to-config.md          #     配置说明
@@ -331,11 +545,15 @@ investor-util/
 │   │   │       ├── data-channels-schema.md                            # 数据通道 Schema 文档
 │   │   │       ├── data-source-stability-test-report.md               # 数据源稳定性专项测试报告
 │   │   │       ├── better-investment-performance-test-report.md        # 端到端性能基准测试报告
-│   │   │       ├── r1-insert-feasibility-audit-into-discussion.py      # R1 数据源可行性审查插入脚本（最终版）
+│   │   │       ├── task91-enhanced-llm-strategy.md                    # 增强型 LLM 策略引擎设计
+│       ├── r1-insert-feasibility-audit-into-discussion.py      # R1 数据源可行性审查插入脚本（最终版）
 │   │   │       ├── debug-find-insert-anchor_r1.py                     # R1 锚点定位合并调试脚本
 │   │   │       ├── llm-hallucination-report_expert-review.md           # LLM 幻觉率采样报告（expert_review 模块）
 │   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
 │   │   │       └── llm-hallucination-sample-output_expert-review.txt   # 幻觉采样 LLM 原始输出样本
+│   │   ├── 0.8.x/                            # v0.8.x 版本迭代归档
+│   │   │   └── perf_report/                  #   性能基准测试方案
+│   │   │       └── perf-three-layer-plan.md  #   性能基准测试设计（已实现）
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

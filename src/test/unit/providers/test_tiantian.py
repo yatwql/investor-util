@@ -1,24 +1,25 @@
-"""测试 tiantian.py 数据解析辅助函数（纯函数，无网络请求）。"""
+"""测试 tiantian_holdings / tiantian_ranking 数据解析辅助函数。"""
 
 import json
 import unittest
 
-from src.python.providers.tiantian import (
-
-    _calc_rating_from_entry,
+from src.python.providers.tiantian_holdings import (
     _extract_fund_meta,
     _extract_quarterly_meta,
     _find_holdings_table,
     _parse_holdings_rows,
-    _parse_perf_evaluation,
     _parse_quarterly_holdings,
+)
+from src.python.providers.tiantian_ranking import (
+    _calc_rating_from_entry,
+    _get_rating_thresholds,
+    _KNOWN_RATING_TYPES,
+    _parse_perf_evaluation,
     _parse_rank_entry,
     _parse_risk_analysis,
     _parse_syl_returns,
     _pct_to_rating,
-    _get_rating_thresholds,
     _RATING_THRESHOLDS,
-    _KNOWN_RATING_TYPES,
 )
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
@@ -174,7 +175,7 @@ class TestExtractQuarterlyMeta(unittest.TestCase):
 
 
 class TestParseSylReturns(unittest.TestCase):
-    """_parse_syl_returns — 解析 JS 中的区间收益率变量（P0：长周期 + -- 防御）。"""
+    """_parse_syl_returns — 解析 JS 中的区间收益率变量（长周期 + -- 防御）。"""
 
     def test_parses_all_short_periods(self):
         js = """
@@ -191,7 +192,7 @@ class TestParseSylReturns(unittest.TestCase):
         self.assertAlmostEqual(result["近1年"]["return"], 12.34)
 
     def test_parses_long_periods(self):
-        """P0 新增：解析 2 年/3 年/5 年长周期收益率。"""
+        """解析 2 年/3 年/5 年长周期收益率。"""
         js = """
         var syl_2n = "8.50";
         var syl_3n = "18.20";
@@ -206,7 +207,7 @@ class TestParseSylReturns(unittest.TestCase):
         self.assertAlmostEqual(result["近5年"]["return"], 25.00)
 
     def test_skips_dash_placeholder(self):
-        """P0 修复：'--' 应跳过而非解析为 0。"""
+        """'--' 应跳过而非解析为 0。"""
         js = 'var syl_1y = "--";'
         result = _parse_syl_returns(js)
         self.assertNotIn("近1月", result)
@@ -265,7 +266,7 @@ class TestParseRankEntry(unittest.TestCase):
 
 
 class TestCalcRatingFromEntry(unittest.TestCase):
-    """_calc_rating_from_entry — 5 级评级 + 类型差异化阈值（P2）。"""
+    """_calc_rating_from_entry — 5 级评级 + 类型差异化阈值。"""
 
     def test_excellent_top_10pct(self):
         self.assertEqual(_calc_rating_from_entry({"percentile": "5.0"}), "优秀")
@@ -280,7 +281,7 @@ class TestCalcRatingFromEntry(unittest.TestCase):
         self.assertEqual(_calc_rating_from_entry({"percentile": "60.0"}), "偏差")
 
     def test_worst_bottom_25pct(self):
-        """新增 5 级：较差（后 25%）。"""
+        """5 级：较差（后 25%）。"""
         self.assertEqual(_calc_rating_from_entry({"percentile": "80.0"}), "较差")
 
     def test_boundary_10(self):
@@ -435,7 +436,7 @@ class TestParsePerfEvaluation(unittest.TestCase):
 
 
 class TestParseRiskAnalysis(unittest.TestCase):
-    """_parse_risk_analysis — 解析风险分析数据（P1 新增）。"""
+    """_parse_risk_analysis — 解析风险分析数据。"""
 
     def test_dict_with_categories_and_data(self):
         """JSON 对象格式：categories + data 双数组。"""

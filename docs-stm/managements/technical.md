@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.8.5-dev
+> 文档版本：v0.8.8-dev
 
 ## 目录
 
@@ -119,7 +119,7 @@
 
 | 入口 | 通道 | 入口文件 | 用户交互层 | 业务逻辑层 | 进度报告 |
 |:-----|:-----|:---------|:----------|:----------|:---------|
-| TUI | 交互菜单 | `main.py` | `tui_menu.py` + `handlers_*.py` | `report/orchestrator.py` + `cache/operations.py` | `TuiProgressReporter` |
+| TUI | 交互菜单 | `tui.py` | `tui_menu.py` + `handlers_*.py` | `report/orchestrator.py` + `cache/operations.py` | `TuiProgressReporter` |
 | CLI | 命令行参数 | `cli.py` | argparse（不经过 handlers_*） | `report/orchestrator.py` + `cache/operations.py` | `CliProgressReporter` |
 
 **共享模块**（TUI/CLI 均直接使用）：
@@ -134,7 +134,7 @@
 
 **分层差异**：TUI 的 `handlers_report.py` / `handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*。保证两次实现共用同一套业务逻辑。
 
-**贯穿层**：`config/` · `registry.py` · `provider_registry.py` · `code_utils.py` · `market_hours.py`
+**贯穿层**：`config/` · `registry.py` · `provider_registry.py` · `code_utils.py` · `market_hours.py` · `perf.py`
 
 **关键分层原则**：
 - 每一层只能依赖其下层和贯穿层，禁止反向依赖
@@ -187,7 +187,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 | 报告类型 | 菜单 | 数据准备深度 | 输出格式 | LLM |
 |:---------|:----|:------------|:---------|:----|
-| `basic` | E | 仅行情（无指数/穿透/分类/新闻） | Excel 单格式 | ❌ |
+| `basic` | E | 行情+指数（无穿透/分类/新闻） | Excel 单格式 | ❌ |
 | `both` | B | 轻量行情 + 快照 + 历史走势（条件） | HTML + Excel | ❌ |
 | `full` | L | 完整行情 + 穿透 + 快照 + 历史走势 + 资金流向 | HTML + Excel | ✅ |
 
@@ -195,7 +195,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 | 层次 | 模块 | 职责 | 文件 |
 |:-----|:-----|:------|:-----|
-| **用户交互** | TUI 主循环 | 菜单编排、用户交互流 | `main.py` / `tui_menu.py` |
+| **用户交互** | TUI 主循环 | 菜单编排、用户交互流 | `tui.py` / `tui_menu.py` |
 | **用户交互** | CLI 命令行 | argparse 解析、共享层直调、定时任务驱动 | `cli.py` |
 | **用户交互** | Handler 命令 | TUI 命令 → 委托编排层或共享层 | `handlers_*.py` |
 | **用户交互** | 进度报告 | ProgressReporter 解耦进度输出 | `report/progress.py` |
@@ -216,6 +216,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **贯穿** | 代码类型判定 | 资产识别原语 | `code_utils.py` |
 | **贯穿** | 交易时段判断 | A 股时段、午间休市 | `market_hours.py` |
 | **贯穿** | HTTP 客户端 | 统一工厂 | `http_client.py` |
+| **贯穿** | 性能收集 | PerfCollector 三路径计时 + perf_history.jsonl 持久化 | `perf.py` |
 
 ### 1.4 概要设计 — 核心架构决策
 
@@ -255,7 +256,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 17 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 18 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型**：
 
@@ -1064,7 +1065,7 @@ def _get_pool() -> ThreadPoolExecutor:
 
 #### 三种报告路径
 
-**basic 路径**（菜单 E）：最简路径，仅生成 Excel，不调数据准备层：
+**basic 路径**（菜单 E）：最简路径，仅生成 Excel，不调编排器数据准备层（`prepare_report_data()`），但汇总页签内部通过 fetcher 独立获取指数行情数据：
 
 ```
 generate_report("basic")
@@ -1228,7 +1229,7 @@ for sec in section_order:
 
 ### 4.6 报告序号可配置
 
-报告 17 个模块的序号/显示名称由 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 18 个模块的序号/显示名称由 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1244,7 +1245,7 @@ for sec in section_order:
 }
 ```
 
-17 个模块分布：`always`×5、`b_series`×4、`news`×1、`llm`×5、`history`×2。
+18 个模块分布：`always`×6、`b_series`×4、`news`×1、`llm`×5、`history`×2。
 
 #### 合并规则流程
 
@@ -1254,7 +1255,7 @@ get_report_section_order(config)
     ▼
 ┌────────────────────────┐
 │ config 中有             │
-│ report_section_order?  │── NO ──→ 返回完整 17 项默认顺序
+│ report_section_order?  │── NO ──→ 返回完整 18 项默认顺序
 └───────────┬────────────┘
            YES
             │
@@ -1272,7 +1273,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（17 项，key/number/type/data_flag）
+返回 result（18 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -1555,7 +1556,7 @@ Excel 热力图着色：
 
 #### B5 基金风格分析
 
-基于持仓个股市值 + PE 数据的加权风格判定（`fund_style_analysis.py`）：
+基于持仓个股市值 + PE 数据的加权风格判定（`fund_style_classify.py` / `fund_style_report.py`）：
 
 ```
 三级降级链路：
@@ -1838,7 +1839,7 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker.py / fallback.py；`prompts.py` 拆分为 core/tables/action 3 文件，逻辑上仍视作一个 Prompt 构建层）：
+`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker.py / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
@@ -2272,7 +2273,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号不可硬编码** — 报告 17 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
+| **C7** | **报告序号不可硬编码** — 报告 18 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 pipeline_data Schema 定义文档中预定义类型、版本号、写入/消费模块后，才能在代码中使用该键（详见附录 H） | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
@@ -2291,7 +2292,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 |:---|:-----|:---------|:---------|:---------|
 | **C8** | **日志统一** — 所有模块必须使用 `logging.getLogger("invest")` 获取日志器，禁止直接使用 `print()` 输出运行时诊断信息 | 统一日志名称使日志过滤、级别控制、格式管理集中生效；`print()` 无法控制日志级别，污染 stdout | 日志碎片化、日志级别失控、`print()` 干扰输出流 | 全模块（交互式 print 如进度提示不受此限） |
 | **C15** | **控制台日志着色** — WARNING 级别使用黄色输出、ERROR 级别使用红色输出；当 `NO_COLOR` 环境变量设置或输出非 TTY 时自动降级为无颜色 | 着色提升控制台日志的辨识度，便于快速定位告警和错误；降级保证日志导出、管道重定向时无转义字符污染输出 | 日志可读性降低、非 TTY 环境下转义字符污染 | `logger.py`（_ColoredFormatter） |
-| **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_providers_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `main.py`/`cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
+| **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_providers_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `tui.py`/`cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
 
 ### 8.6 测试约束
 
@@ -2317,29 +2318,34 @@ investor-util/
 │   │   ├── __init__.py
 │   │   ├── analysis/            # 业务分析计算层（再平衡、量化指标）
 │   │   ├── anonymizer.py        # 持仓匿名化（名称替换/数量模糊/关闭三模式）
+│   │   ├── ansi_colors.py       # ANSI 颜色常量（终端输出着色）
 │   │   ├── cache/               # 缓存引擎子包（8 子模块 + operations + services）
+│   │   ├── circuit_breaker.py   # 统一断路器网关（Provider + LLM 熔断状态查询）
+│   │   ├── cli.py               # CLI 命令行入口（argparse + 共享层直调）
 │   │   ├── code_utils.py        # 代码类型判定中心化
 │   │   ├── config/              # 配置管理子包（_config_defaults / _comments / _core）
 │   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
 │   │   ├── features.py          # 功能开关注册表（28 项 Feature Flag）
 │   │   ├── fetcher/             # 数据获取调度（price/index/fund/fund_manager/industry/chain/akshare/bond_yield/news/history_diff）
 │   │   ├── handlers_cache.py    # TUI 缓存管理命令（薄壳委托 operations）
+│   │   ├── handlers_check_sources.py # 数据源健康检查命令处理器
 │   │   ├── handlers_config.py   # TUI 配置管理命令
 │   │   ├── handlers_report.py   # TUI 报告生成命令（薄壳委托 orchestrator）
 │   │   ├── http_client.py       # HTTP 客户端工厂
 │   │   ├── llm/                 # LLM 集成（编排/骨架/API 路由/提示词/指纹/熔断器等）
 │   │   ├── logger.py            # 日志模块（_ColoredFormatter）
-│   │   ├── main.py              # TUI 入口 + 菜单循环
 │   │   ├── market_hours.py      # A 股交易时段判断
+│   │   ├── perf.py               # 性能收集（PerfCollector 计时 + perf_history.jsonl）
 │   │   ├── models.py            # 数据模型
 │   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
 │   │   ├── providers/           # 数据源提供商（各 API 封装）
 │   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（30 个数据模块 + 17 个报告模块 + 7 个计算模块）
+│   │   ├── registry.py          # 中央注册表（30 个数据模块 + 18 个报告模块 + 7 个计算模块）
 │   │   ├── report/              # 报告生成（编排器/进度/管线/数据构建器/页签写入器）
 │   │   ├── schemas/             # Pydantic 数据模式（快照等）
-│   │   ├── tui.py               # 键盘输入封装
+│   │   ├── tui.py               # TUI 入口 + 菜单循环
 │   │   ├── tui_handlers.py      # 菜单通用辅助
+│   │   ├── tui_keys.py          # 键盘输入封装
 │   │   └── tui_menu.py          # 菜单交互
 │   └── test/                    # 测试（按标记分组）
 │       ├── conftest.py          # pytest 配置 + 分层标记注册
@@ -2362,8 +2368,8 @@ investor-util/
 |:-----|:---------|:-------------|
 | 场内 A 股/ETF 实时价 | 腾讯财经 → 新浪财经（双链路 fallback） | `tencent.py` / `sina.py` |
 | 场外基金净值 | 东方财富（直达，无备用） | `eastmoney.py` |
-| 基金业绩排名 | 天天基金 JS 变量解析（直达） | `tiantian.py` |
-| 基金持仓数据 | 天天基金 HTML 解析（直达） | `tiantian.py` |
+| 基金业绩排名 | 天天基金 JS 变量解析（直达） | `tiantian_ranking.py` |
+| 基金持仓数据 | 天天基金 HTML 解析（直达） | `tiantian_holdings.py` |
 | A 股指数 | 腾讯财经 → 新浪财经（双链路 fallback） | `tencent.py` / `sina.py` |
 | 美股指数 | 新浪财经 → 腾讯财经（双链路 fallback） | `sina.py` |
 | 财经新闻 | 5 源并行：新浪/东方财富/财联社/华尔街见闻/akshare | 各 `*_news.py` |

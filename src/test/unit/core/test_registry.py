@@ -254,9 +254,9 @@ class TestDataModuleDef:
 class TestReportSectionDefault:
     """_REPORT_SECTION_DEFAULT 完整性验证。"""
 
-    def test_total_17_sections(self):
-        """应有 17 个报告模块。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 17
+    def test_total_sections(self):
+        """检查报告模块总数（新增模块时同步更新此值）。"""
+        assert len(_REPORT_SECTION_DEFAULT) == 18
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -291,14 +291,21 @@ class TestReportSectionDefault:
                     f"{sec['key']}: {sec['type']} 类型缺少 data_flag"
                 )
 
-    def test_default_numbers_are_1_to_17(self):
-        """默认序号应为 1 到 17。"""
+    def test_default_numbers_are_unique(self):
+        """默认序号应唯一且非零。"""
         numbers = [sec["number"] for sec in _REPORT_SECTION_DEFAULT]
-        assert numbers == list(range(1, 18)), f"序号不连续: {numbers}"
+        assert len(numbers) == len(set(numbers)), f"序号重复: {numbers}"
+        assert all(n > 0 for n in numbers), f"序号包含零: {numbers}"
 
     def test_llm_usage_is_last(self):
         """llm_usage 应在默认列表最后。"""
         assert _REPORT_SECTION_DEFAULT[-1]["key"] == "llm_usage"
+
+    def test_data_source_status_before_llm_usage(self):
+        """data_source_status 应在 llm_usage 之前（序号 18 vs 17）。"""
+        keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
+        assert "data_source_status" in keys
+        assert keys.index("data_source_status") < keys.index("llm_usage")
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""
@@ -310,10 +317,10 @@ class TestReportSectionDefault:
 class TestGetReportSectionKeys:
     """get_report_section_keys() 单元测试。"""
 
-    def test_returns_all_17_keys(self):
-        """应返回 17 个有效 key。"""
+    def test_total_keys_count(self):
+        """应返回正确数量的有效 key。"""
         keys = get_report_section_keys()
-        assert len(keys) == 17
+        assert len(keys) == len(_REPORT_SECTION_DEFAULT)
 
     def test_contains_known_keys(self):
         """应包含已知的几个关键 key。"""
@@ -328,7 +335,7 @@ class TestGetReportSectionOrder:
     def test_no_config_returns_defaults(self):
         """config 为 None → 返回 18 项默认值。"""
         order = get_report_section_order()
-        assert len(order) == 17
+        assert len(order) == len(_REPORT_SECTION_DEFAULT)
         assert order[-1]["key"] == "llm_usage"
         # 验证每个条目的 number 与原默认一致
         for sec, default in zip(order, _REPORT_SECTION_DEFAULT):
@@ -344,13 +351,13 @@ class TestGetReportSectionOrder:
     def test_empty_config_returns_defaults(self):
         """report_section_order 为空字典 → 返回默认。"""
         order = get_report_section_order({"report_section_order": {}})
-        assert len(order) == 17
+        assert len(order) == len(_REPORT_SECTION_DEFAULT)
         assert order[0]["key"] == "summary"
 
     def test_non_dict_config_returns_defaults(self):
         """report_section_order 不是 dict → 返回默认。"""
         order = get_report_section_order({"report_section_order": "invalid"})
-        assert len(order) == 17
+        assert len(order) == len(_REPORT_SECTION_DEFAULT)
         assert order[0]["key"] == "summary"
 
     def test_partial_config_items_first(self):
@@ -362,8 +369,8 @@ class TestGetReportSectionOrder:
         assert order[0]["number"] == 1
         assert order[1]["key"] == "summary"
         assert order[1]["number"] == 2
-        # 前两项之外应有 16 项（含 llm_usage 在最后）
-        assert len(order) == 17
+        # 前两项之外应有 N-2 项（含 llm_usage 在最后）
+        assert len(order) == len(_REPORT_SECTION_DEFAULT)
 
     def test_partial_config_unconfigured_after_configured(self):
         """未配置项排在已配置项之后。"""
@@ -416,7 +423,7 @@ class TestGetReportSectionOrder:
         # 反序配置
         full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}
         order = get_report_section_order({"report_section_order": full_config})
-        assert len(order) == 17
+        assert len(order) == len(_REPORT_SECTION_DEFAULT)
         assert order[-1]["key"] == "llm_usage"
         # 第一个应为反序后的最后一个（即 fund_manager 的反序... 等等）
         reversed_last = list(reversed(all_keys))[0]

@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_providers, pytest.mark.edge]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
 
 class TestBondYieldEdge:

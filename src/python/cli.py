@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CLI 命令行模式 — argparse 主入口。
 
-支持 report 和 cache 子命令，共享 P1 已提取的业务编排层。
+支持 report 和 cache 子命令，共享业务编排层。
 """
 
 from __future__ import annotations
@@ -77,6 +77,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "  cache --clean                  清理过期缓存\n"
         "  cache --stats                  查看缓存统计"
     )
+
+    # ── check-sources 子命令 ──
+    check_p = sub.add_parser("check-sources", help="数据源健康检查（无需 config）")
+    check_p.epilog = "示例:\n  check-sources    测试各数据源联通性"
 
     return parser
 
@@ -304,6 +308,21 @@ def _handle_cache_update(update_type: str, config: dict, reporter) -> int:
     return _EXIT_SEVERE
 
 
+
+def _handle_check_sources() -> int:
+    """处理 check-sources 子命令——数据源健康检查。
+
+    Returns:
+        int 退出码（0=全部正常, 1=有告警, 2=有失败）
+    """
+    from src.python.handlers_check_sources import run_check_sources
+
+    run_check_sources()
+    return 2  # unreachable, run_check_sources calls sys.exit
+
+
+
+
 # ── 主入口 ───────────────────────────────────────────────
 
 
@@ -322,6 +341,9 @@ def main() -> int:
     args = parser.parse_args()
 
     from src.python.config import get_config, init_config
+
+    if args.command == "check-sources":
+        return _handle_check_sources()
 
     init_config(config_path=args.config)
     config = get_config()

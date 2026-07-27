@@ -4,9 +4,11 @@ prepare_report_data mock 测试 + capture_snapshot。
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
 import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+
+from unittest.mock import MagicMock, patch
 
 from src.python.report.orchestrator import (
     ReportResult,

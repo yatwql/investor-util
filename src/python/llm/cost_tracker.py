@@ -87,7 +87,7 @@ def check_input_budget(module_name: str, input_tokens: int, warn_once: bool = Tr
         warn_once: 同一报告周期是否只告警一次（默认 True）。
 
     Returns:
-        True = 未超出预算（或已告警过不再重复），False = 超出预算且首次告警。
+        True = 未超出预算（或已告警过不重复），False = 超出预算且首次告警。
     """
     global _budget_warned
     usage = get_session_usage()

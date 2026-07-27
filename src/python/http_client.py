@@ -1,7 +1,7 @@
 """HTTP 客户端工厂 — 统一控制 SSL 验证策略。
 
 所有 provider 模块通过 ``make_http_client()`` 创建 httpx.Client，
-不再分散使用 ``verify=False``。
+确保 SSL 验证策略统一管理。
 
 SSL 验证由环境变量 ``SSL_VERIFY`` 控制（默认 ``true``）：
   - ``true`` / ``1`` / ``yes`` → 验证证书（生产环境推荐）

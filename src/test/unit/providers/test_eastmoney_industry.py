@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
 # 新 API 字段映射:
 #   f127 = 行业名称（如"电力"）  f129 = 概念名称列表（逗号分隔）
-#   f198 = 行业 BK 代码（如"BK0428"）  f140 = 数值（不再含概念 ID）
+#   f198 = 行业 BK 代码（如"BK0428"）  f140 = 数值字段
 #   f128 = 地域板块（如"北京板块"）
 
 _MOCK_SUCCESS_RESPONSE = {
@@ -264,7 +264,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         for code in ("600900", "600905", "600919"):
             fetch_industry_and_concepts(code)
         self.assertTrue(reg.is_circuit_broken("eastmoney_industry"))
-        # 熔断后请求直接跳过，不再调 API
+        # 熔断后请求直接跳过，不调 API
         result = fetch_industry_and_concepts("600601")
         self.assertIsNone(result)
 

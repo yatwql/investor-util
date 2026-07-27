@@ -284,6 +284,65 @@ def generate_excel_report(
             except Exception:
                 logger.debug("[excel] 组合历史走势页签写入失败（非关键）", exc_info=True)
 
+    # ── 数据源可用性矩阵页签 ──
+    ws_ds = sheets.get("data_source_status")
+    if ws_ds is not None:
+        prog.info("正在写入数据源可用性矩阵...")
+        try:
+            from src.python.report.data_source_matrix import build_data_source_matrix
+            from src.python.report.excel_writer import (
+                auto_width,
+                write_data_row,
+                write_header_row,
+                write_title_row,
+            )
+            from openpyxl.styles import Font
+
+            _FONT_RED = Font(color="CC0000")
+            _FONT_GREEN = Font(color="009900")
+            _FONT_ORANGE = Font(color="E67E22")
+
+            matrix = build_data_source_matrix()
+            if matrix:
+                ncols = 5
+                row = write_title_row(ws_ds, 1, "数据源可用性矩阵", ncols)
+                row = write_header_row(
+                    ws_ds, row,
+                    ["数据源", "状态", "详情", "成功", "失败/降级"],
+                )
+                for m in matrix:
+                    if m["status"] == "ok":
+                        status_label = "✅ 正常"
+                        _font = _FONT_GREEN
+                    elif m["status"] == "degraded":
+                        status_label = "⚠️ 降级"
+                        _font = _FONT_ORANGE
+                    else:
+                        status_label = "❌ 失败"
+                        _font = _FONT_RED
+                    row = write_data_row(
+                        ws_ds, row,
+                        [m["name"], status_label, m["detail"],
+                         m["ok"], f"{m['degraded']}/{m['failed']}"],
+                    )
+                    if m["status"] != "ok":
+                        for col in range(1, 6):
+                            ws_ds.cell(row=row - 1, column=col).font = _font
+
+                has_failures = any(m["sample_failures"] for m in matrix)
+                if has_failures:
+                    row += 1
+                    row = write_title_row(ws_ds, row, "失败明细", ncols)
+                    for m in matrix:
+                        for sf in m.get("sample_failures", []):
+                            row = write_data_row(ws_ds, row, [m["name"], sf, "", "", ""])
+                auto_width(ws_ds)
+                logger.info("数据源可用性矩阵页签已写入")
+            else:
+                logger.debug("[excel] 数据源矩阵为空，跳过页签写入")
+        except Exception:
+            logger.debug("[excel] 数据源可用性矩阵页签写入失败（非关键）", exc_info=True)
+
     # ── 组合历史走势：环比对比摘要（写入 summary 页签底部） ──
     if pipeline_data and pipeline_data.get("diff") and "summary" in sheets:
         prog.info("正在写入环比对比摘要...")

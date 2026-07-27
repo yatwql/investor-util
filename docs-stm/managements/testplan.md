@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
-> 文档版本：v0.8.5-dev
+> 文档版本：v0.8.8-dev
 
 ---
 
@@ -78,7 +78,7 @@
 | `scenario/basic/test_scenario_penetration.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
 | `scenario/basic/test_scenario_section_order.py` | C-P1b | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
-| `scenario/test_llm_hallucination.py` | P4‑08 | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
+| `scenario/llm/test_llm_hallucination.py` | P4‑08 | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
 
 **业务场景规格（S0a-S0d、S1-S34、T1-T21）：**
 
@@ -337,7 +337,7 @@
 
 | 优先级 | 回归范围 | 触发条件 | 备注 |
 |:------:|:---------|:---------|:-----|
-| **P0** | `python scripts/test_runner.py --mode regression` 通过（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组） | **任何代码变更** | 提交前极速验证 |
+| **P0** | `python scripts/test_runner.py --mode dev-verify` 通过（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量） | **任何代码变更** | 提交前极速验证 |
 | **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） | 验证缺陷场景的断言 |
 | **P0** | 测试隔离验证：`pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
 | **P1** | 手动菜单 E/B/L 各一次，检查报告完整性 | config / report / html / llm 变更 | Excel 页签完整、不崩溃 |
@@ -485,9 +485,10 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode regression`（项数见 [`test-coverage.md`](./test-coverage.md) → 场景测试分组）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + 手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
 11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + 断网降级/旧缓存兼容/跨池污染确认
+    > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 人工验证
 

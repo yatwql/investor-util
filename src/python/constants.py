@@ -1,7 +1,7 @@
 """项目共享常量模块。
 
 此模块不含对本项目其他任何模块的 import，保持零依赖。
-供 cache.py、registry.py、main.py 等模块引用。
+供 cache.py、registry.py、tui.py 等模块引用。
 """
 
 import os
@@ -33,7 +33,7 @@ PROJECT_ROOT = _find_project_root()
 
 # ── 项目版本 ──────────────────────────────────────────────
 
-APP_VERSION = "0.8.5-dev"
+APP_VERSION = "0.8.8-dev"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 

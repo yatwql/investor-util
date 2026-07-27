@@ -4,9 +4,11 @@
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, PropertyMock, patch
-
 import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_cli]
+
+from unittest.mock import MagicMock, PropertyMock, patch
 
 from src.python.cli import (
     _EXIT_PARTIAL,

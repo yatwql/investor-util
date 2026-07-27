@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 # mock 目标路径：liquidity.py 内部 from src.python.fetcher.chain import fetch_with_incremental_fallback
 _MOCK_TARGET = "src.python.fetcher.chain.fetch_with_incremental_fallback"
