@@ -6,8 +6,8 @@
 
 ## [0.8.8-dev] - 未发布
 
-### Fixed
--（待补充）
+### Changed
+- **Python 最低版本锁定 ≥3.11**：3.10 已于 2026-10 EOL，CI 中反复出现 3.10 特有的兼容性问题（threading.Lock 类型检查、浮点精度、本次 CI 3.10-only 失败）。CI matrix 移除 3.10，pyproject.toml requires-python 同步更新，README.md 新增环境要求章节，faq.md 版本号更新
 
 ## [0.8.7] - 2026-07-27
 

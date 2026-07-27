@@ -32,11 +32,11 @@ A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope C
 
 **Q: 需要什么 Python 版本？**
 
-A: Python 3.10+。启动脚本（`launch.ps1` / `launch.sh`）自动检测 Python 版本是否满足要求并创建虚拟环境，也可手动执行 `pip install -r requirements.txt`。
+A: Python 3.11+。启动脚本（`launch.ps1` / `launch.sh`）自动检测 Python 版本是否满足要求并创建虚拟环境，也可手动执行 `pip install -r requirements.txt`。
 
 **Q: 支持 Windows 7 吗？**
 
-A: 不正式支持。Python 3.10+ 在 Windows 7 上安装受限，且部分依赖库（如 httpx、openpyxl 的最新版本）已不再支持 Win7。建议使用 Windows 10/11 或 Linux/macOS。
+A: 不正式支持。Python 3.11+ 在 Windows 7 上安装受限，且部分依赖库（如 httpx、openpyxl 的最新版本）已不再支持 Win7。建议使用 Windows 10/11 或 Linux/macOS。
 
 **Q: 程序首次启动为什么比较慢？**
 
@@ -48,7 +48,7 @@ A: 部分远程终端（如某些 SSH 客户端、tmux 默认配置）可能无�
 
 **Q: 启动脚本报依赖安装失败（如 lxml 编译错误）？**
 
-A: Windows 下部分 Python 包（如 lxml、pandas）需要编译 C 扩展，建议使用预编译 wheel。先确保 Python 3.10+ 已安装，然后运行：
+A: Windows 下部分 Python 包（如 lxml、pandas）需要编译 C 扩展，建议使用预编译 wheel。先确保 Python 3.11+ 已安装，然后运行：
 
 ```
 pip install --only-binary :all: -r requirements.txt
@@ -679,7 +679,7 @@ A: 有。`logs/app.log` 按文件大小切割（单文件超 **10MB** 自动切�
 
 **Q: WSL（Windows Subsystem for Linux）下可以运行吗？**
 
-A: 可以。在 WSL 中安装 Python 3.10+ 后，使用 `./scripts/launch.sh` 启动即可。注意 WSL 默认可能没有中文字体，HTML 报告导出到 Windows 侧（`/mnt/c/`）用浏览器打开即可正常显示。
+A: 可以。在 WSL 中安装 Python 3.11+ 后，使用 `./scripts/launch.sh` 启动即可。注意 WSL 默认可能没有中文字体，HTML 报告导出到 Windows 侧（`/mnt/c/`）用浏览器打开即可正常显示。
 
 **Q: 程序可以放在中文路径下运行吗？**
 
@@ -735,7 +735,7 @@ A: 程序在数据获取阶段会通过 TUI 输出进度消息（如 "正在获�
 
 **Q: 程序启动后立刻闪退或报错"模块未找到"？**
 
-A: 常见原因：① 虚拟环境未正确激活——确保 `.venv/` 存在且完整，可删除后重新运行启动脚本重建；② Python 版本不满足要求——确认 Python 3.10+；③ 依赖未完整安装——执行 `pip install -r requirements.txt`。查看 `logs/app.log` 中的启动错误日志可定位具体原因。
+A: 常见原因：① 虚拟环境未正确激活——确保 `.venv/` 存在且完整，可删除后重新运行启动脚本重建；② Python 版本不满足要求——确认 Python 3.11+；③ 依赖未完整安装——执行 `pip install -r requirements.txt`。查看 `logs/app.log` 中的启动错误日志可定位具体原因。
 
 **Q: 报告中的数据看起来明显异常（如收益率极高、市值不对）？**
 
