@@ -551,7 +551,7 @@ investor-util/
 │   │   │       ├── llm-hallucination-report_expert-review.md           # LLM 幻觉率采样报告（expert_review 模块）
 │   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
 │   │   │       └── llm-hallucination-sample-output_expert-review.txt   # 幻觉采样 LLM 原始输出样本
-│   │   ├── 0.8.x/                            # v0.8.x 版本迭代归档
+│   │   ├── v0.8.x/                           # v0.8.x 版本迭代归档
 │   │   │   └── perf_report/                  #   性能基准测试方案
 │   │   │       └── perf-three-layer-plan.md  #   性能基准测试设计（已实现）
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
