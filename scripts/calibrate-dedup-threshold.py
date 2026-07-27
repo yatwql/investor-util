@@ -24,12 +24,12 @@ _ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "cache", "dedup_anchors.jsonl
 # 算法同时使用中文 bigram + 英数 token 匹配，
 # 跨源采用梯度阈值：
 #   - bg≥3: ratio≥0.30 合并（已有规则）
-#   - bg=2: ratio≥0.40 合并（补充梯度规则）
+#   （bg=2 梯度规则已移除，参见 changelog v0.8.7-dev）
 #   - bg≤1: 不合并（即使 ratio 较高也是虚假重叠）
 _CROSS_THRESHOLD = 0.30  # cross_threshold
 _SAME_SRC_BIGRAM = 4  # 同源 bigram 阈值
 _CROSS_BIGRAM = 3  # 跨源 bigram 阈值
-_BG2_RATIO = 0.40  # 梯度阈值：bg=2 时需 ratio≥0.40 才合并
+# _BG2_RATIO 已移除（v0.8.7-dev 废除 bg=2 梯度规则）
 
 
 def load_anchors(path: str = _ANCHOR_PATH) -> list[dict[str, Any]]:
@@ -114,24 +114,6 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
         print("=== cross_merge: 无记录 ===")
     print()
 
-    # cross_merge_bg2: 跨源 ratio ≥ 0.38 且 bigram = 2 被合并（梯度规则）
-    merge_bg2 = by_rule.get("cross_merge_bg2", [])
-    if merge_bg2:
-        ratios = [r["ratio"] for r in merge_bg2]
-        overlaps = [r["bigram_overlap"] for r in merge_bg2]
-        print(f"=== cross_merge_bg2（跨源 bg=2 且 ratio≥0.38 梯度合并 — 新增规则）===")
-        print(f"  数量: {len(merge_bg2)}")
-        print(f"  ratio 范围: {min(ratios):.3f} ~ {max(ratios):.3f}")
-        # 检查 ratio=0.38 附近的边界
-        edge = [r for r in merge_bg2 if r["ratio"] < 0.42]
-        if edge:
-            print(f"  ratio<0.42 边界: {len(edge)} 条")
-            if not summary_only:
-                for r in edge[:5]:
-                    print(f"    ratio={r['ratio']:.3f} bg={r['bigram_overlap']} [{r['source_a']}] {r['title_a'][:30]}")
-                    print(f"    → [{r['source_b']}] {r['title_b'][:30]}")
-    else:
-        print("=== cross_merge_bg2: 无记录 ===")
     print()
 
     # cross_safe: 跨源 ratio ≥ 0.50 直接合并
@@ -176,12 +158,11 @@ def _print_calibration_advice(
 
     skip = by_rule.get("cross_skip", [])
     merge = by_rule.get("cross_merge", [])
-    merge_bg2 = by_rule.get("cross_merge_bg2", [])
     same = by_rule.get("same_src", [])
     safe = by_rule.get("cross_safe", [])
 
     # 跨源 candidate 总数
-    cross_candidates = len(skip) + len(merge) + len(merge_bg2) + len(safe)
+    cross_candidates = len(skip) + len(merge) + len(safe)
 
     # 1. cross_threshold (0.30)
     if skip:
@@ -195,25 +176,12 @@ def _print_calibration_advice(
         print(f"    bg=1: {len(skip_bg1)} 条（几乎无实体重叠，安全跳过）")
         print(f"    bg>=2: {len(skip_bg2)} 条（有实体重叠但未达阈值，需审查）")
 
-        # bg≥2 且有较高 ratio → 被梯度规则覆盖
-        high_skip_entity = [r for r in skip_bg2 if r["ratio"] >= _BG2_RATIO]
-        if high_skip_entity:
+        # bg≥2 的 skip — 有实体重叠但未达 bg≥3 合并门槛
+        skip_bg2_high = [r for r in skip_bg2 if r["ratio"] >= 0.35]
+        if skip_bg2_high:
             print()
-            print(f"[!] bg≥2 且 ratio≥{_BG2_RATIO} 被跳过: {len(high_skip_entity)} 条")
-            print(f"    这些应被梯度规则 cross_merge_bg2 捕获，如仍有记录说明需排查。")
-            if not summary_only:
-                for r in high_skip_entity[:5]:
-                    print(
-                        f"      ratio={r['ratio']:.3f} bg={r['bigram_overlap']} [{r['source_a']}] {r['title_a'][:30]}"
-                    )
-                    print(f"      → [{r['source_b']}] {r['title_b'][:30]}")
-        # bg≥2 但 ratio 介于 0.35~0.38 之间
-        mid_skip_entity = [r for r in skip_bg2 if _BG2_RATIO > r["ratio"] >= 0.35]
-        if mid_skip_entity:
-            print()
-            print(f"[?] bg≥2 且 0.35≤ratio<{_BG2_RATIO} 被跳过: {len(mid_skip_entity)} 条")
-            print(f"    这些案例有实体重叠但 ratio 未达梯度阈值 {_BG2_RATIO}，")
-            print(f"    建议审查是否应为重复，以便决定是否进一步降低阈值。")
+            print(f"[?] bg≥2 且 ratio≥0.35 被跳过: {len(skip_bg2_high)} 条")
+            print(f"    有实体重叠但未达 bg≥3 合并条件，需审查是否应为重复")
 
         # bg=0,1 但 ratio 很高 → 说明归一化不够，不是阈值问题
         high_skip_noise = [r for r in skip if r["bigram_overlap"] <= 1 and r["ratio"] >= 0.40]
@@ -231,20 +199,19 @@ def _print_calibration_advice(
                     print(f"      → [{r['source_b']}] {r['title_b'][:30]}")
 
         # 绝大多数 skip 都在边界内 → 阈值合适
-        if not high_skip_entity:
+        if not any(r["bigram_overlap"] >= 2 and r["ratio"] >= 0.35 for r in skip):
             print(f"[OK] cross_threshold=0.30 当前合适（无非重复漏判）")
     else:
         print(f"[OK] cross_threshold=0.30: 无 skips，阈值安全")
 
-    # 2. 跨源 bigram 阈值 (3) 与梯度阈值 (bg=2 + ratio≥0.40)
-    if merge or merge_bg2:
+    # 2. 跨源 bigram 阈值 (3)
+    if merge:
         edge_merge = [r for r in merge if r["bigram_overlap"] == 3]
         if edge_merge:
             ratio_ok = sum(1 for r in edge_merge if r["ratio"] >= 0.40)
             print()
             print(f"[!] 跨源 bigram=3: {len(edge_merge)} 条在边界上")
             print(f"    其中 {ratio_ok}/{len(edge_merge)} 条 ratio>=0.40")
-            print(f"    已有梯度规则（bg=2 + ratio≥{_BG2_RATIO}）作为降级补充路径，")
             print(f"    降低 bigram=3 阈值的需求不大。")
 
         bigram_4plus = [r for r in merge if r["bigram_overlap"] >= 4]
@@ -275,7 +242,7 @@ def _print_calibration_advice(
     print("─" * 60)
     print("当前阈值规则")
     print("─" * 60)
-    print(f"  跨源梯度阈值：bg≥3 + ratio≥0.30 || bg=2 + ratio≥{_BG2_RATIO} → 合并")
+    print(f"  跨源：bg≥3 + ratio≥0.30 → 合并（bg=2 梯度规则已移除）")
     print(f"  跨源安全区：ratio≥0.50 → 直接合并")
     print(f"  同源：bigram≥4 → 合并")
     print(f"  _normalize_title 过滤模式：%、万亿、前N、\\\\b(?:19|20)\\\\d{{2}}\\\\b、字母后缀年份")

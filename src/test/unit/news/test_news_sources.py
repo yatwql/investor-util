@@ -249,16 +249,17 @@ class TestDedupByTitle(unittest.TestCase):
         self.assertEqual(len(result), 2)
 
     def test_cross_source_bg2_high_ratio_merged(self) -> None:
-        """跨源：bg=2 但 ratio≥0.38 时梯度合并（新增梯度规则）。"""
+        """跨源：英数 token 重叠≥3（amd+helios+azure+ai），走正常 bg≥3 规则合并。"""
         from src.python.providers.news_aggregator import _dedup_by_title
 
-        # 同一事件（微软+AMD+Helios）不同表述，bg≈2（amd、helios）+ ratio≈0.49
+        # 同一事件不同表述，entity bigram 含 amd/helios/azure/ai 4 个英数 token
+        # （注：原标注为 bg=2 梯度规则测试，实际走的是 bg≥3 主干规则）
         items = [
             self._make_item("微软Azure采用大规模集群AMD Helios以推动AI创新", "东方财富"),
             self._make_item("AMD与微软AI合作推出Azure上Helios系统", "新浪财经"),
         ]
         result = _dedup_by_title(items)
-        # 梯度规则：overlap=2（amd+helios）且 ratio≈0.49 ≥ 0.40 → 合并为1条
+        # entity overlap = {amd, helios, azure, ai, _tk:helios, _tk:azure} ≥ 3 → 合并为1条
         self.assertEqual(len(result), 1)
 
     def test_cross_source_bg2_low_ratio_kept(self) -> None:

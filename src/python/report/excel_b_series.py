@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import Any
 
 from src.python.logger import setup_logger
+from src.python.fetcher.fund import fetch_fund_holdings_cached
 from src.python.report.fund_performance import is_fund
 from src.python.report.progress import ProgressReporter
 
@@ -32,7 +33,7 @@ def _process_b_module(
     fund_codes = list(dict.fromkeys(h.code for h in holdings if is_fund(h)))
     fund_holdings_map: dict[str, dict] = {}
     for code in fund_codes:
-        fh = _fetch_fund_holdings_cached(code)
+        fh = fetch_fund_holdings_cached(code)
         if fh and fh.get("holdings"):
             fund_holdings_map[code] = {
                 "name": fh.get("name", code),

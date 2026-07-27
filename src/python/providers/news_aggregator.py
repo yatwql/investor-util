@@ -419,12 +419,6 @@ def _dedup_by_title(
                     is_dup = True
                     _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
                     break
-                elif overlap >= 2 and ratio >= 0.40:
-                    # 梯度规则：bg=2 但 ratio≥0.40 时也合并。实体重叠较少但
-                    # ratio 较高的跨源相似标题，视为同一新闻。
-                    is_dup = True
-                    _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge_bg2"))
-                    break
                 # 锚点：跨源候选区但 bigram 不足
                 _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, overlap, False, "cross_skip"))
 
