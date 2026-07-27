@@ -29,6 +29,12 @@
   - **C12 边缘文件隔离**：极端值/异常场景测试（如 `unit/analysis/test_liquidity_edge.py`、`unit/analysis/test_liquidity_otc_edge.py`）**必须**使用 `@pytest.mark.edge` 标记并放入 `*_edge.py` 文件，conftest.py 的 `pytest_collection_modifyitems` 会自动校验
 - **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
+- **任务编号规范**：
+  - `plan.md` 的待办任务：`plan-{全局递增序号}`（如 `plan-1`、`plan-2`），从 1 开始单调递增，已归档或已完成的序号不回收
+  - `review-findings.md` 的自审问题：`rf-{全局递增序号}`（如 `rf-1`、`rf-2`），从 1 开始单调递增，已修复归档的序号不回收
+  - 序号仅用于标识，**不编码优先级、不编码层级、不编码分类**。优先级信息在分类表头文字描述中表达
+  - 跨文档引用时**必须带前缀**（`plan-`/`rf-`），避免歧义
+  - 历史数据保持原名（如 `P3-09`、`P4-91`），不追溯重命名
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md）
 - **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-menu.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource.md, datasource-reliability.md, reports-instruction.md, faq.md, how-to-test-my-code.md, how-to-schedule.md, scripts-reference.md）

@@ -8,13 +8,13 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 146 | 39,294 | `src/python/` 下所有 `.py`（不含测试） |
+| 主程序代码 | Python | 152 | 39,801 | `src/python/` 下所有 `.py`（不含测试） |
 | HTML 报告模板 | HTML | 1 | 1,844 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python/Shell | 10 | 3,227 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **157** | **44,365** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **189** | **57,960** | `src/test/` 所有 `.py` 文件 |
+| 辅助脚本 | Python | 9 | 3,153 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **162** | **44,798** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **189** | **57,982** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **3,765 个** | `pytest --collect-only` 统计 |
-| **用户文档** | Markdown | **87** | — | `docs-stm/`（85 文件）+ `README.md` + `CLAUDE.md` |
+| **用户文档** | Markdown | **88** | — | `docs-stm/`（86 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
 
@@ -551,6 +551,9 @@ investor-util/
 │   │   │       ├── llm-hallucination-report_expert-review.md           # LLM 幻觉率采样报告（expert_review 模块）
 │   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
 │   │   │       └── llm-hallucination-sample-output_expert-review.txt   # 幻觉采样 LLM 原始输出样本
+│   │   ├── 0.8.x/                            # v0.8.x 版本迭代归档
+│   │   │   └── perf_report/                  #   性能基准测试方案
+│   │   │       └── perf-three-layer-plan.md  #   性能基准测试设计（已实现）
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

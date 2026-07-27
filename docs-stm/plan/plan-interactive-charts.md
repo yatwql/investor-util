@@ -21,15 +21,28 @@
 - 部分用户打印 HTML 报告：交互式图表打印时需要 fallback 静态图
 - Chart.js 特定版本安全风险（需锁定版本号，不 auto-load latest）
 
-## 工作量估算
+## 架构约束遵从
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| **C14** (渲染期数据不可写入模块级全局变量) | 所有图表数据（chart_data、chart_config 等）必须通过 `render()` context 参数传递，**严禁**注入 `_ENV.globals`。当前 `section_visible` 为唯一 globals 条目（fail-closed 默认值 + 渲染期 context 覆盖），Chart.js 数据不得增加第二个 globals 条目 |
+| **C19** (pipeline_data Schema 契约) | 若新增管线级图表数据结构（如预处理的 Chart.js dataset 格式），必须在 pipeline_data Schema 定义集中预定义类型/版本号/写入模块。若仅对现有 template context 数据（`history_data.bars` 等）做 `tojson` 序列化后直接 Chart.js 消费，则不需要新 Schema 条目 |
+| **§1.4.4** (报告配置化) | Chart.js 交互功能应通过 Feature Flag `enable_interactive_charts`（默认开启）控制，用户可在 `config.json` 或 `features.json` 关闭后回退到现有 Canvas 2D 渲染。渲染期通过模板 context 传递标志量，不硬编码行为 |
+| **§1.4.5** (数据降级治理) | 数据量不足的图表（如相关性矩阵品种 < 3 只不生成）Chart.js 应渲染空状态提示而非白屏，与现有降级占位逻辑一致 |
+
+**对 plan-3/plan-6 的依赖（反向）**：plan-1 是 plan-3（净值曲线/回撤图）和 plan-6（多快照趋势图）的 Chart.js 升级前提。若 plan-1 推迟，plan-3/plan-6 的图表增强需在现有 Canvas 2D 框架内实现（有限功能，不阻塞）。
+
+## 工作量估算（含架构约束适配）
 
 | 阶段 | 内容 | 天数 |
-|------|------|------|
-| 技术选型验证 | Chart.js vs ECharts vs ApexCharts → 选定模板集成方案 | 0.5 |
-| 模板改造 | jinja2 模板引入 Chart.js、数据序列化接口、渲染函数 | 1 |
+|------|------|:----:|
+| 技术选型验证 | Chart.js vs ECharts vs ApexCharts → 选定模板集成方案；明确 CDN ↔ 本地 bundle 策略 | 0.5 |
+| 数据接口定义 | 定义每类图表所需的 template context 数据结构（C14 约束：走 `render()` context，非 `_ENV.globals`）；若新增 pipeline_data 键则完成 C19 Schema 定义 | 0.5 |
+| 模板改造 | jinja2 模板引入 Chart.js CDN ↔ 本地 bundle 切换、数据序列化接口、`tojson` 管道、渲染函数（C14 约束） | 1 |
 | 图表迁移 | 饼图、柱状图、净值曲线、热力图逐个替换为交互版 | 1 |
-| 打印降级 | @media print + canvas-to-image fallback | 0.5 |
-| **合计** | | **3 天** |
+| 打印降级 | `@media print` + `chart.toBase64Image()` fallback | 0.5 |
+| Feature Flag 适配 | `features.json` 新增 `enable_interactive_charts`（默认开启），渲染器根据 flag 切换 Chart.js ↔ Canvas 2D | 0.5 |
+| **合计** | | **4 天** |
 
 ## 实现的 6 张交互图表
 

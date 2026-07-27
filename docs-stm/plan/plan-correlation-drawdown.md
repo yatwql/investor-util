@@ -1,6 +1,6 @@
 # 分析功能基础增强：相关性矩阵 + 最大回撤 + 净值曲线
 
-> **任务编号**：P2-2（持仓相关性矩阵）／ P2-3（最大回撤+净值曲线）
+> **任务编号**：plan-2（持仓相关性矩阵）／ plan-3（最大回撤+净值曲线）
 
 ## 目录
 
@@ -37,14 +37,32 @@
 - 次新品种（< 60 个交易日）历史数据不足会显示 N/A，需在 UI 明确标注
 - 场外基金历史净值分页目前上限 200 条（~10 个月），如需更长的回看窗口（≥3 年）需调大 `pageSize` 阈值
 
-### 工作量估算
+### 架构约束遵从
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| **C1** (代码类型判定中心化) | 各品种的数据获取链路选择必须通过 `code_utils.py` 判定资产类型（股票→history_stock、基金→history_fund_otc），不自行实现判定逻辑 |
+| **C6** (Provider Chain 必经) | 历史数据获取复用 `fetch_with_incremental_fallback()` 既有链路，不绕过 Chain 直接调 Provider |
+| **C2/C3** (缓存统一+原子写入) | 全品种历史数据通过 `cache/` 子包读写，36 场外基金分页参数修改走 `cache/_io.py` 原子写入 |
+| **C4** (会话级 API 复用) | 同资产历史数据在会话内通过 DataSourceRegistry.session_cache 消重（与 portfolio_history 共享） |
+| **C7** (报告序号可配置) | 相关性矩阵页签必须在 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册新条目（type=`b_series`、data_flag=`correlation_data`），支持用户通过 `config.json` 自定义序号和开关 |
+| **C14** (渲染期数据不可写入模块级全局变量) | 热力图数据必须通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` |
+| **C19** (pipeline_data Schema 契约) | 新增 `correlation_data` 键，类型 `dict`，在 pipeline_data Schema 定义集中预定义类型/版本号/写入模块后再使用 |
+| **§1.4.5** (数据降级治理) | 品种历史数据不足 60 交易日时标注 `correlation_available=false`，热力图中显示灰色 N/A，不走 DegradationTracker（非数据源故障，系数据量不足） |
+| **§1.4.1** (代码类型判定中心化) | 同 C1 |
+
+**对 `rf-1` 的依赖**：相关性矩阵涉及 15+ 品种历史数据获取，若全量串行则每品种 ~1-2s HTTP，合计 15-30s 额外等待。预期 rf-1 批量并行实现后此瓶颈消除（收益 < rf-1 主场景，约 10-20s），可先行实现计算逻辑和渲染，待 rf-1 完成后追加批量获取优化。
+
+### 工作量估算（含架构约束适配）
 
 | 阶段 | 内容 | 天数 |
 |------|------|------|
-| 分析模块 | `analysis/correlation.py` 相关系数计算 + 协方差矩阵 + p-value | 1 |
-| Excel 输出 | 热力图配色条件格式 + 数值表页签 | 0.5 |
-| HTML 输出 | Chart.js 矩阵热力图渲染 | 0.5 |
-| **合计** | | **2 天** |
+| 纯计算函数 | `analysis/correlation.py` 时间序列对齐 → pairwise Pearson/Spearman + p-value 显著性标记，纯 pandas 运算，不依赖 report/ 模块 | 0.5 |
+| 数据获取编排 | `orchestrator.py` 获取全品种历史数据 → 调用纯计算函数 → 结果写入 `pipeline_data['correlation_data']`（C19 新键） | 0.5 |
+| 注册与配置 | `registry.py` 新增报告模块条目（C7）+ 两层可见性模型适配 | 0.5 |
+| Excel 输出 | 热力图条件格式配色 + 数值表页签 + 数据不足品种 N/A 降级展示（§1.4.5） | 0.5 |
+| HTML 输出 | Chart.js 矩阵热力图渲染 + 数据通过模板 context 传递（C14） | 0.5 |
+| **合计** | | **2.5 天** |
 
 ### 实现思路
 
@@ -62,7 +80,7 @@ graph LR
 
 ### 数据源可行性分析
 
-P2-2 不依赖新数据源，复用 `fetch_history_data()` 既有链路。
+plan-2 不依赖新数据源，复用 `fetch_history_data()` 既有链路。
 
 #### API 上限速查
 
@@ -149,14 +167,31 @@ days = min(max(days, 5), 365)
 - 场外基金：方案一（东方财富 `max_pages=36`），方案二（天天基金主链路）
 - 指数：直接使用全量 3-5 年数据（Sina 3650 天上限绰绰有余）
 
-### 工作量估算
+### 架构约束遵从
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| **C7** (报告序号可配置) | `drawdown_analysis` 已在 `registry.py` 注册（type=history、number=16），增强内容不新增报告模块，不需修改注册表 |
+| **C14** (渲染期数据不可写入模块级全局变量) | 所有新数据通过 `history_data` 模板 context 传递，沿用现有 `render()` context 参数机制，不写入 `_ENV.globals` |
+| **C19** (pipeline_data Schema 契约) | 新增 `drawdown_events`（list[dict]: peak_date/trough_date/recovery_date/drawdown_pct）和 `recovery_times`（list[dict]: start_date/end_date/days）字段需在 pipeline_data Schema 定义集中预定义类型/版本号/写入模块，与已有 `max_drawdown_pct`/`drawdown_start`/`drawdown_end` 共同纳入 schema 管理 |
+| **§1.4.5** (数据降级治理) | 全量历史 span < 60 交易日时，`drawdown_analysis` 标记 `drawdown_available=false`，回撤分析章节显示"数据不足"占位文本，不走 DegradationTracker（系数据量不足，非数据源故障） |
+| **C6** (Provider Chain 必经) | 同 §1——复用 `fetch_with_incremental_fallback()` 既有链路 |
+| **C2/C3** (缓存统一+原子写入) | 同 §1——复用既有 `cache/` 子包 |
+
+**对 plan-1 的依赖**：当前 drawdown 图表使用 Canvas 2D API 原生渲染（`drawSimpleChart`），plan-3 计划升级为 Chart.js 双轴图（净值线 + 回撤填充）。Chart.js 迁移由 plan-1 统一实施，plan-3 需在 plan-1 完成后适配模板参数。若 plan-1 搁置或推迟，plan-3 可回退在现有 Canvas 2D 框架内增强标注（添加回撤区间阴影标注 + 恢复时间水印），不阻塞。
+
+### 工作量估算（含架构约束适配）
 
 | 阶段 | 内容 | 天数 |
 |------|------|------|
-| 分析处理 | 多期净值数据聚合 + 回撤区间标注 | 0.5 |
-| Excel 输出 | 净值表 + 回撤明细 + 最大回撤标注行 | 0.5 |
-| HTML 输出 | Chart.js 双轴图（净值线 + 回撤填充） | 0.5 |
-| **合计** | | **1.5 天** |
+| C19 Schema 定义 | `drawdown_events` / `recovery_times` 字段预定义类型/版本号/写入模块，更新 pipeline_data Schema 文档 | 0.25 |
+| 数据加工 | `portfolio_history.py` 提取独立回撤事件（从 bars 逐日 drawdown 序列检测峰谷→合并连续回撤区间→计算恢复时间），纯计算不依赖 report/ 模块 | 0.5 |
+| Excel 输出 | 新增历史回撤明细页签内容：回撤序号/起始日/最深日/恢复日/幅度/持续天数 | 0.5 |
+| HTML 增强 | 图表标注（回撤区间阴影/恢复时间水印）+ 回撤明细表格 + 数据不足占位处理（§1.4.5） | 0.5 |
+| 模板渲染适配 | 新增数据通过模板 context 传递（C14 约束） | 0.25 |
+| **合计** | | **2 天** |
+
+> Chart.js 双轴图部分由 plan-1 统一实施，本估算不含 Chart.js 迁移费用。
 
 ### 实现思路
 
