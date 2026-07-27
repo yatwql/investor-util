@@ -253,10 +253,10 @@ def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
     neg = [(n, c, p) for n, c, p in top5 if p < 0]
 
     if pos:
-        pos_parts = [f"{n}(+{p / total_abs * 100:.1f}%)" for n, c, p in pos]
+        pos_parts = [f"{n}(+{p / total_abs * 100:.1f}pp)" for n, c, p in pos]
         lines.append(f"主要盈利来源: {'、'.join(pos_parts)}")
     if neg:
-        neg_parts = [f"{n}({p / total_abs * 100:.1f}%)" for n, c, p in neg]
+        neg_parts = [f"{n}({p / total_abs * 100:.1f}pp)" for n, c, p in neg]
         lines.append(f"主要亏损来源: {'、'.join(neg_parts)}")
 
     pos_total = sum(p for _, _, p in profits if p > 0)
