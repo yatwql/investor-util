@@ -22,7 +22,7 @@
 
 > **plan-1**～**plan-7**（plan-4 已放弃）合计 ~18d 预排。
 
-#### `plan-1` 交互式 HTML 报告升级（[`plan-interactive-charts.md`](../plan/plan-interactive-charts.md)）
+#### `plan-1` 交互式 HTML 报告升级（[`plan-chartjs-report-upgrade.md`](../plan/plan-chartjs-report-upgrade.md)）
 
 Chart.js 替换 Canvas 静态图表，实现缩放、悬停提示、筛选、导出。**预估：4d**
 

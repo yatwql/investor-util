@@ -1,4 +1,8 @@
-# 交互式 HTML 报告升级
+# 交互式 HTML 报告升级（Chart.js 实施方案）
+
+> **关系**：本文档 = 实施方案；关联的风险/收益/架构分析见 [`plan-chartjs-risk-analysis.md`](./plan-chartjs-risk-analysis.md)。
+>
+> 二者共同组成 plan-1 的完整设计方案：实施方案聚焦"怎么做"，风险分析聚焦"为什么这么做"。
 
 ## 概述
 
