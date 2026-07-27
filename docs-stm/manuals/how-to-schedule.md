@@ -22,6 +22,7 @@ CLI 入口：`python -m src.python.cli [全局参数] <子命令> [子命令参�
 | 更新持仓类缓存 | `python -m src.python.cli cache --update position` |
 | 清理过期缓存 | `python -m src.python.cli cache --clean` |
 | 查看缓存状态 | `python -m src.python.cli cache --stats` |
+| 查看性能历史趋势 | `python scripts/perf_view.py` |
 
 ### 退出码含义
 
@@ -176,6 +177,17 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 - 短时网络抖动 → 自动重试（3 次）
 - 数据源持续不可用 → 熔断器开启 → 使用过期缓存
 - 报告在无网络环境下降级生成（exit=1，部分数据为空）
+
+### 4.5 性能历史自动收集
+
+每次 CLI 报告生成时，系统自动记录两方面的性能数据到 `data/state/` 目录：
+
+| 文件 | 内容 | 查看方式 |
+|:-----|:------|:---------|
+| `perf_history.jsonl` | 各阶段耗时（行情/数据准备/HTML/Excel/LLM 等），含版本号和持仓数量 | `python scripts/perf_view.py` |
+| `datasource_health.jsonl` | 全量数据源 HTTP 连通性检查结果 + 延迟 | 同上命令（同文件含来源格式） |
+
+这些记录自动积累，可用于跨版本性能退化检测和异常波动排查，无需手动触发。
 
 ### 4.4 退出码速查
 

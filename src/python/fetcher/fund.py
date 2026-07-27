@@ -20,7 +20,8 @@ from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.fetcher.chain import fetch_with_fallback
 from src.python.http_client import make_http_client
-from src.python.providers import tiantian
+from src.python.providers.tiantian_holdings import fetch_fund_holdings
+from src.python.providers.tiantian_ranking import fetch_fund_rankings
 
 logger = logging.getLogger("invest")
 
@@ -34,7 +35,7 @@ _FUND_PERF_CACHE_PREFIX = "fund_perf_"
 _ProviderFunc = Callable[..., dict[str, Any] | None]
 
 _FUND_RANK_PROVIDERS: dict[str, tuple[str, _ProviderFunc]] = {
-    "tiantian": ("天天基金", tiantian.fetch_fund_rankings),
+    "tiantian": ("天天基金", fetch_fund_rankings),
 }
 
 
@@ -70,7 +71,7 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
 _FUND_HOLD_CACHE_PREFIX = "fund_hold_"
 
 _FUND_HOLD_PROVIDERS: dict[str, tuple[str, _ProviderFunc]] = {
-    "tiantian": ("天天基金", tiantian.fetch_fund_holdings),
+    "tiantian": ("天天基金", fetch_fund_holdings),
 }
 
 

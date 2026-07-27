@@ -771,6 +771,8 @@
 | R-PERF-06 | 基金风格分析中同一品种的 API 数据应在会话内跨基金复用 |
 | R-PERF-07 | 历史数据获取应使用增量模式（缓存底座 + 增量新数据），避免全量重取 |
 | R-PERF-08 | 历史走势获取应阶段超时保护（超时后已完成部分保留，未完成部分以占位处理） |
+| R-PERF-09 | 每次报告生成应自动记录各阶段耗时（行情获取/数据准备/HTML生成/Excel生成/LLM+新闻等），持久化到 `data/state/perf_history.jsonl` 用于跨版本性能趋势追踪 |
+| R-PERF-10 | 每次报告生成应在后台自动执行数据源健康检查（HTTP 连通性+延迟），结果存入 `data/state/datasource_health.jsonl` 并注入 DegradationTracker 供数据源可用性矩阵展示 |
 
 ---
 

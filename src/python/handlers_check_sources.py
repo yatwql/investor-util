@@ -174,9 +174,57 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
 ]
 
 
+def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
+    """执行全量数据源健康检查，返回结构化结果列表。
+
+    Args:
+        max_timeout: HTTP 超时秒数（自动检查时可用较短值如 8s）
+
+    Returns:
+        列表，每项含：name / label / ok / latency_ms / message
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    results: list[dict] = []
+
+    def _run_check(name: str, label: str, check_fn: Callable) -> dict:
+        symbol, elapsed, msg = check_fn()
+        return {
+            "name": name,
+            "label": label,
+            "ok": symbol == _OK,
+            "latency_ms": round(elapsed, 1),
+            "message": msg,
+        }
+
+    with ThreadPoolExecutor(max_workers=min(len(_checks), 8)) as pool:
+        fut_to_name = {
+            pool.submit(_run_check, name, label, fn): name
+            for name, label, fn in _checks
+        }
+        for fut in as_completed(fut_to_name):
+            try:
+                results.append(fut.result())
+            except Exception as e:
+                name = fut_to_name[fut]
+                results.append({
+                    "name": name,
+                    "label": "",
+                    "ok": False,
+                    "latency_ms": 0.0,
+                    "message": str(e)[:60],
+                })
+
+    # 按 name 排序保证输出稳定
+    results.sort(key=lambda r: r["name"])
+    return results
+
+
 def run_check_sources() -> None:
-    """执行全量数据源健康检查并打印结果。"""
+    """执行全量数据源健康检查并打印结果（CLI 入口）。"""
     from datetime import date
+
+    results = run_health_checks(max_timeout=15.0)
 
     print(f"\n数据源健康检查结果 ({date.today()})")
     print("─" * 55)
@@ -187,26 +235,23 @@ def run_check_sources() -> None:
     warn_count = 0
     err_count = 0
 
-    for name, label, check_fn in _checks:
-        symbol, elapsed, msg = check_fn()
-        if symbol == _OK:
+    for r in results:
+        if r["ok"]:
             ok_count += 1
-        elif symbol == _WARN:
+        elif "timeout" in r["message"].lower() or "超时" in r["message"]:
             warn_count += 1
         else:
             err_count += 1
 
-        color = "green" if symbol == _OK else ("yellow" if symbol == _WARN else "red")
-        elapsed_str = f"{elapsed:>7.0f}ms" if elapsed >= 0 else "       -"
-        print(f"  {symbol}  {name:<12} {label:<10} {elapsed_str:>8}  {msg}")
+        symbol = _OK if r["ok"] else (_WARN if "timeout" in r["message"].lower() else _ERR)
+        elapsed_str = f"{r['latency_ms']:>7.0f}ms" if r["latency_ms"] >= 0 else "       -"
+        print(f"  {symbol}  {r['name']:<12} {r['label']:<10} {elapsed_str:>8}  {r['message']}")
 
     print("─" * 55)
-    status_color = "green" if err_count == 0 else ("yellow" if warn_count > 0 else "red")
     total = ok_count + warn_count + err_count
     print(f"  {total} 个数据源 — {_OK} {ok_count} / {_WARN} {warn_count} / {_ERR} {err_count}")
     print()
 
-    # 返回退出码
     if err_count > 0:
         sys.exit(2)
     if warn_count > 0:

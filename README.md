@@ -87,6 +87,12 @@ python -m src.python.cli cache --stats
 - **竞争语境对比** — 智囊团复盘中自动对比组合 vs 沪深300/中证500/中证全债等多指数的今日涨跌幅、区间累计收益和夏普/波动率/最大回撤，指数池通过 `config.json` 自定义
 - **币种敞口分布** — 穿透深度分析中展示 A股/港股/美股 按市值加权占比，非人民币资产>0% 时附加汇率波动风险提示
 
+### 性能追踪与运维
+
+- **自动阶段计时** — 每次报告生成自动记录各阶段耗时（行情获取/数据准备/快照对比/历史走势/HTML 生成/Excel 生成/LLM+新闻），持久化到 `data/state/perf_history.jsonl`
+- **数据源健康检查** — 每次报告生成时后台并行执行全量数据源 HTTP 连通性检测，结果存入 `data/state/datasource_health.jsonl` 并实时反映在报告 #17 数据源可用性矩阵章节
+- **趋势查看工具** — `scripts/perf_view.py` 读取历史记录，输出版本间耗时对比 Markdown 表格，用于多版本间性能退化检测
+
 ### 基金评价
 
 - **基金业绩 5 级评级** — 基于天天基金同类排名百分位，按类型使用差异化阈值（债券型/QDII 更宽松，指数型更严格），再经超额收益评分修正，自动标注优秀/良好/稳定/偏差/较差，带颜色标识
@@ -126,6 +132,7 @@ python -m src.python.cli cache --stats
 | [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块（含 LLM）检查清单 |
 | [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试模式、新增测试指南 |
 | [辅助脚本参考](docs-stm/manuals/scripts-reference.md) | scripts/ 目录全部工具脚本用法速查 |
+| [性能历史趋势查看](scripts/perf_view.py) | 查看每次报告生成的各阶段耗时记录（`python scripts/perf_view.py`） |
 
 ## 📋 项目内部文档
 

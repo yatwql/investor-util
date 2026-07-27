@@ -164,7 +164,7 @@ class TestDebateProconFlow(unittest.TestCase):
             self.assertIsNone(pro)
             self.assertIsNone(con)
             self.assertIsNone(syn)
-            # pro 失败后应短路，不再调用 con/synthesis
+            # pro 失败后应短路，不调用 con/synthesis
             self.assertEqual(mock_gen.call_count, 1)
 
     # ── 测试：con 步骤失败 ──────────────────────────────────
@@ -183,7 +183,7 @@ class TestDebateProconFlow(unittest.TestCase):
             self.assertIsNone(pro)
             self.assertIsNone(con)
             self.assertIsNone(syn)
-            # con 失败后应短路，不再调用 synthesis
+            # con 失败后应短路，不调用 synthesis
             self.assertEqual(mock_gen.call_count, 2)
 
     # ── 测试：pro 返回空字符串 ──────────────────────────────

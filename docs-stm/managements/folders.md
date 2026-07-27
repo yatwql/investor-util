@@ -66,7 +66,10 @@ investor-util/
 │   │   │   ├── eastmoney.py          #   东方财富 API（场外基金净值/历史净值）
 │   │   │   ├── eastmoney_industry.py #   东方财富行业分类/概念板块
 │   │   │   ├── eastmoney_industry_rest.py # 东方财富行业 REST 接口封装
-│   │   │   ├── tiantian.py           #   天天基金 API（基金业绩排名/评级）
+│   │   │   ├── tiantian_base.py        #   天天基金 API — 公共 HTTP 请求解析
+│   │   │   ├── tiantian_holdings.py    #   天天基金 API — 基金持仓数据
+│   │   │   ├── tiantian_nav.py         #   天天基金 API — 历史净值数据
+│   │   │   ├── tiantian_ranking.py     #   天天基金 API — 业绩排名/评级/风险分析
 │   │   │   ├── akshare_extras.py     #   akshare 封装（盈利预测/资金流向/分红）
 │   │   │   ├── akshare_news.py       #   akshare 新闻源（财新网/CCTV）
 │   │   │   ├── sina_news.py          #   新浪财经新闻源
@@ -146,7 +149,9 @@ investor-util/
 │   │   │   ├── fund_manager_sheet.py #   基金经理 Excel 页签
 │   │   │   ├── fund_overlap.py       #   基金持仓重叠分析
 │   │   │   ├── fund_overlap_sheet.py #   重叠分析 Excel 页签
-│   │   │   ├── fund_style_analysis.py #  基金风格分析（大小盘/价值成长）
+│   │   │   ├── fund_style_base.py       #   基金风格基础（常量/快照/PECity阈值）
+│   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
+│   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
@@ -183,6 +188,7 @@ investor-util/
 │   │   ├── ansi_colors.py            # ANSI 颜色常量（终端输出着色）
 │   │   ├── code_utils.py             # 证券代码/类型判定工具
 │   │   ├── market_hours.py           # 交易时段判断（A股/港股/QDII）
+│   │   ├── perf.py                   # 性能收集（PerfCollector 计时 + 数据源健康检查持久化）
 │   │   ├── anonymizer.py              # 匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
 │   │   ├── circuit_breaker.py         # 统一断路器网关（Provider + LLM 熔断状态查询）
 │   │   ├── http_client.py            # HTTP 客户端（请求/重试/超时）
@@ -425,7 +431,8 @@ investor-util/
 │   ├── check-version-consistency.py #   版本号一致性检查
 │   ├── calibrate-dedup-threshold.py #   新闻去重阈值校准
 │   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
-│   ├── perf_report.py               #   端到端性能基准测试
+│   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
+│   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
 │   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 ├── docs-stm/                         # 项目文档

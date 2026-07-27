@@ -142,7 +142,7 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("持仓集中度监控模块缺失 (fund_concentration)")
 
     try:
-        from src.python.report.fund_style_analysis import analyze_style_for_all_funds
+        from src.python.report.fund_style_report import analyze_style_for_all_funds
         from src.python.report.fund_style_sheet import write_style_sheet
 
         modules["analyze_style_for_all_funds"] = analyze_style_for_all_funds

@@ -1,140 +1,129 @@
-# 工程质量与性能优化：大文件拆分 + 异步化 + 基准测试
+# 工程质量与性能优化：大文件拆分 + 批量并行 + 基准测试
+
+> 当前状态：P3-09（tiantian.py 拆分）、P3-10（fund_style_analysis.py 拆分）、P3-13（性能基准）**已全部完成**。P3-11（批量并行）**待处理**。
 
 ## 目录
 
-1. [大文件拆分（tiantian.py / fund_style_analysis.py）](#1-大文件拆分)
-2. [异步化关键 HTTP 路径](#2-异步化关键-http-路径)
-3. [Performance Benchmark](#3-performance-benchmark)
+1. ~~[大文件拆分（tiantian.py / fund_style_analysis.py）](#1-大文件拆分)~~ — ✅ 已完成（v0.8.7-dev）
+2. [批量数据获取串行瓶颈](#2-批量数据获取串行瓶颈)
+3. ~~[Performance Benchmark](#3-performance-benchmark)~~ — ✅ 已完成（v0.8.7-dev）
 
 ---
 
-## 1. 大文件拆分
+## 1. 大文件拆分 — ✅ 已完成
 
-### 概述
+### 实际完成内容
 
-`providers/tiantian.py`（~768 行）和 `report/fund_style_analysis.py`（~652 行）已在 `review-findings.md` 中标注为 P3 问题。两项独立职责揉合在一个文件中，影响可维护性和测试覆盖。
+| 原文件 | 子模块 | 行数变化 |
+|--------|--------|---------|
+| `providers/tiantian.py`（768 行） | `tiantian_base.py`（HTTP 基底）+ `tiantian_holdings.py`（持仓/季报）+ `tiantian_ranking.py`（排名/评级/风险分析）+ `tiantian_nav.py`（历史净值） | 原文件删除，外部调用方直接引用子模块 |
+| `report/fund_style_analysis.py`（652 行） | `fund_style_base.py`（常量/快照/工具函数）+ `fund_style_classify.py`（单股分类/行业 PE/入口函数）+ `fund_style_report.py`（漂移检测/全基金分析） | 原文件删除，外部调用方直接引用子模块 |
 
-### 收益
+### 说明
 
-- **可测试性**：拆分后每个子模块的测试可以独立 mock，当前大文件的测试覆盖很难做到彻底
-- **可读性**：每个文件一个职责，新人读代码不需要翻 700 行找入口
-- **降低合并冲突**：多人开发时，大文件是冲突热点
-- **review-findings 清零**：P3-9 和 P3-10 两个待办可以关闭
-
-### 风险
-
-- 拆分涉及重构导入路径，需注意循环依赖
-- 回归测试需要覆盖全功能路径，不能遗漏原有行为
-- `tiantian.py` 是天天基金数据源的核心文件，拆分后需验证全部数据端点正常
-
-### 工作量估算
-
-| 文件 | 拆分方案 | 天数 |
-|------|----------|------|
-| `tiantian.py` | 拆为：`base.py`(公共HTTP/解析) / `nav.py`(净值) / `ranking.py`(排名) / `holdings.py`(持仓) | 1.5 |
-| `fund_style_analysis.py` | 拆为：`snapshot.py`(快照管理) / `style.py`(风格计算) / `report.py`(输出) | 1 |
-| 验证 | 跑全量单元测试 + 集成测试 | 0.5 |
-| **合计** | | **3 天** |
-
-### 拆分策略
-
-不一次性拆完，以原子操作为单位：
-1. 从原文件逐个提取独立函数/类
-2. 每提取一个模块就跑一遍对应测试
-3. 原文件保留 import 重定向（兼容外部调用方）
-4. 全部提取完成后删掉原文件
+- 拆分时**未保留向后兼容重导出层**——所有外部调用方统一改为直接引用子模块
+- 拆分后**测试覆盖率未降低**——每子模块对应的测试用例均存在并标记正确
+- 参见 `review-findings.md` 归档区 P3-09 / P3-10
 
 ---
 
-## 2. 异步化关键 HTTP 路径
+## 2. 批量数据获取串行瓶颈
 
 ### 概述
 
-当前 80+ 处 `httpx.Client` 同步请求串联执行。单次报告生成中，行情获取（15 个品种）、基金排名（~10 个基金）、行业数据（55+ 代码）等环节完全串行，是性能瓶颈。
+核心批量数据获取（行情 15 品种、基金排名 10 基金、行业 55+ 代码）在批次内逐资产串行请求，全量 full 路径约 85s 中 ~50s 为串行 IO。
 
-### 收益
+### 根因分析
 
-- **生成速度提升 2-3 倍**：15 个品种的行情并行获取，从 ~15 秒降到 ~3 秒
-- **降低超时风险**：串行链路中一个品种超时阻塞后续全部；并行时独立超时
-- **更好的资源利用**：CPU 等待 IO 时无事可做，异步让等待时间重叠
+串行是架构层的有意选择，非代码疏忽。数据获取层围绕**单资产接口**设计（`fetch_market_data(code)`、`fetch_fund_rank(code)` 等均以单代码为粒度）：
 
-### 风险
+| 架构决策 | 影响 | 约束编号 |
+|:---------|:-----|:---------|
+| Provider Chain 必经 | 每资产独立走完 fallback+熔断器链路保障可靠性 | C6 / §1.4.2 |
+| 缓存统一管理 | 按资产代码缓存键 | C2 |
+| 数据降级治理 | 按资产维度做降级追踪 | §1.4.5 |
+| HTTP 客户端统一 | 同步 httpx 客户端，不支持 async/await | C5 |
 
-- 混合同步/异步代码容易出错：同步块中 `asyncio.run()` 的嵌套调用
-- 部分数据源（akshare）本身不是异步友好的，需在线程池中运行
-- 测试框架需要 `pytest-asyncio` 支持
-- 改造成本大：80+ 处调用点，涉及几乎所有 Provider 和 Fetcher
+### 方案决策：ThreadPoolExecutor 批量并行（否决 async/await）
 
-### 工作量估算
+**否决 async/await 的原因**：
+- 与 C5 冲突——httpx 同步客户端统一管理 SSL/超时/连接池，切换 async 需推翻整个 HTTP 层
+- 与 C6 冲突——Provider Chain 为同步调用链设计，熔断器/fallback 皆为同步
+- 与 C2/C3 冲突——缓存层原子写入为同步 `tempfile.mkstemp` + `os.replace`
+- 与 §1.4.5 冲突——降级追踪的调用栈设计假设同步路径
+- 改造成本极大（80+ 调用点），且收益上限受限于 IO 等待时间重叠（非 cpu-bound 加速）
+
+**选择 ThreadPoolExecutor 的原因**：
+- 与系统现有并行模式一致（附录E：`orch_prep`/`orch_llm_news`/`cache_ops` 均为 TPE）
+- Provider Chain 无需改动——每资产 `fetch_with_fallback()` 保持同步，外层 TPE 池调度 N 个资产并行
+- 缓存写入天然安全——cache key 异质性避免文件冲突
+- 无需新增测试基础设施——ThreadPoolExecutor 无需 pytest-asyncio
+
+### 设计方案
+
+引入批量并行抽象层（`batch.py` + `chain.py` 增强）：
+
+```
+                 ┌──────────────────────────────┐
+                 │     BatchDispatcher           │
+                 │  (ThreadPoolExecutor 池)       │
+                 └──────┬───────┬───────┬───────┘
+                        │       │       │
+                   ┌────┘   ┌───┘   ┌───┘
+                   ▼        ▼       ▼
+            fetch_with_fallback(code₁)
+            fetch_with_fallback(code₂)     ← 每资产独立走完整 Chain
+            fetch_with_fallback(codeₙ)
+```
+
+核心功能：
+1. **链级并行** — N 资产同时走各自的 Provider Chain，IO 等待时间重叠
+2. **熔断器感知** — 聚合多资产熔断状态，避免集体突发对同一 Provider 施压
+3. **限速控制** — Provider 感知的批间间隔，防 API 限频
+4. **降级追踪聚合** — 多资产同时降级时聚合为单一降级记录（适配 §1.4.5）
+5. **缓存复用** — 保留 C4 会话级缓存，同资产跨环节重复请求不重复获取
+
+### 工作量估算：**8-10 天**
 
 | 阶段 | 内容 | 天数 |
 |------|------|------|
-| 基础设施 | 异步 HTTP 客户端 + 连接池 + 超时配置 | 1 |
-| 核心路径改造 | 行情获取(price.py) + 基金净值(fund.py) → async | 2 |
-| 次级路径改造 | 行业/指数/新闻 → async | 1.5 |
-| 测试适配 | pytest-asyncio + mock 适配 | 1 |
-| **合计** | | **5.5 天** |
+| 批量并行抽象层 | `batch.py` + `chain.py` 增强（熔断器感知/限速/降级聚合） | 3-4 |
+| price.py 批量行情 | 主链路行情 15 品种并行（收益最大） | 1.5 |
+| fund.py 批量净值/排名 | 基金净值/排名 10 品种并行 | 1 |
+| industry.py 批量行业 | 行业 55+ 代码并行 | 1 |
+| 测试适配 | ThreadPoolExecutor 并行测试 + 熔断器感知测试 | 1.5 |
+| **合计** | | **8-10 天** |
 
-### 建议策略
+### 约束遵从
 
-**不做全量异步化**，只改造瓶颈路径：
-1. `price.py` 的批量行情获取（15 个品种并发请求）—— 收益最大
-2. `fund.py` 的净值/排名批量获取
-3. `industry.py` 的行业数据批量获取
-4. 其余保持同步（收益不足以覆盖改造成本）
-
-### 架构方案
-
-```python
-# 新增 async_runner.py 统一管理异步任务组
-class AsyncTaskGroup:
-    async def run(self, tasks: list[Callable], concurrency: int = 5) -> list:
-        semaphore = asyncio.Semaphore(concurrency)
-        ...
-```
+| 约束 | 适配方式 |
+|:-----|:---------|
+| C2/C3 缓存管理 | 并行写仍走 cache/ 子包，cache key 异质性避免文件冲突 |
+| C4 会话缓存 | 同资产跨环节通过 DataSourceRegistry.session_cache 消重 |
+| C5 HTTP 统一 | TPE 方案不引入 async/await，httpx 同步客户端不变 |
+| C6 Provider Chain | 以 `fetch_with_fallback()` 为最小并行单元，不绕过链 |
+| C8 统一日志 | 并行日志带资产 code 前缀便于追踪 |
+| C10 新闻可配置 | 并行数量受用户配置约束 |
+| §1.4.5 降级治理 | 批量失败聚合为单一降级记录，避免 N 条噪声 |
 
 ---
 
-## 3. Performance Benchmark
+## 3. Performance Benchmark — ✅ 已完成
 
-### 概述
+### 实际完成内容
 
-当前没有端到端的性能基准。不知道：一次完整报告生成需要多久？哪个环节最慢？版本升级后性能是变好还是差了？
+三层性能基准体系已于 v0.8.7-dev 实现，对应 review-findings P3-13。
 
-### 收益
+| 层 | 模块 | 功能 |
+|:---|:-----|:------|
+| **L1 自动计时** | `src/python/perf.py`（PerfCollector + ReportRunSnapshot） | 每次报告生成自动记录各阶段耗时到 `data/state/perf_history.jsonl`，原子写入（C3 约束） |
+| **L2 独立基准** | `scripts/perf_report.py` | mock 外部源的独立基准脚本，用于精准回归检测 |
+| **L3 趋势工具** | `scripts/perf_view.py` | 读取 JSONL 历史文件输出版本间耗时对比 Markdown 表格 |
 
-- **量化进度**：知道瓶颈在哪（当前是 HTTP 串行请求），优化有目标
-- **回归检测**：合并新代码后跑一次基准，性能退化立刻发现
-- **用户预期管理**：可以告诉用户"预计需要 X 分钟"
+### 关键设计点
 
-### 风险
-
-- 基准测试依赖网络状态和外部 API 响应时间，数据天然有波动
-- 需要一个干净的基准环境（缓存清空 vs 缓存热，差别很大）
-- 测试数据需要固定版本（持仓文件、日期快照），不能依赖实时行情
-
-### 工作量估算：**1 天**
-
-### 实现方案
-
-```bash
-# 用法
-python scripts/perf_profile.py                     # 全量基准（冷缓存）
-python scripts/perf_profile.py --cache warm        # 热缓存基准
-python scripts/perf_profile.py --compare HEAD~3    # 与 3 次提交前对比
-```
-
-输出 JSON 报告：
-```json
-{
-  "version": "0.8.6-dev",
-  "timestamp": "2026-07-26T18:00:00",
-  "total_seconds": 85.3,
-  "phases": [
-    {"name": "行情获取", "seconds": 12.1, "requests": 15},
-    {"name": "基金数据", "seconds": 18.4, "requests": 10},
-    {"name": "新闻获取", "seconds": 25.7, "requests": 5},
-    {"name": "报告生成", "seconds": 29.1}
-  ]
-}
-```
+- PerfCollector 为生成函数内的**局部实例**（C14 约束：无模块级全局变量）
+- 路径从 `constants.PROJECT_ROOT` 推导（C16 路径绝对化）
+- 不向 pipeline_data 注入计时数据，仅独立 JSONL 文件（C19 Schema 契约）
+- 三路径埋点：basic（1 阶段） / both（5 阶段） / full（7 阶段）
+- 即使部分失败也记录 perf data（在 try/except 之后调用 `perf.save()`）

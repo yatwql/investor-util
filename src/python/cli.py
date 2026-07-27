@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CLI 命令行模式 — argparse 主入口。
 
-支持 report 和 cache 子命令，共享 P1 已提取的业务编排层。
+支持 report 和 cache 子命令，共享业务编排层。
 """
 
 from __future__ import annotations

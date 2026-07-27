@@ -48,8 +48,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "scenario_basic: 基础业务链路（S1-S5 + S0a-S0d + S21-S28 + S29-S33）")
     config.addinivalue_line("markers", "scenario_resilience: 异常容错场景（S6-S10）")
     config.addinivalue_line("markers", "scenario_llm: LLM 场景组合（S11-S20）")
-    config.addinivalue_line("markers", "scenario_perf: 性能基准测试（P4-14）")
-    config.addinivalue_line("markers", "scenario_security: 安全基线测试（P4-16）")
+    config.addinivalue_line("markers", "scenario_perf: 性能基准测试")
+    config.addinivalue_line("markers", "scenario_security: 安全基线测试")
     config.addinivalue_line("markers", "scenario_datetime: 日期/时间场景（T1-T21）")
     config.addinivalue_line("markers", "scenario_stock: 场景 S1 — 纯股票组合")
     config.addinivalue_line("markers", "scenario_fund: 场景 S2 — 纯基金组合")
@@ -142,6 +142,16 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "src.python.analysis.rebalance._SILENCE_FILE",
         str(tmp_path / "data/state/rebalance_silence.json"),
+    )
+    # perf_history.jsonl 性能历史文件隔离
+    monkeypatch.setattr(
+        "src.python.perf._PERF_HISTORY_FILE",
+        str(tmp_path / "data/state/perf_history.jsonl"),
+    )
+    # datasource_health.jsonl 数据源健康检查历史文件隔离
+    monkeypatch.setattr(
+        "src.python.perf._HEALTH_CHECK_FILE",
+        str(tmp_path / "data/state/datasource_health.jsonl"),
     )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(

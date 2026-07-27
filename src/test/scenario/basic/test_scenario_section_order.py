@@ -182,7 +182,7 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
         self.assertEqual(len(set(keys)), len(_REPORT_SECTION_DEFAULT))
 
     def test_custom_unknown_key_falls_back_to_default(self):
-        """自定义配置中有不再注册表中的 key → 忽略，不影响合并结果。"""
+        """自定义配置中有不在注册表中的 key → 忽略，不影响合并结果。"""
         config = {
             "report_section_order": {
                 "summary": 1,

@@ -286,7 +286,7 @@ class TestValidateEnableBoards(unittest.TestCase):
     """_validate_enable_boards 测试。"""
 
     def test_missing_all_no_issue(self):
-        """全部缺失 → 正常（向后兼容）。"""
+        """全部缺失 → 正常（默认启用）。"""
         n = val._validate_enable_boards({}, 0)
         self.assertEqual(n, 0)
 

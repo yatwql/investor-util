@@ -483,7 +483,7 @@ def generate_llm_module(
             timeout_default=timeout_default,
         )
 
-    # ── 标准模式（原有的 4 个分析模块） ──────────────────
+    # ── 标准模式（4 个分析模块） ───────────────────────────
     return _run_standard_mode(
         llm_config,
         module_key,

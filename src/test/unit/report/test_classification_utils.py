@@ -1,6 +1,6 @@
-"""classification_utils → code_utils 合并后的遗留测试。
+"""code_utils 分类函数测试。
 
-测试原 classification_utils 的独有函数，现已迁入 code_utils：
+验证 code_utils 中的分类函数：
   - is_etf_by_name_or_code — ETF 识别（名称含 ETF / 代码 5/1 开头）
   - is_bond_fund_by_name   — 债券基金名称匹配（宽松）
   - is_offsite_fund        — 场外基金账户判定

@@ -304,6 +304,61 @@ def fetch_history_data(
         return None
 
 
+def _spawn_health_checks(holdings: list) -> object | None:
+    """在后台启动数据源健康检查，返回 Future 或 None。
+
+    检查结果与主管线并行执行，不阻塞报告生成。
+    在管线末尾调用 _collect_health_checks() 收集结果。
+    """
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+
+        from src.python.handlers_check_sources import run_health_checks
+
+        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="orch_health")
+        fut = pool.submit(run_health_checks)
+        # 不让 pool 在函数退出时 shutdown — 让 Future 独立运行
+        return fut
+    except Exception:
+        logger.info("[health] 启动健康检查失败（非关键，不影响报告生成）", exc_info=True)
+        return None
+
+
+def _collect_health_checks(
+    health_future: object | None,
+    report_type: str,
+    holdings: list,
+) -> None:
+    """收集数据源健康检查结果并持久化。
+
+    必须在管线末尾调用（所有主要阶段完成后）。
+    """
+    if health_future is None:
+        return
+    try:
+        results = health_future.result(timeout=30)
+        if not results:
+            return
+        from src.python.perf import save_health_check_snapshot
+
+        save_health_check_snapshot(results, report_type=report_type, holdings_count=len(holdings))
+
+        # 将结果注入 DegradationTracker，供 data_source_matrix 使用
+        from src.python.report.data_status import get_tracker
+
+        tracker = get_tracker()
+        for r in results:
+            source_key = f"health_{r['name']}"
+            tracker.record(
+                source_key=source_key,
+                tier="T4",
+                success=r["ok"],
+                failure_type="unreachable" if not r["ok"] else "",
+            )
+    except Exception:
+        logger.info("[health] 收集健康检查结果失败（非关键）", exc_info=True)
+
+
 # ── generate_report ──
 
 
@@ -332,13 +387,19 @@ def generate_report(
 
     if report_type == "basic":
         # basic 路径：仅生成 Excel，不调 prepare_report_data / capture_snapshot / fetch_history_data
+        from src.python.perf import PerfCollector
         from src.python.registry import get_report_section_order
         from src.python.report.excel_generator import generate_excel_report
 
+        perf = PerfCollector(report_type="basic", holdings=holdings)
         sec_order = get_report_section_order(config)
         output = output_dir or config.get("output_dir", "reports")
 
+        # 后台启动健康检查（与 Excel 生成并行）
+        _health_fut = _spawn_health_checks(holdings)
+
         try:
+            perf.start("Excel 生成")
             generate_excel_report(
                 holdings,
                 include_news=False,
@@ -346,14 +407,18 @@ def generate_report(
                 section_order=sec_order,
                 progress=reporter,
             )
+            perf.stop()
             result.excel_ok = True
             result.holdings_ok = True
             result.report_generated = True
         except Exception:
+            perf.add_error("Excel 报告生成失败")
             reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
             logger.exception("生成 Excel 报告失败")
             result.errors.append("Excel 报告生成失败")
 
+        perf.save()
+        _collect_health_checks(_health_fut, "basic", holdings)
         return result
 
     if report_type == "both":
@@ -412,12 +477,17 @@ def _generate_report_both(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import is_enable_b_series, is_enable_history, is_enable_news
+    from src.python.perf import PerfCollector
     from src.python.registry import get_report_section_order
     from src.python.report.excel_generator import generate_excel_report
     from src.python.report.html_writer import write_html_report
 
+    perf = PerfCollector(report_type="both", holdings=holdings)
     result = ReportResult()
     result.holdings_ok = True
+
+    # 后台启动健康检查（与数据获取并行）
+    _health_fut = _spawn_health_checks(holdings)
 
     _enable_b_series = is_enable_b_series(config)
     _enable_news = is_enable_news(config)
@@ -427,10 +497,14 @@ def _generate_report_both(
     news_top_count = int(config.get("news_top_count", 100))
 
     # ── 1. 行情获取（轻量级，无指数/穿透/分类） ──
+    perf.start("行情获取")
     details = _compute_details(holdings, config, reporter)
+    perf.stop()
 
     # ── 2. F1 快照对比（始终执行） ──
+    perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, details, config, reporter)
+    perf.stop()
     # [checkpoint] pipeline_data 类型断言
     if pipeline_data is not None:
         assert isinstance(pipeline_data, dict), "capture_snapshot(both) pipeline_data 类型异常"
@@ -441,7 +515,9 @@ def _generate_report_both(
     # ── 3. F2 历史走势（条件获取） ──
     if _enable_history:
         _resolved_mode = "auto" if history_mode in ("auto",) else "off"
+        perf.start("历史走势")
         history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
+        perf.stop()
     else:
         history_data = None
         reporter.info("[章节配置] 历史走势已关闭，跳过")
@@ -449,6 +525,7 @@ def _generate_report_both(
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
     reporter.info(f"正在生成 HTML 报告（{_news_label}）...")
+    perf.start("HTML 生成")
     try:
         path = write_html_report(
             holdings,
@@ -470,9 +547,11 @@ def _generate_report_both(
         reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("HTML 报告写入失败")
         result.errors.append("HTML 报告生成失败")
+    perf.stop()
 
     # ── 5. Excel 报告 ──
     reporter.info("正在生成 Excel 报告...")
+    perf.start("Excel 生成")
     try:
         generate_excel_report(
             holdings,
@@ -495,8 +574,11 @@ def _generate_report_both(
         reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("Excel 报告生成失败")
         result.errors.append("Excel 报告生成失败")
+    perf.stop()
 
     result.report_generated = result.html_ok or result.excel_ok
+    perf.save()
+    _collect_health_checks(_health_fut, "both", holdings)
     return result
 
 
@@ -692,12 +774,17 @@ def _generate_report_full(
     """
     from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
     from src.python.fetcher.akshare import get_sector_fund_flow
+    from src.python.perf import PerfCollector
     from src.python.registry import get_report_section_order
     from src.python.report.excel_generator import generate_excel_report
     from src.python.report.html_writer import write_html_report
 
+    perf = PerfCollector(report_type="full", holdings=holdings)
     result = ReportResult()
     result.holdings_ok = True
+
+    # 后台启动健康检查（与数据准备并行）
+    _health_fut = _spawn_health_checks(holdings)
 
     _enable_b_series = is_enable_b_series(config)
     _enable_news = is_enable_news(config)
@@ -706,6 +793,7 @@ def _generate_report_full(
     sec_order = get_report_section_order(config)
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
+    perf.start("数据准备")
     prep = prepare_report_data(holdings, reporter, config)
     # [checkpoint] prep 类型断言
     assert isinstance(prep, dict), "prepare_report_data 返回类型异常"
@@ -727,7 +815,10 @@ def _generate_report_full(
         elif not isinstance(prep.get(_ck), (int, float, dict, list, str, type(None))):
             logger.warning("[checkpoint] prep.%s 类型异常: %s", _ck, type(prep.get(_ck)).__name__)
 
+    perf.stop()
+
     # ── 2. F1 快照对比 ──
+    perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
     # [checkpoint] pipeline_data 类型断言
     if pipeline_data is not None:
@@ -737,10 +828,14 @@ def _generate_report_full(
             if not isinstance(_diff, dict):
                 logger.warning("[checkpoint] pipeline_data.diff 类型异常: %s", type(_diff).__name__)
 
+    perf.stop()
+
     # ── 3. F2 历史走势（条件获取） ──
     if _enable_history:
+        perf.start("历史走势")
         _resolved_mode = "auto" if history_mode in ("auto",) else "off"
         history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
+        perf.stop()
         # 从 history_data 提取风险指标，注入 prep 和 pipeline_data
         if history_data and history_data.get("status") not in ("unavailable",):
             _risk = {
@@ -825,6 +920,7 @@ def _generate_report_full(
 
     # ── 4. 行业资金流向 ──
     reporter.info("正在获取行业资金流向...")
+    perf.start("行业资金流向")
     try:
         sector_flow = get_sector_fund_flow()
         if sector_flow:
@@ -832,10 +928,12 @@ def _generate_report_full(
     except Exception:
         sector_flow = None
         reporter.warn("行业资金流向获取失败，将继续生成报告")
+    perf.stop()
 
     # ── 5. 并行获取 LLM + 新闻（4 分支统一处理） ──
     # 读取对比指数池配置（默认预设池在 _config_defaults.py 中定义）
     _comparison_indices = config.get("comparison_indices", None)
+    perf.start("LLM+新闻")
     llm_content, news_data, news_llm_meta, news_ok, debate_info = _fetch_llm_and_news(
         holdings,
         prep,
@@ -857,10 +955,12 @@ def _generate_report_full(
         llm_content = build_fallback_llm_content(llm_content)
         if all(c is not None for c in llm_content[:4]):
             result.llm_ok = True
+    perf.stop()
 
     # ── 6. HTML 报告 ──
     _report_label = "含新闻 + LLM" if news_ok else "仅 LLM"
     reporter.info(f"正在生成 HTML 报告（{_report_label}分析章节）...")
+    perf.start("HTML 生成")
     try:
         path = write_html_report(
             holdings,
@@ -888,9 +988,11 @@ def _generate_report_full(
         reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("HTML 报告写入失败")
         result.errors.append("HTML 报告生成失败")
+    perf.stop()
 
     # ── 8. Excel 报告 ──
     reporter.info("正在生成 Excel 报告...")
+    perf.start("Excel 生成")
     try:
         generate_excel_report(
             holdings,
@@ -920,7 +1022,10 @@ def _generate_report_full(
         reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("Excel 报告生成失败")
         result.errors.append("Excel 报告生成失败")
+    perf.stop()
 
     result.news_ok = news_ok
     result.report_generated = result.html_ok or result.excel_ok
+    perf.save()
+    _collect_health_checks(_health_fut, "full", holdings)
     return result

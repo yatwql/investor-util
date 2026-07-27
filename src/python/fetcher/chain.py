@@ -339,7 +339,7 @@ def fetch_with_incremental_fallback(
 _HISTORY_PROVIDER_MAP: dict[str, str] = {
     "tencent": "src.python.providers.tencent",
     "sina": "src.python.providers.sina",
-    "tiantian": "src.python.providers.tiantian",
+    "tiantian": "src.python.providers.tiantian_nav",
     "eastmoney": "src.python.providers.eastmoney",
 }
 

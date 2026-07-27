@@ -195,7 +195,7 @@ def _validate_enable_boards(config: dict, issues: int) -> int:
     for key in ("enable_b_series", "enable_news", "enable_history"):
         val = config.get(key)
         if val is None:
-            continue  # 缺失视为 True（向后兼容）
+            continue  # 缺失视为 True（默认启用）
         if not isinstance(val, bool):
             logger.warning("config.json %s = %r 不是布尔值，将使用默认值 true", key, val)
             issues += 1
@@ -206,7 +206,7 @@ def _validate_enable_llm(issues: int) -> int:
     """验证 llm_settings.json 中 enabled_llm 字典的子键。
 
     仅检查格式/拼写错误，不判断业务语义（全关正常——可能是用户主动关闭
-    所有 LLM 报告模块但仍需 news_correlation）。缺失视为正常（向后兼容）。
+    所有 LLM 报告模块但仍需 news_correlation）。缺失视为正常（默认启用）。
     """
     from src.python.config._core import get_llm_config
 

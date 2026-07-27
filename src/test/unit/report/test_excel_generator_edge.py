@@ -67,7 +67,7 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
                   return_value={"funds": [], "matrix": [], "pairs": []}),
             patch("src.python.report.fund_concentration.compute_concentration",
                   return_value=[]),
-            patch("src.python.report.fund_style_analysis.analyze_style_for_all_funds",
+            patch("src.python.report.fund_style_report.analyze_style_for_all_funds",
                   return_value={"results": []}),
             # 新闻
             patch("src.python.report.news_correlation.build_news_data",

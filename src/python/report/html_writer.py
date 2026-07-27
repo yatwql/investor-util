@@ -446,7 +446,7 @@ def write_html_report(
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
 
 
-# ── 桥接 import：已迁出的子模块 ─────────────────────────────
+# ── 桥接 import：外部子模块 ─────────────────────────────────
 from src.python.report.html_renderers import (  # noqa: E402, F401
     _render_account_grouping,
     _render_category_info,

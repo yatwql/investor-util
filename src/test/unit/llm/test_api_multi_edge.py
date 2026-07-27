@@ -15,7 +15,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm, pytest.ma
 
 
 class TestChainNoFallbackFields(unittest.TestCase):
-    """验证 _provider_list 配置后，旧 fallback 字段不再生效。"""
+    """验证 _provider_list 配置后 fallback 字段不生效。"""
 
     @patch("src.python.llm.api.call_single_provider")
     def test_fallback_fields_ignored_when_chain_configured(self, mock_call: MagicMock) -> None:
@@ -78,7 +78,7 @@ class TestChainNoFallbackFields(unittest.TestCase):
 
 
 class TestFailureTrackingLegacyFormat(unittest.TestCase):
-    """旧字符串格式仍可被消费者读取。"""
+    """字符串格式仍可被消费者读取。"""
 
     def test_dict_format_not_mistaken_for_disabled(self) -> None:
         """dict 格式不应被 == FAIL_REASON_DISABLED 误匹配。"""
@@ -93,7 +93,7 @@ class TestFailureTrackingLegacyFormat(unittest.TestCase):
         LLM_MODULE_FAILURE.pop("health_check", None)
 
     def test_legacy_string_still_works(self) -> None:
-        """旧字符串格式的 FAIL_REASON 仍能正确比较。"""
+        """字符串格式的 FAIL_REASON 能正确比较。"""
         from src.python.llm.prompts import (
             LLM_MODULE_FAILURE,
             FAIL_REASON_API_ERROR, FAIL_REASON_TIMEOUT,

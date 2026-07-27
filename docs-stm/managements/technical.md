@@ -134,7 +134,7 @@
 
 **分层差异**：TUI 的 `handlers_report.py` / `handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*。保证两次实现共用同一套业务逻辑。
 
-**贯穿层**：`config/` · `registry.py` · `provider_registry.py` · `code_utils.py` · `market_hours.py`
+**贯穿层**：`config/` · `registry.py` · `provider_registry.py` · `code_utils.py` · `market_hours.py` · `perf.py`
 
 **关键分层原则**：
 - 每一层只能依赖其下层和贯穿层，禁止反向依赖
@@ -216,6 +216,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **贯穿** | 代码类型判定 | 资产识别原语 | `code_utils.py` |
 | **贯穿** | 交易时段判断 | A 股时段、午间休市 | `market_hours.py` |
 | **贯穿** | HTTP 客户端 | 统一工厂 | `http_client.py` |
+| **贯穿** | 性能收集 | PerfCollector 三路径计时 + perf_history.jsonl 持久化 | `perf.py` |
 
 ### 1.4 概要设计 — 核心架构决策
 
@@ -1555,7 +1556,7 @@ Excel 热力图着色：
 
 #### B5 基金风格分析
 
-基于持仓个股市值 + PE 数据的加权风格判定（`fund_style_analysis.py`）：
+基于持仓个股市值 + PE 数据的加权风格判定（`fund_style_classify.py` / `fund_style_report.py`）：
 
 ```
 三级降级链路：
@@ -1838,7 +1839,7 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker.py / fallback.py；`prompts.py` 拆分为 core/tables/action 3 文件，逻辑上仍视作一个 Prompt 构建层）：
+`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker.py / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
@@ -2334,6 +2335,7 @@ investor-util/
 │   │   ├── llm/                 # LLM 集成（编排/骨架/API 路由/提示词/指纹/熔断器等）
 │   │   ├── logger.py            # 日志模块（_ColoredFormatter）
 │   │   ├── market_hours.py      # A 股交易时段判断
+│   │   ├── perf.py               # 性能收集（PerfCollector 计时 + perf_history.jsonl）
 │   │   ├── models.py            # 数据模型
 │   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
 │   │   ├── providers/           # 数据源提供商（各 API 封装）
@@ -2366,8 +2368,8 @@ investor-util/
 |:-----|:---------|:-------------|
 | 场内 A 股/ETF 实时价 | 腾讯财经 → 新浪财经（双链路 fallback） | `tencent.py` / `sina.py` |
 | 场外基金净值 | 东方财富（直达，无备用） | `eastmoney.py` |
-| 基金业绩排名 | 天天基金 JS 变量解析（直达） | `tiantian.py` |
-| 基金持仓数据 | 天天基金 HTML 解析（直达） | `tiantian.py` |
+| 基金业绩排名 | 天天基金 JS 变量解析（直达） | `tiantian_ranking.py` |
+| 基金持仓数据 | 天天基金 HTML 解析（直达） | `tiantian_holdings.py` |
 | A 股指数 | 腾讯财经 → 新浪财经（双链路 fallback） | `tencent.py` / `sina.py` |
 | 美股指数 | 新浪财经 → 腾讯财经（双链路 fallback） | `sina.py` |
 | 财经新闻 | 5 源并行：新浪/东方财富/财联社/华尔街见闻/akshare | 各 `*_news.py` |

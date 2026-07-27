@@ -7,13 +7,19 @@
 ## [0.8.7-dev] - 未发布
 
 ### Added
--（待补充）
+- **三层性能基准体系（P3-13）**：① `perf.py` PerfCollector 在 `generate_report()` 三路径（basic/both/full）嵌入轻量计时埋点，每次运行自动记录各阶段耗时到 `data/state/perf_history.jsonl` ② `scripts/perf_report.py` 保留独立基准脚本（mock 外部源）用于精准回归检测 ③ `scripts/perf_view.py` 趋势查看工具读取历史文件输出版本间耗时对比 Markdown 表格。遵循 C3（原子写入）、C8（统一日志）、C14（局部实例非单例）、C16（路径绝对化）约束
+- **数据源健康检查自动收集**：每次客户端生成报告时，后台并行运行全量数据源健康检查（HTTP 连通性+延迟），结果存入 `data/state/datasource_health.jsonl` 并注入 DegradationTracker，供数据源可用性矩阵章节（#17）实时展示。`handlers_check_sources.py` 提取 `run_health_checks()` 返回结构化数据，CLI `check-sources` 命令保持不变
 
 ### Fixed
 -（待补充）
 
 ### Changed
--（待补充）
+- **代码/测试注释历史迭代痕迹清理（6 轮）**：全面清除源码注释、测试注释/描述、管理文档正文（changelog.md/plan.md/review-findings.md 除外）、用户文档中的所有历史变更痕迹。覆盖模式包括「不再」「向后兼容」「保留供兼容」「已废弃」「原有的」「此前」「曾」「已迁」「已拆分」「已改为」等，累计修复 50+ 处。涉及 8 个源码文件、5 个测试文件、3 份管理文档、3 份用户文档。豁免文件按约定保留历史记录
+- **P3-11 问题描述修正**：`review-findings.md` P3-11 从错误描述的"async 异步化"修正为 ThreadPoolExecutor 批量并行方案，对齐 C5/C6/C2/C3/§1.4.5 架构约束
+- **迭代计划文件同步**：`plan-engineering.md` 大文件拆分/性能基准段标记为已完成，异步化段重写为 TPE 并行方案并补齐架构约束分析；`plan-documentation.md` ADR 段标记为搁置并记录原因；`perf-three-layer-plan.md` 归档至 `archive/0.8.x/perf_report/`
+
+### Docs
+- `review-findings.md` P3-11 补充架构耦合约束脚注（C5/C6/C2/C3/1.4.2/1.4.5）
 
 
 ## [0.8.6] - 2026-07-27

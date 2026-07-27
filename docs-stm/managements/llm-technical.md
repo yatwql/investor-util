@@ -149,7 +149,7 @@ skeleton.py:_generate_llm_content()
 
 ### 2.1 子模块总览
 
-说明：`prompts.py` 逻辑上已拆分为 `prompts_core.py` / `prompts_tables.py` / `prompts_action.py` 3 文件，`prompts.py` 仍保留为 re-export 入口供外部模块兼容导入。
+说明：`prompts.py` 为统一导出入口，将 `prompts_core.py` / `prompts_tables.py` / `prompts_action.py` 的公开符号汇总导出。
 
 | 模块 | 分类 | 职责 | 入口函数 |
 |:-----|:-----|:------|:---------|
@@ -162,9 +162,9 @@ skeleton.py:_generate_llm_content()
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
 | `fact_checker.py` | 基础设施 | LLM 输出伪代码/虚假信息过滤，正则级行级幻觉检测 | `run_fact_check()` |
 | `fallback.py` | 基础设施 | 全模块失败时的降级占位模板 | `get_fallback_content()` |
-| `prompts_core.py` | 工具 | System/User Prompt 构建（拆分自 prompts.py） | `_build_system_prompt()` / `_build_user_prompt()` |
-| `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown（拆分自 prompts.py） | `_build_metrics_table()` / `_build_performance_table()` |
-| `prompts_action.py` | 工具 | 行动建议表格/诊断结论格式化（拆分自 prompts.py） | `_build_action_table()` / `_build_diagnosis_block()` |
+| `prompts_core.py` | 工具 | System / User Prompt 构建 | `_build_system_prompt()` / `_build_user_prompt()` |
+| `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown | `_build_metrics_table()` / `_build_performance_table()` |
+| `prompts_action.py` | 工具 | 行动建议表格/诊断结论格式化 | `_build_action_table()` / `_build_diagnosis_block()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `_compute_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `reset_session_usage()` |
 | `cost_tracker.py` | 工具 | Token 预算管理、输入检查、成本摘要格式化（compact/verbose） | `reset_budget()` / `get_cost_summary()` |
@@ -896,7 +896,7 @@ _session_usage = {
 
 ### 9.1.1 duration 字段
 
-`record_per_module()` 新增 `duration: float = 0.0` 参数，记录每个模块的 API 调用耗时（秒）。`skeleton.py` 中 `generate_llm_content()` 通过 `time.monotonic()` 计时，调用 `call_llm()` 前后计算耗时，传入 `_finalize_and_cache()` 后写入 `per_module` 的 `"duration"` 键。多条缓存路径（首次生成 + 截断重试）的耗时通过 `duration` 字段累计。
+`record_per_module()` 接受 `duration: float = 0.0` 参数，记录每个模块的 API 调用耗时（秒）。`skeleton.py` 中 `generate_llm_content()` 通过 `time.monotonic()` 计时，调用 `call_llm()` 前后计算耗时，传入 `_finalize_and_cache()` 后写入 `per_module` 的 `"duration"` 键。多条缓存路径（首次生成 + 截断重试）的耗时通过 `duration` 字段累计。
 
 HTML 报告页脚自动显示每个模块的耗时（`耗时: X.Xs`），便于识别慢模块。
 

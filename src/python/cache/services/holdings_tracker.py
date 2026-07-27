@@ -95,7 +95,7 @@ def check_and_refresh_caches(holdings: list) -> list[str]:
       - 返回新增的资产代码列表（用于主流程主动取数填充单条缓存）
 
     注意：份额/成本变动只会改变指纹（触发关联缓存刷新），不会将已有资产
-    误判为"新增"——仅当代码集合中出现了此前未记录的代码时才视为新增。
+    误判为"新增"——仅当代码集合中出现了未记录的代码时才视为新增。
 
     Args:
         holdings: 当前持仓列表（每项需有 code/account/shares/cost_price）

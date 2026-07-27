@@ -16,7 +16,7 @@ LLM 熔断（llm/circuit_breaker.py 模块级）共享同一查询入口。
     # 查询 LLM 熔断端点状态
     llm_status = gateway.get("llm")
 
-兼容包装函数:
+包装函数:
     get_all_breaker_status() / get_provider_breaker_status() / get_llm_endpoint_status()
     委派给网关。
 """
