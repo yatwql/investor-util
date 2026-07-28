@@ -383,6 +383,44 @@ class RateLimiter:
         self._last_call.pop(provider, None)
 
 
+def get_batch_worker_count(config_key: str, default: int = 3) -> int:
+    """读取 batch 池配置并校验全局线程上限。
+
+    从 config.json 的 batch 段读取指定池的 worker 数，
+    确保不超过 batch.max_total_workers 硬上限。
+
+    Args:
+        config_key: batch 配置子键（如 "fund_workers"、"industry_workers"）。
+        default: 配置缺失时的默认回退值。
+
+    Returns:
+        满足上限约束的 worker 数。
+    """
+    try:
+        from src.python.config import get_config
+
+        cfg = get_config()
+        batch_cfg = cfg.get("batch", {})
+        requested = batch_cfg.get(config_key, default)
+        max_total = batch_cfg.get("max_total_workers", 15)
+
+        if not isinstance(requested, (int, float)) or requested < 1:
+            requested = default
+        if not isinstance(max_total, (int, float)) or max_total < 1:
+            max_total = 15
+
+        clamped = min(int(requested), int(max_total))
+        if clamped != int(requested):
+            logger.warning(
+                "[batch] %s 请求 %d workers 超过上限 %d，已钳位至 %d",
+                config_key, int(requested), int(max_total), clamped,
+            )
+        return clamped
+    except Exception:
+        logger.debug("[batch] 读取 %s 配置失败，回退默认 %d", config_key, default)
+        return default
+
+
 def get_strategy_hook(
     code_type: str,
     chain: list[str] | None = None,

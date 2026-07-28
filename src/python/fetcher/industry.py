@@ -116,9 +116,12 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[st
     from functools import partial
 
     from src.python.cache import get as cache_get
-    from src.python.fetcher.batch import BatchDispatcher
+    from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
 
-    dispatcher = BatchDispatcher(max_workers=max_workers, thread_name_prefix="batch_industry")
+    dispatcher = BatchDispatcher(
+        max_workers=get_batch_worker_count("industry_workers", 8),
+        thread_name_prefix="batch_industry",
+    )
 
     items = [
         (

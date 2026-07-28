@@ -127,9 +127,12 @@ def fetch_fund_rankings_batch(
 
     own = dispatcher is None
     if dispatcher is None:
-        from src.python.fetcher.batch import BatchDispatcher
+        from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
 
-        dispatcher = BatchDispatcher(max_workers=3, thread_name_prefix="batch_fund_rank")
+        dispatcher = BatchDispatcher(
+            max_workers=get_batch_worker_count("fund_workers", 3),
+            thread_name_prefix="batch_fund_rank",
+        )
 
     from functools import partial
 
@@ -179,9 +182,12 @@ def fetch_fund_holdings_batch(
 
     own = dispatcher is None
     if dispatcher is None:
-        from src.python.fetcher.batch import BatchDispatcher
+        from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
 
-        dispatcher = BatchDispatcher(max_workers=3, thread_name_prefix="batch_fund_hold")
+        dispatcher = BatchDispatcher(
+            max_workers=get_batch_worker_count("fund_workers", 3),
+            thread_name_prefix="batch_fund_hold",
+        )
 
     from functools import partial
 

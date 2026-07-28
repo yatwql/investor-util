@@ -81,6 +81,20 @@
   // ── J. 匿名化配置 ──
   "anonymization": {
     "mode": "off"
+  },
+
+  // ── K. 批量并行调度 ──
+  "batch": {
+    "max_total_workers": 15,
+    "fund_workers": 3,
+    "industry_workers": 8
+  },
+  "batch_rate_limit": {
+    "tencent": 0.0,
+    "sina": 0.0,
+    "eastmoney": 0.1,
+    "tiantian": 0.5,
+    "eastmoney_industry": 0.05
   }
 }
 ```
@@ -549,6 +563,41 @@
 | `summary` | 仅大类汇总 | — | — |
 
 通过 TUI 主菜单 `[A]` 配置持仓匿名化可交互切换。
+
+---
+### K. 批量并行调度
+
+#### batch 池配置
+
+`batch` 段控制批量数据获取的线程池参数（迭代 8a，rf-1 项目）：
+
+| 键 | 默认值 | 说明 |
+|:---|:------:|:-----|
+| `batch.max_total_workers` | `15` | 全局 batch 线程硬上限，超过时自动钳位 |
+| `batch.fund_workers` | `3` | 基金排名/持仓批量并发数 |
+| `batch.industry_workers` | `8` | 行业分类批量并发数 |
+
+```json
+"batch": {
+  "max_total_workers": 15,
+  "fund_workers": 3,
+  "industry_workers": 8
+}
+```
+
+#### batch_rate_limit Provider 请求间隔
+
+`batch_rate_limit` 控制各数据源的请求间隔（秒），防止并发过高触发反爬限制：
+
+| 键 | 默认值 | 说明 |
+|:---|:------:|:-----|
+| `tencent` | `0.0` | 腾讯行情（不限速） |
+| `sina` | `0.0` | 新浪行情（不限速） |
+| `eastmoney` | `0.1` | 东方财富行情（100ms） |
+| `tiantian` | `0.5` | 天天基金（500ms） |
+| `eastmoney_industry` | `0.05` | 东方财富行业（50ms） |
+
+值为 0 表示不限速。配置后需重启程序生效。
 
 ---
 ### 功能开关（features.json）

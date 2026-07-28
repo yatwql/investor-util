@@ -93,6 +93,19 @@ _DEFAULT_CONFIG = {
     "redemption_limits": {},  # 场外基金单日赎回上限（code → 金额，空=未配置）
     # ── J. 匿名化配置 ──
     "anonymization": {"mode": "off"},  # 匿名化模式：off/code_display/full_anonymous/summary
+    # ── K. 批量并行调度 ──
+    "batch": {
+        "max_total_workers": 15,  # 全局 batch 线程硬上限（已有池不计入）
+        "fund_workers": 3,  # 基金排名/持仓批量并发数
+        "industry_workers": 8,  # 行业分类批量并发数
+    },
+    "batch_rate_limit": {  # Provider 级别请求间隔（秒），0=不限速
+        "tencent": 0.0,
+        "sina": 0.0,
+        "eastmoney": 0.1,
+        "tiantian": 0.5,
+        "eastmoney_industry": 0.05,
+    },
 }
 
 
@@ -180,6 +193,20 @@ def _get_default_config_template() -> str:
         "  // ── J. 匿名化配置 ──\n"
         '  "anonymization": {\n'
         '    "mode": "off"\n'
+        "  },\n"
+        "\n"
+        "  // ── K. 批量并行调度 ──\n"
+        '  "batch": {\n'
+        '    "max_total_workers": 15,\n'
+        '    "fund_workers": 3,\n'
+        '    "industry_workers": 8\n'
+        "  },\n"
+        '  "batch_rate_limit": {\n'
+        '    "tencent": 0.0,\n'
+        '    "sina": 0.0,\n'
+        '    "eastmoney": 0.1,\n'
+        '    "tiantian": 0.5,\n'
+        '    "eastmoney_industry": 0.05\n'
         "  }\n"
         "}\n"
     )
