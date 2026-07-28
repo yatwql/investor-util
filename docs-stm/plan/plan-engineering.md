@@ -1,33 +1,18 @@
-# 工程质量与性能优化：大文件拆分 + 批量并行 + 基准测试
+# 工程质量与性能优化：批量并行（rf-1）
 
-> 当前状态：`rf-2`（tiantian.py 拆分）、`rf-3`（fund_style_analysis.py 拆分）、`rf-4`（性能基准）**已全部完成**。`rf-1`（批量并行）**待处理**。
+> `rf-2`（tiantian.py 拆分）、`rf-3`（fund_style_analysis.py 拆分）、`rf-4`（性能基准）**均已归档至 `archive/v0.8.x/`**，本文档仅保留未完成的 `rf-1` 批量并行方案。
+>
+> - tiantian.py 拆分：↗ [`archive/v0.8.x/tiantian-split/tiantian-split.md`](../archive/v0.8.x/tiantian-split/tiantian-split.md)
+> - fund_style_analysis.py 拆分：↗ [`archive/v0.8.x/fundstyle-split/fundstyle-split.md`](../archive/v0.8.x/fundstyle-split/fundstyle-split.md)
+> - 性能基准体系：↗ [`archive/v0.8.x/perf-benchmark/perf-benchmark.md`](../archive/v0.8.x/perf-benchmark/perf-benchmark.md)
 
 ## 目录
 
-1. ~~[大文件拆分（tiantian.py / fund_style_analysis.py）](#1-大文件拆分)~~ — ✅ 已完成（v0.8.7-dev）
-2. [批量数据获取串行瓶颈](#2-批量数据获取串行瓶颈)
-3. ~~[Performance Benchmark](#3-performance-benchmark)~~ — ✅ 已完成（v0.8.7-dev）
+1. [批量数据获取串行瓶颈](#1-批量数据获取串行瓶颈)
 
 ---
 
-## 1. 大文件拆分 — ✅ 已完成
-
-### 实际完成内容
-
-| 原文件 | 子模块 | 行数变化 |
-|--------|--------|---------|
-| `providers/tiantian.py`（768 行） | `tiantian_base.py`（HTTP 基底）+ `tiantian_holdings.py`（持仓/季报）+ `tiantian_ranking.py`（排名/评级/风险分析）+ `tiantian_nav.py`（历史净值） | 原文件删除，外部调用方直接引用子模块 |
-| `report/fund_style_analysis.py`（652 行） | `fund_style_base.py`（常量/快照/工具函数）+ `fund_style_classify.py`（单股分类/行业 PE/入口函数）+ `fund_style_report.py`（漂移检测/全基金分析） | 原文件删除，外部调用方直接引用子模块 |
-
-### 说明
-
-- 拆分时**未保留向后兼容重导出层**——所有外部调用方统一改为直接引用子模块
-- 拆分后**测试覆盖率未降低**——每子模块对应的测试用例均存在并标记正确
-- 参见 `review-findings.md` 归档区 `rf-2` / `rf-3`
-
----
-
-## 2. 批量数据获取串行瓶颈
+## 1. 批量数据获取串行瓶颈
 
 ### 概述
 
@@ -106,24 +91,3 @@
 | C10 新闻可配置 | 并行数量受用户配置约束 |
 | §1.4.5 降级治理 | 批量失败聚合为单一降级记录，避免 N 条噪声 |
 
----
-
-## 3. Performance Benchmark — ✅ 已完成
-
-### 实际完成内容
-
-三层性能基准体系已于 v0.8.7-dev 实现，对应 review-findings `rf-4`。
-
-| 层 | 模块 | 功能 |
-|:---|:-----|:------|
-| **L1 自动计时** | `src/python/perf.py`（PerfCollector + ReportRunSnapshot） | 每次报告生成自动记录各阶段耗时到 `data/state/perf_history.jsonl`，原子写入（C3 约束） |
-| **L2 独立基准** | `scripts/perf_report.py` | mock 外部源的独立基准脚本，用于精准回归检测 |
-| **L3 趋势工具** | `scripts/perf_view.py` | 读取 JSONL 历史文件输出版本间耗时对比 Markdown 表格 |
-
-### 关键设计点
-
-- PerfCollector 为生成函数内的**局部实例**（C14 约束：无模块级全局变量）
-- 路径从 `constants.PROJECT_ROOT` 推导（C16 路径绝对化）
-- 不向 pipeline_data 注入计时数据，仅独立 JSONL 文件（C19 Schema 契约）
-- 三路径埋点：basic（1 阶段） / both（5 阶段） / full（7 阶段）
-- 即使部分失败也记录 perf data（在 try/except 之后调用 `perf.save()`）

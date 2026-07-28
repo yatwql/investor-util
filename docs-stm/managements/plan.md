@@ -83,12 +83,12 @@ CSS 变量 + localStorage 切换按钮。**预估：0.5d**
 
 - **✅ plan-12 错误友好提示/数据源可用性矩阵**（`plan-web-ui.md §4`）— 已在 `data_source_matrix.py` 实现，作为报告章节 #17（always 类型页签）输出
 
-#### 文档体系完善（[`plan-documentation.md`](../plan/plan-documentation.md)）— **plan-13 / plan-14**
+#### 文档体系完善（[`datasource-reliability-documentation.md`](../archive/v0.8.x/datasource-reliability-documentation/datasource-reliability-documentation.md)）— **plan-13 / plan-14（已归档）**
 
 | # | 项目 | 内容 | 工作量 | 状态 |
 |:-:|:-----|:-----|:------:|:----:|
 | plan-13 | **数据源可靠性文档** | 8 类数据源可靠性详表 + 降级路径 + 限流规则 + 历史故障 | 1-1.5d | ✅ 已完成 (`datasource-reliability.md` + `cli check-sources`) |
-| plan-14 | **架构决策记录（ADR）** | ADR 目录/模板 + 补写 5-8 个关键决策 + 流程固化 | 2.5d | ⏳ 待排期 |
+| plan-14 | **架构决策记录（ADR）** | ADR 目录/模板 + 补写 5-8 个关键决策 + 流程固化 | 2.5d | ⏸ 已搁置（`technical.md` 架构约束表 + `review-findings.md` rf-1 脚注已覆盖关键决策记录，当前优先级不足投入 2.5d） |
 
 ### P4 — 实验功能
 
@@ -100,6 +100,7 @@ CSS 变量 + localStorage 切换按钮。**预估：0.5d**
 
 ## 归档
 
+- [`datasource-reliability-documentation.md`](../archive/v0.8.x/datasource-reliability-documentation/datasource-reliability-documentation.md) — plan-13（数据源可靠性文档✅）／ plan-14（ADR⏸）
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)
 - [`archived_plan.0.6.x.md`](../archive/v0.6.x/archived_plan.0.6.x.md)
 - [`archived_plan.0.5.x.md`](../archive/v0.5.x/archived_plan.0.5.x.md)
