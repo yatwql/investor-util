@@ -551,18 +551,18 @@ investor-util/
 │   │   │       ├── llm-hallucination-report_expert-review.md           # LLM 幻觉率采样报告（expert_review 模块）
 │   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
 │   │   │       └── llm-hallucination-sample-output_expert-review.txt   # 幻觉采样 LLM 原始输出样本
-│   │   ├── v0.8.x/                           # v0.8.x 版本迭代归档
-│   │   │   ├── tiantian-split/               #   tiantian.py 拆分（rf-2✅）
+│   │   ├── v0.8.x/                           # v0.8.x 版本文档归档
+│   │   │   ├── tiantian-split/               #   tiantian.py 大文件拆分记录
 │   │   │   │   └── tiantian-split.md
-│   │   │   ├── fundstyle-split/               #   fund_style_analysis.py 拆分（rf-3✅）
+│   │   │   ├── fundstyle-split/               #   fund_style_analysis.py 大文件拆分记录
 │   │   │   │   └── fundstyle-split.md
-│   │   │   ├── datasource-matrix/             #   错误友好提示/数据源可用性矩阵（plan-12✅）
+│   │   │   ├── datasource-matrix/             #   数据源可用性矩阵实现记录
 │   │   │   │   └── datasource-matrix.md
-│   │   │   ├── datasource-reliability-documentation/   #   文档体系完善（plan-13✅/plan-14⏸）
+│   │   │   ├── datasource-reliability-documentation/   #   数据源可靠性文档
 │   │   │   │   └── datasource-reliability-documentation.md
-│   │   │   ├── perf-benchmark/               #   三层性能基准体系（rf-4✅）
+│   │   │   ├── perf-benchmark/               #   三层性能基准体系（自动计时 + 回归检测 + 趋势工具）
 │   │   │   │   ├── perf-completion-summary.md #     完成摘要
-│   │   │   │   └── perf-design-and-verification.md # 原始设计 + 实现对照
+│   │   │   │   └── perf-design-and-verification.md # 设计方案与实现对照
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
