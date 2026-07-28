@@ -560,9 +560,9 @@ investor-util/
 │   │   │   │   └── datasource-matrix.md
 │   │   │   ├── datasource-reliability-documentation/   #   数据源可靠性文档
 │   │   │   │   └── datasource-reliability-documentation.md
-│   │   │   ├── perf-benchmark/               #   三层性能基准体系（自动计时 + 回归检测 + 趋势工具）
-│   │   │   │   ├── perf-completion-summary.md #     完成摘要
-│   │   │   │   └── perf-design-and-verification.md # 设计方案与实现对照
+│   │   │   ├── perf-benchmark/               #   性能基准体系（自动计时/回归检测/趋势工具）
+│   │   │   │   ├── perf-completion-summary.md #     归档摘要
+│   │   │   │   └── perf-design-and-verification.md # 设计方案
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
