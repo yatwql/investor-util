@@ -13,7 +13,7 @@ from collections.abc import Callable
 from typing import Any
 
 from src.python.cache import get_ttl
-from src.python.code_utils import is_a_share_code, is_exchange_fund_code, is_otc_code_overlap
+from src.python.code_utils import is_a_share_code, is_exchange_fund_code, is_otc_code_overlap, is_otc_fund_by_name
 from src.python.fetcher.chain import fetch_with_fallback
 from src.python.providers import eastmoney, tencent
 from src.python.providers import sina as sina_provider
@@ -158,16 +158,19 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
     cache_key = _price_cache_key(code)
 
     # 按代码类型选择专属 Provider Chain
+    # 场外基金（含名称可识别的 00 代码）→ eastmoney（直达，无备用）
     # 股票/ETF → tencent → sina（同质 fallback）
-    # 场外基金 → eastmoney（直达，无备用）
-    if is_exchange_fund_code(code) or is_a_share_code(code):
+    if is_otc_code_overlap(code) and expected_name and is_otc_fund_by_name(expected_name, code):
+        data_type = "price_fund_otc"
+        _needs_degrade = False
+    elif is_exchange_fund_code(code) or is_a_share_code(code):
         data_type = "price_stock"
+        # 降级标记：00 开头存在 A 股/OTC 基金重叠，代码前缀无法区分
+        # 若股票链路全失败，降级到场外基金链路尝试
+        _needs_degrade = is_otc_code_overlap(code)
     else:
         data_type = "price_fund_otc"
-
-    # 降级标记：00 开头同时存在 A 股和 OTC 基金，代码前缀无法区分
-    # 若股票链路全失败，降级到场外基金链路尝试
-    _needs_degrade = data_type == "price_stock" and is_otc_code_overlap(code)
+        _needs_degrade = False
 
     def _validate(raw: dict, provider_name: str) -> bool:
         if provider_name in ("tencent", "sina"):

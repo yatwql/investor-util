@@ -440,10 +440,11 @@ def _build_penetration_deep_prompt(
 
     # 根据代码前缀推断国别/币种
     country_lines = _calc_country_exposure(holdings_details)
+    total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
 
     return (
         f"【当前时间】{now_bj}（北京时间）\n"
-        f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} 成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}\n"
+        f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} 成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）\n"
         f"【分布】{' '.join(cat_parts)}\n"
         f"\n"
         f"【持仓明细】\n"

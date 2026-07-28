@@ -85,7 +85,7 @@
     "sh000012": "中证全债"
   },
   "history": {
-    "analysis": "off",
+    "analysis": "auto",
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,

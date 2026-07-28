@@ -35,7 +35,7 @@
   // ═══════════════════════════════════════════
   "system_prompt_expert_review": null,
   "model_expert_review": null,
-  "temperature_expert_review": 0.8,
+  "temperature_expert_review": 0.3,
   "max_tokens_expert_review": 8192,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
@@ -49,7 +49,7 @@
   // ═══════════════════════════════════════════
   "system_prompt_health_check": null,
   "model_health_check": null,
-  "temperature_health_check": 0.5,
+  "temperature_health_check": 0.1,
   "max_tokens_health_check": 4096,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
@@ -63,7 +63,7 @@
   // ═══════════════════════════════════════════
   "system_prompt_penetration_deep": null,
   "model_penetration_deep": null,
-  "temperature_penetration_deep": 0.4,
+  "temperature_penetration_deep": 0.1,
   "max_tokens_penetration_deep": 4096,
   "timeout_penetration_deep": 90,
   "cache_enabled_penetration_deep": true,

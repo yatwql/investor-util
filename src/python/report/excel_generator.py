@@ -329,6 +329,14 @@ def generate_excel_report(
                         for col in range(1, 6):
                             ws_ds.cell(row=row - 1, column=col).font = _font
 
+                has_degraded = any(m["degraded_list"] for m in matrix)
+                if has_degraded:
+                    row += 1
+                    row = write_title_row(ws_ds, row, "降级明细", ncols)
+                    for m in matrix:
+                        for dg in m.get("degraded_list", []):
+                            row = write_data_row(ws_ds, row, [m["name"], dg, "", "", ""])
+
                 has_failures = any(m["sample_failures"] for m in matrix)
                 if has_failures:
                     row += 1

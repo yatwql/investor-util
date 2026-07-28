@@ -26,7 +26,7 @@ def _prompt_history(reporter: TuiProgressReporter) -> str:
     config = get_config_cache() or {}
     if not is_enable_history(config):
         return "off"
-    _history_cfg_mode = config.get("history", {}).get("analysis", "off")
+    _history_cfg_mode = config.get("history", {}).get("analysis", "auto")
     if _history_cfg_mode == "prompt":
         try:
             _resp = input("  [..] 是否获取组合历史走势数据（as-if 模拟）？(y/N): ").strip().lower()

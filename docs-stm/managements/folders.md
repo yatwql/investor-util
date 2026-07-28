@@ -50,6 +50,7 @@ investor-util/
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── akshare.py            #   akshare 封装层（盈利预测/资金流向/分红）
 │   │   │   ├── bond_yield.py         #   无风险利率获取（akshare 国债收益率 + config 手动兜底）
+│   │   │   ├── batch.py              #   批量并行调度（BatchDispatcher + RateLimiter）
 │   │   │   ├── chain.py              #   Provider Chain 获取链路（主→备→过期缓存）
 │   │   │   ├── fund.py               #   基金数据获取（净值/业绩排名/持仓）
 │   │   │   ├── fund_manager.py       #   基金经理数据获取
@@ -248,6 +249,7 @@ investor-util/
 │       │   ├── fetcher/             #   数据获取单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_api_edge.py         #   API 获取边缘场景
+│       │   │   ├── test_batch.py            #   批量调度单元测试
 │       │   │   ├── test_chain.py            #   数据链主链路测试
 │       │   │   ├── test_chain_edge.py       #   数据链边缘场景
 │       │   │   ├── test_fetcher.py          #   获取调度核心测试
@@ -259,7 +261,6 @@ investor-util/
 │       │   ├── handlers/            #   命令处理器单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_handlers_cache.py  #   缓存管理命令处理测试
-│   │   ├── handlers_check_sources.py #     数据源健康检查命令处理器
 │       │   │   └── test_handlers_report.py #   报告生成命令处理测试
 │       │   ├── llm/                 #   LLM 单元测试
 │       │   │   ├── __init__.py      #       子包标记
@@ -272,6 +273,7 @@ investor-util/
 │       │   │   ├── test_cache_multi.py        #   多 Provider 缓存测试
 │       │   │   ├── test_circuit_breaker_edge.py  #   LLM 熔断器边缘场景
 │       │   │   ├── test_circuit_breaker_recovery.py # 熔断恢复测试
+│       │   │   ├── test_cost_tracker.py     #   Token 成本跟踪测试
 │       │   │   ├── test_debate_conditional.py #   辩论条件触发测试
 │       │   │   ├── test_debate_edge.py        #   辩论边缘场景
 │       │   │   ├── test_debate_generators.py  #   辩论提示词生成测试

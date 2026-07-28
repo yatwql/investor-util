@@ -73,15 +73,31 @@ class BatchDispatcher:
     或使用上下文管理器（推荐，异常路径自动 shutdown）：
         with BatchDispatcher(max_workers=3) as dispatcher:
             results = dispatcher.execute([task1, task2, task3])
+
+    限速控制：
+        传入 rate_limit_provider 后，execute() 自动在每任务前调用
+        RateLimiter.acquire(provider_name)，确保请求间隔 ≥ 配置值。
+        限速配置从 config.json batch_rate_limit 读取（菜单 R 刷新后生效）。
     """
 
-    def __init__(self, max_workers: int = 4, thread_name_prefix: str = "batch"):
+    def __init__(
+        self,
+        max_workers: int = 4,
+        thread_name_prefix: str = "batch",
+        *,
+        rate_limit_provider: str | None = None,
+    ):
         self._executor = ThreadPoolExecutor(
             max_workers=max_workers,
             thread_name_prefix=thread_name_prefix,
         )
         # _registry 初始化为 None，execute_with_chain_precheck 中惰性加载
         self._registry: Any = None
+        self._rate_limiter: RateLimiter | None = None
+        self._rate_limit_provider = rate_limit_provider
+        if rate_limit_provider is not None:
+            # 惰性加载：首次 execute() 时已确保 config 就绪
+            self._rate_limiter = get_rate_limiter()
 
     # ── 上下文管理器 ──
 
@@ -101,9 +117,25 @@ class BatchDispatcher:
         参数按输入顺序返回（通过 futures 完成时的 index 映射）。
         每个异常任务产生一个 success=False 的 BatchResult，不会中断
         其他任务的执行（系统级异常除外）。
+
+        限速控制：若构造函数传入 rate_limit_provider，
+        自动在每任务前执行限速等待，确保请求间隔 ≥ 配置值。
         """
         if not tasks:
             return []
+
+        # ── 限速包装：若配置了 rate_limit_provider，为每任务插入 acquire() ──
+        if self._rate_limit_provider and self._rate_limiter is not None:
+            wrapped: list[Callable[[], Any]] = []
+            for t in tasks:
+                provider = self._rate_limit_provider
+                def _wrap(task: Callable[[], Any], p: str = provider) -> Callable[[], Any]:
+                    def _rate_limited() -> Any:
+                        self._rate_limiter.acquire(p)  # type: ignore[union-attr]
+                        return task()
+                    return _rate_limited
+                wrapped.append(_wrap(t))
+            tasks = wrapped
 
         futures = {self._executor.submit(task): i for i, task in enumerate(tasks)}
         results: list[BatchResult | None] = [None] * len(tasks)
@@ -464,3 +496,54 @@ def get_strategy_hook(
     except Exception:
         logger.debug("[batch] 策略钩子构造失败，返回 None", exc_info=True)
         return None
+
+
+# ── 模块级默认限速器（惰性加载） ─────────────────────────
+
+_DEFAULT_RATE_LIMITER: RateLimiter | None = None
+_DEFAULT_RATE_LIMITER_LOCK = threading.Lock()
+
+
+def get_rate_limiter() -> RateLimiter:
+    """获取模块级 RateLimiter 单例（从 config.json batch_rate_limit 加载）。
+
+    首次调用时从 config 读取 batch_rate_limit 配置，后续复用。
+    菜单 R 刷新配置后调用 get_rate_limiter.cache_clear() 可重建实例。
+    """
+    global _DEFAULT_RATE_LIMITER
+    if _DEFAULT_RATE_LIMITER is None:
+        with _DEFAULT_RATE_LIMITER_LOCK:
+            if _DEFAULT_RATE_LIMITER is None:
+                _DEFAULT_RATE_LIMITER = _build_rate_limiter_from_config()
+    return _DEFAULT_RATE_LIMITER
+
+
+def _clear_rate_limiter_cache() -> None:
+    """清除 RateLimiter 单例缓存，下次调用 get_rate_limiter() 时重建。
+
+    供菜单 R 刷新配置后调用，使 batch_rate_limit 配置即时生效。
+    """
+    global _DEFAULT_RATE_LIMITER
+    with _DEFAULT_RATE_LIMITER_LOCK:
+        _DEFAULT_RATE_LIMITER = None
+
+
+# 将 cache_clear 挂到 get_rate_limiter 上，方便调用方发现
+get_rate_limiter.cache_clear = _clear_rate_limiter_cache  # type: ignore[attr-defined]
+
+
+def _build_rate_limiter_from_config() -> RateLimiter:
+    """从 config.json batch_rate_limit 段构造 RateLimiter。
+
+    支持热重载：调用方在菜单 R 刷新后调用 get_rate_limiter.cache_clear() 可重建。
+    """
+    try:
+        from src.python.config import get_config
+
+        cfg = get_config()
+        rate_cfg = cfg.get("batch_rate_limit", {})
+        if isinstance(rate_cfg, dict):
+            return RateLimiter(rate_cfg)
+    except Exception:
+        logger.debug("[batch] 读取 batch_rate_limit 配置失败，使用空配置")
+    return RateLimiter({})

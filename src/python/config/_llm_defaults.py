@@ -50,7 +50,7 @@ def _get_default_llm_settings_template() -> str:
         "  // ═══════════════════════════════════════════\n"
         '  "system_prompt_expert_review": null,\n'
         '  "model_expert_review": null,\n'
-        '  "temperature_expert_review": 0.8,\n'
+        '  "temperature_expert_review": 0.3,\n'
         '  "max_tokens_expert_review": 8192,\n'
         '  "timeout_expert_review": 120,\n'
         '  "cache_enabled_expert_review": true,\n'
@@ -64,7 +64,7 @@ def _get_default_llm_settings_template() -> str:
         "  // ═══════════════════════════════════════════\n"
         '  "system_prompt_health_check": null,\n'
         '  "model_health_check": null,\n'
-        '  "temperature_health_check": 0.5,\n'
+        '  "temperature_health_check": 0.1,\n'
         '  "max_tokens_health_check": 4096,\n'
         '  "timeout_health_check": 120,\n'
         '  "cache_enabled_health_check": true,\n'
@@ -78,7 +78,7 @@ def _get_default_llm_settings_template() -> str:
         "  // ═══════════════════════════════════════════\n"
         '  "system_prompt_penetration_deep": null,\n'
         '  "model_penetration_deep": null,\n'
-        '  "temperature_penetration_deep": 0.4,\n'
+        '  "temperature_penetration_deep": 0.1,\n'
         '  "max_tokens_penetration_deep": 4096,\n'
         '  "timeout_penetration_deep": 90,\n'
         '  "cache_enabled_penetration_deep": true,\n'

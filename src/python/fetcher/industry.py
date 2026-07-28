@@ -121,6 +121,7 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[st
     dispatcher = BatchDispatcher(
         max_workers=get_batch_worker_count("industry_workers", 8),
         thread_name_prefix="batch_industry",
+        rate_limit_provider="eastmoney_industry",
     )
 
     items = [

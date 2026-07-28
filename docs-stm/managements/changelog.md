@@ -4,19 +4,29 @@
 
 ---
 
-## [0.8.8-dev] - 未发布
+## [0.8.8] - 2026-07-29
+
+### Added
+- **数据源可用性矩阵降级明细展示**：矩阵下方新增"降级明细"节，分行列出每个降级的具体数据源及其失败类型。HTML 页面使用橙色边框 `.data-status-warn` 样式区分于已有的"失败明细"；Excel 页签同步输出降级列表，与普通失败项视觉隔离。涉及 `data_source_matrix.py`（新增 `degraded_list` 字段）、`report_template.html`、`excel_generator.py`
+- **测试覆盖补全（3 组 15 项）**：① `get_rate_limiter.cache_clear()` 单例重建（3 项） ② price.py OTC 三路路由（直通/空名称降级/纯 A 股/ETF，4 项） ③ `build_data_source_matrix()` degraded_list（8 项：纯 degraded/纯 failed/混合/全 ok/多条同类别/全 failed/空事件/格式验证）
 
 ### Changed
 - **industry.py 批量并行重构**：`batch_fetch_industry_data()` 从自定义 ThreadPoolExecutor + 手动锁 + 逐条重试迁移为统一 BatchDispatcher（`execute_with_cache_check` + `retry_failed`），移除 threading、random、time、as_completed 等 6 项手动导入，保持非 A 股过滤/熔断预检/None 重试语义不变（rf-1 迭代 7）
 - **Python 最低版本锁定 ≥3.11**：3.10 已于 2026-10 EOL，CI 中反复出现 3.10 特有的兼容性问题（threading.Lock 类型检查、浮点精度、本次 CI 3.10-only 失败）。CI matrix 移除 3.10，pyproject.toml requires-python 同步更新，README.md 新增环境要求章节，faq.md 版本号更新
+- **LLM 模块温度调低**：expert_review 0.8→0.3、health_check 0.5→0.1、penetration_deep 0.4→0.1，降低数值幻觉概率，减少事实校验 false positive。`_llm_defaults.py` 模板与 `llm_settings.json` 默认值同步更新，`how-to-config-llm.md` 说明文档同步
+- **`history.analysis` 默认值改为 `"auto"`**（原 `"off"`），新用户开箱即用组合历史走势分析与回撤统计，无需手动修改配置。涉及 `_config_defaults.py`（默认值+模板）、`config.json`、`handlers_report.py`（fallback 默认）、`how-to-config.md`
 
 ### Fixed
 - **收益归因贡献占比与收益率混淆导致 LLM 事实校验告警**：`_build_profit_attribution_block()` 使用 `%` 标注贡献占比（品种利润/全品种绝对利润之和），LLM 在持仓体检报告/智囊团深度复盘中误作个股收益率引用。贡献占比改为 `pp`（百分点）后缀，与收益率 `%` 视觉区分。涉及 2 个 LLM 模块、14 条事实校验告警
 - **Python 最低版本锁定 ≥3.11**：3.10 已于 2026-10 EOL，CI 中反复出现 3.10 特有的兼容性问题（threading.Lock 类型检查、浮点精度、本次 CI 3.10-only 失败）。CI matrix 移除 3.10，pyproject.toml requires-python 同步更新，README.md 新增环境要求章节，faq.md 版本号更新
 - **rf-1 技术债清理（4 项）**：① `BatchDispatcher.execute_with_cache_check` 新增 `strict_none` 参数，消除 industry.py None 后检胶水代码 ② 新增 `fetch_fund_rankings_cached` 为 fund 排名添加 session_cache，消除双管线间文件 IO ③ `compute_penetration_top10()` 实现 fund 持仓与已知 A 股行业分类并行预取，重叠 ~5s IO 等待 ④ 拆出 `_apply_industry_data` 纯函数供并行预取复用
+- **穿透深度分析 LLM 虚构收益率**：prompt 缺少 `total_profit_rate` 字段（总收益率），LLM 在无数据约束下虚构 ~18% 而非实际 28.6%，多份报告重复触发事实校验告警。`prompts_action.py` prompt 补充总收益率字段
+- **辩论模式白脸/黑脸观点相同**：`generate_debate_procon()` 中 pro 和 con 两次调用 `generate_llm_module(module_key="expert_review")` 均未传递 `fingerprint_fn`，导致内部缓存键均为 `llm_expert_review_`（空指纹），con 调用命中 pro 的缓存结果。修复：pro/con/synthesis 各次调用分别传入含角色后缀的 `fingerprint_fn`，确保内部缓存键隔离
 
 ### Docs
 - **回撤分析占位提示补充配置说明**：`report_template.html` 回撤分析数据暂不可用提示增加 `history.analysis: "auto"` 脚注，与组合历史走势模块的提示一致
+- **测试覆盖统计全量刷新**：test-coverage.md 项数更新（all 3849，unit 3478，unit_fetcher 270，unit_report 1070，快照日期 2026-07-29）
+- **目录结构同步**：folders.md 修复 test/handlers/ 下误入的 `handlers_check_sources.py` 重复行，补充 source tree fetcher/ 下 `batch.py`、test tree 下 `test_batch.py` 和 `test_cost_tracker.py`、`test_data_source_matrix.py`
 
 ## [0.8.7] - 2026-07-27
 

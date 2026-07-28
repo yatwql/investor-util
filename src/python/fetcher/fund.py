@@ -149,6 +149,7 @@ def fetch_fund_rankings_batch(
         dispatcher = BatchDispatcher(
             max_workers=get_batch_worker_count("fund_workers", 3),
             thread_name_prefix="batch_fund_rank",
+            rate_limit_provider="tiantian",
         )
 
     from functools import partial
@@ -204,6 +205,7 @@ def fetch_fund_holdings_batch(
         dispatcher = BatchDispatcher(
             max_workers=get_batch_worker_count("fund_workers", 3),
             thread_name_prefix="batch_fund_hold",
+            rate_limit_provider="tiantian",
         )
 
     from functools import partial

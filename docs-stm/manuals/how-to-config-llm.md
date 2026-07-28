@@ -59,7 +59,7 @@ LLM 配置由三个独立文件管理：
   },
   "temperature_global_macro": 0.3,
   "max_tokens_global_macro": 2048,
-  "temperature_expert_review": 0.8,
+  "temperature_expert_review": 0.3,
   "max_tokens_expert_review": 8192,
   "pricing": {
     "currency": "CNY"
@@ -344,7 +344,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // ═══════════════════════════════════════════
   "system_prompt_expert_review": null,
   "model_expert_review": null,
-  "temperature_expert_review": 0.8,
+  "temperature_expert_review": 0.3,
   "max_tokens_expert_review": 8192,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
@@ -358,7 +358,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // ═══════════════════════════════════════════
   "system_prompt_health_check": null,
   "model_health_check": null,
-  "temperature_health_check": 0.5,
+  "temperature_health_check": 0.1,
   "max_tokens_health_check": 4096,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
@@ -372,7 +372,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // ═══════════════════════════════════════════
   "system_prompt_penetration_deep": null,
   "model_penetration_deep": null,
-  "temperature_penetration_deep": 0.4,
+  "temperature_penetration_deep": 0.1,
   "max_tokens_penetration_deep": 4096,
   "timeout_penetration_deep": 90,
   "cache_enabled_penetration_deep": true,
@@ -447,17 +447,17 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | output_brief_limit |
 |------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:------------------:|
 | **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | **200 字** |
-| **智囊团深度复盘** | null | **0.8**（高温促多元） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
-| **持仓体检报告** | null | **0.5**（居中平衡） | **4096** | **120s** | **true** | 12000 | 300 字 |
-| **穿透深度分析** | null | **0.4**（中低温稳定） | **4096** | **90s** | false | 8000 | 300 字 |
+| **智囊团深度复盘** | null | **0.3**（低温保事实） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
+| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **4096** | **120s** | **true** | 12000 | 300 字 |
+| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **4096** | **90s** | false | 8000 | 300 字 |
 | **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | 不适用 |
 
 > **补充**：财经新闻关联分析还支持 `news_correlation_top_n` 配置项（默认 `30`），控制送 LLM 分析的新闻条数上限，按关键词匹配数降序选取。增大此值会线性增加 Token 消耗，减小则降低 LLM 关联分析的覆盖率。设为 `0` 可完全禁用 LLM 分析（仅保留关键词匹配）。
 
 > **temperature 项说明**：
-> - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**>0.5 时全球政经局势可能编造经济指标**。
+> - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**智囊团深度复盘/持仓体检/穿透分析已改用 0.1~0.2 极低温以减少数值幻觉**。
 > - **中温（0.4~0.6）**：在准确性和判断力之间平衡，适合评分分析。
-> - **高温（≥0.7）**：鼓励多样性和创造性输出，适合辩论式分析。**<0.4 时智囊团专家观点雷同**。
+> - **高温（≥0.7）**：鼓励多样性和创造性输出，适合辩论式分析。**当前已不推荐用于数值引用类模块**。
 
 ---
 

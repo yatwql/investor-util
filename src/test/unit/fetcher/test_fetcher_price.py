@@ -169,6 +169,67 @@ class TestFetchMarketData(unittest.TestCase):
         args, kwargs = mock_fallback.call_args
         self.assertIn("validate", kwargs)
 
+    # ── OTC 三路路由（is_otc_fund_by_name 预判） ──────────────
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.fetcher.price.fetch_with_fallback")
+    def test_otc_fund_bypassed_stock_chain(
+        self, mock_fallback, mock_fresh,
+    ):
+        """002943 场外基金（名称可识别）→ 直接走 fund_otc，不经过 stock 链路。"""
+        from src.python.fetcher.price import fetch_market_data
+
+        mock_fallback.return_value = None  # 无关返回值，我们只检查调用次数
+        fetch_market_data("002943", "广发多因子灵活配置混合")
+        # 仅 1 次调用（无降级重试）
+        self.assertEqual(mock_fallback.call_count, 1)
+        args, kwargs = mock_fallback.call_args
+        self.assertEqual(kwargs["data_type"], "price_fund_otc")
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.fetcher.price.fetch_with_fallback")
+    def test_otc_fund_empty_name_fallback_to_degrade(
+        self, mock_fallback, mock_fresh,
+    ):
+        """002943 无 expected_name → 先走 stock 失败后降级 fund_otc（2 次调用）。"""
+        from src.python.fetcher.price import fetch_market_data
+
+        mock_fallback.side_effect = [None, None]
+        fetch_market_data("002943", "")
+        self.assertEqual(mock_fallback.call_count, 2)
+        args1, kwargs1 = mock_fallback.call_args_list[0]
+        self.assertEqual(kwargs1["data_type"], "price_stock")
+        args2, kwargs2 = mock_fallback.call_args_list[1]
+        self.assertEqual(kwargs2["data_type"], "price_fund_otc")
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.fetcher.price.fetch_with_fallback")
+    def test_a_share_stock_only_one_call(
+        self, mock_fallback, mock_fresh,
+    ):
+        """600900 A 股 → 仅走 stock 链路，不降级。"""
+        from src.python.fetcher.price import fetch_market_data
+
+        mock_fallback.return_value = None
+        fetch_market_data("600900", "长江电力")
+        self.assertEqual(mock_fallback.call_count, 1)
+        args, kwargs = mock_fallback.call_args
+        self.assertEqual(kwargs["data_type"], "price_stock")
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.fetcher.price.fetch_with_fallback")
+    def test_etf_fund_only_stock_chain(
+        self, mock_fallback, mock_fresh,
+    ):
+        """161725 ETF 基金 → 仅走 stock 链路（exchange_fund 判定），不降级。"""
+        from src.python.fetcher.price import fetch_market_data
+
+        mock_fallback.return_value = None
+        fetch_market_data("161725", "招商中证白酒指数(LOF)")
+        self.assertEqual(mock_fallback.call_count, 1)
+        args, kwargs = mock_fallback.call_args
+        self.assertEqual(kwargs["data_type"], "price_stock")
+
     # ── 00 代码降级 ──────────────────────────────────────
 
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)

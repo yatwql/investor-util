@@ -486,6 +486,10 @@ def _cmd_refresh_config() -> None:
     llm_config = get_llm_config()
     reload_pricing()
 
+    # 刷新 BatchDispatcher 限速器配置（batch_rate_limit 即时生效）
+    from src.python.fetcher.batch import get_rate_limiter
+    get_rate_limiter.cache_clear()
+
     # 刷新 tui_menu 配置缓存
     refresh_config()
 

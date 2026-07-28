@@ -74,7 +74,7 @@ _DEFAULT_CONFIG = {
     "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
     # ── G. 持仓快照 ──
     "history": {
-        "analysis": "off",
+        "analysis": "auto",
         "snapshot_retention_days": 60,
         "snapshot_max_count": 365,
         "coverage_threshold": 0.8,
