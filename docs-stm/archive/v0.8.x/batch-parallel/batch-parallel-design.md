@@ -152,9 +152,9 @@ prepare_report_data:
 
 以下项在本轮不实施，但作为文档化可追踪的后续方向：
 
-| # | 方向 | 内容 | 触发条件 | 收益预期 |
-|:--|:-----|:------|:---------|:---------|
-| F1 | fund 持仓 + industry 并行化 | 当前 `_merge_fund_layer` → `_enrich_with_industry_api` 在 `compute_penetration_top10()` 内串行。通过重构 penetration 开始阶段就同时启动两个 batch，可让 fund 持仓和行业分类**真正并行** | 本次完成后持仓+行业总耗时仍 > 15s | 额外 -4~5s（3s+8s → 5s～6s） |
-| F2 | fund 排名 session_cache | 当前 fund 排名只有文件缓存无 session_cache。Excel 渲染阶段写完排名后，HTML 渲染靠文件缓存去重（1s 左右）。若加 session_cache 可消除文件 IO | 文件缓存去重耗时 > 0.5s | 额外 -0.5s |
-| F3 | `cache/operations.py` `refresh_fund_cache()` 并行化 | 当前 `warm_cache=True` 时串行更新所有基金缓存，但 `warm_cache` 默认 False 不在管线热路径 | 用户开启 `warm_cache` 且等待 > 10s | 低（冷路径） |
-| F4 | 日志噪声控制标准化 | BatchDispatcher 单资产失败已降为 DEBUG（Iter 1），但 `cache.py`/`chain.py` 中仍有单资产 ERROR | 用户反馈日志噪声 | 可维护性改善 |
+| # | 方向 | 内容 | 触发条件 | 收益预期 | 状态 |
+|:--|:-----|:------|:---------|:---------|:-----|
+| F1 | fund 持仓 + industry 并行化 | `compute_penetration_top10()` 在获取基金持仓同时并行预取已知 A 股行业分类，重叠 ~5s IO 等待 | 已实现 | -4~5s | ✅ 已实现 |
+| F2 | fund 排名 session_cache | `fetch_fund_rankings_cached` 使用 `registry.session_cache_get/set` 消除双管线间重复文件 IO | 已实现 | -0.5s | ✅ 已实现 |
+| F3 | `cache/operations.py` `refresh_fund_cache()` 并行化 | 当前 `warm_cache=True` 时串行更新所有基金缓存，但 `warm_cache` 默认 False 不在管线热路径 | 用户开启 `warm_cache` 且等待 > 10s | 低（冷路径） | ⏸ 待评估 |
+| F4 | 日志噪声控制标准化 | `cache.py`/`chain.py` 中已无单资产 ERROR 日志，无需额外处理 | 已验证 | 可维护性改善 | ❌ 无需处理 |

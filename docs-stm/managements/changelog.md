@@ -13,6 +13,7 @@
 ### Fixed
 - **收益归因贡献占比与收益率混淆导致 LLM 事实校验告警**：`_build_profit_attribution_block()` 使用 `%` 标注贡献占比（品种利润/全品种绝对利润之和），LLM 在持仓体检报告/智囊团深度复盘中误作个股收益率引用。贡献占比改为 `pp`（百分点）后缀，与收益率 `%` 视觉区分。涉及 2 个 LLM 模块、14 条事实校验告警
 - **Python 最低版本锁定 ≥3.11**：3.10 已于 2026-10 EOL，CI 中反复出现 3.10 特有的兼容性问题（threading.Lock 类型检查、浮点精度、本次 CI 3.10-only 失败）。CI matrix 移除 3.10，pyproject.toml requires-python 同步更新，README.md 新增环境要求章节，faq.md 版本号更新
+- **rf-1 技术债清理（4 项）**：① `BatchDispatcher.execute_with_cache_check` 新增 `strict_none` 参数，消除 industry.py None 后检胶水代码 ② 新增 `fetch_fund_rankings_cached` 为 fund 排名添加 session_cache，消除双管线间文件 IO ③ `compute_penetration_top10()` 实现 fund 持仓与已知 A 股行业分类并行预取，重叠 ~5s IO 等待 ④ 拆出 `_apply_industry_data` 纯函数供并行预取复用
 
 ### Docs
 - **回撤分析占位提示补充配置说明**：`report_template.html` 回撤分析数据暂不可用提示增加 `history.analysis: "auto"` 脚注，与组合历史走势模块的提示一致
