@@ -136,13 +136,13 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[st
         cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("industry", cache_id)),
     )
 
-    # 将 None 结果标记为失败，使 retry_failed 重试（与原实现语义一致）
+    # 将 None 结果标记为失败，触发 retry_failed 重试
     for r in results:
         if r.success and r.result is None:
             r.success = False
             r.error = "fetch returned None"
 
-    # 通用重试（复用主 executor，修复 TD-5 线程泄漏）
+    # 通用重试（复用主 executor）
     results = dispatcher.retry_failed(
         results,
         task_factory=lambda idx: partial(fetch_industry_data, code=a_codes[idx]),

@@ -337,7 +337,7 @@ class DegradationTracker:
 
         将批量操作中的多条失败压缩为单条降级记录，避免 N 条噪声。
         通过 ratio + severity 区分小故障（3/15）和大故障（15/15）。
-        TD-13：同 (source_key, tier) 的后续调用替换前一条，不追加。
+        同 (source_key, tier) 的后续调用替换前一条，不追加。
 
         Args:
             source_key: 数据源标识（如 "batch_fund_rank"）。
@@ -351,7 +351,7 @@ class DegradationTracker:
         severity = "high" if ratio >= 0.5 else "low"
 
         with self._lock:
-            # TD-13：同 (source_key, tier) 去重——替换而非追加
+            # 同 (source_key, tier) 去重——替换而非追加
             for i, ev in enumerate(self._events):
                 if ev.source_key == source_key and ev.tier == tier and ev.failure_type == "aggregated":
                     self._events[i] = DegradationEvent(

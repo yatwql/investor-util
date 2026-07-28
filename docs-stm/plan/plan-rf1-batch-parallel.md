@@ -402,7 +402,7 @@ class BatchDispatcher:
         # 逐资产预检分流...
         # ...（同原设计）
 
-    # ── TD-5 修复：改为实例方法，复用 self._executor ──
+    # ── 复用 self._executor（实例方法） ──
     def retry_failed(
         self,
         results: list[BatchResult],

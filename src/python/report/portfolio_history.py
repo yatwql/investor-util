@@ -332,7 +332,7 @@ class PortfolioHistoryCalculator:
         # 质量校验（只校验收益率起算点之后的数据，避免新基金加入导致的跳变误报）
         warnings.extend(_validate_bars(bars))
 
-        # ── 基准指数历史走势（Iter 6a: 并行获取；Iter 6b: 归一化对齐） ──
+        # ── 基准指数历史走势（并行获取 + 归一化对齐） ──
         benchmarks: list[dict[str, Any]] = []
         if self._benchmark_indices:
             logger.info("[history] 开始获取 %d 个基准指数历史走势", len(self._benchmark_indices))

@@ -55,14 +55,14 @@ class TestDebateSystemPrompts(unittest.TestCase):
         """_SYSTEM_DEBATE_CONDITIONAL_SCENARIO 模板存在且包含 {name}/{desc} 占位符。
 
         条件推理情景模板（I-04 模式 2）用于在提示词中注入预设上/下行情景。
-        该常量尚未在 prompts_core.py 中实现，待补充后此测试将自动生效。
+        该常量未在 prompts_core.py 中定义时跳过测试。
         """
         try:
             from src.python.llm.prompts import _SYSTEM_DEBATE_CONDITIONAL_SCENARIO as SCENARIO
         except (ImportError, AttributeError):
             self.skipTest(
-                "_SYSTEM_DEBATE_CONDITIONAL_SCENARIO 尚未在 prompts 模块中定义，"
-                "实现该常量后此测试将自动生效。"
+                "_SYSTEM_DEBATE_CONDITIONAL_SCENARIO 未在 prompts 模块中定义，"
+                "定义后此测试将自动生效。"
             )
         self.assertIsInstance(SCENARIO, str)
         self.assertIn("{name}", SCENARIO)
