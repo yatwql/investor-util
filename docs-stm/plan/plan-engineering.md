@@ -1,14 +1,11 @@
 # 工程质量与性能优化：批量并行（rf-1）
 
-> `rf-2`（tiantian.py 拆分）、`rf-3`（fund_style_analysis.py 拆分）、`rf-4`（性能基准）**均已归档至 `archive/v0.8.x/`**，本文档仅保留未完成的 `rf-1` 批量并行方案的高层概览。
+> `rf-2`（tiantian.py 拆分）、`rf-3`（fund_style_analysis.py 拆分）、`rf-4`（性能基准）、`rf-1`（批量并行）**均已归档至 `archive/v0.8.x/`**。
 >
 > tiantian.py 拆分：↗ [`archive/v0.8.x/tiantian-split/tiantian-split.md`](../archive/v0.8.x/tiantian-split/tiantian-split.md)
 > fund_style_analysis.py 拆分：↗ [`archive/v0.8.x/fundstyle-split/fundstyle-split.md`](../archive/v0.8.x/fundstyle-split/fundstyle-split.md)
 > 性能基准体系：↗ [`archive/v0.8.x/perf-benchmark/perf-benchmark.md`](../archive/v0.8.x/perf-benchmark/perf-benchmark.md)
->
-> **rf-1 详细 12 轮迭代计划**已独立拆分至：
-> ↗ [`plan-rf1-batch-parallel.md`](plan-rf1-batch-parallel.md)
-> （含逐轮验收标准、技术设计、测试范围、风险分析、架构约束遵从矩阵）
+> 批量并行优化（rf-1）：↗ [`archive/v0.8.x/batch-parallel/plan-rf1-batch-parallel.md`](../archive/v0.8.x/batch-parallel/plan-rf1-batch-parallel.md)
 
 ## 目录
 
