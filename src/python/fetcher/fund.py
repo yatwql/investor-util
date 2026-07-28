@@ -100,6 +100,21 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
     return result
 
 
+def fetch_fund_rankings_cached(code: str) -> dict[str, Any] | None:
+    """基金排名获取（含会话缓存），同一报告生成中同基金只获取一次。
+
+    消除 Excel/HTML 双管线间重复的文件缓存读取。
+    """
+    from src.python.provider_registry import NOT_FOUND, get_registry
+
+    registry = get_registry()
+    cached = registry.session_cache_get("fund_rank", code)
+    if cached is not NOT_FOUND:
+        return cached
+    result = fetch_fund_rankings(code)
+    registry.session_cache_set("fund_rank", code, result, source="api")
+    return result
+
 
 # ═══════════════════════════════════════════════════════════
 #  批量接口
@@ -114,6 +129,8 @@ def fetch_fund_rankings_batch(
 
     使用 BatchDispatcher 并行获取多只基金排名，按 fund code 返回映射。
     支持传入外部 dispatcher 以便共享线程池；不传时内部创建并自动 shutdown。
+    内部使用 fetch_fund_rankings_cached（含 session_cache），
+    同报告生成中 Excel/HTML 双管线间消除重复文件 IO。
 
     Args:
         fund_codes: 基金代码列表。
@@ -142,7 +159,7 @@ def fetch_fund_rankings_batch(
     items = [
         (
             f"{_FUND_PERF_CACHE_PREFIX}{code}",
-            partial(fetch_fund_rankings, code=code),
+            partial(fetch_fund_rankings_cached, code=code),
         )
         for code in fund_codes
     ]

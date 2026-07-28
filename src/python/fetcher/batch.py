@@ -261,6 +261,7 @@ class BatchDispatcher:
         cache_check_fn: Callable[[str], Any],
         *,
         strategy_hook: Callable[[], str] | None = None,
+        strict_none: bool = False,
     ) -> list[BatchResult]:
         """缓存优先执行：批前先检查缓存，已缓存资产跳过线程池调度。
 
@@ -277,6 +278,8 @@ class BatchDispatcher:
             strategy_hook: 可选策略预检闭包，返回 "cache" 时全量走缓存。
                            由 get_strategy_hook() 工厂函数构造。
                            不传则退化为普通缓存优先。
+            strict_none: 为 True 时，执行结果为 None 的项标记为失败而非成功。
+                         适用于业务层以 None 表示"获取失败"的语义（如 industry.py）。
 
         Returns:
             按 items 顺序排列的结果列表。
@@ -330,6 +333,13 @@ class BatchDispatcher:
             p_results = self.execute(pending_tasks)
             for orig_idx, pr in zip(pending_indices, p_results):
                 results[orig_idx] = pr
+
+        # ── strict_none：业务层以 None 表示失败（如 industry.py fetch 返回 None）──
+        if strict_none:
+            for r in results:
+                if r is not None and r.success and r.result is None:
+                    r.success = False
+                    r.error = "task returned None"
 
         return results  # type: ignore[return-value]
 

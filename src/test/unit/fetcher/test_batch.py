@@ -388,6 +388,26 @@ class TestBatchDispatcherCacheCheck(unittest.TestCase):
         results = self.dispatcher.execute_with_cache_check([], lambda x: None)
         self.assertEqual(results, [])
 
+    def test_strict_none_default_preserves_none(self):
+        """strict_none=False（默认）→ None 结果保持 success=True。"""
+        items = [("a", lambda: None)]
+        results = self.dispatcher.execute_with_cache_check(
+            items, lambda x: None,
+        )
+        self.assertTrue(results[0].success)
+        self.assertIsNone(results[0].result)
+
+    def test_strict_none_marks_none_as_failure(self):
+        """strict_none=True → None 结果标记为失败。"""
+        items = [("a", lambda: 42), ("b", lambda: None)]
+        results = self.dispatcher.execute_with_cache_check(
+            items, lambda x: None, strict_none=True,
+        )
+        self.assertTrue(results[0].success)
+        self.assertEqual(results[0].result, 42)
+        self.assertFalse(results[1].success)
+        self.assertIn("None", results[1].error or "")
+
 
 class TestBatchDispatcherStrategyHook(unittest.TestCase):
     """execute_with_cache_check strategy_hook 策略预检。"""

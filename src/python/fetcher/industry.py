@@ -134,13 +134,8 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[st
     results = dispatcher.execute_with_cache_check(
         items,
         cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("industry", cache_id)),
+        strict_none=True,
     )
-
-    # 将 None 结果标记为失败，触发 retry_failed 重试
-    for r in results:
-        if r.success and r.result is None:
-            r.success = False
-            r.error = "fetch returned None"
 
     # 通用重试（复用主 executor）
     results = dispatcher.retry_failed(
