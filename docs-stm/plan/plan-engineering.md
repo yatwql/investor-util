@@ -5,7 +5,8 @@
 > tiantian.py 拆分：↗ [`archive/v0.8.x/tiantian-split/tiantian-split.md`](../archive/v0.8.x/tiantian-split/tiantian-split.md)
 > fund_style_analysis.py 拆分：↗ [`archive/v0.8.x/fundstyle-split/fundstyle-split.md`](../archive/v0.8.x/fundstyle-split/fundstyle-split.md)
 > 性能基准体系：↗ [`archive/v0.8.x/perf-benchmark/perf-benchmark.md`](../archive/v0.8.x/perf-benchmark/perf-benchmark.md)
-> 批量并行优化（rf-1）：↗ [`archive/v0.8.x/batch-parallel/plan-rf1-batch-parallel.md`](../archive/v0.8.x/batch-parallel/plan-rf1-batch-parallel.md)
+> 批量并行调度技术设计：↗ [`archive/v0.8.x/batch-parallel/batch-parallel-design.md`](../archive/v0.8.x/batch-parallel/batch-parallel-design.md)
+> 批量并行调度迭代计划：↗ [`archive/v0.8.x/batch-parallel/batch-parallel-iteration-plan.md`](../archive/v0.8.x/batch-parallel/batch-parallel-iteration-plan.md)
 
 ## 目录
 
