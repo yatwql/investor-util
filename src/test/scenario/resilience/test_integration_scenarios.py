@@ -40,13 +40,13 @@ class ScenarioTestBase(unittest.TestCase):
             "source_api": "tencent",
         }
 
-        self._fund_patcher = patch("src.python.report.penetration.fetch_fund_holdings")
+        self._fund_patcher = patch("src.python.report.penetration.fetch_fund_holdings_batch")
         self._mock_fund = self._fund_patcher.start()
-        self._mock_fund.return_value = {
+        self._mock_fund.return_value = {"510300": {
             "code": "510300", "name": "沪深300ETF",
             "date": "2026-03-31",
             "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
-        }
+        }}
 
         # LLM 相关 mock
         self._llm_config_patcher = patch(

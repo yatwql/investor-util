@@ -106,8 +106,8 @@ class TestSuspendedStockY2(unittest.TestCase):
 class TestNewFundEmptyHoldingsY2(unittest.TestCase):
     """新成立基金尚无持仓数据 → 穿透不崩溃。"""
 
-    @patch("src.python.report.penetration.fetch_fund_holdings", return_value=None)
-    def test_empty_holdings_moves_to_unknown(self, mock_fetch):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch", return_value={"019999": None})
+    def test_empty_holdings_moves_to_unknown(self, mock_batch):
         """空持仓基金 → 归入 unknown_mv，不崩溃。"""
         from src.python.report.penetration import _merge_fund_layer
 
@@ -120,19 +120,17 @@ class TestNewFundEmptyHoldingsY2(unittest.TestCase):
         self.assertEqual(len(failed_details), 1)
         self.assertEqual(failed_details[0]["code"], "019999")
 
-    @patch("src.python.report.penetration.fetch_fund_holdings", return_value=None)
-    def test_empty_holdings_mixed_with_normal(self, mock_fetch):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_empty_holdings_mixed_with_normal(self, mock_batch):
         """空持仓基金+正常基金混合 → 正常基金穿透仍正确。"""
         from src.python.report.penetration import _merge_fund_layer
 
-        def side_effect(code):
-            if code == "005827":
-                return {"holdings": [
-                    {"name": "贵州茅台", "code": "600519", "ratio": 50.0},
-                ]}
-            return None
-
-        mock_fetch.side_effect = side_effect
+        _data = {
+            "005827": {"holdings": [
+                {"name": "贵州茅台", "code": "600519", "ratio": 50.0},
+            ]},
+        }
+        mock_batch.side_effect = lambda codes: {code: _data.get(code) for code in codes}
 
         detail_map = {
             "005827": 1000.0,
@@ -210,26 +208,22 @@ class TestNestedFOFY2(unittest.TestCase):
     """FOF 持有 FOF → 仅处理第一层，不递归崩溃。"""
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
-    @patch("src.python.report.penetration.fetch_fund_holdings")
-    def test_fof_holding_fof_no_crash(self, mock_fetch, mock_ind):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_fof_holding_fof_no_crash(self, mock_batch, mock_ind):
         """FOF 持有另一只基金 → 穿透不崩溃，第一层正常。"""
         from src.python.report.penetration import compute_penetration_top10
 
-        def side_effect(code):
-            if code == "FOF001":
-                return {"holdings": [
-                    {"name": "子基金 A", "code": "SUB001", "ratio": 60.0},
-                    {"name": "中国平安", "code": "601318", "ratio": 40.0},
-                ]}
-            elif code == "SUB001":
-                # 子基金自己是 FOF → 不应递归
-                return {"holdings": [
-                    {"name": "贵州茅台", "code": "600519", "ratio": 80.0},
-                    {"name": "腾讯控股", "code": "SUB002", "ratio": 20.0},
-                ]}
-            return None
-
-        mock_fetch.side_effect = side_effect
+        _data = {
+            "FOF001": {"holdings": [
+                {"name": "子基金 A", "code": "SUB001", "ratio": 60.0},
+                {"name": "中国平安", "code": "601318", "ratio": 40.0},
+            ]},
+            "SUB001": {"holdings": [
+                {"name": "贵州茅台", "code": "600519", "ratio": 80.0},
+                {"name": "腾讯控股", "code": "SUB002", "ratio": 20.0},
+            ]},
+        }
+        mock_batch.side_effect = lambda codes: {code: _data.get(code) for code in codes}
 
         funds = [
             _make_holding("FOF母基金", "FOF001", 1000, 2.0, account="支付宝"),
@@ -251,8 +245,8 @@ class TestETFSuperManyHoldingsY2(unittest.TestCase):
     """ETF 持仓 200+ 只 → 穿透不崩溃，TOP10 正确。"""
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
-    @patch("src.python.report.penetration.fetch_fund_holdings")
-    def test_etf_200_holdings_no_crash(self, mock_fetch, mock_ind):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_etf_200_holdings_no_crash(self, mock_batch, mock_ind):
         """ETF 含 200 只持仓 → compute_penetration_top10 不崩溃。"""
         from src.python.report.penetration import compute_penetration_top10
 
@@ -260,7 +254,7 @@ class TestETFSuperManyHoldingsY2(unittest.TestCase):
             {"name": f"持仓{i:04d}", "code": f"{600000+i}", "ratio": 0.5}
             for i in range(200)
         ]
-        mock_fetch.return_value = {"holdings": holdings_200}
+        mock_batch.return_value = {"510300": {"holdings": holdings_200}}
 
         etf = _make_holding("沪深300ETF", "510300", 1000, 4.0, account="证券")
         details = [_make_detail_row("510300", 4000.0, "沪深300ETF")]
@@ -273,8 +267,8 @@ class TestETFSuperManyHoldingsY2(unittest.TestCase):
         self.assertGreaterEqual(result["summary"]["merged_count"], 200)
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
-    @patch("src.python.report.penetration.fetch_fund_holdings")
-    def test_etf_200_holdings_ratio_sum(self, mock_fetch, mock_ind):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_etf_200_holdings_ratio_sum(self, mock_batch, mock_ind):
         """ETF 200 只持仓 ratio_pct 之和 ≈ 100%。"""
         from src.python.report.penetration import compute_penetration_top10
 
@@ -282,7 +276,7 @@ class TestETFSuperManyHoldingsY2(unittest.TestCase):
             {"name": f"持仓{i:04d}", "code": f"{600000+i}", "ratio": 0.5}
             for i in range(200)
         ]
-        mock_fetch.return_value = {"holdings": holdings_200}
+        mock_batch.return_value = {"510300": {"holdings": holdings_200}}
 
         etf = _make_holding("宽基ETF", "510300", 1000, 4.0)
         details = [_make_detail_row("510300", 4000.0, "宽基ETF")]
@@ -326,14 +320,14 @@ class TestNegativePriceNavY2(unittest.TestCase):
         self.assertEqual(detail.today_profit, expected_today)
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
-    @patch("src.python.report.penetration.fetch_fund_holdings")
-    def test_negative_nav_penetration(self, mock_fetch, mock_ind):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_negative_nav_penetration(self, mock_batch, mock_ind):
         """基金净值为负 → 穿透不崩溃。"""
         from src.python.report.penetration import compute_penetration_top10
 
-        mock_fetch.return_value = {"holdings": [
+        mock_batch.return_value = {"005827": {"holdings": [
             {"name": "贵州茅台", "code": "600519", "ratio": 100.0},
-        ]}
+        ]}}
         h = _make_holding("亏损基金", "005827", 100, 10.0)
         details = [_make_detail_row("005827", -500.0, "亏损基金")]
         result = compute_penetration_top10([h], details)
@@ -383,15 +377,15 @@ class TestBondDefaultY2(unittest.TestCase):
     """债券违约场景。"""
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
-    @patch("src.python.report.penetration.fetch_fund_holdings")
-    def test_bond_fund_with_defaulted_bond(self, mock_fetch, mock_ind):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_bond_fund_with_defaulted_bond(self, mock_batch, mock_ind):
         """债券基金含违约债券（价格暴跌）→ 穿透不崩溃。"""
         from src.python.report.penetration import compute_penetration_top10
 
-        mock_fetch.return_value = {"holdings": [
+        mock_batch.return_value = {"008888": {"holdings": [
             {"name": "17华置债", "code": "123456", "ratio": 30.0},
             {"name": "国债1901", "code": "019611", "ratio": 70.0},
-        ]}
+        ]}}
         bond_fund = _make_holding("XX纯债", "008888", 1000, 1.0, account="支付宝")
         # 违约债券导致基金净值暴跌
         details = [_make_detail_row("008888", 500.0, "XX纯债")]
@@ -404,14 +398,14 @@ class TestBondDefaultY2(unittest.TestCase):
             self.assertAlmostEqual(item["mv"], 150.0, delta=0.01)
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
-    @patch("src.python.report.penetration.fetch_fund_holdings")
-    def test_bond_fund_zero_nav(self, mock_fetch, mock_ind):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_bond_fund_zero_nav(self, mock_batch, mock_ind):
         """债券违约后净值为 0 → 穿透不崩溃。"""
         from src.python.report.penetration import compute_penetration_top10
 
-        mock_fetch.return_value = {"holdings": [
+        mock_batch.return_value = {"008888": {"holdings": [
             {"name": "违约债", "code": "123456", "ratio": 100.0},
-        ]}
+        ]}}
         h = _make_holding("XX纯债", "008888", 1000, 1.0, account="支付宝")
         details = [_make_detail_row("008888", 0.0, "XX纯债")]
         result = compute_penetration_top10([h], details)
@@ -446,8 +440,8 @@ class TestSameFundMultiShareY2(unittest.TestCase):
             self.assertEqual(cat, "etf")
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
-    @patch("src.python.report.penetration.fetch_fund_holdings", return_value=None)
-    def test_a_c_merged_in_penetration(self, mock_fetch, mock_ind):
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch", return_value={"004231": None, "004232": None})
+    def test_a_c_merged_in_penetration(self, mock_batch, mock_ind):
         """A/C 类份额 → 在穿透中不被额外处理，不崩溃。"""
         from src.python.report.penetration import compute_penetration_top10
 

@@ -209,12 +209,20 @@ class TestS0bSameFundACClass(unittest.TestCase):
         ]
 
         with (
-            patch("src.python.report.penetration.fetch_fund_holdings",
+            patch("src.python.report.penetration.fetch_fund_holdings_batch",
                   return_value={
-                      "code": "005827", "name": "易方达蓝筹精选",
-                      "date": "2026-03-31",
-                      "holdings": [{"name": "贵州茅台", "code": "600519",
-                                    "ratio": 16.0}],
+                      "005827": {
+                          "code": "005827", "name": "易方达蓝筹精选",
+                          "date": "2026-03-31",
+                          "holdings": [{"name": "贵州茅台", "code": "600519",
+                                        "ratio": 16.0}],
+                      },
+                      "012772": {
+                          "code": "005827", "name": "易方达蓝筹精选",
+                          "date": "2026-03-31",
+                          "holdings": [{"name": "贵州茅台", "code": "600519",
+                                        "ratio": 16.0}],
+                      },
                   }),
             patch("src.python.report.penetration._enrich_with_industry_api",
                   return_value=(True, "")),
@@ -254,12 +262,20 @@ class TestS0bSameFundACClass(unittest.TestCase):
         ]
 
         with (
-            patch("src.python.report.penetration.fetch_fund_holdings",
+            patch("src.python.report.penetration.fetch_fund_holdings_batch",
                   return_value={
-                      "code": "005827", "name": "易方达蓝筹精选",
-                      "date": "2026-03-31",
-                      "holdings": [{"name": "贵州茅台", "code": "600519",
-                                    "ratio": 16.0}],
+                      "005827": {
+                          "code": "005827", "name": "易方达蓝筹精选",
+                          "date": "2026-03-31",
+                          "holdings": [{"name": "贵州茅台", "code": "600519",
+                                        "ratio": 16.0}],
+                      },
+                      "012772": {
+                          "code": "005827", "name": "易方达蓝筹精选",
+                          "date": "2026-03-31",
+                          "holdings": [{"name": "贵州茅台", "code": "600519",
+                                        "ratio": 16.0}],
+                      },
                   }),
             patch("src.python.report.penetration._enrich_with_industry_api",
                   return_value=(True, "")),

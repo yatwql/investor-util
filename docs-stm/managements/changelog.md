@@ -6,10 +6,12 @@
 
 ## [0.8.8-dev] - 未发布
 
+### Changed
+- **industry.py 批量并行重构**：`batch_fetch_industry_data()` 从自定义 ThreadPoolExecutor + 手动锁 + 逐条重试迁移为统一 BatchDispatcher（`execute_with_cache_check` + `retry_failed`），移除 threading、random、time、as_completed 等 6 项手动导入，保持非 A 股过滤/熔断预检/None 重试语义不变（rf-1 迭代 7）
+- **Python 最低版本锁定 ≥3.11**：3.10 已于 2026-10 EOL，CI 中反复出现 3.10 特有的兼容性问题（threading.Lock 类型检查、浮点精度、本次 CI 3.10-only 失败）。CI matrix 移除 3.10，pyproject.toml requires-python 同步更新，README.md 新增环境要求章节，faq.md 版本号更新
+
 ### Fixed
 - **收益归因贡献占比与收益率混淆导致 LLM 事实校验告警**：`_build_profit_attribution_block()` 使用 `%` 标注贡献占比（品种利润/全品种绝对利润之和），LLM 在持仓体检报告/智囊团深度复盘中误作个股收益率引用。贡献占比改为 `pp`（百分点）后缀，与收益率 `%` 视觉区分。涉及 2 个 LLM 模块、14 条事实校验告警
-
-### Changed
 - **Python 最低版本锁定 ≥3.11**：3.10 已于 2026-10 EOL，CI 中反复出现 3.10 特有的兼容性问题（threading.Lock 类型检查、浮点精度、本次 CI 3.10-only 失败）。CI matrix 移除 3.10，pyproject.toml requires-python 同步更新，README.md 新增环境要求章节，faq.md 版本号更新
 
 ### Docs
