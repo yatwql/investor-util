@@ -419,7 +419,7 @@ investor-util/
 ├── logs/                             # 程序日志（app.log，自动轮转）
 ├── test-reports/                     # 测试报告（自动生成，按 mode 分组）
 ├── .github/                         # GitHub 配置
-│   └── workflows/
+│   └── workflows/                      #   CI/CD 配置文件
 │       └── ci.yml                   #   CI/CD 流水线（P0/P1/P2 三级门禁）
 ├── pytest.ini                       # pytest 全局配置
 ├── reason.bat                       # Reasonix AI code editor 启动（`reasonix code`）
@@ -462,11 +462,11 @@ investor-util/
 │   ├── plan/                         #   中间设计文件（当前迭代中）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
-│   │   ├── v0.1.x/                            # v0.1.x 版本迭代归档
+│   │   ├── v0.1.x/                            # v0.1.x 版本归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
 │   │   │   ├── archived_plan.0.1.x.md             # 实现计划归档 v0.1.x
 │   │   │   └── archived_review-findings.0.1.x.md  # 自审记录归档 v0.1.x
-│   │   ├── v0.2.x/                            # v0.2.x 版本迭代归档
+│   │   ├── v0.2.x/                            # v0.2.x 版本归档
 │   │   │   ├── archived_changelog.0.2.x.md        # 变更日志归档 v0.2.x
 │   │   │   ├── archived_plan.0.2.x.md             # 实现计划归档 v0.2.x
 │   │   │   ├── archived_review-findings.0.2.x.md  # 自审记录归档 v0.2.x
@@ -488,7 +488,7 @@ investor-util/
 │   │   │   │   └── validate_coverage_map.py       # 覆盖地图验证脚本
 │   │   │   └── test-runtime-optimization/         # 测试运行优化
 │   │   │       └── A5-test-runtime-optimization.md # 测试运行优化
-│   │   ├── v0.3.x/                            # v0.3.x 版本迭代归档
+│   │   ├── v0.3.x/                            # v0.3.x 版本归档
 │   │   │   ├── archived_changelog.0.3.x.md        # 变更日志归档 v0.3.x
 │   │   │   ├── archived_plan.0.3.x.md             # 实现计划归档 v0.3.x
 │   │   │   ├── archived_review-findings.0.3.x.md  # 自审记录归档 v0.3.x
@@ -506,7 +506,7 @@ investor-util/
 │   │   │   │   └── R-207-summary-llm-usage-split-plan.md # LLM 用量摘要拆分计划
 │   │   │   └── test-verify-mode-optimization/     # 测试verify 模式运行优化
 │   │   │       └── r200_verify_mode_optimization.md # 测试verify 模式运行优化
-│   │   ├── v0.4.x/                            # v0.4.x 版本迭代归档
+│   │   ├── v0.4.x/                            # v0.4.x 版本归档
 │   │   │   ├── archived_changelog.0.4.x.md        # 变更日志归档 v0.4.x
 │   │   │   ├── archived_plan.0.4.x.md             # 实现计划归档 v0.4.x
 │   │   │   ├── archived_review-findings.0.4.x.md  # 自审记录归档 v0.4.x
@@ -515,7 +515,7 @@ investor-util/
 │   │   │   │   └── html-report-chart-native-canvas-fallback-plan.md # HTML Canvas 渲染修复
 │   │   │   └── test-add-config-edge-testcase/     # 边缘测试配置
 │   │   │       └── y5-edge-test-config-env.md     # 边缘测试配置环境
-│   │   ├── v0.5.x/                            # v0.5.x 版本迭代归档
+│   │   ├── v0.5.x/                            # v0.5.x 版本归档
 │   │   │   ├── archived_changelog.0.5.x.md        # 变更日志归档 v0.5.x
 │   │   │   ├── archived_plan.0.5.x.md             # 实现计划归档 v0.5.x
 │   │   │   ├── archived_review-findings.0.5.x.md  # 自审记录归档 v0.5.x
@@ -525,7 +525,7 @@ investor-util/
 │   │   │   │   └── plan-iter-8-excel-benchmark-columns.md # I 迭代 Excel 基准指数列
 │   │   │   └── report-board-visibility-configable/ # 看板可见性配置
 │   │   │       └── g-board-visibility-iteration-plan.md # 看板可见性配置迭代计划
-│   │   ├── v0.6.x/                            # v0.6.x 版本迭代归档
+│   │   ├── v0.6.x/                            # v0.6.x 版本归档
 │   │   │   ├── archived_changelog.0.6.x.md        # 变更日志归档 v0.6.x
 │   │   │   ├── archived_plan.0.6.x.md             # 实现计划归档 v0.6.x
 │   │   │   ├── archived_review-findings.0.6.x.md  # 自审记录归档 v0.6.x
@@ -535,7 +535,7 @@ investor-util/
 │   │   │   └── cli-mode/                          # CLI 命令行模式归档
 │   │   │       ├── cli-mode-iteration-plan.md     # CLI 迭代计划
 │   │   │       └── cli-mode-technical-design.md   # CLI 技术设计
-│   │   ├── v0.7.x/                            # v0.7.x 版本迭代归档
+│   │   ├── v0.7.x/                            # v0.7.x 版本归档
 │   │   │   ├── archived_changelog.0.7.x.md        # 变更日志归档 v0.7.x
 │   │   │   ├── archived_plan.0.7.x.md             # 实现计划归档 v0.7.x
 │   │   │   ├── archived_review-findings.0.7.x.md  # 自审记录归档 v0.7.x
@@ -551,18 +551,18 @@ investor-util/
 │   │   │       ├── llm-hallucination-report_expert-review.md           # LLM 幻觉率采样报告（expert_review 模块）
 │   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
 │   │   │       └── llm-hallucination-sample-output_expert-review.txt   # 幻觉采样 LLM 原始输出样本
-│   │   ├── v0.8.x/                           # v0.8.x 版本文档归档
+│   │   ├── v0.8.x/                           # v0.8.x 版本归档
 │   │   │   ├── tiantian-split/               #   tiantian.py 大文件拆分记录
-│   │   │   │   └── tiantian-split.md
+│   │   │   │   └── tiantian-split.md          #     tiantian.py 拆分记录
 │   │   │   ├── fundstyle-split/               #   fund_style_analysis.py 大文件拆分记录
-│   │   │   │   └── fundstyle-split.md
+│   │   │   │   └── fundstyle-split.md         #     fund_style_analysis.py 拆分记录
 │   │   │   ├── datasource-matrix/             #   数据源可用性矩阵实现记录
-│   │   │   │   └── datasource-matrix.md
+│   │   │   │   └── datasource-matrix.md       #     数据源可用性矩阵实现记录
 │   │   │   ├── datasource-reliability-documentation/   #   数据源可靠性文档
-│   │   │   │   └── datasource-reliability-documentation.md
+│   │   │   │   └── datasource-reliability-documentation.md # 数据源可靠性文档
 │   │   │   ├── perf-benchmark/               #   性能基准体系（自动计时/回归检测/趋势工具）
-│   │   │   │   ├── perf-completion-summary.md #     归档摘要
-│   │   │   │   └── perf-design-and-verification.md # 设计方案
+│   │   │   │   ├── perf-completion-summary.md #     性能基准体系归档摘要
+│   │   │   │   └── perf-design-and-verification.md # 性能基准体系设计方案
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
