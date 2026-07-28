@@ -35,7 +35,7 @@ from src.python.code_utils import (
     is_otc_fund_by_name,
     is_qdii_extended,
 )
-from src.python.fetcher.fund import fetch_fund_holdings
+from src.python.fetcher.fund import fetch_fund_holdings_batch
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.models import Holding
 from src.python.report.market_value import DetailRow
@@ -585,18 +585,25 @@ def _merge_fund_layer(
     funds: list[Holding],
     detail_map: dict[str, float],
 ) -> tuple[dict[str, Any], float, int, list[dict[str, str]]]:
-    """合并基金层穿透，返回 merged 字典 + 统计值。"""
+    """合并基金层穿透，返回 merged 字典 + 统计值。
+
+    批量并行获取所有基金持仓。
+    """
     merged: dict[str, Any] = {}
     unknown_mv = 0.0
     failed_count = 0
     failed_fund_details: list[dict[str, str]] = []
+
+    # ── 批量并行获取所有基金持仓（替换原串行循环内 fetch_fund_holdings） ──
+    fund_codes = [f.code for f in funds]
+    holdings_batch = fetch_fund_holdings_batch(fund_codes)
 
     for fund in funds:
         fund_mv = detail_map.get(fund.code, 0.0)
         ftype = classify_penetration(fund)
         tag = _fund_type_tag(ftype)
 
-        holdings_data = fetch_fund_holdings(fund.code)
+        holdings_data = holdings_batch.get(fund.code)
         # 同页面顺带获取基金经理数据并缓存，供 B2 基金经理变更监控使用
         _prefetch_manager_data(fund.code)
 

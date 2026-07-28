@@ -392,6 +392,202 @@ class TestConstants:
 
 
 # ═══════════════════════════════════════════════════════════
+#  DegradationTracker — record_aggregated() 聚合降级
+# ═══════════════════════════════════════════════════════════
+
+
+class TestRecordAggregated:
+    """聚合降级记录（ratio+severity, 同 source_key+tier 去重）。"""
+
+    def test_ratio_low_severity(self):
+        """3/15 → ratio=0.2, severity='low'。"""
+        tracker = DegradationTracker()
+        tracker.record_aggregated(
+            "batch_fund_rank", "T2",
+            failed_count=3, total_count=15,
+            codes=["001", "002", "003"],
+            message="3/15 个基金排名不可用",
+        )
+        log = tracker.get_log()
+        assert len(log) == 1
+        detail = log[0]["detail"]
+        assert detail is not None
+        assert detail["failed_count"] == 3
+        assert detail["total_count"] == 15
+        assert detail["ratio"] == 0.2
+        assert detail["severity"] == "low"
+        assert detail["message"] == "3/15 个基金排名不可用"
+
+    def test_ratio_high_severity(self):
+        """15/15 → ratio=1.0, severity='high'。"""
+        tracker = DegradationTracker()
+        tracker.record_aggregated(
+            "batch_industry", "T2",
+            failed_count=15, total_count=15,
+            codes=[str(i) for i in range(15)],
+            message="全部行业代码不可用",
+        )
+        log = tracker.get_log()
+        assert len(log) == 1
+        detail = log[0]["detail"]
+        assert detail["ratio"] == 1.0
+        assert detail["severity"] == "high"
+
+    def test_ratio_zero_when_total_zero(self):
+        """total_count=0 → ratio=0.0, severity='low'（避免除零）。"""
+        tracker = DegradationTracker()
+        tracker.record_aggregated(
+            "batch_test", "T3",
+            failed_count=0, total_count=0,
+            codes=[],
+            message="无资产",
+        )
+        log = tracker.get_log()
+        assert log[0]["detail"]["ratio"] == 0.0
+        assert log[0]["detail"]["severity"] == "low"
+
+    def test_detail_fields_in_get_log(self):
+        """get_log() 输出包含完整 detail 字段。"""
+        tracker = DegradationTracker()
+        tracker.record_aggregated(
+            "batch_fund", "T2",
+            failed_count=2, total_count=10,
+            codes=["a", "b"],
+            message="2/10",
+        )
+        log = tracker.get_log()
+        entry = log[0]
+        # 核心字段完整
+        assert entry["source_key"] == "batch_fund"
+        assert entry["tier"] == "T2"
+        assert entry["success"] is False
+        assert entry["failure_type"] == "aggregated"
+        assert entry["degraded"] is True
+        assert entry["count"] == 2
+        assert entry["effective_threshold"] == 1
+        assert isinstance(entry["timestamp"], float)
+        # detail 子字段
+        assert entry["detail"]["failed_count"] == 2
+        assert entry["detail"]["total_count"] == 10
+        assert entry["detail"]["ratio"] == 0.2
+        assert entry["detail"]["severity"] == "low"
+        assert entry["detail"]["message"] == "2/10"
+
+    def test_dedup_same_source_and_tier(self):
+        """同 (source_key, tier) 第二次调用替换前一条，不追加。"""
+        tracker = DegradationTracker()
+        tracker.record_aggregated(
+            "batch_fund", "T2",
+            failed_count=3, total_count=10,
+            codes=["a", "b", "c"],
+            message="第一轮",
+        )
+        tracker.record_aggregated(
+            "batch_fund", "T2",
+            failed_count=1, total_count=10,
+            codes=["d"],
+            message="第二轮（替换）",
+        )
+        log = tracker.get_log()
+        assert len(log) == 1, "同 (source_key, tier) 应替换而非追加"
+        assert log[0]["detail"]["message"] == "第二轮（替换）"
+        assert log[0]["detail"]["failed_count"] == 1
+        assert log[0]["count"] == 1
+
+    def test_dedup_different_tier_not_replaced(self):
+        """不同 tier 的同 source_key 各自保留。"""
+        tracker = DegradationTracker()
+        tracker.record_aggregated(
+            "batch_source", "T2",
+            failed_count=5, total_count=10,
+            codes=["a"], message="T2 降级",
+        )
+        tracker.record_aggregated(
+            "batch_source", "T3",
+            failed_count=2, total_count=10,
+            codes=["b"], message="T3 降级",
+        )
+        log = tracker.get_log()
+        assert len(log) == 2
+        assert log[0]["detail"]["message"] == "T2 降级"
+        assert log[1]["detail"]["message"] == "T3 降级"
+
+    def test_dedup_different_source_not_replaced(self):
+        """不同 source_key 的同 tier 各自保留。"""
+        tracker = DegradationTracker()
+        tracker.record_aggregated(
+            "source_a", "T2",
+            failed_count=3, total_count=10,
+            codes=["a"], message="A",
+        )
+        tracker.record_aggregated(
+            "source_b", "T2",
+            failed_count=4, total_count=10,
+            codes=["b"], message="B",
+        )
+        log = tracker.get_log()
+        assert len(log) == 2
+
+    def test_mixed_with_regular_record(self):
+        """record_aggregated 与 record() 的事件互不干扰。"""
+        tracker = DegradationTracker()
+        tracker.record("src_normal", "T2", success=True)
+        tracker.record_aggregated(
+            "src_batch", "T2",
+            failed_count=3, total_count=10,
+            codes=["x"], message="批量",
+        )
+        log = tracker.get_log()
+        assert len(log) == 2
+        # 普通 record 无 detail
+        assert log[0]["detail"] is None
+        # 聚合 record 有 detail
+        assert log[1]["detail"] is not None
+        assert log[1]["detail"]["failed_count"] == 3
+
+    def test_zero_failures_no_aggregated_call(self):
+        """0 失败时调用方不应调用 record_aggregated（验证边界安全）。"""
+        tracker = DegradationTracker()
+        # 调用方逻辑：if failed_count > 0: tracker.record_aggregated(...)
+        # 此处模拟不调用后的状态
+        assert len(tracker.get_log()) == 0
+        # 显示调用 0 失败也应正常工作
+        tracker.record_aggregated(
+            "batch_test", "T2",
+            failed_count=0, total_count=10,
+            codes=[],
+            message="全部成功",
+        )
+        log = tracker.get_log()
+        assert len(log) == 1
+        assert log[0]["detail"]["ratio"] == 0.0
+
+    def test_thread_safe(self):
+        """多线程并发 record_aggregated 不抛异常。"""
+        import concurrent.futures
+
+        tracker = DegradationTracker()
+
+        def _agg(idx: int):
+            source = f"source_{idx % 3}"
+            tracker.record_aggregated(
+                source, "T2",
+                failed_count=idx % 5, total_count=10,
+                codes=[f"code_{idx}"],
+                message=f"batch {idx}",
+            )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+            list(ex.map(_agg, range(30)))
+
+        # 验证无异常，每种 source 至多一条 aggregated 记录
+        log = tracker.get_log()
+        agg_events = [e for e in log if e["failure_type"] == "aggregated"]
+        # 去重后只有 3 个 source（%3），各自保留最后一条
+        assert len(agg_events) == 3
+
+
+# ═══════════════════════════════════════════════════════════
 #  get_tracker() 单例工厂 + get_log() + reset_tracker()
 # ═══════════════════════════════════════════════════════════
 

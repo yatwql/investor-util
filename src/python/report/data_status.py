@@ -46,7 +46,12 @@ DataStatus = dict[str, DataStatusItem]
 class DegradationEvent:
     """单次降级记录事件。
 
-    每次 record() 调用产生一个事件，供 get_log() 汇总为 LLM 可消费的结构化列表。
+    每次 record() 或 record_aggregated() 调用产生一个事件，
+    供 get_log() 汇总为 LLM 可消费的结构化列表。
+
+    detail 字段为可选字典，用于承载 record_aggregated() 的聚合信息
+    （failed_count / total_count / ratio / severity / message）。
+    纯 record() 调用不设 detail，保持向后兼容。
     """
 
     source_key: str
@@ -57,6 +62,7 @@ class DegradationEvent:
     count: int
     effective_threshold: int
     timestamp: float
+    detail: dict | None = None  # 聚合降级扩展信息
 
 
 # ── 消息常量 ──────────────────────────────────
@@ -305,6 +311,7 @@ class DegradationTracker:
                     "count": e.count,
                     "effective_threshold": e.effective_threshold,
                     "timestamp": e.timestamp,
+                    "detail": e.detail,
                 }
                 for e in self._events
             ]
@@ -313,6 +320,78 @@ class DegradationTracker:
         """清空事件日志（测试用）。"""
         with self._lock:
             self._events.clear()
+
+    # ── 聚合降级记录 ──
+
+    def record_aggregated(
+        self,
+        source_key: str,
+        tier: str,
+        *,
+        failed_count: int,
+        total_count: int,
+        codes: list[str],
+        message: str,
+    ) -> None:
+        """记录一条聚合降级记录。
+
+        将批量操作中的多条失败压缩为单条降级记录，避免 N 条噪声。
+        通过 ratio + severity 区分小故障（3/15）和大故障（15/15）。
+        TD-13：同 (source_key, tier) 的后续调用替换前一条，不追加。
+
+        Args:
+            source_key: 数据源标识（如 "batch_fund_rank"）。
+            tier: 层级 "T2" / "T3" / "T4"。
+            failed_count: 失败资产数。
+            total_count: 总资产数。
+            codes: 失败资产代码列表。
+            message: 人类可读的描述（如 "3/10 个基金排名数据不可用"）。
+        """
+        ratio = failed_count / total_count if total_count > 0 else 0.0
+        severity = "high" if ratio >= 0.5 else "low"
+
+        with self._lock:
+            # TD-13：同 (source_key, tier) 去重——替换而非追加
+            for i, ev in enumerate(self._events):
+                if ev.source_key == source_key and ev.tier == tier and ev.failure_type == "aggregated":
+                    self._events[i] = DegradationEvent(
+                        source_key=source_key,
+                        tier=tier,
+                        success=False,
+                        failure_type="aggregated",
+                        degraded=True,
+                        count=failed_count,
+                        effective_threshold=1,
+                        timestamp=time.time(),
+                        detail={
+                            "failed_count": failed_count,
+                            "total_count": total_count,
+                            "ratio": round(ratio, 2),
+                            "severity": severity,
+                            "message": message,
+                        },
+                    )
+                    self._persist_dirty = True
+                    return
+
+            self._events.append(DegradationEvent(
+                source_key=source_key,
+                tier=tier,
+                success=False,
+                failure_type="aggregated",
+                degraded=True,
+                count=failed_count,
+                effective_threshold=1,
+                timestamp=time.time(),
+                detail={
+                    "failed_count": failed_count,
+                    "total_count": total_count,
+                    "ratio": round(ratio, 2),
+                    "severity": severity,
+                    "message": message,
+                },
+            ))
+            self._persist_dirty = True
 
     # ── 内部实现 ──────────────────────────────
 

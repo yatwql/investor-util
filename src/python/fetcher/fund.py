@@ -100,6 +100,116 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
     return result
 
 
+
+# ═══════════════════════════════════════════════════════════
+#  批量接口
+# ═══════════════════════════════════════════════════════════
+
+
+def fetch_fund_rankings_batch(
+    fund_codes: list[str],
+    dispatcher: Any = None,
+) -> dict[str, dict[str, Any] | None]:
+    """批量获取基金排名数据。
+
+    使用 BatchDispatcher 并行获取多只基金排名，按 fund code 返回映射。
+    支持传入外部 dispatcher 以便共享线程池；不传时内部创建并自动 shutdown。
+
+    Args:
+        fund_codes: 基金代码列表。
+        dispatcher: 可选外部 BatchDispatcher 实例，None 时内部新建。
+
+    Returns:
+        {code: 排名数据 dict} 映射，失败项为 None。
+    """
+    if not fund_codes:
+        return {}
+
+    own = dispatcher is None
+    if dispatcher is None:
+        from src.python.fetcher.batch import BatchDispatcher
+
+        dispatcher = BatchDispatcher(max_workers=3, thread_name_prefix="batch_fund_rank")
+
+    from functools import partial
+
+    from src.python.cache import get as cache_get
+    from src.python.cache import get_ttl
+
+    items = [
+        (
+            f"{_FUND_PERF_CACHE_PREFIX}{code}",
+            partial(fetch_fund_rankings, code=code),
+        )
+        for code in fund_codes
+    ]
+
+    results = dispatcher.execute_with_cache_check(
+        items,
+        cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("rank", cache_id)),
+    )
+
+    rank_map: dict[str, dict[str, Any] | None] = {}
+    for code, r in zip(fund_codes, results):
+        rank_map[code] = r.result if r.success else None
+
+    if own:
+        dispatcher.shutdown()
+    return rank_map
+
+
+def fetch_fund_holdings_batch(
+    fund_codes: list[str],
+    dispatcher: Any = None,
+) -> dict[str, dict[str, Any] | None]:
+    """批量获取基金持仓数据。
+
+    使用 BatchDispatcher 并行获取多只基金持仓，按 fund code 返回映射。
+    内部使用 fetch_fund_holdings_cached（含 session_cache），同基金跨环节去重。
+
+    Args:
+        fund_codes: 基金代码列表。
+        dispatcher: 可选外部 BatchDispatcher 实例，None 时内部新建。
+
+    Returns:
+        {code: 持仓数据 dict} 映射，失败项为 None。
+    """
+    if not fund_codes:
+        return {}
+
+    own = dispatcher is None
+    if dispatcher is None:
+        from src.python.fetcher.batch import BatchDispatcher
+
+        dispatcher = BatchDispatcher(max_workers=3, thread_name_prefix="batch_fund_hold")
+
+    from functools import partial
+
+    from src.python.cache import get as cache_get
+    from src.python.cache import get_ttl
+
+    items = [
+        (
+            f"{_FUND_HOLD_CACHE_PREFIX}{code}",
+            partial(fetch_fund_holdings_cached, code=code),
+        )
+        for code in fund_codes
+    ]
+
+    results = dispatcher.execute_with_cache_check(
+        items,
+        cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("hold", cache_id)),
+    )
+
+    hold_map: dict[str, dict[str, Any] | None] = {}
+    for code, r in zip(fund_codes, results):
+        hold_map[code] = r.result if r.success else None
+
+    if own:
+        dispatcher.shutdown()
+    return hold_map
+
+
 def fetch_fund_holdings_cached(code: str) -> dict[str, Any] | None:
     """基金持仓获取（含会话缓存），同一报告生成中同基金只获取一次。
 
