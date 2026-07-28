@@ -11,7 +11,7 @@ def _find_project_root() -> str:
     """从当前文件向上查找标记文件，确定项目根目录。
 
     查找顺序：pyproject.toml → .git（目录）。两种标记均可，找到即停。
-    不依赖目录树深度，重构移动文件不会导致路径偏移。
+    不依赖目录树深度，文件移动不会导致路径偏移。
     """
     current = os.path.dirname(os.path.abspath(__file__))
     for _ in range(20):  # 安全上限，防止意外死循环

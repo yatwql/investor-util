@@ -263,7 +263,7 @@
 <script>
 /* --- Native Canvas 2D chart renderer (multi-dataset, no external deps) --- */
 window.drawSimpleChart = function(canvasId, a, b, c) {
-    /* Backward compat: old (canvasId, labels, values, opts) → new (canvasId, datasets, opts) */
+    /* 兼容旧调用格式 (canvasId, labels, values, opts) → 新格式 (canvasId, datasets, opts) */
     var datasets, opts;
     if (Array.isArray(a) && a.length > 0 && typeof a[0] === 'object' && 'values' in a[0]) {
         datasets = a;

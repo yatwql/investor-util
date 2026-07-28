@@ -1,6 +1,6 @@
-"""TUI 命令处理器模块（精简版）— 实用工具 + 菜单调度。
+"""TUI 命令处理器模块 — 实用工具 + 菜单调度。
 
-按职责拆分后，报告生成 → handlers_report.py，缓存管理 → handlers_cache.py，
+对应关系：报告生成 → handlers_report.py，缓存管理 → handlers_cache.py，
 配置管理 → handlers_config.py。本文件保留：
   - 菜单执行调度（execute_item）
   - 通用辅助函数（_print_*、_check_*、prepare_holdings、select_holdings_file 等）

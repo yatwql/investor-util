@@ -51,7 +51,7 @@ class DegradationEvent:
 
     detail 字段为可选字典，用于承载 record_aggregated() 的聚合信息
     （failed_count / total_count / ratio / severity / message）。
-    纯 record() 调用不设 detail，保持向后兼容。
+    纯 record() 调用不设 detail。
     """
 
     source_key: str

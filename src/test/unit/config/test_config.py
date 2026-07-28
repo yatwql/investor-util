@@ -401,7 +401,7 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
     模拟场景：
       1. 写入时 os.replace 抛出异常 → 配置保持原内容
       2. 写入时 tempfile.mkstemp 成功但后续崩溃 → 临时文件被清理
-      3. 半写文件被遗留（模拟断电后重启）→ get_config 仍能返回默认值
+      3. 半写文件残留（模拟断电后重启）→ get_config 仍能返回默认值
     """
 
     def setUp(self):
@@ -462,7 +462,7 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
         self.assertEqual(payload.get("output_dir"), "/reports/original")
 
     def test_simulate_power_failure_then_recovery(self):
-        """模拟断电后重启：遗留临时文件不影响正常读取。"""
+        """模拟断电后重启：残留临时文件不影响正常读取。"""
         cfg.set_config("holdings_dir", "/before/crash")
 
         # 模拟断电：手动创建临时文件但不执行 replace

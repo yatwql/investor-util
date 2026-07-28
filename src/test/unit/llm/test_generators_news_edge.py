@@ -1,6 +1,6 @@
 """边缘测试：LLM 新闻关联分析模块 — generators_news.py
 
-TODO: 填充实际边缘测试用例。
+占位测试文件，测试用例待补充。
 """
 
 import pytest

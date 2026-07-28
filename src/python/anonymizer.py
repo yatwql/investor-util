@@ -35,7 +35,7 @@ logger = logging.getLogger("invest")
 
 _ANONYMIZATION_MODES = frozenset({"off", "code_display", "full_anonymous", "summary"})
 
-# 模式名别名映射（旧配置值 → 当前命名）
+# 模式名别名映射（别名 → 当前命名）
 _DEPRECATED_MODE_MAP: dict[str, str] = {
     "name_replace": "code_display",
     "quantity_blur": "full_anonymous",

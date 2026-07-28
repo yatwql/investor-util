@@ -273,8 +273,6 @@ def _run_fact_check(
     """对 LLM 输出执行全量事实校验（使用独立检查器）。
 
     直接调用 fact_checker 的三个独立检查器，精确统计。
-    建议语境识别已下沉到 check_symbol_existence 内部,
-    不再需要 sampler 自行分类。
 
     Returns:
         {"issues": {...}, "total_checks": int, "hallucination_rate": float, ...}

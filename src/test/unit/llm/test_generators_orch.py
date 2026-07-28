@@ -1,6 +1,6 @@
 """测试：LLM 批量编排模块 — generators_orchestrator.py
 
-TODO: 填充实际测试用例。
+占位测试文件，测试用例待补充。
 """
 
 import pytest
