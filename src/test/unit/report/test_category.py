@@ -4,7 +4,7 @@
   - _categorize_holding — 8 种分类分支全覆盖
   - write_category_sheet — 空/单条/混合持仓场景
   - _apply_profit_colors — 着色边界
-  - 三维度分类聚合一致 — 资产属性/投资分类/账户小计之和 = 总计 (R-093)
+  - 三维度分类聚合一致 — 资产属性/投资分类/账户小计之和 = 总计
 
 运行：
   cd D:/codebase/zoo/investor-util

@@ -1,13 +1,13 @@
-"""市场价值边缘场景测试 — R-090 (溢价率)、R-091 (today_profit=0)。
+"""市场价值边缘场景测试 — 溢价率/today_profit/净值空窗/时段切换。
 
 测试目标：
-  - R-090: premium 始终为占位符 "--"，所有资产溢价率列正确显示
-  - R-091: 场外基金非 T 日净值日期 → today_profit = 0
-  - R-091: tencent 场内存货始终计算 today_profit
-  - R-091: 无净值日期 → today_profit = 0
+  - premium 始终为占位符 "--"，所有资产溢价率列正确显示
+  - 场外基金非 T 日净值日期 → today_profit = 0
+  - tencent 场内资产始终计算 today_profit
+  - 无净值日期 → today_profit = 0
   - detail row 序列化溢价率列值正确
-  - R-100: 净值数据空窗期处理（_count_trading_days_back / NAV 日期缺口）
-  - R-101: 交易时段切换瞬间取价方式标签 + cache TTL 竞争行为
+  - 净值数据空窗期处理（_count_trading_days_back / NAV 日期缺口）
+  - 交易时段切换瞬间取价方式标签 + cache TTL 竞争行为
 
 运行：
   cd D:/codebase/zoo/investor-util
@@ -38,7 +38,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 class TestPremiumPlaceholder(unittest.TestCase):
-    """R-090: 溢价率始终为占位符 '--'。"""
+    """溢价率始终为占位符 '--'。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
@@ -112,7 +112,7 @@ class TestPremiumPlaceholder(unittest.TestCase):
 
 
 class TestTodayProfitEastMoneyNonTDay(unittest.TestCase):
-    """R-091: 场外基金非 T 日 → today_profit = 0。"""
+    """场外基金非 T 日 → today_profit = 0。"""
 
     def _make_market_data(self, nav_date: str, source_api: str = "eastmoney") -> dict:
         return {
@@ -155,7 +155,7 @@ class TestTodayProfitEastMoneyNonTDay(unittest.TestCase):
 
 
 class TestTodayProfitTencentAlways(unittest.TestCase):
-    """R-091: Tencent 场内资产始终计算 today_profit。"""
+    """Tencent 场内资产始终计算 today_profit。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
@@ -262,7 +262,7 @@ class TestPremiumInWriteSheet(unittest.TestCase):
 
 
 class TestCurrencyConversion(unittest.TestCase):
-    """R-096: 多币种转换正确 — 美元/港币份额处理。"""
+    """多币种转换正确 — 美元/港币份额处理。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
@@ -316,7 +316,7 @@ class TestCurrencyConversion(unittest.TestCase):
 
 
 class TestCountTradingDaysBack(unittest.TestCase):
-    """R-100: _count_trading_days_back 净值日期空窗期判定。
+    """_count_trading_days_back 净值日期空窗期判定。
 
     验证场外基金净值日期缺失时的 T-N 计算正确性，
     覆盖基金建仓期净值不可用约 3 个月的极端场景。
@@ -388,7 +388,7 @@ class TestCountTradingDaysBack(unittest.TestCase):
 
 
 class TestDeterminePriceTypeNavGap(unittest.TestCase):
-    """R-100: _determine_price_type 场外基金净值日期空窗期取价标签。"""
+    """_determine_price_type 场外基金净值日期空窗期取价标签。"""
 
     def setUp(self):
         self.td = "2026-07-01"  # Wednesday
@@ -440,7 +440,7 @@ class TestDeterminePriceTypeNavGap(unittest.TestCase):
 
 
 class TestDeterminePriceTypeSessionSwitch(unittest.TestCase):
-    """R-101: 交易时段切换瞬间 _determine_price_type 标签正确。"""
+    """交易时段切换瞬间 _determine_price_type 标签正确。"""
 
     def setUp(self):
         self.td = "2026-07-01"

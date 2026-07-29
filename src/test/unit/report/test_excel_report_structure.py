@@ -322,7 +322,7 @@ class TestExcelModuleSheets(unittest.TestCase):
                 self.fail(f"generate_excel_report 不应崩溃: {e}")
 
     def test_write_module_data_rows_has_border_fix(self):
-        """写入器函数正确使用边框样式（R-149 回归检查）。
+        """写入器函数正确使用边框样式（回归检查）。
 
         确认 excel_writer 中的写入函数设置了 cell.border，
         避免因隐式依赖导致边框缺失。

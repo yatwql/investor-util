@@ -10,6 +10,7 @@
 |:-----|:-----|:-------|
 | `test_runner.py` | 测试 | pytest 标记模式封装驱动，支持 15+ 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
+| `check-history-traces.py` | 测试 | 注释/文档字符串中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -106,6 +107,32 @@ python scripts/extract-test-failures.py                     # ③ 看详细错�
 python -m pytest <test_file>::<test_name> -v --tb=short     # ④ 单用例验证
 python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
 ```
+
+---
+
+### `check-history-traces.py` — 历史痕迹检查
+
+扫描 `src/python/` 和 `src/test/` 下所有 `.py` 文件的注释和文档字符串，检查是否含有代码历史迭代信息（来源拆分、版本号、任务编号等）。代码注释只应描述"当前是什么"，不应记录"从哪里来"。
+
+```bash
+# 检查全部
+python scripts/check-history-traces.py
+
+# 详细输出（含排除行信息）
+python scripts/check-history-traces.py -v
+
+# CI 模式（仅输出 文件名:行号，非零退出码）
+python scripts/check-history-traces.py --ci
+```
+
+**退出码含义**：
+
+| 退出码 | 含义 | 行动 |
+|:------:|:-----|:-----|
+| 0 | 全部通过 | 无需处理 |
+| 1 | HIGH/ORIGIN/VERSION 痕迹 | 必须修复后再提交 |
+| 2 | CODE（任务编号引用如 R-xxx） | 应从注释中移除 |
+| 3 | 仅 TODO/CHANGE/DEPR 级别 | 建议人工复核 |
 
 ---
 

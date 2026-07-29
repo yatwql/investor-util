@@ -391,7 +391,7 @@ class TestLlmSettingsKeyConsistency:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  R-085: config 原子写入断电恢复回归测试
+#  config 原子写入断电恢复回归测试
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -581,7 +581,7 @@ class TestValidateReportSectionOrder(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  R-164: _get_default_config_template() 与 _DEFAULT_CONFIG 一致性
+#  _get_default_config_template() 与 _DEFAULT_CONFIG 一致性
 # ═══════════════════════════════════════════════════════════════
 
 

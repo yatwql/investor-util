@@ -16,7 +16,8 @@
 退出码：
   0 — 全部通过（无可疑痕迹）
   1 — 发现高置信度痕迹（HIGH/ORIGIN/VERSION）
-  2 — 仅 LOW 级别痕迹，建议人工复核
+  2 — 发现任务编号引用（CODE），应从注释中移除
+  3 — 仅 LOW 级别痕迹，建议人工复核
 """
 
 from __future__ import annotations
@@ -288,6 +289,7 @@ def main() -> None:
 
     total_hits = 0
     high_count = 0
+    code_count = 0
     low_count = 0
     summary: dict[str, int] = {}
 
@@ -309,6 +311,8 @@ def main() -> None:
                 is_high = cat in ("HIGH", "ORIGIN", "VERSION")
                 if is_high:
                     high_count += 1
+                elif cat == "CODE":
+                    code_count += 1
                 else:
                     low_count += 1
 
@@ -330,15 +334,15 @@ def main() -> None:
     print(f"[!] 发现 {total_hits} 处可疑痕迹（{cat_stats}）")
     if high_count > 0:
         print(f"    {high_count} 处高置信度（HIGH/ORIGIN/VERSION），建议优先审查")
-        print()
-        print("    高置信度模式通常对应：")
-        print("    - docstring 标注「从XX.py拆分」 → 应改为「XX模块」")
-        print("    - 注释标注「已迁至XX.py」 → 删除迁移动态")
-        print("    - 注释标注版本号 → 删除版本信息")
         sys.exit(1)
 
-    print(f"[!] 仅 {low_count} 处 LOW 级别痕迹（TODO/CHANGE/DEPR），建议人工复核")
-    sys.exit(2)
+    if code_count > 0:
+        print(f"    {code_count} 处任务编号引用（CODE），应从注释中移除")
+        sys.exit(2)
+
+    if low_count > 0:
+        print(f"[!] 仅 {low_count} 处 LOW 级别痕迹（TODO/CHANGE/DEPR），建议人工复核")
+        sys.exit(3)
 
 
 if __name__ == "__main__":
