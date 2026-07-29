@@ -34,7 +34,7 @@
 
 | # | 分类 | 文件 | 说明 |
 |---|------|------|------|
-| **rf-106** | 测试覆盖缺口 | 10+ 模块无对应测试 | `analysis/alignment_correction.py`、`circuit_breaker_wrapper.py`、`drawdown_warning.py`、`llm/fallback.py`、`llm/prompts_core.py`、`cache/_io.py`、`cache/services/holdings_tracker.py`、`report/excel_b_series.py` 等 |
+| ~~**rf-106**~~ | 测试覆盖缺口 | 10+ 模块无对应测试 | **已修复**：在 `test-coverage.md` 新增"已知覆盖缺口"章节（§已知覆盖缺口），系统化登记无测试模块清单及风险等级 |
 
 ---
 

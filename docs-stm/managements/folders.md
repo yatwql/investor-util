@@ -165,6 +165,7 @@ investor-util/
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
+│   │   │   ├── _history_quality.py   #   历史走势数据质量校验（提取自 portfolio_history.py）
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
 │   │   │   ├── news_correlation.py   #   新闻与持仓关联分析报告
 │   │   │   ├── orchestrator.py       #   报告编排共享层（TUI/CLI 共用）
