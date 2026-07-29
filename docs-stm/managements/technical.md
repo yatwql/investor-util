@@ -2172,7 +2172,7 @@ load_holdings(filepath)
 所有 HTTP 请求必须使用 `http_client.py` 工厂方法创建客户端实例（C5 约束），统一 SSL 配置、超时策略、连接池管理。
 
 ```python
-make_http_client(timeout=10.0) → requests.Session
+make_http_client(timeout=10.0) → httpx.Client
 ```
 
 默认超时 10s，支持 per-call 覆盖，所有 provider 模块统一使用此接口。

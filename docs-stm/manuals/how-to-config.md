@@ -65,7 +65,13 @@
     "benchmark_indices": {"sh000300": "沪深300"}
   },
 
-  // ── H. 再平衡配置 ──
+  // ── H. 业绩评价配置 ──
+  "performance_evaluation": {
+    "excess_threshold_up": 80,      // 超额收益 >= 此值 -> 上调一级
+    "excess_threshold_down": 40     // 超额收益 < 此值 -> 下调一级
+  },
+
+  // ── I. 再平衡配置 ──
   "rebalance": {
     "threshold": 0.15,
     "deviation_threshold": 0.05,
@@ -75,15 +81,15 @@
     "equity_fixed_income": {}
   },
 
-  // ── I. 流动性配置 ──
+  // ── J. 流动性配置 ──
   "redemption_limits": {},
 
-  // ── J. 匿名化配置 ──
+  // ── K. 匿名化配置 ──
   "anonymization": {
     "mode": "off"
   },
 
-  // ── K. 批量并行调度 ──
+  // ── L. 批量并行调度 ──
   "batch": {
     "max_total_workers": 15,
     "fund_workers": 3,
@@ -129,6 +135,8 @@
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
 | `history.benchmark_indices` | `{"sh000300": "沪深300"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
+| `performance_evaluation.excess_threshold_up` | `80` | 超额收益 ≥ 此值（百分点）时基金业绩评级上调一级 | 手动编辑 |
+| `performance_evaluation.excess_threshold_down` | `40` | 超额收益 < 此值（百分点）时基金业绩评级下调一级 | 手动编辑 |
 | `rebalance.threshold` | `0.15` | 单品种权重超限阈值（15%），超限触发再平衡建议 | 手动编辑 |
 | `rebalance.deviation_threshold` | `0.05` | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 | 手动编辑 |
 | `rebalance.profile` | `"moderate"` | 预设阈值集：conservative（保守 10%/3%）/ moderate（稳健 15%/5%）/ aggressive（进取 25%/8%）/ custom（自定义） | 手动编辑 |
@@ -479,7 +487,22 @@
 > **数据获取链路**：基准指数通过 `fetch_index_history()` → `history_index` chain → 腾讯 K 线 / 新浪 K 线（与组合持仓的个股 K 线共享熔断器）。数据写入缓存键 `history_index_{code}.json`。
 
 ---
-### H. 再平衡配置
+### H. 业绩评价配置
+
+#### performance_evaluation 基金业绩评级
+
+`performance_evaluation` 段控制基金业绩评级的超额收益阈值，用于 `fund_performance.py` 对持仓基金进行业绩评级判定。
+
+| 键 | 默认值 | 说明 |
+|:---|:------:|:-----|
+| `performance_evaluation.excess_threshold_up` | `80` | 超额收益 ≥ 此值（百分点）时评级上调一级 |
+| `performance_evaluation.excess_threshold_down` | `40` | 超额收益 < 此值（百分点）时评级下调一级 |
+
+超额收益 = 基金区间收益率 - 基准指数区间收益率。评级调整分为五档（低→较低→中等→较高→高），每个百分点差距触发一次调整。
+
+---
+
+### I. 再平衡配置
 
 #### threshold 品种权重超限阈值
 
@@ -531,7 +554,7 @@
 空对象 `{}` 表示不启用此项检查。
 
 ---
-### I. 流动性配置
+### J. 流动性配置
 
 #### redemption_limits 场外基金赎回上限
 
@@ -549,7 +572,7 @@
 配置后程序可计算场外品种全量赎回所需天数。未配置的品种在报告中标记"需手动确认赎回上限"。
 
 ---
-### J. 匿名化配置
+### K. 匿名化配置
 
 #### anonymization.mode 匿名化模式
 
@@ -565,7 +588,7 @@
 通过 TUI 主菜单 `[A]` 配置持仓匿名化可交互切换。
 
 ---
-### K. 批量并行调度
+### L. 批量并行调度
 
 #### batch 池配置
 
@@ -600,7 +623,7 @@
 值为 0 表示不限速。配置后可通过菜单 `R` 刷新配置立即生效，无需重启程序。
 
 ---
-### L. 功能开关（features.json）
+### M. 功能开关（features.json）
 
 `data/config/features.json` 提供 28 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
@@ -630,7 +653,7 @@
 > 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---
-### M. 缓存分组
+### N. 缓存分组
 
 所有缓存模块归入两个分组，控制菜单命令的缓存清除范围：
 

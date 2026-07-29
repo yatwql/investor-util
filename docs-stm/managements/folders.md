@@ -225,6 +225,7 @@ investor-util/
 │       │   │   ├── __init__.py       #       子包标记
 │       │   │   ├── test_bond_yield.py         #   无风险利率获取
 │       │   │   ├── test_bond_yield_edge.py    #   无风险利率边缘场景
+│       │   │   ├── test_circuit_breaker_wrapper.py #   断路器包装器测试
 │       │   │   ├── test_fx_exposure.py        #   外汇敞口分析
 │       │   │   ├── test_liquidity.py          #   流动性分析：场内品种变现天数
 │       │   │   ├── test_liquidity_edge.py     #   流动性分析：边缘场景
@@ -232,6 +233,7 @@ investor-util/
 │       │   │   ├── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景
 │       │   │   ├── test_rebalance.py          #   再平衡信号计算
 │       │   │   ├── test_rebalance_edge.py     #   再平衡边缘场景
+│       │   │   ├── test_scenario.py           #   情景分析测试
 │       │   │   ├── test_alignment_correction.py #   口径修正因子计算
 │       │   │   └── test_drawdown_warning.py   #   回撤历史分位预警
 │       │   ├── config/              #   配置单元测试
@@ -248,6 +250,9 @@ investor-util/
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_cache.py            #   缓存引擎测试
 │       │   │   ├── test_cache_edge.py       #   缓存引擎边缘场景
+│       │   │   ├── test_cache_cleanup.py    #   缓存清理测试
+│       │   │   ├── test_cache_core.py       #   缓存核心功能测试
+│       │   │   ├── test_cache_format.py     #   缓存格式测试
 │       │   │   ├── test_code_utils.py       #   证券代码工具测试
 │       │   │   ├── test_filesystem_edge.py  #   文件系统边缘场景
 │       │   │   ├── test_http_client.py      #   HTTP 客户端测试
@@ -261,12 +266,13 @@ investor-util/
 │       │   │   ├── test_reader.py           #   持仓文件读取测试
 │       │   │   ├── test_registry.py         #   中央注册表测试
 │       │   │   ├── test_registry_edge.py    #   注册表边缘场景
-│       │   │   ├── test_scenario.py         #   情景分析测试
+│       │   ├── cache/               #   缓存单元测试
+│       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_cache_io.py         #   缓存 IO 测试
 │       │   │   ├── test_holdings_tracker.py #   持仓快照缓存追踪器
-│       │   │   ├── test_low_risk_modules.py #   批量低风险模块覆盖
 │       │   ├── fetcher/             #   数据获取单元测试
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_api_edge.py         #   API 获取边缘场景
+│       │   │   ├── test_fetcher_api_edge.py  #   API 获取边缘场景
 │       │   │   ├── test_batch.py            #   批量调度单元测试
 │       │   │   ├── test_chain.py            #   数据链主链路测试
 │       │   │   ├── test_chain_edge.py       #   数据链边缘场景
@@ -282,12 +288,6 @@ investor-util/
 │       │   │   └── test_handlers_report.py #   报告生成命令处理测试
 │       │   ├── llm/                 #   LLM 单元测试
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_api.py                #   LLM API 主入口测试
-│       │   │   ├── test_api_base.py           #   LLM API 基类测试
-│       │   │   ├── test_api_base_edge.py      #   API 基类边缘场景
-│       │   │   ├── test_api_edge.py           #   API 边缘场景
-│       │   │   ├── test_api_multi.py          #   多 Provider API 测试
-│       │   │   ├── test_api_multi_edge.py     #   多 Provider 边缘场景
 │       │   │   ├── test_cache_multi.py        #   多 Provider 缓存测试
 │       │   │   ├── test_circuit_breaker_edge.py  #   LLM 熔断器边缘场景
 │       │   │   ├── test_circuit_breaker_recovery.py # 熔断恢复测试
@@ -301,17 +301,26 @@ investor-util/
 │       │   │   ├── test_fact_checker.py       #   事实校验器测试
 │       │   │   ├── test_fingerprint.py        #   缓存指纹测试
 │       │   │   ├── test_generators.py         #   全局提示词生成测试
-│       │   │   ├── test_generators_news.py    #   新闻提示词生成测试
-│       │   │   ├── test_generators_news_edge.py #   新闻提示词边缘场景
-│       │   │   ├── test_generators_orch.py    #   多轮对话编排测试
-│       │   │   ├── test_generators_orch_edge.py #   编排边缘场景
 │       │   │   ├── test_integration_multi.py  #   多 Provider 集成测试
 │       │   │   ├── test_llm.py                #   LLM 模块通用测试
+│       │   │   ├── test_llm_analysis.py       #   LLM 分析测试
+│       │   │   ├── test_llm_api.py            #   LLM API 主入口测试
+│       │   │   ├── test_llm_api_base.py       #   LLM API 基类测试
+│       │   │   ├── test_llm_api_base_calls.py #   LLM API 基类调用测试
+│       │   │   ├── test_llm_api_base_edge.py  #   API 基类边缘场景
+│       │   │   ├── test_llm_api_edge.py       #   API 边缘场景
+│       │   │   ├── test_llm_api_multi.py      #   多 Provider API 测试
+│       │   │   ├── test_llm_api_multi_edge.py #   多 Provider 边缘场景
 │       │   │   ├── test_llm_content.py        #   LLM 内容写入测试
 │       │   │   ├── test_llm_fallback.py       #   LLM 降级回退策略
+│       │   │   ├── test_llm_generators.py     #   LLM generators 测试
 │       │   │   ├── test_llm_placeholder.py    #   LLM 占位内容测试
 │       │   │   ├── test_llm_placeholder_distinction_edge.py # 占位区分边缘场景
+│       │   │   ├── test_llm_prompts.py        #   LLM 提示词测试
+│       │   │   ├── test_llm_session.py        #   LLM 会话测试
+│       │   │   ├── test_llm_utils.py          #   LLM 工具函数测试
 │       │   │   ├── test_prompts.py            #   提示词库测试
+│       │   │   ├── test_prompts_core.py       #   提示词核心测试
 │       │   │   ├── test_session.py            #   会话管理测试
 │       │   │   ├── test_skeleton.py           #   内容骨架生成测试
 │       │   │   └── test_strategy.py           #   策略引擎测试

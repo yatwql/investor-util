@@ -329,7 +329,7 @@ python scripts/diagnose_gemini_proxy.py
 
 ## CLI 模式
 
-### `--check-sources` — 数据源健康检查
+### `check-sources` — 数据源健康检查
 
 跳过 TUI 交互界面，直接测试各数据源联通性并报告延迟。
 
@@ -346,7 +346,7 @@ python -m src.python.cli check-sources
   ✅  腾讯财经      行情           45ms  正常
   ✅  新浪财经      行情           82ms  正常
   ⚠️  天天基金      持仓/排名     2.3s  响应慢
-  ❌  akshare       资金           timeout  连接超时
+  ❌  财联社        新闻           timeout  连接超时
 ```
 
 **检查覆盖范围**：腾讯财经行情、新浪财经行情、东方财富净值、天天基金持仓/排名、东方财富行业分类、新浪财经新闻、东方财富新闻、华尔街见闻、财联社、腾讯 K 线——共 **10 个端点**。
