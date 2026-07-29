@@ -184,7 +184,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 单元测试系列（`unit` / `standard`）
 
-- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（11 个子组：providers、fetcher、llm、news、report、config、core、analysis、ui、cli），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
+- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（11 个子组：providers、fetcher、llm、news、report、config、core、analysis、handlers、ui、cli），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
 - **`--mode standard`** 在 `unit` 基础上排除 edge（异常边界）和 data（数据正确性）两个跨类标记，仅保留"常规路径"的单元测试。适用于日常开发中快速验证模块本身逻辑正确，不需要关心边界情况。
 
 #### 🔷 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
@@ -213,7 +213,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 #### 🔷 全量（`all`）
 
 - **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 3min，作为发布门禁。
-- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试（3741+ 项，~6.5min）。需要全覆盖时手动调用。
+- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试（3847 项，~6.5min）。需要全覆盖时手动调用。
 - **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
 
 #### 🔷 多模式组合
@@ -366,6 +366,7 @@ pytest src/test/ -m "<对应标记>" --lf
 | `unit_config` | 配置管理 |
 | `unit_core` | 核心基础设施（缓存/模型/注册表等） |
 | `unit_analysis` | 分析计算（流动性/再平衡/汇率/债券收益率/情景） |
+| `unit_handlers` | 命令处理器（缓存刷新/配置写入/报告确认） |
 | `unit_ui` | TUI 交互 |
 | `unit_cli` | CLI 命令行模式 |
 | `unit_providers or unit_fetcher` | 数据管道（Provider + 调度） |
