@@ -646,7 +646,5 @@ def get_registry() -> DataSourceRegistry:
     return DataSourceRegistry()
 
 
-# ── PhaseTimeout 已提取至 _phase_timeout.py 子模块 ──────
-# phase_timeout / _PhaseTimeoutContext / _PhaseTimeoutState
-# 均已迁至 src/python/_phase_timeout.py，满足 C14 约束。
+# ── PhaseTimeout（定义于 _phase_timeout.py）────────────
 # 测试隔离：_phase_timeout._phase_timeout.reset()

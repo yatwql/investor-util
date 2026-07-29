@@ -1,7 +1,5 @@
 """新浪财经 API — 历史 K 线数据。
 
-从 sina.py 中提取的 K 线相关函数（rf-84 大文件拆分）。
-
 使用 sina 模块中的 make_http_client 和 is_index_code（lazy import），
 确保现有测试的 patch("src.python.providers.sina.make_http_client") 和
 patch("src.python.providers.sina.is_index_code") 继续生效。

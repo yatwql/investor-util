@@ -1,7 +1,6 @@
 """新闻去重模块 — 标题模糊去重 + 实体 bigram 辅助判定 + 锚点采集。
 
 包含 _dedup_by_title 去重核心逻辑及其依赖的所有常量和辅助函数。
-从 news_aggregator.py 分离，降低模块复杂度 (rf-83)。
 """
 
 from __future__ import annotations
