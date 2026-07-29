@@ -1,6 +1,6 @@
 # LLM 集成层技术设计
 
-> 文档版本：v0.8.11-dev-dev
+> 文档版本：v0.8.11-dev
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
