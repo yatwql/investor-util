@@ -51,17 +51,19 @@ PATTERNS: list[tuple[str, str, str]] = [
     # ═══ HIGH：明确的历史变更痕迹 ═══
     #   命中即违规——注释中不应出现这类内容。
     #
-    (r"从[\w._\-]++\.py\s*(?:拆分|提取|迁移|合并|移[入出至到])", "HIGH",
-     "显式来源叙述（从XX.py拆分/提取/迁移）"),
-    (r"(?:拆分|提取|分离)[自到][\w._\-]+\.py", "HIGH",
-     "来源叙述（拆分自/提取到XX.py）"),
+    (r"从[\w._\-]+\.py\s*(?:拆分|提取|迁移|合并|分离|移[入出至到])", "HIGH",
+     "显式来源叙述（从XX.py拆分/提取/迁移/合并）"),
+    (r"合并[自到][\w._\-]+\.py", "HIGH",
+     "合并自XX.py（暗示从其他文件合并而来）"),
+    (r"(?:拆分|提取|分离)[自到成为][\w._\-]+\.py", "HIGH",
+     "来源叙述（拆分自/分离为XX.py）"),
     (r"已迁[至到]\s*[\w._\-]+\.py", "HIGH",
      "已迁至XX.py（旧代码所在注释）"),
     (r"从原[\w._\-]+\.py\s*(?:合并|迁[入移])", "HIGH",
      "从原文件合并/迁入"),
     (r"(?<!原)\.py\s*(?:拆分|迁移)(?:至此|到此)", "HIGH",
      "拆分/迁移到此文件"),
-    (r"(?:共同|原有).*?(?:职责|功能|逻辑).*?(?:拆分|提取|迁移)(?:至此|到此)", "HIGH",
+    (r"(?:共同|原有).*?(?:职责|功能|逻辑).*?(?:拆分|提取|迁移|分离)(?:至此|到此)", "HIGH",
      "职责/功能迁移到此"),
     (r"自[\w._\-]+\.py\s*(?:拆分|提取|迁移)", "HIGH",
      "自XX.py拆分/提取"),
@@ -70,8 +72,8 @@ PATTERNS: list[tuple[str, str, str]] = [
     # ═══ CODE：任务/编号引用 ═══
     #   代码注释中不应出现管理任务的编号（如 rf-117、plan-42）。
     #
-    (r"(?:rf|plan)-\d+", "CODE",
-     "任务编号引用（如 rf-117）"),
+    (r"(?:rf|plan|R)-\d+", "CODE",
+     "任务编号引用（如 rf-117、R-086）"),
 
     #
     # ═══ VERSION：版本号 / 发布 / 迭代标记 ═══
@@ -95,6 +97,18 @@ PATTERNS: list[tuple[str, str, str]] = [
      "本文件保留/维护内容（暗示拆分）"),
     (r"由[\w._\-]+\.py\s*(?:移[入至]|迁[入至])", "ORIGIN",
      "由XX.py迁入/移入"),
+    (r"原[\w._\-]+\.py", "ORIGIN",
+     "原XX.py（暗示代码来源）"),
+    (r"原为[\w._\-]+\.py", "ORIGIN",
+     "原为XX.py（暗示历史来源）"),
+    (r"来源于[\w._\-]+\.py", "ORIGIN",
+     "来源于XX.py（暗示代码来源）"),
+    (r"出自[\w._\-]+\.py", "ORIGIN",
+     "出自XX.py（暗示代码来源）"),
+    (r"原属[\w._\-]+\.py", "ORIGIN",
+     "原属XX.py（暗示归属变迁）"),
+    (r"是[\w._\-]+\.py\s*(?:的一部分|的组成部分)", "ORIGIN",
+     "是XX.py的一部分（暗示文件拆分关系）"),
 
     #
     # ═══ DEPR：废弃/过时标记 ═══
@@ -194,18 +208,22 @@ EXCLUDE_LINE: list[str] = [
 _COMPILED_EXCLUDE = [re.compile(p) for p in EXCLUDE_LINE]
 
 
-def _is_comment_or_docstring(line: str) -> bool:
-    """判断该行是否为注释或文档字符串内容。"""
-    stripped = line.strip()
-    if not stripped:
-        return False
-    return (
-        stripped.startswith("#")
-        or stripped.startswith('"""')
-        or stripped.startswith("'''")
-        or '"""' in stripped
-        or "'''" in stripped
-    )
+def _is_triple_quote_line(stripped: str) -> tuple[bool, bool]:
+    """判断该行是否为三引号行。
+
+    Returns:
+        (is_open_close, is_open_only)
+        is_open_close — 同一行内打开又关闭（如 \\"\\"\\"brief doc\\"\\"\\"）
+        is_open_only  — 仅打开（或仅关闭）没有在同一行闭合
+    """
+    if stripped.startswith('"""') or stripped.startswith("'''"):
+        # 检查该行是否在开头三引号之后又出现了结尾三引号
+        rest = stripped[3:]
+        close_quote = '"""' if stripped.startswith('"""') else "'''"
+        if close_quote in rest:
+            return (True, False)  # 同一行内开+关
+        return (False, True)  # 仅打开或仅关闭
+    return (False, False)
 
 
 def _is_excluded(line: str) -> bool:
@@ -224,12 +242,21 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
     except (OSError, UnicodeDecodeError):
         return hits
 
+    in_docstring = False
     for lineno, raw in enumerate(text.split("\n"), 1):
         stripped = raw.strip()
         if not stripped:
             continue
-        if not _is_comment_or_docstring(stripped):
+
+        # 检测三引号开关，切换 docstring 状态
+        is_oc, is_open = _is_triple_quote_line(stripped)
+        if is_open:
+            in_docstring = not in_docstring
+            # 开关行本身继续往下参与模式匹配
+        elif not in_docstring and not stripped.startswith("#"):
+            # 不在 docstring 内也不是注释 → 跳过
             continue
+
         if _is_excluded(stripped):
             if verbose:
                 print(f"    (excluded) L{lineno}: {stripped[:80]}")

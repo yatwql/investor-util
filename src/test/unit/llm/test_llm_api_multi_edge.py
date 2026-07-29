@@ -2,7 +2,7 @@
 
 运行：
   cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_api_multi_edge.py -v
+  python -m pytest src/test/unit/llm/test_llm_api_multi_edge.py -v
 """
 
 from __future__ import annotations

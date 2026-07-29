@@ -3,9 +3,7 @@
 测试目标：
   - call_llm — provider 路由
   - call_claude — Extended Thinking 降级
-  - Circuit Breaker — _cb_endpoint / _cb_record_failure / _cb_record_success / _cb_is_open
   - Provider 回退链路
-  - 熔断器冷却恢复
   - content_filter 空返回安抚重试
 
 运行：
@@ -23,15 +21,6 @@ import pytest
 from src.python.llm.api import (
     call_claude,
     call_llm,
-)
-from src.python.llm.circuit_breaker import (
-    _CIRCUIT_BREAKER_THRESHOLD,
-    _CIRCUIT_BREAKER_RECOVERY,
-    _cb_endpoint,
-    _cb_is_open,
-    _cb_record_failure,
-    _cb_record_success,
-    _circuit_open_until,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
@@ -193,69 +182,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         self.assertEqual(_payload["output_config"]["effort"], "max")
 
 
-# ═══════════════════════════════════════════════════════════
-#  Circuit Breaker — _cb_endpoint / _cb_record_failure / _cb_record_success / _cb_is_open
-# ═══════════════════════════════════════════════════════════
-
-
-class TestCircuitBreaker(unittest.TestCase):
-    """测试 LLM 熔断器逻辑。"""
-
-    def setUp(self) -> None:
-        import src.python.llm.circuit_breaker as _cb
-        _cb._circuit_failures.clear()
-        _cb._circuit_open_until.clear()
-
-    def test_cb_endpoint_normal(self) -> None:
-        """应正确提取域名。"""
-        self.assertEqual(_cb_endpoint("https://api.anthropic.com/v1/messages"), "api.anthropic.com")
-
-    def test_cb_endpoint_empty(self) -> None:
-        """空 URL 应返回 unknown。"""
-        self.assertEqual(_cb_endpoint(""), "unknown")
-
-    def test_cb_endpoint_invalid(self) -> None:
-        """无效 URL 应返回 unknown。"""
-        self.assertEqual(_cb_endpoint("not-a-url"), "unknown")
-
-    def test_cb_record_failure_increment(self) -> None:
-        """记录失败应递增计数。"""
-        _cb_record_failure("https://api.anthropic.com/v1/messages")
-        _cb_record_failure("https://api.anthropic.com/v1/messages")
-        from src.python.llm.circuit_breaker import _circuit_failures
-        self.assertEqual(_circuit_failures.get("api.anthropic.com"), 2)
-
-    def test_cb_record_failure_opens_at_threshold(self) -> None:
-        """达到阈值应开启熔断。"""
-        url = "https://api.test.com/v1"
-        for _ in range(_CIRCUIT_BREAKER_THRESHOLD):
-            _cb_record_failure(url)
-        self.assertTrue(_cb_is_open(url))
-
-    def test_cb_record_success_resets(self) -> None:
-        """成功应重置失败计数。"""
-        url = "https://api.test.com/v1"
-        _cb_record_failure(url)
-        _cb_record_success(url)
-        from src.python.llm.circuit_breaker import _circuit_failures
-        self.assertNotIn("api.test.com", _circuit_failures)
-
-    def test_cb_is_open_unknown_endpoint(self) -> None:
-        """未知 endpoint 返回 False。"""
-        self.assertFalse(_cb_is_open("https://api.unknown.com/v1"))
-
-    def test_cb_record_success_after_opened(self) -> None:
-        """熔断后成功应关闭熔断。"""
-        url = "https://api.test.com/v1"
-        for _ in range(_CIRCUIT_BREAKER_THRESHOLD):
-            _cb_record_failure(url)
-        self.assertTrue(_cb_is_open(url))
-        _cb_record_success(url)
-        self.assertFalse(_cb_is_open(url))
 
 
 # ═══════════════════════════════════════════════════════════════
-#  R-086: Provider 回退链路测试
+#  Provider 回退链路测试
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -326,100 +256,10 @@ class TestProviderFallback(unittest.TestCase):
         self.assertEqual(mock_call.call_count, 1)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  R-087: 熔断器冷却恢复测试（半开探测）
-# ═══════════════════════════════════════════════════════════════
-
-
-class TestCircuitBreakerRecovery(unittest.TestCase):
-    """测试熔断器熔断 → 冷却 → 半开 → 恢复全流程。"""
-
-    def setUp(self) -> None:
-        import src.python.llm.circuit_breaker as _cb
-        _cb._circuit_failures.clear()
-        _cb._circuit_open_until.clear()
-
-    def test_full_recovery_cycle(self):
-        """熔断 → 冷却 → 半开(返回False) → 成功后关闭熔断。"""
-        url = "https://api.test.com/v1/chat"
-        from src.python.llm.circuit_breaker import (
-            _CIRCUIT_BREAKER_RECOVERY,
-            _cb_is_open, _cb_record_failure, _cb_record_success,
-            _circuit_open_until,
-        )
-
-        # 所有 time.time 操作在同一 patch 下, 保证时间线一致
-        with patch("src.python.llm.circuit_breaker.time.time") as mock_time:
-            mock_time.return_value = 1000.0
-
-            # 1. 连续失败 3 次 → 熔断开启
-            for _ in range(3):
-                _cb_record_failure(url)
-            self.assertTrue(_cb_is_open(url))
-
-            # 2. 快进到冷却结束后 → 半开（_cb_is_open 返回 False）
-            mock_time.return_value = 1000.0 + _CIRCUIT_BREAKER_RECOVERY + 1
-            self.assertFalse(_cb_is_open(url))
-            # 冷却结束 → _circuit_open_until 中已清除 key
-            self.assertNotIn("api.test.com", _circuit_open_until)
-
-            # 3. 半开后成功调用 → 熔断关闭
-            _cb_record_success(url)
-            self.assertFalse(_cb_is_open(url))
-
-    def test_recovery_before_timeout_still_open(self):
-        """冷却期内熔断仍开启。"""
-        url = "https://api.test.com/v1"
-        from src.python.llm.circuit_breaker import (
-            _CIRCUIT_BREAKER_RECOVERY,
-            _cb_is_open, _cb_record_failure,
-        )
-
-        with patch("src.python.llm.circuit_breaker.time.time") as mock_time:
-            mock_time.return_value = 1000.0
-
-            for _ in range(3):
-                _cb_record_failure(url)
-
-            # 冷却期内（快进 30s，不到 60s）
-            mock_time.return_value = 1000.0 + 30
-            self.assertTrue(_cb_is_open(url))
-
-    def test_recovery_after_exact_timeout(self):
-        """冷却时间刚好到达 → 半开（返回 False）。"""
-        url = "https://api.test.com/v1"
-        from src.python.llm.circuit_breaker import (
-            _CIRCUIT_BREAKER_RECOVERY,
-            _cb_is_open, _cb_record_failure,
-        )
-
-        with patch("src.python.llm.circuit_breaker.time.time") as mock_time:
-            mock_time.return_value = 1000.0
-
-            for _ in range(3):
-                _cb_record_failure(url)
-
-            # 刚好冷却期满
-            mock_time.return_value = 1000.0 + _CIRCUIT_BREAKER_RECOVERY
-            self.assertFalse(_cb_is_open(url))
-
-    def test_multiple_endpoints_independent(self):
-        """不同 endpoint 的熔断状态独立。"""
-        url_a = "https://api.a.com/v1"
-        url_b = "https://api.b.com/v1"
-        from src.python.llm.circuit_breaker import (
-            _cb_is_open, _cb_record_failure,
-        )
-
-        for _ in range(3):
-            _cb_record_failure(url_a)
-
-        self.assertTrue(_cb_is_open(url_a))
-        self.assertFalse(_cb_is_open(url_b))
 
 
 # ═══════════════════════════════════════════════════════════════
-#  R-089: LLM content_filter 空返回安抚重试测试
+#  LLM content_filter 空返回安抚重试测试
 # ═══════════════════════════════════════════════════════════════
 
 

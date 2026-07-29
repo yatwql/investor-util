@@ -567,3 +567,263 @@ class TestLogTokenUsage(unittest.TestCase):
         from src.python.llm.api_base import _log_token_usage
 
         _log_token_usage("claude", None, "test_label")  # Should not raise
+
+
+# ═══════════════════════════════════════════════════════════════
+#  call_llm_with_retry — HTTP 错误码/内容过滤/截断
+#  使用 mock Response 对象构造，覆盖具体 HTTP 错误码场景
+# ═══════════════════════════════════════════════════════════════
+
+def _make_mock_response(status_code: int = 200, json_data: dict | None = None,
+                        usage: dict | None = None) -> MagicMock:
+    """创建模拟 httpx.Response。"""
+    if json_data is None:
+        json_data = {"content": [{"type": "text", "text": "回复"}]}
+    if usage is not None:
+        json_data["usage"] = usage
+
+    resp = MagicMock(spec=httpx.Response)
+    resp.status_code = status_code
+    resp.json.return_value = json_data
+
+    if status_code >= 400:
+        resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            f"{status_code} error",
+            request=MagicMock(),
+            response=resp,
+        )
+    else:
+        resp.raise_for_status.return_value = None
+
+    return resp
+
+
+def _default_extract(data: dict) -> str:
+    return data.get("content", [{}])[0].get("text", "")
+
+
+def _no_truncation(data: dict, mt: int) -> bool:
+    return False
+
+
+class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
+    """call_llm_with_retry — HTTP 错误码重试 + 最终失败。"""
+
+    def setUp(self) -> None:
+        self.client = MagicMock(spec=httpx.Client)
+        self.base_kw = dict(
+            label="Test", client=self.client, url="https://api.test.com/v1",
+            headers={}, payload={"model": "test"}, timeout=60, max_retries=2,
+            max_tokens=1000, config_field="max_tokens",
+            extract_fn=_default_extract, check_truncation_fn=_no_truncation,
+            provider="claude", model_name="test-model",
+        )
+        self.cb_patcher = patch("src.python.llm.api_base._cb_is_open", return_value=False)
+        self.cb_patcher.start()
+
+    def tearDown(self) -> None:
+        self.cb_patcher.stop()
+
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("src.python.llm.api_base._log_token_usage")
+    @patch("src.python.llm.api_base.track_session_usage")
+    def test_success_first_try(self, mock_track, mock_log, mock_success):
+        """首次调用成功。"""
+        usage = {"input_tokens": 10, "output_tokens": 5}
+        self.client.post.return_value = _make_mock_response(
+            200, {"content": [{"type": "text", "text": "OK"}]}, usage=usage,
+        )
+        from src.python.llm.api_base import call_llm_with_retry
+        result, u = call_llm_with_retry(**self.base_kw)
+        self.assertEqual(result, "OK")
+        self.assertEqual(u["input_tokens"], 10)
+        mock_success.assert_called_once()
+        mock_log.assert_called_once()
+        mock_track.assert_called_once()
+
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("time.sleep")
+    def test_429_then_success(self, mock_sleep, mock_success):
+        """429 → 重试 → 成功。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
+        self.client.post.side_effect = [_make_mock_response(429), succeed]
+        result, usage = call_llm_with_retry(**self.base_kw)
+        self.assertEqual(result, "OK")
+        self.assertEqual(self.client.post.call_count, 2)
+        mock_success.assert_called_once()
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    @patch("time.sleep")
+    def test_429_all_fail(self, mock_sleep, mock_failure):
+        """429 全部重试失败 → (None, None)。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        self.client.post.return_value = _make_mock_response(429)
+        result, usage = call_llm_with_retry(**self.base_kw)
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        self.assertEqual(self.client.post.call_count, 3)
+        mock_failure.assert_called_once()
+
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("time.sleep")
+    def test_503_then_success(self, mock_sleep, mock_success):
+        """503 → 重试 → 成功。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
+        self.client.post.side_effect = [_make_mock_response(503), succeed]
+        result, usage = call_llm_with_retry(**self.base_kw)
+        self.assertEqual(result, "OK")
+        self.assertEqual(self.client.post.call_count, 2)
+
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("time.sleep")
+    def test_timeout_then_success(self, mock_sleep, mock_success):
+        """超时 → 重试 → 成功。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
+        self.client.post.side_effect = [httpx.TimeoutException("timeout"), succeed]
+        result, usage = call_llm_with_retry(**self.base_kw)
+        self.assertEqual(result, "OK")
+        self.assertEqual(self.client.post.call_count, 2)
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    @patch("time.sleep")
+    def test_timeout_all_fail(self, mock_sleep, mock_failure):
+        """超时全部重试失败 → (None, None)。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        self.client.post.side_effect = httpx.TimeoutException("timeout")
+        result, usage = call_llm_with_retry(**self.base_kw)
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        self.assertEqual(self.client.post.call_count, 3)
+        mock_failure.assert_called_once()
+
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("time.sleep")
+    def test_request_error_then_success(self, mock_sleep, mock_success):
+        """网络错误 → 重试 → 成功。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
+        self.client.post.side_effect = [httpx.RequestError("reset"), succeed]
+        result, usage = call_llm_with_retry(**self.base_kw)
+        self.assertEqual(result, "OK")
+        self.assertEqual(self.client.post.call_count, 2)
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    @patch("time.sleep")
+    def test_request_error_all_fail(self, mock_sleep, mock_failure):
+        """网络错误全部重试失败 → (None, None)。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        self.client.post.side_effect = httpx.RequestError("reset")
+        result, usage = call_llm_with_retry(**self.base_kw)
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        self.assertEqual(self.client.post.call_count, 3)
+        mock_failure.assert_called_once()
+
+
+class TestCallLlmWithRetryResponseErrors(unittest.TestCase):
+    """call_llm_with_retry — 响应解析错误（不重试，立即失败）。"""
+
+    def setUp(self) -> None:
+        self.client = MagicMock(spec=httpx.Client)
+        self.base_kw = dict(
+            label="Test", client=self.client, url="https://api.test.com/v1",
+            headers={}, payload={}, timeout=60, max_retries=2,
+            max_tokens=1000, config_field="max_tokens",
+            extract_fn=_default_extract, check_truncation_fn=_no_truncation,
+            provider="claude", model_name="",
+        )
+        self.cb_patcher = patch("src.python.llm.api_base._cb_is_open", return_value=False)
+        self.cb_patcher.start()
+
+    def tearDown(self) -> None:
+        self.cb_patcher.stop()
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    def test_json_decode_error(self, mock_failure):
+        """JSON 解析失败 → 立即失败，不重试。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        resp = _make_mock_response(200, json_data={"content": [{"type": "text", "text": ""}]})
+        resp.json.side_effect = ValueError("Invalid JSON")
+        self.client.post.return_value = resp
+        result, usage = call_llm_with_retry(**self.base_kw)
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        self.assertEqual(self.client.post.call_count, 1)
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    def test_extract_returns_none(self, mock_failure):
+        """extract_fn 返回 None → 立即失败。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        def _none_extract(data):
+            return None
+        resp = _make_mock_response(200, json_data={"wrong": "format"})
+        self.client.post.return_value = resp
+        result, usage = call_llm_with_retry(**{**self.base_kw, "extract_fn": _none_extract})
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        self.assertEqual(self.client.post.call_count, 1)
+
+
+class TestCallLlmWithRetryContentFilter(unittest.TestCase):
+    """call_llm_with_retry — 空内容（内容过滤）处理。"""
+
+    def setUp(self) -> None:
+        self.client = MagicMock(spec=httpx.Client)
+        self.cb_patcher = patch("src.python.llm.api_base._cb_is_open", return_value=False)
+        self.cb_patcher.start()
+
+    def tearDown(self) -> None:
+        self.cb_patcher.stop()
+
+    def test_empty_content_returns_with_usage(self) -> None:
+        """空内容 → 返回 ("", usage) 供安抚重试。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        usage = {"input_tokens": 10, "output_tokens": 5}
+        data = {"content": [{"type": "text", "text": ""}], "usage": usage}
+        resp = _make_mock_response(200, json_data=data)
+        self.client.post.return_value = resp
+
+        result, u = call_llm_with_retry(
+            "Test", self.client, "https://api.test.com/v1",
+            {}, {}, 60, 2, 1000, "max_tokens",
+            _default_extract, _no_truncation, "claude", "",
+        )
+        self.assertEqual(result, "")
+        self.assertEqual(u["input_tokens"], 10)
+
+
+class TestCallLlmWithRetryTruncation(unittest.TestCase):
+    """call_llm_with_retry — 截断检测 + 警告追加。"""
+
+    def setUp(self) -> None:
+        self.client = MagicMock(spec=httpx.Client)
+        self.cb_patcher = patch("src.python.llm.api_base._cb_is_open", return_value=False)
+        self.cb_patcher.start()
+
+    def tearDown(self) -> None:
+        self.cb_patcher.stop()
+
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("src.python.llm.api_base._log_token_usage")
+    @patch("src.python.llm.api_base.track_session_usage")
+    def test_truncation_appends_warning(self, mock_track, mock_log, mock_success):
+        """截断 → 内容追加截断警告。"""
+        from src.python.llm.api_base import TRUNCATION_MARKER, call_llm_with_retry
+        def _truncated(data, mt):
+            return True
+        data = {"content": [{"type": "text", "text": "部分内容"}],
+                "usage": {"input_tokens": 10, "output_tokens": 800}}
+        resp = _make_mock_response(200, json_data=data)
+        self.client.post.return_value = resp
+
+        result, usage = call_llm_with_retry(
+            "Test", self.client, "https://api.test.com/v1",
+            {}, {}, 60, 2, 800, "max_tokens_expert_review",
+            _default_extract, _truncated, "claude", "",
+        )
+        self.assertIn("max_tokens_expert_review", result)
+        self.assertIn(TRUNCATION_MARKER, result)
+        self.assertIn("部分内容", result)

@@ -231,7 +231,9 @@ investor-util/
 │       │   │   ├── test_liquidity_otc.py      #   流动性分析：场外赎回天数
 │       │   │   ├── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景
 │       │   │   ├── test_rebalance.py          #   再平衡信号计算
-│       │   │   └── test_rebalance_edge.py     #   再平衡边缘场景
+│       │   │   ├── test_rebalance_edge.py     #   再平衡边缘场景
+│       │   │   ├── test_alignment_correction.py #   口径修正因子计算
+│       │   │   └── test_drawdown_warning.py   #   回撤历史分位预警
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_config.py            #   配置管理核心测试
@@ -259,7 +261,9 @@ investor-util/
 │       │   │   ├── test_reader.py           #   持仓文件读取测试
 │       │   │   ├── test_registry.py         #   中央注册表测试
 │       │   │   ├── test_registry_edge.py    #   注册表边缘场景
-│       │   │   └── test_scenario.py         #   情景分析测试
+│       │   │   ├── test_scenario.py         #   情景分析测试
+│       │   │   ├── test_holdings_tracker.py #   持仓快照缓存追踪器
+│       │   │   ├── test_low_risk_modules.py #   批量低风险模块覆盖
 │       │   ├── fetcher/             #   数据获取单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_api_edge.py         #   API 获取边缘场景
@@ -304,6 +308,7 @@ investor-util/
 │       │   │   ├── test_integration_multi.py  #   多 Provider 集成测试
 │       │   │   ├── test_llm.py                #   LLM 模块通用测试
 │       │   │   ├── test_llm_content.py        #   LLM 内容写入测试
+│       │   │   ├── test_llm_fallback.py       #   LLM 降级回退策略
 │       │   │   ├── test_llm_placeholder.py    #   LLM 占位内容测试
 │       │   │   ├── test_llm_placeholder_distinction_edge.py # 占位区分边缘场景
 │       │   │   ├── test_prompts.py            #   提示词库测试
