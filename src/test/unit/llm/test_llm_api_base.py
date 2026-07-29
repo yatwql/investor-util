@@ -643,7 +643,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
 
     @patch("src.python.llm.api_base._cb_record_success")
     @patch("time.sleep")
-    def test_429_then_success(self, mock_sleep, mock_success):
+    def test_retry_on_429_then_success(self, mock_sleep, mock_success):
         """429 → 重试 → 成功。"""
         from src.python.llm.api_base import call_llm_with_retry
         succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
@@ -655,7 +655,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
 
     @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")
-    def test_429_all_fail(self, mock_sleep, mock_failure):
+    def test_retry_on_429_all_fail(self, mock_sleep, mock_failure):
         """429 全部重试失败 → (None, None)。"""
         from src.python.llm.api_base import call_llm_with_retry
         self.client.post.return_value = _make_mock_response(429)
@@ -667,7 +667,7 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
 
     @patch("src.python.llm.api_base._cb_record_success")
     @patch("time.sleep")
-    def test_503_then_success(self, mock_sleep, mock_success):
+    def test_retry_on_503_then_success(self, mock_sleep, mock_success):
         """503 → 重试 → 成功。"""
         from src.python.llm.api_base import call_llm_with_retry
         succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})

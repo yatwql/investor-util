@@ -2,7 +2,145 @@
 
 > 归档时间：2026-07-30
 > 原始文件：`docs-stm/managements/changelog.md`
-> 涵盖版本：v0.8.0 ~ v0.8.9
+> 涵盖版本：v0.8.0 ~ v0.8.10（2026-07-21 ~ 2026-07-30）
+
+---
+
+## [0.8.10] - 2026-07-30
+
+### Added
+- **注释历史痕迹检查脚本**：新增 `scripts/check-history-traces.py`，扫描 src/ 下所有 .py 文件中的历史变更痕迹（拆分来源叙述、版本号标记、任务编号引用等），15+ 模式分类
+- **P1 门禁前置检查**：`test_runner.py verify` 模式增加 `preflight` 机制，运行测试前先执行 `check-history-traces.py --ci`，检测到历史痕迹即中断合入流程
+- **rf-72: provider_registry.py 会话缓存提取**：`DataSourceRegistry` 中的会话缓存管理逻辑提取为独立模块 `_session_cache.py`（`SessionCache` 类），provider_registry.py 从 549 行降至约 400 行
+- **rf-82: alignment_correction.py 费率估算提取**：组合费率估算逻辑提取为独立子模块 `analysis/_fee_estimation.py`，alignment_correction.py 从 577 行降至约 500 行
+- **rf-83: news_aggregator.py 去重逻辑提取**（已在上一轮 rf-47 中完成）：`news_dedup.py` 独立管理标题去重和锚点持久化，news_aggregator.py 降至 236 行
+- **rf-84: sina.py K 线函数提取**：历史 K 线获取函数提取为 `providers/sina_kline.py`，sina.py 从 507 行降至约 400 行
+- **rf-87: portfolio_history.py 数据质量校验提取**：历史走势数据质量校验（异常检测与收益率诊断）提取为 `report/_history_quality.py`，portfolio_history.py 从 597 降至 513 行
+- **rf-65: orchestrator.py 按职责拆分**：1031 行的 `orchestrator.py` 拆分为 3 个子模块——`_report_generation.py`（生成管线）、`_snapshot.py`（快照/历史走势）、`_llm_news.py`（LLM+新闻编排），orchestrator.py 降至 245 行纯编排入口
+- **rf-74: skeleton.py 批量模式提取**：批量处理逻辑提取为 `llm/_batch_mode.py`，skeleton.py 从 705 降至 532 行
+- **rf-88: html_writer.py 渲染函数提取**：14 个 HTML 子渲染函数提取到 `html_renderers.py`，保存逻辑提取到 `html_save.py`，`write_html_report()` 从 ~275 降至 ~210 行
+- **rf-100: test_llm_scenarios.py 拆分**：1202 行大测试文件按 S11-S17 场景分组拆分为 7 个子文件（`test_s11_mixed_cache.py` ~ `test_s17_partial_cache.py` + `test_llm_scenarios_misc.py`），19 个测试全部通过
+- **rf-96: test_llm.py 拆分**：2037 行大测试文件拆分为 test_llm_api.py/test_llm_generators.py/test_llm_session.py 3 个子文件
+- **rf-97: test_scenario_penetration.py 拆分**：1592 行按场景拆分为 4 个子文件（basic/advanced/mixed/edge）
+- **rf-99: test_cache.py 拆分**：1422 行拆出 test_cache_core.py/cleanup/format 3 子模块
+- **rf-73: api.py 拆分**：707 行的 `api.py` 拆分为 `_api_claude.py`（Claude）/`_api_openai.py`（OpenAI）/`_api_gemini.py`（Gemini）三个子模块，api.py 降至 521 行
+
+- **rf-131~rf-135: P2D 测试覆盖缺口补充**（5 个新测试文件，96 用例全部通过）：
+  - `test_alignment_correction.py`（21 用例）：覆盖口径修正模块 cash_stripping/twr_calculation/compute_alignment_factors
+  - `test_drawdown_warning.py`（16 用例）：覆盖滚动最大回撤/历史分位预警/集成等级判断
+  - `test_holdings_tracker.py`（14 用例）：覆盖持仓指纹 MD5 计算/代码提取/缓存刷新
+  - `test_llm_fallback.py`（17 用例）：覆盖占位文本获取/全部失败检测/降级内容构建
+  - `test_rf135_coverage.py`（28 用例）：覆盖 IndicatorBreaker/原子文件 IO/_fmt_wan 格式化/管线辅助函数/B 系列写入入口
+
+### Fixed
+- **P2B 魔数/硬编码修复（rf-90 ~ rf-95 共 6 项）**：
+  - rf-90: `report/penetration.py` `_SECTOR_KEYWORDS` ~330 行硬编码 → 迁出至 `data/knowledge/sector_keywords.json`，`_load_sector_keywords()` 加载
+  - rf-91: `fetcher/bond_yield.py` `df.columns[3]` → 改为列名匹配 `"中国国债收益率10年"`（随 C6 修复 rf-12 一并完成）
+  - rf-92: `market_hours.py` 时区硬编码 → 提取为模块级常量 `_BJ_TZ`
+  - rf-93: `providers/sina.py`/`tencent.py` K 线超时硬编码 → 提取为模块级常量 `_KLINE_TIMEOUT`
+  - rf-94: `report/fund_performance.py` 超额阈值硬编码 → 改为 `config.json` 可配置（`performance_evaluation.excess_threshold_up/down`），`_config_defaults.py` 新增对应配置段
+  - rf-95: `fetcher/fund.py` `_BUILTIN_BENCHMARKS` 13 条硬编码 → 迁出至 `data/knowledge/fund_benchmarks.json`，`_load_builtin_benchmarks()` 加载
+
+- **P2F LLM 模块技术债修复（rf-119 ~ rf-130 共 12 项，不含 rf-118）**：
+  - rf-119: `generators.py` 影子导入 — 移除 `generate_debate_procon()` 内部重复导入
+  - rf-120: `prompts_action.py` 重复 `logger` 定义 — 删除重复行
+  - rf-121: `prompts_tables.py` 未使用导入 — 移除 `is_a_share_code`、`is_hk_stock_code`
+  - rf-122: `prompts_core.py` 未使用导入 — 移除 `datetime`、`timedelta`、`timezone`
+  - rf-123: `prompts.py` `__all__` 缺失 — 补充 `_build_qa_concentration_block`
+  - rf-124: `api.py` 空白内容重试逻辑重复 — 提取共享 `_calm_retry()` 函数
+  - rf-125: `prompts_action.py` TOP3 代码重复 — 复用 `_build_top3_block()`
+  - rf-126: `api.py` thinking budget 计算重复 — 提取共享 `_resolve_thinking_budget()` 函数
+  - rf-127: `fact_checker.py` 贡献度关键词检查重复 — 提取 `_is_contribution_sentence()`
+  - rf-128: `generators_orchestrator.py` 硬编码 HTTP 连接池参数 → 模块级常量 `_LLM_MAX_CONNECTIONS`、`_LLM_MAX_KEEPALIVE`
+  - rf-129: `skeleton.py` 硬编码 `BATCH_SIZE`/`max_workers` → 模块级常量 `_BATCH_CHUNK_SIZE`、`_BATCH_MAX_WORKERS`
+  - rf-130: `api.py` 硬编码默认模型名 → 模块级常量 `_DEFAULT_CLAUDE_MODEL`、`_DEFAULT_OPENAI_MODEL`、`_DEFAULT_GEMINI_MODEL`
+
+- **P1A 架构约束违反修复（rf-17/19 — 2 项，补全前序修复）**：
+  - rf-17: `fetcher/price.py/industry.py/fund_manager.py` 添加 `session_cache_get/set` 会话缓存层，消除双管线场景下同一资产重复读取文件缓存
+  - rf-19: `provider_registry.py` 模块级全局变量（`_phase_timer`/`_phase_expired`/`_phase_timeout_lock`/`_phase_timer_name`）封装为 `_PhaseTimeoutState` 实例，使用 `contextvars.ContextVar` 管理
+
+- **P1D 函数过长批量拆分（rf-36 ~ rf-50 共 15 项）**：
+  - rf-36/rf-46: `orchestrator.py` `_generate_report_full`(~272→~85 行) 拆出 `_prepare_full_risk_metrics`/`_generate_full_html_report`/`_generate_full_excel_report`；`_fetch_llm_and_news`(~126→~64 行) 拆出 `_submit_llm_future`/`_submit_news_future`/`_collect_llm_future_result`/`_collect_news_future_result`
+  - rf-37: `portfolio_history.py` `get_combined_timeseries`(~232→~112 行) 拆出 7 个子函数
+  - rf-38: `fund_manager.py` `parse_manager_from_html`(~139→~35 行) 拆出 4 个子函数
+  - rf-39/42/45: `rebalance.py` 拆出 5 个子函数
+  - rf-40: `alignment_correction.py` 现金识别+剥离+费率估算拆分
+  - rf-41: `scenario.py` `scenario_analysis`(~123→~61 行) 拆出 `_build_scenario_entry`
+  - rf-43: `price.py` `fetch_market_data`(~97→~25 行) 拆出 3 个子函数
+  - rf-44: `fund_style_classify.py` `classify_fund_style`(~116→~30 行) 拆出 3 个子函数
+  - rf-48: `fact_checker.py` `check_numerical_consistency`(~142→~45 行) 拆出 `_evaluate_percent_value`
+  - rf-49: `skeleton.py` `generate_llm_content`(~118→~40 行) 拆出 2 个子函数
+  - rf-50: `generators_orchestrator.py` `generate_all_llm`(~166→~80 行) 拆出 3 个预检子函数
+
+- **P3 批量修复（rf-108 ~ rf-117 共 10 项）**：
+  - rf-108: `providers/__init__.py` 补充 `__all__`（21 个子模块）
+  - rf-109: `fetcher/industry.py` 删除冗余 `_is_a_share_code()` 包装
+  - rf-111: `config/_config_defaults.py` 字符串拼接改为 `_build_template_from_defaults()` dict-driven 生成
+  - rf-112: `config/_llm_defaults.py` 同上
+  - rf-113: `registry.py` `enumerate + pop` 改为 `remove + append`
+  - rf-114: `code_utils.py` 删除未使用的 `import logging` 和 `logger`
+  - rf-115: `provider_registry.py:is_chain_broken()` 未注册 provider 视为不可用（`continue` 跳过）
+  - rf-116: `eastmoney_news.py` 新增 `prev_sort_end` 游标去重守卫
+  - rf-117: `tui_handlers.py` `_busy` 标志位新增 `threading.Lock()` 保护
+  - rf-118: `generators_orchestrator.py` `_MODULE_FNS` 提升为模块级 `_build_module_fns()` 工厂函数
+
+- **P1A 架构约束违反修复（rf-15 ~ rf-22 共 6 项，不含 rf-17/19 待定）**：
+  - rf-15: `alignment_correction.py:_classify_fund_type()` 硬编码代码类型判定 → 改用 `code_utils.is_a_share_code()`/`is_hk_stock_code()`
+  - rf-16: `news_aggregator.py` 锚点文件 `data/cache/dedup_anchors.jsonl` → 迁出到 `data/calibration/`
+  - rf-18: `registry.py` 辩论模块 `DataModuleDef` 缺 `settings_suffix` → 补充 `debate_pro`/`debate_con`/`debate_synthesis`
+  - rf-20: `handlers_check_sources.py:_colored()` 缺 `NO_COLOR`/`isatty` 检查 → 新增 `_use_ansi()` 统一判断（含 rf-110 移重复 `import sys`）
+  - rf-21: `orchestrator.py` 直接赋值 `pipeline_data["risk_metrics"]` → 在 Schema 中注册 `risk_metrics`/`portfolio_daily_returns`
+  - rf-22: `pipeline_data_builder.py` 静默注册未知键 → 未注册键先 `logger.warning` 再注册
+
+- **P1B 裸异常修复（rf-23 ~ rf-30 共 8 项）**：
+  - rf-23: `config/_core.py` `_get_llm_providers_path()`/`_get_llm_key_path()` → 缩小异常范围
+  - rf-24: `reader.py:get_xlsx_info()` → 缩小为 `(FileNotFoundError, BadZipFile, InvalidFileException, OSError)`
+  - rf-25: `circuit_breaker_wrapper.py:_log_ff_event()`/`record_failure()` → 添加 `logger.debug`
+  - rf-26: `metrics.py:get_dividend_yield` → 提升日志级别到 `logger.warning`
+  - rf-27: `llm/api.py:_resolve_first_provider_model_endpoint` → 添加 `logger.debug`
+  - rf-28: `llm/skeleton.py` 两处 `except Exception: pass` → 添加 `logger.debug`
+  - rf-29: `news_aggregator.py:_flush_anchors()` `except OSError: pass` → `logger.warning`
+  - rf-30: `akshare_extras.py` 指纹/分红摘要 → 缩小异常范围
+
+- **P1C 死代码清理（rf-31 ~ rf-35 共 5 项）**：
+  - rf-31: 删除 `tui_handlers.py:check_network_available()`
+  - rf-32: 删除 `_config_defaults.py:_PATH_KEYS`
+  - rf-33: 删除 `html_jinja_env.py:_jinja_section_visible()`
+  - rf-34: 删除 `akshare_extras.py:_SECTOR_FLOW_FAILURE` 及相关赋值
+  - rf-35: 删除 `akshare_news.py:_MAX_CCTV`
+
+- **P1E 重复代码修复（rf-51 ~ rf-60 共 10 项）**：
+  - rf-51: 辩论模式检测逻辑 → 提取到 `data_status.py` 共享函数
+  - rf-52: 原子写入模式 → 提取 `_atomic_write()` 工具函数
+  - rf-53: `_ts_to_str()` 三模块重复 → 统一到 `providers/_utils.py`
+  - rf-54: `_safe_float()` 两处实现 → 统一到 `providers/_utils.py`
+  - rf-55~57: handlers 三个模块命令模式 → 提取通用辅助函数
+  - rf-58: 截断重试逻辑 → `_execute_and_merge_batch` 复用 `_handle_truncation`
+  - rf-59: 缓存命中处理 → 统一处理逻辑
+  - rf-60: `sina.py` 三处 `_pf()` → 提取为模块级私有函数
+
+- **P1F 线程安全问题修复（rf-61 ~ rf-64 共 4 项）**：
+  - rf-61: `news_aggregator.py:_last_src_results` → 新增 `_src_results_lock` 保护
+  - rf-62: `news_aggregator.py:_ANCHOR_RECORDS` → 新增 `_ANCHOR_LOCK` + `_record_anchor()` 线程安全追加
+  - rf-63: `provider_registry.py:fetch_cached_only()` → `data = dict(data)` 复制再修改
+  - rf-64: `features.py:FEATURE_FLAGS` → 新增 `_FEATURES_LOCK` 保护所有写操作
+
+- **P2D 测试质量修复（rf-101 ~ rf-105 共 5 项）**：
+  - rf-101: `test_integration.py` S4 死测试 — 修正 `fetch_market_data` mock 路径 + 补充 `is_market_open` mock，移除 `@unittest.skip`，清除重复 setUp 代码
+  - rf-102: `conftest.py` `_isolate_sensitive_paths` 补充 LLM 配置文件路径隔离（`llm_key.json`、`llm_providers.json`、`llm_settings.json`）
+  - rf-103: `test_config.py` 硬编码路径 → 改用 `get_llm_settings_path()`
+  - rf-104: `test_integration.py` 硬编码 `cache_dir = 'data/cache'` → 改用 `get_cache_dir()`
+  - rf-105: `test_datetime_scenarios.py` 测试重复 — `TestGetTtlMarketAware`（12 个测试）和 `TestClassifyHoldings`（12 个测试）参数化重构，代码减少 ~60%，覆盖不变（41 pt ✅）
+
+- **P0 技术债批量修复（rf-6 ~ rf-14 共 9 项）**：
+  - C3 原子写入（3 项）：`provider_registry._save_state()`、`features.save_feature_overrides()`、`handlers_config._write_llm_settings()` 全部改用 `tempfile.mkstemp + os.replace` 模式
+  - C18 凭据分离（2 项）：`_parse_providers_list()` 内联 api_key 改为强制 credentials_ref 并输出 WARNING，移除 `get_llm_config()` 中 `llm_settings.json` api_key 回退路径
+  - C16 路径安全（1 项）：`_PATH_CONFIG_KEYS` 补上 `llm_providers_file`
+  - C6 Chain 约束（1 项）：`bond_yield.py` 集成 akshare 熔断检查，`df.columns[3]` 改为列名匹配
+  - 封装破坏（1 项）：新增 `config._core.invalidate_config_cache()` / `invalidate_llm_config_cache()` 公共 API
+  - 死测试（1 项）：删除 4 个 `@pytest.mark.skip` 骨架占位文件
+
+- **rf-107 排查关闭**：确认 `simple_rebalance.compute_simple_rebalance_signals` 与 `rebalance.compute_rebalance_signals` 函数名已区分，无命名冲突；`simple_rebalance` 仍被 `prompts_core.py` 用于无配置依赖的轻量再平衡场景，非废弃代码，保持现状
 
 ---
 
@@ -54,7 +192,6 @@
 
 ### Fixed
 - **excel_b_series.py `NameError: _fetch_fund_holdings_cached`**：P2-6（提交 `259e4b4`）将本地私有函数 `_fetch_fund_holdings_cached` 提取到 `fetcher/fund.py` 为公开函数 `fetch_fund_holdings_cached`，删除了本地定义并更新了导入名，但调用点（`_process_b_module` 第 36 行）仍使用旧私有名 `_fetch_fund_holdings_cached`，导致 `enable_b_series=True` 且持有基金时触发 `NameError`，持仓重合度/集中度/风格分析三个模块均回退为占位。修复：导入 `fetch_fund_holdings_cached` 并修正调用名
-- **新闻去重 cross_merge_bg2 梯度规则 78% 误判**：v0.8.6 引入的 bg=2 + ratio≥0.40 梯度规则实际仅 2/9 pair 正确合并，其余 7/9 为高频金融 bigram（"指数""涨""成交""额"）导致的虚假重叠（如"N长鑫成交额1300亿"误合并为"沪深总成交额20766亿"、"港股开盘"误合并为"日经225收盘"）。移除该规则，恢复纯 bg≥3 合并条件。涉及 `news_aggregator.py`、`calibrate-dedup-threshold.py`、`test_news_sources.py`
 
 ### Changed
 - **代码/测试注释历史迭代痕迹清理（6 轮）**：全面清除源码注释、测试注释/描述、管理文档正文（changelog.md/plan.md/review-findings.md 除外）、用户文档中的所有历史变更痕迹。覆盖模式包括「不再」「向后兼容」「保留供兼容」「已废弃」「原有的」「此前」「曾」「已迁」「已拆分」「已改为」等，累计修复 50+ 处。涉及 8 个源码文件、5 个测试文件、3 份管理文档、3 份用户文档。豁免文件按约定保留历史记录
@@ -64,7 +201,6 @@
 ### Docs
 - `review-findings.md` P3-11 补充架构耦合约束脚注（C5/C6/C2/C3/1.4.2/1.4.5）
 
-
 ## [0.8.6] - 2026-07-27
 
 ### Added
@@ -73,122 +209,81 @@
 ### Fixed
 - **cost_tracker 全局预算 xdist 竞态**：`_input_budget` 和 `_budget_warned` 为模块级全局变量，xdist 并行时其他测试通过 `patch("src.python.llm.session.get_session_usage")` 污染 worker，导致 `get_budget_status()` 中 `usage.get("input_tokens", 0)` 返回 MagicMock 而非 int，`max(0, input_budget - MagicMock)` 抛出 TypeError。修复：`_auto_reset_cost_tracker` autouse fixture 增加 `reset_session_usage()` 调用，每次测试前同时重置 session 用量 + budget，确保 `get_budget_status()` 读取到干净的 int 数据；修复 4 个失败用例（`test_cost_tracker.py::TestBudgetManagement`）
 - **穿透测试 HTTP 请求遗漏 mock**：`_prefetch_manager_data()` 在 `compute_penetration_top10()` 中遍历基金调用 `fetch_fund_manager(code)`（每只基金一次 HTTP 请求），`mock_all_apis` 未 mock 该函数导致穿透性能测试实际发出 10 次网络请求耗时 17s — 在 `test_e2e_perf.py::mock_all_apis` 中补回 `patch("src.python.report.penetration.fetch_fund_manager", return_value=None)`
-- **`orchestrator.py` 历史走势获取失败时 NoneType 崩溃**：`fetch_history_data()` 可返回 `None`（数据源不可用/异常），但行 763 无条件调用 `.get()` 导致 `AttributeError` — 增加 `if history_data:` 保护，为 None 时跳过全量量化指标计算
 
 ### Changed
-- **`_extract_entity_bigrams()` 英数专名 `_tk:` 加权**：长度 ≥4 的英文专名（Anthropic/Meta/Helios 等）在实体 bigram 中额外插入 `_tk:` 前缀虚拟 bigram，使 `Anthropic+Meta` 等英数专名重叠的跨源标题即使 ratio<0.40 也能通过 bg≥3 候选区合并，无需降低 ratio 阈值；新规则下 cross_skip 从 3956 降至 10（单次运行）
-- **新闻去重跨源梯度阈值**：bg=2 且 ratio≥0.40 时合并（cross_merge_bg2），覆盖 bg=2 实体重叠少但 ratio 较高的重复案例（如"微软Azure Helios" vs "AMD+微软Azure Helios"），对应 616 条遗漏中 ~301 条被捕获
-- **`_normalize_title()` 增加孤立年份剥离**：`\b(?:19|20)\d{2}\b` 正则过滤独立 4 位年份数字（1900-2099），减少共享"2026""2025"等年份导致的 SequenceMatcher 虚高
-- **`calibrate-dedup-threshold.py` 适配新规则**：新增 cross_merge_bg2 分组统计、梯度阈值边界分析、0.35~0.40 灰色带审查提示
+- **`_extract_entity_bigrams()` 英数专名 `_tk:` 加权**：长度 ≥4 的英文专名（Anthropic/Meta/Helios 等）在实体 bigram 中额外插入 `_tk:` 前缀虚拟 bigram，使 `Anthropic+Meta` 等英数专名重叠的跨源标题即使 ratio<0.40 也能通过 bg≥3 候选区合并，无需降低 ratio 阈值
 
 ### Docs
-- **内部文档序号/组织校对**：全量审核 6 份文档并修复不一致——llm-technical.md（§2.1 去硬编码计数、§9.1 合并子节、§5.1 新增 `_call_gemini()` 图文）、how-to-start.md（示例数据段并入提示）、how-to-config.md（章节 A→J 重新排序 + 新增 risk_free_rate/rebalance/anonymization 等）、reports-instruction.md（#17/#18 序号对齐 6 处）、how-to-use-registry.md（绘图分析→历史回撤分析）、faq.md（E 菜单范围修正）
-- **config JSON/章节标题三向对齐**：`_config_defaults.py` 注释标签、config.json JSON 标签、how-to-config.md 描述三方同步为 `B. 报告章节可见性` / `F. 业绩基准与无风险利率`
-- **统计数据全量刷新**：folders.md（源码 146/39,294、测试 189/57,960、用例 3765、文档 87）、test-coverage.md（all 3765，11 子组项数同步）
-- **plan.md 与 review-findings.md 同步**：6 份 plan 子文档纳入 plan.md 分层管理（P2 ~22d / P3）；plan-engineering.md 内容登记至 review-findings.md（P3-11 HTTP 同步 / P3-13 性能基准）
-- **已实现功能状态标注**：plan-documentation.md §1（数据源可靠性文档 ✅）、plan-web-ui.md §4（数据源可用性矩阵 ✅）
-
+- **内部文档序号/组织校对**：全量审核 6 份文档并修复不一致
+- **统计数据全量刷新**：folders.md、test-coverage.md
 
 ## [0.8.5] - 2026-07-24
 
 ### Fixed
-- **CI 超时 & 退出码混乱**：`regression` 和 `verify` Phase B 的 600s 超时在 CI 慢速 runner 上频繁截断场景测试；超时退出码 `-1` 经 `sys.exit()` 转为 255，难以区分与真实崩溃 — 增加默认超时到 1200s，CI 全部加 `--no-timeout` 禁用超时，超时退出码改为标准 124
+- **CI 超时 & 退出码混乱**：增加默认超时到 1200s，CI 全部加 `--no-timeout` 禁用超时，超时退出码改为标准 124
 
 ### Changed
-- **P0 提交门禁优化**：`regression`（~6min 全场景）改 `dev-verify`（~1min 核心单元+基础场景）—— 最频繁的编辑-验证循环从 6 分钟降为 1 分钟，释放开发效率
-- **verify 模式瘦身**：移除 Phase B 场景测试（重复 P0 regression），仅保留单元测试（~50s 而非 ~5min）—— 场景测试由 P0（dev 提交）和 P2（版本发布）覆盖
-- **P2 发布门禁优化**：`all`（3741 测试，~6.5min）改 `verify,regression`（单元+场景，1306 测试，~3min）—— 减少 65% 测试量，仍覆盖核心通路
-- **`src/test/` 目录结构全面重组**：
-  - `unit/` 新增 `analysis/` 子目录：9 个分析计算测试文件从根目录移入（流动性/再平衡/汇率/债券收益率），标记 `unit_providers` → `unit_analysis`
-  - `unit/` 新增 `cli/` 子目录：`test_cli.py` / `test_cli_edge.py` 从根目录移入
-  - `unit/` `test_cost_tracker.py` 移入 `llm/`，标记 `unit_providers` → `unit_llm`
-  - `unit/` `test_orchestrator.py` 从根目录移入 `report/`
-  - `scenario/` 新增 `perf/` 和 `security/` 子目录：`test_e2e_perf.py` / `test_security.py` 从根目录移入；`test_chain_resilience.py` 移入 `resilience/`；`test_llm_hallucination.py` 移入 `llm/`
-  - `integration/`：`test_cli_integration.py` 从根目录移入
-  - `unit/conftest.py` `_DIR_TO_MARKER` 补齐 `analysis`/`cli`/`handlers` 映射，新增标记校验兜底
-  - 清理空目录 `unit/report/template/`
-  - 根目录 4 个"流浪"测试文件全部归位，`src/test/` 根目录不再有除 `conftest.py`/`helpers.py`/`__init__.py` 外的测试文件
+- **P0 提交门禁优化**：`regression`（~6min 全场景）改 `dev-verify`（~1min 核心单元+基础场景）
+- **verify 模式瘦身**：移除 Phase B 场景测试，仅保留单元测试
+- **P2 发布门禁优化**：`all`（3741 测试，~6.5min）改 `verify,regression`（单元+场景，1306 测试，~3min）
+- **`src/test/` 目录结构全面重组**：9 个分析计算测试文件从根目录移入 `unit/analysis/` 等
 
 ### Docs
-- **门禁文档同步**：CLAUDE.md、how-to-test-my-code.md（10 处）、testplan.md、test-coverage.md（verify 项数 2180→~1022）、scripts-reference.md（4 处）– 与 verify 瘦身/P2 优化对齐
-- **目录树全量同步**：`folders.md` — 更新统计（源码 143→144、测试 177→185、用例 3616→3760、文档 73→81）；展开测试子组完整目录树（unit 含 11 子组含 analysis/cli、integration 含 test_cli_integration、scenario 含 6 子组含 perf/security、data/hallucination 数据集）；补充 `_validation.py`、`__init__.py`、`.github/workflows/ci.yml`、`pytest.ini`、`reason.bat` 等新文件；清理冗余版本描述
-- **测试重组同步**：CLAUDE.md C12 示例路径加 `unit/analysis/` 前缀；testplan.md P0 引用 `regression` → `dev-verify` + hallucination 路径更新；test-coverage.md 新增 analysis 行、功能域表同步、场景测试源统计更新；how-to-test-my-code.md Quick Start/P0 门禁/工作流图/unit 子组数对齐
-- **数据源文档补充**：`datasource.md` — 新增"持仓重合度"(`fund_overlap_`)和"基金风格扩展数据"(`extended_`)两条数据源；`bond_yield_rf` 标注精确缓存键脚注；补充 exact_cache_keys 仅模块说明
+- **门禁文档同步**：CLAUDE.md、how-to-test-my-code.md 等
+- **目录树全量同步**：folders.md
 
 ---
 
 ## [0.8.4] - 2026-07-22
 
 ### Fixed
-- **`metrics.py` 零方差浮点精度（Linux CI）**：`sharpe_ratio()` 和 `individual_volatility()` 使用 `variance == 0` 精确比较，但 Linux 上 `[0.001]*252` 的方差计算因浮点精度返回 `~6.8e-41` 而非 0，导致夏普返回天文数字而非 None、波动率返回 `1e-17` 而非 0.0 — 改为 `< 1e-15` epsilon 容差
-- **`test_fund.py` threading.Lock 类型检查兼容**：Python 3.10 某些平台上 `threading.Lock` 在 `isinstance()` 中非 type 类型 — 改用 `type(threading.Lock())` 动态获取实际类型
-- **`llm_hallucination_sampler.py` 中文引号语法错误**：第 324 行中文引号误用 ASCII 双引号，导致 Python 3.10 下 SyntaxError（ruff 强于本地版本检测到），CI 回归测试失败 — 改用单引号包裹字符串
-- **`fallback.py` 占位文本缺字**：智囊团深度复盘降级占位文本缺少"成"字（"无法生"→"无法生成"），已补回
-- **`handlers_config.py` 辩论模式说明缺字**：辩论模式启用说明中"智囊团复盘"缺少"深度"二字，正文为"智囊团深度复盘"
-- **`news_correlation.py` 日志使用缩写**：LLM 新闻关联失败日志"LLM 新闻关联分析"改为完整模块名"财经新闻热点与持仓关联分析（LLM）"
+- **`metrics.py` 零方差浮点精度（Linux CI）**：改为 `< 1e-15` epsilon 容差
+- **`test_fund.py` threading.Lock 类型检查兼容**：改用 `type(threading.Lock())` 动态获取实际类型
+- **`fallback.py` 占位文本缺字**：补回"成"字
+- **`handlers_config.py` 辩论模式说明缺字**：补全"深度"二字
 
 ### Changed
-- **`generators_orchestrator.py` 消除硬编码模块标签**：事实校验阶段 `_module_labels` 字典从硬编码改为调用 `get_llm_module_names()`，与注册表自动同步
+- **`generators_orchestrator.py` 消除硬编码模块标签**：改为调用 `get_llm_module_names()`
 
 ### Chore
-- **ruff format 全量对齐**：33 个源码文件 `ruff format` 格式化，CI 格式检查不再报错（非阻塞门禁，但保持全绿）
+- **ruff format 全量对齐**：33 个源码文件
 
 ## [0.8.3] - 2026-07-22
 
 ### Fixed
-- **P3-12 CI 测试持续失败**：三个原因修复：① `pyproject.toml` 中 `required_plugins` 将 `pytest-mock` 死锁在 `==3.15.1`，但 deps 声明 `>=3.15`，导致 pip 安装的版本不满足硬校验，pytest 拒绝启动 — 统一改为 `>=3.15`；② `format` job 的 Ruff 检查无 `continue-on-error: true`，非阻塞门禁却阻断 CI — 已添加；③ `all` 模式无 `--no-timeout`，大套件易超时截断 — 已添加
-- **辩论模式 HTML 报告编码错误**：`report_template.html` 中辩论白脸（pro_text）和黑脸（con_text）的 Jinja2 模板变量缺少 `| safe` 过滤器，导致 LLM 返回的 HTML 内容被转义为文本源码显示。综合权衡段（`expert_review`）已有 `| safe`，不受影响
-- **`_normalize_title()` 数字模式过滤**：加入百分比 `\d+(?:\.?\d+)?%` 和金额 `\d+(?:\.?\d+)?[万亿]` 正则过滤，减少跨源去重时不同新闻因共享数字模式（如"20%""25亿"）导致的 SequenceMatcher 比率虚高。同步更新 `test_cross_source_english_token_only_overlap` 测试用例（去百分比后实体 bigram 由 4 降为 2，正确保持 2 条独立新闻）
-- **全球政经局势 LLM 虚构最大持仓**：`_build_global_macro_prompt()` 未传入持仓排名数据，LLM 猜测"561910 为最大持仓"但实际最大为 011506。修复：prompt 中新增【持仓TOP3】区块（按市值排序的名称/代码/市值/占比/收益率），并在 system prompt 追加"请勿虚构持仓排名"约束。涉及 `prompts_action.py`、`generators.py`、`generators_orchestrator.py`
-- **`_normalize_title()` 扩展前缀/数字模式降去重噪声**：校准锚点分析发现 257 条 bg≤1/ratio≥0.40 噪声。修复：新增 7 个编辑栏目前缀（数据图解、CCI快报、市场动态等）、剔除事件年份数字（`WAIC 2026`→`WAIC`）、剔除排名标记（前N），降低未来校准分析的 false high 比例
-- **`_normalize_title()` 再增 4 个高频率栏目前缀**：`量化观察`、`刷屏`、`尾盘`、`华尔街见闻早餐`，基于 3650 条 cross_skip 锚点数据分析补充
+- **P3-12 CI 测试持续失败**：修复依赖版本锁死、Ruff 格式检查和超时截断
+- **辩论模式 HTML 报告编码错误**：Jinja2 模板变量补充 `| safe` 过滤器
+- **新闻去重算法优化**：扩展 STOP 集，增加前缀/数字模式过滤
 
 ### Changed
-- **辩论模式防幻觉增强**：pro/con 系统提示词新增严格约束——"数据来自输入，不得虚构任何数值、百分比或排名"；health_check 提示词补充"不得编造未提供的数值"
-- **事实校验器防误报**：新增 `_PROPORTION_KEYWORDS` 策略，跳过"XX%的品种""XX%的持仓"等品种计数比例语境，不再将其误判为收益率与累计收益率比较
-- **config.json 中文注释分组对齐 TUI 菜单**：B 组注释 `章节可见性` → `报告可选章节`，补充行内注释（`enable_b_series: 基金深度分析（#6~9）` 等），`enable_history` 章节编号修正 `#15~#16` → `#16~17`（与 TUI 菜单描述一致）；默认值和模板同步更新。涉及 `config.json`、`_config_defaults.py`
-- **历史走势基准指数移除标普500(gb_inx)**：默认 `benchmark_indices` 移除 `gb_inx: "标普500"`（Sina/Tencent K-line 均不可用，走势始终空白）。同步更新：`_config_defaults.py`（默认值 + 模板）、`config.json`、`benchmark.py` docstring、`how-to-config.md`（示例/字段表/描述 4 处）、`requirements.md`（配置表 1 处）。美股日行情数据源不受影响
+- **辩论模式防幻觉增强**：pro/con 系统提示词新增严格约束
+- **事实校验器防误报**：新增 `_PROPORTION_KEYWORDS` 策略
+- **历史走势基准指数移除标普500(gb_inx)**：Sina/Tencent K-line 均不可用
 
 ## [0.8.2] - 2026-07-22
 
 ### Fixed
-- **新闻去重算法优化**：`_extract_entity_bigrams()` 加入英数 token 提取（原仅中文 bigram，丢失"AI""AMD"等英文专名），实测减少 14.5% 跨源漏判；扩展 `_STOP_BIGRAMS` 过滤同比/环比等高频噪声；阈值经 80396 条锚点数据分析确认不变
-- **校准工具错误建议修正**：`calibrate-dedup-threshold.py` — 按 bigram 重叠度分档分析 cross_skip，不再对 bg≤1（无实体重叠）的 pair 误判"降低阈值"，正确归因于公共日期/财经关键词虚高；移除 ⚠ 字符修复 Windows GBK 编码崩溃
-- **SequenceMatcher 剥离日期模式降虚高**：`_dedup_by_title()` 中 comparison 前先剥离 `\d{4}年|\d+月|\d+日` 通用日期格式，防止完全不相关的新闻（如"2026年7月票房" vs "2026年7月经营质量"）因共享日期 ratio 虚高进入候选区
+- **新闻去重算法优化**：`_extract_entity_bigrams()` 加入英数 token 提取
+- **校准工具错误建议修正**：`calibrate-dedup-threshold.py` 分档分析
 
 ### Changed
-- **同步 technical.md 去重算法描述至最新代码**：算法概述去掉校准数据细节；流程图新增日期剥离步骤；核心概念表 STOP 集 24→44 词并含英数 token；实体 bigram 提取补充英数 token 步骤和 STOP 全列表；校准工具输出描述同步为三档分仓分类
-- **术语统一（报告内容+注释+文档）**：全项目范围将内部架构术语替换为用户友好术语
-  - `板块可见性` → `章节可见性`（config 注释、日志、管理文档）
-  - `B 系列` / `B 系列基金深度分析` → `基金深度分析`（模块 docstring、代码注释、HTML 模板注释、文档）
-  - `新闻板块` → `市场新闻`（config 注释、文档）
-  - `LLM 板块` → `LLM 分析章节` / `LLM 分析章节组`（config 注释、文档）
-  - `板块开关` → `章节开关`（technical.md）
-  - `板块配置` → `章节配置`（日志输出，此前已改）
-  - 覆盖文件：`config/_config_defaults.py`、`config/_core.py`、`features.py`、`registry.py`、`report/excel_b_series.py`、`report/data_status.py`、`report/orchestrator.py`、`report/html_writer.py`、`report/excel_generator.py`、`report/excel_sheet_factory.py`、`report/tmpl/report_template.html`、`README.md`、5 份用户文档、3 份管理文档
-- **同步 technical.md 与 llm-technical.md 交叉引用**：§5（LLM 集成层）各子节末指向 llm-technical.md 对应章节；§8（架构设计约束）C9/C17/C18 补充 llm-technical.md 参考；llm-technical.md 首部补充引言说明其与 technical.md 的定位关系
-- **清理版本历史术语**：源码注释中移除历版本号引用（`akshare 1.18.64` → `新版`，`旧/新模式` → `单/多凭据格式`）；CLAUDE.md 架构遵从指引改为引用 §架构设计约束表
-- **测试隔离增强**：conftest.py 新增 `_auto_reset_feature_flags` fixture 防止 feature 状态跨测试泄漏；LLM 空持仓场景兼容 8/9 元组返回值；e2e_perf 补充缺失 mock
-- **用户文档违规引用清理**：how-to-config.md 移除 requirements.md 引用；faq.md 移除 changelog.md 引用；how-to-test-my-code.md 13→1 处管理文档引用合并；README.md 内部文档区标题优化
+- **术语统一**：全项目范围将内部架构术语替换为用户友好术语
+- **测试隔离增强**：conftest.py 新增 `_auto_reset_feature_flags` fixture
 
 ## [0.8.1] - 2026-07-22
 
 ### Fixed
-- **P3-13**: `llm/generators.py` `_filter_hallucinated_codes` — 英文词误杀修复：全小写启发式 + `_HALLU_SAFE_WORDS` 白名单豁免 HTML/CSS 标签（`style`、`flash`、`color` 等）和金融术语（`QDII`、`ETF`），正则 `[A-Za-z0-9]{4,6}` 不再误判全小写词，真正虚构代码仍被过滤
-- **P2-11b**: `analysis/metrics.py` 新增 `portfolio_beta_analysis()` — 组合 Beta 95% 置信区间、t 统计量、p 值及可靠性标记（区间宽度 > 1.5 标记不可靠）
-- **P3-09b**: `analysis/alignment_correction.py` 实现三项口径修正因子 — 组合综合费率估算 (`portfolio_fee_estimation`)、现金剥离 (`cash_stripping`)、时间加权收益率 TWR (`twr_calculation`)，统一入口 `compute_alignment_factors` 已集成至报告管线
-- **P2-12**: `config/_core.py` 验证函数提取至 `config/_validation.py`（`_core.py` 1146→739 行，-407 行；`_validation.py` 新建 442 行）
+- **P3-13**: `llm/generators.py` `_filter_hallucinated_codes` — 英文词误杀修复
+- **P2-11b**: `analysis/metrics.py` 新增 `portfolio_beta_analysis()`
+- **P3-09b**: `analysis/alignment_correction.py` 实现三项口径修正因子
+- **P2-12**: `config/_core.py` 验证函数提取至 `config/_validation.py`
 
 ### Changed
-- **features.py** + **orchestrator.py**: 实验性功能开启时，生成报告日志中以 `[ERROR]`（红色）高亮显示具体开启了哪些实验性功能
 - 版本号更新至 v0.8.1
-- **check-version-consistency.py**: review-findings.md、llm-technical.md 加入版本号一致性检查清单（11 项）
-- **tui_menu.py**: 菜单 [S] 描述改为"配置 LLM 分析章节"，更简洁准确
-- **handlers_config.py**: 辩论模式区域标注 ⚗ 实验性功能标识，底部增加实验阶段提示
-- **review-findings.md**: P3-12 新增 CI 测试失败跟踪项；P3-13 新增 debate 幻觉过滤误杀问题；P3-9/P3-10/P3-11 更新实际行号
+- `check-version-consistency.py` 加入 review-findings.md、llm-technical.md
 
 ## [0.8.0] - 2026-07-21
 
 ### Changed
 - 版本号发布 v0.8.0
-- **review-findings.md**：新增 P2 段，记录 Beta 置信区间（P2-11b）和口径修正因子（P3-09b）两项技术债务，待后续迭代切入
+- **review-findings.md**：新增 P2 段，记录 Beta 置信区间（P2-11b）和口径修正因子（P3-09b）两项技术债务

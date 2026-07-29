@@ -73,7 +73,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
             "name": name, "code": code,
         }
 
-    def test_200_holdings_generate_details(self):
+    def test_large_holdings_generate_details(self):
         """200+ 持仓 → _generate_details 不崩溃。"""
         from src.python.report.market_value import _generate_details
 
@@ -89,7 +89,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
             self.assertGreater(d.market_value, 0)
             self.assertEqual(d.source_api, "tencent")
 
-    def test_200_holdings_market_value_sum(self):
+    def test_large_holdings_market_value_sum(self):
         """200+ 持仓 → 总市值 = 每条市值之和（不遗漏/不重复）。"""
         from src.python.report.market_value import _compute_detail_row
 
@@ -106,7 +106,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
 
         self.assertAlmostEqual(total_mv, 201000.0)
 
-    def test_200_holdings_all_account_subtotals(self):
+    def test_large_holdings_account_subtotals(self):
         """200+ 持仓按账户分组 → 小计之和 = 总计。"""
         from src.python.report.market_value import _compute_detail_row
 
@@ -142,7 +142,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
         self.assertAlmostEqual(total, all_held_total)
         self.assertEqual(len(subtotals), 3)
 
-    def test_500_holdings_bulk_computation(self):
+    def test_extreme_holdings_bulk_computation(self):
         """500+ 持仓 → 批量计算不崩溃（极限验证）。"""
         from src.python.report.market_value import _generate_details
 

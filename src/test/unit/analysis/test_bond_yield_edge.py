@@ -320,7 +320,7 @@ class TestBondYieldEdge:
     @patch("src.python.fetcher.bond_yield.cache_get")
     @patch("src.python.fetcher.bond_yield.get_config")
     @patch("akshare.bond_zh_us_rate")
-    def test_rf_out_of_range_after_division(
+    def test_risk_free_rate_out_of_range(
         self,
         mock_bond: MagicMock,
         mock_config: MagicMock,

@@ -2,7 +2,7 @@
 
 > 归档时间：2026-07-30
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.8.0 ~ v0.8.9（2026-07-21 ~ 2026-07-29）
+> 涵盖版本：v0.8.0 ~ v0.8.10（2026-07-21 ~ 2026-07-30）
 
 ---
 
@@ -67,3 +67,69 @@
 | rf-62 | **P1F 线程安全** | `news_aggregator.py:_ANCHOR_RECORDS` 模块级 list 无锁 |
 | rf-63 | **P1F 线程安全** | `provider_registry.py:fetch_cached_only()` 就地修改缓存 dict |
 | rf-64 | **P1F 线程安全** | `features.py:FEATURE_FLAGS` `clear()+update()` 非原子 |
+
+### v0.8.10（2026-07-30）
+
+| # | 分类 | 摘要 |
+|---|------|------|
+| rf-66 | **P2A 文件过大** | `analysis/metrics.py` 990 行，辅助数学函数揉合 |
+| rf-67 | **P2A 文件过大** | `report/penetration.py` 895 行，`_SECTOR_KEYWORDS` ~330 行硬编码 |
+| rf-68 | **P2A 文件过大** | `analysis/rebalance.py` 875 行，静默期管理揉合 |
+| rf-69 | **P2A 文件过大** | `llm/generators.py` 754 行，幻觉过滤逻辑揉合 |
+| rf-70 | **P2A 文件过大** | `llm/generators_orchestrator.py` 743 行，`_MODULE_FNS` 局部变量 |
+| rf-71 | **P2A 文件过大** | `config/_core.py` 738 行，LLM 配置解析逻辑揉合 |
+| rf-72 | **P2A 文件过大** | `provider_registry.py` 708 行，熔断/超时/缓存揉合 |
+| rf-73 | **P2A 文件过大** | `llm/api.py` 707 行，call_claude/call_openai/call_gemini 揉合 |
+| rf-82 | **P2A 文件过大** | `analysis/alignment_correction.py` 577 行 |
+| rf-83 | **P2A 文件过大** | `providers/news_aggregator.py` 524 行 |
+| rf-84 | **P2A 文件过大** | `providers/sina.py` 516 行 |
+| rf-65 | **P2A 文件过大** | `report/orchestrator.py` 1031 行 |
+| rf-74 | **P2A 文件过大** | `llm/skeleton.py` 705 行 |
+| rf-88 | **P2A 文件过大** | `report/html_writer.py` 480 行 |
+| rf-87 | **P2A 文件过大** | `report/portfolio_history.py` 597 行 |
+| rf-90 | **P2B 魔数 — 行业关键词硬编码** | `report/penetration.py` `_SECTOR_KEYWORDS` ~330 行硬编码字典 |
+| rf-91 | **P2B 魔数 — 列索引硬编码** | `fetcher/bond_yield.py:107` `df.columns[3]` 硬编码列索引 |
+| rf-92 | **P2B 魔数 - 时区硬编码** | `market_hours.py` 5 个函数中重复 `timezone(timedelta(hours=8))` |
+| rf-93 | **P2B 魔数 - K 线超时硬编码** | `providers/sina.py`/`tencent.py` 中 K 线超时 `30.0` 硬编码 |
+| rf-94 | **P2B 魔数 - 超额阈值硬编码** | `report/fund_performance.py` `_EXCESS_THRESHOLD_UP/DOWN` 硬编码 |
+| rf-95 | **P2B 魔数 — 基准映射硬编码** | `fetcher/fund.py` `_BUILTIN_BENCHMARKS` 13 条硬编码基准映射 |
+| rf-96 | **P2C 测试文件过大** | `test_llm.py` 2037 行 |
+| rf-97 | **P2C 测试文件过大** | `test_scenario_penetration.py` 1592 行 |
+| rf-98 | **P2C 测试文件过大** | `test_datetime_scenarios.py` 1471 行 |
+| rf-99 | **P2C 测试文件过大** | `test_cache.py` 1422 行 |
+| rf-100 | **P2C 测试文件过大** | `test_llm_scenarios.py` 1203 行 |
+| rf-101 | **P2D 测试死代码** | `test_integration.py:426` `test_api_called_when_no_cache` 长期 `@unittest.skip` |
+| rf-102 | **P2D C13 隔离不完整** | `test/conftest.py:_isolate_sensitive_paths` 未重定向 LLM 配置文件 |
+| rf-103 | **P2D C13 违反** | `test_config.py:382` 直接 `open(...)` 读取真实 LLM 配置文件 |
+| rf-104 | **P2D C13 违反** | `test_integration.py:403-408` 硬编码 `cache_dir = 'data/cache'` |
+| rf-105 | **P2D 测试重复** | `test_datetime_scenarios.py` 重复模式 |
+| rf-107 | 排查关闭 — 设计冲突（误报） | `simple_rebalance.py` 与 `rebalance.py` 存在同名函数 `compute_rebalance_signals`。排查确… |
+| rf-108 | **P3 包入口无 `__all__`** | `providers/__init__.py` 仅 4 行 docstring，无 `__all__` 导出声明 |
+| rf-109 | **P3 冗余委托函数** | `fetcher/industry.py:80-82` `_is_a_share_code()` 仅封装 `code_utils.is_a_share_c… |
+| rf-110 | **P3 重复导入** | `handlers_check_sources.py:12,23` 同一文件重复 `import sys` |
+| rf-111 | **P3 字符串拼接默认值** | `config/_config_defaults.py:112-212` 纯字符串拼接构建 JSON（~100 行） |
+| rf-112 | **P3 字符串拼接默认值** | `config/_llm_defaults.py:10-143` 纯字符串拼接 LLM 默认值（134 行） |
+| rf-113 | **P3 `enumerate + pop` 迭代删除** | `registry.py:609-613` `get_report_section_order()` 在循环中 `enumerate` 后 `pop` 删除元素 |
+| rf-114 | **P3 模块级 `logger` 未使用** | `code_utils.py:13` `logger` 变量初始化后全文件无日志调用 |
+| rf-115 | **P3 `is_chain_broken()` 对未注册 Provider 返回 False** | `provider_registry.py:370-397` 未注册的 Provider 被认为"链可用" |
+| rf-116 | **P3 翻页游标潜在无限循环** | `providers/eastmoney_news.py:77-129` `sort_end` 依赖最后一条 `showTime` 作游标 |
+| rf-117 | **P3 `_busy` 标志位无锁** | `tui_handlers.py:24,254-267` 标志位无锁保护 |
+| rf-118 | **P2F `_MODULE_FNS` 局部变量** | `llm/generators_orchestrator.py` `_MODULE_FNS` 是局部变量，新增 LLM 模块需潜入 239 行函数内部注册 |
+| rf-119 | **P2F 影子导入** | `llm/generators.py` `generate_debate_procon()` 内部重复导入 |
+| rf-120 | **P2F 重复 logger** | `llm/prompts_action.py` 连续两行 `logger = logging.getLogger("invest")` |
+| rf-121 | **P2F 未使用导入** | `llm/prompts_tables.py:20` 导入 `is_a_share_code`、`is_hk_stock_code` 但无调用 |
+| rf-122 | **P2F 未使用导入** | `llm/prompts_core.py:15` 从 `datetime` 导入 `datetime`、`timedelta`、`timezone` 但无调用 |
+| rf-123 | **P2F `__all__` 缺失** | `llm/prompts.py` 导入 `_build_qa_concentration_block` 但 `__all__` 未列出 |
+| rf-124 | **P2F 重复逻辑** | `llm/api.py` 空白内容重试逻辑在 `_call_provider_entry` 和 `_call_llm_legacy` 中重复 |
+| rf-125 | **P2F 重复逻辑** | `llm/prompts_action.py` `_build_global_macro_prompt()` 内联完整 TOP3 排序与 `_build_… |
+| rf-126 | **P2F 重复逻辑** | `llm/api.py` `call_gemini()` 重新实现 `configure_extended_thinking()` 的 budget-fl… |
+| rf-127 | **P2F 重复逻辑** | `llm/fact_checker.py` 内联关键词检查与 `_is_contribution_sentence()` 重复 |
+| rf-128 | **P2F 硬编码值** | `llm/generators_orchestrator.py` HTTP 连接池参数硬编码 |
+| rf-129 | **P2F 硬编码值** | `llm/skeleton.py` `BATCH_SIZE=10`、`max_workers=min(...)` 硬编码 |
+| rf-130 | **P2F 硬编码值** | `llm/api.py` 默认模型名 `"claude-sonnet-4-20250514"` 等硬编码 |
+| rf-131 | **P2D 测试覆盖缺口** | `analysis/alignment_correction.py` 无独立单元测试 |
+| rf-132 | **P2D 测试覆盖缺口** | `analysis/drawdown_warning.py` 无独立单元测试 |
+| rf-133 | **P2D 测试覆盖缺口** | `cache/services/holdings_tracker.py` 无独立单元测试 |
+| rf-134 | **P2D 测试覆盖缺口** | `llm/fallback.py` 无独立单元测试 |
+| rf-135 | **P2D 测试覆盖缺口（批量低风险）** | `circuit_breaker_wrapper.py`, `cache/_io.py`, `llm/prompts_core.py`, `report/… |
+| rf-106 | **P2D 已废弃** | 10+ 模块无对应测试 |

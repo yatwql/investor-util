@@ -256,7 +256,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         import src.python.config as cfg
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
 
-        # 仅 llm_settings.json 有 api_key（无 llm_key.json），按 C18 不再回退
+        # llm_settings.json 含 api_key 且无 llm_key.json → 返回 None（C18 合规）
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "\t sk-ant-from-settings \n", "temperature": 0.7}, f)
 

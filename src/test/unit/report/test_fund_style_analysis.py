@@ -115,24 +115,24 @@ class TestPeToStyle(unittest.TestCase):
 class TestEstimateByCode(unittest.TestCase):
     """_estimate_style_by_code：代码段降级"""
 
-    def test_60_start(self):
+    def test_code_60_prefix(self):
         """60xxxx → 大盘"""
         self.assertEqual(_get_size_from_code("600519"), "大盘")
         self.assertEqual(_get_size_from_code("601318"), "大盘")
 
-    def test_000_start(self):
+    def test_code_000_prefix(self):
         """000xxx → 中盘"""
         self.assertEqual(_get_size_from_code("000858"), "中盘")
 
-    def test_002_start(self):
+    def test_code_002_prefix(self):
         """002xxx → 中盘"""
         self.assertEqual(_get_size_from_code("002415"), "中盘")
 
-    def test_300_start(self):
+    def test_code_300_prefix(self):
         """300xxx → 小盘"""
         self.assertEqual(_get_size_from_code("300750"), "小盘")
 
-    def test_688_start(self):
+    def test_code_688_prefix(self):
         """688xxx → 小盘"""
         self.assertEqual(_get_size_from_code("688001"), "小盘")
 

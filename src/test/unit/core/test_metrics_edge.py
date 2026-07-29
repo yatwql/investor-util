@@ -36,7 +36,7 @@ class TestSharpeRatioEdge:
 
         assert sharpe_ratio([0.001] * 252, rf_annual=0.015) is None
 
-    def test_none_rf_uses_default(self):
+    def test_none_risk_free_rate_uses_default(self):
         """rf_annual=None → 使用默认无风险利率，不崩溃。"""
         from src.python.analysis.metrics import sharpe_ratio
 
@@ -478,7 +478,7 @@ class TestGetConfidenceLevelEdge:
 
         assert get_confidence_level([0.001] * 100) == "low"
 
-    def test_252_or_more_returns_high(self):
+    def test_full_year_days_returns_high(self):
         """≥252 日 → 'high'。"""
         from src.python.analysis.metrics import get_confidence_level
 

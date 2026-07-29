@@ -234,7 +234,7 @@ class TestFetchMarketData(unittest.TestCase):
 
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
-    def test_00_code_degrade_to_eastmoney(
+    def test_code_fallback_to_eastmoney(
         self, mock_fallback, mock_fresh,
     ):
         """00 代码股票链路全失败 → 降级场外基金净值链路。"""
@@ -259,7 +259,7 @@ class TestFetchMarketData(unittest.TestCase):
 
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
-    def test_00_code_degrade_all_fail(
+    def test_code_fallback_all_fail(
         self, mock_fallback, mock_fresh,
     ):
         """00 代码股票链路 + 降级链路均失败 → None。"""
@@ -271,7 +271,7 @@ class TestFetchMarketData(unittest.TestCase):
 
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
-    def test_00_code_stock_success_no_degrade(
+    def test_code_stock_no_fallback(
         self, mock_fallback, mock_fresh,
     ):
         """00 代码但股票链路成功 → 不回退降级。"""
