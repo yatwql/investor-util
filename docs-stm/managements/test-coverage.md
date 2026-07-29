@@ -1,6 +1,6 @@
 # 测试覆盖统计
 
-> 文档版本：v0.8.9
+> 文档版本：v0.8.10-dev
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
