@@ -100,7 +100,7 @@ CSS 变量 + localStorage 切换按钮。**预估：0.5d**
 
 ## 归档
 
-- [`datasource-reliability-documentation.md`](../archive/v0.8.x/datasource-reliability-documentation/datasource-reliability-documentation.md) — plan-13（数据源可靠性文档✅）／ plan-14（ADR⏸）
+- [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.9（含设计文档索引）
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)
 - [`archived_plan.0.6.x.md`](../archive/v0.6.x/archived_plan.0.6.x.md)
 - [`archived_plan.0.5.x.md`](../archive/v0.5.x/archived_plan.0.5.x.md)

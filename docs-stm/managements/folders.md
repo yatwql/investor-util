@@ -582,6 +582,9 @@ investor-util/
 │   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
 │   │   │       └── llm-hallucination-sample-output_expert-review.txt   # 幻觉采样 LLM 原始输出样本
 │   │   ├── v0.8.x/                           # v0.8.x 版本归档
+│   │   │   ├── archived_changelog.0.8.x.md    # 变更日志归档 v0.8.x
+│   │   │   ├── archived_plan.0.8.x.md         # 实现计划归档 v0.8.x
+│   │   │   ├── archived_review-findings.0.8.x.md # 自审记录归档 v0.8.x
 │   │   │   ├── tiantian-split/               #   tiantian.py 大文件拆分记录
 │   │   │   │   └── tiantian-split.md          #     tiantian.py 拆分记录
 │   │   │   ├── fundstyle-split/               #   fund_style_analysis.py 大文件拆分记录
