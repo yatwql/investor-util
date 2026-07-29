@@ -74,9 +74,9 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
 # 此处列出的功能默认关闭，用户在 features.json 中手动开启后，
 # 启动时会在日志中以红色高亮提示。
 EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
-    "llm_debate_procon": ("辩论-M1 正反辩论", "三段式(白脸→黑脸→综合)"),
-    "llm_debate_conditional": ("辩论-M2 条件推理", "情景化分析(涨/跌/震荡)"),
-    "llm_debate_qa_concentration": ("辩论-M3 集中度问答", "集中度风险问答"),
+    "llm_debate_procon": ("辩论-正反辩论", "三段式(白脸→黑脸→综合)"),
+    "llm_debate_conditional": ("辩论-条件推理", "情景化分析(涨/跌/震荡)"),
+    "llm_debate_qa_concentration": ("辩论-集中度问答", "集中度风险问答"),
 }
 
 

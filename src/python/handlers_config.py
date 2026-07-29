@@ -236,9 +236,9 @@ def _cmd_config_llm_modules() -> None:
 
     # 辩论模式开关定义：(flag_key, 显示名, 说明)
     DEBATE_FLAGS: list[tuple[str, str, str]] = [
-        ("llm_debate_procon", "辩论-M1 正反辩论", "三段式(白脸→黑脸→综合)"),
-        ("llm_debate_conditional", "辩论-M2 条件推理", "情景化分析(涨/跌/震荡)"),
-        ("llm_debate_qa_concentration", "辩论-M3 集中度问答", "集中度风险问答"),
+        ("llm_debate_procon", "辩论-正反辩论", "三段式(白脸→黑脸→综合)"),
+        ("llm_debate_conditional", "辩论-条件推理", "情景化分析(涨/跌/震荡)"),
+        ("llm_debate_qa_concentration", "辩论-集中度问答", "集中度风险问答"),
     ]
 
     while True:

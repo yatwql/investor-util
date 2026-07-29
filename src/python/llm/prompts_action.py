@@ -132,6 +132,41 @@ def _build_global_macro_prompt(
     )
 
 
+# ── TOP3 持仓排名块（防止 LLM 猜测最大持仓） ──────────────
+
+
+def _build_top3_block(
+    holdings_details: list[dict] | None,
+    total_mv: float,
+) -> str:
+    """构建持仓排名文本块（按市值降序 TOP3），供 LLM 直接引用排名信息。
+
+    Args:
+        holdings_details: 持仓明细列表。
+        total_mv: 持仓总市值。
+
+    Returns:
+        TOP3 排名文本块，无数据时返回空字符串。
+    """
+    if not holdings_details or total_mv <= 0:
+        return ""
+    sorted_h = sorted(
+        [d for d in holdings_details if (d.get("market_value", 0) or 0) > 0],
+        key=lambda d: d.get("market_value", 0) or 0,
+        reverse=True,
+    )
+    top_lines = []
+    for i, h in enumerate(sorted_h[:3], 1):
+        code = h.get("code", "")
+        name = h.get("name", "")
+        mv = h.get("market_value", 0) or 0
+        weight = (mv / total_mv * 100) if total_mv else 0
+        rate = h.get("profit_rate")
+        rate_str = f"{rate:+.2f}%" if rate is not None else "--"
+        top_lines.append(f"  {i}. {name}（{code}）市值{mv:,.0f} 占比{weight:.1f}% 收益率{rate_str}")
+    return "\n【持仓TOP3】\n" + "\n".join(top_lines) if top_lines else ""
+
+
 # ── 集中度反问引导 ──────────────────────────────────────────
 
 
@@ -204,7 +239,7 @@ def _build_qa_concentration_block(
 
 
 # ── 条件推理 + 反问引导 ─────────────────────────────────────
-# 通过 _build_expert_review_prompt 的 enable_mode_2/enable_mode_3 参数控制
+# 通过 _build_expert_review_prompt 的 enable_conditional/enable_qa_concentration 参数控制
 
 
 def _build_expert_review_prompt(
@@ -220,8 +255,8 @@ def _build_expert_review_prompt(
     competitive_context: str | None = None,
     metrics: dict | None = None,
     *,  # 以下为实验模式参数
-    enable_mode_2: bool = False,
-    enable_mode_3: bool = False,
+    enable_conditional: bool = False,
+    enable_qa_concentration: bool = False,
     industry_concentration: dict[str, float] | None = None,
 ) -> str:
     """构建智囊团深度复盘的用户提示词（紧凑格式）。
@@ -253,6 +288,8 @@ def _build_expert_review_prompt(
         f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} "
         f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）今日{total_today_profit:+,.0f}",
         f"【分布】{' '.join(cat_parts)}{pen_text}",
+        # TOP3 持仓排名（显式排序，防止 LLM 猜测最大持仓）
+        _build_top3_block(holdings_details, total_mv),
     ]
     if diff_text:
         parts.append(diff_text)
@@ -311,12 +348,12 @@ def _build_expert_review_prompt(
     ]
 
     # ── 条件推理情景追加 ────────────────────────────────
-    if enable_mode_2:
+    if enable_conditional:
         try:
             from src.python.config._core import get_llm_config
 
             _cfg = get_llm_config()
-            _scenarios = (_cfg or {}).get("debate", {}).get("mode_2_conditional", {}).get("scenarios", [])
+            _scenarios = (_cfg or {}).get("debate", {}).get("conditional", {}).get("scenarios", [])
             if _scenarios:
                 scenario_lines = ["\n\n### 情景分析"]
                 for _s in _scenarios:
@@ -331,7 +368,7 @@ def _build_expert_review_prompt(
             logger.warning("[debate] 条件推理情景追加失败，已跳过")
 
     # ── 集中度反问引导 ──────────────────────────────────
-    if enable_mode_3:
+    if enable_qa_concentration:
         _qa_block = _build_qa_concentration_block(
             holdings_details,
             total_mv,
@@ -376,12 +413,17 @@ def _build_health_check_prompt(
     attribution_text = _build_profit_attribution_block(holdings_details)
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
 
+    # TOP3 持仓排名（显式排序，防止 LLM 猜测最大持仓）
+    top3_text = _build_top3_block(holdings_details, total_mv)
+
     parts = [
         f"【当前时间】{now_bj}（北京时间）",
         f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} "
         f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）今日{total_today_profit:+,.0f}",
         f"【分布】{' '.join(cat_parts)}{pen_text}",
     ]
+    if top3_text:
+        parts.append(top3_text)
     if diff_text:
         parts.append(diff_text)
     if degradation_text:
@@ -402,6 +444,12 @@ def _build_health_check_prompt(
         "4. 成本结构 — 成本分布与浮盈浮亏比",
         "5. 数据质量 — 结合【数据质量降级】段落评估数据完整性",
         "按要求的输出格式给出评分和改进建议。",
+        "",
+        "【数值精度约束】",
+        "1. 持仓明细已标注每只品种的盈亏比例（如 +6.00%），请直接引用，不得虚构、推算或编造任何百分比数值。",
+        "2. 如果需要引用收益归因，请参考【收益归因】段落，并标注为「贡献占比」而非收益率。",
+        "3. 不确定具体数字时使用定性描述（如「表现较好」「有盈利」「亏损」）而非虚构具体百分比。",
+        "4. 持仓排名已通过【持仓TOP3】段明确给出，不得自行推测「最大持仓」或「第一重仓」。",
     ]
     return "\n".join(parts)
 

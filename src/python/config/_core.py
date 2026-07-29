@@ -265,19 +265,19 @@ def _check_unknown_llm_keys(settings: dict) -> None:
 
 
 _DEBATE_CONFIG_DEFAULTS: dict[str, Any] = {
-    "mode_1_procon": {
+    "procon": {
         "per_call_max_tokens": None,
         "synthesis_model": None,
         "synthesis_temperature": 0.5,
     },
-    "mode_2_conditional": {
+    "conditional": {
         "scenarios": [
             {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
             {"name": "下跌", "change": -0.20, "desc": "如果未来市场下跌 20%"},
             {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"},
         ],
     },
-    "mode_3_qa_concentration": {
+    "qa_concentration": {
         "threshold": 0.20,
     },
     "max_total_tokens_per_report": 16000,
@@ -300,45 +300,45 @@ def _load_debate_config(settings: dict) -> dict:
 
     merged = copy.deepcopy(_DEBATE_CONFIG_DEFAULTS)
 
-    # mode_1_procon
-    raw_m1 = raw_debate.get("mode_1_procon")
-    if isinstance(raw_m1, dict):
-        if isinstance(raw_m1.get("per_call_max_tokens"), (int, float)) and raw_m1["per_call_max_tokens"] > 0:
-            merged["mode_1_procon"]["per_call_max_tokens"] = raw_m1["per_call_max_tokens"]
-        elif raw_m1.get("per_call_max_tokens") is not None:
-            logger.warning("[debate] mode_1_procon.per_call_max_tokens 应为正数或 null，使用默认值 None")
-        if isinstance(raw_m1.get("synthesis_model"), str) and raw_m1["synthesis_model"].strip():
-            merged["mode_1_procon"]["synthesis_model"] = raw_m1["synthesis_model"].strip()
-        if isinstance(raw_m1.get("synthesis_temperature"), (int, float)):
-            if 0.0 <= raw_m1["synthesis_temperature"] <= 2.0:
-                merged["mode_1_procon"]["synthesis_temperature"] = raw_m1["synthesis_temperature"]
+    # procon（正反辩论配置）
+    raw_procon = raw_debate.get("procon")
+    if isinstance(raw_procon, dict):
+        if isinstance(raw_procon.get("per_call_max_tokens"), (int, float)) and raw_procon["per_call_max_tokens"] > 0:
+            merged["procon"]["per_call_max_tokens"] = raw_procon["per_call_max_tokens"]
+        elif raw_procon.get("per_call_max_tokens") is not None:
+            logger.warning("[debate] procon.per_call_max_tokens 应为正数或 null，使用默认值 None")
+        if isinstance(raw_procon.get("synthesis_model"), str) and raw_procon["synthesis_model"].strip():
+            merged["procon"]["synthesis_model"] = raw_procon["synthesis_model"].strip()
+        if isinstance(raw_procon.get("synthesis_temperature"), (int, float)):
+            if 0.0 <= raw_procon["synthesis_temperature"] <= 2.0:
+                merged["procon"]["synthesis_temperature"] = raw_procon["synthesis_temperature"]
             else:
-                logger.warning("[debate] mode_1_procon.synthesis_temperature 应在 [0.0, 2.0] 范围，使用默认值 0.5")
+                logger.warning("[debate] procon.synthesis_temperature 应在 [0.0, 2.0] 范围，使用默认值 0.5")
 
-    # mode_2_conditional
-    raw_m2 = raw_debate.get("mode_2_conditional")
-    if isinstance(raw_m2, dict):
-        raw_scenarios = raw_m2.get("scenarios")
+    # conditional（条件推理配置）
+    raw_conditional = raw_debate.get("conditional")
+    if isinstance(raw_conditional, dict):
+        raw_scenarios = raw_conditional.get("scenarios")
         if isinstance(raw_scenarios, list) and raw_scenarios:
             validated: list[dict] = []
             for idx, s in enumerate(raw_scenarios):
                 if isinstance(s, dict) and "name" in s and "desc" in s:
                     validated.append({"name": str(s["name"]), "change": s.get("change", 0.0), "desc": str(s["desc"])})
                 else:
-                    logger.warning("[debate] mode_2_conditional.scenarios[%d] 格式无效，已跳过", idx)
+                    logger.warning("[debate] conditional.scenarios[%d] 格式无效，已跳过", idx)
             if validated:
-                merged["mode_2_conditional"]["scenarios"] = validated
+                merged["conditional"]["scenarios"] = validated
             else:
-                logger.warning("[debate] mode_2_conditional.scenarios 全部无效，使用默认情景")
+                logger.warning("[debate] conditional.scenarios 全部无效，使用默认情景")
 
-    # mode_3_qa_concentration
-    raw_m3 = raw_debate.get("mode_3_qa_concentration")
-    if isinstance(raw_m3, dict):
-        raw_threshold = raw_m3.get("threshold")
+    # qa_concentration（集中度问答配置）
+    raw_qa = raw_debate.get("qa_concentration")
+    if isinstance(raw_qa, dict):
+        raw_threshold = raw_qa.get("threshold")
         if isinstance(raw_threshold, (int, float)) and 0.0 < raw_threshold < 1.0:
-            merged["mode_3_qa_concentration"]["threshold"] = raw_threshold
+            merged["qa_concentration"]["threshold"] = raw_threshold
         elif raw_threshold is not None:
-            logger.warning("[debate] mode_3_qa_concentration.threshold 应在 (0, 1) 范围，使用默认值 0.20")
+            logger.warning("[debate] qa_concentration.threshold 应在 (0, 1) 范围，使用默认值 0.20")
 
     # 顶层标量
     raw_total = raw_debate.get("max_total_tokens_per_report")

@@ -1744,7 +1744,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 {% endif %}
                 <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
                 {% if debate_mode_label %}
-                <tr><td>实验模式</td><td>{{ debate_mode_label }}</td></tr>
+                <tr><td>实验模式</td><td>{{ debate_mode_label }}{% if debate_mode_combination %} · {{ debate_mode_combination }}{% endif %}</td></tr>
                 {% endif %}
             </table>
             {% endif %}
@@ -1848,7 +1848,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="report-footer" style="text-align: center; padding: 14px 20px; color: #999; font-size: 12px;">
         个人投资分析报告 v{{ app_version }} | 生成时间: {{ now }}
-	        <br><span style="font-size:11px;">本报告数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到配置的 provider，不会用于训练。</span>
+        {%- if debate_mode_combination %}
+        <br>🧪 辩论模式已启用：{{ debate_mode_combination }}
+        {%- endif %}
+        <br><span style="font-size:11px;">本报告数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到配置的 provider，不会用于训练。</span>
     </div>
 
 </div>

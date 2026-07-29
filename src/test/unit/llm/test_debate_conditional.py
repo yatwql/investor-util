@@ -1,6 +1,6 @@
 """辩论模式条件推理单元测试 — Mode 2 情景分析注入。
 
-测试 _build_expert_review_prompt() 在 enable_mode_2 参数下的行为：
+测试 _build_expert_review_prompt() 在 enable_conditional 参数下的行为：
   - 多情景注入
   - 空情景/禁用的对比
   - 单情景
@@ -39,7 +39,7 @@ def _mock_llm_config_with_scenarios(scenarios: list[dict]) -> dict:
     """构造带指定 scenarios 的 mock LLM 配置。"""
     return {
         "debate": {
-            "mode_2_conditional": {
+            "conditional": {
                 "scenarios": scenarios,
             },
         },
@@ -48,7 +48,7 @@ def _mock_llm_config_with_scenarios(scenarios: list[dict]) -> dict:
 
 @pytest.mark.unit_llm
 class TestDebateConditionalMode2(unittest.TestCase):
-    """_build_expert_review_prompt enable_mode_2 条件推理情景注入。"""
+    """_build_expert_review_prompt enable_conditional 条件推理情景注入。"""
 
     # ── test 1: Mode 2 启用 + 3 情景 ──────────────────────────
 
@@ -70,7 +70,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
             holdings_count=5,
             categories={},
             holdings_details=_make_minimal_holdings(),
-            enable_mode_2=True,
+            enable_conditional=True,
         )
 
         self.assertIn("### 情景分析", result)
@@ -119,7 +119,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
             holdings_count=5,
             categories={},
             holdings_details=_make_minimal_holdings(),
-            enable_mode_2=True,
+            enable_conditional=True,
         )
 
         self.assertIn("### 情景分析", result)
@@ -141,7 +141,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
             holdings_count=5,
             categories={},
             holdings_details=_make_minimal_holdings(),
-            enable_mode_2=True,
+            enable_conditional=True,
         )
 
         self.assertNotIn("### 情景分析", result)

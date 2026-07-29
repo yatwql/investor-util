@@ -76,7 +76,7 @@ class TestDebateEdgeAllProvidersUnavailable(unittest.TestCase):
 
 @pytest.mark.edge
 class TestDebateEdgeSingleHolding(unittest.TestCase):
-    """仅有 1 个持仓品种 → M1/3 正常。"""
+    """仅有 1 个持仓品种 → 正反辩论/集中度问答正常。"""
 
     @patch("src.python.llm.generators.generate_llm_module", side_effect=[
         _mock_llm_result("pro分析正面持有理由充足"),
@@ -100,7 +100,7 @@ class TestDebateEdgeSingleHolding(unittest.TestCase):
 
 @pytest.mark.edge
 class TestDebateEdgeBonds(unittest.TestCase):
-    """持仓全部为债券 → M1 黑脸诚实说明无负面理由。"""
+    """持仓全部为债券 → 黑脸诚实说明无负面理由。"""
 
     @patch("src.python.llm.generators.generate_llm_module", side_effect=[
         _mock_llm_result("债券配置合理持有"),
@@ -123,7 +123,7 @@ class TestDebateEdgeBonds(unittest.TestCase):
 
 @pytest.mark.edge
 class TestDebateEdgePenetrateEmpty(unittest.TestCase):
-    """penetrate_data 为空 → M1/2/3 均正常。"""
+    """penetrate_data 为空 → 正反辩论/条件推理/集中度问答均正常。"""
 
     @patch("src.python.llm.generators.generate_llm_module", side_effect=[
         _mock_llm_result("pro正面分析"),
@@ -146,7 +146,7 @@ class TestDebateEdgePenetrateEmpty(unittest.TestCase):
 
 @pytest.mark.edge
 class TestDebateEdgeProSuccessConFailure(unittest.TestCase):
-    """M1 pro 成功但 con 失败 → 回退普通模式。"""
+    """正反辩论 pro 成功但 con 失败 → 回退普通模式。"""
 
     @patch("src.python.llm.generators.generate_llm_module", side_effect=[
         _mock_llm_result("pro正面分析"),
@@ -168,7 +168,7 @@ class TestDebateEdgeProSuccessConFailure(unittest.TestCase):
 
 @pytest.mark.edge
 class TestDebateEdgeSynthesisTimeout(unittest.TestCase):
-    """M1 全部成功但 synthesis 超时 → 返回 pro+con 拼接。"""
+    """正反辩论全部成功但 synthesis 超时 → 返回 pro+con 拼接。"""
 
     @patch("src.python.llm.generators.generate_llm_module", side_effect=[
         _mock_llm_result("pro正面持有理由分析结果"),

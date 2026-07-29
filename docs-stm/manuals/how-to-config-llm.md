@@ -43,7 +43,7 @@ LLM 配置由三个独立文件管理：
 }
 ```
 
-> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。`fallback_*` 回退字段可选，配置后主 provider 连续失败时自动切换，适用于高可用场景（如主用 DeepSeek 低成本、回退 Anthropic Claude 高稳定性）。非敏感参数统一移至 `llm_settings.json` 管理。
+> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。`fallback_*` 回退字段可选，配置后主 provider 连续失败时自动切换，适用于高可用场景（如主用 DeepSeek 低成本、回退 Anthropic Claude 高稳定性）。非敏感参数统一在 `llm_settings.json` 中管理。
 
 **Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数。示意结构如下（完整配置项见「配置项总览」章节）：
 
@@ -282,7 +282,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
-- `debate`（dict，可选实验功能）：辩论模式配置。含 mode_1_procon（三段式正反辩论）、mode_2_conditional（条件情景推理）、mode_3_qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
+- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
 
 ### 模块级配置
 
@@ -401,14 +401,14 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // 通过 Feature Flag 控制启停，菜单 [S] 可交互开关
   // ═══════════════════════════════════════════
   "debate": {
-    // M1 正反辩论 — 三段式(白脸→黑脸→综合)
-    "mode_1_procon": {
+    // 正反辩论 — 三段式(白脸→黑脸→综合)
+    "procon": {
       "per_call_max_tokens": null,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
     },
-    // M2 条件推理 — 情景化分析
-    "mode_2_conditional": {
+    // 条件推理 — 情景化分析
+    "conditional": {
       // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)
       "scenarios": [
         {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
@@ -416,8 +416,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
         {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"}
       ]
     },
-    // M3 集中度问答 — 集中度风险问答块
-    "mode_3_qa_concentration": {
+    // 集中度问答 — 集中度风险问答块
+    "qa_concentration": {
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
@@ -455,9 +455,9 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 > **补充**：财经新闻关联分析还支持 `news_correlation_top_n` 配置项（默认 `30`），控制送 LLM 分析的新闻条数上限，按关键词匹配数降序选取。增大此值会线性增加 Token 消耗，减小则降低 LLM 关联分析的覆盖率。设为 `0` 可完全禁用 LLM 分析（仅保留关键词匹配）。
 
 > **temperature 项说明**：
-> - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**智囊团深度复盘/持仓体检/穿透分析已改用 0.1~0.2 极低温以减少数值幻觉**。
+> - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**智囊团深度复盘/持仓体检/穿透分析使用 0.1~0.2 极低温以减少数值幻觉**。
 > - **中温（0.4~0.6）**：在准确性和判断力之间平衡，适合评分分析。
-> - **高温（≥0.7）**：鼓励多样性和创造性输出，适合辩论式分析。**当前已不推荐用于数值引用类模块**。
+> - **高温（≥0.7）**：鼓励多样性和创造性输出，适合辩论式分析。**不推荐用于数值引用类模块**。
 
 ---
 

@@ -260,8 +260,10 @@ def generate_excel_report(
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
     _debate_mode_label: str | None = None
+    _debate_mode_combination: str | None = None
     if debate_info and isinstance(debate_info, dict):
         _debate_mode_label = debate_info.get("mode_label")
+        _debate_mode_combination = debate_info.get("mode_combination")
     if not _debate_mode_label:
         from src.python.features import is_feature_enabled
 
@@ -269,6 +271,20 @@ def generate_excel_report(
             _debate_mode_label = "🧪 辩论模式"
         elif is_feature_enabled("llm_debate_conditional") or is_feature_enabled("llm_debate_qa_concentration"):
             _debate_mode_label = "🧪 实验模式"
+
+    # 构建组合标识（debate_info 不存在时从 feature flag 检测）
+    if not _debate_mode_combination:
+        _comb_parts = []
+        if is_feature_enabled("llm_debate_procon"):
+            _comb_parts.append("正反辩论")
+        if is_feature_enabled("llm_debate_conditional"):
+            _comb_parts.append("条件推理")
+        if is_feature_enabled("llm_debate_qa_concentration"):
+            _comb_parts.append("集中度问答")
+        _debate_mode_combination = "+".join(_comb_parts) if _comb_parts else None
+
+    if _debate_mode_label and _debate_mode_combination:
+        _debate_mode_label = f"{_debate_mode_label} · {_debate_mode_combination}"
     write_llm_section_and_usage(
         sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
     )

@@ -372,6 +372,21 @@ def _dispatch_llm_workers(
     # ── 辩论模式路由：替换 expert_review 条目 ─────────────────
     from src.python.features import is_feature_enabled
 
+    def _build_debate_mode_combination() -> str:
+        """构建当前启用的辩论模式组合标识字符串。
+
+        Returns:
+            如 "正反辩论+条件推理" 或 "条件推理+集中度问答" 等形式。
+        """
+        _parts = []
+        if is_feature_enabled("llm_debate_procon"):
+            _parts.append("正反辩论")
+        if is_feature_enabled("llm_debate_conditional"):
+            _parts.append("条件推理")
+        if is_feature_enabled("llm_debate_qa_concentration"):
+            _parts.append("集中度问答")
+        return "+".join(_parts) if _parts else ""
+
     if is_feature_enabled("llm_debate_procon") and needs.get("expert_review"):
         _original_expert = _MODULE_FNS["expert_review"]
 
@@ -402,6 +417,7 @@ def _dispatch_llm_workers(
                             "pro_text": pro,
                             "con_text": con,
                             "mode_label": "🧪 辩论模式",
+                            "mode_combination": _build_debate_mode_combination(),
                         }
                     if synthesis:
                         return (synthesis, True)
@@ -624,6 +640,12 @@ def generate_all_llm(
     from src.python.features import is_feature_enabled
 
     needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k)) for k, v in precheck_results.items()}
+
+    # ── 辩论模式：强制不走标准 expert_review 缓存预检 ──────
+    # 辩论路由使用独立缓存键（llm_debate_pro_/llm_debate_con_/llm_debate_synthesis_），
+    # 与标准 expert_review 缓存键（llm_expert_review_）不同，需绕过标准缓存预检。
+    if is_feature_enabled("llm_debate_procon"):
+        needs["expert_review"] = is_llm_module_enabled(llm_config, "expert_review")
 
     # ── 辩论模式容器（用于闭包捕获 debate_info） ────────
     _debate_info_container: list[dict | None] = [None]
