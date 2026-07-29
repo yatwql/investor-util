@@ -48,65 +48,59 @@ def _prompt_force_llm(reporter: TuiProgressReporter) -> bool:
     return _force
 
 
-def _cmd_generate_excel() -> None:
-    """生成 Excel 分析报告（必选内容）。"""
+def _run_generate(
+    report_type: str,
+    *,
+    history_mode: str | None = None,
+    force_llm: bool | None = None,
+) -> TuiProgressReporter | None:
+    """通用报告生成命令骨架。
+
+    Args:
+        report_type: 报告类型（"basic" / "both" / "full"）
+        history_mode: 历史走势模式，None 表示不传入（使用 orchestrator 默认）
+        force_llm: 是否强制刷新 LLM 缓存，None 表示不传入
+
+    Returns:
+        TuiProgressReporter 实例（成功时）或 None（持仓未就绪时）
+    """
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
     holdings = prepare_holdings()
     if not holdings:
-        return
+        return None
+    kwargs: dict = {
+        "holdings": holdings,
+        "config": config,
+        "reporter": reporter,
+        "report_type": report_type,
+    }
+    if history_mode is not None:
+        kwargs["history_mode"] = history_mode
+    if force_llm is not None:
+        kwargs["force_llm"] = force_llm
     try:
-        orchestrator.generate_report(
-            holdings=holdings,
-            config=config,
-            reporter=reporter,
-            report_type="basic",
-        )
+        orchestrator.generate_report(**kwargs)
     except Exception as e:
-        logger.exception("生成 Excel 报告失败")
+        logger.exception("生成 %s 报告失败", report_type)
         print_error_with_hint(e, "生成失败")
     finish_report(reporter)
+    return reporter
+
+
+def _cmd_generate_excel() -> None:
+    """生成 Excel 分析报告（必选内容）。"""
+    _run_generate("basic")
 
 
 def _cmd_generate_both() -> None:
     """生成全系列包含新闻的报告（Excel+HTML，不含 LLM 分析章节）。"""
     reporter = TuiProgressReporter()
-    config = get_config_cache() or {}
-    holdings = prepare_holdings()
-    if not holdings:
-        return
-    try:
-        orchestrator.generate_report(
-            holdings=holdings,
-            config=config,
-            reporter=reporter,
-            report_type="both",
-            history_mode=_prompt_history(reporter),
-        )
-    except Exception as e:
-        logger.exception("生成全系列报告失败")
-        print_error_with_hint(e, "生成失败")
-    finish_report(reporter)
+    _run_generate("both", history_mode=_prompt_history(reporter))
 
 
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 分析章节）。"""
     reporter = TuiProgressReporter()
-    config = get_config_cache() or {}
-    holdings = prepare_holdings()
-    if not holdings:
-        return
-    try:
-        orchestrator.generate_report(
-            holdings=holdings,
-            config=config,
-            reporter=reporter,
-            report_type="full",
-            history_mode=_prompt_history(reporter),
-            force_llm=_prompt_force_llm(reporter),
-        )
-        print_llm_session_usage()
-    except Exception as e:
-        logger.exception("生成全系列报告失败")
-        print_error_with_hint(e, "生成失败")
-    finish_report(reporter)
+    _run_generate("full", history_mode=_prompt_history(reporter), force_llm=_prompt_force_llm(reporter))
+    print_llm_session_usage()

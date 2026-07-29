@@ -20,6 +20,25 @@ from src.python.config._validation import _absolutize_paths, validate_config
 
 logger = logging.getLogger("invest")
 
+
+def _atomic_write(filepath: str, content: str) -> None:
+    """原子写入文件：先写临时文件再 os.replace。
+
+    Args:
+        filepath: 目标文件路径
+        content: 要写入的字符串内容
+    """
+    fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(filepath), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp_path, filepath)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.remove(tmp_path)
+        raise
+
+
 # ═══════════════════════════════════════════════════════════════
 # 配置缓存（线程安全，按 mtime 自动失效）
 # ═══════════════════════════════════════════════════════════════
@@ -127,16 +146,7 @@ def set_config(key: str, value: Any) -> None:
 
     os.makedirs(config_dir, exist_ok=True)
 
-    # 原子写入：先写临时文件再 os.replace
-    fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, config_path)
-    except Exception:
-        with contextlib.suppress(OSError):
-            os.remove(tmp_path)
-        raise
+    _atomic_write(config_path, json.dumps(config, ensure_ascii=False, indent=2))
 
     _config_cache = None
     _config_mtime = 0
@@ -165,26 +175,15 @@ def init_config(config_path: str | None = None) -> None:
         return
     config_dir = os.path.dirname(config_path)
     os.makedirs(config_dir, exist_ok=True)
-    # 原子写入，复用 set_config() 模式
-    fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(_config_defaults._get_default_config_template())
-        try:
-            os.replace(tmp_path, config_path)
-        except PermissionError:
-            # Windows 并发场景：另一线程/进程已创建文件，清理自身临时文件后继续
-            with contextlib.suppress(OSError):
-                os.remove(tmp_path)
-            if os.path.exists(config_path):
-                config = get_config()
-                validate_config(config)
-                return
-            raise  # 文件确实不存在，重新抛出
-    except Exception:
-        with contextlib.suppress(OSError):
-            os.remove(tmp_path)
-        raise
+        _atomic_write(config_path, _config_defaults._get_default_config_template())
+    except PermissionError:
+        # Windows 并发场景：另一线程/进程已创建文件，清理自身临时文件后继续
+        if os.path.exists(config_path):
+            config = get_config()
+            validate_config(config)
+            return
+        raise  # 文件确实不存在，重新抛出
     _config_cache = None
     _config_mtime = 0
     _config_size = 0
@@ -378,16 +377,7 @@ def _ensure_llm_settings_file() -> None:
         return
     try:
         os.makedirs(os.path.dirname(settings_path), exist_ok=True)
-        # 原子写入，复用 set_config() 模式
-        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(settings_path), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(_get_default_llm_settings_template())
-            os.replace(tmp_path, settings_path)
-        except Exception:
-            with contextlib.suppress(OSError):
-                os.remove(tmp_path)
-            raise
+        _atomic_write(settings_path, _get_default_llm_settings_template())
         logger.info("LLM 设置文件已自动生成: %s", settings_path)
     except OSError as e:
         logger.warning("无法自动创建 LLM 设置文件: %s", e)
@@ -400,15 +390,7 @@ def _ensure_llm_providers_file() -> None:
         return
     try:
         os.makedirs(os.path.dirname(providers_path), exist_ok=True)
-        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(providers_path), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(_get_default_llm_providers_template())
-            os.replace(tmp_path, providers_path)
-        except Exception:
-            with contextlib.suppress(OSError):
-                os.remove(tmp_path)
-            raise
+        _atomic_write(providers_path, _get_default_llm_providers_template())
         logger.info("LLM Provider 配置文件已自动生成: %s", providers_path)
     except OSError as e:
         logger.warning("无法自动创建 LLM Provider 配置文件: %s", e)
@@ -433,7 +415,7 @@ def _get_llm_providers_path() -> str:
 
         config = get_config()
         return config.get("llm_providers_file") or _LLM_PROVIDERS_FILE_DEFAULT
-    except Exception:
+    except (KeyError, TypeError, AttributeError):
         return _LLM_PROVIDERS_FILE_DEFAULT
 
 
@@ -444,7 +426,7 @@ def _get_llm_key_path() -> str:
 
         config = get_config()
         return config.get("llm_key_file") or _LLM_KEY_FILE_DEFAULT
-    except Exception:
+    except (KeyError, TypeError, AttributeError):
         return _LLM_KEY_FILE_DEFAULT
 
 

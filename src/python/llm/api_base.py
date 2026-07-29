@@ -26,7 +26,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_NETWORK_ERROR,
     FAIL_REASON_TIMEOUT,
 )
-from src.python.llm.session import track_session_usage
+from src.python.llm.session import record_per_module, track_session_usage
 
 logger = logging.getLogger("invest")
 
@@ -107,6 +107,42 @@ CACHE_LINE_HTML = '<p style="color:#888;font-size:12px">本次使用LLM缓存，
 def _cache_line_model_tpl(model: str) -> str:
     """生成缓存命中提示行（含模型名）。"""
     return f'<p style="color:#888;font-size:12px">本次使用LLM缓存（原始模型：{model}）</p>'
+
+
+def _build_cache_hint_and_record(
+    cached: str,
+    module_key: str,
+    llm_config: dict,
+    thinking_enabled: bool,
+    endpoint: str = "",
+    model_hint: str | None = None,
+) -> str:
+    """构建缓存 HTML 提示行并记录模块用量。
+
+    统一 _handle_cache_hit 与 _precheck_one_cache 中的重复逻辑。
+
+    Args:
+        cached: 缓存的原始 HTML 内容
+        module_key: 模块键名
+        llm_config: LLM 配置
+        thinking_enabled: 是否启用 Extended Thinking
+        endpoint: API 端点（可为空字符串）
+        model_hint: 模型名称提示（用于当缓存中无法提取模型名时回退）
+
+    Returns:
+        附加了缓存提示的 HTML 内容
+    """
+    orig_model = _extract_model_from_cached(cached)
+    hint = _cache_line_model_tpl(orig_model) if orig_model else CACHE_LINE_HTML
+    if thinking_enabled:
+        hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
+    if module_key:
+        model_for_record = orig_model or model_hint or llm_config.get("model", "") or "缓存命中"
+        endpoint_for_record = endpoint or llm_config.get("endpoint", "") or ""
+        record_per_module(
+            module_key, model_for_record, cached=True, thinking=thinking_enabled, endpoint=endpoint_for_record
+        )
+    return cached + hint
 
 
 # 含原始模型名称的缓存提示行模板。

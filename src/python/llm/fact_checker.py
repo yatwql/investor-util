@@ -342,7 +342,7 @@ def check_numerical_consistency(
                 continue
 
             # 策略 3：句中含贡献类关键词 → 跳过不可验证
-            if any(kw in sentence for kw in ("贡献", "贡献度", "归因", "主要来源")):
+            if _is_contribution_sentence(sentence):
                 passed += 1
                 continue
 

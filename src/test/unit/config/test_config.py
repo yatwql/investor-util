@@ -376,10 +376,10 @@ class TestLlmSettingsKeyConsistency:
     def test_all_keys_tracked(self):
         """llm_settings.json 中不应有未在 _KNOWN_LLM_SETTINGS_KEYS 中登记的键。"""
         import json
-        from src.python.config import _KNOWN_LLM_SETTINGS_KEYS, _strip_json_comments
+        from src.python.config import _KNOWN_LLM_SETTINGS_KEYS, _strip_json_comments, get_llm_settings_path
 
 
-        with open("data/config/llm_settings.json", encoding="utf-8") as f:
+        with open(get_llm_settings_path(), encoding="utf-8") as f:
             raw = f.read()
             llm = json.loads(_strip_json_comments(raw))
 

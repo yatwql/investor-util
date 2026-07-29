@@ -34,8 +34,6 @@ from src.python.llm.prompts_tables import (
 
 logger = logging.getLogger("invest")
 
-logger = logging.getLogger("invest")
-
 
 def _build_global_macro_prompt(
     a_indices: dict[str, dict[str, Any]],
@@ -98,24 +96,7 @@ def _build_global_macro_prompt(
         flow_text = "\n【行业资金流向】\n" + "\n".join(flow_lines)
 
     # ── TOP3 持仓排名（按市值） ──
-    top_text = ""
-    if holdings_details:
-        sorted_h = sorted(
-            [d for d in holdings_details if (d.get("market_value", 0) or 0) > 0],
-            key=lambda d: d.get("market_value", 0) or 0,
-            reverse=True,
-        )
-        top_lines = []
-        for i, h in enumerate(sorted_h[:3], 1):
-            code = h.get("code", "")
-            name = h.get("name", "")
-            mv = h.get("market_value", 0) or 0
-            weight = (mv / total_mv * 100) if total_mv else 0
-            rate = h.get("profit_rate")
-            rate_str = f"{rate:+.2f}%" if rate is not None else "--"
-            top_lines.append(f"  {i}. {name}（{code}）市值{mv:,.0f} 占比{weight:.1f}% 收益率{rate_str}")
-        if top_lines:
-            top_text = "\n【持仓TOP3】\n" + "\n".join(top_lines)
+    top_text = _build_top3_block(holdings_details, total_mv)
 
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
     comp_text = f"\n{competitive_context}" if competitive_context else ""

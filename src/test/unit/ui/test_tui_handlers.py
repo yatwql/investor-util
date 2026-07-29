@@ -3,7 +3,6 @@
 测试目标：
   - _Timer 类上下文管理器
   - print_timing_summary / print_llm_session_usage 输出格式化
-  - check_network_available 行情数据可用性检测（含 print 输出）
   - print_error_with_hint 不同类型异常的友好提示格式
   - _add_error / _clear_errors / _print_error_summary 错误累积
   - _call_sheet 安全调用包装
@@ -27,8 +26,6 @@ import src.python.tui_handlers as _th_module
 from src.python.report.progress import _timing_records, Timer as _Timer
 
 from src.python.tui_handlers import (
-
-    check_network_available,
     execute_item,
     print_error_with_hint,
     print_llm_session_usage,
@@ -39,52 +36,9 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
 
-
-class FakeDetail:
-    """模拟 DetailRow（namedtuple 替代）。"""
-    def __init__(self, price=None):
-        self.price = price
-
-
 # ═══════════════════════════════════════════════════════════════
 # 基础测试
 # ═══════════════════════════════════════════════════════════════
-
-class TestCheckNetworkAvailable(unittest.TestCase):
-    """check_network_available 测试。"""
-
-    def test_empty_list(self) -> None:
-        """空列表 → False。"""
-        self.assertFalse(check_network_available([]))
-
-    def test_all_none(self) -> None:
-        """所有价格均为 None → False（网络不可用）。"""
-        details = [FakeDetail(price=None), FakeDetail(price=None)]
-        self.assertFalse(check_network_available(details))
-
-    def test_all_zero(self) -> None:
-        """所有价格均为 0 → False（网络不可用）。"""
-        details = [FakeDetail(price=0), FakeDetail(price=0)]
-        self.assertFalse(check_network_available(details))
-
-    def test_mixed_available(self) -> None:
-        """部分有价 → True。"""
-        details = [FakeDetail(price=None), FakeDetail(price=10.5)]
-        self.assertTrue(check_network_available(details))
-
-    def test_all_available(self) -> None:
-        """全部有价 → True。"""
-        details = [FakeDetail(price=10.0), FakeDetail(price=20.5)]
-        self.assertTrue(check_network_available(details))
-
-    def test_single_none(self) -> None:
-        """单条 None → False。"""
-        self.assertFalse(check_network_available([FakeDetail(price=None)]))
-
-    def test_single_available(self) -> None:
-        """单条有价 → True。"""
-        self.assertTrue(check_network_available([FakeDetail(price=15.0)]))
-
 
 class TestPrintErrorWithHint(unittest.TestCase):
     """print_error_with_hint 错误提示格式测试。"""
@@ -354,55 +308,6 @@ class TestPrintLlmSessionUsage(unittest.TestCase):
         out = self._capture(usage)
         self.assertIn("1", out)
         self.assertIn("0", out)
-
-
-# ═══════════════════════════════════════════════════════════════
-# 新增测试 — check_network_available print 输出
-# ═══════════════════════════════════════════════════════════════
-
-class TestCheckNetworkAvailablePrint(unittest.TestCase):
-    """check_network_available 的 print 输出测试。"""
-
-    def _capture_call(self, details: list) -> tuple[bool, str]:
-        out = io.StringIO()
-        with patch("sys.stdout", out):
-            result = check_network_available(details)
-        return result, out.getvalue()
-
-    def test_empty_list_no_print(self):
-        """空列表不输出。"""
-        result, out = self._capture_call([])
-        self.assertFalse(result)
-        self.assertEqual(out, "")
-
-    def test_all_none_prints_warning(self):
-        """全部为 None 时打印网络异常提示。"""
-        result, out = self._capture_call([FakeDetail(price=None)])
-        self.assertFalse(result)
-        self.assertIn("所有行情数据均获取失败", out)
-
-    def test_all_zero_prints_warning(self):
-        """全部为 0 时打印网络异常提示。"""
-        result, out = self._capture_call([FakeDetail(price=0)])
-        self.assertFalse(result)
-        self.assertIn("所有行情数据均获取失败", out)
-
-    def test_mixed_no_print(self):
-        """部分有价时不输出。"""
-        result, out = self._capture_call([FakeDetail(price=None), FakeDetail(price=10.0)])
-        self.assertTrue(result)
-        self.assertEqual(out, "")
-
-    def test_all_available_no_print(self):
-        """全部有价时不输出。"""
-        result, out = self._capture_call([FakeDetail(price=10.0), FakeDetail(price=20.5)])
-        self.assertTrue(result)
-        self.assertEqual(out, "")
-
-    def test_warning_message_contains_guide(self):
-        """网络异常消息包含指引文字。"""
-        _, out = self._capture_call([FakeDetail(price=None)])
-        self.assertIn("请于交易时段或在网络通畅时重新生成", out)
 
 
 # ═══════════════════════════════════════════════════════════════

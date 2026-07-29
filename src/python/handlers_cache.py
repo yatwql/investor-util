@@ -130,44 +130,43 @@ def _print_position_result(result) -> None:
 # ── TUI 命令入口（委托至 cache/operations.py）────────────────
 
 
-def _cmd_update_basic_cache() -> None:
-    """更新基础类缓存。"""
-    holdings = _read_holdings_and_clear_cache("refresh")
+def _run_cache_update(group_name: str, update_fn, print_fn, action_name: str) -> None:
+    """通用缓存更新命令骨架。
+
+    Args:
+        group_name: 缓存分组名称（传给 clear_by_group）
+        update_fn: 执行缓存的函数，签名 (holdings, reporter) -> result
+        print_fn: 结果格式化函数，签名 (result) -> None
+        action_name: 操作名称（用于错误提示）
+    """
+    holdings = _read_holdings_and_clear_cache(group_name)
     if holdings is None:
         return
 
-    from src.python.cache.operations import update_basic_cache
     from src.python.report.progress import TuiProgressReporter
 
     reporter = TuiProgressReporter()
-
     try:
-        result = update_basic_cache(holdings, reporter)
-        _print_cache_refresh_report(result)
+        result = update_fn(holdings, reporter)
+        print_fn(result)
     except Exception as e:
-        logger.exception("更新基础缓存失败")
-        print_error_with_hint(e, "更新基础缓存")
+        logger.exception("更新%s失败", action_name)
+        print_error_with_hint(e, f"更新{action_name}")
     press_any_key()
+
+
+def _cmd_update_basic_cache() -> None:
+    """更新基础类缓存。"""
+    from src.python.cache.operations import update_basic_cache
+
+    _run_cache_update("refresh", update_basic_cache, _print_cache_refresh_report, "基础缓存")
 
 
 def _cmd_update_position_cache() -> None:
     """更新持仓类缓存。"""
-    holdings = _read_holdings_and_clear_cache("preload")
-    if holdings is None:
-        return
-
     from src.python.cache.operations import update_position_cache
-    from src.python.report.progress import TuiProgressReporter
 
-    reporter = TuiProgressReporter()
-
-    try:
-        result = update_position_cache(holdings, reporter)
-        _print_position_result(result)
-    except Exception as e:
-        logger.exception("更新持仓缓存失败")
-        print_error_with_hint(e, "更新持仓缓存")
-    press_any_key()
+    _run_cache_update("preload", update_position_cache, _print_position_result, "持仓缓存")
 
 
 def _cmd_cleanup_cache() -> None:

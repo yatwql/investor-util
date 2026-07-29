@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from collections.abc import Callable
@@ -20,8 +21,6 @@ logger = setup_logger()
 
 # ── 显示符号（自动降级：非 UTF-8 终端使用 ASCII 替代） ──
 
-import sys
-
 _USE_ASCII = sys.stdout.encoding and sys.stdout.encoding.upper() not in ("UTF-8", "UTF8")
 
 _OK = "[V]" if _USE_ASCII else "✅"
@@ -30,9 +29,24 @@ _ERR = "[X]" if _USE_ASCII else "❌"
 _SKIP = "[-]" if _USE_ASCII else "⏭️"
 
 
+def _use_ansi() -> bool:
+    """判断是否支持 ANSI 颜色输出。
+
+    同时满足以下条件时返回 True：
+    - 未设置 NO_COLOR 环境变量
+    - stdout 是终端（非管道重定向）
+    - 编码支持 Unicode/ANSI
+    """
+    if os.environ.get("NO_COLOR"):
+        return False
+    if not sys.stdout.isatty():
+        return False
+    return bool(sys.stdout.encoding and sys.stdout.encoding.upper() in ("UTF-8", "UTF8"))
+
+
 def _colored(text: str, ok: bool, warn: bool = False) -> str:
     """简易颜色标记。终端不支持 ANSI 时自动降级纯文本。"""
-    if _USE_ASCII:
+    if not _use_ansi():
         return text
     try:
         if ok:

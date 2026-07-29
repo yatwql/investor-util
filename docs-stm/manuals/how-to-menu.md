@@ -15,13 +15,13 @@
     [F] 配置持仓信息文件名
     [O] 配置报告输出目录
     [1] 更新基础类缓存
-    [I] 管理对比指数池
     [2] 更新行情类缓存（含价格/指数等）
     [3] 清理过期缓存文件
     [4] 查看缓存/状态统计
     [P] 配置报告可选章节（基金分析/市场新闻/历史走势）
-    [S] 配置LLM分析章节
+    [I] 管理对比指数池
     [A] 配置持仓匿名化（代码/名称脱敏）
+    [S] 配置LLM分析章节
     [R] 刷新配置
     [X] 退出
 ```
@@ -41,16 +41,16 @@
 
 ## 报告内容对照
 
-| 菜单 | 核心报告 | 财经新闻 | 基金深度分析¹ | 组合历史走势³ ⁴ | 全球政经局势（LLM） | 智囊团深度复盘（LLM） | 持仓体检报告（LLM） | 穿透深度分析（LLM） | LLM API 用量 |
+| 菜单 | 核心报告 | 财经新闻 | 基金深度分析¹ | 组合历史走势² ³ | 全球政经局势（LLM） | 智囊团深度复盘（LLM） | 持仓体检报告（LLM） | 穿透深度分析（LLM） | LLM API 用量 |
 |------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | **E** | ✅ | — | — | — | — | — | — | — | — |
-| **B** | ✅ | ✅ | ☆⁵ | ☆⁵ | — | — | — | — | — |
-| **L** | ✅ | ✅ | ☆⁵ | ☆⁵ | ☆⁵ | ☆⁵ | ☆⁵ | ☆⁵ | ☆⁵ |
+| **B** | ✅ | ✅ | ☆⁴ | ☆⁴ | — | — | — | — | — |
+| **L** | ✅ | ✅ | ☆⁴ | ☆⁴ | ☆⁴ | ☆⁴ | ☆⁴ | ☆⁴ | ☆⁴ |
 
 ¹ 基金深度分析：基金经理变更监控、持仓重合度矩阵、持仓集中度监控、基金风格分析，共 4 个页签。
-³ 组合历史走势 + 回撤分析依赖 `history.analysis` 配置（`"prompt"` 或 `"auto"` 时可用，`"off"` 时显示占位文本）。
-⁴ 累计收益率从 ≥80% 持仓覆盖的日期起算，避免 QDII/债券基金数据起点较晚导致组合早期市值偏低、收益率虚高的问题。
-⁵ ☆ 表示受章节可见性配置控制：基金深度分析的 `enable_b_series`、新闻的 `enable_news`、历史走势的 `enable_history`（均在 `config.json`）和 LLM 的 `enabled_llm`（在 `llm_settings.json`）。详见[配置指南](how-to-config.md#h-报告章节可见性)。
+² 组合历史走势 + 回撤分析依赖 `history.analysis` 配置（`"prompt"` 或 `"auto"` 时可用，`"off"` 时显示占位文本）。
+³ 累计收益率从 ≥80% 持仓覆盖的日期起算，避免 QDII/债券基金数据起点较晚导致组合早期市值偏低、收益率虚高的问题。
+⁴ ☆ 表示受章节可见性配置控制：基金深度分析的 `enable_b_series`、新闻的 `enable_news`、历史走势的 `enable_history`（均在 `config.json`）和 LLM 的 `enabled_llm`（在 `llm_settings.json`）。详见[配置指南](how-to-config.md#b-报告章节可见性)。
 
 ---
 
@@ -147,7 +147,7 @@
 > | `llm_debate_conditional` | 7 | 辩论-条件推理 |
 > | `llm_debate_qa_concentration` | 8 | 辩论-集中度问答 |
 >
-> 除辩论开关外，`features.json` 还统一管理匿名化模式（`anonymization.mode`）、新闻分类（`news_cls`）、历史走势（`history_portfolio`/`history_benchmark`）、量化指标（`metrics_*`）、缓存清理（`cache_daily_cleanup`）等共 28 项开关。完整清单见[配置指引-功能开关 §I](how-to-config.md#i-功能开关featuresjson)。
+> 除辩论开关外，`features.json` 还统一管理匿名化模式（`anonymization.mode`）、新闻分类（`news_cls`）、历史走势（`history_portfolio`/`history_benchmark`）、量化指标（`metrics_*`）、缓存清理（`cache_daily_cleanup`）等共 28 项开关。完整清单见[配置指引-功能开关 §L](how-to-config.md#l-功能开关featuresjson)。
 
 #### [A] 配置持仓匿名化（代码/名称脱敏）
 

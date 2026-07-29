@@ -61,7 +61,7 @@ def get_xlsx_info(filepath: str) -> dict:
             }
         finally:
             wb.close()
-    except Exception as e:
+    except (FileNotFoundError, zipfile.BadZipFile, InvalidFileException, OSError) as e:
         return {"error": str(e)}
 
 

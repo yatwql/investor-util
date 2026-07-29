@@ -27,7 +27,16 @@ from src.python.http_client import make_http_client
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://hq.sinajs.cn/list="
-_TIMEOUT = 15.0
+_TIMEOUT = 15.0  # 普通行情超时
+_KLINE_TIMEOUT = 30.0  # K 线超时（需等待更多数据）
+
+
+def _pf(parts: list[str], idx: int) -> float:
+    """安全地按索引从 CSV 行中提取浮点数。"""
+    try:
+        return float(parts[idx].strip()) if parts[idx].strip() else 0.0
+    except (ValueError, IndexError):
+        return 0.0
 
 # 美股指数代码 (gb_* 前缀为新浪全球指数代码)
 _US_INDICES: dict[str, str] = {
@@ -88,15 +97,9 @@ def _parse_price_response(text: str, code: str) -> dict[str, Any] | None:
         logger.warning("Sina 行情字段不足(%d): %s", len(parts), body[:80])
         return None
 
-    def _pf(idx: int) -> float:
-        try:
-            return float(parts[idx].strip()) if parts[idx].strip() else 0.0
-        except (ValueError, IndexError):
-            return 0.0
-
     name = parts[0].strip() if parts[0] else ""
-    price = _pf(3)
-    yclose = _pf(2)
+    price = _pf(parts, 3)
+    yclose = _pf(parts, 2)
     raw_date = parts[30].strip() if len(parts) > 30 else ""
     price_date = raw_date.split(" ")[0] if raw_date else ""
 
@@ -106,11 +109,11 @@ def _parse_price_response(text: str, code: str) -> dict[str, Any] | None:
         "price": price,
         "yesterday_close": yclose,
         "price_date": price_date,
-        "open": _pf(1),
-        "high": _pf(4),
-        "low": _pf(5),
-        "volume": _pf(8),
-        "turnover": _pf(9),
+        "open": _pf(parts, 1),
+        "high": _pf(parts, 4),
+        "low": _pf(parts, 5),
+        "volume": _pf(parts, 8),
+        "turnover": _pf(parts, 9),
         "source": "新浪财经",
     }
 
@@ -186,15 +189,9 @@ def _parse_a_index(text: str) -> dict[str, Any] | None:
     if len(parts) < 7:
         return None
 
-    def _pf(idx: int) -> float:
-        try:
-            return float(parts[idx].strip()) if parts[idx].strip() else 0.0
-        except (ValueError, IndexError):
-            return 0.0
-
     name = parts[0].strip() if parts[0] else ""
-    price = _pf(1)
-    change = _pf(2)
+    price = _pf(parts, 1)
+    change = _pf(parts, 2)
 
     # 昨收盘 = 当前价 - 涨跌额
     yclose = round(price - change, 2) if price > 0 else 0.0
@@ -292,17 +289,11 @@ def _parse_us_index(text: str) -> dict[str, Any] | None:
     if len(parts) < 5:
         return None
 
-    def _pf(idx: int) -> float:
-        try:
-            return float(parts[idx].strip()) if parts[idx].strip() else 0.0
-        except (ValueError, IndexError):
-            return 0.0
-
     name = parts[0].strip() if parts[0] else ""
-    price = _pf(1)
-    change = _pf(4)
-    high = _pf(6)
-    low = _pf(7)
+    price = _pf(parts, 1)
+    change = _pf(parts, 4)
+    high = _pf(parts, 6)
+    low = _pf(parts, 7)
 
     # 昨收盘 = 当前价 - 涨跌额
     yclose = round(price - change, 2) if price > 0 else 0.0
@@ -414,7 +405,7 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
     logger.debug("Sina K 线请求: %s, days=%d", full_code, days)
 
     try:
-        with make_http_client(timeout=30.0) as client:
+        with make_http_client(timeout=_KLINE_TIMEOUT) as client:
             resp = client.get(url, params=params, headers={"Referer": "https://finance.sina.com.cn"})
             resp.encoding = "utf-8"
             data = resp.json()
@@ -461,7 +452,7 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
     logger.debug("Sina 指数 K 线请求: %s, days=%d", symbol, days)
 
     try:
-        with make_http_client(timeout=30.0) as client:
+        with make_http_client(timeout=_KLINE_TIMEOUT) as client:
             resp = client.get(url, params=params, headers={"Referer": "https://finance.sina.com.cn"})
             resp.encoding = "utf-8"
             data = resp.json()

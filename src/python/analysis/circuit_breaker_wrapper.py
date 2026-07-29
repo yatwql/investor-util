@@ -216,7 +216,7 @@ class IndicatorBreaker:
                 "启用" if now_enabled else "关闭",
             )
         except Exception:
-            pass  # DegradationTracker 不可用时不阻塞
+            logger.debug("[breaker] DegradationTracker 不可用，跳过 Feature Flag 记录", exc_info=True)  # DegradationTracker 不可用时不阻塞
 
     # ── 记录成功/失败 ────────────────────────────────
 
@@ -286,7 +286,7 @@ class IndicatorBreaker:
                     failure_type="unreachable",
                 )
             except Exception:
-                pass
+                logger.debug("[breaker] DegradationTracker 不可用，跳过失败记录", exc_info=True)
 
         self._save_state()
 

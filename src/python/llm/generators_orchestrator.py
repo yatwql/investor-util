@@ -21,10 +21,8 @@ from src.python.cache import get as cache_get
 from src.python.config import get_llm_config
 from src.python.http_client import make_http_client
 from src.python.llm.api_base import (
-    CACHE_LINE_HTML,
     LLM_TIMEOUT,
-    _cache_line_model_tpl,
-    _extract_model_from_cached,
+    _build_cache_hint_and_record,
 )
 from src.python.llm.fingerprint import (
     build_llm_fingerprint,
@@ -46,7 +44,6 @@ from src.python.llm.prompts import (
     LLM_MODULE_FAILURE,
     _build_competitive_context_block,
 )
-from src.python.llm.session import record_per_module
 from src.python.llm.skeleton import is_llm_module_enabled
 from src.python.registry import get_llm_module_name, get_llm_module_names
 
@@ -85,11 +82,13 @@ def get_news_correlation_result() -> tuple[list[dict], bool, dict] | None:
 
 # ── HTTP 客户端配置 ──────────────────────────────────────────
 # 各工作线程共享同一组连接参数，通过 HTTP/2 + keepalive 减少连接建立开销
+_LLM_MAX_CONNECTIONS = 20  # 总连接池上限
+_LLM_MAX_KEEPALIVE = 10  # 空闲保持连接数
 _LLM_CLIENT_SETTINGS: dict[str, Any] = {
     "http2": True,  # HTTP/2 多路复用
     "limits": httpx.Limits(
-        max_connections=20,  # 总连接池上限
-        max_keepalive_connections=10,  # 空闲保持连接数
+        max_connections=_LLM_MAX_CONNECTIONS,
+        max_keepalive_connections=_LLM_MAX_KEEPALIVE,
     ),
 }
 
@@ -198,24 +197,17 @@ def _precheck_one_cache(
     cached = cache_get(cache_info["key"], cache_info["ttl"])
     if not cached:
         return (None, False)
-    clean = cached
-    model = _extract_model_from_cached(cached)
-    hint = _cache_line_model_tpl(model) if model else CACHE_LINE_HTML
     thinking_enabled = llm_config.get(cache_info["thinking_key"], False)
-    if thinking_enabled:
-        hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
-    # 记录模块用量，确保 API 用量页签显示"缓存"状态而非"—"
-    if module_key:
-        _name_for_record = model or llm_config.get("model", "") or "缓存命中"
-        _endpoint_for_record = llm_config.get("endpoint", "") or ""
-        if not _endpoint_for_record and llm_config.get("_provider_list") and module_key:
-            from src.python.llm.api import _resolve_first_provider_model_endpoint
+    # 当 endpoint 为空时有 provider chain 则尝试解析
+    endpoint = llm_config.get("endpoint", "") or ""
+    if not endpoint and llm_config.get("_provider_list") and module_key:
+        from src.python.llm.api import _resolve_first_provider_model_endpoint
 
-            _, _endpoint_for_record = _resolve_first_provider_model_endpoint(llm_config, module_key)
-        record_per_module(
-            module_key, _name_for_record, cached=True, thinking=thinking_enabled, endpoint=_endpoint_for_record
-        )
-    return (clean + hint, True)
+        _, endpoint = _resolve_first_provider_model_endpoint(llm_config, module_key)
+    augmented_html = _build_cache_hint_and_record(
+        cached, module_key, llm_config, thinking_enabled, endpoint=endpoint,
+    )
+    return (augmented_html, True)
 
 
 def _precheck_all_modules(

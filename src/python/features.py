@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 from typing import Any
 
 from src.python.constants import PROJECT_ROOT
@@ -121,6 +122,7 @@ __all__ = [
 # 合并默认值 + 外部覆写后的最终生效值
 
 FEATURE_FLAGS: dict[str, bool] = dict(_FEATURE_FLAGS_DEFAULT)
+_FEATURES_LOCK = threading.Lock()
 
 
 def get_feature_defaults() -> dict[str, bool]:
@@ -186,16 +188,17 @@ def load_feature_overrides() -> None:
         return
 
     valid_count = 0
-    for flag_name, value in overrides.items():
-        if isinstance(value, bool) and flag_name in FEATURE_FLAGS:
-            FEATURE_FLAGS[flag_name] = value
-            valid_count += 1
-        elif isinstance(value, bool):
-            logger.debug("[features] 覆写未知开关 '%s'，仍加载", flag_name)
-            FEATURE_FLAGS[flag_name] = value
-            valid_count += 1
-        else:
-            logger.warning("[features] 覆写 '%s' 值应为 bool，忽略", flag_name)
+    with _FEATURES_LOCK:
+        for flag_name, value in overrides.items():
+            if isinstance(value, bool) and flag_name in FEATURE_FLAGS:
+                FEATURE_FLAGS[flag_name] = value
+                valid_count += 1
+            elif isinstance(value, bool):
+                logger.debug("[features] 覆写未知开关 '%s'，仍加载", flag_name)
+                FEATURE_FLAGS[flag_name] = value
+                valid_count += 1
+            else:
+                logger.warning("[features] 覆写 '%s' 值应为 bool，忽略", flag_name)
 
     if valid_count:
         logger.info("[features] 已加载 %d 项功能开关覆写", valid_count)
@@ -243,8 +246,9 @@ def save_feature_overrides(overrides: dict[str, bool], merge: bool = True) -> No
 
 def reset_feature_flags() -> None:
     """重置所有功能开关为默认值（运行时状态，不影响持久化文件）。"""
-    FEATURE_FLAGS.clear()
-    FEATURE_FLAGS.update(_FEATURE_FLAGS_DEFAULT)
+    with _FEATURES_LOCK:
+        FEATURE_FLAGS.clear()
+        FEATURE_FLAGS.update(_FEATURE_FLAGS_DEFAULT)
     logger.debug("[features] 功能开关已重置为默认值")
 
 

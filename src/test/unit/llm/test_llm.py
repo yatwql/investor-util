@@ -1428,7 +1428,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_penetration.assert_called_once()
 
     @patch("src.python.llm.generators_orchestrator.cache_get")
-    @patch("src.python.llm.generators_orchestrator.record_per_module")
+    @patch("src.python.llm.api_base.record_per_module")
     def test_cache_hit_records_per_module(
         self, mock_record: MagicMock, mock_cache_get: MagicMock,
         mock_expert: MagicMock, mock_macro: MagicMock,
@@ -1452,7 +1452,7 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
             cached = kwargs.get("cached") if "cached" in kwargs else (call[0][2] if len(call[0]) > 2 else False)
             self.assertTrue(cached, f"模块 {call[0][0]} 的 cached 不是 True")
 
-    @patch("src.python.llm.generators_orchestrator.record_per_module")
+    @patch("src.python.llm.api_base.record_per_module")
     def test_partial_cache_records_per_module(
         self, mock_record: MagicMock,
         mock_expert: MagicMock, mock_macro: MagicMock,

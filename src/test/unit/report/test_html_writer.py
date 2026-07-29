@@ -746,22 +746,20 @@ class TestSectionOrderTemplateRendering(unittest.TestCase):
 
     def setUp(self):
         from jinja2 import Environment
-        from src.python.report.html_jinja_env import _jinja_section_visible, _ENV
+        from src.python.report.html_jinja_env import _ENV
         self.env = Environment()
         self._module_env = _ENV
         # 注册 section_visible 全局函数（与 html_writer 中一致）
-        self.env.globals["section_visible"] = _jinja_section_visible
-        # 预计算 section_visible_dict，设置到模块级 _ENV.globals（_jinja_section_visible 读取的位置）
-        self._module_env.globals["section_visible_dict"] = {}
-        self._saved_visible_dict = self._module_env.globals.get("section_visible_dict")
+        self._visible_dict: dict[str, bool] = {}
+        self.env.globals["section_visible"] = lambda key: self._visible_dict.get(key, False)
 
     def tearDown(self):
-        # 恢复模块级 env 原始状态
-        self._module_env.globals["section_visible_dict"] = self._saved_visible_dict
+        pass
 
     def _set_visible_dict(self, visible: dict[str, bool]) -> None:
-        """设置 section_visible_dict 到模块级 _ENV globals。"""
-        self._module_env.globals["section_visible_dict"] = visible
+        """设置 section_visible_dict。"""
+        self._visible_dict.clear()
+        self._visible_dict.update(visible)
 
     def _render_nav(self, section_order: list[dict]) -> str:
         """渲染导航栏片段。"""

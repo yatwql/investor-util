@@ -28,6 +28,8 @@ logger = logging.getLogger("invest")
 _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "diff",
     "data_degradation",
+    "risk_metrics",
+    "portfolio_daily_returns",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -46,6 +48,7 @@ _PREP_KNOWN_KEYS: set[str] = {
     "today_str",
     "output_dir",
     "news_top_count",
+    "risk_metrics",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -53,6 +56,8 @@ _PREP_KNOWN_KEYS: set[str] = {
 _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "diff": (dict, type(None)),
     "data_degradation": list,
+    "risk_metrics": dict,
+    "portfolio_daily_returns": list,
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -69,6 +74,7 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "today_str": str,
     "output_dir": str,
     "news_top_count": int,
+    "risk_metrics": dict,
 }
 
 
@@ -128,7 +134,9 @@ def build(
     # 合并额外键
     for k, v in extra.items():
         result[k] = v
-        _PIPELINE_DATA_KNOWN_KEYS.add(k)
+        if k not in _PIPELINE_DATA_KNOWN_KEYS:
+            logger.warning("[pipeline_data] 未注册键 '%s' 通过 extra 注入，请先在 Schema 定义中注册", k)
+            _PIPELINE_DATA_KNOWN_KEYS.add(k)
 
     # 类型校验
     for key, expected in _PIPELINE_DATA_TYPE_MAP.items():
@@ -264,5 +272,7 @@ def merge_pipeline_data(
         if k in merged:
             logger.debug("[pipeline_data] 覆盖已有键 '%s'", k)
         merged[k] = v
-        _PIPELINE_DATA_KNOWN_KEYS.add(k)
+        if k not in _PIPELINE_DATA_KNOWN_KEYS:
+            logger.warning("[pipeline_data] 未注册键 '%s' 通过 merge 注入，请先在 Schema 定义中注册", k)
+            _PIPELINE_DATA_KNOWN_KEYS.add(k)
     return merged

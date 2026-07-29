@@ -20,6 +20,9 @@ from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger("invest")
 
+# ── 北京时区常量 ──────────────────────────────────────────
+_BJ_TZ = timezone(timedelta(hours=8))
+
 # ── A 股交易时段（内置默认值，用于 fallback） ───────────
 # 早盘 09:30 (570min) – 11:30 (690min)
 # 午盘 13:00 (780min) – 15:00 (900min)
@@ -102,7 +105,7 @@ def _is_market_open_config(current_min: int) -> bool | None:
     end_min = _parse_time_to_minutes(end_str)
     if start_min is None or end_min is None:
         return None
-    now = datetime.now(timezone(timedelta(hours=8)))
+    now = datetime.now(_BJ_TZ)
     if now.weekday() >= 5:
         return False
     in_range = start_min <= current_min <= end_min
@@ -126,7 +129,7 @@ def _is_market_open_official(current_min: int) -> bool | None:
     use_official = mh_config.get("official_source", True)
     if not use_official:
         return None
-    now = datetime.now(timezone(timedelta(hours=8)))
+    now = datetime.now(_BJ_TZ)
     if now.weekday() >= 5:
         return None  # 周末 return None 让 fallback 处理
     official_ttl = 60 if _MORNING_START <= current_min <= _AFTERNOON_END else 86400 * 7
@@ -154,7 +157,7 @@ def _is_market_open_fallback(current_min: int) -> bool:
 
     北京时区工作日 09:30–11:30 + 13:00–15:00，自动排除午餐和周末。
     """
-    now = datetime.now(timezone(timedelta(hours=8)))
+    now = datetime.now(_BJ_TZ)
     if now.weekday() >= 5:
         return False
     in_morning = _MORNING_START <= current_min <= _MORNING_END
@@ -171,7 +174,7 @@ def is_midday_break() -> bool:
     Returns:
         True 表示正处于午间休市时段（11:30-13:00 之间）
     """
-    now = datetime.now(timezone(timedelta(hours=8)))
+    now = datetime.now(_BJ_TZ)
     if now.weekday() >= 5:
         return False
     current_min = now.hour * 60 + now.minute
@@ -192,7 +195,7 @@ def is_market_open() -> bool:
         是否在交易时段内
     """
     try:
-        now = datetime.now(timezone(timedelta(hours=8)))
+        now = datetime.now(_BJ_TZ)
         current_min = now.hour * 60 + now.minute
 
         # 第 1 层：config.json 手动覆盖

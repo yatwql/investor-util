@@ -25,7 +25,7 @@
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。
 > ¹ `bond_yield_rf` 为精确缓存键名（`exact_cache_keys`），非前缀匹配，单独管理。
-> 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数纯 `exact_cache_keys` 模块（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`），无缓存前缀，不受常规缓存清理影响。
+> 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数 `exact_cache_keys` 模块，使用具体键名而非前缀匹配，不受 TTL 扫描清除影响（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`）。其中 `fund_benchmarks`、`fund_manager_snapshot` 等仍归属于缓存分组，可通过菜单 `[1]` 刷新。
 > **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。历史走势类不受菜单缓存命令影响，仅按 TTL 过期。
 
 ### LLM 模块缓存

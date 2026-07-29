@@ -153,6 +153,15 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.perf._HEALTH_CHECK_FILE",
         str(tmp_path / "data/state/datasource_health.jsonl"),
     )
+    # LLM 配置文件隔离
+    monkeypatch.setattr(
+        "src.python.config._core._LLM_KEY_FILE_DEFAULT",
+        str(tmp_path / "data/config/llm_key.json"),
+    )
+    monkeypatch.setattr(
+        "src.python.config._core._LLM_PROVIDERS_FILE_DEFAULT",
+        str(tmp_path / "data/config/llm_providers.json"),
+    )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(
         "src.python.constants.HISTORY_SNAPSHOT_DIR",
@@ -163,7 +172,14 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         str(tmp_path / "data/history/snapshots"),
     )
     # 清空配置缓存，使下次 get_config() 使用新路径
+    import src.python.config._config_defaults as _cfg_defaults
     import src.python.config._core as _cfg_core
+
+    monkeypatch.setitem(
+        _cfg_defaults._DEFAULT_CONFIG,
+        "llm_settings_file",
+        str(tmp_path / "data/config/llm_settings.json"),
+    )
     _cfg_core._clear_config_cache()
 
 

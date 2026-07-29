@@ -547,7 +547,6 @@ def generate_debate_procon(
     import threading as _threading
     from src.python.config._core import get_llm_config
     from src.python.llm.fingerprint import build_llm_fingerprint
-    from src.python.llm.prompts_action import _build_debate_synthesis_prompt, _build_expert_review_prompt
 
     # ── 辩论模式 feature 组合 ──────────────────────────
     _fp_suffix = _build_feature_suffix()

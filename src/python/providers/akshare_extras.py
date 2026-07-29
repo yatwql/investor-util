@@ -115,7 +115,7 @@ def _compute_index_fingerprint() -> str:
 
         raw = json.dumps([a_indices, us_indices], ensure_ascii=False, sort_keys=True, default=str)
         return hashlib.md5(raw.encode()).hexdigest()[:12]
-    except Exception:
+    except (TypeError, ValueError):
         logger.debug("指数指纹计算失败（降级到纯 TTL 缓存）", exc_info=True)
         return ""
 
@@ -331,7 +331,7 @@ def _compute_dividend_fingerprint(codes: list[str]) -> str:
     try:
         raw = json.dumps(sorted(set(codes)), ensure_ascii=False, sort_keys=True)
         return hashlib.md5(raw.encode()).hexdigest()[:12]
-    except Exception:
+    except (TypeError, ValueError):
         logger.debug("分红指纹计算失败，降级到无指纹缓存", exc_info=True)
         return "nofp"
 
@@ -369,7 +369,7 @@ def _calc_dividend_summary(df_data) -> dict | None:
             "avg_dividend": round(avg_div, 4),
             "record_count": record_count,
         }
-    except Exception:
+    except (TypeError, ValueError, IndexError, KeyError):
         logger.debug("分红数据解析失败", exc_info=True)
         return None
 

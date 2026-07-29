@@ -56,26 +56,19 @@ def _classify_fund_type(name: str, code: str) -> tuple[str, float]:
         if any(kw in name for kw in keywords):
             return type_label, fee_rate
 
-    # 代码特征识别
+    # 代码特征识别（通过 code_utils 中心化函数判断）
     code = code.strip().upper()
-    # 股票代码：6 位纯数字且不以 00/60/30 且非基金代码
+    from src.python.code_utils import is_a_share_code, is_hk_stock_code
+
     # A 股股票
-    if code.startswith(("SH", "SZ", "BJ")):
-        code_stripped = code[2:]
-        if code_stripped.isdigit() and len(code_stripped) == 6:
-            return "stock", _STOCK_FEE_RATE
-    # 纯数字 6 位 A 股代码
-    if code.isdigit() and len(code) == 6 and not code.startswith(("00", "60", "30")):
+    if is_a_share_code(code.lower()):
         return "stock", _STOCK_FEE_RATE
-
     # 港股 5 位数字
-    if code.isdigit() and len(code) == 5:
+    if is_hk_stock_code(code):
         return "stock", _STOCK_FEE_RATE
-
     # 美股：字母为主
     if code.isalpha() or (code.isalnum() and not code.isdigit()):
         return "stock", _STOCK_FEE_RATE
-
     # 无法识别 → 默认
     return "unknown", _DEFAULT_FEE_RATE
 

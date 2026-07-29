@@ -110,23 +110,6 @@ def _jinja_sentiment_colorize(text: str) -> str:
     return text
 
 
-def _jinja_section_visible(key: str) -> bool:
-    """Jinja2 全局函数：判断报告模块是否可见。
-
-    依赖模板上下文中的 section_visible_dict，在渲染前由
-    write_html_report 设置。
-
-    Usage in template:
-        {% if section_visible("fund_manager") %}
-        ...
-        {% endif %}
-    """
-    sv_dict = _ENV.globals.get("section_visible_dict", {})
-    if not isinstance(sv_dict, dict):
-        return False
-    return bool(sv_dict.get(key, False))
-
-
 # ── 注册过滤器 & 全局函数 ────────────────────────────────────
 
 _ENV.filters["money"] = _jinja_money

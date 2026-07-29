@@ -8,12 +8,12 @@ Endpoint: https://www.cls.cn/v1/roll/get_roll_list
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
 
 from src.python.http_client import make_http_client
+from src.python.providers._utils import ts_to_str
 
 logger = logging.getLogger("invest")
 
@@ -27,24 +27,6 @@ _HEADERS: dict[str, str] = {
     "Referer": "https://www.cls.cn",
 }
 
-
-def _ts_to_str(ts: int) -> str:
-    """将 Unix 时间戳（秒）转换为格式化的日期字符串。
-
-    CLS API 返回的时间戳为北京时间（UTC+8）。
-
-    Args:
-        ts: Unix 时间戳（秒）
-
-    Returns:
-        "YYYY-MM-DD HH:MM" 格式的字符串
-    """
-    try:
-        bj_tz = timezone(timedelta(hours=8))
-        dt = datetime.fromtimestamp(ts, tz=bj_tz)
-        return dt.strftime("%Y-%m-%d %H:%M")
-    except (OSError, ValueError, OverflowError):
-        return ""
 
 
 def _parse_news_item(item: dict[str, Any]) -> dict[str, Any] | None:
@@ -65,7 +47,7 @@ def _parse_news_item(item: dict[str, Any]) -> dict[str, Any] | None:
     raw_ctime = item.get("ctime")
     if raw_ctime:
         try:
-            ctime_str = _ts_to_str(int(raw_ctime))
+            ctime_str = ts_to_str(int(raw_ctime))
         except (TypeError, ValueError):
             ctime_str = ""
     else:

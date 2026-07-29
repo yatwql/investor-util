@@ -571,6 +571,7 @@ class DataSourceRegistry:
             key = cache_key_fn(code)
             data = _cache.get(key, 86400 * 7)
             if data is not None:
+                data = dict(data)  # 复制避免修改缓存原始对象
                 # 检查 price_date 是否匹配今天
                 data["_cache_date_mismatch"] = True  # 默认标记（文件缓存总是旧数据）
                 price_date = data.get("price_date", "")

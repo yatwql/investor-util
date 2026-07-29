@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from src.python.code_utils import is_qdii_extended
@@ -318,9 +317,9 @@ def _build_concept_sector_block(penetrated_assets: list[dict] | None) -> str:
 
 def _build_rebalance_block(holdings_details: list[dict] | None, total_mv: float) -> str:
     """构建再平衡建议段落。"""
-    from src.python.analysis.simple_rebalance import compute_rebalance_signals
+    from src.python.analysis.simple_rebalance import compute_simple_rebalance_signals
 
-    signals = compute_rebalance_signals(holdings_details, total_mv)
+    signals = compute_simple_rebalance_signals(holdings_details, total_mv)
     if not signals:
         return ""
 

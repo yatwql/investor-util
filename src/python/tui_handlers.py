@@ -97,22 +97,6 @@ def print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
         print(f"  [ERR] {prefix}: 操作异常，详情请查看日志文件 logs/app.log")
 
 
-def check_network_available(details: list) -> bool:
-    """检查行情数据是否全部不可用并在 TUI 上显示友好提示。"""
-    if not details:
-        return False
-    all_unavailable = all(getattr(d, "price", 0) is None or getattr(d, "price", 0) == 0 for d in details)
-    if all_unavailable:
-        print("  " + "=" * 54)
-        print("  [!] 所有行情数据均获取失败")
-        print("      可能原因：非交易时段 / 网络异常 / API 限速")
-        print("      报告中将显示「暂无行情」占位符，不影响持仓成本统计")
-        print("      请于交易时段或在网络通畅时重新生成")
-        print("  " + "=" * 54)
-        return False
-    return True
-
-
 # ── 持仓准备 / 收尾 ────────────────────────────────────────
 
 

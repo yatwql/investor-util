@@ -85,9 +85,22 @@ _FUND_TYPE_LABEL = {
 # 评级权重（最差→最好）
 _RATING_ORDER = ["较差", "偏差", "稳定", "良好", "优秀"]
 
-# 超额收益评分阈值（用于评级修正）
-_EXCESS_THRESHOLD_UP = 80  # 超额收益 ≥ 80 → 评级上调一级
-_EXCESS_THRESHOLD_DOWN = 40  # 超额收益 < 40 → 评级下调一级
+# 超额收益评分阈值（用于评级修正，可从 config.json 覆盖）
+_DEFAULT_EXCESS_THRESHOLD_UP = 80
+_DEFAULT_EXCESS_THRESHOLD_DOWN = 40
+
+
+def _get_excess_thresholds() -> tuple[int, int]:
+    """从 config.json 读取超额收益评分阈值，失败时返回内置默认值。"""
+    try:
+        from src.python.config import get_config
+
+        cfg = get_config().get("performance_evaluation", {})
+        up = int(cfg.get("excess_threshold_up", _DEFAULT_EXCESS_THRESHOLD_UP))
+        down = int(cfg.get("excess_threshold_down", _DEFAULT_EXCESS_THRESHOLD_DOWN))
+        return up, down
+    except (TypeError, ValueError, KeyError):
+        return _DEFAULT_EXCESS_THRESHOLD_UP, _DEFAULT_EXCESS_THRESHOLD_DOWN
 
 
 def _fund_display_type(h: Holding) -> str:
@@ -193,10 +206,12 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
 
     current_idx = _RATING_ORDER.index(peer_rating)
 
-    if excess_score >= _EXCESS_THRESHOLD_UP:
+    up, down = _get_excess_thresholds()
+
+    if excess_score >= up:
         # 超额收益显著 → 上调
         new_idx = min(current_idx + 1, len(_RATING_ORDER) - 1)
-    elif excess_score < _EXCESS_THRESHOLD_DOWN:
+    elif excess_score < down:
         # 超额收益较差 → 下调
         new_idx = max(current_idx - 1, 0)
     else:

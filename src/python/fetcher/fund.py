@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import threading
 from collections.abc import Callable
@@ -18,6 +20,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.config import get_config
+from src.python.constants import PROJECT_ROOT
 from src.python.fetcher.chain import fetch_with_fallback
 from src.python.http_client import make_http_client
 from src.python.providers.tiantian_holdings import fetch_fund_holdings
@@ -306,21 +309,25 @@ def _fetch_benchmark_from_api(code: str) -> str | None:
 
 # ── 第 2 层：内置知识库 ────────────────────────────────
 
-_BUILTIN_BENCHMARKS: dict[str, str] = {
-    "561910": "中证电池主题指数收益率",
-    "159941": "汇率调整后的纳斯达克100指数收益率",
-    "159222": "国证自由现金流指数收益率",
-    "518880": "国内黄金现货价格收益率",
-    "011506": "中证高端装备制造指数75% + 中证全债15% + 中证港股通10%",
-    "017730": "MSCI全球指数75% + 沪深30020% + 活期存款5%",
-    "022365": "战略性新兴产业成份指数70% + 恒生科技10% + 中债综合20%",
-    "016055": "经汇率调整的纳斯达克100指数95% + 活期存款5%",
-    "002943": "中证800 65% + 中债全债35%",
-    "096001": "标普500等权重指数（全收益指数）",
-    "240012": "中国债券总指数收益率100%",
-    "012325": "中债综合财富(1年以下)85% + 一年定存15%",
-    "040046": "纳斯达克100指数(经汇率)95% + 活期存款5%",
-}
+_BENCHMARKS_FILE = os.path.join(PROJECT_ROOT, "data/knowledge/fund_benchmarks.json")
+
+
+def _load_builtin_benchmarks() -> dict[str, str]:
+    """从 fund_benchmarks.json 加载内置基金基准对照表。"""
+    if not os.path.exists(_BENCHMARKS_FILE):
+        logger.warning("[基准] 内置基准文件 %s 不存在，使用空表", _BENCHMARKS_FILE)
+        return {}
+    try:
+        with open(_BENCHMARKS_FILE, encoding="utf-8") as f:
+            data: dict[str, str] = json.load(f)
+        logger.info("[基准] 已加载 %d 条内置基准对照", len(data))
+        return data
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("[基准] 加载内置基准文件失败: %s，使用空表", e)
+        return {}
+
+
+_BUILTIN_BENCHMARKS: dict[str, str] = _load_builtin_benchmarks()
 
 
 # ── 第 3 层：用户配置覆盖 ──────────────────────────────

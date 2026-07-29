@@ -17,11 +17,9 @@ from src.python.http_client import make_http_client
 from src.python.llm.api import call_llm
 from src.python.llm.api_base import (
     AUTO_INCREASE_FACTOR,
-    CACHE_LINE_HTML,
     LLM_TIMEOUT,
     TRUNCATION_MARKER,
-    _cache_line_model_tpl,
-    _extract_model_from_cached,
+    _build_cache_hint_and_record,
     _get_last_llm_failure,
     clear_last_llm_failure,
 )
@@ -41,6 +39,10 @@ from src.python.registry import get_llm_module_name
 _MN = get_llm_module_name
 
 logger = logging.getLogger("invest")
+
+# 批量调用参数
+_BATCH_CHUNK_SIZE = 10  # 每批最大条目数
+_BATCH_MAX_WORKERS = 6  # 批量调用最大并行度
 
 __all__ = [
     "is_llm_module_enabled",
@@ -84,19 +86,7 @@ def _handle_cache_hit(
         带缓存标记的 HTML 字符串
     """
     logger.info("LLM 缓存命中: %s", cache_key)
-    cached_clean = cached
-    _orig_model = _extract_model_from_cached(cached)
-    _hint = _cache_line_model_tpl(_orig_model) if _orig_model else CACHE_LINE_HTML
-    if thinking_enabled:
-        _hint = _hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
-    cached_clean += _hint
-    if module_key:
-        _model_for_record = _orig_model or model or llm_config.get("model", "") or "缓存命中"
-        _endpoint_for_record = endpoint or llm_config.get("endpoint", "") or ""
-        record_per_module(
-            module_key, _model_for_record, cached=True, thinking=thinking_enabled, endpoint=_endpoint_for_record
-        )
-    return cached_clean
+    return _build_cache_hint_and_record(cached, module_key, llm_config, thinking_enabled, endpoint=endpoint, model_hint=model)
 
 
 def _finalize_and_cache(
@@ -241,6 +231,7 @@ def _build_provider_cache_key(
             chain = resolve_provider_chain(provider_list, strategy, module_key, preferred)
             name = chain[0]["name"] if chain else "unknown"
         except Exception:
+            logger.debug("[skeleton] Provider chain 解析异常，使用默认缓存键", exc_info=True)
             name = "unknown"
     else:
         name = "unknown"
@@ -287,7 +278,7 @@ def generate_llm_content(
 
                 _, first_model, first_endpoint = _resolve_entry_credentials(first_entry, llm_config)
         except Exception:
-            pass
+            logger.debug("[skeleton] Provider 凭据解析异常", exc_info=True)
 
     precheck_key = _build_provider_cache_key(cache_key, llm_config, module_key, first_name)
 
@@ -571,23 +562,10 @@ def _execute_and_merge_batch(
             model=model,
         )
         if result and TRUNCATION_MARKER in result:
-            new_max = int(max_tokens * AUTO_INCREASE_FACTOR)
-            logger.warning(
-                "%s 输出被截断，自动以 %d 重新生成 [批 %d/%d]", _MN(module_key), new_max, batch_id + 1, total_batches
+            result, usage = _handle_truncation(
+                result, usage, max_tokens, system_prompt, user_prompt, llm_config,
+                timeout, batch_client, f"max_tokens_{module_key}", temperature, model,
             )
-            result2, usage2, _ = call_llm(
-                system_prompt,
-                user_prompt,
-                llm_config,
-                timeout=timeout,
-                http_client=batch_client,
-                max_tokens=new_max,
-                config_field=f"max_tokens_{module_key}",
-                temperature=temperature,
-                model=model,
-            )
-            if result2:
-                result, usage = result2, usage2
 
         if result:
             parsed_list = response_parser(batch_items, result)
@@ -646,11 +624,10 @@ def run_batch_mode(
     total_out = 0
 
     if uncached_indices and batch_prompt_fn and response_parser:
-        BATCH_SIZE = 10
-        batches = [uncached_indices[i : i + BATCH_SIZE] for i in range(0, len(uncached_indices), BATCH_SIZE)]
-        logger.info("正在调用 %s（%d 批未缓存，每批最多 %d 条）...", _MN(module_key), len(batches), BATCH_SIZE)
+        batches = [uncached_indices[i : i + _BATCH_CHUNK_SIZE] for i in range(0, len(uncached_indices), _BATCH_CHUNK_SIZE)]
+        logger.info("正在调用 %s（%d 批未缓存，每批最多 %d 条）...", _MN(module_key), len(batches), _BATCH_CHUNK_SIZE)
 
-        with ThreadPoolExecutor(max_workers=min(3, len(batches), 6)) as ex:
+        with ThreadPoolExecutor(max_workers=min(3, len(batches), _BATCH_MAX_WORKERS)) as ex:
             _fut_map = {
                 ex.submit(
                     _execute_and_merge_batch,

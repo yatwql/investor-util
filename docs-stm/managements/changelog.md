@@ -6,7 +6,86 @@
 
 ## [0.8.10-dev] - 2026-07-29
 
-### (待定)
+### Fixed
+- **P2B 魔数/硬编码修复（rf-90 ~ rf-95 共 6 项）**：
+  - rf-90: `report/penetration.py` `_SECTOR_KEYWORDS` ~330 行硬编码 → 迁出至 `data/knowledge/sector_keywords.json`，`_load_sector_keywords()` 加载
+  - rf-91: `fetcher/bond_yield.py` `df.columns[3]` → 改为列名匹配 `"中国国债收益率10年"`（随 C6 修复 rf-12 一并完成）
+  - rf-92: `market_hours.py` 时区硬编码 → 提取为模块级常量 `_BJ_TZ`
+  - rf-93: `providers/sina.py`/`tencent.py` K 线超时硬编码 → 提取为模块级常量 `_KLINE_TIMEOUT`
+  - rf-94: `report/fund_performance.py` 超额阈值硬编码 → 改为 `config.json` 可配置（`performance_evaluation.excess_threshold_up/down`），`_config_defaults.py` 新增对应配置段
+  - rf-95: `fetcher/fund.py` `_BUILTIN_BENCHMARKS` 13 条硬编码 → 迁出至 `data/knowledge/fund_benchmarks.json`，`_load_builtin_benchmarks()` 加载
+
+- **P2F LLM 模块技术债修复（rf-119 ~ rf-130 共 12 项，不含 rf-118）**：
+  - rf-119: `generators.py` 影子导入 — 移除 `generate_debate_procon()` 内部重复导入
+  - rf-120: `prompts_action.py` 重复 `logger` 定义 — 删除重复行
+  - rf-121: `prompts_tables.py` 未使用导入 — 移除 `is_a_share_code`、`is_hk_stock_code`
+  - rf-122: `prompts_core.py` 未使用导入 — 移除 `datetime`、`timedelta`、`timezone`
+  - rf-123: `prompts.py` `__all__` 缺失 — 补充 `_build_qa_concentration_block`
+  - rf-124: `api.py` 空白内容重试逻辑重复 — 提取共享 `_calm_retry()` 函数
+  - rf-125: `prompts_action.py` TOP3 代码重复 — 复用 `_build_top3_block()`
+  - rf-126: `api.py` thinking budget 计算重复 — 提取共享 `_resolve_thinking_budget()` 函数
+  - rf-127: `fact_checker.py` 贡献度关键词检查重复 — 提取 `_is_contribution_sentence()`
+  - rf-128: `generators_orchestrator.py` 硬编码 HTTP 连接池参数 → 模块级常量 `_LLM_MAX_CONNECTIONS`、`_LLM_MAX_KEEPALIVE`
+  - rf-129: `skeleton.py` 硬编码 `BATCH_SIZE`/`max_workers` → 模块级常量 `_BATCH_CHUNK_SIZE`、`_BATCH_MAX_WORKERS`
+  - rf-130: `api.py` 硬编码默认模型名 → 模块级常量 `_DEFAULT_CLAUDE_MODEL`、`_DEFAULT_OPENAI_MODEL`、`_DEFAULT_GEMINI_MODEL`
+
+- **P1A 架构约束违反修复（rf-15 ~ rf-22 共 6 项，不含 rf-17/19 待定）**：
+  - rf-15: `alignment_correction.py:_classify_fund_type()` 硬编码代码类型判定 → 改用 `code_utils.is_a_share_code()`/`is_hk_stock_code()`
+  - rf-16: `news_aggregator.py` 锚点文件 `data/cache/dedup_anchors.jsonl` → 迁出到 `data/calibration/`
+  - rf-18: `registry.py` 辩论模块 `DataModuleDef` 缺 `settings_suffix` → 补充 `debate_pro`/`debate_con`/`debate_synthesis`
+  - rf-20: `handlers_check_sources.py:_colored()` 缺 `NO_COLOR`/`isatty` 检查 → 新增 `_use_ansi()` 统一判断（含 rf-110 移重复 `import sys`）
+  - rf-21: `orchestrator.py` 直接赋值 `pipeline_data["risk_metrics"]` → 在 Schema 中注册 `risk_metrics`/`portfolio_daily_returns`
+  - rf-22: `pipeline_data_builder.py` 静默注册未知键 → 未注册键先 `logger.warning` 再注册
+
+- **P1B 裸异常修复（rf-23 ~ rf-30 共 8 项）**：
+  - rf-23: `config/_core.py` `_get_llm_providers_path()`/`_get_llm_key_path()` → 缩小异常范围
+  - rf-24: `reader.py:get_xlsx_info()` → 缩小为 `(FileNotFoundError, BadZipFile, InvalidFileException, OSError)`
+  - rf-25: `circuit_breaker_wrapper.py:_log_ff_event()`/`record_failure()` → 添加 `logger.debug`
+  - rf-26: `metrics.py:get_dividend_yield` → 提升日志级别到 `logger.warning`
+  - rf-27: `llm/api.py:_resolve_first_provider_model_endpoint` → 添加 `logger.debug`
+  - rf-28: `llm/skeleton.py` 两处 `except Exception: pass` → 添加 `logger.debug`
+  - rf-29: `news_aggregator.py:_flush_anchors()` `except OSError: pass` → `logger.warning`
+  - rf-30: `akshare_extras.py` 指纹/分红摘要 → 缩小异常范围
+
+- **P1C 死代码清理（rf-31 ~ rf-35 共 5 项）**：
+  - rf-31: 删除 `tui_handlers.py:check_network_available()`
+  - rf-32: 删除 `_config_defaults.py:_PATH_KEYS`
+  - rf-33: 删除 `html_jinja_env.py:_jinja_section_visible()`
+  - rf-34: 删除 `akshare_extras.py:_SECTOR_FLOW_FAILURE` 及相关赋值
+  - rf-35: 删除 `akshare_news.py:_MAX_CCTV`
+
+- **P1E 重复代码修复（rf-51 ~ rf-60 共 10 项）**：
+  - rf-51: 辩论模式检测逻辑 → 提取到 `data_status.py` 共享函数
+  - rf-52: 原子写入模式 → 提取 `_atomic_write()` 工具函数
+  - rf-53: `_ts_to_str()` 三模块重复 → 统一到 `providers/_utils.py`
+  - rf-54: `_safe_float()` 两处实现 → 统一到 `providers/_utils.py`
+  - rf-55~57: handlers 三个模块命令模式 → 提取通用辅助函数
+  - rf-58: 截断重试逻辑 → `_execute_and_merge_batch` 复用 `_handle_truncation`
+  - rf-59: 缓存命中处理 → 统一处理逻辑
+  - rf-60: `sina.py` 三处 `_pf()` → 提取为模块级私有函数
+
+- **P1F 线程安全问题修复（rf-61 ~ rf-64 共 4 项）**：
+  - rf-61: `news_aggregator.py:_last_src_results` → 新增 `_src_results_lock` 保护
+  - rf-62: `news_aggregator.py:_ANCHOR_RECORDS` → 新增 `_ANCHOR_LOCK` + `_record_anchor()` 线程安全追加
+  - rf-63: `provider_registry.py:fetch_cached_only()` → `data = dict(data)` 复制再修改
+  - rf-64: `features.py:FEATURE_FLAGS` → 新增 `_FEATURES_LOCK` 保护所有写操作
+
+- **P2D 测试质量修复（rf-101 ~ rf-105 共 5 项）**：
+  - rf-101: `test_integration.py` S4 死测试 — 修正 `fetch_market_data` mock 路径 + 补充 `is_market_open` mock，移除 `@unittest.skip`，清除重复 setUp 代码
+  - rf-102: `conftest.py` `_isolate_sensitive_paths` 补充 LLM 配置文件路径隔离（`llm_key.json`、`llm_providers.json`、`llm_settings.json`）
+  - rf-103: `test_config.py` 硬编码路径 → 改用 `get_llm_settings_path()`
+  - rf-104: `test_integration.py` 硬编码 `cache_dir = 'data/cache'` → 改用 `get_cache_dir()`
+  - rf-105: `test_datetime_scenarios.py` 测试重复 — `TestGetTtlMarketAware`（12 个测试）和 `TestClassifyHoldings`（12 个测试）参数化重构，代码减少 ~60%，覆盖不变（41 pt ✅）
+
+- **P0 技术债批量修复（rf-6 ~ rf-14 共 9 项）**：
+  - C3 原子写入（3 项）：`provider_registry._save_state()`、`features.save_feature_overrides()`、`handlers_config._write_llm_settings()` 全部改用 `tempfile.mkstemp + os.replace` 模式
+  - C18 凭据分离（2 项）：`_parse_providers_list()` 内联 api_key 改为强制 credentials_ref 并输出 WARNING，移除 `get_llm_config()` 中 `llm_settings.json` api_key 回退路径
+  - C16 路径安全（1 项）：`_PATH_CONFIG_KEYS` 补上 `llm_providers_file`
+  - C6 Chain 约束（1 项）：`bond_yield.py` 集成 akshare 熔断检查，`df.columns[3]` 改为列名匹配
+  - 封装破坏（1 项）：新增 `config._core.invalidate_config_cache()` / `invalidate_llm_config_cache()` 公共 API
+  - 死测试（1 项）：删除 4 个 `@pytest.mark.skip` 骨架占位文件
+
+- **rf-107 排查关闭**：确认 `simple_rebalance.compute_simple_rebalance_signals` 与 `rebalance.compute_rebalance_signals` 函数名已区分，无命名冲突；`simple_rebalance` 仍被 `prompts_core.py` 用于无配置依赖的轻量再平衡场景，非废弃代码，保持现状
 
 —
 

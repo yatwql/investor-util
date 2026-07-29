@@ -25,8 +25,6 @@ def get_config_path() -> str:
 
 
 # 默认配置（按业务分组排列顺序，与模板 _get_default_config_template() 一致）
-_PATH_KEYS = frozenset({"holdings_dir", "output_dir", "llm_settings_file", "llm_key_file", "llm_providers_file"})
-
 _DEFAULT_CONFIG = {
     # ── A. 路径与文件 ──
     # 以下路径型键使用绝对路径，使配置不依赖 CWD；holdings_filename 是纯文件名，保持相对
@@ -80,7 +78,12 @@ _DEFAULT_CONFIG = {
         "coverage_threshold": 0.8,
         "benchmark_indices": {"sh000300": "沪深300"},
     },
-    # ── H. 再平衡配置 ──
+    # ── H. 业绩评价配置 ──
+    "performance_evaluation": {
+        "excess_threshold_up": 80,  # 超额收益 ≥ 此值 → 评级上调一级
+        "excess_threshold_down": 40,  # 超额收益 < 此值 → 评级下调一级
+    },
+    # ── I. 再平衡配置 ──
     "rebalance": {
         "threshold": 0.15,  # 单品种权重超限阈值（默认 15%）
         "deviation_threshold": 0.05,  # 大类/品种配置偏离阈值（默认 5%）
@@ -89,11 +92,11 @@ _DEFAULT_CONFIG = {
         "target_allocation": {},  # 目标配置 Schema（空=不启用目标配置检查）
         "equity_fixed_income": {},  # 权益/固收超大类目标配置（空=不启用）
     },
-    # ── I. 流动性配置 ──
+    # ── J. 流动性配置 ──
     "redemption_limits": {},  # 场外基金单日赎回上限（code → 金额，空=未配置）
-    # ── J. 匿名化配置 ──
+    # ── K. 匿名化配置 ──
     "anonymization": {"mode": "off"},  # 匿名化模式：off/code_display/full_anonymous/summary
-    # ── K. 批量并行调度 ──
+    # ── L. 批量并行调度 ──
     "batch": {
         "max_total_workers": 15,  # 全局 batch 线程硬上限（已有池不计入）
         "fund_workers": 3,  # 基金排名/持仓批量并发数
@@ -177,7 +180,13 @@ def _get_default_config_template() -> str:
         '    "benchmark_indices": {"sh000300": "沪深300"}\n'
         "  },\n"
         "\n"
-        "  // ── H. 再平衡配置 ──\n"
+        "  // ── H. 业绩评价配置 ──\n"
+        '  "performance_evaluation": {\n'
+        '    "excess_threshold_up": 80,\n'
+        '    "excess_threshold_down": 40\n'
+        "  },\n"
+        "\n"
+        "  // ── I. 再平衡配置 ──\n"
         '  "rebalance": {\n'
         '    "threshold": 0.15,\n'
         '    "deviation_threshold": 0.05,\n'
@@ -187,15 +196,15 @@ def _get_default_config_template() -> str:
         '    "equity_fixed_income": {}\n'
         "  },\n"
         "\n"
-        "  // ── I. 流动性配置 ──\n"
+        "  // ── J. 流动性配置 ──\n"
         '  "redemption_limits": {},\n'
         "\n"
-        "  // ── J. 匿名化配置 ──\n"
+        "  // ── K. 匿名化配置 ──\n"
         '  "anonymization": {\n'
         '    "mode": "off"\n'
         "  },\n"
         "\n"
-        "  // ── K. 批量并行调度 ──\n"
+        "  // ── L. 批量并行调度 ──\n"
         '  "batch": {\n'
         '    "max_total_workers": 15,\n'
         '    "fund_workers": 3,\n'

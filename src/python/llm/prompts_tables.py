@@ -17,7 +17,7 @@ import logging
 from typing import Any
 
 from src.python.analysis.fx_exposure import fx_exposure as _fx_exposure
-from src.python.code_utils import get_currency_by_code, is_a_share_code, is_hk_stock_code
+from src.python.code_utils import get_currency_by_code
 from src.python.llm.prompts_core import _fmt_holding_line, _fmt_wan
 
 logger = logging.getLogger("invest")

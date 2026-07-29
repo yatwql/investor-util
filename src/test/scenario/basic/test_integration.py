@@ -194,7 +194,7 @@ class ScenarioTestBase(unittest.TestCase):
 
     def setUp(self):
         # 阻止所有网络/API 调用
-        self._price_patcher = patch("src.python.fetcher.price.fetch_market_data")
+        self._price_patcher = patch("src.python.report.market_value.fetch_market_data")
         self._mock_price = self._price_patcher.start()
         self._mock_price.return_value = {
             "price": 10.0, "yesterday_close": 9.8,
@@ -396,31 +396,31 @@ class TestScenarioMixedAccounts(ScenarioTestBase):
 
 @pytest.mark.scenario_new_holdings
 class TestScenarioNewHoldings(ScenarioTestBase):
-    def setUp(self):
-        super().setUp()
-        """清除可能影响测试的缓存。"""
-        import os, glob
-        cache_dir = 'data/cache'
-        for f in glob.glob(os.path.join(cache_dir, 'price_600900*')):
-            try: os.remove(f)
-            except OSError: pass
-        for f in glob.glob(os.path.join(cache_dir, 'trading_calendar*')):
-            try: os.remove(f)
-            except OSError: pass
-
-        """清除可能影响测试的缓存。"""
-        import os, glob
-        cache_dir = 'data/cache'
-        for f in glob.glob(os.path.join(cache_dir, 'price_600900*')):
-            try: os.remove(f)
-            except OSError: pass
-        for f in glob.glob(os.path.join(cache_dir, 'trading_calendar*')):
-            try: os.remove(f)
-            except OSError: pass
-
     """S4: 新持仓无缓存 → 全部从 API 获取。"""
 
-    @unittest.skip("pre-existing: mock path mismatch with chain code")
+    def setUp(self):
+        super().setUp()
+        # 清除可能影响测试的缓存
+        import glob
+        import os
+        from src.python.cache import get_cache_dir
+
+        cache_dir = get_cache_dir()
+        for pattern in ("price_600900*", "trading_calendar*"):
+            for f in glob.glob(os.path.join(cache_dir, pattern)):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+
+        # 确保 S4 场景走实时获取路径
+        self._market_open_patcher = patch("src.python.report.market_value.is_market_open", return_value=True)
+        self._market_open_patcher.start()
+
+    def tearDown(self):
+        self._market_open_patcher.stop()
+        super().tearDown()
+
     def test_api_called_when_no_cache(self):
         """无缓存 → 调用 fetch_market_data。"""
         holdings = [

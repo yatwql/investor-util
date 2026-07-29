@@ -290,30 +290,9 @@ def write_html_report(
     llm_module_info, llm_endpoint, module_disabled, _llm_session_usage = _render_llm_module_info(llm_enabled_flag)
 
     # ── 辩论模式标签 ──
-    _debate_mode_label: str | None = None
-    _debate_mode_combination: str | None = None
-    if debate_info and isinstance(debate_info, dict):
-        _debate_mode_label = debate_info.get("mode_label")
-        _debate_mode_combination = debate_info.get("mode_combination")
-    if not _debate_mode_label:
-        # 条件推理/集中度问答仅启用时从 feature flag 检测
-        from src.python.features import is_feature_enabled
+    from src.python.report._debate_utils import detect_debate_mode
 
-        if is_feature_enabled("llm_debate_procon"):
-            _debate_mode_label = "🧪 辩论模式"
-        elif is_feature_enabled("llm_debate_conditional") or is_feature_enabled("llm_debate_qa_concentration"):
-            _debate_mode_label = "🧪 实验模式"
-
-    # debate_info 不存在时（仅条件推理/集中度问答场景），从 feature flag 构建组合标识
-    if not _debate_mode_combination:
-        _comb_parts = []
-        if is_feature_enabled("llm_debate_procon"):
-            _comb_parts.append("正反辩论")
-        if is_feature_enabled("llm_debate_conditional"):
-            _comb_parts.append("条件推理")
-        if is_feature_enabled("llm_debate_qa_concentration"):
-            _comb_parts.append("集中度问答")
-        _debate_mode_combination = "+".join(_comb_parts) if _comb_parts else None
+    _debate_mode_label, _debate_mode_combination = detect_debate_mode(debate_info)
 
     # 辩论模式启用时覆盖 llm_module_info 中 expert_review 的状态标签
     if _debate_mode_label:

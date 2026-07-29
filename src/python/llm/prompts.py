@@ -91,6 +91,7 @@ __all__ = [
     "_build_health_check_prompt",
     "_build_penetration_deep_prompt",
     "_build_debate_synthesis_prompt",
+    "_build_qa_concentration_block",
     # 新闻关联分析
     "_build_holdings_summary",
     "_build_news_correlation_summary",

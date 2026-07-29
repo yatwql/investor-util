@@ -169,70 +169,61 @@ def _replace_dict_block(text: str, key: str, new_val: dict) -> str:
     return text  # brace 不平衡，放弃替换
 
 
-def _cmd_config_dir() -> None:
-    """配置持仓目录。"""
+def _edit_single_config(key: str, label: str, default: str = "", *, pre_hook=None) -> None:
+    """通用单配置项编辑命令。
+
+    封装 刷新 → 显示当前值 → 输入新值 → 保存 的重复模式。
+
+    Args:
+        key: config.json 中的键名
+        label: 显示用名称
+        default: 默认值
+        pre_hook: 可选前置回调（如显示文件列表），无参回调
+    """
     refresh_config()
     config = get_config_cache() or {}
-    current = config.get("holdings_dir", "")
-    print(f"  当前目录: {current}")
-    print("  请输入新目录路径（留空则不修改）:")
+    current = config.get(key, default)
+    if pre_hook:
+        pre_hook()
+    print(f"  当前{label}: {current}")
+    print(f"  请输入新{label}（留空则不修改）:")
     try:
-        new_dir = input("  > ").strip()
+        new_val = input("  > ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         return
-    if new_dir:
-        set_config("holdings_dir", new_dir)
+    if new_val:
+        set_config(key, new_val)
         refresh_config()
-        print(f"  {GREEN}[OK]{RESET} 目录已更新为: {new_dir}")
+        print(f"  {GREEN}[OK]{RESET} {label}已更新为: {new_val}")
     else:
         print("  未修改")
 
 
-def _cmd_config_filename() -> None:
-    """配置持仓文件名。"""
-    refresh_config()
+def _list_xlsx_preview() -> None:
+    """列出当前 holdings_dir 中的 xlsx 文件（供 _cmd_config_filename 使用）。"""
     config = get_config_cache() or {}
-    current = config.get("holdings_filename", "")
     files = list_xlsx_files(config.get("holdings_dir", ""))
     if files:
         print("  当前目录中的 xlsx 文件:")
         for i, f in enumerate(files, 1):
             print(f"    [{i}] {os.path.basename(f)}")
         print()
-    print(f"  当前文件名: {current}")
-    print("  请输入文件名（留空则不修改）:")
-    try:
-        new_name = input("  > ").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return
-    if new_name:
-        set_config("holdings_filename", new_name)
-        refresh_config()
-        print(f"  {GREEN}[OK]{RESET} 文件名已更新为: {new_name}")
-    else:
-        print("  未修改")
+
+
+def _cmd_config_dir() -> None:
+    """配置持仓目录。"""
+    _edit_single_config("holdings_dir", "目录")
+
+
+def _cmd_config_filename() -> None:
+    """配置持仓文件名。"""
+    _edit_single_config("holdings_filename", "文件名", pre_hook=_list_xlsx_preview)
 
 
 def _cmd_config_output_dir() -> None:
     """配置报告输出目录。"""
-    refresh_config()
-    config = get_config_cache() or {}
-    current = config.get("output_dir", "reports")
-    print(f"  当前输出目录: {current}")
-    print("  请输入新的报告输出目录路径（留空则不修改）:")
-    try:
-        new_dir = input("  > ").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return
-    if new_dir:
-        set_config("output_dir", new_dir)
-        refresh_config()
-        print(f"  {GREEN}[OK]{RESET} 输出目录已更新为: {new_dir}")
-    else:
-        print("  未修改")
+    _edit_single_config("output_dir", "报告输出目录", default="reports")
 
 
 def _cmd_config_llm_modules() -> None:

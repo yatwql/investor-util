@@ -483,7 +483,7 @@ def get_dividend_yield(code: str) -> float | None:
 
         return None
     except Exception:
-        logger.debug("[metrics] 获取 %s 股息率失败", code, exc_info=True)
+        logger.warning("[metrics] 获取 %s 股息率失败", code, exc_info=True)
         return None
 
 

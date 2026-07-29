@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -29,12 +30,19 @@ logger = logging.getLogger("invest")
 #   {"ts","title_a","title_b","source_a","source_b",
 #    "ratio","bigram_overlap","decision","rule"}
 _ANCHOR_RECORDS: list[dict[str, Any]] = []
+_ANCHOR_LOCK = threading.Lock()
 _ANCHOR_PATH = os.path.join(
     PROJECT_ROOT,
     "data",
-    "cache",
+    "calibration",
     "dedup_anchors.jsonl",
 )
+
+
+def _record_anchor(record: dict[str, Any]) -> None:
+    """线程安全地追加一条锚点记录。"""
+    with _ANCHOR_LOCK:
+        _ANCHOR_RECORDS.append(record)
 
 
 def get_enabled_sources() -> list[str]:
@@ -81,6 +89,7 @@ def _save_news_cache(cache_key: str, result: list[dict]) -> None:
 # ── 上次获取的各源状态（用于 D-7b 空态占位） ──────────────────
 
 _last_src_results: dict[str, tuple[int, str]] = {}
+_src_results_lock = threading.Lock()
 
 
 def get_last_source_status() -> dict[str, dict]:
@@ -242,15 +251,16 @@ def _flush_anchors() -> None:
     global _ANCHOR_RECORDS
     if not _ANCHOR_RECORDS:
         return
-    records = _ANCHOR_RECORDS
-    _ANCHOR_RECORDS = []  # 先清空再写，防止递归写入
+    with _ANCHOR_LOCK:
+        records = _ANCHOR_RECORDS
+        _ANCHOR_RECORDS = []  # 先清空再写，防止递归写入
     try:
         os.makedirs(os.path.dirname(_ANCHOR_PATH), exist_ok=True)
         with open(_ANCHOR_PATH, "a", encoding="utf-8") as f:
             for r in records:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    except OSError:
-        pass  # best effort，不影响主流程
+    except OSError as e:
+        logger.warning("锚点文件写入失败: %s", e)
 
 
 def _dedup_by_title(
@@ -396,7 +406,7 @@ def _dedup_by_title(
                     break
                 # 锚点：同源 bigram 接近阈值
                 if 2 <= overlap <= 5:
-                    _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, 0.0, overlap, False, "same_src"))
+                    _record_anchor(_make_anchor(item, existing_item, 0.0, overlap, False, "same_src"))
 
             # ② 跨源安全区：ratio ≥ 0.50 直接合并
             #    剥离通用日期模式后比较，避免不同新闻因共享"2026年7月"等虚高
@@ -407,7 +417,7 @@ def _dedup_by_title(
                 is_dup = True
                 # 锚点：跨源安全区擦边
                 if ratio < 0.60:
-                    _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, 0, True, "cross_safe"))
+                    _record_anchor(_make_anchor(item, existing_item, ratio, 0, True, "cross_safe"))
                 break
 
             # ③ 跨源候选区：0.30 ≤ ratio < 0.50，需共享 ≥ 3 实体 bigram
@@ -417,10 +427,10 @@ def _dedup_by_title(
                 overlap = len(bg1 & bg2)
                 if overlap >= 3:
                     is_dup = True
-                    _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
+                    _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
                     break
                 # 锚点：跨源候选区但 bigram 不足
-                _ANCHOR_RECORDS.append(_make_anchor(item, existing_item, ratio, overlap, False, "cross_skip"))
+                _record_anchor(_make_anchor(item, existing_item, ratio, overlap, False, "cross_skip"))
 
             # ④ 子串包含
             if not is_dup:
@@ -506,11 +516,13 @@ def aggregate_news(
     cache_key = _compute_cache_key(keywords, top_n, sources, per_source)
     cached = _check_news_cache(cache_key, sources)
     if cached is not None:
-        _last_src_results = {s: (0, "cache") for s in sources}
+        with _src_results_lock:
+            _last_src_results = {s: (0, "cache") for s in sources}
         return cached
 
     all_raw, src_results = _fetch_from_all_sources(sources, per_source, progress_callback)
-    _last_src_results = src_results
+    with _src_results_lock:
+        _last_src_results = src_results
 
     if not all_raw:
         logger.warning("所有新闻源均获取失败，请检查网络连接")

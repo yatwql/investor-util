@@ -153,6 +153,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         "llm_debate_pro",
         cache_prefixes=("llm_debate_pro_",),
         cache_ttl=86400,
+        settings_suffix="debate_pro",
         cache_groups=("preload",),
     ),
     DataModuleDef(
@@ -160,6 +161,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         "llm_debate_con",
         cache_prefixes=("llm_debate_con_",),
         cache_ttl=86400,
+        settings_suffix="debate_con",
         cache_groups=("preload",),
     ),
     DataModuleDef(
@@ -167,6 +169,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         "llm_debate_synthesis",
         cache_prefixes=("llm_debate_synthesis_",),
         cache_ttl=86400,
+        settings_suffix="debate_synthesis",
         cache_groups=("preload",),
     ),
     # ── 补充数据（refresh 组）──
