@@ -76,9 +76,9 @@ class TestSP1DirectStocks(unittest.TestCase):
         self.assertEqual(summary["total_stocks"], 3)
         self.assertEqual(summary["total_funds"], 0)
 
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
-    def test_stock_sector_mapping(self, mock_enrich):
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
+    def test_stock_sector_mapping(self, mock_ind):
         """纯股票 → 板块映射正确：茅台→消费, 长江电力→能源资源, 宁德时代→新能源。"""
         details = [
             self._make_detail("600519", "贵州茅台", 1500.0, 100),
@@ -503,9 +503,9 @@ class TestSP4ActiveEquity(unittest.TestCase):
             self.assertTrue(tag_found, f"{entry['name']} 来源缺少 [权益] 标签")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
-    def test_active_equity_sector_医药(self, mock_enrich, mock_batch):
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
+    def test_active_equity_sector_医药(self, mock_ind, mock_batch):
         """主动基金 → 穿透标的板块映射为"医药"。"""
         mock_batch.return_value = {
             "003095": {

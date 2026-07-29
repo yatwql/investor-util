@@ -8,13 +8,13 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 153 | 40,874 | `src/python/` 下所有 `.py`（不含测试） |
+| 主程序代码 | Python | 178 | 42,821 | `src/python/` 下所有 `.py`（不含测试） |
 | HTML 报告模板 | HTML | 1 | 1,862 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python | 9 | 3,118 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **163** | **45,854** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **191** | **59,441** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,849 个** | `pytest --collect-only` 统计 |
-| **用户文档** | Markdown | **95** | — | `docs-stm/`（93 文件）+ `README.md` + `CLAUDE.md` |
+| 辅助脚本 | Python | 12 | 3,741 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **191** | **48,424** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **221** | **60,982** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,880 个** | `pytest --collect-only` 统计 |
+| **用户文档** | Markdown | **98** | — | `docs-stm/`（96 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
 
@@ -218,7 +218,7 @@ investor-util/
 │       │   └── hallucination/        #   幻觉测试数据集
 │       │       ├── __init__.py       #       子包标记
 │       │       └── datasets.py       #       幻觉评估标准持仓数据
-│       ├── unit/                     #   单元测试（10 子组）
+│       ├── unit/                     #   单元测试（12 子目录）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── conftest.py           #   单元测试 conftest
 │       │   ├── analysis/             #   分析计算单元测试
@@ -233,7 +233,7 @@ investor-util/
 │       │   │   ├── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景
 │       │   │   ├── test_rebalance.py          #   再平衡信号计算
 │       │   │   ├── test_rebalance_edge.py     #   再平衡边缘场景
-│       │   │   ├── test_scenario.py           #   情景分析测试
+│       │   │   ├── test_scenario_analysis.py       #   情景分析测试
 │       │   │   ├── test_alignment_correction.py #   口径修正因子计算
 │       │   │   └── test_drawdown_warning.py   #   回撤历史分位预警
 │       │   ├── config/              #   配置单元测试
@@ -289,7 +289,7 @@ investor-util/
 │       │   │   └── test_handlers_report.py #   报告生成命令处理测试
 │       │   ├── llm/                 #   LLM 单元测试
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_cache_multi.py        #   多 Provider 缓存测试
+│       │   │   ├── test_llm_cache_multi.py         #   多 Provider 缓存测试
 │       │   │   ├── test_circuit_breaker_edge.py  #   LLM 熔断器边缘场景
 │       │   │   ├── test_circuit_breaker_recovery.py # 熔断恢复测试
 │       │   │   ├── test_cost_tracker.py     #   Token 成本跟踪测试
@@ -319,9 +319,9 @@ investor-util/
 │       │   │   ├── test_llm_prompts.py        #   LLM 提示词测试
 │       │   │   ├── test_llm_session.py        #   LLM 会话测试
 │       │   │   ├── test_llm_utils.py          #   LLM 工具函数测试
-│       │   │   ├── test_prompts.py            #   提示词库测试
+│       │   │   ├── test_llm_prompt_builders.py     #   提示词构建器测试
 │       │   │   ├── test_prompts_core.py       #   提示词核心测试
-│       │   │   ├── test_session.py            #   会话管理测试
+│       │   │   ├── test_llm_session_usage.py       #   会话用量管理测试
 │       │   │   ├── test_skeleton.py           #   内容骨架生成测试
 │       │   │   └── test_strategy.py           #   策略引擎测试
 │       │   ├── news/                #   新闻单元测试
@@ -410,7 +410,7 @@ investor-util/
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── basic/               #   基本面场景测试
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_integration.py             #   集成场景测试
+│       │   │   ├── test_scenario_basic_flows.py    #   基础业务链路场景测试
 │       │   │   ├── test_pipeline_metrics_injection.py # 管线指标注入测试
 │       │   │   ├── test_pipeline_smoke.py          #   管线冒烟测试
 │       │   │   ├── test_scenario_holdings_quality.py # 持仓质量场景测试
@@ -421,17 +421,27 @@ investor-util/
 │       │   ├── datetime/            #   日期时间场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   └── test_datetime_scenarios.py #   日期时间场景测试
-│       │   ├── llm/                 #   LLM 场景测试
+│       │   ├── llm/                 #   LLM 场景测试（12 测试文件）
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_llm_hallucination.py  #   LLM 幻觉率采样场景测试
-│       │   │   └── test_llm_scenarios.py #   LLM 场景测试
+│       │   │   ├── test_llm_mixed_cache.py      #   混合缓存+真实调用
+│       │   │   ├── test_llm_all_fail.py         #   全部失败（5 种原因）
+│       │   │   ├── test_llm_extended_thinking.py #   Extended Thinking 混合
+│       │   │   ├── test_llm_disabled.py         #   LLM 不启用
+│       │   │   ├── test_llm_disabled_cache.py   #   禁用+缓存混合
+│       │   │   ├── test_llm_network_error.py    #   断网下 LLM 降级
+│       │   │   ├── test_llm_partial_cache.py    #   部分缓存超期
+│       │   │   ├── test_llm_empty_holdings.py   #   空持仓/全缓存
+│       │   │   ├── test_llm_output_consistency.py #  输出格式一致性
+│       │   │   ├── test_llm_non_trading_day.py  #   非交易日 LLM 行为
+│       │   │   ├── test_llm_multi_account.py    #   多账户多轮交互
+│       │   │   └── test_llm_hallucination.py    #   LLM 幻觉率采样场景测试
 │       │   ├── perf/                #   性能场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   └── test_e2e_perf.py #   端到端性能场景测试
 │       │   ├── resilience/          #   弹性场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_chain_resilience.py   #   数据链弹性场景测试
-│       │   │   ├── test_integration_scenarios.py #   集成弹性场景测试
+│       │   │   ├── test_scenario_resilience_flows.py # 弹性业务链路场景测试
 │       │   │   └── test_scenario_extreme.py      #   极端场景测试
 │       │   └── security/            #   安全场景测试
 │       │       ├── __init__.py      #       子包标记

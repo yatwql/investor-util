@@ -53,20 +53,20 @@
 |:-------|:---------|:--------:|:-----------|
 | `scenario`（父标记） | S0a/S0b/S0d + S1-S34 + T1-T21 全量业务场景（含 S0c+S10） | **285** | 见下 |
 | ├─ `scenario_basic` | 基础业务链路 S1-S5 + S0a/S0b/S0d + S21-S34 + P1p | **122** | |
-| │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_integration.py::TestScenarioS1` |
-| │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_integration.py::TestScenarioS2` |
-| │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 | `test_integration.py::TestScenarioS3` |
-| │  ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 | `test_integration.py::TestScenarioS4` |
-| │  ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 | `test_integration.py::TestScenarioS5` |
+| │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_scenario_basic_flows.py::TestScenarioS1` |
+| │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_scenario_basic_flows.py::TestScenarioS2` |
+| │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 | `test_scenario_basic_flows.py::TestScenarioS3` |
+| │  ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 | `test_scenario_basic_flows.py::TestScenarioS4` |
+| │  ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 | `test_scenario_basic_flows.py::TestScenarioS5` |
 | │  ├ `scenario_special_securities` | S21-S28: 特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债） | 27 | `test_scenario_special_securities.py` |
 | │  ├ `scenario_s0_holdings_quality` | S0a/S0b/S0d: 持仓质量（清仓/同名多份额/特殊字符） | **13** | `test_scenario_holdings_quality.py::TestS0a/TestS0b/TestS0d` |
 | │  ├ `scenario_section_order` | C-P1b: 报告序号可配置合并场景（含自定义/部分配置/未知 key） | 6 | `test_scenario_section_order.py` |
 | │  └ `—` | S29-S34: 操作行为（分红送转/定投摊薄/部分卖出/跨账户转仓/新股待上市）+ 组合历史走势基准指数对比 | 15 | `test_scenario_operational_behavior.py` |
 | ├─ `scenario_resilience` | 异常容错场景 S6-S9 | **13** | |
-| │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | `test_integration_scenarios.py::TestScenarioBond` |
-| │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_integration_scenarios.py::TestScenarioNetworkDown` |
-| │  ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 | `test_integration_scenarios.py::TestScenarioSingleHolding` |
-| │  └ `scenario_zero_cost` | S9: 零成本持仓 | 4 | `test_integration_scenarios.py::TestScenarioZeroCost` |
+| │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | `test_scenario_resilience_flows.py::TestScenarioBond` |
+| │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_scenario_resilience_flows.py::TestScenarioNetworkDown` |
+| │  ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 | `test_scenario_resilience_flows.py::TestScenarioSingleHolding` |
+| │  └ `scenario_zero_cost` | S9: 零成本持仓 | 4 | `test_scenario_resilience_flows.py::TestScenarioZeroCost` |
 | ├─ `scenario_extreme`（独立标记） | 极限场景 S0c+S10（超多持仓/极端份额/高精度净值/零值组合），不包含在 `scenario` 父标记中 | **9** | `test_scenario_extreme.py::TestS0cLargeHoldings/TestScenarioExtreme` |
 | ├─ `scenario_llm` | LLM 场景组合 S11-S20（10 个类共 32 项，其中 24 项同时标记为 llm） | 32 | `test_llm_scenarios.py`（TestS11~S20，每场景一独立类） |
 | └─ `scenario_datetime` | 日期/时间场景 T1-T21（含跨月/跨年/调休/港股通假期） | 100 | |
@@ -85,7 +85,7 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 12 子组合计 | **3513** |
+| `unit`（父标记） | 11 子组合计 | **3513** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 191 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 263 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退） | 621 |
@@ -102,7 +102,7 @@
 
 | 标记 | 覆盖范围 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `llm` | 全部 LLM 相关（unit_llm 584 + scenario_llm 32，其中 503 项标有 llm 标记），**全部为 mock 测试，无需真实 API key** | **503** |
+| `llm` | 全部 LLM 相关（unit_llm 621 + scenario_llm 32，其中 503 项标有 llm 标记），**全部为 mock 测试，无需真实 API key** | **503** |
 | `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** |
 | `edge` | 异常/边界场景（含熔断冷却探针） | **473** |
 | `data` | 数据正确性验证 | **69** |

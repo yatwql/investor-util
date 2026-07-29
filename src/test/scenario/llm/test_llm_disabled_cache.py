@@ -4,7 +4,7 @@ S15：1 禁用 + 1 缓存 + 1 成功 → 禁用优先原则。
 
 运行：
   cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_s15_disabled_cache.py -v
+  pytest src/test/scenario/llm/test_llm_disabled_cache.py
 """
 
 from __future__ import annotations

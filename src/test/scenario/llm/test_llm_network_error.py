@@ -4,7 +4,7 @@ S16：网络断开 → 所有模块降级为 NETWORK_ERROR。
 
 运行：
   cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_s16_network_error.py -v
+  pytest src/test/scenario/llm/test_llm_network_error.py
 """
 
 from __future__ import annotations

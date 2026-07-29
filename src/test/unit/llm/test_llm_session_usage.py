@@ -9,7 +9,7 @@
 
 运行：
   cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_session.py -v
+  python -m pytest src/test/unit/llm/test_llm_session_usage.py -v
 """
 
 from __future__ import annotations

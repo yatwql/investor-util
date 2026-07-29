@@ -447,12 +447,12 @@ pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 |:---------|:-------|:-----|
 | **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache.py` 追加 `TestCacheEdgeCases` |
 | **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
-| **业务场景测试** | `test_integration.py`（基础链路 S1-S5）或 `test_integration_scenarios.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_integration.py` |
+| **业务场景测试** | `test_scenario_basic_flows.py`（基础链路 S1-S5）或 `test_scenario_resilience_flows.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_scenario_basic_flows.py` |
 | **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
 | **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
 | **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S34 |
 | **报告序号场景** | `scenario/basic/test_scenario_section_order.py` | 序号合规性 |
-| **LLM 场景测试** | `test_llm_scenarios_misc.py` 等（按 S11-S17 分组拆分为 7 个子文件） | S11-S20 |
+| **LLM 场景测试** | `test_llm_mixed_cache.py` / `test_llm_all_fail.py` / `test_llm_extended_thinking.py` / `test_llm_disabled.py` / `test_llm_disabled_cache.py` / `test_llm_network_error.py` / `test_llm_partial_cache.py` / `test_llm_empty_holdings.py` / `test_llm_output_consistency.py` / `test_llm_non_trading_day.py` / `test_llm_multi_account.py` | S11-S20 |
 | **日期/时间场景** | `test_datetime_scenarios.py` | T1-T21 |
 | **辩论模式场景** | `integration/test_debate_pipeline.py` | 端到端管线 |
 | **辩论模式单元测试** | `unit/llm/test_debate_*.py` | generators/prompts/edge/token_budget/conditional/qa |

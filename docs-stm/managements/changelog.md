@@ -6,7 +6,21 @@
 
 ## [0.8.11-dev] - 2026-07-30
 
-—
+### 修复
+
+- **回归测试：4 个穿透测试 mock 失效** — `compute_penetration_top10` 已重构为 Phase 1(`batch_fetch_industry_data`)/Phase 3(`_apply_industry_data`) 实时 API 流程，旧 mock `_enrich_with_industry_api` 处于死代码路径不再被调用，导致返回真实行业数据覆盖关键字分类。改为 mock `batch_fetch_industry_data` 返回空字典，让 sector 保持关键字分类结果。（`test_penetration_core.py`、`test_scenario_penetration_basic.py`）
+- **回归测试：`test_llm_content_none_when_disabled` 顺序依赖失败** — `_render_llm_module_info` 在所有条件下均读取全局 `LLM_MODULE_FAILURE`，前序测试（test_llm_all_fail）设值后污染状态导致 module_disabled 出现非预期值。增加 `patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {})` 隔离。（`test_llm_disabled.py`）
+
+### 重构
+
+- **测试文件重命名 — `scenario/llm/`（7 文件）**：`test_s11_mixed_cache.py` → `test_llm_mixed_cache.py`、`test_s12_all_fail.py` → `test_llm_all_fail.py`、`test_s13_extended_thinking.py` → `test_llm_extended_thinking.py`、`test_s14_llm_disabled.py` → `test_llm_disabled.py`、`test_s15_disabled_cache.py` → `test_llm_disabled_cache.py`、`test_s16_network_error.py` → `test_llm_network_error.py`、`test_s17_partial_cache.py` → `test_llm_partial_cache.py`
+- **`test_llm_scenarios_misc.py` 拆分（→ 4 文件）**：拆为 `test_llm_empty_holdings.py`（S18-S19）、`test_llm_output_consistency.py`（S20）、`test_llm_non_trading_day.py`、`test_llm_multi_account.py`，原文件删除
+- **测试文件重命名 — 其余 6 文件**：`scenario/basic/test_integration.py` → `test_scenario_basic_flows.py`、`scenario/resilience/test_integration_scenarios.py` → `test_scenario_resilience_flows.py`、`unit/llm/test_prompts.py` → `test_llm_prompt_builders.py`、`unit/llm/test_session.py` → `test_llm_session_usage.py`、`unit/llm/test_cache_multi.py` → `test_llm_cache_multi.py`、`unit/analysis/test_scenario.py` → `test_scenario_analysis.py`
+
+### 杂项
+
+- 同步更新 `testplan.md`、`test-coverage.md`、`how-to-test-my-code.md`、`folders.md` 中所有文件引用、统计数字和 Sxx 注释
+- 更新各重命名文件的 docstring 运行命令
 
 ## 归档
 

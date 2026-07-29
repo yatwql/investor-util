@@ -5,7 +5,7 @@ S17a：全部模块缓存命中，无 API 调用。
 
 运行：
   cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_s17_partial_cache.py -v
+  pytest src/test/scenario/llm/test_llm_partial_cache.py
 """
 
 from __future__ import annotations

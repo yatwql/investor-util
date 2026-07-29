@@ -2,7 +2,7 @@
 
 运行：
   cd D:/codebase/zoo/investor-util
-  pytest src/test/unit/llm/test_prompts.py -v
+  pytest src/test/unit/llm/test_llm_prompt_builders.py -v
 """
 
 from __future__ import annotations

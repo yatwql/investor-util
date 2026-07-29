@@ -4,7 +4,7 @@ S14：TUI 不按 L → 无 LLM 章节、无 LLM API 用量页。
 
 运行：
   cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_s14_llm_disabled.py -v
+  pytest src/test/scenario/llm/test_llm_disabled.py -v
 """
 
 from __future__ import annotations
@@ -95,6 +95,9 @@ class TestS14LlmDisabled(unittest.TestCase):
                 patch("src.python.report.html_renderers._build_perf_data"))
             mock_llm = stack.enter_context(
                 patch("src.python.llm.generate_all_llm"))
+            # 隔离 LLM_MODULE_FAILURE 全局状态，避免前序测试污染
+            stack.enter_context(
+                patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {}))
             mock_template = stack.enter_context(
                 patch("src.python.report.html_writer._ENV.get_template"))
 

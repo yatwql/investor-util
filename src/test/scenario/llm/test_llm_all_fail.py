@@ -4,7 +4,7 @@ S12：5 种失败原因全量覆盖。
 
 运行：
   cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_s12_all_fail.py -v
+  pytest src/test/scenario/llm/test_llm_all_fail.py
 """
 
 from __future__ import annotations
