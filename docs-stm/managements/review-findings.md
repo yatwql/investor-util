@@ -15,8 +15,6 @@
 
 | # | 文件 | 行数 | 拆分建议 |
 |---|------|------|----------|
-| **rf-65** | `report/orchestrator.py` | 1031 | 数据准备 / 快照 / 历史走势 / LLM新闻 / 管线生成 5 职责（注：长函数已拆分，文件级别未拆） |
-| **rf-74** | `llm/skeleton.py` | 705 | 批量模式代码拆出到 `_batch_mode.py` |
 | **rf-75** | `registry.py` | 617 | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责 |
 | **rf-76** | `llm/fact_checker.py` | 623 | 核心校验逻辑与辅助函数分离（注：长函数已拆分，文件级别未拆） |
 | **rf-77** | `handlers_config.py` | 553 | JSON 文本编辑函数提取到 `config/` 子模块 |
@@ -26,19 +24,7 @@
 | **rf-81** | `report/html_renderers.py` | 521 | 所有 HTML render 函数揉合一体 |
 | **rf-85** | `fetcher/fund.py` | 394 | 排名/持仓/基准三职责可拆分为子模块 |
 | **rf-86** | `cache/operations.py` | 472 | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
-| **rf-87** | `report/portfolio_history.py` | 597 | `get_combined_timeseries()` 已拆分，文件因新增子函数反而增长 |
-| **rf-88** | `report/html_writer.py` | 480 | `write_html_report()` ~275 行单函数可拆分 |
 | **rf-89** | `report/excel_generator.py` | 447 | Excel 编排器 |
-
-#### P2D — 测试质量问题
-
-| # | 分类 | 文件 | 说明 |
-|---|------|------|------|
-| **rf-131** | 测试覆盖缺口 | `analysis/alignment_correction.py` | 口径修正逻辑（alignment factors 计算 + scenario 分析）无独立单元测试 |
-| **rf-132** | 测试覆盖缺口 | `analysis/drawdown_warning.py` | 回撤告警逻辑无独立单元测试 |
-| **rf-133** | 测试覆盖缺口 | `cache/services/holdings_tracker.py` | 持仓追踪器无独立单元测试 |
-| **rf-134** | 测试覆盖缺口 | `llm/fallback.py` | LLM 降级/回退策略无独立单元测试 |
-| **rf-135** | 测试覆盖缺口（批量低风险） | `circuit_breaker_wrapper.py`, `cache/_io.py`, `llm/prompts_core.py`, `report/excel_b_series.py`, `llm/skeleton.py` 子函数, `report/_pipeline.py` | 均由调用方间接覆盖，低风险 |
 
 ---
 
@@ -109,6 +95,10 @@
 | rf-82 | **P2A 文件过大** | `analysis/alignment_correction.py` 577 行 | 拆出 `_fee_estimation.py`（费率估算） | v0.8.10-dev |
 | rf-83 | **P2A 文件过大** | `providers/news_aggregator.py` 524 行 | 去重逻辑提取为 `news_dedup.py`（随 rf-47 完成），降至 236 行 | v0.8.10-dev |
 | rf-84 | **P2A 文件过大** | `providers/sina.py` 516 行 | K 线函数提取为 `sina_kline.py`，降至 ~400 行 | v0.8.10-dev |
+| rf-65 | **P2A 文件过大** | `report/orchestrator.py` 1031 行 | 数据准备/快照/历史走势/LLM新闻/管线生成 5 职责拆分为 `_report_generation.py`/`_snapshot.py`/`_llm_news.py`，降至 245 行 | v0.8.10-dev |
+| rf-74 | **P2A 文件过大** | `llm/skeleton.py` 705 行 | 批量模式代码拆出到 `_batch_mode.py`，降至 532 行 | v0.8.10-dev |
+| rf-88 | **P2A 文件过大** | `report/html_writer.py` 480 行 | 14 个渲染函数提取到 `html_renderers.py`，保存逻辑提取到 `html_save.py`，`write_html_report()` 降至 ~210 行 | v0.8.10-dev |
+| rf-87 | **P2A 文件过大** | `report/portfolio_history.py` 597 行 | 历史走势数据质量校验提取到 `_history_quality.py`，降至 513 行 | v0.8.10-dev |
 | rf-90 | **P2B 魔数 — 行业关键词硬编码** | `report/penetration.py` `_SECTOR_KEYWORDS` ~330 行硬编码字典 | 迁出至 `data/knowledge/sector_keywords.json`，`_load_sector_keywords()` 加载 | v0.8.10-dev |
 | rf-91 | **P2B 魔数 — 列索引硬编码** | `fetcher/bond_yield.py:107` `df.columns[3]` 硬编码列索引 | 改为列名匹配 `"中国国债收益率10年"`（随 C6 修复 rf-12 一并完成） | v0.8.10-dev |
 | rf-92 | **P2B 魔数 - 时区硬编码** | `market_hours.py` 5 个函数中重复 `timezone(timedelta(hours=8))` | 提取为模块级常量 `_BJ_TZ` | v0.8.10-dev |
@@ -149,6 +139,11 @@
 | rf-128 | **P2F 硬编码值** | `llm/generators_orchestrator.py` HTTP 连接池参数硬编码 | 提取为模块级常量 `_LLM_MAX_CONNECTIONS`、`_LLM_MAX_KEEPALIVE` | v0.8.10-dev |
 | rf-129 | **P2F 硬编码值** | `llm/skeleton.py` `BATCH_SIZE=10`、`max_workers=min(...)` 硬编码 | 提取为模块级常量 `_BATCH_CHUNK_SIZE`、`_BATCH_MAX_WORKERS` | v0.8.10-dev |
 | rf-130 | **P2F 硬编码值** | `llm/api.py` 默认模型名 `"claude-sonnet-4-20250514"` 等硬编码 | 提取为模块级常量 `_DEFAULT_CLAUDE_MODEL` 等 | v0.8.10-dev |
+| rf-131 | **P2D 测试覆盖缺口** | `analysis/alignment_correction.py` 无独立单元测试 | 新增 `test_alignment_correction.py`（21 用例，覆盖 cash_stripping/twr_calculation/compute_alignment_factors） | v0.8.10-dev |
+| rf-132 | **P2D 测试覆盖缺口** | `analysis/drawdown_warning.py` 无独立单元测试 | 新增 `test_drawdown_warning.py`（16 用例，覆盖滚动回撤/分位预警/集成等级判断） | v0.8.10-dev |
+| rf-133 | **P2D 测试覆盖缺口** | `cache/services/holdings_tracker.py` 无独立单元测试 | 新增 `test_holdings_tracker.py`（14 用例，覆盖指纹计算/代码提取/缓存刷新） | v0.8.10-dev |
+| rf-134 | **P2D 测试覆盖缺口** | `llm/fallback.py` 无独立单元测试 | 新增 `test_llm_fallback.py`（17 用例，覆盖占位文本/失败检测/降级内容构建） | v0.8.10-dev |
+| rf-135 | **P2D 测试覆盖缺口（批量低风险）** | `circuit_breaker_wrapper.py`, `cache/_io.py`, `llm/prompts_core.py`, `report/excel_b_series.py`, `report/_pipeline.py` 无独立单元测试 | 新增 `test_rf135_coverage.py`（28 用例，覆盖 IndicatorBreaker/原子 IO/format 格式化/管线辅助函数/B 系列写入入口） | v0.8.10-dev |
 | rf-106 | **P2D 已废弃** | 10+ 模块无对应测试 | 被 rf-131~rf-135 取代：原 `test-coverage.md` 静态缺口列表不驱动行动，改为独立 RF 任务追踪 | v0.8.10-dev |
 
 ### 归档档案

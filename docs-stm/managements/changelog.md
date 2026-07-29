@@ -13,12 +13,22 @@
 - **rf-82: alignment_correction.py 费率估算提取**：组合费率估算逻辑提取为独立子模块 `analysis/_fee_estimation.py`，alignment_correction.py 从 577 行降至约 500 行
 - **rf-83: news_aggregator.py 去重逻辑提取**（已在上一轮 rf-47 中完成）：`news_dedup.py` 独立管理标题去重和锚点持久化，news_aggregator.py 降至 236 行
 - **rf-84: sina.py K 线函数提取**：历史 K 线获取函数提取为 `providers/sina_kline.py`，sina.py 从 507 行降至约 400 行
+- **rf-87: portfolio_history.py 数据质量校验提取**：历史走势数据质量校验（异常检测与收益率诊断）提取为 `report/_history_quality.py`，portfolio_history.py 从 597 降至 513 行
+- **rf-65: orchestrator.py 按职责拆分**：1031 行的 `orchestrator.py` 拆分为 3 个子模块——`_report_generation.py`（生成管线）、`_snapshot.py`（快照/历史走势）、`_llm_news.py`（LLM+新闻编排），orchestrator.py 降至 245 行纯编排入口
+- **rf-74: skeleton.py 批量模式提取**：批量处理逻辑提取为 `llm/_batch_mode.py`，skeleton.py 从 705 降至 532 行
+- **rf-88: html_writer.py 渲染函数提取**：14 个 HTML 子渲染函数提取到 `html_renderers.py`，保存逻辑提取到 `html_save.py`，`write_html_report()` 从 ~275 降至 ~210 行
 - **rf-100: test_llm_scenarios.py 拆分**：1202 行大测试文件按 S11-S17 场景分组拆分为 7 个子文件（`test_s11_mixed_cache.py` ~ `test_s17_partial_cache.py` + `test_llm_scenarios_misc.py`），19 个测试全部通过
 - **rf-96: test_llm.py 拆分**：2037 行大测试文件拆分为 test_llm_api.py/test_llm_generators.py/test_llm_session.py 3 个子文件
 - **rf-97: test_scenario_penetration.py 拆分**：1592 行按场景拆分为 4 个子文件（basic/advanced/mixed/edge）
 - **rf-99: test_cache.py 拆分**：1422 行拆出 test_cache_core.py/cleanup/format 3 子模块
-
 - **rf-73: api.py 拆分**：707 行的 `api.py` 拆分为 `_api_claude.py`（Claude）/`_api_openai.py`（OpenAI）/`_api_gemini.py`（Gemini）三个子模块，api.py 降至 521 行
+
+- **rf-131~rf-135: P2D 测试覆盖缺口补充**（5 个新测试文件，96 用例全部通过）：
+  - `test_alignment_correction.py`（21 用例）：覆盖口径修正模块 cash_stripping/twr_calculation/compute_alignment_factors
+  - `test_drawdown_warning.py`（16 用例）：覆盖滚动最大回撤/历史分位预警/集成等级判断
+  - `test_holdings_tracker.py`（14 用例）：覆盖持仓指纹 MD5 计算/代码提取/缓存刷新
+  - `test_llm_fallback.py`（17 用例）：覆盖占位文本获取/全部失败检测/降级内容构建
+  - `test_rf135_coverage.py`（28 用例）：覆盖 IndicatorBreaker/原子文件 IO/_fmt_wan 格式化/管线辅助函数/B 系列写入入口
 
 ### Fixed
 - **P2B 魔数/硬编码修复（rf-90 ~ rf-95 共 6 项）**：
