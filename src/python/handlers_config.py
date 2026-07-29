@@ -8,6 +8,9 @@ from __future__ import annotations
 import json
 import os
 
+import contextlib
+import tempfile
+
 from src.python.config import set_config
 from src.python.constants import PROJECT_ROOT
 from src.python.logger import setup_logger
@@ -51,16 +54,31 @@ def _write_llm_settings(settings: dict, path: str) -> None:
     except FileNotFoundError:
         raw = ""
 
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     if raw.strip():
         from src.python.config import _strip_json_comments
 
         current = json.loads(_strip_json_comments(raw))
         updated_raw = _update_json_raw_text(raw, current, settings)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(updated_raw)
+        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(updated_raw)
+            os.replace(tmp_path, path)
+        except Exception:
+            with contextlib.suppress(OSError):
+                os.remove(tmp_path)
+            raise
     else:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(settings, f, ensure_ascii=False, indent=2)
+        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, path)
+        except Exception:
+            with contextlib.suppress(OSError):
+                os.remove(tmp_path)
+            raise
 
     from src.python.config import get_llm_config
 
@@ -472,15 +490,12 @@ def _cmd_config_report_boards() -> None:
 
 def _cmd_refresh_config() -> None:
     """重新加载所有配置（config.json + llm_settings.json + llm_key.json）。"""
-    # 破坏内部缓存强制重新读取
-    import src.python.config as _cfg_mod
     from src.python.config import get_config, get_llm_config
+    from src.python.config._core import invalidate_config_cache, invalidate_llm_config_cache
     from src.python.llm.pricing import reload_pricing
 
-    _cfg_mod._config_cache = None
-    _cfg_mod._config_mtime = 0
-    _cfg_mod._llm_config_cache = None
-    _cfg_mod._llm_config_mtime = 0
+    invalidate_config_cache()
+    invalidate_llm_config_cache()
 
     config = get_config()
     llm_config = get_llm_config()

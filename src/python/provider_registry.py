@@ -223,8 +223,10 @@ class DataSourceRegistry:
         return os.path.join(os.path.dirname(_CACHE_DIR), "state", _CIRCUIT_BREAKER_STATE_FILE)
 
     def _save_state(self) -> None:
-        """持久化当前熔断状态到 JSON 文件。"""
+        """持久化当前熔断状态到 JSON 文件（原子写入）。"""
+        import contextlib
         import json
+        import tempfile
 
         path = self._get_breaker_state_path()
         now = time.time()
@@ -243,8 +245,15 @@ class DataSourceRegistry:
                     }
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(state, f, ensure_ascii=False, indent=2)
+            fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(state, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_path, path)
+            except Exception:
+                with contextlib.suppress(OSError):
+                    os.remove(tmp_path)
+                raise
         except OSError as e:
             logger.warning("[registry] 熔断状态持久化失败: %s", e)
 

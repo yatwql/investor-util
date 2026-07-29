@@ -13,9 +13,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
+import tempfile
 from typing import Any
 
 from src.python.constants import PROJECT_ROOT
@@ -221,9 +223,16 @@ def save_feature_overrides(overrides: dict[str, bool], merge: bool = True) -> No
 
     try:
         os.makedirs(os.path.dirname(_FEATURES_FILE), exist_ok=True)
-        with open(_FEATURES_FILE, "w", encoding="utf-8") as f:
-            json.dump(cleaned, f, ensure_ascii=False, indent=2)
-        logger.info("[features] 已保存 %d 项功能开关覆写", len(cleaned))
+        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(_FEATURES_FILE), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(cleaned, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, _FEATURES_FILE)
+            logger.info("[features] 已保存 %d 项功能开关覆写", len(cleaned))
+        except Exception:
+            with contextlib.suppress(OSError):
+                os.remove(tmp_path)
+            raise
     except OSError as e:
         logger.warning("[features] 保存覆写失败: %s", e)
 

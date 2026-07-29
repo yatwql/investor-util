@@ -214,7 +214,9 @@ class TestParseProvidersList(unittest.TestCase):
         }
         result = _parse_providers_list(raw)
         self.assertIsNotNone(result)
-        self.assertEqual(result[0]["api_key"], "sk-test-key")
+        # C18 约束：内联 api_key 被迁入 _inline_api_key 并设置 credentials_ref
+        self.assertEqual(result[0]["_inline_api_key"], "sk-test-key")
+        self.assertEqual(result[0]["credentials_ref"], "_inline_p1")
 
     # ── 非 dict entry ──
 

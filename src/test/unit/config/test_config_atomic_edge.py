@@ -252,22 +252,22 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
                          "api_key 首尾空格应被去除")
 
     def test_api_key_whitespace_in_settings_only(self):
-        """仅 llm_settings.json 含 api_key 且有空格 → 被 strip。"""
+        """仅 llm_settings.json 含 api_key → 因无 llm_key.json 返回 None（C18 合规）。"""
         import src.python.config as cfg
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
 
-        # 仅 llm_settings.json 有 api_key（无 llm_key.json）
+        # 仅 llm_settings.json 有 api_key（无 llm_key.json），按 C18 不再回退
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "\t sk-ant-from-settings \n", "temperature": 0.7}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")):
+             patch("src.python.config._core._get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")), \
+             patch("src.python.config._core._get_llm_providers_path", return_value=os.path.join(self.tmp.name, "llm_providers_not_exists.json")):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
-        self.assertIsNotNone(result)
-        self.assertEqual(result["api_key"], "sk-ant-from-settings",
-                         "settings 中的 api_key 也应被 strip")
+        # C18 约束：无 llm_key.json 且无 llm_providers.json → 返回 None
+        self.assertIsNone(result)
 
     # ── 缺失嵌套键 ──
 

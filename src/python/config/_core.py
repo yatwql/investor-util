@@ -36,6 +36,24 @@ def _clear_config_cache() -> None:
     _config_cache = None
 
 
+def invalidate_config_cache() -> None:
+    """使 config.json 缓存失效，下次 get_config() 自动重读。"""
+    global _config_cache, _config_mtime, _config_size
+    with _config_lock:
+        _config_cache = None
+        _config_mtime = 0
+        _config_size = 0
+
+
+def invalidate_llm_config_cache() -> None:
+    """使 LLM 配置缓存失效，下次 get_llm_config() 自动重读。"""
+    global _llm_config_cache, _llm_config_mtime, _llm_config_size
+    with _llm_config_lock:
+        _llm_config_cache = None
+        _llm_config_mtime = 0
+        _llm_config_size = 0
+
+
 def get_config() -> dict:
     """
     读取配置文件并返回配置字典（带线程安全缓存）。
@@ -533,8 +551,16 @@ def _parse_providers_list(raw_config: dict) -> list[dict] | None:
         if entry.get("credentials_ref"):
             entry_dict["credentials_ref"] = entry["credentials_ref"]
         else:
-            entry_dict["api_key"] = entry["api_key"].strip()
-            entry_dict["model"] = entry["model"]
+            # C18 合规：强制使用 credentials_ref
+            logger.warning(
+                "provider '%s' 内嵌 api_key 违反 C18 凭据分离约束，"
+                "将在运行时自动迁入凭据字典。请将 api_key 迁移到 "
+                "llm_key.json 并使用 credentials_ref 引用",
+                name,
+            )
+            entry_dict["credentials_ref"] = f"_inline_{name}"
+            entry_dict["_inline_api_key"] = entry["api_key"].strip()
+            entry_dict["_inline_model"] = entry["model"]
         validated.append(entry_dict)
 
     if not validated:
@@ -653,6 +679,24 @@ def _inject_provider_chain_data(config: dict) -> dict:
                         ref,
                     )
 
+        # ── 内联 api_key 自动注入凭据字典（C18 兼容过渡） ──
+        provider_list = config.get("_provider_list")
+        if provider_list:
+            for entry in provider_list:
+                inline_key = entry.pop("_inline_api_key", None)
+                inline_model = entry.pop("_inline_model", None)
+                if inline_key:
+                    ref = entry.get("credentials_ref", "")
+                    if ref:
+                        creds = config.get("_llm_credentials")
+                        if creds is None:
+                            creds = {}
+                            config["_llm_credentials"] = creds
+                        if ref not in creds:
+                            creds[ref] = {"api_key": inline_key}
+                            if inline_model:
+                                creds[ref]["model"] = inline_model
+
     return config
 
 
@@ -677,14 +721,10 @@ def get_llm_config() -> dict | None:
                 logger.warning("LLM 设置文件读取失败: %s", e)
 
         if not os.path.exists(_get_llm_key_path()):
-            logger.warning("LLM 密钥文件不存在: %s", _get_llm_key_path())
-            if base_settings.get("api_key"):
-                base_settings["api_key"] = base_settings["api_key"].strip()
-                base_settings["debate"] = _load_debate_config(base_settings)
-                _llm_config_cache = _inject_provider_chain_data(base_settings)
-                _llm_config_mtime = 0
-                _llm_config_size = 0
-                return _llm_config_cache
+            logger.warning(
+                "LLM 密钥文件不存在: %s。请配置 llm_key.json 或使用 llm_providers.json 多链模式",
+                _get_llm_key_path(),
+            )
             # 检查 llm_providers.json 是否有 provider（链模式可不依赖 llm_key.json）
             raw_providers = _load_llm_providers()
             if raw_providers and raw_providers.get("providers"):

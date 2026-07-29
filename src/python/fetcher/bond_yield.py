@@ -1,4 +1,4 @@
-"""Rf 无风险利率获取器 — bond_zh_us_rate + 用户配置兜底。
+"""无风险利率获取器 — bond_zh_us_rate + 用户配置兜底。
 
 主源：akshare bond_zh_us_rate() → 中国 10Y 国债收益率；
 手动兜底：config.json risk_free_rate 字段（非 None 时跳过 fetcher）。
@@ -45,17 +45,17 @@ def get_risk_free_rate(cache_ok: bool = True) -> float | None:
         if manual_rf is not None:
             rf = float(manual_rf)
             if 0 < rf < 1:
-                logger.info("Rf: 使用用户配置 risk_free_rate = %.4f (%s)", rf, "手动配置")
+                logger.info("无风险利率: 使用用户配置 risk_free_rate = %.4f (%s)", rf, "手动配置")
                 return rf
             elif rf >= 1:
                 # 用户可能填的是百分比（如 1.74 而非 0.0174），自动转换
                 rf_adj = rf / 100
-                logger.info("Rf: 用户配置 %.4f 疑似百分比，自动转换为 %.6f", rf, rf_adj)
+                logger.info("无风险利率: 用户配置 %.4f 疑似百分比，自动转换为 %.6f", rf, rf_adj)
                 return rf_adj
             else:
-                logger.warning("Rf: 用户配置 risk_free_rate = %.4f 超出合理范围，跳过", rf)
+                logger.warning("无风险利率: 用户配置 risk_free_rate = %.4f 超出合理范围，跳过", rf)
     except (TypeError, ValueError, KeyError) as e:
-        logger.debug("Rf: 解析用户配置失败: %s", e)
+        logger.debug("无风险利率: 解析用户配置失败: %s", e)
 
     # ── 2. 缓存 ──
     if cache_ok:
@@ -63,21 +63,23 @@ def get_risk_free_rate(cache_ok: bool = True) -> float | None:
         if cached is not None:
             try:
                 rf = float(cached)
-                logger.info("Rf: 缓存命中 = %.4f", rf)
+                logger.info("无风险利率: 缓存命中 = %.4f", rf)
                 return rf
             except (TypeError, ValueError):
-                logger.debug("Rf: 缓存值解析失败")
+                logger.debug("无风险利率: 缓存值解析失败")
 
-    # ── 3. akshare 实时获取 ──
-    try:
+    # ── 3. akshare 实时获取（含熔断检查） ──
+    from src.python.provider_registry import get_registry
+
+    if get_registry().is_circuit_broken("akshare"):
+        logger.info("无风险利率: akshare 已被熔断，跳过实时获取")
+    else:
         rf = _fetch_from_akshare()
         if rf is not None:
             cache_set(_CACHE_KEY_RF, rf)
             return rf
-    except Exception as e:
-        logger.warning("Rf: akshare 获取失败: %s", e)
 
-    logger.warning("Rf: 全部数据源不可用，返回 None")
+    logger.warning("无风险利率: 全部数据源不可用，返回 None")
     return None
 
 
@@ -92,37 +94,46 @@ def _fetch_from_akshare() -> float | None:
 
         import akshare as ak
     except ImportError:
-        logger.warning("Rf: akshare 未安装，无法获取")
+        logger.warning("无风险利率: akshare 未安装，无法获取")
         return None
 
     try:
         df = ak.bond_zh_us_rate()
         if df is None or df.empty:
-            logger.warning("Rf: bond_zh_us_rate 返回空数据")
+            logger.warning("无风险利率: bond_zh_us_rate 返回空数据")
             return None
 
         # 取最后一行（最新日期）的中国国债收益率 10 年
-        # DataFrame 列顺序稳定：col 0=日期, col 3=中国国债收益率10年
+        # 使用列名匹配而非硬编码索引，提高对 akshare 列顺序变化的鲁棒性
         latest_row = df.iloc[-1]
-        china_10y_col = df.columns[3]  # 中国国债收益率10年
-        raw_value = latest_row[china_10y_col]
+        china_10y_cols = [c for c in df.columns if "10" in str(c) and "中国" in str(c)]
+        if not china_10y_cols:
+            logger.warning("无风险利率: 无法定位中国10Y国债收益率列（可用列: %s）", list(df.columns))
+            return None
+        raw_value = latest_row[china_10y_cols[0]]
 
         if pd.isna(raw_value):
-            logger.warning("Rf: 最新值缺失（NaN）")
+            logger.warning("无风险利率: 最新值缺失（NaN）")
             return None
 
         # bond_zh_us_rate 返回的值为百分比（如 1.7404），需转为小数
         rf = float(raw_value) / 100.0
 
         if rf <= 0 or rf >= 1:
-            logger.warning("Rf: 获取值 %.4f 超出合理范围（期望 0~1）", rf)
+            logger.warning("无风险利率: 获取值 %.4f 超出合理范围（期望 0~1）", rf)
             return None
 
-        logger.info("Rf: akshare 获取成功 = %.4f (%s)", rf, latest_row.iloc[0])
+        from src.python.provider_registry import get_registry
+
+        get_registry().record_success("akshare")
+        logger.info("无风险利率: akshare 获取成功 = %.4f (%s)", rf, latest_row.iloc[0])
         return rf
 
     except Exception as e:
-        logger.warning("Rf: akshare bond_zh_us_rate 异常: %s", e)
+        from src.python.provider_registry import get_registry
+
+        get_registry().record_failure("akshare", "bond_yield:transport")
+        logger.warning("无风险利率: akshare bond_zh_us_rate 异常: %s", e)
         return None
 
 
