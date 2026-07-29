@@ -74,10 +74,18 @@ def fetch_news(num: int = 50) -> list[dict[str, Any]]:
     sort_end = ""
     max_pages = 10  # 安全保护
 
+    prev_sort_end = ""
+
     for _ in range(max_pages):
         remaining = num - len(all_items)
         if remaining <= 0:
             break
+
+        # 游标未变化则视为已翻到底，避免无限循环
+        if sort_end and sort_end == prev_sort_end:
+            logger.debug("东方财富新闻翻页结束: 游标未变化")
+            break
+        prev_sort_end = sort_end
 
         params = {
             "client": "web",

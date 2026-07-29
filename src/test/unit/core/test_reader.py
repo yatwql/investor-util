@@ -310,7 +310,7 @@ class TestGetXlsxInfo(unittest.TestCase):
     @patch("src.python.reader.openpyxl.load_workbook")
     def test_invalid_file_returns_error_dict(self, mock_load):
         """无法读取的文件 -> 返回含 error 字段的字典。"""
-        mock_load.side_effect = Exception("无法打开文件")
+        mock_load.side_effect = OSError("无法打开文件")
         result = reader.get_xlsx_info("dummy.xlsx")
         self.assertIn("error", result)
         self.assertEqual(result["error"], "无法打开文件")

@@ -32,13 +32,8 @@
 
 from __future__ import annotations
 
-import datetime
-import json
 import logging
-import os
 from typing import Any
-
-from src.python.constants import PROJECT_ROOT
 
 from src.python.code_utils import (
     is_a_share_code,
@@ -53,6 +48,13 @@ from src.python.code_utils import (
     is_etf_by_name_or_code,
 )
 from src.python.config._core import get_config
+from src.python.analysis._silence import (
+    _SILENCE_FILE,
+    _filter_silenced_signals,
+    _load_silence_state,
+    _save_silence_state,
+    _update_silence_state,
+)
 
 logger = logging.getLogger("invest")
 
@@ -212,140 +214,6 @@ def _compute_confidence(
     return "low"
 
 
-# ── 静默期管理 ──────────────────────────────────────────────────
-
-# 静默期持久化路径（可通过 monkeypatch.setattr 注入测试路径）
-_SILENCE_FILE = os.path.join(PROJECT_ROOT, "data/state/rebalance_silence.json")
-
-
-def _load_silence_state(silence_file: str | None = None) -> dict[str, str]:
-    """从持久化文件加载静默期状态。
-
-    Args:
-        silence_file: 静默期文件路径。为 None 时使用 _SILENCE_FILE。
-
-    Returns:
-        {品种代码: 触发日期 (YYYY-MM-DD)}
-    """
-    path = silence_file or _SILENCE_FILE
-    if not os.path.exists(path):
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            logger.warning("再平衡静默期文件格式异常，将重置: %s", path)
-            return {}
-        return data
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning("再平衡静默期文件读取失败，将重置: %s", e)
-        return {}
-
-
-def _save_silence_state(state: dict[str, str], silence_file: str | None = None) -> None:
-    """持久化静默期状态到文件。
-
-    Args:
-        state: {品种代码: 触发日期 (YYYY-MM-DD)}
-        silence_file: 静默期文件路径。为 None 时使用 _SILENCE_FILE。
-    """
-    path = silence_file or _SILENCE_FILE
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
-    except OSError as e:
-        logger.error("再平衡静默期文件写入失败: %s", e)
-
-
-def _filter_silenced_signals(
-    signals: list[dict[str, Any]],
-    silence_days: int,
-    silence_file: str | None = None,
-) -> list[dict[str, Any]]:
-    """过滤静默期内的再平衡信号。
-
-    对于有 code 的信号（单品超限、品种级偏离），检查是否在静默期内。
-    大类偏离信号（category）不参与静默期检查。
-    静默期到期的条目自动从持久化状态中清理。
-
-    Args:
-        signals: 再平衡信号列表
-        silence_days: 静默期天数
-        silence_file: 静默期文件路径
-
-    Returns:
-        过滤后的信号列表（附静默信息）
-    """
-    if not signals or silence_days <= 0:
-        return signals
-
-    state = _load_silence_state(silence_file)
-    today = datetime.date.today()
-    today_str = today.isoformat()
-    expired_codes: set[str] = set()
-    result: list[dict[str, Any]] = []
-
-    for sig in signals:
-        code = sig.get("code", "")
-        if not code or sig.get("type") in ("category", "summary"):
-            # 大类偏离和汇总信号不参与静默期
-            result.append(sig)
-            continue
-
-        trigger_date_str = state.get(code)
-        if trigger_date_str:
-            try:
-                trigger_date = datetime.date.fromisoformat(trigger_date_str)
-                days_passed = (today - trigger_date).days
-                if days_passed < silence_days:
-                    # 静默期内：跳过，添加过期标记（延迟清理）
-                    remaining = silence_days - days_passed
-                    logger.debug("品种 %s 在静默期内（剩余 %d 天），跳过", code, remaining)
-                    continue
-                else:
-                    # 静默期已过：清理
-                    expired_codes.add(code)
-            except (ValueError, TypeError):
-                # 日期格式异常，视为过期
-                expired_codes.add(code)
-
-        result.append(sig)
-
-    # 清理过期条目
-    if expired_codes:
-        for c in expired_codes:
-            state.pop(c, None)
-        _save_silence_state(state, silence_file)
-
-    return result
-
-
-def _update_silence_state(
-    signals: list[dict[str, Any]],
-    silence_file: str | None = None,
-) -> None:
-    """将新触发的信号更新到静默期持久化状态。
-
-    Args:
-        signals: 再平衡信号列表
-        silence_file: 静默期文件路径
-    """
-    state = _load_silence_state(silence_file)
-    today_str = datetime.date.today().isoformat()
-    updated = False
-
-    for sig in signals:
-        code = sig.get("code", "")
-        if code and sig.get("type") not in ("category", "summary"):
-            if code not in state:
-                state[code] = today_str
-                updated = True
-
-    if updated:
-        _save_silence_state(state, silence_file)
-
-
 # ── 资产分类 —──────────────────────────────────────────────────
 
 
@@ -478,122 +346,87 @@ def _calc_category_weights(
     return weights
 
 
-# ── 目标配置偏离度计算 ─────────────────────────────────────────
-
-
-def compute_target_deviation(
-    holdings_details: list[dict[str, Any]] | None,
-    total_mv: float,
-    target_allocation: dict[str, dict] | None = None,
-    deviation_threshold: float = 0.05,
-) -> list[dict[str, Any]]:
-    """计算当前持仓与目标配置的偏离度。
+def _calc_group_weights(cat_weights: dict[str, float]) -> dict[str, float]:
+    """汇总各大类权重为权益/固收超大类权重。
 
     Args:
-        holdings_details: 持仓明细列表
-        total_mv: 持仓总市值
-        target_allocation: 目标配置 Schema。
-            为 None 时从 config.json 读取。
-            空字典 {} = 不启用目标配置检查。
-        deviation_threshold: 偏离度阈值（小数，0.05=5%）。偏离低于此值且未超限时不输出信号。
+        cat_weights: _calc_category_weights() 的返回
 
     Returns:
-        偏离度信号列表：
-        [
-          {
-            "type": "category",  # 大类偏离
-            "category": "equity",
-            "category_label": "权益（股票/ETF）",
-            "current_weight": 55.0,   # 当前权重 %
-            "target_weight": 50.0,    # 目标权重 %
-            "min": 30.0,              # 目标下限
-            "max": 70.0,              # 目标上限
-            "deviation": 5.0,         # 偏离度（正=超配，负=低配）
-            "action": "超配 5.0%，建议适当止盈权益类，增配固收类",
-          },
-          {
-            "type": "security",  # 品种级偏离
-            "code": "600519",
-            "name": "贵州茅台",
-            "current_weight": 18.5,
-            "target_weight": 10.0,
-            "deviation": 8.5,
-            "action": "持有 18.5%，目标 10.0%，超配 8.5%，建议部分止盈",
-          },
-        ]
+        {超大类key: 权重百分比}
     """
-    if not holdings_details or total_mv <= 0:
-        return []
+    group_weights: dict[str, float] = {}
+    for group_key, group_info in _EQUITY_FI_GROUPS.items():
+        total_w = sum(cat_weights.get(cat, 0.0) for cat in group_info["categories"])
+        group_weights[group_key] = round(total_w, 2)
+    return group_weights
 
-    # 读取目标配置
-    if target_allocation is None:
-        config = get_config()
-        rebalance_cfg = config.get("rebalance", {})
-        target_allocation = rebalance_cfg.get("target_allocation", {})
 
-    if not target_allocation:
-        return []
-
-    # 分类 + 计算大类权重
-    categorized = _categorize_holdings(holdings_details)
-    cat_weights = _calc_category_weights(categorized, total_mv)
-
+def _build_category_deviation_signals(
+    cat_weights: dict[str, float],
+    target_allocation: dict[str, dict],
+    deviation_threshold: float,
+) -> list[dict[str, Any]]:
+    """大类配置偏离检查：遍历 target_allocation 中属于大类的条目，生成偏离信号。"""
     signals: list[dict[str, Any]] = []
-
-    # 1. 大类配置偏离检查
+    threshold_pct = deviation_threshold * 100
     for key, target in target_allocation.items():
-        # 跳过品种级配置（键为证券代码的，在品种级检查中处理）
-        if key in _CATEGORY_ORDER or key in _CATEGORY_LABELS:
-            current = cat_weights.get(key, 0.0)
-            t_min = target.get("min", 0)
-            t_max = target.get("max", 100)
-            t_target = target.get("target")
+        if key not in _CATEGORY_ORDER and key not in _CATEGORY_LABELS:
+            continue
+        current = cat_weights.get(key, 0.0)
+        t_min = target.get("min", 0)
+        t_max = target.get("max", 100)
+        t_target = target.get("target")
 
-            deviation = round(current - (t_target or (t_min + t_max) / 2), 2)
+        deviation = round(current - (t_target or (t_min + t_max) / 2), 2)
+        out_of_range = current < t_min or current > t_max
+        if abs(deviation) < threshold_pct and not out_of_range:
+            continue
 
-            # 仅在偏离超过阈值或超出范围时输出
-            threshold_pct = deviation_threshold * 100
-            out_of_range = current < t_min or current > t_max
-            if abs(deviation) < threshold_pct and not out_of_range:
-                continue
-
-            # 生成建议文本
-            if current > t_max:
-                action = (
-                    f"权益占比 {current}%，超过目标上限 {t_max}%，超配 {deviation:.1f}%，建议适当止盈权益类，增配固收类"
-                )
-            elif current < t_min:
-                action = f"权益占比 {current}%，低于目标下限 {t_min}%，低配 {-deviation:.1f}%，建议适当增配权益类"
-            else:
-                action = f"权益占比 {current}%，在目标范围 {t_min}%-{t_max}% 内，无需调整"
-
-            label = _CATEGORY_LABELS.get(key, key)
-            confidence = _compute_confidence(
-                "category",
-                deviation=deviation,
-                deviation_threshold_pct=deviation_threshold * 100,
+        if current > t_max:
+            action = (
+                f"权益占比 {current}%，超过目标上限 {t_max}%，超配 {deviation:.1f}%，建议适当止盈权益类，增配固收类"
             )
-            signals.append(
-                {
-                    "type": "category",
-                    "category": key,
-                    "category_label": label,
-                    "current_weight": current,
-                    "target_weight": t_target or (t_min + t_max) / 2,
-                    "min": t_min,
-                    "max": t_max,
-                    "deviation": deviation,
-                    "confidence": confidence,
-                    "action": action,
-                }
-            )
+        elif current < t_min:
+            action = f"权益占比 {current}%，低于目标下限 {t_min}%，低配 {-deviation:.1f}%，建议适当增配权益类"
+        else:
+            action = f"权益占比 {current}%，在目标范围 {t_min}%-{t_max}% 内，无需调整"
 
-    # 2. 品种级配置检查
+        label = _CATEGORY_LABELS.get(key, key)
+        confidence = _compute_confidence(
+            "category",
+            deviation=deviation,
+            deviation_threshold_pct=deviation_threshold * 100,
+        )
+        signals.append(
+            {
+                "type": "category",
+                "category": key,
+                "category_label": label,
+                "current_weight": current,
+                "target_weight": t_target or (t_min + t_max) / 2,
+                "min": t_min,
+                "max": t_max,
+                "deviation": deviation,
+                "confidence": confidence,
+                "action": action,
+            }
+        )
+    return signals
+
+
+def _build_security_deviation_signals(
+    holdings_details: list[dict[str, Any]],
+    total_mv: float,
+    target_allocation: dict[str, dict],
+    deviation_threshold: float,
+) -> list[dict[str, Any]]:
+    """品种级配置偏离检查：遍历 target_allocation 中属于证券代码的条目，生成偏离信号。"""
+    signals: list[dict[str, Any]] = []
+    threshold_pct = deviation_threshold * 100
     for key, target in target_allocation.items():
-        # 品种级: 键为证券代码
         if key in _CATEGORY_ORDER or key in _CATEGORY_LABELS:
             continue
-        # 查找该品种的当前持有
         for h in holdings_details:
             if h.get("code") == key:
                 mv = h.get("market_value", 0) or 0
@@ -604,7 +437,7 @@ def compute_target_deviation(
 
                 deviation = round(current_w - (t_target or (t_min + t_max) / 2), 2)
                 out_of_range = current_w < t_min or current_w > t_max
-                if abs(deviation) < (deviation_threshold * 100) and not out_of_range:
+                if abs(deviation) < threshold_pct and not out_of_range:
                     continue
 
                 if current_w > t_max:
@@ -631,77 +464,54 @@ def compute_target_deviation(
                     }
                 )
                 break
+    return signals
 
+
+# ── 目标配置偏离度计算 ─────────────────────────────────────────
+
+
+def compute_target_deviation(
+    holdings_details: list[dict[str, Any]] | None,
+    total_mv: float,
+    target_allocation: dict[str, dict] | None = None,
+    deviation_threshold: float = 0.05,
+) -> list[dict[str, Any]]:
+    """计算当前持仓与目标配置的偏离度。
+
+    编排 _build_category_deviation_signals 和 _build_security_deviation_signals，
+    分别计算大类偏离和品种级偏离信号。
+    """
+    if not holdings_details or total_mv <= 0:
+        return []
+
+    if target_allocation is None:
+        config = get_config()
+        rebalance_cfg = config.get("rebalance", {})
+        target_allocation = rebalance_cfg.get("target_allocation", {})
+
+    if not target_allocation:
+        return []
+
+    categorized = _categorize_holdings(holdings_details)
+    cat_weights = _calc_category_weights(categorized, total_mv)
+
+    signals: list[dict[str, Any]] = []
+    signals.extend(_build_category_deviation_signals(cat_weights, target_allocation, deviation_threshold))
+    signals.extend(_build_security_deviation_signals(holdings_details, total_mv, target_allocation, deviation_threshold))
     return signals
 
 
 # ── 权益/固收偏离 ────────────────────────────────────────────
 
 
-def equity_fixed_income_deviation(
-    holdings_details: list[dict[str, Any]],
-    total_mv: float,
-    equity_fi_target: dict[str, dict] | None = None,
-    deviation_threshold: float = 0.05,
+def _build_equity_fi_signals(
+    group_weights: dict[str, float],
+    equity_fi_target: dict[str, dict],
+    threshold_pct: float,
+    deviation_threshold: float,
 ) -> list[dict[str, Any]]:
-    """计算权益/固收超大类偏离信号。
-
-    将 7 个资产大类汇总为两个超大类进行偏离分析：
-      - 权益类（equity）：equity + fund_equity + qdii
-      - 固收类（fixed_income）：fixed_income + money_market + alternative
-
-    对照目标配置计算偏离度，偏离低于阈值时不输出。
-    输出示例："权益类仓位 78%，超过目标上限 70%（超配 8%），建议适当止盈权益类品种，增配固收类"
-
-    Args:
-        holdings_details: 持仓明细列表
-        total_mv: 持仓总市值
-        equity_fi_target: 权益/固收目标配置。
-            None 时从 config.json 的 rebalance.equity_fixed_income 读取。
-            空字典 {} = 不启用检查。
-        deviation_threshold: 偏离度阈值（小数，0.05=5%）。偏离低于此值且未超限时不输出。
-
-    Returns:
-        权益/固收偏离信号列表：
-        [
-          {
-            "type": "equity_fixed_income",
-            "group": "equity",          # 超大类 key
-            "group_label": "权益类",
-            "current_weight": 78.0,     # 当前权重 %
-            "target_weight": 70.0,      # 目标权重 %
-            "min": 60.0,                # 目标下限
-            "max": 80.0,                # 目标上限
-            "deviation": 8.0,           # 偏离度（正=超配，负=低配）
-            "confidence": "high",
-            "action": "权益类仓位 78%，超过目标上限 80%（超配 8%），建议适当止盈权益类品种，增配固收类",
-          },
-        ]
-    """
-    if not holdings_details or total_mv <= 0:
-        return []
-
-    if equity_fi_target is None:
-        config = get_config()
-        rebalance_cfg = config.get("rebalance", {})
-        equity_fi_target = rebalance_cfg.get("equity_fixed_income", {})
-
-    if not equity_fi_target:
-        return []
-
-    # 分类并计算各类权重
-    categorized = _categorize_holdings(holdings_details)
-    cat_weights = _calc_category_weights(categorized, total_mv)
-
-    # 汇总为权益/固收超大类权重
-    group_weights: dict[str, float] = {}
-    for group_key, group_info in _EQUITY_FI_GROUPS.items():
-        total_w = sum(cat_weights.get(cat, 0.0) for cat in group_info["categories"])
-        group_weights[group_key] = round(total_w, 2)
-
+    """构建权益/固收超大类偏离信号。"""
     signals: list[dict[str, Any]] = []
-    threshold_pct = deviation_threshold * 100
-
     for group_key, target in equity_fi_target.items():
         if group_key not in _EQUITY_FI_GROUPS:
             logger.warning("equity_fixed_income_deviation: 未知超大类 %r，跳过", group_key)
@@ -715,7 +525,6 @@ def equity_fixed_income_deviation(
         deviation = round(current - (t_target or (t_min + t_max) / 2), 2)
         out_of_range = current < t_min or current > t_max
 
-        # 偏离低于阈值且未超限 → 不输出
         if abs(deviation) < threshold_pct and not out_of_range:
             continue
 
@@ -758,48 +567,46 @@ def equity_fixed_income_deviation(
     return signals
 
 
-# ── 再平衡信号入口（整合单品超限 + 目标偏离 + 权益/固收偏离） ─
-
-
-def compute_rebalance_signals(
-    holdings_details: list[dict[str, Any]] | None,
+def equity_fixed_income_deviation(
+    holdings_details: list[dict[str, Any]],
     total_mv: float,
-    rebalance_config: dict[str, Any] | None = None,
+    equity_fi_target: dict[str, dict] | None = None,
+    deviation_threshold: float = 0.05,
 ) -> list[dict[str, Any]]:
-    """计算完整再平衡信号。
+    """计算权益/固收超大类偏离信号。
 
-    包含三路信号：
-      1. 单品超限信号
-      2. 目标配置偏离信号（大类 + 品种级）
-      3. 权益/固收超大类偏离信号
-
-    配置项：
-      - threshold: 单品超限阈值（默认 15%）
-      - deviation_threshold: 大类/品种偏离阈值（默认 5%）
-      - profile: 预设阈值集（conservative/moderate/aggressive/custom）
-      - target_allocation: 目标配置 Schema
-      - equity_fixed_income: 权益/固收超大类目标配置
-
-    Args:
-        holdings_details: 持仓明细列表（含 market_value / name / code）
-        total_mv: 持仓总市值
-        rebalance_config: 再平衡配置段。为 None 时从 config.json 读取。
-
-    Returns:
-        合并后的再平衡信号列表
+    将 7 个资产大类汇总为权益类和固收类超大类，
+    委托 _calc_group_weights / _build_equity_fi_signals 计算偏离信号。
     """
     if not holdings_details or total_mv <= 0:
         return []
 
-    # 解析配置（含预设 profile 覆盖）
-    resolved = resolve_rebalance_config(rebalance_config)
-    threshold = resolved.get("threshold", 0.15)
-    deviation_threshold = resolved.get("deviation_threshold", 0.05)
-    target_allocation = resolved.get("target_allocation", {})
+    if equity_fi_target is None:
+        config = get_config()
+        rebalance_cfg = config.get("rebalance", {})
+        equity_fi_target = rebalance_cfg.get("equity_fixed_income", {})
 
-    signals: list[dict[str, Any]] = []
+    if not equity_fi_target:
+        return []
 
-    # 1. 单品超限信号
+    categorized = _categorize_holdings(holdings_details)
+    cat_weights = _calc_category_weights(categorized, total_mv)
+    group_weights = _calc_group_weights(cat_weights)
+    threshold_pct = deviation_threshold * 100
+
+    return _build_equity_fi_signals(group_weights, equity_fi_target, threshold_pct, deviation_threshold)
+
+
+# ── 再平衡信号入口（整合单品超限 + 目标偏离 + 权益/固收偏离） ─
+
+
+def _compute_single_overflow_signals(
+    holdings_details: list[dict[str, Any]],
+    total_mv: float,
+    threshold: float,
+) -> list[dict[str, Any]]:
+    """单品超限信号：检查每个品种是否超过单项配置上限，超过 3 个时汇总。"""
+    _MAX_DETAILED = 3
     single_signals: list[dict[str, Any]] = []
     for h in holdings_details:
         mv = h.get("market_value", 0) or 0
@@ -823,8 +630,7 @@ def compute_rebalance_signals(
                 }
             )
 
-    # 去重聚合：超过 3 个时汇总
-    _MAX_DETAILED = 3
+    signals: list[dict[str, Any]] = []
     if len(single_signals) > _MAX_DETAILED:
         signals.append(
             {
@@ -841,26 +647,44 @@ def compute_rebalance_signals(
         single_signals.sort(key=lambda x: -x["weight"])
         signals.extend(single_signals[:_MAX_DETAILED])
 
+    return signals
+
+
+def compute_rebalance_signals(
+    holdings_details: list[dict[str, Any]] | None,
+    total_mv: float,
+    rebalance_config: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """计算完整再平衡信号。
+
+    编排五步流程：
+      1. 单品超限信号（_compute_single_overflow_signals）
+      2. 目标配置偏离信号（compute_target_deviation）
+      3. 权益/固收超大类偏离信号（equity_fixed_income_deviation）
+      4. 误报防护（_apply_false_positive_protection）
+      5. 静默期过滤（_filter_silenced_signals）
+    """
+    if not holdings_details or total_mv <= 0:
+        return []
+
+    resolved = resolve_rebalance_config(rebalance_config)
+    threshold = resolved.get("threshold", 0.15)
+    deviation_threshold = resolved.get("deviation_threshold", 0.05)
+    target_allocation = resolved.get("target_allocation", {})
+    equity_fi_target = resolved.get("equity_fixed_income", {})
+
+    signals: list[dict[str, Any]] = []
+
+    # 1. 单品超限信号
+    signals.extend(_compute_single_overflow_signals(holdings_details, total_mv, threshold))
+
     # 2. 目标配置偏离信号
     if target_allocation:
-        dev_signals = compute_target_deviation(
-            holdings_details,
-            total_mv,
-            target_allocation,
-            deviation_threshold,
-        )
-        signals.extend(dev_signals)
+        signals.extend(compute_target_deviation(holdings_details, total_mv, target_allocation, deviation_threshold))
 
     # 3. 权益/固收超大类偏离信号
-    equity_fi_target = resolved.get("equity_fixed_income", {})
     if equity_fi_target:
-        ef_signals = equity_fixed_income_deviation(
-            holdings_details,
-            total_mv,
-            equity_fi_target,
-            deviation_threshold,
-        )
-        signals.extend(ef_signals)
+        signals.extend(equity_fixed_income_deviation(holdings_details, total_mv, equity_fi_target, deviation_threshold))
 
     # 4. 误报防护
     signals = _apply_false_positive_protection(signals, holdings_details)

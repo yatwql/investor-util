@@ -14,10 +14,10 @@ import pytest
 from src.python.provider_registry import (
     FetchStrategy,
     NOT_FOUND,
-    _SESSION_CACHE_MAX_ENTRIES,
     DataSourceRegistry,
     get_registry,
 )
+from src.python._session_cache import _SESSION_CACHE_MAX_ENTRIES
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 

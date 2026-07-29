@@ -140,6 +140,85 @@ def _price_cache_fresh(data: dict) -> bool:
         return True
 
 
+def _route_price_request(code: str, expected_name: str) -> tuple[str, bool]:
+    """按代码类型选择数据路由。
+
+    Returns:
+        (data_type, needs_degrade)
+    """
+    if is_otc_code_overlap(code) and expected_name and is_otc_fund_by_name(expected_name, code):
+        return ("price_fund_otc", False)
+    elif is_exchange_fund_code(code) or is_a_share_code(code):
+        needs_degrade = is_otc_code_overlap(code)
+        return ("price_stock", needs_degrade)
+    else:
+        return ("price_fund_otc", False)
+
+
+def _validate_price_data(raw: dict, provider_name: str, expected_name: str) -> bool:
+    """验证价格数据是否符合预期。"""
+    if provider_name in ("tencent", "sina"):
+        if not raw.get("name"):
+            return False
+        pname = raw.get("name", "").strip()
+        return not (expected_name and pname and not _name_matches(pname, expected_name))
+    if provider_name == "eastmoney":
+        return bool(raw.get("nav") and raw.get("nav", 0.0) > 0)
+    return True
+
+
+def _fetch_price_with_cache_refresh(
+    data_type: str,
+    code: str,
+    cache_key: str,
+    expected_name: str,
+) -> dict[str, Any] | None:
+    """一次 fetch + 收市后新鲜度校验（跨日残留缓存清仓重试）。"""
+    from src.python.report.data_status import get_tracker
+
+    _t = get_tracker()
+    _src_key = f"price_{data_type}_{code}"
+
+    def _validate(raw: dict, provider_name: str) -> bool:
+        return _validate_price_data(raw, provider_name, expected_name)
+
+    r = fetch_with_fallback(
+        data_type=data_type,
+        provider_fn_map=_PRICE_PROVIDERS,
+        cache_key=cache_key,
+        cache_ttl=get_ttl("price", cache_key),
+        fn_kwargs={"code": code},
+        transform=_PRICE_TRANSFORMS,
+        validate=_validate,
+    )
+    if r is not None:
+        _t.record(_src_key, "T2", success=True)
+    else:
+        _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+
+    if r is not None and not _price_cache_fresh(r):
+        from src.python.cache import clear as _cache_clear
+        from src.python.report.market_value import get_last_trading_day as _gtd
+
+        _td = _gtd()
+        logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新", r.get("price_date", "?"), _td)
+        _cache_clear(cache_key)
+        r = fetch_with_fallback(
+            data_type=data_type,
+            provider_fn_map=_PRICE_PROVIDERS,
+            cache_key=cache_key,
+            cache_ttl=get_ttl("price", cache_key),
+            fn_kwargs={"code": code},
+            transform=_PRICE_TRANSFORMS,
+            validate=_validate,
+        )
+        if r is not None:
+            _t.record(f"{_src_key}_refresh", "T2", success=True)
+        else:
+            _t.record(f"{_src_key}_refresh", "T2", success=False, failure_type="unreachable")
+    return r
+
+
 def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | None:
     """获取一只证券的市场行情（按代码类型自动路由 Provider Chain）。
 
@@ -157,84 +236,36 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
     code = code.strip()
     cache_key = _price_cache_key(code)
 
-    # 按代码类型选择专属 Provider Chain
-    # 场外基金（含名称可识别的 00 代码）→ eastmoney（直达，无备用）
-    # 股票/ETF → tencent → sina（同质 fallback）
-    if is_otc_code_overlap(code) and expected_name and is_otc_fund_by_name(expected_name, code):
-        data_type = "price_fund_otc"
-        _needs_degrade = False
-    elif is_exchange_fund_code(code) or is_a_share_code(code):
-        data_type = "price_stock"
-        # 降级标记：00 开头存在 A 股/OTC 基金重叠，代码前缀无法区分
-        # 若股票链路全失败，降级到场外基金链路尝试
-        _needs_degrade = is_otc_code_overlap(code)
-    else:
-        data_type = "price_fund_otc"
-        _needs_degrade = False
+    # 按代码类型选择数据路由
+    data_type, _needs_degrade = _route_price_request(code, expected_name)
 
-    def _validate(raw: dict, provider_name: str) -> bool:
-        if provider_name in ("tencent", "sina"):
-            if not raw.get("name"):
-                return False
-            pname = raw.get("name", "").strip()
-            return not (expected_name and pname and not _name_matches(pname, expected_name))
-        if provider_name == "eastmoney":
-            return bool(raw.get("nav") and raw.get("nav", 0.0) > 0)
-        return True
-
-    def _fetch_with_cache_refresh(dt: str) -> dict[str, Any] | None:
-        """一次 fetch + 收市后新鲜度校验（跨日残留缓存清仓重试）。"""
-        from src.python.report.data_status import get_tracker
-
-        _t = get_tracker()
-        _src_key = f"price_{dt}_{code}"
-
-        r = fetch_with_fallback(
-            data_type=dt,
-            provider_fn_map=_PRICE_PROVIDERS,
-            cache_key=cache_key,
-            cache_ttl=get_ttl("price", cache_key),
-            fn_kwargs={"code": code},
-            transform=_PRICE_TRANSFORMS,
-            validate=_validate,
-        )
-        if r is not None:
-            _t.record(_src_key, "T2", success=True)
-        else:
-            _t.record(_src_key, "T2", success=False, failure_type="unreachable")
-
-        if r is not None and not _price_cache_fresh(r):
-            from src.python.cache import clear as _cache_clear
-            from src.python.report.market_value import get_last_trading_day as _gtd
-
-            _td = _gtd()
-            logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新", r.get("price_date", "?"), _td)
-            _cache_clear(cache_key)
-            r = fetch_with_fallback(
-                data_type=dt,
-                provider_fn_map=_PRICE_PROVIDERS,
-                cache_key=cache_key,
-                cache_ttl=get_ttl("price", cache_key),
-                fn_kwargs={"code": code},
-                transform=_PRICE_TRANSFORMS,
-                validate=_validate,
-            )
-            if r is not None:
-                _t.record(f"{_src_key}_refresh", "T2", success=True)
-            else:
-                _t.record(f"{_src_key}_refresh", "T2", success=False, failure_type="unreachable")
-        return r
-
-    result = _fetch_with_cache_refresh(data_type)
+    result = _fetch_price_with_cache_refresh(data_type, code, cache_key, expected_name)
 
     # ── 降级：00 代码在股票链路全失败 → 尝试场外基金链路 ──
     if result is None and _needs_degrade:
         _tag = f"  [{code} {expected_name}]" if expected_name else f"  [{code}]"
         logger.info("[price]%s 股票链路全部失败（该代码可能为场外基金），降级尝试东方财富净值链路", _tag)
-        result = _fetch_with_cache_refresh("price_fund_otc")
+        result = _fetch_price_with_cache_refresh("price_fund_otc", code, cache_key, expected_name)
         if result is not None:
             logger.info("[price]%s 降级成功——通过场外基金链路获取到净值", _tag)
         else:
             logger.warning("[price]%s 降级也失败——场外基金链路亦无数据", _tag)
 
+    return result
+
+
+def fetch_market_data_cached(code: str, expected_name: str = "") -> dict[str, Any] | None:
+    """市场行情获取（含会话缓存），同一报告生成中同证券只获取一次。
+
+    消除多个模块独立调用 fetch_market_data 的冗余文件缓存读取。
+    """
+    from src.python.provider_registry import NOT_FOUND, get_registry
+
+    registry = get_registry()
+    cached = registry.session_cache_get("price", code)
+    if cached is not NOT_FOUND:
+        return cached
+    result = fetch_market_data(code, expected_name)
+    if result and result.get("price", 0) > 0:
+        registry.session_cache_set("price", code, result, source="api")
     return result

@@ -77,9 +77,21 @@ def fetch_industry_data(code: str) -> dict | None:
     return result
 
 
-def _is_a_share_code(code: str) -> bool:
-    """判断是否为 A 股代码（委托至 code_utils.is_a_share_code）。"""
-    return is_a_share_code(code)
+def fetch_industry_data_cached(code: str) -> dict | None:
+    """行业数据获取（含会话缓存），同一报告生成中同证券只获取一次。
+
+    消除多个模块独立调用 fetch_industry_data 的冗余文件缓存读取。
+    """
+    from src.python.provider_registry import NOT_FOUND, get_registry
+
+    registry = get_registry()
+    cached = registry.session_cache_get("industry", code)
+    if cached is not NOT_FOUND:
+        return cached
+    result = fetch_industry_data(code)
+    if result is not None:
+        registry.session_cache_set("industry", code, result, source="api")
+    return result
 
 
 def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[str, dict]:
@@ -100,7 +112,7 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[st
         return {}
 
     # 过滤非 A 股代码，避免无效 API 调用
-    a_codes = [c for c in valid_codes if _is_a_share_code(c)]
+    a_codes = [c for c in valid_codes if is_a_share_code(c)]
     skipped = len(valid_codes) - len(a_codes)
     if skipped:
         logger.debug("跳过 %d 个非 A 股代码（行业数据仅支持 A 股）", skipped)

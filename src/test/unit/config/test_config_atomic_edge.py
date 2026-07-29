@@ -189,7 +189,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             # 清缓存
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
@@ -220,7 +220,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -243,7 +243,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "  sk-test-with-spaces  ", "provider": "claude"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -261,8 +261,8 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "\t sk-ant-from-settings \n", "temperature": 0.7}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")), \
-             patch("src.python.config._core._get_llm_providers_path", return_value=os.path.join(self.tmp.name, "llm_providers_not_exists.json")):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")), \
+             patch("src.python.config._llm_providers._get_llm_providers_path", return_value=os.path.join(self.tmp.name, "llm_providers_not_exists.json")):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -285,7 +285,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "sk-test", "provider": "openai"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -306,7 +306,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 

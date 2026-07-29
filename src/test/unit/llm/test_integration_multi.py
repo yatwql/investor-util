@@ -47,21 +47,27 @@ class TestIntegrationChainAllStrategies(unittest.TestCase):
 class TestConfigNoLlmKeyFile(unittest.TestCase):
     """验证 get_llm_config() 无 llm_key.json 但 llm_providers.json 有 provider 时正常。"""
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._get_llm_key_path")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     @patch("src.python.config._core.os.path.exists")
     @patch("src.python.config._core.get_llm_settings_path")
     def test_llm_providers_as_key_source(
         self, mock_settings_path: MagicMock,
         mock_exists: MagicMock, mock_load: MagicMock,
+        mock_get_key_path: MagicMock,
     ) -> None:
         """llm_key.json 不存在 + llm_settings.json 无 api_key + llm_providers.json 有 provider → 成功。"""
         import src.python.config._core as core
+        import src.python.config._llm_providers as llm_providers
 
         # settings 无 api_key
         mock_settings_path.return_value = "/tmp/nonexistent/settings.json"
-        # llm_key.json 不存在
+        # llm_key.json 不存在 — 让 _get_llm_key_path 和 os.path.exists 都认同一个 fake path
+        fake_key_path = "/tmp/nonexistent/llm_key.json"
+        mock_get_key_path.return_value = fake_key_path
+
         def _exists_side_effect(p: str) -> bool:
-            if p == core._LLM_KEY_FILE_DEFAULT:
+            if p == fake_key_path:
                 return False
             return True  # 其他路径都存
         mock_exists.side_effect = _exists_side_effect

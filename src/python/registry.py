@@ -608,13 +608,14 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     # 合并：已配置在前，未配置在后（保持默认相对顺序）
     result = configured + unconfigured
 
-    # llm_usage 强制末位
+    # llm_usage 强制末位（先查找再移除，避免迭代中删除）
     llm_entry: dict | None = None
-    for i, sec in enumerate(result):
+    for sec in result:
         if sec["key"] == "llm_usage":
-            llm_entry = result.pop(i)
+            llm_entry = sec
             break
     if llm_entry:
+        result.remove(llm_entry)
         result.append(llm_entry)
 
     return result

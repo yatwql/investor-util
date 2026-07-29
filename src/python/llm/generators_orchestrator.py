@@ -1,10 +1,9 @@
 """LLM 批量编排模块 — 缓存预检查、线程池分发与 LLM 全量生成。
 
-包含 _compute_module_cache_info、_precheck_one_cache、_precheck_all_modules、
-_dispatch_llm_workers、generate_all_llm 和 _LLM_CLIENT_SETTINGS。
+包含 ``_build_module_fns``（模块级注册）、``_dispatch_llm_workers``、
+``generate_all_llm`` 和 ``_LLM_CLIENT_SETTINGS``。
 
-``_MODULE_FNS`` 集中管理所有 LLM 模块的生成函数，确保一致的
-缓存预检、线程池分发和失败处理。新增模块需在此注册。
+新增 LLM 模块需在 ``_build_module_fns`` 中添加条目，无需深入分发函数。
 """
 
 from __future__ import annotations
@@ -52,6 +51,7 @@ _MN = get_llm_module_name
 
 
 __all__ = [
+    "_build_module_fns",
     "_LLM_CLIENT_SETTINGS",
     "_compute_module_cache_info",
     "_precheck_one_cache",
@@ -229,6 +229,91 @@ def _precheck_all_modules(
     return results
 
 
+def _build_module_fns(
+    a_indices,
+    us_indices,
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    total_today_profit: float,
+    holdings_count: int,
+    categories: dict,
+    penetrated_assets: list[dict] | None,
+    holdings_details: list[dict] | None,
+    sector_flow: list[dict] | None,
+    force: bool,
+    pipeline_data: dict | None = None,
+    competitive_context: str = "",
+    metrics: dict | None = None,
+    degradation_events: list[dict] | None = None,
+) -> dict[str, Callable]:
+    """构建 LLM 模块名称 → 生成函数闭包 的映射。
+
+    模块级集中注册，新增 LLM 模块只需在此添加条目。
+    每个闭包签名: (http_client, llm_config) → (result_str | None, from_cache)。
+    """
+    return {
+        "global_macro": lambda c, lc: generate_global_macro(
+            a_indices,
+            us_indices,
+            total_mv,
+            total_profit,
+            total_cost,
+            categories,
+            sector_flow=sector_flow,
+            force=force,
+            http_client=c,
+            llm_config=lc,
+            competitive_context=competitive_context,
+            holdings_details=holdings_details,
+        ),
+        "expert_review": lambda c, lc: generate_expert_review(
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
+            pipeline_data=pipeline_data,
+            competitive_context=competitive_context,
+            metrics=metrics,
+        ),
+        "health_check": lambda c, lc: generate_health_check(
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
+            pipeline_data=pipeline_data,
+            degradation_events=degradation_events,
+        ),
+        "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
+        ),
+    }
+
+
 def _dispatch_llm_workers(
     needs: dict[str, bool],
     llm_config: dict | None,
@@ -300,66 +385,24 @@ def _dispatch_llm_workers(
 
         return _run
 
-    _MODULE_FNS: dict[str, Callable] = {
-        "global_macro": lambda c, lc: generate_global_macro(
-            a_indices,
-            us_indices,
-            total_mv,
-            total_profit,
-            total_cost,
-            categories,
-            sector_flow=sector_flow,
-            force=force,
-            http_client=c,
-            llm_config=lc,
-            competitive_context=_competitive_context,
-            holdings_details=holdings_details,
-        ),
-        "expert_review": lambda c, lc: generate_expert_review(
-            total_mv,
-            total_cost,
-            total_profit,
-            total_today_profit,
-            holdings_count,
-            categories,
-            penetrated_assets,
-            holdings_details=holdings_details,
-            force=force,
-            http_client=c,
-            llm_config=lc,
-            pipeline_data=pipeline_data,
-            competitive_context=_competitive_context,
-            metrics=_metrics,
-        ),
-        "health_check": lambda c, lc: generate_health_check(
-            total_mv,
-            total_cost,
-            total_profit,
-            total_today_profit,
-            holdings_count,
-            categories,
-            penetrated_assets,
-            holdings_details=holdings_details,
-            force=force,
-            http_client=c,
-            llm_config=lc,
-            pipeline_data=pipeline_data,
-            degradation_events=_degradation_events,
-        ),
-        "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
-            total_mv,
-            total_cost,
-            total_profit,
-            total_today_profit,
-            holdings_count,
-            categories,
-            penetrated_assets,
-            holdings_details=holdings_details,
-            force=force,
-            http_client=c,
-            llm_config=lc,
-        ),
-    }
+    _MODULE_FNS = _build_module_fns(
+        a_indices=a_indices,
+        us_indices=us_indices,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_count=holdings_count,
+        categories=categories,
+        penetrated_assets=penetrated_assets,
+        holdings_details=holdings_details,
+        sector_flow=sector_flow,
+        force=force,
+        pipeline_data=pipeline_data,
+        competitive_context=_competitive_context,
+        metrics=_metrics,
+        degradation_events=_degradation_events,
+    )
 
     # ── 辩论模式路由：替换 expert_review 条目 ─────────────────
     from src.python.features import is_feature_enabled

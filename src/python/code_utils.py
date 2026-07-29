@@ -8,10 +8,6 @@
 
 from __future__ import annotations
 
-import logging
-
-logger = logging.getLogger("invest")
-
 # ── 已知代码前缀区间 ────────────────────────────────────────
 # A 股股票：
 #   60xxxx（上海主板）、68xxxx（科创板）

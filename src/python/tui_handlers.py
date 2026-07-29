@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import datetime
 
 from src.python.llm.pricing import CURRENCY_SYMBOLS
@@ -21,7 +22,8 @@ from src.python.tui_menu import MENU_ITEMS, get_config_cache, press_any_key, ref
 
 logger = setup_logger()
 
-_busy: bool = False  # 防连续按键保护
+_busy: bool = False          # 防连续按键保护
+_busy_lock = threading.Lock()  # _busy 标志位锁保护
 
 
 # ── LLM 用量 / 耗时 / 错误提示 ──────────────────────────────
@@ -235,9 +237,10 @@ def execute_item(sel: int) -> None:
 
         exit_app()
     if callback is not None:
-        if _busy:
-            return
-        _busy = True
+        with _busy_lock:
+            if _busy:
+                return
+            _busy = True
         try:
             callback()
         except KeyboardInterrupt:
@@ -249,4 +252,5 @@ def execute_item(sel: int) -> None:
             print_error_with_hint(e, "操作执行异常")
             press_any_key()
         finally:
-            _busy = False
+            with _busy_lock:
+                _busy = False

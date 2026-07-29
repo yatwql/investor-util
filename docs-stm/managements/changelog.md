@@ -6,6 +6,20 @@
 
 ## [0.8.10-dev] - 2026-07-29
 
+### Added
+- **注释历史痕迹检查脚本**：新增 `scripts/check-history-traces.py`，扫描 src/ 下所有 .py 文件中的历史变更痕迹（拆分来源叙述、版本号标记、任务编号引用等），15+ 模式分类
+- **P1 门禁前置检查**：`test_runner.py verify` 模式增加 `preflight` 机制，运行测试前先执行 `check-history-traces.py --ci`，检测到历史痕迹即中断合入流程
+- **rf-72: provider_registry.py 会话缓存提取**：`DataSourceRegistry` 中的会话缓存管理逻辑提取为独立模块 `_session_cache.py`（`SessionCache` 类），provider_registry.py 从 549 行降至约 400 行
+- **rf-82: alignment_correction.py 费率估算提取**：组合费率估算逻辑提取为独立子模块 `analysis/_fee_estimation.py`，alignment_correction.py 从 577 行降至约 500 行
+- **rf-83: news_aggregator.py 去重逻辑提取**（已在上一轮 rf-47 中完成）：`news_dedup.py` 独立管理标题去重和锚点持久化，news_aggregator.py 降至 236 行
+- **rf-84: sina.py K 线函数提取**：历史 K 线获取函数提取为 `providers/sina_kline.py`，sina.py 从 507 行降至约 400 行
+- **rf-100: test_llm_scenarios.py 拆分**：1202 行大测试文件按 S11-S17 场景分组拆分为 7 个子文件（`test_s11_mixed_cache.py` ~ `test_s17_partial_cache.py` + `test_llm_scenarios_misc.py`），19 个测试全部通过
+- **rf-96: test_llm.py 拆分**：2037 行大测试文件拆分为 test_llm_api.py/test_llm_generators.py/test_llm_session.py 3 个子文件
+- **rf-97: test_scenario_penetration.py 拆分**：1592 行按场景拆分为 4 个子文件（basic/advanced/mixed/edge）
+- **rf-99: test_cache.py 拆分**：1422 行拆出 test_cache_core.py/cleanup/format 3 子模块
+
+- **rf-73: api.py 拆分**：707 行的 `api.py` 拆分为 `_api_claude.py`（Claude）/`_api_openai.py`（OpenAI）/`_api_gemini.py`（Gemini）三个子模块，api.py 降至 521 行
+
 ### Fixed
 - **P2B 魔数/硬编码修复（rf-90 ~ rf-95 共 6 项）**：
   - rf-90: `report/penetration.py` `_SECTOR_KEYWORDS` ~330 行硬编码 → 迁出至 `data/knowledge/sector_keywords.json`，`_load_sector_keywords()` 加载
@@ -28,6 +42,35 @@
   - rf-128: `generators_orchestrator.py` 硬编码 HTTP 连接池参数 → 模块级常量 `_LLM_MAX_CONNECTIONS`、`_LLM_MAX_KEEPALIVE`
   - rf-129: `skeleton.py` 硬编码 `BATCH_SIZE`/`max_workers` → 模块级常量 `_BATCH_CHUNK_SIZE`、`_BATCH_MAX_WORKERS`
   - rf-130: `api.py` 硬编码默认模型名 → 模块级常量 `_DEFAULT_CLAUDE_MODEL`、`_DEFAULT_OPENAI_MODEL`、`_DEFAULT_GEMINI_MODEL`
+
+- **P1A 架构约束违反修复（rf-17/19 — 2 项，补全前序修复）**：
+  - rf-17: `fetcher/price.py/industry.py/fund_manager.py` 添加 `session_cache_get/set` 会话缓存层，消除双管线场景下同一资产重复读取文件缓存
+  - rf-19: `provider_registry.py` 模块级全局变量（`_phase_timer`/`_phase_expired`/`_phase_timeout_lock`/`_phase_timer_name`）封装为 `_PhaseTimeoutState` 实例，使用 `contextvars.ContextVar` 管理
+
+- **P1D 函数过长批量拆分（rf-36 ~ rf-50 共 15 项）**：
+  - rf-36/rf-46: `orchestrator.py` `_generate_report_full`(~272→~85 行) 拆出 `_prepare_full_risk_metrics`/`_generate_full_html_report`/`_generate_full_excel_report`；`_fetch_llm_and_news`(~126→~64 行) 拆出 `_submit_llm_future`/`_submit_news_future`/`_collect_llm_future_result`/`_collect_news_future_result`
+  - rf-37: `portfolio_history.py` `get_combined_timeseries`(~232→~112 行) 拆出 7 个子函数
+  - rf-38: `fund_manager.py` `parse_manager_from_html`(~139→~35 行) 拆出 4 个子函数
+  - rf-39/42/45: `rebalance.py` 拆出 5 个子函数
+  - rf-40: `alignment_correction.py` 现金识别+剥离+费率估算拆分
+  - rf-41: `scenario.py` `scenario_analysis`(~123→~61 行) 拆出 `_build_scenario_entry`
+  - rf-43: `price.py` `fetch_market_data`(~97→~25 行) 拆出 3 个子函数
+  - rf-44: `fund_style_classify.py` `classify_fund_style`(~116→~30 行) 拆出 3 个子函数
+  - rf-48: `fact_checker.py` `check_numerical_consistency`(~142→~45 行) 拆出 `_evaluate_percent_value`
+  - rf-49: `skeleton.py` `generate_llm_content`(~118→~40 行) 拆出 2 个子函数
+  - rf-50: `generators_orchestrator.py` `generate_all_llm`(~166→~80 行) 拆出 3 个预检子函数
+
+- **P3 批量修复（rf-108 ~ rf-117 共 10 项）**：
+  - rf-108: `providers/__init__.py` 补充 `__all__`（21 个子模块）
+  - rf-109: `fetcher/industry.py` 删除冗余 `_is_a_share_code()` 包装
+  - rf-111: `config/_config_defaults.py` 字符串拼接改为 `_build_template_from_defaults()` dict-driven 生成
+  - rf-112: `config/_llm_defaults.py` 同上
+  - rf-113: `registry.py` `enumerate + pop` 改为 `remove + append`
+  - rf-114: `code_utils.py` 删除未使用的 `import logging` 和 `logger`
+  - rf-115: `provider_registry.py:is_chain_broken()` 未注册 provider 视为不可用（`continue` 跳过）
+  - rf-116: `eastmoney_news.py` 新增 `prev_sort_end` 游标去重守卫
+  - rf-117: `tui_handlers.py` `_busy` 标志位新增 `threading.Lock()` 保护
+  - rf-118: `generators_orchestrator.py` `_MODULE_FNS` 提升为模块级 `_build_module_fns()` 工厂函数
 
 - **P1A 架构约束违反修复（rf-15 ~ rf-22 共 6 项，不含 rf-17/19 待定）**：
   - rf-15: `alignment_correction.py:_classify_fund_type()` 硬编码代码类型判定 → 改用 `code_utils.is_a_share_code()`/`is_hk_stock_code()`

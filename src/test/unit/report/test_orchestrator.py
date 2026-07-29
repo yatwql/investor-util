@@ -259,8 +259,8 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.market_value._generate_details", return_value=[mock_detail]),
-            patch("src.python.report.orchestrator.capture_snapshot") as mock_cap,
-            patch("src.python.report.orchestrator.fetch_history_data") as mock_hist,
+            patch("src.python.report._snapshot.capture_snapshot") as mock_cap,
+            patch("src.python.report._snapshot.fetch_history_data") as mock_hist,
             patch("src.python.report.html_writer.write_html_report") as mock_html,
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.registry.get_report_section_order", return_value=[]),
@@ -304,8 +304,8 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
-            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
-            patch("src.python.report.orchestrator.fetch_history_data") as mock_hist,
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            patch("src.python.report._snapshot.fetch_history_data") as mock_hist,
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.registry.get_report_section_order"),
@@ -333,8 +333,8 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
-            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
-            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            patch("src.python.report._snapshot.fetch_history_data"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.registry.get_report_section_order"),
@@ -360,8 +360,8 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
-            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
-            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            patch("src.python.report._snapshot.fetch_history_data"),
             patch(
                 "src.python.report.html_writer.write_html_report",
                 side_effect=RuntimeError("HTML 失败"),
@@ -396,9 +396,9 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
-            patch("src.python.report.orchestrator.fetch_history_data"),
-            patch("src.python.report.orchestrator._fetch_llm_and_news") as mock_llm_news,
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            patch("src.python.report._snapshot.fetch_history_data"),
+            patch("src.python.report._llm_news._fetch_llm_and_news") as mock_llm_news,
             patch("src.python.report.html_writer.write_html_report") as mock_html,
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.registry.get_report_section_order", return_value=[]),
@@ -448,8 +448,8 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot", return_value=None),
-            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report._snapshot.capture_snapshot", return_value=None),
+            patch("src.python.report._snapshot.fetch_history_data"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.registry.get_report_section_order"),
@@ -485,8 +485,8 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot", return_value=None),
-            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report._snapshot.capture_snapshot", return_value=None),
+            patch("src.python.report._snapshot.fetch_history_data"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.registry.get_report_section_order"),
@@ -523,8 +523,8 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot", return_value=None),
-            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report._snapshot.capture_snapshot", return_value=None),
+            patch("src.python.report._snapshot.fetch_history_data"),
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.registry.get_report_section_order"),
@@ -558,8 +558,8 @@ class TestGenerateReport:
 
         with (
             patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
-            patch("src.python.report.orchestrator.capture_snapshot", return_value={}),
-            patch("src.python.report.orchestrator.fetch_history_data"),
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            patch("src.python.report._snapshot.fetch_history_data"),
             patch(
                 "src.python.report.html_writer.write_html_report",
                 side_effect=RuntimeError("HTML 失败"),

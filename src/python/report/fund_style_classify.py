@@ -275,40 +275,11 @@ def _batch_tencent_extended(codes: list[str]) -> dict[str, dict[str, Any]]:
     return results
 
 
-def classify_fund_style(
-    fund_code: str,
-    holdings: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """判定一只基金的风格。
-
-    Args:
-        fund_code: 基金代码（仅用于日志/索引）
-        holdings: [{name, code, ratio}, ...] 该基金的前 N 大持仓
-
-    Returns:
-        {"code": fund_code,
-         "style": "大盘成长"/"--",
-         "is_estimated": bool,
-         "details": [{"name", "code", "size", "style", "ratio", "is_estimated"}, ...]}
-    """
-    _ensure_tencent_provider_registered()  # 惰性注册（避免模块级副作用）
-    from src.python.provider_registry import NOT_FOUND, get_registry
-
-    reg = get_registry()
-
-    if not holdings:
-        return {"code": fund_code, "style": "--", "is_estimated": False, "details": []}
-
-    # 获取所有持仓股票代码
-    stock_codes = [h.get("code", "").strip() for h in holdings if h.get("code")]
-    stock_codes = [c for c in stock_codes if c]
-
-    # 获取行业平均 PE（当前为空）
-    industry_avg_pe_map = _get_industry_avg_pe(stock_codes) if stock_codes else {}
-
-    # ── 预取阶段：并行填充 registry session_cache ──────────────────
-    # 三级降级：push2（精确）→ Tencent 批量并发（可靠）→ 代码段估算（兜底）
-    # 非 A 股（美股/港股/基金等）跳过 API 调用，直接估算
+def _prefetch_extended_data(
+    holdings: list[dict],
+    reg: Any,
+) -> None:
+    """预取各持仓股票的扩展数据（三级降级：push2 → Tencent → 代码段估算）。"""
     _codes_to_fetch = [c for h in holdings if (c := (h.get("code") or "").strip()) and c and is_a_share_code(c)]
     # 去重：同一股票跨基金不重复请求
     _seen: set[str] = set()
@@ -327,7 +298,19 @@ def classify_fund_style(
     if _need_tencent and not reg.is_circuit_broken("tencent_style"):
         _batch_tencent_extended(_need_tencent)
 
-    # ── 判定阶段：逐只股票读取 registry session_cache 判定风格 ──
+
+def _classify_stock_styles(
+    holdings: list[dict],
+    reg: Any,
+    industry_avg_pe_map: dict[str, float],
+) -> tuple[list[dict], dict[str, float], dict[str, float], float, bool]:
+    """逐只股票读取缓存数据并判定风格。
+
+    Returns:
+        (stock_styles, size_weights, style_weights, total_weight, has_estimated)
+    """
+    from src.python.provider_registry import NOT_FOUND
+
     stock_styles: list[dict[str, Any]] = []
     total_weight = 0.0
     size_weights: dict[str, float] = {"大盘": 0.0, "中盘": 0.0, "小盘": 0.0}
@@ -376,13 +359,23 @@ def classify_fund_style(
             style_weights[style] += ratio
         total_weight += ratio
 
+    return stock_styles, size_weights, style_weights, total_weight, has_estimated
+
+
+def _finalize_fund_style(
+    fund_code: str,
+    stock_styles: list[dict],
+    total_weight: float,
+    size_weights: dict[str, float],
+    style_weights: dict[str, float],
+    has_estimated: bool,
+) -> dict[str, Any]:
+    """按权重确定最终风格并组装结果。"""
     if total_weight <= 0:
         return {"code": fund_code, "style": "--", "is_estimated": False, "details": []}
 
-    # 按权重确定最终风格
     dominant_size = max(size_weights, key=lambda k: size_weights[k])
     dominant_style = max(style_weights, key=lambda k: style_weights[k])
-
     style_label = f"{dominant_size}{dominant_style}"
 
     return {
@@ -391,3 +384,48 @@ def classify_fund_style(
         "is_estimated": has_estimated,
         "details": stock_styles,
     }
+
+
+def classify_fund_style(
+    fund_code: str,
+    holdings: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """判定一只基金的风格。
+
+    Args:
+        fund_code: 基金代码（仅用于日志/索引）
+        holdings: [{name, code, ratio}, ...] 该基金的前 N 大持仓
+
+    Returns:
+        {"code": fund_code,
+         "style": "大盘成长"/"--",
+         "is_estimated": bool,
+         "details": [{"name", "code", "size", "style", "ratio", "is_estimated"}, ...]}
+    """
+    _ensure_tencent_provider_registered()  # 惰性注册（避免模块级副作用）
+    from src.python.provider_registry import get_registry
+
+    reg = get_registry()
+
+    if not holdings:
+        return {"code": fund_code, "style": "--", "is_estimated": False, "details": []}
+
+    # 获取所有持仓股票代码
+    stock_codes = [h.get("code", "").strip() for h in holdings if h.get("code")]
+    stock_codes = [c for c in stock_codes if c]
+
+    # 获取行业平均 PE
+    industry_avg_pe_map = _get_industry_avg_pe(stock_codes) if stock_codes else {}
+
+    # ── 预取阶段：并行填充 registry session_cache ──
+    _prefetch_extended_data(holdings, reg)
+
+    # ── 判定阶段：逐只股票读取缓存数据判定风格 ──
+    stock_styles, size_weights, style_weights, total_weight, has_estimated = _classify_stock_styles(
+        holdings, reg, industry_avg_pe_map,
+    )
+
+    # ── 按权重确定最终风格 ──
+    return _finalize_fund_style(
+        fund_code, stock_styles, total_weight, size_weights, style_weights, has_estimated,
+    )

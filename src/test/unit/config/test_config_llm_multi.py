@@ -60,7 +60,7 @@ class TestLoadLlmProviders(unittest.TestCase):
                 }
             ],
         })
-        with patch("src.python.config._core._get_llm_providers_path", return_value=self.providers_path):
+        with patch("src.python.config._llm_providers._get_llm_providers_path", return_value=self.providers_path):
             result = _load_llm_providers()
         self.assertIsNotNone(result)
         self.assertEqual(result["strategy"], "priority")
@@ -72,7 +72,7 @@ class TestLoadLlmProviders(unittest.TestCase):
     def test_file_not_found(self):
         """文件不存在返回 None（不抛异常）。"""
         missing = os.path.join(self.tmp.name, "nonexistent.json")
-        with patch("src.python.config._core._get_llm_providers_path", return_value=missing):
+        with patch("src.python.config._llm_providers._get_llm_providers_path", return_value=missing):
             result = _load_llm_providers()
         self.assertIsNone(result)
 
@@ -309,7 +309,7 @@ class TestInjectProviderChainData(unittest.TestCase):
 
     # ── _provider_list ──
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_has_provider_list(self, mock_load):
         """_inject_provider_chain_data → merged dict 含 _provider_list。"""
         mock_load.return_value = {
@@ -325,7 +325,7 @@ class TestInjectProviderChainData(unittest.TestCase):
 
     # ── strategy ──
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_strategy_default_priority(self, mock_load):
         """未指定 strategy → 默认 "priority"。"""
         mock_load.return_value = {
@@ -336,7 +336,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         result = _inject_provider_chain_data(dict(self.base_config))
         self.assertEqual(result["_strategy"], "priority")
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_strategy_explicit_priority(self, mock_load):
         """指定 strategy="weighted" → 保留用户设置。"""
         mock_load.return_value = {
@@ -348,7 +348,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         result = _inject_provider_chain_data(dict(self.base_config))
         self.assertEqual(result["_strategy"], "weighted")
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_strategy_invalid_fallback(self, mock_load):
         """非法策略值回退 priority + WARNING。"""
         mock_load.return_value = {
@@ -364,7 +364,7 @@ class TestInjectProviderChainData(unittest.TestCase):
 
     # ── preferred_providers ──
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_preferred_default_empty(self, mock_load):
         """未指定 preferred_providers → 默认 {}。"""
         mock_load.return_value = {
@@ -375,7 +375,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         result = _inject_provider_chain_data(dict(self.base_config))
         self.assertEqual(result["_preferred_providers"], {})
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_preferred_valid_name(self, mock_load):
         """preferred_providers 中 name 存在 → 保留。"""
         mock_load.return_value = {
@@ -387,7 +387,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         result = _inject_provider_chain_data(dict(self.base_config))
         self.assertEqual(result["_preferred_providers"], {"news": "p1"})
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_preferred_invalid_name(self, mock_load):
         """不存在的偏好 name → WARNING + 忽略。"""
         mock_load.return_value = {
@@ -403,7 +403,7 @@ class TestInjectProviderChainData(unittest.TestCase):
 
     # ── 原有字段保留 ──
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_first_provider_reference(self, mock_load):
         """原有 provider/api_key/model/endpoint 字段在注入后保留。"""
         mock_load.return_value = {
@@ -425,7 +425,7 @@ class TestInjectProviderChainData(unittest.TestCase):
 
     # ── 无 llm_providers.json ──
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_no_providers_file(self, mock_load):
         """llm_providers.json 不存在 → _provider_list=None, _strategy=priority, _preferred={}。"""
         mock_load.return_value = None
@@ -436,7 +436,7 @@ class TestInjectProviderChainData(unittest.TestCase):
 
     # ── preferred_providers 非 dict ──
 
-    @patch("src.python.config._core._load_llm_providers")
+    @patch("src.python.config._llm_providers._load_llm_providers")
     def test_preferred_not_dict(self, mock_load):
         """preferred_providers 不是 dict → WARNING + 空 dict。"""
         mock_load.return_value = {

@@ -138,7 +138,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.report.data_status._default_persist_path",
         lambda: str(tmp_path / "data/state/.degradation_state.json"),
     )
-    # rebalance 静默期文件隔离
+    # rebalance 静默期文件隔离（_silence.py 是实际定义方，rebalance.py 仅 re-export）
+    monkeypatch.setattr(
+        "src.python.analysis._silence._SILENCE_FILE",
+        str(tmp_path / "data/state/rebalance_silence.json"),
+    )
     monkeypatch.setattr(
         "src.python.analysis.rebalance._SILENCE_FILE",
         str(tmp_path / "data/state/rebalance_silence.json"),
@@ -155,11 +159,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     )
     # LLM 配置文件隔离
     monkeypatch.setattr(
-        "src.python.config._core._LLM_KEY_FILE_DEFAULT",
+        "src.python.config._llm_providers._LLM_KEY_FILE_DEFAULT",
         str(tmp_path / "data/config/llm_key.json"),
     )
     monkeypatch.setattr(
-        "src.python.config._core._LLM_PROVIDERS_FILE_DEFAULT",
+        "src.python.config._llm_providers._LLM_PROVIDERS_FILE_DEFAULT",
         str(tmp_path / "data/config/llm_providers.json"),
     )
     # data/history/ 快照目录隔离

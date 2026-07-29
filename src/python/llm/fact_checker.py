@@ -256,6 +256,84 @@ def _is_suggestion_context(code: str, full_text: str) -> bool:
 # ── 检查器 1：数值一致性（v3 — 带语境感知）───────────────────────
 
 
+def _evaluate_percent_value(
+    value: float,
+    sentence: str,
+    stock_rates_abs: dict[str, float],
+    holding_codes: set[str],
+    profit_rate: float,
+    profit_sign: str,
+) -> str | None:
+    """评估单个百分比数值，返回 issue 字符串或 None（通过/跳过）。"""
+    # 品种计数/比例语境
+    if any(kw in sentence for kw in _PROPORTION_KEYWORDS):
+        return None
+
+    # 无收益关键词或收益率太小 → 无法校验
+    is_profit_context = any(kw in sentence for kw in _PROFIT_KEYWORDS)
+    if not is_profit_context or profit_rate < 0.01:
+        return None
+
+    # 构建参考收益率列表：个股收益率 + 组合总收益率
+    ref_rates: dict[str, float] = dict(stock_rates_abs)
+    ref_rates["_portfolio"] = profit_rate
+
+    closest_ref = min(ref_rates, key=lambda k: abs(value - ref_rates[k]))
+    closest_diff = abs(value - ref_rates[closest_ref])
+
+    # 策略 1：最接近的参考值在容差内
+    if closest_diff <= _DEFAULT_TOLERANCE_PCT:
+        return None
+
+    # 策略 2：句中代码全部为指数代码
+    codes_in_sentence = _CODE_PATTERN.findall(sentence)
+    index_codes_in_sentence = [c for c in codes_in_sentence if c in _INDEX_CODES]
+    holding_codes_in_sentence = [c for c in codes_in_sentence if c in holding_codes]
+    if not holding_codes_in_sentence and index_codes_in_sentence:
+        return None
+
+    # 策略 3：贡献/归因类关键词
+    if _is_contribution_sentence(sentence):
+        return None
+
+    # 策略 4：金融基准类关键词
+    if any(kw in sentence for kw in ("国债", "利率", "通胀", "GDP", "CPI", "PMI")):
+        return None
+
+    # 策略 5：仓位/占比语境
+    if _is_position_weight_context(sentence):
+        return None
+
+    # 策略 6：假设/情景语境
+    if _is_hypothetical_context(sentence):
+        return None
+
+    # 策略 7：调仓目标语境
+    if any(kw in sentence for kw in _REBALANCE_TARGET_KEYWORDS):
+        return None
+
+    # 策略 8：币种/敞口语境
+    if any(kw in sentence for kw in _EXPOSURE_KEYWORDS):
+        return None
+
+    # 全部策略均未通过 → 标记为不一致
+    if len(holding_codes_in_sentence) > 1:
+        best_code = min(holding_codes_in_sentence, key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
+    elif holding_codes_in_sentence:
+        best_code = holding_codes_in_sentence[0]
+    else:
+        best_code = None
+
+    if best_code:
+        stock_rate = stock_rates_abs.get(best_code, 0)
+        return f"收益相关数值 {value}% 与 {best_code} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
+    elif closest_ref != "_portfolio":
+        stock_rate = stock_rates_abs.get(closest_ref, 0)
+        return f"收益相关数值 {value}% 与 {closest_ref} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
+    else:
+        return f"收益相关数值 {value}% 与实际累计收益率 {profit_rate:.1f}%（{profit_sign}）偏差超过容差"
+
+
 def check_numerical_consistency(
     text: str,
     holdings_details: list[dict] | None,
@@ -286,7 +364,7 @@ def check_numerical_consistency(
 
     # 构建个股收益率映射
     stock_rates = _build_stock_rate_map(holdings_details)
-    # 持仓代码集合（用于判断句中代码是否为持仓品种）
+    stock_rates_abs = {code: abs(r) for code, r in stock_rates.items()}
     holding_codes = set(_extract_holding_map(holdings_details).keys())
 
     total_checked = 0
@@ -307,90 +385,15 @@ def check_numerical_consistency(
 
             total_checked += 1
 
-            # 品种计数/比例语境（如"80%的品种处于盈利"）→ 数值为品种比例而非收益率，跳过
-            if any(kw in sentence for kw in _PROPORTION_KEYWORDS):
+            issue = _evaluate_percent_value(
+                value, sentence,
+                stock_rates_abs, holding_codes,
+                profit_rate, profit_sign,
+            )
+            if issue is None:
                 passed += 1
-                continue
-
-            # 无收益关键词 → 不是收益/回报类百分比 → 无法校验，默认为通过
-            is_profit_context = any(kw in sentence for kw in _PROFIT_KEYWORDS)
-            if not is_profit_context or profit_rate < 0.01:
-                passed += 1
-                continue
-
-            # 构建参考收益率列表：个股收益率 + 组合总收益率
-            # 对每个数值，找最接近的参考值进行匹配
-            stock_rates_abs = {code: abs(r) for code, r in stock_rates.items()}
-            ref_rates: dict[str, float] = dict(stock_rates_abs)
-            ref_rates["_portfolio"] = profit_rate
-
-            # 找最接近的参考值
-            closest_ref = min(ref_rates, key=lambda k: abs(value - ref_rates[k]))
-            closest_diff = abs(value - ref_rates[closest_ref])
-
-            # 策略 1：最接近的参考值在容差内 → 通过
-            if closest_diff <= _DEFAULT_TOLERANCE_PCT:
-                passed += 1
-                continue
-
-            # 策略 2：句中代码全部为指数代码 → 跳过（基准数值不来自持仓）
-            codes_in_sentence = _CODE_PATTERN.findall(sentence)
-            index_codes_in_sentence = [c for c in codes_in_sentence if c in _INDEX_CODES]
-            holding_codes_in_sentence = [c for c in codes_in_sentence if c in holding_codes]
-            if not holding_codes_in_sentence and index_codes_in_sentence:
-                passed += 1
-                continue
-
-            # 策略 3：句中含贡献类关键词 → 跳过不可验证
-            if _is_contribution_sentence(sentence):
-                passed += 1
-                continue
-
-            # 策略 4：句中含金融基准类关键词（利率/通胀/国债等外部指标）→ 跳过
-            if any(kw in sentence for kw in ("国债", "利率", "通胀", "GDP", "CPI", "PMI")):
-                passed += 1
-                continue
-
-            # 策略 5：仓位/占比语境 → 跳过（如"茅台占比52.4%"）
-            if _is_position_weight_context(sentence):
-                passed += 1
-                continue
-
-            # 策略 6：假设/情景语境 → 跳过（如"若下跌20%"）
-            if _is_hypothetical_context(sentence):
-                passed += 1
-                continue
-
-            # 策略 7：调仓目标语境 → 跳过（如"从52%降至15%"）
-            if any(kw in sentence for kw in _REBALANCE_TARGET_KEYWORDS):
-                passed += 1
-                continue
-
-            # 策略 8：币种/敞口语境 → 跳过（如"人民币 100%"）
-            if any(kw in sentence for kw in _EXPOSURE_KEYWORDS):
-                passed += 1
-                continue
-
-            # 全部策略均未通过 → 标记为不一致
-            # 优先匹配句中持仓代码中与数值最接近的品种（而非仅取第一个代码）
-            if len(holding_codes_in_sentence) > 1:
-                best_code = min(holding_codes_in_sentence, key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
-            elif holding_codes_in_sentence:
-                best_code = holding_codes_in_sentence[0]
             else:
-                best_code = None
-            if best_code:
-                stock_rate = stock_rates_abs.get(best_code, 0)
-                issues.append(
-                    f"收益相关数值 {value}% 与 {best_code} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
-                )
-            elif closest_ref != "_portfolio":
-                stock_rate = stock_rates_abs.get(closest_ref, 0)
-                issues.append(
-                    f"收益相关数值 {value}% 与 {closest_ref} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
-                )
-            else:
-                issues.append(f"收益相关数值 {value}% 与实际累计收益率 {profit_rate:.1f}%（{profit_sign}）偏差超过容差")
+                issues.append(issue)
 
     return issues, total_checked, passed
 

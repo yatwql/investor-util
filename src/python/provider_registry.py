@@ -27,6 +27,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from src.python._session_cache import NOT_FOUND, SessionCache, SessionCacheEntry
+from src.python._phase_timeout import _PhaseTimeoutContext, phase_timeout
+
 logger = logging.getLogger("invest")
 
 # ── 常量 ────────────────────────────────────────────────
@@ -383,15 +386,25 @@ class DataSourceRegistry:
         """
         with self._provider_lock:
             now = time.time()
-            # 检查全链熔断
+            registered_any = False
+            # 检查全链熔断（未注册 provider 视为不可用，跳过）
             for p in chain:
                 state = self._providers.get(p)
-                if state is None or not state.is_skipped:
+                if state is None:
+                    logger.debug("[registry] %s 未注册，视为不可用", p)
+                    continue
+                registered_any = True
+                if not state.is_skipped:
                     return False
+            # 无任何 provider 已注册 → 无判断依据，视为可用
+            if not registered_any:
+                return False
             # 全链熔断 → 检查是否有冷却期满的（解除所有冷却期满的 provider）
             any_recovered = False
             for p in chain:
-                state = self._providers[p]
+                state = self._providers.get(p)
+                if state is None:
+                    continue
                 if now - state.last_failure_time >= state.cooldown_secs:
                     state.is_skipped = False
                     state.consecutive_failures = 0
@@ -633,86 +646,7 @@ def get_registry() -> DataSourceRegistry:
     return DataSourceRegistry()
 
 
-# ── PhaseTimeout（全局超时上下文管理器） ─────────────────
-
-
-_phase_timer: threading.Timer | None = None
-_phase_expired = False
-_phase_timeout_lock = threading.Lock()
-_phase_timer_name: str = ""
-
-
-@contextmanager
-def phase_timeout(seconds: float, phase_name: str = "data_fetch"):
-    """数据获取阶段全局超时上下文管理器。
-
-    超时后已获取的数据保留，未完成的以占位处理。
-    超时不影响正在运行的 HTTP 线程（Python 无法 kill 线程），但结果被丢弃。
-
-    不支持嵌套——检测到嵌套时抛出 RuntimeError。
-
-    Args:
-        seconds: 超时秒数
-        phase_name: 阶段名称（日志用）
-
-    Yields:
-        _PhaseTimeoutContext 实例，供调用方检查过期/剩余时间
-    """
-    global _phase_timer, _phase_expired, _phase_timer_name
-
-    if _phase_timer is not None:
-        raise RuntimeError(f"phase_timeout 不支持嵌套：已有 '{_phase_timer_name}' 在运行，不能开启 '{phase_name}'")
-
-    start = time.time()
-    _phase_expired = False
-    _phase_timer_name = phase_name
-
-    def _expire():
-        global _phase_expired
-        with _phase_timeout_lock:
-            _phase_expired = True
-        logger.warning(
-            "[phase_timeout] %s 超时（%.0fs），继续使用已获取数据",
-            phase_name,
-            seconds,
-        )
-
-    timer = threading.Timer(seconds, _expire)
-    timer.daemon = True
-    timer.start()
-    _phase_timer = timer
-
-    try:
-        yield _PhaseTimeoutContext(start, seconds)
-    finally:
-        timer.cancel()
-        with _phase_timeout_lock:
-            _phase_expired = False
-        _phase_timer = None
-        _phase_timer_name = ""
-
-
-class _PhaseTimeoutContext:
-    """超时上下文，供调用方检查超时状态。"""
-
-    def __init__(self, start: float, total: float):
-        self._start = start
-        self._total = total
-
-    @property
-    def expired(self) -> bool:
-        with _phase_timeout_lock:
-            return _phase_expired
-
-    @property
-    def elapsed(self) -> float:
-        return time.time() - self._start
-
-    @property
-    def remaining(self) -> float:
-        return max(0.0, self._total - self.elapsed)
-
-    def check(self) -> None:
-        """检查超时，超时时抛出 TimeoutError。"""
-        if self.expired:
-            raise TimeoutError(f"数据获取阶段超时（{self._total:.0f}s）")
+# ── PhaseTimeout 已提取至 _phase_timeout.py 子模块 ──────
+# phase_timeout / _PhaseTimeoutContext / _PhaseTimeoutState
+# 均已迁至 src/python/_phase_timeout.py，满足 C14 约束。
+# 测试隔离：_phase_timeout._phase_timeout.reset()

@@ -13,16 +13,10 @@ if TYPE_CHECKING:
     import httpx
 
 from src.python.llm.api_base import (
-    _check_claude_truncation,
-    _check_gemini_truncation,
-    _check_openai_truncation,
-    _extract_content,
-    _extract_content_from_gemini,
     _get_last_llm_failure,
     _get_retry_max,
     _is_effort_model,
     _supports_extended_thinking,
-    call_llm_with_retry,
 )
 from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
@@ -39,15 +33,6 @@ logger = logging.getLogger("invest")
 _DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
 _DEFAULT_OPENAI_MODEL = "gpt-4o"
 _DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
-
-__all__ = [
-    "call_llm",
-    "call_single_provider",
-    "call_claude",
-    "call_openai",
-    "call_gemini",
-    "configure_extended_thinking",
-]
 
 # ── 内容过滤安抚重试 ────────────────────────────────
 
@@ -521,216 +506,16 @@ def configure_extended_thinking(
         logger.info("Extended Thinking 已开启 [%s]: budget=%d", module_suffix, budget)
 
 
-def call_claude(
-    system: str,
-    user: str,
-    api_key: str,
-    model: str,
-    endpoint: str,
-    max_tokens: int,
-    timeout: float = 60.0,
-    max_retries: int = 2,
-    http_client: httpx.Client | None = None,
-    config_field: str = "max_tokens",
-    temperature: float | None = None,
-    llm_config: dict | None = None,
-) -> tuple[str | None, dict | None]:
-    """调用 Claude API (Messages API)，带重试 + 用量日志。
+# ── Provider 调用实现（从子模块导入） ─────────────────
+from src.python.llm._api_claude import call_claude  # noqa: E402, F401
+from src.python.llm._api_openai import call_openai  # noqa: E402, F401
+from src.python.llm._api_gemini import call_gemini  # noqa: E402, F401
 
-    实际 HTTP 重试逻辑委托给 _call_llm_with_retry。
-    system prompt 使用数组格式 + cache_control 以支持 Anthropic Prompt Caching
-    （同一 system prompt 在 5 分钟内多次调用时节省输入 token）。
-
-    支持 Extended Thinking（thinking 参数），通过 llm_settings.json 中
-    thinking_enabled_{模块} / thinking_budget_{模块} 配置开启。
-    推荐仅在智囊团深度复盘（expert_review）场景开启，全球政经局势和财经新闻热点与持仓关联分析收益有限。
-    若模型不支持 Extended Thinking（如 claude-sonnet-3-5），自动降级跳过。
-
-    Args:
-        max_retries: 最大重试次数，从 llm_config 读取
-        temperature: 若不为 None，覆盖 payload 中的 temperature 字段
-        llm_config: LLM 合并配置，用于读取 thinking 配置项
-
-    Returns:
-        (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
-    """
-    url = endpoint or "https://api.anthropic.com/v1/messages"
-    headers = {
-        "Content-Type": "application/json",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-    }
-    # 数组格式 + cache_control 支持 Prompt Caching
-    payload = {
-        "model": model or _DEFAULT_CLAUDE_MODEL,
-        "max_tokens": max_tokens,
-        "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-        "messages": [{"role": "user", "content": user}],
-    }
-    # ── Extended Thinking（根据模型类型 + 模块配置） ──
-    configure_extended_thinking(payload, llm_config, config_field, model, max_tokens)
-    if temperature is not None and "thinking" not in payload:
-        payload["temperature"] = temperature
-    client = http_client
-    assert client is not None
-
-    return call_llm_with_retry(
-        label="Claude",
-        client=client,
-        url=url,
-        headers=headers,
-        payload=payload,
-        timeout=timeout,
-        max_retries=max_retries,
-        max_tokens=max_tokens,
-        config_field=config_field,
-        extract_fn=_extract_content,
-        check_truncation_fn=lambda d, mt: _check_claude_truncation(d, mt, "Claude", config_field),
-        provider="claude",
-        model_name=model,
-    )
-
-
-def call_openai(
-    system: str,
-    user: str,
-    api_key: str,
-    model: str,
-    endpoint: str,
-    max_tokens: int,
-    timeout: float = 60.0,
-    max_retries: int = 2,
-    http_client: httpx.Client | None = None,
-    config_field: str = "max_tokens",
-    temperature: float | None = None,
-) -> tuple[str | None, dict | None]:
-    """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。
-
-    实际 HTTP 重试逻辑委托给 _call_llm_with_retry。
-
-    Args:
-        max_retries: 最大重试次数，从 llm_config 读取
-        temperature: 若不为 None，覆盖 payload 中的 temperature 字段
-
-    Returns:
-        (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
-    """
-    url = endpoint or "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    }
-    payload = {
-        "model": model or _DEFAULT_OPENAI_MODEL,
-        "max_tokens": max_tokens,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-    }
-    if temperature is not None:
-        payload["temperature"] = temperature
-    client = http_client
-    assert client is not None
-
-    def _extract_openai(data: dict) -> str | None:
-        try:
-            return data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError):
-            return None
-
-    return call_llm_with_retry(
-        label="OpenAI",
-        client=client,
-        url=url,
-        headers=headers,
-        payload=payload,
-        timeout=timeout,
-        max_retries=max_retries,
-        max_tokens=max_tokens,
-        config_field=config_field,
-        extract_fn=_extract_openai,
-        check_truncation_fn=lambda d, mt: _check_openai_truncation(d, mt, "OpenAI", config_field),
-        provider="openai",
-        model_name=model,
-    )
-
-
-def call_gemini(
-    system: str,
-    user: str,
-    api_key: str,
-    model: str,
-    endpoint: str,
-    max_tokens: int,
-    timeout: float = 60.0,
-    max_retries: int = 2,
-    http_client: httpx.Client | None = None,
-    config_field: str = "max_tokens",
-    temperature: float | None = None,
-    llm_config: dict | None = None,
-) -> tuple[str | None, dict | None]:
-    """调用 Google Gemini API (generateContent)，带重试 + 用量日志。
-
-    Gemini API 使用 x-goog-api-key header 认证，模型名嵌入 URL 路径。
-    支持 system instruction（通过 systemInstruction 字段）和 generationConfig。
-
-    Args:
-        max_retries: 最大重试次数，从 llm_config 读取
-        temperature: 若不为 None，覆盖 generationConfig 中的 temperature 字段
-
-    Returns:
-        (content, usage) — usage 为标准化后的用量字典，失败时均为 None
-    """
-    url = (
-        f"{endpoint.rstrip('/')}/models/{model}:generateContent"
-        if endpoint
-        else f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    )
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": api_key,
-    }
-    payload = {
-        "contents": [
-            {"role": "user", "parts": [{"text": user}]},
-        ],
-        "systemInstruction": {"parts": [{"text": system}]},
-        "generationConfig": {
-            "maxOutputTokens": max_tokens,
-        },
-    }
-    if temperature is not None:
-        payload["generationConfig"]["temperature"] = temperature
-
-    # ── Gemini Extended Thinking（通过 generationConfig.thinkingConfig） ──
-    if llm_config:
-        module_suffix = config_field.replace("max_tokens_", "")
-        if llm_config.get(f"thinking_enabled_{module_suffix}", False):
-            resolved_model = model or _DEFAULT_GEMINI_MODEL
-            if _supports_extended_thinking(resolved_model):
-                budget = _resolve_thinking_budget(llm_config, config_field, max_tokens)
-                payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
-                payload["generationConfig"].pop("temperature", None)
-                logger.info("Gemini Extended Thinking 已开启 [%s]: budget=%d", module_suffix, budget)
-            else:
-                logger.warning("模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]", resolved_model, module_suffix)
-
-    client = http_client
-    assert client is not None
-
-    return call_llm_with_retry(
-        label="Gemini",
-        client=client,
-        url=url,
-        headers=headers,
-        payload=payload,
-        timeout=timeout,
-        max_retries=max_retries,
-        max_tokens=max_tokens,
-        config_field=config_field,
-        extract_fn=_extract_content_from_gemini,
-        check_truncation_fn=lambda d, mt: _check_gemini_truncation(d, mt, "Gemini", config_field),
-        provider="gemini",
-        model_name=model,
-    )
+__all__ = [
+    "call_llm",
+    "call_single_provider",
+    "call_claude",
+    "call_openai",
+    "call_gemini",
+    "configure_extended_thinking",
+]

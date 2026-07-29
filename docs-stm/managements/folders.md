@@ -43,6 +43,7 @@ investor-util/
 │   │   │   ├── _config_defaults.py   #   config.json 默认值定义
 │   │   │   ├── _core.py              #   配置加载/保存/校验核心逻辑
 │   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
+│   │   │   ├── _llm_providers.py     #   LLM 提供程序配置解析
 │   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义
 │   │   │   └── _validation.py        #   配置校验函数集
 │   │   │
@@ -64,6 +65,7 @@ investor-util/
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── tencent.py            #   腾讯财经 API（A 股/ETF 实时价）
 │   │   │   ├── sina.py               #   新浪财经 API（备用实时价/美股指数）
+│   │   │   ├── sina_kline.py          #   新浪财经 API — K 线数据
 │   │   │   ├── eastmoney.py          #   东方财富 API（场外基金净值/历史净值）
 │   │   │   ├── eastmoney_industry.py #   东方财富行业分类/概念板块
 │   │   │   ├── eastmoney_industry_rest.py # 东方财富行业 REST 接口封装
@@ -78,12 +80,16 @@ investor-util/
 │   │   │   ├── cls_news.py           #   财联社新闻源（签名鉴权，默认关闭）
 │   │   │   ├── wallstreetcn_news.py  #   华尔街见闻新闻源
 │   │   │   ├── news_aggregator.py    #   新闻聚合器（多源合并去重）
+│   │   │   ├── news_dedup.py         #   新闻标题去重
 │   │   │   ├── news_correlator.py    #   新闻与持仓关联分析
 │   │   │   ├── news_keywords.py      #   新闻关键词提取与匹配
 │   │   │   └── news_sources.py       #   新闻源注册与配置
 │   │   │
 │   │   ├── analysis/                 # 业务计算层（独立无依赖，不导入 report/）
 │   │   │   ├── __init__.py                    #   包标记；导出 check_liquidity 等
+│   │   │   ├── _fee_estimation.py             #   组合综合费率估算
+│   │   │   ├── _math_utils.py                 #   数学工具函数（Beta/t-分布）
+│   │   │   ├── _silence.py                    #   再平衡静默期管理
 │   │   │   ├── alignment_correction.py        #   口径修正因子计算（估值偏差校准）
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
@@ -106,6 +112,10 @@ investor-util/
 │   │   │   ├── generators.py         #   提示词生成（全局政经/智囊团复盘）
 │   │   │   ├── generators_news.py    #   新闻分析提示词生成
 │   │   │   ├── generators_orchestrator.py # LLM 多轮对话编排
+│   │   │   ├── _api_claude.py         #   Claude API 调用实现
+│   │   │   ├── _api_gemini.py         #   Gemini API 调用实现
+│   │   │   ├── _api_openai.py         #   OpenAI API 调用实现
+│   │   │   ├── _hallucination_filter.py #   LLM 幻觉过滤
 │   │   │   ├── markdown.py           #   LLM 输出 Markdown 解析/格式化
 │   │   │   ├── pricing.py            #   Token 计费与用量统计
 │   │   │   ├── prompts.py            #   提示词模板库
@@ -183,6 +193,9 @@ investor-util/
 │   │   ├── handlers_config.py        # 配置管理命令处理器
 │   │   ├── registry.py               # 中央注册表（模块/TTL/分组定义）
 │   │   ├── provider_registry.py      # 数据源注册中心（熔断器/会话缓存）
+│   │   ├── _breaker_state.py         # 熔断器状态管理
+│   │   ├── _phase_timeout.py         # 数据获取阶段超时管理
+│   │   ├── _session_cache.py         # 会话缓存管理
 │   │   ├── features.py               # Feature Flag 注册中心（开关集中管理，含默认值与运行时控制，持久化到 data/config/features.json）
 │   │   ├── models.py                 # 数据模型（持仓/行情/基金/新闻）
 │   │   ├── reader.py                 # 持仓 xlsx 文件读取
