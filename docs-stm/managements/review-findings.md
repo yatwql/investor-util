@@ -34,7 +34,11 @@
 
 | # | 分类 | 文件 | 说明 |
 |---|------|------|------|
-| ~~**rf-106**~~ | 测试覆盖缺口 | 10+ 模块无对应测试 | **已修复**：在 `test-coverage.md` 新增"已知覆盖缺口"章节（§已知覆盖缺口），系统化登记无测试模块清单及风险等级 |
+| **rf-131** | 测试覆盖缺口 | `analysis/alignment_correction.py` | 口径修正逻辑（alignment factors 计算 + scenario 分析）无独立单元测试 |
+| **rf-132** | 测试覆盖缺口 | `analysis/drawdown_warning.py` | 回撤告警逻辑无独立单元测试 |
+| **rf-133** | 测试覆盖缺口 | `cache/services/holdings_tracker.py` | 持仓追踪器无独立单元测试 |
+| **rf-134** | 测试覆盖缺口 | `llm/fallback.py` | LLM 降级/回退策略无独立单元测试 |
+| **rf-135** | 测试覆盖缺口（批量低风险） | `circuit_breaker_wrapper.py`, `cache/_io.py`, `llm/prompts_core.py`, `report/excel_b_series.py`, `llm/skeleton.py` 子函数, `report/_pipeline.py` | 均由调用方间接覆盖，低风险 |
 
 ---
 
@@ -145,6 +149,7 @@
 | rf-128 | **P2F 硬编码值** | `llm/generators_orchestrator.py` HTTP 连接池参数硬编码 | 提取为模块级常量 `_LLM_MAX_CONNECTIONS`、`_LLM_MAX_KEEPALIVE` | v0.8.10-dev |
 | rf-129 | **P2F 硬编码值** | `llm/skeleton.py` `BATCH_SIZE=10`、`max_workers=min(...)` 硬编码 | 提取为模块级常量 `_BATCH_CHUNK_SIZE`、`_BATCH_MAX_WORKERS` | v0.8.10-dev |
 | rf-130 | **P2F 硬编码值** | `llm/api.py` 默认模型名 `"claude-sonnet-4-20250514"` 等硬编码 | 提取为模块级常量 `_DEFAULT_CLAUDE_MODEL` 等 | v0.8.10-dev |
+| rf-106 | **P2D 已废弃** | 10+ 模块无对应测试 | 被 rf-131~rf-135 取代：原 `test-coverage.md` 静态缺口列表不驱动行动，改为独立 RF 任务追踪 | v0.8.10-dev |
 
 ### 归档档案
 

@@ -108,23 +108,5 @@
 
 详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。
 
-### 已知覆盖缺口
-
-以下模块当前无对应单元测试，修改时需手动验证或补充测试：
-
-| 源模块（`src/python/`） | 说明 | 风险等级 |
-|:------------------------|:-----|:--------:|
-| `analysis/alignment_correction.py` | 口径修正逻辑（alignment factors 计算 + scenario 分析） | 中 |
-| `analysis/circuit_breaker_wrapper.py` | 熔断包装器（由 provider_registry 间接覆盖但无直接测试） | 低 |
-| `analysis/drawdown_warning.py` | 回撤告警逻辑 | 中 |
-| `cache/_io.py` | 缓存 I/O 层（由 cache_core 间接覆盖） | 低 |
-| `cache/services/holdings_tracker.py` | 持仓追踪器 | 中 |
-| `llm/fallback.py` | LLM 降级/回退策略 | 中 |
-| `llm/prompts_core.py` | LLM 提示词核心（由 prompts 模块间接覆盖） | 低 |
-| `report/excel_b_series.py` | B 系列 Excel 页签写入 | 低 |
-| `llm/skeleton.py` 各子函数 | 骨架模块子函数（`_handle_truncation`/`_handle_cache_hit`/`_finalize_and_cache` 等，通过 `generate_llm_content` 间接覆盖） | 低 |
-| `report/_pipeline.py` | 新管线模块（进度从属 orchestrator 测试） | 低 |
-
-> 注："间接覆盖"指该模块的功能通过调用方的测试进行了覆盖，但无独立的模块级测试文件。
 
 
