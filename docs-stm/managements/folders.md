@@ -285,6 +285,7 @@ investor-util/
 │       │   ├── handlers/            #   命令处理器单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_handlers_cache.py  #   缓存管理命令处理测试
+│       │   │   ├── test_handlers_config.py #   命令处理器配置测试
 │       │   │   └── test_handlers_report.py #   报告生成命令处理测试
 │       │   ├── llm/                 #   LLM 单元测试
 │       │   │   ├── __init__.py      #       子包标记
@@ -302,7 +303,6 @@ investor-util/
 │       │   │   ├── test_fingerprint.py        #   缓存指纹测试
 │       │   │   ├── test_generators.py         #   全局提示词生成测试
 │       │   │   ├── test_integration_multi.py  #   多 Provider 集成测试
-│       │   │   ├── test_llm.py                #   LLM 模块通用测试
 │       │   │   ├── test_llm_analysis.py       #   LLM 分析测试
 │       │   │   ├── test_llm_api.py            #   LLM API 主入口测试
 │       │   │   ├── test_llm_api_base.py       #   LLM API 基类测试
@@ -395,7 +395,6 @@ investor-util/
 │       │   │   └── test_cli_edge.py          #   CLI 边缘场景测试
 │       │   ├── ui/                  #   UI 单元测试
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_handlers.py         #   事件处理测试
 │       │   │   ├── test_log_sanitize.py     #   日志清洗测试
 │       │   │   ├── test_tui.py              #   TUI 交互测试
 │       │   │   ├── test_tui_edge.py         #   TUI 边缘场景
