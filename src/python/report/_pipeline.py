@@ -6,8 +6,8 @@
   - LLM+新闻并行获取（_fetch_llm_and_news 及其辅助函数）
   - 历史+指标提取（_fetch_history_with_metrics）
 
-数据准备函数（prepare_report_data / capture_snapshot / fetch_history_data等）仍留在
-``orchestrator.py``。管线函数通过模块内导入引用它们，避免循环依赖。
+数据准备函数（prepare_report_data / capture_snapshot / fetch_history_data等）
+由本模块通过 ``orchestrator`` 模块内导入引用，避免循环依赖。
 """
 
 from __future__ import annotations
