@@ -6,7 +6,7 @@
 
 本项目的测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行。使用 `scripts/test_runner.py` 脚本统一驱动，自动输出结构化报告。
 
-> **关联参考**：各 `--mode` 的精确测试项数统计见 **[test-coverage.md](../managements/test-coverage.md)**（以下标注为撰写时快照值，随版本迭代变化）。
+> **关联参考**：各 `--mode` 的精确测试项数统计见 **[test-coverage.md](../managements/test-coverage.md)**。
 
 ## 前置条件
 
@@ -151,14 +151,13 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 项目推荐的四道质量门禁，按开发阶段逐级收紧：
 
 - **提交前门禁（`--mode dev-verify` / P0）** — commit 前必须执行。组合 4 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis，并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 1min。是编辑-验证循环中的正式屏障。
-- **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S34 + T1-T21，共 276 项），确保端到端用户路径不被破坏。约 6min。推荐在改动了跨模块路径或数据流后补充运行。
+- **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S34 + T1-T21），确保端到端用户路径不被破坏。约 6min。推荐在改动了跨模块路径或数据流后补充运行。
 - **合入验证（`--mode verify` / P1）** — 准备合并到 master 前必须执行。覆盖 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）、`unit_config`（配置管理）、`unit_news`（新闻聚合）、`unit_llm`（LLM 模块）、`unit_analysis`（分析计算：流动性/再平衡/汇率/债券收益率等）七个单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。并行执行，约 1min。场景测试已在 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）中覆盖，P1 不重复。
-- **发布验证（`--mode verify,regression`）** — 发布版本（打 tag/release）前必须执行。组合单元测试 + 场景测试，覆盖全部核心通路。约 3min，比原来的 `--mode all`（~10min）减少 65% 测试量。
+- **发布验证（`--mode verify,regression`）** — 发布版本（打 tag/release）前必须执行。组合单元测试 + 场景测试，覆盖全部核心通路。约 3min。
   > 注：若走常规 `dev → merge → tag master` 流程，P1 已保证 `verify` 通过，P2 的 `verify` 属冗余验证。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。如确定流程中有严格 merge 屏障且不直接发布 dev，P2 可优化为仅 `--mode regression`（~6min）。详见 [`testplan.md`](../managements/testplan.md) → §6.3 脚注。
 
-> ⚠ 以上项数为撰写时的快照值，实际计数随版本迭代而变化。
 
-> `regression` 与 `scenario` 底层使用相同的标记表达式（`-m "scenario"`），测试项数一致。前者是语义别名——强调"提交前快速回归"的用途定位；后者是分类名——强调"业务场景测试"的数据性质。两者可互相替代，但建议按使用场合选用对应名称以增强代码意图可读性。
+> `regression` 与 `scenario` 底层使用相同的标记表达式（`-m "scenario"`），前者是语义别名——强调"提交前快速回归"的用途定位；后者是分类名——强调"业务场景测试"的数据性质。两者可互相替代，但建议按使用场合选用对应名称以增强代码意图可读性。
 
 **推荐工作流：**
 
@@ -213,7 +212,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 #### 🔷 全量（`all`）
 
 - **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 3min，作为发布门禁。
-- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试（3847 项，~6.5min）。需要全覆盖时手动调用。
+- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试。需要全覆盖时手动调用。
 - **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
 
 #### 🔷 多模式组合
