@@ -528,5 +528,5 @@ def generate_llm_module(
     )
 
 
-# bridge import — 批量处理提取至 _batch_mode.py 以保持 skeleton 精简
+# bridge import — run_batch_mode 批量处理入口
 from src.python.llm._batch_mode import run_batch_mode  # noqa: F811, E402, E501
