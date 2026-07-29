@@ -595,9 +595,7 @@ investor-util/
 │   │   │   │   └── perf-design-and-verification.md # 性能基准体系设计方案
 │   │   │   ├── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
-│   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
-│   │   │   ├── archived_review-findings.0.8.x.md # 已修复问题归档（rf-1~rf-135 + rf-106）
-│   │   │   └── archived_plan.0.8.x.md            # 当前迭代计划归档（plan-1~plan-14）
+│   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
