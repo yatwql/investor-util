@@ -85,6 +85,15 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
         "max_total_tokens_per_report": 16000,
         "per_call_timeout_override": 90,
     },
+    "fact_check": {
+        "tolerance": 1.0,
+        "tolerance_overrides": {
+            "expert_review": 2.0,
+            "health_check": 1.0,
+            "global_macro": 1.0,
+            "penetration_deep": 1.0,
+        },
+    },
     "pricing": {
         "currency": "CNY",
         "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.3},
@@ -187,6 +196,25 @@ def _get_default_llm_settings_template() -> str:
     lines.append(f'    "max_total_tokens_per_report": {debate["max_total_tokens_per_report"]},')
     lines.append(f"    // 辩论模式单次 API 调用超时覆盖（秒）")
     lines.append(f'    "per_call_timeout_override": {debate["per_call_timeout_override"]}')
+    lines.append(f"  }},")
+
+    # ── 事实校验 ──
+    lines.append("")
+    lines.append("  // ═══════════════════════════════════════════")
+    lines.append("  // 事实校验（fact_check）— LLM 输出数值一致性检测")
+    lines.append("  // ═══════════════════════════════════════════")
+    fc = d["fact_check"]
+    lines.append(f'  "fact_check": {{')
+    lines.append(f"    // 全局数值偏差容差（百分点），默认 1.0 — LLM 声称的收益率/占比等")
+    lines.append(f"    // 与真实值偏差在 ±tolerance 百分点内即视为通过校验")
+    lines.append(f'    "tolerance": {fc["tolerance"]},')
+    lines.append(f"    // 按模块覆盖容差（模块名 → 百分点）— 覆盖全局 tolerance")
+    lines.append(f"    // 对于需要更大容差的分析模块（如 expert_review 综合判断多）,")
+    lines.append(f"    // 可单独设置较宽松的阈值，避免过度告警")
+    lines.append(f'    "tolerance_overrides": {{')
+    for mod, val in fc["tolerance_overrides"].items():
+        lines.append(f'      "{mod}": {val},')
+    lines.append(f"    }}")
     lines.append(f"  }},")
 
     # ── 计价配置 ──

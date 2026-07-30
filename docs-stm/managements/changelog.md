@@ -4,21 +4,39 @@
 
 ---
 
-## [0.9.2-dev] - 2026-07-30
+## [0.9.2-dev] - 2026-07-31
 
 ### Feat
 
-- **新闻去重新增 bg=2 梯度规则** — `news_dedup.py` 在跨源候选区新增 `bg=2 + ratio≥0.45` 合并规则（`cross_merge_bg2`），弥补 bg≥3 硬门槛遗漏的有实体重叠 + 中高 ratio 的重复对
-- **英文专名 ratio 降权** — 跨源 ratio 比较前对英文词做占位化处理（`_tk_`），避免共享英文专名（Anthropic/Meta/AMD 等）导致 SequenceMatcher 比率虚高；英文专名重叠仍由 `_extract_entity_bigrams` 独立处理
+- **事实校验 v3：自动修正机制** — `fact_checker.py`：`check_numerical_consistency` 返回 `(issue, correction)` 二元组、`run_fact_check` 返回 `(corrected_html, summary_html)`、`apply_numerical_corrections` 支持正则级联替换；新增 `tolerance_pct` + `tolerance_overrides` 逐模块容差、pp 混淆语境跳过策略
+- **Prompt 防御统一注入架构** — `prompts_tables.py` 新增 `_build_prompt_appendix`（TOP3 排名 + 数据速查表 + 代码白名单），在 `skeleton.py:_run_standard_mode()` 自动注入到所有模块的 user prompt 末尾，各模块无需手动调用；`prompts_action.py` 移除各模块的手动防御调用
+- **跨源 bg=2 梯度阈值调低至 0.40** — `news_dedup.py` 的 `cross_merge_bg2` 规则从 `ratio≥0.45` 降至 `ratio≥0.40`，基于校准报告（119654 条锚点）发现 bg≥2+ratio≥0.35 区间有 580 条含实体重叠被跳过，0.40 可额外捕获约 300-400 条真实重复，bg=2 已提供实体重叠安全垫
 
 ### Fix
 
-- **入口文件 sys.path 注入路径层数修复** — `tui/tui.py` 和 `cli/cli.py` 的 `_project_root` 从脚本路径上溯项目根时少算一次 `dirname`（子包重构后文件下沉了 `src/python/tui/` 层级但路径计算未同步更新），导致 `from src.python.config` 等导入因 `sys.path` 指向 `src/` 而非项目根目录而引发 `ModuleNotFoundError`
+- **辩论模式 synthesis 重复白脸/黑脸观点 + 情景分析** — `prompts_core.py:_SYSTEM_DEBATE_SYNTHESIS` 重写：明确禁止 synthesis 重述双方论点（"读者已阅读过原文"）、禁止插入情景分析段落；输出结构从"关键分歧点→分歧定论"改为"共识与分歧摘要→综合评估"，压缩 LLM 重复论述空间
+- **`_build_debate_synthesis_prompt` 错误标记 HTML 为 markdown 代码块** — `prompts_action.py:463` 中 ` ```markdown ` → ` ``` `（pro_text/con_text 已是 HTML，标记为 markdown 误导 LLM）
+- **LLM 持仓排名幻觉** — `_build_code_whitelist_block` 声明 #1 品种身份，阻止 LLM 将非排名 #1 的代码断言为"最大持仓"
+- **LLM 数值混淆（pp 贡献占比 ↔ 收益率）** — `_build_data_slot_block` 提供精确逐品种收益率，`fact_checker` 增强 pp 语境检测
+- **`_SYSTEM_EXPERT_REVIEW` 情景分析双重指令** — 从 system prompt 移除"### 情景分析"段（第54-66行），移至 user prompt builder 作为单一注入点；`_build_expert_review_prompt` 新增 `skip_scenarios` 参数，辩论 pro/con 跳过情景分析避免双重输出
+- **回撤数值误判为收益率** — `fact_checker.py`：新增 `_DRAWDOWN_KEYWORDS` 和 `_is_drawdown_context`（全句扫描回撤关键词+ match 前 15 字收益关键词近邻守卫，避免跨分句干扰），回撤语境数值改与实际 `max_drawdown_pct` 比较而非与组合累计收益率比较；告警消息增加句段截图（`句段：...`）辅助定位
+- **已修正值不重复告警** — `run_fact_check` 中已自动修正的数值不再在 ⚠ 告警明细中重复列出（仅保留"自动修正 N 处"摘要），用户看到的内容中已不存在该值即不警告
+
+### Test
+
+- **事实校验测试扩展** — 新增 `test_pp_vs_rate_confusion_detected`、`test_contribution_sentence_skips_pp_values`、`test_tolerance_override_looser` 三个测试用例
+- **回撤语境检测回归测试** — 新增 6 用例：`test_drawdown_value_within_tolerance`（19.0%≈18.97%→通过）、`test_drawdown_value_out_of_tolerance`、`test_drawdown_value_no_data_skips`、`test_drawdown_mixed_with_profit_in_sentence`（分句感知）、`test_issue_message_contains_sentence_snippet`（句段截图验证）、`test_run_fact_check_corrected_values_not_in_warnings`（已修正不重复告警）
+- **辩论 synthesis 测试同步** — `test_system_debate_synthesis_contains_placeholders` → `test_system_debate_synthesis_contains_instruction_keywords`（验证"不要重复"指令）；`test_output_contains_markdown_code_block` → `test_output_contains_code_block`
+- **场景分析指令迁移测试** — 新增 `TestBuildExpertReviewPromptSkipScenarios` 3 用例（`skip_scenarios=True` 剔除场景、默认保留场景、不影响其他内容块）
+- **统一注入防御专用测试** — 新增 `TestBuildPromptAppendix` 4 用例（空持仓、单品种含三块、多品种排序验证、零市值防除零）
+- **测试适配** — `test_mode2_disabled` 改为断言标准场景存在（场景指令已从 system prompt 移入 user prompt）；`test_system_expert_review_constant` 改用"置信度指引"代替已移除的"情景分析"断言
 
 ### Docs
 
 - **全文档路径引用同步** — 子包重构后（`core/`、`tui/`、`cli/`、`config/`）过期路径集中清理：`technical.md`（~20 处）、`llm-technical.md`（5 处）、`test-coverage.md`（6 处）、`testplan.md`（6 处）、`review-findings.md`（3 处）、`how-to-schedule.md`（2 处）、`plan-correlation-drawdown.md`（4 处）、`plan-chartjs-report-upgrade.md`（2 处）、`plan-chartjs-risk-analysis.md`（11 处）
 - **校准报告归档** — `calibrate-dedup-threshold.py` 输出保存至 `docs-stm/tmp/dedup-calibration-report.md`，含 `cross_merge_bg2` 新规则基线数据（119654 条锚点）
+- **requirements.md §11.4 `proxy_preferred` 措辞修正** — "proxy_preferred 策略使用" → "per-provider 后处理标记，有代理环境时自动前置"，与 §7.1 R-LLM-06 定义保持一致
+- **testplan.md 菜单选项数同步** — §1.1 tui/tui_menu.py 和 §3 TUI 菜单行中 "15 选项" → "16 选项"（同步菜单已新增 [I] 管理对比指数池的当前状态）
 
 ## [0.9.1] - 2026-07-30
 

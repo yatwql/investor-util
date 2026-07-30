@@ -8,19 +8,19 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 182 | 42,871 | `src/python/` 下所有 `.py`（不含测试） |
+| 主程序代码 | Python | 182 | 43,317 | `src/python/` 下所有 `.py`（不含测试） |
 | HTML 报告模板 | HTML | 1 | 1,862 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python | 10 | 3,440 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **193** | **48,173** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **217** | **58,716** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,786 个** | `pytest --collect-only` 统计 |
+| 辅助脚本 | Python | 10 | 3,446 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **193** | **48,625** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **217** | **58,964** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,802 个** | `pytest --collect-only` 统计 |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **87** | — | 含 CLAUDE.md |
+| **项目文档** | Markdown | **88** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 69 | — | 各版本 changelog/plan/review-findings 等 |
 | ├ plan/ | 中间设计文件 | 6 | — | 当前迭代中的设计方案 |
-| └ tmp/ | 临时文件 | 2 | — | 调试产物、迁移暂存（git 忽略） |
+| └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
 
@@ -71,6 +71,7 @@ investor-util/
 │   │   │
 │   │   ├── providers/                # 数据源提供商实现
 │   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── _utils.py             #   提供商模块共享工具函数
 │   │   │   ├── tencent.py            #   腾讯财经 API（A 股/ETF 实时价）
 │   │   │   ├── sina.py               #   新浪财经 API（备用实时价/美股指数）
 │   │   │   ├── sina_kline.py          #   新浪财经 API — K 线数据
@@ -112,6 +113,7 @@ investor-util/
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
 │   │   │   ├── api_base.py           #   LLM API 基类（请求/重试/流式）
+│   │   │   ├── _thinking.py          #   Extended Thinking 配置
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
 │   │   │   ├── cost_tracker.py       #   Token 成本跟踪与预算管理（会话级 Token 守卫）
 │   │   │   ├── fact_checker.py       #   LLM 事实锚定校验器（数值/品种/排名一致性校验）
@@ -121,8 +123,11 @@ investor-util/
 │   │   │   ├── generators_news.py    #   新闻分析提示词生成
 │   │   │   ├── generators_orchestrator.py # LLM 多轮对话编排
 │   │   │   ├── _api_claude.py         #   Claude API 调用实现
+│   │   │   ├── _call_claude.py        #   Claude API 单 Provider 调用
 │   │   │   ├── _api_gemini.py         #   Gemini API 调用实现
+│   │   │   ├── _call_gemini.py        #   Gemini API 单 Provider 调用
 │   │   │   ├── _api_openai.py         #   OpenAI API 调用实现
+│   │   │   ├── _call_openai.py        #   OpenAI API 单 Provider 调用
 │   │   │   ├── _hallucination_filter.py #   LLM 幻觉过滤
 │   │   │   ├── markdown.py           #   LLM 输出 Markdown 解析/格式化
 │   │   │   ├── pricing.py            #   Token 计费与用量统计
@@ -132,6 +137,7 @@ investor-util/
 │   │   │   ├── prompts_tables.py     #   提示词表格模块（持仓/穿透/场景分析格式化与摘要构造）
 │   │   │   ├── session.py            #   LLM 会话管理（上下文窗口/历史）
 │   │   │   ├── skeleton.py           #   LLM 内容骨架生成（结构化输出引导）
+│   │   │   ├── _batch_mode.py        #   LLM 批量处理（缓存预检/并行调用/合并）
 │   │   │   └── strategy.py           #   Provider 多链切换策略引擎
 │   │   │
 │   │   ├── schemas/                  # 数据模型定义
@@ -150,6 +156,7 @@ investor-util/
 │   │   │   ├── excel_b_series.py     #   Excel 基金深度分析页签
 │   │   │   ├── excel_llm_usage.py    #   Excel LLM 用量统计页签
 │   │   │   ├── excel_writer.py       #   Excel 底层写入器（openpyxl 封装）
+│   │   │   ├── _debate_utils.py      #   辩论模式检测工具函数（共享 html/excel）
 │   │   │   ├── html_writer.py        #   HTML 报告主写入器
 │   │   │   ├── html_builders.py      #   HTML 各区块构建器
 │   │   │   ├── html_renderers.py     #   HTML 渲染管线
@@ -173,10 +180,14 @@ investor-util/
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
-│   │   │   ├── _history_quality.py   #   历史走势数据质量校验（提取自 portfolio_history.py）
+│   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
+│   │   │   ├── _snapshot.py          #   快照与历史数据（持仓快照/环比差异/组合历史走势）
 │   │   │   ├── news_correlation.py   #   新闻与持仓关联分析报告
 │   │   │   ├── orchestrator.py       #   报告编排共享层（TUI/CLI 共用）
+│   │   │   ├── _llm_news.py          #   LLM/新闻并行获取（线程池提交/收集/报告）
+│   │   │   ├── _pipeline.py          #   报告管线编排（单管线/双管线调度）
+│   │   │   ├── _report_generation.py #   报告生成实现（both/full 两种路径）
 │   │   │   ├── privacy_notice.py     #   隐私提示模块（首次运行提示 + 报告脚注）
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要

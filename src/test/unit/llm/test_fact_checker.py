@@ -49,54 +49,62 @@ class TestCheckNumericalConsistency:
 
     def test_empty_text(self):
         """空文本 → 无检查项。"""
-        issues, checked, passed = check_numerical_consistency("", None)
+        issues, checked, passed, corrections = check_numerical_consistency("", None)
         assert issues == []
         assert checked == 0
         assert passed == 0
+        assert corrections == []
 
     def test_no_percentage_values(self, sample_holdings):
         """无百分比数值的文本 → 无检查项。"""
         text = "本季度组合运行平稳，持仓结构保持合理分散。"
-        issues, checked, passed = check_numerical_consistency(text, sample_holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
         assert issues == []
         assert checked == 0
         assert passed == 0
+        assert corrections == []
 
     def test_profit_percentage_matches(self, sample_holdings):
         """收益率数值与实际一致 → 通过。"""
         # 总收益率 = (200+80+50+30+10 - (150+60+40+25+9)) / (150+60+40+25+9) * 100
         # total_mv = 3700000, total_cost = 2840000, profit_rate ≈ 30.28%
         text = "本季度组合累计收益率为 30.5%，表现稳健。"
-        issues, checked, passed = check_numerical_consistency(text, sample_holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
         assert checked == 1
         assert passed == 1
         assert issues == []
+        assert corrections == []
 
     def test_profit_percentage_mismatch(self, sample_holdings):
         """收益率数值与实际偏差大 → 告警。"""
         text = "本季度组合累计收益率为 5.0%，表现不及预期。"
-        issues, checked, passed = check_numerical_consistency(text, sample_holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
         assert checked == 1
         assert passed == 0
         assert len(issues) == 1
         assert "偏差超过容差" in issues[0]
+        assert len(corrections) == 1  # 返回修正信息
+        assert corrections[0][0] == "5.0"  # wrong value
+        assert corrections[0][1] == "30.3"  # correct value
 
     def test_non_profit_context_skipped(self, sample_holdings):
         """非收益上下文中的百分比不检查（如仓位比例）。"""
         text = "股票仓位占比 70%，债券仓位占比 30%。"
-        issues, checked, passed = check_numerical_consistency(text, sample_holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
         # 百分比 30 在文本中出现但无收益关键词，跳过
         # 70% 也是无收益关键词
         assert checked >= 2
         assert passed == checked  # 全部跳过=全部通过
         assert issues == []
+        assert corrections == []
 
     def test_deduplicate_same_value(self, sample_holdings):
         """同一数值多次出现只检一次。"""
         text = "累计收益率为 30.3%。表现不错，收益率 30.3%。"
-        issues, checked, passed = check_numerical_consistency(text, sample_holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
         assert checked == 1  # 只检一次
         assert passed == 1
+        assert corrections == []
 
     def test_negative_profit_rate(self, sample_holdings):
         """亏损场景 — 绝对值比较。"""
@@ -107,19 +115,21 @@ class TestCheckNumericalConsistency:
         ]
         # 总亏损率 ≈ -50%
         text = "组合累计亏损 50.0%。"
-        issues, checked, passed = check_numerical_consistency(text, loss_holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, loss_holdings)
         assert checked == 1
         assert passed == 1
         assert issues == []
+        assert corrections == []
 
     def test_zero_cost_edge(self):
         """零成本持仓 — 不产生 NaN 错误。"""
         holdings = [{"name": "测试", "code": "000001", "market_value": 1000.0, "cost": 0.0}]
         text = "累计收益率为 10.0%。"
-        issues, checked, passed = check_numerical_consistency(text, holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
         # 零成本导致 profit_rate=0，与 10% 偏差超过容差
         assert isinstance(checked, int)
         assert isinstance(passed, int)
+        assert isinstance(corrections, list)
         # profit_rate 为 0，但文本是 10%，应该不匹配
         assert checked >= 0
 
@@ -127,10 +137,11 @@ class TestCheckNumericalConsistency:
         """市值缺失 — 不影响函数运行。"""
         holdings = [{"name": "测试", "code": "000001", "cost": 1000.0}]
         text = "累计收益率为 5.0%。"
-        issues, checked, passed = check_numerical_consistency(text, holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
         assert isinstance(issues, list)
         assert isinstance(checked, int)
         assert isinstance(passed, int)
+        assert isinstance(corrections, list)
 
     def test_multiple_values_with_mixed_context(self, sample_holdings):
         """混合上下文中的多个百分比 — 只检收益相关的。"""
@@ -139,12 +150,128 @@ class TestCheckNumericalConsistency:
             "股票仓位 75%，债券仓位 25%。"
             "最大回撤 3.5%。"
         )
-        issues, checked, passed = check_numerical_consistency(text, sample_holdings)
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
         # 30.3% → 收益上下文 → 检查通过
         # 75%, 25% → 仓位上下文 → 跳过
         # 3.5% → 回撤上下文 → 跳过
         assert checked >= 1
         assert passed == checked
+        assert corrections == []
+
+    def test_pp_vs_rate_confusion_detected(self):
+        """LLM 混淆贡献占比 pp 与个股收益率 → 检测并修正。"""
+        holdings = [
+            {"name": "建设银行", "code": "601939", "market_value": 500000.0,
+             "cost": 490000.0, "profit": 10000.0, "profit_rate": 2.0},
+            {"name": "贵州茅台", "code": "600519", "market_value": 2000000.0,
+             "cost": 1500000.0, "profit": 500000.0, "profit_rate": 33.3},
+        ]
+        # LLM 误将 11.0pp 贡献占比当作收益率 11.0%
+        text = "建设银行（601939）本季度收益率为 11.0%，表现稳健。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert checked == 1
+        assert passed == 0
+        assert len(issues) == 1
+        assert "601939" in issues[0]
+        assert "11.0" in issues[0]
+        assert "2.0" in issues[0]  # 实际收益率
+        assert len(corrections) == 1
+        assert corrections[0][0] == "11.0"  # wrong value
+        assert corrections[0][1] == "2.0"   # correct value
+        assert "601939" in corrections[0][2]  # sentence context
+
+    def test_contribution_sentence_skips_pp_values(self):
+        """贡献归因句中的 pp 数值不触发告警（策略 3）。"""
+        holdings = [
+            {"name": "建设银行", "code": "601939", "market_value": 500000.0,
+             "cost": 490000.0, "profit": 10000.0, "profit_rate": 2.0},
+        ]
+        # 收益归因句中的 pp 数值应跳过
+        text = "主要盈利来源中，建设银行(+11.0pp)为组合贡献了重要收益。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        # 收益归因句整体跳过，无检查项
+        assert issues == []
+        assert passed == 0
+        assert corrections == []
+
+    def test_tolerance_override_looser(self, sample_holdings):
+        """宽松容差下偏差较小的数值通过。"""
+        text = "组合收益率为 31.5%。"  # 实际≈30.28%，偏差1.22pp
+        issues, checked, passed, corrections = check_numerical_consistency(
+            text, sample_holdings, tolerance_pct=2.0,
+        )
+        assert checked == 1
+        assert passed == 1  # 容差 ±2% 已覆盖
+        assert issues == []
+        assert corrections == []
+
+    def test_drawdown_value_within_tolerance(self, sample_holdings):
+        """回撤语境数值与实际最大回撤在容差内 → 通过。"""
+        text = "组合历史最大回撤为 19.0%。"
+        issues, checked, passed, corrections = check_numerical_consistency(
+            text, sample_holdings, max_drawdown_pct=18.97,
+        )
+        assert checked == 1
+        assert passed == 1  # 19.0 vs 18.97, diff=0.03 <= 1.0
+        assert issues == []
+        assert corrections == []
+
+    def test_drawdown_value_out_of_tolerance(self, sample_holdings):
+        """回撤语境数值与实际偏差大 → 告警。"""
+        text = "组合历史最大回撤为 5.0%。"
+        issues, checked, passed, corrections = check_numerical_consistency(
+            text, sample_holdings, max_drawdown_pct=18.97,
+        )
+        assert checked == 1
+        assert passed == 0
+        assert len(issues) == 1
+        assert "回撤相关数值" in issues[0]
+        assert "18.97" in issues[0] or "19.0" in issues[0]
+        assert len(corrections) == 1
+
+    def test_drawdown_value_no_data_skips(self, sample_holdings):
+        """回撤语境但无回撤数据 → 跳过（无法校验）。"""
+        text = "组合最大回撤为 19.0%。"
+        issues, checked, passed, corrections = check_numerical_consistency(
+            text, sample_holdings, max_drawdown_pct=None,
+        )
+        assert checked == 1  # % found
+        assert passed == 1  # skipped (no drawdown data, no profit context)
+        assert issues == []
+
+    def test_drawdown_mixed_with_profit_in_sentence(self, sample_holdings):
+        """同一句中同时含回撤和收益数值 → 分别校验。"""
+        text = "最大回撤 19.0%，累计收益 30.3%。"
+        issues, checked, passed, corrections = check_numerical_consistency(
+            text, sample_holdings, max_drawdown_pct=18.97,
+        )
+        # 19.0% → drawdown context, matches 18.97 within tolerance
+        # 30.3% → profit context, matches 30.28 within tolerance
+        assert checked == 2
+        assert passed == 2
+        assert issues == []
+
+    def test_issue_message_contains_sentence_snippet(self, sample_holdings):
+        """告警消息包含句段上下文摘要。"""
+        text = "本季度组合累计收益率为 5.0%，表现不及预期。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
+        assert len(issues) == 1
+        assert "句段：" in issues[0]
+        assert "本季度组合累计收益率" in issues[0]
+
+    def test_run_fact_check_corrected_values_not_in_warnings(self, sample_holdings):
+        """run_fact_check 中已自动修正的数值不在告警明细列出。"""
+        text = "<p>组合累计收益率为 5.0%，历史最大回撤 19.0%。</p>"
+        from src.python.llm.fact_checker import run_fact_check
+        corrected, summary = run_fact_check(
+            text, sample_holdings, module_label="测试",
+            history_data={"max_drawdown_pct": 18.97},
+        )
+        # 5.0% → will be auto-corrected, not in warning details
+        # 19.0% → drawdown within tolerance, no issue
+        assert "自动修正 1 处数值" in summary
+        # The corrected 5.0 should NOT appear as a ⚠ warning
+        assert "⚠" not in summary
 
 
 # ── check_symbol_existence ────────────────────────────────────
@@ -370,51 +497,57 @@ class TestRunFactCheck:
     """统一入口 — run_fact_check 测试。"""
 
     def test_empty_content(self, sample_holdings):
-        """空 HTML 内容 → 返回空字符串。"""
-        result = run_fact_check("", sample_holdings, "测试模块")
-        assert result == ""
+        """空 HTML 内容 → 返回(原内容, 空字符串)。"""
+        corr, summ = run_fact_check("", sample_holdings, "测试模块")
+        assert corr == ""
+        assert summ == ""
 
     def test_none_content(self, sample_holdings):
-        """None 内容（空字符串） → 返回空字符串。"""
-        result = run_fact_check("", sample_holdings, "测试模块")
-        assert result == ""
+        """None 内容（空字符串） → 返回(原内容, 空字符串)。"""
+        corr, summ = run_fact_check("", sample_holdings, "测试模块")
+        assert corr == ""
+        assert summ == ""
 
     def test_all_checks_pass(self, sample_holdings):
         """所有检查通过 → 绿色摘要。"""
         html = """<p>贵州茅台（600519）是组合最大持仓。</p>
 <p>组合累计收益率为 30.3%。</p>"""
-        result = run_fact_check(html, sample_holdings, "智囊团深度复盘")
-        assert result != ""
-        assert "事实校验通过" in result
-        assert "color:#4a4" in result  # 绿色
-        assert "智囊团深度复盘" in result
+        corr, summ = run_fact_check(html, sample_holdings, "智囊团深度复盘")
+        assert summ != ""
+        assert "事实校验通过" in summ
+        assert "color:#4a4" in summ  # 绿色
+        assert "智囊团深度复盘" in summ
 
     def test_with_issues(self, sample_holdings):
-        """存在不一致 → 黄色告警摘要。"""
+        """存在不一致 → 黄色告警摘要 + 自动修正。"""
         html = """<p>招商银行（600036）是组合最大持仓。</p>
 <p>组合累计收益率为 5.0%。</p>"""
-        result = run_fact_check(html, sample_holdings, "持仓体检报告")
-        assert result != ""
-        assert "事实校验" in result
-        assert "项通过" in result
-        assert "color:#a40" in result  # 黄色
-        assert "持仓体检报告" in result
-        assert "600036" in result
+        corr, summ = run_fact_check(html, sample_holdings, "持仓体检报告")
+        assert summ != ""
+        assert "事实校验" in summ
+        assert "项通过" in summ
+        assert "color:#a40" in summ  # 黄色
+        assert "持仓体检报告" in summ
+        assert "600036" in summ
+        # 自动修正：5.0% → 30.3%
+        assert "30.3%" in corr
+        assert "5.0%" not in corr
 
     def test_no_module_label(self, sample_holdings):
         """无 module_label 时摘要不包含标签前缀。"""
         html = "<p>贵州茅台（600519）是组合最大持仓。</p>"
-        result = run_fact_check(html, sample_holdings)
-        assert result != ""
-        assert "[贵州茅台" not in result  # 模块标签标记不出现
-        assert "事实校验通过" in result
+        corr, summ = run_fact_check(html, sample_holdings)
+        assert summ != ""
+        assert "[贵州茅台" not in summ  # 模块标签标记不出现
+        assert "事实校验通过" in summ
 
     def test_holdings_none(self):
         """holdings_details 为 None → 跳过品种和排名检查，只检数值。"""
         # 纯文本不含百分比 → 0 checks
         html = "<p>贵州茅台是组合最大持仓。</p>"
-        result = run_fact_check(html, None, "测试")
-        assert result == ""  # 没有代码可检（纯中文）也没百分比
+        corr, summ = run_fact_check(html, None, "测试")
+        assert corr == html  # 内容不变
+        assert summ == ""  # 没有代码可检（纯中文）也没百分比
 
     def test_integration_full_html(self, sample_holdings):
         """模拟真实 LLM HTML 内容做完整端到端校验。"""
@@ -422,17 +555,18 @@ class TestRunFactCheck:
 <p>本季度贵州茅台（600519）作为组合最大持仓继续领跑，白酒板块整体向好。</p>
 <p>招商银行（600036）表现稳健，宁德时代（300750）受新能源政策提振。</p>
 <p>组合累计收益率为 30.3%，跑赢沪深300指数（000300）。</p>"""
-        result = run_fact_check(html, sample_holdings, "智囊团深度复盘")
-        assert result != ""
+        corr, summ = run_fact_check(html, sample_holdings, "智囊团深度复盘")
+        assert summ != ""
         # 代码检查：600519✓, 600036✓, 300750✓, 000300(指数跳过) — 全部通过
         # 排名检查：600519 是最大持仓 ✓
         # 数值检查：30.3% ≈ 30.28% ✓
-        assert "事实校验通过" in result
+        assert "事实校验通过" in summ
 
     def test_empty_holdings_edge(self):
         """空持仓列表 — 品种和排名检查跳过，数值检查至少不崩溃。"""
         html = "<p>组合累计收益率为 5.0%。</p>"
-        result = run_fact_check(html, [], "测试")
+        corr, summ = run_fact_check(html, [], "测试")
         # 空持仓时 profit_rate=0，"5.0%" 不匹配但上下文不含收益关键词，跳过
         # 无论是否通过，不应崩溃
-        assert isinstance(result, str)
+        assert isinstance(corr, str)
+        assert isinstance(summ, str)

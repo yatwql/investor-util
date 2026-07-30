@@ -44,12 +44,15 @@ class TestDebateSystemPrompts(unittest.TestCase):
         self.assertIn("集中度风险", _SYSTEM_DEBATE_CON)
         self.assertIn("流动性风险", _SYSTEM_DEBATE_CON)
 
-    def test_system_debate_synthesis_contains_placeholders(self):
-        """_SYSTEM_DEBATE_SYNTHESIS 包含 {pro_text} 和 {con_text} 占位符。"""
+    def test_system_debate_synthesis_contains_instruction_keywords(self):
+        """_SYSTEM_DEBATE_SYNTHESIS 包含不应重复论点和情景分析等关键指令。"""
         from src.python.llm.prompts import _SYSTEM_DEBATE_SYNTHESIS
         self.assertIsInstance(_SYSTEM_DEBATE_SYNTHESIS, str)
-        self.assertIn("{pro_text}", _SYSTEM_DEBATE_SYNTHESIS)
-        self.assertIn("{con_text}", _SYSTEM_DEBATE_SYNTHESIS)
+        # 应包含"不要重复"或"无需"等阻止重复的指令
+        has_no_repeat = any(kw in _SYSTEM_DEBATE_SYNTHESIS for kw in ("不要重复", "无需重复", "无需"))
+        self.assertTrue(has_no_repeat, "_SYSTEM_DEBATE_SYNTHESIS 应包含禁止重复论点的指令")
+        # 应包含 "共识与分歧摘要" 输出结构
+        self.assertIn("共识与分歧摘要", _SYSTEM_DEBATE_SYNTHESIS)
 
     def test_system_debate_conditional_scenario_exists(self):
         """_SYSTEM_DEBATE_CONDITIONAL_SCENARIO 模板存在且包含 {name}/{desc} 占位符。
@@ -96,13 +99,13 @@ class TestDebateSynthesisPrompt(unittest.TestCase):
         self.assertIn(pro, result)
         self.assertIn(con, result)
 
-    def test_output_contains_markdown_code_block(self):
-        """输出应包含 markdown 代码块标记（```markdown）。"""
+    def test_output_contains_code_block(self):
+        """输出应包含代码块标记（```），白脸和黑脸各一开一闭共 4 个。"""
         from src.python.llm.prompts import _build_debate_synthesis_prompt
         result = _build_debate_synthesis_prompt("pro", "con")
-        self.assertIn("```markdown", result)
-        # 应该是两个代码块（白脸和黑脸各一个）
-        self.assertEqual(result.count("```markdown"), 2)
+        self.assertIn("```", result)
+        # 两个代码块，每块一开一闭：白脸 ```...``` + 黑脸 ```...``` = 4 个
+        self.assertEqual(result.count("```"), 4)
 
 
 @pytest.mark.unit_llm

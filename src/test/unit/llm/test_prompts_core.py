@@ -23,7 +23,8 @@ class TestPromptsCore:
 
         assert isinstance(_SYSTEM_EXPERT_REVIEW, str)
         assert "Phase" in _SYSTEM_EXPERT_REVIEW or "定音锤" in _SYSTEM_EXPERT_REVIEW
-        assert "情景分析" in _SYSTEM_EXPERT_REVIEW
+        assert "置信度指引" in _SYSTEM_EXPERT_REVIEW
+        assert "竞争语境约束" in _SYSTEM_EXPERT_REVIEW
 
     def test_system_health_check_constant(self):
         """_SYSTEM_HEALTH_CHECK 是非常字符串。"""

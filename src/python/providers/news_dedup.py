@@ -313,7 +313,9 @@ def _dedup_by_title(
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
                     break
                 # ④ bg=2 梯度规则：中高 ratio + 有实体重叠 → 合并
-                if overlap >= 2 and ratio >= 0.45:
+                # 阈值 0.40 基于校准报告：bg≥2+ratio≥0.35 有 580 条含实体重叠被跳过，
+                # 0.40 可额外捕获约 300-400 条真实重复，bg=2 已提供实体重叠安全垫
+                if overlap >= 2 and ratio >= 0.40:
                     is_dup = True
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge_bg2"))
                     break

@@ -39,7 +39,12 @@ def _format_holdings_block(
     """
     if not holdings_details:
         return ""
-    return "\n".join(_fmt_holding_line(h, show_cost=show_cost, compact=compact) for h in holdings_details[:limit])
+    # 按市值降序排列确保与 TOP3 排名一致，消除 LLM 排名幻觉
+    sorted_h = sorted(
+        holdings_details,
+        key=lambda h: -(h.get("market_value", 0) or 0),
+    )
+    return "\n".join(_fmt_holding_line(h, show_cost=show_cost, compact=compact) for h in sorted_h[:limit])
 
 
 def _format_penetration_block(penetrated_assets: list[dict] | None, limit: int = 10) -> str:
@@ -354,6 +359,182 @@ def _build_news_correlation_summary(news_data: list[dict]) -> str:
     return "\n".join(parts)
 
 
+# ═══════════════════════════════════════════════════════════
+#  统一 prompt 附录（自动注入，所有模块共享）
+# ═══════════════════════════════════════════════════════════
+# 以下三个块由 generate_llm_module 统一注入到每个模块的
+# user prompt 末尾，各模块无需手动调用。
+# 新模块自动获得防御，无需逐个追加。
+
+
+def _build_top3_block(
+    holdings_details: list[dict] | None,
+    total_mv: float,
+) -> str:
+    """构建持仓排名文本块（按市值降序 TOP3），供 LLM 直接引用排名信息。
+
+    Args:
+        holdings_details: 持仓明细列表。
+        total_mv: 持仓总市值。
+
+    Returns:
+        TOP3 排名文本块，无数据时返回空字符串。
+    """
+    if not holdings_details or total_mv <= 0:
+        return ""
+    sorted_h = sorted(
+        [d for d in holdings_details if (d.get("market_value", 0) or 0) > 0],
+        key=lambda d: d.get("market_value", 0) or 0,
+        reverse=True,
+    )
+    top_lines = []
+    for i, h in enumerate(sorted_h[:3], 1):
+        code = h.get("code", "")
+        name = h.get("name", "")
+        mv = h.get("market_value", 0) or 0
+        weight = (mv / total_mv * 100) if total_mv else 0
+        rate = h.get("profit_rate")
+        rate_str = f"{rate:+.2f}%" if rate is not None else "--"
+        top_lines.append(f"  {i}. {name}（{code}）市值{mv:,.0f} 占比{weight:.1f}% 收益率{rate_str}")
+    return "\n【持仓TOP3】\n" + "\n".join(top_lines) if top_lines else ""
+
+
+def _build_data_slot_block(
+    holdings_details: list[dict] | None,
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+) -> str:
+    """构建数据速查表——LLM 必须直接使用的精确数值清单。
+
+    放置在 prompt 末尾，降低 LLM 编造收益率的概率。
+
+    Args:
+        holdings_details: 持仓明细列表。
+        total_mv: 持仓总市值。
+        total_cost: 持仓总成本。
+        total_profit: 持仓总盈亏。
+
+    Returns:
+        数据速查表文本块，无数据时返回空字符串。
+    """
+    if not holdings_details or total_mv <= 0:
+        return ""
+
+    total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
+
+    lines = ["\n【你必须直接使用的数据】"]
+    lines.append(f"- 组合累计收益率: {total_rate:+.2f}%")
+
+    # 最大持仓（按市值降序）
+    sorted_h = sorted(
+        [d for d in holdings_details if (d.get("market_value", 0) or 0) > 0],
+        key=lambda d: d.get("market_value", 0) or 0,
+        reverse=True,
+    )
+    if sorted_h:
+        top1 = sorted_h[0]
+        top1_name = top1.get("name", "")
+        top1_code = top1.get("code", "")
+        top1_mv = top1.get("market_value", 0) or 0
+        top1_weight = (top1_mv / total_mv * 100) if total_mv else 0
+        lines.append(f"- 最大持仓: {top1_name}（{top1_code}）占比 {top1_weight:.1f}%")
+
+    # 各品种收益率 TOP10
+    rate_lines = []
+    for h in sorted_h[:10]:
+        code = h.get("code", "")
+        name = h.get("name", "")
+        rate = h.get("profit_rate")
+        if rate is not None:
+            rate_lines.append(f"  {name}（{code}）: 收益率 {rate:+.2f}%")
+    if rate_lines:
+        lines.append("- 各品种盈亏比例:")
+        lines.extend(rate_lines)
+
+    lines.append("（以上为精确数据，请直接引用，不得编造或推算替代数值）")
+    return "\n".join(lines)
+
+
+def _build_code_whitelist_block(
+    holdings_details: list[dict] | None,
+    total_mv: float,
+) -> str:
+    """构建持仓代码白名单 + 排名断言，防止 LLM 虚构代码和最大持仓声称。
+
+    列出用户持仓中所有合法品种代码，并明确标注按市值排名第 1 的品种，
+    让 LLM 无法将不属于该名单的代码声称"最大持仓"。
+
+    Args:
+        holdings_details: 持仓明细列表。
+        total_mv: 持仓总市值。
+
+    Returns:
+        白名单文本块，无数据时返回空字符串。
+    """
+    if not holdings_details or total_mv <= 0:
+        return ""
+
+    sorted_h = sorted(
+        [d for d in holdings_details if (d.get("market_value", 0) or 0) > 0],
+        key=lambda d: d.get("market_value", 0) or 0,
+        reverse=True,
+    )
+    if not sorted_h:
+        return ""
+
+    # 所有合法代码
+    all_codes = [h.get("code", "") for h in sorted_h if h.get("code")]
+    codes_str = "、".join(all_codes)
+
+    # 排名第 1 的品种
+    top1 = sorted_h[0]
+    top1_name = top1.get("name", "")
+    top1_code = top1.get("code", "")
+
+    return (
+        "【持仓代码白名单】\n"
+        f"你的持仓中仅包含以下品种代码（共 {len(all_codes)} 个）：{codes_str}\n"
+        f"按市值排名第 1 的品种是 {top1_name}（{top1_code}），"
+        f"这是唯一可以被称作「最大持仓」「第一重仓」「首要持仓」的品种。\n"
+        "严禁在报告中引用上述白名单之外的任何 6 位数字代码作为持仓品种。"
+        "任何时候都不应在你的输出中出现白名单之外的 6 位数字代码。"
+    )
+
+
+def _build_prompt_appendix(
+    holdings_details: list[dict] | None,
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+) -> str:
+    """构建统一 prompt 附录（TOP3 + 数据速查表 + 代码白名单）。
+
+    由 generate_llm_module 统一注入到每个模块的 user prompt 末尾，
+    各模块无需手动调用。确保新模块自动获得三样防御。
+
+    Args:
+        holdings_details: 持仓明细列表。
+        total_mv: 持仓总市值。
+        total_cost: 持仓总成本。
+        total_profit: 持仓总盈亏。
+
+    Returns:
+        格式化的附录文本块，无数据时返回空字符串。
+    """
+    parts = []
+    top3 = _build_top3_block(holdings_details, total_mv)
+    if top3:
+        parts.append(top3)
+    data_slot = _build_data_slot_block(holdings_details, total_mv, total_cost, total_profit)
+    if data_slot:
+        parts.append(data_slot)
+    whitelist = _build_code_whitelist_block(holdings_details, total_mv)
+    if whitelist:
+        parts.append(whitelist)
+    return "\n\n" + "\n\n".join(parts) if parts else ""
+
+
 __all__ = [
     "_format_holdings_block",
     "_format_penetration_block",
@@ -363,4 +544,8 @@ __all__ = [
     "_build_news_correlation_summary",
     "_build_metrics_table_block",
     "_build_data_quality_detail_block",
+    "_build_top3_block",
+    "_build_data_slot_block",
+    "_build_code_whitelist_block",
+    "_build_prompt_appendix",
 ]

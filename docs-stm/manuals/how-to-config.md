@@ -15,7 +15,7 @@
   // ── B. 报告章节可见性 ──
   "enable_b_series": true,  // 基金深度分析（#6~9）
   "enable_news": true,      // 市场新闻（#10）
-  "enable_history": true,   // 组合历史走势+回撤（#16~17）
+  "enable_history": true,   // 组合历史走势+回撤（#15~16）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,

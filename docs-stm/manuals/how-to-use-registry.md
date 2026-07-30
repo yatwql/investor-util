@@ -59,7 +59,7 @@ class DataModuleDef:
 | **行业分类（refresh）** | 行业分类 | `industry` | 14天 | 主动刷新触发 |
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
-| **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | P4 实验功能，三段独立缓存（复用 expert_review 指纹） |
+| **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | 实验功能，三段独立缓存（复用 expert_review 指纹） |
 | **补充数据（refresh）** | 盈利预测、资金流向、分红、无风险利率 | `profit_forecast`, `sector_flow`, `dividend`, `bond_yield` | 15min~30d | 主动刷新触发；`bond_yield` 为精确键名 `bond_yield_rf` |
 | **基金深度分析（refresh）** | 基金经理、持仓重合度、基金风格扩展数据 | `fund_manager`, `fund_overlap`, `extended` | 24h~7d | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |

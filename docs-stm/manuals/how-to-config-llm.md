@@ -275,11 +275,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 > 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation）。
 
-配置分为**全局配置**和**模块级配置**两类。全局配置共有 6 项：
+配置分为**全局配置**和**模块级配置**两类。全局配置共有 7 项：
 
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
+- `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
 - `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
@@ -300,6 +301,47 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
 > 各模块默认值差异详见下方「各模块推荐参数值」表。
+
+---
+
+### 事实校验容差配置
+
+`fact_check` 段控制 LLM 生成内容中数值的自动校验和修正逻辑，用于检测并纠正 LLM 在报告中提到的收益率、占比、排名等数值与实际数据的偏差。
+
+```json
+"fact_check": {
+  // 全局数值偏差容差（百分点），默认 1.0
+  "tolerance": 1.0,
+  // 按模块覆盖容差（模块名 → 百分点）
+  "tolerance_overrides": {
+    "expert_review": 2.0,
+    "health_check": 1.0,
+    "global_macro": 1.0,
+    "penetration_deep": 1.0
+  }
+}
+```
+
+| 配置键 | 类型 | 默认值 | 说明 |
+|--------|:----:|:------:|------|
+| `tolerance` | float | `1.0` | 全局数值偏差容差（百分点）。LLM 输出的百分比数值与真实值偏差在 ±tolerance 百分点内即视为通过校验，超出则被标记为"疑似幻觉"并触发自动修正 |
+| `tolerance_overrides` | dict | 见默认值 | 按模块覆盖容差。key 为模块名（`expert_review` / `health_check` / `global_macro` / `penetration_deep`），value 为该模块专用的容差值。未在 override 中列出的模块使用全局 `tolerance` |
+
+**工作原理**：
+1. LLM 模块生成报告后，事实校验器扫描 HTML 中的百分比数值
+2. 将每个数值与持仓数据的真实值对比（如持仓收益率、组合占比等）
+3. 偏差 ≤ `tolerance`（或模块对应的 override 值）→ 标记为绿色 ✅ 通过
+4. 偏差 > 容差 → 标记为红色 ❌ 疑似幻觉，并用真实值自动替换错误数值
+5. 批量修正后，报告末尾追加一段"事实校验"摘要（显示修正前后的对比）
+
+**推荐配置**：
+- **`expert_review`（智囊团深度复盘）= 2.0**：该模块综合判断较多，LLM 可能对收益率进行"约数"表述（如"约 15%"而非精确的 14.7%），给予更宽松容差可减少误报
+- **`health_check` / `global_macro` / `penetration_deep` = 1.0**：这些模块数值引用较少，1 个百分点已足够宽松
+- 若发现某模块频繁误报"通过"的数值，可适当降低该模块容差；反之频繁误标"疑似幻觉"时可适当提高
+
+> **注意**：容差以百分点为单位，非百分比。例如 `tolerance: 1.0` 表示 LLM 说"15%"而真实值为 14.0%~16.0% 之间均算通过。修正操作仅在偏差超过容差时触发，并自动将错误数值替换为真实值。
+
+---
 
 <details>
 <summary><b>📄 llm_settings.json 完整参考</b>（点击展开）</summary>
@@ -424,6 +466,21 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
     "max_total_tokens_per_report": 16000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
+  },
+
+  // ═══════════════════════════════════════════
+  // 事实校验（fact_check）— LLM 输出数值一致性检测
+  // ═══════════════════════════════════════════
+  "fact_check": {
+    // 全局数值偏差容差（百分点），默认 1.0
+    "tolerance": 1.0,
+    // 按模块覆盖容差（模块名 → 百分点）
+    "tolerance_overrides": {
+      "expert_review": 2.0,
+      "health_check": 1.0,
+      "global_macro": 1.0,
+      "penetration_deep": 1.0
+    }
   },
 
   // ═══════════════════════════════════════════

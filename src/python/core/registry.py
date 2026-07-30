@@ -300,7 +300,7 @@ def get_known_llm_settings_keys() -> set[str]:
         if m.is_llm:
             keys |= m.llm_settings_keys()
     # 全局键名
-    keys |= {"max_retries", "enabled_llm", "pricing", "llm_max_concurrency", "news_correlation_top_n", "debate"}
+    keys |= {"max_retries", "enabled_llm", "pricing", "llm_max_concurrency", "news_correlation_top_n", "debate", "fact_check"}
     return keys
 
 

@@ -733,6 +733,13 @@ def generate_all_llm(
     # 仅检查非缓存且非空的模块（缓存命中说明内容未变化，无需重复校验）。
     _module_labels = get_llm_module_names()
 
+    # 读取事实校验容差配置（来自 llm_settings.json fact_check 段）
+    _fc_cfg = (llm_config or {}).get("fact_check", {})
+    _fc_tolerance: float = _fc_cfg.get("tolerance", 1.0)
+    _fc_overrides: dict = _fc_cfg.get("tolerance_overrides", {})
+
+    # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
+
     # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
     _penetrated_codes: set[str] = set()
     if penetrated_assets:
@@ -748,22 +755,30 @@ def generate_all_llm(
             ("penetration_deep", pd_r),
         ]:
             if _result:
-                _summary = run_fact_check(
+                _mod_tolerance = _fc_overrides.get(_mk, _fc_tolerance)
+                _corrected, _summary = run_fact_check(
                     _result,
                     holdings_details,
                     module_label=_module_labels.get(_mk, _mk),
                     extra_valid_codes=_penetrated_codes if _mk == "penetration_deep" else None,
                     is_penetration_module=_mk == "penetration_deep",
+                    tolerance_pct=_mod_tolerance,
+                    history_data=history_data,
                 )
+                # 用修正后的内容替换原结果
+                if _corrected != _result and _corrected != _summary:
+                    _result = _corrected
                 if _summary and _summary not in _result:
-                    if _mk == "global_macro":
-                        gm_r = _result + "\n" + _summary
-                    elif _mk == "expert_review":
-                        er_r = _result + "\n" + _summary
-                    elif _mk == "health_check":
-                        hc_r = _result + "\n" + _summary
-                    elif _mk == "penetration_deep":
-                        pd_r = _result + "\n" + _summary
+                    _result = _result + "\n" + _summary
+                # 写回元组变量
+                if _mk == "global_macro":
+                    gm_r = _result
+                elif _mk == "expert_review":
+                    er_r = _result
+                elif _mk == "health_check":
+                    hc_r = _result
+                elif _mk == "penetration_deep":
+                    pd_r = _result
 
     logger.info(
         "LLM 生成完成: %s=%s, %s=%s, %s=%s, %s=%s",

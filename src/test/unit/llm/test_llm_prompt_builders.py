@@ -453,3 +453,105 @@ class TestBuildCompetitiveContextBlock(unittest.TestCase):
         from src.python.llm.prompts import _build_competitive_context_block
         result = _build_competitive_context_block(None, 0, 0)
         self.assertNotIn("幸存者偏差", result)
+
+
+@pytest.mark.unit_llm
+class TestBuildExpertReviewPromptSkipScenarios(unittest.TestCase):
+    """_build_expert_review_prompt skip_scenarios 参数验证。"""
+
+    def test_skip_scenarios_removes_scenario_block(self):
+        """skip_scenarios=True 时不应包含情景分析指令。"""
+        from src.python.llm.prompts import _build_expert_review_prompt
+        result = _build_expert_review_prompt(
+            total_mv=100_000, total_cost=80_000, total_profit=20_000,
+            total_today_profit=1_000, holdings_count=5, categories={},
+            skip_scenarios=True,
+        )
+        self.assertNotIn("### 情景分析", result)
+        self.assertNotIn("上涨情景", result)
+        self.assertNotIn("下跌情景", result)
+
+    def test_default_scenarios_present(self):
+        """skip_scenarios=False（默认）时应包含情景分析指令。"""
+        from src.python.llm.prompts import _build_expert_review_prompt
+        result = _build_expert_review_prompt(
+            total_mv=100_000, total_cost=80_000, total_profit=20_000,
+            total_today_profit=1_000, holdings_count=5, categories={},
+        )
+        self.assertIn("### 情景分析", result)
+        self.assertIn("上涨情景", result)
+        self.assertIn("下跌情景", result)
+
+    def test_skip_scenarios_keeps_other_content(self):
+        """skip_scenarios=True 不影响其他内容块。"""
+        from src.python.llm.prompts import _build_expert_review_prompt
+        details = [
+            {"code": "600900", "market_value": 50_000, "profit": 5_000,
+             "profit_rate": 10.0, "source_api": "tencent", "name": "长江电力",
+             "change_pct": 0.5},
+        ]
+        result = _build_expert_review_prompt(
+            total_mv=100_000, total_cost=80_000, total_profit=20_000,
+            total_today_profit=1_000, holdings_count=5, categories={},
+            holdings_details=details,
+            skip_scenarios=True,
+        )
+        self.assertIn("持仓明细", result)
+        self.assertIn("600900", result)
+        self.assertNotIn("### 情景分析", result)
+
+
+@pytest.mark.unit_llm
+class TestBuildPromptAppendix(unittest.TestCase):
+    """_build_prompt_appendix 统一注入防御。"""
+
+    def _make_holding(self, code: str, name: str, mv: float, rate: float | None = None) -> dict:
+        return {
+            "code": code,
+            "name": name,
+            "market_value": mv,
+            "profit_rate": rate,
+            "profit": mv * (rate or 0) / 100 if rate else 0,
+        }
+
+    def test_empty_holdings_returns_empty(self):
+        """空持仓返回空字符串。"""
+        from src.python.llm.prompts_tables import _build_prompt_appendix
+        self.assertEqual(_build_prompt_appendix(None, 0, 0, 0), "")
+        self.assertEqual(_build_prompt_appendix([], 100_000, 80_000, 20_000), "")
+
+    def test_single_holding_contains_all_blocks(self):
+        """单个品种包含 TOP3 + 数据速查表 + 代码白名单。"""
+        from src.python.llm.prompts_tables import _build_prompt_appendix
+        holdings = [self._make_holding("011506", "建信高端装备", 60_000, 8.5)]
+        result = _build_prompt_appendix(holdings, 60_000, 55_000, 5_000)
+        self.assertIn("TOP3", result)
+        self.assertIn("数据", result)
+        self.assertIn("白名单", result)
+        self.assertIn("011506", result)
+        self.assertIn("建信高端装备", result)
+
+    def test_multiple_holdings_correct_ranking(self):
+        """多品种时 TOP3 按市值降序排列，#1 是市值最高者。"""
+        from src.python.llm.prompts_tables import _build_prompt_appendix
+        holdings = [
+            self._make_holding("011506", "建信高端装备", 60_000, 8.5),
+            self._make_holding("601939", "建设银行", 30_000, 2.0),
+            self._make_holding("561910", "电池ETF", 10_000, -1.5),
+        ]
+        result = _build_prompt_appendix(holdings, 100_000, 90_000, 10_000)
+        # #1 应为建信高端装备（市值最高）
+        self.assertIn("1. 建信高端装备", result)
+        # 白名单应包含所有三个代码
+        self.assertIn("011506", result)
+        self.assertIn("601939", result)
+        self.assertIn("561910", result)
+        # 数据速查表应有各品种收益率
+        self.assertIn("+8.50%", result)
+
+    def test_zero_mv_returns_partial_content(self):
+        """total_mv=0 时返回空字符串（避免除零）。"""
+        from src.python.llm.prompts_tables import _build_prompt_appendix
+        holdings = [self._make_holding("011506", "建信高端装备", 0, 0)]
+        result = _build_prompt_appendix(holdings, 0, 0, 0)
+        self.assertEqual(result, "")

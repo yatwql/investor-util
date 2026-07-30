@@ -102,6 +102,10 @@ def generate_global_macro(
         max_tokens_default=800,
         timeout_default=60.0,
         output_brief_limit=200,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
 
 
@@ -222,6 +226,10 @@ def generate_expert_review(
         max_tokens_default=8192,
         timeout_default=120.0,
         output_brief_limit=300,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
 
 
@@ -278,6 +286,10 @@ def generate_health_check(
         max_tokens_default=4096,
         timeout_default=120.0,
         output_brief_limit=300,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
 
 
@@ -330,6 +342,10 @@ def generate_penetration_deep_analysis(
         max_tokens_default=4096,
         timeout_default=90.0,
         output_brief_limit=300,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
 
 
@@ -377,7 +393,7 @@ def generate_debate_procon(
     _enable_qa_concentration = "q" in _fp_suffix
     _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
 
-    # ── 构建基础 user prompt（复用普通 expert_review 的数据块） ──
+    # ── 构建基础 user prompt（辩论模式跳过情景分析，避免双重输出） ──
     _user = _build_expert_review_prompt(
         total_mv,
         total_cost,
@@ -393,6 +409,7 @@ def generate_debate_procon(
         enable_conditional=_enable_conditional,
         enable_qa_concentration=_enable_qa_concentration,
         industry_concentration=_industry_conc,
+        skip_scenarios=True,  # 辩论模式下 pro/con 不写情景分析，避免双重输出
     )
 
     # ── 指纹计算 ────────────────────────────────────────
@@ -466,6 +483,10 @@ def generate_debate_procon(
             output_brief_limit=300,
             system_prompt=_SYSTEM_DEBATE_PRO,
             user_prompt=_user,
+            holdings_details=holdings_details,
+            total_mv=total_mv,
+            total_cost=total_cost,
+            total_profit=total_profit,
         )
         pro_text = pro_result[0] if pro_result and isinstance(pro_result, tuple) else None
         if pro_text:
@@ -512,6 +533,10 @@ def generate_debate_procon(
             output_brief_limit=300,
             system_prompt=_SYSTEM_DEBATE_CON,
             user_prompt=_user,
+            holdings_details=holdings_details,
+            total_mv=total_mv,
+            total_cost=total_cost,
+            total_profit=total_profit,
         )
         con_text = con_result[0] if con_result and isinstance(con_result, tuple) else None
         if con_text:

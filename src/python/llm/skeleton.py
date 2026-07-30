@@ -31,6 +31,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_NOT_CONFIGURED,
     LLM_MODULE_FAILURE,
 )
+from src.python.llm.prompts_tables import _build_prompt_appendix
 from src.python.llm.session import record_per_module
 from src.python.core.registry import get_llm_module_name
 
@@ -410,6 +411,11 @@ def _run_standard_mode(
     output_brief_limit: int,
     system_prompt: str | None = None,
     user_prompt: str | None = None,
+    # ── 统一 prompt 附录数据 ──
+    holdings_details: list[dict] | None = None,
+    total_mv: float = 0.0,
+    total_cost: float = 0.0,
+    total_profit: float = 0.0,
 ) -> tuple[str | None, bool]:
     """标准 LLM 单篇生成模式：缓存 → 调用 → 处理结果。
 
@@ -430,6 +436,12 @@ def _run_standard_mode(
         _user = user_prompt
     else:
         _user = prompt_builder() if prompt_builder else ""
+
+    # ── 统一注入 prompt 附录（TOP3 + 数据速查表 + 代码白名单） ──
+    if _user:
+        appendix = _build_prompt_appendix(holdings_details, total_mv, total_cost, total_profit)
+        if appendix:
+            _user = _user + "\n\n" + appendix
 
     fingerprint = fingerprint_fn() if fingerprint_fn else ""
     cache_key = CACHE_PREFIX_LLM + f"{module_key}_{fingerprint}"
@@ -473,6 +485,11 @@ def generate_llm_module(
     per_item_cache_fn: Any = None,  # fn(index, item, context_fp) → cache_key or None
     batch_prompt_fn: Any = None,  # fn(batch_items, context) → user_prompt 字符串
     response_parser: Any = None,  # fn(batch_items, llm_response) → [parsed 列表]
+    # ── 统一 prompt 附录数据（自动注入 TOP3/速查表/白名单） ──
+    holdings_details: list[dict] | None = None,
+    total_mv: float = 0.0,
+    total_cost: float = 0.0,
+    total_profit: float = 0.0,
 ) -> Any:
     """通用 LLM 模块生成骨架。
 
@@ -527,6 +544,10 @@ def generate_llm_module(
         output_brief_limit,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
 
 

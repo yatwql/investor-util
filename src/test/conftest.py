@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import os
 import warnings
 
 import pytest
@@ -185,6 +186,9 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         str(tmp_path / "data/config/llm_settings.json"),
     )
     _cfg_core._clear_config_cache()
+    # 注：llm_settings.json 不在此处 seed 隔离路径。需要读写真实配置的测试
+    # （如 test_all_keys_tracked 检查代码 vs 配置文件的键名一致性），
+    # 应直接从 PROJECT_ROOT 读取真实文件，而非依赖隔离路径的副本。
 
 
 @pytest.fixture(autouse=True)

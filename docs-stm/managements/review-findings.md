@@ -26,6 +26,24 @@
 | **rf-86** | `cache/operations.py` | 472 | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
 | **rf-89** | `report/excel_generator.py` | 447 | Excel 编排器 |
 
+### P3 — 测试覆盖缺口（建议补齐）
+
+| # | 位置 | 问题 |
+|---|------|------|
+
+---
+
+## 已修复（摘要）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-90 | `_build_prompt_appendix` 无专用测试 | 新增 `TestBuildPromptAppendix` 4 用例（空持仓/单品种/多品种排序/零市值）+ `TestBuildExpertReviewPromptSkipScenarios` 3 用例 | `changelog.md` → Test |
+| rf-91 | `fact_checker` 数值混淆（601939 11.0%→2.0%） | 自动修正 v3：返回 correction 二元组 + apply_numerical_corrections + tolerance_overrides | `changelog.md` → 事实校验 v3 |
+| rf-92 | LLM 持仓排名幻觉（040046/561910 声称"最大持仓"）| 统一注入架构：`_build_prompt_appendix` 在 `_run_standard_mode` 自动注入 TOP3/速查表/白名单 | `changelog.md` → Prompt 防御统一注入 |
+| rf-93 | 辩论 synthesis 重复白脸/黑脸观点 + 情景分析 | `_SYSTEM_DEBATE_SYNTHESIS` 重写：禁止重述论点、禁止插入情景分析 | `changelog.md` → 辩论模式 synthesis 修复 |
+| rf-94 | `_build_debate_synthesis_prompt` HTML误标为markdown | ` ```markdown` → ` ```` | `changelog.md` → 同上 |
+| rf-95 | `_SYSTEM_EXPERT_REVIEW` 情景分析双重指令 + 辩论 pro/con 情景重复 | 从 system prompt 移除情景段移至 user prompt 单一注入；`skip_scenarios` 参数使辩论模式跳过情景分析 | `changelog.md` → Fix |
+
 ---
 
 ## 归档

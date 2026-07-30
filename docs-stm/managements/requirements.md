@@ -911,7 +911,7 @@
 | `priority` | int | — | 99 | 优先级（数值越小优先级越高），priority 策略使用 |
 | `weight` | int | — | 1 | 权重值，weighted 策略使用 |
 | `timeout` | float | — | 60.0 | API 超时秒数 |
-| `proxy_preferred` | bool | — | false | 是否优先使用 proxy（proxy_preferred 策略使用） |
+| `proxy_preferred` | bool | — | false | 是否优先使用 proxy（per-provider 后处理标记，有代理环境时自动前置） |
 
 **示例**：
 ```json

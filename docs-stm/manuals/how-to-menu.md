@@ -60,8 +60,8 @@
 
 #### [E] 生成基础版 Excel 分析报告
 
-读取持仓 → 获取行情 → 生成 Excel 报告，包含 5 个核心页签：
-- 投资分析汇总、市值核算明细表、持仓分类表、资产穿透 TOP10、基金业绩分析
+读取持仓 → 获取行情 → 生成 Excel 报告，包含 6 个核心页签：
+- 投资分析汇总、市值核算明细表、持仓分类表、资产穿透 TOP10、基金业绩分析、数据源可用性矩阵
 
 无新闻、无 LLM、无基金深度分析。生成速度最快，适合快速查看持仓概况。
 
@@ -147,7 +147,7 @@
 > | `llm_debate_conditional` | 7 | 辩论-条件推理 |
 > | `llm_debate_qa_concentration` | 8 | 辩论-集中度问答 |
 >
-> 除辩论开关外，`features.json` 还统一管理匿名化模式（`anonymization.mode`）、新闻分类（`news_cls`）、历史走势（`history_portfolio`/`history_benchmark`）、量化指标（`metrics_*`）、缓存清理（`cache_daily_cleanup`）等共 28 项开关。完整清单见[配置指引-功能开关 §L](how-to-config.md#l-功能开关featuresjson)。
+> 除辩论开关外，`features.json` 还统一管理匿名化模式（`anonymization.mode`）、新闻分类（`news_cls`）、历史走势（`history_portfolio`/`history_benchmark`）、量化指标（`metrics_*`）、缓存清理（`cache_daily_cleanup`）等共 28 项开关。完整清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)。
 
 #### [A] 配置持仓匿名化（代码/名称脱敏）
 

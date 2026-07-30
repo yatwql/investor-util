@@ -894,7 +894,7 @@ _session_usage = {
 | `get_budget_status()` | 查询当前预算使用情况 |
 | `get_cost_summary(for_report=True)` | 生成成本摘要文本（`for_report=True` 对应 verbose 模式） |
 
-### 9.1.1 duration 字段
+#### 9.1.1 duration 字段
 
 `record_per_module()` 接受 `duration: float = 0.0` 参数，记录每个模块的 API 调用耗时（秒）。`skeleton.py` 中 `generate_llm_content()` 通过 `time.monotonic()` 计时，调用 `call_llm()` 前后计算耗时，传入 `_finalize_and_cache()` 后写入 `per_module` 的 `"duration"` 键。多条缓存路径（首次生成 + 截断重试）的耗时通过 `duration` 字段累计。
 
@@ -1192,6 +1192,9 @@ LLM 集成层与系统其他组件的接口：
 | `temperature_{module_key}` | 生成温度 | `0.7` |
 | `max_tokens_{module_key}` | 最大输出 token | `4096` |
 | `timeout_{module_key}` | API 超时（秒） | `120` |
+| `system_prompt_{module_key}` | 系统提示词覆盖 | `null`（使用内置） |
+| `cache_enabled_{module_key}` | 是否启用缓存 | `true` / `false` |
+| `output_brief_{module_key}` | 精简模式 | `true` / `false` |
 | `thinking_enabled_{module_key}` | 是否启用 Extended Thinking | `true` / `false` |
 | `reasoning_effort_{module_key}` | DeepSeek 推理强度 | `high` / `medium` / `low` |
 | `thinking_budget_{module_key}` | Claude/Gemini Thinking 预算 token | `10240` |
@@ -1200,7 +1203,7 @@ LLM 集成层与系统其他组件的接口：
 
 ### 附录 B：内置模型定价表
 
-以下为 `core/constants.py` 中 `MODEL_PRICING` 内置的定价快照（单位：元/百万 token），可通过 `llm_settings.json` 的 `pricing_overrides` 覆盖：
+以下为 `core/constants.py` 中 `MODEL_PRICING` 内置的定价快照（单位：元/百万 token），可通过 `llm_settings.json` 的 `pricing` 覆盖：
 
 | 模型 | 输入 | 输出 | 缓存命中 |
 |:-----|:----:|:----:|:--------:|
