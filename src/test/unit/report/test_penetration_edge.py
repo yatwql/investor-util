@@ -18,7 +18,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 

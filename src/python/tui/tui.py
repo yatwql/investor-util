@@ -16,10 +16,10 @@ if _project_root not in sys.path:
 
 from src.python.config import init_config
 from src.python.llm.pricing import CURRENCY_SYMBOLS
-from src.python.logger import log_app_boundary, setup_logger
-from src.python.tui_keys import KEY_CTRL_C, KEY_DOWN, KEY_ENTER, KEY_UP, get_key
-from src.python.tui_handlers import execute_item
-from src.python.tui_menu import (
+from src.python.core.logger import log_app_boundary, setup_logger
+from src.python.tui.tui_keys import KEY_CTRL_C, KEY_DOWN, KEY_ENTER, KEY_UP, get_key
+from src.python.tui.tui_handlers import execute_item
+from src.python.tui.tui_menu import (
     MENU_ITEMS,
     exit_app,
     index_by_key,
@@ -53,7 +53,7 @@ def _print_session_usage_on_exit() -> None:
             print(f"  模型: {model}")
             per_module = usage.get("per_module", {})
             if per_module:
-                from src.python.registry import get_llm_module_names
+                from src.python.core.registry import get_llm_module_names
 
                 _MODULE_DISPLAY = get_llm_module_names()
                 for key, display_name in _MODULE_DISPLAY.items():
@@ -77,13 +77,13 @@ def _print_session_usage_on_exit() -> None:
 
 def _bind_callbacks() -> None:
     """运行时将函数引用填入 MENU_ITEMS。"""
-    from src.python.handlers_cache import (
+    from src.python.tui.handlers_cache import (
         _cmd_cleanup_cache,
         _cmd_show_cache_stats,
         _cmd_update_basic_cache,
         _cmd_update_position_cache,
     )
-    from src.python.handlers_config import (
+    from src.python.tui.handlers_config import (
         _cmd_config_anonymization_mode,
         _cmd_config_comparison_indices,
         _cmd_config_dir,
@@ -93,7 +93,7 @@ def _bind_callbacks() -> None:
         _cmd_config_report_boards,
         _cmd_refresh_config,
     )
-    from src.python.handlers_report import (
+    from src.python.tui.handlers_report import (
         _cmd_generate_both,
         _cmd_generate_excel,
         _cmd_generate_full,

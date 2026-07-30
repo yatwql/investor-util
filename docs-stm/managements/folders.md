@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：0.9.0
+> 文档版本：0.9.1-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,10 +8,10 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 178 | 42,821 | `src/python/` 下所有 `.py`（不含测试） |
+| 主程序代码 | Python | 182 | 42,871 | `src/python/` 下所有 `.py`（不含测试） |
 | HTML 报告模板 | HTML | 1 | 1,862 | `src/python/tmpl/report_template.html` |
 | 辅助脚本 | Python | 12 | 3,743 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **191** | **48,426** | 主程序 + 模板 + 脚本 |
+| **源代码合计** | — | **195** | **48,476** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **217** | **58,699** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **3,786 个** | `pytest --collect-only` 统计 |
 | **用户文档** | Markdown | **98** | — | `docs-stm/`（96 文件）+ `README.md` + `CLAUDE.md` |
@@ -45,7 +45,9 @@ investor-util/
 │   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
 │   │   │   ├── _llm_providers.py     #   LLM 提供程序配置解析
 │   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义
-│   │   │   └── _validation.py        #   配置校验函数集
+│   │   │   ├── _validation.py        #   配置校验函数集
+│   │   │   ├── anonymizer.py         #   匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
+│   │   │   └── features.py           #   Feature Flag 注册中心（开关集中管理，含默认值与运行时控制，持久化到 data/config/features.json）
 │   │   │
 │   │   ├── fetcher/                  # 数据获取调度
 │   │   │   ├── __init__.py           #   子包标记
@@ -183,32 +185,39 @@ investor-util/
 │   │   ├── tmpl/                     # HTML 报告模板
 │   │   │   └── report_template.html  #   Jinja2 HTML 报告主模板
 │   │   │
-│   │   ├── tui.py                    # 程序入口 + TUI 主循环
-│   │   ├── cli.py                    # 程序入口 + CLI 命令行模式（argparse + 共享层路由）
-│   │   ├── tui_keys.py               # 终端键盘输入封装
-│   │   ├── tui_menu.py               # TUI 菜单系统
-│   │   ├── tui_handlers.py           # TUI 键盘/事件处理
-│   │   ├── handlers_report.py        # 报告生成命令处理器
-│   │   ├── handlers_cache.py         # 缓存管理命令处理器
-│   │   ├── handlers_check_sources.py #     数据源健康检查命令处理器
-│   │   ├── handlers_config.py        # 配置管理命令处理器
-│   │   ├── registry.py               # 中央注册表（模块/TTL/分组定义）
-│   │   ├── provider_registry.py      # 数据源注册中心（熔断器/会话缓存）
-│   │   ├── _breaker_state.py         # 熔断器状态管理
-│   │   ├── _phase_timeout.py         # 数据获取阶段超时管理
-│   │   ├── _session_cache.py         # 会话缓存管理
-│   │   ├── features.py               # Feature Flag 注册中心（开关集中管理，含默认值与运行时控制，持久化到 data/config/features.json）
-│   │   ├── models.py                 # 数据模型（持仓/行情/基金/新闻）
-│   │   ├── reader.py                 # 持仓 xlsx 文件读取
-│   │   ├── ansi_colors.py            # ANSI 颜色常量（终端输出着色）
-│   │   ├── code_utils.py             # 证券代码/类型判定工具
-│   │   ├── market_hours.py           # 交易时段判断（A股/港股/QDII）
-│   │   ├── perf.py                   # 性能收集（PerfCollector 计时 + 数据源健康检查持久化）
-│   │   ├── anonymizer.py              # 匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
-│   │   ├── circuit_breaker.py         # 统一断路器网关（Provider + LLM 熔断状态查询）
-│   │   ├── http_client.py            # HTTP 客户端（请求/重试/超时）
-│   │   ├── constants.py              # 全局常量/版本号
-│   │   └── logger.py                 # 日志模块（文件+控制台，自动轮转）
+│   │   ├── core/                     # 核心基础设施（从根目录迁入）
+│   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── _phase_timeout.py     #   数据获取阶段超时管理
+│   │   │   ├── _session_cache.py     #   会话缓存管理
+│   │   │   ├── ansi_colors.py        #   ANSI 颜色常量（终端输出着色）
+│   │   │   ├── check_sources.py      #   数据源健康检查命令处理器（CLI/报告共享）
+│   │   │   ├── circuit_breaker.py    #   统一断路器网关（Provider + LLM 熔断状态查询）
+│   │   │   ├── code_utils.py         #   证券代码/类型判定工具
+│   │   │   ├── constants.py          #   全局常量/版本号
+│   │   │   ├── http_client.py        #   HTTP 客户端（请求/重试/超时）
+│   │   │   ├── logger.py             #   日志模块（文件+控制台，自动轮转）
+│   │   │   ├── market_hours.py       #   交易时段判断（A股/港股/QDII）
+│   │   │   ├── models.py             #   数据模型（持仓/行情/基金/新闻）
+│   │   │   ├── perf.py               #   性能收集（PerfCollector 计时 + 数据源健康检查持久化）
+│   │   │   ├── provider_registry.py  #   数据源注册中心（熔断器/会话缓存）
+│   │   │   ├── reader.py             #   持仓 xlsx 文件读取
+│   │   │   └── registry.py           #   中央注册表（模块/TTL/分组定义）
+│   │   │
+│   │   ├── cli/                      # CLI 命令行模式入口（从根目录迁入）
+│   │   │   ├── __init__.py           #   子包标记，re-export cli 符号
+│   │   │   ├── __main__.py           #   python -m 入口
+│   │   │   └── cli.py                #   argparse + 共享层路由
+│   │   │
+│   │   ├── tui/                      # TUI 交互模式入口（从根目录迁入）
+│   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── __main__.py           #   python -m 入口
+│   │   │   ├── handlers_cache.py     #   缓存管理命令处理器
+│   │   │   ├── handlers_config.py    #   配置管理命令处理器
+│   │   │   ├── handlers_report.py    #   报告生成命令处理器
+│   │   │   ├── tui.py                #   主循环入口
+│   │   │   ├── tui_handlers.py       #   键盘/事件处理
+│   │   │   ├── tui_keys.py           #   终端键盘输入封装
+│   │   │   └── tui_menu.py           #   菜单系统
 │   │
 │   └── test/                         # 测试套件
 │       ├── __init__.py               #   包标记（空文件）

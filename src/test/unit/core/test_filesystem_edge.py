@@ -27,15 +27,15 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_core, pytest.mark.edge]
 class TestEncryptedExcelY3(unittest.TestCase):
     """加密 Excel/xlsm 文件处理。"""
 
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_encrypted_xlsx_raises_value_error(self, mock_load):
         """加密 xlsx → 抛出 ValueError。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         import openpyxl
         mock_load.side_effect = openpyxl.utils.exceptions.InvalidFileException(
             "File contains encrypted content"
         )
-        with patch("src.python.reader.os.path.exists", return_value=True):
+        with patch("src.python.core.reader.os.path.exists", return_value=True):
             with self.assertRaises(ValueError) as ctx:
                 read_holdings("encrypted.xlsx")
         self.assertIn("encrypted", str(ctx.exception).lower()
@@ -43,7 +43,7 @@ class TestEncryptedExcelY3(unittest.TestCase):
 
     def test_xlsm_not_listed_as_xlsx(self):
         """xlsm 文件不被 list_xlsx_files 识别（只认 .xlsx）。"""
-        from src.python.reader import list_xlsx_files
+        from src.python.core.reader import list_xlsx_files
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "macro.xlsm")
             with open(fpath, "w"): pass
@@ -59,10 +59,10 @@ class TestHiddenSheetY3(unittest.TestCase):
     """隐藏工作表处理。"""
 
     def setUp(self):
-        from src.python import reader as rdr
+        from src.python.core import reader as rdr
         self.reader = rdr
 
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_hidden_sheet_skipped(self, mock_load):
         """隐藏/非常见工作表 → 跳过不计入 accounts。"""
         mock_wb = MagicMock()
@@ -81,8 +81,8 @@ class TestHiddenSheetY3(unittest.TestCase):
         mock_wb.__getitem__.side_effect = getitem
         mock_load.return_value = mock_wb
 
-        from src.python.reader import get_xlsx_info
-        with patch("src.python.reader.os.path.exists", return_value=True):
+        from src.python.core.reader import get_xlsx_info
+        with patch("src.python.core.reader.os.path.exists", return_value=True):
             info = get_xlsx_info("work.xlsx")
         self.assertIn("证券账户", info["sheet_names"])
         self.assertEqual(info["accounts"], 3)
@@ -97,7 +97,7 @@ class TestCorruptedXlsxY3(unittest.TestCase):
 
     def test_bad_zip_file_raises_value_error(self):
         """非 zip 格式 → ValueError。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         import zipfile
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "bad.xlsx")
@@ -109,7 +109,7 @@ class TestCorruptedXlsxY3(unittest.TestCase):
 
     def test_truncated_xlsx_raises_value_error(self):
         """截断的 xlsx → ValueError。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         import zipfile
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "truncated.xlsx")
@@ -128,11 +128,11 @@ class TestCorruptedXlsxY3(unittest.TestCase):
 class TestUncPathY3(unittest.TestCase):
     """UNC 网络路径处理。"""
 
-    @patch("src.python.reader.openpyxl.load_workbook")
-    @patch("src.python.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
     def test_unc_path_read(self, mock_exists, mock_load):
         """UNC 路径 → 正常传递到 load_workbook。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         unc_path = r"\\server\share\holdings.xlsx"
         mock_exists.return_value = True
         mock_wb = MagicMock()
@@ -145,7 +145,7 @@ class TestUncPathY3(unittest.TestCase):
 
     def test_unc_path_listing(self):
         """UNC 路径目录 → list_xlsx_files 不崩溃。"""
-        from src.python.reader import list_xlsx_files
+        from src.python.core.reader import list_xlsx_files
         # UNC 路径不存在时返回空列表，不崩溃
         result = list_xlsx_files(r"\\nonexistent-server\share")
         self.assertEqual(result, [])
@@ -158,11 +158,11 @@ class TestUncPathY3(unittest.TestCase):
 class TestFileLockedY3(unittest.TestCase):
     """文件被其他进程占用。"""
 
-    @patch("src.python.reader.openpyxl.load_workbook")
-    @patch("src.python.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
     def test_locked_file_permission_error(self, mock_exists, mock_load):
         """文件被占用（PermissionError）→ 转为 ValueError。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         mock_exists.return_value = True
         mock_load.side_effect = PermissionError("被其他程序打开")
         # 当前实现可能直接抛出 PermissionError
@@ -172,11 +172,11 @@ class TestFileLockedY3(unittest.TestCase):
         except (PermissionError, ValueError):
             pass
 
-    @patch("src.python.reader.openpyxl.load_workbook")
-    @patch("src.python.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
     def test_locked_file_oserror(self, mock_exists, mock_load):
         """文件被占用（OSError）→ 不崩溃。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         mock_exists.return_value = True
         mock_load.side_effect = OSError("文件已被其他进程占用")
         try:
@@ -195,7 +195,7 @@ class TestPermissionChangedY3(unittest.TestCase):
 
     def test_readonly_file(self):
         """只读文件 → openpyxl 可读取。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         import openpyxl
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "readonly.xlsx")
@@ -211,10 +211,10 @@ class TestPermissionChangedY3(unittest.TestCase):
             finally:
                 os.chmod(fpath, 0o644)
 
-    @patch("src.python.reader.os.path.exists", return_value=False)
+    @patch("src.python.core.reader.os.path.exists", return_value=False)
     def test_directory_no_permission(self, mock_exists):
         """无权限访问目录 → 返回空列表。"""
-        from src.python.reader import list_xlsx_files
+        from src.python.core.reader import list_xlsx_files
         result = list_xlsx_files("Z:\\nonexistent")
         self.assertEqual(result, [])
 
@@ -228,16 +228,16 @@ class TestLongPathY3(unittest.TestCase):
 
     def test_long_path_listing(self):
         """超长路径 → list_xlsx_files 不崩溃返回空。"""
-        from src.python.reader import list_xlsx_files
+        from src.python.core.reader import list_xlsx_files
         long_path = "C:\\" + "a" * 200 + "\\" + "b" * 50
         result = list_xlsx_files(long_path)
         self.assertEqual(result, [])
 
-    @patch("src.python.reader.openpyxl.load_workbook")
-    @patch("src.python.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
     def test_long_path_read(self, mock_exists, mock_load):
         """超长路径 → 可传递到 load_workbook。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         long_path = "C:\\" + "a" * 150 + "\\holdings.xlsx"
         mock_exists.return_value = True
         mock_wb = MagicMock()
@@ -315,7 +315,7 @@ class TestNullBytesInXlsxY3(unittest.TestCase):
 
     def test_xlsx_with_null_bytes(self):
         """空字节污染 xlsx → 格式错误或正常解析。"""
-        from src.python.reader import read_holdings
+        from src.python.core.reader import read_holdings
         import openpyxl
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "nullbytes.xlsx")

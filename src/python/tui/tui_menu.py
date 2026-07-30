@@ -15,7 +15,7 @@ import os
 import sys
 from collections.abc import Callable
 
-from src.python.ansi_colors import GREEN, RED, RESET, YELLOW
+from src.python.core.ansi_colors import GREEN, RED, RESET, YELLOW
 from src.python.config import get_config, get_llm_config
 
 # 每个菜单项：(快捷键, 显示标签, 回调函数, 是否退出项)
@@ -64,7 +64,7 @@ def print_sep(char: str = "=", width: int = 56) -> None:
 
 def print_header() -> None:
     """打印程序标题头（每次主循环迭代时重绘）。"""
-    from src.python.constants import APP_VERSION
+    from src.python.core.constants import APP_VERSION
 
     print_sep()
     print(f"        个人投资分析报告生成小助手  v{APP_VERSION}")
@@ -137,7 +137,7 @@ def _show_privacy_and_security_status() -> None:
 def _show_llm_config_status() -> None:
     """显示 LLM 配置状态（绿色已配置 / 红色未配置），含多链详细信息。"""
     from src.python.llm.circuit_breaker import get_circuit_status
-    from src.python.registry import get_llm_module_names
+    from src.python.core.registry import get_llm_module_names
 
     llm_config = get_llm_config()
     if llm_config is None:
@@ -182,7 +182,7 @@ def _show_multi_chain_status(llm_config: dict, provider_list: list[dict]) -> Non
     单独提取为函数以保持 _show_llm_config_status 清晰。
     """
     from src.python.llm.circuit_breaker import get_circuit_status
-    from src.python.registry import get_llm_module_names
+    from src.python.core.registry import get_llm_module_names
 
     strategy_raw = llm_config.get("_strategy", "priority")
     strategy_labels = {
@@ -254,7 +254,7 @@ def index_by_key(key: str) -> int | None:
 
 def press_any_key() -> None:
     """等待用户按任意键继续。支持 Ctrl+C 退出。"""
-    from src.python.tui_keys import KEY_CTRL_C, get_key
+    from src.python.tui.tui_keys import KEY_CTRL_C, get_key
 
     print("  按任意键返回菜单...")
     k = get_key()

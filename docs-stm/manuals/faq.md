@@ -28,7 +28,7 @@ A: 请使用支持 UTF-8 的终端（Windows Terminal 或 VS Code 终端），�
 
 **Q: 程序启动时 PowerShell 报"无法加载文件，因为在此系统上禁止运行脚本"？**
 
-A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，再运行 `.\scripts\launch.ps1`。或使用手动方式：`.venv\Scripts\activate` + `python src/python/tui.py`。
+A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，再运行 `.\scripts\launch.ps1`。或使用手动方式：`.venv\Scripts\activate` + `python -m src.python.tui.tui`。
 
 **Q: 需要什么 Python 版本？**
 
@@ -113,7 +113,7 @@ echo 'export VENV_PATH=/data/shared/venvs/investor-util' >> ~/.bashrc && source 
 ```bash
 # Linux（Docker / Jenkins / GitHub Actions）
 /data/shared/venvs/investor-util/bin/python scripts/test_runner.py --mode regression
-/data/shared/venvs/investor-util/bin/python src/python/tui.py
+/data/shared/venvs/investor-util/bin/python -m src.python.tui.tui
 
 # Windows（部署脚本）
 & "D:\shared\venvs\investor-util\Scripts\python.exe" scripts\test_runner.py --mode regression

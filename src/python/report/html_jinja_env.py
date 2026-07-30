@@ -7,7 +7,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from src.python.code_utils import is_qdii_extended
+from src.python.core.code_utils import is_qdii_extended
 
 # ── 路径 & Jinja2 环境 ─────────────────────────────────────
 

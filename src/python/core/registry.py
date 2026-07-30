@@ -6,7 +6,7 @@
   - 消除 config.py / cache.py / constants.py 三处分散维护的遗漏风险
 
 用法：
-  >>> from src.python.registry import get_cache_ttl_defaults
+  >>> from src.python.core.registry import get_cache_ttl_defaults
   >>> ttl_map = get_cache_ttl_defaults()
   >>> ttl_map["price"]
   86400
@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from src.python.constants import CACHE_DAILY, CACHE_MONTHLY, CACHE_TWO_WEEKS, CACHE_WEEKLY
+from src.python.core.constants import CACHE_DAILY, CACHE_MONTHLY, CACHE_TWO_WEEKS, CACHE_WEEKLY
 
 logger = logging.getLogger("invest")
 

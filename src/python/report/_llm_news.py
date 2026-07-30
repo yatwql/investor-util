@@ -20,7 +20,7 @@ def _report_llm_module_results(
     """统一的 LLM 模块结果报告逻辑。"""
     from src.python.llm import FAIL_REASON_DISABLED
     from src.python.llm.prompts import LLM_MODULE_FAILURE
-    from src.python.registry import get_llm_module_name
+    from src.python.core.registry import get_llm_module_name
     from src.python.report.llm_module_info import get_llm_module_failure_reason
 
     _MODULE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep")

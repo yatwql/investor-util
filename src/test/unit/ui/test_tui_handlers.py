@@ -21,11 +21,11 @@ import time as _time_module
 import unittest
 from unittest.mock import MagicMock, patch
 
-import src.python.tui_handlers as _th_module
+import src.python.tui.tui_handlers as _th_module
 
 from src.python.report.progress import _timing_records, Timer as _Timer
 
-from src.python.tui_handlers import (
+from src.python.tui.tui_handlers import (
     execute_item,
     print_error_with_hint,
     print_llm_session_usage,
@@ -370,17 +370,17 @@ class TestExecuteItem(unittest.TestCase):
     def tearDown(self):
         _th_module._busy = False
 
-    @patch("src.python.tui_handlers.MENU_ITEMS")
+    @patch("src.python.tui.tui_handlers.MENU_ITEMS")
     def test_exit_item_calls_exit_app(self, mock_menu):
         """退出项调用 _exit_app。"""
         callback = MagicMock()
         mock_menu.__getitem__.return_value = ("X", "Exit", callback, True)
-        with patch("src.python.tui_menu.exit_app", side_effect=SystemExit(0)):
+        with patch("src.python.tui.tui_menu.exit_app", side_effect=SystemExit(0)):
             with self.assertRaises(SystemExit):
                 execute_item(0)
         callback.assert_not_called()
 
-    @patch("src.python.tui_handlers.MENU_ITEMS")
+    @patch("src.python.tui.tui_handlers.MENU_ITEMS")
     def test_normal_item_calls_callback(self, mock_menu):
         """普通项调用回调函数。"""
         callback = MagicMock()
@@ -388,7 +388,7 @@ class TestExecuteItem(unittest.TestCase):
         execute_item(0)
         callback.assert_called_once()
 
-    @patch("src.python.tui_handlers.MENU_ITEMS")
+    @patch("src.python.tui.tui_handlers.MENU_ITEMS")
     def test_busy_lock_prevents_reentry(self, mock_menu):
         """_busy 锁防止重入。"""
         callback = MagicMock()
@@ -397,7 +397,7 @@ class TestExecuteItem(unittest.TestCase):
         execute_item(0)
         callback.assert_not_called()
 
-    @patch("src.python.tui_handlers.MENU_ITEMS")
+    @patch("src.python.tui.tui_handlers.MENU_ITEMS")
     def test_busy_reset_after_execution(self, mock_menu):
         """执行后 _busy 恢复为 False。"""
         callback = MagicMock()
@@ -405,17 +405,17 @@ class TestExecuteItem(unittest.TestCase):
         execute_item(0)
         self.assertFalse(_th_module._busy)
 
-    @patch("src.python.tui_handlers.MENU_ITEMS")
+    @patch("src.python.tui.tui_handlers.MENU_ITEMS")
     def test_keyboard_interrupt_handled(self, mock_menu):
         """KeyboardInterrupt 被捕获并调用 _press_any_key。"""
         callback = MagicMock(side_effect=KeyboardInterrupt)
         mock_menu.__getitem__.return_value = ("T", "Test", callback, False)
-        with patch("src.python.tui_handlers.press_any_key") as mock_pak:
+        with patch("src.python.tui.tui_handlers.press_any_key") as mock_pak:
             execute_item(0)
             mock_pak.assert_called_once()
         self.assertFalse(_th_module._busy)
 
-    @patch("src.python.tui_handlers.MENU_ITEMS")
+    @patch("src.python.tui.tui_handlers.MENU_ITEMS")
     def test_none_callback_does_not_set_busy(self, mock_menu):
         """callback 为 None 时不设置 _busy。"""
         mock_menu.__getitem__.return_value = ("T", "Test", None, False)
@@ -435,8 +435,8 @@ class TestExecuteItem(unittest.TestCase):
 class TestSelectHoldingsFile(unittest.TestCase):
     """select_holdings_file 文件选择逻辑测试。"""
 
-    @patch("src.python.tui_handlers.refresh_config")
-    @patch("src.python.tui_handlers.get_config_cache")
+    @patch("src.python.tui.tui_handlers.refresh_config")
+    @patch("src.python.tui.tui_handlers.get_config_cache")
     @patch("os.path.exists")
     def test_specific_path_exists(
         self,
@@ -454,10 +454,10 @@ class TestSelectHoldingsFile(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertIn("myfile.xlsx", result)
 
-    @patch("src.python.tui_handlers.refresh_config")
-    @patch("src.python.tui_handlers.get_config_cache")
+    @patch("src.python.tui.tui_handlers.refresh_config")
+    @patch("src.python.tui.tui_handlers.get_config_cache")
     @patch("os.path.exists")
-    @patch("src.python.tui_handlers.list_xlsx_files")
+    @patch("src.python.tui.tui_handlers.list_xlsx_files")
     def test_no_files_found(
         self,
         mock_list: MagicMock,
@@ -478,10 +478,10 @@ class TestSelectHoldingsFile(unittest.TestCase):
         self.assertIsNone(result)
         self.assertIn("未找到", out.getvalue())
 
-    @patch("src.python.tui_handlers.refresh_config")
-    @patch("src.python.tui_handlers.get_config_cache")
+    @patch("src.python.tui.tui_handlers.refresh_config")
+    @patch("src.python.tui.tui_handlers.get_config_cache")
     @patch("os.path.exists")
-    @patch("src.python.tui_handlers.list_xlsx_files")
+    @patch("src.python.tui.tui_handlers.list_xlsx_files")
     def test_single_file_auto_select(
         self,
         mock_list: MagicMock,
@@ -502,11 +502,11 @@ class TestSelectHoldingsFile(unittest.TestCase):
         self.assertEqual(result, "dummy_dir/holdings.xlsx")
         self.assertIn("唯一找到", out.getvalue())
 
-    @patch("src.python.tui_handlers.refresh_config")
-    @patch("src.python.tui_handlers.get_config_cache")
+    @patch("src.python.tui.tui_handlers.refresh_config")
+    @patch("src.python.tui.tui_handlers.get_config_cache")
     @patch("os.path.exists")
-    @patch("src.python.tui_handlers.list_xlsx_files")
-    @patch("src.python.tui_handlers.get_xlsx_info")
+    @patch("src.python.tui.tui_handlers.list_xlsx_files")
+    @patch("src.python.tui.tui_handlers.get_xlsx_info")
     @patch("os.path.getsize")
     @patch("os.path.getmtime")
     @patch("builtins.input")
@@ -535,11 +535,11 @@ class TestSelectHoldingsFile(unittest.TestCase):
         result = select_holdings_file()
         self.assertEqual(result, "dummy_dir/b.xlsx")
 
-    @patch("src.python.tui_handlers.refresh_config")
-    @patch("src.python.tui_handlers.get_config_cache")
+    @patch("src.python.tui.tui_handlers.refresh_config")
+    @patch("src.python.tui.tui_handlers.get_config_cache")
     @patch("os.path.exists")
-    @patch("src.python.tui_handlers.list_xlsx_files")
-    @patch("src.python.tui_handlers.get_xlsx_info")
+    @patch("src.python.tui.tui_handlers.list_xlsx_files")
+    @patch("src.python.tui.tui_handlers.get_xlsx_info")
     @patch("os.path.getsize")
     @patch("os.path.getmtime")
     @patch("builtins.input")
@@ -568,11 +568,11 @@ class TestSelectHoldingsFile(unittest.TestCase):
         result = select_holdings_file()
         self.assertIsNone(result)
 
-    @patch("src.python.tui_handlers.refresh_config")
-    @patch("src.python.tui_handlers.get_config_cache")
+    @patch("src.python.tui.tui_handlers.refresh_config")
+    @patch("src.python.tui.tui_handlers.get_config_cache")
     @patch("os.path.exists")
-    @patch("src.python.tui_handlers.list_xlsx_files")
-    @patch("src.python.tui_handlers.get_xlsx_info")
+    @patch("src.python.tui.tui_handlers.list_xlsx_files")
+    @patch("src.python.tui.tui_handlers.get_xlsx_info")
     @patch("os.path.getsize")
     @patch("os.path.getmtime")
     @patch("builtins.input")

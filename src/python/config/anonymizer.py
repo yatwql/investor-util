@@ -9,7 +9,7 @@
   - "summary":         仅显示大类汇总，不展示单条持仓
 
 使用方式：
-  >>> from src.python.anonymizer import anonymize_holdings
+  >>> from src.python.config.anonymizer import anonymize_holdings
   >>> anon = anonymize_holdings(holdings, mode="code_display")
   >>> anon[0].name
   '品种A'
@@ -27,7 +27,7 @@ import logging
 import warnings
 from typing import Any
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 logger = logging.getLogger("invest")
 
@@ -239,7 +239,7 @@ def _categorize_holding(h: Holding) -> str:
     简单回退：代码以 0/3/6 开头且字段齐全按股票处理。
     """
     try:
-        from src.python.code_utils import is_fund_holding
+        from src.python.core.code_utils import is_fund_holding
 
         if is_fund_holding(h.name, h.code, h.account):
             return "基金"
@@ -260,7 +260,7 @@ def _categorize_detail(d: dict[str, Any]) -> str:
     name = d.get("name", "")
     account = d.get("account", "")
     try:
-        from src.python.code_utils import is_fund_holding
+        from src.python.core.code_utils import is_fund_holding
 
         if is_fund_holding(name, code, account):
             return "基金"

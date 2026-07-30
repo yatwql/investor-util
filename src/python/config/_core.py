@@ -14,8 +14,8 @@ from typing import Any
 from src.python.config import _comments, _config_defaults, _llm_providers
 from src.python.config._llm_defaults import _get_default_llm_settings_template
 from src.python.config._llm_providers_defaults import _get_default_llm_providers_template
-from src.python.constants import PROJECT_ROOT
-from src.python.registry import get_known_llm_settings_keys
+from src.python.core.constants import PROJECT_ROOT
+from src.python.core.registry import get_known_llm_settings_keys
 from src.python.config._validation import _absolutize_paths, validate_config
 
 # 从 _llm_providers 模块再导出（保持向后兼容，供测试导入）

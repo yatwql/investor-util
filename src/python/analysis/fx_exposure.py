@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.python.code_utils import get_currency_by_code
+from src.python.core.code_utils import get_currency_by_code
 
 # ── 币种常量 ──────────────────────────────────────────────────
 

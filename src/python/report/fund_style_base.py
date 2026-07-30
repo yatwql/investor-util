@@ -11,7 +11,7 @@ from typing import Any
 
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
-from src.python.code_utils import estimate_market_cap_by_prefix
+from src.python.core.code_utils import estimate_market_cap_by_prefix
 
 logger = logging.getLogger("invest")
 
@@ -50,7 +50,7 @@ def _ensure_tencent_provider_registered() -> None:
     global _tencent_registered
     if _tencent_registered:
         return
-    from src.python.provider_registry import get_registry
+    from src.python.core.provider_registry import get_registry
 
     get_registry().register_provider("tencent_style", tier=4, timeout=15.0)
     _tencent_registered = True

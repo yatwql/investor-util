@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 

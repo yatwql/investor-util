@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report import penetration as pene
 from src.python.report.market_value import DetailRow
 import pytest
@@ -192,7 +192,7 @@ class TestIsBondFund(unittest.TestCase):
     """测试 is_bond_related_by_name。"""
 
     def test_bond_keywords(self):
-        from src.python.code_utils import is_bond_related_by_name
+        from src.python.core.code_utils import is_bond_related_by_name
         for name in [
             "招商鑫福中短债A", "博时安盈短债A", "广发景明中短债A",
             "南方利率债A", "富国信用债A", "某纯债A", "某债券A",
@@ -201,7 +201,7 @@ class TestIsBondFund(unittest.TestCase):
                 self.assertTrue(is_bond_related_by_name(name))
 
     def test_not_bond(self):
-        from src.python.code_utils import is_bond_related_by_name
+        from src.python.core.code_utils import is_bond_related_by_name
         self.assertFalse(is_bond_related_by_name("中欧医疗健康混合"))
         self.assertFalse(is_bond_related_by_name("华夏纳斯达克100ETF(QDII)"))
         self.assertFalse(is_bond_related_by_name("电池ETF"))
@@ -211,7 +211,7 @@ class TestIsIndexLink(unittest.TestCase):
     """测试 is_index_link_by_name。"""
 
     def test_link_keywords(self):
-        from src.python.code_utils import is_index_link_by_name
+        from src.python.core.code_utils import is_index_link_by_name
         for name in [
             "天弘沪深300ETF联接A",
             "天弘沪深300ETF联接",
@@ -222,7 +222,7 @@ class TestIsIndexLink(unittest.TestCase):
                 self.assertTrue(is_index_link_by_name(name))
 
     def test_not_link(self):
-        from src.python.code_utils import is_index_link_by_name
+        from src.python.core.code_utils import is_index_link_by_name
         self.assertFalse(is_index_link_by_name("中欧医疗健康混合"))
         self.assertFalse(is_index_link_by_name("电池ETF"))
         self.assertFalse(is_index_link_by_name("招商鑫福中短债A"))

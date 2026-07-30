@@ -199,7 +199,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
     """_get_industry_avg_pe：行业平均 PE 计算"""
 
     def setUp(self):
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         get_registry().session_cache_clear("extended")
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
@@ -301,7 +301,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
             "000858": {"market_cap": 5e11, "pe": 15.0},
         }
 
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
 
         def _push2_with_memo(code):
             val = push2_data.get(code)
@@ -341,7 +341,7 @@ class TestClassifyFundStyle(unittest.TestCase):
 
     def setUp(self):
         """每个测试前清除 registry session_cache（extended 域），避免跨测试污染。"""
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         get_registry().session_cache_clear("extended")
 
     def test_empty_holdings(self):

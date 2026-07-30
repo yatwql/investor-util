@@ -20,7 +20,7 @@ import unittest
 from typing import Any
 from unittest.mock import MagicMock, call, patch
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report import fund_performance as fp
 from src.python.report import penetration as pene
 from src.python.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT

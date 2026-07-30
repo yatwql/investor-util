@@ -5,7 +5,7 @@ A 股市场当前是否在交易时段。
 
 用法::
 
-    from src.python.market_hours import is_market_open
+    from src.python.core.market_hours import is_market_open
 
     if is_market_open():
         # 盘中，使用短 TTL
@@ -70,7 +70,7 @@ def _fetch_trading_status_from_official() -> int | None:
     Returns:
         交易状态码（0-3），API 失败返回 None
     """
-    from src.python.http_client import make_http_client
+    from src.python.core.http_client import make_http_client
 
     params = {"secid": "1.000001", "fields": "f100,f169"}
     try:

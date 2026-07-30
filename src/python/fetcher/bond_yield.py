@@ -69,7 +69,7 @@ def get_risk_free_rate(cache_ok: bool = True) -> float | None:
                 logger.debug("无风险利率: 缓存值解析失败")
 
     # ── 3. akshare 实时获取（含熔断检查） ──
-    from src.python.provider_registry import get_registry
+    from src.python.core.provider_registry import get_registry
 
     if get_registry().is_circuit_broken("akshare"):
         logger.info("无风险利率: akshare 已被熔断，跳过实时获取")
@@ -123,14 +123,14 @@ def _fetch_from_akshare() -> float | None:
             logger.warning("无风险利率: 获取值 %.4f 超出合理范围（期望 0~1）", rf)
             return None
 
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
 
         get_registry().record_success("akshare")
         logger.info("无风险利率: akshare 获取成功 = %.4f (%s)", rf, latest_row.iloc[0])
         return rf
 
     except Exception as e:
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
 
         get_registry().record_failure("akshare", "bond_yield:transport")
         logger.warning("无风险利率: akshare bond_zh_us_rate 异常: %s", e)

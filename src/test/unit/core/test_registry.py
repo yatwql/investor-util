@@ -4,8 +4,8 @@ from __future__ import annotations
 
 
 
-from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
-from src.python.registry import (
+from src.python.core.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
+from src.python.core.registry import (
     ComputModuleDef,
     DataModuleDef,
     get_computation_module,

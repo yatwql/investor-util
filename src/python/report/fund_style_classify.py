@@ -11,7 +11,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from src.python.code_utils import is_a_share_code
+from src.python.core.code_utils import is_a_share_code
 from src.python.report.fund_style_base import (
     _ensure_tencent_provider_registered,
     _get_size_from_code,
@@ -74,7 +74,7 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
     """
     from src.python.cache import get as _cache_get
     from src.python.cache import set as _cache_set
-    from src.python.constants import CACHE_DAILY
+    from src.python.core.constants import CACHE_DAILY
 
     _key = f"extended_{code}"
     _cached = _cache_get(_key, CACHE_DAILY)
@@ -124,14 +124,14 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
     """
     from src.python.cache import get as _cache_get
     from src.python.cache import set as _cache_set
-    from src.python.constants import CACHE_DAILY
+    from src.python.core.constants import CACHE_DAILY
 
     _key = f"extended_{code}"
     _cached = _cache_get(_key, CACHE_DAILY)
     if _cached is not None:
         return _cached
 
-    from src.python.provider_registry import get_registry
+    from src.python.core.provider_registry import get_registry
 
     reg = get_registry()
     try:
@@ -267,7 +267,7 @@ def _batch_tencent_extended(codes: list[str]) -> dict[str, dict[str, Any]]:
                 results[c] = data
     # 同步写入 registry session_cache（主循环不会重复请求）
     if results:
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
 
         reg = get_registry()
         for c, d in results.items():
@@ -309,7 +309,7 @@ def _classify_stock_styles(
     Returns:
         (stock_styles, size_weights, style_weights, total_weight, has_estimated)
     """
-    from src.python.provider_registry import NOT_FOUND
+    from src.python.core.provider_registry import NOT_FOUND
 
     stock_styles: list[dict[str, Any]] = []
     total_weight = 0.0
@@ -403,7 +403,7 @@ def classify_fund_style(
          "details": [{"name", "code", "size", "style", "ratio", "is_estimated"}, ...]}
     """
     _ensure_tencent_provider_registered()  # 惰性注册（避免模块级副作用）
-    from src.python.provider_registry import get_registry
+    from src.python.core.provider_registry import get_registry
 
     reg = get_registry()
 

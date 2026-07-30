@@ -264,22 +264,22 @@ class TestSslErrorsY1(unittest.TestCase):
 class TestHttpClientSslVerifyY1(unittest.TestCase):
     """SSL_VERIFY 环境变量控制验证策略。"""
 
-    @patch("src.python.http_client.os.getenv")
+    @patch("src.python.core.http_client.os.getenv")
     def test_ssl_verify_false_disables_verification(self, mock_getenv):
         """SSL_VERIFY=false → Client(verify=False)。"""
         mock_getenv.return_value = "false"
         # 重新加载模块级变量
         import importlib
-        import src.python.http_client as hc
+        import src.python.core.http_client as hc
         importlib.reload(hc)
         self.assertFalse(hc._SSL_VERIFY)
 
-    @patch("src.python.http_client.os.getenv")
+    @patch("src.python.core.http_client.os.getenv")
     def test_ssl_verify_default_true(self, mock_getenv):
         """SSL_VERIFY 未设置（默认 true）→ Client(verify=True)。"""
         mock_getenv.return_value = "true"
         import importlib
-        import src.python.http_client as hc
+        import src.python.core.http_client as hc
         importlib.reload(hc)
         self.assertTrue(hc._SSL_VERIFY)
 

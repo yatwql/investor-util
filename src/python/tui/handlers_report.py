@@ -5,16 +5,16 @@
 
 from __future__ import annotations
 
-from src.python.logger import setup_logger
+from src.python.core.logger import setup_logger
 from src.python.report import orchestrator
 from src.python.report.progress import TuiProgressReporter
-from src.python.tui_handlers import (
+from src.python.tui.tui_handlers import (
     finish_report,
     prepare_holdings,
     print_error_with_hint,
     print_llm_session_usage,
 )
-from src.python.tui_menu import get_config_cache
+from src.python.tui.tui_menu import get_config_cache
 
 logger = setup_logger()
 

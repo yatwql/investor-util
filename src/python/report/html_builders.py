@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings, fetch_fund_rankings_batch
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.category import _categorize_holding, calc_yield_text
 from src.python.report.fund_performance import (
     _RATING_COMMENT,
@@ -40,7 +40,7 @@ def _build_category_data(
     dividend_data: dict = {}
     dividend_success = True
     try:
-        from src.python.code_utils import is_a_share_code
+        from src.python.core.code_utils import is_a_share_code
         from src.python.fetcher.akshare import get_dividend_data
 
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]

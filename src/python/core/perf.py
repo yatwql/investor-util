@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from src.python.constants import APP_VERSION, PROJECT_ROOT
+from src.python.core.constants import APP_VERSION, PROJECT_ROOT
 
 logger = logging.getLogger("invest")
 

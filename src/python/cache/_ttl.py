@@ -9,9 +9,9 @@ import hashlib
 import logging
 import time
 
-from src.python.constants import CACHE_DAILY
-from src.python.market_hours import is_market_open as _is_market_open
-from src.python.registry import get_cache_ttl_defaults
+from src.python.core.constants import CACHE_DAILY
+from src.python.core.market_hours import is_market_open as _is_market_open
+from src.python.core.registry import get_cache_ttl_defaults
 
 from ._io import _read_cache_data
 from ._paths import _GZIP_SUFFIX, _cache_path
@@ -90,7 +90,7 @@ def get_cache_age_by_data_type(
 
         return get_cache_age(get_profit_forecast_cache_key())
     # 标准路径：prefix + identifier
-    from src.python.registry import get_registry  # 延迟导入避免循环依赖
+    from src.python.core.registry import get_registry  # 延迟导入避免循环依赖
 
     for module in get_registry():
         if module.data_type == data_type and identifier is not None and module.cache_prefixes:

@@ -25,7 +25,7 @@ from src.python.llm.prompts import (
 )
 from src.python.llm.session import record_per_module
 from src.python.llm.skeleton import generate_llm_module
-from src.python.registry import get_llm_module_name
+from src.python.core.registry import get_llm_module_name
 
 logger = logging.getLogger("invest")
 _MN = get_llm_module_name

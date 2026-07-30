@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 import re
 
-from src.python.code_utils import is_etf_by_name, is_index_link_by_name
-from src.python.models import Holding
+from src.python.core.code_utils import is_etf_by_name, is_index_link_by_name
+from src.python.core.models import Holding
 
 logger = logging.getLogger("invest")
 

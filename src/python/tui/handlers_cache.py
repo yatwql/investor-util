@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import os
 
-from src.python.logger import setup_logger
-from src.python.reader import read_holdings
-from src.python.tui_handlers import print_error_with_hint, select_holdings_file
-from src.python.tui_menu import GREEN, RED, RESET, YELLOW, press_any_key, refresh_config
+from src.python.core.logger import setup_logger
+from src.python.core.reader import read_holdings
+from src.python.tui.tui_handlers import print_error_with_hint, select_holdings_file
+from src.python.tui.tui_menu import GREEN, RED, RESET, YELLOW, press_any_key, refresh_config
 
 logger = setup_logger()
 
@@ -190,7 +190,7 @@ def _cmd_show_cache_stats() -> None:
     from datetime import datetime
 
     from src.python.cache import get_cache_dir
-    from src.python.constants import PROJECT_ROOT
+    from src.python.core.constants import PROJECT_ROOT
 
     cache_dir = get_cache_dir()
 

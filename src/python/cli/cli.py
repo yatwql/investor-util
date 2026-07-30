@@ -16,7 +16,7 @@ _project_root = os.path.dirname(os.path.dirname(_src_dir))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from src.python.constants import APP_VERSION
+from src.python.core.constants import APP_VERSION
 
 # ── 退出码 ───────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ def _show_llm_config_status_cli() -> None:
 
     from src.python.config import get_llm_config
     from src.python.llm.circuit_breaker import get_circuit_status
-    from src.python.registry import get_llm_module_names
+    from src.python.core.registry import get_llm_module_names
 
     llm_config = get_llm_config()
     if llm_config is None:
@@ -194,7 +194,7 @@ def _cli_read_holdings(config: dict) -> list | None:
         )
         return None
 
-    from src.python.reader import list_xlsx_files, read_holdings
+    from src.python.core.reader import list_xlsx_files, read_holdings
 
     # 如果 holdings_filename 实际是一个目录，自动选第一个 xlsx 文件
     if os.path.isdir(filepath):
@@ -314,7 +314,7 @@ def _handle_check_sources() -> int:
     Returns:
         int 退出码（0=全部正常, 1=有告警, 2=有失败）
     """
-    from src.python.handlers_check_sources import run_check_sources
+    from src.python.core.check_sources import run_check_sources
 
     run_check_sources()
     return 2  # unreachable, run_check_sources calls sys.exit
@@ -329,7 +329,7 @@ def main() -> int:
     Returns:
         int 退出码（0=成功, 1=部分失败, 2=严重错误）
     """
-    from src.python.logger import log_app_boundary, setup_logger
+    from src.python.core.logger import log_app_boundary, setup_logger
 
     setup_logger()
     log_app_boundary("启动", "CLI模式")
@@ -353,7 +353,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    from src.python.logger import log_app_boundary
+    from src.python.core.logger import log_app_boundary
 
     try:
         sys.exit(main())

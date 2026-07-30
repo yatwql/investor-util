@@ -7,7 +7,7 @@ import zipfile
 import openpyxl
 from openpyxl.utils.exceptions import InvalidFileException
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 logger = logging.getLogger("invest")
 

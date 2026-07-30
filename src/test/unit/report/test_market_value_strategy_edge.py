@@ -15,8 +15,8 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 
-from src.python.models import Holding
-from src.python.provider_registry import FetchStrategy, get_registry
+from src.python.core.models import Holding
+from src.python.core.provider_registry import FetchStrategy, get_registry
 from src.python.report import market_value as mv
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
@@ -99,7 +99,7 @@ class TestStrategyCircuitBreaker:
 
     @patch("src.python.report.market_value.is_market_open", return_value=True)
     @patch("src.python.report.market_value.fetch_market_data")
-    @patch("src.python.provider_registry.time")
+    @patch("src.python.core.provider_registry.time")
     def test_chain_broken_reads_cache(self, mock_time, mock_fetch, mock_open):
         """交易时段但全链熔断，A 股持仓走缓存。"""
         _setup_registry()

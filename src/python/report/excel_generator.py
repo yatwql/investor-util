@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.python.logger import setup_logger
-from src.python.registry import get_report_section_order
+from src.python.core.logger import setup_logger
+from src.python.core.registry import get_report_section_order
 from src.python.report.excel_b_series import write_b_series_sheets
 from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_llm_usage import write_llm_section_and_usage

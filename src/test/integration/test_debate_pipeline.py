@@ -45,7 +45,7 @@ class TestDebatePipelineBackwardCompat(unittest.TestCase):
     """所有 Flag 关闭时输出 8 元组（不含 debate_info）。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
-    @patch("src.python.features.is_feature_enabled")
+    @patch("src.python.config.features.is_feature_enabled")
     @patch("src.python.llm.generators_orchestrator._precheck_all_modules")
     def test_all_flags_off_returns_8tuple(
         self,
@@ -83,7 +83,7 @@ class TestDebatePipelineProconEnabled(unittest.TestCase):
     """正反辩论启用时 debate_info 正确返回。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
-    @patch("src.python.features.is_feature_enabled")
+    @patch("src.python.config.features.is_feature_enabled")
     @patch("src.python.llm.generators_orchestrator._precheck_all_modules")
     def test_procon_enabled_returns_debate_info(
         self,
@@ -134,7 +134,7 @@ class TestDebatePipelineSynthesisFallback(unittest.TestCase):
     """正反辩论启用 + debate 全部失败 → 降级普通模式。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
-    @patch("src.python.features.is_feature_enabled")
+    @patch("src.python.config.features.is_feature_enabled")
     @patch("src.python.llm.generators_orchestrator._precheck_all_modules")
     def test_synthesis_none_fallback(
         self,

@@ -20,9 +20,9 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.config import get_config
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 from src.python.fetcher.chain import fetch_with_fallback
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 from src.python.providers.tiantian_holdings import fetch_fund_holdings
 from src.python.providers.tiantian_ranking import fetch_fund_rankings
 
@@ -108,7 +108,7 @@ def fetch_fund_rankings_cached(code: str) -> dict[str, Any] | None:
 
     消除 Excel/HTML 双管线间重复的文件缓存读取。
     """
-    from src.python.provider_registry import NOT_FOUND, get_registry
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     registry = get_registry()
     cached = registry.session_cache_get("fund_rank", code)
@@ -243,7 +243,7 @@ def fetch_fund_holdings_cached(code: str) -> dict[str, Any] | None:
 
     消除多个模块独立调用 fetch_fund_holdings 的冗余文件缓存读取。
     """
-    from src.python.provider_registry import NOT_FOUND, get_registry
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     registry = get_registry()
     cached = registry.session_cache_get("fund_hold", code)

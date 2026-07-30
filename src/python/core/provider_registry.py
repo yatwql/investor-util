@@ -27,8 +27,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from src.python._session_cache import NOT_FOUND, SessionCache, SessionCacheEntry
-from src.python._phase_timeout import _PhaseTimeoutContext, phase_timeout
+from src.python.core._session_cache import NOT_FOUND, SessionCache, SessionCacheEntry
+from src.python.core._phase_timeout import _PhaseTimeoutContext, phase_timeout
 
 logger = logging.getLogger("invest")
 
@@ -506,7 +506,7 @@ class DataSourceRegistry:
 
         # 检测交易时段
         if market_open is None:
-            from src.python.market_hours import is_market_open
+            from src.python.core.market_hours import is_market_open
 
             try:
                 market_open = is_market_open()

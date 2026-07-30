@@ -52,7 +52,7 @@ def _classify_fund_type(name: str, code: str) -> tuple[str, float]:
 
     # 代码特征识别（通过 code_utils 中心化函数判断）
     code = code.strip().upper()
-    from src.python.code_utils import is_a_share_code, is_hk_stock_code
+    from src.python.core.code_utils import is_a_share_code, is_hk_stock_code
 
     # A 股股票
     if is_a_share_code(code.lower()):

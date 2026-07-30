@@ -4,7 +4,7 @@
 所有开关在注册表中统一声明默认值，支持运行时启用/禁用。
 
 用法：
-  >>> from src.python.features import is_feature_enabled, FEATURE_FLAGS
+  >>> from src.python.config.features import is_feature_enabled, FEATURE_FLAGS
   >>> if is_feature_enabled("llm_global_macro"):
   ...     generate_global_macro()
 
@@ -21,7 +21,7 @@ import tempfile
 import threading
 from typing import Any
 
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
 

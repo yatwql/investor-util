@@ -18,7 +18,7 @@ import unittest
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 

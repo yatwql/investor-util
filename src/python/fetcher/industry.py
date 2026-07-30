@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from src.python.cache import get_ttl
-from src.python.code_utils import is_a_share_code
+from src.python.core.code_utils import is_a_share_code
 from src.python.fetcher.chain import fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
 from src.python.providers.eastmoney_industry import make_push2_request as _make_push2_request
@@ -82,7 +82,7 @@ def fetch_industry_data_cached(code: str) -> dict | None:
 
     消除多个模块独立调用 fetch_industry_data 的冗余文件缓存读取。
     """
-    from src.python.provider_registry import NOT_FOUND, get_registry
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     registry = get_registry()
     cached = registry.session_cache_get("industry", code)

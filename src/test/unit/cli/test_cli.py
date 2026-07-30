@@ -283,7 +283,7 @@ class TestHandleCacheUpdate:
         mock_result.exit_code = 0
 
         with (
-            patch("src.python.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.cache.operations.update_basic_cache", return_value=mock_result),
         ):
             code = _handle_cache_update("basic", {}, MagicMock())
@@ -295,7 +295,7 @@ class TestHandleCacheUpdate:
         mock_result.exit_code = 0
 
         with (
-            patch("src.python.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.cache.operations.update_position_cache", return_value=mock_result),
         ):
             code = _handle_cache_update("position", {}, MagicMock())
@@ -309,7 +309,7 @@ class TestHandleCacheUpdate:
         mock_pos.exit_code = 0
 
         with (
-            patch("src.python.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.cache.operations.update_basic_cache", return_value=mock_basic),
             patch("src.python.cache.operations.update_position_cache", return_value=mock_pos),
         ):
@@ -318,7 +318,7 @@ class TestHandleCacheUpdate:
 
     def test_holdings_none_returns_severe(self):
         """持仓为 None 时返回 _EXIT_SEVERE。"""
-        with patch("src.python.cli._cli_read_holdings", return_value=None):
+        with patch("src.python.cli.cli._cli_read_holdings", return_value=None):
             code = _handle_cache_update("basic", {}, MagicMock())
         assert code == _EXIT_SEVERE
 
@@ -335,10 +335,10 @@ class TestMain:
     def test_report_param_passthrough(self):
         """report 子命令参数正确透传给 _handle_report。"""
         with (
-            patch("src.python.cli._handle_report", return_value=_EXIT_SUCCESS) as mock_report,
+            patch("src.python.cli.cli._handle_report", return_value=_EXIT_SUCCESS) as mock_report,
             patch("src.python.config.init_config"),
             patch("src.python.config.get_config", return_value={}),
-            patch("src.python.logger.setup_logger"),
+            patch("src.python.core.logger.setup_logger"),
         ):
             with patch.object(
                 __import__("sys"), "argv",
@@ -356,10 +356,10 @@ class TestMain:
     def test_cache_param_passthrough(self):
         """cache 子命令参数正确透传给 _handle_cache。"""
         with (
-            patch("src.python.cli._handle_cache", return_value=_EXIT_SUCCESS) as mock_cache,
+            patch("src.python.cli.cli._handle_cache", return_value=_EXIT_SUCCESS) as mock_cache,
             patch("src.python.config.init_config"),
             patch("src.python.config.get_config", return_value={}),
-            patch("src.python.logger.setup_logger"),
+            patch("src.python.core.logger.setup_logger"),
         ):
             with patch.object(
                 __import__("sys"), "argv",

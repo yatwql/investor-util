@@ -19,7 +19,7 @@ import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, patch
 
-from src.python.market_hours import (
+from src.python.core.market_hours import (
 
     _parse_time_to_minutes,
     is_market_open,
@@ -85,79 +85,79 @@ class TestParseTimeToMinutes(unittest.TestCase):
 class TestFetchTradingStatusOfficial(unittest.TestCase):
     """东方财富 push2 API 实时状态获取测试。"""
 
-    @patch("src.python.http_client.make_http_client")
+    @patch("src.python.core.http_client.make_http_client")
     def test_trading(self, mock_make_client):
         """API 返回 f100=1 → 返回 1（交易中）。"""
         mock_client = MagicMock()
         mock_client.get.return_value.json.return_value = {"data": {"f100": 1}}
         mock_make_client.return_value.__enter__.return_value = mock_client
-        from src.python.market_hours import _fetch_trading_status_from_official
+        from src.python.core.market_hours import _fetch_trading_status_from_official
 
         result = _fetch_trading_status_from_official()
         self.assertEqual(result, 1)
 
-    @patch("src.python.http_client.make_http_client")
+    @patch("src.python.core.http_client.make_http_client")
     def test_closed(self, mock_make_client):
         """API 返回 f100=2 → 返回 2（已收盘）。"""
         mock_client = MagicMock()
         mock_client.get.return_value.json.return_value = {"data": {"f100": 2}}
         mock_make_client.return_value.__enter__.return_value = mock_client
-        from src.python.market_hours import _fetch_trading_status_from_official
+        from src.python.core.market_hours import _fetch_trading_status_from_official
 
         result = _fetch_trading_status_from_official()
         self.assertEqual(result, 2)
 
-    @patch("src.python.http_client.make_http_client")
+    @patch("src.python.core.http_client.make_http_client")
     def test_pre_open(self, mock_make_client):
         """API 返回 f100=0 → 返回 0（未开盘）。"""
         mock_client = MagicMock()
         mock_client.get.return_value.json.return_value = {"data": {"f100": 0}}
         mock_make_client.return_value.__enter__.return_value = mock_client
-        from src.python.market_hours import _fetch_trading_status_from_official
+        from src.python.core.market_hours import _fetch_trading_status_from_official
 
         result = _fetch_trading_status_from_official()
         self.assertEqual(result, 0)
 
-    @patch("src.python.http_client.make_http_client")
+    @patch("src.python.core.http_client.make_http_client")
     def test_lunch_break(self, mock_make_client):
         """API 返回 f100=3 → 返回 3（午间休市）。"""
         mock_client = MagicMock()
         mock_client.get.return_value.json.return_value = {"data": {"f100": 3}}
         mock_make_client.return_value.__enter__.return_value = mock_client
-        from src.python.market_hours import _fetch_trading_status_from_official
+        from src.python.core.market_hours import _fetch_trading_status_from_official
 
         result = _fetch_trading_status_from_official()
         self.assertEqual(result, 3)
 
-    @patch("src.python.http_client.make_http_client")
+    @patch("src.python.core.http_client.make_http_client")
     def test_api_timeout_returns_none(self, mock_make_client):
         """API 超时异常 → 返回 None。"""
         mock_client = MagicMock()
         mock_client.get.side_effect = Exception("timeout")
         mock_make_client.return_value.__enter__.return_value = mock_client
-        from src.python.market_hours import _fetch_trading_status_from_official
+        from src.python.core.market_hours import _fetch_trading_status_from_official
 
         result = _fetch_trading_status_from_official()
         self.assertIsNone(result)
 
-    @patch("src.python.http_client.make_http_client")
+    @patch("src.python.core.http_client.make_http_client")
     def test_empty_data_returns_none(self, mock_make_client):
         """API 返回 data 为空 → None。"""
         mock_client = MagicMock()
         mock_client.get.return_value.json.return_value = {"data": None}
         mock_make_client.return_value.__enter__.return_value = mock_client
-        from src.python.market_hours import _fetch_trading_status_from_official
+        from src.python.core.market_hours import _fetch_trading_status_from_official
 
         result = _fetch_trading_status_from_official()
         self.assertIsNone(result)
 
-    @patch("src.python.http_client.make_http_client")
+    @patch("src.python.core.http_client.make_http_client")
     def test_status_missing_returns_none(self, mock_make_client):
         """API 返回 data 缺少 f100 → None。"""
         mock_client = MagicMock()
         mock_client.get.return_value.json.return_value = {"data": {"f169": 12345}}
         mock_make_client.return_value.__enter__.return_value = mock_client
-        from src.python.market_hours import _fetch_trading_status_from_official
+        from src.python.core.market_hours import _fetch_trading_status_from_official
 
         result = _fetch_trading_status_from_official()
         self.assertIsNone(result)
@@ -172,11 +172,11 @@ class TestIsMarketOpenFallback(unittest.TestCase):
     """内置默认值策略测试。"""
 
     def _run(self, mock_dt: datetime) -> bool:
-        with patch("src.python.market_hours.datetime") as mock_datetime:
+        with patch("src.python.core.market_hours.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.timezone = timezone
             mock_datetime.timedelta = timedelta
-            from src.python.market_hours import _is_market_open_fallback
+            from src.python.core.market_hours import _is_market_open_fallback
 
             current_min = mock_dt.hour * 60 + mock_dt.minute
             return _is_market_open_fallback(current_min)
@@ -259,7 +259,7 @@ class TestIsMarketOpenConfig(unittest.TestCase):
     def test_no_config_returns_none(self, mock_get_config):
         """未配置 market_hours → None。"""
         mock_get_config.return_value = {}
-        from src.python.market_hours import _is_market_open_config
+        from src.python.core.market_hours import _is_market_open_config
         result = _is_market_open_config(600)
         self.assertIsNone(result)
 
@@ -267,12 +267,12 @@ class TestIsMarketOpenConfig(unittest.TestCase):
     def test_partial_config_returns_none(self, mock_get_config):
         """配置不完整（缺 end）→ None。"""
         mock_get_config.return_value = {"market_hours": {"start": "09:30"}}
-        from src.python.market_hours import _is_market_open_config
+        from src.python.core.market_hours import _is_market_open_config
         result = _is_market_open_config(600)
         self.assertIsNone(result)
 
     @patch("src.python.config.get_config")
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_config_in_range_no_lunch(self, mock_dt_datetime, mock_get_config):
         """配置 09:00-17:00，09:30 → True（午餐仍排除）。"""
         mock_get_config.return_value = {"market_hours": {"start": "09:00", "end": "17:00"}}
@@ -280,12 +280,12 @@ class TestIsMarketOpenConfig(unittest.TestCase):
         mock_dt_datetime.now.return_value = fake_now
         mock_dt_datetime.timezone = timezone
         mock_dt_datetime.timedelta = timedelta
-        from src.python.market_hours import _is_market_open_config
+        from src.python.core.market_hours import _is_market_open_config
         result = _is_market_open_config(570)
         self.assertTrue(result)
 
     @patch("src.python.config.get_config")
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_config_lunch_still_excluded(self, mock_dt_datetime, mock_get_config):
         """配置 09:00-17:00，12:00 → False（午餐排除）。"""
         mock_get_config.return_value = {"market_hours": {"start": "09:00", "end": "17:00"}}
@@ -293,12 +293,12 @@ class TestIsMarketOpenConfig(unittest.TestCase):
         mock_dt_datetime.now.return_value = fake_now
         mock_dt_datetime.timezone = timezone
         mock_dt_datetime.timedelta = timedelta
-        from src.python.market_hours import _is_market_open_config
+        from src.python.core.market_hours import _is_market_open_config
         result = _is_market_open_config(720)
         self.assertFalse(result)
 
     @patch("src.python.config.get_config")
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_config_weekend_returns_false(self, mock_dt_datetime, mock_get_config):
         """配置 09:00-17:00，周六 → False。"""
         mock_get_config.return_value = {"market_hours": {"start": "09:00", "end": "17:00"}}
@@ -306,7 +306,7 @@ class TestIsMarketOpenConfig(unittest.TestCase):
         mock_dt_datetime.now.return_value = fake_now
         mock_dt_datetime.timezone = timezone
         mock_dt_datetime.timedelta = timedelta
-        from src.python.market_hours import _is_market_open_config
+        from src.python.core.market_hours import _is_market_open_config
         result = _is_market_open_config(600)
         self.assertFalse(result)
 
@@ -314,7 +314,7 @@ class TestIsMarketOpenConfig(unittest.TestCase):
     def test_invalid_time_format_returns_none(self, mock_get_config):
         """配置中时间格式无效 → None。"""
         mock_get_config.return_value = {"market_hours": {"start": "abc", "end": "15:00"}}
-        from src.python.market_hours import _is_market_open_config
+        from src.python.core.market_hours import _is_market_open_config
         result = _is_market_open_config(600)
         self.assertIsNone(result)
 
@@ -327,10 +327,10 @@ class TestIsMarketOpenConfig(unittest.TestCase):
 class TestIsMarketOpen(unittest.TestCase):
     """三层策略编排集成测试。"""
 
-    @patch("src.python.market_hours._is_market_open_config", return_value=True)
-    @patch("src.python.market_hours._is_market_open_official")
-    @patch("src.python.market_hours._is_market_open_fallback")
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours._is_market_open_config", return_value=True)
+    @patch("src.python.core.market_hours._is_market_open_official")
+    @patch("src.python.core.market_hours._is_market_open_fallback")
+    @patch("src.python.core.market_hours.datetime")
     def test_config_takes_precedence_true(
         self, mock_dt, mock_fallback, mock_official, mock_config
     ):
@@ -342,10 +342,10 @@ class TestIsMarketOpen(unittest.TestCase):
         mock_official.assert_not_called()
         mock_fallback.assert_not_called()
 
-    @patch("src.python.market_hours._is_market_open_config", return_value=None)
-    @patch("src.python.market_hours._is_market_open_official", return_value=True)
-    @patch("src.python.market_hours._is_market_open_fallback")
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours._is_market_open_config", return_value=None)
+    @patch("src.python.core.market_hours._is_market_open_official", return_value=True)
+    @patch("src.python.core.market_hours._is_market_open_fallback")
+    @patch("src.python.core.market_hours.datetime")
     def test_official_takes_precedence(
         self, mock_dt, mock_fallback, mock_official, mock_config
     ):
@@ -356,10 +356,10 @@ class TestIsMarketOpen(unittest.TestCase):
         self.assertTrue(is_market_open())
         mock_fallback.assert_not_called()
 
-    @patch("src.python.market_hours._is_market_open_config", return_value=None)
-    @patch("src.python.market_hours._is_market_open_official", return_value=None)
-    @patch("src.python.market_hours._is_market_open_fallback", return_value=True)
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours._is_market_open_config", return_value=None)
+    @patch("src.python.core.market_hours._is_market_open_official", return_value=None)
+    @patch("src.python.core.market_hours._is_market_open_fallback", return_value=True)
+    @patch("src.python.core.market_hours.datetime")
     def test_fallback_used_when_all_others_none(
         self, mock_dt, mock_fallback, mock_official, mock_config
     ):
@@ -370,10 +370,10 @@ class TestIsMarketOpen(unittest.TestCase):
         self.assertTrue(is_market_open())
         mock_fallback.assert_called_once()
 
-    @patch("src.python.market_hours._is_market_open_config", return_value=False)
-    @patch("src.python.market_hours._is_market_open_official")
-    @patch("src.python.market_hours._is_market_open_fallback")
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours._is_market_open_config", return_value=False)
+    @patch("src.python.core.market_hours._is_market_open_official")
+    @patch("src.python.core.market_hours._is_market_open_fallback")
+    @patch("src.python.core.market_hours.datetime")
     def test_config_false_short_circuits(
         self, mock_dt, mock_fallback, mock_official, mock_config
     ):
@@ -385,10 +385,10 @@ class TestIsMarketOpen(unittest.TestCase):
         mock_official.assert_not_called()
         mock_fallback.assert_not_called()
 
-    @patch("src.python.market_hours._is_market_open_config", side_effect=Exception("boom"))
-    @patch("src.python.market_hours._is_market_open_official")
-    @patch("src.python.market_hours._is_market_open_fallback")
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours._is_market_open_config", side_effect=Exception("boom"))
+    @patch("src.python.core.market_hours._is_market_open_official")
+    @patch("src.python.core.market_hours._is_market_open_fallback")
+    @patch("src.python.core.market_hours.datetime")
     def test_exception_returns_false(
         self, mock_dt, mock_fallback, mock_official, mock_config
     ):
@@ -449,14 +449,14 @@ class TestUtcTimezoneConsistency(unittest.TestCase):
         )
         # 直接调整 weekday（更精确）
         from datetime import timezone as dt_tz, timedelta as dt_td
-        with patch("src.python.market_hours.datetime") as mock_dt:
+        with patch("src.python.core.market_hours.datetime") as mock_dt:
             # 模拟系统 datetime.now() 返回带系统时区偏移的时间
             mock_dt.now.return_value = target_system_dt
             mock_dt.timezone = dt_tz
             mock_dt.timedelta = dt_td
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
-            from src.python.market_hours import is_market_open as _imo
+            from src.python.core.market_hours import is_market_open as _imo
             return _imo()
 
     def _call_is_market_open_at_beijing_time(
@@ -464,8 +464,8 @@ class TestUtcTimezoneConsistency(unittest.TestCase):
         system_offset: int = 8
     ) -> bool:
         """简化的北京时间测试辅助方法。"""
-        from src.python.market_hours import _is_market_open_fallback, _is_market_open_config
-        with patch("src.python.market_hours.datetime") as mock_dt:
+        from src.python.core.market_hours import _is_market_open_fallback, _is_market_open_config
+        with patch("src.python.core.market_hours.datetime") as mock_dt:
             # 构造北京时间的时间对象
             beijing_dt = datetime(
                 2026, 7, 6 + weekday, hour, minute,
@@ -486,16 +486,16 @@ class TestUtcTimezoneConsistency(unittest.TestCase):
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
-            from src.python.market_hours import is_market_open
+            from src.python.core.market_hours import is_market_open
 
             return is_market_open()
 
     def setUp(self):
         # 确保 config 层不干预
-        self._cfg_patcher = patch("src.python.market_hours._is_market_open_config",
+        self._cfg_patcher = patch("src.python.core.market_hours._is_market_open_config",
                                    return_value=None)
         self._cfg_patcher.start()
-        self._official_patcher = patch("src.python.market_hours._is_market_open_official",
+        self._official_patcher = patch("src.python.core.market_hours._is_market_open_official",
                                         return_value=None)
         self._official_patcher.start()
 

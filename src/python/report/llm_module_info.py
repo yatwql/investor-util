@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.python.registry import get_llm_module_names
+from src.python.core.registry import get_llm_module_names
 
 try:
     from src.python.llm import (

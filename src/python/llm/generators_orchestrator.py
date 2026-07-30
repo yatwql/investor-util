@@ -18,7 +18,7 @@ import httpx
 
 from src.python.cache import get as cache_get
 from src.python.config import get_llm_config
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 from src.python.llm.api_base import (
     LLM_TIMEOUT,
     _build_cache_hint_and_record,
@@ -44,7 +44,7 @@ from src.python.llm.prompts import (
     _build_competitive_context_block,
 )
 from src.python.llm.skeleton import is_llm_module_enabled
-from src.python.registry import get_llm_module_name, get_llm_module_names
+from src.python.core.registry import get_llm_module_name, get_llm_module_names
 
 logger = logging.getLogger("invest")
 _MN = get_llm_module_name
@@ -409,7 +409,7 @@ def _dispatch_llm_workers(
     )
 
     # ── 辩论模式路由：替换 expert_review 条目 ─────────────────
-    from src.python.features import is_feature_enabled
+    from src.python.config.features import is_feature_enabled
 
     def _build_debate_mode_combination() -> str:
         """构建当前启用的辩论模式组合标识字符串。
@@ -676,7 +676,7 @@ def generate_all_llm(
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
 
-    from src.python.features import is_feature_enabled
+    from src.python.config.features import is_feature_enabled
 
     needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k)) for k, v in precheck_results.items()}
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.python.code_utils import (
+from src.python.core.code_utils import (
     FUND_ACCOUNT_KEYWORDS,
     is_bond_fund_by_name,
     is_etf_by_name_or_code,

@@ -12,10 +12,10 @@ import contextlib
 import tempfile
 
 from src.python.config import set_config
-from src.python.constants import PROJECT_ROOT
-from src.python.logger import setup_logger
-from src.python.reader import list_xlsx_files
-from src.python.tui_menu import GREEN, RED, RESET, YELLOW, get_config_cache, press_any_key, refresh_config
+from src.python.core.constants import PROJECT_ROOT
+from src.python.core.logger import setup_logger
+from src.python.core.reader import list_xlsx_files
+from src.python.tui.tui_menu import GREEN, RED, RESET, YELLOW, get_config_cache, press_any_key, refresh_config
 
 logger = setup_logger()
 
@@ -232,8 +232,8 @@ def _cmd_config_llm_modules() -> None:
     标准 LLM 模块（1-5）通过 enabled_llm 控制，存储在 llm_settings.json。
     辩论模式增强（6-8）通过 Feature Flag 控制，存储在 features.json。
     """
-    from src.python.features import is_feature_enabled, save_feature_overrides, set_feature_enabled
-    from src.python.registry import get_llm_module_names
+    from src.python.config.features import is_feature_enabled, save_feature_overrides, set_feature_enabled
+    from src.python.core.registry import get_llm_module_names
 
     result = _read_llm_settings()
     if result is None:
@@ -511,7 +511,7 @@ def _cmd_refresh_config() -> None:
 
 def _cmd_config_anonymization_mode() -> None:
     """配置持仓匿名化（关闭/代码显示/完全匿名/汇总）。"""
-    from src.python.anonymizer import (
+    from src.python.config.anonymizer import (
         ANONYMIZATION_MODE_DESCRIPTIONS,
         get_anonymization_mode,
         set_anonymization_mode,

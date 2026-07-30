@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report import category as cat
 from src.python.report.market_value import DetailRow
 import pytest

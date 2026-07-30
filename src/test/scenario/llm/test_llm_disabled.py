@@ -71,7 +71,7 @@ class TestS14LlmDisabled(unittest.TestCase):
         """generate_all_llm 不被调用 → llm_content 为 None。"""
         # 测试 html_writer 在 enable_llm=False 时是否传递 llm_enabled=False 到模板
         from src.python.report.html_writer import write_html_report
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]
 

@@ -14,7 +14,7 @@ import os
 import datetime
 from typing import Any
 
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
 

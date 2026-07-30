@@ -2,7 +2,7 @@
 
 import logging
 
-from src.python.constants import CACHE_DAILY
+from src.python.core.constants import CACHE_DAILY
 
 from ._cleanup import _process_cache_file, cleanup_expired, clean_sensitive
 from ._groups import clear_by_group, clear_by_prefix

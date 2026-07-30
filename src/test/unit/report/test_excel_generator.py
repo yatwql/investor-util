@@ -427,7 +427,7 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
             stack.enter_context(
                 patch("src.python.llm.prompts.LLM_MODULE_FAILURE", module_failure))
             stack.enter_context(
-                patch("src.python.registry.get_llm_module_names",
+                patch("src.python.core.registry.get_llm_module_names",
                       return_value=self._name_map))
             from src.python.report.excel_llm_usage import build_llm_usage_sheet
             build_llm_usage_sheet(self.wb, self.prog)
@@ -672,7 +672,7 @@ class TestCreateSheets(unittest.TestCase):
 
     def test_default_order_uses_default_titles(self):
         """默认 section_order → 标题使用连续重新编号（非注册序号）。"""
-        from src.python.registry import _REPORT_SECTION_DEFAULT
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         # always(6) + history(2) = 8 个页签，连续编号 1-8
@@ -706,7 +706,7 @@ class TestCreateSheets(unittest.TestCase):
 
     def test_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签。"""
-        from src.python.registry import _REPORT_SECTION_DEFAULT
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         # board 层启用 news + data 层 news 可用 → 新闻版块页签应出现

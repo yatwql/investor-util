@@ -149,12 +149,12 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     )
     # perf_history.jsonl 性能历史文件隔离
     monkeypatch.setattr(
-        "src.python.perf._PERF_HISTORY_FILE",
+        "src.python.core.perf._PERF_HISTORY_FILE",
         str(tmp_path / "data/state/perf_history.jsonl"),
     )
     # datasource_health.jsonl 数据源健康检查历史文件隔离
     monkeypatch.setattr(
-        "src.python.perf._HEALTH_CHECK_FILE",
+        "src.python.core.perf._HEALTH_CHECK_FILE",
         str(tmp_path / "data/state/datasource_health.jsonl"),
     )
     # LLM 配置文件隔离
@@ -168,7 +168,7 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(
-        "src.python.constants.HISTORY_SNAPSHOT_DIR",
+        "src.python.core.constants.HISTORY_SNAPSHOT_DIR",
         str(tmp_path / "data/history/snapshots"),
     )
     monkeypatch.setattr(
@@ -194,7 +194,7 @@ def _auto_reset_provider_registry():
     每个测试执行前清空注册信息、熔断状态和会话缓存。
     依赖 provider_registry.get_registry().reset() 而非重新创建实例。
     """
-    from src.python.provider_registry import get_registry
+    from src.python.core.provider_registry import get_registry
     get_registry().reset()
 
 
@@ -206,7 +206,7 @@ def _auto_reset_feature_flags():
     需要特定 feature 状态的测试应自行 mock is_feature_enabled()
     或在测试体内调用 set_feature_enabled()，reset fixture 保证不污染下游。
     """
-    from src.python.features import reset_feature_flags
+    from src.python.config.features import reset_feature_flags
     reset_feature_flags()
 
 
@@ -255,7 +255,7 @@ def _mock_market_hours_api(monkeypatch):
     mock 返回的行情数据，而非真实市场状态。
     """
     monkeypatch.setattr(
-        "src.python.market_hours._is_market_open_official",
+        "src.python.core.market_hours._is_market_open_official",
         lambda _: None,
     )
 

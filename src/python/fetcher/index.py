@@ -14,7 +14,7 @@ from typing import Any
 from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
-from src.python.constants import CACHE_WEEKLY
+from src.python.core.constants import CACHE_WEEKLY
 from src.python.providers import sina, tencent
 
 logger = logging.getLogger("invest")
@@ -228,7 +228,7 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     from src.python.fetcher.chain import fetch_with_incremental_fallback
 
     # 先查会话缓存（C4 约束）
-    from src.python.provider_registry import NOT_FOUND, get_registry
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     reg = get_registry()
     cached = reg.session_cache_get("history_index", code)
@@ -236,7 +236,7 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
         return cached
 
     # 美股指数使用独立 chain（新浪优先，腾讯备用；腾讯 K-line 不支持 gb_* 代码）
-    from src.python.code_utils import is_us_index_code
+    from src.python.core.code_utils import is_us_index_code
 
     chain_name = "history_index_us" if is_us_index_code(code) else "history_index"
     days = min(max(days, 5), 3650)

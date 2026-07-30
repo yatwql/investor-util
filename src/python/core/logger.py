@@ -6,8 +6,8 @@ import socket
 import sys
 from logging.handlers import RotatingFileHandler
 
-from src.python.constants import PROJECT_ROOT
-from src.python.ansi_colors import RED, RESET, YELLOW
+from src.python.core.constants import PROJECT_ROOT
+from src.python.core.ansi_colors import RED, RESET, YELLOW
 
 # 日志文件路径（始终以项目根目录为基准，不受 CWD 影响）
 _LOG_BASE = os.path.join(PROJECT_ROOT, "logs")
@@ -118,7 +118,7 @@ def log_app_boundary(event: str, mode: str) -> None:
         event: "启动" 或 "关闭"
         mode: "CLI模式" 或 "TUI模式"
     """
-    from src.python.constants import APP_VERSION
+    from src.python.core.constants import APP_VERSION
 
     ip = _get_machine_ip()
     logging.getLogger("invest").info(

@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.data_status import DataStatusItem, STATUS_MESSAGES
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]

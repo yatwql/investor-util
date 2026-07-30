@@ -14,8 +14,8 @@ import sys
 import time
 from collections.abc import Callable
 
-from src.python.http_client import make_http_client
-from src.python.logger import setup_logger
+from src.python.core.http_client import make_http_client
+from src.python.core.logger import setup_logger
 
 logger = setup_logger()
 

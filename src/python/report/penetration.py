@@ -26,7 +26,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-from src.python.code_utils import (
+from src.python.core.code_utils import (
     is_a_share_code,
     is_bond_related_by_name,
     is_convertible_bond_by_name,
@@ -37,10 +37,10 @@ from src.python.code_utils import (
     is_otc_fund_by_name,
     is_qdii_extended,
 )
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 from src.python.fetcher.fund import fetch_fund_holdings_batch
 from src.python.fetcher.fund_manager import fetch_fund_manager
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 
 logger = logging.getLogger("invest")

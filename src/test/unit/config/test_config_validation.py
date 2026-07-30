@@ -21,7 +21,7 @@ from unittest.mock import patch
 import pytest
 
 from src.python.config import _validation as val
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 

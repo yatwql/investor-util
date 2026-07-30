@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 
 # ═════════════════════════════════════════════════════════════════════════
@@ -525,7 +525,7 @@ class TestCrossModuleCacheConsistency(unittest.TestCase):
 
     def test_cache_prefix_consistency_price(self):
         """market_value 和 fetcher.price 使用相同缓存前缀。"""
-        from src.python.registry import get_prefix_type_map
+        from src.python.core.registry import get_prefix_type_map
         prefix_map = get_prefix_type_map()
         self.assertIn("price_", prefix_map)
         self.assertEqual(prefix_map["price_"], "price")
@@ -571,8 +571,8 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_all_menu_keys_have_callbacks(self):
         """所有非退出菜单项的 callback 不为 None。"""
-        from src.python.tui import _bind_callbacks
-        from src.python.tui_menu import MENU_ITEMS
+        from src.python.tui.tui import _bind_callbacks
+        from src.python.tui.tui_menu import MENU_ITEMS
 
         _bind_callbacks()
 
@@ -587,7 +587,7 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_menu_key_coverage(self):
         """MENU_ITEMS 包含所有标准功能键。"""
-        from src.python.tui_menu import MENU_ITEMS
+        from src.python.tui.tui_menu import MENU_ITEMS
 
         keys = {item[0] for item in MENU_ITEMS}
         expected = {"E", "P", "B", "L", "C", "F", "O", "I", "A",
@@ -600,7 +600,7 @@ class TestTuiRouting(unittest.TestCase):
         注：前序测试 _bind_callbacks 会绑定真实回调函数到 MENU_ITEMS，
         此处仅验证回调非 None 且可调用，不实际执行防止触发报告生成逻辑。
         """
-        from src.python.tui_menu import MENU_ITEMS
+        from src.python.tui.tui_menu import MENU_ITEMS
 
         # 找到非退出项
         non_exit_idx = next(i for i, item in enumerate(MENU_ITEMS)
@@ -614,11 +614,11 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_bind_callbacks_fills_all_slots(self):
         """_bind_callbacks 后所有菜单项 callback 非 None。"""
-        from src.python.tui import _bind_callbacks
+        from src.python.tui.tui import _bind_callbacks
 
         _bind_callbacks()
 
-        from src.python.tui_menu import MENU_ITEMS
+        from src.python.tui.tui_menu import MENU_ITEMS
         for key, label, callback, is_exit in MENU_ITEMS:
             with self.subTest(key=key, label=label):
                 if is_exit:
@@ -627,7 +627,7 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_menu_sel_navigation(self):
         """菜单选择索引在上下界内。"""
-        from src.python.tui_menu import MENU_ITEMS
+        from src.python.tui.tui_menu import MENU_ITEMS
         sel = 0
         n = len(MENU_ITEMS)
 
@@ -641,11 +641,11 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_keyboard_shortcut_routing(self):
         """字母键直达路由：E → handler_report._cmd_generate_excel。"""
-        from src.python.tui import _bind_callbacks
+        from src.python.tui.tui import _bind_callbacks
 
         _bind_callbacks()
 
-        from src.python.tui_menu import MENU_ITEMS
+        from src.python.tui.tui_menu import MENU_ITEMS
         e_item = next(item for item in MENU_ITEMS if item[0] == "E")
         self.assertIsNotNone(e_item[2])
 
@@ -655,11 +655,11 @@ class TestTuiRouting(unittest.TestCase):
 
     def test_llm_key_routes_to_full_generation(self):
         """L 键路由到 _cmd_generate_full。"""
-        from src.python.tui import _bind_callbacks
+        from src.python.tui.tui import _bind_callbacks
 
         _bind_callbacks()
 
-        from src.python.tui_menu import MENU_ITEMS
+        from src.python.tui.tui_menu import MENU_ITEMS
         l_item = next(item for item in MENU_ITEMS if item[0] == "L")
         cb_name = l_item[2].__name__ if l_item[2] else ""
         self.assertEqual(cb_name, "_cmd_generate_full")

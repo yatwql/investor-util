@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from src.python.logger import setup_logger
+from src.python.core.logger import setup_logger
 from src.python.fetcher.fund import fetch_fund_holdings_cached
 from src.python.report.fund_performance import is_fund
 from src.python.report.progress import ProgressReporter

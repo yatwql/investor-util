@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from openpyxl import Workbook
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.excel_writer import create_workbook, save_workbook
 from src.python.report.excel_generator import generate_excel_report as _generate_excel_report
 

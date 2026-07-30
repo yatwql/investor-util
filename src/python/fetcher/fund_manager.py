@@ -22,7 +22,7 @@ import httpx
 
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 
 logger = logging.getLogger("invest")
 
@@ -386,7 +386,7 @@ def fetch_fund_manager_cached(code: str) -> dict[str, Any] | None:
 
     消除多个模块独立调用 fetch_fund_manager 的冗余文件缓存读取。
     """
-    from src.python.provider_registry import NOT_FOUND, get_registry
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     registry = get_registry()
     cached = registry.session_cache_get("fund_manager", code)

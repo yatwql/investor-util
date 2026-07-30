@@ -11,7 +11,7 @@ from typing import Any
 
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 from src.python.llm.api import call_llm
 from src.python.llm.api_base import LLM_TIMEOUT, TRUNCATION_MARKER
 from src.python.llm.fingerprint import get_cache_ttl_llm

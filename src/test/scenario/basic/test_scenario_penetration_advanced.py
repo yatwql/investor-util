@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 from src.python.report import penetration as pene
 

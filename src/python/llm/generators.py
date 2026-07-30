@@ -38,7 +38,7 @@ from src.python.llm.prompts import (
     _build_health_check_prompt,
     _build_penetration_deep_prompt,
 )
-from src.python.features import is_feature_enabled
+from src.python.config.features import is_feature_enabled
 from src.python.llm._hallucination_filter import _filter_hallucinated_codes, _is_safe_word
 from src.python.llm.skeleton import generate_llm_module
 

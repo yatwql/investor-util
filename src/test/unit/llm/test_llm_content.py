@@ -221,7 +221,7 @@ class TestGetModuleKeyMap(unittest.TestCase):
         self.assertNotIn("news_correlation", result.values())
         self.assertNotIn("llm_usage", result.values())
         # 默认模块排除 2 个 = total - 2
-        from src.python.registry import _REPORT_SECTION_DEFAULT
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT
         self.assertEqual(len(result), len(_REPORT_SECTION_DEFAULT) - 2)
 
     def test_empty_list_falls_back_to_default(self):

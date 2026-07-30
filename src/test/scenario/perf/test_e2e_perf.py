@@ -19,7 +19,7 @@ import pytest
 
 pytestmark = [pytest.mark.scenario_perf]
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 
 logger = logging.getLogger("invest")

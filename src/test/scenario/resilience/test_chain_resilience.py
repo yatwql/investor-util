@@ -23,8 +23,8 @@ import pytest
 
 pytestmark = [pytest.mark.scenario_resilience]
 
-from src.python.circuit_breaker import gateway
-from src.python.provider_registry import get_registry
+from src.python.core.circuit_breaker import gateway
+from src.python.core.provider_registry import get_registry
 
 logger = logging.getLogger("invest")
 

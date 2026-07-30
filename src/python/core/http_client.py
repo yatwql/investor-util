@@ -9,7 +9,7 @@ SSL 验证由环境变量 ``SSL_VERIFY`` 控制（默认 ``true``）：
 
 用法::
 
-    from src.python.http_client import make_http_client
+    from src.python.core.http_client import make_http_client
 
     with make_http_client(timeout=30.0) as client:
         resp = client.get(url)

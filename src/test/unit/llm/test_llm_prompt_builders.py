@@ -169,7 +169,7 @@ class TestBuildHoldingsSummary(unittest.TestCase):
     def test_returns_text_with_holdings(self):
         """从持仓列表生成摘要文本。"""
         from src.python.llm.prompts import _build_holdings_summary
-        from src.python.models import Holding
+        from src.python.core.models import Holding
         holdings = [
             Holding("证券", "长江电力", "600900", 100, 15.0),
             Holding("基金", "易方达中小盘", "110011", 500, 2.0),
@@ -182,7 +182,7 @@ class TestBuildHoldingsSummary(unittest.TestCase):
     def test_with_industry_data(self):
         """行业概念标签嵌入。"""
         from src.python.llm.prompts import _build_holdings_summary
-        from src.python.models import Holding
+        from src.python.core.models import Holding
         holdings = [Holding("证券", "长江电力", "600900", 100, 15.0)]
         industry_data = {
             "600900": {"industry": "电力", "concepts": ["水电", "清洁能源"]},

@@ -21,7 +21,7 @@ def detect_debate_mode(
     Returns:
         (mode_label, mode_combination) 二元组，均可能为 None
     """
-    from src.python.features import is_feature_enabled
+    from src.python.config.features import is_feature_enabled
 
     mode_label: str | None = None
     mode_combination: str | None = None

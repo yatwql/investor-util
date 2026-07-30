@@ -22,7 +22,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 # 各 S0 类已各自标注 @pytest.mark.scenario，模块级不写入 scenario
 # 避免 TestS0cLargeHoldings（无 @pytest.mark.scenario）被意外收集

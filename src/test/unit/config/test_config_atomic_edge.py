@@ -349,12 +349,12 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
 
     def test_no_color_env_suppresses_ansi(self):
         """NO_COLOR 环境变量设置时，_show_llm_config_status 输出不含 ANSI 转义。"""
-        import src.python.tui_menu as tui
+        import src.python.tui.tui_menu as tui
 
         # 模拟非 TTY stdout + NO_COLOR
         with patch("sys.stdout.isatty", return_value=False), \
              patch.dict(os.environ, {"NO_COLOR": "1"}), \
-             patch("src.python.tui_menu.get_llm_config",
+             patch("src.python.tui.tui_menu.get_llm_config",
                    return_value={"api_key": "sk-test", "provider": "claude"}):
             with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
                 tui._show_llm_config_status()
@@ -365,11 +365,11 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
 
     def test_no_color_env_unconfigured_ansi_suppressed(self):
         """NO_COLOR + 未配置 LLM → 输出不含 ANSI 转义。"""
-        import src.python.tui_menu as tui
+        import src.python.tui.tui_menu as tui
 
         with patch("sys.stdout.isatty", return_value=False), \
              patch.dict(os.environ, {"NO_COLOR": "1"}), \
-             patch("src.python.tui_menu.get_llm_config", return_value=None):
+             patch("src.python.tui.tui_menu.get_llm_config", return_value=None):
             with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
                 tui._show_llm_config_status()
                 for call_args, _ in mock_stdout.write.call_args_list:

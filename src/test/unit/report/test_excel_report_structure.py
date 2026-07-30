@@ -129,7 +129,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
     def test_all_titles_follow_number_name_format(self):
         """所有页签标题符合 {number}.{name} 格式。"""
         from src.python.report.excel_sheet_factory import create_sheets
-        from src.python.registry import get_report_section_order
+        from src.python.core.registry import get_report_section_order
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
@@ -151,7 +151,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
     def test_title_numbers_are_unique(self):
         """所有页签标题的数字序号无重复。"""
         from src.python.report.excel_sheet_factory import create_sheets
-        from src.python.registry import get_report_section_order
+        from src.python.core.registry import get_report_section_order
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
@@ -169,7 +169,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
     def test_titles_are_unique(self):
         """所有页签标题字符串无重复。"""
         from src.python.report.excel_sheet_factory import create_sheets
-        from src.python.registry import get_report_section_order
+        from src.python.core.registry import get_report_section_order
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
@@ -200,7 +200,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
     def test_title_order_tracks_section_order(self):
         """页签标题顺序与 section_order 的 number 值排序一致。"""
         from src.python.report.excel_sheet_factory import create_sheets
-        from src.python.registry import get_report_section_order
+        from src.python.core.registry import get_report_section_order
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,

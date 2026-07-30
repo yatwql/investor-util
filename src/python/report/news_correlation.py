@@ -20,8 +20,8 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.models import Holding
-from src.python.registry import get_llm_module_name
+from src.python.core.models import Holding
+from src.python.core.registry import get_llm_module_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,

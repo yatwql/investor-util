@@ -13,7 +13,7 @@ from collections.abc import Callable
 from typing import Any
 
 from src.python.cache import get_ttl
-from src.python.code_utils import is_a_share_code, is_exchange_fund_code, is_otc_code_overlap, is_otc_fund_by_name
+from src.python.core.code_utils import is_a_share_code, is_exchange_fund_code, is_otc_code_overlap, is_otc_fund_by_name
 from src.python.fetcher.chain import fetch_with_fallback
 from src.python.providers import eastmoney, tencent
 from src.python.providers import sina as sina_provider
@@ -125,7 +125,7 @@ def _price_cache_fresh(data: dict) -> bool:
     盘中不验证（短 TTL 已保证实时性）。
     """
     try:
-        from src.python.market_hours import is_market_open as _mh_open
+        from src.python.core.market_hours import is_market_open as _mh_open
         from src.python.report.market_value import get_last_trading_day as _gtd
 
         if _mh_open():
@@ -259,7 +259,7 @@ def fetch_market_data_cached(code: str, expected_name: str = "") -> dict[str, An
 
     消除多个模块独立调用 fetch_market_data 的冗余文件缓存读取。
     """
-    from src.python.provider_registry import NOT_FOUND, get_registry
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     registry = get_registry()
     cached = registry.session_cache_get("price", code)

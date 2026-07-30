@@ -21,7 +21,7 @@ import math
 from datetime import datetime, timedelta
 from unittest.mock import ANY, MagicMock, patch
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.market_value import (
     _compute_detail_row,
     _count_trading_days_back,

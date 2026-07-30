@@ -21,10 +21,10 @@ from typing import Any
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.cache import get_ttl
-from src.python.code_utils import is_fund_holding
+from src.python.core.code_utils import is_fund_holding
 from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings, fetch_fund_rankings_batch
-from src.python.models import Holding
-from src.python.registry import get_report_sheet_name
+from src.python.core.models import Holding
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import (
     STATUS_MESSAGES,
     DataStatus,

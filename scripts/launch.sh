@@ -123,7 +123,7 @@ mkdir -p data/holdings data/cache data/config docs-stm/tmp logs
 trap 'deactivate 2>/dev/null; echo "虚拟环境已退出。"' EXIT
 
 echo "正在启动主程序 ..."
-$PYTHON_CMD src/python/tui.py
+$PYTHON_CMD src/python/tui/tui.py
 if [ $? -ne 0 ]; then
     echo "错误: 程序运行失败。" >&2
     exit 1

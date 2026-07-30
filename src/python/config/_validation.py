@@ -10,8 +10,8 @@ import logging
 import os
 from typing import Any
 
-from src.python.constants import PROJECT_ROOT
-from src.python.registry import get_known_enabled_llm_keys, get_report_section_keys
+from src.python.core.constants import PROJECT_ROOT
+from src.python.core.registry import get_known_enabled_llm_keys, get_report_section_keys
 
 logger = logging.getLogger("invest")
 

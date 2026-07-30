@@ -9,7 +9,7 @@ import logging
 import os
 import time
 
-from src.python.registry import get_exact_type_map, get_prefix_type_map
+from src.python.core.registry import get_exact_type_map, get_prefix_type_map
 
 from ._io import _read_cache_data
 from ._paths import _CACHE_DIR

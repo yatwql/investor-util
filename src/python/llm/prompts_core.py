@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.python.code_utils import is_qdii_extended
+from src.python.core.code_utils import is_qdii_extended
 
 logger = logging.getLogger("invest")
 

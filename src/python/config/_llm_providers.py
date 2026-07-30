@@ -13,7 +13,7 @@ import json
 import logging
 import os
 
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
 

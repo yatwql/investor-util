@@ -26,10 +26,10 @@ class TestUtcTimezoneConsistencyEdge(unittest.TestCase):
 
     def setUp(self):
         # 确保 config 层不干预
-        self._cfg_patcher = patch("src.python.market_hours._is_market_open_config",
+        self._cfg_patcher = patch("src.python.core.market_hours._is_market_open_config",
                                    return_value=None)
         self._cfg_patcher.start()
-        self._official_patcher = patch("src.python.market_hours._is_market_open_official",
+        self._official_patcher = patch("src.python.core.market_hours._is_market_open_official",
                                         return_value=None)
         self._official_patcher.start()
 
@@ -42,7 +42,7 @@ class TestUtcTimezoneConsistencyEdge(unittest.TestCase):
         system_offset: int = 8
     ) -> bool:
         """简化的北京时间测试辅助方法。"""
-        with patch("src.python.market_hours.datetime") as mock_dt:
+        with patch("src.python.core.market_hours.datetime") as mock_dt:
             # 构造北京时间的时间对象
             beijing_dt = datetime(
                 2026, 7, 6 + weekday, hour, minute,
@@ -62,12 +62,12 @@ class TestUtcTimezoneConsistencyEdge(unittest.TestCase):
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
-            from src.python.market_hours import is_market_open
+            from src.python.core.market_hours import is_market_open
             return is_market_open()
 
     def _call_midday_break_at_beijing_time(self, hour, minute, weekday=1, system_offset=8):
         """在指定系统时区下调用 is_midday_break() 辅助方法。"""
-        with patch("src.python.market_hours.datetime") as mock_dt:
+        with patch("src.python.core.market_hours.datetime") as mock_dt:
             beijing_dt = datetime(
                 2026, 7, 6 + weekday, hour, minute,
                 tzinfo=timezone(timedelta(hours=8))
@@ -83,7 +83,7 @@ class TestUtcTimezoneConsistencyEdge(unittest.TestCase):
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
-            from src.python.market_hours import is_midday_break
+            from src.python.core.market_hours import is_midday_break
             return is_midday_break()
 
     # ── 系统时区为 JST（UTC+9）─ 与北京同时区方向 ──

@@ -5,7 +5,7 @@ Provider 熔断（provider_registry.py DataSourceRegistry）和
 LLM 熔断（llm/circuit_breaker.py 模块级）共享同一查询入口。
 
 用法:
-    from src.python.circuit_breaker import gateway
+    from src.python.core.circuit_breaker import gateway
 
     # 获取统一状态报告
     status = gateway.summary()
@@ -87,7 +87,7 @@ class CircuitBreakerGateway:
     状态查询和管理接口，消除双熔断器运维复杂度。
 
     用法:
-        >>> from src.python.circuit_breaker import gateway
+        >>> from src.python.core.circuit_breaker import gateway
         >>> status = gateway.summary()  # dict 格式统一报告
         >>> registry = gateway.get("data_source")  # DataSourceRegistry 实例
     """
@@ -106,7 +106,7 @@ class CircuitBreakerGateway:
             或 None（未知名称）
         """
         if name == "data_source":
-            from src.python.provider_registry import get_registry
+            from src.python.core.provider_registry import get_registry
 
             return get_registry()
         if name == "llm":
@@ -150,7 +150,7 @@ class CircuitBreakerGateway:
     @staticmethod
     def _get_provider_status() -> dict[str, dict[str, Any]]:
         """返回所有 Provider 的熔断状态报告。"""
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
 
         return get_registry().generate_status_report()
 

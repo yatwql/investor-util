@@ -21,7 +21,7 @@ from typing import Any
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.fetcher.fund_manager import fetch_fund_manager
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.fund_performance import is_fund
 
 logger = logging.getLogger("invest")

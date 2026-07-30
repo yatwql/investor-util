@@ -206,7 +206,7 @@ class BatchDispatcher:
         """
         if not self._registry:
             try:
-                from src.python.provider_registry import get_registry
+                from src.python.core.provider_registry import get_registry
 
                 self._registry = get_registry()
             except Exception:
@@ -496,7 +496,7 @@ def get_strategy_hook(
     内部使用惰性 import 避免循环依赖（provider_registry → fetcher/batch）。
     """
     try:
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
 
         registry = get_registry()
         # 验证 code_type 是否存在有效策略定义，不存在则返回 None

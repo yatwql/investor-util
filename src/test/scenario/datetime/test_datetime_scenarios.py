@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 
 # ═══════════════════════════════════════════════════════════
@@ -98,7 +98,7 @@ class TestGetTtlMarketAware:
         self._mock_is_open.return_value = is_open
         self._setup_config(market_hour_aware=aware, cache_ttl=cache_ttl)
         if expected == "__CACHE_DAILY__":
-            from src.python.constants import CACHE_DAILY
+            from src.python.core.constants import CACHE_DAILY
 
             expected = CACHE_DAILY
         from src.python.cache import get_ttl
@@ -121,7 +121,7 @@ class TestIsMiddayBreak(unittest.TestCase):
 
     def _run_at(self, hour: int, minute: int, weekday: int = 0) -> bool:
         """在 mock 的北京时间下调用 is_midday_break。"""
-        with patch("src.python.market_hours.datetime") as mock_dt:
+        with patch("src.python.core.market_hours.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(
                 2026, 7, 6 + weekday, hour, minute,
                 tzinfo=timezone(timedelta(hours=8)),
@@ -129,7 +129,7 @@ class TestIsMiddayBreak(unittest.TestCase):
             mock_dt.timezone = timezone
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
-            from src.python.market_hours import is_midday_break
+            from src.python.core.market_hours import is_midday_break
             return is_midday_break()
 
     def test_morning_session(self):

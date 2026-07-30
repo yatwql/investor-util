@@ -138,7 +138,7 @@ New-Item -ItemType Directory -Force -Path "logs" | Out-Null
 # 6. 启动主程序
 Write-Host "正在启动主程序 ..."
 try {
-    & $pythonCmd src\python\tui.py
+    & $pythonCmd src\python\tui\tui.py
 } catch {
     Write-Host "错误: 程序运行失败: $_" -ForegroundColor Red
 }

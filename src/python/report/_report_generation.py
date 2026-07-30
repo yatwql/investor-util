@@ -24,7 +24,7 @@ def _spawn_health_checks(holdings: list) -> object | None:
     try:
         from concurrent.futures import ThreadPoolExecutor
 
-        from src.python.handlers_check_sources import run_health_checks
+        from src.python.core.check_sources import run_health_checks
 
         pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="orch_health")
         fut = pool.submit(run_health_checks)
@@ -50,7 +50,7 @@ def _collect_health_checks(
         results = health_future.result(timeout=30)
         if not results:
             return
-        from src.python.perf import save_health_check_snapshot
+        from src.python.core.perf import save_health_check_snapshot
 
         save_health_check_snapshot(results, report_type=report_type, holdings_count=len(holdings))
 
@@ -351,8 +351,8 @@ def _generate_report_both(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import is_enable_b_series, is_enable_history, is_enable_news
-    from src.python.perf import PerfCollector
-    from src.python.registry import get_report_section_order
+    from src.python.core.perf import PerfCollector
+    from src.python.core.registry import get_report_section_order
     from src.python.report._snapshot import capture_snapshot, fetch_history_data
     from src.python.report.excel_generator import generate_excel_report
     from src.python.report.html_writer import write_html_report
@@ -477,8 +477,8 @@ def _generate_report_full(
     """
     from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
     from src.python.fetcher.akshare import get_sector_fund_flow
-    from src.python.perf import PerfCollector
-    from src.python.registry import get_report_section_order
+    from src.python.core.perf import PerfCollector
+    from src.python.core.registry import get_report_section_order
     from src.python.report._llm_news import _fetch_llm_and_news
     from src.python.report._snapshot import capture_snapshot
     from src.python.report.orchestrator import ReportResult, prepare_report_data

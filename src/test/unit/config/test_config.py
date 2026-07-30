@@ -19,7 +19,7 @@ import unittest
 from unittest.mock import patch
 
 from src.python import config as cfg
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 

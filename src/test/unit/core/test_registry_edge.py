@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.python.registry import (
+from src.python.core.registry import (
     get_report_section_order,
     _REPORT_SECTION_DEFAULT,
 )
