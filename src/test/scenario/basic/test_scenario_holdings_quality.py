@@ -224,8 +224,8 @@ class TestS0bSameFundACClass(unittest.TestCase):
                                         "ratio": 16.0}],
                       },
                   }),
-            patch("src.python.report.penetration._enrich_with_industry_api",
-                  return_value=(True, "")),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data",
+                  return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
 
@@ -277,8 +277,8 @@ class TestS0bSameFundACClass(unittest.TestCase):
                                         "ratio": 16.0}],
                       },
                   }),
-            patch("src.python.report.penetration._enrich_with_industry_api",
-                  return_value=(True, "")),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data",
+                  return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
 

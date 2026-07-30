@@ -151,8 +151,8 @@ class TestPenetrationIndustryRatio(unittest.TestCase):
         ]
 
         with (
-            patch("src.python.report.penetration._enrich_with_industry_api",
-                  return_value=(True, "")),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data",
+                  return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
             top10 = result.get("top10", [])
@@ -626,8 +626,8 @@ class TestPenetrationTop10RatioNormalization(unittest.TestCase):
                       "2026-07-03", "tencent", 10.0, 1000.0, 1.0, "--", 1),
         ]
         with (
-            patch("src.python.report.penetration._enrich_with_industry_api",
-                  return_value=(True, "")),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data",
+                  return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
             self.assertIn("top10_coverage_pct", result["summary"])
@@ -646,8 +646,8 @@ class TestPenetrationTop10RatioNormalization(unittest.TestCase):
                       "2026-07-03", "tencent", 0.0, 0.0, 0.0, "--", 1),
         ]
         with (
-            patch("src.python.report.penetration._enrich_with_industry_api",
-                  return_value=(True, "")),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data",
+                  return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
             top10 = result.get("top10", [])

@@ -62,8 +62,8 @@ class TestSP1DirectStocks(unittest.TestCase):
             source="mock", source_api="tencent",
         )
 
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_stock_classification_count(self, mock_enrich):
         """纯股票 → summary.total_stocks = 3, total_funds = 0。"""
         details = [
@@ -91,8 +91,8 @@ class TestSP1DirectStocks(unittest.TestCase):
         self.assertEqual(sectors.get("长江电力"), "能源资源")
         self.assertEqual(sectors.get("宁德时代"), "新能源")
 
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_stock_ratio_sum_100(self, mock_enrich):
         """纯股票 → 各股占比总和 = 100%。"""
         details = [
@@ -104,8 +104,8 @@ class TestSP1DirectStocks(unittest.TestCase):
         total_ratio = sum(e["ratio_pct"] for e in result["top10"])
         self.assertAlmostEqual(total_ratio, 100.0, places=4)
 
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_stock_sorted_by_mv_desc(self, mock_enrich):
         """纯股票 → TOP10 按市值降序排列。"""
         details = [
@@ -118,8 +118,8 @@ class TestSP1DirectStocks(unittest.TestCase):
         for i in range(1, len(mvs)):
             self.assertGreaterEqual(mvs[i - 1], mvs[i])
 
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_stock_source_direct_holding(self, mock_enrich):
         """纯股票 → 来源标注包含"直接持有"。"""
         details = [
@@ -131,8 +131,8 @@ class TestSP1DirectStocks(unittest.TestCase):
         for entry in result["top10"]:
             self.assertIn("直接持有", entry["sources"])
 
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_stock_no_fund_breakdown(self, mock_enrich):
         """纯股票 → fund_breakdown 为空字符串（无基金）。"""
         details = [
@@ -168,8 +168,8 @@ class TestSP2BondFund(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_bond_classification(self, mock_enrich, mock_batch):
         """债券基金 → unknown_mv=0, failed_funds=0。"""
         mock_batch.return_value = {
@@ -196,8 +196,8 @@ class TestSP2BondFund(unittest.TestCase):
         self.assertEqual(result["summary"]["failed_funds"], 0)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_bond_source_tag(self, mock_enrich, mock_batch):
         """债券基金 → 来源包含"[债券]"标签。"""
         mock_batch.return_value = {
@@ -225,8 +225,8 @@ class TestSP2BondFund(unittest.TestCase):
             self.assertTrue(tag_found, f"{entry['name']} 来源缺少 [债券] 标签")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_bond_mv_attribution(self, mock_enrich, mock_batch):
         """债券基金 → 穿透市值 = 基金市值 × 比例。"""
         mock_batch.return_value = {
@@ -256,8 +256,8 @@ class TestSP2BondFund(unittest.TestCase):
                 self.assertAlmostEqual(entry["mv"], 5000.0 * 0.06, places=1)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_bond_fund_breakdown(self, mock_enrich, mock_batch):
         """债券基金 → fund_breakdown 含"债券1"。"""
         mock_batch.return_value = {
@@ -311,8 +311,8 @@ class TestSP3ETF(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_etf_source_tag(self, mock_enrich, mock_batch):
         """ETF → 来源包含"[ETF]"标签。"""
         mock_batch.return_value = {
@@ -340,8 +340,8 @@ class TestSP3ETF(unittest.TestCase):
             self.assertTrue(tag_found, f"{entry['name']} 来源缺少 [ETF] 标签")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_etf_mv_sorted(self, mock_enrich, mock_batch):
         """ETF → 成分股按市值降序排序。"""
         mock_batch.return_value = {
@@ -375,8 +375,8 @@ class TestSP3ETF(unittest.TestCase):
         self.assertEqual(names[2], "赣锋锂业")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_etf_merged_count(self, mock_enrich, mock_batch):
         """ETF → merged_count = 成分股个数。"""
         mock_batch.return_value = {
@@ -402,8 +402,8 @@ class TestSP3ETF(unittest.TestCase):
         self.assertEqual(result["summary"]["merged_count"], 2)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_foreign_index_etf_classification(self, mock_enrich, mock_batch):
         """基于国外指数的场内ETF（标普500ETF）→ 分类为 ETF 且穿透美股板块映射正确。"""
         mock_batch.return_value = {
@@ -473,8 +473,8 @@ class TestSP4ActiveEquity(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_active_equity_source_tag(self, mock_enrich, mock_batch):
         """主动基金 → 来源包含"[权益]"标签。"""
         mock_batch.return_value = {
@@ -532,8 +532,8 @@ class TestSP4ActiveEquity(unittest.TestCase):
                              f"{entry['name']} 板块应为医药")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_active_equity_mv_attribution(self, mock_enrich, mock_batch):
         """主动基金 → 穿透市值 = 1800 × 比例。"""
         mock_batch.return_value = {

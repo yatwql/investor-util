@@ -126,7 +126,8 @@ class TestScenarioBond(ScenarioTestBase):
 
         from src.python.report.penetration import compute_penetration_top10
 
-        result = compute_penetration_top10(self.holdings, details_list)
+        with patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
+            result = compute_penetration_top10(self.holdings, details_list)
 
         # 债券一般不穿透或穿透结果极少, 只要不崩溃就满足
         self.assertIsNotNone(result)

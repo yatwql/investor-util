@@ -4,11 +4,11 @@
 
 ---
 
-## [0.8.11-dev] - 2026-07-30
+## [0.8.11] - 2026-07-30
 
 ### 修复
 
-- **回归测试：4 个穿透测试 mock 失效** — `compute_penetration_top10` 已重构为 Phase 1(`batch_fetch_industry_data`)/Phase 3(`_apply_industry_data`) 实时 API 流程，旧 mock `_enrich_with_industry_api` 处于死代码路径不再被调用，导致返回真实行业数据覆盖关键字分类。改为 mock `batch_fetch_industry_data` 返回空字典，让 sector 保持关键字分类结果。（`test_penetration_core.py`、`test_scenario_penetration_basic.py`）
+- **dev-verify Phase B 超时** — 旧余 `_enrich_with_industry_api` mock 打在死代码路径上，9 个文件共 36 处穿透测试 mock 失效，每条测试真实请求东方财富 API 10-35s，串行合计 455s 导致 Phase B 300s 超时。全局替换为 `batch_fetch_industry_data` mock + xdist 4 核并行，Phase B 降至 101s，dev-verify 整体 145s。修复文件：`test_scenario_penetration_basic.py`、`test_scenario_penetration_advanced.py`、`test_scenario_penetration_mixed.py`、`test_scenario_penetration_edge.py`、`test_scenario_holdings_quality.py`、`test_scenario_basic_flows.py`、`test_scenario_resilience_flows.py`、`test_penetration.py`、`test_data_integrity.py`、`test_integration_coverage.py`
 - **回归测试：`test_llm_content_none_when_disabled` 顺序依赖失败** — `_render_llm_module_info` 在所有条件下均读取全局 `LLM_MODULE_FAILURE`，前序测试（test_llm_all_fail）设值后污染状态导致 module_disabled 出现非预期值。增加 `patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {})` 隔离。（`test_llm_disabled.py`）
 - **文档引用修复** — testplan.md 中 `test_scenario_penetration.py` 和 `test_cache.py` 引用已拆分的旧文件名，how-to-test-my-code.md 中示例同样引用已删除的 `test_cache.py`；technical.md 中"30 个数据模块"（实际 29）数字错误；folders.md 测试代码行数、脚本行数等统计更新，目录树补充缺失的 `check-history-traces.py`、`test_data_source_matrix.py`、`test_excel_b_series.py`、`test_pipeline_utils.py` 并修复 `batch-parallel-iteration-plan.md` 缩进错位。全部已修正。
 

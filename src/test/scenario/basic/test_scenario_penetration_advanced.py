@@ -48,8 +48,8 @@ class TestSP5QDII(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_qdii_source_tag(self, mock_enrich, mock_batch):
         """QDII → 来源包含"[QDII]"标签。"""
         mock_batch.return_value = {
@@ -79,8 +79,8 @@ class TestSP5QDII(unittest.TestCase):
             self.assertTrue(tag_found, f"{entry['name']} 来源缺少 [QDII] 标签")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_qdii_sector_tech(self, mock_enrich, mock_batch):
         """QDII → 美股板块映射为"科技"。"""
         mock_batch.return_value = {
@@ -109,8 +109,8 @@ class TestSP5QDII(unittest.TestCase):
                              f"{entry['name']} 板块应映射为科技")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_qdii_breakdown(self, mock_enrich, mock_batch):
         """QDII → fund_breakdown 含"QDII"。"""
         mock_batch.return_value = {
@@ -136,8 +136,8 @@ class TestSP5QDII(unittest.TestCase):
         self.assertIn("QDII", result["summary"]["fund_breakdown"])
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_qdii_mv_calculation(self, mock_enrich, mock_batch):
         """QDII → 穿透市值 = 基金市值 × 比例。"""
         mock_batch.return_value = {
@@ -187,8 +187,8 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_qdii_index_source_tag(self, mock_enrich, mock_batch):
         """QDII 指数基金 → 来源含"[QDII]"，fund_breakdown 含"QDII"。"""
         mock_batch.return_value = {
@@ -221,8 +221,8 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
         self.assertIn("QDII", result["summary"]["fund_breakdown"])
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_qdii_index_sorted_by_mv(self, mock_enrich, mock_batch):
         """QDII 指数基金 → TOP10 按市值降序排列。"""
         mock_batch.return_value = {
@@ -252,8 +252,8 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
             self.assertGreaterEqual(mvs[i - 1], mvs[i])
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_qdii_index_5_stocks(self, mock_enrich, mock_batch):
         """QDII 指数基金 → 5 只成分股全部进入 TOP10。"""
         mock_batch.return_value = {
@@ -310,8 +310,8 @@ class TestSP8IndexLink(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_index_link_source_tag(self, mock_enrich, mock_batch):
         """联接基金 → 来源包含"[联接]"标签。"""
         mock_batch.return_value = {
@@ -340,8 +340,8 @@ class TestSP8IndexLink(unittest.TestCase):
             self.assertTrue(tag_found, f"{entry['name']} 来源缺少 [联接] 标签")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_index_link_breakdown(self, mock_enrich, mock_batch):
         """联接基金 → fund_breakdown 含"联接"、merged_count 正确。"""
         mock_batch.return_value = {
@@ -369,8 +369,8 @@ class TestSP8IndexLink(unittest.TestCase):
         self.assertEqual(result["summary"]["merged_count"], 2)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_index_link_many_constituents(self, mock_enrich, mock_batch):
         """联接基金 → 超过 10 只成分股时只取 TOP10。"""
         mock_batch.return_value = {

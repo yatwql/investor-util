@@ -210,6 +210,10 @@ class ScenarioTestBase(unittest.TestCase):
             "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
         }}
 
+        self._ind_patcher = patch("src.python.fetcher.industry.batch_fetch_industry_data",
+                                   return_value={})
+        self._mock_ind = self._ind_patcher.start()
+
         # LLM 相关 mock
         self._llm_config_patcher = patch(
             "src.python.config.get_llm_config",
@@ -220,6 +224,7 @@ class ScenarioTestBase(unittest.TestCase):
     def tearDown(self):
         self._price_patcher.stop()
         self._fund_patcher.stop()
+        self._ind_patcher.stop()
         self._llm_config_patcher.stop()
 
     def _make_holding(self, account: str, name: str, code: str,

@@ -47,8 +47,8 @@ class TestSP6GoldETF(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_gold_etf_all_invalid_ratios(self, mock_enrich, mock_batch):
         """黄金ETF 全为无效比例 → top10 为空、unknown_mv=全值。"""
         mock_batch.return_value = {
@@ -80,8 +80,8 @@ class TestSP6GoldETF(unittest.TestCase):
         self.assertEqual(result["summary"]["failed_funds"], 1)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_gold_etf_mixed_ratios(self, mock_enrich, mock_batch):
         """黄金ETF 混有无效和有效比例 → 只保留有效。"""
         mock_batch.return_value = {

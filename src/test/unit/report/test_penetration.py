@@ -545,7 +545,8 @@ class TestPenetrationEdgeCases(unittest.TestCase):
         holdings = [
             Holding("支付宝", "某混合基金", "001234", 1000, 1.0),
         ]
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch:
+        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
+             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
             mock_batch.return_value = _mock_fund_holdings_batch({
                 "001234": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 5.0},
@@ -592,7 +593,8 @@ class TestPenetrationConcepts(unittest.TestCase):
         ]
         details = [MockDetailRow("561910", 10000.0)]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch:
+        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
+             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
             mock_batch.return_value = {"561910": {
                 "code": "561910", "name": "电池ETF", "date": "2026-03-31",
                 "holdings": [
@@ -614,7 +616,8 @@ class TestPenetrationConcepts(unittest.TestCase):
         ]
         details = [MockDetailRow("561910", 10000.0)]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch:
+        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
+             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
             mock_batch.return_value = {"561910": {
                 "code": "561910", "name": "电池ETF", "date": "2026-03-31",
                 "holdings": [
@@ -680,7 +683,8 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
             self._make_detail("600900", "长江电力", 28.0),
         ]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch:
+        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
+             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
             mock_batch.return_value = {"510300": {
                 "code": "510300", "name": "沪深300ETF",
                 "date": "2026-03-31",
@@ -708,7 +712,8 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
             self._make_detail("600900", "长江电力", 28.0),
         ]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch:
+        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
+             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
             mock_batch.return_value = {"600900": None}
             result = pene.compute_penetration_top10(holdings, details)
         top10 = result.get("top10", [])
@@ -725,7 +730,8 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
         details = [self._make_detail(h.code, h.name, h.cost_price)
                     for h in holdings]
 
-        result = pene.compute_penetration_top10(holdings, details)
+        with patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
+            result = pene.compute_penetration_top10(holdings, details)
         top10 = result.get("top10", [])
         total_ratio = sum(t.get("ratio_pct", 0) for t in top10)
         self.assertLessEqual(total_ratio, 100.0 + 1e-9)
@@ -737,7 +743,8 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
         ]
         details = [self._make_detail("510300", "沪深300ETF", 4.0)]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch:
+        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
+             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
             mock_batch.return_value = {"510300": {
                 "code": "510300", "name": "沪深300ETF",
                 "date": "2026-03-31",
@@ -759,8 +766,9 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
     def _make_detail(self, code: str, market_value: float) -> MockDetailRow:
         return MockDetailRow(code, market_value)
 
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    def test_failed_fund_not_in_top10(self, mock_batch):
+    def test_failed_fund_not_in_top10(self, mock_batch, mock_ind):
         """持仓数据取不到的基金 → 不进入 top10，基金全值计入 unknown_mv。"""
         mock_batch.return_value = {
             "561910": {
@@ -806,8 +814,9 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         # failed_funds 应正确计数
         self.assertEqual(result["summary"]["failed_funds"], 2)
 
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    def test_failed_fund_ratio_not_distorted(self, mock_batch):
+    def test_failed_fund_ratio_not_distorted(self, mock_batch, mock_ind):
         """未穿透的基金不参与总市值计算，ratio_pct 仅基于可识别资产。"""
         mock_batch.return_value = {
             "561910": {
@@ -840,8 +849,9 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         self.assertAlmostEqual(result["summary"]["unknown_mv"], 100000.0, delta=0.02)
         self.assertEqual(result["summary"]["failed_funds"], 1)
 
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    def test_invalid_ratio_filtered(self, mock_batch):
+    def test_invalid_ratio_filtered(self, mock_batch, mock_ind):
         """持仓比例 >100% 的标的应被过滤（如 518880 黄金 ETF API 返回的垃圾数据）。"""
         mock_batch.return_value = {
             "518880": {
@@ -872,8 +882,9 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         self.assertAlmostEqual(result["summary"]["unknown_mv"], 8309.70, delta=0.02)
         self.assertEqual(result["summary"]["failed_funds"], 1)
 
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    def test_mixed_valid_and_invalid_ratios(self, mock_batch):
+    def test_mixed_valid_and_invalid_ratios(self, mock_batch, mock_ind):
         """同一基金混有无效和有效比例 → 只保留有效比例。"""
         mock_batch.return_value = {
             "518880": {

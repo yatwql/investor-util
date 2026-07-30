@@ -56,8 +56,8 @@ class TestSP9MixedAllTypes(unittest.TestCase):
         # 主动基金市值 = 2 * 500 = 1000
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_mixed_classification_counts(self, mock_enrich, mock_batch):
         """混合场景 → total_stocks=1, total_funds=2, fund_breakdown 含"ETF1 + 主动1"。"""
         mock_batch.return_value = {
@@ -112,8 +112,8 @@ class TestSP9MixedAllTypes(unittest.TestCase):
         self.assertIn("主动1", s["fund_breakdown"])
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_mixed_merged_and_sorted(self, mock_enrich, mock_batch):
         """混合场景 → merged_count=4, TOP10 按市值降序。"""
         mock_batch.return_value = {
@@ -168,8 +168,8 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             self.assertGreaterEqual(mvs[i - 1], mvs[i])
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_mixed_same_underlying_merged(self, mock_enrich, mock_batch):
         """混合场景 → 宁德时代跨 ETF 和主动基金合并为一条。"""
         mock_batch.return_value = {
@@ -226,8 +226,8 @@ class TestSP9MixedAllTypes(unittest.TestCase):
         self.assertEqual(len(nd["sources"]), 2)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_mixed_ratio_sum_le_100(self, mock_enrich, mock_batch):
         """混合场景 → 穿透占比总和 ≤ 100%。"""
         mock_batch.return_value = {
@@ -280,8 +280,8 @@ class TestSP9MixedAllTypes(unittest.TestCase):
                              f"TOP10 占比总和 {total_ratio:.2f}% > 100%")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_mixed_sources_have_type_tags(self, mock_enrich, mock_batch):
         """混合场景 → 来源包含正确的类型标签。"""
         mock_batch.return_value = {
@@ -367,8 +367,8 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_cross_holding_dedup(self, mock_enrich, mock_batch):
         """交叉持股 → 贵州茅台只出现一次。"""
         mock_batch.return_value = {
@@ -438,8 +438,8 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
         self.assertEqual(len(mt["sources"]), 3)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_cross_holding_total_mv(self, mock_enrich, mock_batch):
         """交叉持股 → total_mv 等于所有合并市值之和。"""
         mock_batch.return_value = {
@@ -505,8 +505,8 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
                                expected_total, places=1)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.report.penetration._enrich_with_industry_api",
-           return_value=(True, ""))
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
+           return_value={})
     def test_cross_holding_all_sources_present(self, mock_enrich, mock_batch):
         """交叉持股 → 每只基金的来源标签类型正确。"""
         mock_batch.return_value = {
