@@ -170,7 +170,7 @@
 | R-BRK-05 | 同一次会话中跨模块的同一 API 调用结果应共享会话级内存缓存（上限 2000 条/domain） |
 | R-BRK-06 | 熔断冷却时间应采用指数退避策略（60s→300s→900s→3600s），每次失败翻倍递增，成功恢复后重置 |
 | R-BRK-07 | 熔断器状态应跨会话持久化到 `data/state/circuit_breaker.json`，与缓存文件隔离，确保会话重启后熔断记忆恢复 |
-| R-BRK-08 | Provider 级熔断器和数据模块级熔断器应通过统一的网关（`circuit_breaker.py` + `provider_registry.py`）管理，消除双熔断器状态不一致
+| R-BRK-08 | Provider 级熔断器和数据模块级熔断器应通过统一的网关（`core/circuit_breaker.py` + `core/provider_registry.py`）管理，消除双熔断器状态不一致
 
 ### 5.4 新闻获取需求
 

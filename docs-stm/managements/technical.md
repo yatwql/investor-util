@@ -2317,36 +2317,43 @@ investor-util/
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
 │   │   ├── analysis/            # 业务分析计算层（再平衡、量化指标）
-│   │   ├── anonymizer.py        # 持仓匿名化（名称替换/数量模糊/关闭三模式）
-│   │   ├── ansi_colors.py       # ANSI 颜色常量（终端输出着色）
-│   │   ├── cache/               # 缓存引擎子包（8 子模块 + operations + services）
-│   │   ├── circuit_breaker.py   # 统一断路器网关（Provider + LLM 熔断状态查询）
-│   │   ├── cli.py               # CLI 命令行入口（argparse + 共享层直调）
-│   │   ├── code_utils.py        # 代码类型判定中心化
-│   │   ├── config/              # 配置管理子包（_config_defaults / _comments / _core）
-│   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
-│   │   ├── features.py          # 功能开关注册表（28 项 Feature Flag）
-│   │   ├── fetcher/             # 数据获取调度（price/index/fund/fund_manager/industry/chain/akshare/bond_yield/news/history_diff）
-│   │   ├── handlers_cache.py    # TUI 缓存管理命令（薄壳委托 operations）
-│   │   ├── handlers_check_sources.py # 数据源健康检查命令处理器
-│   │   ├── handlers_config.py   # TUI 配置管理命令
-│   │   ├── handlers_report.py   # TUI 报告生成命令（薄壳委托 orchestrator）
-│   │   ├── http_client.py       # HTTP 客户端工厂
-│   │   ├── llm/                 # LLM 集成（编排/骨架/API 路由/提示词/指纹/熔断器等）
-│   │   ├── logger.py            # 日志模块（_ColoredFormatter）
-│   │   ├── market_hours.py      # A 股交易时段判断
-│   │   ├── perf.py               # 性能收集（PerfCollector 计时 + perf_history.jsonl）
-│   │   ├── models.py            # 数据模型
-│   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
+│   │   ├── cache/               # 缓存引擎（TTL/清理/统计/分组/IO）
+│   │   ├── cli/                 # CLI 命令行模式入口（从根目录迁入）
+│   │   │   ├── __init__.py      #   子包标记，re-export cli 符号
+│   │   │   ├── __main__.py      #   python -m 入口
+│   │   │   └── cli.py           #   argparse + 共享层路由
+│   │   ├── config/              # 配置管理（含 features.py + anonymizer.py）
+│   │   ├── core/                # 核心基础设施（从根目录迁入）
+│   │   │   ├── __init__.py      #   子包标记
+│   │   │   ├── ansi_colors.py   #   ANSI 颜色常量
+│   │   │   ├── check_sources.py #   数据源健康检查（CLI/报告共享）
+│   │   │   ├── circuit_breaker.py #  统一断路器网关
+│   │   │   ├── code_utils.py    #   代码类型判定中心化
+│   │   │   ├── constants.py     #   共享常量 + 项目根路径
+│   │   │   ├── http_client.py   #   HTTP 客户端工厂
+│   │   │   ├── logger.py        #   日志模块
+│   │   │   ├── market_hours.py  #   交易时段判断
+│   │   │   ├── models.py        #   数据模型
+│   │   │   ├── perf.py          #   性能收集
+│   │   │   ├── provider_registry.py # 数据源注册中心
+│   │   │   ├── reader.py        #   持仓 Excel 解析
+│   │   │   └── registry.py      #   中央注册表
+│   │   ├── fetcher/             # 数据获取调度
+│   │   ├── llm/                 # LLM 集成
 │   │   ├── providers/           # 数据源提供商（各 API 封装）
-│   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（29 个数据模块 + 18 个报告模块 + 7 个计算模块）
-│   │   ├── report/              # 报告生成（编排器/进度/管线/数据构建器/页签写入器）
-│   │   ├── schemas/             # Pydantic 数据模式（快照等）
-│   │   ├── tui.py               # TUI 入口 + 菜单循环
-│   │   ├── tui_handlers.py      # 菜单通用辅助
-│   │   ├── tui_keys.py          # 键盘输入封装
-│   │   └── tui_menu.py          # 菜单交互
+│   │   ├── report/              # 报告生成
+│   │   ├── schemas/             # 数据模式
+│   │   ├── tmpl/                # HTML 报告模板
+│   │   └── tui/                 # TUI 交互模式入口（从根目录迁入）
+│   │       ├── __init__.py      #   子包标记
+│   │       ├── __main__.py      #   python -m 入口
+│   │       ├── handlers_cache.py #   缓存管理命令
+│   │       ├── handlers_config.py #  配置管理命令
+│   │       ├── handlers_report.py #  报告生成命令
+│   │       ├── tui.py           #   主循环入口
+│   │       ├── tui_handlers.py  #   键盘/事件处理
+│   │       ├── tui_keys.py      #   键盘输入封装
+│   │       └── tui_menu.py      #   菜单交互
 │   └── test/                    # 测试（按标记分组）
 │       ├── conftest.py          # pytest 配置 + 分层标记注册
 │       ├── helpers.py           # 测试辅助工具
@@ -2362,7 +2369,7 @@ investor-util/
 └── CLAUDE.md
 ```
 
-### 附录 B：数据源一览
+### 附录 B### 附录 B：数据源一览
 
 | 用途 | 链路方案 | Provider 文件 |
 |:-----|:---------|:-------------|

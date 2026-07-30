@@ -50,7 +50,7 @@ class DataModuleDef:
 
 ## 注册表结构
 
-见 `registry.py` 中 `_MODULE_REGISTRY: tuple[DataModuleDef, ...]` — 当前包含以下几类：
+见 `core/registry.py` 中 `_MODULE_REGISTRY: tuple[DataModuleDef, ...]` — 当前包含以下几类：
 
 | 分组 | 包含模块 | data_type | TTL | 说明 |
 |------|---------|-----------|:---:|------|
@@ -73,7 +73,7 @@ class DataModuleDef:
 ### 遍历与查询
 
 ```python
-from src.python.registry import get_registry
+from src.python.core.registry import get_registry
 
 registry = get_registry()            # → tuple[DataModuleDef, ...]
 for m in registry:
@@ -83,7 +83,7 @@ for m in registry:
 ### 缓存相关
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_cache_ttl_defaults,          # → dict[data_type → ttl]
     get_prefix_type_map,             # → dict[prefix → data_type]
     get_exact_type_map,              # → dict[exact_key → data_type]
@@ -100,7 +100,7 @@ from src.python.registry import (
 ### LLM 模块名称查询
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_llm_module_name,             # suffix → 中文名称
     get_llm_module_names,            # → dict[suffix → 名称]
 )
@@ -114,7 +114,7 @@ from src.python.registry import (
 ### LLM Settings 键名查询
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_known_llm_settings_keys,     # → set[str]
 )
 ```
@@ -125,7 +125,7 @@ from src.python.registry import (
 ### enabled_llm 子键查询
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_known_enabled_llm_keys,      # → set[str]
 )
 ```
@@ -136,7 +136,7 @@ from src.python.registry import (
 ### 报表排序与页签名称
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_report_sheet_name,           # sheet_key → 中文标题
     get_report_section_order,        # config → list[dict]（含 key/number/type/data_flag 的完整排序列表）
     get_report_section_number,       # key → 当前配置下的序号
@@ -180,7 +180,7 @@ from src.python.registry import (
 ### 计算模块查询
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_computation_registry,        # → tuple[ComputModuleDef, ...]
     get_computation_module,          # module_key → ComputModuleDef | None
 )
@@ -205,7 +205,7 @@ from src.python.registry import (
 | `llm/generators_orchestrator.py` | `get_llm_module_name()`, `get_llm_module_names()` | LLM 调度标签 |
 | `llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架消息映射 |
 | `report/orchestrator.py` | `get_llm_module_name()`, `get_report_section_order()` | 报告生成编排（LLM 模块标签 + 页签排序） |
-| `handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
+| `tui/handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
 | `report/excel_generator.py` | `get_report_section_order()` | Excel 页签排序 |
 | `report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入 |
 | `report/llm_module_info.py` | `get_llm_module_names()` | 构建模块状态/Token用量/费用信息 |
@@ -258,7 +258,7 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 | # | 步骤 | 操作位置 | 产出 |
 |---|------|---------|------|
-| ① | **注册模块定义** | `registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
+| ① | **注册模块定义** | `core/registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
 | ② | **配置 JSON 键组** | `llm_settings.json` | 新增 9~10 个 `{key}_{suffix}` 配置键 |
 | ③ | **实现生成函数** | `llm/generators.py` | 新增生成函数，通过 `_call_llm()` 调用 LLM |
 | ④ | **注册调度入口** | `llm/generators_orchestrator.py` | 在 `_MODULE_FNS` 字典中添加新模块条目（键=settings_suffix，值=lambda 调用新函数）；在 `_compute_module_cache_info()` 中添加对应的指纹计算和 `info` 条目 |
@@ -290,7 +290,7 @@ DataModuleDef("我的固定键", "fixed",
 
 ## 计算模块注册表（_COMPUTATION_REGISTRY）
 
-除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表。
+除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`core/registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表。
 
 ```python
 @dataclass(frozen=True)
