@@ -14,8 +14,9 @@
 | **源代码合计** | — | **193** | **48,173** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **217** | **58,716** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **3,786 个** | `pytest --collect-only` 统计 |
-| **用户文档** | Markdown | **100** | — | 含 README.md + CLAUDE.md |
+| **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
+| **项目文档** | Markdown | **87** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 69 | — | 各版本 changelog/plan/review-findings 等 |
 | ├ plan/ | 中间设计文件 | 6 | — | 当前迭代中的设计方案 |
