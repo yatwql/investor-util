@@ -224,7 +224,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.1 代码类型判定中心化
 
-**决策**：所有资产代码类型判定集中到 `src/python/code_utils.py`，禁止任何模块自行实现判定逻辑。
+**决策**：所有资产代码类型判定集中到 `src/python/core/code_utils.py`，禁止任何模块自行实现判定逻辑。
 
 **动机**：系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落、新增资产类型时需全局搜索替换。
 
@@ -421,7 +421,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 ### 2.2 三层熔断架构
 
-由 `DataSourceRegistry` 单例（`src/python/provider_registry.py`）统一管理，采用**双锁设计**（`_provider_lock` + `_cache_lock`）使熔断操作和会话缓存互不阻塞。
+由 `DataSourceRegistry` 单例（`src/python/core/provider_registry.py`）统一管理，采用**双锁设计**（`_provider_lock` + `_cache_lock`）使熔断操作和会话缓存互不阻塞。
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -848,7 +848,7 @@ _write_atomic(fd, tmp_path, final_path)
 **项目根路径查找**（`constants.py:_find_project_root()`）：
 
 ```
-从 src/python/constants.py 所在目录
+从 src/python/core/constants.py 所在目录
     → 向上逐层搜索 pyproject.toml 或 .git
     → 找到即停，完全不依赖目录树深度
     → 安全上限 20 层，未找到时按当前文件所在目录兜底
@@ -2127,7 +2127,7 @@ load_holdings(filepath)
 
 ### 6.5 代码类型判定中心化
 
-所有资产代码类型判定集中到 `src/python/code_utils.py`，以纯技术原语形式提供。
+所有资产代码类型判定集中到 `src/python/core/code_utils.py`，以纯技术原语形式提供。
 
 #### 原语清单
 

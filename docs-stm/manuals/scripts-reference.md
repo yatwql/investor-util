@@ -215,7 +215,7 @@ python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.json
 
 ### `check-version-consistency.py` — 版本号一致性检查
 
-发布版本前必须运行。检查 `APP_VERSION`（`src/python/constants.py`）与以下文件的版本号是否一致：
+发布版本前必须运行。检查 `APP_VERSION`（`src/python/core/constants.py`）与以下文件的版本号是否一致：
 
 - `README.md`
 - `pyproject.toml`

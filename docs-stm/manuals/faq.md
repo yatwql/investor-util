@@ -236,7 +236,7 @@ A: 需要备份的文件：
 
 **Q: 为什么报告或配置中显示的版本号不是最新的？**
 
-A: 版本号在 `src/python/constants.py` 的 `APP_VERSION` 中定义。发布新版本后，需运行 `python scripts/check-version-consistency.py` 按提示同步所有文件中的版本号（README.md、pyproject.toml、管理文档头部等），确保全局一致。遇到版本号不一致时运行上述脚本即可排查并修复。
+A: 版本号在 `src/python/core/constants.py` 的 `APP_VERSION` 中定义。发布新版本后，需运行 `python scripts/check-version-consistency.py` 按提示同步所有文件中的版本号（README.md、pyproject.toml、管理文档头部等），确保全局一致。遇到版本号不一致时运行上述脚本即可排查并修复。
 
 **Q: 如何配置场外基金的赎回上限？**
 
@@ -671,7 +671,7 @@ A: 复制整个项目目录（含 `data/cache/` 和 `data/config/`）到新电�
 
 A: 日志文件在 `logs/app.log`，DEBUG 级别的详细信息（如 LLM 发出的完整 prompt）已自动写入该文件，查看即可。
 
-如需调整日志输出级别，编辑 `src/python/logger.py`：
+如需调整日志输出级别，编辑 `src/python/core/logger.py`：
 
 | 修改目标 | 找到的代码行 | 改为 |
 |:---------|:-----------|:-----|
