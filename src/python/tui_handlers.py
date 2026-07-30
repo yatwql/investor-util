@@ -22,7 +22,7 @@ from src.python.tui_menu import MENU_ITEMS, get_config_cache, press_any_key, ref
 
 logger = setup_logger()
 
-_busy: bool = False          # 防连续按键保护
+_busy: bool = False  # 防连续按键保护
 _busy_lock = threading.Lock()  # _busy 标志位锁保护
 
 

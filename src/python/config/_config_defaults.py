@@ -128,7 +128,7 @@ def _build_template_from_defaults() -> str:
     parts = [
         "{",
         # ── A ──
-        '  // ── A. 路径与文件 ──',
+        "  // ── A. 路径与文件 ──",
         f'  "holdings_dir": {json.dumps(d["holdings_dir"])},',
         f'  "holdings_filename": {json.dumps(d["holdings_filename"])},',
         f'  "output_dir": {json.dumps(d["output_dir"])},',
@@ -137,58 +137,58 @@ def _build_template_from_defaults() -> str:
         f'  "llm_providers_file": {json.dumps(d["llm_providers_file"])},',
         "",
         # ── B ──
-        '  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──',
+        "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──",
         f'  "enable_b_series": {json.dumps(d["enable_b_series"])},  // 基金深度分析（#6~9）',
         f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#10）',
         f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#16~17）',
         "",
         # ── C ──
-        '  // ── C. 数据源与提供商 ──',
+        "  // ── C. 数据源与提供商 ──",
         f'  "news_top_count": {json.dumps(d["news_top_count"])},',
         f'  "news_sources": {json.dumps(d["news_sources"], ensure_ascii=False)},',
         f'  "preferred_provider": {json.dumps(d["preferred_provider"])},',
         "",
         # ── D ──
-        '  // ── D. 市场时段与缓存 ──',
+        "  // ── D. 市场时段与缓存 ──",
         f'  "market_hour_aware": {json.dumps(d["market_hour_aware"])},',
         f'  "market_hour_ttl": {json.dumps(d["market_hour_ttl"])},',
         f'  "market_hours": {json.dumps(d["market_hours"], indent=2).replace(chr(10), chr(10) + "  ")},',
         f'  "cache_ttl": {json.dumps(d["cache_ttl"], ensure_ascii=False, indent=2).replace(chr(10), chr(10) + "  ")},',
         "",
         # ── E ──
-        '  // ── E. 行为调优 ──',
+        "  // ── E. 行为调优 ──",
         f'  "default_menu_key": {json.dumps(d["default_menu_key"])},',
         f'  "report_section_order": {json.dumps(d["report_section_order"])},',
         f'  "degradation": {json.dumps(d["degradation"], indent=2).replace(chr(10), chr(10) + "  ")},',
         "",
         # ── F ──
-        '  // ── F. 业绩基准与无风险利率 ──',
+        "  // ── F. 业绩基准与无风险利率 ──",
         f'  "risk_free_rate": {json.dumps(d["risk_free_rate"])},',
         f'  "user_fund_benchmarks": {json.dumps(d["user_fund_benchmarks"])},',
         f'  "comparison_indices": {json.dumps(d["comparison_indices"], ensure_ascii=False)},',
         "",
         # ── G ──
-        '  // ── G. 组合历史走势与持仓快照 ──',
+        "  // ── G. 组合历史走势与持仓快照 ──",
         f'  "history": {json.dumps(d["history"], indent=2).replace(chr(10), chr(10) + "  ")},',
         "",
         # ── H ──
-        '  // ── H. 业绩评价配置 ──',
+        "  // ── H. 业绩评价配置 ──",
         f'  "performance_evaluation": {json.dumps(d["performance_evaluation"], indent=2).replace(chr(10), chr(10) + "  ")},',
         "",
         # ── I ──
-        '  // ── I. 再平衡配置 ──',
+        "  // ── I. 再平衡配置 ──",
         f'  "rebalance": {json.dumps(d["rebalance"], indent=2).replace(chr(10), chr(10) + "  ")},',
         "",
         # ── J ──
-        '  // ── J. 流动性配置 ──',
+        "  // ── J. 流动性配置 ──",
         f'  "redemption_limits": {json.dumps(d["redemption_limits"])},',
         "",
         # ── K ──
-        '  // ── K. 匿名化配置 ──',
+        "  // ── K. 匿名化配置 ──",
         f'  "anonymization": {json.dumps(d["anonymization"], indent=2).replace(chr(10), chr(10) + "  ")},',
         "",
         # ── L ──
-        '  // ── L. 批量并行调度 ──',
+        "  // ── L. 批量并行调度 ──",
         f'  "batch": {json.dumps(d["batch"], indent=2).replace(chr(10), chr(10) + "  ")},',
         f'  "batch_rate_limit": {json.dumps(d["batch_rate_limit"], indent=2).replace(chr(10), chr(10) + "  ")}',
         "}",

@@ -45,9 +45,7 @@ _CONTENT_FILTER_RECOVERY = (
 追加到 system prompt 尾部重新请求。"""
 
 
-def _calm_retry(
-    system_prompt: str, user_prompt: str, name: str, do_retry
-) -> tuple[str | None, dict | None]:
+def _calm_retry(system_prompt: str, user_prompt: str, name: str, do_retry) -> tuple[str | None, dict | None]:
     """追加安抚指令后重试一次（空白内容兜底）。
 
     Args:
@@ -421,12 +419,23 @@ def _call_llm_legacy(
     if result is not None:
         if result != "":
             return result, usage, {"name": provider or None, "model": resolved_model, "endpoint": endpoint or ""}
+
         # 空内容 → 安抚重试
         def _legacy_retry(sys: str, usr: str):
             r = call_single_provider(
-                provider, sys, usr, api_key, resolved_model, endpoint,
-                resolved_max_tokens, timeout, max_retries, http_client,
-                config_field, temperature, llm_config,
+                provider,
+                sys,
+                usr,
+                api_key,
+                resolved_model,
+                endpoint,
+                resolved_max_tokens,
+                timeout,
+                max_retries,
+                http_client,
+                config_field,
+                temperature,
+                llm_config,
             )
             return r[0], r[1]
 

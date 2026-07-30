@@ -211,7 +211,11 @@ def _build_perf_data(
 
     result: list[dict[str, Any]] = []
     for idx, fund in enumerate(fund_holdings_sorted, 1):
-        result.append(_build_single_perf_item(idx, fund, detail_map, prog, len(fund_holdings_sorted), prefetched_rankings=prefetched_rankings))
+        result.append(
+            _build_single_perf_item(
+                idx, fund, detail_map, prog, len(fund_holdings_sorted), prefetched_rankings=prefetched_rankings
+            )
+        )
     if result:
         logger.info("基金业绩分析完成，%d 只基金获取成功", len(result))
     else:

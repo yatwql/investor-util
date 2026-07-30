@@ -537,8 +537,6 @@ def individual_volatility(
     return result
 
 
-
-
 # ── 组合 Beta（协方差法） ───────────────────────
 
 

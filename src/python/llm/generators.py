@@ -180,15 +180,18 @@ def generate_expert_review(
     _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
 
     def _fingerprint():
-        return build_llm_fingerprint(
-            total_mv=total_mv,
-            total_cost=total_cost,
-            total_profit=total_profit,
-            total_today_profit=total_today_profit,
-            holdings_details=holdings_details,
-            penetrated_assets=penetrated_assets,
-            categories=categories,
-        ) + _fp_suffix
+        return (
+            build_llm_fingerprint(
+                total_mv=total_mv,
+                total_cost=total_cost,
+                total_profit=total_profit,
+                total_today_profit=total_today_profit,
+                holdings_details=holdings_details,
+                penetrated_assets=penetrated_assets,
+                categories=categories,
+            )
+            + _fp_suffix
+        )
 
     def _prompt():
         return _build_expert_review_prompt(

@@ -79,7 +79,10 @@ def _execute_and_merge_batch(
 
     logger.info(
         "%s [%d/%d] 批处理中 (%d 条)...",
-        _MN(module_key), batch_id + 1, total_batches, len(batch_indices),
+        _MN(module_key),
+        batch_id + 1,
+        total_batches,
+        len(batch_indices),
     )
     batch_client = make_http_client(timeout=LLM_TIMEOUT)
     total_in = 0
@@ -100,8 +103,17 @@ def _execute_and_merge_batch(
         )
         if result and TRUNCATION_MARKER in result:
             result, usage = _handle_truncation(
-                result, usage, max_tokens, system_prompt, user_prompt, llm_config,
-                timeout, batch_client, f"max_tokens_{module_key}", temperature, model,
+                result,
+                usage,
+                max_tokens,
+                system_prompt,
+                user_prompt,
+                llm_config,
+                timeout,
+                batch_client,
+                f"max_tokens_{module_key}",
+                temperature,
+                model,
             )
 
         if result:
@@ -163,7 +175,9 @@ def run_batch_mode(
     total_out = 0
 
     if uncached_indices and batch_prompt_fn and response_parser:
-        batches = [uncached_indices[i : i + _BATCH_CHUNK_SIZE] for i in range(0, len(uncached_indices), _BATCH_CHUNK_SIZE)]
+        batches = [
+            uncached_indices[i : i + _BATCH_CHUNK_SIZE] for i in range(0, len(uncached_indices), _BATCH_CHUNK_SIZE)
+        ]
         logger.info("正在调用 %s（%d 批未缓存，每批最多 %d 条）...", _MN(module_key), len(batches), _BATCH_CHUNK_SIZE)
 
         with ThreadPoolExecutor(max_workers=min(3, len(batches), _BATCH_MAX_WORKERS)) as ex:

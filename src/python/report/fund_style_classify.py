@@ -422,10 +422,17 @@ def classify_fund_style(
 
     # ── 判定阶段：逐只股票读取缓存数据判定风格 ──
     stock_styles, size_weights, style_weights, total_weight, has_estimated = _classify_stock_styles(
-        holdings, reg, industry_avg_pe_map,
+        holdings,
+        reg,
+        industry_avg_pe_map,
     )
 
     # ── 按权重确定最终风格 ──
     return _finalize_fund_style(
-        fund_code, stock_styles, total_weight, size_weights, style_weights, has_estimated,
+        fund_code,
+        stock_styles,
+        total_weight,
+        size_weights,
+        style_weights,
+        has_estimated,
     )

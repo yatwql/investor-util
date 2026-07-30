@@ -228,8 +228,9 @@ def save_health_check_snapshot(
         "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "report_type": report_type,
         "holdings_count": holdings_count,
-        "sources": {r["name"]: {"ok": r["ok"], "latency_ms": r["latency_ms"], "message": r["message"]}
-                     for r in results},
+        "sources": {
+            r["name"]: {"ok": r["ok"], "latency_ms": r["latency_ms"], "message": r["message"]} for r in results
+        },
         "total": len(results),
         "ok_count": sum(1 for r in results if r["ok"]),
         "fail_count": sum(1 for r in results if not r["ok"]),

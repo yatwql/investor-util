@@ -420,9 +420,7 @@ def _fetch_history_with_metrics(
     _total_mv = prep.get("total_mv", 0)
 
     _portfolio_weights = [
-        h["market_value"] / _total_mv
-        for h in _holdings_details
-        if _total_mv > 0 and h.get("market_value", 0) > 0
+        h["market_value"] / _total_mv for h in _holdings_details if _total_mv > 0 and h.get("market_value", 0) > 0
     ] or None
 
     _metrics = compute_all_metrics(
@@ -543,7 +541,12 @@ def _generate_report_full(
     # ── 3. F2 历史走势 + 全量量化指标 + 情景分析 + 口径修正 ──
     perf.start("历史走势")
     history_data, _metrics = _fetch_history_with_metrics(
-        holdings, config, reporter, history_mode, prep, pipeline_data,
+        holdings,
+        config,
+        reporter,
+        history_mode,
+        prep,
+        pipeline_data,
     )
     perf.stop()
 

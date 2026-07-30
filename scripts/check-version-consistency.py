@@ -65,16 +65,16 @@ CHECKS.append((REPO_ROOT / "src" / "python" / "constants.py", "exact", (r'^APP_V
 
 # Markdown 管理文档
 add_exact(REPO_ROOT / "README.md", r"> 当前版本：{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "folders.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "folders.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md", "{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
-add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md", "{v}")
 
 
 # ── 校验逻辑 ────────────────────────────────────────────────

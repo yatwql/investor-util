@@ -527,6 +527,7 @@ def compute_penetration_top10(
         ind_future: Any = None
         if known_a_codes:
             from src.python.fetcher.industry import batch_fetch_industry_data as batch_ind
+
             ind_future = pen_exec.submit(batch_ind, list(known_a_codes))
 
         # 等待基金持仓获取完成

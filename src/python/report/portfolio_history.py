@@ -166,9 +166,7 @@ class PortfolioHistoryCalculator:
             }
         """
         # 1) 收集每只持仓的走势（并行获取，显著提速）
-        all_series, success_count, failed_holdings, successful_holdings = (
-            self._fetch_all_histories(holdings)
-        )
+        all_series, success_count, failed_holdings, successful_holdings = self._fetch_all_histories(holdings)
         warnings: list[str] = []
 
         if not all_series:
@@ -214,8 +212,8 @@ class PortfolioHistoryCalculator:
         sorted_dates = self._trim_effective_range(sorted_dates, fund_count_on_date, len(all_series))
 
         # 4) 构建完整时间线 + 计算回撤
-        bars, max_drawdown_val, max_drawdown_pct, drawdown_start, drawdown_end = (
-            self._compute_drawdown(sorted_dates, date_map)
+        bars, max_drawdown_val, max_drawdown_pct, drawdown_start, drawdown_end = self._compute_drawdown(
+            sorted_dates, date_map
         )
 
         # 5) 计算日收益率序列 + 年化波动率
@@ -254,7 +252,9 @@ class PortfolioHistoryCalculator:
 
     # ── 子函数 ──────────────────────────────────────────
 
-    def _fetch_all_histories(self, holdings: list[tuple[str, str, float]]) -> tuple[list[list[dict]], int, list[str], list[str]]:
+    def _fetch_all_histories(
+        self, holdings: list[tuple[str, str, float]]
+    ) -> tuple[list[list[dict]], int, list[str], list[str]]:
         """并行收集每只持仓的历史走势。
 
         Args:
@@ -510,4 +510,3 @@ class PortfolioHistoryCalculator:
         variance = sum((r - mean) ** 2 for r in daily_returns) / (len(daily_returns) - 1)
         std_dev = math.sqrt(variance)
         return std_dev * math.sqrt(252)
-

@@ -212,22 +212,21 @@ def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
         }
 
     with ThreadPoolExecutor(max_workers=min(len(_checks), 8)) as pool:
-        fut_to_name = {
-            pool.submit(_run_check, name, label, fn): name
-            for name, label, fn in _checks
-        }
+        fut_to_name = {pool.submit(_run_check, name, label, fn): name for name, label, fn in _checks}
         for fut in as_completed(fut_to_name):
             try:
                 results.append(fut.result())
             except Exception as e:
                 name = fut_to_name[fut]
-                results.append({
-                    "name": name,
-                    "label": "",
-                    "ok": False,
-                    "latency_ms": 0.0,
-                    "message": str(e)[:60],
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "label": "",
+                        "ok": False,
+                        "latency_ms": 0.0,
+                        "message": str(e)[:60],
+                    }
+                )
 
     # 按 name 排序保证输出稳定
     results.sort(key=lambda r: r["name"])

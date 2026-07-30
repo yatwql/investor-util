@@ -497,7 +497,9 @@ def compute_target_deviation(
 
     signals: list[dict[str, Any]] = []
     signals.extend(_build_category_deviation_signals(cat_weights, target_allocation, deviation_threshold))
-    signals.extend(_build_security_deviation_signals(holdings_details, total_mv, target_allocation, deviation_threshold))
+    signals.extend(
+        _build_security_deviation_signals(holdings_details, total_mv, target_allocation, deviation_threshold)
+    )
     return signals
 
 

@@ -308,7 +308,6 @@ def _handle_cache_update(update_type: str, config: dict, reporter) -> int:
     return _EXIT_SEVERE
 
 
-
 def _handle_check_sources() -> int:
     """处理 check-sources 子命令——数据源健康检查。
 
@@ -319,8 +318,6 @@ def _handle_check_sources() -> int:
 
     run_check_sources()
     return 2  # unreachable, run_check_sources calls sys.exit
-
-
 
 
 # ── 主入口 ───────────────────────────────────────────────

@@ -28,7 +28,6 @@ _HEADERS: dict[str, str] = {
 }
 
 
-
 def _parse_news_item(item: dict[str, Any]) -> dict[str, Any] | None:
     """解析单条新闻项。
 

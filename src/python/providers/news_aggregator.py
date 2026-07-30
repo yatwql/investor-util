@@ -32,6 +32,7 @@ from src.python.providers.news_sources import (
 
 logger = logging.getLogger("invest")
 
+
 def get_enabled_sources() -> list[str]:
     """返回当前启用的新闻来源名称列表。
 

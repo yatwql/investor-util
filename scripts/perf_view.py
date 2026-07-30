@@ -143,8 +143,7 @@ def build_trend_report(
             lines.append("|:-----|--------:|----:|----:|-----:|")
             for name, stat in phase_stats.items():
                 lines.append(
-                    f"| {name} | {stat['avg']:.2f}s | {stat['min']:.2f}s | "
-                    f"{stat['max']:.2f}s | {stat['count']} |"
+                    f"| {name} | {stat['avg']:.2f}s | {stat['min']:.2f}s | {stat['max']:.2f}s | {stat['count']} |"
                 )
             lines.append("")
 

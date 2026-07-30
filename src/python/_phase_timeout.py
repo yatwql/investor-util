@@ -76,9 +76,7 @@ def phase_timeout(seconds: float, phase_name: str = "data_fetch"):
         _PhaseTimeoutContext 实例，供调用方检查过期/剩余时间
     """
     if _phase_timeout.timer is not None:
-        raise RuntimeError(
-            f"phase_timeout 不支持嵌套：已有 '{_phase_timeout.name}' 在运行，不能开启 '{phase_name}'"
-        )
+        raise RuntimeError(f"phase_timeout 不支持嵌套：已有 '{_phase_timeout.name}' 在运行，不能开启 '{phase_name}'")
 
     start = time.time()
     _phase_timeout.expired = False

@@ -386,9 +386,12 @@ def check_numerical_consistency(
             total_checked += 1
 
             issue = _evaluate_percent_value(
-                value, sentence,
-                stock_rates_abs, holding_codes,
-                profit_rate, profit_sign,
+                value,
+                sentence,
+                stock_rates_abs,
+                holding_codes,
+                profit_rate,
+                profit_sign,
             )
             if issue is None:
                 passed += 1

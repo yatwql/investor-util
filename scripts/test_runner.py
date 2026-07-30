@@ -64,7 +64,12 @@ MODES: dict[str, dict] = {
         "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景，~2.5min）",
         "order": 5,
         "phases": [
-            {"marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data)", "desc": "核心模块单元测试", "timeout_sec": 120, "parallel": True},
+            {
+                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data)",
+                "desc": "核心模块单元测试",
+                "timeout_sec": 120,
+                "parallel": True,
+            },
             {"marker": "scenario_basic", "desc": "基础业务场景（140 项，~100s）", "timeout_sec": 300, "parallel": True},
         ],
     },

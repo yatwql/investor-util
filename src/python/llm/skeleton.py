@@ -80,7 +80,9 @@ def _handle_cache_hit(
         带缓存标记的 HTML 字符串
     """
     logger.info("LLM 缓存命中: %s", cache_key)
-    return _build_cache_hint_and_record(cached, module_key, llm_config, thinking_enabled, endpoint=endpoint, model_hint=model)
+    return _build_cache_hint_and_record(
+        cached, module_key, llm_config, thinking_enabled, endpoint=endpoint, model_hint=model
+    )
 
 
 def _finalize_and_cache(

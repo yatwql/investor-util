@@ -37,6 +37,7 @@ def _pf(parts: list[str], idx: int) -> float:
     except (ValueError, IndexError):
         return 0.0
 
+
 # 美股指数代码 (gb_* 前缀为新浪全球指数代码)
 _US_INDICES: dict[str, str] = {
     "gb_dji": "道琼斯",

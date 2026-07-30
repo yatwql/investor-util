@@ -14,7 +14,14 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from src.python.analysis._fee_estimation import _classify_fund_type, portfolio_fee_estimation, _FUND_TYPE_RULES, _DEFAULT_FEE_RATE, _MIN_HOLDINGS_FOR_FEE_ESTIMATION, _STOCK_FEE_RATE
+from src.python.analysis._fee_estimation import (
+    _classify_fund_type,
+    portfolio_fee_estimation,
+    _FUND_TYPE_RULES,
+    _DEFAULT_FEE_RATE,
+    _MIN_HOLDINGS_FOR_FEE_ESTIMATION,
+    _STOCK_FEE_RATE,
+)
 
 # ── TWR 计算常量 ────────────────────────────────
 _TRADING_DAYS_PER_YEAR = 252

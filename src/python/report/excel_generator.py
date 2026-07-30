@@ -303,7 +303,8 @@ def generate_excel_report(
                 ncols = 5
                 row = write_title_row(ws_ds, 1, "数据源可用性矩阵", ncols)
                 row = write_header_row(
-                    ws_ds, row,
+                    ws_ds,
+                    row,
                     ["数据源", "状态", "详情", "成功", "失败/降级"],
                 )
                 for m in matrix:
@@ -317,9 +318,9 @@ def generate_excel_report(
                         status_label = "❌ 失败"
                         _font = _FONT_RED
                     row = write_data_row(
-                        ws_ds, row,
-                        [m["name"], status_label, m["detail"],
-                         m["ok"], f"{m['degraded']}/{m['failed']}"],
+                        ws_ds,
+                        row,
+                        [m["name"], status_label, m["detail"], m["ok"], f"{m['degraded']}/{m['failed']}"],
                     )
                     if m["status"] != "ok":
                         for col in range(1, 6):

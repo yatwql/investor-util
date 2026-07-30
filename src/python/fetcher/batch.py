@@ -59,6 +59,7 @@ class BatchResult:
 
 class BatchError(Exception):
     """批量任务执行错误。"""
+
     pass
 
 
@@ -129,11 +130,14 @@ class BatchDispatcher:
             wrapped: list[Callable[[], Any]] = []
             for t in tasks:
                 provider = self._rate_limit_provider
+
                 def _wrap(task: Callable[[], Any], p: str = provider) -> Callable[[], Any]:
                     def _rate_limited() -> Any:
                         self._rate_limiter.acquire(p)  # type: ignore[union-attr]
                         return task()
+
                     return _rate_limited
+
                 wrapped.append(_wrap(t))
             tasks = wrapped
 
@@ -203,6 +207,7 @@ class BatchDispatcher:
         if not self._registry:
             try:
                 from src.python.provider_registry import get_registry
+
                 self._registry = get_registry()
             except Exception:
                 logger.debug("[batch] registry 加载失败，跳过熔断预检")
@@ -216,12 +221,11 @@ class BatchDispatcher:
         if self._registry.is_chain_broken(chain):
             logger.warning(
                 "[batch:%s] 全链熔断，跳过 %d 个（chain=%s）",
-                data_type, len(items), chain,
+                data_type,
+                len(items),
+                chain,
             )
-            return [
-                BatchResult(i, False, skipped=True, error=f"全链熔断:{data_type}")
-                for i in range(len(items))
-            ]
+            return [BatchResult(i, False, skipped=True, error=f"全链熔断:{data_type}") for i in range(len(items))]
 
         return self.execute([task for _, task in items])
 
@@ -262,7 +266,8 @@ class BatchDispatcher:
         actual_delay = delay + random.uniform(0, jitter)
         logger.info(
             "[batch] 重试 %d 个失败任务（delay=%.1fs）",
-            len(failed_indices), actual_delay,
+            len(failed_indices),
+            actual_delay,
         )
         time.sleep(actual_delay)
 
@@ -330,14 +335,21 @@ class BatchDispatcher:
                     for i, (cache_id, _) in enumerate(items):
                         try:
                             cached = cache_check_fn(cache_id)
-                            cache_results.append(BatchResult(
-                                index=i, success=cached is not None,
-                                result=cached,
-                            ))
+                            cache_results.append(
+                                BatchResult(
+                                    index=i,
+                                    success=cached is not None,
+                                    result=cached,
+                                )
+                            )
                         except Exception as e:
-                            cache_results.append(BatchResult(
-                                index=i, success=False, error=str(e),
-                            ))
+                            cache_results.append(
+                                BatchResult(
+                                    index=i,
+                                    success=False,
+                                    error=str(e),
+                                )
+                            )
                     return cache_results
             except Exception:
                 logger.warning("[batch] 策略预检异常，回退正常执行", exc_info=True)
@@ -455,7 +467,10 @@ def get_batch_worker_count(config_key: str, default: int = 3) -> int:
         if clamped != int(requested):
             logger.warning(
                 "[batch] %s 请求 %d workers 超过上限 %d，已钳位至 %d",
-                config_key, int(requested), int(max_total), clamped,
+                config_key,
+                int(requested),
+                int(max_total),
+                clamped,
             )
         return clamped
     except Exception:

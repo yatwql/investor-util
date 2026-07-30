@@ -205,7 +205,11 @@ def _precheck_one_cache(
 
         _, endpoint = _resolve_first_provider_model_endpoint(llm_config, module_key)
     augmented_html = _build_cache_hint_and_record(
-        cached, module_key, llm_config, thinking_enabled, endpoint=endpoint,
+        cached,
+        module_key,
+        llm_config,
+        thinking_enabled,
+        endpoint=endpoint,
     )
     return (augmented_html, True)
 

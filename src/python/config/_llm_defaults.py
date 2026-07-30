@@ -131,20 +131,20 @@ def _get_default_llm_settings_template() -> str:
                 lines.append(f"  {_kv(key)},")
 
     def _scalar(key: str, comment: str = ""):
-        lines.append(f'  {_kv(key)}{"," if comment else ""}  {comment}')
+        lines.append(f"  {_kv(key)}{',' if comment else ''}  {comment}")
 
     # ── 全局设置 ──
-    lines.append('  // ═══════════════════════════════════════════')
-    lines.append('  // 全局设置')
-    lines.append('  // ═══════════════════════════════════════════')
+    lines.append("  // ═══════════════════════════════════════════")
+    lines.append("  // 全局设置")
+    lines.append("  // ═══════════════════════════════════════════")
     _scalar("max_retries")
     _scalar("llm_max_concurrency")
     lines.append("")
 
     # ── 模块开关 ──
-    lines.append('  // ═══════════════════════════════════════════')
-    lines.append('  // 模块开关 — 控制各 LLM 分析功能的启用/停用')
-    lines.append('  // ═══════════════════════════════════════════')
+    lines.append("  // ═══════════════════════════════════════════")
+    lines.append("  // 模块开关 — 控制各 LLM 分析功能的启用/停用")
+    lines.append("  // ═══════════════════════════════════════════")
     lines.append(f'  "enabled_llm": {json.dumps(d["enabled_llm"], indent=4, ensure_ascii=False)}')
 
     _module_block("global_macro")
@@ -154,10 +154,10 @@ def _get_default_llm_settings_template() -> str:
 
     # ── news_correlation ──
     lines.append("")
-    lines.append('  // ═══════════════════════════════════════════')
-    lines.append('  // 财经新闻热点与持仓关联分析 — news_correlation')
-    lines.append('  // （注：news_correlation 不支持 output_brief 模式）')
-    lines.append('  // ═══════════════════════════════════════════')
+    lines.append("  // ═══════════════════════════════════════════")
+    lines.append("  // 财经新闻热点与持仓关联分析 — news_correlation")
+    lines.append("  // （注：news_correlation 不支持 output_brief 模式）")
+    lines.append("  // ═══════════════════════════════════════════")
     for key in d:
         if key.endswith("_news_correlation"):
             lines.append(f"  {_kv(key)},")
@@ -165,35 +165,35 @@ def _get_default_llm_settings_template() -> str:
 
     # ── 辩论模式 ──
     lines.append("")
-    lines.append('  // ═══════════════════════════════════════════')
-    lines.append('  // 辩论模式（实验功能，缺省关闭）')
-    lines.append('  // 通过 Feature Flag 控制启停，菜单 [S] 可交互开关')
-    lines.append('  // ═══════════════════════════════════════════')
+    lines.append("  // ═══════════════════════════════════════════")
+    lines.append("  // 辩论模式（实验功能，缺省关闭）")
+    lines.append("  // 通过 Feature Flag 控制启停，菜单 [S] 可交互开关")
+    lines.append("  // ═══════════════════════════════════════════")
     debate = d["debate"]
     lines.append(f'  "debate": {{')
-    lines.append(f'    // 正反辩论 — 三段式(白脸→黑脸→综合)')
+    lines.append(f"    // 正反辩论 — 三段式(白脸→黑脸→综合)")
     lines.append(f'    "procon": {json.dumps(debate["procon"], indent=4, ensure_ascii=False)},')
-    lines.append(f'    // 条件推理 — 情景化分析')
+    lines.append(f"    // 条件推理 — 情景化分析")
     lines.append(f'    "conditional": {{')
-    lines.append(f'      // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)')
+    lines.append(f"      // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)")
     lines.append(f'      "scenarios": [')
     for s in debate["conditional"]["scenarios"]:
-        lines.append(f'        {json.dumps(s, ensure_ascii=False)},')
-    lines.append(f'      ]')
-    lines.append(f'    }},')
-    lines.append(f'    // 集中度问答 — 集中度风险问答块')
+        lines.append(f"        {json.dumps(s, ensure_ascii=False)},")
+    lines.append(f"      ]")
+    lines.append(f"    }},")
+    lines.append(f"    // 集中度问答 — 集中度风险问答块")
     lines.append(f'    "qa_concentration": {json.dumps(debate["qa_concentration"])},')
-    lines.append(f'    // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）')
+    lines.append(f"    // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）")
     lines.append(f'    "max_total_tokens_per_report": {debate["max_total_tokens_per_report"]},')
-    lines.append(f'    // 辩论模式单次 API 调用超时覆盖（秒）')
+    lines.append(f"    // 辩论模式单次 API 调用超时覆盖（秒）")
     lines.append(f'    "per_call_timeout_override": {debate["per_call_timeout_override"]}')
-    lines.append(f'  }},')
+    lines.append(f"  }},")
 
     # ── 计价配置 ──
     lines.append("")
-    lines.append('  // ═══════════════════════════════════════════')
-    lines.append('  // 计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）')
-    lines.append('  // ═══════════════════════════════════════════')
+    lines.append("  // ═══════════════════════════════════════════")
+    lines.append("  // 计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）")
+    lines.append("  // ═══════════════════════════════════════════")
     lines.append(f'  "pricing": {json.dumps(d["pricing"], indent=2, ensure_ascii=False)}')
 
     lines.append("}")

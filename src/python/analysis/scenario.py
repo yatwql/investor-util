@@ -166,9 +166,14 @@ def scenario_analysis(
 
     for market_chg in _MARKET_SCENARIOS:
         entry = _build_scenario_entry(
-            market_chg, portfolio_value, beta,
-            ci_available, beta_ci_lower, beta_ci_upper,
-            se_available, beta_se,
+            market_chg,
+            portfolio_value,
+            beta,
+            ci_available,
+            beta_ci_lower,
+            beta_ci_upper,
+            se_available,
+            beta_se,
         )
         scenarios.append(entry)
 

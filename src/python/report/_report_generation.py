@@ -179,9 +179,7 @@ def _prepare_full_risk_metrics(
         _total_mv = prep.get("total_mv", 0)
 
         _portfolio_weights = [
-            h["market_value"] / _total_mv
-            for h in _holdings_details
-            if _total_mv > 0 and h.get("market_value", 0) > 0
+            h["market_value"] / _total_mv for h in _holdings_details if _total_mv > 0 and h.get("market_value", 0) > 0
         ] or None
 
         _metrics = compute_all_metrics(
@@ -510,8 +508,14 @@ def _generate_report_full(
 
     # ── 3. F2 历史走势 + 全量量化指标 ──
     history_data, _metrics = _prepare_full_risk_metrics(
-        holdings, config, reporter, perf, history_mode,
-        _enable_history, prep, pipeline_data,
+        holdings,
+        config,
+        reporter,
+        perf,
+        history_mode,
+        _enable_history,
+        prep,
+        pipeline_data,
     )
 
     # ── 4. 行业资金流向 ──
@@ -530,8 +534,14 @@ def _generate_report_full(
     _comparison_indices = config.get("comparison_indices", None)
     perf.start("LLM+新闻")
     llm_content, news_data, news_llm_meta, news_ok, debate_info = _fetch_llm_and_news(
-        holdings, prep, sector_flow, force_llm, pipeline_data,
-        _enable_news, _enable_llm, reporter,
+        holdings,
+        prep,
+        sector_flow,
+        force_llm,
+        pipeline_data,
+        _enable_news,
+        _enable_llm,
+        reporter,
         history_data=history_data,
         comparison_indices=_comparison_indices,
         metrics=_metrics,
@@ -546,18 +556,43 @@ def _generate_report_full(
 
     # ── 6. HTML 报告 ──
     result.html_ok = _generate_full_html_report(
-        holdings, prep, output_dir, sec_order,
-        llm_content, news_data, news_llm_meta, news_ok,
-        history_data, reporter, _enable_b_series, _enable_news,
-        _enable_history, _enable_llm, debate_info, result,
+        holdings,
+        prep,
+        output_dir,
+        sec_order,
+        llm_content,
+        news_data,
+        news_llm_meta,
+        news_ok,
+        history_data,
+        reporter,
+        _enable_b_series,
+        _enable_news,
+        _enable_history,
+        _enable_llm,
+        debate_info,
+        result,
     )
 
     # ── 7. Excel 报告 ──
     result.excel_ok = _generate_full_excel_report(
-        holdings, prep, output_dir, news_ok,
-        llm_content, news_data, news_llm_meta, sec_order,
-        pipeline_data, history_data, reporter, _enable_b_series,
-        _enable_news, _enable_history, _enable_llm, debate_info, result,
+        holdings,
+        prep,
+        output_dir,
+        news_ok,
+        llm_content,
+        news_data,
+        news_llm_meta,
+        sec_order,
+        pipeline_data,
+        history_data,
+        reporter,
+        _enable_b_series,
+        _enable_news,
+        _enable_history,
+        _enable_llm,
+        debate_info,
+        result,
     )
 
     result.news_ok = news_ok

@@ -178,9 +178,15 @@ def _fetch_llm_and_news(
     try:
         _news_fut = _submit_news_future(pool, holdings, prep_data, enable_news)
         _llm_fut = _submit_llm_future(
-            pool, holdings, prep_data, sector_flow, force_llm,
-            pipeline_data, enable_llm,
-            history_data=history_data, comparison_indices=comparison_indices,
+            pool,
+            holdings,
+            prep_data,
+            sector_flow,
+            force_llm,
+            pipeline_data,
+            enable_llm,
+            history_data=history_data,
+            comparison_indices=comparison_indices,
             metrics=metrics,
         )
 

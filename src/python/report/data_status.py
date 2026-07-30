@@ -374,23 +374,25 @@ class DegradationTracker:
                     self._persist_dirty = True
                     return
 
-            self._events.append(DegradationEvent(
-                source_key=source_key,
-                tier=tier,
-                success=False,
-                failure_type="aggregated",
-                degraded=True,
-                count=failed_count,
-                effective_threshold=1,
-                timestamp=time.time(),
-                detail={
-                    "failed_count": failed_count,
-                    "total_count": total_count,
-                    "ratio": round(ratio, 2),
-                    "severity": severity,
-                    "message": message,
-                },
-            ))
+            self._events.append(
+                DegradationEvent(
+                    source_key=source_key,
+                    tier=tier,
+                    success=False,
+                    failure_type="aggregated",
+                    degraded=True,
+                    count=failed_count,
+                    effective_threshold=1,
+                    timestamp=time.time(),
+                    detail={
+                        "failed_count": failed_count,
+                        "total_count": total_count,
+                        "ratio": round(ratio, 2),
+                        "severity": severity,
+                        "message": message,
+                    },
+                )
+            )
             self._persist_dirty = True
 
     # ── 内部实现 ──────────────────────────────

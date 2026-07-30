@@ -71,7 +71,7 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
             "degraded": 0,
             "failed": 0,
             "sample_failures": [],  # 失败项（含 source_key + failure_type）
-            "degraded_list": [],    # 降级项列表（含 source_key + failure_type）
+            "degraded_list": [],  # 降级项列表（含 source_key + failure_type）
         }
 
     unmatched: list[str] = []
@@ -130,16 +130,18 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
 
     # 5) 追加未归类项（如有）
     if unmatched:
-        matrix.append({
-            "key": "_unmatched",
-            "name": "其他数据源",
-            "status": "ok",
-            "detail": f"{len(unmatched)} 个未归类源（均正常）",
-            "total": len(unmatched),
-            "ok": len(unmatched),
-            "degraded": 0,
-            "failed": 0,
-            "sample_failures": [],
-        })
+        matrix.append(
+            {
+                "key": "_unmatched",
+                "name": "其他数据源",
+                "status": "ok",
+                "detail": f"{len(unmatched)} 个未归类源（均正常）",
+                "total": len(unmatched),
+                "ok": len(unmatched),
+                "degraded": 0,
+                "failed": 0,
+                "sample_failures": [],
+            }
+        )
 
     return matrix
