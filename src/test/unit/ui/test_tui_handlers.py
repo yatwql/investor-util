@@ -91,7 +91,7 @@ class TestPrintErrorWithHint(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — _Timer
+# _Timer 测试
 # ═══════════════════════════════════════════════════════════════
 
 class TestTimer(unittest.TestCase):
@@ -166,7 +166,7 @@ class TestTimer(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — print_timing_summary
+# print_timing_summary 测试
 # ═══════════════════════════════════════════════════════════════
 
 class TestPrintTimingSummary(unittest.TestCase):
@@ -241,7 +241,7 @@ class TestPrintTimingSummary(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — print_llm_session_usage
+# print_llm_session_usage 测试
 # ═══════════════════════════════════════════════════════════════
 
 class TestPrintLlmSessionUsage(unittest.TestCase):
@@ -311,7 +311,7 @@ class TestPrintLlmSessionUsage(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — print_error_with_hint 额外用例
+# print_error_with_hint 扩展测试
 # ═══════════════════════════════════════════════════════════════
 
 class TestPrintErrorWithHintExtended(unittest.TestCase):
@@ -358,7 +358,7 @@ class TestPrintErrorWithHintExtended(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — execute_item
+# execute_item 测试
 # ═══════════════════════════════════════════════════════════════
 
 class TestExecuteItem(unittest.TestCase):
@@ -429,7 +429,7 @@ class TestExecuteItem(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 新增测试 — select_holdings_file
+# select_holdings_file 测试
 # ═══════════════════════════════════════════════════════════════
 
 class TestSelectHoldingsFile(unittest.TestCase):

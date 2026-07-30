@@ -10,10 +10,10 @@
 > |---|---|---|---|---|
 | 主程序代码 | Python | 178 | 42,821 | `src/python/` 下所有 `.py`（不含测试） |
 | HTML 报告模板 | HTML | 1 | 1,862 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python | 12 | 3,741 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **191** | **48,424** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **221** | **60,982** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,880 个** | `pytest --collect-only` 统计 |
+| 辅助脚本 | Python | 12 | 3,743 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **191** | **48,426** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **217** | **58,699** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,786 个** | `pytest --collect-only` 统计 |
 | **用户文档** | Markdown | **98** | — | `docs-stm/`（96 文件）+ `README.md` + `CLAUDE.md` |
 
 ## 目录树
@@ -248,11 +248,10 @@ investor-util/
 │       │   │   └── test_config_validation.py     #   配置校验函数测试
 │       │   ├── core/                #   核心模块单元测试
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_cache.py            #   缓存引擎测试
-│       │   │   ├── test_cache_edge.py       #   缓存引擎边缘场景
-│       │   │   ├── test_cache_cleanup.py    #   缓存清理测试
-│       │   │   ├── test_cache_core.py       #   缓存核心功能测试
+│       │   │   ├── test_cache_core.py       #   缓存核心功能测试（含 TTL/目录/常量）
+│       │   │   ├── test_cache_cleanup.py    #   缓存清理与统计测试
 │       │   │   ├── test_cache_format.py     #   缓存格式测试
+│       │   │   ├── test_cache_edge.py       #   缓存边缘场景测试
 │       │   │   ├── test_code_utils.py       #   证券代码工具测试
 │       │   │   ├── test_filesystem_edge.py  #   文件系统边缘场景
 │       │   │   ├── test_http_client.py      #   HTTP 客户端测试
@@ -354,7 +353,9 @@ investor-util/
 │       │   │   ├── test_classification_utils.py   #   分类工具测试
 │       │   │   ├── test_data_integrity.py         #   数据完整性测试
 │       │   │   ├── test_data_quality_edge.py      #   数据质量边缘场景
+│       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵测试
 │       │   │   ├── test_data_status.py            #   数据状态测试
+│       │   │   ├── test_excel_b_series.py          #   Excel B 系列页签测试
 │       │   │   ├── test_excel_format_edge.py      #   Excel 格式边缘场景
 │       │   │   ├── test_excel_generator.py        #   Excel 生成测试
 │       │   │   ├── test_excel_generator_edge.py   #   Excel 生成边缘场景
@@ -383,6 +384,7 @@ investor-util/
 │       │   │   ├── test_news_degradation_edge.py  #   新闻降级边缘场景
 │       │   │   ├── test_penetration.py            #   穿透分析测试
 │       │   │   ├── test_penetration_edge.py       #   穿透分析边缘场景
+│       │   │   ├── test_pipeline_utils.py          #   管线工具函数测试
 │       │   │   ├── test_portfolio_history.py      #   组合历史走势测试
 │       │   │   ├── test_progress.py               #   进度跟踪测试
 │       │   │   ├── test_qdii_timezone_edge.py     #   QDII 时区边缘场景
@@ -416,7 +418,10 @@ investor-util/
 │       │   │   ├── test_scenario_holdings_quality.py # 持仓质量场景测试
 │       │   │   ├── test_scenario_operational_behavior.py # 操作行为场景测试
 │       │   │   ├── test_scenario_section_order.py  #   报告章节顺序场景测试
-│       │   │   ├── test_scenario_penetration.py    #   穿透分析场景测试
+│       │   │   ├── test_scenario_penetration_basic.py    #   穿透分析基础场景
+│       │   │   ├── test_scenario_penetration_advanced.py #   穿透分析高级场景
+│       │   │   ├── test_scenario_penetration_mixed.py   #   穿透分析混合场景
+│       │   │   ├── test_scenario_penetration_edge.py    #   穿透分析边缘场景
 │       │   │   └── test_scenario_special_securities.py # 特殊证券场景测试
 │       │   ├── datetime/            #   日期时间场景测试
 │       │   │   ├── __init__.py      #       子包标记
@@ -469,6 +474,7 @@ investor-util/
 │   ├── check-test-markers.py        #   测试标记合规检查
 │   ├── check-version-consistency.py #   版本号一致性检查
 │   ├── calibrate-dedup-threshold.py #   新闻去重阈值校准
+│   ├── check-history-traces.py      #   注释历史痕迹检查
 │   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
 │   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
@@ -607,7 +613,7 @@ investor-util/
 │   │   │   │   └── perf-design-and-verification.md # 性能基准体系设计方案
 │   │   │   ├── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
-│   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
+│   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

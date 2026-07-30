@@ -426,3 +426,147 @@ class TestCacheClearByPrefix(CacheTestBase):
             mock_remove.side_effect = [OSError("locked"), None]
             count = real_cbp("price_")
             self.assertEqual(count, 1)
+
+
+# ═══════════════════════════════════════════════════════════
+#  get_ttl 测试
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGetTTL(unittest.TestCase):
+    """测试 get_ttl 的配置读取、默认值与兜底逻辑。"""
+
+    @patch("src.python.cache._ttl._is_market_open", return_value=False)
+    def test_known_type_returns_default(self, mock_market):
+        """已知类型未配置 → 返回默认值。"""
+        from src.python.cache import CACHE_DAILY, get_ttl
+
+        self.assertEqual(get_ttl("price"), CACHE_DAILY)
+
+    def test_unknown_type_returns_daily(self):
+        """未知类型 → 返回 CACHE_DAILY。"""
+        from src.python.cache import CACHE_DAILY, get_ttl
+
+        self.assertEqual(get_ttl("unknown_type_xyz"), CACHE_DAILY)
+
+    def test_hold_returns_weekly(self):
+        """hold 类型 → 默认返回 CACHE_WEEKLY。"""
+        from src.python.constants import CACHE_WEEKLY
+        from src.python.cache import get_ttl
+
+        self.assertEqual(get_ttl("hold"), CACHE_WEEKLY)
+
+    def test_benchmark_returns_monthly(self):
+        """benchmark 类型 → 默认返回 CACHE_MONTHLY。"""
+        from src.python.constants import CACHE_MONTHLY
+        from src.python.cache import get_ttl
+
+        self.assertEqual(get_ttl("benchmark"), CACHE_MONTHLY)
+
+    @patch("src.python.config.get_config")
+    def test_config_value_used_when_present(self, mock_get_config):
+        """配置文件中的 cache_ttl 值被优先使用。"""
+        mock_get_config.return_value = {
+            "cache_ttl": {"price": 12345},
+        }
+        from src.python.cache import get_ttl
+
+        self.assertEqual(get_ttl("price"), 12345.0)
+
+    @patch("src.python.cache._ttl._is_market_open", return_value=False)
+    @patch("src.python.config.get_config")
+    def test_config_zero_value_ignored(self, mock_get_config, mock_market):
+        """配置中 TTL 为 0 → 忽略该值，使用默认。"""
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
+
+        mock_get_config.return_value = {
+            "cache_ttl": {"price": 0},
+        }
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
+
+    @patch("src.python.cache._ttl._is_market_open", return_value=False)
+    @patch("src.python.config.get_config")
+    def test_config_negative_value_ignored(self, mock_get_config, mock_market):
+        """配置中 TTL 为负数 → 忽略该值，使用默认。"""
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
+
+        mock_get_config.return_value = {
+            "cache_ttl": {"price": -100},
+        }
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
+
+    @patch("src.python.cache._ttl._is_market_open", return_value=False)
+    @patch("src.python.config.get_config")
+    def test_config_exception_falls_back(self, mock_get_config, mock_market):
+        """get_config 抛出异常 → 返回默认值。"""
+        mock_get_config.side_effect = RuntimeError("config error")
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
+
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
+
+    @patch("src.python.cache._ttl._is_market_open", return_value=False)
+    @patch("src.python.config.get_config")
+    def test_config_missing_cache_ttl_key(self, mock_get_config, mock_market):
+        """配置中无 cache_ttl 键 → 返回默认值。"""
+        mock_get_config.return_value = {}
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
+
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
+
+    @patch("src.python.cache._ttl._is_market_open", return_value=False)
+    @patch("src.python.config.get_config")
+    def test_config_cache_ttl_is_none(self, mock_get_config, mock_market):
+        """配置中 cache_ttl 为 None → 返回默认值。"""
+        mock_get_config.return_value = {"cache_ttl": None}
+        from src.python.cache import get_ttl
+        from src.python.registry import get_cache_ttl_defaults
+
+        self.assertEqual(get_ttl("price"), get_cache_ttl_defaults()["price"])
+
+
+# ═══════════════════════════════════════════════════════════
+#  get_cache_dir 测试
+# ═══════════════════════════════════════════════════════════
+
+
+class TestGetCacheDir(unittest.TestCase):
+    """测试 get_cache_dir 返回绝对路径。"""
+
+    def test_returns_absolute_path(self):
+        """返回值是绝对路径。"""
+        from src.python.cache import get_cache_dir
+
+        path = get_cache_dir()
+        self.assertTrue(os.path.isabs(path))
+
+    def test_ends_with_cache(self):
+        """路径以 cache 结尾。"""
+        from src.python.cache import get_cache_dir
+
+        path = get_cache_dir()
+        self.assertTrue(path.endswith("cache"))
+
+
+# ═══════════════════════════════════════════════════════════
+#  全局常量测试
+# ═══════════════════════════════════════════════════════════
+
+
+class TestCacheConstants(unittest.TestCase):
+    """测试缓存常量定义符合预期。"""
+
+    def test_cache_daily(self):
+        from src.python.cache import CACHE_DAILY
+        self.assertEqual(CACHE_DAILY, 86400)
+
+    def test_cache_weekly(self):
+        from src.python.constants import CACHE_WEEKLY
+        self.assertEqual(CACHE_WEEKLY, 604800)
+
+    def test_cache_monthly(self):
+        from src.python.constants import CACHE_MONTHLY
+        self.assertEqual(CACHE_MONTHLY, 2592000)

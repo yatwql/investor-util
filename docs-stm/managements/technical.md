@@ -2001,7 +2001,7 @@ class DataModuleDef:
     cache_groups: tuple      # 分组
 ```
 
-当前注册 **30 个数据模块**：
+当前注册 **29 个数据模块**：
 
 | 分类 | 数量 | 模块 |
 |:-----|:----:|:-----|
@@ -2340,7 +2340,7 @@ investor-util/
 │   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
 │   │   ├── providers/           # 数据源提供商（各 API 封装）
 │   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（30 个数据模块 + 18 个报告模块 + 7 个计算模块）
+│   │   ├── registry.py          # 中央注册表（29 个数据模块 + 18 个报告模块 + 7 个计算模块）
 │   │   ├── report/              # 报告生成（编排器/进度/管线/数据构建器/页签写入器）
 │   │   ├── schemas/             # Pydantic 数据模式（快照等）
 │   │   ├── tui.py               # TUI 入口 + 菜单循环

@@ -76,7 +76,7 @@
 | `scenario/basic/test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
 | `scenario/basic/test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
 | `scenario/basic/test_scenario_operational_behavior.py` | S29-S34 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 + 组合历史走势基准指数对比 |
-| `scenario/basic/test_scenario_penetration.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
+| `scenario/basic/test_scenario_penetration_basic.py` / `_advanced.py` / `_mixed.py` / `_edge.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
 | `scenario/basic/test_scenario_section_order.py` | — | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 | `scenario/llm/test_llm_hallucination.py` | P4‑08 | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
@@ -163,7 +163,7 @@
 |:---------|:------:|:---------|
 | **数据流完整链路**：持仓 xlsx → 数据获取 → 缓存 → Excel/HTML 输出 | ✅ | `test_scenario_basic_flows.py` S1-S5 |
 | **Provider 回退链路端到端**：腾讯不可用 → 东方财富 → 过期缓存 | ✅ | `test_chain.py` |
-| **缓存与 API 协同**：缓存命中不调 API，缓存缺失调 API 并写入 | ✅ | `test_cache.py` |
+| **缓存与 API 协同**：缓存命中不调 API，缓存缺失调 API 并写入 | ✅ | `test_cache_core.py` / `test_cache_format.py` |
 | **原子写入恢复**：磁盘满/断电后缓存和配置文件完整性 | ✅ | `test_config_atomic.py` |
 | **模块间接口契约**：reader 输出 → market_value 输入 → penetration 输入 → ... 类型链正确 | ✅ | `test_integration_coverage.py` (integration_contract) |
 | **错误隔离**：penetration/LLM/news_correlation 任一模块失败，不阻塞其他模块写入 | ✅ | `test_excel_generator.py` `test_sheet_exception_others_still_called` |

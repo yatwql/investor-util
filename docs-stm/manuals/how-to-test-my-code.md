@@ -445,7 +445,7 @@ pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 
 | 测试类型 | 放哪里 | 示例 |
 |:---------|:-------|:-----|
-| **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache.py` 追加 `TestCacheEdgeCases` |
+| **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache_core.py` 追加 `TestCacheEdgeCases` |
 | **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
 | **业务场景测试** | `test_scenario_basic_flows.py`（基础链路 S1-S5）或 `test_scenario_resilience_flows.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_scenario_basic_flows.py` |
 | **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
