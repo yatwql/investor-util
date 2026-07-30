@@ -42,7 +42,7 @@
 ### 1.2 边界（不做什么）
 
 - **不引入新数据源** — 所有图表数据来自现有 pipeline_data / template context
-- **不新增报告模块** — 不修改 `registry.py` `_REPORT_SECTION_DEFAULT`
+- **不新增报告模块** — 不修改 `core/registry.py` `_REPORT_SECTION_DEFAULT`
 - **不改变 Excel 管线** — 仅 HTML 端变化
 - **不引入后端渲染** — Chart.js 完全客户端侧
 - **不替代现有 Canvas 2D** — Feature Flag 控制回退，保留 Canvas 代码路径
@@ -86,7 +86,7 @@ report_template.html (1845 行 Jinja2 模板)
 | **消除自制 Canvas 2D 维护负担** | `drawSimpleChart()` 265 行内联 JS（含 Canvas 原生 DPR 缩放、多数据集、tooltip 等）→ 代之以 Chart.js 成熟库，减少定制 JS 维护量 |
 | **一致性** | 6 张图统一使用 Chart.js API 风格、配色体系、交互行为，不再各自为政 |
 | **数据分离** | 当前 history_data 既用于 Excel 又用于 HTML Canvas JS 序列化（tojson），Chart.js 迁移后数据结构更明确 |
-| **Feature Flag 基础设施** | 为后续"报告模块可配置化"（§1.4.4）积累经验——当前 features.py 仅用于 LLM 模块 |
+| **Feature Flag 基础设施** | 为后续"报告模块可配置化"（§1.4.4）积累经验——当前 config/features.py 仅用于 LLM 模块 |
 
 ### 2.3 间接收益（对 plan-3 / plan-6 的支撑）
 
@@ -108,7 +108,7 @@ plan-1 是 plan-3（最大回撤+净值曲线 Chart.js 双轴图增强）和 pla
 | R6 | **C14 违规风险** | 低 | 低 | **高** | 开发过程中不慎将 chart_data 或 chart_config 写入 `_ENV.globals` | 代码审查重点标注 + 自动化 grep `_ENV.globals\[` 不得出现在非 `html_jinja_env.py` 的文件中 |
 | R7 | **JavaScript 调试困难** | 中 | 中 | 中 | Chart.js 数据集配置复杂（特别是热力图 + 雷达图 + 双轴图复合），浏览器调试 vs Python 调试模式切换 | ① 建立 JS 调试辅助页（独立 test HTML）② 模板内 `console.log` 兜底 ③ Python 端预处理器（§8.2.2）减少 JS 复杂度 |
 | R8 | **历史走势数据粒度与图表性能** | 中 | 中 | 中 | 净值曲线若含每日数据（~250 点/年 × 品种），Chart.js 渲染性能下降 | ① 服务端下采样（按周/月聚合）② Chart.js `decimation` 插件（内置）③ 数据阈值告警 |
-| R9 | **数据隐私泄露** | **中** | 高 | 中 | `tojson` 将全量持仓明细（代码/份额/成本/每日市值）嵌入 HTML 文件内联 `<script>`，分享 HTML 报告 = 分享全量持仓数据。Chart.js 的结构化 JSON 键名规律使批量提取更容易 | ① 在报告中标注"本文件含全量持仓数据，分享前请谨慎" ② `anonymizer` Feature Flag（`features.py` 已存在）开启时对 Chart.js 数据做模糊处理 ③ Chart.js 数据最小化（只传递日期+市值，不含份额/成本） |
+| R9 | **数据隐私泄露** | **中** | 高 | 中 | `tojson` 将全量持仓明细（代码/份额/成本/每日市值）嵌入 HTML 文件内联 `<script>`，分享 HTML 报告 = 分享全量持仓数据。Chart.js 的结构化 JSON 键名规律使批量提取更容易 | ① 在报告中标注"本文件含全量持仓数据，分享前请谨慎" ② `anonymizer` Feature Flag（`config/features.py` 已存在）开启时对 Chart.js 数据做模糊处理 ③ Chart.js 数据最小化（只传递日期+市值，不含份额/成本） |
 | R10 | **CDN 供应链攻击** | 低 | 极低 | **高** | CDN 被投毒或劫持时，恶意 JS 可访问报告中所有数据 | ① 使用 SRI（Subresource Integrity）`integrity="sha384-{{硬编码 hash}}" crossorigin="anonymous"` 锁定文件内容 ② hash 硬编码在模板中，非构建步骤 ③ `onerror` Canvas 回退兜底 |
 
 ### 3.2 风险最高项：CDN 可用性（R3）+ 热力图插件（R4）
@@ -245,12 +245,12 @@ C19 ✅
 
 **现有 Feature Flag 基础设施**：
 
-- `features.py` 定义了 28 项 Feature Flag，当前覆盖 LLM 模块 + B 系列 + 历史回撤
+- `config/features.py` 定义了 28 项 Feature Flag，当前覆盖 LLM 模块 + B 系列 + 历史回撤
 - 加载机制：`load_feature_overrides()` → `features.json` → `is_feature_enabled()`
 - **现状**：`enable_interactive_charts` 尚未注册到 `_FEATURE_FLAGS_DEFAULT`，仅在 `plan-chartjs-report-upgrade.md` 中提及
 
 **实施建议**：
-1. `features.py` `_FEATURE_FLAGS_DEFAULT` 新增 `"enable_interactive_charts": True`（默认开启）
+1. `config/features.py` `_FEATURE_FLAGS_DEFAULT` 新增 `"enable_interactive_charts": True`（默认开启）
 2. `features.json` 可选覆盖（`"enable_interactive_charts": false` → 回退 Canvas 2D）
 3. 渲染期通过模板 context 传递标志量：
    ```python
@@ -314,7 +314,7 @@ C19 ✅
 
 ### 6.6 §1.4.4 Feature Flag 与 metrics Flag 的交互
 
-`features.py` 中注册了 7 个 `metrics_*` Feature Flag（`metrics_sharpe`、`metrics_calmar`、`metrics_hhi`、`metrics_winrate`、`metrics_turnover`、`metrics_risk_contribution`、`metrics_beta`），雷达图依赖这些指标数据。
+`config/features.py` 中注册了 7 个 `metrics_*` Feature Flag（`metrics_sharpe`、`metrics_calmar`、`metrics_hhi`、`metrics_winrate`、`metrics_turnover`、`metrics_risk_contribution`、`metrics_beta`），雷达图依赖这些指标数据。
 
 **交互风险**：用户关闭部分指标 Flag 后，雷达图的数据条缺失。若 Chart.js 直接渲染空数据点会导致指标显示为 0（误读为"表现极差"）。
 
@@ -382,7 +382,7 @@ const chartTheme = {
 
 | 组件 | 状态 |
 |:-----|:------|
-| `features.py` `enable_interactive_charts` | ❌ 不存在（仅在文档中） |
+| `config/features.py` `enable_interactive_charts` | ❌ 不存在（仅在文档中） |
 | `features.json` 中相关字段 | ❌ 不存在 |
 | 模板中 Chart.js CDN `<script>` | ❌ 不存在 |
 | 模板中 Chart.js 渲染逻辑 | ❌ 不存在 |
@@ -505,7 +505,7 @@ def build_chart_datasets(
 | CDN 策略 | 纯 CDN / CDN+local / 纯 local / **CDN+SRI+onerror** | **CDN + SRI + onerror** | 零部署成本，CDN 失败/篡改时可降级 |
 | JS 组织 | 内联模板 / 外部独立 JS | **外部独立 JS**（chart-init.js + chart-config.js） | 可测试性 + 维护性 + 暗色模式预留 |
 | 数据处理 | JS 端 tojson 消费 / Python 端预处理器 | **Python 端预处理器**（chart_data_builder.py） | 可 pytest 测试 + 降低 JS 复杂度 |
-| Feature Flag 注册 | features.py / config.json | **features.py** | 与现有 LLM/B 系列标志一致 |
+| Feature Flag 注册 | config/features.py / config.json | **config/features.py** | 与现有 LLM/B 系列标志一致 |
 | 热力图方案 | chartjs-chart-matrix / Canvas 2D | **先 POC 验证，确定后选 matrix** | POC 不通过则用 Canvas 自制 |
 | 颜色方案 | 硬编码 / CSS 变量 | **CSS 变量** | 为 plan-11 暗色模式预留 |
 | 双路径清理 | N 版本后移除 Canvas / 长期共存 | **N=2** | 给用户适应期，积累稳定性 |
@@ -522,7 +522,7 @@ def build_chart_datasets(
 | Python 端数据预处理器 | — | **0.5d** | ⬆ 新增 `chart_data_builder.py`，6 张图数据格式转换 + 降级分级处理 |
 | 图表迁移/新建 | 1d | **0.75d** | ⬇ 借助 Python 预处理器，JS 端只需消费已格式化数据 |
 | 打印降级 | 0.5d | **0.75d** | ⬆ `beforeprint`/`afterprint` 异步时序处理 + 2x 密度 |
-| Feature Flag | 0.5d | 0.25d | ⬇ 利用现有 `features.py` 基础设施 |
+| Feature Flag | 0.5d | 0.25d | ⬇ 利用现有 `config/features.py` 基础设施 |
 | 测试（新增） | — | **0.5d** | ⬆ Python 预处理器单元测试 + Feature Flag 开关测试 + 降级分级测试 + 双路径回退测试 |
 | **合计** | **4d** | **5.25d** | ⬆ +1.25d |
 
@@ -547,7 +547,7 @@ def build_chart_datasets(
 
 | 文件 | 改动类型 | 改动内容 |
 |:-----|:---------|:---------|
-| `src/python/features.py` | 修改 | `_FEATURE_FLAGS_DEFAULT` 新增 `enable_interactive_charts: True` |
+| `src/python/config/features.py` | 修改 | `_FEATURE_FLAGS_DEFAULT` 新增 `enable_interactive_charts: True` |
 | `src/python/report/html_writer.py` | 修改 | context 传递 `enable_interactive_charts` + `chart_datasets`（Python 预处理器结果） |
 | `src/python/report/chart_data_builder.py` | **新建** | Python 端数据预处理器，6 张图数据格式转换 + 降级分级处理 |
 | `src/python/report/html_jinja_env.py` | 不改 | C14 约束：不新增 globals |
@@ -618,7 +618,7 @@ _ENV.globals["section_visible"] = lambda key: False  # fail-closed 默认值
 ### C.4 Feature Flag 加载机制
 
 ```python
-# features.py 第 34 行
+# config/features.py 第 34 行
 _FEATURE_FLAGS_DEFAULT = {
     "llm_global_macro": True,
     "b_series_fund_manager": True,
@@ -640,7 +640,7 @@ def load_feature_overrides() -> None:
 
 | 检查点 | 清理内容 | 触发条件 |
 |:-------|:---------|:---------|
-| plan-1 完成后首次提交 | `features.py` 注册 flag + 回退路径测试 | plan-1 实施时 |
+| plan-1 完成后首次提交 | `config/features.py` 注册 flag + 回退路径测试 | plan-1 实施时 |
 | plan-1 稳定 2 版本后 | 移除 `drawSimpleChart()` + Canvas 回退路径 + Feature Flag 条件分支 | 发布 2 个版本后（如 v0.9.0） |
 | 每次 Chart.js 安全更新 | 刷新 CDN 版本号 | CVE 公告 |
 
@@ -734,7 +734,7 @@ html_writer.py: _compute_section_visibility()
 
 | # | 问题 | 等级 | 说明 |
 |:-:|:-----|:----|:------|
-| H1 | `features.py` 分类注释计数不同步 | 低 | `# ── 功能特性（2 项）──` → 注册后应为 **3 项** |
+| H1 | `config/features.py` 分类注释计数不同步 | 低 | `# ── 功能特性（2 项）──` → 注册后应为 **3 项** |
 | H2 | `data_unavailable` 与 chart 的交互未覆盖 | 低 | `data_unavailable=True` 时（持仓有成本但总市值=0），Chart.js 应显示"暂无数据"横幅而非尝试渲染空图。**已修复** — Iter 3（§5 验收标准 4）和 Iter 6（§5 验收标准 6）均已添加 `data_unavailable` 交叉验证 |
 | H3 | 模板 context 膨胀未评估 | 低 | 当前 render() 已传递约 **40 个 context 变量**。`chart_datasets` 是多个 JSON 数据集构成的嵌套 dict，加入后 context 序列化/传递性能需验证（预估 <5ms 增量） |
 | H4 | 量化指标雷达图数据来源核查已确认 | 中 | `prep["risk_metrics"]` 仅含 5 个基本字段（volatility/max_drawdown/return 等）。全量 14 项指标（sharpe/calmar/HHI/beta 等）由 `compute_all_metrics()` 计算后存于局部变量 `_metrics`，**仅传入 LLM（第 948 行），从未传入 `write_html_report()`**。Iter 1 需在编排器中将 `_metrics` 合并到 `chart_datasets` 或在 `build_chart_datasets()` 新增参数 `all_metrics` 接收 |

@@ -223,6 +223,10 @@ def _extract_entity_bigrams(text: str) -> set[str]:
 # 新闻因共享日期格式而获得虚高 ratio，进入不必要的候选区。
 # ⚠ 仅用于 ratio 计算，不影响 kept_norms（后者用于 bigram 提取）。
 _RATIO_CLEAN = re.compile(r"\d{4}年|\d+月|\d+日")
+# 英文词占位化：用于 ratio 比较时降权共享英文专名（Anthropic/Meta 等），
+# 避免 SequenceMatcher 比率虚高。英文专名在 _extract_entity_bigrams
+# 中已有独立处理，不影响 bigram 提取。
+_ENG_PLACEHOLDER = re.compile(r"[a-z]+")
 
 
 def _dedup_by_title(
@@ -231,16 +235,20 @@ def _dedup_by_title(
 ) -> list[dict[str, Any]]:
     """基于标准化标题模糊去重 + 中文实体 bigram 辅助判定。
 
-    三档阈值策略（基于 10.6 万条锚点校准，2026-07-26 更新）：
-      - 同源：共享实体 bigram ≥ 2 即合并。
+    四档阈值策略（基于 10.6 万条锚点校准，2026-07-30 更新）：
+      - 同源：共享实体 bigram ≥ 4 即合并。
         同源不会同时出现方向对立报道（如"突破3万亿"vs"跌破3万亿"），
         所以不依赖 SequenceMatcher 阈值，只检查实体重叠。
       - 跨源：采用梯度阈值——
         ① ratio ≥ 0.50 安全区，直接合并
         ② cross_threshold ≤ ratio < 0.50，阶梯判定：
            - 共享 ≥ 3 个实体 bigram → 合并（高实体重叠，低 ratio 门槛）
-           - 共享 ≥ 2 个实体 bigram 且 ratio ≥ 0.38 → 合并（梯度补偿）
+           - 共享 ≥ 2 个实体 bigram 且 ratio ≥ 0.45 → 合并（中高 ratio 补偿）
            - 否则跳过（实体重叠不足或 ratio 太低）
+
+    _normalize_title 剥离通用数字模式（百分比、金额、年份等）和前缀修饰语。
+    ratio 比较前额外剥离日期模式和英文专名，避免虚高。英文专名的实体重叠
+    由 _extract_entity_bigrams 独立处理。
 
     实体 bigram：
       - 提取中文 2-gram，过滤常见财经动词（上调/下跌/超越等）
@@ -282,6 +290,11 @@ def _dedup_by_title(
             #    剥离通用日期模式后比较，避免不同新闻因共享"2026年7月"等虚高
             _norm_clean = _RATIO_CLEAN.sub("", norm)
             _exist_clean = _RATIO_CLEAN.sub("", existing)
+            # 英文专名占位化，避免共享专名（Anthropic/Meta/AMD）导致
+            # SequenceMatcher 比率虚高（英文专名在 _extract_entity_bigrams
+            # 中已有独立处理，ratio 中可降权）。
+            _norm_clean = _ENG_PLACEHOLDER.sub("_tk_", _norm_clean)
+            _exist_clean = _ENG_PLACEHOLDER.sub("_tk_", _exist_clean)
             ratio = SequenceMatcher(None, _norm_clean, _exist_clean).ratio()
             if ratio >= 0.50:
                 is_dup = True
@@ -299,10 +312,15 @@ def _dedup_by_title(
                     is_dup = True
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
                     break
+                # ④ bg=2 梯度规则：中高 ratio + 有实体重叠 → 合并
+                if overlap >= 2 and ratio >= 0.45:
+                    is_dup = True
+                    _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge_bg2"))
+                    break
                 # 锚点：跨源候选区但 bigram 不足
                 _record_anchor(_make_anchor(item, existing_item, ratio, overlap, False, "cross_skip"))
 
-            # ④ 子串包含
+            # ⑤ 子串包含
             if not is_dup:
                 short, long = (norm, existing) if len(norm) <= len(existing) else (existing, norm)
                 if len(short) >= 6 and short in long:

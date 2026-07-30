@@ -39,12 +39,12 @@
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 190 |
 | **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_b_series, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, portfolio_history, history_snapshot) | `unit/report/` 共 41 文件含 test_html_writer、test_html_template 等 | 1079 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content, cost_tracker, fallback) | `unit/llm/`(含 API 路由/熔断/重试/降级/骨架/prompts/generators/辩论/cache 等) + `scenario/llm/` | 670 |
-| **核心基础设施** | `cache.py`, `models.py`, `reader.py`, `registry.py`, `http_client.py`, `market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 562 |
-| **配置管理** | `config.py`, `constants.py` | `unit/config/test_config*.py` | 177 |
+| **核心基础设施** | `core/cache.py`, `core/models.py`, `core/reader.py`, `core/registry.py`, `core/http_client.py`, `core/market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 562 |
+| **配置管理** | `config/`, `core/constants.py` | `unit/config/test_config*.py` | 177 |
 | **分析计算** | `analysis/`(liquidity, rebalance, fx_exposure, bond_yield, alignment_correction, drawdown_warning) | `unit/analysis/test_{liquidity,rebalance,bond_yield,fx_exposure,alignment_correction,drawdown_warning}*.py` | 233 |
-| **TUI 交互** | `tui*.py`, `handlers.py`, `tui_keys.py` | `unit/ui/test_{tui,tui_handlers,tui_menu,log_sanitize}.py` | 125 |
-| **CLI 命令行模式** | `cli.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py` + `integration/test_cli_integration.py` | 48 |
-| **命令处理器** | `handlers_cache.py`, `handlers_config.py`, `handlers_report.py` | `unit/handlers/test_{handlers_cache,handlers_config,handlers_report}.py` | 32 |
+| **TUI 交互** | `tui/tui*.py`, `tui/handlers*.py`, `tui/tui_keys.py` | `unit/ui/test_{tui,tui_handlers,tui_menu,log_sanitize}.py` | 125 |
+| **CLI 命令行模式** | `cli/cli.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py` + `integration/test_cli_integration.py` | 48 |
+| **命令处理器** | `tui/handlers_cache.py`, `tui/handlers_config.py`, `tui/handlers_report.py` | `unit/handlers/test_{handlers_cache,handlers_config,handlers_report}.py` | 32 |
 | **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组 12 文件) | 275 |
 
 ### 场景测试分组（scenario）

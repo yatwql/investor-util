@@ -37,7 +37,7 @@
 
 ```
                                主流程入口
-                          handlers_report.py
+                               tui/handlers_report.py
                                 │
                                 ▼
                     ┌─────────────────────────┐
@@ -361,7 +361,7 @@ _run_batch_mode(llm_config, module_key, *hooks)
 ### 4.1 `generate_all_llm()` 完整流程
 
 ```
-handlers_report.py 菜单 L/B
+tui/handlers_report.py 菜单 L/B
     │
     ▼
 generate_all_llm(a_indices, us_indices, total_mv, total_cost, ...)
@@ -962,7 +962,7 @@ _session_usage ──→ format_session_usage()
 
 `_PRICING_MERGED` 运行时合并自两层：
 
-1. **内置默认**（`constants.py` 中的 `MODEL_PRICING` 字典）
+1. **内置默认**（`core/constants.py` 中的 `MODEL_PRICING` 字典）
 2. **用户覆盖**（`llm_settings.json` → `pricing` 字段，模块加载时 `_reload_pricing()` 自动合并）
 
 文件配置优先级高于内置默认：
@@ -1002,11 +1002,11 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 
 ## 11. 熔断器
 
-`llm/circuit_breaker.py` 实现端点级熔断器，与 `provider_registry.py` 的熔断器职责分离：
+`llm/circuit_breaker.py` 实现端点级熔断器，与 `core/provider_registry.py` 的熔断器职责分离：
 
 | 特性 | DataSourceRegistry 熔断器 | LLM 熔断器 |
 |:-----|:------------------------|:----------|
-| 位置 | `provider_registry.py` | `llm/circuit_breaker.py` |
+| 位置 | `core/provider_registry.py` | `llm/circuit_breaker.py` |
 | 保护对象 | 数据源 Provider（腾讯/新浪/东财等） | LLM API 端点（Anthropic/OpenAI） |
 | 粒度 | per-provider | per-endpoint（域名级） |
 | 参数 | 单 API：3 次/300s；批量 API：6 次/120s | 3 次/60s |
@@ -1056,7 +1056,7 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 
 ### 12.2 注册表键名派生
 
-在 `registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`），自动派生 `llm_settings.json` 的所有合法键名：
+在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`），自动派生 `llm_settings.json` 的所有合法键名：
 
 ```
 已知 LLM Settings 键名（每个模块 10 个）：
@@ -1109,9 +1109,9 @@ get_llm_config()
 LLM 集成层与系统其他组件的接口：
 
 ```
-                            ┌────────────────────┐
-  ┌─────────────────────── │ handlers_report.py  │ ← 菜单 L/B 入口
-  │                         └─────────┬──────────┘
+                            ┌────────────────────────┐
+  ┌─────────────────────── │ tui/handlers_report.py │ ← 菜单 L/B 入口
+  │                         └───────────┬───────────┘
   │                                   │
   │                                   ▼
   │                         ┌────────────────────┐
@@ -1200,7 +1200,7 @@ LLM 集成层与系统其他组件的接口：
 
 ### 附录 B：内置模型定价表
 
-以下为 `constants.py` 中 `MODEL_PRICING` 内置的定价快照（单位：元/百万 token），可通过 `llm_settings.json` 的 `pricing_overrides` 覆盖：
+以下为 `core/constants.py` 中 `MODEL_PRICING` 内置的定价快照（单位：元/百万 token），可通过 `llm_settings.json` 的 `pricing_overrides` 覆盖：
 
 | 模型 | 输入 | 输出 | 缓存命中 |
 |:-----|:----:|:----:|:--------:|

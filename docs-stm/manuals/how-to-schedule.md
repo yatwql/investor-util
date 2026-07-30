@@ -43,10 +43,10 @@ CLI 入口：`python -m src.python.cli [全局参数] <子命令> [子命令参�
 
 ```batch
 :: 每日 16:00 生成全量报告（盘后）
-schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "python D:\codebase\zoo\investor-util\src\python\cli.py report --type full --history auto" /ST 16:00 /F
+schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "python D:\codebase\zoo\investor-util\src\python\cli\cli.py report --type full --history auto" /ST 16:00 /F
 
 :: 每周一早 9:00 更新全部缓存
-schtasks /CREATE /SC WEEKLY /D MON /TN "InvestCacheUpdate" /TR "python D:\codebase\zoo\investor-util\src\python\cli.py cache --update all" /ST 09:00 /F
+schtasks /CREATE /SC WEEKLY /D MON /TN "InvestCacheUpdate" /TR "python D:\codebase\zoo\investor-util\src\python\cli\cli.py cache --update all" /ST 09:00 /F
 ```
 
 ### 2.2 PowerShell 包装脚本（推荐）
