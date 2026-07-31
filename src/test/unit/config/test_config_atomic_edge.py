@@ -81,6 +81,29 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
         self.assertEqual(final.get("base"), 0, "初始 key 不应被覆盖")
 
     @patch("src.python.config._config_defaults.get_config_path")
+    def test_set_config_raises_on_corrupt_file(self, mock_get_path):
+        """配置文件损坏时 set_config 抛异常且不覆盖原文件。
+
+        回归缺陷：set_config 的 get_config() 读取失败时静默回退默认配置并覆盖写，
+        并发写入（os.replace 瞬间）或文件损坏场景下丢失已有配置项（如 base key）。
+        """
+        mock_get_path.return_value = self.config_path
+        from src.python.config import set_config
+        import json
+
+        # 写入损坏 JSON（模拟读取失败场景）
+        broken_content = "{broken json"
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            f.write(broken_content)
+
+        with self.assertRaises(json.JSONDecodeError):
+            set_config("new_key", 1)
+
+        # 损坏文件未被覆盖（不得静默回退默认配置写入）
+        with open(self.config_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), broken_content, "读取失败时不得覆盖原文件")
+
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_power_failure_during_replace(self, mock_get_path):
         """模拟断电：os.replace 抛出异常 → 原文件完整，无临时文件残留。"""
         mock_get_path.return_value = self.config_path

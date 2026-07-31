@@ -38,6 +38,7 @@
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
 | rf-96 | 辩论虚构过滤按"行"删除，HTML 单行输出被一个误判 token 整段清空（TOP2/TOP3/Smart 误判 → 白脸 6412 字符过滤后 0 字符 → 回退普通模式） | 过滤粒度改"行内句段"级；`raw_filter_fn` 钩子使过滤在 markdown_to_html 前作用于原始 Markdown；`TOP\d` 与 `smart`/`money` 白名单降低误报 | `changelog.md` → 辩论虚构过滤修复 |
+| rf-97 | `set_config` 读-改-写无锁，并发下 get_config 读失败静默回退默认配置覆盖写，丢失已有配置项（P2 verify 门禁暴露：并发测试 final.get("base")=None） | `_config_lock` 改 RLock；`set_config` 整个 RMW 纳入锁内串行化；`get_config(_strict=True)` 文件存在但读失败时抛异常中止写而非静默覆盖；新增损坏文件回归测试 | `changelog.md` → Fix |
 | rf-90 | `_build_prompt_appendix` 无专用测试 | 新增 `TestBuildPromptAppendix` 4 用例（空持仓/单品种/多品种排序/零市值）+ `TestBuildExpertReviewPromptSkipScenarios` 3 用例 | `changelog.md` → Test |
 | rf-91 | `fact_checker` 数值混淆（601939 11.0%→2.0%） | 自动修正 v3：返回 correction 二元组 + apply_numerical_corrections + tolerance_overrides | `changelog.md` → 事实校验 v3 |
 | rf-92 | LLM 持仓排名幻觉（040046/561910 声称"最大持仓"）| 统一注入架构：`_build_prompt_appendix` 在 `_run_standard_mode` 自动注入 TOP3/速查表/白名单 | `changelog.md` → Prompt 防御统一注入 |

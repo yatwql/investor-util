@@ -8,6 +8,7 @@
 
 ### Fix
 
+- **`set_config` 并发读-改-写竞态导致丢失已有配置项** — `_core.py`：`_config_lock` 改 `threading.RLock`；`set_config` 整个读-改-写纳入锁内串行化（并发线程不再基于旧快照覆盖写）；`get_config(_strict=True)` 文件存在但读取失败时抛异常中止写而非静默回退默认配置覆盖（P2 verify 门禁在 xdist 4-worker 下暴露：并发测试 `final.get("base")` 为 None）；新增损坏文件不覆盖回归测试
 - **辩论虚构过滤按"行"删除导致整段误删** — `_hallucination_filter.py` 过滤粒度从"整行"改为"行内句段"（先按行、行内再按句末标点切分），markdown_to_html 输出的单行 HTML 不再因一个误判 token 被整段清空（6412 字符→0 字符→白脸失败回退普通模式）
 - **虚构过滤时机下移** — `skeleton.py` 新增 `raw_filter_fn` 钩子，在 markdown_to_html 之前对 LLM 原始输出过滤（作用于带换行的 Markdown）；`generators.py` 辩论 pro/con/synthesis 三处手动过滤收敛到骨架一处，synthesis 顺带获得过滤保护
 - **虚构代码误报降低** — `_is_safe_word` 豁免 `TOP\d+`（提示词附录 TOP3 块回声），白名单新增 `smart`/`money`（Smart Beta/Money 等金融术语）
@@ -20,6 +21,7 @@
 
 ### Test
 
+- **set_config 并发竞态回归测试** — 新增 `test_set_config_raises_on_corrupt_file`（edge）：配置文件损坏时 `set_config` 抛异常且不覆盖原文件，杜绝静默回退默认配置覆盖写丢数据；原并发测试 `test_concurrent_set_config_thread_safe` 修复后 5 连跑稳定通过
 - **虚构过滤回归测试** — 新增 4 用例：`test_sentence_level_removal_same_line`（行内句段删除）、`test_top_rank_suffix_not_filtered`（TOP2/TOP3 豁免）、`test_smart_term_not_filtered`（Smart 豁免）、`test_filter_single_line_html_keeps_other_sentences`（单行 HTML 不整段清空，edge）
 - **测试用例数据更新** — 同步 bg=2 梯度阈值 0.40 更新后的去重预期行为
 

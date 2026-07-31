@@ -57,7 +57,7 @@ def _atomic_write(filepath: str, content: str) -> None:
 _config_cache: dict | None = None
 _config_mtime: float = 0
 _config_size: int = 0
-_config_lock = threading.Lock()
+_config_lock = threading.RLock()
 
 
 def _clear_config_cache() -> None:
@@ -84,11 +84,16 @@ def invalidate_llm_config_cache() -> None:
         _llm_config_size = 0
 
 
-def get_config() -> dict:
+def get_config(_strict: bool = False) -> dict:
     """
     读取配置文件并返回配置字典（带线程安全缓存）。
 
     缓存按文件修改时间自动失效。若配置文件不存在或内容损坏，返回默认配置。
+
+    Args:
+        _strict: 内部参数。True 时若文件存在但读取失败则抛异常（供 set_config
+                 使用，避免基于损坏/读取失败的默认配置覆盖写入丢失已有配置项）。
+                 普通读取（get_config() 缺省调用）仍保持静默回退降级策略。
     """
     global _config_cache, _config_mtime, _config_size
 
@@ -133,6 +138,9 @@ def get_config() -> dict:
             return merged
         except (OSError, json.JSONDecodeError):
             _config_cache = None
+            if _strict and os.path.exists(config_path):
+                logger.warning("配置文件 %s 读取失败，中止配置写入", config_path)
+                raise
             logger.warning("配置文件 %s 读取失败，已回退到默认配置", config_path)
             return dict(_config_defaults._DEFAULT_CONFIG)
 
@@ -149,19 +157,21 @@ def set_config(key: str, value: Any) -> None:
     """
     global _config_cache, _config_mtime, _config_size
 
-    config = get_config()
-    config[key] = value
-
     config_path = _config_defaults.get_config_path()
-    config_dir = os.path.dirname(config_path)
+    # 整个 读-改-写 纳入锁内串行化，避免并发线程基于旧快照覆盖写丢失已有配置项
+    # （RLock 可重入，内部 get_config 再次获取同一锁不冲突）
+    with _config_lock:
+        config = get_config(_strict=True)
+        config[key] = value
 
-    os.makedirs(config_dir, exist_ok=True)
+        config_dir = os.path.dirname(config_path)
+        os.makedirs(config_dir, exist_ok=True)
 
-    _atomic_write(config_path, json.dumps(config, ensure_ascii=False, indent=2))
+        _atomic_write(config_path, json.dumps(config, ensure_ascii=False, indent=2))
 
-    _config_cache = None
-    _config_mtime = 0
-    _config_size = 0
+        _config_cache = None
+        _config_mtime = 0
+        _config_size = 0
 
 
 def init_config(config_path: str | None = None) -> None:
