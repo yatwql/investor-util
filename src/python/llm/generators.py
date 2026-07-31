@@ -563,7 +563,9 @@ def generate_debate_procon(
 
     # ── Step 3: 综合（Synthesis） ──────────────────────
     _synthesis_user = _build_debate_synthesis_prompt(
-        pro_text, con_text, enable_conditional=_enable_conditional,
+        pro_text,
+        con_text,
+        enable_conditional=_enable_conditional,
     )
     _pro_digest = hashlib.sha256(pro_text[:200].encode()).hexdigest()[:8]
     _con_digest = hashlib.sha256(con_text[:200].encode()).hexdigest()[:8]

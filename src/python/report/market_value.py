@@ -509,7 +509,9 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
         if mkt is not None and not _price_cache_fresh(mkt):
             logger.debug(
                 "CACHE_ONLY 缓存过时: %s (%s) price_date=%s，降级到实时获取",
-                h.name, h.code, mkt.get("price_date", "?"),
+                h.name,
+                h.code,
+                mkt.get("price_date", "?"),
             )
             mkt = None
         result_map[(h.account.strip(), h.code.strip())] = mkt

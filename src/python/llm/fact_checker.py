@@ -117,7 +117,7 @@ def _is_drawdown_context(sentence: str, match_start: int) -> bool:
     if not any(kw in sentence for kw in _DRAWDOWN_KEYWORDS):
         return False
     # match 前 15 字符内有收益关键词 → 以收益为主
-    _profit_nearby = sentence[max(0, match_start - 15):match_start]
+    _profit_nearby = sentence[max(0, match_start - 15) : match_start]
     if any(kw in _profit_nearby for kw in _PROFIT_KEYWORDS):
         return False
     return True
@@ -127,6 +127,7 @@ def _sentence_snippet(sentence: str, max_len: int = 50) -> str:
     """截取句子前 max_len 字作为上下文摘要。"""
     s = sentence.replace(" ", "").strip()
     return s[:max_len] + "…" if len(s) > max_len else s
+
 
 # 调仓目标上下文——数值为目标而非实际收益率
 _REBALANCE_TARGET_KEYWORDS = frozenset(
@@ -671,8 +672,8 @@ def apply_numerical_corrections(
 
         # 在 HTML 文本中查找 wrong_val%（带可选空格）
         # lookbehind 确保不会替换数字的一部分
-        pattern = re.compile(r'(?<!\d)' + re.escape(wrong_val) + r'\s*%')
-        result = pattern.sub(correct_val + '%', result)
+        pattern = re.compile(r"(?<!\d)" + re.escape(wrong_val) + r"\s*%")
+        result = pattern.sub(correct_val + "%", result)
 
     return result
 
@@ -749,7 +750,9 @@ def run_fact_check(
 
     # 检查 1：数值一致性（含回撤语境检测）
     num_issues, num_checked, num_passed, corrections = check_numerical_consistency(
-        text, holdings_details, tolerance_pct=effective_tolerance,
+        text,
+        holdings_details,
+        tolerance_pct=effective_tolerance,
         max_drawdown_pct=_max_dd,
     )
     all_issues.extend(num_issues)

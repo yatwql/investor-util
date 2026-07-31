@@ -258,6 +258,7 @@ def _print_calibration_advice(
 def main() -> None:
     # 强制 stdout 使用 UTF-8，确保输出重定向到文件时中文不丢失
     import sys
+
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
