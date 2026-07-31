@@ -232,10 +232,11 @@ class TestDedupByTitle(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
     def test_cross_source_english_token_only_overlap(self) -> None:
-        """跨源：仅英数 token 重叠但无实质实体重叠，不合并。
+        """跨源：仅英数 token 重叠但 ratio≥0.40 时走 bg=2 梯度规则合并。
 
         数值 token（2.5%、0.8%）被 _normalize_title 过滤后，仅剩
-        {cpi, ppi} 2 个 token，达不到跨源 ≥3 实体 bigram 的合并门槛。
+        {cpi, ppi} 2 个 token。ratio≈0.43 ≥ 0.40 阈值，触发
+        bg=2 梯度规则（overlap≥2 + ratio≥0.40）合并。
         """
         from src.python.providers.news_aggregator import _dedup_by_title
 
@@ -244,9 +245,8 @@ class TestDedupByTitle(unittest.TestCase):
             self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
         ]
         result = _dedup_by_title(items)
-        # _normalize_title 过滤百分比后 entity overlap={cpi, ppi}=2 < 3
-        # ratio≈0.33 在候选区但 bigram 不足 → 保留2条
-        self.assertEqual(len(result), 2)
+        # bg=2 梯度规则：ratio≈0.43 ≥ 0.40 → 合并为1条
+        self.assertEqual(len(result), 1)
 
     def test_cross_source_bg2_high_ratio_merged(self) -> None:
         """跨源：英数 token 重叠≥3（amd+helios+azure+ai），走正常 bg≥3 规则合并。"""
@@ -266,13 +266,13 @@ class TestDedupByTitle(unittest.TestCase):
         """跨源：bg=2 但 ratio<0.40 时不合并，梯度规则不误杀。"""
         from src.python.providers.news_aggregator import _dedup_by_title
 
-        # 共享 CPI+PPI 2 个英数 token 但 ratio≈0.389，低于 0.40 门槛
+        # 共享"持续""续走"2 个中文 bigram 但 ratio≈0.375，低于 0.40 门槛
         items = [
-            self._make_item("CPI同比增长2.5%PPI同比下降0.8%", "东方财富"),
-            self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
+            self._make_item("科技板块持续走强", "东方财富"),
+            self._make_item("国际油价持续走弱", "新浪财经"),
         ]
         result = _dedup_by_title(items)
-        # overlap=2 但 ratio≈0.389 < 0.40 → 保留2条
+        # overlap=2 但 ratio≈0.375 < 0.40 → 保留2条
         self.assertEqual(len(result), 2)
 
     def test_cross_source_year_digit_not_inflated(self) -> None:

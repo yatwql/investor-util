@@ -4,13 +4,14 @@
 
 ---
 
-## [0.9.2-dev] - 2026-07-31
+## [0.9.2] - 2026-07-31
 
 ### Feat
 
 - **事实校验 v3：自动修正机制** — `fact_checker.py`：`check_numerical_consistency` 返回 `(issue, correction)` 二元组、`run_fact_check` 返回 `(corrected_html, summary_html)`、`apply_numerical_corrections` 支持正则级联替换；新增 `tolerance_pct` + `tolerance_overrides` 逐模块容差、pp 混淆语境跳过策略
 - **Prompt 防御统一注入架构** — `prompts_tables.py` 新增 `_build_prompt_appendix`（TOP3 排名 + 数据速查表 + 代码白名单），在 `skeleton.py:_run_standard_mode()` 自动注入到所有模块的 user prompt 末尾，各模块无需手动调用；`prompts_action.py` 移除各模块的手动防御调用
 - **跨源 bg=2 梯度阈值调低至 0.40** — `news_dedup.py` 的 `cross_merge_bg2` 规则从 `ratio≥0.45` 降至 `ratio≥0.40`，基于校准报告（119654 条锚点）发现 bg≥2+ratio≥0.35 区间有 580 条含实体重叠被跳过，0.40 可额外捕获约 300-400 条真实重复，bg=2 已提供实体重叠安全垫
+- **辩论模式 synthesis 条件推理注入** — `prompts_action.py:_build_debate_synthesis_prompt` 新增 `enable_conditional` 参数，辩论+条件推理同时开启时在综合阶段追加配置化情景分析（涨/跌/震荡三情景），弥补 pro/con 因 `skip_scenarios=True` 跳过情景分析的空缺
 
 ### Fix
 
@@ -30,6 +31,8 @@
 - **场景分析指令迁移测试** — 新增 `TestBuildExpertReviewPromptSkipScenarios` 3 用例（`skip_scenarios=True` 剔除场景、默认保留场景、不影响其他内容块）
 - **统一注入防御专用测试** — 新增 `TestBuildPromptAppendix` 4 用例（空持仓、单品种含三块、多品种排序验证、零市值防除零）
 - **测试适配** — `test_mode2_disabled` 改为断言标准场景存在（场景指令已从 system prompt 移入 user prompt）；`test_system_expert_review_constant` 改用"置信度指引"代替已移除的"情景分析"断言
+- **新闻去重测试用例同步** — `test_cross_source_english_token_only_overlap` 从预期保留 2 条改为预期合并 1 条（匹配 bg=2+ratio≥0.40 新规则）；`test_cross_source_bg2_low_ratio_kept` 替换测试数据（改用 ratio≈0.375 的"科技板块持续走强"vs"国际油价持续走弱"验证 <0.40 不合并）
+- **缓存测试 patch 路径修复** — `test_handlers_cache.py:TestRefreshDividendCache` 中 `test_with_valid_codes` 和 `test_empty_holdings` 的 `@patch` 目标从 `src.python.providers.akshare_extras.get_dividend_data` 修正为 `src.python.fetcher.akshare.get_dividend_data`（模块加载时本地绑定导致 xdist 并行下间歇性失败）
 
 ### Docs
 

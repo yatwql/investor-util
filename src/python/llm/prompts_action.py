@@ -469,17 +469,49 @@ def _build_penetration_deep_prompt(
 # ── 辩论模式：综合 prompt 构建 ──────────────────────────────
 
 
-def _build_debate_synthesis_prompt(pro_text: str, con_text: str) -> str:
+def _build_debate_synthesis_prompt(
+    pro_text: str,
+    con_text: str,
+    enable_conditional: bool = False,
+) -> str:
     """构建综合阶段的用户 prompt，包含白脸和黑脸的原始分析全文。
+
+    当 ``enable_conditional=True`` 时额外追加条件推理的情景分析指令，
+    让指挥官在综合正反观点的基础上按涨/跌/震荡情景分别给出建议。
 
     Args:
         pro_text: 白脸分析的完整文本。
         con_text: 黑脸分析的完整文本。
+        enable_conditional: 是否追加条件推理情景分析指令。
 
     Returns:
         格式化的综合 prompt 字符串。
     """
-    return f"白脸原始分析：\n\n```\n{pro_text}\n```\n\n黑脸原始分析：\n\n```\n{con_text}\n```"
+    prompt = f"白脸原始分析：\n\n```\n{pro_text}\n```\n\n黑脸原始分析：\n\n```\n{con_text}\n```"
+
+    if enable_conditional:
+        try:
+            from src.python.config._core import get_llm_config
+
+            _cfg = get_llm_config()
+            _scenarios = (_cfg or {}).get("debate", {}).get("conditional", {}).get("scenarios", [])
+            if _scenarios:
+                scenario_lines = [
+                    "\n\n### 情景分析",
+                    "请结合上述白脸和黑脸的分析，按以下情景分别给出综合后的行动建议：",
+                ]
+                for _s in _scenarios:
+                    _name = _s.get("name", "未知")
+                    _desc = _s.get("desc", "")
+                    scenario_lines.append(
+                        f"📈 **{_name}情景（{_desc}）**：至少 2 句具体行动建议，"
+                        f"综合正反观点，给出在 {_desc} 情境下的持仓调整建议。"
+                    )
+                prompt += "\n".join(scenario_lines)
+        except Exception:
+            logger.warning("[debate] 综合阶段条件推理情景追加失败，已跳过")
+
+    return prompt
 
 
 __all__ = [

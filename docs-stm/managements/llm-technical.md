@@ -101,7 +101,7 @@
               └──────────────────┘          └────────────────────┘
               ┌──────────────────┐          ┌────────────────────┐
               │ circuit_breaker  │          │ fact_checker.py    │
-              │ .py              │          │ 伪代码/幻觉过滤    │
+              │ .py              │          │ 事实锚定校验        │
               │ LLM 端点熔断器    │          └────────────────────┘
               └──────────────────┘
               ┌──────────────────┐
@@ -160,7 +160,7 @@ skeleton.py:_generate_llm_content()
 | `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、Gemini API 调用 | `_call_llm()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `_call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
-| `fact_checker.py` | 基础设施 | LLM 输出伪代码/虚假信息过滤，正则级行级幻觉检测 | `run_fact_check()` |
+| `fact_checker.py` | 基础设施 | LLM 输出事实锚定校验（数值一致性/品种存在性/排名正确性）+ 自动修正 | `run_fact_check()` |
 | `fallback.py` | 基础设施 | 全模块失败时的降级占位模板 | `get_fallback_content()` |
 | `prompts_core.py` | 工具 | System / User Prompt 构建 | `_build_system_prompt()` / `_build_user_prompt()` |
 | `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown | `_build_metrics_table()` / `_build_performance_table()` |
@@ -261,6 +261,13 @@ _run_standard_mode()
 │ user_prompt = prompt_builder │
 │ ()                           │
 └──────────┬───────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────┐
+│ 注入 Prompt Appendix（防御统一注入）      │
+│ _build_prompt_appendix() → 追加至尾部     │
+│  TOP3 排名 + 数据速查表 + 代码白名单       │
+└──────────────────┬───────────────────────┘
            │
            ▼
 ┌──────────────────────────────────────┐
@@ -1048,6 +1055,7 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 | Provider 链与策略 | `llm_providers.json` | `{"strategy": "priority", "providers": [{"name": "p1", "credentials_ref": "deepseek-main", ...}]}` |
 | Per-module 参数 | `llm_settings.json` | `max_tokens_expert_review`, `timeout_global_macro` |
 | 模块启用开关 | `llm_settings.json` | `enabled_llm.global_macro` |
+| 事实校验容差 | `llm_settings.json` | `fact_check.tolerance`, `fact_check.tolerance_overrides` |
 | Thinking 配置 | `llm_settings.json` | `thinking_enabled_expert_review`, `thinking_budget_expert_review` |
 | 简化模式 | `llm_settings.json` | `output_brief_expert_review` |
 | 缓存 TTL | `config.json` | `cache_ttl.llm_global_macro` |
@@ -1073,7 +1081,8 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 除 news_correlation 外的 4 个模块额外增加：
   output_brief_{suffix}
 
-加上 2 个全局键名：
+加上全局键名：
+  fact_check
   llm_max_concurrency
   fail_title_{suffix}
 ```

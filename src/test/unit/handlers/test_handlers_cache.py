@@ -220,7 +220,7 @@ class TestRefreshDividendCache(unittest.TestCase):
         from src.python.cache.operations import _refresh_dividend_cache
         return _refresh_dividend_cache(holdings)
 
-    @patch("src.python.providers.akshare_extras.get_dividend_data")
+    @patch("src.python.fetcher.akshare.get_dividend_data")
     def test_with_valid_codes(self, mock_get):
         """有效代码返回正确计数。"""
         mock_get.return_value = {"600900": {}, "600519": {}}
@@ -232,7 +232,7 @@ class TestRefreshDividendCache(unittest.TestCase):
         count = self._call(holdings)
         self.assertEqual(count, 2)
 
-    @patch("src.python.providers.akshare_extras.get_dividend_data")
+    @patch("src.python.fetcher.akshare.get_dividend_data")
     def test_empty_holdings(self, mock_get):
         """空持仓列表返回 0 且不调用 API。"""
         count = self._call([])
