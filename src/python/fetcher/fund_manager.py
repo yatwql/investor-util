@@ -22,7 +22,7 @@ import httpx
 
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 
 logger = logging.getLogger("invest")
 
@@ -35,7 +35,119 @@ _HEADERS = {
 }
 _TIMEOUT = 15.0
 
-# ── HTML 解析 ────────────────────────────────────────────────────
+# ── HTML 解析辅助函数 ─────────────────────────────────────────
+
+
+def _parse_info_of_fund(html: str) -> tuple[str, str]:
+    """从 infoOfFund 表格提取基金经理姓名和任职起始日。"""
+    info_match = re.search(
+        r'<div[^>]*class="infoOfFund"[^>]*>(.*?)</div>',
+        html,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if not info_match:
+        return ("", "")
+
+    info_html = info_match.group(1)
+    # 旧格式：基金经理 独立 td → 下一个 td 含名字
+    manager_row = re.search(
+        r"基金经理\s*</td>\s*<td[^>]*>(.*?)</td>",
+        info_html,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if manager_row:
+        cell_html = manager_row.group(1)
+        # 提取所有 <a> 标签内的名字（多位经理以链接形式并列）
+        names = re.findall(r"<a[^>]*>(.*?)</a>", cell_html)
+        if names:
+            manager_name = "/".join(n.strip() for n in names if n.strip())
+        else:
+            # 回退：提取纯文本
+            text = re.sub(r"<[^>]+>", "", cell_html).strip()
+            if text:
+                manager_name = text.split("（")[0].split("(")[0].strip()
+            else:
+                manager_name = ""
+
+        # 提取任职起始日（旧格式中在与经理名同一 cell）
+        date_match = re.search(
+            r"任职起始日[：:]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})",
+            cell_html,
+        )
+        if not date_match:
+            date_match = re.search(
+                r"(\d{4}[-/]\d{1,2}[-/]\d{1,2})\s*至今",
+                cell_html,
+            )
+        start_date = date_match.group(1).replace("/", "-") if date_match else ""
+        return (manager_name if manager_name else "", start_date)
+    else:
+        # 新格式：同一 td 内 "基金经理：<a>name</a>"
+        new_match = re.search(
+            r"基金经理[：:]\s*<a[^>]*>(.*?)</a>",
+            info_html,
+        )
+        manager_name = new_match.group(1).strip() if new_match else ""
+        # 新格式 infoOfFund 不含任职起始日，留空由档案页回退补充
+        return (manager_name, "")
+
+
+def _parse_text_fallback(html: str) -> str:
+    """从页面文本回退搜索基金经理名称。"""
+    full_match = re.search(
+        r"基金经理[：:]\s*([^<>\n]{2,20})",
+        html,
+    )
+    if full_match:
+        return full_match.group(1).strip()
+
+    # 搜索 "基金经理</span>" 模式（移动端或简化版页面）
+    mobile_match = re.search(
+        r"基金经理</span>\s*<span[^>]*>\s*<a[^>]*>(.*?)</a>",
+        html,
+        re.DOTALL,
+    )
+    if mobile_match:
+        return mobile_match.group(1).strip()
+    return ""
+
+
+def _calc_tenure_days(start_date: str) -> int:
+    """计算任职天数。"""
+    if not start_date:
+        return 0
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        return (datetime.now() - start).days
+    except (ValueError, TypeError):
+        return 0
+
+
+def _extract_manager_history(html: str) -> list[dict]:
+    """提取历任基金经理简要列表。"""
+    history: list[dict] = []
+    history_section = re.search(
+        r"历任基金经理\s*</td>\s*<td[^>]*>(.*?)</td>",
+        html,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if history_section:
+        history_html = history_section.group(1)
+        hist_items = re.findall(
+            r"<a[^>]*>(.*?)</a>\s*[（(](\d{4}[-/]\d{1,2}[-/]\d{1,2})",
+            history_html,
+        )
+        for name, date in hist_items:
+            history.append(
+                {
+                    "name": name.strip(),
+                    "start_date": date.replace("/", "-"),
+                }
+            )
+    return history
+
+
+# ── HTML 解析（主入口） ────────────────────────────────────────
 
 
 def parse_manager_from_html(html: str) -> dict[str, Any] | None:
@@ -62,112 +174,22 @@ def parse_manager_from_html(html: str) -> dict[str, Any] | None:
     if not html or not isinstance(html, str):
         return None
 
-    manager_name = ""
-    start_date = ""
-
     # ── 策略 1：从 infoOfFund 表格提取 ──
-    # 表格结构：<div class="infoOfFund">...<td>基金经理</td><td>...<a>经理名</a>...</td>...
-    info_match = re.search(
-        r'<div[^>]*class="infoOfFund"[^>]*>(.*?)</div>',
-        html,
-        re.DOTALL | re.IGNORECASE,
-    )
-    if info_match:
-        info_html = info_match.group(1)
-        # 旧格式：基金经理 独立 td → 下一个 td 含名字
-        manager_row = re.search(
-            r"基金经理\s*</td>\s*<td[^>]*>(.*?)</td>",
-            info_html,
-            re.DOTALL | re.IGNORECASE,
-        )
-        if manager_row:
-            cell_html = manager_row.group(1)
-            # 提取所有 <a> 标签内的名字（多位经理以链接形式并列）
-            names = re.findall(r"<a[^>]*>(.*?)</a>", cell_html)
-            if names:
-                manager_name = "/".join(n.strip() for n in names if n.strip())
-            else:
-                # 回退：提取纯文本
-                text = re.sub(r"<[^>]+>", "", cell_html).strip()
-                if text:
-                    manager_name = text.split("（")[0].split("(")[0].strip()
-
-            # 提取任职起始日（旧格式中在与经理名同一 cell）
-            date_match = re.search(
-                r"任职起始日[：:]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})",
-                cell_html,
-            )
-            if not date_match:
-                date_match = re.search(
-                    r"(\d{4}[-/]\d{1,2}[-/]\d{1,2})\s*至今",
-                    cell_html,
-                )
-            if date_match:
-                start_date = date_match.group(1).replace("/", "-")
-        else:
-            # 新格式：同一 td 内 "基金经理：<a>name</a>"
-            new_match = re.search(
-                r"基金经理[：:]\s*<a[^>]*>(.*?)</a>",
-                info_html,
-            )
-            if new_match:
-                manager_name = new_match.group(1).strip()
-            # 新格式 infoOfFund 不含任职起始日，留空由档案页回退补充
+    manager_name, start_date = _parse_info_of_fund(html)
 
     # ── 策略 2：页面文本回退搜索 ──
     if not manager_name:
-        # 在全文搜索 "基金经理：" 或 "基金经理 "</td>
-        full_match = re.search(
-            r"基金经理[：:]\s*([^<>\n]{2,20})",
-            html,
-        )
-        if full_match:
-            manager_name = full_match.group(1).strip()
-
-        if not manager_name:
-            # 搜索 "基金经理</span>" 模式（移动端或简化版页面）
-            mobile_match = re.search(
-                r"基金经理</span>\s*<span[^>]*>\s*<a[^>]*>(.*?)</a>",
-                html,
-                re.DOTALL,
-            )
-            if mobile_match:
-                manager_name = mobile_match.group(1).strip()
+        manager_name = _parse_text_fallback(html)
 
     if not manager_name:
         logger.debug("基金经理解析失败：页面中未找到经理信息")
         return None
 
     # ── 计算任职天数 ──
-    tenure_days = 0
-    if start_date:
-        try:
-            start = datetime.strptime(start_date, "%Y-%m-%d")
-            tenure_days = (datetime.now() - start).days
-        except (ValueError, TypeError):
-            tenure_days = 0
+    tenure_days = _calc_tenure_days(start_date)
 
-    # ── 提取历任经理简要列表（页面中可能含"历任基金经理"） ──
-    history: list[dict] = []
-    history_section = re.search(
-        r"历任基金经理\s*</td>\s*<td[^>]*>(.*?)</td>",
-        html,
-        re.DOTALL | re.IGNORECASE,
-    )
-    if history_section:
-        history_html = history_section.group(1)
-        # 每个经理可能是 <a> 或纯文本
-        hist_items = re.findall(
-            r"<a[^>]*>(.*?)</a>\s*[（(](\d{4}[-/]\d{1,2}[-/]\d{1,2})",
-            history_html,
-        )
-        for name, date in hist_items:
-            history.append(
-                {
-                    "name": name.strip(),
-                    "start_date": date.replace("/", "-"),
-                }
-            )
+    # ── 提取历任经理简要列表 ──
+    history = _extract_manager_history(html)
 
     result: dict[str, Any] = {
         "manager_name": manager_name,
@@ -357,3 +379,20 @@ def fetch_fund_manager(code: str) -> dict[str, Any] | None:
 
     logger.warning("基金经理全部解析失败 [%s]", code)
     return None
+
+
+def fetch_fund_manager_cached(code: str) -> dict[str, Any] | None:
+    """基金经理信息获取（含会话缓存），同一报告生成中同基金只获取一次。
+
+    消除多个模块独立调用 fetch_fund_manager 的冗余文件缓存读取。
+    """
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
+
+    registry = get_registry()
+    cached = registry.session_cache_get("fund_manager", code)
+    if cached is not NOT_FOUND:
+        return cached
+    result = fetch_fund_manager(code)
+    if result is not None:
+        registry.session_cache_set("fund_manager", code, result, source="api")
+    return result

@@ -121,7 +121,7 @@ class TestApiKeyNotInLog(unittest.TestCase):
         from src.python.llm.api import call_claude
 
         secret_key = "sk-header-key-88888"
-        with patch("src.python.llm.api.call_llm_with_retry") as mock_retry:
+        with patch("src.python.llm._api_claude.call_llm_with_retry") as mock_retry:
             mock_retry.return_value = ("result", {"input_tokens": 10})
             call_claude(
                 system="sys", user="user", api_key=secret_key,
@@ -184,7 +184,7 @@ class TestSanitizeEndpointInLogs(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"provider": "claude", "api_key": secret}, f)
 
-        with patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+        with patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             with patch("src.python.config.get_llm_settings_path",
                        return_value=os.path.join(tmp.name, "llm_settings.json")):
                 with patch("src.python.config._core.os.path.exists") as mock_exists:

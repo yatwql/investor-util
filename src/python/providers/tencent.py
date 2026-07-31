@@ -11,18 +11,19 @@ from typing import Any
 
 import httpx
 
-from src.python.code_utils import (
+from src.python.core.code_utils import (
     get_exchange_prefix,
     is_a_share_code,
     is_exchange_fund_code,
     is_index_code,
 )
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://qt.gtimg.cn/q="
-_TIMEOUT = 15.0
+_TIMEOUT = 15.0  # 普通行情超时
+_KLINE_TIMEOUT = 30.0  # K 线超时（需等待更多数据）
 
 
 # Tencent 实际返回格式（~ 分隔）：
@@ -253,7 +254,7 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
     logger.debug("Tencent K 线请求: %s, days=%d", full_code, days)
 
     try:
-        with make_http_client(timeout=30.0) as client:
+        with make_http_client(timeout=_KLINE_TIMEOUT) as client:
             resp = client.get(url, params=params)
             resp.encoding = "utf-8"
             data = resp.json()
@@ -344,7 +345,7 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
     logger.debug("Tencent 指数 K 线请求: %s, days=%d", full_code, days)
 
     try:
-        with make_http_client(timeout=30.0) as client:
+        with make_http_client(timeout=_KLINE_TIMEOUT) as client:
             resp = client.get(url, params=params)
             resp.encoding = "utf-8"
             data = resp.json()

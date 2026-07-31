@@ -23,8 +23,8 @@ class TestTsToStr(unittest.TestCase):
     """_ts_to_str 纯函数测试。"""
 
     def _call(self, ts: int) -> str:
-        from src.python.providers.cls_news import _ts_to_str
-        return _ts_to_str(ts)
+        from src.python.providers._utils import ts_to_str
+        return ts_to_str(ts)
 
     def test_normal_timestamp(self):
         """正常时间戳 → 格式化为 YYYY-MM-DD HH:MM。"""

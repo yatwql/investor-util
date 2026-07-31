@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.providers.news_keywords import build_holding_keywords
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_news]

@@ -1,7 +1,7 @@
 """华尔街见闻 news provider 单元测试。
 
 测试目标：
-  - _ts_to_str — 时间戳转换（北京时间）
+  - ts_to_str — 时间戳转换（北京时间）
   - _parse_news_item — 纯函数，JSON 条目解析（含 HTML 剥离、标题回退）
   - fetch_news — HTTP 请求、错误处理、空数据、limit 上限
 
@@ -15,9 +15,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
+from src.python.providers._utils import ts_to_str
 from src.python.providers.wallstreetcn_news import (
-
-    _ts_to_str,
     _parse_news_item,
     fetch_news,
 )
@@ -26,17 +25,17 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
 
 class TestTsToStr(unittest.TestCase):
-    """_ts_to_str 时间戳转换测试。"""
+    """ts_to_str 时间戳转换测试。"""
 
     def test_normal_timestamp(self):
         """正常时间戳 → 格式化为北京时间。"""
         # 1782873000 = 2026-07-01 02:30:00 UTC = 2026-07-01 10:30 CST
-        result = _ts_to_str(1782873000)
+        result = ts_to_str(1782873000)
         self.assertEqual(result, "2026-07-01 10:30")
 
     def test_epoch(self):
         """Unix 纪元 → 1970-01-01 08:00。"""
-        result = _ts_to_str(0)
+        result = ts_to_str(0)
         self.assertEqual(result, "1970-01-01 08:00")
 
 

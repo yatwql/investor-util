@@ -15,7 +15,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report import news_correlation as nc
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
@@ -639,7 +639,7 @@ class TestEnrichKeywordsWithIndustryTags(unittest.TestCase):
 
     def _make_lookup(self, industry_data: dict | None = None) -> dict:
         """构建带 industry_data 的 lookup。"""
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         holdings = [
             Holding("证券", "长江电力", "600900", 100, 10.0),

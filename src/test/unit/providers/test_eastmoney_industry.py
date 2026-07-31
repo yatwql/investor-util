@@ -196,7 +196,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
     """测试 fetch_industry_and_concepts 主函数。"""
 
     def setUp(self):
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         get_registry().session_cache_clear("industry")
         get_registry().reset()
 
@@ -256,7 +256,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
     def test_timeout_triggers_registry_failure(self, mock_client_cls):
         """连续 3 次 API 超时 → registry 熔断打开。"""
         import httpx
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         reg = get_registry()
         reg.reset()
         mock_client_cls.side_effect = _mock_httpx(error=httpx.TimeoutException)
@@ -362,7 +362,7 @@ class TestFetchIndustry(unittest.TestCase):
     """测试 fetch_industry 便捷接口。"""
 
     def setUp(self):
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         get_registry().session_cache_clear("industry")
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
@@ -406,7 +406,7 @@ class TestFetchConcepts(unittest.TestCase):
     """测试 fetch_concepts 便捷接口。"""
 
     def setUp(self):
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         get_registry().session_cache_clear("industry")
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")

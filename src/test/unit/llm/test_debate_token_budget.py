@@ -44,7 +44,7 @@ class TestDebateTokenBudgetExceeded(unittest.TestCase):
             "debate": {
                 "max_total_tokens_per_report": 100,
                 "per_call_timeout_override": 30,
-                "mode_1_procon": {
+                "procon": {
                     "per_call_max_tokens": 8192,
                     "synthesis_temperature": 0.5,
                 },
@@ -82,7 +82,7 @@ class TestDebateTokenBudgetNormal(unittest.TestCase):
             "debate": {
                 "max_total_tokens_per_report": 16000,
                 "per_call_timeout_override": 90,
-                "mode_1_procon": {
+                "procon": {
                     "per_call_max_tokens": 8192,
                     "synthesis_temperature": 0.5,
                 },
@@ -119,7 +119,7 @@ class TestDebateTokenBudget2xFallback(unittest.TestCase):
             "debate": {
                 "max_total_tokens_per_report": 100,
                 "per_call_timeout_override": 30,
-                "mode_1_procon": {
+                "procon": {
                     "per_call_max_tokens": 8192,
                     "synthesis_temperature": 0.5,
                 },

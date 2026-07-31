@@ -2,7 +2,7 @@
 
 ## 概述
 
-`src/python/registry.py` 是本项目的**中央注册表**，统一管理所有数据模块的：
+`src/python/core/registry.py` 是本项目的**中央注册表**，统一管理所有数据模块的：
 
 - **中文名称**（`name`）— 页面、报告、日志中显示的人类可读名称
 - **缓存前缀**（`cache_prefixes`）— 缓存文件名的前缀，用于按类型清理/匹配
@@ -50,7 +50,7 @@ class DataModuleDef:
 
 ## 注册表结构
 
-见 `registry.py` 中 `_MODULE_REGISTRY: tuple[DataModuleDef, ...]` — 当前包含以下几类：
+见 `core/registry.py` 中 `_MODULE_REGISTRY: tuple[DataModuleDef, ...]` — 当前包含以下几类：
 
 | 分组 | 包含模块 | data_type | TTL | 说明 |
 |------|---------|-----------|:---:|------|
@@ -59,7 +59,7 @@ class DataModuleDef:
 | **行业分类（refresh）** | 行业分类 | `industry` | 14天 | 主动刷新触发 |
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
-| **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | P4 实验功能，三段独立缓存（复用 expert_review 指纹） |
+| **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | 实验功能，三段独立缓存（复用 expert_review 指纹） |
 | **补充数据（refresh）** | 盈利预测、资金流向、分红、无风险利率 | `profit_forecast`, `sector_flow`, `dividend`, `bond_yield` | 15min~30d | 主动刷新触发；`bond_yield` 为精确键名 `bond_yield_rf` |
 | **基金深度分析（refresh）** | 基金经理、持仓重合度、基金风格扩展数据 | `fund_manager`, `fund_overlap`, `extended` | 24h~7d | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
@@ -73,7 +73,7 @@ class DataModuleDef:
 ### 遍历与查询
 
 ```python
-from src.python.registry import get_registry
+from src.python.core.registry import get_registry
 
 registry = get_registry()            # → tuple[DataModuleDef, ...]
 for m in registry:
@@ -83,7 +83,7 @@ for m in registry:
 ### 缓存相关
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_cache_ttl_defaults,          # → dict[data_type → ttl]
     get_prefix_type_map,             # → dict[prefix → data_type]
     get_exact_type_map,              # → dict[exact_key → data_type]
@@ -100,7 +100,7 @@ from src.python.registry import (
 ### LLM 模块名称查询
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_llm_module_name,             # suffix → 中文名称
     get_llm_module_names,            # → dict[suffix → 名称]
 )
@@ -114,7 +114,7 @@ from src.python.registry import (
 ### LLM Settings 键名查询
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_known_llm_settings_keys,     # → set[str]
 )
 ```
@@ -125,7 +125,7 @@ from src.python.registry import (
 ### enabled_llm 子键查询
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_known_enabled_llm_keys,      # → set[str]
 )
 ```
@@ -136,7 +136,7 @@ from src.python.registry import (
 ### 报表排序与页签名称
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_report_sheet_name,           # sheet_key → 中文标题
     get_report_section_order,        # config → list[dict]（含 key/number/type/data_flag 的完整排序列表）
     get_report_section_number,       # key → 当前配置下的序号
@@ -180,7 +180,7 @@ from src.python.registry import (
 ### 计算模块查询
 
 ```python
-from src.python.registry import (
+from src.python.core.registry import (
     get_computation_registry,        # → tuple[ComputModuleDef, ...]
     get_computation_module,          # module_key → ComputModuleDef | None
 )
@@ -205,7 +205,7 @@ from src.python.registry import (
 | `llm/generators_orchestrator.py` | `get_llm_module_name()`, `get_llm_module_names()` | LLM 调度标签 |
 | `llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架消息映射 |
 | `report/orchestrator.py` | `get_llm_module_name()`, `get_report_section_order()` | 报告生成编排（LLM 模块标签 + 页签排序） |
-| `handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
+| `tui/handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
 | `report/excel_generator.py` | `get_report_section_order()` | Excel 页签排序 |
 | `report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入 |
 | `report/llm_module_info.py` | `get_llm_module_names()` | 构建模块状态/Token用量/费用信息 |
@@ -258,7 +258,7 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 | # | 步骤 | 操作位置 | 产出 |
 |---|------|---------|------|
-| ① | **注册模块定义** | `registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
+| ① | **注册模块定义** | `core/registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
 | ② | **配置 JSON 键组** | `llm_settings.json` | 新增 9~10 个 `{key}_{suffix}` 配置键 |
 | ③ | **实现生成函数** | `llm/generators.py` | 新增生成函数，通过 `_call_llm()` 调用 LLM |
 | ④ | **注册调度入口** | `llm/generators_orchestrator.py` | 在 `_MODULE_FNS` 字典中添加新模块条目（键=settings_suffix，值=lambda 调用新函数）；在 `_compute_module_cache_info()` 中添加对应的指纹计算和 `info` 条目 |
@@ -290,7 +290,7 @@ DataModuleDef("我的固定键", "fixed",
 
 ## 计算模块注册表（_COMPUTATION_REGISTRY）
 
-除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表。
+除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`core/registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表。
 
 ```python
 @dataclass(frozen=True)

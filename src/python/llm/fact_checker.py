@@ -91,6 +91,44 @@ _PROPORTION_KEYWORDS: tuple[str, ...] = (
     "的资产",
 )
 
+# 回撤上下文——数值为回撤幅度而非个股/组合收益率
+_DRAWDOWN_KEYWORDS = frozenset(
+    [
+        "回撤",
+        "最大回撤",
+        "回撤率",
+        "回撤幅度",
+        "回落",
+        "自高点",
+        "从高点",
+        "历史最大",
+    ]
+)
+
+
+def _is_drawdown_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否在回撤语境中（如"历史最大回撤...19.0%"）。
+
+    全句检查回撤关键词——回撤关键词可能距离百分值几百字（如包含大段正文）。
+    但若 match 前 15 字符内有收益关键词（"收益""盈利""累计"等）
+    则以收益为主，不判定为回撤语境。15 字 ≈ 5-7 个中文词，
+    足以捕获"累计收益率"等紧邻修饰，又不会跨分句读到其他数值的修饰词。
+    """
+    if not any(kw in sentence for kw in _DRAWDOWN_KEYWORDS):
+        return False
+    # match 前 15 字符内有收益关键词 → 以收益为主
+    _profit_nearby = sentence[max(0, match_start - 15) : match_start]
+    if any(kw in _profit_nearby for kw in _PROFIT_KEYWORDS):
+        return False
+    return True
+
+
+def _sentence_snippet(sentence: str, max_len: int = 50) -> str:
+    """截取句子前 max_len 字作为上下文摘要。"""
+    s = sentence.replace(" ", "").strip()
+    return s[:max_len] + "…" if len(s) > max_len else s
+
+
 # 调仓目标上下文——数值为目标而非实际收益率
 _REBALANCE_TARGET_KEYWORDS = frozenset(
     [
@@ -256,10 +294,132 @@ def _is_suggestion_context(code: str, full_text: str) -> bool:
 # ── 检查器 1：数值一致性（v3 — 带语境感知）───────────────────────
 
 
+def _evaluate_percent_value(
+    value: float,
+    value_str: str,
+    sentence: str,
+    stock_rates_abs: dict[str, float],
+    holding_codes: set[str],
+    profit_rate: float,
+    profit_sign: str,
+    tolerance_pct: float = _DEFAULT_TOLERANCE_PCT,
+    drawdown_pct: float | None = None,
+    is_drawdown: bool = False,
+) -> tuple[str | None, tuple[str, str, str] | None]:
+    """评估单个百分比数值。
+
+    Args:
+        value: 数值浮点。
+        value_str: 数值原始文本（用于修正替换）。
+        sentence: 所在句子。
+        stock_rates_abs: {code: abs_profit_rate} 映射。
+        holding_codes: 持仓代码集合。
+        profit_rate: 组合总收益率（绝对值）。
+        profit_sign: "盈利" / "亏损"。
+        tolerance_pct: 容差（百分点）。
+        drawdown_pct: 实际最大回撤百分比（可选），is_drawdown=True 时使用。
+        is_drawdown: 是否为回撤语境数值。
+
+    Returns:
+        (issue_str_or_None, correction_or_None)
+        correction = (wrong_value_str, correct_value_str, context_sentence)
+    """
+    # 品种计数/比例语境
+    if any(kw in sentence for kw in _PROPORTION_KEYWORDS):
+        return None, None
+
+    # 回撤语境 → 与实际最大回撤比较
+    if is_drawdown:
+        if drawdown_pct is None or drawdown_pct < 0.01:
+            return None, None  # 无回撤数据，无法校验，跳过
+        diff = abs(value - drawdown_pct)
+        if diff <= tolerance_pct:
+            return None, None
+        correct_str = f"{drawdown_pct:.1f}"
+        _ctx = _sentence_snippet(sentence)
+        issue = f"回撤相关数值 {value}% 与实际最大回撤 {correct_str}% 偏差超过容差（句段：{_ctx}）"
+        return issue, (value_str, correct_str, sentence)
+
+    # 无收益关键词或收益率太小 → 无法校验
+    is_profit_context = any(kw in sentence for kw in _PROFIT_KEYWORDS)
+    if not is_profit_context or profit_rate < 0.01:
+        return None, None
+
+    # 构建参考收益率列表：个股收益率 + 组合总收益率
+    ref_rates: dict[str, float] = dict(stock_rates_abs)
+    ref_rates["_portfolio"] = profit_rate
+
+    closest_ref = min(ref_rates, key=lambda k: abs(value - ref_rates[k]))
+    closest_diff = abs(value - ref_rates[closest_ref])
+
+    # 策略 1：最接近的参考值在容差内
+    if closest_diff <= tolerance_pct:
+        return None, None
+
+    # 策略 2：句中代码全部为指数代码
+    codes_in_sentence = _CODE_PATTERN.findall(sentence)
+    index_codes_in_sentence = [c for c in codes_in_sentence if c in _INDEX_CODES]
+    holding_codes_in_sentence = [c for c in codes_in_sentence if c in holding_codes]
+    if not holding_codes_in_sentence and index_codes_in_sentence:
+        return None, None
+
+    # 策略 3：贡献/归因类关键词
+    if _is_contribution_sentence(sentence):
+        return None, None
+
+    # 策略 4：金融基准类关键词
+    if any(kw in sentence for kw in ("国债", "利率", "通胀", "GDP", "CPI", "PMI")):
+        return None, None
+
+    # 策略 5：仓位/占比语境
+    if _is_position_weight_context(sentence):
+        return None, None
+
+    # 策略 6：假设/情景语境
+    if _is_hypothetical_context(sentence):
+        return None, None
+
+    # 策略 7：调仓目标语境
+    if any(kw in sentence for kw in _REBALANCE_TARGET_KEYWORDS):
+        return None, None
+
+    # 策略 8：币种/敞口语境
+    if any(kw in sentence for kw in _EXPOSURE_KEYWORDS):
+        return None, None
+
+    # 全部策略均未通过 → 标记为不一致
+    if len(holding_codes_in_sentence) > 1:
+        best_code = min(holding_codes_in_sentence, key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
+    elif holding_codes_in_sentence:
+        best_code = holding_codes_in_sentence[0]
+    else:
+        best_code = None
+
+    if best_code:
+        stock_rate = stock_rates_abs.get(best_code, 0)
+        correct_str = f"{stock_rate:.1f}"
+        _ctx = _sentence_snippet(sentence)
+        issue = f"收益相关数值 {value}% 与 {best_code} 的实际收益率 {correct_str}%（{profit_sign}）偏差超过容差（句段：{_ctx}）"
+        return issue, (value_str, correct_str, sentence)
+    elif closest_ref != "_portfolio":
+        stock_rate = stock_rates_abs.get(closest_ref, 0)
+        correct_str = f"{stock_rate:.1f}"
+        _ctx = _sentence_snippet(sentence)
+        issue = f"收益相关数值 {value}% 与 {closest_ref} 的实际收益率 {correct_str}%（{profit_sign}）偏差超过容差（句段：{_ctx}）"
+        return issue, (value_str, correct_str, sentence)
+    else:
+        correct_str = f"{profit_rate:.1f}"
+        _ctx = _sentence_snippet(sentence)
+        issue = f"收益相关数值 {value}% 与实际累计收益率 {correct_str}%（{profit_sign}）偏差超过容差（句段：{_ctx}）"
+        return issue, (value_str, correct_str, sentence)
+
+
 def check_numerical_consistency(
     text: str,
     holdings_details: list[dict] | None,
-) -> tuple[list[str], int, int]:
+    tolerance_pct: float = _DEFAULT_TOLERANCE_PCT,
+    max_drawdown_pct: float | None = None,
+) -> tuple[list[str], int, int, list[tuple[str, str, str]]]:
     """检查 LLM 输出中的百分比数值与实际组合/个股数据是否一致。
 
     v2 改进：
@@ -269,16 +429,27 @@ def check_numerical_consistency(
     - 指数基准代码数值自动跳过
     - 贡献度/归因段落数值跳过（不可直接比较）
 
+    v3 改进：
+    - 返回修正信息列表，供 auto_correct 消费
+    - 容差可配置
+
+    v4 改进：
+    - 回撤语境检测：将"最大回撤"等数值与实际最大回撤比较而非与收益率比较
+
     Args:
         text: 去 HTML 标签后的纯文本。
         holdings_details: 持仓明细列表。
+        tolerance_pct: 数值偏差容差（百分点），默认 1.0。
+        max_drawdown_pct: 实际组合最大回撤百分比（可选）。
 
     Returns:
-        (issues, total_checked, passed_count)
+        (issues, total_checked, passed_count, corrections)
+        corrections: [(wrong_value_str, correct_value_str, context_sentence), ...]
     """
     issues: list[str] = []
+    corrections: list[tuple[str, str, str]] = []
     if not text:
-        return issues, 0, 0
+        return issues, 0, 0, corrections
 
     values = _calc_portfolio_values(holdings_details)
     profit_rate = abs(values["total_profit_rate"])
@@ -286,7 +457,7 @@ def check_numerical_consistency(
 
     # 构建个股收益率映射
     stock_rates = _build_stock_rate_map(holdings_details)
-    # 持仓代码集合（用于判断句中代码是否为持仓品种）
+    stock_rates_abs = {code: abs(r) for code, r in stock_rates.items()}
     holding_codes = set(_extract_holding_map(holdings_details).keys())
 
     total_checked = 0
@@ -307,92 +478,29 @@ def check_numerical_consistency(
 
             total_checked += 1
 
-            # 品种计数/比例语境（如"80%的品种处于盈利"）→ 数值为品种比例而非收益率，跳过
-            if any(kw in sentence for kw in _PROPORTION_KEYWORDS):
+            # 回撤语境检测
+            is_dd = _is_drawdown_context(sentence, match.start()) if max_drawdown_pct is not None else False
+
+            issue, correction = _evaluate_percent_value(
+                value,
+                value_str,
+                sentence,
+                stock_rates_abs,
+                holding_codes,
+                profit_rate,
+                profit_sign,
+                tolerance_pct=tolerance_pct,
+                drawdown_pct=max_drawdown_pct,
+                is_drawdown=is_dd,
+            )
+            if issue is None:
                 passed += 1
-                continue
-
-            # 无收益关键词 → 不是收益/回报类百分比 → 无法校验，默认为通过
-            is_profit_context = any(kw in sentence for kw in _PROFIT_KEYWORDS)
-            if not is_profit_context or profit_rate < 0.01:
-                passed += 1
-                continue
-
-            # 构建参考收益率列表：个股收益率 + 组合总收益率
-            # 对每个数值，找最接近的参考值进行匹配
-            stock_rates_abs = {code: abs(r) for code, r in stock_rates.items()}
-            ref_rates: dict[str, float] = dict(stock_rates_abs)
-            ref_rates["_portfolio"] = profit_rate
-
-            # 找最接近的参考值
-            closest_ref = min(ref_rates, key=lambda k: abs(value - ref_rates[k]))
-            closest_diff = abs(value - ref_rates[closest_ref])
-
-            # 策略 1：最接近的参考值在容差内 → 通过
-            if closest_diff <= _DEFAULT_TOLERANCE_PCT:
-                passed += 1
-                continue
-
-            # 策略 2：句中代码全部为指数代码 → 跳过（基准数值不来自持仓）
-            codes_in_sentence = _CODE_PATTERN.findall(sentence)
-            index_codes_in_sentence = [c for c in codes_in_sentence if c in _INDEX_CODES]
-            holding_codes_in_sentence = [c for c in codes_in_sentence if c in holding_codes]
-            if not holding_codes_in_sentence and index_codes_in_sentence:
-                passed += 1
-                continue
-
-            # 策略 3：句中含贡献类关键词 → 跳过不可验证
-            if any(kw in sentence for kw in ("贡献", "贡献度", "归因", "主要来源")):
-                passed += 1
-                continue
-
-            # 策略 4：句中含金融基准类关键词（利率/通胀/国债等外部指标）→ 跳过
-            if any(kw in sentence for kw in ("国债", "利率", "通胀", "GDP", "CPI", "PMI")):
-                passed += 1
-                continue
-
-            # 策略 5：仓位/占比语境 → 跳过（如"茅台占比52.4%"）
-            if _is_position_weight_context(sentence):
-                passed += 1
-                continue
-
-            # 策略 6：假设/情景语境 → 跳过（如"若下跌20%"）
-            if _is_hypothetical_context(sentence):
-                passed += 1
-                continue
-
-            # 策略 7：调仓目标语境 → 跳过（如"从52%降至15%"）
-            if any(kw in sentence for kw in _REBALANCE_TARGET_KEYWORDS):
-                passed += 1
-                continue
-
-            # 策略 8：币种/敞口语境 → 跳过（如"人民币 100%"）
-            if any(kw in sentence for kw in _EXPOSURE_KEYWORDS):
-                passed += 1
-                continue
-
-            # 全部策略均未通过 → 标记为不一致
-            # 优先匹配句中持仓代码中与数值最接近的品种（而非仅取第一个代码）
-            if len(holding_codes_in_sentence) > 1:
-                best_code = min(holding_codes_in_sentence, key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
-            elif holding_codes_in_sentence:
-                best_code = holding_codes_in_sentence[0]
             else:
-                best_code = None
-            if best_code:
-                stock_rate = stock_rates_abs.get(best_code, 0)
-                issues.append(
-                    f"收益相关数值 {value}% 与 {best_code} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
-                )
-            elif closest_ref != "_portfolio":
-                stock_rate = stock_rates_abs.get(closest_ref, 0)
-                issues.append(
-                    f"收益相关数值 {value}% 与 {closest_ref} 的实际收益率 {stock_rate:.1f}%（{profit_sign}）偏差超过容差"
-                )
-            else:
-                issues.append(f"收益相关数值 {value}% 与实际累计收益率 {profit_rate:.1f}%（{profit_sign}）偏差超过容差")
+                issues.append(issue)
+                if correction:
+                    corrections.append(correction)
 
-    return issues, total_checked, passed
+    return issues, total_checked, passed, corrections
 
 
 # ── 检查器 2：品种存在性 ────────────────────────────────────
@@ -531,6 +639,45 @@ def check_ranking_correctness(
     return issues, total_checked, passed
 
 
+# ── 数值自动修正 ──────────────────────────────────────────────
+
+
+def apply_numerical_corrections(
+    html: str,
+    corrections: list[tuple[str, str, str]],
+) -> str:
+    """对 HTML 内容中的错误百分比数值执行自动替换。
+
+    使用 sentence 上下文确认匹配位置，避免误替换 HTML 属性中的数值。
+    按 wrong_value 长度降序替换（避免 "3.7" 先于 "3.79" 被替换）。
+
+    Args:
+        html: 原始 HTML 内容。
+        corrections: [(wrong_value_str, correct_value_str, context_sentence), ...]。
+
+    Returns:
+        修正后的 HTML 内容。
+    """
+    if not corrections:
+        return html
+
+    # 按 wrong_value 降序排列，避免部分匹配问题
+    sorted_cx = sorted(corrections, key=lambda c: -len(c[0]))
+    stripped = _strip_html(html)
+
+    result = html
+    for wrong_val, correct_val, sentence in sorted_cx:
+        if sentence not in stripped:
+            continue
+
+        # 在 HTML 文本中查找 wrong_val%（带可选空格）
+        # lookbehind 确保不会替换数字的一部分
+        pattern = re.compile(r"(?<!\d)" + re.escape(wrong_val) + r"\s*%")
+        result = pattern.sub(correct_val + "%", result)
+
+    return result
+
+
 # ── 统一入口 ──────────────────────────────────────────────────
 
 
@@ -540,15 +687,28 @@ def run_fact_check(
     module_label: str = "",
     extra_valid_codes: set[str] | None = None,
     is_penetration_module: bool = False,
-) -> str:
-    """对 LLM 生成的 HTML 内容执行全量事实校验。
+    auto_correct: bool = True,
+    tolerance_pct: float | None = None,
+    tolerance_overrides: dict[str, float] | None = None,
+    history_data: dict | None = None,
+) -> tuple[str, str]:
+    """对 LLM 生成的 HTML 内容执行全量事实校验与自动修正。
 
     依次执行数值一致性、品种存在性、排名正确性三项检查，
-    返回可追加到 HTML 底部的校验摘要。
+    当 auto_correct=True 时自动修正错误数值。
+    返回 (修正后的 HTML, 校验摘要 HTML)。
 
     v2 新增参数：
         extra_valid_codes: 额外有效代码集合（穿透分析用）。
         is_penetration_module: 是否为穿透分析模块（排名使用穿透排序而非直接持仓）。
+
+    v3 新增参数：
+        auto_correct: 是否自动修正错误的数值（默认 True）。
+        tolerance_pct: 数值偏差容差（百分点），覆盖模块级配置。
+        tolerance_overrides: 模块名→容差映射，如 {"expert_review": 2.0}。
+
+    v4 新增参数：
+        history_data: 组合历史走势数据字典，用于提取最大回撤等指标。
 
     Args:
         html_content: LLM 生成的 HTML 内容。
@@ -556,26 +716,49 @@ def run_fact_check(
         module_label: 模块中文名，用于摘要标签（如"全球政经局势"）。
         extra_valid_codes: 额外有效代码集合（穿透分析用）。
         is_penetration_module: 是否为穿透分析模块。
+        auto_correct: 是否自动修正错误的数值。
+        tolerance_pct: 数值偏差容差（百分点），默认 None 使用 _DEFAULT_TOLERANCE_PCT。
+        tolerance_overrides: 按模块覆盖容差。
+        history_data: 组合历史走势数据字典（含 max_drawdown_pct）。
 
     Returns:
-        HTML 摘要片段，空字符串表示无需追加（无内容或无需检查）。
-        示例：
-            <p style="color:#4a4;font-size:12px">[全球政经局势] ✓ 事实校验通过：5/5 项检查全部通过</p>
-            <p style="color:#a40;font-size:12px">[全球政经局势] 事实校验：3/5 项通过，2 项提示<br/>⚠ 品种代码 600000 不在当前持仓中</p>
+        (corrected_html, summary_html)
+        — corrected_html 是 auto_correct 后的内容（未修正时与原内容相同）。
+        — summary_html 为 HTML 摘要片段，空字符串表示无内容或无需检查。
     """
     if not html_content:
-        return ""
+        return html_content, ""
+
+    # 确定容差（模块级覆盖优先）
+    effective_tolerance = _DEFAULT_TOLERANCE_PCT
+    if tolerance_pct is not None:
+        effective_tolerance = tolerance_pct
+    elif tolerance_overrides and module_label:
+        key = module_label.replace(" ", "_")
+        effective_tolerance = tolerance_overrides.get(key, _DEFAULT_TOLERANCE_PCT)
+
+    # 从 history_data 提取最大回撤
+    _max_dd = None
+    if history_data and history_data.get("max_drawdown_pct"):
+        _max_dd = float(history_data["max_drawdown_pct"])
 
     text = _strip_html(html_content)
     all_issues: list[str] = []
     total_checks = 0
     total_passed = 0
+    all_corrections: list[tuple[str, str, str]] = []
 
-    # 检查 1：数值一致性
-    num_issues, num_checked, num_passed = check_numerical_consistency(text, holdings_details)
+    # 检查 1：数值一致性（含回撤语境检测）
+    num_issues, num_checked, num_passed, corrections = check_numerical_consistency(
+        text,
+        holdings_details,
+        tolerance_pct=effective_tolerance,
+        max_drawdown_pct=_max_dd,
+    )
     all_issues.extend(num_issues)
     total_checks += num_checked
     total_passed += num_passed
+    all_corrections.extend(corrections)
 
     # 检查 2：品种存在性（支持穿透分析的额外有效代码）
     sym_issues, sym_checked, sym_passed, sym_suggestions = check_symbol_existence(
@@ -593,8 +776,13 @@ def run_fact_check(
     total_checks += rank_checked
     total_passed += rank_passed
 
+    # ── 自动修正 ──
+    corrected_html = html_content
+    if auto_correct and all_corrections:
+        corrected_html = apply_numerical_corrections(html_content, all_corrections)
+
     if total_checks == 0:
-        return ""
+        return corrected_html, ""
 
     tag = f"[{module_label}] " if module_label else ""
 
@@ -612,9 +800,20 @@ def run_fact_check(
         result = f'<p style="color:#4a4;font-size:12px">{summary}</p>'
         if suggestion_lines:
             result += suggestion_lines
-        return result
+        return corrected_html, result
 
-    # 存在不一致 — 黄色告警摘要
-    detail_lines = "\n".join(f"⚠ {tag}{issue}" for issue in all_issues)
-    summary = f"{tag}事实校验：{total_passed}/{total_checks} 项通过，{len(all_issues)} 项提示\n{detail_lines}"
-    return f'<p style="color:#a40;font-size:12px">{summary}</p>{suggestion_lines}'
+    # 存在不一致 — 黄色告警摘要（若已修正则标注修正条数，已修正项不重复列出）
+    corrected_values = {c[0] for c in all_corrections} if auto_correct else set()
+    detail_lines: list[str] = []
+    for issue in all_issues:
+        # 跳过已自动修正的数值的告警（用户在内容中已看不到该值，列出徒增困惑）
+        if any(cv in issue for cv in corrected_values):
+            continue
+        detail_lines.append(f"⚠ {tag}{issue}")
+    auto_msg = f"（自动修正 {len(all_corrections)} 处数值）" if auto_correct and all_corrections else ""
+    if detail_lines:
+        summary = f"{tag}事实校验：{total_passed}/{total_checks} 项通过，{len(detail_lines)} 项提示{auto_msg}\n"
+        summary += "\n".join(detail_lines)
+    else:
+        summary = f"{tag}✓ 事实校验通过：{total_passed}/{total_checks} 项检查全部通过{auto_msg}"
+    return corrected_html, f'<p style="color:#a40;font-size:12px">{summary}</p>{suggestion_lines}'

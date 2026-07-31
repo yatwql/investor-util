@@ -10,8 +10,8 @@ import logging
 import os
 from typing import Any
 
-from src.python.constants import PROJECT_ROOT
-from src.python.registry import get_known_enabled_llm_keys, get_report_section_keys
+from src.python.core.constants import PROJECT_ROOT
+from src.python.core.registry import get_known_enabled_llm_keys, get_report_section_keys
 
 logger = logging.getLogger("invest")
 
@@ -38,6 +38,7 @@ _STRING_CONFIG_KEYS: set[str] = {
     "output_dir",
     "llm_key_file",
     "llm_settings_file",
+    "llm_providers_file",
 }
 
 # 需要绝对化的路径型配置键（不包含纯文件名 holdings_filename）
@@ -46,6 +47,7 @@ _PATH_CONFIG_KEYS: set[str] = {
     "output_dir",
     "llm_key_file",
     "llm_settings_file",
+    "llm_providers_file",
 }
 
 _MISSING = object()

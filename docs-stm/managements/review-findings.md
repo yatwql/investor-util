@@ -1,35 +1,58 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
-> 文档版本：v0.8.8-dev
+> 文档版本：0.9.3
+> 审查范围：全代码库（src/python/ + src/test/ + scripts/）
+> 审查基准：technical.md §8 架构设计约束（C1~C19）+ §1.4 核心架构决策 + 代码质量最佳实践
+> 审查日期：2026-07-29
 
 ---
 
 ## 当前待处理问题
 
-### P3（低优先级 — 修复收益有限，建议长期跟踪）
+### P2 - 代码质量（低优先级，增量改进）
 
-| # | 分类 | 文件 | 行号 | 问题 | 风险 | 整改收益 |
-|---|------|------|------|------|------|---------|
-| rf-1 | **批量数据获取串行瓶颈** | `providers/` + `fetcher/` | ~80 处 | 核心批量数据获取（行情 15 品种、基金排名 10 基金、行业 55+ 代码）在批次内逐资产串行请求，无法利用 IO 等待时间并行获取。根因是数据获取层围绕**单资产接口**设计（`fetch_market_data(code)`、`fetch_fund_rank(code)` 等均以单代码为粒度），这是架构层的有意选择——C6（1.4.2 Provider Chain）确保每资产独立走完 fallback+熔断器链路保障可靠性，C2 按资产代码缓存键，1.4.5 按资产维度做降级追踪。串行是架构为可靠性付出的代价，非代码疏忽。 | **中**：全量 full 路径约 85s 中 ~50s 为串行 IO。C4 会话级缓存可消重同资产重复请求但无法消除首请求串行。full 路径下 prepare_report_data 内行情/穿透/分类等环节叠加 15+ 品种逐资产轮询，放大串行开销。 | 引入批量并行抽象层（batch.py + chain.py 增强）统一管理并行请求的生命周期：① 链级并行（N 资产同时走各自的 Provider Chain）② 熔断器感知（聚合多资产熔断状态，避免集体突发对同一 Provider 施压）③ 限速控制（Provider 感知的批间间隔，防 API 限频）④ 降级追踪聚合（1.4.5 适配）。保留 C6 每资产独立 fallback+C4 缓存复用。预计 full 路径提速 2-3 倍（8-10d）。 |
+#### P2A — 文件过长（>500 行，建议拆分）
 
-> 耦合约束：C5（httpx 同步客户端统一）→ 并行方案使用 ThreadPoolExecutor 而非 async/await，与系统现有 orch_prep/cache_ops 线程池模式（附录E）一致；C6（1.4.2 Provider Chain）→ 批量层不得绕过链，必须以每资产独立 `fetch_with_fallback()` 为并行单元；C2/C3（缓存统一管理+原子写入）→ 并行写入仍走 cache/ 子包，利用 cache key 异质性天然避免文件冲突；1.4.5（数据降级治理）→ 并行场景的多资产同时降级需聚合为单一降级记录而非 N 条独立记录。
+| # | 文件 | 行数 | 拆分建议 |
+|---|------|------|----------|
+| **rf-75** | `core/registry.py` | 617 | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责 |
+| **rf-76** | `llm/fact_checker.py` | 623 | 核心校验逻辑与辅助函数分离（注：长函数已拆分，文件级别未拆） |
+| **rf-77** | `tui/handlers_config.py` | 553 | JSON 文本编辑函数提取到 `config/` 子模块 |
+| **rf-78** | `fetcher/batch.py` | 549 | BatchDispatcher 本身内聚，可维持现状 |
+| **rf-79** | `core/code_utils.py` | 541 | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出 |
+| **rf-80** | `report/data_status.py` | 528 | DegradationTracker 单类偏大 |
+| **rf-81** | `report/html_renderers.py` | 521 | 所有 HTML render 函数揉合一体 |
+| **rf-85** | `fetcher/fund.py` | 394 | 排名/持仓/基准三职责可拆分为子模块 |
+| **rf-86** | `cache/operations.py` | 472 | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
+| **rf-89** | `report/excel_generator.py` | 447 | Excel 编排器 |
 
+### P3 — 测试覆盖缺口（建议补齐）
+
+| # | 位置 | 问题 |
+|---|------|------|
+
+---
+
+## 已修复（摘要）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-96 | 辩论虚构过滤按"行"删除，HTML 单行输出被一个误判 token 整段清空（TOP2/TOP3/Smart 误判 → 白脸 6412 字符过滤后 0 字符 → 回退普通模式） | 过滤粒度改"行内句段"级；`raw_filter_fn` 钩子使过滤在 markdown_to_html 前作用于原始 Markdown；`TOP\d` 与 `smart`/`money` 白名单降低误报 | `changelog.md` → 辩论虚构过滤修复 |
+| rf-97 | `set_config` 读-改-写无锁，并发下 get_config 读失败静默回退默认配置覆盖写，丢失已有配置项（P2 verify 门禁暴露：并发测试 final.get("base")=None） | `_config_lock` 改 RLock；`set_config` 整个 RMW 纳入锁内串行化；`get_config(_strict=True)` 文件存在但读失败时抛异常中止写而非静默覆盖；新增损坏文件回归测试 | `changelog.md` → Fix |
+| rf-90 | `_build_prompt_appendix` 无专用测试 | 新增 `TestBuildPromptAppendix` 4 用例（空持仓/单品种/多品种排序/零市值）+ `TestBuildExpertReviewPromptSkipScenarios` 3 用例 | `changelog.md` → Test |
+| rf-91 | `fact_checker` 数值混淆（601939 11.0%→2.0%） | 自动修正 v3：返回 correction 二元组 + apply_numerical_corrections + tolerance_overrides | `changelog.md` → 事实校验 v3 |
+| rf-92 | LLM 持仓排名幻觉（040046/561910 声称"最大持仓"）| 统一注入架构：`_build_prompt_appendix` 在 `_run_standard_mode` 自动注入 TOP3/速查表/白名单 | `changelog.md` → Prompt 防御统一注入 |
+| rf-93 | 辩论 synthesis 重复白脸/黑脸观点 + 情景分析 | `_SYSTEM_DEBATE_SYNTHESIS` 重写：禁止重述论点、禁止插入情景分析 | `changelog.md` → 辩论模式 synthesis 修复 |
+| rf-94 | `_build_debate_synthesis_prompt` HTML误标为markdown | ` ```markdown` → ` ```` | `changelog.md` → 同上 |
+| rf-95 | `_SYSTEM_EXPERT_REVIEW` 情景分析双重指令 + 辩论 pro/con 情景重复 | 从 system prompt 移除情景段移至 user prompt 单一注入；`skip_scenarios` 参数使辩论模式跳过情景分析 | `changelog.md` → Fix |
 
 ---
 
 ## 归档
 
-### 已修复问题
-
-| # | 分类 | 问题 | 修复内容 | 修复版本 |
-|---|------|------|---------|---------|
-| rf-2 | 文件过长 | `providers/tiantian.py`（768 行）持仓解析、季报回退、排名评级、历史净值揉合一体 | 拆分为 4 子模块：`tiantian_base.py`（HTTP 基底）、`tiantian_holdings.py`（持仓/季报）、`tiantian_ranking.py`（排名/评级/风险分析）、`tiantian_nav.py`（历史净值）；原文件删除；外部调用方直接引用子模块 | v0.8.7-dev |
-| rf-3 | 文件过长 | `report/fund_style_analysis.py`（652 行）快照管理、单股分类、行业 PE、批量降级、漂移检测揉合一体 | 拆分为 3 子模块：`fund_style_base.py`（常量/快照/工具函数）、`fund_style_classify.py`（单股分类/行业 PE/入口函数）、`fund_style_report.py`（漂移检测/全基金分析）；原文件删除 | v0.8.7-dev |
-| rf-4 | 缺乏性能基准 | `scripts/` — 无端到端性能基准，无法量化进度、检测回归 | 三层性能基准体系：① `perf.py` PerfCollector 每次报告生成自动计时 + 持久化到 `perf_history.jsonl` ② `perf_report.py` 独立基准脚本（mock 外部源）用于精准回归检测 ③ `perf_view.py` 历史趋势可视化工具 | v0.8.7-dev |
-| rf-5 | CI 测试失败 | `pyproject.toml` 中 `required_plugins` 将 `pytest-mock` 死锁在 `==3.15.1`，但 deps 声明 `>=3.15`，导致 pip 安装的版本（如 `3.15.2`）不满足 `==3.15.1` 硬校验，pytest 拒绝启动；`format` job 的 Ruff 检查无 `continue-on-error`，阻塞 CI；`all` 模式无 `--no-timeout` 易超时截断 | ① `required_plugins` 改为 `pytest-mock>=3.15` 与 deps 一致 ② `format` job 添加 `continue-on-error: true` ③ `all` 模式添加 `--no-timeout` | v0.8.6-dev |
-
 ### 归档档案
 
+- [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
 - [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) 
 - [`archived_review-findings.0.6.x.md`](../archive/v0.6.x/archived_review-findings.0.6.x.md)
 - [`archived_review-findings.0.5.x.md`](../archive/v0.5.x/archived_review-findings.0.5.x.md)
@@ -37,4 +60,3 @@
 - [`archived_review-findings.0.3.x.md`](../archive/v0.3.x/archived_review-findings.0.3.x.md)
 - [`archived_review-findings.0.2.x.md`](../archive/v0.2.x/archived_review-findings.0.2.x.md)
 - [`archived_review-findings.0.1.x.md`](../archive/v0.1.x/archived_review-findings.0.1.x.md)
-

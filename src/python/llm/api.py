@@ -13,16 +13,10 @@ if TYPE_CHECKING:
     import httpx
 
 from src.python.llm.api_base import (
-    _check_claude_truncation,
-    _check_gemini_truncation,
-    _check_openai_truncation,
-    _extract_content,
-    _extract_content_from_gemini,
     _get_last_llm_failure,
     _get_retry_max,
     _is_effort_model,
     _supports_extended_thinking,
-    call_llm_with_retry,
 )
 from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
@@ -35,14 +29,10 @@ from src.python.llm.strategy import resolve_provider_chain
 
 logger = logging.getLogger("invest")
 
-__all__ = [
-    "call_llm",
-    "call_single_provider",
-    "call_claude",
-    "call_openai",
-    "call_gemini",
-    "configure_extended_thinking",
-]
+# ── 默认模型名（Provider 未指定时使用） ─────────────────
+_DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
+_DEFAULT_OPENAI_MODEL = "gpt-4o"
+_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 
 # ── 内容过滤安抚重试 ────────────────────────────────
 
@@ -53,6 +43,47 @@ _CONTENT_FILTER_RECOVERY = (
 )
 """当 API 返回空内容（可能被内容过滤机制拦截）时，
 追加到 system prompt 尾部重新请求。"""
+
+
+def _calm_retry(system_prompt: str, user_prompt: str, name: str, do_retry) -> tuple[str | None, dict | None]:
+    """追加安抚指令后重试一次（空白内容兜底）。
+
+    Args:
+        system_prompt: 原始 system prompt
+        user_prompt: 原始 user prompt
+        name: provider 名称（日志用）
+        do_retry: 重试可调用，签名 (sys, usr) -> (result, usage)
+
+    Returns:
+        (result, usage)，失败返回 (None, None)
+    """
+    logger.warning("%s API 返回空内容，追加安抚指令重试一次", name)
+    calmed = system_prompt + _CONTENT_FILTER_RECOVERY
+    result2, usage2 = do_retry(calmed, user_prompt)
+    if result2 and result2.strip():
+        logger.info("%s 安抚重试成功", name)
+        return result2, usage2
+    logger.warning("%s 安抚重试后仍返回空内容", name)
+    return None, None
+
+
+def _resolve_thinking_budget(llm_config: dict, config_field: str, max_tokens: int) -> int:
+    """从 llm_config 解析 Extended Thinking budget_tokens，失败时自动兜底。
+
+    Args:
+        llm_config: LLM 配置字典
+        config_field: 如 ``"max_tokens_expert_review"``
+        max_tokens: 模块 max_tokens 值，用于兜底计算
+
+    Returns:
+        budget_tokens 值
+    """
+    module_suffix = config_field.replace("max_tokens_", "")
+    budget_key = f"thinking_budget_{module_suffix}"
+    budget = llm_config.get(budget_key)
+    if not budget or budget < max_tokens + 1024:
+        budget = max_tokens + 4096  # 自动兜底
+    return budget
 
 
 def _resolve_entry_credentials(
@@ -113,7 +144,7 @@ def _resolve_first_provider_model_endpoint(
             _, model, endpoint = _resolve_entry_credentials(entry, llm_config)
             return (model, endpoint or "")
     except Exception:
-        pass
+        logger.debug("[llm] _resolve_first_provider_model_endpoint 异常", exc_info=True)
     return (None, "")
 
 
@@ -173,11 +204,8 @@ def _call_provider_entry(
     result, usage = _do_call(system_prompt, user_prompt)
     # 空内容 → 安抚重试（仅一次）
     if result is not None and result == "":
-        logger.warning("%s API 返回空内容，追加安抚指令重试一次", name)
-        calmed_system = system_prompt + _CONTENT_FILTER_RECOVERY
-        result2, usage2 = _do_call(calmed_system, user_prompt)
-        if result2 and result2.strip():
-            logger.info("%s 安抚重试成功", name)
+        result2, usage2 = _calm_retry(system_prompt, user_prompt, name, _do_call)
+        if result2 is not None:
             return result2, usage2
         logger.warning("%s 安抚重试后仍返回空内容，切换下一 provider", name)
         return (None, None)
@@ -391,28 +419,29 @@ def _call_llm_legacy(
     if result is not None:
         if result != "":
             return result, usage, {"name": provider or None, "model": resolved_model, "endpoint": endpoint or ""}
+
         # 空内容 → 安抚重试
-        logger.warning("%s API 返回空内容，追加安抚指令重试一次", provider)
-        calmed_system = system_prompt + _CONTENT_FILTER_RECOVERY
-        result2, usage2 = call_single_provider(
-            provider,
-            calmed_system,
-            user_prompt,
-            api_key,
-            resolved_model,
-            endpoint,
-            resolved_max_tokens,
-            timeout,
-            max_retries,
-            http_client,
-            config_field,
-            temperature,
-            llm_config,
-        )
-        if result2 and result2.strip():
-            logger.info("安抚重试成功")
+        def _legacy_retry(sys: str, usr: str):
+            r = call_single_provider(
+                provider,
+                sys,
+                usr,
+                api_key,
+                resolved_model,
+                endpoint,
+                resolved_max_tokens,
+                timeout,
+                max_retries,
+                http_client,
+                config_field,
+                temperature,
+                llm_config,
+            )
+            return r[0], r[1]
+
+        result2, usage2 = _calm_retry(system_prompt, user_prompt, provider, _legacy_retry)
+        if result2 is not None:
             return result2, usage2, {"name": provider or None, "model": resolved_model, "endpoint": endpoint or ""}
-        logger.warning("安抚重试后仍返回空内容")
 
     # 回退 provider（旧 fallback 字段）
     fallback_provider = llm_config.get("fallback_provider", "")
@@ -463,7 +492,7 @@ def configure_extended_thinking(
     if not llm_config.get(thinking_key, False):
         return
 
-    resolved_model = model or "claude-sonnet-4-20250514"
+    resolved_model = model or _DEFAULT_CLAUDE_MODEL
     if not _supports_extended_thinking(resolved_model):
         logger.warning(
             "模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]",
@@ -481,227 +510,21 @@ def configure_extended_thinking(
         payload["output_config"] = {"effort": effort}
         logger.info("Extended Thinking 已开启 [%s]: effort=%s", module_suffix, effort)
     else:
-        budget_key = f"thinking_budget_{module_suffix}"
-        budget = llm_config.get(budget_key)
-        if not budget or budget < max_tokens + 1024:
-            budget = max_tokens + 4096  # 自动兜底
+        budget = _resolve_thinking_budget(llm_config, config_field, max_tokens)
         payload["thinking"]["budget_tokens"] = budget
         logger.info("Extended Thinking 已开启 [%s]: budget=%d", module_suffix, budget)
 
 
-def call_claude(
-    system: str,
-    user: str,
-    api_key: str,
-    model: str,
-    endpoint: str,
-    max_tokens: int,
-    timeout: float = 60.0,
-    max_retries: int = 2,
-    http_client: httpx.Client | None = None,
-    config_field: str = "max_tokens",
-    temperature: float | None = None,
-    llm_config: dict | None = None,
-) -> tuple[str | None, dict | None]:
-    """调用 Claude API (Messages API)，带重试 + 用量日志。
+# ── Provider 调用实现（从子模块导入） ─────────────────
+from src.python.llm._api_claude import call_claude  # noqa: E402, F401
+from src.python.llm._api_openai import call_openai  # noqa: E402, F401
+from src.python.llm._api_gemini import call_gemini  # noqa: E402, F401
 
-    实际 HTTP 重试逻辑委托给 _call_llm_with_retry。
-    system prompt 使用数组格式 + cache_control 以支持 Anthropic Prompt Caching
-    （同一 system prompt 在 5 分钟内多次调用时节省输入 token）。
-
-    支持 Extended Thinking（thinking 参数），通过 llm_settings.json 中
-    thinking_enabled_{模块} / thinking_budget_{模块} 配置开启。
-    推荐仅在智囊团深度复盘（expert_review）场景开启，全球政经局势和财经新闻热点与持仓关联分析收益有限。
-    若模型不支持 Extended Thinking（如 claude-sonnet-3-5），自动降级跳过。
-
-    Args:
-        max_retries: 最大重试次数，从 llm_config 读取
-        temperature: 若不为 None，覆盖 payload 中的 temperature 字段
-        llm_config: LLM 合并配置，用于读取 thinking 配置项
-
-    Returns:
-        (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
-    """
-    url = endpoint or "https://api.anthropic.com/v1/messages"
-    headers = {
-        "Content-Type": "application/json",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-    }
-    # 数组格式 + cache_control 支持 Prompt Caching
-    payload = {
-        "model": model or "claude-sonnet-4-20250514",
-        "max_tokens": max_tokens,
-        "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-        "messages": [{"role": "user", "content": user}],
-    }
-    # ── Extended Thinking（根据模型类型 + 模块配置） ──
-    configure_extended_thinking(payload, llm_config, config_field, model, max_tokens)
-    if temperature is not None and "thinking" not in payload:
-        payload["temperature"] = temperature
-    client = http_client
-    assert client is not None
-
-    return call_llm_with_retry(
-        label="Claude",
-        client=client,
-        url=url,
-        headers=headers,
-        payload=payload,
-        timeout=timeout,
-        max_retries=max_retries,
-        max_tokens=max_tokens,
-        config_field=config_field,
-        extract_fn=_extract_content,
-        check_truncation_fn=lambda d, mt: _check_claude_truncation(d, mt, "Claude", config_field),
-        provider="claude",
-        model_name=model,
-    )
-
-
-def call_openai(
-    system: str,
-    user: str,
-    api_key: str,
-    model: str,
-    endpoint: str,
-    max_tokens: int,
-    timeout: float = 60.0,
-    max_retries: int = 2,
-    http_client: httpx.Client | None = None,
-    config_field: str = "max_tokens",
-    temperature: float | None = None,
-) -> tuple[str | None, dict | None]:
-    """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。
-
-    实际 HTTP 重试逻辑委托给 _call_llm_with_retry。
-
-    Args:
-        max_retries: 最大重试次数，从 llm_config 读取
-        temperature: 若不为 None，覆盖 payload 中的 temperature 字段
-
-    Returns:
-        (content, usage) — usage 为 API 返回的用量字典，失败时均为 None
-    """
-    url = endpoint or "https://api.openai.com/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    }
-    payload = {
-        "model": model or "gpt-4o",
-        "max_tokens": max_tokens,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-    }
-    if temperature is not None:
-        payload["temperature"] = temperature
-    client = http_client
-    assert client is not None
-
-    def _extract_openai(data: dict) -> str | None:
-        try:
-            return data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError):
-            return None
-
-    return call_llm_with_retry(
-        label="OpenAI",
-        client=client,
-        url=url,
-        headers=headers,
-        payload=payload,
-        timeout=timeout,
-        max_retries=max_retries,
-        max_tokens=max_tokens,
-        config_field=config_field,
-        extract_fn=_extract_openai,
-        check_truncation_fn=lambda d, mt: _check_openai_truncation(d, mt, "OpenAI", config_field),
-        provider="openai",
-        model_name=model,
-    )
-
-
-def call_gemini(
-    system: str,
-    user: str,
-    api_key: str,
-    model: str,
-    endpoint: str,
-    max_tokens: int,
-    timeout: float = 60.0,
-    max_retries: int = 2,
-    http_client: httpx.Client | None = None,
-    config_field: str = "max_tokens",
-    temperature: float | None = None,
-    llm_config: dict | None = None,
-) -> tuple[str | None, dict | None]:
-    """调用 Google Gemini API (generateContent)，带重试 + 用量日志。
-
-    Gemini API 使用 x-goog-api-key header 认证，模型名嵌入 URL 路径。
-    支持 system instruction（通过 systemInstruction 字段）和 generationConfig。
-
-    Args:
-        max_retries: 最大重试次数，从 llm_config 读取
-        temperature: 若不为 None，覆盖 generationConfig 中的 temperature 字段
-
-    Returns:
-        (content, usage) — usage 为标准化后的用量字典，失败时均为 None
-    """
-    url = (
-        f"{endpoint.rstrip('/')}/models/{model}:generateContent"
-        if endpoint
-        else f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    )
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": api_key,
-    }
-    payload = {
-        "contents": [
-            {"role": "user", "parts": [{"text": user}]},
-        ],
-        "systemInstruction": {"parts": [{"text": system}]},
-        "generationConfig": {
-            "maxOutputTokens": max_tokens,
-        },
-    }
-    if temperature is not None:
-        payload["generationConfig"]["temperature"] = temperature
-
-    # ── Gemini Extended Thinking（通过 generationConfig.thinkingConfig） ──
-    if llm_config:
-        module_suffix = config_field.replace("max_tokens_", "")
-        if llm_config.get(f"thinking_enabled_{module_suffix}", False):
-            resolved_model = model or "gemini-2.5-flash"
-            if _supports_extended_thinking(resolved_model):
-                budget_key = f"thinking_budget_{module_suffix}"
-                budget = llm_config.get(budget_key)
-                if not budget or budget < max_tokens + 1024:
-                    budget = max_tokens + 4096
-                payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
-                payload["generationConfig"].pop("temperature", None)
-                logger.info("Gemini Extended Thinking 已开启 [%s]: budget=%d", module_suffix, budget)
-            else:
-                logger.warning("模型 %s 不支持 Extended Thinking，已自动降级跳过 [%s]", resolved_model, module_suffix)
-
-    client = http_client
-    assert client is not None
-
-    return call_llm_with_retry(
-        label="Gemini",
-        client=client,
-        url=url,
-        headers=headers,
-        payload=payload,
-        timeout=timeout,
-        max_retries=max_retries,
-        max_tokens=max_tokens,
-        config_field=config_field,
-        extract_fn=_extract_content_from_gemini,
-        check_truncation_fn=lambda d, mt: _check_gemini_truncation(d, mt, "Gemini", config_field),
-        provider="gemini",
-        model_name=model,
-    )
+__all__ = [
+    "call_llm",
+    "call_single_provider",
+    "call_claude",
+    "call_openai",
+    "call_gemini",
+    "configure_extended_thinking",
+]

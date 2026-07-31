@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.providers.news_aggregator import (
     aggregate_news as _aggregate_news,
 )

@@ -43,7 +43,7 @@ LLM 配置由三个独立文件管理：
 }
 ```
 
-> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。`fallback_*` 回退字段可选，配置后主 provider 连续失败时自动切换，适用于高可用场景（如主用 DeepSeek 低成本、回退 Anthropic Claude 高稳定性）。非敏感参数统一移至 `llm_settings.json` 管理。
+> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。`fallback_*` 回退字段可选，配置后主 provider 连续失败时自动切换，适用于高可用场景（如主用 DeepSeek 低成本、回退 Anthropic Claude 高稳定性）。非敏感参数统一在 `llm_settings.json` 中管理。
 
 **Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数。示意结构如下（完整配置项见「配置项总览」章节）：
 
@@ -59,7 +59,7 @@ LLM 配置由三个独立文件管理：
   },
   "temperature_global_macro": 0.3,
   "max_tokens_global_macro": 2048,
-  "temperature_expert_review": 0.8,
+  "temperature_expert_review": 0.3,
   "max_tokens_expert_review": 8192,
   "pricing": {
     "currency": "CNY"
@@ -275,14 +275,15 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 > 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation）。
 
-配置分为**全局配置**和**模块级配置**两类。全局配置共有 6 项：
+配置分为**全局配置**和**模块级配置**两类。全局配置共有 7 项：
 
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
+- `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
-- `debate`（dict，可选实验功能）：辩论模式配置。含 mode_1_procon（三段式正反辩论）、mode_2_conditional（条件情景推理）、mode_3_qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
+- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
 
 ### 模块级配置
 
@@ -300,6 +301,47 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
 > 各模块默认值差异详见下方「各模块推荐参数值」表。
+
+---
+
+### 事实校验容差配置
+
+`fact_check` 段控制 LLM 生成内容中数值的自动校验和修正逻辑，用于检测并纠正 LLM 在报告中提到的收益率、占比、排名等数值与实际数据的偏差。
+
+```json
+"fact_check": {
+  // 全局数值偏差容差（百分点），默认 1.0
+  "tolerance": 1.0,
+  // 按模块覆盖容差（模块名 → 百分点）
+  "tolerance_overrides": {
+    "expert_review": 2.0,
+    "health_check": 1.0,
+    "global_macro": 1.0,
+    "penetration_deep": 1.0
+  }
+}
+```
+
+| 配置键 | 类型 | 默认值 | 说明 |
+|--------|:----:|:------:|------|
+| `tolerance` | float | `1.0` | 全局数值偏差容差（百分点）。LLM 输出的百分比数值与真实值偏差在 ±tolerance 百分点内即视为通过校验，超出则被标记为"疑似幻觉"并触发自动修正 |
+| `tolerance_overrides` | dict | 见默认值 | 按模块覆盖容差。key 为模块名（`expert_review` / `health_check` / `global_macro` / `penetration_deep`），value 为该模块专用的容差值。未在 override 中列出的模块使用全局 `tolerance` |
+
+**工作原理**：
+1. LLM 模块生成报告后，事实校验器扫描 HTML 中的百分比数值
+2. 将每个数值与持仓数据的真实值对比（如持仓收益率、组合占比等）
+3. 偏差 ≤ `tolerance`（或模块对应的 override 值）→ 标记为绿色 ✅ 通过
+4. 偏差 > 容差 → 标记为红色 ❌ 疑似幻觉，并用真实值自动替换错误数值
+5. 批量修正后，报告末尾追加一段"事实校验"摘要（显示修正前后的对比）
+
+**推荐配置**：
+- **`expert_review`（智囊团深度复盘）= 2.0**：该模块综合判断较多，LLM 可能对收益率进行"约数"表述（如"约 15%"而非精确的 14.7%），给予更宽松容差可减少误报
+- **`health_check` / `global_macro` / `penetration_deep` = 1.0**：这些模块数值引用较少，1 个百分点已足够宽松
+- 若发现某模块频繁误报"通过"的数值，可适当降低该模块容差；反之频繁误标"疑似幻觉"时可适当提高
+
+> **注意**：容差以百分点为单位，非百分比。例如 `tolerance: 1.0` 表示 LLM 说"15%"而真实值为 14.0%~16.0% 之间均算通过。修正操作仅在偏差超过容差时触发，并自动将错误数值替换为真实值。
+
+---
 
 <details>
 <summary><b>📄 llm_settings.json 完整参考</b>（点击展开）</summary>
@@ -344,7 +386,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // ═══════════════════════════════════════════
   "system_prompt_expert_review": null,
   "model_expert_review": null,
-  "temperature_expert_review": 0.8,
+  "temperature_expert_review": 0.3,
   "max_tokens_expert_review": 8192,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
@@ -358,7 +400,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // ═══════════════════════════════════════════
   "system_prompt_health_check": null,
   "model_health_check": null,
-  "temperature_health_check": 0.5,
+  "temperature_health_check": 0.1,
   "max_tokens_health_check": 4096,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
@@ -372,8 +414,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // ═══════════════════════════════════════════
   "system_prompt_penetration_deep": null,
   "model_penetration_deep": null,
-  "temperature_penetration_deep": 0.4,
-  "max_tokens_penetration_deep": 4096,
+  "temperature_penetration_deep": 0.1,
+  "max_tokens_penetration_deep": 8192,
   "timeout_penetration_deep": 90,
   "cache_enabled_penetration_deep": true,
   "output_brief_penetration_deep": false,
@@ -401,14 +443,14 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // 通过 Feature Flag 控制启停，菜单 [S] 可交互开关
   // ═══════════════════════════════════════════
   "debate": {
-    // M1 正反辩论 — 三段式(白脸→黑脸→综合)
-    "mode_1_procon": {
+    // 正反辩论 — 三段式(白脸→黑脸→综合)
+    "procon": {
       "per_call_max_tokens": null,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
     },
-    // M2 条件推理 — 情景化分析
-    "mode_2_conditional": {
+    // 条件推理 — 情景化分析
+    "conditional": {
       // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)
       "scenarios": [
         {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
@@ -416,14 +458,29 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
         {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"}
       ]
     },
-    // M3 集中度问答 — 集中度风险问答块
-    "mode_3_qa_concentration": {
+    // 集中度问答 — 集中度风险问答块
+    "qa_concentration": {
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
     "max_total_tokens_per_report": 16000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
+  },
+
+  // ═══════════════════════════════════════════
+  // 事实校验（fact_check）— LLM 输出数值一致性检测
+  // ═══════════════════════════════════════════
+  "fact_check": {
+    // 全局数值偏差容差（百分点），默认 1.0
+    "tolerance": 1.0,
+    // 按模块覆盖容差（模块名 → 百分点）
+    "tolerance_overrides": {
+      "expert_review": 2.0,
+      "health_check": 1.0,
+      "global_macro": 1.0,
+      "penetration_deep": 1.0
+    }
   },
 
   // ═══════════════════════════════════════════
@@ -447,17 +504,17 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | output_brief_limit |
 |------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:------------------:|
 | **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | **200 字** |
-| **智囊团深度复盘** | null | **0.8**（高温促多元） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
-| **持仓体检报告** | null | **0.5**（居中平衡） | **4096** | **120s** | **true** | 12000 | 300 字 |
-| **穿透深度分析** | null | **0.4**（中低温稳定） | **4096** | **90s** | false | 8000 | 300 字 |
+| **智囊团深度复盘** | null | **0.3**（低温保事实） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
+| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **4096** | **120s** | **true** | 12000 | 300 字 |
+| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | 300 字 |
 | **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | 不适用 |
 
 > **补充**：财经新闻关联分析还支持 `news_correlation_top_n` 配置项（默认 `30`），控制送 LLM 分析的新闻条数上限，按关键词匹配数降序选取。增大此值会线性增加 Token 消耗，减小则降低 LLM 关联分析的覆盖率。设为 `0` 可完全禁用 LLM 分析（仅保留关键词匹配）。
 
 > **temperature 项说明**：
-> - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**>0.5 时全球政经局势可能编造经济指标**。
+> - **低温（≤0.3）**：输出稳定可预测，适合事实性分析和结构化 JSON。**智囊团深度复盘/持仓体检/穿透分析使用 0.1~0.2 极低温以减少数值幻觉**。
 > - **中温（0.4~0.6）**：在准确性和判断力之间平衡，适合评分分析。
-> - **高温（≥0.7）**：鼓励多样性和创造性输出，适合辩论式分析。**<0.4 时智囊团专家观点雷同**。
+> - **高温（≥0.7）**：鼓励多样性和创造性输出，适合辩论式分析。**不推荐用于数值引用类模块**。
 
 ---
 

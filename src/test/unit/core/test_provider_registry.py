@@ -11,13 +11,13 @@ from unittest import mock
 
 import pytest
 
-from src.python.provider_registry import (
+from src.python.core.provider_registry import (
     FetchStrategy,
     NOT_FOUND,
-    _SESSION_CACHE_MAX_ENTRIES,
     DataSourceRegistry,
     get_registry,
 )
+from src.python.core._session_cache import _SESSION_CACHE_MAX_ENTRIES
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
@@ -177,7 +177,7 @@ class TestCircuitBreaker:
 
     def test_is_transport_failure(self):
         """校验 is_transport_failure 正确识别 sentinel。"""
-        from src.python.provider_registry import TRANSPORT_FAILURE
+        from src.python.core.provider_registry import TRANSPORT_FAILURE
         assert DataSourceRegistry.is_transport_failure(TRANSPORT_FAILURE) is True
         assert DataSourceRegistry.is_transport_failure(None) is False
         assert DataSourceRegistry.is_transport_failure({}) is False
@@ -260,7 +260,7 @@ class TestFetchOrCached:
         def _fetch(code: str) -> dict:
             calls.append(code)
             return {"price": 100.0}
-        with mock.patch("src.python.market_hours.is_market_open", return_value=True):
+        with mock.patch("src.python.core.market_hours.is_market_open", return_value=True):
             result = r.fetch_or_cached("600519", "a_share", _fetch,
                                        cache_domain="price", chain=[])
         assert result == {"price": 100.0}
@@ -282,7 +282,7 @@ class TestFetchOrCached:
             def _fetch(code: str) -> dict:
                 calls.append(code)
                 return {"price": 200.0}
-            with mock.patch("src.python.market_hours.is_market_open", return_value=True):
+            with mock.patch("src.python.core.market_hours.is_market_open", return_value=True):
                 result = r.fetch_or_cached("600519", "a_share", _fetch,
                                            cache_domain="price", chain=["t1", "t2"])
         # 全链熔断 → CACHE_ONLY → 返回 session cache
@@ -294,7 +294,7 @@ class TestFetchOrCached:
         r = _fresh_registry()
         def _fetch(code: str) -> None:
             return None
-        with mock.patch("src.python.market_hours.is_market_open", return_value=True):
+        with mock.patch("src.python.core.market_hours.is_market_open", return_value=True):
             result = r.fetch_or_cached("600519", "a_share", _fetch,
                                        cache_domain="price")
         assert result is None

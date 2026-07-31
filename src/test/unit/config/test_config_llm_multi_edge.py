@@ -77,7 +77,7 @@ class TestMalformedJson(unittest.TestCase):
 
     def _patch_providers_path(self):
         """mock _get_llm_providers_path 返回临时路径。"""
-        return patch("src.python.config._core._get_llm_providers_path",
+        return patch("src.python.config._llm_providers._get_llm_providers_path",
                      return_value=self.providers_path)
 
     def test_malformed_json_returns_none(self):

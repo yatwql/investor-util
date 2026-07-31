@@ -27,7 +27,7 @@ import logging
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s:%(name)s:%(message)s")
 
-from src.python.perf import load_history
+from src.python.core.perf import load_history
 
 _TMP_DIR = os.path.join(_PROJECT_ROOT, "docs-stm", "tmp")
 _TREND_REPORT_PATH = os.path.join(_TMP_DIR, "perf_trend.md")
@@ -143,8 +143,7 @@ def build_trend_report(
             lines.append("|:-----|--------:|----:|----:|-----:|")
             for name, stat in phase_stats.items():
                 lines.append(
-                    f"| {name} | {stat['avg']:.2f}s | {stat['min']:.2f}s | "
-                    f"{stat['max']:.2f}s | {stat['count']} |"
+                    f"| {name} | {stat['avg']:.2f}s | {stat['min']:.2f}s | {stat['max']:.2f}s | {stat['count']} |"
                 )
             lines.append("")
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 
 
-from src.python.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
-from src.python.registry import (
+from src.python.core.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
+from src.python.core.registry import (
     ComputModuleDef,
     DataModuleDef,
     get_computation_module,
@@ -84,13 +84,14 @@ class TestRegistryCompleteness:
         assert "enabled_llm" in keys
         assert "pricing" in keys
         assert "news_correlation_top_n" in keys
+        assert "fact_check" in keys
         # 确认 per-module 键生成正确
         assert "temperature_global_macro" in keys
         assert "output_brief_global_macro" in keys
         # news_correlation 不应有 output_brief
         assert "output_brief_news_correlation" not in keys
         # 确认总键数
-        assert len(keys) == 55, f"预期 55 个 LLM settings 键，实际 {len(keys)}"
+        assert len(keys) == 86, f"预期 86 个 LLM settings 键，实际 {len(keys)}"
 
     def test_each_llm_module_has_model_key(self):
         """每个 LLM 模块必须有 model_{suffix} 键。"""

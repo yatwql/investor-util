@@ -216,7 +216,7 @@
 - **缓存过期且数据源连续失败** → 熔断开启，使用缓存占位
 - **无缓存** → 显示占位文本（如 `数据暂不可用`）
 
-> 详细降级治理体系见 `technical.md` §1.4.5。
+> 详细降级治理体系见 `../managements/technical.md` §1.4.5。
 
 ---
 
@@ -236,9 +236,13 @@ python -m src.python.cli check-sources
 ✅ 腾讯财经    行情    45ms   正常
 ✅ 新浪财经    行情    82ms   正常
 ⚠️ 天天基金    排名    2.3s   响应慢
-❌ akshare     资金    timeout  连接超时
 ✅ 东方财富    净值    120ms  正常
-...
+✅ 新浪新闻    财经    150ms  正常
+✅ 东方财富新闻 财经    95ms   正常
+⚠️ 华尔街见闻  财经    1.8s   响应慢
+❌ 财联社      财经    timeout  连接超时
+✅ 东方财富    行业    110ms  正常
+✅ 腾讯K线     历史    65ms   正常
 ```
 
 ### 检查内容
@@ -250,9 +254,11 @@ python -m src.python.cli check-sources
 | 东方财富净值 | 请求 `000001` 基金净值 | 返回 JSONP |
 | 天天基金排名 | 请求 `pingzhongdata/000001.js` | 返回 JS 变量 |
 | 东方财富行业 | 请求 `push2.eastmoney.com` 行业分类 | 返回 JSON |
-| akshare 盈利预测 | 调用 `stock_profit_forecast_em` | 返回 DataFrame |
-| 新闻源联通 | 逐一请求各新闻源首页 | HTTP 200 |
-| 历史 K 线 | 请求腾讯 K 线 `sh000001` | 返回 JSON |
+| 新浪新闻 | 请求新闻列表页 | HTTP 200 |
+| 东方财富新闻 | 请求新闻列表页 | HTTP 200 |
+| 华尔街见闻 | 请求新闻列表页 | HTTP 200 |
+| 财联社 | 请求新闻列表页 | HTTP 200 |
+| 腾讯 K 线 | 请求腾讯 K 线 `sh000001` | 返回 JSON |
 
 ---
 

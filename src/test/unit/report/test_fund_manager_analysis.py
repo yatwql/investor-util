@@ -34,7 +34,7 @@ from src.python.report.fund_manager_analysis import (
     build_first_check_summary,
     detect_manager_changes,
 )
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 

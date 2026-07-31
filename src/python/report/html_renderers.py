@@ -5,11 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.python.code_utils import is_a_share_code
+from src.python.core.code_utils import is_a_share_code
 from src.python.fetcher.akshare import get_dividend_data, get_profit_forecast
 from src.python.fetcher.fund import fetch_fund_holdings_cached
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix

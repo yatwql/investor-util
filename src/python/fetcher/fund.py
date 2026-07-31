@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import threading
 from collections.abc import Callable
@@ -18,8 +20,9 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.config import get_config
+from src.python.core.constants import PROJECT_ROOT
 from src.python.fetcher.chain import fetch_with_fallback
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 from src.python.providers.tiantian_holdings import fetch_fund_holdings
 from src.python.providers.tiantian_ranking import fetch_fund_rankings
 
@@ -100,12 +103,147 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
     return result
 
 
+def fetch_fund_rankings_cached(code: str) -> dict[str, Any] | None:
+    """基金排名获取（含会话缓存），同一报告生成中同基金只获取一次。
+
+    消除 Excel/HTML 双管线间重复的文件缓存读取。
+    """
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
+
+    registry = get_registry()
+    cached = registry.session_cache_get("fund_rank", code)
+    if cached is not NOT_FOUND:
+        return cached
+    result = fetch_fund_rankings(code)
+    registry.session_cache_set("fund_rank", code, result, source="api")
+    return result
+
+
+# ═══════════════════════════════════════════════════════════
+#  批量接口
+# ═══════════════════════════════════════════════════════════
+
+
+def fetch_fund_rankings_batch(
+    fund_codes: list[str],
+    dispatcher: Any = None,
+) -> dict[str, dict[str, Any] | None]:
+    """批量获取基金排名数据。
+
+    使用 BatchDispatcher 并行获取多只基金排名，按 fund code 返回映射。
+    支持传入外部 dispatcher 以便共享线程池；不传时内部创建并自动 shutdown。
+    内部使用 fetch_fund_rankings_cached（含 session_cache），
+    同报告生成中 Excel/HTML 双管线间消除重复文件 IO。
+
+    Args:
+        fund_codes: 基金代码列表。
+        dispatcher: 可选外部 BatchDispatcher 实例，None 时内部新建。
+
+    Returns:
+        {code: 排名数据 dict} 映射，失败项为 None。
+    """
+    if not fund_codes:
+        return {}
+
+    own = dispatcher is None
+    if dispatcher is None:
+        from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
+
+        dispatcher = BatchDispatcher(
+            max_workers=get_batch_worker_count("fund_workers", 3),
+            thread_name_prefix="batch_fund_rank",
+            rate_limit_provider="tiantian",
+        )
+
+    from functools import partial
+
+    from src.python.cache import get as cache_get
+    from src.python.cache import get_ttl
+
+    items = [
+        (
+            f"{_FUND_PERF_CACHE_PREFIX}{code}",
+            partial(fetch_fund_rankings_cached, code=code),
+        )
+        for code in fund_codes
+    ]
+
+    results = dispatcher.execute_with_cache_check(
+        items,
+        cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("rank", cache_id)),
+    )
+
+    rank_map: dict[str, dict[str, Any] | None] = {}
+    for code, r in zip(fund_codes, results):
+        rank_map[code] = r.result if r.success else None
+
+    if own:
+        dispatcher.shutdown()
+    return rank_map
+
+
+def fetch_fund_holdings_batch(
+    fund_codes: list[str],
+    dispatcher: Any = None,
+) -> dict[str, dict[str, Any] | None]:
+    """批量获取基金持仓数据。
+
+    使用 BatchDispatcher 并行获取多只基金持仓，按 fund code 返回映射。
+    内部使用 fetch_fund_holdings_cached（含 session_cache），同基金跨环节去重。
+
+    Args:
+        fund_codes: 基金代码列表。
+        dispatcher: 可选外部 BatchDispatcher 实例，None 时内部新建。
+
+    Returns:
+        {code: 持仓数据 dict} 映射，失败项为 None。
+    """
+    if not fund_codes:
+        return {}
+
+    own = dispatcher is None
+    if dispatcher is None:
+        from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
+
+        dispatcher = BatchDispatcher(
+            max_workers=get_batch_worker_count("fund_workers", 3),
+            thread_name_prefix="batch_fund_hold",
+            rate_limit_provider="tiantian",
+        )
+
+    from functools import partial
+
+    from src.python.cache import get as cache_get
+    from src.python.cache import get_ttl
+
+    items = [
+        (
+            f"{_FUND_HOLD_CACHE_PREFIX}{code}",
+            partial(fetch_fund_holdings_cached, code=code),
+        )
+        for code in fund_codes
+    ]
+
+    results = dispatcher.execute_with_cache_check(
+        items,
+        cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("hold", cache_id)),
+    )
+
+    hold_map: dict[str, dict[str, Any] | None] = {}
+    for code, r in zip(fund_codes, results):
+        hold_map[code] = r.result if r.success else None
+
+    if own:
+        dispatcher.shutdown()
+    return hold_map
+
+
 def fetch_fund_holdings_cached(code: str) -> dict[str, Any] | None:
     """基金持仓获取（含会话缓存），同一报告生成中同基金只获取一次。
 
     消除多个模块独立调用 fetch_fund_holdings 的冗余文件缓存读取。
     """
-    from src.python.provider_registry import NOT_FOUND, get_registry
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     registry = get_registry()
     cached = registry.session_cache_get("fund_hold", code)
@@ -171,21 +309,25 @@ def _fetch_benchmark_from_api(code: str) -> str | None:
 
 # ── 第 2 层：内置知识库 ────────────────────────────────
 
-_BUILTIN_BENCHMARKS: dict[str, str] = {
-    "561910": "中证电池主题指数收益率",
-    "159941": "汇率调整后的纳斯达克100指数收益率",
-    "159222": "国证自由现金流指数收益率",
-    "518880": "国内黄金现货价格收益率",
-    "011506": "中证高端装备制造指数75% + 中证全债15% + 中证港股通10%",
-    "017730": "MSCI全球指数75% + 沪深30020% + 活期存款5%",
-    "022365": "战略性新兴产业成份指数70% + 恒生科技10% + 中债综合20%",
-    "016055": "经汇率调整的纳斯达克100指数95% + 活期存款5%",
-    "002943": "中证800 65% + 中债全债35%",
-    "096001": "标普500等权重指数（全收益指数）",
-    "240012": "中国债券总指数收益率100%",
-    "012325": "中债综合财富(1年以下)85% + 一年定存15%",
-    "040046": "纳斯达克100指数(经汇率)95% + 活期存款5%",
-}
+_BENCHMARKS_FILE = os.path.join(PROJECT_ROOT, "data/knowledge/fund_benchmarks.json")
+
+
+def _load_builtin_benchmarks() -> dict[str, str]:
+    """从 fund_benchmarks.json 加载内置基金基准对照表。"""
+    if not os.path.exists(_BENCHMARKS_FILE):
+        logger.warning("[基准] 内置基准文件 %s 不存在，使用空表", _BENCHMARKS_FILE)
+        return {}
+    try:
+        with open(_BENCHMARKS_FILE, encoding="utf-8") as f:
+            data: dict[str, str] = json.load(f)
+        logger.info("[基准] 已加载 %d 条内置基准对照", len(data))
+        return data
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("[基准] 加载内置基准文件失败: %s，使用空表", e)
+        return {}
+
+
+_BUILTIN_BENCHMARKS: dict[str, str] = _load_builtin_benchmarks()
 
 
 # ── 第 3 层：用户配置覆盖 ──────────────────────────────

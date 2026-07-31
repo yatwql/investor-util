@@ -34,8 +34,6 @@ from src.python.llm.prompts_tables import (
 
 logger = logging.getLogger("invest")
 
-logger = logging.getLogger("invest")
-
 
 def _build_global_macro_prompt(
     a_indices: dict[str, dict[str, Any]],
@@ -97,38 +95,17 @@ def _build_global_macro_prompt(
             flow_lines.append("  ".join(parts))
         flow_text = "\n【行业资金流向】\n" + "\n".join(flow_lines)
 
-    # ── TOP3 持仓排名（按市值） ──
-    top_text = ""
-    if holdings_details:
-        sorted_h = sorted(
-            [d for d in holdings_details if (d.get("market_value", 0) or 0) > 0],
-            key=lambda d: d.get("market_value", 0) or 0,
-            reverse=True,
-        )
-        top_lines = []
-        for i, h in enumerate(sorted_h[:3], 1):
-            code = h.get("code", "")
-            name = h.get("name", "")
-            mv = h.get("market_value", 0) or 0
-            weight = (mv / total_mv * 100) if total_mv else 0
-            rate = h.get("profit_rate")
-            rate_str = f"{rate:+.2f}%" if rate is not None else "--"
-            top_lines.append(f"  {i}. {name}（{code}）市值{mv:,.0f} 占比{weight:.1f}% 收益率{rate_str}")
-        if top_lines:
-            top_text = "\n【持仓TOP3】\n" + "\n".join(top_lines)
-
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
     comp_text = f"\n{competitive_context}" if competitive_context else ""
+
     return (
         f"【当前时间】{now_bj}（北京时间）\n"
         f"【指数】{idx_text}\n"
         f"【持仓】总市值{total_mv:,.0f} 总盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）\n"
         f"【分布】{' '.join(cat_parts)}\n"
-        f"{top_text}"
         f"{flow_text}"
         f"{comp_text}"
-        f"请基于以上数据，分析当前全球政经局势对持仓的潜在影响。注意：请勿虚构持仓排名，"
-        f"TOP3 排名已在【持仓TOP3】中给出。"
+        f"请基于以上数据，分析当前全球政经局势对持仓的潜在影响。注意：请勿虚构持仓排名和数值。"
     )
 
 
@@ -204,7 +181,7 @@ def _build_qa_concentration_block(
 
 
 # ── 条件推理 + 反问引导 ─────────────────────────────────────
-# 通过 _build_expert_review_prompt 的 enable_mode_2/enable_mode_3 参数控制
+# 通过 _build_expert_review_prompt 的 enable_conditional/enable_qa_concentration 参数控制
 
 
 def _build_expert_review_prompt(
@@ -220,9 +197,10 @@ def _build_expert_review_prompt(
     competitive_context: str | None = None,
     metrics: dict | None = None,
     *,  # 以下为实验模式参数
-    enable_mode_2: bool = False,
-    enable_mode_3: bool = False,
+    enable_conditional: bool = False,
+    enable_qa_concentration: bool = False,
     industry_concentration: dict[str, float] | None = None,
+    skip_scenarios: bool = False,  # 辩论模式跳过所有情景分析
 ) -> str:
     """构建智囊团深度复盘的用户提示词（紧凑格式）。
 
@@ -234,6 +212,8 @@ def _build_expert_review_prompt(
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），
             可选，由呼叫方构建并传入。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
+        skip_scenarios: True 时跳过所有情景分析指令（辩论 pro/con 用，
+            避免双重情景输出）。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
@@ -310,28 +290,44 @@ def _build_expert_review_prompt(
         "给出优化建议和风险预警。",
     ]
 
-    # ── 条件推理情景追加 ────────────────────────────────
-    if enable_mode_2:
-        try:
-            from src.python.config._core import get_llm_config
+    # ── 情景分析（标准 fallback / 配置条件情景 / 跳过） ──────
+    if not skip_scenarios:
+        _scenario_appended = False
+        if enable_conditional:
+            try:
+                from src.python.config._core import get_llm_config
 
-            _cfg = get_llm_config()
-            _scenarios = (_cfg or {}).get("debate", {}).get("mode_2_conditional", {}).get("scenarios", [])
-            if _scenarios:
-                scenario_lines = ["\n\n### 情景分析"]
-                for _s in _scenarios:
-                    _name = _s.get("name", "未知")
-                    _desc = _s.get("desc", "")
-                    _change = _s.get("change", 0)
-                    scenario_lines.append(
-                        f"📈 **{_name}情景（{_desc}）**：至少 2 句具体行动建议，分析在 {_desc} 情境下应如何调整持仓。"
-                    )
-                parts.append("\n".join(scenario_lines))
-        except Exception:
-            logger.warning("[debate] 条件推理情景追加失败，已跳过")
+                _cfg = get_llm_config()
+                _scenarios = (_cfg or {}).get("debate", {}).get("conditional", {}).get("scenarios", [])
+                if _scenarios:
+                    scenario_lines = ["\n\n### 情景分析"]
+                    for _s in _scenarios:
+                        _name = _s.get("name", "未知")
+                        _desc = _s.get("desc", "")
+                        scenario_lines.append(
+                            f"📈 **{_name}情景（{_desc}）**：至少 2 句具体行动建议，分析在 {_desc} 情境下应如何调整持仓。"
+                        )
+                    parts.append("\n".join(scenario_lines))
+                    _scenario_appended = True
+            except Exception:
+                logger.warning("[debate] 条件推理情景追加失败，已跳过")
+        if not _scenario_appended and not enable_conditional:
+            # 标准情景 fallback（从 _SYSTEM_EXPERT_REVIEW 移出，避免双重指令）
+            parts.append(
+                "\n\n### 情景分析\n\n"
+                "请在回复末尾增加 **'### 情景分析'** 二级标题，标题下包含两个子段落：\n\n"
+                "📈 **上涨情景：如果未来市场上涨 20%…**\n"
+                "- 至少 2 句具体行动建议（如：哪些品种建议止盈、哪些可继续持有、是否加仓等）\n"
+                "- 结合当前持仓结构和盈亏状态给出差异化建议\n\n"
+                "📉 **下跌情景：如果未来市场下跌 20%…**\n"
+                "- 至少 2 句具体行动建议（如：哪些品种可逢低补仓、是否需要设止损、现金管理建议等）\n"
+                "- 结合品种的当前回撤位置和基本面判断\n\n"
+                "注意：两个情景必须给出方向性判断和具体品种建议，"
+                "避免'视情况而定'这类模棱两可的表述。"
+            )
 
     # ── 集中度反问引导 ──────────────────────────────────
-    if enable_mode_3:
+    if enable_qa_concentration:
         _qa_block = _build_qa_concentration_block(
             holdings_details,
             total_mv,
@@ -402,6 +398,12 @@ def _build_health_check_prompt(
         "4. 成本结构 — 成本分布与浮盈浮亏比",
         "5. 数据质量 — 结合【数据质量降级】段落评估数据完整性",
         "按要求的输出格式给出评分和改进建议。",
+        "",
+        "【数值精度约束】",
+        "1. 持仓明细已标注每只品种的盈亏比例（如 +6.00%），请直接引用，不得虚构、推算或编造任何百分比数值。",
+        "2. 如果需要引用收益归因，请参考【收益归因】段落，并标注为「贡献占比」而非收益率。",
+        "3. 不确定具体数字时使用定性描述（如「表现较好」「有盈利」「亏损」）而非虚构具体百分比。",
+        "4. 持仓排名已通过【持仓TOP3】段明确给出，不得自行推测「最大持仓」或「第一重仓」。",
     ]
     return "\n".join(parts)
 
@@ -440,10 +442,11 @@ def _build_penetration_deep_prompt(
 
     # 根据代码前缀推断国别/币种
     country_lines = _calc_country_exposure(holdings_details)
+    total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
 
     return (
         f"【当前时间】{now_bj}（北京时间）\n"
-        f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} 成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}\n"
+        f"【持仓概况】{holdings_count}只 市值{total_mv:,.0f} 成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）\n"
         f"【分布】{' '.join(cat_parts)}\n"
         f"\n"
         f"【持仓明细】\n"
@@ -466,17 +469,49 @@ def _build_penetration_deep_prompt(
 # ── 辩论模式：综合 prompt 构建 ──────────────────────────────
 
 
-def _build_debate_synthesis_prompt(pro_text: str, con_text: str) -> str:
+def _build_debate_synthesis_prompt(
+    pro_text: str,
+    con_text: str,
+    enable_conditional: bool = False,
+) -> str:
     """构建综合阶段的用户 prompt，包含白脸和黑脸的原始分析全文。
+
+    当 ``enable_conditional=True`` 时额外追加条件推理的情景分析指令，
+    让指挥官在综合正反观点的基础上按涨/跌/震荡情景分别给出建议。
 
     Args:
         pro_text: 白脸分析的完整文本。
         con_text: 黑脸分析的完整文本。
+        enable_conditional: 是否追加条件推理情景分析指令。
 
     Returns:
         格式化的综合 prompt 字符串。
     """
-    return f"白脸原始分析：\n\n```markdown\n{pro_text}\n```\n\n黑脸原始分析：\n\n```markdown\n{con_text}\n```"
+    prompt = f"白脸原始分析：\n\n```\n{pro_text}\n```\n\n黑脸原始分析：\n\n```\n{con_text}\n```"
+
+    if enable_conditional:
+        try:
+            from src.python.config._core import get_llm_config
+
+            _cfg = get_llm_config()
+            _scenarios = (_cfg or {}).get("debate", {}).get("conditional", {}).get("scenarios", [])
+            if _scenarios:
+                scenario_lines = [
+                    "\n\n### 情景分析",
+                    "请结合上述白脸和黑脸的分析，按以下情景分别给出综合后的行动建议：",
+                ]
+                for _s in _scenarios:
+                    _name = _s.get("name", "未知")
+                    _desc = _s.get("desc", "")
+                    scenario_lines.append(
+                        f"📈 **{_name}情景（{_desc}）**：至少 2 句具体行动建议，"
+                        f"综合正反观点，给出在 {_desc} 情境下的持仓调整建议。"
+                    )
+                prompt += "\n".join(scenario_lines)
+        except Exception:
+            logger.warning("[debate] 综合阶段条件推理情景追加失败，已跳过")
+
+    return prompt
 
 
 __all__ = [

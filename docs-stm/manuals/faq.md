@@ -12,7 +12,7 @@
 - [数据获取](#数据获取)
 - [LLM 相关](#llm-相关)
 - [报告理解](#报告理解)
-- [报告数据解读](#报告数据解读)
+- [投资概念与指标释义](#投资概念与指标释义)
 - [缓存相关](#缓存相关)
 - [平台与兼容性](#平台与兼容性)
 - [隐私与安全](#隐私与安全)
@@ -28,7 +28,7 @@ A: 请使用支持 UTF-8 的终端（Windows Terminal 或 VS Code 终端），�
 
 **Q: 程序启动时 PowerShell 报"无法加载文件，因为在此系统上禁止运行脚本"？**
 
-A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，再运行 `.\scripts\launch.ps1`。或使用手动方式：`.venv\Scripts\activate` + `python src/python/tui.py`。
+A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，再运行 `.\scripts\launch.ps1`。或使用手动方式：`.venv\Scripts\activate` + `python -m src.python.tui.tui`。
 
 **Q: 需要什么 Python 版本？**
 
@@ -113,7 +113,7 @@ echo 'export VENV_PATH=/data/shared/venvs/investor-util' >> ~/.bashrc && source 
 ```bash
 # Linux（Docker / Jenkins / GitHub Actions）
 /data/shared/venvs/investor-util/bin/python scripts/test_runner.py --mode regression
-/data/shared/venvs/investor-util/bin/python src/python/tui.py
+/data/shared/venvs/investor-util/bin/python -m src.python.tui.tui
 
 # Windows（部署脚本）
 & "D:\shared\venvs\investor-util\Scripts\python.exe" scripts\test_runner.py --mode regression
@@ -236,7 +236,7 @@ A: 需要备份的文件：
 
 **Q: 为什么报告或配置中显示的版本号不是最新的？**
 
-A: 版本号在 `src/python/constants.py` 的 `APP_VERSION` 中定义。发布新版本后，需运行 `python scripts/check-version-consistency.py` 按提示同步所有文件中的版本号（README.md、pyproject.toml、管理文档头部等），确保全局一致。遇到版本号不一致时运行上述脚本即可排查并修复。
+A: 版本号在 `src/python/core/constants.py` 的 `APP_VERSION` 中定义。发布新版本后，需运行 `python scripts/check-version-consistency.py` 按提示同步所有文件中的版本号（README.md、pyproject.toml、管理文档头部等），确保全局一致。遇到版本号不一致时运行上述脚本即可排查并修复。
 
 **Q: 如何配置场外基金的赎回上限？**
 
@@ -393,7 +393,7 @@ A: 可以。在 `llm_settings.json` 中设置对应模块的 `output_brief_{模�
 
 **Q: 如何评估 LLM 输出的准确性，防止幻觉？**
 
-A: 使用 `scripts/llm_hallucination_sampler.py` 对 10 组标准化持仓数据进行采样测试。脚本调用当前 prompt 配置生成 LLM 分析，通过事实校验器自动验证数值一致性、品种存在性和排名正确性，生成幻觉率报告到 `docs-stm/tmp/hallucination-report.md`。目标幻觉率 < 5%，每次 prompt 重大修改后应重新采样。详见 [`how-to-test-my-code.md`](how-to-test-my-code.md#-llm-幻觉率采样测试)。
+A: 使用 `scripts/llm_hallucination_sampler.py` 对 10 组标准化持仓数据进行采样测试。脚本调用当前 prompt 配置生成 LLM 分析，通过事实校验器自动验证数值一致性、品种存在性和排名正确性，生成幻觉率报告到 `docs-stm/tmp/hallucination-report.md`。目标幻觉率 < 5%，每次 prompt 重大修改后应重新采样。详见 [`how-to-test-my-code.md`](how-to-test-my-code.md#llm-幻觉率采样测试)。
 
 **Q: 调用 LLM 大概需要多少费用？**
 
@@ -471,13 +471,20 @@ A: 如果存在跨账户的同一只持仓，各账户小计仅反映该账户�
 
 **Q: 报告中的专业概念（QDII、穿透、溢价率等）是什么意思？**
 
-A: 报告中涉及的专业投资概念均在[报告文件结构](reports-instruction.md#附录投资产品知识点)的"投资产品知识点"附录中有集中解释，包括：
-- 场内 vs 场外、实时价 vs 净值、QDII 机制
-- 资产穿透、溢价率、浮动盈亏
-- 基金 5 级评级体系、最大回撤、年化波动率
-- Jaccard 系数、Overlap Ratio、行业资金流向等
+A: 报告中涉及的主要投资概念如下：
 
-建议阅读该附录以更好地理解报告数据含义。
+- **场内 vs 场外**：场内品种在交易所挂牌交易（股票、ETF），价格实时波动；场外品种通过基金公司直销或代销渠道申赎，以每日公布的单位净值为准。
+- **实时价 vs 净值**：实时价是场内品种在交易时段内的即时成交价；净值是基金每份的实际资产价值，通常每日公布一次。
+- **QDII**：合格境内机构投资者基金，投资境外市场。净值存在 1 个交易日滞后（T-1），报告中以蓝色字体标注取价方式。
+- **资产穿透**：将基金等持仓标的逐层拆解到底层资产（如 ETF→成分股、联接基金→底层基金），合并计算实际持仓比例最高的前 10 项底层资产。详见报告 §4 资产穿透TOP10。
+- **溢价率**：仅针对场内 ETF/LOF，公式 = (最新价 − 净值) ÷ 净值 × 100%。正值表示溢价交易（市价高于净值），负值表示折价交易。
+- **浮动盈亏**：以"最新价 × 持仓份额 − 成本（成本价 × 持仓份额）"计算，未扣除交易佣金和税费，非已实现盈亏。
+- **基金 5 级评级**：基于天天基金同类排名百分位，分为优秀/良好/稳定/偏差/较差，不同类型基金使用不同阈值。
+- **最大回撤**：Peak-to-Trough 算法，从净值最高点到后续最低点的最大跌幅，衡量组合的历史风险。
+- **年化波动率**：日收益率样本标准差（ddof=1）× √252，衡量组合收益的波动程度。
+- **Jaccard 系数**：两基金持仓交集与并集之比，衡量持仓相似度。 |A∩B| / |A∪B|。
+- **Overlap Ratio（重叠率）**：两基金持仓交集与较小持仓数之比，|A∩B| / min(|A|, |B|)。重合度取 Jaccard 和重叠率的较大值。
+- **行业资金流向**：基于 akshare 封装的东方财富接口，展示各行业板块的资金净流入/流出排名。
 
 **Q: 报告中会展示持仓的币种敞口分布吗？**
 
@@ -513,7 +520,7 @@ A: 格式为 `个人投资分析报告-YYYYMMDD-HHMMSS`，即生成时的本地�
 
 ---
 
-## 报告数据解读
+## 投资概念与指标释义
 
 **Q: 报告中的"穿透"是什么意思？**
 
@@ -561,7 +568,7 @@ A: 如果不同持仓的历史数据起止日期差异较大（如 QDII 基金�
 
 **Q: 走势图中的基准指数曲线是怎么来的？**
 
-A: 通过 `config.json` 的 `history.benchmark_indices` 配置（默认 `{"sh000300": "沪深300", "gb_inx": "标普500"}`），程序在计算组合历史走势的同时，并行获取指定指数的历史日线数据，以组合起算日为基点归一化至 100，叠加在走势图上。回撤图同样叠加指数回撤序列。禁用时可将该字段设为空对象 `{}`。
+A: 通过 `config.json` 的 `history.benchmark_indices` 配置（默认 `{"sh000300": "沪深300"}`），程序在计算组合历史走势的同时，并行获取指定指数的历史日线数据，以组合起算日为基点归一化至 100，叠加在走势图上。回撤图同样叠加指数回撤序列。禁用时可将该字段设为空对象 `{}`。
 
 **Q: 基准指数标普500获取失败，走势对比图上没有标普500曲线？**
 
@@ -664,7 +671,7 @@ A: 复制整个项目目录（含 `data/cache/` 和 `data/config/`）到新电�
 
 A: 日志文件在 `logs/app.log`，DEBUG 级别的详细信息（如 LLM 发出的完整 prompt）已自动写入该文件，查看即可。
 
-如需调整日志输出级别，编辑 `src/python/logger.py`：
+如需调整日志输出级别，编辑 `src/python/core/logger.py`：
 
 | 修改目标 | 找到的代码行 | 改为 |
 |:---------|:-----------|:-----|

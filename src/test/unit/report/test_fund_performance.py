@@ -20,7 +20,7 @@ import unittest
 from typing import Any
 from unittest.mock import MagicMock, call, patch
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report import fund_performance as fp
 from src.python.report import penetration as pene
 from src.python.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT
@@ -313,6 +313,7 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         "src.python.report.fund_performance.write_data_row",
         "src.python.report.fund_performance.freeze_header",
         "src.python.report.fund_performance.auto_width",
+        "src.python.report.fund_performance.fetch_fund_rankings_batch",
         "src.python.report.fund_performance.fetch_fund_rankings",
         "src.python.report.fund_performance.fetch_fund_benchmark",
         "src.python.report.fund_performance.classify_penetration",
@@ -350,30 +351,31 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
             return pene.ACTIVE_EQUITY
         self.mocks["classify_penetration"].side_effect = _cls_side_effect
 
-        # -- fetch_fund_rankings 侧效 --
-        def _rankings_side_effect(code: str) -> dict | None:
-            data = {
-                "561910": {
-                    "rankings": {
-                        "近3月": {"return": 1.5},
-                        "近6月": {"return": 3.2},
-                        "近1年": {"return": 8.5},
-                        "同类排名": {"rank": 50, "total": 500},
-                    },
-                    "rating": "优秀",
+        # -- fetch_fund_rankings_batch 侧效 --
+        _RANKINGS_DATA = {
+            "561910": {
+                "rankings": {
+                    "近3月": {"return": 1.5},
+                    "近6月": {"return": 3.2},
+                    "近1年": {"return": 8.5},
+                    "同类排名": {"rank": 50, "total": 500},
                 },
-                "012325": {
-                    "rankings": {
-                        "近3月": {"return": 0.8},
-                        "近6月": {"return": 1.5},
-                        "近1年": {"return": 3.0},
-                        "同类排名": {"rank": 100, "total": 800},
-                    },
-                    "rating": "稳定",
+                "rating": "优秀",
+            },
+            "012325": {
+                "rankings": {
+                    "近3月": {"return": 0.8},
+                    "近6月": {"return": 1.5},
+                    "近1年": {"return": 3.0},
+                    "同类排名": {"rank": 100, "total": 800},
                 },
-            }
-            return data.get(code)  # None 表示获取失败
-        self.mocks["fetch_fund_rankings"].side_effect = _rankings_side_effect
+                "rating": "稳定",
+            },
+        }
+
+        def _rankings_batch_side_effect(codes: list[str]) -> dict:
+            return {code: _RANKINGS_DATA.get(code) for code in codes}
+        self.mocks["fetch_fund_rankings_batch"].side_effect = _rankings_batch_side_effect
 
         # -- fetch_fund_benchmark 侧效 --
         def _benchmark_side_effect(code: str) -> str:
@@ -483,14 +485,14 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
         self.mocks["auto_width"].assert_called_once_with(self.ws)
 
         # fetch 不应被调用
-        self.mocks["fetch_fund_rankings"].assert_not_called()
+        self.mocks["fetch_fund_rankings_batch"].assert_not_called()
         self.mocks["fetch_fund_benchmark"].assert_not_called()
 
     # -- all fail ----------------------------------------------------
 
     def test_all_funds_fail(self):
         """所有基金 API 获取失败 -> 全部写占位行 + 统计正确。"""
-        self.mocks["fetch_fund_rankings"].side_effect = lambda code: None
+        self.mocks["fetch_fund_rankings_batch"].side_effect = lambda codes: {code: None for code in codes}
 
         fp.write_fund_performance_sheet(self.ws, self.holdings, self.details)
 
@@ -527,19 +529,22 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
     def test_partial_fail(self):
         """部分基金获取失败 -> 成功行 + 占位行 + 统计 + 评级分布。"""
         # 只有 561910 成功
-        self.mocks["fetch_fund_rankings"].side_effect = lambda code: (
-            None if code == "012325" else {
-                "561910": {
-                    "rankings": {
-                        "近3月": {"return": 1.5},
-                        "近6月": {"return": 3.2},
-                        "近1年": {"return": 8.5},
-                        "同类排名": {"rank": 50, "total": 500},
+        self.mocks["fetch_fund_rankings_batch"].side_effect = lambda codes: {
+            code: (
+                None if code == "012325" else {
+                    "561910": {
+                        "rankings": {
+                            "近3月": {"return": 1.5},
+                            "近6月": {"return": 3.2},
+                            "近1年": {"return": 8.5},
+                            "同类排名": {"rank": 50, "total": 500},
+                        },
+                        "rating": "优秀",
                     },
-                    "rating": "优秀",
-                },
-            }.get(code)
-        )
+                }.get(code)
+            )
+            for code in codes
+        }
 
         # 额外细节：002325 的 detail 实际上不会被用到（占位行）
         fp.write_fund_performance_sheet(self.ws, self.holdings, self.details)
@@ -592,7 +597,7 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
 
     def test_rating_colors(self):
         """各种评级对应正确的单元格字体颜色。"""
-        def _rankings_all_ratings(code: str) -> dict | None:
+        def _rankings_all_ratings(codes: list[str]) -> dict:
             data = {
                 "561910": {
                     "rankings": {"近3月": {"return": 1.0},
@@ -609,9 +614,9 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
                     "rating": "稳定",
                 },
             }
-            return data.get(code)
+            return {code: data.get(code) for code in codes}
 
-        self.mocks["fetch_fund_rankings"].side_effect = _rankings_all_ratings
+        self.mocks["fetch_fund_rankings_batch"].side_effect = _rankings_all_ratings
 
         # 添加第三只基金仅用于测试 "偏差" 评级
         holdings = self.holdings + [
@@ -630,7 +635,7 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
             return pene.ACTIVE_EQUITY
         self.mocks["classify_penetration"].side_effect = _cls_side_effect_3
 
-        def _rankings_3(code: str) -> dict | None:
+        def _rankings_3_batch(codes: list[str]) -> dict:
             data = {
                 "561910": {
                     "rankings": {"近3月": {"return": 1.0},
@@ -654,8 +659,8 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
                     "rating": "偏差",
                 },
             }
-            return data.get(code)
-        self.mocks["fetch_fund_rankings"].side_effect = _rankings_3
+            return {code: data.get(code) for code in codes}
+        self.mocks["fetch_fund_rankings_batch"].side_effect = _rankings_3_batch
 
         fp.write_fund_performance_sheet(self.ws, holdings, details)
 
@@ -672,7 +677,7 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
     def test_rating_distribution(self):
         """多基金不同评级 -> 评级分布汇总行正确。"""
         # 3 只基金，评级分别为 优秀 x2, 偏差 x1
-        def _rankings_dist(code: str) -> dict | None:
+        def _rankings_dist_batch(codes: list[str]) -> dict:
             data = {
                 "561910": {
                     "rankings": {"近3月": {"return": 1.0},
@@ -696,8 +701,8 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
                     "rating": "偏差",
                 },
             }
-            return data.get(code)
-        self.mocks["fetch_fund_rankings"].side_effect = _rankings_dist
+            return {code: data.get(code) for code in codes}
+        self.mocks["fetch_fund_rankings_batch"].side_effect = _rankings_dist_batch
 
         holdings = self.holdings + [
             Holding("微信", "易方达蓝筹精选", "005827", 300, 2.0),
@@ -734,26 +739,25 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
 
     def test_perf_eval_null_categories(self):
         """perf_evaluation.categories 为 JSON null → 不崩溃，正确兜底。"""
-        def _rankings_null_cat(code: str) -> dict | None:
-            return {
-                "561910": {
-                    "rankings": {"近3月": {"return": 1.5},
-                                 "近6月": {"return": 3.2},
-                                 "近1年": {"return": 8.5},
-                                 "同类排名": {"rank": 50, "total": 500}},
-                    "rating": "优秀",
-                    "perf_evaluation": {"categories": None, "data": None},
-                },
-                "012325": {
-                    "rankings": {"近3月": {"return": 0.8},
-                                 "近6月": {"return": 1.5},
-                                 "近1年": {"return": 3.0},
-                                 "同类排名": {"rank": 100, "total": 800}},
-                    "rating": "稳定",
-                    "perf_evaluation": {"categories": None, "data": None},
-                },
-            }.get(code)
-        self.mocks["fetch_fund_rankings"].side_effect = _rankings_null_cat
+        _data = {
+            "561910": {
+                "rankings": {"近3月": {"return": 1.5},
+                             "近6月": {"return": 3.2},
+                             "近1年": {"return": 8.5},
+                             "同类排名": {"rank": 50, "total": 500}},
+                "rating": "优秀",
+                "perf_evaluation": {"categories": None, "data": None},
+            },
+            "012325": {
+                "rankings": {"近3月": {"return": 0.8},
+                             "近6月": {"return": 1.5},
+                             "近1年": {"return": 3.0},
+                             "同类排名": {"rank": 100, "total": 800}},
+                "rating": "稳定",
+                "perf_evaluation": {"categories": None, "data": None},
+            },
+        }
+        self.mocks["fetch_fund_rankings_batch"].side_effect = lambda codes: {code: _data.get(code) for code in codes}
 
         fp.write_fund_performance_sheet(self.ws, self.holdings, self.details)
 
@@ -770,18 +774,17 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
 
     def test_perf_eval_null_data(self):
         """perf_evaluation.data 为 JSON null，categories 正常 → 不崩溃。"""
-        def _rankings_null_data(code: str) -> dict | None:
-            return {
-                "561910": {
-                    "rankings": {"近3月": {"return": 1.5},
-                                 "近6月": {"return": 3.2},
-                                 "近1年": {"return": 8.5},
-                                 "同类排名": {"rank": 50, "total": 500}},
-                    "rating": "优秀",
-                    "perf_evaluation": {"categories": ["超额收益", "选股能力"], "data": None},
-                },
-            }.get(code)
-        self.mocks["fetch_fund_rankings"].side_effect = _rankings_null_data
+        _data = {
+            "561910": {
+                "rankings": {"近3月": {"return": 1.5},
+                             "近6月": {"return": 3.2},
+                             "近1年": {"return": 8.5},
+                             "同类排名": {"rank": 50, "total": 500}},
+                "rating": "优秀",
+                "perf_evaluation": {"categories": ["超额收益", "选股能力"], "data": None},
+            },
+        }
+        self.mocks["fetch_fund_rankings_batch"].side_effect = lambda codes: {code: _data.get(code) for code in codes}
 
         fp.write_fund_performance_sheet(self.ws, [self.holdings[0]], [self.details[0]])
 
@@ -796,7 +799,7 @@ class TestWriteFundPerformanceSheet(unittest.TestCase):
 
 
 # ============================================================
-#  R-098: 基金排名数据合理性
+#  基金排名数据合理性
 # ============================================================
 
 @pytest.mark.data
@@ -896,14 +899,14 @@ class TestRankDataReasonableRange(unittest.TestCase):
             return _cell_cache[key]
         self.ws.cell.side_effect = _cell_side_effect
 
-    @patch("src.python.report.fund_performance.fetch_fund_rankings")
+    @patch("src.python.report.fund_performance.fetch_fund_rankings_batch")
     @patch("src.python.report.fund_performance.fetch_fund_benchmark",
            return_value="沪深300指数")
     @patch("src.python.report.fund_performance.classify_penetration",
            return_value=pene.ACTIVE_EQUITY)
-    def test_yield_rate_in_reasonable_range(self, mock_pene, mock_bm, mock_rank):
+    def test_yield_rate_in_reasonable_range(self, mock_pene, mock_bm, mock_batch):
         """收益率极端值应通过 _format_return 格式化为正确字符串。"""
-        mock_rank.return_value = {
+        mock_batch.return_value = {"005827": {
             "rankings": {
                 "近3月": {"return": 9999.99},      # 极端大
                 "近6月": {"return": -99.99},        # 极端小负
@@ -911,7 +914,7 @@ class TestRankDataReasonableRange(unittest.TestCase):
                 "同类排名": {"rank": 100, "total": 500},
             },
             "rating": "优秀",
-        }
+        }}
         holdings = [Holding("支付宝", "易方达蓝筹混合", "005827", 100, 2.0)]
         details = [_MockDetailRow("005827", profit=1000.0, profit_rate=0.05,
                                   market_value=10000.0)]
@@ -932,14 +935,14 @@ class TestRankDataReasonableRange(unittest.TestCase):
             self.assertAlmostEqual(fund_row[4], -0.9999)
             self.assertEqual(fund_row[5], 0.5)
 
-    @patch("src.python.report.fund_performance.fetch_fund_rankings")
+    @patch("src.python.report.fund_performance.fetch_fund_rankings_batch")
     @patch("src.python.report.fund_performance.fetch_fund_benchmark",
            return_value="沪深300指数")
     @patch("src.python.report.fund_performance.classify_penetration",
            return_value=pene.ACTIVE_EQUITY)
-    def test_rank_not_exceed_total_all(self, mock_pene, mock_bm, mock_rank):
+    def test_rank_not_exceed_total_all(self, mock_pene, mock_bm, mock_batch):
         """排名数据中 rank ≤ total → _format_rank 输出正确格式。"""
-        mock_rank.return_value = {
+        mock_batch.return_value = {"005827": {
             "rankings": {
                 "近3月": {"return": 5.0},
                 "近6月": {"return": 3.0},
@@ -947,7 +950,7 @@ class TestRankDataReasonableRange(unittest.TestCase):
                 "同类排名": {"rank": 500, "total": 500},  # 边界值
             },
             "rating": "优秀",
-        }
+        }}
         holdings = [Holding("支付宝", "易方达蓝筹混合", "005827", 100, 2.0)]
         details = [_MockDetailRow("005827", profit=1000.0, profit_rate=0.05,
                                   market_value=10000.0)]

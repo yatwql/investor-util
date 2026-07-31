@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 
-from src.python.provider_registry import phase_timeout
+from src.python.core.provider_registry import phase_timeout
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 

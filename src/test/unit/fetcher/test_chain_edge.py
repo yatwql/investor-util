@@ -126,8 +126,8 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
 
     def _break_provider(self, name: str, at_time: float):
         """在指定时间点模拟 provider 连续 3 次传输级失败。"""
-        from src.python.provider_registry import get_registry
-        with patch("src.python.provider_registry.time.time", return_value=at_time):
+        from src.python.core.provider_registry import get_registry
+        with patch("src.python.core.provider_registry.time.time", return_value=at_time):
             reg = get_registry()
             reg.register_provider(name, 2)
             reg.record_failure(name, "test")
@@ -147,13 +147,13 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         p1_fn = MagicMock(return_value={"data": "probe_ok"})
         self.provider_map["p1"] = ("P1", p1_fn)
 
-        with patch("src.python.provider_registry.time.time", return_value=1001.0):
+        with patch("src.python.core.provider_registry.time.time", return_value=1001.0):
             from src.python.fetcher.chain import fetch_with_fallback
             result = fetch_with_fallback("price", self.provider_map, "k1", 3600)
 
         self.assertEqual(result, {"data": "probe_ok"})
         p1_fn.assert_called_once()  # 试探请求被放行
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         self.assertFalse(get_registry().is_circuit_broken("p1"))  # 熔断已清除
 
     @patch("src.python.fetcher.chain.cache_get")
@@ -168,14 +168,14 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         p1_fn = MagicMock(side_effect=RuntimeError("transport error"))
         self.provider_map["p1"] = ("P1", p1_fn)
 
-        with patch("src.python.provider_registry.time.time", return_value=1001.0):
+        with patch("src.python.core.provider_registry.time.time", return_value=1001.0):
             from src.python.fetcher.chain import fetch_with_fallback
 
             # 第1次：探头失败 → p2 兜底 → p1 计数器 = 1，尚未重新熔断
             result = fetch_with_fallback("price", self.provider_map, "k2a", 3600)
             self.assertEqual(result, {"data": "fallback"})
             p1_fn.assert_called_once()
-            from src.python.provider_registry import get_registry
+            from src.python.core.provider_registry import get_registry
             self.assertFalse(get_registry().is_circuit_broken("p1"))  # 未重新熔断
 
             # 第2次：p1 计数器 = 2，仍不熔断
@@ -202,7 +202,7 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         p1_fn = MagicMock(return_value={"data": "should_not_call"})
         self.provider_map["p1"] = ("P1", p1_fn)
 
-        with patch("src.python.provider_registry.time.time", return_value=950.0):
+        with patch("src.python.core.provider_registry.time.time", return_value=950.0):
             from src.python.fetcher.chain import fetch_with_fallback
             result = fetch_with_fallback("price", self.provider_map, "k3", 3600)
 

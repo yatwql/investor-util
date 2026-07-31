@@ -11,7 +11,7 @@ import time as _time_module
 from collections.abc import Callable
 from typing import Any
 
-from src.python.ansi_colors import CYAN, GREEN, RED, RESET, YELLOW
+from src.python.core.ansi_colors import CYAN, GREEN, RED, RESET, YELLOW
 
 logger = logging.getLogger("invest")
 

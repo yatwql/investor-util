@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
-> 文档版本：v0.8.8-dev
+> 文档版本：0.9.3
 
 ---
 
@@ -79,17 +79,6 @@ Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做�
 
 CSS 变量 + localStorage 切换按钮。**预估：0.5d**
 
-#### 已完成项
-
-- **✅ plan-12 错误友好提示/数据源可用性矩阵**（`plan-web-ui.md §4`）— 已在 `data_source_matrix.py` 实现，作为报告章节 #17（always 类型页签）输出
-
-#### 文档体系完善（[`plan-documentation.md`](../plan/plan-documentation.md)）— **plan-13 / plan-14**
-
-| # | 项目 | 内容 | 工作量 | 状态 |
-|:-:|:-----|:-----|:------:|:----:|
-| plan-13 | **数据源可靠性文档** | 8 类数据源可靠性详表 + 降级路径 + 限流规则 + 历史故障 | 1-1.5d | ✅ 已完成 (`datasource-reliability.md` + `cli check-sources`) |
-| plan-14 | **架构决策记录（ADR）** | ADR 目录/模板 + 补写 5-8 个关键决策 + 流程固化 | 2.5d | ⏳ 待排期 |
-
 ### P4 — 实验功能
 
 > 实验性功能，缺省关闭，需通过配置项或 features.json 显式启用。启用不影响现有功能稳定性。
@@ -100,6 +89,7 @@ CSS 变量 + localStorage 切换按钮。**预估：0.5d**
 
 ## 归档
 
+- [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)
 - [`archived_plan.0.6.x.md`](../archive/v0.6.x/archived_plan.0.6.x.md)
 - [`archived_plan.0.5.x.md`](../archive/v0.5.x/archived_plan.0.5.x.md)

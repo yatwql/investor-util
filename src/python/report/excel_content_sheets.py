@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.python.registry import get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.progress import ProgressReporter
 
 

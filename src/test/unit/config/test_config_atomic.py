@@ -1,4 +1,4 @@
-"""Config 原子写入断电恢复测试 — R-085。
+"""Config 原子写入断电恢复测试。
 
 测试目标：
   - set_config 使用 tempfile + os.replace 原子写入模式

@@ -263,7 +263,7 @@
 <script>
 /* --- Native Canvas 2D chart renderer (multi-dataset, no external deps) --- */
 window.drawSimpleChart = function(canvasId, a, b, c) {
-    /* Backward compat: old (canvasId, labels, values, opts) → new (canvasId, datasets, opts) */
+    /* 兼容旧调用格式 (canvasId, labels, values, opts) → 新格式 (canvasId, datasets, opts) */
     var datasets, opts;
     if (Array.isArray(a) && a.length > 0 && typeof a[0] === 'object' && 'values' in a[0]) {
         datasets = a;
@@ -1688,11 +1688,25 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 {% endfor %}
             </table>
             {% set _has_failures = namespace(value=false) %}
+            {% set _has_degraded = namespace(value=false) %}
             {% for m in data_source_matrix %}
             {% if m.sample_failures %}
             {% set _has_failures.value = true %}
             {% endif %}
+            {% if m.degraded_list %}
+            {% set _has_degraded.value = true %}
+            {% endif %}
             {% endfor %}
+            {% if _has_degraded.value %}
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">降级明细</div>
+                {% for m in data_source_matrix %}
+                {% for dg in m.degraded_list %}
+                <div class="data-status-warn">&#9888; [{{ m.name }}] {{ dg }}</div>
+                {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
             {% if _has_failures.value %}
             <div class="data-status" style="margin-top:12px;">
                 <div class="data-status-title">失败明细</div>
@@ -1730,7 +1744,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 {% endif %}
                 <tr><td>累计费用</td><td>{{ llm_session_usage["cost_display"] }}</td></tr>
                 {% if debate_mode_label %}
-                <tr><td>实验模式</td><td>{{ debate_mode_label }}</td></tr>
+                <tr><td>实验模式</td><td>{{ debate_mode_label }}{% if debate_mode_combination %} · {{ debate_mode_combination }}{% endif %}</td></tr>
                 {% endif %}
             </table>
             {% endif %}
@@ -1834,7 +1848,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="report-footer" style="text-align: center; padding: 14px 20px; color: #999; font-size: 12px;">
         个人投资分析报告 v{{ app_version }} | 生成时间: {{ now }}
-	        <br><span style="font-size:11px;">本报告数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到配置的 provider，不会用于训练。</span>
+        {%- if debate_mode_combination %}
+        <br>🧪 辩论模式已启用：{{ debate_mode_combination }}
+        {%- endif %}
+        <br><span style="font-size:11px;">本报告数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到配置的 provider，不会用于训练。</span>
     </div>
 
 </div>

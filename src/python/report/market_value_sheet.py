@@ -16,8 +16,8 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.code_utils import is_qdii_extended
-from src.python.registry import get_report_sheet_name
+from src.python.core.code_utils import is_qdii_extended
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
     freeze_header,

@@ -7,7 +7,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from src.python.code_utils import is_qdii_extended
+from src.python.core.code_utils import is_qdii_extended
 
 # ── 路径 & Jinja2 环境 ─────────────────────────────────────
 
@@ -108,23 +108,6 @@ def _jinja_sentiment_colorize(text: str) -> str:
     text = text.replace("[利好]", '<span style="color:#CC0000;font-weight:bold">[利好]</span>')
     text = text.replace("[利空]", '<span style="color:#009900;font-weight:bold">[利空]</span>')
     return text
-
-
-def _jinja_section_visible(key: str) -> bool:
-    """Jinja2 全局函数：判断报告模块是否可见。
-
-    依赖模板上下文中的 section_visible_dict，在渲染前由
-    write_html_report 设置。
-
-    Usage in template:
-        {% if section_visible("fund_manager") %}
-        ...
-        {% endif %}
-    """
-    sv_dict = _ENV.globals.get("section_visible_dict", {})
-    if not isinstance(sv_dict, dict):
-        return False
-    return bool(sv_dict.get(key, False))
 
 
 # ── 注册过滤器 & 全局函数 ────────────────────────────────────

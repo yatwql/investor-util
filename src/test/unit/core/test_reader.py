@@ -23,8 +23,8 @@ from unittest.mock import MagicMock, patch
 
 from openpyxl.utils.exceptions import InvalidFileException
 
-from src.python import reader
-from src.python.models import Holding
+from src.python.core import reader
+from src.python.core.models import Holding
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
@@ -249,7 +249,7 @@ class TestListXlsxFiles(unittest.TestCase):
 class TestGetXlsxInfo(unittest.TestCase):
     """测试 get_xlsx_info 元信息读取。"""
 
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_single_sheet(self, mock_load):
         """单个工作表 -> 返回正确元信息。"""
         mock_wb = MagicMock()
@@ -264,7 +264,7 @@ class TestGetXlsxInfo(unittest.TestCase):
         self.assertEqual(result["accounts"], 1)
         self.assertEqual(result["total_rows"], 9)
 
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_multiple_sheets(self, mock_load):
         """多个工作表 -> 汇总所有账号行数。"""
         mock_wb = MagicMock()
@@ -281,7 +281,7 @@ class TestGetXlsxInfo(unittest.TestCase):
         self.assertEqual(result["accounts"], 3)
         self.assertEqual(result["total_rows"], 14)
 
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_sheet_with_only_header(self, mock_load):
         """只有标题行无数据 -> total_rows 为 0。"""
         mock_wb = MagicMock()
@@ -294,7 +294,7 @@ class TestGetXlsxInfo(unittest.TestCase):
         result = reader.get_xlsx_info("dummy.xlsx")
         self.assertEqual(result["total_rows"], 0)
 
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_sheet_with_none_max_row(self, mock_load):
         """max_row 为 None -> 按 1 处理，total_rows 为 0。"""
         mock_wb = MagicMock()
@@ -307,15 +307,15 @@ class TestGetXlsxInfo(unittest.TestCase):
         result = reader.get_xlsx_info("dummy.xlsx")
         self.assertEqual(result["total_rows"], 0)
 
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_invalid_file_returns_error_dict(self, mock_load):
         """无法读取的文件 -> 返回含 error 字段的字典。"""
-        mock_load.side_effect = Exception("无法打开文件")
+        mock_load.side_effect = OSError("无法打开文件")
         result = reader.get_xlsx_info("dummy.xlsx")
         self.assertIn("error", result)
         self.assertEqual(result["error"], "无法打开文件")
 
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_workbook_closed(self, mock_load):
         """get_xlsx_info 结束后应当 close workbook。"""
         mock_wb = MagicMock()
@@ -588,8 +588,8 @@ class TestReadHoldings(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             reader.read_holdings("D:/nonexistent_file_for_test.xlsx")
 
-    @patch("src.python.reader.os.path.exists")
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_invalid_file_format(self, mock_load, mock_exists):
         """InvalidFileException -> ValueError。"""
         mock_exists.return_value = True
@@ -599,8 +599,8 @@ class TestReadHoldings(unittest.TestCase):
             reader.read_holdings("bad.xlsx")
         self.assertIn("格式错误", str(ctx.exception))
 
-    @patch("src.python.reader.os.path.exists")
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_bad_zip_file(self, mock_load, mock_exists):
         """BadZipFile -> ValueError。"""
         mock_exists.return_value = True
@@ -610,8 +610,8 @@ class TestReadHoldings(unittest.TestCase):
             reader.read_holdings("bad.xlsx")
         self.assertIn("格式错误", str(ctx.exception))
 
-    @patch("src.python.reader.os.path.exists")
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_empty_workbook(self, mock_load, mock_exists):
         """空工作簿 -> 返回空列表。"""
         mock_exists.return_value = True
@@ -622,8 +622,8 @@ class TestReadHoldings(unittest.TestCase):
         holdings = reader.read_holdings("empty.xlsx")
         self.assertEqual(holdings, [])
 
-    @patch("src.python.reader.os.path.exists")
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_workbook_closed_after_read(self, mock_load, mock_exists):
         """文件读取完后 close 被调用。"""
         mock_exists.return_value = True
@@ -634,8 +634,8 @@ class TestReadHoldings(unittest.TestCase):
         reader.read_holdings("dummy.xlsx")
         mock_wb.close.assert_called_once()
 
-    @patch("src.python.reader.os.path.exists")
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_logging_on_empty_result(self, mock_load, mock_exists):
         """无持仓记录时记录 WARNING 日志。"""
         mock_exists.return_value = True
@@ -653,8 +653,8 @@ class TestReadHoldings(unittest.TestCase):
             any("未读取到任何持仓记录" in msg for msg in log.output)
         )
 
-    @patch("src.python.reader.os.path.exists")
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_file_not_exists_before_load(self, mock_load, mock_exists):
         """os.path.exists 在 load_workbook 之前被调用。"""
         mock_exists.return_value = False
@@ -663,8 +663,8 @@ class TestReadHoldings(unittest.TestCase):
             reader.read_holdings("missing.xlsx")
         mock_load.assert_not_called()
 
-    @patch("src.python.reader.os.path.exists")
-    @patch("src.python.reader.openpyxl.load_workbook")
+    @patch("src.python.core.reader.os.path.exists")
+    @patch("src.python.core.reader.openpyxl.load_workbook")
     def test_logging_info_on_start(self, mock_load, mock_exists):
         """读取开始时记录 INFO 日志。"""
         mock_exists.return_value = True

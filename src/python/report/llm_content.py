@@ -22,7 +22,7 @@ from src.python.llm import (
     FAIL_REASON_TIMEOUT,
 )
 from src.python.llm.prompts import LLM_MODULE_FAILURE
-from src.python.registry import get_llm_module_name, get_report_section_order
+from src.python.core.registry import get_llm_module_name, get_report_section_order
 from src.python.report.excel_writer import (
     freeze_header,
     write_title_row,

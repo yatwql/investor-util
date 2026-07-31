@@ -1,4 +1,4 @@
-"""QDII 多时区净值日期一致性边缘测试 — R-099。
+"""QDII 多时区净值日期一致性边缘测试 。
 
 测试目标：
   - QDII 基金在不同时区场景下的净值日期判定
@@ -18,13 +18,13 @@ from unittest.mock import patch
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 class TestQdiiNavDateConsistency(unittest.TestCase):
-    """R-099: 多时区 QDII 净值日期一致性验证。"""
+    """多时区 QDII 净值日期一致性验证。"""
 
     def _make_us_qdii_detail(self, nav_date: str, trading_day: str) -> dict:
         """构造美股 QDII DetailRow（通过 market_value._compute_detail_row）。"""

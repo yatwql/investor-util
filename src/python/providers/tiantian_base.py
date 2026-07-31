@@ -14,7 +14,8 @@ from typing import Any
 
 import httpx
 
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
+from src.python.providers._utils import safe_float as _safe_float
 
 logger = logging.getLogger("invest")
 
@@ -23,13 +24,6 @@ _HEADERS = {
     "Referer": "https://fund.eastmoney.com/",
 }
 _TIMEOUT = 15.0
-
-
-def _safe_float(s: Any) -> float:
-    try:
-        return float(s) if s is not None else 0.0
-    except (ValueError, TypeError):
-        return 0.0
 
 
 def _request_fund_html(code: str) -> str | None:

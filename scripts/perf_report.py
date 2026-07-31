@@ -51,7 +51,7 @@ def _generate_holdings(count: int = _20_HOLDINGS_COUNT) -> list[Any]:
 
     生成的品种涵盖股票、ETF、场外基金等类型，确保管线全路径覆盖。
     """
-    from src.python.models import Holding
+    from src.python.core.models import Holding
 
     _STOCKS = [
         ("贵州茅台", "600519"),

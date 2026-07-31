@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]

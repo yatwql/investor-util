@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
@@ -31,7 +31,7 @@ class TestCsvFormulaInjectionY6(unittest.TestCase):
     def test_holding_name_starts_with_equal_sign(self):
         """持仓名以 = 开头 → 正常处理（不执行公式）。"""
         from src.python.report.market_value import _compute_detail_row
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding("证券", "=SUM(A1:A10)", "000001", 100, 10.0)
         mkt = {"price": 10.0, "yesterday_close": 9.5,
@@ -47,7 +47,7 @@ class TestCsvFormulaInjectionY6(unittest.TestCase):
     def test_holding_name_starts_with_plus(self):
         """持仓名以 + 开头 → 正常处理。"""
         from src.python.report.market_value import _compute_detail_row
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding("证券", "+123456", "000001", 100, 10.0)
         mkt = {"price": 10.0, "yesterday_close": 9.5,
@@ -70,7 +70,7 @@ class TestXssCacheInjectionY6(unittest.TestCase):
     def test_holding_name_with_html_tags(self):
         """持仓名含 <script> → 在 DetailRow 中原样保留（不做 HTML 解码）。"""
         from src.python.report.market_value import _compute_detail_row
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding("证券", '<script>alert("xss")</script>', "000001", 100, 10.0)
         mkt = {"price": 10.0, "yesterday_close": 9.5,
@@ -123,7 +123,7 @@ class TestXssCacheInjectionY6(unittest.TestCase):
     def test_xss_payload_in_name_preserved(self):
         """持仓名含 XSS payload → DetailRow 中原样传递（需在模板层 autoescape）。"""
         from src.python.report.market_value import _compute_detail_row
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding("证券", '<img src=x onerror=alert(1)>', "000001", 100, 10.0)
         mkt = {"price": 10.0, "yesterday_close": 9.5,
@@ -159,7 +159,7 @@ class TestSymlinkY6(unittest.TestCase):
 
     def test_symlink_in_holdings_dir(self):
         """持仓目录存在非普通文件 → list_xlsx_files 过滤掉。"""
-        from src.python.reader import list_xlsx_files
+        from src.python.core.reader import list_xlsx_files
         with tempfile.TemporaryDirectory() as tmpdir:
             # 创建一个命名管道（模拟特殊文件类型），Windows 用普通文件代替
             fpath = os.path.join(tmpdir, "not_a_real.xlsx")

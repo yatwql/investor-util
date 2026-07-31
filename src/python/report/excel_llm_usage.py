@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.python.logger import setup_logger
+from src.python.core.logger import setup_logger
 from src.python.report.llm_module_info import build_llm_module_info
 from src.python.report.progress import ProgressReporter, Timer
 

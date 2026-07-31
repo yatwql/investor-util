@@ -15,8 +15,8 @@ from src.python.cache import clear as cache_clear
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.config import get_config
-from src.python.constants import CACHE_WEEKLY
-from src.python.provider_registry import TRANSPORT_FAILURE, get_registry
+from src.python.core.constants import CACHE_WEEKLY
+from src.python.core.provider_registry import TRANSPORT_FAILURE, get_registry
 
 logger = logging.getLogger("invest")
 

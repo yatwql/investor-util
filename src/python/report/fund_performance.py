@@ -21,10 +21,10 @@ from typing import Any
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.cache import get_ttl
-from src.python.code_utils import is_fund_holding
-from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
-from src.python.models import Holding
-from src.python.registry import get_report_sheet_name
+from src.python.core.code_utils import is_fund_holding
+from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings, fetch_fund_rankings_batch
+from src.python.core.models import Holding
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import (
     STATUS_MESSAGES,
     DataStatus,
@@ -85,9 +85,22 @@ _FUND_TYPE_LABEL = {
 # 评级权重（最差→最好）
 _RATING_ORDER = ["较差", "偏差", "稳定", "良好", "优秀"]
 
-# 超额收益评分阈值（用于评级修正）
-_EXCESS_THRESHOLD_UP = 80  # 超额收益 ≥ 80 → 评级上调一级
-_EXCESS_THRESHOLD_DOWN = 40  # 超额收益 < 40 → 评级下调一级
+# 超额收益评分阈值（用于评级修正，可从 config.json 覆盖）
+_DEFAULT_EXCESS_THRESHOLD_UP = 80
+_DEFAULT_EXCESS_THRESHOLD_DOWN = 40
+
+
+def _get_excess_thresholds() -> tuple[int, int]:
+    """从 config.json 读取超额收益评分阈值，失败时返回内置默认值。"""
+    try:
+        from src.python.config import get_config
+
+        cfg = get_config().get("performance_evaluation", {})
+        up = int(cfg.get("excess_threshold_up", _DEFAULT_EXCESS_THRESHOLD_UP))
+        down = int(cfg.get("excess_threshold_down", _DEFAULT_EXCESS_THRESHOLD_DOWN))
+        return up, down
+    except (TypeError, ValueError, KeyError):
+        return _DEFAULT_EXCESS_THRESHOLD_UP, _DEFAULT_EXCESS_THRESHOLD_DOWN
 
 
 def _fund_display_type(h: Holding) -> str:
@@ -193,10 +206,12 @@ def _adjust_rating_with_benchmark(peer_rating: str, perf_eval: dict | None = Non
 
     current_idx = _RATING_ORDER.index(peer_rating)
 
-    if excess_score >= _EXCESS_THRESHOLD_UP:
+    up, down = _get_excess_thresholds()
+
+    if excess_score >= up:
         # 超额收益显著 → 上调
         new_idx = min(current_idx + 1, len(_RATING_ORDER) - 1)
-    elif excess_score < _EXCESS_THRESHOLD_DOWN:
+    elif excess_score < down:
         # 超额收益较差 → 下调
         new_idx = max(current_idx - 1, 0)
     else:
@@ -214,6 +229,7 @@ def _write_one_fund_row(
     row: int,
     fund: Holding,
     detail_map: dict[str, DetailRow],
+    prefetched_rankings: dict[str, dict[str, Any] | None] | None = None,
 ) -> str | None:
     """获取并写入单只基金的业绩数据行。
 
@@ -222,11 +238,15 @@ def _write_one_fund_row(
         row: 当前行号
         fund: 基金持仓
         detail_map: 估值明细映射 {code: DetailRow}
+        prefetched_rankings: 预取的批量排名映射，None 时回退到单个获取。
 
     Returns:
         最终评级（优秀/良好/稳定/偏差/较差），获取失败返回 None
     """
-    perf_data = fetch_fund_rankings(fund.code)
+    if prefetched_rankings is not None and fund.code in prefetched_rankings:
+        perf_data = prefetched_rankings[fund.code]
+    else:
+        perf_data = fetch_fund_rankings(fund.code)
 
     if perf_data is None or not perf_data.get("rankings"):
         _write_empty_row(ws, row, fund)
@@ -398,9 +418,12 @@ def write_fund_performance_sheet(
 
     adjusted_ratings: dict[str, str] = {}
 
+    fund_codes = [f.code for f in fund_holdings_sorted]
+    prefetched_rankings = fetch_fund_rankings_batch(fund_codes)
+
     for idx, fund in enumerate(fund_holdings_sorted, 1):
         logger.info("获取基金业绩 [%d/%d]: %s (%s)", idx, len(fund_holdings_sorted), fund.name, fund.code)
-        rating = _write_one_fund_row(ws, row, fund, detail_map)
+        rating = _write_one_fund_row(ws, row, fund, detail_map, prefetched_rankings=prefetched_rankings)
         if rating:
             adjusted_ratings[fund.code] = rating
         row += 1

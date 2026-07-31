@@ -14,7 +14,8 @@ from typing import Any
 
 import httpx
 
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
+from src.python.providers._utils import safe_float as _safe_float
 
 logger = logging.getLogger("invest")
 
@@ -154,13 +155,6 @@ def _fallback_fundf10(code: str) -> dict[str, Any] | None:
         "yesterday_nav": nav,  # 备用链路无前日净值，使用 nav 确保 today_profit=0
         "source": "天天基金(备用链路)",
     }
-
-
-def _safe_float(s: str) -> float:
-    try:
-        return float(s)
-    except (ValueError, TypeError):
-        return 0.0
 
 
 def fetch_fund_nav_history(code: str) -> list[dict]:

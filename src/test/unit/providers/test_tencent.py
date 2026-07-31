@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.python.code_utils import is_index_code
+from src.python.core.code_utils import is_index_code
 from src.python.providers.tencent import (
     _add_prefix,
     _parse_float,

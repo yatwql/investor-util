@@ -81,6 +81,29 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
         self.assertEqual(final.get("base"), 0, "初始 key 不应被覆盖")
 
     @patch("src.python.config._config_defaults.get_config_path")
+    def test_set_config_raises_on_corrupt_file(self, mock_get_path):
+        """配置文件损坏时 set_config 抛异常且不覆盖原文件。
+
+        回归缺陷：set_config 的 get_config() 读取失败时静默回退默认配置并覆盖写，
+        并发写入（os.replace 瞬间）或文件损坏场景下丢失已有配置项（如 base key）。
+        """
+        mock_get_path.return_value = self.config_path
+        from src.python.config import set_config
+        import json
+
+        # 写入损坏 JSON（模拟读取失败场景）
+        broken_content = "{broken json"
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            f.write(broken_content)
+
+        with self.assertRaises(json.JSONDecodeError):
+            set_config("new_key", 1)
+
+        # 损坏文件未被覆盖（不得静默回退默认配置写入）
+        with open(self.config_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), broken_content, "读取失败时不得覆盖原文件")
+
+    @patch("src.python.config._config_defaults.get_config_path")
     def test_power_failure_during_replace(self, mock_get_path):
         """模拟断电：os.replace 抛出异常 → 原文件完整，无临时文件残留。"""
         mock_get_path.return_value = self.config_path
@@ -189,7 +212,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             # 清缓存
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
@@ -220,7 +243,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -243,7 +266,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "  sk-test-with-spaces  ", "provider": "claude"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -252,22 +275,22 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
                          "api_key 首尾空格应被去除")
 
     def test_api_key_whitespace_in_settings_only(self):
-        """仅 llm_settings.json 含 api_key 且有空格 → 被 strip。"""
+        """仅 llm_settings.json 含 api_key → 因无 llm_key.json 返回 None（C18 合规）。"""
         import src.python.config as cfg
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
 
-        # 仅 llm_settings.json 有 api_key（无 llm_key.json）
+        # llm_settings.json 含 api_key 且无 llm_key.json → 返回 None（C18 合规）
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "\t sk-ant-from-settings \n", "temperature": 0.7}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")), \
+             patch("src.python.config._llm_providers._get_llm_providers_path", return_value=os.path.join(self.tmp.name, "llm_providers_not_exists.json")):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
-        self.assertIsNotNone(result)
-        self.assertEqual(result["api_key"], "sk-ant-from-settings",
-                         "settings 中的 api_key 也应被 strip")
+        # C18 约束：无 llm_key.json 且无 llm_providers.json → 返回 None
+        self.assertIsNone(result)
 
     # ── 缺失嵌套键 ──
 
@@ -285,7 +308,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "sk-test", "provider": "openai"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -306,7 +329,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
         with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._core._get_llm_key_path", return_value=key_path):
+             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             cfg._core._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -349,12 +372,12 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
 
     def test_no_color_env_suppresses_ansi(self):
         """NO_COLOR 环境变量设置时，_show_llm_config_status 输出不含 ANSI 转义。"""
-        import src.python.tui_menu as tui
+        import src.python.tui.tui_menu as tui
 
         # 模拟非 TTY stdout + NO_COLOR
         with patch("sys.stdout.isatty", return_value=False), \
              patch.dict(os.environ, {"NO_COLOR": "1"}), \
-             patch("src.python.tui_menu.get_llm_config",
+             patch("src.python.tui.tui_menu.get_llm_config",
                    return_value={"api_key": "sk-test", "provider": "claude"}):
             with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
                 tui._show_llm_config_status()
@@ -365,11 +388,11 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
 
     def test_no_color_env_unconfigured_ansi_suppressed(self):
         """NO_COLOR + 未配置 LLM → 输出不含 ANSI 转义。"""
-        import src.python.tui_menu as tui
+        import src.python.tui.tui_menu as tui
 
         with patch("sys.stdout.isatty", return_value=False), \
              patch.dict(os.environ, {"NO_COLOR": "1"}), \
-             patch("src.python.tui_menu.get_llm_config", return_value=None):
+             patch("src.python.tui.tui_menu.get_llm_config", return_value=None):
             with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
                 tui._show_llm_config_status()
                 for call_args, _ in mock_stdout.write.call_args_list:

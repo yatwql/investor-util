@@ -70,7 +70,8 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
             "ok": 0,
             "degraded": 0,
             "failed": 0,
-            "sample_failures": [],
+            "sample_failures": [],  # 失败项（含 source_key + failure_type）
+            "degraded_list": [],  # 降级项列表（含 source_key + failure_type）
         }
 
     unmatched: list[str] = []
@@ -87,12 +88,10 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
             cd["ok"] += 1
         elif ev["degraded"]:
             cd["degraded"] += 1
+            cd["degraded_list"].append(f"{src_key}: {ev.get('failure_type', 'unknown')}")
         else:
             cd["failed"] += 1
-            if len(cd["sample_failures"]) < 3:
-                cd["sample_failures"].append(
-                    f"{src_key}: {ev.get('failure_type', 'unknown')}"
-                )
+            cd["sample_failures"].append(f"{src_key}: {ev.get('failure_type', 'unknown')}")
 
     # 4) 计算综合状态并生成输出行
     matrix: list[dict[str, Any]] = []
@@ -125,21 +124,24 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
             "degraded": cd["degraded"],
             "failed": cd["failed"],
             "sample_failures": cd["sample_failures"],
+            "degraded_list": cd["degraded_list"],
         }
         matrix.append(row)
 
     # 5) 追加未归类项（如有）
     if unmatched:
-        matrix.append({
-            "key": "_unmatched",
-            "name": "其他数据源",
-            "status": "ok",
-            "detail": f"{len(unmatched)} 个未归类源（均正常）",
-            "total": len(unmatched),
-            "ok": len(unmatched),
-            "degraded": 0,
-            "failed": 0,
-            "sample_failures": [],
-        })
+        matrix.append(
+            {
+                "key": "_unmatched",
+                "name": "其他数据源",
+                "status": "ok",
+                "detail": f"{len(unmatched)} 个未归类源（均正常）",
+                "total": len(unmatched),
+                "ok": len(unmatched),
+                "degraded": 0,
+                "failed": 0,
+                "sample_failures": [],
+            }
+        )
 
     return matrix

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from src.python import cache
-from src.python.code_utils import (
+from src.python.core.code_utils import (
     is_a_share_code,
     is_etf_by_name,
     is_exchange_fund_code,
@@ -18,11 +18,11 @@ from src.python.code_utils import (
     is_otc_fund_by_name,
     is_qdii_extended,
 )
-from src.python.fetcher.price import fetch_market_data
-from src.python.market_hours import is_market_open as _mh_is_market_open
-from src.python.market_hours import is_midday_break as _mh_is_midday_break
-from src.python.models import Holding
-from src.python.provider_registry import FetchStrategy, get_registry
+from src.python.fetcher.price import fetch_market_data, _price_cache_fresh
+from src.python.core.market_hours import is_market_open as _mh_is_market_open
+from src.python.core.market_hours import is_midday_break as _mh_is_midday_break
+from src.python.core.models import Holding
+from src.python.core.provider_registry import FetchStrategy, get_registry
 
 logger = logging.getLogger("invest")
 
@@ -505,6 +505,15 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
     result_map: dict[tuple[str, str], dict | None] = {}
     for h in cache_holdings:
         mkt = registry.fetch_cached_only(h.code, "price", _price_cache_key)
+        # 收市后校验 OTC 基金净值日期是否 ≥ 上一个交易日（跨日残留缓存 → 降级重取）
+        if mkt is not None and not _price_cache_fresh(mkt):
+            logger.debug(
+                "CACHE_ONLY 缓存过时: %s (%s) price_date=%s，降级到实时获取",
+                h.name,
+                h.code,
+                mkt.get("price_date", "?"),
+            )
+            mkt = None
         result_map[(h.account.strip(), h.code.strip())] = mkt
 
     # 3b. 缓存未命中 → 降级到 LIVE_FETCH（CACHE_ONLY 找不到缓存时逐条回退）

@@ -11,9 +11,9 @@ from datetime import datetime
 from typing import Any
 
 from src.python.cache import get_cache_hit_rate
-from src.python.constants import APP_VERSION
-from src.python.models import Holding
-from src.python.registry import get_llm_module_names, get_report_section_order
+from src.python.core.constants import APP_VERSION
+from src.python.core.models import Holding
+from src.python.core.registry import get_llm_module_names, get_report_section_order
 from src.python.report.category import build_category_data_status
 from src.python.report.data_status import STATUS_MESSAGES, DataStatus, DataStatusItem
 from src.python.report.fund_performance import build_perf_data_status, is_fund
@@ -180,6 +180,152 @@ def _build_data_status_sections(
     return data_status_summary, data_status_penetration, data_status_perf, data_status_category
 
 
+def _build_history_data_status(history_data: dict | None) -> DataStatus:
+    """从 history_data 构建历史走势数据状态字典。"""
+    data_status_history: DataStatus = {}
+    if not history_data:
+        return data_status_history
+    status = history_data.get("status", "unavailable")
+    warnings = history_data.get("warnings", [])
+    if status == "unavailable":
+        data_status_history["history_source"] = DataStatusItem(
+            available=False,
+            tier="T3",
+            message=STATUS_MESSAGES.get("history_price_unavailable", "历史走势数据暂不可用"),
+        )
+    else:
+        if status == "degraded":
+            data_status_history["history_degraded"] = DataStatusItem(
+                available=True,
+                tier="T3",
+                message=STATUS_MESSAGES.get("history_degraded", "历史走势部分数据来自降级链路"),
+            )
+        for w in warnings:
+            if "收盘价为 0" in w or "零收盘" in w:
+                key = "history_zero_value"
+            elif "修正" in w or "重叠" in w:
+                key = "history_correction"
+            else:
+                continue
+            data_status_history[key] = DataStatusItem(
+                available=True,
+                tier="T3",
+                message=STATUS_MESSAGES.get(key, w),
+            )
+    return data_status_history
+
+
+def _render_template(
+    *,
+    now_str: str,
+    today_str: str,
+    trading_day: str,
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    total_profit_rate: float,
+    total_today_profit: float,
+    today_profit_rate: float,
+    cat_counts: dict,
+    update_status_dict: dict,
+    a_indices_list: list,
+    us_indices_list: list,
+    accounts: list,
+    account_totals: list,
+    cat_data: list,
+    penetration: dict,
+    perf_data: list,
+    news_data: list,
+    _news_llm_meta: dict | None,
+    has_llm_analysis: bool,
+    manager_analysis: dict,
+    overlap_matrix: dict,
+    concentration_analysis: dict,
+    style_analysis: dict,
+    llm_enabled_flag: bool,
+    global_macro_content: str | None,
+    expert_review_content: str | None,
+    health_check_content: str | None,
+    penetration_deep_content: str | None,
+    _llm_session_usage: dict,
+    _llm_module_info: list,
+    llm_endpoint: str | None,
+    module_disabled: list,
+    _debate_mode_label: str,
+    debate_info: dict | None,
+    _debate_mode_combination: str,
+    order: list,
+    section_numbers: dict,
+    section_visible_dict: dict,
+    _sv_fn,
+    data_status_summary: DataStatus,
+    data_status_penetration: DataStatus,
+    data_status_perf: DataStatus,
+    data_status_category: DataStatus,
+    history_data: dict | None,
+    data_status_history: DataStatus,
+    data_source_matrix: dict,
+) -> str:
+    """渲染 Jinja2 模板并返回 HTML。"""
+    return _ENV.get_template("report_template.html").render(
+        now=now_str,
+        today=today_str,
+        trading_day=trading_day,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_profit_rate=total_profit_rate,
+        total_today_profit=total_today_profit,
+        today_profit_rate=today_profit_rate,
+        categories=cat_counts,
+        update_status=update_status_dict,
+        a_indices=a_indices_list,
+        us_indices=us_indices_list,
+        accounts=accounts,
+        account_totals=account_totals,
+        cat_data=cat_data,
+        penetration=penetration,
+        perf_data=perf_data,
+        # SAC: news_data[*].enriched_keywords[*].display 来自外部 API
+        # 模板中已禁用 |safe 过滤器，依赖 autoescape 防 XSS —— 勿加 |safe
+        news_data=news_data,
+        news_llm_meta=_news_llm_meta,
+        has_llm_analysis=has_llm_analysis,
+        manager_analysis=manager_analysis,
+        overlap_matrix=overlap_matrix,
+        concentration_analysis=concentration_analysis,
+        style_analysis=style_analysis,
+        llm_enabled=llm_enabled_flag,
+        global_macro=global_macro_content,
+        expert_review=expert_review_content,
+        health_check=health_check_content,
+        penetration_deep=penetration_deep_content,
+        llm_session_usage=_llm_session_usage,
+        module_labels=get_llm_module_names(),
+        module_disabled=module_disabled,
+        llm_module_info=_llm_module_info,
+        llm_endpoint=llm_endpoint,
+        cache_stats=get_cache_hit_rate(),
+        app_version=APP_VERSION,
+        debate_mode_label=_debate_mode_label,
+        debate_info=debate_info,
+        debate_mode_combination=_debate_mode_combination,
+        section_order=order,
+        section_numbers=section_numbers,
+        section_visible_dict=section_visible_dict,
+        section_visible=_sv_fn,
+        data_status_summary=data_status_summary,
+        data_status_penetration=data_status_penetration,
+        data_status_perf=data_status_perf,
+        data_status_category=data_status_category,
+        history_data=history_data,
+        data_status_history=data_status_history,
+        data_source_matrix=data_source_matrix,
+        report_year=datetime.now().year,
+        data_unavailable=bool(total_mv == 0 and total_cost > 0),
+    )
+
+
 # ── 核心生成函数 ────────────────────────────────────────────
 
 
@@ -290,17 +436,9 @@ def write_html_report(
     llm_module_info, llm_endpoint, module_disabled, _llm_session_usage = _render_llm_module_info(llm_enabled_flag)
 
     # ── 辩论模式标签 ──
-    _debate_mode_label: str | None = None
-    if debate_info and isinstance(debate_info, dict):
-        _debate_mode_label = debate_info.get("mode_label")
-    if not _debate_mode_label:
-        # M2/M3 仅启用时从 feature flag 检测
-        from src.python.features import is_feature_enabled
+    from src.python.report._debate_utils import detect_debate_mode
 
-        if is_feature_enabled("llm_debate_procon"):
-            _debate_mode_label = "🧪 辩论模式"
-        elif is_feature_enabled("llm_debate_conditional") or is_feature_enabled("llm_debate_qa_concentration"):
-            _debate_mode_label = "🧪 实验模式"
+    _debate_mode_label, _debate_mode_combination = detect_debate_mode(debate_info)
 
     # 辩论模式启用时覆盖 llm_module_info 中 expert_review 的状态标签
     if _debate_mode_label:
@@ -343,44 +481,16 @@ def write_html_report(
     )
 
     # ── 10c) 组合历史走势数据状态 ──
-    data_status_history: DataStatus = {}
-    if history_data:
-        status = history_data.get("status", "unavailable")
-        warnings = history_data.get("warnings", [])
-        if status == "unavailable":
-            data_status_history["history_source"] = DataStatusItem(
-                available=False,
-                tier="T3",
-                message=STATUS_MESSAGES.get("history_price_unavailable", "历史走势数据暂不可用"),
-            )
-        else:
-            if status == "degraded":
-                data_status_history["history_degraded"] = DataStatusItem(
-                    available=True,
-                    tier="T3",
-                    message=STATUS_MESSAGES.get("history_degraded", "历史走势部分数据来自降级链路"),
-                )
-            for w in warnings:
-                if "收盘价为 0" in w or "零收盘" in w:
-                    key = "history_zero_value"
-                elif "修正" in w or "重叠" in w:
-                    key = "history_correction"
-                else:
-                    continue
-                data_status_history[key] = DataStatusItem(
-                    available=True,
-                    tier="T3",
-                    message=STATUS_MESSAGES.get(key, w),
-                )
+    data_status_history = _build_history_data_status(history_data)
 
     # ── 10d) 数据源可用性矩阵 ──
     from src.python.report.data_source_matrix import build_data_source_matrix
 
     data_source_matrix = build_data_source_matrix()
 
-    html = _ENV.get_template("report_template.html").render(
-        now=now_str,
-        today=today_str,
+    html = _render_template(
+        now_str=now_str,
+        today_str=today_str,
         trading_day=trading_day,
         total_mv=total_mv,
         total_cost=total_cost,
@@ -388,59 +498,45 @@ def write_html_report(
         total_profit_rate=total_profit_rate,
         total_today_profit=total_today_profit,
         today_profit_rate=today_profit_rate,
-        categories=cat_counts,
-        update_status=update_status_dict,
-        a_indices=a_indices_list,
-        us_indices=us_indices_list,
+        cat_counts=cat_counts,
+        update_status_dict=update_status_dict,
+        a_indices_list=a_indices_list,
+        us_indices_list=us_indices_list,
         accounts=accounts,
         account_totals=account_totals,
         cat_data=cat_data,
         penetration=penetration,
         perf_data=perf_data,
-        # SAC: news_data[*].enriched_keywords[*].display 来自外部 API
-        # 模板中已禁用 |safe 过滤器，依赖 autoescape 防 XSS —— 勿加 |safe
         news_data=news_data,
-        news_llm_meta=_news_llm_meta,
+        _news_llm_meta=_news_llm_meta,
         has_llm_analysis=has_llm_analysis,
         manager_analysis=manager_analysis,
         overlap_matrix=overlap_matrix,
         concentration_analysis=concentration_analysis,
         style_analysis=style_analysis,
-        llm_enabled=llm_enabled_flag,
-        global_macro=global_macro_content,
-        expert_review=expert_review_content,
-        health_check=health_check_content,
-        penetration_deep=penetration_deep_content,
-        llm_session_usage=_llm_session_usage,
-        module_labels=get_llm_module_names(),
-        module_disabled=module_disabled,
-        llm_module_info=llm_module_info,
+        llm_enabled_flag=llm_enabled_flag,
+        global_macro_content=global_macro_content,
+        expert_review_content=expert_review_content,
+        health_check_content=health_check_content,
+        penetration_deep_content=penetration_deep_content,
+        _llm_session_usage=_llm_session_usage,
+        _llm_module_info=llm_module_info,
         llm_endpoint=llm_endpoint,
-        cache_stats=get_cache_hit_rate(),
-        app_version=APP_VERSION,
-        # 辩论模式（模板使用 debate_mode_label + debate_info）
-        debate_mode_label=_debate_mode_label,
+        module_disabled=module_disabled,
+        _debate_mode_label=_debate_mode_label,
         debate_info=debate_info,
-        # 序号 & 可见性（模板使用 section_numbers/section_visible_dict）
-        section_order=order,
+        _debate_mode_combination=_debate_mode_combination,
+        order=order,
         section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,
-        # PF 修复：section_visible 函数由 context 变量传入，不写入 _ENV.globals
-        section_visible=_sv_fn,
-        # 数据源状态摘要
+        _sv_fn=_sv_fn,
         data_status_summary=data_status_summary,
         data_status_penetration=data_status_penetration,
         data_status_perf=data_status_perf,
         data_status_category=data_status_category,
-        # 组合历史走势数据
         history_data=history_data,
         data_status_history=data_status_history,
-        # 数据源可用性矩阵
         data_source_matrix=data_source_matrix,
-        # 报告年份（穿透表预测EPS列使用）
-        report_year=datetime.now().year,
-        # 数据不可用标记 — 模板用于显示/隐藏 暂无数据 横幅
-        data_unavailable=bool(total_mv == 0 and total_cost > 0),
     )
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)

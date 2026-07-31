@@ -115,24 +115,24 @@ class TestPeToStyle(unittest.TestCase):
 class TestEstimateByCode(unittest.TestCase):
     """_estimate_style_by_code：代码段降级"""
 
-    def test_60_start(self):
+    def test_code_60_prefix(self):
         """60xxxx → 大盘"""
         self.assertEqual(_get_size_from_code("600519"), "大盘")
         self.assertEqual(_get_size_from_code("601318"), "大盘")
 
-    def test_000_start(self):
+    def test_code_000_prefix(self):
         """000xxx → 中盘"""
         self.assertEqual(_get_size_from_code("000858"), "中盘")
 
-    def test_002_start(self):
+    def test_code_002_prefix(self):
         """002xxx → 中盘"""
         self.assertEqual(_get_size_from_code("002415"), "中盘")
 
-    def test_300_start(self):
+    def test_code_300_prefix(self):
         """300xxx → 小盘"""
         self.assertEqual(_get_size_from_code("300750"), "小盘")
 
-    def test_688_start(self):
+    def test_code_688_prefix(self):
         """688xxx → 小盘"""
         self.assertEqual(_get_size_from_code("688001"), "小盘")
 
@@ -199,7 +199,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
     """_get_industry_avg_pe：行业平均 PE 计算"""
 
     def setUp(self):
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         get_registry().session_cache_clear("extended")
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
@@ -301,7 +301,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
             "000858": {"market_cap": 5e11, "pe": 15.0},
         }
 
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
 
         def _push2_with_memo(code):
             val = push2_data.get(code)
@@ -341,7 +341,7 @@ class TestClassifyFundStyle(unittest.TestCase):
 
     def setUp(self):
         """每个测试前清除 registry session_cache（extended 域），避免跨测试污染。"""
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         get_registry().session_cache_clear("extended")
 
     def test_empty_holdings(self):

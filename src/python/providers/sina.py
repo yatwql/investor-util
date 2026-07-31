@@ -16,18 +16,27 @@ from typing import Any
 
 import httpx
 
-from src.python.code_utils import (
+from src.python.core.code_utils import (
     get_exchange_prefix,
     is_a_share_code,
     is_exchange_fund_code,
     is_index_code,
 )
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://hq.sinajs.cn/list="
-_TIMEOUT = 15.0
+_TIMEOUT = 15.0  # 普通行情超时
+
+
+def _pf(parts: list[str], idx: int) -> float:
+    """安全地按索引从 CSV 行中提取浮点数。"""
+    try:
+        return float(parts[idx].strip()) if parts[idx].strip() else 0.0
+    except (ValueError, IndexError):
+        return 0.0
+
 
 # 美股指数代码 (gb_* 前缀为新浪全球指数代码)
 _US_INDICES: dict[str, str] = {
@@ -88,15 +97,9 @@ def _parse_price_response(text: str, code: str) -> dict[str, Any] | None:
         logger.warning("Sina 行情字段不足(%d): %s", len(parts), body[:80])
         return None
 
-    def _pf(idx: int) -> float:
-        try:
-            return float(parts[idx].strip()) if parts[idx].strip() else 0.0
-        except (ValueError, IndexError):
-            return 0.0
-
     name = parts[0].strip() if parts[0] else ""
-    price = _pf(3)
-    yclose = _pf(2)
+    price = _pf(parts, 3)
+    yclose = _pf(parts, 2)
     raw_date = parts[30].strip() if len(parts) > 30 else ""
     price_date = raw_date.split(" ")[0] if raw_date else ""
 
@@ -106,11 +109,11 @@ def _parse_price_response(text: str, code: str) -> dict[str, Any] | None:
         "price": price,
         "yesterday_close": yclose,
         "price_date": price_date,
-        "open": _pf(1),
-        "high": _pf(4),
-        "low": _pf(5),
-        "volume": _pf(8),
-        "turnover": _pf(9),
+        "open": _pf(parts, 1),
+        "high": _pf(parts, 4),
+        "low": _pf(parts, 5),
+        "volume": _pf(parts, 8),
+        "turnover": _pf(parts, 9),
         "source": "新浪财经",
     }
 
@@ -186,15 +189,9 @@ def _parse_a_index(text: str) -> dict[str, Any] | None:
     if len(parts) < 7:
         return None
 
-    def _pf(idx: int) -> float:
-        try:
-            return float(parts[idx].strip()) if parts[idx].strip() else 0.0
-        except (ValueError, IndexError):
-            return 0.0
-
     name = parts[0].strip() if parts[0] else ""
-    price = _pf(1)
-    change = _pf(2)
+    price = _pf(parts, 1)
+    change = _pf(parts, 2)
 
     # 昨收盘 = 当前价 - 涨跌额
     yclose = round(price - change, 2) if price > 0 else 0.0
@@ -292,17 +289,11 @@ def _parse_us_index(text: str) -> dict[str, Any] | None:
     if len(parts) < 5:
         return None
 
-    def _pf(idx: int) -> float:
-        try:
-            return float(parts[idx].strip()) if parts[idx].strip() else 0.0
-        except (ValueError, IndexError):
-            return 0.0
-
     name = parts[0].strip() if parts[0] else ""
-    price = _pf(1)
-    change = _pf(4)
-    high = _pf(6)
-    low = _pf(7)
+    price = _pf(parts, 1)
+    change = _pf(parts, 4)
+    high = _pf(parts, 6)
+    low = _pf(parts, 7)
 
     # 昨收盘 = 当前价 - 涨跌额
     yclose = round(price - change, 2) if price > 0 else 0.0
@@ -375,142 +366,8 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
     return results
 
 
-# ── 组合历史走势：历史 K 线数据（备用链路） ──────────────────────
-
-
-def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:
-    """获取股票/ETF 历史 K 线数据（纯获取，Tencent 备用链路）。
-
-    Endpoint: money.finance.sina.com.cn/getKLineData
-    Sina K 线 API 返回 JSON 格式。
-
-    ✅ C5：使用 make_http_client()。
-    Provider 函数保持纯数据获取，不碰缓存层。
-
-    Args:
-        code: 6 位证券代码
-        days: 获取天数（默认 30，最大 365）
-        start_from: 起始日期（该参数由 chain 层使用，provider 侧按 days 获取）
-
-    Returns:
-        list[dict]: [{date, open, close, high, low, volume}, ...]
-        按日期升序排列。API 失败返回空列表。
-    """
-    if not is_a_share_code(code) and not is_exchange_fund_code(code):
-        logger.debug("Sina K 线跳过不支持的类型: %s", code)
-        return []
-
-    days = min(max(days, 5), 365)
-    full_code = _add_prefix(code)
-    url = "https://money.finance.sina.com.cn/getKLineData"
-
-    params: dict[str, str | int] = {
-        "symbol": full_code,
-        "datalen": days,
-        "scale": 240,
-        "ma": "no",
-    }
-
-    logger.debug("Sina K 线请求: %s, days=%d", full_code, days)
-
-    try:
-        with make_http_client(timeout=30.0) as client:
-            resp = client.get(url, params=params, headers={"Referer": "https://finance.sina.com.cn"})
-            resp.encoding = "utf-8"
-            data = resp.json()
-    except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
-        logger.warning("Sina K 线获取失败 %s: %s", full_code, e)
-        return []
-
-    return _parse_kline_json(data)
-
-
-def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:
-    """获取指数历史 K 线数据（备用链路）。
-
-    与 fetch_kline() 的区别：
-      - 入口通过 code_utils.is_index_code() 校验（C1 约束）
-      - 不检查 is_a_share_code/is_exchange_fund_code
-      - 不调用 _add_prefix（指数代码直接透传）
-      - 复用 _parse_kline_json() 解析逻辑
-
-    Args:
-        code: 指数代码，如 "sh000300" / "gb_inx"
-        days: 获取天数（默认 30，最大 3650）
-        start_from: 起始日期（由 chain 层使用，provider 侧按 days 获取）
-
-    Returns:
-        list[dict]: [{date, open, close, high, low, volume}, ...]
-        API 失败返回空列表。
-    """
-    if not is_index_code(code):
-        logger.debug("Sina 跳过非指数代码: %s", code)
-        return []
-
-    days = min(max(days, 5), 3650)
-    symbol = code.strip()
-    url = "https://money.finance.sina.com.cn/getKLineData"
-
-    params: dict[str, str | int] = {
-        "symbol": symbol,
-        "datalen": days,
-        "scale": 240,
-        "ma": "no",
-    }
-
-    logger.debug("Sina 指数 K 线请求: %s, days=%d", symbol, days)
-
-    try:
-        with make_http_client(timeout=30.0) as client:
-            resp = client.get(url, params=params, headers={"Referer": "https://finance.sina.com.cn"})
-            resp.encoding = "utf-8"
-            data = resp.json()
-    except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
-        logger.warning("Sina 指数 K 线获取失败 %s: %s", symbol, e)
-        return []
-
-    return _parse_kline_json(data)
-
-
-def _parse_kline_json(data: list | dict | None) -> list[dict]:
-    """解析 Sina K 线 JSON 响应。
-
-    Sina 返回 JSON 数组：
-    [
-      {"day": "2026-07-01", "open": "21.50", "high": "22.00",
-       "low": "21.30", "close": "21.80", "volume": "12345678"},
-      ...
-    ]
-    """
-    if not isinstance(data, list):
-        logger.warning("Sina K 线格式异常: 非列表")
-        return []
-
-    bars: list[dict] = []
-    for entry in data:
-        if not isinstance(entry, dict):
-            continue
-        date_str = str(entry.get("day", "") or "")
-        close_val = _parse_sina_kline_float(entry.get("close"))
-        if not date_str or close_val <= 0:
-            continue
-        bars.append(
-            {
-                "date": date_str,
-                "open": _parse_sina_kline_float(entry.get("open")),
-                "close": close_val,
-                "high": _parse_sina_kline_float(entry.get("high")),
-                "low": _parse_sina_kline_float(entry.get("low")),
-                "volume": _parse_sina_kline_float(entry.get("volume")),
-            }
-        )
-
-    return sorted(bars, key=lambda x: x["date"])
-
-
-def _parse_sina_kline_float(v: Any) -> float:
-    """安全解析 Sina K 线浮点数字段。"""
-    try:
-        return float(v) if v is not None else 0.0
-    except (ValueError, TypeError):
-        return 0.0
+# ── 从 sina_kline 子模块导入 K 线相关函数 ────────────────────────
+from src.python.providers.sina_kline import (  # noqa: E402, F401
+    fetch_kline,
+    fetch_index_kline,
+)

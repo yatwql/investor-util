@@ -1,12 +1,14 @@
 # 轻量 Web UI + 用户体验改进
 
+> plan-12 **错误友好提示/数据源可用性矩阵**（§4）**已完成并归档**：
+> ↗ [`archive/v0.8.x/datasource-matrix/datasource-matrix.md`](../archive/v0.8.x/datasource-matrix/datasource-matrix.md)
+
 ## 目录
 
 1. [轻量 Web UI](#1-轻量-web-ui)
 2. [首次运行引导](#2-首次运行引导)
 3. [日志可视化](#3-日志可视化)
-4. [错误友好提示](#4-错误友好提示)
-5. [HTML 暗色模式](#5-html-暗色模式)
+4. [HTML 暗色模式](#4-html-暗色模式)
 
 ---
 
@@ -113,42 +115,7 @@
 
 ---
 
-## 4. 错误友好提示
-
-> **状态：✅ 已完成**（2026-07-27）
-> - 核心实现：`src/python/report/data_source_matrix.py`（从 DegradationTracker 聚合各数据源状态）
-> - 状态追踪：`src/python/report/data_status.py`（DegradationTracker 单例）
-> - 渲染输出：报告章节 #17 数据源可用性矩阵（Excel + HTML 双格式）
-
-### 概述
-
-当前 akshare 连接断开时只记录 WARNING 日志，用户跑完报告不知道哪些数据是降级的。在报告输出页面加**数据源可用性矩阵**。
-
-### 收益
-
-- **信任报告**：用户看到所有数据源都是绿色，才对报告数据产生信任
-- **诊断问题**：红色标记的数据源告诉用户"这个数据有问题，报告里对应内容可能不完整"
-- **开发效率**：测试时一眼看到哪个源挂了，不需要翻日志
-
-### 风险
-
-- 矩阵列太多显得杂乱（当前 ~15 个数据源端点）
-- 部分数据源是懒惰加载的，没被触发的不应标记为红色
-
-### 工作量估算：**1 天**
-
-### 实现思路
-
-在 `orchestrator.py` 中注入一个全局 `DataSourceStatus` 上下文：
-```python
-class DataSourceStatus:
-    sources: dict[str, Literal['pending','success','degraded','failed']]
-```
-每次 fetch 后更新状态，报告生成时读取渲染。
-
----
-
-## 5. HTML 暗色模式
+## 4. HTML 暗色模式
 
 ### 概述
 

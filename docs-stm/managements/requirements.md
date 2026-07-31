@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
-> 文档版本：v0.8.8-dev
+> 文档版本：0.9.3
 
 ---
 
@@ -170,7 +170,7 @@
 | R-BRK-05 | 同一次会话中跨模块的同一 API 调用结果应共享会话级内存缓存（上限 2000 条/domain） |
 | R-BRK-06 | 熔断冷却时间应采用指数退避策略（60s→300s→900s→3600s），每次失败翻倍递增，成功恢复后重置 |
 | R-BRK-07 | 熔断器状态应跨会话持久化到 `data/state/circuit_breaker.json`，与缓存文件隔离，确保会话重启后熔断记忆恢复 |
-| R-BRK-08 | Provider 级熔断器和数据模块级熔断器应通过统一的网关（`circuit_breaker.py` + `provider_registry.py`）管理，消除双熔断器状态不一致
+| R-BRK-08 | Provider 级熔断器和数据模块级熔断器应通过统一的网关（`core/circuit_breaker.py` + `core/provider_registry.py`）管理，消除双熔断器状态不一致
 
 ### 5.4 新闻获取需求
 
@@ -241,7 +241,7 @@
 | 9 | 基金风格分析 | B/L | 基金深度分析 | 市值/PE 加权六宫格+漂移评分 |
 | 10 | 财经新闻热点与持仓关联分析 | B/L | 新闻 | 5 源新闻关键词匹配，可选 LLM 增强 |
 | 11 | 全球政经局势 | L | LLM | 基于指数+持仓结构生成 |
-| 12 | 智囊团深度复盘 | L | LLM | 三阶段圆桌会议；Feature Flag 开启辩论模式（M1/M2/M3）时输出含辩论内容并标注"(实验)"标签 |
+| 12 | 智囊团深度复盘 | L | LLM | 三阶段圆桌会议；Feature Flag 开启辩论模式（正反辩论/条件推理/集中度问答）时输出含辩论内容并标注"(实验)"标签 |
 | 13 | 持仓体检报告 | L | LLM | 四维度量化评分 |
 | 14 | 穿透深度分析 | L | LLM | 行业集中度+国别暴露 |
 | 15 | 组合历史走势 | B/L | 历史 | as-if 市值曲线+累计收益率+最大回撤+年化波动率 |
@@ -454,6 +454,25 @@
 
 **F1 快照摘要**：回撤分析页脚嵌入持仓快照对比，展示本次与上次之间的总市值变化、总盈亏变化及持仓变动 TOP5。
 
+#### 6.4.13 数据源可用性矩阵
+
+**字段说明**：
+
+| # | 字段 | 说明 |
+|---|------|------|
+| 1 | 数据源类别 | 按功能分类（行情/基金排名/基金持仓/行业分类/指数/盈利预测/分红/资金流向） |
+| 2 | 状态 | 综合健康度：✅ 正常 / ⚠ 降级 / ❌ 失败 |
+| 3 | 详情 | 各计数汇总，如"3 正常，1 降级" |
+| 4 | 正常 | 该类别下运行正常的数据源数量 |
+| 5 | 降级/失败 | 该类别下降级和失败的数据源数量 |
+
+**状态判定规则**：
+- **ok**：该类别下全部数据源正常（失败=0 且 降级=0）
+- **failed**：该类别下全部数据源失败（失败>0 且 正常=0）
+- **degraded**：其他情况（部分正常、部分降级/失败）
+
+数据由 DegradationTracker 事件日志实时聚合，在报告生成时自动采集各数据源最新状态。失败项在表格下方展示具体失败源明细。
+
 ### 6.5 取价方式规范
 
 | 取价方式 | 触发条件 |
@@ -609,52 +628,52 @@
 | 需求标识 | 需求描述 |
 |:---------|:---------|
 | R-LLM-DB-01 | 辩论模式是智囊团深度复盘（`expert_review`）模块的可选增强通路，通过 Feature Flag 独立开关，默认关闭 |
-| R-LLM-DB-02 | 辩论模式支持三种增强形态：M1 正反辩论（白脸/黑脸/综合）、M2 条件推理、M3 集中度问答 |
+| R-LLM-DB-02 | 辩论模式支持三种增强形态：正反辩论（白脸/黑脸/综合）、条件推理、集中度问答 |
 | R-LLM-DB-03 | 辩论模式启用时，智囊团深度复盘的生成入口由标准模式切换为 debate 通路，输出内容包含辩论标识和分段数据 |
 | R-LLM-DB-04 | 辩论模式与标准模式互斥，同一报告周期内仅使用生效的一路（辩论优先于标准模式） |
 | R-LLM-DB-05 | 辩论模式使用独立于标准 expert_review 的三段缓存（pro/con/synthesis），指纹复用 expert_review 的持仓指纹（排除行情波动字段），默认 TTL 24h |
 | R-LLM-DB-06 | 三段独立缓存前缀注册到 registry：`llm_debate_pro_`/`llm_debate_con_`/`llm_debate_synthesis_`，分组为 preload，受菜单 [2] 刷新影响 |
 | R-LLM-DB-07 | 辩论模式输出在报告页签标题尾部附加"(实验)"标签，标识当前为辩论模式产物 |
 
-#### 7.8.2 M1 正反辩论（白脸/黑脸/综合）
+#### 7.8.2 正反辩论（白脸/黑脸/综合）
 
 启用后，智囊团深度复盘生成过程分解为三个阶段独立调用 LLM API，每阶段独立的 system prompt 和 temperature 控制。
 
 | 需求标识 | 需求描述 |
 |:---------|:---------|
-| R-LLM-DB-M1-01 | M1 启用的标志是 Feature Flag `llm_debate_procon` 为 true |
-| R-LLM-DB-M1-02 | 白脸（pro）阶段：基于持仓数据生成正面论据（看多理由、持有信心、潜在收益机会），使用乐观引导型 system prompt |
-| R-LLM-DB-M1-03 | 黑脸（con）阶段：基于持仓数据生成反面论据（风险提示、看空理由、潜在损失风险），使用审慎质疑型 system prompt |
-| R-LLM-DB-M1-04 | 综合（synthesis）阶段：整合白脸和黑脸的论据，生成平衡的综合判断和调仓建议，使用中性综合型 system prompt |
-| R-LLM-DB-M1-05 | 三段调用依次执行（pro→con→synthesis），每段结果独立缓存，后续直接使用缓存结果跳过 API 调用 |
-| R-LLM-DB-M1-06 | Token 预算守卫：基于字符数计量保护 token 消耗。单阶段输出超过 `int(max_tokens × 0.65)` 字符时触发 1× 超限→跳过 synthesis 阶段（返回 pro+con 拼接）；超过 2× 超限时跳过全部 debate（回退标准模式） |
-| R-LLM-DB-M1-07 | Fallback 策略：pro 或 con 阶段失败→回退标准模式输出；synthesis 阶段失败→返回 pro+con 拼接结果，日志记录 WARNING |
-| R-LLM-DB-M1-08 | 虚构代码过滤：`_filter_hallucinated_codes()` 基于正则的行级过滤，使用 `(?:^\|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]\|$)` 适配中文环境（替代英文 `\b`），消除 LLM 产生的虚构证券代码 |
-| R-LLM-DB-M1-09 | HTML 渲染：三段内容以棒棒糖式展开设计，pro 绿色背景、con 红色背景、synthesis 金色背景，视觉区分辩手身份 |
-| R-LLM-DB-M1-10 | Excel 渲染：pro（绿底）/con（红底）/synthesis（金底）三色块依次输出，标注辩手身份和阶段说明 |
-| R-LLM-DB-M1-11 | M1 的三段缓存共用 expert_review 的指纹计算策略，持仓品种/份额/成本变化时三段缓存同时失效 |
+| R-LLM-DB-PROCON-01 | 正反辩论启用的标志是 Feature Flag `llm_debate_procon` 为 true |
+| R-LLM-DB-PROCON-02 | 白脸（pro）阶段：基于持仓数据生成正面论据（看多理由、持有信心、潜在收益机会），使用乐观引导型 system prompt |
+| R-LLM-DB-PROCON-03 | 黑脸（con）阶段：基于持仓数据生成反面论据（风险提示、看空理由、潜在损失风险），使用审慎质疑型 system prompt |
+| R-LLM-DB-PROCON-04 | 综合（synthesis）阶段：整合白脸和黑脸的论据，生成平衡的综合判断和调仓建议，使用中性综合型 system prompt |
+| R-LLM-DB-PROCON-05 | 三段调用依次执行（pro→con→synthesis），每段结果独立缓存，后续直接使用缓存结果跳过 API 调用 |
+| R-LLM-DB-PROCON-06 | Token 预算守卫：基于字符数计量保护 token 消耗。单阶段输出超过 `int(max_tokens × 0.65)` 字符时触发 1× 超限→跳过 synthesis 阶段（返回 pro+con 拼接）；超过 2× 超限时跳过全部 debate（回退标准模式） |
+| R-LLM-DB-PROCON-07 | Fallback 策略：pro 或 con 阶段失败→回退标准模式输出；synthesis 阶段失败→返回 pro+con 拼接结果，日志记录 WARNING |
+| R-LLM-DB-PROCON-08 | 虚构代码过滤：`_filter_hallucinated_codes()` 基于正则的行级过滤，使用 `(?:^\|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]\|$)` 适配中文环境（替代英文 `\b`），消除 LLM 产生的虚构证券代码 |
+| R-LLM-DB-PROCON-09 | HTML 渲染：三段内容以棒棒糖式展开设计，pro 绿色背景、con 红色背景、synthesis 金色背景，视觉区分辩手身份 |
+| R-LLM-DB-PROCON-10 | Excel 渲染：pro（绿底）/con（红底）/synthesis（金底）三色块依次输出，标注辩手身份和阶段说明 |
+| R-LLM-DB-PROCON-11 | 正反辩论的三段缓存共用 expert_review 的指纹计算策略，持仓品种/份额/成本变化时三段缓存同时失效 |
 
-#### 7.8.3 M2 条件推理
-
-| 需求标识 | 需求描述 |
-|:---------|:---------|
-| R-LLM-DB-M2-01 | M2 启用的标志是 Feature Flag `llm_debate_conditional` 为 true |
-| R-LLM-DB-M2-02 | M2 在智囊团复盘 prompt 中注入预设的市场情景（默认三组：上涨+20%、下跌-20%、震荡±5%），使分析结果情景化 |
-| R-LLM-DB-M2-03 | 情景通过 `llm_settings.json` 的 `debate.mode_2_conditional.scenarios` 配置，每条含 name/change/desc 三个字段，支持用户自定义 |
-| R-LLM-DB-M2-04 | 情景注入不改变原有 LLM 调用次数（仍为单次调用），仅修改 user prompt 内容 |
-| R-LLM-DB-M2-05 | 无有效情景配置时（scenarios 为空或全部校验失败），M2 不生效，回退原有 expert_review prompt |
-| R-LLM-DB-M2-06 | 情景内容嵌入智囊团复盘输出中，位于调仓建议段落之前 |
-
-#### 7.8.4 M3 集中度问答
+#### 7.8.3 条件推理
 
 | 需求标识 | 需求描述 |
 |:---------|:---------|
-| R-LLM-DB-M3-01 | M3 启用的标志是 Feature Flag `llm_debate_qa_concentration` 为 true |
-| R-LLM-DB-M3-02 | 系统自动检测持仓集中度，当单品种市值占比 ≥ threshold（默认 0.20）时触发集中度问答块生成 |
-| R-LLM-DB-M3-03 | 集中度问答块输出内容：集中度风险的量化评估、与分散化基准的定量对比、针对性的调仓建议 |
-| R-LLM-DB-M3-04 | 集中度判定阈值通过 `llm_settings.json` 的 `debate.mode_3_qa_concentration.threshold` 配置，类型 float，范围 (0, 1)，默认 0.20 |
-| R-LLM-DB-M3-05 | 集中度问答块嵌入智囊团深度复盘输出中，位于辩论段落之后、调仓建议之前 |
-| R-LLM-DB-M3-06 | M3 不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_qa_concentration_block()` 构建，嵌在 expert_review 的 user prompt 中） |
+| R-LLM-DB-CONDITIONAL-01 | 条件推理启用的标志是 Feature Flag `llm_debate_conditional` 为 true |
+| R-LLM-DB-CONDITIONAL-02 | 条件推理在智囊团复盘 prompt 中注入预设的市场情景（默认三组：上涨+20%、下跌-20%、震荡±5%），使分析结果情景化 |
+| R-LLM-DB-CONDITIONAL-03 | 情景通过 `llm_settings.json` 的 `debate.conditional.scenarios` 配置，每条含 name/change/desc 三个字段，支持用户自定义 |
+| R-LLM-DB-CONDITIONAL-04 | 情景注入不改变 LLM 调用次数（仍为单次调用），仅修改 user prompt 内容 |
+| R-LLM-DB-CONDITIONAL-05 | 无有效情景配置时（scenarios 为空或全部校验失败），条件推理不生效，回退标准 expert_review prompt |
+| R-LLM-DB-CONDITIONAL-06 | 情景内容嵌入智囊团复盘输出中，位于调仓建议段落之前 |
+
+#### 7.8.4 集中度问答
+
+| 需求标识 | 需求描述 |
+|:---------|:---------|
+| R-LLM-DB-QA-CONCENTRATION-01 | 集中度问答启用的标志是 Feature Flag `llm_debate_qa_concentration` 为 true |
+| R-LLM-DB-QA-CONCENTRATION-02 | 系统自动检测持仓集中度，当单品种市值占比 ≥ threshold（默认 0.20）时触发集中度问答块生成 |
+| R-LLM-DB-QA-CONCENTRATION-03 | 集中度问答块输出内容：集中度风险的量化评估、与分散化基准的定量对比、针对性的调仓建议 |
+| R-LLM-DB-QA-CONCENTRATION-04 | 集中度判定阈值通过 `llm_settings.json` 的 `debate.qa_concentration.threshold` 配置，类型 float，范围 (0, 1)，默认 0.20 |
+| R-LLM-DB-QA-CONCENTRATION-05 | 集中度问答块嵌入智囊团深度复盘输出中，位于辩论段落之后、调仓建议之前 |
+| R-LLM-DB-QA-CONCENTRATION-06 | 集中度问答不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_qa_concentration_block()` 构建，嵌在 expert_review 的 user prompt 中） |
 
 ---
 
@@ -861,11 +880,11 @@
 
 | 键 | 类型 | 默认值 | 说明 |
 |:---|:----:|:------:|:-----|
-| `debate.mode_1_procon.per_call_max_tokens` | int/null | null | M1 每阶段 max_tokens 覆盖（null=使用模块级 `max_tokens_expert_review`） |
-| `debate.mode_1_procon.synthesis_model` | str/null | null | M1 综合阶段模型覆盖（null=使用 pro/con 相同的模型） |
-| `debate.mode_1_procon.synthesis_temperature` | float | 0.5 | M1 综合阶段 temperature（低于常规以保持客观，范围 [0.0, 2.0]） |
-| `debate.mode_2_conditional.scenarios` | list[dict] | 上涨/下跌/震荡 三组 | M2 预设情景列表，每条含 `name`（情景名）/ `change`（涨跌幅）/ `desc`（描述）三个必填字段 |
-| `debate.mode_3_qa_concentration.threshold` | float | 0.20 | M3 集中度问答触发阈值（单品种占比 ≥ 此值时触发），范围 (0, 1) |
+| `debate.procon.per_call_max_tokens` | int/null | null | 正反辩论每阶段 max_tokens 覆盖（null=使用模块级 `max_tokens_expert_review`） |
+| `debate.procon.synthesis_model` | str/null | null | 正反辩论综合阶段模型覆盖（null=使用 pro/con 相同的模型） |
+| `debate.procon.synthesis_temperature` | float | 0.5 | 正反辩论综合阶段 temperature（低于常规以保持客观，范围 [0.0, 2.0]） |
+| `debate.conditional.scenarios` | list[dict] | 上涨/下跌/震荡 三组 | 条件推理预设情景列表，每条含 `name`（情景名）/ `change`（涨跌幅）/ `desc`（描述）三个必填字段 |
+| `debate.qa_concentration.threshold` | float | 0.20 | 集中度问答触发阈值（单品种占比 ≥ 此值时触发），范围 (0, 1) |
 | `debate.max_total_tokens_per_report` | int | — | 单次报告辩论模式总 token 预算上限（超出后跳过 debate 回退标准模式） |
 | `debate.per_call_timeout_override` | int | — | 辩论模式单次 API 调用超时覆盖秒数 |
 
@@ -892,7 +911,7 @@
 | `priority` | int | — | 99 | 优先级（数值越小优先级越高），priority 策略使用 |
 | `weight` | int | — | 1 | 权重值，weighted 策略使用 |
 | `timeout` | float | — | 60.0 | API 超时秒数 |
-| `proxy_preferred` | bool | — | false | 是否优先使用 proxy（proxy_preferred 策略使用） |
+| `proxy_preferred` | bool | — | false | 是否优先使用 proxy（per-provider 后处理标记，有代理环境时自动前置） |
 
 **示例**：
 ```json
@@ -913,7 +932,7 @@
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|
 | `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` | bool | true（llm_news_correlation 为保留字段） | LLM 各模块独立启停开关（llm_news_correlation 的实际启停由 llm_settings.json 的 enabled_llm.news_correlation 控制，默认 false） |
-| `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | bool | false（全部默认关闭） | 辩论模式三增强通路独立启停：M1 正反辩论/M2 条件推理/M3 集中度问答 |
+| `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | bool | false（全部默认关闭） | 辩论模式三增强通路独立启停：正反辩论/条件推理/集中度问答 |
 | `b_series_fund_manager` / `b_series_fund_overlap` / `b_series_fund_concentration` / `b_series_fund_style` | bool | true | 基金深度分析模块启停 |
 | `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
 | `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |

@@ -12,7 +12,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.cache import get_cache_age_by_data_type, get_ttl
-from src.python.registry import get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import (
     STATUS_MESSAGES,
     DataStatus,

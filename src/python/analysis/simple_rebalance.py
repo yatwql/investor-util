@@ -26,13 +26,13 @@ from __future__ import annotations
 
 from typing import Any
 
-__all__ = ["compute_rebalance_signals"]
+__all__ = ["compute_simple_rebalance_signals"]
 
 _THRESHOLD = 0.15  # 单品种权重上限（硬编码）
 _MAX_DETAILED = 3  # 逐条显示上限
 
 
-def compute_rebalance_signals(
+def compute_simple_rebalance_signals(
     holdings_details: list[dict[str, Any]] | None,
     total_mv: float,
 ) -> list[dict[str, Any]]:

@@ -42,7 +42,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 4. 启动 TUI 交互模式
-python src/python/tui.py
+python -m src.python.tui
 ```
 
 ## 方式三：CLI 命令行模式

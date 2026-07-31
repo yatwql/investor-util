@@ -25,7 +25,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -327,7 +327,7 @@ class TestS28BondHoldings(unittest.TestCase):
 
     def test_treasury_name_contains_bond_keyword(self):
         """国债名称含"债" → is_bond_related_by_name 或 "债" in name 匹配。"""
-        from src.python.code_utils import is_bond_related_by_name
+        from src.python.core.code_utils import is_bond_related_by_name
         h = Holding("证券", "20国债01", "019641", shares=100, cost_price=100.0)
         self.assertTrue(is_bond_related_by_name(h.name) or "债" in h.name)
 

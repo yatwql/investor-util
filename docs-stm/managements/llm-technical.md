@@ -1,6 +1,6 @@
 # LLM 集成层技术设计
 
-> 文档版本：v0.8.8-dev
+> 文档版本：0.9.3
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -37,7 +37,7 @@
 
 ```
                                主流程入口
-                          handlers_report.py
+                               tui/handlers_report.py
                                 │
                                 ▼
                     ┌─────────────────────────┐
@@ -101,7 +101,7 @@
               └──────────────────┘          └────────────────────┘
               ┌──────────────────┐          ┌────────────────────┐
               │ circuit_breaker  │          │ fact_checker.py    │
-              │ .py              │          │ 伪代码/幻觉过滤    │
+              │ .py              │          │ 事实锚定校验        │
               │ LLM 端点熔断器    │          └────────────────────┘
               └──────────────────┘
               ┌──────────────────┐
@@ -154,13 +154,13 @@ skeleton.py:_generate_llm_content()
 | 模块 | 分类 | 职责 | 入口函数 |
 |:-----|:-----|:------|:---------|
 | `generators_orchestrator.py` | 编排层 | 4+1 模块并行调度，缓存预检查，线程池分发 | `generate_all_llm()` |
-| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep） | 各 `generate_*()` |
+| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 | 各 `generate_*()` |
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
-| `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑） | `_generate_llm_module()` |
+| `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑）+ `raw_filter_fn` 原始输出过滤钩子（markdown_to_html 之前） | `_generate_llm_module()` |
 | `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、Gemini API 调用 | `_call_llm()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `_call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
-| `fact_checker.py` | 基础设施 | LLM 输出伪代码/虚假信息过滤，正则级行级幻觉检测 | `run_fact_check()` |
+| `fact_checker.py` | 基础设施 | LLM 输出事实锚定校验（数值一致性/品种存在性/排名正确性）+ 自动修正 | `run_fact_check()` |
 | `fallback.py` | 基础设施 | 全模块失败时的降级占位模板 | `get_fallback_content()` |
 | `prompts_core.py` | 工具 | System / User Prompt 构建 | `_build_system_prompt()` / `_build_user_prompt()` |
 | `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown | `_build_metrics_table()` / `_build_performance_table()` |
@@ -181,7 +181,7 @@ skeleton.py:_generate_llm_content()
 | `global_macro` | 全球政经局势 | 800 | 60s | 24h（86400s） | 宏观经济学家角色，500 字内，纯文本 |
 | `expert_review` | 智囊团深度复盘 | 8192 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
 | `health_check` | 持仓体检报告 | 4096 | 120s | 24h（86400s） | 四维度评分（风险分散度/流动性/收益合理性/成本结构） |
-| `penetration_deep` | 穿透深度分析 | 4096 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
+| `penetration_deep` | 穿透深度分析 | 8192 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
 
 #### 批量模式模块（1 个，通过 `_generate_llm_module` 以批量模式调用）
 
@@ -263,6 +263,13 @@ _run_standard_mode()
 └──────────┬───────────────────┘
            │
            ▼
+┌──────────────────────────────────────────┐
+│ 注入 Prompt Appendix（防御统一注入）      │
+│ _build_prompt_appendix() → 追加至尾部     │
+│  TOP3 排名 + 数据速查表 + 代码白名单       │
+└──────────────────┬───────────────────────┘
+           │
+           ▼
 ┌──────────────────────────────────────┐
 │ _generate_llm_content()              │
 │                                      │
@@ -290,6 +297,14 @@ _run_standard_mode()
 │ │ result 含截断标记?               │  │
 │ │ YES → max_tokens × 1.5 重试一次  │  │
 │ │ 二次截断则保留第一次结果+警告      │  │
+│ └──────────────┬──────────────────┘  │
+│                │                      │
+│ ┌──────────────▼──────────────────┐  │
+│ │ ③' 原始输出过滤（可选）          │  │
+│ │ raw_filter_fn 非空 →             │  │
+│ │   result = raw_filter_fn(result) │  │
+│ │ 辩论模式虚构代码过滤：对带换行     │  │
+│ │ 的原始 Markdown 先过滤，再转 HTML  │  │
 │ └──────────────┬──────────────────┘  │
 │                │                      │
 │ ┌──────────────▼──────────────────┐  │
@@ -361,7 +376,7 @@ _run_batch_mode(llm_config, module_key, *hooks)
 ### 4.1 `generate_all_llm()` 完整流程
 
 ```
-handlers_report.py 菜单 L/B
+tui/handlers_report.py 菜单 L/B
     │
     ▼
 generate_all_llm(a_indices, us_indices, total_mv, total_cost, ...)
@@ -734,7 +749,7 @@ penetrated_assets ──→ _extract_stable_penetration()
 
 **设计目的**：`expert_review` / `health_check` / `penetration_deep` 的 `_compute_fingerprint()` 在序列化前排除行情波动字段（`price`、`change_pct`），仅品种/份额/成本变化时指纹改变。防止日内股价波动导致 TTL 期内缓存频繁失效。
 
-**风险信号摘要**：`risk_metrics` 摘要（夏普/卡玛/HHI 等计算指标的 MD5 摘要）已加入指纹哈希因子。风险信号变化时缓存自动失效，确保 LLM 提示词中包含的量化指标与最新计算结果一致。
+**风险信号摘要**：`risk_metrics` 摘要（夏普/卡玛/HHI 等计算指标的 MD5 摘要）作为指纹哈希因子。风险信号变化时缓存自动失效，确保 LLM 提示词中包含的量化指标与最新计算结果一致。
 
 ### 7.2 缓存键模式
 
@@ -894,7 +909,7 @@ _session_usage = {
 | `get_budget_status()` | 查询当前预算使用情况 |
 | `get_cost_summary(for_report=True)` | 生成成本摘要文本（`for_report=True` 对应 verbose 模式） |
 
-### 9.1.1 duration 字段
+#### 9.1.1 duration 字段
 
 `record_per_module()` 接受 `duration: float = 0.0` 参数，记录每个模块的 API 调用耗时（秒）。`skeleton.py` 中 `generate_llm_content()` 通过 `time.monotonic()` 计时，调用 `call_llm()` 前后计算耗时，传入 `_finalize_and_cache()` 后写入 `per_module` 的 `"duration"` 键。多条缓存路径（首次生成 + 截断重试）的耗时通过 `duration` 字段累计。
 
@@ -962,7 +977,7 @@ _session_usage ──→ format_session_usage()
 
 `_PRICING_MERGED` 运行时合并自两层：
 
-1. **内置默认**（`constants.py` 中的 `MODEL_PRICING` 字典）
+1. **内置默认**（`core/constants.py` 中的 `MODEL_PRICING` 字典）
 2. **用户覆盖**（`llm_settings.json` → `pricing` 字段，模块加载时 `_reload_pricing()` 自动合并）
 
 文件配置优先级高于内置默认：
@@ -1002,11 +1017,11 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 
 ## 11. 熔断器
 
-`llm/circuit_breaker.py` 实现端点级熔断器，与 `provider_registry.py` 的熔断器职责分离：
+`llm/circuit_breaker.py` 实现端点级熔断器，与 `core/provider_registry.py` 的熔断器职责分离：
 
 | 特性 | DataSourceRegistry 熔断器 | LLM 熔断器 |
 |:-----|:------------------------|:----------|
-| 位置 | `provider_registry.py` | `llm/circuit_breaker.py` |
+| 位置 | `core/provider_registry.py` | `llm/circuit_breaker.py` |
 | 保护对象 | 数据源 Provider（腾讯/新浪/东财等） | LLM API 端点（Anthropic/OpenAI） |
 | 粒度 | per-provider | per-endpoint（域名级） |
 | 参数 | 单 API：3 次/300s；批量 API：6 次/120s | 3 次/60s |
@@ -1048,6 +1063,7 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 | Provider 链与策略 | `llm_providers.json` | `{"strategy": "priority", "providers": [{"name": "p1", "credentials_ref": "deepseek-main", ...}]}` |
 | Per-module 参数 | `llm_settings.json` | `max_tokens_expert_review`, `timeout_global_macro` |
 | 模块启用开关 | `llm_settings.json` | `enabled_llm.global_macro` |
+| 事实校验容差 | `llm_settings.json` | `fact_check.tolerance`, `fact_check.tolerance_overrides` |
 | Thinking 配置 | `llm_settings.json` | `thinking_enabled_expert_review`, `thinking_budget_expert_review` |
 | 简化模式 | `llm_settings.json` | `output_brief_expert_review` |
 | 缓存 TTL | `config.json` | `cache_ttl.llm_global_macro` |
@@ -1056,7 +1072,7 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 
 ### 12.2 注册表键名派生
 
-在 `registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`），自动派生 `llm_settings.json` 的所有合法键名：
+在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`），自动派生 `llm_settings.json` 的所有合法键名：
 
 ```
 已知 LLM Settings 键名（每个模块 10 个）：
@@ -1073,7 +1089,8 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 除 news_correlation 外的 4 个模块额外增加：
   output_brief_{suffix}
 
-加上 2 个全局键名：
+加上全局键名：
+  fact_check
   llm_max_concurrency
   fail_title_{suffix}
 ```
@@ -1109,9 +1126,9 @@ get_llm_config()
 LLM 集成层与系统其他组件的接口：
 
 ```
-                            ┌────────────────────┐
-  ┌─────────────────────── │ handlers_report.py  │ ← 菜单 L/B 入口
-  │                         └─────────┬──────────┘
+                            ┌────────────────────────┐
+  ┌─────────────────────── │ tui/handlers_report.py │ ← 菜单 L/B 入口
+  │                         └───────────┬───────────┘
   │                                   │
   │                                   ▼
   │                         ┌────────────────────┐
@@ -1192,6 +1209,9 @@ LLM 集成层与系统其他组件的接口：
 | `temperature_{module_key}` | 生成温度 | `0.7` |
 | `max_tokens_{module_key}` | 最大输出 token | `4096` |
 | `timeout_{module_key}` | API 超时（秒） | `120` |
+| `system_prompt_{module_key}` | 系统提示词覆盖 | `null`（使用内置） |
+| `cache_enabled_{module_key}` | 是否启用缓存 | `true` / `false` |
+| `output_brief_{module_key}` | 精简模式 | `true` / `false` |
 | `thinking_enabled_{module_key}` | 是否启用 Extended Thinking | `true` / `false` |
 | `reasoning_effort_{module_key}` | DeepSeek 推理强度 | `high` / `medium` / `low` |
 | `thinking_budget_{module_key}` | Claude/Gemini Thinking 预算 token | `10240` |
@@ -1200,7 +1220,7 @@ LLM 集成层与系统其他组件的接口：
 
 ### 附录 B：内置模型定价表
 
-以下为 `constants.py` 中 `MODEL_PRICING` 内置的定价快照（单位：元/百万 token），可通过 `llm_settings.json` 的 `pricing_overrides` 覆盖：
+以下为 `core/constants.py` 中 `MODEL_PRICING` 内置的定价快照（单位：元/百万 token），可通过 `llm_settings.json` 的 `pricing` 覆盖：
 
 | 模型 | 输入 | 输出 | 缓存命中 |
 |:-----|:----:|:----:|:--------:|

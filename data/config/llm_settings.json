@@ -35,7 +35,7 @@
   // ═══════════════════════════════════════════
   "system_prompt_expert_review": null,
   "model_expert_review": null,
-  "temperature_expert_review": 0.8,
+  "temperature_expert_review": 0.3,
   "max_tokens_expert_review": 8192,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
@@ -49,7 +49,7 @@
   // ═══════════════════════════════════════════
   "system_prompt_health_check": null,
   "model_health_check": null,
-  "temperature_health_check": 0.5,
+  "temperature_health_check": 0.1,
   "max_tokens_health_check": 4096,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
@@ -63,8 +63,8 @@
   // ═══════════════════════════════════════════
   "system_prompt_penetration_deep": null,
   "model_penetration_deep": null,
-  "temperature_penetration_deep": 0.4,
-  "max_tokens_penetration_deep": 4096,
+  "temperature_penetration_deep": 0.1,
+  "max_tokens_penetration_deep": 8192,
   "timeout_penetration_deep": 90,
   "cache_enabled_penetration_deep": true,
   "output_brief_penetration_deep": false,
@@ -92,14 +92,14 @@
   // 通过 Feature Flag 控制启停，菜单 [S] 可交互开关
   // ═══════════════════════════════════════════
   "debate": {
-    // M1 正反辩论 — 三段式(白脸→黑脸→综合)
-    "mode_1_procon": {
+    // 正反辩论 — 三段式(白脸→黑脸→综合)
+    "procon": {
       "per_call_max_tokens": null,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
     },
-    // M2 条件推理 — 情景化分析
-    "mode_2_conditional": {
+    // 条件推理 — 情景化分析
+    "conditional": {
       // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)
       "scenarios": [
         {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
@@ -107,14 +107,29 @@
         {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"}
       ]
     },
-    // M3 集中度问答 — 集中度风险问答块
-    "mode_3_qa_concentration": {
+    // 集中度问答 — 集中度风险问答块
+    "qa_concentration": {
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
     "max_total_tokens_per_report": 16000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
+  },
+
+  // ═══════════════════════════════════════════
+  // 事实校验（fact_check）— LLM 输出数值一致性检测
+  // ═══════════════════════════════════════════
+  "fact_check": {
+    // 全局数值偏差容差（百分点），默认 1.0
+    "tolerance": 1.0,
+    // 按模块覆盖容差（模块名 → 百分点）
+    "tolerance_overrides": {
+      "expert_review": 2.0,
+      "health_check": 1.0,
+      "global_macro": 1.0,
+      "penetration_deep": 1.0
+    }
   },
 
   // ═══════════════════════════════════════════

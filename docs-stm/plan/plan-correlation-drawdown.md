@@ -41,11 +41,11 @@
 
 | 约束 | 适配方式 |
 |:-----|:---------|
-| **C1** (代码类型判定中心化) | 各品种的数据获取链路选择必须通过 `code_utils.py` 判定资产类型（股票→history_stock、基金→history_fund_otc），不自行实现判定逻辑 |
+| **C1** (代码类型判定中心化) | 各品种的数据获取链路选择必须通过 `core/code_utils.py` 判定资产类型（股票→history_stock、基金→history_fund_otc），不自行实现判定逻辑 |
 | **C6** (Provider Chain 必经) | 历史数据获取复用 `fetch_with_incremental_fallback()` 既有链路，不绕过 Chain 直接调 Provider |
 | **C2/C3** (缓存统一+原子写入) | 全品种历史数据通过 `cache/` 子包读写，36 场外基金分页参数修改走 `cache/_io.py` 原子写入 |
 | **C4** (会话级 API 复用) | 同资产历史数据在会话内通过 DataSourceRegistry.session_cache 消重（与 portfolio_history 共享） |
-| **C7** (报告序号可配置) | 相关性矩阵页签必须在 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册新条目（type=`b_series`、data_flag=`correlation_data`），支持用户通过 `config.json` 自定义序号和开关 |
+| **C7** (报告序号可配置) | 相关性矩阵页签必须在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册新条目（type=`b_series`、data_flag=`correlation_data`），支持用户通过 `config.json` 自定义序号和开关 |
 | **C14** (渲染期数据不可写入模块级全局变量) | 热力图数据必须通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` |
 | **C19** (pipeline_data Schema 契约) | 新增 `correlation_data` 键，类型 `dict`，在 pipeline_data Schema 定义集中预定义类型/版本号/写入模块后再使用 |
 | **§1.4.5** (数据降级治理) | 品种历史数据不足 60 交易日时标注 `correlation_available=false`，热力图中显示灰色 N/A，不走 DegradationTracker（非数据源故障，系数据量不足） |
@@ -59,7 +59,7 @@
 |------|------|------|
 | 纯计算函数 | `analysis/correlation.py` 时间序列对齐 → pairwise Pearson/Spearman + p-value 显著性标记，纯 pandas 运算，不依赖 report/ 模块 | 0.5 |
 | 数据获取编排 | `orchestrator.py` 获取全品种历史数据 → 调用纯计算函数 → 结果写入 `pipeline_data['correlation_data']`（C19 新键） | 0.5 |
-| 注册与配置 | `registry.py` 新增报告模块条目（C7）+ 两层可见性模型适配 | 0.5 |
+| 注册与配置 | `core/registry.py` 新增报告模块条目（C7）+ 两层可见性模型适配 | 0.5 |
 | Excel 输出 | 热力图条件格式配色 + 数值表页签 + 数据不足品种 N/A 降级展示（§1.4.5） | 0.5 |
 | HTML 输出 | Chart.js 矩阵热力图渲染 + 数据通过模板 context 传递（C14） | 0.5 |
 | **合计** | | **2.5 天** |
@@ -171,7 +171,7 @@ days = min(max(days, 5), 365)
 
 | 约束 | 适配方式 |
 |:-----|:---------|
-| **C7** (报告序号可配置) | `drawdown_analysis` 已在 `registry.py` 注册（type=history、number=16），增强内容不新增报告模块，不需修改注册表 |
+| **C7** (报告序号可配置) | `drawdown_analysis` 已在 `core/registry.py` 注册（type=history、number=16），增强内容不新增报告模块，不需修改注册表 |
 | **C14** (渲染期数据不可写入模块级全局变量) | 所有新数据通过 `history_data` 模板 context 传递，沿用现有 `render()` context 参数机制，不写入 `_ENV.globals` |
 | **C19** (pipeline_data Schema 契约) | 新增 `drawdown_events`（list[dict]: peak_date/trough_date/recovery_date/drawdown_pct）和 `recovery_times`（list[dict]: start_date/end_date/days）字段需在 pipeline_data Schema 定义集中预定义类型/版本号/写入模块，与已有 `max_drawdown_pct`/`drawdown_start`/`drawdown_end` 共同纳入 schema 管理 |
 | **§1.4.5** (数据降级治理) | 全量历史 span < 60 交易日时，`drawdown_analysis` 标记 `drawdown_available=false`，回撤分析章节显示"数据不足"占位文本，不走 DegradationTracker（系数据量不足，非数据源故障） |

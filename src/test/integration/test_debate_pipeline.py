@@ -45,7 +45,7 @@ class TestDebatePipelineBackwardCompat(unittest.TestCase):
     """所有 Flag 关闭时输出 8 元组（不含 debate_info）。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
-    @patch("src.python.features.is_feature_enabled")
+    @patch("src.python.config.features.is_feature_enabled")
     @patch("src.python.llm.generators_orchestrator._precheck_all_modules")
     def test_all_flags_off_returns_8tuple(
         self,
@@ -79,19 +79,19 @@ class TestDebatePipelineBackwardCompat(unittest.TestCase):
         self.assertEqual(len(result), 8)
 
 
-class TestDebatePipelineM1Enabled(unittest.TestCase):
-    """M1 启用时 debate_info 正确返回。"""
+class TestDebatePipelineProconEnabled(unittest.TestCase):
+    """正反辩论启用时 debate_info 正确返回。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
-    @patch("src.python.features.is_feature_enabled")
+    @patch("src.python.config.features.is_feature_enabled")
     @patch("src.python.llm.generators_orchestrator._precheck_all_modules")
-    def test_m1_enabled_returns_debate_info(
+    def test_procon_enabled_returns_debate_info(
         self,
         mock_precheck,
         mock_feature,
         mock_config,
     ):
-        """M1 启用 → 返回 9 元组，含 debate_info。"""
+        """正反辩论启用 → 返回 9 元组，含 debate_info。"""
         mock_config.return_value = {"cache_enabled_expert_review": True,
                                     "enabled_llm": {"global_macro": True,
                                                     "expert_review": True,
@@ -99,7 +99,7 @@ class TestDebatePipelineM1Enabled(unittest.TestCase):
                                                     "penetration_deep": True}}
         mock_precheck.return_value = _NONE_CACHED
 
-        # M1 启用状态 + 用 side_effect 模拟 dispatch 填充 debate_info 容器
+        # 正反辩论启用状态 + 用 side_effect 模拟 dispatch 填充 debate_info 容器
         mock_feature.side_effect = lambda name: name == "llm_debate_procon"
 
         _debate_info = {"pro_text": "白脸观点", "con_text": "黑脸观点", "mode_label": "\U0001f9ea 辩论模式"}
@@ -120,7 +120,7 @@ class TestDebatePipelineM1Enabled(unittest.TestCase):
                 categories={"股票": 1},
             )
 
-        # M1 启用 → 9 元组
+        # 正反辩论启用 → 9 元组
         self.assertEqual(len(result), 9)
         debate_info = result[8]
         self.assertIsNotNone(debate_info)
@@ -131,10 +131,10 @@ class TestDebatePipelineM1Enabled(unittest.TestCase):
 
 
 class TestDebatePipelineSynthesisFallback(unittest.TestCase):
-    """M1 启用 + debate 全部失败 → 降级普通模式。"""
+    """正反辩论启用 + debate 全部失败 → 降级普通模式。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
-    @patch("src.python.features.is_feature_enabled")
+    @patch("src.python.config.features.is_feature_enabled")
     @patch("src.python.llm.generators_orchestrator._precheck_all_modules")
     def test_synthesis_none_fallback(
         self,

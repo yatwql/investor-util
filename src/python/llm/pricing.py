@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from src.python.constants import MODEL_PRICING
+from src.python.core.constants import MODEL_PRICING
 
 logger = logging.getLogger("invest")
 

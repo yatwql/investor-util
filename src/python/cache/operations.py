@@ -10,7 +10,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
-import src.python.logger as _logger_mod
+import src.python.core.logger as _logger_mod
 
 logger = _logger_mod.setup_logger()
 
@@ -422,7 +422,7 @@ def get_cache_stats(reporter) -> CacheStats:
     from src.python.cache import (
         get_cache_stats as _get_cache_stats,
     )
-    from src.python.constants import PROJECT_ROOT
+    from src.python.core.constants import PROJECT_ROOT
 
     stats = CacheStats()
     cache_dir = get_cache_dir()

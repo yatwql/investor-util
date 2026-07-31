@@ -19,9 +19,6 @@ logger = logging.getLogger("invest")
 
 _TIMEOUT = 30.0
 
-# 央视新闻每天条数较少，仅作为补充
-_MAX_CCTV = 17
-
 
 def _fetch_from_caixin(num: int = 100) -> list[dict[str, Any]]:
     """从财新网获取要闻（通过 akshare 封装）。

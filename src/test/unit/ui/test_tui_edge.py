@@ -30,7 +30,7 @@ class TestPrintErrorWithHint(unittest.TestCase):
         self.capture = io.StringIO()
 
     def _call(self, e: Exception, prefix: str = "操作失败"):
-        from src.python.tui_handlers import print_error_with_hint
+        from src.python.tui.tui_handlers import print_error_with_hint
         with patch("sys.stdout", self.capture):
             print_error_with_hint(e, prefix)
         return self.capture.getvalue()
@@ -135,13 +135,13 @@ class TestExecuteItemErrorFriendly(unittest.TestCase):
         self.capture = io.StringIO()
 
     def _execute(self, callback):
-        from src.python.tui_handlers import execute_item
+        from src.python.tui.tui_handlers import execute_item
         # 修补 MENU_ITEMS 构造一个临时条目
-        with patch("src.python.tui_handlers.MENU_ITEMS", [
+        with patch("src.python.tui.tui_handlers.MENU_ITEMS", [
             (0, "test", callback, False),
         ]):
             with patch("sys.stdout", self.capture):
-                with patch("src.python.tui_handlers.press_any_key"):
+                with patch("src.python.tui.tui_handlers.press_any_key"):
                     execute_item(0)
         return self.capture.getvalue()
 
@@ -181,18 +181,18 @@ class TestExecuteItemErrorFriendly(unittest.TestCase):
         """Ctrl+C → 不调用 print_error_with_hint，直接显示取消。"""
         def _cancel():
             raise KeyboardInterrupt()
-        with patch("src.python.tui_handlers.print_error_with_hint") as mock_err:
+        with patch("src.python.tui.tui_handlers.print_error_with_hint") as mock_err:
             out = self._execute(_cancel)
         self.assertIn("操作已取消", out)
         mock_err.assert_not_called()
 
     def test_busy_skip(self):
         """_busy=True 时跳过执行。"""
-        from src.python.tui_handlers import execute_item
+        from src.python.tui.tui_handlers import execute_item
         callback = MagicMock()
-        with patch("src.python.tui_handlers.MENU_ITEMS", [
+        with patch("src.python.tui.tui_handlers.MENU_ITEMS", [
             (0, "test", callback, False),
         ]):
-            with patch("src.python.tui_handlers._busy", True):
+            with patch("src.python.tui.tui_handlers._busy", True):
                 execute_item(0)
         callback.assert_not_called()

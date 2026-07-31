@@ -18,7 +18,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from src.python.tui_menu import (
+from src.python.tui.tui_menu import (
 
     MENU_ITEMS,
     index_by_key,
@@ -37,7 +37,7 @@ class TestMenuItems(unittest.TestCase):
 
     def setUp(self):
         """重置 MENU_ITEMS 回调为 None，防止前序测试副作用。"""
-        import src.python.tui_menu as _tm
+        import src.python.tui.tui_menu as _tm
         for i, (key, label, _cb, is_exit) in enumerate(_tm.MENU_ITEMS):
             _tm.MENU_ITEMS[i] = (key, label, None, is_exit)
 
@@ -133,7 +133,7 @@ class TestConfigCache(unittest.TestCase):
 
     def setUp(self) -> None:
         """重置模块级 _config_cache 为初始 None，防止前序测试的副作用。"""
-        import src.python.tui_menu as _tm
+        import src.python.tui.tui_menu as _tm
         _tm._config_cache = None
 
     def test_get_config_cache_default(self) -> None:

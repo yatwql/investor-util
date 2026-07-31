@@ -61,11 +61,17 @@ MODES: dict[str, dict] = {
         "parallel": False,
     },
     "dev-verify": {
-        "marker": ("(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)"),
-        "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景，~1min）",
-        "timeout_sec": 180,
+        "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景，~2.5min）",
         "order": 5,
-        "parallel": True,
+        "phases": [
+            {
+                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data)",
+                "desc": "核心模块单元测试",
+                "timeout_sec": 120,
+                "parallel": True,
+            },
+            {"marker": "scenario_basic", "desc": "基础业务场景（140 项，~100s）", "timeout_sec": 300, "parallel": True},
+        ],
     },
     "verify": {
         "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis",
@@ -409,8 +415,8 @@ def run_mode(
     """
     mode_cfg = MODES.get(mode_key, {})
 
-    # 分阶段模式：若模式定义了 phases 且命令行传入 --phased
-    if phased and "phases" in mode_cfg:
+    # 分阶段模式：若模式定义了 phases 则自动启用分阶段运行
+    if "phases" in mode_cfg:
         return _run_phased(mode_cfg["phases"], mode_key, coverage, parallel_level, timeout_override, no_timeout)
     html_available = _check_pytest_html()
 
@@ -437,6 +443,8 @@ def run_mode(
             pytest_args,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             cwd=_PROJECT_ROOT,
             env=_env,
@@ -698,6 +706,8 @@ def _run_phased(
                 pytest_args,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
                 cwd=_PROJECT_ROOT,
                 env=_env,
@@ -721,9 +731,20 @@ def _run_phased(
         combined["errors"] += stats["errors"]
         combined["subtests"] += stats["subtests"]
 
-        # 打印 pytest 摘要行
+        # 打印 pytest 摘要行（含 FAILURES 段详情）
+        # 注：默认过滤只保留关键词行，会丢弃失败详情（测试名/断言错误）。
+        # 失败时（FAILURES 段出现）需完整打印该段，便于定位失败测试。
+        in_failures = False
         for line in output.splitlines():
             stripped = line.strip()
+            if stripped.startswith("====="):
+                if "FAILURES" in stripped:
+                    in_failures = True
+                elif in_failures:
+                    in_failures = False
+            if in_failures:
+                print(f"      {line}")
+                continue
             if not stripped:
                 continue
             if any(

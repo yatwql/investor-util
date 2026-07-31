@@ -22,7 +22,7 @@ class TestCliEdge:
         """report 路径无 input() 调用。"""
         mock_holdings = [MagicMock()]
         with (
-            patch("src.python.cli._cli_read_holdings", return_value=mock_holdings),
+            patch("src.python.cli.cli._cli_read_holdings", return_value=mock_holdings),
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
         ):
             from src.python.cli import _handle_report
@@ -43,7 +43,7 @@ class TestCliEdge:
         mock_result.exit_code = _EXIT_SUCCESS
 
         with (
-            patch("src.python.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.cache.operations.update_basic_cache", return_value=mock_result),
         ):
             code = _handle_cache_update("basic", {}, MagicMock())
@@ -63,7 +63,7 @@ class TestCliEdge:
     def test_holdings_dir_is_none(self):
         """holdings_dir 缺失时使用默认值。"""
         # 使用不存在的路径但 holdings_dir 取默认值
-        with patch("src.python.cli.os.path.exists", return_value=False):
+        with patch("src.python.cli.cli.os.path.exists", return_value=False):
             result = _cli_read_holdings({})
         assert result is None
 
@@ -91,7 +91,7 @@ class TestCliEdge:
             "holdings_filename": str(holdings_dir),  # 指向目录
         }
 
-        with patch("src.python.reader.read_holdings", return_value=[]):
+        with patch("src.python.core.reader.read_holdings", return_value=[]):
             result = _cli_read_holdings(config)
         # 该目录下无有效 xlsx（文件内容不是真实 xlsx），read_holdings 返回空列表
         assert result is None

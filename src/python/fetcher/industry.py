@@ -8,14 +8,10 @@ Provider Chain（可配置）：
 from __future__ import annotations
 
 import logging
-import random
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from src.python.cache import get_ttl
-from src.python.code_utils import is_a_share_code
+from src.python.core.code_utils import is_a_share_code
 from src.python.fetcher.chain import fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
 from src.python.providers.eastmoney_industry import make_push2_request as _make_push2_request
@@ -81,20 +77,32 @@ def fetch_industry_data(code: str) -> dict | None:
     return result
 
 
-def _is_a_share_code(code: str) -> bool:
-    """判断是否为 A 股代码（委托至 code_utils.is_a_share_code）。"""
-    return is_a_share_code(code)
+def fetch_industry_data_cached(code: str) -> dict | None:
+    """行业数据获取（含会话缓存），同一报告生成中同证券只获取一次。
+
+    消除多个模块独立调用 fetch_industry_data 的冗余文件缓存读取。
+    """
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
+
+    registry = get_registry()
+    cached = registry.session_cache_get("industry", code)
+    if cached is not NOT_FOUND:
+        return cached
+    result = fetch_industry_data(code)
+    if result is not None:
+        registry.session_cache_set("industry", code, result, source="api")
+    return result
 
 
-def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[str, dict]:
+def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[str, dict]:
     """批量获取多只证券的行业分类和概念板块归属。
 
-    使用线程池并发获取，已缓存的不重复请求。
+    使用 BatchDispatcher 统一并行调度，支持缓存优先、熔断预检、通用重试。
     非 A 股代码（美股/港股等）自动跳过，不调用 API。
 
     Args:
         codes: 6 位证券代码列表
-        max_workers: 最大并发线程数
+        max_workers: 最大并发线程数（默认 8）
 
     Returns:
         {code: {code, industry, concepts, ...}, ...}
@@ -104,7 +112,7 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
         return {}
 
     # 过滤非 A 股代码，避免无效 API 调用
-    a_codes = [c for c in valid_codes if _is_a_share_code(c)]
+    a_codes = [c for c in valid_codes if is_a_share_code(c)]
     skipped = len(valid_codes) - len(a_codes)
     if skipped:
         logger.debug("跳过 %d 个非 A 股代码（行业数据仅支持 A 股）", skipped)
@@ -117,54 +125,47 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 3) -> dict[st
         logger.warning("[industry] 行业数据 API 全链不可用（熔断），跳过 %d 个代码的批量获取", len(a_codes))
         return {}
 
-    result: dict[str, dict] = {}
-    lock = threading.Lock()
+    from functools import partial
 
-    def _fetch_one(code: str) -> tuple[str, dict] | None:
-        data = fetch_industry_data(code)
-        if data:
-            return code, data
-        return None
+    from src.python.cache import get as cache_get
+    from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_fetch_one, code): code for code in a_codes}
-        for future in as_completed(futures):
-            try:
-                res = future.result()
-            except Exception as exc:
-                logger.warning("批量行业数据获取异常: %s", exc)
-                continue
-            if res is not None:
-                code, data = res
-                with lock:
-                    result[code] = data
+    dispatcher = BatchDispatcher(
+        max_workers=get_batch_worker_count("industry_workers", 8),
+        thread_name_prefix="batch_industry",
+        rate_limit_provider="eastmoney_industry",
+    )
 
-    # 首次获取失败的代码，短暂等幅后重试一次
-    failed = [c for c in a_codes if c not in result]
-    if failed:
-        # 重试预检：如熔断未恢复则跳过重试，避免无效等待
-        if is_provider_chain_broken("industry"):
-            logger.info("[industry] 行业数据全链熔断未恢复，跳过 %d 个失败代码重试", len(failed))
-        else:
-            delay = _BATCH_RETRY_DELAY + random.uniform(0, _BATCH_RETRY_JITTER)
-            logger.info("批量行业数据重试 %d 个失败代码（%.1fs 后）", len(failed), delay)
-            time.sleep(delay)
-            with ThreadPoolExecutor(max_workers=min(max_workers, len(failed))) as executor:
-                futures = {executor.submit(_fetch_one, code): code for code in failed}
-                for future in as_completed(futures):
-                    try:
-                        res = future.result()
-                    except Exception:
-                        _failed_code = futures[future]
-                        logger.warning("[industry] 重试批量 %s 仍失败", _failed_code, exc_info=True)
-                        continue
-                    if res is not None:
-                        code, data = res
-                        with lock:
-                            result[code] = data
+    items = [
+        (
+            f"{_INDUSTRY_CACHE_PREFIX}{code}",
+            partial(fetch_industry_data, code=code),
+        )
+        for code in a_codes
+    ]
 
-    logger.info("批量行业数据就绪: %d/%d 个代码（含缓存命中）", len(result), len(a_codes))
-    return result
+    results = dispatcher.execute_with_cache_check(
+        items,
+        cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("industry", cache_id)),
+        strict_none=True,
+    )
+
+    # 通用重试（复用主 executor）
+    results = dispatcher.retry_failed(
+        results,
+        task_factory=lambda idx: partial(fetch_industry_data, code=a_codes[idx]),
+        delay=_BATCH_RETRY_DELAY,
+        jitter=_BATCH_RETRY_JITTER,
+    )
+
+    result_map: dict[str, dict] = {}
+    for code, r in zip(a_codes, results):
+        if r.success and r.result:
+            result_map[code] = r.result
+
+    dispatcher.shutdown()
+    logger.info("批量行业数据就绪: %d/%d 个代码（含缓存命中）", len(result_map), len(a_codes))
+    return result_map
 
 
 def make_push2_request(code: str, retries: int = 3) -> dict | None:

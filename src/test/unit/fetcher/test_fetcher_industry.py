@@ -30,8 +30,8 @@ class TestIsAShareCode(unittest.TestCase):
     """_is_a_share_code 纯函数测试。"""
 
     def _call(self, code: str) -> bool:
-        from src.python.fetcher.industry import _is_a_share_code
-        return _is_a_share_code(code)
+        from src.python.core.code_utils import is_a_share_code
+        return is_a_share_code(code)
 
     def test_normal_sh(self):
         """sh 前缀 A 股代码 → True。"""
@@ -332,7 +332,7 @@ class TestRestFetchIndustryAndConcepts(unittest.TestCase):
     """eastmoney_industry_rest.fetch_industry_and_concepts 测试。"""
 
     def setUp(self):
-        from src.python.provider_registry import get_registry
+        from src.python.core.provider_registry import get_registry
         get_registry().session_cache_clear("industry_rest")
 
     @patch("src.python.providers.eastmoney_industry_rest.make_http_client")

@@ -116,7 +116,7 @@ report_template.html (1845 行 Jinja2 模板)
 |:-----|:---------|:------|
 | **C14** 渲染期数据不写 `_ENV.globals` | 所有 chart data 通过 `render()` context → `chart_datasets` 字典 | 代码审查 grep `_ENV.globals\[` 不得出现在非 `html_jinja_env.py` |
 | **C19** pipeline_data Schema | 仅 `tojson` 复用 → 不需新 Schema；仅当新增 `chart_datasets` 进 pipeline 时才需注册 | 当前方案：只传 template context |
-| **§1.4.4** Feature Flag | `features.py` 注册 `enable_interactive_charts: True` | features.json 可覆盖 |
+| **§1.4.4** Feature Flag | `config/features.py` 注册 `enable_interactive_charts: True` | features.json 可覆盖 |
 | **§1.4.5** 数据降级 | 三级：ok→实线 / degraded→虚线 / unavailable→占位 | 复用 `data_status_history` |
 | **C7** 报告序号 | 不改 `_REPORT_SECTION_DEFAULT`，仅增强已有模块 | |
 | **C16** 路径绝对化 | 本地 bundle 已降级为 P2 未来增强，Iter 1 不涉及 | |
@@ -370,7 +370,7 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 
 | 任务 | 涉及文件 | 测试范围 |
 |:-----|:---------|:---------|
-| `features.py` 注册 `enable_interactive_charts: True` + 更新分类注释 `2→3 项` | `features.py` | ✅ `is_feature_enabled("enable_interactive_charts")` 默认 True ✅ `features.json` 可覆盖 ✅ 未知 flag 返回 False（已有 `_auto_reset_feature_flags` fixture 自动清理） |
+| `config/features.py` 注册 `enable_interactive_charts: True` + 更新分类注释 `2→3 项` | `config/features.py` | ✅ `is_feature_enabled("enable_interactive_charts")` 默认 True ✅ `features.json` 可覆盖 ✅ 未知 flag 返回 False（已有 `_auto_reset_feature_flags` fixture 自动清理） |
 | `chart_data_builder.py`（完整 6 图骨架 + 净值/回撤数据集 | `chart_data_builder.py` | ✅ 输入 `history_data` → 输出正确 JSON 格式 ✅ ok/degraded/unavailable 三级 ✅ 空/None 输入返回空 dict |
 | `html_writer.py` context 注入 `chart_datasets` + `enable_interactive_charts` + 新增参数支持 | `html_writer.py` | ✅ `write_html_report()` 新增 `chart_datasets: dict \| None = None`、`enable_interactive_charts: bool = False` 参数 ✅ Flag OFF 时 context 不含 chart_datasets ✅ `chart_datasets` 传入后正确进入 render() context ✅ **不新增 `_ENV.globals` 条目** |
 | `orchestrator.py` 整合 metrics 并传入 html_writer + Feature Flag 读取 | `orchestrator.py` | ✅ full 路径：`prep["risk_metrics"]` + `_metrics` → 合并后调用 `build_chart_datasets()` → `write_html_report(chart_datasets=..., enable_interactive_charts=...)` ✅ both 路径：无 `_metrics` → 传入 None，`build_chart_datasets()` 从 `history_data` 提取 3 个基本轴 ✅ Feature Flag 在 orchestrator 读取：`enable_interactive_charts = is_feature_enabled("enable_interactive_charts")` → 作为参数传入 html_writer（与 enable_b_series/enable_news 模式一致） ✅ **不跳过 build_chart_datasets()**——纯计算 ~5ms，全量执行，html_writer 靠 Flag 控制 context 注入 |

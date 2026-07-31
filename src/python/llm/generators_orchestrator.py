@@ -1,10 +1,9 @@
 """LLM 批量编排模块 — 缓存预检查、线程池分发与 LLM 全量生成。
 
-包含 _compute_module_cache_info、_precheck_one_cache、_precheck_all_modules、
-_dispatch_llm_workers、generate_all_llm 和 _LLM_CLIENT_SETTINGS。
+包含 ``_build_module_fns``（模块级注册）、``_dispatch_llm_workers``、
+``generate_all_llm`` 和 ``_LLM_CLIENT_SETTINGS``。
 
-``_MODULE_FNS`` 集中管理所有 LLM 模块的生成函数，确保一致的
-缓存预检、线程池分发和失败处理。新增模块需在此注册。
+新增 LLM 模块需在 ``_build_module_fns`` 中添加条目，无需深入分发函数。
 """
 
 from __future__ import annotations
@@ -19,12 +18,10 @@ import httpx
 
 from src.python.cache import get as cache_get
 from src.python.config import get_llm_config
-from src.python.http_client import make_http_client
+from src.python.core.http_client import make_http_client
 from src.python.llm.api_base import (
-    CACHE_LINE_HTML,
     LLM_TIMEOUT,
-    _cache_line_model_tpl,
-    _extract_model_from_cached,
+    _build_cache_hint_and_record,
 )
 from src.python.llm.fingerprint import (
     build_llm_fingerprint,
@@ -46,15 +43,15 @@ from src.python.llm.prompts import (
     LLM_MODULE_FAILURE,
     _build_competitive_context_block,
 )
-from src.python.llm.session import record_per_module
 from src.python.llm.skeleton import is_llm_module_enabled
-from src.python.registry import get_llm_module_name, get_llm_module_names
+from src.python.core.registry import get_llm_module_name, get_llm_module_names
 
 logger = logging.getLogger("invest")
 _MN = get_llm_module_name
 
 
 __all__ = [
+    "_build_module_fns",
     "_LLM_CLIENT_SETTINGS",
     "_compute_module_cache_info",
     "_precheck_one_cache",
@@ -85,11 +82,13 @@ def get_news_correlation_result() -> tuple[list[dict], bool, dict] | None:
 
 # ── HTTP 客户端配置 ──────────────────────────────────────────
 # 各工作线程共享同一组连接参数，通过 HTTP/2 + keepalive 减少连接建立开销
+_LLM_MAX_CONNECTIONS = 20  # 总连接池上限
+_LLM_MAX_KEEPALIVE = 10  # 空闲保持连接数
 _LLM_CLIENT_SETTINGS: dict[str, Any] = {
     "http2": True,  # HTTP/2 多路复用
     "limits": httpx.Limits(
-        max_connections=20,  # 总连接池上限
-        max_keepalive_connections=10,  # 空闲保持连接数
+        max_connections=_LLM_MAX_CONNECTIONS,
+        max_keepalive_connections=_LLM_MAX_KEEPALIVE,
     ),
 }
 
@@ -198,24 +197,21 @@ def _precheck_one_cache(
     cached = cache_get(cache_info["key"], cache_info["ttl"])
     if not cached:
         return (None, False)
-    clean = cached
-    model = _extract_model_from_cached(cached)
-    hint = _cache_line_model_tpl(model) if model else CACHE_LINE_HTML
     thinking_enabled = llm_config.get(cache_info["thinking_key"], False)
-    if thinking_enabled:
-        hint = hint.rstrip().replace("</p>", " | Extended Thinking</p>", 1)
-    # 记录模块用量，确保 API 用量页签显示"缓存"状态而非"—"
-    if module_key:
-        _name_for_record = model or llm_config.get("model", "") or "缓存命中"
-        _endpoint_for_record = llm_config.get("endpoint", "") or ""
-        if not _endpoint_for_record and llm_config.get("_provider_list") and module_key:
-            from src.python.llm.api import _resolve_first_provider_model_endpoint
+    # 当 endpoint 为空时有 provider chain 则尝试解析
+    endpoint = llm_config.get("endpoint", "") or ""
+    if not endpoint and llm_config.get("_provider_list") and module_key:
+        from src.python.llm.api import _resolve_first_provider_model_endpoint
 
-            _, _endpoint_for_record = _resolve_first_provider_model_endpoint(llm_config, module_key)
-        record_per_module(
-            module_key, _name_for_record, cached=True, thinking=thinking_enabled, endpoint=_endpoint_for_record
-        )
-    return (clean + hint, True)
+        _, endpoint = _resolve_first_provider_model_endpoint(llm_config, module_key)
+    augmented_html = _build_cache_hint_and_record(
+        cached,
+        module_key,
+        llm_config,
+        thinking_enabled,
+        endpoint=endpoint,
+    )
+    return (augmented_html, True)
 
 
 def _precheck_all_modules(
@@ -235,6 +231,91 @@ def _precheck_all_modules(
         result, from_cache = _precheck_one_cache(info, llm_config, module_key)
         results[module_key] = {"result": result, "cached": from_cache}
     return results
+
+
+def _build_module_fns(
+    a_indices,
+    us_indices,
+    total_mv: float,
+    total_cost: float,
+    total_profit: float,
+    total_today_profit: float,
+    holdings_count: int,
+    categories: dict,
+    penetrated_assets: list[dict] | None,
+    holdings_details: list[dict] | None,
+    sector_flow: list[dict] | None,
+    force: bool,
+    pipeline_data: dict | None = None,
+    competitive_context: str = "",
+    metrics: dict | None = None,
+    degradation_events: list[dict] | None = None,
+) -> dict[str, Callable]:
+    """构建 LLM 模块名称 → 生成函数闭包 的映射。
+
+    模块级集中注册，新增 LLM 模块只需在此添加条目。
+    每个闭包签名: (http_client, llm_config) → (result_str | None, from_cache)。
+    """
+    return {
+        "global_macro": lambda c, lc: generate_global_macro(
+            a_indices,
+            us_indices,
+            total_mv,
+            total_profit,
+            total_cost,
+            categories,
+            sector_flow=sector_flow,
+            force=force,
+            http_client=c,
+            llm_config=lc,
+            competitive_context=competitive_context,
+            holdings_details=holdings_details,
+        ),
+        "expert_review": lambda c, lc: generate_expert_review(
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
+            pipeline_data=pipeline_data,
+            competitive_context=competitive_context,
+            metrics=metrics,
+        ),
+        "health_check": lambda c, lc: generate_health_check(
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
+            pipeline_data=pipeline_data,
+            degradation_events=degradation_events,
+        ),
+        "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
+            total_mv,
+            total_cost,
+            total_profit,
+            total_today_profit,
+            holdings_count,
+            categories,
+            penetrated_assets,
+            holdings_details=holdings_details,
+            force=force,
+            http_client=c,
+            llm_config=lc,
+        ),
+    }
 
 
 def _dispatch_llm_workers(
@@ -308,69 +389,42 @@ def _dispatch_llm_workers(
 
         return _run
 
-    _MODULE_FNS: dict[str, Callable] = {
-        "global_macro": lambda c, lc: generate_global_macro(
-            a_indices,
-            us_indices,
-            total_mv,
-            total_profit,
-            total_cost,
-            categories,
-            sector_flow=sector_flow,
-            force=force,
-            http_client=c,
-            llm_config=lc,
-            competitive_context=_competitive_context,
-            holdings_details=holdings_details,
-        ),
-        "expert_review": lambda c, lc: generate_expert_review(
-            total_mv,
-            total_cost,
-            total_profit,
-            total_today_profit,
-            holdings_count,
-            categories,
-            penetrated_assets,
-            holdings_details=holdings_details,
-            force=force,
-            http_client=c,
-            llm_config=lc,
-            pipeline_data=pipeline_data,
-            competitive_context=_competitive_context,
-            metrics=_metrics,
-        ),
-        "health_check": lambda c, lc: generate_health_check(
-            total_mv,
-            total_cost,
-            total_profit,
-            total_today_profit,
-            holdings_count,
-            categories,
-            penetrated_assets,
-            holdings_details=holdings_details,
-            force=force,
-            http_client=c,
-            llm_config=lc,
-            pipeline_data=pipeline_data,
-            degradation_events=_degradation_events,
-        ),
-        "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
-            total_mv,
-            total_cost,
-            total_profit,
-            total_today_profit,
-            holdings_count,
-            categories,
-            penetrated_assets,
-            holdings_details=holdings_details,
-            force=force,
-            http_client=c,
-            llm_config=lc,
-        ),
-    }
+    _MODULE_FNS = _build_module_fns(
+        a_indices=a_indices,
+        us_indices=us_indices,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_count=holdings_count,
+        categories=categories,
+        penetrated_assets=penetrated_assets,
+        holdings_details=holdings_details,
+        sector_flow=sector_flow,
+        force=force,
+        pipeline_data=pipeline_data,
+        competitive_context=_competitive_context,
+        metrics=_metrics,
+        degradation_events=_degradation_events,
+    )
 
     # ── 辩论模式路由：替换 expert_review 条目 ─────────────────
-    from src.python.features import is_feature_enabled
+    from src.python.config.features import is_feature_enabled
+
+    def _build_debate_mode_combination() -> str:
+        """构建当前启用的辩论模式组合标识字符串。
+
+        Returns:
+            如 "正反辩论+条件推理" 或 "条件推理+集中度问答" 等形式。
+        """
+        _parts = []
+        if is_feature_enabled("llm_debate_procon"):
+            _parts.append("正反辩论")
+        if is_feature_enabled("llm_debate_conditional"):
+            _parts.append("条件推理")
+        if is_feature_enabled("llm_debate_qa_concentration"):
+            _parts.append("集中度问答")
+        return "+".join(_parts) if _parts else ""
 
     if is_feature_enabled("llm_debate_procon") and needs.get("expert_review"):
         _original_expert = _MODULE_FNS["expert_review"]
@@ -402,6 +456,7 @@ def _dispatch_llm_workers(
                             "pro_text": pro,
                             "con_text": con,
                             "mode_label": "🧪 辩论模式",
+                            "mode_combination": _build_debate_mode_combination(),
                         }
                     if synthesis:
                         return (synthesis, True)
@@ -621,9 +676,15 @@ def generate_all_llm(
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
 
-    from src.python.features import is_feature_enabled
+    from src.python.config.features import is_feature_enabled
 
     needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k)) for k, v in precheck_results.items()}
+
+    # ── 辩论模式：强制不走标准 expert_review 缓存预检 ──────
+    # 辩论路由使用独立缓存键（llm_debate_pro_/llm_debate_con_/llm_debate_synthesis_），
+    # 与标准 expert_review 缓存键（llm_expert_review_）不同，需绕过标准缓存预检。
+    if is_feature_enabled("llm_debate_procon"):
+        needs["expert_review"] = is_llm_module_enabled(llm_config, "expert_review")
 
     # ── 辩论模式容器（用于闭包捕获 debate_info） ────────
     _debate_info_container: list[dict | None] = [None]
@@ -672,6 +733,13 @@ def generate_all_llm(
     # 仅检查非缓存且非空的模块（缓存命中说明内容未变化，无需重复校验）。
     _module_labels = get_llm_module_names()
 
+    # 读取事实校验容差配置（来自 llm_settings.json fact_check 段）
+    _fc_cfg = (llm_config or {}).get("fact_check", {})
+    _fc_tolerance: float = _fc_cfg.get("tolerance", 1.0)
+    _fc_overrides: dict = _fc_cfg.get("tolerance_overrides", {})
+
+    # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
+
     # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
     _penetrated_codes: set[str] = set()
     if penetrated_assets:
@@ -687,22 +755,30 @@ def generate_all_llm(
             ("penetration_deep", pd_r),
         ]:
             if _result:
-                _summary = run_fact_check(
+                _mod_tolerance = _fc_overrides.get(_mk, _fc_tolerance)
+                _corrected, _summary = run_fact_check(
                     _result,
                     holdings_details,
                     module_label=_module_labels.get(_mk, _mk),
                     extra_valid_codes=_penetrated_codes if _mk == "penetration_deep" else None,
                     is_penetration_module=_mk == "penetration_deep",
+                    tolerance_pct=_mod_tolerance,
+                    history_data=history_data,
                 )
+                # 用修正后的内容替换原结果
+                if _corrected != _result and _corrected != _summary:
+                    _result = _corrected
                 if _summary and _summary not in _result:
-                    if _mk == "global_macro":
-                        gm_r = _result + "\n" + _summary
-                    elif _mk == "expert_review":
-                        er_r = _result + "\n" + _summary
-                    elif _mk == "health_check":
-                        hc_r = _result + "\n" + _summary
-                    elif _mk == "penetration_deep":
-                        pd_r = _result + "\n" + _summary
+                    _result = _result + "\n" + _summary
+                # 写回元组变量
+                if _mk == "global_macro":
+                    gm_r = _result
+                elif _mk == "expert_review":
+                    er_r = _result
+                elif _mk == "health_check":
+                    hc_r = _result
+                elif _mk == "penetration_deep":
+                    pd_r = _result
 
     logger.info(
         "LLM 生成完成: %s=%s, %s=%s, %s=%s, %s=%s",

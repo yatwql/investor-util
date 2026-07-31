@@ -25,7 +25,7 @@ import os
 import time
 from typing import Any, Callable
 
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
 
@@ -153,7 +153,7 @@ class IndicatorBreaker:
           - Feature Flag 打开时自动重置断路器状态
           - Feature Flag 变更事件记录到 DegradationTracker
         """
-        from src.python.features import FEATURE_FLAGS, is_feature_enabled
+        from src.python.config.features import FEATURE_FLAGS, is_feature_enabled
 
         # 映射指标名称到 Feature Flag 名称
         flag_map: dict[str, str] = {
@@ -216,7 +216,9 @@ class IndicatorBreaker:
                 "启用" if now_enabled else "关闭",
             )
         except Exception:
-            pass  # DegradationTracker 不可用时不阻塞
+            logger.debug(
+                "[breaker] DegradationTracker 不可用，跳过 Feature Flag 记录", exc_info=True
+            )  # DegradationTracker 不可用时不阻塞
 
     # ── 记录成功/失败 ────────────────────────────────
 
@@ -233,7 +235,7 @@ class IndicatorBreaker:
         feature_flag 关闭时不计失败次数（C20-a）。
         """
         # 先检查 Feature Flag
-        from src.python.features import is_feature_enabled
+        from src.python.config.features import is_feature_enabled
 
         flag_map: dict[str, str] = {
             "sharpe_ratio": "metrics_sharpe",
@@ -286,7 +288,7 @@ class IndicatorBreaker:
                     failure_type="unreachable",
                 )
             except Exception:
-                pass
+                logger.debug("[breaker] DegradationTracker 不可用，跳过失败记录", exc_info=True)
 
         self._save_state()
 

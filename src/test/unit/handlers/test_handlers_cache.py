@@ -91,7 +91,7 @@ class TestPrintCacheRefreshReport(unittest.TestCase):
         return self.CacheUpdateResult(**kwargs)
 
     def _call(self, result):
-        from src.python.handlers_cache import _print_cache_refresh_report
+        from src.python.tui.handlers_cache import _print_cache_refresh_report
         with patch("sys.stdout", self._stdout):
             _print_cache_refresh_report(result)
         return self._stdout.getvalue()
@@ -133,7 +133,7 @@ class TestPrintCacheRefreshReport(unittest.TestCase):
             total_funds=1, perf_ok=1, hold_ok=1, bm_ok=1,
             pf_ok=0, sf_ok=0,
         )
-        from src.python.handlers_cache import _print_cache_refresh_report
+        from src.python.tui.handlers_cache import _print_cache_refresh_report
         with patch("sys.stdout", self._stdout):
             _print_cache_refresh_report(result)
         output = self._stdout.getvalue()
@@ -155,10 +155,10 @@ class TestCmdCleanupCache(unittest.TestCase):
 
     def test_cleanup_removed_some(self):
         """清理到过期文件（verify delegation + TuiProgressReporter output）。"""
-        from src.python.handlers_cache import _cmd_cleanup_cache
+        from src.python.tui.handlers_cache import _cmd_cleanup_cache
         with (
             patch("src.python.cache.operations.cleanup_cache", return_value=5),
-            patch("src.python.handlers_cache.press_any_key"),
+            patch("src.python.tui.handlers_cache.press_any_key"),
             patch("src.python.report.progress.TuiProgressReporter.ok"),
             patch("src.python.report.progress.TuiProgressReporter.info"),
             patch("sys.stdout", io.StringIO()),
@@ -167,10 +167,10 @@ class TestCmdCleanupCache(unittest.TestCase):
 
     def test_cleanup_nothing(self):
         """无过期文件（verify delegation + TuiProgressReporter output）。"""
-        from src.python.handlers_cache import _cmd_cleanup_cache
+        from src.python.tui.handlers_cache import _cmd_cleanup_cache
         with (
             patch("src.python.cache.operations.cleanup_cache", return_value=0),
-            patch("src.python.handlers_cache.press_any_key"),
+            patch("src.python.tui.handlers_cache.press_any_key"),
         ):
             _cmd_cleanup_cache()
 
@@ -187,7 +187,7 @@ class TestRefreshIndustryCache(unittest.TestCase):
     def test_with_valid_codes(self, mock_fetch):
         """有效代码返回正确计数。"""
         mock_fetch.return_value = {"600900": {}, "600519": {}}
-        from src.python.models import Holding
+        from src.python.core.models import Holding
         holdings = [
             Holding("证券", "长江电力", "600900", 100, 15.0),
             Holding("证券", "贵州茅台", "600519", 10, 2000.0),
@@ -206,7 +206,7 @@ class TestRefreshIndustryCache(unittest.TestCase):
     def test_empty_result(self, mock_fetch):
         """API 返回空字典。"""
         mock_fetch.return_value = {}
-        from src.python.models import Holding
+        from src.python.core.models import Holding
         holdings = [Holding("证券", "测试", "000001", 100, 10.0)]
         count = self._call(holdings)
         self.assertEqual(count, 0)
@@ -220,11 +220,11 @@ class TestRefreshDividendCache(unittest.TestCase):
         from src.python.cache.operations import _refresh_dividend_cache
         return _refresh_dividend_cache(holdings)
 
-    @patch("src.python.providers.akshare_extras.get_dividend_data")
+    @patch("src.python.fetcher.akshare.get_dividend_data")
     def test_with_valid_codes(self, mock_get):
         """有效代码返回正确计数。"""
         mock_get.return_value = {"600900": {}, "600519": {}}
-        from src.python.models import Holding
+        from src.python.core.models import Holding
         holdings = [
             Holding("证券", "长江电力", "600900", 100, 15.0),
             Holding("证券", "贵州茅台", "600519", 10, 2000.0),
@@ -232,7 +232,7 @@ class TestRefreshDividendCache(unittest.TestCase):
         count = self._call(holdings)
         self.assertEqual(count, 2)
 
-    @patch("src.python.providers.akshare_extras.get_dividend_data")
+    @patch("src.python.fetcher.akshare.get_dividend_data")
     def test_empty_holdings(self, mock_get):
         """空持仓列表返回 0 且不调用 API。"""
         count = self._call([])

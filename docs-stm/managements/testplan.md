@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
-> 文档版本：v0.8.8-dev
+> 文档版本：0.9.3
 
 ---
 
@@ -28,18 +28,18 @@
 
 | 模块 | 覆盖目标 | 强制验证项 |
 |:-----|:--------|:-----------|
-| `models.py` | 100% 字段验证 | 有效值、边界值（0/负数/超长字符串）、类型错误 |
-| `config.py` | 100% 读写/异常 | 文件缺失、JSON 损坏、null 值覆盖、类型错误、权限拒绝、并发写入 |
-| `reader.py` | 标准格式 + 7 种异常 | 空文件、缺列、多工作表、全空行、数值类型转换失败、zip 损坏、临时文件（~$前缀自动跳过） |
+| `core/models.py` | 100% 字段验证 | 有效值、边界值（0/负数/超长字符串）、类型错误 |
+| `config/` 子包 | 100% 读写/异常 | 文件缺失、JSON 损坏、null 值覆盖、类型错误、权限拒绝、并发写入 |
+| `core/reader.py` | 标准格式 + 7 种异常 | 空文件、缺列、多工作表、全空行、数值类型转换失败、zip 损坏、临时文件（~$前缀自动跳过） |
 | `cache/` 子包 | 过期判断、读写、清理 | 原子写入、损坏恢复、TTL 边界（0s/1s/过期1s）、前缀匹配、并发 access、gzip 透明解压 |
 | `providers/*.py` | mock HTTP + 异常 | 200 正常 / 空数据 / 超时 / 429 / 503 / JSON 格式错误 / HTML 而非 JSON / 空响应 / 字段缺失 / 编码异常 |
 | `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、指纹确定性 |
-| `llm/` — 辩论模式 | 6 文件专项覆盖 | `test_debate_generators.py`（三段生成流程 pro→con→synthesis 控制）、`test_debate_prompts.py`（提示词模板/合成提示/集中度问答块）、`test_debate_token_budget.py`（Token 预算守卫 1×/2× 阈值）、`test_debate_edge.py`（C12 合规边缘场景 11 项）、`test_debate_conditional.py`（条件推理 M2 场景注入）、`test_debate_qa.py`（集中度问答 M3 阈值触发） |
+| `llm/` — 辩论模式 | 6 文件专项覆盖 | `test_debate_generators.py`（三段生成流程 pro→con→synthesis 控制）、`test_debate_prompts.py`（提示词模板/合成提示/集中度问答块）、`test_debate_token_budget.py`（Token 预算守卫 1×/2× 阈值）、`test_debate_edge.py`（C12 合规边缘场景 11 项）、`test_debate_conditional.py`（条件推理场景注入）、`test_debate_qa.py`（集中度问答阈值触发） |
 | `report/*.py` | 正常 + 空数据 + 边界 | 单条持仓、最大 100 条持仓、零成本/零市值、全亏损、全盈利、混合账户 |
-| `market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |
-| `provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断（默认 3 次→冷却 300s→自动恢复，批量 API 如 eastmoney_industry 为 6 次→120s）、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
-| `handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
-| `tui_menu.py` | 所有 15 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
+| `core/market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |
+| `core/provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断（默认 3 次→冷却 300s→自动恢复，批量 API 如 eastmoney_industry 为 6 次→120s）、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
+| `tui/handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
+| `tui/tui_menu.py` | 所有 16 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
 
 ### 1.2 数据边界 Edge Case 强制清单（通用规范）
 
@@ -68,68 +68,69 @@
 
 | 测试文件 | 覆盖场景 | 职责范围 |
 |:---------|:---------|:---------|
-| `scenario/basic/test_integration.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
-| `scenario/resilience/test_integration_scenarios.py` | S6-S9 | 异常容错场景：纯债/断网/单账户/零成本 |
+| `scenario/basic/test_scenario_basic_flows.py` | S1-S5 | 基础业务链路：股票/基金/多账户/缓存首次/缓存命中 |
+| `scenario/resilience/test_scenario_resilience_flows.py` | S6-S9 | 异常容错场景：纯债/断网/单账户/零成本 |
 | `scenario/resilience/test_scenario_extreme.py` | S0c+S10 | 极限场景：超多持仓/极端份额/高精度净值/零值组合 |
-| `scenario/llm/test_llm_scenarios.py` | S11-S20 | LLM 全场景组合：混合失败/Thinking/禁用/缓存/渲染 |
+| `scenario/llm/test_llm_mixed_cache.py` ~ `test_llm_partial_cache.py` | S11-S17 | LLM 混合缓存/全部失败/Thinking/禁用/缓存分组/断网降级 |
+| `scenario/llm/test_llm_empty_holdings.py` + `test_llm_output_consistency.py` + `test_llm_non_trading_day.py` + `test_llm_multi_account.py` | S18-S20 | LLM 全缓存/空持仓降级/输出格式一致性/非交易日/多账户交互 |
 | `scenario/basic/test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
 | `scenario/basic/test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
 | `scenario/basic/test_scenario_operational_behavior.py` | S29-S34 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 + 组合历史走势基准指数对比 |
-| `scenario/basic/test_scenario_penetration.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
-| `scenario/basic/test_scenario_section_order.py` | C-P1b | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
+| `scenario/basic/test_scenario_penetration_basic.py` / `_advanced.py` / `_mixed.py` / `_edge.py` | S-P1-S-P10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
+| `scenario/basic/test_scenario_section_order.py` | — | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 | `scenario/llm/test_llm_hallucination.py` | P4‑08 | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
 
 **业务场景规格（S0a-S0d、S1-S34、T1-T21）：**
 
-| 场景 | 前置场景 | 前置条件 | 操作 | 验证点 |
-|:-----|:---------|:---------|:-----|:-------|
-| **S0a: 清仓持仓** | — | 持仓含份额=0 的已清仓品种 | 菜单 E | 清仓品种不计入市值、盈亏、总计；分类表跳过空行 |
-| **S0b: 同名多份额** | — | 同一基金分多笔买入（A 类+C 类同一代码） | 菜单 B | 多份额合并计算、穿透不崩溃、分类各计各 |
-| **S0c: 超多持仓** | — | 200 条持仓（覆盖各品种类型） | 菜单 L | 所有账户小计正确、总计正确、无性能问题（标记 `scenario_extreme`，文件 `test_scenario_extreme.py`） |
-| **S0d: 特殊字符** | — | 名称含全角括号/空格/日文/emoji | 菜单 L | 分类正确、穿透正常、Excel/HTML 不崩溃 |
-| **S1: 纯股票组合** | — | 持仓仅含 3 只 A 股，无基金 | 菜单 B | 穿透 TOP10 等于直接持股；基金业绩显示"无基金"；总计正确 |
-| **S2: 纯基金组合** | — | 持仓仅含 5 只基金（ETF+主动+QDII） | 菜单 L | 穿透计算正确、分类表无"股票"行、LLM 正常生成 |
-| **S3: 混合多账户** | — | 3 个账户：证券（股票+ETF）、支付宝（场外基金）、微信（债基） | 菜单 L | 分账户小计正确、总计 = 小计和、分类表按账户分组 |
-| **S4: 新持仓无缓存** | — | 删除全部缓存后首次生成 | 菜单 L | 所有 API 正常获取、无缓存命中提示、生成时间 > 缓存命中场景 |
-| **S5: 缓存全命中** | **S4** | 连续两次执行菜单 L，间隔 < TTL | 菜单 L × 2 | 第二次所有 LLM 显示"缓存命中"页脚、总费用为 0 |
-| **S21: 港股通** | — | 持仓含港股通股票（00700.HK 腾讯控股） | 菜单 E | 港股通代码正确分类（hk_stock），无行情不崩溃 |
-| **S22: 可转债** | — | 持仓含可转债（如 127005 长证转债） | 菜单 E | 可转债正确分类（convertible_bond），名称含"转债"关键字识别 |
-| **S23: REITs** | — | 持仓含 REITs（如 508000 张江REIT） | 菜单 E | REITs 正确分类（reit），名称含"REIT"关键字，市值计算正常 |
-| **S24: 货币基金** | — | 持仓含场外货币基金/理财产品 | 菜单 E | 货币基金分类正确（money_market），净值恒为 1 |
-| **S25: 科创板+北交所** | — | 持仓含科创板（688xxx）和北交所（8xxxxx）股票 | 菜单 E | 代码前缀正确触发分类（star_market/bse），腾讯前缀补全 |
-| **S26: 商品/黄金ETF** | — | 持仓含黄金ETF/商品ETF | 菜单 E | 商品ETF 分类正确（commodity），溢价率计算正常 |
-| **S27: 跨境ETF** | — | 持仓含跨境 ETF（如 159941 纳指ETF） | 菜单 L | 分类为 QDII，净值日期 T-1，T-1 净值正确计算 |
-| **S28: 纯债** | — | 持仓含纯债/国债/企业债 | 菜单 E | 纯债分类正确（bond），名称含"债"关键字，市值计算正常 |
-| **S29: 分红送转除权** | — | 持仓含送转后份额翻倍/除权后收益率/纯送股零成本 | 菜单 E | 送转后份额翻倍、除权后收益率正确计算、纯送股profit_rate=None |
-| **S30: 定投成本摊薄** | — | 同一基金多批定投（批次按加权平均计算成本） | 菜单 E | 两批/三批不等额/定投亏损均加权平均正确；盈亏计算使用加权成本 |
-| **S31: 部分调仓卖出** | — | 持仓含卖出一半/90%/全部清仓 | 菜单 E | 卖出后剩余份额市值盈亏正确；全部清仓不崩溃 |
-| **S32: 跨账户转仓** | — | 同一代码出现在两个账户 | 菜单 E | 各账户独立计算明细、分类各自汇总、总计=账户和 |
-| **S33: 新股中签待上市** | — | 持仓含无行情新股尚未上市 | 菜单 E | 无行情降级 cost 正确显示、上市后正常计算、多只新股不干扰 |
-| **S34: 组合历史走势基准指数对比** | — | 持仓含 A 股+基金，config.json 含 `benchmark_indices: {"sh000300": "沪深300"}` | 菜单 L | 组合走势 + 基准指数走势归一化正确；HTML 走势图显示组合曲线+基准虚线+图例；Excel portfolio_history/drawdown_analysis 页签含基准列；benchmark_indices 为空时走势正常不崩溃 |
-| **S6: 纯债券基金组合** | — | 持仓仅含债券基金（国债ETF + 场外债基） | 菜单 E | 穿透 TOP10 无股权覆盖或极小；债券基金正确分类 |
-| **S7: 网络中断降级** | — | 持仓缓存存在但网络断开 | 菜单 B | 价格从缓存读取（过期缓存降级）；报告完整不含空白页签 |
-| **S8: 单账户单持仓** | — | 仅一个账户一只持仓 | 菜单 E | 分类表仅一行、穿透 TOP10 仅该持仓、总计 = 该持仓市值 |
-| **S9: 零成本持仓** | — | 持仓成本=0（赠送/未记录买入价） | 菜单 B | 盈亏 = 市值 - 0、收益率不除零崩溃、显示合理占位 |
-| **S10: 极端值** | — | 超大市值/极小份额/极多小数位 | 菜单 E | 正确定标至万元/亿元单位，不溢出、不崩溃（标记 `scenario_extreme`，文件 `test_scenario_extreme.py`）|
-| **S11: LLM 混合缓存+真实调用** | — | 4 模块（假设 news_correlation 关闭）：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 模块列表正确 |
-| **S12: LLM 全部失败（5 种原因）** | — | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
-| **S13: Extended Thinking 混合** | — | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用模块行，Excel/HTML/Summary 三种输出一致 |
-| **S14: LLM 不启用** | — | TUI 不按 L，直接生成报告 | 菜单 E / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 18、HTML 无第 18 节）；LLM 分析章节整体不出现 |
-| **S15: 禁用+缓存混合** | — | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），禁用优先于缓存或 per_module 数据 |
-| **S16: 断网下 LLM 降级** | — | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为 NETWORK_ERROR 占位文本，不阻塞报告生成 |
-| **S17: LLM 部分缓存超期** | — | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示缓存状态 |
-| **S18: 全缓存无 API 调用** | — | 连续两次菜单 L（间隔 < TTL，全部模块命中缓存） | 菜单 L → 菜单 L | 第二次 LLM API 用量汇总"无新增 API 调用，数据全部来自缓存"，call_count=0 |
-| **S19: 空持仓 LLM 降级** | — | 无持仓数据但按 L | 菜单 L（空目录） | LLM 调用跳过，输出空占位，报告不崩溃 |
-| **S20: 三种输出格式一致性** | — | 正常持仓 + 菜单 L | 菜单 L | Excel/HTML/Summary 三种输出对同一 module_info 的状态/颜色/费用一致 |
-| **D1: 辩论模式 M1 三段正常生成** | — | 含多品种持仓，Feature Flag `llm_debate_procon=true` | 菜单 L | pro（白脸）→ con（黑脸）→ synthesis（综合）三段完整生成；HTML 显示三色块+实验模式标签；Excel 显示"🧪 辩论模式"灰字注记；LLM 用量表正确归入"实验模式"行 |
-| **D2: 辩论降级回退普通模式** | — | M1 启用但 pro 或 con 返回 None | 菜单 L（模拟 LLM pro 失败） | 自动回退普通 expert_review；返回 8 元组（无 debate_info）；HTML 不显示辩论块，显示普通结果 |
-| **D3: Token 预算触发生成截断** | — | 配置极低 `max_total_tokens_per_report`，持仓数据量大使 pro+con 超 1× 预算 | 菜单 L（模拟长篇输出） | 超过 1× 预算跳过 synthesis，返回 pro+con 拼接；超过 2× 跳过全部 debate 回退普通模式；日志输出 budget 告警 |
+| 场景 | 前置场景 | 所属文件 | 前置条件 | 操作 | 验证点 |
+|:-----|:---------|:---------|:---------|:-----|:-------|
+| **S0a: 清仓持仓** | — | `test_scenario_holdings_quality.py` | 持仓含份额=0 的已清仓品种 | 菜单 E | 清仓品种不计入市值、盈亏、总计；分类表跳过空行 |
+| **S0b: 同名多份额** | — | `test_scenario_holdings_quality.py` | 同一基金分多笔买入（A 类+C 类同一代码） | 菜单 B | 多份额合并计算、穿透不崩溃、分类各计各 |
+| **S0c: 超多持仓** | — | `test_scenario_extreme.py` | 200 条持仓（覆盖各品种类型） | 菜单 L | 所有账户小计正确、总计正确、无性能问题（标记 `scenario_extreme`） |
+| **S0d: 特殊字符** | — | `test_scenario_holdings_quality.py` | 名称含全角括号/空格/日文/emoji | 菜单 L | 分类正确、穿透正常、Excel/HTML 不崩溃 |
+| **S1: 纯股票组合** | — | `test_scenario_basic_flows.py` | 持仓仅含 3 只 A 股，无基金 | 菜单 B | 穿透 TOP10 等于直接持股；基金业绩显示"无基金"；总计正确 |
+| **S2: 纯基金组合** | — | `test_scenario_basic_flows.py` | 持仓仅含 5 只基金（ETF+主动+QDII） | 菜单 L | 穿透计算正确、分类表无"股票"行、LLM 正常生成 |
+| **S3: 混合多账户** | — | `test_scenario_basic_flows.py` | 3 个账户：证券（股票+ETF）、支付宝（场外基金）、微信（债基） | 菜单 L | 分账户小计正确、总计 = 小计和、分类表按账户分组 |
+| **S4: 新持仓无缓存** | — | `test_scenario_basic_flows.py` | 删除全部缓存后首次生成 | 菜单 L | 所有 API 正常获取、无缓存命中提示、生成时间 > 缓存命中场景 |
+| **S5: 缓存全命中** | **S4** | `test_scenario_basic_flows.py` | 连续两次执行菜单 L，间隔 < TTL | 菜单 L × 2 | 第二次所有 LLM 显示"缓存命中"页脚、总费用为 0 |
+| **S6: 纯债券基金组合** | — | `test_scenario_resilience_flows.py` | 持仓仅含债券基金（国债ETF + 场外债基） | 菜单 E | 穿透 TOP10 无股权覆盖或极小；债券基金正确分类 |
+| **S7: 网络中断降级** | — | `test_scenario_resilience_flows.py` | 持仓缓存存在但网络断开 | 菜单 B | 价格从缓存读取（过期缓存降级）；报告完整不含空白页签 |
+| **S8: 单账户单持仓** | — | `test_scenario_resilience_flows.py` | 仅一个账户一只持仓 | 菜单 E | 分类表仅一行、穿透 TOP10 仅该持仓、总计 = 该持仓市值 |
+| **S9: 零成本持仓** | — | `test_scenario_resilience_flows.py` | 持仓成本=0（赠送/未记录买入价） | 菜单 B | 盈亏 = 市值 - 0、收益率不除零崩溃、显示合理占位 |
+| **S10: 极端值** | — | `test_scenario_extreme.py` | 超大市值/极小份额/极多小数位 | 菜单 E | 正确定标至万元/亿元单位，不溢出、不崩溃（标记 `scenario_extreme`）|
+| **S11: LLM 混合缓存+真实调用** | — | `test_llm_mixed_cache.py` | 4 模块（假设 news_correlation 关闭）：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 模块列表正确 |
+| **S12: LLM 全部失败（5 种原因）** | — | `test_llm_all_fail.py` | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
+| **S13: Extended Thinking 混合** | — | `test_llm_extended_thinking.py` | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用模块行，Excel/HTML/Summary 三种输出一致 |
+| **S14: LLM 不启用** | — | `test_llm_disabled.py` | TUI 不按 L，直接生成报告 | 菜单 E / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 18、HTML 无第 18 节）；LLM 分析章节整体不出现 |
+| **S15: 禁用+缓存混合** | — | `test_llm_disabled_cache.py` | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），禁用优先于缓存或 per_module 数据 |
+| **S16: 断网下 LLM 降级** | — | `test_llm_network_error.py` | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为 NETWORK_ERROR 占位文本，不阻塞报告生成 |
+| **S17: LLM 部分缓存超期** | — | `test_llm_partial_cache.py` | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示缓存状态 |
+| **S18: 全缓存无 API 调用** | — | `test_llm_empty_holdings.py` | 连续两次菜单 L（间隔 < TTL，全部模块命中缓存） | 菜单 L → 菜单 L | 第二次 LLM API 用量汇总"无新增 API 调用，数据全部来自缓存"，call_count=0 |
+| **S19: 空持仓 LLM 降级** | — | `test_llm_empty_holdings.py` | 无持仓数据但按 L | 菜单 L（空目录） | LLM 调用跳过，输出空占位，报告不崩溃 |
+| **S20: 三种输出格式一致性** | — | `test_llm_output_consistency.py` | 正常持仓 + 菜单 L | 菜单 L | Excel/HTML/Summary 三种输出对同一 module_info 的状态/颜色/费用一致 |
+| **S21: 港股通** | — | `test_scenario_special_securities.py` | 持仓含港股通股票（00700.HK 腾讯控股） | 菜单 E | 港股通代码正确分类（hk_stock），无行情不崩溃 |
+| **S22: 可转债** | — | `test_scenario_special_securities.py` | 持仓含可转债（如 127005 长证转债） | 菜单 E | 可转债正确分类（convertible_bond），名称含"转债"关键字识别 |
+| **S23: REITs** | — | `test_scenario_special_securities.py` | 持仓含 REITs（如 508000 张江REIT） | 菜单 E | REITs 正确分类（reit），名称含"REIT"关键字，市值计算正常 |
+| **S24: 货币基金** | — | `test_scenario_special_securities.py` | 持仓含场外货币基金/理财产品 | 菜单 E | 货币基金分类正确（money_market），净值恒为 1 |
+| **S25: 科创板+北交所** | — | `test_scenario_special_securities.py` | 持仓含科创板（688xxx）和北交所（8xxxxx）股票 | 菜单 E | 代码前缀正确触发分类（star_market/bse），腾讯前缀补全 |
+| **S26: 商品/黄金ETF** | — | `test_scenario_special_securities.py` | 持仓含黄金ETF/商品ETF | 菜单 E | 商品ETF 分类正确（commodity），溢价率计算正常 |
+| **S27: 跨境ETF** | — | `test_scenario_special_securities.py` | 持仓含跨境 ETF（如 159941 纳指ETF） | 菜单 L | 分类为 QDII，净值日期 T-1，T-1 净值正确计算 |
+| **S28: 纯债** | — | `test_scenario_special_securities.py` | 持仓含纯债/国债/企业债 | 菜单 E | 纯债分类正确（bond），名称含"债"关键字，市值计算正常 |
+| **S29: 分红送转除权** | — | `test_scenario_operational_behavior.py` | 持仓含送转后份额翻倍/除权后收益率/纯送股零成本 | 菜单 E | 送转后份额翻倍、除权后收益率正确计算、纯送股profit_rate=None |
+| **S30: 定投成本摊薄** | — | `test_scenario_operational_behavior.py` | 同一基金多批定投（批次按加权平均计算成本） | 菜单 E | 两批/三批不等额/定投亏损均加权平均正确；盈亏计算使用加权成本 |
+| **S31: 部分调仓卖出** | — | `test_scenario_operational_behavior.py` | 持仓含卖出一半/90%/全部清仓 | 菜单 E | 卖出后剩余份额市值盈亏正确；全部清仓不崩溃 |
+| **S32: 跨账户转仓** | — | `test_scenario_operational_behavior.py` | 同一代码出现在两个账户 | 菜单 E | 各账户独立计算明细、分类各自汇总、总计=账户和 |
+| **S33: 新股中签待上市** | — | `test_scenario_operational_behavior.py` | 持仓含无行情新股尚未上市 | 菜单 E | 无行情降级 cost 正确显示、上市后正常计算、多只新股不干扰 |
+| **S34: 组合历史走势基准指数对比** | — | `test_scenario_operational_behavior.py` + 单元测试 | 持仓含 A 股+基金，config.json 含 `benchmark_indices: {"sh000300": "沪深300"}` | 菜单 L | 组合走势 + 基准指数走势归一化正确；HTML 走势图显示组合曲线+基准虚线+图例；Excel portfolio_history/drawdown_analysis 页签含基准列；benchmark_indices 为空时走势正常不崩溃 |
+| **D1: 辩论模式-正反辩论三段正常生成** | — | `test_debate_pipeline.py` | 含多品种持仓，Feature Flag `llm_debate_procon=true` | 菜单 L | pro（白脸）→ con（黑脸）→ synthesis（综合）三段完整生成；HTML 显示三色块+实验模式标签；Excel 显示"🧪 辩论模式"灰字注记；LLM 用量表正确归入"实验模式"行 |
+| **D2: 辩论降级回退普通模式** | — | `test_debate_pipeline.py` | 正反辩论启用但 pro 或 con 返回 None | 菜单 L（模拟 LLM pro 失败） | 自动回退普通 expert_review；返回 8 元组（无 debate_info）；HTML 不显示辩论块，显示普通结果 |
+| **D3: Token 预算触发生成截断** | — | `test_debate_token_budget.py` | 配置极低 `max_total_tokens_per_report`，持仓数据量大使 pro+con 超 1× 预算 | 菜单 L（模拟长篇输出） | 超过 1× 预算跳过 synthesis，返回 pro+con 拼接；超过 2× 跳过全部 debate 回退普通模式；日志输出 budget 告警 |
 
-> 添加新场景时，按复杂度选择文件。LLM 相关的场景统一放在 `test_llm_scenarios.py`。
+> LLM 相关的场景按 S11-S17 分组拆分为 7 个子文件（`scenario/llm/test_llm_mixed_cache.py` ~ `test_llm_partial_cache.py`），S18-S20 归入 `test_llm_empty_holdings.py` / `test_llm_output_consistency.py` / `test_llm_non_trading_day.py` / `test_llm_multi_account.py`。
 > S0a/S0b/S0d（持仓质量，不含 S0c）统一放在 `test_scenario_holdings_quality.py`；S0c（超多持仓）和 S10（极端值）放在 `test_scenario_extreme.py`。
 > S21-S28（特殊品种）统一放在 `test_scenario_special_securities.py`。
-> S29-S33（操作行为）统一放在 `test_scenario_operational_behavior.py`。
+> S29-S34（操作行为）统一放在 `test_scenario_operational_behavior.py`。
 > S34（基准指数对比）覆盖在以下单元测试中（scenario 测试环境搭建成本较高，单元级验证已充分）：
 > - `unit/report/test_benchmark.py` — normalize_benchmarks 算法 11 项 + 边缘 7 项
 > - `unit/report/test_portfolio_history.py` — benchmark 集成调用 3 项（提供/空/异常）
@@ -137,13 +138,13 @@
 > - `unit/fetcher/test_chain.py` — history_index 路由 5 项
 > T 类场景统一放在 `test_datetime_scenarios.py` 并标注 `scenario_datetime`。
 > 新增场景需要同时标注场景子标记（如 `scenario_basic`、`scenario_llm`）和通用 `scenario` 父标记，确保 `-m "scenario"` 能自动涵盖。
-> D1-D3（辩论模式）统一放在 `test_llm_scenarios.py`，归属 LLM 大场景组。
+> D1-D3（辩论模式）统一放在 `test_debate_pipeline.py`（D1-D2）和 `test_debate_token_budget.py`（D3），归属集成测试组。
 
 ### 1.4 单元测试标记分组（Unit Test Markers）
 
 单元测试按被测模块分组，通过 **父子双层 marker** 实现灵活筛选：
 
-- **父标记 `unit`** 匹配全部 9 个子组，用于全量单元测试运行（`-m "unit"`）
+- **父标记 `unit`** 匹配全部 11 个子组，用于全量单元测试运行（`-m "unit"`）
 - **子标记**如 `unit_providers`、`unit_fetcher`、`unit_llm` 等支持单独运行指定模块的测试（`-m "unit_providers"`）
 - 新增单元测试文件时，必须为其测试类标注子标记和父标记，缺一不可
 
@@ -160,13 +161,13 @@
 
 | 集成维度 | 已验证 | 测试位置 |
 |:---------|:------:|:---------|
-| **数据流完整链路**：持仓 xlsx → 数据获取 → 缓存 → Excel/HTML 输出 | ✅ | `test_integration.py` S1-S5 |
+| **数据流完整链路**：持仓 xlsx → 数据获取 → 缓存 → Excel/HTML 输出 | ✅ | `test_scenario_basic_flows.py` S1-S5 |
 | **Provider 回退链路端到端**：腾讯不可用 → 东方财富 → 过期缓存 | ✅ | `test_chain.py` |
-| **缓存与 API 协同**：缓存命中不调 API，缓存缺失调 API 并写入 | ✅ | `test_cache.py` |
+| **缓存与 API 协同**：缓存命中不调 API，缓存缺失调 API 并写入 | ✅ | `test_cache_core.py` / `test_cache_format.py` |
 | **原子写入恢复**：磁盘满/断电后缓存和配置文件完整性 | ✅ | `test_config_atomic.py` |
 | **模块间接口契约**：reader 输出 → market_value 输入 → penetration 输入 → ... 类型链正确 | ✅ | `test_integration_coverage.py` (integration_contract) |
 | **错误隔离**：penetration/LLM/news_correlation 任一模块失败，不阻塞其他模块写入 | ✅ | `test_excel_generator.py` `test_sheet_exception_others_still_called` |
-| **LLM 输出→报告渲染**：Markdown → HTML/Jinja2 → 条件段落的渲染链路 | ✅ | `test_llm_scenarios.py` S14/S20（无 LLM 不渲染） |
+| **LLM 输出→报告渲染**：Markdown → HTML/Jinja2 → 条件段落的渲染链路 | ✅ | `test_llm_output_consistency.py` / `test_llm_disabled.py` 等 |
 | **新闻流水线集成**：fetch_all → aggregate → deduplicate → correlate_with_holdings → write_to_report | ✅ | `test_news_pipeline_edge.py` |
 | **多模块缓存一致性**：price 刷新后，market_value / fund_performance 使用同一缓存源 | ✅ | `test_integration_coverage.py` (integration_cache) |
 | **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ✅ | `test_integration_coverage.py` (integration_tui) |
@@ -200,7 +201,7 @@
 | Provider 回退链路 | 主 provider 失败 → fallback provider | ✅ `test_chain_edge.py`（超时/429/503/全失败） |
 | 熔断器冷却恢复 | 熔断后 60s 半开探测 | ✅ `test_circuit_breaker_edge.py`（60s 边界/59s 仍开/多端点） |
 | 缓存 > 100KB gzip 压缩 | 自动 `.json.gz` 存储 + 透明解压 | ✅ `test_cache_edge.py`（gzip 边界 100KB/损坏删除） |
-| LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | ✅ `test_api_edge.py`（恢复重试/仍空不回退） |
+| LLM content_filter 空返回安抚重试 | 追加安抚指令重试一次 | ✅ `test_llm_api_edge.py`（恢复重试/仍空不回退） |
 | **辩论虚构代码过滤** | 行级检测 LLM 输出的含字母虚构代码，移出该整行 | ✅ `test_debate_edge.py` `test_filter_removes_hallucinated` |
 | **辩论 Provider 全不可用** | pro 失败返回 (None, None, None)，回退普通模式 | ✅ `test_debate_edge.py` `test_pro_failure_returns_none` |
 | **辩论 synthesis 超时** | pro+con 成功但 synthesis 失败 → 返回 pro+con 拼接 | ✅ `test_debate_edge.py` `test_synthesis_timeout_returns_pro_con` |
@@ -305,7 +306,7 @@
 
 | 验证项 | 标准 | 现有测试 |
 |:-------|:-----|:--------:|
-| **TUI 菜单** | 15 选项完整、中文字符正常、按键响应正确 | ✅ |
+| **TUI 菜单** | 16 选项完整、中文字符正常、按键响应正确 | ✅ |
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
 | **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
@@ -378,7 +379,7 @@ def test_fetch_price_normal(self, mock_client_cls):
     self.assertIsNotNone(result)
 ```
 
-> 注意：provider 通过 `http_client.py` 创建 client（`with get_httpx_client() as client:`），
+> 注意：provider 通过 `core/http_client.py` 创建 client（`with get_httpx_client() as client:`），
 > 应 mock `httpx.Client` 类的构造，而非直接 mock 模块函数。
 
 ### 5.3 Mock LLM API
@@ -485,7 +486,7 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ `python scripts/check-history-traces.py --ci`（注释历史痕迹检查）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + 手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
 11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + 断网降级/旧缓存兼容/跨池污染确认
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。

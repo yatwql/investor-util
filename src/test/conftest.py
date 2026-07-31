@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import os
 import warnings
 
 import pytest
@@ -138,24 +139,37 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.report.data_status._default_persist_path",
         lambda: str(tmp_path / "data/state/.degradation_state.json"),
     )
-    # rebalance 静默期文件隔离
+    # rebalance 静默期文件隔离（_silence.py 是实际定义方，rebalance.py 仅 re-export）
+    monkeypatch.setattr(
+        "src.python.analysis._silence._SILENCE_FILE",
+        str(tmp_path / "data/state/rebalance_silence.json"),
+    )
     monkeypatch.setattr(
         "src.python.analysis.rebalance._SILENCE_FILE",
         str(tmp_path / "data/state/rebalance_silence.json"),
     )
     # perf_history.jsonl 性能历史文件隔离
     monkeypatch.setattr(
-        "src.python.perf._PERF_HISTORY_FILE",
+        "src.python.core.perf._PERF_HISTORY_FILE",
         str(tmp_path / "data/state/perf_history.jsonl"),
     )
     # datasource_health.jsonl 数据源健康检查历史文件隔离
     monkeypatch.setattr(
-        "src.python.perf._HEALTH_CHECK_FILE",
+        "src.python.core.perf._HEALTH_CHECK_FILE",
         str(tmp_path / "data/state/datasource_health.jsonl"),
+    )
+    # LLM 配置文件隔离
+    monkeypatch.setattr(
+        "src.python.config._llm_providers._LLM_KEY_FILE_DEFAULT",
+        str(tmp_path / "data/config/llm_key.json"),
+    )
+    monkeypatch.setattr(
+        "src.python.config._llm_providers._LLM_PROVIDERS_FILE_DEFAULT",
+        str(tmp_path / "data/config/llm_providers.json"),
     )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(
-        "src.python.constants.HISTORY_SNAPSHOT_DIR",
+        "src.python.core.constants.HISTORY_SNAPSHOT_DIR",
         str(tmp_path / "data/history/snapshots"),
     )
     monkeypatch.setattr(
@@ -163,8 +177,18 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         str(tmp_path / "data/history/snapshots"),
     )
     # 清空配置缓存，使下次 get_config() 使用新路径
+    import src.python.config._config_defaults as _cfg_defaults
     import src.python.config._core as _cfg_core
+
+    monkeypatch.setitem(
+        _cfg_defaults._DEFAULT_CONFIG,
+        "llm_settings_file",
+        str(tmp_path / "data/config/llm_settings.json"),
+    )
     _cfg_core._clear_config_cache()
+    # 注：llm_settings.json 不在此处 seed 隔离路径。需要读写真实配置的测试
+    # （如 test_all_keys_tracked 检查代码 vs 配置文件的键名一致性），
+    # 应直接从 PROJECT_ROOT 读取真实文件，而非依赖隔离路径的副本。
 
 
 @pytest.fixture(autouse=True)
@@ -174,7 +198,7 @@ def _auto_reset_provider_registry():
     每个测试执行前清空注册信息、熔断状态和会话缓存。
     依赖 provider_registry.get_registry().reset() 而非重新创建实例。
     """
-    from src.python.provider_registry import get_registry
+    from src.python.core.provider_registry import get_registry
     get_registry().reset()
 
 
@@ -186,7 +210,7 @@ def _auto_reset_feature_flags():
     需要特定 feature 状态的测试应自行 mock is_feature_enabled()
     或在测试体内调用 set_feature_enabled()，reset fixture 保证不污染下游。
     """
-    from src.python.features import reset_feature_flags
+    from src.python.config.features import reset_feature_flags
     reset_feature_flags()
 
 
@@ -235,7 +259,7 @@ def _mock_market_hours_api(monkeypatch):
     mock 返回的行情数据，而非真实市场状态。
     """
     monkeypatch.setattr(
-        "src.python.market_hours._is_market_open_official",
+        "src.python.core.market_hours._is_market_open_official",
         lambda _: None,
     )
 

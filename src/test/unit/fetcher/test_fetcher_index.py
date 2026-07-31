@@ -311,11 +311,11 @@ class TestFetchIndexHistory(unittest.TestCase):
     _SAMPLE_KLINE_2 = {"date": "2026-07-02", "close": 4020.0, "open": 4000.0,
                         "high": 4030.0, "low": 3990.0, "volume": 1200000}
 
-    @patch("src.python.provider_registry.get_registry")
+    @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
     def test_normal_return(self, mock_fetch, mock_get_reg):
         """正常返回 → 调用 chain 并写入会话缓存。"""
-        from src.python.provider_registry import NOT_FOUND
+        from src.python.core.provider_registry import NOT_FOUND
         mock_reg = MagicMock()
         mock_reg.session_cache_get.return_value = NOT_FOUND
         mock_get_reg.return_value = mock_reg
@@ -331,7 +331,7 @@ class TestFetchIndexHistory(unittest.TestCase):
         mock_reg.session_cache_set.assert_called_once_with(
             "history_index", "sh000300", expected, source="api")
 
-    @patch("src.python.provider_registry.get_registry")
+    @patch("src.python.core.provider_registry.get_registry")
     def test_empty_code_returns_none(self, mock_get_reg):
         """空代码 → 返回 None，不调用注册表。"""
         from src.python.fetcher.index import fetch_index_history
@@ -340,7 +340,7 @@ class TestFetchIndexHistory(unittest.TestCase):
         # 空代码在导入前就返回了，注册表不应被调用
         mock_get_reg.assert_not_called()
 
-    @patch("src.python.provider_registry.get_registry")
+    @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
     def test_session_cache_hit_skips_chain(self, mock_fetch, mock_get_reg):
         """会话缓存命中 → 不调 chain（C4 约束）。"""
@@ -356,11 +356,11 @@ class TestFetchIndexHistory(unittest.TestCase):
         mock_fetch.assert_not_called()
         mock_reg.session_cache_set.assert_not_called()
 
-    @patch("src.python.provider_registry.get_registry")
+    @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
     def test_chain_failure_returns_empty(self, mock_fetch, mock_get_reg):
         """全链路失败 → 返回空列表。"""
-        from src.python.provider_registry import NOT_FOUND
+        from src.python.core.provider_registry import NOT_FOUND
         mock_reg = MagicMock()
         mock_reg.session_cache_get.return_value = NOT_FOUND
         mock_get_reg.return_value = mock_reg
@@ -374,11 +374,11 @@ class TestFetchIndexHistory(unittest.TestCase):
         mock_reg.session_cache_set.assert_called_once_with(
             "history_index", "sh000300", [], source="api")
 
-    @patch("src.python.provider_registry.get_registry")
+    @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
     def test_chain_exception_returns_empty(self, mock_fetch, mock_get_reg):
         """chain 抛出异常 → 返回空列表。"""
-        from src.python.provider_registry import NOT_FOUND
+        from src.python.core.provider_registry import NOT_FOUND
         mock_reg = MagicMock()
         mock_reg.session_cache_get.return_value = NOT_FOUND
         mock_get_reg.return_value = mock_reg
@@ -392,11 +392,11 @@ class TestFetchIndexHistory(unittest.TestCase):
         mock_reg.session_cache_set.assert_called_once_with(
             "history_index", "sh000300", [], source="api")
 
-    @patch("src.python.provider_registry.get_registry")
+    @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
     def test_days_clamped_min(self, mock_fetch, mock_get_reg):
         """days < 5 → 钳制到 5。"""
-        from src.python.provider_registry import NOT_FOUND
+        from src.python.core.provider_registry import NOT_FOUND
         mock_reg = MagicMock()
         mock_reg.session_cache_get.return_value = NOT_FOUND
         mock_get_reg.return_value = mock_reg
@@ -407,11 +407,11 @@ class TestFetchIndexHistory(unittest.TestCase):
 
         mock_fetch.assert_called_once_with("history_index", "sh000300", 5)
 
-    @patch("src.python.provider_registry.get_registry")
+    @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
     def test_days_clamped_max(self, mock_fetch, mock_get_reg):
         """days > 3650 → 钳制到 3650。"""
-        from src.python.provider_registry import NOT_FOUND
+        from src.python.core.provider_registry import NOT_FOUND
         mock_reg = MagicMock()
         mock_reg.session_cache_get.return_value = NOT_FOUND
         mock_get_reg.return_value = mock_reg
@@ -422,11 +422,11 @@ class TestFetchIndexHistory(unittest.TestCase):
 
         mock_fetch.assert_called_once_with("history_index", "sh000300", 3650)
 
-    @patch("src.python.provider_registry.get_registry")
+    @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
     def test_us_index_code(self, mock_fetch, mock_get_reg):
         """美股指数代码（gb_ 前缀）同样走 chain。"""
-        from src.python.provider_registry import NOT_FOUND
+        from src.python.core.provider_registry import NOT_FOUND
         mock_reg = MagicMock()
         mock_reg.session_cache_get.return_value = NOT_FOUND
         mock_get_reg.return_value = mock_reg

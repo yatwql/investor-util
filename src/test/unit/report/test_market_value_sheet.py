@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 from openpyxl import Workbook
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report import market_value_sheet as mvs
 import pytest
 

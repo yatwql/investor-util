@@ -9,7 +9,7 @@ import logging
 import os
 import stat
 
-from src.python.constants import PROJECT_ROOT
+from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
 

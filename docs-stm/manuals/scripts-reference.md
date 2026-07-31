@@ -10,6 +10,7 @@
 |:-----|:-----|:-------|
 | `test_runner.py` | 测试 | pytest 标记模式封装驱动，支持 15+ 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
+| `check-history-traces.py` | 测试 | 注释/文档字符串中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -109,6 +110,32 @@ python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
 
 ---
 
+### `check-history-traces.py` — 历史痕迹检查
+
+扫描 `src/python/` 和 `src/test/` 下所有 `.py` 文件的注释和文档字符串，检查是否含有代码历史迭代信息（来源拆分、版本号、任务编号等）。代码注释只应描述"当前是什么"，不应记录"从哪里来"。
+
+```bash
+# 检查全部
+python scripts/check-history-traces.py
+
+# 详细输出（含排除行信息）
+python scripts/check-history-traces.py -v
+
+# CI 模式（仅输出 文件名:行号，非零退出码）
+python scripts/check-history-traces.py --ci
+```
+
+**退出码含义**：
+
+| 退出码 | 含义 | 行动 |
+|:------:|:-----|:-----|
+| 0 | 全部通过 | 无需处理 |
+| 1 | HIGH/ORIGIN/VERSION 痕迹 | 必须修复后再提交 |
+| 2 | CODE（任务编号引用如 R-xxx） | 应从注释中移除 |
+| 3 | 仅 TODO/CHANGE/DEPR 级别 | 建议人工复核 |
+
+---
+
 ### `check-test-markers.py` — 标记合规性检查
 
 AST 静态扫描所有 `test_*.py` 文件，检查：
@@ -188,7 +215,7 @@ python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.json
 
 ### `check-version-consistency.py` — 版本号一致性检查
 
-发布版本前必须运行。检查 `APP_VERSION`（`src/python/constants.py`）与以下文件的版本号是否一致：
+发布版本前必须运行。检查 `APP_VERSION`（`src/python/core/constants.py`）与以下文件的版本号是否一致：
 
 - `README.md`
 - `pyproject.toml`
@@ -302,7 +329,7 @@ python scripts/diagnose_gemini_proxy.py
 
 ## CLI 模式
 
-### `--check-sources` — 数据源健康检查
+### `check-sources` — 数据源健康检查
 
 跳过 TUI 交互界面，直接测试各数据源联通性并报告延迟。
 
@@ -319,7 +346,7 @@ python -m src.python.cli check-sources
   ✅  腾讯财经      行情           45ms  正常
   ✅  新浪财经      行情           82ms  正常
   ⚠️  天天基金      持仓/排名     2.3s  响应慢
-  ❌  akshare       资金           timeout  连接超时
+  ❌  财联社        新闻           timeout  连接超时
 ```
 
 **检查覆盖范围**：腾讯财经行情、新浪财经行情、东方财富净值、天天基金持仓/排名、东方财富行业分类、新浪财经新闻、东方财富新闻、华尔街见闻、财联社、腾讯 K 线——共 **10 个端点**。

@@ -1,4 +1,4 @@
-"""穿透市值占比归一化验证测试 — R-092。
+"""穿透市值占比归一化验证测试 。
 
 测试目标：
   - 各资产 ratio_pct 之和 ≈ 100%（允许舍入误差 ±0.01%）
@@ -18,7 +18,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 

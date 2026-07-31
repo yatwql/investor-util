@@ -85,7 +85,7 @@
     "sh000012": "中证全债"
   },
   "history": {
-    "analysis": "off",
+    "analysis": "auto",
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
@@ -104,6 +104,20 @@
   "redemption_limits": {},
   "anonymization": {
     "mode": "off"
+  },
+
+  // ── K. 批量并行调度 ──
+  "batch": {
+    "max_total_workers": 15,  // 全局 batch 线程硬上限（已有池不计入）
+    "fund_workers": 3,  // 基金排名/持仓批量并发数
+    "industry_workers": 8  // 行业分类批量并发数
+  },
+  "batch_rate_limit": {
+    "tencent": 0.0,  // 腾讯行情（不限速）
+    "sina": 0.0,  // 新浪行情（不限速）
+    "eastmoney": 0.1,  // 东方财富行情（100ms）
+    "tiantian": 0.5,  // 天天基金（500ms）
+    "eastmoney_industry": 0.05  // 东方财富行业（50ms）
   },
   "_privacy_notice_shown": true
 }

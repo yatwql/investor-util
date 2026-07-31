@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：v0.8.8-dev
+> 文档版本：0.9.3
 
 ## 目录
 
@@ -86,7 +86,7 @@
   │  │腾讯→新浪  │ │ 指数直调  │ │天天解析  │ │ push2    │ │ ...    │ │
   │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └───┬────┘ │
   │       │            │            │            │            │       │
-  │  Provider Chain 路由 + fallback + 熔断器 (provider_registry.py)  │
+  │  Provider Chain 路由+fallback+熔断器 (core/provider_registry.py) │
   └──────────────────────────────────┬────────────────────────────────┘
                                      │
                                      ▼
@@ -119,8 +119,8 @@
 
 | 入口 | 通道 | 入口文件 | 用户交互层 | 业务逻辑层 | 进度报告 |
 |:-----|:-----|:---------|:----------|:----------|:---------|
-| TUI | 交互菜单 | `tui.py` | `tui_menu.py` + `handlers_*.py` | `report/orchestrator.py` + `cache/operations.py` | `TuiProgressReporter` |
-| CLI | 命令行参数 | `cli.py` | argparse（不经过 handlers_*） | `report/orchestrator.py` + `cache/operations.py` | `CliProgressReporter` |
+| TUI | 交互菜单 | `tui/tui.py` | `tui/tui_menu.py` + `tui/handlers_*.py` | `report/orchestrator.py` + `cache/operations.py` | `TuiProgressReporter` |
+| CLI | 命令行参数 | `cli/cli.py` | argparse（不经过 tui/handlers_*） | `report/orchestrator.py` + `cache/operations.py` | `CliProgressReporter` |
 
 **共享模块**（TUI/CLI 均直接使用）：
 
@@ -129,12 +129,12 @@
 | 报告编排器 | `report/orchestrator.py` | 三路径报告生成（basic/both/full） |
 | 缓存操作 | `cache/operations.py` | 缓存刷新/清理/统计 |
 | 进度接口 | `report/progress.py` | `ProgressReporter` 基类 |
-| 持仓读取 | `reader.py` | xlsx 解析 |
+| 持仓读取 | `core/reader.py` | xlsx 解析 |
 | 配置管理 | `config/` | 三文件分层配置 |
 
-**分层差异**：TUI 的 `handlers_report.py` / `handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*。保证两次实现共用同一套业务逻辑。
+**分层差异**：TUI 的 `tui/handlers_report.py` / `tui/handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*。保证两次实现共用同一套业务逻辑。
 
-**贯穿层**：`config/` · `registry.py` · `provider_registry.py` · `code_utils.py` · `market_hours.py` · `perf.py`
+**贯穿层**：`config/` · `core/registry.py` · `core/provider_registry.py` · `core/code_utils.py` · `core/market_hours.py` · `core/perf.py`
 
 **关键分层原则**：
 - 每一层只能依赖其下层和贯穿层，禁止反向依赖
@@ -151,7 +151,7 @@
 持仓 xlsx
     │
     ▼
-reader.py ──→ models.Holding / DetailRow（持仓数据模型）
+core/reader.py ──→ core/models.Holding / DetailRow（持仓数据模型）
     │
     ├─────────── 获取层（并行）──────────────┐
     │                                        │
@@ -195,15 +195,15 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 | 层次 | 模块 | 职责 | 文件 |
 |:-----|:-----|:------|:-----|
-| **用户交互** | TUI 主循环 | 菜单编排、用户交互流 | `tui.py` / `tui_menu.py` |
-| **用户交互** | CLI 命令行 | argparse 解析、共享层直调、定时任务驱动 | `cli.py` |
-| **用户交互** | Handler 命令 | TUI 命令 → 委托编排层或共享层 | `handlers_*.py` |
+| **用户交互** | TUI 主循环 | 菜单编排、用户交互流 | `tui/tui.py` / `tui/tui_menu.py` |
+| **用户交互** | CLI 命令行 | argparse 解析、共享层直调、定时任务驱动 | `cli/cli.py` |
+| **用户交互** | Handler 命令 | TUI 命令 → 委托编排层或共享层 | `tui/handlers_*.py` |
 | **用户交互** | 进度报告 | ProgressReporter 解耦进度输出 | `report/progress.py` |
 | **用户交互** | CLI 进度报告 | CliProgressReporter（logging 输出 / verbose stderr） | `report/cli_progress.py` |
-| **输入** | 持仓读取 | xlsx 解析、列校验、多账户 | `reader.py` |
+| **输入** | 持仓读取 | xlsx 解析、列校验、多账户 | `core/reader.py` |
 | **配置** | 配置管理层 | 三文件分层配置 | `config/` |
-| **注册** | 中央注册表 | 数据模块 + 报告模块注册 | `registry.py` |
-| **数据获取** | 数据源注册中心 | 熔断器、会话缓存、策略、审计 | `provider_registry.py` |
+| **注册** | 中央注册表 | 数据模块 + 报告模块注册 | `core/registry.py` |
+| **数据获取** | 数据源注册中心 | 熔断器、会话缓存、策略、审计 | `core/provider_registry.py` |
 | **数据获取** | Fetcher 调度 | Provider Chain 路由、数据获取 | `fetcher/price.py` 等 |
 | **数据获取** | 数据源 Provider | 外部 API 封装 | `providers/*.py` |
 | **缓存** | 缓存引擎 | 泛用 JSON KV、TTL、指纹、分组 | `cache/` |
@@ -213,10 +213,10 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **报告** | HTML 管线 | Jinja2 模板渲染 | `report/html_writer.py` |
 | **报告** | 内容模块 | 各页签写入器 | `report/*.py` |
 | **LLM** | 智能分析 | Claude/OpenAI/Gemini 调用、Provider Chain 策略路由、Multi-Provider 多链切换、fingerprint 指纹缓存、Extended Thinking、骨架流程、并行编排、费用估算 | `llm/` |
-| **贯穿** | 代码类型判定 | 资产识别原语 | `code_utils.py` |
-| **贯穿** | 交易时段判断 | A 股时段、午间休市 | `market_hours.py` |
-| **贯穿** | HTTP 客户端 | 统一工厂 | `http_client.py` |
-| **贯穿** | 性能收集 | PerfCollector 三路径计时 + perf_history.jsonl 持久化 | `perf.py` |
+| **贯穿** | 代码类型判定 | 资产识别原语 | `core/code_utils.py` |
+| **贯穿** | 交易时段判断 | A 股时段、午间休市 | `core/market_hours.py` |
+| **贯穿** | HTTP 客户端 | 统一工厂 | `core/http_client.py` |
+| **贯穿** | 性能收集 | PerfCollector 三路径计时 + perf_history.jsonl 持久化 | `core/perf.py` |
 
 ### 1.4 概要设计 — 核心架构决策
 
@@ -224,7 +224,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.1 代码类型判定中心化
 
-**决策**：所有资产代码类型判定集中到 `src/python/code_utils.py`，禁止任何模块自行实现判定逻辑。
+**决策**：所有资产代码类型判定集中到 `src/python/core/code_utils.py`，禁止任何模块自行实现判定逻辑。
 
 **动机**：系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落、新增资产类型时需全局搜索替换。
 
@@ -421,7 +421,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 ### 2.2 三层熔断架构
 
-由 `DataSourceRegistry` 单例（`src/python/provider_registry.py`）统一管理，采用**双锁设计**（`_provider_lock` + `_cache_lock`）使熔断操作和会话缓存互不阻塞。
+由 `DataSourceRegistry` 单例（`src/python/core/provider_registry.py`）统一管理，采用**双锁设计**（`_provider_lock` + `_cache_lock`）使熔断操作和会话缓存互不阻塞。
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -472,7 +472,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 | 维度 | 单股票 API | 批量 API（eastmoney_industry） | LLM 熔断器 |
 |:-----|:----------|:-----------------------------|:----------|
-| 实现位置 | `provider_registry.py` | `provider_registry.py` | `llm/circuit_breaker.py` |
+| 实现位置 | `core/provider_registry.py` | `core/provider_registry.py` | `llm/circuit_breaker.py` |
 | 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 N 次 |
 | 冷却时长 | 指数退避 60s→300s→900s→3600s | 120s | 60s |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
@@ -483,7 +483,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 **跨会话持久化**：熔断器状态持久化到 `data/state/circuit_breaker.json`，与 `data/cache/` 隔离，避免缓存清理误删。会话重启后恢复熔断记忆。
 
-**双熔断器统一网关**：`provider_registry.py` 和 `circuit_breaker.py` 通过统一的熔断网关管理。Provider 级熔断（HTTP 传输层）管"某个数据源能不能调用"；数据模块级熔断（业务层）管"某类数据是否跳过"。两熔断器状态同步。
+**双熔断器统一网关**：`core/provider_registry.py` 和 `core/circuit_breaker.py` 通过统一的熔断网关管理。Provider 级熔断（HTTP 传输层）管"某个数据源能不能调用"；数据模块级熔断（业务层）管"某类数据是否跳过"。两熔断器状态同步。
 
 #### Chain 自动注册
 
@@ -543,7 +543,7 @@ get_effective_strategy(code_type, chain)
 
 #### 数据获取全局超时 `phase_timeout()`
 
-`provider_registry.py` 提供 `phase_timeout` 上下文管理器，用于数据获取阶段超时保护：
+`core/provider_registry.py` 提供 `phase_timeout` 上下文管理器，用于数据获取阶段超时保护：
 
 ```
 with phase_timeout(seconds=120, phase_name="data_fetch") as ctx:
@@ -592,7 +592,7 @@ fetcher/
 
 **问题**：OTC 基金代码与 A 股代码前缀重叠（均以 `00` 开头），`is_a_share_code()` 无法区分。`price.py` 和 `portfolio_history.py` 需要"先股票链路，失败后基金链路"的双阶段降级。
 
-**判定支持函数**（`code_utils.py`）：
+**判定支持函数**（`core/code_utils.py`）：
 
 | 函数 | 策略 | 用途 |
 |:-----|:------|:------|
@@ -845,10 +845,10 @@ _write_atomic(fd, tmp_path, final_path)
 - `_cache_path(key)` 对 key 做 `replace("..", "_")` 防目录穿越
 - 缓存目录不存在时 `os.makedirs(dir, exist_ok=True)` 自动创建
 
-**项目根路径查找**（`constants.py:_find_project_root()`）：
+**项目根路径查找**（`core/constants.py:_find_project_root()`）：
 
 ```
-从 src/python/constants.py 所在目录
+从 src/python/core/constants.py 所在目录
     → 向上逐层搜索 pyproject.toml 或 .git
     → 找到即停，完全不依赖目录树深度
     → 安全上限 20 层，未找到时按当前文件所在目录兜底
@@ -904,7 +904,7 @@ _write_atomic(fd, tmp_path, final_path)
 
 ### 3.5 缓存分组
 
-通过 `registry.py` 的 `cache_groups` 字段定义分组，由 `clear_by_group()` 统一管理：
+通过 `core/registry.py` 的 `cache_groups` 字段定义分组，由 `clear_by_group()` 统一管理：
 
 ```
                    缓存分组体系
@@ -936,7 +936,7 @@ _write_atomic(fd, tmp_path, final_path)
 
 ### 3.6 缓存操作共享层
 
-`cache/operations.py` 封装了 TUI 和 CLI 共用的缓存操作业务逻辑，通过 `ThreadPoolExecutor` 并行执行缓存刷新任务，消除 `handlers_cache.py` 中的逻辑重复。
+`cache/operations.py` 封装了 TUI 和 CLI 共用的缓存操作业务逻辑，通过 `ThreadPoolExecutor` 并行执行缓存刷新任务，消除 `tui/handlers_cache.py` 中的逻辑重复。
 
 #### 数据结构
 
@@ -996,7 +996,7 @@ def _get_pool() -> ThreadPoolExecutor:
     return _POOL
 ```
 
-**关键设计**：`cache/operations.py` 是 `ThreadPoolExecutor` 的唯一宿主，`handlers_cache.py` 和其他调用方通过调用 `operations.py` 的函数间接使用线程池，不直接持有池引用。
+**关键设计**：`cache/operations.py` 是 `ThreadPoolExecutor` 的唯一宿主，`tui/handlers_cache.py` 和其他调用方通过调用 `operations.py` 的函数间接使用线程池，不直接持有池引用。
 
 [↑ 回到顶部](#目录)
 
@@ -1006,10 +1006,10 @@ def _get_pool() -> ThreadPoolExecutor:
 
 ### 4.1 管线总览
 
-`src/python/report/` 采用**编排器 + 内容模块**架构，Excel 和 HTML 双端共享 `data_status.py` 降级状态基础设施。顶层由 `orchestrator.py` 统一调度，TUI 的 `handlers_report.py` 仅作为"薄壳"委托编排器。
+`src/python/report/` 采用**编排器 + 内容模块**架构，Excel 和 HTML 双端共享 `data_status.py` 降级状态基础设施。顶层由 `orchestrator.py` 统一调度，TUI 的 `tui/handlers_report.py` 仅作为"薄壳"委托编排器。
 
 ```
-                                         handlers_report.py
+                                       tui/handlers_report.py
                                               │
                                               ▼
                                      orchestrator.generate_report()
@@ -1229,7 +1229,7 @@ for sec in section_order:
 
 ### 4.6 报告序号可配置
 
-报告 18 个模块的序号/显示名称由 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 18 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1863,9 +1863,9 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
                fallback.py          全失败降级占位模板
 ```
 
-**LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名。
+**LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `core/registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名。
 
-**辩论模式（实验性路由）**：当 Feature Flag `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` 任一启用时，`generators_orchestrator.py` 中的 `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`。辩论模式与标准模式互斥（辩论优先），路由后 `skeleton.generate_llm_module()` 走辩论三段缓存（`llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_`）而非标准 expert_review 缓存。三段独立的 `DataModuleDef` 注册在 `registry.py` 中（preload 组，24h TTL）。
+**辩论模式（实验性路由）**：当 Feature Flag `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` 任一启用时，`generators_orchestrator.py` 中的 `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`。辩论模式与标准模式互斥（辩论优先），路由后 `skeleton.generate_llm_module()` 走辩论三段缓存（`llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_`）而非标准 expert_review 缓存。三段独立的 `DataModuleDef` 注册在 `core/registry.py` 中（preload 组，24h TTL）。
 
 各子模块的详细设计见 `llm-technical.md` §1~§4（架构总览、模块清单、骨架流程、并行编排）。
 
@@ -1941,7 +1941,7 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 | 乐观缓存预检 | 从 Provider 链中取链首 Provider 优先检查缓存，命中即返回 | 减少链遍历开销 |
 | 辩论路由 | `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`，Feature Flag 控制启停（默认关闭） | 辩论模式与标准模式互斥，辩论优先 |
 | Token 预算守卫 | 每阶段输出字符数 > `int(max_tokens × 0.65)` 时触发保护：1× 超限→跳过 synthesis 阶段并拼接 pro+con；2× 超限→回退标准模式 | 防止辩论模式过度消耗 token |
-| 虚构代码过滤 | `_filter_hallucinated_codes()` 基于正则的行级过滤，使用 `(?:^\|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]\|$)` 适配中文环境 | 消除 LLM 产生的虚构证券代码 |
+| 虚构代码过滤 | `_filter_hallucinated_codes()` 正则句段级过滤，经 `skeleton.py` 的 `raw_filter_fn` 钩子在 markdown_to_html 之前作用于 LLM 原始 Markdown；按"行→句末标点"两级切分精确删除，`TOP\d` 排名表述 + 英文白名单豁免误报 | 消除 LLM 产生的虚构证券代码，且不因 HTML 单行拼接误删整段 |
 
 各项机制的详细实现见 `llm-technical.md` §5~§11（API 调用层、重试与容错、缓存与指纹失效、提示词管理、会话级 Token 追踪、模型定价、熔断器）。
 
@@ -1985,7 +1985,7 @@ config/
 
 ### 6.2 中央注册表
 
-**设计目标**：消除 `config.py` / `cache.py` / `constants.py` 三处分散维护的遗漏风险，做到"一处注册，全局生效"。
+**设计目标**：消除 `config/` / `cache/cache.py` / `core/constants.py` 三处分散维护的遗漏风险，做到"一处注册，全局生效"。
 
 #### DataModuleDef 条目结构
 
@@ -2001,7 +2001,7 @@ class DataModuleDef:
     cache_groups: tuple      # 分组
 ```
 
-当前注册 **30 个数据模块**：
+当前注册 **29 个数据模块**：
 
 | 分类 | 数量 | 模块 |
 |:-----|:----:|:-----|
@@ -2059,7 +2059,7 @@ class ComputModuleDef:
 
 ### 6.3 市场时段判断
 
-**三层 fallback 架构**（`market_hours.py`）：
+**三层 fallback 架构**（`core/market_hours.py`）：
 
 ```
 is_market_open()
@@ -2103,7 +2103,7 @@ is_market_open()
 
 ### 6.4 持仓读取与列校验
 
-基于 openpyxl 解析持仓 xlsx（`reader.py`）：
+基于 openpyxl 解析持仓 xlsx（`core/reader.py`）：
 
 ```
 load_holdings(filepath)
@@ -2127,7 +2127,7 @@ load_holdings(filepath)
 
 ### 6.5 代码类型判定中心化
 
-所有资产代码类型判定集中到 `src/python/code_utils.py`，以纯技术原语形式提供。
+所有资产代码类型判定集中到 `src/python/core/code_utils.py`，以纯技术原语形式提供。
 
 #### 原语清单
 
@@ -2169,10 +2169,10 @@ load_holdings(filepath)
 
 ### 6.6 HTTP 客户端统一
 
-所有 HTTP 请求必须使用 `http_client.py` 工厂方法创建客户端实例（C5 约束），统一 SSL 配置、超时策略、连接池管理。
+所有 HTTP 请求必须使用 `core/http_client.py` 工厂方法创建客户端实例（C5 约束），统一 SSL 配置、超时策略、连接池管理。
 
 ```python
-make_http_client(timeout=10.0) → requests.Session
+make_http_client(timeout=10.0) → httpx.Client
 ```
 
 默认超时 10s，支持 per-call 覆盖，所有 provider 模块统一使用此接口。
@@ -2184,16 +2184,16 @@ make_http_client(timeout=10.0) → requests.Session
 ## 7. 模块间依赖关系
 
 ```
-reader.py (持仓解析)
-  → models.py (Holding/DetailRow 数据模型)
+core/reader.py (持仓解析)
+  → core/models.py (Holding/DetailRow 数据模型)
   → fetcher/price.py (价格获取)
   → fetcher/index.py (指数获取)
   → fetcher/fund.py (基金数据获取)
   → fetcher/industry.py (行业分类)
   → providers/* (各数据源 API 实现)
   → cache/ (缓存读写)
-    → market_hours.py (交易时段感知 TTL)
-    → registry.py (TTL 默认值、缓存分组)
+    → core/market_hours.py (交易时段感知 TTL)
+    → core/registry.py (TTL 默认值、缓存分组)
 
 cache/operations.py (缓存操作共享层)
   → cache/ (缓存引擎核心)
@@ -2214,7 +2214,7 @@ report/orchestrator.py (报告编排层)
   → report/html_writer.py (HTML 管线)
   → report/excel_generator.py (Excel 管线)
   → config/ (开关配置)
-  → registry.py (报告模块注册)
+  → core/registry.py (报告模块注册)
 
 report/excel_generator.py (Excel 编排器)
   → report/excel_module_loader.py (模块动态加载)
@@ -2236,12 +2236,12 @@ llm/ (LLM 集成)
   → llm/prompts.py / fingerprint.py / pricing.py / session.py
   → cache/ (LLM 结果缓存)
 
-handlers_*.py (TUI 命令)
+tui/handlers_*.py (TUI 命令)
   → orchestrator.py 或 cache/operations.py (委托业务逻辑)
   → report/progress.py (TuiProgressReporter)
 
-config/ → registry.py
-code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
+config/ → core/registry.py
+core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 ```
 
 [↑ 回到顶部](#目录)
@@ -2257,9 +2257,9 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C1** | **代码类型判定中心化** — 所有资产代码类型判定必须使用 `code_utils.py` 提供的函数，禁止任何模块自行实现判定逻辑 | 系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落，"魔法判定"遍地，新增资产类型时需全局搜索替换 | 代码评审不通过；新增资产类型时遗漏大量散落判定点 | 所有涉及代码类型判定的模块（fetcher/、report/、llm/ 等） |
+| **C1** | **代码类型判定中心化** — 所有资产代码类型判定必须使用 `core/code_utils.py` 提供的函数，禁止任何模块自行实现判定逻辑 | 系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落，"魔法判定"遍地，新增资产类型时需全局搜索替换 | 代码评审不通过；新增资产类型时遗漏大量散落判定点 | 所有涉及代码类型判定的模块（fetcher/、report/、llm/ 等） |
 | **C4** | **会话级 API 复用** — 同次会话内同一 API 返回的数据必须通过 `DataSourceRegistry.session_cache` 复用，禁止重复 HTTP 请求 | 避免同一资产在多个模块中重复请求相同 API 数据，降低 API 限频风险，提升性能 | API 调用量膨胀、触发限频、报告生成时间增长 | 所有通过 Provider 获取数据的模块 |
-| **C5** | **HTTP 客户端统一** — 所有 HTTP 请求必须使用 `http_client.py` 工厂方法创建客户端实例 | 统一 SSL 配置、超时策略、连接池管理；防止各模块自行构造 request 导致配置散落、连接池泄漏 | SSL 配置不一致、连接泄漏、重试策略不统一 | 所有发起 HTTP 请求的模块（providers/、llm/） |
+| **C5** | **HTTP 客户端统一** — 所有 HTTP 请求必须使用 `core/http_client.py` 工厂方法创建客户端实例 | 统一 SSL 配置、超时策略、连接池管理；防止各模块自行构造 request 导致配置散落、连接池泄漏 | SSL 配置不一致、连接泄漏、重试策略不统一 | 所有发起 HTTP 请求的模块（providers/、llm/） |
 | **C6** | **Provider Chain 必经** — 大多数数据获取必须通过 `fetch_with_fallback()` 走 Chain 路由，不得直接调用 Provider 函数 | 跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失 | 熔断器失效、fallback 断路、故障记录缺失 | fetcher/ 各模块（例外：index.py 直调 Provider 的双链路 fallback 硬编码，熔断器不适用于指数场景） |
 
 ### 8.2 缓存层约束
@@ -2273,7 +2273,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号不可硬编码** — 报告 18 个模块的序号和显示名称必须通过 `registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
+| **C7** | **报告序号不可硬编码** — 报告 18 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 pipeline_data Schema 定义文档中预定义类型、版本号、写入/消费模块后，才能在代码中使用该键（详见附录 H） | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
@@ -2282,7 +2282,7 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `registry.py` 的 `DataModuleDef` 注册表中同时注册（详见 `llm-technical.md` §12） | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失 | llm/ 包 + registry.py |
+| **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `core/registry.py` 的 `DataModuleDef` 注册表中同时注册（详见 `llm-technical.md` §12） | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失 | llm/ 包 + core/registry.py |
 | **C17** | **Multi-LLM Provider Chain** — 所有 LLM API 调用必须通过 Provider Chain（`strategy.py` + `api.py`）路由，`call_llm()` 返回 `(result, usage, provider_name)` 三元组，provider_name 记录实际使用的 Provider 条目名（详见 `llm-technical.md` §5.2） | 手动切换 Provider 导致配置散落、失败无法递补、Provider 名称不可追踪 | API 调用不经过 Chain → 无法自动递补、Provider 名称缺失 → 缓存键冲突、用量统计不准确 | llm/api.py、llm/skeleton.py、llm/strategy.py |
 | **C18** | **credentials_ref 凭据分离** — API 凭据（api_key/model/endpoint）必须通过 `llm_key.json` 的 `credentials_ref` 引用，禁止在 `llm_providers.json` 中直接存储敏感凭据（详见 `llm-technical.md` §5.3） | 凭据与路由配置混存导致凭据泄露风险；凭据变更时需同时修改两份配置 | 凭据泄露风险、凭据变更需多处修改、凭据复用困难 | data/config/llm_providers.json、data/config/llm_key.json、config/_core.py、llm/api.py |
 
@@ -2291,8 +2291,8 @@ code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
 | **C8** | **日志统一** — 所有模块必须使用 `logging.getLogger("invest")` 获取日志器，禁止直接使用 `print()` 输出运行时诊断信息 | 统一日志名称使日志过滤、级别控制、格式管理集中生效；`print()` 无法控制日志级别，污染 stdout | 日志碎片化、日志级别失控、`print()` 干扰输出流 | 全模块（交互式 print 如进度提示不受此限） |
-| **C15** | **控制台日志着色** — WARNING 级别使用黄色输出、ERROR 级别使用红色输出；当 `NO_COLOR` 环境变量设置或输出非 TTY 时自动降级为无颜色 | 着色提升控制台日志的辨识度，便于快速定位告警和错误；降级保证日志导出、管道重定向时无转义字符污染输出 | 日志可读性降低、非 TTY 环境下转义字符污染 | `logger.py`（_ColoredFormatter） |
-| **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_providers_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `tui.py`/`cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
+| **C15** | **控制台日志着色** — WARNING 级别使用黄色输出、ERROR 级别使用红色输出；当 `NO_COLOR` 环境变量设置或输出非 TTY 时自动降级为无颜色 | 着色提升控制台日志的辨识度，便于快速定位告警和错误；降级保证日志导出、管道重定向时无转义字符污染输出 | 日志可读性降低、非 TTY 环境下转义字符污染 | `core/logger.py`（_ColoredFormatter） |
+| **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_providers_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `tui/tui.py`/`cli/cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
 
 ### 8.6 测试约束
 
@@ -2317,36 +2317,43 @@ investor-util/
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
 │   │   ├── analysis/            # 业务分析计算层（再平衡、量化指标）
-│   │   ├── anonymizer.py        # 持仓匿名化（名称替换/数量模糊/关闭三模式）
-│   │   ├── ansi_colors.py       # ANSI 颜色常量（终端输出着色）
-│   │   ├── cache/               # 缓存引擎子包（8 子模块 + operations + services）
-│   │   ├── circuit_breaker.py   # 统一断路器网关（Provider + LLM 熔断状态查询）
-│   │   ├── cli.py               # CLI 命令行入口（argparse + 共享层直调）
-│   │   ├── code_utils.py        # 代码类型判定中心化
-│   │   ├── config/              # 配置管理子包（_config_defaults / _comments / _core）
-│   │   ├── constants.py         # 共享常量 + 项目根路径（标记文件查找法）
-│   │   ├── features.py          # 功能开关注册表（28 项 Feature Flag）
-│   │   ├── fetcher/             # 数据获取调度（price/index/fund/fund_manager/industry/chain/akshare/bond_yield/news/history_diff）
-│   │   ├── handlers_cache.py    # TUI 缓存管理命令（薄壳委托 operations）
-│   │   ├── handlers_check_sources.py # 数据源健康检查命令处理器
-│   │   ├── handlers_config.py   # TUI 配置管理命令
-│   │   ├── handlers_report.py   # TUI 报告生成命令（薄壳委托 orchestrator）
-│   │   ├── http_client.py       # HTTP 客户端工厂
-│   │   ├── llm/                 # LLM 集成（编排/骨架/API 路由/提示词/指纹/熔断器等）
-│   │   ├── logger.py            # 日志模块（_ColoredFormatter）
-│   │   ├── market_hours.py      # A 股交易时段判断
-│   │   ├── perf.py               # 性能收集（PerfCollector 计时 + perf_history.jsonl）
-│   │   ├── models.py            # 数据模型
-│   │   ├── provider_registry.py # 数据源注册中心 — 熔断/缓存/策略/审计
+│   │   ├── cache/               # 缓存引擎（TTL/清理/统计/分组/IO）
+│   │   ├── cli/                 # CLI 命令行模式入口
+│   │   │   ├── __init__.py      #   子包标记，re-export cli 符号
+│   │   │   ├── __main__.py      #   python -m 入口
+│   │   │   └── cli.py           #   argparse + 共享层路由
+│   │   ├── config/              # 配置管理（含 features.py + anonymizer.py）
+│   │   ├── core/                # 核心基础设施
+│   │   │   ├── __init__.py      #   子包标记
+│   │   │   ├── ansi_colors.py   #   ANSI 颜色常量
+│   │   │   ├── check_sources.py #   数据源健康检查（CLI/报告共享）
+│   │   │   ├── circuit_breaker.py #  统一断路器网关
+│   │   │   ├── code_utils.py    #   代码类型判定中心化
+│   │   │   ├── constants.py     #   共享常量 + 项目根路径
+│   │   │   ├── http_client.py   #   HTTP 客户端工厂
+│   │   │   ├── logger.py        #   日志模块
+│   │   │   ├── market_hours.py  #   交易时段判断
+│   │   │   ├── models.py        #   数据模型
+│   │   │   ├── perf.py          #   性能收集
+│   │   │   ├── provider_registry.py # 数据源注册中心
+│   │   │   ├── reader.py        #   持仓 Excel 解析
+│   │   │   └── registry.py      #   中央注册表
+│   │   ├── fetcher/             # 数据获取调度
+│   │   ├── llm/                 # LLM 集成
 │   │   ├── providers/           # 数据源提供商（各 API 封装）
-│   │   ├── reader.py            # 持仓 Excel 解析
-│   │   ├── registry.py          # 中央注册表（30 个数据模块 + 18 个报告模块 + 7 个计算模块）
-│   │   ├── report/              # 报告生成（编排器/进度/管线/数据构建器/页签写入器）
-│   │   ├── schemas/             # Pydantic 数据模式（快照等）
-│   │   ├── tui.py               # TUI 入口 + 菜单循环
-│   │   ├── tui_handlers.py      # 菜单通用辅助
-│   │   ├── tui_keys.py          # 键盘输入封装
-│   │   └── tui_menu.py          # 菜单交互
+│   │   ├── report/              # 报告生成
+│   │   ├── schemas/             # 数据模式
+│   │   ├── tmpl/                # HTML 报告模板
+│   │   └── tui/                 # TUI 交互模式入口
+│   │       ├── __init__.py      #   子包标记
+│   │       ├── __main__.py      #   python -m 入口
+│   │       ├── handlers_cache.py #   缓存管理命令
+│   │       ├── handlers_config.py #  配置管理命令
+│   │       ├── handlers_report.py #  报告生成命令
+│   │       ├── tui.py           #   主循环入口
+│   │       ├── tui_handlers.py  #   键盘/事件处理
+│   │       ├── tui_keys.py      #   键盘输入封装
+│   │       └── tui_menu.py      #   菜单交互
 │   └── test/                    # 测试（按标记分组）
 │       ├── conftest.py          # pytest 配置 + 分层标记注册
 │       ├── helpers.py           # 测试辅助工具

@@ -1,6 +1,6 @@
 """辩论模式条件推理单元测试 — Mode 2 情景分析注入。
 
-测试 _build_expert_review_prompt() 在 enable_mode_2 参数下的行为：
+测试 _build_expert_review_prompt() 在 enable_conditional 参数下的行为：
   - 多情景注入
   - 空情景/禁用的对比
   - 单情景
@@ -39,7 +39,7 @@ def _mock_llm_config_with_scenarios(scenarios: list[dict]) -> dict:
     """构造带指定 scenarios 的 mock LLM 配置。"""
     return {
         "debate": {
-            "mode_2_conditional": {
+            "conditional": {
                 "scenarios": scenarios,
             },
         },
@@ -48,7 +48,7 @@ def _mock_llm_config_with_scenarios(scenarios: list[dict]) -> dict:
 
 @pytest.mark.unit_llm
 class TestDebateConditionalMode2(unittest.TestCase):
-    """_build_expert_review_prompt enable_mode_2 条件推理情景注入。"""
+    """_build_expert_review_prompt enable_conditional 条件推理情景注入。"""
 
     # ── test 1: Mode 2 启用 + 3 情景 ──────────────────────────
 
@@ -70,7 +70,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
             holdings_count=5,
             categories={},
             holdings_details=_make_minimal_holdings(),
-            enable_mode_2=True,
+            enable_conditional=True,
         )
 
         self.assertIn("### 情景分析", result)
@@ -84,7 +84,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
     # ── test 2: Mode 2 禁用 ──────────────────────────────────
 
     def test_mode2_disabled(self):
-        """Mode 2 禁用 → prompt 末尾与 MVP-06 一致，无情景段落。"""
+        """Mode 2 禁用 → 标准情景分析（从 _SYSTEM_EXPERT_REVIEW 移入 user prompt）。"""
         from src.python.llm.prompts import _build_expert_review_prompt
 
         result = _build_expert_review_prompt(
@@ -97,9 +97,10 @@ class TestDebateConditionalMode2(unittest.TestCase):
             holdings_details=_make_minimal_holdings(),
         )
 
-        self.assertNotIn("### 情景分析", result)
-        # MVP-06 末尾段落为"给出优化建议和风险预警。"后无追加内容
-        self.assertTrue(result.strip().endswith("风险预警。"))
+        # 标准情景现在在 user prompt（原在 system prompt，为消除双重指令移出）
+        self.assertIn("### 情景分析", result)
+        self.assertIn("上涨情景", result)
+        self.assertIn("下跌情景", result)
 
     # ── test 3: 单情景 ───────────────────────────────────────
 
@@ -119,7 +120,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
             holdings_count=5,
             categories={},
             holdings_details=_make_minimal_holdings(),
-            enable_mode_2=True,
+            enable_conditional=True,
         )
 
         self.assertIn("### 情景分析", result)
@@ -141,7 +142,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
             holdings_count=5,
             categories={},
             holdings_details=_make_minimal_holdings(),
-            enable_mode_2=True,
+            enable_conditional=True,
         )
 
         self.assertNotIn("### 情景分析", result)

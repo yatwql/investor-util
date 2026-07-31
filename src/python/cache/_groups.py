@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import os
 
-from src.python.registry import get_registry
+from src.python.core.registry import get_registry
 
 from ._paths import _CACHE_DIR, _GZIP_SUFFIX, _cache_path
 from ._store import _cache_lock, clear

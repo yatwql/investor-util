@@ -296,3 +296,132 @@ class TestFetchFundBenchmark(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ═══════════════════════════════════════════════════════════
+#  批量接口测试
+# ═══════════════════════════════════════════════════════════
+
+
+class TestFetchFundRankingsBatch(unittest.TestCase):
+    """fetch_fund_rankings_batch 批量并行获取。"""
+
+    def test_empty_list_returns_empty_dict(self):
+        """空列表 → 空 dict。"""
+        from src.python.fetcher.fund import fetch_fund_rankings_batch
+
+        result = fetch_fund_rankings_batch([])
+        self.assertEqual(result, {})
+
+    @patch("src.python.fetcher.batch.BatchDispatcher")
+    def test_single_fund(self, mock_dispatcher_cls):
+        """单基金返回正确映射。"""
+        mock_disp = MagicMock()
+        mock_disp.execute_with_cache_check.return_value = [
+            type("R", (), {"success": True, "result": {"rank": 1}})(),
+        ]
+        mock_dispatcher_cls.return_value = mock_disp
+
+        from src.python.fetcher.fund import fetch_fund_rankings_batch
+
+        result = fetch_fund_rankings_batch(["000001"])
+        self.assertIn("000001", result)
+        self.assertEqual(result["000001"]["rank"], 1)
+
+    @patch("src.python.fetcher.batch.BatchDispatcher")
+    def test_partial_failures(self, mock_dispatcher_cls):
+        """部分失败 → 缺失项为 None。"""
+        mock_disp = MagicMock()
+        mock_disp.execute_with_cache_check.return_value = [
+            type("R", (), {"success": True, "result": {"rank": 1}})(),
+            type("R", (), {"success": False, "result": None, "error": "err"})(),
+            type("R", (), {"success": True, "result": {"rank": 3}})(),
+        ]
+        mock_dispatcher_cls.return_value = mock_disp
+
+        from src.python.fetcher.fund import fetch_fund_rankings_batch
+
+        result = fetch_fund_rankings_batch(["000001", "000002", "000003"])
+        self.assertIsNotNone(result["000001"])
+        self.assertIsNone(result["000002"])
+        self.assertIsNotNone(result["000003"])
+
+    @patch("src.python.fetcher.batch.BatchDispatcher")
+    def test_uses_cache_check(self, mock_dispatcher_cls):
+        """使用 execute_with_cache_check（非 execute）。"""
+        mock_disp = MagicMock()
+        mock_disp.execute_with_cache_check.return_value = []
+        mock_dispatcher_cls.return_value = mock_disp
+
+        from src.python.fetcher.fund import fetch_fund_rankings_batch
+
+        fetch_fund_rankings_batch(["000001"])
+        mock_disp.execute_with_cache_check.assert_called_once()
+
+    def test_external_dispatcher_no_shutdown(self):
+        """传入外部 dispatcher 时不 shutdown。"""
+        from unittest.mock import MagicMock
+
+        mock_disp = MagicMock()
+        mock_disp.execute_with_cache_check.return_value = [
+            type("R", (), {"success": True, "result": {"rank": 1}})(),
+        ]
+
+        from src.python.fetcher.fund import fetch_fund_rankings_batch
+
+        result = fetch_fund_rankings_batch(["000001"], dispatcher=mock_disp)
+        self.assertIn("000001", result)
+        mock_disp.shutdown.assert_not_called()
+
+
+class TestFetchFundHoldingsBatch(unittest.TestCase):
+    """fetch_fund_holdings_batch 批量并行获取。"""
+
+    def test_empty_list_returns_empty_dict(self):
+        """空列表 → 空 dict。"""
+        from src.python.fetcher.fund import fetch_fund_holdings_batch
+
+        result = fetch_fund_holdings_batch([])
+        self.assertEqual(result, {})
+
+    @patch("src.python.fetcher.batch.BatchDispatcher")
+    def test_uses_cache_check_method(self, mock_dispatcher_cls):
+        """使用 execute_with_cache_check（缓存优先）。"""
+        mock_disp = MagicMock()
+        mock_disp.execute_with_cache_check.return_value = [
+            type("R", (), {"success": True, "result": {"holdings": []}})(),
+        ]
+        mock_dispatcher_cls.return_value = mock_disp
+
+        from src.python.fetcher.fund import fetch_fund_holdings_batch
+
+        result = fetch_fund_holdings_batch(["000001"])
+        self.assertEqual(len(result), 1)
+
+    @patch("src.python.fetcher.batch.BatchDispatcher")
+    def test_partial_failures(self, mock_dispatcher_cls):
+        """部分失败 → 缺失项为 None。"""
+        mock_disp = MagicMock()
+        mock_disp.execute_with_cache_check.return_value = [
+            type("R", (), {"success": True, "result": {"holdings": []}})(),
+            type("R", (), {"success": False, "result": None, "error": "err"})(),
+        ]
+        mock_dispatcher_cls.return_value = mock_disp
+
+        from src.python.fetcher.fund import fetch_fund_holdings_batch
+
+        result = fetch_fund_holdings_batch(["000001", "000002"])
+        self.assertIsNotNone(result["000001"])
+        self.assertIsNone(result["000002"])
+
+    def test_calls_fetch_fund_holdings_cached_internally(self):
+        """内部使用 fetch_fund_holdings_cached（含 session_cache）。"""
+        from src.python.fetcher.fund import fetch_fund_holdings_batch, fetch_fund_holdings_cached
+
+        # Verify the batch function uses the cached variant
+        from functools import partial
+        import inspect
+
+        # Check that the source references fetch_fund_holdings_cached
+        src = inspect.getsource(fetch_fund_holdings_batch)
+        self.assertIn("fetch_fund_holdings_cached", src)

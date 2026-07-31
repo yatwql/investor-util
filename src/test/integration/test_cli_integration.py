@@ -52,7 +52,7 @@ class TestCliIntegration:
             patch("src.python.cli._cli_read_holdings", return_value=mock_holdings),
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
         ):
-            from src.python.cli import _handle_report
+            from src.python.cli.cli import _handle_report
             args = MagicMock(type="basic", history="off", force_llm=False,
                               warm=False, output="/custom/path", verbose=False)
             _handle_report(args, test_config)
@@ -64,7 +64,7 @@ class TestCliIntegration:
 
     def test_cli_cache_config_respected(self):
         """cache 子命令使用 config 中的 holdings 路径。"""
-        from src.python.cli import _handle_cache_update
+        from src.python.cli.cli import _handle_cache_update
 
         mock_result = MagicMock()
         mock_result.exit_code = 0
@@ -82,17 +82,17 @@ class TestCliIntegration:
 
     def test_cli_exit_code_success(self):
         """正常完成 → exit 0。"""
-        from src.python.cli import _EXIT_SUCCESS
+        from src.python.cli.cli import _EXIT_SUCCESS
         assert _EXIT_SUCCESS == 0
 
     def test_cli_exit_code_partial(self):
         """部分失败 → exit 1。"""
-        from src.python.cli import _EXIT_PARTIAL
+        from src.python.cli.cli import _EXIT_PARTIAL
         assert _EXIT_PARTIAL == 1
 
     def test_cli_exit_code_severe(self):
         """严重错误 → exit 2。"""
-        from src.python.cli import _EXIT_SEVERE
+        from src.python.cli.cli import _EXIT_SEVERE
         assert _EXIT_SEVERE == 2
 
     def test_handle_report_return_exit_code(self):
@@ -105,7 +105,7 @@ class TestCliIntegration:
             patch("src.python.cli._cli_read_holdings", return_value=mock_holdings),
             patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
         ):
-            from src.python.cli import _handle_report
+            from src.python.cli.cli import _handle_report
             args = MagicMock(type="basic", history="off", force_llm=False,
                               warm=False, output=None, verbose=False)
             code = _handle_report(args, {})

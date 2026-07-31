@@ -25,7 +25,7 @@ from unittest.mock import MagicMock, call, patch
 
 from openpyxl import Workbook
 
-from src.python.models import Holding
+from src.python.core.models import Holding
 from src.python.report import market_value as mv
 from src.python.report.styles import BLUE_FONT
 import pytest
@@ -54,42 +54,42 @@ class TestIsQdii(unittest.TestCase):
 
     def test_qdii_in_name(self):
         """名称含 QDII → True。"""
-        from src.python.code_utils import is_qdii_by_name
+        from src.python.core.code_utils import is_qdii_by_name
         self.assertTrue(is_qdii_by_name("华夏纳斯达克100ETF(QDII)"))
 
     def test_qdii_lowercase(self):
         """名称含小写 qdii → True（大小写不敏感）。"""
-        from src.python.code_utils import is_qdii_by_name
+        from src.python.core.code_utils import is_qdii_by_name
         self.assertTrue(is_qdii_by_name("华夏纳斯达克100ETF(qdii)"))
 
     def test_qdii_mixed_case(self):
         """名称含混合大小写 QdIi → True。"""
-        from src.python.code_utils import is_qdii_by_name
+        from src.python.core.code_utils import is_qdii_by_name
         self.assertTrue(is_qdii_by_name("测试(QdIi)"))
 
     def test_non_qdii(self):
         """不含 QDII → False。"""
-        from src.python.code_utils import is_qdii_by_name
+        from src.python.core.code_utils import is_qdii_by_name
         self.assertFalse(is_qdii_by_name("电池ETF"))
 
     def test_empty_string(self):
         """空字符串 → False。"""
-        from src.python.code_utils import is_qdii_by_name
+        from src.python.core.code_utils import is_qdii_by_name
         self.assertFalse(is_qdii_by_name(""))
 
     def test_no_market_value_keyword(self):
         """含有其他相似关键词但不含 QDII → False。"""
-        from src.python.code_utils import is_qdii_by_name
+        from src.python.core.code_utils import is_qdii_by_name
         self.assertFalse(is_qdii_by_name("QD股票基金"))
 
     def test_non_etf(self):
         """不含 ETF → False（通过 _etf_by_name 委派 code_utils）。"""
-        from src.python.code_utils import is_etf_by_name
+        from src.python.core.code_utils import is_etf_by_name
         self.assertFalse(is_etf_by_name("长江电力"))
 
     def test_empty_string(self):
         """空字符串 → False。"""
-        from src.python.code_utils import is_etf_by_name
+        from src.python.core.code_utils import is_etf_by_name
         self.assertFalse(is_etf_by_name(""))
 
 
@@ -401,67 +401,67 @@ class TestPriceUpdateStatus(unittest.TestCase):
 class TestIsMarketOpen(unittest.TestCase):
     """测试 is_market_open A 股交易时段判断（mock datetime.now）。"""
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_weekend_saturday(self, mock_dt):
         """周六 → False。"""
         mock_dt.now.return_value = datetime(2026, 6, 27, 10, 0, 0)  # Saturday
         self.assertFalse(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_weekend_sunday(self, mock_dt):
         """周日 → False。"""
         mock_dt.now.return_value = datetime(2026, 6, 28, 10, 0, 0)  # Sunday
         self.assertFalse(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_before_open(self, mock_dt):
         """周一 9:00（开盘前）→ False。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 9, 0, 0)  # Mon
         self.assertFalse(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_morning_session(self, mock_dt):
         """周一 10:00（上午交易时段）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 10, 0, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_morning_open_boundary(self, mock_dt):
         """周一 9:30（开盘边界）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 9, 30, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_morning_close_boundary(self, mock_dt):
         """周一 11:30（午休边界）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 11, 30, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_lunch_break(self, mock_dt):
         """周一 12:00（午休）→ False。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 12, 0, 0)
         self.assertFalse(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_afternoon_session(self, mock_dt):
         """周一 14:00（下午交易时段）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 14, 0, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_afternoon_open_boundary(self, mock_dt):
         """周一 13:00（下午开盘边界）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 13, 0, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_afternoon_close_boundary(self, mock_dt):
         """周一 15:00（收盘边界）→ True。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 15, 0, 0)
         self.assertTrue(mv.is_market_open())
 
-    @patch("src.python.market_hours.datetime")
+    @patch("src.python.core.market_hours.datetime")
     def test_after_close(self, mock_dt):
         """周一 15:30（收盘后）→ False。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 15, 30, 0)
@@ -1016,11 +1016,11 @@ class TestGenerateDetails(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  R-090: 溢价率计算验证
+#  溢价率计算验证
 
 
 # ═══════════════════════════════════════════════════════════════
-#  R-090: 溢价率计算验证
+#  溢价率计算验证
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -1039,7 +1039,7 @@ class TestPremiumRate(unittest.TestCase):
         from src.python.report.market_value import (
             _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
         )
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding(account="证券", name="华夏纳斯达克100ETF(QDII)",
                      code="513300", shares=100, cost_price=1.5)
@@ -1056,7 +1056,7 @@ class TestPremiumRate(unittest.TestCase):
         from src.python.report.market_value import (
             _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
         )
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding(account="证券", name="沪深300ETF",
                      code="510300", shares=100, cost_price=4.0)
@@ -1087,7 +1087,7 @@ class TestPremiumRate(unittest.TestCase):
         from src.python.report.market_value import (
             _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
         )
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding(account="证券", name="普通股票",
                      code="600000", shares=100, cost_price=10.0)
@@ -1102,7 +1102,7 @@ class TestPremiumRate(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  R-091: 场外基金非 T 日 today_profit=0 验证
+#  场外基金非 T 日 today_profit=0 验证
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -1123,7 +1123,7 @@ class TestTodayProfitOffMarket(unittest.TestCase):
     def test_off_market_nav_not_t_day(self):
         """场外基金 nav_date != trading_day → today_profit=0。"""
         from src.python.report.market_value import _compute_detail_row
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding(account="支付宝", name="易方达蓝筹精选",
                      code="005827", shares=1000, cost_price=2.0)
@@ -1138,7 +1138,7 @@ class TestTodayProfitOffMarket(unittest.TestCase):
     def test_on_market_nav_is_t_day(self):
         """场外基金 nav_date == trading_day → today_profit 正常计算。"""
         from src.python.report.market_value import _compute_detail_row
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding(account="支付宝", name="易方达蓝筹精选",
                      code="005827", shares=1000, cost_price=2.0)
@@ -1154,7 +1154,7 @@ class TestTodayProfitOffMarket(unittest.TestCase):
     def test_tencent_source_ignores_nav_date(self):
         """腾讯源（场内实时）即使无 nav_date 也计算 today_profit。"""
         from src.python.report.market_value import _compute_detail_row
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
         h = Holding(account="证券", name="长江电力",
                      code="600900", shares=100, cost_price=20.0)
@@ -1170,7 +1170,7 @@ class TestTodayProfitOffMarket(unittest.TestCase):
     def test_no_nav_date_non_tencent(self):
         """非腾讯源且无 nav_date → today_profit=0。"""
         from src.python.report.market_value import _compute_detail_row
-        from src.python.models import Holding
+        from src.python.core.models import Holding
 
 
         h = Holding(account="支付宝", name="某基金",

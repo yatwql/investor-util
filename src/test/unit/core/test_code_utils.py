@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.python.code_utils import (
+from src.python.core.code_utils import (
     get_index_exchange_prefix,
     is_index_code,
     is_us_index_code,

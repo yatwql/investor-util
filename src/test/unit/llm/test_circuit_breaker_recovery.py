@@ -1,4 +1,4 @@
-"""熔断器冷却恢复测试 — R-087。
+"""熔断器冷却恢复测试。
 
 测试目标：
   - 连续 3 次失败 → 熔断开启（_cb_is_open 返回 True）
@@ -298,6 +298,41 @@ class TestCircuitBreakerEdgeCases(unittest.TestCase):
         _cb_record_failure(url)  # 1（从 0 重新开始）
         _cb_record_failure(url)  # 2
         self.assertFalse(_cb_is_open(url))  # 还需一次才到 3
+
+
+class TestCircuitBreakerEndpoint(unittest.TestCase):
+    """_cb_endpoint URL 解析与基础计数测试。"""
+
+    def test_endpoint_normal(self):
+        """标准 URL → 提取域名。"""
+        from src.python.llm.circuit_breaker import _cb_endpoint
+        self.assertEqual(_cb_endpoint("https://api.anthropic.com/v1/messages"), "api.anthropic.com")
+
+    def test_endpoint_empty(self):
+        """空 URL → unknown。"""
+        from src.python.llm.circuit_breaker import _cb_endpoint
+        self.assertEqual(_cb_endpoint(""), "unknown")
+
+    def test_endpoint_invalid(self):
+        """无效 URL → unknown。"""
+        from src.python.llm.circuit_breaker import _cb_endpoint
+        self.assertEqual(_cb_endpoint("not-a-url"), "unknown")
+
+    def test_failure_count_increments(self):
+        """连续记录失败 → 计数递增。"""
+        from src.python.llm.circuit_breaker import (
+            _cb_record_failure, _circuit_failures,
+        )
+        _circuit_failures.clear()
+        _cb_record_failure("https://api.anthropic.com/v1/messages")
+        _cb_record_failure("https://api.anthropic.com/v1/messages")
+        self.assertEqual(_circuit_failures.get("api.anthropic.com"), 2)
+        _circuit_failures.clear()
+
+    def test_unknown_endpoint_not_open(self):
+        """未记录的 endpoint → 熔断关闭。"""
+        from src.python.llm.circuit_breaker import _cb_is_open
+        self.assertFalse(_cb_is_open("https://api.unknown.com/v1"))
 
 
 if __name__ == "__main__":

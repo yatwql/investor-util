@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -39,6 +38,8 @@ from src.python.llm.prompts import (
     _build_health_check_prompt,
     _build_penetration_deep_prompt,
 )
+from src.python.config.features import is_feature_enabled
+from src.python.llm._hallucination_filter import _filter_hallucinated_codes, _is_safe_word
 from src.python.llm.skeleton import generate_llm_module
 
 logger = logging.getLogger("invest")
@@ -101,7 +102,54 @@ def generate_global_macro(
         max_tokens_default=800,
         timeout_default=60.0,
         output_brief_limit=200,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
+
+
+def _build_feature_suffix() -> str:
+    """构建辩论模式组合的确定性缓存指纹后缀。
+
+    取各启用模式的代号字母排序后拼接（conditional=c, qa_concentration=q），
+    保证相同组合产生相同后缀，不同组合不会冲突。
+
+    Returns:
+        空字符串（无模式启用）或 "_cq" 等后缀（启用后）。
+    """
+    _parts = []
+    if is_feature_enabled("llm_debate_conditional"):
+        _parts.append("c")  # conditional
+    if is_feature_enabled("llm_debate_qa_concentration"):
+        _parts.append("q")  # qa_concentration
+    return "_" + "".join(sorted(_parts)) if _parts else ""
+
+
+def _compute_industry_concentration(
+    penetrated_assets: list[dict] | None,
+    total_mv: float,
+) -> dict[str, float] | None:
+    """从穿透资产数据计算行业集中度字典。
+
+    按 sector 字段聚合穿透资产的市值占比，结果形如
+    {"银行": 0.35, "消费": 0.25}，供集中度问答模块使用。
+
+    Args:
+        penetrated_assets: 穿透资产列表（每项含 sector/mv 字段）。
+        total_mv: 持仓总市值。
+
+    Returns:
+        行业集中度字典，数据不足时返回 None。
+    """
+    if not penetrated_assets or total_mv <= 0:
+        return None
+    ind_mv: dict[str, float] = {}
+    for _a in penetrated_assets:
+        _s = _a.get("sector", "--")
+        _m = _a.get("mv", 0) or 0
+        ind_mv[_s] = ind_mv.get(_s, 0) + _m
+    return {k: round(v / total_mv, 4) for k, v in ind_mv.items()}
 
 
 def generate_expert_review(
@@ -122,20 +170,31 @@ def generate_expert_review(
 ) -> tuple[str | None, bool]:
     """生成智囊团深度复盘。
 
+    辩论模式的附加功能通过 feature flag 注入 prompt：
+      - conditional（条件推理）：追加涨/跌/震荡情景分析段
+      - qa_concentration（集中度问答）：追加集中度反问引导段
+
     Args:
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），可选。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
     """
+    _fp_suffix = _build_feature_suffix()
+    _enable_conditional = "c" in _fp_suffix
+    _enable_qa_concentration = "q" in _fp_suffix
+    _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
 
     def _fingerprint():
-        return build_llm_fingerprint(
-            total_mv=total_mv,
-            total_cost=total_cost,
-            total_profit=total_profit,
-            total_today_profit=total_today_profit,
-            holdings_details=holdings_details,
-            penetrated_assets=penetrated_assets,
-            categories=categories,
+        return (
+            build_llm_fingerprint(
+                total_mv=total_mv,
+                total_cost=total_cost,
+                total_profit=total_profit,
+                total_today_profit=total_today_profit,
+                holdings_details=holdings_details,
+                penetrated_assets=penetrated_assets,
+                categories=categories,
+            )
+            + _fp_suffix
         )
 
     def _prompt():
@@ -151,6 +210,9 @@ def generate_expert_review(
             pipeline_data=pipeline_data,
             competitive_context=competitive_context,
             metrics=metrics,
+            enable_conditional=_enable_conditional,
+            enable_qa_concentration=_enable_qa_concentration,
+            industry_concentration=_industry_conc,
         )
 
     return generate_llm_module(
@@ -164,6 +226,10 @@ def generate_expert_review(
         max_tokens_default=8192,
         timeout_default=120.0,
         output_brief_limit=300,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
 
 
@@ -220,6 +286,10 @@ def generate_health_check(
         max_tokens_default=4096,
         timeout_default=120.0,
         output_brief_limit=300,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
 
 
@@ -272,190 +342,14 @@ def generate_penetration_deep_analysis(
         max_tokens_default=4096,
         timeout_default=90.0,
         output_brief_limit=300,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
     )
 
 
 # ── 辩论模式：白脸/黑脸/综合生成 ───────────────────────────
-
-
-# 已知安全英文词白名单——不应被当作虚构股票代码（大小写不敏感）
-# 出现场景：LLM 在分析报告中插入 HTML/CSS 标签、金融术语、英文词汇
-_HALLU_SAFE_WORDS: set[str] = {
-    # 已报告误杀（HTML/CSS 标签、英文词汇）
-    "style",
-    "flash",
-    "strong",
-    "font",
-    "size",
-    "color",
-    "token",
-    "qdii",
-    "12px",
-    "100etf",
-    # HTML/CSS 常见属性
-    "width",
-    "height",
-    "align",
-    "border",
-    "margin",
-    "padding",
-    "inline",
-    "solid",
-    "dashed",
-    "dotted",
-    "double",
-    "groove",
-    "ridge",
-    "inset",
-    "outset",
-    "hidden",
-    "visible",
-    "scroll",
-    # 金融/经济分析高频词汇
-    "value",
-    "price",
-    "yield",
-    "total",
-    "index",
-    "month",
-    "year",
-    "daily",
-    "weekly",
-    "growth",
-    "level",
-    "range",
-    "trend",
-    "large",
-    "small",
-    "short",
-    "long",
-    "cover",
-    "limit",
-    "order",
-    "trade",
-    "share",
-    "stock",
-    "bond",
-    "fund",
-    "cash",
-    "risk",
-    "rate",
-    "asset",
-    "debt",
-    "equity",
-    "fixed",
-    "float",
-    "clear",
-    "cycle",
-    "light",
-    "dark",
-    "block",
-    "track",
-    "focus",
-    "upper",
-    "lower",
-    "major",
-    "minor",
-    "prime",
-    "core",
-    "delta",
-    "gamma",
-    "theta",
-    "alpha",
-    "beta",
-    "sigma",
-    "rally",
-    "crash",
-    "bulls",
-    "bears",
-    "spike",
-    "split",
-    # 报告写作常见词
-    "title",
-    "table",
-    "label",
-    "point",
-    "issue",
-    "topic",
-    "chart",
-    "graph",
-    "phase",
-    "stage",
-    "state",
-    "event",
-    "cause",
-    "effect",
-    "basis",
-    "shift",
-    "swing",
-}
-
-
-def _is_safe_word(code: str) -> bool:
-    """判断一个由正则捕获的字母数字组合是否为安全英文词汇而非虚构代码。
-
-    两条规则满足其一即安全：
-      1. **全小写字母**：实盘交易所代码不会全小写，低风险豁免。
-      2. **白名单命中**：大小写不敏感匹配 ``_HALLU_SAFE_WORDS``。
-
-    Args:
-        code: 正则捕获的 4-6 位字母数字串。
-
-    Returns:
-        该词为安全英文词汇时返回 True，否则返回 False。
-    """
-    # 全小写字母 → 绝非实盘代码
-    if code.islower():
-        return True
-    # 大小写不敏感匹配白名单
-    return code.lower() in _HALLU_SAFE_WORDS
-
-
-def _filter_hallucinated_codes(
-    text: str,
-    valid_codes: set[str],
-) -> str:
-    """从 LLM 输出中过滤虚构代码。
-
-    正则提取所有 6 位数字代码（A 股）及字母数字代码（港股/美股），
-    与 valid_codes 交叉校验，移除虚构代码及其所在整句。
-
-    Args:
-        text: LLM 原始输出文本。
-        valid_codes: 合法持仓代码集合。
-
-    Returns:
-        过滤后的文本（无虚构代码的句子），如全部移除则返回空字符串。
-    """
-    if not text:
-        return text
-
-    # 使用左边界(^|[^A-Za-z0-9])和右边界([^A-Za-z0-9]|$)替代\b
-    # 避免中文环境下\b失效（Python re 视中文字符为\w）
-    found_codes = set(re.findall(r"(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]|$)", text))
-    invalid = {c for c in found_codes if c not in valid_codes and not c.isdigit() and not _is_safe_word(c)}
-
-    if not invalid:
-        return text
-
-    logger.warning("[debate-hallu] 检测到 %d 个虚构品种代码: %s", len(invalid), invalid)
-    lines = text.split("\n")
-    filtered = []
-    removed_count = 0
-    for line in lines:
-        line_codes = set(re.findall(r"(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]|$)", line))
-        if line_codes & invalid:
-            removed_count += 1
-            continue
-        filtered.append(line)
-
-    logger.info(
-        "[debate-hallu] 过滤前 %d 字符，过滤后 %d 字符，移除了 %d 个虚构品种所在行",
-        len(text),
-        len("\n".join(filtered)),
-        removed_count,
-    )
-    return "\n".join(filtered)
 
 
 def generate_debate_procon(
@@ -478,6 +372,11 @@ def generate_debate_procon(
 ) -> tuple[str | None, str | None, str | None]:
     """生成白脸/黑脸辩论 + 综合结果。
 
+    辩论模式下附加功能通过 feature flag 注入 pro/con/syn 的 prompt：
+      - conditional（条件推理）：pro/con 各自含情景分析段
+      - qa_concentration（集中度问答）：pro/con 各自含集中度反问引导段
+    组合后缀隔离所有缓存键，不同 feature 组合不串扰。
+
     pro 或 con 失败时返回 (None, None, None) — 由调用方决定是否回退普通模式。
     synthesis 失败时返回 (pro_text, con_text, None) — 调用方可使用拼接结果。
 
@@ -487,9 +386,14 @@ def generate_debate_procon(
     import threading as _threading
     from src.python.config._core import get_llm_config
     from src.python.llm.fingerprint import build_llm_fingerprint
-    from src.python.llm.prompts_action import _build_debate_synthesis_prompt, _build_expert_review_prompt
 
-    # ── 构建基础 user prompt（复用普通 expert_review 的数据块） ──
+    # ── 辩论模式 feature 组合 ──────────────────────────
+    _fp_suffix = _build_feature_suffix()
+    _enable_conditional = "c" in _fp_suffix
+    _enable_qa_concentration = "q" in _fp_suffix
+    _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
+
+    # ── 构建基础 user prompt（辩论模式跳过情景分析，避免双重输出） ──
     _user = _build_expert_review_prompt(
         total_mv,
         total_cost,
@@ -502,6 +406,10 @@ def generate_debate_procon(
         pipeline_data=pipeline_data,
         competitive_context=competitive_context,
         metrics=metrics,
+        enable_conditional=_enable_conditional,
+        enable_qa_concentration=_enable_qa_concentration,
+        industry_concentration=_industry_conc,
+        skip_scenarios=True,  # 辩论模式下 pro/con 不写情景分析，避免双重输出
     )
 
     # ── 指纹计算 ────────────────────────────────────────
@@ -532,9 +440,9 @@ def generate_debate_procon(
     # ── 获取 debate 配置 ────────────────────────────────
     _lc = llm_config or get_llm_config()
     debate_cfg = (_lc or {}).get("debate", {})
-    m1_cfg = debate_cfg.get("mode_1_procon", {})
-    _per_call_max_tokens = m1_cfg.get("per_call_max_tokens")
-    _synthesis_temperature = m1_cfg.get("synthesis_temperature", 0.5)
+    procon_cfg = debate_cfg.get("procon", {})
+    _per_call_max_tokens = procon_cfg.get("per_call_max_tokens")
+    _synthesis_temperature = procon_cfg.get("synthesis_temperature", 0.5)
 
     _max_tokens = _per_call_max_tokens if _per_call_max_tokens is not None else 8192
     _timeout = debate_cfg.get("per_call_timeout_override", 90)
@@ -554,8 +462,8 @@ def generate_debate_procon(
                 _valid_codes.add(str(_code))
 
     # ── Step 1: 白脸（Pro） ────────────────────────────
-    _pro_cache_key = f"llm_debate_pro_{_fingerprint}"
-    _session_pro_key = f"debate_pro_{_fingerprint}"
+    _pro_cache_key = f"llm_debate_pro_{_fingerprint}{_fp_suffix}"
+    _session_pro_key = f"debate_pro_{_fingerprint}{_fp_suffix}"
     pro_text = _check_session_cache(_session_pro_key)
 
     if pro_text is None and not force:
@@ -567,6 +475,7 @@ def generate_debate_procon(
             "expert_review",
             force=force,
             http_client=http_client,
+            fingerprint_fn=lambda: f"{_fingerprint}{_fp_suffix}_debate_pro",
             system_prompt_default=_SYSTEM_DEBATE_PRO,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -574,10 +483,14 @@ def generate_debate_procon(
             output_brief_limit=300,
             system_prompt=_SYSTEM_DEBATE_PRO,
             user_prompt=_user,
+            holdings_details=holdings_details,
+            total_mv=total_mv,
+            total_cost=total_cost,
+            total_profit=total_profit,
+            raw_filter_fn=lambda t: _filter_hallucinated_codes(t, _valid_codes),
         )
         pro_text = pro_result[0] if pro_result and isinstance(pro_result, tuple) else None
         if pro_text:
-            pro_text = _filter_hallucinated_codes(pro_text, _valid_codes)
             cache_set(_pro_cache_key, pro_text)
             _set_session_cache(_session_pro_key, pro_text)
 
@@ -599,8 +512,8 @@ def generate_debate_procon(
         return (None, None, None)
 
     # ── Step 2: 黑脸（Con） ────────────────────────────
-    _con_cache_key = f"llm_debate_con_{_fingerprint}"
-    _session_con_key = f"debate_con_{_fingerprint}"
+    _con_cache_key = f"llm_debate_con_{_fingerprint}{_fp_suffix}"
+    _session_con_key = f"debate_con_{_fingerprint}{_fp_suffix}"
     con_text = _check_session_cache(_session_con_key)
 
     if con_text is None and not force:
@@ -612,6 +525,7 @@ def generate_debate_procon(
             "expert_review",
             force=force,
             http_client=http_client,
+            fingerprint_fn=lambda: f"{_fingerprint}{_fp_suffix}_debate_con",
             system_prompt_default=_SYSTEM_DEBATE_CON,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -619,10 +533,14 @@ def generate_debate_procon(
             output_brief_limit=300,
             system_prompt=_SYSTEM_DEBATE_CON,
             user_prompt=_user,
+            holdings_details=holdings_details,
+            total_mv=total_mv,
+            total_cost=total_cost,
+            total_profit=total_profit,
+            raw_filter_fn=lambda t: _filter_hallucinated_codes(t, _valid_codes),
         )
         con_text = con_result[0] if con_result and isinstance(con_result, tuple) else None
         if con_text:
-            con_text = _filter_hallucinated_codes(con_text, _valid_codes)
             cache_set(_con_cache_key, con_text)
             _set_session_cache(_session_con_key, con_text)
 
@@ -644,10 +562,14 @@ def generate_debate_procon(
         return (pro_text, con_text, None)
 
     # ── Step 3: 综合（Synthesis） ──────────────────────
-    _synthesis_user = _build_debate_synthesis_prompt(pro_text, con_text)
+    _synthesis_user = _build_debate_synthesis_prompt(
+        pro_text,
+        con_text,
+        enable_conditional=_enable_conditional,
+    )
     _pro_digest = hashlib.sha256(pro_text[:200].encode()).hexdigest()[:8]
     _con_digest = hashlib.sha256(con_text[:200].encode()).hexdigest()[:8]
-    _syn_fingerprint = f"{_fingerprint}_{_pro_digest}_{_con_digest}"
+    _syn_fingerprint = f"{_fingerprint}{_fp_suffix}_{_pro_digest}_{_con_digest}"
     _syn_cache_key = f"llm_debate_synthesis_{_syn_fingerprint}"
     _session_syn_key = f"debate_syn_{_syn_fingerprint}"
     synthesis_text = _check_session_cache(_session_syn_key)
@@ -661,6 +583,7 @@ def generate_debate_procon(
             "expert_review",
             force=force,
             http_client=http_client,
+            fingerprint_fn=lambda: f"{_fingerprint}{_fp_suffix}_debate_syn_{_pro_digest}_{_con_digest}",
             system_prompt_default=_SYSTEM_DEBATE_SYNTHESIS,
             prompt_builder=lambda: _synthesis_user,
             max_tokens_default=_max_tokens,
@@ -668,10 +591,10 @@ def generate_debate_procon(
             output_brief_limit=300,
             system_prompt=_SYSTEM_DEBATE_SYNTHESIS,
             user_prompt=_synthesis_user,
+            raw_filter_fn=lambda t: _filter_hallucinated_codes(t, _valid_codes),
         )
         synthesis_text = synthesis_result[0] if synthesis_result and isinstance(synthesis_result, tuple) else None
         if synthesis_text:
-            synthesis_text = _filter_hallucinated_codes(synthesis_text, _valid_codes)
             cache_set(_syn_cache_key, synthesis_text)
             _set_session_cache(_session_syn_key, synthesis_text)
 

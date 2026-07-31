@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.python.logger import setup_logger
-from src.python.registry import get_report_section_order
+from src.python.core.logger import setup_logger
+from src.python.core.registry import get_report_section_order
 from src.python.report.excel_b_series import write_b_series_sheets
 from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_llm_usage import write_llm_section_and_usage
@@ -259,16 +259,12 @@ def generate_excel_report(
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
     write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
-    _debate_mode_label: str | None = None
-    if debate_info and isinstance(debate_info, dict):
-        _debate_mode_label = debate_info.get("mode_label")
-    if not _debate_mode_label:
-        from src.python.features import is_feature_enabled
+    from src.python.report._debate_utils import detect_debate_mode
 
-        if is_feature_enabled("llm_debate_procon"):
-            _debate_mode_label = "🧪 辩论模式"
-        elif is_feature_enabled("llm_debate_conditional") or is_feature_enabled("llm_debate_qa_concentration"):
-            _debate_mode_label = "🧪 实验模式"
+    _debate_mode_label, _debate_mode_combination = detect_debate_mode(debate_info)
+
+    if _debate_mode_label and _debate_mode_combination:
+        _debate_mode_label = f"{_debate_mode_label} · {_debate_mode_combination}"
     write_llm_section_and_usage(
         sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
     )
@@ -307,7 +303,8 @@ def generate_excel_report(
                 ncols = 5
                 row = write_title_row(ws_ds, 1, "数据源可用性矩阵", ncols)
                 row = write_header_row(
-                    ws_ds, row,
+                    ws_ds,
+                    row,
                     ["数据源", "状态", "详情", "成功", "失败/降级"],
                 )
                 for m in matrix:
@@ -321,13 +318,21 @@ def generate_excel_report(
                         status_label = "❌ 失败"
                         _font = _FONT_RED
                     row = write_data_row(
-                        ws_ds, row,
-                        [m["name"], status_label, m["detail"],
-                         m["ok"], f"{m['degraded']}/{m['failed']}"],
+                        ws_ds,
+                        row,
+                        [m["name"], status_label, m["detail"], m["ok"], f"{m['degraded']}/{m['failed']}"],
                     )
                     if m["status"] != "ok":
                         for col in range(1, 6):
                             ws_ds.cell(row=row - 1, column=col).font = _font
+
+                has_degraded = any(m["degraded_list"] for m in matrix)
+                if has_degraded:
+                    row += 1
+                    row = write_title_row(ws_ds, row, "降级明细", ncols)
+                    for m in matrix:
+                        for dg in m.get("degraded_list", []):
+                            row = write_data_row(ws_ds, row, [m["name"], dg, "", "", ""])
 
                 has_failures = any(m["sample_failures"] for m in matrix)
                 if has_failures:

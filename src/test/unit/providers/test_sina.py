@@ -256,7 +256,7 @@ class TestFetchIndexKline(unittest.TestCase):
         ])
         mock_client.get.return_value = mock_resp
 
-        from src.python.code_utils import is_index_code as _orig_is_index
+        from src.python.core.code_utils import is_index_code as _orig_is_index
         with patch("src.python.providers.sina.is_index_code",
                    wraps=_orig_is_index) as spy:
             from src.python.providers.sina import fetch_index_kline

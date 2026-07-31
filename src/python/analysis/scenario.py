@@ -44,6 +44,77 @@ __all__ = [
 ]
 
 
+def _build_scenario_entry(
+    market_chg: float,
+    portfolio_value: float,
+    beta: float | None,
+    ci_available: bool,
+    beta_ci_lower: float | None,
+    beta_ci_upper: float | None,
+    se_available: bool,
+    beta_se: float | None,
+) -> dict[str, Any]:
+    """构建单个市场情景条目，包含预期变动、CI 传播和波动率区间。"""
+    if beta is None:
+        return {
+            "market_change": market_chg,
+            "expected_change_pct": None,
+            "expected_change_amt": None,
+            "ci_lower_pct": None,
+            "ci_upper_pct": None,
+            "ci_lower_amt": None,
+            "ci_upper_amt": None,
+            "vol_1sigma_pct": None,
+            "vol_1sigma_upper_pct": None,
+            "vol_2sigma_pct": None,
+            "vol_2sigma_upper_pct": None,
+        }
+
+    expected_pct = beta * market_chg
+    expected_amt = portfolio_value * expected_pct
+
+    # Beta CI 传播到情景变动
+    ci_lower_pct = None
+    ci_upper_pct = None
+    ci_lower_amt = None
+    ci_upper_amt = None
+    if ci_available and market_chg != 0:
+        if market_chg > 0:
+            ci_lower_pct = beta_ci_lower * market_chg
+            ci_upper_pct = beta_ci_upper * market_chg
+        else:
+            ci_lower_pct = beta_ci_upper * market_chg
+            ci_upper_pct = beta_ci_lower * market_chg
+        ci_lower_amt = portfolio_value * ci_lower_pct
+        ci_upper_amt = portfolio_value * ci_upper_pct
+
+    # ±1σ/±2σ 波动率区间
+    vol_1sigma_pct = None
+    vol_1sigma_upper_pct = None
+    vol_2sigma_pct = None
+    vol_2sigma_upper_pct = None
+    if se_available and beta_se is not None:
+        se_pct = beta_se * abs(market_chg)
+        vol_1sigma_pct = expected_pct - se_pct
+        vol_1sigma_upper_pct = expected_pct + se_pct
+        vol_2sigma_pct = expected_pct - 2.0 * se_pct
+        vol_2sigma_upper_pct = expected_pct + 2.0 * se_pct
+
+    return {
+        "market_change": market_chg,
+        "expected_change_pct": round(expected_pct, 4),
+        "expected_change_amt": round(expected_amt, 2),
+        "ci_lower_pct": round(ci_lower_pct, 4) if ci_lower_pct is not None else None,
+        "ci_upper_pct": round(ci_upper_pct, 4) if ci_upper_pct is not None else None,
+        "ci_lower_amt": round(ci_lower_amt, 2) if ci_lower_amt is not None else None,
+        "ci_upper_amt": round(ci_upper_amt, 2) if ci_upper_amt is not None else None,
+        "vol_1sigma_pct": round(vol_1sigma_pct, 4) if vol_1sigma_pct is not None else None,
+        "vol_1sigma_upper_pct": round(vol_1sigma_upper_pct, 4) if vol_1sigma_upper_pct is not None else None,
+        "vol_2sigma_pct": round(vol_2sigma_pct, 4) if vol_2sigma_pct is not None else None,
+        "vol_2sigma_upper_pct": round(vol_2sigma_upper_pct, 4) if vol_2sigma_upper_pct is not None else None,
+    }
+
+
 def scenario_analysis(
     portfolio_value: float,
     beta: float | None = None,
@@ -90,77 +161,21 @@ def scenario_analysis(
     scenarios: list[dict[str, Any]] = []
     has_data = beta is not None
 
-    # Beta CI 传播到情景变动
     ci_available = has_data and beta_ci_lower is not None and beta_ci_upper is not None
     se_available = has_data and beta_se is not None and beta_se > 0
-    vol_available = has_data and portfolio_volatility is not None and portfolio_volatility > 0
 
     for market_chg in _MARKET_SCENARIOS:
-        if not has_data or beta is None:
-            scenarios.append(
-                {
-                    "market_change": market_chg,
-                    "expected_change_pct": None,
-                    "expected_change_amt": None,
-                    "ci_lower_pct": None,
-                    "ci_upper_pct": None,
-                    "ci_lower_amt": None,
-                    "ci_upper_amt": None,
-                    "vol_1sigma_pct": None,
-                    "vol_1sigma_upper_pct": None,
-                    "vol_2sigma_pct": None,
-                    "vol_2sigma_upper_pct": None,
-                }
-            )
-            continue
-
-        expected_pct = beta * market_chg
-        expected_amt = portfolio_value * expected_pct
-
-        # Meta CI 传播：E(Rp) = β × Rm，CI 也线性缩放
-        ci_lower_pct = None
-        ci_upper_pct = None
-        ci_lower_amt = None
-        ci_upper_amt = None
-        if ci_available and market_chg != 0:
-            if market_chg > 0:
-                ci_lower_pct = beta_ci_lower * market_chg
-                ci_upper_pct = beta_ci_upper * market_chg
-            else:
-                # 市场下跌时 CI 反转：下限用 beta_upper（更悲观）
-                ci_lower_pct = beta_ci_upper * market_chg
-                ci_upper_pct = beta_ci_lower * market_chg
-            ci_lower_amt = portfolio_value * ci_lower_pct
-            ci_upper_amt = portfolio_value * ci_upper_pct
-
-        # ±1σ/±2σ 波动率区间
-        vol_1sigma_pct = None
-        vol_1sigma_upper_pct = None
-        vol_2sigma_pct = None
-        vol_2sigma_upper_pct = None
-        if se_available and beta_se is not None:
-            # Beta 标准误传播到预期变动
-            se_pct = beta_se * abs(market_chg)
-            vol_1sigma_pct = expected_pct - se_pct
-            vol_1sigma_upper_pct = expected_pct + se_pct
-            vol_2sigma_pct = expected_pct - 2.0 * se_pct
-            vol_2sigma_upper_pct = expected_pct + 2.0 * se_pct
-
-        scenarios.append(
-            {
-                "market_change": market_chg,
-                "expected_change_pct": round(expected_pct, 4),
-                "expected_change_amt": round(expected_amt, 2),
-                "ci_lower_pct": round(ci_lower_pct, 4) if ci_lower_pct is not None else None,
-                "ci_upper_pct": round(ci_upper_pct, 4) if ci_upper_pct is not None else None,
-                "ci_lower_amt": round(ci_lower_amt, 2) if ci_lower_amt is not None else None,
-                "ci_upper_amt": round(ci_upper_amt, 2) if ci_upper_amt is not None else None,
-                "vol_1sigma_pct": round(vol_1sigma_pct, 4) if vol_1sigma_pct is not None else None,
-                "vol_1sigma_upper_pct": round(vol_1sigma_upper_pct, 4) if vol_1sigma_upper_pct is not None else None,
-                "vol_2sigma_pct": round(vol_2sigma_pct, 4) if vol_2sigma_pct is not None else None,
-                "vol_2sigma_upper_pct": round(vol_2sigma_upper_pct, 4) if vol_2sigma_upper_pct is not None else None,
-            }
+        entry = _build_scenario_entry(
+            market_chg,
+            portfolio_value,
+            beta,
+            ci_available,
+            beta_ci_lower,
+            beta_ci_upper,
+            se_available,
+            beta_se,
         )
+        scenarios.append(entry)
 
     return {
         "has_data": has_data,

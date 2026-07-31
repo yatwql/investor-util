@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings
-from src.python.models import Holding
+from src.python.fetcher.fund import fetch_fund_benchmark, fetch_fund_rankings, fetch_fund_rankings_batch
+from src.python.core.models import Holding
 from src.python.report.category import _categorize_holding, calc_yield_text
 from src.python.report.fund_performance import (
     _RATING_COMMENT,
@@ -40,7 +40,7 @@ def _build_category_data(
     dividend_data: dict = {}
     dividend_success = True
     try:
-        from src.python.code_utils import is_a_share_code
+        from src.python.core.code_utils import is_a_share_code
         from src.python.fetcher.akshare import get_dividend_data
 
         stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
@@ -116,8 +116,13 @@ def _build_single_perf_item(
     detail_map: dict,
     prog: ProgressReporter,
     fund_count: int,
+    prefetched_rankings: dict[str, dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
-    """构建单只基金的业绩分析条目。"""
+    """构建单只基金的业绩分析条目。
+
+    Args:
+        prefetched_rankings: 预取的批量排名映射，None 时回退到单个获取。
+    """
     logger.info(
         "获取基金业绩 [%d/%d]: %s (%s)",
         idx,
@@ -127,7 +132,10 @@ def _build_single_perf_item(
     )
     prog.info(f"基金业绩 [{idx}/{fund_count}]: {fund.name}")
     d = detail_map.get(fund.code)
-    perf_data = fetch_fund_rankings(fund.code)
+    if prefetched_rankings is not None and fund.code in prefetched_rankings:
+        perf_data = prefetched_rankings[fund.code]
+    else:
+        perf_data = fetch_fund_rankings(fund.code)
     rankings: dict[str, Any] = {}
     rating: str = ""
     if perf_data and perf_data.get("rankings"):
@@ -198,9 +206,16 @@ def _build_perf_data(
         key=lambda h: detail_map.get(h.code, DetailRow()).market_value,
         reverse=True,
     )
+    fund_codes = [f.code for f in fund_holdings_sorted]
+    prefetched_rankings = fetch_fund_rankings_batch(fund_codes)
+
     result: list[dict[str, Any]] = []
     for idx, fund in enumerate(fund_holdings_sorted, 1):
-        result.append(_build_single_perf_item(idx, fund, detail_map, prog, len(fund_holdings_sorted)))
+        result.append(
+            _build_single_perf_item(
+                idx, fund, detail_map, prog, len(fund_holdings_sorted), prefetched_rankings=prefetched_rankings
+            )
+        )
     if result:
         logger.info("基金业绩分析完成，%d 只基金获取成功", len(result))
     else:

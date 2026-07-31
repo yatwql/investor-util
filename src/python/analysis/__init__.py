@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from src.python.analysis.simple_rebalance import compute_rebalance_signals  # noqa: F401
+from src.python.analysis.simple_rebalance import compute_simple_rebalance_signals  # noqa: F401
 from src.python.analysis.metrics import (  # noqa: F401
     sharpe_ratio,
     calmar_ratio,
@@ -53,7 +53,7 @@ from src.python.analysis.alignment_correction import (  # noqa: F401
 )
 
 __all__ = [
-    "compute_rebalance_signals",
+    "compute_simple_rebalance_signals",
     "sharpe_ratio",
     "calmar_ratio",
     "hhi",

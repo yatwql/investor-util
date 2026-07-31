@@ -20,7 +20,7 @@ from typing import Any
 from openpyxl.styles import PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_section_number, get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,

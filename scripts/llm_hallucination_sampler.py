@@ -42,7 +42,7 @@ _HTTP_CLIENT: Any = None
 def _get_http_client():
     global _HTTP_CLIENT
     if _HTTP_CLIENT is None:
-        from src.python.http_client import make_http_client
+        from src.python.core.http_client import make_http_client
 
         _HTTP_CLIENT = make_http_client(timeout=120.0, http2=False)
     return _HTTP_CLIENT
@@ -273,8 +273,6 @@ def _run_fact_check(
     """对 LLM 输出执行全量事实校验（使用独立检查器）。
 
     直接调用 fact_checker 的三个独立检查器，精确统计。
-    建议语境识别已下沉到 check_symbol_existence 内部,
-    不再需要 sampler 自行分类。
 
     Returns:
         {"issues": {...}, "total_checks": int, "hallucination_rate": float, ...}

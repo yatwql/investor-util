@@ -22,8 +22,8 @@ from typing import Any
 
 import httpx
 
-from src.python.code_utils import get_push2_secid
-from src.python.http_client import make_http_client
+from src.python.core.code_utils import get_push2_secid
+from src.python.core.http_client import make_http_client
 
 logger = logging.getLogger("invest")
 
@@ -68,7 +68,7 @@ def make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
     Returns:
         data 内层字典；全部失败返回 None
     """
-    from src.python.provider_registry import get_registry
+    from src.python.core.provider_registry import get_registry
 
     reg = get_registry()
     if reg.is_circuit_broken("eastmoney_industry"):
@@ -143,7 +143,7 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     Returns:
         {...} 详见函数内结果字典定义；None: API 异常或解析失败
     """
-    from src.python.provider_registry import NOT_FOUND, get_registry
+    from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     reg = get_registry()
     cached = reg.session_cache_get("industry", code)

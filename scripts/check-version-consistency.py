@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """版本号一致性检查脚本。
 
-以 src/python/constants.py 的 APP_VERSION 为单一事实源，校验以下文件中的版本号与其一致：
+以 src/python/core/constants.py 的 APP_VERSION 为单一事实源，校验以下文件中的版本号与其一致：
 
   - pyproject.toml          version = "X.Y.Z"
   - README.md               > 当前版本：X.Y.Z
@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # ── 读取事实源 ──────────────────────────────────────────────
 
-CONSTANTS_FILE = REPO_ROOT / "src" / "python" / "constants.py"
+CONSTANTS_FILE = REPO_ROOT / "src" / "python" / "core" / "constants.py"
 
 
 def _get_app_version() -> str:
@@ -61,20 +61,20 @@ def add_contains(path: Path, *patterns: str):
 
 # 代码文件
 CHECKS.append((REPO_ROOT / "pyproject.toml", "pyproject_version", ()))
-CHECKS.append((REPO_ROOT / "src" / "python" / "constants.py", "exact", (r'^APP_VERSION\s*=\s*"[^"]*"$',)))
+CHECKS.append((REPO_ROOT / "src" / "python" / "core" / "constants.py", "exact", (r'^APP_VERSION\s*=\s*"[^"]*"$',)))
 
 # Markdown 管理文档
 add_exact(REPO_ROOT / "README.md", r"> 当前版本：{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "folders.md", "v{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "folders.md", "{v}")
+add_contains(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md", "{v}")
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
-add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md", "v{v}")
+add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md", "{v}")
 
 
 # ── 校验逻辑 ────────────────────────────────────────────────
@@ -165,7 +165,7 @@ def main() -> None:
 
     print("[ERR] 版本号不一致 — 请先手动更新后重试。")
     print("      发布流程：")
-    print("        1. 修改 src/python/constants.py APP_VERSION")
+    print("        1. 修改 src/python/core/constants.py APP_VERSION")
     print("        2. 运行 python scripts/check-version-consistency.py")
     print("        3. 按 [ERR] 提示逐个更新文档版本号")
     print("        4. 再次运行确认全部 [OK]")

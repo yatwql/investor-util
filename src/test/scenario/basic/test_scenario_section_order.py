@@ -19,7 +19,7 @@ import unittest
 
 import pytest
 
-from src.python.registry import _REPORT_SECTION_DEFAULT
+from src.python.core.registry import _REPORT_SECTION_DEFAULT
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -31,7 +31,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
     """
 
     def setUp(self):
-        from src.python.registry import (
+        from src.python.core.registry import (
             _REPORT_SECTION_DEFAULT,
             get_report_section_order,
             get_report_section_keys,
@@ -130,7 +130,7 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
     """
 
     def setUp(self):
-        from src.python.registry import (
+        from src.python.core.registry import (
             get_report_section_order,
         )
         self._get_order = get_report_section_order

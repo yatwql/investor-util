@@ -15,7 +15,7 @@
   // ── B. 报告章节可见性 ──
   "enable_b_series": true,  // 基金深度分析（#6~9）
   "enable_news": true,      // 市场新闻（#10）
-  "enable_history": true,   // 组合历史走势+回撤（#16~17）
+  "enable_history": true,   // 组合历史走势+回撤（#15~16）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -58,14 +58,20 @@
 
   // ── G. 组合历史走势与持仓快照 ──
   "history": {
-    "analysis": "off",
+    "analysis": "auto",
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
     "benchmark_indices": {"sh000300": "沪深300"}
   },
 
-  // ── H. 再平衡配置 ──
+  // ── H. 业绩评价配置 ──
+  "performance_evaluation": {
+    "excess_threshold_up": 80,      // 超额收益 >= 此值 -> 上调一级
+    "excess_threshold_down": 40     // 超额收益 < 此值 -> 下调一级
+  },
+
+  // ── I. 再平衡配置 ──
   "rebalance": {
     "threshold": 0.15,
     "deviation_threshold": 0.05,
@@ -75,19 +81,33 @@
     "equity_fixed_income": {}
   },
 
-  // ── I. 流动性配置 ──
+  // ── J. 流动性配置 ──
   "redemption_limits": {},
 
-  // ── J. 匿名化配置 ──
+  // ── K. 匿名化配置 ──
   "anonymization": {
     "mode": "off"
+  },
+
+  // ── L. 批量并行调度 ──
+  "batch": {
+    "max_total_workers": 15,
+    "fund_workers": 3,
+    "industry_workers": 8
+  },
+  "batch_rate_limit": {
+    "tencent": 0.0,
+    "sina": 0.0,
+    "eastmoney": 0.1,
+    "tiantian": 0.5,
+    "eastmoney_industry": 0.05
   }
 }
 ```
 
 ## 字段说明
 
-以下字段可通过 TUI 主菜单的对应命令修改（运行 `python src/python/tui.py` 进入主菜单）。标有"手动编辑"的字段需直接修改 JSON 文件。
+以下字段可通过 TUI 主菜单的对应命令修改（运行 `python -m src.python.tui.tui` 进入主菜单）。标有"手动编辑"的字段需直接修改 JSON 文件。
 
 | 字段 | 默认值 | 说明 | TUI 修改 |
 |------|--------|------|----------|
@@ -110,11 +130,13 @@
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `comparison_indices` | `{"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}` | 竞争语境对比指数池。智囊团深度复盘中对比组合 vs 多指数的今日涨跌幅、区间累计收益和指标（夏普/波动率/最大回撤）。格式 `{指数代码: 显示名称}`。禁用时设为空对象 `{}` | 手动编辑 |
 | `risk_free_rate` | `null` | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74）。程序默认通过 akshare `bond_zh_us_rate` 获取中国 10Y 国债收益率 | 手动编辑 |
-| `history.analysis` | `"off"` | 组合历史走势获取模式：`"off"`=关闭（默认）、`"prompt"`=报告后询问、`"auto"`=自动获取 | 手动编辑 |
+| `history.analysis` | `"auto"` | 组合历史走势获取模式：`"off"`=关闭、`"prompt"`=报告后询问、`"auto"`=自动获取（默认） | 手动编辑 |
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
 | `history.benchmark_indices` | `{"sh000300": "沪深300"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
+| `performance_evaluation.excess_threshold_up` | `80` | 超额收益 ≥ 此值（百分点）时基金业绩评级上调一级 | 手动编辑 |
+| `performance_evaluation.excess_threshold_down` | `40` | 超额收益 < 此值（百分点）时基金业绩评级下调一级 | 手动编辑 |
 | `rebalance.threshold` | `0.15` | 单品种权重超限阈值（15%），超限触发再平衡建议 | 手动编辑 |
 | `rebalance.deviation_threshold` | `0.05` | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 | 手动编辑 |
 | `rebalance.profile` | `"moderate"` | 预设阈值集：conservative（保守 10%/3%）/ moderate（稳健 15%/5%）/ aggressive（进取 25%/8%）/ custom（自定义） | 手动编辑 |
@@ -430,9 +452,9 @@
 
 | 模式 | 说明 |
 |:----|:------|
-| `"off"` | 关闭（默认）。不获取历史走势数据，报告中的"组合历史走势"和"回撤分析"章节显示占位文本 |
+| `"off"` | 关闭。不获取历史走势数据，报告中的"组合历史走势"和"回撤分析"章节显示占位文本 |
 | `"prompt"` | 报告生成后询问用户是否需要获取历史走势数据（耗时约 15s） |
-| `"auto"` | 自动获取，不询问用户 |
+| `"auto"` | 自动获取，不询问用户（默认） |
 
 > **数据获取链路**：股票/ETF 走腾讯 K 线历史 → 新浪备用；OTC 基金走天天基金历史净值 → 东方财富备用（空结果递补）。东方财富净值 API 使用 `pageSize=20` 分页获取（最多约 200 条≈10 个月），增量缓存逐步积累更久数据。
 >
@@ -452,7 +474,7 @@
 可在 `config.json` 中设置：
 ```json
 "history": {
-    "analysis": "off",
+    "analysis": "auto",
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
@@ -465,7 +487,22 @@
 > **数据获取链路**：基准指数通过 `fetch_index_history()` → `history_index` chain → 腾讯 K 线 / 新浪 K 线（与组合持仓的个股 K 线共享熔断器）。数据写入缓存键 `history_index_{code}.json`。
 
 ---
-### H. 再平衡配置
+### H. 业绩评价配置
+
+#### performance_evaluation 基金业绩评级
+
+`performance_evaluation` 段控制基金业绩评级的超额收益阈值，用于 `fund_performance.py` 对持仓基金进行业绩评级判定。
+
+| 键 | 默认值 | 说明 |
+|:---|:------:|:-----|
+| `performance_evaluation.excess_threshold_up` | `80` | 超额收益 ≥ 此值（百分点）时评级上调一级 |
+| `performance_evaluation.excess_threshold_down` | `40` | 超额收益 < 此值（百分点）时评级下调一级 |
+
+超额收益 = 基金区间收益率 - 基准指数区间收益率。评级调整分为五档（低→较低→中等→较高→高），每个百分点差距触发一次调整。
+
+---
+
+### I. 再平衡配置
 
 #### threshold 品种权重超限阈值
 
@@ -517,7 +554,7 @@
 空对象 `{}` 表示不启用此项检查。
 
 ---
-### I. 流动性配置
+### J. 流动性配置
 
 #### redemption_limits 场外基金赎回上限
 
@@ -535,7 +572,7 @@
 配置后程序可计算场外品种全量赎回所需天数。未配置的品种在报告中标记"需手动确认赎回上限"。
 
 ---
-### J. 匿名化配置
+### K. 匿名化配置
 
 #### anonymization.mode 匿名化模式
 
@@ -551,7 +588,42 @@
 通过 TUI 主菜单 `[A]` 配置持仓匿名化可交互切换。
 
 ---
-### 功能开关（features.json）
+### L. 批量并行调度
+
+#### batch 池配置
+
+`batch` 段控制批量数据获取的线程池参数：
+
+| 键 | 默认值 | 说明 |
+|:---|:------:|:-----|
+| `batch.max_total_workers` | `15` | 全局 batch 线程硬上限，超过时自动钳位 |
+| `batch.fund_workers` | `3` | 基金排名/持仓批量并发数 |
+| `batch.industry_workers` | `8` | 行业分类批量并发数 |
+
+```json
+"batch": {
+  "max_total_workers": 15,
+  "fund_workers": 3,
+  "industry_workers": 8
+}
+```
+
+#### batch_rate_limit Provider 请求间隔
+
+`batch_rate_limit` 控制各数据源的请求间隔（秒），防止并发过高触发反爬限制：
+
+| 键 | 默认值 | 说明 |
+|:---|:------:|:-----|
+| `tencent` | `0.0` | 腾讯行情（不限速） |
+| `sina` | `0.0` | 新浪行情（不限速） |
+| `eastmoney` | `0.1` | 东方财富行情（100ms） |
+| `tiantian` | `0.5` | 天天基金（500ms） |
+| `eastmoney_industry` | `0.05` | 东方财富行业（50ms） |
+
+值为 0 表示不限速。配置后可通过菜单 `R` 刷新配置立即生效，无需重启程序。
+
+---
+### M. 功能开关（features.json）
 
 `data/config/features.json` 提供 28 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
@@ -569,7 +641,7 @@
 | 开关名 | 默认值 | 说明 |
 |:-------|:------:|:-----|
 | `llm_*`（5 项） | true（features.py 全部默认 true；news_correlation 实际启停通过 llm_settings.json 的 `enabled_llm` 控制，默认 false） | LLM 各模块独立启停 |
-| `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | **false**（全部默认关闭） | 辩论模式三增强通路：M1 正反辩论/M2 条件推理/M3 集中度问答。菜单 **[S]** 可交互开关 |
+| `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | **false**（全部默认关闭） | 辩论模式三增强通路：正反辩论/条件推理/集中度问答。菜单 **[S]** 可交互开关 |
 | `b_series_*`（4 项） | true | 基金深度分析模块 |
 | `news_*`（5 项） | true（cls 默认 false） | 新闻源启停 |
 | `history_portfolio` / `history_benchmark` | true | 历史走势与基准指数开关 |
@@ -581,7 +653,7 @@
 > 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---
-## 缓存分组
+### N. 缓存分组
 
 所有缓存模块归入两个分组，控制菜单命令的缓存清除范围：
 

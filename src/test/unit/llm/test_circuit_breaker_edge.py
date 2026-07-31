@@ -60,7 +60,7 @@ class TestCircuitBreakerBoundary(unittest.TestCase):
         self.assertFalse(_cb_is_open(url))
 
     @patch("src.python.llm.circuit_breaker.time")
-    def test_59s_still_open(self, mock_time):
+    def test_recovery_time_not_reached(self, mock_time):
         """冷却期 59s（未满 60s）→ 仍然熔断。"""
         from src.python.llm.circuit_breaker import (
             _cb_record_failure, _cb_is_open,

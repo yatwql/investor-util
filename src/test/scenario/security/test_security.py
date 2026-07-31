@@ -23,11 +23,11 @@ import pytest
 
 pytestmark = [pytest.mark.scenario_security]
 
-from src.python.anonymizer import (
+from src.python.config.anonymizer import (
     anonymize_holdings,
     anonymize_holdings_details,
 )
-from src.python.models import Holding
+from src.python.core.models import Holding
 
 logger = logging.getLogger("invest")
 
@@ -95,7 +95,7 @@ class TestSecurityBaseline:
             "data/config/llm_providers.json",
         ]
         for rel_path in llm_key_paths:
-            from src.python.constants import PROJECT_ROOT
+            from src.python.core.constants import PROJECT_ROOT
 
             full_path = os.path.join(PROJECT_ROOT, rel_path)
             if not os.path.exists(full_path):

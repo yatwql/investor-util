@@ -5,7 +5,7 @@
   2. 调用 fetch_with_incremental_fallback() 获取历史数据
   3. 合并为统一的时间序列（as-if 市值）
   4. 计算回撤、波动率、收益率
-  5. 数据质量校验（_validate_bars）
+  5. 数据质量校验（_validate_bars）— 见 _history_quality.py
 
 C1 约束：代码类型判定使用 code_utils 组合逻辑。
 C4 约束：会话内重复请求先查 session_cache。
@@ -18,10 +18,9 @@ from __future__ import annotations
 import logging
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
 from typing import Any
 
-from src.python.code_utils import (
+from src.python.core.code_utils import (
     is_a_share_code,
     is_bond_fund_by_name,
     is_exchange_fund_code,
@@ -31,6 +30,7 @@ from src.python.code_utils import (
     is_qdii_extended,
 )
 from src.python.fetcher.chain import fetch_with_incremental_fallback
+from src.python.report._history_quality import _diagnose_return, _validate_bars
 from src.python.report.benchmark import fetch_benchmarks, normalize_benchmarks
 
 logger = logging.getLogger("invest")
@@ -165,11 +165,107 @@ class PortfolioHistoryCalculator:
                                 max_drawdown_pct, data_start, data_end, status}, ...],
             }
         """
-        # 收集每只持仓的走势（并行获取，显著提速）
+        # 1) 收集每只持仓的走势（并行获取，显著提速）
+        all_series, success_count, failed_holdings, successful_holdings = self._fetch_all_histories(holdings)
+        warnings: list[str] = []
+
+        if not all_series:
+            return {
+                "bars": [],
+                "max_drawdown": 0,
+                "max_drawdown_pct": 0,
+                "annualized_volatility": 0,
+                "total_return": 0,
+                "total_return_pct": 0,
+                "daily_returns": [],
+                "daily_returns_portfolio": [],
+                "status": "unavailable",
+                "warnings": ["所有持仓均无法获取历史走势数据"],
+                "failed_holdings": failed_holdings,
+                "successful_holdings": [],
+            }
+
+        total_holdings = len(holdings)
+        status = "ok"
+        if success_count < total_holdings:
+            warnings.append(f"部分持仓历史走势不可用（{success_count}/{total_holdings}）")
+            status = "degraded"
+
+        # 2) 合并为统一时间线（含 LOCF）
+        sorted_dates, date_map, fund_count_on_date = self._merge_locf(all_series)
+
+        if not sorted_dates:
+            return {
+                "bars": [],
+                "max_drawdown": 0,
+                "max_drawdown_pct": 0,
+                "annualized_volatility": 0,
+                "total_return": 0,
+                "total_return_pct": 0,
+                "daily_returns": [],
+                "daily_returns_portfolio": [],
+                "status": "unavailable",
+                "warnings": warnings,
+            }
+
+        # 3) 有效区间截断：去除首尾覆盖不足的日期
+        sorted_dates = self._trim_effective_range(sorted_dates, fund_count_on_date, len(all_series))
+
+        # 4) 构建完整时间线 + 计算回撤
+        bars, max_drawdown_val, max_drawdown_pct, drawdown_start, drawdown_end = self._compute_drawdown(
+            sorted_dates, date_map
+        )
+
+        # 5) 计算日收益率序列 + 年化波动率
+        daily_returns = self._compute_daily_returns(bars)
+        annualized_vol = self._compute_annualized_volatility(daily_returns)
+
+        # 6) 计算总收益率（从截断后的起算点开始）
+        total_return, total_return_pct = self._compute_total_return(bars)
+
+        # 7) 诊断 + 质量校验
+        _diagnose_return(bars, sorted_dates, 0, fund_count_on_date, total_return_pct, len(all_series))
+        warnings.extend(_validate_bars(bars))
+
+        # 8) 基准指数历史走势
+        benchmarks = self._fetch_benchmarks(bars, days)
+
+        return {
+            "bars": bars,
+            "max_drawdown": round(-max_drawdown_val, 2),
+            "max_drawdown_pct": round(-max_drawdown_pct, 2),
+            "drawdown_start": drawdown_start,
+            "drawdown_end": drawdown_end,
+            "annualized_volatility": round(annualized_vol, 4),
+            "total_return": round(total_return, 2),
+            "total_return_pct": round(total_return_pct, 2),
+            "daily_returns": daily_returns,
+            "daily_returns_portfolio": daily_returns,
+            "data_start": sorted_dates[0],
+            "data_end": sorted_dates[-1],
+            "status": status,
+            "warnings": warnings,
+            "failed_holdings": failed_holdings,
+            "successful_holdings": successful_holdings,
+            "benchmarks": benchmarks,
+        }
+
+    # ── 子函数 ──────────────────────────────────────────
+
+    def _fetch_all_histories(
+        self, holdings: list[tuple[str, str, float]]
+    ) -> tuple[list[list[dict]], int, list[str], list[str]]:
+        """并行收集每只持仓的历史走势。
+
+        Args:
+            holdings: [(code, name, shares), ...] 持仓列表
+
+        Returns:
+            (all_series, success_count, failed_holdings, successful_holdings)
+        """
         all_series: list[list[dict]] = []
         total_holdings = len(holdings)
         success_count = 0
-        warnings: list[str] = []
         failed_holdings: list[str] = []
         successful_holdings: list[str] = []
 
@@ -193,30 +289,20 @@ class PortfolioHistoryCalculator:
                 else:
                     failed_holdings.append(f"{_name}({_code})")
 
-        if not all_series:
-            return {
-                "bars": [],
-                "max_drawdown": 0,
-                "max_drawdown_pct": 0,
-                "annualized_volatility": 0,
-                "total_return": 0,
-                "total_return_pct": 0,
-                "daily_returns": [],
-                "daily_returns_portfolio": [],
-                "status": "unavailable",
-                "warnings": ["所有持仓均无法获取历史走势数据"],
-                "failed_holdings": failed_holdings,
-                "successful_holdings": [],
-            }
+        return all_series, success_count, failed_holdings, successful_holdings
 
-        status = "ok"
-        if success_count < total_holdings:
-            warnings.append(f"部分持仓历史走势不可用（{success_count}/{total_holdings}）")
-            status = "degraded"
+    @staticmethod
+    def _merge_locf(
+        all_series: list[list[dict]],
+    ) -> tuple[list[str], dict[str, float], dict[str, int]]:
+        """合并为统一时间线（含 LOCF）。
 
-        # 合并为统一时间线（含 LOCF：净值未更新的标的沿用上次已知值）
-        # 例如 QDII 净值 T-1 滞后、场外基金净值比股票晚更新等，
-        # 若直接略过会导致该日组合市值偏低、收益/回撤异常放大
+        LOCF（Last Observation Carried Forward）：净值未更新的标的沿用上次已知值，
+        避免因 QDII 净值 T-1 滞后、场外基金净值晚更新等导致组合市值偏低。
+
+        Returns:
+            (sorted_dates, date_map, fund_count_on_date)
+        """
         all_dates = sorted({d for series in all_series for b in series for d in [b["date"]]})
         date_map: dict[str, float] = {d: 0.0 for d in all_dates}
         fund_count_on_date: dict[str, int] = {d: 0 for d in all_dates}
@@ -231,26 +317,28 @@ class PortfolioHistoryCalculator:
                     date_map[d] += last_val
                     fund_count_on_date[d] += 1
 
-        sorted_dates = all_dates
-        if not sorted_dates:
-            return {
-                "bars": [],
-                "max_drawdown": 0,
-                "max_drawdown_pct": 0,
-                "annualized_volatility": 0,
-                "total_return": 0,
-                "total_return_pct": 0,
-                "daily_returns": [],
-                "daily_returns_portfolio": [],
-                "status": "unavailable",
-                "warnings": warnings,
-            }
+        return all_dates, date_map, fund_count_on_date
 
-        # 找到可用的收益率起算日期和终止日期：要求该日 ≥80% 的持仓有数据
-        # 不同基金数据起止日期不同（如有的从2025-09、有的从2026-03），
-        # 过早的起算点会因基金不全导致组合市值偏低、收益率虚高；
-        # 过晚的终止点同样会因部分基金数据未刷新导致市值骤降
-        total_funds = len(all_series)
+    def _trim_effective_range(
+        self,
+        sorted_dates: list[str],
+        fund_count_on_date: dict[str, int],
+        total_funds: int,
+    ) -> list[str]:
+        """有效区间截断：去除首尾覆盖不足的日期。
+
+        不同基金数据起止日期不同（如有的从2025-09、有的从2026-03），
+        过早的起算点会因基金不全导致组合市值偏低、收益率虚高；
+        过晚的终止点同样会因部分基金数据未刷新导致市值骤降。
+
+        Args:
+            sorted_dates: 排序后的完整日期列表
+            fund_count_on_date: 每日期有数据的标的数
+            total_funds: 总标的数
+
+        Returns:
+            截断后的日期列表
+        """
         min_coverage = max(1, int(total_funds * self._coverage_threshold))
         valid_start_idx = 0
         for i, d in enumerate(sorted_dates):
@@ -271,9 +359,18 @@ class PortfolioHistoryCalculator:
                 sorted_dates[valid_start_idx],
                 sorted_dates[valid_end_idx],
             )
-        sorted_dates = sorted_dates[valid_start_idx : valid_end_idx + 1]
+        return sorted_dates[valid_start_idx : valid_end_idx + 1]
 
-        # 构建完整时间线 + 计算指标
+    @staticmethod
+    def _compute_drawdown(
+        sorted_dates: list[str],
+        date_map: dict[str, float],
+    ) -> tuple[list[dict], float, float, str, str]:
+        """构建完整时间线，计算回撤指标。
+
+        Returns:
+            (bars, max_drawdown_val, max_drawdown_pct, drawdown_start, drawdown_end)
+        """
         bars: list[dict] = []
         peak = 0.0
         max_drawdown_val = 0.0
@@ -286,7 +383,7 @@ class PortfolioHistoryCalculator:
             tv = date_map[date]
             if tv > peak:
                 peak = tv
-                current_dd_start = date  # 新高日=潜在回撤起算日
+                current_dd_start = date
             drawdown = peak - tv
             drawdown_pct = drawdown / peak * 100 if peak > 0 else 0
 
@@ -295,7 +392,7 @@ class PortfolioHistoryCalculator:
                 max_drawdown_pct = drawdown_pct
                 drawdown_end = date
                 if current_dd_start:
-                    drawdown_start = current_dd_start  # 峰值日
+                    drawdown_start = current_dd_start
                 else:
                     drawdown_start = date
 
@@ -308,69 +405,72 @@ class PortfolioHistoryCalculator:
                 }
             )
 
-        # 计算年化波动率
-        daily_returns = []
+        return bars, max_drawdown_val, max_drawdown_pct, drawdown_start, drawdown_end
+
+    @staticmethod
+    def _compute_daily_returns(bars: list[dict]) -> list[float]:
+        """计算日收益率序列。
+
+        Args:
+            bars: 走势数据列表（含 total_value）
+
+        Returns:
+            日收益率列表（小数形式，非百分比）
+        """
+        daily_returns: list[float] = []
         for i in range(1, len(bars)):
             prev = bars[i - 1]["total_value"]
             curr = bars[i]["total_value"]
             if prev > 0:
                 daily_returns.append((curr - prev) / prev)
+        return daily_returns
 
-        annualized_vol = self._compute_annualized_volatility(daily_returns)
+    @staticmethod
+    def _compute_total_return(bars: list[dict]) -> tuple[float, float]:
+        """计算总收益率。
 
-        # 计算总收益率（从 valid_start_idx 起算，避免早期数据覆盖不全导致虚高）
-        # 注意：sorted_dates 已在上面截断为 [valid_start_idx:valid_end_idx+1]，
-        # bars 基于截断后的 sorted_dates 构建，因此索引 0 即起算点
+        bars 基于截断后的日期列表构建，索引 0 即有效起算点。
+
+        Returns:
+            (total_return, total_return_pct) 绝对收益和百分比收益
+        """
         first_val = bars[0]["total_value"]
         last_val = bars[-1]["total_value"]
         total_return = last_val - first_val
         total_return_pct = (total_return / first_val * 100) if first_val > 0 else 0
+        return total_return, total_return_pct
 
-        # 诊断：输出起止值明细（用于排查收益率异常）
-        _diagnose_return(bars, sorted_dates, 0, fund_count_on_date, total_return_pct, len(all_series))
+    def _fetch_benchmarks(self, bars: list[dict], days: int) -> list[dict[str, Any]]:
+        """获取基准指数历史走势并归一化对齐。
 
-        # 质量校验（只校验收益率起算点之后的数据，避免新基金加入导致的跳变误报）
-        warnings.extend(_validate_bars(bars))
+        Args:
+            bars: 组合走势数据（用于归一化对齐）
+            days: 历史天数
 
-        # ── 基准指数历史走势（Iter 6a: 并行获取；Iter 6b: 归一化对齐） ──
+        Returns:
+            基准指数走势列表，空列表表示无基准或获取失败
+        """
         benchmarks: list[dict[str, Any]] = []
-        if self._benchmark_indices:
-            logger.info("[history] 开始获取 %d 个基准指数历史走势", len(self._benchmark_indices))
-            try:
-                raw_benchmarks = fetch_benchmarks(self._benchmark_indices, days=days)
-                if raw_benchmarks:
-                    ok_count = len(raw_benchmarks)
-                    logger.info("[history] 基准指数获取完成: %d/%d", ok_count, len(self._benchmark_indices))
-                    # 归一化对齐
-                    benchmarks = normalize_benchmarks(bars, raw_benchmarks)
-                    if benchmarks:
-                        logger.info("[history] 基准指数归一化完成: %d 条", len(benchmarks))
-                    else:
-                        logger.warning("[history] 基准指数归一化全部失败")
-                else:
-                    logger.warning("[history] 基准指数全部获取失败")
-            except Exception:
-                logger.warning("[history] 基准指数获取异常", exc_info=True)
+        if not self._benchmark_indices:
+            return benchmarks
 
-        return {
-            "bars": bars,
-            "max_drawdown": round(-max_drawdown_val, 2),
-            "max_drawdown_pct": round(-max_drawdown_pct, 2),
-            "drawdown_start": drawdown_start,
-            "drawdown_end": drawdown_end,
-            "annualized_volatility": round(annualized_vol, 4),
-            "total_return": round(total_return, 2),
-            "total_return_pct": round(total_return_pct, 2),
-            "daily_returns": daily_returns,
-            "daily_returns_portfolio": daily_returns,
-            "data_start": sorted_dates[0],
-            "data_end": sorted_dates[-1],
-            "status": status,
-            "warnings": warnings,
-            "failed_holdings": failed_holdings,
-            "successful_holdings": successful_holdings,
-            "benchmarks": benchmarks,
-        }
+        logger.info("[history] 开始获取 %d 个基准指数历史走势", len(self._benchmark_indices))
+        try:
+            raw_benchmarks = fetch_benchmarks(self._benchmark_indices, days=days)
+            if raw_benchmarks:
+                ok_count = len(raw_benchmarks)
+                logger.info("[history] 基准指数获取完成: %d/%d", ok_count, len(self._benchmark_indices))
+                benchmarks = normalize_benchmarks(bars, raw_benchmarks)
+                if benchmarks:
+                    logger.info("[history] 基准指数归一化完成: %d 条", len(benchmarks))
+                else:
+                    logger.warning("[history] 基准指数归一化全部失败")
+            else:
+                logger.warning("[history] 基准指数全部获取失败")
+        except Exception:
+            logger.warning("[history] 基准指数获取异常", exc_info=True)
+
+        return benchmarks
 
     # ── 内部路由 ──────────────────────────────────────────
 
@@ -410,88 +510,3 @@ class PortfolioHistoryCalculator:
         variance = sum((r - mean) ** 2 for r in daily_returns) / (len(daily_returns) - 1)
         std_dev = math.sqrt(variance)
         return std_dev * math.sqrt(252)
-
-
-# ═══════════════════════════════════════════════════════════════
-#  数据质量校验
-# ═══════════════════════════════════════════════════════════════
-
-
-def _validate_bars(bars: list[dict]) -> list[str]:
-    """检查走势数据质量，返回警告列表。
-
-    检查项：
-      - 收盘价为 0
-      - 未来日期
-      - 明显的异常跳变（单日涨跌 > 50%）
-
-    Args:
-        bars: 走势数据列表
-
-    Returns:
-        警告消息列表，无问题时为空列表
-    """
-    warnings: list[str] = []
-    today_str = datetime.now().strftime("%Y-%m-%d")
-
-    for i, b in enumerate(bars):
-        close = b.get("close") or b.get("total_value", 0)
-        if close == 0:
-            warnings.append(f"{b['date']}: 收盘价为 0（可能停牌或数据异常）")
-        if b.get("date", "") > today_str:
-            warnings.append(f"{b['date']}: 日期为未来")
-
-        # 检查异常跳变
-        if i > 0:
-            prev = bars[i - 1].get("close") or bars[i - 1].get("total_value", 0)
-            if prev > 0 and close > 0:
-                change_pct = abs(close - prev) / prev
-                if change_pct > 0.5:
-                    warnings.append(f"{b['date']}: 单日变化 {change_pct * 100:.1f}%（可能异常）")
-
-    return warnings
-
-
-def _diagnose_return(
-    bars: list[dict],
-    sorted_dates: list[str],
-    valid_start_idx: int,
-    fund_count_on_date: dict[str, int],
-    total_return_pct: float,
-    total_series: int,
-) -> None:
-    """诊断收益率异常：输出起止日市值、覆盖标的数、每日明细快照。"""
-    if not bars:
-        return
-
-    first_bar = bars[valid_start_idx]
-    last_bar = bars[-1]
-
-    # 取起止日 + 中间等间隔抽 3 个样本
-    step = max(1, (len(bars) - 1) // 4)
-    sample_idxs = [valid_start_idx] + [valid_start_idx + step * i for i in range(1, 4)] + [len(bars) - 1]
-    sample_idxs = sorted(set(i for i in sample_idxs if i < len(bars)))
-
-    lines = [
-        "[history] ═══ 累计收益率诊断 ═══",
-        f"[history]  起算日: {first_bar['date']}  total_value={first_bar['total_value']:.2f}  "
-        f"覆盖 {fund_count_on_date.get(first_bar['date'], 0)}/{total_series} 只",
-        f"[history]  终止日: {last_bar['date']}  total_value={last_bar['total_value']:.2f}  "
-        f"覆盖 {fund_count_on_date.get(last_bar['date'], 0)}/{total_series} 只",
-        f"[history]  收益率: {total_return_pct:.2f}%",
-        f"[history]  期间: {first_bar['date']} → {last_bar['date']} 共 {len(bars) - valid_start_idx} 个交易日",
-    ]
-
-    # 每日明细快照
-    lines.append(f"[history]  中轴抽样（{len(sample_idxs)} 点）:")
-    for idx in sample_idxs:
-        b = bars[idx]
-        coverage = fund_count_on_date.get(b["date"], 0)
-        lines.append(
-            f"[history]    {b['date']}  tv={b['total_value']:.2f}  "
-            f"dd={b['drawdown']:.2f}  dd%={b['drawdown_pct']:.2f}%  "
-            f"覆盖={coverage}/{total_series}"
-        )
-
-    for line in lines:
-        logger.info(line)
