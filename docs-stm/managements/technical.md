@@ -1887,7 +1887,7 @@ generators_orchestrator（并行调度 4+1 模块）
             │      └── api_base._attempt_api_call()
             │              ├── Claude → anthropic SDK
             │              └── OpenAI/DeepSeek → openai SDK
-            │ ④ 内容过滤安抚重试（空返回时追加安抚提示）
+            │ ④ 空内容处理（None→切换 provider；""→安抚重试一次）
             │ ⑤ Markdown→HTML（markdown.py）
             │ ⑥ 写入缓存（Provider 感知键名，记录实际 Provider 名）
             └── 返回 (result, usage, provider_name) 三元组
@@ -1932,7 +1932,7 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 | Extended Thinking | Claude: `thinking.budget_tokens`；DeepSeek: `output_config.effort` | 与 `temperature` 互斥 |
 | Prompt Caching | Anthropic 专属，system prompt 数组 + `cache_control: ephemeral` | 5 分钟内复用免全价 |
 | 截断重试 | 检测 `TRUNCATION_MARKER` 后自动 1.5× max_tokens 重试一次 | 修复内容被截断的情况 |
-| 内容过滤安抚 | 空返回时追加安抚指令重试 | 应对内容审查误杀 |
+| 空内容处理 | `_extract_content` 无 text block 返回 None → 直接切换 provider（DeepSeek V4 思考耗尽 max_tokens 预算场景，安抚无效）；仅真正空字符串 `""` 追加安抚指令重试一次 | 应对思考预算耗尽 + 内容审查误杀 |
 | 会话用量追踪 | `session.py` 维护线程安全 `session_usage` 字典 + `cost_tracker.py` 报告级预算管理 | 按模块粒度追踪 token/费用/缓存命中/耗时 |
 | Token 预算告警 | `cost_tracker.check_input_budget()` — 累计输入 Token 超 8K 时日志告警（不截断） | 为模型分层提供基线数据 |
 | 调用耗时记录 | `skeleton.py` `time.monotonic()` 计时 → `record_per_module(duration=)` → HTML 页脚展示 | 每次 call_llm() 记录实际耗时 |

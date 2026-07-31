@@ -17,8 +17,10 @@
 
 ### Docs
 
-- **how-to-config-llm.md 调优参数同步** — 参数表新增 `reasoning_effort` 列；health_check max_tokens 4096→8192；expert_review / health_check effort 标为 medium（非统一 high）
-- **llm-technical.md 参数表 health_check 4096→8192**
+- **how-to-config-llm.md 调优参数同步** — 参数表新增 `reasoning_effort` 列；health_check max_tokens 4096→8192；expert_review / health_check effort 标为 medium（非统一 high）；失败降级表区分"返回空内容（None）→ 切换 Provider"与"空字符串 → 安抚重试"；Extended Thinking 章节补充 DeepSeek V4 强制推理说明（thinking+text 共享 max_tokens 预算）与空内容调参建议（增大 max_tokens / 降低 effort）
+- **llm-technical.md 空内容处理与参数同步** — 参数表 health_check 4096→8192；调用链/§5.1/§6.1 四层容错更新空内容处理（`_extract_content` 无 text block → None → 直接切换 provider；仅真正空字符串 `""` 安抚重试）；effort 兜底说明（模板默认 expert_review / health_check 为 medium）；附录 A `reasoning_effort` 枚举补 `low`/`max`
+- **technical.md LLM 章节空内容处理同步** — §5.2 调用链、§5.5 关键机制表"内容过滤安抚"改为"空内容处理"（None 切 provider / "" 安抚重试）
+- **review-findings.md rf-98 标记已修复** — 详细说明移至 changelog，摘要行保留于已修复表
 
 ## [0.9.3] - 2026-07-31
 

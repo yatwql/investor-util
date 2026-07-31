@@ -245,7 +245,9 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 |------|------|------|
 | `llm_key.json` 缺失或 key 为空 | 显示占位："本节内容待生成 — LLM 未配置" | INFO |
 | `enabled_llm.{module}` = false | 直接跳过，不显示占位 | INFO |
-| API 调用失败（网络错误/超时/返回空） | 显示占位："（本节内容生成失败）" | WARNING |
+| API 调用失败（网络错误/超时） | 显示占位："（本节内容生成失败）" | WARNING |
+| 返回空内容（无文本块，如思考耗尽 max_tokens 预算） | 切换下一 Provider；全部失败则显示占位 | WARNING |
+| 返回空字符串（内容被过滤） | 追加安抚指令重试一次，仍失败则切换 Provider | WARNING |
 | 输出被截断（含 `... [TRUNCATED] ...`） | 自动增大 `max_tokens` 1.5× 重试一次，仍截断则记录日志提示用户手动调大 | WARNING |
 
 ---
@@ -522,7 +524,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 > **Claude**（provider: `"claude"`）：模型 ≥ `claude-sonnet-4` 时生效，用 `thinking.budget_tokens` 控制思考 token 预算。
 >
-> **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"high"` / `"max"`）。
+> **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"low"` / `"medium"` / `"high"` / `"max"`）。
 >
 > **Gemini**（provider: `"gemini"`）：模型 `gemini-2.5-*` 时生效，用 `generationConfig.thinkingConfig.thinkingBudget` 控制思考 token 预算。
 
@@ -570,6 +572,10 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 **一句话总结（Claude / Gemini）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
 **一句话总结（DeepSeek）：** `reasoning_effort` 管"想多深"，`"max"` 对应深度分析的极致模式。
+
+**DeepSeek V4 强制推理说明**：DeepSeek V4 系列为**强制推理模型**，即使 `thinking_enabled` 关闭也会返回 `thinking` block；且 `max_tokens` 是 **thinking + 最终文本的共享预算**（而非仅最终输出）。当思考部分耗尽预算时，响应只含 thinking block、无最终文本（即"返回空内容"场景），程序会直接切换下一 Provider，不消耗安抚重试。
+
+**调参建议**：若日志出现 `LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本`，请**增大对应模块的 `max_tokens_{module}`** 或**降低 `reasoning_effort_{module}`**（如 `"high"` → `"medium"`）。参考：health_check 此前使用 4096 + `"high"` 稳定触发空内容，改为 8192 + `"medium"` 后正常产出。
 
 ### 效果参考
 
