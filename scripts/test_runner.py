@@ -731,9 +731,20 @@ def _run_phased(
         combined["errors"] += stats["errors"]
         combined["subtests"] += stats["subtests"]
 
-        # 打印 pytest 摘要行
+        # 打印 pytest 摘要行（含 FAILURES 段详情）
+        # 注：默认过滤只保留关键词行，会丢弃失败详情（测试名/断言错误）。
+        # 失败时（FAILURES 段出现）需完整打印该段，便于定位失败测试。
+        in_failures = False
         for line in output.splitlines():
             stripped = line.strip()
+            if stripped.startswith("====="):
+                if "FAILURES" in stripped:
+                    in_failures = True
+                elif in_failures:
+                    in_failures = False
+            if in_failures:
+                print(f"      {line}")
+                continue
             if not stripped:
                 continue
             if any(
