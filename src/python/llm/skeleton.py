@@ -279,8 +279,14 @@ def _execute_llm_with_finalize(
     cache_key: str,
     module_key: str,
     thinking_enabled: bool,
+    raw_filter_fn: Any = None,
 ) -> tuple[str | None, bool]:
-    """调用 LLM → 截断重试 → 处理结果并写入缓存。"""
+    """调用 LLM → 截断重试 → 原始输出过滤 → 处理结果并写入缓存。
+
+    Args:
+        raw_filter_fn: 在 markdown_to_html 之前对 LLM 原始输出应用的过滤函数
+            （如辩论模式虚构代码过滤），作用于带换行的 Markdown 文本。
+    """
     clear_last_llm_failure()
     _t0 = time.monotonic()
     result, usage, provider_info = call_llm(
@@ -308,6 +314,8 @@ def _execute_llm_with_finalize(
         temperature,
         model,
     )
+    if raw_filter_fn and result:
+        result = raw_filter_fn(result)
 
     if result:
         provider_name = provider_info.get("name") if provider_info else None
@@ -355,6 +363,7 @@ def generate_llm_content(
     http_client: httpx.Client | None = None,
     thinking_enabled: bool = False,
     module_key: str = "",
+    raw_filter_fn: Any = None,
 ) -> tuple[str | None, bool]:
     """通用 LLM 内容生成骨架，带缓存检查与写入。"""
     if module_key:
@@ -395,6 +404,7 @@ def generate_llm_content(
         cache_key,
         module_key,
         thinking_enabled,
+        raw_filter_fn,
     )
 
 
@@ -416,12 +426,14 @@ def _run_standard_mode(
     total_mv: float = 0.0,
     total_cost: float = 0.0,
     total_profit: float = 0.0,
+    raw_filter_fn: Any = None,
 ) -> tuple[str | None, bool]:
     """标准 LLM 单篇生成模式：缓存 → 调用 → 处理结果。
 
     Args:
         system_prompt: 不为 None 时覆盖 system prompt（不走 llm_config 配置）。
         user_prompt: 不为 None 时跳过 prompt_builder，直接使用此值。
+        raw_filter_fn: 在 markdown_to_html 之前对 LLM 原始输出应用的过滤函数。
     """
     cache_enabled = llm_config.get(f"cache_enabled_{module_key}", True)
 
@@ -462,6 +474,7 @@ def _run_standard_mode(
         http_client=http_client,
         thinking_enabled=llm_config.get(f"thinking_enabled_{module_key}", False),
         module_key=module_key,
+        raw_filter_fn=raw_filter_fn,
     )
 
 
@@ -490,11 +503,17 @@ def generate_llm_module(
     total_mv: float = 0.0,
     total_cost: float = 0.0,
     total_profit: float = 0.0,
+    # ── LLM 原始输出过滤钩子（辩论模式虚构代码过滤） ──
+    raw_filter_fn: Any = None,  # fn(原始文本) → 过滤后文本，在 markdown_to_html 之前应用
 ) -> Any:
     """通用 LLM 模块生成骨架。
 
     标准模式（无 batch_preparer）：生成单篇分析内容。
     批量模式（有 batch_preparer）：逐条缓存、分批并行、JSON 解析。
+
+    ``raw_filter_fn`` 在 markdown_to_html 之前对 LLM 原始输出应用
+    （如辩论模式的虚构代码过滤），保证过滤作用于带换行的 Markdown
+    而非拼接后的单行 HTML。默认 None 不改变现有模块行为。
 
     标准模式返回 (HTML 或 None, 是否来自缓存)。
     批量模式返回 (results_dict, all_cached, token_usage, cached_count)。
@@ -548,6 +567,7 @@ def generate_llm_module(
         total_mv=total_mv,
         total_cost=total_cost,
         total_profit=total_profit,
+        raw_filter_fn=raw_filter_fn,
     )
 
 

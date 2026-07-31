@@ -55,7 +55,7 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "system_prompt_penetration_deep": None,
     "model_penetration_deep": None,
     "temperature_penetration_deep": 0.1,
-    "max_tokens_penetration_deep": 4096,
+    "max_tokens_penetration_deep": 8192,
     "timeout_penetration_deep": 90,
     "cache_enabled_penetration_deep": True,
     "output_brief_penetration_deep": False,

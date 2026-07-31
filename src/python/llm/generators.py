@@ -487,10 +487,10 @@ def generate_debate_procon(
             total_mv=total_mv,
             total_cost=total_cost,
             total_profit=total_profit,
+            raw_filter_fn=lambda t: _filter_hallucinated_codes(t, _valid_codes),
         )
         pro_text = pro_result[0] if pro_result and isinstance(pro_result, tuple) else None
         if pro_text:
-            pro_text = _filter_hallucinated_codes(pro_text, _valid_codes)
             cache_set(_pro_cache_key, pro_text)
             _set_session_cache(_session_pro_key, pro_text)
 
@@ -537,10 +537,10 @@ def generate_debate_procon(
             total_mv=total_mv,
             total_cost=total_cost,
             total_profit=total_profit,
+            raw_filter_fn=lambda t: _filter_hallucinated_codes(t, _valid_codes),
         )
         con_text = con_result[0] if con_result and isinstance(con_result, tuple) else None
         if con_text:
-            con_text = _filter_hallucinated_codes(con_text, _valid_codes)
             cache_set(_con_cache_key, con_text)
             _set_session_cache(_session_con_key, con_text)
 
@@ -591,10 +591,10 @@ def generate_debate_procon(
             output_brief_limit=300,
             system_prompt=_SYSTEM_DEBATE_SYNTHESIS,
             user_prompt=_synthesis_user,
+            raw_filter_fn=lambda t: _filter_hallucinated_codes(t, _valid_codes),
         )
         synthesis_text = synthesis_result[0] if synthesis_result and isinstance(synthesis_result, tuple) else None
         if synthesis_text:
-            synthesis_text = _filter_hallucinated_codes(synthesis_text, _valid_codes)
             cache_set(_syn_cache_key, synthesis_text)
             _set_session_cache(_session_syn_key, synthesis_text)
 

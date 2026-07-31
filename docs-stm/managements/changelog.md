@@ -8,6 +8,10 @@
 
 ### Fix
 
+- **辩论虚构过滤按"行"删除导致整段误删** — `_hallucination_filter.py` 过滤粒度从"整行"改为"行内句段"（先按行、行内再按句末标点切分），markdown_to_html 输出的单行 HTML 不再因一个误判 token 被整段清空（6412 字符→0 字符→白脸失败回退普通模式）
+- **虚构过滤时机下移** — `skeleton.py` 新增 `raw_filter_fn` 钩子，在 markdown_to_html 之前对 LLM 原始输出过滤（作用于带换行的 Markdown）；`generators.py` 辩论 pro/con/synthesis 三处手动过滤收敛到骨架一处，synthesis 顺带获得过滤保护
+- **虚构代码误报降低** — `_is_safe_word` 豁免 `TOP\d+`（提示词附录 TOP3 块回声），白名单新增 `smart`/`money`（Smart Beta/Money 等金融术语）
+- **`max_tokens_penetration_deep` 4096→8192** — 同步生产配置 `llm_settings.json`、默认模板 `_llm_defaults.py`、`how-to-config-llm.md`，避免穿透深度分析输出撞 max_tokens 上限触发 1.5× 重试
 - **test_runner.py subprocess UnicodeDecodeError** — 两处 `subprocess.run` 添加 `errors="replace"`，防止 Windows 子进程输出非 UTF-8 字节时崩溃
 - **回撤数值误判窗口收窄** — `_is_drawdown_context` 近邻守卫窗口 30→15 字符，避免跨分句误判"累计"为收益率关键词
 - **辩论模式 synthesis 条件推理注入补全** — `_build_debate_synthesis_prompt` 新增 `enable_conditional` 参数，辩论+条件推理同时开启时 synthesis 阶段追加配置化情景分析，弥补 pro/con 跳过情景分析的空缺
@@ -16,7 +20,17 @@
 
 ### Test
 
+- **虚构过滤回归测试** — 新增 4 用例：`test_sentence_level_removal_same_line`（行内句段删除）、`test_top_rank_suffix_not_filtered`（TOP2/TOP3 豁免）、`test_smart_term_not_filtered`（Smart 豁免）、`test_filter_single_line_html_keeps_other_sentences`（单行 HTML 不整段清空，edge）
 - **测试用例数据更新** — 同步 bg=2 梯度阈值 0.40 更新后的去重预期行为
+
+### Docs
+
+- **llm-technical.md 骨架流程同步** — 骨架执行 ASCII 图新增 `③' 原始输出过滤（可选）` 步骤（`raw_filter_fn` 钩子，位于截断处理之后、markdown_to_html 之前）；模块表更新 `skeleton.py` 描述与 `generators.py` 辩论生成说明；`max_tokens_penetration_deep` 参数表 4096→8192
+- **technical.md 虚构过滤架构表行更新** — 描述改为"句子级删除 + `raw_filter_fn` 钩子时机下移"，同步 C 约束表对应行的设计说明
+- **test-coverage.md 统计快照更新** — all 3806 / unit 3494 / standard 2957 / verify 2248 / edge 474 / unit_llm 650 / LLM 功能域 683（2026-07-31 实时收集）
+- **folders.md 目录树与统计项更新** — 主程序 182/43422、脚本 10/3460、源码合计 193/48744、测试代码 217/59014、测试用例 3806；目录树含 `src/test/data/hallucination/` 两个 gitignore 测试数据集文件
+- **how-to-config-llm.md `max_tokens_penetration_deep` 8192** — JSON 示例与参数表行同步
+- **review-findings.md rf-96 标记已修复** — 详细说明移至 changelog，摘要行保留于已修复表
 
 ## [0.9.2] - 2026-07-31
 

@@ -154,9 +154,9 @@ skeleton.py:_generate_llm_content()
 | 模块 | 分类 | 职责 | 入口函数 |
 |:-----|:-----|:------|:---------|
 | `generators_orchestrator.py` | 编排层 | 4+1 模块并行调度，缓存预检查，线程池分发 | `generate_all_llm()` |
-| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep） | 各 `generate_*()` |
+| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 | 各 `generate_*()` |
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
-| `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑） | `_generate_llm_module()` |
+| `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑）+ `raw_filter_fn` 原始输出过滤钩子（markdown_to_html 之前） | `_generate_llm_module()` |
 | `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、Gemini API 调用 | `_call_llm()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `_call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
@@ -181,7 +181,7 @@ skeleton.py:_generate_llm_content()
 | `global_macro` | 全球政经局势 | 800 | 60s | 24h（86400s） | 宏观经济学家角色，500 字内，纯文本 |
 | `expert_review` | 智囊团深度复盘 | 8192 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
 | `health_check` | 持仓体检报告 | 4096 | 120s | 24h（86400s） | 四维度评分（风险分散度/流动性/收益合理性/成本结构） |
-| `penetration_deep` | 穿透深度分析 | 4096 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
+| `penetration_deep` | 穿透深度分析 | 8192 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
 
 #### 批量模式模块（1 个，通过 `_generate_llm_module` 以批量模式调用）
 
@@ -297,6 +297,14 @@ _run_standard_mode()
 │ │ result 含截断标记?               │  │
 │ │ YES → max_tokens × 1.5 重试一次  │  │
 │ │ 二次截断则保留第一次结果+警告      │  │
+│ └──────────────┬──────────────────┘  │
+│                │                      │
+│ ┌──────────────▼──────────────────┐  │
+│ │ ③' 原始输出过滤（可选）          │  │
+│ │ raw_filter_fn 非空 →             │  │
+│ │   result = raw_filter_fn(result) │  │
+│ │ 辩论模式虚构代码过滤：对带换行     │  │
+│ │ 的原始 Markdown 先过滤，再转 HTML  │  │
 │ └──────────────┬──────────────────┘  │
 │                │                      │
 │ ┌──────────────▼──────────────────┐  │
