@@ -4,6 +4,20 @@
 
 ---
 
+## [0.9.3-dev] - 2026-07-31
+
+### Fix
+
+- **test_runner.py subprocess UnicodeDecodeError** — 两处 `subprocess.run` 添加 `errors="replace"`，防止 Windows 子进程输出非 UTF-8 字节时崩溃
+- **回撤数值误判窗口收窄** — `_is_drawdown_context` 近邻守卫窗口 30→15 字符，避免跨分句误判"累计"为收益率关键词
+- **辩论模式 synthesis 条件推理注入补全** — `_build_debate_synthesis_prompt` 新增 `enable_conditional` 参数，辩论+条件推理同时开启时 synthesis 阶段追加配置化情景分析，弥补 pro/con 跳过情景分析的空缺
+- **缓存测试 patch 路径修复** — `test_handlers_cache.py` 的 `@patch` 目标从 `providers.akshare_extras` 修正为 `fetcher.akshare`（模块加载本地绑定导致 xdist 并行下间歇性失败）
+- **新闻去重测试用例同步** — `test_cross_source_english_token_only_overlap` 预期合并 1 条；`test_cross_source_bg2_low_ratio_kept` 替换测试数据
+
+### Test
+
+- **测试用例数据更新** — 同步 bg=2 梯度阈值 0.40 更新后的去重预期行为
+
 ## [0.9.2] - 2026-07-31
 
 ### Feat
