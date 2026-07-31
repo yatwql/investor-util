@@ -393,7 +393,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
   "thinking_budget_expert_review": 16000,
-  "reasoning_effort_expert_review": "high",
+  "reasoning_effort_expert_review": "medium",
 
   // ═══════════════════════════════════════════
   // 持仓体检报告 — health_check
@@ -401,13 +401,13 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_health_check": null,
   "model_health_check": null,
   "temperature_health_check": 0.1,
-  "max_tokens_health_check": 4096,
+  "max_tokens_health_check": 8192,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
   "output_brief_health_check": false,
   "thinking_enabled_health_check": true,
   "thinking_budget_health_check": 12000,
-  "reasoning_effort_health_check": "high",
+  "reasoning_effort_health_check": "medium",
 
   // ═══════════════════════════════════════════
   // 穿透深度分析 — penetration_deep
@@ -499,15 +499,15 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 ## 各模块推荐参数值
 
-> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`reasoning_effort="high"`。
+> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`reasoning_effort="high"`（expert_review / health_check 例外，见下表）。
 
-| 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | output_brief_limit |
-|------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:------------------:|
-| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | **200 字** |
-| **智囊团深度复盘** | null | **0.3**（低温保事实） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
-| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **4096** | **120s** | **true** | 12000 | 300 字 |
-| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | 300 字 |
-| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | 不适用 |
+| 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | reasoning_effort | output_brief_limit |
+|------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:----------------:|:------------------:|
+| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | high | **200 字** |
+| **智囊团深度复盘** | null | **0.3**（低温保事实） | **8192** | **120s** | **true** ⭐ | 16000 | **medium** | 300 字 |
+| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **8192** | **120s** | **true** | 12000 | **medium** | 300 字 |
+| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | high | 300 字 |
+| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | high | 不适用 |
 
 > **补充**：财经新闻关联分析还支持 `news_correlation_top_n` 配置项（默认 `30`），控制送 LLM 分析的新闻条数上限，按关键词匹配数降序选取。增大此值会线性增加 Token 消耗，减小则降低 LLM 关联分析的覆盖率。设为 `0` 可完全禁用 LLM 分析（仅保留关键词匹配）。
 

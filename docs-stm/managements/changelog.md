@@ -6,6 +6,20 @@
 
 ## [0.9.4-dev] - 2026-07-31
 
+### Fix
+
+- **LLM 空内容误判"内容被过滤"→ 根因区分 + 修复无效安抚重试** — DeepSeek V4 兼容端点为强制推理模型，`thinking` 与 `text` 共享 `max_tokens` 预算；思考部分耗尽预算时响应仅含 `thinking` block 无 `text`（复现：effort=high + max_tokens=4096 稳定触发）。`_extract_content` 对无 text block 的响应区分根因：`stop_reason=max_tokens` 记录"思考耗尽预算"日志（建议增大 max_tokens/降低 effort），其他仍记录"可能被内容过滤"；统一返回 `None` 走 provider 切换，替代对空内容追加安抚指令的无效重试
+- **health_check `max_tokens` 4096→8192 + effort high→medium** — 实测（mt=8192 + effort=high 输出 5172 tokens 正常）验证增大预算可消除空 text；expert_review effort high→medium 缩短 thinking 预留文本预算。同步生产 `llm_settings.json`、默认模板 `_llm_defaults.py`
+
+### Test
+
+- **`_extract_content` 空 text 回归测试** — edge 新增 `TestExtractContentEdge` 3 用例：仅 thinking + max_tokens → None 且记录预算耗尽日志（不误报过滤）、仅 thinking + end_turn → None 且记录过滤日志、thinking+text 并存正常返回；同步 4 处既有断言（空列表/仅 thinking → None）
+
+### Docs
+
+- **how-to-config-llm.md 调优参数同步** — 参数表新增 `reasoning_effort` 列；health_check max_tokens 4096→8192；expert_review / health_check effort 标为 medium（非统一 high）
+- **llm-technical.md 参数表 health_check 4096→8192**
+
 ## [0.9.3] - 2026-07-31
 
 ### Fix

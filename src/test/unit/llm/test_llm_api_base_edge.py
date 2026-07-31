@@ -48,8 +48,12 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
             data,
             extract_fn=lambda d: "",
             check_truncation_fn=lambda d, mt: False,
-            max_tokens=1000, config_field="max_tokens",
-            provider="claude", model_name="test", label="Test", url="https://api.test.com",
+            max_tokens=1000,
+            config_field="max_tokens",
+            provider="claude",
+            model_name="test",
+            label="Test",
+            url="https://api.test.com",
         )
         self.assertEqual(content, "")
         self.assertEqual(usage, {"input_tokens": 10})
@@ -64,8 +68,12 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
                 data,
                 extract_fn=lambda d: None,
                 check_truncation_fn=lambda d, mt: False,
-                max_tokens=1000, config_field="max_tokens",
-                provider="claude", model_name="test", label="Test", url="https://api.test.com",
+                max_tokens=1000,
+                config_field="max_tokens",
+                provider="claude",
+                model_name="test",
+                label="Test",
+                url="https://api.test.com",
             )
         self.assertIsNone(content)
         self.assertIsNone(usage)
@@ -82,8 +90,12 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
             data,
             extract_fn=lambda d: d.get("content"),
             check_truncation_fn=lambda d, mt: True,
-            max_tokens=100, config_field="max_tokens",
-            provider="claude", model_name="test", label="Test", url="https://api.test.com",
+            max_tokens=100,
+            config_field="max_tokens",
+            provider="claude",
+            model_name="test",
+            label="Test",
+            url="https://api.test.com",
         )
         self.assertIn(TRUNCATION_MARKER, content)
         self.assertIsNotNone(usage)
@@ -98,8 +110,12 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
                 data,
                 extract_fn=lambda d: d.get("content"),
                 check_truncation_fn=lambda d, mt: False,
-                max_tokens=100, config_field="max_tokens",
-                provider="claude", model_name="test", label="Test", url="https://api.test.com",
+                max_tokens=100,
+                config_field="max_tokens",
+                provider="claude",
+                model_name="test",
+                label="Test",
+                url="https://api.test.com",
             )
             self.assertEqual(content, "no usage data")
             self.assertIsNone(usage)
@@ -165,9 +181,7 @@ class TestCallLlmWithRetryEdge(unittest.TestCase):
     @patch("src.python.llm.api_base._cb_is_open", return_value=False)
     @patch("src.python.llm.api_base._attempt_api_call")
     @patch("src.python.llm.api_base._cb_record_success")
-    def test_empty_content_filter_recovery(
-        self, mock_record_success, mock_attempt, mock_cb_open
-    ) -> None:
+    def test_empty_content_filter_recovery(self, mock_record_success, mock_attempt, mock_cb_open) -> None:
         """内容过滤空返回 → 带空标记。"""
         from src.python.llm.api_base import call_llm_with_retry
 
@@ -178,8 +192,15 @@ class TestCallLlmWithRetryEdge(unittest.TestCase):
 
         mock_client = MagicMock()
         result, usage = call_llm_with_retry(
-            "Test", mock_client, "https://api.test.com", {}, {},
-            30.0, 2, 1000, "max_tokens",
+            "Test",
+            mock_client,
+            "https://api.test.com",
+            {},
+            {},
+            30.0,
+            2,
+            1000,
+            "max_tokens",
             extract_fn=lambda d: d.get("content"),
             check_truncation_fn=lambda d, mt: False,
             provider="claude",
