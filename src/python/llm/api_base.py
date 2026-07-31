@@ -292,11 +292,20 @@ def _extract_content(data: dict) -> str | None:
                     texts.append(str(block["text"]))
         if texts:
             return "\n".join(texts)
-        # content 列表为空或只有 non-text block（如 thinking / redacted_thinking）
-        # 可能是内容被过滤，返回空字符串而非 None 以便上层做针对性处理
-        if not texts and content_field:
-            return ""
-        return ""  # 空列表也视为空内容而非格式异常
+        # content 无任何 text block（如只有 thinking / redacted_thinking，或空列表）。
+        # 区分根因，避免误报"内容被过滤"：
+        #   1) stop_reason=max_tokens → 思考部分耗尽 max_tokens 预算（DeepSeek V4 等强制
+        #      推理模型常见），未产出最终文本。安抚重试（改 system prompt）对该场景无效，
+        #      返回 None 触发 provider 切换而非无效重试。
+        #   2) 其他 → 内容可能被过滤拦截，同样视为无可用文本，返回 None。
+        if data.get("stop_reason") == "max_tokens":
+            logger.warning(
+                "LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本"
+                "（建议增大对应 max_tokens 配置或降低 reasoning_effort）"
+            )
+        else:
+            logger.warning("LLM API 返回空内容（可能被内容过滤机制拦截）")
+        return None
 
     return None
 

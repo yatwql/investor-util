@@ -294,9 +294,9 @@ class TestExtractContent(unittest.TestCase):
         self.assertEqual(_extract_content(data), "直接字符串回复")
 
     def test_content_as_empty_list(self) -> None:
-        """content 为空列表 → 返回空字符串（视为空内容而非格式异常）。"""
+        """content 为空列表 → 返回 None（无可用文本，走 provider 切换）。"""
         data = {"content": []}
-        self.assertEqual(_extract_content(data), "")
+        self.assertIsNone(_extract_content(data))
 
     def test_content_missing(self) -> None:
         """响应中无 content 字段。"""
@@ -324,9 +324,9 @@ class TestExtractContent(unittest.TestCase):
         self.assertIsNone(_extract_content(data))
 
     def test_content_list_no_text(self) -> None:
-        """content 列表但元素无 text 字段 → 返回空字符串（视为空内容而非格式异常）。"""
+        """content 列表但元素无 text 字段 → 返回 None（无可用文本，走 provider 切换）。"""
         data = {"content": [{"type": "image"}, {"type": "tool_use"}]}
-        self.assertEqual(_extract_content(data), "")
+        self.assertIsNone(_extract_content(data))
 
 # ═══════════════════════════════════════════════════════════
 #  截断检测

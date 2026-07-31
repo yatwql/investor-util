@@ -50,12 +50,12 @@ class TestExtractContent(unittest.TestCase):
         self.assertEqual(result, "final answer")
 
     def test_empty_content_list(self) -> None:
-        """content 为空列表 → 返回空字符串。"""
+        """content 为空列表 → 返回 None（无可用文本，走 provider 切换）。"""
         from src.python.llm.api_base import _extract_content
 
         data = {"content": []}
         result = _extract_content(data)
-        self.assertEqual(result, "")
+        self.assertIsNone(result)
 
     def test_error_in_response(self) -> None:
         """data 含 error → 返回 None。"""
@@ -73,12 +73,12 @@ class TestExtractContent(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_only_thinking_blocks(self) -> None:
-        """仅有 thinking block 无 text → 返回空字符串。"""
+        """仅有 thinking block 无 text → 返回 None（无可用文本，走 provider 切换）。"""
         from src.python.llm.api_base import _extract_content
 
         data = {"content": [{"type": "thinking", "thinking": "thinking..."}, {"type": "redacted_thinking", "data": "..."}]}
         result = _extract_content(data)
-        self.assertEqual(result, "")
+        self.assertIsNone(result)
 
 
 class TestCheckClaudeTruncation(unittest.TestCase):
