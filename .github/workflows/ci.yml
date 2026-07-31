@@ -49,6 +49,16 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: python scripts/test_runner.py --mode verify,regression --no-timeout
 
+      # 即使测试失败也上传报告，便于诊断失败测试（保留 7 天）
+      - name: 上传测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.python-version }}
+          path: test-reports/latest/
+          if-no-files-found: warn
+          retention-days: 7
+
   format:
     runs-on: ubuntu-latest
     continue-on-error: true  # 格式问题不阻断 CI（非阻塞门禁，可后续修复）
