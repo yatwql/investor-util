@@ -503,7 +503,7 @@ const chartTheme = {
 
 | # | 约束 | 内容 |
 |:-:|:-----|:-----|
-| F1 | **Flag 层级** | `enable_interactive_charts` 是**总开关**，`metrics_*`（7 项）是**雷达子开关**。总开关关闭 → 整个 Chart.js 不加载、`metrics_*` 无意义（子开关仅在全量指标构建 radar 轴时过滤）；总开关开启 → 子开关逐个过滤雷达轴（§6.6）。两者正交，无冲突 |
+| F1 | **Flag 层级** | `enable_interactive_charts` 是**总开关**，`metrics_*`（7 项）中 **6 项是雷达子开关**（sharpe/calmar/hhi/winrate/turnover/beta），`metrics_risk_contribution` 是**指标级熔断开关**（`circuit_breaker_wrapper` 消费，控制风险贡献计算，非雷达轴）。总开关关闭 → 整个 Chart.js 不加载、`metrics_*` 无意义；总开关开启 → 6 个雷达子开关逐个过滤雷达轴（§6.6）。两者正交，无冲突 |
 | F2 | **默认 True 的兜底** | 默认开启渐进增强；用户可在 `data/config/features.json` 设 `"enable_interactive_charts": false` 一键回退旧 Canvas + 表格渲染（双路径保证，与 §4.7 呼应）。`features.json` 缺失该键 → 用默认 True，不强制新增键 |
 | F3 | **生命周期废弃** | §4.7 定义「稳定 2 版本后删 Canvas」；**补充**：Chart.js 成为唯一渲染器后，同步删除 ① `_FEATURE_FLAGS_DEFAULT` 中 `enable_interactive_charts` 键 ② 分类注释 `3→2 项` ③ `test_feature_interactive.py` 相关用例 ④ 模板 Flag 分支 ⑤ `features.json` 示例键——避免死 flag 残留 |
 | F4 | **注册位置** | `_FEATURE_FLAGS_DEFAULT`「功能特性」分类（现 2 项）→ 新增后 **3 项**（注释计数同步，H1）；非实验功能，不列入 `EXPERIMENTAL_FEATURES` |
@@ -819,18 +819,18 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 
 | 任务 | 测试范围 |
 |:-----|:---------|
-| `chartjs-chart-matrix` POC 验证与 Chart.js v4 兼容性 | ✅ 兼容：Matrix 插件正确渲染含悬停数值的热力图 ✅ 不兼容：有 Canvas 2D 回退方案（0.5d 缓冲覆盖） |
-| 热力图框架（接收 `correlation_data` 占位数据） | ✅ 无 `correlation_data` → 占位文本 ✅ 有空数据 → 显示"等待 plan-2 数据" |
-| 全链路手动验证（Chrome 90+ / Edge 90+ 主验，Firefox 90+ / Safari 14+ 抽验，R17） | ✅ 6 张图均渲染 ✅ 缩放/悬停/图例交互正常 ✅ 打印 preview 正常 ✅ **R21**：离线场景（断网/`file://`）本地 bundle 正常渲染 ✅ **A1/A4**：禁用 Canvas 后显示 fallback 文本；375px 宽度自适应不溢出（R10） ✅ **R22**：微信内置浏览器实测（链接 + file:// 两种打开方式） |
-| Canvas 回归验证 | ✅ Flag OFF 时 2 张 Canvas 图与改造前渲染一致 ✅ 模板结构测试全部通过 |
+| `chartjs-chart-matrix` POC 验证与 Chart.js v4 兼容性 | ⏳ 推迟到 plan-2（相关性矩阵在 plan-2 提供 `correlation_data` 后实现；本迭代不引入 Matrix 插件，避免 YAGNI） |
+| 热力图框架占位 | ✅ MODULE 14 持仓重合度矩阵已有完善空数据占位（"暂无重合度数据"）；plan-1 不新建 `correlation_data` 渲染（§5.0.2 可跳过，占位文本已具备） |
+| 全链路手动验证（Chrome 90+ / Edge 90+ 主验，Firefox 90+ / Safari 14+ 抽验，R17） | ⏳ **浏览器人工验证项**（见下方验收标准 2/3/4/6）——需在真实浏览器 + 微信中执行，非自动化 |
+| Canvas 回归验证 | ✅ 新增 `test_flag_off_legacy_canvas_regression`：Flag OFF 时 6 个新 canvas 均不输出、旧 `portfolioChart`/`drawdownChart` 保留、`drawSimpleChart` 定义保留 ✅ 模板结构测试全部通过（1292 passed） |
 
 **验收标准**：
-1. ✅ POC 通过 → Matrix 插件与 Chart.js v4 兼容；不通过 → 有 Canvas 2D 回退方案
-2. ✅ 6 张图在 Chrome 90+ / Edge 90+ 中均可渲染和基本交互；Firefox 90+ / Safari 14+ 抽验通过（R17 矩阵）
-3. ✅ 打印预览：所有 chart 以高分辨率静态图显示（2x DPI）
-4. ✅ **R21** 离线验证：断网/删除 chart.min.js 场景 → 所有 chart 由 `typeof Chart` 守卫跳过 → 回退 Canvas / 表格（不再依赖 CDN 阻断）
-5. ✅ Feature Flag OFF → 报告与未升级版渲染一致（Canvas + 表格）
-6. ✅ **R22** 微信内置浏览器实测：**链接访问**（部署到 http/https）→ 6 图正常渲染；**file://**（传输助手/收藏点开）→ 若图表不渲染，确认 `typeof Chart` 守卫回退 Canvas/表格，数据可读（表格明细不缺失）
+1. ⏳ POC 推迟到 plan-2（`correlation_data` 未到，不提前引入 Matrix 插件依赖）
+2. ⏳ **手动**：6 张图在 Chrome 90+ / Edge 90+ 中均可渲染和基本交互；Firefox 90+ / Safari 14+ 抽验（R17 矩阵）
+3. ⏳ **手动**：打印预览所有 chart 以高分辨率静态图显示（2x DPI，`chart-print.js` 快照 + `@media print` 浅色强制已实现）
+4. ⏳ **手动**：**R21** 离线验证——断网/删除 chart.min.js → `typeof Chart` 守卫跳过 → 回退 Canvas / 表格（守卫逻辑已实现）
+5. ✅ Feature Flag OFF → 报告与未升级版渲染一致（`test_flag_off_legacy_canvas_regression` + 1292 passed 覆盖）
+6. ⏳ **手动**：**R22** 微信内置浏览器实测（链接 + file:// 两种打开方式）——依赖 `typeof Chart` 守卫回退，逻辑已实现待实测
 
 **测试范围边界**：
 - ✅ 测：全链路集成、跨浏览器渲染、离线场景（本地 bundle）、打印降级、微信打开场景（R22）
@@ -867,10 +867,10 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 | 3 | 资产构成 Doughnut | 0.25d | ~3（含 H2 data_unavailable） | 不涉及 | Iter 1 |
 | 4 | 行业分布 Horizontal Bar | 0.25d | ~3（+2 edge） | ✅ `*_edge.py` | Iter 1 |
 | 5 | 穿透 TOP10 Bar | 0.25d | ~2 | 不涉及 | Iter 1 |
-| 6 | 量化指标 Radar（双数据源：all_metrics + risk_metrics） | 0.25d | ~8（含 H2 + 双降级路径）+1 edge | ✅ `*_edge.py` | Iter 1（risk_metrics + all_metrics） |
-| 7 | 热力图框架 + 集成验证（**可裁剪**，§5.0.2） | 0.5d | ~6（手动） | 不涉及 | Iter 1-6 |
-| 8 | 代码审查 + 文档 + 门禁 | 0.5d | 1（C14 grep）+ dev-verify,report | C12 合规检查 | Iter 7 |
-| **合计** | | **3.75d + 1.5d** = **5.25d** | **~45** | | |
+| 6 | 量化指标 Radar（双数据源：all_metrics + risk_metrics + 6 雷达子开关） | 0.25d | ~10（含 H2 + 双降级路径 + Flag 过滤）+4 edge | ✅ `*_edge.py` | Iter 1（risk_metrics + all_metrics） |
+| 7 | 热力图框架（占位已具备，推迟 plan-2）+ 集成验证（**可裁剪**，§5.0.2） | 0.25d | 1（Flag OFF 回归）+ 手动项待实测 | 不涉及 | Iter 1-6 |
+| 8 | 代码审查 + 文档 + 门禁（C14 ✅ / dev-verify ✅ / report ✅） | 0.5d | 1（C14 grep）+ dev-verify,report（1292 passed） | C12 合规检查 ✅ | Iter 7 |
+| **合计** | | **3.75d + 1.5d** = **5.25d** | **~46** | | |
 
 ---
 

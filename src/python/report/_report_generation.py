@@ -499,17 +499,29 @@ def _build_chart_datasets_for_report(
 
     - Flag 关闭 → None（模板不渲染 Chart.js，回退旧 Canvas）
     - Flag 开启 → build_chart_datasets()（内部对单图失败独立 try/except，R11）
+
+    metrics_* Flag（§6.6 F1）：收集雷达子开关值传给预处理器，
+    关闭的指标在 radar 数据集输出 "N/A"。注：metrics_risk_contribution
+    是指标级熔断开关（circuit_breaker_wrapper 消费），非雷达轴，不在此收集。
     """
     if not enable_interactive:
         return None
     try:
+        from src.python.config.features import is_feature_enabled
         from src.python.report.chart_data_builder import build_chart_datasets
+
+        _metric_flag_names = (
+            "metrics_sharpe", "metrics_calmar", "metrics_hhi",
+            "metrics_winrate", "metrics_turnover", "metrics_beta",
+        )
+        metric_flags = {n: is_feature_enabled(n) for n in _metric_flag_names}
 
         return build_chart_datasets(
             history_data=history_data,
             details=details,
             risk_metrics=risk_metrics,
             all_metrics=all_metrics,
+            metric_flags=metric_flags,
         )
     except Exception:
         # 预处理器顶层兜底（R11）：任何异常 → 返回空 dict（报告仍有表格/占位）

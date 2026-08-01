@@ -9,6 +9,9 @@
 ### Fix
 
 - **chart：行业分布空白 sector 未归一化** — `_build_industry_bar_dataset` 仅做 `entry.get("sector") or "其他"`，纯空白字符串 `"  "` 被当作有效行业分类（生成空白标签）。修复：`(sector or "").strip() or "其他"`，None/空串/纯空白统一归入"其他"。回归测试见 `test_chart_data_builder_edge.py`（plan-1 Iter 4 验收标准 5）
+- **chart：量化指标 Radar 图表（Iter 6）** — 第 6 张图迁移为 Chart.js v4 radar：① 数据三级降级（R12）——`all_metrics` 全量 6 轴（夏普/卡玛/胜率/换手率/组合 Beta/集中度 HHI）→ `risk_metrics` 3 基本字段 → `history_data` 3 基本轴，`risk_metrics`/`history_data` 兜底时 `datasets[0]["note"]="仅限基础指标"` + `degraded=True`；② §6.6 F1 子开关——6 个 `metrics_*` 雷达子开关收集传入预处理器，对应轴关闭时输出 `"N/A"`（非 0）；③ 胜率 `win_rate()` 返回 dict，`_extract_rate` 提取 0~1 数值；④ 模板 3 路占位——`data_unavailable` → "持仓市值数据不可用，量化指标暂停计算"、radar 无 labels → "量化指标数据不足"、全量/降级 → canvas + 降级 note 文本；⑤ `chart-init.js` 新增 `initRadarChart`（radar 极坐标 scale，O1 独立 try/catch，降级虚线描边）
+- **chart：Iter 8 代码审查 4 项 LOW 修复** — ① rf-107：`metrics_risk_contribution` 从雷达 flag 收集移除（该 flag 是指标级熔断开关，`circuit_breaker_wrapper` 消费，非雷达轴；设计文档 F1 同步修正"6 项雷达子开关 + 1 项熔断开关"）；② rf-108：`chart_data_builder.py` 404 行→397 行，合并 risk_metrics/history_data 两降级分支 + 提取 `_BASIC_RADAR_AXES` 常量（§4.11 O4 预算 ≤400）；③ rf-109：`initRadarChart` 增加 `borderDash: degraded ? [5,5] : undefined`，对齐 line/drawdown"降级→虚线"统一契约；④ rf-110：模板降级 note `<div>` 移出固定高度 `.chart-box` 容器，避免溢出压到下方数据块
+- **chart：Flag OFF 回归测试补全（Iter 7 集成验证）** — 新增 `test_flag_off_legacy_canvas_regression`：`enable_interactive_charts=False` 时 6 个新 Chart.js canvas 均不输出（无空 div/canvas 残留）、旧 `portfolioChart`/`drawdownChart` Canvas 保留、`drawSimpleChart` 定义保留——保证 Flag OFF 报告与未升级版渲染一致（Iter 7 验收标准 5）；热力图框架按 §5.0.2 推迟到 plan-2（`correlation_data` 未到，不提前引入 Matrix 插件，MODULE 14 占位已具备）；R21 本地 bundle `typeof Chart` 守卫、`chart-print.js` 打印快照已实现，浏览器人工验证项（Chrome/微信/打印/375px）在设计文档标注 ⏳ 待实测
 - **rf-102：Tencent 指数 K 线超限崩溃修复** — `fetch_index_kline` 文档声称上限 3650 天，实测 `days=3650` 时 API 返回 `[]`（list），`_parse_kline_response` 以 `data.get(...)` 处理 dict 而崩溃 `AttributeError: 'list' object has no attribute 'get'`；实际上限约 2000 天。修复：`_parse_kline_response` 加非 dict 类型守卫（异常响应 → 空列表不崩）；`fetch_index_kline` 钳位上限 3650→2000 + docstring 同步
 - **rf-103：Sina 指数 K 线备用链路降级处理** — Sina `getKLineData` 端点当前环境对**所有**代码返回 404/空（数据源故障，非代码 bug），`sina_kline.fetch_index_kline` 备用链路失效。处理：`sina_kline.fetch_index_kline` 钳位上限对齐 2000（rf-102 同类防）；`_parse_kline_json` 已有非 list 容错；接受 Tencent 单链路降级，Sina 保留为代码级备用（环境恢复后自动生效），设计文档表述如实修正（原"🟢 生产验证"→ 降级接受）
 - **rf-106：`get_combined_timeseries` days 参数语义澄清** — `portfolio_history.py` 该方法 `days` 仅作用于基准指数（`_fetch_benchmarks`），不控制持仓历史长度（`_fetch_all_histories` 走 chain 默认 30）；docstring"历史天数"有误导，澄清并标注 rf-106，提示后续需透传 days 时改 `_fetch_all_histories`
@@ -16,6 +19,7 @@
 ### Test
 
 - **chart 行业分布边缘回归测试** — 新增 `test_chart_data_builder_edge.py`（C12 合规）：全部无行业归属→归入"其他"、None/空串/纯空白 sector 归一化、mv 为 None/负值不崩溃、top10 空列表占位；`test_chart_data_builder.py` 补 Iter 4/5 验收用例（行业市值总和与穿透口径一致、最多 10 个行业截断、穿透品种 <3 仍渲染）
+- **chart Radar 降级与 Flag 过滤测试** — `test_chart_data_builder.py` TestRadar 新增 6 用例（metrics_sharpe 关闭→该轴 "N/A"、全关→6 个 "N/A"、全 N/A 占位保轴、risk_metrics 兜底 degraded+note、history 兜底 degraded+note、全量路径无 note）；`test_chart_data_builder_edge.py` 新增 4 用例（all_metrics 与 risk_metrics 均 None→空、all_metrics=None+history 降级、未知 flag 名不影响该轴、部分指标缺失→N/A 其余保留）；`test_html_report_structure.py` 结构测试 3 用例（radar 有 labels 渲染 canvas、无 labels"量化指标数据不足"占位、data_unavailable"持仓市值数据不可用"占位）+ 既有 2 用例 chart-box 计数更新（3→4 / 5→6）
 - **rf-102/103 回归测试** — `test_tencent_edge.py` 新增 2 例（API 返回 list 非 dict 不崩、days=3650 钳位到 2000）；`test_sina_edge.py` 新增 1 例（days 钳位 2000 对齐 Tencent），防超限崩溃与钳位逻辑回退
 
 ### Docs

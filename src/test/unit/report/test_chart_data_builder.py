@@ -432,6 +432,77 @@ class TestRadar:
             "夏普比率", "卡玛比率", "胜率", "换手率", "组合 Beta", "集中度 HHI",
         ]
 
+    def test_radar_flag_off_shows_na(self) -> None:
+        """§6.6 F1：metrics_sharpe=False → 该指标输出 "N/A"（非 0）。"""
+        ds = build_chart_datasets(
+            history_data=None,
+            all_metrics=self._ALL_METRICS,
+            metric_flags={"metrics_sharpe": False},
+        )
+        chart = ds["radar"]
+        assert chart["labels"][0] == "夏普比率"
+        assert chart["datasets"][0]["data"][0] == "N/A"
+        # 其余轴不受影响
+        assert chart["datasets"][0]["data"][1] == 0.8
+
+    def test_radar_flag_map_all_axes(self) -> None:
+        """§6.6 F1：6 个雷达轴均被 metrics_* Flag 覆盖（映射完整）。"""
+        flags = {
+            "metrics_sharpe": False, "metrics_calmar": False, "metrics_winrate": False,
+            "metrics_turnover": False, "metrics_beta": False, "metrics_hhi": False,
+        }
+        ds = build_chart_datasets(
+            history_data=None,
+            all_metrics=self._ALL_METRICS,
+            metric_flags=flags,
+        )
+        chart = ds["radar"]
+        assert chart["datasets"][0]["data"] == ["N/A"] * 6
+
+    def test_radar_all_na_placeholder_axes_kept(self) -> None:
+        """全 N/A → 轴保留，数据 "N/A"（§6.6：Flag 全关仍显示轴标签）。"""
+        flags = {f: False for f in (
+            "metrics_sharpe", "metrics_calmar", "metrics_winrate",
+            "metrics_turnover", "metrics_beta", "metrics_hhi",
+        )}
+        ds = build_chart_datasets(
+            history_data=_history_ok(),
+            all_metrics=self._ALL_METRICS,
+            metric_flags=flags,
+        )
+        chart = ds["radar"]
+        assert chart["labels"] == ["夏普比率", "卡玛比率", "胜率", "换手率", "组合 Beta", "集中度 HHI"]
+        assert chart["datasets"][0]["data"] == ["N/A"] * 6
+
+    def test_radar_degraded_note_risk_metrics(self) -> None:
+        """降级标注：仅 risk_metrics 可用时 note="仅限基础指标" + degraded=True。"""
+        rm = {"annualized_volatility": 0.18, "max_drawdown_pct": -0.05, "total_return_pct": 0.1}
+        ds = build_chart_datasets(history_data=_history_ok(), risk_metrics=rm)
+        chart = ds["radar"]
+        assert chart["datasets"][0]["degraded"] is True
+        assert chart["datasets"][0]["note"] == "仅限基础指标"
+
+    def test_radar_degraded_note_history(self) -> None:
+        """降级标注：仅 history_data 兜底时 note="仅限基础指标"（both 路径）。"""
+        hd = _history_ok()
+        hd["annualized_volatility"] = 0.18
+        hd["max_drawdown_pct"] = -0.05
+        hd["total_return_pct"] = 0.1
+        ds = build_chart_datasets(history_data=hd)
+        chart = ds["radar"]
+        assert chart["datasets"][0]["degraded"] is True
+        assert chart["datasets"][0]["note"] == "仅限基础指标"
+
+    def test_radar_full_no_note(self) -> None:
+        """all_metrics 全量路径无降级标注（degraded=False 且无 note）。"""
+        ds = build_chart_datasets(
+            history_data=_history_ok(),
+            all_metrics=self._ALL_METRICS,
+        )
+        chart = ds["radar"]
+        assert chart["datasets"][0]["degraded"] is False
+        assert "note" not in chart["datasets"][0]
+
 
 # ═══════════════════════════════════════════════════════════════
 #  R11 单图脏数据隔离

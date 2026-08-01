@@ -243,6 +243,7 @@
       return;
     }
     var d = ds.datasets[0];
+    // 降级标注：risk_metrics/history_data 兜底时模板已渲染 note 文本 + 虚线描边（与 line 图契约一致）
     trackChart(new Chart(el, {
       type: 'radar',
       data: {
@@ -253,7 +254,8 @@
           borderColor: d.borderColor || (theme.primary || '#2E75B6'),
           backgroundColor: d.backgroundColor || 'rgba(46,117,182,0.2)',
           borderWidth: 2,
-          pointRadius: 3
+          pointRadius: 3,
+          borderDash: d.degraded ? [5, 5] : undefined
         }]
       },
       options: {

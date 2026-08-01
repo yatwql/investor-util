@@ -41,6 +41,10 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| rf-107 | `_report_generation.py` 收集 7 个 `metrics_*` flag 传入 builder，但 `metrics_risk_contribution` 无雷达轴消费（`risk_contributions` 为 `list[dict]` 非单标量）；设计文档 F1/§6.6 称"7 项全是雷达子开关"与实际不符 | 收集列表移除 `metrics_risk_contribution`（保留 6 个雷达子开关）；设计文档 F1 修正为"6 项雷达子开关 + 1 项指标级熔断开关"（`circuit_breaker_wrapper` 消费） | `changelog.md` → Fix / Docs |
+| rf-108 | `chart_data_builder.py` 404 行，超出 §4.11 O4 预算 ≤400 行 | 合并 risk_metrics 与 history_data 两个降级分支为单一分支 + 提取 `_BASIC_RADAR_AXES` 模块常量（397 行） | `changelog.md` → Fix |
+| rf-109 | `chart-init.js` `initRadarChart` 未渲染 `degraded` 虚线，与 line/drawdown 图"degraded→虚线"统一契约不一致（降级雷达视觉实线，仅靠模板 note 文本提示） | `initRadarChart` dataset 增加 `borderDash: d.degraded ? [5,5] : undefined` | `changelog.md` → Fix |
+| rf-110 | 模板雷达降级 note `<div>` 位于固定高度 `height:320px` 的 `.chart-box` 内、canvas（height:100%）之后，flow 中溢出容器边界，可能压到下方 `.data-status` 块 | note 移至 `.chart-box` 闭合标签之外（独立条件渲染），容器高度不再溢出 | `changelog.md` → Fix |
 | rf-102 | `providers/tencent.py::fetch_index_kline` 文档声称上限 3650 天，实测 `days=3650` 时 API 返回 `[]`（list），`_parse_kline_response` 以 `data.get("data", ...)` 处理 dict 而崩溃 `AttributeError: 'list' object has no attribute 'get'`；实际上限约 2000 天 | `_parse_kline_response` 加非 dict 类型守卫（API 异常时返回 list → 判空不崩）；`fetch_index_kline` 钳位上限 3650→2000（实测）；docstring 同步；边缘回归测试 2 例（非 dict 响应、钳位 2000） | `changelog.md` → Fix / Test |
 | rf-103 | Sina `getKLineData` 端点对**所有**代码（含 sh600000 股票、sh000300/sh000919 指数）返回 404/空 → `sina_kline.fetch_index_kline` 备用链路当前失效；设计文档原"🟢 生产验证"与实测不符 | 代码无结构 bug（`_parse_kline_json` 已对非 list 容错）；`sina_kline.fetch_index_kline` 钳位上限 3650→2000 与 Tencent 对齐（rf-102 同类防）；当前环境 404 为数据源故障，接受 Tencent 单链路降级，Sina 保留为代码级备用（环境恢复后自动生效），设计文档表述已如实修正 | `changelog.md` → Fix / Docs |
 | rf-104 | CSI 风格指数 `sh000920`（300 成长）自 **2023-02-17** 起在 Tencent 停更（截至 2026-08-01 距今 1261 天），probe 判定该因子代理不可用 | plan-7 MVP 用 500成长（sh000925）单因子覆盖成长（见 `plan-advanced-analysis.md` §4 MVP 范围定义）；probe 脚本保留 sh000920 作探测候选（探测停更状态即其目的）；无代码改动 | `changelog.md` → Docs |

@@ -73,3 +73,54 @@ def test_empty_top10_returns_empty_dataset() -> None:
     ds = build_chart_datasets(history_data=None, penetration=_penetration([]))
     assert ds["industry_bar"] == {"labels": [], "datasets": []}
     assert ds["penetration_bar"] == {"labels": [], "datasets": []}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  量化指标 Radar 边缘场景（Iter 6 §6.6 / C12）
+# ═══════════════════════════════════════════════════════════════
+
+
+def test_radar_both_sources_none_empty() -> None:
+    """all_metrics 与 risk_metrics 均为 None → radar 空 dict（验收标准 6）。"""
+    ds = build_chart_datasets(history_data=None, all_metrics=None, risk_metrics=None)
+    assert ds["radar"] == {"labels": [], "datasets": []}
+
+
+def test_radar_all_metrics_none_with_history() -> None:
+    """all_metrics=None 但 history_data 有 3 基本轴 → 降级渲染（验收标准 1）。"""
+    hd = {
+        "status": "ok",
+        "bars": [],
+        "annualized_volatility": 0.18,
+        "max_drawdown_pct": -0.05,
+        "total_return_pct": 0.1,
+    }
+    ds = build_chart_datasets(history_data=hd, all_metrics=None, risk_metrics=None)
+    chart = ds["radar"]
+    assert chart["labels"] == ["年化波动率", "最大回撤", "累计收益"]
+    assert chart["datasets"][0]["data"] == [0.18, -0.05, 0.1]
+    assert chart["datasets"][0]["note"] == "仅限基础指标"
+
+
+def test_radar_flag_off_for_missing_flag_name() -> None:
+    """metric_flags 含未知 flag 名 → 不影响该轴（映射外的指标默认可用）。"""
+    am = {
+        "sharpe_ratio": 1.2,
+        "calmar_ratio": 0.8,
+    }
+    ds = build_chart_datasets(
+        history_data=None,
+        all_metrics=am,
+        metric_flags={"metrics_unknown_flag": False},
+    )
+    chart = ds["radar"]
+    assert chart["datasets"][0]["data"][0] == 1.2
+    assert chart["datasets"][0]["data"][1] == 0.8
+
+
+def test_radar_all_metrics_partial_na() -> None:
+    """部分指标缺失 → 该轴 "N/A"，其余轴数值保留（验收标准 1）。"""
+    am = {"sharpe_ratio": 1.2, "calmar_ratio": None, "hhi": 0.2}
+    ds = build_chart_datasets(history_data=None, all_metrics=am)
+    chart = ds["radar"]
+    assert chart["datasets"][0]["data"] == [1.2, "N/A", "N/A", "N/A", "N/A", 0.2]

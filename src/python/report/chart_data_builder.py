@@ -36,6 +36,24 @@ DATASET_KEYS = (
 # 统一提供（A3 色盲安全 palette，§4.8），避免 Python/JS 调色板漂移。
 _CATEGORY_ORDER = ("股票", "基金", "债券", "现金", "其他")
 
+# ── 雷达轴 → metrics_* Feature Flag 映射（§6.6 F1）──────
+# 子开关逐个过滤雷达轴：Flag 关闭 → 该轴值转为 "N/A"（非 0）。
+_RADAR_FLAG_MAP = {
+    "sharpe_ratio": "metrics_sharpe",
+    "calmar_ratio": "metrics_calmar",
+    "win_rate": "metrics_winrate",
+    "turnover_rate": "metrics_turnover",
+    "portfolio_beta": "metrics_beta",
+    "hhi": "metrics_hhi",
+}
+
+# 降级雷达的 3 个基本轴（risk_metrics / history_data 兜底共用）
+_BASIC_RADAR_AXES = (
+    ("annualized_volatility", "年化波动率"),
+    ("max_drawdown_pct", "最大回撤"),
+    ("total_return_pct", "累计收益"),
+)
+
 
 def build_chart_datasets(
     history_data: dict | None,
@@ -45,12 +63,14 @@ def build_chart_datasets(
     details: list | None = None,
     risk_metrics: dict | None = None,
     all_metrics: dict | None = None,
+    metric_flags: dict | None = None,
 ) -> dict:
     """构建 6 张图的数据集，返回 dict → template context（C14 合规）。
 
     关键数据源：
     - risk_metrics: 源自 prep["risk_metrics"]（5 个基本字段，仅 full 路径）
     - all_metrics:  compute_all_metrics() 返回值（14 项全量，仅 full 路径）
+    - metric_flags: metrics_* Feature Flag 值 dict（§6.6 F1），关闭 → "N/A"
     - 降级兜底：both 路径传入 None 时，radar 从 history_data 提取
       annualized_volatility / max_drawdown_pct / total_return_pct 3 个基本轴。
 
@@ -87,7 +107,9 @@ def build_chart_datasets(
     # ⚠ R12：radar 放在所有条件之外，仅依赖 all_metrics / risk_metrics / history_data
     # 三源独立判断——history_data 不可用但 all_metrics 有值时，radar 仍应渲染。
     try:
-        datasets["radar"] = _build_radar_dataset(history_data, all_metrics, risk_metrics)
+        datasets["radar"] = _build_radar_dataset(
+            history_data, all_metrics, risk_metrics, metric_flags
+        )
     except Exception as e:  # R11：radar 失败 → 空占位，不影响其他图
         logger.warning("[chart] radar 构建失败，跳过该图: %s", e)
         datasets["radar"] = _empty_dataset()
@@ -302,6 +324,7 @@ def _build_radar_dataset(
     history_data: dict | None,
     all_metrics: dict | None,
     risk_metrics: dict | None,
+    metric_flags: dict | None = None,
 ) -> dict:
     """量化指标 Radar — 三级降级优先级（R12）：
 
@@ -310,38 +333,38 @@ def _build_radar_dataset(
     3. history_data 内部提取（annualized_volatility / max_drawdown_pct / total_return_pct，
        双路径均有——确保 both 路径也能显示 3 个基本轴）
 
-    数据最小化（R9）：只传指标数值，不含内部明细。Flag 关闭指标 → "N/A"（非 0）。
+    数据最小化（R9）：只传指标数值，不含内部明细。
+    Flag 过滤（§6.6 F1）：metrics_* 关闭 → 该轴值转为 "N/A"（非 0）。
+    降级标注：risk_metrics / history_data 兜底时 datasets[0]["note"]="仅限基础指标"。
     """
+    degraded = False
     if all_metrics:
-        axes = [
-            ("sharpe_ratio", "夏普比率", all_metrics.get("sharpe_ratio")),
-            ("calmar_ratio", "卡玛比率", all_metrics.get("calmar_ratio")),
-            ("win_rate", "胜率", _extract_rate(all_metrics.get("win_rate"))),
-            ("turnover_rate", "换手率", all_metrics.get("turnover_rate")),
-            ("portfolio_beta", "组合 Beta", all_metrics.get("portfolio_beta")),
-            ("hhi", "集中度 HHI", all_metrics.get("hhi")),
-        ]
-    elif risk_metrics:
-        axes = [
-            ("annualized_volatility", "年化波动率", risk_metrics.get("annualized_volatility")),
-            ("max_drawdown_pct", "最大回撤", risk_metrics.get("max_drawdown_pct")),
-            ("total_return_pct", "累计收益", risk_metrics.get("total_return_pct")),
-        ]
-    elif history_data:
-        _fields = {
-            "annualized_volatility": history_data.get("annualized_volatility"),
-            "max_drawdown_pct": history_data.get("max_drawdown_pct"),
-            "total_return_pct": history_data.get("total_return_pct"),
-        }
-        if not any(v is not None for v in _fields.values()):
-            return _empty_dataset()
-        axes = [
-            ("annualized_volatility", "年化波动率", _fields["annualized_volatility"]),
-            ("max_drawdown_pct", "最大回撤", _fields["max_drawdown_pct"]),
-            ("total_return_pct", "累计收益", _fields["total_return_pct"]),
-        ]
+        # all_metrics 全量轴，逐轴应用 metrics_* Flag 过滤
+        axes = []
+        for key, name in (
+            ("sharpe_ratio", "夏普比率"),
+            ("calmar_ratio", "卡玛比率"),
+            ("win_rate", "胜率"),
+            ("turnover_rate", "换手率"),
+            ("portfolio_beta", "组合 Beta"),
+            ("hhi", "集中度 HHI"),
+        ):
+            value = all_metrics.get(key)
+            if key == "win_rate":
+                value = _extract_rate(value)
+            flag = _RADAR_FLAG_MAP.get(key)
+            if flag and metric_flags is not None and not metric_flags.get(flag, True):
+                value = None  # Flag 关闭 → N/A
+            axes.append((key, name, value))
     else:
-        return _empty_dataset()
+        # risk_metrics / history_data 兜底 → 3 个基本轴（降级标注）
+        source = risk_metrics or history_data
+        if not source:
+            return _empty_dataset()
+        axes = [(key, name, source.get(key)) for key, name in _BASIC_RADAR_AXES]
+        if not any(v is not None for _, _, v in axes):
+            return _empty_dataset()
+        degraded = True
 
     # 保留全部轴；None → "N/A"（非 0，§4.12 / §6.6 契约：Flag 关闭或缺失显示 N/A）
     labels = [name for _, name, _ in axes]
@@ -350,17 +373,16 @@ def _build_radar_dataset(
     if not labels:
         return _empty_dataset()
 
-    return {
-        "labels": labels,
-        "datasets": [
-            {
-                "label": "量化指标",
-                "data": values,
-                "borderColor": "var(--chart-primary)",
-                "degraded": False,
-            }
-        ],
+    dataset: dict[str, Any] = {
+        "label": "量化指标",
+        "data": values,
+        "borderColor": "var(--chart-primary)",
+        "degraded": degraded,
     }
+    if degraded:
+        dataset["note"] = "仅限基础指标"
+
+    return {"labels": labels, "datasets": [dataset]}
 
 
 def _extract_rate(win_rate: Any) -> float | None:

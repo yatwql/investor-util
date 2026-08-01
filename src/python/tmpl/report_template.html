@@ -1557,6 +1557,25 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <div class="value">{{ history_data.annualized_volatility | change }}</div>
                 </div>
             </div>
+            {% if enable_interactive_charts %}
+            {# 量化指标 Radar（Iter 6）：3 张摘要卡片 → 雷达图增强。
+               数据源三级降级（all_metrics / risk_metrics / history_data，builder 处理）。
+               空值语义：data_unavailable → "持仓市值数据不可用，量化指标暂停计算"；
+               radar 无 labels → "量化指标数据不足"。 #}
+            <div class="chart-box" style="height:320px;margin-top:16px;">
+                {% if data_unavailable %}
+                <div class="chart-empty-note">持仓市值数据不可用，量化指标暂停计算</div>
+                {% elif chart_datasets and chart_datasets.get("radar", {}).get("labels") %}
+                <canvas id="chart_radar" width="480" height="320" style="width:100%;height:100%;"></canvas>
+                {% else %}
+                <div class="chart-empty-note">量化指标数据不足</div>
+                {% endif %}
+            </div>
+            {# 降级 note 置于固定高度容器外，避免溢出 320px 边界 #}
+            {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") and chart_datasets["radar"]["datasets"][0].get("note") %}
+            <div style="text-align:center;font-size:12px;color:#888;margin-top:4px;">{{ chart_datasets["radar"]["datasets"][0]["note"] }}</div>
+            {% endif %}
+            {% endif %}
             {% if history_data.warnings or history_data.failed_holdings or history_data.successful_holdings %}
             <div class="data-status" style="margin-top:12px;">
                 {% if history_data.warnings %}

@@ -565,7 +565,8 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         }
         soup = self._render_interactive(chart_overrides=overrides)
         boxes = soup.select(".chart-box")
-        self.assertEqual(len(boxes), 3, "应恰好 3 个 .chart-box（净值+回撤+Doughnut）")
+        # 净值+回撤+Doughnut+Radar 共 4 个 .chart-box（Radar 无 labels 时渲染占位容器）
+        self.assertEqual(len(boxes), 4, "应恰好 4 个 .chart-box（净值+回撤+Doughnut+Radar）")
         canvas_ids = {c.get("id") for b in boxes for c in b.select("canvas")}
         self.assertIn("chart_portfolio_line", canvas_ids)
         self.assertIn("chart_drawdown", canvas_ids)
@@ -584,7 +585,8 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         }
         soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
         boxes = soup.select(".chart-box")
-        self.assertEqual(len(boxes), 5, "应恰好 5 个 .chart-box（净值+回撤+Doughnut+行业+穿透）")
+        # 净值+回撤+Doughnut+行业+穿透+Radar 共 6 个 .chart-box（Radar 无 labels 时渲染占位容器）
+        self.assertEqual(len(boxes), 6, "应恰好 6 个 .chart-box（净值+回撤+Doughnut+行业+穿透+Radar）")
         canvas_ids = {c.get("id") for b in boxes for c in b.select("canvas")}
         for key in (
             "chart_portfolio_line", "chart_drawdown", "chart_category_doughnut",
@@ -623,6 +625,50 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(section.find(id="chart_industry_bar"))
         self.assertIsNone(section.find(id="chart_penetration_bar"))
 
+    def test_radar_chart_rendered_when_labels(self) -> None:
+        """量化指标 radar 有 labels 时渲染 canvas（Iter 6）。"""
+        overrides = {
+            "radar": {
+                "labels": ["夏普比率", "卡玛比率"],
+                "datasets": [{"label": "量化指标", "data": [1.2, 0.8]}],
+            },
+        }
+        soup = self._render_interactive(chart_overrides=overrides)
+        section = soup.find(id="sec-portfolio_history")
+        self.assertIsNotNone(section)
+        radar_canvas = section.find(id="chart_radar")
+        self.assertIsNotNone(radar_canvas)
+        # canvas 的直接父级即 .chart-box 容器
+        self.assertIn("chart-box", radar_canvas.parent.get("class", []))
+
+    def test_radar_empty_note_when_no_labels(self) -> None:
+        """radar 无 labels 时显示"量化指标数据不足"占位，不渲染 canvas（Iter 6 验收 5）。"""
+        soup = self._render_interactive()
+        section = soup.find(id="sec-portfolio_history")
+        note = section.select_one(".chart-empty-note")
+        self.assertIsNotNone(note)
+        self.assertIn("量化指标数据不足", note.get_text())
+        self.assertIsNone(section.find(id="chart_radar"))
+
+    def test_radar_data_unavailable_placeholder(self) -> None:
+        """data_unavailable=True 时显示"持仓市值数据不可用，量化指标暂停计算"（Iter 6 验收 7）。"""
+        overrides = {"radar": {"labels": ["夏普比率"], "datasets": [{"data": [1.2]}]}}
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["enable_interactive_charts"] = True
+        data["data_unavailable"] = True  # 持仓有成本但市值全 0
+        data["chart_datasets"] = {k: {"labels": [], "datasets": []} for k in self._DATASET_KEYS}
+        data["chart_datasets"].update(overrides)
+        data["history_data"] = self._HISTORY
+        soup = _render_template(data)
+        section = soup.find(id="sec-portfolio_history")
+        note = section.select_one(".chart-empty-note")
+        self.assertIsNotNone(note)
+        self.assertIn("持仓市值数据不可用，量化指标暂停计算", note.get_text())
+        self.assertIsNone(section.find(id="chart_radar"))
+
     def test_chart_scripts_loaded_in_order(self) -> None:
         """chart-print.js 先于 chart-config.js，再 chart-init.js（登记先于初始化）。"""
         soup = self._render_interactive()
@@ -657,6 +703,30 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         soup = self._render_interactive()
         self.assertIsNone(soup.find(id="portfolioChart"))
         self.assertIsNone(soup.find(id="drawdownChart"))
+
+    def test_flag_off_legacy_canvas_regression(self) -> None:
+        """Iter 7 验收标准 5：Flag OFF 时报告与未升级版一致（旧 Canvas + 表格）。
+
+        enable_interactive_charts=False（默认渲染路径）：
+          - 6 个新 Chart.js canvas 均不输出（无空 div / 空 canvas 残留）
+          - 旧 Canvas（portfolioChart / drawdownChart）正常保留
+          - drawSimpleChart 定义保留（旧绘图函数可用）
+        """
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["history_data"] = self._HISTORY
+        # 显式置 False（默认值即 False，此处防御性声明）
+        data["enable_interactive_charts"] = False
+        soup = _render_template(data)
+
+        for key in ("chart_portfolio_line", "chart_drawdown", "chart_category_doughnut",
+                    "chart_industry_bar", "chart_penetration_bar", "chart_radar"):
+            self.assertIsNone(soup.find(id=key), f"Flag OFF 时不应输出 {key} canvas")
+        self.assertIsNotNone(soup.find(id="portfolioChart"), "Flag OFF 时应保留旧净值 Canvas")
+        self.assertIsNotNone(soup.find(id="drawdownChart"), "Flag OFF 时应保留旧回撤 Canvas")
+        self.assertIn("drawSimpleChart", str(soup), "Flag OFF 时应保留旧绘图函数")
 
 
 if __name__ == "__main__":
