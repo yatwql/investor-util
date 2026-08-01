@@ -168,6 +168,7 @@ investor-util/
 │   │   │   ├── market_value.py       #   市值计算与盈亏分析
 │   │   │   ├── market_value_sheet.py #   市值分析 Excel 页签
 │   │   │   ├── category.py           #   持仓分类（股票/基金/债券/QDII 等）
+│   │   │   ├── chart_data_builder.py #   Chart.js 6 图数据集预处理器（§4.11，≤400 行）
 │   │   │   ├── fund_performance.py   #   基金业绩分析（排名/回撤/超额收益）
 │   │   │   ├── fund_concentration.py #   基金持仓集中度分析
 │   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
@@ -193,6 +194,7 @@ investor-util/
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
 │   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #18）
+│   │   │   ├── downsample.py         #   P1 服务端下采样（日频→周/月聚合，§4.9）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
@@ -235,6 +237,12 @@ investor-util/
 │   │   │   ├── tui_handlers.py       #   键盘/事件处理
 │   │   │   ├── tui_keys.py           #   终端键盘输入封装
 │   │   │   └── tui_menu.py           #   菜单系统
+│   │
+│   ├── js/                           # Chart.js 交互图表前端资产（R21 本地 bundle）
+│   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
+│   │   ├── chart-print.js            #   打印降级（beforeprint 快照 <img> / afterprint 恢复，§4.5）
+│   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制，≤150 行）
+│   │   └── chart-init.js             #   6 张图初始化（O1 隔离 + degraded 虚线，≤300 行）
 │   │
 │   └── test/                         # 测试套件
 │       ├── __init__.py               #   包标记（空文件）
@@ -376,11 +384,14 @@ investor-util/
 │       │   │   ├── test_benchmark_edge.py         #   基准边缘场景
 │       │   │   ├── test_category.py               #   持仓分类测试
 │       │   │   ├── test_category_edge.py          #   分类边缘场景
+│       │   │   ├── test_chart_data_builder.py     #   Chart.js 6 图数据集预处理器测试
+│       │   │   ├── test_chart_data_builder_edge.py #   图表数据预处理器边缘场景（行业归"其他"等）
 │       │   │   ├── test_classification_utils.py   #   分类工具测试
 │       │   │   ├── test_data_integrity.py         #   数据完整性测试
 │       │   │   ├── test_data_quality_edge.py      #   数据质量边缘场景
 │       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵测试
 │       │   │   ├── test_data_status.py            #   数据状态测试
+│       │   │   ├── test_downsample.py             #   P1 服务端下采样测试（§4.9）
 │       │   │   ├── test_excel_b_series.py          #   Excel B 系列页签测试
 │       │   │   ├── test_excel_format_edge.py      #   Excel 格式边缘场景
 │       │   │   ├── test_excel_generator.py        #   Excel 生成测试
@@ -388,6 +399,7 @@ investor-util/
 │       │   │   ├── test_excel_report_structure.py #   Excel 报告结构测试
 │       │   │   ├── test_excel_roundtrip.py        #   Excel 写入读取回环测试
 │       │   │   ├── test_excel_writer.py           #   Excel 写入器测试
+│       │   │   ├── test_feature_interactive.py    #   交互图表 Feature Flag 管线测试
 │       │   │   ├── test_fund_bseries_sheet_edge.py # 基金深度分析页签边缘场景
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
 │       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试

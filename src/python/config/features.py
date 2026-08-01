@@ -67,9 +67,10 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     # ── 历史数据与回撤（2 项） ──
     "history_portfolio": True,
     "history_benchmark": True,
-    # ── 功能特性（2 项） ──
+    # ── 功能特性（3 项） ──
     "anonymizer": False,
     "cache_daily_cleanup": True,
+    "enable_interactive_charts": True,
 }
 
 # ── 实验性功能定义 ──────────────────────────────────────────

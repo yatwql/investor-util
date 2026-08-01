@@ -659,6 +659,18 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 - Iter 7 依赖 Iter 1-6 全部完成（全链路集成验证）
 - Iter 8 为终审轮，依赖所有前置轮次
 
+### 高危项优先通过清单（R23 补充）
+
+3 项**高危风险**（risk-analysis.md R6/R11/R9，后果=高）必须**首个通过**——作为迭代验收的硬性前置，任何一条不通过即视为该迭代未完成，不得进入下一轮（除非按 §5.0.2 裁剪）。
+
+| 高危项 | 对应风险 | 硬性前置位置 | 通过标准（可度量） |
+|:-------|:--------|:------------|:------------------|
+| 🔴 **C14 合规** | R6（一票否决） | Iter 1 任务表 `html_writer.py` 行 + Iter 8 终审 | Iter 1：`write_html_report()` 新增 `chart_datasets`/`enable_interactive_charts` 参数后**不新增 `_ENV.globals` 条目**（验收项 ①，见下）；Iter 8：`grep -rn '_ENV\.globals\[' src/python/ \| grep -v html_jinja_env.py` → **0 matches**（验收标准 1） |
+| 🔴 **异常隔离** | R11 | Iter 1 验收标准 ⑧ | `build_chart_datasets()` 某 dataset 抛异常 → **仅该图缺失、其余图正常、报告生成不失败**；顶层兜底返回空 dict（表格/占位仍存在） |
+| 🔴 **隐私最小化** | R9 | Iter 1 验收标准 ① | `test_chart_data_builder.py` 断言各 chart 数据集**只含图表所需字段（日期+市值+聚合值），不含份额/成本等敏感字段**（§4.10 S4）——预处理器实现即验证，非事后补丁 |
+
+> **判定规则**：Iter 1 结束时此 3 项全部通过才算 Iter 1 完成；Iter 8 终审复核（C14 grep 自动化为准，异常隔离/隐私由 Iter 1 单测回归兜底）。此后每次提交前，任何改动不得使已通过的 3 项回退。
+
 ### 迭代 1：基础设施搭建（1.0d）
 
 **目标**：Python 预处理器 + Feature Flag 注册 + chart.min.js 本地集成（src/js/）+ 模板 context 注入 + `risk_metrics` 数据流
@@ -667,14 +679,14 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 |:-----|:---------|:---------|
 | `config/features.py` 注册 `enable_interactive_charts: True` + 更新分类注释 `2→3 项` | `config/features.py` | ✅ `is_feature_enabled("enable_interactive_charts")` 默认 True ✅ `features.json` 可覆盖 ✅ 未知 flag 返回 False（已有 `_auto_reset_feature_flags` fixture 自动清理） |
 | `chart_data_builder.py`（完整 6 图骨架 + 净值/回撤数据集 | `chart_data_builder.py` | ✅ 输入 `history_data` → 输出正确 JSON 格式 ✅ ok/degraded/unavailable 三级 ✅ 空/None 输入返回空 dict ✅ **R11**：bars 缺字段/值非数字 → 该图跳过、其余图正常、顶层兜底返回空 dict ✅ **R12**：`history_data=None` 但 `all_metrics` 有值 → radar 仍构建 |
-| `html_writer.py` context 注入 `chart_datasets` + `enable_interactive_charts` + 新增参数支持 | `html_writer.py` | ✅ `write_html_report()` 新增 `chart_datasets: dict \| None = None`、`enable_interactive_charts: bool = False` 参数 ✅ Flag OFF 时 context 不含 chart_datasets ✅ `chart_datasets` 传入后正确进入 render() context ✅ **不新增 `_ENV.globals` 条目** |
+| 🔴 **高危（R6，一票否决）** `html_writer.py` context 注入 `chart_datasets` + `enable_interactive_charts` + 新增参数支持 | `html_writer.py` | ✅ `write_html_report()` 新增 `chart_datasets: dict \| None = None`、`enable_interactive_charts: bool = False` 参数 ✅ Flag OFF 时 context 不含 chart_datasets ✅ `chart_datasets` 传入后正确进入 render() context ✅ **不新增 `_ENV.globals` 条目** |
 | `_report_generation.py` 整合 metrics 并传入 html_writer + Feature Flag 读取 | `_report_generation.py` | ✅ full 路径（`_generate_full_html_report`）：`prep["risk_metrics"]` + `_metrics` → 合并后调用 `build_chart_datasets()` → `write_html_report(chart_datasets=..., enable_interactive_charts=...)` ✅ both 路径（`_generate_report_both`）：无 `_metrics` → 传入 None，`build_chart_datasets()` 从 `history_data` 提取 3 个基本轴 ✅ Feature Flag 在 `_report_generation.py` 读取：`enable_interactive_charts = is_feature_enabled("enable_interactive_charts")` → 作为参数传入 html_writer（与 `is_enable_b_series(config)`/`is_enable_news(config)` 的既有读取位置一致） ✅ **不跳过 build_chart_datasets()**——纯计算 ~5ms，全量执行，html_writer 靠 Flag 控制 context 注入。⚠ orchestrator.py 不做此整合（它仅按 report_type 分发到 `_generate_report_both`/`_generate_report_full`） |
 | `chart-config.js`（CSS 变量 + 颜色常量） | `chart-config.js` | ✅ 所有色值使用 `var(--chart-*)`，无硬编码 ✅ 变量缺失时用备选色值 |
 | `chart-init.js` 加载骨架 + 净值/回撤图初始化函数占位 | `chart-init.js` | ✅ 独立 test HTML 页渲染验证 ✅ chart.min.js 加载失败时 `typeof Chart` 检测跳过初始化 → Canvas 回退 ✅ **S1**：所有 label/tooltip 走 Chart.js 文本渲染，无 `innerHTML` 拼接（R12） ✅ **O1**：每个 init 函数独立 `try/catch`（R13） |
 | 建 `src/js/` 目录 + chart.min.js 入库 + 模板本地 script + Feature Flag 分支 + `data_unavailable` + chart canvas 容器 | `src/js/`、`report_template.html` | ✅ `src/js/` 含 chart.min.js（引擎）+ chart-config.js + chart-init.js ✅ 模板用相对路径 `<script src="chart.min.js">`（无 CDN/integrity/crossorigin）✅ 复制逻辑 `shutil.copy2(PROJECT_ROOT/src/js/*, output_dir)` ✅ Flag OFF → 无 Chart.js script 标签 ✅ `data_unavailable=True` → 显示"暂无数据"横幅 ✅ **A1**：每个 `<canvas>` 含 `aria-label`/`role="img"` + fallback 文本（R10） ✅ 复用 `_render_template` + BeautifulSoup 验证结构 |
 
 **验收标准（可度量）**：
-1. ✅ `pytest src/test/test_chart_data_builder.py` — ≥8 个用例（正常 portfolio + 正常 drawdown + 空 history + degraded + unavailable + None + **R11 脏数据隔离** + **R12 radar 独立构建**）：全部通过
+1. 🔴 **高危（R9/R11）** `pytest src/test/test_chart_data_builder.py` — ≥8 个用例（正常 portfolio + 正常 drawdown + 空 history + degraded + unavailable + None + **R11 脏数据隔离** + **R12 radar 独立构建**）：全部通过；且各 dataset 输出**不含份额/成本等敏感字段**（S4 数据最小化，R9）
 2. ✅ `pytest src/test/test_feature_interactive.py` — ≥3 个用例（默认值 + 覆盖 + 未知 flag）：全部通过
 3. ✅ `pytest src/test/unit/report/test_html_report_structure.py` — 不新增 case（现有结构不变），且已有 case 全部通过  
    ⚠ 前置：`_build_minimal_render_data()` 需新增 `chart_datasets={}` 和 `enable_interactive_charts=False`，确保现有测试获得安全默认值
@@ -682,7 +694,7 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 5. ✅ Flag ON 渲染 → HTML 中包含 `<script id="chart-data">` + `<script src="chart.min.js">` + chart-config.js + chart-init.js；`src/js/` 三文件已复制到输出目录
 6. ✅ Feature Flag 读取位置验证：`_report_generation.py` 使用 `is_feature_enabled()` 读取，作为参数传入 html_writer（与 `_generate_report_both` 中 `is_enable_b_series(config)` 等 config 标志的既有读取位置一致），html_writer 内部不自行读取
 7. ✅ DegradationTracker 兼容性确认：Chart.js 三级降级（ok/degraded/unavailable）基于 `history_data.status`，与 DegradationTracker 的 T1~T4 数据源降级系统正交，无冲突
-8. ✅ **R11**：某 dataset 抛异常 → 仅该图缺失，其余图正常渲染，报告生成不失败
+8. 🔴 **高危（R11）**：某 dataset 抛异常 → 仅该图缺失，其余图正常渲染，报告生成不失败
 9. ✅ **R12**：`history_data=None` 但 `all_metrics` 有值 → `datasets["radar"]` 仍存在（全量轴）
 10. ✅ **O2**：`build_chart_datasets()` 返回键集合与 §4.11 契约清单一致（6 个固定键，R13）
 11. ✅ **R14**：各图输出结构符合 §4.12 通用结构（labels/datasets/degraded 字段存在）
@@ -840,7 +852,7 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 | 缓冲时间 | 打印时序调试、国产浏览器兼容修复 | 0.5d 预留 |
 
 **验收标准**：
-1. ✅ C14 违规数为 0（grep 规则通过）
+1. 🔴 **高危（R6，一票否决）**：C14 违规数为 0（grep 规则通过）
 2. ✅ `python scripts/test_runner.py --mode dev-verify,report` 全部通过（P0 提交门禁，R9：report 模式补足 unit_report 覆盖）
 3. ✅ `test_chart_data_builder_edge.py` 中 edge 标记与文件命名一致（C12）
 4. ✅ `folders.md` 目录树同步完成（新增文件全部列出）
@@ -936,3 +948,4 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 > - **v23（R20）**：最终收敛与质量检查 — 目录 §5 锚点与标题对齐（补「× 测试范围」）；§1.3 编号重复修正（总工作量 → §1.4）；迭代总览测试计数 ~45 与 risk-analysis.md §2.4 交叉引用一致（~39→~45）；folders.md 目录树 plan/ 展开 6 文件（统计表已列但树未展开）；版本记录 v1-v23 完整性校验通过
 > - **v24（R21）**：**引擎加载策略反转：CDN → 纯本地 bundle**（用户决策）——新增 §4.3 本地 bundle 决策（src/js/chart.min.js 随报告分发、离线自包含、R3/R10 闭环）；新建 `src/js/` 目录承接前端 JS 资产（chart.min.js + chart-init.js + chart-config.js + README.md）；§4.2 交付机制/模板 script/守卫改本地相对路径（`typeof Chart` 替代 `__CHART_CDN_FAILED`）；§4.8 A5、§4.9 P3、§4.10 S2/S5、§4.12、§4.14、§4.15、§5.0、Iter 1/7、迭代总览、§6 文件清单、§7 全部同步；升级 Chart.js 仅替换 src/js/chart.min.js；risk-analysis.md v27
 > - **v25（R22）**：低配机 + 微信打开场景补充 — §4.9 新增 P4「DPR 限制」（`devicePixelRatio: 1.5`，低配机 + 高分屏省显存/绘制时间，对折线/柱状视觉无感）；§4.14 新增微信打开场景表（链接访问 X5/WKWebView 兼容良好 ✅；file:// 相对 JS 可能被沙箱限制 ⚠ 需实测）+ 移动端图表退化为静态呈现是合理预期说明；Iter 7 全链路验证 + 验收补微信实测（链接 + file://）；risk R2 澄清「微信链接访问兼容良好，主要不确定点是 file:// 加载」；risk-analysis.md v28
+> - **v26（R23）**：高危风险硬性前置标注 — 3 项高危（R6 C14 / R11 异常隔离 / R9 隐私）显式标注为「必须首个通过」：新增 §5.0「高危项优先通过清单」小节（硬性前置位置 + 可度量通过标准 + 判定规则：Iter 1 全过才算完成、Iter 8 终审复核、提交后不回退）；Iter 1 验收标准 ①/⑧ + 任务表 `html_writer.py` 行、Iter 8 验收标准 ① 标 🔴；Iter 1 用例集补 R9 断言（各 dataset 输出不含份额/成本字段）；risk-analysis.md v29

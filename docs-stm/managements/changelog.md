@@ -8,12 +8,14 @@
 
 ### Fix
 
+- **chart：行业分布空白 sector 未归一化** — `_build_industry_bar_dataset` 仅做 `entry.get("sector") or "其他"`，纯空白字符串 `"  "` 被当作有效行业分类（生成空白标签）。修复：`(sector or "").strip() or "其他"`，None/空串/纯空白统一归入"其他"。回归测试见 `test_chart_data_builder_edge.py`（plan-1 Iter 4 验收标准 5）
 - **rf-102：Tencent 指数 K 线超限崩溃修复** — `fetch_index_kline` 文档声称上限 3650 天，实测 `days=3650` 时 API 返回 `[]`（list），`_parse_kline_response` 以 `data.get(...)` 处理 dict 而崩溃 `AttributeError: 'list' object has no attribute 'get'`；实际上限约 2000 天。修复：`_parse_kline_response` 加非 dict 类型守卫（异常响应 → 空列表不崩）；`fetch_index_kline` 钳位上限 3650→2000 + docstring 同步
 - **rf-103：Sina 指数 K 线备用链路降级处理** — Sina `getKLineData` 端点当前环境对**所有**代码返回 404/空（数据源故障，非代码 bug），`sina_kline.fetch_index_kline` 备用链路失效。处理：`sina_kline.fetch_index_kline` 钳位上限对齐 2000（rf-102 同类防）；`_parse_kline_json` 已有非 list 容错；接受 Tencent 单链路降级，Sina 保留为代码级备用（环境恢复后自动生效），设计文档表述如实修正（原"🟢 生产验证"→ 降级接受）
 - **rf-106：`get_combined_timeseries` days 参数语义澄清** — `portfolio_history.py` 该方法 `days` 仅作用于基准指数（`_fetch_benchmarks`），不控制持仓历史长度（`_fetch_all_histories` 走 chain 默认 30）；docstring"历史天数"有误导，澄清并标注 rf-106，提示后续需透传 days 时改 `_fetch_all_histories`
 
 ### Test
 
+- **chart 行业分布边缘回归测试** — 新增 `test_chart_data_builder_edge.py`（C12 合规）：全部无行业归属→归入"其他"、None/空串/纯空白 sector 归一化、mv 为 None/负值不崩溃、top10 空列表占位；`test_chart_data_builder.py` 补 Iter 4/5 验收用例（行业市值总和与穿透口径一致、最多 10 个行业截断、穿透品种 <3 仍渲染）
 - **rf-102/103 回归测试** — `test_tencent_edge.py` 新增 2 例（API 返回 list 非 dict 不崩、days=3650 钳位到 2000）；`test_sina_edge.py` 新增 1 例（days 钳位 2000 对齐 Tencent），防超限崩溃与钳位逻辑回退
 
 ### Docs

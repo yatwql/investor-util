@@ -114,6 +114,9 @@ def _build_minimal_render_data(
         "section_order": section_order,
         "section_numbers": section_numbers,
         "section_visible_dict": section_visible_dict,
+        # Chart.js 交互图表（Iter 1）：默认关闭，模板双路径走旧绘图
+        "chart_datasets": {},
+        "enable_interactive_charts": False,
     }
 
     # B 系列模块可见时，填充 mock 数据结构（模板内部 .get() 要求 dict 非 None）
@@ -485,6 +488,175 @@ class TestHtmlAnchorValidity(unittest.TestCase):
         hrefs = [link.get("href", "") for link in links]
         self.assertEqual(len(hrefs), len(set(hrefs)),
                          f"导航 href 重复: {set(h for h in hrefs if hrefs.count(h) > 1)}")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: Interactive Charts mode (Iter 2)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlInteractiveCharts(unittest.TestCase):
+    """交互图表模式下模板结构测试（Iter 2 §4.5/§4.11）。"""
+
+    _HISTORY = {
+        "status": "ok",
+        "bars": [{"date": "2026-01-01", "total_value": 100.0, "drawdown_pct": 0.0}],
+        "total_return_pct": 0.1, "total_return": 1000.0,
+        "data_start": "2026-01-01", "data_end": "2026-01-01",
+        "max_drawdown_pct": -0.05, "max_drawdown": -500.0,
+        "drawdown_start": "2026-01-01", "drawdown_end": "2026-01-01",
+        "annualized_volatility": 0.18,
+        "warnings": None, "failed_holdings": None, "successful_holdings": None,
+    }
+
+    _DATASET_KEYS = (
+        "portfolio_line", "drawdown", "category_doughnut",
+        "industry_bar", "penetration_bar", "radar",
+    )
+
+    # 最小穿透数据：触发 sec-penetration 渲染图表容器（Iter 4/5）
+    _PENETRATION = {
+        "top10": [
+            {"rank": 1, "name": "贵州茅台", "codes": ["600519"], "mv": 10000.0,
+             "ratio_pct": 12.5, "sector": "白酒", "concepts": ["白酒"],
+             "eps_text": "58", "dividend_text": "25.3", "sources": ["基金A"]},
+            {"rank": 2, "name": "宁德时代", "codes": ["300750"], "mv": 8000.0,
+             "ratio_pct": 10.0, "sector": "电池", "concepts": ["新能源"],
+             "eps_text": "--", "dividend_text": "--", "sources": ["基金B"]},
+        ],
+        "summary": {
+            "total_mv": 18000.0, "unknown_mv": 0, "total_funds": 2, "failed_funds": 0,
+            "fund_breakdown": "2/2", "total_stocks": 0, "merged_count": 2,
+            "top10_coverage_pct": 100.0, "failed_fund_details": [],
+        },
+    }
+
+    def _render_interactive(
+        self,
+        chart_overrides: dict | None = None,
+        penetration: dict | None = None,
+    ) -> BeautifulSoup:
+        """渲染 enable_interactive_charts=True 的模板。
+
+        chart_overrides：覆盖默认空 dataset，用于验证各图 canvas 是否渲染。
+        penetration：传入时 sec-penetration 章节渲染图表容器（Iter 4/5）。
+        """
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["enable_interactive_charts"] = True
+        data["chart_datasets"] = {k: {"labels": [], "datasets": []} for k in self._DATASET_KEYS}
+        if chart_overrides:
+            data["chart_datasets"].update(chart_overrides)
+        if penetration is not None:
+            data["penetration"] = penetration
+        data["history_data"] = self._HISTORY
+        return _render_template(data)
+
+    def test_chart_box_wraps_canvases(self) -> None:
+        """各图 canvas 被 .chart-box 包裹（§4.5 打印不跨页）。
+
+        净值+回撤（Iter 2）+ 资产构成 Doughnut（Iter 3）共 3 张已迁移。
+        无穿透数据时，sec-penetration 不渲染图表容器（Iter 5 占位）。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides)
+        boxes = soup.select(".chart-box")
+        self.assertEqual(len(boxes), 3, "应恰好 3 个 .chart-box（净值+回撤+Doughnut）")
+        canvas_ids = {c.get("id") for b in boxes for c in b.select("canvas")}
+        self.assertIn("chart_portfolio_line", canvas_ids)
+        self.assertIn("chart_drawdown", canvas_ids)
+        self.assertIn("chart_category_doughnut", canvas_ids)
+
+    def test_penetration_charts_rendered_when_data(self) -> None:
+        """穿透数据存在时渲染行业分布 + 穿透 TOP10 两图（Iter 4/5）。
+
+        计划 §4.9：行业分布与穿透 TOP10 同属 sec-penetration 章节，
+        有数据时图表容器渲染 canvas；穿透章节共 2 个 .chart-box。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "industry_bar": {"labels": ["白酒", "电池"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台", "宁德时代"], "datasets": [{"data": [10000.0, 8000.0]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        boxes = soup.select(".chart-box")
+        self.assertEqual(len(boxes), 5, "应恰好 5 个 .chart-box（净值+回撤+Doughnut+行业+穿透）")
+        canvas_ids = {c.get("id") for b in boxes for c in b.select("canvas")}
+        for key in (
+            "chart_portfolio_line", "chart_drawdown", "chart_category_doughnut",
+            "chart_industry_bar", "chart_penetration_bar",
+        ):
+            self.assertIn(key, canvas_ids)
+        # 行业分布 Horizontal Bar 与穿透 TOP10 容器处于同一章节
+        section = soup.find(id="sec-penetration")
+        self.assertIsNotNone(section)
+        section_canvases = {c.get("id") for c in section.select("canvas")}
+        self.assertIn("chart_industry_bar", section_canvases)
+        self.assertIn("chart_penetration_bar", section_canvases)
+
+    def test_industry_empty_note_when_no_data(self) -> None:
+        """行业数据全不可用时显示"行业数据暂不可用"（Iter 4 验收标准 3）。
+
+        §4.12 空值语义：dataset 无 labels 时模板渲染占位提示，不输出空 canvas。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台"], "datasets": [{"data": [10000.0]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        section = soup.find(id="sec-penetration")
+        note = section.select_one(".chart-empty-note")
+        self.assertIsNotNone(note, "行业数据为空时应渲染占位提示")
+        self.assertIn("行业数据暂不可用", note.get_text())
+        self.assertIsNone(section.find(id="chart_industry_bar"), "空数据时不应输出 industry canvas")
+
+    def test_penetration_none_shows_placeholder(self) -> None:
+        """penetration=None 时显示"暂无穿透数据"占位，不渲染图表容器（Iter 5）。"""
+        soup = self._render_interactive()
+        section = soup.find(id="sec-penetration")
+        self.assertIsNotNone(section)
+        self.assertIsNotNone(section.select_one(".empty-note"))
+        self.assertIsNone(section.find(id="chart_industry_bar"))
+        self.assertIsNone(section.find(id="chart_penetration_bar"))
+
+    def test_chart_scripts_loaded_in_order(self) -> None:
+        """chart-print.js 先于 chart-config.js，再 chart-init.js（登记先于初始化）。"""
+        soup = self._render_interactive()
+        chart_scripts = [
+            s.get("src") for s in soup.select("script[src]")
+            if (s.get("src") or "").startswith("chart-")
+        ]
+        self.assertIn("chart-print.js", chart_scripts)
+        self.assertLess(
+            chart_scripts.index("chart-print.js"),
+            chart_scripts.index("chart-config.js"),
+            "chart-print.js 必须在 chart-config.js 之前加载",
+        )
+        self.assertLess(
+            chart_scripts.index("chart-config.js"),
+            chart_scripts.index("chart-init.js"),
+            "chart-config.js 必须在 chart-init.js 之前加载",
+        )
+
+    def test_print_css_forces_light_theme(self) -> None:
+        """/media print 覆盖 --chart-* 为浅色 + .chart-box break-inside（§4.5）。"""
+        soup = self._render_interactive()
+        style = soup.find("style").get_text()
+        # 打印覆盖只在 @media print 内出现（主 :root 是 #333333，这里是 #000）
+        self.assertIn("--chart-text: #000", style)
+        self.assertIn("--chart-grid", style)
+        self.assertIn(".chart-box", style)
+        self.assertIn("break-inside: avoid", style)
+
+    def test_old_canvas_path_absent(self) -> None:
+        """交互模式下旧 Canvas 兜底路径不输出。"""
+        soup = self._render_interactive()
+        self.assertIsNone(soup.find(id="portfolioChart"))
+        self.assertIsNone(soup.find(id="drawdownChart"))
 
 
 if __name__ == "__main__":
