@@ -404,13 +404,14 @@ const chartTheme = {
 
 ### 4.9 性能优化决策（R11 补充）
 
-> **R11 审查发现**：R1（文件体积膨胀 280KB→~1MB）/R8（数据粒度）/TD4 已识别性能风险，但「下采样（可选）」未落成具体决策——无触发阈值、无聚合粒度、无实现位置；动画与 CDN 阻塞未提及。本节固化决策。
+> **R11 审查发现**：R1（文件体积膨胀 280KB→~1MB）/R8（数据粒度）/TD4 已识别性能风险，但「下采样（可选）」未落成具体决策——无触发阈值、无聚合粒度、无实现位置；动画与 CDN 阻塞未提及。本节固化决策。（R22 补充 P4：低配机 + 高分屏的 DPR 限制）
 
 | # | 决策 | 内容 | 触发条件/阈值 | 实现位置 |
 |:-:|:-----|:-----|:-------------|:---------|
 | P1 | **服务端下采样（净值趋势）** | 净值曲线数据点超过阈值时按**周聚合**（取每周最后一个交易日的市值，保证曲线形态不畸变），否则保留日频 | `len(history_data.bars) > 500`（约 2 年日频）触发；聚合后的点 < 200 时改按**月聚合**兜底 | `chart_data_builder.py` `_build_portfolio_line_dataset()` 内，纯 Python 可单测 |
 | P2 | **动画关闭** | 报告是静态分析工具，无需入场动画；`chart-config.js` 统一 `animation: false`（交互 hover tooltip 不受影响） | 始终关闭 | `chart-config.js` Chart.defaults |
 | P3 | **本地 bundle 非阻塞加载** | chart.min.js `<script>` 加 `defer`（本地文件加载毫秒级，defer 保证不阻塞 HTML 解析；脚本顺序由 `defer` 保证 → chart.min.js → chart-config.js → chart-init.js 依次执行） | 始终 | `report_template.html` 引擎 `<script>` 标签（R21 更新） |
+| P4 | **DPR 限制（低配机优化，R22）** | Chart.js 默认按设备 DPR 渲染（4K 屏 2x/3x → canvas 像素数翻 4~9 倍）。限制 `devicePixelRatio: 1.5`（`chart-config.js` Chart.defaults）——高分屏下渲染分辨率略降但对折线/柱状图视觉无感，低配机 + 高分屏显著省显存/绘制时间 | 始终（Chart.js v4 默认 DPR 上限即 1.0，显式设 1.5 在清晰度与性能间平衡） | `chart-config.js` Chart.defaults |
 
 **下采样与打印/降级的交互**：
 - 下采样**仅作用于 Chart.js 数据集**，不改变 `history_data.bars` 原始数据——Excel 管线、Canvas fallback（Flag OFF）仍用原始日频
@@ -536,6 +537,17 @@ const chartTheme = {
 - 图表仍是渐进增强：表格明细永远存在，浏览器能力不足时用户仍可读数据
 
 **Iter 7 验证范围更新**：`Chrome 120+ / Edge 120+` → **Chrome 90+ / Edge 90+ / Firefox 90+ / Safari 14+**（主验证 Chrome/Edge；Firefox/Safari 抽验）；国产 Chromium 内核浏览器留待迭代 8 缓冲处理
+
+**微信打开场景（R22 补充）**：
+
+| 打开方式 | 内核 | 本地 bundle 加载 | 图表渲染 | 结论 |
+|:--------|:-----|:----------------|:---------|:-----|
+| **链接访问**（报告部署到 http/https） | 安卓 8.0+ 内置 X5 内核（Chromium 107+）/ iOS WKWebView（Safari 14+），远超 Chart.js v4 需求 | 相对路径 `chart.min.js` 正常 | ✅ 完全正常 | **无困难**；本地 bundle 反优（微信里加载 jsdelivr CDN 慢/被墙，本地无此问题） |
+| **本地 file://**（从文件传输助手/收藏点开 .html 附件） | 同上 | ⚠ **需实测**——微信沙箱对 file:// + 同目录相对 JS 加载可能有限制（X5 内核疑似拦截） | ⚠ 未知 | **边界场景**，Iter 7 需实测 |
+
+**结论**：主要使用路径（链接访问）无困难；`file://` 在微信内是唯一不确定点。即使图表不渲染（`typeof Chart` 守卫跳过初始化），Canvas/表格明细永远存在，用户仍可读全部数据——图表本就是渐进增强，不阻塞数据获取。
+
+> 注：微信内展示报告本质上是"看一张静态报告"，交互图表的悬停/缩放价值在移动端有限（触屏 hover 不友好），**移动端图表退化为可读的静态呈现是合理预期**，不构成功能缺失。
 
 ### 4.15 演进路径与回退（R18 补充）
 
@@ -797,7 +809,7 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 |:-----|:---------|
 | `chartjs-chart-matrix` POC 验证与 Chart.js v4 兼容性 | ✅ 兼容：Matrix 插件正确渲染含悬停数值的热力图 ✅ 不兼容：有 Canvas 2D 回退方案（0.5d 缓冲覆盖） |
 | 热力图框架（接收 `correlation_data` 占位数据） | ✅ 无 `correlation_data` → 占位文本 ✅ 有空数据 → 显示"等待 plan-2 数据" |
-| 全链路手动验证（Chrome 90+ / Edge 90+ 主验，Firefox 90+ / Safari 14+ 抽验，R17） | ✅ 6 张图均渲染 ✅ 缩放/悬停/图例交互正常 ✅ 打印 preview 正常 ✅ **R21**：离线场景（断网/`file://`）本地 bundle 正常渲染 ✅ **A1/A4**：禁用 Canvas 后显示 fallback 文本；375px 宽度自适应不溢出（R10） |
+| 全链路手动验证（Chrome 90+ / Edge 90+ 主验，Firefox 90+ / Safari 14+ 抽验，R17） | ✅ 6 张图均渲染 ✅ 缩放/悬停/图例交互正常 ✅ 打印 preview 正常 ✅ **R21**：离线场景（断网/`file://`）本地 bundle 正常渲染 ✅ **A1/A4**：禁用 Canvas 后显示 fallback 文本；375px 宽度自适应不溢出（R10） ✅ **R22**：微信内置浏览器实测（链接 + file:// 两种打开方式） |
 | Canvas 回归验证 | ✅ Flag OFF 时 2 张 Canvas 图与改造前渲染一致 ✅ 模板结构测试全部通过 |
 
 **验收标准**：
@@ -806,9 +818,10 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 3. ✅ 打印预览：所有 chart 以高分辨率静态图显示（2x DPI）
 4. ✅ **R21** 离线验证：断网/删除 chart.min.js 场景 → 所有 chart 由 `typeof Chart` 守卫跳过 → 回退 Canvas / 表格（不再依赖 CDN 阻断）
 5. ✅ Feature Flag OFF → 报告与未升级版渲染一致（Canvas + 表格）
+6. ✅ **R22** 微信内置浏览器实测：**链接访问**（部署到 http/https）→ 6 图正常渲染；**file://**（传输助手/收藏点开）→ 若图表不渲染，确认 `typeof Chart` 守卫回退 Canvas/表格，数据可读（表格明细不缺失）
 
 **测试范围边界**：
-- ✅ 测：全链路集成、跨浏览器渲染、离线场景（本地 bundle）、打印降级
+- ✅ 测：全链路集成、跨浏览器渲染、离线场景（本地 bundle）、打印降级、微信打开场景（R22）
 - ❌ 不测：Excel 管线（不变）、性能基准（已在 rf-4 覆盖）
 
 ### 迭代 8：代码审查 + C14 自检 + 文档 + 缓冲（0.5d）
@@ -922,3 +935,4 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 > - **v22（R19）**：与数据降级体系融合 — 新增 §4.16（降级传播链可视化：数据源 T1~T4 → history_data.status 汇合 → 图表三级降级；消息口径复用 STATUS_MESSAGES 常量防两种表述；radar 走数据源缺失链区别于 history_data.status 三级降级）；Iter 1 验收补 2 条
 > - **v23（R20）**：最终收敛与质量检查 — 目录 §5 锚点与标题对齐（补「× 测试范围」）；§1.3 编号重复修正（总工作量 → §1.4）；迭代总览测试计数 ~45 与 risk-analysis.md §2.4 交叉引用一致（~39→~45）；folders.md 目录树 plan/ 展开 6 文件（统计表已列但树未展开）；版本记录 v1-v23 完整性校验通过
 > - **v24（R21）**：**引擎加载策略反转：CDN → 纯本地 bundle**（用户决策）——新增 §4.3 本地 bundle 决策（src/js/chart.min.js 随报告分发、离线自包含、R3/R10 闭环）；新建 `src/js/` 目录承接前端 JS 资产（chart.min.js + chart-init.js + chart-config.js + README.md）；§4.2 交付机制/模板 script/守卫改本地相对路径（`typeof Chart` 替代 `__CHART_CDN_FAILED`）；§4.8 A5、§4.9 P3、§4.10 S2/S5、§4.12、§4.14、§4.15、§5.0、Iter 1/7、迭代总览、§6 文件清单、§7 全部同步；升级 Chart.js 仅替换 src/js/chart.min.js；risk-analysis.md v27
+> - **v25（R22）**：低配机 + 微信打开场景补充 — §4.9 新增 P4「DPR 限制」（`devicePixelRatio: 1.5`，低配机 + 高分屏省显存/绘制时间，对折线/柱状视觉无感）；§4.14 新增微信打开场景表（链接访问 X5/WKWebView 兼容良好 ✅；file:// 相对 JS 可能被沙箱限制 ⚠ 需实测）+ 移动端图表退化为静态呈现是合理预期说明；Iter 7 全链路验证 + 验收补微信实测（链接 + file://）；risk R2 澄清「微信链接访问兼容良好，主要不确定点是 file:// 加载」；risk-analysis.md v28

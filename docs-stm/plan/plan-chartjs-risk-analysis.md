@@ -124,7 +124,7 @@ plan-1 是 **plan-3**（最大回撤+净值曲线 Chart.js 双轴图增强）和
 | # | 风险 | 等级 | 概率 | 影响 | 触发条件 | 缓解措施 |
 |:-:|:-----|:----|:----:|:----:|:---------|:---------|
 | R1 | **HTML 文件体积膨胀** | 中 | 高 | 中 | 6 张图表原始数据内联到 JS → 模板体积 280KB → 预估 ~1MB | ① 服务端预聚合降低数据粒度（如净值曲线按周聚合）② 热力图数据压缩（仅下三角）③ Feature Flag 关闭时回退 Canvas |
-| R2 | **国产浏览器兼容性** | 低 | 中 | 低 | 微信内置浏览器/老旧 Chrome 对 ES6+ 或 Chart.js v4 支持不完整 | ① 锁定 Chart.js 版本（不 auto-load latest）② `@babel/standalone` 转译（可选）③ Canvas 回退兜底 |
+| R2 | **国产浏览器/微信兼容性** | 低 | 中 | 低 | 微信内置浏览器/老旧 Chrome 对 ES6+ 或 Chart.js v4 支持不完整；**R22 澄清**：微信链接访问（X5 内核 Chromium 107+/iOS WKWebView）兼容良好，主要不确定点是 **file:// 方式打开时相对 JS 加载可能被沙箱限制**（需实测，Iter 7 已加验证项） | ① 锁定 Chart.js 版本（不 auto-load latest）② ES5 保守语法（§4.14，替代 @babel/standalone）③ Canvas/表格回退兜底（表格明细永远存在，图表是渐进增强） |
 | R3 | **CDN 可用性风险** | 低 | 极低 | 低 | **R21 已闭环**：改用纯本地 bundle（`src/js/chart.min.js` 随报告分发），交互图表不依赖网络，离线/内网照常渲染。残余风险仅剩本地文件损坏（极低，`typeof Chart` 守卫跳过初始化 → Canvas/表格兜底） | ① chart.min.js 随报告复制（离线自包含）② `typeof Chart === 'undefined'` 守卫 → 跳过初始化 → 回退 Canvas 2D / 表格 ③ CDN 方案降级为未来可选增强 |
 | R4 | **Chart.js 热力图插件不成熟** | 中 | 中 | 中 | `chartjs-chart-matrix` 社区插件与 Chart.js v4 版本兼容性未知 | ① 技术选型阶段做 POC 验证 ② 不通过则回退到自制 Canvas 热力图（当前纯文本格子） |
 | R5 | **打印降级时序问题** | 中 | 中 | 中 | `chart.toBase64Image()` 异步调用，`window.print()` 触发时快照尚未就绪，打印输出空白或模糊图 | ① `beforeprint` 事件提前预渲染所有 chart 快照到 `<img>` fallback ② `afterprint` 清理临时 img（见 §6.5.4 方案） |
@@ -869,3 +869,4 @@ html_writer.py: _compute_section_visibility()
 > - 2026-08-01 v25（R19）：与数据降级体系融合 — 正交性已确认（§6.5/R7），补传播链与消息口径：新增 upgrade.md §4.16（降级传播链：数据源 T1~T4 → history_data.status 汇合 → 图表三级降级；占位消息复用 STATUS_MESSAGES 常量防口径分裂；radar 数据源缺失链区别于 history_data.status 三级降级）；Iter 1 验收补 2 条；upgrade.md v22
 > - 2026-08-01 v26（R20）：最终收敛与质量检查 — 版本记录 v1-v25 / upgrade.md v1-v22 完整性校验通过；修复 3 处交叉不一致：① §2.4 测试计数 ~39→~45（与 upgrade.md 迭代总览 R11 起同步）② folders.md 目录树 plan/ 未展开子文件（统计表已列 6 个但树未展开，补 6 文件行）③ upgrade.md 目录 §5 锚点与标题（多「× 测试范围」）不匹配 + §1.3 编号重复（总工作量 → §1.4）；全文档章节引用/降级链路/Feature Flag 治理均无遗留占位；upgrade.md v23
 > - 2026-08-01 v27（R21）：**引擎加载策略反转：CDN → 纯本地 bundle**（用户决策）— R3 从「中/低/高」降为「低/极低/低」且**已闭环**（chart.min.js 随报告分发、离线自包含）；R10 供应链攻击随之消除（无外部加载即无注入面）；§3.2 重写为纯本地 bundle 方案（对比表 + 理由 + 防御性 `typeof Chart` 兜底 + 来源维护）；TD2 从「CDN 生产依赖」改为「报告体积增大 ~200KB」；C5/C16 更新；§8.2 重写；§8.4 引擎加载决策行、§8.5 P1 本地 bundle 入库；附录 A 新增 `src/js/` 目录（chart.min.js 引擎 + README 版本记录）；附录 D 安全更新动作改替换 src/js/chart.min.js；附录 B/C 同步；新建 `src/js/` 承接前端 JS 资产（用户建议）；upgrade.md v24
+> - 2026-08-01 v28（R22）：**低配机 + 微信打开场景补充** — R2 澄清「微信链接访问（X5 Chromium 107+/iOS WKWebView）兼容良好，主要不确定点是 **file:// 方式打开时相对 JS 加载可能被沙箱限制**（需实测，Iter 7 已加验证项）」，规避方案中 ② 从 @babel/standalone 改为 **ES5 保守语法**（§4.14）；本地 bundle 方案补 P4 **DPR 限制**（`devicePixelRatio: 1.5`，低配机 + 高分屏优化，对应 upgrade.md §4.9 P4）；微信打开场景明细表在 upgrade.md §4.14（链接访问 ✅ / file:// ⚠）；upgrade.md v25
