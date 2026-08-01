@@ -550,6 +550,7 @@ investor-util/
 │   │   ├── plan-correlation-drawdown.md #     相关性矩阵+回撤+净值曲线计划（plan-2/3）
 │   │   ├── plan-chartjs-risk-analysis.md #    Chart.js 升级风险/收益/架构分析（plan-1）
 │   │   ├── plan-chartjs-report-upgrade.md #  Chart.js 升级实施方案（plan-1）
+│   │   ├── plan-1-iter7-verification-checklist.md  # plan-1 Iter 7 浏览器人工验证清单（rf-113）
 │   │   └── plan-web-ui.md              #     轻量 Web UI 计划
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析

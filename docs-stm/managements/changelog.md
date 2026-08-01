@@ -36,6 +36,7 @@
 - **rf-112 文档同步** — review-findings.md rf-112 已修复表 + rf-111（模板 canvas 缺 A1 aria-label/fallback，文档与实际不符，待处理）P2B 小节；`src/static/README.md` 文件清单补 `test-chart.html` + S2 升级指引改为"先调试页验证再真实报告验证"；`folders.md` src/static/ 子树补 `test-chart.html` 条目
 - **rf-111 修复归档 + plan-1 遗留技术债 P1 记录** — review-findings.md：rf-111 从 P2B 移至已修复表（含修复方案与变更记录）；新增 P1 小节「plan-1 交互图表遗留技术债（2026-08-02）」记录 rf-113~121——rf-113（Iter 7 浏览器人工验证 6 项未实测，test-chart.html 已备载体）、rf-114（TD3 双渲染路径，稳定 2 版本后移除 Canvas）、rf-115（TD-L2 history_data 数据裁剪）、rf-116（TD-L3 模板单文件拆分）、rf-117（A6 键盘可达性）、rf-118（Heatmap 依赖 plan-2 correlation_data）、rf-119（单图导出 PNG 可选增强）、rf-120（S5 CSP 可选）、rf-121（TD2 报告体积 ~200KB）
 - **`src/js/` 更名 `src/static/`（前端静态资产目录）** — 目录实际承载 Chart.js 引擎 + 自有 JS + 独立 HTML 调试页 + README，`js/` 名不副实，更名反映"前端静态资产"语义（为未来承接 HTML/CSS/图片预留，行业惯例 static/）。同步：`html_writer.py` `_copy_js_assets` 复制源路径 `src/js` → `src/static`（运行时唯一代码引用）；4 份管理/设计文档 `src/js` 引用全量替换；`src/static/README.md` 标题 + 职责描述更新；`folders.md` 目录树 `js/` → `static/`。模板与调试页走相对路径，运行时不受影响。report 套件 1153 passed + dev-verify 1181 passed 确认复制逻辑正常
+- **rf-113 验证清单备妥** — 新增 `docs-stm/plan/plan-1-iter7-verification-checklist.md`（plan-1 Iter 7 浏览器人工验证勾选清单，rf-113）：对照 upgrade.md §5 Iter 7 验收标准 2/3/4/6 + §4.8 A1/A4，6 项 × 具体操作步骤（Chrome/Edge 主验、Firefox/Safari 抽验）+ 结果汇总 + 通过后回填 changelog/review-findings 处理流程；`review-findings.md` rf-113 修复方向引用清单；`folders.md` plan/ 子树补条目
 
 ### Test
 
