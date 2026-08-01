@@ -99,3 +99,36 @@ class TestFetchIndexKlineEdge(unittest.TestCase):
 
         result = fetch_index_kline("sh000300", 30)
         self.assertEqual(result, [])
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_api_returns_list_not_dict(self, mock_factory):
+        """回归：API 返回 list（而非 dict）→ 空列表，不抛 AttributeError。
+
+        修复前 `_parse_kline_response` 以 `data.get(...)` 处理 list 而崩溃
+        （`'list' object has no attribute 'get'`），这是 days=3650 超限时的实测响应形态。
+        """
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = []  # 超限时 API 返回 list
+        mock_client.get.return_value = mock_resp
+
+        result = fetch_index_kline("sh000300", 3650)
+        self.assertEqual(result, [])
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_days_clamped_to_2000(self, mock_factory):
+        """回归：请求 days=3650 时钳位到 2000（实测 API 上限），避免超限响应。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"data": {"sh000300": {"qfqday": []}}}
+        mock_client.get.return_value = mock_resp
+
+        fetch_index_kline("sh000300", 3650)
+        call_kwargs = mock_client.get.call_args.kwargs
+        param = call_kwargs["params"]["param"]
+        self.assertIn(",,2000,qfq", param)
+        self.assertNotIn(",,3650,qfq", param)

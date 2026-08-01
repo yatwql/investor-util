@@ -11,11 +11,7 @@
 
 ### P1 — probe 探测发现（plan-7 决策相关，2026-08-01）
 
-| # | 问题 | 状态 |
-|---|------|------|
-| rf-102 | `providers/tencent.py` `fetch_index_kline` 文档声称上限 3650 天，实测 `days=3650` 时 API 返回 `[]`（list），`_parse_kline_response` 以 `data.get("data", ...)` 处理 dict 而崩溃 `AttributeError: 'list' object has no attribute 'get'`；实际上限约 2000 天 | 待处理 |
-| rf-103 | Sina `getKLineData` 端点对**所有**代码（含 sh600000 股票、sh000300/sh000919 指数）返回 404/空 → `sina_kline.fetch_index_kline` 备用链路当前失效；`plan-advanced-analysis.md` §4 声称"Sina 指数链路 🟢 生产验证"与当前环境实测不符（可能为端点变更或环境拦截，需在真实网络环境复核） | 待处理 |
-| rf-104 | CSI 风格指数 `sh000920`（300 成长）自 **2023-02-17** 起在 Tencent 停更（截至 2026-08-01 距今 1261 天），probe 判定该因子代理不可用，plan-7 需替换代理 | 待处理 |
+（无待处理项 — rf-102/103/104/106 已全部处理，见"已修复"表）
 
 ### P2 - 代码质量（低优先级，增量改进）
 
@@ -45,7 +41,11 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| rf-102 | `providers/tencent.py::fetch_index_kline` 文档声称上限 3650 天，实测 `days=3650` 时 API 返回 `[]`（list），`_parse_kline_response` 以 `data.get("data", ...)` 处理 dict 而崩溃 `AttributeError: 'list' object has no attribute 'get'`；实际上限约 2000 天 | `_parse_kline_response` 加非 dict 类型守卫（API 异常时返回 list → 判空不崩）；`fetch_index_kline` 钳位上限 3650→2000（实测）；docstring 同步；边缘回归测试 2 例（非 dict 响应、钳位 2000） | `changelog.md` → Fix / Test |
+| rf-103 | Sina `getKLineData` 端点对**所有**代码（含 sh600000 股票、sh000300/sh000919 指数）返回 404/空 → `sina_kline.fetch_index_kline` 备用链路当前失效；设计文档原"🟢 生产验证"与实测不符 | 代码无结构 bug（`_parse_kline_json` 已对非 list 容错）；`sina_kline.fetch_index_kline` 钳位上限 3650→2000 与 Tencent 对齐（rf-102 同类防）；当前环境 404 为数据源故障，接受 Tencent 单链路降级，Sina 保留为代码级备用（环境恢复后自动生效），设计文档表述已如实修正 | `changelog.md` → Fix / Docs |
+| rf-104 | CSI 风格指数 `sh000920`（300 成长）自 **2023-02-17** 起在 Tencent 停更（截至 2026-08-01 距今 1261 天），probe 判定该因子代理不可用 | plan-7 MVP 用 500成长（sh000925）单因子覆盖成长（见 `plan-advanced-analysis.md` §4 MVP 范围定义）；probe 脚本保留 sh000920 作探测候选（探测停更状态即其目的）；无代码改动 | `changelog.md` → Docs |
 | rf-105 | `test_handlers_config.py::test_write_settings` 测试隔离缺陷：mock 了 `open`/`json.dump` 但 `_write_llm_settings` 还调用真实 `os.makedirs('/fake/path')` + `tempfile.mkstemp` + `os.replace`，非 root 环境下 `/fake` 不可建 → `PermissionError`（P0 dev-verify 门禁失败，与本次改动无关） | 测试补全 fs 写路径 4 个 mock（`os.makedirs`/`tempfile.mkstemp`/`os.fdopen`/`os.replace`）+ 对应断言，测试隔离完备 | `changelog.md` → Test |
+| rf-106 | `report/portfolio_history.py::get_combined_timeseries` 的 `days` 参数**仅控制基准指数**（`_fetch_benchmarks`），**不控制持仓历史长度**（`_fetch_all_histories` 走 chain 默认 `days=30`）；docstring"历史天数"语义有误导。plan-7 曾误以为 `days≥60` 可获 60 期组合收益 | docstring 澄清 `days` 仅作用于基准指数，持仓历史由 chain 默认 30 决定（标注 rf-106）；plan-7 设计已改独立拉取持仓历史 days=60 方案规避（`plan-advanced-analysis.md` §4 计算方案） | `changelog.md` → Fix / Docs |
 | rf-101 | `test_runner.py` 打印子进程捕获输出时，GBK 控制台遇 U+FFFD 替换字符抛 UnicodeEncodeError，Phase A 后 runner 崩溃致 Phase B 不执行（dev-verify 门禁跑不全） | `sys.stdout.reconfigure(errors="replace")` 模块级兜底，异常时静默跳过 | `changelog.md` → Fix |
 | rf-100 | `test_fetcher_index.py::test_tencent_success` mock 目标笔误：mock `tencent.fetch_price`，实际调用 `fetch_index_price`——有外网时真调成功侥幸通过，无外网环境失败 | mock 目标对齐 `fetch_index_price` + 新增 `assert_called()` 回归守卫 | `changelog.md` → Fix / Test |
 | rf-99 | TUI [S] 菜单泄漏旧设计遗留辩论三模块：`debate_pro`/`debate_con`/`debate_synthesis` 显示为 6/7/8 开关，切换仅写入 `enabled_llm` 但无生成路径消费（僵尸开关） | 菜单层过滤：`tui_menu.py` 新增 `LLM_MENU_HIDDEN_KEYS` + `filter_menu_llm_modules()`，[S] 面板与模型路由显示同步过滤；注册表条目保留（缓存 TTL/前缀清理依赖） | `changelog.md` → Fix |

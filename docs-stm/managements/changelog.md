@@ -6,12 +6,24 @@
 
 ## [0.9.5-dev] - 2026-08-01
 
+### Fix
+
+- **rf-102：Tencent 指数 K 线超限崩溃修复** — `fetch_index_kline` 文档声称上限 3650 天，实测 `days=3650` 时 API 返回 `[]`（list），`_parse_kline_response` 以 `data.get(...)` 处理 dict 而崩溃 `AttributeError: 'list' object has no attribute 'get'`；实际上限约 2000 天。修复：`_parse_kline_response` 加非 dict 类型守卫（异常响应 → 空列表不崩）；`fetch_index_kline` 钳位上限 3650→2000 + docstring 同步
+- **rf-103：Sina 指数 K 线备用链路降级处理** — Sina `getKLineData` 端点当前环境对**所有**代码返回 404/空（数据源故障，非代码 bug），`sina_kline.fetch_index_kline` 备用链路失效。处理：`sina_kline.fetch_index_kline` 钳位上限对齐 2000（rf-102 同类防）；`_parse_kline_json` 已有非 list 容错；接受 Tencent 单链路降级，Sina 保留为代码级备用（环境恢复后自动生效），设计文档表述如实修正（原"🟢 生产验证"→ 降级接受）
+- **rf-106：`get_combined_timeseries` days 参数语义澄清** — `portfolio_history.py` 该方法 `days` 仅作用于基准指数（`_fetch_benchmarks`），不控制持仓历史长度（`_fetch_all_histories` 走 chain 默认 30）；docstring"历史天数"有误导，澄清并标注 rf-106，提示后续需透传 days 时改 `_fetch_all_histories`
+
+### Test
+
+- **rf-102/103 回归测试** — `test_tencent_edge.py` 新增 2 例（API 返回 list 非 dict 不崩、days=3650 钳位到 2000）；`test_sina_edge.py` 新增 1 例（days 钳位 2000 对齐 Tencent），防超限崩溃与钳位逻辑回退
+
 ### Docs
 
 - **plan.md 与迭代设计文档依赖状态同步** — 核实 rf-1 批量并行已落地（`BatchDispatcher` 应用于行情/基金排名/行业链路）后：① plan.md plan-2 依赖标注 ⚠️→✅（原"串行获取全品种历史 15-30s"顾虑已消除），P2 头部补充前置状态注记，合计预排 ~18d→~21d；② plan-1 预估 4d→5.25d，对齐 `plan-chartjs-report-upgrade.md` 8 迭代方案，移除 plan.md 中过时的 4d 分阶段表；③ `plan-correlation-drawdown.md` §1 "对 rf-1 的依赖"改写为"已解除"，数据获取编排行注明复用 `BatchDispatcher` 并行链路；④ `plan-engineering.md` 补充 rf-1 完成状态注记（v0.8.x 已回归验证）
 - **plan.md 按推荐实施顺序重排** — 新增"推荐实施顺序"总览小节（①~⑨ 跨 P2/P3 归类），标注推荐理由与工作量；P2 区块内部重排（plan-2/3 → plan-1 → plan-6/5/7，plan-4 已放弃保留），P3 区块内部重排（plan-9 → plan-11 → plan-10 → plan-8）；各计划项标题/表格行补充推荐序号标注；plan-7 状态列明确"实施前先做 0.5d probe 决策闸门（≥3 个 CSI 指数有效 → MVP 3 因子，否则放弃）"；同步 P2 定义行预排数 ~22d→~21d 消除不一致
 - **plan-7 probe 决策闸门完成 → MVP 3 因子** — 新增 `scripts/probe-csi-factor-indices.py`（只读探测，支持 `--provider tencent|sina`/`--days`/`--threshold`/`--stale`/`--codes`/`--no-extra`），对 5 个 CSI 风格指数 + 低波补充逐个调用 `fetch_index_kline`，按 plan-advanced-analysis.md §4.3 + 数据新鲜度维度（条数 ≥ threshold 且 距今 ≤ stale 天）输出 5f/3f/infeasible 判定。实测（365 天窗口，新鲜度 120 天）：**Tencent 4/5 有效且新鲜**（300价值/500价值/500成长/300质量），**300成长（sh000920）自 2023-02-17 停更**需替换代理，低波（sh000931）有效可作补充 → **MVP 3 因子可行（3f）**。同步 plan.md plan-7 行（3.5d→2.5d、状态 ✅ probe 完成、P2 预排 ~21d→~20d）与 `plan-advanced-analysis.md` §4.3（可行性评级、风险表、probe 结论）
 - **plan-7 实现设计补齐：架构约束遵从表 + 技术债预置** — `plan-advanced-analysis.md` §4 新增三小节：① 架构约束遵从表（C1/C6/C7/C14/C19/§1.4.5/C2，对齐 plan-2/plan-3 文档规范，补设计缺口）；② 技术债与技术预置——既有技术债 rf-102（Tencent 3650 上限崩溃）/rf-103（Sina 备用链路 404）/rf-104（sh000920 停更）对 plan-7 的影响与处理建议，C7 注册条目（`factor_exposure` number=17，data_source_status/llm_usage 顺延 18/19）与 C19 schema（`factor_exposure` dict 键结构）预置，计算方案（R_p 复用 `get_combined_timeseries().daily_returns` + `numpy.linalg.lstsq` 手写 OLS 复用 `_math_utils`，不新增 statsmodels 依赖；饼图降级为柱状图不阻塞 plan-1）；③ 工作量估算 3.5d→2.5d 对齐 plan.md。同步 technical.md 附录 H 追加 `factor_exposure` 计划中条目；plan.md plan-7 行"饼图"改"柱状图"
+- **plan-7 迭代设计 10 轮复盘（质量收敛）** — `plan-advanced-analysis.md` §4 多轮自我进化（2026-08-01）：① **R_p 来源重要修正**——`get_combined_timeseries` 的 `days` 参数只传基准、持仓历史固定走 chain 默认 30 期（新增 rf-106），改编排层独立拉取持仓历史 `days=60` 按 as-if 语义算组合收益；② 共线性 MVP 处置明确（不做正交化/岭回归，仅相关矩阵诊断展示 + 高相关文案提示）；③ 风险清单深化 4 项（仅单点数据源/as-if 失真/手写 OLS 正确性/因子停更静默污染，按数据重要性排优先级，降级原则"绝不输出误导性数字"显式化）；④ 新增"与其它计划项交互"表（plan-2 对齐复用 / plan-3 as-if 口径一致约束 + 共享提取技术债预留 / plan-6 快照预留 / LLM 不注入）；⑤ MVP 范围收敛（固定 3 因子集合 `FACTOR_INDICES` + 明确不做清单 + 保留项，修正"少 1 个因子代理"与"低波作补充"两处矛盾）；⑥ 新增测试策略章节（OLS 已知答案小数据集/降级路径/口径一致用例 + marker 分配 + 门禁映射）。同步 review-findings.md 记录 rf-106
+- **rf-102/103/104/106 技术债处理落地** — review-findings.md 四条目从待处理移至已修复表（含修复方案与变更记录）；`plan-advanced-analysis.md` §4 技术债表更新为 ✅ 已处理（C6 行、风险清单"仅单点数据源"同步降级接受表述）；plan.md plan-7 行标注"实施前技术债已全部处理"；rf-104（sh000920 停更）MVP 因子替代方案确认（500成长 sh000925 单因子，probe 脚本保留 sh000920 作探测候选）
 
 ### Test
 

@@ -90,3 +90,18 @@ class TestFetchIndexKlineEdge(unittest.TestCase):
 
         result = fetch_index_kline("sh000300", 30)
         self.assertEqual(result, [])
+
+    @patch("src.python.providers.sina.make_http_client")
+    def test_days_clamped_to_2000(self, mock_factory):
+        """回归：请求 days=3650 时钳位到 2000（与 Tencent 对齐），避免超限响应。"""
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = []
+        mock_client.get.return_value = mock_resp
+
+        fetch_index_kline("sh000300", 3650)
+        call_kwargs = mock_client.get.call_args.kwargs
+        datalen = call_kwargs["params"]["datalen"]
+        self.assertEqual(datalen, 2000)
