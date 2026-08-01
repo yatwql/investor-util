@@ -8,15 +8,23 @@
 
 ### Fix
 
+- **test_runner.py GBK 控制台打印崩溃** — 子进程捕获输出经 `errors="replace"` 处理后含 U+FFFD 替换字符，直接 `print` 到 GBK 控制台抛 `UnicodeEncodeError`，Phase A 后 runner 崩溃导致 Phase B 不执行。修复：模块顶部 `sys.stdout.reconfigure(errors="replace")` 兜底（异常时静默跳过）
+- **`test_tencent_success` mock 目标笔误导致静默真调 API** — `fetch_indices` 主链路实际调用 `tencent.fetch_index_price`，测试却 mock 了 `tencent.fetch_price`：有外网时真调成功侥幸通过，无外网环境暴露（返回空 → 断言失败）。修复：mock 目标对齐 `fetch_index_price` + 新增 `mock_fetch_price.assert_called()` 回归守卫，杜绝 mock 目标漂移
+- **TUI [S] 菜单泄漏旧设计遗留辩论三模块（僵尸开关）** — 辩论白脸/黑脸/综合（`debate_pro`/`debate_con`/`debate_synthesis`）注册表条目保留，但作为 LLM 模块泄漏进 [S] 面板显示为 6/7/8 开关（写入 `enabled_llm` 后无任何生成路径消费，切换无效）。修复：菜单层过滤——`tui_menu.py` 新增 `LLM_MENU_HIDDEN_KEYS` 常量与 `filter_menu_llm_modules()` 辅助函数，`handlers_config.py` [S] 面板与 TUI 模型路由显示同步过滤；注册表条目原样保留（缓存 TTL/前缀清理仍依赖）。修复后 [S] 面板恢复文档描述的标准 5 模块 + 实验 6-8（正反辩论/条件推理/集中度问答）
 - **LLM 空内容误判"内容被过滤"→ 根因区分 + 修复无效安抚重试** — DeepSeek V4 兼容端点为强制推理模型，`thinking` 与 `text` 共享 `max_tokens` 预算；思考部分耗尽预算时响应仅含 `thinking` block 无 `text`（复现：effort=high + max_tokens=4096 稳定触发）。`_extract_content` 对无 text block 的响应区分根因：`stop_reason=max_tokens` 记录"思考耗尽预算"日志（建议增大 max_tokens/降低 effort），其他仍记录"可能被内容过滤"；统一返回 `None` 走 provider 切换，替代对空内容追加安抚指令的无效重试
 - **health_check `max_tokens` 4096→8192 + effort high→medium** — 实测（mt=8192 + effort=high 输出 5172 tokens 正常）验证增大预算可消除空 text；expert_review effort high→medium 缩短 thinking 预留文本预算。同步生产 `llm_settings.json`、默认模板 `_llm_defaults.py`
 
 ### Test
 
+- **`test_tencent_success` mock 目标回归守卫** — 断言腾讯主链路 mock 实际被调用，防止 mock 目标与代码调用漂移后静默真调 API
+- **辩论模块菜单过滤回归测试** — 新增 `TestFilterMenuLlmModules` 2 用例：过滤后仅剩 5 个标准模块（不含 `debate_pro`/`debate_con`/`debate_synthesis`）、注册表仍保留辩论三模块条目
 - **`_extract_content` 空 text 回归测试** — edge 新增 `TestExtractContentEdge` 3 用例：仅 thinking + max_tokens → None 且记录预算耗尽日志（不误报过滤）、仅 thinking + end_turn → None 且记录过滤日志、thinking+text 并存正常返回；同步 4 处既有断言（空列表/仅 thinking → None）
 
 ### Docs
 
+- **how-to-menu.md [S] 章节补充三段式说明** — 新增"6/7/8 与白脸/黑脸/综合的关系"注解：正反辩论（编号 6）内部即为白脸→黑脸→综合三段式，非独立开关；旧设计遗留的独立模块开关已从菜单隐藏（注册表保留仅用于缓存）
+- **4 份用户手册同步 [S] 面板布局与辩论三模块说明** — how-to-config.md（features 章节补充 [S] 面板分组注解）、how-to-config-llm.md（模块启停补充菜单分组与三段式说明）、reports-instruction.md（§12 智囊团复盘补充辩论模式增强说明 + 对照表新增辩论式复盘行）、how-to-use-registry.md（辩论三模块标注"仅缓存管理用途、菜单已隐藏"，LLM 名称/键名查询与消费方清单同步）
+- **review-findings.md rf-99 标记已修复** — 详细说明移至 changelog，摘要行保留于已修复表
 - **how-to-config-llm.md 调优参数同步** — 参数表新增 `reasoning_effort` 列；health_check max_tokens 4096→8192；expert_review / health_check effort 标为 medium（非统一 high）；失败降级表区分"返回空内容（None）→ 切换 Provider"与"空字符串 → 安抚重试"；Extended Thinking 章节补充 DeepSeek V4 强制推理说明（thinking+text 共享 max_tokens 预算）与空内容调参建议（增大 max_tokens / 降低 effort）
 - **llm-technical.md 空内容处理与参数同步** — 参数表 health_check 4096→8192；调用链/§5.1/§6.1 四层容错更新空内容处理（`_extract_content` 无 text block → None → 直接切换 provider；仅真正空字符串 `""` 安抚重试）；effort 兜底说明（模板默认 expert_review / health_check 为 medium）；附录 A `reasoning_effort` 枚举补 `low`/`max`
 - **technical.md LLM 章节空内容处理同步** — §5.2 调用链、§5.5 关键机制表"内容过滤安抚"改为"空内容处理"（None 切 provider / "" 安抚重试）

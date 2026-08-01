@@ -221,6 +221,7 @@ LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
+- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。「辩论-正反辩论」内部即为白脸→黑脸→综合三段式流程，**不是**三个独立开关；早期独立的白脸/黑脸/综合模块开关已从菜单隐藏（注册表条目保留，仅用于缓存键/TTL 管理）
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 

@@ -55,6 +55,18 @@ def get_config_cache() -> dict | None:
     return _config_cache
 
 
+# ── LLM 菜单隐藏模块 ──────────────────────────────────────
+# 旧设计遗留的辩论三模块（debate_pro/con/synthesis）在注册表中保留
+# （缓存 TTL/前缀清理仍依赖），但不在菜单/状态面板展示，避免误导为可开关模块。
+# 实际辩论开关由 features.json 的实验性 Flag（正反辩论/条件推理/集中度问答）控制。
+LLM_MENU_HIDDEN_KEYS: frozenset[str] = frozenset({"debate_pro", "debate_con", "debate_synthesis"})
+
+
+def filter_menu_llm_modules(module_names: dict[str, str]) -> dict[str, str]:
+    """菜单层过滤：剔除隐藏的 LLM 模块（注册表条目保留）。"""
+    return {k: v for k, v in module_names.items() if k not in LLM_MENU_HIDDEN_KEYS}
+
+
 # ── 界面输出 ──────────────────────────────────────────────
 
 
@@ -169,7 +181,7 @@ def _show_llm_config_status() -> None:
 
     print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}{cb_display}")
     _route_parts = []
-    for _sfx, _name in get_llm_module_names().items():
+    for _sfx, _name in filter_menu_llm_modules(get_llm_module_names()).items():
         _mv = llm_config.get(f"model_{_sfx}") or model
         _route_parts.append(f"{_name}={_mv}")
     print(f"         模型路由: {' / '.join(_route_parts)}")
