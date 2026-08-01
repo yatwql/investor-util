@@ -1,7 +1,7 @@
-# src/js/ — 前端 JS 资产
+# src/static/ — 前端静态资产
 
-Chart.js 交互式图表的前端资产统一存放于此目录。报告生成时由
-`html_writer.py` 通过 `shutil.copy2` 复制到报告输出目录（与 HTML 同目录），
+Chart.js 交互式图表的前端资产（引擎 + 自有 JS + 独立调试页）统一存放于此目录。
+报告生成时由 `html_writer.py` 通过 `shutil.copy2` 复制到报告输出目录（与 HTML 同目录），
 模板以**相对路径**引用，报告完全离线自包含（R21 纯本地 bundle 决策）。
 
 ## 文件清单

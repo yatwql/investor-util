@@ -20,7 +20,7 @@
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
-| **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | ①③⑤ 可用 `src/js/test-chart.html` 调试页自检（TD8 rf-112 已补齐载体）；②④⑥ 需真实浏览器/微信实操——对照验收标准写勾选清单逐步验证，结果回填 changelog |
+| **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | ①③⑤ 可用 `src/static/test-chart.html` 调试页自检（TD8 rf-112 已补齐载体）；②④⑥ 需真实浏览器/微信实操——对照验收标准写勾选清单逐步验证，结果回填 changelog |
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器 |
 | **rf-115** | TD-L2：`history_data` 数据同时服务 Excel + HTML Chart.js，模板 `tojson` 序列化全量字段（含 Excel 不需要的字段） | plan-2/plan-3 引入 chart_data 专用裁剪 |
 | **rf-116** | TD-L3：模板仍为单文件 ~2000 行（Chart.js 初始化 JS 已外部化缓解，Canvas 函数 + 条件分支仍占体积） | 独立技术债迭代做章节级 partial 拆分 |
@@ -64,7 +64,7 @@
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
 | rf-111 | 模板 6 个 chart canvas 无 `aria-label`/`role="img"`/fallback 文本（设计文档 §4.8 A1 声称已实现，实际 `grep -c aria-label` = 0 处） | 模板 6 处 canvas 补 A1 属性 + 内嵌 fallback 文本（对齐 `test-chart.html` 示范写法）；新增 `test_all_chart_canvases_have_a11y_attrs` 回归用例（6 图 canvas 断言 aria-label 含"悬停查看"/role=img/fallback 文本非空）；report 套件 161 passed | `changelog.md` → Fix / Test |
-| rf-112 | **TD8 JS 调试设施空白** — 设计文档多处声称已建"独立 test HTML 调试页"，仓库实际无此文件（仅 `report_template.html`），升级 Chart.js（S2 流程）无独立验证载体 | 新增 `src/js/test-chart.html` 独立调试页：6 图渲染/交互 + 4 场景（正常/降级/空数据/离线）自检横幅（`canvas._chart` 统计初始化数 + `typeof Chart` 守卫验证），ES5 语法（R17/R22），数据契约对齐 §4.12；`src/js/README.md` 文件清单 + S2 升级指引同步 | `changelog.md` → Fix / Docs |
+| rf-112 | **TD8 JS 调试设施空白** — 设计文档多处声称已建"独立 test HTML 调试页"，仓库实际无此文件（仅 `report_template.html`），升级 Chart.js（S2 流程）无独立验证载体 | 新增 `src/static/test-chart.html` 独立调试页：6 图渲染/交互 + 4 场景（正常/降级/空数据/离线）自检横幅（`canvas._chart` 统计初始化数 + `typeof Chart` 守卫验证），ES5 语法（R17/R22），数据契约对齐 §4.12；`src/static/README.md` 文件清单 + S2 升级指引同步 | `changelog.md` → Fix / Docs |
 | rf-107 | `_report_generation.py` 收集 7 个 `metrics_*` flag 传入 builder，但 `metrics_risk_contribution` 无雷达轴消费（`risk_contributions` 为 `list[dict]` 非单标量）；设计文档 F1/§6.6 称"7 项全是雷达子开关"与实际不符 | 收集列表移除 `metrics_risk_contribution`（保留 6 个雷达子开关）；设计文档 F1 修正为"6 项雷达子开关 + 1 项指标级熔断开关"（`circuit_breaker_wrapper` 消费） | `changelog.md` → Fix / Docs |
 | rf-108 | `chart_data_builder.py` 404 行，超出 §4.11 O4 预算 ≤400 行 | 合并 risk_metrics 与 history_data 两个降级分支为单一分支 + 提取 `_BASIC_RADAR_AXES` 模块常量（397 行） | `changelog.md` → Fix |
 | rf-109 | `chart-init.js` `initRadarChart` 未渲染 `degraded` 虚线，与 line/drawdown 图"degraded→虚线"统一契约不一致（降级雷达视觉实线，仅靠模板 note 文本提示） | `initRadarChart` dataset 增加 `borderDash: d.degraded ? [5,5] : undefined` | `changelog.md` → Fix |

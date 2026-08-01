@@ -558,11 +558,11 @@ def write_html_report(
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
 
 
-# ── Chart.js JS 资产复制（src/js/ → 输出目录）───────────────
+# ── Chart.js JS 资产复制（src/static/ → 输出目录）───────────────
 
 
 def _copy_js_assets(output_dir: str) -> None:
-    """将 src/js/ 下四个前端 JS 资产复制到报告输出目录（R21 本地 bundle）。
+    """将 src/static/ 下四个前端 JS 资产复制到报告输出目录（R21 本地 bundle）。
 
     模板以相对路径引用（chart.min.js / chart-print.js / chart-config.js /
     chart-init.js），报告完全离线自包含。文件缺失时仅告警，不阻断报告生成（防御性）。
@@ -575,7 +575,7 @@ def _copy_js_assets(output_dir: str) -> None:
     from src.python.core.constants import PROJECT_ROOT
 
     _JS_ASSETS = ("chart.min.js", "chart-print.js", "chart-config.js", "chart-init.js")
-    src_dir = os.path.join(PROJECT_ROOT, "src", "js")
+    src_dir = os.path.join(PROJECT_ROOT, "src", "static")
     os.makedirs(output_dir, exist_ok=True)
     for fname in _JS_ASSETS:
         src = os.path.join(src_dir, fname)
