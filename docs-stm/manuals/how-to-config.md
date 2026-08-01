@@ -625,7 +625,7 @@
 ---
 ### M. 功能开关（features.json）
 
-`data/config/features.json` 提供 28 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
+`data/config/features.json` 提供 29 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
 ```json
 {
@@ -648,6 +648,7 @@
 | `metrics_*`（7 项） | true | 量化指标（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
 | `anonymizer` | false | 匿名化功能总开关（关闭后强制 off）；具体模式通过 config.json 的 anonymization.mode 设置 |
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
+| `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）；关闭回退旧 Canvas + 表格静态渲染 |
 
 > **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（1-5，由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性辩论模式（6-8，由上方 `llm_debate_*` 开关控制）。「辩论-正反辩论」内部即为白脸→黑脸→综合三段式流程，**不是**三个独立开关；早期版本的独立"辩论白脸/黑脸/综合"模块开关已从菜单隐藏（注册表条目保留，仅用于缓存键/TTL 管理）。
 

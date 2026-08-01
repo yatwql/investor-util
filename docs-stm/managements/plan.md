@@ -28,7 +28,7 @@
 | ① | **plan-9** 首次运行引导 | P3 | 1d | 性价比最高，所有新用户体验；独立无依赖，可从 P3 提前实施 |
 | ② | **plan-7** 因子暴露分析（MVP 3 因子） | P2 | 2.5d | probe 已验证（2026-08-01）MVP 3 因子可行；300成长停更由 500成长替代 |
 | ③ | **plan-2 / plan-3** 分析基础 | P2 | 4.5d | rf-1 依赖已解除；共享历史数据源与缓存；plan-3 C7 注册已完成 |
-| ④ | **plan-1** 交互式 HTML 报告 | P2 | 5.25d | 收益乘数最高，解锁 plan-3/6/11；设计完备（8 迭代）、风险可控 |
+| ④ | **plan-1** 交互式 HTML 报告 | P2 | 5.25d | ✅ **已完成**（8 迭代落地）；解锁 plan-3/6/11 图表增强 |
 | ⑤ | **plan-6** 多快照趋势追踪 | P2 | 3d | 依赖 plan-1 图表框架；聚合既有快照，低风险 |
 | ⑥ | **plan-5** 调仓 What-if 模拟 | P2 | 5d | 独立大块，无数据源依赖；plan-1 后 diff 图表受益 |
 | ⑦ | **plan-11** HTML 暗色模式 | P3 | 0.5d | 依赖 plan-1 的 CSS 变量预留，极低成本 |
@@ -50,9 +50,9 @@
 
 #### `plan-1` 交互式 HTML 报告升级（[`plan-chartjs-report-upgrade.md`](../plan/plan-chartjs-report-upgrade.md)）— **推荐④**
 
-Chart.js 替换 Canvas 静态图表，实现缩放、悬停提示、筛选、导出。**预估：5.25d**（8 迭代拆分、Python 端预处理器、CDN+SRI+onerror 降级与验收标准详见设计文档）
+Chart.js 替换 Canvas 静态图表，实现缩放、悬停提示、筛选、导出。**预估：5.25d**（8 迭代拆分、Python 端预处理器、chart.min.js 本地 bundle 与验收标准详见设计文档）。**✅ 已完成**（8 迭代全部落地，双路径回退验证通过，详见 `changelog.md`）
 
-覆盖 6 张交互图表：资产构成(Doughnut)、行业分布(Horizontal Bar)、穿透 TOP10(Bar)、净值趋势(Line)、相关性矩阵(Heatmap)、量化指标(Gauge/Radar)。（⬆ plan-3/plan-6 图表增强依赖本项）
+覆盖 6 张交互图表：净值趋势(Line)、最大回撤(Line)、资产构成(Doughnut)、行业分布(Horizontal Bar)、穿透 TOP10(Bar)、量化指标(Radar)。相关性矩阵(Heatmap)依赖 plan-2 的 correlation_data，推迟至 plan-2。（⬆ plan-3/plan-6 图表增强依赖本项）
 
 #### 高级分析功能（[`plan-advanced-analysis.md`](../plan/plan-advanced-analysis.md)）— **plan-4（已放弃）~ plan-7**
 

@@ -242,7 +242,8 @@ investor-util/
 │   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
 │   │   ├── chart-print.js            #   打印降级（beforeprint 快照 <img> / afterprint 恢复，§4.5）
 │   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制，≤150 行）
-│   │   └── chart-init.js             #   6 张图初始化（O1 隔离 + degraded 虚线，≤300 行）
+│   │   ├── chart-init.js             #   6 张图初始化（O1 隔离 + degraded 虚线，≤300 行）
+│   │   └── README.md                 #   JS 资产说明 + Chart.js 版本号记录（S2 升级指引）
 │   │
 │   └── test/                         # 测试套件
 │       ├── __init__.py               #   包标记（空文件）

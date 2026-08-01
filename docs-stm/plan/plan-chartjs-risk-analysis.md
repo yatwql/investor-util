@@ -36,8 +36,10 @@
 | 2 | 行业分布（Horizontal Bar） | 无图表（表格文本） | 水平柱状图，排序切换 |
 | 3 | 穿透 TOP10（Bar） | 无图表（表格文本） | 柱状图，点击跳转 |
 | 4 | 净值趋势（Line） | Canvas `drawSimpleChart` | 折线图，框选缩放+基准对比 |
-| 5 | 相关性矩阵（Heatmap） | 无图表（纯文本格子） | Chart.js Matrix 热力图 |
-| 6 | 量化指标（Gauge/Radar） | 无图表（表格文本） | 雷达图，与基准对比 |
+| 5 | 最大回撤（Line） | Canvas `drawSimpleChart` | 折线图，回撤填充+基准对比 |
+| 6 | 量化指标（Radar） | 无图表（表格文本） | 雷达图，与基准对比 |
+
+> 相关性矩阵（Heatmap）依赖 plan-2 的 `correlation_data`，plan-1 仅建框架、实际推迟至 plan-2（详见 `plan-chartjs-report-upgrade.md §1.1`）。
 
 ### 1.2 边界（不做什么）
 
