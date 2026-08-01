@@ -61,11 +61,15 @@ class TestReadLlmSettings:
 class TestWriteLlmSettings:
     """_write_llm_settings: 写入 JSON + 刷新 LLM 配置缓存。"""
 
+    @patch("src.python.tui.handlers_config.os.replace")
+    @patch("src.python.tui.handlers_config.os.fdopen")
+    @patch("src.python.tui.handlers_config.tempfile.mkstemp", return_value=(7, "/fake/path/llm_settings.json.tmp"))
+    @patch("src.python.tui.handlers_config.os.makedirs")
     @patch("src.python.config.get_llm_config")
     @patch("src.python.tui.handlers_config.json.dump")
     @patch("src.python.tui.handlers_config.open")
-    def test_write_settings(self, mock_open, mock_json_dump, mock_get_llm):
-        """正确写入并刷新配置。"""
+    def test_write_settings(self, mock_open, mock_json_dump, mock_get_llm, mock_makedirs, mock_mkstemp, mock_fdopen, mock_replace):
+        """正确写入并刷新配置（fs 写路径全 mock，避免依赖 /fake 目录可写权限）。"""
         from src.python.tui.handlers_config import _write_llm_settings
 
         settings = {"enabled_llm": {"news_correlation": True}}
@@ -75,6 +79,9 @@ class TestWriteLlmSettings:
         mock_open.return_value = mock_file
 
         _write_llm_settings(settings, path)
+        mock_makedirs.assert_called_once()
+        mock_mkstemp.assert_called_once()
+        mock_replace.assert_called_once()
         mock_json_dump.assert_called_once()
         mock_get_llm.assert_called_once()
 

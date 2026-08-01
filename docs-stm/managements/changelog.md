@@ -10,6 +10,11 @@
 
 - **plan.md 与迭代设计文档依赖状态同步** — 核实 rf-1 批量并行已落地（`BatchDispatcher` 应用于行情/基金排名/行业链路）后：① plan.md plan-2 依赖标注 ⚠️→✅（原"串行获取全品种历史 15-30s"顾虑已消除），P2 头部补充前置状态注记，合计预排 ~18d→~21d；② plan-1 预估 4d→5.25d，对齐 `plan-chartjs-report-upgrade.md` 8 迭代方案，移除 plan.md 中过时的 4d 分阶段表；③ `plan-correlation-drawdown.md` §1 "对 rf-1 的依赖"改写为"已解除"，数据获取编排行注明复用 `BatchDispatcher` 并行链路；④ `plan-engineering.md` 补充 rf-1 完成状态注记（v0.8.x 已回归验证）
 - **plan.md 按推荐实施顺序重排** — 新增"推荐实施顺序"总览小节（①~⑨ 跨 P2/P3 归类），标注推荐理由与工作量；P2 区块内部重排（plan-2/3 → plan-1 → plan-6/5/7，plan-4 已放弃保留），P3 区块内部重排（plan-9 → plan-11 → plan-10 → plan-8）；各计划项标题/表格行补充推荐序号标注；plan-7 状态列明确"实施前先做 0.5d probe 决策闸门（≥3 个 CSI 指数有效 → MVP 3 因子，否则放弃）"；同步 P2 定义行预排数 ~22d→~21d 消除不一致
+- **plan-7 probe 决策闸门完成 → MVP 3 因子** — 新增 `scripts/probe-csi-factor-indices.py`（只读探测，支持 `--provider tencent|sina`/`--days`/`--threshold`/`--stale`/`--codes`/`--no-extra`），对 5 个 CSI 风格指数 + 低波补充逐个调用 `fetch_index_kline`，按 plan-advanced-analysis.md §4.3 + 数据新鲜度维度（条数 ≥ threshold 且 距今 ≤ stale 天）输出 5f/3f/infeasible 判定。实测（365 天窗口，新鲜度 120 天）：**Tencent 4/5 有效且新鲜**（300价值/500价值/500成长/300质量），**300成长（sh000920）自 2023-02-17 停更**需替换代理，低波（sh000931）有效可作补充 → **MVP 3 因子可行（3f）**。同步 plan.md plan-7 行（3.5d→2.5d、状态 ✅ probe 完成、P2 预排 ~21d→~20d）与 `plan-advanced-analysis.md` §4.3（可行性评级、风险表、probe 结论）
+
+### Test
+
+- **`test_write_settings` 测试隔离补全** — mock 了 `open`/`json.dump` 但 `_write_llm_settings` 还调用真实 `os.makedirs('/fake/path')` + `tempfile.mkstemp` + `os.replace`，非 root 环境下 `/fake` 不可建 → `PermissionError` 使 P0 dev-verify 门禁失败（rf-105）。修复：补全 fs 写路径 4 个 mock（`os.makedirs`/`tempfile.mkstemp`/`os.fdopen`/`os.replace`）+ `assert_called_once()` 断言，测试隔离完备且不依赖根目录可写权限
 
 ---
 
