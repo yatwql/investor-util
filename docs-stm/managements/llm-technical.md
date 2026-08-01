@@ -1,6 +1,6 @@
 # LLM 集成层技术设计
 
-> 文档版本：0.9.3
+> 文档版本：0.9.4-dev
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -118,7 +118,7 @@ skeleton.py:_generate_llm_content()
     │  ② _call_llm()
     │      └─ api.py:_call_llm()
     │             │  路由 provider → _call_claude() / _call_openai()
-    │             │  ③ 内容过滤安抚重试（空返回时）
+    │             │  ③ 空内容处理：None→直接切换 provider；""→安抚重试
     │             │  ④ 回退 provider（主 provider 失败时）
     │             └─ api_base.py:_call_llm_with_retry()
     │                    │  熔断预检 → 熔断中则直接返回
@@ -180,7 +180,7 @@ skeleton.py:_generate_llm_content()
 |:-------|:-----|:---------------:|:------------:|:--------:|:-------------------|
 | `global_macro` | 全球政经局势 | 800 | 60s | 24h（86400s） | 宏观经济学家角色，500 字内，纯文本 |
 | `expert_review` | 智囊团深度复盘 | 8192 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
-| `health_check` | 持仓体检报告 | 4096 | 120s | 24h（86400s） | 四维度评分（风险分散度/流动性/收益合理性/成本结构） |
+| `health_check` | 持仓体检报告 | 8192 | 120s | 24h（86400s） | 四维度评分（风险分散度/流动性/收益合理性/成本结构） |
 | `penetration_deep` | 穿透深度分析 | 8192 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
 
 #### 批量模式模块（1 个，通过 `_generate_llm_module` 以批量模式调用）
@@ -288,7 +288,7 @@ _run_standard_mode()
 │ │ ② _call_llm()                   │  │
 │ │ 清除上次失败原因                  │  │
 │ │ → 主 provider API 调用           │  │
-│ │ → 内容过滤安抚重试                │  │
+│ │ → 空内容处理（None→切换/""→安抚）│  │
 │ │ → 回退 provider                  │  │
 │ └──────────────┬──────────────────┘  │
 │                │                      │
@@ -490,7 +490,9 @@ _call_llm(system_prompt, user_prompt, llm_config, ...)
     │                + ThinkingConfig 注入 (generationConfig.thinkingConfig.thinkingBudget)
     │
     │          成功 → 返回 (content, usage, provider_name)
-    │          空内容 → 内容过滤安抚重试（追加安抚指令重试一次）
+    │          空内容 None（无 text block，如 thinking 耗尽 max_tokens 预算）
+    │            → 直接切换下一 entry（安抚重试无效，不再尝试）
+    │          空字符串 ""（真正被过滤/无内容）→ 内容过滤安抚重试（追加安抚指令重试一次）
     │          失败 → 记录失败原因，继续下一 entry
     │
     └─ ④ 全链失败 → 返回 (None, {}, None)
@@ -531,7 +533,7 @@ _configure_extended_thinking(payload, llm_config, config_field, model, max_token
     ├─ effort 模型 (DeepSeek V4+) →
     │      payload["output_config"] = {"effort": effort}
     │      effort 从 reasoning_effort_{module_suffix} 读取
-    │      默认 "high"
+    │      配置缺失时兜底 "high"（模板默认：expert_review / health_check 为 medium）
     │
     └─ budget_tokens 模型 (Claude Sonnet 4 / Opus 4 / Gemini 2.5) →
            payload["thinking"]["budget_tokens"] = budget
@@ -662,11 +664,13 @@ call_gemini() Extended Thinking 注入
     ── max_tokens × 1.5 重试一次
     ── 二次截断则保留第一次结果 + 尾部警告
 
-第 4 层：内容过滤安抚重试（api.py）
-    ── API 返回空内容（可能被内容审查拦截）
-    ── 追加安抚指令到 system prompt 尾部重试一次
+第 4 层：空内容处理（api.py）
+    ── `_extract_content` 无 text block → 返回 None → 直接切换下一 provider
+       （DeepSeek V4 强制推理模型思考部分耗尽 max_tokens 预算时响应仅含
+        thinking block 无 text；安抚重试对预算耗尽无效，故不再安抚）
+    ── 真正空字符串 ""（可能被内容审查拦截）→ 追加安抚指令重试一次
     ── 安抚成功 → 返回重试结果
-    ── 安抚失败 → 尝试回退 provider
+    ── 安抚失败 → 切换 provider
 ```
 
 ### 6.2 指数退避延迟
@@ -1213,7 +1217,7 @@ LLM 集成层与系统其他组件的接口：
 | `cache_enabled_{module_key}` | 是否启用缓存 | `true` / `false` |
 | `output_brief_{module_key}` | 精简模式 | `true` / `false` |
 | `thinking_enabled_{module_key}` | 是否启用 Extended Thinking | `true` / `false` |
-| `reasoning_effort_{module_key}` | DeepSeek 推理强度 | `high` / `medium` / `low` |
+| `reasoning_effort_{module_key}` | DeepSeek 推理强度 | `low` / `medium` / `high` / `max` |
 | `thinking_budget_{module_key}` | Claude/Gemini Thinking 预算 token | `10240` |
 
 所有参数在 `llm_settings.json` 中配置，`{module_key}` 取值为 `global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`。

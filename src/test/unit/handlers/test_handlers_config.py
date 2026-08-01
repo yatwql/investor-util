@@ -127,3 +127,30 @@ class TestRefreshOneFundCache:
 
         with pytest.raises(Exception, match="API err"):
             _refresh_one_fund_cache(self._make_fund())
+
+
+class TestFilterMenuLlmModules:
+    """菜单层隐藏旧设计遗留的辩论三模块（注册表条目保留）。"""
+
+    def test_filter_hides_legacy_debate_modules(self):
+        """过滤后仅剩 5 个标准模块，不含 debate_pro/con/synthesis。"""
+        from src.python.core.registry import get_llm_module_names
+        from src.python.tui.tui_menu import filter_menu_llm_modules
+
+        filtered = filter_menu_llm_modules(get_llm_module_names())
+        assert set(filtered.keys()) == {
+            "global_macro",
+            "expert_review",
+            "news_correlation",
+            "health_check",
+            "penetration_deep",
+        }
+
+    def test_registry_keeps_legacy_debate_modules(self):
+        """注册表仍保留辩论三模块（缓存 TTL/前缀清理依赖），未被删除。"""
+        from src.python.core.registry import get_llm_module_names
+
+        names = get_llm_module_names()
+        assert "debate_pro" in names
+        assert "debate_con" in names
+        assert "debate_synthesis" in names

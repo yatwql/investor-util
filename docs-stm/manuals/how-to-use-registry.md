@@ -59,7 +59,7 @@ class DataModuleDef:
 | **行业分类（refresh）** | 行业分类 | `industry` | 14天 | 主动刷新触发 |
 | **新闻（refresh）** | 新闻聚合 | `news` | 15min | 短 TTL 高频更新 |
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
-| **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | 实验功能，三段独立缓存（复用 expert_review 指纹） |
+| **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | 实验功能三段独立缓存键（复用 expert_review 指纹）。**仅缓存管理用途**：注册表条目保留供 TTL/前缀清理使用，菜单 [S] 已隐藏，实际启停由 Feature Flag `llm_debate_procon`（正反辩论）控制 |
 | **补充数据（refresh）** | 盈利预测、资金流向、分红、无风险利率 | `profit_forecast`, `sector_flow`, `dividend`, `bond_yield` | 15min~30d | 主动刷新触发；`bond_yield` 为精确键名 `bond_yield_rf` |
 | **基金深度分析（refresh）** | 基金经理、持仓重合度、基金风格扩展数据 | `fund_manager`, `fund_overlap`, `extended` | 24h~7d | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
@@ -109,7 +109,7 @@ from src.python.core.registry import (
 **用途：**
 - `get_llm_module_name("expert_review")` → `"智囊团深度复盘"`
 - `get_llm_module_names()` → `{"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘", ...}`
-- 可选 suffix：`global_macro`, `expert_review`, `health_check`, `penetration_deep`, `news_correlation`
+- 可选 suffix：`global_macro`, `expert_review`, `health_check`, `penetration_deep`, `news_correlation`（另含缓存管理保留条目 `debate_pro`/`debate_con`/`debate_synthesis`，已在菜单层隐藏）
 
 ### LLM Settings 键名查询
 
@@ -131,7 +131,7 @@ from src.python.core.registry import (
 ```
 
 **用途：**
-- 返回 `llm_settings.json` → `enabled_llm` 字典的所有合法子键（即各 LLM 模块的 `settings_suffix`：`global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`），用于 `_validate_enable_llm()` 的子键拼写校验
+- 返回 `llm_settings.json` → `enabled_llm` 字典的所有合法子键（即各 LLM 模块的 `settings_suffix`：`global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`，另含缓存管理保留条目 `debate_pro` / `debate_con` / `debate_synthesis`），用于 `_validate_enable_llm()` 的子键拼写校验
 
 ### 报表排序与页签名称
 
@@ -205,7 +205,7 @@ from src.python.core.registry import (
 | `llm/generators_orchestrator.py` | `get_llm_module_name()`, `get_llm_module_names()` | LLM 调度标签 |
 | `llm/skeleton.py` | `get_llm_module_name()` | LLM 骨架消息映射 |
 | `report/orchestrator.py` | `get_llm_module_name()`, `get_report_section_order()` | 报告生成编排（LLM 模块标签 + 页签排序） |
-| `tui/handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示 |
+| `tui/handlers_config.py` | `get_llm_module_names()` | 菜单 S LLM 配置展示（经 `filter_menu_llm_modules()` 过滤隐藏辩论三模块） |
 | `report/excel_generator.py` | `get_report_section_order()` | Excel 页签排序 |
 | `report/html_writer.py` | `get_llm_module_name()`, `get_llm_module_names()` | HTML 模板注入 |
 | `report/llm_module_info.py` | `get_llm_module_names()` | 构建模块状态/Token用量/费用信息 |

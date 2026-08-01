@@ -48,8 +48,12 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
             data,
             extract_fn=lambda d: "",
             check_truncation_fn=lambda d, mt: False,
-            max_tokens=1000, config_field="max_tokens",
-            provider="claude", model_name="test", label="Test", url="https://api.test.com",
+            max_tokens=1000,
+            config_field="max_tokens",
+            provider="claude",
+            model_name="test",
+            label="Test",
+            url="https://api.test.com",
         )
         self.assertEqual(content, "")
         self.assertEqual(usage, {"input_tokens": 10})
@@ -64,8 +68,12 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
                 data,
                 extract_fn=lambda d: None,
                 check_truncation_fn=lambda d, mt: False,
-                max_tokens=1000, config_field="max_tokens",
-                provider="claude", model_name="test", label="Test", url="https://api.test.com",
+                max_tokens=1000,
+                config_field="max_tokens",
+                provider="claude",
+                model_name="test",
+                label="Test",
+                url="https://api.test.com",
             )
         self.assertIsNone(content)
         self.assertIsNone(usage)
@@ -82,8 +90,12 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
             data,
             extract_fn=lambda d: d.get("content"),
             check_truncation_fn=lambda d, mt: True,
-            max_tokens=100, config_field="max_tokens",
-            provider="claude", model_name="test", label="Test", url="https://api.test.com",
+            max_tokens=100,
+            config_field="max_tokens",
+            provider="claude",
+            model_name="test",
+            label="Test",
+            url="https://api.test.com",
         )
         self.assertIn(TRUNCATION_MARKER, content)
         self.assertIsNotNone(usage)
@@ -98,13 +110,69 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
                 data,
                 extract_fn=lambda d: d.get("content"),
                 check_truncation_fn=lambda d, mt: False,
-                max_tokens=100, config_field="max_tokens",
-                provider="claude", model_name="test", label="Test", url="https://api.test.com",
+                max_tokens=100,
+                config_field="max_tokens",
+                provider="claude",
+                model_name="test",
+                label="Test",
+                url="https://api.test.com",
             )
             self.assertEqual(content, "no usage data")
             self.assertIsNone(usage)
         except Exception as e:
             self.fail(f"usage 缺失引发异常: {e}")
+
+
+class TestExtractContentEdge(unittest.TestCase):
+    """_extract_content — 仅 thinking block 无 text 的边缘场景（回归测试）。
+
+    回归缺陷：DeepSeek V4 强制推理模型在思考部分耗尽 max_tokens 预算时
+    响应只有 thinking block、无 text block，原实现误判为"内容被过滤"并返回空串，
+    触发无效安抚重试。修复后返回 None 走 provider 切换。
+    """
+
+    def test_thinking_only_max_tokens_returns_none(self) -> None:
+        """仅 thinking + stop_reason=max_tokens → None，记录预算耗尽日志（非"内容被过滤"）。"""
+        from src.python.llm.api_base import _extract_content
+
+        data = {
+            "content": [{"type": "thinking", "thinking": "internal thoughts..."}],
+            "stop_reason": "max_tokens",
+            "usage": {"output_tokens": 4096},
+        }
+        with self.assertLogs("invest", level="WARNING") as cm:
+            result = _extract_content(data)
+        self.assertIsNone(result)
+        log_text = "\n".join(cm.output)
+        self.assertIn("max_tokens", log_text, "应记录预算耗尽根因日志")
+        self.assertNotIn("内容过滤", log_text, "不得误报为内容被过滤")
+
+    def test_thinking_only_end_turn_returns_none(self) -> None:
+        """仅 thinking + stop_reason=end_turn → None（内容为空，可能被过滤）。"""
+        from src.python.llm.api_base import _extract_content
+
+        data = {
+            "content": [{"type": "thinking", "thinking": "internal thoughts..."}],
+            "stop_reason": "end_turn",
+        }
+        with self.assertLogs("invest", level="WARNING") as cm:
+            result = _extract_content(data)
+        self.assertIsNone(result)
+        self.assertIn("空内容", "\n".join(cm.output))
+
+    def test_thinking_plus_text_returns_text(self) -> None:
+        """thinking + text 并存 → 正常返回 text（不回归）。"""
+        from src.python.llm.api_base import _extract_content
+
+        data = {
+            "content": [
+                {"type": "thinking", "thinking": "internal thoughts..."},
+                {"type": "text", "text": "final answer"},
+            ],
+            "stop_reason": "end_turn",
+        }
+        result = _extract_content(data)
+        self.assertEqual(result, "final answer")
 
 
 class TestCallLlmWithRetryEdge(unittest.TestCase):
@@ -113,9 +181,7 @@ class TestCallLlmWithRetryEdge(unittest.TestCase):
     @patch("src.python.llm.api_base._cb_is_open", return_value=False)
     @patch("src.python.llm.api_base._attempt_api_call")
     @patch("src.python.llm.api_base._cb_record_success")
-    def test_empty_content_filter_recovery(
-        self, mock_record_success, mock_attempt, mock_cb_open
-    ) -> None:
+    def test_empty_content_filter_recovery(self, mock_record_success, mock_attempt, mock_cb_open) -> None:
         """内容过滤空返回 → 带空标记。"""
         from src.python.llm.api_base import call_llm_with_retry
 
@@ -126,8 +192,15 @@ class TestCallLlmWithRetryEdge(unittest.TestCase):
 
         mock_client = MagicMock()
         result, usage = call_llm_with_retry(
-            "Test", mock_client, "https://api.test.com", {}, {},
-            30.0, 2, 1000, "max_tokens",
+            "Test",
+            mock_client,
+            "https://api.test.com",
+            {},
+            {},
+            30.0,
+            2,
+            1000,
+            "max_tokens",
             extract_fn=lambda d: d.get("content"),
             check_truncation_fn=lambda d, mt: False,
             provider="claude",

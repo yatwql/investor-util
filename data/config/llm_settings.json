@@ -42,7 +42,7 @@
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
   "thinking_budget_expert_review": 16000,
-  "reasoning_effort_expert_review": "high",
+  "reasoning_effort_expert_review": "medium",
 
   // ═══════════════════════════════════════════
   // 持仓体检报告 — health_check
@@ -50,13 +50,13 @@
   "system_prompt_health_check": null,
   "model_health_check": null,
   "temperature_health_check": 0.1,
-  "max_tokens_health_check": 4096,
+  "max_tokens_health_check": 8192,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
   "output_brief_health_check": false,
   "thinking_enabled_health_check": true,
   "thinking_budget_health_check": 12000,
-  "reasoning_effort_health_check": "high",
+  "reasoning_effort_health_check": "medium",
 
   // ═══════════════════════════════════════════
   // 穿透深度分析 — penetration_deep

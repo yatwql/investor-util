@@ -49,7 +49,7 @@ class TestFetchIndices(unittest.TestCase):
 
     @patch("src.python.fetcher.index.cache_set")
     @patch("src.python.fetcher.index.cache_get", return_value=None)
-    @patch("src.python.fetcher.index.tencent.fetch_price")
+    @patch("src.python.fetcher.index.tencent.fetch_index_price")
     def test_tencent_success(self, mock_fetch_price, mock_cache_get,
                               mock_cache_set):
         """腾讯主链路成功 → 不调新浪备用。"""
@@ -62,6 +62,8 @@ class TestFetchIndices(unittest.TestCase):
         from src.python.fetcher.index import fetch_indices
         result = fetch_indices()
         self.assertGreater(len(result), 0)
+        # 回归守卫：mock 目标必须与实际调用一致，否则静默真调 API（无网时暴露）
+        mock_fetch_price.assert_called()
 
     @patch("src.python.fetcher.index.cache_set")
     @patch("src.python.fetcher.index.cache_get", return_value=None)

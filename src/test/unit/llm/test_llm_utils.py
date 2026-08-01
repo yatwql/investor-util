@@ -241,8 +241,7 @@ class TestPromptConstants(unittest.TestCase):
 
     def test_expert_compact(self) -> None:
         """智囊团 Prompt 已精简。"""
-        self.assertLess(len(_SYSTEM_EXPERT_REVIEW), 1000,
-                        f"EXPERT prompt too long: {len(_SYSTEM_EXPERT_REVIEW)} chars")
+        self.assertLess(len(_SYSTEM_EXPERT_REVIEW), 1000, f"EXPERT prompt too long: {len(_SYSTEM_EXPERT_REVIEW)} chars")
         self.assertIn("Phase", _SYSTEM_EXPERT_REVIEW)
         self.assertIn("约束", _SYSTEM_EXPERT_REVIEW)
         self.assertIn("Markdown", _SYSTEM_EXPERT_REVIEW)
@@ -294,9 +293,9 @@ class TestExtractContent(unittest.TestCase):
         self.assertEqual(_extract_content(data), "直接字符串回复")
 
     def test_content_as_empty_list(self) -> None:
-        """content 为空列表 → 返回空字符串（视为空内容而非格式异常）。"""
+        """content 为空列表 → 返回 None（无可用文本，走 provider 切换）。"""
         data = {"content": []}
-        self.assertEqual(_extract_content(data), "")
+        self.assertIsNone(_extract_content(data))
 
     def test_content_missing(self) -> None:
         """响应中无 content 字段。"""
@@ -305,11 +304,13 @@ class TestExtractContent(unittest.TestCase):
 
     def test_multiple_text_blocks(self) -> None:
         """多个 text block，拼接返回。"""
-        data = {"content": [
-            {"type": "text", "text": "第一段"},
-            {"type": "tool_use", "id": "tool1"},
-            {"type": "text", "text": "第二段"},
-        ]}
+        data = {
+            "content": [
+                {"type": "text", "text": "第一段"},
+                {"type": "tool_use", "id": "tool1"},
+                {"type": "text", "text": "第二段"},
+            ]
+        }
         result = _extract_content(data)
         self.assertIn("第一段", result)
         self.assertIn("第二段", result)
@@ -324,9 +325,10 @@ class TestExtractContent(unittest.TestCase):
         self.assertIsNone(_extract_content(data))
 
     def test_content_list_no_text(self) -> None:
-        """content 列表但元素无 text 字段 → 返回空字符串（视为空内容而非格式异常）。"""
+        """content 列表但元素无 text 字段 → 返回 None（无可用文本，走 provider 切换）。"""
         data = {"content": [{"type": "image"}, {"type": "tool_use"}]}
-        self.assertEqual(_extract_content(data), "")
+        self.assertIsNone(_extract_content(data))
+
 
 # ═══════════════════════════════════════════════════════════
 #  截断检测
@@ -367,8 +369,10 @@ class TestCheckTruncation(unittest.TestCase):
     def test_check_openai_truncation_custom_field(self) -> None:
         """OpenAI config_field='max_tokens_global_macro' → 日志提示 max_tokens_global_macro。"""
 
-        data = {"choices": [{"finish_reason": "length", "message": {"content": "..."}}],
-                "usage": {"completion_tokens": 800}}
+        data = {
+            "choices": [{"finish_reason": "length", "message": {"content": "..."}}],
+            "usage": {"completion_tokens": 800},
+        }
         with self.assertLogs("invest", level="ERROR") as logs:
             result = _check_openai_truncation(data, 800, "OpenAI", config_field="max_tokens_global_macro")
         self.assertTrue(result)
@@ -379,8 +383,10 @@ class TestCheckTruncation(unittest.TestCase):
     def test_check_openai_truncation_not_truncated(self) -> None:
         """finish_reason 不是 length → 不记录日志。"""
 
-        data = {"choices": [{"finish_reason": "stop", "message": {"content": "..."}}],
-                "usage": {"completion_tokens": 100}}
+        data = {
+            "choices": [{"finish_reason": "stop", "message": {"content": "..."}}],
+            "usage": {"completion_tokens": 100},
+        }
         result = _check_openai_truncation(data, 8192, "OpenAI")
         self.assertFalse(result)
 
@@ -434,5 +440,4 @@ class TestPricing(unittest.TestCase):
         """reload_pricing 应合并不覆盖已有值。"""
         orig = dict(PRICING_MERGED)
         reload_pricing()
-        self.assertEqual(PRICING_MERGED.get("deepseek-v4-flash"),
-                         orig.get("deepseek-v4-flash"))
+        self.assertEqual(PRICING_MERGED.get("deepseek-v4-flash"), orig.get("deepseek-v4-flash"))

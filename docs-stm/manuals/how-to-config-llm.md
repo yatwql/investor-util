@@ -221,6 +221,7 @@ LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
+- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。「辩论-正反辩论」内部即为白脸→黑脸→综合三段式流程，**不是**三个独立开关；早期独立的白脸/黑脸/综合模块开关已从菜单隐藏（注册表条目保留，仅用于缓存键/TTL 管理）
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 
@@ -245,7 +246,9 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 |------|------|------|
 | `llm_key.json` 缺失或 key 为空 | 显示占位："本节内容待生成 — LLM 未配置" | INFO |
 | `enabled_llm.{module}` = false | 直接跳过，不显示占位 | INFO |
-| API 调用失败（网络错误/超时/返回空） | 显示占位："（本节内容生成失败）" | WARNING |
+| API 调用失败（网络错误/超时） | 显示占位："（本节内容生成失败）" | WARNING |
+| 返回空内容（无文本块，如思考耗尽 max_tokens 预算） | 切换下一 Provider；全部失败则显示占位 | WARNING |
+| 返回空字符串（内容被过滤） | 追加安抚指令重试一次，仍失败则切换 Provider | WARNING |
 | 输出被截断（含 `... [TRUNCATED] ...`） | 自动增大 `max_tokens` 1.5× 重试一次，仍截断则记录日志提示用户手动调大 | WARNING |
 
 ---
@@ -393,7 +396,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
   "thinking_budget_expert_review": 16000,
-  "reasoning_effort_expert_review": "high",
+  "reasoning_effort_expert_review": "medium",
 
   // ═══════════════════════════════════════════
   // 持仓体检报告 — health_check
@@ -401,13 +404,13 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_health_check": null,
   "model_health_check": null,
   "temperature_health_check": 0.1,
-  "max_tokens_health_check": 4096,
+  "max_tokens_health_check": 8192,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
   "output_brief_health_check": false,
   "thinking_enabled_health_check": true,
   "thinking_budget_health_check": 12000,
-  "reasoning_effort_health_check": "high",
+  "reasoning_effort_health_check": "medium",
 
   // ═══════════════════════════════════════════
   // 穿透深度分析 — penetration_deep
@@ -499,15 +502,15 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 ## 各模块推荐参数值
 
-> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`reasoning_effort="high"`。
+> 以下仅列出**有差异的调优参数**。其余参数所有模块统一：`cache_enabled=true`、`output_brief=false`、`system_prompt=null`（使用内置）、`reasoning_effort="high"`（expert_review / health_check 例外，见下表）。
 
-| 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | output_brief_limit |
-|------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:------------------:|
-| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | **200 字** |
-| **智囊团深度复盘** | null | **0.3**（低温保事实） | **8192** | **120s** | **true** ⭐ | 16000 | 300 字 |
-| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **4096** | **120s** | **true** | 12000 | 300 字 |
-| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | 300 字 |
-| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | 不适用 |
+| 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | reasoning_effort | output_brief_limit |
+|------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:----------------:|:------------------:|
+| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | high | **200 字** |
+| **智囊团深度复盘** | null | **0.3**（低温保事实） | **8192** | **120s** | **true** ⭐ | 16000 | **medium** | 300 字 |
+| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **8192** | **120s** | **true** | 12000 | **medium** | 300 字 |
+| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | high | 300 字 |
+| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | high | 不适用 |
 
 > **补充**：财经新闻关联分析还支持 `news_correlation_top_n` 配置项（默认 `30`），控制送 LLM 分析的新闻条数上限，按关键词匹配数降序选取。增大此值会线性增加 Token 消耗，减小则降低 LLM 关联分析的覆盖率。设为 `0` 可完全禁用 LLM 分析（仅保留关键词匹配）。
 
@@ -522,7 +525,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 > **Claude**（provider: `"claude"`）：模型 ≥ `claude-sonnet-4` 时生效，用 `thinking.budget_tokens` 控制思考 token 预算。
 >
-> **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"high"` / `"max"`）。
+> **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"low"` / `"medium"` / `"high"` / `"max"`）。
 >
 > **Gemini**（provider: `"gemini"`）：模型 `gemini-2.5-*` 时生效，用 `generationConfig.thinkingConfig.thinkingBudget` 控制思考 token 预算。
 
@@ -570,6 +573,10 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 **一句话总结（Claude / Gemini）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
 **一句话总结（DeepSeek）：** `reasoning_effort` 管"想多深"，`"max"` 对应深度分析的极致模式。
+
+**DeepSeek V4 强制推理说明**：DeepSeek V4 系列为**强制推理模型**，即使 `thinking_enabled` 关闭也会返回 `thinking` block；且 `max_tokens` 是 **thinking + 最终文本的共享预算**（而非仅最终输出）。当思考部分耗尽预算时，响应只含 thinking block、无最终文本（即"返回空内容"场景），程序会直接切换下一 Provider，不消耗安抚重试。
+
+**调参建议**：若日志出现 `LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本`，请**增大对应模块的 `max_tokens_{module}`** 或**降低 `reasoning_effort_{module}`**（如 `"high"` → `"medium"`）。参考：health_check 此前使用 4096 + `"high"` 稳定触发空内容，改为 8192 + `"medium"` 后正常产出。
 
 ### 效果参考
 
