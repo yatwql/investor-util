@@ -15,12 +15,15 @@
 - **rf-102：Tencent 指数 K 线超限崩溃修复** — `fetch_index_kline` 文档声称上限 3650 天，实测 `days=3650` 时 API 返回 `[]`（list），`_parse_kline_response` 以 `data.get(...)` 处理 dict 而崩溃 `AttributeError: 'list' object has no attribute 'get'`；实际上限约 2000 天。修复：`_parse_kline_response` 加非 dict 类型守卫（异常响应 → 空列表不崩）；`fetch_index_kline` 钳位上限 3650→2000 + docstring 同步
 - **rf-103：Sina 指数 K 线备用链路降级处理** — Sina `getKLineData` 端点当前环境对**所有**代码返回 404/空（数据源故障，非代码 bug），`sina_kline.fetch_index_kline` 备用链路失效。处理：`sina_kline.fetch_index_kline` 钳位上限对齐 2000（rf-102 同类防）；`_parse_kline_json` 已有非 list 容错；接受 Tencent 单链路降级，Sina 保留为代码级备用（环境恢复后自动生效），设计文档表述如实修正（原"🟢 生产验证"→ 降级接受）
 - **rf-106：`get_combined_timeseries` days 参数语义澄清** — `portfolio_history.py` 该方法 `days` 仅作用于基准指数（`_fetch_benchmarks`），不控制持仓历史长度（`_fetch_all_histories` 走 chain 默认 30）；docstring"历史天数"有误导，澄清并标注 rf-106，提示后续需透传 days 时改 `_fetch_all_histories`
+- **rf-111：模板 6 个 chart canvas 补 A1 可访问性属性** — 设计文档 §4.8 A1 声称每个 `<canvas>` 含 aria-label/role + fallback 文本（Iter 1 验收 ✅），实际 `grep -c aria-label` = 0 处（文档与实现不符）。修复：`report_template.html` 6 处 canvas（净值趋势/最大回撤/资产构成/行业分布/穿透 TOP10/量化雷达）补 `aria-label`（"悬停查看…"描述图义）+ `role="img"` + 内嵌 fallback 文本（降级环境指引用户看明细表格），写法对齐 `test-chart.html` 示范；旧 Canvas 兜底 `portfolioChart`/`drawdownChart` 不受影响
+- **rf-112：TD8 JS 调试设施空白补全** — 设计文档多处声称已建"独立 test HTML 调试页"，仓库实际无此文件（仅 `report_template.html`），升级 Chart.js（S2 流程）无独立验证载体。新增 `src/js/test-chart.html` 独立调试页：6 图渲染/交互 + 4 场景（正常/降级/空数据/离线）自检横幅（`canvas._chart` 统计初始化数 + `typeof Chart` 引擎守卫验证），ES5 语法（R17/R22），数据契约对齐 §4.12；动态注入引擎 script（离线场景移除 chart.min.js 模拟引擎缺失）
 
 ### Test
 
 - **chart 行业分布边缘回归测试** — 新增 `test_chart_data_builder_edge.py`（C12 合规）：全部无行业归属→归入"其他"、None/空串/纯空白 sector 归一化、mv 为 None/负值不崩溃、top10 空列表占位；`test_chart_data_builder.py` 补 Iter 4/5 验收用例（行业市值总和与穿透口径一致、最多 10 个行业截断、穿透品种 <3 仍渲染）
 - **chart Radar 降级与 Flag 过滤测试** — `test_chart_data_builder.py` TestRadar 新增 6 用例（metrics_sharpe 关闭→该轴 "N/A"、全关→6 个 "N/A"、全 N/A 占位保轴、risk_metrics 兜底 degraded+note、history 兜底 degraded+note、全量路径无 note）；`test_chart_data_builder_edge.py` 新增 4 用例（all_metrics 与 risk_metrics 均 None→空、all_metrics=None+history 降级、未知 flag 名不影响该轴、部分指标缺失→N/A 其余保留）；`test_html_report_structure.py` 结构测试 3 用例（radar 有 labels 渲染 canvas、无 labels"量化指标数据不足"占位、data_unavailable"持仓市值数据不可用"占位）+ 既有 2 用例 chart-box 计数更新（3→4 / 5→6）
 - **rf-102/103 回归测试** — `test_tencent_edge.py` 新增 2 例（API 返回 list 非 dict 不崩、days=3650 钳位到 2000）；`test_sina_edge.py` 新增 1 例（days 钳位 2000 对齐 Tencent），防超限崩溃与钳位逻辑回退
+- **rf-111 回归测试** — `test_html_report_structure.py` 新增 `TestHtmlInteractiveCharts::test_all_chart_canvases_have_a11y_attrs`：6 图全部渲染（Flag ON + 数据存在）时断言各 canvas 含 `aria-label`（含"悬停查看"）/`role="img"`/内嵌 fallback 文本非空，防 A1 属性回退
 
 ### Docs
 
@@ -30,6 +33,8 @@
 - **plan-7 实现设计补齐：架构约束遵从表 + 技术债预置** — `plan-advanced-analysis.md` §4 新增三小节：① 架构约束遵从表（C1/C6/C7/C14/C19/§1.4.5/C2，对齐 plan-2/plan-3 文档规范，补设计缺口）；② 技术债与技术预置——既有技术债 rf-102（Tencent 3650 上限崩溃）/rf-103（Sina 备用链路 404）/rf-104（sh000920 停更）对 plan-7 的影响与处理建议，C7 注册条目（`factor_exposure` number=17，data_source_status/llm_usage 顺延 18/19）与 C19 schema（`factor_exposure` dict 键结构）预置，计算方案（R_p 复用 `get_combined_timeseries().daily_returns` + `numpy.linalg.lstsq` 手写 OLS 复用 `_math_utils`，不新增 statsmodels 依赖；饼图降级为柱状图不阻塞 plan-1）；③ 工作量估算 3.5d→2.5d 对齐 plan.md。同步 technical.md 附录 H 追加 `factor_exposure` 计划中条目；plan.md plan-7 行"饼图"改"柱状图"
 - **plan-7 迭代设计 10 轮复盘（质量收敛）** — `plan-advanced-analysis.md` §4 多轮自我进化（2026-08-01）：① **R_p 来源重要修正**——`get_combined_timeseries` 的 `days` 参数只传基准、持仓历史固定走 chain 默认 30 期（新增 rf-106），改编排层独立拉取持仓历史 `days=60` 按 as-if 语义算组合收益；② 共线性 MVP 处置明确（不做正交化/岭回归，仅相关矩阵诊断展示 + 高相关文案提示）；③ 风险清单深化 4 项（仅单点数据源/as-if 失真/手写 OLS 正确性/因子停更静默污染，按数据重要性排优先级，降级原则"绝不输出误导性数字"显式化）；④ 新增"与其它计划项交互"表（plan-2 对齐复用 / plan-3 as-if 口径一致约束 + 共享提取技术债预留 / plan-6 快照预留 / LLM 不注入）；⑤ MVP 范围收敛（固定 3 因子集合 `FACTOR_INDICES` + 明确不做清单 + 保留项，修正"少 1 个因子代理"与"低波作补充"两处矛盾）；⑥ 新增测试策略章节（OLS 已知答案小数据集/降级路径/口径一致用例 + marker 分配 + 门禁映射）。同步 review-findings.md 记录 rf-106
 - **rf-102/103/104/106 技术债处理落地** — review-findings.md 四条目从待处理移至已修复表（含修复方案与变更记录）；`plan-advanced-analysis.md` §4 技术债表更新为 ✅ 已处理（C6 行、风险清单"仅单点数据源"同步降级接受表述）；plan.md plan-7 行标注"实施前技术债已全部处理"；rf-104（sh000920 停更）MVP 因子替代方案确认（500成长 sh000925 单因子，probe 脚本保留 sh000920 作探测候选）
+- **rf-112 文档同步** — review-findings.md rf-112 已修复表 + rf-111（模板 canvas 缺 A1 aria-label/fallback，文档与实际不符，待处理）P2B 小节；`src/js/README.md` 文件清单补 `test-chart.html` + S2 升级指引改为"先调试页验证再真实报告验证"；`folders.md` src/js/ 子树补 `test-chart.html` 条目
+- **rf-111 修复归档 + plan-1 遗留技术债 P1 记录** — review-findings.md：rf-111 从 P2B 移至已修复表（含修复方案与变更记录）；新增 P1 小节「plan-1 交互图表遗留技术债（2026-08-02）」记录 rf-113~121——rf-113（Iter 7 浏览器人工验证 6 项未实测，test-chart.html 已备载体）、rf-114（TD3 双渲染路径，稳定 2 版本后移除 Canvas）、rf-115（TD-L2 history_data 数据裁剪）、rf-116（TD-L3 模板单文件拆分）、rf-117（A6 键盘可达性）、rf-118（Heatmap 依赖 plan-2 correlation_data）、rf-119（单图导出 PNG 可选增强）、rf-120（S5 CSP 可选）、rf-121（TD2 报告体积 ~200KB）
 
 ### Test
 

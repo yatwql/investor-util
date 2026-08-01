@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chart.js 交互图表调试页（TD8 / S2 升级验证）</title>
+<style>
+  /* CSS 变量与 report_template.html :root 一致（chart-config.js 依赖读取） */
+  :root {
+    --chart-primary: #2E75B6;
+    --chart-secondary: #CC0000;
+    --chart-danger: #CC0000;
+    --chart-danger-transparent: rgba(204, 0, 0, 0.15);
+    --chart-success: #2E7D32;
+    --chart-warning: #E68A00;
+    --chart-grid: rgba(128, 128, 128, 0.15);
+    --chart-text: #333333;
+    --chart-bg: #FFFFFF;
+  }
+  body { font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 16px; background: #f4f6f8; color: #333; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: #666; margin-bottom: 12px; }
+  .scenario-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .scenario-bar a { padding: 5px 14px; border: 1px solid #ccc; border-radius: 4px; text-decoration: none; font-size: 13px; background: #fff; color: #333; }
+  .scenario-bar a.active { background: #2E75B6; border-color: #2E75B6; color: #fff; font-weight: bold; }
+  #banner { padding: 8px 12px; border-radius: 4px; font-size: 13px; margin-bottom: 14px; border: 1px solid; }
+  #banner.ok { background: #e8f5e9; border-color: #2E7D32; color: #1b5e20; }
+  #banner.warn { background: #fff8e1; border-color: #E68A00; color: #7a5c00; }
+  #banner.err { background: #ffebee; border-color: #CC0000; color: #8b0000; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+  .chart-box { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
+  .chart-title { font-size: 13px; font-weight: bold; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .chart-holder { height: 300px; position: relative; }
+  .chart-empty-note { color: #888; text-align: center; padding: 40px 0; font-size: 13px; }
+  .badge { font-size: 11px; padding: 1px 8px; border-radius: 10px; color: #fff; }
+  .badge.ok { background: #2E7D32; }
+  .badge.degraded { background: #E68A00; }
+  .badge.empty { background: #9e9e9e; }
+  .badge.offline { background: #CC0000; }
+  .note { font-size: 12px; color: #888; text-align: center; margin-top: 4px; }
+  @media print {
+    /* 打印验证：浅色主题（R16 强制） + 防跨页 */
+    :root { --chart-text: #000; --chart-grid: rgba(0,0,0,0.12); --chart-bg: #fff; }
+    .chart-box { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Chart.js 交互图表调试页</h1>
+<div class="sub">独立验证 6 图渲染 + 交互 + 降级场景（TD8）；升级 chart.min.js 后在此页验证（S2 流程）。场景切换见下，离线场景模拟引擎缺失。</div>
+
+<div class="scenario-bar" id="scenario-bar">
+  <a href="?s=ok">正常</a>
+  <a href="?s=degraded">降级（虚线）</a>
+  <a href="?s=empty">空数据（占位）</a>
+  <a href="?s=offline">离线（无引擎）</a>
+</div>
+
+<div id="banner">加载中…</div>
+
+<!-- chart-data 契约（§4.12）：与报告模板同 id，chart-init.js 读取此元素 -->
+<script type="application/json" id="chart-data"></script>
+
+<div class="grid">
+  <div class="chart-box">
+    <div class="chart-title">净值趋势<span class="badge" id="bd_portfolio_line">…</span></div>
+    <div class="chart-holder"><canvas id="chart_portfolio_line" width="800" height="350" style="width:100%;height:100%;" aria-label="净值趋势图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas></div>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">最大回撤<span class="badge" id="bd_drawdown">…</span></div>
+    <div class="chart-holder"><canvas id="chart_drawdown" width="800" height="250" style="width:100%;height:100%;" aria-label="回撤分析图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas></div>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">资产构成<span class="badge" id="bd_category_doughnut">…</span></div>
+    <div class="chart-holder"><canvas id="chart_category_doughnut" width="480" height="320" style="width:100%;height:100%;" aria-label="资产构成环形图（悬停查看占比）" role="img">图表无法显示，数据见持仓分类表</canvas></div>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">行业分布<span class="badge" id="bd_industry_bar">…</span></div>
+    <div class="chart-holder"><canvas id="chart_industry_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="行业分布水平柱状图（悬停查看市值）" role="img">图表无法显示，数据见穿透分析表</canvas></div>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">穿透 TOP10<span class="badge" id="bd_penetration_bar">…</span></div>
+    <div class="chart-holder"><canvas id="chart_penetration_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="穿透 TOP10 柱状图（悬停查看市值）" role="img">图表无法显示，数据见资产穿透表</canvas></div>
+  </div>
+  <div class="chart-box">
+    <div class="chart-title">量化指标<span class="badge" id="bd_radar">…</span></div>
+    <div class="chart-holder"><canvas id="chart_radar" width="480" height="320" style="width:100%;height:100%;" aria-label="量化指标雷达图（悬停查看指标值）" role="img">图表无法显示，数据见智囊团复盘页</canvas></div>
+    <div class="note" id="radar-note"></div>
+  </div>
+</div>
+
+<script>
+/* 调试页引导脚本（ES5，R17/R22）：按 ?s= 场景填充 chart-data 并注入引擎 script。
+ * 注入顺序与报告模板一致：chart.min.js → chart-print.js → chart-config.js → chart-init.js。
+ * offline 场景去掉 chart.min.js，模拟"引擎文件缺失"——其余 script 靠 typeof Chart 守卫静默跳过。
+ */
+(function () {
+  'use strict';
+
+  function getScenario() {
+    var qs = window.location.search.replace(/^\?/, '').split('&');
+    for (var i = 0; i < qs.length; i++) {
+      var kv = qs[i].split('=');
+      if (kv[0] === 's') {
+        return kv[1] || 'ok';
+      }
+    }
+    return 'ok';
+  }
+  var scenario = getScenario();
+  var SCENARIOS = ['ok', 'degraded', 'empty', 'offline'];
+  if (SCENARIOS.indexOf(scenario) < 0) { scenario = 'ok'; }
+
+  /* 场景高亮 */
+  var links = document.getElementById('scenario-bar').getElementsByTagName('a');
+  for (var li = 0; li < links.length; li++) {
+    if (links[li].getAttribute('href') === '?s=' + scenario) {
+      links[li].className = 'active';
+    }
+  }
+
+  /* ── 模拟 chart_datasets（§4.12 契约，键名对应 §4.11 O2）── */
+  var DATES = ['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25',
+               '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31'];
+  var NAV = [100.00, 101.20, 99.85, 100.65, 102.10, 101.55, 103.40, 104.05, 103.20];
+  var BM = [100.00, 99.60, 100.40, 101.10, 100.80, 102.00, 101.30, 102.60, 103.10];
+  var DRAWDOWN = [-0.00, -0.80, -2.15, -1.35, -0.00, -0.55, -0.00, -0.00, -0.85];
+  var BM_DD = [-0.00, -0.40, -0.00, -0.00, -0.30, -0.00, -0.70, -0.10, -0.00];
+
+  var DATA = {
+    ok: {
+      portfolio_line: {
+        labels: DATES,
+        datasets: [{ label: '组合 (as-if)', data: NAV, borderColor: 'var(--chart-primary)', degraded: false }],
+        benchmarks: [{ label: '沪深300', data: BM, borderColor: '#CC0000', degraded: false }]
+      },
+      drawdown: {
+        labels: DATES,
+        datasets: [{ label: '组合回撤', data: DRAWDOWN, borderColor: 'var(--chart-danger)', backgroundColor: 'var(--chart-danger-transparent)', degraded: false }],
+        benchmarks: [{ label: '沪深300', data: BM_DD, borderColor: '#9CA3AF', degraded: false }]
+      },
+      category_doughnut: {
+        labels: ['股票', '基金', '债券', '现金', '其他'],
+        datasets: [{ label: '资产市值', data: [380000, 220000, 120000, 60000, 20000], degraded: false }]
+      },
+      industry_bar: {
+        labels: ['银行', '白酒', '医药', '新能源', '电子', '其他'],
+        datasets: [{ label: '行业市值', data: [90000, 80000, 70000, 60000, 50000, 40000], borderColor: 'var(--chart-primary)', degraded: false }]
+      },
+      penetration_bar: {
+        labels: ['沪深300ETF', '贵州茅台', '招商银行', '宁德时代', '长江电力', '五粮液', '药明康德', '立讯精密', '中国平安', '东方财富'],
+        datasets: [{ label: '穿透市值', data: [55000, 48000, 39000, 36000, 31000, 28000, 24000, 22000, 19000, 16000], borderColor: 'var(--chart-primary)', degraded: false }]
+      },
+      radar: {
+        labels: ['夏普比率', '卡玛比率', '胜率', '换手率', '组合 Beta', '集中度 HHI'],
+        datasets: [{ label: '量化指标', data: [1.2, 0.9, 0.58, 0.35, 0.92, 0.18], borderColor: 'var(--chart-primary)', degraded: false }]
+      }
+    },
+    /* 降级场景：净值/回撤 degraded（虚线）+ radar 3 轴兜底 + note（§6.6/R12） */
+    degraded: {
+      portfolio_line: {
+        labels: DATES,
+        datasets: [{ label: '组合 (as-if)', data: NAV, borderColor: 'var(--chart-primary)', degraded: true }],
+        benchmarks: []
+      },
+      drawdown: {
+        labels: DATES,
+        datasets: [{ label: '组合回撤', data: DRAWDOWN, borderColor: 'var(--chart-danger)', backgroundColor: 'var(--chart-danger-transparent)', degraded: true }],
+        benchmarks: []
+      },
+      category_doughnut: {
+        labels: ['股票', '基金', '债券'],
+        datasets: [{ label: '资产市值', data: [380000, 220000, 120000], degraded: false }]
+      },
+      industry_bar: {
+        labels: ['银行', '白酒', '医药'],
+        datasets: [{ label: '行业市值', data: [90000, 80000, 70000], borderColor: 'var(--chart-primary)', degraded: false }]
+      },
+      penetration_bar: {
+        labels: ['沪深300ETF', '贵州茅台', '招商银行'],
+        datasets: [{ label: '穿透市值', data: [55000, 48000, 39000], borderColor: 'var(--chart-primary)', degraded: false }]
+      },
+      radar: {
+        labels: ['年化波动率', '最大回撤', '累计收益'],
+        datasets: [{ label: '量化指标', data: [0.18, -0.21, 0.42], borderColor: 'var(--chart-primary)', degraded: true, note: '仅限基础指标' }]
+      }
+    },
+    /* 空数据场景：资产构成 + 雷达 空 labels → 占位文本 */
+    empty: {
+      portfolio_line: {
+        labels: DATES,
+        datasets: [{ label: '组合 (as-if)', data: NAV, borderColor: 'var(--chart-primary)', degraded: false }],
+        benchmarks: []
+      },
+      drawdown: {
+        labels: DATES,
+        datasets: [{ label: '组合回撤', data: DRAWDOWN, borderColor: 'var(--chart-danger)', backgroundColor: 'var(--chart-danger-transparent)', degraded: false }],
+        benchmarks: []
+      },
+      category_doughnut: { labels: [], datasets: [] },
+      industry_bar: {
+        labels: ['银行', '白酒', '医药'],
+        datasets: [{ label: '行业市值', data: [90000, 80000, 70000], borderColor: 'var(--chart-primary)', degraded: false }]
+      },
+      penetration_bar: {
+        labels: ['沪深300ETF', '贵州茅台', '招商银行'],
+        datasets: [{ label: '穿透市值', data: [55000, 48000, 39000], borderColor: 'var(--chart-primary)', degraded: false }]
+      },
+      radar: { labels: [], datasets: [] }
+    }
+  };
+
+  var data = scenario === 'offline' ? DATA.ok : DATA[scenario];
+
+  /* 填充 chart-data（chart-init.js 读取） */
+  document.getElementById('chart-data').textContent = JSON.stringify(data);
+
+  /* radar 降级 note（模板独立渲染，chart-init.js 不处理） */
+  if (scenario === 'degraded' && data.radar && data.radar.datasets && data.radar.datasets[0] && data.radar.datasets[0].note) {
+    document.getElementById('radar-note').textContent = data.radar.datasets[0].note;
+  }
+
+  /* ── 注入引擎 script（顺序保证：非 async 动态注入按序执行）── */
+  var scripts = ['chart.min.js', 'chart-print.js', 'chart-config.js', 'chart-init.js'];
+  if (scenario === 'offline') { scripts.shift(); } /* 模拟 chart.min.js 缺失 */
+
+  for (var si = 0; si < scripts.length; si++) {
+    var s = document.createElement('script');
+    s.src = scripts[si];
+    document.head.appendChild(s);
+  }
+
+  /* ── 自检（延迟到注入脚本执行后）── */
+  var KEYS = ['portfolio_line', 'drawdown', 'category_doughnut', 'industry_bar', 'penetration_bar', 'radar'];
+  setTimeout(function () {
+    var banner = document.getElementById('banner');
+    if (typeof Chart === 'undefined') {
+      banner.className = 'err';
+      banner.textContent = '引擎缺失（typeof Chart === undefined）→ chart-config / chart-init 静默跳过，页面无 JS 报错，canvas 保留 fallback 文本。✅ 守卫逻辑符合预期（R21）。';
+      return;
+    }
+    /* 统计 canvas 是否被 Chart.js 接管（canvas._chart 内部句柄） */
+    var initCount = 0;
+    var statuses = {};
+    for (var ki = 0; ki < KEYS.length; ki++) {
+      var key = KEYS[ki];
+      var canvas = document.getElementById('chart_' + key);
+      var badge = document.getElementById('bd_' + key);
+      var ds = data[key];
+      var expect = ds && ds.labels && ds.labels.length ? 'ok' : 'empty';
+      if (scenario === 'degraded' && key === 'radar') { expect = 'degraded'; }
+      if (canvas && canvas._chart) {
+        initCount++;
+        statuses[key] = expect === 'empty' ? 'empty(渲染但空数据)' : 'ok';
+        badge.textContent = expect === 'degraded' ? '降级' : 'ok';
+        badge.className = 'badge ' + (expect === 'degraded' ? 'degraded' : 'ok');
+      } else {
+        statuses[key] = expect === 'empty' ? 'empty(占位)' : '空(未初始化)';
+        badge.textContent = expect === 'empty' ? '占位' : '空';
+        badge.className = 'badge ' + (expect === 'empty' ? 'empty' : 'err');
+      }
+    }
+    banner.className = initCount === 6 ? 'ok' : 'warn';
+    banner.textContent = '场景 [' + scenario + ']：' + initCount + '/6 图已初始化。' +
+      (scenario === 'degraded' ? '降级图应显示虚线描边 + radar 底部"仅限基础指标"。' : '') +
+      (scenario === 'empty' ? '空数据图应显示占位文本（badge 灰色）。' : '') +
+      ' 悬停任意图查看 tooltip。打印预览验证 2x DPI 快照（chart-print.js）。';
+  }, 800);
+})();
+</script>
+</body>
+</html>

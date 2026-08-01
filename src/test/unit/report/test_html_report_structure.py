@@ -669,6 +669,32 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIn("持仓市值数据不可用，量化指标暂停计算", note.get_text())
         self.assertIsNone(section.find(id="chart_radar"))
 
+    def test_all_chart_canvases_have_a11y_attrs(self) -> None:
+        """6 个 Chart.js canvas 均含 A1 可访问性属性（§4.8 A1）。
+
+        模板 6 处 canvas 补 aria-label + role="img" + 内嵌 fallback 文本：
+        屏幕阅读器读出图表含义，降级环境（Canvas/JS 不可用）读 fallback
+        指引用户看明细表格——与 test-chart.html 示范写法对齐。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "industry_bar": {"labels": ["白酒"], "datasets": [{"data": [10000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台"], "datasets": [{"data": [10000.0]}]},
+            "radar": {"labels": ["夏普比率"], "datasets": [{"data": [1.2]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        for key in self._DATASET_KEYS:
+            canvas = soup.find(id=f"chart_{key}")
+            self.assertIsNotNone(canvas, f"{key} canvas 应渲染（Flag ON + 数据存在）")
+            label = canvas.get("aria-label")
+            self.assertTrue(label, f"{key} canvas 应含 aria-label")
+            self.assertIn("悬停查看", label, f"{key} aria-label 应描述图表含义")
+            self.assertEqual(canvas.get("role"), "img", f"{key} canvas role 应为 img")
+            self.assertTrue(
+                canvas.get_text().strip(),
+                f"{key} canvas 应含内嵌 fallback 文本（降级环境指引）",
+            )
+
     def test_chart_scripts_loaded_in_order(self) -> None:
         """chart-print.js 先于 chart-config.js，再 chart-init.js（登记先于初始化）。"""
         soup = self._render_interactive()
