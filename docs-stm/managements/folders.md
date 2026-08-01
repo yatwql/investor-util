@@ -531,6 +531,12 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
+│   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
+│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势/因子）
+│   │   ├── plan-correlation-drawdown.md #     相关性矩阵+回撤+净值曲线计划（plan-2/3）
+│   │   ├── plan-chartjs-risk-analysis.md #    Chart.js 升级风险/收益/架构分析（plan-1）
+│   │   ├── plan-chartjs-report-upgrade.md #  Chart.js 升级实施方案（plan-1）
+│   │   └── plan-web-ui.md              #     轻量 Web UI 计划
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
