@@ -110,7 +110,7 @@ plan-1 是 **plan-3**（最大回撤+净值曲线 Chart.js 双轴图增强）和
 | **投入** | 5.25d（约 1 人周）+ ~45 个测试用例 + 1 个新 Feature Flag |
 | **直接收益** | 6 张图从静态 → 交互（悬停精确值/缩放/筛选），报告可读性质变；消除 265 行自制 Canvas JS 维护负担 |
 | **杠杆收益** | 解锁 plan-3 / plan-6 的前提依赖；plan-7 软依赖（方案 B 复用 Chart.js Bar）；CSS 变量为 plan-11 暗色模式预留；为"报告模块可配置化"积累 Feature Flag 经验 |
-| **风险对冲** | 双路径（Flag 开关可回退）、CDN 三重缓解（SRI+onerror+本地 P2）、C14 零容忍 grep |
+| **风险对冲** | 双路径（Flag 开关可回退）、纯本地 bundle（R21：离线自包含，R3 闭环）、`typeof Chart` 守卫兜底、C14 零容忍 grep |
 | **结论** | **值** — 5.25d 换报告从"静态截图"到"交互仪表盘"的质变，且双路径保证可随时回退（Flag OFF 即还原旧渲染），不构成高风险高投入的不可逆改造。**唯一需监控的是实际交付时点**：若 8 迭代中某迭代超支，按 `upgrade.md §5.0 MVP 范围收敛` 的裁剪顺序降档交付（P0 4 张图必保，依次裁 Iter 7 热力图 → Iter 6 雷达降级 → Iter 4 行业分布减配 → Iter 5 穿透分色减配） |
 
 > ⚠ **R4 修正**：§2.2 原"config/features.py 仅用于 LLM 模块"表述错误（实际 28 个 flag，含基金/新闻/量化/功能分类），已修正。
@@ -125,36 +125,42 @@ plan-1 是 **plan-3**（最大回撤+净值曲线 Chart.js 双轴图增强）和
 |:-:|:-----|:----|:----:|:----:|:---------|:---------|
 | R1 | **HTML 文件体积膨胀** | 中 | 高 | 中 | 6 张图表原始数据内联到 JS → 模板体积 280KB → 预估 ~1MB | ① 服务端预聚合降低数据粒度（如净值曲线按周聚合）② 热力图数据压缩（仅下三角）③ Feature Flag 关闭时回退 Canvas |
 | R2 | **国产浏览器兼容性** | 低 | 中 | 低 | 微信内置浏览器/老旧 Chrome 对 ES6+ 或 Chart.js v4 支持不完整 | ① 锁定 Chart.js 版本（不 auto-load latest）② `@babel/standalone` 转译（可选）③ Canvas 回退兜底 |
-| R3 | **CDN 可用性风险** | 中 | 低 | 高 | CDN 宕机/被墙导致 Chart.js 无法加载 → 全部交互图表白屏 | ① CDN SRI 完整性校验（防篡改，hash 硬编码）② 加载失败 `onerror` 自动回退到 Canvas 2D ③ 本地 bundle 作为 P2 未来增强预留 |
+| R3 | **CDN 可用性风险** | 低 | 极低 | 低 | **R21 已闭环**：改用纯本地 bundle（`src/js/chart.min.js` 随报告分发），交互图表不依赖网络，离线/内网照常渲染。残余风险仅剩本地文件损坏（极低，`typeof Chart` 守卫跳过初始化 → Canvas/表格兜底） | ① chart.min.js 随报告复制（离线自包含）② `typeof Chart === 'undefined'` 守卫 → 跳过初始化 → 回退 Canvas 2D / 表格 ③ CDN 方案降级为未来可选增强 |
 | R4 | **Chart.js 热力图插件不成熟** | 中 | 中 | 中 | `chartjs-chart-matrix` 社区插件与 Chart.js v4 版本兼容性未知 | ① 技术选型阶段做 POC 验证 ② 不通过则回退到自制 Canvas 热力图（当前纯文本格子） |
 | R5 | **打印降级时序问题** | 中 | 中 | 中 | `chart.toBase64Image()` 异步调用，`window.print()` 触发时快照尚未就绪，打印输出空白或模糊图 | ① `beforeprint` 事件提前预渲染所有 chart 快照到 `<img>` fallback ② `afterprint` 清理临时 img（见 §6.5.4 方案） |
 | R6 | **C14 违规风险** | 低 | 低 | **高** | 开发过程中不慎将 chart_data 或 chart_config 写入 `_ENV.globals` | 代码审查重点标注 + 自动化 grep `_ENV.globals\[` 不得出现在非 `html_jinja_env.py` 的文件中 |
 | R7 | **JavaScript 调试困难** | 中 | 中 | 中 | Chart.js 数据集配置复杂（特别是热力图 + 雷达图 + 双轴图复合），浏览器调试 vs Python 调试模式切换 | ① 建立 JS 调试辅助页（独立 test HTML）② 模板内 `console.log` 兜底 ③ Python 端预处理器（§8.2.2）减少 JS 复杂度 |
 | R8 | **历史走势数据粒度与图表性能** | 中 | 中 | 中 | 净值曲线若含每日数据（~250 点/年 × 品种），Chart.js 渲染性能下降 | ① 服务端下采样（按周/月聚合）② Chart.js `decimation` 插件（内置）③ 数据阈值告警 |
 | R9 | **数据隐私泄露** | **中** | 高 | 中 | `tojson` 将全量持仓明细（代码/份额/成本/每日市值）嵌入 HTML 文件内联 `<script>`，分享 HTML 报告 = 分享全量持仓数据。Chart.js 的结构化 JSON 键名规律使批量提取更容易 | ① 在报告中标注"本文件含全量持仓数据，分享前请谨慎" ② `anonymizer` Feature Flag（`config/features.py` 已存在）开启时对 Chart.js 数据做模糊处理 ③ Chart.js 数据最小化（只传递日期+市值，不含份额/成本） |
-| R10 | **CDN 供应链攻击** | 低 | 极低 | **高** | CDN 被投毒或劫持时，恶意 JS 可访问报告中所有数据 | ① 使用 SRI（Subresource Integrity）`integrity="sha384-{{硬编码 hash}}" crossorigin="anonymous"` 锁定文件内容 ② hash 硬编码在模板中，非构建步骤 ③ `onerror` Canvas 回退兜底 |
+| R10 | **CDN 供应链攻击** | 低 | 极低 | 低 | **R21 已闭环**：无 CDN 加载，引擎来自自身 `src/js/chart.min.js`（可信下载源 + git 跟踪），供应链注入面消失。残余风险仅剩源码仓库被投毒（与依赖注入同源风险，由常规供应链管控覆盖） | ① chart.min.js 从官方/镜像下载一次后入库 git 跟踪 ② 无外部域名加载（浏览器不发起跨域请求）③ 如需额外防护可对该文件计算 SHA-256 并记录在 `src/js/README.md` |
 | R11 | **预处理器单图失败导致整报告失败** | 中 | 中 | 高 | `build_chart_datasets()` 对脏数据（如 bars 缺字段、metrics 值非数字）抛异常 → 报告生成整体失败（非单图降级） | ① `build_chart_datasets()` 内部对每个 dataset 独立 try/except，单图失败仅记 warning 并跳过该图，其余图正常 ② 顶层再包一层兜底，任何异常 → 返回空 dict（报告仍有表格/占位）③ 单元测试覆盖脏输入（R6 新增） |
 | R12 | **radar 与 history_data 耦合边界** | 低 | 低 | 中 | 外层 `if history_data and status != "unavailable"` 块内构建 radar——当 `history_data` 不可用但 `all_metrics` 有值（历史数据少但指标可算）时，radar 意外丢失 | ① 将 radar 构建移到外层 if 之外，仅依赖 `all_metrics`/`risk_metrics`/`history_data` 三源独立判断 ② 若保持外层 if，需在 Iter 6 验收标准中补充该边界用例（R6 新增） |
 
-### 3.2 风险最高项：CDN 可用性（R3）+ 热力图插件（R4）
+### 3.2 风险最高项：引擎加载（R3/R10）+ 热力图插件（R4）
 
-#### R3 / R10 合并缓解方案：CDN + SRI + onerror
+#### R3 / R10 合并缓解方案：纯本地 bundle（R21 决策）
 
 | 方案 | 实现成本 | 用户感知 | 维护成本 |
 |:-----|:--------|:---------|:--------|
-| **纯 CDN**（cdn.jsdelivr.net/npm/chart.js@4） | 低：1 行 `<script>` | 依赖 CDN 可用 | 低 |
-| **CDN + SRI + script onerror Canvas 回退**（推荐） | 低：`<script integrity="sha384-..." onerror="fallback()">` | CDN 失败/篡改时所有图变 Canvas | 低：hash 硬编码，仅在 Chart.js 版本升级时手动更新 |
+| **纯 CDN**（cdn.jsdelivr.net/npm/chart.js@4） | 低：1 行 `<script>` | 依赖 CDN 可用，离线白屏 | 低 |
+| **CDN + SRI + script onerror Canvas 回退**（旧推荐） | 低：`<script integrity="..." onerror="...">` | CDN 失败/篡改时所有图变 Canvas | 低：SRI hash 需手动重算 |
+| **纯本地 bundle**（**R21 采用**） | 低：`src/js/chart.min.js` 随报告复制 + 相对路径 `<script>` | 完全离线自包含，交互不受网络影响 | 低：升级 Chart.js 时替换一个文件 |
 
-**推荐组合**：CDN + SRI 完整性校验 + `onerror` Canvas 回退。SRI hash 硬编码在模板中（非模板变量，不经过 Python context），仅在 Chart.js 版本升级时手动计算一次：
+**R21 决策**：**纯本地 bundle** —— `chart.min.js`（Chart.js v4 UMD，~200KB）存入 `src/js/`（git 跟踪、随源码分发），`html_writer.py` 渲染后随 `chart-init.js` / `chart-config.js` 一并 `shutil.copy2` 到报告输出目录，模板用相对路径引用。
 
-```bash
-# 非日常构建步骤——仅在升级 Chart.js 版本时执行
-curl -sL https://cdn.jsdelivr.net/npm/chart.js@4.x/dist/chart.umd.min.js \
-  | openssl dgst -sha384 -binary | base64
-# 输出直接填入 <script integrity="sha384-输出">，不作为模板变量
-```
+**理由**：
+1. **报告是静态制品** — Chart.js 对报告就像报告里的图片，应内嵌而非外链；外链会失效，外链 JS 同理
+2. **个人工具无分发成本** — 唯一使用者是自己，200KB 可忽略
+3. **R3 直接闭环** — 交互图表与网络彻底解耦，离线/内网打开照常交互（本项目真实场景：报告可能在无外网环境查看）
+4. **R10 随之消除** — 无 CDN 加载即无供应链注入面
+5. **实施更简单** — 无 SRI hash 计算、无 onerror 动态加载时序、无 CSP 域名
 
-> **本地 bundle 方案**已降级为 P2 未来增强（用户反馈 CDN 不可达时再实施）。Iter 1 不涉及该方案，无需 Feature Flag `chart_js_source` 或 `chart.min.js` 文件。
+**防御性兜底**（本地文件损坏等极低概率）：
+- `chart-init.js` 每个初始化前 `typeof Chart === 'undefined'` 检测 → 跳过初始化 → 回退 Canvas 2D / 表格
+
+**来源与维护**：
+- chart.min.js 从 jsdelivr/npm 下载 `chart.umd.min.js` 一次命名 `chart.min.js` 入库 `src/js/`
+- 升级 Chart.js 版本时替换该文件并验证（版本号记录在 `src/js/README.md`）
 
 #### R4 缓解方案
 
@@ -172,8 +178,8 @@ curl -sL https://cdn.jsdelivr.net/npm/chart.js@4.x/dist/chart.umd.min.js \
 
 | # | 债务项 | 性质 | 规模 | 偿还条件 |
 |:-:|:-------|:-----|:----|:---------|
-| TD1 | **Chart.js 版本锁定** | 依赖锁定 | 1 行 `<script>` src 版本号 + 1 个 SRI hash | Chart.js v5 发布后升级（非强制） |
-| TD2 | **CDN 生产依赖** | 外部依赖 | 1 个 `<script>` 标签 | ① 内网环境需 bundle ② 离线场景需本地化 |
+| TD1 | **Chart.js 版本锁定** | 依赖锁定 | `src/js/chart.min.js` 固定版本 + 版本号记录于 `src/js/README.md` | Chart.js v5 发布后升级（非强制） |
+| TD2 | **报告体积增大** | 静态资源 | `src/js/chart.min.js` ~200KB 随每份报告复制 | 报告自包含的代价；如未来对体积敏感可改 CDN 优先 + 本地兜底（R21 更新：原 CDN 生产依赖已消除） |
 | TD3 | **双渲染路径共存** | 代码膨胀 | Canvas `drawSimpleChart()` + Chart.js 渲染器并存 | Feature Flag 稳定后移除 Canvas 路径（见 §4.3） |
 | TD4 | **内联 JS 数据膨胀** | 模板体积 | 6 张图 × 序列化数据 = ~700KB 新增 | 数据预聚合/下采样（R8 缓解） |
 | TD5 | **测试覆盖缺口** | 测试 | Chart.js 渲染无法用 pytest 测试；双路径 × Feature Flag × 数据状态组合使测试用例翻倍（R5 修正：与 TD7 合并计数，不重复表述） | ① 新增 Python 端数据预处理器单元测试 ② JS 端浏览器截图对比测试（可选） |
@@ -187,7 +193,7 @@ curl -sL https://cdn.jsdelivr.net/npm/chart.js@4.x/dist/chart.umd.min.js \
 |:-:|:-------|:-----|:------------|
 | TD-L1 | `drawSimpleChart()` 265 行内联 JS | 保留在模板中，仅 Feature Flag 关闭时使用 | plan-1 稳定 2 个版本后移除 |
 | TD-L2 | `history_data` 数据同时服务 Excel + HTML Chart.js | 模板 `tojson` 序列化全量数据（含 Excel 不需要的字段） | plan-2/plan-3 可引入 chart_data 专用裁剪 |
-| TD-L3 | 模板仍为单文件 1862 行 | Chart.js 初始化 JS 已外部化（chart-init.js + chart-config.js，§8.2.1），模板仅新增 CDN `<script>` + canvas 容器 + Feature Flag 分支，**实际增量有限**（预估 +80~150 行） | plan-1 实施后模板约 1950-2050 行；若需进一步拆分（如章节级 partial），建议纳入 plan-1 之后的独立技术债迭代（R5 更新：JS 外部化已部分缓解模板膨胀） |
+| TD-L3 | 模板仍为单文件 1862 行 | Chart.js 初始化 JS 已外部化（chart-init.js + chart-config.js，§8.2.1），模板仅新增本地 bundle `<script>` + canvas 容器 + Feature Flag 分支，**实际增量有限**（预估 +80~150 行） | plan-1 实施后模板约 1950-2050 行；若需进一步拆分（如章节级 partial），建议纳入 plan-1 之后的独立技术债迭代（R5 更新：JS 外部化已部分缓解模板膨胀） |
 
 ### 4.3 Feature Flag 稳定后的双路径清理策略
 
@@ -213,7 +219,7 @@ graph LR
 |:-----|:-----|:------|
 | **C1** 代码类型判定中心化 | ✅ 无关 | Chart.js 图表数据不涉及代码类型判定 |
 | **C4** 会话级 API 复用 | ✅ 无关 | 图表数据复用现有 `history_data` / `info` 字典，不新增 HTTP 请求 |
-| **C5** HTTP 客户端统一 | ✅ 无关 | Chart.js CDN 加载走浏览器 `<script>`，不经过 Python HTTP 层 |
+| **C5** HTTP 客户端统一 | ✅ 无关 | Chart.js 本地 bundle 由浏览器从报告目录加载 `<script src="chart.min.js">`，不经过 Python HTTP 层（R21 更新） |
 | **C6** Provider Chain 必经 | ✅ 无关 | 图表所需数据已在编排器阶段通过 `fetch_with_fallback()` 获取 |
 
 ### 5.2 缓存层约束
@@ -238,7 +244,7 @@ graph LR
 |:-----|:-----|:------|
 | **C8** 日志统一 | ✅ 无关 | Chart.js 是客户端侧，不经过 Python 日志 |
 | **C15** 控制台日志着色 | ✅ 无关 | |
-| **C16** 路径绝对化 | ⚠ 注意 | 本地 bundle 已降级为 P2 未来增强，Iter 1 采用 CDN 路径不涉及本地文件路由 |
+| **C16** 路径绝对化 | ✅ 合规 | R21 本地 bundle 方案：`src/js/` 三文件经 `shutil.copy2(PROJECT_ROOT/src/js/*, output_dir)` 复制，`output_dir` 已由 `_absolutize_paths()` 绝对化；模板用相对路径引用，路径安全 |
 
 ### 5.5 合规总评
 
@@ -294,13 +300,10 @@ C19 ✅
        "enable_interactive_charts": is_feature_enabled("enable_interactive_charts"),
    }
    ```
-4. 模板中条件切换（配合 JS 外部化方案 §8.2.1）：
+4. 模板中条件切换（配合 JS 外部化方案 §8.2.1，R21 本地 bundle）：
    ```jinja2
    {% if enable_interactive_charts %}
-     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
-             integrity="sha384-ABC123..."  {# 硬编码 hash #}
-             crossorigin="anonymous"
-             onerror="window.__CHART_CDN_FAILED=true"></script>
+     <script src="chart.min.js"></script>   {# src/js/ 本地 bundle，随报告分发 #}
      <script src="chart-init.js"></script>
      <canvas id="chart_{{ key }}"></canvas>
    {% else %}
@@ -442,34 +445,45 @@ const chartTheme = {
 | ApexCharts | ~130KB | 无原生 | 内置 | medium | 缺热力图 |
 | 保留 Canvas 2D 自制 | 0KB | 自制 | 无 | low | 放弃（失去交互价值） |
 
-### 8.2 CDN vs 本地 Bundle + SRI
+### 8.2 引擎加载策略：纯本地 bundle（R21 决策）
 
-**推荐策略**：CDN + SRI 完整性校验 + `onerror` 自动回退 Canvas 2D（零构建步骤，SRI hash 硬编码）
+**R21 决策**：纯本地 bundle —— `chart.min.js`（Chart.js v4 UMD，~200KB）存入 `src/js/`（git 跟踪、随源码分发），渲染时随 `chart-init.js` / `chart-config.js` 一并复制到报告输出目录，模板用相对路径 `<script src="chart.min.js">` 引用。
 
 ```
-1. 默认: <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
-            integrity="sha384-ABC123..."  {# 硬编码，非模板变量 #}
-            crossorigin="anonymous"
-            onerror="window.__CHART_CDN_FAILED=true">
-   加载失败或完整性校验不通过 → 所有图表回退到 drawSimpleChart() + 表格
+1. src/js/（前端 JS 资产统一目录，随源码分发）
+   ├── chart.min.js      ← Chart.js v4 UMD 引擎（从 jsdelivr/npm 下载一次入库）
+   ├── chart-config.js   ← 配色/字体/主题常量（CSS 变量驱动）
+   ├── chart-init.js     ← 6 个图表初始化函数（含 typeof Chart 守卫）
+   └── README.md         ← Chart.js 版本号 + 来源 + 升级说明
 
-2. 本地 bundle 方案已降级为 P2 未来增强（用户反馈 CDN 不可达时再实施），
-   不纳入 Iter 1 范围，不新增 Feature Flag `chart_js_source`，
-   不新增 `chart.min.js` 文件。
+2. html_writer.py 渲染后 shutil.copy2 复制到报告输出目录
+   模板相对路径引用：<script src="chart.min.js"> + chart-config.js + chart-init.js
+   （无 CDN、无 SRI、无 onerror 动态加载）
+
+3. 防御性兜底：chart-init.js 内 typeof Chart === 'undefined' 检测
+   → 跳过初始化 → 回退 Canvas 2D / 表格（本地文件损坏等极低概率）
 ```
+
+**为何放弃 CDN**（R21 复审）：
+1. **报告是静态制品** — Chart.js 对报告就像报告里的图片，应内嵌而非外链
+2. **个人工具无分发成本** — 200KB 可忽略，且报告自包含是真实需求（离线/内网查看）
+3. **CDN 在国内不稳定** — jsdelivr 时快时慢，交互功能不应依赖它
+4. **消除供应链面** — 无外部加载即无 R10 注入风险
 
 ### 8.2.1 设计优化：JS 外部化
 
 **问题**：模板已 1862 行，新增 6 个 Chart.js 初始化脚本（每个 ~30 行 JS + 数据配置）→ 预估 2100+ 行，可维护性下降。
 
-**优化方案**：将 Chart.js 初始化 JS 从模板中分离为独立文件：
+**优化方案**：将 Chart.js 初始化 JS 从模板中分离为独立文件，统一放 `src/js/`（R21 新建目录）：
 
 ```
-tmpl/
-├── report_template.html     ← 主模板（仅保留 CDN script 标签 + canvas 容器）
-├── chart-init.js            ← Chart.js 通用初始化逻辑（6 个图表函数）
-└── chart-config.js          ← 图表配色/字体/主题常量化配置（CSS 变量驱动，§6.7）
+src/js/
+├── chart.min.js         ← 第三方引擎（本地 bundle）
+├── chart-init.js        ← Chart.js 通用初始化逻辑（6 个图表函数）
+└── chart-config.js      ← 图表配色/字体/主题常量化配置（CSS 变量驱动，§6.7）
 ```
+
+> `src/python/tmpl/` 仅保留 `report_template.html`（模板职责）；前端 JS 资产独立到 `src/js/`，升级 Chart.js 时仅替换 `chart.min.js`。
 
 Python 端通过 `html_writer.py` context 传递 JS 文件路径（C14 合规）：
 ```python
@@ -540,7 +554,7 @@ def build_chart_datasets(
 | 决策 | 选项 | 推荐 | 理由 |
 |:-----|:-----|:-----|:------|
 | 图表库 | Chart.js / ECharts / ApexCharts | **Chart.js** | 最轻量，够用 |
-| CDN 策略 | 纯 CDN / CDN+local / 纯 local / **CDN+SRI+onerror** | **CDN + SRI + onerror** | 零部署成本，CDN 失败/篡改时可降级 |
+| 引擎加载 | 纯 CDN / CDN+local / CDN+SRI+onerror / **纯本地 bundle** | **纯本地 bundle**（R21） | 离线自包含，R3/R10 闭环，无网络依赖 |
 | JS 组织 | 内联模板 / 外部独立 JS | **外部独立 JS**（chart-init.js + chart-config.js） | 可测试性 + 维护性 + 暗色模式预留 |
 | 数据处理 | JS 端 tojson 消费 / Python 端预处理器 | **Python 端预处理器**（chart_data_builder.py） | 可 pytest 测试 + 降低 JS 复杂度 |
 | Feature Flag 注册 | config/features.py / config.json | **config/features.py** | 与现有 LLM/B 系列标志一致 |
@@ -556,7 +570,7 @@ def build_chart_datasets(
 |:-----|:------:|:----:|:---------|
 | 技术选型验证 | 0.5d | 0.5d | ✅ 不变（含热力图插件 POC） |
 | 数据接口定义 | 0.5d | 0.5d | ✅ 不变（`tojson` 复用） |
-| 模板改造 + JS 外部化 | 1d | **1.5d** | ⬆ 新增 chart-init.js / chart-config.js 独立 + SRI 标签 + CDN onerror 回退逻辑 |
+| 模板改造 + JS 外部化 | 1d | **1.5d** | ⬆ 新增 src/js/ 目录（chart.min.js 入库）+ chart-init.js / chart-config.js 独立 + 本地 bundle 复制逻辑 + 模板相对路径 script |
 | Python 端数据预处理器 | — | **0.5d** | ⬆ 新增 `chart_data_builder.py`，6 张图数据格式转换 + 降级分级处理 |
 | 图表迁移/新建 | 1d | **0.75d** | ⬇ 借助 Python 预处理器，JS 端只需消费已格式化数据 |
 | 打印降级 | 0.5d | **0.75d** | ⬆ `beforeprint`/`afterprint` 异步时序处理 + 2x 密度 |
@@ -572,7 +586,7 @@ def build_chart_datasets(
 |:------:|:-------|:-----|:------:|:-----|
 | **P0** | Python 端数据预处理器（§8.2.2） | 可测试 + 降低 JS 复杂度 | 0.5d | **必须做**，否则 JS 端数据转换不可测 |
 | **P0** | JS 外部化（§8.2.1） | 维护性 + 暗色模式预留 | 0.25d | **必须做**，防止模板膨胀到 2100+ 行 |
-| **P1** | CDN SRI（§8.2） | 供应链安全 | 0.1d | **建议做**，成本极低 |
+| **P1** | 本地 bundle 入库（§8.2） | 离线自包含 + 供应链面消除 | 0.1d | **建议做**，下载 chart.min.js 一次入库 src/js/ |
 | **P1** | CSS 变量颜色方案（§6.7） | plan-11 兼容 | 0.1d | **建议做**，一次性成本 |
 | **P2** | 降级分级渲染（§6.5） | 用户体验精细度 | 已含在预处理中 | 随预处理器自然实现 |
 | **P2** | 打印 `beforeprint` 时序（§6.5.4） | 打印可靠性 | 0.15d | 推荐实施 |
@@ -589,9 +603,11 @@ def build_chart_datasets(
 | `src/python/report/html_writer.py` | 修改 | context 传递 `enable_interactive_charts` + `chart_datasets`（Python 预处理器结果） |
 | `src/python/report/chart_data_builder.py` | **新建** | Python 端数据预处理器，6 张图数据格式转换 + 降级分级处理 |
 | `src/python/report/html_jinja_env.py` | 不改 | C14 约束：不新增 globals |
-| `src/python/tmpl/report_template.html` | 修改 | 移除内联 JS（改为 `<script src="chart-init.js">`）+ CDN SRI `<script>` + onerror 回退 + canvas 容器 + 打印降级 |
-| `src/python/tmpl/chart-init.js` | **新建** | Chart.js 通用初始化逻辑（6 个图表函数），从模板中分离 |
-| `src/python/tmpl/chart-config.js` | **新建** | 图表配色/字体/主题常量化配置（CSS 变量驱动） |
+| `src/python/tmpl/report_template.html` | 修改 | 移除内联 JS（改为 `<script src="chart-init.js">`）+ 本地 bundle `<script src="chart.min.js">` + 防御性守卫 + canvas 容器 + 打印降级 |
+| `src/js/` | **新建** | 前端 JS 资产统一目录（R21）：`chart.min.js` + `chart-init.js` + `chart-config.js` + `README.md`（版本号记录） |
+| `src/js/chart.min.js` | **新建** | Chart.js v4 UMD 引擎（~200KB，git 跟踪，随源码分发） |
+| `src/js/chart-init.js` | **新建** | Chart.js 通用初始化逻辑（6 个图表函数），从模板中分离，含 `typeof Chart` 守卫 |
+| `src/js/chart-config.js` | **新建** | 图表配色/字体/主题常量化配置（CSS 变量驱动） |
 | `src/python/report/html_renderers.py` | 不改 | 保持现有渲染函数返回值不变，向后兼容 |
 | `data/config/features.json` | 修改（可选） | 用户覆盖 `enable_interactive_charts` |
 | `src/test/test_chart_data_builder.py` | **新建** | 预处理器单元测试 + 降级分级测试 |
@@ -611,11 +627,11 @@ plan-2 (相关性计算)                    plan-1 (交互图表基础框架)
                                              │
    ├──→ plan-3 (最大回撤+净值曲线 Chart.js 双轴图)
    │     仅需新增 Chart.js 双轴数据集配置 + 模板中第二个 canvas
-   │     不涉及 Feature Flag / CDN / 基础设施
+   │     不涉及 Feature Flag / 图表引擎 / 基础设施
    │
    ├──→ plan-6 (多快照趋势追踪 Chart.js 多线图)
    │     仅需新增 trend_data 模板 context + Chart.js 线图配置
-   │     不涉及 Feature Flag / CDN / 基础设施
+   │     不涉及 Feature Flag / 图表引擎 / 基础设施
    │
    └──→ plan-11 (HTML 暗色模式)
          依赖 plan-1 chart-config.js CSS 变量预留（§6.7）
@@ -711,7 +727,7 @@ def load_feature_overrides() -> None:
 |:-------|:---------|:---------|
 | plan-1 完成后首次提交 | `config/features.py` 注册 flag + 回退路径测试 | plan-1 实施时 |
 | plan-1 稳定 2 版本后 | 移除 `drawSimpleChart()` + Canvas 回退路径 + Feature Flag 条件分支 | 发布 2 个版本后（如 v0.9.0） |
-| 每次 Chart.js 安全更新 | 刷新 CDN 版本号 | CVE 公告 |
+| 每次 Chart.js 安全更新 | 替换 `src/js/chart.min.js` 为新版本并验证（版本号同步更新于 `src/js/README.md`） | CVE 公告 |
 
 ---
 
@@ -751,7 +767,7 @@ def load_feature_overrides() -> None:
 | **C2** 缓存统一 | ✅ 无关 | 无新增缓存类型 |
 | **C3** 缓存原子写入 | ✅ 无关 | HTML 写入仍走 `html_save.py` |
 | **C4** 会话级 API 复用 | ✅ 无关 | `chart_data_builder.py` 是纯计算函数，无 HTTP 请求 |
-| **C5** HTTP 客户端统一 | ✅ 无关 | Chart.js CDN 加载走浏览器 `<script>` |
+| **C5** HTTP 客户端统一 | ✅ 无关 | Chart.js 本地 bundle 由浏览器从报告目录加载 `<script src="chart.min.js">`，不经过 Python HTTP 层（R21 更新） |
 | **C6** Provider Chain 必经 | ✅ 无关 | 图表所需数据已在编排器阶段获取 |
 | **C7** 报告序号可配置 | ✅ 安全 | 不改 `_REPORT_SECTION_DEFAULT`，不新增模块 |
 | **C8** 日志统一 | ✅ 无关 | 客户端 JS 不经过 Python 日志 |
@@ -759,7 +775,7 @@ def load_feature_overrides() -> None:
 | **C10** 新闻召回可配置 | ✅ 无关 | 不涉及新闻系统 |
 | **C14** 渲染期数据不可写 `_ENV.globals` | ✅ 深度合规 | 见下方 §F.2 |
 | **C15** 日志着色 | ✅ 无关 | |
-| **C16** 路径绝对化 | ✅ 无影响 | 本地 bundle 已降级为 P2 未来增强，Iter 1 采用 CDN。JS 复制走 `shutil.copy2(src, os.path.join(output_dir, fname))`，`output_dir` 在 `get_config()` 时已由 `_absolutize_paths()` 绝对化（`config/_core.py`），故复制路径安全（R3 补充依据） |
+| **C16** 路径绝对化 | ✅ 合规 | R21 本地 bundle 方案：`src/js/` 三文件经 `shutil.copy2(src, os.path.join(output_dir, fname))` 复制，`output_dir` 在 `get_config()` 时已由 `_absolutize_paths()` 绝对化（`config/_core.py`），模板用相对路径引用，路径安全 |
 | **C17** Multi-LLM Provider Chain | ✅ 无关 | plan-1 不新增 LLM API 调用（R3 补齐，原表遗漏） |
 | **C18** credentials_ref 凭据分离 | ✅ 无关 | plan-1 不新增凭据配置（R3 补齐，原表遗漏） |
 | **C19** pipeline_data Schema | ✅ 安全 | `chart_datasets` 不经过 pipeline_data，仅 template context。注：radar 数据间接派生自 `pipeline_data["risk_metrics"]`（`_prepare_full_risk_metrics` 注入，`_report_generation.py:165/167`），但 `risk_metrics` 键已在 Schema 定义，无需新增键（R3 补充依据） |
@@ -852,3 +868,4 @@ html_writer.py: _compute_section_visibility()
 > - 2026-08-01 v24（R18）：演进路径与回退 — §4.7 清理计划缺阶段总览与切换判定；新增 upgrade.md §4.15（三阶段演进 Canvas→双路径→Chart.js 唯一、切换 4 判定含无回退诉求、Flag OFF 不渲染 canvas 容器避免空 div、回退验证清单汇总）；Iter 8 补演进确认；upgrade.md v21
 > - 2026-08-01 v25（R19）：与数据降级体系融合 — 正交性已确认（§6.5/R7），补传播链与消息口径：新增 upgrade.md §4.16（降级传播链：数据源 T1~T4 → history_data.status 汇合 → 图表三级降级；占位消息复用 STATUS_MESSAGES 常量防口径分裂；radar 数据源缺失链区别于 history_data.status 三级降级）；Iter 1 验收补 2 条；upgrade.md v22
 > - 2026-08-01 v26（R20）：最终收敛与质量检查 — 版本记录 v1-v25 / upgrade.md v1-v22 完整性校验通过；修复 3 处交叉不一致：① §2.4 测试计数 ~39→~45（与 upgrade.md 迭代总览 R11 起同步）② folders.md 目录树 plan/ 未展开子文件（统计表已列 6 个但树未展开，补 6 文件行）③ upgrade.md 目录 §5 锚点与标题（多「× 测试范围」）不匹配 + §1.3 编号重复（总工作量 → §1.4）；全文档章节引用/降级链路/Feature Flag 治理均无遗留占位；upgrade.md v23
+> - 2026-08-01 v27（R21）：**引擎加载策略反转：CDN → 纯本地 bundle**（用户决策）— R3 从「中/低/高」降为「低/极低/低」且**已闭环**（chart.min.js 随报告分发、离线自包含）；R10 供应链攻击随之消除（无外部加载即无注入面）；§3.2 重写为纯本地 bundle 方案（对比表 + 理由 + 防御性 `typeof Chart` 兜底 + 来源维护）；TD2 从「CDN 生产依赖」改为「报告体积增大 ~200KB」；C5/C16 更新；§8.2 重写；§8.4 引擎加载决策行、§8.5 P1 本地 bundle 入库；附录 A 新增 `src/js/` 目录（chart.min.js 引擎 + README 版本记录）；附录 D 安全更新动作改替换 src/js/chart.min.js；附录 B/C 同步；新建 `src/js/` 承接前端 JS 资产（用户建议）；upgrade.md v24
