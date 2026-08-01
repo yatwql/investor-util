@@ -2518,5 +2518,8 @@ investor-util/
 | liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
 | fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
 | scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
+| factor_exposure | dict | 是 | 计划中 | prepare_report_data |
+
+> `factor_exposure`（plan-7 因子暴露分析）：`{"available": bool, "betas": {factor: float}, "t_stats": {factor: float}, "style_allocation": {factor: float}, "window": int}`。C7 注册见 `plan-advanced-analysis.md` §4 技术债与技术预置。
 
 [↑ 回到顶部](#目录)

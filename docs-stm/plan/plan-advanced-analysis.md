@@ -17,6 +17,9 @@
 2. [调仓 What-if 模拟](#2-调仓-what-if-模拟)
 3. [多快照趋势追踪](#3-多快照趋势追踪)
 4. [因子暴露分析](#4-因子暴露分析)
+   - [架构约束遵从](#架构约束遵从)
+   - [数据源可行性分析](#数据源可行性分析)
+   - [技术债与技术预置](#技术债与技术预置)
 
 ---
 
@@ -190,12 +193,14 @@ data/holdings/
 
 ### 工作量估算
 
+> **对齐 plan.md（MVP 3 因子，2.5 天）**。probe 已完成，数据源可行性已验证，剩余为接入/计算/输出三阶段（比原 5 因子设计少 1 个因子代理 + 图表降级为柱状图）。
+
 | 阶段 | 内容 | 天数 |
 |------|------|------|
-| 因子代理 | 中证系列风格指数数据接入 | 1 |
-| 回归模型 | OLS 回归暴露 + t 值显著性 | 1.5 |
-| 报告输出 | 因子暴露柱状图 + 风格归属矩阵 | 1 |
-| **合计** | | **3.5 天** |
+| 因子代理 | 中证风格指数接入 `_A_INDICES` + C7 注册 + C19 schema 预置 | 0.5 |
+| 回归模型 | OLS 回归暴露 + t 值显著性（`numpy.linalg.lstsq`，复用 `_math_utils`） | 1 |
+| 报告输出 | 因子暴露柱状图 + 风格归属表 + 数据不足降级（§1.4.5） | 1 |
+| **合计** | | **2.5 天** |
 
 ### 实现思路
 
@@ -205,6 +210,18 @@ R_p = β₁R_value + β₂R_growth + β₃R_momentum + β₄R_quality + β₅R_l
 不追求高精度（截面回归 > 时间序列回归），用 ≥36 期数据估算。
 结果输出为"风格归属饼图"（价值 40% / 成长 30% / 动量 20% / 质量 10%）。
 ```
+
+### 架构约束遵从
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定（probe 已验证 `sh000919` 等原始 6 位前缀命中 `000/399/932` 规则），不在 plan-7 模块内自行实现指数判定；新代码注册到 `fetcher/index.py` 的 `_A_INDICES` 供名称映射 |
+| **C6** (Provider Chain 必经) | 指数历史 K 线通过 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "sina"]`），不绕过 Chain 直调 Provider。⚠️ 注意 rf-103：Sina 备用链路当前 404 失效，chain fallback 实际为空——实施前需先处理（修复 Sina 或接受 Tencent 单链路并记录降级） |
+| **C7** (报告序号可配置) | 新增 `factor_exposure` 报告模块，必须在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`b_series`、data_flag=`factor_exposure_data`），支持用户通过 `config.json` 自定义序号与开关；不硬编码序号 |
+| **C14** (渲染期数据不可写入模块级全局变量) | 因子暴露数据（回归系数/风格归属/暴露柱状图数据）通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
+| **C19** (pipeline_data Schema 契约) | 新增 `factor_exposure` 键（类型 `dict`：含 `available`/`betas`/`t_stats`/`style_allocation`/`window`），必须在 pipeline_data Schema 定义文档（technical.md 附录 H）预定义类型/版本号/写入模块后再使用，详见下文"技术债与技术预置" |
+| **§1.4.5** (数据降级治理) | 因子指数历史数据不足 36 期时，标记 `factor_exposure.available=false`，报告显示"数据不足"占位文本；不走 DegradationTracker（系数据量不足，非数据源故障，与 plan-2/plan-3 同款约定） |
+| **C2/C3** (缓存统一+原子写入) | 指数 K 线通过 `cache/` 子包统一读写（`fetch_index_history` 已复用 `history_index` chain 缓存），新增代码不自行建缓存键 |
 
 ### 数据源可行性分析
 
@@ -279,3 +296,35 @@ sh000931 中证低波: 365 条，距今 1d    ✅ 可用（附加补充候选）
 - 主链路为 Tencent（`--provider tencent`）；Sina 备用链路当前 404 失效（rf-103）。
 - 成长因子由 500成长（sh000925）覆盖，300成长停更影响大盘成长代理，实施时可用 500成长 + 低波（sh000931）组合替代。
 - 结论：**按 MVP 3 因子实施**（价值+成长+质量，低波作补充），动量标记实验性。
+
+---
+
+### 技术债与技术预置
+
+实施 plan-7 前需明确处理的既有技术债与预置项（probe 阶段发现的增量信息）。
+
+#### 既有技术债（review-findings.md 跟踪）
+
+| # | 技术债 | 对 plan-7 的影响 | 处理建议 |
+|:--|:--|:--|:--|
+| rf-102 | `providers/tencent.py::fetch_index_kline` 文档声称上限 3650 天，实测 `days=3650` 崩溃（`'list' object has no attribute 'get'`），实际上限约 2000 天 | 回归窗口需 ≥36 期（60 交易日 ≈ 3 个月），2000 天 ≈ 8 年充分满足；**但不可传 ≥3650 的窗口** | 实施时请求窗口钳位到 ≤2000（或顺手修 `_parse_kline_response` 对空 list 的容错）；计划文档中"3650 天"表述均已修正为"约 2000" |
+| rf-103 | Sina `getKLineData` 端点当前对所有代码返回 404/空，`sina_kline.fetch_index_kline` 备用链路失效 | chain 的 `history_index` 双链路兜底实际只剩 Tencent 单链路——Tencent 故障时因子章节无数据 | 实施前二选一：① 修复 Sina 链路（在真实网络环境复核，可能端点变更/环境拦截）；② 接受 Tencent 单链路并让 C6/降级记录如实反映。**设计文档原"🟢 生产验证"表述已修正** |
+| rf-104 | CSI `sh000920`（300 成长）自 2023-02-17 停更 | 大盘成长代理缺失 | MVP 用 500成长（sh000925）覆盖成长因子，低波（sh000931）作补充；完整 5 因子降级为 3+1 |
+
+#### C7 / C19 预置（实施前必须完成）
+
+1. **C7 注册**：`core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 新增：
+   ```python
+   {"key": "factor_exposure", "name": "因子暴露分析", "number": 17,
+    "type": "b_series", "data_flag": "factor_exposure_data"}
+   ```
+   （现有 `data_source_status`=17 / `llm_usage`=18 顺延为 18/19。序号仅驱动显示顺序，注册表无硬编码序号引用，插入安全；`get_report_section_keys()` 自动含新键。）
+2. **C19 schema**：technical.md 附录 H 新增一行：
+   | `factor_exposure` | dict | 是 | 计划中 | prepare_report_data |
+   键结构：`{"available": bool, "betas": {factor: float}, "t_stats": {factor: float}, "style_allocation": {factor: float}, "window": int}`。
+
+#### 计算方案（probe 后新增，原设计未明确）
+
+- **组合收益 R_p 来源**：复用 `PortfolioHistoryCalculator.get_combined_timeseries()` 的 `daily_returns`（日收益率百分比序列）。⚠️ 该方法默认 `days=30`，回归需 ≥36 期 → 调用时传 `days≥60`（60 交易日 ≈ 3 个月），需确认 `_fetch_all_histories` 能覆盖（Tencent 2000 天上限内）。
+- **OLS 实现**：`statsmodels` **未安装**，且项目惯例是 `_math_utils.py` 纯 math 无 scipy 依赖（已有 `_t_critical_95`/`_beta_se` 等 t 分布辅助）。建议用 `numpy.linalg.lstsq` 手写 OLS + t 检验，复用 `_math_utils.py` 的 t 分布函数，**不新增 statsmodels 依赖**。
+- **图表输出**：现 `drawSimpleChart`（Canvas 2D）支持折线/柱状，**不支持饼图**。MVP 阶段"风格归属饼图"降级为**柱状图**（每个因子一根柱），或依赖 plan-1 的 Chart.js 迁移后再升级为饼图——**plan-7 不阻塞在 plan-1**，与 plan-3 的依赖约定一致（可回退 Canvas 框架）。
