@@ -7,6 +7,8 @@
 > 性能基准体系：↗ [`archive/v0.8.x/perf-benchmark/perf-benchmark.md`](../archive/v0.8.x/perf-benchmark/perf-benchmark.md)
 > 批量并行调度技术设计：↗ [`archive/v0.8.x/batch-parallel/batch-parallel-design.md`](../archive/v0.8.x/batch-parallel/batch-parallel-design.md)
 > 批量并行调度迭代计划：↗ [`archive/v0.8.x/batch-parallel/batch-parallel-iteration-plan.md`](../archive/v0.8.x/batch-parallel/batch-parallel-iteration-plan.md)
+>
+> **状态**：rf-1 批量并行已完成并通过回归验证（v0.8.x，归档记录见 `archived_changelog.0.8.x.md`）。`fetcher/batch.py` 的 `BatchDispatcher` 已应用于行情（`market_value.py`）、基金排名（`fund.py`）、行业分类（`industry.py`）批量链路，plan-2 历史数据获取可直接复用。本文档保留设计决策供历史参考，实施细节以归档的 batch-parallel 设计/迭代计划为准。
 
 ## 目录
 

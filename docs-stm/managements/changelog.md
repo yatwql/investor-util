@@ -6,7 +6,10 @@
 
 ## [0.9.5-dev] - 2026-08-01
 
-（开发中，暂无条目）
+### Docs
+
+- **plan.md 与迭代设计文档依赖状态同步** — 核实 rf-1 批量并行已落地（`BatchDispatcher` 应用于行情/基金排名/行业链路）后：① plan.md plan-2 依赖标注 ⚠️→✅（原"串行获取全品种历史 15-30s"顾虑已消除），P2 头部补充前置状态注记，合计预排 ~18d→~21d；② plan-1 预估 4d→5.25d，对齐 `plan-chartjs-report-upgrade.md` 8 迭代方案，移除 plan.md 中过时的 4d 分阶段表；③ `plan-correlation-drawdown.md` §1 "对 rf-1 的依赖"改写为"已解除"，数据获取编排行注明复用 `BatchDispatcher` 并行链路；④ `plan-engineering.md` 补充 rf-1 完成状态注记（v0.8.x 已回归验证）
+- **plan.md 按推荐实施顺序重排** — 新增"推荐实施顺序"总览小节（①~⑨ 跨 P2/P3 归类），标注推荐理由与工作量；P2 区块内部重排（plan-2/3 → plan-1 → plan-6/5/7，plan-4 已放弃保留），P3 区块内部重排（plan-9 → plan-11 → plan-10 → plan-8）；各计划项标题/表格行补充推荐序号标注；plan-7 状态列明确"实施前先做 0.5d probe 决策闸门（≥3 个 CSI 指数有效 → MVP 3 因子，否则放弃）"；同步 P2 定义行预排数 ~22d→~21d 消除不一致
 
 ---
 
