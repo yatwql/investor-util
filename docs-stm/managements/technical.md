@@ -302,7 +302,7 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 
 | 系统 | 层级 | 管什么 | 粒度 | 恢复方式 |
 |:-----|:-----|:-------|:-----|:---------|
-| DataSourceRegistry | 熔断层（HTTP 级） | 这个 Provider 能不能调用 | per-provider | 固定 300s 冷却 |
+| DataSourceRegistry | 熔断层（HTTP 级） | 这个 Provider 能不能调用 | per-provider | 指数退避冷却（60s→300s→900s→3600s） |
 | DegradationTracker | 降级决策层（数据质量级） | 这批数据能不能信任 | per-source | 跨会话持久化 |
 
 [↑ 回到顶部](#目录)
@@ -322,6 +322,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
  ┌──────────────────────────────────────────────────────────────────┐
  │  price_stock:   腾讯财经 (qt.gtimg.cn)  →  新浪财经 (hq.sinajs.cn)│
  │  price_fund_otc: 东方财富净值 API（直达，无备用）                   │
+ │  price:         腾讯财经 → 东方财富（行情策略链：开盘状态判断）      │
  │  history_stock:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_index:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_index_us: 新浪财经 K 线        →  腾讯财经 K 线          │
@@ -329,6 +330,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
  │  industry:       东方财富 push2          →  行情页 quotedata      │
  │  fund_rank:      天天基金（直达）                                   │
  │  fund_hold:      天天基金（直达）                                   │
+ │  bond_yield:     akshare bond_zh_us_rate（国债收益率，无风险利率）│
  └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -575,10 +577,10 @@ fetcher/
 ├── fund_manager.py     基金经理数据（天天基金 HTML 解析）
 ├── industry.py         行业分类+概念板块（push2 双链路）
 ├── chain.py            Provider 优先链定义 + fallback 路由 + 增量合并
+├── batch.py            批量并行调度（BatchDispatcher + RateLimiter）
 ├── akshare.py          AKShare 数据获取（备用数据源）
 ├── bond_yield.py       债券收益率数据
 ├── news.py             新闻数据获取
-├── portfolio_history.py 组合历史走势计算（位于 report/ 包）
 └── history_diff.py     F1 快照差异计算（纯计算，无 I/O）
 ```
 
@@ -1025,7 +1027,7 @@ def _get_pool() -> ThreadPoolExecutor:
           (菜单 L/B)                    │                      │
             │                           ▼                      ▼
             ▼                  excel_generator.py       html_writer.py
-      ┌──────────┐                 (编排器 98 行)          │
+      ┌──────────┐                 (编排器 437 行)         │
       │ F1 快照  │                     │                   ▼
       │ 比较     │                     ▼           html_builders.py
       │          │           excel_sheet_factory.py   (数据构建器)
@@ -1222,8 +1224,9 @@ for sec in section_order:
 | `overlap_data` | `overlap_matrix is not None` | `b_series` | B3 持仓重合度 |
 | `concentration_data` | `concentration_analysis is not None` | `b_series` | B4 持仓集中度 |
 | `style_data` | `style_analysis is not None` | `b_series` | B5 基金风格 |
-| `include_news` | `include_news` flag | `news` | 新闻关联分析 |
-| `llm_enabled` | `llm_enabled_flag` | `llm` | LLM 全部 5 模块 |
+| `factor_exposure_data` | `factor_exposure is not None` | `b_series` | B6 因子暴露 |
+| `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
+| `llm_data_available` | `llm_enabled_flag`（LLM 生成成功） | `llm` | LLM 全部 5 模块 |
 
 `always` 类型模块（summary / market_value / category / penetration / fund_performance）无 data_flag，始终显示。
 
@@ -1594,7 +1597,7 @@ R_p = β₁R_value + β₂R_growth + β₃R_quality + α + ε
     结果输出为"风格归属柱状图"（价值/成长/质量各一根柱）
 ```
 
-**模块分层（对齐 plan-2 模式，C14 依赖）**：
+**模块分层（C14 依赖）**：
 
 ```
 analysis/factor_exposure.py   # 纯计算：接收(组合收益序列+因子收益序列) → OLS → 输出
@@ -1610,17 +1613,17 @@ report/ 渲染                   # 模板 context 传递（C14）→ 柱状图 +
 | 因子 | 代理指数 | 代码 | 说明 |
 |:----|:--------|:-----|:-----|
 | 价值 | 300 价值 | sh000919 | 大盘价值代理 |
-| 成长 | 500 成长 | sh000925 | 替代停更的 300 成长（sh000920）；中盘成长代理，报告中注明代理口径 |
+| 成长 | 500 成长 | sh000925 | 中盘成长代理，报告中注明代理口径 |
 | 质量 | 300 质量 | sh000930 | 全指质量代理 |
 
-- 低波（sh000931）probe 有效但不进 MVP（保留为扩展位）
+- 低波（sh000931）不进 MVP 因子集合（保留为扩展位）
 - `FACTOR_STALE_DAYS=120` 新鲜度校验：最后一根 bar 距今 > 120 天的因子从集合剔除并告警（`stale_factors`），剩余因子 < 2 时落 §1.4.5 数据不足分支
 - 基准对照 `baseline_betas`：沪深300（sh000300）在同一回归窗口的因子暴露，用于风格漂移判断（复用既有指数链路）
 
-**计算方案（probe 后收敛）**：
+**计算方案**：
 
 - **R_p 来源（重要）**：不能复用 `PortfolioHistoryCalculator.get_combined_timeseries().daily_returns`——该方法的 `days` 参数只传给基准，持仓历史走 chain 默认 `days=30`，组合收益序列固定 30 期不满足 ≥36 期需求。编排层独立拉取每只持仓历史（`fetch_with_incremental_fallback("history_stock"|"history_fund_otc", code, days=60)`，C4 会话缓存复用已拉 30 天、增量补至 60 天），按 as-if 语义（当前份额 × 历史价格）计算组合日收益序列，与 `portfolio_history` 章节口径一致。
-- **回归序列对齐（关键）**：OLS 要求 R_p 与各因子收益严格按交易日对齐。pandas 构造 DataFrame 后 `merge`（on=`date`，inner join）对齐——因子收益由 CSI 指数 K 线 `close` 计算 pct_change，天然带日期索引；复用 plan-2 相同对齐思路（`analysis/correlation.py`），不另造机制。
+- **回归序列对齐（关键）**：OLS 要求 R_p 与各因子收益严格按交易日对齐。pandas 构造 DataFrame 后 `merge`（on=`date`，inner join）对齐——因子收益由 CSI 指数 K 线 `close` 计算 pct_change，天然带日期索引；复用 `analysis/correlation.py` 的日期对齐思路，不另造机制。
 - **NaN 处理**：持仓品种停牌/缺数据时 `daily_returns` 含 NaN，对 R_p 用 `dropna()` 剔除无效日后再 merge，记录实际有效样本数。
 - **动态窗口（数据量自适应）**：回归窗口 = `min(60, 有效样本 - 自由度余量)`，优先满足 ≥36 下限，不足则数据不足分支。
 - **OLS 实现**：`statsmodels` 未安装，用 `numpy.linalg.lstsq` 手写 OLS + t 检验，复用 `_math_utils.py` 的 t 分布函数（`_t_critical_95`/`_beta_se`），**不新增依赖**。
@@ -1631,7 +1634,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 柱状图 +
 | 约束 | 适配方式 |
 |:-----|:---------|
 | **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
-| **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "sina"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（rf-103 已处理，降级接受），Tencent 故障时因子章节落 §1.4.5 数据不足分支 |
+| **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "sina"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），Tencent 故障时因子章节落 §1.4.5 数据不足分支 |
 | **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`b_series`、data_flag=`factor_exposure_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号 |
 | **C14** (渲染期数据不可写入模块级全局变量) | 因子暴露数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
 | **C19** (pipeline_data Schema 契约) | 新增 `factor_exposure` 键（类型 `dict`），键结构见附录 H，先定义类型再使用 |
@@ -1879,7 +1882,7 @@ _dedup_by_title(items)
 DataSourceRegistry（熔断层）  ─  管"这个 Provider 能不能调用"
     HTTP 层面的快速跳过
     per-provider 粒度
-    固定阈值（3次/300s）
+    固定阈值（连续 3 次失败）+ 指数退避冷却
     自动冷却恢复
 
 DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
@@ -1923,7 +1926,7 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
 
 **LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `core/registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名。
 
-**辩论模式（实验性路由）**：当 Feature Flag `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` 任一启用时，`generators_orchestrator.py` 中的 `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`。辩论模式与标准模式互斥（辩论优先），路由后 `skeleton.generate_llm_module()` 走辩论三段缓存（`llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_`）而非标准 expert_review 缓存。三段独立的 `DataModuleDef` 注册在 `core/registry.py` 中（preload 组，24h TTL）。
+**辩论模式（实验性路由）**：当 Feature Flag `llm_debate_procon` 启用时，`generators_orchestrator.py` 中的 `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`；`llm_debate_conditional` / `llm_debate_qa_concentration` 仅叠加模式组合，不触发路由。辩论模式与标准模式互斥（辩论优先），路由后 `skeleton.generate_llm_module()` 走辩论三段缓存（`llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_`）而非标准 expert_review 缓存。三段独立的 `DataModuleDef` 注册在 `core/registry.py` 中（preload 组，24h TTL）。
 
 各子模块的详细设计见 `llm-technical.md` §1~§4（架构总览、模块清单、骨架流程、并行编排）。
 
@@ -1967,7 +1970,7 @@ LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_
 
 每个模块的详细参数（model、temperature、timeout、max_tokens 等）通过 `module_{标识}` 命名约定在 `llm_settings.json` 中配置。
 
-**辩论模式路由**：当 Feature Flag 开启时，expert_review 模块的生成入口被 `_debate_wrapper` 接管，输出路径变为 debate 三段式。辩论模式使用独立的缓存键（`llm_debate_pro_`/`llm_debate_con_`/`llm_debate_synthesis_`）和 Token 预算守卫，三段缓存共用 expert_review 的持仓指纹（排除行情波动），默认 TTL 24h。辩论模式启用时报告页签标题尾部附加"(实验)"标签。
+**辩论模式路由**：当 Feature Flag 开启时，expert_review 模块的生成入口被 `_debate_wrapper` 接管，输出路径变为 debate 三段式。辩论模式使用独立的缓存键（`llm_debate_pro_`/`llm_debate_con_`/`llm_debate_synthesis_`）和 Token 预算守卫，三段缓存共用 expert_review 的持仓指纹（排除行情波动），默认 TTL 24h。辩论模式启用时，HTML 的模块状态标签与 Excel 用量页对 expert_review 显示模式标识：`llm_debate_procon` 启用 → "🧪 辩论模式"，仅条件推理/集中度问答启用 → "🧪 实验模式"。
 
 各模块的详细配置参数、System Prompt 设计、User Prompt 构建逻辑见 `llm-technical.md` §8（提示词管理）。辩论模式相关生成器见 `llm-technical.md` §2.1（子模块总览）。
 
@@ -2017,7 +2020,7 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 config.json (基础配置)       → get_config() 内存缓存，按 mtime 自动失效
 llm_settings.json (非敏感)    → get_llm_config() 合并读取，联合 mtime 失效
 llm_key.json (敏感凭据)       → 覆盖 llm_settings.json 的同名字段；多凭据块供 credentials_ref 引用
-llm_providers.json (链配置)   → _load_llm_providers() 读取，$inject_provider_chain_data 注入
+llm_providers.json (链配置)   → _load_llm_providers() 读取，_inject_provider_chain_data 注入
 ```
 
 `config/` 子包结构：
@@ -2555,7 +2558,7 @@ investor-util/
 
 > 基本原则：任何数据获取失败均不得阻止报告生成（文件系统写失败除外）。降级状态下生成的报告必须在页脚注明降级摘要。
 
-### 附录 H：pipeline_data Schema 定义（当前已实现 + 计划中）
+### 附录 H：pipeline_data Schema 定义（已实现全量）
 
 > 完整定义和维护责任见 pipeline_data Schema 定义文档。
 > 此处仅列出当前阶段已确认的键名和类型。

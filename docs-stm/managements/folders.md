@@ -8,18 +8,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 186 | 45,481 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 1 | 2,068 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python | 12 | 4,097 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
-| **源代码合计** | — | **199** | **51,646** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **223** | **62,393** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,964 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| 主程序代码 | Python | 186 | 45,567 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 1 | 2,088 | `src/python/tmpl/report_template.html` |
+| 辅助脚本 | Python | 12 | 4,107 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
+| **源代码合计** | — | **199** | **51,762** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **223** | **62,605** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,973 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **95** | — | 含 CLAUDE.md |
+| **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 80 | — | 各版本 changelog/plan/review-findings 等（76 md + 3 py + 1 txt） |
-| ├ plan/ | 中间设计文件 | 5 | — | 当前迭代中的设计方案 |
+| ├ plan/ | 中间设计文件 | 6 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -244,6 +244,7 @@ investor-util/
 │   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
 │   │   ├── chart-print.js            #   打印降级（beforeprint 快照 <img> / afterprint 恢复，§4.5）
 │   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制，≤150 行）
+│   │   ├── chart-export.js           #   单图导出 PNG 按钮（.chart-box 注入，2x 分辨率下载）
 │   │   ├── chart-init.js             #   6 张图初始化（O1 隔离 + degraded 虚线，≤300 行）
 │   │   ├── test-chart.html           #   独立调试页（TD8）：6 图渲染/降级/离线场景自检（S2 升级载体）
 │   │   └── README.md                 #   资产说明 + Chart.js 版本号记录（S2 升级指引）
@@ -498,6 +499,8 @@ investor-util/
 │
 ├── data/                             # 运行时数据
 │   ├── holdings/                     #   持仓 xlsx 文件（用户放置）
+│   ├── knowledge/                    #   知识数据（fund_benchmarks.json / sector_keywords.json，随仓库发布）
+│   ├── calibration/                  #   校准数据（dedup_anchors.jsonl，自动生成）
 │   ├── cache/                        #   API 响应缓存（自动生成，JSON/GZ）
 │   ├── config/                       #   配置文件（config.json / features.json / llm_key.json / llm_settings.json / llm_providers.json）
 │   ├── state/                        #   运行时状态文件（.degradation_state.json / circuit_breaker.json，自动生成）
@@ -555,7 +558,8 @@ investor-util/
 │   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势）
 │   │   ├── plan-correlation-drawdown.md #     相关性矩阵+回撤+净值曲线计划（plan-2/3）
 │   │   ├── plan-web-ui.md              #     轻量 Web UI 计划
-│   │   └── plan-fix-deepseek-thinking-exhaustion.md  # DeepSeek thinking 耗尽 max_tokens 修复方案（rf-122）
+│   │   ├── plan-fix-deepseek-thinking-exhaustion.md  # DeepSeek thinking 耗尽 max_tokens 修复方案（rf-122）
+│   │   └── plan-fix-qa-concentration-and-chart-optimization.md  # 集中度问答无输出修复 + 穿透 TOP10 柱状图区分/布局优化（rf-150）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
@@ -665,16 +669,16 @@ investor-util/
 │   │   │   ├── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
 │   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
-│   │   │   ├── v0.9.x/                           # v0.9.x 版本归档（changelog/plan/review-findings + 已完成项设计文档）
-│   │   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（plan-1/plan-7 已完成项 + 设计文档索引）
-│   │   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x（0.9.0 ~ 0.9.5）
-│   │   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x（rf-90 ~ rf-144）
-│   │   │   │   ├── chartjs-upgrade/               #   plan-1 交互式 HTML 报告升级设计（8 迭代）
-│   │   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案（plan-1）
-│   │   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析（plan-1）
-│   │   │   │   │   └── plan-1-iter7-verification-checklist.md # plan-1 Iter 7 浏览器人工验证清单（rf-113）
-│   │   │   │   └── factor-exposure/                 #   plan-7 因子暴露分析设计（原 plan-advanced-analysis §4）
-│   │   │   │       └── plan-factor-exposure.md      #     因子暴露分析设计（plan-7）
+│   │   ├── v0.9.x/                           # v0.9.x 版本归档（changelog/plan/review-findings + 已完成项设计文档）
+│   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（plan-1/plan-7 已完成项 + 设计文档索引）
+│   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x（0.9.0 ~ 0.9.5）
+│   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x（rf-90 ~ rf-144）
+│   │   │   ├── chartjs-upgrade/               #   plan-1 交互式 HTML 报告升级设计（8 迭代）
+│   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案（plan-1）
+│   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析（plan-1）
+│   │   │   │   └── plan-1-iter7-verification-checklist.md # plan-1 Iter 7 浏览器人工验证清单（rf-113）
+│   │   │   └── factor-exposure/                 #   plan-7 因子暴露分析设计（原 plan-advanced-analysis §4）
+│   │   │       └── plan-factor-exposure.md      #     因子暴露分析设计（plan-7）
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

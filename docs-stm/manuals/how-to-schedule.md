@@ -53,7 +53,7 @@ schtasks /CREATE /SC WEEKLY /D MON /TN "InvestCacheUpdate" /TR "python D:\codeba
 
 推荐使用 PowerShell 包装脚本，方便日志记录和错误处理：
 
-**`scripts/scheduled_report.ps1`**：
+以下为自行创建的定时包装脚本示例（保存为 `scripts/scheduled_report.ps1`）：
 
 ```powershell
 param(
@@ -67,7 +67,7 @@ $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
 try {
     $env:PYTHONUNBUFFERED = "1"
-    $result = & python -m src.python.cli report --type $ReportType --history auto --output $OutputDir 2>&1
+    $result = & python -m src.python.cli --output $OutputDir report --type $ReportType --history auto 2>&1
     $exitCode = $LASTEXITCODE
 
     "$Timestamp [exit=$exitCode] $result" | Out-File $LogFile -Append -Encoding UTF8
@@ -147,7 +147,7 @@ cron/stderr 日志建议自行配置 logrotate：
 ```bash
 # 先更新缓存，再生成报告
 python -m src.python.cli cache --update all
-python -m src.python.cli report --type basic --output ./reports
+python -m src.python.cli --output ./reports report --type basic
 
 # 或者使用 --warm 在报告生成时预热
 python -m src.python.cli report --type full --warm --history auto

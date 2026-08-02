@@ -27,10 +27,10 @@ python scripts/test_runner.py --help
 
 # ===== ① 日常常用（快速反馈，提交前验证） =====
 
-# 提交前快速验证（~1min，P0 门禁）
+# 提交前快速验证（~2.5min，P0 门禁）
 python scripts/test_runner.py --mode dev-verify
 
-# 冒烟测试（~2s 快速验证核心通路）
+# 冒烟测试（~15s 快速验证核心通路）
 python scripts/test_runner.py --mode smoke
 
 # 仅运行业务场景测试
@@ -61,7 +61,7 @@ python scripts/test_runner.py --coverage
 
 # ===== ③ 全量/CI 门禁（耗时较长） =====
 
-# 开发期快速验证（全部 unit 并行 + 基础场景，~2min）
+# 开发期快速验证（全部 unit 并行 + 基础场景，~2.5min）
 python scripts/test_runner.py --mode dev-verify
 
 # 合入验证 — PR 前检查（~8min）
@@ -137,7 +137,7 @@ pytest src/test/ -m "edge"
 
 | 级别 | 定义 | 阻断点 | 对应的流水线阶段 |
 |:-----|:-----|:-------|:----------------|
-| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `dev-verify`（~1min） |
+| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `dev-verify`（~2.5min） |
 | **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~8min） |
 | **P2** | 阻塞发布 | 不得 release | ③ `verify,regression`（~7min） |
 | **P3** | 建议修复 | 不阻断 | — |
@@ -150,7 +150,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 项目推荐的四道质量门禁，按开发阶段逐级收紧：
 
-- **提交前门禁（`--mode dev-verify` / P0）** — commit 前必须执行。组合 4 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis，并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 1min。是编辑-验证循环中的正式屏障。
+- **提交前门禁（`--mode dev-verify` / P0）** — commit 前必须执行。组合 4 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis，并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 2.5min。是编辑-验证循环中的正式屏障。
 - **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S34 + T1-T21），确保端到端用户路径不被破坏。约 6min。推荐在改动了跨模块路径或数据流后补充运行。
 - **合入验证（`--mode verify` / P1）** — 准备合并到 master 前必须执行。覆盖 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）、`unit_config`（配置管理）、`unit_news`（新闻聚合）、`unit_llm`（LLM 模块）、`unit_analysis`（分析计算：流动性/再平衡/汇率/债券收益率等）七个单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。并行执行，约 1min。场景测试已在 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）中覆盖，P1 不重复。
 - **发布验证（`--mode verify,regression`）** — 发布版本（打 tag/release）前必须执行。组合单元测试 + 场景测试，覆盖全部核心通路。约 3min。
@@ -162,14 +162,14 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 **推荐工作流：**
 
 ```
-编码 → --mode dev-verify(1min) → commit → 多次积累 → merge → P1 --mode verify(1min) → release前 → P2 --mode verify,regression(3min)
+编码 → --mode dev-verify(2.5min) → commit → 多次积累 → merge → P1 --mode verify(1min) → release前 → P2 --mode verify,regression(3min)
           ↑                                    ↗
     改完代码随时跑                      若改跨模块调用
       提交前必过P0门禁                  先跑 --mode integration(50s)
 ```
 
 在一次典型开发周期中：
-1. **提交前门禁验证**：修改代码后运行 `--mode dev-verify`（1min）确认核心单元+基础场景通过（P0 强制）
+1. **提交前门禁验证**：修改代码后运行 `--mode dev-verify`（2.5min）确认核心单元+基础场景通过（P0 强制）
 2. **全场景补充验证**：若改动了跨模块路径/数据流，再跑 `--mode regression`（6min）确保全场景正常
 3. 如果改了跨模块调用关系（缓存、新闻流水线、TUI 路由等），再跑 `--mode integration`（50s）确认接口契约和全链路正常
 4. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify`（1min）确认整条管道通畅
@@ -183,7 +183,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 🔷 单元测试系列（`unit` / `standard`）
 
-- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（11 个子组：providers、fetcher、llm、news、report、config、core、analysis、handlers、ui、cli），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
+- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（11 个子组：providers、fetcher、llm、news、report、config、config_edge、core、analysis、ui、cli），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
 - **`--mode standard`** 在 `unit` 基础上排除 edge（异常边界）和 data（数据正确性）两个跨类标记，仅保留"常规路径"的单元测试。适用于日常开发中快速验证模块本身逻辑正确，不需要关心边界情况。
 
 #### 🔷 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
@@ -192,7 +192,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
   场景测试按职责分为 **7 大类**：
 
-  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、特殊字符不乱码（超多持仓 S0c 在 scenario_extreme）），以及操作行为场景（S29-S34：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市/基准指数走势对比）。
+  - **`scenario_basic` — 基础业务链路**：验证正常业务流程，包括纯股票/纯基金/混合多账户的市值穿透计算、缓存首次/命中逻辑、特殊品种（港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债）的正确分类和计算，以及持仓质量边界（清仓不计入、同名多份额合并、特殊字符不乱码（超多持仓 S0c 在 scenario_extreme）），以及操作行为场景（S29-S33：分红送转除权/定投成本摊薄/部分调仓卖出/跨账户转仓/新股中签待上市）。
   - **`scenario_resilience` — 异常容错场景**：验证系统在非正常输入或环境下的降级能力，包括纯债券基金组合（穿透无股权覆盖）、网络中断（价格从过期缓存读取）、单账户单持仓、零成本持仓（不除零崩溃）。
   - **`scenario_extreme` — 极限场景**：验证极端数据下的正确性，包括超多持仓（S0c，200+ 条批量计算）和极端值（S10，超大/极小份额、高精度净值、零值组合）。标记 `scenario_extreme`，不包含在 `scenario` / `scenario_basic` / `scenario_resilience` 中，需单独运行 `--mode scenario_extreme`。
   - **`scenario_llm` — LLM 场景组合**：验证 LLM 模块在各种状态下的行为，包括缓存/成功/失败混合状态的颜色渲染、五种失败原因独立映射、Extended Thinking 标记、禁用优先原则、断网降级、全缓存无调用、三种输出格式（Excel/HTML/Summary）一致性。
@@ -200,14 +200,14 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
 - **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。
-- **`--mode dev-verify`** 提交前门禁模式（P0），组合 4 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis，排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 1min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。
+- **`--mode dev-verify`** 提交前门禁模式（P0），组合 4 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis，排除 edge/data）并行 + 基础业务场景（`scenario_basic`）。约 2.5min，适合开发者改完代码后随时跑。不包含极限场景（scenario_extreme）和 LLM/日期/容错等专项场景。
 - **`--mode verify`** 合入门禁模式（`unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis`），包含核心基础设施 + 数据源 Provider + 数据获取调度 + 配置管理 + 新闻聚合 + LLM 模块 + 分析计算的单元测试，共约 1min（并行执行）。场景测试由 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）覆盖。
 
 #### 🔷 专项验证系列（`edge` / `data` / `smoke`）
 
 - **`--mode edge`** 仅运行标记为 `edge` 的测试，覆盖各种异常和边界情况：零值、空数据集、并发竞态、Unicode、时区安全、文件系统边界、API 网络异常等。适用于修改了函数内部错误处理逻辑后的针对性验证。
 - **`--mode data`** 仅运行标记为 `data` 的测试，覆盖数据精确性：市值=价格×份额、盈亏=市值-成本、收益率=盈亏÷成本（成本>0）、穿透 TOP10 占比归一化等。适用于修改了数值计算逻辑后的回归。
-- **`--mode smoke`** 仅运行标记为 `smoke` 的测试，从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s，合计 ~2s。适用于部署后冒烟或极速"通不通"检查。
+- **`--mode smoke`** 仅运行标记为 `smoke` 的测试，从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s，合计 ~15s。适用于部署后冒烟或极速"通不通"检查。
 
 #### 🔷 全量（`all`）
 
@@ -333,8 +333,7 @@ pytest src/test/ -m "<对应标记>" --lf
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
 | `scenario` | 全部业务场景 S0a-S0d + S1-S34 + T1-T21 |
-| `scenario_basic` | 基础链路 S0a-S0d + S1-S5 + S21-S34 |
-| ├ `scenario_holdings_quality` | S0a-S0d: 持仓质量 |
+| `scenario_basic` | 基础链路 S0a/S0b/S0d + S1-S5 + S21-S33 |
 | ├ `scenario_stock` | S1: 纯股票组合 |
 | ├ `scenario_fund` | S2: 纯基金组合 |
 | ├ `scenario_mixed_accounts` | S3: 混合多账户 |
@@ -367,7 +366,7 @@ pytest src/test/ -m "<对应标记>" --lf
 | `unit_config` | 配置管理 |
 | `unit_core` | 核心基础设施（缓存/模型/注册表等） |
 | `unit_analysis` | 分析计算（流动性/再平衡/汇率/债券收益率/情景） |
-| `unit_handlers` | 命令处理器（缓存刷新/配置写入/报告确认） |
+| `unit_config_edge` | 配置管理边缘场景（必须放在 `*_edge.py`） |
 | `unit_ui` | TUI 交互 |
 | `unit_cli` | CLI 命令行模式 |
 | `unit_providers or unit_fetcher` | 数据管道（Provider + 调度） |
@@ -411,7 +410,7 @@ pytest src/test/unit/report/test_category.py -v
 # 运行单个测试类
 pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
 
-# 冒烟测试（~2s 验证核心通路）
+# 冒烟测试（~15s 验证核心通路）
 pytest src/test/ -m "smoke" -v
 
 # 冒烟 + 边缘测试
@@ -450,9 +449,9 @@ pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 | **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache_core.py` 追加 `TestCacheEdgeCases` |
 | **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
 | **业务场景测试** | `test_scenario_basic_flows.py`（基础链路 S1-S5）或 `test_scenario_resilience_flows.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_scenario_basic_flows.py` |
-| **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a-S0d |
+| **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a/S0b/S0d |
 | **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
-| **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S34 |
+| **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S33 |
 | **报告序号场景** | `scenario/basic/test_scenario_section_order.py` | 序号合规性 |
 | **LLM 场景测试** | `test_llm_mixed_cache.py` / `test_llm_all_fail.py` / `test_llm_extended_thinking.py` / `test_llm_disabled.py` / `test_llm_disabled_cache.py` / `test_llm_network_error.py` / `test_llm_partial_cache.py` / `test_llm_empty_holdings.py` / `test_llm_output_consistency.py` / `test_llm_non_trading_day.py` / `test_llm_multi_account.py` | S11-S20 |
 | **日期/时间场景** | `test_datetime_scenarios.py` | T1-T21 |

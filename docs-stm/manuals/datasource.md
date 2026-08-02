@@ -51,11 +51,11 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 - **A 股指数** → `history_index` 通道：腾讯财经 → 新浪财经（备用）
 - **美股指数** → `history_index_us` 通道：新浪财经（`gb_*` 前缀） → 腾讯财经（备用，因腾讯 K-line API 不支持 `gb_*` 代码）
-- **因子暴露分析**（`analysis/factor_exposure.py`）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925 替代停更的 sh000920、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理
+- **因子暴露分析**（`analysis/factor_exposure.py`）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理
 
 ### 实时行情
 
-由 `report/portfolio_history.py` 内部路由：
+由 `fetcher/index.py` 内部路由（`fetch_indices` / `fetch_us_indices`）：
 
 - **A 股指数** → 腾讯财经 → 新浪财经（备用）
 - **美股指数** → 新浪财经 → 腾讯财经（备用）

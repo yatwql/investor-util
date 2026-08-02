@@ -80,7 +80,7 @@ New-Item -ItemType SymbolicLink -Path .venv -Target D:\shared\venvs\investor-uti
 
 创建后，Python、pip、pytest、VSCode 全部自动跟随到实际目录，无需环境变量、无需 `activate`。`.gitignore` 已有 `.venv/`，不污染仓库。多个项目可指向同一个外部 `.venv` 节省磁盘空间。
 
-启动脚本会自动识别链接：检测到 `.venv` 是符号链接/Junction 时，直接使用（`launch.sh` 第 21~26 行、`launch.ps1` 第 29~33 行）。
+启动脚本会自动识别链接：检测到 `.venv` 是符号链接/Junction 时，直接使用（`launch.sh` 第 34~42 行、`launch.ps1` 第 44~53 行）。
 
 **方案 B：VENV_PATH 环境变量（启动脚本原生支持）**
 
@@ -101,7 +101,7 @@ VENV_PATH=/opt/venvs/investor-util ./scripts/launch.sh
 echo 'export VENV_PATH=/data/shared/venvs/investor-util' >> ~/.bashrc && source ~/.bashrc
 ```
 
-原理（`launch.sh` 第 27~38 行 / `launch.ps1` 第 35~47 行）：
+原理（`launch.sh` 第 43~56 行 / `launch.ps1` 第 54~77 行）：
 1. 检测到 `VENV_PATH` → 外部目录不存在时自动 `python -m venv` 创建
 2. 自动创建 `.venv` 符号链接（`ln -s` / `New-Item -ItemType Junction`）
 3. 下次启动时走到方案 A 的检测逻辑，直接复用
@@ -117,7 +117,7 @@ echo 'export VENV_PATH=/data/shared/venvs/investor-util' >> ~/.bashrc && source 
 
 # Windows（部署脚本）
 & "D:\shared\venvs\investor-util\Scripts\python.exe" scripts\test_runner.py --mode regression
-& "D:\shared\venvs\investor-util\Scripts\python.exe" src\python\tui.py
+& "D:\shared\venvs\investor-util\Scripts\python.exe" src\python\tui\tui.py
 ```
 
 原理：**PEP 405** 规定 Python 解释器启动时会自动读取同级目录下的 `pyvenv.cfg`，知道自己在虚拟环境中。使用 `.venv/bin/python` 直接执行等效于先 `activate` 再运行——自动使用 venv 内的 site-packages，无需任何环境变量。pip 安装也同理：
@@ -413,7 +413,7 @@ A: 菜单 `L` 会先检查缓存，缓存过期（默认全球政经局势/持�
 
 **Q: LLM 返回内容被截断了怎么办？**
 
-A: 程序内置自动增大 `max_tokens` 1.5 倍重试机制。如果仍被截断，可在 `llm_settings.json` 中手动调大对应模块的 `max_tokens_{模块键}` 值（各模块默认值不同，见[配置指引](how-to-config-llm.md)，如智囊团深度复盘 20000）。调整后菜单 `R` 刷新配置，再重新生成即可。
+A: 程序内置自动增大 `max_tokens` 1.5 倍重试机制。如果仍被截断，可在 `llm_settings.json` 中手动调大对应模块的 `max_tokens_{模块键}` 值（各模块默认值不同，见[配置指引](how-to-config-llm.md)，如智囊团深度复盘 24000）。调整后菜单 `R` 刷新配置，再重新生成即可。
 
 **Q: 如何配置多个 LLM Provider 做链式服务？**
 

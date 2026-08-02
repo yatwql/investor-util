@@ -8,7 +8,7 @@
 
 | 脚本 | 分类 | 一句话 |
 |:-----|:-----|:-------|
-| `test_runner.py` | 测试 | pytest 标记模式封装驱动，支持 15+ 种 `--mode` |
+| `test_runner.py` | 测试 | pytest 标记模式封装驱动，支持 14 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
 | `check-history-traces.py` | 测试 | 注释/文档字符串中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
@@ -48,7 +48,7 @@ python scripts/test_runner.py --mode verify,regression
 python scripts/test_runner.py --mode unit         # 全量单元测试
 python scripts/test_runner.py --mode scenario     # 业务场景测试
 python scripts/test_runner.py --mode edge         # 边缘/异常场景
-python scripts/test_runner.py --mode smoke        # 冒烟测试（~2s）
+python scripts/test_runner.py --mode smoke        # 冒烟测试（~15s）
 python scripts/test_runner.py --mode data         # 数据正确性验证
 
 # 多模式组合
@@ -73,7 +73,7 @@ python scripts/test_runner.py --mode unit --coverage
 | `scenario` | `scenario` | ~6min |
 | `integration` | `scenario or integration` | ~50s |
 | `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis` | ~1min |
-| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)` | ~1min |
+| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)` | ~2.5min |
 | `all` | （无过滤，全量） | ~10min |
 | `all_no_unit` | `not unit` | ~7min |
 | `report` | `unit_report` | ~15s |
@@ -155,7 +155,7 @@ python scripts/check-test-markers.py
 
 ### `llm_hallucination_sampler.py` — LLM 幻觉率采样
 
-对 **10 组标准化持仓数据** 调用当前 prompt，经事实校验器验证后统计幻觉率（P4‑08 幻觉率采样测试）。
+对 **10 组标准化持仓数据** 调用当前 prompt，经事实校验器验证后统计幻觉率（`scenario_llm` 幻觉率采样测试）。
 
 ```bash
 # 完整采样（调用 LLM API 对 10 组数据生成分析）
@@ -354,7 +354,7 @@ python -m src.python.cli check-sources
 **输出示例**：
 
 ```
-数据源健康检查结果 (2026-07-26)
+数据源健康检查结果 (YYYY-MM-DD)
 ──────────────────────────────────────────────────────────
   ✅  腾讯财经      行情           45ms  正常
   ✅  新浪财经      行情           82ms  正常

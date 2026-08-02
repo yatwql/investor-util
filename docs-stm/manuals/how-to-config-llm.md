@@ -60,7 +60,7 @@ LLM 配置由三个独立文件管理：
   "temperature_global_macro": 0.3,
   "max_tokens_global_macro": 2048,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 20000,
+  "max_tokens_expert_review": 24000,
   "pricing": {
     "currency": "CNY"
   }
@@ -122,7 +122,7 @@ LLM 配置由三个独立文件管理：
   "deepseek-main": {
     "api_key": "sk-your-deepseek-key",
     "model": "DeepSeek-V4-Flash",
-    "endpoint": "https://api.deepseek.com/anthropic"
+    "endpoint": "https://api.deepseek.com/anthropic/v1/messages"
   },
   "gemini-fb": {
     "api_key": "AIzaSyYourGeminiKey",
@@ -141,7 +141,7 @@ LLM 配置由三个独立文件管理：
 | `name` | ✅ | string | Provider 唯一标识名，用于日志和缓存键 |
 | `provider` | ✅ | string | 服务商类型：`claude` / `openai` / `gemini` |
 | `credentials_ref` | ✅ | string | 引用 `llm_key.json` 中的凭据块键名 |
-| `priority` | ❌ | int | 优先级（数值越小越优先），默认 50 |
+| `priority` | ❌ | int | 优先级（数值越小越优先），默认 99 |
 | `weight` | ❌ | int | 加权随机权重，仅 `weighted` 策略有效，默认 1 |
 | `timeout` | ❌ | int | 超时秒数，覆盖全局 timeout，默认 60 |
 | `proxy_preferred` | ❌ | bool | `true` 时优先使用代理直连（而非自动路由），默认 `false` |
@@ -195,8 +195,19 @@ LLM 配置由三个独立文件管理：
 TUI 菜单 **[S]** 查看状态时会显示多链模式详情：
 
 ```
-LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
+─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+LLM Provider 状态
+状态: 已配置 | 策略: 优先级排序 | 多链服务: 2 provider
+  [1] deepseek-main (claude)
+      模型: deepseek-v4-flash    优先级: 99（默认）    熔断: 正常
+  [2] gemini-fallback (gemini)
+      模型: gemini-2.5-flash    优先级: 99（默认）    熔断: 正常
+  ▶ 模块偏好: 智囊团深度复盘 → gemini-fallback / 持仓体检报告 → gemini-fallback
 ```
+
+- 首行状态：`状态` 行显示所选策略（优先级排序 / 加权随机 / 价格最低优先 / 仅 Fallback）与 provider 数量
+- 每个 provider 单独两行：`[序号] 名称 (backend)` + `模型 / 优先级 / 熔断` 状态
+- `▶ 模块偏好` 行仅在配置了 `preferred_providers` 时显示
 
 ### 兼容性
 
@@ -295,7 +306,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `system_prompt_{module}` | string / null | `null` | 系统提示词覆盖，`null`=使用代码内置 prompt |
 | `model_{module}` | string / null | `null` | 独立指定本模块使用的模型，`null`=使用 Provider 默认模型。**仅 flat 模式生效；多链模式优先使用 `llm_providers.json` 中凭据块定义的模型** |
 | `temperature_{module}` | float | 0.1~0.8（模块差异） | 采样温度，0=确定性最高，1=最大多样性 |
-| `max_tokens_{module}` | int | 2048~20000（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试）。**DeepSeek 为 thinking + 正文共享预算**（详见下方 DeepSeek V4 说明） |
+| `max_tokens_{module}` | int | 2048~24000（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试）。**DeepSeek 为 thinking + 正文共享预算**（详见下方 DeepSeek V4 说明） |
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
 | `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式（news_correlation）不支持** |
@@ -390,13 +401,13 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_expert_review": null,
   "model_expert_review": null,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 20000,
+  "max_tokens_expert_review": 24000,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
   "thinking_budget_expert_review": 16000,
-  "reasoning_effort_expert_review": "medium",
+  "reasoning_effort_expert_review": "low",
 
   // ═══════════════════════════════════════════
   // 持仓体检报告 — health_check
@@ -507,7 +518,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | reasoning_effort | output_brief_limit |
 |------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:----------------:|:------------------:|
 | **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | high | **200 字** |
-| **智囊团深度复盘** | null | **0.3**（低温保事实） | **20000** | **120s** | **true** ⭐ | 16000 | **medium** | 300 字 |
+| **智囊团深度复盘** | null | **0.3**（低温保事实） | **24000** | **120s** | **true** ⭐ | 16000 | **low** | 300 字 |
 | **持仓体检报告** | null | **0.1**（极低温保数值精确） | **16000** | **120s** | **true** | 12000 | **medium** | 300 字 |
 | **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | high | 300 字 |
 | **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | high | 不适用 |
@@ -558,7 +569,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | 控制参数 | `thinking.budget_tokens`（token 数量预算） | `output_config.effort`（"high"/"max" 定性控制） | `generationConfig.thinkingConfig.thinkingBudget`（token 数量预算） |
 | 与 temperature 关系 | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） |
 | 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） | `generativelanguage.googleapis.com` |
-| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` | 低成本备选，适合轻量推理
+| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` | 低成本备选，适合轻量推理 |
 
 ### `thinking_budget` 与 `max_tokens` 的关系
 
@@ -566,7 +577,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 | 配置项 | 管什么 | expert 默认值 |
 |--------|--------|:------------:|
-| `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 20000 |
+| `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 24000 |
 | `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 16000 |
 
 **API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
@@ -578,7 +589,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 **思考耗尽自动兜底**：开启 Extended Thinking 时若出现"思考部分耗尽 max_tokens 预算"，程序会**自动关闭 thinking 同 Provider 重试一次**（`call_claude` 层安全网，日志 `关闭 thinking 重试一次，避免模块整体失败`），保证有正文产出；重试仍失败才切换下一 Provider。因此正常情况下不再因思考耗尽直接丢模块内容。
 
-**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。当前默认 expert_review 20000 / health_check 16000（对应 thinking_budget 16000/12000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险），配合自动兜底双重保障。
+**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。当前默认 expert_review 24000 / health_check 16000（对应 thinking_budget 16000/12000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险），配合自动兜底双重保障。
 
 ### 效果参考
 
@@ -774,6 +785,10 @@ python -m src.python.tui
 | `deepseek-v4-flash` | 1.00 | 2.00 | 0.02 | ⭐ 高性价比推荐，默认模型 |
 | `deepseek-v4-pro` | 3.00 | 6.00 | 0.025 | DeepSeek 增强推理 |
 | `deepseek-chat` | 1.00 | 2.00 | 0.02 | DeepSeek V3 |
+| `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比 |
+| `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 轻量 |
+| `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
+| `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 旧版轻量 |
 
 > **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash：输入 3000 tokens × ¥1 + 输出 2000 tokens × ¥2 = ¥0.007/次。缓存命中时输入部分按 `input_cache_hit` 计费。
 >

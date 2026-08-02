@@ -124,7 +124,7 @@
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
-| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/P/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
+| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/C/F/O/1/2/3/4/P/I/A/S/R/X），启动后光标自动定位 | 手动编辑 |
 | `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（19 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
@@ -630,7 +630,7 @@
 
 ```json
 {
-  "anonymization": {"mode": "code_display"},
+  "anonymizer": true,
   "news_cls": true
 }
 ```
