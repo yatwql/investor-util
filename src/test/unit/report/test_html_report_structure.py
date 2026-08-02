@@ -771,10 +771,11 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
             )
 
     def test_chart_scripts_loaded_in_order(self) -> None:
-        """chart-print.js 先于 chart-config.js，再 chart-init.js（登记先于初始化）。"""
+        """加载顺序：chart-print → chart-config → chart-export → chart-init（登记/导出先于初始化）。"""
         soup = self._render_interactive()
         chart_scripts = [s.get("src") for s in soup.select("script[src]") if (s.get("src") or "").startswith("chart-")]
-        self.assertIn("chart-print.js", chart_scripts)
+        for fname in ("chart-print.js", "chart-config.js", "chart-export.js", "chart-init.js"):
+            self.assertIn(fname, chart_scripts, f"{fname} 应被模板引用")
         self.assertLess(
             chart_scripts.index("chart-print.js"),
             chart_scripts.index("chart-config.js"),
@@ -782,8 +783,13 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         )
         self.assertLess(
             chart_scripts.index("chart-config.js"),
+            chart_scripts.index("chart-export.js"),
+            "chart-config.js 必须在 chart-export.js 之前加载",
+        )
+        self.assertLess(
+            chart_scripts.index("chart-export.js"),
             chart_scripts.index("chart-init.js"),
-            "chart-config.js 必须在 chart-init.js 之前加载",
+            "chart-export.js 必须在 chart-init.js 之前加载",
         )
 
     def test_print_css_forces_light_theme(self) -> None:

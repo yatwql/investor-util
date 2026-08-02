@@ -29,10 +29,13 @@
 
   var theme = window.ChartTheme || {};
 
-  /* ── 登记图表实例（打印快照遍历，见 chart-print.js）── */
-  function trackChart(chart) {
+  /* ── 登记图表实例（打印快照 + 导出按钮，见 chart-print.js / chart-export.js）── */
+  function trackChart(chart, key) {
     if (window.ChartPrint && typeof window.ChartPrint.register === 'function') {
       window.ChartPrint.register(chart);
+    }
+    if (window.ChartExport && typeof window.ChartExport.register === 'function') {
+      window.ChartExport.register(chart, key);
     }
     return chart;
   }
@@ -97,7 +100,7 @@
       type: 'line',
       data: { labels: ds.labels, datasets: datasets },
       options: lineOptions('净值')
-    }));
+    }), 'portfolio_line');
   }
 
   function initDrawdownChart() {
@@ -137,7 +140,7 @@
       type: 'line',
       data: { labels: ds.labels, datasets: datasets },
       options: lineOptions('回撤 (%)')
-    }));
+    }), 'drawdown');
   }
 
   function initCategoryDoughnut() {
@@ -164,7 +167,7 @@
           tooltip: { enabled: true }
         }
       }
-    }));
+    }), 'category_doughnut');
   }
 
   function initIndustryBar() {
@@ -181,8 +184,8 @@
         datasets: [{
           label: d.label || '行业市值',
           data: d.data,
-          backgroundColor: d.backgroundColor || (theme.primary || '#2E75B6'),
-          borderColor: d.borderColor || 'rgba(46,117,182,0.2)',
+          backgroundColor: d.backgroundColor || theme.barColors[0] || theme.primary || '#2E75B6',
+          borderColor: d.borderColor || theme.barColors[0] || 'rgba(46,117,182,0.2)',
           borderWidth: 1
         }]
       },
@@ -198,7 +201,7 @@
           y: { ticks: { color: theme.text }, grid: { color: theme.grid } }
         }
       }
-    }));
+    }), 'industry_bar');
   }
 
   function initPenetrationBar() {
@@ -215,8 +218,8 @@
         datasets: [{
           label: d.label || '穿透市值',
           data: d.data,
-          backgroundColor: d.backgroundColor || 'rgba(46,117,182,0.75)',
-          borderColor: d.borderColor || 'rgba(46,117,182,0.2)',
+          backgroundColor: d.backgroundColor || theme.barColors[1] || 'rgba(230,138,0,0.75)',
+          borderColor: d.borderColor || theme.barColors[1] || 'rgba(230,138,0,0.35)',
           borderWidth: 1
         }]
       },
@@ -232,7 +235,7 @@
           y: { ticks: { color: theme.text }, grid: { color: theme.grid } }
         }
       }
-    }));
+    }), 'penetration_bar');
   }
 
   function initRadarChart() {
@@ -273,7 +276,7 @@
           }
         }
       }
-    }));
+    }), 'radar');
   }
 
   /* ── 注册初始化函数（O1：每个独立 try/catch）────────── */

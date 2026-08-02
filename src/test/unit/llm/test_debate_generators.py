@@ -271,8 +271,8 @@ class TestDebateProconFlow(unittest.TestCase):
     def test_penetrated_assets_codes_not_filtered(self):
         """穿透 TOP10 资产代码（如 QDII 基金穿透到 AAPL/MSFT）不被误判为虚构。
 
-        回归缺陷：valid_codes 仅收集直接持仓代码，穿透资产代码被 _filter_hallucinated_codes
-        误判为虚构，LLM 在辩论中合理引用时整句删除。
+        valid_codes 须同时包含穿透资产代码；LLM 在辩论中合理引用穿透品种时，
+        其代码不应被当作虚构 token 删除。
         """
         kwargs = dict(self.base_kwargs)
         kwargs["penetrated_assets"] = [
@@ -370,7 +370,7 @@ class TestFilterHallucinatedCodes(unittest.TestCase):
     def test_sentence_level_removal_same_line(self):
         """同一行内按句末标点切分，仅删除含虚构代码的句子（不整行删除）。
 
-        回归缺陷：过滤按整行删除，单行多句文本会因一个虚构 token 丢失整行。
+        单行多句文本须按句切分——一个虚构 token 只删除其所在句子，不丢整行。
         """
         text = "600519 表现良好。X1234 虚构品种需警惕。600900 稳健。"
         result = self._call(text, {"600519", "600900"})
@@ -384,9 +384,9 @@ class TestFilterHallucinatedCodes(unittest.TestCase):
 
 @pytest.mark.unit_llm
 class TestFilterHallucinatedCodesEnglishWords(unittest.TestCase):
-    """常见英文词汇不会被误判为虚构代码（正则误杀修复）。
+    """常见英文词汇不会被误判为虚构代码。
 
-    修复后必须同时满足：
+    过滤规则必须同时满足：
       1. HTML/CSS 标签、金融术语、英文高频词不被误杀
       2. 真正的虚构代码（格式类似代码的字母组合）仍被过滤
     """
@@ -463,7 +463,7 @@ class TestFilterHallucinatedCodesEnglishWords(unittest.TestCase):
         self.assertIn("600519", result)
         self.assertIn("00700", result)
         self.assertNotIn("ZZZZZ", result)
-        self.assertGreater(len(result), 0, "误杀导致全空，修复后应有内容")
+        self.assertGreater(len(result), 0, "误杀导致全空，应保留有效内容")
 
     def test_top_rank_suffix_not_filtered(self):
         """TOP2/TOP3 排名表述（提示词附录 TOP3 块的回声）不被误判为虚构代码。"""

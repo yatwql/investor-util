@@ -28,10 +28,18 @@
   #banner.warn { background: #fff8e1; border-color: #E68A00; color: #7a5c00; }
   #banner.err { background: #ffebee; border-color: #CC0000; color: #8b0000; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
-  .chart-box { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
+  .chart-box { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px; position: relative; }
   .chart-title { font-size: 13px; font-weight: bold; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
   .chart-holder { height: 300px; position: relative; }
   .chart-empty-note { color: #888; text-align: center; padding: 40px 0; font-size: 13px; }
+  .chart-export-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 5;
+    padding: 3px 10px; font-size: 12px; line-height: 1.6;
+    color: var(--chart-text, #333); background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #d0d5dd; border-radius: 4px; cursor: pointer;
+  }
+  .chart-export-btn:hover { background: #e9ecf0; }
+  .chart-title .chart-export-btn { position: static; margin-left: 8px; }
   .badge { font-size: 11px; padding: 1px 8px; border-radius: 10px; color: #fff; }
   .badge.ok { background: #2E7D32; }
   .badge.degraded { background: #E68A00; }
@@ -42,6 +50,7 @@
     /* 打印验证：浅色主题（R16 强制） + 防跨页 */
     :root { --chart-text: #000; --chart-grid: rgba(0,0,0,0.12); --chart-bg: #fff; }
     .chart-box { break-inside: avoid; }
+    .chart-export-btn { display: none; }
   }
 </style>
 </head>
@@ -92,7 +101,7 @@
 
 <script>
 /* 调试页引导脚本（ES5，R17/R22）：按 ?s= 场景填充 chart-data 并注入引擎 script。
- * 注入顺序与报告模板一致：chart.min.js → chart-print.js → chart-config.js → chart-init.js。
+ * 注入顺序与报告模板一致：chart.min.js → chart-print.js → chart-config.js → chart-export.js → chart-init.js。
  * offline 场景去掉 chart.min.js，模拟"引擎文件缺失"——其余 script 靠 typeof Chart 守卫静默跳过。
  */
 (function () {
@@ -222,7 +231,7 @@
   }
 
   /* ── 注入引擎 script（顺序保证：非 async 动态注入按序执行）── */
-  var scripts = ['chart.min.js', 'chart-print.js', 'chart-config.js', 'chart-init.js'];
+  var scripts = ['chart.min.js', 'chart-print.js', 'chart-config.js', 'chart-export.js', 'chart-init.js'];
   if (scenario === 'offline') { scripts.shift(); } /* 模拟 chart.min.js 缺失 */
 
   for (var si = 0; si < scripts.length; si++) {

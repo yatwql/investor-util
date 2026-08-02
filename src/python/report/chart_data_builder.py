@@ -117,7 +117,7 @@ def _build_portfolio_line_dataset(history_data: dict) -> dict:
     bars = downsample_bars(history_data.get("bars") or [])
     status = history_data.get("status")
     labels = [b["date"] for b in bars]
-    # 归一化组合至 100 基点，与基准指数同量纲比较（与模板原逻辑一致）
+    # 归一化组合至 100 基点，与基准指数同量纲比较（与模板口径一致）
     values = [b["total_value"] for b in bars]
     if values:
         first = values[0]
@@ -166,7 +166,7 @@ def _build_drawdown_dataset(history_data: dict) -> dict:
     bars = downsample_bars(history_data.get("bars") or [])
     status = history_data.get("status")
     labels = [b["date"] for b in bars]
-    # bars 字段为 drawdown_pct（模板原逻辑用 b.drawdown_pct ×100 展示百分比）
+    # bars 字段为 drawdown_pct，模板以 b.drawdown_pct ×100 展示为百分比
     values = [b.get("drawdown_pct", 0) * 100 for b in bars]
     dataset = {
         "label": "组合回撤",
@@ -183,7 +183,7 @@ def _build_drawdown_dataset(history_data: dict) -> dict:
 
 
 def _build_benchmark_drawdowns(benchmarks: list) -> list:
-    """基准回撤数据集（从归一化值计算逐日回撤，模板原逻辑）。"""
+    """基准回撤数据集（从归一化值计算逐日回撤，与模板口径一致）。"""
     result: list[dict] = []
     colors = ("#9CA3AF", "#B0BEC5", "#90A4AE")
     for i, bm in enumerate(benchmarks):
@@ -311,7 +311,9 @@ def _build_penetration_bar_dataset(penetration: dict | None) -> dict:
             {
                 "label": "穿透市值",
                 "data": values,
-                "borderColor": "var(--chart-primary)",
+                # 颜色单一来源在 JS/CSS 层：穿透柱状图用橙（--chart-bar-2），
+                # 与行业分布柱状图（--chart-primary 蓝）明显区分。
+                "borderColor": "var(--chart-bar-2)",
                 "degraded": False,
             }
         ],

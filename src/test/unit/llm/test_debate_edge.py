@@ -309,8 +309,8 @@ class TestDebateEdgeFilterHallucinatedCodes(unittest.TestCase):
     def test_filter_single_line_html_keeps_other_sentences(self):
         """单行 HTML（markdown_to_html 后无换行）中仅删除含虚构代码的句子。
 
-        回归缺陷：过滤按整行删除，而 HTML 为无换行的单行拼接字符串，
-        一个虚构 token 会导致整段内容被清空（过滤后 0 字符）。
+        单行拼接字符串须按句切分后删除——仅删除含虚构代码的句子，
+        不得因单个虚构 token 清空整段内容。
         """
         from src.python.llm.generators import _filter_hallucinated_codes
 

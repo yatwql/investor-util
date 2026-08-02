@@ -124,11 +124,11 @@ class TestProcessSuccessResponseEdge(unittest.TestCase):
 
 
 class TestExtractContentEdge(unittest.TestCase):
-    """_extract_content — 仅 thinking block 无 text 的边缘场景（回归测试）。
+    """_extract_content — 仅 thinking block 无 text 的边缘场景。
 
-    回归缺陷：DeepSeek V4 强制推理模型在思考部分耗尽 max_tokens 预算时
-    响应只有 thinking block、无 text block，原实现误判为"内容被过滤"并返回空串，
-    触发无效安抚重试。修复后返回 None 走 provider 切换。
+    当 DeepSeek V4 强制推理模型在思考部分耗尽 max_tokens 预算时，响应只有
+    thinking block、无 text block。此场景应返回 None（走 provider 切换），
+    不得误判为"内容被过滤"返回空串而触发无效安抚重试。
     """
 
     def test_thinking_only_max_tokens_returns_none(self) -> None:

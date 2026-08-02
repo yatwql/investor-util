@@ -230,7 +230,7 @@ def _show_multi_chain_status(llm_config: dict, provider_list: list[dict]) -> Non
 
         # 优先级显示
         raw_priority = entry.get("priority")
-        priority_display = str(raw_priority) if raw_priority is not None else "50（默认）"
+        priority_display = str(raw_priority) if raw_priority is not None else "99（默认）"
 
         # 熔断状态
         cb_status = get_circuit_status(endpoint) if endpoint else "—"

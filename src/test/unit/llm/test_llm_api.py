@@ -290,10 +290,9 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     ) -> None:
         """DeepSeek 强制推理模型未显式开 thinking 也思考耗尽 → 安全网重试一次。
 
-        回归缺陷：DeepSeek 兼容端点思考默认开启，即使 thinking_enabled=false（payload
-        无 thinking 参数）也会落入默认思考模式占满 max_tokens。旧安全网要求
-        thinking_was_enabled=True，对该场景静默失效，导致模块直接 api_error 失败。
-        修复后对 effort 模型即使未开 thinking 也重试，重试 payload 显式 disabled。
+        DeepSeek 兼容端点思考默认开启：即使 thinking_enabled=false（payload 无
+        thinking 参数）也可能落入默认思考模式占满 max_tokens。安全网须对 effort
+        模型在未开 thinking 时也重试，重试 payload 显式注入 disabled。
         """
         mock_get.side_effect = [True, False]
         mock_retry.side_effect = [(None, None), ("recovered", {"output_tokens": 5})]
@@ -323,7 +322,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     def test_deepseek_thinking_disabled_injected_when_not_enabled(self, mock_retry: MagicMock) -> None:
         """治本：DeepSeek 模型 thinking_enabled=false 时 payload 显式注入 thinking:disabled。
 
-        回归缺陷：未显式开启 thinking 的 DeepSeek 调用落在默认思考模式（effort=high），
+        未显式开启 thinking 的 DeepSeek 调用可能落在默认思考模式（effort=high），
         思考占满 max_tokens 导致无正文耗尽。显式 disabled 从源头关闭思考。
         """
         cfg = {"thinking_enabled_global_macro": False}
@@ -360,7 +359,7 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         self.assertIsNone(_extract_content(exhausted_data))
         self.assertTrue(_get_last_thinking_exhausted())
 
-        # 并发线程提取普通响应（旧全局实现会复位共享标志 → 本断言回归失败）
+        # 并发线程提取普通响应：不得复位共享标志（线程隔离契约）
         def _worker() -> None:
             _extract_content(normal_data)
 

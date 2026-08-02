@@ -1,11 +1,11 @@
-"""辩论模式集中度反问单元测试 — Mode 3 Q&A 块构建。
+"""辩论模式集中度问答单元测试 — Mode 3 Q&A 块构建。
 
-测试 _build_qa_concentration_block() 集中度反问段落构建：
+测试 _build_qa_concentration_block() 集中度问答引导段落构建：
   - 单品种集中（>20%）
   - 全部低集中（<5%）
   - 前 3 品种合计集中（>60%）
   - 行业集中（>40%）
-  - 免责声明结尾
+  - 要求回答引导（量化评估/基准对比/调仓建议）
   - 纯计算无 LLM 调用
 
 运行：
@@ -104,17 +104,20 @@ class TestDebateQaConcentration(unittest.TestCase):
         self.assertIn("45.0%", result)
         self.assertIn("40% 行业集中度预警线", result)
 
-    # ── test 5: 免责声明 ─────────────────────────────────────
+    # ── test 5: 要求回答引导（对齐需求 R-LLM-DB-QA-CONCENTRATION-03） ──
 
-    def test_disclaimer_present(self):
-        """QA 块末尾包含免责声明。"""
+    def test_requires_answer_instead_of_disclaimer(self):
+        """QA 块要求回答（量化评估/基准对比/调仓建议），不再含"无需回答"免责声明。"""
         holdings = [
             {"mv": 250_000, "name": "贵州茅台", "code": "600519"},
             {"mv": 750_000, "name": "长江电力", "code": "600900"},
         ]
         result = _call_qa_block(holdings, 1_000_000)
 
-        self.assertIn("以上问题旨在引发思考", result)
+        self.assertIn("### 集中度问答", result)
+        self.assertIn("量化评估", result)
+        self.assertIn("调仓建议", result)
+        self.assertNotIn("无需在本次报告中回答", result)
 
     # ── test 6: 纯计算无 LLM ─────────────────────────────────
 

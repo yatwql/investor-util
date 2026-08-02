@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from unittest import mock
 
 import pytest
 
@@ -251,3 +252,200 @@ class TestBuildQaConcentrationBlock(unittest.TestCase):
         ind_conc = {"白酒": 0.25, "科技": 0.15}
         result = _build_qa_concentration_block(details, 50_000, industry_concentration=ind_conc)
         self.assertEqual(result, "")
+
+
+@pytest.mark.unit_llm
+class TestDebateQaConcentrationConfig(unittest.TestCase):
+    """集中度问答的合成阶段（synthesis）与阈值配置读取。
+
+    对齐需求 R-LLM-DB-QA-CONCENTRATION-03/04：
+      - 综合权衡 prompt 在 qa 开启时追加集中度问答引导段（要求回答版）
+      - synthesis 阶段 threshold 从 llm_settings 读取，而非硬编码 0.20
+      - system prompt 在 qa 开启时追加集中度问答章节输出要求
+      - 标准模式（expert_review）threshold 同样从配置读取
+    """
+
+    # ── _build_debate_synthesis_prompt ──────────────────────────
+
+    def test_synthesis_prompt_qa_enabled_appends_instruction(self):
+        """enable_qa_concentration=True 且命中触发时，合成 prompt 含集中度问答指令与问题。"""
+        from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+        holdings = [
+            {"name": "贵州茅台", "code": "600519", "mv": 250_000},
+            {"name": "长江电力", "code": "600900", "mv": 750_000},
+        ]
+        prompt = _build_debate_synthesis_prompt(
+            "白脸",
+            "黑脸",
+            enable_qa_concentration=True,
+            holdings_details=holdings,
+            total_mv=1_000_000,
+        )
+        self.assertIn("集中度问答", prompt)
+        self.assertIn("贵州茅台", prompt)
+        self.assertIn("警戒线", prompt)
+        self.assertIn("调仓建议", prompt)
+
+    def test_synthesis_prompt_qa_disabled_no_instruction(self):
+        """enable_qa_concentration=False 时合成 prompt 不含集中度问答指令。"""
+        from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+        holdings = [
+            {"name": "贵州茅台", "code": "600519", "mv": 250_000},
+            {"name": "长江电力", "code": "600900", "mv": 750_000},
+        ]
+        prompt = _build_debate_synthesis_prompt(
+            "白脸",
+            "黑脸",
+            enable_qa_concentration=False,
+            holdings_details=holdings,
+            total_mv=1_000_000,
+        )
+        self.assertNotIn("集中度问答", prompt)
+        self.assertNotIn("警戒线", prompt)
+
+    @mock.patch("src.python.config._core.get_llm_config")
+    def test_synthesis_prompt_qa_uses_config_threshold(self, mock_get):
+        """合成阶段 threshold 从 llm_settings 读取（18% 占比 + 15% 阈值 → 触发）。
+
+        若 threshold 硬编码为默认 0.20，18% 将不触发 → 本断言验证配置读取生效。
+        """
+        from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+        mock_get.return_value = {"debate": {"qa_concentration": {"threshold": 0.15}}}
+        # 单品种占比 18%（>15% 触发，但 <20% 默认阈值），前 3 合计 50.8% < 60%
+        holdings = [
+            {"name": "甲", "code": "000001", "mv": 180_000},
+            {"name": "乙", "code": "000002", "mv": 164_000},
+            {"name": "丙", "code": "000003", "mv": 164_000},
+            {"name": "丁", "code": "000004", "mv": 164_000},
+            {"name": "戊", "code": "000005", "mv": 164_000},
+            {"name": "己", "code": "000006", "mv": 164_000},
+        ]
+        prompt = _build_debate_synthesis_prompt(
+            "白脸",
+            "黑脸",
+            enable_qa_concentration=True,
+            holdings_details=holdings,
+            total_mv=1_000_000,
+        )
+        self.assertIn("集中度问答", prompt)
+        self.assertIn("甲", prompt)
+        self.assertIn("警戒线", prompt)
+
+    @mock.patch("src.python.config._core.get_llm_config")
+    def test_synthesis_prompt_qa_config_threshold_below_skips(self, mock_get):
+        """合成阶段 threshold 读配置为 20% 时，18% 占比不触发集中度问答。"""
+        from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+        mock_get.return_value = {"debate": {"qa_concentration": {"threshold": 0.20}}}
+        holdings = [
+            {"name": "甲", "code": "000001", "mv": 180_000},
+            {"name": "乙", "code": "000002", "mv": 164_000},
+            {"name": "丙", "code": "000003", "mv": 164_000},
+            {"name": "丁", "code": "000004", "mv": 164_000},
+            {"name": "戊", "code": "000005", "mv": 164_000},
+            {"name": "己", "code": "000006", "mv": 164_000},
+        ]
+        prompt = _build_debate_synthesis_prompt(
+            "白脸",
+            "黑脸",
+            enable_qa_concentration=True,
+            holdings_details=holdings,
+            total_mv=1_000_000,
+        )
+        self.assertNotIn("集中度问答", prompt)
+
+    # ── _build_system_debate_synthesis ──────────────────────────
+
+    def test_system_prompt_qa_appends_appendix(self):
+        """enable_qa_concentration=True 时 system prompt 追加集中度问答输出要求。"""
+        from src.python.llm.prompts import _build_system_debate_synthesis
+
+        result = _build_system_debate_synthesis(
+            enable_conditional=False,
+            enable_qa_concentration=True,
+        )
+        self.assertIn("集中度问答（qa 模式）", result)
+        self.assertIn("量化评估", result)
+        self.assertIn("调仓建议", result)
+
+    def test_system_prompt_qa_off_no_appendix(self):
+        """enable_qa_concentration=False 时 system prompt 不含 qa 附录。"""
+        from src.python.llm.prompts import _build_system_debate_synthesis
+
+        result = _build_system_debate_synthesis(enable_conditional=False)
+        self.assertNotIn("集中度问答（qa 模式）", result)
+
+    def test_system_prompt_conditional_plus_qa_combination(self):
+        """conditional + qa 组合：情景分析纪律与 qa 附录同时存在，无编号冲突。"""
+        from src.python.llm.prompts import _build_system_debate_synthesis
+
+        result = _build_system_debate_synthesis(
+            enable_conditional=True,
+            enable_qa_concentration=True,
+        )
+        self.assertIn("情景分析纪律", result)
+        self.assertIn("5. **情景分析**", result)
+        self.assertIn("集中度问答（qa 模式）", result)
+
+    # ── _build_expert_review_prompt threshold 配置读取 ──────────
+
+    @mock.patch("src.python.config._core.get_llm_config")
+    def test_expert_review_prompt_threshold_from_config(self, mock_get):
+        """标准模式 expert_review 的 threshold 从配置读取（22% 占比 + 15% 阈值 → 触发）。"""
+        from src.python.llm.prompts import _build_expert_review_prompt
+
+        mock_get.return_value = {"debate": {"qa_concentration": {"threshold": 0.15}}}
+        # 单品种占比 22%（>15% 触发，但 <30%），前 3 合计 53.2% < 60% → 仅触发器①按配置阈值判定
+        details = [
+            {"name": "甲", "code": "000001", "mv": 220_000, "cost": 200_000},
+            {"name": "乙", "code": "000002", "mv": 156_000, "cost": 140_000},
+            {"name": "丙", "code": "000003", "mv": 156_000, "cost": 140_000},
+            {"name": "丁", "code": "000004", "mv": 156_000, "cost": 140_000},
+            {"name": "戊", "code": "000005", "mv": 156_000, "cost": 140_000},
+            {"name": "己", "code": "000006", "mv": 156_000, "cost": 140_000},
+        ]
+        prompt = _build_expert_review_prompt(
+            total_mv=1_000_000,
+            total_cost=900_000,
+            total_profit=100_000,
+            total_today_profit=5_000,
+            holdings_count=len(details),
+            categories={},
+            holdings_details=details,
+            enable_qa_concentration=True,
+        )
+        self.assertIn("### 集中度问答", prompt)
+        self.assertIn("甲", prompt)
+        self.assertIn("警戒线", prompt)
+
+    @mock.patch("src.python.config._core.get_llm_config")
+    def test_expert_review_prompt_threshold_higher_skips(self, mock_get):
+        """threshold 高于单品种占比（30% 阈值 + 22% 占比）→ 不触发集中度问答。
+
+        若 threshold 硬编码为默认 0.20，22% 将触发；配置读取 0.30 后应跳过。
+        """
+        from src.python.llm.prompts import _build_expert_review_prompt
+
+        mock_get.return_value = {"debate": {"qa_concentration": {"threshold": 0.30}}}
+        details = [
+            {"name": "甲", "code": "000001", "mv": 220_000, "cost": 200_000},
+            {"name": "乙", "code": "000002", "mv": 156_000, "cost": 140_000},
+            {"name": "丙", "code": "000003", "mv": 156_000, "cost": 140_000},
+            {"name": "丁", "code": "000004", "mv": 156_000, "cost": 140_000},
+            {"name": "戊", "code": "000005", "mv": 156_000, "cost": 140_000},
+            {"name": "己", "code": "000006", "mv": 156_000, "cost": 140_000},
+        ]
+        prompt = _build_expert_review_prompt(
+            total_mv=1_000_000,
+            total_cost=900_000,
+            total_profit=100_000,
+            total_today_profit=5_000,
+            holdings_count=len(details),
+            categories={},
+            holdings_details=details,
+            enable_qa_concentration=True,
+        )
+        self.assertNotIn("### 集中度问答", prompt)
