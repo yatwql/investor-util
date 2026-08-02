@@ -650,7 +650,7 @@
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
 | `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）；关闭回退旧 Canvas + 表格静态渲染 |
 
-> **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（1-5，由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性辩论模式（6-8，由上方 `llm_debate_*` 开关控制）。「辩论-正反辩论」（编号 6）开启后输出白脸（看多）→ 黑脸（看空）→ 综合（收敛）三个连续色块，三者是同一功能内的生成阶段，**不提供单独开关**。
+> **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（1-5，由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性辩论模式（6-8，由上方 `llm_debate_*` 开关控制，三项相互独立、可组合开启）。**正反辩论（`llm_debate_procon`）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**为分析注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估。
 
 > 以上为主要功能开关速查。完整清单（含所有子开关名、默认值及说明）以 `data/config/features.json` 文件中的注释为准，可直接查看该文件。
 > 该文件不包含敏感信息，可安全纳入版本控制。
