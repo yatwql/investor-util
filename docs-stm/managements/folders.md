@@ -551,7 +551,7 @@ investor-util/
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
 │   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
-│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势，plan-7 已归档）
+│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势）
 │   │   ├── plan-correlation-drawdown.md #     相关性矩阵+回撤+净值曲线计划（plan-2/3）
 │   │   ├── plan-web-ui.md              #     轻量 Web UI 计划
 │   │   └── plan-fix-deepseek-thinking-exhaustion.md  # DeepSeek thinking 耗尽 max_tokens 修复方案（rf-122）
