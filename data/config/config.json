@@ -8,9 +8,9 @@
   "llm_providers_file": "data/config/llm_providers.json",
 
   // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──
-  "enable_fund_deep_analysis": true,  // 基金深度分析（#6~9）
+  "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露（#6~9、#17）
   "enable_news": true,  // 市场新闻（#10）
-  "enable_history": true,  // 组合历史走势+回撤（#16~17）
+  "enable_history": true,  // 组合历史走势+回撤（#15~16）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,

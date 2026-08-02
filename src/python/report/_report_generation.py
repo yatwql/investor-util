@@ -250,7 +250,7 @@ def _generate_full_html_report(
         metrics: compute_all_metrics() 返回值（14 项全量，仅 full 路径）；
             用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
         factor_exposure: 因子暴露分析 C19 契约 dict，
-            b_series 关闭或数据不足时为 None/available=False。
+            基金深度分析关闭或数据不足时为 None/available=False。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report

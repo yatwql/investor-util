@@ -161,7 +161,7 @@ class TestDerivedMaps:
     def test_exact_type_map_no_extra_keys(self):
         """exact_map 不包含多余键名。"""
         etm = get_exact_type_map()
-        # 3 个已有（benchmark/tracking/calendar）+ 3 个 B 系列（manager/concentration/style）+ 1 bond_yield_rf
+        # 3 个已有（benchmark/tracking/calendar）+ 3 个基金深度分析（manager/concentration/style）+ 1 bond_yield_rf
         assert len(etm) == 7, f"预期 7 个精确键名，实际 {len(etm)}"
 
     def test_registered_data_types(self):
@@ -400,7 +400,7 @@ class TestGetReportSectionOrder:
         assert summary_entry["number"] == -5
 
     def test_full_config_reverse_order(self):
-        """全部 18 项都配了 → 按配置序号排序，llm_usage 最后。"""
+        """全部 19 项都配了 → 按配置序号排序，llm_usage 最后。"""
         all_keys = [s["key"] for s in _REPORT_SECTION_DEFAULT if s["key"] != "llm_usage"]
         # 反序配置
         full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}

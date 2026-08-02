@@ -375,16 +375,16 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
 
 
 # ============================================================
-#  B 系列模块空态占位（D-7a）
+#  基金深度分析模块空态占位（D-7a）
 # ============================================================
 
 
-class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
-    """B 系列模块在 enable_fund_deep_analysis=True 且数据为空时 → section 可见 + 占位文本。"""
+class TestWriteHtmlReportFundDeepAnalysisEmpty(unittest.TestCase):
+    """基金深度分析模块在 enable_fund_deep_analysis=True 且数据为空时 → section 可见 + 占位文本。"""
 
     def setUp(self):
         self.holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]
-        self._tmp = tempfile.mkdtemp(prefix="test_html_bs_")
+        self._tmp = tempfile.mkdtemp(prefix="test_html_fund_deep_")
         self.detail = MagicMock()
         self.detail.market_value = 1000.0
         self.detail.cost = 500.0
@@ -406,7 +406,7 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
         shutil.rmtree(self._tmp, ignore_errors=True)
 
     def _make_fund_deep_analysis_mocks(self, stack):
-        """mock 标准依赖 + 4 个 B 系列 _render_* 返回空数据。"""
+        """mock 标准依赖 + 4 个基金深度分析 _render_* 返回空数据。"""
         stack.enter_context(patch("src.python.report.html_renderers._generate_details", return_value=[self.detail]))
         stack.enter_context(
             patch(
@@ -435,7 +435,7 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
                 return_value=([], True),
             )
         )
-        # 4 个 B 系列模块返回空数据
+        # 4 个基金深度分析模块返回空数据
         stack.enter_context(
             patch(
                 "src.python.report.html_writer._render_manager_analysis",
@@ -470,8 +470,8 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
         stack.enter_context(patch("src.python.report.html_writer._ENV.get_template", return_value=tmpl))
         return tmpl
 
-    def test_all_bseries_sections_visible_when_empty(self):
-        """B 系列 4 模块全部返回空数据 → 4 个 section 均可见（section_visible_dict=True）。"""
+    def test_all_fund_deep_analysis_sections_visible_when_empty(self):
+        """基金深度分析 4 模块全部返回空数据 → 4 个 section 均可见（section_visible_dict=True）。"""
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
@@ -485,7 +485,7 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
         self.assertTrue(svis.get("fund_concentration"), "集中度 section 应可见")
         self.assertTrue(svis.get("fund_style"), "风格分析 section 应可见")
 
-    def test_bseries_empty_data_passed_to_template(self):
+    def test_fund_deep_analysis_empty_data_passed_to_template(self):
         """空数据时 manager_analysis / overlap_matrix / concentration_analysis / style_analysis
         正确传递给模板且为 dict。"""
         from src.python.report.html_writer import write_html_report
@@ -495,7 +495,7 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
             write_html_report(self.holdings, include_news=True, output_dir=self._tmp)
 
         _, kwargs = tmpl.render.call_args
-        # 每个 B 系列数据都为 dict（非 None），确保模板不会因 .get("results") 而炸
+        # 每个基金深度分析数据都为 dict（非 None），确保模板不会因 .get("results") 而炸
         self.assertIsInstance(kwargs.get("manager_analysis"), dict)
         self.assertIsInstance(kwargs.get("overlap_matrix"), dict)
         self.assertIsInstance(kwargs.get("concentration_analysis"), dict)

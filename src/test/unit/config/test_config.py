@@ -271,9 +271,9 @@ class TestSetConfig(unittest.TestCase):
 class TestSetConfigSingleKeyPatch(unittest.TestCase):
     """set_config 单键 patch：保留注释分组、只改目标键、新键追加。
 
-    回归守卫：set_config 曾用 json.dumps 全量重写 config.json，剥掉模板的
-    ``// ── X. ...`` 分组注释与行尾注释；单键 patch 改为基于磁盘原始文本
-    仅替换目标键 value，本类用例断言注释与相邻键不被破坏。
+    单键 patch 基于磁盘原始文本仅替换目标键 value，保留模板的
+    ``// ── X. ...`` 分组注释与行尾注释，不破坏相邻键。本类用例
+    断言注释与相邻键保持完整。
     """
 
     def setUp(self):

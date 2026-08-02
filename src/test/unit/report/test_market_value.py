@@ -32,7 +32,7 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
-# ── 从原 test_market_value_edge.py 合并的导入 ────────────
+# ── 市值明细计算与行情更新状态辅助导入 ────────────
 from src.python.report.market_value import (
     _FUND_PREMIUM_PLACEHOLDER,
     _compute_detail_row,
@@ -1185,7 +1185,7 @@ class TestTodayProfitOffMarket(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  以下为从原 test_market_value_edge.py 合并的非 edge 测试
+#  以下为市值明细非 edge 场景测试
 # ═══════════════════════════════════════════════════════════════
 
 

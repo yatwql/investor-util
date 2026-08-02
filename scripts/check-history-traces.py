@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """注释/文档字符串历史变更痕迹检查脚本。
 
-扫描 src/ 与 scripts/ 下的 .py / .js / .mjs / .html 文件，检查注释和
-文档字符串中是否含有关代码历史迭代、重构拆分、版本号标记、文件
-迁入迁出等变更痕迹。各语言注释形式：Python（# 与三引号 docstring）、
-JS（// 与 /* */）、HTML（<!-- --> 与 Jinja {# #} 及 CSS /* */）。
+扫描 src/ 与 scripts/ 下的 .py / .js / .mjs / .html / .sh / .ps1 /
+.bat / .cmd 文件，检查注释和文档字符串中是否含有关代码历史迭代、
+重构拆分、版本号标记、文件迁入迁出等变更痕迹。各语言注释形式：
+Python（# 与三引号 docstring）、JS（// 与 /* */）、HTML（<!-- --> 与
+Jinja {# #} 及 CSS /* */）、Shell（#）、PowerShell（# 与 <# #>）、
+Windows 批处理（REM / ::）。
 
 在代码和测试的注释/文档串中，只应描述"当前代码是什么/做什么"，
 不应记录"从哪里来、怎么变的"。此类信息应放在管理文档
@@ -85,6 +87,9 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"已由\s*[`\w./_-]+\.py\s*(?:完整)?覆盖", "HIGH", "已由XX.py覆盖（测试覆盖来源叙述）"),
     (r"\b(?:Iter|Iteration)\s*\d+\b", "HIGH", "Iter/Iteration N 迭代标记（历史迭代信息）"),
     (r"已迁移", "HIGH", "已迁移（迁移痕迹）"),
+    (r"历史上|历次迭代", "HIGH", "历史迭代信息（历史上/历次迭代）"),
+    (r"曾(?:经)?(?:用[于]?|作为|属于|采用|以)", "HIGH", "曾用/曾用于/曾作为（历史实现叙述）"),
+    (r"(?:后来|之后|随后)\s*(?:改[为成]|换[为成]|引入|移除)", "HIGH", "后来改为/之后引入（变更痕迹）"),
     #   以下模式将来源叙述扩展到非 .py 文件（.js/.html 等）。
     (r"提取自\s*[`\w./_-]+\.(?:js|mjs|html|ts|vue)", "HIGH", "提取自XX.js/html（来源归属叙述）"),
     (
@@ -108,12 +113,13 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"迭代\s*(?:\d+|任务|计划)", "VERSION", "迭代/任务标记"),
     (r"切[换至到]\s*(?:dev|master|main|分支)", "VERSION", "分支切换记录"),
     (r"未升级版|旧版|老版", "VERSION", "旧版/未升级版（版本对比痕迹）"),
+    (r"(?:原先|最初|早期)(?:是|为|使用|采用|属于)", "VERSION", "原先/最初/早期（历史状态叙述）"),
     #
     # ═══ ORIGIN：来源归属（通常也是痕迹） ═══
     #
     (r"本文件(?:保留|维护)(?:测试|内容|的)", "ORIGIN", "本文件保留/维护内容（暗示拆分）"),
     (r"由[\w._\-]+\.py\s*(?:移[入至]|迁[入至])", "ORIGIN", "由XX.py迁入/移入"),
-    (r"原[\w._\-]+\.py", "ORIGIN", "原XX.py（暗示代码来源）"),
+    (r"原\s*[`\w./_-]+\.(?:py|js|mjs|html|ts|vue)", "ORIGIN", "原XX.py/js（暗示代码来源）"),
     (r"原为[\w._\-]+\.py", "ORIGIN", "原为XX.py（暗示历史来源）"),
     (r"来源于[\w._\-]+\.py", "ORIGIN", "来源于XX.py（暗示代码来源）"),
     (r"出自[\w._\-]+\.py", "ORIGIN", "出自XX.py（暗示代码来源）"),
@@ -257,10 +263,11 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
 def _iter_comment_lines(fpath: Path) -> Iterator[tuple[int, str]]:
     """按文件类型提取注释/文档字符串行，产出 (行号, 注释内容)。
 
-    支持的扩展名：.py / .js / .mjs / .html。其余类型不参与扫描。
+    支持的扩展名：.py / .js / .mjs / .html / .sh / .ps1 / .bat / .cmd。
+    其余类型不参与扫描。
     """
     suffix = fpath.suffix.lower()
-    if suffix not in (".py", ".js", ".mjs", ".html"):
+    if suffix not in (".py", ".js", ".mjs", ".html", ".sh", ".ps1", ".bat", ".cmd"):
         return
     try:
         text = fpath.read_text(encoding="utf-8")
@@ -270,8 +277,48 @@ def _iter_comment_lines(fpath: Path) -> Iterator[tuple[int, str]]:
         yield from _py_comment_lines(text)
     elif suffix in (".js", ".mjs"):
         yield from _js_comment_lines(text)
-    else:
+    elif suffix == ".html":
         yield from _html_comment_lines(text)
+    else:
+        yield from _shell_comment_lines(suffix, text)
+
+
+def _shell_comment_lines(suffix: str, text: str) -> Iterator[tuple[int, str]]:
+    """脚本文件注释：`.sh`（#）、`.ps1`（# 与 `<# #>`）、`.bat`/`.cmd`（REM/::）。"""
+    if suffix in (".bat", ".cmd"):
+        for lineno, raw in enumerate(text.split("\n"), 1):
+            stripped = raw.strip().lstrip("﻿")
+            if not stripped:
+                continue
+            if stripped[:4].upper() == "REM ":
+                yield lineno, stripped[4:].lstrip()
+            elif stripped.startswith("::"):
+                yield lineno, stripped[2:].lstrip()
+        return
+    in_ps_block = False
+    for lineno, raw in enumerate(text.split("\n"), 1):
+        stripped = raw.strip().lstrip("﻿")
+        if not stripped:
+            continue
+        if suffix == ".ps1" and in_ps_block:
+            yield lineno, stripped
+            if "#>" in stripped:
+                in_ps_block = False
+            continue
+        if suffix == ".ps1" and stripped.startswith("<#"):
+            yield lineno, stripped
+            if "#>" not in stripped[2:]:
+                in_ps_block = True
+            continue
+        if stripped.startswith("#!"):
+            continue  # shebang，非注释
+        if stripped.startswith("#"):
+            yield lineno, stripped
+            continue
+        # 行内注释：提取由空白引导的 # 之后的注释文本（跳过字符串/URL 内 #）
+        m = re.search(r"[ \t]#", stripped)
+        if m:
+            yield lineno, stripped[m.start() + 1 :]
 
 
 def _py_comment_lines(text: str) -> Iterator[tuple[int, str]]:
@@ -390,7 +437,7 @@ def main() -> None:
     low_count = 0
     summary: dict[str, int] = {}
 
-    supported = {".py", ".js", ".mjs", ".html"}
+    supported = {".py", ".js", ".mjs", ".html", ".sh", ".ps1", ".bat", ".cmd"}
     for scan_dir in SCAN_DIRS:
         if not scan_dir.exists():
             continue

@@ -92,7 +92,7 @@ def prepare_report_data(
     pen_result = compute_penetration_top10(holdings, details)
     penetrated_assets = (pen_result or {}).get("top10", [])
 
-    # 因子暴露分析：b_series 关闭时为 None（章节隐藏），
+    # 因子暴露分析：基金深度分析关闭时为 None（章节隐藏），
     # 开启时计算 C19 dict（数据不足/故障时 available=False，不阻塞主报告）
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
 
@@ -131,7 +131,7 @@ def prepare_report_data(
         "news_top_count": int(config.get("news_top_count", 100)),
         # 组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
         "risk_metrics": {},
-        # 因子暴露分析（C19 契约；b_series 关闭时为 None）
+        # 因子暴露分析（C19 契约；基金深度分析关闭时为 None）
         "factor_exposure": factor_exposure,
     }
 
@@ -196,7 +196,7 @@ def compute_factor_exposure_data(
         reporter: 进度上报
 
     Returns:
-        C19 契约 dict；b_series 关闭时返回 None（章节隐藏）。
+        C19 契约 dict；基金深度分析关闭时返回 None（章节隐藏）。
         数据不足/故障时 available=False（章节显示降级占位，不阻塞主报告，§1.4.5）。
     """
     from src.python.config import is_enable_fund_deep_analysis

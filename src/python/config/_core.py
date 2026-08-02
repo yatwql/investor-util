@@ -502,7 +502,7 @@ def is_enable_news(config: dict | None = None) -> bool:
 
 
 def is_enable_history(config: dict | None = None) -> bool:
-    """组合历史走势+回撤分析（#16~17）是否启用。缺失时返回 True。"""
+    """组合历史走势+回撤分析（#15~16）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_history")

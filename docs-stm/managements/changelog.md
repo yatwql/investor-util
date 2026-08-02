@@ -4,7 +4,7 @@
 
 ---
 
-## [0.9.5-dev] - 2026-08-01
+## [0.9.5-dev] - 2026-08-02
 
 ### Added
 
@@ -54,6 +54,8 @@
 
 ### Docs
 
+- **'B 系列' → '基金深度分析' 术语统一（代码/测试注释 + 文档正文）+ 报告模块序号修正（18→19）** — 确认"B 系列"即基金深度分析模块组后，按用户要求全局替换：① 代码与测试注释/文档字符串中的人性化描述"B 系列"全部改为"基金深度分析"（`test_excel_generator_edge.py`/`test_html_writer_edge.py`/`test_fund_deep_analysis_sheet_edge.py`/`test_excel_fund_deep_analysis.py`/`test_scenario_section_order.py`/`test_registry.py`/`test_html_report_structure.py`/`test_excel_report_structure.py` + 用户文档 8 份 + 管理文档 + `plan-chartjs-risk-analysis.md` 设计文档）；② 报告模块总数 18→19 全链修正——`factor_exposure` #17、`data_source_status` 17→18、`llm_usage` 18→19（history #15~16 不变），涉及 how-to-config/how-to-use-registry/faq/technical/requirements/testplan/reports-instruction/how-to-menu；③ 测试文件 `test_fund_bseries_sheet_edge.py` → `test_fund_deep_analysis_sheet_edge.py`（`git mv` 保留历史）；④ **内部契约保留**——注册表 `type="b_series"`、board_flags dict key、`enable_fund_deep_analysis` 门控键稳定不变（rf-125 决策）
+- **check-history-traces.py 覆盖强化 + 全库历史痕迹清零（Python/JS/HTML/脚本）** — 按用户要求对 `.py/.js/.mjs/.html` + `.sh/.ps1/.bat/.cmd` 全类型扫描并打磨脚本：新增 shell 注释提取（`.sh` `#`、`.ps1` `#`+`<# #>`、`.bat/.cmd` `REM`/`::`，BOM 头处理，shebang 跳过）；HIGH 新正则（`历史上|历次迭代`、`曾(?:经)?(?:用[于]?|作为|属于|采用|以)`、`(?:后来|之后|随后)\s*(?:改[为成]|换[为成]|引入|移除)`）；VERSION `(?:原先|最初|早期)(?:是|为|使用|采用|属于)`；ORIGIN 扩展非 `.py` 后缀（`原\s*[`\w./_-]+\.(?:py|js|mjs|html|ts|vue)`）。手动清扫暴露旧版漏检 3 类痕迹并修复：`test_market_value.py` "从原 test_market_value_edge.py 合并"、`test_config.py` "曾用 json.dumps 全量重写"、`registry.py` 4 处 "对应原 constants.py/cache.py/config.py 的功能"（源归属 docstring）。全库扫描 exit 0（`scripts-reference.md` 同步 8 种支持扩展名）
 - **rf-122 归档 + rf-123 编号更正** — rf-122（LLM thinking 思考耗尽安全网竞态）从待处理移至已修复表（摘要行），详细修复说明见 changelog Fix 条目；同时更正上一笔提交的编号冲突——config.json 路径修复由误用的 rf-122 改为 **rf-123**（rf-122 已被 LLM thinking 问题占用，原编号违反"单调递增不回收"规则），changelog Fix/Test/Docs 与 review-findings 已修复表同步
 - **rf-123 归档 + review-findings.md 已修复表** — rf-123（config.json 路径型键落盘绝对路径）从待处理移至已修复表（摘要行），详细修复说明见 changelog Fix 条目；config.json 相对路径恢复后已确认磁盘相对 + 运行时绝对化双向一致
 - **rf-124 归档 + review-findings.md 已修复表** — rf-124（set_config 全量 json.dumps 重写剥注释分组）从待处理移至已修复表（摘要行），详细修复说明见 changelog Fix 条目；config.json 重建后已确认 A~L 12 分组注释 + batch/batch_rate_limit 行尾注释齐全、`performance_evaluation` 补回、`_privacy_notice_shown` 保留

@@ -154,7 +154,7 @@ investor-util/
 │   │   │   ├── excel_content_sheets.py #  Excel 内容页签（持仓明细/汇总）
 │   │   │   ├── excel_market_data.py  #   Excel 行情数据页签
 │   │   │   ├── excel_news_warning.py #   Excel 新闻页签
-│   │   │   ├── excel_fund_deep_analysis.py  #   Excel 基金深度分析页签（B 系列：经理/重合度/集中度/风格/因子暴露）
+│   │   │   ├── excel_fund_deep_analysis.py  #   Excel 基金深度分析页签（基金深度分析：经理/重合度/集中度/风格/因子暴露）
 │   │   │   ├── excel_llm_usage.py    #   Excel LLM 用量统计页签
 │   │   │   ├── excel_writer.py       #   Excel 底层写入器（openpyxl 封装）
 │   │   │   ├── _debate_utils.py      #   辩论模式检测工具函数（共享 html/excel）
@@ -405,7 +405,7 @@ investor-util/
 │       │   │   ├── test_excel_roundtrip.py        #   Excel 写入读取回环测试
 │       │   │   ├── test_excel_writer.py           #   Excel 写入器测试
 │       │   │   ├── test_feature_interactive.py    #   交互图表 Feature Flag 管线测试
-│       │   │   ├── test_fund_bseries_sheet_edge.py # 基金深度分析页签边缘场景
+│       │   │   ├── test_fund_deep_analysis_sheet_edge.py # 基金深度分析页签边缘场景
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
 │       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试
 │       │   │   ├── test_fund_manager_sheet.py     #   基金经理页签测试

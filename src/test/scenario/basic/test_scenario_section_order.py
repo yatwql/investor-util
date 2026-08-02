@@ -5,7 +5,7 @@
   - 序号 1~N 连续递增
   - get_report_section_keys 完备性
   - 5 种可见性类型计数正确（always=6, history=2, b_series=5, news=1, llm=5）
-  - B 系列 data_flag 各不相同
+  - 基金深度分析 data_flag 各不相同
   - 空配置与无配置行为一致
 
 运行：
@@ -74,7 +74,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertIn("data_source_status", keys)
 
     def test_default_fund_deep_analysis_type_has_5_sections(self):
-        """b_series 类型模块共 5 个（基金深度分析 + 因子暴露）。"""
+        """基金深度分析类型模块共 5 个（含因子暴露）。"""
         fund_deep_analysis = [s for s in self._default if s["type"] == "b_series"]
         self.assertEqual(len(fund_deep_analysis), 5)
         keys = [s["key"] for s in fund_deep_analysis]
@@ -98,7 +98,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(llm[-1]["key"], "llm_usage")
 
     def test_different_data_flags_in_fund_deep_analysis(self):
-        """b_series 的 data_flag 各不相同。"""
+        """基金深度分析的 data_flag 各不相同。"""
         fund_deep_analysis = [s for s in self._default if s["type"] == "b_series"]
         flags = [s["data_flag"] for s in fund_deep_analysis]
         self.assertEqual(len(set(flags)), len(flags), f"data_flag 应各不相同: {flags}")

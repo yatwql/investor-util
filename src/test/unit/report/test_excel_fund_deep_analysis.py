@@ -1,4 +1,4 @@
-"""B 系列（基金深度分析）Excel 章节辅助函数单元测试。"""
+"""基金深度分析 Excel 章节辅助函数单元测试。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 class TestExcelFundDeepAnalysis:
-    """B 系列（基金深度分析）基础函数测试。"""
+    """基金深度分析基础函数测试。"""
 
     def test_process_fund_deep_analysis_module_signature(self):
         """_process_fund_deep_analysis_module 可调用并返回 (list, dict) 元组。"""

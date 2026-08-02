@@ -93,7 +93,7 @@ def _build_minimal_render_data(
 ) -> dict:
     """构建最小化模板渲染数据。
 
-    根据 visible_set 自动填充 B 系列/新闻模块所需的 mock 数据结构，
+    根据 visible_set 自动填充基金深度分析/新闻模块所需的 mock 数据结构，
     避免模板内 .get() 或 [] 操作因 None 值崩溃。
 
     Args:
@@ -146,7 +146,7 @@ def _build_minimal_render_data(
         "enable_interactive_charts": False,
     }
 
-    # B 系列模块可见时，填充 mock 数据结构（模板内部 .get() 要求 dict 非 None）
+    # 基金深度分析模块可见时，填充 mock 数据结构（模板内部 .get() 要求 dict 非 None）
     if visible_keys & _FUND_DEEP_ANALYSIS_KEYS:
         data["manager_analysis"] = {"first_check_summary": None, "results": []}
         data["overlap_matrix"] = {"fund_names": {}, "funds": [], "matrix": [], "pairs": []}
@@ -195,7 +195,7 @@ class TestHtmlNavStructure(unittest.TestCase):
     def setUpClass(cls):
         cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
-        # 所有模块可见（b_series 也给 True，因为我们要测结构完整性）
+        # 所有模块可见（基金深度分析也给 True，因为我们要测结构完整性）
         cls.sv_dict = {sec["key"]: True for sec in cls.order}
         cls.soup = _render_template(
             _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
@@ -350,7 +350,7 @@ class TestHtmlSectionVisibility(unittest.TestCase):
         self.assertEqual(link_keys, _ALWAYS_KEYS, f"应只有 always 模块: {_ALWAYS_KEYS}，实际 {link_keys}")
 
     def test_always_plus_fund_deep_analysis(self):
-        """always + b_series 可见（通常 b_series 由数据驱动）。"""
+        """always + 基金深度分析可见（通常基金深度分析由数据驱动）。"""
         visible = _ALWAYS_KEYS | _FUND_DEEP_ANALYSIS_KEYS
         soup = self._render_with_visibility(visible)
         links = soup.select("nav.section-nav a")
@@ -398,7 +398,7 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "market_value", "name": "市值核算明细表", "number": 3},
             {"key": "category", "name": "持仓分类表", "number": 4},
             {"key": "penetration", "name": "资产穿透TOP10", "number": 5},
-            # b_series 保持默认
+            # 基金深度分析保持默认
             {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
             {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7},
             {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},

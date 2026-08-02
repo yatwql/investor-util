@@ -102,14 +102,14 @@ class TestExcelSheetOrder(unittest.TestCase):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
-        # 启用 always + b_series
+        # 启用 always + 基金深度分析
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_fund_deep_analysis=True, enable_news=False, enable_llm=False,
                                 enable_history=False)
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
                          if sec["type"] in ("always", "b_series")]
         self.assertEqual(list(sheets.keys()), expected_keys)
-        self.assertEqual(len(sheets), 9, "always(5) + b_series(4) = 9")
+        self.assertEqual(len(sheets), 9, "always + 基金深度分析 = 9")
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -260,7 +260,6 @@ def get_registry() -> tuple[DataModuleDef, ...]:
 def get_cache_ttl_defaults() -> dict[str, float]:
     """按数据类型返回默认 TTL 映射。
 
-    对应原 constants.py 中 CACHE_TTL_DEFAULTS 的功能。
     未注册的类型回退到 CACHE_DAILY。
     """
     return {m.data_type: m.cache_ttl for m in _MODULE_REGISTRY}
@@ -270,7 +269,6 @@ def get_prefix_type_map() -> dict[str, str]:
     """缓存文件名前缀 → 数据类型映射。
 
     用于 cleanup_expired() 从文件名前缀推断数据类型。
-    对应原 cache.py 中 prefix_type_map 的功能。
     """
     result: dict[str, str] = {}
     for m in _MODULE_REGISTRY:
@@ -283,7 +281,6 @@ def get_exact_type_map() -> dict[str, str]:
     """精确缓存键名 → 数据类型映射。
 
     用于固定键名（无通配前缀）的缓存文件清理。
-    对应原 cache.py 中 exact_map 的功能。
     """
     return {key: m.data_type for m in _MODULE_REGISTRY for key in m.exact_cache_keys}
 
@@ -293,7 +290,6 @@ def get_known_llm_settings_keys() -> set[str]:
 
     由每个 LLM 模块的 settings_suffix 自动派生。
     外加全局键名（max_retries, enabled_llm, pricing）。
-    对应原 config.py 中 _KNOWN_LLM_SETTINGS_KEYS 的功能。
     """
     keys: set[str] = set()
     for m in _MODULE_REGISTRY:
@@ -507,7 +503,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "category", "name": "持仓分类表", "number": 3, "type": "always", "data_flag": None},
     {"key": "penetration", "name": "资产穿透TOP10", "number": 4, "type": "always", "data_flag": None},
     {"key": "fund_performance", "name": "基金业绩分析", "number": 5, "type": "always", "data_flag": None},
-    # ── b_series 类型（有数据才显示） ──
+    # ── 基金深度分析 类型（有数据才显示） ──
     {"key": "fund_manager", "name": "基金经理变更监控", "number": 6, "type": "b_series", "data_flag": "manager_data"},
     {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7, "type": "b_series", "data_flag": "overlap_data"},
     {
@@ -534,7 +530,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
     {"key": "portfolio_history", "name": "组合历史走势", "number": 15, "type": "history", "data_flag": None},
     {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16, "type": "history", "data_flag": None},
-    # ── b_series 类型（有数据才显示；序号 17 与 data_source_status/llm_usage 顺延） ──
+    # ── 基金深度分析 类型（有数据才显示；序号 17 与 data_source_status/llm_usage 顺延） ──
     {
         "key": "factor_exposure",
         "name": "因子暴露分析",
@@ -582,7 +578,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 
     处理逻辑：
-      1. 无配置或配置为空 → 返回完整 18 项默认顺序（与当前硬编码一致）
+      1. 无配置或配置为空 → 返回完整 19 项默认顺序（与当前硬编码一致）
       2. 用户配置的模块使用配置序号，其余保持默认序号
       3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
       4. llm_usage 始终固定在最后一位
@@ -592,7 +588,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 18 项
+        [{key, name, number, type, data_flag}, ...] 共 19 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

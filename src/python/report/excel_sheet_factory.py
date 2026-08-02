@@ -12,7 +12,7 @@ def should_create_sheet(section: dict, data_availability: dict[str, bool] | None
     """纯 data 层：按注册表的 data_flag 判断模块数据是否就绪。
 
     无 data_flag 的模块（always、history）始终创建；data_flag
-    未出现在 data_availability 中时视为已就绪（如 b_series 的
+    未出现在 data_availability 中时视为已就绪（如基金深度分析的
     数据在页签创建后才写入，由下游函数自行兜底）。
     """
     flag_name = section.get("data_flag")

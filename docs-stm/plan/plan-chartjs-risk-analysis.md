@@ -287,7 +287,7 @@ C19 ✅
 
 **现有 Feature Flag 基础设施**：
 
-- `config/features.py` 定义了 28 项 Feature Flag，当前覆盖 LLM 模块 + B 系列 + 历史回撤
+- `config/features.py` 定义了 28 项 Feature Flag，当前覆盖 LLM 模块 + 基金深度分析 + 历史回撤
 - 加载机制：`load_feature_overrides()` → `features.json` → `is_feature_enabled()`
 - **现状**：`enable_interactive_charts` 尚未注册到 `_FEATURE_FLAGS_DEFAULT`，仅在 `plan-chartjs-report-upgrade.md` 中提及
 
@@ -559,7 +559,7 @@ def build_chart_datasets(
 | 引擎加载 | 纯 CDN / CDN+local / CDN+SRI+onerror / **纯本地 bundle** | **纯本地 bundle**（R21） | 离线自包含，R3/R10 闭环，无网络依赖 |
 | JS 组织 | 内联模板 / 外部独立 JS | **外部独立 JS**（chart-init.js + chart-config.js） | 可测试性 + 维护性 + 暗色模式预留 |
 | 数据处理 | JS 端 tojson 消费 / Python 端预处理器 | **Python 端预处理器**（chart_data_builder.py） | 可 pytest 测试 + 降低 JS 复杂度 |
-| Feature Flag 注册 | config/features.py / config.json | **config/features.py** | 与现有 LLM/B 系列标志一致 |
+| Feature Flag 注册 | config/features.py / config.json | **config/features.py** | 与现有 LLM/基金深度分析标志一致 |
 | 热力图方案 | chartjs-chart-matrix / Canvas 2D | **先 POC 验证，确定后选 matrix** | POC 不通过则用 Canvas 自制 |
 | 颜色方案 | 硬编码 / CSS 变量 | **CSS 变量** | 为 plan-11 暗色模式预留 |
 | 双路径清理 | N 版本后移除 Canvas / 长期共存 | **N=2** | 给用户适应期，积累稳定性 |
