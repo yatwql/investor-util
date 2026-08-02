@@ -129,7 +129,7 @@ class TestComputeFactorExposureData:
         assert result["status"] == "insufficient"
         assert result["betas"] == {}
 
-    def test_b_series_disabled_returns_none(self):
+    def test_fund_deep_analysis_disabled_returns_none(self):
         """基金深度分析关闭 → 返回 None（章节隐藏，不发起任何数据拉取）。"""
         with (
             patch("src.python.fetcher.chain.fetch_with_incremental_fallback") as mock_chain,

@@ -448,16 +448,16 @@ def _cmd_config_report_boards() -> None:
 
     while True:
         config = get_config()
-        b_series = is_enable_fund_deep_analysis(config)
+        fund_deep_analysis = is_enable_fund_deep_analysis(config)
         news = is_enable_news(config)
         history = is_enable_history(config)
 
         print()
         print("  ┌── 配置报告可选章节 ────────────────────┐")
-        b_status = f"{GREEN}启用{RESET}" if b_series else f"{RED}禁用{RESET}"
+        fund_status = f"{GREEN}启用{RESET}" if fund_deep_analysis else f"{RED}禁用{RESET}"
         n_status = f"{GREEN}启用{RESET}" if news else f"{RED}禁用{RESET}"
         h_status = f"{GREEN}启用{RESET}" if history else f"{RED}禁用{RESET}"
-        print(f"  │ 1. 基金深度分析（#6~9）         [{b_status}]{' ' * 8}│")
+        print(f"  │ 1. 基金深度分析（#6~9）         [{fund_status}]{' ' * 8}│")
         print(f"  │ 2. 市场新闻（#10）              [{n_status}]{' ' * 8}│")
         print(f"  │ 3. 组合历史走势+回撤（#16~17）  [{h_status}]{' ' * 8}│")
         print("  │                                   │")
@@ -475,8 +475,8 @@ def _cmd_config_report_boards() -> None:
             break
 
         if choice == "1":
-            set_config("enable_fund_deep_analysis", not b_series)
-            print(f"  {GREEN}[OK]{RESET} 基金深度分析已{'禁用' if b_series else '启用'}")
+            set_config("enable_fund_deep_analysis", not fund_deep_analysis)
+            print(f"  {GREEN}[OK]{RESET} 基金深度分析已{'禁用' if fund_deep_analysis else '启用'}")
         elif choice == "2":
             set_config("enable_news", not news)
             print(f"  {GREEN}[OK]{RESET} 市场新闻已{'禁用' if news else '启用'}")

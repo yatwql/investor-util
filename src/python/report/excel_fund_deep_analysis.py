@@ -3,7 +3,7 @@
 职责：基金经理变更监控、持仓重合度矩阵、持仓集中度监控、基金风格漂移分析。
 
 注：三个模块（重合度/集中度/风格）共享相同的数据准备模板，
-通过 _process_b_module 辅助函数消除重复代码。
+通过 _process_fund_deep_analysis_module 辅助函数消除重复代码。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from src.python.report.progress import ProgressReporter
 logger = setup_logger()
 
 
-def _process_b_module(
+def _process_fund_deep_analysis_module(
     holdings: list,
     process_fn: Callable,
     prog: ProgressReporter,
@@ -43,7 +43,7 @@ def _process_b_module(
     return fund_codes, fund_holdings_map
 
 
-def write_b_series_sheets(
+def write_fund_deep_analysis_sheets(
     sheets: dict[str, Any],
     holdings: list,
     enable_fund_deep_analysis: bool,
@@ -91,7 +91,7 @@ def write_b_series_sheets(
         overlap_result = None
         fund_names: dict[str, str] = {}
         try:
-            fund_codes, fund_holdings_map = _process_b_module(holdings, compute_overlap, prog)
+            fund_codes, fund_holdings_map = _process_fund_deep_analysis_module(holdings, compute_overlap, prog)
             if len(fund_codes) < 2:
                 logger.info("持仓重合度矩阵：基金数 < 2（%d），跳过", len(fund_codes))
             elif len(fund_holdings_map) >= 2:
@@ -133,7 +133,7 @@ def write_b_series_sheets(
         prog.info("正在计算持仓集中度...")
         conc_data = None
         try:
-            _, conc_fund_holdings = _process_b_module(holdings, compute_conc, prog)
+            _, conc_fund_holdings = _process_fund_deep_analysis_module(holdings, compute_conc, prog)
             if conc_fund_holdings:
                 conc_data = compute_conc(conc_fund_holdings)
                 if conc_data:
@@ -161,7 +161,7 @@ def write_b_series_sheets(
         prog.info("正在分析基金风格漂移...")
         style_result = None
         try:
-            _, style_fund_holdings = _process_b_module(holdings, analyze_style, prog)
+            _, style_fund_holdings = _process_fund_deep_analysis_module(holdings, analyze_style, prog)
             if style_fund_holdings:
                 style_result = analyze_style(style_fund_holdings)
                 if style_result.get("results"):

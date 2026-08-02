@@ -73,11 +73,11 @@ class TestScenarioSectionOrder(unittest.TestCase):
         keys = {s["key"] for s in always}
         self.assertIn("data_source_status", keys)
 
-    def test_default_b_series_type_has_5_sections(self):
+    def test_default_fund_deep_analysis_type_has_5_sections(self):
         """b_series 类型模块共 5 个（基金深度分析 + 因子暴露）。"""
-        b_series = [s for s in self._default if s["type"] == "b_series"]
-        self.assertEqual(len(b_series), 5)
-        keys = [s["key"] for s in b_series]
+        fund_deep_analysis = [s for s in self._default if s["type"] == "b_series"]
+        self.assertEqual(len(fund_deep_analysis), 5)
+        keys = [s["key"] for s in fund_deep_analysis]
         self.assertIn("fund_manager", keys)
         self.assertIn("fund_overlap", keys)
         self.assertIn("fund_concentration", keys)
@@ -97,10 +97,10 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(len(llm), 5)
         self.assertEqual(llm[-1]["key"], "llm_usage")
 
-    def test_different_data_flags_in_b_series(self):
+    def test_different_data_flags_in_fund_deep_analysis(self):
         """b_series 的 data_flag 各不相同。"""
-        b_series = [s for s in self._default if s["type"] == "b_series"]
-        flags = [s["data_flag"] for s in b_series]
+        fund_deep_analysis = [s for s in self._default if s["type"] == "b_series"]
+        flags = [s["data_flag"] for s in fund_deep_analysis]
         self.assertEqual(len(set(flags)), len(flags), f"data_flag 应各不相同: {flags}")
 
     def test_empty_config_equals_no_config(self):

@@ -35,39 +35,49 @@ _TEMPLATE_PATH = os.path.normpath(
 
 # 默认注册表 key（按默认顺序，与 registry.py 对齐）
 _ALL_KEYS_DEFAULT = [
-    "summary", "market_value", "category", "penetration",
+    "summary",
+    "market_value",
+    "category",
+    "penetration",
     "fund_performance",
-    "fund_manager", "fund_overlap", "fund_concentration", "fund_style",
+    "fund_manager",
+    "fund_overlap",
+    "fund_concentration",
+    "fund_style",
     "news_correlation",
-    "global_macro", "expert_review", "health_check", "penetration_deep",
-    "portfolio_history", "drawdown_analysis",
+    "global_macro",
+    "expert_review",
+    "health_check",
+    "penetration_deep",
+    "portfolio_history",
+    "drawdown_analysis",
     "llm_usage",
 ]
 
 _ALWAYS_KEYS = {"summary", "market_value", "category", "penetration", "fund_performance"}
-_B_SERIES_KEYS = {"fund_manager", "fund_overlap", "fund_concentration", "fund_style"}
+_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "fund_overlap", "fund_concentration", "fund_style"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
 _HISTORY_KEYS = {"portfolio_history", "drawdown_analysis"}
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
-    {"key": "summary",            "name": "投资分析汇总",                     "number": 1},
-    {"key": "market_value",       "name": "市值核算明细表",                   "number": 2},
-    {"key": "category",           "name": "持仓分类表",                       "number": 3},
-    {"key": "penetration",        "name": "资产穿透TOP10",                    "number": 4},
-    {"key": "fund_performance",   "name": "基金业绩分析",                     "number": 5},
-    {"key": "fund_manager",       "name": "基金经理变更监控",                 "number": 6},
-    {"key": "fund_overlap",       "name": "持仓重合度矩阵",                   "number": 7},
-    {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8},
-    {"key": "fund_style",         "name": "基金风格分析",                     "number": 9},
-    {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10},
-    {"key": "global_macro",       "name": "全球政经局势",                     "number": 11},
-    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12},
-    {"key": "health_check",       "name": "持仓体检报告",                     "number": 13},
-    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14},
-    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 15},
-    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 16},
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 17},
+    {"key": "summary", "name": "投资分析汇总", "number": 1},
+    {"key": "market_value", "name": "市值核算明细表", "number": 2},
+    {"key": "category", "name": "持仓分类表", "number": 3},
+    {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
+    {"key": "fund_performance", "name": "基金业绩分析", "number": 5},
+    {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
+    {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7},
+    {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
+    {"key": "fund_style", "name": "基金风格分析", "number": 9},
+    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
+    {"key": "global_macro", "name": "全球政经局势", "number": 11},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
+    {"key": "health_check", "name": "持仓体检报告", "number": 13},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14},
+    {"key": "portfolio_history", "name": "组合历史走势", "number": 15},
+    {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 17},
 ]
 
 
@@ -95,21 +105,38 @@ def _build_minimal_render_data(
         "now": "2026-07-05 12:00:00",
         "today": "2026-07-05",
         "trading_day": "2026-07-03",
-        "total_mv": 0, "total_cost": 0, "total_profit": 0,
-        "total_profit_rate": 0, "total_today_profit": 0, "today_profit_rate": 0,
-        "categories": {}, "update_status": None,
-        "a_indices": [], "us_indices": [],
-        "accounts": {}, "account_totals": {},
-        "cat_data": [], "penetration": None, "perf_data": [],
-        "news_data": None, "news_llm_meta": None, "has_llm_analysis": False,
-        "manager_analysis": None, "overlap_matrix": None,
-        "concentration_analysis": None, "style_analysis": None,
+        "total_mv": 0,
+        "total_cost": 0,
+        "total_profit": 0,
+        "total_profit_rate": 0,
+        "total_today_profit": 0,
+        "today_profit_rate": 0,
+        "categories": {},
+        "update_status": None,
+        "a_indices": [],
+        "us_indices": [],
+        "accounts": {},
+        "account_totals": {},
+        "cat_data": [],
+        "penetration": None,
+        "perf_data": [],
+        "news_data": None,
+        "news_llm_meta": None,
+        "has_llm_analysis": False,
+        "manager_analysis": None,
+        "overlap_matrix": None,
+        "concentration_analysis": None,
+        "style_analysis": None,
         "llm_enabled": True,
-        "global_macro": None, "expert_review": None,
-        "health_check": None, "penetration_deep": None,
+        "global_macro": None,
+        "expert_review": None,
+        "health_check": None,
+        "penetration_deep": None,
         "llm_session_usage": None,
-        "module_labels": {}, "module_disabled": {},
-        "llm_module_info": [], "llm_endpoint": "",
+        "module_labels": {},
+        "module_disabled": {},
+        "llm_module_info": [],
+        "llm_endpoint": "",
         "cache_stats": None,
         "section_order": section_order,
         "section_numbers": section_numbers,
@@ -120,7 +147,7 @@ def _build_minimal_render_data(
     }
 
     # B 系列模块可见时，填充 mock 数据结构（模板内部 .get() 要求 dict 非 None）
-    if visible_keys & _B_SERIES_KEYS:
+    if visible_keys & _FUND_DEEP_ANALYSIS_KEYS:
         data["manager_analysis"] = {"first_check_summary": None, "results": []}
         data["overlap_matrix"] = {"fund_names": {}, "funds": [], "matrix": [], "pairs": []}
         data["concentration_analysis"] = {"results": []}
@@ -140,8 +167,7 @@ def _render_template(render_data: dict) -> BeautifulSoup:
     # 注入 section_visible 闭包（与生产代码相同的 context 变量方式，不写入 _ENV.globals）
     _sv_dict = render_data.get("section_visible_dict", {})
     _sv_fn = lambda key, _d=_sv_dict: bool(_d.get(key, False))
-    html = _ENV.get_template("report_template.html").render(
-        **render_data, section_visible=_sv_fn)
+    html = _ENV.get_template("report_template.html").render(**render_data, section_visible=_sv_fn)
     return BeautifulSoup(html, "html.parser")
 
 
@@ -180,8 +206,7 @@ class TestHtmlNavStructure(unittest.TestCase):
     def test_nav_link_count(self):
         """导航链接数量应等于可见模块数（全部可见 = 17）。"""
         links = self.soup.select("nav.section-nav a")
-        self.assertEqual(len(links), 17,
-                         f"导航应有 17 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 17, f"导航应有 17 个链接，实际 {len(links)}")
 
     def test_every_nav_link_has_corresponding_section(self):
         """每个导航链接的 href 指向一个存在的 section id。"""
@@ -203,8 +228,7 @@ class TestHtmlNavStructure(unittest.TestCase):
         """所有 section id 唯一，无重复。"""
         sections = self.soup.select("div.section")
         ids = [sec.get("id") for sec in sections if sec.get("id")]
-        self.assertEqual(len(ids), len(set(ids)),
-                         f"发现重复 section id: {set(i for i in ids if ids.count(i) > 1)}")
+        self.assertEqual(len(ids), len(set(ids)), f"发现重复 section id: {set(i for i in ids if ids.count(i) > 1)}")
 
     # ── CSS order ──────────────────────────────────────────────
 
@@ -218,8 +242,9 @@ class TestHtmlNavStructure(unittest.TestCase):
             self.assertIsNotNone(m, f"#{sec.get('id')} 缺少 order 样式: {style}")
             orders.append(int(m.group(1)))
 
-        self.assertEqual(len(orders), len(set(orders)),
-                         f"order 值不唯一: {set(o for o in orders if orders.count(o) > 1)}")
+        self.assertEqual(
+            len(orders), len(set(orders)), f"order 值不唯一: {set(o for o in orders if orders.count(o) > 1)}"
+        )
 
     def test_order_values_start_from_1(self):
         """order 值从 1 开始，无缺失。"""
@@ -232,7 +257,8 @@ class TestHtmlNavStructure(unittest.TestCase):
 
         expected = set(range(1, len(sections) + 1))
         self.assertEqual(
-            orders, expected,
+            orders,
+            expected,
             f"order 值不连续: 获得 {sorted(orders)}，期望 {sorted(expected)}",
         )
 
@@ -247,7 +273,8 @@ class TestHtmlNavStructure(unittest.TestCase):
             actual_order = int(m.group(1))
             expected_order = self.numbers.get(key)
             self.assertEqual(
-                actual_order, expected_order,
+                actual_order,
+                expected_order,
                 f"#{sec_id} order 为 {actual_order}，但 section_numbers['{key}'] = {expected_order}",
             )
 
@@ -290,8 +317,9 @@ class TestHtmlNavStructure(unittest.TestCase):
         """默认配置下所有 16 个模块 key 都在导航中。"""
         links = self.soup.select("nav.section-nav a")
         link_keys = {link.get("href", "").replace("#sec-", "") for link in links}
-        self.assertEqual(link_keys, set(_ALL_KEYS_DEFAULT),
-                         f"导航缺失/多余 keys: 期望 {set(_ALL_KEYS_DEFAULT)}，实际 {link_keys}")
+        self.assertEqual(
+            link_keys, set(_ALL_KEYS_DEFAULT), f"导航缺失/多余 keys: 期望 {set(_ALL_KEYS_DEFAULT)}，实际 {link_keys}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -319,12 +347,11 @@ class TestHtmlSectionVisibility(unittest.TestCase):
         soup = self._render_with_visibility(_ALWAYS_KEYS)
         links = soup.select("nav.section-nav a")
         link_keys = {link.get("href", "").replace("#sec-", "") for link in links}
-        self.assertEqual(link_keys, _ALWAYS_KEYS,
-                         f"应只有 always 模块: {_ALWAYS_KEYS}，实际 {link_keys}")
+        self.assertEqual(link_keys, _ALWAYS_KEYS, f"应只有 always 模块: {_ALWAYS_KEYS}，实际 {link_keys}")
 
-    def test_always_plus_b_series(self):
+    def test_always_plus_fund_deep_analysis(self):
         """always + b_series 可见（通常 b_series 由数据驱动）。"""
-        visible = _ALWAYS_KEYS | _B_SERIES_KEYS
+        visible = _ALWAYS_KEYS | _FUND_DEEP_ANALYSIS_KEYS
         soup = self._render_with_visibility(visible)
         links = soup.select("nav.section-nav a")
         link_keys = {link.get("href", "").replace("#sec-", "") for link in links}
@@ -366,26 +393,26 @@ class TestHtmlCustomOrder(unittest.TestCase):
     def setUpClass(cls):
         # 用户配置：调整 3 个模块顺序
         cls.custom_order: list[dict] = [
-            {"key": "fund_performance", "name": "基金业绩分析",                     "number": 1},
-            {"key": "summary",          "name": "投资分析汇总",                     "number": 2},
-            {"key": "market_value",     "name": "市值核算明细表",                   "number": 3},
-            {"key": "category",         "name": "持仓分类表",                       "number": 4},
-            {"key": "penetration",      "name": "资产穿透TOP10",                    "number": 5},
+            {"key": "fund_performance", "name": "基金业绩分析", "number": 1},
+            {"key": "summary", "name": "投资分析汇总", "number": 2},
+            {"key": "market_value", "name": "市值核算明细表", "number": 3},
+            {"key": "category", "name": "持仓分类表", "number": 4},
+            {"key": "penetration", "name": "资产穿透TOP10", "number": 5},
             # b_series 保持默认
-            {"key": "fund_manager",       "name": "基金经理变更监控",                 "number": 6},
-            {"key": "fund_overlap",       "name": "持仓重合度矩阵",                   "number": 7},
-            {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8},
-            {"key": "fund_style",         "name": "基金风格分析",                     "number": 9},
+            {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
+            {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7},
+            {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
+            {"key": "fund_style", "name": "基金风格分析", "number": 9},
             # news 保持默认
-            {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10},
+            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
             # llm 保持默认
-            {"key": "global_macro",       "name": "全球政经局势",                     "number": 11},
-            {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12},
-            {"key": "health_check",       "name": "持仓体检报告",                     "number": 13},
-            {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14},
-            {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 15},
-            {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 16},
-            {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 17},
+            {"key": "global_macro", "name": "全球政经局势", "number": 11},
+            {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
+            {"key": "health_check", "name": "持仓体检报告", "number": 13},
+            {"key": "penetration_deep", "name": "穿透深度分析", "number": 14},
+            {"key": "portfolio_history", "name": "组合历史走势", "number": 15},
+            {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16},
+            {"key": "llm_usage", "name": "LLM API 用量", "number": 17},
         ]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.custom_order}
         cls.sv_dict = {sec["key"]: True for sec in cls.custom_order}
@@ -398,18 +425,15 @@ class TestHtmlCustomOrder(unittest.TestCase):
         links = self.soup.select("nav.section-nav a")
         expected_keys = [sec["key"] for sec in self.custom_order]
         actual_keys = [link.get("href", "").replace("#sec-", "") for link in links]
-        self.assertEqual(actual_keys, expected_keys,
-                         f"导航顺序不正确\n  期望: {expected_keys}\n  实际: {actual_keys}")
+        self.assertEqual(actual_keys, expected_keys, f"导航顺序不正确\n  期望: {expected_keys}\n  实际: {actual_keys}")
 
     def test_custom_fund_performance_first(self):
         """自定义配置下 fund_performance 应排第 1 位。"""
         links = self.soup.select("nav.section-nav a")
         first_key = links[0].get("href", "").replace("#sec-", "")
-        self.assertEqual(first_key, "fund_performance",
-                         f"第一位应为 fund_performance，实际为 {first_key}")
+        self.assertEqual(first_key, "fund_performance", f"第一位应为 fund_performance，实际为 {first_key}")
         first_text = links[0].get_text(strip=True)
-        self.assertTrue(first_text.startswith("1"),
-                        f"第一位标题应以 1 开头，实际为 '{first_text}'")
+        self.assertTrue(first_text.startswith("1"), f"第一位标题应以 1 开头，实际为 '{first_text}'")
 
     def test_nav_section_title_text_consistency(self):
         """导航文字与 section-title 文字一致。"""
@@ -423,7 +447,8 @@ class TestHtmlCustomOrder(unittest.TestCase):
                 if title_div:
                     title_text = title_div.get_text(strip=True)
                     self.assertEqual(
-                        nav_text, title_text,
+                        nav_text,
+                        title_text,
                         f"#{key} 导航文字 '{nav_text}' 与标题 '{title_text}' 不一致",
                     )
 
@@ -439,8 +464,7 @@ class TestHtmlCustomOrder(unittest.TestCase):
 
         self.assertIn("sec-llm_usage", orders)
         # llm_usage 的 order 应为 17（默认值，未配置时保持）
-        self.assertEqual(orders["sec-llm_usage"], 17,
-                         "llm_usage 的 order 应为 17（末位）")
+        self.assertEqual(orders["sec-llm_usage"], 17, "llm_usage 的 order 应为 17（末位）")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -477,17 +501,14 @@ class TestHtmlAnchorValidity(unittest.TestCase):
         link_ids = {link.get("href", "").replace("#", "") for link in links}
 
         # 可见 section 的 id 应在 link_ids 中
-        visible_sections = {sec.get("id") for sec in sections
-                           if sec.get("id") in link_ids}
-        self.assertEqual(len(visible_sections), len(sections),
-                         "部分 section 不在导航中")
+        visible_sections = {sec.get("id") for sec in sections if sec.get("id") in link_ids}
+        self.assertEqual(len(visible_sections), len(sections), "部分 section 不在导航中")
 
     def test_nav_link_ids_are_unique(self):
         """导航链接 href 无重复。"""
         links = self.soup.select("nav.section-nav a")
         hrefs = [link.get("href", "") for link in links]
-        self.assertEqual(len(hrefs), len(set(hrefs)),
-                         f"导航 href 重复: {set(h for h in hrefs if hrefs.count(h) > 1)}")
+        self.assertEqual(len(hrefs), len(set(hrefs)), f"导航 href 重复: {set(h for h in hrefs if hrefs.count(h) > 1)}")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -501,33 +522,67 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
     _HISTORY = {
         "status": "ok",
         "bars": [{"date": "2026-01-01", "total_value": 100.0, "drawdown_pct": 0.0}],
-        "total_return_pct": 0.1, "total_return": 1000.0,
-        "data_start": "2026-01-01", "data_end": "2026-01-01",
-        "max_drawdown_pct": -0.05, "max_drawdown": -500.0,
-        "drawdown_start": "2026-01-01", "drawdown_end": "2026-01-01",
+        "total_return_pct": 0.1,
+        "total_return": 1000.0,
+        "data_start": "2026-01-01",
+        "data_end": "2026-01-01",
+        "max_drawdown_pct": -0.05,
+        "max_drawdown": -500.0,
+        "drawdown_start": "2026-01-01",
+        "drawdown_end": "2026-01-01",
         "annualized_volatility": 0.18,
-        "warnings": None, "failed_holdings": None, "successful_holdings": None,
+        "warnings": None,
+        "failed_holdings": None,
+        "successful_holdings": None,
     }
 
     _DATASET_KEYS = (
-        "portfolio_line", "drawdown", "category_doughnut",
-        "industry_bar", "penetration_bar", "radar",
+        "portfolio_line",
+        "drawdown",
+        "category_doughnut",
+        "industry_bar",
+        "penetration_bar",
+        "radar",
     )
 
     # 最小穿透数据：触发 sec-penetration 渲染图表容器
     _PENETRATION = {
         "top10": [
-            {"rank": 1, "name": "贵州茅台", "codes": ["600519"], "mv": 10000.0,
-             "ratio_pct": 12.5, "sector": "白酒", "concepts": ["白酒"],
-             "eps_text": "58", "dividend_text": "25.3", "sources": ["基金A"]},
-            {"rank": 2, "name": "宁德时代", "codes": ["300750"], "mv": 8000.0,
-             "ratio_pct": 10.0, "sector": "电池", "concepts": ["新能源"],
-             "eps_text": "--", "dividend_text": "--", "sources": ["基金B"]},
+            {
+                "rank": 1,
+                "name": "贵州茅台",
+                "codes": ["600519"],
+                "mv": 10000.0,
+                "ratio_pct": 12.5,
+                "sector": "白酒",
+                "concepts": ["白酒"],
+                "eps_text": "58",
+                "dividend_text": "25.3",
+                "sources": ["基金A"],
+            },
+            {
+                "rank": 2,
+                "name": "宁德时代",
+                "codes": ["300750"],
+                "mv": 8000.0,
+                "ratio_pct": 10.0,
+                "sector": "电池",
+                "concepts": ["新能源"],
+                "eps_text": "--",
+                "dividend_text": "--",
+                "sources": ["基金B"],
+            },
         ],
         "summary": {
-            "total_mv": 18000.0, "unknown_mv": 0, "total_funds": 2, "failed_funds": 0,
-            "fund_breakdown": "2/2", "total_stocks": 0, "merged_count": 2,
-            "top10_coverage_pct": 100.0, "failed_fund_details": [],
+            "total_mv": 18000.0,
+            "unknown_mv": 0,
+            "total_funds": 2,
+            "failed_funds": 0,
+            "fund_breakdown": "2/2",
+            "total_stocks": 0,
+            "merged_count": 2,
+            "top10_coverage_pct": 100.0,
+            "failed_fund_details": [],
         },
     }
 
@@ -589,8 +644,11 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertEqual(len(boxes), 6, "应恰好 6 个 .chart-box（净值+回撤+Doughnut+行业+穿透+Radar）")
         canvas_ids = {c.get("id") for b in boxes for c in b.select("canvas")}
         for key in (
-            "chart_portfolio_line", "chart_drawdown", "chart_category_doughnut",
-            "chart_industry_bar", "chart_penetration_bar",
+            "chart_portfolio_line",
+            "chart_drawdown",
+            "chart_category_doughnut",
+            "chart_industry_bar",
+            "chart_penetration_bar",
         ):
             self.assertIn(key, canvas_ids)
         # 行业分布 Horizontal Bar 与穿透 TOP10 容器处于同一章节
@@ -698,10 +756,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
     def test_chart_scripts_loaded_in_order(self) -> None:
         """chart-print.js 先于 chart-config.js，再 chart-init.js（登记先于初始化）。"""
         soup = self._render_interactive()
-        chart_scripts = [
-            s.get("src") for s in soup.select("script[src]")
-            if (s.get("src") or "").startswith("chart-")
-        ]
+        chart_scripts = [s.get("src") for s in soup.select("script[src]") if (s.get("src") or "").startswith("chart-")]
         self.assertIn("chart-print.js", chart_scripts)
         self.assertLess(
             chart_scripts.index("chart-print.js"),
@@ -747,8 +802,14 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         data["enable_interactive_charts"] = False
         soup = _render_template(data)
 
-        for key in ("chart_portfolio_line", "chart_drawdown", "chart_category_doughnut",
-                    "chart_industry_bar", "chart_penetration_bar", "chart_radar"):
+        for key in (
+            "chart_portfolio_line",
+            "chart_drawdown",
+            "chart_category_doughnut",
+            "chart_industry_bar",
+            "chart_penetration_bar",
+            "chart_radar",
+        ):
             self.assertIsNone(soup.find(id=key), f"Flag OFF 时不应输出 {key} canvas")
         self.assertIsNotNone(soup.find(id="portfolioChart"), "Flag OFF 时应保留旧净值 Canvas")
         self.assertIsNotNone(soup.find(id="drawdownChart"), "Flag OFF 时应保留旧回撤 Canvas")

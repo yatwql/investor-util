@@ -51,8 +51,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
         """pen_result 无 top10 → 直接返回，不加载额外数据。"""
         from src.python.report.html_renderers import _render_penetration_section
 
-        with patch("src.python.report.html_renderers.compute_penetration_top10",
-                   return_value={}):
+        with patch("src.python.report.html_renderers.compute_penetration_top10", return_value={}):
             result, _, _ = _render_penetration_section(self.holdings, [self.detail], self.prog)
         self.assertEqual(result, {})
 
@@ -69,12 +68,15 @@ class TestRenderPenetrationSection(unittest.TestCase):
         }
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10",
-                                      return_value=mock_top10))
-            stack.enter_context(patch("src.python.report.html_renderers.get_profit_forecast",
-                                      side_effect=Exception("API 失败")))
-            stack.enter_context(patch("src.python.report.html_renderers.get_dividend_data",
-                                      side_effect=Exception("API 失败")))
+            stack.enter_context(
+                patch("src.python.report.html_renderers.compute_penetration_top10", return_value=mock_top10)
+            )
+            stack.enter_context(
+                patch("src.python.report.html_renderers.get_profit_forecast", side_effect=Exception("API 失败"))
+            )
+            stack.enter_context(
+                patch("src.python.report.html_renderers.get_dividend_data", side_effect=Exception("API 失败"))
+            )
             result, prof_ok, div_ok = _render_penetration_section(self.holdings, [self.detail], self.prog)
 
         for entry in result["top10"]:
@@ -96,17 +98,26 @@ class TestRenderPenetrationSection(unittest.TestCase):
         }
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10",
-                                      return_value=mock_top10))
-            stack.enter_context(patch("src.python.report.html_renderers.get_profit_forecast",
-                                      return_value={
-                                          "600900": {"eps_2026e": 1.23},
-                                          "600519": {"eps_2026e": 58.5},
-                                      }))
-            stack.enter_context(patch("src.python.report.html_renderers.get_dividend_data",
-                                      return_value={
-                                          "600900": {"avg_dividend": 0.85},
-                                      }))
+            stack.enter_context(
+                patch("src.python.report.html_renderers.compute_penetration_top10", return_value=mock_top10)
+            )
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_renderers.get_profit_forecast",
+                    return_value={
+                        "600900": {"eps_2026e": 1.23},
+                        "600519": {"eps_2026e": 58.5},
+                    },
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_renderers.get_dividend_data",
+                    return_value={
+                        "600900": {"avg_dividend": 0.85},
+                    },
+                )
+            )
             result, prof_ok, div_ok = _render_penetration_section(self.holdings, [self.detail], self.prog)
 
         entry_600900 = next(e for e in result["top10"] if "600900" in (e.get("codes") or []))
@@ -131,12 +142,11 @@ class TestRenderPenetrationSection(unittest.TestCase):
         }
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10",
-                                      return_value=mock_top10))
-            stack.enter_context(patch("src.python.report.html_renderers.get_profit_forecast",
-                                      return_value={}))
-            stack.enter_context(patch("src.python.report.html_renderers.get_dividend_data",
-                                      return_value={}))
+            stack.enter_context(
+                patch("src.python.report.html_renderers.compute_penetration_top10", return_value=mock_top10)
+            )
+            stack.enter_context(patch("src.python.report.html_renderers.get_profit_forecast", return_value={}))
+            stack.enter_context(patch("src.python.report.html_renderers.get_dividend_data", return_value={}))
             result, _, _ = _render_penetration_section(self.holdings, [self.detail], self.prog)
 
         entry = result["top10"][0]
@@ -181,40 +191,53 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
 
         with ExitStack() as stack:
             # 标准外部依赖 mock
-            stack.enter_context(patch("src.python.report.html_renderers._generate_details",
-                                       return_value=[self.detail]))
-            stack.enter_context(patch("src.python.report.html_renderers.fetch_indices",
-                                       return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
-            stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices",
-                                       return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
-            stack.enter_context(patch("src.python.report.html_renderers._build_category_data",
-                                       return_value=([], True)))
-            stack.enter_context(patch("src.python.report.html_renderers.price_update_status",
-                                       return_value=(0, 0, True)))
+            stack.enter_context(patch("src.python.report.html_renderers._generate_details", return_value=[self.detail]))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_renderers.fetch_indices",
+                    return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}},
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_renderers.fetch_us_indices",
+                    return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}},
+                )
+            )
+            stack.enter_context(patch("src.python.report.html_renderers._build_category_data", return_value=([], True)))
+            stack.enter_context(
+                patch("src.python.report.html_renderers.price_update_status", return_value=(0, 0, True))
+            )
             # 穿透子函数 mock — 返回空穿透结果（industry_success=False）
-            stack.enter_context(patch(
-                "src.python.report.html_writer._render_penetration_section",
-                return_value=({"top10": [], "summary": {}, "industry_success": False}, False, True),
-            ))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer._render_penetration_section",
+                    return_value=({"top10": [], "summary": {}, "industry_success": False}, False, True),
+                )
+            )
             # 基金业绩子函数 mock
-            stack.enter_context(patch(
-                "src.python.report.html_writer._render_fund_performance_section",
-                return_value=([], True),
-            ))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer._render_fund_performance_section",
+                    return_value=([], True),
+                )
+            )
             # data_status mock — industry 失败
-            stack.enter_context(patch(
-                "src.python.report.html_writer.build_penetration_data_status",
-                return_value={
-                    "industry": DataStatusItem(
-                        available=False, tier="T3",
-                        message=STATUS_MESSAGES["industry_unavailable"],
-                    ),
-                },
-            ))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer.build_penetration_data_status",
+                    return_value={
+                        "industry": DataStatusItem(
+                            available=False,
+                            tier="T3",
+                            message=STATUS_MESSAGES["industry_unavailable"],
+                        ),
+                    },
+                )
+            )
             tmpl = MagicMock()
             tmpl.render.return_value = "<html>ok</html>"
-            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template",
-                                       return_value=tmpl))
+            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template", return_value=tmpl))
 
             write_html_report(self.holdings, output_dir=self._tmp)
 
@@ -229,38 +252,51 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.report.html_renderers._generate_details",
-                                       return_value=[self.detail]))
-            stack.enter_context(patch("src.python.report.html_renderers.fetch_indices",
-                                       return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
-            stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices",
-                                       return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
-            stack.enter_context(patch("src.python.report.html_renderers._build_category_data",
-                                       return_value=([], True)))
-            stack.enter_context(patch("src.python.report.html_renderers.price_update_status",
-                                       return_value=(0, 0, True)))
-            stack.enter_context(patch(
-                "src.python.report.html_writer._render_penetration_section",
-                return_value=({"top10": [], "summary": {}, "industry_success": True}, True, True),
-            ))
+            stack.enter_context(patch("src.python.report.html_renderers._generate_details", return_value=[self.detail]))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_renderers.fetch_indices",
+                    return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}},
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_renderers.fetch_us_indices",
+                    return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}},
+                )
+            )
+            stack.enter_context(patch("src.python.report.html_renderers._build_category_data", return_value=([], True)))
+            stack.enter_context(
+                patch("src.python.report.html_renderers.price_update_status", return_value=(0, 0, True))
+            )
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer._render_penetration_section",
+                    return_value=({"top10": [], "summary": {}, "industry_success": True}, True, True),
+                )
+            )
             # 基金业绩子函数 — profit_success=False
-            stack.enter_context(patch(
-                "src.python.report.html_writer._render_fund_performance_section",
-                return_value=([], False),
-            ))
-            stack.enter_context(patch(
-                "src.python.report.html_writer.build_perf_data_status",
-                return_value={
-                    "rank": DataStatusItem(
-                        available=False, tier="T2",
-                        message=STATUS_MESSAGES["rank_unavailable"],
-                    ),
-                },
-            ))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer._render_fund_performance_section",
+                    return_value=([], False),
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer.build_perf_data_status",
+                    return_value={
+                        "rank": DataStatusItem(
+                            available=False,
+                            tier="T2",
+                            message=STATUS_MESSAGES["rank_unavailable"],
+                        ),
+                    },
+                )
+            )
             tmpl = MagicMock()
             tmpl.render.return_value = "<html>ok</html>"
-            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template",
-                                       return_value=tmpl))
+            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template", return_value=tmpl))
 
             write_html_report(self.holdings, output_dir=self._tmp)
 
@@ -274,44 +310,59 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.report.html_renderers._generate_details",
-                                       return_value=[self.detail]))
-            stack.enter_context(patch("src.python.report.html_renderers.fetch_indices",
-                                       return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
-            stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices",
-                                       return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
-            stack.enter_context(patch("src.python.report.html_renderers._build_category_data",
-                                       return_value=([], True)))
-            stack.enter_context(patch("src.python.report.html_renderers.price_update_status",
-                                       return_value=(0, 0, True)))
+            stack.enter_context(patch("src.python.report.html_renderers._generate_details", return_value=[self.detail]))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_renderers.fetch_indices",
+                    return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}},
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_renderers.fetch_us_indices",
+                    return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}},
+                )
+            )
+            stack.enter_context(patch("src.python.report.html_renderers._build_category_data", return_value=([], True)))
+            stack.enter_context(
+                patch("src.python.report.html_renderers.price_update_status", return_value=(0, 0, True))
+            )
             # 穿透有数据（truthy），profit_success/dividend_success 不影响 data_status mock
-            stack.enter_context(patch(
-                "src.python.report.html_writer._render_penetration_section",
-                return_value=({"top10": [{"rank": 1, "codes": ["600900"]}], "summary": {}}, True, True),
-            ))
-            stack.enter_context(patch(
-                "src.python.report.html_writer._render_fund_performance_section",
-                return_value=([], True),
-            ))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer._render_penetration_section",
+                    return_value=({"top10": [{"rank": 1, "codes": ["600900"]}], "summary": {}}, True, True),
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer._render_fund_performance_section",
+                    return_value=([], True),
+                )
+            )
             # 穿透 data_status 抛异常 → 被辅助函数捕获，结果为 {}
-            stack.enter_context(patch(
-                "src.python.report.html_writer.build_penetration_data_status",
-                side_effect=Exception("模拟穿透状态构建失败"),
-            ))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer.build_penetration_data_status",
+                    side_effect=Exception("模拟穿透状态构建失败"),
+                )
+            )
             # 基金业绩 data_status 正常返回
-            stack.enter_context(patch(
-                "src.python.report.html_writer.build_perf_data_status",
-                return_value={
-                    "benchmark": DataStatusItem(
-                        available=False, tier="T3",
-                        message=STATUS_MESSAGES["benchmark_unavailable"],
-                    ),
-                },
-            ))
+            stack.enter_context(
+                patch(
+                    "src.python.report.html_writer.build_perf_data_status",
+                    return_value={
+                        "benchmark": DataStatusItem(
+                            available=False,
+                            tier="T3",
+                            message=STATUS_MESSAGES["benchmark_unavailable"],
+                        ),
+                    },
+                )
+            )
             tmpl = MagicMock()
             tmpl.render.return_value = "<html>ok</html>"
-            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template",
-                                       return_value=tmpl))
+            stack.enter_context(patch("src.python.report.html_writer._ENV.get_template", return_value=tmpl))
 
             write_html_report(self.holdings, output_dir=self._tmp)
 
@@ -354,56 +405,69 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self._tmp, ignore_errors=True)
 
-    def _make_b_series_mocks(self, stack):
+    def _make_fund_deep_analysis_mocks(self, stack):
         """mock 标准依赖 + 4 个 B 系列 _render_* 返回空数据。"""
-        stack.enter_context(patch("src.python.report.html_renderers._generate_details",
-                                   return_value=[self.detail]))
-        stack.enter_context(patch("src.python.report.html_renderers.fetch_indices",
-                                   return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}}))
-        stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices",
-                                   return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}}))
-        stack.enter_context(patch("src.python.report.html_renderers._build_category_data",
-                                   return_value=([], True)))
-        stack.enter_context(patch("src.python.report.html_renderers.price_update_status",
-                                   return_value=(0, 0, True)))
+        stack.enter_context(patch("src.python.report.html_renderers._generate_details", return_value=[self.detail]))
+        stack.enter_context(
+            patch(
+                "src.python.report.html_renderers.fetch_indices",
+                return_value={"sh000001": {"name": "上证", "price": 3120, "change": 10, "change_pct": 0.32}},
+            )
+        )
+        stack.enter_context(
+            patch(
+                "src.python.report.html_renderers.fetch_us_indices",
+                return_value={"gb_dji": {"name": "道指", "price": 35000, "change": 100, "change_pct": 0.29}},
+            )
+        )
+        stack.enter_context(patch("src.python.report.html_renderers._build_category_data", return_value=([], True)))
+        stack.enter_context(patch("src.python.report.html_renderers.price_update_status", return_value=(0, 0, True)))
         # 穿透 + 基金业绩返回（标准）
-        stack.enter_context(patch(
-            "src.python.report.html_writer._render_penetration_section",
-            return_value=({"top10": [], "summary": {}, "industry_success": False}, False, True),
-        ))
-        stack.enter_context(patch(
-            "src.python.report.html_writer._render_fund_performance_section",
-            return_value=([], True),
-        ))
+        stack.enter_context(
+            patch(
+                "src.python.report.html_writer._render_penetration_section",
+                return_value=({"top10": [], "summary": {}, "industry_success": False}, False, True),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "src.python.report.html_writer._render_fund_performance_section",
+                return_value=([], True),
+            )
+        )
         # 4 个 B 系列模块返回空数据
-        stack.enter_context(patch(
-            "src.python.report.html_writer._render_manager_analysis",
-            return_value={"results": [], "first_check_summary": None},
-        ))
-        stack.enter_context(patch(
-            "src.python.report.html_writer._render_overlap_matrix",
-            return_value={"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False},
-        ))
-        stack.enter_context(patch(
-            "src.python.report.html_writer._render_concentration",
-            return_value={"results": []},
-        ))
-        stack.enter_context(patch(
-            "src.python.report.html_writer._render_style_analysis",
-            return_value={"results": []},
-        ))
+        stack.enter_context(
+            patch(
+                "src.python.report.html_writer._render_manager_analysis",
+                return_value={"results": [], "first_check_summary": None},
+            )
+        )
+        stack.enter_context(
+            patch(
+                "src.python.report.html_writer._render_overlap_matrix",
+                return_value={"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False},
+            )
+        )
+        stack.enter_context(
+            patch(
+                "src.python.report.html_writer._render_concentration",
+                return_value={"results": []},
+            )
+        )
+        stack.enter_context(
+            patch(
+                "src.python.report.html_writer._render_style_analysis",
+                return_value={"results": []},
+            )
+        )
         # data_status 构建（标准）
-        stack.enter_context(patch("src.python.report.html_writer.build_index_data_status",
-                                   return_value={}))
-        stack.enter_context(patch("src.python.report.html_writer.build_penetration_data_status",
-                                   return_value={}))
-        stack.enter_context(patch("src.python.report.html_writer.build_perf_data_status",
-                                   return_value={}))
+        stack.enter_context(patch("src.python.report.html_writer.build_index_data_status", return_value={}))
+        stack.enter_context(patch("src.python.report.html_writer.build_penetration_data_status", return_value={}))
+        stack.enter_context(patch("src.python.report.html_writer.build_perf_data_status", return_value={}))
         # 模板
         tmpl = MagicMock()
         tmpl.render.return_value = "<html>ok</html>"
-        stack.enter_context(patch("src.python.report.html_writer._ENV.get_template",
-                                   return_value=tmpl))
+        stack.enter_context(patch("src.python.report.html_writer._ENV.get_template", return_value=tmpl))
         return tmpl
 
     def test_all_bseries_sections_visible_when_empty(self):
@@ -411,7 +475,7 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            tmpl = self._make_b_series_mocks(stack)
+            tmpl = self._make_fund_deep_analysis_mocks(stack)
             write_html_report(self.holdings, include_news=True, output_dir=self._tmp)
 
         _, kwargs = tmpl.render.call_args
@@ -427,7 +491,7 @@ class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
-            tmpl = self._make_b_series_mocks(stack)
+            tmpl = self._make_fund_deep_analysis_mocks(stack)
             write_html_report(self.holdings, include_news=True, output_dir=self._tmp)
 
         _, kwargs = tmpl.render.call_args

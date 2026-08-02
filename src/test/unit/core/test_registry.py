@@ -292,7 +292,7 @@ class TestReportSectionDefault:
         assert "data_source_status" in keys
         assert keys.index("data_source_status") < keys.index("llm_usage")
 
-    def test_factor_exposure_registered_as_b_series(self):
+    def test_factor_exposure_registered_as_fund_deep_analysis(self):
         """factor_exposure 应注册为 b_series 模块（data_flag=factor_exposure_data）。"""
         fe = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "factor_exposure"]
         assert len(fe) == 1, "缺少 factor_exposure 模块条目"

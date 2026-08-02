@@ -9,7 +9,7 @@ from typing import Any
 
 from src.python.core.logger import setup_logger
 from src.python.core.registry import get_report_section_order
-from src.python.report.excel_fund_deep_analysis import write_b_series_sheets
+from src.python.report.excel_fund_deep_analysis import write_fund_deep_analysis_sheets
 from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_llm_usage import write_llm_section_and_usage
 from src.python.report.excel_market_data import resolve_indices, resolve_market_data
@@ -258,7 +258,7 @@ def generate_excel_report(
     pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
     # 因子暴露：C19 数据在编排层注入 pipeline_data，此处透传页签写入
-    write_b_series_sheets(
+    write_fund_deep_analysis_sheets(
         sheets,
         holdings,
         enable_fund_deep_analysis,
