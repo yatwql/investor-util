@@ -418,6 +418,30 @@ class TestCheckSymbolExistence:
         assert "600276" in issues[0]
         assert suggestions == []
 
+    def test_penetration_codes_as_extra_valid(self, sample_holdings):
+        """穿透 TOP10 代码作为 extra_valid_codes → 不报"不在当前持仓中"。
+
+        阳光电源（300274）非直接持仓但属组合穿透范围，智囊团/持仓体检引用
+        其代码时传入 extra_valid_codes 视为有效。
+        """
+        text = "宁德时代（300750）与阳光电源（300274）是组合穿透中的新能源核心持仓。"
+        issues, checked, passed, suggestions = check_symbol_existence(
+            text,
+            sample_holdings,
+            extra_valid_codes={"300274"},
+        )
+        assert checked == 2
+        assert passed == 2  # 300750 持仓 + 300274 穿透有效
+        assert issues == []
+        assert suggestions == []
+
+    def test_penetration_code_alerts_without_extra(self, sample_holdings):
+        """未传 extra_valid_codes 时穿透代码仍告警（参数是唯一豁免来源）。"""
+        text = "阳光电源（300274）作为组合穿透核心持仓值得关注。"
+        issues, checked, passed, suggestions = check_symbol_existence(text, sample_holdings)
+        assert len(issues) == 1
+        assert "300274" in issues[0]
+
     def test_holdings_none(self):
         """holdings_details 为 None → 直接返回。"""
         issues, checked, passed, suggestions = check_symbol_existence("代码 600519 表现良好", None)

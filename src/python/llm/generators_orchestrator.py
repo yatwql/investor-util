@@ -760,7 +760,14 @@ def generate_all_llm(
                     _result,
                     holdings_details,
                     module_label=_module_labels.get(_mk, _mk),
-                    extra_valid_codes=_penetrated_codes if _mk == "penetration_deep" else None,
+                    # 智囊团/持仓体检/穿透深度三模块的提示词均含【穿透 TOP10】数据
+                    # （_format_penetration_block），LLM 会引用穿透股票代码（如宁德时代
+                    # 300750、阳光电源 300274）——它们非直接持仓但属于组合穿透范围，
+                    # 品种存在性校验时须作为额外有效代码，否则误报"不在当前持仓中"。
+                    # 全球政经（global_macro）提示词不含穿透数据，保持严格校验。
+                    extra_valid_codes=_penetrated_codes
+                    if _mk in ("penetration_deep", "expert_review", "health_check")
+                    else None,
                     is_penetration_module=_mk == "penetration_deep",
                     tolerance_pct=_mod_tolerance,
                     history_data=history_data,
