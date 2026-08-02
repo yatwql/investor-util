@@ -61,15 +61,16 @@ class TestHallucinationDetection:
     def test_wrong_profit_rate_vs_portfolio(self):
         """LLM 声称的组合总收益率与实际偏离（20% vs 9.73%）。"""
         text = "组合累计收益达到 20.0%"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, corrections = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) >= 1, "应检测到组合收益率偏离"
+        assert len(corrections) >= 1, "偏离应生成数值修正"
         logger.info("组合收益率偏离检出: %s", issues)
 
     @pytest.mark.scenario_llm
     def test_correct_profit_rate_vs_portfolio(self):
         """LLM 声明的组合总收益率接近实际（10% vs 9.73%），应通过。"""
         text = "组合累计收益约 10.0%"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, _ = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) == 0, "合理精度内不应误报"
         assert passed > 0, "应计入通过"
 
@@ -77,53 +78,55 @@ class TestHallucinationDetection:
     def test_wrong_stock_return(self):
         """LLM 声称招商银行收益率 5%，实际 8.2%。"""
         text = "招商银行(600036)本期收益率为 5.0%"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, corrections = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         # 句中含持仓代码 600036，应对比个股收益率 8.2%
         assert len(issues) >= 1, "应检测到个股收益率偏离"
         assert "600036" in issues[0], "告警应提到具体代码"
+        assert len(corrections) >= 1, "个股收益偏离应生成数值修正"
 
     @pytest.mark.scenario_llm
     def test_correct_stock_return(self):
         """LLM 声明的个股收益率接近实际（8.0% vs 8.2%），应通过。"""
         text = "招商银行(600036)上涨约 8.0%"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, _ = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) == 0, "个股收益率在容差内不应误报"
 
     @pytest.mark.scenario_llm
     def test_correct_portfolio_and_stock(self):
         """LLM 同时引用组合总收益和个股收益，两者均正确。"""
         text = "组合累计收益10.0%，其中招商银行上涨8.0%"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, _ = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) == 0, "正确数值不应告警"
 
     @pytest.mark.scenario_llm
     def test_mixed_correct_and_wrong(self):
         """LLM 的组合收益正确但个股收益错误。"""
         text = "组合收益10.0%，招商银行上涨20.0%"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, corrections = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         # 14.8% → 组合总收益匹配 → pass
         # 20.0% → 句中含 600036 → 对比个股 8.2% → flag
         assert len(issues) >= 1, "个股错误应被检出"
+        assert len(corrections) >= 1, "个股收益偏离应生成数值修正"
 
     @pytest.mark.scenario_llm
     def test_attribution_sentence_skipped(self):
         """收益归因段落中的贡献度占比应跳过（不可与收益率比较）。"""
         text = "【收益归因】主要盈利来源: 招商银行(+26.0%)、贵州茅台(+16.0%)"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, _ = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) == 0, "归因段落数值不应触发收益率告警"
 
     @pytest.mark.scenario_llm
     def test_index_benchmark_skipped(self):
         """指数基准数值（如沪深300涨幅）应跳过。"""
         text = "同期沪深300(000300)涨幅为 23.0%"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, _ = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) == 0, "指数基准数值不应触发告警"
 
     @pytest.mark.scenario_llm
     def test_non_profit_context_skipped(self):
         """非收益上下文数值（如估值百分位）应跳过。"""
         text = "目前招商银行 PE 估值处于历史 15% 分位"
-        issues, total, passed = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        issues, total, passed, _ = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         assert len(issues) == 0, "非收益上下文数值不应触发告警"
 
     # ── 品种存在性 ─────────────────────────────────────────
@@ -193,7 +196,7 @@ class TestHallucinationDetection:
             "贵州茅台(600519)上涨 15.0%。"
             "最大持仓是贵州茅台(600519)。"
         )
-        i1, _, p1 = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
+        i1, _, p1, _ = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         i2, _, p2, _ = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
         i3, _, p3 = check_ranking_correctness(text, _STD_HOLDINGS_DETAILS)
         fails = len(i1) + len(i2) + len(i3)
