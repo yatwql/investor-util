@@ -243,7 +243,7 @@ def _dedup_by_title(
         ① ratio ≥ 0.50 安全区，直接合并
         ② cross_threshold ≤ ratio < 0.50，阶梯判定：
            - 共享 ≥ 3 个实体 bigram → 合并（高实体重叠，低 ratio 门槛）
-           - 共享 ≥ 2 个实体 bigram 且 ratio ≥ 0.45 → 合并（中高 ratio 补偿）
+           - 共享 ≥ 2 个实体 bigram 且 ratio ≥ 0.40 → 合并（中高 ratio 补偿）
            - 否则跳过（实体重叠不足或 ratio 太低）
 
     _normalize_title 剥离通用数字模式（百分比、金额、年份等）和前缀修饰语。
