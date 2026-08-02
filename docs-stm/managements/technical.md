@@ -2001,7 +2001,7 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 | 指纹缓存 | `fingerprint.py` — 依赖数据指纹过滤（排除行情波动字段） | 仅品种/份额/成本变化时重新调用 |
 | 乐观缓存预检 | 从 Provider 链中取链首 Provider 优先检查缓存，命中即返回 | 减少链遍历开销 |
 | 辩论路由 | `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`，Feature Flag 控制启停（默认关闭） | 辩论模式与标准模式互斥，辩论优先 |
-| Token 预算守卫 | 每阶段输出字符数 > `int(max_tokens × 0.65)` 时触发保护：1× 超限→跳过 synthesis 阶段并拼接 pro+con；2× 超限→回退标准模式 | 防止辩论模式过度消耗 token |
+| Token 预算守卫 | pro+con 累计输出字符数 > `int(max_total_tokens_per_report)`（1 字符 ≈ 1 token，默认预算 48000）时触发保护：1× 超限→跳过 synthesis 阶段并拼接 pro+con；2× 超限→回退标准模式。配合 `per_call_max_tokens`（默认 8192，经 `max_tokens_override` 生效）单段上限双闸保护 | 防止辩论模式过度消耗 token |
 | 虚构代码过滤 | `_filter_hallucinated_codes()` 正则句段级过滤，经 `skeleton.py` 的 `raw_filter_fn` 钩子在 markdown_to_html 之前作用于 LLM 原始 Markdown；按"行→句末标点"两级切分精确删除，`TOP\d` 排名表述 + 英文白名单豁免误报 | 消除 LLM 产生的虚构证券代码，且不因 HTML 单行拼接误删整段 |
 
 各项机制的详细实现见 `llm-technical.md` §5~§11（API 调用层、重试与容错、缓存与指纹失效、提示词管理、会话级 Token 追踪、模型定价、熔断器）。

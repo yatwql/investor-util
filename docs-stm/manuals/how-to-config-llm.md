@@ -297,7 +297,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
-- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
+- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，null=默认 8192）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 48000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
 
 ### 模块级配置
 
@@ -459,6 +459,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "debate": {
     // 正反辩论 — 三段式(白脸→黑脸→综合)
     "procon": {
+      // 每阶段 max_tokens 覆盖（null=默认 8192；经 max_tokens_override 优先于 max_tokens_expert_review）
       "per_call_max_tokens": null,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
@@ -477,7 +478,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
-    "max_total_tokens_per_report": 16000,
+    "max_total_tokens_per_report": 48000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
   },

@@ -19,7 +19,7 @@ _MIN_HOLDINGS = [
      "profit": 20000, "profit_rate": 0.25, "change_pct": 1.5, "nav_date": "2026-07-20", "source_api": "mock"},
 ]
 
-_LONG_TEXT = "分析" * 2000  # 4000 chars — exceeds default budget (16000*0.65=10400 chars)
+_LONG_TEXT = "分析" * 2000  # 4000 chars — 配合显式低预算（100×1.0=100 chars）超 1× 阈值
 _SHORT_TEXT = "分析结果"  # 4 chars
 
 
@@ -53,7 +53,7 @@ class TestDebateTokenBudgetExceeded(unittest.TestCase):
         # 模拟 pro 和 con 返回长文本（超过预算）
         mock_gen.side_effect = [
             _mock_short_result(),  # pro: 4 chars
-            _mock_long_result(),  # con: 4000 chars → 总和 4004 > 65(100*0.65=65)
+            _mock_long_result(),  # con: 4000 chars → 总和 4004 > 100(100×1.0=100)
         ]
 
         from src.python.llm.generators import generate_debate_procon
@@ -125,8 +125,8 @@ class TestDebateTokenBudget2xFallback(unittest.TestCase):
                 },
             },
         }
-        # 2× 预算 = 100*0.65*2 = 130 chars，单个 long 就超过
-        _very_long = "分" * 200
+        # 2× 预算 = 100×1.0×2 = 200 chars，单个 long（300）超过 2× 阈值
+        _very_long = "分" * 300
         mock_gen.side_effect = [
             (_very_long, False),  # pro: 200 chars > 130
         ]

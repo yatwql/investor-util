@@ -15,6 +15,14 @@
 
 - **报告图表图下说明（每张图表标注该图是什么图表）** — 用户需求：报告中每个图表下方标注图表说明（如「TOP 10 持仓资产」）。`report_template.html` 新增 `.chart-caption` 样式（居中 12px 灰色，置于 `.chart-box` 容器外避免固定高度溢出，复用 radar 既有"降级 note"容器外模式），并为 6 张 Chart.js 图表在 canvas 下方渲染图注：净值趋势→「组合净值走势」、回撤分析→「历史回撤走势」、资产构成环形图→「资产构成分布」、行业分布→「持仓行业分布」、穿透 TOP10→「TOP 10 持仓资产」、量化指标雷达→「组合量化指标画像」。图注跟随 canvas 渲染分支（Doughnut/行业/穿透/Radar 有数据才渲染，空数据显示占位无图注；净值/回撤 canvas 无条件渲染则图注常显）。纯模板静态文本，不触 O2 键名契约 / C14 / C19 约束，不动 JS 文件。新增 2 个回归用例（6 图图注文案齐全 + 空数据不渲染图注）。`reports-instruction.md` 交互图表特性同步补充图注说明
 
+### Fix
+
+- **rf-153：辩论 Token 预算守卫频繁误触发跳过 synthesis（per_call_max_tokens 死配置 + 预算默认过低 + 字符换算低估）** — 用户反馈（2026-08-02 实测日志：pro+con 输出 13872 chars > 10400 阈值 → 综合失败返回 pro+con 拼接）。三个叠加根因：① **`debate.procon.per_call_max_tokens` 是死配置**：`generate_debate_procon` 算出的 `_max_tokens`（8192）仅作为 `max_tokens_default` 传入 `generate_llm_module`，而 `_run_standard_mode`（`skeleton.py`）优先读 `llm_config["max_tokens_expert_review"]`（用户配置 24000）——单段输出上限实际是 24000 而非 8192（实测 pro 约 8900 tokens 已超 8192），文档宣称的"每阶段 max_tokens 覆盖"未实现；② **默认预算 16000 喂不饱三段式调用**：每段输入 prompt ~3000 tokens（完整专家复盘上下文），synthesis 还要把 pro+con 全文（~1.4 万字符）塞进输入，三段真实成本约 3.5 万 token，16000 连 pro+con 都快装不下 → synthesis 必被砍；③ **字符换算 0.65 低估实际用量**：注释假设"1 中文字符 ≈ 1.5 token"，实际中文+Markdown 约 1 字符 ≈ 1 token，守卫在真实预算 ~65% 处提前触发，且只数 pro+con 输出、漏算每段输入与 thinking 消耗。修复：① `skeleton.py` `generate_llm_module` / `_run_standard_mode` 新增 `max_tokens_override` 参数（不为 None 时优先于 `max_tokens_{module_key}`），`generate_debate_procon` 三段调用（pro/con/synthesis）均传入 `_max_tokens`，`per_call_max_tokens`（null=默认 8192）恢复生效；② `max_total_tokens_per_report` 默认 16000→48000（`_llm_defaults.py` / `_core.py` / 用户 `data/config/llm_settings.json`），覆盖三段真实成本 + 最坏情形余量；③ 字符换算 `int(budget × 0.65)`→`int(budget)`（1 字符 ≈ 1 token），守卫退化为病态输出的纯安全网（正常三段输出 1.4~2 万字符远低于 4.8 万阈值，synthesis 稳定执行）。同步文档：`requirements.md` R-LLM-DB-PROCON-06 公式/`per_call_max_tokens` 语义（null=默认 8192）/`max_total_tokens_per_report` 默认值；`technical.md` Token 预算守卫表；`how-to-config-llm.md` debate 描述 + 示例注释 + 默认值
+
+### Test
+
+- **rf-153 回归测试** — `test_skeleton.py` 新增 `TestMaxTokensOverride` 3 例：`test_override_wins_over_module_level_config`（显式 override 优先于 `max_tokens_expert_review`=24000）/ `test_override_none_falls_back_to_module_config`（无 override 回退模块级，兼容既有行为）/ `test_override_none_falls_back_to_default_when_config_missing`（模块级缺失回退 `max_tokens_default`）；`test_debate_generators.py` 新增 `test_per_call_max_tokens_passed_as_override`（配置 `per_call_max_tokens=4096` 时三段调用均携带 `max_tokens_override=4096`，锁定死配置修复）；`test_debate_token_budget.py` 2× 边界测试文本 200→300 字符（换算因子 0.65→1.0 后 2× 阈值=200）、`test_debate_generators.py` 预算跳过测试改为显式低预算（100）配置触发（默认预算已提至 48000）。LLM 套件 891 passed
+
 ---
 
 ## [0.9.6] - 2026-08-02

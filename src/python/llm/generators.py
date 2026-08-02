@@ -448,9 +448,10 @@ def generate_debate_procon(
     _timeout = debate_cfg.get("per_call_timeout_override", 90)
 
     # ── Token 预算守卫 ─────────────────────────────────
-    _max_total_tokens_budget = debate_cfg.get("max_total_tokens_per_report", 16000)
-    # 按 1 中文字符 ≈ 1.5 token 估算，转为字符级阈值（保守偏宽松）
-    _budget_char_threshold = int(_max_total_tokens_budget * 0.65)
+    _max_total_tokens_budget = debate_cfg.get("max_total_tokens_per_report", 48000)
+    # 实际中文+Markdown 混排输出约 1 字符 ≈ 1 token（原 ×0.65 按 1.5 token/字符
+    # 估算严重低估，守卫在真实预算 ~65% 处过早触发，synthesis 频繁被砍），改为按 1:1。
+    _budget_char_threshold = int(_max_total_tokens_budget)
     _cumulative_chars: int = 0
 
     # ── 构建有效持仓代码集合（幻觉过滤用） ────────────
@@ -487,6 +488,7 @@ def generate_debate_procon(
             system_prompt_default=_SYSTEM_DEBATE_PRO,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
+            max_tokens_override=_max_tokens,
             timeout_default=_timeout,
             output_brief_limit=300,
             system_prompt=_SYSTEM_DEBATE_PRO,
@@ -537,6 +539,7 @@ def generate_debate_procon(
             system_prompt_default=_SYSTEM_DEBATE_CON,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
+            max_tokens_override=_max_tokens,
             timeout_default=_timeout,
             output_brief_limit=300,
             system_prompt=_SYSTEM_DEBATE_CON,
@@ -606,6 +609,7 @@ def generate_debate_procon(
             system_prompt_default=_synthesis_system,
             prompt_builder=lambda: _synthesis_user,
             max_tokens_default=_max_tokens,
+            max_tokens_override=_max_tokens,
             timeout_default=_timeout,
             output_brief_limit=300,
             system_prompt=_synthesis_system,

@@ -93,5 +93,70 @@ class TestHandleCacheHit(unittest.TestCase):
         self.assertTrue(hasattr(skeleton, "_handle_truncation"))
 
 
+class TestMaxTokensOverride(unittest.TestCase):
+    """max_tokens_override — 显式覆盖优先于模块级 max_tokens_{module_key} 配置。
+
+    回归锁定 rf-153 死配置 bug：辩论模式 per_call_max_tokens 以 max_tokens_default
+    传入时被 _run_standard_mode 的 ``llm_config.get("max_tokens_{module_key}")`` 覆盖，
+    实际继承 expert_review 模块的宽松上限（24000），单段输出不受 8192 限制 → 辩论
+    总成本失控 → 预算守卫频繁触发跳过 synthesis。
+    """
+
+    def _capture_max_tokens(self, llm_config: dict, override: int | None, module_max: int):
+        """调用 _run_standard_mode，返回 generate_llm_content 实际收到的 max_tokens。"""
+        from unittest.mock import patch
+
+        from src.python.llm import skeleton
+
+        captured: dict = {}
+
+        def fake_generate_llm_content(*args, **kwargs):
+            captured["max_tokens"] = kwargs.get("max_tokens")
+            return (None, False)
+
+        with patch.object(skeleton, "generate_llm_content", side_effect=fake_generate_llm_content):
+            skeleton._run_standard_mode(
+                llm_config=llm_config,
+                module_key="expert_review",
+                force=True,
+                http_client=None,
+                fingerprint_fn=lambda: "fp",
+                system_prompt_default="sys",
+                prompt_builder=lambda: "user",
+                max_tokens_default=8192,
+                max_tokens_override=override,
+                timeout_default=90,
+                output_brief_limit=300,
+            )
+        return captured.get("max_tokens")
+
+    def test_override_wins_over_module_level_config(self):
+        """显式 override 存在时优先使用（辩论 per_call_max_tokens 生效）。"""
+        result = self._capture_max_tokens(
+            llm_config={"max_tokens_expert_review": 24000},
+            override=4096,
+            module_max=24000,
+        )
+        self.assertEqual(result, 4096)
+
+    def test_override_none_falls_back_to_module_config(self):
+        """无 override 时回退模块级 max_tokens_{module_key}（兼容既有行为）。"""
+        result = self._capture_max_tokens(
+            llm_config={"max_tokens_expert_review": 24000},
+            override=None,
+            module_max=24000,
+        )
+        self.assertEqual(result, 24000)
+
+    def test_override_none_falls_back_to_default_when_config_missing(self):
+        """无 override 且模块级配置缺失时回退 max_tokens_default。"""
+        result = self._capture_max_tokens(
+            llm_config={},
+            override=None,
+            module_max=8192,
+        )
+        self.assertEqual(result, 8192)
+
+
 if __name__ == "__main__":
     unittest.main()
