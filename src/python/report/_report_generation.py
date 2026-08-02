@@ -235,19 +235,22 @@ def _generate_full_html_report(
     news_ok: bool,
     history_data: dict | None,
     reporter: ProgressReporter,
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     enable_news: bool,
     enable_history: bool,
     enable_llm: bool,
     debate_info: dict | None,
     result,
     metrics: dict | None = None,
+    factor_exposure: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
     Args:
         metrics: compute_all_metrics() 返回值（14 项全量，仅 full 路径）；
             用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
+        factor_exposure: 因子暴露分析 C19 契约 dict，
+            基金深度分析关闭或数据不足时为 None/available=False。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -277,13 +280,14 @@ def _generate_full_html_report(
             progress=reporter,
             a_indices=prep["a_indices"],
             us_indices=prep["us_indices"],
-            enable_b_series=enable_b_series,
+            enable_fund_deep_analysis=enable_fund_deep_analysis,
             enable_news=enable_news,
             enable_history=enable_history,
             enable_llm=enable_llm,
             debate_info=debate_info,
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
+            factor_exposure=factor_exposure,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -309,7 +313,7 @@ def _generate_full_excel_report(
     pipeline_data: dict | None,
     history_data: dict | None,
     reporter: ProgressReporter,
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     enable_news: bool,
     enable_history: bool,
     enable_llm: bool,
@@ -337,7 +341,7 @@ def _generate_full_excel_report(
             progress=reporter,
             pipeline_data=pipeline_data,
             history_data=history_data,
-            enable_b_series=enable_b_series,
+            enable_fund_deep_analysis=enable_fund_deep_analysis,
             enable_news=enable_news,
             enable_history=enable_history,
             enable_llm=enable_llm,
@@ -367,7 +371,7 @@ def _generate_report_both(
     流程：_compute_details() → capture_snapshot() → fetch_history_data()
           → write_html_report() → generate_excel_report()
     """
-    from src.python.config import is_enable_b_series, is_enable_history, is_enable_news
+    from src.python.config import is_enable_fund_deep_analysis, is_enable_history, is_enable_news
     from src.python.config.features import is_feature_enabled
     from src.python.core.perf import PerfCollector
     from src.python.core.registry import get_report_section_order
@@ -383,7 +387,7 @@ def _generate_report_both(
     # 后台启动健康检查（与数据获取并行）
     _health_fut = _spawn_health_checks(holdings)
 
-    _enable_b_series = is_enable_b_series(config)
+    _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
@@ -436,7 +440,7 @@ def _generate_report_both(
             section_order=sec_order,
             history_data=history_data,
             progress=reporter,
-            enable_b_series=_enable_b_series,
+            enable_fund_deep_analysis=_enable_fund_deep_analysis,
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=False,
@@ -465,7 +469,7 @@ def _generate_report_both(
             pipeline_data=pipeline_data,
             history_data=history_data,
             progress=reporter,
-            enable_b_series=_enable_b_series,
+            enable_fund_deep_analysis=_enable_fund_deep_analysis,
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=False,
@@ -511,8 +515,12 @@ def _build_chart_datasets_for_report(
         from src.python.report.chart_data_builder import build_chart_datasets
 
         _metric_flag_names = (
-            "metrics_sharpe", "metrics_calmar", "metrics_hhi",
-            "metrics_winrate", "metrics_turnover", "metrics_beta",
+            "metrics_sharpe",
+            "metrics_calmar",
+            "metrics_hhi",
+            "metrics_winrate",
+            "metrics_turnover",
+            "metrics_beta",
         )
         metric_flags = {n: is_feature_enabled(n) for n in _metric_flag_names}
 
@@ -546,7 +554,7 @@ def _generate_report_full(
           → get_sector_fund_flow() → _fetch_llm_and_news()
           → write_html_report() → generate_excel_report()
     """
-    from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
+    from src.python.config import is_enable_fund_deep_analysis, is_enable_history, is_enable_llm, is_enable_news
     from src.python.config.features import is_feature_enabled
     from src.python.fetcher.akshare import get_sector_fund_flow
     from src.python.core.perf import PerfCollector
@@ -560,7 +568,7 @@ def _generate_report_full(
     result.holdings_ok = True
     _health_fut = _spawn_health_checks(holdings)
 
-    _enable_b_series = is_enable_b_series(config)
+    _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_llm = is_enable_llm(config)
@@ -575,6 +583,10 @@ def _generate_report_full(
     # ── 2. F1 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
+    # 因子暴露：prep 中已组装（C19 契约），注入 pipeline_data 供 HTML/Excel 消费；
+    # capture_snapshot 在降级路径可能返回 None，需判空
+    if pipeline_data is not None:
+        pipeline_data["factor_exposure"] = prep.get("factor_exposure")
     _validate_pipeline_snapshot(pipeline_data)
     perf.stop()
 
@@ -638,13 +650,14 @@ def _generate_report_full(
         news_ok,
         history_data,
         reporter,
-        _enable_b_series,
+        _enable_fund_deep_analysis,
         _enable_news,
         _enable_history,
         _enable_llm,
         debate_info,
         result,
         _metrics,
+        prep.get("factor_exposure"),
     )
 
     # ── 7. Excel 报告 ──
@@ -660,7 +673,7 @@ def _generate_report_full(
         pipeline_data,
         history_data,
         reporter,
-        _enable_b_series,
+        _enable_fund_deep_analysis,
         _enable_news,
         _enable_history,
         _enable_llm,

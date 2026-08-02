@@ -217,6 +217,51 @@ class TestDebateProconFlow(unittest.TestCase):
             # 超预算后 synthesis 不调用
             self.assertEqual(mock_gen.call_count, 2)
 
+    # ── 测试：穿透资产代码加入 valid_codes（幻觉过滤误伤修复） ──
+
+    def _capture_con_raw_filter(self, kwargs: dict):
+        """mock generate_llm_module 三步全成功后，捕获 con 步骤的 raw_filter_fn。"""
+        from src.python.llm.generators import generate_debate_procon
+
+        with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
+            mock_gen.side_effect = [
+                ("600519 适合长期持有。", False),
+                ("600519 需注意。", False),
+                ("综合建议。", False),
+            ]
+            generate_debate_procon(**kwargs)
+            return mock_gen.call_args_list[1].kwargs["raw_filter_fn"]
+
+    def test_penetrated_assets_codes_not_filtered(self):
+        """穿透 TOP10 资产代码（如 QDII 基金穿透到 AAPL/MSFT）不被误判为虚构。
+
+        回归缺陷：valid_codes 仅收集直接持仓代码，穿透资产代码被 _filter_hallucinated_codes
+        误判为虚构，LLM 在辩论中合理引用时整句删除。
+        """
+        kwargs = dict(self.base_kwargs)
+        kwargs["penetrated_assets"] = [
+            {"name": "苹果", "codes": ["AAPL"], "mv": 100000, "ratio": 8.0, "sector": "科技"},
+            {"name": "微软", "codes": ["MSFT"], "mv": 90000, "ratio": 7.2, "sector": "科技"},
+        ]
+        raw_filter_fn = self._capture_con_raw_filter(kwargs)
+        text = "穿透底层 AAPL 苹果是纳指最大权重股，MSFT 微软同样占比较大。"
+        filtered = raw_filter_fn(text)
+        self.assertIn("AAPL", filtered)
+        self.assertIn("MSFT", filtered)
+        self.assertEqual(filtered, text)
+
+    def test_penetrated_assets_real_hallucination_still_filtered(self):
+        """加入穿透代码后，真正的虚构代码仍被过滤（不过度豁免）。"""
+        kwargs = dict(self.base_kwargs)
+        kwargs["penetrated_assets"] = [
+            {"name": "苹果", "codes": ["AAPL"], "mv": 100000, "ratio": 8.0, "sector": "科技"},
+        ]
+        raw_filter_fn = self._capture_con_raw_filter(kwargs)
+        text = "AAPL 苹果是真实穿透资产。\nX1234 虚构品种需警惕。"
+        filtered = raw_filter_fn(text)
+        self.assertIn("AAPL", filtered)
+        self.assertNotIn("X1234", filtered)
+
 
 @pytest.mark.unit_llm
 class TestFilterHallucinatedCodes(unittest.TestCase):

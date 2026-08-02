@@ -256,7 +256,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 18 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 19 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型**：
 
@@ -266,7 +266,7 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 
 | 层级 | 含义 | 来源 |
 |:-----|:------|:------|
-| board 层 | 用户配置的章节开关 | `config.json`（`enable_b_series`/`enable_news`/`enable_history`） |
+| board 层 | 用户配置的章节开关 | `config.json`（`enable_fund_deep_analysis`/`enable_news`/`enable_history`） |
 | data 层 | 运行时数据可用性 | 各子模块返回值非 None 判定 |
 
 #### 1.4.5 数据降级治理体系
@@ -1041,7 +1041,7 @@ def _get_pool() -> ThreadPoolExecutor:
                                  news_correlation /       (STATUS_MESSAGES/
                                  llm_content /            TIER_PREFIX/
                                                           DegradationTracker)
-                                 基金深度分析 4 个 /
+                                 基金深度分析 5 个 /
                                  excel_writer.py +
                                  styles.py
 ```
@@ -1197,7 +1197,7 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 ```python
 board_flags = {
     "always":   True,
-    "b_series": enable_b_series,
+    "b_series": enable_fund_deep_analysis,
     "news":     enable_news,
     "history":  enable_history,
     "llm":      enable_llm,
@@ -1229,7 +1229,7 @@ for sec in section_order:
 
 ### 4.6 报告序号可配置
 
-报告 18 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 19 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1245,7 +1245,7 @@ for sec in section_order:
 }
 ```
 
-18 个模块分布：`always`×6、`b_series`×4、`news`×1、`llm`×5、`history`×2。
+19 个模块分布：`always`×6、`基金深度分析`×5、`news`×1、`llm`×5、`history`×2。
 
 #### 合并规则流程
 
@@ -1255,7 +1255,7 @@ get_report_section_order(config)
     ▼
 ┌────────────────────────┐
 │ config 中有             │
-│ report_section_order?  │── NO ──→ 返回完整 18 项默认顺序
+│ report_section_order?  │── NO ──→ 返回完整 19 项默认顺序
 └───────────┬────────────┘
            YES
             │
@@ -1273,7 +1273,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（18 项，key/number/type/data_flag）
+返回 result（19 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -1476,12 +1476,12 @@ prune()：两阶段自动清理
 
 ### 4.8 基金深度分析
 
-基金深度分析 4 个模块通过 `enable_b_series` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
+基金深度分析 5 个模块通过 `enable_fund_deep_analysis` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
 
 ```
                     基金深度分析模块架构
                          │
-           enable_b_series = True?
+           enable_fund_deep_analysis = True?
                          │
               ┌──────────┴──────────┐
               │                     │
@@ -1490,6 +1490,9 @@ prune()：两阶段自动清理
               │                     │
          B4 持仓集中度          B5 基金风格分析
          TOP N 占比+环比      市值/PE 加权判定
+              │
+         B6 因子暴露分析
+         OLS 回归风格画像
 ```
 
 #### B2 基金经理变更监控
@@ -1578,6 +1581,61 @@ Excel 热力图着色：
 - 会话级缓存委托 DataSourceRegistry session_cache（domain="extended"），同一股票仅首次 HTTP
 - Tencent 二级降级基于 registry 熔断器（provider="tencent_style"），避免网络不可达时逐只等待超时
 - 独立快照 `fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
+
+#### B6 因子暴露分析
+
+基于组合整体时间序列回归估算组合在价值/成长/质量因子上的暴露（β），输出"组合风格画像"（`analysis/factor_exposure.py` / `report/orchestrator.py::compute_factor_exposure_data`）。
+
+> **与 B5 基金风格分析的差异化**：B5 是**每只基金的截面分类**（六宫格：市值×风格，基于 PE/市值阈值），回答"这只基金长什么样"；B6 是**组合整体的时间序列回归**（因子收益回归组合收益得 β），回答"组合收益由什么风格因子驱动"。方法论与粒度均不同，报告 UI 文案需注明差异（"分类" vs "回归估算"），避免混淆"风格归属柱状图"与六宫格。
+
+```
+R_p = β₁R_value + β₂R_growth + β₃R_quality + α + ε
+                          ↑ MVP 固定 3 因子（价值/成长/质量）
+    结果输出为"风格归属柱状图"（价值/成长/质量各一根柱）
+```
+
+**模块分层（对齐 plan-2 模式，C14 依赖）**：
+
+```
+analysis/factor_exposure.py   # 纯计算：接收(组合收益序列+因子收益序列) → OLS → 输出
+    ↑ 无数据获取、无报告依赖，纯 pandas/numpy
+report/orchestrator.py         # 编排：拉取组合收益(独立拉持仓历史 days=60 算 as-if) + 因子K线
+    │                           (fetch_index_history，走 chain) → 对齐 → 调纯计算
+    ↓                           → 写 pipeline_data['factor_exposure']（C19）
+report/ 渲染                   # 模板 context 传递（C14）→ 柱状图 + 风格归属表
+```
+
+**因子集合（分析模块常量 `FACTOR_INDICES`，不注册 `_A_INDICES`，见 C1 行）**：
+
+| 因子 | 代理指数 | 代码 | 说明 |
+|:----|:--------|:-----|:-----|
+| 价值 | 300 价值 | sh000919 | 大盘价值代理 |
+| 成长 | 500 成长 | sh000925 | 替代停更的 300 成长（sh000920）；中盘成长代理，报告中注明代理口径 |
+| 质量 | 300 质量 | sh000930 | 全指质量代理 |
+
+- 低波（sh000931）probe 有效但不进 MVP（保留为扩展位）
+- `FACTOR_STALE_DAYS=120` 新鲜度校验：最后一根 bar 距今 > 120 天的因子从集合剔除并告警（`stale_factors`），剩余因子 < 2 时落 §1.4.5 数据不足分支
+- 基准对照 `baseline_betas`：沪深300（sh000300）在同一回归窗口的因子暴露，用于风格漂移判断（复用既有指数链路）
+
+**计算方案（probe 后收敛）**：
+
+- **R_p 来源（重要）**：不能复用 `PortfolioHistoryCalculator.get_combined_timeseries().daily_returns`——该方法的 `days` 参数只传给基准，持仓历史走 chain 默认 `days=30`，组合收益序列固定 30 期不满足 ≥36 期需求。编排层独立拉取每只持仓历史（`fetch_with_incremental_fallback("history_stock"|"history_fund_otc", code, days=60)`，C4 会话缓存复用已拉 30 天、增量补至 60 天），按 as-if 语义（当前份额 × 历史价格）计算组合日收益序列，与 `portfolio_history` 章节口径一致。
+- **回归序列对齐（关键）**：OLS 要求 R_p 与各因子收益严格按交易日对齐。pandas 构造 DataFrame 后 `merge`（on=`date`，inner join）对齐——因子收益由 CSI 指数 K 线 `close` 计算 pct_change，天然带日期索引；复用 plan-2 相同对齐思路（`analysis/correlation.py`），不另造机制。
+- **NaN 处理**：持仓品种停牌/缺数据时 `daily_returns` 含 NaN，对 R_p 用 `dropna()` 剔除无效日后再 merge，记录实际有效样本数。
+- **动态窗口（数据量自适应）**：回归窗口 = `min(60, 有效样本 - 自由度余量)`，优先满足 ≥36 下限，不足则数据不足分支。
+- **OLS 实现**：`statsmodels` 未安装，用 `numpy.linalg.lstsq` 手写 OLS + t 检验，复用 `_math_utils.py` 的 t 分布函数（`_t_critical_95`/`_beta_se`），**不新增依赖**。
+- **因子共线性**（500价值/500成长同源指数高度相关）：MVP 不做正交化/岭回归，仅输出**因子相关矩阵**作为诊断展示，并在风格归属图中对高相关因子的并列 β 给出文案提示。
+
+**架构约束遵从**：
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
+| **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "sina"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（rf-103 已处理，降级接受），Tencent 故障时因子章节落 §1.4.5 数据不足分支 |
+| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`b_series`、data_flag=`factor_exposure_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号 |
+| **C14** (渲染期数据不可写入模块级全局变量) | 因子暴露数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
+| **C19** (pipeline_data Schema 契约) | 新增 `factor_exposure` 键（类型 `dict`），键结构见附录 H，先定义类型再使用 |
+| **§1.4.5** (数据降级治理) | 区分两分支：① **数据不足**——因子指数历史不足 36 期或有效样本 < 36，标记 `factor_exposure.available=false`，显示"数据不足"占位文本，**不走 DegradationTracker**（系数据量不足，非故障）；② **数据源故障**——`fetch_index_history` 返回空（chain 全失败），走 DegradationTracker 记录 T2 降级事件，显示"数据源暂不可用"，与数据不足文案区分。**绝不输出误导性数字** |
 
 ### 4.9 资产穿透 TOP10
 
@@ -2273,7 +2331,7 @@ core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号不可硬编码** — 报告 18 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
+| **C7** | **报告序号不可硬编码** — 报告 19 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 pipeline_data Schema 定义文档中预定义类型、版本号、写入/消费模块后，才能在代码中使用该键（详见附录 H） | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
@@ -2518,8 +2576,8 @@ investor-util/
 | liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
 | fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
 | scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
-| factor_exposure | dict | 是 | 计划中 | prepare_report_data |
+| factor_exposure | dict | 是 | 已实现 | prepare_report_data |
 
-> `factor_exposure`（因子暴露分析）：`{"available": bool, "betas": {factor: float}, "t_stats": {factor: float}, "style_allocation": {factor: float}, "window": int}`。C7 注册见 `plan-advanced-analysis.md` §4 技术债与技术预置。
+> `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`b_series`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 B6。
 
 [↑ 回到顶部](#目录)

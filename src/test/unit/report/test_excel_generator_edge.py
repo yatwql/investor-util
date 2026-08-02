@@ -60,7 +60,7 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
             # 基金业绩
             patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None),
             patch("src.python.fetcher.fund.fetch_fund_benchmark", return_value="--"),
-            # B 系列数据
+            # 基金深度分析数据
             patch("src.python.report.fund_manager_analysis.detect_manager_changes",
                   return_value=[]),
             patch("src.python.report.fund_overlap.compute_overlap_matrix",
@@ -98,8 +98,8 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
             progress=self.progress,
         )
 
-    def test_global_degradation_bseries_placeholder_logged(self):
-        """所有外部 API 失败 → B 系列模块写入占位文本（而非报错）。"""
+    def test_global_degradation_fund_deep_analysis_placeholder_logged(self):
+        """所有外部 API 失败 → 基金深度分析模块写入占位文本（而非报错）。"""
         from src.python.report.excel_generator import generate_excel_report
 
         self._mock_external_apis()
@@ -119,7 +119,7 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
         # generator 运行时未记录任何 add_error → 各模块异常隔离生效
         errors = self.progress.get_errors()
         # 因所有 API 被 mock 返回空数据，内部 sheet 逻辑正常处理，
-        # 且 B 系列写入器无条件调用（不受 if data: 保护），预期不触发 add_error
+        # 且基金深度分析写入器无条件调用（不受 if data: 保护），预期不触发 add_error
         self.assertEqual(len(errors), 0)
 
 
@@ -161,7 +161,7 @@ class TestMessageConsistency(unittest.TestCase):
                 self.assertGreater(len(msg), 0)
 
     def test_placeholder_texts_used_in_both(self):
-        """B 系列 STATUS_MESSAGES key 完整且被 sheet 模块引用。"""
+        """基金深度分析 STATUS_MESSAGES key 完整且被 sheet 模块引用。"""
         from src.python.report.fund_manager_sheet import write_fund_manager_sheet
         from src.python.report.fund_concentration_sheet import write_concentration_sheet
         from src.python.report.fund_style_sheet import write_style_sheet

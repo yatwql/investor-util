@@ -12,7 +12,7 @@ def should_create_sheet(section: dict, data_availability: dict[str, bool] | None
     """纯 data 层：按注册表的 data_flag 判断模块数据是否就绪。
 
     无 data_flag 的模块（always、history）始终创建；data_flag
-    未出现在 data_availability 中时视为已就绪（如 b_series 的
+    未出现在 data_availability 中时视为已就绪（如基金深度分析的
     数据在页签创建后才写入，由下游函数自行兜底）。
     """
     flag_name = section.get("data_flag")
@@ -25,7 +25,7 @@ def should_create_sheet(section: dict, data_availability: dict[str, bool] | None
 def create_sheets(
     wb: Any,
     section_order: list[dict],
-    enable_b_series: bool = False,
+    enable_fund_deep_analysis: bool = False,
     enable_news: bool = True,  # board 层
     enable_history: bool = True,  # board 层
     enable_llm: bool = True,  # board 层
@@ -40,7 +40,7 @@ def create_sheets(
     Args:
         wb: openpyxl Workbook
         section_order: 注册表模块顺序列表
-        enable_b_series: board 层 — 基金深度分析是否开启（配置驱动）
+        enable_fund_deep_analysis: board 层 — 基金深度分析是否开启（配置驱动）
         enable_news: board 层 — 市场新闻是否开启（配置驱动）
         enable_history: board 层 — 历史走势章节是否开启
         enable_llm: board 层 — LLM 分析章节是否开启
@@ -49,7 +49,7 @@ def create_sheets(
     # 内联 board_flags dict（与 HTML 端结构一致，行为一致性由集成测试保证）
     board_flags = {
         "always": True,
-        "b_series": enable_b_series,
+        "b_series": enable_fund_deep_analysis,
         "news": enable_news,  # ← 配置驱动的 board 层值
         "history": enable_history,
         "llm": enable_llm,

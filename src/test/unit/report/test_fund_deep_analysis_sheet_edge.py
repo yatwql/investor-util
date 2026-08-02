@@ -1,4 +1,4 @@
-"""B 系列 Excel 写入模块空数据占位边缘测试（D-7a）。
+"""基金深度分析 Excel 写入模块空数据占位边缘测试（D-7a）。
 
 测试目标：
   - fund_manager_sheet：manager_data 为空 → 写占位
@@ -7,7 +7,7 @@
   - fund_style_sheet：style_data 为空 → 写占位
 
 运行：
-  pytest src/test/unit/report/test_fund_bseries_sheet_edge.py -v
+  pytest src/test/unit/report/test_fund_deep_analysis_sheet_edge.py -v
 """
 
 from __future__ import annotations

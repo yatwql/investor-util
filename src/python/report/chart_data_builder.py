@@ -4,12 +4,9 @@
 只需渲染已格式化数据。数据经 template context 传递（`chart_datasets`），
 **不写 `_ENV.globals`**（C14 合规，不新增 Schema — C19 豁免）。
 
-契约：
-- 输出 dict 的 6 个固定键（§4.11 O2）：`portfolio_line` / `drawdown` /
-  `category_doughnut` / `industry_bar` / `penetration_bar` / `radar`
-- 通用结构（§4.12）：`{"labels": [...], "datasets": [{..., "degraded": bool}]}`
-- 空值语义：键缺失 → 占位；空 labels/datasets → "无数据"；`degraded: true` → 虚线
-- 行数预算：≤400 行（§4.11 O4）
+契约（§4.11 O2/§4.12）：6 固定键 portfolio_line/drawdown/category_doughnut/
+industry_bar/penetration_bar/radar；空 labels/datasets → "无数据"；degraded → 虚线；
+行数预算 ≤400 行（O4）。
 """
 
 from __future__ import annotations
@@ -67,15 +64,10 @@ def build_chart_datasets(
 ) -> dict:
     """构建 6 张图的数据集，返回 dict → template context（C14 合规）。
 
-    关键数据源：
-    - risk_metrics: 源自 prep["risk_metrics"]（5 个基本字段，仅 full 路径）
-    - all_metrics:  compute_all_metrics() 返回值（14 项全量，仅 full 路径）
-    - metric_flags: metrics_* Feature Flag 值 dict（§6.6 F1），关闭 → "N/A"
-    - 降级兜底：both 路径传入 None 时，radar 从 history_data 提取
-      annualized_volatility / max_drawdown_pct / total_return_pct 3 个基本轴。
-
-    ⚠ R11：每个 dataset 独立 try/except——单图脏数据失败仅跳过该图，
-    不得因一个图抛异常导致整份报告生成失败。
+    关键数据源：risk_metrics（5 基本字段，full）/ all_metrics（14 项全量，full）/
+    metric_flags（§6.6 F1，关闭 → "N/A"）；both 路径传入 None 时，radar 从
+    history_data 提取 3 个基本轴兜底。
+    ⚠ R11：每个 dataset 独立 try/except——单图脏数据失败仅跳过该图，不影响整份报告。
     """
     datasets: dict[str, Any] = {}
 
@@ -92,7 +84,7 @@ def build_chart_datasets(
 
     # category_doughnut + industry_bar + penetration_bar
     try:
-        datasets["category_doughnut"] = _build_category_doughnut_dataset(details)
+        datasets["category_doughnut"] = _build_category_doughnut_dataset(details, cat_data)
     except Exception as e:  # R11：捕获一切异常，单图失败仅跳过该图
         logger.warning("[chart] category_doughnut 构建失败，跳过该图: %s", e)
     try:
@@ -107,9 +99,7 @@ def build_chart_datasets(
     # ⚠ R12：radar 放在所有条件之外，仅依赖 all_metrics / risk_metrics / history_data
     # 三源独立判断——history_data 不可用但 all_metrics 有值时，radar 仍应渲染。
     try:
-        datasets["radar"] = _build_radar_dataset(
-            history_data, all_metrics, risk_metrics, metric_flags
-        )
+        datasets["radar"] = _build_radar_dataset(history_data, all_metrics, risk_metrics, metric_flags)
     except Exception as e:  # R11：radar 失败 → 空占位，不影响其他图
         logger.warning("[chart] radar 构建失败，跳过该图: %s", e)
         datasets["radar"] = _empty_dataset()
@@ -223,20 +213,27 @@ def _build_benchmark_drawdowns(benchmarks: list) -> list:
     return result
 
 
-def _build_category_doughnut_dataset(details: list | None) -> dict:
-    """资产构成 Doughnut：details → 按资产属性（property）聚合市值。
+def _build_category_doughnut_dataset(details: list | None, cat_data: list | None = None) -> dict:
+    """资产构成 Doughnut：按资产属性（property）聚合市值。
 
-    聚合键 = property（股票/基金/债券/现金/其他），复用 category 分类语义。
+    双数据源：
+    - cat_data（持仓分类表数据，_categorize_holding 权威分类，优先）
+      → 按 property 聚合 sub_mv，保证饼图与表格完全一致（DetailRow 无 property 字段）。
+    - details（市值明细兜底）→ 按 property 属性聚合 market_value，无则 _infer_property。
     数据最小化（R9 S4）：只传市值，不含份额/成本等敏感字段。
     扇区颜色由 JS 端 ChartTheme.doughnutColors 提供（A3 色盲安全 palette，§4.8）。
     """
-    if not details:
-        return _empty_dataset()
-
     total_by_prop: dict[str, float] = {}
-    for d in details:
-        prop = getattr(d, "property", None) or _infer_property(d)
-        total_by_prop[prop] = total_by_prop.get(prop, 0.0) + float(getattr(d, "market_value", 0) or 0)
+    if cat_data is not None:
+        for group in cat_data:
+            prop = str(group.get("property") or "其他")
+            total_by_prop[prop] = total_by_prop.get(prop, 0.0) + float(group.get("sub_mv", 0) or 0)
+    elif details:
+        for d in details:
+            prop = getattr(d, "property", None) or _infer_property(d)
+            total_by_prop[prop] = total_by_prop.get(prop, 0.0) + float(getattr(d, "market_value", 0) or 0)
+    else:
+        return _empty_dataset()
 
     labels = [p for p in _CATEGORY_ORDER if total_by_prop.get(p, 0) > 0]
     values = [round(total_by_prop[p], 2) for p in labels]
@@ -256,11 +253,12 @@ def _build_category_doughnut_dataset(details: list | None) -> dict:
 
 
 def _infer_property(d: Any) -> str:
-    """兜底：DetailRow 无 property 属性时，从代码推断资产属性（尽力而为）。"""
-    code = str(getattr(d, "code", "") or "")
-    name = str(getattr(d, "name", "") or "")
-    if code[:1] in ("6", "0", "3") and not name:
+    """兜底：DetailRow 无 property 属性时，按代码前缀推断资产属性（尽力而为）。"""
+    code = str(getattr(d, "code", "") or "").strip()
+    if code[:1] in ("6", "0", "3"):
         return "股票"
+    if code[:1] in ("5", "1"):
+        return "基金"
     return "其他"
 
 

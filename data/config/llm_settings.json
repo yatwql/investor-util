@@ -36,13 +36,13 @@
   "system_prompt_expert_review": null,
   "model_expert_review": null,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 20000,
+  "max_tokens_expert_review": 24000,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
   "thinking_budget_expert_review": 16000,
-  "reasoning_effort_expert_review": "medium",
+  "reasoning_effort_expert_review": "low",
 
   // ═══════════════════════════════════════════
   // 持仓体检报告 — health_check

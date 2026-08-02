@@ -748,11 +748,11 @@ def generate_all_llm(
             _penetrated_codes.update(_codes)
 
     if holdings_details and any(r is not None for r in (gm_r, er_r, hc_r, pd_r)):
-        for _mk, _result in [
-            ("global_macro", gm_r),
-            ("expert_review", er_r),
-            ("health_check", hc_r),
-            ("penetration_deep", pd_r),
+        for _mk, _result, _cached in [
+            ("global_macro", gm_r, gm_c),
+            ("expert_review", er_r, er_c),
+            ("health_check", hc_r, hc_c),
+            ("penetration_deep", pd_r, pd_c),
         ]:
             if _result:
                 _mod_tolerance = _fc_overrides.get(_mk, _fc_tolerance)
@@ -764,6 +764,10 @@ def generate_all_llm(
                     is_penetration_module=_mk == "penetration_deep",
                     tolerance_pct=_mod_tolerance,
                     history_data=history_data,
+                    # 缓存命中：LLM 内容基于生成时的数据快照，用当前市值校验其
+                    # 排名声称会因价格变动产生"排名翻转"误报 → 跳过排名校验。
+                    # 数值/品种校验仍执行，缓存内容中的数值错误仍会被自动修正。
+                    skip_ranking_check=_cached,
                 )
                 # 用修正后的内容替换原结果
                 if _corrected != _result and _corrected != _summary:

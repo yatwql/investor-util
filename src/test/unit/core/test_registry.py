@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from src.python.core.constants import CACHE_DAILY, CACHE_WEEKLY, CACHE_MONTHLY
 from src.python.core.registry import (
     ComputModuleDef,
@@ -21,8 +20,8 @@ from src.python.core.registry import (
     _REPORT_SECTION_DEFAULT,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
 
 class TestRegistryCompleteness:
@@ -98,9 +97,7 @@ class TestRegistryCompleteness:
         keys = get_known_llm_settings_keys()
         for m in get_registry():
             if m.is_llm:
-                assert f"model_{m.settings_suffix}" in keys, (
-                    f"LLM 模块 {m.data_type} 缺少 model_{m.settings_suffix}"
-                )
+                assert f"model_{m.settings_suffix}" in keys, f"LLM 模块 {m.data_type} 缺少 model_{m.settings_suffix}"
 
 
 class TestDerivedMaps:
@@ -110,9 +107,7 @@ class TestDerivedMaps:
         """所有数据类型在 TTL 默认值中均有定义。"""
         ttl_map = get_cache_ttl_defaults()
         for m in get_registry():
-            assert m.data_type in ttl_map, (
-                f"data_type {m.data_type} 未在 get_cache_ttl_defaults() 中"
-            )
+            assert m.data_type in ttl_map, f"data_type {m.data_type} 未在 get_cache_ttl_defaults() 中"
             assert ttl_map[m.data_type] == m.cache_ttl, (
                 f"{m.data_type}: 预期 TTL={m.cache_ttl}, 实际={ttl_map[m.data_type]}"
             )
@@ -132,9 +127,7 @@ class TestDerivedMaps:
         ptm = get_prefix_type_map()
         for m in get_registry():
             for pfx in m.cache_prefixes:
-                assert pfx in ptm, (
-                    f"前缀 {pfx!r} ({m.data_type}) 未在 get_prefix_type_map() 中"
-                )
+                assert pfx in ptm, f"前缀 {pfx!r} ({m.data_type}) 未在 get_prefix_type_map() 中"
                 assert ptm[pfx] == m.data_type
 
     def test_prefix_type_map_known_entries(self):
@@ -168,7 +161,7 @@ class TestDerivedMaps:
     def test_exact_type_map_no_extra_keys(self):
         """exact_map 不包含多余键名。"""
         etm = get_exact_type_map()
-        # 3 个已有（benchmark/tracking/calendar）+ 3 个 B 系列（manager/concentration/style）+ 1 bond_yield_rf
+        # 3 个已有（benchmark/tracking/calendar）+ 3 个基金深度分析（manager/concentration/style）+ 1 bond_yield_rf
         assert len(etm) == 7, f"预期 7 个精确键名，实际 {len(etm)}"
 
     def test_registered_data_types(self):
@@ -190,8 +183,7 @@ class TestDerivedMaps:
             for pfx, mapped_type in ptm.items():
                 if dtype.startswith(pfx) and dtype != mapped_type:
                     pytest.fail(
-                        f"data_type {dtype!r} 被前缀 {pfx!r} 匹配到 {mapped_type!r}，"
-                        f"可能导致 cleanup_expired 误判"
+                        f"data_type {dtype!r} 被前缀 {pfx!r} 匹配到 {mapped_type!r}，可能导致 cleanup_expired 误判"
                     )
 
     def test_cache_groups_known_values(self):
@@ -226,8 +218,7 @@ class TestDataModuleDef:
 
     def test_llm_settings_keys_llm(self):
         """LLM 模块返回适当的键名。"""
-        m = DataModuleDef("测试LLM", "test_llm", cache_ttl=3600,
-                          settings_suffix="test_module")
+        m = DataModuleDef("测试LLM", "test_llm", cache_ttl=3600, settings_suffix="test_module")
         assert m.is_llm
         keys = m.llm_settings_keys()
         assert f"model_test_module" in keys
@@ -236,8 +227,7 @@ class TestDataModuleDef:
 
     def test_llm_settings_keys_news_correlation_no_output_brief(self):
         """news_correlation 模块不应有 output_brief 键。"""
-        m = DataModuleDef("测试新闻", "test_news", cache_ttl=3600,
-                          settings_suffix="news_correlation")
+        m = DataModuleDef("测试新闻", "test_news", cache_ttl=3600, settings_suffix="news_correlation")
         assert "output_brief_news_correlation" not in m.llm_settings_keys()
 
     def test_frozen_dataclass(self):
@@ -257,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 18
+        assert len(_REPORT_SECTION_DEFAULT) == 19
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -272,25 +262,19 @@ class TestReportSectionDefault:
         """type 只能是 always/history/b_series/news/llm 之一。"""
         valid_types = {"always", "history", "b_series", "news", "llm"}
         for sec in _REPORT_SECTION_DEFAULT:
-            assert sec["type"] in valid_types, (
-                f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
-            )
+            assert sec["type"] in valid_types, f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
 
     def test_always_type_has_no_data_flag(self):
         """always 类型的 data_flag 应为 None。"""
         for sec in _REPORT_SECTION_DEFAULT:
             if sec["type"] == "always":
-                assert sec["data_flag"] is None, (
-                    f"{sec['key']}: always 类型不应有 data_flag"
-                )
+                assert sec["data_flag"] is None, f"{sec['key']}: always 类型不应有 data_flag"
 
     def test_non_always_type_has_data_flag(self):
         """非 always/history 类型必须有 data_flag。"""
         for sec in _REPORT_SECTION_DEFAULT:
             if sec["type"] not in ("always", "history"):
-                assert sec["data_flag"] is not None, (
-                    f"{sec['key']}: {sec['type']} 类型缺少 data_flag"
-                )
+                assert sec["data_flag"] is not None, f"{sec['key']}: {sec['type']} 类型缺少 data_flag"
 
     def test_default_numbers_are_unique(self):
         """默认序号应唯一且非零。"""
@@ -303,10 +287,19 @@ class TestReportSectionDefault:
         assert _REPORT_SECTION_DEFAULT[-1]["key"] == "llm_usage"
 
     def test_data_source_status_before_llm_usage(self):
-        """data_source_status 应在 llm_usage 之前（序号 18 vs 17）。"""
+        """data_source_status 应在 llm_usage 之前（序号 19 vs 18）。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         assert "data_source_status" in keys
         assert keys.index("data_source_status") < keys.index("llm_usage")
+
+    def test_factor_exposure_registered_as_fund_deep_analysis(self):
+        """factor_exposure 应注册为 b_series 模块（data_flag=factor_exposure_data），跟随 B2~B5 之后。"""
+        fe = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "factor_exposure"]
+        assert len(fe) == 1, "缺少 factor_exposure 模块条目"
+        sec = fe[0]
+        assert sec["type"] == "b_series"
+        assert sec["data_flag"] == "factor_exposure_data"
+        assert sec["number"] == 10
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""
@@ -334,7 +327,7 @@ class TestGetReportSectionOrder:
     """get_report_section_order() 单元测试。"""
 
     def test_no_config_returns_defaults(self):
-        """config 为 None → 返回 18 项默认值。"""
+        """config 为 None → 返回 19 项默认值。"""
         order = get_report_section_order()
         assert len(order) == len(_REPORT_SECTION_DEFAULT)
         assert order[-1]["key"] == "llm_usage"
@@ -363,9 +356,7 @@ class TestGetReportSectionOrder:
 
     def test_partial_config_items_first(self):
         """已配置项排在最前，按序号升序。"""
-        order = get_report_section_order({
-            "report_section_order": {"fund_manager": 1, "summary": 2}
-        })
+        order = get_report_section_order({"report_section_order": {"fund_manager": 1, "summary": 2}})
         assert order[0]["key"] == "fund_manager"
         assert order[0]["number"] == 1
         assert order[1]["key"] == "summary"
@@ -375,9 +366,7 @@ class TestGetReportSectionOrder:
 
     def test_partial_config_unconfigured_after_configured(self):
         """未配置项排在已配置项之后。"""
-        order = get_report_section_order({
-            "report_section_order": {"fund_manager": 1, "summary": 2}
-        })
+        order = get_report_section_order({"report_section_order": {"fund_manager": 1, "summary": 2}})
         # 检查前两项之后第一项是未配置的 market_value（默认顺序第 2 位）
         # 但注意 market_value 默认序号是 2，与 summary 重复
         keys_after = [s["key"] for s in order[2:]]
@@ -386,25 +375,19 @@ class TestGetReportSectionOrder:
 
     def test_llm_usage_always_last(self):
         """llm_usage 即使被配置也强制最后。"""
-        order = get_report_section_order({
-            "report_section_order": {"llm_usage": 1}
-        })
+        order = get_report_section_order({"report_section_order": {"llm_usage": 1}})
         assert order[-1]["key"] == "llm_usage"
 
     def test_llm_usage_config_in_middle(self):
         """llm_usage 配了居中序号 → 仍强制最后。"""
-        order = get_report_section_order({
-            "report_section_order": {"summary": 5, "llm_usage": 3}
-        })
+        order = get_report_section_order({"report_section_order": {"summary": 5, "llm_usage": 3}})
         assert order[-1]["key"] == "llm_usage"
         # summary 应该在前面（已配置）
         assert order[0]["key"] == "summary"
 
     def test_invalid_number_uses_default(self):
         """无效序号回退默认值。"""
-        order = get_report_section_order({
-            "report_section_order": {"summary": "abc"}
-        })
+        order = get_report_section_order({"report_section_order": {"summary": "abc"}})
         summary_entry = [s for s in order if s["key"] == "summary"][0]
         # summary 默认序号是 1，配置值 "abc" 无效应回退
         assert summary_entry["number"] == 1
@@ -412,14 +395,12 @@ class TestGetReportSectionOrder:
     def test_negative_number_uses_user_value(self):
         """注意：负数也作为用户配置值保留（校验由 config.py 负责）。"""
         # 这里 get_report_section_order 不校验正负，只负责 int() 转换
-        order = get_report_section_order({
-            "report_section_order": {"summary": -5}
-        })
+        order = get_report_section_order({"report_section_order": {"summary": -5}})
         summary_entry = [s for s in order if s["key"] == "summary"][0]
         assert summary_entry["number"] == -5
 
     def test_full_config_reverse_order(self):
-        """全部 18 项都配了 → 按配置序号排序，llm_usage 最后。"""
+        """全部 19 项都配了 → 按配置序号排序，llm_usage 最后。"""
         all_keys = [s["key"] for s in _REPORT_SECTION_DEFAULT if s["key"] != "llm_usage"]
         # 反序配置
         full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}

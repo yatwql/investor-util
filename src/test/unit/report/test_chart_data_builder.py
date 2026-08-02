@@ -42,9 +42,7 @@ def _history_ok(bars=None) -> dict:
             {"date": "2026-01-01", "total_value": 100.0, "drawdown_pct": 0.0},
             {"date": "2026-02-01", "total_value": 110.0, "drawdown_pct": -0.02},
         ],
-        "benchmarks": [
-            {"name": "沪深300", "bars": [{"value": 100.0}, {"value": 105.0}]}
-        ],
+        "benchmarks": [{"name": "沪深300", "bars": [{"value": 100.0}, {"value": 105.0}]}],
     }
 
 
@@ -129,9 +127,12 @@ class TestKeysContract:
             details=_details(),
             penetration=_penetration(),
             all_metrics={  # 使 radar 非空（否则为空占位）
-                "sharpe_ratio": 1.2, "calmar_ratio": 0.8,
-                "win_rate": {"win_rate": 0.55}, "turnover_rate": 0.3,
-                "portfolio_beta": 0.9, "hhi": 0.2,
+                "sharpe_ratio": 1.2,
+                "calmar_ratio": 0.8,
+                "win_rate": {"win_rate": 0.55},
+                "turnover_rate": 0.3,
+                "portfolio_beta": 0.9,
+                "hhi": 0.2,
             },
         )
         for key in DATASET_KEYS:
@@ -296,6 +297,63 @@ class TestCategoryDoughnut:
         chart = ds["category_doughnut"]
         assert chart["labels"] == ["股票", "其他"]
 
+    def test_infer_property_named_stock_classified_by_code(self) -> None:
+        """回归：真实 DetailRow（含名称）按代码前缀分类，股票/基金不再落入"其他"。
+
+        旧 _infer_property 要求 `not name` 才返回"股票"，而真实明细行始终有名称
+        → 全部误判为"其他"，饼图显示 100% 其他。修复后仅按代码前缀分类；
+        CASH 等无匹配前缀的代码仍归"其他"（兜底语义，见 test_infer_property_fallback）。
+        """
+        details = [
+            SimpleNamespace(code="600000", name="浦发银行", market_value=10000.0),
+            SimpleNamespace(code="510300", name="沪深300ETF", market_value=5000.0),
+            SimpleNamespace(code="CASH", name="货币基金", market_value=2000.0),
+        ]
+        ds = build_chart_datasets(history_data=None, details=details)
+        chart = ds["category_doughnut"]
+        assert chart["labels"] == ["股票", "基金", "其他"]
+        assert chart["datasets"][0]["data"] == [10000.0, 5000.0, 2000.0]
+
+    def test_category_doughnut_prefers_cat_data(self) -> None:
+        """回归：传入 cat_data（持仓分类表权威数据）时，饼图优先取 cat_data。
+
+        cat_data 与持仓分类表同源（_categorize_holding），避免 details 兜底
+        分类偏差导致饼图与表格不一致。
+        """
+        cat_data = [
+            {"property": "股票", "sub_mv": 8000.0},
+            {"property": "基金", "sub_mv": 4000.0},
+        ]
+        ds = build_chart_datasets(
+            history_data=None,
+            cat_data=cat_data,
+            details=[SimpleNamespace(code="600000", name="浦发银行", market_value=99999.0)],
+        )
+        chart = ds["category_doughnut"]
+        assert chart["labels"] == ["股票", "基金"]
+        assert chart["datasets"][0]["data"] == [8000.0, 4000.0]
+
+    def test_category_doughnut_from_cat_data_aggregation(self) -> None:
+        """cat_data 内同 property 多组聚合 sub_mv，按 _CATEGORY_ORDER 排序。"""
+        from src.python.report.chart_data_builder import _build_category_doughnut_dataset
+
+        cat_data = [
+            {"property": "基金", "sub_mv": 3000.0},
+            {"property": "股票", "sub_mv": 5000.0},
+            {"property": "基金", "sub_mv": 2000.0},  # 同 property 第二组 → 聚合
+            {"property": "现金", "sub_mv": 1000.0},
+        ]
+        chart = _build_category_doughnut_dataset(None, cat_data)
+        assert chart["labels"] == ["股票", "基金", "现金"]
+        assert chart["datasets"][0]["data"] == [5000.0, 5000.0, 1000.0]
+
+    def test_category_doughnut_from_cat_data_empty(self) -> None:
+        """cat_data 为空/None → 空数据集（不崩溃，图表显示"无数据"）。"""
+        from src.python.report.chart_data_builder import _build_category_doughnut_dataset
+
+        assert _build_category_doughnut_dataset(None, None) == {"labels": [], "datasets": []}
+        assert _build_category_doughnut_dataset(None, []) == {"labels": [], "datasets": []}
+
     def test_empty_details_returns_empty(self) -> None:
         """无明细时返回空数据集（空数组→无数据）。"""
         ds = build_chart_datasets(history_data=None, details=None)
@@ -341,10 +399,7 @@ class TestIndustryAndPenetration:
 
     def test_industry_bar_max_10_sectors(self) -> None:
         """行业分布最多展示 10 个行业（按市值降序截断）。"""
-        top10 = [
-            {"rank": i, "name": f"标的{i}", "sector": f"行业{i}", "mv": float(i)}
-            for i in range(1, 15)
-        ]
+        top10 = [{"rank": i, "name": f"标的{i}", "sector": f"行业{i}", "mv": float(i)} for i in range(1, 15)]
         ds = build_chart_datasets(history_data=None, penetration=_penetration(top10))
         chart = ds["industry_bar"]
         assert len(chart["labels"]) == 10
@@ -429,7 +484,12 @@ class TestRadar:
         assert "portfolio_line" not in ds
         assert "radar" in ds
         assert ds["radar"]["labels"] == [
-            "夏普比率", "卡玛比率", "胜率", "换手率", "组合 Beta", "集中度 HHI",
+            "夏普比率",
+            "卡玛比率",
+            "胜率",
+            "换手率",
+            "组合 Beta",
+            "集中度 HHI",
         ]
 
     def test_radar_flag_off_shows_na(self) -> None:
@@ -448,8 +508,12 @@ class TestRadar:
     def test_radar_flag_map_all_axes(self) -> None:
         """§6.6 F1：6 个雷达轴均被 metrics_* Flag 覆盖（映射完整）。"""
         flags = {
-            "metrics_sharpe": False, "metrics_calmar": False, "metrics_winrate": False,
-            "metrics_turnover": False, "metrics_beta": False, "metrics_hhi": False,
+            "metrics_sharpe": False,
+            "metrics_calmar": False,
+            "metrics_winrate": False,
+            "metrics_turnover": False,
+            "metrics_beta": False,
+            "metrics_hhi": False,
         }
         ds = build_chart_datasets(
             history_data=None,
@@ -461,10 +525,17 @@ class TestRadar:
 
     def test_radar_all_na_placeholder_axes_kept(self) -> None:
         """全 N/A → 轴保留，数据 "N/A"（§6.6：Flag 全关仍显示轴标签）。"""
-        flags = {f: False for f in (
-            "metrics_sharpe", "metrics_calmar", "metrics_winrate",
-            "metrics_turnover", "metrics_beta", "metrics_hhi",
-        )}
+        flags = {
+            f: False
+            for f in (
+                "metrics_sharpe",
+                "metrics_calmar",
+                "metrics_winrate",
+                "metrics_turnover",
+                "metrics_beta",
+                "metrics_hhi",
+            )
+        }
         ds = build_chart_datasets(
             history_data=_history_ok(),
             all_metrics=self._ALL_METRICS,

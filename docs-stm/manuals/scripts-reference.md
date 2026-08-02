@@ -113,7 +113,7 @@ python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
 
 ### `check-history-traces.py` — 历史痕迹检查
 
-扫描 `src/python/` 和 `src/test/` 下所有 `.py` 文件的注释和文档字符串，检查是否含有代码历史迭代信息（来源拆分、版本号、任务编号等）。代码注释只应描述"当前是什么"，不应记录"从哪里来"。
+扫描 `src/python/`、`src/test/`、`src/static/`、`scripts/` 下所有 `.py` / `.js` / `.mjs` / `.html` / `.sh` / `.ps1` / `.bat` / `.cmd` 文件的注释和文档字符串，检查是否含有代码历史迭代信息（来源拆分、版本号、任务编号、历史迭代叙述等）。代码注释只应描述"当前是什么"，不应记录"从哪里来、怎么变的"。
 
 ```bash
 # 检查全部

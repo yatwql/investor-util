@@ -20,6 +20,9 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 import pytest
+
+from src.python.config import _comments
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 
 
@@ -44,7 +47,7 @@ class TestConfigAtomicWrite(unittest.TestCase):
 
         self.assertTrue(os.path.exists(self.config_path))
         with open(self.config_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
+            payload = json.loads(_comments._strip_json_comments(f.read()))
         self.assertEqual(payload["test_key"], "hello")
 
     @patch("src.python.config._config_defaults.get_config_path")
@@ -135,8 +138,8 @@ class TestConfigAtomicWrite(unittest.TestCase):
         self.assertIn("中文值", content)
         # 验证缩进
         self.assertIn("  ", content)  # indent=2
-        # 验证可解析
-        payload = json.loads(content)
+        # 验证可解析（配置文件带 // 注释，需剥离后解析）
+        payload = json.loads(_comments._strip_json_comments(content))
         self.assertEqual(payload["中文键"], "中文值")
         self.assertEqual(payload["number"], 42)
 
@@ -191,7 +194,7 @@ class TestConfigAtomicWriteFailure(unittest.TestCase):
 
         self.assertTrue(os.path.exists(nested_path))
         with open(nested_path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
+            payload = json.loads(_comments._strip_json_comments(f.read()))
         self.assertEqual(payload["nested_key"], "created")
 
 

@@ -233,7 +233,7 @@ class TestSetConfig(unittest.TestCase):
             "llm_settings_file": "data/config/llm_settings.json",
             "llm_key_file": "data/config/llm_key.json",
             "llm_providers_file": "data/config/llm_providers.json",
-            "enable_b_series": True,
+            "enable_fund_deep_analysis": True,
             "news_top_count": 300,
         }
         with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -253,7 +253,7 @@ class TestSetConfig(unittest.TestCase):
         cfg.init_config()
         cfg.set_config("holdings_dir", "data/custom")
         with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
-            data = json.load(f)
+            data = json.loads(_comments._strip_json_comments(f.read()))
         self.assertEqual(data["holdings_dir"], "data/custom")
         result = cfg.get_config()
         self.assertEqual(result["holdings_dir"], os.path.join(PROJECT_ROOT, "data/custom"))
@@ -264,8 +264,83 @@ class TestSetConfig(unittest.TestCase):
         external = os.path.join(os.path.dirname(PROJECT_ROOT), "external")
         cfg.set_config("holdings_dir", external)
         with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
-            data = json.load(f)
+            data = json.loads(_comments._strip_json_comments(f.read()))
         self.assertEqual(data["holdings_dir"], external)
+
+
+class TestSetConfigSingleKeyPatch(unittest.TestCase):
+    """set_config 单键 patch：保留注释分组、只改目标键、新键追加。
+
+    单键 patch 基于磁盘原始文本仅替换目标键 value，保留模板的
+    ``// ── X. ...`` 分组注释与行尾注释，不破坏相邻键。本类用例
+    断言注释与相邻键保持完整。
+    """
+
+    def setUp(self):
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
+        self.tmp = tempfile.TemporaryDirectory()
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        cfg.init_config()
+
+    def tearDown(self):
+        cfg._config_defaults._CONFIG_FILE = self._orig_config
+        self.tmp.cleanup()
+
+    def _read_disk(self) -> str:
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
+            return f.read()
+
+    def test_preserves_comment_groups_and_inline(self):
+        """set_config 后分组注释与行尾注释完整保留，目标键值已更新。"""
+        cfg.set_config("enable_news", False)
+        raw = self._read_disk()
+        # 首尾分组注释保留
+        self.assertIn("// ── A. 路径与文件 ──", raw)
+        self.assertIn("// ── L. 批量并行调度 ──", raw)
+        # enable_news 行尾注释保留
+        self.assertIn("// 市场新闻（#10）", raw)
+        # 值已更新
+        data = json.loads(_comments._strip_json_comments(raw))
+        self.assertFalse(data["enable_news"])
+
+    def test_patch_only_touches_target_key(self):
+        """仅替换目标键值，其余键与注释保持。"""
+        cfg.set_config("market_hour_ttl", 60)
+        raw = self._read_disk()
+        self.assertIn('"market_hour_ttl": 60,', raw)
+        self.assertNotIn('"market_hour_ttl": 30', raw)
+        self.assertIn("// ── C. 数据源与提供商 ──", raw)
+        self.assertIn('"news_top_count": 300,', raw)
+        self.assertIn("// ── I. 再平衡配置 ──", raw)
+
+    def test_new_key_appended_at_end(self):
+        """新键追加到对象末尾，已有注释与其他键不受影响。"""
+        cfg.set_config("custom_extra", {"nested": [1, 2, 3]})
+        raw = self._read_disk()
+        data = json.loads(_comments._strip_json_comments(raw))
+        self.assertEqual(data["custom_extra"], {"nested": [1, 2, 3]})
+        # 新键位于文件末尾的顶层对象内
+        self.assertLess(raw.rfind('"custom_extra"'), raw.rfind("}"))
+        self.assertIn("// ── D. 市场时段与缓存 ──", raw)
+
+    def test_replace_nested_value_preserves_neighbors(self):
+        """替换嵌套 dict 值不破坏相邻键与注释。"""
+        cfg.set_config("comparison_indices", {"sh000300": "沪深300", "sh000905": "中证500"})
+        raw = self._read_disk()
+        data = json.loads(_comments._strip_json_comments(raw))
+        self.assertEqual(data["comparison_indices"], {"sh000300": "沪深300", "sh000905": "中证500"})
+        self.assertIn("// ── F. 业绩基准与无风险利率 ──", raw)
+        self.assertIsNone(data["risk_free_rate"])
+        self.assertEqual(data["user_fund_benchmarks"], {})
+
+    def test_first_creation_has_comment_groups(self):
+        """文件不存在时 set_config 用模板打底 → 落盘带完整分组注释。"""
+        os.remove(cfg._config_defaults._CONFIG_FILE)
+        cfg.set_config("_privacy_notice_shown", True)
+        raw = self._read_disk()
+        self.assertIn("// ── A. 路径与文件 ──", raw)
+        data = json.loads(_comments._strip_json_comments(raw))
+        self.assertTrue(data["_privacy_notice_shown"])
 
 
 if __name__ == "__main__":
@@ -537,7 +612,7 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
 
         # 直接读取文件内容验证（内存缓存可能已被 crash 污染）
         with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
-            payload = json.load(f)
+            payload = json.loads(_comments._strip_json_comments(f.read()))
         self.assertEqual(payload.get("output_dir"), "/reports/original")
 
     def test_simulate_power_failure_then_recovery(self):
@@ -577,7 +652,7 @@ class TestAtomicWriteCrashRecovery(unittest.TestCase):
 
         # 旧值依然可用（直接读文件避免内存缓存污染）
         with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
-            payload = json.load(f)
+            payload = json.loads(_comments._strip_json_comments(f.read()))
         self.assertEqual(payload.get("holdings_dir"), "/safe/value")
 
 

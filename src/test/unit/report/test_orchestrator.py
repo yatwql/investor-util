@@ -2,6 +2,7 @@
 
 prepare_report_data mock 测试 + capture_snapshot。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -48,7 +49,7 @@ class TestReadSectionFlags:
 
     def test_all_enabled(self):
         with (
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=True),
@@ -58,7 +59,7 @@ class TestReadSectionFlags:
 
     def test_all_disabled(self):
         with (
-            patch("src.python.config.is_enable_b_series", return_value=False),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=False),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
             patch("src.python.config.is_enable_llm", return_value=False),
@@ -68,7 +69,7 @@ class TestReadSectionFlags:
 
     def test_partial_flags(self):
         with (
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=False),
@@ -112,14 +113,30 @@ class TestPrepareReportData:
             patch("src.python.fetcher.index.fetch_indices", return_value={"sh000001": 3000}),
             patch("src.python.fetcher.index.fetch_us_indices", return_value={"gb_inx": 5000}),
             patch("src.python.report.penetration.compute_penetration_top10", return_value={"top10": []}),
+            # 因子暴露编排含真实网络拉取（持仓历史/因子指数 K 线），测试必须 mock（防 API 依赖/不稳定）
+            patch(
+                "src.python.report.orchestrator.compute_factor_exposure_data",
+                return_value={"available": False, "status": "insufficient"},
+            ),
         ):
             result = prepare_report_data(mock_holdings, mock_reporter, config={})
 
         expected_keys = {
-            "details", "total_mv", "total_cost", "total_profit",
-            "total_today_profit", "categories", "a_indices", "us_indices",
-            "penetrated_assets", "holdings_details", "today_str",
-            "output_dir", "news_top_count", "risk_metrics",
+            "details",
+            "total_mv",
+            "total_cost",
+            "total_profit",
+            "total_today_profit",
+            "categories",
+            "a_indices",
+            "us_indices",
+            "penetrated_assets",
+            "holdings_details",
+            "today_str",
+            "output_dir",
+            "news_top_count",
+            "risk_metrics",
+            "factor_exposure",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 
@@ -185,7 +202,8 @@ class TestGenerateReport:
         assert result.exit_code == 0
         # 验证 generate_excel_report 被正确调用
         mock_gen.assert_called_once_with(
-            mock_holdings, include_news=False,
+            mock_holdings,
+            include_news=False,
             output_dir="reports",
             section_order=[{"key": "overview"}],
             progress=mock_reporter,
@@ -241,7 +259,6 @@ class TestGenerateReport:
         _call_kwargs = mock_gen.call_args.kwargs
         assert _call_kwargs["output_dir"] == "/custom/path"
 
-
     def test_generate_report_both_calls_compute_details(self):
         """both 路径调用 _compute_details 而非 prepare_report_data，不调用 LLM/线程池。"""
         mock_reporter = MagicMock()
@@ -264,7 +281,7 @@ class TestGenerateReport:
             patch("src.python.report.html_writer.write_html_report") as mock_html,
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.core.registry.get_report_section_order", return_value=[]),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
         ):
@@ -309,7 +326,7 @@ class TestGenerateReport:
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
         ):
@@ -338,7 +355,7 @@ class TestGenerateReport:
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
             # 使用 wrapt 确保 prepare_report_data 不被调用
@@ -368,7 +385,7 @@ class TestGenerateReport:
             ),
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.core.registry.get_report_section_order"),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
         ):
@@ -403,21 +420,32 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.core.registry.get_report_section_order", return_value=[]),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=[]),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=True),
         ):
             mock_prep.return_value = {
-                "details": [], "total_mv": 0, "total_cost": 0,
-                "total_profit": 0, "total_today_profit": 0,
-                "categories": [], "a_indices": {}, "us_indices": {},
-                "penetrated_assets": [], "holdings_details": [],
-                "today_str": "2026-07-16", "output_dir": "reports",
+                "details": [],
+                "total_mv": 0,
+                "total_cost": 0,
+                "total_profit": 0,
+                "total_today_profit": 0,
+                "categories": [],
+                "a_indices": {},
+                "us_indices": {},
+                "penetrated_assets": [],
+                "holdings_details": [],
+                "today_str": "2026-07-16",
+                "output_dir": "reports",
                 "news_top_count": 100,
             }
             mock_llm_news.return_value = (
-                (None, None, None, None), [], {}, False, None,
+                (None, None, None, None),
+                [],
+                {},
+                False,
+                None,
             )
 
             result = generate_report(
@@ -454,24 +482,33 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=False),
             patch("src.python.report.news_correlation.build_news_data", return_value=([{"title": "新闻1"}], {})),
         ):
             mock_prep.return_value = {
-                "details": [], "total_mv": 0, "total_cost": 0,
-                "total_profit": 0, "total_today_profit": 0,
-                "categories": [], "a_indices": {}, "us_indices": {},
-                "penetrated_assets": [], "holdings_details": [],
-                "today_str": "2026-07-16", "output_dir": "reports",
+                "details": [],
+                "total_mv": 0,
+                "total_cost": 0,
+                "total_profit": 0,
+                "total_today_profit": 0,
+                "categories": [],
+                "a_indices": {},
+                "us_indices": {},
+                "penetrated_assets": [],
+                "holdings_details": [],
+                "today_str": "2026-07-16",
+                "output_dir": "reports",
                 "news_top_count": 100,
             }
 
             result = generate_report(
-                holdings=mock_holdings, config=config,
-                reporter=mock_reporter, report_type="full",
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="full",
             )
 
         assert result.report_generated is True
@@ -491,26 +528,45 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=True),
-            patch("src.python.llm.generate_all_llm", return_value=(
-                "<p>宏观</p>", None, None, None, False, False, False, False,
-            )),
+            patch(
+                "src.python.llm.generate_all_llm",
+                return_value=(
+                    "<p>宏观</p>",
+                    None,
+                    None,
+                    None,
+                    False,
+                    False,
+                    False,
+                    False,
+                ),
+            ),
         ):
             mock_prep.return_value = {
-                "details": [], "total_mv": 0, "total_cost": 0,
-                "total_profit": 0, "total_today_profit": 0,
-                "categories": [], "a_indices": {}, "us_indices": {},
-                "penetrated_assets": [], "holdings_details": [],
-                "today_str": "2026-07-16", "output_dir": "reports",
+                "details": [],
+                "total_mv": 0,
+                "total_cost": 0,
+                "total_profit": 0,
+                "total_today_profit": 0,
+                "categories": [],
+                "a_indices": {},
+                "us_indices": {},
+                "penetrated_assets": [],
+                "holdings_details": [],
+                "today_str": "2026-07-16",
+                "output_dir": "reports",
                 "news_top_count": 100,
             }
 
             result = generate_report(
-                holdings=mock_holdings, config=config,
-                reporter=mock_reporter, report_type="full",
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="full",
             )
 
         assert result.report_generated is True
@@ -529,23 +585,32 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=False),
         ):
             mock_prep.return_value = {
-                "details": [], "total_mv": 0, "total_cost": 0,
-                "total_profit": 0, "total_today_profit": 0,
-                "categories": [], "a_indices": {}, "us_indices": {},
-                "penetrated_assets": [], "holdings_details": [],
-                "today_str": "2026-07-16", "output_dir": "reports",
+                "details": [],
+                "total_mv": 0,
+                "total_cost": 0,
+                "total_profit": 0,
+                "total_today_profit": 0,
+                "categories": [],
+                "a_indices": {},
+                "us_indices": {},
+                "penetrated_assets": [],
+                "holdings_details": [],
+                "today_str": "2026-07-16",
+                "output_dir": "reports",
                 "news_top_count": 100,
             }
 
             result = generate_report(
-                holdings=mock_holdings, config=config,
-                reporter=mock_reporter, report_type="full",
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="full",
             )
 
         assert result.report_generated is True
@@ -567,23 +632,32 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.core.registry.get_report_section_order"),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
             patch("src.python.config.is_enable_llm", return_value=False),
         ):
             mock_prep.return_value = {
-                "details": [], "total_mv": 0, "total_cost": 0,
-                "total_profit": 0, "total_today_profit": 0,
-                "categories": [], "a_indices": {}, "us_indices": {},
-                "penetrated_assets": [], "holdings_details": [],
-                "today_str": "2026-07-16", "output_dir": "reports",
+                "details": [],
+                "total_mv": 0,
+                "total_cost": 0,
+                "total_profit": 0,
+                "total_today_profit": 0,
+                "categories": [],
+                "a_indices": {},
+                "us_indices": {},
+                "penetrated_assets": [],
+                "holdings_details": [],
+                "today_str": "2026-07-16",
+                "output_dir": "reports",
                 "news_top_count": 100,
             }
 
             result = generate_report(
-                holdings=mock_holdings, config=config,
-                reporter=mock_reporter, report_type="full",
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="full",
             )
 
         assert result.html_ok is False
@@ -601,6 +675,7 @@ class TestReportLlmModuleResults:
     def _clean_llm_failure_state(self):
         """清除 LLM_MODULE_FAILURE 全局状态，避免跨测试污染。"""
         from src.python.llm.prompts import LLM_MODULE_FAILURE
+
         _saved = dict(LLM_MODULE_FAILURE)
         LLM_MODULE_FAILURE.clear()
         yield
@@ -649,10 +724,14 @@ class TestFetchLlmAndNews:
         data = {
             "news_top_count": 100,
             "penetrated_assets": [],
-            "a_indices": {}, "us_indices": {},
-            "total_mv": 0, "total_cost": 0, "total_profit": 0,
+            "a_indices": {},
+            "us_indices": {},
+            "total_mv": 0,
+            "total_cost": 0,
+            "total_profit": 0,
             "total_today_profit": 0,
-            "categories": [], "holdings_details": [],
+            "categories": [],
+            "holdings_details": [],
         }
         data.update(overrides)
         return data
@@ -664,16 +743,35 @@ class TestFetchLlmAndNews:
         prep = self._make_prep_data()
 
         with (
-            patch("src.python.llm.generate_all_llm", return_value=(
-                "<p>宏观</p>", None, None, None, False, False, False, False,
-            )),
-            patch("src.python.report.news_correlation.build_news_data", return_value=(
-                [{"title": "新闻1"}], {},
-            )),
+            patch(
+                "src.python.llm.generate_all_llm",
+                return_value=(
+                    "<p>宏观</p>",
+                    None,
+                    None,
+                    None,
+                    False,
+                    False,
+                    False,
+                    False,
+                ),
+            ),
+            patch(
+                "src.python.report.news_correlation.build_news_data",
+                return_value=(
+                    [{"title": "新闻1"}],
+                    {},
+                ),
+            ),
         ):
             result = _fetch_llm_and_news(
-                holdings, prep, sector_flow=[], force_llm=False,
-                pipeline_data=None, enable_news=True, enable_llm=True,
+                holdings,
+                prep,
+                sector_flow=[],
+                force_llm=False,
+                pipeline_data=None,
+                enable_news=True,
+                enable_llm=True,
                 reporter=reporter,
             )
 
@@ -689,14 +787,29 @@ class TestFetchLlmAndNews:
         prep = self._make_prep_data()
 
         with (
-            patch("src.python.llm.generate_all_llm", return_value=(
-                "<p>宏观</p>", None, None, None, False, False, False, False,
-            )),
+            patch(
+                "src.python.llm.generate_all_llm",
+                return_value=(
+                    "<p>宏观</p>",
+                    None,
+                    None,
+                    None,
+                    False,
+                    False,
+                    False,
+                    False,
+                ),
+            ),
             patch("src.python.report.news_correlation.build_news_data"),
         ):
             result = _fetch_llm_and_news(
-                holdings, prep, sector_flow=[], force_llm=False,
-                pipeline_data=None, enable_news=False, enable_llm=True,
+                holdings,
+                prep,
+                sector_flow=[],
+                force_llm=False,
+                pipeline_data=None,
+                enable_news=False,
+                enable_llm=True,
                 reporter=reporter,
             )
 
@@ -713,13 +826,22 @@ class TestFetchLlmAndNews:
 
         with (
             patch("src.python.llm.generate_all_llm"),
-            patch("src.python.report.news_correlation.build_news_data", return_value=(
-                [{"title": "新闻1"}], {},
-            )),
+            patch(
+                "src.python.report.news_correlation.build_news_data",
+                return_value=(
+                    [{"title": "新闻1"}],
+                    {},
+                ),
+            ),
         ):
             result = _fetch_llm_and_news(
-                holdings, prep, sector_flow=[], force_llm=False,
-                pipeline_data=None, enable_news=True, enable_llm=False,
+                holdings,
+                prep,
+                sector_flow=[],
+                force_llm=False,
+                pipeline_data=None,
+                enable_news=True,
+                enable_llm=False,
                 reporter=reporter,
             )
 
@@ -733,8 +855,13 @@ class TestFetchLlmAndNews:
         reporter = MagicMock()
 
         result = _fetch_llm_and_news(
-            [], {}, sector_flow=None, force_llm=False,
-            pipeline_data=None, enable_news=False, enable_llm=False,
+            [],
+            {},
+            sector_flow=None,
+            force_llm=False,
+            pipeline_data=None,
+            enable_news=False,
+            enable_llm=False,
             reporter=reporter,
         )
 
@@ -752,13 +879,22 @@ class TestFetchLlmAndNews:
 
         with (
             patch("src.python.llm.generate_all_llm", side_effect=RuntimeError("LLM 异常")),
-            patch("src.python.report.news_correlation.build_news_data", return_value=(
-                [{"title": "新闻1"}], {},
-            )),
+            patch(
+                "src.python.report.news_correlation.build_news_data",
+                return_value=(
+                    [{"title": "新闻1"}],
+                    {},
+                ),
+            ),
         ):
             result = _fetch_llm_and_news(
-                holdings, prep, sector_flow=[], force_llm=False,
-                pipeline_data=None, enable_news=True, enable_llm=True,
+                holdings,
+                prep,
+                sector_flow=[],
+                force_llm=False,
+                pipeline_data=None,
+                enable_news=True,
+                enable_llm=True,
                 reporter=reporter,
             )
 
@@ -773,8 +909,7 @@ class TestFetchLlmAndNews:
 class TestCaptureSnapshot:
     """capture_snapshot 快照创建测试（8 用例覆盖 5 子步骤）。"""
 
-    def _make_mock_detail(self, code="SH600001", name="测试", mv=1200.0,
-                          cost=1000.0, profit=200.0) -> MagicMock:
+    def _make_mock_detail(self, code="SH600001", name="测试", mv=1200.0, cost=1000.0, profit=200.0) -> MagicMock:
         d = MagicMock()
         d.code = code
         d.name = name
@@ -784,8 +919,7 @@ class TestCaptureSnapshot:
         d.profit_rate = profit / cost if cost else 0
         return d
 
-    def _make_mock_holding(self, code="SH600001", name="测试",
-                           shares=100, cost_price=10.0) -> MagicMock:
+    def _make_mock_holding(self, code="SH600001", name="测试", shares=100, cost_price=10.0) -> MagicMock:
         h = MagicMock()
         h.code = code
         h.name = name
@@ -810,7 +944,10 @@ class TestCaptureSnapshot:
             mock_hd.compute.return_value = mock_diff
 
             result = capture_snapshot(
-                [self._make_mock_holding()], [detail], config, mock_reporter,
+                [self._make_mock_holding()],
+                [detail],
+                config,
+                mock_reporter,
             )
 
         # 首次运行返回 None
@@ -834,7 +971,9 @@ class TestCaptureSnapshot:
 
             capture_snapshot(
                 [self._make_mock_holding(code="SH600001", shares=200, cost_price=12.0)],
-                [detail], config, mock_reporter,
+                [detail],
+                config,
+                mock_reporter,
             )
 
         # HistoryDiff.compute 被调用，说明 holdings 回查未抛出异常
@@ -860,9 +999,10 @@ class TestCaptureSnapshot:
             mock_hd.compute.return_value = mock_diff
 
             capture_snapshot(
-                [self._make_mock_holding(code="SH600001"),
-                 self._make_mock_holding(code="SH600002")],
-                details, config, mock_reporter,
+                [self._make_mock_holding(code="SH600001"), self._make_mock_holding(code="SH600002")],
+                details,
+                config,
+                mock_reporter,
             )
 
         # HistoryDiff.compute 被正确传入 SnapshotData
@@ -904,7 +1044,10 @@ class TestCaptureSnapshot:
             mock_hd_cls.compute.return_value = mock_diff
 
             result = capture_snapshot(
-                [self._make_mock_holding()], details, config, mock_reporter,
+                [self._make_mock_holding()],
+                details,
+                config,
+                mock_reporter,
             )
 
         assert result is not None
@@ -930,7 +1073,10 @@ class TestCaptureSnapshot:
             mock_hd.compute.return_value = mock_diff
 
             capture_snapshot(
-                [self._make_mock_holding()], [detail], config, mock_reporter,
+                [self._make_mock_holding()],
+                [detail],
+                config,
+                mock_reporter,
             )
 
         # 验证 prune 参数来自 config 而非 get_config_cache()
@@ -963,7 +1109,10 @@ class TestCaptureSnapshot:
             mock_hd_cls.compute.return_value = mock_diff
 
             result = capture_snapshot(
-                [self._make_mock_holding()], [detail], config, mock_reporter,
+                [self._make_mock_holding()],
+                [detail],
+                config,
+                mock_reporter,
             )
 
         assert result is not None
@@ -987,7 +1136,10 @@ class TestCaptureSnapshot:
             mock_hd.compute.return_value = mock_diff
 
             result = capture_snapshot(
-                [self._make_mock_holding()], [detail], config, mock_reporter,
+                [self._make_mock_holding()],
+                [detail],
+                config,
+                mock_reporter,
             )
 
         assert result is None
@@ -1005,7 +1157,10 @@ class TestCaptureSnapshot:
             patch("src.python.report.history_snapshot.prune"),
         ):
             result = capture_snapshot(
-                [self._make_mock_holding()], [detail], config, mock_reporter,
+                [self._make_mock_holding()],
+                [detail],
+                config,
+                mock_reporter,
             )
 
         assert result is None
@@ -1030,15 +1185,14 @@ class TestFetchHistoryData:
             "status": "available",
         }
 
-        with patch(
-            "src.python.report.portfolio_history.PortfolioHistoryCalculator"
-        ) as mock_cls:
+        with patch("src.python.report.portfolio_history.PortfolioHistoryCalculator") as mock_cls:
             mock_calc = MagicMock()
             mock_calc.get_combined_timeseries.return_value = mock_history_data
             mock_cls.return_value = mock_calc
 
             result = fetch_history_data(
-                [mock_holding], {"history": {"coverage_threshold": 0.9}},
+                [mock_holding],
+                {"history": {"coverage_threshold": 0.9}},
                 mock_reporter,
             )
 
@@ -1055,7 +1209,10 @@ class TestFetchHistoryData:
         mock_reporter = MagicMock()
 
         result = fetch_history_data(
-            [], {"history": {}}, mock_reporter, mode="off",
+            [],
+            {"history": {}},
+            mock_reporter,
+            mode="off",
         )
 
         assert result is None
@@ -1065,15 +1222,15 @@ class TestFetchHistoryData:
         mock_reporter = MagicMock()
         mock_history_data = {"status": "unavailable"}
 
-        with patch(
-            "src.python.report.portfolio_history.PortfolioHistoryCalculator"
-        ) as mock_cls:
+        with patch("src.python.report.portfolio_history.PortfolioHistoryCalculator") as mock_cls:
             mock_calc = MagicMock()
             mock_calc.get_combined_timeseries.return_value = mock_history_data
             mock_cls.return_value = mock_calc
 
             result = fetch_history_data(
-                [MagicMock()], {"history": {}}, mock_reporter,
+                [MagicMock()],
+                {"history": {}},
+                mock_reporter,
             )
 
         assert result is not None
@@ -1089,7 +1246,9 @@ class TestFetchHistoryData:
             side_effect=RuntimeError("测试异常"),
         ):
             result = fetch_history_data(
-                [MagicMock()], {"history": {}}, mock_reporter,
+                [MagicMock()],
+                {"history": {}},
+                mock_reporter,
             )
 
         assert result is None

@@ -3,7 +3,7 @@
 职责：基金经理变更监控、持仓重合度矩阵、持仓集中度监控、基金风格漂移分析。
 
 注：三个模块（重合度/集中度/风格）共享相同的数据准备模板，
-通过 _process_b_module 辅助函数消除重复代码。
+通过 _process_fund_deep_analysis_module 辅助函数消除重复代码。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from src.python.report.progress import ProgressReporter
 logger = setup_logger()
 
 
-def _process_b_module(
+def _process_fund_deep_analysis_module(
     holdings: list,
     process_fn: Callable,
     prog: ProgressReporter,
@@ -43,16 +43,22 @@ def _process_b_module(
     return fund_codes, fund_holdings_map
 
 
-def write_b_series_sheets(
+def write_fund_deep_analysis_sheets(
     sheets: dict[str, Any],
     holdings: list,
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     data: dict[str, Any],
     modules: dict[str, Any],
     prog: ProgressReporter,
+    factor_exposure: dict[str, Any] | None = None,
 ) -> None:
-    """写入基金深度分析页签。"""
-    if not enable_b_series:
+    """写入基金深度分析页签。
+
+    Args:
+        factor_exposure: 因子暴露 C19 契约 dict，来自 pipeline_data；
+            未提供或 available=False 时页签写入占位（§1.4.5 降级治理）。
+    """
+    if not enable_fund_deep_analysis:
         return
 
     # ── 基金经理变更监控（独立逻辑，无 fetch_fund_holdings 依赖） ──
@@ -85,7 +91,7 @@ def write_b_series_sheets(
         overlap_result = None
         fund_names: dict[str, str] = {}
         try:
-            fund_codes, fund_holdings_map = _process_b_module(holdings, compute_overlap, prog)
+            fund_codes, fund_holdings_map = _process_fund_deep_analysis_module(holdings, compute_overlap, prog)
             if len(fund_codes) < 2:
                 logger.info("持仓重合度矩阵：基金数 < 2（%d），跳过", len(fund_codes))
             elif len(fund_holdings_map) >= 2:
@@ -127,7 +133,7 @@ def write_b_series_sheets(
         prog.info("正在计算持仓集中度...")
         conc_data = None
         try:
-            _, conc_fund_holdings = _process_b_module(holdings, compute_conc, prog)
+            _, conc_fund_holdings = _process_fund_deep_analysis_module(holdings, compute_conc, prog)
             if conc_fund_holdings:
                 conc_data = compute_conc(conc_fund_holdings)
                 if conc_data:
@@ -155,7 +161,7 @@ def write_b_series_sheets(
         prog.info("正在分析基金风格漂移...")
         style_result = None
         try:
-            _, style_fund_holdings = _process_b_module(holdings, analyze_style, prog)
+            _, style_fund_holdings = _process_fund_deep_analysis_module(holdings, analyze_style, prog)
             if style_fund_holdings:
                 style_result = analyze_style(style_fund_holdings)
                 if style_result.get("results"):
@@ -174,3 +180,23 @@ def write_b_series_sheets(
         except Exception as e:
             logger.warning("基金风格分析页签写入失败: %s", e)
             prog.add_error("基金风格分析页签写入失败")
+
+    # ── 因子暴露分析（数据已在编排层组装，见 pipeline_data["factor_exposure"]） ──
+    write_fe = modules.get("write_factor_exposure_sheet")
+    ws_fe = sheets.get("factor_exposure")
+    if ws_fe is not None and write_fe is not None:
+        prog.info("正在写入因子暴露分析页签...")
+        _factor_names = None
+        if factor_exposure:
+            try:
+                from src.python.analysis.factor_exposure import FACTOR_NAMES
+
+                _factor_names = FACTOR_NAMES
+            except Exception:
+                _factor_names = None
+        try:
+            write_fe(ws_fe, factor_exposure, _factor_names)
+            prog.ok("因子暴露分析页签写入完成")
+        except Exception as e:
+            logger.warning("因子暴露分析页签写入失败: %s", e)
+            prog.add_error("因子暴露分析页签写入失败")

@@ -677,7 +677,7 @@ class TestCreateSheets(unittest.TestCase):
         wb = self._make_wb()
         # always(6) + history(2) = 8 个页签，连续编号 1-8
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=False, enable_news=False, enable_llm=False)
+                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
         self.assertEqual(len(sheets), 8)
         expected_titles = {
             "summary":          "1.投资分析汇总",
@@ -698,7 +698,7 @@ class TestCreateSheets(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         sheets = create_sheets(wb, self._CUSTOM_ORDER,
-                                enable_b_series=False, enable_news=False, enable_llm=False)
+                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
         self.assertEqual(len(sheets), 3)
         self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析")
         self.assertEqual(sheets["summary"].title, "2.投资分析汇总")
@@ -711,7 +711,7 @@ class TestCreateSheets(unittest.TestCase):
         wb = self._make_wb()
         # board 层启用 news + data 层 news 可用 → 新闻版块页签应出现
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=False, enable_news=True, enable_llm=False,
+                                enable_fund_deep_analysis=False, enable_news=True, enable_llm=False,
                                 data_availability={"news_data_available": True})
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
         # always(6) + history(2) + news(1) = 9

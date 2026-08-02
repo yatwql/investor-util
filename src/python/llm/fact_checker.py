@@ -34,8 +34,16 @@ logger = logging.getLogger("invest")
 # 使用 re.ASCII 确保 \b 在中文和非 ASCII 字符旁也正常匹配边界
 _CODE_PATTERN = re.compile(r"\b[0-9]{6}\b", re.ASCII)
 
-# 排名声称模式
-_RANK_MAX_PATTERN = re.compile(r"(?:第[一二三四五六七八九十\d]+大|最大|最重|首要|主要|第一重仓|第一权重)")
+# 排名声称模式 — "最大持仓"/"第一大重仓"/"前三大持仓" 等持仓排名声称。
+# 要求排名词与持仓名词紧邻（允许中间一个"的"），避免将
+# "最大单项亏损品种"/"主要利润贡献"/"最大亏损来源"/"最大特点" 等
+# 非持仓排名语境误判为排名声称。
+# "第X大/前X大/头X大" 的"大"可省略（如"第一重仓"），但须与持仓名词紧邻。
+_RANK_MAX_PATTERN = re.compile(
+    r"(?:第[一二三四五六七八九十\d]+大?|最大|最重|首要|主要|"
+    r"前[一二三四五六七八九十\d]+大?|头[一二三四五六七八九十\d]+大?)"
+    r"(?:的)?(?:持仓|重仓|仓位|持股|权重)"
+)
 _RANK_TOP_N_PATTERN = re.compile(r"(?:前[一二三四五六七八九十\d]+|头[一二三四五六七八九十\d]+)")
 
 # 百分比数值
@@ -691,6 +699,7 @@ def run_fact_check(
     tolerance_pct: float | None = None,
     tolerance_overrides: dict[str, float] | None = None,
     history_data: dict | None = None,
+    skip_ranking_check: bool = False,
 ) -> tuple[str, str]:
     """对 LLM 生成的 HTML 内容执行全量事实校验与自动修正。
 
@@ -710,6 +719,12 @@ def run_fact_check(
     v4 新增参数：
         history_data: 组合历史走势数据字典，用于提取最大回撤等指标。
 
+    v5 新增参数：
+        skip_ranking_check: 是否跳过排名正确性校验（默认 False）。
+            缓存命中的 LLM 内容基于生成时的数据快照，用当前市值校验其排名
+            声称会因价格变动产生"排名翻转"误报 → 由调用方传 True。
+            数值/品种校验仍执行。
+
     Args:
         html_content: LLM 生成的 HTML 内容。
         holdings_details: 持仓明细数据（用于品种存在性和排名校验）。
@@ -720,6 +735,7 @@ def run_fact_check(
         tolerance_pct: 数值偏差容差（百分点），默认 None 使用 _DEFAULT_TOLERANCE_PCT。
         tolerance_overrides: 按模块覆盖容差。
         history_data: 组合历史走势数据字典（含 max_drawdown_pct）。
+        skip_ranking_check: 是否跳过排名正确性校验。
 
     Returns:
         (corrected_html, summary_html)
@@ -771,7 +787,12 @@ def run_fact_check(
     total_passed += sym_passed
 
     # 检查 3：排名正确性（穿透分析模块使用穿透排名基线）
-    rank_issues, rank_checked, rank_passed = check_ranking_correctness(text, holdings_details, is_penetration_module)
+    # skip_ranking_check=True（缓存命中场景）时跳过排名校验：
+    # 缓存内容基于生成时的价格快照，当前市值可能已发生排名翻转 → 误报。
+    if skip_ranking_check:
+        rank_issues, rank_checked, rank_passed = [], 0, 0
+    else:
+        rank_issues, rank_checked, rank_passed = check_ranking_correctness(text, holdings_details, is_penetration_module)
     all_issues.extend(rank_issues)
     total_checks += rank_checked
     total_passed += rank_passed

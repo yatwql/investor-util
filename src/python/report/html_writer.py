@@ -87,9 +87,10 @@ def _compute_section_visibility(
     llm_enabled_flag: bool,
     # ↓↓↓ board 层新增参数 ↓↓↓
     enable_news: bool = True,  # board 层：市场新闻是否开启（配置驱动，不是 include_news！）
-    enable_b_series: bool = True,  # board 层：基金深度分析是否开启
+    enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
+    factor_exposure: dict | None = None,  # data 层：因子暴露 C19 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
 
@@ -102,7 +103,7 @@ def _compute_section_visibility(
     # board 层：内联 dict（与 Excel 端结构一致）
     board_flags: dict[str, bool] = {
         "always": True,
-        "b_series": enable_b_series,
+        "b_series": enable_fund_deep_analysis,
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "llm": enable_llm,  # ← board 层
@@ -115,6 +116,9 @@ def _compute_section_visibility(
         "style_data": style_analysis is not None,
         "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）
         "llm_data_available": llm_enabled_flag,  # ← data 层（LLM 生成成功？）
+        # factor_exposure 非 None（含 available=False 降级占位）→ 章节可见，
+        # 模板依据 available/status 在"完整内容/数据不足/数据源暂不可用"间切换（§1.4.5）
+        "factor_exposure_data": factor_exposure is not None,
     }
 
     # 两层合并：section_visible = board_ok AND data_ok
@@ -268,6 +272,8 @@ def _render_template(
     data_source_matrix: dict,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
+    factor_exposure: dict | None = None,
+    factor_names: dict | None = None,
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     return _ENV.get_template("report_template.html").render(
@@ -328,6 +334,8 @@ def _render_template(
         data_unavailable=bool(total_mv == 0 and total_cost > 0),
         chart_datasets=chart_datasets,
         enable_interactive_charts=enable_interactive_charts,
+        factor_exposure=factor_exposure,
+        factor_names=factor_names or {},
     )
 
 
@@ -351,12 +359,13 @@ def write_html_report(
     history_data: dict | None = None,
     a_indices: dict | None = None,
     us_indices: dict | None = None,
-    enable_b_series: bool = True,
+    enable_fund_deep_analysis: bool = True,
     enable_news: bool = True,
     enable_history: bool = True,
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
+    factor_exposure: dict | None = None,
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -405,17 +414,41 @@ def write_html_report(
     penetration, penetration_profit_ok, penetration_dividend_ok = _render_penetration_section(holdings, details, prog)
     perf_data, _ = _render_fund_performance_section(holdings, details, prog)
 
+    # ── 5b) Chart.js 数据集补齐：category_doughnut / industry_bar / penetration_bar ──
+    # 这三张图的数据源（cat_data / penetration）只在 write_html_report 内计算，
+    # 调用侧传入的 chart_datasets 拿不到它们，导致图表误显示"暂不可用"。
+    # 此处用权威数据重建并覆盖，保证图表与表格同源（R11：单图失败仅跳过该图）。
+    if enable_interactive_charts and chart_datasets is not None:
+        from src.python.report.chart_data_builder import (
+            _build_category_doughnut_dataset,
+            _build_industry_bar_dataset,
+            _build_penetration_bar_dataset,
+        )
+
+        try:
+            chart_datasets["category_doughnut"] = _build_category_doughnut_dataset(None, cat_data)
+        except Exception:
+            logger.warning("[chart] category_doughnut 数据补齐失败，保留原数据集", exc_info=True)
+        try:
+            chart_datasets["industry_bar"] = _build_industry_bar_dataset(penetration)
+        except Exception:
+            logger.warning("[chart] industry_bar 数据补齐失败，保留原数据集", exc_info=True)
+        try:
+            chart_datasets["penetration_bar"] = _build_penetration_bar_dataset(penetration)
+        except Exception:
+            logger.warning("[chart] penetration_bar 数据补齐失败，保留原数据集", exc_info=True)
+
     # ── 13) 基金经理变更监控 ──
-    manager_analysis = _render_manager_analysis(holdings, enable_b_series, prog)
+    manager_analysis = _render_manager_analysis(holdings, enable_fund_deep_analysis, prog)
 
     # ── 14) 持仓重合度矩阵 ──
-    overlap_matrix = _render_overlap_matrix(holdings, details, enable_b_series, prog)
+    overlap_matrix = _render_overlap_matrix(holdings, details, enable_fund_deep_analysis, prog)
 
     # ── 15) 持仓集中度监控 ──
-    concentration_analysis = _render_concentration(holdings, enable_b_series, prog)
+    concentration_analysis = _render_concentration(holdings, enable_fund_deep_analysis, prog)
 
     # ── 16) 基金风格分析 ──
-    style_analysis = _render_style_analysis(holdings, enable_b_series, prog)
+    style_analysis = _render_style_analysis(holdings, enable_fund_deep_analysis, prog)
 
     # ── 8) 财经新闻 ──
     news_data, _news_llm_meta = _render_news_section(
@@ -472,9 +505,10 @@ def write_html_report(
         include_news,
         llm_enabled_flag,
         enable_news=enable_news,
-        enable_b_series=enable_b_series,
+        enable_fund_deep_analysis=enable_fund_deep_analysis,
         enable_history=enable_history,
         enable_llm=enable_llm,  # enable_llm is the board param for LLM
+        factor_exposure=factor_exposure,
     )
 
     # ── 10b) 数据源状态摘要 ──
@@ -498,6 +532,16 @@ def write_html_report(
     from src.python.report.data_source_matrix import build_data_source_matrix
 
     data_source_matrix = build_data_source_matrix()
+
+    # 因子中文名映射（单一数据源：analysis 层常量，经 context 传递，C14 合规）
+    _factor_names: dict = {}
+    if factor_exposure:
+        try:
+            from src.python.analysis.factor_exposure import FACTOR_NAMES
+
+            _factor_names = FACTOR_NAMES
+        except Exception:
+            _factor_names = {}
 
     html = _render_template(
         now_str=now_str,
@@ -525,6 +569,8 @@ def write_html_report(
         overlap_matrix=overlap_matrix,
         concentration_analysis=concentration_analysis,
         style_analysis=style_analysis,
+        factor_exposure=factor_exposure,
+        factor_names=_factor_names,
         llm_enabled_flag=llm_enabled_flag,
         global_macro_content=global_macro_content,
         expert_review_content=expert_review_content,

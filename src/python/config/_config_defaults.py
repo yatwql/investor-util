@@ -36,9 +36,9 @@ _DEFAULT_CONFIG = {
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
     # ── B. 报告章节可见性 ──
-    "enable_b_series": True,  # 基金深度分析（#6~9）
+    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露（#6~9、#17）
     "enable_news": True,  # 市场新闻（#10）
-    "enable_history": True,  # 组合历史走势+回撤（#16~17）
+    "enable_history": True,  # 组合历史走势+回撤（#15~16）
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -137,7 +137,7 @@ def _build_template_from_defaults() -> str:
         # ── A ──
         "  // ── A. 路径与文件 ──",
         f'  "holdings_dir": {json.dumps(d["holdings_dir"])},',
-        f'  "holdings_filename": {json.dumps(d["holdings_filename"])},',
+        f'  "holdings_filename": {json.dumps(d["holdings_filename"], ensure_ascii=False)},',
         f'  "output_dir": {json.dumps(d["output_dir"])},',
         f'  "llm_settings_file": {json.dumps(d["llm_settings_file"])},',
         f'  "llm_key_file": {json.dumps(d["llm_key_file"])},',
@@ -145,9 +145,9 @@ def _build_template_from_defaults() -> str:
         "",
         # ── B ──
         "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──",
-        f'  "enable_b_series": {json.dumps(d["enable_b_series"])},  // 基金深度分析（#6~9）',
+        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露（#6~9、#17）',
         f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#10）',
-        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#16~17）',
+        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#15~16）',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",
@@ -176,7 +176,7 @@ def _build_template_from_defaults() -> str:
         "",
         # ── G ──
         "  // ── G. 组合历史走势与持仓快照 ──",
-        f'  "history": {json.dumps(d["history"], indent=2).replace(chr(10), chr(10) + "  ")},',
+        f'  "history": {json.dumps(d["history"], indent=2, ensure_ascii=False).replace(chr(10), chr(10) + "  ")},',
         "",
         # ── H ──
         "  // ── H. 业绩评价配置 ──",
@@ -195,9 +195,21 @@ def _build_template_from_defaults() -> str:
         f'  "anonymization": {json.dumps(d["anonymization"], indent=2).replace(chr(10), chr(10) + "  ")},',
         "",
         # ── L ──
+        # batch/batch_rate_limit 手动构建（json.dumps 会丢 _DEFAULT_CONFIG 行尾注释）：
+        # 注释文本对齐 _DEFAULT_CONFIG（batch 子项）与历史 config.json（batch_rate_limit 子项）
         "  // ── L. 批量并行调度 ──",
-        f'  "batch": {json.dumps(d["batch"], indent=2).replace(chr(10), chr(10) + "  ")},',
-        f'  "batch_rate_limit": {json.dumps(d["batch_rate_limit"], indent=2).replace(chr(10), chr(10) + "  ")}',
+        '  "batch": {',
+        f'    "max_total_workers": {d["batch"]["max_total_workers"]},  // 全局 batch 线程硬上限（已有池不计入）',
+        f'    "fund_workers": {d["batch"]["fund_workers"]},  // 基金排名/持仓批量并发数',
+        f'    "industry_workers": {d["batch"]["industry_workers"]}  // 行业分类批量并发数',
+        "  },",
+        '  "batch_rate_limit": {  // Provider 级别请求间隔（秒），0=不限速',
+        f'    "tencent": {d["batch_rate_limit"]["tencent"]},  // 腾讯行情（不限速）',
+        f'    "sina": {d["batch_rate_limit"]["sina"]},  // 新浪行情（不限速）',
+        f'    "eastmoney": {d["batch_rate_limit"]["eastmoney"]},  // 东方财富行情（100ms）',
+        f'    "tiantian": {d["batch_rate_limit"]["tiantian"]},  // 天天基金（500ms）',
+        f'    "eastmoney_industry": {d["batch_rate_limit"]["eastmoney_industry"]}  // 东方财富行业（50ms）',
+        "  }",
         "}",
     ]
     return "\n".join(parts) + "\n"

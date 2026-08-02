@@ -490,6 +490,12 @@ def configure_extended_thinking(
     module_suffix = config_field.replace("max_tokens_", "")
     thinking_key = f"thinking_enabled_{module_suffix}"
     if not llm_config.get(thinking_key, False):
+        # DeepSeek 等强制推理模型：未显式开启 thinking 时不传任何思考参数会落入默认
+        # 思考模式（effort=high），思考占满 max_tokens 导致无正文（耗尽 max_tokens 预算）。
+        # 显式 disabled 才能真正关闭思考，从源头避免耗尽。非 effort 模型（Anthropic 原生
+        # 默认不思考）保持原样不注入。
+        if model and _is_effort_model(model):
+            payload["thinking"] = {"type": "disabled"}
         return
 
     resolved_model = model or _DEFAULT_CLAUDE_MODEL

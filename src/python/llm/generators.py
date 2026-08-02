@@ -454,12 +454,20 @@ def generate_debate_procon(
     _cumulative_chars: int = 0
 
     # ── 构建有效持仓代码集合（幻觉过滤用） ────────────
+    # 穿透 TOP10 底层资产代码同样合法（如 QDII 基金穿透到 AAPL/MSFT），
+    # 与 news_correlation 关键词构建（_extract_keywords_from_penetrated）保持一致。
+    # 否则 LLM 在辩论中合理引用穿透代码会被误判为虚构，导致整句删除。
     _valid_codes: set[str] = set()
     if holdings_details:
         for _h in holdings_details:
             _code = _h.get("code", "")
             if _code:
                 _valid_codes.add(str(_code))
+    if penetrated_assets:
+        for _a in penetrated_assets:
+            for _c in _a.get("codes") or []:
+                if _c and str(_c).strip():
+                    _valid_codes.add(str(_c).strip())
 
     # ── Step 1: 白脸（Pro） ────────────────────────────
     _pro_cache_key = f"llm_debate_pro_{_fingerprint}{_fp_suffix}"

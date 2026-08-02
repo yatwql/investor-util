@@ -4,8 +4,8 @@
   - 默认顺序完整性（len(_REPORT_SECTION_DEFAULT) 个模块，summary 开头/llm_usage 结尾）
   - 序号 1~N 连续递增
   - get_report_section_keys 完备性
-  - 5 种可见性类型计数正确（always=6, history=2, b_series=4, news=1, llm=5）
-  - B 系列 data_flag 各不相同
+  - 5 种可见性类型计数正确（always=6, history=2, b_series=5, news=1, llm=5）
+  - 基金深度分析 data_flag 各不相同
   - 空配置与无配置行为一致
 
 运行：
@@ -36,11 +36,12 @@ class TestScenarioSectionOrder(unittest.TestCase):
             get_report_section_order,
             get_report_section_keys,
         )
+
         self._default = _REPORT_SECTION_DEFAULT
         self._get_order = get_report_section_order
         self._get_keys = get_report_section_keys
 
-    def test_default_order_17_items(self):
+    def test_default_order_full_items(self):
         """默认顺序包含完整的 N 个模块。"""
         order = self._get_order()
         self.assertEqual(len(order), len(self._default))
@@ -51,7 +52,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(order[0]["key"], "summary")
         self.assertEqual(order[-1]["key"], "llm_usage")
 
-    def test_default_numbers_1_to_18(self):
+    def test_default_numbers_sequential(self):
         """默认序号为 1~N 连续递增。"""
         order = self._get_order()
         numbers = [s["number"] for s in order]
@@ -72,15 +73,16 @@ class TestScenarioSectionOrder(unittest.TestCase):
         keys = {s["key"] for s in always}
         self.assertIn("data_source_status", keys)
 
-    def test_default_b_series_type_has_4_sections(self):
-        """b_series 类型模块共 4 个（基金深度分析）。"""
-        b_series = [s for s in self._default if s["type"] == "b_series"]
-        self.assertEqual(len(b_series), 4)
-        keys = [s["key"] for s in b_series]
+    def test_default_fund_deep_analysis_type_has_5_sections(self):
+        """基金深度分析类型模块共 5 个（含因子暴露）。"""
+        fund_deep_analysis = [s for s in self._default if s["type"] == "b_series"]
+        self.assertEqual(len(fund_deep_analysis), 5)
+        keys = [s["key"] for s in fund_deep_analysis]
         self.assertIn("fund_manager", keys)
         self.assertIn("fund_overlap", keys)
         self.assertIn("fund_concentration", keys)
         self.assertIn("fund_style", keys)
+        self.assertIn("factor_exposure", keys)
 
     def test_default_news_type_has_1_section(self):
         """news 类型模块共 1 个（新闻）。"""
@@ -95,12 +97,11 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(len(llm), 5)
         self.assertEqual(llm[-1]["key"], "llm_usage")
 
-    def test_different_data_flags_in_b_series(self):
-        """b_series 的 data_flag 各不相同。"""
-        b_series = [s for s in self._default if s["type"] == "b_series"]
-        flags = [s["data_flag"] for s in b_series]
-        self.assertEqual(len(set(flags)), len(flags),
-                         f"data_flag 应各不相同: {flags}")
+    def test_different_data_flags_in_fund_deep_analysis(self):
+        """基金深度分析的 data_flag 各不相同。"""
+        fund_deep_analysis = [s for s in self._default if s["type"] == "b_series"]
+        flags = [s["data_flag"] for s in fund_deep_analysis]
+        self.assertEqual(len(set(flags)), len(flags), f"data_flag 应各不相同: {flags}")
 
     def test_empty_config_equals_no_config(self):
         """空配置与无配置结果一致。"""
@@ -118,7 +119,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(set(type_counts.keys()), {"always", "history", "b_series", "news", "llm"})
         self.assertEqual(type_counts["always"], 6)
         self.assertEqual(type_counts["history"], 2)
-        self.assertEqual(type_counts["b_series"], 4)
+        self.assertEqual(type_counts["b_series"], 5)
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)
 
@@ -133,6 +134,7 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
         from src.python.core.registry import (
             get_report_section_order,
         )
+
         self._get_order = get_report_section_order
 
     def _partial_config(self) -> dict:
@@ -172,8 +174,7 @@ class TestScenarioCustomSectionOrder(unittest.TestCase):
         # number 列应单调递增（可包含重复因部分配置和默认序号冲突）
         numbers = [s["number"] for s in remaining]
         for i in range(1, len(numbers)):
-            self.assertGreaterEqual(numbers[i], numbers[i-1],
-                                    f"剩余项序号不单调递增: {numbers}")
+            self.assertGreaterEqual(numbers[i], numbers[i - 1], f"剩余项序号不单调递增: {numbers}")
 
     def test_partial_custom_all_keys_present(self):
         """部分自定义 → 所有 N 个 key 都出现且不重复。"""

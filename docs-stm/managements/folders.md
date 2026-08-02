@@ -18,8 +18,8 @@
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **87** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 69 | — | 各版本 changelog/plan/review-findings 等 |
-| ├ plan/ | 中间设计文件 | 8 | — | 当前迭代中的设计方案 |
+| ├ archive/ | 版本归档 | 78 | — | 各版本 changelog/plan/review-findings 等 |
+| ├ plan/ | 中间设计文件 | 5 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -102,6 +102,7 @@ investor-util/
 │   │   │   ├── alignment_correction.py        #   口径修正因子计算（估值偏差校准）
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
+│   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
@@ -153,7 +154,7 @@ investor-util/
 │   │   │   ├── excel_content_sheets.py #  Excel 内容页签（持仓明细/汇总）
 │   │   │   ├── excel_market_data.py  #   Excel 行情数据页签
 │   │   │   ├── excel_news_warning.py #   Excel 新闻页签
-│   │   │   ├── excel_b_series.py     #   Excel 基金深度分析页签
+│   │   │   ├── excel_fund_deep_analysis.py  #   Excel 基金深度分析页签（基金深度分析：经理/重合度/集中度/风格/因子暴露）
 │   │   │   ├── excel_llm_usage.py    #   Excel LLM 用量统计页签
 │   │   │   ├── excel_writer.py       #   Excel 底层写入器（openpyxl 封装）
 │   │   │   ├── _debate_utils.py      #   辩论模式检测工具函数（共享 html/excel）
@@ -180,6 +181,7 @@ investor-util/
 │   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
+│   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
@@ -271,7 +273,8 @@ investor-util/
 │       │   │   ├── test_rebalance_edge.py     #   再平衡边缘场景
 │       │   │   ├── test_scenario_analysis.py       #   情景分析测试
 │       │   │   ├── test_alignment_correction.py #   口径修正因子计算
-│       │   │   └── test_drawdown_warning.py   #   回撤历史分位预警
+│       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
+│       │   │   └── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_config.py            #   配置管理核心测试
@@ -394,7 +397,7 @@ investor-util/
 │       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵测试
 │       │   │   ├── test_data_status.py            #   数据状态测试
 │       │   │   ├── test_downsample.py             #   P1 服务端下采样测试（§4.9）
-│       │   │   ├── test_excel_b_series.py          #   Excel B 系列页签测试
+│       │   │   ├── test_excel_fund_deep_analysis.py  #   Excel 基金深度分析页签测试
 │       │   │   ├── test_excel_format_edge.py      #   Excel 格式边缘场景
 │       │   │   ├── test_excel_generator.py        #   Excel 生成测试
 │       │   │   ├── test_excel_generator_edge.py   #   Excel 生成边缘场景
@@ -402,7 +405,7 @@ investor-util/
 │       │   │   ├── test_excel_roundtrip.py        #   Excel 写入读取回环测试
 │       │   │   ├── test_excel_writer.py           #   Excel 写入器测试
 │       │   │   ├── test_feature_interactive.py    #   交互图表 Feature Flag 管线测试
-│       │   │   ├── test_fund_bseries_sheet_edge.py # 基金深度分析页签边缘场景
+│       │   │   ├── test_fund_deep_analysis_sheet_edge.py # 基金深度分析页签边缘场景
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
 │       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试
 │       │   │   ├── test_fund_manager_sheet.py     #   基金经理页签测试
@@ -462,7 +465,8 @@ investor-util/
 │       │   │   ├── test_scenario_penetration_advanced.py #   穿透分析高级场景
 │       │   │   ├── test_scenario_penetration_mixed.py   #   穿透分析混合场景
 │       │   │   ├── test_scenario_penetration_edge.py    #   穿透分析边缘场景
-│       │   │   └── test_scenario_special_securities.py # 特殊证券场景测试
+│       │   │   ├── test_scenario_special_securities.py # 特殊证券场景测试
+│       │   │   └── test_pipeline_factor_exposure.py     #   因子暴露管线场景测试
 │       │   ├── datetime/            #   日期时间场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   └── test_datetime_scenarios.py #   日期时间场景测试
@@ -547,11 +551,8 @@ investor-util/
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
 │   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
-│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势/因子）
+│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势）
 │   │   ├── plan-correlation-drawdown.md #     相关性矩阵+回撤+净值曲线计划（plan-2/3）
-│   │   ├── plan-chartjs-risk-analysis.md #    Chart.js 升级风险/收益/架构分析（plan-1）
-│   │   ├── plan-chartjs-report-upgrade.md #  Chart.js 升级实施方案（plan-1）
-│   │   ├── plan-1-iter7-verification-checklist.md  # plan-1 Iter 7 浏览器人工验证清单（rf-113）
 │   │   ├── plan-web-ui.md              #     轻量 Web UI 计划
 │   │   └── plan-fix-deepseek-thinking-exhaustion.md  # DeepSeek thinking 耗尽 max_tokens 修复方案（rf-122）
 │   ├── archive/                      #   历史归档
@@ -663,6 +664,14 @@ investor-util/
 │   │   │   ├── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
 │   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
+│   │   │   ├── v0.9.x/                           # v0.9.x 版本归档（本迭代已完成项）
+│   │   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（plan-1/plan-7 已完成项 + 设计文档索引）
+│   │   │   │   ├── chartjs-upgrade/               #   plan-1 交互式 HTML 报告升级设计（8 迭代）
+│   │   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案（plan-1）
+│   │   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析（plan-1）
+│   │   │   │   │   └── plan-1-iter7-verification-checklist.md # plan-1 Iter 7 浏览器人工验证清单（rf-113）
+│   │   │   │   └── factor-exposure/                 #   plan-7 因子暴露分析设计（原 plan-advanced-analysis §4）
+│   │   │   │       └── plan-factor-exposure.md      #     因子暴露分析设计（plan-7）
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

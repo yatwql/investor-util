@@ -1,7 +1,9 @@
 # Chart.js 交互式报告升级 — 风险/收益/架构分析
 
 > **文档版本**：v0.8.7-dev · **分析日期**：2026-07-27
-> **关联计划**：[`plan-chartjs-report-upgrade.md`](./plan-chartjs-report-upgrade.md)（实施方案）· [`plan.md`](../managements/plan.md)
+> **关联计划**：[`plan-chartjs-report-upgrade.md`](./plan-chartjs-report-upgrade.md)（实施方案）· [`plan.md`](../../../managements/plan.md)
+>
+> **归档说明**：plan-1（交互式 HTML 报告升级）已全部完成（8 迭代落地），本文档 2026-08-02 随实施方案一并归档至 `archive/v0.9.x/chartjs-upgrade/`。
 > **数据源**：代码审查 + `technical.md` 架构约束 + 模板/渲染管线源码分析
 
 ---
@@ -287,7 +289,7 @@ C19 ✅
 
 **现有 Feature Flag 基础设施**：
 
-- `config/features.py` 定义了 28 项 Feature Flag，当前覆盖 LLM 模块 + B 系列 + 历史回撤
+- `config/features.py` 定义了 28 项 Feature Flag，当前覆盖 LLM 模块 + 基金深度分析 + 历史回撤
 - 加载机制：`load_feature_overrides()` → `features.json` → `is_feature_enabled()`
 - **现状**：`enable_interactive_charts` 尚未注册到 `_FEATURE_FLAGS_DEFAULT`，仅在 `plan-chartjs-report-upgrade.md` 中提及
 
@@ -559,7 +561,7 @@ def build_chart_datasets(
 | 引擎加载 | 纯 CDN / CDN+local / CDN+SRI+onerror / **纯本地 bundle** | **纯本地 bundle**（R21） | 离线自包含，R3/R10 闭环，无网络依赖 |
 | JS 组织 | 内联模板 / 外部独立 JS | **外部独立 JS**（chart-init.js + chart-config.js） | 可测试性 + 维护性 + 暗色模式预留 |
 | 数据处理 | JS 端 tojson 消费 / Python 端预处理器 | **Python 端预处理器**（chart_data_builder.py） | 可 pytest 测试 + 降低 JS 复杂度 |
-| Feature Flag 注册 | config/features.py / config.json | **config/features.py** | 与现有 LLM/B 系列标志一致 |
+| Feature Flag 注册 | config/features.py / config.json | **config/features.py** | 与现有 LLM/基金深度分析标志一致 |
 | 热力图方案 | chartjs-chart-matrix / Canvas 2D | **先 POC 验证，确定后选 matrix** | POC 不通过则用 Canvas 自制 |
 | 颜色方案 | 硬编码 / CSS 变量 | **CSS 变量** | 为 plan-11 暗色模式预留 |
 | 双路径清理 | N 版本后移除 Canvas / 长期共存 | **N=2** | 给用户适应期，积累稳定性 |
@@ -838,7 +840,7 @@ html_writer.py: _compute_section_visibility()
 | H2 | `data_unavailable` 与 chart 的交互未覆盖 | 低 | `data_unavailable=True` 时（持仓有成本但总市值=0），Chart.js 应显示"暂无数据"横幅而非尝试渲染空图。**已修复** — Iter 3（§5 验收标准 4）和 Iter 6（§5 验收标准 6）均已添加 `data_unavailable` 交叉验证 |
 | H3 | 模板 context 膨胀未评估 | 低 | 当前 render() 已传递约 **40 个 context 变量**。`chart_datasets` 是多个 JSON 数据集构成的嵌套 dict，加入后 context 序列化/传递性能需验证（预估 <5ms 增量） |
 | H4 | 量化指标雷达图数据来源核查已确认 | 中 | `prep["risk_metrics"]` 仅含 5 个基本字段（volatility/max_drawdown/return 等）。全量 14 项指标（sharpe/calmar/HHI/beta 等）由 `compute_all_metrics()` 计算后存于局部变量 `_metrics`，**仅传入 LLM（`_report_generation.py:547` `metrics=_metrics`），从未传入 `write_html_report()`**。Iter 1 需在 `_report_generation.py::_generate_full_html_report` 中将 `_metrics` 合并到 `chart_datasets` 或在 `build_chart_datasets()` 新增参数 `all_metrics` 接收（R1 基线修正：原文档"编排器"与"第 948 行"不准确） |
-| H5 | Feature Flag 读取位置选择 | 低 | `enable_interactive_charts` 是在 `html_writer.py` 内部读（如 debate flag），还是由 caller 传参？当前 debate flag 在内部读，建议一致。**已修复** — 经代码审查确认：`enable_b_series/enable_news/enable_history/enable_llm` 全部从 config 读取后以参数形式传入 `write_html_report()`，debate flag 的 `html_writer` 内读是特例（late-binding 需求）。统一采用参数传递模式：`_report_generation.py`（`_generate_report_both`）读 `is_feature_enabled("enable_interactive_charts")` → 传入 `write_html_report()`。实际代码中 `is_enable_b_series(config)` 等在 `_report_generation.py::_generate_report_both` 内读取（非 orchestrator），R1 基线修正后读取位置明确归 `_report_generation.py`（R7 + R1 确认） |
+| H5 | Feature Flag 读取位置选择 | 低 | `enable_interactive_charts` 是在 `html_writer.py` 内部读（如 debate flag），还是由 caller 传参？当前 debate flag 在内部读，建议一致。**已修复** — 经代码审查确认：`enable_fund_deep_analysis/enable_news/enable_history/enable_llm` 全部从 config 读取后以参数形式传入 `write_html_report()`，debate flag 的 `html_writer` 内读是特例（late-binding 需求）。统一采用参数传递模式：`_report_generation.py`（`_generate_report_both`）读 `is_feature_enabled("enable_interactive_charts")` → 传入 `write_html_report()`。实际代码中 `is_enable_fund_deep_analysis(config)` 等在 `_report_generation.py::_generate_report_both` 内读取（非 orchestrator），R1 基线修正后读取位置明确归 `_report_generation.py`（R7 + R1 确认） |
 | H6 | Both 路径雷达图数据源缺口 | 低 | both 路径不计算 `prep["risk_metrics"]`（中段代码无 `_risk` 注入），也不计算 `_metrics`。雷达图若无兜底将完全为空。**已修复** — `_build_radar_dataset()` 新增第三级降级：当 `all_metrics=None` 且 `risk_metrics=None` 时，从 `history_data` 提取 `annualized_volatility`/`max_drawdown_pct`/`total_return_pct` 3 个基本轴。`history_data` 双路径均有，此降级确保 both 路径也能显示基础雷达图（R7 确认） |
 
 
@@ -850,7 +852,7 @@ html_writer.py: _compute_section_visibility()
 >   - H4 确认升级：`_metrics`（14 项全量）从未传入 `write_html_report()`，Iter 1 需新增 `all_metrics` 预处理器参数
 > - 2026-07-27 v5（R6）：实施细节补全 — JS 文件交付机制（`shutil.copy2`）、chart-init.js CDN 失败守卫 + canvas 存在检测、`Chart.instances.forEach` 修正（非标准 API）、Both 路径雷达图差异标记
 > - 2026-07-27 v6（R7）：Feature Flag 读取位置确认（orchestrator 参数传递模式 ↑ 与 enable_* 系列一致）、DegradationTracker 兼容性确认（正交无冲突）、H5/H6 修复、Both 路径雷达图 `history_data` 三级降级兜底
-> - 2026-08-01 v7（R1）：基线复盘修正 — 模板行数 1845→1862（5 处同步）；`write_html_report()` 实际调用方为 `_report_generation.py`（orchestrator 仅分发入口，§1.3/§7.2 管线图修正）；H4 `_metrics` 传给 LLM 位置 948→547；H5 读取位置明确归 `_report_generation.py`（与 `is_enable_b_series(config)` 既有位置一致）
+> - 2026-08-01 v7（R1）：基线复盘修正 — 模板行数 1845→1862（5 处同步）；`write_html_report()` 实际调用方为 `_report_generation.py`（orchestrator 仅分发入口，§1.3/§7.2 管线图修正）；H4 `_metrics` 传给 LLM 位置 948→547；H5 读取位置明确归 `_report_generation.py`（与 `is_enable_fund_deep_analysis(config)` 既有位置一致）
 > - 2026-08-01 v8（R2）：数据链路复盘 — 资产构成聚合键 `code_type`→`property`（附录 E 数据依赖矩阵）；行业分布聚合键明确 penetration `sector`（`classify_sector`/`sector_api`，无归属归"其他"）；§6.6 雷达图空值判断 `x or "N/A"`→`x is not None`（0.0 合法值不误判）；upgrade.md 新增 R2 数据契约明细
 > - 2026-08-01 v9（R3）：架构约束核对 — §5.5 合规总评补齐 C9/C11/C12/C13/C17/C18 六项实现 19 条全覆盖；附录 F 表补齐 C9/C17/C18 三行（原表遗漏）；C16 补充 `output_dir` 已绝对化依据；C19 补充 `risk_metrics` 键已在 Schema 定义的间接派生说明
 > - 2026-08-01 v10（R4）：收益验证 — §2.2 修正"config/features.py 仅用于 LLM"错误（实际 28 个 flag）；新增 §2.4 ROI 总判断（投入 5.25d vs 质变收益 + 双路径回退 + 超支裁剪方案）

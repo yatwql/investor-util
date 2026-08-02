@@ -148,7 +148,7 @@ from src.python.core.registry import (
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
 - `get_report_section_number("fund_manager")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
-- `get_report_section_keys()` → 全部 18 个模块键名（见下表）
+- `get_report_section_keys()` → 全部 19 个模块键名（见下表）
 
 全部键名及对应中文标题：
 
@@ -163,6 +163,7 @@ from src.python.core.registry import (
 | `fund_overlap` | 持仓重合度矩阵 | 基金深度分析 |
 | `fund_concentration` | 持仓集中度监控 | 基金深度分析 |
 | `fund_style` | 基金风格分析 | 基金深度分析 |
+| `factor_exposure` | 因子暴露分析 | 基金深度分析 |
 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻 |
 | `global_macro` | 全球政经局势 | LLM |
 | `expert_review` | 智囊团深度复盘 | LLM |
@@ -175,7 +176,7 @@ from src.python.core.registry import (
 
 > LLM 模块（`global_macro`/`expert_review`/`health_check`/`penetration_deep`/`news_correlation`）的页签标题统一通过 `get_llm_module_name(settings_suffix)` 获取；`llm_usage` 的序号和名称也在 registry 中注册，内容（Token/费用数据）由程序动态计算。
 
-完整 18 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
+完整 19 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
 
 ### 计算模块查询
 

@@ -489,6 +489,48 @@ class TestCheckRankingCorrectness:
         assert passed == 0
         assert len(issues) == 1
 
+    # ── 非持仓排名语境不误判 ──────────────────────────────
+
+    def test_max_single_loss_item_not_flagged(self, sample_holdings):
+        """"最大单项亏损品种" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        text = "561910 是组合最大单项亏损品种，需关注回撤风险。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert issues == []
+        assert checked == 0
+        assert passed == 0
+
+    def test_contributed_main_profit_not_flagged(self, sample_holdings):
+        """"贡献了主要利润" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        text = "601939 本季度贡献了主要利润，表现突出。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert issues == []
+        assert checked == 0
+        assert passed == 0
+
+    def test_max_loss_source_not_flagged(self, sample_holdings):
+        """"最大亏损来源" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        text = "600900 是组合最大亏损来源，拖累整体表现。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert issues == []
+        assert checked == 0
+        assert passed == 0
+
+    def test_max_feature_not_flagged(self, sample_holdings):
+        """排名词 + 非持仓名词（特点/风险）→ 不误判为排名声称（回归）。"""
+        text = "600900 最大特点是高股息，适合防守配置。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert issues == []
+        assert checked == 0
+        assert passed == 0
+
+    def test_top3_holding_claim_still_detected(self, sample_holdings):
+        """前三大持仓（合法排名声称）→ 仍被检测且正确通过（不破坏既有功能）。"""
+        text = "组合前三大持仓依次为 600519、600036、300750。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert checked == 1
+        assert passed == 1  # 600519 是实际第一
+        assert issues == []
+
 
 # ── run_fact_check（统一入口） ──────────────────────────────
 
@@ -570,3 +612,48 @@ class TestRunFactCheck:
         # 无论是否通过，不应崩溃
         assert isinstance(corr, str)
         assert isinstance(summ, str)
+
+    # ── 缓存命中跳过排名校验 ──────────────────────────────
+
+    def test_skip_ranking_check_skips_stale_rank_claim(self, sample_holdings):
+        """缓存命中内容含过期排名声称：skip_ranking_check=True → 不报排名误报（回归）。
+
+        600036 是实际第 2 大持仓，声称其为最大持仓在默认校验下会告警；
+        但缓存内容基于生成时价格快照，当前排名可能已翻转 → 缓存命中场景应跳过排名校验。
+        数值/品种校验仍执行。
+        """
+        html = "<p>招商银行（600036）是组合最大持仓。</p>"
+        corr, summ = run_fact_check(
+            html,
+            sample_holdings,
+            "智囊团深度复盘",
+            skip_ranking_check=True,
+        )
+        # 排名校验被跳过 → 无"声称最大持仓"误报
+        assert "最大持仓" not in summ
+        # 600036 为真实持仓 → 品种存在性通过，无其他告警 → 全部通过
+        assert "事实校验通过" in summ
+
+    def test_skip_ranking_check_still_corrects_numbers(self, sample_holdings):
+        """缓存命中跳过排名校验但数值自动修正仍生效（保留数值修正）。"""
+        html = """<p>招商银行（600036）是组合最大持仓。</p>
+<p>组合累计收益率为 5.0%。</p>"""
+        corr, summ = run_fact_check(
+            html,
+            sample_holdings,
+            "持仓体检报告",
+            skip_ranking_check=True,
+        )
+        # 排名误报不出现
+        assert "最大持仓" not in summ
+        # 数值修正仍生效：5.0% → 30.3%
+        assert "30.3%" in corr
+        assert "5.0%" not in corr
+        assert "自动修正 1 处数值" in summ
+
+    def test_ranking_check_active_by_default(self, sample_holdings):
+        """默认（skip_ranking_check=False）：过期排名声称仍被检出（不破坏既有功能）。"""
+        html = "<p>招商银行（600036）是组合最大持仓。</p>"
+        corr, summ = run_fact_check(html, sample_holdings, "智囊团深度复盘")
+        assert "600036" in summ
+        assert "最大持仓" in summ

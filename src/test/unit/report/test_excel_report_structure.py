@@ -63,7 +63,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=False, enable_news=False, enable_llm=False,
+                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False,
                                 enable_history=False)
         # 只有 always 类型的 5 个页签
         expected_order = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
@@ -81,7 +81,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         ]
         wb = self._make_wb()
         sheets = create_sheets(wb, custom_order,
-                                enable_b_series=False, enable_news=False, enable_llm=False)
+                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
         expected_order = [sec["key"] for sec in custom_order]
         self.assertEqual(list(sheets.keys()), expected_order)
         self.assertEqual(wb.sheetnames, [sheets[k].title for k in expected_order])
@@ -91,7 +91,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                enable_fund_deep_analysis=True, enable_news=True, enable_llm=True,
                                 data_availability={"news_data_available": True, "llm_data_available": True})
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys,
@@ -102,14 +102,14 @@ class TestExcelSheetOrder(unittest.TestCase):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
-        # 启用 always + b_series
+        # 启用 always + 基金深度分析
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_b_series=True, enable_news=False, enable_llm=False,
+                                enable_fund_deep_analysis=True, enable_news=False, enable_llm=False,
                                 enable_history=False)
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
                          if sec["type"] in ("always", "b_series")]
         self.assertEqual(list(sheets.keys()), expected_keys)
-        self.assertEqual(len(sheets), 9, "always(5) + b_series(4) = 9")
+        self.assertEqual(len(sheets), 9, "always + 基金深度分析 = 9")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -133,7 +133,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
-                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                enable_fund_deep_analysis=True, enable_news=True, enable_llm=True,
                                 data_availability={"news_data_available": True, "llm_data_available": True})
         for key, ws in sheets.items():
             self.assertRegex(
@@ -155,7 +155,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
-                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                enable_fund_deep_analysis=True, enable_news=True, enable_llm=True,
                                 data_availability={"news_data_available": True, "llm_data_available": True})
         numbers = []
         for ws in sheets.values():
@@ -173,7 +173,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
-                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                enable_fund_deep_analysis=True, enable_news=True, enable_llm=True,
                                 data_availability={"news_data_available": True, "llm_data_available": True})
         titles = [ws.title for ws in sheets.values()]
         self.assertEqual(len(titles), len(set(titles)),
@@ -189,7 +189,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         ]
         wb = self._make_wb()
         sheets = create_sheets(wb, custom_order,
-                                enable_b_series=False, enable_news=False, enable_llm=False)
+                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
         self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析",
                          "fund_performance 应使用自定义序号 1")
         self.assertEqual(sheets["summary"].title, "2.投资分析汇总",
@@ -204,7 +204,7 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         wb = self._make_wb()
         order = get_report_section_order()
         sheets = create_sheets(wb, order,
-                                enable_b_series=True, enable_news=True, enable_llm=True,
+                                enable_fund_deep_analysis=True, enable_news=True, enable_llm=True,
                                 data_availability={"news_data_available": True, "llm_data_available": True})
         # 标题应是递增序号
         import re
@@ -312,7 +312,7 @@ class TestExcelModuleSheets(unittest.TestCase):
                     us_indices={},
                     news_data=[],
                     news_llm_meta=None,
-                    enable_b_series=False,
+                    enable_fund_deep_analysis=False,
                 )
                 # 检查输出文件是否存在
                 files = os.listdir(tmpdir)

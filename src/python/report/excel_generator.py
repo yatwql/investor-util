@@ -9,7 +9,7 @@ from typing import Any
 
 from src.python.core.logger import setup_logger
 from src.python.core.registry import get_report_section_order
-from src.python.report.excel_b_series import write_b_series_sheets
+from src.python.report.excel_fund_deep_analysis import write_fund_deep_analysis_sheets
 from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_llm_usage import write_llm_section_and_usage
 from src.python.report.excel_market_data import resolve_indices, resolve_market_data
@@ -185,7 +185,7 @@ def generate_excel_report(
     us_indices: dict[str, dict[str, Any]] | None = None,
     news_data: list | None = None,
     news_llm_meta: dict | None = None,
-    enable_b_series: bool = False,  # board 层：基金深度分析是否开启
+    enable_fund_deep_analysis: bool = False,  # board 层：基金深度分析是否开启
     enable_news: bool = True,  # board 层：市场新闻是否开启（配置值）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
@@ -209,7 +209,7 @@ def generate_excel_report(
         us_indices: 美股指数数据
         news_data: 预获取的新闻数据
         news_llm_meta: 新闻 LLM 元数据
-        enable_b_series: board 层 — 基金深度分析是否开启
+        enable_fund_deep_analysis: board 层 — 基金深度分析是否开启
         enable_news: board 层 — 市场新闻是否开启（配置值）
         enable_llm: board 层 — LLM 分析章节是否开启
         enable_history: board 层 — 历史走势章节是否开启
@@ -243,7 +243,7 @@ def generate_excel_report(
     sheets = create_sheets(
         wb,
         order,
-        enable_b_series=enable_b_series,
+        enable_fund_deep_analysis=enable_fund_deep_analysis,
         enable_news=enable_news,
         enable_history=enable_history,
         enable_llm=enable_llm,
@@ -257,7 +257,16 @@ def generate_excel_report(
     # ── 各页签写入 ──
     pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
-    write_b_series_sheets(sheets, holdings, enable_b_series, data, modules, prog)
+    # 因子暴露：C19 数据在编排层注入 pipeline_data，此处透传页签写入
+    write_fund_deep_analysis_sheets(
+        sheets,
+        holdings,
+        enable_fund_deep_analysis,
+        data,
+        modules,
+        prog,
+        factor_exposure=(pipeline_data or {}).get("factor_exposure"),
+    )
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
     from src.python.report._debate_utils import detect_debate_mode
 

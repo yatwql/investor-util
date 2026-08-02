@@ -13,9 +13,9 @@
   "llm_providers_file": "data/config/llm_providers.json",
 
   // ── B. 报告章节可见性 ──
-  "enable_b_series": true,  // 基金深度分析（#6~9）
-  "enable_news": true,      // 市场新闻（#10）
-  "enable_history": true,   // 组合历史走势+回撤（#15~16）
+  "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露（#6~10）
+  "enable_news": true,      // 市场新闻（#11）
+  "enable_history": true,   // 组合历史走势+回撤（#16~17）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -125,7 +125,7 @@
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 | `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/P/C/F/O/1/2/3/4/S/R/X），启动后光标自动定位 | 手动编辑 |
-| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（18 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
+| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（19 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `comparison_indices` | `{"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}` | 竞争语境对比指数池。智囊团深度复盘中对比组合 vs 多指数的今日涨跌幅、区间累计收益和指标（夏普/波动率/最大回撤）。格式 `{指数代码: 显示名称}`。禁用时设为空对象 `{}` | 手动编辑 |
@@ -145,9 +145,9 @@
 | `rebalance.equity_fixed_income` | `{}` | 权益/固收超大类目标配置（空=不启用）。格式 `{"equity":{"min":30,"max":70}}` | 手动编辑 |
 | `redemption_limits` | `{}` | 场外基金单日赎回上限，格式 `{基金代码: 金额}`。配置后程序可计算场外品种全量赎回所需天数。未配置品种标记"需手动确认赎回上限" | 手动编辑 |
 | `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）/ `code_display`（名称→"品种X"，保留代码和盈亏）/ `full_anonymous`（名称→"品种X"，代码→"000XXX"，盈亏→±XX%）/ `summary`（仅大类汇总） | 菜单 `A` |
-| `enable_b_series` | `true` | 基金深度分析章节可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
-| `enable_news` | `true` | 市场新闻章节可见性（模块 #10），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
-| `enable_history` | `true` | 历史走势章节可见性（模块 #15~#16），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
+| `enable_fund_deep_analysis` | `true` | 基金深度分析章节可见性（模块 #6~#10），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
+| `enable_news` | `true` | 市场新闻章节可见性（模块 #11），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
+| `enable_history` | `true` | 历史走势章节可见性（模块 #16~#17），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
 
 ---
 
@@ -159,16 +159,16 @@
 
 ### B. 报告章节可见性
 
-`enable_b_series`、`enable_news`、`enable_history` 三个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
+`enable_fund_deep_analysis`、`enable_news`、`enable_history` 三个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
 
 通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换各章节组的可见性。
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
-| `enable_b_series` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析 | 基金深度分析章节组 |
-| `enable_news` | `true` | `config.json` | #10 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
-| `enable_history` | `true` | `config.json` | #15 组合历史走势、#16 历史回撤分析 | 历史走势章节组（F1 持仓快照不受影响，始终自动执行） |
-| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #11 全球政经局势、#12 智囊团深度复盘、#13 持仓体检报告、#14 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
+| `enable_fund_deep_analysis` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析、#10 因子暴露分析 | 基金深度分析章节组 |
+| `enable_news` | `true` | `config.json` | #11 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
+| `enable_history` | `true` | `config.json` | #16 组合历史走势、#17 历史回撤分析 | 历史走势章节组（F1 持仓快照不受影响，始终自动执行） |
+| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #12 全球政经局势、#13 智囊团深度复盘、#14 持仓体检报告、#15 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
 
@@ -353,7 +353,7 @@
 | 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
 | 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
 
-**18 个模块标识及默认顺序：**
+**19 个模块标识及默认顺序：**
 
 | 默认序号 | 模块标识 | 显示名称 | 类型 |
 |:--------:|:---------|:---------|:-----|
@@ -362,19 +362,20 @@
 | 3 | `category` | 持仓分类表 | 始终显示 |
 | 4 | `penetration` | 资产穿透TOP10 | 始终显示 |
 | 5 | `fund_performance` | 基金业绩分析 | 始终显示 |
-| 6 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_b_series 控制；有数据才显示） |
-| 7 | `fund_overlap` | 持仓重合度矩阵 | 基金深度分析（enable_b_series 控制；有数据才显示） |
-| 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_b_series 控制；有数据才显示） |
-| 9 | `fund_style` | 基金风格分析 | 基金深度分析（enable_b_series 控制；有数据才显示） |
-| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
-| 11 | `global_macro` | 全球政经局势 | LLM |
-| 12 | `expert_review` | 智囊团深度复盘 | LLM |
-| 13 | `health_check` | 持仓体检报告 | LLM |
-| 14 | `penetration_deep` | 穿透深度分析 | LLM |
-| 15 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 16 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 17 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 18 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 6 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 7 | `fund_overlap` | 持仓重合度矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 9 | `fund_style` | 基金风格分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 10 | `factor_exposure` | 因子暴露分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 11 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
+| 12 | `global_macro` | 全球政经局势 | LLM |
+| 13 | `expert_review` | 智囊团深度复盘 | LLM |
+| 14 | `health_check` | 持仓体检报告 | LLM |
+| 15 | `penetration_deep` | 穿透深度分析 | LLM |
+| 16 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
+| 17 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
+| 18 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
+| 19 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 
@@ -394,7 +395,7 @@
 
 > 效果：基金经理/重合度/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
-> 空对象 `{}` 或缺失此字段时使用上述 18 项默认顺序。
+> 空对象 `{}` 或缺失此字段时使用上述 19 项默认顺序。
 
 **实用示例** — 将组合历史走势提到前面，关注回撤风险：
 
@@ -650,7 +651,7 @@
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
 | `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）；关闭回退旧 Canvas + 表格静态渲染 |
 
-> **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（1-5，由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性辩论模式（6-8，由上方 `llm_debate_*` 开关控制）。「辩论-正反辩论」内部即为白脸→黑脸→综合三段式流程，**不是**三个独立开关；菜单中三者不会单独出现，只通过编号 6 整体启停（注册表条目保留，仅用于缓存键/TTL 管理）。
+> **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（1-5，由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性辩论模式（6-8，由上方 `llm_debate_*` 开关控制，三项相互独立、可组合开启）。**正反辩论（`llm_debate_procon`）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**为分析注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估。
 
 > 以上为主要功能开关速查。完整清单（含所有子开关名、默认值及说明）以 `data/config/features.json` 文件中的注释为准，可直接查看该文件。
 > 该文件不包含敏感信息，可安全纳入版本控制。

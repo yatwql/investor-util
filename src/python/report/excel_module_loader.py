@@ -152,4 +152,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["write_style_sheet"] = None
         prog.add_error("基金风格分析模块缺失 (fund_style)")
 
+    try:
+        from src.python.report.factor_exposure_sheet import write_factor_exposure_sheet
+
+        modules["write_factor_exposure_sheet"] = write_factor_exposure_sheet
+    except ImportError:
+        modules["write_factor_exposure_sheet"] = None
+        prog.add_error("因子暴露分析模块缺失 (factor_exposure)")
+
     return modules
