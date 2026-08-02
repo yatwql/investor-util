@@ -8,12 +8,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 195 | 47,829 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 2 | 2,904 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页） |
+| 主程序代码 | Python | 195 | 47,924 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 3 | 2,910 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
 | 辅助脚本 | Python | 12 | 4,113 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
-| **源代码合计** | — | **209** | **54,846** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **238** | **65,985** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,169 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **210** | **54,947** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **238** | **66,253** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,174 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
