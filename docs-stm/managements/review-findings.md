@@ -22,8 +22,8 @@
 |---|------|----------|
 | **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | ①③⑤ 可用 `src/static/test-chart.html` 调试页自检（TD8 rf-112 已补齐载体）；②④⑥ 需真实浏览器/微信实操——**勾选清单已备**：`docs-stm/archive/v0.9.x/chartjs-upgrade/plan-1-iter7-verification-checklist.md`（含 6 项 × 具体操作步骤 + 结果汇总），按清单勾选完成后回填 changelog |
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器 |
-| **rf-115** | TD-L2：`history_data` 数据同时服务 Excel + HTML Chart.js，模板 `tojson` 序列化全量字段（含 Excel 不需要的字段） | plan-2/plan-3 引入 chart_data 专用裁剪 |
-| **rf-116** | TD-L3：模板仍为单文件 ~2000 行（Chart.js 初始化 JS 已外部化缓解，Canvas 函数 + 条件分支仍占体积） | 独立技术债迭代做章节级 partial 拆分 |
+| **rf-115** | TD-L2：`history_data` 数据同时服务 Excel + HTML Chart.js，模板 `tojson` 序列化全量字段（含 Excel 不需要的字段）。**plan-5/6 扩展同模式**：`evolution_data`/`whatif_data` 亦经 `tojson` 全量内联（`#evolution-chart-data`/`#whatif-chart-data`），图表仅用其中部分字段 | plan-2/plan-3 引入 chart_data 专用裁剪（组合演进/调仓 What-if 属同一模式，后续裁剪方案一并覆盖） |
+| **rf-116** | TD-L3：模板仍为单文件 ~2000 行（Chart.js 初始化 JS 已外部化缓解，Canvas 函数 + 条件分支仍占体积）。**plan-6 加剧**：`report_template.html` 现 2570 行（组合演进章节 +165 行内联，含 3 图 canvas + 数据段 + 表格） | 独立技术债迭代做章节级 partial 拆分（组合演进章节应为首批提取对象之一） |
 | **rf-117** | A6 键盘可达性未做（Chart.js tooltip 为鼠标悬停驱动，键盘聚焦不触发） | 设计明确"不做 MVP 记入技术债"（upgrade.md §4.8 A6）；如需支持，给 chart-init.js 加键盘交互扩展 |
 | **rf-118** | 相关性矩阵 Heatmap 仅占位文本（Chart.js Matrix 插件未引入） | 依赖 plan-2 提供 `correlation_data` 后引入 `chartjs-chart-matrix` 渲染（Iter 7 已推迟，非 YAGNI） |
 | **rf-120** | S5 CSP 未配置（报告为离线静态 HTML，无外部域名） | 可选不做 MVP（upgrade.md §4.10 S5）；未来若加 CSP 仅需 `script-src 'self'` |
@@ -33,7 +33,11 @@
 
 （无待处理项 — rf-122 已处理，见"已修复"表；竞态根因 + 配置缓解详见 changelog Fix 条目）
 
-### P2 - 代码质量（低优先级，增量改进）
+### P1 — plan-5/6 新功能遗留技术债（2026-08-03）
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-159** | 调仓 What-if 独立页 `whatif_template.html` 内联双环图初始化逻辑（`trackChart` + `doughnutOptions` + O1 每图 try/catch + ES5 保守语法，~58 行），与主报告 `chart-init.js` 的 `initCategoryDoughnut` 模式**重复**（复用 `ChartTheme.doughnutColors`/`chart-export.js`，但数据段 `#whatif-chart-data`/DOM id 与主报告不同，未直接复用 chart-init.js） | 设计权衡：whatif 为独立产物，耦合主报告 chart-init.js 需参数化改造；后续可抽公共 Chart 初始化 helper（如 `chart-init-common.js` 提供 `trackChart`/`doughnutOptions`），主报告与 whatif 页共用，消除双环图配置重复 |
 
 #### P2A — 文件过长（>500 行，建议拆分）
 
