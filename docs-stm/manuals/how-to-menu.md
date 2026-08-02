@@ -126,7 +126,7 @@
 
 > **⚗ 辩论模式说明**：6/7/8 是三项**相互独立的开关**，默认全部关闭，可任意组合开启。**正反辩论（6）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（7）**为分析注入上涨/下跌/震荡情景，使结果情景化；**集中度问答（8）**在单品种占比≥20% 时自动附加集中度量化评估。
 
-辩论模式开启后，智囊团复盘页签标题尾部附加 `(实验)` 标签。同一次报告周期内辩论模式与标准模式互斥（辩论优先）。
+辩论模式开启后，智囊团复盘页签标题尾部附加 `🧪 辩论模式` / `🧪 实验模式` 标签。同一次报告周期内辩论模式与标准模式互斥（辩论优先）。
 
 多个辩论模式可同时开启（如正反辩论+条件推理）。启用后，**HTML 报告页脚**和 **LLM 用量页**会显示当前启用的模式组合标识（如"🧪 辩论模式 · 正反辩论+条件推理"），方便确认生效的组合。**Excel 报告**的 LLM 用量行也会展示相同的组合标识。
 
@@ -149,7 +149,7 @@
 > | `llm_debate_conditional` | 7 | 辩论-条件推理 |
 > | `llm_debate_qa_concentration` | 8 | 辩论-集中度问答 |
 >
-> 除辩论开关外，`features.json` 还统一管理匿名化模式（`anonymization.mode`）、新闻分类（`news_cls`）、历史走势（`history_portfolio`/`history_benchmark`）、量化指标（`metrics_*`）、缓存清理（`cache_daily_cleanup`）、交互图表（`enable_interactive_charts`）等共 29 项开关。完整清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)。
+> 除辩论开关外，`features.json` 还统一管理匿名化总开关（`anonymizer`）、新闻分类（`news_cls`）、历史走势（`history_portfolio`/`history_benchmark`）、量化指标（`metrics_*`）、缓存清理（`cache_daily_cleanup`）、交互图表（`enable_interactive_charts`）等共 29 项开关。完整清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)。
 
 #### [A] 配置持仓匿名化（代码/名称脱敏）
 

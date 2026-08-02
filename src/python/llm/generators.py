@@ -574,6 +574,10 @@ def generate_debate_procon(
         pro_text,
         con_text,
         enable_conditional=_enable_conditional,
+        enable_qa_concentration=_enable_qa_concentration,
+        industry_concentration=_industry_conc,
+        holdings_details=holdings_details,
+        total_mv=total_mv,
     )
     _pro_digest = hashlib.sha256(pro_text[:200].encode()).hexdigest()[:8]
     _con_digest = hashlib.sha256(con_text[:200].encode()).hexdigest()[:8]
@@ -589,7 +593,10 @@ def generate_debate_procon(
         # conditional 开启时用强化版 system prompt（允许情景分析但约束不复述
         # 白脸/黑脸观点，避免 user prompt 的情景指令与 system prompt 的
         # "禁止插入情景分析" 直接冲突）。
-        _synthesis_system = _build_system_debate_synthesis(_enable_conditional)
+        _synthesis_system = _build_system_debate_synthesis(
+            _enable_conditional,
+            _enable_qa_concentration,
+        )
         synthesis_result = generate_llm_module(
             _lc,
             "expert_review",

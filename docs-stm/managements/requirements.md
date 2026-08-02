@@ -93,7 +93,7 @@
 | S | 配置 LLM 分析章节 | 交互切换各 LLM 报告的启用/停用，含实验性辩论模式（⚗ 标识） |
 | R | 刷新配置 | 重新加载 config.json / llm_settings.json / llm_key.json |
 | **缓存管理** | | |
-| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/资金流向/分红/基金经理/持仓重合度。纯股票持仓无基金时自动跳过基金项 |
+| 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/资金流向/分红/基金经理/持仓重合度/风格扩展。纯股票持仓无基金时自动跳过基金项 |
 | 2 | 更新持仓类缓存 | 主动更新价格/指数行情，清除关联 LLM 缓存 |
 | 3 | 清理过期缓存文件 | 扫描 data/cache/ 目录，删除已过期的缓存文件 |
 | 4 | 查看缓存/状态统计 | 分别显示 data/cache/（缓存文件总数/大小/命中率/前缀分布/过期预览）、data/history/snapshots/（历史快照数量/大小）、data/state/（运行时状态文件数量/大小）三项统计 |
@@ -242,11 +242,11 @@
 | 10 | 因子暴露分析 | B/L | 基金深度分析 | 风格因子暴露分解（β 系数+基准对照+显著性） |
 | 11 | 财经新闻热点与持仓关联分析 | B/L | 新闻 | 5 源新闻关键词匹配，可选 LLM 增强 |
 | 12 | 全球政经局势 | L | LLM | 基于指数+持仓结构生成 |
-| 13 | 智囊团深度复盘 | L | LLM | 三阶段圆桌会议；Feature Flag 开启辩论模式（正反辩论/条件推理/集中度问答）时输出含辩论内容并标注"(实验)"标签 |
-| 14 | 持仓体检报告 | L | LLM | 四维度量化评分 |
+| 13 | 智囊团深度复盘 | L | LLM | 三阶段圆桌会议；Feature Flag 开启辩论模式（正反辩论/条件推理/集中度问答）时输出含辩论内容并标注"🧪 辩论模式"/"🧪 实验模式"标签 |
+| 14 | 持仓体检报告 | L | LLM | 五维度量化评分 |
 | 15 | 穿透深度分析 | L | LLM | 行业集中度+国别暴露 |
 | 16 | 组合历史走势 | B/L | 历史 | as-if 市值曲线+累计收益率+最大回撤+年化波动率 |
-| 17 | 回撤分析 | B/L | 历史 | 回撤面积图+最大回撤值/率/区间 |
+| 17 | 历史回撤分析 | B/L | 历史 | 回撤面积图+最大回撤值/率/区间 |
 | 18 | 数据源可用性矩阵 | E/B/L | 基础报表 | 各数据源实时可用性状态汇总 |
 | 19 | LLM API 用量 | L | LLM | 当前会话的 LLM API 用量汇总（强制末位） |
 
@@ -411,7 +411,7 @@
 2. Tencent 扩展字段（可靠，不标注估算）
 3. 代码前缀估算（兜底，标注"估算风格"）
 
-#### 6.4.10 财经新闻热点与持仓关联分析
+#### 6.4.11 财经新闻热点与持仓关联分析
 
 **关键词富化显示**：
 
@@ -424,7 +424,7 @@
 
 **可选 LLM 增强**：`enabled_llm.news_correlation=true` 时启用 LLM 关联度评级（高/中/低/无关）+ 情感分析（利好/利空/中性）。
 
-#### 6.4.11 组合历史走势
+#### 6.4.16 组合历史走势
 
 **输出指标**：
 
@@ -445,7 +445,7 @@
 - 收益率计算从 ≥80% 持仓覆盖的日期起算
 - 早期数据保留在走势图上但排除出收益率计算
 
-#### 6.4.12 回撤分析
+#### 6.4.17 历史回撤分析
 
 **输出指标**：最大回撤幅度、最大回撤金额、回撤区间（始于峰值日）。
 
@@ -455,7 +455,7 @@
 
 **F1 快照摘要**：回撤分析页脚嵌入持仓快照对比，展示本次与上次之间的总市值变化、总盈亏变化及持仓变动 TOP5。
 
-#### 6.4.13 数据源可用性矩阵
+#### 6.4.18 数据源可用性矩阵
 
 **字段说明**：
 
@@ -553,7 +553,7 @@
 |:---------|:---------|
 | R-LLM-01 | LLM 分析是可选增强内容，仅在菜单 L 中触发 |
 | R-LLM-02 | 每个 LLM 模块可通过配置独立启停（enabled_llm.x） |
-| R-LLM-03 | 支持 Claude / OpenAI / DeepSeek 三种 Provider，可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
+| R-LLM-03 | 支持 Claude / OpenAI / Gemini 三种 Provider（DeepSeek 经 Claude 兼容端点接入），可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
 | R-LLM-04 | Provider 不可用时自动按策略递补下一备选 Provider，全链失败时降级占位文本 |
 | R-LLM-05 | 所有 LLM 模块的 API 调用量（Token、费用、模块明细）需在报告中统计展示 |
 | R-LLM-06 | Multi-Provider Chain 支持 4 种切换策略：priority（优先级排序）、weighted（加权随机）、cost_first（价格最低优先）、fallback_only（仅主 provider 失败时切换，等价于 priority）。`proxy_preferred` 为 per-provider 后处理标记，不属策略 |
@@ -634,7 +634,7 @@
 | R-LLM-DB-04 | 辩论模式与标准模式互斥，同一报告周期内仅使用生效的一路（辩论优先于标准模式） |
 | R-LLM-DB-05 | 辩论模式使用独立于标准 expert_review 的三段缓存（pro/con/synthesis），指纹复用 expert_review 的持仓指纹（排除行情波动字段），默认 TTL 24h |
 | R-LLM-DB-06 | 三段独立缓存前缀注册到 registry：`llm_debate_pro_`/`llm_debate_con_`/`llm_debate_synthesis_`，分组为 preload，受菜单 [2] 刷新影响 |
-| R-LLM-DB-07 | 辩论模式输出在报告页签标题尾部附加"(实验)"标签，标识当前为辩论模式产物 |
+| R-LLM-DB-07 | 辩论模式输出在报告页签标题尾部附加"🧪 辩论模式"/"🧪 实验模式"标签，标识当前为辩论模式产物 |
 
 #### 7.8.2 正反辩论（白脸/黑脸/综合）
 
@@ -647,7 +647,7 @@
 | R-LLM-DB-PROCON-03 | 黑脸（con）阶段：基于持仓数据生成反面论据（风险提示、看空理由、潜在损失风险），使用审慎质疑型 system prompt |
 | R-LLM-DB-PROCON-04 | 综合（synthesis）阶段：整合白脸和黑脸的论据，生成平衡的综合判断和调仓建议，使用中性综合型 system prompt |
 | R-LLM-DB-PROCON-05 | 三段调用依次执行（pro→con→synthesis），每段结果独立缓存，后续直接使用缓存结果跳过 API 调用 |
-| R-LLM-DB-PROCON-06 | Token 预算守卫：基于字符数计量保护 token 消耗。单阶段输出超过 `int(max_tokens × 0.65)` 字符时触发 1× 超限→跳过 synthesis 阶段（返回 pro+con 拼接）；超过 2× 超限时跳过全部 debate（回退标准模式） |
+| R-LLM-DB-PROCON-06 | Token 预算守卫：基于字符数计量保护 token 消耗。pro+con 累计字符超过 `int(max_total_tokens_per_report × 0.65)` 时触发 1× 超限→跳过 synthesis 阶段（返回 pro+con 拼接）；超过 2× 超限时跳过全部 debate（回退标准模式） |
 | R-LLM-DB-PROCON-07 | Fallback 策略：pro 或 con 阶段失败→回退标准模式输出；synthesis 阶段失败→返回 pro+con 拼接结果，日志记录 WARNING |
 | R-LLM-DB-PROCON-08 | 虚构代码过滤：`_filter_hallucinated_codes()` 基于正则的行级过滤，使用 `(?:^\|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]\|$)` 适配中文环境（替代英文 `\b`），消除 LLM 产生的虚构证券代码 |
 | R-LLM-DB-PROCON-09 | HTML 渲染：三段内容以棒棒糖式展开设计，pro 绿色背景、con 红色背景、synthesis 金色背景，视觉区分辩手身份 |
@@ -749,7 +749,7 @@
 | R-CCH-19 | LLM 持仓体检报告 | 24h | — |
 | R-CCH-20 | LLM 穿透深度分析 | 24h | — |
 | R-CCH-21 | 基金经理数据 | 24h | — |
-| R-CCH-22 | 基金风格扩展数据 | 30 天（月级） | — |
+| R-CCH-22 | 基金风格扩展数据 | 24h | — |
 | R-CCH-23 | 历史 K 线 | 7 天 | — |
 | R-CCH-24 | 历史净值 | 30 天 | — |
 | R-CCH-25 | 指数历史日线 | 30 天 | — |
@@ -806,7 +806,7 @@
 | `holdings_filename` | str | `个人投资持仓信息.xlsx` | ✅ F | 持仓文件名 |
 | `output_dir` | str | `reports` | ✅ O | 报告输出根目录 |
 | `news_top_count` | int | 300 | — | 新闻关联输出 TOP N |
-| `news_sources` | dict | 全开启 | — | 各新闻源启停 |
+| `news_sources` | dict | sina/eastmoney/wallstreetcn/akshare 开启，cls 默认关闭 | — | 各新闻源启停 |
 | `preferred_provider` | dict | 空 | — | 各数据类型的首选 Provider |
 | `user_fund_benchmarks` | dict | 空 | — | 自定义基金业绩基准 |
 | `risk_free_rate` | float/null | null | — | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74） |
@@ -819,7 +819,7 @@
 | `market_hour_ttl` | int | 30 | — | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30",end:"15:00"}` | — | 交易时段配置 |
 | `degradation` | dict | T2/T3/T4 默认 | — | T2（基金业绩/行业分类等, stale_days=3）/ T3（资金流向/基金持仓等, stale_days=14）/ T4（穿透数据, stale_days=14），每层含 unreachable_threshold / empty_data_threshold / stale_days 三参数 |
-| `history.analysis` | str | "off" | — | 历史走势获取模式（off/prompt/auto） |
+| `history.analysis` | str | "auto" | — | 历史走势获取模式（off/prompt/auto） |
 | `history.snapshot_retention_days` | int | 60 | — | 快照保留天数 |
 | `history.snapshot_max_count` | int | 365 | — | 快照最大数量 |
 | `history.coverage_threshold` | float | 0.8 | — | 有效区间覆盖阈值 |
@@ -886,8 +886,8 @@
 | `debate.procon.synthesis_temperature` | float | 0.5 | 正反辩论综合阶段 temperature（低于常规以保持客观，范围 [0.0, 2.0]） |
 | `debate.conditional.scenarios` | list[dict] | 上涨/下跌/震荡 三组 | 条件推理预设情景列表，每条含 `name`（情景名）/ `change`（涨跌幅）/ `desc`（描述）三个必填字段 |
 | `debate.qa_concentration.threshold` | float | 0.20 | 集中度问答触发阈值（单品种占比 ≥ 此值时触发），范围 (0, 1) |
-| `debate.max_total_tokens_per_report` | int | — | 单次报告辩论模式总 token 预算上限（超出后跳过 debate 回退标准模式） |
-| `debate.per_call_timeout_override` | int | — | 辩论模式单次 API 调用超时覆盖秒数 |
+| `debate.max_total_tokens_per_report` | int | 16000 | 单次报告辩论模式总 token 预算上限（超出后跳过 debate 回退标准模式） |
+| `debate.per_call_timeout_override` | int | 90 | 辩论模式单次 API 调用超时覆盖秒数 |
 
 ### 11.4 llm_providers.json（Provider 多链配置）
 

@@ -55,7 +55,7 @@
 | **Unicode/全角** | 名称含全角括号、emoji、日文 | 不崩、JSON 序列化正常、Excel 不乱码 |
 | **并发/竞态** | 两个线程同时 `cache.set()` 同 key | 不产生损坏文件 |
 | **时区安全** | 系统时区非 UTC+8 时运行 | `datetime.now(timezone(hours=8))` 一致 |
-| **版本兼容** | 缓存占位符格式迁移（`--` → `|--|`） | 旧缓存正确降级读取 |
+| **版本兼容** | 缓存数据为旧版本占位符（`--` / `—`） | 正确降级读取不报错 |
 | **特殊代码格式** | `600000`（无前缀）、`sh600000`、`600000.SH` | 统一处理 |
 | **文件系统边界** | 缓存目录不存在、磁盘满、路径含空格/中文 | 自动创建目录、gzip 压缩回退 |
 
@@ -73,14 +73,14 @@
 | `scenario/resilience/test_scenario_extreme.py` | S0c+S10 | 极限场景：超多持仓/极端份额/高精度净值/零值组合 |
 | `scenario/llm/test_llm_mixed_cache.py` ~ `test_llm_partial_cache.py` | S11-S17 | LLM 混合缓存/全部失败/Thinking/禁用/缓存分组/断网降级 |
 | `scenario/llm/test_llm_empty_holdings.py` + `test_llm_output_consistency.py` + `test_llm_non_trading_day.py` + `test_llm_multi_account.py` | S18-S20 | LLM 全缓存/空持仓降级/输出格式一致性/非交易日/多账户交互 |
-| `scenario/basic/test_scenario_holdings_quality.py` | S0a-S0d | 持仓质量：清仓/同名多份额/超多持仓/特殊字符 |
+| `scenario/basic/test_scenario_holdings_quality.py` | S0a/S0b/S0d | 持仓质量：清仓/同名多份额/特殊字符 |
 | `scenario/basic/test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
-| `scenario/basic/test_scenario_operational_behavior.py` | S29-S34 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 + 组合历史走势基准指数对比 |
+| `scenario/basic/test_scenario_operational_behavior.py` | S29-S33 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 |
 | `scenario/basic/test_scenario_penetration_basic.py` / `_advanced.py` / `_mixed.py` / `_edge.py` | SP1-SP10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
 | `scenario/basic/test_scenario_section_order.py` | — | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `scenario/basic/test_pipeline_smoke.py` / `test_pipeline_metrics_injection.py` / `test_pipeline_factor_exposure.py` | — | 管线冒烟/指标注入/因子暴露管线（C19 契约 + 全失败 source_failed + 空持仓 insufficient） |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
-| `scenario/llm/test_llm_hallucination.py` | P4‑08 | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
+| `scenario/llm/test_llm_hallucination.py` | `scenario_llm` | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
 
 **业务场景规格（S0a-S0d、S1-S34、T1-T21）：**
 
@@ -123,7 +123,7 @@
 | **S31: 部分调仓卖出** | — | `test_scenario_operational_behavior.py` | 持仓含卖出一半/90%/全部清仓 | 菜单 E | 卖出后剩余份额市值盈亏正确；全部清仓不崩溃 |
 | **S32: 跨账户转仓** | — | `test_scenario_operational_behavior.py` | 同一代码出现在两个账户 | 菜单 E | 各账户独立计算明细、分类各自汇总、总计=账户和 |
 | **S33: 新股中签待上市** | — | `test_scenario_operational_behavior.py` | 持仓含无行情新股尚未上市 | 菜单 E | 无行情降级 cost 正确显示、上市后正常计算、多只新股不干扰 |
-| **S34: 组合历史走势基准指数对比** | — | `test_scenario_operational_behavior.py` + 单元测试 | 持仓含 A 股+基金，config.json 含 `benchmark_indices: {"sh000300": "沪深300"}` | 菜单 L | 组合走势 + 基准指数走势归一化正确；HTML 走势图显示组合曲线+基准虚线+图例；Excel portfolio_history/drawdown_analysis 页签含基准列；benchmark_indices 为空时走势正常不崩溃 |
+| **S34: 组合历史走势基准指数对比** | — | 单元测试（见下方注） | 持仓含 A 股+基金，config.json 含 `benchmark_indices: {"sh000300": "沪深300"}` | 菜单 L | 组合走势 + 基准指数走势归一化正确；HTML 走势图显示组合曲线+基准虚线+图例；Excel portfolio_history/drawdown_analysis 页签含基准列；benchmark_indices 为空时走势正常不崩溃 |
 | **D1: 辩论模式-正反辩论三段正常生成** | — | `test_debate_pipeline.py` | 含多品种持仓，Feature Flag `llm_debate_procon=true` | 菜单 L | pro（白脸）→ con（黑脸）→ synthesis（综合）三段完整生成；HTML 显示三色块+实验模式标签；Excel 显示"🧪 辩论模式"灰字注记；LLM 用量表正确归入"实验模式"行 |
 | **D2: 辩论降级回退普通模式** | — | `test_debate_pipeline.py` | 正反辩论启用但 pro 或 con 返回 None | 菜单 L（模拟 LLM pro 失败） | 自动回退普通 expert_review；返回 8 元组（无 debate_info）；HTML 不显示辩论块，显示普通结果 |
 | **D3: Token 预算触发生成截断** | — | `test_debate_token_budget.py` | 配置极低 `max_total_tokens_per_report`，持仓数据量大使 pro+con 超 1× 预算 | 菜单 L（模拟长篇输出） | 超过 1× 预算跳过 synthesis，返回 pro+con 拼接；超过 2× 跳过全部 debate 回退普通模式；日志输出 budget 告警 |
@@ -131,7 +131,7 @@
 > LLM 相关的场景按 S11-S17 分组拆分为 7 个子文件（`scenario/llm/test_llm_mixed_cache.py` ~ `test_llm_partial_cache.py`），S18-S20 归入 `test_llm_empty_holdings.py` / `test_llm_output_consistency.py` / `test_llm_non_trading_day.py` / `test_llm_multi_account.py`。
 > S0a/S0b/S0d（持仓质量，不含 S0c）统一放在 `test_scenario_holdings_quality.py`；S0c（超多持仓）和 S10（极端值）放在 `test_scenario_extreme.py`。
 > S21-S28（特殊品种）统一放在 `test_scenario_special_securities.py`。
-> S29-S34（操作行为）统一放在 `test_scenario_operational_behavior.py`。
+> S29-S33（操作行为）统一放在 `test_scenario_operational_behavior.py`。
 > S34（基准指数对比）覆盖在以下单元测试中（scenario 测试环境搭建成本较高，单元级验证已充分）：
 > - `unit/report/test_benchmark.py` — normalize_benchmarks 算法 11 项 + 边缘 7 项
 > - `unit/report/test_portfolio_history.py` — benchmark 集成调用 3 项（提供/空/异常）
@@ -311,7 +311,7 @@
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
 | **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
-| **Excel 页签结构** | 页签编号排序（1.~18.）、冻结首行、列宽自适应 | ✅ |
+| **Excel 页签结构** | 页签编号排序（1.~19.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
 | **Excel 盈亏着色** | 正数绿/红色（RGB 正绿/红），覆盖所有盈亏列（本日盈亏/持仓盈亏/收益率） | ✅ |
 | **Excel LLM 状态颜色** | 蓝底=缓存、绿底=成功、红底=失败、灰底=禁用+各色图标 | ✅ |
 | **Excel 取价方式标识** | 蓝色字体标注（实时价/收盘价/官方净值） | ✅ |
@@ -496,7 +496,7 @@ def test_get_ttl_closed(self, mock_open):
 
 12. **异常场景不崩溃**：对 §1.6 异常场景清单中的 🔴/🟡 状态项，人工确认至少不导致程序崩溃
 13. **报告文件视觉检查**：Excel 和 HTML 输出文件无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）
-14. **TUI 菜单功能正常**：所有菜单选项（[E]/[B]/[L]/[P]/[C]/[F]/[O]/[S]/[R]/[1][2][3][4]）响应正确，无崩溃
+14. **TUI 菜单功能正常**：所有菜单选项（[E]/[B]/[L]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确，无崩溃
 
 ---
 

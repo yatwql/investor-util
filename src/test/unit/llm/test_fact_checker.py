@@ -145,11 +145,7 @@ class TestCheckNumericalConsistency:
 
     def test_multiple_values_with_mixed_context(self, sample_holdings):
         """混合上下文中的多个百分比 — 只检收益相关的。"""
-        text = (
-            "本季度组合累计收益率为 30.3%。"
-            "股票仓位 75%，债券仓位 25%。"
-            "最大回撤 3.5%。"
-        )
+        text = "本季度组合累计收益率为 30.3%。股票仓位 75%，债券仓位 25%。最大回撤 3.5%。"
         issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
         # 30.3% → 收益上下文 → 检查通过
         # 75%, 25% → 仓位上下文 → 跳过
@@ -161,10 +157,22 @@ class TestCheckNumericalConsistency:
     def test_pp_vs_rate_confusion_detected(self):
         """LLM 混淆贡献占比 pp 与个股收益率 → 检测并修正。"""
         holdings = [
-            {"name": "建设银行", "code": "601939", "market_value": 500000.0,
-             "cost": 490000.0, "profit": 10000.0, "profit_rate": 2.0},
-            {"name": "贵州茅台", "code": "600519", "market_value": 2000000.0,
-             "cost": 1500000.0, "profit": 500000.0, "profit_rate": 33.3},
+            {
+                "name": "建设银行",
+                "code": "601939",
+                "market_value": 500000.0,
+                "cost": 490000.0,
+                "profit": 10000.0,
+                "profit_rate": 2.0,
+            },
+            {
+                "name": "贵州茅台",
+                "code": "600519",
+                "market_value": 2000000.0,
+                "cost": 1500000.0,
+                "profit": 500000.0,
+                "profit_rate": 33.3,
+            },
         ]
         # LLM 误将 11.0pp 贡献占比当作收益率 11.0%
         text = "建设银行（601939）本季度收益率为 11.0%，表现稳健。"
@@ -177,14 +185,20 @@ class TestCheckNumericalConsistency:
         assert "2.0" in issues[0]  # 实际收益率
         assert len(corrections) == 1
         assert corrections[0][0] == "11.0"  # wrong value
-        assert corrections[0][1] == "2.0"   # correct value
+        assert corrections[0][1] == "2.0"  # correct value
         assert "601939" in corrections[0][2]  # sentence context
 
     def test_contribution_sentence_skips_pp_values(self):
         """贡献归因句中的 pp 数值不触发告警（策略 3）。"""
         holdings = [
-            {"name": "建设银行", "code": "601939", "market_value": 500000.0,
-             "cost": 490000.0, "profit": 10000.0, "profit_rate": 2.0},
+            {
+                "name": "建设银行",
+                "code": "601939",
+                "market_value": 500000.0,
+                "cost": 490000.0,
+                "profit": 10000.0,
+                "profit_rate": 2.0,
+            },
         ]
         # 收益归因句中的 pp 数值应跳过
         text = "主要盈利来源中，建设银行(+11.0pp)为组合贡献了重要收益。"
@@ -198,7 +212,9 @@ class TestCheckNumericalConsistency:
         """宽松容差下偏差较小的数值通过。"""
         text = "组合收益率为 31.5%。"  # 实际≈30.28%，偏差1.22pp
         issues, checked, passed, corrections = check_numerical_consistency(
-            text, sample_holdings, tolerance_pct=2.0,
+            text,
+            sample_holdings,
+            tolerance_pct=2.0,
         )
         assert checked == 1
         assert passed == 1  # 容差 ±2% 已覆盖
@@ -209,7 +225,9 @@ class TestCheckNumericalConsistency:
         """回撤语境数值与实际最大回撤在容差内 → 通过。"""
         text = "组合历史最大回撤为 19.0%。"
         issues, checked, passed, corrections = check_numerical_consistency(
-            text, sample_holdings, max_drawdown_pct=18.97,
+            text,
+            sample_holdings,
+            max_drawdown_pct=18.97,
         )
         assert checked == 1
         assert passed == 1  # 19.0 vs 18.97, diff=0.03 <= 1.0
@@ -220,7 +238,9 @@ class TestCheckNumericalConsistency:
         """回撤语境数值与实际偏差大 → 告警。"""
         text = "组合历史最大回撤为 5.0%。"
         issues, checked, passed, corrections = check_numerical_consistency(
-            text, sample_holdings, max_drawdown_pct=18.97,
+            text,
+            sample_holdings,
+            max_drawdown_pct=18.97,
         )
         assert checked == 1
         assert passed == 0
@@ -233,7 +253,9 @@ class TestCheckNumericalConsistency:
         """回撤语境但无回撤数据 → 跳过（无法校验）。"""
         text = "组合最大回撤为 19.0%。"
         issues, checked, passed, corrections = check_numerical_consistency(
-            text, sample_holdings, max_drawdown_pct=None,
+            text,
+            sample_holdings,
+            max_drawdown_pct=None,
         )
         assert checked == 1  # % found
         assert passed == 1  # skipped (no drawdown data, no profit context)
@@ -243,7 +265,9 @@ class TestCheckNumericalConsistency:
         """同一句中同时含回撤和收益数值 → 分别校验。"""
         text = "最大回撤 19.0%，累计收益 30.3%。"
         issues, checked, passed, corrections = check_numerical_consistency(
-            text, sample_holdings, max_drawdown_pct=18.97,
+            text,
+            sample_holdings,
+            max_drawdown_pct=18.97,
         )
         # 19.0% → drawdown context, matches 18.97 within tolerance
         # 30.3% → profit context, matches 30.28 within tolerance
@@ -263,8 +287,11 @@ class TestCheckNumericalConsistency:
         """run_fact_check 中已自动修正的数值不在告警明细列出。"""
         text = "<p>组合累计收益率为 5.0%，历史最大回撤 19.0%。</p>"
         from src.python.llm.fact_checker import run_fact_check
+
         corrected, summary = run_fact_check(
-            text, sample_holdings, module_label="测试",
+            text,
+            sample_holdings,
+            module_label="测试",
             history_data={"max_drawdown_pct": 18.97},
         )
         # 5.0% → will be auto-corrected, not in warning details
@@ -339,7 +366,9 @@ class TestCheckSymbolExistence:
         """suggestion_keywords=None 时建议语境也告警。"""
         text = "建议关注511010国债ETF"
         issues, checked, passed, suggestions = check_symbol_existence(
-            text, sample_holdings, suggestion_keywords=None,
+            text,
+            sample_holdings,
+            suggestion_keywords=None,
         )
         assert len(issues) == 1, "关闭建议检测后应正常告警"
         assert suggestions == []
@@ -441,10 +470,7 @@ class TestCheckRankingCorrectness:
 
     def test_mixed_ranking_claims(self, sample_holdings):
         """混合正确和错误的排名声称。"""
-        text = (
-            "贵州茅台（600519）是组合最大持仓。"
-            "宁德时代（300750）是第一重仓股。"
-        )
+        text = "贵州茅台（600519）是组合最大持仓。宁德时代（300750）是第一重仓股。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert checked == 2
         assert passed == 1
@@ -492,7 +518,7 @@ class TestCheckRankingCorrectness:
     # ── 非持仓排名语境不误判 ──────────────────────────────
 
     def test_max_single_loss_item_not_flagged(self, sample_holdings):
-        """"最大单项亏损品种" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        """ "最大单项亏损品种" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
         text = "561910 是组合最大单项亏损品种，需关注回撤风险。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert issues == []
@@ -500,7 +526,7 @@ class TestCheckRankingCorrectness:
         assert passed == 0
 
     def test_contributed_main_profit_not_flagged(self, sample_holdings):
-        """"贡献了主要利润" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        """ "贡献了主要利润" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
         text = "601939 本季度贡献了主要利润，表现突出。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert issues == []
@@ -508,7 +534,7 @@ class TestCheckRankingCorrectness:
         assert passed == 0
 
     def test_max_loss_source_not_flagged(self, sample_holdings):
-        """"最大亏损来源" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        """ "最大亏损来源" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
         text = "600900 是组合最大亏损来源，拖累整体表现。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert issues == []
@@ -657,3 +683,29 @@ class TestRunFactCheck:
         corr, summ = run_fact_check(html, sample_holdings, "智囊团深度复盘")
         assert "600036" in summ
         assert "最大持仓" in summ
+
+    def test_corrections_detail_in_summary(self, sample_holdings):
+        """自动修正后摘要列出修正明细（wrong%→correct% + 句段），供用户直接查看。"""
+        html = """<p>招商银行（600036）是组合最大持仓。</p>
+<p>组合累计收益率为 5.0%。</p>"""
+        corr, summ = run_fact_check(html, sample_holdings, "智囊团深度复盘")
+        # 内容中 5.0% 已被替换为 30.3%
+        assert "30.3%" in corr
+        assert "5.0%" not in corr
+        # 摘要追加灰色「已修正明细」行，含 wrong→correct 与句段
+        assert "已修正明细" in summ
+        assert "5.0%→30.3%" in summ
+        assert "组合累计收益率为" in summ
+
+    def test_corrections_logged(self, sample_holdings, caplog):
+        """自动修正明细写入日志（含模块标签 + wrong→correct 明细）。"""
+        import logging
+
+        html = """<p>招商银行（600036）是组合最大持仓。</p>
+<p>组合累计收益率为 5.0%。</p>"""
+        with caplog.at_level(logging.INFO, logger="invest"):
+            run_fact_check(html, sample_holdings, "智囊团深度复盘")
+        joined = caplog.text
+        assert "智囊团深度复盘" in joined
+        assert "自动修正 1 处数值" in joined
+        assert "5.0%→30.3%" in joined

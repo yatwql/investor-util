@@ -221,7 +221,7 @@ def _prepare_full_risk_metrics(
     return history_data, _metrics
 
 
-# ── _generate_full_html_report（拆分自 _generate_report_full）──
+# ── _generate_full_html_report ─────────────────────────
 
 
 def _generate_full_html_report(
@@ -298,7 +298,7 @@ def _generate_full_html_report(
         return False
 
 
-# ── _generate_full_excel_report（拆分自 _generate_report_full）──
+# ── _generate_full_excel_report ────────────────────────
 
 
 def _generate_full_excel_report(

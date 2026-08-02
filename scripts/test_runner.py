@@ -78,7 +78,7 @@ MODES: dict[str, dict] = {
                 "timeout_sec": 120,
                 "parallel": True,
             },
-            {"marker": "scenario_basic", "desc": "基础业务场景（140 项，~100s）", "timeout_sec": 300, "parallel": True},
+            {"marker": "scenario_basic", "desc": "基础业务场景（145 项，~100s）", "timeout_sec": 300, "parallel": True},
         ],
     },
     "verify": {

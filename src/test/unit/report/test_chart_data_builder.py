@@ -150,7 +150,7 @@ class TestKeysContract:
 
 class TestPortfolioLineAndDrawdown:
     def test_portfolio_line_normalized_to_100(self) -> None:
-        """净值曲线归一化至 100 基点（与模板原逻辑一致）。"""
+        """净值曲线归一化至 100 基点（与模板口径一致）。"""
         ds = build_chart_datasets(history_data=_history_ok())
         chart = ds["portfolio_line"]
         assert chart["labels"] == ["2026-01-01", "2026-02-01"]
@@ -298,11 +298,11 @@ class TestCategoryDoughnut:
         assert chart["labels"] == ["股票", "其他"]
 
     def test_infer_property_named_stock_classified_by_code(self) -> None:
-        """回归：真实 DetailRow（含名称）按代码前缀分类，股票/基金不再落入"其他"。
+        """真实 DetailRow（含名称）按代码前缀分类，股票/基金不落入"其他"。
 
-        旧 _infer_property 要求 `not name` 才返回"股票"，而真实明细行始终有名称
-        → 全部误判为"其他"，饼图显示 100% 其他。修复后仅按代码前缀分类；
-        CASH 等无匹配前缀的代码仍归"其他"（兜底语义，见 test_infer_property_fallback）。
+        _infer_property 仅按代码前缀分类，不依赖 name 是否为空——含名称的
+        真实明细行同样正确归类；CASH 等无匹配前缀的代码仍归"其他"（兜底语义，
+        见 test_infer_property_fallback）。
         """
         details = [
             SimpleNamespace(code="600000", name="浦发银行", market_value=10000.0),

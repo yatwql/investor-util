@@ -651,12 +651,29 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
             "chart_penetration_bar",
         ):
             self.assertIn(key, canvas_ids)
-        # 行业分布 Horizontal Bar 与穿透 TOP10 容器处于同一章节
+        # 行业分布 Vertical Bar 与穿透 TOP10 容器处于同一章节
         section = soup.find(id="sec-penetration")
         self.assertIsNotNone(section)
         section_canvases = {c.get("id") for c in section.select("canvas")}
         self.assertIn("chart_industry_bar", section_canvases)
         self.assertIn("chart_penetration_bar", section_canvases)
+
+    def test_industry_and_penetration_bars_both_vertical(self) -> None:
+        """行业分布与穿透 TOP10 柱状图风格统一为垂直（竖桩）。
+
+        穿透模块两图并排：行业分布原为 indexAxis:'y' 水平条，穿透 TOP10 为
+        垂直条，风格不一致。统一后两图 aria-label 均应描述"垂直柱状图"、
+        不含"水平"字样。
+        """
+        overrides = {
+            "industry_bar": {"labels": ["白酒", "电池"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台", "宁德时代"], "datasets": [{"data": [10000.0, 8000.0]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        for key in ("chart_industry_bar", "chart_penetration_bar"):
+            label = soup.find(id=key).get("aria-label")
+            self.assertIn("垂直柱状图", label, f"{key} aria-label 应描述垂直柱状图")
+            self.assertNotIn("水平", label, f"{key} aria-label 不应残留「水平柱状图」描述")
 
     def test_industry_empty_note_when_no_data(self) -> None:
         """行业数据全不可用时显示"行业数据暂不可用"。
@@ -754,10 +771,11 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
             )
 
     def test_chart_scripts_loaded_in_order(self) -> None:
-        """chart-print.js 先于 chart-config.js，再 chart-init.js（登记先于初始化）。"""
+        """加载顺序：chart-print → chart-config → chart-export → chart-init（登记/导出先于初始化）。"""
         soup = self._render_interactive()
         chart_scripts = [s.get("src") for s in soup.select("script[src]") if (s.get("src") or "").startswith("chart-")]
-        self.assertIn("chart-print.js", chart_scripts)
+        for fname in ("chart-print.js", "chart-config.js", "chart-export.js", "chart-init.js"):
+            self.assertIn(fname, chart_scripts, f"{fname} 应被模板引用")
         self.assertLess(
             chart_scripts.index("chart-print.js"),
             chart_scripts.index("chart-config.js"),
@@ -765,8 +783,13 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         )
         self.assertLess(
             chart_scripts.index("chart-config.js"),
+            chart_scripts.index("chart-export.js"),
+            "chart-config.js 必须在 chart-export.js 之前加载",
+        )
+        self.assertLess(
+            chart_scripts.index("chart-export.js"),
             chart_scripts.index("chart-init.js"),
-            "chart-config.js 必须在 chart-init.js 之前加载",
+            "chart-export.js 必须在 chart-init.js 之前加载",
         )
 
     def test_print_css_forces_light_theme(self) -> None:

@@ -102,10 +102,10 @@ class TestFetchIndexKlineEdge(unittest.TestCase):
 
     @patch("src.python.providers.tencent.make_http_client")
     def test_api_returns_list_not_dict(self, mock_factory):
-        """回归：API 返回 list（而非 dict）→ 空列表，不抛 AttributeError。
+        """API 返回 list（而非 dict）→ 空列表，不抛 AttributeError。
 
-        修复前 `_parse_kline_response` 以 `data.get(...)` 处理 list 而崩溃
-        （`'list' object has no attribute 'get'`），这是 days=3650 超限时的实测响应形态。
+        `_parse_kline_response` 须兼容 list 响应形态（days=3650 超限时 API 返回
+        list），不得以 `data.get(...)` 方式访问而抛 `'list' object has no attribute 'get'`。
         """
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client

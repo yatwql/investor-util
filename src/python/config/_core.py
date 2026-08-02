@@ -480,7 +480,7 @@ def init_config(config_path: str | None = None) -> None:
 
 
 def is_enable_fund_deep_analysis(config: dict | None = None) -> bool:
-    """基金深度分析章节（#6~9）是否启用。缺失时返回 True。"""
+    """基金深度分析章节（#6~10）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_fund_deep_analysis")
@@ -491,7 +491,7 @@ def is_enable_fund_deep_analysis(config: dict | None = None) -> bool:
 
 
 def is_enable_news(config: dict | None = None) -> bool:
-    """市场新闻（#10）是否启用。缺失时返回 True。"""
+    """市场新闻（#11）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_news")
@@ -502,7 +502,7 @@ def is_enable_news(config: dict | None = None) -> bool:
 
 
 def is_enable_history(config: dict | None = None) -> bool:
-    """组合历史走势+回撤分析（#15~16）是否启用。缺失时返回 True。"""
+    """组合历史走势+回撤分析（#16~17）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_history")

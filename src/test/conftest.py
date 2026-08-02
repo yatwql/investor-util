@@ -247,6 +247,21 @@ def _auto_reset_cost_tracker():
 
 
 @pytest.fixture(autouse=True)
+def _auto_reset_llm_module_failure():
+    """自动重置 LLM_MODULE_FAILURE 全局字典，防止测试间状态污染。
+
+    问题场景（xdist 并发）：
+      write_llm_sheets() 读取 LLM_MODULE_FAILURE 判断模块是否被禁用（见
+      llm_content.py write_llm_sheets），若某测试设置
+      LLM_MODULE_FAILURE[key]=FAIL_REASON_DISABLED 后未清理，同一 worker
+      上后续 test_content_none 等测试的页签被跳过不写入，A2 占位符断言失败。
+    """
+    from src.python.llm.prompts import LLM_MODULE_FAILURE
+
+    LLM_MODULE_FAILURE.clear()
+
+
+@pytest.fixture(autouse=True)
 def _mock_market_hours_api(monkeypatch):
     """禁用实时东方财富 push2 API 调用，使用内置默认值判断市场时段。
 

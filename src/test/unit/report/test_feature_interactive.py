@@ -79,8 +79,14 @@ class TestBuildChartDatasetsForReport:
 
 
 class TestCopyJsAssets:
-    def test_copies_four_js_files(self, tmp_path) -> None:
-        """Chart.js 本地 bundle 4 文件随报告复制到输出目录（R21）。"""
+    def test_copies_all_js_files(self, tmp_path) -> None:
+        """Chart.js 本地 bundle 全部 JS 文件随报告复制到输出目录（R21）。"""
         _copy_js_assets(str(tmp_path))
-        for fname in ("chart.min.js", "chart-print.js", "chart-config.js", "chart-init.js"):
+        for fname in (
+            "chart.min.js",
+            "chart-print.js",
+            "chart-config.js",
+            "chart-export.js",
+            "chart-init.js",
+        ):
             assert (tmp_path / fname).exists(), f"{fname} 未复制"

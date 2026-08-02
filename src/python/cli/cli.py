@@ -138,7 +138,7 @@ def _show_llm_config_status_cli() -> None:
 
             model_display = model or "默认"
             raw_priority = entry.get("priority")
-            priority_display = str(raw_priority) if raw_priority is not None else "50（默认）"
+            priority_display = str(raw_priority) if raw_priority is not None else "99（默认）"
             cb_status = get_circuit_status(endpoint) if endpoint else "—"
 
             logger.info("  [%d] %s (%s)", i, name, backend)

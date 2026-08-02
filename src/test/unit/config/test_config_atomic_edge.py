@@ -86,8 +86,8 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
     def test_set_config_raises_on_corrupt_file(self, mock_get_path):
         """配置文件损坏时 set_config 抛异常且不覆盖原文件。
 
-        回归缺陷：set_config 的 get_config() 读取失败时静默回退默认配置并覆盖写，
-        并发写入（os.replace 瞬间）或文件损坏场景下丢失已有配置项（如 base key）。
+        set_config 读取失败（文件损坏或并发 os.replace 瞬间）时必须抛异常，
+        不得静默回退默认配置并覆盖写，以免丢失已有配置项（如 base key）。
         """
         mock_get_path.return_value = self.config_path
         from src.python.config import set_config

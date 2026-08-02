@@ -118,9 +118,10 @@ def _build_qa_concentration_block(
     threshold: float = 0.20,
     industry_concentration: dict[str, float] | None = None,
 ) -> str:
-    """构建集中度反问段落。
+    """构建集中度问答引导段落。
 
-    检查持仓集中度，命中任一阈值即追加反问段落。
+    检查持仓集中度，命中任一阈值即追加集中度问答引导段，
+    要求 LLM 对每项集中度风险给出量化评估、基准对比与调仓建议。
     纯计算函数，不涉及 LLM 调用。
 
     Args:
@@ -130,7 +131,7 @@ def _build_qa_concentration_block(
         industry_concentration: 可选行业集中度字典 {行业名: 占比}。
 
     Returns:
-        反问段落字符串（无触发时返回空字符串）。
+        集中度问答引导段字符串（无触发时返回空字符串）。
     """
     if not holdings_details or total_mv <= 0:
         return ""
@@ -144,8 +145,8 @@ def _build_qa_concentration_block(
         if ratio > threshold:
             name = h.get("name", h.get("code", "未知"))
             questions.append(
-                f"1. **{name} 占比 {ratio:.1%}**，远超 {threshold:.0%} 警戒线。"
-                "若该品种出现极端行情，可能对组合整体造成显著冲击。"
+                f"1. **{name} 占比 {ratio:.1%}**，超过 {threshold:.0%} 警戒线，"
+                "存在单品种集中风险。若该品种出现极端行情，可能对组合整体造成显著冲击。"
             )
             break  # 只需提示最突出的一个
 
@@ -154,7 +155,8 @@ def _build_qa_concentration_block(
     top3_ratio = sum((h.get("mv", 0) or 0) for h in sorted_by_mv[:3]) / total_mv
     if top3_ratio > 0.60:
         questions.append(
-            f"2. **前 3 大品种合计 {top3_ratio:.1%}**，集中度偏高。您是否评估过前 3 品种同时回调对组合的影响？"
+            f"2. **前 3 大品种合计 {top3_ratio:.1%}**，超过 60% 集中度警戒线，"
+            "前 3 品种同时回调将对组合造成较大影响。"
         )
 
     # 触发器③：行业穿透集中度
@@ -172,11 +174,18 @@ def _build_qa_concentration_block(
         return ""
 
     lines = [
-        "\n\n### 思考\n",
-        "您是否考虑过以下问题？\n",
+        "\n\n### 集中度问答\n",
+        "您的组合存在以下集中度风险，请逐一进行量化评估：\n",
     ]
     lines.extend(questions)
-    lines.append("\n（以上问题旨在引发思考，无需在本次报告中回答。）")
+    lines.extend(
+        [
+            "\n针对以上每项集中度风险，请给出：\n",
+            "- ① 集中度风险的量化评估（对比 20%/60%/40% 基准，标注超限幅度）\n",
+            "- ② 与分散化基准的定量对比\n",
+            "- ③ 针对性的调仓建议\n",
+        ]
+    )
     return "".join(lines)
 
 
@@ -326,12 +335,24 @@ def _build_expert_review_prompt(
                 "避免'视情况而定'这类模棱两可的表述。"
             )
 
-    # ── 集中度反问引导 ──────────────────────────────────
+    # ── 集中度问答引导 ──────────────────────────────────
     if enable_qa_concentration:
+        try:
+            from src.python.config._core import get_llm_config
+
+            _cfg = get_llm_config()
+            _threshold = (
+                (_cfg or {})
+                .get("debate", {})
+                .get("qa_concentration", {})
+                .get("threshold", 0.20)
+            )
+        except Exception:
+            _threshold = 0.20
         _qa_block = _build_qa_concentration_block(
             holdings_details,
             total_mv,
-            threshold=0.20,  # 默认值，可由调用方传入
+            threshold=_threshold,
             industry_concentration=industry_concentration,
         )
         if _qa_block:
@@ -473,16 +494,26 @@ def _build_debate_synthesis_prompt(
     pro_text: str,
     con_text: str,
     enable_conditional: bool = False,
+    enable_qa_concentration: bool = False,
+    industry_concentration: dict[str, float] | None = None,
+    holdings_details: list[dict] | None = None,
+    total_mv: float = 0.0,
 ) -> str:
     """构建综合阶段的用户 prompt，包含白脸和黑脸的原始分析全文。
 
     当 ``enable_conditional=True`` 时额外追加条件推理的情景分析指令，
     让指挥官在综合正反观点的基础上按涨/跌/震荡情景分别给出建议。
+    当 ``enable_qa_concentration=True`` 时额外追加集中度问答引导段，
+    要求综合权衡输出集中度风险的量化评估、基准对比与调仓建议。
 
     Args:
         pro_text: 白脸分析的完整文本。
         con_text: 黑脸分析的完整文本。
         enable_conditional: 是否追加条件推理情景分析指令。
+        enable_qa_concentration: 是否追加集中度问答引导段。
+        industry_concentration: 行业集中度字典 {行业名: 占比}，供集中度问答使用。
+        holdings_details: 持仓明细列表，供集中度问答计算使用。
+        total_mv: 持仓总市值，供集中度问答计算使用。
 
     Returns:
         格式化的综合 prompt 字符串。
@@ -510,6 +541,33 @@ def _build_debate_synthesis_prompt(
                 prompt += "\n".join(scenario_lines)
         except Exception:
             logger.warning("[debate] 综合阶段条件推理情景追加失败，已跳过")
+
+    # ── 集中度问答（对齐需求 R-LLM-DB-QA-CONCENTRATION-03） ────
+    if enable_qa_concentration:
+        try:
+            from src.python.config._core import get_llm_config
+
+            _cfg = get_llm_config()
+            _threshold = (
+                (_cfg or {})
+                .get("debate", {})
+                .get("qa_concentration", {})
+                .get("threshold", 0.20)
+            )
+        except Exception:
+            _threshold = 0.20
+        _qa_block = _build_qa_concentration_block(
+            holdings_details,
+            total_mv,
+            threshold=_threshold,
+            industry_concentration=industry_concentration,
+        )
+        if _qa_block:
+            prompt += (
+                "\n\n请结合上述白脸和黑脸对集中度的分析，在综合权衡中输出"
+                "'### 集中度问答'章节（置于调仓建议之前）。"
+                + _qa_block
+            )
 
     return prompt
 

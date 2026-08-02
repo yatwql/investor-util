@@ -8,6 +8,7 @@
         :root {
             /* Chart.js 主题色（§4.6）— chart-config.js 读取，暗色模式预留 */
             --chart-primary: #2E75B6;
+            --chart-bar-2: #E68A00;  /* 穿透 TOP10 柱状图（橙，与行业图蓝柱区分） */
             --chart-secondary: #CC0000;
             --chart-danger: #CC0000;
             --chart-danger-transparent: rgba(204, 0, 0, 0.15);
@@ -269,6 +270,7 @@
             /* Chart.js 打印降级（§4.5）：强制浅色（暗色模式预留）+ 图表不跨页断裂 */
             :root {
                 --chart-primary: #2E75B6;
+                --chart-bar-2: #E68A00;  /* 穿透 TOP10 柱状图（橙，与行业图蓝柱区分） */
                 --chart-secondary: #CC0000;
                 --chart-danger: #CC0000;
                 --chart-danger-transparent: rgba(204, 0, 0, 0.15);
@@ -293,6 +295,23 @@
             font-size: 13px;
             letter-spacing: 1px;
         }
+        /* --- 单图导出按钮（chart-export.js 注入；打印时隐藏）--- */
+        .chart-box { position: relative; }
+        .chart-export-btn {
+            position: absolute;
+            top: 6px; right: 6px;
+            z-index: 5;
+            padding: 3px 10px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--chart-text, #333);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #d0d5dd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .chart-export-btn:hover { background: #e9ecf0; }
+        @media print { .chart-export-btn { display: none; } }
     </style>
 
 {% if section_visible("portfolio_history") or section_visible("drawdown_analysis") %}
@@ -554,10 +573,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 {# Chart.js 交互图表（R21 本地 bundle：相对路径，离线自包含） #}
 {# chart_datasets 数据经 context 传递（C14 合规，不写 _ENV.globals） #}
 <script type="application/json" id="chart-data">{{ chart_datasets | tojson }}</script>
-{# P3（R21 本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-init） #}
+{# P3（R21 本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-init） #}
 <script defer src="chart.min.js"></script>
 <script defer src="chart-print.js"></script>
 <script defer src="chart-config.js"></script>
+<script defer src="chart-export.js"></script>
 <script defer src="chart-init.js"></script>
 {% endif %}
 </head>
@@ -868,22 +888,22 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% if penetration and penetration.get("top10") %}
         <div class="section-content" style="padding: 0;">
             {% if enable_interactive_charts %}
-            {# 行业分布 + 穿透 TOP10：一图一表并排，图表前置概述。
+            {# 行业分布 + 穿透 TOP10：两个垂直柱状图分两行显示、居中，避免小屏并排不齐。
                空值语义（§4.12）：dataset 无 labels 时不渲染 canvas，显示占位提示。 #}
             <div class="penetration-charts" style="display: flex; flex-wrap: wrap; gap: 16px; padding: 12px;">
-                <div style="flex: 1; min-width: 280px;">
+                <div style="flex: 1 1 100%; max-width: 720px; margin: 0 auto;">
                     <div class="chart-box" style="height: 320px;">
                         {% if chart_datasets and chart_datasets.get("industry_bar", {}).get("labels") %}
-                        <canvas id="chart_industry_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="行业分布水平柱状图（悬停查看市值）" role="img">图表无法显示，数据见穿透分析表</canvas>
+                        <canvas id="chart_industry_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="行业分布垂直柱状图（悬停查看市值）" role="img">图表无法显示，数据见穿透分析表</canvas>
                         {% else %}
                         <div class="chart-empty-note">行业数据暂不可用</div>
                         {% endif %}
                     </div>
                 </div>
-                <div style="flex: 1; min-width: 280px;">
+                <div style="flex: 1 1 100%; max-width: 720px; margin: 0 auto;">
                     <div class="chart-box" style="height: 320px;">
                         {% if chart_datasets and chart_datasets.get("penetration_bar", {}).get("labels") %}
-                        <canvas id="chart_penetration_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="穿透 TOP10 柱状图（悬停查看市值）" role="img">图表无法显示，数据见资产穿透表</canvas>
+                        <canvas id="chart_penetration_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="穿透 TOP10 垂直柱状图（悬停查看市值）" role="img">图表无法显示，数据见资产穿透表</canvas>
                         {% else %}
                         <div class="chart-empty-note">穿透数据暂不可用</div>
                         {% endif %}

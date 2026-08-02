@@ -52,18 +52,18 @@
   ┌────────────────┐  ┌──────────────────┐  ┌────────────────────┐
   │ generators.py  │  │ generators_news  │  │ skeleton.py        │ ← 骨架层
   │                │  │ .py              │  │                    │
-  │ 4 个单例生成   │  │ LLM 增强新闻关联 │  │ _generate_llm_     │
+  │ 4 个单例生成   │  │ LLM 增强新闻关联 │  │ generate_llm_      │
   │ 函数           │  │ enhance_news_    │  │ module()           │
   │                │  │ correlation()    │  │                    │
   └───────┬────────┘  └────────┬─────────┘  │ _run_standard_mode │
-          │                    │             │ _run_batch_mode    │
+          │                    │             │ run_batch_mode     │
           │                    │             └───────┬────────────┘
-          │                    │                     │ _generate_llm_content()
+          │                    │                     │ generate_llm_content()
           └──────────┬─────────┘                     │
                      │                               ▼
                      │                      ┌────────────────┐
                      │                      │  api.py        │ ← API 路由层
-                     │                      │ _call_llm()    │
+                     │                      │ call_llm()     │
                      │                      │ 路由 provider  │
                      │                      └───────┬────────┘
                      │                              │
@@ -74,8 +74,8 @@
                      │                      │ _attempt_api_  │
                      │                      │ call()         │
                      │                      │                │
-                     │                      │ _call_llm_with │
-                     │                      │ _retry()       │
+                     │                      │ call_llm_with  │
+                     │                      │ retry()        │
                      │                      │                │
                      │                      │ 重试骨架       │
                      │                      │ 截断检测       │
@@ -113,14 +113,14 @@
 **调用链（API 调用流程）**：
 
 ```
-skeleton.py:_generate_llm_content()
+skeleton.py:generate_llm_content()
     │  ① 缓存检查 → 命中直接返回
-    │  ② _call_llm()
-    │      └─ api.py:_call_llm()
-    │             │  路由 provider → _call_claude() / _call_openai()
+    │  ② call_llm()
+    │      └─ api.py:call_llm()
+    │             │  路由 provider → call_claude() / call_openai()
     │             │  ③ 空内容处理：thinking 耗尽→关闭 thinking 同 provider 重试一次；仍失败→切换 provider；""→安抚重试
     │             │  ④ 回退 provider（主 provider 失败时）
-    │             └─ api_base.py:_call_llm_with_retry()
+    │             └─ api_base.py:call_llm_with_retry()
     │                    │  熔断预检 → 熔断中则直接返回
     │                    │  循环 attempt=0..max_retries:
     │                    │    _attempt_api_call() → HTTP POST
@@ -128,7 +128,7 @@ skeleton.py:_generate_llm_content()
     │                    │           → _extract_content()
     │                    │           → 截断检测
     │                    │           → _log_token_usage()
-    │                    │           → _track_session_usage()
+    │                    │           → track_session_usage()
     │                    │    可重试 → sleep → retry
     │                    │    致命 → 记录失败原因 → 返回
     │                    └→ _cb_record_failure/success()
@@ -137,7 +137,7 @@ skeleton.py:_generate_llm_content()
     │        → markdown_to_html()
     │        → 拼接模型/用量/费用页脚
     │        → cache_set()
-    │        → _record_per_module()
+    │        → record_per_module()
     └── 返回 (html, from_cached)
 ```
 
@@ -156,34 +156,37 @@ skeleton.py:_generate_llm_content()
 | `generators_orchestrator.py` | 编排层 | 4+1 模块并行调度，缓存预检查，线程池分发 | `generate_all_llm()` |
 | `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 | 各 `generate_*()` |
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
-| `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑）+ `raw_filter_fn` 原始输出过滤钩子（markdown_to_html 之前） | `_generate_llm_module()` |
-| `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、Gemini API 调用 | `_call_llm()` |
-| `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `_call_llm_with_retry()` |
+| `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑）+ `raw_filter_fn` 原始输出过滤钩子（markdown_to_html 之前） | `generate_llm_module()` |
+| `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、单 Provider 分派 | `call_llm()` / `call_single_provider()` |
+| `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
 | `fact_checker.py` | 基础设施 | LLM 输出事实锚定校验（数值一致性/品种存在性/排名正确性）+ 自动修正 | `run_fact_check()` |
 | `fallback.py` | 基础设施 | 全模块失败时的降级占位模板 | `get_fallback_content()` |
-| `prompts_core.py` | 工具 | System / User Prompt 构建 | `_build_system_prompt()` / `_build_user_prompt()` |
-| `prompts_tables.py` | 工具 | 持仓/指标数据表格格式化为 Markdown | `_build_metrics_table()` / `_build_performance_table()` |
-| `prompts_action.py` | 工具 | 行动建议表格/诊断结论格式化 | `_build_action_table()` / `_build_diagnosis_block()` |
-| `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `_compute_fingerprint()` |
-| `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `reset_session_usage()` |
+| `prompts_core.py` | 工具 | System Prompt 常量 + 上下文构建块（数据降级/收益归因/竞争语境/再平衡/概念板块/管线差异） | `_SYSTEM_*` 常量 + `_build_system_debate_synthesis()` |
+| `prompts_tables.py` | 工具 | 持仓/穿透/指标/情景/数据质量/汇率等数据块格式化为 Markdown | `_format_holdings_block()` / `_build_holdings_summary()` |
+| `prompts_action.py` | 工具 | 各模块 User Prompt 构建（global_macro / expert_review / health_check / penetration_deep / debate_synthesis）+ 集中度问答块 | `_build_expert_review_prompt()` / `_build_qa_concentration_block()` |
+| `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `compute_fingerprint()` / `build_llm_fingerprint()` |
+| `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `track_session_usage()` / `get_session_usage()` |
 | `cost_tracker.py` | 工具 | Token 预算管理、输入检查、成本摘要格式化（compact/verbose） | `reset_budget()` / `get_cost_summary()` |
-| `pricing.py` | 工具 | 模型定价合并、费用估算 | `_estimate_cost()` |
-| `circuit_breaker.py` | 工具 | LLM 端点熔断器（3 次/60s） | `_cb_is_open()` |
-| `markdown.py` | 工具 | Markdown→HTML 转换 | `_markdown_to_html()` |
+| `pricing.py` | 工具 | 模型定价合并、费用估算 | `estimate_cost()` / `reload_pricing()` |
+| `circuit_breaker.py` | 工具 | LLM 端点熔断器（连续 3 次失败 + 固定 60s 冷却） | `get_circuit_status()` |
+| `markdown.py` | 工具 | Markdown→HTML 转换 | `markdown_to_html()` |
+| `_api_claude.py` / `_api_gemini.py` / `_api_openai.py` | 私有 | 各 Provider 单次调用实现（自包含依赖，委托 api_base 重试 + Extended Thinking 注入），api.py 分派目标 | `call_claude()` / `call_gemini()` / `call_openai()` |
+| `_call_claude.py` / `_call_gemini.py` / `_call_openai.py` | 私有 | 各 Provider 单次调用实现（与 `_api_*.py` 功能等价的并列入口） | `call_claude()` 等 |
+| `_batch_mode.py` | 私有 | 批量模式分块执行（`_BATCH_CHUNK_SIZE=10` 每批、并行度 6） | `run_batch_mode()` |
 
 ### 2.2 四大+一模块详情
 
-#### 标准模式模块（4 个，通过 `_generate_llm_module` 以标准模式调用）
+#### 标准模式模块（4 个，通过 `generate_llm_module` 以标准模式调用）
 
 | 模块键 | 名称 | 默认 max_tokens | 默认 timeout | 默认 TTL | 默认 system_prompt |
 |:-------|:-----|:---------------:|:------------:|:--------:|:-------------------|
 | `global_macro` | 全球政经局势 | 2048 | 60s | 24h（86400s） | 宏观经济学家角色，500 字内，纯文本 |
-| `expert_review` | 智囊团深度复盘 | 20000 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
-| `health_check` | 持仓体检报告 | 16000 | 120s | 24h（86400s） | 四维度评分（风险分散度/流动性/收益合理性/成本结构） |
+| `expert_review` | 智囊团深度复盘 | 24000 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
+| `health_check` | 持仓体检报告 | 16000 | 120s | 24h（86400s） | 五维度评分（风险分散度/流动性/收益合理性/成本结构/数据质量） |
 | `penetration_deep` | 穿透深度分析 | 8192 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
 
-#### 批量模式模块（1 个，通过 `_generate_llm_module` 以批量模式调用）
+#### 批量模式模块（1 个，通过 `generate_llm_module` 以批量模式调用）
 
 | 模块键 | 名称 | 默认 max_tokens | 默认 timeout | 默认 TTL | 默认 system_prompt |
 |:-------|:-----|:---------------:|:------------:|:--------:|:-------------------|
@@ -206,18 +209,18 @@ skeleton.py:_generate_llm_content()
 
 ## 3. 骨架流程
 
-### 3.1 `_generate_llm_module()` — 两路分支
+### 3.1 `generate_llm_module()` — 两路分支
 
 ```
-_generate_llm_module(llm_config, module_key, *hooks)
+generate_llm_module(llm_config, module_key, *hooks)
     │
     ├── llm_config is None → get_llm_config() 尝试读取配置
     │      └── 仍为 None → 返回 None（未配置）
     │
-    ├── _is_llm_module_enabled() → False
+    ├── is_llm_module_enabled() → False
     │      └── 返回 None（已禁用），记录 _LLM_MODULE_FAILURE[module_key] = FAIL_REASON_DISABLED
     │
-    ├── batch_preparer is not None  → _run_batch_mode()（批量模式）
+    ├── batch_preparer is not None  → run_batch_mode()（批量模式）
     │
     └── 标准模式 → _run_standard_mode()
 ```
@@ -285,7 +288,7 @@ _run_standard_mode()
 │ └──────────────┬──────────────────┘  │
 │                │                      │
 │ ┌──────────────▼──────────────────┐  │
-│ │ ② _call_llm()                   │  │
+│ │ ② call_llm()                    │  │
 │ │ 清除上次失败原因                  │  │
 │ │ → 主 provider API 调用           │  │
 │ │ → 空内容处理（None→切换/""→安抚）│  │
@@ -312,16 +315,16 @@ _run_standard_mode()
 │ │ markdown_to_html() → 判空       │  │
 │ │ → 拼接模型/用量/费用页脚         │  │
 │ │ → cache_set()                   │  │
-│ │ → _record_per_module()          │  │
+│ │ → record_per_module()           │  │
 │ │ 返回 (html, False)              │  │
 │ └─────────────────────────────────┘  │
 └──────────────────────────────────────┘
 ```
 
-### 3.3 `_run_batch_mode()` — 批量模式流程
+### 3.3 `run_batch_mode()` — 批量模式流程
 
 ```
-_run_batch_mode(llm_config, module_key, *hooks)
+run_batch_mode(llm_config, module_key, *hooks)
     │
     ▼
 ┌───────────────────────────────────────────┐
@@ -351,7 +354,7 @@ _run_batch_mode(llm_config, module_key, *hooks)
 │  _merge_batch() │
 │  → batch_prompt │
 │    _fn(items)   │
-│  → _call_llm()  │
+│  → call_llm()   │
 │  → response_    │
 │    parser()     │
 │  → cache_set()  │
@@ -434,7 +437,7 @@ _LLM_CLIENT_SETTINGS = {
 
 ```python
 # 仅对缓存未命中且已启用的模块提交
-needs = {k: (v["result"] is None and _is_llm_module_enabled(llm_config, k))
+needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k))
          for k, v in precheck_results.items()}
 
 # 无需求时直接返回
@@ -459,7 +462,7 @@ if not any(needs.values()):
 ### 5.1 Provider 路由
 
 ```
-_call_llm(system_prompt, user_prompt, llm_config, ...)
+call_llm(system_prompt, user_prompt, llm_config, ...)
     │
     ├─ ① 读取 Provider 列表和策略
     │   strategy.resolve_provider_chain(provider_list, strategy, module_key, preferred)
@@ -628,7 +631,7 @@ call_gemini() Extended Thinking 注入
 
 **设计目的**：将敏感凭据（api_key、model、endpoint）与 Provider 路由配置分离，降低凭据泄露风险，支持凭据复用。
 
-**凭据来源**：`llm_config["_llm_credentials"]`，由 `config/_core.py` 的 `_load_llm_key_credentials()` 读取 `llm_key.json` 构建。
+**凭据来源**：`llm_config["_llm_credentials"]`，由 `config/_llm_providers.py` 的 `_load_llm_key_credentials()` 读取 `llm_key.json` 构建。
 
 **解析优先级**（`_resolve_entry_credentials()`）：
 
@@ -650,7 +653,7 @@ call_gemini() Extended Thinking 注入
 
 ```
 第 1 层：熔断器（circuit_breaker.py）
-    ── _call_llm_with_retry() 入口检查
+    ── call_llm_with_retry() 入口检查
     ── 连续 3 次失败 → 冷却 60s → 半开放行
     ── 熔断中直接跳过，不发起 HTTP
 
@@ -721,38 +724,38 @@ LLM_MODULE_FAILURE: dict[str, dict] = {
 
 LLM 缓存使用指纹驱动失效机制。指纹变化时缓存自动失效，无需等待 TTL 到期。
 
-#### `_compute_fingerprint()` — 通用确定性哈希
+#### `compute_fingerprint()` — 通用确定性哈希
 
 ```python
-def _compute_fingerprint(*args: Any) -> str:
+def compute_fingerprint(*args: Any) -> str:
     raw = json.dumps(args, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.md5(raw.encode()).hexdigest()[:12]
 ```
 
 输入参数任意组合 → 确定性 MD5 → 前 12 位十六进制作为缓存键后缀。
 
-#### `_build_llm_fingerprint()` — LLM 专用指纹构建
+#### `build_llm_fingerprint()` — LLM 专用指纹构建
 
 ```
-_build_llm_fingerprint(total_mv, total_cost, total_profit, total_today_profit,
-                       holdings_details, penetrated_assets, categories,
-                       full_penetration=False)
+build_llm_fingerprint(total_mv, total_cost, total_profit, total_today_profit,
+                      holdings_details, penetrated_assets, categories,
+                      full_penetration=False)
 ```
 
 在序列化前执行稳定性字段提取：
 
 ```
-holdings_details ──→ _extract_stable_holdings()
+holdings_details ──→ extract_stable_holdings()
                      仅保留 {name, code, cost}
                      剔除 price/change_pct/nav_date 等行情波动字段
 
-penetrated_assets ──→ _extract_stable_penetration()
+penetrated_assets ──→ extract_stable_penetration()
                      默认仅保留 {name, codes}（排除行情波动）
                      full_penetration=True 时额外保留 {mv, sector, ratio}
                        （穿透深度分析需要穿透数据变化触发失效）
 ```
 
-**设计目的**：`expert_review` / `health_check` / `penetration_deep` 的 `_compute_fingerprint()` 在序列化前排除行情波动字段（`price`、`change_pct`），仅品种/份额/成本变化时指纹改变。防止日内股价波动导致 TTL 期内缓存频繁失效。
+**设计目的**：`expert_review` / `health_check` / `penetration_deep` 的 `compute_fingerprint()` 在序列化前排除行情波动字段（`price`、`change_pct`），仅品种/份额/成本变化时指纹改变。防止日内股价波动导致 TTL 期内缓存频繁失效。
 
 **风险信号摘要**：`risk_metrics` 摘要（夏普/卡玛/HHI 等计算指标的 MD5 摘要）作为指纹哈希因子。风险信号变化时缓存自动失效，确保 LLM 提示词中包含的量化指标与最新计算结果一致。
 
@@ -839,7 +842,7 @@ cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
 
 约束：每个论点引用品种代码和收益率；禁止虚构数据；标注 `(QDII滞后1日)` 的基金不得讨论本日盈亏。
 
-**持仓体检报告** (`_SYSTEM_HEALTH_CHECK`)：四维度各 100 分评分制，输出 Markdown 表格结构：
+**持仓体检报告** (`_SYSTEM_HEALTH_CHECK`)：五维度各 100 分评分制，输出 Markdown 表格结构：
 - 风险分散度（行业/品种集中度，含环比变化）
 - 流动性（场内场外/停牌/封闭期）
 - 收益合理性（与市场/同类对比）
@@ -924,35 +927,36 @@ HTML 报告页脚自动显示每个模块的耗时（`耗时: X.Xs`），便于�
 
 ```
 _precheck_one_cache() -> 缓存命中
-    → _record_per_module(key, model, cached=True, ...)
+    → record_per_module(key, model, cached=True, ...)
 
-_generate_llm_content() -> API 调用成功
+generate_llm_content() -> API 调用成功
     → time.monotonic() 计时开始
-    → _track_session_usage(provider, usage, model_name)
-    → _record_per_module(key, model, inp, out, cost, ...)
+    → track_session_usage(provider, usage, model_name)
+    → record_per_module(key, model, inp, out, cost, ...)
     → duration = time.monotonic() - start
     → _finalize_and_cache(..., duration=duration) ← 页脚显示耗时
 
 enhance_news_correlation() -> 新闻关联完成
     → _finalize_news_token_usage()
-      → _record_per_module("news_correlation", ...)
+      → record_per_module("news_correlation", ...)
 ```
 
 ### 9.3 生命周期
 
 ```
-tui.py 菜单 L/B 入口
+进程内模块级 _session_usage 累计
     │
-    ├─ reset_session_usage()          ← 会话开始，清空累计
+    ├─ track_session_usage()           ← 每次 API 调用后累计 Token/费用（api_base.py）
+    ├─ record_per_module()             ← 按模块记录模型/耗时/缓存/Thinking（api_base.py）
     ├─ generate_all_llm()              ← 4 模块并行生成
     ├─ enhance_news_correlation()      ← 新闻 LLM 关联（可选）
     ├─ 生成报告（Excel/HTML 渲染）
-    ├─ _print_llm_session_usage()      ← TUI 输出用量汇总
+    ├─ print_llm_session_usage()       ← TUI 输出用量汇总（tui_handlers.py）
     │
-    └─ 菜单退出                          ← 数据丢弃（下次调用 reset）
+    └─ 进程退出                          ← 数据随进程释放（无显式重置调用点）
 ```
 
-每次菜单 L/B 生成报告均为独立会话。会话开始时 `reset_session_usage()` 清空数据。
+用量数据由 `track_session_usage()` 随调用实时累计，`reset_session_usage()` 虽提供重置接口但生产代码无调用点；进程内多次生成报告时数据持续累计。
 
 ### 9.4 用量展示映射
 
@@ -983,13 +987,13 @@ _session_usage ──→ format_session_usage()
 `_PRICING_MERGED` 运行时合并自两层：
 
 1. **内置默认**（`core/constants.py` 中的 `MODEL_PRICING` 字典）
-2. **用户覆盖**（`llm_settings.json` → `pricing` 字段，模块加载时 `_reload_pricing()` 自动合并）
+2. **用户覆盖**（`llm_settings.json` → `pricing` 字段，模块加载时 `reload_pricing()` 自动合并）
 
 文件配置优先级高于内置默认：
 
 ```
 _PRICING_MERGED = dict(MODEL_PRICING)     # 内置默认
-_reload_pricing() → 合并 llm_settings.json → pricing
+reload_pricing() → 合并 llm_settings.json → pricing
                     每个模型条目覆盖或补充到 _PRICING_MERGED
                     可选字段 input_cache_hit 缺失时继承内置（或等于 input）
 ```
@@ -1006,7 +1010,7 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 
 ### 10.3 定价匹配优先级
 
-`_estimate_cost()` 匹配模型定价的优先级：
+`estimate_cost()` 匹配模型定价的优先级：
 
 1. **精确匹配**：模型全名小写 → 同名字典
 2. **前缀匹配**：`deepseek-v4-flash-xxx` → `deepseek-v4-flash`
@@ -1080,7 +1084,7 @@ _reload_pricing() → 合并 llm_settings.json → pricing
 在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`），自动派生 `llm_settings.json` 的所有合法键名：
 
 ```
-已知 LLM Settings 键名（每个模块 10 个）：
+已知 LLM Settings 键名（每个模块 9 个）：
   model_{suffix}
   temperature_{suffix}
   timeout_{suffix}
@@ -1095,9 +1099,13 @@ _reload_pricing() → 合并 llm_settings.json → pricing
   output_brief_{suffix}
 
 加上全局键名：
-  fact_check
+  max_retries
+  enabled_llm
+  pricing
   llm_max_concurrency
-  fail_title_{suffix}
+  news_correlation_top_n
+  debate
+  fact_check
 ```
 
 所有键名由 `get_known_llm_settings_keys()` 统一校验。新增 LLM 模块只需在 registry.py 注册表中添加一行 `DataModuleDef`，无需修改 config 校验逻辑。
