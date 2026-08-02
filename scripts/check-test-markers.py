@@ -42,6 +42,8 @@ EXPECTED_DIR_MARKERS: dict[str, set[str]] = {
     "unit/news": {"unit", "unit_news"},
     "unit/providers": {"unit", "unit_providers"},
     "unit/report": {"unit", "unit_report"},
+    "unit/analysis": {"unit", "unit_analysis"},
+    "unit/cli": {"unit", "unit_cli"},
     "unit/ui": {"unit", "unit_ui"},
     # scenario 子模块
     "scenario/basic": {"scenario", "scenario_basic"},
@@ -53,7 +55,7 @@ EXPECTED_DIR_MARKERS: dict[str, set[str]] = {
 # 已移除的标记（不得出现）— 当前无已移除标记
 DEPRECATED_MARKERS: set[str] = set()
 
-# 已知的合法标记全集（conftest.py 注册的）
+# 已知的合法标记全集（与 src/test/conftest.py 注册保持一致）
 KNOWN_MARKERS = {
     "scenario",
     "scenario_basic",
@@ -70,6 +72,8 @@ KNOWN_MARKERS = {
     "scenario_single_holding",
     "scenario_zero_cost",
     "scenario_extreme",
+    "scenario_perf",
+    "scenario_security",
     "unit",
     "unit_providers",
     "unit_fetcher",
@@ -77,9 +81,11 @@ KNOWN_MARKERS = {
     "unit_news",
     "unit_report",
     "unit_config",
+    "unit_config_edge",
     "unit_core",
-    "unit_rebalance",
+    "unit_cli",
     "unit_ui",
+    "unit_analysis",
     "edge",
     "smoke",
     "data",

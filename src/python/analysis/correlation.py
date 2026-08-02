@@ -34,6 +34,23 @@ SIGNIFICANCE_LEVEL: float = 0.05
 FETCH_DAYS: int = 90
 
 
+def _is_valid_return(value) -> bool:
+    """收益值是否可参与相关计算：排除 None 与 NaN/Inf（后者会使 Pearson 产生虚假相关）。
+
+    Args:
+        value: 收益率字段原始值（int/float/str/None）。
+
+    Returns:
+        True 表示可参与计算。
+    """
+    if value is None:
+        return False
+    try:
+        return not math.isinf(float(value)) and not math.isnan(float(value))
+    except (TypeError, ValueError):
+        return False
+
+
 # ═══════════════════════════════════════════════════════════════
 #  结果工厂
 # ═══════════════════════════════════════════════════════════════
@@ -135,7 +152,7 @@ def compute_correlation_matrix(
     names = {c: (names_by_code or {}).get(c, c) for c in returns_by_code}
     active: dict[str, list[dict]] = {}
     for c, seq in returns_by_code.items():
-        _clean = [r for r in seq if r.get("return") is not None]
+        _clean = [r for r in seq if _is_valid_return(r.get("return"))]
         if _clean:
             active[c] = _clean
 

@@ -8,12 +8,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 186 | 45,567 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 1 | 2,088 | `src/python/tmpl/report_template.html` |
+| 主程序代码 | Python | 190 | 46,663 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 1 | 2,407 | `src/python/tmpl/report_template.html` |
 | 辅助脚本 | Python | 12 | 4,107 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
-| **源代码合计** | — | **199** | **51,762** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **223** | **62,605** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,973 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **203** | **53,177** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **232** | **64,804** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,111 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
@@ -103,6 +103,7 @@ investor-util/
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
 │   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
+│   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
@@ -182,6 +183,7 @@ investor-util/
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
+│   │   │   ├── correlation_sheet.py  #   持仓相关性矩阵 Excel 页签（热力格/配对明细）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
@@ -276,7 +278,9 @@ investor-util/
 │       │   │   ├── test_scenario_analysis.py       #   情景分析测试
 │       │   │   ├── test_alignment_correction.py #   口径修正因子计算
 │       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
-│       │   │   └── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
+│       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
+│       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
+│       │   │   └── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口，rf-157 回归）
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_config.py            #   配置管理核心测试
@@ -414,6 +418,9 @@ investor-util/
 │       │   │   ├── test_fund_overlap.py           #   基金重叠分析测试
 │       │   │   ├── test_fund_performance.py       #   基金业绩测试
 │       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
+│       │   │   ├── test_correlation_html.py       #   持仓相关性章节 HTML 呈现
+│       │   │   ├── test_correlation_sheet.py      #   持仓相关性矩阵 Excel 页签呈现
+│       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试
