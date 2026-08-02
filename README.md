@@ -95,7 +95,7 @@ python -m src.python.cli cache --stats
 ### 性能追踪与运维
 
 - **自动阶段计时** — 每次报告生成自动记录各阶段耗时（行情获取/数据准备/快照对比/历史走势/HTML 生成/Excel 生成/LLM+新闻），持久化到 `data/state/perf_history.jsonl`
-- **数据源健康检查** — 每次报告生成时后台并行执行全量数据源 HTTP 连通性检测，结果存入 `data/state/datasource_health.jsonl` 并实时反映在报告 #17 数据源可用性矩阵章节
+- **数据源健康检查** — 每次报告生成时后台并行执行全量数据源 HTTP 连通性检测，结果存入 `data/state/datasource_health.jsonl` 并实时反映在报告 #18 数据源可用性矩阵章节
 - **趋势查看工具** — `scripts/perf_view.py` 读取历史记录，输出版本间耗时对比 Markdown 表格，用于多版本间性能退化检测
 
 ### 基金评价

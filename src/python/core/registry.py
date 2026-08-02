@@ -514,30 +514,30 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "data_flag": "concentration_data",
     },
     {"key": "fund_style", "name": "基金风格分析", "number": 9, "type": "b_series", "data_flag": "style_data"},
+    # ── 基金深度分析 类型（有数据才显示；跟随 B2~B5 之后） ──
+    {
+        "key": "factor_exposure",
+        "name": "因子暴露分析",
+        "number": 10,
+        "type": "b_series",
+        "data_flag": "factor_exposure_data",
+    },
     # ── news 类型（需启用新闻功能） ──
     {
         "key": "news_correlation",
         "name": "财经新闻热点与持仓关联分析",
-        "number": 10,
+        "number": 11,
         "type": "news",
         "data_flag": "news_data_available",
     },
     # ── llm 类型（需启用 LLM 功能） ──
-    {"key": "global_macro", "name": "全球政经局势", "number": 11, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "health_check", "name": "持仓体检报告", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "global_macro", "name": "全球政经局势", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "health_check", "name": "持仓体检报告", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 15, "type": "llm", "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
-    {"key": "portfolio_history", "name": "组合历史走势", "number": 15, "type": "history", "data_flag": None},
-    {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16, "type": "history", "data_flag": None},
-    # ── 基金深度分析 类型（有数据才显示；序号 17 与 data_source_status/llm_usage 顺延） ──
-    {
-        "key": "factor_exposure",
-        "name": "因子暴露分析",
-        "number": 17,
-        "type": "b_series",
-        "data_flag": "factor_exposure_data",
-    },
+    {"key": "portfolio_history", "name": "组合历史走势", "number": 16, "type": "history", "data_flag": None},
+    {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 17, "type": "history", "data_flag": None},
     # ── always 类型（始终显示） ──
     {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always", "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──

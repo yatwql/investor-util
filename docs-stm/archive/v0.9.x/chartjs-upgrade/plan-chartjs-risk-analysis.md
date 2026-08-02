@@ -1,7 +1,9 @@
 # Chart.js 交互式报告升级 — 风险/收益/架构分析
 
 > **文档版本**：v0.8.7-dev · **分析日期**：2026-07-27
-> **关联计划**：[`plan-chartjs-report-upgrade.md`](./plan-chartjs-report-upgrade.md)（实施方案）· [`plan.md`](../managements/plan.md)
+> **关联计划**：[`plan-chartjs-report-upgrade.md`](./plan-chartjs-report-upgrade.md)（实施方案）· [`plan.md`](../../../managements/plan.md)
+>
+> **归档说明**：plan-1（交互式 HTML 报告升级）已全部完成（8 迭代落地），本文档 2026-08-02 随实施方案一并归档至 `archive/v0.9.x/chartjs-upgrade/`。
 > **数据源**：代码审查 + `technical.md` 架构约束 + 模板/渲染管线源码分析
 
 ---

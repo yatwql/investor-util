@@ -18,8 +18,8 @@
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **87** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 69 | — | 各版本 changelog/plan/review-findings 等 |
-| ├ plan/ | 中间设计文件 | 8 | — | 当前迭代中的设计方案 |
+| ├ archive/ | 版本归档 | 78 | — | 各版本 changelog/plan/review-findings 等 |
+| ├ plan/ | 中间设计文件 | 5 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -551,11 +551,8 @@ investor-util/
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
 │   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
-│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势/因子）
+│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势，plan-7 已归档）
 │   │   ├── plan-correlation-drawdown.md #     相关性矩阵+回撤+净值曲线计划（plan-2/3）
-│   │   ├── plan-chartjs-risk-analysis.md #    Chart.js 升级风险/收益/架构分析（plan-1）
-│   │   ├── plan-chartjs-report-upgrade.md #  Chart.js 升级实施方案（plan-1）
-│   │   ├── plan-1-iter7-verification-checklist.md  # plan-1 Iter 7 浏览器人工验证清单（rf-113）
 │   │   ├── plan-web-ui.md              #     轻量 Web UI 计划
 │   │   └── plan-fix-deepseek-thinking-exhaustion.md  # DeepSeek thinking 耗尽 max_tokens 修复方案（rf-122）
 │   ├── archive/                      #   历史归档
@@ -667,6 +664,14 @@ investor-util/
 │   │   │   ├── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
 │   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
+│   │   │   ├── v0.9.x/                           # v0.9.x 版本归档（本迭代已完成项）
+│   │   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（plan-1/plan-7 已完成项 + 设计文档索引）
+│   │   │   │   ├── chartjs-upgrade/               #   plan-1 交互式 HTML 报告升级设计（8 迭代）
+│   │   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案（plan-1）
+│   │   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析（plan-1）
+│   │   │   │   │   └── plan-1-iter7-verification-checklist.md # plan-1 Iter 7 浏览器人工验证清单（rf-113）
+│   │   │   │   └── factor-exposure/                 #   plan-7 因子暴露分析设计（原 plan-advanced-analysis §4）
+│   │   │   │       └── plan-factor-exposure.md      #     因子暴露分析设计（plan-7）
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

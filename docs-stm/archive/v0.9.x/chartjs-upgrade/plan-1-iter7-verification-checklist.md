@@ -1,5 +1,7 @@
 # plan-1 Iter 7 全链路浏览器人工验证清单（rf-113）
 
+> **归档说明**：随 plan-1 设计文档一并归档（2026-08-02），清单仍在 review-findings.md P1 跟踪（rf-113 浏览器人工验证项）。关联方案文档见同目录 [`plan-chartjs-report-upgrade.md`](./plan-chartjs-report-upgrade.md) 与 [`plan-chartjs-risk-analysis.md`](./plan-chartjs-risk-analysis.md)。
+>
 > 关联：`plan-chartjs-report-upgrade.md` §5 Iter 7 验收标准 2/3/4/6 + §4.8（A1/A4）+ §4.14（R17 浏览器矩阵）+ §4.15（R22 微信场景）
 > 状态：⏳ 待实测（rf-113，review-findings.md P1）
 > 目的：plan-1 代码与自动化测试已落地（dev-verify 1181 passed），以下为**只能真实浏览器/微信执行的验证项**——本清单提供可勾选的操作步骤，勾选完成后回填 `changelog.md` 并将 rf-113 从 review-findings.md 待处理移至已修复表。

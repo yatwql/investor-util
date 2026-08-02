@@ -293,13 +293,13 @@ class TestReportSectionDefault:
         assert keys.index("data_source_status") < keys.index("llm_usage")
 
     def test_factor_exposure_registered_as_fund_deep_analysis(self):
-        """factor_exposure 应注册为 b_series 模块（data_flag=factor_exposure_data）。"""
+        """factor_exposure 应注册为 b_series 模块（data_flag=factor_exposure_data），跟随 B2~B5 之后。"""
         fe = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "factor_exposure"]
         assert len(fe) == 1, "缺少 factor_exposure 模块条目"
         sec = fe[0]
         assert sec["type"] == "b_series"
         assert sec["data_flag"] == "factor_exposure_data"
-        assert sec["number"] == 17
+        assert sec["number"] == 10
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""

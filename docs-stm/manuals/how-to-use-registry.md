@@ -163,6 +163,7 @@ from src.python.core.registry import (
 | `fund_overlap` | 持仓重合度矩阵 | 基金深度分析 |
 | `fund_concentration` | 持仓集中度监控 | 基金深度分析 |
 | `fund_style` | 基金风格分析 | 基金深度分析 |
+| `factor_exposure` | 因子暴露分析 | 基金深度分析 |
 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻 |
 | `global_macro` | 全球政经局势 | LLM |
 | `expert_review` | 智囊团深度复盘 | LLM |
@@ -170,7 +171,6 @@ from src.python.core.registry import (
 | `penetration_deep` | 穿透深度分析 | LLM |
 | `portfolio_history` | 组合历史走势 | 历史走势 |
 | `drawdown_analysis` | 历史回撤分析 | 历史走势 |
-| `factor_exposure` | 因子暴露分析 | 基金深度分析 |
 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
 | `llm_usage` | LLM API 用量 | LLM（强制末位） |
 

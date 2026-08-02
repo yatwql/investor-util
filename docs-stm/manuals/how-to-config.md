@@ -13,9 +13,9 @@
   "llm_providers_file": "data/config/llm_providers.json",
 
   // ── B. 报告章节可见性 ──
-  "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露（#6~9、#17）
-  "enable_news": true,      // 市场新闻（#10）
-  "enable_history": true,   // 组合历史走势+回撤（#15~16）
+  "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露（#6~10）
+  "enable_news": true,      // 市场新闻（#11）
+  "enable_history": true,   // 组合历史走势+回撤（#16~17）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -145,9 +145,9 @@
 | `rebalance.equity_fixed_income` | `{}` | 权益/固收超大类目标配置（空=不启用）。格式 `{"equity":{"min":30,"max":70}}` | 手动编辑 |
 | `redemption_limits` | `{}` | 场外基金单日赎回上限，格式 `{基金代码: 金额}`。配置后程序可计算场外品种全量赎回所需天数。未配置品种标记"需手动确认赎回上限" | 手动编辑 |
 | `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）/ `code_display`（名称→"品种X"，保留代码和盈亏）/ `full_anonymous`（名称→"品种X"，代码→"000XXX"，盈亏→±XX%）/ `summary`（仅大类汇总） | 菜单 `A` |
-| `enable_fund_deep_analysis` | `true` | 基金深度分析章节可见性（模块 #6~#9），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
-| `enable_news` | `true` | 市场新闻章节可见性（模块 #10），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
-| `enable_history` | `true` | 历史走势章节可见性（模块 #15~#16），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
+| `enable_fund_deep_analysis` | `true` | 基金深度分析章节可见性（模块 #6~#10），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
+| `enable_news` | `true` | 市场新闻章节可见性（模块 #11），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
+| `enable_history` | `true` | 历史走势章节可见性（模块 #16~#17），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
 
 ---
 
@@ -165,10 +165,10 @@
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
-| `enable_fund_deep_analysis` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析 | 基金深度分析章节组 |
-| `enable_news` | `true` | `config.json` | #10 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
-| `enable_history` | `true` | `config.json` | #15 组合历史走势、#16 历史回撤分析 | 历史走势章节组（F1 持仓快照不受影响，始终自动执行） |
-| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #11 全球政经局势、#12 智囊团深度复盘、#13 持仓体检报告、#14 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
+| `enable_fund_deep_analysis` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析、#10 因子暴露分析 | 基金深度分析章节组 |
+| `enable_news` | `true` | `config.json` | #11 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
+| `enable_history` | `true` | `config.json` | #16 组合历史走势、#17 历史回撤分析 | 历史走势章节组（F1 持仓快照不受影响，始终自动执行） |
+| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #12 全球政经局势、#13 智囊团深度复盘、#14 持仓体检报告、#15 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
 
@@ -366,14 +366,14 @@
 | 7 | `fund_overlap` | 持仓重合度矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
 | 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
 | 9 | `fund_style` | 基金风格分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
-| 11 | `global_macro` | 全球政经局势 | LLM |
-| 12 | `expert_review` | 智囊团深度复盘 | LLM |
-| 13 | `health_check` | 持仓体检报告 | LLM |
-| 14 | `penetration_deep` | 穿透深度分析 | LLM |
-| 15 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 16 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 17 | `factor_exposure` | 因子暴露分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 10 | `factor_exposure` | 因子暴露分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 11 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
+| 12 | `global_macro` | 全球政经局势 | LLM |
+| 13 | `expert_review` | 智囊团深度复盘 | LLM |
+| 14 | `health_check` | 持仓体检报告 | LLM |
+| 15 | `penetration_deep` | 穿透深度分析 | LLM |
+| 16 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
+| 17 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
 | 18 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
 | 19 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 

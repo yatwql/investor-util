@@ -5,6 +5,8 @@
 > 二者共同组成 plan-1 的完整设计方案：实施方案聚焦"怎么做"，风险分析聚焦"为什么这么做"。
 >
 > **文档版本**：v0.8.7-dev · 估算：**5.25d** · 迭代：8 轮
+>
+> **归档说明**：plan-1（交互式 HTML 报告升级）已全部完成（8 迭代落地，双路径回退验证通过），本文档 2026-08-02 归档至 `archive/v0.9.x/chartjs-upgrade/`。
 
 ---
 
@@ -45,7 +47,7 @@
 - **不引入后端渲染** — Chart.js 完全客户端侧
 - **不替代现有 Canvas** — Feature Flag 控制，保留 Canvas 路径
 - **C14 零容忍** — 所有数据通过 `render()` context 传递，不写 `_ENV.globals`
-- **为 plan-7 预留** — 穿透 TOP10 Bar / 行业分布 Horizontal Bar 的 Chart.js 能力可被 plan-7 复用（方案 B）；plan-7 MVP 用方案 A（自建轻量柱状渲染）不阻塞在 plan-1，见 `plan-advanced-analysis.md §4`
+- **为 plan-7 预留** — 穿透 TOP10 Bar / 行业分布 Horizontal Bar 的 Chart.js 能力可被 plan-7 复用（方案 B）；plan-7 MVP 用方案 A（自建轻量柱状渲染）不阻塞在 plan-1，见 [`plan-factor-exposure.md`](../factor-exposure/plan-factor-exposure.md)（已归档）
 
 ### 1.3 图表映射到现有模板章节
 
