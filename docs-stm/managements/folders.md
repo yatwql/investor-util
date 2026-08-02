@@ -8,17 +8,17 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 186 | 45,304 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
+| 主程序代码 | Python | 186 | 45,481 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 1 | 2,068 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python | 12 | 4,073 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
-| **源代码合计** | — | **199** | **51,445** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **223** | **62,066** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,941 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| 辅助脚本 | Python | 12 | 4,097 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
+| **源代码合计** | — | **199** | **51,646** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **223** | **62,393** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,964 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **88** | — | 含 CLAUDE.md |
+| **项目文档** | Markdown | **95** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 79 | — | 各版本 changelog/plan/review-findings 等（76 md + 3 py） |
+| ├ archive/ | 版本归档 | 80 | — | 各版本 changelog/plan/review-findings 等（76 md + 3 py + 1 txt） |
 | ├ plan/ | 中间设计文件 | 5 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -197,7 +197,7 @@ investor-util/
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
 │   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #18）
 │   │   │   ├── downsample.py         #   P1 服务端下采样（日频→周/月聚合）
-│   │   │   ├── llm_content.py        #   LLM 分析结果写入报告
+│   │   │   ├── llm_content.py        #   LLM 分析结果写入报告（块级 HTML 分段 + 事实校验摘要分块着色）
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
 │   │   │   ├── cli_progress.py         #   CLI 进度报告器（CliProgressReporter）

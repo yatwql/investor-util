@@ -60,21 +60,92 @@ def _extract_footer_text(html: str) -> str:
     return ""
 
 
+# 块级结束标签/自闭合 → 换行，保证剥离后的纯文本保留段落/列表结构
+_BLOCK_END_TO_NEWLINE_RE = re.compile(
+    r"(</p>|</li>|</h[1-6]>|</div>|</ul>|</ol>|<br\s*/?>|<hr\s*/?>)",
+    re.IGNORECASE,
+)
+
+
 def _strip_html(text: str) -> str:
-    """移除文本中的 HTML 标签，保留纯文本内容。"""
+    """移除文本中的 HTML 标签，保留纯文本内容。
+
+    块级结束标签（``</p>``、``</li>`` 等）与自闭合块（``<br>``/``<hr>``）
+    先替换为换行，使剥离后的多行块（如 ``<ul>`` 列表、校验摘要明细行）
+    保留段落结构，避免标签间文本粘连成一行；连续换行折叠为单个，
+    消除块级结束标签与既有换行叠加产生的空行。
+    """
     if not text:
         return ""
+    text = _BLOCK_END_TO_NEWLINE_RE.sub("\n", text)
+    text = re.sub(r"\n+", "\n", text)
     return re.sub(r"<[^>]+>", "", text).strip()
+
+
+# 块级 HTML 标签（含自闭合 <br>/<hr>），用于将 LLM 内容分段写入 Excel 单元格
+_BLOCK_TAG_RE = re.compile(
+    r"(<p\b[^>]*>.*?</p>|<li\b[^>]*>.*?</li>|<div\b[^>]*>.*?</div>|"
+    r"<h[1-6]\b[^>]*>.*?</h[1-6]>|<ul\b[^>]*>.*?</ul>|<ol\b[^>]*>.*?</ol>|<br\s*/?>|<hr\s*/?>)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _split_html_blocks(html: str) -> list[str]:
+    """按块级 HTML 元素将内容切分为多个块，供逐块写入 Excel 单元格。
+
+    真实 LLM 内容由 ``markdown_to_html`` 以无换行方式拼接 ``<p>`` 标签，
+    按 ``\\n\\n`` 分段会把整模块坍缩进一个单元格，且 footer、事实校验
+    摘要无法独立成行。本函数以块级标签为切分点；游离文本
+    （如校验摘要尾部的 ``<span>`` 附属行）并入前一块，纯文本输入则回退
+    按 ``\\n\\n`` 分段以兼容历史输入。
+
+    Returns:
+        按出现顺序排列的 HTML 块片段列表（含标签）。
+    """
+    if not html:
+        return []
+    parts = _BLOCK_TAG_RE.split(html)
+    blocks: list[str] = []
+    pending = ""
+    for part in parts:
+        if not part or not part.strip():
+            continue
+        if _BLOCK_TAG_RE.fullmatch(part.strip()):
+            # 块级元素本身：先收拢 pending 游离文本，再入块
+            if pending:
+                blocks.append(pending)
+                pending = ""
+            blocks.append(part.strip())
+        else:
+            # 游离文本：并入前一块（通常为校验摘要的 <span> 附属行），
+            # 与前块以 \n 分隔，避免剥离后粘连成一行导致明细样式丢失。
+            # part 自身换行先 strip，防与前块拼接产生 \n\n 被二次分段。
+            if blocks:
+                sep = "" if blocks[-1].endswith("\n") else "\n"
+                blocks[-1] = blocks[-1] + sep + part.strip()
+            else:
+                pending += part
+    if pending:
+        blocks.append(pending)
+    # 纯文本段（无块级标签）回退按 \n\n 分段，兼容历史输入
+    result: list[str] = []
+    for block in blocks:
+        sub = [seg.strip() for seg in block.split("\n\n") if seg.strip()]
+        result.extend(sub)
+    return result
 
 
 def _calc_row_height(text: str) -> int:
     """根据文本长度估算行高。
 
     按中文字符宽度估算：列宽 _COL_WIDTH 约容纳 _CHARS_PER_LINE 个中文。
+    含 ``\\n`` 的多行块（如 ``<ul>`` 列表剥离后的列表项、摘要明细行）
+    逐行估算宽度并求和，避免行高不足导致内容截断。
     """
     if not text:
         return _ROW_HEIGHT_MIN
-    lines = ceil(len(text) / _CHARS_PER_LINE)
+    width_rows = sum(ceil(len(line) / _CHARS_PER_LINE) for line in text.split("\n"))
+    lines = max(width_rows, 1)
     return max(lines * _ROW_HEIGHT_PER_LINE, _ROW_HEIGHT_MIN)
 
 
@@ -103,6 +174,8 @@ _FACT_CHECK_FAIL_RE = re.compile(r"事实校验：.*提示|^⚠ ")  # 告警：�
 # 事实校验字体（与 HTML 报告的 #4a4 / #a40 对应）
 _FACT_CHECK_PASS_FONT = GREEN_FONT
 _FACT_CHECK_WARN_FONT = Font(color="CC6600", size=11)  # 琥珀色
+# 摘要明细行灰色小字（对应 HTML 中 #888「已修正明细」/ #999「建议提及」行）
+_FACT_CHECK_DETAIL_FONT = Font(color="888888", size=9)
 
 
 def _get_module_key_map(section_order: list[dict] | None = None) -> dict[str, str]:
@@ -141,6 +214,33 @@ def _get_placeholder(title: str, section_order: list[dict] | None = None) -> str
         if reason:
             return "本节内容待生成 — LLM 生成失败"
     return "本节内容待生成 — 请配置 LLM API Key（data/config/llm_key.json）"
+
+
+def _write_fact_check_block(ws: Worksheet, start_row: int, block_text: str) -> int:
+    """写事实校验摘要块：首行绿/琥珀，明细行灰色小字。
+
+    摘要块内部以 ``\\n`` 分隔首行（通过/告警概述）与逐条明细，
+    拆为多行分别着色，避免整块坍缩进一个单元格后明细样式丢失。
+
+    Args:
+        ws: 目标工作表
+        start_row: 起始行号
+        block_text: 摘要块纯文本（含 ``\\n`` 分隔的明细行）
+
+    Returns:
+        写完最后一个明细行后的下一行号。
+    """
+    lines = [ln.strip() for ln in block_text.split("\n") if ln.strip()]
+    is_warn = _FACT_CHECK_FAIL_RE.search(block_text)
+    first_font = _FACT_CHECK_WARN_FONT if is_warn else _FACT_CHECK_PASS_FONT
+    row = start_row
+    for i, line in enumerate(lines):
+        cell = ws.cell(row=row, column=1, value=line)
+        cell.font = first_font if i == 0 else _FACT_CHECK_DETAIL_FONT
+        cell.alignment = _CONTENT_ALIGN
+        ws.row_dimensions[row].height = _calc_row_height(line)
+        row += 1
+    return row
 
 
 def _write_content_sheet(
@@ -182,28 +282,28 @@ def _write_content_sheet(
         # 先提取底部 LLM footer（在剥离 HTML 前进行）
         footer_text = _extract_footer_text(content)
 
-        text = _strip_html(content)
-        # 按双换行分段，过滤空段
-        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        # 按块级 HTML 元素分段（真实内容由 markdown_to_html 无换行拼接 <p> 标签，
+        # 按 "\n\n" 分段会坍缩整模块进一个单元格、footer/摘要无法独立成行）
+        blocks = _split_html_blocks(content)
 
-        # 排除 footer 文本（避免在正文中重复显示底部标识行）
-        if footer_text and paragraphs and paragraphs[-1] == footer_text:
-            paragraphs = paragraphs[:-1]
-
-        for para in paragraphs:
-            cell = ws.cell(row=row, column=1, value=para)
-            # 事实校验摘要行使用特殊字体（绿/琥珀色）以便视觉区分
-            if _FACT_CHECK_PASS_RE.search(para):
-                cell.font = _FACT_CHECK_PASS_FONT
-            elif _FACT_CHECK_FAIL_RE.search(para):
-                cell.font = _FACT_CHECK_WARN_FONT
-            else:
-                cell.font = CONTENT_FONT
+        for block in blocks:
+            block_text = _strip_html(block)
+            if not block_text:
+                continue
+            # footer 块：正文跳过，末尾统一写一次，避免重复
+            if footer_text and block_text == footer_text:
+                continue
+            # 事实校验摘要块：首行绿/琥珀，明细行灰色小字
+            if _FACT_CHECK_PASS_RE.search(block_text) or _FACT_CHECK_FAIL_RE.search(block_text):
+                row = _write_fact_check_block(ws, row, block_text)
+                row += 1  # 摘要块后空行
+                continue
+            # 普通段落
+            cell = ws.cell(row=row, column=1, value=block_text)
+            cell.font = CONTENT_FONT
             cell.alignment = _CONTENT_ALIGN
-            ws.row_dimensions[row].height = _calc_row_height(para)
-            row += 1
-            # 段落间空行
-            row += 1
+            ws.row_dimensions[row].height = _calc_row_height(block_text)
+            row += 2
 
         # 底部 LLM 标识行（从 HTML 中提取，与 HTML 报告格式保持一致）
         if footer_text:
