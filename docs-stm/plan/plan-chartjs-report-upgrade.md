@@ -507,7 +507,7 @@ const chartTheme = {
 | F2 | **默认 True 的兜底** | 默认开启渐进增强；用户可在 `data/config/features.json` 设 `"enable_interactive_charts": false` 一键回退旧 Canvas + 表格渲染（双路径保证，与 §4.7 呼应）。`features.json` 缺失该键 → 用默认 True，不强制新增键 |
 | F3 | **生命周期废弃** | §4.7 定义「稳定 2 版本后删 Canvas」；**补充**：Chart.js 成为唯一渲染器后，同步删除 ① `_FEATURE_FLAGS_DEFAULT` 中 `enable_interactive_charts` 键 ② 分类注释 `3→2 项` ③ `test_feature_interactive.py` 相关用例 ④ 模板 Flag 分支 ⑤ `features.json` 示例键——避免死 flag 残留 |
 | F4 | **注册位置** | `_FEATURE_FLAGS_DEFAULT`「功能特性」分类（现 2 项）→ 新增后 **3 项**（注释计数同步，H1）；非实验功能，不列入 `EXPERIMENTAL_FEATURES` |
-| F5 | **命名规范** | `enable_*` 前缀与 `enable_b_series`/`enable_news`/`enable_history`/`enable_llm` 一致；读取位置统一在 `_report_generation.py` 参数传递（R7 确认） |
+| F5 | **命名规范** | `enable_*` 前缀与 `enable_fund_deep_analysis`/`enable_news`/`enable_history`/`enable_llm` 一致；读取位置统一在 `_report_generation.py` 参数传递（R7 确认） |
 
 **测试**（`test_feature_interactive.py`，`unit_config` marker）：
 - ✅ 默认值为 `True`（`_FEATURE_FLAGS_DEFAULT`）
@@ -680,7 +680,7 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 | `config/features.py` 注册 `enable_interactive_charts: True` + 更新分类注释 `2→3 项` | `config/features.py` | ✅ `is_feature_enabled("enable_interactive_charts")` 默认 True ✅ `features.json` 可覆盖 ✅ 未知 flag 返回 False（已有 `_auto_reset_feature_flags` fixture 自动清理） |
 | `chart_data_builder.py`（完整 6 图骨架 + 净值/回撤数据集 | `chart_data_builder.py` | ✅ 输入 `history_data` → 输出正确 JSON 格式 ✅ ok/degraded/unavailable 三级 ✅ 空/None 输入返回空 dict ✅ **R11**：bars 缺字段/值非数字 → 该图跳过、其余图正常、顶层兜底返回空 dict ✅ **R12**：`history_data=None` 但 `all_metrics` 有值 → radar 仍构建 |
 | 🔴 **高危（R6，一票否决）** `html_writer.py` context 注入 `chart_datasets` + `enable_interactive_charts` + 新增参数支持 | `html_writer.py` | ✅ `write_html_report()` 新增 `chart_datasets: dict \| None = None`、`enable_interactive_charts: bool = False` 参数 ✅ Flag OFF 时 context 不含 chart_datasets ✅ `chart_datasets` 传入后正确进入 render() context ✅ **不新增 `_ENV.globals` 条目** |
-| `_report_generation.py` 整合 metrics 并传入 html_writer + Feature Flag 读取 | `_report_generation.py` | ✅ full 路径（`_generate_full_html_report`）：`prep["risk_metrics"]` + `_metrics` → 合并后调用 `build_chart_datasets()` → `write_html_report(chart_datasets=..., enable_interactive_charts=...)` ✅ both 路径（`_generate_report_both`）：无 `_metrics` → 传入 None，`build_chart_datasets()` 从 `history_data` 提取 3 个基本轴 ✅ Feature Flag 在 `_report_generation.py` 读取：`enable_interactive_charts = is_feature_enabled("enable_interactive_charts")` → 作为参数传入 html_writer（与 `is_enable_b_series(config)`/`is_enable_news(config)` 的既有读取位置一致） ✅ **不跳过 build_chart_datasets()**——纯计算 ~5ms，全量执行，html_writer 靠 Flag 控制 context 注入。⚠ orchestrator.py 不做此整合（它仅按 report_type 分发到 `_generate_report_both`/`_generate_report_full`） |
+| `_report_generation.py` 整合 metrics 并传入 html_writer + Feature Flag 读取 | `_report_generation.py` | ✅ full 路径（`_generate_full_html_report`）：`prep["risk_metrics"]` + `_metrics` → 合并后调用 `build_chart_datasets()` → `write_html_report(chart_datasets=..., enable_interactive_charts=...)` ✅ both 路径（`_generate_report_both`）：无 `_metrics` → 传入 None，`build_chart_datasets()` 从 `history_data` 提取 3 个基本轴 ✅ Feature Flag 在 `_report_generation.py` 读取：`enable_interactive_charts = is_feature_enabled("enable_interactive_charts")` → 作为参数传入 html_writer（与 `is_enable_fund_deep_analysis(config)`/`is_enable_news(config)` 的既有读取位置一致） ✅ **不跳过 build_chart_datasets()**——纯计算 ~5ms，全量执行，html_writer 靠 Flag 控制 context 注入。⚠ orchestrator.py 不做此整合（它仅按 report_type 分发到 `_generate_report_both`/`_generate_report_full`） |
 | `chart-config.js`（CSS 变量 + 颜色常量） | `chart-config.js` | ✅ 所有色值使用 `var(--chart-*)`，无硬编码 ✅ 变量缺失时用备选色值 |
 | `chart-init.js` 加载骨架 + 净值/回撤图初始化函数占位 | `chart-init.js` | ✅ 独立 test HTML 页渲染验证 ✅ chart.min.js 加载失败时 `typeof Chart` 检测跳过初始化 → Canvas 回退 ✅ **S1**：所有 label/tooltip 走 Chart.js 文本渲染，无 `innerHTML` 拼接（R12） ✅ **O1**：每个 init 函数独立 `try/catch`（R13） |
 | 建 `src/static/` 目录 + chart.min.js 入库 + 模板本地 script + Feature Flag 分支 + `data_unavailable` + chart canvas 容器 | `src/static/`、`report_template.html` | ✅ `src/static/` 含 chart.min.js（引擎）+ chart-config.js + chart-init.js ✅ 模板用相对路径 `<script src="chart.min.js">`（无 CDN/integrity/crossorigin）✅ 复制逻辑 `shutil.copy2(PROJECT_ROOT/src/static/*, output_dir)` ✅ Flag OFF → 无 Chart.js script 标签 ✅ `data_unavailable=True` → 显示"暂无数据"横幅 ✅ **A1**：每个 `<canvas>` 含 `aria-label`/`role="img"` + fallback 文本（R10） ✅ 复用 `_render_template` + BeautifulSoup 验证结构 |
@@ -692,7 +692,7 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
    ⚠ 前置：`_build_minimal_render_data()` 需新增 `chart_datasets={}` 和 `enable_interactive_charts=False`，确保现有测试获得安全默认值
 4. ✅ Flag OFF 渲染 → HTML 中无 chart.min.js `<script>`，模板 `<canvas>` 容器尺寸正确
 5. ✅ Flag ON 渲染 → HTML 中包含 `<script id="chart-data">` + `<script src="chart.min.js">` + chart-config.js + chart-init.js；`src/static/` 三文件已复制到输出目录
-6. ✅ Feature Flag 读取位置验证：`_report_generation.py` 使用 `is_feature_enabled()` 读取，作为参数传入 html_writer（与 `_generate_report_both` 中 `is_enable_b_series(config)` 等 config 标志的既有读取位置一致），html_writer 内部不自行读取
+6. ✅ Feature Flag 读取位置验证：`_report_generation.py` 使用 `is_feature_enabled()` 读取，作为参数传入 html_writer（与 `_generate_report_both` 中 `is_enable_fund_deep_analysis(config)` 等 config 标志的既有读取位置一致），html_writer 内部不自行读取
 7. ✅ DegradationTracker 兼容性确认：Chart.js 三级降级（ok/degraded/unavailable）基于 `history_data.status`，与 DegradationTracker 的 T1~T4 数据源降级系统正交，无冲突
 8. 🔴 **高危（R11）**：某 dataset 抛异常 → 仅该图缺失，其余图正常渲染，报告生成不失败
 9. ✅ **R12**：`history_data=None` 但 `all_metrics` 有值 → `datasets["radar"]` 仍存在（全量轴）
@@ -879,7 +879,7 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 | 文件 | 改动类型 | 改动内容 |
 |:-----|:---------|:---------|
 | `src/python/features.py` | 修改 | `_FEATURE_FLAGS_DEFAULT` 新增 `enable_interactive_charts: True` |
-| `src/python/report/_report_generation.py` | 修改 | **write_html_report() 的实际调用方**。`_generate_full_html_report`：合并 `prep["risk_metrics"]`+`_metrics` → `build_chart_datasets()` → 新参数 `chart_datasets`/`enable_interactive_charts` 传入 `write_html_report()`；`_generate_report_both`：`is_feature_enabled("enable_interactive_charts")` 读取 + 参数透传（与 `is_enable_b_series(config)` 读取位置一致） |
+| `src/python/report/_report_generation.py` | 修改 | **write_html_report() 的实际调用方**。`_generate_full_html_report`：合并 `prep["risk_metrics"]`+`_metrics` → `build_chart_datasets()` → 新参数 `chart_datasets`/`enable_interactive_charts` 传入 `write_html_report()`；`_generate_report_both`：`is_feature_enabled("enable_interactive_charts")` 读取 + 参数透传（与 `is_enable_fund_deep_analysis(config)` 读取位置一致） |
 | `src/python/report/orchestrator.py` | **不改** | 仅按 report_type 分发到 `_generate_report_both`/`_generate_report_full`，不涉及 write_html_report() 调用（R1 基线修正：原文档误归于此） |
 | `src/python/report/html_writer.py` | 修改 | 新增 `chart_datasets` + `enable_interactive_charts` 参数 → context 注入 |
 | `src/python/report/chart_data_builder.py` | **新建** | Python 端预处理器，6 张图数据格式转换 |
@@ -927,7 +927,7 @@ Iter 1（基础设施）────→ Iter 2（净值曲线）────→ 
 >   - **R6 修复**：§4.5 `Chart.instances.forEach` → `Object.values(Chart.instances).forEach`
 >   - **R6 新增**：Iter 6 Both 路径雷达图差异文档化（用户可见行为差异）
 > - **v4（R7）**：Feature Flag 读取位置确认（orchestrator 读取 + 参数传递，与 enable_* 一致）；条件预计算（不跳过 build_chart_datasets，纯计算 ~5ms 全量执行）；DegradationTracker 兼容性确认（正交系统无冲突）；`_build_radar_dataset` 新增 `history_data` 三级降级兜底（both 路径 3 个基本轴）；`orchestrator.py` 加入文件清单
-> - **v5（R1）**：基线复盘修正 — 模板行数 1845→1862；`write_html_report()` 实际调用方为 `_report_generation.py`（非 orchestrator），文件清单新增 `_report_generation.py`（修改）并将 orchestrator.py 改为不改；Feature Flag 读取位置修正为 `_report_generation.py`（与 `is_enable_b_series(config)` 既有位置一致）；§2.2 渲染管线图更新调用链
+> - **v5（R1）**：基线复盘修正 — 模板行数 1845→1862；`write_html_report()` 实际调用方为 `_report_generation.py`（非 orchestrator），文件清单新增 `_report_generation.py`（修改）并将 orchestrator.py 改为不改；Feature Flag 读取位置修正为 `_report_generation.py`（与 `is_enable_fund_deep_analysis(config)` 既有位置一致）；§2.2 渲染管线图更新调用链
 > - **v6（R2）**：数据与渲染链路复盘 — §2.1 资产构成聚合键 `code_type`→`property`（代码中无 code_type 字段）；行业分布聚合键明确为 penetration 的 per-asset `sector`；新增 R2 数据契约明细表（history_data.bars/benchmarks/metrics 返回值精确字段名）；§6.6 雷达图空值判断修正（`x or "N/A"` → `x is not None`，避免 0.0 合法值误判）
 > - **v7（R3）**：架构约束核对 — §3.2 不变约束补齐 C9/C17/C18 无关行（实现 19 条全覆盖）；C16 补充 `output_dir` 已 `_absolutize_paths()` 绝对化依据
 > - **v8（R5）**：技术债与降级体系 — 与 risk-analysis.md v11 同步：TD5/TD7 测试组合数合并（12 种）、TD-L3 更新为 JS 外部化已缓解模板膨胀（预估 1950-2050 行）

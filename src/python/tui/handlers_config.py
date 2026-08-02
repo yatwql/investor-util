@@ -440,7 +440,7 @@ def _cmd_config_report_boards() -> None:
     """配置报告可选章节（基金分析 / 市场新闻 / 历史走势）。"""
     from src.python.config import (
         get_config,
-        is_enable_b_series,
+        is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_news,
         set_config,
@@ -448,7 +448,7 @@ def _cmd_config_report_boards() -> None:
 
     while True:
         config = get_config()
-        b_series = is_enable_b_series(config)
+        b_series = is_enable_fund_deep_analysis(config)
         news = is_enable_news(config)
         history = is_enable_history(config)
 
@@ -475,7 +475,7 @@ def _cmd_config_report_boards() -> None:
             break
 
         if choice == "1":
-            set_config("enable_b_series", not b_series)
+            set_config("enable_fund_deep_analysis", not b_series)
             print(f"  {GREEN}[OK]{RESET} 基金深度分析已{'禁用' if b_series else '启用'}")
         elif choice == "2":
             set_config("enable_news", not news)

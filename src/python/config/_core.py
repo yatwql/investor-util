@@ -16,7 +16,13 @@ from src.python.config._llm_defaults import _get_default_llm_settings_template
 from src.python.config._llm_providers_defaults import _get_default_llm_providers_template
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.registry import get_known_llm_settings_keys
-from src.python.config._validation import _absolutize_paths, _deabsolutize_paths, validate_config
+from src.python.config._validation import (
+    _PATH_CONFIG_KEYS,
+    _absolutize_paths,
+    _deabsolutize_paths,
+    _is_abs,
+    validate_config,
+)
 
 # 从 _llm_providers 模块再导出（保持向后兼容，供测试导入）
 from src.python.config._llm_providers import (
@@ -145,10 +151,240 @@ def get_config(_strict: bool = False) -> dict:
             return dict(_config_defaults._DEFAULT_CONFIG)
 
 
-def set_config(key: str, value: Any) -> None:
-    """
-    更新配置项并持久化到文件。
+def _skip_ws_and_comments(text: str, i: int) -> int:
+    """跳过空白、``//`` 行注释、``/* */`` 块注释，返回下一个实质字符索引。"""
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if ch in " \t\r\n":
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+            j = text.find("\n", i)
+            i = n if j == -1 else j + 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            j = text.find("*/", i)
+            i = n if j == -1 else j + 2
+            continue
+        break
+    return i
 
+
+def _find_top_level_value_span(raw: str, key: str) -> tuple[int, int] | None:
+    """定位含注释 JSON 文本中顶层键的 value 区间 (start, end)。
+
+    返回 (value_start, value_end)：value 文本切片为 raw[value_start:value_end]。
+    仅匹配顶层对象（深度 1）成员；字符串内 / 注释内出现的同名片段不误匹配。
+    键不存在时返回 None。
+    """
+    n = len(raw)
+    depth = 0
+    i = 0
+    while i < n:
+        ch = raw[i]
+        if ch == '"':
+            j = i + 1
+            while j < n:
+                if raw[j] == "\\":
+                    j += 2
+                    continue
+                if raw[j] == '"':
+                    j += 1
+                    break
+                j += 1
+            if depth == 1 and json.loads(raw[i:j]) == key:
+                k = _skip_ws_and_comments(raw, j)
+                if k < n and raw[k] == ":":
+                    vs = _skip_ws_and_comments(raw, k + 1)
+                    ve = _find_value_end(raw, vs)
+                    return vs, ve
+            i = j
+            continue
+        if ch in "{[":
+            depth += 1
+            i += 1
+            continue
+        if ch in "}]":
+            depth -= 1
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and raw[i + 1] == "/":
+            j = raw.find("\n", i)
+            i = n if j == -1 else j + 1
+            continue
+        if ch == "/" and i + 1 < n and raw[i + 1] == "*":
+            j = raw.find("*/", i)
+            i = n if j == -1 else j + 2
+            continue
+        i += 1
+    return None
+
+
+def _find_value_end(raw: str, start: int) -> int:
+    """返回 value 的结束索引（不含），value 起始于 start。
+
+    结构值（``{`` / ``[``）：括号匹配到对应闭合。标量值：扫描到逗号或
+    对象/数组闭合符（无尾随逗号场景）。字符串与注释内容不会被误判结束。
+    """
+    n = len(raw)
+    if start >= n:
+        return start
+    if raw[start] in "{[":
+        depth = 0
+        i = start
+        while i < n:
+            ch = raw[i]
+            if ch == '"':
+                j = i + 1
+                while j < n:
+                    if raw[j] == "\\":
+                        j += 2
+                        continue
+                    if raw[j] == '"':
+                        j += 1
+                        break
+                    j += 1
+                i = j
+                continue
+            if ch in "{[":
+                depth += 1
+                i += 1
+                continue
+            if ch in "}]":
+                depth -= 1
+                i += 1
+                if depth == 0:
+                    return i
+                continue
+            if ch == "/" and i + 1 < n and raw[i + 1] == "/":
+                j = raw.find("\n", i)
+                i = n if j == -1 else j + 1
+                continue
+            if ch == "/" and i + 1 < n and raw[i + 1] == "*":
+                j = raw.find("*/", i)
+                i = n if j == -1 else j + 2
+                continue
+            i += 1
+        return n
+    i = start
+    while i < n:
+        ch = raw[i]
+        if ch == '"':
+            j = i + 1
+            while j < n:
+                if raw[j] == "\\":
+                    j += 2
+                    continue
+                if raw[j] == '"':
+                    j += 1
+                    break
+                j += 1
+            i = j
+            continue
+        if ch in ",}]":
+            return i
+        if ch == "/" and i + 1 < n and raw[i + 1] == "/":
+            j = raw.find("\n", i)
+            i = n if j == -1 else j + 1
+            continue
+        if ch == "/" and i + 1 < n and raw[i + 1] == "*":
+            j = raw.find("*/", i)
+            i = n if j == -1 else j + 2
+            continue
+        i += 1
+    return n
+
+
+def _find_top_level_close_brace(raw: str) -> int | None:
+    """返回顶层对象的闭合右花括号索引（键不存在时用于追加新键）。"""
+    n = len(raw)
+    depth = 0
+    i = 0
+    while i < n:
+        ch = raw[i]
+        if ch == '"':
+            j = i + 1
+            while j < n:
+                if raw[j] == "\\":
+                    j += 2
+                    continue
+                if raw[j] == '"':
+                    j += 1
+                    break
+                j += 1
+            i = j
+            continue
+        if ch in "{[":
+            depth += 1
+            i += 1
+            continue
+        if ch in "}]":
+            depth -= 1
+            if ch == "}" and depth == 0:
+                return i
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and raw[i + 1] == "/":
+            j = raw.find("\n", i)
+            i = n if j == -1 else j + 1
+            continue
+        if ch == "/" and i + 1 < n and raw[i + 1] == "*":
+            j = raw.find("*/", i)
+            i = n if j == -1 else j + 2
+            continue
+        i += 1
+    return None
+
+
+def _patch_config_key(raw: str, key: str, new_value_text: str) -> str:
+    """在含注释 JSON 文本中替换或追加顶层键的值，保留注释与其他键。
+
+    键已存在 → 仅替换该键的 value 区间；不存在 → 追加到对象末尾（保持合法）。
+
+    Args:
+        raw: 磁盘原始文本（可含 ``//`` 分组注释与行尾注释）
+        key: 顶层配置键名
+        new_value_text: 新值的 JSON 序列化文本（如 ``"abc"``、``42``、``{...}``）
+
+    Returns:
+        patch 后的完整文本。
+    """
+    span = _find_top_level_value_span(raw, key)
+    if span is not None:
+        start, end = span
+        return raw[:start] + new_value_text + raw[end:]
+    top_close = _find_top_level_close_brace(raw)
+    if top_close is None:
+        raise ValueError(f"config.json 无法定位顶层对象闭合位置，无法插入键 {key!r}")
+    key_text = json.dumps(key, ensure_ascii=False)
+    before = raw[:top_close]
+    if before.rstrip().endswith("{"):
+        # 空对象 { } → 直接写入成员
+        new_raw = before + f"\n  {key_text}: {new_value_text}\n" + raw[top_close:]
+    else:
+        # 顶层最后一个成员后补逗号 + 换行 + 新键（逗号紧跟最后成员闭合符）
+        stripped = before.rstrip()
+        tail = before[len(stripped):]
+        new_raw = stripped + f",\n  {key_text}: {new_value_text}" + tail + raw[top_close:]
+    return new_raw
+
+
+def _patch_value_for_write(key: str, value: Any) -> str:
+    """将 set_config 的目标值序列化为写盘文本（路径键反绝对化）。"""
+    if key in _PATH_CONFIG_KEYS and isinstance(value, str) and _is_abs(value):
+        one = {key: value}
+        _deabsolutize_paths(one)
+        value = one[key]
+    return json.dumps(value, ensure_ascii=False)
+
+
+def set_config(key: str, value: Any) -> None:
+    """更新配置项并持久化到文件。
+
+    写入策略：**基于磁盘原始文本做单键 patch**——仅替换目标键的 value，
+    保留 config.json 的分组注释、行尾注释、其他键与相对路径（不再全量
+    json.dumps 重写，避免剥掉用户可读的注释分组）。键不存在时追加到对象末尾。
     写入后自动失效配置缓存，确保后续 get_config() 读取最新内容。
 
     Args:
@@ -161,20 +397,37 @@ def set_config(key: str, value: Any) -> None:
     # 整个 读-改-写 纳入锁内串行化，避免并发线程基于旧快照覆盖写丢失已有配置项
     # （RLock 可重入，内部 get_config 再次获取同一锁不冲突）
     with _config_lock:
-        config = get_config(_strict=True)
-        config[key] = value
+        # 读取磁盘原始文本（保留注释）；文件不存在/空白 → 用默认模板打底，
+        # 使首次 set_config 创建的文件同样带完整分组注释。
+        raw: str | None = None
+        if os.path.exists(config_path):
+            with open(config_path, encoding="utf-8-sig") as f:
+                raw = f.read()
+        if raw is None or not raw.strip():
+            raw = _config_defaults._get_default_config_template()
 
-        # 写盘用浅拷贝：仅对副本做反绝对化，避免原子写失败时污染 _config_cache
-        # （缓存仍保留 get_config 绝对化后的内存值，且 value 已即时生效）
-        payload = dict(config)
-        # 写盘前将 PROJECT_ROOT 下的绝对路径还原为相对路径，避免本机绝对路径
-        # 落盘导致 config.json 跨机器不可移植（下次 get_config 会重新绝对化）
-        _deabsolutize_paths(payload)
+        # 校验原文件可解析（保持 _strict 语义：损坏则中止，避免基于损坏文件覆盖写）
+        try:
+            json.loads(_comments._strip_json_comments(raw))
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning("config.json 内容损坏，中止写入: %s", e)
+            raise
+
+        # 目标键反绝对化后序列化，单键 patch
+        value_text = _patch_value_for_write(key, value)
+        new_raw = _patch_config_key(raw, key, value_text)
+
+        # 防御：patch 结果必须仍是合法 JSON（定位/插入异常时拒绝落盘坏文件）
+        try:
+            json.loads(_comments._strip_json_comments(new_raw))
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error("config.json 单键 patch 结果非法，拒绝写入: %s", e)
+            raise
 
         config_dir = os.path.dirname(config_path)
         os.makedirs(config_dir, exist_ok=True)
 
-        _atomic_write(config_path, json.dumps(payload, ensure_ascii=False, indent=2))
+        _atomic_write(config_path, new_raw)
 
         _config_cache = None
         _config_mtime = 0
@@ -226,13 +479,13 @@ def init_config(config_path: str | None = None) -> None:
 # ═══════════════════════════════════════════════════════════════
 
 
-def is_enable_b_series(config: dict | None = None) -> bool:
+def is_enable_fund_deep_analysis(config: dict | None = None) -> bool:
     """基金深度分析章节（#6~9）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
-    val = config.get("enable_b_series")
+    val = config.get("enable_fund_deep_analysis")
     if val is None:
-        logger.debug("config.json 缺少 enable_b_series，使用默认值 true")
+        logger.debug("config.json 缺少 enable_fund_deep_analysis，使用默认值 true")
         return True
     return bool(val)
 

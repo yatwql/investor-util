@@ -329,7 +329,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
 
 
 class TestWriteHtmlReportBseriesEmpty(unittest.TestCase):
-    """B 系列模块在 enable_b_series=True 且数据为空时 → section 可见 + 占位文本。"""
+    """B 系列模块在 enable_fund_deep_analysis=True 且数据为空时 → section 可见 + 占位文本。"""
 
     def setUp(self):
         self.holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]

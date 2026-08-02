@@ -46,13 +46,13 @@ def _process_b_module(
 def write_b_series_sheets(
     sheets: dict[str, Any],
     holdings: list,
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     data: dict[str, Any],
     modules: dict[str, Any],
     prog: ProgressReporter,
 ) -> None:
     """写入基金深度分析页签。"""
-    if not enable_b_series:
+    if not enable_fund_deep_analysis:
         return
 
     # ── 基金经理变更监控（独立逻辑，无 fetch_fund_holdings 依赖） ──

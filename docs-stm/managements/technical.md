@@ -266,7 +266,7 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 
 | 层级 | 含义 | 来源 |
 |:-----|:------|:------|
-| board 层 | 用户配置的章节开关 | `config.json`（`enable_b_series`/`enable_news`/`enable_history`） |
+| board 层 | 用户配置的章节开关 | `config.json`（`enable_fund_deep_analysis`/`enable_news`/`enable_history`） |
 | data 层 | 运行时数据可用性 | 各子模块返回值非 None 判定 |
 
 #### 1.4.5 数据降级治理体系
@@ -1197,7 +1197,7 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 ```python
 board_flags = {
     "always":   True,
-    "b_series": enable_b_series,
+    "b_series": enable_fund_deep_analysis,
     "news":     enable_news,
     "history":  enable_history,
     "llm":      enable_llm,
@@ -1476,12 +1476,12 @@ prune()：两阶段自动清理
 
 ### 4.8 基金深度分析
 
-基金深度分析 4 个模块通过 `enable_b_series` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
+基金深度分析 4 个模块通过 `enable_fund_deep_analysis` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
 
 ```
                     基金深度分析模块架构
                          │
-           enable_b_series = True?
+           enable_fund_deep_analysis = True?
                          │
               ┌──────────┴──────────┐
               │                     │

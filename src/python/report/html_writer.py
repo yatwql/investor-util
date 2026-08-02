@@ -87,7 +87,7 @@ def _compute_section_visibility(
     llm_enabled_flag: bool,
     # ↓↓↓ board 层新增参数 ↓↓↓
     enable_news: bool = True,  # board 层：市场新闻是否开启（配置驱动，不是 include_news！）
-    enable_b_series: bool = True,  # board 层：基金深度分析是否开启
+    enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
@@ -102,7 +102,7 @@ def _compute_section_visibility(
     # board 层：内联 dict（与 Excel 端结构一致）
     board_flags: dict[str, bool] = {
         "always": True,
-        "b_series": enable_b_series,
+        "b_series": enable_fund_deep_analysis,
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "llm": enable_llm,  # ← board 层
@@ -351,7 +351,7 @@ def write_html_report(
     history_data: dict | None = None,
     a_indices: dict | None = None,
     us_indices: dict | None = None,
-    enable_b_series: bool = True,
+    enable_fund_deep_analysis: bool = True,
     enable_news: bool = True,
     enable_history: bool = True,
     debate_info: dict | None = None,
@@ -430,16 +430,16 @@ def write_html_report(
             logger.warning("[chart] penetration_bar 数据补齐失败，保留原数据集", exc_info=True)
 
     # ── 13) 基金经理变更监控 ──
-    manager_analysis = _render_manager_analysis(holdings, enable_b_series, prog)
+    manager_analysis = _render_manager_analysis(holdings, enable_fund_deep_analysis, prog)
 
     # ── 14) 持仓重合度矩阵 ──
-    overlap_matrix = _render_overlap_matrix(holdings, details, enable_b_series, prog)
+    overlap_matrix = _render_overlap_matrix(holdings, details, enable_fund_deep_analysis, prog)
 
     # ── 15) 持仓集中度监控 ──
-    concentration_analysis = _render_concentration(holdings, enable_b_series, prog)
+    concentration_analysis = _render_concentration(holdings, enable_fund_deep_analysis, prog)
 
     # ── 16) 基金风格分析 ──
-    style_analysis = _render_style_analysis(holdings, enable_b_series, prog)
+    style_analysis = _render_style_analysis(holdings, enable_fund_deep_analysis, prog)
 
     # ── 8) 财经新闻 ──
     news_data, _news_llm_meta = _render_news_section(
@@ -496,7 +496,7 @@ def write_html_report(
         include_news,
         llm_enabled_flag,
         enable_news=enable_news,
-        enable_b_series=enable_b_series,
+        enable_fund_deep_analysis=enable_fund_deep_analysis,
         enable_history=enable_history,
         enable_llm=enable_llm,  # enable_llm is the board param for LLM
     )

@@ -292,12 +292,12 @@ class TestValidateEnableBoards(unittest.TestCase):
 
     def test_valid_bools_no_issue(self):
         """有效布尔值 → 正常。"""
-        n = val._validate_enable_boards({"enable_b_series": True, "enable_news": False}, 0)
+        n = val._validate_enable_boards({"enable_fund_deep_analysis": True, "enable_news": False}, 0)
         self.assertEqual(n, 0)
 
     def test_non_bool_warns(self):
         """非布尔值 → 告警。"""
-        n = val._validate_enable_boards({"enable_b_series": "yes"}, 0)
+        n = val._validate_enable_boards({"enable_fund_deep_analysis": "yes"}, 0)
         self.assertEqual(n, 1)
 
 

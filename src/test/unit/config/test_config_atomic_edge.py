@@ -20,6 +20,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 import pytest
 
+from src.python.config import _comments
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config, pytest.mark.edge]
 
 
@@ -156,7 +158,7 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
 
         # 原文件应仍为旧值
         with open(self.config_path, "r", encoding="utf-8") as f:
-            content = json.load(f)
+            content = json.loads(_comments._strip_json_comments(f.read()))
         self.assertEqual(content.get("key_a"), "value_a")
         self.assertEqual(content.get("key_b"), "value_b")
         self.assertEqual(replace_attempts[0], 1)

@@ -235,7 +235,7 @@ def _generate_full_html_report(
     news_ok: bool,
     history_data: dict | None,
     reporter: ProgressReporter,
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     enable_news: bool,
     enable_history: bool,
     enable_llm: bool,
@@ -277,7 +277,7 @@ def _generate_full_html_report(
             progress=reporter,
             a_indices=prep["a_indices"],
             us_indices=prep["us_indices"],
-            enable_b_series=enable_b_series,
+            enable_fund_deep_analysis=enable_fund_deep_analysis,
             enable_news=enable_news,
             enable_history=enable_history,
             enable_llm=enable_llm,
@@ -309,7 +309,7 @@ def _generate_full_excel_report(
     pipeline_data: dict | None,
     history_data: dict | None,
     reporter: ProgressReporter,
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     enable_news: bool,
     enable_history: bool,
     enable_llm: bool,
@@ -337,7 +337,7 @@ def _generate_full_excel_report(
             progress=reporter,
             pipeline_data=pipeline_data,
             history_data=history_data,
-            enable_b_series=enable_b_series,
+            enable_fund_deep_analysis=enable_fund_deep_analysis,
             enable_news=enable_news,
             enable_history=enable_history,
             enable_llm=enable_llm,
@@ -367,7 +367,7 @@ def _generate_report_both(
     流程：_compute_details() → capture_snapshot() → fetch_history_data()
           → write_html_report() → generate_excel_report()
     """
-    from src.python.config import is_enable_b_series, is_enable_history, is_enable_news
+    from src.python.config import is_enable_fund_deep_analysis, is_enable_history, is_enable_news
     from src.python.config.features import is_feature_enabled
     from src.python.core.perf import PerfCollector
     from src.python.core.registry import get_report_section_order
@@ -383,7 +383,7 @@ def _generate_report_both(
     # 后台启动健康检查（与数据获取并行）
     _health_fut = _spawn_health_checks(holdings)
 
-    _enable_b_series = is_enable_b_series(config)
+    _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
@@ -436,7 +436,7 @@ def _generate_report_both(
             section_order=sec_order,
             history_data=history_data,
             progress=reporter,
-            enable_b_series=_enable_b_series,
+            enable_fund_deep_analysis=_enable_fund_deep_analysis,
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=False,
@@ -465,7 +465,7 @@ def _generate_report_both(
             pipeline_data=pipeline_data,
             history_data=history_data,
             progress=reporter,
-            enable_b_series=_enable_b_series,
+            enable_fund_deep_analysis=_enable_fund_deep_analysis,
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=False,
@@ -546,7 +546,7 @@ def _generate_report_full(
           → get_sector_fund_flow() → _fetch_llm_and_news()
           → write_html_report() → generate_excel_report()
     """
-    from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
+    from src.python.config import is_enable_fund_deep_analysis, is_enable_history, is_enable_llm, is_enable_news
     from src.python.config.features import is_feature_enabled
     from src.python.fetcher.akshare import get_sector_fund_flow
     from src.python.core.perf import PerfCollector
@@ -560,7 +560,7 @@ def _generate_report_full(
     result.holdings_ok = True
     _health_fut = _spawn_health_checks(holdings)
 
-    _enable_b_series = is_enable_b_series(config)
+    _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_llm = is_enable_llm(config)
@@ -638,7 +638,7 @@ def _generate_report_full(
         news_ok,
         history_data,
         reporter,
-        _enable_b_series,
+        _enable_fund_deep_analysis,
         _enable_news,
         _enable_history,
         _enable_llm,
@@ -660,7 +660,7 @@ def _generate_report_full(
         pipeline_data,
         history_data,
         reporter,
-        _enable_b_series,
+        _enable_fund_deep_analysis,
         _enable_news,
         _enable_history,
         _enable_llm,

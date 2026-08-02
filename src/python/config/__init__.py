@@ -67,7 +67,7 @@ from src.python.config._core import (
     get_llm_settings_path,
     init_config,
     # 章节可见性
-    is_enable_b_series,
+    is_enable_fund_deep_analysis,
     is_enable_history,
     is_enable_llm,
     is_enable_news,
@@ -107,7 +107,7 @@ __all__ = [
     "_KNOWN_PROVIDER_NAMES",
     "_STRING_CONFIG_KEYS",
     # 章节可见性
-    "is_enable_b_series",
+    "is_enable_fund_deep_analysis",
     "is_enable_news",
     "is_enable_history",
     "is_enable_llm",

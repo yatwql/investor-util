@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
 from collections.abc import Callable
 from typing import Any
@@ -69,12 +70,20 @@ __all__ = [
 _last_llm_failure_reason: str | None = None
 """最近一次 LLM API 调用失败的详细原因（FAIL_REASON_* 常量），成功调用后为 None。"""
 
-_last_thinking_exhausted: bool = False
-"""最近一次响应提取是否因"思考部分耗尽 max_tokens 预算"而无正文（DeepSeek 强制推理模型）。
+# 思考耗尽标志使用线程局部存储：LLM 生成在 ThreadPoolExecutor(llm_max_concurrency=3)
+# 下并发执行（generators_orchestrator），若用模块级全局会被其他线程 _extract_content 的
+# 无条件复位踩踏，导致 call_claude"关闭 thinking 重试"安全网静默失效。
+_thinking_exhausted_local = threading.local()
+"""线程局部的思考耗尽标志。
 
 仅由 _extract_content 设置：`stop_reason == "max_tokens"` 且无任何 text block 时为 True，
 其余路径复位为 False。供 call_claude 判断是否可用"关闭 thinking 重试"安全网兜底。
 """
+
+
+def _set_last_thinking_exhausted(value: bool) -> None:
+    """设置当前线程的思考耗尽标志。"""
+    _thinking_exhausted_local.last = value
 
 
 def clear_last_llm_failure() -> None:
@@ -84,14 +93,16 @@ def clear_last_llm_failure() -> None:
 
 
 def _get_last_thinking_exhausted() -> bool:
-    """返回最近一次响应提取是否因思考耗尽而空内容。"""
-    return _last_thinking_exhausted
+    """返回当前线程最近一次响应提取是否因思考耗尽而空内容。"""
+    return getattr(_thinking_exhausted_local, "last", False)
 
 
 def clear_last_thinking_exhausted() -> None:
-    """清除思考耗尽标志（重试前复位）。"""
-    global _last_thinking_exhausted
-    _last_thinking_exhausted = False
+    """清除当前线程的思考耗尽标志（重试前复位）。"""
+    try:
+        del _thinking_exhausted_local.last
+    except AttributeError:
+        pass
 
 
 def _get_last_llm_failure() -> str | None:
@@ -286,8 +297,7 @@ def _extract_content(data: dict) -> str | None:
         str: 提取的文本内容
         None: 响应格式异常或内容被过滤
     """
-    global _last_thinking_exhausted
-    _last_thinking_exhausted = False  # 每次提取前复位，仅 max_tokens 无正文分支置 True
+    _set_last_thinking_exhausted(False)  # 每次提取前复位（当前线程），仅 max_tokens 无正文分支置 True
     # API 返回了错误信息
     if data and "error" in data:
         logger.warning("LLM API 返回错误: %s", data["error"])
@@ -321,7 +331,7 @@ def _extract_content(data: dict) -> str | None:
         #      返回 None 触发 provider 切换而非无效重试。
         #   2) 其他 → 内容可能被过滤拦截，同样视为无可用文本，返回 None。
         if data.get("stop_reason") == "max_tokens":
-            _last_thinking_exhausted = True
+            _set_last_thinking_exhausted(True)
             logger.warning(
                 "LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本"
                 "（建议增大对应 max_tokens 配置或降低 reasoning_effort）"

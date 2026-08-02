@@ -181,14 +181,14 @@
 ### 可见性规则总览
 
 两层可见性模型：
-- **board 层**：用户配置的章节开关（`enable_b_series`/`enable_news`/`enable_history`/`enabled_llm`），关闭则整个类型的章节完全隐藏
+- **board 层**：用户配置的章节开关（`enable_fund_deep_analysis`/`enable_news`/`enable_history`/`enabled_llm`），关闭则整个类型的章节完全隐藏
 - **data 层**：运行时数据可用性，某模块数据不可用时仅隐藏该模块自身
 - 两层 AND 关系：board 层关闭 → 隐藏全部；board 层开启但 data 层不可用 → 仅隐藏该模块
 
 | type | board 层控制 | data 层条件 | 菜单来源 |
 |:-----|:------------|:------------|:---------|
 | `always` | 无条件 | 无 | E / B / L |
-| `b_series` | `enable_b_series` | 有基金持仓数据 | B / L |
+| `b_series` | `enable_fund_deep_analysis` | 有基金持仓数据 | B / L |
 | `news` | `enable_news` | 新闻获取成功 | B / L |
 | `llm` | `enabled_llm`（任一报告模块启用） | LLM 内容生成成功 | L |
 | `history` | `enable_history` | 历史走势数据可用（不可用时占位） | B / L |

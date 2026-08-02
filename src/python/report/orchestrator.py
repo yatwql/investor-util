@@ -37,10 +37,10 @@ class ReportResult:
 
 def _read_section_flags(config: dict) -> dict:
     """从 config 读取章节可见性开关，返回统一字典。"""
-    from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
+    from src.python.config import is_enable_fund_deep_analysis, is_enable_history, is_enable_llm, is_enable_news
 
     return {
-        "b_series": is_enable_b_series(config),
+        "b_series": is_enable_fund_deep_analysis(config),
         "news": is_enable_news(config),
         "history": is_enable_history(config),
         "llm": is_enable_llm(config),

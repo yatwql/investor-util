@@ -811,7 +811,7 @@
 | `risk_free_rate` | float/null | null | — | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74） |
 | `report_section_order` | dict | 空 | — | 报告模块序号自定义 |
 | `anonymization.mode` | str | `"off"` | ✅ A | 匿名化模式：`off` / `code_display` / `full_anonymous` / `summary` |
-| `enable_b_series` | bool | true | ✅ P | 基金深度分析启停 |
+| `enable_fund_deep_analysis` | bool | true | ✅ P | 基金深度分析启停 |
 | `enable_news` | bool | true | ✅ P | 市场新闻启停 |
 | `enable_history` | bool | true | ✅ P | 历史走势启停 |
 | `market_hour_aware` | list | `["price","index"]` | — | 交易时段短 TTL 的数据类型 |

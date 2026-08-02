@@ -50,7 +50,7 @@
 ¹ 基金深度分析：基金经理变更监控、持仓重合度矩阵、持仓集中度监控、基金风格分析，共 4 个页签。
 ² 组合历史走势 + 回撤分析依赖 `history.analysis` 配置（`"prompt"` 或 `"auto"` 时可用，`"off"` 时显示占位文本）。
 ³ 累计收益率从 ≥80% 持仓覆盖的日期起算，避免 QDII/债券基金数据起点较晚导致组合早期市值偏低、收益率虚高的问题。
-⁴ ☆ 表示受章节可见性配置控制：基金深度分析的 `enable_b_series`、新闻的 `enable_news`、历史走势的 `enable_history`（均在 `config.json`）和 LLM 的 `enabled_llm`（在 `llm_settings.json`）。详见[配置指南](how-to-config.md#b-报告章节可见性)。
+⁴ ☆ 表示受章节可见性配置控制：基金深度分析的 `enable_fund_deep_analysis`、新闻的 `enable_news`、历史走势的 `enable_history`（均在 `config.json`）和 LLM 的 `enabled_llm`（在 `llm_settings.json`）。详见[配置指南](how-to-config.md#b-报告章节可见性)。
 
 ---
 

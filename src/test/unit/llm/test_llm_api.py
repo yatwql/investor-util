@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import threading
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -21,6 +22,10 @@ import pytest
 from src.python.llm.api import (
     call_claude,
     call_llm,
+)
+from src.python.llm.api_base import (
+    _extract_content,
+    _get_last_thinking_exhausted,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
@@ -272,6 +277,41 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         self.assertIsNone(result)
         self.assertEqual(mock_retry.call_count, 1)
         mock_clear.assert_not_called()
+
+    def test_thinking_exhausted_flag_thread_local_isolation(self) -> None:
+        """并发线程 _extract_content 不清除本线程思考耗尽标志（thread-local 隔离）。
+
+        LLM 生成在 ThreadPoolExecutor(llm_max_concurrency=3) 下并发执行（多个模块
+        并行）。思考耗尽标志存储于线程局部存储：其他线程 _extract_content 开头的
+        无条件复位不会清除本线程已置位的标志，call_claude"关闭 thinking 重试"安全网
+        可靠触发，provider 不会因并发线程的提取而误标 api_error。
+        """
+        exhausted_data = {
+            "content": [{"type": "thinking", "thinking": "思考内容"}],  # 仅 thinking block
+            "stop_reason": "max_tokens",
+            "usage": {"input_tokens": 10, "output_tokens": 20000},
+        }
+        normal_data = {
+            "content": [{"type": "text", "text": "ok"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 5, "output_tokens": 10},
+        }
+        # 主线程提取思考耗尽响应 → 置位本线程标志
+        self.assertIsNone(_extract_content(exhausted_data))
+        self.assertTrue(_get_last_thinking_exhausted())
+
+        # 并发线程提取普通响应（旧全局实现会复位共享标志 → 本断言回归失败）
+        def _worker() -> None:
+            _extract_content(normal_data)
+
+        t = threading.Thread(target=_worker)
+        t.start()
+        t.join()
+        self.assertTrue(_get_last_thinking_exhausted(), "并发线程不应清除本线程思考耗尽标志")
+
+        # 本线程内后续提取仍正常复位（thread-local 保留原语义）
+        _extract_content(normal_data)
+        self.assertFalse(_get_last_thinking_exhausted())
 
 
 # ═══════════════════════════════════════════════════════════════

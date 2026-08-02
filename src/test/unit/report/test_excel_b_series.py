@@ -29,13 +29,13 @@ class TestExcelBSeries:
         assert len(result) == 2
 
     def test_write_b_series_disabled(self):
-        """enable_b_series=False → 不写入任何内容（返回 None）。"""
+        """enable_fund_deep_analysis=False → 不写入任何内容（返回 None）。"""
         from src.python.report.excel_b_series import write_b_series_sheets
 
         result = write_b_series_sheets(
             sheets={},
             holdings=[],
-            enable_b_series=False,
+            enable_fund_deep_analysis=False,
             data={},
             modules={},
             prog=type("_P", (), {"info": lambda s, m: None, "ok": lambda s, m: None, "add_error": lambda s, m: None})(),

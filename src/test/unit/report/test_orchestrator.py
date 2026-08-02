@@ -48,7 +48,7 @@ class TestReadSectionFlags:
 
     def test_all_enabled(self):
         with (
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=True),
@@ -58,7 +58,7 @@ class TestReadSectionFlags:
 
     def test_all_disabled(self):
         with (
-            patch("src.python.config.is_enable_b_series", return_value=False),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=False),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
             patch("src.python.config.is_enable_llm", return_value=False),
@@ -68,7 +68,7 @@ class TestReadSectionFlags:
 
     def test_partial_flags(self):
         with (
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=False),
@@ -264,7 +264,7 @@ class TestGenerateReport:
             patch("src.python.report.html_writer.write_html_report") as mock_html,
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.core.registry.get_report_section_order", return_value=[]),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
         ):
@@ -309,7 +309,7 @@ class TestGenerateReport:
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
         ):
@@ -338,7 +338,7 @@ class TestGenerateReport:
             patch("src.python.report.html_writer.write_html_report"),
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
             # 使用 wrapt 确保 prepare_report_data 不被调用
@@ -368,7 +368,7 @@ class TestGenerateReport:
             ),
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.core.registry.get_report_section_order"),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
         ):
@@ -403,7 +403,7 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.core.registry.get_report_section_order", return_value=[]),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=[]),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=True),
@@ -454,7 +454,7 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=False),
@@ -491,7 +491,7 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=True),
@@ -529,7 +529,7 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order"),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=False),
@@ -567,7 +567,7 @@ class TestGenerateReport:
             patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
             patch("src.python.core.registry.get_report_section_order"),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=None),
-            patch("src.python.config.is_enable_b_series", return_value=True),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
             patch("src.python.config.is_enable_llm", return_value=False),

@@ -257,7 +257,7 @@ def _render_fund_performance_section(
 
 def _render_manager_analysis(
     holdings: list[Holding],
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     prog: ProgressReporter,
 ) -> dict | None:
     """构建基金经理变更监控数据。
@@ -265,7 +265,7 @@ def _render_manager_analysis(
     Returns:
         {results: [...], first_check_summary: str | None} 或 None（不启用时）
     """
-    if not enable_b_series:
+    if not enable_fund_deep_analysis:
         return None
     prog.info("正在分析基金经理变更...")
     try:
@@ -283,7 +283,7 @@ def _render_manager_analysis(
 def _render_overlap_matrix(
     holdings: list[Holding],
     details: list,
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     prog: ProgressReporter,
 ) -> dict | None:
     """构建持仓重合度矩阵数据。
@@ -291,7 +291,7 @@ def _render_overlap_matrix(
     Returns:
         compute_overlap_matrix() 的结果字典，或 None（不启用时）
     """
-    if not enable_b_series:
+    if not enable_fund_deep_analysis:
         return None
     prog.info("正在计算持仓重合度矩阵...")
     try:
@@ -326,7 +326,7 @@ def _render_overlap_matrix(
 
 def _render_concentration(
     holdings: list[Holding],
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     prog: ProgressReporter,
 ) -> dict | None:
     """构建持仓集中度监控数据。
@@ -334,7 +334,7 @@ def _render_concentration(
     Returns:
         {results: [...], ...} 或 None（不启用时）
     """
-    if not enable_b_series:
+    if not enable_fund_deep_analysis:
         return None
     prog.info("正在计算持仓集中度...")
     try:
@@ -359,7 +359,7 @@ def _render_concentration(
 
 def _render_style_analysis(
     holdings: list[Holding],
-    enable_b_series: bool,
+    enable_fund_deep_analysis: bool,
     prog: ProgressReporter,
 ) -> dict | None:
     """构建基金风格分析数据。
@@ -367,7 +367,7 @@ def _render_style_analysis(
     Returns:
         {results: [...], ...} 或 None（不启用时）
     """
-    if not enable_b_series:
+    if not enable_fund_deep_analysis:
         return None
     prog.info("正在分析基金风格漂移...")
     try:
