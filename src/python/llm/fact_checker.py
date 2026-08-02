@@ -792,15 +792,27 @@ def run_fact_check(
     if skip_ranking_check:
         rank_issues, rank_checked, rank_passed = [], 0, 0
     else:
-        rank_issues, rank_checked, rank_passed = check_ranking_correctness(text, holdings_details, is_penetration_module)
+        rank_issues, rank_checked, rank_passed = check_ranking_correctness(
+            text, holdings_details, is_penetration_module
+        )
     all_issues.extend(rank_issues)
     total_checks += rank_checked
     total_passed += rank_passed
 
     # ── 自动修正 ──
     corrected_html = html_content
+    correction_lines = ""
     if auto_correct and all_corrections:
         corrected_html = apply_numerical_corrections(html_content, all_corrections)
+        # 修正明细：日志记录 + HTML 摘要灰色行（供用户直接查看具体修正了什么）
+        _corr_detail = "; ".join(f"{w}%→{c}%（{_sentence_snippet(s)}）" for w, c, s in all_corrections)
+        logger.info(
+            "[%s] 事实校验自动修正 %d 处数值: %s",
+            module_label or "LLM",
+            len(all_corrections),
+            _corr_detail,
+        )
+        correction_lines = f'\n<span style="color:#888;font-size:11px">已修正明细: {_corr_detail}</span>'
 
     if total_checks == 0:
         return corrected_html, ""
@@ -821,7 +833,7 @@ def run_fact_check(
         result = f'<p style="color:#4a4;font-size:12px">{summary}</p>'
         if suggestion_lines:
             result += suggestion_lines
-        return corrected_html, result
+        return corrected_html, result + correction_lines
 
     # 存在不一致 — 黄色告警摘要（若已修正则标注修正条数，已修正项不重复列出）
     corrected_values = {c[0] for c in all_corrections} if auto_correct else set()
@@ -837,4 +849,4 @@ def run_fact_check(
         summary += "\n".join(detail_lines)
     else:
         summary = f"{tag}✓ 事实校验通过：{total_passed}/{total_checks} 项检查全部通过{auto_msg}"
-    return corrected_html, f'<p style="color:#a40;font-size:12px">{summary}</p>{suggestion_lines}'
+    return corrected_html, f'<p style="color:#a40;font-size:12px">{summary}</p>{suggestion_lines}{correction_lines}'
