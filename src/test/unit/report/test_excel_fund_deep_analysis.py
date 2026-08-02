@@ -12,7 +12,7 @@ class TestExcelBSeries:
 
     def test_process_b_module_signature(self):
         """_process_b_module 可调用并返回 (list, dict) 元组。"""
-        from src.python.report.excel_b_series import _process_b_module
+        from src.python.report.excel_fund_deep_analysis import _process_b_module
 
         class _MockHolding:
             def __init__(self, code: str = "000001"):
@@ -21,7 +21,8 @@ class TestExcelBSeries:
                 self.account = "主账户"
 
         class _MockProgress:
-            def info(self, msg): pass
+            def info(self, msg):
+                pass
 
         holdings = [_MockHolding("600519")]
         result = _process_b_module(holdings, lambda h: h, _MockProgress())
@@ -30,7 +31,7 @@ class TestExcelBSeries:
 
     def test_write_b_series_disabled(self):
         """enable_fund_deep_analysis=False → 不写入任何内容（返回 None）。"""
-        from src.python.report.excel_b_series import write_b_series_sheets
+        from src.python.report.excel_fund_deep_analysis import write_b_series_sheets
 
         result = write_b_series_sheets(
             sheets={},

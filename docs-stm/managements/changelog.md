@@ -6,6 +6,11 @@
 
 ## [0.9.5-dev] - 2026-08-01
 
+### Added
+
+- **plan-7：因子暴露分析（MVP 3 因子：价值/成长/质量）** — 组合风格画像：`analysis/factor_exposure.py` 纯计算层（时间序列 OLS 回归，`numpy.linalg.lstsq` + 复用 `_math_utils._t_critical_95`，statsmodels 未装故不依赖）；因子代理指数 `FACTOR_INDICES`（value=sh000919 300价值、growth=sh000925 500成长替代停更的 sh000920、quality=sh000930 300质量），**不注册 `_A_INDICES`（C1：避免污染实时行情循环 fetch_indices）**；组合 R_p 按 as-if 口径（当前份额 × 历史价格 + LOCF，与 `portfolio_history` 一致）；对齐策略（组合 ffill+dropna、因子 inner join、基准 left join、有效样本 <36 判数据不足）；停更因子剔除（`FACTOR_STALE_DAYS=120`，剔除后剩余因子 <2 判数据不足）；C19 契约 13 键（available/status/betas/t_stats/significant/style_allocation/baseline_betas/factor_correlations/correlation_note/alpha/window/sample_count/stale_factors）；§1.4.5 双重降级（数据不足 insufficient / 数据源故障 source_failed）；编排 `report/orchestrator.py::compute_factor_exposure_data` 并行拉持仓历史 → 注入 `pipeline_data["factor_exposure"]`；HTML MODULE 17 风格归属柱状图（方案 A 自绘 CSS 宽度条）+ Excel `factor_exposure_sheet.py` 页签；`excel_module_loader.py` C7 注册带 ImportError 兜底；双层可见性（board_flags `enable_fund_deep_analysis` 门控 + data_flags `factor_exposure_data` 数据可用）。测试：单元 11 例（`test_factor_exposure.py`，OLS 已知解/共线性诊断/样本下限/停更剔除/as-if 收益/LOCF）+ 场景 5 例（`test_pipeline_factor_exposure.py`，C19 契约/全因子失败 source_failed/空持仓 insufficient/管线注入）
+- **`excel_b_series.py` → `excel_fund_deep_analysis.py` 文件重命名** — 文件名与对应测试文件名 `test_excel_b_series.py` → `test_excel_fund_deep_analysis.py`（`git mv` 保留历史），模块路径 import 同步（`excel_generator.py`、测试文件）；rf-125 仅保留内部模块分组类型标识（`"b_series"` dict key、`write_b_series_sheets` 函数名）原样，**文件名层面用户要求统一为 `fund_deep_analysis` 语义**；活动文档同步（folders.md/test-coverage.md），archive 历史引用不追溯重命名
+
 ### Fix
 
 - **fact-check：缓存命中模块误报"最大持仓"排名翻转（rf-138）** — [智囊团深度复盘]/[持仓体检报告] 反复出现"声称 X 为最大持仓，但实际最大持仓为 040046"误报（600900/011506/561910 被反复标记）。根因：`generators_orchestrator.py` fact_check 循环已提取缓存标志（`gm_c/er_c/hc_c/pd_c`）但**未使用**——对**缓存命中**的 LLM 内容仍用**当前**持仓市值校验排名。缓存内容基于生成时的价格快照（011506/040046 市值仅差 ~1,800 元约 5%），价格变动即排名翻转 → 用当前排名校验旧快照内容必然误报。修复：`run_fact_check` 新增 `skip_ranking_check` 参数；orchestrator fact_check 循环改为带 cached 标志的列表，缓存命中模块传 `skip_ranking_check=True` 跳过排名校验（数值/品种校验保留，缓存内容的数值自动修正仍生效），与注释"仅检查非缓存且非空的模块"意图一致

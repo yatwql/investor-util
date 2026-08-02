@@ -534,10 +534,18 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
     {"key": "portfolio_history", "name": "组合历史走势", "number": 15, "type": "history", "data_flag": None},
     {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16, "type": "history", "data_flag": None},
+    # ── b_series 类型（有数据才显示；序号 17 与 data_source_status/llm_usage 顺延） ──
+    {
+        "key": "factor_exposure",
+        "name": "因子暴露分析",
+        "number": 17,
+        "type": "b_series",
+        "data_flag": "factor_exposure_data",
+    },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 17, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always", "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 18, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 

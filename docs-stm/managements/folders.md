@@ -102,6 +102,7 @@ investor-util/
 │   │   │   ├── alignment_correction.py        #   口径修正因子计算（估值偏差校准）
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
+│   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
@@ -153,7 +154,7 @@ investor-util/
 │   │   │   ├── excel_content_sheets.py #  Excel 内容页签（持仓明细/汇总）
 │   │   │   ├── excel_market_data.py  #   Excel 行情数据页签
 │   │   │   ├── excel_news_warning.py #   Excel 新闻页签
-│   │   │   ├── excel_b_series.py     #   Excel 基金深度分析页签
+│   │   │   ├── excel_fund_deep_analysis.py  #   Excel 基金深度分析页签（B 系列：经理/重合度/集中度/风格/因子暴露）
 │   │   │   ├── excel_llm_usage.py    #   Excel LLM 用量统计页签
 │   │   │   ├── excel_writer.py       #   Excel 底层写入器（openpyxl 封装）
 │   │   │   ├── _debate_utils.py      #   辩论模式检测工具函数（共享 html/excel）
@@ -180,6 +181,7 @@ investor-util/
 │   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
+│   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
@@ -271,7 +273,8 @@ investor-util/
 │       │   │   ├── test_rebalance_edge.py     #   再平衡边缘场景
 │       │   │   ├── test_scenario_analysis.py       #   情景分析测试
 │       │   │   ├── test_alignment_correction.py #   口径修正因子计算
-│       │   │   └── test_drawdown_warning.py   #   回撤历史分位预警
+│       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
+│       │   │   └── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_config.py            #   配置管理核心测试
@@ -394,7 +397,7 @@ investor-util/
 │       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵测试
 │       │   │   ├── test_data_status.py            #   数据状态测试
 │       │   │   ├── test_downsample.py             #   P1 服务端下采样测试（§4.9）
-│       │   │   ├── test_excel_b_series.py          #   Excel B 系列页签测试
+│       │   │   ├── test_excel_fund_deep_analysis.py  #   Excel 基金深度分析页签测试
 │       │   │   ├── test_excel_format_edge.py      #   Excel 格式边缘场景
 │       │   │   ├── test_excel_generator.py        #   Excel 生成测试
 │       │   │   ├── test_excel_generator_edge.py   #   Excel 生成边缘场景
@@ -462,7 +465,8 @@ investor-util/
 │       │   │   ├── test_scenario_penetration_advanced.py #   穿透分析高级场景
 │       │   │   ├── test_scenario_penetration_mixed.py   #   穿透分析混合场景
 │       │   │   ├── test_scenario_penetration_edge.py    #   穿透分析边缘场景
-│       │   │   └── test_scenario_special_securities.py # 特殊证券场景测试
+│       │   │   ├── test_scenario_special_securities.py # 特殊证券场景测试
+│       │   │   └── test_pipeline_factor_exposure.py     #   因子暴露管线场景测试
 │       │   ├── datetime/            #   日期时间场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   └── test_datetime_scenarios.py #   日期时间场景测试

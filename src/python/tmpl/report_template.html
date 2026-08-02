@@ -1263,6 +1263,94 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
     {% endif %}
 
+    {% if section_visible("factor_exposure") %}
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 17: 因子暴露分析                              -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-factor_exposure" style="order: {{ section_numbers['factor_exposure'] }};">
+        <div class="section-title">{{ section_numbers['factor_exposure'] }}、因子暴露分析</div>
+        <div class="section-content">
+            {% if factor_exposure and factor_exposure.get("available") %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                基于最近 <strong>{{ factor_exposure["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ factor_exposure["sample_count"] }} 期）
+                {% if factor_exposure.get("stale_factors") %}
+                <span style="color:#856404;"> · 已剔除停更因子：{{ factor_exposure["stale_factors"] | join("、") }}</span>
+                {% endif %}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>风格因子</th><th>暴露系数 β</th><th>t 值</th><th>显著（95%）</th><th style="width: 32%;">风格归属占比</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in ["value", "growth", "quality"] %}
+                    {% if f in factor_exposure["betas"] %}
+                    {% set _alloc = factor_exposure["style_allocation"].get(f, 0) %}
+                    {% set _bar_w = (_alloc * 100) | round(1) %}
+                    <tr>
+                        <td>{{ factor_names.get(f, f) }}</td>
+                        <td>{{ factor_exposure["betas"][f] }}</td>
+                        <td>{{ factor_exposure["t_stats"].get(f, "--") }}</td>
+                        <td>{% if factor_exposure["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <div style="flex:1; background:#f0f2f5; border-radius:4px; height:14px;">
+                                    <div style="width: {{ _bar_w }}%; height:14px; background:{% if _alloc >= 0.5 %}#2E75B6{% elif _alloc >= 0.3 %}#70AD47{% else %}#C00000{% endif %}; border-radius:4px;"></div>
+                                </div>
+                                <span style="font-size:12px; white-space:nowrap;">{{ (_alloc * 100) | round(1) }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if factor_exposure.get("factor_correlations") %}
+            <div class="penetration-notes">
+                <div>* 因子间相关性：{% for pair, v in factor_exposure["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
+                {% if factor_exposure.get("correlation_note") %}
+                <div style="color:#856404;">* {{ factor_exposure["correlation_note"] }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if factor_exposure.get("baseline_betas") %}
+            <div class="summary-tag" style="margin: 10px 0 4px;">基准对照（沪深300 同窗口回归）</div>
+            <table>
+                <thead>
+                    <tr><th>风格因子</th><th>组合 β</th><th>基准 β</th><th>相对暴露</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in ["value", "growth", "quality"] %}
+                    {% if f in factor_exposure["betas"] and f in factor_exposure["baseline_betas"] %}
+                    {% set _rel = factor_exposure["betas"][f] - factor_exposure["baseline_betas"][f] %}
+                    <tr>
+                        <td>{{ factor_names.get(f, f) }}</td>
+                        <td>{{ factor_exposure["betas"][f] }}</td>
+                        <td>{{ factor_exposure["baseline_betas"][f] }}</td>
+                        <td class="{% if _rel > 0.1 %}red-text{% elif _rel < -0.1 %}green-text{% endif %}">{{ _rel | round(3) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            <div class="penetration-notes">
+                <div>* 因子暴露 = 组合日收益对因子指数日收益的 OLS 回归系数 β（窗口 {{ factor_exposure["window"] }} 期）</div>
+                <div>* α（截距）={{ factor_exposure.get("alpha", 0) }}；t 值显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
+                <div>* 风格归属占比 = |β| 归一化；基准对照用于判断组合相对市场风格的偏离</div>
+            </div>
+            {% elif factor_exposure %}
+            {% if factor_exposure.get("status") == "source_failed" %}
+            <div class="empty-section">📭 因子数据源暂不可用，请稍后重试</div>
+            {% else %}
+            <div class="empty-section">📭 因子暴露数据不足（有效样本 {{ factor_exposure.get("sample_count", 0) }} 期，低于阈值 36），暂不计算</div>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     {% if section_visible("news_correlation") %}
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  MODULE 6: 财经新闻热点与持仓关联分析 (News)            -->

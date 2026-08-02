@@ -50,8 +50,14 @@ def write_b_series_sheets(
     data: dict[str, Any],
     modules: dict[str, Any],
     prog: ProgressReporter,
+    factor_exposure: dict[str, Any] | None = None,
 ) -> None:
-    """写入基金深度分析页签。"""
+    """写入基金深度分析页签。
+
+    Args:
+        factor_exposure: 因子暴露 C19 契约 dict，来自 pipeline_data；
+            未提供或 available=False 时页签写入占位（§1.4.5 降级治理）。
+    """
     if not enable_fund_deep_analysis:
         return
 
@@ -174,3 +180,23 @@ def write_b_series_sheets(
         except Exception as e:
             logger.warning("基金风格分析页签写入失败: %s", e)
             prog.add_error("基金风格分析页签写入失败")
+
+    # ── 因子暴露分析（数据已在编排层组装，见 pipeline_data["factor_exposure"]） ──
+    write_fe = modules.get("write_factor_exposure_sheet")
+    ws_fe = sheets.get("factor_exposure")
+    if ws_fe is not None and write_fe is not None:
+        prog.info("正在写入因子暴露分析页签...")
+        _factor_names = None
+        if factor_exposure:
+            try:
+                from src.python.analysis.factor_exposure import FACTOR_NAMES
+
+                _factor_names = FACTOR_NAMES
+            except Exception:
+                _factor_names = None
+        try:
+            write_fe(ws_fe, factor_exposure, _factor_names)
+            prog.ok("因子暴露分析页签写入完成")
+        except Exception as e:
+            logger.warning("因子暴露分析页签写入失败: %s", e)
+            prog.add_error("因子暴露分析页签写入失败")

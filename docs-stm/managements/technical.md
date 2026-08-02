@@ -2518,8 +2518,8 @@ investor-util/
 | liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
 | fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
 | scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
-| factor_exposure | dict | 是 | 计划中 | prepare_report_data |
+| factor_exposure | dict | 是 | 已实现 | prepare_report_data |
 
-> `factor_exposure`（因子暴露分析）：`{"available": bool, "betas": {factor: float}, "t_stats": {factor: float}, "style_allocation": {factor: float}, "window": int}`。C7 注册见 `plan-advanced-analysis.md` §4 技术债与技术预置。
+> `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 `plan-advanced-analysis.md` §4 技术债与技术预置。
 
 [↑ 回到顶部](#目录)

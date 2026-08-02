@@ -67,6 +67,7 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| rf-141 | `analysis/factor_exposure.py::klines_to_returns` 无效日（close/nav≤0）处理最初重置 `prev_close=None` → 断链，该日之后的所有有效收益全部丢失（`test_klines_to_returns_decimal` 断言失败暴露）；与 `_align_series` ffill（LOCF）口径不一致 | 无效日 `continue` 不重置 `prev_close`，保留上次有效值继续链式计算（LOCF 语义，与 `_align_series` 的 ffill 口径一致），单日缺失不再损后续收益；回归测试覆盖无效日跳过但后续收益保留 | `changelog.md` → plan-7 因子暴露 Added / Test |
 | rf-140 | `src/test/scenario/llm/test_llm_hallucination.py` 10 处（64/72/80/89/96/103/112/119/126/196）以 **3 值**解包 `check_numerical_consistency`，但该函数在 rf-91 v3 升级时已返回 **4 元组**（含 corrections）→ `ValueError: too many values to unpack`，LLM 数值/归因幻觉检测场景（10 项）全部无法运行；`scenario_llm` marker 不在门禁内故未被捕获 | 10 处解包补 `_`；3 个偏离用例（组合收益率/个股收益率/混合）额外断言 `len(corrections) >= 1` 验证数值修正生成；LLM 场景套件 17 用例全绿（此前 10 失败） | `changelog.md` → Test |
 | rf-138 | fact_check 循环（`generators_orchestrator.py`）已提取缓存标志（`gm_c/er_c/hc_c/pd_c`）但未使用——对**缓存命中**的 LLM 内容仍用**当前**持仓市值校验排名；缓存内容基于生成时价格快照，011506/040046 市值仅差 ~1,800 元（5%），价格变动即排名翻转 → 反复误报"声称 X 为最大持仓，但实际最大持仓为 040046" | `run_fact_check` 新增 `skip_ranking_check` 参数；orchestrator fact_check 循环改为带 cached 标志的列表，缓存命中模块传 `skip_ranking_check=True` 跳过排名校验（数值/品种校验保留，缓存内容数值修正仍生效），与注释"仅检查非缓存且非空的模块"意图一致 | `changelog.md` → Fix / Test |
 | rf-139 | `_RANK_MAX_PATTERN` 过宽（`最大\|最重\|首要\|主要` 单独匹配即触发）——"561910 是最大单项亏损品种""601939 贡献了主要利润""600900 最大特点是…"等非持仓排名语境被误判为"声称 X 为最大持仓" | 正则收紧：排名词（第X大/第一/最大/最重/首要/主要/前X大/头X大）须与持仓名词（持仓/重仓/仓位/持股/权重）紧邻（允许中间一个"的"）才算排名声称；"最大单项亏损品种/主要利润/最大亏损来源/最大特点"不再匹配 | `changelog.md` → Fix / Test |
