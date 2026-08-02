@@ -64,14 +64,18 @@ class TestScenarioSectionOrder(unittest.TestCase):
         expected = {s["key"] for s in self._default}
         self.assertEqual(keys, expected)
 
-    def test_default_always_type_has_6_sections(self):
-        """always 类型模块共 6 个（含数据源可用性矩阵），均无 data_flag。"""
+    def test_default_always_type_has_7_sections(self):
+        """always 类型模块共 7 个（含数据源可用性矩阵、组合演进）；除组合演进外均无 data_flag（组合演进用 data_flag 控制可见性，available=False 时展示层写占位，见 technical.md §4.12）。"""
         always = [s for s in self._default if s["type"] == "always"]
-        self.assertEqual(len(always), 6)
-        for sec in always:
-            self.assertIsNone(sec["data_flag"])
+        self.assertEqual(len(always), 7)
         keys = {s["key"] for s in always}
         self.assertIn("data_source_status", keys)
+        self.assertIn("portfolio_evolution", keys)
+        for sec in always:
+            if sec["key"] == "portfolio_evolution":
+                self.assertEqual(sec["data_flag"], "evolution_data")
+            else:
+                self.assertIsNone(sec["data_flag"])
 
     def test_default_fund_deep_analysis_type_has_6_sections(self):
         """基金深度分析类型模块共 6 个（含因子暴露、持仓相关性）。"""
@@ -118,7 +122,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         for sec in self._default:
             type_counts[sec["type"]] = type_counts.get(sec["type"], 0) + 1
         self.assertEqual(set(type_counts.keys()), {"always", "history", "b_series", "news", "llm"})
-        self.assertEqual(type_counts["always"], 6)
+        self.assertEqual(type_counts["always"], 7)
         self.assertEqual(type_counts["history"], 2)
         self.assertEqual(type_counts["b_series"], 6)
         self.assertEqual(type_counts["news"], 1)

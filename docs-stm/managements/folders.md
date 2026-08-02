@@ -8,12 +8,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 190 | 46,663 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 1 | 2,407 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python | 12 | 4,107 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
-| **源代码合计** | — | **203** | **53,177** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **232** | **64,804** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,111 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| 主程序代码 | Python | 195 | 47,829 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 2 | 2,904 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页） |
+| 辅助脚本 | Python | 12 | 4,113 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
+| **源代码合计** | — | **209** | **54,846** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **238** | **65,985** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,169 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
@@ -107,9 +107,11 @@ investor-util/
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
+│   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → C19 evolution_data，plan-6）
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
 │   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
-│   │   │   └── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
+│   │   │   ├── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
+│   │   │   └── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比，plan-5）
 │   │   │
 │   │   ├── llm/                      # LLM 智能分析
 │   │   │   ├── __init__.py           #   子包标记
@@ -184,6 +186,7 @@ investor-util/
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
 │   │   │   ├── correlation_sheet.py  #   持仓相关性矩阵 Excel 页签（热力格/配对明细）
+│   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁，plan-6）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
@@ -203,10 +206,13 @@ investor-util/
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
 │   │   │   ├── cli_progress.py         #   CLI 进度报告器（CliProgressReporter）
+│   │   │   ├── whatif_sheet.py       #   调仓 What-if Excel 页签（摘要/分类/变动明细，plan-5）
+│   │   │   ├── whatif_writer.py      #   调仓 What-if 报告输出编排（Excel+HTML，plan-5）
 │   │   │   └── styles.py             #   Excel 样式定义
 │   │   │
 │   │   ├── tmpl/                     # HTML 报告模板
-│   │   │   └── report_template.html  #   Jinja2 HTML 报告主模板
+│   │   │   ├── report_template.html  #   Jinja2 HTML 报告主模板
+│   │   │   └── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细，plan-5）
 │   │   │
 │   │   ├── core/                     # 核心基础设施
 │   │   │   ├── __init__.py           #   子包标记
@@ -229,7 +235,7 @@ investor-util/
 │   │   ├── cli/                      # CLI 命令行模式入口
 │   │   │   ├── __init__.py           #   子包标记，re-export cli 符号
 │   │   │   ├── __main__.py           #   python -m 入口
-│   │   │   └── cli.py                #   argparse + 共享层路由
+│   │   │   └── cli.py                #   argparse + 共享层路由（report/update/whatif 子命令）
 │   │   │
 │   │   ├── tui/                      # TUI 交互模式入口
 │   │   │   ├── __init__.py           #   子包标记
@@ -280,7 +286,9 @@ investor-util/
 │       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
 │       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
-│       │   │   └── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口，rf-157 回归）
+│       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口，rf-157 回归）
+│       │   │   ├── test_portfolio_evolution.py #  组合演进聚合计算（多快照趋势/HHI/TOP 变迁，plan-6）
+│       │   │   └── test_whatif.py             #   调仓 What-if 计算（变动识别/成本权重/HHI/降级，plan-5）
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_config.py            #   配置管理核心测试
@@ -420,6 +428,10 @@ investor-util/
 │       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
 │       │   │   ├── test_correlation_html.py       #   持仓相关性章节 HTML 呈现
 │       │   │   ├── test_correlation_sheet.py      #   持仓相关性矩阵 Excel 页签呈现
+│       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明，plan-6）
+│       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现（plan-6）
+│       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现（plan-5）
+│       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现（plan-5）
 │       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景

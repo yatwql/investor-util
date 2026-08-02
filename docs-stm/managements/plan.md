@@ -28,18 +28,19 @@
 | ① | ~~**plan-9** 首次运行引导~~ | P3 | 1d | ✅ 已完成（2026-08-03） |
 | ② | ~~**plan-2 / plan-3** 分析基础~~ | P2 | 4.5d | ✅ 已完成（2026-08-03，含相关性矩阵/最大回撤/净值曲线） |
 | ③ | ~~**plan-12** HTML 左侧可折叠 TOC~~ | P3 | 0.5d | ✅ 已完成（2026-08-03，用户新增需求） |
-| ④ | **plan-6** 多快照趋势追踪 | P2 | 3d | 依赖 plan-1 图表框架（已就绪）；聚合既有快照，低风险 |
-| ⑤ | **plan-5** 调仓 What-if 模拟 | P2 | 5d | 独立大块，无数据源依赖；plan-1 后 diff 图表受益 |
+| ④ | ~~**plan-6** 多快照趋势追踪~~ | P2 | 3d | ✅ 已完成（2026-08-03，多快照聚合→总市值/HHI/TOP 变迁） |
+| ⑤ | ~~**plan-5** 调仓 What-if 模拟~~ | P2 | 5d | ✅ 已完成（2026-08-03，双持仓成本口径 diff 报告） |
 | ⑥ | **plan-11** HTML 暗色模式 | P3 | 0.5d | 依赖 plan-1 的 CSS 变量预留（已就绪），极低成本 |
 | ⑦ | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
 | ⑧ | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
 
 > ✅ **已完成并归档**：**plan-1**（交互式 HTML 报告，8 迭代落地）与 **plan-7**（因子暴露分析 MVP 3 因子，2026-08-02 完成）不再列入实施顺序，设计文档归档见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)。
 > ✅ **已完成（v0.9.7，2026-08-03）**：**plan-9** 首次运行引导、**plan-2/plan-3** 分析基础、**plan-12** HTML 左侧可折叠 TOC。
+> ✅ **已完成（v0.9.8-dev，2026-08-03）**：**plan-6** 组合演进（多快照趋势追踪）、**plan-5** 调仓 What-if 模拟。
 
 ### P2 — 下一阶段就绪
 
-> **plan-2 / plan-3 / plan-5 / plan-6**（plan-4 已放弃，plan-1/plan-7 已完成归档）合计 ~12.5d 预排。
+> **plan-2 / plan-3 / plan-5 / plan-6 均已提前完成**（plan-4 已放弃，plan-1/plan-7 已完成归档），P2 组当前无待办。
 > **前置状态**：rf-1 批量并行已落地（v0.8.x），plan-2 全品种历史获取依赖已解除；plan-3 的 `drawdown_analysis` 模块 C7 注册已完成；plan-1 交互式 HTML 图表框架已就绪（chartjs-upgrade 归档见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)）。
 > 组内条目按推荐实施顺序排列（见上方总览）。
 
@@ -55,10 +56,14 @@
 | # | 项目 | 内容 | 工作量 | 状态 |
 |:-:|:-----|:-----|:------:|:----:|
 | ~~plan-4~~ | ~~**业绩归因（Brinson 分解）**~~ | ~~单期 Brinson（配置+选股+交互）+ 多期平滑 + 基准选择~~ | ~~4d~~ | ❌ **已放弃** — 3/4 关键数据源不可突破：① 行业指数 K 线不稳定 ② 无免费基准行业权重 ③ 非 A 股品种无行业归属。详见 `archive/v0.7.x/better-investment-advice/discussion-better-investment-advice.md` §4.2 不做清单 |
-| plan-6 | **多快照趋势追踪（推荐③）** | 多期快照聚合 → 市值趋势/行业配置流/穿透变迁/HHI 趋势 | 3d | ⏳ 数据源 ✅ 无新依赖 · ✅ plan-1 图表框架已就绪 |
-| plan-5 | **调仓 What-if 模拟（推荐④）** | 双目录镜像 + 对比管线 + diff 视图（Excel/HTML） | 5d | ⏳ 数据源 ✅ 无新依赖 |
+| ~~plan-6~~ | ~~**多快照趋势追踪（推荐③）**~~ | ~~多期快照聚合 → 市值趋势/行业配置流/穿透变迁/HHI 趋势~~ | ~~3d~~ | ✅ **已完成（2026-08-03）** |
+| ~~plan-5~~ | ~~**调仓 What-if 模拟（推荐④）**~~ | ~~双目录镜像 + 对比管线 + diff 视图（Excel/HTML）~~ | ~~5d~~ | ✅ **已完成（2026-08-03）** |
 
 > ✅ **plan-7 因子暴露分析（MVP 3 因子）已完成（2026-08-02）并归档**：`analysis/factor_exposure.py`（OLS 回归/样本下限/停更剔除/LOCF）+ `report/orchestrator.py` 编排注入 + C19 13 键契约 + HTML 模块 #10 柱状图 + Excel 页签 + 单元 11 例/场景 5 例。设计文档归档见 [`plan-factor-exposure.md`](../archive/v0.9.x/factor-exposure/plan-factor-exposure.md)；实施前技术债 rf-102/103/104/106 已全部处理（Tencent 钳位 2000 + 解析容错、Sina 降级接受、因子替代、days 语义澄清）。
+
+> ✅ **plan-6 / plan-5 已完成（v0.9.8-dev，2026-08-03）**：
+> - **plan-6 组合演进**：`analysis/portfolio_evolution.py`（多快照聚合 → C19 `evolution_data`）+ Excel「组合演进」页签 + HTML「组合演进」章节（3 张 Chart.js 图各带 `.chart-caption`，C20）+ 快照 <3 降级占位（§1.4.5）。
+> - **plan-5 调仓 What-if**：`analysis/whatif.py`（双持仓成本口径 diff，复用 `classify_holding`）+ `whatif` CLI 子命令（`--candidate` 必填）+ 独立报告 `调仓模拟_{ts}.xlsx/.html`（Excel 3 页签 + HTML 双环图双栏页）。
 
 ### P3 — 用户体验改进
 

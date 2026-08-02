@@ -33,6 +33,8 @@
   - [4.9 资产穿透 TOP10](#49-资产穿透-top10)
   - [4.10 财经新闻热点与持仓关联分析](#410-财经新闻热点与持仓关联分析)
   - [4.11 数据降级治理体系](#411-数据降级治理体系)
+  - [4.12 组合演进（多快照趋势，plan-6）](#412-组合演进多快照趋势plan-6)
+  - [4.13 调仓 What-if 模拟（plan-5）](#413-调仓-what-if-模拟plan-5)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -256,7 +258,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 19 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 21 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型**：
 
@@ -1225,14 +1227,16 @@ for sec in section_order:
 | `concentration_data` | `concentration_analysis is not None` | `b_series` | 持仓集中度监控 |
 | `style_data` | `style_analysis is not None` | `b_series` | 基金风格分析 |
 | `factor_exposure_data` | `factor_exposure is not None` | `b_series` | 因子暴露分析 |
+| `correlation_data` | `correlation_data is not None` | `b_series` | 持仓相关性矩阵 |
+| `evolution_data` | `evolution_data is not None` | `always` | 组合演进（多快照趋势） |
 | `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
 | `llm_data_available` | `llm_enabled_flag`（LLM 生成成功） | `llm` | LLM 全部 5 模块 |
 
-`always` 类型模块（summary / market_value / category / penetration / fund_performance）无 data_flag，始终显示。
+`always` 类型模块（summary / market_value / category / penetration / fund_performance / data_source_status）无 data_flag，始终显示。例外：`portfolio_evolution`（组合演进）虽为 `always` 类型但带 `evolution_data` 标志——聚合数据存在（`evolution_data is not None`）才渲染章节，`available=False` 时章节内写占位文本（与 correlation 降级模式一致）。
 
 ### 4.6 报告序号可配置
 
-报告 19 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 21 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1248,7 +1252,7 @@ for sec in section_order:
 }
 ```
 
-19 个模块分布：`always`×6、`基金深度分析`×5、`news`×1、`llm`×5、`history`×2。
+21 个模块分布：`always`×7、`基金深度分析`×6、`news`×1、`llm`×5、`history`×2。
 
 #### 合并规则流程
 
@@ -1892,6 +1896,66 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
     跨会话持久化
 ```
 
+### 4.12 组合演进（多快照趋势，plan-6）
+
+聚合 `data/history/snapshots/snapshot_{timestamp}.json` 多期快照，输出组合市值/HHI/TOP 持仓占比的趋势数据（`analysis/portfolio_evolution.py` / `report/orchestrator.py` 组装），供 Excel「组合演进」页签与 HTML「组合演进」章节消费（3 张 Chart.js 图：总市值与总盈亏 / HHI / TOP 持仓占比变迁）。
+
+**数据口径**：快照为历史时点截图（含持仓结构 + 总市值），演进数据纯本地计算、零网络请求。历史快照可能缺市值（`market_value=0.0`），权重回退到成本口径（`cost=份额×每份成本`）。
+
+**模块分层（C14 依赖）**：
+
+```
+analysis/portfolio_evolution.py   # 纯计算：读快照 JSON → 趋势聚合 → C19 契约 evolution_data
+    ↑ 无数据获取、无报告依赖
+report/orchestrator.py            # 编排：聚合快照 → 写 pipeline_data['evolution_data']（C19）
+report/ 渲染                      # Excel 页签 + HTML 章节（模板 context 传递，C14）
+```
+
+**快照数下限**：`MIN_SNAPSHOTS=3`，有效快照不足时 `evolution_data.available=false`，展示层写「组合演进数据不足」占位（§1.4.5 降级）。
+
+**架构约束遵从**：
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| **C3** (缓存原子写入) | 快照写入沿用既有原子写（temp + rename），聚合读取对缺文件/损坏 JSON 容错跳过 |
+| **C7** (报告序号可配置) | `portfolio_evolution` 注册于 `_REPORT_SECTION_DEFAULT`（type=`always`、data_flag=`evolution_data`、number=19），序号/名称可配置，不硬编码 |
+| **C14** (渲染期数据不可写入模块级全局变量) | evolution_data 通过模板 `render()` context 传递，不写 `_ENV.globals` |
+| **C19** (pipeline_data Schema 契约) | 新增 `evolution_data` 键（类型 `dict`），键结构见附录 H，先定义类型再使用 |
+| **C20** (HTML 图表图下说明强制) | 3 张 Chart.js 图各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |
+| **§1.4.5** (数据降级治理) | 有效快照 < MIN_SNAPSHOTS → `available=false`，章节写占位（数据量不足，非故障，不走 DegradationTracker）；快照文件缺失/损坏时逐文件跳过并告警 |
+
+### 4.13 调仓 What-if 模拟（plan-5）
+
+双持仓（基准 base / 目标 candidate）**成本口径截面比较**，输出 diff 报告（`analysis/whatif.py` 计算 → `report/whatif_writer.py` 输出 Excel + HTML 独立报告）。
+
+**设计边界（plan-advanced-analysis.md §2 风险）**：
+- **成本口径**：candidate 无市场历史，无法取实时市值/净值，所有指标（权重/集中度）基于 `成本 = 份额 × 每份成本`，纯结构层、**零网络请求**（"只能做截面比较"）。
+- **不可回测**：What-if 无真实交易数据，不产出任何回测类结论（夏普/波动率等）。
+
+**变动类型**（复用 `schemas/history.py _DiffAction` 语义）：新增 / 清仓 / 加仓 / 减仓 / 不变。
+
+**模块分层（C14 依赖）**：
+
+```
+analysis/whatif.py               # 纯计算：_merge_holdings(按 code 合并多账户) → 成本权重/HHI → 变动分类
+    ↑ 复用 analysis/rebalance.py 的 classify_holding/_CATEGORY_ORDER/_CATEGORY_LABELS
+report/whatif_sheet.py           # Excel 3 页签：调仓摘要 / 分类配置对比 / 持仓变动明细（行底色按变动类型）
+report/whatif_writer.py          # 编排双产物：调仓模拟_{ts}.xlsx / .html + Chart.js 资产复制
+cli/cli.py                       # whatif 子命令：--candidate 必填、--base 可选（缺省用 config 持仓）
+```
+
+**C19 契约 `whatif_data`（独立报告，非 pipeline_data 键）**：`{"available", "status", "base_file", "candidate_file", "base", "candidate", "summary", "categories", "changes", "stats", "reason"}`。两侧均为空 → `available=false` 降级；单侧为空视为合法的「全部清仓/全部新增」对比，仍可计算。
+
+**架构约束遵从**：
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| **C7** (报告序号可配置) | whatif 为**独立报告产物**（调仓模拟_{ts}.xlsx/.html），不注册进主报告 `_REPORT_SECTION_DEFAULT` |
+| **C14** (渲染期数据不可写入模块级全局变量) | whatif_data 通过模板 `render()` context 传递，不写 `_ENV.globals` |
+| **C19** (pipeline_data Schema 契约) | `whatif_data` 契约独立于主报告管线（不经 `pipeline_data_builder.build()`），本报告自建契约并在模块 docstring 声明 |
+| **C20** (HTML 图表图下说明强制) | 资产配置对比双环形图各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |
+| **§1.4.5** (数据降级治理) | 两侧为空 → `available=false`，Excel 摘要页/HTML 写「调仓对比数据暂不可用」占位；CLI 层对空持仓文件直接报错返回 `_EXIT_SEVERE` |
+
 [↑ 回到顶部](#目录)
 
 ---
@@ -2334,7 +2398,7 @@ core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号不可硬编码** — 报告 19 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
+| **C7** | **报告序号不可硬编码** — 报告 21 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 pipeline_data Schema 定义文档中预定义类型、版本号、写入/消费模块后，才能在代码中使用该键（详见附录 H） | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
@@ -2582,10 +2646,13 @@ investor-util/
 | scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
 | factor_exposure | dict | 是 | 已实现 | prepare_report_data |
 | correlation_data | dict | 是 | 已实现 | prepare_report_data |
+| evolution_data | dict | 是 | 已实现 | prepare_report_data |
 
 > `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`b_series`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 因子暴露分析。
 
 > `correlation_data`（持仓相关性矩阵，C19 契约，11 键）：`{"available": bool, "status": str, "window": int, "sample_count": int, "codes": list[str], "names": {code: str}, "matrix": list[list[float\|None]], "p_values": list[list[float\|None]], "pairs": list[dict], "insufficient_codes": list[str], "note": str}`。下三角矩阵（row>col 有值、对角=1.0、上三角 None），配对明细含 code_a/name_a/code_b/name_b/pearson/p_value/significant/samples。由 `analysis/correlation.py` 计算、`report/orchestrator.py::compute_correlation_data` 注入。C7 注册见 §8.3（type=`b_series`、data_flag=`correlation_data`），数据不足（重叠样本 <60 / 品种 <2）落 §1.4.5 降级。
+
+> `evolution_data`（组合演进，C19 契约，多快照趋势聚合）：`{"available": bool, "snapshot_count": int, "min_snapshots": int, "periods": list[str], "total_value": list[float], "total_cost": list[float], "total_pnl": list[float], "holding_counts": list[int], "account_flows": {account: list[float]}, "hhi": list[float\|None], "top_holdings": list[dict], "reason": str}`。`top_holdings` 每项含 code/name/weights（各期占比 %）/present_count（出现期数）；历史快照 `market_value=0.0` 时权重回退成本口径。由 `analysis/portfolio_evolution.py` 计算、`report/orchestrator.py` 注入（C7 注册 type=`always`、data_flag=`evolution_data`，见 §4.12），有效快照 < MIN_SNAPSHOTS=3 时 `available=false` 落 §1.4.5 降级。
 
 > `history_data`（组合历史走势 + 回撤，C19 契约）：`{"bars": list[dict], "max_drawdown": float, "max_drawdown_pct": float, "drawdown_events": list[dict], "recovery_times": list[dict], "drawdown_available": bool, "annualized_volatility": float, "total_return": float, "daily_returns": list[float], "warnings": list[str], "benchmarks": list[dict], "successful_holdings": list}`。`drawdown_events`（独立回撤事件）含 peak_date/trough_date/recovery_date/drawdown_pct/duration_days/recovery_days/recovered；`recovery_times`（恢复耗时明细）含 start_date/end_date/days。由 `report/portfolio_history.py` 组装（C7 注册 type=`history`），`drawdown_available` 表示有效交易日 ≥ MIN_SPAN 才渲染回撤明细，否则落 §1.4.5 降级。
 

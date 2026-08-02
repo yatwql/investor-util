@@ -8,7 +8,8 @@
 
 ### Feat
 
-（开发中）
+- **plan-6 组合演进（多快照趋势追踪）** — 聚合 `data/history/snapshots/snapshot_{timestamp}.json` 多期快照 → 组合演进趋势数据（`analysis/portfolio_evolution.py` 纯计算，C19 新键 `evolution_data`）：各期总市值/总成本/总盈亏/持仓品种数 + HHI 集中度 + TOP 持仓占比变迁（含出现期数）+ 多账户配置流。历史快照缺市值（`market_value=0.0`）时权重回退成本口径。C7 registry 注册章节「组合演进」（type=`always`、data_flag=`evolution_data`、#19，序号可配置）；`evolution_sheet.py` Excel「组合演进」页签（总市值趋势/HHI 趋势/TOP 变迁/账户配置流/说明，标题顺序固定）+ report_template.html「组合演进」章节（3 张 Chart.js 图：总市值与总盈亏/HHI/TOP 占比变迁，各带 `.chart-caption` 图下说明，C20）。有效快照 < `MIN_SNAPSHOTS=3` → `available=false` 降级占位（§1.4.5），`evolution_data=None` 章节隐藏。测试：`test_portfolio_evolution.py` 10 例 + `test_evolution_sheet.py` 6 例 + `test_evolution_html.py` 7 例 + `test_html_report_structure_edge.py`/`test_excel_generator.py` 章节计数同步 21
+- **plan-5 调仓 What-if 模拟（双持仓成本口径 diff 报告）** — 新增 `whatif` CLI 子命令（`--candidate` 必填、`--base` 可选缺省用 config 持仓）：对比基准/目标两份持仓，识别变动类型（新增/清仓/加仓/减仓/不变，份额差 <1e-3 视为不变）并输出成本口径 diff 报告（`analysis/whatif.py` 纯计算，复用 `classify_holding`/`_CATEGORY_ORDER`/`_CATEGORY_LABELS`；权重 = 成本 ÷ 总成本，**零网络请求、不可回测**，口径/局限在说明区注明）。双产物独立输出：`whatif_sheet.py` Excel 调仓模拟工作簿 3 页签（调仓摘要含变动统计+汇总指标+变化箭头 / 分类配置对比 / 持仓变动明细，行底色按变动类型：新增绿/清仓红/加仓黄/减仓蓝/不变灰）+ `whatif_writer.py` + `whatif_template.html` HTML 双栏对比页（对比文件卡+汇总指标卡+基准/目标资产配置双环形图各带图下说明 C20+分类对比表+变动明细表+说明）。两侧均为空 → `available=false` 降级占位（§1.4.5），CLI 对空持仓文件直接报错返回严重退出码。测试：`test_whatif.py` 12 例 + `test_whatif_sheet.py` 8 例 + `test_whatif_html.py` 7 例 + `test_cli.py` whatif 子命令 8 例（argparse/处理器委托/main 透传）
 
 ### Fix
 
@@ -16,7 +17,8 @@
 
 ### Test
 
-（开发中）
+- **plan-6 组合演进回归测试** — `test_portfolio_evolution.py` 10 例（快照聚合时序升序/缺市值回退成本权重/总成本口径/账户流合并/短于 MIN_SNAPSHOTS 降级/空快照降级/多账户/TOP 变迁出现期数/HHI 计算/键契约）；`test_evolution_sheet.py` 6 例（总市值趋势/HHI 趋势/TOP 变迁/账户配置流/说明四区渲染 + 标题顺序固定 + 降级占位）；`test_evolution_html.py` 7 例（6 大章节渲染/图表 canvas+图注/降级占位/evolution_data None 隐藏）；`test_html_report_structure.py`/`test_excel_generator.py` 章节计数 19→21 同步
+- **plan-5 调仓 What-if 回归测试** — `test_whatif.py` 12 例（变动类型识别/份额 ε 视为不变/变动排序按类型优先级/成本权重与 HHI/汇总增量与箭头/分类配置对比/跨账户合并/两侧空降级/单侧空仍可算「全部清仓」/文件标签保留/箭头辅助函数）；`test_whatif_sheet.py` 8 例（3 页签渲染/变动统计/汇总指标与箭头/行底色按变动类型 新增绿/清仓红/加仓黄/减仓蓝/不变灰/分类对比表/说明区）；`test_whatif_html.py` 7 例（双栏对比布局/对比文件卡/汇总指标卡/双环图 canvas+图注/变动明细行 class 按英文 slug/降级占位/available False 占位）；`test_cli.py` whatif 子命令 8 例（argparse 子命令注册/`--candidate` 缺失报参数错误/显式 base/缺省 base 用 config/读文件失败严重退出/available False 严重退出/main 透传）
 
 ---
 

@@ -83,6 +83,8 @@ STATUS_MESSAGES: dict[str, str] = {
     "style_unavailable": "基金风格数据暂不可用",
     "factor_exposure_unavailable": "因子暴露数据暂不可用",
     "correlation_unavailable": "持仓相关性数据暂不可用",
+    "evolution_unavailable": "组合演进数据暂不可用（快照不足，趋势待积累）",
+    "whatif_unavailable": "调仓对比数据暂不可用（基准或目标持仓为空）",
     # 新闻 / 预警
     "news_all_failed": "新闻数据暂不可用，请检查网络连接",
     "warning_unavailable": "预警数据暂不可用",

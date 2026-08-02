@@ -1,11 +1,13 @@
-/* chart-init.js — 6 张 Chart.js 图表初始化。
+/* chart-init.js — 6 张核心 Chart.js 图表 + 3 张组合演进图表初始化。
  *
- * 读取模板内联 chart-data（chart_datasets），为每个 <canvas id="chart_<key>">
- * 初始化对应图表。O1 隔离：每图独立 try/catch，单图失败仅 console.warn。
+ * 核心 6 图读取模板内联 chart-data（chart_datasets）；组合演进 3 图
+ * 读取独立内联数据段 #evolution-chart-data（evolution_data 契约 dict）。
+ * O1 隔离：每图独立 try/catch，单图失败仅 console.warn。
  * 守卫：Chart 引擎缺失（R21）或 canvas 不存在（模块隐藏）→ 跳过该图。
  * ES5 保守语法（R17/R22）。打印快照降级见 chart-print.js。
  * 键名契约（§4.11 O2）：portfolio_line / drawdown / category_doughnut /
- * industry_bar / penetration_bar / radar。行数预算 ≤300（§4.11 O4）。
+ * industry_bar / penetration_bar / radar；evolution_total / evolution_hhi /
+ * evolution_top（组合演进扩展）。
  */
 
 (function () {
@@ -279,6 +281,87 @@
     }), 'radar');
   }
 
+  /* ── 组合演进图表（读取独立内联数据段）────────── */
+
+  function readEvolutionChartData() {
+    var dataEl = document.getElementById('evolution-chart-data');
+    if (!dataEl) return null;
+    try {
+      var d = JSON.parse(dataEl.textContent || '{}');
+      if (!d || !d.periods || !d.periods.length) return null;
+      return d;
+    } catch (e) {
+      console.warn('[chart] evolution-chart-data 解析失败，组合演进图表跳过');
+      return null;
+    }
+  }
+
+  function initEvolutionTotalChart() {
+    var d = readEvolutionChartData();
+    var el = document.getElementById('chart_evolution_total');
+    if (!d || !el) return;
+    var datasets = [
+      { label: '总市值', data: d.total_value || [], borderColor: theme.primary || '#2E75B6', borderWidth: 2, pointRadius: 2, fill: false, tension: 0.1 },
+      { label: '总盈亏', data: d.total_pnl || [], borderColor: '#E68A00', borderWidth: 2, pointRadius: 2, fill: false, tension: 0.1 }
+    ];
+    trackChart(new Chart(el, {
+      type: 'line',
+      data: { labels: d.periods, datasets: datasets },
+      options: lineOptions('金额 (元)')
+    }), 'evolution_total');
+  }
+
+  function initEvolutionHhiChart() {
+    var d = readEvolutionChartData();
+    var el = document.getElementById('chart_evolution_hhi');
+    if (!d || !el) return;
+    var hhi = (d.hhi || []).map(function (v) {
+      return (v === null || v === undefined) ? null : v;
+    });
+    trackChart(new Chart(el, {
+      type: 'line',
+      data: {
+        labels: d.periods,
+        datasets: [{
+          label: 'HHI 集中度',
+          data: hhi,
+          borderColor: theme.danger || '#CC0000',
+          backgroundColor: 'rgba(204,0,0,0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          fill: true,
+          tension: 0.1
+        }]
+      },
+      options: lineOptions('HHI (0~1)')
+    }), 'evolution_hhi');
+  }
+
+  function initEvolutionTopChart() {
+    var d = readEvolutionChartData();
+    var el = document.getElementById('chart_evolution_top');
+    if (!d || !el) return;
+    var top = (d.top_holdings || []).slice(0, 6);
+    if (!top.length) return;
+    var palette = ['#2E75B6', '#E68A00', '#2E7D32', '#8E44AD', '#CC0000', '#7B8A9E'];
+    var datasets = top.map(function (h, i) {
+      return {
+        label: h.name || h.code,
+        data: h.weights || [],
+        borderColor: palette[i % palette.length],
+        borderWidth: 2,
+        pointRadius: 2,
+        fill: false,
+        tension: 0.1
+      };
+    });
+    trackChart(new Chart(el, {
+      type: 'line',
+      data: { labels: d.periods, datasets: datasets },
+      options: lineOptions('占比 (%)')
+    }), 'evolution_top');
+  }
+
   /* ── 注册初始化函数（O1：每个独立 try/catch）────────── */
   var inits = {
     portfolio_line: initPortfolioChart,
@@ -286,7 +369,10 @@
     category_doughnut: initCategoryDoughnut,
     industry_bar: initIndustryBar,
     penetration_bar: initPenetrationBar,
-    radar: initRadarChart
+    radar: initRadarChart,
+    evolution_total: initEvolutionTotalChart,
+    evolution_hhi: initEvolutionHhiChart,
+    evolution_top: initEvolutionTopChart
   };
 
   Object.keys(inits).forEach(function (key) {

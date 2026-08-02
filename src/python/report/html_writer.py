@@ -93,6 +93,7 @@ def _compute_section_visibility(
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     factor_exposure: dict | None = None,  # data 层：因子暴露 C19 dict（None=无数据，章节隐藏）
     correlation_data: dict | None = None,  # data 层：持仓相关性 C19 dict（None=无数据，章节隐藏）
+    evolution_data: dict | None = None,  # data 层：组合演进 C19 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
 
@@ -123,6 +124,9 @@ def _compute_section_visibility(
         "factor_exposure_data": factor_exposure is not None,
         # correlation_data 同上：非 None（含降级占位）→ 章节可见
         "correlation_data": correlation_data is not None,
+        # evolution_data 同上：始终由编排层计算注入（非 None）→ 章节可见，
+        # available=False 时模板写占位文本（快照不足，§1.4.5）
+        "evolution_data": evolution_data is not None,
     }
 
     # 两层合并：section_visible = board_ok AND data_ok
@@ -279,6 +283,7 @@ def _render_template(
     factor_exposure: dict | None = None,
     factor_names: dict | None = None,
     correlation_data: dict | None = None,
+    evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
@@ -343,6 +348,7 @@ def _render_template(
         factor_exposure=factor_exposure,
         factor_names=factor_names or {},
         correlation_data=correlation_data,
+        evolution_data=evolution_data,
         drawdown_min_span=drawdown_min_span,
     )
 
@@ -375,6 +381,7 @@ def write_html_report(
     enable_interactive_charts: bool = False,
     factor_exposure: dict | None = None,
     correlation_data: dict | None = None,
+    evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
@@ -520,6 +527,7 @@ def write_html_report(
         enable_llm=enable_llm,  # enable_llm is the board param for LLM
         factor_exposure=factor_exposure,
         correlation_data=correlation_data,
+        evolution_data=evolution_data,
     )
 
     # ── 10b) 数据源状态摘要 ──
@@ -583,6 +591,7 @@ def write_html_report(
         factor_exposure=factor_exposure,
         factor_names=_factor_names,
         correlation_data=correlation_data,
+        evolution_data=evolution_data,
         drawdown_min_span=drawdown_min_span,
         llm_enabled_flag=llm_enabled_flag,
         global_macro_content=global_macro_content,

@@ -86,6 +86,34 @@ def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -
     return details
 
 
+# ── 组合演进数据（多快照趋势聚合）──
+
+
+def _inject_evolution_data(pipeline_data: dict | None) -> dict:
+    """计算组合演进数据并注入 pipeline_data（C19 `evolution_data` 键）。
+
+    聚合 `data/history/snapshots/` 多期快照，供 HTML「组合演进」章节与
+    Excel 页签消费。计算失败或数据不足时注入 available=False 的降级 dict，
+    展示层写占位文本（§1.4.5），不阻断报告生成（R11 隔离）。
+
+    Args:
+        pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
+
+    Returns:
+        注入 evolution_data 后的 pipeline_data（None 时新建字典）
+    """
+    if pipeline_data is None:
+        pipeline_data = {}
+    try:
+        from src.python.analysis.portfolio_evolution import build_evolution_data
+
+        pipeline_data["evolution_data"] = build_evolution_data()
+    except Exception:
+        logger.warning("[evolution] 组合演进数据构建失败（非关键）", exc_info=True)
+        pipeline_data["evolution_data"] = {"available": False, "reason": "组合演进数据构建失败"}
+    return pipeline_data
+
+
 # ── 校验函数 ──
 
 
@@ -244,6 +272,7 @@ def _generate_full_html_report(
     metrics: dict | None = None,
     factor_exposure: dict | None = None,
     correlation_data: dict | None = None,
+    evolution_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -254,6 +283,8 @@ def _generate_full_html_report(
             基金深度分析关闭或数据不足时为 None/available=False。
         correlation_data: 持仓相关性矩阵 C19 契约 dict，
             基金深度分析关闭或数据不足时为 None/available=False。
+        evolution_data: 组合演进 C19 契约 dict（多快照趋势聚合），
+            数据不足时 available=False（模板写占位）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -292,6 +323,7 @@ def _generate_full_html_report(
             enable_interactive_charts=_enable_interactive_charts,
             factor_exposure=factor_exposure,
             correlation_data=correlation_data,
+            evolution_data=evolution_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -407,6 +439,8 @@ def _generate_report_both(
     # ── 2. F1 快照对比（始终执行） ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, details, config, reporter)
+    # 2b. 组合演进数据（聚合多期快照，C19 evolution_data）
+    pipeline_data = _inject_evolution_data(pipeline_data)
     perf.stop()
     # [checkpoint] pipeline_data 类型断言
     if pipeline_data is not None:
@@ -450,6 +484,7 @@ def _generate_report_both(
             enable_llm=False,
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
+            evolution_data=(pipeline_data or {}).get("evolution_data"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -593,6 +628,8 @@ def _generate_report_full(
         pipeline_data["factor_exposure"] = prep.get("factor_exposure")
         pipeline_data["correlation_data"] = prep.get("correlation_data")
     _validate_pipeline_snapshot(pipeline_data)
+    # 2b. 组合演进数据（聚合多期快照，C19 evolution_data）
+    pipeline_data = _inject_evolution_data(pipeline_data)
     perf.stop()
 
     # ── 3. F2 历史走势 + 全量量化指标 ──
@@ -664,6 +701,7 @@ def _generate_report_full(
         _metrics,
         prep.get("factor_exposure"),
         prep.get("correlation_data"),
+        (pipeline_data or {}).get("evolution_data"),
     )
 
     # ── 7. Excel 报告 ──
