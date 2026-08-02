@@ -95,12 +95,17 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
 
     Args:
         code: 指数代码，如 "sh000300" / "gb_inx"
-        days: 获取天数（默认 30，最大 3650）
+        days: 获取天数（默认 30，最大 2000。与 Tencent 对齐钳位到 2000，
+              避免超限响应引发解析问题）
         start_from: 起始日期（由 chain 层使用，provider 侧按 days 获取）
 
     Returns:
         list[dict]: [{date, open, close, high, low, volume}, ...]
         API 失败返回空列表。
+
+    Note:
+        当前环境 `getKLineData` 端点对所有代码返回 404/空（备用链路暂不可用），
+        保留此实现作为代码级备用；环境恢复后自动生效。
     """
     # lazy import: 通过 sina 模块引用 is_index_code, 使现有测试 spy 生效
     from src.python.providers import sina as _sina_mod  # noqa: E402
@@ -109,7 +114,7 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
         logger.debug("Sina 跳过非指数代码: %s", code)
         return []
 
-    days = min(max(days, 5), 3650)
+    days = min(max(days, 5), 2000)  # 与 Tencent 对齐钳位 2000
     symbol = code.strip()
     url = "https://money.finance.sina.com.cn/getKLineData"
 

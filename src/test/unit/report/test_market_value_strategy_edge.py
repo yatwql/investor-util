@@ -60,9 +60,14 @@ class TestStrategyMarketClosed:
     """非交易时段：CACHE_ONLY → 走缓存，不发起 HTTP。"""
 
     @patch("src.python.report.market_value.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-06-26")
     @patch("src.python.report.market_value.fetch_market_data")
-    def test_a_share_cache_only_skips_http(self, mock_fetch, mock_open):
-        """非交易时段，A 股持仓走缓存，fetch_market_data 不被调用。"""
+    def test_a_share_cache_only_skips_http(self, mock_fetch, mock_ltd, mock_open):
+        """非交易时段，A 股持仓走缓存，fetch_market_data 不被调用。
+
+        注意：mock get_last_trading_day 使缓存 price_date 与最近交易日一致，
+        避免 _price_cache_fresh 因真实日期判定缓存过期而降级 live。
+        """
         _setup_registry()
         # 预填 session cache
         get_registry().session_cache_set("price", "561910", _TENCENT_DATA, source="test")
@@ -98,10 +103,15 @@ class TestStrategyCircuitBreaker:
     """全链熔断 → CACHE_ONLY。"""
 
     @patch("src.python.report.market_value.is_market_open", return_value=True)
+    @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-06-26")
     @patch("src.python.report.market_value.fetch_market_data")
     @patch("src.python.core.provider_registry.time")
-    def test_chain_broken_reads_cache(self, mock_time, mock_fetch, mock_open):
-        """交易时段但全链熔断，A 股持仓走缓存。"""
+    def test_chain_broken_reads_cache(self, mock_time, mock_fetch, mock_ltd, mock_open):
+        """交易时段但全链熔断，A 股持仓走缓存。
+
+        注意：mock get_last_trading_day 使 _price_cache_fresh 在真实收市
+        （周末/非交易时段）也不判定缓存过期，聚焦熔断→CACHE_ONLY 行为本身。
+        """
         _setup_registry()
         reg = get_registry()
         # 模拟全链熔断（tencent + eastmoney 各 3 次失败）
@@ -217,9 +227,14 @@ class TestStrategyLogging:
     """策略选择日志和计数。"""
 
     @patch("src.python.report.market_value.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-06-26")
     @patch("src.python.report.market_value.fetch_market_data")
-    def test_cache_only_logged_no_http(self, mock_fetch, mock_open, caplog):
-        """CACHE_ONLY 路径不产生 HTTP 调用日志，不统计为失败。"""
+    def test_cache_only_logged_no_http(self, mock_fetch, mock_ltd, mock_open, caplog):
+        """CACHE_ONLY 路径不产生 HTTP 调用日志，不统计为失败。
+
+        注意：mock get_last_trading_day 避免 _price_cache_fresh 因真实日期
+        判定缓存过期而降级 live（与 test_a_share_cache_only_skips_http 同理）。
+        """
         _setup_registry()
         import logging
         caplog.set_level(logging.INFO)

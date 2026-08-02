@@ -60,7 +60,7 @@ LLM 配置由三个独立文件管理：
   "temperature_global_macro": 0.3,
   "max_tokens_global_macro": 2048,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 8192,
+  "max_tokens_expert_review": 20000,
   "pricing": {
     "currency": "CNY"
   }
@@ -221,7 +221,7 @@ LLM: 已配置  多链服务: deepseek-main + gemini-fallback (2 provider)
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
-- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。「辩论-正反辩论」内部即为白脸→黑脸→综合三段式流程，**不是**三个独立开关；早期独立的白脸/黑脸/综合模块开关已从菜单隐藏（注册表条目保留，仅用于缓存键/TTL 管理）
+- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。「辩论-正反辩论」内部即为白脸→黑脸→综合三段式流程，**不是**三个独立开关；菜单中三者不会单独出现，只通过编号 6 整体启停（注册表条目保留，仅用于缓存键/TTL 管理）
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 
@@ -247,7 +247,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `llm_key.json` 缺失或 key 为空 | 显示占位："本节内容待生成 — LLM 未配置" | INFO |
 | `enabled_llm.{module}` = false | 直接跳过，不显示占位 | INFO |
 | API 调用失败（网络错误/超时） | 显示占位："（本节内容生成失败）" | WARNING |
-| 返回空内容（无文本块，如思考耗尽 max_tokens 预算） | 切换下一 Provider；全部失败则显示占位 | WARNING |
+| 返回空内容（无文本块，如思考耗尽 max_tokens 预算） | 关闭 thinking 同 Provider 重试一次；仍失败才切换下一 Provider | WARNING |
 | 返回空字符串（内容被过滤） | 追加安抚指令重试一次，仍失败则切换 Provider | WARNING |
 | 输出被截断（含 `... [TRUNCATED] ...`） | 自动增大 `max_tokens` 1.5× 重试一次，仍截断则记录日志提示用户手动调大 | WARNING |
 
@@ -295,7 +295,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `system_prompt_{module}` | string / null | `null` | 系统提示词覆盖，`null`=使用代码内置 prompt |
 | `model_{module}` | string / null | `null` | 独立指定本模块使用的模型，`null`=使用 Provider 默认模型。**仅 flat 模式生效；多链模式优先使用 `llm_providers.json` 中凭据块定义的模型** |
 | `temperature_{module}` | float | 0.1~0.8（模块差异） | 采样温度，0=确定性最高，1=最大多样性 |
-| `max_tokens_{module}` | int | 1024~8192（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试） |
+| `max_tokens_{module}` | int | 2048~20000（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试）。**DeepSeek 为 thinking + 正文共享预算**（详见下方 DeepSeek V4 说明） |
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
 | `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式（news_correlation）不支持** |
@@ -390,7 +390,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_expert_review": null,
   "model_expert_review": null,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 8192,
+  "max_tokens_expert_review": 20000,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
   "output_brief_expert_review": false,
@@ -404,7 +404,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_health_check": null,
   "model_health_check": null,
   "temperature_health_check": 0.1,
-  "max_tokens_health_check": 8192,
+  "max_tokens_health_check": 16000,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
   "output_brief_health_check": false,
@@ -507,8 +507,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | reasoning_effort | output_brief_limit |
 |------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:----------------:|:------------------:|
 | **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | high | **200 字** |
-| **智囊团深度复盘** | null | **0.3**（低温保事实） | **8192** | **120s** | **true** ⭐ | 16000 | **medium** | 300 字 |
-| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **8192** | **120s** | **true** | 12000 | **medium** | 300 字 |
+| **智囊团深度复盘** | null | **0.3**（低温保事实） | **20000** | **120s** | **true** ⭐ | 16000 | **medium** | 300 字 |
+| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **16000** | **120s** | **true** | 12000 | **medium** | 300 字 |
 | **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | high | 300 字 |
 | **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | high | 不适用 |
 
@@ -566,7 +566,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 | 配置项 | 管什么 | expert 默认值 |
 |--------|--------|:------------:|
-| `max_tokens_expert_review` | **最终输出文本**的最大 token 数 | 8192 |
+| `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 20000 |
 | `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 16000 |
 
 **API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
@@ -574,9 +574,11 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 **一句话总结（Claude / Gemini）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
 **一句话总结（DeepSeek）：** `reasoning_effort` 管"想多深"，`"max"` 对应深度分析的极致模式。
 
-**DeepSeek V4 强制推理说明**：DeepSeek V4 系列为**强制推理模型**，即使 `thinking_enabled` 关闭也会返回 `thinking` block；且 `max_tokens` 是 **thinking + 最终文本的共享预算**（而非仅最终输出）。当思考部分耗尽预算时，响应只含 thinking block、无最终文本（即"返回空内容"场景），程序会直接切换下一 Provider，不消耗安抚重试。
+**DeepSeek V4 强制推理说明**：DeepSeek V4 系列为**强制推理模型**，即使 `thinking_enabled` 关闭也会返回 `thinking` block；且 `max_tokens` 是 **thinking + 最终文本的共享预算**（而非仅最终输出）。当思考部分耗尽预算时，响应只含 thinking block、无最终文本（即"返回空内容"场景）。
 
-**调参建议**：若日志出现 `LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本`，请**增大对应模块的 `max_tokens_{module}`** 或**降低 `reasoning_effort_{module}`**（如 `"high"` → `"medium"`）。参考：health_check 此前使用 4096 + `"high"` 稳定触发空内容，改为 8192 + `"medium"` 后正常产出。
+**思考耗尽自动兜底**：开启 Extended Thinking 时若出现"思考部分耗尽 max_tokens 预算"，程序会**自动关闭 thinking 同 Provider 重试一次**（`call_claude` 层安全网，日志 `关闭 thinking 重试一次，避免模块整体失败`），保证有正文产出；重试仍失败才切换下一 Provider。因此正常情况下不再因思考耗尽直接丢模块内容。
+
+**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。当前默认 expert_review 20000 / health_check 16000（对应 thinking_budget 16000/12000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险），配合自动兜底双重保障。
 
 ### 效果参考
 

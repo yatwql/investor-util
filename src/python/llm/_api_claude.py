@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 from src.python.llm.api_base import (
     _extract_content,
     _check_claude_truncation,
+    _get_last_thinking_exhausted,
+    clear_last_thinking_exhausted,
     call_llm_with_retry,
 )
 from src.python.llm.api import (
@@ -77,18 +79,37 @@ def call_claude(
     client = http_client
     assert client is not None
 
-    return call_llm_with_retry(
-        label="Claude",
-        client=client,
-        url=url,
-        headers=headers,
-        payload=payload,
-        timeout=timeout,
-        max_retries=max_retries,
-        max_tokens=max_tokens,
-        config_field=config_field,
-        extract_fn=_extract_content,
-        check_truncation_fn=lambda d, mt: _check_claude_truncation(d, mt, "Claude", config_field),
-        provider="claude",
-        model_name=model,
-    )
+    def _do_call(p: dict) -> tuple[str | None, dict | None]:
+        return call_llm_with_retry(
+            label="Claude",
+            client=client,
+            url=url,
+            headers=headers,
+            payload=p,
+            timeout=timeout,
+            max_retries=max_retries,
+            max_tokens=max_tokens,
+            config_field=config_field,
+            extract_fn=_extract_content,
+            check_truncation_fn=lambda d, mt: _check_claude_truncation(d, mt, "Claude", config_field),
+            provider="claude",
+            model_name=model,
+        )
+
+    # ── 思考耗尽安全网：DeepSeek 等强制推理模型在 max_tokens（thinking+正文共享预算）
+    #    被思考占满时响应仅含 thinking block、无正文，直接切 provider 会丢模块内容。
+    #    此处关闭 thinking 同 provider 重试一次，保证有正文产出。 ──
+    thinking_was_enabled = "thinking" in payload
+    call_result = _do_call(payload)
+    if call_result[0] is None and thinking_was_enabled and _get_last_thinking_exhausted():
+        logger.warning(
+            "Extended Thinking 思考部分耗尽 max_tokens 预算（无正文），关闭 thinking 重试一次，避免模块整体失败"
+        )
+        # 构建全新 payload，避免污染首次请求记录
+        retry_payload = dict(payload)
+        retry_payload.pop("thinking", None)
+        if temperature is not None and "thinking" not in retry_payload:
+            retry_payload["temperature"] = temperature
+        clear_last_thinking_exhausted()
+        call_result = _do_call(retry_payload)
+    return call_result

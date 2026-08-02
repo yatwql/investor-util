@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime
 from typing import Any
 
@@ -265,6 +266,8 @@ def _render_template(
     history_data: dict | None,
     data_status_history: DataStatus,
     data_source_matrix: dict,
+    chart_datasets: dict | None = None,
+    enable_interactive_charts: bool = False,
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     return _ENV.get_template("report_template.html").render(
@@ -323,6 +326,8 @@ def _render_template(
         data_source_matrix=data_source_matrix,
         report_year=datetime.now().year,
         data_unavailable=bool(total_mv == 0 and total_cost > 0),
+        chart_datasets=chart_datasets,
+        enable_interactive_charts=enable_interactive_charts,
     )
 
 
@@ -350,6 +355,8 @@ def write_html_report(
     enable_news: bool = True,
     enable_history: bool = True,
     debate_info: dict | None = None,
+    chart_datasets: dict | None = None,
+    enable_interactive_charts: bool = False,
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -368,6 +375,10 @@ def write_html_report(
             None 时历史章节显示占位文本。
         a_indices: 可选预获取 A 股指数数据，传入时跳过 HTTP 请求。
         us_indices: 可选预获取美股指数数据，传入时跳过 HTTP 请求。
+        chart_datasets: Chart.js 数据集（chart_data_builder 输出），经 context 传递（C14 合规）。
+            默认 None → 图表章节回退旧 Canvas 渲染。
+        enable_interactive_charts: Chart.js 交互图表总开关（Feature Flag）。
+            默认 False → 模板不加载 chart.min.js / canvas 容器。
 
     Returns:
         最新版报告的绝对路径
@@ -537,9 +548,44 @@ def write_html_report(
         history_data=history_data,
         data_status_history=data_status_history,
         data_source_matrix=data_source_matrix,
+        chart_datasets=chart_datasets,
+        enable_interactive_charts=enable_interactive_charts,
     )
 
+    if enable_interactive_charts:
+        _copy_js_assets(output_dir)
+
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
+
+
+# ── Chart.js JS 资产复制（src/static/ → 输出目录）───────────────
+
+
+def _copy_js_assets(output_dir: str) -> None:
+    """将 src/static/ 下四个前端 JS 资产复制到报告输出目录（R21 本地 bundle）。
+
+    模板以相对路径引用（chart.min.js / chart-print.js / chart-config.js /
+    chart-init.js），报告完全离线自包含。文件缺失时仅告警，不阻断报告生成（防御性）。
+
+    Args:
+        output_dir: 报告输出目录（与 HTML 同目录）
+    """
+    import shutil
+
+    from src.python.core.constants import PROJECT_ROOT
+
+    _JS_ASSETS = ("chart.min.js", "chart-print.js", "chart-config.js", "chart-init.js")
+    src_dir = os.path.join(PROJECT_ROOT, "src", "static")
+    os.makedirs(output_dir, exist_ok=True)
+    for fname in _JS_ASSETS:
+        src = os.path.join(src_dir, fname)
+        if not os.path.exists(src):
+            logger.warning("[chart] JS 资产缺失（跳过复制）: %s", src)
+            continue
+        try:
+            shutil.copy2(src, os.path.join(output_dir, fname))
+        except OSError as e:
+            logger.warning("[chart] JS 资产复制失败: %s", e)
 
 
 # ── 桥接 import：外部子模块 ─────────────────────────────────

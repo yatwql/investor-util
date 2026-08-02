@@ -1,6 +1,6 @@
 """报告生成实现 — both/full 两种路径的 HTML+Excel 生成逻辑。
 
-提取自 ``report/orchestrator.py``，包含报告生成管线各工序实现。
+包含报告生成管线各工序实现。
 """
 
 from __future__ import annotations
@@ -241,13 +241,28 @@ def _generate_full_html_report(
     enable_llm: bool,
     debate_info: dict | None,
     result,
+    metrics: dict | None = None,
 ) -> bool:
-    """full 路径的 HTML 报告生成，返回是否成功。"""
+    """full 路径的 HTML 报告生成，返回是否成功。
+
+    Args:
+        metrics: compute_all_metrics() 返回值（14 项全量，仅 full 路径）；
+            用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
+    """
+    from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
 
     _report_label = "含新闻 + LLM" if news_ok else "仅 LLM"
     reporter.info(f"正在生成 HTML 报告（{_report_label}分析章节）...")
     try:
+        _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
+        chart_datasets = _build_chart_datasets_for_report(
+            history_data=history_data,
+            details=prep.get("details"),
+            risk_metrics=prep.get("risk_metrics"),
+            all_metrics=metrics,
+            enable_interactive=_enable_interactive_charts,
+        )
         path = write_html_report(
             holdings,
             output_dir=output_dir or prep["output_dir"],
@@ -267,6 +282,8 @@ def _generate_full_html_report(
             enable_history=enable_history,
             enable_llm=enable_llm,
             debate_info=debate_info,
+            chart_datasets=chart_datasets,
+            enable_interactive_charts=_enable_interactive_charts,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -351,6 +368,7 @@ def _generate_report_both(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import is_enable_b_series, is_enable_history, is_enable_news
+    from src.python.config.features import is_feature_enabled
     from src.python.core.perf import PerfCollector
     from src.python.core.registry import get_report_section_order
     from src.python.report._snapshot import capture_snapshot, fetch_history_data
@@ -368,6 +386,7 @@ def _generate_report_both(
     _enable_b_series = is_enable_b_series(config)
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
+    _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
     news_top_count = int(config.get("news_top_count", 100))
@@ -403,6 +422,11 @@ def _generate_report_both(
     reporter.info(f"正在生成 HTML 报告（{_news_label}）...")
     perf.start("HTML 生成")
     try:
+        chart_datasets = _build_chart_datasets_for_report(
+            history_data=history_data,
+            details=details,
+            enable_interactive=_enable_interactive_charts,
+        )
         path = write_html_report(
             holdings,
             output_dir=output,
@@ -416,6 +440,8 @@ def _generate_report_both(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_llm=False,
+            chart_datasets=chart_datasets,
+            enable_interactive_charts=_enable_interactive_charts,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -458,6 +484,51 @@ def _generate_report_both(
     return result
 
 
+# ── Chart.js 数据集构建辅助 ───────────────────────────────
+
+
+def _build_chart_datasets_for_report(
+    *,
+    history_data: dict | None,
+    details: list | None = None,
+    risk_metrics: dict | None = None,
+    all_metrics: dict | None = None,
+    enable_interactive: bool = True,
+) -> dict | None:
+    """构建 Chart.js 数据集（Flag 关闭或数据缺失时返回 None/空 dict）。
+
+    - Flag 关闭 → None（模板不渲染 Chart.js，回退旧 Canvas）
+    - Flag 开启 → build_chart_datasets()（内部对单图失败独立 try/except，R11）
+
+    metrics_* Flag（§6.6 F1）：收集雷达子开关值传给预处理器，
+    关闭的指标在 radar 数据集输出 "N/A"。注：metrics_risk_contribution
+    是指标级熔断开关（circuit_breaker_wrapper 消费），非雷达轴，不在此收集。
+    """
+    if not enable_interactive:
+        return None
+    try:
+        from src.python.config.features import is_feature_enabled
+        from src.python.report.chart_data_builder import build_chart_datasets
+
+        _metric_flag_names = (
+            "metrics_sharpe", "metrics_calmar", "metrics_hhi",
+            "metrics_winrate", "metrics_turnover", "metrics_beta",
+        )
+        metric_flags = {n: is_feature_enabled(n) for n in _metric_flag_names}
+
+        return build_chart_datasets(
+            history_data=history_data,
+            details=details,
+            risk_metrics=risk_metrics,
+            all_metrics=all_metrics,
+            metric_flags=metric_flags,
+        )
+    except Exception:
+        # 预处理器顶层兜底（R11）：任何异常 → 返回空 dict（报告仍有表格/占位）
+        logger.warning("[chart] 数据集构建失败，图表整体跳过（报告仍正常）", exc_info=True)
+        return {}
+
+
 # ── _generate_report_full（HTML+Excel+LLM）──
 
 
@@ -476,6 +547,7 @@ def _generate_report_full(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import is_enable_b_series, is_enable_history, is_enable_llm, is_enable_news
+    from src.python.config.features import is_feature_enabled
     from src.python.fetcher.akshare import get_sector_fund_flow
     from src.python.core.perf import PerfCollector
     from src.python.core.registry import get_report_section_order
@@ -572,6 +644,7 @@ def _generate_report_full(
         _enable_llm,
         debate_info,
         result,
+        _metrics,
     )
 
     # ── 7. Excel 报告 ──

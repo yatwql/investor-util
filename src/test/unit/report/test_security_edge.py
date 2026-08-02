@@ -200,8 +200,7 @@ class TestApiKeyLogLeakY6(unittest.TestCase):
     """API Key 不应出现在日志中。"""
 
     def test_logger_sanitizes_api_key(self):
-        """验证日志配置不输出 api_key（委托已有测试）。"""
-        # 已由 test_log_sanitize.py 完整覆盖
+        """验证日志配置不输出 api_key。"""
         # 此测试为交叉引用，验证导入可用
         from src.python.llm.api_base import _sanitize_endpoint
         result = _sanitize_endpoint("https://api.anthropic.com/v1/messages")
@@ -249,12 +248,17 @@ class TestTempFileRaceY6(unittest.TestCase):
     """临时文件安全 — mkstemp 原子写入。"""
 
     def test_mkstemp_used_for_config(self):
-        """set_config 使用 mkstemp 防半写。"""
+        """set_config 原子写防半写（委托 _atomic_write，内含 mkstemp + os.replace）。"""
         from src.python.config import set_config
+        from src.python.config._core import _atomic_write
         import inspect
-        source = inspect.getsource(set_config)
-        self.assertIn("mkstemp", source)
-        self.assertIn("os.replace", source)
+        # 原子写实现（_atomic_write）必须使用 mkstemp + os.replace 防半写
+        source_atomic = inspect.getsource(_atomic_write)
+        self.assertIn("mkstemp", source_atomic)
+        self.assertIn("os.replace", source_atomic)
+        # set_config 必须委托 _atomic_write（而非直接写文件）
+        source_set = inspect.getsource(set_config)
+        self.assertIn("_atomic_write", source_set)
 
     def test_mkstemp_used_for_cache(self):
         """cache.set 使用 mkstemp 防半写。"""

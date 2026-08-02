@@ -1,6 +1,6 @@
 """LLM 批量处理模块 — 批量 LLM 调用的缓存检查、执行与合并。
 
-提取自 ``llm/skeleton.py``，管理批量模式下的缓存预检、并行调用和结果合并。
+管理批量模式下的缓存预检、并行调用和结果合并。
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """LLM/新闻并行获取 — 线程池提交/收集/报告。
 
-提取自 ``report/orchestrator.py``，统一管理 LLM 内容和新闻数据的并行获取。
+统一管理 LLM 内容和新闻数据的并行获取。
 """
 
 from __future__ import annotations

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 
+from src.python.config._validation import _deabsolutize_paths
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.registry import get_cache_ttl_defaults
 
@@ -123,8 +124,14 @@ def _get_default_config_template() -> str:
 
 
 def _build_template_from_defaults() -> str:
-    """从 _DEFAULT_CONFIG 生成带注释的 JSON 模板。"""
-    d = _DEFAULT_CONFIG
+    """从 _DEFAULT_CONFIG 生成带注释的 JSON 模板。
+
+    模板中路径型键写相对路径（可移植，跨机器友好）；运行时由
+    _absolutize_paths() 绝对化。_DEFAULT_CONFIG 内存值保持绝对路径。
+    """
+    # 浅拷贝后反绝对化：仅改顶层路径键，不污染 _DEFAULT_CONFIG
+    d = dict(_DEFAULT_CONFIG)
+    _deabsolutize_paths(d)
     parts = [
         "{",
         # ── A ──

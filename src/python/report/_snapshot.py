@@ -1,6 +1,6 @@
 """快照与历史数据 — 持仓快照创建/环比差异计算/组合历史走势。
 
-提取自 ``report/orchestrator.py``，管理 F1 快照和 F2 历史走势两个工序。
+管理 F1 快照和 F2 历史走势两个工序。
 """
 
 from __future__ import annotations

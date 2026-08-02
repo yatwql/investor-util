@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
-> 文档版本：0.9.4-dev
+> 文档版本：0.9.5-dev
 
 ---
 
@@ -12,72 +12,83 @@
 
 ## 当前迭代待办
 
-> **P0** = 必须完成才能发布 · **P1** = 当前待办 · **P2** = 下一阶段就绪（~22d 预排） · **P3** = 预期实施，有空时安排 · **P4** = 实验功能（缺省关闭，需显式启用）
+> **P0** = 必须完成才能发布 · **P1** = 当前待办 · **P2** = 下一阶段就绪（~21d 预排） · **P3** = 预期实施，有空时安排 · **P4** = 实验功能（缺省关闭，需显式启用）
 
 ### P0 — 发布门禁
 
 （待排期）
 
+### 推荐实施顺序
+
+> 结合架构约束、收益/风险与最新依赖状态（rf-1 批量并行已落地、plan-3 C7 注册已完成）重排的推荐实施次序。
+> ①~⑨ 为推荐先后；括号内为计划项原有优先级归类（P2=下一阶段就绪 / P3=预期实施）。plan-4 已放弃，不列入实施序列。
+
+| 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
+|:--:|:--|:--:|:--:|:--|
+| ① | **plan-9** 首次运行引导 | P3 | 1d | 性价比最高，所有新用户体验；独立无依赖，可从 P3 提前实施 |
+| ② | **plan-7** 因子暴露分析（MVP 3 因子） | P2 | 2.5d | probe 已验证（2026-08-01）MVP 3 因子可行；300成长停更由 500成长替代 |
+| ③ | **plan-2 / plan-3** 分析基础 | P2 | 4.5d | rf-1 依赖已解除；共享历史数据源与缓存；plan-3 C7 注册已完成 |
+| ④ | **plan-1** 交互式 HTML 报告 | P2 | 5.25d | ✅ **已完成**（8 迭代落地）；解锁 plan-3/6/11 图表增强 |
+| ⑤ | **plan-6** 多快照趋势追踪 | P2 | 3d | 依赖 plan-1 图表框架；聚合既有快照，低风险 |
+| ⑥ | **plan-5** 调仓 What-if 模拟 | P2 | 5d | 独立大块，无数据源依赖；plan-1 后 diff 图表受益 |
+| ⑦ | **plan-11** HTML 暗色模式 | P3 | 0.5d | 依赖 plan-1 的 CSS 变量预留，极低成本 |
+| ⑧ | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
+| ⑨ | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
+
 ### P2 — 下一阶段就绪
 
-> **plan-1**～**plan-7**（plan-4 已放弃）合计 ~18d 预排。
+> **plan-1**～**plan-7**（plan-4 已放弃）合计 ~20d 预排。
+> **前置状态**：rf-1 批量并行已落地（v0.8.x），plan-2 全品种历史获取依赖已解除；plan-3 的 `drawdown_analysis` 模块 C7 注册已完成。
+> 组内条目按推荐实施顺序排列（见上方总览）。
 
-#### `plan-1` 交互式 HTML 报告升级（[`plan-chartjs-report-upgrade.md`](../plan/plan-chartjs-report-upgrade.md)）
-
-Chart.js 替换 Canvas 静态图表，实现缩放、悬停提示、筛选、导出。**预估：4d**
-
-| 阶段 | 内容 | 工作量 |
-|------|------|:------:|
-| 技术选型验证 | Chart.js vs ECharts vs ApexCharts → 选定模板集成方案；CDN ↔ 本地 bundle 策略 | 0.5d |
-| 数据接口定义 | 每类图表 template context 数据结构（C14 约束：走 `render()` context）；C19 Schema 定义（如需新增 pipeline_data 键） | 0.5d |
-| 模板改造 | jinja2 模板引入 Chart.js、数据序列化接口、渲染函数 | 1d |
-| 图表迁移 | 饼图、柱状图、净值曲线、热力图逐个替换为交互版 | 1d |
-| 打印降级 | @media print + canvas-to-image fallback | 0.5d |
-| Feature Flag | `enable_interactive_charts` 控制迁移回退（§1.4.4 配置驱动） | 0.5d |
-
-覆盖 6 张交互图表：资产构成(Doughnut)、行业分布(Horizontal Bar)、穿透 TOP10(Bar)、净值趋势(Line)、相关性矩阵(Heatmap)、量化指标(Gauge/Radar)。（⬆ plan-3/plan-6 图表增强依赖本项）
-
-#### 分析功能基础增强（[`plan-correlation-drawdown.md`](../plan/plan-correlation-drawdown.md)）— **plan-2 / plan-3**
+#### 分析功能基础增强（[`plan-correlation-drawdown.md`](../plan/plan-correlation-drawdown.md)）— **plan-2 / plan-3（推荐③）**
 
 | # | 项目 | 内容 | 工作量 |
 |:-:|:-----|:-----|:------:|
-| plan-2 | **持仓相关性矩阵** | 纯计算(`analysis/correlation.py`)+编排(`orchestrator.py` 获取全品种历史+注入)+registry 注册(C7)+pipeline_data 新键(C19)+Excel/HTML 渲染+数据不足降级(§1.4.5) | 2.5d | ⚠️ 对 `rf-1` 有间接依赖（串行获取全品种历史 ~15-30s，详 `plan-correlation-drawdown.md §1`） |
+| plan-2 | **持仓相关性矩阵** | 纯计算(`analysis/correlation.py`)+编排(`orchestrator.py` 获取全品种历史+注入)+registry 注册(C7)+pipeline_data 新键(C19)+Excel/HTML 渲染+数据不足降级(§1.4.5) | 2.5d | ✅ `rf-1` 批量并行已落地，全品种历史可并行获取，无阻塞（详 `plan-correlation-drawdown.md §1`） |
 | plan-3 | **最大回撤+净值曲线** | 回撤区间标注 + 多期净值聚合 + 恢复时间明细表 + C19 schema 定义 + 数据不足降级(§1.4.5) + 图表增强(依赖 plan-1) | 2d | ⚠️ Chart.js 双轴图依赖 plan-1（详 `plan-correlation-drawdown.md §2`） |
+
+#### `plan-1` 交互式 HTML 报告升级（[`plan-chartjs-report-upgrade.md`](../plan/plan-chartjs-report-upgrade.md)）— **推荐④**
+
+Chart.js 替换 Canvas 静态图表，实现缩放、悬停提示、筛选、导出。**预估：5.25d**（8 迭代拆分、Python 端预处理器、chart.min.js 本地 bundle 与验收标准详见设计文档）。**✅ 已完成**（8 迭代全部落地，双路径回退验证通过，详见 `changelog.md`）
+
+覆盖 6 张交互图表：净值趋势(Line)、最大回撤(Line)、资产构成(Doughnut)、行业分布(Horizontal Bar)、穿透 TOP10(Bar)、量化指标(Radar)。相关性矩阵(Heatmap)依赖 plan-2 的 correlation_data，推迟至 plan-2。（⬆ plan-3/plan-6 图表增强依赖本项）
 
 #### 高级分析功能（[`plan-advanced-analysis.md`](../plan/plan-advanced-analysis.md)）— **plan-4（已放弃）~ plan-7**
 
 | # | 项目 | 内容 | 工作量 | 状态 |
 |:-:|:-----|:-----|:------:|:----:|
 | ~~plan-4~~ | ~~**业绩归因（Brinson 分解）**~~ | ~~单期 Brinson（配置+选股+交互）+ 多期平滑 + 基准选择~~ | ~~4d~~ | ❌ **已放弃** — 3/4 关键数据源不可突破：① 行业指数 K 线不稳定 ② 无免费基准行业权重 ③ 非 A 股品种无行业归属。详见 `archive/v0.7.x/better-investment-advice/discussion-better-investment-advice.md` §4.2 不做清单 |
-| plan-5 | **调仓 What-if 模拟** | 双目录镜像 + 对比管线 + diff 视图（Excel/HTML） | 5d | ⏳ 数据源 ✅ 无新依赖 |
-| plan-6 | **多快照趋势追踪** | 多期快照聚合 → 市值趋势/行业配置流/穿透变迁/HHI 趋势 | 3d | ⏳ 数据源 ✅ 无新依赖 |
-| plan-7 | **因子暴露分析** | 中证因子代理 + OLS 回归 + 风格归属饼图 | 3.5d | ⏳ 数据源 ⚠️ 需 CSI 风格指数 probe 验证 |
+| plan-6 | **多快照趋势追踪（推荐⑤）** | 多期快照聚合 → 市值趋势/行业配置流/穿透变迁/HHI 趋势 | 3d | ⏳ 数据源 ✅ 无新依赖 · ⚠️ HTML 图表依赖 plan-1 |
+| plan-5 | **调仓 What-if 模拟（推荐⑥）** | 双目录镜像 + 对比管线 + diff 视图（Excel/HTML） | 5d | ⏳ 数据源 ✅ 无新依赖 |
+| plan-7 | **因子暴露分析（推荐② MVP 3 因子）** | 中证因子代理 + OLS 回归 + 风格归属柱状图 | 2.5d | ✅ **probe 已完成（2026-08-01）**：Tencent 4/5 主候选有效且新鲜，300成长（sh000920）停更由 500成长（sh000925）替代 → 按 MVP 3 因子实施（详 `plan-advanced-analysis.md §4`，含架构约束遵从表与技术债预置）；**实施前技术债 rf-102/103/104/106 已全部处理**（Tencent 钳位 2000 + 解析容错、Sina 降级接受、因子替代、days 语义澄清） |
 
 ### P3 — 用户体验改进
 
 > **P3** = 预期实施，有空时安排。部分子项已完成，剩余待排期。
+> 组内条目按推荐实施顺序排列（见上方总览）；其中 plan-9（推荐①）性价比最高，建议从 P3 提前实施。
 
-#### `plan-8` 轻量 Web UI（[`plan-web-ui.md §1`](../plan/plan-web-ui.md#1-轻量-web-ui)）
+#### `plan-9` 首次运行引导（[`plan-web-ui.md §2`](../plan/plan-web-ui.md#2-首次运行引导)）— **推荐①**
 
-Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做多用户/LLM 在线修改/实时日志流。
+检测 config.json/llm_key/holdings 首次缺失 → 交互式引导创建。**预估：1d**
+
+#### `plan-11` HTML 暗色模式（[`plan-web-ui.md §5`](../plan/plan-web-ui.md#5-html-暗色模式)）— **推荐⑦**
+
+CSS 变量 + localStorage 切换按钮。**预估：0.5d**（依赖 plan-1 的 chart-config.js CSS 变量预留）
+
+#### `plan-10` 日志可视化（[`plan-web-ui.md §3`](../plan/plan-web-ui.md#3-日志可视化)）— **推荐⑧**
+
+结构化日志查看（`--view-logs` 命令 + 报告尾部数据源状态表）。**预估：1d**
+
+#### `plan-8` 轻量 Web UI（[`plan-web-ui.md §1`](../plan/plan-web-ui.md#1-轻量-web-ui)）— **推荐⑨**
+
+Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做多用户/LLM 在线修改/实时日志流。**运维与安全成本最高，单人工具需谨慎，建议作为 P3 最后项。**
 
 | 阶段 | 工作量 |
 |------|:------:|
 | MVP 核心 | 3d |
 | 功能补齐 | 1.5d |
 | 体验打磨 | 1d |
-
-#### `plan-9` 首次运行引导（[`plan-web-ui.md §2`](../plan/plan-web-ui.md#2-首次运行引导)）
-
-检测 config.json/llm_key/holdings 首次缺失 → 交互式引导创建。**预估：1d**
-
-#### `plan-10` 日志可视化（[`plan-web-ui.md §3`](../plan/plan-web-ui.md#3-日志可视化)）
-
-结构化日志查看（`--view-logs` 命令 + 报告尾部数据源状态表）。**预估：1d**
-
-#### `plan-11` HTML 暗色模式（[`plan-web-ui.md §5`](../plan/plan-web-ui.md#5-html-暗色模式)）
-
-CSS 变量 + localStorage 切换按钮。**预估：0.5d**
 
 ### P4 — 实验功能
 

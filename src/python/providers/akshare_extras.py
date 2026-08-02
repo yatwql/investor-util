@@ -3,7 +3,7 @@
 通过 akshare 获取以下数据：
   1. stock_profit_forecast_em — 机构盈利预测（全量股票，含预测 EPS）
   2. stock_sector_fund_flow_rank — 行业资金流向排名（含主力净流入）
-  3. stock_history_dividend — 全量股票历史分红（akshare 新版无参调用，按代码过滤）
+  3. stock_history_dividend — 全量股票历史分红（akshare 无参调用，按代码过滤）
 
 各函数独立，使用指数变化/代码列表指纹 + TTL 双因子缓存失效策略。
 """
@@ -339,7 +339,7 @@ def _compute_dividend_fingerprint(codes: list[str]) -> str:
 def _calc_dividend_summary(df_data) -> dict | None:
     """从股票分红汇总 DataFrame 提取年度平均分红。
 
-    akshare 新版 stock_history_dividend() 返回聚合数据（每只股票一行），
+    akshare 的 stock_history_dividend() 返回聚合数据（每只股票一行），
     列包含：代码、名称、上市日期、累计股息、年均股息、分红次数 等。
 
     Args:
@@ -377,7 +377,7 @@ def _calc_dividend_summary(df_data) -> dict | None:
 def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
     """获取多只股票的分红数据，返回 {code: summary}。
 
-    akshare 新版 stock_history_dividend() 不接受参数，返回全量数据。
+    akshare 的 stock_history_dividend() 不接受参数，返回全量数据。
     一次拉取后按代码过滤。
     """
     result: dict[str, dict] = {}
@@ -393,7 +393,7 @@ def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
         logger.warning("分红全量数据为空")
         return result
 
-    # 定位"代码"列（akshare 新版列名）
+    # 定位"代码"列（akshare 列名）
     code_col = next((c for c in full_df.columns if "代码" in c or c.lower() in ("code", "symbol")), None)
     name_col = next((c for c in full_df.columns if "名称" in c or "简称" in c), None)
     if code_col is None:
@@ -416,7 +416,7 @@ def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
 def get_dividend_data(codes: list[str]) -> dict[str, dict]:
     """获取股票历史分红数据，计算年均每股分红。
 
-    调用 ak.stock_history_dividend()（全量拉取，akshare 新版无参数）
+    调用 ak.stock_history_dividend()（全量拉取，akshare 无参数）
     获取所有股票历年分红记录，按代码过滤后汇总为年均每股股利。
 
     缓存策略：代码列表指纹 + 1 月 TTL 双因子失效。

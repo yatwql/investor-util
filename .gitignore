@@ -3,8 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
-.venv/
-venv/
+.venv
+venv
 
 # ── 个人数据（持仓、缓存、API Key）────────────────────
 data/
@@ -13,6 +13,9 @@ data/
 !data/config/llm_providers.json
 !data/knowledge/
 !data/knowledge/*.json
+!src/test/data/
+!src/test/data/hallucination/
+!src/test/data/hallucination/*.py
 
 # ── 运行时生成 ───────────────────────────────────────
 logs/

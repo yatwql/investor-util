@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：0.9.4-dev
+> 文档版本：0.9.5-dev
 
 ## 目录
 
@@ -1455,7 +1455,7 @@ get_combined_timeseries()
 - 每个基准完成归一化后输出 `logger.info(...)` 
 - 异常捕获在 try/except 中，不阻塞主流程
 
-**HTML 渲染**：`drawSimpleChart()` 多 dataset 版本，组合 as-if 曲线（实线）+ 基准指数（虚线，颜色循环），右侧图例显示。使用 Canvas 2D API 原生渲染（无 Chart.js 外部依赖）。
+**HTML 渲染**：`enable_interactive_charts` 开启时由 Chart.js 渲染交互图表（净值/回撤曲线、资产构成环形图、行业分布、穿透 TOP10、量化雷达图）；关闭时回退 `drawSimpleChart()`（Canvas 2D API 原生渲染，无 Chart.js 依赖），组合 as-if 曲线（实线）+ 基准指数（虚线，颜色循环），右侧图例显示。
 
 **Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值），`drawdown_analysis` 页签对比指标矩阵。
 
@@ -1887,7 +1887,7 @@ generators_orchestrator（并行调度 4+1 模块）
             │      └── api_base._attempt_api_call()
             │              ├── Claude → anthropic SDK
             │              └── OpenAI/DeepSeek → openai SDK
-            │ ④ 空内容处理（None→切换 provider；""→安抚重试一次）
+            │ ④ 空内容处理（thinking 耗尽→关闭 thinking 同 provider 重试一次；仍失败→切换 provider）
             │ ⑤ Markdown→HTML（markdown.py）
             │ ⑥ 写入缓存（Provider 感知键名，记录实际 Provider 名）
             └── 返回 (result, usage, provider_name) 三元组
@@ -1911,7 +1911,7 @@ LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_
 
 **辩论模式路由**：当 Feature Flag 开启时，expert_review 模块的生成入口被 `_debate_wrapper` 接管，输出路径变为 debate 三段式。辩论模式使用独立的缓存键（`llm_debate_pro_`/`llm_debate_con_`/`llm_debate_synthesis_`）和 Token 预算守卫，三段缓存共用 expert_review 的持仓指纹（排除行情波动），默认 TTL 24h。辩论模式启用时报告页签标题尾部附加"(实验)"标签。
 
-各模块的详细配置参数、System Prompt 设计、User Prompt 构建逻辑见 `llm-technical.md` §8（提示词管理）。辩论模式详见 `llm-technical.md` §4.1 和 §5.5。
+各模块的详细配置参数、System Prompt 设计、User Prompt 构建逻辑见 `llm-technical.md` §8（提示词管理）。辩论模式相关生成器见 `llm-technical.md` §2.1（子模块总览）。
 
 ### 5.4 多 Provider 链模式
 
@@ -1932,7 +1932,7 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 | Extended Thinking | Claude: `thinking.budget_tokens`；DeepSeek: `output_config.effort` | 与 `temperature` 互斥 |
 | Prompt Caching | Anthropic 专属，system prompt 数组 + `cache_control: ephemeral` | 5 分钟内复用免全价 |
 | 截断重试 | 检测 `TRUNCATION_MARKER` 后自动 1.5× max_tokens 重试一次 | 修复内容被截断的情况 |
-| 空内容处理 | `_extract_content` 无 text block 返回 None → 直接切换 provider（DeepSeek V4 思考耗尽 max_tokens 预算场景，安抚无效）；仅真正空字符串 `""` 追加安抚指令重试一次 | 应对思考预算耗尽 + 内容审查误杀 |
+| 空内容处理 | `_extract_content` 无 text block（DeepSeek 思考耗尽）→ 先关闭 thinking 同 provider 重试一次（安全网）；仍无正文再切换 provider；真正空字符串 `""` 追加安抚指令重试一次 | 应对思考预算耗尽 + 内容审查误杀 |
 | 会话用量追踪 | `session.py` 维护线程安全 `session_usage` 字典 + `cost_tracker.py` 报告级预算管理 | 按模块粒度追踪 token/费用/缓存命中/耗时 |
 | Token 预算告警 | `cost_tracker.check_input_budget()` — 累计输入 Token 超 8K 时日志告警（不截断） | 为模型分层提供基线数据 |
 | 调用耗时记录 | `skeleton.py` `time.monotonic()` 计时 → `record_per_module(duration=)` → HTML 页脚展示 | 每次 call_llm() 记录实际耗时 |
@@ -2518,5 +2518,8 @@ investor-util/
 | liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
 | fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
 | scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
+| factor_exposure | dict | 是 | 计划中 | prepare_report_data |
+
+> `factor_exposure`（因子暴露分析）：`{"available": bool, "betas": {factor: float}, "t_stats": {factor: float}, "style_allocation": {factor: float}, "window": int}`。C7 注册见 `plan-advanced-analysis.md` §4 技术债与技术预置。
 
 [↑ 回到顶部](#目录)

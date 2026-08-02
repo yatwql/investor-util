@@ -217,7 +217,7 @@ class TestFetchNav(unittest.TestCase):
 
 
 class TestQdiiNavRelationships(unittest.TestCase):
-    """R-097: QDII 估值净值 vs 官方净值关系。"""
+    """QDII 估值净值 vs 官方净值关系。"""
 
     def _call_fetch_nav(self, mock_data: dict | None = None):
         """Mock fetch_nav 返回指定数据。"""

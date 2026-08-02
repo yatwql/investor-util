@@ -279,8 +279,13 @@ def _parse_kline_response(data: dict, code: str) -> list[dict]:
     }
 
     优先使用 qfqday（前复权），回退到 day。
+
+    API 在请求窗口超限等异常时可能返回 list（而非 dict），非 dict 输入直接判空，不抛异常。
     """
     bars: list[dict] = []
+    if not isinstance(data, dict):
+        logger.warning("Tencent K 线响应非 dict（类型 %s），视为无数据", type(data).__name__)
+        return []
     try:
         inner = data.get("data", {}).get(code, {})
         # 优先前复权
@@ -323,7 +328,8 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
 
     Args:
         code: 指数代码，如 "sh000300" / "gb_inx"
-        days: 获取天数（默认 30，最大 3650）
+        days: 获取天数（默认 30，最大 2000。实测 API 上限约 2000 天，
+              传 3650 时 API 返回 list 触发解析崩溃，故钳位到 2000）
         start_from: 起始日期 YYYY-MM-DD，为 None 时从头获取
 
     Returns:
@@ -334,7 +340,7 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
         logger.debug("Tencent 跳过非指数代码: %s", code)
         return []
 
-    days = min(max(days, 5), 3650)
+    days = min(max(days, 5), 2000)  # 上限钳位到实测 2000 天
     full_code = code.strip()
     url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 

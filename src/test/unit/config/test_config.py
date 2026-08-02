@@ -19,6 +19,7 @@ import unittest
 from unittest.mock import patch
 
 from src.python import config as cfg
+from src.python.config import _comments
 from src.python.core.constants import PROJECT_ROOT
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
@@ -148,6 +149,29 @@ class TestInitConfig(unittest.TestCase):
         cfg.init_config()
         self.assertTrue(os.path.exists(cfg._config_defaults._CONFIG_FILE))
 
+    @pytest.mark.smoke
+    def test_init_template_writes_relative_paths(self):
+        """首次生成 config.json → 路径型键为相对路径（全新安装可移植）。"""
+        # conftest _isolate_sensitive_paths 会把 llm_settings_file 注入为跨盘临时路径，
+        # 此处还原为项目根内路径，验证模板在真实场景下写相对路径
+        orig = cfg._config_defaults._DEFAULT_CONFIG["llm_settings_file"]
+        try:
+            cfg._config_defaults._DEFAULT_CONFIG["llm_settings_file"] = os.path.join(
+                PROJECT_ROOT, "data/config/llm_settings.json"
+            )
+            cfg.init_config()
+        finally:
+            cfg._config_defaults._DEFAULT_CONFIG["llm_settings_file"] = orig
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
+            raw = f.read()
+        cleaned = _comments._strip_json_comments(raw)
+        data = json.loads(cleaned)
+        for key in _PATH_KEYS_IN_TEMPLATE:
+            self.assertFalse(
+                os.path.isabs(data[key]),
+                f"{key} 被写成绝对路径: {data[key]}",
+            )
+
 
 class TestSetConfig(unittest.TestCase):
     """set_config 的异常场景测试。"""
@@ -194,6 +218,54 @@ class TestSetConfig(unittest.TestCase):
         with patch("tempfile.mkstemp", side_effect=_mock_mkstemp):
             with self.assertRaises(PermissionError):
                 cfg.set_config("key", "value")
+
+    @pytest.mark.smoke
+    def test_set_non_path_key_preserves_relative_paths(self):
+        """写非路径键（如隐私提示）→ 路径型键保持相对路径，不落盘绝对路径。
+
+        显式预写相对路径配置，隔离 conftest 对 llm_settings_file 的跨盘注入。
+        """
+        os.makedirs(self.tmp.name, exist_ok=True)
+        relative = {
+            "holdings_dir": "data/holdings",
+            "holdings_filename": "个人投资持仓信息.xlsx",
+            "output_dir": "reports",
+            "llm_settings_file": "data/config/llm_settings.json",
+            "llm_key_file": "data/config/llm_key.json",
+            "llm_providers_file": "data/config/llm_providers.json",
+            "enable_b_series": True,
+            "news_top_count": 300,
+        }
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(relative, f)
+        # 生产环境实际触发 set_config 的入口：首次运行隐私提示标记
+        cfg.set_config("_privacy_notice_shown", True)
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        for key in _PATH_KEYS_IN_TEMPLATE:
+            self.assertFalse(
+                os.path.isabs(data[key]),
+                f"{key} 被写成绝对路径: {data[key]}",
+            )
+
+    def test_set_relative_path_value_kept_relative(self):
+        """写入相对路径值 → 落盘仍为相对路径，读取时被绝对化。"""
+        cfg.init_config()
+        cfg.set_config("holdings_dir", "data/custom")
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["holdings_dir"], "data/custom")
+        result = cfg.get_config()
+        self.assertEqual(result["holdings_dir"], os.path.join(PROJECT_ROOT, "data/custom"))
+
+    def test_set_external_absolute_path_kept(self):
+        """写入 PROJECT_ROOT 之外的绝对路径 → 保持绝对，不被误相对化（越界保护）。"""
+        cfg.init_config()
+        external = os.path.join(os.path.dirname(PROJECT_ROOT), "external")
+        cfg.set_config("holdings_dir", external)
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["holdings_dir"], external)
 
 
 if __name__ == "__main__":

@@ -71,6 +71,36 @@ def _absolutize_paths(config: dict) -> dict:
     return config
 
 
+def _deabsolutize_paths(config: dict) -> dict:
+    """将配置中位于项目根目录下的绝对路径键还原为相对路径（写盘前调用）。
+
+    与 _absolutize_paths 相对：运行时内存中使用绝对路径，落盘时还原为
+    相对路径，避免把本机绝对路径写入 config.json 导致跨机器不可移植。
+    仅处理 PROJECT_ROOT 之下的路径；外部绝对路径（不同盘符/项目外目录）
+    无法相对化或相对化会越出根目录，保持原样不变。
+
+    Args:
+        config: 待写盘的配置字典（就地修改路径型键）
+
+    Returns:
+        传入的同一 dict（便于链式调用）
+    """
+    for key in _PATH_CONFIG_KEYS:
+        val = config.get(key)
+        if not isinstance(val, str) or not _is_abs(val):
+            continue
+        try:
+            rel = os.path.relpath(val, PROJECT_ROOT)
+        except ValueError:
+            # 不同盘符（Windows）无法计算相对路径，保持绝对路径
+            continue
+        # 位于 PROJECT_ROOT 之外（relpath 越出根目录），保持绝对路径
+        if not rel or rel.startswith(".."):
+            continue
+        config[key] = rel.replace(os.sep, "/")
+    return config
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 校验辅助函数
 # ═══════════════════════════════════════════════════════════════════

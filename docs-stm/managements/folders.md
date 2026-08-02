@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：0.9.4-dev
+> 文档版本：0.9.5-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,18 +8,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 182 | 43,422 | `src/python/` 下所有 `.py`（不含测试） |
-| HTML 报告模板 | HTML | 1 | 1,862 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python | 10 | 3,460 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **193** | **48,744** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **217** | **59,014** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,806 个** | `pytest --collect-only` 统计 |
+| 主程序代码 | Python | 184 | 44,103 | `src/python/` 下所有 `.py`（不含测试） |
+| HTML 报告模板 | HTML | 1 | 1,980 | `src/python/tmpl/report_template.html` |
+| 辅助脚本 | Python | 11 | 3,857 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
+| **源代码合计** | — | **196** | **49,940** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **221** | **60,590** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,881 个** | `pytest --collect-only` 统计 |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **88** | — | 含 CLAUDE.md |
+| **项目文档** | Markdown | **87** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 69 | — | 各版本 changelog/plan/review-findings 等 |
-| ├ plan/ | 中间设计文件 | 6 | — | 当前迭代中的设计方案 |
+| ├ plan/ | 中间设计文件 | 8 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -168,6 +168,7 @@ investor-util/
 │   │   │   ├── market_value.py       #   市值计算与盈亏分析
 │   │   │   ├── market_value_sheet.py #   市值分析 Excel 页签
 │   │   │   ├── category.py           #   持仓分类（股票/基金/债券/QDII 等）
+│   │   │   ├── chart_data_builder.py #   Chart.js 6 图数据集预处理器（≤400 行）
 │   │   │   ├── fund_performance.py   #   基金业绩分析（排名/回撤/超额收益）
 │   │   │   ├── fund_concentration.py #   基金持仓集中度分析
 │   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
@@ -193,6 +194,7 @@ investor-util/
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
 │   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #18）
+│   │   │   ├── downsample.py         #   P1 服务端下采样（日频→周/月聚合）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
@@ -202,7 +204,7 @@ investor-util/
 │   │   ├── tmpl/                     # HTML 报告模板
 │   │   │   └── report_template.html  #   Jinja2 HTML 报告主模板
 │   │   │
-│   │   ├── core/                     # 核心基础设施（从根目录迁入）
+│   │   ├── core/                     # 核心基础设施
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── _phase_timeout.py     #   数据获取阶段超时管理
 │   │   │   ├── _session_cache.py     #   会话缓存管理
@@ -220,12 +222,12 @@ investor-util/
 │   │   │   ├── reader.py             #   持仓 xlsx 文件读取
 │   │   │   └── registry.py           #   中央注册表（模块/TTL/分组定义）
 │   │   │
-│   │   ├── cli/                      # CLI 命令行模式入口（从根目录迁入）
+│   │   ├── cli/                      # CLI 命令行模式入口
 │   │   │   ├── __init__.py           #   子包标记，re-export cli 符号
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   └── cli.py                #   argparse + 共享层路由
 │   │   │
-│   │   ├── tui/                      # TUI 交互模式入口（从根目录迁入）
+│   │   ├── tui/                      # TUI 交互模式入口
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   ├── handlers_cache.py     #   缓存管理命令处理器
@@ -235,6 +237,14 @@ investor-util/
 │   │   │   ├── tui_handlers.py       #   键盘/事件处理
 │   │   │   ├── tui_keys.py           #   终端键盘输入封装
 │   │   │   └── tui_menu.py           #   菜单系统
+│   │
+│   ├── static/                       # 前端静态资产（R21 本地 bundle + 调试页）
+│   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
+│   │   ├── chart-print.js            #   打印降级（beforeprint 快照 <img> / afterprint 恢复，§4.5）
+│   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制，≤150 行）
+│   │   ├── chart-init.js             #   6 张图初始化（O1 隔离 + degraded 虚线，≤300 行）
+│   │   ├── test-chart.html           #   独立调试页（TD8）：6 图渲染/降级/离线场景自检（S2 升级载体）
+│   │   └── README.md                 #   资产说明 + Chart.js 版本号记录（S2 升级指引）
 │   │
 │   └── test/                         # 测试套件
 │       ├── __init__.py               #   包标记（空文件）
@@ -376,11 +386,14 @@ investor-util/
 │       │   │   ├── test_benchmark_edge.py         #   基准边缘场景
 │       │   │   ├── test_category.py               #   持仓分类测试
 │       │   │   ├── test_category_edge.py          #   分类边缘场景
+│       │   │   ├── test_chart_data_builder.py     #   Chart.js 6 图数据集预处理器测试
+│       │   │   ├── test_chart_data_builder_edge.py #   图表数据预处理器边缘场景（行业归"其他"等）
 │       │   │   ├── test_classification_utils.py   #   分类工具测试
 │       │   │   ├── test_data_integrity.py         #   数据完整性测试
 │       │   │   ├── test_data_quality_edge.py      #   数据质量边缘场景
 │       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵测试
 │       │   │   ├── test_data_status.py            #   数据状态测试
+│       │   │   ├── test_downsample.py             #   P1 服务端下采样测试（§4.9）
 │       │   │   ├── test_excel_b_series.py          #   Excel B 系列页签测试
 │       │   │   ├── test_excel_format_edge.py      #   Excel 格式边缘场景
 │       │   │   ├── test_excel_generator.py        #   Excel 生成测试
@@ -388,6 +401,7 @@ investor-util/
 │       │   │   ├── test_excel_report_structure.py #   Excel 报告结构测试
 │       │   │   ├── test_excel_roundtrip.py        #   Excel 写入读取回环测试
 │       │   │   ├── test_excel_writer.py           #   Excel 写入器测试
+│       │   │   ├── test_feature_interactive.py    #   交互图表 Feature Flag 管线测试
 │       │   │   ├── test_fund_bseries_sheet_edge.py # 基金深度分析页签边缘场景
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
 │       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试
@@ -504,6 +518,7 @@ investor-util/
 │   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
 │   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
+│   ├── probe-csi-factor-indices.py  #   CSI 风格指数可用性探测（因子暴露分析前置决策闸门）
 │   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 ├── docs-stm/                         # 项目文档
@@ -531,6 +546,14 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中）
+│   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
+│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势/因子）
+│   │   ├── plan-correlation-drawdown.md #     相关性矩阵+回撤+净值曲线计划（plan-2/3）
+│   │   ├── plan-chartjs-risk-analysis.md #    Chart.js 升级风险/收益/架构分析（plan-1）
+│   │   ├── plan-chartjs-report-upgrade.md #  Chart.js 升级实施方案（plan-1）
+│   │   ├── plan-1-iter7-verification-checklist.md  # plan-1 Iter 7 浏览器人工验证清单（rf-113）
+│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划
+│   │   └── plan-fix-deepseek-thinking-exhaustion.md  # DeepSeek thinking 耗尽 max_tokens 修复方案（rf-122）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档

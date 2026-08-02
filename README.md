@@ -2,7 +2,7 @@
 
 读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.9.4-dev
+> 当前版本：0.9.5-dev
 
 ## 环境要求
 
@@ -53,7 +53,7 @@ python -m src.python.cli cache --stats
   - **新闻**（1 个）：财经新闻热点与持仓关联分析——启用新闻源时生成
   - **历史走势**（2 个）：组合历史走势、回撤分析——始终可见，数据不可用时占位
   - **LLM 分析**（5 个）：全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、LLM API 用量——启用 LLM 时生成
-- **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、财经新闻热点与持仓关联分析，全部页面顺序展示）
+- **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、财经新闻热点与持仓关联分析、6 张 Chart.js 交互图表——悬停/缩放，全部页面顺序展示）
 
 ### 新闻与数据增强
 
@@ -64,9 +64,9 @@ python -m src.python.cli cache --stats
 
 ### LLM 分析
 
-- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek / Google Gemini API，结果按策略缓存（2h~24h），持仓变更时通过缓存指纹自动失效
+- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek / Google Gemini API，结果按策略缓存（1h~24h），持仓变更时通过缓存指纹自动失效
 - **多 Provider 链式分发** — `llm_providers.json` 支持 priority（顺序递补）/ weighted（加权随机）/ cost_first（低成本优先）/ fallback_only（仅故障降级）四种策略，任一 Provider 失败自动递补
-- **Extended Thinking** — 支持 Claude 和 DeepSeek（Anthropic 兼容端点）的扩展思考模式，按模块独立开启
+- **Extended Thinking** — 支持 Claude、DeepSeek（Anthropic 兼容端点）和 Gemini 2.5 的扩展思考模式，按模块独立开启
 - **每模块独立控制** — 菜单 `S` 交互切换 5 个 LLM 模块的启停，立即生效无需重启
 - **LLM 幻觉率评估** — `scripts/llm_hallucination_sampler.py` 对 10 组标准化持仓数据采样，事实校验器自动验证数值/品种/排名正确性
 

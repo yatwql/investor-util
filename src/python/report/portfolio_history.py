@@ -148,7 +148,9 @@ class PortfolioHistoryCalculator:
 
         Args:
             holdings: [(code, name, shares), ...] 持仓列表
-            days: 历史天数
+            days: 历史天数。⚠️ 仅作用于基准指数（_fetch_benchmarks）；
+                  持仓历史长度由 chain 默认 days=30 决定（_fetch_all_histories 不带 days）。
+                  若需控制持仓历史长度，应改 _fetch_all_histories 透传 days。
 
         Returns:
             {

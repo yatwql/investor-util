@@ -72,8 +72,12 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
 
     def setUp(self) -> None:
         self.base_kw = dict(
-            system="system", user="user", api_key="sk-test",
-            endpoint="", max_tokens=800, http_client=MagicMock(),
+            system="system",
+            user="user",
+            api_key="sk-test",
+            endpoint="",
+            max_tokens=800,
+            http_client=MagicMock(),
         )
         self.llm_config = {
             "thinking_enabled_global_macro": True,
@@ -84,8 +88,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     def test_thinking_injected_for_supported_model(self, mock_retry: MagicMock) -> None:
         """Sonnet-4 支持 Extended Thinking，应注入 thinking 参数。"""
         call_claude(
-            **self.base_kw, model="claude-sonnet-4-20250514",
-            config_field="max_tokens_global_macro", llm_config=self.llm_config,
+            **self.base_kw,
+            model="claude-sonnet-4-20250514",
+            config_field="max_tokens_global_macro",
+            llm_config=self.llm_config,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertIn("thinking", _payload)
@@ -97,8 +103,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     def test_thinking_skipped_for_unsupported_model(self, mock_retry: MagicMock) -> None:
         """Sonnet-3.5 不支持 Extended Thinking，应降级跳过。"""
         call_claude(
-            **self.base_kw, model="claude-sonnet-3-5-20241022",
-            config_field="max_tokens_global_macro", llm_config=self.llm_config,
+            **self.base_kw,
+            model="claude-sonnet-3-5-20241022",
+            config_field="max_tokens_global_macro",
+            llm_config=self.llm_config,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
@@ -108,8 +116,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         """thinking_enabled=False 时不应注入 thinking 参数。"""
         cfg = {"thinking_enabled_global_macro": False}
         call_claude(
-            **self.base_kw, model="claude-sonnet-4-20250514",
-            config_field="max_tokens_global_macro", llm_config=cfg,
+            **self.base_kw,
+            model="claude-sonnet-4-20250514",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
@@ -118,8 +128,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     def test_thinking_skipped_when_no_llm_config(self, mock_retry: MagicMock) -> None:
         """llm_config=None 时不报错、不注入。"""
         call_claude(
-            **self.base_kw, model="claude-sonnet-4-20250514",
-            config_field="max_tokens_global_macro", llm_config=None,
+            **self.base_kw,
+            model="claude-sonnet-4-20250514",
+            config_field="max_tokens_global_macro",
+            llm_config=None,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertNotIn("thinking", _payload)
@@ -129,8 +141,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         """budget 小于 max_tokens + 1024 时自动补足到 max_tokens + 4096。"""
         cfg = {"thinking_enabled_global_macro": True, "thinking_budget_global_macro": 100}
         call_claude(
-            **self.base_kw, model="claude-sonnet-4-20250514",
-            config_field="max_tokens_global_macro", llm_config=cfg,
+            **self.base_kw,
+            model="claude-sonnet-4-20250514",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
         )
         _payload = mock_retry.call_args[1]["payload"]
         # max_tokens=800 → auto_pad=800+4096=4896
@@ -144,8 +158,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
             "reasoning_effort_global_macro": "high",
         }
         call_claude(
-            **self.base_kw, model="DeepSeek-V4-Flash",
-            config_field="max_tokens_global_macro", llm_config=cfg,
+            **self.base_kw,
+            model="DeepSeek-V4-Flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertEqual(_payload["thinking"]["type"], "enabled")
@@ -161,8 +177,10 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         """DeepSeek 未配置 reasoning_effort 时默认 high。"""
         cfg = {"thinking_enabled_global_macro": True}
         call_claude(
-            **self.base_kw, model="DeepSeek-V4-Flash",
-            config_field="max_tokens_global_macro", llm_config=cfg,
+            **self.base_kw,
+            model="DeepSeek-V4-Flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertEqual(_payload["output_config"]["effort"], "high")
@@ -175,13 +193,85 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
             "reasoning_effort_global_macro": "max",
         }
         call_claude(
-            **self.base_kw, model="DeepSeek-V4-Flash",
-            config_field="max_tokens_global_macro", llm_config=cfg,
+            **self.base_kw,
+            model="DeepSeek-V4-Flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
         )
         _payload = mock_retry.call_args[1]["payload"]
         self.assertEqual(_payload["output_config"]["effort"], "max")
 
+    # ═══════════════════════════════════════════════════════════
+    #  思考耗尽安全网：thinking 耗尽 max_tokens 预算无正文时，
+    #  自动关闭 thinking 同 provider 重试一次，保证有正文产出。
+    # ═══════════════════════════════════════════════════════════
 
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
+    @patch("src.python.llm._api_claude.clear_last_thinking_exhausted")
+    def test_thinking_exhausted_retries_without_thinking(
+        self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
+    ) -> None:
+        """思考耗尽（无正文）→ 关闭 thinking 重试一次，temperature 恢复，返回第二次结果。"""
+        mock_get.side_effect = [True, False]
+        mock_retry.side_effect = [(None, None), ("recovered", {"output_tokens": 5})]
+        cfg = {"thinking_enabled_global_macro": True}
+        result, usage = call_claude(
+            **self.base_kw,
+            model="DeepSeek-V4-Flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+            temperature=0.3,
+        )
+        self.assertEqual(result, "recovered")
+        self.assertEqual(mock_retry.call_count, 2)
+        first_payload = mock_retry.call_args_list[0][1]["payload"]
+        second_payload = mock_retry.call_args_list[1][1]["payload"]
+        self.assertIn("thinking", first_payload)
+        self.assertNotIn("thinking", second_payload)
+        # thinking 关闭后恢复 temperature
+        self.assertEqual(second_payload.get("temperature"), 0.3)
+        mock_clear.assert_called_once()
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
+    @patch("src.python.llm._api_claude.clear_last_thinking_exhausted")
+    def test_thinking_exhausted_flag_false_no_retry(
+        self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
+    ) -> None:
+        """flag False（非思考耗尽空内容）→ 不重试，行为与现状一致。"""
+        mock_get.return_value = False
+        mock_retry.return_value = (None, None)
+        cfg = {"thinking_enabled_global_macro": True}
+        result, usage = call_claude(
+            **self.base_kw,
+            model="DeepSeek-V4-Flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        self.assertIsNone(result)
+        self.assertEqual(mock_retry.call_count, 1)
+        mock_clear.assert_not_called()
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
+    @patch("src.python.llm._api_claude.clear_last_thinking_exhausted")
+    def test_no_thinking_enabled_no_retry(
+        self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
+    ) -> None:
+        """未注入 thinking → 即使 flag True 也不重试（短路由，不误触）。"""
+        mock_get.return_value = True
+        mock_retry.return_value = (None, None)
+        cfg = {"thinking_enabled_global_macro": False}
+        result, usage = call_claude(
+            **self.base_kw,
+            model="DeepSeek-V4-Flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        self.assertIsNone(result)
+        self.assertEqual(mock_retry.call_count, 1)
+        mock_clear.assert_not_called()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -197,8 +287,10 @@ class TestProviderFallback(unittest.TestCase):
         """主 provider 成功 → 不调用 fallback。"""
         mock_call.return_value = ("main result", {"input_tokens": 100})
         config = {
-            "provider": "claude", "api_key": "sk-main",
-            "fallback_provider": "openai", "fallback_api_key": "sk-fb",
+            "provider": "claude",
+            "api_key": "sk-main",
+            "fallback_provider": "openai",
+            "fallback_api_key": "sk-fb",
         }
         content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "main result")
@@ -208,12 +300,14 @@ class TestProviderFallback(unittest.TestCase):
     def test_main_failure_fallback_used(self, mock_call):
         """主 provider 返回 None → fallback 被调用。"""
         mock_call.side_effect = [
-            (None, None),          # 主 provider 失败
+            (None, None),  # 主 provider 失败
             ("fb result", {"prompt_tokens": 50}),  # fallback 成功
         ]
         config = {
-            "provider": "claude", "api_key": "sk-main",
-            "fallback_provider": "openai", "fallback_api_key": "sk-fb",
+            "provider": "claude",
+            "api_key": "sk-main",
+            "fallback_provider": "openai",
+            "fallback_api_key": "sk-fb",
             "fallback_endpoint": "https://api.openai.com/v1",
             "fallback_model": "gpt-4o",
         }
@@ -226,8 +320,10 @@ class TestProviderFallback(unittest.TestCase):
         """主 + fallback 均失败 → (None, None)。"""
         mock_call.return_value = (None, None)
         config = {
-            "provider": "claude", "api_key": "sk-main",
-            "fallback_provider": "openai", "fallback_api_key": "sk-fb",
+            "provider": "claude",
+            "api_key": "sk-main",
+            "fallback_provider": "openai",
+            "fallback_api_key": "sk-fb",
         }
         content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
@@ -248,14 +344,14 @@ class TestProviderFallback(unittest.TestCase):
         """fallback_provider == provider → 不重复调用。"""
         mock_call.return_value = (None, None)
         config = {
-            "provider": "claude", "api_key": "sk-main",
-            "fallback_provider": "claude", "fallback_api_key": "sk-fb",
+            "provider": "claude",
+            "api_key": "sk-main",
+            "fallback_provider": "claude",
+            "fallback_api_key": "sk-fb",
         }
         content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertEqual(mock_call.call_count, 1)
-
-
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -270,7 +366,7 @@ class TestContentFilterRecovery(unittest.TestCase):
     def test_empty_content_triggers_retry(self, mock_call):
         """API 返回空字符串 → 追加安抚指令重试一次。"""
         mock_call.side_effect = [
-            ("", {"input_tokens": 100}),      # 第一次：空内容
+            ("", {"input_tokens": 100}),  # 第一次：空内容
             ("retry result", {"input_tokens": 200}),  # 第二次：安抚后成功
         ]
         config = {"provider": "claude", "api_key": "sk-test"}
@@ -289,13 +385,15 @@ class TestContentFilterRecovery(unittest.TestCase):
     def test_empty_content_then_still_empty(self, mock_call):
         """安抚重试后仍为空 → 尝试 fallback provider。"""
         mock_call.side_effect = [
-            ("", {"input_tokens": 10}),   # 主 provider 空
-            ("", {"input_tokens": 20}),   # 安抚重试仍空
+            ("", {"input_tokens": 10}),  # 主 provider 空
+            ("", {"input_tokens": 20}),  # 安抚重试仍空
             ("fb ok", {"prompt_tokens": 5}),  # fallback 成功
         ]
         config = {
-            "provider": "claude", "api_key": "sk-main",
-            "fallback_provider": "openai", "fallback_api_key": "sk-fb",
+            "provider": "claude",
+            "api_key": "sk-main",
+            "fallback_provider": "openai",
+            "fallback_api_key": "sk-fb",
         }
         content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "fb ok")
@@ -324,12 +422,14 @@ class TestContentFilterRecovery(unittest.TestCase):
     def test_none_from_provider_triggers_fallback_not_retry(self, mock_call):
         """provider 返回 None（格式异常）→ 不触发安抚重试，直接走 fallback。"""
         mock_call.side_effect = [
-            (None, None),           # 主 provider 格式异常
-            ("fb result", None),    # fallback 成功
+            (None, None),  # 主 provider 格式异常
+            ("fb result", None),  # fallback 成功
         ]
         config = {
-            "provider": "claude", "api_key": "sk-main",
-            "fallback_provider": "openai", "fallback_api_key": "sk-fb",
+            "provider": "claude",
+            "api_key": "sk-main",
+            "fallback_provider": "openai",
+            "fallback_api_key": "sk-fb",
         }
         content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "fb result")

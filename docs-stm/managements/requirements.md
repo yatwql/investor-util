@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
-> 文档版本：0.9.4-dev
+> 文档版本：0.9.5-dev
 
 ---
 
@@ -436,7 +436,7 @@
 | 基准指数对比 | 各基准归一化至 100 基点走势叠加、区间累计收益率、区间最大回撤 |
 
 **渲染**：
-- HTML：原生 Canvas 折线图（含基准指数叠加对比）+ 3 个摘要卡片
+- HTML：交互折线图（Chart.js，含基准指数叠加对比）+ 3 个摘要卡片
 - Excel：`portfolio_history` 页签每基准一列（归一化值 0.00 格式），`drawdown_analysis` 页签对比指标矩阵（累计收益率/最大回撤/波动率等）
 
 **数据覆盖**：
@@ -449,7 +449,7 @@
 **输出指标**：最大回撤幅度、最大回撤金额、回撤区间（始于峰值日）。
 
 **渲染**：
-- HTML：原生 Canvas 回撤面积图（红色填充）+ 3 个摘要卡片
+- HTML：交互回撤面积图（Chart.js，红色填充）+ 3 个摘要卡片
 - Excel：灰色占位文本（图表仅在 HTML 渲染）
 
 **F1 快照摘要**：回撤分析页脚嵌入持仓快照对比，展示本次与上次之间的总市值变化、总盈亏变化及持仓变动 TOP5。
@@ -748,7 +748,7 @@
 | R-CCH-19 | LLM 持仓体检报告 | 24h | — |
 | R-CCH-20 | LLM 穿透深度分析 | 24h | — |
 | R-CCH-21 | 基金经理数据 | 24h | — |
-| R-CCH-22 | 基金风格扩展数据 | 24h | — |
+| R-CCH-22 | 基金风格扩展数据 | 30 天（月级） | — |
 | R-CCH-23 | 历史 K 线 | 7 天 | — |
 | R-CCH-24 | 历史净值 | 30 天 | — |
 | R-CCH-25 | 指数历史日线 | 30 天 | — |
@@ -927,7 +927,7 @@
 
 ### 11.5 features.json（功能开关注册表）
 
-独立配置文件，提供 28 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
+独立配置文件，提供 29 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
 
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|
@@ -939,6 +939,7 @@
 | `metrics_sharpe` / `metrics_calmar` / `metrics_hhi` / `metrics_winrate` / `metrics_turnover` / `metrics_risk_contribution` / `metrics_beta` | bool | true | 量化指标独立启停（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
 | `anonymizer` | bool | false | 匿名化功能全局开关（模式选择在 config.json 的 `anonymization.mode` 中配置） |
 | `cache_daily_cleanup` | bool | true | 启动时自动清理过期缓存 |
+| `enable_interactive_charts` | bool | true | 报告 HTML 交互图表（Chart.js）；关闭时回退基础 Canvas 图表 |
 
 用法：在 `features.json` 中仅列出需覆写的开关，未列出的保持默认值。
 ```json
