@@ -16,7 +16,7 @@ from src.python.config._llm_defaults import _get_default_llm_settings_template
 from src.python.config._llm_providers_defaults import _get_default_llm_providers_template
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.registry import get_known_llm_settings_keys
-from src.python.config._validation import _absolutize_paths, validate_config
+from src.python.config._validation import _absolutize_paths, _deabsolutize_paths, validate_config
 
 # 从 _llm_providers 模块再导出（保持向后兼容，供测试导入）
 from src.python.config._llm_providers import (
@@ -164,10 +164,17 @@ def set_config(key: str, value: Any) -> None:
         config = get_config(_strict=True)
         config[key] = value
 
+        # 写盘用浅拷贝：仅对副本做反绝对化，避免原子写失败时污染 _config_cache
+        # （缓存仍保留 get_config 绝对化后的内存值，且 value 已即时生效）
+        payload = dict(config)
+        # 写盘前将 PROJECT_ROOT 下的绝对路径还原为相对路径，避免本机绝对路径
+        # 落盘导致 config.json 跨机器不可移植（下次 get_config 会重新绝对化）
+        _deabsolutize_paths(payload)
+
         config_dir = os.path.dirname(config_path)
         os.makedirs(config_dir, exist_ok=True)
 
-        _atomic_write(config_path, json.dumps(config, ensure_ascii=False, indent=2))
+        _atomic_write(config_path, json.dumps(payload, ensure_ascii=False, indent=2))
 
         _config_cache = None
         _config_mtime = 0

@@ -8,6 +8,7 @@
 
 ### Fix
 
+- **rf-122：config.json 路径型键落盘绝对路径导致跨机器不可移植** — `get_config()` 在内存把相对路径绝对化（`_absolutize_paths`），`set_config()` 却拿绝对化后的 dict 直接 `json.dumps` 全量写回 → 本机绝对路径（`D:\codebase\...`）落盘并随 git 提交，换机器/换目录后 `holdings_dir`/`output_dir` 等全部失效；`llm_providers_file` 等尚未绝对化的键在下次任何 `set_config()` 触发时也会被污染。修复：① `_validation.py` 新增 `_deabsolutize_paths()`（与 `_absolutize_paths` 对称）——仅将 PROJECT_ROOT 之下的绝对路径还原为相对路径，跨盘（Windows 不同盘符 relpath 抛 ValueError）与项目外路径（relpath `..` 越界）保持原样；② `set_config()` 写盘改用浅拷贝 + 先反绝对化再序列化，且不污染 `_config_cache`（原子写失败时缓存仍保持绝对路径内存值）；③ `_config_defaults._build_template_from_defaults()` 模板同样反绝对化——全新安装首次生成 config.json 也写相对路径；④ 恢复 `data/config/config.json` 中 4b403a3 提交的 4 个绝对路径键为相对路径
 - **chart：行业分布空白 sector 未归一化** — `_build_industry_bar_dataset` 仅做 `entry.get("sector") or "其他"`，纯空白字符串 `"  "` 被当作有效行业分类（生成空白标签）。修复：`(sector or "").strip() or "其他"`，None/空串/纯空白统一归入"其他"。回归测试见 `test_chart_data_builder_edge.py`（plan-1 Iter 4 验收标准 5）
 - **chart：量化指标 Radar 图表（Iter 6）** — 第 6 张图迁移为 Chart.js v4 radar：① 数据三级降级（R12）——`all_metrics` 全量 6 轴（夏普/卡玛/胜率/换手率/组合 Beta/集中度 HHI）→ `risk_metrics` 3 基本字段 → `history_data` 3 基本轴，`risk_metrics`/`history_data` 兜底时 `datasets[0]["note"]="仅限基础指标"` + `degraded=True`；② §6.6 F1 子开关——6 个 `metrics_*` 雷达子开关收集传入预处理器，对应轴关闭时输出 `"N/A"`（非 0）；③ 胜率 `win_rate()` 返回 dict，`_extract_rate` 提取 0~1 数值；④ 模板 3 路占位——`data_unavailable` → "持仓市值数据不可用，量化指标暂停计算"、radar 无 labels → "量化指标数据不足"、全量/降级 → canvas + 降级 note 文本；⑤ `chart-init.js` 新增 `initRadarChart`（radar 极坐标 scale，O1 独立 try/catch，降级虚线描边）
 - **chart：Iter 8 代码审查 4 项 LOW 修复** — ① rf-107：`metrics_risk_contribution` 从雷达 flag 收集移除（该 flag 是指标级熔断开关，`circuit_breaker_wrapper` 消费，非雷达轴；设计文档 F1 同步修正"6 项雷达子开关 + 1 项熔断开关"）；② rf-108：`chart_data_builder.py` 404 行→397 行，合并 risk_metrics/history_data 两降级分支 + 提取 `_BASIC_RADAR_AXES` 常量（§4.11 O4 预算 ≤400）；③ rf-109：`initRadarChart` 增加 `borderDash: degraded ? [5,5] : undefined`，对齐 line/drawdown"降级→虚线"统一契约；④ rf-110：模板降级 note `<div>` 移出固定高度 `.chart-box` 容器，避免溢出压到下方数据块
@@ -20,6 +21,7 @@
 
 ### Test
 
+- **rf-122 回归测试** — `test_config.py` 新增 4 用例：`test_init_template_writes_relative_paths`（全新安装模板写相对路径，可移植）、`test_set_non_path_key_preserves_relative_paths`（写非路径键如隐私提示 → 5 个路径键保持相对——生产实际触发场景）、`test_set_relative_path_value_kept_relative`（写相对值落盘仍相对 + 读取时被绝对化）、`test_set_external_absolute_path_kept`（项目外绝对路径不被误相对化，越界保护）。config 套件 182 passed
 - **chart 行业分布边缘回归测试** — 新增 `test_chart_data_builder_edge.py`（C12 合规）：全部无行业归属→归入"其他"、None/空串/纯空白 sector 归一化、mv 为 None/负值不崩溃、top10 空列表占位；`test_chart_data_builder.py` 补 Iter 4/5 验收用例（行业市值总和与穿透口径一致、最多 10 个行业截断、穿透品种 <3 仍渲染）
 - **chart Radar 降级与 Flag 过滤测试** — `test_chart_data_builder.py` TestRadar 新增 6 用例（metrics_sharpe 关闭→该轴 "N/A"、全关→6 个 "N/A"、全 N/A 占位保轴、risk_metrics 兜底 degraded+note、history 兜底 degraded+note、全量路径无 note）；`test_chart_data_builder_edge.py` 新增 4 用例（all_metrics 与 risk_metrics 均 None→空、all_metrics=None+history 降级、未知 flag 名不影响该轴、部分指标缺失→N/A 其余保留）；`test_html_report_structure.py` 结构测试 3 用例（radar 有 labels 渲染 canvas、无 labels"量化指标数据不足"占位、data_unavailable"持仓市值数据不可用"占位）+ 既有 2 用例 chart-box 计数更新（3→4 / 5→6）
 - **rf-102/103 回归测试** — `test_tencent_edge.py` 新增 2 例（API 返回 list 非 dict 不崩、days=3650 钳位到 2000）；`test_sina_edge.py` 新增 1 例（days 钳位 2000 对齐 Tencent），防超限崩溃与钳位逻辑回退
@@ -27,6 +29,7 @@
 
 ### Docs
 
+- **rf-122 归档 + review-findings.md 已修复表** — rf-122（config.json 路径型键落盘绝对路径）从待处理移至已修复表（摘要行），详细修复说明见 changelog Fix 条目；config.json 相对路径恢复后已确认磁盘相对 + 运行时绝对化双向一致
 - **plan.md 与迭代设计文档依赖状态同步** — 核实 rf-1 批量并行已落地（`BatchDispatcher` 应用于行情/基金排名/行业链路）后：① plan.md plan-2 依赖标注 ⚠️→✅（原"串行获取全品种历史 15-30s"顾虑已消除），P2 头部补充前置状态注记，合计预排 ~18d→~21d；② plan-1 预估 4d→5.25d，对齐 `plan-chartjs-report-upgrade.md` 8 迭代方案，移除 plan.md 中过时的 4d 分阶段表；③ `plan-correlation-drawdown.md` §1 "对 rf-1 的依赖"改写为"已解除"，数据获取编排行注明复用 `BatchDispatcher` 并行链路；④ `plan-engineering.md` 补充 rf-1 完成状态注记（v0.8.x 已回归验证）
 - **plan.md 按推荐实施顺序重排** — 新增"推荐实施顺序"总览小节（①~⑨ 跨 P2/P3 归类），标注推荐理由与工作量；P2 区块内部重排（plan-2/3 → plan-1 → plan-6/5/7，plan-4 已放弃保留），P3 区块内部重排（plan-9 → plan-11 → plan-10 → plan-8）；各计划项标题/表格行补充推荐序号标注；plan-7 状态列明确"实施前先做 0.5d probe 决策闸门（≥3 个 CSI 指数有效 → MVP 3 因子，否则放弃）"；同步 P2 定义行预排数 ~22d→~21d 消除不一致
 - **plan-7 probe 决策闸门完成 → MVP 3 因子** — 新增 `scripts/probe-csi-factor-indices.py`（只读探测，支持 `--provider tencent|sina`/`--days`/`--threshold`/`--stale`/`--codes`/`--no-extra`），对 5 个 CSI 风格指数 + 低波补充逐个调用 `fetch_index_kline`，按 plan-advanced-analysis.md §4.3 + 数据新鲜度维度（条数 ≥ threshold 且 距今 ≤ stale 天）输出 5f/3f/infeasible 判定。实测（365 天窗口，新鲜度 120 天）：**Tencent 4/5 有效且新鲜**（300价值/500价值/500成长/300质量），**300成长（sh000920）自 2023-02-17 停更**需替换代理，低波（sh000931）有效可作补充 → **MVP 3 因子可行（3f）**。同步 plan.md plan-7 行（3.5d→2.5d、状态 ✅ probe 完成、P2 预排 ~21d→~20d）与 `plan-advanced-analysis.md` §4.3（可行性评级、风险表、probe 结论）

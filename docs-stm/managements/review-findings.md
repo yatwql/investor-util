@@ -63,6 +63,7 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| rf-122 | `set_config()` 写盘前未还原 `_absolutize_paths` 的内存绝对化 → 本机绝对路径（`D:\codebase\...`）直接落盘 config.json 并随 git 提交，跨机器不可移植；`llm_providers_file` 等后续也会被绝对化；另 `init_config` 模板同样写绝对路径（全新安装即不可移植） | `_validation.py` 新增 `_deabsolutize_paths()`（与 `_absolutize_paths` 对称，仅还原 PROJECT_ROOT 之下路径，跨盘/项目外绝对路径保留）；`set_config()` 写盘用浅拷贝先反绝对化再序列化（写盘失败不污染缓存）；`_build_template_from_defaults()` 模板同样反绝对化；恢复 config.json 已提交的 4 个绝对路径为相对 | `changelog.md` → Fix / Test / Docs |
 | rf-111 | 模板 6 个 chart canvas 无 `aria-label`/`role="img"`/fallback 文本（设计文档 §4.8 A1 声称已实现，实际 `grep -c aria-label` = 0 处） | 模板 6 处 canvas 补 A1 属性 + 内嵌 fallback 文本（对齐 `test-chart.html` 示范写法）；新增 `test_all_chart_canvases_have_a11y_attrs` 回归用例（6 图 canvas 断言 aria-label 含"悬停查看"/role=img/fallback 文本非空）；report 套件 161 passed | `changelog.md` → Fix / Test |
 | rf-112 | **TD8 JS 调试设施空白** — 设计文档多处声称已建"独立 test HTML 调试页"，仓库实际无此文件（仅 `report_template.html`），升级 Chart.js（S2 流程）无独立验证载体 | 新增 `src/static/test-chart.html` 独立调试页：6 图渲染/交互 + 4 场景（正常/降级/空数据/离线）自检横幅（`canvas._chart` 统计初始化数 + `typeof Chart` 守卫验证），ES5 语法（R17/R22），数据契约对齐 §4.12；`src/static/README.md` 文件清单 + S2 升级指引同步 | `changelog.md` → Fix / Docs |
 | rf-107 | `_report_generation.py` 收集 7 个 `metrics_*` flag 传入 builder，但 `metrics_risk_contribution` 无雷达轴消费（`risk_contributions` 为 `list[dict]` 非单标量）；设计文档 F1/§6.6 称"7 项全是雷达子开关"与实际不符 | 收集列表移除 `metrics_risk_contribution`（保留 6 个雷达子开关）；设计文档 F1 修正为"6 项雷达子开关 + 1 项指标级熔断开关"（`circuit_breaker_wrapper` 消费） | `changelog.md` → Fix / Docs |

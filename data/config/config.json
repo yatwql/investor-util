@@ -1,9 +1,9 @@
 {
-  "holdings_dir": "D:\\codebase\\zoo\\investor-util\\data/holdings",
+  "holdings_dir": "data/holdings",
   "holdings_filename": "个人投资持仓信息.xlsx",
-  "output_dir": "D:\\codebase\\zoo\\investor-util\\reports",
-  "llm_settings_file": "D:\\codebase\\zoo\\investor-util\\data/config/llm_settings.json",
-  "llm_key_file": "D:\\codebase\\zoo\\investor-util\\data/config/llm_key.json",
+  "output_dir": "reports",
+  "llm_settings_file": "data/config/llm_settings.json",
+  "llm_key_file": "data/config/llm_key.json",
   "llm_providers_file": "data/config/llm_providers.json",
   "enable_b_series": true,
   "enable_news": true,
