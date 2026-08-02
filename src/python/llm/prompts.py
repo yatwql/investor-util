@@ -19,6 +19,7 @@ from src.python.llm.prompts_core import (
     _SYSTEM_DEBATE_CON,
     _SYSTEM_DEBATE_PRO,
     _SYSTEM_DEBATE_SYNTHESIS,
+    _SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL,
     _SYSTEM_EXPERT_REVIEW,
     _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_HEALTH_CHECK,
@@ -30,6 +31,7 @@ from src.python.llm.prompts_core import (
     _build_difpipeline_data_block,
     _build_profit_attribution_block,
     _build_rebalance_block,
+    _build_system_debate_synthesis,
     _fmt_holding_line,
     _fmt_wan,
 )
@@ -72,6 +74,8 @@ __all__ = [
     "_SYSTEM_DEBATE_PRO",
     "_SYSTEM_DEBATE_CON",
     "_SYSTEM_DEBATE_SYNTHESIS",
+    "_SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL",
+    "_build_system_debate_synthesis",
     # 格式化函数
     "_fmt_wan",
     "_fmt_holding_line",

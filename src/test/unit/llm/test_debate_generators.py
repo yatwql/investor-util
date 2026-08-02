@@ -75,6 +75,42 @@ class TestDebateProconFlow(unittest.TestCase):
             self.assertEqual(mock_gen.call_args_list[1].kwargs["system_prompt"], _SYSTEM_DEBATE_CON)
             self.assertEqual(mock_gen.call_args_list[2].kwargs["system_prompt"], _SYSTEM_DEBATE_SYNTHESIS)
 
+    def test_system_prompt_uses_conditional_variant_when_enabled(self):
+        """conditional 开启时 synthesis system prompt 使用强化版（不复述白脸/黑脸）。
+
+        conditional 开启时 _build_debate_synthesis_prompt 会注入情景分析指令，
+        此时 synthesis system prompt 必须切换为允许情景分析但强化引用纪律的版本，
+        避免与基线版本"禁止插入情景分析段落"冲突导致重复复述。
+        """
+        from src.python.llm.prompts import (
+            _SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL,
+            _build_system_debate_synthesis,
+        )
+        from src.python.llm.generators import generate_debate_procon
+
+        with (
+            patch("src.python.llm.generators.generate_llm_module") as mock_gen,
+            patch(
+                "src.python.llm.generators.is_feature_enabled",
+                side_effect=lambda flag: flag == "llm_debate_conditional",
+            ),
+        ):
+            mock_gen.side_effect = [
+                ("600519 贵州茅台适合长期持有。", False),
+                ("600519 估值已偏高。", False),
+                ("综合双方意见，建议持有。", False),
+            ]
+            generate_debate_procon(**self.base_kwargs)
+
+            self.assertEqual(mock_gen.call_count, 3)
+            # synthesis（第 3 步）system_prompt 应为 conditional 强化版
+            syn_prompt = mock_gen.call_args_list[2].kwargs["system_prompt"]
+            self.assertIs(syn_prompt, _SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL)
+            # 且与 _build_system_debate_synthesis(True) 一致
+            self.assertEqual(syn_prompt, _build_system_debate_synthesis(enable_conditional=True))
+            # conditional 强化版不应包含基线"禁止情景分析"的冲突断言
+            self.assertNotIn("不要在综合权衡中再次插入情景分析段落", syn_prompt)
+
     def test_user_prompt_is_not_empty(self):
         """user_prompt 参数在每个阶段均为非空字符串。"""
         from src.python.llm.generators import generate_debate_procon

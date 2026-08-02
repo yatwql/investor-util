@@ -26,7 +26,7 @@ from src.python.llm.fingerprint import (
 from src.python.llm.prompts import (
     _SYSTEM_DEBATE_CON,
     _SYSTEM_DEBATE_PRO,
-    _SYSTEM_DEBATE_SYNTHESIS,
+    _build_system_debate_synthesis,
     _SYSTEM_EXPERT_REVIEW,
     _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_HEALTH_CHECK,
@@ -586,18 +586,22 @@ def generate_debate_procon(
         synthesis_text = cache_get(_syn_cache_key, get_cache_ttl_llm("debate_synthesis"))
 
     if synthesis_text is None:
+        # conditional 开启时用强化版 system prompt（允许情景分析但约束不复述
+        # 白脸/黑脸观点，避免 user prompt 的情景指令与 system prompt 的
+        # "禁止插入情景分析" 直接冲突）。
+        _synthesis_system = _build_system_debate_synthesis(_enable_conditional)
         synthesis_result = generate_llm_module(
             _lc,
             "expert_review",
             force=force,
             http_client=http_client,
             fingerprint_fn=lambda: f"{_fingerprint}{_fp_suffix}_debate_syn_{_pro_digest}_{_con_digest}",
-            system_prompt_default=_SYSTEM_DEBATE_SYNTHESIS,
+            system_prompt_default=_synthesis_system,
             prompt_builder=lambda: _synthesis_user,
             max_tokens_default=_max_tokens,
             timeout_default=_timeout,
             output_brief_limit=300,
-            system_prompt=_SYSTEM_DEBATE_SYNTHESIS,
+            system_prompt=_synthesis_system,
             user_prompt=_synthesis_user,
             raw_filter_fn=lambda t: _filter_hallucinated_codes(t, _valid_codes),
         )
