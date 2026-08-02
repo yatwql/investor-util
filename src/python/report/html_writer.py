@@ -405,6 +405,30 @@ def write_html_report(
     penetration, penetration_profit_ok, penetration_dividend_ok = _render_penetration_section(holdings, details, prog)
     perf_data, _ = _render_fund_performance_section(holdings, details, prog)
 
+    # ── 5b) Chart.js 数据集补齐：category_doughnut / industry_bar / penetration_bar ──
+    # 这三张图的数据源（cat_data / penetration）只在 write_html_report 内计算，
+    # 调用侧传入的 chart_datasets 拿不到它们，导致图表误显示"暂不可用"。
+    # 此处用权威数据重建并覆盖，保证图表与表格同源（R11：单图失败仅跳过该图）。
+    if enable_interactive_charts and chart_datasets is not None:
+        from src.python.report.chart_data_builder import (
+            _build_category_doughnut_dataset,
+            _build_industry_bar_dataset,
+            _build_penetration_bar_dataset,
+        )
+
+        try:
+            chart_datasets["category_doughnut"] = _build_category_doughnut_dataset(None, cat_data)
+        except Exception:
+            logger.warning("[chart] category_doughnut 数据补齐失败，保留原数据集", exc_info=True)
+        try:
+            chart_datasets["industry_bar"] = _build_industry_bar_dataset(penetration)
+        except Exception:
+            logger.warning("[chart] industry_bar 数据补齐失败，保留原数据集", exc_info=True)
+        try:
+            chart_datasets["penetration_bar"] = _build_penetration_bar_dataset(penetration)
+        except Exception:
+            logger.warning("[chart] penetration_bar 数据补齐失败，保留原数据集", exc_info=True)
+
     # ── 13) 基金经理变更监控 ──
     manager_analysis = _render_manager_analysis(holdings, enable_b_series, prog)
 

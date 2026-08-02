@@ -20,8 +20,8 @@ from unittest.mock import MagicMock, patch
 
 from src.python.core.models import Holding
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 # ============================================================
@@ -34,6 +34,7 @@ class TestJinjaFilters(unittest.TestCase):
 
     def setUp(self):
         from src.python.report.html_jinja_env import _jinja_price_type_color, _jinja_thousands
+
         self.fn = _jinja_thousands
         self.price_type_fn = _jinja_price_type_color
 
@@ -85,9 +86,12 @@ class TestNewsLlmMetaTemplate(unittest.TestCase):
 
     def setUp(self):
         from jinja2 import Environment
+
         self.env = Environment()
 
-    def _render_news_section(self, news_data: list, news_llm_meta: dict | None = None, has_llm_analysis: bool = False) -> str:
+    def _render_news_section(
+        self, news_data: list, news_llm_meta: dict | None = None, has_llm_analysis: bool = False
+    ) -> str:
         """渲染新闻 section 的 Jinja2 模板片段。"""
         template_str = """{% if news_data %}
         <table>
@@ -130,7 +134,9 @@ class TestNewsLlmMetaTemplate(unittest.TestCase):
         </div>
         {% endif %}"""
         template = self.env.from_string(template_str)
-        return template.render(news_data=news_data, news_llm_meta=news_llm_meta or {}, has_llm_analysis=has_llm_analysis)
+        return template.render(
+            news_data=news_data, news_llm_meta=news_llm_meta or {}, has_llm_analysis=has_llm_analysis
+        )
 
     def test_llm_analysis_column_rendered(self):
         """has_llm_analysis=True → 渲染 LLM 关联分析 列。"""
@@ -173,7 +179,8 @@ class TestNewsLlmMetaTemplate(unittest.TestCase):
         html = self._render_news_section(
             [{"title": "新闻A", "llm_analysis": "[高] 利好"}],
             news_llm_meta={
-                "llm_enabled": True, "llm_cached": False,
+                "llm_enabled": True,
+                "llm_cached": False,
                 "token_usage": {"input_tokens": 2000, "output_tokens": 500, "total_tokens": 2500},
             },
             has_llm_analysis=True,
@@ -229,7 +236,9 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
             mock_details.return_value = [self.detail]
-            mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
+            mock_a_idx.return_value = {
+                "sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}
+            }
             mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
             mock_penetration.return_value = {}
             mock_cat.return_value = ([], True)
@@ -326,6 +335,147 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 
 
 # ============================================================
+#  write_html_report — Chart.js 数据集补齐（cat_data / penetration）
+# ============================================================
+
+
+class TestWriteHtmlReportChartMerge(unittest.TestCase):
+    """write_html_report 内补齐 category_doughnut / industry_bar / penetration_bar。
+
+    回归场景：调用侧 `_build_chart_datasets_for_report` 拿不到 cat_data / penetration，
+    传入的 chart_datasets 缺这三张图 → 模板误显示"暂不可用"。merge 逻辑用
+    write_html_report 内计算的权威数据重建并覆盖，保证图表与表格同源。
+    """
+
+    def setUp(self):
+        self.holdings = [Holding("证券账户", "长江电力", "600900", 100, 50.0)]
+        self._tmp = tempfile.mkdtemp(prefix="test_html_chart_")
+        self.detail = MagicMock()
+        self.detail.market_value = 1000.0
+        self.detail.cost = 500.0
+        self.detail.profit = 500.0
+        self.detail.today_profit = 50.0
+        self.detail.name = "长江电力"
+        self.detail.code = "600900"
+        self.detail.price = 55.0
+        self.detail.yesterday_close = 54.0
+        self.detail.profit_rate = 1.0
+        self.detail.source = "腾讯"
+        self.detail.price_type = "实时"
+        self.detail.premium = ""
+        self.detail.shares = 100
+        self.detail.cost_price = 50.0
+        self.detail.nav_date = ""
+
+    def tearDown(self):
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    def _cat_data(self) -> list[dict]:
+        """持仓分类表数据（_build_category_data 输出，含 property / sub_mv）。"""
+        return [
+            {"property": "股票", "sub_category": "A股", "sub_mv": 8000.0},
+            {"property": "基金", "sub_category": "被动", "sub_mv": 4000.0},
+        ]
+
+    def _penetration(self) -> dict:
+        """穿透数据：top10 有数据 + summary 含 1 只失败基金（部分失败场景）。"""
+        return {
+            "top10": [
+                {"rank": 1, "name": "贵州茅台", "codes": ["600519"], "sector": "白酒", "mv": 5000.0},
+                {"rank": 2, "name": "宁德时代", "codes": ["300750"], "sector": "新能源", "mv": 3000.0},
+            ],
+            "summary": {
+                "unknown_mv": 7589.70,
+                "failed_funds": ["华安黄金ETF"],
+                "failed_fund_details": [{"name": "华安黄金ETF", "code": "518880"}],
+            },
+        }
+
+    def _render_kwargs(self, mock_template):
+        tmpl = MagicMock()
+        tmpl.render.return_value = "<html>ok</html>"
+        mock_template.return_value = tmpl
+        return tmpl
+
+    def _call_write_html_report(self, *, chart_datasets=None, enable_interactive_charts=False):
+        from src.python.report.html_writer import write_html_report
+
+        with ExitStack() as stack:
+            mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices"))
+            mock_penetration = stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
+            mock_status = stack.enter_context(patch("src.python.report.html_renderers.price_update_status"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
+            mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
+
+            mock_details.return_value = [self.detail]
+            mock_a_idx.return_value = {}
+            mock_us_idx.return_value = {}
+            mock_penetration.return_value = self._penetration()
+            mock_cat.return_value = (self._cat_data(), True)
+            mock_status.return_value = (0, 0, True)
+            mock_perf.return_value = {}
+            tmpl = self._render_kwargs(mock_template)
+
+            write_html_report(
+                self.holdings,
+                output_dir=self._tmp,
+                include_news=False,  # 图表补齐与新闻无关，跳过新闻获取避免真实抓取
+                chart_datasets=chart_datasets,
+                enable_interactive_charts=enable_interactive_charts,
+            )
+
+        _, kwargs = tmpl.render.call_args
+        return kwargs
+
+    def test_chart_merge_fills_category_doughnut(self):
+        """回归：分类饼图由 cat_data 补齐，不再显示 100% 其他/暂不可用。"""
+        chart_datasets = {"portfolio_line": {}, "drawdown": {}, "radar": {}}
+        kwargs = self._call_write_html_report(chart_datasets=chart_datasets, enable_interactive_charts=True)
+        merged = kwargs["chart_datasets"]
+        self.assertEqual(merged["category_doughnut"]["labels"], ["股票", "基金"])
+        self.assertEqual(merged["category_doughnut"]["datasets"][0]["data"], [8000.0, 4000.0])
+        # 原图（净值/回撤/雷达）不受影响
+        self.assertIn("portfolio_line", merged)
+        self.assertIn("radar", merged)
+
+    def test_chart_merge_fills_penetration_charts(self):
+        """回归：行业分布 + 穿透 TOP10 图由 penetration 补齐，不再误报"暂不可用"。"""
+        chart_datasets = {"portfolio_line": {}, "drawdown": {}, "radar": {}}
+        kwargs = self._call_write_html_report(chart_datasets=chart_datasets, enable_interactive_charts=True)
+        merged = kwargs["chart_datasets"]
+        self.assertEqual(merged["industry_bar"]["labels"], ["白酒", "新能源"])
+        self.assertEqual(merged["penetration_bar"]["labels"], ["贵州茅台", "宁德时代"])
+
+    def test_chart_merge_partial_penetration_still_renders(self):
+        """回归：12 只基金中 1 只无法获取穿透数据 → 图表仍渲染（非全量失败）。
+
+        用户报告场景：top10 有数据，summary 有 failed_funds（部分失败），
+        但章节开头误显示"行业数据暂不可用/穿透数据暂不可用"。
+        """
+        chart_datasets = {"portfolio_line": {}, "drawdown": {}, "radar": {}}
+        kwargs = self._call_write_html_report(chart_datasets=chart_datasets, enable_interactive_charts=True)
+        merged = kwargs["chart_datasets"]
+        self.assertTrue(merged["industry_bar"]["labels"], "部分失败时行业图不应为空")
+        self.assertTrue(merged["penetration_bar"]["labels"], "部分失败时穿透图不应为空")
+
+    def test_chart_merge_skipped_when_flag_off(self):
+        """Flag 关闭（enable_interactive_charts=False）→ 不触发补齐，模板不渲染图表。"""
+        chart_datasets = {"portfolio_line": {}, "drawdown": {}, "radar": {}}
+        kwargs = self._call_write_html_report(chart_datasets=chart_datasets, enable_interactive_charts=False)
+        merged = kwargs["chart_datasets"]
+        self.assertNotIn("category_doughnut", merged)
+        self.assertNotIn("industry_bar", merged)
+
+    def test_chart_merge_skipped_when_datasets_none(self):
+        """chart_datasets=None → 补齐逻辑跳过（保持默认不渲染 Chart.js）。"""
+        kwargs = self._call_write_html_report(chart_datasets=None, enable_interactive_charts=True)
+        self.assertIsNone(kwargs["chart_datasets"])
+
+
+# ============================================================
 #  write_html_report — LLM 内部调用路径 (Modules 7/8)
 # ============================================================
 
@@ -350,6 +500,7 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         self._tmp = tempfile.mkdtemp(prefix="test_html_")
         # 清理前序测试在 LLM_MODULE_FAILURE 中残留的状态
         from src.python.llm.prompts import LLM_MODULE_FAILURE
+
         self._saved_llm_failure = dict(LLM_MODULE_FAILURE)
         LLM_MODULE_FAILURE.clear()
 
@@ -357,6 +508,7 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
         shutil.rmtree(self._tmp, ignore_errors=True)
         # 恢复 LLM_MODULE_FAILURE 原始状态
         from src.python.llm.prompts import LLM_MODULE_FAILURE
+
         LLM_MODULE_FAILURE.clear()
         LLM_MODULE_FAILURE.update(self._saved_llm_failure)
 
@@ -438,7 +590,9 @@ class TestWriteHtmlReportLlmType(unittest.TestCase):
             mock_template_call = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
             mock_details.return_value = [self.mock_detail]
-            mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
+            mock_a_idx.return_value = {
+                "sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}
+            }
             mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
             mock_penetration.return_value = {}
             mock_cat.return_value = ([], True)
@@ -494,11 +648,17 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_cache_hit(self):
         """per_module 缓存命中 → status='cached', status_label='缓存'。"""
         from src.python.report.llm_module_info import build_llm_module_info
+
         per_module = {
             "global_macro": {
-                "model": "deepseek-v4-flash", "cached": True,
-                "input_tokens": 0, "output_tokens": 0, "cache_hit_tokens": 500,
-                "cost": 0.0, "thinking": False, "endpoint": "",
+                "model": "deepseek-v4-flash",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 500,
+                "cost": 0.0,
+                "thinking": False,
+                "endpoint": "",
             },
         }
         result = build_llm_module_info({}, per_module)
@@ -512,11 +672,17 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_success_call(self):
         """per_module 非缓存 → status='success', status_label='成功'。"""
         from src.python.report.llm_module_info import build_llm_module_info
+
         per_module = {
             "expert_review": {
-                "model": "deepseek-v4-flash", "cached": False,
-                "input_tokens": 500, "output_tokens": 300,
-                "cache_hit_tokens": 0, "cost": 0.001, "thinking": True, "endpoint": "",
+                "model": "deepseek-v4-flash",
+                "cached": False,
+                "input_tokens": 500,
+                "output_tokens": 300,
+                "cache_hit_tokens": 0,
+                "cost": 0.001,
+                "thinking": True,
+                "endpoint": "",
             },
         }
         result = build_llm_module_info({}, per_module)
@@ -532,6 +698,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
         """FAIL_REASON_DISABLED → status='disabled', status_label='已禁用'。"""
         from src.python.llm import FAIL_REASON_DISABLED
         from src.python.report.llm_module_info import build_llm_module_info
+
         failure = {"global_macro": FAIL_REASON_DISABLED}
         result = build_llm_module_info(failure, {})
         gm = next(m for m in result if m["key"] == "global_macro")
@@ -544,6 +711,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
         """FAIL_REASON_API_ERROR → status='failed', status_label 含错误描述。"""
         from src.python.llm import FAIL_REASON_API_ERROR
         from src.python.report.llm_module_info import build_llm_module_info
+
         failure = {"health_check": FAIL_REASON_API_ERROR}
         result = build_llm_module_info(failure, {})
         hc = next(m for m in result if m["key"] == "health_check")
@@ -553,10 +721,14 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_failed_all_reasons(self):
         """各失败原因 → 对应的中文描述。"""
         from src.python.llm import (
-            FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
-            FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_CIRCUIT_OPEN,
+            FAIL_REASON_NOT_CONFIGURED,
+            FAIL_REASON_API_ERROR,
+            FAIL_REASON_NETWORK_ERROR,
+            FAIL_REASON_TIMEOUT,
+            FAIL_REASON_CIRCUIT_OPEN,
         )
         from src.python.report.llm_module_info import build_llm_module_info
+
         cases = [
             (FAIL_REASON_NOT_CONFIGURED, "LLM 未配置"),
             (FAIL_REASON_API_ERROR, "LLM API 调用失败"),
@@ -576,6 +748,7 @@ class TestBuildModuleInfoList(unittest.TestCase):
     def test_unknown(self):
         """无 per_module 且无 failure → status='unknown', status_label=''。"""
         from src.python.report.llm_module_info import build_llm_module_info
+
         result = build_llm_module_info({}, {})
         for mk in ["global_macro", "expert_review", "health_check", "penetration_deep"]:
             m = next(entry for entry in result if entry["key"] == mk)
@@ -586,20 +759,30 @@ class TestBuildModuleInfoList(unittest.TestCase):
         """混合状态：禁用、失败、缓存、成功同时存在。"""
         from src.python.llm import FAIL_REASON_DISABLED, FAIL_REASON_TIMEOUT
         from src.python.report.llm_module_info import build_llm_module_info
+
         failure = {
             "global_macro": FAIL_REASON_DISABLED,
             "health_check": FAIL_REASON_TIMEOUT,
         }
         per_module = {
             "expert_review": {
-                "model": "claude-sonnet-4", "cached": True,
-                "input_tokens": 0, "output_tokens": 0, "cache_hit_tokens": 1000,
-                "cost": 0.0, "thinking": False, "endpoint": "",
+                "model": "claude-sonnet-4",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 1000,
+                "cost": 0.0,
+                "thinking": False,
+                "endpoint": "",
             },
             "penetration_deep": {
-                "model": "deepseek-v4-flash", "cached": False,
-                "input_tokens": 300, "output_tokens": 200,
-                "cache_hit_tokens": 0, "cost": 0.002, "thinking": True,
+                "model": "deepseek-v4-flash",
+                "cached": False,
+                "input_tokens": 300,
+                "output_tokens": 200,
+                "cache_hit_tokens": 0,
+                "cost": 0.002,
+                "thinking": True,
                 "endpoint": "https://api.test.com",
             },
         }
@@ -624,21 +807,19 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
     def _call(self, llm_enabled_flag=False, session_usage=None, module_failure=None):
         """调用 _render_llm_module_info，返回结果四元组。"""
         from contextlib import ExitStack
+
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE",
-                                      module_failure or {}))
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", module_failure or {}))
             if session_usage is not None:
-                stack.enter_context(
-                    patch("src.python.llm.get_session_usage", return_value=session_usage))
-                stack.enter_context(
-                    patch("src.python.llm.format_session_usage", return_value=session_usage))
+                stack.enter_context(patch("src.python.llm.get_session_usage", return_value=session_usage))
+                stack.enter_context(patch("src.python.llm.format_session_usage", return_value=session_usage))
             from src.python.report.html_renderers import _render_llm_module_info
+
             return _render_llm_module_info(llm_enabled_flag)
 
     def test_not_enabled_returns_unknown(self):
         """llm_enabled_flag=False → 所有模块状态为 unknown，无用量数据。"""
-        llm_module_info, llm_endpoint, module_disabled, llm_session_usage = self._call(
-            llm_enabled_flag=False)
+        llm_module_info, llm_endpoint, module_disabled, llm_session_usage = self._call(llm_enabled_flag=False)
         self.assertEqual(len(llm_module_info), 5)
         for mi in llm_module_info:
             self.assertEqual(mi["status"], "unknown")
@@ -649,24 +830,54 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
     def test_enabled_with_cache_hit(self):
         """llm_enabled_flag=True + 全缓存 → 所有模块状态为 cached。"""
         session_usage = {
-            "has_usage": True, "call_count": 0, "per_module": {
-                "global_macro": {"model": "ds", "cached": True, "input_tokens": 0,
-                                 "output_tokens": 0, "cache_hit_tokens": 500,
-                                 "cost": 0.0, "thinking": False, "endpoint": ""},
-                "expert_review": {"model": "ds", "cached": True, "input_tokens": 0,
-                                  "output_tokens": 0, "cache_hit_tokens": 300,
-                                  "cost": 0.0, "thinking": True, "endpoint": ""},
-                "health_check": {"model": "ds", "cached": True, "input_tokens": 0,
-                                 "output_tokens": 0, "cache_hit_tokens": 200,
-                                 "cost": 0.0, "thinking": False, "endpoint": ""},
-                "penetration_deep": {"model": "claude", "cached": True, "input_tokens": 0,
-                                     "output_tokens": 0, "cache_hit_tokens": 400,
-                                     "cost": 0.0, "thinking": False,
-                                     "endpoint": "https://api.test.com"},
+            "has_usage": True,
+            "call_count": 0,
+            "per_module": {
+                "global_macro": {
+                    "model": "ds",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 500,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+                "expert_review": {
+                    "model": "ds",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 300,
+                    "cost": 0.0,
+                    "thinking": True,
+                    "endpoint": "",
+                },
+                "health_check": {
+                    "model": "ds",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 200,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+                "penetration_deep": {
+                    "model": "claude",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 400,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "https://api.test.com",
+                },
             },
         }
         llm_module_info, llm_endpoint, module_disabled, llm_session_usage = self._call(
-            llm_enabled_flag=True, session_usage=session_usage)
+            llm_enabled_flag=True, session_usage=session_usage
+        )
         by_key = {m["key"]: m for m in llm_module_info}
         for mk in ["global_macro", "expert_review", "health_check", "penetration_deep"]:
             self.assertEqual(by_key[mk]["status"], "cached")
@@ -677,14 +888,31 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
     def test_enabled_with_mixed_states(self):
         """llm_enabled_flag=True + 混合 + failure → 正确状态分发。"""
         from src.python.llm import FAIL_REASON_DISABLED, FAIL_REASON_API_ERROR
+
         session_usage = {
-            "has_usage": True, "call_count": 2, "per_module": {
-                "global_macro": {"model": "ds", "cached": False, "input_tokens": 500,
-                                 "output_tokens": 300, "cache_hit_tokens": 0,
-                                 "cost": 0.002, "thinking": False, "endpoint": ""},
-                "expert_review": {"model": "claude", "cached": True, "input_tokens": 0,
-                                  "output_tokens": 0, "cache_hit_tokens": 1000,
-                                  "cost": 0.0, "thinking": False, "endpoint": ""},
+            "has_usage": True,
+            "call_count": 2,
+            "per_module": {
+                "global_macro": {
+                    "model": "ds",
+                    "cached": False,
+                    "input_tokens": 500,
+                    "output_tokens": 300,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.002,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+                "expert_review": {
+                    "model": "claude",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 1000,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
+                },
             },
         }
         module_failure = {
@@ -692,8 +920,8 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
             "penetration_deep": FAIL_REASON_API_ERROR,
         }
         llm_module_info, llm_endpoint, module_disabled, _ = self._call(
-            llm_enabled_flag=True, session_usage=session_usage,
-            module_failure=module_failure)
+            llm_enabled_flag=True, session_usage=session_usage, module_failure=module_failure
+        )
         by_key = {m["key"]: m for m in llm_module_info}
         self.assertEqual(by_key["global_macro"]["status"], "success")
         self.assertEqual(by_key["expert_review"]["status"], "cached")
@@ -708,18 +936,16 @@ class TestRenderLlmModuleInfo(unittest.TestCase):
     def test_enabled_import_failure_returns_unknown(self):
         """llm_enabled_flag=True 但 format_session_usage 异常 → 返回 unknown + 无 session_usage。"""
         from contextlib import ExitStack
+
         with ExitStack() as stack:
             stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {}))
             # 模拟 format_session_usage / get_session_usage 抛出 TypeError
             # （与 _render_llm_module_info 中 except (ImportError, TypeError, AttributeError) 匹配）
-            stack.enter_context(patch("src.python.llm.get_session_usage",
-                                      side_effect=TypeError("模拟错误")))
-            stack.enter_context(patch("src.python.llm.format_session_usage",
-                                      side_effect=TypeError("模拟错误")))
+            stack.enter_context(patch("src.python.llm.get_session_usage", side_effect=TypeError("模拟错误")))
+            stack.enter_context(patch("src.python.llm.format_session_usage", side_effect=TypeError("模拟错误")))
             from src.python.report.html_renderers import _render_llm_module_info
 
-            llm_module_info, llm_endpoint, _, llm_session_usage = \
-                _render_llm_module_info(True)
+            llm_module_info, llm_endpoint, _, llm_session_usage = _render_llm_module_info(True)
         for mi in llm_module_info:
             self.assertEqual(mi["status"], "unknown")
         self.assertIsNone(llm_session_usage)
@@ -747,6 +973,7 @@ class TestSectionOrderTemplateRendering(unittest.TestCase):
     def setUp(self):
         from jinja2 import Environment
         from src.python.report.html_jinja_env import _ENV
+
         self.env = Environment()
         self._module_env = _ENV
         # 注册 section_visible 全局函数（与 html_writer 中一致）
@@ -781,9 +1008,9 @@ class TestSectionOrderTemplateRendering(unittest.TestCase):
         ]
         self._set_visible_dict({"summary": True, "fund_manager": False, "llm_usage": True})
         html = self._render_nav(section_order)
-        self.assertIn('#sec-summary', html)
-        self.assertNotIn('#sec-fund_manager', html)
-        self.assertIn('#sec-llm_usage', html)
+        self.assertIn("#sec-summary", html)
+        self.assertNotIn("#sec-fund_manager", html)
+        self.assertIn("#sec-llm_usage", html)
 
     def test_nav_renders_numbers(self):
         """导航链接显示正确的序号。"""
@@ -819,74 +1046,58 @@ class TestSectionOrderTemplateRendering(unittest.TestCase):
 
     def _render_section_order_attr(self, key: str, number: int) -> str:
         """渲染单个 section 的 order 属性。"""
-        tpl = self.env.from_string(
-            '<div class="section" style="order: {{ section_numbers[\'%s\'] }};">'
-            % key
-        )
+        tpl = self.env.from_string('<div class="section" style="order: {{ section_numbers[\'%s\'] }};">' % key)
         return tpl.render(section_numbers={key: number})
 
     def test_order_attribute_correct(self):
         """CSS order 属性值等于配置序号。"""
         html = self._render_section_order_attr("summary", 1)
-        self.assertIn('order: 1', html)
+        self.assertIn("order: 1", html)
         html = self._render_section_order_attr("fund_manager", 6)
-        self.assertIn('order: 6', html)
+        self.assertIn("order: 6", html)
 
     def test_order_attribute_large_number(self):
         """大序号时 CSS order 正确渲染。"""
         html = self._render_section_order_attr("llm_usage", 99)
-        self.assertIn('order: 99', html)
+        self.assertIn("order: 99", html)
 
     # ── 章节标题序号渲染 ───────────────────────────────
 
     def _render_section_title(self, section_numbers: dict, key: str, name: str) -> str:
         """渲染章节标题。"""
-        tpl = self.env.from_string(
-            '<h2 class="section-title">{{ section_numbers[\'%s\'] }}、%s</h2>'
-            % (key, name)
-        )
+        tpl = self.env.from_string("<h2 class=\"section-title\">{{ section_numbers['%s'] }}、%s</h2>" % (key, name))
         return tpl.render(section_numbers=section_numbers)
 
     def test_section_title_renders_custom_number(self):
         """章节标题使用 section_numbers 中的序号。"""
-        html = self._render_section_title(
-            {"fund_manager": 1}, "fund_manager", "基金经理变更监控"
-        )
-        self.assertIn('1、基金经理变更监控', html)
+        html = self._render_section_title({"fund_manager": 1}, "fund_manager", "基金经理变更监控")
+        self.assertIn("1、基金经理变更监控", html)
 
     def test_section_title_reordered_number(self):
         """章节标题展示重新排序后的序号。"""
-        html = self._render_section_title(
-            {"summary": 5}, "summary", "投资分析汇总"
-        )
-        self.assertIn('5、投资分析汇总', html)
-        self.assertNotIn('1、投资分析汇总', html)
+        html = self._render_section_title({"summary": 5}, "summary", "投资分析汇总")
+        self.assertIn("5、投资分析汇总", html)
+        self.assertNotIn("1、投资分析汇总", html)
 
     # ── section_visible_dict 联动 ──────────────────────
 
     def test_visible_dict_true_renders_content(self):
         """visible=True → 内容块可见。"""
-        tpl = self.env.from_string(
-            "{% if section_visible('summary') %}内容可见{% endif %}"
-        )
+        tpl = self.env.from_string("{% if section_visible('summary') %}内容可见{% endif %}")
         self._set_visible_dict({"summary": True})
         html = tpl.render()
         self.assertIn("内容可见", html)
 
     def test_visible_dict_false_hides_content(self):
         """visible=False → 内容块隐藏。"""
-        tpl = self.env.from_string(
-            "{% if section_visible('fund_manager') %}内容可见{% endif %}"
-        )
+        tpl = self.env.from_string("{% if section_visible('fund_manager') %}内容可见{% endif %}")
         self._set_visible_dict({"fund_manager": False})
         html = tpl.render()
         self.assertEqual(html.strip(), "")
 
     def test_visible_dict_missing_key_false(self):
         """字典中缺少的 key → section_visible 返回 False。"""
-        tpl = self.env.from_string(
-            "{% if section_visible('unknown') %}内容可见{% endif %}"
-        )
+        tpl = self.env.from_string("{% if section_visible('unknown') %}内容可见{% endif %}")
         self._set_visible_dict({})
         html = tpl.render()
         self.assertEqual(html.strip(), "")
@@ -938,7 +1149,9 @@ class TestAppVersionInTemplate(unittest.TestCase):
             mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
             mock_details.return_value = [self.detail]
-            mock_a_idx.return_value = {"sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}}
+            mock_a_idx.return_value = {
+                "sh000001": {"name": "上证指数", "price": 3120, "change": 10, "change_pct": 0.32}
+            }
             mock_us_idx.return_value = {"gb_dji": {"name": "道琼斯", "price": 35000, "change": 100, "change_pct": 0.29}}
             mock_penetration.return_value = {}
             mock_cat.return_value = ([], True)
@@ -948,8 +1161,7 @@ class TestAppVersionInTemplate(unittest.TestCase):
             tmpl.render.return_value = "<html>ok</html>"
             mock_template.return_value = tmpl
 
-            write_html_report(self.holdings, output_dir=self._tmp,
-                              include_news=False)
+            write_html_report(self.holdings, output_dir=self._tmp, include_news=False)
 
         _, kwargs = tmpl.render.call_args
         self.assertIn("app_version", kwargs)
