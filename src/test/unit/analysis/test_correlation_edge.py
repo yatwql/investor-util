@@ -83,17 +83,13 @@ class TestNaNReturnRegression:
         base = [math.sin(i / 6.0) for i in range(n)]
         # 独立噪声使干净相关明显小于 1.0
         y_clean = [v + random.uniform(-0.3, 0.3) for v in base]
-        clean = compute_correlation_matrix(
-            {"a": _seq(base, dates), "b": _seq(y_clean, dates)}
-        )
+        clean = compute_correlation_matrix({"a": _seq(base, dates), "b": _seq(y_clean, dates)})
         r_clean = clean["matrix"][1][0]
         assert r_clean < 0.999, "测试数据相关过高，无法区分虚假相关"
 
         y_nan = list(y_clean)
         y_nan[30] = float("nan")
-        res = compute_correlation_matrix(
-            {"a": _seq(base, dates), "b": _seq(y_nan, dates)}
-        )
+        res = compute_correlation_matrix({"a": _seq(base, dates), "b": _seq(y_nan, dates)})
         r_nan = res["matrix"][1][0]
         p_nan = res["p_values"][1][0]
         assert not math.isnan(r_nan) and not math.isnan(p_nan)
@@ -104,9 +100,7 @@ class TestNaNReturnRegression:
     def test_all_nan_series_dropped(self):
         """全 NaN 序列 → 整条剔除；跌破 MIN_HOLDINGS → 数据不足降级。"""
         dates = _dates(80)
-        res = compute_correlation_matrix(
-            {"a": _seq([0.01] * 80, dates), "b": _seq([float("nan")] * 80, dates)}
-        )
+        res = compute_correlation_matrix({"a": _seq([0.01] * 80, dates), "b": _seq([float("nan")] * 80, dates)})
         assert res["available"] is False
         assert res["status"] == "insufficient"
         # 全 NaN 的 b 被剔除，剩余仅 a 不足 2 品种；unavailable_result 契约 codes=[]
@@ -146,9 +140,7 @@ class TestSampleBoundary:
         dates_b = _dates(60, "2026-01-07")
         x = [0.01] * 60
         y = [0.02] * 60
-        res = compute_correlation_matrix(
-            {"a": _seq(x, dates_a), "b": _seq(y, dates_b)}
-        )
+        res = compute_correlation_matrix({"a": _seq(x, dates_a), "b": _seq(y, dates_b)})
         assert res["available"] is False
         assert res["status"] == "insufficient"
         assert res["matrix"] == []  # unavailable_result 工厂空矩阵
@@ -180,9 +172,7 @@ class TestDateHandling:
         x = [math.sin(i / 6.0) for i in range(n)]
         y = [math.cos(i / 6.0) for i in range(n)]
         y_short = y[:30] + y[33:]  # 与 dates_b 按位置对齐
-        res = compute_correlation_matrix(
-            {"a": _seq(x, dates_a), "b": _seq(y_short, dates_b)}
-        )
+        res = compute_correlation_matrix({"a": _seq(x, dates_a), "b": _seq(y_short, dates_b)})
         assert res["available"] is True
         assert res["sample_count"] >= MIN_SAMPLES
 
@@ -223,9 +213,7 @@ class TestLargeMatrix:
         series: dict[str, list[dict]] = {}
         for k in range(10):
             code = f"c{k}"
-            series[code] = _seq(
-                [math.sin(i / 6.0 + k) + 0.01 * k for i in range(n)], dates
-            )
+            series[code] = _seq([math.sin(i / 6.0 + k) + 0.01 * k for i in range(n)], dates)
         res = compute_correlation_matrix(series)
         assert res["available"] is True
         matrix = res["matrix"]

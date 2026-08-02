@@ -57,10 +57,14 @@ def _correlation_data(**extra) -> dict:
         "p_values": [[None, None], [0.0001, None]],
         "pairs": [
             {
-                "code_a": "b", "name_a": "资产B",
-                "code_b": "a", "name_b": "资产A",
-                "pearson": -0.87, "p_value": 0.0001,
-                "significant": True, "samples": 60,
+                "code_a": "b",
+                "name_a": "资产B",
+                "code_b": "a",
+                "name_b": "资产A",
+                "pearson": -0.87,
+                "p_value": 0.0001,
+                "significant": True,
+                "samples": 60,
             }
         ],
         "insufficient_codes": [],
@@ -81,12 +85,12 @@ class TestHtmlCorrelationSection(unittest.TestCase):
         section = self._section(_correlation_data())
         text = section.get_text()
         self.assertIn("持仓相关性矩阵", text)
-        self.assertIn("个品种", text)          # 汇总卡
-        self.assertIn("相关度最高", text)      # 提示横幅
-        self.assertIn("配对明细", text)        # 配对表
+        self.assertIn("个品种", text)  # 汇总卡
+        self.assertIn("相关度最高", text)  # 提示横幅
+        self.assertIn("配对明细", text)  # 配对表
         self.assertIn("资产A", text)
         self.assertIn("资产B", text)
-        self.assertIn("-0.87", text)           # r 值
+        self.assertIn("-0.87", text)  # r 值
         self.assertIn("显著", text)
         # 说明区
         self.assertIn("Pearson 相关系数", text)
@@ -98,8 +102,8 @@ class TestHtmlCorrelationSection(unittest.TestCase):
         data["names"] = {"a": "资产A", "b": "资产B", "c": "资产C"}
         data["matrix"] = [
             [1.0, None, None],
-            [-0.6, 1.0, None],          # b×a 强负
-            [None, 0.02, 1.0],          # c×a 样本不足 N/A；c×b 不显著 0.02
+            [-0.6, 1.0, None],  # b×a 强负
+            [None, 0.02, 1.0],  # c×a 样本不足 N/A；c×b 不显著 0.02
         ]
         data["p_values"] = [
             [None, None, None],
@@ -107,17 +111,33 @@ class TestHtmlCorrelationSection(unittest.TestCase):
             [None, 0.20, None],
         ]
         data["pairs"] = [
-            {"code_a": "b", "name_a": "资产B", "code_b": "a", "name_b": "资产A",
-             "pearson": -0.6, "p_value": 0.001, "significant": True, "samples": 60},
-            {"code_a": "c", "name_a": "资产C", "code_b": "b", "name_b": "资产B",
-             "pearson": 0.02, "p_value": 0.20, "significant": False, "samples": 60},
+            {
+                "code_a": "b",
+                "name_a": "资产B",
+                "code_b": "a",
+                "name_b": "资产A",
+                "pearson": -0.6,
+                "p_value": 0.001,
+                "significant": True,
+                "samples": 60,
+            },
+            {
+                "code_a": "c",
+                "name_a": "资产C",
+                "code_b": "b",
+                "name_b": "资产B",
+                "pearson": 0.02,
+                "p_value": 0.20,
+                "significant": False,
+                "samples": 60,
+            },
         ]
         section = self._section(data)
         text = section.get_text()
-        self.assertIn("强负", text)       # r=-0.6 ≤ -0.5 → 强负格
-        self.assertIn("N/A", text)        # c×a 样本不足
-        self.assertIn("0.02", text)       # 不显著白格显示数值
-        self.assertIn("1.00", text)       # 对角线自相关
+        self.assertIn("强负", text)  # r=-0.6 ≤ -0.5 → 强负格
+        self.assertIn("N/A", text)  # c×a 样本不足
+        self.assertIn("0.02", text)  # 不显著白格显示数值
+        self.assertIn("1.00", text)  # 对角线自相关
 
     def test_insufficient_codes_note(self):
         """重叠样本不足品种 → 灰 N/A 提示行。"""
@@ -131,8 +151,7 @@ class TestHtmlCorrelationSection(unittest.TestCase):
 
     def test_insufficient_placeholder(self):
         """available=False + status=insufficient → 数据不足占位。"""
-        data = _correlation_data(available=False, status="insufficient",
-                                 sample_count=20, window=60, codes=[], pairs=[])
+        data = _correlation_data(available=False, status="insufficient", sample_count=20, window=60, codes=[], pairs=[])
         section = self._section(data)
         self.assertIn("持仓相关性数据不足", section.get_text())
         self.assertNotIn("配对明细", section.get_text())
