@@ -233,7 +233,11 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         first_payload = mock_retry.call_args_list[0][1]["payload"]
         second_payload = mock_retry.call_args_list[1][1]["payload"]
         self.assertIn("thinking", first_payload)
-        self.assertNotIn("thinking", second_payload)
+        # DeepSeek 兼容端点思考默认开启：重试必须显式 disabled（移除参数无效），
+        # 并移除与 disabled 互斥的 output_config / reasoning_effort
+        self.assertEqual(second_payload.get("thinking", {}).get("type"), "disabled")
+        self.assertNotIn("output_config", second_payload)
+        self.assertNotIn("reasoning_effort", second_payload)
         # thinking 关闭后恢复 temperature
         self.assertEqual(second_payload.get("temperature"), 0.3)
         mock_clear.assert_called_once()
@@ -264,19 +268,75 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     def test_no_thinking_enabled_no_retry(
         self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
     ) -> None:
-        """未注入 thinking → 即使 flag True 也不重试（短路由，不误触）。"""
+        """非 effort 模型未注入 thinking → 即使 flag True 也不重试（短路由，不误触）。"""
         mock_get.return_value = True
         mock_retry.return_value = (None, None)
         cfg = {"thinking_enabled_global_macro": False}
         result, usage = call_claude(
             **self.base_kw,
-            model="DeepSeek-V4-Flash",
+            model="claude-sonnet-4-20250514",
             config_field="max_tokens_global_macro",
             llm_config=cfg,
         )
         self.assertIsNone(result)
         self.assertEqual(mock_retry.call_count, 1)
         mock_clear.assert_not_called()
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
+    @patch("src.python.llm._api_claude.clear_last_thinking_exhausted")
+    def test_deepseek_no_thinking_enabled_exhausted_retries_with_disabled(
+        self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
+    ) -> None:
+        """DeepSeek 强制推理模型未显式开 thinking 也思考耗尽 → 安全网重试一次。
+
+        回归缺陷：DeepSeek 兼容端点思考默认开启，即使 thinking_enabled=false（payload
+        无 thinking 参数）也会落入默认思考模式占满 max_tokens。旧安全网要求
+        thinking_was_enabled=True，对该场景静默失效，导致模块直接 api_error 失败。
+        修复后对 effort 模型即使未开 thinking 也重试，重试 payload 显式 disabled。
+        """
+        mock_get.side_effect = [True, False]
+        mock_retry.side_effect = [(None, None), ("recovered", {"output_tokens": 5})]
+        cfg = {"thinking_enabled_global_macro": False}
+        result, usage = call_claude(
+            **self.base_kw,
+            model="DeepSeek-V4-Flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+            temperature=0.3,
+        )
+        self.assertEqual(result, "recovered")
+        self.assertEqual(mock_retry.call_count, 2)
+        first_payload = mock_retry.call_args_list[0][1]["payload"]
+        second_payload = mock_retry.call_args_list[1][1]["payload"]
+        # 首次调用：thinking_enabled=false 的 DeepSeek 经治本逻辑已显式注入 disabled
+        self.assertEqual(first_payload.get("thinking", {}).get("type"), "disabled")
+        self.assertNotIn("output_config", first_payload)
+        # 重试 payload 同样显式禁用思考（保持一致）
+        self.assertEqual(second_payload.get("thinking", {}).get("type"), "disabled")
+        self.assertNotIn("output_config", second_payload)
+        self.assertNotIn("reasoning_effort", second_payload)
+        self.assertEqual(second_payload.get("temperature"), 0.3)
+        mock_clear.assert_called_once()
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    def test_deepseek_thinking_disabled_injected_when_not_enabled(self, mock_retry: MagicMock) -> None:
+        """治本：DeepSeek 模型 thinking_enabled=false 时 payload 显式注入 thinking:disabled。
+
+        回归缺陷：未显式开启 thinking 的 DeepSeek 调用落在默认思考模式（effort=high），
+        思考占满 max_tokens 导致无正文耗尽。显式 disabled 从源头关闭思考。
+        """
+        cfg = {"thinking_enabled_global_macro": False}
+        call_claude(
+            **self.base_kw,
+            model="DeepSeek-V4-Flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(_payload.get("thinking", {}).get("type"), "disabled")
+        self.assertNotIn("output_config", _payload)
+        self.assertNotIn("reasoning_effort", _payload)
 
     def test_thinking_exhausted_flag_thread_local_isolation(self) -> None:
         """并发线程 _extract_content 不清除本线程思考耗尽标志（thread-local 隔离）。

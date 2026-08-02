@@ -15,6 +15,7 @@ from src.python.llm.api_base import (
     _extract_content,
     _check_claude_truncation,
     _get_last_thinking_exhausted,
+    _is_effort_model,
     clear_last_thinking_exhausted,
     call_llm_with_retry,
 )
@@ -101,14 +102,28 @@ def call_claude(
     #    此处关闭 thinking 同 provider 重试一次，保证有正文产出。 ──
     thinking_was_enabled = "thinking" in payload
     call_result = _do_call(payload)
-    if call_result[0] is None and thinking_was_enabled and _get_last_thinking_exhausted():
+    # 触发条件放宽到 DeepSeek 强制推理模型：即使 thinking_enabled=false（payload 无
+    # thinking 参数），DeepSeek 兼容端点也会落入默认思考模式（effort=high）并占满
+    # max_tokens 耗尽，同样需要安全网兜底。非 effort 模型仍需显式开启 thinking 才重试。
+    _is_forced_reasoning = bool(model) and _is_effort_model(model)
+    if call_result[0] is None and _get_last_thinking_exhausted() and (thinking_was_enabled or _is_forced_reasoning):
         logger.warning(
             "Extended Thinking 思考部分耗尽 max_tokens 预算（无正文），关闭 thinking 重试一次，避免模块整体失败"
         )
         # 构建全新 payload，避免污染首次请求记录
         retry_payload = dict(payload)
-        retry_payload.pop("thinking", None)
-        if temperature is not None and "thinking" not in retry_payload:
+        if _is_forced_reasoning:
+            # DeepSeek Anthropic 兼容端点思考默认开启：仅移除 thinking 参数会回到默认
+            # 思考模式，必须显式 disabled 才能真正关闭；且 thinking:disabled 与
+            # output_config.effort / reasoning_effort 互斥（并存报 HTTP 400），一并移除。
+            retry_payload["thinking"] = {"type": "disabled"}
+            retry_payload.pop("output_config", None)
+            retry_payload.pop("reasoning_effort", None)
+        else:
+            retry_payload.pop("thinking", None)
+        # thinking 非 enabled（已禁用/已移除）时恢复 temperature（与 temperature 互斥
+        # 的仅是思考开启状态，禁用后应允许温度生效）
+        if temperature is not None and retry_payload.get("thinking", {}).get("type") != "enabled":
             retry_payload["temperature"] = temperature
         clear_last_thinking_exhausted()
         call_result = _do_call(retry_payload)
