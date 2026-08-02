@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
-> 文档版本：0.9.7-dev
+> 文档版本：0.9.8-dev
 > 审查范围：全代码库（src/python/ + src/test/ + scripts/）
 > 审查基准：technical.md §8 架构设计约束（C1~C20）+ §1.4 核心架构决策 + 代码质量最佳实践
 > 审查日期：2026-07-29
@@ -22,8 +22,6 @@
 |---|------|----------|
 | **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | ①③⑤ 可用 `src/static/test-chart.html` 调试页自检（TD8 rf-112 已补齐载体）；②④⑥ 需真实浏览器/微信实操——**勾选清单已备**：`docs-stm/archive/v0.9.x/chartjs-upgrade/plan-1-iter7-verification-checklist.md`（含 6 项 × 具体操作步骤 + 结果汇总），按清单勾选完成后回填 changelog |
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器 |
-| **rf-115** | TD-L2：`history_data` 数据同时服务 Excel + HTML Chart.js，模板 `tojson` 序列化全量字段（含 Excel 不需要的字段） | plan-2/plan-3 引入 chart_data 专用裁剪 |
-| **rf-116** | TD-L3：模板仍为单文件 ~2000 行（Chart.js 初始化 JS 已外部化缓解，Canvas 函数 + 条件分支仍占体积） | 独立技术债迭代做章节级 partial 拆分 |
 | **rf-117** | A6 键盘可达性未做（Chart.js tooltip 为鼠标悬停驱动，键盘聚焦不触发） | 设计明确"不做 MVP 记入技术债"（upgrade.md §4.8 A6）；如需支持，给 chart-init.js 加键盘交互扩展 |
 | **rf-118** | 相关性矩阵 Heatmap 仅占位文本（Chart.js Matrix 插件未引入） | 依赖 plan-2 提供 `correlation_data` 后引入 `chartjs-chart-matrix` 渲染（Iter 7 已推迟，非 YAGNI） |
 | **rf-120** | S5 CSP 未配置（报告为离线静态 HTML，无外部域名） | 可选不做 MVP（upgrade.md §4.10 S5）；未来若加 CSP 仅需 `script-src 'self'` |
@@ -33,7 +31,9 @@
 
 （无待处理项 — rf-122 已处理，见"已修复"表；竞态根因 + 配置缓解详见 changelog Fix 条目）
 
-### P2 - 代码质量（低优先级，增量改进）
+### P1 — plan-5/6 新功能遗留技术债（2026-08-03）
+
+（无待处理项 — rf-159 已处理，见"已修复"表）
 
 #### P2A — 文件过长（>500 行，建议拆分）
 
@@ -66,6 +66,9 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| rf-159 | 调仓 What-if 独立页 `whatif_template.html` 内联双环图初始化逻辑（`trackChart` + `doughnutOptions` + O1 每图 try/catch + ES5 保守语法，~58 行），与主报告 `chart-init.js` 的 `initCategoryDoughnut` 模式**重复**（复用 `ChartTheme.doughnutColors`/`chart-export.js`，但数据段 `#whatif-chart-data`/DOM id 与主报告不同，未直接复用 chart-init.js） | 新增 `src/static/chart-common.js` 公共 Chart 初始化 helper（IIFE 暴露 `window.ChartCommon`：`trackChart`/`lineOptions`/`doughnutOptions`，读取 `window.ChartTheme`）；`chart-init.js` 的 trackChart/lineOptions/doughnutOptions/initCategoryDoughnut 改为薄封装委托 `ChartCommon`；`whatif_template.html` 内联 ~58 行双环图初始化替换为 `window.ChartCommon.trackChart`/`doughnutOptions(true)` 调用（数据段 `#whatif-chart-data`/DOM id 保留页面独有），守卫 `if (!window.ChartCommon)` 降级跳过。两页 `<script defer>` 均加载 chart-common.js（chart-export → chart-common → chart-init），`_JS_ASSETS` 补 chart-common.js | `changelog.md` → Refactor / Test |
+| rf-115 | TD-L2：`history_data` 数据同时服务 Excel + HTML Chart.js，模板 `tojson` 序列化全量字段（含 Excel 不需要的字段）。**plan-5/6 扩展同模式**：`evolution_data`/`whatif_data` 亦经 `tojson` 全量内联（`#evolution-chart-data`/`#whatif-chart-data`），图表仅用其中部分字段 | Python 侧专用裁剪（R9 数据最小化）：`chart_data_builder.build_evolution_chart_data()` 只输出图表消费字段（`periods`/`total_value`/`total_pnl`/`hhi`/`top_holdings`[仅 name/code/weights]，排除 `total_cost`/`holding_counts`/`account_flows`/`reason`）；`whatif_writer._trim_whatif_chart_data()` 只输出 `available`/`categories`（排除 `summary`/`changes`/`stats`/`base`/`candidate`/`reason`）。html_writer 渲染时注入 `evolution_chart_data`，模板 `#evolution-chart-data`/`#whatif-chart-data` 改为渲染裁剪后负载 | `changelog.md` → Refactor / Test |
+| rf-116 | TD-L3：模板仍为单文件 ~2000 行（Chart.js 初始化 JS 已外部化缓解，Canvas 函数 + 条件分支仍占体积）。**plan-6 加剧**：`report_template.html` 现 2570 行（组合演进章节 +165 行内联，含 3 图 canvas + 数据段 + 表格） | 章节级 partial 拆分首批：组合演进章节（原 MODULE 18，~2200-2361 行）提取至 `tmpl/partials/evolution_section.html`，report_template.html 以 `{% include "partials/evolution_section.html" with context %}` 引入（2570→2410 行）。partial 内嵌 `.back-to-top-link` 等价 HTML（partial 不共享父模板宏 render_back_to_top）；`_evo`/`evolution_chart_data` 仍经 context 透传（C14） | `changelog.md` → Refactor / Test |
 | rf-119 | plan-1 遗留：单图导出 PNG 按钮未做（`chart.toBase64Image()` 已用于打印快照，可复用） | 新增 `src/static/chart-export.js`：提供 `window.ChartExport.register(chart, key)`，为每张 Chart.js 图表在 `.chart-box` 内注入「导出PNG」按钮（有 `.chart-title` 时进标题栏，否则绝对定位右上角），点击 `toBase64Image()` 2x 分辨率下载 PNG；`chart-init.js` `trackChart` 传入各图 key；模板/调试页加载顺序 chart-config → chart-export → chart-init，`_copy_js_assets` 同步复制新文件；打印时按钮隐藏 | `changelog.md` → Fix / Test |
 | rf-150 | 集中度问答开关开启但报告无输出 + 资产穿透 TOP10 两柱状图难区分/小屏不齐（用户反馈 2026-08-02，他机运行报告）：① `_build_qa_concentration_block` 输出"（以上问题旨在引发思考，无需在本次报告中回答。）"仅引导不要求回答；② 辩论综合权衡（synthesis）阶段完全不支持集中度问答（`_build_debate_synthesis_prompt` 只接受 `enable_conditional`），而用户在辩论模式下看到的主体正是综合权衡 → 与需求 R-LLM-DB-QA-CONCENTRATION-03（要求输出量化评估/基准对比/调仓建议）矛盾；③ `_build_expert_review_prompt` 调用时 threshold=0.20 硬编码未读 llm_settings 配置（违反 R-04）。柱状图：行业分布/穿透 TOP10 均主色蓝难区分 + flex 并排小屏不齐 | ① `_build_qa_concentration_block` 改为要求回答（输出量化评估/基准对比/调仓建议，删除"无需回答"免责声明，标题改"### 集中度问答"）；② `_build_debate_synthesis_prompt` 新增 `enable_qa_concentration`/`industry_concentration`/`holdings_details`/`total_mv` 参数并追加集中度问答引导段；`_build_system_debate_synthesis` 新增 `enable_qa_concentration` 追加 `_SYSTEM_DEBATE_SYNTHESIS_QA_APPENDIX`（不重写编号结构避免与 conditional 冲突）；`generate_debate_procon` 传入 qa 参数；③ threshold 从 `get_llm_config() debate.qa_concentration.threshold` 读取（标准+辩论两路径）。柱状图：`ChartTheme.barColors`（蓝/橙）+ 模板 `--chart-bar-2` CSS 变量，穿透图背景/边框改橙、行业图蓝；`.penetration-charts` 两子 div 改 `flex:1 1 100%; max-width:720px` 分两行居中。新增 9 个回归用例（要求回答引导/合成阶段 qa 追加与禁用/配置阈值读取双向/synthesis 与 system prompt qa 附录/组合模式/expert_review 阈值两向） | `changelog.md` → Fix / Test |
 | rf-151 | LLM provider `priority` 默认值显示不一致（文档核查 2026-08-02）：`_llm_providers.py`/`strategy.py` 实际默认 `priority=99`，但 TUI/CLI 状态显示文案与 `how-to-config-llm.md` 字段表/示例均写"默认 50"——用户省略 `priority` 时按 99 路由（末位兜底），显示却说 50，误导配置判断 | `cli.py` / `tui_menu.py` 显示文案 `50（默认）`→`99（默认）`；`how-to-config-llm.md` 字段表 + TUI 输出示例同步为 99 | `changelog.md` → Fix |
@@ -82,7 +85,7 @@
 | rf-147 | 资产穿透 TOP10 两图风格**不统一**（用户反馈 2026-08-02）：穿透章节两图并排，行业分布图为 `indexAxis: 'y'` 水平条，穿透 TOP10 为垂直柱状图，横竖混排观感割裂 | `chart-init.js` `initIndustryBar` 移除 `indexAxis: 'y'` + scales 改为垂直配置（x 轴类别 `maxRotation: 45`、y 轴数值网格），与 `initPenetrationBar` 竖桩统一；`report_template.html` / `test-chart.html` 两图 aria-label 统一为「垂直柱状图」（穿透 TOP10 补"垂直"前缀，语义与渲染一致）；`reports-instruction.md` 描述同步。新增回归测试 `test_industry_and_penetration_bars_both_vertical`（两图 aria-label 均含"垂直柱状图"、无"水平"残留） | `changelog.md` → Fix |
 | rf-148 | 事实校验自动修正明细**不可见**（用户反馈 2026-08-02，他机运行报告）：校验摘要仅显示"自动修正 N 处数值"计数，修正明细（wrong%→correct% + 句段）不落盘、不在摘要展开，用户无法得知具体修正了哪些数值 | `run_fact_check` 自动修正后 ① 修正明细写入 `invest` 日志（模块标签 + 逐条 `wrong%→correct%（句段）`）；② HTML 校验摘要追加灰色小字「已修正明细: …」行（追加在模块章节尾部，供用户直接查看）。新增回归测试 `test_corrections_detail_in_summary` / `test_corrections_logged`。不破坏既有格式（`llm_content.py` 摘要正则匹配宽松） | `changelog.md` → Fix |
 
-> 0.9.0 ~ 0.9.5 已修复问题记录（rf-90 ~ rf-144）已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md)，本表仅跟踪当前迭代（0.9.7-dev）修复项。
+> 0.9.0 ~ 0.9.5 已修复问题记录（rf-90 ~ rf-144）已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md)，本表仅跟踪当前迭代（0.9.8-dev）修复项。
 
 ---
 

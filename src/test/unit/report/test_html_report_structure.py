@@ -831,10 +831,10 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
             )
 
     def test_chart_scripts_loaded_in_order(self) -> None:
-        """加载顺序：chart-print → chart-config → chart-export → chart-init（登记/导出先于初始化）。"""
+        """加载顺序：chart-print → chart-config → chart-export → chart-common → chart-init（登记/导出/公共 helper 先于初始化）。"""
         soup = self._render_interactive()
         chart_scripts = [s.get("src") for s in soup.select("script[src]") if (s.get("src") or "").startswith("chart-")]
-        for fname in ("chart-print.js", "chart-config.js", "chart-export.js", "chart-init.js"):
+        for fname in ("chart-print.js", "chart-config.js", "chart-export.js", "chart-common.js", "chart-init.js"):
             self.assertIn(fname, chart_scripts, f"{fname} 应被模板引用")
         self.assertLess(
             chart_scripts.index("chart-print.js"),
@@ -848,8 +848,13 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         )
         self.assertLess(
             chart_scripts.index("chart-export.js"),
+            chart_scripts.index("chart-common.js"),
+            "chart-export.js 必须在 chart-common.js 之前加载",
+        )
+        self.assertLess(
+            chart_scripts.index("chart-common.js"),
             chart_scripts.index("chart-init.js"),
-            "chart-export.js 必须在 chart-init.js 之前加载",
+            "chart-common.js 必须在 chart-init.js 之前加载（chart-init 依赖 ChartCommon）",
         )
 
     def test_print_css_forces_light_theme(self) -> None:
@@ -936,7 +941,8 @@ class TestHtmlBackToTop(unittest.TestCase):
         for sec in sections:
             links = sec.select('.back-to-top-link a[href="#report-top"]')
             self.assertEqual(
-                len(links), 1,
+                len(links),
+                1,
                 f"#{sec.get('id')} 应恰好有 1 个指向 #report-top 的链接，实际 {len(links)}",
             )
 
@@ -998,15 +1004,12 @@ class TestHtmlTocSidebar(unittest.TestCase):
             section_id = _get_section_id_from_href(href)
             target = self.soup.find(id=section_id)
             self.assertIsNotNone(target, f"目录链接 {href} 无对应 section")
-            self.assertTrue("section" in target.get("class", []),
-                            f"{href} 对应元素应带 .section 类")
+            self.assertTrue("section" in target.get("class", []), f"{href} 对应元素应带 .section 类")
 
     def test_toc_link_text_shows_number_and_name(self):
         """目录链接文字含「编号、章节名」。"""
         for sec in self.order:
-            link = self.soup.select_one(
-                f"#toc-sidebar a[href='#sec-{sec['key']}']"
-            )
+            link = self.soup.select_one(f"#toc-sidebar a[href='#sec-{sec['key']}']")
             self.assertIsNotNone(link, f"目录缺少章节 {sec['key']}")
             text = link.get_text(strip=True)
             expected = f"{sec['number']}、{sec['name']}"

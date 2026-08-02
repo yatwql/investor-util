@@ -23,6 +23,7 @@ import pytest
 from src.python.report.chart_data_builder import (
     DATASET_KEYS,
     build_chart_datasets,
+    build_evolution_chart_data,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
@@ -617,3 +618,67 @@ class TestR11Isolation:
         chart = ds["radar"]
         assert chart["labels"] == ["年化波动率", "最大回撤", "累计收益"]
         assert chart["datasets"][0]["data"] == ["N/A", "N/A", "N/A"]
+
+
+# ═══════════════════════════════════════════════════════════════
+#  组合演进图表数据裁剪（避免整包序列化）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestEvolutionChartData:
+    """build_evolution_chart_data 专用裁剪测试。"""
+
+    def _evo(self, **extra) -> dict:
+        d = {
+            "available": True,
+            "snapshot_count": 5,
+            "min_snapshots": 3,
+            "periods": ["07-01", "07-02"],
+            "total_value": [100000.0, 110000.0],
+            "total_cost": [90000.0, 90000.0],
+            "total_pnl": [10000.0, 20000.0],
+            "holding_counts": [2, 3],
+            "account_flows": {"账户A": [60.0, 50.0]},
+            "hhi": [0.52, 0.58],
+            "top_holdings": [
+                {"code": "a", "name": "资产A", "weights": [60.0, 70.0], "present_count": 2},
+                {"code": "b", "name": "资产B", "weights": [40.0, 30.0], "present_count": 2},
+            ],
+            "reason": "",
+        }
+        d.update(extra)
+        return d
+
+    def test_trim_only_chart_keys(self) -> None:
+        """available=True → 仅保留图表消费字段，剔除表格字段。"""
+        payload = build_evolution_chart_data(self._evo())
+        assert set(payload.keys()) == {"periods", "total_value", "total_pnl", "hhi", "top_holdings"}
+        assert payload["periods"] == ["07-01", "07-02"]
+        assert "total_cost" not in payload
+        assert "holding_counts" not in payload
+        assert "account_flows" not in payload
+        assert "reason" not in payload
+
+    def test_top_holdings_trimmed_to_name_code_weights(self) -> None:
+        """top_holdings 每项仅保留 name/code/weights（图表 JS 消费字段）。"""
+        payload = build_evolution_chart_data(self._evo())
+        assert payload["top_holdings"] == [
+            {"code": "a", "name": "资产A", "weights": [60.0, 70.0]},
+            {"code": "b", "name": "资产B", "weights": [40.0, 30.0]},
+        ]
+        assert "present_count" not in payload["top_holdings"][0]
+
+    def test_none_returns_none(self) -> None:
+        """evolution_data=None → None（章节不可见，模板不输出数据段）。"""
+        assert build_evolution_chart_data(None) is None
+
+    def test_unavailable_returns_none(self) -> None:
+        """available=False → None（降级占位，模板不输出数据段）。"""
+        assert build_evolution_chart_data(self._evo(available=False, reason="快照不足")) is None
+
+    def test_does_not_mutate_source(self) -> None:
+        """裁剪不改动原始 evolution_data（不可变）。"""
+        src = self._evo()
+        before = dict(src)
+        build_evolution_chart_data(src)
+        assert src == before

@@ -648,11 +648,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 {# Chart.js 交互图表（R21 本地 bundle：相对路径，离线自包含） #}
 {# chart_datasets 数据经 context 传递（C14 合规，不写 _ENV.globals） #}
 <script type="application/json" id="chart-data">{{ chart_datasets | tojson }}</script>
-{# P3（R21 本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-init） #}
+{# P3（R21 本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-common → chart-init） #}
 <script defer src="chart.min.js"></script>
 <script defer src="chart-print.js"></script>
 <script defer src="chart-config.js"></script>
 <script defer src="chart-export.js"></script>
+<script defer src="chart-common.js"></script>
 <script defer src="chart-init.js"></script>
 {% endif %}
 {# 左侧目录 TOC（独立于图表开关，始终加载；R21 本地 bundle） #}
@@ -2196,9 +2197,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
     {% endif %}
 
+    {% include "partials/evolution_section.html" with context %}
+
     {% if section_visible("data_source_status") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 18: 数据源可用性矩阵                           -->
+    <!--  MODULE 19: 数据源可用性矩阵                           -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-data_source_status" style="order: {{ section_numbers['data_source_status'] }};">
         <div class="section-title">{{ section_numbers['data_source_status'] }}、数据源可用性矩阵</div>

@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
-> 文档版本：0.9.7-dev
+> 文档版本：0.9.8-dev
 
 ---
 
@@ -43,6 +43,12 @@
 | `analysis/correlation.py` | Pearson 相关矩阵计算+降级 | 已知答案（r=±1/缩放不变）、不显著配对、下三角布局、配对 |r| 降序、数据不足/单品种/无有效收益降级、名称回退、C19 契约键、NaN/Inf/None 过滤（rf-157 回归）、重复日期去重、日期缺口对齐、极大幅值钳位、多品种大矩阵 |
 | `report/correlation_sheet.py` | 相关性页签 Excel 呈现 | 矩阵/配对/说明三区齐全、下三角+对角+上三角空、N/A 格、available=False/None 占位、配对 |r| 降序 |
 | `report/report_template.html`（correlation 模块） | 相关性章节 HTML 呈现 | 汇总卡+相关度最高+热力矩阵+配对明细、单元格样式分支（强正/强负/不显著/N/A）、不足品种提示、available=False 降级占位、correlation_data=None 章节隐藏 |
+| `analysis/portfolio_evolution.py` | 多快照趋势聚合计算 | 多账户合并、快照缺市值回退成本权重、HHI 计算、TOP 持仓变迁、快照数不足 available=False、历史快照容错跳过 |
+| `report/evolution_sheet.py` + `report_template.html`（evolution 模块） | 组合演进双端呈现 | 汇总/总市值/HHI/TOP/账户流/说明顺序、多账户流表、单账户无流表、HHI 无效期记 "-"、available=False 占位、evolution_data=None 章节隐藏、3 图各带 .chart-caption（C20） |
+| `analysis/whatif.py` | 双持仓成本口径 diff 计算 | 新增/清仓/加仓/减仓/不变识别、份额容差(<1e-3)、成本权重+HHI、汇总 delta+箭头、分类配置（_CATEGORY_ORDER 排序）、多账户合并、两侧空降级、单侧空=全清仓仍可算 |
+| `report/whatif_sheet.py` | 调仓 What-if Excel 三页签呈现 | 摘要(文件对比+变动统计+汇总+箭头)、分类配置权重%、变动明细行底色（新增绿/清仓红/加仓黄/减仓蓝/不变灰）、available=False/None 占位 |
+| `report/whatif_writer.py` + `whatif_template.html` | 调仓 What-if 独立 HTML 页 | ①~⑥ 六段齐全、双环形图+2×.chart-caption（C20）+#whatif-chart-data JSON、行动作行 class + badge、箭头类、available=False 占位 |
+| `cli/cli.py`（whatif 子命令） | whatif argparse + 处理器 | --candidate 必填、--base 可选、_handle_whatif 委托（显式 base/config 默认/读取失败/目标失败/不可用数据不写报告）、main 透传 |
 
 ### 1.2 数据边界 Edge Case 强制清单（通用规范）
 
@@ -503,6 +509,7 @@ def test_get_ttl_closed(self, mock_open):
 12. **异常场景不崩溃**：对 §1.6 异常场景清单中的 🔴/🟡 状态项，人工确认至少不导致程序崩溃
 13. **报告文件视觉检查**：Excel 和 HTML 输出文件无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）
 14. **TUI 菜单功能正常**：所有菜单选项（[E]/[B]/[L]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确，无崩溃
+15. **whatif CLI 手动验证**：`python -m src.python.cli whatif --base 调仓前.xlsx --candidate 调仓后.xlsx` 生成 `调仓模拟_{ts}.xlsx/.html`；缺省 --base 用 config 持仓；--candidate 缺失报参数错误；HTML 双环图正常渲染、Excel 变动行底色正确
 
 ---
 

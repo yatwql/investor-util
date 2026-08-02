@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 20
+        assert len(_REPORT_SECTION_DEFAULT) == 21
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -265,9 +265,9 @@ class TestReportSectionDefault:
             assert sec["type"] in valid_types, f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
 
     def test_always_type_has_no_data_flag(self):
-        """always 类型的 data_flag 应为 None。"""
+        """always 类型的 data_flag 应为 None（唯一例外：portfolio_evolution 用 data_flag 控制可见性，available=False 时展示层写占位，见 technical.md §4.12）。"""
         for sec in _REPORT_SECTION_DEFAULT:
-            if sec["type"] == "always":
+            if sec["type"] == "always" and sec["key"] != "portfolio_evolution":
                 assert sec["data_flag"] is None, f"{sec['key']}: always 类型不应有 data_flag"
 
     def test_non_always_type_has_data_flag(self):
@@ -287,7 +287,7 @@ class TestReportSectionDefault:
         assert _REPORT_SECTION_DEFAULT[-1]["key"] == "llm_usage"
 
     def test_data_source_status_before_llm_usage(self):
-        """data_source_status 应在 llm_usage 之前（序号 19 vs 18）。"""
+        """data_source_status 应在 llm_usage 之前（序号 20 vs 21）。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         assert "data_source_status" in keys
         assert keys.index("data_source_status") < keys.index("llm_usage")
@@ -400,7 +400,7 @@ class TestGetReportSectionOrder:
         assert summary_entry["number"] == -5
 
     def test_full_config_reverse_order(self):
-        """全部 19 项都配了 → 按配置序号排序，llm_usage 最后。"""
+        """全部 21 项都配了 → 按配置序号排序，llm_usage 最后。"""
         all_keys = [s["key"] for s in _REPORT_SECTION_DEFAULT if s["key"] != "llm_usage"]
         # 反序配置
         full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}

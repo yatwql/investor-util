@@ -372,6 +372,7 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "correlation_analysis": "持仓相关性矩阵",
     "portfolio_history": "组合历史走势",
     "drawdown_analysis": "历史回撤分析",
+    "portfolio_evolution": "组合演进",
 }
 
 
@@ -547,10 +548,20 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
     {"key": "portfolio_history", "name": "组合历史走势", "number": 17, "type": "history", "data_flag": None},
     {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 18, "type": "history", "data_flag": None},
+    # ── always 类型（始终显示；数据不足时展示层写占位文本） ──
+    # 组合演进：聚合本地多期快照，data_flag 控制章节可见性，
+    # available=False 时模板/页签写占位（与 correlation 的降级模式一致）
+    {
+        "key": "portfolio_evolution",
+        "name": "组合演进",
+        "number": 19,
+        "type": "always",
+        "data_flag": "evolution_data",
+    },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 19, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 20, "type": "always", "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 20, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 21, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 
@@ -587,7 +598,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 
     处理逻辑：
-      1. 无配置或配置为空 → 返回完整 19 项默认顺序（与当前硬编码一致）
+      1. 无配置或配置为空 → 返回完整 21 项默认顺序（与当前硬编码一致）
       2. 用户配置的模块使用配置序号，其余保持默认序号
       3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
       4. llm_usage 始终固定在最后一位
@@ -597,7 +608,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 19 项
+        [{key, name, number, type, data_flag}, ...] 共 21 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

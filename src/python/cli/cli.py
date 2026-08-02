@@ -79,6 +79,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "  cache --stats                  查看缓存统计"
     )
 
+    # ── whatif 子命令 ──
+    whatif_p = sub.add_parser("whatif", help="调仓 What-if 模拟：对比两份持仓生成 diff 报告")
+    whatif_p.add_argument("--candidate", metavar="PATH", required=True, help="目标持仓文件（调仓后/假设，必填）")
+    whatif_p.add_argument("--base", metavar="PATH", help="基准持仓文件（调仓前）；缺省用 config 配置的持仓文件")
+    whatif_p.epilog = (
+        "示例:\n"
+        "  whatif --candidate 调仓后.xlsx              对比当前持仓 vs 目标持仓\n"
+        "  whatif --base 调仓前.xlsx --candidate 调仓后.xlsx   显式指定两份持仓\n"
+        "输出: 调仓模拟_{时间戳}.xlsx / .html（成本口径截面比较，零网络请求）"
+    )
+
     # ── check-sources 子命令 ──
     check_p = sub.add_parser("check-sources", help="数据源健康检查（无需 config）")
     check_p.epilog = "示例:\n  check-sources    测试各数据源联通性"
@@ -309,6 +320,56 @@ def _handle_cache_update(update_type: str, config: dict, reporter) -> int:
     return _EXIT_SEVERE
 
 
+def _handle_whatif(args: argparse.Namespace, config: dict) -> int:
+    """处理 whatif 子命令——调仓 What-if 模拟。
+
+    对比基准（--base，缺省为 config 持仓文件）与目标（--candidate）两份持仓，
+    生成调仓 diff 报告（Excel + HTML）。全程本地计算，零网络请求。
+    """
+    from src.python.analysis.whatif import build_whatif_data
+    from src.python.core.reader import read_holdings
+    from src.python.report.cli_progress import CliProgressReporter
+    from src.python.report.whatif_writer import write_whatif_report
+
+    reporter = CliProgressReporter(verbose=args.verbose)
+
+    # ── 基准持仓（--base 或 config 默认）──
+    base_file = args.base
+    if base_file:
+        base_holdings = read_holdings(base_file)
+    else:
+        base_file = os.path.join(
+            config.get("holdings_dir", "data/holdings"),
+            config.get("holdings_filename", "个人投资持仓信息.xlsx"),
+        )
+        base_holdings = _cli_read_holdings(config)
+    if not base_holdings:
+        reporter.error(f"基准持仓读取失败或为空: {base_file}")
+        return _EXIT_SEVERE
+
+    # ── 目标持仓（--candidate，必填）──
+    cand_file = args.candidate
+    cand_holdings = read_holdings(cand_file)
+    if not cand_holdings:
+        reporter.error(f"目标持仓读取失败或为空: {cand_file}")
+        return _EXIT_SEVERE
+
+    data = build_whatif_data(
+        base_holdings,
+        cand_holdings,
+        base_file=os.path.basename(base_file),
+        candidate_file=os.path.basename(cand_file),
+    )
+    if not data.get("available"):
+        reporter.error(f"调仓对比数据不可用: {data.get('reason', '未知原因')}")
+        return _EXIT_SEVERE
+
+    output_dir = args.output or config.get("output_dir", "reports")
+    write_whatif_report(data, output_dir=output_dir, reporter=reporter)
+    reporter.print_timing_summary()
+    return _EXIT_SUCCESS
+
+
 def _handle_check_sources() -> int:
     """处理 check-sources 子命令——数据源健康检查。
 
@@ -360,6 +421,8 @@ def main() -> int:
         return _handle_report(args, config)
     elif args.command == "cache":
         return _handle_cache(args, config)
+    elif args.command == "whatif":
+        return _handle_whatif(args, config)
     return _EXIT_SEVERE
 
 

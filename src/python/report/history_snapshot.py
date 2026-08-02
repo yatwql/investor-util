@@ -165,6 +165,24 @@ def load_latest() -> SnapshotData | None:
     return _load_file(latest)
 
 
+def load_all() -> list[SnapshotData]:
+    """加载全部快照（按时间戳升序），供多期趋势聚合（组合演进）。
+
+    Returns:
+        按 timestamp 升序排列的 SnapshotData 列表（损坏文件自动跳过）。
+        无快照文件时返回空列表。
+    """
+    snapshots: list[tuple[str, float, SnapshotData]] = []
+    for path in _list_snapshot_files():
+        ts = os.path.basename(path).replace("snapshot_", "").replace(".json", "")
+        data = _load_file(path)
+        if data is not None:
+            snapshots.append((ts, os.path.getmtime(path), data))
+    # 按时间戳升序；同名时间戳时按 mtime 兜底
+    snapshots.sort(key=lambda x: (x[0], x[1]))
+    return [sd for _, _, sd in snapshots]
+
+
 def list_all() -> list[dict[str, Any]]:
     """列出所有快照文件的元信息（按 mtime 降序）。
 

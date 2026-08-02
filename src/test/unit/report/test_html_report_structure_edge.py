@@ -41,18 +41,15 @@ class TestHtmlCssStructure(unittest.TestCase):
         )
         self.assertIsNotNone(match, ".section-nav CSS 中未找到 flex-wrap 属性")
         wrap_value = match.group(1).strip()
-        self.assertEqual(wrap_value, "wrap",
-                         f".section-nav flex-wrap 应为 wrap，当前为 '{wrap_value}'")
+        self.assertEqual(wrap_value, "wrap", f".section-nav flex-wrap 应为 wrap，当前为 '{wrap_value}'")
 
     def test_no_nowrap_in_section_nav(self):
         """.section-nav 不应包含 nowrap 或 overflow-x: auto。"""
         nav_css = re.search(r"\.section-nav\s*\{[^}]*\}", self.tmpl)
         self.assertIsNotNone(nav_css)
         block = nav_css.group(0)
-        self.assertNotIn("nowrap", block,
-                         ".section-nav 中不应有 nowrap，否则导航不换行")
-        self.assertNotIn("overflow-x", block,
-                         ".section-nav 中不应有 overflow-x，否则导航不换行")
+        self.assertNotIn("nowrap", block, ".section-nav 中不应有 nowrap，否则导航不换行")
+        self.assertNotIn("overflow-x", block, ".section-nav 中不应有 overflow-x，否则导航不换行")
 
     # ── Nav <a> white-space ────────────────────────────────────
 
@@ -64,8 +61,7 @@ class TestHtmlCssStructure(unittest.TestCase):
         )
         self.assertIsNotNone(match, ".section-nav a 中未找到 white-space 属性")
         ws_value = match.group(1).strip()
-        self.assertEqual(ws_value, "nowrap",
-                         f".section-nav a white-space 应为 nowrap，当前为 '{ws_value}'")
+        self.assertEqual(ws_value, "nowrap", f".section-nav a white-space 应为 nowrap，当前为 '{ws_value}'")
 
     # ── No empty anchor divs ───────────────────────────────────
 
@@ -76,7 +72,8 @@ class TestHtmlCssStructure(unittest.TestCase):
             self.tmpl,
         )
         self.assertEqual(
-            len(empty_anchors), 0,
+            len(empty_anchors),
+            0,
             f"发现 {len(empty_anchors)} 个空锚点 div，应直接使用 .section 容器作为锚点: {empty_anchors}",
         )
 
@@ -86,21 +83,34 @@ class TestHtmlCssStructure(unittest.TestCase):
         """每个 <div class="section"> 必须有 id 属性。"""
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
         for sec_tag in sections:
-            self.assertIn(" id=\"", sec_tag,
-                          f"section div 缺少 id 属性: {sec_tag}")
+            self.assertIn(' id="', sec_tag, f"section div 缺少 id 属性: {sec_tag}")
 
     def test_all_section_divs_have_order(self):
         """每个 <div class="section"> 必须有 style="order: ..."。"""
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
         for sec_tag in sections:
-            self.assertIn("style=\"order:", sec_tag,
-                          f"section div 缺少 order 样式: {sec_tag}")
+            self.assertIn('style="order:', sec_tag, f"section div 缺少 order 样式: {sec_tag}")
 
     def test_section_count(self):
-        """模板应包含 20 个 .section 容器（含 factor_exposure、correlation_analysis）。"""
+        """模板 + partials 应共含 21 个 .section 容器（含 factor_exposure、correlation_analysis、portfolio_evolution）。
+
+        组合演进章节已拆入 partials/evolution_section.html（经 include 引入），
+        因此统计需覆盖 tmpl/partials/ 下的 partial 文件。
+        """
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
-        self.assertEqual(len(sections), 20,
-                         f"应有 20 个 .section 容器，实际 {len(sections)}")
+        partials_dir = os.path.join(os.path.dirname(_TEMPLATE_PATH), "partials")
+        extra = 0
+        if os.path.isdir(partials_dir):
+            for fname in sorted(os.listdir(partials_dir)):
+                if not fname.endswith(".html"):
+                    continue
+                with open(os.path.join(partials_dir, fname), "r", encoding="utf-8") as f:
+                    extra += len(re.findall(r'<div\s+class="section"[^>]*>', f.read()))
+        self.assertEqual(
+            len(sections) + extra,
+            21,
+            f"应有 21 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
+        )
 
     # ── section-title pattern ──────────────────────────────────
 
@@ -112,8 +122,9 @@ class TestHtmlCssStructure(unittest.TestCase):
             re.DOTALL,
         )
         for title_html in title_divs:
-            self.assertIn("section_numbers['", title_html,
-                          f"section-title 缺少 section_numbers 引用: {title_html[:80]}")
+            self.assertIn(
+                "section_numbers['", title_html, f"section-title 缺少 section_numbers 引用: {title_html[:80]}"
+            )
 
     # ── 18 nav <a> in section-nav ──────────────────────────────
 
@@ -138,12 +149,10 @@ class TestHtmlRegressionChecks(unittest.TestCase):
             r'<div\s+id="sec-\w+"[^>]*>(?!\s*<div\s+class="section)',
             self.tmpl,
         )
-        lonely_clean = [
-            d for d in lonely
-            if 'class="section"' not in d
-        ]
+        lonely_clean = [d for d in lonely if 'class="section"' not in d]
         self.assertEqual(
-            len(lonely_clean), 0,
+            len(lonely_clean),
+            0,
             f"发现孤立锚点 div（无 section class）: {lonely_clean}",
         )
 
@@ -153,22 +162,17 @@ class TestHtmlRegressionChecks(unittest.TestCase):
             r"\.section-nav\s*\{[^}]*scrollbar-width\s*:\s*none",
             self.tmpl,
         )
-        self.assertIsNotNone(match,
-                             ".section-nav 应设置 scrollbar-width: none 以避免滚动条占位")
+        self.assertIsNotNone(match, ".section-nav 应设置 scrollbar-width: none 以避免滚动条占位")
 
     def test_print_hides_nav(self):
         """打印样式应隐藏导航栏（.section-nav { display: none }）。"""
-        self.assertIn(".section-nav", self.tmpl,
-                       "模板中应有 .section-nav 选择器")
-        self.assertIn("display: none", self.tmpl,
-                      "打印样式应包含 display: none")
+        self.assertIn(".section-nav", self.tmpl, "模板中应有 .section-nav 选择器")
+        self.assertIn("display: none", self.tmpl, "打印样式应包含 display: none")
         print_pos = self.tmpl.find("@media print")
         self.assertGreater(print_pos, -1, "模板中缺少 @media print")
-        block = self.tmpl[print_pos:print_pos + 800]
-        self.assertIn(".section-nav", block,
-                      ".section-nav 应出现在 @media print 块中")
-        self.assertIn("display: none", block,
-                      "display: none 应出现在 @media print 块中")
+        block = self.tmpl[print_pos : print_pos + 800]
+        self.assertIn(".section-nav", block, ".section-nav 应出现在 @media print 块中")
+        self.assertIn("display: none", block, "display: none 应出现在 @media print 块中")
 
 
 class TestHtmlBackToTopStatic(unittest.TestCase):
@@ -181,7 +185,7 @@ class TestHtmlBackToTopStatic(unittest.TestCase):
     def test_report_top_anchor_in_header(self):
         """报告头部 div 应含 id="report-top" 锚点。"""
         match = re.search(r'<div\s+class="report-header"[^>]*id="report-top"', self.tmpl)
-        self.assertIsNotNone(match, "report-header 应含 id=\"report-top\" 锚点")
+        self.assertIsNotNone(match, 'report-header 应含 id="report-top" 锚点')
 
     def test_back_to_top_css_defined(self):
         """.back-to-top-link CSS 类已定义（居中 + 链接配色）。"""
@@ -193,19 +197,18 @@ class TestHtmlBackToTopStatic(unittest.TestCase):
         """打印时隐藏章节"回到顶部"链接。"""
         print_pos = self.tmpl.find("@media print")
         self.assertGreater(print_pos, -1, "模板中缺少 @media print")
-        block = self.tmpl[print_pos:print_pos + 1200]
-        self.assertIn(".back-to-top-link", block,
-                      ".back-to-top-link 应出现在 @media print 块中（打印隐藏）")
+        block = self.tmpl[print_pos : print_pos + 1200]
+        self.assertIn(".back-to-top-link", block, ".back-to-top-link 应出现在 @media print 块中（打印隐藏）")
         self.assertIn("display: none", block)
 
     def test_back_to_top_macro_defined_and_called(self):
         """render_back_to_top 宏已定义，且调用次数 = .section 容器数。"""
-        self.assertIn("{% macro render_back_to_top() %}", self.tmpl,
-                      "应定义 render_back_to_top 宏")
+        self.assertIn("{% macro render_back_to_top() %}", self.tmpl, "应定义 render_back_to_top 宏")
         calls = len(re.findall(r"\{\{\s*render_back_to_top\(\)\s*\}\}", self.tmpl))
         sections = len(re.findall(r'<div\s+class="section"[^>]*>', self.tmpl))
-        self.assertEqual(calls, sections,
-                         f"宏调用 {calls} 次应与 .section 容器 {sections} 个一致（每个章节底部各 1 个链接）")
+        self.assertEqual(
+            calls, sections, f"宏调用 {calls} 次应与 .section 容器 {sections} 个一致（每个章节底部各 1 个链接）"
+        )
 
 
 class TestHtmlTocStatic(unittest.TestCase):
@@ -222,10 +225,8 @@ class TestHtmlTocStatic(unittest.TestCase):
 
     def test_toc_collapsed_state_css(self):
         """存在 body.toc-collapsed 折叠状态规则（侧栏移出 + 展开按钮显示）。"""
-        self.assertIn("body.toc-collapsed .toc-sidebar", self.tmpl,
-                      "应存在收起时侧栏移出规则")
-        self.assertIn("body.toc-collapsed .toc-toggle-btn", self.tmpl,
-                      "应存在收起时展开按钮显示规则")
+        self.assertIn("body.toc-collapsed .toc-sidebar", self.tmpl, "应存在收起时侧栏移出规则")
+        self.assertIn("body.toc-collapsed .toc-toggle-btn", self.tmpl, "应存在收起时展开按钮显示规则")
 
     def test_toc_active_highlight_css(self):
         """.toc-list a.active 高亮样式已定义。"""
@@ -235,7 +236,8 @@ class TestHtmlTocStatic(unittest.TestCase):
         """窄屏（< 900px）隐藏左侧栏，保留横向 section-nav。"""
         match = re.search(
             r"@media\s*\(max-width:\s*899px\)\s*\{(.*?)\}",
-            self.tmpl, re.DOTALL,
+            self.tmpl,
+            re.DOTALL,
         )
         self.assertIsNotNone(match, "应存在 max-width: 899px 响应式块")
         block = match.group(1)
@@ -246,19 +248,19 @@ class TestHtmlTocStatic(unittest.TestCase):
         """宽屏（>= 900px）展开时内容让出左侧栏。"""
         match = re.search(
             r"@media\s*\(min-width:\s*900px\)\s*\{(.*?)\}",
-            self.tmpl, re.DOTALL,
+            self.tmpl,
+            re.DOTALL,
         )
         self.assertIsNotNone(match, "应存在 min-width: 900px 响应式块")
         block = match.group(1)
-        self.assertIn("margin-left: 220px", block,
-                      "宽屏展开时 .container 应让出 220px 左侧栏")
+        self.assertIn("margin-left: 220px", block, "宽屏展开时 .container 应让出 220px 左侧栏")
 
     def test_toc_print_hidden(self):
         """打印样式应隐藏左侧目录（.toc-sidebar / .toc-toggle-btn）。"""
         self.assertIn(".toc-sidebar", self.tmpl, "模板中应有 .toc-sidebar 选择器")
         print_pos = self.tmpl.find("@media print")
         self.assertGreater(print_pos, -1, "模板中缺少 @media print")
-        block = self.tmpl[print_pos:print_pos + 1200]
+        block = self.tmpl[print_pos : print_pos + 1200]
         self.assertIn(".toc-sidebar", block, ".toc-sidebar 应出现在 @media print 块中")
         self.assertIn(".toc-toggle-btn", block, ".toc-toggle-btn 应出现在 @media print 块中")
 
@@ -270,11 +272,11 @@ class TestHtmlTocStatic(unittest.TestCase):
         """平滑滚动应置于 prefers-reduced-motion: no-preference 内（A6 可达性）。"""
         match = re.search(
             r"@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{(.*?)\}",
-            self.tmpl, re.DOTALL,
+            self.tmpl,
+            re.DOTALL,
         )
         self.assertIsNotNone(match, "应存在 prefers-reduced-motion: no-preference 块")
-        self.assertIn("scroll-behavior: smooth", match.group(1),
-                      "平滑滚动应尊重减少动态偏好")
+        self.assertIn("scroll-behavior: smooth", match.group(1), "平滑滚动应尊重减少动态偏好")
 
 
 if __name__ == "__main__":
