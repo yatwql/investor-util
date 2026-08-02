@@ -3,7 +3,8 @@
  * 核心 6 图读取模板内联 chart-data（chart_datasets）；组合演进 3 图
  * 读取独立内联数据段 #evolution-chart-data（evolution_data 契约 dict）。
  * O1 隔离：每图独立 try/catch，单图失败仅 console.warn。
- * 守卫：Chart 引擎缺失（R21）或 canvas 不存在（模块隐藏）→ 跳过该图。
+ * 守卫：Chart 引擎（chart.min.js）或 ChartCommon（chart-common.js）缺失
+ * （R21）→ 全部跳过；canvas 不存在（模块隐藏）→ 跳过该图。
  * ES5 保守语法（R17/R22）。打印快照降级见 chart-print.js。
  * 键名契约（§4.11 O2）：portfolio_line / drawdown / category_doughnut /
  * industry_bar / penetration_bar / radar；evolution_total / evolution_hhi /
@@ -13,10 +14,11 @@
 (function () {
   'use strict';
 
-  /* ── 引擎守卫：chart.min.js 未加载 → 全部跳过 ───────── */
-  if (typeof Chart === 'undefined') {
+  /* ── 引擎守卫：chart.min.js / chart-common.js 未加载 → 全部跳过 ───────── */
+  if (typeof Chart === 'undefined' || !window.ChartCommon) {
     return;
   }
+  var common = window.ChartCommon;
 
   /* ── 读取模板内联数据 ───────────────────────────────── */
   var dataEl = document.getElementById('chart-data');
@@ -31,35 +33,18 @@
 
   var theme = window.ChartTheme || {};
 
-  /* ── 登记图表实例（打印快照 + 导出按钮，见 chart-print.js / chart-export.js）── */
+  /* ── 登记图表实例 + 折线图配置：统一委托 chart-common.js ──
+   * 薄封装保持调用点可读；实现与 What-if 页共用，消除配置复制。 */
   function trackChart(chart, key) {
-    if (window.ChartPrint && typeof window.ChartPrint.register === 'function') {
-      window.ChartPrint.register(chart);
-    }
-    if (window.ChartExport && typeof window.ChartExport.register === 'function') {
-      window.ChartExport.register(chart, key);
-    }
-    return chart;
+    return common.trackChart(chart, key);
   }
 
-  /* ── 折线图通用配置（净值/回撤共用）────────────────── */
   function lineOptions(yLabel) {
-    var opts = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: theme.text || '#333', boxWidth: 12 } },
-        tooltip: { enabled: true }
-      }
-    };
-    opts.scales = {
-      x: { ticks: { color: theme.text }, grid: { color: theme.grid } },
-      y: { ticks: { color: theme.text }, grid: { color: theme.grid } }
-    };
-    if (yLabel) {
-      opts.scales.y.title = { display: true, text: yLabel, color: theme.text };
-    }
-    return opts;
+    return common.lineOptions(yLabel);
+  }
+
+  function doughnutOptions(percent) {
+    return common.doughnutOptions(percent);
   }
 
   /* ── 单图初始化函数（O1：每个独立 try/catch）────────── */
@@ -161,14 +146,7 @@
           backgroundColor: d.backgroundColor || (theme.doughnutColors || ['#2E75B6', '#E68A00', '#2E7D32', '#8E44AD', '#7B8A9E'])
         }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'right', labels: { color: theme.text || '#333', boxWidth: 12 } },
-          tooltip: { enabled: true }
-        }
-      }
+      options: doughnutOptions(false)
     }), 'category_doughnut');
   }
 

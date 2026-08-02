@@ -36,11 +36,14 @@ def _order_with_evolution() -> list[dict]:
 
 def _render_evolution(evolution_data, interactive: bool = False) -> "BeautifulSoup":
     """渲染 portfolio_evolution 可见、其余隐藏的模板。"""
+    from src.python.report.chart_data_builder import build_evolution_chart_data
+
     order = _order_with_evolution()
     numbers = {sec["key"]: sec["number"] for sec in order}
     sv_dict = {sec["key"]: (sec["key"] == "portfolio_evolution") for sec in order}
     data = _build_minimal_render_data(order, numbers, sv_dict)
     data["evolution_data"] = evolution_data
+    data["evolution_chart_data"] = build_evolution_chart_data(evolution_data)
     if interactive:
         data["enable_interactive_charts"] = True
     return _render_template(data)
@@ -107,8 +110,20 @@ class TestHtmlEvolutionSection(unittest.TestCase):
         self.assertIn("总市值与总盈亏", joined)
         self.assertIn("HHI", joined)
         self.assertIn("TOP 持仓占比", joined)
-        # 图表 JSON 数据注入
-        self.assertIsNotNone(section.find(id="evolution-chart-data"))
+        # 图表 JSON 数据注入（Python 侧裁剪后的专用负载：只含图表消费字段）
+        import json
+
+        data_el = section.find(id="evolution-chart-data")
+        self.assertIsNotNone(data_el)
+        payload = json.loads(data_el.string)
+        self.assertEqual(payload["periods"], ["07-01", "07-02", "07-03"])
+        self.assertEqual(payload["total_value"], [100000.0, 110000.0, 120000.0])
+        self.assertEqual(payload["top_holdings"][0]["name"], "资产A")
+        self.assertEqual(payload["top_holdings"][0]["weights"], [60.0, 70.0, 50.0])
+        self.assertNotIn("total_cost", payload, "图表负载不应含表格字段 total_cost")
+        self.assertNotIn("holding_counts", payload, "图表负载不应含表格字段 holding_counts")
+        self.assertNotIn("account_flows", payload, "图表负载不应含表格字段 account_flows")
+        self.assertNotIn("reason", payload, "图表负载不应含降级原因字段")
 
     def test_top_chart_only_when_multiple_top_holdings(self):
         """TOP 变迁图仅在 top_holdings > 1 时渲染（单品种无需变迁图）。"""

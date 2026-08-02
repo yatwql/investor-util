@@ -161,7 +161,7 @@
                     <div class="chart-caption">目标持仓资产大类成本权重分布（%）</div>
                 </div>
             </div>
-            <script type="application/json" id="whatif-chart-data">{{ _w | tojson }}</script>
+            <script type="application/json" id="whatif-chart-data">{{ whatif_chart_data | tojson }}</script>
         </div>
     </div>
 
@@ -270,11 +270,18 @@
 <script defer src="chart.min.js"></script>
 <script defer src="chart-config.js"></script>
 <script defer src="chart-export.js"></script>
+<script defer src="chart-common.js"></script>
 <script>
-/* 调仓 What-if 双环图。O1 隔离：每图独立 try/catch。ES5 保守语法。 */
+/* 调仓 What-if 双环图。复用 ChartCommon（chart-common.js 公共 helper）：
+ * trackChart/doughnutOptions 与主报告 chart-init.js 共用，消除配置复制。
+ * O1 隔离：每图独立 try/catch。ES5 保守语法。 */
 (function () {
   'use strict';
   document.addEventListener('DOMContentLoaded', function () {
+    if (!window.ChartCommon) {
+      console.warn('[whatif] chart-common.js 未加载，图表跳过');
+      return;
+    }
     var dataEl = document.getElementById('whatif-chart-data');
     if (!dataEl) return;
     var whatif;
@@ -293,32 +300,14 @@
     var palette = (window.ChartTheme && window.ChartTheme.doughnutColors) ||
       ['#2E75B6', '#E68A00', '#2E7D32', '#8E44AD', '#7B8A9E', '#C0392B', '#16A085'];
 
-    function trackChart(chart, key) {
-      if (window.ChartExport && typeof window.ChartExport.register === 'function') {
-        window.ChartExport.register(chart, key);
-      }
-      return chart;
-    }
-
-    function doughnutOptions() {
-      return {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'right', labels: { boxWidth: 12, color: '#333' } },
-          tooltip: { enabled: true, callbacks: { label: function (ctx) { return ' ' + ctx.label + ': ' + ctx.raw + '%'; } } }
-        }
-      };
-    }
-
     function build(canvasId, data) {
       var el = document.getElementById(canvasId);
       if (!el) return;
       try {
-        trackChart(new Chart(el, {
+        window.ChartCommon.trackChart(new Chart(el, {
           type: 'doughnut',
           data: { labels: labels, datasets: [{ data: data, backgroundColor: palette }] },
-          options: doughnutOptions()
+          options: window.ChartCommon.doughnutOptions(true)
         }), canvasId);
       } catch (err) {
         console.warn('[whatif] 图表 ' + canvasId + ' 初始化失败: ', err);

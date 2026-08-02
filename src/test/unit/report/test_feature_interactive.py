@@ -51,16 +51,12 @@ class TestFeatureFlagRegistration:
 class TestBuildChartDatasetsForReport:
     def test_flag_off_returns_none(self) -> None:
         """Flag 关闭 → helper 返回 None（模板回退旧 Canvas）。"""
-        result = _build_chart_datasets_for_report(
-            history_data=_history_ok(), enable_interactive=False
-        )
+        result = _build_chart_datasets_for_report(history_data=_history_ok(), enable_interactive=False)
         assert result is None
 
     def test_flag_on_returns_datasets(self) -> None:
         """Flag 开启 → helper 返回数据集 dict。"""
-        result = _build_chart_datasets_for_report(
-            history_data=_history_ok(), enable_interactive=True
-        )
+        result = _build_chart_datasets_for_report(history_data=_history_ok(), enable_interactive=True)
         assert isinstance(result, dict)
         assert "portfolio_line" in result
 
@@ -72,9 +68,7 @@ class TestBuildChartDatasetsForReport:
             "src.python.report.chart_data_builder.build_chart_datasets",
             side_effect=RuntimeError("boom"),
         ):
-            result = _build_chart_datasets_for_report(
-                history_data=_history_ok(), enable_interactive=True
-            )
+            result = _build_chart_datasets_for_report(history_data=_history_ok(), enable_interactive=True)
         assert result == {}
 
 
@@ -87,6 +81,7 @@ class TestCopyJsAssets:
             "chart-print.js",
             "chart-config.js",
             "chart-export.js",
+            "chart-common.js",
             "chart-init.js",
             "toc.js",
         ):

@@ -71,6 +71,18 @@ def write_whatif_excel(whatif_data: dict[str, Any], output_dir: str = "reports")
     return os.path.abspath(latest)
 
 
+def _trim_whatif_chart_data(whatif_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    """What-if 图表数据专用裁剪（避免整包 tojson，R9 数据最小化）。
+
+    whatif_data（C19 契约）含 summary/changes/stats/base/candidate 等表格字段，
+    双环图只需 categories（图表 JS 读取 whatif.categories）。保留 available 便于
+    JS 侧可用性判断；数据不足（None/available=False）返回 None（模板不输出数据段）。
+    """
+    if not whatif_data or not whatif_data.get("available"):
+        return None
+    return {"available": True, "categories": whatif_data.get("categories") or []}
+
+
 def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
     """渲染 whatif_template.html，返回完整 HTML 字符串。
 
@@ -83,7 +95,11 @@ def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
     """
     from src.python.report.html_jinja_env import _ENV
 
-    return _ENV.get_template("whatif_template.html").render(whatif_data=whatif_data, now=now_str)
+    return _ENV.get_template("whatif_template.html").render(
+        whatif_data=whatif_data,
+        now=now_str,
+        whatif_chart_data=_trim_whatif_chart_data(whatif_data),
+    )
 
 
 def write_whatif_html(whatif_data: dict[str, Any], output_dir: str = "reports") -> str:

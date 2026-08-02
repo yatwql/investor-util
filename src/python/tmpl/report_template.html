@@ -648,11 +648,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 {# Chart.js 交互图表（R21 本地 bundle：相对路径，离线自包含） #}
 {# chart_datasets 数据经 context 传递（C14 合规，不写 _ENV.globals） #}
 <script type="application/json" id="chart-data">{{ chart_datasets | tojson }}</script>
-{# P3（R21 本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-init） #}
+{# P3（R21 本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-common → chart-init） #}
 <script defer src="chart.min.js"></script>
 <script defer src="chart-print.js"></script>
 <script defer src="chart-config.js"></script>
 <script defer src="chart-export.js"></script>
+<script defer src="chart-common.js"></script>
 <script defer src="chart-init.js"></script>
 {% endif %}
 {# 左侧目录 TOC（独立于图表开关，始终加载；R21 本地 bundle） #}
@@ -2196,168 +2197,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
     {% endif %}
 
-    {% if section_visible("portfolio_evolution") %}
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 18: 组合演进（多快照趋势追踪）           -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    {% set _evo = evolution_data or {} %}
-    <div class="section" id="sec-portfolio_evolution" style="order: {{ section_numbers['portfolio_evolution'] }};">
-        <div class="section-title">
-            {{ section_numbers['portfolio_evolution'] }}、组合演进
-            <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">多期快照趋势追踪</span>
-        </div>
-        {% if _evo.get("available") %}
-        {% set _evo_periods = _evo.get("periods", []) %}
-        {% set _evo_n = _evo_periods | length %}
-        <div class="section-content">
-            <div class="summary-tag" style="margin-bottom: 8px;">
-                📈 已聚合 <strong>{{ _evo.get("snapshot_count", 0) }}</strong> 份快照，
-                <strong>{{ _evo_n }}</strong> 个有效观察日（每日取最后一次快照）。
-                数据来自每次报告自动生成的本地快照，无需联网。
-            </div>
-            {% if enable_interactive_charts %}
-            <script type="application/json" id="evolution-chart-data">{{ _evo | tojson }}</script>
-            {% endif %}
-
-            <!-- ① 总市值趋势 -->
-            <div style="font-weight: bold; font-size: 14px; margin: 10px 0 6px;">① 总市值与总盈亏趋势</div>
-            {% if enable_interactive_charts %}
-            <div class="chart-box" style="height:300px;">
-                <canvas id="chart_evolution_total" width="800" height="300" style="width:100%;height:100%;" aria-label="总市值与总盈亏趋势折线图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
-            </div>
-            <div class="chart-caption">总市值与总盈亏随快照日期变化趋势（单位：元）</div>
-            {% endif %}
-            <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>观察日</th>
-                        <th>总市值(元)</th>
-                        <th>总成本(元)</th>
-                        <th>总盈亏(元)</th>
-                        <th>持仓数量</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for i in range(_evo_n) %}
-                    <tr>
-                        <td>{{ _evo_periods[i] }}</td>
-                        <td style="text-align:right;">{{ _evo["total_value"][i] | money }}</td>
-                        <td style="text-align:right;">{{ _evo["total_cost"][i] | money }}</td>
-                        <td style="text-align:right; color: {{ _evo["total_pnl"][i] | profit_color }};">{{ _evo["total_pnl"][i] | money }}</td>
-                        <td style="text-align:right;">{{ _evo["holding_counts"][i] }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-
-            <!-- ② 集中度 HHI 趋势 -->
-            <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">② 持仓集中度（HHI）趋势</div>
-            {% if enable_interactive_charts %}
-            <div class="chart-box" style="height:280px;">
-                <canvas id="chart_evolution_hhi" width="800" height="280" style="width:100%;height:100%;" aria-label="持仓集中度HHI趋势折线图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
-            </div>
-            <div class="chart-caption">持仓集中度 HHI 变化趋势（0~1，越接近 1 越集中）</div>
-            {% endif %}
-            <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>观察日</th>
-                        {% for p in _evo_periods %}<th>{{ p }}</th>{% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="font-weight:600;">HHI 集中度</td>
-                        {% for h in _evo.get("hhi", []) %}
-                        <td style="text-align:right;">{% if h is not none %}{{ "%.4f"|format(h) }}{% else %}-{% endif %}</td>
-                        {% endfor %}
-                    </tr>
-                </tbody>
-            </table>
-            </div>
-
-            <!-- ③ TOP 持仓占比变迁 -->
-            {% set _evo_top = _evo.get("top_holdings", []) %}
-            {% if _evo_top %}
-            <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">③ TOP 持仓占比变迁</div>
-            {% if enable_interactive_charts and _evo_top | length > 1 %}
-            <div class="chart-box" style="height:300px;">
-                <canvas id="chart_evolution_top" width="800" height="300" style="width:100%;height:100%;" aria-label="TOP持仓占比变迁折线图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
-            </div>
-            <div class="chart-caption">TOP 持仓占比（%）随快照日期变化趋势（市值口径，市值为 0 时回退成本口径）</div>
-            {% endif %}
-            <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>排名</th>
-                        <th>品种</th>
-                        {% for p in _evo_periods %}<th>{{ p }} (%)</th>{% endfor %}
-                        <th>出现期数</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for th in _evo_top %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td class="text-left">{{ th.name }}({{ th.code }})</td>
-                        {% for w in th.weights %}<td style="text-align:right;">{{ "%.2f"|format(w) }}</td>{% endfor %}
-                        <td style="text-align:right;">{{ th.present_count }} / {{ _evo_n }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-            {% endif %}
-
-            <!-- ④ 账户配置流（多账户时展示） -->
-            {% set _evo_flows = _evo.get("account_flows", {}) %}
-            {% if _evo_flows | length > 1 %}
-            <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">④ 账户配置流（市值占比 %）</div>
-            <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>账户</th>
-                        {% for p in _evo_periods %}<th>{{ p }} (%)</th>{% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for aname, shares in _evo_flows.items() %}
-                    <tr>
-                        <td class="text-left">{{ aname }}</td>
-                        {% for s in shares %}<td style="text-align:right;">{{ "%.2f"|format(s) }}</td>{% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-            {% endif %}
-
-            <div class="penetration-notes" style="margin-top: 12px;">
-                <div>* 权重口径：优先使用持仓市值，市值为 0 的旧快照回退成本口径；单期无有效权重时该期 HHI 记 "-"</div>
-                <div>* 快照格式限制：行业配置流、穿透 TOP10 变迁、量化指标（夏普/波动率）趋势需快照字段扩展，暂未纳入</div>
-            </div>
-        </div>
-        {% else %}
-        <div class="section-content">
-            <div class="empty-note placeholder-note">
-                <p><strong>组合演进数据不足</strong></p>
-                <p style="margin-top:8px;font-size:13px;color:#888;">
-                    {% if _evo.get("reason") %}{{ _evo["reason"] }}{% else %}组合演进快照不足，趋势数据待积累{% endif %}。
-                </p>
-                <p style="margin-top:12px;font-size:12px;color:#aaa;">
-                    每次生成报告会自动保存一份本地快照；积累 {{ _evo.get("min_snapshots", 3) }} 个不同日期的快照后，即可展示组合演进趋势。
-                </p>
-            </div>
-        </div>
-        {% endif %}
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
+    {% include "partials/evolution_section.html" with context %}
 
     {% if section_visible("data_source_status") %}
     <!-- ═══════════════════════════════════════════════════════ -->

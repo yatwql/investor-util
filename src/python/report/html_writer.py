@@ -287,6 +287,8 @@ def _render_template(
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
+    from src.python.report.chart_data_builder import build_evolution_chart_data
+
     return _ENV.get_template("report_template.html").render(
         now=now_str,
         today=today_str,
@@ -349,6 +351,7 @@ def _render_template(
         factor_names=factor_names or {},
         correlation_data=correlation_data,
         evolution_data=evolution_data,
+        evolution_chart_data=build_evolution_chart_data(evolution_data),
         drawdown_min_span=drawdown_min_span,
     )
 
@@ -633,8 +636,8 @@ def _copy_js_assets(output_dir: str) -> None:
     """将 src/static/ 下 Chart.js 前端 JS 资产复制到报告输出目录（R21 本地 bundle）。
 
     模板以相对路径引用（chart.min.js / chart-print.js / chart-config.js /
-    chart-export.js / chart-init.js / toc.js），报告完全离线自包含。文件缺失时
-    仅告警，不阻断报告生成（防御性）。
+    chart-export.js / chart-common.js / chart-init.js / toc.js），报告完全离线
+    自包含。文件缺失时仅告警，不阻断报告生成（防御性）。
 
     Args:
         output_dir: 报告输出目录（与 HTML 同目录）
@@ -643,7 +646,15 @@ def _copy_js_assets(output_dir: str) -> None:
 
     from src.python.core.constants import PROJECT_ROOT
 
-    _JS_ASSETS = ("chart.min.js", "chart-print.js", "chart-config.js", "chart-export.js", "chart-init.js", "toc.js")
+    _JS_ASSETS = (
+        "chart.min.js",
+        "chart-print.js",
+        "chart-config.js",
+        "chart-export.js",
+        "chart-common.js",
+        "chart-init.js",
+        "toc.js",
+    )
     src_dir = os.path.join(PROJECT_ROOT, "src", "static")
     os.makedirs(output_dir, exist_ok=True)
     for fname in _JS_ASSETS:

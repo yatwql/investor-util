@@ -182,13 +182,19 @@ class TestWhatifHtmlPage(unittest.TestCase):
         self.assertIn('id="chart_whatif_base"', text)
         self.assertIn('id="chart_whatif_candidate"', text)
         self.assertEqual(text.count('class="chart-caption"'), 2, "每张图必须有 .chart-caption（C20）")
-        # 图表 JSON 数据注入可解析
+        # 图表 JSON 数据注入可解析（Python 侧裁剪后的专用负载：只含图表消费字段）
         m = 'id="whatif-chart-data">'
         start = text.index(m) + len(m)
         end = text.index("</script>", start)
         payload = json.loads(text[start:end])
         self.assertEqual(payload["available"], True)
         self.assertEqual(len(payload["categories"]), 2)
+        self.assertEqual(payload["categories"][0]["label"], "股票")
+        self.assertNotIn("summary", payload, "图表负载不应含汇总指标 summary")
+        self.assertNotIn("changes", payload, "图表负载不应含变动明细 changes")
+        self.assertNotIn("stats", payload, "图表负载不应含变动统计 stats")
+        self.assertNotIn("base", payload, "图表负载不应含基准快照 base")
+        self.assertNotIn("candidate", payload, "图表负载不应含目标快照 candidate")
 
     def test_changes_table_with_action_rows(self):
         """变动明细：行动作行 class + action-badge。"""

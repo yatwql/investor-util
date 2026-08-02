@@ -28,6 +28,17 @@ DATASET_KEYS = (
     "radar",
 )
 
+# ── 组合演进图表专用键（裁剪自 evolution_data C19 契约）────────
+# 图表（chart-init.js initEvolution*）只消费以下字段；total_cost/holding_counts/
+# account_flows/reason 等表格字段不序列化（R9 数据最小化）。
+EVOLUTION_CHART_KEYS = (
+    "periods",
+    "total_value",
+    "total_pnl",
+    "hhi",
+    "top_holdings",
+)
+
 # ── 资产构成 Doughnut 键序（与 category.py _PROP_ORDER 一致）─
 # 扇区颜色不在 Python 侧硬编码——由 chart-config.js ChartTheme.doughnutColors
 # 统一提供（A3 色盲安全 palette，§4.8），避免 Python/JS 调色板漂移。
@@ -105,6 +116,33 @@ def build_chart_datasets(
         datasets["radar"] = _empty_dataset()
 
     return datasets
+
+
+def build_evolution_chart_data(evolution_data: dict | None) -> dict | None:
+    """组合演进图表数据专用裁剪（避免整包 tojson，R9 数据最小化）。
+
+    evolution_data（C19 契约）为完整趋势 dict（含 total_cost/holding_counts/
+    account_flows/reason 等表格字段），图表（chart-init.js initEvolution*）只需
+    periods/total_value/total_pnl/hhi/top_holdings，且 top_holdings 每项仅保留
+    name/code/weights。此处裁剪后序列化到模板 #evolution-chart-data。
+
+    Returns:
+        裁剪后的图表负载 dict；None 或 available=False → 返回 None，
+        模板不输出数据段（章节降级占位）。
+    """
+    if not evolution_data or not evolution_data.get("available"):
+        return None
+    payload: dict[str, Any] = {k: evolution_data.get(k) for k in EVOLUTION_CHART_KEYS}
+    top = payload.get("top_holdings") or []
+    payload["top_holdings"] = [
+        {
+            "name": h.get("name", ""),
+            "code": h.get("code", ""),
+            "weights": h.get("weights", []),
+        }
+        for h in top
+    ]
+    return payload
 
 
 def _empty_dataset() -> dict:
