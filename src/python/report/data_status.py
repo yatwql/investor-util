@@ -82,6 +82,7 @@ STATUS_MESSAGES: dict[str, str] = {
     "concentration_unavailable": "持仓集中度数据暂不可用",
     "style_unavailable": "基金风格数据暂不可用",
     "factor_exposure_unavailable": "因子暴露数据暂不可用",
+    "correlation_unavailable": "持仓相关性数据暂不可用",
     # 新闻 / 预警
     "news_all_failed": "新闻数据暂不可用，请检查网络连接",
     "warning_unavailable": "预警数据暂不可用",

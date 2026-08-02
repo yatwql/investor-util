@@ -243,6 +243,7 @@ def _generate_full_html_report(
     result,
     metrics: dict | None = None,
     factor_exposure: dict | None = None,
+    correlation_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -250,6 +251,8 @@ def _generate_full_html_report(
         metrics: compute_all_metrics() 返回值（14 项全量，仅 full 路径）；
             用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
         factor_exposure: 因子暴露分析 C19 契约 dict，
+            基金深度分析关闭或数据不足时为 None/available=False。
+        correlation_data: 持仓相关性矩阵 C19 契约 dict，
             基金深度分析关闭或数据不足时为 None/available=False。
     """
     from src.python.config.features import is_feature_enabled
@@ -288,6 +291,7 @@ def _generate_full_html_report(
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
             factor_exposure=factor_exposure,
+            correlation_data=correlation_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -583,10 +587,11 @@ def _generate_report_full(
     # ── 2. F1 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
-    # 因子暴露：prep 中已组装（C19 契约），注入 pipeline_data 供 HTML/Excel 消费；
+    # 因子暴露 / 持仓相关性：prep 中已组装（C19 契约），注入 pipeline_data 供 HTML/Excel 消费；
     # capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
         pipeline_data["factor_exposure"] = prep.get("factor_exposure")
+        pipeline_data["correlation_data"] = prep.get("correlation_data")
     _validate_pipeline_snapshot(pipeline_data)
     perf.stop()
 
@@ -658,6 +663,7 @@ def _generate_report_full(
         result,
         _metrics,
         prep.get("factor_exposure"),
+        prep.get("correlation_data"),
     )
 
     # ── 7. Excel 报告 ──

@@ -97,10 +97,10 @@ class TestHtmlCssStructure(unittest.TestCase):
                           f"section div 缺少 order 样式: {sec_tag}")
 
     def test_section_count(self):
-        """模板应包含 18 个 .section 容器。"""
+        """模板应包含 20 个 .section 容器（含 factor_exposure、correlation_analysis）。"""
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
-        self.assertEqual(len(sections), 18,
-                         f"应有 18 个 .section 容器，实际 {len(sections)}")
+        self.assertEqual(len(sections), 20,
+                         f"应有 20 个 .section 容器，实际 {len(sections)}")
 
     # ── section-title pattern ──────────────────────────────────
 
@@ -169,6 +169,112 @@ class TestHtmlRegressionChecks(unittest.TestCase):
                       ".section-nav 应出现在 @media print 块中")
         self.assertIn("display: none", block,
                       "display: none 应出现在 @media print 块中")
+
+
+class TestHtmlBackToTopStatic(unittest.TestCase):
+    """章节底部"回到顶部"链接静态检查 — CSS / 宏 / 打印样式。"""
+
+    def setUp(self):
+        with open(_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            self.tmpl = f.read()
+
+    def test_report_top_anchor_in_header(self):
+        """报告头部 div 应含 id="report-top" 锚点。"""
+        match = re.search(r'<div\s+class="report-header"[^>]*id="report-top"', self.tmpl)
+        self.assertIsNotNone(match, "report-header 应含 id=\"report-top\" 锚点")
+
+    def test_back_to_top_css_defined(self):
+        """.back-to-top-link CSS 类已定义（居中 + 链接配色）。"""
+        self.assertIn(".back-to-top-link", self.tmpl)
+        self.assertIn("text-align: center", self.tmpl)
+        self.assertIn(".back-to-top-link a", self.tmpl)
+
+    def test_back_to_top_print_hidden(self):
+        """打印时隐藏章节"回到顶部"链接。"""
+        print_pos = self.tmpl.find("@media print")
+        self.assertGreater(print_pos, -1, "模板中缺少 @media print")
+        block = self.tmpl[print_pos:print_pos + 1200]
+        self.assertIn(".back-to-top-link", block,
+                      ".back-to-top-link 应出现在 @media print 块中（打印隐藏）")
+        self.assertIn("display: none", block)
+
+    def test_back_to_top_macro_defined_and_called(self):
+        """render_back_to_top 宏已定义，且调用次数 = .section 容器数。"""
+        self.assertIn("{% macro render_back_to_top() %}", self.tmpl,
+                      "应定义 render_back_to_top 宏")
+        calls = len(re.findall(r"\{\{\s*render_back_to_top\(\)\s*\}\}", self.tmpl))
+        sections = len(re.findall(r'<div\s+class="section"[^>]*>', self.tmpl))
+        self.assertEqual(calls, sections,
+                         f"宏调用 {calls} 次应与 .section 容器 {sections} 个一致（每个章节底部各 1 个链接）")
+
+
+class TestHtmlTocStatic(unittest.TestCase):
+    """左侧目录 TOC 静态检查 — CSS 结构 / 折叠状态 / 响应式 / 打印。"""
+
+    def setUp(self):
+        with open(_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            self.tmpl = f.read()
+
+    def test_toc_sidebar_fixed_position(self):
+        """.toc-sidebar 应为 fixed 定位（独立于页面滚动）。"""
+        match = re.search(r"\.toc-sidebar\s*\{[^}]*position\s*:\s*fixed", self.tmpl)
+        self.assertIsNotNone(match, ".toc-sidebar 应使用 position: fixed")
+
+    def test_toc_collapsed_state_css(self):
+        """存在 body.toc-collapsed 折叠状态规则（侧栏移出 + 展开按钮显示）。"""
+        self.assertIn("body.toc-collapsed .toc-sidebar", self.tmpl,
+                      "应存在收起时侧栏移出规则")
+        self.assertIn("body.toc-collapsed .toc-toggle-btn", self.tmpl,
+                      "应存在收起时展开按钮显示规则")
+
+    def test_toc_active_highlight_css(self):
+        """.toc-list a.active 高亮样式已定义。"""
+        self.assertIn(".toc-list a.active", self.tmpl)
+
+    def test_toc_narrow_screen_hidden(self):
+        """窄屏（< 900px）隐藏左侧栏，保留横向 section-nav。"""
+        match = re.search(
+            r"@media\s*\(max-width:\s*899px\)\s*\{(.*?)\}",
+            self.tmpl, re.DOTALL,
+        )
+        self.assertIsNotNone(match, "应存在 max-width: 899px 响应式块")
+        block = match.group(1)
+        self.assertIn(".toc-sidebar", block, "窄屏块应隐藏 .toc-sidebar")
+        self.assertIn(".toc-toggle-btn", block, "窄屏块应隐藏展开按钮")
+
+    def test_toc_wide_screen_content_shift(self):
+        """宽屏（>= 900px）展开时内容让出左侧栏。"""
+        match = re.search(
+            r"@media\s*\(min-width:\s*900px\)\s*\{(.*?)\}",
+            self.tmpl, re.DOTALL,
+        )
+        self.assertIsNotNone(match, "应存在 min-width: 900px 响应式块")
+        block = match.group(1)
+        self.assertIn("margin-left: 220px", block,
+                      "宽屏展开时 .container 应让出 220px 左侧栏")
+
+    def test_toc_print_hidden(self):
+        """打印样式应隐藏左侧目录（.toc-sidebar / .toc-toggle-btn）。"""
+        self.assertIn(".toc-sidebar", self.tmpl, "模板中应有 .toc-sidebar 选择器")
+        print_pos = self.tmpl.find("@media print")
+        self.assertGreater(print_pos, -1, "模板中缺少 @media print")
+        block = self.tmpl[print_pos:print_pos + 1200]
+        self.assertIn(".toc-sidebar", block, ".toc-sidebar 应出现在 @media print 块中")
+        self.assertIn(".toc-toggle-btn", block, ".toc-toggle-btn 应出现在 @media print 块中")
+
+    def test_toc_script_referenced(self):
+        """模板引用 toc.js（defer 加载）。"""
+        self.assertIn('<script defer src="toc.js"></script>', self.tmpl)
+
+    def test_smooth_scroll_reduced_motion_guarded(self):
+        """平滑滚动应置于 prefers-reduced-motion: no-preference 内（A6 可达性）。"""
+        match = re.search(
+            r"@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{(.*?)\}",
+            self.tmpl, re.DOTALL,
+        )
+        self.assertIsNotNone(match, "应存在 prefers-reduced-motion: no-preference 块")
+        self.assertIn("scroll-behavior: smooth", match.group(1),
+                      "平滑滚动应尊重减少动态偏好")
 
 
 if __name__ == "__main__":

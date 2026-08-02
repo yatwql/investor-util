@@ -185,6 +185,21 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "llm_settings_file",
         str(tmp_path / "data/config/llm_settings.json"),
     )
+    # C13: llm_key.json / llm_providers.json 路径同样 seed 到默认配置。
+    # _get_llm_key_path()/_get_llm_providers_path() 优先读 config["llm_key_file"]
+    # / config["llm_providers_file"]（来自 _DEFAULT_CONFIG），仅靠 patch
+    # _LLM_KEY_FILE_DEFAULT 会被默认配置里的真实路径绕过 —— 必须同步 seed，
+    # 否则测试会读写用户真实凭据文件（data/config/llm_key.json）。
+    monkeypatch.setitem(
+        _cfg_defaults._DEFAULT_CONFIG,
+        "llm_key_file",
+        str(tmp_path / "data/config/llm_key.json"),
+    )
+    monkeypatch.setitem(
+        _cfg_defaults._DEFAULT_CONFIG,
+        "llm_providers_file",
+        str(tmp_path / "data/config/llm_providers.json"),
+    )
     _cfg_core._clear_config_cache()
     # 注：llm_settings.json 不在此处 seed 隔离路径。需要读写真实配置的测试
     # （如 test_all_keys_tracked 检查代码 vs 配置文件的键名一致性），

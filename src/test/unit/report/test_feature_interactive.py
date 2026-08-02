@@ -88,5 +88,6 @@ class TestCopyJsAssets:
             "chart-config.js",
             "chart-export.js",
             "chart-init.js",
+            "toc.js",
         ):
             assert (tmp_path / fname).exists(), f"{fname} 未复制"

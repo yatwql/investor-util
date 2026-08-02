@@ -246,6 +246,7 @@ investor-util/
 │   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制，≤150 行）
 │   │   ├── chart-export.js           #   单图导出 PNG 按钮（.chart-box 注入，2x 分辨率下载）
 │   │   ├── chart-init.js             #   6 张图初始化（O1 隔离 + degraded 虚线，≤300 行）
+│   │   ├── toc.js                    #   左侧目录 TOC（折叠/展开 + IntersectionObserver 滚动高亮，离线自包含）
 │   │   ├── test-chart.html           #   独立调试页（TD8）：6 图渲染/降级/离线场景自检（S2 升级载体）
 │   │   └── README.md                 #   资产说明 + Chart.js 版本号记录（S2 升级指引）
 │   │

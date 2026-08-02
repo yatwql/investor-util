@@ -152,16 +152,21 @@ class TestInitConfig(unittest.TestCase):
     @pytest.mark.smoke
     def test_init_template_writes_relative_paths(self):
         """首次生成 config.json → 路径型键为相对路径（全新安装可移植）。"""
-        # conftest _isolate_sensitive_paths 会把 llm_settings_file 注入为跨盘临时路径，
-        # 此处还原为项目根内路径，验证模板在真实场景下写相对路径
-        orig = cfg._config_defaults._DEFAULT_CONFIG["llm_settings_file"]
+        # conftest _isolate_sensitive_paths 会把 llm_settings_file / llm_key_file /
+        # llm_providers_file 注入为临时路径，此处还原为项目根内路径，验证模板在
+        # 真实场景下写相对路径
+        _defaults = cfg._config_defaults._DEFAULT_CONFIG
+        _rel_values = {
+            "llm_settings_file": os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
+            "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
+            "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
+        }
+        _orig = {k: _defaults[k] for k in _rel_values}
         try:
-            cfg._config_defaults._DEFAULT_CONFIG["llm_settings_file"] = os.path.join(
-                PROJECT_ROOT, "data/config/llm_settings.json"
-            )
+            _defaults.update(_rel_values)
             cfg.init_config()
         finally:
-            cfg._config_defaults._DEFAULT_CONFIG["llm_settings_file"] = orig
+            _defaults.update(_orig)
         with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
             raw = f.read()
         cleaned = _comments._strip_json_comments(raw)

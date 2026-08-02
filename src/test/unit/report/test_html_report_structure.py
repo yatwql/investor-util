@@ -531,6 +531,18 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         "drawdown_start": "2026-01-01",
         "drawdown_end": "2026-01-01",
         "annualized_volatility": 0.18,
+        "drawdown_available": True,  # 有效交易日 ≥ MIN_SPAN 才渲染回撤明细（上游计算）
+        "drawdown_events": [
+            {
+                "peak_date": "2026-01-01",
+                "trough_date": "2026-01-01",
+                "recovery_date": "",
+                "drawdown_pct": 5.0,
+                "duration_days": 0,
+                "recovery_days": None,
+                "recovered": False,
+            }
+        ],
         "warnings": None,
         "failed_holdings": None,
         "successful_holdings": None,
@@ -885,6 +897,176 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNotNone(soup.find(id="portfolioChart"), "Flag OFF 时应保留旧净值 Canvas")
         self.assertIsNotNone(soup.find(id="drawdownChart"), "Flag OFF 时应保留旧回撤 Canvas")
         self.assertIn("drawSimpleChart", str(soup), "Flag OFF 时应保留旧绘图函数")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 章节底部"回到顶部"链接
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlBackToTop(unittest.TestCase):
+    """每个章节底部都应有一个回到顶部链接，点击跳转 #report-top。
+
+    用户需求：HTML 报告中每个章节底部提供链接，快速回到报告头部。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    def test_report_top_anchor_exists(self):
+        """报告头部存在唯一 #report-top 锚点。"""
+        anchors = self.soup.find_all(id="report-top")
+        self.assertEqual(len(anchors), 1, f"应恰好存在 1 个 #report-top 锚点，实际 {len(anchors)}")
+        self.assertIn(
+            "report-header",
+            anchors[0].get("class", []),
+            "#report-top 锚点应位于报告头部",
+        )
+
+    def test_every_section_has_exactly_one_back_to_top_link(self):
+        """每个 .section 底部都有且仅有一个指向 #report-top 的链接。"""
+        sections = self.soup.select("div.section")
+        self.assertGreaterEqual(len(sections), 1, "模板应渲染至少一个章节")
+        for sec in sections:
+            links = sec.select('.back-to-top-link a[href="#report-top"]')
+            self.assertEqual(
+                len(links), 1,
+                f"#{sec.get('id')} 应恰好有 1 个指向 #report-top 的链接，实际 {len(links)}",
+            )
+
+    def test_back_to_top_link_has_visible_text(self):
+        """回到顶部链接含可读文字（标题 + 箭头）。"""
+        first = self.soup.select_one("div.section .back-to-top-link a[href='#report-top']")
+        self.assertIsNotNone(first, "应至少渲染一个回到顶部链接")
+        text = first.get_text(strip=True)
+        self.assertIn("回到顶部", text, f"链接文字应含「回到顶部」，实际为「{text}」")
+
+    def test_back_to_top_is_last_child_of_section(self):
+        """回到顶部链接是每个章节的最后一个子元素（紧贴章节底部）。"""
+        sections = self.soup.select("div.section")
+        for sec in sections:
+            children = sec.find_all(recursive=False)
+            self.assertTrue(children, f"#{sec.get('id')} 应有子元素")
+            last = children[-1]
+            self.assertTrue(
+                last.name == "div" and "back-to-top-link" in last.get("class", []),
+                f"#{sec.get('id')} 最后一个子元素应为 .back-to-top-link，实际 <{last.name}> class={last.get('class')}",
+            )
+
+
+class TestHtmlTocSidebar(unittest.TestCase):
+    """左侧目录 TOC 结构测试 — 可展开/收起的章节快速定位栏。
+
+    用户需求：HTML 报告左侧提供 TOC，点击快速定位到具体章节，且可展开/收起。
+    渲染侧校验：目录项 ↔ section 一一对应、折叠/展开按钮存在、JS 加载。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    # ── TOC sidebar 本体 ──────────────────────────────────────
+
+    def test_toc_sidebar_present(self):
+        """存在唯一的 #toc-sidebar 左侧栏，且带章节 aria-label。"""
+        sidebars = self.soup.find_all(id="toc-sidebar")
+        self.assertEqual(len(sidebars), 1, f"应恰好 1 个 #toc-sidebar，实际 {len(sidebars)}")
+        self.assertEqual(sidebars[0].name, "aside", "#toc-sidebar 应为 <aside> 语义元素")
+        self.assertEqual(sidebars[0].get("aria-label"), "章节目录")
+
+    def test_toc_link_count_matches_sections(self):
+        """目录链接数量 = 可见模块数（全部可见 = 17）。"""
+        links = self.soup.select("#toc-sidebar a[href^='#sec-']")
+        self.assertEqual(len(links), 17, f"目录应有 17 个链接，实际 {len(links)}")
+
+    def test_every_toc_link_has_corresponding_section(self):
+        """每个目录链接的 href 指向一个存在的 section id。"""
+        links = self.soup.select("#toc-sidebar a[href^='#sec-']")
+        for link in links:
+            href = link.get("href", "")
+            section_id = _get_section_id_from_href(href)
+            target = self.soup.find(id=section_id)
+            self.assertIsNotNone(target, f"目录链接 {href} 无对应 section")
+            self.assertTrue("section" in target.get("class", []),
+                            f"{href} 对应元素应带 .section 类")
+
+    def test_toc_link_text_shows_number_and_name(self):
+        """目录链接文字含「编号、章节名」。"""
+        for sec in self.order:
+            link = self.soup.select_one(
+                f"#toc-sidebar a[href='#sec-{sec['key']}']"
+            )
+            self.assertIsNotNone(link, f"目录缺少章节 {sec['key']}")
+            text = link.get_text(strip=True)
+            expected = f"{sec['number']}、{sec['name']}"
+            self.assertEqual(text, expected, f"{sec['key']} 目录文案应为「{expected}」，实际「{text}」")
+
+    # ── 折叠/展开控件 ─────────────────────────────────────────
+
+    def test_collapse_button_in_header(self):
+        """目录头部含「收起」按钮（折叠 TOC 用）。"""
+        btn = self.soup.select_one("#toc-sidebar .toc-collapse-btn")
+        self.assertIsNotNone(btn, "目录头部应有收起按钮")
+        self.assertIn("收起", btn.get_text(strip=True))
+        self.assertEqual(btn.get("aria-label"), "收起目录")
+
+    def test_expand_toggle_button_present(self):
+        """存在独立的展开按钮 #toc-toggle-btn（收起后悬浮显示）。"""
+        btn = self.soup.select_one("button#toc-toggle-btn")
+        self.assertIsNotNone(btn, "应有展开目录的悬浮按钮")
+        self.assertEqual(btn.get("aria-label"), "展开目录")
+
+    def test_toc_js_loaded(self):
+        """模板引用 toc.js（R21 本地 bundle 加载）。"""
+        self.assertIn("toc.js", str(self.soup), "模板应加载 toc.js")
+
+    def test_toc_links_follow_section_order(self):
+        """目录项顺序 = section_order 顺序。"""
+        links = self.soup.select("#toc-sidebar a[href^='#sec-']")
+        order_keys = [sec["key"] for sec in self.order]
+        link_keys = [link.get("href").replace("#sec-", "") for link in links]
+        self.assertEqual(link_keys, order_keys, "目录顺序应与 section_order 一致")
+
+
+class TestHtmlTocVisibility(unittest.TestCase):
+    """左侧目录 TOC 可见性测试 — 不可见模块不出现在目录中。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+
+    def _render_with_visibility(self, visible_keys: set[str]) -> BeautifulSoup:
+        sv_dict = {sec["key"]: sec["key"] in visible_keys for sec in self.order}
+        return _render_template(
+            _build_minimal_render_data(self.order, self.numbers, sv_dict),
+        )
+
+    def test_toc_only_always_visible(self):
+        """仅 always 模块可见时，目录也只有对应链接。"""
+        soup = self._render_with_visibility(_ALWAYS_KEYS)
+        links = soup.select("#toc-sidebar a[href^='#sec-']")
+        link_keys = {link.get("href", "").replace("#sec-", "") for link in links}
+        self.assertEqual(link_keys, _ALWAYS_KEYS, f"目录应只含 always 模块: {_ALWAYS_KEYS}")
+
+    def test_toc_tracks_nav_when_subset(self):
+        """部分模块可见时，目录链接集合 = 横向 section-nav 链接集合。"""
+        visible = _ALWAYS_KEYS | _FUND_DEEP_ANALYSIS_KEYS | _LLM_KEYS
+        soup = self._render_with_visibility(visible)
+        toc_keys = {a.get("href") for a in soup.select("#toc-sidebar a[href^='#sec-']")}
+        nav_keys = {a.get("href") for a in soup.select("nav.section-nav a")}
+        self.assertEqual(toc_keys, nav_keys, "目录与横向导航的链接集合应一致")
 
 
 if __name__ == "__main__":

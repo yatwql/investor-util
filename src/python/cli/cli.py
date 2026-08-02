@@ -40,6 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", metavar="PATH", help="备用配置文件路径（默认: data/config/config.json）")
     parser.add_argument("--output", metavar="DIR", help="报告输出目录（覆盖 config.json 的 output_dir）")
     parser.add_argument("--verbose", action="store_true", help="将进度消息同步到 stderr（默认仅写入 logs/app.log）")
+    parser.add_argument("--non-interactive", action="store_true", help="跳过首次运行交互式引导（定时任务/脚本使用）")
     parser.add_argument("--version", action="version", version=f"%(prog)s v{APP_VERSION}")
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -344,6 +345,16 @@ def main() -> int:
 
     init_config(config_path=args.config)
     config = get_config()
+
+    # 首次运行引导（非交互/CI/脚本环境自动跳过，不阻塞命令执行）
+    try:
+        from src.python.startup_wizard import show_startup_wizard_if_needed
+
+        show_startup_wizard_if_needed(non_interactive=args.non_interactive)
+    except Exception:
+        import logging
+
+        logging.getLogger("invest").debug("首次运行引导显示失败（非关键）", exc_info=True)
 
     if args.command == "report":
         return _handle_report(args, config)

@@ -32,14 +32,17 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "fund_overlap",       "name": "持仓重合度矩阵",                   "number": 7,  "type": "b_series"},
     {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8,  "type": "b_series"},
     {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "b_series"},
-    {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 10, "type": "news"},
-    {"key": "global_macro",       "name": "全球政经局势",                     "number": 11, "type": "llm"},
-    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 12, "type": "llm"},
-    {"key": "health_check",       "name": "持仓体检报告",                     "number": 13, "type": "llm"},
-    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 14, "type": "llm"},
-    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 15, "type": "history"},
-    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 16, "type": "history"},
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 17, "type": "llm"},
+    {"key": "factor_exposure",    "name": "因子暴露分析",                     "number": 10, "type": "b_series"},
+    {"key": "correlation_analysis", "name": "持仓相关性矩阵",                 "number": 11, "type": "b_series"},
+    {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 12, "type": "news"},
+    {"key": "global_macro",       "name": "全球政经局势",                     "number": 13, "type": "llm"},
+    {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 14, "type": "llm"},
+    {"key": "health_check",       "name": "持仓体检报告",                     "number": 15, "type": "llm"},
+    {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 16, "type": "llm"},
+    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 17, "type": "history"},
+    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 18, "type": "history"},
+    {"key": "data_source_status", "name": "数据源可用性矩阵",                 "number": 19, "type": "always"},
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 20, "type": "llm"},
 ]
 
 
@@ -87,7 +90,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         self.assertEqual(wb.sheetnames, [sheets[k].title for k in expected_order])
 
     def test_sheet_order_all_types_enabled(self):
-        """全部类型启用 → 16 个页签按默认顺序排列。"""
+        """全部类型启用 → 20 个页签按默认顺序排列。"""
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
@@ -96,7 +99,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys,
                          "全部启用时页签顺序应与默认注册表一致")
-        self.assertEqual(len(sheets), 17)
+        self.assertEqual(len(sheets), 20)
 
     def test_sheet_order_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
@@ -109,7 +112,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
                          if sec["type"] in ("always", "b_series")]
         self.assertEqual(list(sheets.keys()), expected_keys)
-        self.assertEqual(len(sheets), 9, "always + 基金深度分析 = 9")
+        self.assertEqual(len(sheets), 12, "always + 基金深度分析 = 12")
 
 
 # ═══════════════════════════════════════════════════════════════

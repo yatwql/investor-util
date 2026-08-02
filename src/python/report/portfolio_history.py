@@ -29,6 +29,11 @@ from src.python.core.code_utils import (
     is_otc_fund_by_name,
     is_qdii_extended,
 )
+from src.python.analysis.drawdown_events import (
+    MIN_SPAN,
+    compute_recovery_times,
+    extract_drawdown_events,
+)
 from src.python.fetcher.chain import fetch_with_incremental_fallback
 from src.python.report._history_quality import _diagnose_return, _validate_bars
 from src.python.report.benchmark import fetch_benchmarks, normalize_benchmarks
@@ -157,6 +162,11 @@ class PortfolioHistoryCalculator:
                 "bars": [{date, total_value, daily_return, drawdown}, ...],
                 "max_drawdown": float,
                 "max_drawdown_pct": float,
+                "drawdown_events": [{peak_date, trough_date, recovery_date,
+                                     drawdown_pct, duration_days, recovery_days,
+                                     recovered}, ...],  # 独立回撤事件
+                "recovery_times": [{start_date, end_date, days}, ...],  # 恢复耗时明细
+                "drawdown_available": bool,  # len(bars) >= MIN_SPAN，§1.4.5
                 "annualized_volatility": float,
                 "total_return": float,
                 "total_return_pct": float,
@@ -232,12 +242,20 @@ class PortfolioHistoryCalculator:
         # 8) 基准指数历史走势
         benchmarks = self._fetch_benchmarks(bars, days)
 
+        # 9) 独立回撤事件 + 恢复耗时（span < MIN_SPAN 标记数据不足，§1.4.5）
+        drawdown_events = extract_drawdown_events(bars)
+        recovery_times = compute_recovery_times(drawdown_events)
+        drawdown_available = len(bars) >= MIN_SPAN
+
         return {
             "bars": bars,
             "max_drawdown": round(-max_drawdown_val, 2),
             "max_drawdown_pct": round(-max_drawdown_pct, 2),
             "drawdown_start": drawdown_start,
             "drawdown_end": drawdown_end,
+            "drawdown_events": drawdown_events,
+            "recovery_times": recovery_times,
+            "drawdown_available": drawdown_available,
             "annualized_volatility": round(annualized_vol, 4),
             "total_return": round(total_return, 2),
             "total_return_pct": round(total_return_pct, 2),

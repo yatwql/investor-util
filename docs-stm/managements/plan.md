@@ -25,15 +25,17 @@
 
 | 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
 |:--:|:--|:--:|:--:|:--|
-| ① | **plan-9** 首次运行引导 | P3 | 1d | 性价比最高，所有新用户体验；独立无依赖，可从 P3 提前实施 |
-| ② | **plan-2 / plan-3** 分析基础 | P2 | 4.5d | rf-1 依赖已解除；共享历史数据源与缓存；plan-3 C7 注册已完成 |
-| ③ | **plan-6** 多快照趋势追踪 | P2 | 3d | 依赖 plan-1 图表框架（已就绪）；聚合既有快照，低风险 |
-| ④ | **plan-5** 调仓 What-if 模拟 | P2 | 5d | 独立大块，无数据源依赖；plan-1 后 diff 图表受益 |
-| ⑤ | **plan-11** HTML 暗色模式 | P3 | 0.5d | 依赖 plan-1 的 CSS 变量预留（已就绪），极低成本 |
-| ⑥ | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
-| ⑦ | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
+| ① | ~~**plan-9** 首次运行引导~~ | P3 | 1d | ✅ 已完成（2026-08-03） |
+| ② | ~~**plan-2 / plan-3** 分析基础~~ | P2 | 4.5d | ✅ 已完成（2026-08-03，含相关性矩阵/最大回撤/净值曲线） |
+| ③ | ~~**plan-12** HTML 左侧可折叠 TOC~~ | P3 | 0.5d | ✅ 已完成（2026-08-03，用户新增需求） |
+| ④ | **plan-6** 多快照趋势追踪 | P2 | 3d | 依赖 plan-1 图表框架（已就绪）；聚合既有快照，低风险 |
+| ⑤ | **plan-5** 调仓 What-if 模拟 | P2 | 5d | 独立大块，无数据源依赖；plan-1 后 diff 图表受益 |
+| ⑥ | **plan-11** HTML 暗色模式 | P3 | 0.5d | 依赖 plan-1 的 CSS 变量预留（已就绪），极低成本 |
+| ⑦ | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
+| ⑧ | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
 
 > ✅ **已完成并归档**：**plan-1**（交互式 HTML 报告，8 迭代落地）与 **plan-7**（因子暴露分析 MVP 3 因子，2026-08-02 完成）不再列入实施顺序，设计文档归档见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)。
+> ✅ **已完成（0.9.7-dev，2026-08-03）**：**plan-9** 首次运行引导、**plan-2/plan-3** 分析基础、**plan-12** HTML 左侧可折叠 TOC。
 
 ### P2 — 下一阶段就绪
 
@@ -65,7 +67,11 @@
 
 #### `plan-9` 首次运行引导（[`plan-web-ui.md §2`](../plan/plan-web-ui.md#2-首次运行引导)）— **推荐①**
 
-检测 config.json/llm_key/holdings 首次缺失 → 交互式引导创建。**预估：1d**
+检测 config.json/llm_key/holdings 首次缺失 → 交互式引导创建。**预估：1d** → ✅ **已完成（2026-08-03）**：`src/python/startup_wizard.py`（首次标记 + 三态检测 + 交互引导 + llm_key 原子写入）+ TUI/CLI 接线（`--non-interactive`）。回归 18 例见 `test_startup_wizard.py`
+
+#### `plan-12` HTML 报告左侧可折叠 TOC 目录 — **新增（P3，用户需求）**
+
+HTML 报告左侧固定目录栏（列出全部可见章节），点击平滑定位到对应章节；TOC 可一键收起/展开（偏好持久化 localStorage），滚动高亮当前章节；窄屏隐藏保留顶部横向导航；打印隐藏。**已完成（2026-08-03）**：`report_template.html` 增 `.toc-sidebar`/`.toc-toggle-btn` + `toc.js`（折叠/展开 + IntersectionObserver 滚动高亮，离线自包含 R21）+ `html_writer._JS_ASSETS` 复制。回归 21 例（`TestHtmlTocSidebar`/`TestHtmlTocVisibility`/`TestHtmlTocStatic` + 打印/JS 资产）
 
 #### `plan-11` HTML 暗色模式（[`plan-web-ui.md §5`](../plan/plan-web-ui.md#5-html-暗色模式)）— **推荐⑤**
 

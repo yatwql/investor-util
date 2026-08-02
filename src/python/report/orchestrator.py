@@ -95,6 +95,8 @@ def prepare_report_data(
     # 因子暴露分析：基金深度分析关闭时为 None（章节隐藏），
     # 开启时计算 C19 dict（数据不足/故障时 available=False，不阻塞主报告）
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
+    # 持仓相关性矩阵：同因子暴露，基金深度分析关闭时为 None（章节隐藏）
+    correlation_data = compute_correlation_data(holdings, config, reporter)
 
     holdings_details = [
         {
@@ -133,6 +135,8 @@ def prepare_report_data(
         "risk_metrics": {},
         # 因子暴露分析（C19 契约；基金深度分析关闭时为 None）
         "factor_exposure": factor_exposure,
+        # 持仓相关性矩阵（C19 契约；基金深度分析关闭时为 None）
+        "correlation_data": correlation_data,
     }
 
 
@@ -289,6 +293,87 @@ def compute_factor_exposure_data(
         return result
     except Exception:
         logger.exception("[factor] 因子暴露计算异常，章节降级")
+        return unavailable_result("source_failed")
+
+
+def compute_correlation_data(
+    holdings: list,
+    config: dict,
+    reporter: ProgressReporter,
+) -> dict | None:
+    """编排持仓相关性矩阵并返回 C19 契约 dict。
+
+    流程：并行拉取各品种历史 K 线（days=90）→ 转日收益 → 纯计算相关矩阵。
+
+    Args:
+        holdings: 持仓列表（Holding 对象，含 code/name/shares）
+        config: 完整配置（只读，C14 约束）
+        reporter: 进度上报
+
+    Returns:
+        C19 契约 dict；基金深度分析关闭时返回 None（章节隐藏）。
+        数据不足/故障时 available=False（章节显示降级占位，不阻塞主报告，§1.4.5）。
+    """
+    from src.python.config import is_enable_fund_deep_analysis
+
+    if not is_enable_fund_deep_analysis(config):
+        return None
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    from src.python.analysis.correlation import (
+        DEFAULT_WINDOW,
+        FETCH_DAYS,
+        MIN_HOLDINGS,
+        MIN_SAMPLES,
+        compute_correlation_matrix,
+        unavailable_result,
+    )
+    from src.python.analysis.factor_exposure import klines_to_returns
+
+    try:
+        reporter.info("正在计算持仓相关性矩阵...")
+        returns_by_code: dict[str, list[dict]] = {}
+        _n = len(holdings)
+        with ThreadPoolExecutor(max_workers=min(6, max(1, _n)), thread_name_prefix="orch_corr") as _pool:
+            _futs = {_pool.submit(_fetch_holding_bars, h.code, h.name, FETCH_DAYS): h for h in holdings}
+            for _fut in _futs:
+                h = _futs[_fut]
+                try:
+                    _bars = _fut.result()
+                except Exception:
+                    _bars = None
+                if _bars:
+                    _rets = klines_to_returns(_bars)
+                    if _rets:
+                        returns_by_code[h.code] = _rets
+
+        if len(returns_by_code) < MIN_HOLDINGS:
+            logger.warning(
+                "[correlation] 有效持仓不足 %d（%d 只），数据不足",
+                MIN_HOLDINGS,
+                len(returns_by_code),
+            )
+            return unavailable_result(
+                "insufficient",
+                sample_count=0,
+                insufficient_codes=sorted(returns_by_code.keys()),
+            )
+
+        names_by_code = {h.code: h.name for h in holdings}
+        result = compute_correlation_matrix(
+            returns_by_code,
+            names_by_code,
+            window=DEFAULT_WINDOW,
+            min_samples=MIN_SAMPLES,
+        )
+        if result.get("available"):
+            reporter.ok("持仓相关性矩阵计算完成")
+        else:
+            reporter.warn(f"持仓相关性数据不足（有效样本 {result.get('sample_count', 0)}）")
+        return result
+    except Exception:
+        logger.exception("[correlation] 相关性矩阵计算异常，章节降级")
         return unavailable_result("source_failed")
 
 
