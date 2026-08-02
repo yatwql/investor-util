@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
-> 文档版本：0.9.8-dev
+> 文档版本：0.9.9-dev
 
 ---
 
@@ -36,7 +36,7 @@
 
 > ✅ **已完成并归档**：**plan-1**（交互式 HTML 报告，8 迭代落地）与 **plan-7**（因子暴露分析 MVP 3 因子，2026-08-02 完成）不再列入实施顺序，设计文档归档见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)。
 > ✅ **已完成（v0.9.7，2026-08-03）**：**plan-9** 首次运行引导、**plan-2/plan-3** 分析基础、**plan-12** HTML 左侧可折叠 TOC。
-> ✅ **已完成（v0.9.8-dev，2026-08-03）**：**plan-6** 组合演进（多快照趋势追踪）、**plan-5** 调仓 What-if 模拟。
+> ✅ **已完成（v0.9.9-dev，2026-08-03）**：**plan-6** 组合演进（多快照趋势追踪）、**plan-5** 调仓 What-if 模拟。
 
 ### P2 — 下一阶段就绪
 
@@ -61,7 +61,7 @@
 
 > ✅ **plan-7 因子暴露分析（MVP 3 因子）已完成（2026-08-02）并归档**：`analysis/factor_exposure.py`（OLS 回归/样本下限/停更剔除/LOCF）+ `report/orchestrator.py` 编排注入 + C19 13 键契约 + HTML 模块 #10 柱状图 + Excel 页签 + 单元 11 例/场景 5 例。设计文档归档见 [`plan-factor-exposure.md`](../archive/v0.9.x/factor-exposure/plan-factor-exposure.md)；实施前技术债 rf-102/103/104/106 已全部处理（Tencent 钳位 2000 + 解析容错、Sina 降级接受、因子替代、days 语义澄清）。
 
-> ✅ **plan-6 / plan-5 已完成（v0.9.8-dev，2026-08-03）**：
+> ✅ **plan-6 / plan-5 已完成（v0.9.9-dev，2026-08-03）**：
 > - **plan-6 组合演进**：`analysis/portfolio_evolution.py`（多快照聚合 → C19 `evolution_data`）+ Excel「组合演进」页签 + HTML「组合演进」章节（3 张 Chart.js 图各带 `.chart-caption`，C20）+ 快照 <3 降级占位（§1.4.5）。
 > - **plan-5 调仓 What-if**：`analysis/whatif.py`（双持仓成本口径 diff，复用 `classify_holding`）+ `whatif` CLI 子命令（`--candidate` 必填）+ 独立报告 `调仓模拟_{ts}.xlsx/.html`（Excel 3 页签 + HTML 双环图双栏页）。
 

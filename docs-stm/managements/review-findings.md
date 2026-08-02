@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
-> 文档版本：0.9.8-dev
+> 文档版本：0.9.9-dev
 > 审查范围：全代码库（src/python/ + src/test/ + scripts/）
 > 审查基准：technical.md §8 架构设计约束（C1~C20）+ §1.4 核心架构决策 + 代码质量最佳实践
 > 审查日期：2026-07-29
@@ -85,7 +85,7 @@
 | rf-147 | 资产穿透 TOP10 两图风格**不统一**（用户反馈 2026-08-02）：穿透章节两图并排，行业分布图为 `indexAxis: 'y'` 水平条，穿透 TOP10 为垂直柱状图，横竖混排观感割裂 | `chart-init.js` `initIndustryBar` 移除 `indexAxis: 'y'` + scales 改为垂直配置（x 轴类别 `maxRotation: 45`、y 轴数值网格），与 `initPenetrationBar` 竖桩统一；`report_template.html` / `test-chart.html` 两图 aria-label 统一为「垂直柱状图」（穿透 TOP10 补"垂直"前缀，语义与渲染一致）；`reports-instruction.md` 描述同步。新增回归测试 `test_industry_and_penetration_bars_both_vertical`（两图 aria-label 均含"垂直柱状图"、无"水平"残留） | `changelog.md` → Fix |
 | rf-148 | 事实校验自动修正明细**不可见**（用户反馈 2026-08-02，他机运行报告）：校验摘要仅显示"自动修正 N 处数值"计数，修正明细（wrong%→correct% + 句段）不落盘、不在摘要展开，用户无法得知具体修正了哪些数值 | `run_fact_check` 自动修正后 ① 修正明细写入 `invest` 日志（模块标签 + 逐条 `wrong%→correct%（句段）`）；② HTML 校验摘要追加灰色小字「已修正明细: …」行（追加在模块章节尾部，供用户直接查看）。新增回归测试 `test_corrections_detail_in_summary` / `test_corrections_logged`。不破坏既有格式（`llm_content.py` 摘要正则匹配宽松） | `changelog.md` → Fix |
 
-> 0.9.0 ~ 0.9.5 已修复问题记录（rf-90 ~ rf-144）已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md)，本表仅跟踪当前迭代（0.9.8-dev）修复项。
+> 0.9.0 ~ 0.9.5 已修复问题记录（rf-90 ~ rf-144）已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md)，本表仅跟踪当前迭代（0.9.9-dev）修复项。
 
 ---
 
