@@ -14,6 +14,7 @@
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
+| `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`pytest --collect-only` 快照，供 test-coverage.md 更新） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
 | `perf_report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf_view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
@@ -209,6 +210,21 @@ python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.json
     建议审查这些案例是否应为重复
 [OK] 跨源 bigram=3: 无边界样本
 ```
+
+---
+
+### `collect-test-coverage.py` — 测试覆盖计数收集
+
+只做 `pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），按 `test_runner.py` MODES 的 marker 表达式本地归类计数，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs-stm/managements/test-coverage.md` 快照更新使用。
+
+```bash
+python scripts/collect-test-coverage.py
+```
+
+**说明**：
+- 只收集不执行——测试体不会运行，不影响测试结果，也不会触发真实数据源 / LLM 调用
+- 项数随版本迭代变化，属撰写时快照，精确计数以本脚本实时输出为准
+- 计数口径与 `test_runner.py` 的 `MODES` marker 表达式对齐（verify / dev-verify 等组合模式同样本地复现）
 
 ---
 
