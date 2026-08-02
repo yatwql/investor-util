@@ -18,6 +18,7 @@
 - **rf-106：`get_combined_timeseries` days 参数语义澄清** — `portfolio_history.py` 该方法 `days` 仅作用于基准指数（`_fetch_benchmarks`），不控制持仓历史长度（`_fetch_all_histories` 走 chain 默认 30）；docstring"历史天数"有误导，澄清并标注 rf-106，提示后续需透传 days 时改 `_fetch_all_histories`
 - **rf-111：模板 6 个 chart canvas 补 A1 可访问性属性** — 设计文档 §4.8 A1 声称每个 `<canvas>` 含 aria-label/role + fallback 文本（Iter 1 验收 ✅），实际 `grep -c aria-label` = 0 处（文档与实现不符）。修复：`report_template.html` 6 处 canvas（净值趋势/最大回撤/资产构成/行业分布/穿透 TOP10/量化雷达）补 `aria-label`（"悬停查看…"描述图义）+ `role="img"` + 内嵌 fallback 文本（降级环境指引用户看明细表格），写法对齐 `test-chart.html` 示范；旧 Canvas 兜底 `portfolioChart`/`drawdownChart` 不受影响
 - **rf-112：TD8 JS 调试设施空白补全** — 设计文档多处声称已建"独立 test HTML 调试页"，仓库实际无此文件（仅 `report_template.html`），升级 Chart.js（S2 流程）无独立验证载体。新增 `src/static/test-chart.html` 独立调试页：6 图渲染/交互 + 4 场景（正常/降级/空数据/离线）自检横幅（`canvas._chart` 统计初始化数 + `typeof Chart` 引擎守卫验证），ES5 语法（R17/R22），数据契约对齐 §4.12；动态注入引擎 script（离线场景移除 chart.min.js 模拟引擎缺失）
+- **rf-122：DeepSeek Extended Thinking 思考耗尽 max_tokens 预算修复** — DeepSeek V4（deepseek-v4-flash）Anthropic 兼容端点 `max_tokens` 为 **thinking + 正文共享预算**（官方文档确认），expert_review/health_check 在 8192 下 medium 思考即耗尽 → 响应仅 thinking block 无正文 → 空内容 → 直接切 provider（gemini 不支持 thinking 且链路不稳，模块内容丢失风险）。修复双层：① 抬 `max_tokens_expert_review` 8192→20000、`max_tokens_health_check` 8192→16000（对齐 thinking_budget 16000/12000 + 正文余量；DeepSeek V4 输出上限 384K 无 400 风险），同步 `data/config/llm_settings.json` + `_llm_defaults.py` 默认模板；② `call_claude` 思考耗尽安全网——`_extract_content` 新增 `_last_thinking_exhausted` 标志（stop_reason=max_tokens 且无 text 置 True），首次调用返回 None 且标志为 True 时自动**关闭 thinking 同 provider 重试一次**（构建全新 retry_payload + 恢复 temperature），保证有正文产出，不再因思考耗尽直接切 provider
 
 ### Test
 
@@ -26,6 +27,7 @@
 - **chart Radar 降级与 Flag 过滤测试** — `test_chart_data_builder.py` TestRadar 新增 6 用例（metrics_sharpe 关闭→该轴 "N/A"、全关→6 个 "N/A"、全 N/A 占位保轴、risk_metrics 兜底 degraded+note、history 兜底 degraded+note、全量路径无 note）；`test_chart_data_builder_edge.py` 新增 4 用例（all_metrics 与 risk_metrics 均 None→空、all_metrics=None+history 降级、未知 flag 名不影响该轴、部分指标缺失→N/A 其余保留）；`test_html_report_structure.py` 结构测试 3 用例（radar 有 labels 渲染 canvas、无 labels"量化指标数据不足"占位、data_unavailable"持仓市值数据不可用"占位）+ 既有 2 用例 chart-box 计数更新（3→4 / 5→6）
 - **rf-102/103 回归测试** — `test_tencent_edge.py` 新增 2 例（API 返回 list 非 dict 不崩、days=3650 钳位到 2000）；`test_sina_edge.py` 新增 1 例（days 钳位 2000 对齐 Tencent），防超限崩溃与钳位逻辑回退
 - **rf-111 回归测试** — `test_html_report_structure.py` 新增 `TestHtmlInteractiveCharts::test_all_chart_canvases_have_a11y_attrs`：6 图全部渲染（Flag ON + 数据存在）时断言各 canvas 含 `aria-label`（含"悬停查看"）/`role="img"`/内嵌 fallback 文本非空，防 A1 属性回退
+- **rf-122 回归测试** — `test_llm_api.py` `TestCallClaudeThinkingDegradation` 新增 3 例：①思考耗尽（stop_reason=max_tokens 无正文）→ 自动关闭 thinking 重试一次且恢复 temperature（断言 2 次调用、第二次 payload 无 thinking、返回第二次结果）；②flag False（非思考耗尽空内容）→ 不重试；③未注入 thinking → 即使 flag True 也不重试（短路由不误触）
 
 ### Docs
 

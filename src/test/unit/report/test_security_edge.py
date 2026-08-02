@@ -200,8 +200,7 @@ class TestApiKeyLogLeakY6(unittest.TestCase):
     """API Key 不应出现在日志中。"""
 
     def test_logger_sanitizes_api_key(self):
-        """验证日志配置不输出 api_key（委托已有测试）。"""
-        # 已由 test_log_sanitize.py 完整覆盖
+        """验证日志配置不输出 api_key。"""
         # 此测试为交叉引用，验证导入可用
         from src.python.llm.api_base import _sanitize_endpoint
         result = _sanitize_endpoint("https://api.anthropic.com/v1/messages")

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """注释/文档字符串历史变更痕迹检查脚本。
 
-扫描 src/ 下所有 .py 文件，检查注释和文档字符串中是否含有关
-于代码历史迭代、重构拆分、版本号标记、文件迁入迁出等变更痕迹。
+扫描 src/ 与 scripts/ 下的 .py / .js / .mjs / .html 文件，检查注释和
+文档字符串中是否含有关代码历史迭代、重构拆分、版本号标记、文件
+迁入迁出等变更痕迹。各语言注释形式：Python（# 与三引号 docstring）、
+JS（// 与 /* */）、HTML（<!-- --> 与 Jinja {# #} 及 CSS /* */）。
 
 在代码和测试的注释/文档串中，只应描述"当前代码是什么/做什么"，
 不应记录"从哪里来、怎么变的"。此类信息应放在管理文档
@@ -25,10 +27,18 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SCAN_DIRS = [REPO_ROOT / "src" / "python", REPO_ROOT / "src" / "test"]
+SCAN_DIRS = [
+    REPO_ROOT / "src" / "python",
+    REPO_ROOT / "src" / "test",
+    REPO_ROOT / "src" / "static",
+    REPO_ROOT / "scripts",
+]
+# 跳过文件名（压缩产物、本工具自身——后者的注释为检测类别文档，含 TODO/XXX 等字面量）
+SKIP_FILES = {"chart.min.js", "check-history-traces.py"}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -64,9 +74,28 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"(?<!原)\.py\s*(?:拆分|迁移)(?:至此|到此)", "HIGH", "拆分/迁移到此文件"),
     (r"(?:共同|原有).*?(?:职责|功能|逻辑).*?(?:拆分|提取|迁移|分离)(?:至此|到此)", "HIGH", "职责/功能迁移到此"),
     (r"自[\w._\-]+\.py\s*(?:拆分|提取|迁移)", "HIGH", "自XX.py拆分/提取"),
+    #   以下模式覆盖 docstring 中 backtick 包裹（``module.py``）或裸写的模块路径，
+    #   以及测试文件之间的覆盖/复用来源叙述（均属代码历史痕迹）。
+    (r"提取自\s*[`\w./_-]+\.py", "HIGH", "提取自XX.py（来源归属叙述）"),
+    (
+        r"(?:从|由)\s*[`\w./_-]+\.py\s*(?:提取|复用|拆分|迁移|合并|分离)",
+        "HIGH",
+        "从XX.py提取/复用/拆分/迁移（来源归属叙述）",
+    ),
+    (r"已由\s*[`\w./_-]+\.py\s*(?:完整)?覆盖", "HIGH", "已由XX.py覆盖（测试覆盖来源叙述）"),
+    (r"\b(?:Iter|Iteration)\s*\d+\b", "HIGH", "Iter/Iteration N 迭代标记（历史迭代信息）"),
+    (r"已迁移", "HIGH", "已迁移（迁移痕迹）"),
+    #   以下模式将来源叙述扩展到非 .py 文件（.js/.html 等）。
+    (r"提取自\s*[`\w./_-]+\.(?:js|mjs|html|ts|vue)", "HIGH", "提取自XX.js/html（来源归属叙述）"),
+    (
+        r"(?:从|由)\s*[`\w./_-]+\.(?:js|mjs|html|ts|vue)\s*(?:提取|复用|拆分|迁移|合并|分离)",
+        "HIGH",
+        "从XX.js/html提取/复用（来源归属叙述）",
+    ),
+    (r"已由\s*[`\w./_-]+\.(?:js|mjs|html|ts|vue)", "HIGH", "已由XX.js/html覆盖（来源叙述）"),
     #
     # ═══ CODE：任务/编号引用 ═══
-    #   代码注释中不应出现管理任务的编号（如 rf-117、plan-42）。
+    #   代码注释中不应出现管理任务的编号（形如 编号前缀-数字）。
     #
     (r"(?:rf|plan|R)-\d+", "CODE", "任务编号引用（如 rf-117、R-086）"),
     #
@@ -78,6 +107,7 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"(?:发版|发布|release)\s*(?:于|版本|v?\d)", "VERSION", "发布/发版标记"),
     (r"迭代\s*(?:\d+|任务|计划)", "VERSION", "迭代/任务标记"),
     (r"切[换至到]\s*(?:dev|master|main|分支)", "VERSION", "分支切换记录"),
+    (r"未升级版|旧版|老版", "VERSION", "旧版/未升级版（版本对比痕迹）"),
     #
     # ═══ ORIGIN：来源归属（通常也是痕迹） ═══
     #
@@ -96,12 +126,14 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"过渡方案|过渡期|过渡性", "DEPR", "过渡性方案说明"),
     (r"暂时保留|暂保留|暂不[处理修复实现支持]", "DEPR", "暂时保留/暂不处理"),
     (r"(?:不再[推荐使用支持保留需要]|不再建议)", "DEPR", "不再推荐/使用/支持"),
+    (r"兼容过渡", "DEPR", "兼容过渡（过渡性方案说明）"),
     #
     # ═══ CHANGE：变更描述（需人工判断） ═══
     #
     (r"重构[为成到]", "CHANGE", "重构为/重构到"),
     (r"新.{0,4}(?:版本|方案).{0,8}(?:替代|替换)", "CHANGE", "新版本/方案替代旧的"),
     (r"替代原有的|替换旧|替代旧", "CHANGE", "替代原有/旧的"),
+    (r"(?<!最)新版", "CHANGE", "新版（版本变更描述，需判断）"),
     #
     # ═══ TODO：待办标记 ═══
     #
@@ -203,11 +235,47 @@ def _is_excluded(line: str) -> bool:
 def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
     """扫描单个文件，返回 [(行号, 分类, 模式说明, 行内容), ...]"""
     hits: list[tuple[int, str, str, str]] = []
+    if fpath.name in SKIP_FILES:
+        return hits
+
+    for lineno, ctext in _iter_comment_lines(fpath):
+        if not ctext.strip():
+            continue
+        if _is_excluded(ctext):
+            if verbose:
+                print(f"    (excluded) L{lineno}: {ctext[:80]}")
+            continue
+
+        for pat, cat, desc in PATTERNS:
+            if re.search(pat, ctext):
+                hits.append((lineno, cat, desc, ctext[:120]))
+                break  # first match only per line
+
+    return hits
+
+
+def _iter_comment_lines(fpath: Path) -> Iterator[tuple[int, str]]:
+    """按文件类型提取注释/文档字符串行，产出 (行号, 注释内容)。
+
+    支持的扩展名：.py / .js / .mjs / .html。其余类型不参与扫描。
+    """
+    suffix = fpath.suffix.lower()
+    if suffix not in (".py", ".js", ".mjs", ".html"):
+        return
     try:
         text = fpath.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        return hits
+        return
+    if suffix == ".py":
+        yield from _py_comment_lines(text)
+    elif suffix in (".js", ".mjs"):
+        yield from _js_comment_lines(text)
+    else:
+        yield from _html_comment_lines(text)
 
+
+def _py_comment_lines(text: str) -> Iterator[tuple[int, str]]:
+    """Python：`#` 行注释（含行内）+ 三引号 docstring（含单行/多行状态跟踪）。"""
     in_docstring = False
     for lineno, raw in enumerate(text.split("\n"), 1):
         stripped = raw.strip()
@@ -218,22 +286,85 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
         is_oc, is_open = _is_triple_quote_line(stripped)
         if is_open:
             in_docstring = not in_docstring
-            # 开关行本身继续往下参与模式匹配
-        elif not in_docstring and not stripped.startswith("#"):
-            # 不在 docstring 内也不是注释 → 跳过
+            yield lineno, stripped  # 开关行本身参与匹配
+        elif is_oc:
+            yield lineno, stripped  # 单行 docstring（同行开闭）
+        elif in_docstring:
+            yield lineno, stripped
+        elif stripped.startswith("#"):
+            yield lineno, stripped
+        else:
+            # 行内注释：提取由空白引导的 # 之后的注释文本（跳过字符串内 #）
+            m = re.search(r"[ \t]#", stripped)
+            if m:
+                yield lineno, stripped[m.start() + 1 :]
+
+
+def _js_comment_lines(text: str) -> Iterator[tuple[int, str]]:
+    """JS：`//` 行注释 + `/* */` 块注释（含行内注释，排除 URL `://`）。"""
+    in_block = False
+    for lineno, raw in enumerate(text.split("\n"), 1):
+        stripped = raw.strip()
+        if in_block:
+            yield lineno, stripped
+            if "*/" in stripped:
+                in_block = False
             continue
-
-        if _is_excluded(stripped):
-            if verbose:
-                print(f"    (excluded) L{lineno}: {stripped[:80]}")
+        if stripped.startswith("/*"):
+            yield lineno, stripped
+            if "*/" not in stripped[2:]:
+                in_block = True
             continue
+        if stripped.startswith("//"):
+            yield lineno, stripped
+            continue
+        # 行内注释：// 或 /*（跳过 URL 的 ://）
+        for m in re.finditer(r"//|/\*", stripped):
+            marker = m.group(0)
+            if marker == "//" and stripped[: m.start()].rstrip().endswith(":"):
+                continue
+            tail = stripped[m.start() :]
+            if marker == "/*":
+                end = tail.find("*/")
+                tail = tail if end < 0 else tail[: end + 2]
+                if end < 0:
+                    in_block = True
+            yield lineno, tail
+            break
 
-        for pat, cat, desc in PATTERNS:
-            if re.search(pat, stripped):
-                hits.append((lineno, cat, desc, stripped[:120]))
-                break  # first match only per line
 
-    return hits
+def _html_comment_lines(text: str) -> Iterator[tuple[int, str]]:
+    """HTML：`<!-- -->`、Jinja `{# #}`、CSS/JS `/* */` 三种注释。"""
+    in_jinja = in_html = in_css = False
+    for lineno, raw in enumerate(text.split("\n"), 1):
+        stripped = raw.strip()
+        if in_jinja or in_html or in_css:
+            yield lineno, stripped
+            if in_jinja and "#}" in stripped:
+                in_jinja = False
+            if in_html and "-->" in stripped:
+                in_html = False
+            if in_css and "*/" in stripped:
+                in_css = False
+            continue
+        starts = [("jinja", stripped.find("{#")), ("html", stripped.find("<!--")), ("css", stripped.find("/*"))]
+        starts = [(k, p) for k, p in starts if p >= 0]
+        if not starts:
+            continue
+        kind, pos = min(starts, key=lambda x: x[1])
+        tail = stripped[pos:]
+        end_marker = {"jinja": "#}", "html": "-->", "css": "*/"}[kind]
+        end = tail.find(end_marker)
+        if end >= 0:
+            yield lineno, tail[: end + len(end_marker)]
+        else:
+            yield lineno, tail
+            if kind == "jinja":
+                in_jinja = True
+            elif kind == "html":
+                in_html = True
+            else:
+                in_css = True
 
 
 def main() -> None:
@@ -259,12 +390,15 @@ def main() -> None:
     low_count = 0
     summary: dict[str, int] = {}
 
+    supported = {".py", ".js", ".mjs", ".html"}
     for scan_dir in SCAN_DIRS:
         if not scan_dir.exists():
             continue
-        for pyfile in sorted(scan_dir.rglob("*.py")):
-            rel = pyfile.relative_to(REPO_ROOT)
-            hits = scan_file(pyfile, args.verbose)
+        for fpath in sorted(scan_dir.rglob("*")):
+            if not fpath.is_file() or fpath.suffix.lower() not in supported:
+                continue
+            rel = fpath.relative_to(REPO_ROOT)
+            hits = scan_file(fpath, args.verbose)
             if not hits:
                 continue
 

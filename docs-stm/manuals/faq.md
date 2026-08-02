@@ -381,7 +381,7 @@ A: 编辑 `data/config/llm_key.json`，修改 `provider` 字段为 `"claude"` �
 
 **Q: 如何开启/关闭 Extended Thinking？**
 
-A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled_{模块键}` 设为 `true`/`false`（如 `"thinking_enabled_expert_review": true`）。目前仅在 Claude 和 DeepSeek（Anthropic 兼容端点）下生效。推荐仅在智囊团深度复盘模块开启，其他模块收益不大且会增加响应时间。
+A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled_{模块键}` 设为 `true`/`false`（如 `"thinking_enabled_expert_review": true`）。目前支持 Claude、DeepSeek（Anthropic 兼容端点）和 Gemini 2.5。推荐仅在智囊团深度复盘模块开启，其他模块收益不大且会增加响应时间。
 
 **Q: 如何开启财经新闻热点与持仓关联分析？**
 
@@ -413,7 +413,7 @@ A: 菜单 `L` 会先检查缓存，缓存过期（默认全球政经局势/持�
 
 **Q: LLM 返回内容被截断了怎么办？**
 
-A: 程序内置自动增大 `max_tokens` 1.5 倍重试机制。如果仍被截断，可在 `llm_settings.json` 中手动调大对应模块的 `max_tokens_{模块键}` 值（默认为 4096，可设为 8192 或更高）。调整后菜单 `R` 刷新配置，再重新生成即可。
+A: 程序内置自动增大 `max_tokens` 1.5 倍重试机制。如果仍被截断，可在 `llm_settings.json` 中手动调大对应模块的 `max_tokens_{模块键}` 值（各模块默认值不同，见[配置指引](how-to-config-llm.md)，如智囊团深度复盘 20000）。调整后菜单 `R` 刷新配置，再重新生成即可。
 
 **Q: 如何配置多个 LLM Provider 做链式服务？**
 

@@ -64,9 +64,9 @@ python -m src.python.cli cache --stats
 
 ### LLM 分析
 
-- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek / Google Gemini API，结果按策略缓存（2h~24h），持仓变更时通过缓存指纹自动失效
+- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek / Google Gemini API，结果按策略缓存（1h~24h），持仓变更时通过缓存指纹自动失效
 - **多 Provider 链式分发** — `llm_providers.json` 支持 priority（顺序递补）/ weighted（加权随机）/ cost_first（低成本优先）/ fallback_only（仅故障降级）四种策略，任一 Provider 失败自动递补
-- **Extended Thinking** — 支持 Claude 和 DeepSeek（Anthropic 兼容端点）的扩展思考模式，按模块独立开启
+- **Extended Thinking** — 支持 Claude、DeepSeek（Anthropic 兼容端点）和 Gemini 2.5 的扩展思考模式，按模块独立开启
 - **每模块独立控制** — 菜单 `S` 交互切换 5 个 LLM 模块的启停，立即生效无需重启
 - **LLM 幻觉率评估** — `scripts/llm_hallucination_sampler.py` 对 10 组标准化持仓数据采样，事实校验器自动验证数值/品种/排名正确性
 

@@ -1190,7 +1190,7 @@ class TestTodayProfitOffMarket(unittest.TestCase):
 
 
 class TestPremiumPlaceholder(unittest.TestCase):
-    """R-090: 溢价率始终为占位符 '--'。"""
+    """溢价率始终为占位符 '--'。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
@@ -1264,7 +1264,7 @@ class TestPremiumPlaceholder(unittest.TestCase):
 
 
 class TestTodayProfitEastMoneyNonTDay(unittest.TestCase):
-    """R-091: 场外基金非 T 日 → today_profit = 0。"""
+    """场外基金非 T 日 → today_profit = 0。"""
 
     def _make_market_data(self, nav_date: str, source_api: str = "eastmoney") -> dict:
         return {
@@ -1307,7 +1307,7 @@ class TestTodayProfitEastMoneyNonTDay(unittest.TestCase):
 
 
 class TestTodayProfitTencentAlways(unittest.TestCase):
-    """R-091: Tencent 场内资产始终计算 today_profit。"""
+    """Tencent 场内资产始终计算 today_profit。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
@@ -1411,7 +1411,7 @@ class TestPremiumInWriteSheet(unittest.TestCase):
 
 
 class TestCurrencyConversion(unittest.TestCase):
-    """R-096: 多币种转换正确 — 美元/港币份额处理。"""
+    """多币种转换正确 — 美元/港币份额处理。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)

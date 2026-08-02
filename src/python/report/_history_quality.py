@@ -1,6 +1,4 @@
 """历史走势数据质量校验 — 异常检测与收益率诊断。
-
-提取自 ``report/portfolio_history.py``。
 """
 
 from __future__ import annotations

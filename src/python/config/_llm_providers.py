@@ -277,7 +277,7 @@ def _inject_provider_chain_data(config: dict) -> dict:
                         ref,
                     )
 
-        # ── 内联 api_key 自动注入凭据字典（C18 兼容过渡） ──
+        # ── 内联 api_key 自动注入凭据字典（C18 凭据分离） ──
         provider_list = config.get("_provider_list")
         if provider_list:
             for entry in provider_list:

@@ -1,4 +1,4 @@
-"""P1 服务端下采样模块单元测试 — downsample.py（交互图表改造 Iter 2）。
+"""P1 服务端下采样模块单元测试 — downsample.py。
 
 覆盖 §4.9 验收标准（与 test_chart_data_builder.py::TestDownsampling 互补：
 本文件测模块级函数，另一文件测经 build_chart_datasets 的集成行为）：

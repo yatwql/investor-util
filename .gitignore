@@ -13,6 +13,9 @@ data/
 !data/config/llm_providers.json
 !data/knowledge/
 !data/knowledge/*.json
+!src/test/data/
+!src/test/data/hallucination/
+!src/test/data/hallucination/*.py
 
 # ── 运行时生成 ───────────────────────────────────────
 logs/

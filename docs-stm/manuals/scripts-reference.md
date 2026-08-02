@@ -18,6 +18,7 @@
 | `perf_report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf_view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
 | `diagnose_gemini_proxy.py` | 诊断 | Gemini API 代理连通性诊断 |
+| `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（因子暴露分析前置决策闸门） |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本 |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
 
@@ -63,19 +64,19 @@ python scripts/test_runner.py --mode unit --coverage
 | `--mode` | 等效 `-m` 表达式 | 典型耗时 |
 |:---------|:-----------------|:--------:|
 | `regression` | `scenario` | ~6min |
-| `smoke` | `smoke` | ~2s |
+| `smoke` | `smoke` | ~15s |
 | `unit` | `unit` | ~30s |
-| `standard` | `unit -edge -data` | ~30s |
+| `standard` | `unit and not (edge or data)` | ~30s |
 | `edge` | `edge` | ~15s |
 | `data` | `data` | ~10s |
 | `scenario` | `scenario` | ~6min |
-| `integration` | `integration` | ~50s |
+| `integration` | `scenario or integration` | ~50s |
 | `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis` | ~1min |
 | `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)` | ~1min |
 | `all` | （无过滤，全量） | ~10min |
 | `all_no_unit` | `not unit` | ~7min |
 | `report` | `unit_report` | ~15s |
-| `scenario_extreme` | `scenario_extreme` | ~1min 45s |
+| `scenario_extreme` | `scenario_extreme` | ~1min |
 
 ---
 
@@ -217,13 +218,9 @@ python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.json
 
 发布版本前必须运行。检查 `APP_VERSION`（`src/python/core/constants.py`）与以下文件的版本号是否一致：
 
+- `pyproject.toml`（`version` 字段，`--fix` 可自动同步）
 - `README.md`
-- `pyproject.toml`
-- `docs-stm/managements/plan.md`
-- `docs-stm/managements/technical.md`
-- `docs-stm/managements/requirements.md`
-- `docs-stm/managements/testplan.md`
-- `docs-stm/managements/changelog.md`
+- 管理文档 9 份：`plan.md`、`technical.md`、`requirements.md`、`testplan.md`、`review-findings.md`、`llm-technical.md`、`folders.md`、`test-coverage.md`、`changelog.md`
 - `docs-stm/manuals/how-to-test-my-code.md`
 
 ```bash

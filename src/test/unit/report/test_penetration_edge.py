@@ -347,7 +347,7 @@ class TestPenetrationWithFunds(unittest.TestCase):
 
 
 class TestSectorAllocationRatio(unittest.TestCase):
-    """R-094: 穿透行业占比归一化 — 各行业占比之和 ≤ 100%。"""
+    """穿透行业占比归一化 — 各行业占比之和 ≤ 100%。"""
 
     def _make_sector_result(self, sectors: list[tuple[str, float]]) -> dict:
         """构造穿透结果，含行业分布。"""

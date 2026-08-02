@@ -222,7 +222,7 @@ class TestFetchUsIndices(unittest.TestCase):
 
 @pytest.mark.data
 class TestIndexValueSanity(unittest.TestCase):
-    """R-095: 指数行情数值合理 — 数量级确认。"""
+    """指数行情数值合理 — 数量级确认。"""
 
     def _call_fetch_indices(self, cached_data: dict | None = None):
         """通过 mock 缓存返回固定的指数数据。"""

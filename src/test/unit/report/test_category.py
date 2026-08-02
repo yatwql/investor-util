@@ -109,7 +109,7 @@ class TestWriteCategorySheet(unittest.TestCase):
 
 @pytest.mark.data
 class TestCategoryAggregationConsistency(unittest.TestCase):
-    """R-093: 三维度分类聚合一致 — 各维度小计之和 = 总计。"""
+    """三维度分类聚合一致 — 各维度小计之和 = 总计。"""
 
     def _build_mock_category_result(self):
         """构造模拟的 category() 输出，验证聚合一致。"""

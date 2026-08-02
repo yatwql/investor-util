@@ -887,7 +887,7 @@ class TestFormatRankSanity(unittest.TestCase):
 
 @pytest.mark.data
 class TestRankDataReasonableRange(unittest.TestCase):
-    """R-098: 排名和收益率在合理范围内（通过 write_fund_performance_sheet 集成测试）。"""
+    """排名和收益率在合理范围内（通过 write_fund_performance_sheet 集成测试）。"""
 
     def setUp(self):
         self.ws = MagicMock()

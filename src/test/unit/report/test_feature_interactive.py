@@ -1,4 +1,4 @@
-"""交互图表 Feature Flag + 报告管线集成单元测试（交互图表改造 Iter 1）。
+"""交互图表 Feature Flag + 报告管线集成单元测试。
 
 覆盖：
   - enable_interactive_charts Flag 默认开启（features.py 注册）

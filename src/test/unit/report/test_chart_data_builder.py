@@ -1,6 +1,6 @@
 """Chart.js 数据预处理器单元测试 — chart_data_builder.py。
 
-覆盖交互图表改造 Iter 1 的验收标准：
+覆盖交互图表模块的验收标准：
   - 6 图固定键契约（§4.11 O2）：portfolio_line / drawdown / category_doughnut /
     industry_bar / penetration_bar / radar
   - 输出 schema（§4.12）：{"labels", "datasets", "degraded"}
@@ -190,7 +190,7 @@ class TestPortfolioLineAndDrawdown:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  P1 服务端下采样（Iter 2，§4.9）
+#  P1 服务端下采样
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -323,13 +323,13 @@ class TestIndustryAndPenetration:
         assert chart["datasets"][0]["data"] == [3000.0, 2000.0, 1000.0]
 
     def test_penetration_none_returns_empty(self) -> None:
-        """penetration 缺失时两图均返回空数据集（Iter 5：penetration=None → 占位）。"""
+        """penetration 缺失时两图均返回空数据集（penetration=None → 占位）。"""
         ds = build_chart_datasets(history_data=None, penetration=None)
         assert ds["industry_bar"] == {"labels": [], "datasets": []}
         assert ds["penetration_bar"] == {"labels": [], "datasets": []}
 
     def test_industry_bar_total_matches_penetration_mv(self) -> None:
-        """行业市值占比与穿透模块计算结果一致（Iter 4 验收标准 2）。
+        """行业市值占比与穿透模块计算结果一致。
 
         行业聚合后各行业市值之和 == 穿透 top10 总市值，保证图表口径与穿透模块一致。
         """
@@ -352,7 +352,7 @@ class TestIndustryAndPenetration:
         assert chart["labels"][-1] == "行业5", "超过 10 个行业时应截断尾部"
 
     def test_penetration_bar_lt3_entries_still_renders(self) -> None:
-        """穿透品种 < 3 时仍渲染图表（Iter 5 验收：品种不足不阻断渲染）。"""
+        """穿透品种 < 3 时仍渲染图表（品种不足不阻断渲染）。"""
         small = _penetration(
             [
                 {"rank": 1, "name": "贵州茅台", "sector": "白酒", "mv": 5000.0},

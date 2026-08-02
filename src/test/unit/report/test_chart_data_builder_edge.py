@@ -26,7 +26,7 @@ def _penetration(top10: list[dict]) -> dict:
 
 
 def test_all_unclassified_sectors_aggregate_to_other() -> None:
-    """全部品种无行业归属 → 全部归入"其他"单一分类（Iter 4 验收标准 5）。"""
+    """全部品种无行业归属 → 全部归入"其他"单一分类。"""
     top10 = [
         {"rank": 1, "name": "标的A", "mv": 3000.0},
         {"rank": 2, "name": "标的B", "mv": 2000.0},
@@ -76,7 +76,7 @@ def test_empty_top10_returns_empty_dataset() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  量化指标 Radar 边缘场景（Iter 6 §6.6 / C12）
+#  量化指标 Radar 边缘场景（C12）
 # ═══════════════════════════════════════════════════════════════
 
 

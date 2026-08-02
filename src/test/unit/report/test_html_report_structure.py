@@ -114,7 +114,7 @@ def _build_minimal_render_data(
         "section_order": section_order,
         "section_numbers": section_numbers,
         "section_visible_dict": section_visible_dict,
-        # Chart.js 交互图表（Iter 1）：默认关闭，模板双路径走旧绘图
+        # Chart.js 交互图表：默认关闭，模板走基础绘图路径
         "chart_datasets": {},
         "enable_interactive_charts": False,
     }
@@ -491,12 +491,12 @@ class TestHtmlAnchorValidity(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Test: Interactive Charts mode (Iter 2)
+#  Test: Interactive Charts mode
 # ═══════════════════════════════════════════════════════════════
 
 
 class TestHtmlInteractiveCharts(unittest.TestCase):
-    """交互图表模式下模板结构测试（Iter 2 §4.5/§4.11）。"""
+    """交互图表模式下模板结构测试。"""
 
     _HISTORY = {
         "status": "ok",
@@ -514,7 +514,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         "industry_bar", "penetration_bar", "radar",
     )
 
-    # 最小穿透数据：触发 sec-penetration 渲染图表容器（Iter 4/5）
+    # 最小穿透数据：触发 sec-penetration 渲染图表容器
     _PENETRATION = {
         "top10": [
             {"rank": 1, "name": "贵州茅台", "codes": ["600519"], "mv": 10000.0,
@@ -539,7 +539,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         """渲染 enable_interactive_charts=True 的模板。
 
         chart_overrides：覆盖默认空 dataset，用于验证各图 canvas 是否渲染。
-        penetration：传入时 sec-penetration 章节渲染图表容器（Iter 4/5）。
+        penetration：传入时 sec-penetration 章节渲染图表容器。
         """
         order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
         numbers = {sec["key"]: sec["number"] for sec in order}
@@ -557,8 +557,8 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
     def test_chart_box_wraps_canvases(self) -> None:
         """各图 canvas 被 .chart-box 包裹（§4.5 打印不跨页）。
 
-        净值+回撤（Iter 2）+ 资产构成 Doughnut（Iter 3）共 3 张已迁移。
-        无穿透数据时，sec-penetration 不渲染图表容器（Iter 5 占位）。
+        净值+回撤 + 资产构成 Doughnut 共 3 张图表。
+        无穿透数据时，sec-penetration 不渲染图表容器（占位）。
         """
         overrides = {
             "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
@@ -573,7 +573,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIn("chart_category_doughnut", canvas_ids)
 
     def test_penetration_charts_rendered_when_data(self) -> None:
-        """穿透数据存在时渲染行业分布 + 穿透 TOP10 两图（Iter 4/5）。
+        """穿透数据存在时渲染行业分布 + 穿透 TOP10 两图。
 
         计划 §4.9：行业分布与穿透 TOP10 同属 sec-penetration 章节，
         有数据时图表容器渲染 canvas；穿透章节共 2 个 .chart-box。
@@ -601,7 +601,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIn("chart_penetration_bar", section_canvases)
 
     def test_industry_empty_note_when_no_data(self) -> None:
-        """行业数据全不可用时显示"行业数据暂不可用"（Iter 4 验收标准 3）。
+        """行业数据全不可用时显示"行业数据暂不可用"。
 
         §4.12 空值语义：dataset 无 labels 时模板渲染占位提示，不输出空 canvas。
         """
@@ -617,7 +617,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(section.find(id="chart_industry_bar"), "空数据时不应输出 industry canvas")
 
     def test_penetration_none_shows_placeholder(self) -> None:
-        """penetration=None 时显示"暂无穿透数据"占位，不渲染图表容器（Iter 5）。"""
+        """penetration=None 时显示"暂无穿透数据"占位，不渲染图表容器。"""
         soup = self._render_interactive()
         section = soup.find(id="sec-penetration")
         self.assertIsNotNone(section)
@@ -626,7 +626,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(section.find(id="chart_penetration_bar"))
 
     def test_radar_chart_rendered_when_labels(self) -> None:
-        """量化指标 radar 有 labels 时渲染 canvas（Iter 6）。"""
+        """量化指标 radar 有 labels 时渲染 canvas。"""
         overrides = {
             "radar": {
                 "labels": ["夏普比率", "卡玛比率"],
@@ -642,7 +642,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIn("chart-box", radar_canvas.parent.get("class", []))
 
     def test_radar_empty_note_when_no_labels(self) -> None:
-        """radar 无 labels 时显示"量化指标数据不足"占位，不渲染 canvas（Iter 6 验收 5）。"""
+        """radar 无 labels 时显示"量化指标数据不足"占位，不渲染 canvas。"""
         soup = self._render_interactive()
         section = soup.find(id="sec-portfolio_history")
         note = section.select_one(".chart-empty-note")
@@ -651,7 +651,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(section.find(id="chart_radar"))
 
     def test_radar_data_unavailable_placeholder(self) -> None:
-        """data_unavailable=True 时显示"持仓市值数据不可用，量化指标暂停计算"（Iter 6 验收 7）。"""
+        """data_unavailable=True 时显示"持仓市值数据不可用，量化指标暂停计算"。"""
         overrides = {"radar": {"labels": ["夏普比率"], "datasets": [{"data": [1.2]}]}}
         order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
         numbers = {sec["key"]: sec["number"] for sec in order}
@@ -731,12 +731,12 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(soup.find(id="drawdownChart"))
 
     def test_flag_off_legacy_canvas_regression(self) -> None:
-        """Iter 7 验收标准 5：Flag OFF 时报告与未升级版一致（旧 Canvas + 表格）。
+        """Flag OFF 时报告与基础版一致（Canvas + 表格）。
 
         enable_interactive_charts=False（默认渲染路径）：
-          - 6 个新 Chart.js canvas 均不输出（无空 div / 空 canvas 残留）
-          - 旧 Canvas（portfolioChart / drawdownChart）正常保留
-          - drawSimpleChart 定义保留（旧绘图函数可用）
+          - 6 个 Chart.js canvas 均不输出（无空 div / 空 canvas 残留）
+          - Canvas（portfolioChart / drawdownChart）正常保留
+          - drawSimpleChart 定义保留（绘图函数可用）
         """
         order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
         numbers = {sec["key"]: sec["number"] for sec in order}

@@ -34,7 +34,7 @@ class TestHtmlCssStructure(unittest.TestCase):
     # ── .section-nav flex-wrap ─────────────────────────────────
 
     def test_section_nav_flex_wrap_is_wrap(self):
-        """.section-nav 必须使用 flex-wrap: wrap（R-168 修复）。"""
+        """.section-nav 必须使用 flex-wrap: wrap。"""
         match = re.search(
             r"\.section-nav\s*\{[^}]*flex-wrap\s*:\s*([^;}]+)",
             self.tmpl,
@@ -70,7 +70,7 @@ class TestHtmlCssStructure(unittest.TestCase):
     # ── No empty anchor divs ───────────────────────────────────
 
     def test_no_empty_anchor_divs(self):
-        """模板中不应有 <div id="sec-xxx"></div> 空锚点（R-168）。"""
+        """模板中不应有 <div id="sec-xxx"></div> 空锚点。"""
         empty_anchors = re.findall(
             r'<div\s+id="sec-\w+"\s*>\s*</div>',
             self.tmpl,

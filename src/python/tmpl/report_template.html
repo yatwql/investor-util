@@ -6,7 +6,7 @@
     <title>个人投资分析报告 - {{ now }}</title>
     <style>
         :root {
-            /* Chart.js 主题色（§4.6）— chart-config.js 读取，plan-11 暗色模式预留 */
+            /* Chart.js 主题色（§4.6）— chart-config.js 读取，暗色模式预留 */
             --chart-primary: #2E75B6;
             --chart-secondary: #CC0000;
             --chart-danger: #CC0000;
@@ -845,7 +845,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </tbody>
             </table>
             {% if enable_interactive_charts %}
-            {# 资产构成 Doughnut（plan-1 Iter 3）：纯表格 → 交互环形图，按资产属性聚合市值 #}
+            {# 资产构成 Doughnut：按资产属性聚合市值的交互环形图 #}
             <div style="max-width:480px;margin:12px auto;">
                 <div class="chart-box" style="height:320px;">
                     {% if chart_datasets and chart_datasets.get("category_doughnut", {}).get("labels") %}
@@ -868,7 +868,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% if penetration and penetration.get("top10") %}
         <div class="section-content" style="padding: 0;">
             {% if enable_interactive_charts %}
-            {# 行业分布 + 穿透 TOP10（plan-1 Iter 4/5）：一图一表并排，图表前置概述。
+            {# 行业分布 + 穿透 TOP10：一图一表并排，图表前置概述。
                空值语义（§4.12）：dataset 无 labels 时不渲染 canvas，显示占位提示。 #}
             <div class="penetration-charts" style="display: flex; flex-wrap: wrap; gap: 16px; padding: 12px;">
                 <div style="flex: 1; min-width: 280px;">
@@ -1558,7 +1558,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
             </div>
             {% if enable_interactive_charts %}
-            {# 量化指标 Radar（Iter 6）：3 张摘要卡片 → 雷达图增强。
+            {# 量化指标 Radar：3 张摘要卡片 + 雷达图增强。
                数据源三级降级（all_metrics / risk_metrics / history_data，builder 处理）。
                空值语义：data_unavailable → "持仓市值数据不可用，量化指标暂停计算"；
                radar 无 labels → "量化指标数据不足"。 #}

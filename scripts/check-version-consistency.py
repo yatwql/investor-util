@@ -6,7 +6,8 @@
   - pyproject.toml          version = "X.Y.Z"
   - README.md               > 当前版本：X.Y.Z
   - docs-stm/managements/plan.md, technical.md, requirements.md,
-    testplan.md, review-findings.md, llm-technical.md
+    testplan.md, review-findings.md, llm-technical.md,
+    folders.md, test-coverage.md
                             最后更新：...（vX.Y.Z ...）
   - docs-stm/manuals/how-to-test-my-code.md
                             最后更新：...（vX.Y.Z）

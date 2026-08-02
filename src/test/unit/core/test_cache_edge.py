@@ -21,7 +21,7 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core, pytest.mark.edge]
 
 
-# ── 测试基类（从 test_cache.py 复用）─────────────────────────────────
+# ── 测试基类 ─────────────────────────────────
 
 class _CacheTestBase:
     """测试辅助方法。"""

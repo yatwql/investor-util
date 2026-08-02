@@ -1,7 +1,7 @@
 /* chart-config.js — Chart.js 全局配置（颜色/字体/主题常量）。
  *
  * 职责：
- *   - 统一定义配色（CSS 变量驱动，与模板暗色模式兼容，plan-11 预留）
+ *   - 统一定义配色（CSS 变量驱动，与模板暗色模式兼容）
  *   - 关闭入场动画（P2：报告是静态分析工具，无需动画，hover tooltip 不受影响）
  *   - 限制 devicePixelRatio（P4/R22：低配机 + 高分屏优化，防止 4K 屏 canvas 像素爆炸）
  *   - ES5 保守语法（R17/R22：兼容微信 X5 / 老旧 Chromium，不使用 const/let/箭头函数）
@@ -27,7 +27,7 @@
   Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif';
   Chart.defaults.font.size = 11;
 
-  /* ── 主题色（CSS 变量驱动，plan-11 暗色模式预留）────── */
+  /* ── 主题色（CSS 变量驱动，暗色模式预留）────────────── */
   // 模板在 :root 定义 --chart-* 变量；此处读取，未定义时用默认值兜底。
   function cssVar(name, fallback) {
     var val = '';

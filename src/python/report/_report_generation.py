@@ -1,6 +1,6 @@
 """报告生成实现 — both/full 两种路径的 HTML+Excel 生成逻辑。
 
-提取自 ``report/orchestrator.py``，包含报告生成管线各工序实现。
+包含报告生成管线各工序实现。
 """
 
 from __future__ import annotations

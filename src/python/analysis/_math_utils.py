@@ -1,6 +1,6 @@
 """辅助数学函数 — Beta/t-分布统计函数。
 
-提取自 ``analysis/metrics.py``，供 ``portfolio_beta_analysis`` 等函数使用。
+供 ``portfolio_beta_analysis`` 等分析函数使用的公共数学工具。
 所有函数均为纯数学计算，无外部依赖（仅标准库 ``math``）。
 
 函数清单：

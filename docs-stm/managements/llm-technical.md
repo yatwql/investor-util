@@ -89,7 +89,7 @@
               │ prompts_core.py  │          │ fingerprint.py     │
               │ prompts_tables.py│          │ 缓存指纹计算       │
               │ prompts_action.py│          │ 稳定性字段提取      │
-              │ （原 prompts.py） │          │ 风险信号摘要        │
+              │                │          │ 风险信号摘要        │
               └──────────────────┘          └────────────────────┘
               ┌──────────────────┐              ┌────────────────────┐
               │ session.py       │              │ pricing.py         │
@@ -118,7 +118,7 @@ skeleton.py:_generate_llm_content()
     │  ② _call_llm()
     │      └─ api.py:_call_llm()
     │             │  路由 provider → _call_claude() / _call_openai()
-    │             │  ③ 空内容处理：None→直接切换 provider；""→安抚重试
+    │             │  ③ 空内容处理：thinking 耗尽→关闭 thinking 同 provider 重试一次；仍失败→切换 provider；""→安抚重试
     │             │  ④ 回退 provider（主 provider 失败时）
     │             └─ api_base.py:_call_llm_with_retry()
     │                    │  熔断预检 → 熔断中则直接返回
@@ -178,16 +178,16 @@ skeleton.py:_generate_llm_content()
 
 | 模块键 | 名称 | 默认 max_tokens | 默认 timeout | 默认 TTL | 默认 system_prompt |
 |:-------|:-----|:---------------:|:------------:|:--------:|:-------------------|
-| `global_macro` | 全球政经局势 | 800 | 60s | 24h（86400s） | 宏观经济学家角色，500 字内，纯文本 |
-| `expert_review` | 智囊团深度复盘 | 8192 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
-| `health_check` | 持仓体检报告 | 8192 | 120s | 24h（86400s） | 四维度评分（风险分散度/流动性/收益合理性/成本结构） |
+| `global_macro` | 全球政经局势 | 2048 | 60s | 24h（86400s） | 宏观经济学家角色，500 字内，纯文本 |
+| `expert_review` | 智囊团深度复盘 | 20000 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
+| `health_check` | 持仓体检报告 | 16000 | 120s | 24h（86400s） | 四维度评分（风险分散度/流动性/收益合理性/成本结构） |
 | `penetration_deep` | 穿透深度分析 | 8192 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
 
 #### 批量模式模块（1 个，通过 `_generate_llm_module` 以批量模式调用）
 
 | 模块键 | 名称 | 默认 max_tokens | 默认 timeout | 默认 TTL | 默认 system_prompt |
 |:-------|:-----|:---------------:|:------------:|:--------:|:-------------------|
-| `news_correlation` | 新闻 LLM 关联分析 | 4096 | 120s | 1h（3600s） | 逐批分析新闻与持仓关联性（JSON 输出） |
+| `news_correlation` | 新闻 LLM 关联分析 | 2000 | 60s | 1h（3600s） | 逐批分析新闻与持仓关联性（JSON 输出） |
 
 **批量模式 vs 标准模式区别**：
 
@@ -491,7 +491,7 @@ _call_llm(system_prompt, user_prompt, llm_config, ...)
     │
     │          成功 → 返回 (content, usage, provider_name)
     │          空内容 None（无 text block，如 thinking 耗尽 max_tokens 预算）
-    │            → 直接切换下一 entry（安抚重试无效，不再尝试）
+    │            → 先关闭 thinking 同 provider 重试一次（安全网）；仍无正文再切换下一 entry
     │          空字符串 ""（真正被过滤/无内容）→ 内容过滤安抚重试（追加安抚指令重试一次）
     │          失败 → 记录失败原因，继续下一 entry
     │
@@ -665,9 +665,10 @@ call_gemini() Extended Thinking 注入
     ── 二次截断则保留第一次结果 + 尾部警告
 
 第 4 层：空内容处理（api.py）
-    ── `_extract_content` 无 text block → 返回 None → 直接切换下一 provider
+    ── `_extract_content` 无 text block → 返回 None，若曾开启 thinking
+       且判定为思考耗尽 → 先关闭 thinking 同 provider 重试一次（安全网）
        （DeepSeek V4 强制推理模型思考部分耗尽 max_tokens 预算时响应仅含
-        thinking block 无 text；安抚重试对预算耗尽无效，故不再安抚）
+        thinking block 无 text；重试后仍无正文才切换下一 provider）
     ── 真正空字符串 ""（可能被内容审查拦截）→ 追加安抚指令重试一次
     ── 安抚成功 → 返回重试结果
     ── 安抚失败 → 切换 provider

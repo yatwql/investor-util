@@ -30,6 +30,14 @@
 | **rf-120** | S5 CSP 未配置（报告为离线静态 HTML，无外部域名） | 可选不做 MVP（upgrade.md §4.10 S5）；未来若加 CSP 仅需 `script-src 'self'` |
 | **rf-121** | TD2：报告体积增大 ~200KB（chart.min.js 随每份报告复制） | R21 决策接受的"报告自包含"代价；如未来对体积敏感可改 CDN 优先 + 本地兜底 |
 
+### P1 — LLM thinking 预算耗尽（2026-08-02）
+
+> 来源：用户运行日志复现。DeepSeek 主链路 thinking 开启模块反复触发"思考部分耗尽 max_tokens 预算"→ 切 provider。
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-122** | `expert_review`/`health_check` 开启 Extended Thinking 时，DeepSeek V4 兼容端点 `max_tokens` 为 **thinking + 正文共享预算**（官方文档确认），`max_tokens=8192` 下 medium 思考即耗尽 → 响应仅 thinking block 无正文 → 空内容 → 切 provider（gemini-fallback 不支持 thinking 且链路不稳，模块内容有丢失风险）。rf-98 只抬 4096→8192，对复杂输入仍不够 | ① 抬 `max_tokens`：expert_review 8192→20000、health_check 8192→16000（对应 thinking_budget 16000/12000 + 正文余量；DeepSeek V4 输出上限 384K 无 400 风险）② 代码安全网：thinking 耗尽时自动**关闭 thinking 重试一次**（`call_claude` 层），保证有正文产出 |
+
 ### P2 - 代码质量（低优先级，增量改进）
 
 #### P2A — 文件过长（>500 行，建议拆分）

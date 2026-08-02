@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""CSI 风格指数可用性探测 — plan-7 因子暴露分析的前置决策闸门。
+"""CSI 风格指数可用性探测 — 因子暴露分析的前置决策闸门。
 
-在实施 plan-7（因子暴露分析）之前，必须验证候选 CSI 风格指数代码是否
+在实施因子暴露分析之前，必须验证候选 CSI 风格指数代码是否
 能被现有历史 K 线链路返回有效数据。本脚本对候选代码逐个请求 K 线 API，
-统计有效条数，并按 plan-advanced-analysis.md §4 的判定标准输出可行性评级，
-以决定 plan-7 去留。
+统计有效条数，并按判定标准输出可行性评级，以决定分析是否可实施。
 
 用法：
   python scripts/probe-csi-factor-indices.py            # 默认 5 个 CSI + 附加探测
@@ -15,7 +14,7 @@
 输出：
   每个候选代码的 K 线条数 / 首末日期 / 距今天数 / 最近收盘价 + 链路探测 + 综合判定
 
-判定标准（对齐 plan-advanced-analysis.md §4.3 + 数据新鲜度维度）：
+判定标准（有效条数 + 数据新鲜度维度）：
   有效 = 条数 ≥ threshold 且 最新日期距今 ≤ stale 天（排除停更指数——仅看条数
   会误判停更数据，如 300 成长曾返回 30 条 2023 年旧数据）
   - 全部 5 个代码有效 → ✅ 全量 5 因子可行
@@ -149,13 +148,13 @@ def evaluate(
         "available": available,
         "stale_codes": stale_codes,
         "stale_threshold_days": stale,
-        "message": "❌ 仅 1-2 个代码可用 → 因子暴露分析在免费数据源下不可实现，建议按 plan-4 模式放弃",
+        "message": "❌ 仅 1-2 个代码可用 → 因子暴露分析在免费数据源下不可实现，建议归档放弃方案",
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="CSI 风格指数可用性探测（plan-7 前置决策闸门）",
+        description="CSI 风格指数可用性探测（因子暴露分析前置决策闸门）",
     )
     parser.add_argument("--days", type=int, default=30, help="K 线窗口天数（默认 30）")
     parser.add_argument("--threshold", type=int, default=20, help="有效数据条数阈值（默认 20）")
@@ -248,13 +247,13 @@ def main() -> int:
             print(f"  [!] 附加探测 {code} {name}: {counts[code]} 条，距今天数 {age}d → 低波因子可作为补充候选")
 
     print("=" * 64)
-    print("\n建议（plan-7 决策）：")
+    print("\n建议（可行性决策）：")
     if result["verdict"] == "5f":
         print("  → 实施完整 5 因子暴露分析（3.5d）")
     elif result["verdict"] == "3f":
         print("  → 实施 MVP 3 因子（价值+成长+质量），动量/低波标记实验性（~2.5d）")
     else:
-        print("  → 不可行，建议放弃 plan-7（按 plan-4 模式归档）")
+        print("  → 不可行，建议归档放弃方案")
 
     return 0
 
