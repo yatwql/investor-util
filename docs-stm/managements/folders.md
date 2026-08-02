@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：0.9.5-dev
+> 文档版本：0.9.6-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,17 +8,17 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 184 | 44,103 | `src/python/` 下所有 `.py`（不含测试） |
-| HTML 报告模板 | HTML | 1 | 1,980 | `src/python/tmpl/report_template.html` |
-| 辅助脚本 | Python | 11 | 3,857 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估） |
-| **源代码合计** | — | **196** | **49,940** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **221** | **60,590** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **3,881 个** | `pytest --collect-only` 统计 |
+| 主程序代码 | Python | 186 | 45,304 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 1 | 2,068 | `src/python/tmpl/report_template.html` |
+| 辅助脚本 | Python | 12 | 4,073 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
+| **源代码合计** | — | **199** | **51,445** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **223** | **62,066** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **3,941 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **87** | — | 含 CLAUDE.md |
+| **项目文档** | Markdown | **88** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 78 | — | 各版本 changelog/plan/review-findings 等 |
+| ├ archive/ | 版本归档 | 79 | — | 各版本 changelog/plan/review-findings 等（76 md + 3 py） |
 | ├ plan/ | 中间设计文件 | 5 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -518,6 +518,7 @@ investor-util/
 │   ├── check-test-markers.py        #   测试标记合规检查
 │   ├── check-version-consistency.py #   版本号一致性检查
 │   ├── calibrate-dedup-threshold.py #   新闻去重阈值校准
+│   ├── collect-test-coverage.py     #   测试覆盖计数收集（pytest --collect-only 快照，供 test-coverage.md 更新）
 │   ├── check-history-traces.py      #   注释历史痕迹检查
 │   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
@@ -664,8 +665,10 @@ investor-util/
 │   │   │   ├── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
 │   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
-│   │   │   ├── v0.9.x/                           # v0.9.x 版本归档（本迭代已完成项）
+│   │   │   ├── v0.9.x/                           # v0.9.x 版本归档（changelog/plan/review-findings + 已完成项设计文档）
 │   │   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（plan-1/plan-7 已完成项 + 设计文档索引）
+│   │   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x（0.9.0 ~ 0.9.5）
+│   │   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x（rf-90 ~ rf-144）
 │   │   │   │   ├── chartjs-upgrade/               #   plan-1 交互式 HTML 报告升级设计（8 迭代）
 │   │   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案（plan-1）
 │   │   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析（plan-1）

@@ -548,6 +548,61 @@ _SYSTEM_DEBATE_SYNTHESIS = """你是投资智囊团首席指挥官。白脸和�
 
 输出格式：行动建议用 bullet point 分优先级。"""
 
+# ── conditional 模式下的综合权衡 system prompt ──────────────────
+# conditional（条件推理）开启时，_build_debate_synthesis_prompt 会在 user prompt
+# 追加"按情景分别给出综合建议"指令（pro/con 因 skip_scenarios=True 不写情景分析，
+# 由综合阶段统一输出情景建议）。此时若 system prompt 仍保留"无需重复情景分析、
+# 不要在综合权衡中插入情景分析段落"的断言，会与 user prompt 直接冲突——LLM 为满足
+# user 的情景指令，只能从白脸/黑脸正文抽取内容填充情景段，造成"综合权衡重复复述
+# 白脸/黑脸观点"。故 conditional 开启时改用本强化版：允许输出情景分析，但强化
+# "引用一句话概括、不展开复述"的纪律，并要求情景建议体现综合权衡而非单方复述。
+_SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL = """你是投资智囊团首席指挥官。白脸和黑脸的完整分析已在上方分别展示，你的综合权衡将紧随其后。
+
+⚠️ 重要：不要重复白脸/黑脸的论点
+- **白脸和黑脸的原始分析全文已在上方单独展示，读者已阅读过原文**
+- **不要在综合权衡中重复或转述白脸/黑脸的具体论述**——直接给出你的判断
+- 需要引用时，用一句话概括即可（如"白方认为估值合理，黑方认为集中度过高"），不要展开
+- **综合评估、行动建议、情景分析三个部分均适用此规则**——引用双方论点仅作为依据，核心是呈现你基于双方论点形成的独立判断
+
+⚠️ 数据纪律（必须优先遵守）：
+- **你的综合判断基于以上两份报告的内容。禁止编造任何数值、百分比或排名**
+- 引用收益率、占比、排名等数据时，确保该数值在白脸或黑脸报告中有明确来源
+- **不得断言任何品种是"最大持仓"或"第一重仓"**——除非白脸或黑脸报告明确提到了该排名
+- 不知道确切数字时使用定性描述（"多数品种"、"部分品种"）而非虚构具体数值
+
+⚠️ 情景分析纪律（conditional 模式）：
+- 下方 prompt 要求你按涨/跌/震荡情景分别给出综合建议，请遵循该指令输出情景分析
+- **各情景下的行动建议同样不得复述白脸/黑脸的具体论述**——引用时一句话概括（如"白方认为防守资产能缓冲"），重点给出基于综合判断的差异化操作建议
+- 各情景之间避免内容重复，且不要与"综合评估/综合行动建议"部分的论点机械复述
+
+请按以下结构输出最终投资建议：
+
+1. **共识与分歧摘要** — 双方达成一致的领域（1-2句）和仍然分歧的关键问题（1-2句），无需展开具体论述
+2. **综合评估** — 基于双方论点给出你的独立判断和权衡理由
+3. **综合行动建议** — 结合正反两面，给出可执行的调仓操作建议（分优先级别）
+4. **置信度评级** — 对每条建议标注置信度（高/中/低），低置信度的建议请附加跟踪条件
+5. **情景分析** — 按下方 prompt 给出的涨/跌/震荡情景，各给出差异化行动建议
+
+输出格式：行动建议用 bullet point 分优先级。"""
+
+
+def _build_system_debate_synthesis(enable_conditional: bool = False) -> str:
+    """构建综合权衡阶段的 system prompt。
+
+    conditional（条件推理）关闭时返回基线版本（禁止插入情景分析段落）；
+    开启时返回强化版（允许按 user prompt 输出情景分析，但强化引用纪律，
+    避免重复复述白脸/黑脸观点）。
+
+    Args:
+        enable_conditional: 是否启用 conditional（条件推理）模式。
+
+    Returns:
+        综合权衡阶段的 system prompt 字符串。
+    """
+    if enable_conditional:
+        return _SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL
+    return _SYSTEM_DEBATE_SYNTHESIS
+
 
 __all__ = [
     "CACHE_PREFIX_LLM",
@@ -566,6 +621,8 @@ __all__ = [
     "_SYSTEM_DEBATE_PRO",
     "_SYSTEM_DEBATE_CON",
     "_SYSTEM_DEBATE_SYNTHESIS",
+    "_SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL",
+    "_build_system_debate_synthesis",
     "_fmt_wan",
     "_fmt_holding_line",
     "_build_difpipeline_data_block",

@@ -24,12 +24,12 @@ _ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "cache", "dedup_anchors.jsonl
 # 算法同时使用中文 bigram + 英数 token 匹配，
 # 跨源采用梯度阈值：
 #   - bg≥3: ratio≥0.30 合并（主规则）
-#   - bg=2: ratio≥0.45 合并（中高 ratio 梯度补偿）
+#   - bg=2: ratio≥0.40 合并（中高 ratio 梯度补偿）
 #   - bg≤1: 不合并（即使 ratio 较高也是虚假重叠）
 _CROSS_THRESHOLD = 0.30  # cross_threshold
 _SAME_SRC_BIGRAM = 4  # 同源 bigram 阈值
 _CROSS_BIGRAM = 3  # 跨源 bigram 阈值
-_CROSS_BG2_RATIO = 0.45  # bg=2 梯度补偿阈值
+_CROSS_BG2_RATIO = 0.40  # bg=2 梯度补偿阈值
 
 
 def load_anchors(path: str = _ANCHOR_PATH) -> list[dict[str, Any]]:
@@ -243,7 +243,7 @@ def _print_calibration_advice(
     print("当前阈值规则")
     print("─" * 60)
     print(f"  跨源：bg≥3 + ratio≥0.30 → 合并（主规则）")
-    print(f"  跨源：bg=2 + ratio≥0.45 → 合并（梯度补偿）")
+    print(f"  跨源：bg=2 + ratio≥0.40 → 合并（梯度补偿）")
     print(f"  跨源安全区：ratio≥0.50 → 直接合并")
     print(f"  同源：bigram≥4 → 合并")
     print(f"  清理模式：日期(年/月/日)、英文专名占位化")

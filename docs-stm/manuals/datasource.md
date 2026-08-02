@@ -51,6 +51,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 - **A 股指数** → `history_index` 通道：腾讯财经 → 新浪财经（备用）
 - **美股指数** → `history_index_us` 通道：新浪财经（`gb_*` 前缀） → 腾讯财经（备用，因腾讯 K-line API 不支持 `gb_*` 代码）
+- **因子暴露分析**（`analysis/factor_exposure.py`）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925 替代停更的 sh000920、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理
 
 ### 实时行情
 
@@ -94,7 +95,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 ### akshare 兼容性
 
-本程序依赖 **akshare >= 1.16.0**。akshare 接口更新较频繁，以下场景可能导致数据获取失败：
+本程序依赖 **akshare**（`pyproject.toml` 锁定 `akshare==1.18.64`，兼容下限 `>= 1.16.0`）。akshare 接口更新较频繁，以下场景可能导致数据获取失败：
 
 - akshare 版本过低 → 接口签名变更导致报错 → 执行 `pip install --upgrade akshare`
 - akshare 版本过高 → 接口返回格式微调 → 如遇兼容问题，可先检查 `logs/app.log` 中的具体报错信息

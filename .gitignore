@@ -6,6 +6,9 @@ __pycache__/
 .venv
 venv
 
+# ── 浏览器/编辑器下载副本（同名下载产生的 (1) 后缀文件）──
+*\(1\)*
+
 # ── 个人数据（持仓、缓存、API Key）────────────────────
 data/
 !data/config/config.json

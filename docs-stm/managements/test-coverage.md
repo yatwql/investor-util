@@ -1,6 +1,6 @@
 # 测试覆盖统计
 
-> 文档版本：0.9.5-dev
+> 文档版本：0.9.6-dev
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
@@ -10,22 +10,22 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **3569** | ~30s |
-| `standard` | **3017** | ~30s |
-| `scenario` | **204** | **~6min** |
-| `regression` | **204** | **~6min** |
-| `dev-verify` | **1181** | **~1min** |
-| `verify` | **2251** | **~1min** |
-| `integration` | **244** | **~50s** |
+| `unit` | **3624** | ~30s |
+| `standard` | **3072** | ~30s |
+| `scenario` | **231** | **~6min** |
+| `regression` | **231** | **~6min** |
+| `dev-verify` | **1198** | **~1min** |
+| `verify` | **2294** | **~1min** |
+| `integration` | **271** | **~50s** |
 | `edge` | 489 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **3859** | **~10min** |
-| `smoke` | 24 | ~2s |
-| `report` | **1153** | ~15s |
-| `all_no_unit` | 290 | **~7min** |
+| `all` | **3941** | **~10min** |
+| `smoke` | 26 | ~2s |
+| `report` | **1162** | ~15s |
+| `all_no_unit` | 317 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 3859 项（2026-08-02 实时收集快照）。
+> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 3941 项（2026-08-02 实时收集快照，`scripts/collect-test-coverage.py` 生成）。
 
 ### 功能域对应测试源
 
@@ -37,21 +37,21 @@
 | **数据源注册中心** | `provider_registry.py` | `unit/core/test_provider_registry.py` + `test_phase_timeout.py` + `test_market_value_strategy_edge.py` | 58 |
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain, history_diff) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_fetcher_api_edge.py` | 263 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 190 |
-| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_fund_deep_analysis, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, factor_exposure_sheet, portfolio_history, history_snapshot) | `unit/report/` 共 41 文件含 test_html_writer、test_html_template 等 | 1153 |
-| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content, cost_tracker, fallback) | `unit/llm/`(含 API 路由/熔断/重试/降级/骨架/prompts/generators/辩论/cache 等) + `scenario/llm/` | 704 |
-| **核心基础设施** | `core/cache.py`, `core/models.py`, `core/reader.py`, `core/registry.py`, `core/http_client.py`, `core/market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 309 |
-| **配置管理** | `config/`, `core/constants.py` | `unit/config/test_config*.py` | 178 |
+| **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_fund_deep_analysis, excel_llm_usage, html, category, penetration, fund_performance, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, fund_overlap, fund_style, factor_exposure_sheet, portfolio_history, history_snapshot) | `unit/report/` 共 49 文件含 test_html_writer、test_html_template 等 | 1162 |
+| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content, cost_tracker, fallback) | `unit/llm/`(含 API 路由/熔断/重试/降级/骨架/prompts/generators/辩论/cache 等) + `scenario/llm/` | 726 |
+| **核心基础设施** | `core/cache.py`, `core/models.py`, `core/reader.py`, `core/registry.py`, `core/http_client.py`, `core/market_hours.py` | `unit/core/test_{cache,models,reader,registry,http_client,market_hours}.py` + `*_edge.py` | 317 |
+| **配置管理** | `config/`, `core/constants.py` | `unit/config/test_config*.py` | 187 |
 | **分析计算** | `analysis/`(liquidity, rebalance, fx_exposure, bond_yield, alignment_correction, drawdown_warning, factor_exposure) | `unit/analysis/test_{liquidity,rebalance,bond_yield,fx_exposure,alignment_correction,drawdown_warning,factor_exposure}*.py` | 244 |
-| **TUI 交互** | `tui/tui*.py`, `tui/handlers*.py`, `tui/tui_keys.py` | `unit/ui/test_{tui,tui_handlers,tui_menu,log_sanitize}.py` | 125 |
+| **TUI 交互** | `tui/tui*.py`, `tui/handlers*.py`, `tui/tui_keys.py` | `unit/ui/test_{tui,tui_handlers,tui_menu,log_sanitize}.py` | 128 |
 | **CLI 命令行模式** | `cli/cli.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py` + `integration/test_cli_integration.py` | 48 |
 | **命令处理器** | `tui/handlers_cache.py`, `tui/handlers_config.py`, `tui/handlers_report.py` | `unit/handlers/test_{handlers_cache,handlers_config,handlers_report}.py` | 34 |
-| **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组 28 文件) | 250 |
+| **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组 29 文件) | 277 |
 
 ### 场景测试分组（scenario）
 
 | 标记 | 覆盖场景 | 覆盖项数 | 参考测试类 |
 |:-------|:---------|:--------:|:-----------|
-| `scenario`（父标记） | 基础业务链路（S0a-S0d、S1-S34，其中 S34 基准指数对比由单元测试覆盖）+ 日期时间（T1-T21）+ LLM 场景/韧性场景子集 | **204** | 见下 |
+| `scenario`（父标记） | 基础业务链路（S0a-S0d、S1-S34，其中 S34 基准指数对比由单元测试覆盖）+ 日期时间（T1-T21）+ LLM 场景/韧性场景子集 | **231** | 见下 |
 | ├─ `scenario_basic` | 基础业务链路（S1-S5 + S0a/S0b/S0d + S21-S33 + C-P1b + 穿透分析 + 管线冒烟/指标注入 + 因子暴露管线） | **145** | |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_scenario_basic_flows.py::TestScenarioStock` |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_scenario_basic_flows.py::TestScenarioFund` |
@@ -66,7 +66,7 @@
 | │  ├ `scenario_zero_cost` | S9: 零成本持仓 | 4 | `test_scenario_resilience_flows.py::TestScenarioZeroCost` |
 | │  └ `test_chain_resilience.py` | 数据链路韧性（仅含 `scenario_resilience` 标记，不含 `scenario`） | 5 | `test_chain_resilience.py` |
 | ├─ `scenario_llm` | LLM 场景组合 S11-S20（32 项含 `scenario` 标记 + 17 项仅 `scenario_llm`） | **49** | `scenario/llm/test_llm_*.py` |
-| └─ `scenario_datetime` | 日期/时间场景 T1-T21（跨月/跨年/调休/港股通假期/交易时段 TTL） | **19** | `test_datetime_scenarios.py` + `test_market_hours.py` |
+| └─ `scenario_datetime` | 日期/时间场景 T1-T21（跨月/跨年/调休/港股通假期/交易时段 TTL） | **41** | `test_datetime_scenarios.py` |
 | `scenario_perf`（独立标记） | 端到端性能基准 | **5** | `test_e2e_perf.py` |
 | `scenario_security`（独立标记） | 安全基线测试 | **10** | `test_security.py` |
 | `scenario_extreme`（独立标记） | 极限场景 S0c/S10（超多持仓/极端份额/高精度净值/零值组合），不包含在 `scenario` 父标记中 | **9** | `test_scenario_extreme.py` |
@@ -75,24 +75,24 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 10 子组合计 | **3569** |
+| `unit`（父标记） | 10 子组合计 | **3624** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 194 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 263 |
-| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退） | 647 |
+| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退） | 669 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 190 |
-| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、基金深度分析模块、数据降级/占位/可用性矩阵） | 1153 |
-| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 178 |
-| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/熔断/持仓追踪器/批处理调度/命令处理器） | 546 |
+| ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、基金深度分析模块、数据降级/占位/可用性矩阵） | 1162 |
+| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验） | 187 |
+| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/熔断/持仓追踪器/批处理调度/命令处理器） | 547 |
 | ├─ `unit_analysis` | 分析计算（流动性/再平衡/汇率/口径修正/回撤预警/无风险利率/因子暴露） | 244 |
 | ├─ `unit_cli` | CLI 命令行模式（参数解析/路由/退出码/日志） | 40 |
-| └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 125 |
+| └─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 128 |
 
 ### 跨类标记
 
 | 标记 | 覆盖范围 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `llm` | 全部 LLM 相关（unit/llm 469 + scenario/llm 24），**全部为 mock 测试，无需真实 API key** | **493** |
-| `smoke` | 6 个关键节点各 4 项，共 24 项 | **24** |
+| `llm` | 全部 LLM 相关（unit/llm 489 + scenario/llm 24，带 `llm` 跨类标记），**全部为 mock 测试，无需真实 API key** | **513** |
+| `smoke` | 关键节点冒烟覆盖，共 26 项 | **26** |
 | `edge` | 异常/边界场景（含熔断冷却探针） | **489** |
 | `data` | 数据正确性验证 | **69** |
 
