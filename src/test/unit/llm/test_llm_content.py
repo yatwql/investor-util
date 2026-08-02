@@ -372,6 +372,33 @@ class TestWriteLlmSheets(unittest.TestCase):
         self.assertIn("LLM API Key", str(ws_list[1].cell(row=2, column=1).value or ""))
 
 
+class TestLlmModuleFailureReset(unittest.TestCase):
+    """回归（P2 flaky）：LLM_MODULE_FAILURE 跨测试残留导致 write_llm_sheets 跳写。
+
+    问题场景（xdist 并发）：
+      write_llm_sheets() 读取模块级全局 LLM_MODULE_FAILURE 判断模块是否被禁用。
+      若测试 A 设置 LLM_MODULE_FAILURE[key]=FAIL_REASON_DISABLED 后未清理，
+      同一 worker 上后续 test_content_none 等测试的页签被跳过不写入，A2
+      占位符断言失败。修复方式为 conftest.py 新增 _auto_reset_llm_module_failure
+      autouse fixture，本用例验证该 fixture 能清除已污染的状态。
+    """
+
+    def test_autouse_fixture_clears_polluted_state(self):
+        """模拟上一测试残留的禁用状态，验证 autouse fixture 的清理逻辑。"""
+        from src.python.llm.prompts import FAIL_REASON_DISABLED, LLM_MODULE_FAILURE
+
+        LLM_MODULE_FAILURE["global_macro"] = FAIL_REASON_DISABLED
+        LLM_MODULE_FAILURE["health_check"] = FAIL_REASON_DISABLED
+        self.assertNotEqual(LLM_MODULE_FAILURE, {})
+
+        # 复现 autouse fixture 的执行时机（__wrapped__ 取 fixture 底层函数）
+        from src.test.conftest import _auto_reset_llm_module_failure
+
+        _auto_reset_llm_module_failure.__wrapped__()
+
+        self.assertEqual(LLM_MODULE_FAILURE, {})
+
+
 class TestWriteLlmSheetsDisabled(unittest.TestCase):
     """测试 write_llm_sheets 在模块禁用时的行为。"""
 
