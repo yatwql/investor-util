@@ -38,6 +38,11 @@
         .section-content { padding: 16px 20px; }
         .report-footer { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
 
+        /* ── 章节底部"回到顶部"链接 ──────────────── */
+        .back-to-top-link { text-align: center; padding: 10px 0 14px; }
+        .back-to-top-link a { color: #2E75B6; text-decoration: none; font-size: 12px; }
+        .back-to-top-link a:hover { text-decoration: underline; }
+
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
         th { background: #f0f4f8; padding: 8px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #ddd; white-space: nowrap; }
         td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #eee; }
@@ -126,6 +131,11 @@
 {% endif %}
 {% endmacro %}
 
+{# 章节底部"回到顶部"链接 — 跳转到报告头部（#report-top 锚点） #}
+{% macro render_back_to_top() %}
+<div class="back-to-top-link"><a href="#report-top" title="回到报告顶部">↑ 回到顶部</a></div>
+{% endmacro %}
+
         .source-tag { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; }
         .source-tag-holding { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #1a56db; }
         .source-tag-penetration { display: inline-block; background: #f0e8fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #7c3aed; }
@@ -151,6 +161,61 @@
 
         @media (max-width: 768px) {
             .section-nav a { font-size: 11px; padding: 8px 10px; }
+        }
+
+        /* ── 左侧目录 TOC（可展开/收起）────────────────── */
+        .toc-sidebar {
+            position: fixed; top: 0; left: 0; z-index: 100;
+            width: 220px; height: 100vh; overflow-y: auto;
+            background: #fff; border-right: 1px solid #e5e7eb;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+            transform: translateX(0); transition: transform 0.25s ease;
+            scrollbar-width: thin;
+        }
+        .toc-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 16px; background: #2E75B6; color: #fff;
+            position: sticky; top: 0; z-index: 2;
+        }
+        .toc-title { font-size: 14px; font-weight: 600; }
+        .toc-collapse-btn {
+            background: rgba(255,255,255,0.18); color: #fff; border: none;
+            border-radius: 4px; cursor: pointer; padding: 2px 8px;
+            font-size: 12px; line-height: 1.7;
+        }
+        .toc-collapse-btn:hover { background: rgba(255,255,255,0.3); }
+        .toc-list { padding: 8px 0; }
+        .toc-list a {
+            display: block; padding: 7px 16px; color: #333;
+            text-decoration: none; font-size: 12.5px; line-height: 1.5;
+            border-left: 3px solid transparent; transition: background 0.2s;
+        }
+        .toc-list a:hover { background: #e8f0fe; }
+        .toc-list a.active { background: #e8f0fe; border-left-color: #2E75B6; color: #1a56db; font-weight: 600; }
+        /* 收起状态：侧栏移出视口 + 浮动展开按钮 */
+        .toc-toggle-btn {
+            position: fixed; left: 12px; top: 12px; z-index: 101;
+            display: none; width: 38px; height: 38px; border-radius: 6px;
+            background: #2E75B6; color: #fff; border: none; cursor: pointer;
+            font-size: 18px; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+        }
+        .toc-toggle-btn:hover { background: #1f5a91; }
+        body.toc-collapsed .toc-sidebar { transform: translateX(-105%); }
+        body.toc-collapsed .toc-toggle-btn { display: block; }
+        /* 宽屏：展开时内容让出左侧栏 */
+        @media (min-width: 900px) {
+            .container { margin-left: 220px; }
+            body.toc-collapsed .container { margin-left: 0; }
+        }
+        /* 窄屏：隐藏左侧栏，保留横向 section-nav 导航 */
+        @media (max-width: 899px) {
+            .toc-sidebar, .toc-toggle-btn { display: none; }
+            .container { margin-left: 0 !important; }
+        }
+        /* 平滑锚点滚动（尊重减少动态偏好） */
+        @media (prefers-reduced-motion: no-preference) {
+            html { scroll-behavior: smooth; }
+            .section { scroll-margin-top: 12px; }
         }
 
         /* ── 移动端响应式 ────────────────────────── */
@@ -235,7 +300,10 @@
 
             /* 隐藏屏幕交互元素 */
             .back-to-top,
-            .section-nav { display: none !important; }
+            .back-to-top-link,
+            .section-nav,
+            .toc-sidebar,
+            .toc-toggle-btn { display: none !important; }
 
             /* 表头跨页重复 */
             thead { display: table-header-group; }
@@ -294,6 +362,13 @@
             color: var(--chart-text, #888);
             font-size: 13px;
             letter-spacing: 1px;
+        }
+        /* --- 图下说明（标注该图是什么图表；跟随 canvas 渲染分支，置于容器外避免溢出固定高度）--- */
+        .chart-caption {
+            text-align: center;
+            font-size: 12px;
+            color: var(--chart-text, #888);
+            margin-top: 4px;
         }
         /* --- 单图导出按钮（chart-export.js 注入；打印时隐藏）--- */
         .chart-box { position: relative; }
@@ -580,14 +655,38 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 <script defer src="chart-export.js"></script>
 <script defer src="chart-init.js"></script>
 {% endif %}
+{# 左侧目录 TOC（独立于图表开关，始终加载；R21 本地 bundle） #}
+<script defer src="toc.js"></script>
 </head>
 <body>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  左侧目录 TOC（可展开/收起，点击定位章节）               -->
+    <!--  桌面端固定左侧栏；窄屏隐藏，改用上方 section-nav 导航    -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <aside class="toc-sidebar" id="toc-sidebar" aria-label="章节目录">
+        <div class="toc-header">
+            <span class="toc-title">目录 / TOC</span>
+            <button type="button" class="toc-collapse-btn" aria-label="收起目录" title="收起目录">« 收起</button>
+        </div>
+        <nav aria-label="章节快速定位">
+            <div class="toc-list">
+                {% for sec in section_order %}
+                {% if section_visible(sec["key"]) %}
+                <a href="#sec-{{ sec['key'] }}">{{ section_numbers[sec["key"]] }}、{{ sec["name"] }}</a>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </nav>
+    </aside>
+    <button type="button" class="toc-toggle-btn" id="toc-toggle-btn" aria-label="展开目录" title="展开目录" aria-expanded="false">☰</button>
+
 <div class="container">
 
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  HEADER                                                -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="report-header">
+    <div class="report-header" id="report-top">
         <h1>个人投资分析报告</h1>
         <div class="subtitle">统计时间: {{ now }} | 所属交易日: {{ trading_day }}</div>
     </div>
@@ -729,6 +828,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
 
         {{ render_data_status(data_status_summary) }}
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -801,6 +901,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </tbody>
             </table>
         </div>
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -874,10 +975,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <div class="chart-empty-note">资产构成数据暂不可用</div>
                     {% endif %}
                 </div>
+                {% if chart_datasets and chart_datasets.get("category_doughnut", {}).get("labels") %}
+                <div class="chart-caption">资产构成分布</div>
+                {% endif %}
             </div>
             {% endif %}
         </div>
         {{ render_data_status(data_status_category) }}
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -899,6 +1004,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <div class="chart-empty-note">行业数据暂不可用</div>
                         {% endif %}
                     </div>
+                    {% if chart_datasets and chart_datasets.get("industry_bar", {}).get("labels") %}
+                    <div class="chart-caption">持仓行业分布</div>
+                    {% endif %}
                 </div>
                 <div style="flex: 1 1 100%; max-width: 720px; margin: 0 auto;">
                     <div class="chart-box" style="height: 320px;">
@@ -908,6 +1016,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <div class="chart-empty-note">穿透数据暂不可用</div>
                         {% endif %}
                     </div>
+                    {% if chart_datasets and chart_datasets.get("penetration_bar", {}).get("labels") %}
+                    <div class="chart-caption">TOP 10 持仓资产</div>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
@@ -963,6 +1074,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="empty-note">暂无穿透数据</div>
         {% endif %}
         {{ render_data_status(data_status_penetration) }}
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -1005,6 +1117,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div>* 业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
         </div>
         {{ render_data_status(data_status_perf) }}
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -1057,6 +1170,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="empty-section">📭 暂无基金经理变更数据（本次分析未检测到基金经理任职未满180天）</div>
             {% endif %}
         </div>
+        {{ render_back_to_top() }}
     </div>
     {% endif %}
 
@@ -1164,6 +1278,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="empty-section">📭 暂无重合度数据（需要至少 2 只基金持仓方可计算持仓重合度矩阵）</div>
             {% endif %}
         </div>
+        {{ render_back_to_top() }}
     </div>
     {% endif %}
 
@@ -1228,6 +1343,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="empty-section">📭 暂无持仓集中度数据（未检测到基金持仓或 API 返回为空）</div>
             {% endif %}
         </div>
+        {{ render_back_to_top() }}
     </div>
     {% endif %}
 
@@ -1280,6 +1396,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="empty-section">📭 暂无基金风格分析数据（未检测到基金持仓或 API 返回为空）</div>
             {% endif %}
         </div>
+        {{ render_back_to_top() }}
     </div>
     {% endif %}
 
@@ -1368,6 +1485,154 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             {% endif %}
         </div>
+        {{ render_back_to_top() }}
+    </div>
+    {% endif %}
+
+    {% if section_visible("correlation_analysis") %}
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  MODULE 11: 持仓相关性矩阵                              -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    {% set _corr_codes = correlation_data.get("codes", []) %}
+    {% set _corr_names = correlation_data.get("names", {}) %}
+    {% set _corr_matrix = correlation_data.get("matrix", []) %}
+    {% set _corr_pvals = correlation_data.get("p_values", []) %}
+    {% set _corr_pairs = correlation_data.get("pairs", []) %}
+    <div class="section" id="sec-correlation_analysis" style="order: {{ section_numbers['correlation_analysis'] }};">
+        <div class="section-title">{{ section_numbers['correlation_analysis'] }}、持仓相关性矩阵</div>
+        <div class="section-content">
+            {% if correlation_data and correlation_data.get("available") and _corr_codes %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                📊 <strong>{{ _corr_codes | length }}</strong> 个品种，最近 <strong>{{ correlation_data["window"] }}</strong> 个交易日重叠样本（有效 {{ correlation_data["sample_count"] }} 期）
+            </div>
+            {% if _corr_pairs %}
+            {% set _corr_top = _corr_pairs[0] %}
+            <div class="notice-banner" style="margin-bottom: 12px;">
+                🔔 相关度最高：<strong>{{ _corr_top.name_a }}({{ _corr_top.code_a }})</strong> × <strong>{{ _corr_top.name_b }}({{ _corr_top.code_b }})</strong>
+                — r={{ "%.2f"|format(_corr_top.pearson) }}，p={{ "%.4f"|format(_corr_top.p_value) }}{% if _corr_top.significant %}（显著）{% else %}（不显著）{% endif %}
+            </div>
+            {% endif %}
+
+            <!-- 矩阵表（下三角；红=正相关 / 蓝=负相关 / 白=不显著 / 灰=N/A） -->
+            <div style="overflow-x: auto;">
+            <table class="heatmap-matrix">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        {% for c in _corr_codes %}
+                        <th style="font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _corr_names.get(c, c) }}">{{ _corr_names.get(c, c) }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(_corr_codes | length) %}
+                    <tr>
+                        <td style="font-weight: bold; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}">{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}</td>
+                        <td style="font-size: 11px; color: #888;">({{ _corr_codes[i] }})</td>
+                        {% for j in range(_corr_codes | length) %}
+                        {% if j == i %}
+                        <td style="background-color: #f5f5f5; color: #bbb;" title="自相关">1.00</td>
+                        {% elif j < i %}
+                        {% set _corr_r = _corr_matrix[i][j] %}
+                        {% if _corr_r is none %}
+                        <td style="background-color: #eeeeee; color: #aaa;" title="重叠样本不足，未计算">N/A</td>
+                        {% else %}
+                        {% set _corr_p = _corr_pvals[i][j] %}
+                        {% if _corr_p is not none and _corr_p >= 0.05 %}
+                        <td style="background-color: #ffffff; color: #999;" title="p={{ "%.4f"|format(_corr_p) }}，不显著">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r >= 0.5 %}
+                        <td style="background-color: #C00000; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强正</td>
+                        {% elif _corr_r >= 0.3 %}
+                        <td style="background-color: #FF7F7F; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r > 0 %}
+                        <td style="background-color: #FFE0E0; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r <= -0.5 %}
+                        <td style="background-color: #1F4E79; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强负</td>
+                        {% elif _corr_r <= -0.3 %}
+                        <td style="background-color: #8DB4E2; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% else %}
+                        <td style="background-color: #E0ECF7; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% endif %}
+                        {% endif %}
+                        {% else %}
+                        <td></td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            <!-- 图例 -->
+            <div class="penetration-notes" style="margin-top: 8px;">
+                <div>
+                    图例：<span style="display:inline-block; width:16px; height:12px; background:#C00000; margin-right:3px; vertical-align:middle;"></span> 强正相关(r≥0.5)
+                    <span style="display:inline-block; width:16px; height:12px; background:#FF7F7F; margin:0 3px 0 10px; vertical-align:middle;"></span> 正相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#FFE0E0; margin:0 3px 0 10px; vertical-align:middle;"></span> 弱正相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#1F4E79; margin:0 3px 0 10px; vertical-align:middle;"></span> 强负相关(r≤-0.5)
+                    <span style="display:inline-block; width:16px; height:12px; background:#8DB4E2; margin:0 3px 0 10px; vertical-align:middle;"></span> 负相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#E0ECF7; margin:0 3px 0 10px; vertical-align:middle;"></span> 弱负相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#ffffff; border:1px solid #ccc; margin:0 3px 0 10px; vertical-align:middle;"></span> 不显著(p≥0.05)
+                    <span style="display:inline-block; width:16px; height:12px; background:#eeeeee; margin:0 3px 0 10px; vertical-align:middle;"></span> 数据不足
+                </div>
+            </div>
+
+            <!-- 配对明细 -->
+            {% if _corr_pairs %}
+            <br>
+            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">配对明细（按 |r| 降序）</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>品种A</th>
+                        <th>品种B</th>
+                        <th>相关系数 r</th>
+                        <th>p 值</th>
+                        <th>样本数</th>
+                        <th>显著性</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in _corr_pairs %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="text-left">{{ p.name_a }}({{ p.code_a }})</td>
+                        <td class="text-left">{{ p.name_b }}({{ p.code_b }})</td>
+                        <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}#2E75B6{% endif %}; font-weight: 600;">
+                            {{ "%.2f"|format(p.pearson) }}
+                        </td>
+                        <td>{{ "%.4f"|format(p.p_value) }}</td>
+                        <td>{{ p.samples }}</td>
+                        <td>{% if p.significant %}✅ 显著{% else %}— 不显著{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if correlation_data.get("insufficient_codes") %}
+            <div class="penetration-notes">
+                <div style="color:#856404;">* 下列品种重叠样本不足 {{ correlation_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ correlation_data["insufficient_codes"] | join("、") }}</div>
+            </div>
+            {% endif %}
+            <div class="penetration-notes">
+                <div>* 相关系数 r = 两品种日收益率的 Pearson 相关系数（窗口内重叠样本）；显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
+                <div>* 下三角矩阵：数值为行品种 × 列品种 的相关性；r&gt;0 同向波动（伪分散风险），r&lt;0 反向对冲</div>
+            </div>
+            {% elif correlation_data %}
+            {% if correlation_data.get("status") == "source_failed" %}
+            <div class="empty-section">📭 持仓相关性数据源暂不可用，请稍后重试</div>
+            {% else %}
+            <div class="empty-section">📭 持仓相关性数据不足（有效样本 {{ correlation_data.get("sample_count", 0) }} 期，低于阈值 {{ correlation_data.get("window", 60) }}），暂不计算</div>
+            {% endif %}
+            {% endif %}
+        </div>
+        {{ render_back_to_top() }}
     </div>
     {% endif %}
 
@@ -1477,6 +1742,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="empty-section">📭 暂无关联新闻</div>
         {% endif %}
         {% endif %}
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -1512,6 +1778,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -1561,6 +1828,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -1589,6 +1857,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+        {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -1617,6 +1886,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+        {{ render_back_to_top() }}
     </div>
 
 {% endif %}
@@ -1640,6 +1910,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="chart-box" style="height:350px;">
                 <canvas id="chart_portfolio_line" width="800" height="350" style="width:100%;height:100%;" aria-label="净值趋势图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
             </div>
+            <div class="chart-caption">组合净值走势</div>
             {% else %}
             <canvas id="portfolioChart" width="800" height="350" style="width:100%;height:350px;"></canvas>
             {% endif %}
@@ -1679,6 +1950,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div class="chart-empty-note">量化指标数据不足</div>
                 {% endif %}
             </div>
+            {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") %}
+            <div class="chart-caption">组合量化指标画像</div>
+            {% endif %}
             {# 降级 note 置于固定高度容器外，避免溢出 320px 边界 #}
             {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") and chart_datasets["radar"]["datasets"][0].get("note") %}
             <div style="text-align:center;font-size:12px;color:#888;margin-top:4px;">{{ chart_datasets["radar"]["datasets"][0]["note"] }}</div>
@@ -1764,6 +2038,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         {% endif %}
         {{ render_data_status(data_status_history) }}
+        {{ render_back_to_top() }}
     </div>
     {% endif %}
 
@@ -1773,12 +2048,13 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!-- ═══════════════════════════════════════════════════════════ -->
     <div class="section" id="sec-drawdown_analysis" style="order: {{ section_numbers['drawdown_analysis'] }};">
         <div class="section-title">{{ section_numbers['drawdown_analysis'] }}、历史回撤分析</div>
-        {% if history_data and history_data.status != "unavailable" and history_data.bars %}
+        {% if history_data and history_data.status != "unavailable" and history_data.bars and history_data.get("drawdown_available") %}
         <div class="section-content">
             {% if enable_interactive_charts %}
             <div class="chart-box" style="height:250px;">
                 <canvas id="chart_drawdown" width="800" height="250" style="width:100%;height:100%;" aria-label="回撤分析图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
             </div>
+            <div class="chart-caption">历史回撤走势</div>
             {% else %}
             <canvas id="drawdownChart" width="800" height="250" style="width:100%;height:250px;"></canvas>
             {% endif %}
@@ -1797,7 +2073,43 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         {{ history_data.drawdown_start or "--" }} → {{ history_data.drawdown_end or "--" }}
                     </div>
                 </div>
+                <div class="summary-card">
+                    <h3>当前回撤状态</h3>
+                    {% set _dd_last = (history_data.drawdown_events[-1] if history_data.drawdown_events else none) %}
+                    <div class="value" style="font-size:20px; {% if _dd_last and not _dd_last.recovered %}color:#CC0000;{% else %}color:#2e7d32;{% endif %}">
+                        {% if _dd_last and not _dd_last.recovered %}回撤中{% elif history_data.drawdown_events %}已恢复{% else %}无显著回撤{% endif %}
+                    </div>
+                    <div class="meta">
+                        {% if _dd_last and _dd_last.recovery_days %}最近一次恢复耗时 {{ _dd_last.recovery_days }} 天{% elif history_data.drawdown_events %}共 {{ history_data.drawdown_events | length }} 次显著回撤{% else %}窗口内未检测到 {{ history_data.get("min_depth_pct", 5) }}% 以上回撤{% endif %}
+                    </div>
+                </div>
             </div>
+
+            <!-- 回撤明细表（独立回撤事件 + 恢复耗时） -->
+            {% if history_data.drawdown_events %}
+            <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">回撤明细（{{ history_data.drawdown_events | length }} 次显著回撤）</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th><th>起峰日</th><th>最深日</th><th>恢复日</th><th>最大回撤</th><th>持续天数</th><th>恢复耗时</th><th>是否已恢复</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in history_data.drawdown_events %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ e.peak_date }}</td>
+                        <td>{{ e.trough_date }}</td>
+                        <td>{{ e.recovery_date or "—" }}</td>
+                        <td style="color:#CC0000; font-weight:600;">{{ "%.2f"|format(e.drawdown_pct) }}%</td>
+                        <td>{{ e.duration_days }} 天</td>
+                        <td>{% if e.recovery_days is not none %}{{ e.recovery_days }} 天{% else %}—{% endif %}</td>
+                        <td>{% if e.recovered %}✅ 已恢复{% else %}⏳ 未恢复{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
         </div>
         {% if not enable_interactive_charts %}
         <script>
@@ -1867,6 +2179,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endfor %}
             {% endif %}
         </div>
+        {% elif history_data and history_data.status != "unavailable" and history_data.bars %}
+        <div class="section-content">
+            <div class="empty-section">📭 历史回撤数据不足（有效交易日不足 {{ drawdown_min_span }} 天），暂不计算回撤事件</div>
+        </div>
         {% else %}
         <div class="section-content">
             <div class="empty-note placeholder-note">
@@ -1876,6 +2192,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+        {{ render_back_to_top() }}
     </div>
     {% endif %}
 
@@ -1949,6 +2266,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
             {% endif %}
         </div>
+        {{ render_back_to_top() }}
     </div>
     {% endif %}
 
@@ -2069,6 +2387,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
             {% endif %}
         </div>
+        {{ render_back_to_top() }}
     </div>
     <!--  FOOTER                                                -->
     <!-- ═══════════════════════════════════════════════════════ -->

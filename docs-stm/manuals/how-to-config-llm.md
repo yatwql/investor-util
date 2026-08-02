@@ -232,7 +232,7 @@ LLM Provider 状态
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
-- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。三个辩论开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估
+- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。三个辩论开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 
@@ -297,7 +297,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
-- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
+- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，null=默认 8192）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 48000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
 
 ### 模块级配置
 
@@ -347,6 +347,15 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 3. 偏差 ≤ `tolerance`（或模块对应的 override 值）→ 标记为绿色 ✅ 通过
 4. 偏差 > 容差 → 标记为红色 ❌ 疑似幻觉，并用真实值自动替换错误数值
 5. 批量修正后，报告末尾追加一段"事实校验"摘要（显示修正前后的对比）
+
+**内置语境感知（自动跳过，无需配置）**：
+- **回撤语境**：「历史最大回撤 19.0%」等回撤数值与实际最大回撤比较，不按收益率校验
+- **环比/同比变化率语境**：「总市值变化-96.02%」「较上期+3.21%」等相对上期/上年的变化比例，与收益率（相对成本）维度不同，**自动跳过不校验**——避免被误当成收益率改写为某个品种的收益率（如 96.02% 被修正为 27.6%）
+- **占比/仓位/归因/假设/调仓目标等语境**：仓位占比、收益归因贡献度、假设情景（"如果下跌 20%"）、调仓目标（"降至 30%"）、币种敞口等数值同样自动跳过，不与收益率直接比较
+
+**品种存在性校验（穿透 TOP10 代码豁免）**：
+- 除数值一致性外，事实校验器还检查 LLM 提到的 6 位品种代码是否真实存在（持仓代码 + 常见指数代码如沪深300 `000300` 视为有效）
+- **穿透 TOP10 代码豁免**：智囊团深度复盘 / 持仓体检报告 / 穿透深度分析三模块的提示词均含【穿透 TOP10】数据（如宁德时代 `300750`、阳光电源 `300274`），这些股票**非直接持仓但属组合穿透范围**——LLM 引用它们不算幻觉，不触发"品种代码不在当前持仓中"告警。全球政经局势提示词不含穿透数据，保持严格校验
 
 **推荐配置**：
 - **`expert_review`（智囊团深度复盘）= 2.0**：该模块综合判断较多，LLM 可能对收益率进行"约数"表述（如"约 15%"而非精确的 14.7%），给予更宽松容差可减少误报
@@ -459,6 +468,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "debate": {
     // 正反辩论 — 三段式(白脸→黑脸→综合)
     "procon": {
+      // 每阶段 max_tokens 覆盖（null=默认 8192；经 max_tokens_override 优先于 max_tokens_expert_review）
       "per_call_max_tokens": null,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
@@ -477,7 +487,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
-    "max_total_tokens_per_report": 16000,
+    "max_total_tokens_per_report": 48000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
   },

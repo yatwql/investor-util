@@ -578,7 +578,7 @@ _DEBATE_CONFIG_DEFAULTS: dict[str, Any] = {
     "qa_concentration": {
         "threshold": 0.20,
     },
-    "max_total_tokens_per_report": 16000,
+    "max_total_tokens_per_report": 48000,
     "per_call_timeout_override": 90,
 }
 

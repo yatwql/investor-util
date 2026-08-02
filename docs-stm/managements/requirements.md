@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 需求文档
 
-> 文档版本：0.9.6-dev
+> 文档版本：0.9.7-dev
 
 ---
 
@@ -225,6 +225,7 @@
 | R-OUT-07 | Excel 页签编号和 HTML 章节序号支持通过配置自定义 |
 | R-OUT-08 | LLM API 用量页签强制固定在最后一位，不受排序配置影响 |
 | R-OUT-09 | 各模块的条件渲染（是否显示）由两层控制：board 层配置开关 + data 层数据可用性 |
+| R-OUT-10 | HTML 报告左侧提供可折叠目录（TOC）：桌面端固定左侧栏列出全部可见章节，点击平滑滚动定位到对应章节；TOC 可一键收起/展开（偏好持久化到 localStorage），滚动时高亮当前章节；窄屏（< 900px）自动隐藏、保留顶部横向 section-nav 导航；打印时隐藏 |
 
 ### 6.3 报告模块清单
 
@@ -647,7 +648,7 @@
 | R-LLM-DB-PROCON-03 | 黑脸（con）阶段：基于持仓数据生成反面论据（风险提示、看空理由、潜在损失风险），使用审慎质疑型 system prompt |
 | R-LLM-DB-PROCON-04 | 综合（synthesis）阶段：整合白脸和黑脸的论据，生成平衡的综合判断和调仓建议，使用中性综合型 system prompt |
 | R-LLM-DB-PROCON-05 | 三段调用依次执行（pro→con→synthesis），每段结果独立缓存，后续直接使用缓存结果跳过 API 调用 |
-| R-LLM-DB-PROCON-06 | Token 预算守卫：基于字符数计量保护 token 消耗。pro+con 累计字符超过 `int(max_total_tokens_per_report × 0.65)` 时触发 1× 超限→跳过 synthesis 阶段（返回 pro+con 拼接）；超过 2× 超限时跳过全部 debate（回退标准模式） |
+| R-LLM-DB-PROCON-06 | Token 预算守卫：基于字符数计量保护 token 消耗。实际中文+Markdown 输出约 1 字符 ≈ 1 token，pro+con 累计字符超过 `int(max_total_tokens_per_report)`（默认 48000）时触发 1× 超限→跳过 synthesis 阶段（返回 pro+con 拼接）；超过 2× 超限时跳过全部 debate（回退标准模式）。配合 `per_call_max_tokens` 单段输出上限（默认 8192，经 `max_tokens_override` 生效）双闸保护，预算覆盖三段式真实成本避免 synthesis 频繁被砍 |
 | R-LLM-DB-PROCON-07 | Fallback 策略：pro 或 con 阶段失败→回退标准模式输出；synthesis 阶段失败→返回 pro+con 拼接结果，日志记录 WARNING |
 | R-LLM-DB-PROCON-08 | 虚构代码过滤：`_filter_hallucinated_codes()` 基于正则的行级过滤，使用 `(?:^\|[^A-Za-z0-9])([A-Za-z0-9]{4,6})(?=[^A-Za-z0-9]\|$)` 适配中文环境（替代英文 `\b`），消除 LLM 产生的虚构证券代码 |
 | R-LLM-DB-PROCON-09 | HTML 渲染：三段内容以棒棒糖式展开设计，pro 绿色背景、con 红色背景、synthesis 金色背景，视觉区分辩手身份 |
@@ -674,7 +675,7 @@
 | R-LLM-DB-QA-CONCENTRATION-03 | 集中度问答块输出内容：集中度风险的量化评估、与分散化基准的定量对比、针对性的调仓建议 |
 | R-LLM-DB-QA-CONCENTRATION-04 | 集中度判定阈值通过 `llm_settings.json` 的 `debate.qa_concentration.threshold` 配置，类型 float，范围 (0, 1)，默认 0.20 |
 | R-LLM-DB-QA-CONCENTRATION-05 | 集中度问答块嵌入智囊团深度复盘输出中，位于辩论段落之后、调仓建议之前 |
-| R-LLM-DB-QA-CONCENTRATION-06 | 集中度问答不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_qa_concentration_block()` 构建，嵌在 expert_review 的 user prompt 中） |
+| R-LLM-DB-QA-CONCENTRATION-06 | 集中度问答不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_qa_concentration_block()` 构建：标准模式嵌在 expert_review 的 user prompt 中，辩论模式嵌在综合权衡 synthesis 的 user prompt 中） |
 
 ---
 
@@ -881,12 +882,12 @@
 
 | 键 | 类型 | 默认值 | 说明 |
 |:---|:----:|:------:|:-----|
-| `debate.procon.per_call_max_tokens` | int/null | null | 正反辩论每阶段 max_tokens 覆盖（null=使用模块级 `max_tokens_expert_review`） |
+| `debate.procon.per_call_max_tokens` | int/null | null | 正反辩论每阶段 max_tokens 覆盖（null=默认 8192），经 `max_tokens_override` 优先于模块级 `max_tokens_expert_review` |
 | `debate.procon.synthesis_model` | str/null | null | 正反辩论综合阶段模型覆盖（null=使用 pro/con 相同的模型） |
 | `debate.procon.synthesis_temperature` | float | 0.5 | 正反辩论综合阶段 temperature（低于常规以保持客观，范围 [0.0, 2.0]） |
 | `debate.conditional.scenarios` | list[dict] | 上涨/下跌/震荡 三组 | 条件推理预设情景列表，每条含 `name`（情景名）/ `change`（涨跌幅）/ `desc`（描述）三个必填字段 |
 | `debate.qa_concentration.threshold` | float | 0.20 | 集中度问答触发阈值（单品种占比 ≥ 此值时触发），范围 (0, 1) |
-| `debate.max_total_tokens_per_report` | int | 16000 | 单次报告辩论模式总 token 预算上限（超出后跳过 debate 回退标准模式） |
+| `debate.max_total_tokens_per_report` | int | 48000 | 单次报告辩论模式总 token 预算上限（超出后跳过 debate 回退标准模式） |
 | `debate.per_call_timeout_override` | int | 90 | 辩论模式单次 API 调用超时覆盖秒数 |
 
 ### 11.4 llm_providers.json（Provider 多链配置）

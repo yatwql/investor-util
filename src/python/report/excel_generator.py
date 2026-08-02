@@ -152,6 +152,34 @@ def _write_drawdown_analysis_sheet(ws, history_data: dict) -> None:
             flist.append(bm_fmt if bm_key else none_fmt)
         row = write_data_row(ws, row, values, formats=flist)
 
+    # ── 回撤明细表（独立回撤事件 + 恢复耗时） ──
+    dd_events = pd.get("drawdown_events") or []
+    dd_ncols = 8
+    ncols_eff = max(ncols, dd_ncols)
+    row += 1
+    row = write_title_row(ws, row, "回撤明细", ncols_eff)
+    dd_headers = ["序号", "起峰日", "最深日", "恢复日", "最大回撤(%)", "持续天数", "恢复耗时(天)", "当前状态"]
+    dd_headers += [""] * (ncols_eff - dd_ncols)
+    row = write_header_row(ws, row, dd_headers)
+    if not dd_events:
+        row = write_data_row(ws, row, ["未检测到显著回撤事件（或历史数据不足）"] + [None] * (ncols_eff - 1))
+    else:
+        for idx, e in enumerate(dd_events, start=1):
+            cells: list[Any] = [
+                idx,
+                e.get("peak_date", ""),
+                e.get("trough_date", ""),
+                e.get("recovery_date") or "未恢复",
+                round(e.get("drawdown_pct", 0.0) / 100, 4),
+                e.get("duration_days", 0),
+                e.get("recovery_days") if e.get("recovery_days") is not None else "--",
+                "已恢复" if e.get("recovered") else "未恢复",
+            ]
+            cells += [None] * (ncols_eff - dd_ncols)
+            dd_fmts: list[str | None] = [None] * 4 + [pct_fmt] + [None] * 3
+            dd_fmts += [None] * (ncols_eff - dd_ncols)
+            row = write_data_row(ws, row, cells, formats=dd_fmts)
+
     freeze_header(ws, row=2)
     auto_width(ws, min_width=10, max_width=28)
 
@@ -266,6 +294,7 @@ def generate_excel_report(
         modules,
         prog,
         factor_exposure=(pipeline_data or {}).get("factor_exposure"),
+        correlation_data=(pipeline_data or {}).get("correlation_data"),
     )
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
     from src.python.report._debate_utils import detect_debate_mode

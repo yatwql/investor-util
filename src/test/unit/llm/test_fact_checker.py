@@ -208,6 +208,41 @@ class TestCheckNumericalConsistency:
         assert passed == 0
         assert corrections == []
 
+    def test_change_rate_context_skipped(self, sample_holdings):
+        """环比/同比变化率语境数值不误判为收益率。
+
+        持仓体检的"环比对比：总市值变化-96.02%"是相对上期的变化率，
+        与收益率（相对成本）维度不同。句子含"下跌"等收益关键词时，
+        变化率必须跳过，否则会被误修正为最近个股/组合收益率。
+        """
+        text = "与上月环比对比，组合总市值大幅下跌96.02%，总盈亏变化+3,263，主要受到重仓个股回调影响。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
+        assert checked == 1  # 96.02% 被识别为变化率语境
+        assert passed == 1  # 跳过 = 通过
+        assert issues == []
+        assert corrections == []  # 不被误修正
+
+    def test_change_rate_uses_nearby_not_whole_sentence(self, sample_holdings):
+        """变化率语境用数值邻近关键词判断，同句首部的真实收益率仍被校验。
+
+        同句"环比总市值变化-96.02%，其中贵州茅台收益率为5.0%"：
+        96.02% 跳过（邻近"变化"），5.0% 仍与茅台 33.3% 比较 → 被修正。
+        """
+        text = "环比上月总市值变化-96.02%，其中贵州茅台收益率为5.0%，表现不佳。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
+        assert checked == 2  # 96.02% + 5.0%
+        assert passed == 1  # 只有变化率通过
+        assert len(corrections) == 1  # 5.0% 被修正
+        assert corrections[0][0] == "5.0"
+        assert corrections[0][1] == "30.3"  # 最接近参考值（组合总收益率）
+
+    def test_change_rate_with_volume_keywords(self, sample_holdings):
+        """变化率语境覆盖"同比/较上期/总市值变化"等关键词组合。"""
+        text = "同比总市值变化-96.02%，较上期总盈亏变化+3,263。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, sample_holdings)
+        assert issues == []
+        assert corrections == []
+
     def test_tolerance_override_looser(self, sample_holdings):
         """宽松容差下偏差较小的数值通过。"""
         text = "组合收益率为 31.5%。"  # 实际≈30.28%，偏差1.22pp
@@ -382,6 +417,30 @@ class TestCheckSymbolExistence:
         assert len(issues) == 1
         assert "600276" in issues[0]
         assert suggestions == []
+
+    def test_penetration_codes_as_extra_valid(self, sample_holdings):
+        """穿透 TOP10 代码作为 extra_valid_codes → 不报"不在当前持仓中"。
+
+        阳光电源（300274）非直接持仓但属组合穿透范围，智囊团/持仓体检引用
+        其代码时传入 extra_valid_codes 视为有效。
+        """
+        text = "宁德时代（300750）与阳光电源（300274）是组合穿透中的新能源核心持仓。"
+        issues, checked, passed, suggestions = check_symbol_existence(
+            text,
+            sample_holdings,
+            extra_valid_codes={"300274"},
+        )
+        assert checked == 2
+        assert passed == 2  # 300750 持仓 + 300274 穿透有效
+        assert issues == []
+        assert suggestions == []
+
+    def test_penetration_code_alerts_without_extra(self, sample_holdings):
+        """未传 extra_valid_codes 时穿透代码仍告警（参数是唯一豁免来源）。"""
+        text = "阳光电源（300274）作为组合穿透核心持仓值得关注。"
+        issues, checked, passed, suggestions = check_symbol_existence(text, sample_holdings)
+        assert len(issues) == 1
+        assert "300274" in issues[0]
 
     def test_holdings_none(self):
         """holdings_details 为 None → 直接返回。"""
@@ -696,6 +755,23 @@ class TestRunFactCheck:
         assert "已修正明细" in summ
         assert "5.0%→30.3%" in summ
         assert "组合累计收益率为" in summ
+
+    def test_run_fact_check_change_rate_not_corrected(self, sample_holdings):
+        """run_fact_check 整链路：环比变化率不被自动修正。
+
+        持仓体检"环比对比中总市值变化-96.02%"是相对上期的变化率，与收益率
+        维度不同，直接比较会误修正。环比变化率跳过数值校验，内容不被篡改，
+        摘要无修正明细。
+        """
+        html = (
+            "<p>组合整体稳健。与上月环比对比，组合总市值大幅下跌96.02%，"
+            "总盈亏变化+3,263，主要受到重仓个股回调影响。</p>"
+        )
+        corr, summ = run_fact_check(html, sample_holdings, "持仓体检报告")
+        assert corr == html  # 内容不被篡改（96.02% 保留）
+        assert "96.02%" in corr
+        assert "已修正明细" not in summ  # 无修正明细
+        assert "事实校验通过" in summ
 
     def test_corrections_logged(self, sample_holdings, caplog):
         """自动修正明细写入日志（含模块标签 + wrong→correct 明细）。"""

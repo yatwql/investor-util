@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：0.9.6-dev
+> 文档版本：0.9.7-dev
 
 ## 目录
 
@@ -1220,11 +1220,11 @@ for sec in section_order:
 | data_flag | 判定依据 | 对应 section.type | 说明 |
 |:----------|:---------|:-----------------|:------|
 | `None` | 始终可见 | `always` / `history` | 不依赖数据状态 |
-| `manager_data` | `manager_analysis is not None` | `b_series` | B2 基金经理 |
-| `overlap_data` | `overlap_matrix is not None` | `b_series` | B3 持仓重合度 |
-| `concentration_data` | `concentration_analysis is not None` | `b_series` | B4 持仓集中度 |
-| `style_data` | `style_analysis is not None` | `b_series` | B5 基金风格 |
-| `factor_exposure_data` | `factor_exposure is not None` | `b_series` | B6 因子暴露 |
+| `manager_data` | `manager_analysis is not None` | `b_series` | 基金经理变更监控 |
+| `overlap_data` | `overlap_matrix is not None` | `b_series` | 持仓重合度矩阵 |
+| `concentration_data` | `concentration_analysis is not None` | `b_series` | 持仓集中度监控 |
+| `style_data` | `style_analysis is not None` | `b_series` | 基金风格分析 |
+| `factor_exposure_data` | `factor_exposure is not None` | `b_series` | 因子暴露分析 |
 | `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
 | `llm_data_available` | `llm_enabled_flag`（LLM 生成成功） | `llm` | LLM 全部 5 模块 |
 
@@ -1488,17 +1488,17 @@ prune()：两阶段自动清理
                          │
               ┌──────────┴──────────┐
               │                     │
-         B2 基金经理变更        B3 持仓重合度
-         快照比对检测          Jaccard+重叠率
+        基金经理变更监控        持仓重合度矩阵
+        快照比对检测          Jaccard+重叠率
               │                     │
-         B4 持仓集中度          B5 基金风格分析
-         TOP N 占比+环比      市值/PE 加权判定
+        持仓集中度监控          基金风格分析
+        TOP N 占比+环比      市值/PE 加权判定
               │
-         B6 因子暴露分析
-         OLS 回归风格画像
+          因子暴露分析
+        OLS 回归风格画像
 ```
 
-#### B2 基金经理变更监控
+#### 基金经理变更监控
 
 基于快照比对检测基金经理变更：
 
@@ -1520,7 +1520,7 @@ fund_manager_snapshot 快照（精确键名，每日更新）
 - 每个基金独立判断，互不干扰
 - 快照使用精确键名（`fund_manager_snapshot`），无指纹后缀，每日 TTL 过期自动刷新
 
-#### B3 持仓重合度矩阵
+#### 持仓重合度矩阵
 
 双指标持仓重合度计算（`fund_overlap.py`）：
 
@@ -1540,7 +1540,7 @@ Excel 热力图着色：
 
 触发条件：持仓中基金数量 ≥ 2 只。
 
-#### B4 持仓集中度监控
+#### 持仓集中度监控
 
 基于持仓 TOP N 占比 + 环比变化（`fund_concentration.py`）：
 
@@ -1560,7 +1560,7 @@ Excel 热力图着色：
 - 环比变化箭头：↑/↓ 标识方向
 - 快照使用精确键名（`fund_concentration_snapshot`），月级 TTL
 
-#### B5 基金风格分析
+#### 基金风格分析
 
 基于持仓个股市值 + PE 数据的加权风格判定（`fund_style_classify.py` / `fund_style_report.py`）：
 
@@ -1585,11 +1585,11 @@ Excel 热力图着色：
 - Tencent 二级降级基于 registry 熔断器（provider="tencent_style"），避免网络不可达时逐只等待超时
 - 独立快照 `fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
-#### B6 因子暴露分析
+#### 因子暴露分析
 
 基于组合整体时间序列回归估算组合在价值/成长/质量因子上的暴露（β），输出"组合风格画像"（`analysis/factor_exposure.py` / `report/orchestrator.py::compute_factor_exposure_data`）。
 
-> **与 B5 基金风格分析的差异化**：B5 是**每只基金的截面分类**（六宫格：市值×风格，基于 PE/市值阈值），回答"这只基金长什么样"；B6 是**组合整体的时间序列回归**（因子收益回归组合收益得 β），回答"组合收益由什么风格因子驱动"。方法论与粒度均不同，报告 UI 文案需注明差异（"分类" vs "回归估算"），避免混淆"风格归属柱状图"与六宫格。
+> **与基金风格分析的差异化**：基金风格分析是**每只基金的截面分类**（六宫格：市值×风格，基于 PE/市值阈值），回答"这只基金长什么样"；因子暴露分析是**组合整体的时间序列回归**（因子收益回归组合收益得 β），回答"组合收益由什么风格因子驱动"。方法论与粒度均不同，报告 UI 文案需注明差异（"分类" vs "回归估算"），避免混淆"风格归属柱状图"与六宫格。
 
 ```
 R_p = β₁R_value + β₂R_growth + β₃R_quality + α + ε
@@ -2001,7 +2001,7 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 | 指纹缓存 | `fingerprint.py` — 依赖数据指纹过滤（排除行情波动字段） | 仅品种/份额/成本变化时重新调用 |
 | 乐观缓存预检 | 从 Provider 链中取链首 Provider 优先检查缓存，命中即返回 | 减少链遍历开销 |
 | 辩论路由 | `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`，Feature Flag 控制启停（默认关闭） | 辩论模式与标准模式互斥，辩论优先 |
-| Token 预算守卫 | 每阶段输出字符数 > `int(max_tokens × 0.65)` 时触发保护：1× 超限→跳过 synthesis 阶段并拼接 pro+con；2× 超限→回退标准模式 | 防止辩论模式过度消耗 token |
+| Token 预算守卫 | pro+con 累计输出字符数 > `int(max_total_tokens_per_report)`（1 字符 ≈ 1 token，默认预算 48000）时触发保护：1× 超限→跳过 synthesis 阶段并拼接 pro+con；2× 超限→回退标准模式。配合 `per_call_max_tokens`（默认 8192，经 `max_tokens_override` 生效）单段上限双闸保护 | 防止辩论模式过度消耗 token |
 | 虚构代码过滤 | `_filter_hallucinated_codes()` 正则句段级过滤，经 `skeleton.py` 的 `raw_filter_fn` 钩子在 markdown_to_html 之前作用于 LLM 原始 Markdown；按"行→句末标点"两级切分精确删除，`TOP\d` 排名表述 + 英文白名单豁免误报 | 消除 LLM 产生的虚构证券代码，且不因 HTML 单行拼接误删整段 |
 
 各项机制的详细实现见 `llm-technical.md` §5~§11（API 调用层、重试与容错、缓存与指纹失效、提示词管理、会话级 Token 追踪、模型定价、熔断器）。
@@ -2338,6 +2338,7 @@ core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 pipeline_data Schema 定义文档中预定义类型、版本号、写入/消费模块后，才能在代码中使用该键（详见附录 H） | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
+| **C20** | **HTML 图表图下说明强制** — HTML 报告中每张图表下方必须渲染图下说明（`.chart-caption`），明确标注该图表是什么、用途是什么；说明必须跟随对应图表 canvas 的渲染分支一同出现（图表有数据 → 说明出现，图表空数据 → 说明不出现） | 图表无说明时用户无法快速理解该图的含义与用途，可读性下降；屏幕阅读器等无障碍场景无法获得图表意图 | 代码评审不通过；图下说明缺失或与图表渲染分支不一致 | 模板 `report_template.html`（所有 chart canvas 渲染处，含净值/回撤/资产构成/行业分布/穿透 TOP10/量化指标 radar 共 6 处）、`chart-*` 前端图表模块 |
 
 ### 8.4 LLM 集成层约束
 
@@ -2580,7 +2581,12 @@ investor-util/
 | fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
 | scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
 | factor_exposure | dict | 是 | 已实现 | prepare_report_data |
+| correlation_data | dict | 是 | 已实现 | prepare_report_data |
 
-> `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`b_series`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 B6。
+> `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`b_series`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 因子暴露分析。
+
+> `correlation_data`（持仓相关性矩阵，C19 契约，11 键）：`{"available": bool, "status": str, "window": int, "sample_count": int, "codes": list[str], "names": {code: str}, "matrix": list[list[float\|None]], "p_values": list[list[float\|None]], "pairs": list[dict], "insufficient_codes": list[str], "note": str}`。下三角矩阵（row>col 有值、对角=1.0、上三角 None），配对明细含 code_a/name_a/code_b/name_b/pearson/p_value/significant/samples。由 `analysis/correlation.py` 计算、`report/orchestrator.py::compute_correlation_data` 注入。C7 注册见 §8.3（type=`b_series`、data_flag=`correlation_data`），数据不足（重叠样本 <60 / 品种 <2）落 §1.4.5 降级。
+
+> `history_data`（组合历史走势 + 回撤，C19 契约）：`{"bars": list[dict], "max_drawdown": float, "max_drawdown_pct": float, "drawdown_events": list[dict], "recovery_times": list[dict], "drawdown_available": bool, "annualized_volatility": float, "total_return": float, "daily_returns": list[float], "warnings": list[str], "benchmarks": list[dict], "successful_holdings": list}`。`drawdown_events`（独立回撤事件）含 peak_date/trough_date/recovery_date/drawdown_pct/duration_days/recovery_days/recovered；`recovery_times`（恢复耗时明细）含 start_date/end_date/days。由 `report/portfolio_history.py` 组装（C7 注册 type=`history`），`drawdown_available` 表示有效交易日 ≥ MIN_SPAN 才渲染回撤明细，否则落 §1.4.5 降级。
 
 [↑ 回到顶部](#目录)

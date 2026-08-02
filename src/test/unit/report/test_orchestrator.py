@@ -118,6 +118,11 @@ class TestPrepareReportData:
                 "src.python.report.orchestrator.compute_factor_exposure_data",
                 return_value={"available": False, "status": "insufficient"},
             ),
+            # 持仓相关性编排同样含真实网络拉取（持仓历史 K 线），必须 mock
+            patch(
+                "src.python.report.orchestrator.compute_correlation_data",
+                return_value={"available": False, "status": "insufficient"},
+            ),
         ):
             result = prepare_report_data(mock_holdings, mock_reporter, config={})
 
@@ -137,6 +142,7 @@ class TestPrepareReportData:
             "news_top_count",
             "risk_metrics",
             "factor_exposure",
+            "correlation_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 

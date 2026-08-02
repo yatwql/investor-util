@@ -17,6 +17,7 @@
 - [`plan-factor-exposure.md`](factor-exposure/plan-factor-exposure.md) — plan-7 因子暴露分析设计（原 `plan-advanced-analysis.md` §4）
 
 > 未完成项（plan-2/3/5/6 等）设计文档仍保留在 `docs-stm/plan/`：`plan-correlation-drawdown.md`（plan-2/3）、`plan-advanced-analysis.md`（plan-4 已放弃 + plan-5/6 待办）、`plan-web-ui.md`、`plan-engineering.md`、`plan-fix-deepseek-thinking-exhaustion.md`。
+> 完成但仍处开发版本（v0.9.7-dev）的修复项设计文档亦保留在 `docs-stm/plan/`（不归档）：`plan-fix-qa-concentration-and-chart-optimization.md`（rf-150，当前迭代修复项，release 后随版本归档）。
 
 ## v0.9.x 已完成项
 
@@ -29,4 +30,4 @@
 
 - plan-1 三个设计文档（实施方案/风险分析/验证清单）2026-08-02 由 `docs-stm/plan/` 移入本目录 `chartjs-upgrade/`。
 - plan-7 设计内容为原 `docs-stm/plan/plan-advanced-analysis.md` §4，2026-08-02 抽取为独立文件移入本目录 `factor-exposure/`；`plan-advanced-analysis.md` 已同步裁剪（仅保留 plan-4/5/6 内容）。
-- 版本号：本归档涵盖已发布版本 v0.9.0 ~ v0.9.5（当前开发版本 v0.9.6-dev），归档目录按版本段命名 v0.9.x。
+- 版本号：本归档涵盖已发布版本 v0.9.0 ~ v0.9.5（当前开发版本 v0.9.7-dev，v0.9.6 已发布，归档时点为 2026-08-02），归档目录按版本段命名 v0.9.x。

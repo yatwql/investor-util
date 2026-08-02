@@ -33,8 +33,14 @@ class TestHtmlTemplatePrintStyles(unittest.TestCase):
         self.assertIn("@media print", self.html)
 
     def test_print_hides_section_nav(self):
-        """打印时隐藏导航栏。"""
-        self.assertIn(".section-nav { display: none !important; }", self.html)
+        """打印时隐藏导航栏（含左侧目录 TOC）。"""
+        # 选择器列表跨行合并为一条规则（.section-nav、.toc-sidebar、.toc-toggle-btn 等），
+        # 匹配 `.section-nav → .toc-sidebar → .toc-toggle-btn { display: none !important }` 规则
+        match = re.search(
+            r"\.section-nav,\s*\.toc-sidebar,\s*\.toc-toggle-btn\s*\{\s*display:\s*none\s*!important\s*;\s*\}",
+            self.html,
+        )
+        self.assertIsNotNone(match, "打印块中应存在同时隐藏 .section-nav/.toc-sidebar/.toc-toggle-btn 的规则")
 
     def test_print_hides_back_to_top(self):
         """打印时隐藏回到顶部按钮。"""

@@ -160,4 +160,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         modules["write_factor_exposure_sheet"] = None
         prog.add_error("因子暴露分析模块缺失 (factor_exposure)")
 
+    try:
+        from src.python.report.correlation_sheet import write_correlation_sheet
+
+        modules["write_correlation_sheet"] = write_correlation_sheet
+    except ImportError:
+        modules["write_correlation_sheet"] = None
+        prog.add_error("持仓相关性矩阵模块缺失 (correlation)")
+
     return modules

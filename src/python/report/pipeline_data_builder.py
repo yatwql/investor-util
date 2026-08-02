@@ -30,6 +30,8 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_degradation",
     "risk_metrics",
     "portfolio_daily_returns",
+    "factor_exposure",
+    "correlation_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -58,6 +60,8 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "data_degradation": list,
     "risk_metrics": dict,
     "portfolio_daily_returns": list,
+    "factor_exposure": (dict, type(None)),
+    "correlation_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {

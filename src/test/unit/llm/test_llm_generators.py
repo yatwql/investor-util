@@ -107,6 +107,53 @@ class TestGenerateAllLlm(unittest.TestCase):
         _, kwargs_m = mock_macro.call_args
         self.assertFalse(kwargs_m.get("force"))
 
+    def test_extra_valid_codes_passed_for_penetration_aware_modules(
+        self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock
+    ) -> None:
+        """智囊团/持仓体检/穿透深度校验时传入穿透代码为额外有效代码，全球政经不传。
+
+        三个模块的提示词均含【穿透 TOP10】数据（_format_penetration_block），
+        LLM 会引用穿透股票代码（如宁德时代 300750、阳光电源 300274）。它们非直接
+        持仓但属组合穿透范围，品种存在性校验须视为有效，否则误报"不在当前持仓中"。
+        全球政经提示词不含穿透数据，保持严格校验（extra_valid_codes=None）。
+        """
+        mock_macro.return_value = ("<p>全球宏观分析</p>", False)
+        mock_expert.return_value = ("<p>智囊团提及穿透品种 300750、300274。</p>", False)
+        mock_health.return_value = ("<p>体检涉及穿透代码 300750。</p>", False)
+        mock_penetration.return_value = ("<p>穿透深度聚焦 300750。</p>", False)
+
+        _labels = {
+            "global_macro": "全球政经局势",
+            "expert_review": "智囊团深度复盘",
+            "health_check": "持仓体检报告",
+            "penetration_deep": "穿透深度分析",
+        }
+        fc_calls: list[tuple[str, object]] = []
+
+        def _fake_fact_check(html, holdings, module_label="", extra_valid_codes=None, **kwargs):
+            fc_calls.append((module_label, extra_valid_codes))
+            return html, ""
+
+        _penetrated = [
+            {"name": "宁德时代", "codes": ["300750"], "mv": 100.0, "ratio": 10.0, "sector": "电力设备"},
+            {"name": "阳光电源", "codes": ["300274"], "mv": 80.0, "ratio": 8.0, "sector": "电力设备"},
+        ]
+        with patch("src.python.llm.generators_orchestrator.run_fact_check", side_effect=_fake_fact_check), \
+             patch("src.python.llm.generators_orchestrator.get_llm_module_names", return_value=_labels):
+            generate_all_llm(
+                {}, {}, 100000, 50000, 50000, 100, 10, {"股票": 10},
+                penetrated_assets=_penetrated,
+                holdings_details=[{"code": "600519", "name": "贵州茅台", "market_value": 50000, "cost": 40000}],
+                force=True,
+            )
+
+        self.assertEqual(len(fc_calls), 4)
+        by_label = dict(fc_calls)
+        self.assertEqual(by_label["智囊团深度复盘"], {"300750", "300274"})
+        self.assertEqual(by_label["持仓体检报告"], {"300750", "300274"})
+        self.assertEqual(by_label["穿透深度分析"], {"300750", "300274"})
+        self.assertIsNone(by_label["全球政经局势"])
+
 
 # ═══════════════════════════════════════════════════════════
 #  generate_* 传递 llm_config 参数

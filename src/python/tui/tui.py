@@ -144,6 +144,14 @@ def main() -> None:
     except Exception:
         logger.debug("隐私提示显示失败（非关键）", exc_info=True)
 
+    # 首次运行引导（检测缺失资源并交互式提示）
+    try:
+        from src.python.startup_wizard import show_startup_wizard_if_needed
+
+        show_startup_wizard_if_needed()
+    except Exception:
+        logger.debug("首次运行引导显示失败（非关键）", exc_info=True)
+
     # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/C/F/O/1/2/3/4/S/R/X
     from src.python.config import get_config
 

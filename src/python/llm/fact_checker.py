@@ -131,6 +131,21 @@ def _is_drawdown_context(sentence: str, match_start: int) -> bool:
     return True
 
 
+def _is_change_rate_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否在环比/同比变化率语境中。
+
+    环比变化率（如"总市值变化-96.02%"）是相对上期/上年的变化比例，
+    与收益率（相对成本）维度不同，不可直接比较，否则会被误修正为
+    某个个股/组合的收益率。用 match 前 20 字符内的变化率关键词判定
+    （变化率数值通常紧邻"环比/变化"等词），而非全句判断——避免同句
+    首部的真实收益率被连带跳过。
+    """
+    if not any(kw in sentence for kw in _CHANGE_RATE_KEYWORDS):
+        return False
+    nearby = sentence[max(0, match_start - 20) : match_start + 5]
+    return any(kw in nearby for kw in _CHANGE_RATE_KEYWORDS)
+
+
 def _sentence_snippet(sentence: str, max_len: int = 50) -> str:
     """截取句子前 max_len 字作为上下文摘要。"""
     s = sentence.replace(" ", "").strip()
@@ -168,6 +183,29 @@ _EXPOSURE_KEYWORDS = frozenset(
         "美元",
         "港币",
         "港元",
+    ]
+)
+
+# 环比/同比变化率上下文——数值为相对上期/上年的变化比例而非收益率。
+# 持仓体检等模块输出的"总市值变化-96.02%""总盈亏变化+3,263"是环比变化率，
+# 与收益率（相对成本）维度不同，直接比较会误修正（96.02% → 某品种收益率）。
+# 与 _PROFIT_KEYWORDS（含"上涨/下跌/增长"）冲突时变化率优先跳过。
+_CHANGE_RATE_KEYWORDS = frozenset(
+    [
+        "环比",
+        "同比",
+        "较上期",
+        "较上周",
+        "较上月",
+        "较昨日",
+        "较上季度",
+        "较上一期",
+        "变化率",
+        "市值变化",
+        "盈亏变化",
+        "总市值变化",
+        "总盈亏变化",
+        "变动幅度",
     ]
 )
 
@@ -313,6 +351,7 @@ def _evaluate_percent_value(
     tolerance_pct: float = _DEFAULT_TOLERANCE_PCT,
     drawdown_pct: float | None = None,
     is_drawdown: bool = False,
+    is_change_rate: bool = False,
 ) -> tuple[str | None, tuple[str, str, str] | None]:
     """评估单个百分比数值。
 
@@ -327,11 +366,16 @@ def _evaluate_percent_value(
         tolerance_pct: 容差（百分点）。
         drawdown_pct: 实际最大回撤百分比（可选），is_drawdown=True 时使用。
         is_drawdown: 是否为回撤语境数值。
+        is_change_rate: 是否为环比/同比变化率语境数值（相对上期，非收益率）。
 
     Returns:
         (issue_str_or_None, correction_or_None)
         correction = (wrong_value_str, correct_value_str, context_sentence)
     """
+    # 环比/同比变化率语境 → 数值为相对上期的变化比例而非收益率，不可比较
+    if is_change_rate:
+        return None, None
+
     # 品种计数/比例语境
     if any(kw in sentence for kw in _PROPORTION_KEYWORDS):
         return None, None
@@ -488,6 +532,8 @@ def check_numerical_consistency(
 
             # 回撤语境检测
             is_dd = _is_drawdown_context(sentence, match.start()) if max_drawdown_pct is not None else False
+            # 环比/同比变化率语境检测
+            is_change_rate = _is_change_rate_context(sentence, match.start())
 
             issue, correction = _evaluate_percent_value(
                 value,
@@ -500,6 +546,7 @@ def check_numerical_consistency(
                 tolerance_pct=tolerance_pct,
                 drawdown_pct=max_drawdown_pct,
                 is_drawdown=is_dd,
+                is_change_rate=is_change_rate,
             )
             if issue is None:
                 passed += 1
