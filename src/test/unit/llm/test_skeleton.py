@@ -96,10 +96,9 @@ class TestHandleCacheHit(unittest.TestCase):
 class TestMaxTokensOverride(unittest.TestCase):
     """max_tokens_override — 显式覆盖优先于模块级 max_tokens_{module_key} 配置。
 
-    回归锁定 rf-153 死配置 bug：辩论模式 per_call_max_tokens 以 max_tokens_default
-    传入时被 _run_standard_mode 的 ``llm_config.get("max_tokens_{module_key}")`` 覆盖，
-    实际继承 expert_review 模块的宽松上限（24000），单段输出不受 8192 限制 → 辩论
-    总成本失控 → 预算守卫频繁触发跳过 synthesis。
+    辩论模式 per_call_max_tokens 若仅以 max_tokens_default 传入，会被
+    _run_standard_mode 的 ``llm_config.get("max_tokens_{module_key}")`` 覆盖
+    （继承 expert_review 宽松上限），显式 override 才能限定每阶段输出上限。
     """
 
     def _capture_max_tokens(self, llm_config: dict, override: int | None, module_max: int):

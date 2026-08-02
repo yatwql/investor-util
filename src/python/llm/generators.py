@@ -449,8 +449,8 @@ def generate_debate_procon(
 
     # ── Token 预算守卫 ─────────────────────────────────
     _max_total_tokens_budget = debate_cfg.get("max_total_tokens_per_report", 48000)
-    # 实际中文+Markdown 混排输出约 1 字符 ≈ 1 token（原 ×0.65 按 1.5 token/字符
-    # 估算严重低估，守卫在真实预算 ~65% 处过早触发，synthesis 频繁被砍），改为按 1:1。
+    # 中文+Markdown 混排输出约 1 字符 ≈ 1 token，按 1:1 折算字符级阈值；
+    # 若按 1.5 token/字符估算，守卫会在真实预算 ~65% 处过早触发。
     _budget_char_threshold = int(_max_total_tokens_budget)
     _cumulative_chars: int = 0
 

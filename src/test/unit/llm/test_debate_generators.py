@@ -238,7 +238,8 @@ class TestDebateProconFlow(unittest.TestCase):
 
         # 显式低预算（threshold = 100 chars，2x = 200 chars）触发守卫：
         # pro 短（pro 单独 < 2x 不回退全部）、con 长（pro+con 超 1x 跳过 synthesis）。
-        # 默认预算已提至 48000、换算按 1 字符≈1 token，不再用真实默认配置触发。
+        # 正常三段输出远低于默认预算（48000），守卫仅在病态输出时触发，
+        # 故用显式低预算构造超限场景。
         kwargs = dict(self.base_kwargs)
         kwargs["llm_config"] = {
             "debate": {
@@ -263,11 +264,10 @@ class TestDebateProconFlow(unittest.TestCase):
             self.assertEqual(mock_gen.call_count, 2)
 
     def test_per_call_max_tokens_passed_as_override(self):
-        """per_call_max_tokens 通过 max_tokens_override 生效（死配置修复 rf-153）。
+        """per_call_max_tokens 通过 max_tokens_override 生效。
 
-        回归锁定：此前 _max_tokens 仅作为 max_tokens_default 传入，被 _run_standard_mode
-        的 max_tokens_{module_key}（expert_review=24000）覆盖，per_call_max_tokens 配置失效。
-        现三段调用均须携带 max_tokens_override。
+        max_tokens_override 优先于模块级 max_tokens_{module_key}（expert_review=24000），
+        使 per_call_max_tokens 真正限定每阶段输出上限。三段调用均须携带该参数。
         """
         from src.python.llm.generators import generate_debate_procon
 
