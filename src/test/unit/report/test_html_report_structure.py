@@ -700,6 +700,54 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(section.find(id="chart_industry_bar"))
         self.assertIsNone(section.find(id="chart_penetration_bar"))
 
+    def test_all_charts_have_captions(self) -> None:
+        """6 张图均在下方渲染图下说明（.chart-caption），标注该图是什么图表。
+
+        用户需求：报告中每个图表下方标注图表说明（如「TOP 10 持仓资产」）。
+        说明置于 .chart-box 容器外（避免固定高度溢出），跟随 canvas 渲染分支。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "industry_bar": {"labels": ["白酒", "电池"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台", "宁德时代"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "radar": {"labels": ["夏普比率"], "datasets": [{"label": "量化指标", "data": [1.2]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        captions = soup.select(".chart-caption")
+        self.assertEqual(len(captions), 6, "6 张图应恰好渲染 6 个图下说明")
+        texts = [c.get_text(strip=True) for c in captions]
+        for expected in (
+            "组合净值走势",
+            "历史回撤走势",
+            "资产构成分布",
+            "持仓行业分布",
+            "TOP 10 持仓资产",
+            "组合量化指标画像",
+        ):
+            self.assertIn(expected, texts, f"图下说明应包含「{expected}」")
+        # 穿透 TOP10 图注位于其 canvas 之后
+        pen_caption = soup.find("div", class_="chart-caption", string="TOP 10 持仓资产")
+        self.assertIsNotNone(pen_caption)
+        pen_canvas = soup.find(id="chart_penetration_bar")
+        pen_box = pen_canvas.parent  # .chart-box
+        box_next = pen_box.find_next_sibling()
+        self.assertEqual(box_next, pen_caption, "穿透 TOP10 图注应紧跟其图表容器")
+
+    def test_caption_not_rendered_when_chart_empty(self) -> None:
+        """图表数据为空时对应图注不渲染（说明跟随 canvas 渲染分支）。
+
+        净值/回撤 canvas 无条件渲染（无 labels 守卫）→ 图注仍出现；
+        Doughnut/行业/穿透/Radar 空数据 → 渲染占位而非图注。
+        """
+        soup = self._render_interactive()  # chart_datasets 全空
+        captions = soup.select(".chart-caption")
+        texts = [c.get_text(strip=True) for c in captions]
+        self.assertEqual(len(captions), 2, "仅净值+回撤两图有图注（其余四图空数据）")
+        self.assertIn("组合净值走势", texts)
+        self.assertIn("历史回撤走势", texts)
+        for absent in ("资产构成分布", "持仓行业分布", "TOP 10 持仓资产", "组合量化指标画像"):
+            self.assertNotIn(absent, texts, f"空数据时不应渲染图注「{absent}」")
+
     def test_radar_chart_rendered_when_labels(self) -> None:
         """量化指标 radar 有 labels 时渲染 canvas。"""
         overrides = {

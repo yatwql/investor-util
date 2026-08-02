@@ -295,6 +295,13 @@
             font-size: 13px;
             letter-spacing: 1px;
         }
+        /* --- 图下说明（标注该图是什么图表；跟随 canvas 渲染分支，置于容器外避免溢出固定高度）--- */
+        .chart-caption {
+            text-align: center;
+            font-size: 12px;
+            color: var(--chart-text, #888);
+            margin-top: 4px;
+        }
         /* --- 单图导出按钮（chart-export.js 注入；打印时隐藏）--- */
         .chart-box { position: relative; }
         .chart-export-btn {
@@ -874,6 +881,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <div class="chart-empty-note">资产构成数据暂不可用</div>
                     {% endif %}
                 </div>
+                {% if chart_datasets and chart_datasets.get("category_doughnut", {}).get("labels") %}
+                <div class="chart-caption">资产构成分布</div>
+                {% endif %}
             </div>
             {% endif %}
         </div>
@@ -899,6 +909,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <div class="chart-empty-note">行业数据暂不可用</div>
                         {% endif %}
                     </div>
+                    {% if chart_datasets and chart_datasets.get("industry_bar", {}).get("labels") %}
+                    <div class="chart-caption">持仓行业分布</div>
+                    {% endif %}
                 </div>
                 <div style="flex: 1 1 100%; max-width: 720px; margin: 0 auto;">
                     <div class="chart-box" style="height: 320px;">
@@ -908,6 +921,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <div class="chart-empty-note">穿透数据暂不可用</div>
                         {% endif %}
                     </div>
+                    {% if chart_datasets and chart_datasets.get("penetration_bar", {}).get("labels") %}
+                    <div class="chart-caption">TOP 10 持仓资产</div>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
@@ -1640,6 +1656,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="chart-box" style="height:350px;">
                 <canvas id="chart_portfolio_line" width="800" height="350" style="width:100%;height:100%;" aria-label="净值趋势图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
             </div>
+            <div class="chart-caption">组合净值走势</div>
             {% else %}
             <canvas id="portfolioChart" width="800" height="350" style="width:100%;height:350px;"></canvas>
             {% endif %}
@@ -1679,6 +1696,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div class="chart-empty-note">量化指标数据不足</div>
                 {% endif %}
             </div>
+            {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") %}
+            <div class="chart-caption">组合量化指标画像</div>
+            {% endif %}
             {# 降级 note 置于固定高度容器外，避免溢出 320px 边界 #}
             {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") and chart_datasets["radar"]["datasets"][0].get("note") %}
             <div style="text-align:center;font-size:12px;color:#888;margin-top:4px;">{{ chart_datasets["radar"]["datasets"][0]["note"] }}</div>
@@ -1779,6 +1799,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="chart-box" style="height:250px;">
                 <canvas id="chart_drawdown" width="800" height="250" style="width:100%;height:100%;" aria-label="回撤分析图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
             </div>
+            <div class="chart-caption">历史回撤走势</div>
             {% else %}
             <canvas id="drawdownChart" width="800" height="250" style="width:100%;height:250px;"></canvas>
             {% endif %}
