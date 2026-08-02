@@ -8,10 +8,10 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 195 | 47,924 | `src/python/` 下所有 `.py`（不含测试，含 13 个 `__init__.py`） |
+| 主程序代码 | Python | 204 | 48,040 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`；rf-76 将 `fact_checker.py` 拆为 `fact_checker/` 子包 10 文件） |
 | HTML 报告模板 | HTML | 3 | 2,910 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
 | 辅助脚本 | Python | 12 | 4,113 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
-| **源代码合计** | — | **210** | **54,947** | 主程序 + 模板 + 脚本 |
+| **源代码合计** | — | **219** | **55,063** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **238** | **66,253** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **4,174 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
@@ -120,7 +120,17 @@ investor-util/
 │   │   │   ├── _thinking.py          #   Extended Thinking 配置
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
 │   │   │   ├── cost_tracker.py       #   Token 成本跟踪与预算管理（会话级 Token 守卫）
-│   │   │   ├── fact_checker.py       #   LLM 事实锚定校验器（数值/品种/排名一致性校验）
+│   │   │   ├── fact_checker/         # LLM 事实锚定校验器（数值/品种/排名一致性校验，rf-76 拆分）
+│   │   │   │   ├── __init__.py       #       子包标记，re-export run_fact_check 等 4 个公开函数
+│   │   │   │   ├── _constants.py     #       关键词词表/指数代码集/默认容差
+│   │   │   │   ├── _context.py       #       语境检测（回撤/变化率/贡献度/仓位/假设/建议）
+│   │   │   │   ├── _corrections.py   #       数值自动修正
+│   │   │   │   ├── _numerical.py     #       数值一致性检查器（最大模块 251 行）
+│   │   │   │   ├── _patterns.py      #       正则模式
+│   │   │   │   ├── _ranking.py       #       排名正确性检查器
+│   │   │   │   ├── _runner.py        #       run_fact_check 统一入口（全量校验 + 自动修正）
+│   │   │   │   ├── _symbols.py       #       品种存在性检查器
+│   │   │   │   └── _utils.py         #       HTML 剥离/句子拆分/持仓映射/组合数值
 │   │   │   ├── fallback.py           #   LLM 故障降级模板（所有模块失败时提供占位内容，防止报告空白）
 │   │   │   ├── fingerprint.py        #   缓存指纹（请求去重，避免重复调用）
 │   │   │   ├── generators.py         #   提示词生成（全局政经/智囊团复盘）

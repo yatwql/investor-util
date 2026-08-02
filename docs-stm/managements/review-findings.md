@@ -37,18 +37,19 @@
 
 #### P2A — 文件过长（>500 行，建议拆分）
 
-| # | 文件 | 行数 | 拆分建议 |
-|---|------|------|----------|
-| **rf-75** | `core/registry.py` | 617 | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责 |
-| **rf-76** | `llm/fact_checker.py` | 623 | 核心校验逻辑与辅助函数分离（注：长函数已拆分，文件级别未拆） |
-| **rf-77** | `tui/handlers_config.py` | 553 | JSON 文本编辑函数提取到 `config/` 子模块 |
-| **rf-78** | `fetcher/batch.py` | 549 | BatchDispatcher 本身内聚，可维持现状 |
-| **rf-79** | `core/code_utils.py` | 541 | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出 |
-| **rf-80** | `report/data_status.py` | 528 | DegradationTracker 单类偏大 |
-| **rf-81** | `report/html_renderers.py` | 521 | 所有 HTML render 函数揉合一体 |
-| **rf-85** | `fetcher/fund.py` | 394 | 排名/持仓/基准三职责可拆分为子模块 |
-| **rf-86** | `cache/operations.py` | 472 | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
-| **rf-89** | `report/excel_generator.py` | 447 | Excel 编排器 |
+> 行数核对：2026-08-03（`wc -l` 实测）。`fact_checker.py` 已拆分处理（rf-76，见"已修复"表），剩余 9 项未拆分。标注「未超限」的 3 项维持现状。
+
+| # | 文件 | 行数 | 状态 | 拆分建议 |
+|---|------|------|------|----------|
+| **rf-75** | `core/registry.py` | 653 | 待处理（617→653，↑36） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责 |
+| **rf-77** | `tui/handlers_config.py` | 573 | 待处理（553→573，↑20） | JSON 文本编辑函数提取到 `config/` 子模块 |
+| **rf-78** | `fetcher/batch.py` | 564 | 待处理（549→564，↑15；原「可维持现状」判定需复核） | BatchDispatcher 本身内聚，可维持现状 |
+| **rf-79** | `core/code_utils.py` | 537 | 待处理（541→537，↓4；仍 >500） | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出 |
+| **rf-80** | `report/data_status.py` | 534 | 待处理（528→534，↑6） | DegradationTracker 单类偏大 |
+| **rf-81** | `report/html_renderers.py` | 521 | 待处理（持平 521，临界值） | 所有 HTML render 函数揉合一体 |
+| **rf-85** | `fetcher/fund.py` | 401 | 未超限（394→401，<500，维持现状） | 排名/持仓/基准三职责可拆分为子模块 |
+| **rf-86** | `cache/operations.py` | 472 | 未超限（持平 472，<500，维持现状） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
+| **rf-89** | `report/excel_generator.py` | 477 | 未超限（447→477，<500，维持现状） | Excel 编排器 |
 
 #### P2B — 文档与实现不符（低优先级，增量改进）
 
@@ -66,6 +67,7 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| rf-76 | `llm/fact_checker.py` 达 **899 行超 800 硬上限**（623→899，↑276；长函数已拆分，文件级别未拆） | 拆分为 `llm/fact_checker/` 子包（9 个私有模块：`_constants`/`_patterns`/`_utils`/`_context`/`_numerical`/`_symbols`/`_ranking`/`_corrections`/`_runner`），`__init__.py` 重导出 4 个公开函数（`run_fact_check`/`check_numerical_consistency`/`check_symbol_existence`/`check_ranking_correctness`），对外导入路径 `from src.python.llm.fact_checker import ...` 不变。最大模块 `_numerical.py` 251 行。顺带删除死代码 `_RANK_TOP_N_PATTERN`（全库无引用）与未使用导入 `Any` | `changelog.md` → Refactor |
 | rf-159 | 调仓 What-if 独立页 `whatif_template.html` 内联双环图初始化逻辑（`trackChart` + `doughnutOptions` + O1 每图 try/catch + ES5 保守语法，~58 行），与主报告 `chart-init.js` 的 `initCategoryDoughnut` 模式**重复**（复用 `ChartTheme.doughnutColors`/`chart-export.js`，但数据段 `#whatif-chart-data`/DOM id 与主报告不同，未直接复用 chart-init.js） | 新增 `src/static/chart-common.js` 公共 Chart 初始化 helper（IIFE 暴露 `window.ChartCommon`：`trackChart`/`lineOptions`/`doughnutOptions`，读取 `window.ChartTheme`）；`chart-init.js` 的 trackChart/lineOptions/doughnutOptions/initCategoryDoughnut 改为薄封装委托 `ChartCommon`；`whatif_template.html` 内联 ~58 行双环图初始化替换为 `window.ChartCommon.trackChart`/`doughnutOptions(true)` 调用（数据段 `#whatif-chart-data`/DOM id 保留页面独有），守卫 `if (!window.ChartCommon)` 降级跳过。两页 `<script defer>` 均加载 chart-common.js（chart-export → chart-common → chart-init），`_JS_ASSETS` 补 chart-common.js | `changelog.md` → Refactor / Test |
 | rf-115 | TD-L2：`history_data` 数据同时服务 Excel + HTML Chart.js，模板 `tojson` 序列化全量字段（含 Excel 不需要的字段）。**plan-5/6 扩展同模式**：`evolution_data`/`whatif_data` 亦经 `tojson` 全量内联（`#evolution-chart-data`/`#whatif-chart-data`），图表仅用其中部分字段 | Python 侧专用裁剪（R9 数据最小化）：`chart_data_builder.build_evolution_chart_data()` 只输出图表消费字段（`periods`/`total_value`/`total_pnl`/`hhi`/`top_holdings`[仅 name/code/weights]，排除 `total_cost`/`holding_counts`/`account_flows`/`reason`）；`whatif_writer._trim_whatif_chart_data()` 只输出 `available`/`categories`（排除 `summary`/`changes`/`stats`/`base`/`candidate`/`reason`）。html_writer 渲染时注入 `evolution_chart_data`，模板 `#evolution-chart-data`/`#whatif-chart-data` 改为渲染裁剪后负载 | `changelog.md` → Refactor / Test |
 | rf-116 | TD-L3：模板仍为单文件 ~2000 行（Chart.js 初始化 JS 已外部化缓解，Canvas 函数 + 条件分支仍占体积）。**plan-6 加剧**：`report_template.html` 现 2570 行（组合演进章节 +165 行内联，含 3 图 canvas + 数据段 + 表格） | 章节级 partial 拆分首批：组合演进章节（原 MODULE 18，~2200-2361 行）提取至 `tmpl/partials/evolution_section.html`，report_template.html 以 `{% include "partials/evolution_section.html" with context %}` 引入（2570→2410 行）。partial 内嵌 `.back-to-top-link` 等价 HTML（partial 不共享父模板宏 render_back_to_top）；`_evo`/`evolution_chart_data` 仍经 context 透传（C14） | `changelog.md` → Refactor / Test |

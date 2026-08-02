@@ -1964,7 +1964,7 @@ cli/cli.py                       # whatif 子命令：--candidate 必填、--bas
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker.py / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
+`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker/ 子包 / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
@@ -1984,7 +1984,7 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
                pricing.py           费用估算
                markdown.py          Markdown→HTML 转换
                circuit_breaker.py   LLM API 熔断器
-               fact_checker.py      LLM 输出伪代码/幻觉过滤
+               fact_checker/        LLM 输出伪代码/幻觉过滤（子包 9 模块，__init__ 重导出 4 公开函数）
                fallback.py          全失败降级占位模板
 ```
 

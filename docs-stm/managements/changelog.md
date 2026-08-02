@@ -14,6 +14,10 @@
 
 （开发中）
 
+### Refactor
+
+- **rf-76：`llm/fact_checker.py`（899 行超 800 硬上限）拆分为 `fact_checker/` 子包** — 按职责拆为 9 个私有模块：`_constants.py`（关键词词表/指数代码集/默认容差）、`_patterns.py`（正则模式）、`_utils.py`（HTML 剥离/句子拆分/持仓映射/组合数值）、`_context.py`（回撤/变化率/贡献度/仓位/假设/建议语境检测）、`_numerical.py`（数值一致性检查器 + `_evaluate_percent_value`）、`_symbols.py`（品种存在性）、`_ranking.py`（排名正确性）、`_corrections.py`（数值自动修正）、`_runner.py`（`run_fact_check` 统一入口）。`__init__.py` 重导出 4 个公开函数，`from src.python.llm.fact_checker import ...` 对外导入路径不变（`generators_orchestrator.py` 与两个测试文件零改动）。顺带删除死代码 `_RANK_TOP_N_PATTERN`（全库无引用）与未使用导入 `Any`。最大模块 `_numerical.py` 251 行。回归：`test_fact_checker.py` + `test_llm_hallucination.py` 82 例、orchestrator 相关 98 例全部通过（纯拆分零行为变更）
+
 ---
 
 ## [0.9.8] - 2026-08-03
