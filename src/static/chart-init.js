@@ -187,7 +187,6 @@
         }]
       },
       options: {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
@@ -195,8 +194,8 @@
           tooltip: { enabled: true }
         },
         scales: {
-          x: { ticks: { color: theme.text }, grid: { color: theme.grid } },
-          y: { ticks: { color: theme.text }, grid: { display: false } }
+          x: { ticks: { color: theme.text, maxRotation: 45 }, grid: { color: theme.grid } },
+          y: { ticks: { color: theme.text }, grid: { color: theme.grid } }
         }
       }
     }));

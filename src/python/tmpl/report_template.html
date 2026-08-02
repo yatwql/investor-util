@@ -874,7 +874,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div style="flex: 1; min-width: 280px;">
                     <div class="chart-box" style="height: 320px;">
                         {% if chart_datasets and chart_datasets.get("industry_bar", {}).get("labels") %}
-                        <canvas id="chart_industry_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="行业分布水平柱状图（悬停查看市值）" role="img">图表无法显示，数据见穿透分析表</canvas>
+                        <canvas id="chart_industry_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="行业分布垂直柱状图（悬停查看市值）" role="img">图表无法显示，数据见穿透分析表</canvas>
                         {% else %}
                         <div class="chart-empty-note">行业数据暂不可用</div>
                         {% endif %}
@@ -883,7 +883,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div style="flex: 1; min-width: 280px;">
                     <div class="chart-box" style="height: 320px;">
                         {% if chart_datasets and chart_datasets.get("penetration_bar", {}).get("labels") %}
-                        <canvas id="chart_penetration_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="穿透 TOP10 柱状图（悬停查看市值）" role="img">图表无法显示，数据见资产穿透表</canvas>
+                        <canvas id="chart_penetration_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="穿透 TOP10 垂直柱状图（悬停查看市值）" role="img">图表无法显示，数据见资产穿透表</canvas>
                         {% else %}
                         <div class="chart-empty-note">穿透数据暂不可用</div>
                         {% endif %}
