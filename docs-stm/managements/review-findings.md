@@ -64,6 +64,7 @@
 
 | # | 位置 | 问题 |
 |---|------|------|
+| **rf-140** | `src/test/scenario/llm/test_llm_hallucination.py` 64/72/80/89/96/103/112/119/126/196 行 | **既有测试代码缺陷（与 rf-138/139 无关，git stash 验证为改动前即失败）**：`check_numerical_consistency` 在 rf-91 v3 升级时返回 **4 元组**（含 corrections），但本文件 10 处仍以 **3 值**解包 → `ValueError: too many values to unpack`，数值/归因幻觉检测场景（10 项）全部无法运行。`scenario_llm` marker 不在 P0/P1/P2 门禁内，故未被门禁发现；其中 `check_ranking_correctness` 3 个场景用例（test_wrong_rank/test_correct_rank/test_penetration_module_skips_rank）正常通过 | 10 处解包补 `_`（`issues, total, passed, _ = ...`）+ 断言校正值引用，LLM 场景套件恢复全绿 |
 
 ---
 
@@ -71,6 +72,8 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| rf-138 | fact_check 循环（`generators_orchestrator.py`）已提取缓存标志（`gm_c/er_c/hc_c/pd_c`）但未使用——对**缓存命中**的 LLM 内容仍用**当前**持仓市值校验排名；缓存内容基于生成时价格快照，011506/040046 市值仅差 ~1,800 元（5%），价格变动即排名翻转 → 反复误报"声称 X 为最大持仓，但实际最大持仓为 040046" | `run_fact_check` 新增 `skip_ranking_check` 参数；orchestrator fact_check 循环改为带 cached 标志的列表，缓存命中模块传 `skip_ranking_check=True` 跳过排名校验（数值/品种校验保留，缓存内容数值修正仍生效），与注释"仅检查非缓存且非空的模块"意图一致 | `changelog.md` → Fix / Test |
+| rf-139 | `_RANK_MAX_PATTERN` 过宽（`最大\|最重\|首要\|主要` 单独匹配即触发）——"561910 是最大单项亏损品种""601939 贡献了主要利润""600900 最大特点是…"等非持仓排名语境被误判为"声称 X 为最大持仓" | 正则收紧：排名词（第X大/第一/最大/最重/首要/主要/前X大/头X大）须与持仓名词（持仓/重仓/仓位/持股/权重）紧邻（允许中间一个"的"）才算排名声称；"最大单项亏损品种/主要利润/最大亏损来源/最大特点"不再匹配 | `changelog.md` → Fix / Test |
 | rf-136 | 持仓分类表下方饼图（category_doughnut）仅显示"其他"占 100%——`_build_category_doughnut_dataset` 从 details 按 `property` 聚合，但真实 `DetailRow` 无 `property` 字段 → 走 `_infer_property`；旧实现 `if code[:1] in ("6","0","3") and not name` 要求名称为空才判股票，而真实明细行始终有名称 → 全部落入"其他" | ① `_infer_property` 仅按代码前缀分类（6/0/3→股票，5/1→基金，无匹配→其他）；② `_build_category_doughnut_dataset` 双数据源——优先 cat_data（`_categorize_holding` 权威分类，按 `sub_mv` 聚合），回退 details；③ `write_html_report` 用本地计算的 cat_data 补齐/覆盖 category_doughnut，图表与持仓分类表同源 | `changelog.md` → Fix / Test |
 | rf-137 | 资产穿透 TOP10 章节开头提示"行业数据暂不可用/穿透数据暂不可用"，但下方表格有穿透数据——12 只基金中仅 1 只无法获取穿透（合计市值 7,589.70 元未计入 TOP10），属**部分失败**；根因：`_build_chart_datasets_for_report` 构建 chart_datasets 时未传 penetration → industry_bar/penetration_bar 返回空 → 模板渲染占位提示 | `write_html_report` 用本地计算的 penetration（含 top10）补齐/覆盖 industry_bar/penetration_bar；空值语义保持——仅全量不可用才显示占位，部分失败（top10 有数据）正常渲染图表 | `changelog.md` → Fix / Test |
 | rf-122 | `set_config()` 写盘前未还原 `_absolutize_paths` 的内存绝对化 → 本机绝对路径（`D:\codebase\...`）直接落盘 config.json 并随 git 提交，跨机器不可移植；`llm_providers_file` 等后续也会被绝对化；另 `init_config` 模板同样写绝对路径（全新安装即不可移植） | `_validation.py` 新增 `_deabsolutize_paths()`（与 `_absolutize_paths` 对称，仅还原 PROJECT_ROOT 之下路径，跨盘/项目外绝对路径保留）；`set_config()` 写盘用浅拷贝先反绝对化再序列化（写盘失败不污染缓存）；`_build_template_from_defaults()` 模板同样反绝对化；恢复 config.json 已提交的 4 个绝对路径为相对 | `changelog.md` → Fix / Test / Docs |
