@@ -1,5 +1,7 @@
 # 修复 DeepSeek Extended Thinking 思考耗尽 max_tokens 预算（rf-122）
 
+> **状态**：rf-122 已实现并修复（竞态 + 配置缓解，v0.9.x 已发布，修复记录见 `archived_review-findings.0.9.x.md`）。设计文档保留在 `docs-stm/plan/` 供历史参考，待 release 后随版本段归档。
+
 ## Context
 
 用户运行报告生成时，DeepSeek 主链路（`deepseek-main` claude/anthropic-compat，模型 `deepseek-v4-flash`）反复触发：

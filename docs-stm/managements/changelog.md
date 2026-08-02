@@ -6,7 +6,10 @@
 
 ## [0.9.7-dev] - 2026-08-02
 
-（开发中）
+### Docs
+
+- **技术文档残留 B 系列编号清理（基金深度分析章节不再加编号）** — 全量排查管理/用户文档，清除 `technical.md` §4.8 及 data_flag 表中残留的展示型 B 编号（B2~B6）：`#### B2 基金经理变更监控` → `#### 基金经理变更监控` 等 5 个章节标题、data_flag 表「说明」列（B2 基金经理→基金经理变更监控…B6 因子暴露→因子暴露分析）、§4.8 ASCII 架构图节点、B5/B6 差异化说明文案、`§4.8 B6` 交叉引用 → `§4.8 因子暴露分析`。保留 `type=b_series` 代码类型标识符、`b_series_fund_manager` 等配置键、归档文件名（`B1-fund-deep-analysis.md`）与计划文档实现步骤标签（B1/B2/B3）。报告展示编号以 1~19 数字为准（基金深度分析 5 模块即 §6~§10），不再使用 B 前缀
+- **计划归档边界 + 已完成任务文档同步（核对 review-findings / plan.md 已实现任务）** — ① 归档边界明确：plan-1/plan-7 设计文档已归档（`archive/v0.9.x/`）；未完成项（plan-2/3/5/6/8/9/10/11）与完成但仍在开发版本（0.9.7-dev）的修复设计文档（`plan-fix-qa` rf-150 / `plan-fix-deepseek` rf-122 / `plan-engineering` rf-1）**保留在 `docs-stm/plan/` 不归档**，`archived_plan.0.9.x.md` 补充保留说明与版本号。② 已实现任务核对 9 份管理/用户文档：`requirements.md` R-LLM-DB-QA-CONCENTRATION-06 补充辩论 synthesis 嵌入路径（rf-150）；`how-to-config-llm.md` / `how-to-config.md` §M / `how-to-menu.md` 集中度问答描述补充「标准模式嵌入专家复盘、辩论模式嵌入综合权衡、要求回答」；`reports-instruction.md` 交互图表特性补充「导出PNG 按钮」（rf-119）。其余核对项（priority 默认 99、穿透/行业垂直柱状图、去重阈值 0.40、修正明细、因子暴露章节/开关/注册项）均已一致，无需改动。`folders.md` 目录树核对无误（plan/ 6 文件 + archive/v0.9.x 结构未变）
 
 ---
 

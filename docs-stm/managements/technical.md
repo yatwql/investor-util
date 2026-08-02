@@ -1220,11 +1220,11 @@ for sec in section_order:
 | data_flag | 判定依据 | 对应 section.type | 说明 |
 |:----------|:---------|:-----------------|:------|
 | `None` | 始终可见 | `always` / `history` | 不依赖数据状态 |
-| `manager_data` | `manager_analysis is not None` | `b_series` | B2 基金经理 |
-| `overlap_data` | `overlap_matrix is not None` | `b_series` | B3 持仓重合度 |
-| `concentration_data` | `concentration_analysis is not None` | `b_series` | B4 持仓集中度 |
-| `style_data` | `style_analysis is not None` | `b_series` | B5 基金风格 |
-| `factor_exposure_data` | `factor_exposure is not None` | `b_series` | B6 因子暴露 |
+| `manager_data` | `manager_analysis is not None` | `b_series` | 基金经理变更监控 |
+| `overlap_data` | `overlap_matrix is not None` | `b_series` | 持仓重合度矩阵 |
+| `concentration_data` | `concentration_analysis is not None` | `b_series` | 持仓集中度监控 |
+| `style_data` | `style_analysis is not None` | `b_series` | 基金风格分析 |
+| `factor_exposure_data` | `factor_exposure is not None` | `b_series` | 因子暴露分析 |
 | `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
 | `llm_data_available` | `llm_enabled_flag`（LLM 生成成功） | `llm` | LLM 全部 5 模块 |
 
@@ -1488,17 +1488,17 @@ prune()：两阶段自动清理
                          │
               ┌──────────┴──────────┐
               │                     │
-         B2 基金经理变更        B3 持仓重合度
-         快照比对检测          Jaccard+重叠率
+        基金经理变更监控        持仓重合度矩阵
+        快照比对检测          Jaccard+重叠率
               │                     │
-         B4 持仓集中度          B5 基金风格分析
-         TOP N 占比+环比      市值/PE 加权判定
+        持仓集中度监控          基金风格分析
+        TOP N 占比+环比      市值/PE 加权判定
               │
-         B6 因子暴露分析
-         OLS 回归风格画像
+          因子暴露分析
+        OLS 回归风格画像
 ```
 
-#### B2 基金经理变更监控
+#### 基金经理变更监控
 
 基于快照比对检测基金经理变更：
 
@@ -1520,7 +1520,7 @@ fund_manager_snapshot 快照（精确键名，每日更新）
 - 每个基金独立判断，互不干扰
 - 快照使用精确键名（`fund_manager_snapshot`），无指纹后缀，每日 TTL 过期自动刷新
 
-#### B3 持仓重合度矩阵
+#### 持仓重合度矩阵
 
 双指标持仓重合度计算（`fund_overlap.py`）：
 
@@ -1540,7 +1540,7 @@ Excel 热力图着色：
 
 触发条件：持仓中基金数量 ≥ 2 只。
 
-#### B4 持仓集中度监控
+#### 持仓集中度监控
 
 基于持仓 TOP N 占比 + 环比变化（`fund_concentration.py`）：
 
@@ -1560,7 +1560,7 @@ Excel 热力图着色：
 - 环比变化箭头：↑/↓ 标识方向
 - 快照使用精确键名（`fund_concentration_snapshot`），月级 TTL
 
-#### B5 基金风格分析
+#### 基金风格分析
 
 基于持仓个股市值 + PE 数据的加权风格判定（`fund_style_classify.py` / `fund_style_report.py`）：
 
@@ -1585,11 +1585,11 @@ Excel 热力图着色：
 - Tencent 二级降级基于 registry 熔断器（provider="tencent_style"），避免网络不可达时逐只等待超时
 - 独立快照 `fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
-#### B6 因子暴露分析
+#### 因子暴露分析
 
 基于组合整体时间序列回归估算组合在价值/成长/质量因子上的暴露（β），输出"组合风格画像"（`analysis/factor_exposure.py` / `report/orchestrator.py::compute_factor_exposure_data`）。
 
-> **与 B5 基金风格分析的差异化**：B5 是**每只基金的截面分类**（六宫格：市值×风格，基于 PE/市值阈值），回答"这只基金长什么样"；B6 是**组合整体的时间序列回归**（因子收益回归组合收益得 β），回答"组合收益由什么风格因子驱动"。方法论与粒度均不同，报告 UI 文案需注明差异（"分类" vs "回归估算"），避免混淆"风格归属柱状图"与六宫格。
+> **与基金风格分析的差异化**：基金风格分析是**每只基金的截面分类**（六宫格：市值×风格，基于 PE/市值阈值），回答"这只基金长什么样"；因子暴露分析是**组合整体的时间序列回归**（因子收益回归组合收益得 β），回答"组合收益由什么风格因子驱动"。方法论与粒度均不同，报告 UI 文案需注明差异（"分类" vs "回归估算"），避免混淆"风格归属柱状图"与六宫格。
 
 ```
 R_p = β₁R_value + β₂R_growth + β₃R_quality + α + ε
@@ -2581,6 +2581,6 @@ investor-util/
 | scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
 | factor_exposure | dict | 是 | 已实现 | prepare_report_data |
 
-> `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`b_series`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 B6。
+> `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`b_series`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 因子暴露分析。
 
 [↑ 回到顶部](#目录)

@@ -232,7 +232,7 @@ LLM Provider 状态
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
-- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。三个辩论开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估
+- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。三个辩论开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 

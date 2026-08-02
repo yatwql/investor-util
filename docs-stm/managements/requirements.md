@@ -674,7 +674,7 @@
 | R-LLM-DB-QA-CONCENTRATION-03 | 集中度问答块输出内容：集中度风险的量化评估、与分散化基准的定量对比、针对性的调仓建议 |
 | R-LLM-DB-QA-CONCENTRATION-04 | 集中度判定阈值通过 `llm_settings.json` 的 `debate.qa_concentration.threshold` 配置，类型 float，范围 (0, 1)，默认 0.20 |
 | R-LLM-DB-QA-CONCENTRATION-05 | 集中度问答块嵌入智囊团深度复盘输出中，位于辩论段落之后、调仓建议之前 |
-| R-LLM-DB-QA-CONCENTRATION-06 | 集中度问答不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_qa_concentration_block()` 构建，嵌在 expert_review 的 user prompt 中） |
+| R-LLM-DB-QA-CONCENTRATION-06 | 集中度问答不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_qa_concentration_block()` 构建：标准模式嵌在 expert_review 的 user prompt 中，辩论模式嵌在综合权衡 synthesis 的 user prompt 中） |
 
 ---
 
