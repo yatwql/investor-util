@@ -8,7 +8,6 @@
 
 ### P1 — plan-1 交互图表遗留技术债（2026-08-02）
 
-> 来源：`archive/v0.9.x/chartjs-upgrade/plan-chartjs-report-upgrade.md` §4.5/§4.7/§4.8/§4.10/§5 Iter 7 + `archive/v0.9.x/chartjs-upgrade/plan-chartjs-risk-analysis.md` §4 TD 表。
 > plan-1 代码与自动化测试已落地，以下为**未实测/计划内延后**项。
 
 | # | 问题 | 修复方向 |
