@@ -1029,7 +1029,7 @@ def _get_pool() -> ThreadPoolExecutor:
           (菜单 L/B)                    │                      │
             │                           ▼                      ▼
             ▼                  excel_generator.py       html_writer.py
-      ┌──────────┐                 (编排器 437 行)         │
+      ┌──────────┐                 (编排器 477 行)         │
       │ 快照对比 │                     │                   ▼
       │          │                     ▼           html_builders.py
       │          │           excel_sheet_factory.py   (数据构建器)
@@ -1848,7 +1848,7 @@ _dedup_by_title(items)
 │  profit_forecast:        "盈利预测数据不可用，EPS 列显示 --"  │
 │  news_all_failed:        "新闻数据暂不可用，请检查网络连接"   │
 │  history_correction:     "检测到历史数据修正，走势可能已重算" │
-│  ...（共 16 条，覆盖价格/排名/行业/穿透/盈利/分红/指数/      │
+│  ...（共 23 条，覆盖价格/排名/行业/穿透/盈利/分红/指数/      │
 │        基金深度分析/新闻/预警/历史走势）                            │
 │                                                             │
 │  TIER_PREFIX = {"T2": "⚠", "T3": "ℹ", "T4": "ℹ"}           │
@@ -1975,7 +1975,7 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker/ 子包 / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
+`src/python/llm/` 包按调用层次分为四层，共 36 个子模块（含 fact_checker/ 子包 9 模块 / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
@@ -2454,6 +2454,7 @@ investor-util/
 │   ├── __init__.py
 │   ├── python/                   # 源代码
 │   │   ├── __init__.py
+│   │   ├── startup_wizard.py    #   首次运行引导向导
 │   │   ├── analysis/            # 业务分析计算层（再平衡、量化指标）
 │   │   ├── cache/               # 缓存引擎（TTL/清理/统计/分组/IO）
 │   │   ├── cli/                 # CLI 命令行模式入口
@@ -2492,6 +2493,7 @@ investor-util/
 │   │       ├── tui_handlers.py  #   键盘/事件处理
 │   │       ├── tui_keys.py      #   键盘输入封装
 │   │       └── tui_menu.py      #   菜单交互
+│   ├── static/                   # 前端静态资产（Chart.js 本地 bundle + 图表初始化/导出/打印 + TOC）
 │   └── test/                    # 测试（按标记分组）
 │       ├── conftest.py          # pytest 配置 + 分层标记注册
 │       ├── helpers.py           # 测试辅助工具

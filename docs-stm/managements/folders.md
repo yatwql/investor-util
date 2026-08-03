@@ -8,18 +8,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 207 | 48,278 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| 主程序代码 | Python | 208 | 48,278 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 3 | 2,910 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
 | 辅助脚本 | Python | 13 | 4,404 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查） |
-| **源代码合计** | — | **223** | **55,592** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **240** | **67,068** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,215 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **224** | **55,592** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **243** | **67,068** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,294 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 88 | — | 各版本 changelog/plan/review-findings 等（84 md + 3 py + 1 txt） |
-| ├ plan/ | 中间设计文件 | 7 | — | 当前迭代中的设计方案 |
+| ├ plan/ | 中间设计文件 | 4 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -29,6 +29,7 @@ investor-util/
 ├── src/                              # 源代码
 │   ├── python/                       # 主程序代码
 │   │   ├── __init__.py               #   包标记（空文件）
+│   │   ├── startup_wizard.py         #   首次运行引导向导（检查配置/创建模板/启动模式引导）
 │   │   ├── cache/                    # 缓存引擎（TTL/清理/统计/分组/IO）
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── _cleanup.py           #   过期缓存清理（按 TTL 分组删除）
@@ -103,6 +104,7 @@ investor-util/
 │   │   │   ├── alignment_correction.py        #   口径修正因子计算（估值偏差校准）
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
+│   │   │   ├── drawdown_events.py             #   回撤事件识别（新高/回撤起止/幅度）
 │   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
 │   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
@@ -127,7 +129,7 @@ investor-util/
 │   │   │   │   ├── _constants.py     #       关键词词表/指数代码集/默认容差
 │   │   │   │   ├── _context.py       #       语境检测（回撤/变化率/贡献度/仓位/假设/建议）
 │   │   │   │   ├── _corrections.py   #       数值自动修正
-│   │   │   │   ├── _numerical.py     #       数值一致性检查器（最大模块 251 行）
+│   │   │   │   ├── _numerical.py     #       数值一致性检查器
 │   │   │   │   ├── _patterns.py      #       正则模式
 │   │   │   │   ├── _ranking.py       #       排名正确性检查器
 │   │   │   │   ├── _runner.py        #       run_fact_check 统一入口（全量校验 + 自动修正）
@@ -184,7 +186,7 @@ investor-util/
 │   │   │   ├── market_value.py       #   市值计算与盈亏分析
 │   │   │   ├── market_value_sheet.py #   市值分析 Excel 页签
 │   │   │   ├── category.py           #   持仓分类（股票/基金/债券/QDII 等）
-│   │   │   ├── chart_data_builder.py #   Chart.js 6 图数据集预处理器（≤400 行）
+│   │   │   ├── chart_data_builder.py #   Chart.js 6 图数据集预处理器
 │   │   │   ├── fund_performance.py   #   基金业绩分析（排名/回撤/超额收益）
 │   │   │   ├── fund_concentration.py #   基金持仓集中度分析
 │   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
@@ -267,10 +269,10 @@ investor-util/
 │   ├── static/                       # 前端静态资产（本地 bundle + 调试页）
 │   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
 │   │   ├── chart-print.js            #   打印降级（beforeprint 快照 <img> / afterprint 恢复）
-│   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制，≤150 行）
+│   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制）
 │   │   ├── chart-export.js           #   单图导出 PNG 按钮（.chart-box 注入，2x 分辨率下载）
 │   │   ├── chart-common.js           #   Chart.js 公共初始化 helper（trackChart/lineOptions/doughnutOptions，chart-init 与 What-if 页共用）
-│   │   ├── chart-init.js             #   6 张图初始化（单图异常隔离 + degraded 虚线，≤300 行）
+│   │   ├── chart-init.js             #   6 张图初始化（单图异常隔离 + degraded 虚线）
 │   │   ├── toc.js                    #   左侧目录 TOC（折叠/展开 + IntersectionObserver 滚动高亮，离线自包含）
 │   │   ├── test-chart.html           #   独立调试页：6 图渲染/降级/离线场景自检（Chart.js 升级验证载体）
 │   │   └── README.md                 #   资产说明 + Chart.js 版本号记录（升级指引：替换引擎后先在此页验证）
@@ -283,7 +285,7 @@ investor-util/
 │       │   └── hallucination/        #   幻觉测试数据集
 │       │       ├── __init__.py       #       子包标记
 │       │       └── datasets.py       #       幻觉评估标准持仓数据
-│       ├── unit/                     #   单元测试（12 子目录）
+│       ├── unit/                     #   单元测试（13 子目录）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── conftest.py           #   单元测试 conftest
 │       │   ├── analysis/             #   分析计算单元测试
@@ -301,6 +303,8 @@ investor-util/
 │       │   │   ├── test_scenario_analysis.py       #   情景分析测试
 │       │   │   ├── test_alignment_correction.py #   口径修正因子计算
 │       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
+│       │   │   ├── test_drawdown_events.py    #   回撤事件识别
+│       │   │   ├── test_drawdown_events_edge.py #  回撤事件识别边缘场景
 │       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
 │       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
@@ -477,6 +481,9 @@ investor-util/
 │       │   │   ├── test_security_edge.py          #   证券边缘场景
 │       │   │   ├── test_orchestrator.py           #   报告编排器单元测试
 │       │   │   └── test_summary.py                #   摘要生成测试
+│       │   ├── startup/              #   首次运行引导单元测试
+│       │   │   ├── __init__.py       #       子包标记
+│       │   │   └── test_startup_wizard.py  #   首次运行引导向导测试
 │       │   ├── cli/                 #   CLI 命令行模式单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_cli.py               #   CLI 命令行模式单元测试
@@ -687,7 +694,7 @@ investor-util/
 │   │   │       ├── data-source-stability-test-report.md               # 数据源稳定性专项测试报告
 │   │   │       ├── better-investment-performance-test-report.md        # 端到端性能基准测试报告
 │   │   │       ├── task91-enhanced-llm-strategy.md                    # 增强型 LLM 策略引擎设计
-│       ├── r1-insert-feasibility-audit-into-discussion.py      # R1 数据源可行性审查插入脚本（最终版）
+│   │   │       ├── r1-insert-feasibility-audit-into-discussion.py      # R1 数据源可行性审查插入脚本（最终版）
 │   │   │       ├── debug-find-insert-anchor_r1.py                     # R1 锚点定位合并调试脚本
 │   │   │       ├── llm-hallucination-report_expert-review.md           # LLM 幻觉率采样报告（expert_review 模块）
 │   │   │       ├── llm-hallucination-prompts_expert-review.md          # 幻觉采样完整 Prompt 构造（Dry-Run）
@@ -734,7 +741,7 @@ investor-util/
 │   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
-│   │   └── tmp/                          #   临时文件（git 忽略，不展开）
+│   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口

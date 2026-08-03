@@ -139,7 +139,7 @@
 | **D2: 辩论降级回退普通模式** | — | `test_debate_pipeline.py` | 正反辩论启用但 pro 或 con 返回 None | 菜单 L（模拟 LLM pro 失败） | 自动回退普通 expert_review；返回 8 元组（无 debate_info）；HTML 不显示辩论块，显示普通结果 |
 | **D3: Token 预算触发生成截断** | — | `test_debate_token_budget.py` | 配置极低 `max_total_tokens_per_report`，持仓数据量大使 pro+con 超 1× 预算 | 菜单 L（模拟长篇输出） | 超过 1× 预算跳过 synthesis，返回 pro+con 拼接；超过 2× 跳过全部 debate 回退普通模式；日志输出 budget 告警 |
 
-> LLM 相关的场景按 S11-S17 分组拆分为 7 个子文件（`scenario/llm/test_llm_mixed_cache.py` ~ `test_llm_partial_cache.py`），S18-S20 归入 `test_llm_empty_holdings.py` / `test_llm_output_consistency.py` / `test_llm_non_trading_day.py` / `test_llm_multi_account.py`。
+> LLM 相关的场景：S11-S17 分布在 7 个子文件（`scenario/llm/test_llm_mixed_cache.py` ~ `test_llm_partial_cache.py`），S18/S19 归入 `test_llm_empty_holdings.py`、S20 归入 `test_llm_output_consistency.py`；另有 `test_llm_non_trading_day.py` / `test_llm_multi_account.py` 覆盖跨日/多账户 LLM 场景。
 > S0a/S0b/S0d（持仓质量，不含 S0c）统一放在 `test_scenario_holdings_quality.py`；S0c（超多持仓）和 S10（极端值）放在 `test_scenario_extreme.py`。
 > S21-S28（特殊品种）统一放在 `test_scenario_special_securities.py`。
 > S29-S33（操作行为）统一放在 `test_scenario_operational_behavior.py`。
@@ -156,7 +156,7 @@
 
 单元测试按被测模块分组，通过 **父子双层 marker** 实现灵活筛选：
 
-- **父标记 `unit`** 匹配全部 11 个子组，用于全量单元测试运行（`-m "unit"`）
+- **父标记 `unit`** 匹配全部 10 个子组，用于全量单元测试运行（`-m "unit"`）
 - **子标记**如 `unit_providers`、`unit_fetcher`、`unit_llm` 等支持单独运行指定模块的测试（`-m "unit_providers"`）
 - 新增单元测试文件时，必须为其测试类标注子标记和父标记，缺一不可
 
@@ -510,8 +510,8 @@ def test_get_ttl_closed(self, mock_open):
 
 12. **异常场景不崩溃**：对 §1.6 异常场景清单中的 🔴/🟡 状态项，人工确认至少不导致程序崩溃
 13. **报告文件视觉检查**：Excel 和 HTML 输出文件无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）
-14. **TUI 菜单功能正常**：所有菜单选项（[E]/[B]/[L]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确，无崩溃
-15. **whatif CLI 手动验证**：`python -m src.python.cli whatif --base 调仓前.xlsx --candidate 调仓后.xlsx` 生成 `调仓模拟.xlsx/.html`（最新版固定名，历史归档至日期子目录）；缺省 --base 用 config 持仓；--candidate 缺失报参数错误；HTML 双环图正常渲染、Excel 变动行底色正确
+14. **TUI 菜单功能正常**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确，无崩溃
+15. **whatif CLI 手动验证**：`python -m src.python.cli whatif --base 调仓前.xlsx --candidate 调仓后.xlsx [--effective-date 2026-07-01]` 生成 `调仓模拟.xlsx/.html`（最新版固定名，历史归档至日期子目录）；缺省 --base 用 config 持仓；--candidate 缺失报参数错误；指定 --effective-date 时输出时序回测（见第 16 项）；HTML 双环图正常渲染、Excel 变动行底色正确
 16. **whatif 生效日时序回测验证**：① 指定 `--effective-date 2026-07-01`（过去日期）→ Excel 出现第 4 页签「时序回测」、HTML 出现④时序回测区（指标卡 + 2 张折线图 + 图下说明）；② 不指定生效日 → 维持现状（3 页签，无回测区，不联网）；③ 未来生效日（如 `--effective-date 2099-01-01`）或格式错误 → 回测降级占位、主报告正常生成；④ 断网/缓存为空时回测不可用 → 报告仍生成（回测区隐藏/占位）
 
 ---
