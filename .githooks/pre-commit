@@ -1,0 +1,34 @@
+#!/bin/sh
+# git pre-commit hook — 任务编号（plan-/rf-）全局一致性检查
+#
+# 提交前校验 plan.md / review-findings.md 的「编号源」标记（plan-next /
+# rf-next）是否与全部历史归档无冲突，防止新增编号撞历史编号。
+#
+# 依赖 Python 在 PATH 中。校验脚本 scripts/check-task-numbering.py 随仓库
+# 同步；本 hook 需启用 core.hooksPath（见 install-hooks.sh）。
+#
+# 失败时中止提交并提示修正编号源标记。
+
+set -e
+
+if ! command -v python >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
+    echo "[ERR] pre-commit: 未找到 python/python3，跳过编号校验" >&2
+    exit 0
+fi
+
+PY_CMD="python"
+command -v python >/dev/null 2>&1 || PY_CMD="python3"
+
+# 仅当本次提交涉及编号管理文档时才校验（减少无关提交开销）
+CHANGED=$(git diff --cached --name-only 2>/dev/null | grep -E '(^|/)plan\.md$|(^|/)review-findings\.md$' || true)
+if [ -z "$CHANGED" ]; then
+    exit 0
+fi
+
+echo "[..] pre-commit: 校验任务编号一致性（涉及编号管理文档）"
+if ! "$PY_CMD" scripts/check-task-numbering.py --ci; then
+    echo "[ERR] pre-commit: 任务编号与历史归档冲突，请修正 plan-next / rf-next 标记后重试" >&2
+    exit 1
+fi
+echo "[OK] pre-commit: 任务编号一致性通过"
+exit 0

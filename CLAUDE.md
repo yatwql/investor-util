@@ -11,9 +11,9 @@
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：`src/test/test_*.py`，执行 `pytest src/test/`
-  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查），否则不得 commit
+  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查），否则不得 commit
   - **合入门禁（P1）**：合并到 master 前必须通过 `python scripts/test_runner.py --mode verify`（核心模块单元测试），否则不得 merge
-  - **发布门禁（P2）**：发布版本前必须通过 `python scripts/test_runner.py --mode verify,regression`（单元+场景验证）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查），否则不得 release
+  - **发布门禁（P2）**：发布版本前必须通过 `python scripts/test_runner.py --mode verify,regression`（单元+场景验证）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查），否则不得 release
   > P1/P2 的完整要求（含手动验证项）见 `testplan.md` → §4 回归测试清单 / §6.3 门禁
 - **CI 辅助检查**：`ruff format --check`（代码格式一致性），非阻塞门禁——格式问题可通过 `ruff format` 自动修复，不阻止合并/发布
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。
@@ -35,6 +35,7 @@
   - 序号仅用于标识，**不编码优先级、不编码层级、不编码分类**。优先级信息在分类表头文字描述中表达
   - 跨文档引用时**必须带前缀**（`plan-`/`rf-`），避免歧义
   - 历史数据保持原名（如 `P3-09`、`P4-91`），不追溯重命名
+  - **编号源标记**：各管理文档头部维护「编号源」标记记录**下一个可用编号**——`plan.md` → `plan-next`、`review-findings.md` → `rf-next`。新增任务时**取当前值**作为编号，完成后**递增更新标记**（+1）。标记单调递增、绝不回退，保证与历史归档（含 `docs-stm/archive/*/`）编号不冲突。若标记遗漏递增或初值异常，`scripts/check-task-numbering.py --ci` 会扫描当前文档+全部归档报错并提示修正值（已用最大+1）
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md）
 - **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-menu.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource.md, datasource-reliability.md, reports-instruction.md, faq.md, how-to-test-my-code.md, how-to-schedule.md, scripts-reference.md）

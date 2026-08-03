@@ -71,6 +71,7 @@ MODES: dict[str, dict] = {
     "dev-verify": {
         "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景，~2.5min）",
         "order": 5,
+        "preflight": [[sys.executable, "scripts/check-task-numbering.py", "--ci"]],
         "phases": [
             {
                 "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)",
@@ -674,8 +675,8 @@ def _run_phased(
 
     每个阶段调用一次 subprocess.run，支持不同 marker/parallel/timeout。
     """
-    html_available = _check_pytest_html()
     mode_cfg = MODES.get(mode_key, {})
+    html_available = _check_pytest_html()
 
     combined: dict = {
         "mode": mode_key,
@@ -689,6 +690,25 @@ def _run_phased(
         "exit_code": 0,
         "timed_out": False,
     }
+
+    # 预检门禁：非 pytest 脚本（如任务编号一致性检查），失败则中止本模式
+    for preflight_cmd in mode_cfg.get("preflight", []):
+        proc = subprocess.run(
+            preflight_cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=_PROJECT_ROOT,
+        )
+        if proc.returncode != 0:
+            output = (proc.stdout or "") + (proc.stderr or "")
+            print(f"    [ERR] 预检失败: {' '.join(preflight_cmd)}")
+            for line in output.splitlines():
+                print(f"      {line}")
+            combined["exit_code"] = proc.returncode
+            print(f"\n  [ERR] {mode_key}（分阶段）: 预检未通过，跳过测试阶段")
+            return combined
 
     for i, phase in enumerate(phases):
         tag = chr(65 + i)  # A, B, C, …
