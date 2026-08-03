@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：0.9.13-dev
+> 文档版本：0.10.0
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -13,7 +13,7 @@
 | 辅助脚本 | Python | 16 | 4,900 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
 | **源代码合计** | — | **228** | **57,551** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **247** | **69,599** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,401 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **测试用例** | — | — | **4,425 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
@@ -729,7 +729,7 @@ investor-util/
 │   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
 │   │   ├── v0.9.x/                           # v0.9.x 版本归档（changelog/plan/review-findings + 设计文档）
 │   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（设计文档索引）
-│   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x（0.9.0 ~ 0.9.8）
+│   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x
 │   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x
 │   │   │   ├── abandoned-design/               #   已放弃设计决策归档区（plan-4 业绩归因）
 │   │   │   │   └── plan-4-brinson-attribution-abandoned.md # plan-4 业绩归因（Brinson）放弃设计
@@ -751,7 +751,7 @@ investor-util/
 │   │   │   │   └── plan-whatif-backtest.md      #     调仓 What-if 指定生效日时序回测设计
 │   │   │   ├── portfolio-evolution/             #   多快照趋势追踪/组合演进设计
 │   │   │   │   └── plan-portfolio-evolution.md  #     多快照趋势追踪设计
-│   │   │   ├── html-dark-mode/                  #   HTML 暗色模式实施归档（plan-11）
+│   │   │   ├── html-dark-mode/                  #   HTML 暗色模式实施归档
 │   │   │   │   ├── dark-mode-implementation.md  #     plan-11 暗色模式实施记录
 │   │   │   │   └── plan-11-dark-mode-plan.md    #     plan-11 暗色模式实施计划
 │   │   │   ├── fix-deepseek-thinking/           #   DeepSeek thinking 思考耗尽修复设计
