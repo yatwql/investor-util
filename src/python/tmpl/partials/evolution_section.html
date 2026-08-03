@@ -1,5 +1,5 @@
 {# ==============================================================
-   组合演进章节 partial（自 report_template.html 提取，减轻主模板体量）。
+   组合演进章节 partial（供 report_template.html 经 include 引入）。
 
    依赖 context 变量（report_template.html 以 `{% include ... with context %}`
    引入）：section_visible / section_numbers / evolution_data /
@@ -7,7 +7,7 @@
    为模板环境全局（html_jinja_env 注册）。
 
    图表数据段 #evolution-chart-data 序列化 evolution_chart_data（Python 侧
-   chart_data_builder.build_evolution_chart_data 裁剪后的专用负载，仅含图表消费字段，
+   chart_data_builder.build_evolution_chart_data 生成的专用负载，仅含图表消费字段，
    避免整包序列化完整契约 dict）。
 
    底部「回到顶部」与 report_template.html 的 render_back_to_top() 宏同构
@@ -15,7 +15,7 @@
    ============================================================== #}
 {% if section_visible("portfolio_evolution") %}
 <!-- ═══════════════════════════════════════════════════════ -->
-<!--  MODULE 18: 组合演进（多快照趋势追踪）           -->
+<!--  MODULE 19: 组合演进（多快照趋势追踪）           -->
 <!-- ═══════════════════════════════════════════════════════ -->
 {% set _evo = evolution_data or {} %}
 <div class="section" id="sec-portfolio_evolution" style="order: {{ section_numbers['portfolio_evolution'] }};">

@@ -12,6 +12,7 @@ import contextlib
 import tempfile
 
 from src.python.config import set_config
+from src.python.config._json_patch import _replace_dict_block, _update_json_raw_text
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.logger import setup_logger
 from src.python.core.reader import list_xlsx_files
@@ -92,90 +93,6 @@ def _write_llm_settings(settings: dict, path: str) -> None:
     from src.python.config import get_llm_config
 
     get_llm_config()
-
-
-def _update_json_raw_text(raw: str, current: dict, new: dict) -> str:
-    """在原始 JSON 文本中做精确的字段级替换，保留注释和空白。
-
-    对 dict 类型值使用 brace 平衡算法 + 自适应缩进替换，
-    对简单值（str/int/bool/None）使用正则替换。
-
-    Args:
-        raw: 原始 JSON 文本（含注释）
-        current: 当前解析后的值
-        new: 要写入的新值
-
-    Returns:
-        经字段级替换后的新文本
-    """
-    import re
-
-    result = raw
-    for key, new_val in new.items():
-        old_val = current.get(key)
-        if old_val == new_val:
-            continue
-
-        if isinstance(old_val, dict):
-            result = _replace_dict_block(result, key, new_val)
-        else:
-            old_json = json.dumps(old_val, ensure_ascii=False, indent=2) if old_val is not None else "null"
-            new_json = json.dumps(new_val, ensure_ascii=False, indent=2) if new_val is not None else "null"
-            result = re.sub(
-                re.escape(f'"{key}":') + r"\s*" + re.escape(old_json),
-                f'"{key}": {new_json}',
-                result,
-                count=1,
-            )
-    return result
-
-
-def _replace_dict_block(text: str, key: str, new_val: dict) -> str:
-    """在 JSON 文本中找到指定 key 的 dict 值区块，自适应缩进替换。
-
-    使用 brace 平衡算法确保正确匹配嵌套大括号，自动检测周围缩进层级，
-    使替换后的 JSON 与文件缩进风格一致。
-    """
-    import json as _json
-    import re
-
-    match = re.search(re.escape(f'"{key}":') + r"\s*\{", text)
-    if not match:
-        return text
-
-    # 检测 key 所在的当前行缩进
-    line_start = text.rfind("\n", 0, match.start()) + 1
-    base_indent = match.start() - line_start  # ""{key}"" 前的空格数
-
-    # 序列化新值，使用 4 空格内缩
-    INNER_INDENT = 4
-    lines = _json.dumps(new_val, ensure_ascii=False, indent=INNER_INDENT).split("\n")
-
-    # 第一行是 "{"，续行加 base_indent 前缀，末行 "}" 也加 base_indent
-    block_lines = [lines[0]]
-    for line in lines[1:]:
-        stripped = line.lstrip()
-        leading = len(line) - len(stripped)
-        if leading == 0:
-            block_lines.append(" " * base_indent + stripped)
-        else:
-            block_lines.append(" " * base_indent + line)
-    block_text = "\n".join(block_lines)
-
-    # 从 opening brace 开始逐字符查找 matching closing brace
-    brace_start = match.end() - 1  # '{' 的位置
-    depth = 0
-    pos = brace_start
-    while pos < len(text):
-        ch = text[pos]
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[: match.start()] + f'"{key}": {block_text}' + text[pos + 1 :]
-        pos += 1
-    return text  # brace 不平衡，放弃替换
 
 
 def _edit_single_config(key: str, label: str, default: str = "", *, pre_hook=None) -> None:
@@ -457,9 +374,9 @@ def _cmd_config_report_boards() -> None:
         fund_status = f"{GREEN}启用{RESET}" if fund_deep_analysis else f"{RED}禁用{RESET}"
         n_status = f"{GREEN}启用{RESET}" if news else f"{RED}禁用{RESET}"
         h_status = f"{GREEN}启用{RESET}" if history else f"{RED}禁用{RESET}"
-        print(f"  │ 1. 基金深度分析（#6~10）        [{fund_status}]{' ' * 8}│")
-        print(f"  │ 2. 市场新闻（#11）              [{n_status}]{' ' * 8}│")
-        print(f"  │ 3. 组合历史走势+回撤（#16~17）  [{h_status}]{' ' * 8}│")
+        print(f"  │ 1. 基金深度分析（#6~11）        [{fund_status}]{' ' * 8}│")
+        print(f"  │ 2. 市场新闻（#12）              [{n_status}]{' ' * 8}│")
+        print(f"  │ 3. 组合历史走势+回撤（#17~18）  [{h_status}]{' ' * 8}│")
         print("  │                                   │")
         print("  │ 4. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")

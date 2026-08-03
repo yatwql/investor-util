@@ -6,7 +6,7 @@
 > 状态：⏳ 待实测（rf-113，review-findings.md P1）
 > 目的：plan-1 代码与自动化测试已落地（dev-verify 1181 passed），以下为**只能真实浏览器/微信执行的验证项**——本清单提供可勾选的操作步骤，勾选完成后回填 `changelog.md` 并将 rf-113 从 review-findings.md 待处理移至已修复表。
 >
-> 文档版本：0.9.5-dev
+> 文档版本：0.9.9-dev（rf-159 后更新资产清单：7 JS + chart-common.js 依赖说明）
 
 ---
 
@@ -14,8 +14,8 @@
 
 | # | 操作 | 说明 |
 |:-:|:-----|:-----|
-| 0.1 | 生成一份完整报告（菜单 L 或 B） | 报告输出目录含 6 个 canvas + 4 个 JS 资产（`chart.min.js`/`chart-print.js`/`chart-config.js`/`chart-init.js`），确认 `src/static/` 四文件已复制 |
-| 0.2 | 打开 `src/static/test-chart.html` 调试页（可独立于真实报告先行） | 6 图渲染/交互 + 4 场景自检；S2 升级验证载体 |
+| 0.1 | 生成一份完整报告（菜单 L 或 B） | 报告输出目录含 6 个 Chart.js canvas + 7 个 JS 资产（`chart.min.js`/`chart-print.js`/`chart-config.js`/`chart-export.js`/`chart-common.js`/`chart-init.js`/`toc.js`），确认 `src/static/` 七文件已复制 |
+| 0.2 | 打开 `src/static/test-chart.html` 调试页（可独立于真实报告先行） | 6 图渲染/交互 + 4 场景自检；S2 升级验证载体。⚠ 注入列表必须含 `chart-common.js`（rf-159 后 chart-init.js 依赖 `window.ChartCommon`，缺失会 0/6 全跳过） |
 | 0.3 | 调试页场景栏切换：正常 / 降级（虚线）/ 空数据（占位）/ 离线（无引擎） | 场景自检横幅显示 `N/6 图已初始化` |
 
 > ⚠ 浏览器最低版本：Chrome / Edge 90+（主验）、Firefox 90+ / Safari 14+（抽验）、国产 Chromium 内核 90+（R17 矩阵）。
@@ -25,6 +25,8 @@
 ## ① 6 图渲染 + 交互（Iter 7 验收标准 2）
 
 > 对应 rf-113 ①。可用 `test-chart.html` 调试页在真实浏览器执行。
+> ⚠ ① 的 6 图 = 核心 6 图（净值/回撤/资产构成/行业/穿透/雷达）。真实报告（菜单 L/B）另含 **3 张组合演进图**（evolution_total/hhi/top，plan-5/6 新增）——非 rf-113 验证对象，正常渲染即可。
+> ⚠ 回撤图（chart_drawdown）在报告里**仅当历史数据 span ≥ 60 交易日才渲染**（§1.4.5，`drawdown_available`）；span 不足时该 canvas 按设计隐藏。要完整验证 6 图交互请用 `test-chart.html`（合成数据全量渲染）。
 
 | # | 检查项 | Chrome | Edge | Firefox* | Safari* |
 |:-:|:-------|:------:|:----:|:-------:|:-------:|
@@ -55,6 +57,7 @@
 ## ③ 离线验证（Iter 7 验收标准 4，R21）
 
 > 对应 rf-113 ③。本地 bundle 离线自包含，`typeof Chart` 守卫跳过初始化。
+> ⚠ 删除 `chart.min.js` 时**保留 `chart-common.js`**：它不依赖引擎，加载无副作用；chart-init.js 靠 `typeof Chart` 守卫静默跳过（双守卫 `typeof Chart === 'undefined' || !window.ChartCommon`，rf-159 后）。
 
 | # | 检查项 | 结果 |
 |:-:|:-------|:----:|

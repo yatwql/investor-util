@@ -11,7 +11,7 @@
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **测试**：`src/test/test_*.py`，执行 `pytest src/test/`
-  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `python scripts/check-history-traces.py --ci`（注释历史痕迹检查），否则不得 commit
+  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查），否则不得 commit
   - **合入门禁（P1）**：合并到 master 前必须通过 `python scripts/test_runner.py --mode verify`（核心模块单元测试），否则不得 merge
   - **发布门禁（P2）**：发布版本前必须通过 `python scripts/test_runner.py --mode verify,regression`（单元+场景验证），否则不得 release
   > P1/P2 的完整要求（含手动验证项）见 `testplan.md` → §4 回归测试清单 / §6.3 门禁

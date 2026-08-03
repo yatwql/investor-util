@@ -98,11 +98,13 @@ def _bind_callbacks() -> None:
         _cmd_generate_excel,
         _cmd_generate_full,
     )
+    from src.python.tui.handlers_whatif import _cmd_whatif
 
     callbacks: dict[str, Callable] = {
         "E": _cmd_generate_excel,
         "B": _cmd_generate_both,
         "L": _cmd_generate_full,
+        "W": _cmd_whatif,
         "C": _cmd_config_dir,
         "F": _cmd_config_filename,
         "O": _cmd_config_output_dir,
@@ -152,7 +154,7 @@ def main() -> None:
     except Exception:
         logger.debug("首次运行引导显示失败（非关键）", exc_info=True)
 
-    # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/C/F/O/1/2/3/4/S/R/X
+    # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/W/C/F/O/1/2/3/4/S/R/X
     from src.python.config import get_config
 
     _default_key = get_config().get("default_menu_key", "L").upper()

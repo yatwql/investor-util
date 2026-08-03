@@ -32,6 +32,11 @@ MIN_HOLDINGS: int = 2
 SIGNIFICANCE_LEVEL: float = 0.05
 # 拉取条数（编排层使用，预留对齐/dropna 头部损耗，与 factor_exposure 一致）
 FETCH_DAYS: int = 90
+# 常数序列检测阈值：标准差低于此值视为方差为 0（常数/近常数序列），
+# 返回 (0.0, 1.0) 绝不硬算。用容差而非精确 == 0——均值舍入误差可能使
+# 常数序列的标准差算出 ~1e-17 的极小非零值（CPython sum 实现差异），
+# 精确相等会绕过保护导致虚假近零相关
+_CONSTANT_EPS: float = 1e-12
 
 
 def _is_valid_return(value) -> bool:
@@ -112,7 +117,7 @@ def _pearson_pvalue(x: list[float], y: list[float]) -> tuple[float, float]:
     num = sum((a - mx) * (b - my) for a, b in zip(x, y))
     sx = math.sqrt(sum((a - mx) ** 2 for a in x))
     sy = math.sqrt(sum((b - my) ** 2 for b in y))
-    if sx == 0 or sy == 0:
+    if sx < _CONSTANT_EPS or sy < _CONSTANT_EPS:
         return 0.0, 1.0
     r = max(-1.0, min(1.0, num / (sx * sy)))
     if abs(r) >= 1.0:

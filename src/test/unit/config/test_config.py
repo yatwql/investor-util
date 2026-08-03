@@ -22,6 +22,7 @@ from src.python import config as cfg
 from src.python.config import _comments
 from src.python.core.constants import PROJECT_ROOT
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 
 
@@ -33,11 +34,73 @@ _ABS_LLM_SETTINGS = os.path.join(PROJECT_ROOT, "data/config/llm_settings.json")
 
 # 模板中的路径型键使用相对路径（用户友好），_DEFAULT_CONFIG 使用绝对路径，
 # 值比较时需跳过这些键
-_PATH_KEYS_IN_TEMPLATE = frozenset({
-    "holdings_dir", "output_dir", "llm_settings_file",
-    "llm_key_file", "llm_providers_file",
-})
+_PATH_KEYS_IN_TEMPLATE = frozenset(
+    {
+        "holdings_dir",
+        "output_dir",
+        "llm_settings_file",
+        "llm_key_file",
+        "llm_providers_file",
+    }
+)
 
+
+class TestMergeLlmDefaults(unittest.TestCase):
+    """_merge_llm_defaults 运行时补默认语义测试。
+
+    语义（与 get_config 的 config.json 合并策略一致）：
+      - 默认值打底，用户覆盖
+      - 用户显式 null 不覆盖默认
+      - 嵌套 dict 一层合并
+      - 未知键透传
+    """
+
+    def setUp(self):
+        from src.python.config._core import _merge_llm_defaults
+
+        self._merge = _merge_llm_defaults
+
+    def test_empty_base_returns_full_defaults(self):
+        """空用户配置 → 返回完整默认配置。"""
+        merged = self._merge({})
+        self.assertEqual(merged["max_retries"], 2)
+        self.assertEqual(merged["temperature_global_macro"], 0.3)
+        self.assertIn("pricing", merged)
+        self.assertIn("fact_check", merged)
+        self.assertIn("debate", merged)
+
+    def test_user_scalar_overrides_default(self):
+        """用户标量覆盖默认值，其余默认保留。"""
+        merged = self._merge({"max_retries": 5})
+        self.assertEqual(merged["max_retries"], 5)
+        self.assertEqual(merged["llm_max_concurrency"], 3)
+
+    def test_null_does_not_override_default(self):
+        """用户显式 null → 不覆盖默认值（null 不覆盖）。"""
+        merged = self._merge({"max_retries": None, "temperature_global_macro": None})
+        self.assertEqual(merged["max_retries"], 2)
+        self.assertEqual(merged["temperature_global_macro"], 0.3)
+
+    def test_dict_one_level_merge(self):
+        """嵌套 dict 一层合并，只覆盖部分子键不丢默认。"""
+        merged = self._merge({"enabled_llm": {"global_macro": False}})
+        self.assertFalse(merged["enabled_llm"]["global_macro"])
+        self.assertTrue(merged["enabled_llm"]["expert_review"])
+
+        merged2 = self._merge({"pricing": {"currency": "USD"}})
+        self.assertEqual(merged2["pricing"]["currency"], "USD")
+        self.assertIn("claude-sonnet-4-6", merged2["pricing"])
+
+    def test_unknown_key_passthrough(self):
+        """默认中不存在的键原样透传（未知键透传）。"""
+        merged = self._merge({"custom_field": "custom_value"})
+        self.assertEqual(merged["custom_field"], "custom_value")
+
+    def test_debate_defaults_preserved(self):
+        """debate 段缺失 → 默认值保留（schema 校验由 _load_debate_config 兜底）。"""
+        merged = self._merge({})
+        self.assertEqual(merged["debate"]["max_total_tokens_per_report"], 48000)
+        self.assertEqual(merged["debate"]["qa_concentration"]["threshold"], 0.20)
 
 
 class TestGetConfig(unittest.TestCase):
@@ -108,6 +171,33 @@ class TestGetConfig(unittest.TestCase):
         result = cfg.get_config()
         self.assertEqual(result["holdings_dir"], "/a")
         self.assertEqual(result["news_top_count"], 50)
+
+    def test_legacy_history_analysis_migrates_to_fetch_mode(self):
+        """旧配置键 history.analysis → 自动迁移为 history.fetch_mode。"""
+        os.makedirs(self.tmp.name, exist_ok=True)
+        legacy = {"history": {"analysis": "off"}}
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(legacy, f)
+        result = cfg.get_config()
+        hist = result.get("history", {})
+        self.assertEqual(hist.get("fetch_mode"), "off")
+        self.assertNotIn("analysis", hist)
+
+    def test_legacy_history_analysis_kept_when_fetch_mode_present(self):
+        """旧键与新键并存时，显式 fetch_mode 优先，analysis 被清理。"""
+        os.makedirs(self.tmp.name, exist_ok=True)
+        mixed = {"history": {"analysis": "off", "fetch_mode": "auto"}}
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(mixed, f)
+        result = cfg.get_config()
+        hist = result.get("history", {})
+        self.assertEqual(hist.get("fetch_mode"), "auto")
+        self.assertNotIn("analysis", hist)
+
+    def test_fetch_mode_default_is_auto(self):
+        """未配置 history 时 fetch_mode 默认 auto。"""
+        result = cfg.get_config()
+        self.assertEqual(result.get("history", {}).get("fetch_mode"), "auto")
 
 
 class TestInitConfig(unittest.TestCase):
@@ -218,8 +308,10 @@ class TestSetConfig(unittest.TestCase):
         cfg.init_config()
         # 模拟写入失败，读取正常（让 get_config 能读出已有配置）
         _real_open = open
+
         def _mock_mkstemp(*args, **kwargs):
             raise PermissionError("denied")
+
         with patch("tempfile.mkstemp", side_effect=_mock_mkstemp):
             with self.assertRaises(PermissionError):
                 cfg.set_config("key", "value")
@@ -303,7 +395,7 @@ class TestSetConfigSingleKeyPatch(unittest.TestCase):
         self.assertIn("// ── A. 路径与文件 ──", raw)
         self.assertIn("// ── L. 批量并行调度 ──", raw)
         # enable_news 行尾注释保留
-        self.assertIn("// 市场新闻（#11）", raw)
+        self.assertIn("// 市场新闻（#12）", raw)
         # 值已更新
         data = json.loads(_comments._strip_json_comments(raw))
         self.assertFalse(data["enable_news"])
@@ -440,6 +532,7 @@ class TestSystemPromptOverride:
     def test_override_from_config(self, mocker):
         """配置中 system_prompt_global_macro 为非 null 时，应以配置值为准。"""
         import src.python.llm.generators as _gens
+
         mock_system = "自定义全球政经局势提示词，请分析全球经济趋势。"
 
         # mock get_llm_config 返回包含 system_prompt_global_macro 的配置
@@ -454,20 +547,21 @@ class TestSystemPromptOverride:
         mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
         # _generate_llm_module 位于 skeleton.py，内部调用 skeleton.get_llm_config 和
         # skeleton._generate_llm_content，因此 mock 需指向 skeleton 而非 generators
-        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content",
-                                return_value=(None, False))
+        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
 
         _gens.generate_global_macro(
-            a_indices={}, us_indices={}, total_mv=100000,
-            total_profit=5000, total_cost=0, categories={},
+            a_indices={},
+            us_indices={},
+            total_mv=100000,
+            total_profit=5000,
+            total_cost=0,
+            categories={},
         )
 
         # 验证 _generate_llm_content 被调用，且第 4 个 positional 参数（system_prompt）等于自定义值
         # _generate_llm_content(llm_config, cache_key, cache_ttl, system_prompt, user_prompt, ...)
         call_args = mock_gen.call_args[0]  # positional args
-        assert call_args[3] == mock_system, (
-            f"预期 system_prompt={mock_system!r}, 实际={call_args[3]!r}"
-        )
+        assert call_args[3] == mock_system, f"预期 system_prompt={mock_system!r}, 实际={call_args[3]!r}"
 
     def test_fallback_to_default(self, mocker):
         """配置中 system_prompt_global_macro 为 null 时，应使用代码内置默认值。"""
@@ -482,19 +576,20 @@ class TestSystemPromptOverride:
             "model": None,
         }
         mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
-        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content",
-                                return_value=(None, False))
+        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
 
         _gens.generate_global_macro(
-            a_indices={}, us_indices={}, total_mv=100000,
-            total_profit=5000, total_cost=0, categories={},
+            a_indices={},
+            us_indices={},
+            total_mv=100000,
+            total_profit=5000,
+            total_cost=0,
+            categories={},
         )
 
         call_args = mock_gen.call_args[0]
         # 应该使用代码内置默认值 _SYSTEM_GLOBAL_MACRO
-        assert call_args[3] == _SYSTEM_GLOBAL_MACRO, (
-            f"预期内置默认值, 实际={call_args[3][:50]!r}"
-        )
+        assert call_args[3] == _SYSTEM_GLOBAL_MACRO, f"预期内置默认值, 实际={call_args[3][:50]!r}"
 
     def test_missing_key_fallback(self, mocker):
         """配置中完全没有 system_prompt_global_macro 键时，应使用内置默认值。"""
@@ -508,18 +603,19 @@ class TestSystemPromptOverride:
             "model": None,
         }
         mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
-        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content",
-                                return_value=(None, False))
+        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
 
         _gens.generate_global_macro(
-            a_indices={}, us_indices={}, total_mv=100000,
-            total_profit=5000, total_cost=0, categories={},
+            a_indices={},
+            us_indices={},
+            total_mv=100000,
+            total_profit=5000,
+            total_cost=0,
+            categories={},
         )
 
         call_args = mock_gen.call_args[0]
-        assert call_args[3] == _SYSTEM_GLOBAL_MACRO, (
-            f"预期内置默认值, 实际={call_args[3][:50]!r}"
-        )
+        assert call_args[3] == _SYSTEM_GLOBAL_MACRO, f"预期内置默认值, 实际={call_args[3][:50]!r}"
 
 
 class TestLlmSettingsKeyConsistency:
@@ -544,9 +640,7 @@ class TestLlmSettingsKeyConsistency:
 
         file_keys = set(llm.keys())
         untracked = file_keys - _KNOWN_LLM_SETTINGS_KEYS
-        assert not untracked, (
-            f"llm_settings.json 中发现 {len(untracked)} 个未登记键名: {sorted(untracked)}"
-        )
+        assert not untracked, f"llm_settings.json 中发现 {len(untracked)} 个未登记键名: {sorted(untracked)}"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -671,13 +765,15 @@ class TestValidateReportSectionOrder(unittest.TestCase):
 
     def test_valid_order_returns_zero(self):
         """有效配置 → 0 问题。"""
-        n = cfg.validate_config({
-            "report_section_order": {
-                "summary": 1,
-                "fund_manager": 6,
-                "global_macro": 12,
+        n = cfg.validate_config(
+            {
+                "report_section_order": {
+                    "summary": 1,
+                    "fund_manager": 6,
+                    "global_macro": 12,
+                }
             }
-        })
+        )
         self.assertEqual(n, 0)
 
     def test_non_dict_order_warns(self):
@@ -687,55 +783,45 @@ class TestValidateReportSectionOrder(unittest.TestCase):
 
     def test_unknown_key_warns(self):
         """未知模块标识 → 1 问题。"""
-        n = cfg.validate_config({
-            "report_section_order": {"nonexistent_module": 1}
-        })
+        n = cfg.validate_config({"report_section_order": {"nonexistent_module": 1}})
         self.assertEqual(n, 1)
 
     def test_non_integer_value_warns(self):
         """配置值不是整数 → 1 问题。"""
-        n = cfg.validate_config({
-            "report_section_order": {"summary": "abc"}
-        })
+        n = cfg.validate_config({"report_section_order": {"summary": "abc"}})
         self.assertEqual(n, 1)
 
     def test_negative_value_warns(self):
         """负值序号 → 1 问题。"""
-        n = cfg.validate_config({
-            "report_section_order": {"summary": -5}
-        })
+        n = cfg.validate_config({"report_section_order": {"summary": -5}})
         self.assertEqual(n, 1)
 
     def test_zero_value_warns(self):
         """零值序号 → 1 问题。"""
-        n = cfg.validate_config({
-            "report_section_order": {"summary": 0}
-        })
+        n = cfg.validate_config({"report_section_order": {"summary": 0}})
         self.assertEqual(n, 1)
 
     def test_duplicate_number_warns(self):
         """重复序号 → 1 问题（仅第二次出现时告警）。"""
-        n = cfg.validate_config({
-            "report_section_order": {"summary": 1, "fund_manager": 1}
-        })
+        n = cfg.validate_config({"report_section_order": {"summary": 1, "fund_manager": 1}})
         self.assertEqual(n, 1)
 
     def test_llm_usage_in_config_warns(self):
         """llm_usage 出现在配置中 → 1 问题。"""
-        n = cfg.validate_config({
-            "report_section_order": {"llm_usage": 1}
-        })
+        n = cfg.validate_config({"report_section_order": {"llm_usage": 1}})
         self.assertEqual(n, 1)
 
     def test_multiple_issues_accumulate(self):
         """多个问题累加计数。"""
-        n = cfg.validate_config({
-            "report_section_order": {
-                "unknown_key": 1,
-                "summary": "abc",
-                "fund_manager": -3,
+        n = cfg.validate_config(
+            {
+                "report_section_order": {
+                    "unknown_key": 1,
+                    "summary": "abc",
+                    "fund_manager": -3,
+                }
             }
-        })
+        )
         self.assertEqual(n, 3)
 
 
@@ -789,7 +875,5 @@ class TestDefaultConfigTemplateConsistency:
                 assert isinstance(parsed[key], str), f"模板中的路径键 {key!r} 非字符串"
             else:
                 assert parsed[key] == cfg._DEFAULT_CONFIG[key], (
-                    f"键 {key!r} 值不匹配:\n"
-                    f"  模板: {parsed[key]!r}\n"
-                    f"  配置: {cfg._DEFAULT_CONFIG[key]!r}"
+                    f"键 {key!r} 值不匹配:\n  模板: {parsed[key]!r}\n  配置: {cfg._DEFAULT_CONFIG[key]!r}"
                 )

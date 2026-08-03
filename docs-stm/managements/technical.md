@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 技术设计
 
-> 文档版本：0.9.8-dev
+> 文档版本：0.9.9-dev
 
 ## 目录
 
@@ -33,8 +33,8 @@
   - [4.9 资产穿透 TOP10](#49-资产穿透-top10)
   - [4.10 财经新闻热点与持仓关联分析](#410-财经新闻热点与持仓关联分析)
   - [4.11 数据降级治理体系](#411-数据降级治理体系)
-  - [4.12 组合演进（多快照趋势，plan-6）](#412-组合演进多快照趋势plan-6)
-  - [4.13 调仓 What-if 模拟（plan-5）](#413-调仓-what-if-模拟plan-5)
+  - [4.12 组合演进（多快照趋势）](#412-组合演进多快照趋势)
+  - [4.13 调仓 What-if 模拟](#413-调仓-what-if-模拟)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -477,7 +477,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 | 维度 | 单股票 API | 批量 API（eastmoney_industry） | LLM 熔断器 |
 |:-----|:----------|:-----------------------------|:----------|
 | 实现位置 | `core/provider_registry.py` | `core/provider_registry.py` | `llm/circuit_breaker.py` |
-| 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 N 次 |
+| 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 3 次 |
 | 冷却时长 | 指数退避 60s→300s→900s→3600s | 120s | 60s |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
 | 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 |
@@ -583,7 +583,7 @@ fetcher/
 ├── akshare.py          AKShare 数据获取（备用数据源）
 ├── bond_yield.py       债券收益率数据
 ├── news.py             新闻数据获取
-└── history_diff.py     F1 快照差异计算（纯计算，无 I/O）
+└── history_diff.py     持仓快照差异计算（纯计算，无 I/O）
 ```
 
 **并行预热**：`preload_cache()` 对 preload 组使用 `ThreadPoolExecutor` 并行获取，减少串行等待。
@@ -670,7 +670,7 @@ _fetch_with_cache_refresh() 返回数据后
         NO（跨日残留）
          │
          ▼
-cache_clear(cache_key) → 强制刷新 → 重新走 Provider Chain
+cache_clear(cache_key) → 强制刷新 → 重新走 Provider Chain → 成功后自动写回缓存
 （盘中因 Tencent 不可用降级写入 EastMoney 净值，
   或盘中缓存的上一交易日残留，均在收市后自动清除）
 ```
@@ -1030,11 +1030,11 @@ def _get_pool() -> ThreadPoolExecutor:
             │                           ▼                      ▼
             ▼                  excel_generator.py       html_writer.py
       ┌──────────┐                 (编排器 437 行)         │
-      │ F1 快照  │                     │                   ▼
-      │ 比较     │                     ▼           html_builders.py
+      │ 快照对比 │                     │                   ▼
+      │          │                     ▼           html_builders.py
       │          │           excel_sheet_factory.py   (数据构建器)
-      │ F2 历史  │                     │                   │
-      │ 走势计算 │                     ▼                   ▼
+      │ 历史走势 │                     │                   │
+      │ 计算     │                     ▼                   ▼
       └──────────┘           excel_module_loader.py  tmpl/report_template.html
             │                 (动态加载写入器)         (Jinja2 模板)
             ▼                       │
@@ -1045,7 +1045,7 @@ def _get_pool() -> ThreadPoolExecutor:
                                  news_correlation /       (STATUS_MESSAGES/
                                  llm_content /            TIER_PREFIX/
                                                           DegradationTracker)
-                                 基金深度分析 5 个 /
+                                 基金深度分析 6 个 /
                                  excel_writer.py +
                                  styles.py
 ```
@@ -1055,8 +1055,8 @@ def _get_pool() -> ThreadPoolExecutor:
 `report/orchestrator.py` 是 TUI 和 CLI 共用的报告编排共享层，负责：
 
 1. **数据准备**：行情获取、指数获取、资产穿透 TOP10
-2. **快照创建与差异计算**：F1 持仓快照 + 环比差异
-3. **历史走势计算**：F2 组合 as-if 走势 + 基准指数对比
+2. **快照创建与差异计算**：持仓快照 + 环比差异
+3. **历史走势计算**：组合 as-if 走势 + 基准指数对比
 4. **行业资金流向获取**
 5. **LLM + 新闻并行获取**（4 分支统一处理）
 6. **双管线生成**：HTML + Excel
@@ -1083,7 +1083,7 @@ generate_report("basic")
 ```
 _generate_report_both()
     → _compute_details()           轻量行情获取（无指数/穿透/分类）
-    → capture_snapshot()           F1 快照对比
+    → capture_snapshot()           快照对比
     → fetch_history_data()         条件：enable_history=True
     → write_html_report()          HTML 管线
     → generate_excel_report()      Excel 管线
@@ -1094,7 +1094,7 @@ _generate_report_both()
 ```
 _generate_report_full()
     → prepare_report_data()        完整数据准备（含指数/穿透/分类/明细）
-    → capture_snapshot()           F1 快照
+    → capture_snapshot()           快照对比
     → fetch_history_data()         条件：enable_history=True
     → get_sector_fund_flow()       行业资金流向
     → _fetch_llm_and_news()        LLM+新闻并行（4 分支：均开/仅 LLM/仅新闻/均关）
@@ -1262,7 +1262,7 @@ get_report_section_order(config)
     ▼
 ┌────────────────────────┐
 │ config 中有             │
-│ report_section_order?  │── NO ──→ 返回完整 19 项默认顺序
+│ report_section_order?  │── NO ──→ 返回完整 21 项默认顺序
 └───────────┬────────────┘
            YES
             │
@@ -1280,7 +1280,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（19 项，key/number/type/data_flag）
+返回 result（21 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -1466,7 +1466,7 @@ get_combined_timeseries()
 
 **Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值），`drawdown_analysis` 页签对比指标矩阵。
 
-#### F1 快照存储与清理（history_snapshot.py）
+#### 持仓快照存储与清理（history_snapshot.py）
 
 ```
 save():
@@ -1483,7 +1483,7 @@ prune()：两阶段自动清理
 
 ### 4.8 基金深度分析
 
-基金深度分析 5 个模块通过 `enable_fund_deep_analysis` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
+基金深度分析 6 个模块通过 `enable_fund_deep_analysis` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
 
 ```
                     基金深度分析模块架构
@@ -1500,6 +1500,9 @@ prune()：两阶段自动清理
               │
           因子暴露分析
         OLS 回归风格画像
+              │
+          持仓相关性矩阵
+        Pearson 相关+显著性
 ```
 
 #### 基金经理变更监控
@@ -1876,7 +1879,7 @@ _dedup_by_title(items)
 | 信号 | 默认阈值 | 说明 |
 |:-----|:---------|:------|
 | 连续失败计数 | T2: 2 次 / T3: 2 次 / T4: 1 次 | 累计失败次数达阈值后触发降级 |
-| 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 7 天 | 距上次成功获取的天数超阈值后触发降级 |
+| 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 14 天 | 距上次成功获取的天数超阈值后触发降级 |
 
 可配置于 `config.json` 的 `degradation` 字段。支持跨会话持久化到 `data/state/.degradation_state.json`。
 
@@ -1896,7 +1899,7 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
     跨会话持久化
 ```
 
-### 4.12 组合演进（多快照趋势，plan-6）
+### 4.12 组合演进（多快照趋势）
 
 聚合 `data/history/snapshots/snapshot_{timestamp}.json` 多期快照，输出组合市值/HHI/TOP 持仓占比的趋势数据（`analysis/portfolio_evolution.py` / `report/orchestrator.py` 组装），供 Excel「组合演进」页签与 HTML「组合演进」章节消费（3 张 Chart.js 图：总市值与总盈亏 / HHI / TOP 持仓占比变迁）。
 
@@ -1924,13 +1927,15 @@ report/ 渲染                      # Excel 页签 + HTML 章节（模板 contex
 | **C20** (HTML 图表图下说明强制) | 3 张 Chart.js 图各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |
 | **§1.4.5** (数据降级治理) | 有效快照 < MIN_SNAPSHOTS → `available=false`，章节写占位（数据量不足，非故障，不走 DegradationTracker）；快照文件缺失/损坏时逐文件跳过并告警 |
 
-### 4.13 调仓 What-if 模拟（plan-5）
+### 4.13 调仓 What-if 模拟
 
 双持仓（基准 base / 目标 candidate）**成本口径截面比较**，输出 diff 报告（`analysis/whatif.py` 计算 → `report/whatif_writer.py` 输出 Excel + HTML 独立报告）。
 
-**设计边界（plan-advanced-analysis.md §2 风险）**：
+**设计边界（数据源可行性约束）**：
 - **成本口径**：candidate 无市场历史，无法取实时市值/净值，所有指标（权重/集中度）基于 `成本 = 份额 × 每份成本`，纯结构层、**零网络请求**（"只能做截面比较"）。
-- **不可回测**：What-if 无真实交易数据，不产出任何回测类结论（夏普/波动率等）。
+- **不可回测**：What-if 无真实交易数据，不产出任何回测类结论（夏普/波动率等）；量化指标仅作**截面结构对比**（权重/集中度/HHI），不表达预期收益。
+- **双份数据内存**：同时加载 base + candidate 两份持仓计算，内存与缓存用量约为单份的 2 倍；净值曲线无历史（新持仓未经历市场），不做时间序列比较。
+- **勿用于回测误用**：用户不得把 What-if 的量化指标当作回测结果——它没有真实交易数据支撑，仅反映结构差异。
 
 **变动类型**（复用 `schemas/history.py _DiffAction` 语义）：新增 / 清仓 / 加仓 / 减仓 / 不变。
 
@@ -1964,7 +1969,7 @@ cli/cli.py                       # whatif 子命令：--candidate 必填、--bas
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker.py / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
+`src/python/llm/` 包按调用层次分为四层，共 16 个子模块（含 fact_checker/ 子包 / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
@@ -1984,7 +1989,7 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
                pricing.py           费用估算
                markdown.py          Markdown→HTML 转换
                circuit_breaker.py   LLM API 熔断器
-               fact_checker.py      LLM 输出伪代码/幻觉过滤
+               fact_checker/        LLM 输出伪代码/幻觉过滤（子包 9 模块，__init__ 重导出 4 公开函数）
                fallback.py          全失败降级占位模板
 ```
 
@@ -2028,7 +2033,7 @@ LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_
 |:-----|:-----|:---------|:---------|:--------|
 | 全球政经局势 | `global_macro` | A 股/美股指数+持仓汇总 → 宏观判断 | preload | 24h |
 | 智囊团深度复盘 | `expert_review` | 持仓明细+穿透 → 专业分析师多视角辩论 | preload | 2h |
-| 组合体检报告 | `health_check` | 持仓明细（排除行情波动）→ 4 维健康度评分 | preload | 24h |
+| 组合体检报告 | `health_check` | 持仓明细（排除行情波动）→ 5 维健康度评分 | preload | 24h |
 | 穿透深度分析 | `penetration_deep` | 穿透 TOP10 → 行业/品种/国家集中度分析 | preload | 24h |
 | 新闻二次关联 | `news_correlation` | 逐条新闻 → LLM 深度关联评分（批量模式） | refresh | 1h |
 
@@ -2095,6 +2100,7 @@ config/
 ├── _comments.py                  # JSON 注释剥离（_strip_json_comments）
 ├── _config_defaults.py           # config.json 默认值定义 + 模板生成
 ├── _core.py                      # 核心读写：get_config()、set_config()、init_config()
+├── _json_patch.py                # JSON 字段级文本替换（_update_json_raw_text/_replace_dict_block）
 ├── _validation.py                # 配置校验：validate_config()、_absolutize_paths()
 ├── _llm_defaults.py              # llm_settings.json 默认模板生成
 └── _llm_providers_defaults.py    # llm_providers.json 默认模板生成
@@ -2332,8 +2338,8 @@ report/orchestrator.py (报告编排层)
   → report/market_value.py (行情获取)
   → fetcher/index.py (指数)
   → report/penetration.py (资产穿透)
-  → report/history_snapshot.py (F1 快照)
-  → report/portfolio_history.py (F2 历史走势)
+  → report/history_snapshot.py (持仓快照)
+  → report/portfolio_history.py (历史走势)
   → report/news_correlation.py (新闻关联)
   → llm/generators_orchestrator.py (LLM 编排)
   → report/html_writer.py (HTML 管线)
@@ -2579,7 +2585,7 @@ investor-util/
 |:-----|:------|:---------|:------------|:------------|
 | T2 | 数据不可用 | ⚠ | 2 次 | 3 天 |
 | T3 | 数据部分可用 | ℹ | 2 次 | 14 天 |
-| T4 | 数据临时不可用 | ℹ | 1 次 | 7 天 |
+| T4 | 数据临时不可用 | ℹ | 1 次 | 14 天 |
 
 降级配置位于 `config.json` 的 `degradation` 字段，支持 per-source 覆盖。
 

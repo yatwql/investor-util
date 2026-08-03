@@ -19,7 +19,6 @@ from io import StringIO
 from unittest.mock import patch
 
 from src.python.tui.tui_menu import (
-
     MENU_ITEMS,
     index_by_key,
     print_header,
@@ -28,8 +27,8 @@ from src.python.tui.tui_menu import (
     get_config_cache,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
 
 class TestMenuItems(unittest.TestCase):
@@ -38,12 +37,21 @@ class TestMenuItems(unittest.TestCase):
     def setUp(self):
         """重置 MENU_ITEMS 回调为 None，防止前序测试副作用。"""
         import src.python.tui.tui_menu as _tm
+
         for i, (key, label, _cb, is_exit) in enumerate(_tm.MENU_ITEMS):
             _tm.MENU_ITEMS[i] = (key, label, None, is_exit)
 
     def test_item_count(self) -> None:
-        """菜单项应为 16 个。"""
-        self.assertEqual(len(MENU_ITEMS), 16)
+        """菜单项应为 17 个。"""
+        self.assertEqual(len(MENU_ITEMS), 17)
+
+    def test_whatif_item(self) -> None:
+        """What-if 菜单项在报告生成组后（第 4 项，快捷键 W）。"""
+        key, label, cb, is_exit = MENU_ITEMS[3]
+        self.assertEqual(key, "W")
+        self.assertIn("What-if", label)
+        self.assertIsNone(cb)
+        self.assertFalse(is_exit)
 
     def test_first_item_excel(self) -> None:
         """第一项快捷键 E。"""
@@ -55,7 +63,7 @@ class TestMenuItems(unittest.TestCase):
 
     def test_last_item_exit(self) -> None:
         """最后一项快捷键 X，is_exit=True。"""
-        key, label, cb, is_exit = MENU_ITEMS[15]
+        key, label, cb, is_exit = MENU_ITEMS[16]
         self.assertEqual(key, "X")
         self.assertIn("退出", label)
         self.assertIsNone(cb)
@@ -88,8 +96,11 @@ class TestIndexByKey(unittest.TestCase):
     def test_find_E(self) -> None:
         self.assertEqual(index_by_key("E"), 0)
 
+    def test_find_W(self) -> None:
+        self.assertEqual(index_by_key("W"), 3)
+
     def test_find_X(self) -> None:
-        self.assertEqual(index_by_key("X"), 15)
+        self.assertEqual(index_by_key("X"), 16)
 
     def test_find_nonexistent(self) -> None:
         self.assertIsNone(index_by_key("Z"))
@@ -99,7 +110,7 @@ class TestIndexByKey(unittest.TestCase):
         self.assertIsNone(index_by_key("e"))
 
     def test_find_number(self) -> None:
-        self.assertEqual(index_by_key("1"), 6)
+        self.assertEqual(index_by_key("1"), 7)
 
     def test_find_empty(self) -> None:
         self.assertIsNone(index_by_key(""))
@@ -134,6 +145,7 @@ class TestConfigCache(unittest.TestCase):
     def setUp(self) -> None:
         """重置模块级 _config_cache 为初始 None，防止前序测试的副作用。"""
         import src.python.tui.tui_menu as _tm
+
         _tm._config_cache = None
 
     def test_get_config_cache_default(self) -> None:

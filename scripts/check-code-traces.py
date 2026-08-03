@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""注释/文档字符串历史变更痕迹检查脚本。
+"""代码注释历史变更痕迹检查脚本（与 check-doc-traces.py 相对）。
 
 扫描 src/ 与 scripts/ 下的 .py / .js / .mjs / .html / .sh / .ps1 /
 .bat / .cmd 文件，检查注释和文档字符串中是否含有关代码历史迭代、
@@ -13,9 +13,9 @@ Windows 批处理（REM / ::）。
 （changelog.md / review-findings.md）中。
 
 用法：
-  python scripts/check-history-traces.py           # 检查全部
-  python scripts/check-history-traces.py -v        # 详细输出
-  python scripts/check-history-traces.py --ci      # CI 模式（仅输出文件名:行号，非零退出码）
+  python scripts/check-code-traces.py           # 检查全部
+  python scripts/check-code-traces.py -v        # 详细输出
+  python scripts/check-code-traces.py --ci      # CI 模式（仅输出文件名:行号，非零退出码）
 
 退出码：
   0 — 全部通过（无可疑痕迹）
@@ -40,7 +40,7 @@ SCAN_DIRS = [
     REPO_ROOT / "scripts",
 ]
 # 跳过文件名（压缩产物、本工具自身——后者的注释为检测类别文档，含 TODO/XXX 等字面量）
-SKIP_FILES = {"chart.min.js", "check-history-traces.py"}
+SKIP_FILES = {"chart.min.js", "check-code-traces.py", "check-doc-traces.py"}
 
 
 # ═══════════════════════════════════════════════════════════════

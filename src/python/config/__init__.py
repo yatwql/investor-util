@@ -19,6 +19,7 @@
 from src.python.config import _comments as _comments
 from src.python.config import _config_defaults as _config_defaults
 from src.python.config import _core as _core
+from src.python.config import _json_patch as _json_patch
 from src.python.config import _llm_defaults as _llm_defaults
 from src.python.config import _validation as _validation
 

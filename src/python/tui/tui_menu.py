@@ -25,6 +25,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("E", "生成基础版Excel分析报告", None, False),
     ("B", "生成标准报告(Excel+HTML) [按章节配置]", None, False),
     ("L", "生成完整报告(Excel+HTML) [含LLM，按章节配置]", None, False),
+    ("W", "调仓 What-if 模拟（对比两份持仓，独立报告）", None, False),
     ("C", "配置持仓信息目录", None, False),
     ("F", "配置持仓信息文件名", None, False),
     ("O", "配置报告输出目录", None, False),

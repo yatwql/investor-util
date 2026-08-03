@@ -12,7 +12,7 @@ import threading
 from typing import Any
 
 from src.python.config import _comments, _config_defaults, _llm_providers
-from src.python.config._llm_defaults import _get_default_llm_settings_template
+from src.python.config._llm_defaults import _DEFAULT_LLM_SETTINGS, _get_default_llm_settings_template
 from src.python.config._llm_providers_defaults import _get_default_llm_providers_template
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.registry import get_known_llm_settings_keys
@@ -124,7 +124,7 @@ def get_config(_strict: bool = False) -> dict:
                 config = json.loads(cleaned)
             merged = dict(_config_defaults._DEFAULT_CONFIG)
             # 过滤 null 值：不允许 config.json 中的 null 覆盖默认值
-            # 嵌套 dict 合并：允许用户只覆盖部分子键（如 history.analysis）而不丢失默认值
+            # 嵌套 dict 合并：允许用户只覆盖部分子键（如 history.fetch_mode）而不丢失默认值
             for key, val in config.items():
                 if val is None and key in _config_defaults._DEFAULT_CONFIG:
                     continue
@@ -132,6 +132,15 @@ def get_config(_strict: bool = False) -> dict:
                     merged[key] = {**merged[key], **val}
                 else:
                     merged[key] = val
+            # 兼容旧配置键：history.analysis → history.fetch_mode（0.9.9 起更名）
+            # 依据原始用户配置判断（合并后 history 始终含默认 fetch_mode，无法区分来源）
+            _raw_history = config.get("history")
+            if isinstance(_raw_history, dict) and "analysis" in _raw_history:
+                _hist = merged.setdefault("history", {})
+                if "fetch_mode" not in _raw_history:
+                    _hist["fetch_mode"] = _raw_history["analysis"]
+                _hist.pop("analysis", None)
+                logger.warning("config.json history.analysis 已更名为 history.fetch_mode，已自动迁移")
             # 绝对化路径键：用户 config.json 中可使用相对路径，运行时统一转为绝对路径
             _absolutize_paths(merged)
             _config_cache = merged
@@ -365,7 +374,7 @@ def _patch_config_key(raw: str, key: str, new_value_text: str) -> str:
     else:
         # 顶层最后一个成员后补逗号 + 换行 + 新键（逗号紧跟最后成员闭合符）
         stripped = before.rstrip()
-        tail = before[len(stripped):]
+        tail = before[len(stripped) :]
         new_raw = stripped + f",\n  {key_text}: {new_value_text}" + tail + raw[top_close:]
     return new_raw
 
@@ -480,7 +489,7 @@ def init_config(config_path: str | None = None) -> None:
 
 
 def is_enable_fund_deep_analysis(config: dict | None = None) -> bool:
-    """基金深度分析章节（#6~10）是否启用。缺失时返回 True。"""
+    """基金深度分析章节（#6~11）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_fund_deep_analysis")
@@ -491,7 +500,7 @@ def is_enable_fund_deep_analysis(config: dict | None = None) -> bool:
 
 
 def is_enable_news(config: dict | None = None) -> bool:
-    """市场新闻（#11）是否启用。缺失时返回 True。"""
+    """市场新闻（#12）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_news")
@@ -502,7 +511,7 @@ def is_enable_news(config: dict | None = None) -> bool:
 
 
 def is_enable_history(config: dict | None = None) -> bool:
-    """组合历史走势+回撤分析（#16~17）是否启用。缺失时返回 True。"""
+    """组合历史走势+回撤分析（#17~18）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_history")
@@ -650,6 +659,35 @@ def _load_debate_config(settings: dict) -> dict:
     return merged
 
 
+def _merge_llm_defaults(base: dict) -> dict:
+    """默认值打底 + 用户覆盖合并；null 不覆盖；dict 键一层合并；未知键透传。
+
+    与 get_config 的 config.json 合并策略一致：
+      - 用户显式写 null 时不覆盖默认值（null 不覆盖）
+      - 嵌套 dict（enabled_llm / fact_check / pricing 等）一层合并，
+        允许用户只覆盖部分子键而不丢失默认值
+      - 默认中不存在的键原样透传（未知键透传，供消费端自定义字段使用）
+
+    debate 段保留默认值作为合并底（_load_debate_config 会对每个子键做
+    schema 校验并以 _DEBATE_CONFIG_DEFAULTS 兜底），此处不特殊处理。
+
+    Args:
+        base: 从 llm_settings.json 解析的用户配置字典。
+
+    Returns:
+        合并默认值后的完整配置字典（含全部默认键，消费端 .get() 可直接取值）。
+    """
+    merged = copy.deepcopy(_DEFAULT_LLM_SETTINGS)
+    for key, val in base.items():
+        if val is None and key in merged:
+            continue
+        if key in merged and isinstance(merged[key], dict) and isinstance(val, dict):
+            merged[key] = {**merged[key], **val}
+        else:
+            merged[key] = val
+    return merged
+
+
 def _ensure_llm_settings_file() -> None:
     """若 llm_settings.json 不存在，用默认值自动创建。"""
     config = get_config()
@@ -700,6 +738,10 @@ def get_llm_config() -> dict | None:
                 settings_mtime = os.path.getmtime(settings_path)
                 if _llm_config_cache is None and base_settings:
                     _check_unknown_llm_keys(base_settings)
+                # 运行时补默认：llm_settings.json 缺失的键按 _DEFAULT_LLM_SETTINGS 兜底，
+                # 消除消费端 .get() 硬编码兜底与模板默认值之间的两套默认值漂移。
+                if base_settings:
+                    base_settings = _merge_llm_defaults(base_settings)
             except (OSError, json.JSONDecodeError) as e:
                 logger.warning("LLM 设置文件读取失败: %s", e)
 

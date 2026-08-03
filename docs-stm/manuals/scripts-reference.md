@@ -10,7 +10,8 @@
 |:-----|:-----|:-------|
 | `test_runner.py` | 测试 | pytest 标记模式封装驱动，支持 14 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
-| `check-history-traces.py` | 测试 | 注释/文档字符串中历史变更痕迹检查 |
+| `check-code-traces.py` | 测试 | 代码注释/文档字符串中历史变更痕迹检查 |
+| `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -22,6 +23,7 @@
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（因子暴露分析前置决策闸门） |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本 |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
+| `whatif` | 诊断 | cli.py 子命令：调仓 What-if 模拟（对比两份持仓生成独立 diff 报告，见 [快速开始](how-to-start.md)） |
 
 ---
 
@@ -112,19 +114,19 @@ python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
 
 ---
 
-### `check-history-traces.py` — 历史痕迹检查
+### `check-code-traces.py` — 代码注释历史痕迹检查
 
 扫描 `src/python/`、`src/test/`、`src/static/`、`scripts/` 下所有 `.py` / `.js` / `.mjs` / `.html` / `.sh` / `.ps1` / `.bat` / `.cmd` 文件的注释和文档字符串，检查是否含有代码历史迭代信息（来源拆分、版本号、任务编号、历史迭代叙述等）。代码注释只应描述"当前是什么"，不应记录"从哪里来、怎么变的"。
 
 ```bash
 # 检查全部
-python scripts/check-history-traces.py
+python scripts/check-code-traces.py
 
 # 详细输出（含排除行信息）
-python scripts/check-history-traces.py -v
+python scripts/check-code-traces.py -v
 
 # CI 模式（仅输出 文件名:行号，非零退出码）
-python scripts/check-history-traces.py --ci
+python scripts/check-code-traces.py --ci
 ```
 
 **退出码含义**：
@@ -135,6 +137,37 @@ python scripts/check-history-traces.py --ci
 | 1 | HIGH/ORIGIN/VERSION 痕迹 | 必须修复后再提交 |
 | 2 | CODE（任务编号引用如 R-xxx） | 应从注释中移除 |
 | 3 | 仅 TODO/CHANGE/DEPR 级别 | 建议人工复核 |
+
+---
+
+### `check-doc-traces.py` — 文档历史痕迹检查
+
+扫描项目根 `README.md` 与 `docs-stm/managements/`、`docs-stm/manuals/` 下所有 `.md` 文件（豁免 `changelog.md` / `review-findings.md` / `plan.md` 及 `archive/`、`plan/`、`tmp/` 目录），检查面向读者的文档正文是否含有历史变更信息（来源叙述、历史实现、迁移痕迹、任务编号、归档文件引用、版本号、Iter 迭代标记等）。此类文档只应描述"当前是什么/做什么"，不应记录"从哪里来、怎么变的"；历史记录集中在管理文档（changelog / review-findings / plan）中。
+
+细节规则：
+- **Markdown 围栏代码块**（``` 包裹）内为命令/配置示例，非文档叙述，自动跳过（避免 `git tag`、`APP_VERSION` 等示例误报）
+- **版本头豁免仅行首锚定**：只豁免 `> 文档版本：0.9.9-dev` 这类版本头行；行中叙述（如"该功能于版本 `vX.Y.Z` 中引入"）仍会命中版本号痕迹
+- **当前能力描述豁免**：暂不支持 / 不再支持 / 不正式支持 / 发布版本前 / 门禁流程等合法当前状态描述不报
+- **LOW 级别**：命中需人工判断的变更/过渡类描述时提示复核，不阻塞提交
+
+```bash
+# 检查全部
+python scripts/check-doc-traces.py
+
+# 详细输出（含豁免行信息）
+python scripts/check-doc-traces.py -v
+
+# CI 模式（仅输出 文件名:行号，非零退出码）
+python scripts/check-doc-traces.py --ci
+```
+
+**退出码含义**：
+
+| 退出码 | 含义 | 行动 |
+|:------:|:-----|:-----|
+| 0 | 全部通过 | 无需处理 |
+| 1 | HIGH/ARCHIVE/CODE 痕迹 | 应从文档中移除 |
+| 2 | 仅 LOW 级别痕迹（需人工判断的变更/过渡类描述） | 建议人工复核 |
 
 ---
 

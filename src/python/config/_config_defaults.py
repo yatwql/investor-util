@@ -36,9 +36,9 @@ _DEFAULT_CONFIG = {
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
     # ── B. 报告章节可见性 ──
-    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露（#6~10）
-    "enable_news": True,  # 市场新闻（#11）
-    "enable_history": True,  # 组合历史走势+回撤（#16~17）
+    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露+相关性（#6~11）
+    "enable_news": True,  # 市场新闻（#12）
+    "enable_history": True,  # 组合历史走势+回撤（#17~18）
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -73,7 +73,7 @@ _DEFAULT_CONFIG = {
     "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
     # ── G. 持仓快照 ──
     "history": {
-        "analysis": "auto",
+        "fetch_mode": "auto",  # 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
         "snapshot_retention_days": 60,
         "snapshot_max_count": 365,
         "coverage_threshold": 0.8,
@@ -145,9 +145,9 @@ def _build_template_from_defaults() -> str:
         "",
         # ── B ──
         "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──",
-        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露（#6~10）',
-        f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#11）',
-        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#16~17）',
+        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露+相关性（#6~11）',
+        f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#12）',
+        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#17~18）',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",

@@ -272,7 +272,7 @@ class TestGenerateReport:
         config = {
             "output_dir": "reports",
             "news_top_count": 100,
-            "history": {"analysis": "auto"},
+            "history": {"fetch_mode": "auto"},
         }
 
         mock_detail = MagicMock()
@@ -299,7 +299,7 @@ class TestGenerateReport:
                 config=config,
                 reporter=mock_reporter,
                 report_type="both",
-                history_mode="auto",
+                fetch_history=True,
             )
 
         assert isinstance(result, ReportResult)
@@ -320,7 +320,7 @@ class TestGenerateReport:
         assert _xls_kwargs.get("enable_llm") is False
 
     def test_generate_report_both_history_off(self):
-        """both 路径 history_mode=off 时不调用 fetch_history_data。"""
+        """both 路径历史走势关闭（enable_history=False）时不调用 fetch_history_data。"""
         mock_reporter = MagicMock()
         mock_holdings = [MagicMock()]
         config = {"output_dir": "reports"}
@@ -341,11 +341,11 @@ class TestGenerateReport:
                 config=config,
                 reporter=mock_reporter,
                 report_type="both",
-                history_mode="off",
+                fetch_history=True,
             )
 
         assert result.report_generated is True
-        # history 关闭时 fetch_history_data 不应被调用
+        # history 关闭时 fetch_history_data 不应被调用（即使 fetch_history=True）
         mock_hist.assert_not_called()
 
     def test_generate_report_both_no_prepare_report_data(self):
@@ -414,7 +414,7 @@ class TestGenerateReport:
         config = {
             "output_dir": "reports",
             "news_top_count": 100,
-            "history": {"analysis": "auto"},
+            "history": {"fetch_mode": "auto"},
         }
 
         with (
@@ -459,7 +459,7 @@ class TestGenerateReport:
                 config=config,
                 reporter=mock_reporter,
                 report_type="full",
-                history_mode="auto",
+                fetch_history=True,
                 force_llm=False,
             )
 
@@ -1177,8 +1177,8 @@ class TestCaptureSnapshot:
 class TestFetchHistoryData:
     """fetch_history_data 历史走势数据获取测试。"""
 
-    def test_fetch_history_data_auto_mode(self):
-        """auto 模式返回 PortfolioHistoryCalculator 计算结果。"""
+    def test_fetch_history_data_fetch_true(self):
+        """fetch=True 返回 PortfolioHistoryCalculator 计算结果。"""
         mock_reporter = MagicMock()
         mock_holding = MagicMock()
         mock_holding.code = "SH600001"
@@ -1200,6 +1200,7 @@ class TestFetchHistoryData:
                 [mock_holding],
                 {"history": {"coverage_threshold": 0.9}},
                 mock_reporter,
+                fetch=True,
             )
 
         assert result is not None
@@ -1210,15 +1211,15 @@ class TestFetchHistoryData:
             benchmark_indices={},
         )
 
-    def test_fetch_history_data_off_mode(self):
-        """非 auto 模式直接返回 None。"""
+    def test_fetch_history_data_fetch_false(self):
+        """fetch=False 直接返回 None。"""
         mock_reporter = MagicMock()
 
         result = fetch_history_data(
             [],
             {"history": {}},
             mock_reporter,
-            mode="off",
+            fetch=False,
         )
 
         assert result is None
