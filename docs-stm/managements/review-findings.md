@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
-> 文档版本：0.9.10-dev
+> 文档版本：0.9.11-dev
 > 审查范围：全代码库（src/python/ + src/test/ + scripts/）
 > 审查基准：technical.md §8 架构设计约束（C1~C20）+ §1.4 核心架构决策 + 代码质量最佳实践
 > 审查日期：2026-07-29
@@ -60,7 +60,7 @@
 | **rf-168** | 智囊团深度复盘排名事实校验误报：`check_ranking_correctness` 将"第N大/前N大持仓"等一律按"最大持仓"校验（仅接受市值第1名），且取"句中第一个代码"作为声称对象——LLM 调仓方案表里"040046 继续持有第一重仓"（正确）被归因到句首 561910，"561910 已是组合第三大持仓"（正确）被当"最大持仓"误报"声称 X 为最大持仓" | 按声称类型拆分校验（`_RANK_MAX_PATTERN` 最大→第1名 / `_RANK_ORDINAL_PATTERN` 第N大→第N名 / `_RANK_TOP_PATTERN` 前N大→前N名内），归因改为表格行内就近找代码（跨行不误归因），移除"主要持仓"模糊声称校验 | 详见 changelog.md v0.9.10-dev Fix |
 | **rf-169** | 文档审计（2026-08-03 管理/用户文档正文一致性 + check-doc-traces.py 打磨）：① folders.md 目录树 4 处行数注释（`_numerical.py` 251 行、chart_data_builder ≤400 行、chart-config ≤150 行、chart-init ≤300 行）——行数信息不必要且随迭代过时；② requirements.md §6.4 字段定义小节跳号（6.4.1~9 → 6.4.12 → 6.4.17~20，缺 6.4.10 因子暴露/6.4.11 相关性矩阵/6.4.13-16 LLM 模块/6.4.21 LLM API 用量）；③ technical.md 与代码实况不符：LLM 模块数 16→36、excel_generator 编排器 437→477 行、STATUS_MESSAGES 16→23 条、附录 A 缺 src/static/ + startup_wizard.py；④ testplan.md unit 子组计数 11 vs test-coverage.md 10、TUI 菜单清单缺 [W]、whatif CLI 示例缺 --effective-date；⑤ check-doc-traces.py 未识别无 v 前缀裸版本号（`0.9.8` 在散文中不命中） | ① folders.md 移除 4 处行数注释；② requirements.md 按代码实况补齐 6.4.10/11/13-16/21 字段定义，编号恢复连续 6.4.1~6.4.21 对齐 §6.3 模块号；③ technical.md 同步 16→36 子模块、437→477 行、16→23 条，附录 A 补 src/static/ + startup_wizard.py；④ testplan.md 11→10 子组、菜单补 [W]、CLI 示例补 --effective-date，LLM 场景组织描述去历史化；⑤ check-doc-traces.py 增裸版本号 pattern（限 0 开头，避免误伤章节号/包版本） | 详见 changelog.md v0.9.10-dev Docs |
 
-> 已发布版本（v0.9.0 ~ v0.9.9）已修复问题记录已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) （v0.9.0 ~ v0.9.5：rf-90 ~ rf-144；v0.9.6 / v0.9.7 / v0.9.8：rf-115/116/119、rf-145 ~ rf-159；v0.9.9：rf-76/77、rf-160 ~ rf-164），本表仅跟踪当前迭代（0.9.10-dev）修复项。
+> 已发布版本（v0.9.0 ~ v0.9.9）已修复问题记录已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) （v0.9.0 ~ v0.9.5：rf-90 ~ rf-144；v0.9.6 / v0.9.7 / v0.9.8：rf-115/116/119、rf-145 ~ rf-159；v0.9.9：rf-76/77、rf-160 ~ rf-164），本表仅跟踪当前迭代（0.9.11-dev）修复项。
 
 ---
 
