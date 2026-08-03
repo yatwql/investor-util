@@ -147,6 +147,19 @@ python -m src.python.cli cache --stats
 | [辅助脚本参考](docs-stm/manuals/scripts-reference.md) | scripts/ 目录全部工具脚本用法速查 |
 | [性能历史趋势查看](scripts/perf_view.py) | 查看每次报告生成的各阶段耗时记录（`python scripts/perf_view.py`） |
 
+#### 任务编号自动保障（开发协作）
+
+项目任务编号（`plan-`/`rf-`）全局单调递增、归档不回收，由 `scripts/check-task-numbering.py` 校验，防止新增编号与历史归档冲突。三层自动保障：
+
+| 机制 | 触发 | 跨机器 |
+|:-----|:-----|:------|
+| **P0/P2 门禁** | 提交/发布前 `check-task-numbering.py --ci` | ✅ 零配置 |
+| **dev-verify preflight** | `test_runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
+| **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `python scripts/install-claude-hook.py` |
+| **git pre-commit** | `git commit` 涉及编号文档时自动校验 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+
+> `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
+
 ## 📋 项目内部文档
 
 以下为项目管理和技术设计文档，供项目维护者和开发者参考，普通用户无需阅读：

@@ -13,6 +13,7 @@
 | `check-code-traces.py` | 测试 | 代码注释/文档字符串中历史变更痕迹检查 |
 | `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
+| `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`pytest --collect-only` 快照，供 test-coverage.md 更新） |
@@ -188,6 +189,43 @@ python scripts/check-test-markers.py
 ```
 
 无报错输出即合规。新增/修改测试文件后必须运行此脚本。
+
+---
+
+### `check-task-numbering.py` — 任务编号全局一致性检查
+
+校验 `plan-` / `rf-` 两类任务编号与各管理文档头部的「编号源」标记（`plan-next` / `rf-next`）是否一致，防止新增编号与历史归档冲突。
+
+新增任务时，编号取管理文档头部 `plan-next` / `rf-next` 当前值，用后将其递增更新；若标记遗漏递增或初值写小，本脚本会扫描当前文档 + 全部历史归档并报错提示修正值。
+
+```bash
+python scripts/check-task-numbering.py            # 检查全部（plan + rf）
+python scripts/check-task-numbering.py --kind rf  # 仅检查 rf
+python scripts/check-task-numbering.py --ci       # CI 模式（只输出错误）
+```
+
+**自动保障机制**（三层，跨机器同步策略见各条目）：
+- **P0 门禁**：`check-task-numbering.py --ci` 已纳入 CLAUDE.md 提交前/发布前门禁，与 `check-code-traces.py --ci` 同构
+- **dev-verify preflight**：`test_runner.py --mode dev-verify` 自动运行编号校验，失败即中止
+- **Claude Code hook**：编辑 `plan.md`/`review-findings.md` 后自动校验（`scripts/check-task-numbering-hook.py`），实时拦截冲突
+- **git pre-commit**：提交涉及编号文档时自动校验（`.githooks/pre-commit`），绕过流程也拦截
+
+---
+
+### `check-task-numbering-hook.py` — Claude Code PostToolUse hook
+
+Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验，失败返回非零退出码中断编辑。读取 `__INJECTED_OBJECT__`（环境变量或命令行参数）识别目标文件；无 hook 上下文或非编号文档时放行。由 `.claude/settings.json` 的 PostToolUse 钩子调用（不随仓库同步，需 `install-claude-hook.py` 接线）。
+
+---
+
+### `install-claude-hook.py` — Claude Code hook 安装/卸载
+
+`.claude/settings.json` 被 `.gitignore` 排除、不随仓库同步。本脚本将 `check-task-numbering-hook.py` 的 PostToolUse 钩子写入该文件，跨机器 clone 后运行一次即完成接线。
+
+```bash
+python scripts/install-claude-hook.py             # 安装（幂等，保留已有配置）
+python scripts/install-claude-hook.py --uninstall # 卸载
+```
 
 ---
 

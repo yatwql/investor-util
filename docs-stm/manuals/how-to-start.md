@@ -216,6 +216,26 @@ python -m src.python.cli check-sources
 
 ---
 
+## （可选）启用开发协作自动校验 hooks
+
+> 面向**贡献者/开发者**。普通使用无需执行本步。
+
+项目维护全局单调递增的任务编号（`plan-`/`rf-`），由 `scripts/check-task-numbering.py` 校验，防止新增编号与历史归档冲突。两条自动拦截机制默认**休眠**（激活配置是本机 git/编辑器配置，不随仓库同步），clone 到新机器后运行一次即可激活：
+
+```bash
+# 1. git pre-commit：提交涉及 plan.md / review-findings.md 时自动校验编号
+sh .githooks/install-hooks.sh          # 启用
+sh .githooks/install-hooks.sh --off   # 停用
+
+# 2. Claude Code hook：编辑 plan.md / review-findings.md 后实时校验
+python scripts/install-claude-hook.py             # 启用（幂等，保留已有配置）
+python scripts/install-claude-hook.py --uninstall # 停用
+```
+
+三层兜底已零配置生效（`check-task-numbering.py --ci` 纳入 P0/P2 门禁；`test_runner.py --mode dev-verify` 自动 preflight），上两命令仅提供更早的实时拦截。详见 [辅助脚本参考](scripts-reference.md)。
+
+---
+
 ## 下一步
 
 - [菜单操作详解](how-to-menu.md) — 各菜单完整说明
