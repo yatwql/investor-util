@@ -1945,7 +1945,7 @@ report/ 渲染                      # Excel 页签 + HTML 章节（模板 contex
 analysis/whatif.py               # 纯计算：_merge_holdings(按 code 合并多账户) → 成本权重/HHI → 变动分类
     ↑ 复用 analysis/rebalance.py 的 classify_holding/_CATEGORY_ORDER/_CATEGORY_LABELS
 report/whatif_sheet.py           # Excel 3 页签：调仓摘要 / 分类配置对比 / 持仓变动明细（行底色按变动类型）
-report/whatif_writer.py          # 编排双产物：调仓模拟_{ts}.xlsx / .html + Chart.js 资产复制
+report/whatif_writer.py          # 编排双产物：调仓模拟.xlsx / .html（最新版固定名 + 日期目录归档版）+ Chart.js 资产复制
 cli/cli.py                       # whatif 子命令：--candidate 必填、--base 可选（缺省用 config 持仓）
 ```
 
@@ -1955,7 +1955,7 @@ cli/cli.py                       # whatif 子命令：--candidate 必填、--bas
 
 | 约束 | 适配方式 |
 |:-----|:---------|
-| **C7** (报告序号可配置) | whatif 为**独立报告产物**（调仓模拟_{ts}.xlsx/.html），不注册进主报告 `_REPORT_SECTION_DEFAULT` |
+| **C7** (报告序号可配置) | whatif 为**独立报告产物**（调仓模拟.xlsx/.html，最新版固定名 + 日期目录归档版），不注册进主报告 `_REPORT_SECTION_DEFAULT` |
 | **C14** (渲染期数据不可写入模块级全局变量) | whatif_data 通过模板 `render()` context 传递，不写 `_ENV.globals` |
 | **C19** (pipeline_data Schema 契约) | `whatif_data` 契约独立于主报告管线（不经 `pipeline_data_builder.build()`），本报告自建契约并在模块 docstring 声明 |
 | **C20** (HTML 图表图下说明强制) | 资产配置对比双环形图各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |

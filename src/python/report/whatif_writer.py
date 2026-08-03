@@ -4,8 +4,11 @@
   - Excel 调仓模拟工作簿（调仓摘要 / 分类配置对比 / 持仓变动明细）
   - HTML 双栏对比页（含资产配置对比环形图，复用 Chart.js 本地 bundle）
 
-报告以独立产物命名 `调仓模拟_{时间戳}` 输出到 output_dir（与主报告分离），
-并复制 Chart.js 前端资产到同目录（离线自包含，R21 约束）。
+报告按主报告归档惯例输出到 output_dir（与主报告分离）：
+  - 最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比）
+  - 归档版 `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx` / `.html`（日期子目录）
+并复制 Chart.js 前端资产到同目录（离线自包含，R21 约束）；
+超过 180 天的归档目录自动清理。
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-from src.python.report.excel_writer import _ensure_reports_dir
+from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.report.html_writer import _copy_js_assets
 from src.python.report.whatif_sheet import (
     write_whatif_category_sheet,
@@ -26,13 +29,10 @@ from src.python.report.whatif_sheet import (
 logger = logging.getLogger("invest")
 
 
-def _timestamp() -> str:
-    """紧凑时间戳（文件命名用）。"""
-    return datetime.now().strftime("%Y%m%d-%H%M%S")
-
-
 def write_whatif_excel(whatif_data: dict[str, Any], output_dir: str = "reports") -> str:
-    """输出调仓模拟 Excel 工作簿（最新版 + 存档版），返回最新文件路径。
+    """输出调仓模拟 Excel 工作簿（最新版固定名 + 日期目录归档版），返回最新文件路径。
+
+    归档格式对齐主报告：`调仓模拟.xlsx`（最新版，覆盖）+ `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx`（归档版）。
 
     Args:
         whatif_data: C19 契约 dict
@@ -53,11 +53,11 @@ def write_whatif_excel(whatif_data: dict[str, Any], output_dir: str = "reports")
     ws_chg = wb.create_sheet("持仓变动明细")
     write_whatif_changes_sheet(ws_chg, whatif_data)
 
-    ts = _timestamp()
-    latest = os.path.join(output_dir, f"调仓模拟_{ts}.xlsx")
-    archive_dir = os.path.join(output_dir, datetime.now().strftime("%Y%m%d"))
-    os.makedirs(archive_dir, exist_ok=True)
-    archive = os.path.join(archive_dir, f"调仓模拟-{ts}.xlsx")
+    now = datetime.now()
+    date_str = now.strftime("%Y%m%d")
+    time_str = now.strftime("%H%M%S")
+    latest = os.path.join(output_dir, "调仓模拟.xlsx")
+    archive = os.path.join(output_dir, date_str, f"调仓模拟-{date_str}-{time_str}.xlsx")
     try:
         wb.save(latest)
     except PermissionError:
@@ -67,6 +67,7 @@ def write_whatif_excel(whatif_data: dict[str, Any], output_dir: str = "reports")
         wb.save(archive)
     except (PermissionError, OSError) as e:
         logger.warning("存档 Excel 写入失败（非关键）: %s", e)
+    _cleanup_old_archives(output_dir)
     logger.info("调仓模拟 Excel 已保存: %s", latest)
     return os.path.abspath(latest)
 
@@ -103,7 +104,9 @@ def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
 
 
 def write_whatif_html(whatif_data: dict[str, Any], output_dir: str = "reports") -> str:
-    """输出调仓模拟 HTML 页面（含 Chart.js 资产复制），返回最新文件路径。
+    """输出调仓模拟 HTML 页面（最新版固定名 + 日期目录归档版，含 Chart.js 资产复制），返回最新文件路径。
+
+    归档格式对齐主报告：`调仓模拟.html`（最新版，覆盖）+ `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.html`（归档版）。
 
     Args:
         whatif_data: C19 契约 dict
@@ -117,10 +120,18 @@ def write_whatif_html(whatif_data: dict[str, Any], output_dir: str = "reports") 
     html = render_whatif_html(whatif_data, now_str)
     _copy_js_assets(output_dir)
 
-    ts = _timestamp()
-    latest = os.path.join(output_dir, f"调仓模拟_{ts}.html")
+    now = datetime.now()
+    date_str = now.strftime("%Y%m%d")
+    time_str = now.strftime("%H%M%S")
+    latest = os.path.join(output_dir, "调仓模拟.html")
     with open(latest, "w", encoding="utf-8") as f:
         f.write(html)
+    archive_dir = os.path.join(output_dir, date_str)
+    os.makedirs(archive_dir, exist_ok=True)
+    archive = os.path.join(archive_dir, f"调仓模拟-{date_str}-{time_str}.html")
+    with open(archive, "w", encoding="utf-8") as f:
+        f.write(html)
+    _cleanup_old_archives(output_dir)
     logger.info("调仓模拟 HTML 已保存: %s", latest)
     return os.path.abspath(latest)
 

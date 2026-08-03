@@ -316,7 +316,12 @@ class TestCacheSet(CacheTestBase):
 
     @patch("src.python.cache._store.time.time")
     def test_set_atomic_write_content(self, mock_time):
-        """原子写入 → 最终文件内容正确，临时文件被清理。"""
+        """原子写入 → 最终文件内容正确，临时文件被清理。
+
+        临时文件由 `_store.set` 用 `tempfile.mkstemp(dir=<缓存目录>, suffix=".tmp")`
+        创建，故在缓存目录内扫描 `.tmp` 残留（此前误扫全局系统临时目录，
+        并行测试下偶发误报，且无法真正验证原子写清理）。
+        """
         mock_time.return_value = 3000.0
         from src.python.cache import set
 
@@ -326,9 +331,8 @@ class TestCacheSet(CacheTestBase):
 
         path = _cache_path("atomic")
 
-        import tempfile
-        tmp_dir = tempfile.gettempdir()
-        tmp_files = [f for f in os.listdir(tmp_dir) if f.startswith("tmp") and f.endswith(".json")]
+        cache_dir = os.path.dirname(path)
+        tmp_files = [f for f in os.listdir(cache_dir) if f.endswith(".tmp")]
         self.assertEqual(len(tmp_files), 0, "临时文件未被清理")
 
     @patch("src.python.cache._store.time.time")
@@ -585,12 +589,15 @@ class TestCacheConstants(unittest.TestCase):
 
     def test_cache_daily(self):
         from src.python.cache import CACHE_DAILY
+
         self.assertEqual(CACHE_DAILY, 86400)
 
     def test_cache_weekly(self):
         from src.python.core.constants import CACHE_WEEKLY
+
         self.assertEqual(CACHE_WEEKLY, 604800)
 
     def test_cache_monthly(self):
         from src.python.core.constants import CACHE_MONTHLY
+
         self.assertEqual(CACHE_MONTHLY, 2592000)

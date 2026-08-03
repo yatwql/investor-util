@@ -54,6 +54,9 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| **rf-165** | TUI 按 W 调仓模拟：持仓目录只有基准一份文件时候选为空直接退出，从不生成报告 | `_select_candidate_file` 空候选改为引导手动输入目标文件完整路径（`_input_candidate_path`），回车取消返回 None | 详见 changelog.md v0.9.10-dev Fix |
+| **rf-166** | TUI 按 W 调仓模拟：`get_config_cache()` 未初始化时回退 `{}`，`output_dir` 用相对路径 `"reports"`（依赖启动目录，与 CLI 绝对路径不一致） | `_cmd_whatif`/`_select_candidate_file` 回退 `get_config()`（absolutized 路径），输出目录与 CLI 一致 | 详见 changelog.md v0.9.10-dev Fix |
+| **rf-167** | `test_set_atomic_write_content` 隔离缺陷：扫描全局系统临时目录断言无 `tmp*.json`，而原子写临时文件实际创建在缓存目录（`.tmp` 后缀）——断言对象错误，仅在并行测试误落系统临时目录时偶发失败，且从未真正验证原子写清理 | 改为扫描缓存目录内 `.tmp` 残留（`os.path.dirname(_cache_path)`），真正验证原子写清理且隔离到测试自身缓存目录 | 详见 changelog.md v0.9.10-dev Fix |
 
 > 已发布版本（v0.9.0 ~ v0.9.9）已修复问题记录已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) （v0.9.0 ~ v0.9.5：rf-90 ~ rf-144；v0.9.6 / v0.9.7 / v0.9.8：rf-115/116/119、rf-145 ~ rf-159；v0.9.9：rf-76/77、rf-160 ~ rf-164），本表仅跟踪当前迭代（0.9.10-dev）修复项。
 

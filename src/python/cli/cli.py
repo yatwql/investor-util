@@ -87,7 +87,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "示例:\n"
         "  whatif --candidate 调仓后.xlsx              对比当前持仓 vs 目标持仓\n"
         "  whatif --base 调仓前.xlsx --candidate 调仓后.xlsx   显式指定两份持仓\n"
-        "输出: 调仓模拟_{时间戳}.xlsx / .html（成本口径截面比较，零网络请求）"
+        "输出: 调仓模拟.xlsx / .html（最新版固定名，历史归档至日期子目录；成本口径截面比较，零网络请求）"
     )
 
     # ── check-sources 子命令 ──

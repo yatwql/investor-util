@@ -450,6 +450,7 @@ investor-util/
 │       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现
 │       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现
 │       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试
+│       │   │   ├── test_whatif_writer.py          #   调仓 What-if 报告输出（固定名+日期归档+清理）
 │       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景

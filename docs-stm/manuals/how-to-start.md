@@ -109,7 +109,7 @@ python -m src.python.cli --verbose report --type basic
 | `--base PATH` | 基准持仓文件（调仓前）。缺省使用 `config.json` 的 `holdings_dir` + `holdings_filename` |
 | `--candidate PATH` | 目标持仓文件（调仓后/假设），**必填** |
 
-对比两份持仓生成独立调仓 diff 报告（Excel 3 页签 + HTML 双栏对比页），产物命名 `调仓模拟_{时间戳}` 输出到报告输出目录。全程本地计算、零网络请求，不并入主报告管线。
+对比两份持仓生成独立调仓 diff 报告（Excel 3 页签 + HTML 双栏对比页），产物输出到报告输出目录：最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比），历史归档至 `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx/.html` 日期子目录（超 180 天自动清理）。全程本地计算、零网络请求，不并入主报告管线。
 
 **使用示例**：
 

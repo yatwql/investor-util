@@ -1,8 +1,8 @@
 """TUI 调仓 What-if 模拟命令处理器。
 
 对比基准（调仓前）与目标（调仓后/假设）两份持仓，生成独立调仓 diff 报告
-（Excel + HTML，命名 `调仓模拟_{时间戳}`）。全程本地计算、零网络请求，
-不并入主报告管线（独立产物，设计边界见 technical.md §4.13）。
+（Excel + HTML，最新版固定名 `调仓模拟.xlsx/.html` + 日期目录归档版）。
+全程本地计算、零网络请求，不并入主报告管线（独立产物，设计边界见 technical.md §4.13）。
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from datetime import datetime
 
+from src.python.config import get_config
 from src.python.core.logger import setup_logger
 from src.python.core.reader import get_xlsx_info, list_xlsx_files, read_holdings
 from src.python.report.progress import TuiProgressReporter
@@ -20,18 +21,17 @@ logger = setup_logger()
 
 
 def _select_candidate_file(base_file: str) -> str | None:
-    """选择目标持仓文件（调仓后/假设），返回绝对路径；未找到时返回 None。
+    """选择目标持仓文件（调仓后/假设），返回绝对路径；未选择时返回 None。
 
-    列出持仓目录下除基准文件外的 xlsx 文件供用户选择，避免自对比。
+    列出持仓目录下除基准文件外的 xlsx 文件供用户选择，避免自对比；
+    目录下无候选文件时引导手动输入目标文件完整路径（可从基准复制修改）。
     """
-    config = get_config_cache() or {}
+    config = get_config_cache() or get_config()
     dir_path = config.get("holdings_dir", "")
     base_abs = os.path.abspath(base_file)
     files = [f for f in list_xlsx_files(dir_path) if os.path.abspath(f) != base_abs]
     if not files:
-        print("  [ERR] 持仓目录下未找到基准之外的 xlsx 文件")
-        print("     请先放置一份目标持仓文件（调仓后/假设）到持仓目录")
-        return None
+        return _input_candidate_path()
     if len(files) == 1:
         print(f"  使用唯一找到的目标文件: {os.path.basename(files[0])}")
         return files[0]
@@ -59,6 +59,29 @@ def _select_candidate_file(base_file: str) -> str | None:
     return None
 
 
+def _input_candidate_path() -> str | None:
+    """无候选文件时引导手动输入目标文件完整路径；直接回车取消返回 None。
+
+    持仓目录下只有基准文件（或目录无 xlsx）时，调仓目标无法从目录选择，
+    改为提示用户复制基准文件修改后作为目标，或输入目标文件的完整路径
+    （可位于任意位置）。文件不存在时递归重新输入。
+    """
+    print("  [ERR] 持仓目录下未找到基准之外的 xlsx 文件")
+    print("     可复制基准持仓文件并修改后作为目标（调仓后/假设）")
+    try:
+        path = input("  请输入目标文件完整路径（直接回车取消）: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+    if not path:
+        return None
+    path = os.path.abspath(path)
+    if not os.path.isfile(path):
+        print("  [ERR] 文件不存在，请检查路径")
+        return _input_candidate_path()
+    return path
+
+
 def _cmd_whatif() -> None:
     """调仓 What-if 模拟：对比基准与目标持仓，生成独立 diff 报告。
 
@@ -68,7 +91,7 @@ def _cmd_whatif() -> None:
     from src.python.report.whatif_operations import run_whatif_simulation
 
     reporter = TuiProgressReporter()
-    config = get_config_cache() or {}
+    config = get_config_cache() or get_config()
     output_dir = config.get("output_dir", "reports")
 
     print("  [..] 调仓 What-if 模拟：先选择基准持仓（调仓前）")

@@ -41,23 +41,83 @@ class TestSelectCandidateFile(unittest.TestCase):
         self.assertEqual(result, "dummy_dir/target.xlsx")
         self.assertIn("唯一找到", out.getvalue())
 
+    @patch("builtins.input")
     @patch("src.python.tui.handlers_whatif.list_xlsx_files")
     @patch("src.python.tui.handlers_whatif.get_config_cache")
     def test_only_base_no_candidate(
         self,
         mock_config: MagicMock,
         mock_list: MagicMock,
+        mock_input: MagicMock,
     ) -> None:
-        """目录下只有基准文件时返回 None 并提示。"""
+        """目录下只有基准文件时引导手动输入；直接回车取消返回 None。"""
         from src.python.tui.handlers_whatif import _select_candidate_file
 
         mock_config.return_value = {"holdings_dir": "dummy_dir"}
         mock_list.return_value = ["dummy_dir/base.xlsx"]
+        mock_input.return_value = ""
         out = __import__("io").StringIO()
         with patch("sys.stdout", out):
             result = _select_candidate_file("dummy_dir/base.xlsx")
         self.assertIsNone(result)
         self.assertIn("未找到", out.getvalue())
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_whatif.list_xlsx_files")
+    @patch("src.python.tui.handlers_whatif.get_config_cache")
+    def test_only_base_manual_input_valid(
+        self,
+        mock_config: MagicMock,
+        mock_list: MagicMock,
+        mock_input: MagicMock,
+    ) -> None:
+        """目录下只有基准文件时手动输入有效路径，返回该路径。"""
+        from src.python.tui.handlers_whatif import _select_candidate_file
+
+        mock_config.return_value = {"holdings_dir": "dummy_dir"}
+        mock_list.return_value = ["dummy_dir/base.xlsx"]
+        mock_input.return_value = "/tmp/after.xlsx"
+        with patch("src.python.tui.handlers_whatif.os.path.isfile", return_value=True):
+            result = _select_candidate_file("dummy_dir/base.xlsx")
+        self.assertEqual(result, "/tmp/after.xlsx")
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_whatif.list_xlsx_files")
+    @patch("src.python.tui.handlers_whatif.get_config_cache")
+    def test_manual_input_not_exist_then_cancel(
+        self,
+        mock_config: MagicMock,
+        mock_list: MagicMock,
+        mock_input: MagicMock,
+    ) -> None:
+        """手动输入的文件不存在时递归重输；再次回车取消返回 None。"""
+        from src.python.tui.handlers_whatif import _select_candidate_file
+
+        mock_config.return_value = {"holdings_dir": "dummy_dir"}
+        mock_list.return_value = ["dummy_dir/base.xlsx"]
+        mock_input.side_effect = ["/no/such.xlsx", ""]
+        with patch("src.python.tui.handlers_whatif.os.path.isfile", return_value=False):
+            result = _select_candidate_file("dummy_dir/base.xlsx")
+        self.assertIsNone(result)
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_whatif.list_xlsx_files")
+    @patch("src.python.tui.handlers_whatif.get_config_cache")
+    def test_manual_input_eof(
+        self,
+        mock_config: MagicMock,
+        mock_list: MagicMock,
+        mock_input: MagicMock,
+    ) -> None:
+        """手动输入时 input 引发 EOFError 返回 None。"""
+        from src.python.tui.handlers_whatif import _select_candidate_file
+
+        mock_config.return_value = {"holdings_dir": "dummy_dir"}
+        mock_list.return_value = ["dummy_dir/base.xlsx"]
+        mock_input.side_effect = EOFError()
+        with patch("src.python.tui.handlers_whatif.os.path.isfile", return_value=True):
+            result = _select_candidate_file("dummy_dir/base.xlsx")
+        self.assertIsNone(result)
 
     @patch("builtins.input")
     @patch("os.path.getmtime")
