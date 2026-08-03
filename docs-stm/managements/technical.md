@@ -670,7 +670,7 @@ _fetch_with_cache_refresh() 返回数据后
         NO（跨日残留）
          │
          ▼
-cache_clear(cache_key) → 强制刷新 → 重新走 Provider Chain
+cache_clear(cache_key) → 强制刷新 → 重新走 Provider Chain → 成功后自动写回缓存
 （盘中因 Tencent 不可用降级写入 EastMoney 净值，
   或盘中缓存的上一交易日残留，均在收市后自动清除）
 ```

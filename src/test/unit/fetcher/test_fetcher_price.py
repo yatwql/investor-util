@@ -17,8 +17,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 
 
 class TestNameMatches(unittest.TestCase):
@@ -26,6 +26,7 @@ class TestNameMatches(unittest.TestCase):
 
     def _call(self, a: str, b: str) -> bool:
         from src.python.fetcher.price import _name_matches
+
         return _name_matches(a, b)
 
     def test_exact_match(self):
@@ -66,6 +67,7 @@ class TestPriceCacheKey(unittest.TestCase):
 
     def _call(self, code: str) -> str:
         from src.python.fetcher.price import _price_cache_key
+
         return _price_cache_key(code)
 
     def test_format(self):
@@ -82,13 +84,16 @@ class TestPriceTransformTencent(unittest.TestCase):
 
     def _call(self, raw: dict, source: str = "腾讯财经"):
         from src.python.fetcher.price import _price_transform_tencent
+
         return _price_transform_tencent(raw, source)
 
     def test_normal(self):
         """正常数据 → 统一格式。"""
         raw = {
-            "name": "长江电力", "code": "600900",
-            "price": 26.65, "yesterday_close": 26.50,
+            "name": "长江电力",
+            "code": "600900",
+            "price": 26.65,
+            "yesterday_close": 26.50,
             "price_date": "2026-07-01",
         }
         result = self._call(raw)
@@ -109,13 +114,16 @@ class TestPriceTransformEastmoney(unittest.TestCase):
 
     def _call(self, raw: dict, source: str = "东方财富"):
         from src.python.fetcher.price import _price_transform_eastmoney
+
         return _price_transform_eastmoney(raw, source)
 
     def test_normal(self):
         """正常数据 → 统一格式。"""
         raw = {
-            "name": "测试基金", "code": "011506",
-            "nav": 1.2345, "yesterday_nav": 1.2000,
+            "name": "测试基金",
+            "code": "011506",
+            "nav": 1.2345,
+            "yesterday_nav": 1.2000,
             "nav_date": "2026-07-01",
         }
         result = self._call(raw)
@@ -144,10 +152,13 @@ class TestFetchMarketData(unittest.TestCase):
     def test_success(self, mock_fallback):
         """正常返回。"""
         mock_fallback.return_value = {
-            "name": "长江电力", "code": "600900",
-            "price": 26.65, "source": "腾讯财经",
+            "name": "长江电力",
+            "code": "600900",
+            "price": 26.65,
+            "source": "腾讯财经",
         }
         from src.python.fetcher.price import fetch_market_data
+
         result = fetch_market_data("600900", "长江电力")
         self.assertEqual(result["price"], 26.65)
 
@@ -156,6 +167,7 @@ class TestFetchMarketData(unittest.TestCase):
         """全部失败 → None。"""
         mock_fallback.return_value = None
         from src.python.fetcher.price import fetch_market_data
+
         self.assertIsNone(fetch_market_data("600900"))
 
     @patch("src.python.fetcher.price.fetch_with_fallback")
@@ -174,7 +186,9 @@ class TestFetchMarketData(unittest.TestCase):
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_otc_fund_bypassed_stock_chain(
-        self, mock_fallback, mock_fresh,
+        self,
+        mock_fallback,
+        mock_fresh,
     ):
         """002943 场外基金（名称可识别）→ 直接走 fund_otc，不经过 stock 链路。"""
         from src.python.fetcher.price import fetch_market_data
@@ -189,7 +203,9 @@ class TestFetchMarketData(unittest.TestCase):
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_otc_fund_empty_name_fallback_to_degrade(
-        self, mock_fallback, mock_fresh,
+        self,
+        mock_fallback,
+        mock_fresh,
     ):
         """002943 无 expected_name → 先走 stock 失败后降级 fund_otc（2 次调用）。"""
         from src.python.fetcher.price import fetch_market_data
@@ -205,7 +221,9 @@ class TestFetchMarketData(unittest.TestCase):
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_a_share_stock_only_one_call(
-        self, mock_fallback, mock_fresh,
+        self,
+        mock_fallback,
+        mock_fresh,
     ):
         """600900 A 股 → 仅走 stock 链路，不降级。"""
         from src.python.fetcher.price import fetch_market_data
@@ -219,7 +237,9 @@ class TestFetchMarketData(unittest.TestCase):
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_etf_fund_only_stock_chain(
-        self, mock_fallback, mock_fresh,
+        self,
+        mock_fallback,
+        mock_fresh,
     ):
         """161725 ETF 基金 → 仅走 stock 链路（exchange_fund 判定），不降级。"""
         from src.python.fetcher.price import fetch_market_data
@@ -235,12 +255,14 @@ class TestFetchMarketData(unittest.TestCase):
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_code_fallback_to_eastmoney(
-        self, mock_fallback, mock_fresh,
+        self,
+        mock_fallback,
+        mock_fresh,
     ):
         """00 代码股票链路全失败 → 降级场外基金净值链路。"""
         mock_fallback.side_effect = [
             None,  # 第 1 次：stock 链路返回 None
-            {      # 第 2 次：降级到 fund_otc（eastmoney 转换后格式）
+            {  # 第 2 次：降级到 fund_otc（eastmoney 转换后格式）
                 "name": "广发多因子",
                 "code": "002943",
                 "price": 1.2345,
@@ -251,6 +273,7 @@ class TestFetchMarketData(unittest.TestCase):
             },
         ]
         from src.python.fetcher.price import fetch_market_data
+
         result = fetch_market_data("002943", "广发多因子")
         self.assertIsNotNone(result)
         self.assertEqual(result["source_api"], "eastmoney")
@@ -260,11 +283,14 @@ class TestFetchMarketData(unittest.TestCase):
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_code_fallback_all_fail(
-        self, mock_fallback, mock_fresh,
+        self,
+        mock_fallback,
+        mock_fresh,
     ):
         """00 代码股票链路 + 降级链路均失败 → None。"""
         mock_fallback.side_effect = [None, None]
         from src.python.fetcher.price import fetch_market_data
+
         result = fetch_market_data("002943", "广发多因子")
         self.assertIsNone(result)
         self.assertEqual(mock_fallback.call_count, 2)
@@ -272,7 +298,9 @@ class TestFetchMarketData(unittest.TestCase):
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
     def test_code_stock_no_fallback(
-        self, mock_fallback, mock_fresh,
+        self,
+        mock_fallback,
+        mock_fresh,
     ):
         """00 代码但股票链路成功 → 不回退降级。"""
         mock_fallback.return_value = {
@@ -282,7 +310,114 @@ class TestFetchMarketData(unittest.TestCase):
             "source_api": "tencent",
         }
         from src.python.fetcher.price import fetch_market_data
+
         result = fetch_market_data("000001", "平安银行")
         self.assertIsNotNone(result)
         self.assertEqual(result["source_api"], "tencent")
         self.assertEqual(mock_fallback.call_count, 1)
+
+
+class TestPriceCacheFresh(unittest.TestCase):
+    """_price_cache_fresh 收市后新鲜度验证测试。"""
+
+    def _call(self, data: dict) -> bool:
+        from src.python.fetcher.price import _price_cache_fresh
+
+        return _price_cache_fresh(data)
+
+    @patch("src.python.core.market_hours.is_market_open", return_value=True)
+    def test_market_open_always_fresh(self, mock_open):
+        """盘中 → 无论 price_date 多旧均视为新鲜（短 TTL 已保证实时性）。"""
+        self.assertTrue(self._call({"price_date": "2020-01-01"}))
+
+    @patch("src.python.core.market_hours.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-31")
+    def test_after_close_fresh(self, mock_td, mock_open):
+        """盘后 price_date >= 最近交易日 → 新鲜。"""
+        self.assertTrue(self._call({"price_date": "2026-07-31"}))
+        self.assertTrue(self._call({"price_date": "2026-08-01"}))
+
+    @patch("src.python.core.market_hours.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-31")
+    def test_after_close_stale(self, mock_td, mock_open):
+        """盘后 price_date < 最近交易日 → 跨日残留，判定不新鲜。"""
+        self.assertFalse(self._call({"price_date": "2026-07-30"}))
+
+    @patch("src.python.core.market_hours.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-31")
+    def test_after_close_no_date(self, mock_td, mock_open):
+        """盘后无 price_date → 视为不新鲜（强制刷新兜底）。"""
+        self.assertFalse(self._call({}))
+        self.assertFalse(self._call({"price_date": ""}))
+
+    @patch("src.python.core.market_hours.is_market_open", side_effect=RuntimeError("boom"))
+    def test_exception_conservative_fresh(self, mock_open):
+        """校验异常 → 保守视为新鲜，不阻塞取价流程。"""
+        self.assertTrue(self._call({"price_date": "2026-07-30"}))
+
+
+class TestFetchPriceCacheRefresh(unittest.TestCase):
+    """_fetch_price_with_cache_refresh 跨日残留强刷路径测试。"""
+
+    _STALE = {
+        "name": "测试基金",
+        "code": "011506",
+        "price": 1.2000,
+        "yesterday_close": 1.1900,
+        "price_date": "2026-07-30",  # 早于最近交易日 → 跨日残留
+        "source_api": "eastmoney",
+        "source": "东方财富",
+    }
+    _FRESH = {
+        "name": "测试基金",
+        "code": "011506",
+        "price": 1.2345,
+        "yesterday_close": 1.2000,
+        "price_date": "2026-07-31",
+        "source_api": "eastmoney",
+        "source": "东方财富",
+    }
+
+    def _call(self):
+        from src.python.fetcher.price import _fetch_price_with_cache_refresh
+
+        return _fetch_price_with_cache_refresh(
+            "price_fund_otc",
+            "011506",
+            "price_011506",
+            "测试基金",
+        )
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=False)
+    @patch("src.python.cache.clear")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
+    def test_stale_triggers_clear_and_refetch(self, mock_fallback, mock_clear, mock_fresh):
+        """跨日残留 → 清除缓存 + 重新拉取，返回最新净值并写回缓存。"""
+        mock_fallback.side_effect = [self._STALE, self._FRESH]
+        result = self._call()
+        self.assertEqual(result["price"], 1.2345)  # 返回第二次（最新）结果
+        self.assertEqual(result["price_date"], "2026-07-31")
+        self.assertEqual(mock_fallback.call_count, 2)
+        mock_clear.assert_called_once_with("price_011506")
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.cache.clear")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
+    def test_fresh_no_clear(self, mock_fallback, mock_clear, mock_fresh):
+        """新鲜缓存 → 不触发强刷，仅一次 fetch。"""
+        mock_fallback.return_value = self._FRESH
+        result = self._call()
+        self.assertEqual(result["price"], 1.2345)
+        self.assertEqual(mock_fallback.call_count, 1)
+        mock_clear.assert_not_called()
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=False)
+    @patch("src.python.cache.clear")
+    @patch("src.python.fetcher.price.fetch_with_fallback")
+    def test_fetch_none_no_clear(self, mock_fallback, mock_clear, mock_fresh):
+        """首次 fetch 即 None → 不进入强刷分支（无缓存可清）。"""
+        mock_fallback.return_value = None
+        result = self._call()
+        self.assertIsNone(result)
+        self.assertEqual(mock_fallback.call_count, 1)
+        mock_clear.assert_not_called()
