@@ -18,12 +18,14 @@ from unittest.mock import MagicMock, patch
 
 from src.python.core.constants import PROJECT_ROOT
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 # ═══════════════════════════════════════════════════════════
 # Y6-1: CSV 公式注入
 # ═══════════════════════════════════════════════════════════
+
 
 class TestCsvFormulaInjectionY6(unittest.TestCase):
     """CSV 公式注入防御 — 持仓名称不以 =/+/-/@ 开头。"""
@@ -34,12 +36,15 @@ class TestCsvFormulaInjectionY6(unittest.TestCase):
         from src.python.core.models import Holding
 
         h = Holding("证券", "=SUM(A1:A10)", "000001", 100, 10.0)
-        mkt = {"price": 10.0, "yesterday_close": 9.5,
-               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-01"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        mkt = {
+            "price": 10.0,
+            "yesterday_close": 9.5,
+            "price_date": "2026-07-01",
+            "source": "腾讯财经",
+            "source_api": "tencent",
+        }
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-01"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 detail = _compute_detail_row(h, mkt)
         # 名称原样保留，不被解释为公式
         self.assertEqual(detail.name, "=SUM(A1:A10)")
@@ -50,12 +55,15 @@ class TestCsvFormulaInjectionY6(unittest.TestCase):
         from src.python.core.models import Holding
 
         h = Holding("证券", "+123456", "000001", 100, 10.0)
-        mkt = {"price": 10.0, "yesterday_close": 9.5,
-               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-01"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        mkt = {
+            "price": 10.0,
+            "yesterday_close": 9.5,
+            "price_date": "2026-07-01",
+            "source": "腾讯财经",
+            "source_api": "tencent",
+        }
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-01"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 detail = _compute_detail_row(h, mkt)
         self.assertEqual(detail.name, "+123456")
 
@@ -63,6 +71,7 @@ class TestCsvFormulaInjectionY6(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 # Y6-2: XSS 缓存注入
 # ═══════════════════════════════════════════════════════════
+
 
 class TestXssCacheInjectionY6(unittest.TestCase):
     """XSS 注入防御 — 持仓名称含 HTML/JS。"""
@@ -73,24 +82,29 @@ class TestXssCacheInjectionY6(unittest.TestCase):
         from src.python.core.models import Holding
 
         h = Holding("证券", '<script>alert("xss")</script>', "000001", 100, 10.0)
-        mkt = {"price": 10.0, "yesterday_close": 9.5,
-               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-01"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        mkt = {
+            "price": 10.0,
+            "yesterday_close": 9.5,
+            "price_date": "2026-07-01",
+            "source": "腾讯财经",
+            "source_api": "tencent",
+        }
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-01"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 detail = _compute_detail_row(h, mkt)
         self.assertIn("<script>", detail.name)
-        self.assertNotEqual(detail.name, "alert(\\\"xss\\\")")
+        self.assertNotEqual(detail.name, 'alert(\\"xss\\")')
 
     def test_jinja2_autoescape_enabled(self):
         """确认 Jinja2 Environment 已启用 autoescape（防止 XSS 注入）。"""
         from src.python.report.html_jinja_env import _ENV
+
         self.assertTrue(_ENV.autoescape)
 
     def test_template_autoescapes_html_tags(self):
         """Jinja2 模板渲染 → 持仓名 <script> 被转义。"""
         from src.python.report.html_jinja_env import _ENV
+
         template = _ENV.from_string("{{ name }}")
         result = template.render(name='<script>alert("xss")</script>')
         self.assertIn("&lt;script&gt;", result)
@@ -99,39 +113,50 @@ class TestXssCacheInjectionY6(unittest.TestCase):
     def test_template_autoescapes_event_handler(self):
         """Jinja2 模板渲染 → onerror 事件处理器被转义。"""
         from src.python.report.html_jinja_env import _ENV
+
         template = _ENV.from_string("{{ name }}")
-        result = template.render(name='<img src=x onerror=alert(1)>')
+        result = template.render(name="<img src=x onerror=alert(1)>")
         self.assertIn("&lt;img", result)
         self.assertNotIn("<img", result)
 
     def test_money_filter_autoescape_safe(self):
         """money 过滤器输出纯文本 → autoescape 不影响数值显示。"""
         from src.python.report.html_jinja_env import _ENV
+
         template = _ENV.from_string("{{ value | money }}")
         result = template.render(value=1234.5)
         self.assertIn("1,234.50", result)
 
     def test_profit_color_filter_autoescape_safe(self):
-        """profit_color 过滤器输出颜色值 → autoescape 不影响。"""
+        """profit_color 过滤器输出主题 CSS 变量（var(--profit)/var(--loss)）→ autoescape 不影响。"""
         from src.python.report.html_jinja_env import _ENV
+
         template = _ENV.from_string("{{ value | profit_color }}")
         result = template.render(value=100)
-        self.assertIn("#CC0000", result)
+        self.assertIn("var(--profit)", result)
         result2 = template.render(value=-50)
-        self.assertIn("#009900", result2)
+        self.assertIn("var(--loss)", result2)
+        # 边界：零/非数字不输出颜色
+        result3 = template.render(value=0)
+        self.assertEqual(result3, "")
+        result4 = template.render(value="n/a")
+        self.assertEqual(result4, "")
 
     def test_xss_payload_in_name_preserved(self):
         """持仓名含 XSS payload → DetailRow 中原样传递（需在模板层 autoescape）。"""
         from src.python.report.market_value import _compute_detail_row
         from src.python.core.models import Holding
 
-        h = Holding("证券", '<img src=x onerror=alert(1)>', "000001", 100, 10.0)
-        mkt = {"price": 10.0, "yesterday_close": 9.5,
-               "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-01"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        h = Holding("证券", "<img src=x onerror=alert(1)>", "000001", 100, 10.0)
+        mkt = {
+            "price": 10.0,
+            "yesterday_close": 9.5,
+            "price_date": "2026-07-01",
+            "source": "腾讯财经",
+            "source_api": "tencent",
+        }
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-01"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 detail = _compute_detail_row(h, mkt)
         self.assertIn("img src", detail.name)
         self.assertIn("onerror", detail.name)
@@ -141,12 +166,14 @@ class TestXssCacheInjectionY6(unittest.TestCase):
 # Y6-3: 符号链接
 # ═══════════════════════════════════════════════════════════
 
+
 class TestSymlinkY6(unittest.TestCase):
     """符号链接处理 — 目录遍历不走符号链接。"""
 
     def test_symlink_in_cache_dir(self):
         """缓存目录存在符号链接 → listdir 不跟随。"""
         from src.python.cache import _cache_path
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # 创建普通文件而不是符号链接（Windows 兼容）
             fpath = _cache_path.__wrapped__("test_key") if hasattr(_cache_path, "__wrapped__") else None
@@ -160,6 +187,7 @@ class TestSymlinkY6(unittest.TestCase):
     def test_symlink_in_holdings_dir(self):
         """持仓目录存在非普通文件 → list_xlsx_files 过滤掉。"""
         from src.python.core.reader import list_xlsx_files
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # 创建一个命名管道（模拟特殊文件类型），Windows 用普通文件代替
             fpath = os.path.join(tmpdir, "not_a_real.xlsx")
@@ -173,12 +201,14 @@ class TestSymlinkY6(unittest.TestCase):
 # Y6-4: 路径遍历
 # ═══════════════════════════════════════════════════════════
 
+
 class TestPathTraversalY6(unittest.TestCase):
     """路径遍历防御。"""
 
     def test_cache_path_traversal_blocked(self):
         """缓存键含 ../ → 被 `_` 替换。"""
         from src.python.cache import _cache_path
+
         safe = _cache_path("../../etc/passwd")
         self.assertNotIn("..", safe)
         self.assertNotIn("/etc", safe)
@@ -186,6 +216,7 @@ class TestPathTraversalY6(unittest.TestCase):
     def test_cache_path_backslash_traversal(self):
         """缓存键含 ..\\ → `..` 和 `\\` 被替换，不逃逸出缓存目录。"""
         from src.python.cache import _cache_path
+
         safe = _cache_path("..\\..\\etc\\passwd")
         self.assertNotIn("..", safe)
         self.assertNotIn("\\\\", safe)  # 反斜杠被 _ 替换
@@ -196,6 +227,7 @@ class TestPathTraversalY6(unittest.TestCase):
 # Y6-5: API Key 日志泄漏（交叉验证已有测试）
 # ═══════════════════════════════════════════════════════════
 
+
 class TestApiKeyLogLeakY6(unittest.TestCase):
     """API Key 不应出现在日志中。"""
 
@@ -203,6 +235,7 @@ class TestApiKeyLogLeakY6(unittest.TestCase):
         """验证日志配置不输出 api_key。"""
         # 此测试为交叉引用，验证导入可用
         from src.python.llm.api_base import _sanitize_endpoint
+
         result = _sanitize_endpoint("https://api.anthropic.com/v1/messages")
         self.assertIn("api.anthropic.com", result)
         self.assertNotIn("v1/messages", result)
@@ -211,6 +244,7 @@ class TestApiKeyLogLeakY6(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 # Y6-6: JSON 原型污染
 # ═══════════════════════════════════════════════════════════
+
 
 class TestJsonPrototypePollutionY6(unittest.TestCase):
     """JSON 反序列化 — Python 原生 JSON 无原型污染风险。"""
@@ -229,6 +263,7 @@ class TestJsonPrototypePollutionY6(unittest.TestCase):
         """config.json 含 __proto__ → 不被特殊处理。"""
         from src.python.config import get_config
         import builtins
+
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = os.path.join(tmpdir, "config.json")
             with open(config_path, "w", encoding="utf-8") as f:
@@ -236,13 +271,13 @@ class TestJsonPrototypePollutionY6(unittest.TestCase):
             with patch("src.python.config._config_defaults._CONFIG_FILE", config_path):
                 config = get_config()
             self.assertIn("__proto__", config)
-            self.assertEqual(config["output_dir"],
-                             os.path.join(PROJECT_ROOT, "reports"))
+            self.assertEqual(config["output_dir"], os.path.join(PROJECT_ROOT, "reports"))
 
 
 # ═══════════════════════════════════════════════════════════
 # Y6-7: 临时文件竞争
 # ═══════════════════════════════════════════════════════════
+
 
 class TestTempFileRaceY6(unittest.TestCase):
     """临时文件安全 — mkstemp 原子写入。"""
@@ -252,6 +287,7 @@ class TestTempFileRaceY6(unittest.TestCase):
         from src.python.config import set_config
         from src.python.config._core import _atomic_write
         import inspect
+
         # 原子写实现（_atomic_write）必须使用 mkstemp + os.replace 防半写
         source_atomic = inspect.getsource(_atomic_write)
         self.assertIn("mkstemp", source_atomic)
@@ -264,6 +300,7 @@ class TestTempFileRaceY6(unittest.TestCase):
         """cache.set 使用 mkstemp 防半写。"""
         from src.python.cache import _write_atomic
         import inspect
+
         source = inspect.getsource(_write_atomic)
         self.assertIn("mkstemp", source)
         self.assertIn("os.replace", source)
@@ -272,8 +309,10 @@ class TestTempFileRaceY6(unittest.TestCase):
         """并发写缓存 → 不崩溃，文件不损坏。"""
         from src.python.cache import set, get
         import concurrent.futures
+
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
+
                 def write_item(i):
                     try:
                         set(f"concurrent_key", {"value": i})
@@ -283,14 +322,14 @@ class TestTempFileRaceY6(unittest.TestCase):
                         return {"__error__": str(sys.exc_info()[1])}
 
                 import sys
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
                     futures = [pool.submit(write_item, i) for i in range(20)]
                     results = [f.result() for f in concurrent.futures.as_completed(futures)]
                 # 所有结果应为 dict 而非损坏数据
                 # 说明：Windows 上并发写入可能产生 PermissionError，返回 __error__
                 for r in results:
-                    self.assertTrue(r is None or isinstance(r, dict),
-                                    f"Unexpected type: {type(r)}: {r}")
+                    self.assertTrue(r is None or isinstance(r, dict), f"Unexpected type: {type(r)}: {r}")
 
 
 if __name__ == "__main__":

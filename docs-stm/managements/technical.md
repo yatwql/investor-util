@@ -35,6 +35,7 @@
   - [4.11 数据降级治理体系](#411-数据降级治理体系)
   - [4.12 组合演进（多快照趋势）](#412-组合演进多快照趋势)
   - [4.13 调仓 What-if 模拟](#413-调仓-what-if-模拟)
+  - [4.14 HTML 暗色模式](#414-html-暗色模式)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -1966,6 +1967,26 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 | **C19** (pipeline_data Schema 契约) | `whatif_data` 契约独立于主报告管线（不经 `pipeline_data_builder.build()`），本报告自建契约并在模块 docstring 声明 |
 | **C20** (HTML 图表图下说明强制) | 资产配置对比双环形图 + 时序回测 2 张线图（归一化净值/回撤）各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |
 | **§1.4.5** (数据降级治理) | 两侧为空 → `available=false`，Excel 摘要页/HTML 写「调仓对比数据暂不可用」占位；回测不可用 → 回测区隐藏/占位、不阻塞主报告；CLI 层对空持仓文件直接报错返回 `_EXIT_SEVERE` |
+
+### 4.14 HTML 暗色模式
+
+主报告与调仓 What-if 报告支持深/浅色主题切换。右上角浮动按钮切换，偏好经 `localStorage`（键 `investor-theme-dark`，'1'/'0'）持久化；**首次默认浅色**（不跟随系统，避免与用户打印/系统偏好耦合）。
+
+**CSS 变量体系**：页面级颜色统一为 CSS 变量，`:root` 定义浅色默认值，`[data-theme="dark"]` 覆盖深色值；语义色提亮（浅色 `--profit:#CC0000 / --loss:#009900`；深色 `--profit:#ff6b6b / --loss:#4caf50`，红涨绿跌惯例保持）。品牌蓝 `#2E75B6`（header/section-title/toc/按钮）与 Chart.js 数据调色板（drawSimpleChart、热力图图例色）为数据/品牌色，不随主题变化。Jinja 过滤器（`profit_color`/`price_type_color`/`sentiment_colorize`）输出 `var(--xxx)` 表达式，模板内联 style 自动适配主题。
+
+**Chart.js 重绘**：`window.ChartTheme` 在脚本加载时一次性烘焙进图表配置。`theme.js::refreshChartTheme()` 切换时重读 CSS 变量原位更新 `ChartTheme`，`applyThemeToCharts()` 用 **`Chart.getChart(canvas)`**（Chart.js v4 全局 API）+ `querySelectorAll('canvas')` 遍历收集图表，更新 `legend.labels.color` 与各 `scales.*` 的 `ticks/grid/angleLines/pointLabels` 后 `chart.update()`（`animation=false` 下同步渲染）。对 report（经 ChartPrint 注册）与 whatif（未加载 chart-print.js）通用，非 Chart.js canvas 自然跳过。
+
+**打印协调**：暗色下 `@media print` 的 CSS 覆盖只影响非 canvas 部分，canvas 像素仍暗色。`theme.js` 用**捕获阶段**监听 `beforeprint`（`addEventListener('beforeprint', fn, true)`——捕获先于 chart-print.js 的冒泡阶段快照执行）：若暗色，先移除 `data-theme` + 重读变量 + 遍历图表 `update()`（同步渲染浅色像素）→ chart-print.js 快照抓到浅色；`afterprint` 捕获阶段恢复暗色 + 重绘（`restoreAfterPrint` 标志记录状态）。`@media print` 同时隐藏 `.theme-toggle-btn`。
+
+**JS 资产**：`html_writer.py::_JS_ASSETS` 增加 `theme.js`（第 8 个本地 bundle），whatif 复用同一复制函数；两模板均在 `toc.js` 之后以 `defer` 加载（DOMContentLoaded 前执行，无 FOUC）。
+
+**架构约束遵从**：
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| **C14** (渲染期数据不可写入模块级全局变量) | 暗色模式为前端静态资源 + Jinja 过滤器变更：过滤器为纯函数（`profit_color`/`price_type_color` 返回 CSS 变量表达式），不写 `_ENV.globals`，渲染数据仍经模板 context 传递 |
+| **C20** (HTML 图表图下说明强制) | 主题不改变图表 DOM 结构与图下说明（`.chart-caption`）渲染分支 |
+| **§1.4.5** (数据降级治理) | `window.Chart` 缺失时 `theme.js` 守卫跳过图表重绘（仅切换页面 CSS 变量），不崩溃；离线降级（drawSimpleChart 旧路径）不受影响 |
 
 [↑ 回到顶部](#目录)
 

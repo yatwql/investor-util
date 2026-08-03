@@ -785,7 +785,6 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIn("量化指标数据不足", note.get_text())
         self.assertIsNone(section.find(id="chart_radar"))
 
-
     def test_radar_data_unavailable_placeholder(self) -> None:
         """data_unavailable=True 时显示"持仓市值数据不可用，量化指标暂停计算"。"""
         overrides = {"radar": {"labels": ["夏普比率"], "datasets": [{"data": [1.2]}]}}
@@ -903,6 +902,87 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNotNone(soup.find(id="portfolioChart"), "Flag OFF 时应保留旧净值 Canvas")
         self.assertIsNotNone(soup.find(id="drawdownChart"), "Flag OFF 时应保留旧回撤 Canvas")
         self.assertIn("drawSimpleChart", str(soup), "Flag OFF 时应保留旧绘图函数")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 暗色模式（主题切换）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlTheme(unittest.TestCase):
+    """HTML 暗色模式（主题切换）结构测试 — 按钮/脚本/CSS 变量/打印隐藏。
+
+    主题元素为模板静态结构（不受章节可见性影响），用 _render_interactive
+    渲染完整页面后断言：
+      - 浮动切换按钮存在且带 aria-label
+      - theme.js 脚本被引用
+      - :root 页面级 CSS 变量（--bg/--surface/--text）
+      - [data-theme="dark"] 深色覆盖块
+      - @media print 隐藏切换按钮
+    """
+
+    def _render_theme_soup(self) -> BeautifulSoup:
+        """渲染完整交互模板（主题元素为静态结构，与章节可见性无关）。"""
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["enable_interactive_charts"] = True
+        data["chart_datasets"] = {k: {"labels": [], "datasets": []} for k in TestHtmlInteractiveCharts._DATASET_KEYS}
+        return _render_template(data)
+
+    def test_theme_toggle_button_present(self) -> None:
+        """浮动右上角切换按钮存在，含 aria-label 与 title（可访问性）。"""
+        soup = self._render_theme_soup()
+        btn = soup.select_one("button.theme-toggle-btn")
+        self.assertIsNotNone(btn, "应存在 theme-toggle-btn 浮动切换按钮")
+        self.assertEqual(btn.get("aria-label"), "切换深色模式", "按钮 aria-label 应描述主题切换")
+        self.assertIsNotNone(btn.get("title"), "按钮应含 title 提示")
+        self.assertIn("🌙", btn.get_text(), "浅色默认态按钮应显示 🌙 图标（可切深色）")
+
+    def test_theme_js_loaded(self) -> None:
+        """模板引用 theme.js（主题切换 主题切换脚本）。"""
+        soup = self._render_theme_soup()
+        scripts = [s.get("src") for s in soup.select("script[src]")]
+        self.assertIn("theme.js", scripts, "模板应加载 theme.js")
+
+    def test_theme_js_loaded_after_toc(self) -> None:
+        """theme.js 在 toc.js 之后加载（保证按钮可访问性逻辑不与 toc 冲突）。"""
+        soup = self._render_theme_soup()
+        srcs = [s.get("src") for s in soup.select("script[src]")]
+        toc_idx = srcs.index("toc.js")
+        theme_idx = srcs.index("theme.js")
+        self.assertLess(toc_idx, theme_idx, "toc.js 应早于 theme.js 加载")
+
+    def test_root_css_variables(self) -> None:
+        """:root 定义页面级 CSS 变量（--bg/--surface/--text 等）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        for var_name in ("--bg:", "--surface:", "--text:", "--profit:", "--loss:"):
+            self.assertIn(var_name, style, f":root 应定义 {var_name} 页面级变量")
+
+    def test_dark_theme_override_block(self) -> None:
+        """存在 [data-theme="dark"] 深色覆盖块（含深色背景/提亮语义色）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        self.assertIn('[data-theme="dark"]', style, 'style 应含 [data-theme="dark"] 覆盖块')
+        self.assertIn("--bg: #121212", style, "深色块应定义深色背景")
+        self.assertIn("--surface: #1e1e1e", style, "深色块应定义深色卡片表面")
+
+    def test_theme_button_hidden_in_print(self) -> None:
+        """@media print 隐藏切换按钮（打印不出现浮动控件）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        self.assertIn("@media print", style, "模板应含打印媒体查询")
+        self.assertIn(".theme-toggle-btn { display: none", style, "打印时应隐藏主题切换按钮")
+
+    def test_css_variables_used_for_theme_aware_colors(self) -> None:
+        """语义色使用 var(--xxx) 而非硬编码（暗色下自动适配）。"""
+        soup = self._render_theme_soup()
+        html = str(soup)
+        # 盈利/亏损色应通过变量引用；不应再出现旧硬编码红绿
+        self.assertNotIn("color: #CC0000", html, "盈利色不应硬编码 #CC0000")
+        self.assertNotIn("color: #009900", html, "亏损色不应硬编码 #009900")
 
 
 # ═══════════════════════════════════════════════════════════════

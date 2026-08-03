@@ -91,6 +91,7 @@ class TestCopyJsAssets:
             "chart-common.js",
             "chart-init.js",
             "toc.js",
+            "theme.js",
         ):
             assert (tmp_path / fname).exists(), f"{fname} 未复制"
 

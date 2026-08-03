@@ -17,26 +17,164 @@
             --chart-grid: rgba(128, 128, 128, 0.15);
             --chart-text: #333333;
             --chart-bg: #FFFFFF;
+            /* 页面级主题变量（暗色模式（主题切换）；浅色默认值 = 原硬编码色） */
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --surface-2: #f8f9fa;           /* 卡片/分组/状态块背景 */
+            --text: #333333;
+            --text-secondary: #555555;
+            --text-tertiary: #666666;
+            --text-muted: #888888;
+            --text-faint: #999999;
+            --border: #dddddd;
+            --border-light: #eeeeee;
+            --border-strong: #ccc;
+            --border-dashed: #d0d5dd;
+            --table-th-bg: #f0f4f8;
+            --table-even: #f8f9fa;
+            --table-hover: #eef5fb;
+            --subtotal-bg: #E8F0FE;
+            --grand-total-bg: #FFF8E1;
+            --row-danger-bg: #FFF0F0;
+            --row-danger-border: #FFCCCC;
+            --row-warning-bg: #FFF8E1;
+            --row-warning-border: #FFE082;
+            --row-first-check-bg: #F5F5F5;
+            --notice-bg: #E3F2FD;
+            --notice-border: #1976D2;
+            --warn-bg: #FFF3CD;
+            --warn-border: #FFC107;
+            --warn-text: #856404;
+            --profit: #CC0000;              /* 盈利/上涨红 */
+            --loss: #009900;                /* 亏损/下跌绿 */
+            --success: #2e7d32;             /* 已恢复/正常态绿 */
+            --rating-excellent: #CC0000;
+            --rating-poor: #006400;
+            --rating-deviation: #009900;
+            --rating-stable: #0066CC;
+            --orange-text: #E65100;
+            --experimental-badge-bg: #fff3e0;
+            --experimental-badge-text: #e65100;
+            --debate-pro-bg: #f0faf0;
+            --debate-pro-border: #4caf50;
+            --debate-con-bg: #fef0f0;
+            --debate-con-border: #f44336;
+            --debate-synthesis-bg: #fffdf0;
+            --debate-synthesis-border: #ff9800;
+            --empty-section-bg: #fafafa;
+            --status-warn: #e67e22;
+            --status-info: #666666;
+            --status-ok: #27ae60;
+            --source-tag-bg: #e8f0fe;
+            --source-tag-text: #1a56db;
+            --source-tag-pen-bg: #f0e8fe;
+            --source-tag-pen-text: #7c3aed;
+            --source-tag-ind-bg: #f3f4f6;
+            --source-tag-ind-text: #6b7280;
+            --source-tag-con-bg: #fef3c7;
+            --source-tag-con-text: #b45309;
+            --toc-bg: #ffffff;
+            --toc-border: #e5e7eb;
+            --progress-track: #f0f2f5;
+            --llm-status-disabled: #9ca3af;
+            --llm-status-failed: #c0392b;
+            --llm-status-cached: #2e86c1;
+            --llm-status-success: #27ae60;
+            --llm-status-unknown: #aaa;
+            --llm-status-thinking: #8e44ad;
+        }
+        /* 暗色模式（主题切换）：根元素 data-theme="dark"，theme.js 切换。
+           品牌蓝（--chart-primary/header/按钮）保持原值，暗色下蓝底白字清晰。 */
+        [data-theme="dark"] {
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --surface-2: #252525;
+            --text: #e0e0e0;
+            --text-secondary: #c0c0c0;
+            --text-tertiary: #b0b0b0;
+            --text-muted: #9a9a9a;
+            --text-faint: #8a8a8a;
+            --border: #3a3a3a;
+            --border-light: #333333;
+            --border-strong: #555555;
+            --border-dashed: #444444;
+            --table-th-bg: #2a2a2a;
+            --table-even: #242424;
+            --table-hover: #2e3a4a;
+            --subtotal-bg: #1e3a5f;
+            --grand-total-bg: #4a3d17;
+            --row-danger-bg: #3a1e1e;
+            --row-danger-border: #5a2e2e;
+            --row-warning-bg: #40381a;
+            --row-warning-border: #5c4f22;
+            --row-first-check-bg: #2e2e2e;
+            --notice-bg: #1e3a5f;
+            --notice-border: #4a90d9;
+            --warn-bg: #3f3512;
+            --warn-border: #c9a227;
+            --warn-text: #e3c56a;
+            --profit: #ff6b6b;              /* 暗色下提亮，红涨绿跌惯例保持 */
+            --loss: #4caf50;
+            --success: #4caf50;
+            --rating-excellent: #ff6b6b;
+            --rating-poor: #81c784;
+            --rating-deviation: #81c784;
+            --rating-stable: #64b5f6;
+            --orange-text: #ff8a50;
+            --experimental-badge-bg: #3d2c10;
+            --experimental-badge-text: #ffb74d;
+            --debate-pro-bg: #17311a;
+            --debate-pro-border: #66bb6a;
+            --debate-con-bg: #331414;
+            --debate-con-border: #e57373;
+            --debate-synthesis-bg: #332a0f;
+            --debate-synthesis-border: #ffb74d;
+            --empty-section-bg: #1a1a1a;
+            --status-warn: #f0a35e;
+            --status-info: #b0b0b0;
+            --status-ok: #66bb6a;
+            --source-tag-bg: #1e3a5f;
+            --source-tag-text: #8ab4f8;
+            --source-tag-pen-bg: #2f1e52;
+            --source-tag-pen-text: #b39ddb;
+            --source-tag-ind-bg: #2e2e2e;
+            --source-tag-ind-text: #a0a0a0;
+            --source-tag-con-bg: #3d3512;
+            --source-tag-con-text: #e6c15c;
+            --toc-bg: #1e1e1e;
+            --toc-border: #333333;
+            --progress-track: #2a2a2a;
+            --llm-status-disabled: #9ca3af;
+            --llm-status-failed: #e74c3c;
+            --llm-status-cached: #5dade2;
+            --llm-status-success: #66bb6a;
+            --llm-status-unknown: #7a7a7a;
+            --llm-status-thinking: #b39ddb;
+            /* Chart.js 深色变量（theme.js refreshChartTheme 重读） */
+            --chart-grid: rgba(255, 255, 255, 0.12);
+            --chart-text: #e0e0e0;
+            --chart-bg: #1e1e1e;
+            --chart-danger-transparent: rgba(255, 107, 107, 0.15);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
+        body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; }
 
         .report-header { background: #2E75B6; color: #fff; padding: 20px 30px; border-radius: 8px; margin-bottom: 24px; }
         .report-header h1 { font-size: 22px; margin-bottom: 4px; }
         .report-header .subtitle { font-size: 14px; opacity: 0.85; }
 
-        .section { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
+        .section { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
         .section-title { background: #2E75B6; color: #fff; padding: 12px 20px; font-size: 16px; font-weight: 600; }
-        .experimental-badge { background: #fff3e0; color: #e65100; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: normal; margin-left: 10px; vertical-align: middle; }
+        .experimental-badge { background: var(--experimental-badge-bg); color: var(--experimental-badge-text); font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: normal; margin-left: 10px; vertical-align: middle; }
         .debate-block { margin: 12px 0; padding: 14px 16px; border-radius: 6px; }
         .debate-block .debate-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
         .debate-block .debate-content { font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
-        .debate-pro { background: #f0faf0; border-left: 4px solid #4caf50; }
-        .debate-con { background: #fef0f0; border-left: 4px solid #f44336; }
-        .debate-synthesis { background: #fffdf0; border-left: 4px solid #ff9800; }
+        .debate-pro { background: var(--debate-pro-bg); border-left: 4px solid var(--debate-pro-border); }
+        .debate-con { background: var(--debate-con-bg); border-left: 4px solid var(--debate-con-border); }
+        .debate-synthesis { background: var(--debate-synthesis-bg); border-left: 4px solid var(--debate-synthesis-border); }
         .section-content { padding: 16px 20px; }
-        .report-footer { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
+        .report-footer { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
 
         /* ── 章节底部"回到顶部"链接 ──────────────── */
         .back-to-top-link { text-align: center; padding: 10px 0 14px; }
@@ -44,79 +182,79 @@
         .back-to-top-link a:hover { text-decoration: underline; }
 
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
-        th { background: #f0f4f8; padding: 8px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #ddd; white-space: nowrap; }
-        td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #eee; }
-        tr:nth-child(even) { background: #f8f9fa; }
-        tr:hover { background: #eef5fb; }
+        th { background: var(--table-th-bg); padding: 8px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
+        td { padding: 6px 10px; text-align: center; border-bottom: 1px solid var(--border-light); }
+        tr:nth-child(even) { background: var(--table-even); }
+        tr:hover { background: var(--table-hover); }
 
-        .subtotal-row { background: #E8F0FE !important; font-weight: 600; }
+        .subtotal-row { background: var(--subtotal-bg) !important; font-weight: 600; }
         .subtotal-row td { border-top: 2px solid #2E75B6; }
-        .grand-total-row { background: #FFF8E1 !important; font-weight: 700; }
-        .grand-total-row td { border-top: 2px solid #333; }
+        .grand-total-row { background: var(--grand-total-bg) !important; font-weight: 700; }
+        .grand-total-row td { border-top: 2px solid var(--text); }
 
-        .profit { color: #CC0000; }
-        .loss { color: #009900; }
-        .rating-excellent { color: #CC0000; font-weight: 600; }
-        .rating-poor { color: #006400; font-weight: 600; }
-        .rating-stable { color: #0066CC; font-weight: 600; }
+        .profit { color: var(--profit); }
+        .loss { color: var(--loss); }
+        .rating-excellent { color: var(--rating-excellent); font-weight: 600; }
+        .rating-poor { color: var(--rating-poor); font-weight: 600; }
+        .rating-stable { color: var(--rating-stable); font-weight: 600; }
 
-        .row-danger { background: #FFF0F0 !important; }
-        .row-danger td { border-top: 1px solid #FFCCCC; }
-        .row-warning { background: #FFF8E1 !important; }
-        .row-warning td { border-top: 1px solid #FFE082; }
-        .row-first-check { background: #F5F5F5 !important; }
-        .row-first-check td { color: #888; }
-        .red-text { color: #CC0000; font-weight: 600; }
-        .orange-text { color: #E65100; font-weight: 600; }
-        .gray-text { color: #888; }
-        .notice-banner { background: #E3F2FD; border-left: 4px solid #1976D2; padding: 10px 14px; font-size: 13px; border-radius: 4px; }
-        .summary-tag { font-size: 13px; color: #555; }
-        .empty-section { padding: 24px 16px; text-align: center; color: #888; font-size: 14px; background: #fafafa; border: 1px dashed #ddd; border-radius: 6px; margin: 8px 0; }
+        .row-danger { background: var(--row-danger-bg) !important; }
+        .row-danger td { border-top: 1px solid var(--row-danger-border); }
+        .row-warning { background: var(--row-warning-bg) !important; }
+        .row-warning td { border-top: 1px solid var(--row-warning-border); }
+        .row-first-check { background: var(--row-first-check-bg) !important; }
+        .row-first-check td { color: var(--text-muted); }
+        .red-text { color: var(--profit); font-weight: 600; }
+        .orange-text { color: var(--orange-text); font-weight: 600; }
+        .gray-text { color: var(--text-muted); }
+        .notice-banner { background: var(--notice-bg); border-left: 4px solid var(--notice-border); padding: 10px 14px; font-size: 13px; border-radius: 4px; }
+        .summary-tag { font-size: 13px; color: var(--text-secondary); }
+        .empty-section { padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 14px; background: var(--empty-section-bg); border: 1px dashed var(--border); border-radius: 6px; margin: 8px 0; }
         .heatmap-matrix { border-collapse: collapse; }
-        .heatmap-matrix th, .heatmap-matrix td { border: 1px solid #ccc; padding: 4px 8px; text-align: center; font-size: 12px; }
-        .heatmap-matrix th { background: #f5f5f5; font-weight: 600; }
+        .heatmap-matrix th, .heatmap-matrix td { border: 1px solid var(--border-strong); padding: 4px 8px; text-align: center; font-size: 12px; }
+        .heatmap-matrix th { background: var(--row-first-check-bg); font-weight: 600; }
 
         .text-left { text-align: left; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
 
         .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .summary-card { background: #f8f9fa; border-radius: 6px; padding: 14px 18px; }
-        .summary-card h3 { font-size: 13px; color: #666; margin-bottom: 6px; }
+        .summary-card { background: var(--surface-2); border-radius: 6px; padding: 14px 18px; }
+        .summary-card h3 { font-size: 13px; color: var(--text-tertiary); margin-bottom: 6px; }
         .summary-card .value { font-size: 22px; font-weight: 700; }
-        .summary-card .meta { font-size: 12px; color: #999; margin-top: 2px; }
+        .summary-card .meta { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
 
         .kv-table { width: auto; min-width: 0; }
         .kv-table td { padding: 6px 16px 6px 0; border-bottom: none; text-align: left; }
-        .kv-table td:first-child { font-weight: 600; color: #555; width: 140px; }
+        .kv-table td:first-child { font-weight: 600; color: var(--text-secondary); width: 140px; }
         .kv-table tr:nth-child(even) { background: transparent; }
 
         .indices-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .indices-group { background: #f8f9fa; border-radius: 6px; padding: 12px 16px; }
-        .indices-group h4 { font-size: 13px; color: #555; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #ddd; }
+        .indices-group { background: var(--surface-2); border-radius: 6px; padding: 12px 16px; }
+        .indices-group h4 { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
         .index-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-        .index-name { color: #555; }
+        .index-name { color: var(--text-secondary); }
         .index-price { font-weight: 600; }
         .index-change { font-size: 12px; margin-left: 8px; }
 
         .update-ok { color: #2E75B6; font-weight: 600; }
-        .update-warn { color: #CC0000; font-weight: 600; }
+        .update-warn { color: var(--profit); font-weight: 600; }
 
-        .penetration-notes { font-size: 12px; color: #666; padding: 8px 20px 16px; line-height: 1.8; }
-        .empty-note { padding: 20px; text-align: center; color: #999; }
-        .placeholder-note { background: #fafbfc; border: 1px dashed #d0d5dd; border-radius: 6px; }
+        .penetration-notes { font-size: 12px; color: var(--text-tertiary); padding: 8px 20px 16px; line-height: 1.8; }
+        .empty-note { padding: 20px; text-align: center; color: var(--text-faint); }
+        .placeholder-note { background: var(--empty-section-bg); border: 1px dashed var(--border-dashed); border-radius: 6px; }
 
         /* ── 数据源状态摘要 ───────────────────── */
-        .data-status { background: #f9f9f9; padding: 10px; margin-top: 15px; border-radius: 4px; font-size: 13px; }
-        .data-status-title { font-size: 14px; font-weight: bold; color: #666; margin-bottom: 6px; }
-        .data-status-warn { border-left: 3px solid #e67e22; padding-left: 8px; margin: 3px 0; color: #e67e22; }
-        .data-status-info { border-left: 3px solid #95a5a6; padding-left: 8px; margin: 3px 0; color: #666; }
-        .data-status-ok { border-left: 3px solid #27ae60; padding-left: 8px; margin: 3px 0; color: #27ae60; }
+        .data-status { background: var(--surface-2); padding: 10px; margin-top: 15px; border-radius: 4px; font-size: 13px; }
+        .data-status-title { font-size: 14px; font-weight: bold; color: var(--text-tertiary); margin-bottom: 6px; }
+        .data-status-warn { border-left: 3px solid var(--status-warn); padding-left: 8px; margin: 3px 0; color: var(--status-warn); }
+        .data-status-info { border-left: 3px solid var(--status-info); padding-left: 8px; margin: 3px 0; color: var(--text-tertiary); }
+        .data-status-ok { border-left: 3px solid var(--status-ok); padding-left: 8px; margin: 3px 0; color: var(--status-ok); }
         /* ── 数据源可用性矩阵 ──────────────── */
-        .src-matrix-ok { color: #27ae60; font-weight: 600; }
-        .src-matrix-degraded { color: #e67e22; font-weight: 600; }
-        .src-matrix-failed { color: #cc0000; font-weight: 600; }
-        .src-matrix-detail { font-size: 12px; color: #888; }
+        .src-matrix-ok { color: var(--status-ok); font-weight: 600; }
+        .src-matrix-degraded { color: var(--status-warn); font-weight: 600; }
+        .src-matrix-failed { color: var(--profit); font-weight: 600; }
+        .src-matrix-detail { font-size: 12px; color: var(--text-muted); }
 
 {% macro render_data_status(data_status_dict) %}
 {% if data_status_dict %}
@@ -136,16 +274,16 @@
 <div class="back-to-top-link"><a href="#report-top" title="回到报告顶部">↑ 回到顶部</a></div>
 {% endmacro %}
 
-        .source-tag { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; }
-        .source-tag-holding { display: inline-block; background: #e8f0fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #1a56db; }
-        .source-tag-penetration { display: inline-block; background: #f0e8fe; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #7c3aed; }
-        .source-tag-industry { display: inline-block; background: #f3f4f6; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #6b7280; }
-        .source-tag-concept { display: inline-block; background: #fef3c7; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: #b45309; }
+        .source-tag { display: inline-block; background: var(--source-tag-bg); border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; }
+        .source-tag-holding { display: inline-block; background: var(--source-tag-bg); border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: var(--source-tag-text); }
+        .source-tag-penetration { display: inline-block; background: var(--source-tag-pen-bg); border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: var(--source-tag-pen-text); }
+        .source-tag-industry { display: inline-block; background: var(--source-tag-ind-bg); border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: var(--source-tag-ind-text); }
+        .source-tag-concept { display: inline-block; background: var(--source-tag-con-bg); border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: var(--source-tag-con-text); }
 
         /* ── 章节快捷导航 ────────────────────── */
         .section-nav {
             display: flex; flex-wrap: wrap;
-            background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             margin-bottom: 16px; padding: 0; -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
         }
@@ -153,10 +291,10 @@
         .section-nav a {
             flex-shrink: 0; display: block; padding: 10px 14px;
             color: #2E75B6; text-decoration: none; font-size: 12px;
-            font-weight: 500; border-right: 1px solid #eee; white-space: nowrap;
+            font-weight: 500; border-right: 1px solid var(--border-light); white-space: nowrap;
             transition: background 0.2s;
         }
-        .section-nav a:hover { background: #e8f0fe; }
+        .section-nav a:hover { background: var(--source-tag-bg); }
         .section-nav a:last-child { border-right: none; }
 
         @media (max-width: 768px) {
@@ -167,7 +305,7 @@
         .toc-sidebar {
             position: fixed; top: 0; left: 0; z-index: 100;
             width: 220px; height: 100vh; overflow-y: auto;
-            background: #fff; border-right: 1px solid #e5e7eb;
+            background: var(--toc-bg); border-right: 1px solid var(--toc-border);
             box-shadow: 2px 0 8px rgba(0,0,0,0.06);
             transform: translateX(0); transition: transform 0.25s ease;
             scrollbar-width: thin;
@@ -186,12 +324,12 @@
         .toc-collapse-btn:hover { background: rgba(255,255,255,0.3); }
         .toc-list { padding: 8px 0; }
         .toc-list a {
-            display: block; padding: 7px 16px; color: #333;
+            display: block; padding: 7px 16px; color: var(--text);
             text-decoration: none; font-size: 12.5px; line-height: 1.5;
             border-left: 3px solid transparent; transition: background 0.2s;
         }
-        .toc-list a:hover { background: #e8f0fe; }
-        .toc-list a.active { background: #e8f0fe; border-left-color: #2E75B6; color: #1a56db; font-weight: 600; }
+        .toc-list a:hover { background: var(--source-tag-bg); }
+        .toc-list a.active { background: var(--source-tag-bg); border-left-color: #2E75B6; color: var(--source-tag-text); font-weight: 600; }
         /* 收起状态：侧栏移出视口 + 浮动展开按钮 */
         .toc-toggle-btn {
             position: fixed; left: 12px; top: 12px; z-index: 101;
@@ -200,6 +338,15 @@
             font-size: 18px; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
         }
         .toc-toggle-btn:hover { background: #1f5a91; }
+        /* ── 主题切换按钮（暗色模式（主题切换）；浮动右上角，两种模板通用）── */
+        .theme-toggle-btn {
+            position: fixed; right: 12px; top: 12px; z-index: 101;
+            width: 38px; height: 38px; border-radius: 50%;
+            background: #2E75B6; color: #fff; border: none; cursor: pointer;
+            font-size: 18px; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-toggle-btn:hover { background: #1f5a91; }
         body.toc-collapsed .toc-sidebar { transform: translateX(-105%); }
         body.toc-collapsed .toc-toggle-btn { display: block; }
         /* 宽屏：展开时内容让出左侧栏 */
@@ -303,7 +450,8 @@
             .back-to-top-link,
             .section-nav,
             .toc-sidebar,
-            .toc-toggle-btn { display: none !important; }
+            .toc-toggle-btn,
+            .theme-toggle-btn { display: none !important; }
 
             /* 表头跨页重复 */
             thead { display: table-header-group; }
@@ -336,6 +484,7 @@
             .report-header { page-break-after: avoid; }
 
             /* Chart.js 打印降级（§4.5）：强制浅色（暗色模式预留）+ 图表不跨页断裂 */
+            /* 页面级变量同步强制浅色（theme.js beforeprint 已移除 data-theme，此处兜底） */
             :root {
                 --chart-primary: #2E75B6;
                 --chart-bar-2: #E68A00;  /* 穿透 TOP10 柱状图（橙，与行业图蓝柱区分） */
@@ -347,6 +496,33 @@
                 --chart-grid: rgba(0, 0, 0, 0.12);
                 --chart-text: #000;
                 --chart-bg: #fff;
+                --bg: #fff;
+                --surface: #fff;
+                --surface-2: #f5f5f5;
+                --text: #000;
+                --text-secondary: #333;
+                --text-tertiary: #333;
+                --text-muted: #444;
+                --text-faint: #555;
+                --border: #ccc;
+                --border-light: #ddd;
+                --table-th-bg: #f0f4f8;
+                --table-even: #fff;
+                --table-hover: #f0f4f8;
+                --subtotal-bg: #f0f4f8;
+                --grand-total-bg: #f5f5f5;
+                --row-danger-bg: #f5f5f5;
+                --row-warning-bg: #f5f5f5;
+                --row-first-check-bg: #f5f5f5;
+                --notice-bg: #f5f5f5;
+                --warn-bg: #f5f5f5;
+                --profit: #000;
+                --loss: #000;
+                --success: #000;
+                --source-tag-bg: #f0f0f0;
+                --source-tag-text: #333;
+                --toc-bg: #fff;
+                --toc-border: #ccc;
             }
             .chart-box { break-inside: avoid; page-break-inside: avoid; }
         }
@@ -380,12 +556,12 @@
             font-size: 12px;
             line-height: 1.6;
             color: var(--chart-text, #333);
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #d0d5dd;
+            background: var(--surface);
+            border: 1px solid var(--border-dashed);
             border-radius: 4px;
             cursor: pointer;
         }
-        .chart-export-btn:hover { background: #e9ecf0; }
+        .chart-export-btn:hover { background: var(--table-hover); }
         @media print { .chart-export-btn { display: none; } }
     </style>
 
@@ -658,6 +834,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 {% endif %}
 {# 左侧目录 TOC（独立于图表开关，始终加载；R21 本地 bundle） #}
 <script defer src="toc.js"></script>
+{# 主题切换（暗色模式（主题切换），独立于图表开关，始终加载） #}
+<script defer src="theme.js"></script>
 </head>
 <body>
 
@@ -681,6 +859,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </nav>
     </aside>
     <button type="button" class="toc-toggle-btn" id="toc-toggle-btn" aria-label="展开目录" title="展开目录" aria-expanded="false">☰</button>
+
+    <!-- 主题切换（暗色模式（主题切换））：浮动右上角，theme.js 接管 icon/aria-label -->
+    <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" aria-label="切换深色模式" title="切换深色模式">🌙</button>
 
 <div class="container">
 
@@ -749,7 +930,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <br>
 
             {% if data_unavailable %}
-            <div class="empty-section" style="background: #FFF3CD; border-color: #FFC107; color: #856404;">
+            <div class="empty-section" style="background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-text);">
                 ⚠ 行情数据全部不可用（非交易时段/网络异常/API限速），以下市值/盈亏为占位显示，不影响持仓成本统计
             </div>
             <br>
@@ -1104,7 +1285,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td class="text-right" style="color: {{ p.get('profit_raw', 0) | profit_color }}">{{ p["profit"] }}</td>
                         <td class="text-right" style="color: {{ p.get('profit_rate_raw', 0) | profit_color }}">{{ p["profit_rate"] }}</td>
                         <td class="text-left" style="font-size: 12px;">{{ p["benchmark"] }}</td>
-                        <td class="text-left" style="font-size: 12px;{{ ' color: #CC0000; font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: #006400; font-weight: 600;' if p['rating_tag'] == '较差' }}{{ ' color: #009900; font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: #0066CC; font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
+                        <td class="text-left" style="font-size: 12px;{{ ' color: var(--rating-excellent); font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: var(--rating-poor); font-weight: 600;' if p['rating_tag'] == '较差' }}{{ ' color: var(--rating-deviation); font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: var(--rating-stable); font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
                         <td>{{ p["rank"] }}</td>
                     </tr>
                     {% endfor %}
@@ -1324,7 +1505,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td><span class="gray-text">📋 首次</span></td>
                         {% elif r.get("change_pct") is not none %}
                         {% set cp = r["change_pct"] %}
-                        <td style="{% if cp > 10 %}color: #CC0000; font-weight: bold;{% endif %}">
+                        <td style="{% if cp > 10 %}color: var(--profit); font-weight: bold;{% endif %}">
                             {% if cp > 0 %}↑{% elif cp < 0 %}↓{% else %}→{% endif %}
                             {{ "%+.2f"|format(cp) }}%
                         </td>
@@ -1412,7 +1593,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="summary-tag" style="margin-bottom: 8px;">
                 基于最近 <strong>{{ factor_exposure["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ factor_exposure["sample_count"] }} 期）
                 {% if factor_exposure.get("stale_factors") %}
-                <span style="color:#856404;"> · 已剔除停更因子：{{ factor_exposure["stale_factors"] | join("、") }}</span>
+                <span style="color:var(--warn-text);"> · 已剔除停更因子：{{ factor_exposure["stale_factors"] | join("、") }}</span>
                 {% endif %}
             </div>
             <table>
@@ -1433,7 +1614,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td>{% if factor_exposure["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
                         <td>
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <div style="flex:1; background:#f0f2f5; border-radius:4px; height:14px;">
+                                <div style="flex:1; background:var(--progress-track); border-radius:4px; height:14px;">
                                     <div style="width: {{ _bar_w }}%; height:14px; background:{% if _alloc >= 0.5 %}#2E75B6{% elif _alloc >= 0.3 %}#70AD47{% else %}#C00000{% endif %}; border-radius:4px;"></div>
                                 </div>
                                 <span style="font-size:12px; white-space:nowrap;">{{ (_alloc * 100) | round(1) }}%</span>
@@ -1448,7 +1629,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="penetration-notes">
                 <div>* 因子间相关性：{% for pair, v in factor_exposure["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
                 {% if factor_exposure.get("correlation_note") %}
-                <div style="color:#856404;">* {{ factor_exposure["correlation_note"] }}</div>
+                <div style="color:var(--warn-text);">* {{ factor_exposure["correlation_note"] }}</div>
                 {% endif %}
             </div>
             {% endif %}
@@ -1539,11 +1720,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         {% elif j < i %}
                         {% set _corr_r = _corr_matrix[i][j] %}
                         {% if _corr_r is none %}
-                        <td style="background-color: #eeeeee; color: #aaa;" title="重叠样本不足，未计算">N/A</td>
+                        <td style="background-color: #eeeeee; color: var(--text-faint);" title="重叠样本不足，未计算">N/A</td>
                         {% else %}
                         {% set _corr_p = _corr_pvals[i][j] %}
                         {% if _corr_p is not none and _corr_p >= 0.05 %}
-                        <td style="background-color: #ffffff; color: #999;" title="p={{ "%.4f"|format(_corr_p) }}，不显著">{{ "%.2f"|format(_corr_r) }}</td>
+                        <td style="background-color: #ffffff; color: var(--text-faint);" title="p={{ "%.4f"|format(_corr_p) }}，不显著">{{ "%.2f"|format(_corr_r) }}</td>
                         {% elif _corr_r >= 0.5 %}
                         <td style="background-color: #C00000; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强正</td>
                         {% elif _corr_r >= 0.3 %}
@@ -1618,7 +1799,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
             {% if correlation_data.get("insufficient_codes") %}
             <div class="penetration-notes">
-                <div style="color:#856404;">* 下列品种重叠样本不足 {{ correlation_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ correlation_data["insufficient_codes"] | join("、") }}</div>
+                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ correlation_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ correlation_data["insufficient_codes"] | join("、") }}</div>
             </div>
             {% endif %}
             <div class="penetration-notes">
@@ -1679,7 +1860,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             {% if item.llm_analysis %}
                             <span>{{ item.llm_analysis | sentiment_colorize | safe }}</span>
                             {% else %}
-                            <span style="color: #999;">—</span>
+                            <span style="color: var(--text-faint);">—</span>
                             {% endif %}
                         </td>
                         {% endif %}
@@ -1772,7 +1953,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     LLM 将生成全球政经局势分析，包括全球主要经济体政策走向、
                     地缘政治风险、市场流动性评估及对持仓的潜在影响。
                 </p>
-                <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
+                <p style="margin-top: 12px; font-size: 12px; color: var(--text-faint);">
                     功能入口：菜单 L（生成全系列完整版报告）|
                     需配置 LLM API Key 后自动启用
                 </p>
@@ -1822,7 +2003,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     LLM 将生成个性化投资复盘，包括持仓结构优化建议、
                     行业集中度风险预警、收益归因分析及调仓策略参考。
                 </p>
-                <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
+                <p style="margin-top: 12px; font-size: 12px; color: var(--text-faint);">
                     功能入口：菜单 L（生成全系列完整版报告）|
                     需配置 LLM API Key 后自动启用
                 </p>
@@ -1851,7 +2032,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     模块说明：从风险分散度、流动性、收益合理性、成本结构
                     四个维度对投资组合进行全面体检并打分，提供具体改进建议。
                 </p>
-                <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
+                <p style="margin-top: 12px; font-size: 12px; color: var(--text-faint);">
                     功能入口：菜单 L（生成全系列完整版报告）|
                     需配置 LLM API Key 后自动启用
                 </p>
@@ -1880,7 +2061,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     模块说明：基于资产穿透TOP10 及全部持仓明细，对投资组合进行
                     行业集中度分析、国家/地区敞口评估、货币敞口分析及底层资产风险揭示。
                 </p>
-                <p style="margin-top: 12px; font-size: 12px; color: #aaa;">
+                <p style="margin-top: 12px; font-size: 12px; color: var(--text-faint);">
                     功能入口：菜单 L（生成全系列完整版报告）|
                     需配置 LLM API Key 后自动启用
                 </p>
@@ -1926,7 +2107,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
                 <div class="summary-card">
                     <h3>最大回撤</h3>
-                    <div class="value" style="color: #CC0000;">{{ history_data.max_drawdown_pct | abs | change }}</div>
+                    <div class="value" style="color: var(--profit);">{{ history_data.max_drawdown_pct | abs | change }}</div>
                     <div class="meta">
                         {% if history_data.drawdown_start %}始于 {{ history_data.drawdown_start }}{% endif %}
                         {% if history_data.drawdown_end %} · 终于 {{ history_data.drawdown_end }}{% endif %}
@@ -1956,7 +2137,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             {# 降级 note 置于固定高度容器外，避免溢出 320px 边界 #}
             {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") and chart_datasets["radar"]["datasets"][0].get("note") %}
-            <div style="text-align:center;font-size:12px;color:#888;margin-top:4px;">{{ chart_datasets["radar"]["datasets"][0]["note"] }}</div>
+            <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:4px;">{{ chart_datasets["radar"]["datasets"][0]["note"] }}</div>
             {% endif %}
             {% endif %}
             {% if history_data.warnings or history_data.failed_holdings or history_data.successful_holdings %}
@@ -1969,7 +2150,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 {% endif %}
                 {% if history_data.failed_holdings %}
                 <div style="margin-top:8px;font-size:13px;">
-                    <div style="font-weight:600;color:#666;margin-bottom:4px;">⬇ 以下持仓无历史走势数据（不含/不支持/获取失败）：</div>
+                    <div style="font-weight:600;color:var(--text-tertiary);margin-bottom:4px;">⬇ 以下持仓无历史走势数据（不含/不支持/获取失败）：</div>
                     {% for h in history_data.failed_holdings %}
                     <div class="data-status-warn" style="border-left-color:#95a5a6;">✗ {{ h }}</div>
                     {% endfor %}
@@ -1977,7 +2158,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 {% endif %}
                 {% if history_data.successful_holdings %}
                 <div style="margin-top:8px;font-size:13px;">
-                    <div style="font-weight:600;color:#666;margin-bottom:4px;">⬆ 以下持仓已纳入走势计算：</div>
+                    <div style="font-weight:600;color:var(--text-tertiary);margin-bottom:4px;">⬆ 以下持仓已纳入走势计算：</div>
                     {% for h in history_data.successful_holdings %}
                     <div class="data-status-ok">✓ {{ h }}</div>
                     {% endfor %}
@@ -2027,7 +2208,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="section-content">
             <div class="empty-note placeholder-note">
                 <p><strong>组合历史走势数据暂不可用</strong></p>
-                <p style="margin-top:8px;font-size:13px;color:#888;">
+                <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
                     模块说明：基于当前持仓份额假设历史持仓不变（as-if 模拟），使用历史股价/净值
                     回溯计算组合的模拟走势，包括累计收益率、最大回撤、年化波动率等关键指标。
                 </p>
@@ -2062,11 +2243,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="summary-grid" style="margin-top:16px;">
                 <div class="summary-card">
                     <h3>最大回撤幅度</h3>
-                    <div class="value" style="color:#CC0000;">{{ history_data.max_drawdown_pct | abs | change }}</div>
+                    <div class="value" style="color:var(--profit);">{{ history_data.max_drawdown_pct | abs | change }}</div>
                 </div>
                 <div class="summary-card">
                     <h3>最大回撤金额</h3>
-                    <div class="value" style="color:#CC0000;">{{ history_data.max_drawdown | abs | money }}</div>
+                    <div class="value" style="color:var(--profit);">{{ history_data.max_drawdown | abs | money }}</div>
                 </div>
                 <div class="summary-card">
                     <h3>回撤区间</h3>
@@ -2077,7 +2258,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div class="summary-card">
                     <h3>当前回撤状态</h3>
                     {% set _dd_last = (history_data.drawdown_events[-1] if history_data.drawdown_events else none) %}
-                    <div class="value" style="font-size:20px; {% if _dd_last and not _dd_last.recovered %}color:#CC0000;{% else %}color:#2e7d32;{% endif %}">
+                    <div class="value" style="font-size:20px; {% if _dd_last and not _dd_last.recovered %}color:var(--profit);{% else %}color:var(--success);{% endif %}">
                         {% if _dd_last and not _dd_last.recovered %}回撤中{% elif history_data.drawdown_events %}已恢复{% else %}无显著回撤{% endif %}
                     </div>
                     <div class="meta">
@@ -2102,7 +2283,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td>{{ e.peak_date }}</td>
                         <td>{{ e.trough_date }}</td>
                         <td>{{ e.recovery_date or "—" }}</td>
-                        <td style="color:#CC0000; font-weight:600;">{{ "%.2f"|format(e.drawdown_pct) }}%</td>
+                        <td style="color:var(--profit); font-weight:600;">{{ "%.2f"|format(e.drawdown_pct) }}%</td>
                         <td>{{ e.duration_days }} 天</td>
                         <td>{% if e.recovery_days is not none %}{{ e.recovery_days }} 天{% else %}—{% endif %}</td>
                         <td>{% if e.recovered %}✅ 已恢复{% else %}⏳ 未恢复{% endif %}</td>
@@ -2158,7 +2339,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="data-status-title">持仓历史数据纳入状态</div>
             {% if history_data.successful_holdings %}
             <div style="margin-top:6px;font-size:13px;">
-                <div style="font-weight:600;color:#2e7d32;margin-bottom:4px;">✓ 已纳入回撤计算（{{ history_data.successful_holdings | length }}）：</div>
+                <div style="font-weight:600;color:var(--success);margin-bottom:4px;">✓ 已纳入回撤计算（{{ history_data.successful_holdings | length }}）：</div>
                 {% for h in history_data.successful_holdings %}
                 <div class="data-status-ok">✓ {{ h }}</div>
                 {% endfor %}
@@ -2166,7 +2347,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             {% if history_data.failed_holdings %}
             <div style="margin-top:6px;font-size:13px;">
-                <div style="font-weight:600;color:#888;margin-bottom:4px;">✗ 无历史走势数据（{{ history_data.failed_holdings | length }}）：</div>
+                <div style="font-weight:600;color:var(--text-muted);margin-bottom:4px;">✗ 无历史走势数据（{{ history_data.failed_holdings | length }}）：</div>
                 {% for h in history_data.failed_holdings %}
                 <div class="data-status-warn" style="border-left-color:#95a5a6;">✗ {{ h }}</div>
                 {% endfor %}
@@ -2188,7 +2369,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="section-content">
             <div class="empty-note placeholder-note">
                 <p><strong>回撤分析数据暂不可用</strong></p>
-                <p style="margin-top:8px;font-size:13px;color:#888;">生成全系列完整版报告后自动回撤分析数据。</p>
+                <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">生成全系列完整版报告后自动回撤分析数据。</p>
                 <p style="margin-top:12px;font-size:12px;color:#aaa;">也可在 config.json 的 history.fetch_mode 中设为 "auto" 自动获取</p>
             </div>
         </div>
@@ -2297,10 +2478,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
 
             {% if llm_module_info %}
-            <div style="margin-top: 14px; font-size: 13px; color: #555;">
+            <div style="margin-top: 14px; font-size: 13px; color: var(--text-secondary);">
                 <strong>各模块明细：</strong>
                 <table class="kv-table" style="margin-top: 6px;">
-                    <tr style="background: #f5f5f5;">
+                    <tr style="background: var(--row-first-check-bg);">
                         <th style="padding: 4px 8px; text-align: left;">模块</th>
                         <th style="padding: 4px 8px; text-align: left;">状态</th>
                         <th style="padding: 4px 8px; text-align: left;">模型</th>
@@ -2317,15 +2498,15 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td style="padding: 4px 8px; font-weight: bold;">{{ _mi.name }}</td>
                         <td style="padding: 4px 8px;">
                             {% if _mi.status == "disabled" %}
-                            <span style="color: #9ca3af;">{{ _mi.status_label }}</span>
+                            <span style="color: var(--llm-status-disabled);">{{ _mi.status_label }}</span>
                             {% elif _mi.status == "failed" %}
-                            <span style="color: #c0392b;" title="{{ _mi.status_label }}">{{ _mi.status_label }}</span>
+                            <span style="color: var(--llm-status-failed);" title="{{ _mi.status_label }}">{{ _mi.status_label }}</span>
                             {% elif _mi.status == "cached" %}
-                            <span style="color: #2e86c1;">{{ _mi.status_label }}</span>
+                            <span style="color: var(--llm-status-cached);">{{ _mi.status_label }}</span>
                             {% elif _mi.status == "success" %}
-                            <span style="color: #27ae60;">{{ _mi.status_label }}</span>
+                            <span style="color: var(--llm-status-success);">{{ _mi.status_label }}</span>
                             {% elif _mi.status_label %}
-                            <span style="color: #aaa;">{{ _mi.status_label }}</span>
+                            <span style="color: var(--llm-status-unknown);">{{ _mi.status_label }}</span>
                             {% endif %}
                         </td>
                         <td style="padding: 4px 8px;">{{ _mi.model or "—" }}</td>
@@ -2337,14 +2518,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             {% if _mi.cost > 0 %}
                             ¥{{ "%.4f"|format(_mi.cost) }}
                             {% elif _mi.status == "cached" %}
-                            <span style="color: #999;">已计入原调用</span>
+                            <span style="color: var(--text-faint);">已计入原调用</span>
                             {% else %}
                             —
                             {% endif %}
                         </td>
                         <td style="padding: 4px 8px; text-align: center;">
                             {% if _mi.cached %}
-                            <span style="color: #2e86c1;">✓</span>
+                            <span style="color: var(--llm-status-cached);">✓</span>
                             {% elif _mi.status == "success" %}
                             <span style="color: #ccc;">—</span>
                             {% else %}
@@ -2353,7 +2534,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         </td>
                         <td style="padding: 4px 8px; text-align: center;">
                             {% if _mi.thinking %}
-                            <span style="color: #8e44ad;">✓</span>
+                            <span style="color: var(--llm-status-thinking);">✓</span>
                             {% elif _mi.status == "success" or _mi.status == "cached" %}
                             <span style="color: #ccc;">—</span>
                             {% else %}
@@ -2367,13 +2548,13 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
 
             {# 调用次数 vs 模块明细差异注释 #}
-            <div style="margin-top: 8px; font-size: 11px; color: #999;">
+            <div style="margin-top: 8px; font-size: 11px; color: var(--text-faint);">
                 注：API 调用次数统计实际发起的 API 请求总数（含截断后自动重试等），
                 各模块明细仅列最终结果；两者不一致属正常现象。
             </div>
 
             {% if cache_stats and cache_stats.get("total", 0) > 0 %}
-            <div style="margin-top: 16px; font-size: 13px; color: #555;">
+            <div style="margin-top: 16px; font-size: 13px; color: var(--text-secondary);">
                 <strong>系统数据缓存：</strong>
                 <table class="kv-table" style="margin-top: 6px;">
                     <tr><td>缓存命中</td><td>{{ cache_stats["hits"] }} 次</td></tr>
@@ -2394,7 +2575,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
     <!--  FOOTER                                                -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="report-footer" style="text-align: center; padding: 14px 20px; color: #999; font-size: 12px;">
+    <div class="report-footer" style="text-align: center; padding: 14px 20px; color: var(--text-faint); font-size: 12px;">
         个人投资分析报告 v{{ app_version }} | 生成时间: {{ now }}
         {%- if debate_mode_combination %}
         <br>🧪 辩论模式已启用：{{ debate_mode_combination }}

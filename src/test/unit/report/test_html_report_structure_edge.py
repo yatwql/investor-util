@@ -279,5 +279,52 @@ class TestHtmlTocStatic(unittest.TestCase):
         self.assertIn("scroll-behavior: smooth", match.group(1), "平滑滚动应尊重减少动态偏好")
 
 
+class TestHtmlThemeStatic(unittest.TestCase):
+    """暗色模式（主题切换）原始模板文本静态断言 — 不依赖渲染。"""
+
+    def setUp(self):
+        with open(_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            self.tmpl = f.read()
+
+    def test_theme_js_script_tag(self):
+        """模板引用 theme.js（defer，在 toc.js 之后）。"""
+        self.assertIn('<script defer src="theme.js"></script>', self.tmpl, "模板应加载 theme.js")
+        theme_pos = self.tmpl.find('src="theme.js"')
+        toc_pos = self.tmpl.find('src="toc.js"')
+        self.assertGreater(theme_pos, toc_pos, "theme.js 应位于 toc.js 之后加载")
+
+    def test_theme_toggle_btn_fixed_css(self):
+        """切换按钮浮动右上角（position: fixed + right/top + 圆角）。"""
+        self.assertIn(".theme-toggle-btn", self.tmpl, "模板应有 .theme-toggle-btn 选择器")
+        self.assertIn("position: fixed", self.tmpl, "切换按钮应浮动定位")
+        self.assertIn("right: 12px", self.tmpl, "切换按钮应贴右上角")
+        self.assertIn("top: 12px", self.tmpl, "切换按钮应贴右上角")
+
+    def test_theme_btn_aria_label(self):
+        """切换按钮 HTML 应含 aria-label（可访问性）。"""
+        self.assertIn('class="theme-toggle-btn"', self.tmpl, "按钮应带 theme-toggle-btn 类")
+        self.assertIn('aria-label="切换深色模式"', self.tmpl, "按钮应带 aria-label")
+
+    def test_dark_theme_override_block(self):
+        """存在 [data-theme="dark"] 覆盖块，且深色下提亮语义色。"""
+        self.assertIn('[data-theme="dark"]', self.tmpl, "模板应含深色主题覆盖块")
+        self.assertIn("--bg: #121212", self.tmpl, "深色背景变量应为深灰")
+        self.assertIn("--profit: #ff6b6b", self.tmpl, "深色下盈利红应提亮")
+
+    def test_theme_btn_print_hidden(self):
+        """@media print 内应隐藏切换按钮。"""
+        print_pos = self.tmpl.find("@media print")
+        self.assertGreater(print_pos, -1, "模板中缺少 @media print")
+        # 主 @media print 块起自按钮样式之前：取 1500 字符覆盖隐藏交互元素清单（含 .theme-toggle-btn）
+        block = self.tmpl[print_pos : print_pos + 1500]
+        self.assertIn(".theme-toggle-btn", block, ".theme-toggle-btn 应出现在 @media print 块中")
+        self.assertIn("display: none", block, "打印时应隐藏切换按钮")
+
+    def test_no_hardcoded_profit_loss_colors(self):
+        """模板不应再出现旧硬编码红绿（#CC0000/#009900）语义色（已变量化）。"""
+        self.assertNotIn("color: #CC0000", self.tmpl, "盈利色不应硬编码 #CC0000")
+        self.assertNotIn("color: #009900", self.tmpl, "亏损色不应硬编码 #009900")
+
+
 if __name__ == "__main__":
     unittest.main()

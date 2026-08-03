@@ -301,3 +301,21 @@ class TestWhatifHtmlPage(unittest.TestCase):
         """whatif_data=None → 降级占位。"""
         text = self._render(None)
         self.assertIn("调仓对比数据暂不可用", text)
+
+    def test_theme_toggle_button_present(self):
+        """暗色模式（主题切换）：浮动切换按钮存在且带 aria-label。"""
+        text = self._render(_whatif_data())
+        self.assertIn('class="theme-toggle-btn"', text, "whatif 页应含主题切换按钮")
+        self.assertIn('aria-label="切换深色模式"', text, "切换按钮应含 aria-label")
+
+    def test_theme_js_loaded(self):
+        """暗色模式（主题切换）：whatif 页加载 theme.js。"""
+        text = self._render(_whatif_data())
+        self.assertIn('src="theme.js"', text, "whatif 页应加载 theme.js")
+
+    def test_dark_theme_css_variables(self):
+        """暗色模式（主题切换）：whatif 页含 :root 变量与深色覆盖块。"""
+        text = self._render(_whatif_data())
+        self.assertIn("--bg:", text, "whatif 页应定义页面级 --bg 变量")
+        self.assertIn('[data-theme="dark"]', text, "whatif 页应含深色覆盖块")
+        self.assertIn("display: none !important", text, "whatif 页打印时应隐藏主题按钮")

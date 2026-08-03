@@ -9,17 +9,17 @@
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
 | 主程序代码 | Python | 208 | 48,278 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 3 | 2,910 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
+| HTML 报告模板 | HTML | 3 | 3,298 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
 | 辅助脚本 | Python | 13 | 4,404 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查） |
-| **源代码合计** | — | **224** | **55,592** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **243** | **67,068** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,294 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **224** | **55,980** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **244** | **68,720** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,317 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
+| **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 88 | — | 各版本 changelog/plan/review-findings 等（84 md + 3 py + 1 txt） |
-| ├ plan/ | 中间设计文件 | 4 | — | 当前迭代中的设计方案 |
+| ├ archive/ | 版本归档 | 89 | — | 各版本 changelog/plan/review-findings 等（85 md + 3 py + 1 txt） |
+| ├ plan/ | 中间设计文件 | 5 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -275,6 +275,7 @@ investor-util/
 │   │   ├── chart-common.js           #   Chart.js 公共初始化 helper（trackChart/lineOptions/doughnutOptions，chart-init 与 What-if 页共用）
 │   │   ├── chart-init.js             #   6 张图初始化（单图异常隔离 + degraded 虚线）
 │   │   ├── toc.js                    #   左侧目录 TOC（折叠/展开 + IntersectionObserver 滚动高亮，离线自包含）
+│   │   ├── theme.js                   #   主题切换（深/浅色 + localStorage 持久化 + Chart.js 重绘 + 打印浅色协调）
 │   │   ├── test-chart.html           #   独立调试页：6 图渲染/降级/离线场景自检（Chart.js 升级验证载体）
 │   │   └── README.md                 #   资产说明 + Chart.js 版本号记录（升级指引：替换引擎后先在此页验证）
 │   │
@@ -466,6 +467,7 @@ investor-util/
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试
 │       │   │   ├── test_html_report_structure_edge.py # HTML 结构边缘场景
 │       │   │   ├── test_html_template.py          #   HTML 模板测试
+│       │   │   ├── test_theme_js.py               #   暗色模式 theme.js 静态断言（plan-11）
 │       │   │   ├── test_html_writer.py            #   HTML 写入器测试
 │       │   │   ├── test_html_writer_edge.py       #   HTML 写入器边缘场景
 │       │   │   ├── test_market_value.py           #   市值计算测试
@@ -609,7 +611,8 @@ investor-util/
 │   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
 │   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（业绩归因设计）
 │   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
-│   │   └── plan-whatif-backtest.md     #     调仓 What-if 指定生效日时序回测设计
+│   │   ├── plan-whatif-backtest.md     #     调仓 What-if 指定生效日时序回测设计
+│   │   └── plan-11-dark-mode-plan.md   #     plan-11 HTML 暗色模式实施计划（已归档）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
@@ -739,6 +742,8 @@ investor-util/
 │   │   │   │   └── plan-whatif-simulation.md    #     调仓 What-if 模拟设计
 │   │   │   ├── portfolio-evolution/             #   多快照趋势追踪/组合演进设计
 │   │   │   │   └── plan-portfolio-evolution.md  #     多快照趋势追踪设计
+│   │   │   ├── dark-mode/                       #   HTML 暗色模式实施归档（plan-11）
+│   │   │   │   └── dark-mode-implementation.md  #     plan-11 暗色模式实施记录
 │   │   │   ├── fix-deepseek-thinking/           #   DeepSeek thinking 思考耗尽修复设计
 │   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计

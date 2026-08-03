@@ -5,76 +5,192 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>调仓 What-if 模拟 - {{ now }}</title>
     <style>
+        :root {
+            /* 页面级主题变量（暗色模式（主题切换）；与 report_template.html 同套，浅色默认值 = 原硬编码色） */
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --surface-2: #f8f9fa;
+            --text: #333333;
+            --text-secondary: #555555;
+            --text-tertiary: #666666;
+            --text-muted: #888888;
+            --text-faint: #999999;
+            --border: #dddddd;
+            --border-light: #eeeeee;
+            --border-dashed: #d0d5dd;
+            --table-th-bg: #f0f4f8;
+            --table-even: #f8f9fa;
+            --table-hover: #eef5fb;
+            --notice-bg: #E3F2FD;
+            --notice-border: #1976D2;
+            --empty-section-bg: #fafafa;
+            --profit: #CC0000;
+            --loss: #009900;
+            --success: #2e7d32;
+            --file-card-bg: #f8f9fa;
+            --file-card-border: #e3e8ef;
+            --file-arrow: #bbb;
+            --arrow-up: #2E7D32;
+            --arrow-down: #CC0000;
+            --arrow-flat: #888;
+            --whatif-added-bg: #C6EFCE;
+            --whatif-removed-bg: #FFC7CE;
+            --whatif-increased-bg: #FFEB9C;
+            --whatif-decreased-bg: #DDEBF7;
+            --whatif-unchanged-bg: #F2F2F2;
+            --badge-added-bg: #d4edda;
+            --badge-added-text: #155724;
+            --badge-removed-bg: #f8d7da;
+            --badge-removed-text: #721c24;
+            --badge-increased-bg: #fff3cd;
+            --badge-increased-text: #856404;
+            --badge-decreased-bg: #d1ecf1;
+            --badge-decreased-text: #0c5460;
+            --badge-unchanged-bg: #e9ecef;
+            --badge-unchanged-text: #6c757d;
+            /* Chart.js 主题色（与主报告 chart-config.js 读取一致） */
+            --chart-primary: #2E75B6;
+            --chart-bar-2: #E68A00;
+            --chart-secondary: #CC0000;
+            --chart-danger: #CC0000;
+            --chart-danger-transparent: rgba(204, 0, 0, 0.15);
+            --chart-success: #2E7D32;
+            --chart-warning: #E68A00;
+            --chart-grid: rgba(128, 128, 128, 0.15);
+            --chart-text: #333333;
+            --chart-bg: #FFFFFF;
+        }
+        /* 暗色模式（主题切换）：根元素 data-theme="dark"，theme.js 切换 */
+        [data-theme="dark"] {
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --surface-2: #252525;
+            --text: #e0e0e0;
+            --text-secondary: #c0c0c0;
+            --text-tertiary: #b0b0b0;
+            --text-muted: #9a9a9a;
+            --text-faint: #8a8a8a;
+            --border: #3a3a3a;
+            --border-light: #333333;
+            --border-dashed: #444444;
+            --table-th-bg: #2a2a2a;
+            --table-even: #242424;
+            --table-hover: #2e3a4a;
+            --notice-bg: #1e3a5f;
+            --notice-border: #4a90d9;
+            --empty-section-bg: #1a1a1a;
+            --profit: #ff6b6b;
+            --loss: #4caf50;
+            --success: #4caf50;
+            --file-card-bg: #252525;
+            --file-card-border: #333333;
+            --file-arrow: #6a6a6a;
+            --arrow-up: #66bb6a;
+            --arrow-down: #ff6b6b;
+            --arrow-flat: #888888;
+            --whatif-added-bg: #1f3a24;
+            --whatif-removed-bg: #3a1f20;
+            --whatif-increased-bg: #3d3512;
+            --whatif-decreased-bg: #1e2f3d;
+            --whatif-unchanged-bg: #2a2a2a;
+            --badge-added-bg: #1f3a24;
+            --badge-added-text: #81c784;
+            --badge-removed-bg: #3a1f20;
+            --badge-removed-text: #e57373;
+            --badge-increased-bg: #3d3512;
+            --badge-increased-text: #e6c15c;
+            --badge-decreased-bg: #1e2f3d;
+            --badge-decreased-text: #7fd4e0;
+            --badge-unchanged-bg: #2a2a2a;
+            --badge-unchanged-text: #a0a0a0;
+            /* Chart.js 深色变量 */
+            --chart-grid: rgba(255, 255, 255, 0.12);
+            --chart-text: #e0e0e0;
+            --chart-bg: #1e1e1e;
+            --chart-danger-transparent: rgba(255, 107, 107, 0.15);
+        }
+        /* 主题切换按钮（暗色模式（主题切换）；浮动右上角，与主报告一致） */
+        .theme-toggle-btn {
+            position: fixed; right: 12px; top: 12px; z-index: 101;
+            width: 38px; height: 38px; border-radius: 50%;
+            background: #2E75B6; color: #fff; border: none; cursor: pointer;
+            font-size: 18px; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-toggle-btn:hover { background: #1f5a91; }
+        @media print { .theme-toggle-btn { display: none !important; } }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
+        body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; }
 
         .report-header { background: #2E75B6; color: #fff; padding: 20px 30px; border-radius: 8px; margin-bottom: 24px; }
         .report-header h1 { font-size: 22px; margin-bottom: 4px; }
         .report-header .subtitle { font-size: 14px; opacity: 0.85; }
 
-        .section { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
+        .section { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
         .section-title { background: #2E75B6; color: #fff; padding: 12px 20px; font-size: 16px; font-weight: 600; }
         .section-content { padding: 16px 20px; }
-        .report-footer { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
+        .report-footer { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
         .back-to-top-link { text-align: center; padding: 12px 0; }
         .back-to-top-link a { color: #2E75B6; text-decoration: none; font-size: 12px; }
 
         /* ── 文件对比 ───────────────────────────── */
         .compare-files { display: flex; align-items: stretch; gap: 16px; }
-        .file-card { flex: 1; background: #f8f9fa; border: 1px solid #e3e8ef; border-radius: 8px; padding: 14px 18px; }
-        .file-card .file-role { font-size: 12px; color: #888; margin-bottom: 6px; }
+        .file-card { flex: 1; background: var(--file-card-bg); border: 1px solid var(--file-card-border); border-radius: 8px; padding: 14px 18px; }
+        .file-card .file-role { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
         .file-card .file-name { font-size: 15px; font-weight: 600; color: #2E75B6; word-break: break-all; }
-        .file-arrow { display: flex; align-items: center; font-size: 28px; color: #bbb; }
-        .summary-tag { font-size: 13px; color: #555; }
+        .file-arrow { display: flex; align-items: center; font-size: 28px; color: var(--file-arrow); }
+        .summary-tag { font-size: 13px; color: var(--text-secondary); }
         .summary-tag strong { color: #2E75B6; }
 
         /* ── 汇总指标卡 ─────────────────────────── */
         .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .summary-card { background: #f8f9fa; border-radius: 6px; padding: 14px 18px; }
-        .summary-card h3 { font-size: 13px; color: #666; margin-bottom: 6px; }
+        .summary-card { background: var(--surface-2); border-radius: 6px; padding: 14px 18px; }
+        .summary-card h3 { font-size: 13px; color: var(--text-tertiary); margin-bottom: 6px; }
         .summary-card .value { font-size: 22px; font-weight: 700; }
-        .summary-card .meta { font-size: 12px; color: #999; margin-top: 4px; }
+        .summary-card .meta { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
         .arrow { font-weight: 700; margin-left: 6px; font-size: 15px; }
-        .arrow-up { color: #2E7D32; }
-        .arrow-down { color: #CC0000; }
-        .arrow-flat { color: #888; }
+        .arrow-up { color: var(--arrow-up); }
+        .arrow-down { color: var(--arrow-down); }
+        .arrow-flat { color: var(--arrow-flat); }
 
         /* ── 资产配置对比图 ─────────────────────── */
         .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .chart-col .chart-box { position: relative; height: 280px; }
-        .chart-caption { font-size: 12px; color: #888; text-align: center; padding: 6px 0 2px; }
+        .chart-caption { font-size: 12px; color: var(--text-muted); text-align: center; padding: 6px 0 2px; }
 
         /* ── 表格 ───────────────────────────────── */
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
-        th { background: #f0f4f8; padding: 8px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #ddd; white-space: nowrap; }
-        td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #eee; }
-        tr:nth-child(even) { background: #f8f9fa; }
-        tr:hover { background: #eef5fb; }
+        th { background: var(--table-th-bg); padding: 8px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
+        td { padding: 6px 10px; text-align: center; border-bottom: 1px solid var(--border-light); }
+        tr:nth-child(even) { background: var(--table-even); }
+        tr:hover { background: var(--table-hover); }
         .text-left { text-align: left; }
         .text-right { text-align: right; }
 
         /* ── 持仓变动行底色 ─────────────────────── */
-        tr.whatif-added td { background: #C6EFCE; }
-        tr.whatif-removed td { background: #FFC7CE; }
-        tr.whatif-increased td { background: #FFEB9C; }
-        tr.whatif-decreased td { background: #DDEBF7; }
-        tr.whatif-unchanged td { background: #F2F2F2; }
+        tr.whatif-added td { background: var(--whatif-added-bg); }
+        tr.whatif-removed td { background: var(--whatif-removed-bg); }
+        tr.whatif-increased td { background: var(--whatif-increased-bg); }
+        tr.whatif-decreased td { background: var(--whatif-decreased-bg); }
+        tr.whatif-unchanged td { background: var(--whatif-unchanged-bg); }
         tr.whatif-unchanged:hover td { background: #EEF5FB; }
         .action-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
-        .badge-added { background: #d4edda; color: #155724; }
-        .badge-removed { background: #f8d7da; color: #721c24; }
-        .badge-increased { background: #fff3cd; color: #856404; }
-        .badge-decreased { background: #d1ecf1; color: #0c5460; }
-        .badge-unchanged { background: #e9ecef; color: #6c757d; }
+        .badge-added { background: var(--badge-added-bg); color: var(--badge-added-text); }
+        .badge-removed { background: var(--badge-removed-bg); color: var(--badge-removed-text); }
+        .badge-increased { background: var(--badge-increased-bg); color: var(--badge-increased-text); }
+        .badge-decreased { background: var(--badge-decreased-bg); color: var(--badge-decreased-text); }
+        .badge-unchanged { background: var(--badge-unchanged-bg); color: var(--badge-unchanged-text); }
 
-        .notice-banner { background: #E3F2FD; border-left: 4px solid #1976D2; padding: 10px 14px; font-size: 13px; border-radius: 4px; }
-        .empty-note { padding: 20px; text-align: center; color: #999; }
-        .placeholder-note { background: #fafbfc; border: 1px dashed #d0d5dd; border-radius: 6px; }
+        .notice-banner { background: var(--notice-bg); border-left: 4px solid var(--notice-border); padding: 10px 14px; font-size: 13px; border-radius: 4px; }
+        .empty-note { padding: 20px; text-align: center; color: var(--text-faint); }
+        .placeholder-note { background: var(--empty-section-bg); border: 1px dashed var(--border-dashed); border-radius: 6px; }
         .chart-export-btn { position: absolute; top: 6px; right: 6px; z-index: 5; font-size: 11px; }
     </style>
 </head>
 <body id="report-top">
+<!-- 主题切换（暗色模式（主题切换））：浮动右上角，theme.js 接管 icon/aria-label -->
+<button type="button" class="theme-toggle-btn" id="theme-toggle-btn" aria-label="切换深色模式" title="切换深色模式">🌙</button>
 <div class="container">
     <div class="report-header">
         <h1>调仓 What-if 模拟</h1>
@@ -238,7 +354,7 @@
                         <td class="text-left">{{ c.get("label", c.get("key", "")) }}</td>
                         <td class="text-right">{{ "%.2f" | format(c.get("base_weight", 0.0)) }}</td>
                         <td class="text-right">{{ "%.2f" | format(c.get("cand_weight", 0.0)) }}</td>
-                        <td class="text-right" style="color: {{ 'CC0000' if c.get('delta_pct', 0.0) > 0 else ('009900' if c.get('delta_pct', 0.0) < 0 else '888888') }};">{{ "%+.2f" | format(c.get("delta_pct", 0.0)) }}</td>
+                        <td class="text-right" style="color: {{ 'var(--profit)' if c.get('delta_pct', 0.0) > 0 else ('var(--loss)' if c.get('delta_pct', 0.0) < 0 else 'var(--text-muted)') }};">{{ "%+.2f" | format(c.get("delta_pct", 0.0)) }}</td>
                         <td class="text-right">{{ c.get("base_cost", 0.0) | money }}</td>
                         <td class="text-right">{{ c.get("cand_cost", 0.0) | money }}</td>
                     </tr>
@@ -304,10 +420,10 @@
         <div class="section-content">
             <div class="empty-note placeholder-note">
                 <p><strong>调仓对比数据暂不可用</strong></p>
-                <p style="margin-top:8px;font-size:13px;color:#888;">
+                <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
                     {% if whatif_data and whatif_data.get("reason") %}{{ whatif_data["reason"] }}{% else %}基准或目标持仓为空，无法对比{% endif %}。
                 </p>
-                <p style="margin-top:12px;font-size:12px;color:#aaa;">请提供基准（调仓前）与目标（调仓后）两份持仓文件后重试。</p>
+                <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">请提供基准（调仓前）与目标（调仓后）两份持仓文件后重试。</p>
             </div>
         </div>
     </div>
@@ -323,6 +439,7 @@
 <script defer src="chart-config.js"></script>
 <script defer src="chart-export.js"></script>
 <script defer src="chart-common.js"></script>
+<script defer src="theme.js"></script>
 <script>
 /* 调仓 What-if 双环图。复用 ChartCommon（chart-common.js 公共 helper）：
  * trackChart/doughnutOptions 与主报告 chart-init.js 共用，消除配置复制。

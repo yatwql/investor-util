@@ -163,10 +163,10 @@
     <div class="section-content">
         <div class="empty-note placeholder-note">
             <p><strong>组合演进数据不足</strong></p>
-            <p style="margin-top:8px;font-size:13px;color:#888;">
+            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
                 {% if _evo.get("reason") %}{{ _evo["reason"] }}{% else %}组合演进快照不足，趋势数据待积累{% endif %}。
             </p>
-            <p style="margin-top:12px;font-size:12px;color:#aaa;">
+            <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
                 每次生成报告会自动保存一份本地快照；积累 {{ _evo.get("min_snapshots", 3) }} 个不同日期的快照后，即可展示组合演进趋势。
             </p>
         </div>

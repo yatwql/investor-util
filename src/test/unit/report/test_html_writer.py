@@ -53,16 +53,16 @@ class TestJinjaFilters(unittest.TestCase):
     # ── price_type_color 过滤器 ─────────────────────────────────
 
     def test_price_type_color_onchange(self):
-        """场内收盘价(T) → #0066CC"""
-        self.assertEqual(self.price_type_fn("场内收盘价(T)"), "#0066CC")
+        """场内收盘价(T) → var(--rating-stable)（主题切换 主题 CSS 变量）"""
+        self.assertEqual(self.price_type_fn("场内收盘价(T)"), "var(--rating-stable)")
 
     def test_price_type_color_nav_today(self):
-        """官方净值(T) → #0066CC"""
-        self.assertEqual(self.price_type_fn("官方净值(T)"), "#0066CC")
+        """官方净值(T) → var(--rating-stable)（主题切换 主题 CSS 变量）"""
+        self.assertEqual(self.price_type_fn("官方净值(T)"), "var(--rating-stable)")
 
     def test_price_type_color_qdii_t_minus_1(self):
-        """QDII 官方净值(T-1) → #0066CC"""
-        self.assertEqual(self.price_type_fn("官方净值(T-1)", "标普500(QDII)"), "#0066CC")
+        """QDII 官方净值(T-1) → var(--rating-stable)（主题切换 主题 CSS 变量）"""
+        self.assertEqual(self.price_type_fn("官方净值(T-1)", "标普500(QDII)"), "var(--rating-stable)")
 
     def test_price_type_color_non_qdii_t_minus_1(self):
         """非 QDII 官方净值(T-1) → 不蓝"""

@@ -8,7 +8,7 @@
 
 ### Feat
 
-（开发中）
+- HTML 报告暗色模式（plan-11）：主报告与调仓 What-if 报告均可切换深/浅色，右上角浮动按钮，主题偏好 localStorage 持久化（首次默认浅色）；页面级颜色统一为 CSS 变量，Chart.js 图表随主题重绘，打印自动切浅色
 
 ### Refactor
 

@@ -24,9 +24,10 @@
 
 | 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
 |:--:|:--|:--:|:--:|:--|
-| ① | **plan-11** HTML 暗色模式 | P3 | 0.5d | 依赖 plan-1 的 CSS 变量预留（已就绪），极低成本 |
-| ② | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
-| ③ | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
+| ① | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
+| ② | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
+
+> ✅ plan-11 **HTML 暗色模式**已实施完成（v0.9.11-dev），详见 [`archive/v0.9.x/dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/dark-mode/dark-mode-implementation.md)。
 
 ### P2 — 高级分析（已结项）
 
@@ -39,15 +40,15 @@
 
 > **P3** = 预期实施，有空时安排。待办项按推荐实施顺序排列（见上方总览）。
 
-#### `plan-11` HTML 暗色模式（[`plan-web-ui.md §4`](../plan/plan-web-ui.md#4-html-暗色模式)）— **推荐①**
-
-CSS 变量 + localStorage 切换按钮。**预估：0.5d**（依赖 plan-1 的 chart-config.js CSS 变量预留）
-
-#### `plan-10` 日志可视化（[`plan-web-ui.md §3`](../plan/plan-web-ui.md#3-日志可视化)）— **推荐②**
+#### `plan-10` 日志可视化（[`plan-web-ui.md §3`](../plan/plan-web-ui.md#3-日志可视化)）— **推荐①**
 
 结构化日志查看（`--view-logs` 命令 + 报告尾部数据源状态表）。**预估：1d**
 
-#### `plan-8` 轻量 Web UI（[`plan-web-ui.md §1`](../plan/plan-web-ui.md#1-轻量-web-ui)）— **推荐③**
+#### ~~`plan-11` HTML 暗色模式~~ — ✅ **已完成（v0.9.11-dev）**
+
+CSS 变量 + localStorage 切换按钮（右上角浮动，首次默认浅色）。实施记录：[`archive/v0.9.x/dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/dark-mode/dark-mode-implementation.md)
+
+#### `plan-8` 轻量 Web UI（[`plan-web-ui.md §1`](../plan/plan-web-ui.md#1-轻量-web-ui)）— **推荐②**
 
 Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做多用户/LLM 在线修改/实时日志流。**运维与安全成本最高，单人工具需谨慎，建议作为 P3 最后项。**
 
