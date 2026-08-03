@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 
-> 文档版本：0.9.9-dev
+> 文档版本：0.9.10-dev
 > 审查范围：全代码库（src/python/ + src/test/ + scripts/）
 > 审查基准：technical.md §8 架构设计约束（C1~C20）+ §1.4 核心架构决策 + 代码质量最佳实践
 > 审查日期：2026-07-29
@@ -74,7 +74,7 @@
 | rf-76 | `llm/fact_checker.py` 达 **899 行超 800 硬上限**（623→899，↑276；长函数已拆分，文件级别未拆） | 拆分为 `llm/fact_checker/` 子包（9 个私有模块：`_constants`/`_patterns`/`_utils`/`_context`/`_numerical`/`_symbols`/`_ranking`/`_corrections`/`_runner`），`__init__.py` 重导出 4 个公开函数（`run_fact_check`/`check_numerical_consistency`/`check_symbol_existence`/`check_ranking_correctness`），对外导入路径 `from src.python.llm.fact_checker import ...` 不变。最大模块 `_numerical.py` 251 行。顺带删除死代码 `_RANK_TOP_N_PATTERN`（全库无引用）与未使用导入 `Any` | `changelog.md` → Refactor |
 | rf-77 | `tui/handlers_config.py` 达 **573 行**（500-800 可选优化区间，职责割裂） | 将纯 JSON 文本编辑函数提取到 `config/_json_patch.py`（`_update_json_raw_text`/`_replace_dict_block`，93 行，无 TUI/IO 依赖，适配带注释 JSON 的字段级替换 + dict 区块 brace 平衡）；`handlers_config.py` 保留 TUI 交互函数（`_read_llm_settings`/`_write_llm_settings`）与全部 `_cmd_*` 命令处理器，573→490 行。`config/__init__.py` 补 `_json_patch` 子模块引用，导入路径 `from src.python.config._json_patch import ...` | `changelog.md` → Refactor |
 
-> 已发布版本已修复问题记录已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) （v0.9.0 ~ v0.9.5：rf-90 ~ rf-144；v0.9.6 / v0.9.7 / v0.9.8：rf-115/116/119、rf-145 ~ rf-159），本表仅跟踪当前迭代（0.9.9-dev）修复项。
+> 已发布版本已修复问题记录已迁移归档至 [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) （v0.9.0 ~ v0.9.5：rf-90 ~ rf-144；v0.9.6 / v0.9.7 / v0.9.8：rf-115/116/119、rf-145 ~ rf-159），本表仅跟踪当前迭代（0.9.10-dev）修复项。
 
 ---
 
