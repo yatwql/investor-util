@@ -574,6 +574,126 @@ class TestCheckRankingCorrectness:
         assert passed == 0
         assert len(issues) == 1
 
+    # ── 第N大 / 前N大 / 主要持仓 声称（回归） ──────────────
+
+    def test_second_largest_correct_pass(self, sample_holdings):
+        """声称"第二大持仓"且名次正确（600036 实际第2）→ 通过（回归）。"""
+        text = "招商银行（600036）是组合第二大持仓。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert checked == 1
+        assert passed == 1
+        assert issues == []
+
+    def test_second_largest_wrong_flagged(self, sample_holdings):
+        """声称"第二大持仓"但名次错误（300750 实际第3）→ 告警且指名实际第2。"""
+        text = "宁德时代（300750）是组合第二大持仓。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert checked == 1
+        assert passed == 0
+        assert len(issues) == 1
+        assert "300750" in issues[0]
+        assert "第2大持仓" in issues[0]
+        assert "600036" in issues[0]  # 实际第二大是招商银行
+
+    def test_third_largest_correct_pass(self, sample_holdings):
+        """声称"第三大持仓"且名次正确（300750 实际第3）→ 通过（回归）。"""
+        text = "宁德时代（300750）是组合第三大持仓。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert checked == 1
+        assert passed == 1
+        assert issues == []
+
+    def test_third_largest_wrong_flagged(self, sample_holdings):
+        """声称"第三大持仓"但名次错误（600900 实际第4）→ 告警且指名实际第3。"""
+        text = "长江电力（600900）是组合第三大持仓。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert checked == 1
+        assert passed == 0
+        assert len(issues) == 1
+        assert "600900" in issues[0]
+        assert "第3大持仓" in issues[0]
+        assert "300750" in issues[0]  # 实际第三大是宁德时代
+
+    def test_top3_non_first_rank_pass(self, sample_holdings):
+        """声称"前三大持仓"且品种在 top3 内但非第一（600036 实际第2）→ 通过（回归）。"""
+        text = "招商银行（600036）属于组合前三大持仓。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert checked == 1
+        assert passed == 1
+        assert issues == []
+
+    def test_top3_outside_rank_flagged(self, sample_holdings):
+        """声称"前三大持仓"但品种不在 top3（510300 实际第5）→ 告警。"""
+        text = "沪深300ETF（510300）属于组合前三大持仓。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert checked == 1
+        assert passed == 0
+        assert len(issues) == 1
+        assert "510300" in issues[0]
+        assert "前3大持仓" in issues[0]
+
+    def test_major_holding_vague_claim_skipped(self, sample_holdings):
+        """ "主要持仓"是模糊声称（不断言精确名次）→ 不校验不告警（回归）。"""
+        text = "招商银行（600036）是组合主要持仓。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert issues == []
+        assert checked == 0
+
+    def test_ordinal_beyond_holdings_count(self, sample_holdings):
+        """声称"第十大持仓"但持仓不足 10 只 → 告警说明品种不足。"""
+        text = "长江电力（600900）是组合第十大持仓。"
+        issues, checked, passed = check_ranking_correctness(text, sample_holdings)
+        assert checked == 1
+        assert passed == 0
+        assert len(issues) == 1
+        assert "持仓品种不足" in issues[0]
+
+    # ── 表格句就近归因（回归：核心误报场景） ────────────────
+
+    @pytest.fixture
+    def table_holdings(self) -> list[dict]:
+        """模拟真实组合：华安纳斯达克100 为第一、电池ETF 为第三。"""
+        return [
+            {"name": "华安纳斯达克100ETF联接A", "code": "040046", "market_value": 100000.0, "cost": 80000.0},
+            {"name": "建信高端装备股票A", "code": "011506", "market_value": 50000.0, "cost": 45000.0},
+            {"name": "招商中证电池主题ETF", "code": "561910", "market_value": 30000.0, "cost": 30010.0},
+            {"name": "长江电力", "code": "600900", "market_value": 20000.0, "cost": 19000.0},
+        ]
+
+    def test_table_sentence_nearest_code_attribution(self, table_holdings):
+        """表格句中的合法排名声称按所在行就近归因，不误报。
+
+        LLM 以表格输出调仓方案，句中含多个代码：
+        - "561910 ... 已是组合第三大持仓"（561910 实际第3，正确）
+        - "040046 ... 组合第一大重仓"（040046 实际第1，正确）
+        两处声称分别指向各自所在行内的品种，均通过校验。
+        """
+        text = (
+            "操作建议|优先级|品种|建议操作|理由|| 🔴 高 | 561910 招商中证电池主题ETF | 减仓 | "
+            "市场占比10.6%，已是组合第三大持仓却贡献负收益 || 🟢 低 | 040046 华安纳斯达克100ETF联接基金A | "
+            "持有 | 收益率+1.16%，组合第一大重仓，继续持有"
+        )
+        issues, checked, passed = check_ranking_correctness(text, table_holdings)
+        assert checked == 2  # 两处排名声称均被校验
+        assert passed == 2
+        assert issues == [], f"合法排名声称不应告警: {issues}"
+
+    def test_table_sentence_wrong_claim_still_detected(self, table_holdings):
+        """表格句中的错误排名声称 → 仍能检测（不因就近归因而漏检）。"""
+        text = (
+            "操作建议|优先级|品种|建议操作|理由|| 🔴 高 | 600900 长江电力 | 减仓 | "
+            "已是组合第三大持仓却贡献负收益 || 🟢 低 | 561910 招商中证电池主题ETF | 持有 | "
+            "收益率+1.16%，组合第一大重仓，继续持有"
+        )
+        issues, checked, passed = check_ranking_correctness(text, table_holdings)
+        assert checked == 2
+        assert passed == 0
+        assert len(issues) == 2
+        # 600900 实际第4，被声称"第三大持仓" → 告警
+        assert any("600900" in i and "第3大持仓" in i for i in issues)
+        # 561910 实际第3，被声称"第一大重仓" → 告警
+        assert any("561910" in i and "最大持仓" in i for i in issues)
+
     # ── 非持仓排名语境不误判 ──────────────────────────────
 
     def test_max_single_loss_item_not_flagged(self, sample_holdings):

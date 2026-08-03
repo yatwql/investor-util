@@ -785,6 +785,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIn("量化指标数据不足", note.get_text())
         self.assertIsNone(section.find(id="chart_radar"))
 
+
     def test_radar_data_unavailable_placeholder(self) -> None:
         """data_unavailable=True 时显示"持仓市值数据不可用，量化指标暂停计算"。"""
         overrides = {"radar": {"labels": ["夏普比率"], "datasets": [{"data": [1.2]}]}}
@@ -1070,6 +1071,69 @@ class TestHtmlTocVisibility(unittest.TestCase):
         toc_keys = {a.get("href") for a in soup.select("#toc-sidebar a[href^='#sec-']")}
         nav_keys = {a.get("href") for a in soup.select("nav.section-nav a")}
         self.assertEqual(toc_keys, nav_keys, "目录与横向导航的链接集合应一致")
+
+
+class TestSummaryDateTimeValueStyles(unittest.TestCase):
+    """投资分析汇总：统计时间/所属交易日 值单元格样式（加粗 / 加粗+加大+蓝色）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    def _value_td_style(self, label: str) -> str:
+        """在投资分析汇总中按标签名找对应行的值单元格（第2列）内联 style。"""
+        summary = self.soup.find(id="sec-summary")
+        self.assertIsNotNone(summary, "未找到 #sec-summary")
+        for tr in summary.select("table.kv-table tr"):
+            tds = tr.find_all("td")
+            if len(tds) == 2 and tds[0].get_text(strip=True) == label:
+                return tds[1].get("style", "")
+        self.fail(f"未找到「{label}」行")
+
+    def test_stat_time_value_bold(self):
+        """统计时间值加粗。"""
+        style = self._value_td_style("统计时间")
+        self.assertRegex(
+            style,
+            r"font-weight:\s*(?:700|bold)",
+            f"统计时间值应加粗，style={style!r}",
+        )
+
+    def test_trading_day_value_bold_larger_blue(self):
+        """所属交易日值加粗+加大+蓝色。"""
+        style = self._value_td_style("所属交易日")
+        self.assertRegex(
+            style,
+            r"font-weight:\s*(?:700|bold)",
+            f"所属交易日值应加粗，style={style!r}",
+        )
+        self.assertRegex(
+            style,
+            r"font-size:\s*1[5-9]px",
+            f"所属交易日字号应加大，style={style!r}",
+        )
+        self.assertRegex(
+            style,
+            r"color:\s*#2E75B6",
+            f"所属交易日值应为蓝色 2E75B6，style={style!r}",
+        )
+
+    def test_kv_label_style_unaffected(self):
+        """标签列不新增内联样式（仅值列加样式）。"""
+        summary = self.soup.find(id="sec-summary")
+        for tr in summary.select("table.kv-table tr"):
+            tds = tr.find_all("td")
+            if len(tds) == 2 and tds[0].get_text(strip=True) in ("统计时间", "所属交易日"):
+                self.assertEqual(
+                    tds[0].get("style", ""),
+                    "",
+                    "标签列不应新增内联样式",
+                )
 
 
 if __name__ == "__main__":

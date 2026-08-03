@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import unittest
 from contextlib import ExitStack
+from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, call, patch
 
@@ -127,6 +128,45 @@ class TestWriteBlanks(unittest.TestCase):
         """写入 0 行空白（行号不变）。"""
         row = s._write_blanks(self.ws, 10, 0)
         self.assertEqual(row, 10)
+
+
+class TestWriteBasicInfoFonts(unittest.TestCase):
+    """_write_basic_info 值单元格样式：统计时间加粗、所属交易日加粗+加大+蓝色。"""
+
+    def _render_basic_info(self, now: datetime):
+        """用真实 openpyxl 工作表渲染基本信息（隔离 get_last_trading_day）。"""
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        with patch("src.python.report.summary.get_last_trading_day", return_value="2026-06-26"):
+            s._write_basic_info(ws, 1, now)
+        return ws
+
+    def test_stat_time_value_bold(self):
+        """统计时间值（第2列）加粗。"""
+        ws = self._render_basic_info(datetime(2026, 6, 27, 15, 30, 0))
+        font = ws.cell(row=1, column=2).font
+        self.assertTrue(font.bold, "统计时间值应加粗")
+
+    def test_trading_day_value_bold_larger_blue(self):
+        """所属交易日值（第2列）加粗+加大+蓝色。"""
+        ws = self._render_basic_info(datetime(2026, 6, 27, 15, 30, 0))
+        font = ws.cell(row=2, column=2).font
+        self.assertTrue(font.bold, "所属交易日值应加粗")
+        self.assertGreater(
+            font.size,
+            ws.cell(row=1, column=2).font.size,
+            "所属交易日字号应大于统计时间",
+        )
+        # openpyxl 对 6 位 hex 存为 ARGB（前缀 00/FF 视版本而定），匹配蓝色 2E75B6 即可
+        self.assertTrue(font.color.rgb.upper().endswith("2E75B6"), "所属交易日值应为蓝色 2E75B6")
+
+    def test_labels_not_bold(self):
+        """标签列（第1列）保持普通字体，不受影响。"""
+        ws = self._render_basic_info(datetime(2026, 6, 27, 15, 30, 0))
+        self.assertFalse(ws.cell(row=1, column=1).font.bold, "统计时间标签不应加粗")
+        self.assertFalse(ws.cell(row=2, column=1).font.bold, "所属交易日标签不应加粗")
 
 
 # ═══════════════════════════════════════════════════════════
