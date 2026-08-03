@@ -249,7 +249,7 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
         config=config,
         reporter=reporter,
         report_type=args.type,
-        history_mode=args.history,
+        fetch_history=(args.history == "auto"),
         force_llm=args.force_llm,
         output_dir=args.output,
         warm_cache=args.warm,

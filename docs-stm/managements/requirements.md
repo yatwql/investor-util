@@ -458,7 +458,7 @@
 
 **F1 快照摘要**：回撤分析页脚嵌入持仓快照对比，展示本次与上次之间的总市值变化、总盈亏变化及持仓变动 TOP5。
 
-#### 6.4.19 组合演进（多快照趋势，plan-6）
+#### 6.4.19 组合演进（多快照趋势）
 
 **字段说明**：
 
@@ -569,7 +569,7 @@
 | R-FX-04 | 非人民币资产合计占比 > 0% 时附加汇率波动风险提示 |
 | R-FX-05 | 汇率敞口分析结果应注入智囊团深度复盘（`expert_review`）LLM prompt 的【币种敞口分布】段落 |
 
-### 6.11 调仓 What-if 模拟（plan-5）
+### 6.11 调仓 What-if 模拟
 
 | 需求标识 | 需求描述 |
 |:---------|:---------|
@@ -580,6 +580,7 @@
 | R-WIF-05 | 输出双产物：Excel 调仓模拟工作簿（调仓摘要 / 分类配置对比 / 持仓变动明细 3 页签，变动行底色标注）+ HTML 双栏对比页（含基准/目标资产配置环形图，每图带图下说明） |
 | R-WIF-06 | What-if 仅做成本口径截面比较，零网络请求；不产出任何回测类结论（目标持仓无市场历史，量化指标不可回测），口径与局限在报告说明区注明 |
 | R-WIF-07 | 两侧持仓均为空时 `available=false`，报告写「调仓对比数据暂不可用」占位；CLI 层对空持仓文件直接报错返回严重退出码 |
+| R-WIF-08 | 提供 TUI 菜单入口（快捷键 W）：交互式选择基准持仓（调仓前，默认配置持仓文件）与目标持仓（调仓后/假设，持仓目录中基准之外的文件），复用同一套计算与输出逻辑生成独立报告 |
 
 ---
 
@@ -857,7 +858,7 @@
 | `market_hour_ttl` | int | 30 | — | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30",end:"15:00"}` | — | 交易时段配置 |
 | `degradation` | dict | T2/T3/T4 默认 | — | T2（基金业绩/行业分类等, stale_days=3）/ T3（资金流向/基金持仓等, stale_days=14）/ T4（穿透数据, stale_days=14），每层含 unreachable_threshold / empty_data_threshold / stale_days 三参数 |
-| `history.analysis` | str | "auto" | — | 历史走势获取模式（off/prompt/auto） |
+| `history.fetch_mode` | str | "auto" | — | 历史走势获取模式（off/prompt/auto） |
 | `history.snapshot_retention_days` | int | 60 | — | 快照保留天数 |
 | `history.snapshot_max_count` | int | 365 | — | 快照最大数量 |
 | `history.coverage_threshold` | float | 0.8 | — | 有效区间覆盖阈值 |

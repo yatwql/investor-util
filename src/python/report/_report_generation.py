@@ -157,7 +157,7 @@ def _prepare_full_risk_metrics(
     config: dict,
     reporter: ProgressReporter,
     perf: object,
-    history_mode: str,
+    fetch_history: bool,
     enable_history: bool,
     prep: dict,
     pipeline_data: dict | None,
@@ -177,8 +177,7 @@ def _prepare_full_risk_metrics(
         return None, None
 
     perf.start("历史走势")
-    _resolved_mode = "auto" if history_mode in ("auto",) else "off"
-    history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
+    history_data = fetch_history_data(holdings, config, reporter, fetch=fetch_history)
     perf.stop()
 
     # 从 history_data 提取风险指标，注入 prep 和 pipeline_data
@@ -399,7 +398,7 @@ def _generate_report_both(
     holdings: list,
     config: dict,
     reporter: ProgressReporter,
-    history_mode: str = "off",
+    fetch_history: bool = False,
     output_dir: str | None = None,
 ) -> "ReportResult":
     """both 报告路径：生成 HTML + Excel，不含 LLM 分析章节。
@@ -451,9 +450,8 @@ def _generate_report_both(
 
     # ── 3. F2 历史走势（条件获取） ──
     if _enable_history:
-        _resolved_mode = "auto" if history_mode in ("auto",) else "off"
         perf.start("历史走势")
-        history_data = fetch_history_data(holdings, config, reporter, mode=_resolved_mode)
+        history_data = fetch_history_data(holdings, config, reporter, fetch=fetch_history)
         perf.stop()
     else:
         history_data = None
@@ -583,7 +581,7 @@ def _generate_report_full(
     holdings: list,
     config: dict,
     reporter: ProgressReporter,
-    history_mode: str = "off",
+    fetch_history: bool = False,
     force_llm: bool = False,
     output_dir: str | None = None,
 ) -> "ReportResult":
@@ -638,7 +636,7 @@ def _generate_report_full(
         config,
         reporter,
         perf,
-        history_mode,
+        fetch_history,
         _enable_history,
         prep,
         pipeline_data,

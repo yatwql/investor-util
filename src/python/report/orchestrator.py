@@ -385,7 +385,7 @@ def generate_report(
     config: dict,
     reporter: ProgressReporter,
     report_type: str = "basic",
-    history_mode: str = "off",
+    fetch_history: bool = False,
     force_llm: bool = False,
     output_dir: str | None = None,
     warm_cache: bool = False,
@@ -395,6 +395,9 @@ def generate_report(
     basic: 仅 Excel（无数据准备/快照/历史）
     both:  HTML+Excel（不含 LLM）
     full:  HTML+Excel+LLM
+
+    Args:
+        fetch_history: 是否获取组合历史走势数据（F2，as-if 模拟），仅 both/full 有效
     """
     result = ReportResult()
 
@@ -447,7 +450,7 @@ def generate_report(
             holdings,
             config,
             reporter,
-            history_mode=history_mode,
+            fetch_history=fetch_history,
             output_dir=output_dir,
         )
 
@@ -458,7 +461,7 @@ def generate_report(
             holdings,
             config,
             reporter,
-            history_mode=history_mode,
+            fetch_history=fetch_history,
             force_llm=force_llm,
             output_dir=output_dir,
         )

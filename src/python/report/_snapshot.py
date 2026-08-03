@@ -142,7 +142,7 @@ def fetch_history_data(
     holdings: list,
     config: dict | None,
     reporter: ProgressReporter,
-    mode: str = "auto",
+    fetch: bool = True,
 ) -> dict | None:
     """获取组合历史走势数据（as-if 模拟），纯业务逻辑，不含用户交互。
 
@@ -150,12 +150,12 @@ def fetch_history_data(
         holdings: 持仓列表
         config: 配置字典（含 history 子段）
         reporter: 进度报告接口
-        mode: 模式，"auto" 执行获取，"off"/其他值直接返回 None
+        fetch: 是否执行获取，False 直接返回 None
 
     Returns:
         history_data 字典，获取失败或不可用时返回 None。
     """
-    if mode not in ("auto",):
+    if not fetch:
         return None
 
     reporter.info("正在获取组合历史走势数据（as-if 模拟）...")

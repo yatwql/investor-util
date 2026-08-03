@@ -124,7 +124,7 @@ def get_config(_strict: bool = False) -> dict:
                 config = json.loads(cleaned)
             merged = dict(_config_defaults._DEFAULT_CONFIG)
             # 过滤 null 值：不允许 config.json 中的 null 覆盖默认值
-            # 嵌套 dict 合并：允许用户只覆盖部分子键（如 history.analysis）而不丢失默认值
+            # 嵌套 dict 合并：允许用户只覆盖部分子键（如 history.fetch_mode）而不丢失默认值
             for key, val in config.items():
                 if val is None and key in _config_defaults._DEFAULT_CONFIG:
                     continue
@@ -132,6 +132,15 @@ def get_config(_strict: bool = False) -> dict:
                     merged[key] = {**merged[key], **val}
                 else:
                     merged[key] = val
+            # 兼容旧配置键：history.analysis → history.fetch_mode（0.9.9 起更名）
+            # 依据原始用户配置判断（合并后 history 始终含默认 fetch_mode，无法区分来源）
+            _raw_history = config.get("history")
+            if isinstance(_raw_history, dict) and "analysis" in _raw_history:
+                _hist = merged.setdefault("history", {})
+                if "fetch_mode" not in _raw_history:
+                    _hist["fetch_mode"] = _raw_history["analysis"]
+                _hist.pop("analysis", None)
+                logger.warning("config.json history.analysis 已更名为 history.fetch_mode，已自动迁移")
             # 绝对化路径键：用户 config.json 中可使用相对路径，运行时统一转为绝对路径
             _absolutize_paths(merged)
             _config_cache = merged

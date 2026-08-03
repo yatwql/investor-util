@@ -343,6 +343,26 @@ def _validate_benchmark_indices(config: dict, issues: int) -> int:
     return issues
 
 
+_FETCH_MODES = frozenset({"off", "prompt", "auto"})  # history.fetch_mode 合法取值
+
+
+def _validate_history_fetch_mode(config: dict, issues: int) -> int:
+    """验证 history.fetch_mode 配置（历史走势获取模式三态）。"""
+    history = config.get("history", {})
+    if not isinstance(history, dict):
+        return issues
+    mode = history.get("fetch_mode")
+    if mode is None:
+        return issues  # 缺失时使用默认值，正常
+    if not isinstance(mode, str) or mode not in _FETCH_MODES:
+        logger.warning(
+            "config.json history.fetch_mode = %r 非法（应为 off/prompt/auto），将使用默认值 auto",
+            mode,
+        )
+        return issues + 1
+    return issues
+
+
 def _validate_comparison_indices(config: dict, issues: int) -> int:
     """验证 comparison_indices 配置。"""
     ci, issues = _section(config, "comparison_indices", dict, "对比指数池将使用默认值", issues)
@@ -470,6 +490,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
     issues = _validate_benchmark_indices(config, issues)
+    issues = _validate_history_fetch_mode(config, issues)
     issues = _validate_comparison_indices(config, issues)
     issues = _validate_rebalance_config(config, issues)
     issues = _validate_enable_llm(issues)
