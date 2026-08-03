@@ -219,6 +219,7 @@ investor-util/
 │   │   │   ├── cli_progress.py         #   CLI 进度报告器（CliProgressReporter）
 │   │   │   ├── whatif_sheet.py       #   调仓 What-if Excel 页签（摘要/分类/变动明细）
 │   │   │   ├── whatif_writer.py      #   调仓 What-if 报告输出编排（Excel+HTML）
+│   │   │   ├── whatif_operations.py  #   调仓 What-if 操作共享层（CLI/TUI 共用的业务链）
 │   │   │   └── styles.py             #   Excel 样式定义
 │   │   │
 │   │   ├── tmpl/                     # HTML 报告模板
@@ -445,7 +446,7 @@ investor-util/
 │       │   │   ├── test_correlation_html.py       #   持仓相关性章节 HTML 呈现
 │       │   │   ├── test_correlation_sheet.py      #   持仓相关性矩阵 Excel 页签呈现
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
-│       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现│       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现│       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现│       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
+│       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现│       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现│       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现│       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试│       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试

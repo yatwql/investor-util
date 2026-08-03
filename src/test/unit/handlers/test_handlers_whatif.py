@@ -15,6 +15,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.python.report.whatif_operations import WhatifRunResult
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
 
@@ -144,8 +146,7 @@ class TestCmdWhatif(unittest.TestCase):
 
     @patch("src.python.tui.handlers_whatif.press_any_key")
     @patch("src.python.tui.handlers_whatif.get_config_cache")
-    @patch("src.python.report.whatif_writer.write_whatif_report")
-    @patch("src.python.analysis.whatif.build_whatif_data")
+    @patch("src.python.report.whatif_operations.run_whatif_simulation")
     @patch("src.python.tui.handlers_whatif.read_holdings")
     @patch("src.python.tui.handlers_whatif._select_candidate_file")
     @patch("src.python.tui.handlers_whatif.select_holdings_file")
@@ -154,46 +155,45 @@ class TestCmdWhatif(unittest.TestCase):
         mock_select_base: MagicMock,
         mock_select_cand: MagicMock,
         mock_read: MagicMock,
-        mock_build: MagicMock,
-        mock_write: MagicMock,
+        mock_run: MagicMock,
         mock_config: MagicMock,
         mock_key: MagicMock,
     ) -> None:
-        """正常流程：两份持仓 → 计算 → 输出报告。"""
+        """正常流程：两份持仓 → 共享层计算 → 输出报告路径。"""
         from src.python.tui.handlers_whatif import _cmd_whatif
 
         mock_config.return_value = {"output_dir": "reports"}
         mock_select_base.return_value = "dummy_dir/base.xlsx"
         mock_select_cand.return_value = "dummy_dir/target.xlsx"
         mock_read.side_effect = lambda p: [{"code": "000001", "name": "测试"}]
-        mock_build.return_value = {"available": True, "changes": []}
-        mock_write.return_value = {"excel": "/r/调仓模拟.xlsx", "html": "/r/调仓模拟.html"}
+        mock_run.return_value = WhatifRunResult(ok=True, excel="/r/调仓模拟.xlsx", html="/r/调仓模拟.html")
 
         out = __import__("io").StringIO()
         with patch("sys.stdout", out):
             _cmd_whatif()
 
-        mock_write.assert_called_once()
+        mock_run.assert_called_once()
+        self.assertEqual(mock_run.call_args.kwargs["output_dir"], "reports")
         self.assertIn("调仓模拟报告已生成", out.getvalue())
         self.assertIn("调仓模拟.xlsx", out.getvalue())
         mock_key.assert_called_once()
 
     @patch("src.python.tui.handlers_whatif.press_any_key")
-    @patch("src.python.report.whatif_writer.write_whatif_report")
+    @patch("src.python.report.whatif_operations.run_whatif_simulation")
     @patch("src.python.tui.handlers_whatif.select_holdings_file")
     def test_base_not_selected(
         self,
         mock_select_base: MagicMock,
-        mock_write: MagicMock,
+        mock_run: MagicMock,
         mock_key: MagicMock,
     ) -> None:
-        """基准文件未选择时提前返回，不生成报告。"""
+        """基准文件未选择时提前返回，不触发共享层。"""
         from src.python.tui.handlers_whatif import _cmd_whatif
 
         mock_select_base.return_value = None
         with patch("sys.stdout", __import__("io").StringIO()):
             _cmd_whatif()
-        mock_write.assert_not_called()
+        mock_run.assert_not_called()
         mock_key.assert_not_called()
 
     @patch("src.python.tui.handlers_whatif.press_any_key")
@@ -215,7 +215,7 @@ class TestCmdWhatif(unittest.TestCase):
         mock_key.assert_not_called()
 
     @patch("src.python.tui.handlers_whatif.press_any_key")
-    @patch("src.python.report.whatif_writer.write_whatif_report")
+    @patch("src.python.report.whatif_operations.run_whatif_simulation")
     @patch("src.python.tui.handlers_whatif.read_holdings")
     @patch("src.python.tui.handlers_whatif._select_candidate_file")
     @patch("src.python.tui.handlers_whatif.select_holdings_file")
@@ -224,10 +224,10 @@ class TestCmdWhatif(unittest.TestCase):
         mock_select_base: MagicMock,
         mock_select_cand: MagicMock,
         mock_read: MagicMock,
-        mock_write: MagicMock,
+        mock_run: MagicMock,
         mock_key: MagicMock,
     ) -> None:
-        """基准持仓为空时提示错误，不生成报告。"""
+        """基准持仓为空时提示错误，不触发共享层。"""
         from src.python.tui.handlers_whatif import _cmd_whatif
 
         mock_select_base.return_value = "dummy_dir/base.xlsx"
@@ -236,13 +236,12 @@ class TestCmdWhatif(unittest.TestCase):
         out = __import__("io").StringIO()
         with patch("sys.stdout", out):
             _cmd_whatif()
-        mock_write.assert_not_called()
+        mock_run.assert_not_called()
         self.assertIn("基准持仓读取失败或为空", out.getvalue())
         mock_key.assert_called_once()
 
     @patch("src.python.tui.handlers_whatif.press_any_key")
-    @patch("src.python.report.whatif_writer.write_whatif_report")
-    @patch("src.python.analysis.whatif.build_whatif_data")
+    @patch("src.python.report.whatif_operations.run_whatif_simulation")
     @patch("src.python.tui.handlers_whatif.read_holdings")
     @patch("src.python.tui.handlers_whatif._select_candidate_file")
     @patch("src.python.tui.handlers_whatif.select_holdings_file")
@@ -251,22 +250,22 @@ class TestCmdWhatif(unittest.TestCase):
         mock_select_base: MagicMock,
         mock_select_cand: MagicMock,
         mock_read: MagicMock,
-        mock_build: MagicMock,
-        mock_write: MagicMock,
+        mock_run: MagicMock,
         mock_key: MagicMock,
     ) -> None:
-        """对比数据不可用（两侧均空）时提示错误，不生成报告。"""
+        """共享层返回不可用时提示错误，不打印报告路径。"""
         from src.python.tui.handlers_whatif import _cmd_whatif
 
         mock_select_base.return_value = "dummy_dir/base.xlsx"
         mock_select_cand.return_value = "dummy_dir/target.xlsx"
         mock_read.side_effect = lambda p: [{"code": "000001", "name": "测试"}]
-        mock_build.return_value = {"available": False, "reason": "两侧均为空"}
+        mock_run.return_value = WhatifRunResult(ok=False, reason="两侧均为空")
         out = __import__("io").StringIO()
         with patch("sys.stdout", out):
             _cmd_whatif()
-        mock_write.assert_not_called()
+        mock_run.assert_called_once()
         self.assertIn("调仓对比数据不可用", out.getvalue())
+        self.assertNotIn("调仓模拟报告已生成", out.getvalue())
         mock_key.assert_called_once()
 
 

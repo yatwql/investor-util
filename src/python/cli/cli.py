@@ -325,11 +325,12 @@ def _handle_whatif(args: argparse.Namespace, config: dict) -> int:
 
     对比基准（--base，缺省为 config 持仓文件）与目标（--candidate）两份持仓，
     生成调仓 diff 报告（Excel + HTML）。全程本地计算，零网络请求。
+    业务链（build→校验→输出）委托共享层 run_whatif_simulation，
+    本函数仅保留文件来源解析与退出码映射。
     """
-    from src.python.analysis.whatif import build_whatif_data
     from src.python.core.reader import read_holdings
     from src.python.report.cli_progress import CliProgressReporter
-    from src.python.report.whatif_writer import write_whatif_report
+    from src.python.report.whatif_operations import run_whatif_simulation
 
     reporter = CliProgressReporter(verbose=args.verbose)
 
@@ -354,18 +355,19 @@ def _handle_whatif(args: argparse.Namespace, config: dict) -> int:
         reporter.error(f"目标持仓读取失败或为空: {cand_file}")
         return _EXIT_SEVERE
 
-    data = build_whatif_data(
+    output_dir = args.output or config.get("output_dir", "reports")
+    result = run_whatif_simulation(
         base_holdings,
         cand_holdings,
-        base_file=os.path.basename(base_file),
-        candidate_file=os.path.basename(cand_file),
+        base_file=base_file,
+        candidate_file=cand_file,
+        output_dir=output_dir,
+        reporter=reporter,
     )
-    if not data.get("available"):
-        reporter.error(f"调仓对比数据不可用: {data.get('reason', '未知原因')}")
+    if not result.ok:
+        reporter.error(f"调仓对比数据不可用: {result.reason}")
         return _EXIT_SEVERE
 
-    output_dir = args.output or config.get("output_dir", "reports")
-    write_whatif_report(data, output_dir=output_dir, reporter=reporter)
     reporter.print_timing_summary()
     return _EXIT_SUCCESS
 

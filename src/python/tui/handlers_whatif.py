@@ -60,9 +60,12 @@ def _select_candidate_file(base_file: str) -> str | None:
 
 
 def _cmd_whatif() -> None:
-    """调仓 What-if 模拟：对比基准与目标持仓，生成独立 diff 报告。"""
-    from src.python.analysis.whatif import build_whatif_data
-    from src.python.report.whatif_writer import write_whatif_report
+    """调仓 What-if 模拟：对比基准与目标持仓，生成独立 diff 报告。
+
+    业务链（build→校验→输出）委托共享层 run_whatif_simulation，
+    本函数仅保留文件选择、判空与结果呈现。
+    """
+    from src.python.report.whatif_operations import run_whatif_simulation
 
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
@@ -91,20 +94,21 @@ def _cmd_whatif() -> None:
             press_any_key()
             return
         print(f"  [OK] 基准 {len(base)} 条 / 目标 {len(cand)} 条持仓")
-        data = build_whatif_data(
+        result = run_whatif_simulation(
             base,
             cand,
-            base_file=os.path.basename(base_file),
-            candidate_file=os.path.basename(cand_file),
+            base_file=base_file,
+            candidate_file=cand_file,
+            output_dir=output_dir,
+            reporter=reporter,
         )
-        if not data.get("available"):
-            print(f"  [ERR] 调仓对比数据不可用: {data.get('reason', '未知原因')}")
+        if not result.ok:
+            print(f"  [ERR] 调仓对比数据不可用: {result.reason}")
             press_any_key()
             return
-        paths = write_whatif_report(data, output_dir=output_dir, reporter=reporter)
         print("  [OK] 调仓模拟报告已生成（独立产物，不并入主报告）")
-        print(f"       Excel: {paths['excel']}")
-        print(f"       HTML:  {paths['html']}")
+        print(f"       Excel: {result.excel}")
+        print(f"       HTML:  {result.html}")
     except Exception as e:
         logger.exception("调仓 What-if 模拟失败")
         print_error_with_hint(e, "调仓 What-if 模拟失败")
