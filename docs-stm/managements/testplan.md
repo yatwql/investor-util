@@ -112,7 +112,7 @@
 | **S11: LLM 混合缓存+真实调用** | — | `test_llm_mixed_cache.py` | 4 模块（假设 news_correlation 关闭）：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 模块列表正确 |
 | **S12: LLM 全部失败（5 种原因）** | — | `test_llm_all_fail.py` | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
 | **S13: Extended Thinking 混合** | — | `test_llm_extended_thinking.py` | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用模块行，Excel/HTML/Summary 三种输出一致 |
-| **S14: LLM 不启用** | — | `test_llm_disabled.py` | TUI 不按 L，直接生成报告 | 菜单 E / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 19、HTML 无第 19 节）；LLM 分析章节整体不出现 |
+| **S14: LLM 不启用** | — | `test_llm_disabled.py` | TUI 不按 L，直接生成报告 | 菜单 E / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 21、HTML 无第 21 节）；LLM 分析章节整体不出现 |
 | **S15: 禁用+缓存混合** | — | `test_llm_disabled_cache.py` | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），禁用优先于缓存或 per_module 数据 |
 | **S16: 断网下 LLM 降级** | — | `test_llm_network_error.py` | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为 NETWORK_ERROR 占位文本，不阻塞报告生成 |
 | **S17: LLM 部分缓存超期** | — | `test_llm_partial_cache.py` | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示缓存状态 |
@@ -323,7 +323,7 @@
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
 | **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
-| **Excel 页签结构** | 页签编号排序（1.~19.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
+| **Excel 页签结构** | 页签编号排序（1.~21.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
 | **Excel 盈亏着色** | 正数绿/红色（RGB 正绿/红），覆盖所有盈亏列（本日盈亏/持仓盈亏/收益率） | ✅ |
 | **Excel LLM 状态颜色** | 蓝底=缓存、绿底=成功、红底=失败、灰底=禁用+各色图标 | ✅ |
 | **Excel 取价方式标识** | 蓝色字体标注（实时价/收盘价/官方净值） | ✅ |

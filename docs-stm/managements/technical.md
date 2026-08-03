@@ -477,7 +477,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 | 维度 | 单股票 API | 批量 API（eastmoney_industry） | LLM 熔断器 |
 |:-----|:----------|:-----------------------------|:----------|
 | 实现位置 | `core/provider_registry.py` | `core/provider_registry.py` | `llm/circuit_breaker.py` |
-| 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 N 次 |
+| 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 3 次 |
 | 冷却时长 | 指数退避 60s→300s→900s→3600s | 120s | 60s |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
 | 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 |
@@ -1045,7 +1045,7 @@ def _get_pool() -> ThreadPoolExecutor:
                                  news_correlation /       (STATUS_MESSAGES/
                                  llm_content /            TIER_PREFIX/
                                                           DegradationTracker)
-                                 基金深度分析 5 个 /
+                                 基金深度分析 6 个 /
                                  excel_writer.py +
                                  styles.py
 ```
@@ -1262,7 +1262,7 @@ get_report_section_order(config)
     ▼
 ┌────────────────────────┐
 │ config 中有             │
-│ report_section_order?  │── NO ──→ 返回完整 19 项默认顺序
+│ report_section_order?  │── NO ──→ 返回完整 21 项默认顺序
 └───────────┬────────────┘
            YES
             │
@@ -1280,7 +1280,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（19 项，key/number/type/data_flag）
+返回 result（21 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -1483,7 +1483,7 @@ prune()：两阶段自动清理
 
 ### 4.8 基金深度分析
 
-基金深度分析 5 个模块通过 `enable_fund_deep_analysis` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
+基金深度分析 6 个模块通过 `enable_fund_deep_analysis` 标志控制条件渲染，跟随 `include_news`（菜单 B/L 时触发）。
 
 ```
                     基金深度分析模块架构
@@ -1500,6 +1500,9 @@ prune()：两阶段自动清理
               │
           因子暴露分析
         OLS 回归风格画像
+              │
+          持仓相关性矩阵
+        Pearson 相关+显著性
 ```
 
 #### 基金经理变更监控
@@ -1876,7 +1879,7 @@ _dedup_by_title(items)
 | 信号 | 默认阈值 | 说明 |
 |:-----|:---------|:------|
 | 连续失败计数 | T2: 2 次 / T3: 2 次 / T4: 1 次 | 累计失败次数达阈值后触发降级 |
-| 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 7 天 | 距上次成功获取的天数超阈值后触发降级 |
+| 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 14 天 | 距上次成功获取的天数超阈值后触发降级 |
 
 可配置于 `config.json` 的 `degradation` 字段。支持跨会话持久化到 `data/state/.degradation_state.json`。
 
@@ -2028,7 +2031,7 @@ LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_
 |:-----|:-----|:---------|:---------|:--------|
 | 全球政经局势 | `global_macro` | A 股/美股指数+持仓汇总 → 宏观判断 | preload | 24h |
 | 智囊团深度复盘 | `expert_review` | 持仓明细+穿透 → 专业分析师多视角辩论 | preload | 2h |
-| 组合体检报告 | `health_check` | 持仓明细（排除行情波动）→ 4 维健康度评分 | preload | 24h |
+| 组合体检报告 | `health_check` | 持仓明细（排除行情波动）→ 5 维健康度评分 | preload | 24h |
 | 穿透深度分析 | `penetration_deep` | 穿透 TOP10 → 行业/品种/国家集中度分析 | preload | 24h |
 | 新闻二次关联 | `news_correlation` | 逐条新闻 → LLM 深度关联评分（批量模式） | refresh | 1h |
 
@@ -2580,7 +2583,7 @@ investor-util/
 |:-----|:------|:---------|:------------|:------------|
 | T2 | 数据不可用 | ⚠ | 2 次 | 3 天 |
 | T3 | 数据部分可用 | ℹ | 2 次 | 14 天 |
-| T4 | 数据临时不可用 | ℹ | 1 次 | 7 天 |
+| T4 | 数据临时不可用 | ℹ | 1 次 | 14 天 |
 
 降级配置位于 `config.json` 的 `degradation` 字段，支持 per-source 覆盖。
 

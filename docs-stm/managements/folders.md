@@ -11,9 +11,9 @@
 | 主程序代码 | Python | 205 | 48,051 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`；rf-76 将 `fact_checker.py` 拆为 `fact_checker/` 子包 10 文件，rf-77 提取 `config/_json_patch.py`） |
 | HTML 报告模板 | HTML | 3 | 2,910 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
 | 辅助脚本 | Python | 12 | 4,113 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
-| **源代码合计** | — | **219** | **55,063** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **238** | **66,253** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,174 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **220** | **55,074** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **238** | **66,294** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,176 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
@@ -211,7 +211,7 @@ investor-util/
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
-│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #18）
+│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #20）
 │   │   │   ├── downsample.py         #   P1 服务端下采样（日频→周/月聚合）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告（块级 HTML 分段 + 事实校验摘要分块着色）
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）

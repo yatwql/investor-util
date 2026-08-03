@@ -374,9 +374,9 @@ def _cmd_config_report_boards() -> None:
         fund_status = f"{GREEN}启用{RESET}" if fund_deep_analysis else f"{RED}禁用{RESET}"
         n_status = f"{GREEN}启用{RESET}" if news else f"{RED}禁用{RESET}"
         h_status = f"{GREEN}启用{RESET}" if history else f"{RED}禁用{RESET}"
-        print(f"  │ 1. 基金深度分析（#6~10）        [{fund_status}]{' ' * 8}│")
-        print(f"  │ 2. 市场新闻（#11）              [{n_status}]{' ' * 8}│")
-        print(f"  │ 3. 组合历史走势+回撤（#16~17）  [{h_status}]{' ' * 8}│")
+        print(f"  │ 1. 基金深度分析（#6~11）        [{fund_status}]{' ' * 8}│")
+        print(f"  │ 2. 市场新闻（#12）              [{n_status}]{' ' * 8}│")
+        print(f"  │ 3. 组合历史走势+回撤（#17~18）  [{h_status}]{' ' * 8}│")
         print("  │                                   │")
         print("  │ 4. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
