@@ -144,6 +144,12 @@ python scripts/check-code-traces.py --ci
 
 扫描项目根 `README.md` 与 `docs-stm/managements/`、`docs-stm/manuals/` 下所有 `.md` 文件（豁免 `changelog.md` / `review-findings.md` / `plan.md` 及 `archive/`、`plan/`、`tmp/` 目录），检查面向读者的文档正文是否含有历史变更信息（来源叙述、历史实现、迁移痕迹、任务编号、归档文件引用、版本号、Iter 迭代标记等）。此类文档只应描述"当前是什么/做什么"，不应记录"从哪里来、怎么变的"；历史记录集中在管理文档（changelog / review-findings / plan）中。
 
+细节规则：
+- **Markdown 围栏代码块**（``` 包裹）内为命令/配置示例，非文档叙述，自动跳过（避免 `git tag`、`APP_VERSION` 等示例误报）
+- **版本头豁免仅行首锚定**：只豁免 `> 文档版本：0.9.9-dev` 这类版本头行；行中叙述（如"该功能于版本 `vX.Y.Z` 中引入"）仍会命中版本号痕迹
+- **当前能力描述豁免**：暂不支持 / 不再支持 / 不正式支持 / 发布版本前 / 门禁流程等合法当前状态描述不报
+- **LOW 级别**：命中需人工判断的变更/过渡类描述时提示复核，不阻塞提交
+
 ```bash
 # 检查全部
 python scripts/check-doc-traces.py
@@ -161,7 +167,7 @@ python scripts/check-doc-traces.py --ci
 |:------:|:-----|:-----|
 | 0 | 全部通过 | 无需处理 |
 | 1 | HIGH/ARCHIVE/CODE 痕迹 | 应从文档中移除 |
-| 2 | 仅 LOW 级别痕迹 | 建议人工复核 |
+| 2 | 仅 LOW 级别痕迹（需人工判断的变更/过渡类描述） | 建议人工复核 |
 
 ---
 

@@ -17,11 +17,12 @@
   - docs-stm/tmp/ 运行时临时产物
 
 豁免内容（当前状态 / 流程描述，非历史痕迹）：
-  - 管理文档版本头（"文档版本：0.9.9-dev"，版本号一致性要求）
+  - 管理文档版本头（"文档版本：0.9.9-dev"，版本号一致性要求，仅行首锚定豁免）
+  - Markdown 围栏代码块（``` 包裹）内命令/配置示例，非文档叙述
   - 需求编号（requirements.md 的 R-LLM-ER-01 等需求条目 ID）
   - folders.md 目录树行（│ ├ └ 开头，记录目录结构，含 archive/ 属合法指向）
   - 当前能力描述（暂不支持 / 不再支持 / 不正式支持）
-  - 门禁与发布流程描述（发布版本 / P0~P3 / --mode / git tag / git pull）
+  - 门禁与发布流程描述（发布版本前 / P0~P3 / --mode / git tag / git pull）
   - 工具使用场景（pytest --ff 等）
   - 模型/环境名（Gemini 旧版 / 旧版 Python）
 
@@ -67,7 +68,7 @@ SKIP_DIRS = {"archive", "plan", "tmp"}
 #   ARCHIVE   — 归档文件/目录引用，面向读者文档不应指向已归档内容
 #   CODE      — 任务编号引用（rf-N / plan-N / R-N），历史记录标识
 #   HIGH      — 高置信度历史痕迹（来源叙述/历史实现/变更节点/迭代/版本号）
-#   LOW       — 需人工判断的变更描述
+#   LOW       — 需人工判断的变更/过渡/待办描述（可能是当前能力也可能是痕迹）
 
 
 def _doc_patterns() -> list[tuple[str, str, str]]:
@@ -99,6 +100,17 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         (r"\bIter(?:ation)?\s*\d+\b", "HIGH", "Iter 迭代标记"),
         (r"迭代\s*(?:\d+|任务|计划)", "HIGH", "迭代/任务标记"),
         (r"\bv\d+\.\d+\.\d+(?:-dev)?\b", "HIGH", "版本号标记"),
+        #  历史状态叙述：需后接状态动词才命中，避免误伤"早期数据仍保留"
+        #  （当前运行时行为）等合法描述。
+        (r"(?:原先|最初|早期)(?:是|为|使用|采用|属于)", "HIGH", "原先/最初/早期（历史状态叙述）"),
+        # ── LOW：需人工判断的变更/过渡/待办描述（可能是当前能力也可能是痕迹） ──
+        (r"重构[为成到]", "LOW", "重构为/重构到（变更描述，需判断）"),
+        (r"已废弃|已弃用", "LOW", "废弃/弃用标注（当前指引或历史，需判断）"),
+        (r"曾(?:经)?被", "LOW", "曾被/曾经被（历史被动叙述）"),
+        (r"尚未[实现处理支持完成覆盖]", "LOW", "尚未完成/实现（待办性质）"),
+        (r"待[办做处补充修复]", "LOW", "待办/待处理"),
+        (r"后续\s*(?:版本|迭代|优化|需要|再处理)", "LOW", "后续版本/迭代（未来计划）"),
+        (r"过渡方案|过渡期|过渡性", "LOW", "过渡性方案说明"),
     ]
 
 
@@ -106,11 +118,12 @@ def _exclude_lines() -> list[re.Pattern]:
     """文档合法内容豁免模式（命中则跳过该行）。"""
     return [
         # ── 管理文档版本头（版本号一致性要求） ──
-        re.compile(r"(?:文档|当前|文档内容|主文档)\s*版本\s*[:：]\s*v?\d"),
-        re.compile(r"版本\s*[:：]\s*v?\d+\.\d+"),
+        # 行首锚定（可带 > 引用块或 ## 标题符）：仅豁免版本头本身，
+        # 不豁免行中叙述（如"该功能于版本：v0.8.9 中引入"应命中版本号模式）。
+        re.compile(r"^\s*[#>]*\s*(?:文档|当前|文档内容|主文档)\s*版本\s*[:：]\s*v?\d"),
         re.compile(r"文档版本号"),
         # ── 门禁 / 发布流程描述 ──
-        re.compile(r"发布版本"),
+        re.compile(r"发布版本前"),
         re.compile(r"发布前|发布后|提交前|合并前|提交后"),
         re.compile(r"版本控制"),
         re.compile(r"\bP[0-3]\b"),
@@ -120,11 +133,11 @@ def _exclude_lines() -> list[re.Pattern]:
         re.compile(r"check-version-consistency\.py"),
         re.compile(r"check-code-traces\.py"),
         re.compile(r"git tag|git pull|打 tag"),
-        # ── 当前能力 / 限制描述 ──
-        re.compile(r"暂不"),
+        # ── 当前能力 / 限制描述（组合限定，避免"暂不采用A改用B"等变更描述被豁免） ──
+        re.compile(r"暂不(?:支持|提供|纳入|实现|处理|参与|显示|包含|在|可用|属于|单独)"),
         re.compile(r"不正式支持"),
         re.compile(r"不再支持"),
-        re.compile(r"已不再"),
+        re.compile(r"已不再(?:支持|推荐|使用|提供)"),
         re.compile(r"仍不"),
         # ── 工具使用场景 ──
         re.compile(r"--ff\b|--failed-first"),
@@ -144,6 +157,8 @@ def _exclude_lines() -> list[re.Pattern]:
     ]
 
 
+# 模块级缓存（模式列表固定，避免逐行重复构建）
+_DOC_PATTERNS = _doc_patterns()
 _COMPILED_EXCLUDE = _exclude_lines()
 
 
@@ -153,23 +168,39 @@ def _is_excluded(line: str) -> bool:
 
 
 def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
-    """扫描单个文档，返回 [(行号, 分类, 模式说明, 行内容), ...]"""
+    """扫描单个文档，返回 [(行号, 分类, 模式说明, 行内容), ...]
+
+    Markdown 围栏代码块（``` 包裹）内是命令/配置示例，非文档叙述，
+    不参与历史痕迹匹配（避免 `git tag v0.9.9`、`APP_VERSION` 示例误报）。
+    """
     hits: list[tuple[int, str, str, str]] = []
     try:
         text = fpath.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return hits
 
+    in_code_block = False
     for lineno, line in enumerate(text.splitlines(), 1):
-        if not line.strip():
+        stripped = line.strip()
+        if not stripped:
             continue
-        if _is_excluded(line):
+        # 围栏代码块：``` 开闭（含可选的 ```lang 标记）
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
             if verbose:
-                print(f"    (excluded) L{lineno}: {line.strip()[:80]}")
+                print(f"    (codeblock) L{lineno}: {stripped[:60]}")
             continue
-        for pat, cat, desc in _doc_patterns():
-            if re.search(pat, line):
-                hits.append((lineno, cat, desc, line.strip()[:120]))
+        if in_code_block:
+            if verbose:
+                print(f"    (codeblock) L{lineno}: {stripped[:60]}")
+            continue
+        if _is_excluded(stripped):
+            if verbose:
+                print(f"    (excluded) L{lineno}: {stripped[:80]}")
+            continue
+        for pat, cat, desc in _DOC_PATTERNS:
+            if re.search(pat, stripped):
+                hits.append((lineno, cat, desc, stripped[:120]))
                 break  # 每行仅报告首个匹配
 
     return hits
@@ -195,11 +226,14 @@ def _iter_docs() -> list[Path]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="扫描文档中的历史变更痕迹")
     parser.add_argument(
-        "-v", "--verbose", action="store_true",
+        "-v",
+        "--verbose",
+        action="store_true",
         help="详细输出（含豁免行信息）",
     )
     parser.add_argument(
-        "--ci", action="store_true",
+        "--ci",
+        action="store_true",
         help="CI 模式：仅输出 文件名:行号，非零退出码",
     )
     args = parser.parse_args()
