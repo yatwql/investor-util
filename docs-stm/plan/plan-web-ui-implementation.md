@@ -438,3 +438,78 @@ src/python/web/
 - 产物定位：`output_dir`（`get_config()` 绝对化）+ 固定文件名 `个人投资分析报告.html`/`.xlsx`（`html_save.py:15`、`excel_writer.py:57`）。
 - 既有安全基线：`src/test/scenario/security/test_security.py`、`src/test/unit/report/test_security_edge.py`（路径遍历/XSS/密钥脱敏已有防线，上传侧为新增缺口）。
 - 数据源健康：`perf.py` 已落 `datasource_health.jsonl`。
+
+---
+
+## 15. 文件变更清单总表（供审查）
+
+> 本表汇总 plan-8 实施涉及的全部**新增/修改**文件，供评审逐项核对。类别分组：**A** 新增—Web 应用代码 · **B** 新增—测试 · **C** 新增—文档 · **D** 修改—配置与脚本 · **E** 修改—测试基建 · **F** 修改—管理/用户文档 · **G** 明确不动（复用现有，零改动）。
+
+### A. 新增 — Web 应用代码
+
+| 目录 | 文件名 | 类型 | 目的 |
+|------|--------|:--:|------|
+| `src/python/web/` | `__init__.py` | 新增 | 子包标记；re-export 公共接口（`main`、`create_app`） |
+| `src/python/web/` | `__main__.py` | 新增 | `python -m src.python.web` 入口（对齐 `cli`/`tui` 组织方式） |
+| `src/python/web/` | `server.py` | 新增 | 主入口：`sys.path` 注入、`main()`、端口占用检测、`app.run(threaded=True)` |
+| `src/python/web/` | `app.py` | 新增 | `create_app()` 应用工厂：路由注册、静态目录、统一 JSON 错误处理、`request_id` 日志注入（可测试） |
+| `src/python/web/` | `handlers.py` | 新增 | 路由 handler：页面/上传/生成/轮询/预览/下载/历史/健康（复刻 `cli.py:_handle_report` 模板） |
+| `src/python/web/` | `upload.py` | 新增 | 上传安全：扩展名校验/PK 魔数/行数上限/uuid 重命名落盘/清理（纯函数，可单测） |
+| `src/python/web/` | `progress.py` | 新增 | `WebProgressReporter(ProgressReporter)`：run 事件缓冲（seq 单调、500 条上限） |
+| `src/python/web/` | `runs.py` | 新增 | `RunManager`：单 worker 队列 + run 状态/事件注册表（Lock 保护、异常兜底） |
+| `src/python/web/templates/` | `index.html` | 新增 | 单页应用骨架（上传/生成/进度/状态三段式，中文，`textContent` 渲染） |
+| `src/python/web/static/` | `main.js` | 新增 | 前端逻辑：上传/表单/轮询/进度渲染/状态恢复（原生 ES6，无构建链） |
+| `src/python/web/static/` | `style.css` | 新增 | 样式（design-quality 原则，响应式/可访问性） |
+
+### B. 新增 — 测试
+
+| 目录 | 文件名 | 类型 | 目的 |
+|------|--------|:--:|------|
+| `src/test/unit/web/` | `test_upload.py` | 新增 | 上传安全单测（unit_web）：非 xlsx/超限/净化/PK 魔数/清理 |
+| `src/test/unit/web/` | `test_progress.py` | 新增 | 事件缓冲单测：run 隔离/seq 单调/level 正确 |
+| `src/test/unit/web/` | `test_runs.py` | 新增 | RunManager 状态机：submit→running→done、并发隔离、单例重置 |
+| `src/test/unit/web/` | `test_handlers.py` | 新增 | Flask test_client 全链路（mock 管线）：上传→生成→轮询→产物 URL；错误信封 |
+| `src/test/unit/web/` | `test_upload_edge.py` | 新增 | 安全边缘用例（unit_web + edge）：zip-bomb/伪装扩展名/路径穿越/空持仓 |
+
+### C. 新增 — 文档
+
+| 目录 | 文件名 | 类型 | 目的 |
+|------|--------|:--:|------|
+| `docs-stm/plan/` | `plan-web-ui-implementation.md` | 新增 | 本文档：plan-8 详细评估与实施拆分 + 45 轮复盘（实施后归档 `archive/v0.x.x/web-ui/`） |
+
+### D. 修改 — 配置与脚本
+
+| 目录 | 文件名 | 类型 | 目的 |
+|------|--------|:--:|------|
+| `(仓库根)` | `pyproject.toml` | 修改 | dependencies 增 `flask==3.1.x` |
+| `(仓库根)` | `requirements.txt` | 修改 | 同步 `flask` 及传递依赖 `werkzeug/itsdangerous/click/blinker` 全链 `==` 锁定（`launch.sh` 增量安装感知） |
+| `scripts/` | `launch.sh` | 修改 | 支持 `web` 入口参数（默认仍 TUI）：`launch.sh web [--host] [--port]` |
+| `scripts/` | `launch.ps1` | 修改 | Windows 侧支持 `web` 入口参数（对齐 `launch.sh`） |
+| `scripts/` | `test_runner.py` | 修改 | MODES 的 unit 集合加 `unit_web`（dev-verify/verify/regression 三模式单点继承） |
+
+### E. 修改 — 测试基建
+
+| 目录 | 文件名 | 类型 | 目的 |
+|------|--------|:--:|------|
+| `src/test/` | `conftest.py` | 修改 | 注册 `unit_web` marker + `_auto_reset_run_manager` 单例重置 fixture + uploads 目录隔离 |
+| `src/test/unit/` | `conftest.py` | 修改 | `_DIR_TO_MARKER` 登记 `unit_web`（新增目录强制子标记） |
+
+### F. 修改 — 管理/用户文档
+
+| 目录 | 文件名 | 类型 | 目的 |
+|------|--------|:--:|------|
+| `docs-stm/managements/` | `folders.md` | 修改 | 目录树登记 `src/python/web/`、`src/test/unit/web/`、本文档；项目统计表更新（发布前刷新数据快照） |
+| `docs-stm/managements/` | `plan.md` | 修改 | plan-8 条目补本文档链接（不展开细节）；编号/阶段不变 |
+| `docs-stm/managements/` | `test-coverage.md` | 修改 | 新增 web 测试计数数据快照（发布前 `collect-test-coverage.py` 刷新） |
+| `docs-stm/manuals/` | `how-to-start.md` | 修改 | 新增 Web 入口启动说明（阶段 3）+ faq 补端口冲突/无法访问/进度卡住常见问题 |
+
+### G. 明确不动（复用，零改动）
+
+| 目录 | 文件名 | 类型 | 目的 |
+|------|--------|:--:|------|
+| `src/python/report/` | `orchestrator.py` | 不动 | `generate_report` 编排层，Web 直接复用 |
+| `src/python/report/` | `progress.py` | 不动 | `ProgressReporter` 接口，Web 注入子类 |
+| `src/python/core/` | `reader.py` | 不动 | `read_holdings` 持仓解析，上传预检复用 |
+| `src/python/config/` | `*` | 不动 | `get_config`/`init_config`，Web 只读默认参数 |
+
+> **待评审关注点**：① 是否所有新增文件都有独立职责（高内聚、可单测）；② `report/` 共享层零改动是否成立（§11「明确不动」）；③ 依赖 `==` 全链锁定与既有 `launch.sh` 增量安装机制是否自洽；④ 文档修改项是否覆盖发布门禁（folders 统计 / 版本头 / 数据快照）；⑤ 是否需要为 web 增加 `docs-stm/manuals/` 分册（当前并入 how-to-start + faq，不新增分册）。
