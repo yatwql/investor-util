@@ -2095,6 +2095,7 @@ config/
 ├── _comments.py                  # JSON 注释剥离（_strip_json_comments）
 ├── _config_defaults.py           # config.json 默认值定义 + 模板生成
 ├── _core.py                      # 核心读写：get_config()、set_config()、init_config()
+├── _json_patch.py                # JSON 字段级文本替换（_update_json_raw_text/_replace_dict_block）
 ├── _validation.py                # 配置校验：validate_config()、_absolutize_paths()
 ├── _llm_defaults.py              # llm_settings.json 默认模板生成
 └── _llm_providers_defaults.py    # llm_providers.json 默认模板生成

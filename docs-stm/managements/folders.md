@@ -8,7 +8,7 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 204 | 48,040 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`；rf-76 将 `fact_checker.py` 拆为 `fact_checker/` 子包 10 文件） |
+| 主程序代码 | Python | 205 | 48,051 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`；rf-76 将 `fact_checker.py` 拆为 `fact_checker/` 子包 10 文件，rf-77 提取 `config/_json_patch.py`） |
 | HTML 报告模板 | HTML | 3 | 2,910 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
 | 辅助脚本 | Python | 12 | 4,113 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
 | **源代码合计** | — | **219** | **55,063** | 主程序 + 模板 + 脚本 |
@@ -48,6 +48,7 @@ investor-util/
 │   │   │   ├── _comments.py          #   配置文件注释读写
 │   │   │   ├── _config_defaults.py   #   config.json 默认值定义
 │   │   │   ├── _core.py              #   配置加载/保存/校验核心逻辑
+│   │   │   ├── _json_patch.py        #   JSON 字段级文本替换（dict 区块 brace 平衡，rf-77 自 handlers_config 提取）
 │   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
 │   │   │   ├── _llm_providers.py     #   LLM 提供程序配置解析
 │   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义

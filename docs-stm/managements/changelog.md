@@ -17,6 +17,7 @@
 ### Refactor
 
 - **rf-76：`llm/fact_checker.py`（899 行超 800 硬上限）拆分为 `fact_checker/` 子包** — 按职责拆为 9 个私有模块：`_constants.py`（关键词词表/指数代码集/默认容差）、`_patterns.py`（正则模式）、`_utils.py`（HTML 剥离/句子拆分/持仓映射/组合数值）、`_context.py`（回撤/变化率/贡献度/仓位/假设/建议语境检测）、`_numerical.py`（数值一致性检查器 + `_evaluate_percent_value`）、`_symbols.py`（品种存在性）、`_ranking.py`（排名正确性）、`_corrections.py`（数值自动修正）、`_runner.py`（`run_fact_check` 统一入口）。`__init__.py` 重导出 4 个公开函数，`from src.python.llm.fact_checker import ...` 对外导入路径不变（`generators_orchestrator.py` 与两个测试文件零改动）。顺带删除死代码 `_RANK_TOP_N_PATTERN`（全库无引用）与未使用导入 `Any`。最大模块 `_numerical.py` 251 行。回归：`test_fact_checker.py` + `test_llm_hallucination.py` 82 例、orchestrator 相关 98 例全部通过（纯拆分零行为变更）
+- **rf-77：`tui/handlers_config.py`（573 行）提取 JSON 文本编辑函数到 `config/_json_patch.py`** — 573→490 行。纯 JSON 编辑算法（`_update_json_raw_text` 字段级替换保留注释/空白 + `_replace_dict_block` dict 值区块 brace 平衡自适应缩进，93 行）从 TUI 配置命令处理器中提取至 `config/_json_patch.py`（无 TUI/IO 依赖）；`handlers_config.py` 保留 TUI 交互函数（`_read_llm_settings`/`_write_llm_settings`）与全部 `_cmd_*` 命令处理器。`config/__init__.py` 补 `_json_patch` 子模块引用，导入路径 `from src.python.config._json_patch import ...`。回归：`test_handlers_config.py` 9 例 + config/handlers/ui 338 passed（纯提取零行为变更）
 
 ---
 
