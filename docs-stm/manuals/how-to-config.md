@@ -108,7 +108,7 @@
 
 ## 字段说明
 
-以下字段可通过 TUI 主菜单的对应命令修改（运行 `python -m src.python.tui.tui` 进入主菜单）。标有"手动编辑"的字段需直接修改 JSON 文件。
+以下字段可通过 TUI 主菜单的对应命令修改（运行 `python -m src.python.tui` 进入主菜单）。标有"手动编辑"的字段需直接修改 JSON 文件。
 
 | 字段 | 默认值 | 说明 | TUI 修改 |
 |------|--------|------|----------|
@@ -654,7 +654,7 @@
 | `metrics_*`（7 项） | true | 量化指标（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
 | `anonymizer` | false | 匿名化功能总开关（关闭后强制 off）；具体模式通过 config.json 的 anonymization.mode 设置 |
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
-| `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）；关闭回退旧 Canvas + 表格静态渲染 |
+| `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）；关闭时回退到 Canvas + 表格静态渲染 |
 
 > **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（1-5，由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性辩论模式（6-8，由上方 `llm_debate_*` 开关控制，三项相互独立、可组合开启）。**正反辩论（`llm_debate_procon`）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**为分析注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议。
 
@@ -669,9 +669,9 @@
 | 分组 | 包含模块 | 使用场景 |
 |------|---------|----------|
 | `preload` | 股票价格、市场指数、LLM 全球政经局势、LLM 智囊团深度复盘、LLM 持仓体检报告、LLM 穿透深度分析 | **切换持仓文件后必须重取的数据。** 价格/指数随持仓变动，LLM 基础分析依赖持仓内容，切换到新持仓文件时必须清除旧缓存 |
-| `refresh` | 基金业绩排名、基金持仓、行业分类、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准、基金经理数据、持仓重合度、基金风格扩展数据 | **可随时独立刷新的补充数据。** 不依赖持仓文件切换，任何时候都可以主动刷新 — 如盘中更新行业资金流向、拉取最新基金排名 |
+| `refresh` | 基金业绩排名、基金持仓、行业分类、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准、基金经理数据、持仓重合度、基金风格扩展数据、无风险利率 | **可随时独立刷新的补充数据。** 不依赖持仓文件切换，任何时候都可以主动刷新 — 如盘中更新行业资金流向、拉取最新基金排名 |
 
-**无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历、`fund_concentration` 集中度历史快照、`fund_style_snapshot` 风格快照、`history_stock` 历史 K 线、`history_fund_otc` 历史净值）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.{key}` 自行调整。
+**无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历、`fund_concentration` 集中度历史快照、`fund_style_snapshot` 风格快照、`history_stock` 历史 K 线、`history_fund_otc` 历史净值、`history_index` 指数历史日线）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.{key}` 自行调整。
 
 ### 与菜单命令的对应关系
 
@@ -697,4 +697,4 @@
 
 **为什么独立存放：** config.json 受 git 跟踪、用于跨机器同步。若把"本机是否已看过引导"这类个性化标志写入 config.json，每台机器会写入各自不同的值，导致 config.json 难以同步。故机器个性化状态统一放 `data/state/` 目录（与熔断器状态、再平衡静默期等同目录），不参与同步。
 
-**升级兼容：** 旧版本（此前）把这两个键写入过 config.json 的机器，程序升级后会在首次读取时自动迁移到 `local_state.json` 并从 config.json 删除，无需手动清理。
+**兼容迁移：** 如 config.json 中存在这两个键，程序首次读取时会自动迁移到 `local_state.json` 并从 config.json 删除，无需手动清理。

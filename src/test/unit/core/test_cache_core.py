@@ -319,8 +319,7 @@ class TestCacheSet(CacheTestBase):
         """原子写入 → 最终文件内容正确，临时文件被清理。
 
         临时文件由 `_store.set` 用 `tempfile.mkstemp(dir=<缓存目录>, suffix=".tmp")`
-        创建，故在缓存目录内扫描 `.tmp` 残留（此前误扫全局系统临时目录，
-        并行测试下偶发误报，且无法真正验证原子写清理）。
+        创建，故在缓存目录内扫描 `.tmp` 残留，即可验证原子写入的临时文件被清理。
         """
         mock_time.return_value = 3000.0
         from src.python.cache import set

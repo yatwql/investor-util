@@ -172,7 +172,6 @@ skeleton.py:generate_llm_content()
 | `circuit_breaker.py` | 工具 | LLM 端点熔断器（连续 3 次失败 + 固定 60s 冷却） | `get_circuit_status()` |
 | `markdown.py` | 工具 | Markdown→HTML 转换 | `markdown_to_html()` |
 | `_api_claude.py` / `_api_gemini.py` / `_api_openai.py` | 私有 | 各 Provider 单次调用实现（自包含依赖，委托 api_base 重试 + Extended Thinking 注入），api.py 分派目标 | `call_claude()` / `call_gemini()` / `call_openai()` |
-| `_call_claude.py` / `_call_gemini.py` / `_call_openai.py` | 私有 | 各 Provider 单次调用实现（与 `_api_*.py` 功能等价的并列入口） | `call_claude()` 等 |
 | `_batch_mode.py` | 私有 | 批量模式分块执行（`_BATCH_CHUNK_SIZE=10` 每批、并行度 6） | `run_batch_mode()` |
 
 ### 2.2 四大+一模块详情
@@ -481,14 +480,14 @@ call_llm(system_prompt, user_prompt, llm_config, ...)
     │            └─ 无 ref → 内联字段回退
     │
     │          _call_provider_entry(entry, ...)
-    │            ├─ "claude"  → _call_claude()
+    │            ├─ "claude"  → call_claude()（_api_claude.py）
     │            │   Anthropic Messages API
     │            │   + Extended Thinking 注入
     │            │   + Prompt Caching (cache_control)
-    │            ├─ "openai"  → _call_openai()
+    │            ├─ "openai"  → call_openai()（_api_openai.py）
     │            │   OpenAI Chat Completions API
     │            │   (也兼容 DeepSeek 等 OpenAI 兼容端点)
-    │            └─ "gemini"  → _call_gemini()
+    │            └─ "gemini"  → call_gemini()（_api_gemini.py）
     │                Google Gemini API (generateContent)
     │                + ThinkingConfig 注入 (generationConfig.thinkingConfig.thinkingBudget)
     │

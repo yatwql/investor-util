@@ -57,7 +57,7 @@ def get_config_cache() -> dict | None:
 
 
 # ── LLM 菜单隐藏模块 ──────────────────────────────────────
-# 旧设计遗留的辩论三模块（debate_pro/con/synthesis）在注册表中保留
+# 辩论三模块（debate_pro/con/synthesis）在注册表中保留
 # （缓存 TTL/前缀清理仍依赖），但不在菜单/状态面板展示，避免误导为可开关模块。
 # 实际辩论开关由 features.json 的实验性 Flag（正反辩论/条件推理/集中度问答）控制。
 LLM_MENU_HIDDEN_KEYS: frozenset[str] = frozenset({"debate_pro", "debate_con", "debate_synthesis"})

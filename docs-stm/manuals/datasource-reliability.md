@@ -278,4 +278,4 @@ python -m src.python.cli check-sources
 
 - 全量菜单 L 前先执行菜单 E/B，热点缓存命中后 LLM 生成阶段速度更快
 - 定期执行菜单 `[3]` 清理过期缓存（不影响 TTL 内数据）
-- akshare 接口频繁变更时，锁版 `pip install akshare==1.16.0` 并在 `requirements.txt` 中固定版本
+- akshare 接口频繁变更时，以 `pyproject.toml` 锁定的版本为准（当前 `akshare==1.18.64`），必要时在 requirements 中固定版本

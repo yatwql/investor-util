@@ -85,6 +85,7 @@ python -m src.python.cli --verbose report --type basic
 | `--config PATH` | 配置文件路径，默认 `data/config/config.json` |
 | `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir` |
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
+| `--non-interactive` | 跳过首次运行交互式引导（定时任务/脚本使用） |
 | `--version` | 显示版本号并退出 |
 
 **`report` 子命令**：
@@ -201,7 +202,7 @@ python -m src.python.cli check-sources
 
 | 内容 | E | B | L |
 |:-----|:-:|:-:|:-:|
-| 核心报告（投资分析汇总/市值/分类/穿透/基金业绩/数据源可用性矩阵） | ✅ | ✅ | ✅ |
+| 核心报告（投资分析汇总/市值/分类/穿透/基金业绩/组合演进/数据源可用性矩阵） | ✅ | ✅ | ✅ |
 | 财经新闻与关联分析 | — | ✅ | ✅ |
 | 基金深度分析 | — | ☆ | ☆ |
 | 组合历史走势 + 回撤分析 | — | ☆ | ☆ |

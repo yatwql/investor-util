@@ -332,7 +332,7 @@ pytest src/test/ -m "<对应标记>" --lf
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
-| `scenario` | 全部业务场景 S0a-S0d + S1-S34 + T1-T21 |
+| `scenario` | 全部业务场景 S0a/S0b/S0d + S1-S34 + T1-T21（S0c 属 `scenario_extreme`，不计入） |
 | `scenario_basic` | 基础链路 S0a/S0b/S0d + S1-S5 + S21-S33 |
 | ├ `scenario_stock` | S1: 纯股票组合 |
 | ├ `scenario_fund` | S2: 纯基金组合 |

@@ -794,7 +794,7 @@ python -m src.python.tui
 | `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比 |
 | `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 轻量 |
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
-| `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 旧版轻量 |
+| `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
 
 > **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash：输入 3000 tokens × ¥1 + 输出 2000 tokens × ¥2 = ¥0.007/次。缓存命中时输入部分按 `input_cache_hit` 计费。
 >

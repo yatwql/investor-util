@@ -1030,7 +1030,7 @@ def _get_pool() -> ThreadPoolExecutor:
           (菜单 L/B)                    │                      │
             │                           ▼                      ▼
             ▼                  excel_generator.py       html_writer.py
-      ┌──────────┐                 (编排器 477 行)         │
+      ┌──────────┐                 (编排器)                │
       │ 快照对比 │                     │                   ▼
       │          │                     ▼           html_builders.py
       │          │           excel_sheet_factory.py   (数据构建器)
@@ -1428,7 +1428,7 @@ annualized_vol = std(daily_returns, ddof=1) × √252
 {
   "history": {
     "benchmark_indices": { "sh000300": "沪深300", "gb_inx": "标普500" },
-    "analysis": "auto"
+    "fetch_mode": "auto"
   }
 }
 ```
@@ -1987,7 +1987,7 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 |:-----|:---------|
 | **C14** (渲染期数据不可写入模块级全局变量) | 暗色模式为前端静态资源 + Jinja 过滤器变更：过滤器为纯函数（`profit_color`/`price_type_color` 返回 CSS 变量表达式），不写 `_ENV.globals`，渲染数据仍经模板 context 传递 |
 | **C20** (HTML 图表图下说明强制) | 主题不改变图表 DOM 结构与图下说明（`.chart-caption`）渲染分支 |
-| **§1.4.5** (数据降级治理) | `window.Chart` 缺失时 `theme.js` 守卫跳过图表重绘（仅切换页面 CSS 变量），不崩溃；离线降级（drawSimpleChart 旧路径）不受影响 |
+| **§1.4.5** (数据降级治理) | `window.Chart` 缺失时 `theme.js` 守卫跳过图表重绘（仅切换页面 CSS 变量），不崩溃；离线降级（drawSimpleChart 回退渲染）不受影响 |
 
 [↑ 回到顶部](#目录)
 
@@ -2040,11 +2040,11 @@ generators_orchestrator（并行调度 4+1 模块）
             │ ③ API 调用（走 Provider Chain）
             ├── api.call_llm()
             │      ├── strategy.resolve_provider_chain() → 策略排序
-            │      ├── api.call_provider_entry() × N（逐链尝试）
+            │      ├── api._call_provider_entry() × N（逐链尝试）
             │      │      └── _resolve_entry_credentials()（credentials_ref 解析）
             │      └── api_base._attempt_api_call()
-            │              ├── Claude → anthropic SDK
-            │              └── OpenAI/DeepSeek → openai SDK
+            │              ├── Claude/DeepSeek(Claude 端点) → HTTP POST {endpoint}/v1/messages
+            │              └── OpenAI/DeepSeek(OpenAI 端点) → HTTP POST {endpoint}/v1/chat/completions
             │ ④ 空内容处理（thinking 耗尽→关闭 thinking 同 provider 重试一次；仍失败→切换 provider）
             │ ⑤ Markdown→HTML（markdown.py）
             │ ⑥ 写入缓存（Provider 感知键名，记录实际 Provider 名）

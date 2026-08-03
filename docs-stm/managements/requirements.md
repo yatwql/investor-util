@@ -90,9 +90,9 @@
 | O | 配置报告输出目录 | 设置报告输出目录（默认 `reports/`） |
 | I | 管理对比指数池（自定义基准指数） | 交互添加/删除对比基准指数 |
 | A | 配置持仓匿名化（代码/名称脱敏） | 交互式切换匿名化模式（关闭/代码显示/完全匿名/汇总） |
-| P | 配置报告可选章节 | 交互切换基金分析/市场新闻/历史走势 3 个章节的启用/停用 |
+| P | 配置报告可选章节 | 交互切换基金深度分析/市场新闻/历史走势/组合演进 4 个章节的启用/停用 |
 | S | 配置 LLM 分析章节 | 交互切换各 LLM 报告的启用/停用，含实验性辩论模式（⚗ 标识） |
-| R | 刷新配置 | 重新加载 config.json / llm_settings.json / llm_key.json |
+| R | 刷新配置 | 重新加载 config.json / llm_settings.json / llm_key.json / llm_providers.json |
 | **缓存管理** | | |
 | 1 | 更新基础类缓存 | 主动更新基金业绩/持仓/基准/行业分类/新闻/盈利预测/资金流向/分红/基金经理/持仓重合度/风格扩展。纯股票持仓无基金时自动跳过基金项 |
 | 2 | 更新持仓类缓存 | 主动更新价格/指数行情，清除关联 LLM 缓存 |
@@ -687,7 +687,7 @@ LLM 五维度量化评分，每项满分 100：
 |:---------|:---------|
 | R-LLM-01 | LLM 分析是可选增强内容，仅在菜单 L 中触发 |
 | R-LLM-02 | 每个 LLM 模块可通过配置独立启停（enabled_llm.x） |
-| R-LLM-03 | 支持 Claude / OpenAI / Gemini 三种 Provider（DeepSeek 经 Claude 兼容端点接入），可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
+| R-LLM-03 | 支持 Claude / OpenAI / Gemini 三种 Provider（DeepSeek 支持 Claude 兼容端点与 OpenAI 兼容端点两种接入），可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
 | R-LLM-04 | Provider 不可用时自动按策略递补下一备选 Provider，全链失败时降级占位文本 |
 | R-LLM-05 | 所有 LLM 模块的 API 调用量（Token、费用、模块明细）需在报告中统计展示 |
 | R-LLM-06 | Multi-Provider Chain 支持 4 种切换策略：priority（优先级排序）、weighted（加权随机）、cost_first（价格最低优先）、fallback_only（仅主 provider 失败时切换，等价于 priority）。`proxy_preferred` 为 per-provider 后处理标记，不属策略 |
@@ -972,7 +972,7 @@ LLM 五维度量化评分，每项满分 100：
 | `llm_providers_file` | str | `data/config/llm_providers.json` | — | LLM Provider 多链配置文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | — | LLM 参数文件路径 |
 
-> **config.json 跨机器同步**：config.json 受 git 跟踪，是可跨机器同步的配置文件，仅存放可共享的业务配置。机器个性化运行时标志（首次运行引导 `_startup_wizard_shown`、隐私提示已读 `_privacy_notice_shown`）**不存放于 config.json**，而是存于 `data/state/local_state.json`（git 忽略、仅本机可见），避免各机器写入差异导致 config.json 难以同步。旧版本遗留于 config.json 的这两个键会在首次读取时惰性迁移（`config/_local_state.py` `_migrate_legacy_keys`），迁移后自动删除，无需手动清理。
+> **config.json 跨机器同步**：config.json 受 git 跟踪，是可跨机器同步的配置文件，仅存放可共享的业务配置。机器个性化运行时标志（首次运行引导 `_startup_wizard_shown`、隐私提示已读 `_privacy_notice_shown`）**不存放于 config.json**，而是存于 `data/state/local_state.json`（git 忽略、仅本机可见），避免各机器写入差异导致 config.json 难以同步。config.json 中若存在这两个键，会在首次读取时惰性迁移（`config/_local_state.py` `_migrate_legacy_keys`），迁移后自动删除，无需手动清理。
 
 ### 11.2 llm_key.json（敏感凭据文件，建议纳入 .gitignore）
 
@@ -986,7 +986,7 @@ LLM 五维度量化评分，每项满分 100：
 | `{ref_name}.endpoint` | str | ✅ | API 端点 URL |
 | `{ref_name}.provider` | str | — | Provider 类型（`claude` / `openai` / `gemini`），仅在覆盖 `llm_providers.json` 时使用 |
 
-**简化格式**（无需 `credentials_ref` 的传统使用）：若文件顶层仅含 `{"api_key": "...", "model": "..."}` 等单键凭据字段，自动包裹为 `{"_default": {...}}` 兼容处理。
+**简化格式**（兼容单键凭据格式，无需 `credentials_ref`）：若文件顶层仅含 `{"api_key": "...", "model": "..."}` 等单键凭据字段，自动包裹为 `{"_default": {...}}` 处理。
 
 ### 11.3 llm_settings.json（非敏感参数）
 

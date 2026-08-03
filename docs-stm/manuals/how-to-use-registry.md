@@ -172,7 +172,7 @@ from src.python.core.registry import (
 | `penetration_deep` | 穿透深度分析 | LLM |
 | `portfolio_history` | 组合历史走势 | 历史走势 |
 | `drawdown_analysis` | 历史回撤分析 | 历史走势 |
-| `portfolio_evolution` | 组合演进 | 始终显示 |
+| `portfolio_evolution` | 组合演进 | 独立开关（`enable_portfolio_evolution`，数据不可用时占位） |
 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
 | `llm_usage` | LLM API 用量 | LLM（强制末位） |
 

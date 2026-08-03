@@ -8,12 +8,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 208 | 48,278 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| 主程序代码 | Python | 209 | 49,353 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 3 | 3,298 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
-| 辅助脚本 | Python | 13 | 4,404 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查） |
-| **源代码合计** | — | **224** | **55,980** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **244** | **68,720** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,317 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| 辅助脚本 | Python | 13 | 4,411 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查） |
+| **源代码合计** | — | **225** | **57,062** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **245** | **69,061** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,345 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
@@ -467,7 +467,7 @@ investor-util/
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试
 │       │   │   ├── test_html_report_structure_edge.py # HTML 结构边缘场景
 │       │   │   ├── test_html_template.py          #   HTML 模板测试
-│       │   │   ├── test_theme_js.py               #   暗色模式 theme.js 静态断言（plan-11）
+│       │   │   ├── test_theme_js.py               #   暗色模式 theme.js 静态断言
 │       │   │   ├── test_html_writer.py            #   HTML 写入器测试
 │       │   │   ├── test_html_writer_edge.py       #   HTML 写入器边缘场景
 │       │   │   ├── test_market_value.py           #   市值计算测试

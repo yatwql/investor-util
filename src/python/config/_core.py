@@ -132,7 +132,7 @@ def get_config(_strict: bool = False) -> dict:
                     merged[key] = {**merged[key], **val}
                 else:
                     merged[key] = val
-            # 兼容旧配置键：history.analysis → history.fetch_mode（0.9.9 起更名）
+            # 兼容旧配置键：history.analysis 自动迁移为 history.fetch_mode
             # 依据原始用户配置判断（合并后 history 始终含默认 fetch_mode，无法区分来源）
             _raw_history = config.get("history")
             if isinstance(_raw_history, dict) and "analysis" in _raw_history:

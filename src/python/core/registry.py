@@ -529,7 +529,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "data_flag": "concentration_data",
     },
     {"key": "fund_style", "name": "基金风格分析", "number": 9, "type": "fund_deep_analysis", "data_flag": "style_data"},
-    # ── 基金深度分析 类型（有数据才显示；跟随 B2~B5 之后） ──
+    # ── 基金深度分析 类型（有数据才显示） ──
     {
         "key": "factor_exposure",
         "name": "因子暴露分析",

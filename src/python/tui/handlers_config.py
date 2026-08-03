@@ -157,7 +157,7 @@ def _cmd_config_llm_modules() -> None:
 
     标准 LLM 模块（1-5）通过 enabled_llm 控制，存储在 llm_settings.json。
     辩论模式增强（6-8）通过 Feature Flag 控制，存储在 features.json。
-    辩论白脸/黑脸/综合（debate_pro/con/synthesis）为旧设计遗留：注册表保留
+    辩论白脸/黑脸/综合（debate_pro/con/synthesis）保留在注册表
     （缓存 TTL/前缀清理仍依赖），菜单层隐藏，不在此面板展示。
     """
     from src.python.config.features import is_feature_enabled, save_feature_overrides, set_feature_enabled
@@ -169,7 +169,7 @@ def _cmd_config_llm_modules() -> None:
     settings, settings_path = result
 
     enabled_map = settings.get("enabled_llm", {})
-    # 菜单层隐藏旧设计遗留的辩论三模块（注册表保留：缓存 TTL/前缀清理仍依赖）
+    # 菜单层隐藏辩论三模块（注册表保留：缓存 TTL/前缀清理仍依赖）
     # 实际辩论开关由下方实验性 Feature Flag（正反辩论等）控制
     module_names = filter_menu_llm_modules(get_llm_module_names())
 
