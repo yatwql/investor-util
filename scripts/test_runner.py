@@ -73,7 +73,7 @@ MODES: dict[str, dict] = {
         "order": 5,
         "phases": [
             {
-                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data)",
+                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)",
                 "desc": "核心模块单元测试",
                 "timeout_sec": 120,
                 "parallel": True,
@@ -82,7 +82,7 @@ MODES: dict[str, dict] = {
         ],
     },
     "verify": {
-        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis",
+        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts",
         "desc": "合入验证（核心/配置/新闻/LLM 模块单元测试，不含场景——场景由 P0+P2 覆盖）",
         "timeout_sec": 300,
         "order": 6,

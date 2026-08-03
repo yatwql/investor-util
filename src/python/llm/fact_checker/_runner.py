@@ -133,8 +133,15 @@ def run_fact_check(
     correction_lines = ""
     if auto_correct and all_corrections:
         corrected_html = apply_numerical_corrections(html_content, all_corrections)
-        # 修正明细：日志记录 + HTML 摘要灰色行（供用户直接查看具体修正了什么）
-        _corr_detail = "; ".join(f"{w}%→{c}%（{_sentence_snippet(s)}）" for w, c, s in all_corrections)
+        # 修正明细：日志记录 + HTML 摘要灰色行（供用户直接查看具体修正了什么）。
+        # 4 元组 correction 带语义 reason（如"601939实际收益率187.1%"），
+        # 展示"修正的是哪个数字、其语义"，而非仅截断句段。
+        _parts = []
+        for cx in all_corrections:
+            w, c, s = cx[0], cx[1], cx[2]
+            reason = cx[3] if len(cx) >= 4 and cx[3] else _sentence_snippet(s)
+            _parts.append(f"{w}%→{c}%（{reason}）")
+        _corr_detail = "; ".join(_parts)
         logger.info(
             "[%s] 事实校验自动修正 %d 处数值: %s",
             module_label or "LLM",

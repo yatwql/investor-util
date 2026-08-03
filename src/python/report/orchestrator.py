@@ -112,7 +112,10 @@ def prepare_report_data(
             "market_value": d.market_value,
             "cost": d.cost,
             "profit": d.profit,
-            "profit_rate": d.profit_rate,
+            # profit_rate 契约为百分比（小数 ×100，如 1.8712 → 187.12），
+            # 供 prompt 格式化（f"{rate:+.2f}%"）与 fact_checker 校验使用；
+            # market_value 的 DetailRow.profit_rate 是小数字段，此处统一为百分。
+            "profit_rate": (d.profit_rate * 100) if d.profit_rate is not None else None,
             "change_pct": (
                 (d.price - d.yesterday_close) / d.yesterday_close * 100
                 if d.yesterday_close and abs(d.yesterday_close) > 1e-10

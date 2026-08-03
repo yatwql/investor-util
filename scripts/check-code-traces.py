@@ -39,8 +39,22 @@ SCAN_DIRS = [
     REPO_ROOT / "src" / "static",
     REPO_ROOT / "scripts",
 ]
-# 跳过文件名（压缩产物、本工具自身——后者的注释为检测类别文档，含 TODO/XXX 等字面量）
-SKIP_FILES = {"chart.min.js", "check-code-traces.py", "check-doc-traces.py"}
+# 跳过文件名（编译产物）。本工具自身（check-*.traces.py）由 _is_tool_self()
+# 模式豁免——见下方说明，不在此硬编码文件名。
+SKIP_FILES = {"chart.min.js"}
+
+
+def _is_tool_self(name: str) -> bool:
+    """检查工具自身识别：check-*.traces.py。
+
+    本工具（check-code-traces.py / check-doc-traces.py）的模式定义区
+    （PATTERNS / EXCLUDE_LINE）与 docstring 必然包含被检测类别的特征字面量
+    （版本号正则、任务编号正则、迁移/重命名描述词等）。这些是"检查规则
+    的元描述"，不是被查对象的历史痕迹；用本工具规则自查本工具自身，
+    与"用尺子量尺子"无异。故整文件豁免，且按模式识别而非硬编码文件名，
+    使未来新增同类工具（check-xml-traces.py 等）自动豁免。
+    """
+    return name.startswith("check-") and name.endswith("traces.py")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -88,6 +102,23 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"已由\s*[`\w./_-]+\.py\s*(?:完整)?覆盖", "HIGH", "已由XX.py覆盖（测试覆盖来源叙述）"),
     (r"\b(?:Iter|Iteration)\s*\d+\b", "HIGH", "Iter/Iteration N 迭代标记（历史迭代信息）"),
     (r"已迁移", "HIGH", "已迁移（迁移痕迹）"),
+    #   时序历史叙述——"之前/此前/以前/曾经/原始/历史版本/此前/旧逻辑"等高频
+    #   历史实现叙述词（注：这是"自我进化"补强，堵住常见漏检）。
+    #   "之前/此前/以前/曾经/历史/先前" 泛指历史时刻；仅时间词不足以判定
+    #   是否为历史痕迹（"之前缓存过"是运行时描述），故需后接动作/状态动词。
+    (r"(?:之前|此前|以前|先前)\s*(?:是|为|直接|就|采用|使用|用|读取|实现|判断|属于|放在|在)", "HIGH", "此前/之前是（历史状态叙述）"),
+    (r"(?:之前|此前|以前|先前)(?:的)?(?:逻辑|实现|方案|做法|判定|版本|代码|判断)", "HIGH", "此前的逻辑/实现（历史实现叙述）"),
+    (r"曾经的?[^\s。，;]{0,6}(?:实现|逻辑|方案|做法|版本|代码)", "HIGH", "曾经的实现/逻辑（历史实现叙述）"),
+    (r"曾考虑[过]?", "HIGH", "曾考虑（历史决策/备选方案叙述）"),
+    (r"原始(?:版本|实现|方案|逻辑)", "HIGH", "原始版本/实现（历史状态叙述）"),
+    (r"历史(?:版本|实现|逻辑|方案|做法)", "HIGH", "历史版本/实现（历史实现叙述）"),
+    (r"(?:之前|此前|以前|旧|原|历史)(?:的)?版本\s*(?:为|号|是|中)", "HIGH", "旧/历史版本号（版本对比痕迹）"),
+    (r"由\s*旧(?:文件|版本|逻辑|方案|实现)", "HIGH", "由旧XX（历史来源/改造叙述）"),
+    (r"改(?:为|成|过来|了)|由旧[^\s。，;]{0,8}(?:改|改来|改造)", "HIGH", "由旧XX改造/改来（历史变更叙述）"),
+    (r"(?:迁移|移到|移至|搬到|转入)\s*(?:到|至)?\s*新(?:模块|文件|目录|位置|路径|函数|类)", "HIGH", "迁移/移到新位置（迁移痕迹）"),
+    (r"重构\s*前", "HIGH", "重构前（重构历史叙述）"),
+    (r"旧(?:逻辑|实现|方案|代码|写法|做法|设计|版本)", "HIGH", "旧逻辑/旧实现（历史实现叙述）"),
+    (r"替代(?:了|掉|原有|旧的)?旧|替换旧", "HIGH", "替代旧/替换旧（历史变更叙述）"),
     (r"历史上|历次迭代", "HIGH", "历史迭代信息（历史上/历次迭代）"),
     (r"曾(?:经)?(?:用[于]?|作为|属于|采用|以)", "HIGH", "曾用/曾用于/曾作为（历史实现叙述）"),
     (r"(?:后来|之后|随后)\s*(?:改[为成]|换[为成]|引入|移除)", "HIGH", "后来改为/之后引入（变更痕迹）"),
@@ -203,6 +234,15 @@ EXCLUDE_LINE: list[str] = [
     r"尚未缓存到 registry session_cache",
     r"尚未重新熔断",
     r"尚未达到新鲜缓存",
+    # ── 补强模式的误报排除（运行时语义，非历史痕迹） ──
+    r"历史数据",        # 运行时历史序列（如行情历史、持仓历史）
+    r"历史(?:序列|区间|值|曲线|走势|数据点|K线)",
+    r"当前版本",        # 当前版本是运行时状态描述
+    r"之前缓存",        # 之前缓存过是运行时缓存行为
+    r"历史日期",        # 历史日期是运行时数据范围
+    r"历史回撤",        # 历史回撤是运行时指标
+    r"此前.*(?:已|已)", # 此前已完成是运行时状态
+    r"以前端|以前台",   # "以前端为准" 是方位描述非历史
     # ── VERSION 模式误报排除（运行时版本） ──
     r"APP_VERSION",
     r"__version__",
@@ -223,8 +263,28 @@ EXCLUDE_LINE: list[str] = [
     r"000XXX",
     r"XXX\[",
     r"jQueryXXX",
+    # ── 工具自身说明（元描述豁免） ──
+    #  描述"检查/检出哪些历史痕迹、来源叙述、原旧实现、迁移/重构"的规则说明行，
+    #  而非代码实际残留历史痕迹（如本工具及其测试的描述性注释）。与
+    #  check-doc-traces.py 的"工具说明行豁免"保持一致——命中
+    #  "检查/检出/扫描 + 痕迹/来源/原旧/迁移/重构 + 类别名词"组合才豁免，
+    #  防止补强后的时序模式误伤工具自身的元描述。
+    r"(?:检查|检测|判定|扫描|检出|识别|不得带|不得包含|不得出现|不应记录|禁止出现).{0,16}(?:历史痕迹|来源叙述|原旧实现|迁移重命名|变更痕迹|迭代标记|版本号标记|归档引用|任务编号|历史实现|旧逻辑|迁移痕迹|重构前|替代旧)",
+]
+
+# ── 测试回归场景元描述豁免（仅 src/test/ 文件生效） ──────────
+# 回归测试的 docstring / 注释必须描述"旧实现/修复前做错什么、修复后如何"
+# 才能表达防回退意图（如"旧实现把 3.41/4.43 修正成 1.9"、分隔注释引用
+# "rf-xxx 批次修复"），这类描述是测试元数据而非源码历史痕迹残留。
+# 与"工具说明行元描述豁免"同理，但仅对 src/test/ 路径生效——避免削弱
+# 源码侧检出（源码注释若残留"旧实现/修复前"叙述仍会被 PATTERNS 命中）。
+TEST_META_EXCLUDE: list[str] = [
+    r"(?:回归断言|回归场景|回归测试|回归：|回归:)",  # 回归测试 docstring/分隔注释
+    r"(?:旧实现|原实现|修复前|修复后).{0,24}(?:误|把|被|会|曾|修正|改为|按|源头|×)",
+    r"rf-\d+\s*(?:批次|类)?修复",  # 引用历史任务编号的修复批次说明
 ]
 _COMPILED_EXCLUDE = [re.compile(p) for p in EXCLUDE_LINE]
+_TEST_META_COMPILED = [re.compile(p) for p in TEST_META_EXCLUDE]
 
 
 def _is_triple_quote_line(stripped: str) -> tuple[bool, bool]:
@@ -241,28 +301,43 @@ def _is_triple_quote_line(stripped: str) -> tuple[bool, bool]:
         close_quote = '"""' if stripped.startswith('"""') else "'''"
         if close_quote in rest:
             return (True, False)  # 同一行内开+关
-        return (False, True)  # 仅打开或仅关闭
+        return (False, True)  # 仅打开（三引号开头但未同行闭合）
+    # 仅关闭：docstring 内容最后一行为 …内容\"\"\"（不以三引号开头但以三引号结尾）。
+    # 若不识别该行，in_docstring 状态会泄漏到后续所有代码行（误当作 docstring 提取）。
+    if stripped.endswith('"""') or stripped.endswith("'''"):
+        return (False, True)  # 仅关闭
     return (False, False)
 
 
-def _is_excluded(line: str) -> bool:
-    """检查该行是否匹配排除模式（合法运行时描述）。"""
+def _is_excluded(line: str, test_file: bool = False) -> bool:
+    """检查该行是否匹配排除模式。
+
+    Args:
+        line: 单行注释文本。
+        test_file: 该行是否来自 src/test/ 下的测试文件。为 True 时额外应用
+            TEST_META_EXCLUDE（回归测试 docstring 描述旧行为属元描述，豁免）。
+    """
     for pat in _COMPILED_EXCLUDE:
         if pat.search(line):
             return True
+    if test_file:
+        for pat in _TEST_META_COMPILED:
+            if pat.search(line):
+                return True
     return False
 
 
 def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
     """扫描单个文件，返回 [(行号, 分类, 模式说明, 行内容), ...]"""
     hits: list[tuple[int, str, str, str]] = []
-    if fpath.name in SKIP_FILES:
+    if fpath.name in SKIP_FILES or _is_tool_self(fpath.name):
         return hits
 
+    is_test_file = "src/test/" in fpath.as_posix()
     for lineno, ctext in _iter_comment_lines(fpath):
         if not ctext.strip():
             continue
-        if _is_excluded(ctext):
+        if _is_excluded(ctext, test_file=is_test_file):
             if verbose:
                 print(f"    (excluded) L{lineno}: {ctext[:80]}")
             continue

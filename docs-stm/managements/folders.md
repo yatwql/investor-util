@@ -12,8 +12,8 @@
 | HTML 报告模板 | HTML | 3 | 3,298 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
 | 辅助脚本 | Python | 13 | 4,411 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查） |
 | **源代码合计** | — | **225** | **57,062** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **245** | **69,061** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,345 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **测试代码** | Python | **247** | **69,599** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,401 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
@@ -287,7 +287,7 @@ investor-util/
 │       │   └── hallucination/        #   幻觉测试数据集
 │       │       ├── __init__.py       #       子包标记
 │       │       └── datasets.py       #       幻觉评估标准持仓数据
-│       ├── unit/                     #   单元测试（13 子目录）
+│       ├── unit/                     #   单元测试（14 子目录）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── conftest.py           #   单元测试 conftest
 │       │   ├── analysis/             #   分析计算单元测试
@@ -485,6 +485,9 @@ investor-util/
 │       │   │   ├── test_security_edge.py          #   证券边缘场景
 │       │   │   ├── test_orchestrator.py           #   报告编排器单元测试
 │       │   │   └── test_summary.py                #   摘要生成测试
+│       │   ├── scripts/              #   工程脚本单元测试（历史痕迹检查工具自检/豁免/补强模式）
+│       │   │   ├── __init__.py       #       子包标记
+│       │   │   └── test_trace_check_scripts.py  #   check-code/doc-traces 工具自身豁免+时序模式检出/豁免回归
 │       │   ├── startup/              #   首次运行引导单元测试
 │       │   │   ├── __init__.py       #       子包标记
 │       │   │   └── test_startup_wizard.py  #   首次运行引导向导测试

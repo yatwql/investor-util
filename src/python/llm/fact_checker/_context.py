@@ -9,6 +9,8 @@ from __future__ import annotations
 from src.python.llm.fact_checker._constants import (
     _CHANGE_RATE_KEYWORDS,
     _CONTRIBUTION_KEYWORDS,
+    _DAILY_MOVE_KEYWORDS,
+    _DAILY_TIME_KEYWORDS,
     _DRAWDOWN_KEYWORDS,
     _HYPOTHETICAL_KEYWORDS,
     _POSITION_WEIGHT_KEYWORDS,
@@ -47,6 +49,24 @@ def _is_change_rate_context(sentence: str, match_start: int) -> bool:
         return False
     nearby = sentence[max(0, match_start - 20) : match_start + 5]
     return any(kw in nearby for kw in _CHANGE_RATE_KEYWORDS)
+
+
+def _is_daily_change_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否在单日/当日涨跌语境中（如"今日下跌-3.41%""单日重挫4.43%"）。
+
+    单日涨跌幅度是相对昨收的单日行情变化，与收益率（相对成本）维度不同，
+    不可直接与收益率比较。检测 match 前 18 字符窗口内是否同时出现时间词
+    （今日/昨日/单日等）与涨跌动作词（下跌/重挫/收涨等）。
+
+    与 _PROFIT_KEYWORDS（含"上涨/下跌"）冲突时单日涨跌优先：LLM 写
+    "今日下跌-3.41%"时"下跌"会使句子被判为收益语境，但该数值是单日涨跌
+    而非收益率。仅时间词（如"今日组合累计收益率为30.3%"）不足以判定——
+    需同时有涨跌动作词。
+    """
+    nearby = sentence[max(0, match_start - 18) : match_start + 5]
+    has_time = any(kw in nearby for kw in _DAILY_TIME_KEYWORDS)
+    has_move = any(kw in nearby for kw in _DAILY_MOVE_KEYWORDS)
+    return has_time and has_move
 
 
 def _is_contribution_sentence(sentence: str) -> bool:

@@ -41,6 +41,21 @@ def sample_holdings() -> list[dict]:
     ]
 
 
+@pytest.fixture
+def holdings_with_rates() -> list[dict]:
+    """含 profit_rate（百分单位，orchestrator 已 ×100）与 change_pct（单日涨跌）的持仓。
+
+    用于回归：百分单位契约（1.9% 是旧小数误读，应修正为 187.1%）与
+    单日涨跌语境按 change_pct 校验（今日下跌 3.41% 不再被误修正为收益率）。
+    """
+    return [
+        {"name": "建设银行", "code": "601939", "market_value": 287120.0, "cost": 100000.0,
+         "profit_rate": 187.12, "change_pct": -3.41},
+        {"name": "贵州茅台", "code": "600519", "market_value": 2000000.0, "cost": 1500000.0,
+         "profit_rate": 33.33, "change_pct": 1.25},
+    ]
+
+
 # ── check_numerical_consistency ───────────────────────────────
 
 
@@ -864,17 +879,18 @@ class TestRunFactCheck:
         assert "最大持仓" in summ
 
     def test_corrections_detail_in_summary(self, sample_holdings):
-        """自动修正后摘要列出修正明细（wrong%→correct% + 句段），供用户直接查看。"""
+        """自动修正后摘要列出修正明细（wrong%→correct% + 语义 reason），供用户直接查看。"""
         html = """<p>招商银行（600036）是组合最大持仓。</p>
 <p>组合累计收益率为 5.0%。</p>"""
         corr, summ = run_fact_check(html, sample_holdings, "智囊团深度复盘")
         # 内容中 5.0% 已被替换为 30.3%
         assert "30.3%" in corr
         assert "5.0%" not in corr
-        # 摘要追加灰色「已修正明细」行，含 wrong→correct 与句段
+        # 摘要追加灰色「已修正明细」行，含 wrong→correct 与语义 reason
+        # （语义 reason 替代原截断句段，说明修正的是哪个数字的含义）
         assert "已修正明细" in summ
         assert "5.0%→30.3%" in summ
-        assert "组合累计收益率为" in summ
+        assert "组合实际收益率30.3%" in summ
 
     def test_run_fact_check_change_rate_not_corrected(self, sample_holdings):
         """run_fact_check 整链路：环比变化率不被自动修正。
@@ -905,3 +921,124 @@ class TestRunFactCheck:
         assert "智囊团深度复盘" in joined
         assert "自动修正 1 处数值" in joined
         assert "5.0%→30.3%" in joined
+
+
+# ── 回归：百分单位契约 + 单日涨跌语境 + 表格行归因（rf-159 批次修复） ──
+
+
+class TestRegressionProfitRateUnitAndDailyChange:
+    """回归：profit_rate 百分单位契约 + 单日涨跌语境按 change_pct 校验。
+
+    真实报告曾把小数 profit_rate（1.8712=187.12%）当百分数使用，导致
+    建设银行"今日下跌3.41%"被误修正为 1.9%（3.41 与 1.9 的偏差仅 1.5pp 在
+    容差内）。修复后 orchestrator 源头 ×100、单日涨跌语境按 change_pct 校验。
+    """
+
+    def test_profit_rate_percent_unit_matches(self, holdings_with_rates):
+        """百分单位：实际收益率 187.12% 时声称 187.1% → 通过，不再误修正。"""
+        text = "建设银行（601939）持仓收益率为 187.1%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings_with_rates)
+        assert checked == 1
+        assert passed == 1
+        assert issues == []
+        assert corrections == []
+
+    def test_profit_rate_decimal_legacy_corrected(self, holdings_with_rates):
+        """百分单位：旧小数误读 1.9%（≈1.8712 被当百分数）→ 修正为 187.1%。
+
+        回归断言 1.9 → 187.1（而非旧实现把 3.41/4.43 修正成 1.9）。
+        """
+        text = "建设银行（601939）持仓收益率为 1.9%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings_with_rates)
+        assert checked == 1
+        assert passed == 0
+        assert len(corrections) == 1
+        assert corrections[0][0] == "1.9"
+        assert corrections[0][1] == "187.1"
+        assert "187.1%" in corrections[0][3]  # 语义 reason 指明实际收益率
+
+    def test_daily_change_matching_change_pct_not_corrected(self, holdings_with_rates):
+        """单日涨跌语境：今日下跌 3.41% 与 601939 change_pct=-3.41 一致 → 不修正。
+
+        回归场景：建设银行"今日下跌3.41%"曾被误修正为 1.9%（误当收益率）。
+        """
+        text = "建设银行（601939）今日下跌3.41%，表现弱于大盘。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings_with_rates)
+        assert checked == 1
+        assert passed == 1
+        assert issues == []
+        assert corrections == []
+
+    def test_daily_change_mismatch_corrected(self, holdings_with_rates):
+        """单日涨跌语境：声称下跌 1.0% 与实际 -3.41% 偏差大 → 修正为 -3.4%。"""
+        text = "建设银行（601939）今日下跌1.0%，跌幅较大。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings_with_rates)
+        assert checked == 1
+        assert passed == 0
+        assert len(corrections) == 1
+        assert corrections[0][0] == "1.0"
+        assert corrections[0][1] == "-3.4"
+
+    def test_daily_change_without_subject_skipped(self, holdings_with_rates):
+        """单日涨跌语境无持仓主体（指数）→ 无可用校验数据，跳过不修正。"""
+        text = "上证指数今日下跌0.5%，市场整体偏弱。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings_with_rates)
+        assert checked == 1
+        assert passed == 1
+        assert corrections == []
+
+    def test_run_fact_check_daily_change_not_corrected(self, holdings_with_rates):
+        """run_fact_check 整链路：单日涨跌不被自动修正，摘要无修正明细。"""
+        html = "<p>建设银行（601939）今日下跌3.41%，表现弱于大盘。</p>"
+        corr, summ = run_fact_check(html, holdings_with_rates, "持仓体检报告")
+        assert corr == html  # 内容不被篡改
+        assert "3.41%" in corr
+        assert "已修正明细" not in summ
+
+
+class TestRegressionTableRowRankAttribution:
+    """回归：表格行内排名声称归因到品种名列，而非行内后出现的比较对象。
+
+    真实报告 LLM 调仓表行："...|| 🔴 高 | 040046 华安纳斯达克100ETF联接A |
+    减仓1/3 | 当前占比11.3%为第一重仓，与016055高度同质；...||"。
+    "第一重仓"声称指向品种名列 040046，但行内同单元格的比较对象 016055
+    离声称词更近。旧实现"整句最近"误归因到 016055 → 误报"016055 为最大持仓"。
+    """
+    # 用真实句段：|| 触发 _ROW_SEP_PATTERN 表格分支，行段内 040046 在声称词前
+    TABLE_ROW = (
+        ":--------:|------|| 🔴 高 | 040046 华安纳斯达克100ETF联接A | "
+        "减仓1/3（约1.3万） | 当前占比11.3%为第一重仓，与016055高度同质；"
+        "锁定QDII盈利 || 🔴 高 | 016055 博时纳斯达克100ETF联接A"
+    )
+
+    def _make_holdings(self) -> list[dict]:
+        return [
+            {"name": "华安纳斯达克100ETF联接A", "code": "040046",
+             "market_value": 50000.0, "cost": 40000.0},
+            {"name": "博时纳斯达克100ETF联接A", "code": "016055",
+             "market_value": 30000.0, "cost": 25000.0},
+        ]
+
+    def test_claimed_to_prior_cell_code(self):
+        """声称"第一重仓"归因 040046（品种名列，实际第一）→ 通过，无误报 016055。"""
+        issues, checked, passed = check_ranking_correctness(self.TABLE_ROW, self._make_holdings())
+        assert checked == 1
+        assert passed == 1
+        assert issues == []  # 旧实现会误报"016055 为最大持仓"
+
+    def test_wrong_claim_references_subject_code(self):
+        """声称主体不在第一时，告警引用品种名列（声称主体），而非比较对象。"""
+        holdings = [
+            {"name": "华安纳斯达克100ETF联接A", "code": "040046",
+             "market_value": 30000.0, "cost": 25000.0},
+            {"name": "博时纳斯达克100ETF联接A", "code": "016055",
+             "market_value": 50000.0, "cost": 40000.0},
+        ]
+        issues, checked, passed = check_ranking_correctness(self.TABLE_ROW, holdings)
+        assert checked == 1
+        assert passed == 0
+        assert len(issues) == 1
+        # 告警应指向声称主体 040046，并提示实际第一为 016055
+        assert "040046" in issues[0]
+        assert "016055" in issues[0]
+        assert "040046" in issues[0] and issues[0].startswith("声称 040046")

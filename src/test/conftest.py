@@ -32,6 +32,7 @@ _KNOWN_MARKERS: set[str] = {
     # unit 分支
     "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news", "unit_report",
     "unit_config", "unit_config_edge", "unit_core", "unit_cli", "unit_ui", "unit_analysis",
+    "unit_scripts",
     # 跨领域标记
     "llm", "edge", "smoke", "data", "integration",
     # integration 分支
@@ -74,6 +75,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_cli: CLI 命令行模式单元测试")
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")
     config.addinivalue_line("markers", "unit_analysis: 分析计算模块单元测试（流动性/再平衡/汇率/无风险利率）")
+    config.addinivalue_line("markers", "unit_scripts: scripts/ 工程脚本单元测试（历史痕迹检查/版本一致性等）")
     config.addinivalue_line("markers", "llm: LLM 相关测试（全部 mock，无需 API key）")
     config.addinivalue_line("markers", "edge: 边缘/异常场景测试 — 必须放在 *_edge.py 文件中，不得与普通测试混搭")
     config.addinivalue_line("markers", "smoke: 冒烟测试（快速验证核心功能）")

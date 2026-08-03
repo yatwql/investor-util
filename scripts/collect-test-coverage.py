@@ -74,10 +74,11 @@ def main() -> None:
             "unit_news",
             "unit_llm",
             "unit_analysis",
+            "unit_scripts",
         ),
         "dev-verify": lambda m: (
             (
-                _sel(m, "unit_core", "unit_providers", "unit_fetcher", "unit_analysis")
+                _sel(m, "unit_core", "unit_providers", "unit_fetcher", "unit_analysis", "unit_scripts")
                 and "edge" not in m
                 and "data" not in m
             )
@@ -107,6 +108,7 @@ def main() -> None:
         "unit_analysis",
         "unit_cli",
         "unit_ui",
+        "unit_scripts",
     ]
     print("\n### unit 子标记")
     for s in unit_subs:

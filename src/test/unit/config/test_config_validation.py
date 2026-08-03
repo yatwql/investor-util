@@ -22,6 +22,7 @@ import pytest
 
 from src.python.config import _validation as val
 from src.python.core.constants import PROJECT_ROOT
+from src.python.analysis.drawdown_events import MIN_SPAN
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 
@@ -415,6 +416,35 @@ class TestValidateRebalanceConfig(unittest.TestCase):
     def test_target_allocation_not_dict_warns(self):
         """target_allocation 不是 dict → 告警。"""
         n = val._validate_rebalance_config({"rebalance": {"target_allocation": "invalid"}}, 0)
+        self.assertEqual(n, 1)
+
+
+class TestValidateHistoryLookbackDays(unittest.TestCase):
+    """_validate_history_lookback_days 校验函数测试。"""
+
+    def test_missing_returns_zero(self):
+        """缺失 lookback_days → 0 问题（走默认值）。"""
+        n = val._validate_history_lookback_days({"history": {}}, 0)
+        self.assertEqual(n, 0)
+
+    def test_valid_returns_zero(self):
+        """合法值 90 → 0 问题。"""
+        n = val._validate_history_lookback_days({"history": {"lookback_days": 90}}, 0)
+        self.assertEqual(n, 0)
+
+    def test_below_min_span_warns(self):
+        """低于 MIN_SPAN（回撤分析最少交易日）→ 告警。"""
+        n = val._validate_history_lookback_days({"history": {"lookback_days": MIN_SPAN - 1}}, 0)
+        self.assertEqual(n, 1)
+
+    def test_above_max_warns(self):
+        """超过上限 365（K 线数据源最多返回条数）→ 告警。"""
+        n = val._validate_history_lookback_days({"history": {"lookback_days": 366}}, 0)
+        self.assertEqual(n, 1)
+
+    def test_non_integer_warns(self):
+        """非整数 → 告警。"""
+        n = val._validate_history_lookback_days({"history": {"lookback_days": "abc"}}, 0)
         self.assertEqual(n, 1)
 
 

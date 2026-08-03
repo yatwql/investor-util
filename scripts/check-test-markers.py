@@ -45,6 +45,7 @@ EXPECTED_DIR_MARKERS: dict[str, set[str]] = {
     "unit/analysis": {"unit", "unit_analysis"},
     "unit/cli": {"unit", "unit_cli"},
     "unit/ui": {"unit", "unit_ui"},
+    "unit/scripts": {"unit", "unit_scripts"},
     # scenario 子模块
     "scenario/basic": {"scenario", "scenario_basic"},
     "scenario/resilience": {"scenario", "scenario_resilience", "scenario_extreme"},
@@ -86,6 +87,7 @@ KNOWN_MARKERS = {
     "unit_cli",
     "unit_ui",
     "unit_analysis",
+    "unit_scripts",
     "edge",
     "smoke",
     "data",

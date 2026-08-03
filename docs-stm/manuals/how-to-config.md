@@ -59,7 +59,8 @@
 
   // ── G. 组合历史走势与持仓快照 ──
   "history": {
-    "fetch_mode": "auto",
+    "fetch_mode": "auto",  // 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
+    "lookback_days": 90,  // 历史走势取数窗口（K 线条数/交易日），需≥60（回撤分析最少交易日）才计算回撤分析，上限 365
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
@@ -132,6 +133,7 @@
 | `comparison_indices` | `{"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}` | 竞争语境对比指数池。智囊团深度复盘中对比组合 vs 多指数的今日涨跌幅、区间累计收益和指标（夏普/波动率/最大回撤）。格式 `{指数代码: 显示名称}`。禁用时设为空对象 `{}` | 手动编辑 |
 | `risk_free_rate` | `null` | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74）。程序默认通过 akshare `bond_zh_us_rate` 获取中国 10Y 国债收益率 | 手动编辑 |
 | `history.fetch_mode` | `"auto"` | 组合历史走势获取模式：`"off"`=关闭、`"prompt"`=报告后询问、`"auto"`=自动获取（默认） | 手动编辑 |
+| `history.lookback_days` | `90` | 组合历史走势取数窗口（K 线条数/交易日）。需 ≥60（回撤分析所需最少交易日）才计算回撤分析，上限 365（K 线源最多返回条数）。股票/ETF 按此取 K 线条数，OTC 基金全量净值截取最近 N 条 | 手动编辑 |
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
@@ -466,6 +468,14 @@
 >
 > **累计收益率起算**：从 `history.coverage_threshold` 比例持仓覆盖的日期起算（**双向截断**：起算点正向扫描 ≥阈值，截止点反向扫描 ≥阈值），避免因 QDII/债券基金数据起点较晚导致早期组合市值偏低、收益率虚高，也避免尾端部分基金净值未更新导致收益率虚低。早期数据保留在走势图上但排除出收益率计算。阈值默认 `0.8`（80%），可在 `config.json` 的 `history.coverage_threshold` 中调整。
 
+#### history.lookback_days 取数窗口
+
+`history.lookback_days` 控制组合历史走势往回取多少根 K 线/净值（交易日）：
+- **股票/ETF**：向 K 线源请求最近 `lookback_days` 根日 K（腾讯/新浪，上限 365 根）
+- **OTC 基金**：净值源全量返回后按最近 `lookback_days` 条截取
+
+**与回撤分析的关系**：回撤分析需要 ≥60 个交易日（`MIN_SPAN`）才能计算独立回撤事件与最大回撤。若取数窗口低于 60，回撤分析章节将显示"有效交易日不足 60 天，暂不计算回撤事件"占位文本。默认 `90` 确保取数窗口超过门槛；配置值低于 60 或超过 365 时，配置校验会告警提示。
+
 #### 持仓快照（快照对比）
 
 快照对比不受 `history.fetch_mode` 配置影响，在 B/L 菜单生成报告时**始终自动执行**。每次生成报告时自动保存持仓快照到 `data/history/snapshots/`，供下次环比对比。
@@ -481,6 +491,7 @@
 ```json
 "history": {
     "fetch_mode": "auto",
+    "lookback_days": 90,
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,

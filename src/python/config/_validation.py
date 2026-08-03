@@ -12,6 +12,7 @@ from typing import Any
 
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.registry import get_known_enabled_llm_keys, get_report_section_keys
+from src.python.analysis.drawdown_events import MIN_SPAN
 
 logger = logging.getLogger("invest")
 
@@ -363,6 +364,36 @@ def _validate_history_fetch_mode(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_history_lookback_days(config: dict, issues: int) -> int:
+    """验证 history.lookback_days 配置（历史走势取数窗口天数）。
+
+    下限绑定 MIN_SPAN（回撤分析所需最少交易日），低于下限时回撤分析
+    将判定数据不足；上限 365 对齐历史 K 线数据源最多返回条数。
+    """
+    history = config.get("history", {})
+    if not isinstance(history, dict):
+        return issues
+    lookback = history.get("lookback_days")
+    if lookback is None:
+        return issues  # 缺失时使用默认值 90，正常
+    try:
+        days = int(lookback)
+    except (ValueError, TypeError):
+        logger.warning("config.json history.lookback_days = %r 不是有效整数，将使用默认值 90", lookback)
+        return issues + 1
+    if days < MIN_SPAN:
+        logger.warning(
+            "config.json history.lookback_days = %s 低于回撤分析所需最少 %d 个交易日，回撤分析将判定数据不足",
+            days,
+            MIN_SPAN,
+        )
+        issues += 1
+    if days > 365:
+        logger.warning("config.json history.lookback_days = %s 超过上限 365，历史 K 线数据源最多返回 365 条", days)
+        issues += 1
+    return issues
+
+
 def _validate_comparison_indices(config: dict, issues: int) -> int:
     """验证 comparison_indices 配置。"""
     ci, issues = _section(config, "comparison_indices", dict, "对比指数池将使用默认值", issues)
@@ -491,6 +522,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_report_section_order(config, issues)
     issues = _validate_benchmark_indices(config, issues)
     issues = _validate_history_fetch_mode(config, issues)
+    issues = _validate_history_lookback_days(config, issues)
     issues = _validate_comparison_indices(config, issues)
     issues = _validate_rebalance_config(config, issues)
     issues = _validate_enable_llm(issues)

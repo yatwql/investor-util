@@ -21,7 +21,7 @@ def apply_numerical_corrections(
 
     Args:
         html: 原始 HTML 内容。
-        corrections: [(wrong_value_str, correct_value_str, context_sentence), ...]。
+        corrections: [(wrong_value_str, correct_value_str, context_sentence, reason), ...]。
 
     Returns:
         修正后的 HTML 内容。
@@ -34,7 +34,8 @@ def apply_numerical_corrections(
     stripped = _strip_html(html)
 
     result = html
-    for wrong_val, correct_val, sentence in sorted_cx:
+    for cx in sorted_cx:
+        wrong_val, correct_val, sentence = cx[0], cx[1], cx[2]
         if sentence not in stripped:
             continue
 

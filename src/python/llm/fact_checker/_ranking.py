@@ -75,7 +75,7 @@ def _claimed_code(sentence: str, match: re.Match) -> str | None:
     """
     m_start, m_end = match.span()
     if _ROW_SEP_PATTERN.search(sentence):
-        # 表格句：以行分隔符划出声称所在行区间，行内就近
+        # 表格句：以行分隔符划出声称所在行区间
         row_start = 0
         for rsm in _ROW_SEP_PATTERN.finditer(sentence, 0, m_start):
             row_start = rsm.end()
@@ -83,7 +83,14 @@ def _claimed_code(sentence: str, match: re.Match) -> str | None:
         rsm = _ROW_SEP_PATTERN.search(sentence, m_end)
         if rsm:
             row_end = rsm.start()
-        code = _nearest_code(sentence, row_start, row_end, m_start)
+        # 行内优先取声称词前面的代码——品种名列通常在声称词前。
+        # 若取"整体最近"，行内同单元格的比较对象会抢位误归因，如
+        #   "| 🔴 高 | 040046 华安纳斯达克100ETF联接A | 减仓1/3 | 当前占比11.3%为第一重仓，与016055高度同质|"
+        # 声称"第一重仓" 8 字后的比较对象 016055 比品种名列的 040046 更近 → 误报。
+        code = _nearest_code(sentence, row_start, m_start, m_start)
+        if not code:
+            # 声称前无代码 → 回退行内就近（防漏检）
+            code = _nearest_code(sentence, row_start, row_end, m_start)
         if code:
             return code
         # 行内无代码 → 回退整句就近（防漏检）

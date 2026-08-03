@@ -1263,3 +1263,57 @@ class TestFetchHistoryData:
             )
 
         assert result is None
+
+    def test_fetch_history_data_uses_lookback_days(self):
+        """history.lookback_days 配置透传给 get_combined_timeseries 的 days 参数。
+
+        回归防护：回撤分析需 ≥60 交易日（MIN_SPAN），若取数窗口未随配置放大，
+        主报告回撤分析将一直判定数据不足。此处断言配置 → days 透传。
+        """
+        mock_reporter = MagicMock()
+        mock_holding = MagicMock()
+        mock_holding.code = "SH600001"
+        mock_holding.name = "测试"
+        mock_holding.shares = 100
+
+        with patch("src.python.report.portfolio_history.PortfolioHistoryCalculator") as mock_cls:
+            mock_calc = MagicMock()
+            mock_calc.get_combined_timeseries.return_value = {"status": "ok", "bars": []}
+            mock_cls.return_value = mock_calc
+
+            fetch_history_data(
+                [mock_holding],
+                {"history": {"lookback_days": 120}},
+                mock_reporter,
+                fetch=True,
+            )
+
+        mock_calc.get_combined_timeseries.assert_called_once_with(
+            [("SH600001", "测试", 100)],
+            days=120,
+        )
+
+    def test_fetch_history_data_lookback_days_default_90(self):
+        """未配置 lookback_days 时取数窗口默认 90。"""
+        mock_reporter = MagicMock()
+        mock_holding = MagicMock()
+        mock_holding.code = "SH600001"
+        mock_holding.name = "测试"
+        mock_holding.shares = 100
+
+        with patch("src.python.report.portfolio_history.PortfolioHistoryCalculator") as mock_cls:
+            mock_calc = MagicMock()
+            mock_calc.get_combined_timeseries.return_value = {"status": "ok", "bars": []}
+            mock_cls.return_value = mock_calc
+
+            fetch_history_data(
+                [mock_holding],
+                {"history": {}},
+                mock_reporter,
+                fetch=True,
+            )
+
+        mock_calc.get_combined_timeseries.assert_called_once_with(
+            [("SH600001", "测试", 100)],
+            days=90,
+        )

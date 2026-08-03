@@ -166,12 +166,14 @@ def fetch_history_data(
     try:
         _coverage = _history_cfg.get("coverage_threshold", 0.8)
         _benchmark_indices = _history_cfg.get("benchmark_indices", {})
+        # 取数窗口：默认 90（≥ drawdown MIN_SPAN 60 个交易日），保证回撤分析可用
+        _lookback_days = _history_cfg.get("lookback_days", 90)
         _calc = PortfolioHistoryCalculator(
             coverage_threshold=_coverage,
             benchmark_indices=_benchmark_indices,
         )
         _holdings_tuples = [(h.code, h.name, h.shares) for h in holdings]
-        history_data = _calc.get_combined_timeseries(_holdings_tuples)
+        history_data = _calc.get_combined_timeseries(_holdings_tuples, days=_lookback_days)
         if history_data and history_data.get("status") != "unavailable":
             reporter.ok("组合历史走势数据获取完成")
         else:

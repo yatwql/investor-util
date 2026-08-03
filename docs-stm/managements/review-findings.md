@@ -48,6 +48,10 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| **rf-160** | 个股收益率 profit_rate 单位错配（小数 1.8712 当百分数），报告"建设银行今日下跌 3.41%"等被误修正为 1.9%；prompt 三处收益率格式化同缺 ×100 | orchestrator 源头 ×100 为百分单位 + `_build_stock_rate_map` 契约对齐 + prompt 三处补 ×100 | v0.9.12 changelog · Fix rf-160/161/162 条目 |
+| **rf-161** | 单日涨跌语境缺失——"今日下跌 3.41%"被按收益率维度误修正 | 新增 `_is_daily_change_context`，单日涨跌按持仓主体 change_pct 校验，无主体（指数）跳过 | 同上 |
+| **rf-162** | 表格行内排名声称归因误判——调仓表行"…为第一重仓，与 016055 高度同质"被误归因到比较对象 016055 | `_claimed_code` 优先行内声称词前代码（品种名列），无则回退行内/整句 | 同上 |
+| **rf-163** | check-code-traces.py `_is_triple_quote_line` 多行 docstring 关闭行识别缺陷——docstring 内容最后一行为 `…内容"""`（不以三引号开头）时 `in_docstring` 状态不翻转、泄漏到后续代码行（assert 被误当 docstring 提取），发布门禁自查时 test_trace_check_scripts.py 出现 8 处误报 | 补「仅关闭」识别分支（`endswith('"""')`）+ 新增回归场景元描述豁免 TEST_META_EXCLUDE（仅 src/test/ 生效，源码侧检出不削弱）；回归测试 TestTestFileMetaExemption 4 项 + TestCommentExtraction 3 项 | v0.9.12 changelog · Refactor 门禁打磨条目 |
 
 
 ---

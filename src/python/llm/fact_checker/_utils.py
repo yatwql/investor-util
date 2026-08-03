@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import re
 
+from src.python.llm.fact_checker._patterns import _CODE_PATTERN
+
 
 def _strip_html(html: str) -> str:
     """去除 HTML 标签，返回纯文本。"""
@@ -64,7 +66,8 @@ def _calc_portfolio_values(holdings_details: list[dict] | None) -> dict[str, flo
 def _build_stock_rate_map(holdings_details: list[dict] | None) -> dict[str, float]:
     """构建 {code: profit_rate} 映射用于个股级校验。
 
-    每个品种的盈亏比例来自持仓明细中的 profit_rate 字段，
+    每个品种的盈亏比例来自持仓明细中的 profit_rate 字段（百分单位，
+    orchestrator 已统一为百分比，如 187.12 = +187.12%），
     用于在 LLM 提及个股收益时进行精准比对，而非一律回退到组合总收益。
     """
     result: dict[str, float] = {}
@@ -74,3 +77,51 @@ def _build_stock_rate_map(holdings_details: list[dict] | None) -> dict[str, floa
         if code and rate is not None:
             result[code] = float(rate)
     return result
+
+
+def _build_stock_change_map(holdings_details: list[dict] | None) -> dict[str, float]:
+    """构建 {code: change_pct} 映射（单日涨跌幅度，百分单位）。
+
+    用于单日涨跌语境校验（如"今日下跌-3.41%"与 601939 的 change_pct=-3.41 比对）。
+    """
+    result: dict[str, float] = {}
+    for d in holdings_details or []:
+        code = d.get("code", "") or ""
+        chg = d.get("change_pct")
+        if code and chg is not None:
+            result[code] = float(chg)
+    return result
+
+
+def _locate_subject_code(
+    sentence: str,
+    holding_codes: set[str],
+    name_to_code: dict[str, str] | None,
+    anchor: int,
+) -> str | None:
+    """定位句中最可能指代的持仓代码。
+
+    优先句中出现的持仓代码（取离 anchor 最近）；无代码时按持仓名称匹配
+    （名称越长越具体优先，取离 anchor 最近）。
+    """
+    best: str | None = None
+    best_dist: int | None = None
+    for cm in _CODE_PATTERN.finditer(sentence):
+        code = cm.group(0)
+        if code not in holding_codes:
+            continue
+        dist = min(abs(cm.start() - anchor), abs(cm.end() - anchor))
+        if best_dist is None or dist < best_dist:
+            best_dist = dist
+            best = code
+    if best:
+        return best
+    for name, code in sorted((name_to_code or {}).items(), key=lambda kv: -len(kv[0])):
+        idx = sentence.find(name)
+        if idx == -1:
+            continue
+        dist = abs(idx - anchor)
+        if best_dist is None or dist < best_dist:
+            best_dist = dist
+            best = code
+    return best

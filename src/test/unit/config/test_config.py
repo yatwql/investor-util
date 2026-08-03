@@ -199,6 +199,23 @@ class TestGetConfig(unittest.TestCase):
         result = cfg.get_config()
         self.assertEqual(result.get("history", {}).get("fetch_mode"), "auto")
 
+    def test_lookback_days_default_is_90(self):
+        """未配置 history 时 lookback_days 默认 90（≥ 回撤分析 MIN_SPAN 60）。"""
+        result = cfg.get_config()
+        self.assertEqual(result.get("history", {}).get("lookback_days"), 90)
+
+    def test_lookback_days_merge_user_value(self):
+        """用户显式配置 history.lookback_days 覆盖默认值。"""
+        os.makedirs(self.tmp.name, exist_ok=True)
+        user = {"history": {"lookback_days": 120}}
+        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(user, f)
+        result = cfg.get_config()
+        hist = result.get("history", {})
+        self.assertEqual(hist.get("lookback_days"), 120)
+        # 覆盖后其余 history 子键默认值仍保留（浅合并不丢默认）
+        self.assertEqual(hist.get("fetch_mode"), "auto")
+
 
 class TestInitConfig(unittest.TestCase):
     """init_config 的边界场景测试。"""
