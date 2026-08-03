@@ -21,6 +21,7 @@
 
 ### Docs
 
+- **rf-162：已发布版本 0.9.8 的 `### Fix` 清理"（开发中）"遗留占位** — 0.9.8-dev 切版时（bca6d4a）模板预置 `### Fix（开发中）`，开发期无任何 fix 提交（仅 feat/docs/refactor），发布提交（e6cbd4c）只改版本头未清理占位。现改为"无（本版本无 bug 修复提交，仅功能 + 技术债清理）"，与已发布版本 changelog 应为终态的约定对齐。纯文档修正，零行为变更
 - **rf-161：requirements R-DATA-05 补"跨日残留强刷"动作 + technical 流程图补写回缓存** — 自查发现 R-DATA-05 只描述"验证 price_date 是否为当日数据"，未写明验证不通过时的处置：现补全为"收盘后需验证缓存中 price_date 是否为**最近交易日**数据；验证不通过（跨日残留）时**强制清除缓存并重新获取最新净值写回**，避免盘中降级残留数据滞留"（与 `fetcher/price.py` `_fetch_price_with_cache_refresh` 实况一致）。同步 technical.md §2.4.1 强刷流程图补"→ 成功后自动写回缓存"节点。纯文档补充，零行为变更
 - **rf-160：requirements/technical/llm-technical 三份管理文档交叉核对冲突修复** — 按代码实况对齐 6 处跨文档冲突：① T4 降级缓存陈旧阈值 technical.md（§4.11 + 附录 D）"7 天"→"14 天"（与 `_config_defaults.py`/requirements §11.1 一致）；② 持仓体检维度 requirements.md R-LLM-HC-01 + technical.md §5.3 "四维/4 维"→"五维度/5 维"（与 `prompts_core.py`/llm-technical §2.2 一致），llm-technical §8.1 体检 prompt 补数据质量维度 bullet；③ 场外基金净值 requirements.md §5.1 备用"天天基金"→"—"（`price_fund_otc` 直达无备用）；④ 基金深度分析 technical.md §4.8 "5 个模块"→"6 个"（注册表 #6~#11），架构图补持仓相关性矩阵（Pearson 相关+显著性）；⑤ E 菜单核心模块 requirements.md §1.2/§3.2 补组合演进（"6 个核心模块"→"7 个"）；⑥ LLM 熔断阈值 technical.md §2.2 "连续 N 次"→"连续 3 次"。同步修正：README.md/faq.md/folders.md 数据源可用性矩阵章节号 #18→#20；how-to-config.md §P flag 表 + JSON 示例、代码注释（`_config_defaults.py`/`_core.py`/`handlers_config.py` TUI 菜单）基金深度分析范围 #6~10→#6~11 且市场新闻 #11→#12、历史走势 #16~17→#17~18；report_template.html MODULE 注释 12~21（新闻 #12→LLM API 用量 #21）+ evolution partial MODULE 18→19；requirements.md §6.4 字段定义小节编号对齐模块号（6.4.11 财经新闻→6.4.12、6.4.16→6.4.17、6.4.17→6.4.18、数据源 6.4.18→6.4.20 并与组合演进 6.4.19 换序）。纯文档/注释修改，零行为变更
 
@@ -45,7 +46,7 @@
 
 ### Fix
 
-（开发中）
+无（本版本无 bug 修复提交，仅功能 + 技术债清理）
 
 ### Test
 
