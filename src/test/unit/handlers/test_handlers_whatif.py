@@ -71,12 +71,12 @@ class TestSelectCandidateFile(unittest.TestCase):
         mock_list: MagicMock,
         mock_input: MagicMock,
     ) -> None:
-        """目录下只有基准文件时手动输入有效路径，返回该路径。"""
+        """目录下只有基准文件时选[2]手动输入有效路径，返回该路径。"""
         from src.python.tui.handlers_whatif import _select_candidate_file
 
         mock_config.return_value = {"holdings_dir": "dummy_dir"}
         mock_list.return_value = ["dummy_dir/base.xlsx"]
-        mock_input.return_value = "/tmp/after.xlsx"
+        mock_input.side_effect = ["2", "/tmp/after.xlsx"]
         with patch("src.python.tui.handlers_whatif.os.path.isfile", return_value=True):
             result = _select_candidate_file("dummy_dir/base.xlsx")
         self.assertEqual(result, "/tmp/after.xlsx")
@@ -95,7 +95,7 @@ class TestSelectCandidateFile(unittest.TestCase):
 
         mock_config.return_value = {"holdings_dir": "dummy_dir"}
         mock_list.return_value = ["dummy_dir/base.xlsx"]
-        mock_input.side_effect = ["/no/such.xlsx", ""]
+        mock_input.side_effect = ["2", "/no/such.xlsx", ""]
         with patch("src.python.tui.handlers_whatif.os.path.isfile", return_value=False):
             result = _select_candidate_file("dummy_dir/base.xlsx")
         self.assertIsNone(result)
@@ -114,8 +114,80 @@ class TestSelectCandidateFile(unittest.TestCase):
 
         mock_config.return_value = {"holdings_dir": "dummy_dir"}
         mock_list.return_value = ["dummy_dir/base.xlsx"]
-        mock_input.side_effect = EOFError()
+        mock_input.side_effect = ["2", EOFError()]
         with patch("src.python.tui.handlers_whatif.os.path.isfile", return_value=True):
+            result = _select_candidate_file("dummy_dir/base.xlsx")
+        self.assertIsNone(result)
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_whatif.list_xlsx_files")
+    @patch("src.python.tui.handlers_whatif.get_config_cache")
+    def test_only_base_choose_copy_template(
+        self,
+        mock_config: MagicMock,
+        mock_list: MagicMock,
+        mock_input: MagicMock,
+    ) -> None:
+        """目录下只有基准文件时选[1]自动复制模板，返回模板路径。"""
+        from src.python.tui.handlers_whatif import _select_candidate_file
+
+        mock_config.return_value = {"holdings_dir": "dummy_dir"}
+        mock_list.return_value = ["dummy_dir/base.xlsx"]
+        mock_input.side_effect = ["1"]
+        with (
+            patch("src.python.tui.handlers_whatif.os.path.isdir", return_value=True),
+            patch("src.python.tui.handlers_whatif.os.path.exists", return_value=False),
+            patch("src.python.tui.handlers_whatif.shutil.copy2") as mock_copy2,
+        ):
+            result = _select_candidate_file("dummy_dir/base.xlsx")
+        self.assertEqual(result, "dummy_dir/base-调仓后模板.xlsx")
+        mock_copy2.assert_called_once_with("dummy_dir/base.xlsx", "dummy_dir/base-调仓后模板.xlsx")
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_whatif.list_xlsx_files")
+    @patch("src.python.tui.handlers_whatif.get_config_cache")
+    def test_only_base_invalid_choice_then_copy_template(
+        self,
+        mock_config: MagicMock,
+        mock_list: MagicMock,
+        mock_input: MagicMock,
+    ) -> None:
+        """无效选择后再次输入[1]复制模板，返回模板路径。"""
+        from src.python.tui.handlers_whatif import _select_candidate_file
+
+        mock_config.return_value = {"holdings_dir": "dummy_dir"}
+        mock_list.return_value = ["dummy_dir/base.xlsx"]
+        mock_input.side_effect = ["x", "1"]
+        with (
+            patch("src.python.tui.handlers_whatif.os.path.isdir", return_value=True),
+            patch("src.python.tui.handlers_whatif.os.path.exists", return_value=False),
+            patch("src.python.tui.handlers_whatif.shutil.copy2"),
+        ):
+            result = _select_candidate_file("dummy_dir/base.xlsx")
+        self.assertEqual(result, "dummy_dir/base-调仓后模板.xlsx")
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_whatif.list_xlsx_files")
+    @patch("src.python.tui.handlers_whatif.get_config_cache")
+    def test_copy_template_failure_returns_none(
+        self,
+        mock_config: MagicMock,
+        mock_list: MagicMock,
+        mock_input: MagicMock,
+    ) -> None:
+        """复制模板失败（OSError）返回 None。"""
+        from src.python.tui.handlers_whatif import _select_candidate_file
+
+        mock_config.return_value = {"holdings_dir": "dummy_dir"}
+        mock_list.return_value = ["dummy_dir/base.xlsx"]
+        mock_input.side_effect = ["1"]
+        with (
+            patch("src.python.tui.handlers_whatif.os.path.exists", return_value=False),
+            patch(
+                "src.python.tui.handlers_whatif.shutil.copy2",
+                side_effect=OSError("disk full"),
+            ),
+        ):
             result = _select_candidate_file("dummy_dir/base.xlsx")
         self.assertIsNone(result)
 

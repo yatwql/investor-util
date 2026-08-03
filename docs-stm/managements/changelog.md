@@ -9,6 +9,7 @@
 ### Feat
 
 - 调仓 What-if 模拟报告归档格式对齐主报告（用户建议）：最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比）+ 日期目录归档版 `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx/.html`（超 180 天自动清理），见 `report/whatif_writer.py`
+- TUI 调仓模拟单文件场景增强（用户建议）：持仓目录只有基准一份时，`_select_candidate_file` 引导三选——`[1]` 自动复制基准为可编辑目标模板（`<基准名>-调仓后模板.xlsx`，同名追加序号不覆盖）/ `[2]` 手动输入目标文件完整路径 / 回车取消，见 `tui/handlers_whatif.py`
 
 ### Fix
 

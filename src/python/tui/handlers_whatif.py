@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from datetime import datetime
 
 from src.python.config import get_config
@@ -24,14 +25,14 @@ def _select_candidate_file(base_file: str) -> str | None:
     """选择目标持仓文件（调仓后/假设），返回绝对路径；未选择时返回 None。
 
     列出持仓目录下除基准文件外的 xlsx 文件供用户选择，避免自对比；
-    目录下无候选文件时引导手动输入目标文件完整路径（可从基准复制修改）。
+    目录下无候选文件时引导选择目标（自动复制模板 / 手动输入完整路径）。
     """
     config = get_config_cache() or get_config()
     dir_path = config.get("holdings_dir", "")
     base_abs = os.path.abspath(base_file)
     files = [f for f in list_xlsx_files(dir_path) if os.path.abspath(f) != base_abs]
     if not files:
-        return _input_candidate_path()
+        return _input_candidate_path(base_file)
     if len(files) == 1:
         print(f"  使用唯一找到的目标文件: {os.path.basename(files[0])}")
         return files[0]
@@ -59,15 +60,36 @@ def _select_candidate_file(base_file: str) -> str | None:
     return None
 
 
-def _input_candidate_path() -> str | None:
-    """无候选文件时引导手动输入目标文件完整路径；直接回车取消返回 None。
+def _input_candidate_path(base_file: str) -> str | None:
+    """无候选文件时引导选择目标持仓文件；回车取消返回 None。
 
     持仓目录下只有基准文件（或目录无 xlsx）时，调仓目标无法从目录选择，
-    改为提示用户复制基准文件修改后作为目标，或输入目标文件的完整路径
-    （可位于任意位置）。文件不存在时递归重新输入。
+    提供 3 个选项：
+      1) 自动复制基准文件为可编辑目标模板（调仓后）
+      2) 手动输入目标文件完整路径（可位于任意位置）
+      3) 直接回车取消
     """
     print("  [ERR] 持仓目录下未找到基准之外的 xlsx 文件")
     print("     可复制基准持仓文件并修改后作为目标（调仓后/假设）")
+    while True:
+        print("  [1] 自动复制基准文件为可编辑目标模板（调仓后）")
+        print("  [2] 手动输入目标文件完整路径")
+        try:
+            choice = input("  请输入选择（直接回车取消）: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return None
+        if not choice:
+            return None
+        if choice == "1":
+            return _copy_base_as_template(base_file)
+        if choice == "2":
+            return _manual_input_path()
+        print("  [ERR] 无效选择")
+
+
+def _manual_input_path() -> str | None:
+    """手动输入目标文件完整路径；直接回车取消返回 None。"""
     try:
         path = input("  请输入目标文件完整路径（直接回车取消）: ").strip()
     except (EOFError, KeyboardInterrupt):
@@ -78,8 +100,35 @@ def _input_candidate_path() -> str | None:
     path = os.path.abspath(path)
     if not os.path.isfile(path):
         print("  [ERR] 文件不存在，请检查路径")
-        return _input_candidate_path()
+        return _manual_input_path()
     return path
+
+
+def _copy_base_as_template(base_file: str) -> str | None:
+    """复制基准文件为可编辑目标模板，返回新文件路径；失败返回 None。
+
+    目标命名 `<基准名>-调仓后模板.xlsx`（同名已存在时追加序号 `-N`，避免覆盖
+    用户已编辑的模板）。复制后提示编辑份额；当前副本对比为「无变动」。
+    """
+    config = get_config_cache() or get_config()
+    holdings_dir = config.get("holdings_dir", "")
+    if not holdings_dir or not os.path.isdir(holdings_dir):
+        print(f"  [ERR] 持仓目录不可用: {holdings_dir or '未配置'}")
+        return None
+    stem, ext = os.path.splitext(os.path.basename(base_file))
+    target = os.path.join(holdings_dir, f"{stem}-调仓后模板{ext}")
+    n = 1
+    while os.path.exists(target):
+        target = os.path.join(holdings_dir, f"{stem}-调仓后模板-{n}{ext}")
+        n += 1
+    try:
+        shutil.copy2(base_file, target)
+    except OSError as e:
+        print(f"  [ERR] 复制基准文件失败: {e}")
+        return None
+    print(f"  [OK] 已创建可编辑目标模板: {target}")
+    print("      当前为基准文件副本（对比无变动）；请编辑份额后再运行 W 查看调仓效果")
+    return target
 
 
 def _cmd_whatif() -> None:
