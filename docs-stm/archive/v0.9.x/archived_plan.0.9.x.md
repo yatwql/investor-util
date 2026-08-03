@@ -2,7 +2,7 @@
 
 > 归档时间：2026-08-03
 > 原始文件：`docs-stm/managements/plan.md`（当前迭代部分）
-> 涵盖版本：v0.9.0 ~ v0.9.8（2026-07-30 ~ 2026-08-03）
+> 涵盖版本：v0.9.0 ~ v0.9.9（2026-07-30 ~ 2026-08-03）
 > 归档内容：本迭代已实现的计划项（plan-1/2/3/5/6/7/9/12）及其迭代设计文件
 
 ---
@@ -46,4 +46,4 @@
 - plan-7 设计内容为原 `docs-stm/plan/plan-advanced-analysis.md` §4，2026-08-02 抽取为独立文件移入本目录 `factor-exposure/`；`plan-advanced-analysis.md` 已同步裁剪（保留 plan-4/5/6 内容）。
 - 2026-08-03 追加归档已完成项记录（迁移自 `plan.md`）：plan-2/3/9/12（v0.9.7 发布）、plan-5/6（v0.9.8 发布）。
 - 2026-08-03 完成项设计文档统一归档至本目录（目录名与内容相关、混合内容按任务拆分）：plan-2/3 → `correlation-drawdown/`（设计 + 实施总纲，原 `plan-implement-2-3-9.md` 按内容拆分）、plan-9 → `first-run-wizard/`、plan-5 → `whatif-simulation/`、plan-6 → `portfolio-evolution/`、rf-122 → `fix-deepseek-thinking/`、rf-150 → `qa-concentration-chart-optimization/`；`docs-stm/plan/` 仅保留未完成项（plan-4 已放弃 / plan-8/10/11）设计文档。
-- 版本号：本归档涵盖已发布版本 v0.9.0 ~ v0.9.8（当前开发版本 v0.9.9-dev，归档时点为 2026-08-03），归档目录按版本段命名 v0.9.x。
+- 版本号：本归档涵盖已发布版本 v0.9.0 ~ v0.9.9（当前开发版本 v0.9.10-dev，归档时点为 2026-08-03），归档目录按版本段命名 v0.9.x。
