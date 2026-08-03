@@ -49,6 +49,7 @@
 | R10 | **配置一致性**：Web 运行期外部改 `config.json`，run 内读到不一致参数 | 低 | **每个 run 启动时取一次 `get_config()` 快照**，run 期间不受外部修改影响（对齐 `_handle_report` 一次性读取语义） |
 | R11 | **磁盘占用**：产物归档（180 天）+ `perf_history.jsonl` + 上传文件长期增长 | 低 | 上传文件生成后即清理；产物沿用 `excel_writer` 180 天保留；`perf_history.jsonl` 增长记录为观察项（后续补清理） |
 | R12 | **浏览器兼容**：前端 JS 兼容性 | 低 | 目标 Chrome/Edge 90+、Firefox 90+（对齐 plan-1 兼容基线）；进度轮询用标准 fetch/EventSource |
+| R13 | **产物半写**：run 中途失败留残缺最新版产物（HTML 已写/Excel 未写，管线固定文件名覆盖写） | 中 | web 层不额外处理（管线既有行为）；run 失败后前端提示"本次未完整生成，最新版文件可能不完整，建议重新生成"；建议重跑覆盖 |
 
 ---
 
@@ -89,7 +90,7 @@ core/perf.load_history()                 # 历史运行记录
 
 管线本身**同步阻塞**（无内建队列/asyncio）。Web 层方案：
 
-1. **RunManager**：维护**单 worker 串行队列**——同一时刻仅执行一个生成任务，后续任务排队等待（消除并发产物覆盖竞态，见复盘 6）。`submit(...)` 把任务排入队列，worker 线程逐个执行，返回 `run_id`；线程名 `web_run_*`（对齐既有 `orch_llm_news` 风格）。**每个 run 在出队执行时取一次 `get_config()` 快照**，run 期间不受外部配置修改影响（R10）。
+1. **RunManager**：维护**单 worker 串行队列**——同一时刻仅执行一个生成任务，后续任务排队等待（消除并发产物覆盖竞态，见复盘 6）。`submit(...)` 把任务排入队列，worker 线程逐个执行，返回 `run_id`；线程名 `web_run_*`（对齐既有 `orch_llm_news` 风格）。**每个 run 在出队执行时取一次 `get_config()` 快照**，run 期间不受外部配置修改影响（R10）。**参数优先级**：前端提交的表单值**优先**，快照默认仅用于表单未填项（表单默认参数在页面加载时取一次 `get_config()`，页面刷新即重取）——避免页面参数与 run 快照时刻不一致（复盘 28）。**run 记录保存实际 `output_dir`（出队快照）**，产物 URL/下载基于 run 记录而非实时 config（外部改 output_dir 时指向不错目录，复盘 32）。**跨进程产物竞态**：单 worker 队列仅防进程内；多进程（多开 web、或 web 与 TUI/CLI 并行）共享同一 `output_dir` 会互相覆盖最新版产物——文档化"同一 `output_dir` 仅一个入口运行"，server 启动时检测 `output_dir` 锁文件有占用则警告（复盘 29）。**run 状态不持久化（权衡）**：MVP 内存态，服务重启即丢（进行中 run）；历史记录页数据源 = `load_history()` 已完成 run 的 perf 快照。**不持久化的权衡**：持久化需新增存储格式（sqlite/jsonl）+ 过期清理 + 并发写竞态处理，与 C3 原子写约束叠加复杂度；收益却是"重启后恢复一次运行中 run"——单人工具重新上传重跑成本低，故 MVP 明确不持久化（复盘 39）。
 2. **WebProgressReporter(ProgressReporter)**：重写 `info/ok/warn/error/add_error/timer`，事件追加到进程内 `dict[run_id, deque[(seq, level, msg, phase)]]`。管线零改动（只注入 reporter）。**事件缓冲每 run 上限 500 条**（滚动丢弃最旧），防内存膨胀（复盘 13）。
 3. **轮询**：`GET /api/runs/{id}/events?after=N` 返回序号 > N 的增量事件；前端 setInterval 轮询（2s，见复盘 15 节流）。
 4. **完成**：worker 结束写 run 记录（`ReportResult.exit_code`、`errors`、耗时、产物路径）；`perf_history.jsonl` 由管线自动落盘，`load_history()` 供「历史记录」页。
@@ -132,11 +133,11 @@ src/python/web/
 | 模块 | 职责 | 复用点 |
 |------|------|--------|
 | `server.py` | sys.path 注入（对齐 `cli.py:13-17`）、`main()`、`setup_logger()`、`init_config(config_path)`、**参数 `--host`（默认 `127.0.0.1`）/`--port`（默认 `8000`）/`--config`（对齐 CLI）**、**端口占用检测**（占用则报错并提示换端口）、`app.run(host, port, threaded=True)`。**生成线程 `daemon=True`**：`Ctrl+C` 时进程可正常退出（任务丢弃，R4 文档化） | `core.logger.setup_logger`、`config.init_config` |
-| `app.py` | `create_app(run_manager=None)` 工厂（Flask test_client 可测）：支持**注入 run_manager**（默认全局单例，测试传内存 fake 免 patch 全局）、路由蓝图注册、**统一 JSON 错误处理**：`errorhandler(500)` 返回 `{"ok": false, "error": "服务器内部错误"}` + 记录 error 日志（不泄绝对路径）；413→中文上传超限提示 | — |
+| `app.py` | `create_app(run_manager=None)` 工厂（Flask test_client 可测）：支持**注入 run_manager**（默认全局单例，测试传内存 fake 免 patch 全局）、路由蓝图注册、**统一 JSON 错误处理**：`errorhandler(500)` 返回 `{"ok": false, "error": "服务器内部错误"}` + 记录 error 日志（不泄绝对路径）；413→中文上传超限提示。**`before_request` 生成 `request_id` 注入日志**（请求可关联到 run，错误定位；复盘 38） | — |
 | `handlers.py` | 各路由 handler；生成 handler 复刻 `cli.py:_handle_report` 模板（读持仓→建 reporter→generate_report→映射 exit_code） | `orchestrator.generate_report`、`core.reader.read_holdings`、`core.check_sources.run_health_checks`、`core.perf.load_history` |
 | `upload.py` | 上传文件校验/净化/`mkstemp` 落盘/清理（纯函数） | `tempfile`、`core.reader.get_xlsx_info`（可选预览元信息） |
 | `progress.py` | `WebProgressReporter` 按 run_id 缓冲事件；事件 `seq` 用**单调递增整数**（非时间戳，测试确定性） | `report.progress.ProgressReporter`（继承） |
-| `runs.py` | RunManager 单 worker 队列 + run 状态/事件队列；**注册表与事件队列均用 `threading.Lock` 保护**（worker 写、HTTP 线程读；事件读取做快照避免遍历中变更） | `threading.Thread` + `threading.Lock`（对齐既有线程池风格） |
+| `runs.py` | RunManager 单 worker 队列 + run 状态/事件队列；**注册表与事件队列均用 `threading.Lock` 保护**（worker 写、HTTP 线程读；事件读取做快照避免遍历中变更）。**worker 线程 `try/except` 包裹**：异常→run failed 状态 + error 日志（不崩溃服务、不静默挂起）；上传读流/临时文件用 `with` 确保关闭（资源泄漏审计，复盘 36） | `threading.Thread` + `threading.Lock`（对齐既有线程池风格） |
 
 ---
 
@@ -153,7 +154,7 @@ src/python/web/
 | C5 | HTTP 客户端统一 | **遵守项**：Web 若发起出站 HTTP（未来）必须走 `core/http_client.py` |
 | C6 | Provider Chain 必经 | **继承项**：管线内部 |
 | C7 | 报告序号不可硬编码 | **继承项**：管线内部 |
-| C8 | 日志统一（禁 print） | **遵守项**：Web 服务日志用 `logging.getLogger("invest")`；`WebProgressReporter` 事件进内存队列并写 logger，不 print。**werkzeug/Flask 自带访问日志纳入 invest logger 统一通道（级别调低或关闭），禁止双通道** |
+| C8 | 日志统一（禁 print） | **遵守项**：Web 服务日志用 `logging.getLogger("invest")`；`WebProgressReporter` 事件进内存队列并写 logger，不 print。**werkzeug/Flask 自带访问日志纳入 invest logger 统一通道（级别调低或关闭），禁止双通道**。**日志隐私边界**：记录请求/生成/错误事件，**不记录上传文件名、持仓内容、绝对路径全文**（对齐既有 `_mask_api_key` 脱敏基线，复盘 23） |
 | C9 | LLM 模块注册 | **继承项**：管线内部 |
 | C10 | 新闻召回策略可配置 | **继承项**：管线内部 |
 | C11 | 测试标记强制 | **遵守项**：新增 `unit_web` marker 注册到 `conftest.py`，web 测试必标注 |
@@ -177,12 +178,13 @@ src/python/web/
 
 | 环节 | 措施 |
 |------|------|
-| 文件名净化 | `werkzeug.utils.secure_filename` 剥离路径/非法字符（补 `.xlsx` 扩展名强制白名单） |
-| 扩展名校验 | 仅接受 `.xlsx`（拒绝 `.xls`/`.xlsm`/宏等，openpyxl 不支持 xls） |
+| 文件名净化 | **弃用 `werkzeug.utils.secure_filename`**（会剥离中文——`个人投资.xlsx` → `xlsx`，中文持仓文件名是仓库常态，复盘 30 关键 bug）；改**服务端重命名**为无冲突安全临时名 `uploads/{uuid}.xlsx`（丢弃原始文件名，内容即身份，天然防路径穿越/中文问题） |
+| 扩展名校验 | 仅接受 `.xlsx`（拒绝 `.xls`/`.xlsm`/宏等，openpyxl 不支持 xls）；**大小写归一化 `.lower()` 后校验** |
 | 大小上限 | 10MB 上限（读流计数，超限即拒） |
 | 内容校验 | 读前 4 字节校验 PK zip 魔数（`PK\x03\x04`），防改扩展名伪装；zip-bomb 由大小上限兜底 |
 | 落盘 | `tempfile.mkstemp` 到 `data/holdings/uploads/`（基于 `PROJECT_ROOT` 绝对化拼接，不依赖 CWD，对齐 C16；gitignore 排除），`os.replace` 原子写 |
-| 解析 | 复用 `read_holdings`（表头/数值/行级容错已有）；空持仓/无有效账户则拒绝并返回中文错误 |
+| 解析 | **上传时立即内容预检**：复用 `read_holdings`（表头/数值/行级容错已有）；空持仓/无有效账户则拒绝并返回中文错误（避免"上传成功、生成失败"的坏体验）；预检通过的路径绑定 `file_id`，生成时直接复用。**行数上限**（如 5000 行，超限拒绝防超大文件解析过载）；持仓代码类型判定由管线内部 C1 完成，web 不判定 |
+| file_id | `secrets.token_urlsafe(16)` 生成（不可预测，防枚举推测他人/过期文件）；内存映射 `file_id→路径`，TTL 过期即失效 |
 | 清理 | 生成任务结束**立即删除**上传临时文件；**未消费文件设 TTL（1h）定时清理**；启动时清理全部残留。`file_id→路径` 为内存映射，服务重启即失效，残留由启动清理兜底（R11 关联） |
 
 ### 6.2 预览/下载防穿越
@@ -212,19 +214,23 @@ src/python/web/
 
 响应统一信封：`{"ok": bool, "data": ..., "error": str|null}`（对齐仓库 API Response Format 惯例）。
 
-> **应用级限制**：`MAX_CONTENT_LENGTH = 10MB`（超限 Flask 返回 413）；上传路由额外读流计数兜底。上传/轮询/健康等端点均设合理超时。
+> **应用级限制**：`MAX_CONTENT_LENGTH = 10MB`（超限 Flask 返回 413）；上传路由额外读流计数兜底。**超时策略**：上传读流设 60s 超时（慢速连接防长时间占用）；前端 fetch 设 `AbortSignal.timeout`（10s，轮询端点除外）；`/api/health` 缓存命中瞬时返回（复盘 7）。
+
+> **幂等与重试**：上传/生成**不引入服务端幂等**（MVP；重复上传由 TTL 清理 + 前端按钮禁用防连击兜底，重复生成由单 worker 队列自然排队）；`POST /api/runs` 队列满返回 429 中文提示"已有任务在跑，排队或稍后再试"（复盘 37）。
+
+> **错误契约（code + 中文 msg）**：错误响应统一 `{"ok": false, "error_code": str|null, "error": 中文文案}`。`error` 面向用户**全中文**（复用 R9/熔断提示等既有中文文案风格）；`error_code` 为机器可判定的短标识（`UPLOAD_TOO_LARGE`/`UPLOAD_BAD_FILE`/`RUN_QUEUE_FULL`/`FILE_EXPIRED`/`BAD_PARAM`/`SERVER_ERROR` 等），**前端按 code 分支动作（是否可重试/按钮态），不靠解析中文文案**（复盘 40）。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/` | 单页应用（index.html） |
-| POST | `/api/upload` | 上传 xlsx，校验后返回 `{file_id, sheets, rows}`（`get_xlsx_info` 预览元信息） |
-| POST | `/api/runs` | 触发生成：body `{file_id, report_type, fetch_history, force_llm}` → `{run_id}`（默认参数来自 `get_config()`） |
+| POST | `/api/upload` | 上传 xlsx，**立即内容预检**（`read_holdings` 空持仓/无有效账户即拒），校验后返回 `{file_id, sheets, rows}`（`sheets`=账户列表、`rows`=总行数；契约固定，前端据此渲染） |
+| POST | `/api/runs` | 触发生成：body `{file_id, report_type, fetch_history, force_llm}` → `{run_id}`。**枚举校验**：`report_type ∈ {basic,both,full}`、`fetch_history/force_llm ∈ bool`，非法返回 400 中文错误；**校验 file_id 存在且未过期**（TTL 清理后引用→404） |
 | GET | `/api/runs` | 运行中/最近 run 列表 |
 | GET | `/api/runs/{id}` | run 详情：状态（running/done/failed）、阶段耗时、`exit_code`、errors、产物路径 |
 | GET | `/api/runs/{id}/events?after=N` | 增量进度事件（轮询），`N` 为最后已读序号 |
-| GET | `/api/runs/history` | `load_history()` 历史运行记录（perf 快照，含阶段耗时） |
+| GET | `/api/runs/history` | `load_history()` 历史运行记录（perf 快照，含阶段耗时）。**结果短缓存 5s**（防频繁轮询重复读 `perf_history.jsonl`）——该 jsonl 属运行时状态记录（非缓存，不受 C2 约束），但 Web 层加短缓存防重复读文件 |
 | GET | `/api/reports/<path>` | `send_from_directory(output_dir, path)` 预览/下载（扩展名白名单） |
-| GET | `/api/health` | `run_health_checks()` 数据源健康 JSON（复用现成结构化数据）；**历史趋势读 `datasource_health.jsonl`（与 plan-10 共享该数据源，避免重复实现）**；结果缓存 60s（§6.3 D 类缓解） |
+| GET | `/api/health` | `run_health_checks()` 数据源健康 JSON（复用现成结构化数据）；**结果仅内存缓存展示（60s），不重复落盘 `datasource_health.jsonl`**（落盘归管线健康检查，避免 web 轮询触发真实探测的副作用/重复写）；**历史趋势读 `load_health_history()`（与 plan-10 共享该数据源）** |
 
 `report_type` 映射：`basic`→仅 Excel / `both`→HTML+Excel（无 LLM）/ `full`→HTML+Excel+LLM（对齐 CLI `--type` 语义）。
 
@@ -238,7 +244,9 @@ src/python/web/
 2. **生成区**：报告格式（basic/both/full）、历史走势、强制 LLM 开关 → 提交 → 进度条（阶段名 + 序号，来自 `/events` 轮询）→ 完成后显示产物按钮（预览 HTML / 下载 Excel）。**失败态**：按 `exit_code` 映射展示（0 成功 / 1 部分失败=黄色告警列 errors / 2 严重=红色），`errors` 逐条展示 + 通用建议文案（如"数据源暂不可用，稍后重试"——复用 R9 熔断提示）；提供「重新生成」按钮；
 3. **状态区**：数据源健康（`/api/health`）+ 历史运行记录（`/api/runs/history`）。
 
-样式遵循 `design-quality` 原则（不做默认模板感）；语言中文；加载态/错误态明确。
+样式遵循 `design-quality` 原则（不做默认模板感）；语言中文；加载态/错误态明确。**错误展示统一**：取服务端 `error` 中文文案直显；`error_code` 驱动分支动作（重试/提示/禁用按钮），中文文案不前端硬编码映射（避免服务端/前端文案漂移，复盘 40）。
+
+**XSS 防护（渲染侧）**：前端**一律 `textContent`/DOM API 渲染服务端返回字符串**（errors/事件/状态，可能含数据源名等不可信内容），**禁止 `innerHTML`**（对齐既有 `test_security.py` XSS 基线；报告 HTML 自身由 Jinja2 autoescape 防护，web 前端是第二道防线，复盘 34）。
 
 **可访问性（a11y）**：
 - 键盘可达：上传区（`<label for=file>` + 按钮）、表单、进度条全部可 Tab 聚焦 + Enter 操作；
@@ -247,6 +255,12 @@ src/python/web/
 - 错误/成功状态 `aria-live="polite"` 播报。
 
 **轮询节流**：`setInterval` 2s 固定轮询（增量 `after=N` 已省流量）；页面不可见时 `visibilitychange` 暂停，恢复可见立即同步一次。
+
+**状态恢复（刷新/重连）**：前端 `localStorage` 存最近 `run_id`，页面刷新后自动重连 `/api/runs/{id}` 恢复进度/结果（避免 full 报告结果刷新即丢）；`file_id` 失效（TTL/服务重启）时提示重新上传。
+
+**静态资源与缓存**：web 静态（`main.js`/`style.css`）带版本查询串 `?v={APP_VERSION}`（防浏览器缓存旧 JS 导致功能异常）；web 只服务自己的 `web/static/`，报告资产（`chart.min.js` 等）经 `/api/reports` 从 `output_dir` 提供——两处静态分离，不混同（复盘 31）。
+
+**前端工具链权衡**：前端用**原生 JS（ES6）+ 单 index.html + 单 CSS**，**不引入 npm/webpack/vite/React 等构建链**——仓库至今零 node 工具链，引入需新增 node 依赖 + 构建产物版本管理，对单文件前端是净技术债；当前复杂度（上传/表单/轮询/进度渲染）原生实现完全可控，仅当出现多视图路由/组件化需求时再评估（复盘 43）。
 
 ---
 
@@ -264,6 +278,7 @@ src/python/web/
 ### 9.2 门禁集成（关键）
 
 - `unit_web` marker **必须纳入 `scripts/test_runner.py` MODES**：dev-verify（提交前）、verify（合入前）、regression（发布前）的 unit 集合均加 `unit_web`，否则 web 测试写了但门禁不跑（形同虚设）。
+- **CI 集成**：`unit_web` 在 MODES 配置里**单点定义**（一处改，三模式自动继承，杜绝矩阵漏配）；CI/干净环境用 `test_runner.py --mode dev-verify` 覆盖 web 核心测试，并验证 `launch.sh` 增量安装 Flask 在干净环境可完成（复盘 41）。
 - `edge` 测试被 dev-verify 排除：上传/预览安全边缘用例在 **verify / regression** 模式覆盖（对齐既有 `test_security_edge.py` 的归属）。
 - 新增 web 测试后刷新 `docs-stm/managements/test-coverage.md` 数据快照（发布前 `collect-test-coverage.py` 强制，见 §11）。
 - **发布前验证**：`launch.sh` 增量安装 Flask 在干净环境可离线完成（依赖从 PyPI 拉取，发布回归清单确认有网环境可安装）。
@@ -307,10 +322,13 @@ src/python/web/
 - `scripts/test_runner.py`：MODES 的 dev-verify / verify 模式 unit 集合加 `unit_web`（门禁集成，见 §9.2）
 - `src/test/conftest.py`：注册 `unit_web` marker + run 管理器重置 fixture（+ uploads 目录隔离）
 - `src/test/unit/conftest.py`：`_DIR_TO_MARKER` 登记 `unit_web`
-- `docs-stm/managements/folders.md`：目录树登记 `src/python/web/`、`src/test/unit/web/`、`docs-stm/plan/plan-web-ui-implementation.md`；项目统计表更新
+- `docs-stm/managements/folders.md`：目录树登记 `src/python/web/`、`src/test/unit/web/`、`docs-stm/plan/plan-web-ui-implementation.md`；项目统计表更新（web 模块代码行数/文件数/测试用例数，发布前 `collect-test-coverage.py` 刷新数据快照，复盘 42）
+- `docs-stm/plan/plan-web-ui-implementation.md`（本文档）：实施完成后随 `archive/v0.x.x/web-ui/` 归档；归档版本头部同步发布版本号标记（设计文档不在 check-version-consistency 清单内，但归档需可追溯，复盘 42）
+- **发布门禁全链核对**：P2 发布前依 CLAUDE.md 发布门禁逐项过——`test_runner.py --mode verify,regression`（含 `unit_web`）+ 3 个 `check-*.py --ci` + 版本号一致（`check-version-consistency.py` 全 [OK]）+ `collect-test-coverage.py` 数据快照刷新（folders.md 统计/test-coverage.md/datasource 文档），缺一不可（复盘 42）
 - `docs-stm/managements/plan.md`：plan-8 条目加本文档链接（不展开细节）
 - `docs-stm/manuals/how-to-start.md`：新增 Web 入口启动说明（阶段 3）
 - `docs-stm/managements/test-coverage.md`：新增 web 测试计数数据快照（发布前 `collect-test-coverage.py` 刷新）
+- **发布前安全审计（步骤）**：`bandit` 静态扫描 `src/python/web/`（上传/下载/输入边界为重点）+ `security-reviewer` agent 专项审计，对齐既有 `test_security.py` 基线；CRITICAL/HIGH 修复后方可过 P2 发布门禁（复盘 44）
 
 ### 明确不动
 - `report/orchestrator.py`、`report/progress.py`、`core/reader.py`、`config/*`：全部复用，**零改动**
@@ -363,6 +381,53 @@ src/python/web/
 5. **正文与复盘一致性**：§1~§12 修订均可在 §13 复盘表找到对应轮次，可追溯。
 
 **设计冻结**：本文档作为 plan-8 实施依据，实施阶段 1~3 按 §10 推进，回归验收按 §9 门禁集成。
+
+---
+
+## 14. 第二轮迭代复盘记录（25 轮，轮次 21~45）
+
+> **复盘方法（同 §13）**：每轮聚焦一个更深维度，综合审视收益/风险/技术债，受 C1~C20 架构约束，从整体架构出发。每轮发现即**回落优化**到正文，再进入下一轮。
+
+| 轮 | 维度 | 核心发现 | 回落优化（章节） |
+|:--:|------|----------|------------------|
+| 21 | 输入契约与校验深度 | upload 返回契约未定义；run 参数枚举未校验；上传校验≠生成校验 | §7 补枚举校验；§6.1 上传即内容预检 |
+| 22 | file_id 安全与绑定 | file_id 可枚举推测；runs 引用未校验存在性 | §6.1 file_id 用 secrets；runs 校验 file_id |
+| 23 | 日志隐私与脱敏 | 上传文件名/持仓内容可能进日志 | §5 C8 补：日志不记录文件名/持仓/路径全文 |
+| 24 | 缓存一致性读取边界 | load_history 频繁读文件；perf 文件非缓存 | §7 history 短缓存；明确 perf 非缓存读取边界 |
+| 25 | 崩溃恢复与产物原子性 | 进程崩溃 run 丢失；产物可能半写 | §3 补 R13；run 失败提示产物可能不完整 |
+| 26 | 超时与慢请求 | 上传读流/健康检查无超时 | §7 补超时策略；前端 AbortSignal |
+| 27 | 前端状态恢复 | 刷新丢失 file_id/run_id 进度 | §8 补 localStorage 最近 run 重连 |
+| 28 | 配置快照边界 | 表单默认参数与 run 快照时刻不一致 | §4.3 明确提交表单值优先、页面加载取默认 |
+| 29 | 多实例/跨进程竞态 | 多进程共享 output_dir 覆盖产物 | §4.3 文档化同目录单入口；启动 lock 检测 |
+| 30 | 平台兼容（关键 bug） | secure_filename 剥离中文（持仓文件名常态） | §6.1 弃用 secure_filename；uuid 重命名 |
+| 31 | 静态资源与缓存 | main.js 无版本化；web 静态与报告资产边界 | §8 补资源版本化；分离 web static 与 output_dir |
+| 32 | output_dir 运行时边界 | run 产物 URL 应基于 run 实际 output_dir | §4.3 run 记录保存实际 output_dir |
+| 33 | 异常持仓边界 | 超大行数/特殊字符/空账户 | §6.1 行数上限；§9 补 edge 用例 |
+| 34 | 前端 XSS 传播 | errors/事件消息 innerHTML 渲染风险 | §8 前端一律 textContent 渲染 |
+| 35 | 健康检查副作用 | run_health_checks 真实请求/重复落盘 | §7 健康结果仅缓存展示不重复落盘 |
+| 36 | 资源泄漏审计 | 文件句柄/worker 异常静默 | §4.4 worker try/except；with 关闭文件 |
+| 37 | 幂等与重试 | 重复上传/双击提交 | §7 前端防连击；429 队列满提示 |
+| 38 | 可观测性深化 | 无请求 ID 关联 run | §5 C8 补 request_id 日志注入 |
+| 39 | run 状态持久化权衡 | 内存 run 重启丢失；历史页靠 perf | §4.3 明确 MVP 不持久化 run 状态 |
+| 40 | 中文一致性 | API 错误/UI 文案统一中文 | §7/§8 错误 code+中文 msg 约定 |
+| 41 | CI 集成 | 3 矩阵需含 unit_web；依赖可装 | §9.2/§11 补 CI 集成 |
+| 42 | 发布门禁全链 | folders.md 统计表/数据快照/文档版本头 | §11 补发布前 folders 统计 + 新文档版本头 |
+| 43 | 前端工具链权衡 | 引入 bundler 是技术债 | §4.4/§8 明确不引入前端构建链 |
+| 44 | 安全审计清单 | bandit + security-reviewer 专项审计 | §11 补发布前审计步骤 |
+| 45 | 整体一致性收尾 | 汇总 21-44、MVP 不膨胀、无过设计 | 全文档一致性核验 |
+
+### 第 45 轮：第二轮最终一致性评审结论
+
+**评审对象**：轮次 21~44 的全部回落优化是否在正文落地、互相一致，且未引入过度设计。
+
+**一致性核验（逐项）**：
+1. **正文已落地核对**：21 输入契约/枚举校验（§6.1、§7）、22 file_id 安全（§6.1）、23 日志隐私（§5 C8）、24 history 短缓存（§7）、25 崩溃恢复（§3 R13）、26 超时策略（§7）、27 状态恢复（§8）、28 配置快照（§4.3）、29 跨进程竞态（§4.3）、30 中文文件名（§6.1）、31 静态分离+版本化（§8）、32 run 实际 output_dir（§4.3）、33 异常持仓（§6.1、§9）、34 前端 XSS（§8）、35 健康检查副作用（§7）、36 资源泄漏（§4.4）、37 幂等重试（§7）、38 request_id（§5 C8、§4.4）、39 run 状态不持久化权衡（§4.3）、40 中文错误契约（§7、§8）、41 CI 集成（§9.2）、42 发布门禁全链（§11）、43 前端工具链（§8）、44 安全审计（§11）——**24 轮均对应正文修改点，无悬空结论**。
+2. **约束符合性终检**：C3 原子写（上传落盘）、C8 日志统一（request_id + 禁 print + 隐私边界）、C11/C12/C13/C14 测试规范（unit_web marker、edge 文件隔离、敏感路径隔离、单例重置）、C16 路径绝对化、C18 凭据隔离——**新增 web 代码不触碰管线共享层，所有遵守项集中于薄层自身**，与 §5 表一致。
+3. **MVP 不膨胀检查**：演进路径（SSE/并发/历史页/LLM 在线配置）**全部带触发条件**，无提前建设；`report/` 共享层**零改动**（§11 明确不动）；前端不引入构建链（复盘 43）；run 状态不持久化（复盘 39）——**收益/成本权衡均显式记录**。
+4. **风险闭环**：§3 风险表（R1~R13）+ STRIDE 威胁模型 + 上传/预览双重安全防线 + 发布前 bandit/security-reviewer 审计步骤——**安全与稳定性风险均有缓解措施或显式接受记录**。
+5. **文档间一致性**：§12 与 plan.md 衔接（仅加链接、plan-8 编号不变）；§10 阶段工作量与 plan.md 3d/1.5d/1d 一致；附录调研结论与正文引用符号/行号一致。
+
+**最终评审结论**：**通过**。设计在 45 轮复盘中收敛——「薄入口 + 共享管线 + 单 worker 串行 + 上传安全 + 内存进度缓冲」的架构成立，约束符合性、风险缓解、MVP 边界三方面均闭合。**实施前遗留动作仅 3 项**：① `src/python/core/constants.py` 与 9 份管理文档的版本头保持 `0.10.1-dev` 一致（发布时走 check-version-consistency.py）；② 阶段 1 编码时先注册 `unit_web` marker 再写测试（防测试写了不跑）；③ 安全审计步骤在阶段 1 上传链路完成后即执行一次，不拖到发布前。
 
 ---
 
