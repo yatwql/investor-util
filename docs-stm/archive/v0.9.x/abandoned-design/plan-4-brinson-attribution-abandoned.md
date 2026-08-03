@@ -1,5 +1,9 @@
 # 高级分析功能：业绩归因（plan-4，已放弃）
 
+> **📦 已归档（已放弃设计决策依据）**：plan-4 业绩归因（Brinson 分解）已于 2026-07-20 feasibility review 确认放弃（3/4 关键数据源不可突破），本文件归档至 `abandoned-design/` 作为放弃设计决策的历史依据，供未来数据源改善时重新评估。
+> 放弃决策原始讨论：`archive/v0.7.x/better-investment-advice/discussion-better-investment-advice.md` §4.2 不做清单。
+> 同源计划：plan-5/6/7 已完成并归档至 `v0.9.x/whatif-simulation/`、`v0.9.x/portfolio-evolution/`、`v0.9.x/factor-exposure/`。
+
 > **⚠ plan-4 业绩归因（Brinson 分解）已于 2026-07-20 的 feasibility review 中确认放弃。**
 > 4 个输入中 **3 个缺口不可突破**：
 > 1. ❌ 行业指数 K 线 — 东方财富 BK 指数历史数据不稳定

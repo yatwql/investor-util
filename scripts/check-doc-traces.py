@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """文档历史变更痕迹检查脚本。
 
-扫描面向读者的仓库文档（.md 全文），检查是否含代码历史迭代、版本号标记、
-任务编号引用、归档文件引用等变更痕迹。此类文档应只描述"当前是什么/做什么"，
-不应记录"从哪里来、怎么变的"；历史记录应集中在管理文档
-（changelog.md / review-findings.md / plan.md）中。
+检查面向读者的仓库文档是否残留历史痕迹，保证正文只反映最新状态。
+
+两条核心规则：
+  1. 文档正文内容不得带有历史痕迹和历史变更（版本号标记、来源叙述、
+     原/旧实现、迁移/重命名、任务编号引用、迭代标记等），只描述
+     "当前是什么/做什么"。changelog.md / plan.md / review-findings.md
+     例外（它们是历史/计划记录）。
+  2. 除上述三个例外文档外，其他管理文档与用户文档的正文内容不得引用
+     归档文件（docs-stm/archive/ 下的目录或 archived_*.md）。
+     例外：folders.md 的目录树（│ ├ └ 行）可引用 archive 目录及其
+     文件名——目录树记录项目结构，archive/ 条目是结构的一部分。
 
 受检范围：
   - 项目根 README.md
@@ -16,15 +23,19 @@
   - docs-stm/archive/ 归档文档
   - docs-stm/tmp/ 运行时临时产物
 
-豁免内容（当前状态 / 流程描述，非历史痕迹）：
+豁免内容（当前状态 / 流程描述 / 结构记录，非历史痕迹）：
   - 管理文档版本头（"文档版本：0.9.10-dev"，版本号一致性要求，仅行首锚定豁免）
   - Markdown 围栏代码块（``` 包裹）内命令/配置示例，非文档叙述
   - 需求编号（requirements.md 的 R-LLM-ER-01 等需求条目 ID）
-  - folders.md 目录树行（│ ├ └ 开头，记录目录结构，含 archive/ 属合法指向）
+  - folders.md 目录树行（│ ├ └ 开头，记录目录结构，可含 archive/ 指向）
+  - folders.md 统计表行（如 | ├ archive/ | 版本归档 |，记录目录计数）
   - 当前能力描述（暂不支持 / 不再支持 / 不正式支持）
+  - 运行时产物归档描述（"归档版" / "归档目录" / "历史归档至 YYYYMMDD/"——
+    指 reports/ 下的报告文件按日期归档，非仓库 docs-stm/archive/）
   - 门禁与发布流程描述（发布版本前 / P0~P3 / --mode / git tag / git pull）
   - 工具使用场景（pytest --ff 等）
   - 模型/环境名（Gemini 旧版 / 旧版 Python）
+  - 工具自身说明（描述脚本跳过/豁免归档目录与归档引用）
 
 用法：
   python scripts/check-doc-traces.py           # 检查全部
@@ -74,10 +85,28 @@ SKIP_DIRS = {"archive", "plan", "tmp"}
 def _doc_patterns() -> list[tuple[str, str, str]]:
     """文档历史痕迹模式（针对 .md 全文语义）。"""
     return [
-        # ── ARCHIVE：归档引用 ──
+        # ── ARCHIVE：归档引用（指向仓库 docs-stm/archive/ 的历史记录） ──
+        #  仓库归档路径引用（docs-stm/archive/、../archive/、裸 archive/）
         (r"(?:docs-stm/|\.\./)?archive/", "ARCHIVE", "归档目录引用（archive/）"),
+        #  归档文件名引用（archived_*.md）
         (r"archived_[A-Za-z0-9._-]+", "ARCHIVE", "归档文件引用（archived_*）"),
+        #  归档路径说明（"归档文件：`../archive/...`"）
         (r"归档文件\s*[:：]?\s*[`]?archive/", "ARCHIVE", "归档路径说明"),
+        #  无显式 archive/ 前缀的归档引用（已/可/应 归档至 某目录），如
+        #  "已归档至 archive/"、"归档至 docs-stm/archive/"——须含"归档"动词 + 归档目标
+        (r"归档\s*(?:至|到|于|在|入|完成|处理)\s*[`]?(?:docs-stm/|\.\./)?archive", "ARCHIVE", "归档引用（归档至 archive/ 等）"),
+        #  明确指向归档文件的叙述（"归档文件：archived_x.md" / "归档于 archived_*"）
+        (r"(?:归档文件|归档于|归档到|归档至)\s*[:：]?\s*[`]?archived_", "ARCHIVE", "归档文件引用（归档至 archived_*）"),
+        #  完成态归档动作（"已归档至 X" / "归档完成"），指向历史归档行为。
+        #  收紧判定：仅匹配"已归档至/到/于 + 非运行时产物目标"——归档目标不是
+        #  reports/、YYYYMMDD/ 等运行时产物（如"报告已归档到 reports/"、"归档至
+        #  YYYYMMDD/ 子目录"为当前功能描述，应豁免）。孤立的"已归档"不命中
+        #  （"已归档版报告"是运行时产物描述）。
+        #  lookahead 内部带 (?:\s*)：外层的贪婪 \s* 在回溯为 0 个空白时，
+        #  视线会落在空格字符上导致排除失败，故让 lookahead 自身也能跳过空白。
+        #  排除的运行时产物目标：reports?/（报告输出目录）、报告输出目录（中文写法）、
+        #  `?\d{8}`?（纯数字日期目录）、`?YYYYMMDD（日期模板）、日期子目录。
+        (r"归档\s*(?:至|到|于|在|完成|处理)\s*(?!(?:\s*)(?:reports?/|报告输出目录|`?\d{8}`?|`?YYYYMMDD|日期子目录))", "ARCHIVE", "归档引用（归档至某处/归档完成）"),
         # ── CODE：任务编号引用 ──
         (r"\brf-\d+", "CODE", "任务编号引用（rf-N）"),
         (r"\bplan-\d+", "CODE", "任务编号引用（plan-N）"),
@@ -156,8 +185,11 @@ def _exclude_lines() -> list[re.Pattern]:
         # ── folders.md 目录结构记录（含 archive/ 属合法指向） ──
         re.compile(r"^\s*[│├└]"),  # 目录树行
         re.compile(r"archive/\s*\|"),  # 统计表行（如 | ├ archive/ | 版本归档 |）
-        # ── 工具自身说明（描述脚本跳过/豁免归档目录，而非引用归档内容） ──
-        re.compile(r"(?:豁免|跳过|不扫描|排除).*archive/"),
+        # ── 工具自身说明（描述脚本跳过/豁免/禁止归档目录引用，而非引用归档内容） ──
+        #  匹配"豁免/跳过/不扫描/排除/检查/不得/禁止 归档目录或归档引用"的工具说明行
+        #  （含"正文不得引用 docs-stm/archive/"这类规则叙述）；
+        #  可能只写"归档文件引用"而不含 archive/ 路径，故用"归档(?:目录|文件|引用|路径)"兼容
+        re.compile(r"(?:豁免|跳过|不扫描|排除|检查|不得|禁止).*(?:archive/|归档(?:目录|文件|引用|路径))"),
         re.compile(r"版本头豁免"),  # 工具自身说明（描述版本头豁免规则，含示例版本号）
     ]
 

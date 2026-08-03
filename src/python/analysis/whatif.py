@@ -3,7 +3,7 @@
 对两份持仓（基准 base / 目标 candidate）做**成本口径**截面比较，
 输出 C19 契约 `whatif_data`，供 Excel 调仓模拟报告与 HTML 双栏对比页消费。
 
-设计边界（对应 plan-advanced-analysis.md §2 风险）：
+设计边界（对应 technical.md §4.13 调仓 What-if 模拟 — 设计边界）：
   - **成本口径**：candidate 持仓没有市场历史，无法取实时市值/净值，
     所有指标（权重/集中度）均基于 成本 = 份额 × 每份成本 计算，纯结构层、
     零网络请求（"只能做截面比较"）。

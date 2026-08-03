@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：0.9.11
+> 文档版本：0.9.12-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -18,8 +18,8 @@
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 89 | — | 各版本 changelog/plan/review-findings 等（85 md + 3 py + 1 txt） |
-| ├ plan/ | 中间设计文件 | 5 | — | 当前迭代中的设计方案 |
+| ├ archive/ | 版本归档 | 92 | — | 各版本 changelog/plan/review-findings 等（88 md + 3 py + 1 txt） |
+| ├ plan/ | 中间设计文件 | 1 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -608,11 +608,7 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
-│   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
-│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（业绩归因设计）
-│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
-│   │   ├── plan-whatif-backtest.md     #     调仓 What-if 指定生效日时序回测设计
-│   │   └── plan-11-dark-mode-plan.md   #     plan-11 HTML 暗色模式实施计划（已归档）
+│   │   └── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
@@ -726,6 +722,8 @@ investor-util/
 │   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（设计文档索引）
 │   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x（0.9.0 ~ 0.9.8）
 │   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x
+│   │   │   ├── abandoned-design/               #   已放弃设计决策归档区（plan-4 业绩归因）
+│   │   │   │   └── plan-4-brinson-attribution-abandoned.md # plan-4 业绩归因（Brinson）放弃设计
 │   │   │   ├── chartjs-upgrade/               #   交互式 HTML 报告升级设计（8 迭代）
 │   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案
 │   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析
@@ -740,10 +738,13 @@ investor-util/
 │   │   │   │   └── plan-first-run-wizard-implementation.md # 实施细节
 │   │   │   ├── whatif-simulation/               #   调仓 What-if 模拟设计
 │   │   │   │   └── plan-whatif-simulation.md    #     调仓 What-if 模拟设计
+│   │   │   ├── whatif-backtest/                 #   调仓 What-if 指定生效日时序回测设计
+│   │   │   │   └── plan-whatif-backtest.md      #     调仓 What-if 指定生效日时序回测设计
 │   │   │   ├── portfolio-evolution/             #   多快照趋势追踪/组合演进设计
 │   │   │   │   └── plan-portfolio-evolution.md  #     多快照趋势追踪设计
-│   │   │   ├── dark-mode/                       #   HTML 暗色模式实施归档（plan-11）
-│   │   │   │   └── dark-mode-implementation.md  #     plan-11 暗色模式实施记录
+│   │   │   ├── html-dark-mode/                  #   HTML 暗色模式实施归档（plan-11）
+│   │   │   │   ├── dark-mode-implementation.md  #     plan-11 暗色模式实施记录
+│   │   │   │   └── plan-11-dark-mode-plan.md    #     plan-11 暗色模式实施计划
 │   │   │   ├── fix-deepseek-thinking/           #   DeepSeek thinking 思考耗尽修复设计
 │   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计

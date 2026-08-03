@@ -1,5 +1,8 @@
 # plan-11 HTML 暗色模式
 
+> **📦 已归档**：plan-11（HTML 暗色模式）已于 2026-08-03 完成（v0.9.11 发布）并归档至本目录。
+> 对应实施记录：[`dark-mode-implementation.md`](dark-mode-implementation.md)（同目录）；设计源：`docs-stm/plan/plan-web-ui.md` §4。
+
 ## Context（背景）
 
 HTML 报告目前仅浅色主题，页面级颜色全部硬编码（body `#f0f2f5`、表格、卡片、行状态等），无主题切换。晚间查看报告刺眼，金融工具缺失暗色模式显过时。

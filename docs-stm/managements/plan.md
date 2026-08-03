@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 实现计划
 
-> 文档版本：0.9.11
+> 文档版本：0.9.12-dev
 
 ---
 
@@ -27,7 +27,7 @@
 | ① | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
 | ② | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
 
-> ✅ plan-11 **HTML 暗色模式**已实施完成（v0.9.11），详见 [`archive/v0.9.x/dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/dark-mode/dark-mode-implementation.md)。
+> ✅ plan-11 **HTML 暗色模式**已实施完成（v0.9.11），详见 [`archive/v0.9.x/html-dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/html-dark-mode/dark-mode-implementation.md)。
 > ✅ plan-12 **组合演进纳入报告可选环节配置**已实施完成（v0.9.11）：新增独立开关 `enable_portfolio_evolution`（默认开启），控制 #19 组合演进章节显示/隐藏，与历史走势开关互相独立。
 
 ### P2 — 高级分析（已结项）
@@ -47,7 +47,7 @@
 
 #### ~~`plan-11` HTML 暗色模式~~ — ✅ **已完成（v0.9.11）**
 
-CSS 变量 + localStorage 切换按钮（右上角浮动，首次默认浅色）。实施记录：[`archive/v0.9.x/dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/dark-mode/dark-mode-implementation.md)
+CSS 变量 + localStorage 切换按钮（右上角浮动，首次默认浅色）。实施记录：[`archive/v0.9.x/html-dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/html-dark-mode/dark-mode-implementation.md)
 
 #### ~~`plan-12` 组合演进纳入报告可选环节配置~~ — ✅ **已完成（v0.9.11）**
 

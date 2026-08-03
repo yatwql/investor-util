@@ -4,6 +4,16 @@
 
 ---
 
+## [0.9.12-dev] - 2026-08-03
+
+### Refactor
+
+- **plan 迭代设计文档归档清理** — ① `plan-11-dark-mode-plan.md` 归档至 `archive/v0.9.x/html-dark-mode/`（原 `archive/v0.9.x/dark-mode/` 目录更名 `html-dark-mode/`）；② `plan-whatif-backtest.md` 归档至 `archive/v0.9.x/whatif-backtest/`；③ `plan-advanced-analysis.md` 归档至 `archive/v0.9.x/abandoned-design/` 并更名 `plan-4-brinson-attribution-abandoned.md`（记录放弃设计决策依据——除已放弃的 plan-4 Brinson 归因外均已实现）；④ `plan-engineering.md` 删除（任务均已实现）。外部引用同步（plan.md / plan-web-ui.md / folders.md 目录树与统计）
+- **因子暴露分析设计沉淀至正式文档** — `technical.md` §4.8 因子暴露分析新增「候选因子代理指数」表（6 个 CSI 指数 + probe 实测状态）与「数据新鲜度判定标准」（threshold/stale 双维度 + 5f/3f/infeasible 分级）；`probe-csi-factor-indices.py` 与 `whatif.py` 注释/文档字符串由 archive 路径改引正式文档（technical.md §4.8 / §4.13）
+- **check-doc-traces.py 打磨（文档痕迹检查收口）** — 明确两条核心规则：① 文档正文不得带历史痕迹与历史变更（changelog / plan / review-findings 例外），只反映最新状态；② 除上述三例外文档外，管理/用户文档正文不得引用归档文件（folders.md 目录树可引用 archive 目录及文件名）。归档引用模式收紧——运行时产物归档描述（"归档至 `YYYYMMDD/` 日期子目录"、"归档到 `reports/`"等）豁免；工具说明豁免加固（含"不得/禁止"前缀）；`scripts-reference.md` 同步说明
+
+---
+
 ## [0.9.11] - 2026-08-03
 
 ### Feat

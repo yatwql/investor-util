@@ -44,7 +44,7 @@ if _PROJECT_ROOT not in sys.path:
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s:%(name)s:%(message)s")
 
 # ── 候选 CSI 风格指数 ─────────────────────────────────
-# 来源：plan-advanced-analysis.md §4 因子代理指数表
+# 来源：technical.md §4.8 因子暴露分析 — 候选因子代理指数表
 # sh = 上证（中证指数统一挂上证前缀，与 _A_INDICES 既有 sh000300 一致）
 _CSI_CANDIDATES: list[tuple[str, str]] = [
     ("sh000919", "300 价值"),
@@ -106,7 +106,7 @@ def evaluate(
     threshold: int,
     stale: int,
 ) -> dict[str, Any]:
-    """按 plan-advanced-analysis.md §4.3 + 数据新鲜度判定标准评估可用性。
+    """按 technical.md §4.8 因子暴露分析 — 数据新鲜度判定标准评估可用性。
 
     Args:
         freshness: 代码 → 距今天数（最新数据距今），-1 表示无数据

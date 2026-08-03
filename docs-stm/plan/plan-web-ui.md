@@ -5,7 +5,7 @@
 >
 > **📦 已归档**：plan-9 **首次运行引导**（§2）已于 2026-08-03 完成（v0.9.7 发布），设计/实施文档归档至 [`archive/v0.9.x/first-run-wizard/`](../archive/v0.9.x/first-run-wizard/)（`plan-first-run-wizard.md` + `plan-first-run-wizard-implementation.md`）。
 >
-> **📦 已归档**：plan-11 **HTML 暗色模式**（§4）已于 2026-08-03 实施完成（v0.9.11-dev），设计/实施见 [`archive/v0.9.x/dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/dark-mode/dark-mode-implementation.md)。本文档继续跟踪未完成项 plan-8/10。
+> **📦 已归档**：plan-11 **HTML 暗色模式**（§4）已于 2026-08-03 实施完成（v0.9.11-dev），设计/实施见 [`archive/v0.9.x/html-dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/html-dark-mode/dark-mode-implementation.md)。本文档继续跟踪未完成项 plan-8/10。
 
 ## 目录
 
