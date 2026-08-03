@@ -587,13 +587,10 @@ investor-util/
 │   │   ├── technical.md              #     技术设计文档
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
-│   ├── plan/                         #   中间设计文件（当前迭代中）
+│   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
 │   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
-│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（模拟/趋势）
-│   │   ├── plan-correlation-drawdown.md #     相关性矩阵+回撤+净值曲线计划（plan-2/3）
-│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划
-│   │   ├── plan-fix-deepseek-thinking-exhaustion.md  # DeepSeek thinking 耗尽 max_tokens 修复方案（rf-122）
-│   │   └── plan-fix-qa-concentration-and-chart-optimization.md  # 集中度问答无输出修复 + 穿透 TOP10 柱状图区分/布局优化（rf-150）
+│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（仅保留 plan-4 业绩归因，已放弃）
+│   │   └── plan-web-ui.md              #     轻量 Web UI 计划（plan-8/10/11 未完成项）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
@@ -704,15 +701,29 @@ investor-util/
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
 │   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
 │   │   ├── v0.9.x/                           # v0.9.x 版本归档（changelog/plan/review-findings + 已完成项设计文档）
-│   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（plan-1/plan-7 已完成项 + 设计文档索引）
-│   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x（0.9.0 ~ 0.9.5）
-│   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x（rf-90 ~ rf-144）
+│   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（已完成项 + 设计文档索引）
+│   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x（0.9.0 ~ 0.9.8）
+│   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x（rf-90 ~ rf-159）
 │   │   │   ├── chartjs-upgrade/               #   plan-1 交互式 HTML 报告升级设计（8 迭代）
 │   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案（plan-1）
 │   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析（plan-1）
 │   │   │   │   └── plan-1-iter7-verification-checklist.md # plan-1 Iter 7 浏览器人工验证清单（rf-113）
-│   │   │   └── factor-exposure/                 #   plan-7 因子暴露分析设计（原 plan-advanced-analysis §4）
-│   │   │       └── plan-factor-exposure.md      #     因子暴露分析设计（plan-7）
+│   │   │   ├── factor-exposure/                 #   plan-7 因子暴露分析设计（原 plan-advanced-analysis §4）
+│   │   │   │   └── plan-factor-exposure.md      #     因子暴露分析设计（plan-7）
+│   │   │   ├── correlation-drawdown/            #   plan-2/3 相关性矩阵 + 回撤/净值设计与实施
+│   │   │   │   ├── plan-correlation-drawdown.md #     分析功能基础增强设计（plan-2/3）
+│   │   │   │   └── plan-correlation-drawdown-implementation.md # 实施总纲（plan-2/3）
+│   │   │   ├── first-run-wizard/                #   plan-9 首次运行引导设计与实施
+│   │   │   │   ├── plan-first-run-wizard.md     #     首次运行引导设计（plan-9）
+│   │   │   │   └── plan-first-run-wizard-implementation.md # 实施细节（plan-9）
+│   │   │   ├── whatif-simulation/               #   plan-5 调仓 What-if 模拟设计
+│   │   │   │   └── plan-whatif-simulation.md    #     调仓 What-if 模拟设计（plan-5）
+│   │   │   ├── portfolio-evolution/             #   plan-6 多快照趋势追踪/组合演进设计
+│   │   │   │   └── plan-portfolio-evolution.md  #     多快照趋势追踪设计（plan-6）
+│   │   │   ├── fix-deepseek-thinking/           #   rf-122 DeepSeek thinking 思考耗尽修复设计
+│   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案（rf-122）
+│   │   │   └── qa-concentration-chart-optimization/ # rf-150 集中度问答 + 穿透柱状图优化修复设计
+│   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复（rf-150）
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

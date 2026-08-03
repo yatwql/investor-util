@@ -1931,7 +1931,7 @@ report/ 渲染                      # Excel 页签 + HTML 章节（模板 contex
 
 双持仓（基准 base / 目标 candidate）**成本口径截面比较**，输出 diff 报告（`analysis/whatif.py` 计算 → `report/whatif_writer.py` 输出 Excel + HTML 独立报告）。
 
-**设计边界（plan-advanced-analysis.md §2 风险）**：
+**设计边界（[`plan-whatif-simulation.md`](../archive/v0.9.x/whatif-simulation/plan-whatif-simulation.md) §1 风险）**：
 - **成本口径**：candidate 无市场历史，无法取实时市值/净值，所有指标（权重/集中度）基于 `成本 = 份额 × 每份成本`，纯结构层、**零网络请求**（"只能做截面比较"）。
 - **不可回测**：What-if 无真实交易数据，不产出任何回测类结论（夏普/波动率等）。
 

@@ -43,7 +43,7 @@
 
 > **P3** = 预期实施，有空时安排。已完成的 plan-9 / plan-12 已归档（见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)），剩余项按推荐实施顺序排列（见上方总览）。
 
-#### `plan-11` HTML 暗色模式（[`plan-web-ui.md §5`](../plan/plan-web-ui.md#5-html-暗色模式)）— **推荐①**
+#### `plan-11` HTML 暗色模式（[`plan-web-ui.md §4`](../plan/plan-web-ui.md#4-html-暗色模式)）— **推荐①**
 
 CSS 变量 + localStorage 切换按钮。**预估：0.5d**（依赖 plan-1 的 chart-config.js CSS 变量预留）
 

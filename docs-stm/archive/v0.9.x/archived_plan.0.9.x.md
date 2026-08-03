@@ -15,10 +15,17 @@
 - [`plan-chartjs-risk-analysis.md`](chartjs-upgrade/plan-chartjs-risk-analysis.md) — plan-1 风险/收益/架构分析
 - [`plan-1-iter7-verification-checklist.md`](chartjs-upgrade/plan-1-iter7-verification-checklist.md) — plan-1 Iter 7 浏览器人工验证清单（rf-113）
 - [`plan-factor-exposure.md`](factor-exposure/plan-factor-exposure.md) — plan-7 因子暴露分析设计（原 `plan-advanced-analysis.md` §4）
+- [`plan-correlation-drawdown.md`](correlation-drawdown/plan-correlation-drawdown.md) — plan-2/3 分析功能基础增强设计（相关性矩阵 + 回撤/净值）
+- [`plan-correlation-drawdown-implementation.md`](correlation-drawdown/plan-correlation-drawdown-implementation.md) — plan-2/3 实施总纲（原 `plan-implement-2-3-9.md`，按内容拆分后 plan-2/3 部分）
+- [`plan-first-run-wizard.md`](first-run-wizard/plan-first-run-wizard.md) — plan-9 首次运行引导设计（原 `plan-web-ui.md` §2）
+- [`plan-first-run-wizard-implementation.md`](first-run-wizard/plan-first-run-wizard-implementation.md) — plan-9 首次运行引导实施细节（原 `plan-implement-2-3-9.md` §4）
+- [`plan-whatif-simulation.md`](whatif-simulation/plan-whatif-simulation.md) — plan-5 调仓 What-if 模拟设计（原 `plan-advanced-analysis.md` §2）
+- [`plan-portfolio-evolution.md`](portfolio-evolution/plan-portfolio-evolution.md) — plan-6 多快照趋势追踪/组合演进设计（原 `plan-advanced-analysis.md` §3）
+- [`plan-fix-deepseek-thinking-exhaustion.md`](fix-deepseek-thinking/plan-fix-deepseek-thinking-exhaustion.md) — rf-122 DeepSeek thinking 思考耗尽修复设计
+- [`plan-fix-qa-concentration-and-chart-optimization.md`](qa-concentration-chart-optimization/plan-fix-qa-concentration-and-chart-optimization.md) — rf-150 集中度问答输出 + 穿透柱状图区分/布局优化修复设计
 
-> 已完成项（plan-2/3/5/6/9/12）设计文档仍保留在 `docs-stm/plan/`（本批仅迁移 plan.md 记录，设计文档待后续统一归档）：`plan-correlation-drawdown.md`（plan-2/3）、`plan-advanced-analysis.md`（plan-4 已放弃 + plan-5/6）、`plan-web-ui.md`（plan-8/9/10/11）。
-> 未完成项（plan-8/10/11）设计文档亦保留在 `docs-stm/plan/`：`plan-web-ui.md`、`plan-engineering.md`、`plan-fix-deepseek-thinking-exhaustion.md`。
-> 完成但仍处开发版本（v0.9.9-dev）的修复项设计文档亦保留在 `docs-stm/plan/`（不归档）：`plan-fix-qa-concentration-and-chart-optimization.md`（rf-150，当前迭代修复项，release 后随版本归档）。
+> 已完成项设计文档均已归档至本目录（2026-08-03）：plan-2/3（`correlation-drawdown/`）、plan-9（`first-run-wizard/`）、plan-5（`whatif-simulation/`）、plan-6（`portfolio-evolution/`）、rf-122（`fix-deepseek-thinking/`）、rf-150（`qa-concentration-chart-optimization/`）。plan-12（TOC）无独立设计文档（直接实现），不涉及归档。
+> 未完成项（plan-4 已放弃 / plan-8/10/11）设计文档保留在 `docs-stm/plan/`：`plan-advanced-analysis.md`（仅 plan-4 已放弃）、`plan-web-ui.md`（plan-8/10/11）、`plan-engineering.md`（rf-1 已随 v0.8.x 归档，文件为 stub）。
 
 ## v0.9.x 已完成项
 
@@ -37,5 +44,6 @@
 
 - plan-1 三个设计文档（实施方案/风险分析/验证清单）2026-08-02 由 `docs-stm/plan/` 移入本目录 `chartjs-upgrade/`。
 - plan-7 设计内容为原 `docs-stm/plan/plan-advanced-analysis.md` §4，2026-08-02 抽取为独立文件移入本目录 `factor-exposure/`；`plan-advanced-analysis.md` 已同步裁剪（保留 plan-4/5/6 内容）。
-- 2026-08-03 追加归档已完成项记录（迁移自 `plan.md`）：plan-2/3/9/12（v0.9.7 发布）、plan-5/6（v0.9.8 发布）；对应设计文档仍保留在 `docs-stm/plan/`。
+- 2026-08-03 追加归档已完成项记录（迁移自 `plan.md`）：plan-2/3/9/12（v0.9.7 发布）、plan-5/6（v0.9.8 发布）。
+- 2026-08-03 完成项设计文档统一归档至本目录（目录名与内容相关、混合内容按任务拆分）：plan-2/3 → `correlation-drawdown/`（设计 + 实施总纲，原 `plan-implement-2-3-9.md` 按内容拆分）、plan-9 → `first-run-wizard/`、plan-5 → `whatif-simulation/`、plan-6 → `portfolio-evolution/`、rf-122 → `fix-deepseek-thinking/`、rf-150 → `qa-concentration-chart-optimization/`；`docs-stm/plan/` 仅保留未完成项（plan-4 已放弃 / plan-8/10/11）设计文档。
 - 版本号：本归档涵盖已发布版本 v0.9.0 ~ v0.9.8（当前开发版本 v0.9.9-dev，归档时点为 2026-08-03），归档目录按版本段命名 v0.9.x。

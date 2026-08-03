@@ -1,14 +1,16 @@
-# 实施 plan-2 / plan-3 / plan-9（总体架构视角）
+# 分析功能基础增强实施总纲：相关性矩阵 + 最大回撤（plan-2 / plan-3）
+
+> **📦 已归档**：plan-2/plan-3 实施细节已于 2026-08-03 完成（v0.9.7 发布）并归档至本目录，与设计文档 `plan-correlation-drawdown.md` 同目录。
+> 原计划：`docs-stm/plan/plan-implement-2-3-9.md`（该实施总纲已按内容拆分：plan-2/3 归入本目录，plan-9 归入 `first-run-wizard/`）。
 
 ## Context（背景）
 
-已完成「HTML 报告每个章节底部回到顶部链接」（上一任务）。本任务实施 `docs-stm/managements/plan.md` 中的三个待办：
+已完成「HTML 报告每个章节底部回到顶部链接」（上一任务）。本任务实施 `docs-stm/managements/plan.md` 中的两个待办：
 
 - **plan-2 持仓相关性矩阵** — 新增报告模块，计算各品种间收益率相关系数热力图，识别"伪分散"
 - **plan-3 最大回撤 + 净值曲线增强** — 在既有 `drawdown_analysis` 模块（type=history）内新增回撤事件/恢复耗时明细
-- **plan-9 首次运行引导** — 首次运行检测缺失资源并交互式引导
 
-实施必须从**整体技术架构**出发，遵循 `technical.md` 的 `## 架构设计约束`（C1~C19 表格）与 `## 概要设计--核心架构决策`（1.4.1~1.4.5）。**plan-7 因子暴露（factor_exposure）是本次三任务的架构模板**——它已完整走通「analysis 纯计算 → orchestrator 编排 → C7 注册 → C19 pipeline_data → HTML/Excel 双层可见性 → 降级治理」全链路，新模块按同一范式接入。
+实施必须从**整体技术架构**出发，遵循 `technical.md` 的 `## 架构设计约束`（C1~C19 表格）与 `## 概要设计--核心架构决策`（1.4.1~1.4.5）。**plan-7 因子暴露（factor_exposure）是本次任务的架构模板**——它已完整走通「analysis 纯计算 → orchestrator 编排 → C7 注册 → C19 pipeline_data → HTML/Excel 双层可见性 → 降级治理」全链路，新模块按同一范式接入。
 
 ---
 
@@ -137,30 +139,6 @@ C19 契约（进入 technical.md 附录 H）：
 
 ---
 
-## plan-9 首次运行引导
-
-### 4.1 新建 `src/python/startup_wizard.py`（镜像 `report/privacy_notice.py` 范式）
-
-- 配置标记键 `_startup_wizard_shown`（同 `_privacy_notice_shown`），`is_first_run()` / `mark_wizard_shown()` / `show_startup_wizard_if_needed()`
-- 检测函数 `_detect_startup_state(config)` → dict：`holdings_ok`（`holdings_dir` 下存在 xlsx，经 `reader.list_xlsx_files`）、`llm_key_ok`（`llm_key.json` 存在 **或** `llm_providers.json` 有 providers，读取复用 `_load_llm_providers`/`get_llm_config`）、`llm_degraded`（provider=claude 但无 key）
-- 交互式引导流程（TUI 内执行，仿隐私提示边框）：
-  ```
-  config.json → init_config 已自动创建，无需处理（打印提示即可）
-  ├── llm_key.json 缺失 → 提示 跳过/输入 Key（输入则经 _atomic_write 原子写 flat llm_key.json：provider/api_key/model/endpoint，C3）
-  ├── holdings/ 为空 → 提示放置持仓文件（引导到 how-to-start.md 持仓格式章节）
-  ├── LLM=claude 无 key → 降级提示（报告对应页签将显示占位）
-  └── 全部就绪 → 打印 "一切就绪，开始生成报告！"
-  ```
-- **非交互检测**：`sys.stdin.isatty()` 为 False、环境变量 `CI`/`NON_INTERACTIVE` 存在、或 CLI 传 `--non-interactive` → **跳过交互**，仅日志记录，不阻塞（设计文档风险项）
-
-### 4.2 接线
-
-- `tui/tui.py` `main()`（L143 隐私提示旁）：`show_startup_wizard_if_needed()` 包 try/except
-- `cli/cli.py`：`_build_parser`（L31）新增 `--non-interactive` 参数；`main()`（L326）`init_config` 后按 `args.non_interactive` 调 `show_startup_wizard_if_needed()`
-- 现有 `tui_menu.print_header()`（L85）"首次使用指引" 保留（非阻塞提示），两者不冲突
-
----
-
 ## 测试计划
 
 > 全部新测试**必须标注 marker**（conftest 已注册）；edge 用例放 `*_edge.py`；LLM/网络调用全 mock；pipeline 测试重定向 output_dir 到 tmp。
@@ -176,7 +154,6 @@ C19 契约（进入 technical.md 附录 H）：
 | `src/test/unit/analysis/test_drawdown_events.py` | `[unit, unit_analysis]` | 峰谷恢复提取、区间合并、恢复耗时 |
 | `src/test/unit/analysis/test_drawdown_events_edge.py` | `[unit, unit_analysis, edge]` | 全程无恢复、<60 日、平缓序列 |
 | `src/test/unit/report/test_drawdown_html_excel.py` | `[unit, unit_report]` | 回撤明细表 HTML/Excel 渲染、数据不足占位 |
-| `src/test/unit/startup/test_startup_wizard.py` | `[unit, unit_ui]` | 状态检测、首次标记、交互 mock、非交互跳过 |
 
 ### 更新既有断言
 - `test_registry.py` L250 `len==19` → **20**；新增 correlation 注册测试
@@ -188,11 +165,11 @@ C19 契约（进入 technical.md 附录 H）：
 
 ## 文档维护（CLAUDE.md 强制项）
 
-- `docs-stm/managements/plan.md`：plan-2/3/9 标记完成
+- `docs-stm/managements/plan.md`：plan-2/3 标记完成
 - `technical.md`：附录 H 补 `correlation_data` C19 契约 + history_data 嵌套字段（drawdown_events/recovery_times/drawdown_available）；新增 §4.x 相关性矩阵章节
-- `folders.md`：目录树新增 `analysis/correlation.py`、`analysis/drawdown_events.py`、`report/correlation_sheet.py`、`startup_wizard.py` 及 9 个测试文件
+- `folders.md`：目录树新增 `analysis/correlation.py`、`analysis/drawdown_events.py`、`report/correlation_sheet.py` 及 8 个测试文件
 - `testplan.md` / `test-coverage.md`：登记新测试项
-- `changelog.md`：`[0.9.7-dev]` 下 3 条 `### Feat` 条目（相关性矩阵 / 回撤明细 / 首次运行引导）
+- `changelog.md`：`[0.9.7-dev]` 下 2 条 `### Feat` 条目（相关性矩阵 / 回撤明细）
 - 新测试 marker 无需新增（沿用 unit_analysis/unit_report/unit_ui/scenario_basic/edge）
 
 ---
@@ -206,4 +183,4 @@ C19 契约（进入 technical.md 附录 H）：
 5. `ruff format --check`（非阻塞，可 `ruff format` 自动修复）
 
 ## 实施顺序
-plan-2 → plan-3 → plan-9（每完成一个跑一次相关单测）→ 全量文档 → P0 门禁
+plan-2 → plan-3（每完成一个跑一次相关单测）→ 全量文档 → P0 门禁
