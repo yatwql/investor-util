@@ -20,7 +20,7 @@
 
 ### 推荐实施顺序
 
-> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~③ 为推荐先后；括号内为计划项原有优先级归类（P3=预期实施）。plan-4 已放弃，不列入实施序列；已完成的 plan-1/2/3/5/6/7/9/12 已归档，见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)。
+> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~③ 为推荐先后；括号内为计划项原有优先级归类（P3=预期实施）。plan-4 已放弃，不列入实施序列；
 
 | 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
 |:--:|:--|:--:|:--:|:--|
@@ -28,12 +28,8 @@
 | ② | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
 | ③ | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
 
-### P2 — 下一阶段就绪
+### P2 — 高级分析（已结项）
 
-> **plan-2 / plan-3 / plan-5 / plan-6 均已完成并归档**（详见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)），plan-4 已放弃，P2 组当前无待办。
-> **前置状态**：rf-1 批量并行已落地（v0.8.x），plan-2 全品种历史获取依赖已解除；plan-3 的 `drawdown_analysis` 模块 C7 注册已完成；plan-1 交互式 HTML 图表框架已就绪（chartjs-upgrade 归档见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)）。
-
-#### 高级分析功能（[`plan-advanced-analysis.md`](../plan/plan-advanced-analysis.md)）— **plan-4（已放弃）**
 
 | # | 项目 | 内容 | 工作量 | 状态 |
 |:-:|:-----|:-----|:------:|:----:|
@@ -41,7 +37,7 @@
 
 ### P3 — 用户体验改进
 
-> **P3** = 预期实施，有空时安排。已完成的 plan-9 / plan-12 已归档（见 [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md)），剩余项按推荐实施顺序排列（见上方总览）。
+> **P3** = 预期实施，有空时安排。待办项按推荐实施顺序排列（见上方总览）。
 
 #### `plan-11` HTML 暗色模式（[`plan-web-ui.md §4`](../plan/plan-web-ui.md#4-html-暗色模式)）— **推荐①**
 
@@ -63,15 +59,13 @@ Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做�
 
 ### P4 — 实验功能
 
-> 实验性功能，缺省关闭，需通过配置项或 features.json 显式启用。启用不影响现有功能稳定性。
-
-（待排期）
+> 实验性功能，缺省关闭，需通过配置项或 features.json 显式启用。启用不影响现有功能稳定性。当前无排期项。
 
 ---
 
 ## 归档
 
-- [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（plan-1/2/3/5/6/7/9/12，含设计文档索引）
+- [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（含设计文档索引）
 - [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)
 - [`archived_plan.0.6.x.md`](../archive/v0.6.x/archived_plan.0.6.x.md)
