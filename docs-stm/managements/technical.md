@@ -2096,6 +2096,7 @@ config.json (基础配置)       → get_config() 内存缓存，按 mtime 自�
 llm_settings.json (非敏感)    → get_llm_config() 合并读取，联合 mtime 失效
 llm_key.json (敏感凭据)       → 覆盖 llm_settings.json 的同名字段；多凭据块供 credentials_ref 引用
 llm_providers.json (链配置)   → _load_llm_providers() 读取，_inject_provider_chain_data 注入
+local_state.json (机器本地)   → get_flag()/set_flag() 读写；config.json 旧键惰性迁移（_migrate_legacy_keys）
 ```
 
 `config/` 子包结构：
@@ -2105,12 +2106,17 @@ config/
 ├── __init__.py                   # 公开 API 导出
 ├── _comments.py                  # JSON 注释剥离（_strip_json_comments）
 ├── _config_defaults.py           # config.json 默认值定义 + 模板生成
-├── _core.py                      # 核心读写：get_config()、set_config()、init_config()
+├── _core.py                      # 核心读写：get_config()、set_config()、del_config()、init_config()
+├── _local_state.py               # 机器本地状态读写（get_flag/set_flag，data/state/local_state.json，含 config.json 旧键惰性迁移）
 ├── _json_patch.py                # JSON 字段级文本替换（_update_json_raw_text/_replace_dict_block）
 ├── _validation.py                # 配置校验：validate_config()、_absolutize_paths()
 ├── _llm_defaults.py              # llm_settings.json 默认模板生成
 └── _llm_providers_defaults.py    # llm_providers.json 默认模板生成
 ```
+
+#### 机器本地状态
+
+`data/state/local_state.json`（git 忽略）存放仅本机有意义的状态标志——首次运行引导（`_startup_wizard_shown`）、隐私提示已读（`_privacy_notice_shown`）。不混入 config.json，避免 config.json 跨机器同步时各机器写入个性化差异。`config/_local_state.py` 提供 `get_flag`/`set_flag`；首次读取时经 `_migrate_legacy_keys` 惰性搬移 config.json 中遗留旧键并调用 `del_config()` 删除（基于磁盘文本 span 定位键行、保留注释与邻居键，末位键自动清理残留尾随逗号），local_state 已有值则不覆盖、不误删。
 
 #### JSON 注释支持
 
@@ -2438,7 +2444,7 @@ core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 |:---|:-----|:---------|:---------|:---------|
 | **C11** | **测试标记强制** — 新增/修改的测试用例（测试类或测试方法）必须标注对应的 pytest marker（如 `@pytest.mark.unit_providers`），marker 定义在 `src/test/conftest.py` 的 `pytest_configure` 中 | 未标记的测试用例无法被分层测试命令精确选择，也无法纳入回归/验证门禁范围 | CI 门禁不通过、测试分类失效 | src/test/ 所有测试文件 |
 | **C12** | **边缘测试文件隔离** — `@pytest.mark.edge` 标记的测试用例必须放置在 `*_edge.py` 文件中，不得与普通测试混放在同一文件 | edge 场景测试对运行环境有特殊要求（预期失败、网络不可达等），混放会导致普通测试运行被 edge 场景的 fixture 干扰 | 测试收集失败、`pytest_collection_modifyitems` 校验报错 | src/test/ 边缘测试文件 |
-| **C13** | **测试敏感路径隔离** — 运行测试时不得修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据；`conftest.py` 的 `_isolate_sensitive_paths` autouse fixture 会自动将 `config.json` 和缓存目录重定向到临时目录 | 测试污染用户数据导致不可逆的配置丢失或持仓文件损坏 | 用户数据被污染、配置丢失 | src/test/ 所有测试用例 |
+| **C13** | **测试敏感路径隔离** — 运行测试时不得修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）、机器本地状态（`data/state/`）等敏感数据；`conftest.py` 的 `_isolate_sensitive_paths` autouse fixture 会自动将 `config.json`、`local_state.json`、缓存目录等重定向到临时目录 | 测试污染用户数据导致不可逆的配置丢失或持仓文件损坏 | 用户数据被污染、配置丢失 | src/test/ 所有测试用例 |
 
 [↑ 回到顶部](#目录)
 

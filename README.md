@@ -115,6 +115,7 @@ python -m src.python.cli cache --stats
 
 - **匿名化 4 模式** — TUI 菜单 `[A]` 切换：off（关闭）/ code_display（代码可见，名称脱敏）/ full_anonymous（完全匿名）/ summary（仅展示汇总数据），持久化到配置
 - **隐私提示脚注** — Excel 报告所有页签底部添加匿名化状态说明行，告知数据脱敏级别
+- **机器本地状态隔离** — 首次运行引导/隐私提示"已读"标志存于 `data/state/local_state.json`（仅本机、git 忽略），不写入 config.json，多机同步项目时 config.json 保持一致，各机器个性化状态互不干扰
 - **缓存审查** — `cache.clean_sensitive()` 可清理含敏感持仓名称的缓存条目
 - **安全测试覆盖** — 缓存目录穿越、配置注入、LLM 凭据泄露、路径遍历等安全场景测试
 
