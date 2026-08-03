@@ -73,6 +73,7 @@ from src.python.config._core import (
     is_enable_llm,
     is_enable_news,
     set_config,
+    del_config,
 )
 
 # ── 默认模板（llm_settings.json）──
@@ -93,6 +94,7 @@ __all__ = [
     # 核心逻辑
     "get_config",
     "set_config",
+    "del_config",
     "init_config",
     "set_config_path_override",
     "invalidate_config_cache",

@@ -130,6 +130,5 @@
     "eastmoney": 0.1,  // 东方财富行情（100ms）
     "tiantian": 0.5,  // 天天基金（500ms）
     "eastmoney_industry": 0.05  // 东方财富行业（50ms）
-  },
-  "_privacy_notice_shown": true
+  }
 }

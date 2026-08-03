@@ -10,6 +10,14 @@
 
 （开发中）
 
+### Refactor
+
+- **首次运行引导/隐私声明已读标志迁移至机器本地状态（config.json 去个性化）** — `_startup_wizard_shown`、`_privacy_notice_shown` 自 `data/config/config.json` 迁移至 `data/state/local_state.json`（git 忽略的机器本地目录），避免 config.json 跨机同步时各机器个性化差异。新增 `config/_local_state.py`（`get_flag`/`set_flag`/`_migrate_legacy_keys` 惰性迁移）与 `del_config()` 删键能力（磁盘文本 span 定位删除键行 + 末位成员尾随逗号清理，保留注释）；startup_wizard/privacy_notice/tui_menu 三处调用点改读 local_state
+
+### Test
+
+- 新增 `test_local_state.py`（标志读写 + 旧键惰性迁移 9 例）、`test_config.py` 增 `TestDelConfig`（删键 5 例，含末位键尾随逗号清理）；conftest `_isolate_sensitive_paths` 隔离 `local_state.json` 路径；修正 `test_menu_key_coverage` 期望键集合补 `W`（调仓 What-if 菜单）
+
 ---
 
 ## 归档

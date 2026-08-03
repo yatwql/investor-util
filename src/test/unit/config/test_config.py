@@ -440,6 +440,63 @@ class TestSetConfigSingleKeyPatch(unittest.TestCase):
         self.assertTrue(data["_privacy_notice_shown"])
 
 
+class TestDelConfig(unittest.TestCase):
+    """del_config 单键删除：保留注释分组、删中间键/末键、键不存在静默。"""
+
+    def setUp(self):
+        self._orig_config = cfg._config_defaults._CONFIG_FILE
+        self.tmp = tempfile.TemporaryDirectory()
+        cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
+        cfg.init_config()
+
+    def tearDown(self):
+        cfg._config_defaults._CONFIG_FILE = self._orig_config
+        self.tmp.cleanup()
+
+    def _read_disk(self) -> str:
+        with open(cfg._config_defaults._CONFIG_FILE, encoding="utf-8") as f:
+            return f.read()
+
+    def test_del_existing_key_removes(self):
+        """删除已有键 → 键消失，文件仍为合法 JSON。"""
+        cfg.set_config("custom_key", 123)
+        cfg.del_config("custom_key")
+        data = json.loads(_comments._strip_json_comments(self._read_disk()))
+        self.assertNotIn("custom_key", data)
+
+    def test_del_nonexistent_key_noop(self):
+        """键不存在 → 静默返回，文件不变。"""
+        raw_before = self._read_disk()
+        cfg.del_config("nonexistent_key_xyz")
+        self.assertEqual(self._read_disk(), raw_before)
+
+    def test_del_preserves_comments_and_neighbors(self):
+        """删除后分组注释与相邻键保持完整。"""
+        cfg.set_config("custom_a", 1)
+        cfg.del_config("custom_a")
+        raw = self._read_disk()
+        self.assertIn("// ── A. 路径与文件 ──", raw)
+        data = json.loads(_comments._strip_json_comments(raw))
+        self.assertEqual(data["news_top_count"], 300)
+
+    def test_del_last_key_keeps_valid_json(self):
+        """删除最后一个键（无尾随逗号）→ 清理前一成员尾逗号，JSON 合法。"""
+        cfg.set_config("z_last", True)
+        cfg.del_config("z_last")
+        data = json.loads(_comments._strip_json_comments(self._read_disk()))
+        self.assertNotIn("z_last", data)
+        self.assertIn("risk_free_rate", data)
+
+    def test_del_middle_key_keeps_neighbors(self):
+        """删除中间键（值后带逗号）→ 后续键保留。"""
+        cfg.set_config("m1", 1)
+        cfg.set_config("m2", 2)
+        cfg.del_config("m1")
+        data = json.loads(_comments._strip_json_comments(self._read_disk()))
+        self.assertNotIn("m1", data)
+        self.assertEqual(data["m2"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -53,6 +53,7 @@ investor-util/
 │   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
 │   │   │   ├── _llm_providers.py     #   LLM 提供程序配置解析
 │   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义
+│   │   │   ├── _local_state.py       #   机器本地状态标志读写（首次引导/隐私已读，存 data/state/local_state.json，含 config.json 旧键惰性迁移）
 │   │   │   ├── _validation.py        #   配置校验函数集
 │   │   │   ├── anonymizer.py         #   匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
 │   │   │   └── features.py           #   Feature Flag 注册中心（开关集中管理，含默认值与运行时控制，持久化到 data/config/features.json）
@@ -321,7 +322,8 @@ investor-util/
 │       │   │   ├── test_config_firstrun_edge.py #   首次运行配置边缘场景
 │       │   │   ├── test_config_llm_multi.py      #   LLM 多配置测试
 │       │   │   ├── test_config_llm_multi_edge.py #   LLM 多配置边缘场景
-│       │   │   └── test_config_validation.py     #   配置校验函数测试
+│       │   │   ├── test_config_validation.py     #   配置校验函数测试
+│       │   │   └── test_local_state.py           #   机器本地状态读写与旧键迁移测试
 │       │   ├── core/                #   核心模块单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_cache_core.py       #   缓存核心功能测试（含 TTL/目录/常量）
@@ -552,7 +554,7 @@ investor-util/
 │   ├── calibration/                  #   校准数据（dedup_anchors.jsonl，自动生成）
 │   ├── cache/                        #   API 响应缓存（自动生成，JSON/GZ）
 │   ├── config/                       #   配置文件（config.json / features.json / llm_key.json / llm_settings.json / llm_providers.json）
-│   ├── state/                        #   运行时状态文件（.degradation_state.json / circuit_breaker.json，自动生成）
+│   ├── state/                        #   运行时状态文件（.degradation_state.json / circuit_breaker.json / local_state.json 等，自动生成，机器本地不随仓库同步）
 │   └── history/snapshots/            #   持仓快照（自动生成，保留 60 天）
 │
 ├── reports/                          # 报告输出（最新版 + 按日期归档）

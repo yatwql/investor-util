@@ -148,6 +148,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.analysis.rebalance._SILENCE_FILE",
         str(tmp_path / "data/state/rebalance_silence.json"),
     )
+    # local_state.json 机器本地状态隔离（首次运行引导/隐私提示已读标志等）
+    monkeypatch.setattr(
+        "src.python.config._local_state._LOCAL_STATE_FILE",
+        str(tmp_path / "data/state/local_state.json"),
+    )
     # perf_history.jsonl 性能历史文件隔离
     monkeypatch.setattr(
         "src.python.core.perf._PERF_HISTORY_FILE",

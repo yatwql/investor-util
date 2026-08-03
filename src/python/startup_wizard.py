@@ -22,9 +22,11 @@ import logging
 import os
 import sys
 
+from src.python.config._local_state import get_flag, set_flag
+
 logger = logging.getLogger("invest")
 
-# 首次运行标记的配置键（同 _privacy_notice_shown 范式）
+# 首次运行标记键（存于 data/state/local_state.json，机器本地状态）
 _FIRST_RUN_KEY = "_startup_wizard_shown"
 
 # 引导边框宽度（仿隐私提示边框）
@@ -41,10 +43,7 @@ def is_first_run() -> bool:
         True 表示首次运行
     """
     try:
-        from src.python.config import get_config
-
-        config = get_config()
-        return not config.get(_FIRST_RUN_KEY, False)
+        return not get_flag(_FIRST_RUN_KEY)
     except Exception:
         return True
 
@@ -52,11 +51,8 @@ def is_first_run() -> bool:
 def mark_wizard_shown() -> None:
     """标记引导已显示，避免重复提示。"""
     try:
-        from src.python.config import get_config, set_config
-
-        config = get_config()
-        if not config.get(_FIRST_RUN_KEY, False):
-            set_config(_FIRST_RUN_KEY, True)
+        if not get_flag(_FIRST_RUN_KEY):
+            set_flag(_FIRST_RUN_KEY, True)
             logger.info("[startup-wizard] 首次运行引导已标记为已读")
     except Exception:
         logger.debug("[startup-wizard] 标记引导失败（非关键）", exc_info=True)

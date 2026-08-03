@@ -138,8 +138,10 @@ def _show_privacy_and_security_status() -> None:
     _anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
     _anon_display = _anon_labels.get(_anon_mode, _anon_mode)
 
-    # 检查隐私提示是否已显示过
-    _privacy_shown = _cfg.get("_privacy_notice_shown", False)
+    # 检查隐私提示是否已显示过（机器本地状态）
+    from src.python.config._local_state import get_flag
+
+    _privacy_shown = get_flag("_privacy_notice_shown")
     _privacy_icon = f"{GREEN}✓{RESET}" if _privacy_shown else f"{YELLOW}待首次报告生成时显示{RESET}"
 
     print(f"  持仓匿名化: {_anon_display}")
