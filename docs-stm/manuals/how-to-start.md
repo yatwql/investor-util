@@ -65,6 +65,9 @@ python -m src.python.cli cache --update all
 # 查看缓存状态
 python -m src.python.cli cache --stats
 
+# 调仓 What-if 模拟（对比两份持仓，生成独立 diff 报告）
+python -m src.python.cli whatif --base data/holdings/调仓前.xlsx --candidate data/holdings/调仓后.xlsx
+
 # 详细模式（终端显示彩色进度前缀）
 python -m src.python.cli --verbose report --type basic
 ```
@@ -99,6 +102,15 @@ python -m src.python.cli --verbose report --type basic
 | `--clean` | 按 TTL 删除过期缓存文件 |
 | `--stats` | 查看缓存状态统计（文件数、总大小、过期文件预览等） |
 
+**`whatif` 子命令**（调仓 What-if 模拟，独立报告）：
+
+| 参数 | 说明 |
+|:-----|:-----|
+| `--base PATH` | 基准持仓文件（调仓前）。缺省使用 `config.json` 的 `holdings_dir` + `holdings_filename` |
+| `--candidate PATH` | 目标持仓文件（调仓后/假设），**必填** |
+
+对比两份持仓生成独立调仓 diff 报告（Excel 3 页签 + HTML 双栏对比页），产物命名 `调仓模拟_{时间戳}` 输出到报告输出目录。全程本地计算、零网络请求，不并入主报告管线。
+
 **使用示例**：
 
 ```bash
@@ -110,6 +122,12 @@ python -m src.python.cli --output D:/my_reports report --type basic
 
 # 使用自定义配置文件
 python -m src.python.cli --config D:/config/my_config.json cache --stats
+
+# 调仓 What-if：基准用配置默认持仓，目标指定另一份文件
+python -m src.python.cli whatif --candidate D:/holdings/调仓方案.xlsx
+
+# 调仓 What-if：显式指定两份持仓
+python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx
 ```
 
 **数据源健康检查**（直接通过主程序运行，无需 TUI 界面）：
@@ -163,6 +181,7 @@ python -m src.python.cli check-sources
   > [E] 生成基础版Excel分析报告
     [B] 生成标准报告(Excel+HTML) [按章节配置]
     [L] 生成完整报告(Excel+HTML) [含LLM，按章节配置]
+    [W] 调仓 What-if 模拟（对比两份持仓，独立报告）
     [C] 配置持仓信息目录    [F] 配置持仓信息文件名
     [O] 配置报告输出目录
     [1] 更新基础类缓存        [2] 更新行情类缓存
@@ -183,6 +202,8 @@ python -m src.python.cli check-sources
 | LLM 全模块分析 | — | — | ☆ |
 
 > ☆ 表示受章节可见性配置控制。各菜单的详细说明参见 [菜单操作手册](how-to-menu.md)。
+>
+> **W（调仓 What-if 模拟）** 不在此表中：它对比两份持仓生成独立 diff 报告（Excel + HTML），不并入主报告管线。
 
 > 建议首次使用直接按 **L** 生成全量报告。
 

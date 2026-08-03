@@ -22,6 +22,7 @@
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（因子暴露分析前置决策闸门） |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本 |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
+| `whatif` | 诊断 | cli.py 子命令：调仓 What-if 模拟（对比两份持仓生成独立 diff 报告，见 [快速开始](how-to-start.md)） |
 
 ---
 
